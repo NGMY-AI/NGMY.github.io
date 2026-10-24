@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'ngmy_studio_kit.dart';
 
@@ -13,6 +14,25 @@ import 'ngmy_studio_kit.dart';
 
 /// What we say about each part.
 const Map<String, (String, String)> kBodyFacts = {
+  'Adrenal glands': ('Hormones', 'Two small glands on top of the kidneys. They make adrenaline, the hormone that gets you ready to run or fight.'),
+  'Pituitary gland': ('Hormones', 'A pea-sized gland under the brain. It is the "master gland" that tells your other glands what to do.'),
+  'Thymus': ('Defence', 'A small gland behind the breastbone where young white blood cells learn to fight germs. It is biggest in children.'),
+  'Tongue': ('Senses', 'A strong muscle covered in about 10,000 taste buds. It helps you taste, chew, swallow and talk.'),
+  'Voice box': ('Breathing', 'The larynx holds your vocal cords. Air makes them buzz, and your mouth shapes the buzz into words. The epiglottis is a flap that stops food going down your windpipe.'),
+  'Spinal discs': ('Frame', 'Soft, spongy cushions between your vertebrae. They absorb shocks when you walk and jump. You are slightly taller in the morning because the discs fill up with water at night.'),
+  'Teeth': ('Digestion', 'Adults have 32 teeth. The outside, called enamel, is the hardest substance in your body.'),
+  'Back muscles': ('Movement', 'Many layers of muscles along your spine keep you standing tall and let you bend and twist.'),
+  'Chest wall muscles': ('Breathing', 'Muscles between your ribs lift the rib cage to help you breathe in and out.'),
+  'Face muscles': ('Movement', 'You have over 40 muscles in your face. A smile uses about 12 of them. Others move your eyes and jaw.'),
+  'Foot muscles': ('Movement', 'Small muscles in your feet curl your toes and hold up the arch of your foot.'),
+  'Hip muscles': ('Movement', 'These lift your leg forward when you walk and keep your hips steady.'),
+  'Inner thigh muscles': ('Movement', 'They pull your legs together and help you balance.'),
+  'Pelvic floor': ('Movement', 'A sling of muscles at the bottom of your pelvis that holds up the organs above it.'),
+  'Rotator cuff': ('Movement', 'Four small muscles that hold your arm bone in your shoulder socket and let you rotate your arm.'),
+  'Arteries': ('Blood', 'Strong tubes carrying fresh, oxygen-rich blood away from the heart to every part of you.'),
+  'Veins': ('Blood', 'Tubes that bring used blood back to the heart. Tiny valves inside stop the blood flowing backwards.'),
+  'Heart vessels': ('Blood', 'The coronary arteries and veins feed the heart muscle itself. The heart needs its own supply of blood to keep beating.'),
+  'Skin': ('Cover', 'Your biggest organ. It keeps water in and germs out, and sheds about 30,000 dead cells every minute.'),
   // Skin
   'Head': ('Skin', 'Your head holds your brain, eyes, ears, nose and mouth. It weighs about 5 kg, as much as a bag of sugar.'),
   'Hair': ('Skin', 'You have about 100,000 hairs on your head. Each grows about a centimetre a month.'),
@@ -98,16 +118,6 @@ const List<(String, String, IconData)> kBodyLayers = [
 class BodyP3 {
   const BodyP3(this.x, this.y, this.z);
   final double x, y, z;
-  BodyP3 operator +(BodyP3 o) => BodyP3(x + o.x, y + o.y, z + o.z);
-  BodyP3 operator -(BodyP3 o) => BodyP3(x - o.x, y - o.y, z - o.z);
-  BodyP3 operator *(double k) => BodyP3(x * k, y * k, z * k);
-  double get len => math.sqrt(x * x + y * y + z * z);
-  BodyP3 get unit {
-    final l = len;
-    return l < 1e-9 ? const BodyP3(0, 1, 0) : BodyP3(x / l, y / l, z / l);
-  }
-
-  BodyP3 cross(BodyP3 o) => BodyP3(y * o.z - z * o.y, z * o.x - x * o.z, x * o.y - y * o.x);
 }
 
 class BodyPart {
@@ -121,467 +131,104 @@ class BodyPart {
   BodyP3 center = const BodyP3(0, 0, 0);
 }
 
-/// All the shapes of the body, built once.
+/// The real human anatomy (BodyParts3D), read from the bundled file.
 class _BodyModel {
-  final List<double> pos = [];
-  final List<double> nrm = [];
-  final List<int> tris = [];
-  final List<int> vPart = [];
-  final List<BodyPart> parts = [];
-  late BodyPart _cur;
+  _BodyModel(this.pos, this.nrm, this.tris, this.vPart, this.parts);
+  final Float32List pos;
+  final Float32List nrm;
+  final Int32List tris;
+  final Int32List vPart;
+  final List<BodyPart> parts;
 
-  void begin(BodyPart p) {
-    _cur = p;
-    p.vStart = pos.length ~/ 3;
-    p.tStart = tris.length ~/ 3;
-    parts.add(p);
-  }
+  static Future<_BodyModel>? _loading;
+  static Future<_BodyModel> load() => _loading ??= _read();
 
-  void end() {
-    _cur.vEnd = pos.length ~/ 3;
-    _cur.tEnd = tris.length ~/ 3;
-    var sx = 0.0, sy = 0.0, sz = 0.0;
-    final n = _cur.vEnd - _cur.vStart;
-    for (var i = _cur.vStart; i < _cur.vEnd; i++) {
-      sx += pos[i * 3];
-      sy += pos[i * 3 + 1];
-      sz += pos[i * 3 + 2];
+  static const _layers = ['skin', 'muscle', 'organ', 'bone', 'vessel'];
+
+  static Future<_BodyModel> _read() async {
+    final raw = await rootBundle.load('assets/data/body3d.bin');
+    final d = ByteData.sublistView(raw);
+    var o = 4; // 'BDY3'
+    final n = d.getUint32(o, Endian.little);
+    o += 4;
+    final heads = <(String, int, int, int, int, int)>[];
+    for (var i = 0; i < n; i++) {
+      final len = d.getUint8(o++);
+      final name = String.fromCharCodes([for (var k = 0; k < len; k++) d.getUint8(o + k)]);
+      o += len;
+      final layer = d.getUint8(o++);
+      final rgb = (d.getUint8(o) << 16) | (d.getUint8(o + 1) << 8) | d.getUint8(o + 2);
+      o += 3;
+      final anim = d.getUint8(o++);
+      final nv = d.getUint32(o, Endian.little);
+      o += 4;
+      final nt = d.getUint32(o, Endian.little);
+      o += 4;
+      heads.add((name, layer, 0xFF000000 | rgb, anim, nv, nt));
     }
-    if (n > 0) _cur.center = BodyP3(sx / n, sy / n, sz / n);
-  }
-
-  int _v(BodyP3 p, BodyP3 n) {
-    pos..add(p.x)..add(p.y)..add(p.z);
-    nrm..add(n.x)..add(n.y)..add(n.z);
-    vPart.add(parts.length - 1);
-    return pos.length ~/ 3 - 1;
-  }
-
-  void _tri(int a, int b, int c) => tris..add(a)..add(b)..add(c);
-
-  /// An egg-shaped blob. [rot] turns it around the z axis (tilt sideways), [tilt] around x (lean forward).
-  void ellipsoid(double cx, double cy, double cz, double rx, double ry, double rz, {double rot = 0, double tilt = 0, double thMax = math.pi, double bump = 0, int lat = 8, int lon = 12}) {
-    final base = pos.length ~/ 3;
-    final cr = math.cos(rot), sr = math.sin(rot), ct = math.cos(tilt), st = math.sin(tilt);
-    BodyP3 xf(BodyP3 v) {
-      // tilt about x, then rotate about z
-      final y1 = v.y * ct - v.z * st, z1 = v.y * st + v.z * ct;
-      return BodyP3(v.x * cr - y1 * sr, v.x * sr + y1 * cr, z1);
+    var totalV = 0, totalT = 0;
+    for (final h in heads) {
+      totalV += h.$5;
+      totalT += h.$6;
     }
-
-    for (var i = 0; i <= lat; i++) {
-      final th = thMax * i / lat;
-      for (var j = 0; j <= lon; j++) {
-        final ph = 2 * math.pi * j / lon;
-        final wob = bump == 0 ? 1.0 : 1 + bump * math.sin(th * 7) * math.sin(ph * 6 + th * 3);
-        final ux = math.sin(th) * math.cos(ph), uy = math.cos(th), uz = math.sin(th) * math.sin(ph);
-        final p = xf(BodyP3(ux * rx * wob, uy * ry * wob, uz * rz * wob));
-        final n = xf(BodyP3(ux / rx, uy / ry, uz / rz)).unit;
-        _v(BodyP3(cx + p.x, cy + p.y, cz + p.z), n);
+    final pos = Float32List(totalV * 3);
+    final nrm = Float32List(totalV * 3);
+    final tris = Int32List(totalT * 3);
+    final vPart = Int32List(totalV);
+    final parts = <BodyPart>[];
+    var vi = 0, ti = 0;
+    for (var gi = 0; gi < heads.length; gi++) {
+      final h = heads[gi];
+      final p = BodyPart(h.$1, _layers[h.$2], Color(h.$3), anim: h.$4, fixed: h.$1 == 'Hair' || h.$1 == 'Lips' || h.$1 == 'Eyes');
+      p.vStart = vi;
+      p.tStart = ti;
+      for (var k = 0; k < h.$5 * 3; k++) {
+        pos[vi * 3 + k] = d.getInt16(o, Endian.little) / 30000.0;
+        o += 2;
       }
-    }
-    for (var i = 0; i < lat; i++) {
-      for (var j = 0; j < lon; j++) {
-        final a = base + i * (lon + 1) + j, b = a + 1, c = a + lon + 1, d = c + 1;
-        _tri(a, c, b);
-        _tri(b, c, d);
+      for (var k = 0; k < h.$5; k++) {
+        vPart[vi + k] = gi;
       }
-    }
-  }
-
-  /// A tube along a path; radius may change along it.
-  void tube(List<BodyP3> path, List<double> radii, {double flat = 1, int ring = 8, bool caps = true}) {
-    final base = pos.length ~/ 3;
-    final m = path.length;
-    var prevN = const BodyP3(0, 0, 1);
-    for (var k = 0; k < m; k++) {
-      final a = path[math.max(0, k - 1)], b = path[math.min(m - 1, k + 1)];
-      final t = (b - a).unit;
-      var n = t.cross(prevN).cross(t);
-      if (n.len < 1e-6) n = t.cross(const BodyP3(1, 0, 0)).len > 1e-6 ? t.cross(const BodyP3(1, 0, 0)) : t.cross(const BodyP3(0, 0, 1));
-      n = n.unit;
-      prevN = n;
-      final bi = t.cross(n).unit;
-      final r = radii[math.min(k, radii.length - 1)];
-      for (var j = 0; j <= ring; j++) {
-        final ph = 2 * math.pi * j / ring;
-        final dir = n * math.cos(ph) + bi * (math.sin(ph) * flat);
-        _v(path[k] + dir * r, (n * math.cos(ph) + bi * (math.sin(ph) / flat)).unit);
+      for (var k = 0; k < h.$6 * 3; k++) {
+        tris[ti * 3 + k] = vi + d.getUint16(o, Endian.little);
+        o += 2;
       }
-    }
-    for (var k = 0; k < m - 1; k++) {
-      for (var j = 0; j < ring; j++) {
-        final a = base + k * (ring + 1) + j, b = a + 1, c = a + ring + 1, d = c + 1;
-        _tri(a, c, b);
-        _tri(b, c, d);
-      }
-    }
-    if (caps) {
-      for (final end in [0, m - 1]) {
-        final t = ((end == 0 ? path[0] - path[1] : path[m - 1] - path[m - 2])).unit;
-        final cIdx = _v(path[end], t);
-        final r0 = base + end * (ring + 1);
-        for (var j = 0; j < ring; j++) {
-          end == 0 ? _tri(cIdx, r0 + j + 1, r0 + j) : _tri(cIdx, r0 + j, r0 + j + 1);
+      vi += h.$5;
+      ti += h.$6;
+      p.vEnd = vi;
+      p.tEnd = ti;
+      // Smooth shading: every point faces the average of the triangles around it.
+      for (var t = p.tStart; t < p.tEnd; t++) {
+        final a = tris[t * 3] * 3, b = tris[t * 3 + 1] * 3, c = tris[t * 3 + 2] * 3;
+        final ux = pos[b] - pos[a], uy = pos[b + 1] - pos[a + 1], uz = pos[b + 2] - pos[a + 2];
+        final vx = pos[c] - pos[a], vy = pos[c + 1] - pos[a + 1], vz = pos[c + 2] - pos[a + 2];
+        final nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+        for (final q in [a, b, c]) {
+          nrm[q] += nx;
+          nrm[q + 1] += ny;
+          nrm[q + 2] += nz;
         }
       }
-    }
-  }
-
-  /// A smooth body shape made from stacked oval slices: (y, centre x, centre z, radius x, radius z).
-  void loft(List<(double, double, double, double, double)> s, {int ring = 18}) {
-    final base = pos.length ~/ 3;
-    for (final e in s) {
-      for (var j = 0; j <= ring; j++) {
-        final ph = 2 * math.pi * j / ring;
-        final c = math.cos(ph), sn = math.sin(ph);
-        _v(BodyP3(e.$2 + c * e.$4, e.$1, e.$3 + sn * e.$5), BodyP3(c / e.$4, 0.15, sn / e.$5).unit);
+      var sx = 0.0, sy = 0.0, sz = 0.0;
+      for (var k = p.vStart; k < p.vEnd; k++) {
+        final l = math.sqrt(nrm[k * 3] * nrm[k * 3] + nrm[k * 3 + 1] * nrm[k * 3 + 1] + nrm[k * 3 + 2] * nrm[k * 3 + 2]);
+        if (l > 1e-12) {
+          nrm[k * 3] /= l;
+          nrm[k * 3 + 1] /= l;
+          nrm[k * 3 + 2] /= l;
+        } else {
+          nrm[k * 3 + 1] = 1;
+        }
+        sx += pos[k * 3];
+        sy += pos[k * 3 + 1];
+        sz += pos[k * 3 + 2];
       }
+      final cnt = math.max(1, p.vEnd - p.vStart);
+      p.center = BodyP3(sx / cnt, sy / cnt, sz / cnt);
+      parts.add(p);
     }
-    for (var k = 0; k < s.length - 1; k++) {
-      for (var j = 0; j < ring; j++) {
-        final a = base + k * (ring + 1) + j, b = a + 1, c = a + ring + 1, d = c + 1;
-        _tri(a, b, c);
-        _tri(b, d, c);
-      }
-    }
+    return _BodyModel(pos, nrm, tris, vPart, parts);
   }
-}
-
-_BodyModel _buildBody() {
-  final m = _BodyModel();
-  const skin = Color(0xFFE2AE86);
-  void both(void Function(double s) f) {
-    f(1);
-    f(-1);
-  }
-
-  BodyPart bp(String g, String layer, int c, {int anim = 0, bool fixed = false}) => BodyPart(g, layer, Color(c), anim: anim, fixed: fixed);
-
-  // ── Skin ─────────────────────────────────────────────────────────────────
-  m.begin(bp('Head', 'skin', skin.toARGB32()));
-  m.ellipsoid(0, 0.935, 0.003, 0.050, 0.063, 0.058, lat: 10, lon: 14);
-  m.ellipsoid(0, 0.905, 0.018, 0.038, 0.030, 0.040, lat: 6, lon: 10);
-  m.end();
-  m.begin(bp('Hair', 'skin', 0xFF2B1B12, fixed: true));
-  m.ellipsoid(0, 0.950, -0.016, 0.054, 0.062, 0.058, thMax: math.pi * 0.56, lat: 8, lon: 14);
-  m.end();
-  m.begin(bp('Eyes', 'skin', 0xFFF8FAFC, fixed: true));
-  both((s) => m.ellipsoid(s * 0.020, 0.945, 0.051, 0.0085, 0.0085, 0.0075, lat: 5, lon: 8));
-  m.end();
-  m.begin(bp('Eyes', 'skin', 0xFF3B82F6, fixed: true));
-  both((s) => m.ellipsoid(s * 0.020, 0.945, 0.0575, 0.0046, 0.0046, 0.003, lat: 4, lon: 7));
-  m.end();
-  m.begin(bp('Nose', 'skin', skin.toARGB32()));
-  m.ellipsoid(0, 0.925, 0.060, 0.008, 0.015, 0.012, tilt: -0.3, lat: 5, lon: 8);
-  m.end();
-  m.begin(bp('Lips', 'skin', 0xFFC2575C, fixed: true));
-  m.ellipsoid(0, 0.903, 0.054, 0.017, 0.005, 0.007, lat: 4, lon: 8);
-  m.end();
-  m.begin(bp('Ears', 'skin', skin.toARGB32()));
-  both((s) => m.ellipsoid(s * 0.051, 0.935, 0.0, 0.006, 0.017, 0.012, lat: 5, lon: 8));
-  m.end();
-  m.begin(bp('Neck', 'skin', skin.toARGB32()));
-  m.tube(const [BodyP3(0, 0.865, 0.002), BodyP3(0, 0.915, 0.006)], const [0.026, 0.024], ring: 10);
-  m.end();
-  m.begin(bp('Chest and belly', 'skin', skin.toARGB32()));
-  m.loft(const [
-    (0.462, 0, 0, 0.078, 0.052),
-    (0.490, 0, 0, 0.090, 0.058),
-    (0.500, 0, 0, 0.088, 0.058),
-    (0.530, 0, 0, 0.098, 0.066),
-    (0.570, 0, 0, 0.092, 0.064),
-    (0.620, 0, 0, 0.082, 0.058),
-    (0.670, 0, 0.002, 0.090, 0.062),
-    (0.730, 0, 0.006, 0.104, 0.070),
-    (0.790, 0, 0.004, 0.118, 0.066),
-    (0.832, 0, 0, 0.122, 0.056),
-    (0.862, 0, 0, 0.072, 0.042),
-    (0.880, 0, 0, 0.030, 0.028),
-  ]);
-  both((s) => m.ellipsoid(s * 0.048, 0.512, -0.034, 0.052, 0.052, 0.052, lat: 7, lon: 10));
-  m.end();
-  m.begin(bp('Arms', 'skin', skin.toARGB32()));
-  both((s) {
-    m.ellipsoid(s * 0.130, 0.830, 0, 0.036, 0.036, 0.036, lat: 6, lon: 10);
-    m.tube([BodyP3(s * 0.134, 0.826, 0), BodyP3(s * 0.146, 0.740, 0), BodyP3(s * 0.153, 0.655, 0)], const [0.031, 0.028, 0.024], ring: 10);
-    m.ellipsoid(s * 0.153, 0.655, 0.002, 0.028, 0.028, 0.028, lat: 5, lon: 8);
-    m.tube([BodyP3(s * 0.153, 0.653, 0.004), BodyP3(s * 0.161, 0.570, 0.008), BodyP3(s * 0.168, 0.492, 0.011)], const [0.023, 0.020, 0.015], ring: 10);
-  });
-  m.end();
-  m.begin(bp('Hands', 'skin', skin.toARGB32()));
-  both((s) {
-    m.ellipsoid(s * 0.172, 0.462, 0.012, 0.014, 0.034, 0.020, lat: 6, lon: 8);
-    for (var f = 0; f < 4; f++) {
-      m.tube([BodyP3(s * (0.164 + f * 0.0085), 0.435, 0.012), BodyP3(s * (0.166 + f * 0.0085), 0.405 - (f == 1 || f == 2 ? 0.005 : 0), 0.012)], const [0.0048, 0.0042], ring: 5);
-    }
-    m.tube([BodyP3(s * 0.182, 0.45, 0.014), BodyP3(s * 0.19, 0.42, 0.02)], const [0.0055, 0.0048], ring: 5);
-  });
-  m.end();
-  m.begin(bp('Legs', 'skin', skin.toARGB32()));
-  both((s) {
-    m.tube([BodyP3(s * 0.058, 0.52, 0), BodyP3(s * 0.062, 0.40, 0.003), BodyP3(s * 0.065, 0.285, 0.004)], const [0.056, 0.047, 0.036], ring: 12);
-    m.ellipsoid(s * 0.065, 0.282, 0.008, 0.040, 0.040, 0.040, lat: 6, lon: 10);
-    m.tube([BodyP3(s * 0.064, 0.280, 0), BodyP3(s * 0.062, 0.18, -0.006), BodyP3(s * 0.058, 0.060, 0)], const [0.034, 0.033, 0.021], ring: 12);
-  });
-  m.end();
-  m.begin(bp('Feet', 'skin', skin.toARGB32()));
-  both((s) {
-    m.ellipsoid(s * 0.059, 0.026, 0.036, 0.026, 0.022, 0.07, lat: 6, lon: 10);
-    m.ellipsoid(s * 0.058, 0.055, -0.004, 0.022, 0.03, 0.025, lat: 5, lon: 8);
-  });
-  m.end();
-
-  // ── Muscles ──────────────────────────────────────────────────────────────
-  const mus = 0xFFC2403A;
-  m.begin(bp('Neck muscles', 'muscle', 0xFFB5352F));
-  both((s) => m.tube([BodyP3(s * 0.016, 0.870, 0.016), BodyP3(s * 0.030, 0.915, 0.012)], const [0.012, 0.01], ring: 6));
-  m.end();
-  m.begin(bp('Trapezius', 'muscle', mus));
-  m.ellipsoid(0, 0.790, -0.060, 0.075, 0.085, 0.012, lat: 7, lon: 12);
-  both((s) => m.ellipsoid(s * 0.07, 0.848, -0.034, 0.05, 0.016, 0.026, rot: s * 0.2, lat: 5, lon: 8));
-  m.end();
-  m.begin(bp('Deltoids', 'muscle', 0xFFC84B3F));
-  both((s) => m.ellipsoid(s * 0.138, 0.826, 0.0, 0.033, 0.040, 0.036, lat: 7, lon: 10));
-  m.end();
-  m.begin(bp('Pectorals', 'muscle', 0xFFD0524A));
-  both((s) => m.ellipsoid(s * 0.050, 0.775, 0.058, 0.054, 0.036, 0.016, rot: s * -0.12, lat: 6, lon: 10));
-  m.end();
-  m.begin(bp('Biceps', 'muscle', 0xFFC84B3F));
-  both((s) => m.tube([BodyP3(s * 0.140, 0.800, 0.020), BodyP3(s * 0.148, 0.735, 0.026), BodyP3(s * 0.153, 0.670, 0.016)], const [0.012, 0.021, 0.011], ring: 8));
-  m.end();
-  m.begin(bp('Triceps', 'muscle', 0xFFB5352F));
-  both((s) => m.tube([BodyP3(s * 0.142, 0.800, -0.018), BodyP3(s * 0.150, 0.735, -0.026), BodyP3(s * 0.154, 0.670, -0.016)], const [0.012, 0.021, 0.011], ring: 8));
-  m.end();
-  m.begin(bp('Forearm muscles', 'muscle', 0xFFC2403A));
-  both((s) {
-    m.tube([BodyP3(s * 0.155, 0.640, 0.014), BodyP3(s * 0.160, 0.590, 0.022), BodyP3(s * 0.168, 0.505, 0.014)], const [0.01, 0.019, 0.009], ring: 8);
-    m.tube([BodyP3(s * 0.155, 0.640, -0.014), BodyP3(s * 0.160, 0.590, -0.020), BodyP3(s * 0.168, 0.505, -0.012)], const [0.01, 0.017, 0.009], ring: 8);
-  });
-  m.end();
-  m.begin(bp('Abs', 'muscle', 0xFFD25A4F));
-  for (var r = 0; r < 4; r++) {
-    both((s) => m.ellipsoid(s * 0.0125, 0.665 - r * 0.036, 0.057 - r * 0.001, 0.0125, 0.0155, 0.01, lat: 5, lon: 8));
-  }
-  m.end();
-  m.begin(bp('Obliques', 'muscle', 0xFFB5352F));
-  both((s) => m.ellipsoid(s * 0.072, 0.62, 0.030, 0.026, 0.07, 0.022, rot: s * 0.1, lat: 6, lon: 8));
-  m.end();
-  m.begin(bp('Latissimus', 'muscle', 0xFFB5352F));
-  both((s) => m.ellipsoid(s * 0.062, 0.700, -0.052, 0.058, 0.082, 0.014, rot: s * -0.15, lat: 7, lon: 10));
-  m.end();
-  m.begin(bp('Glutes', 'muscle', 0xFFC84B3F));
-  both((s) => m.ellipsoid(s * 0.050, 0.508, -0.036, 0.050, 0.048, 0.044, lat: 7, lon: 10));
-  m.end();
-  m.begin(bp('Quadriceps', 'muscle', 0xFFD0524A));
-  both((s) {
-    m.tube([BodyP3(s * 0.060, 0.50, 0.040), BodyP3(s * 0.064, 0.40, 0.050), BodyP3(s * 0.066, 0.31, 0.034)], const [0.024, 0.036, 0.016], ring: 8);
-    m.tube([BodyP3(s * 0.082, 0.49, 0.020), BodyP3(s * 0.088, 0.40, 0.030), BodyP3(s * 0.078, 0.32, 0.022)], const [0.018, 0.028, 0.012], ring: 8);
-  });
-  m.end();
-  m.begin(bp('Hamstrings', 'muscle', 0xFFB5352F));
-  both((s) => m.tube([BodyP3(s * 0.058, 0.49, -0.040), BodyP3(s * 0.062, 0.40, -0.048), BodyP3(s * 0.064, 0.31, -0.030)], const [0.024, 0.036, 0.016], ring: 8));
-  m.end();
-  m.begin(bp('Calves', 'muscle', 0xFFC2403A));
-  both((s) => m.tube([BodyP3(s * 0.064, 0.27, -0.030), BodyP3(s * 0.066, 0.21, -0.040), BodyP3(s * 0.058, 0.08, -0.016)], const [0.014, 0.030, 0.008], ring: 8));
-  m.end();
-  m.begin(bp('Shin muscles', 'muscle', 0xFFC84B3F));
-  both((s) => m.tube([BodyP3(s * 0.068, 0.26, 0.030), BodyP3(s * 0.066, 0.17, 0.034), BodyP3(s * 0.058, 0.07, 0.020)], const [0.010, 0.014, 0.006], ring: 7));
-  m.end();
-
-  // ── Organs ───────────────────────────────────────────────────────────────
-  m.begin(bp('Brain', 'organ', 0xFFF4B6C2));
-  m.ellipsoid(0, 0.950, -0.004, 0.043, 0.046, 0.050, bump: 0.05, lat: 10, lon: 16);
-  m.end();
-  m.begin(bp('Thyroid', 'organ', 0xFFD6736B));
-  both((s) => m.ellipsoid(s * 0.010, 0.872, 0.016, 0.009, 0.014, 0.007, lat: 5, lon: 8));
-  m.end();
-  m.begin(bp('Windpipe', 'organ', 0xFFBAE6FD));
-  m.tube(const [BodyP3(0, 0.885, 0.006), BodyP3(0, 0.800, 0.006)], const [0.0075, 0.0075], ring: 8);
-  both((s) => m.tube([BodyP3(0, 0.800, 0.006), BodyP3(s * 0.032, 0.755, 0.004)], const [0.0058, 0.0045], ring: 6));
-  m.end();
-  m.begin(bp('Food pipe', 'organ', 0xFFF29E8E));
-  m.tube(const [BodyP3(0, 0.885, -0.008), BodyP3(0.004, 0.760, -0.020), BodyP3(0.020, 0.680, -0.014), BodyP3(0.034, 0.655, 0.002)], const [0.0055, 0.0065, 0.0065, 0.0065], ring: 7);
-  m.end();
-  m.begin(bp('Lungs', 'organ', 0xFFF6A9BB, anim: 2));
-  m.ellipsoid(-0.050, 0.750, -0.002, 0.042, 0.078, 0.048, lat: 8, lon: 12);
-  m.ellipsoid(0.048, 0.750, -0.002, 0.038, 0.076, 0.046, lat: 8, lon: 12);
-  m.end();
-  m.begin(bp('Heart', 'organ', 0xFFE23B3B, anim: 1));
-  m.ellipsoid(0.018, 0.738, 0.022, 0.030, 0.036, 0.027, rot: -0.5, lat: 8, lon: 12);
-  m.ellipsoid(0.006, 0.752, 0.020, 0.018, 0.020, 0.018, lat: 6, lon: 10);
-  m.end();
-  m.begin(bp('Diaphragm', 'organ', 0xFFCB6B5E));
-  m.ellipsoid(0, 0.684, 0.0, 0.092, 0.012, 0.056, lat: 5, lon: 12);
-  m.end();
-  m.begin(bp('Liver', 'organ', 0xFF9C3B34));
-  m.ellipsoid(-0.036, 0.652, 0.012, 0.062, 0.032, 0.042, rot: 0.12, lat: 7, lon: 12);
-  m.end();
-  m.begin(bp('Gallbladder', 'organ', 0xFF4FA36A));
-  m.ellipsoid(-0.024, 0.626, 0.044, 0.008, 0.013, 0.008, lat: 5, lon: 8);
-  m.end();
-  m.begin(bp('Stomach', 'organ', 0xFFF29C6E));
-  m.ellipsoid(0.044, 0.648, 0.018, 0.040, 0.029, 0.028, rot: 0.7, lat: 7, lon: 12);
-  m.end();
-  m.begin(bp('Spleen', 'organ', 0xFF7C4B8C));
-  m.ellipsoid(0.076, 0.652, -0.028, 0.014, 0.030, 0.015, rot: 0.2, lat: 6, lon: 8);
-  m.end();
-  m.begin(bp('Pancreas', 'organ', 0xFFE8C26B));
-  m.ellipsoid(0.012, 0.620, 0.004, 0.052, 0.011, 0.013, rot: 0.1, lat: 5, lon: 10);
-  m.end();
-  m.begin(bp('Kidneys', 'organ', 0xFF8B2D3B));
-  both((s) => m.ellipsoid(s * 0.040, 0.614, -0.040, 0.014, 0.029, 0.014, rot: s * 0.2, lat: 6, lon: 8));
-  m.end();
-  m.begin(bp('Small intestine', 'organ', 0xFFF5A99F));
-  {
-    final path = <BodyP3>[];
-    for (var row = 0; row < 6; row++) {
-      final y = 0.600 - row * 0.0125;
-      final dir = row.isEven ? 1.0 : -1.0;
-      for (var k = 0; k <= 8; k++) {
-        final t = k / 8;
-        path.add(BodyP3(dir * (-0.048 + 0.096 * t), y + 0.004 * math.sin(t * math.pi * 2), 0.018 + 0.012 * math.sin(t * math.pi)));
-      }
-    }
-    m.tube(path, const [0.0085], ring: 6, caps: true);
-  }
-  m.end();
-  m.begin(bp('Large intestine', 'organ', 0xFFD9A58B));
-  m.tube(const [BodyP3(-0.064, 0.548, 0.020), BodyP3(-0.070, 0.590, 0.020), BodyP3(-0.066, 0.628, 0.024), BodyP3(-0.030, 0.640, 0.036), BodyP3(0.030, 0.640, 0.036), BodyP3(0.066, 0.628, 0.024), BodyP3(0.070, 0.590, 0.020), BodyP3(0.064, 0.550, 0.018), BodyP3(0.030, 0.528, 0.012), BodyP3(0.004, 0.512, 0.004)], const [0.0125], ring: 7);
-  m.end();
-  m.begin(bp('Bladder', 'organ', 0xFFFFC857));
-  m.ellipsoid(0, 0.525, 0.026, 0.024, 0.022, 0.022, lat: 6, lon: 10);
-  m.end();
-  m.begin(bp('Spinal cord', 'organ', 0xFFFDE68A));
-  m.tube(const [BodyP3(0, 0.915, -0.030), BodyP3(0, 0.870, -0.044), BodyP3(0, 0.720, -0.050), BodyP3(0, 0.580, -0.052), BodyP3(0, 0.530, -0.050)], const [0.005], ring: 6);
-  m.end();
-
-  // ── Bones ────────────────────────────────────────────────────────────────
-  const bone = 0xFFEFE6CF;
-  m.begin(bp('Skull', 'bone', bone));
-  m.ellipsoid(0, 0.945, 0, 0.047, 0.056, 0.055, lat: 10, lon: 14);
-  both((s) => m.ellipsoid(s * 0.019, 0.941, 0.049, 0.0105, 0.0105, 0.008, lat: 5, lon: 8));
-  m.ellipsoid(0, 0.918, 0.056, 0.007, 0.012, 0.006, lat: 4, lon: 7);
-  m.end();
-  m.begin(bp('Jaw', 'bone', 0xFFE7DCC2));
-  m.tube(const [BodyP3(-0.038, 0.918, 0.0), BodyP3(-0.032, 0.896, 0.030), BodyP3(0, 0.890, 0.046), BodyP3(0.032, 0.896, 0.030), BodyP3(0.038, 0.918, 0.0)], const [0.0075], ring: 6);
-  m.end();
-  m.begin(bp('Neck bones', 'bone', bone));
-  for (var i = 0; i < 7; i++) {
-    m.ellipsoid(0, 0.912 - i * 0.0075, -0.026 - i * 0.002, 0.0125, 0.0042, 0.011, lat: 4, lon: 8);
-  }
-  m.end();
-  m.begin(bp('Chest spine', 'bone', 0xFFE7DCC2));
-  for (var i = 0; i < 12; i++) {
-    m.ellipsoid(0, 0.855 - i * 0.0185, -0.043 - 0.006 * math.sin(i / 12 * math.pi), 0.0135, 0.0064, 0.0115, lat: 4, lon: 8);
-  }
-  m.end();
-  m.begin(bp('Lower spine', 'bone', bone));
-  for (var i = 0; i < 5; i++) {
-    m.ellipsoid(0, 0.632 - i * 0.021, -0.050 + 0.004 * i, 0.0185, 0.0082, 0.0155, lat: 4, lon: 8);
-  }
-  m.end();
-  m.begin(bp('Tailbone', 'bone', 0xFFE7DCC2));
-  m.ellipsoid(0, 0.512, -0.048, 0.024, 0.030, 0.012, tilt: 0.25, lat: 6, lon: 8);
-  m.ellipsoid(0, 0.480, -0.040, 0.007, 0.015, 0.006, tilt: 0.5, lat: 4, lon: 6);
-  m.end();
-  m.begin(bp('Ribs', 'bone', 0xFFF1E9D4));
-  for (var i = 0; i < 12; i++) {
-    final y0 = 0.846 - i * 0.0185;
-    final a = i < 8 ? 0.062 + 0.0045 * math.min(i, 5) : 0.068 - (i - 7) * 0.0055;
-    final end = i < 10 ? math.pi * 0.93 : math.pi * 0.52;
-    both((s) {
-      final path = <BodyP3>[];
-      for (var k = 0; k <= 9; k++) {
-        final ph = end * k / 9;
-        path.add(BodyP3(s * (0.012 + (a - 0.006) * math.sin(ph)), y0 - 0.013 * math.sin(ph) - 0.020 * ph / math.pi, -0.046 + 0.100 * (1 - math.cos(ph)) / 2));
-      }
-      m.tube(path, const [0.0034], ring: 5, caps: false);
-    });
-  }
-  m.end();
-  m.begin(bp('Breastbone', 'bone', bone));
-  m.ellipsoid(0, 0.772, 0.052, 0.012, 0.058, 0.007, lat: 5, lon: 8);
-  m.end();
-  m.begin(bp('Collarbones', 'bone', bone));
-  both((s) => m.tube([BodyP3(s * 0.010, 0.846, 0.036), BodyP3(s * 0.065, 0.852, 0.030), BodyP3(s * 0.118, 0.842, -0.004)], const [0.0058], ring: 6));
-  m.end();
-  m.begin(bp('Shoulder blades', 'bone', 0xFFE7DCC2));
-  both((s) => m.ellipsoid(s * 0.074, 0.780, -0.050, 0.034, 0.046, 0.0065, rot: s * 0.15, lat: 5, lon: 8));
-  m.end();
-  m.begin(bp('Upper arm bones', 'bone', bone));
-  both((s) {
-    m.ellipsoid(s * 0.128, 0.826, -0.002, 0.014, 0.014, 0.014, lat: 5, lon: 8);
-    m.tube([BodyP3(s * 0.130, 0.820, -0.002), BodyP3(s * 0.153, 0.655, 0.002)], const [0.0095, 0.0095], ring: 7);
-    m.ellipsoid(s * 0.153, 0.652, 0.002, 0.012, 0.012, 0.012, lat: 5, lon: 8);
-  });
-  m.end();
-  m.begin(bp('Forearm bones', 'bone', 0xFFE7DCC2));
-  both((s) {
-    m.tube([BodyP3(s * 0.151, 0.648, 0.006), BodyP3(s * 0.165, 0.492, 0.012)], const [0.0058, 0.0048], ring: 6);
-    m.tube([BodyP3(s * 0.156, 0.648, -0.004), BodyP3(s * 0.171, 0.492, 0.004)], const [0.0058, 0.0048], ring: 6);
-  });
-  m.end();
-  m.begin(bp('Hand bones', 'bone', bone));
-  both((s) {
-    m.ellipsoid(s * 0.171, 0.475, 0.008, 0.012, 0.012, 0.008, lat: 4, lon: 7);
-    for (var f = 0; f < 5; f++) {
-      m.tube([BodyP3(s * (0.162 + f * 0.0085), 0.462, 0.008), BodyP3(s * (0.165 + f * 0.0085), 0.436, 0.010), BodyP3(s * (0.167 + f * 0.0085), 0.408, 0.011)], const [0.0028], ring: 5, caps: false);
-    }
-  });
-  m.end();
-  m.begin(bp('Pelvis', 'bone', 0xFFEFE6CF));
-  both((s) {
-    m.ellipsoid(s * 0.056, 0.538, -0.004, 0.036, 0.030, 0.016, rot: s * -0.35, tilt: 0.1, lat: 7, lon: 10);
-    m.ellipsoid(s * 0.020, 0.486, 0.042, 0.016, 0.018, 0.008, lat: 4, lon: 7);
-  });
-  m.end();
-  m.begin(bp('Thigh bones', 'bone', bone));
-  both((s) {
-    m.ellipsoid(s * 0.052, 0.512, 0.0, 0.016, 0.016, 0.016, lat: 5, lon: 8);
-    m.tube([BodyP3(s * 0.054, 0.505, 0.0), BodyP3(s * 0.064, 0.290, 0.004)], const [0.0135, 0.0135], ring: 8);
-    m.ellipsoid(s * 0.065, 0.286, 0.004, 0.019, 0.016, 0.018, lat: 5, lon: 8);
-  });
-  m.end();
-  m.begin(bp('Kneecaps', 'bone', 0xFFE7DCC2));
-  both((s) => m.ellipsoid(s * 0.065, 0.282, 0.030, 0.013, 0.016, 0.007, lat: 5, lon: 8));
-  m.end();
-  m.begin(bp('Shin bones', 'bone', bone));
-  both((s) {
-    m.tube([BodyP3(s * 0.064, 0.272, 0.004), BodyP3(s * 0.059, 0.070, 0.000)], const [0.0115, 0.009], ring: 7);
-    m.tube([BodyP3(s * 0.076, 0.268, 0.0), BodyP3(s * 0.068, 0.068, -0.004)], const [0.0058, 0.006], ring: 6);
-  });
-  m.end();
-  m.begin(bp('Foot bones', 'bone', 0xFFE7DCC2));
-  both((s) {
-    m.ellipsoid(s * 0.059, 0.034, -0.010, 0.018, 0.015, 0.026, lat: 5, lon: 8);
-    for (var f = 0; f < 5; f++) {
-      m.tube([BodyP3(s * (0.047 + f * 0.0082), 0.022, 0.012), BodyP3(s * (0.047 + f * 0.0082), 0.018, 0.060)], const [0.0036], ring: 5, caps: false);
-    }
-  });
-  m.end();
-
-  // ── Blood vessels ────────────────────────────────────────────────────────
-  m.begin(bp('Aorta', 'vessel', 0xFFE11D48));
-  m.tube(const [BodyP3(0.010, 0.752, 0.016), BodyP3(0.004, 0.790, 0.010), BodyP3(-0.010, 0.790, -0.010), BodyP3(-0.016, 0.760, -0.026), BodyP3(-0.012, 0.680, -0.032), BodyP3(-0.010, 0.580, -0.026), BodyP3(-0.006, 0.520, -0.018)], const [0.0095, 0.0085, 0.0085, 0.008, 0.0075, 0.0065, 0.005], ring: 7);
-  both((s) => m.tube([BodyP3(-0.006, 0.520, -0.018), BodyP3(s * 0.034, 0.490, -0.006), BodyP3(s * 0.052, 0.440, 0.0), BodyP3(s * 0.060, 0.320, 0.0)], const [0.0045, 0.0042, 0.004, 0.0035], ring: 5));
-  m.end();
-  m.begin(bp('Vena cava', 'vessel', 0xFF2563EB));
-  m.tube(const [BodyP3(0.022, 0.750, 0.012), BodyP3(0.030, 0.800, 0.002), BodyP3(0.020, 0.840, -0.006), BodyP3(0.014, 0.820, -0.012), BodyP3(0.016, 0.740, -0.020), BodyP3(0.014, 0.640, -0.028), BodyP3(0.010, 0.560, -0.022), BodyP3(0.004, 0.520, -0.014)], const [0.0095, 0.0085, 0.007, 0.0075, 0.0085, 0.008, 0.0075, 0.0055], ring: 7);
-  m.end();
-  m.begin(bp('Neck arteries', 'vessel', 0xFFF43F5E));
-  both((s) => m.tube([BodyP3(s * 0.004, 0.800, 0.012), BodyP3(s * 0.020, 0.860, 0.014), BodyP3(s * 0.026, 0.910, 0.014)], const [0.0045, 0.004, 0.0035], ring: 6));
-  m.end();
-  m.begin(bp('Lung vessels', 'vessel', 0xFFFB7185));
-  both((s) {
-    m.tube([BodyP3(s * 0.010, 0.752, 0.022), BodyP3(s * 0.030, 0.752, 0.020), BodyP3(s * 0.052, 0.746, 0.016)], const [0.0055, 0.0048, 0.004], ring: 6);
-    m.tube([BodyP3(s * 0.016, 0.760, 0.010), BodyP3(s * 0.034, 0.775, 0.006), BodyP3(s * 0.050, 0.790, 0.0)], const [0.0045, 0.004, 0.0035], ring: 6);
-  });
-  m.end();
-  m.begin(bp('Leg arteries', 'vessel', 0xFFF43F5E));
-  both((s) => m.tube([BodyP3(s * 0.060, 0.320, 0.0), BodyP3(s * 0.062, 0.200, 0.006), BodyP3(s * 0.058, 0.060, 0.012)], const [0.0035, 0.003, 0.0026], ring: 5));
-  m.end();
-  return m;
 }
 
 class NgmyBodyExplorer extends StatefulWidget {
@@ -592,7 +239,11 @@ class NgmyBodyExplorer extends StatefulWidget {
 }
 
 class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerProviderStateMixin, StudioFrames {
-  static final _BodyModel _model = _buildBody();
+  _BodyModel? _modelN;
+  _BodyModel get _model => _modelN!;
+  Float32List _zs = Float32List(0), _shade = Float32List(0), _facing = Float32List(0);
+  Float32List _tz = Float32List(0), _pts = Float32List(0);
+  Int32List _tid = Int32List(0), _cols = Int32List(0);
   final GlobalKey _shot = GlobalKey();
 
   // Which layers are showing.
@@ -634,6 +285,9 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
   void initState() {
     super.initState();
     startFrames();
+    _BodyModel.load().then((m) {
+      if (mounted) setState(() => _modelN = m);
+    });
   }
 
   bool _partOn(BodyPart p) {
@@ -650,6 +304,7 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
 
   @override
   void onFrame(double dt) {
+    if (_modelN == null) return;
     _t += dt;
     _idle += dt;
     if (_spin && _idle > 1.5 && _sel == null) _yaw += dt * 0.35;
@@ -813,9 +468,12 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
     if (_screen.length != nv * 2) {
       _screen = Float32List(nv * 2);
     }
-    final zs = Float32List(nv);
-    final shade = Float32List(nv);
-    final facing = Float32List(nv);
+    if (_zs.length != nv) {
+      _zs = Float32List(nv);
+      _shade = Float32List(nv);
+      _facing = Float32List(nv);
+    }
+    final zs = _zs, shade = _shade, facing = _facing;
     final beat = (_t * _bpm / 60) % 1.0;
     final heart = 1 + 0.16 * math.exp(-beat * 7) + 0.09 * math.exp(-math.pow((beat - 0.28) * 9, 2).toDouble());
     final breath = 1 + 0.05 * math.sin(_t * 1.3);
@@ -826,6 +484,7 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
       triTotal += p.tEnd - p.tStart;
       final a = p.anim == 1 ? heart : (p.anim == 2 ? breath : 1.0);
       final c = p.center;
+      final twoSided = p.layer == 'muscle' || p.layer == 'vessel';
       for (var i = p.vStart; i < p.vEnd; i++) {
         var x = m.pos[i * 3], y = m.pos[i * 3 + 1], z = m.pos[i * 3 + 2];
         if (a != 1.0) {
@@ -849,6 +508,11 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
         nx = nx1;
         ny = ny2;
         nz = nz2;
+        if (twoSided && nz < 0) {
+          nx = -nx;
+          ny = -ny;
+          nz = -nz;
+        }
         facing[i] = nz;
         shade[i] = 0.30 + 0.70 * math.max(0, nx * lx + ny * ly + nz * lz) + 0.22 * math.pow(1 - nz.abs(), 3);
       }
@@ -856,8 +520,11 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
     // Sort the triangles from far to near (a fast bucket sort).
     const buckets = 600;
     final counts = List<int>.filled(buckets + 1, 0);
-    final tz = Float32List(triTotal);
-    final tid = Int32List(triTotal);
+    if (_tz.length < triTotal) {
+      _tz = Float32List(triTotal);
+      _tid = Int32List(triTotal);
+    }
+    final tz = _tz, tid = _tid;
     var n = 0;
     var zmin = 9.0, zmax = -9.0;
     for (final p in visible) {
@@ -887,8 +554,11 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
     _triOrder = order;
     _triCount = n;
 
-    final pts = Float32List(n * 6);
-    final cols = Int32List(n * 3);
+    if (_pts.length < n * 6) {
+      _pts = Float32List(n * 6);
+      _cols = Int32List(n * 3);
+    }
+    final pts = _pts, cols = _cols;
     final tone = _tones[_tone];
     final selPulse = 0.5 + 0.5 * math.sin(_t * 6);
     for (var k = 0; k < n; k++) {
@@ -910,7 +580,7 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
       }
     }
     if (n > 0) {
-      final v = ui.Vertices.raw(ui.VertexMode.triangles, pts, colors: cols);
+      final v = ui.Vertices.raw(ui.VertexMode.triangles, Float32List.sublistView(pts, 0, n * 6), colors: Int32List.sublistView(cols, 0, n * 3));
       canvas.drawVertices(v, BlendMode.dst, Paint());
     }
     // A soft floor shadow.
@@ -923,14 +593,14 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
     final sel = _sel;
     final info = sel == null ? null : kBodyFacts[sel];
     final names = <String>[];
-    for (final p in _model.parts) {
+    for (final p in (_modelN?.parts ?? const <BodyPart>[])) {
       if (!_partOn(p) || (p.layer == 'skin' && _layers.isNotEmpty)) continue;
       if (!names.contains(p.group)) names.add(p.group);
     }
     return StudioPage(
       title: 'BODY EXPLORER',
       accent: const Color(0xFFF472B6),
-      help: 'A 3D human you can explore.\n\nDrag with one finger to turn the body all the way round. Pinch with two fingers to zoom in and out. Tap any part of the body to fly in close and read about it.\n\nUse the layer buttons to look inside: Skin, Muscles, Organs, Skeleton and Blood vessels. You can have several on at once. The skin turns see-through so you can see what is inside. Tap Skin again to make it solid or switch it off.\n\nThe list under the buttons names every part: tap a name to find it. In Organs you can watch the lungs breathe and the heart beat, and change the heart rate.\n\nTurn on Quiz and tap the part you are asked to find.',
+      help: 'A 3D human you can explore.\n\nDrag with one finger to turn the body all the way round. Pinch with two fingers to zoom in and out. Tap any part of the body to fly in close and read about it.\n\nUse the layer buttons to look inside: Skin, Muscles, Organs, Skeleton and Blood vessels. You can have several on at once. The skin turns see-through so you can see what is inside. Tap Skin again to make it solid or switch it off.\n\nReal 3D anatomy from BodyParts3D, (c) The Database Center for Life Science, licensed under CC Attribution 4.0 International. The model is an adult male reference.\n\nThe list under the buttons names every part: tap a name to find it. In Organs you can watch the lungs breathe and the heart beat, and change the heart rate.\n\nTurn on Quiz and tap the part you are asked to find.',
       actions: [IconButton(onPressed: () => studioShare(context, _shot, name: 'body'), icon: const Icon(Icons.ios_share_rounded, color: Colors.white70, size: 21), tooltip: 'Share')],
       stage: LayoutBuilder(builder: (context, box) {
         _size = Size(box.maxWidth, box.maxHeight);
@@ -1030,7 +700,7 @@ class _BodyPainter extends CustomPainter {
     canvas.drawRect(Offset.zero & size, Paint()..shader = RadialGradient(center: const Alignment(0, -0.2), radius: 1.1, colors: const [Color(0xFF1B2030), Color(0xFF07080F)]).createShader(Offset.zero & size));
     canvas.save();
     canvas.clipRect(Offset.zero & size);
-    s._render(canvas, size);
+    if (s._modelN != null) s._render(canvas, size);
     canvas.restore();
   }
 
