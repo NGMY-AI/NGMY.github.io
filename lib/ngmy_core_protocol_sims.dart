@@ -16,6 +16,7 @@ import 'ngmy_play_hub.dart';
 import 'ngmy_arcade_a.dart';
 import 'ngmy_edu_a.dart';
 import 'ngmy_edu_b.dart';
+import 'ngmy_fun_a.dart';
 import 'ngmy_universe_hub.dart';
 
 /// Core Protocol: four auto-playing "unfold" sequences. Each one builds three glass slabs in a
@@ -31,7 +32,7 @@ class NgmyCoreProtocolSimsScreen extends StatefulWidget {
 /// The same dark page colour as the home screen.
 const Color _kBg = Color(0xFF121212);
 
-enum _UnfoldStyle { accordion, flip, towers, assemble }
+enum _UnfoldStyle { accordion, flip, towers, assemble, carousel, burst }
 
 class _UnfoldMeta {
   const _UnfoldMeta({
@@ -92,28 +93,68 @@ const _kSequences = <_UnfoldMeta>[
     labels: ['Launch', 'Charge', 'Shine'],
     subs: ['Lifts off', 'Powers up', 'Lights the sky'],
   ),
+  _UnfoldMeta(
+    style: _UnfoldStyle.carousel,
+    title: 'SPIN CAROUSEL',
+    blurb: 'Cards swing around a glowing ring, front card shines',
+    colors: [Color(0xFF22D3EE), Color(0xFF0E7490)],
+    icons: [Icons.public_rounded, Icons.explore_rounded, Icons.travel_explore_rounded],
+    labels: ['Explore', 'Discover', 'Learn'],
+    subs: ['Go anywhere', 'Find something new', 'Know more each day'],
+  ),
+  _UnfoldMeta(
+    style: _UnfoldStyle.burst,
+    title: 'POP BURST',
+    blurb: 'Cards pop in with a shockwave and a burst of sparks',
+    colors: [Color(0xFFFB7185), Color(0xFFBE123C)],
+    icons: [Icons.celebration_rounded, Icons.emoji_events_rounded, Icons.favorite_rounded],
+    labels: ['Cheer', 'Win', 'Love'],
+    subs: ['Make some noise', 'First place', 'Share the joy'],
+  ),
 ];
+
 
 class _NgmyCoreProtocolSimsScreenState extends State<NgmyCoreProtocolSimsScreen> {
   _UnfoldMeta? _active;
+  ScrollController _sc = ScrollController();
+  double _savedOffset = 0;
+
+  void _open(_UnfoldMeta m) {
+    if (_sc.hasClients) _savedOffset = _sc.offset;
+    setState(() => _active = m);
+  }
+
+  void _leave() {
+    _sc.dispose();
+    _sc = ScrollController(initialScrollOffset: _savedOffset);
+    setState(() => _active = null);
+  }
+
+  @override
+  void dispose() {
+    _sc.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final active = _active;
+
     return PopScope(
       canPop: active == null,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && active != null) setState(() => _active = null);
+        if (!didPop && active != null) _leave();
       },
       child: Scaffold(
         backgroundColor: _kBg,
         resizeToAvoidBottomInset: false,
         body: active == null
             ? _SequencePicker(
-                onPick: (s) => setState(() => _active = s),
+                controller: _sc,
+                onPick: _open,
                 onClose: () => Navigator.of(context).maybePop(),
               )
-            : _SequenceCanvas(key: ValueKey(active.title), meta: active, onExit: () => setState(() => _active = null)),
+            : _SequenceCanvas(key: ValueKey(active.title), meta: active, onExit: _leave),
       ),
     );
   }
@@ -141,7 +182,8 @@ final List<_StudioDef> _kStudios = [
   _StudioDef('ECOSYSTEM LAB', 'Grass, rabbits and foxes', Icons.pets_rounded, const Color(0xFF4ADE80), () => const NgmyEcosystemStudio()),
   _StudioDef('BALANCE LAB', 'Levers, weight and torque', Icons.balance_rounded, const Color(0xFFFBBF24), () => const NgmyBalanceStudio()),
   _StudioDef('GEAR LAB', 'Teeth, speed and force', Icons.settings_rounded, const Color(0xFFFB923C), () => const NgmyGearStudio()),
-  _StudioDef('OPTICS LAB', 'How a lens makes an image', Icons.visibility_rounded, const Color(0xFFFACC15), () => const NgmyOpticsStudio()),
+  _StudioDef('LASER MAZE', 'Bend the beam with mirrors', Icons.flare_rounded, const Color(0xFFEF4444), () => const NgmyLaserMazeStudio()),
+  _StudioDef('LIGHT MIXER', 'Match colours with light', Icons.color_lens_rounded, const Color(0xFF22D3EE), () => const NgmyLightMixerStudio()),
   _StudioDef('CIPHER LAB', 'Make and crack secret codes', Icons.vpn_key_rounded, const Color(0xFF38BDF8), () => const NgmyCipherStudio()),
   _StudioDef('REACTION LAB', 'Wire parts together', Icons.hub_rounded, const Color(0xFF34D399), () => const NgmyReactionLabScreen()),
   _StudioDef('SPARK PAINTER', 'Paint with light', Icons.brush_rounded, const Color(0xFFF472B6), () => const NgmySparkPainterStudio()),
@@ -149,7 +191,6 @@ final List<_StudioDef> _kStudios = [
   _StudioDef('ORBIT STUDIO', 'Slingshot planets', Icons.public_rounded, const Color(0xFFFB923C), () => const NgmyOrbitStudio()),
   _StudioDef('SWARM STUDIO', 'A living school of fish', Icons.bubble_chart_rounded, const Color(0xFF4ADE80), () => const NgmySwarmStudio()),
   _StudioDef('CHAIN BURST', 'One tap, a whole chain', Icons.bolt_rounded, const Color(0xFFF472B6), () => const NgmyChainBurstStudio()),
-  _StudioDef('PALETTE LAB', 'Colours that go together', Icons.palette_rounded, const Color(0xFF2DD4BF), () => const NgmyPaletteStudio()),
   _StudioDef('TITLE ANIMATOR', 'Make a moving title', Icons.title_rounded, const Color(0xFFFACC15), () => const NgmyTitleStudio()),
   _StudioDef('CIRCUIT LAB', 'Connect logic, learn it', Icons.memory_rounded, const Color(0xFF60A5FA), () => const NgmyCircuitStudio()),
   _StudioDef('MARBLE MUSIC', 'Marbles ring the notes', Icons.blur_circular_rounded, const Color(0xFF22D3EE), () => const NgmyMarbleStudio()),
@@ -157,7 +198,8 @@ final List<_StudioDef> _kStudios = [
 ];
 
 class _SequencePicker extends StatelessWidget {
-  const _SequencePicker({required this.onPick, required this.onClose});
+  const _SequencePicker({required this.onPick, required this.onClose, required this.controller});
+  final ScrollController controller;
   final ValueChanged<_UnfoldMeta> onPick;
   final VoidCallback onClose;
 
@@ -185,7 +227,7 @@ class _SequencePicker extends StatelessWidget {
           ]),
         ),
         Expanded(
-          child: CustomScrollView(slivers: [
+          child: CustomScrollView(controller: controller, slivers: [
             SliverToBoxAdapter(child: _heading('STUDIOS', 'Play, make things, and keep what you make')),
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -567,6 +609,8 @@ class _SequenceCanvasState extends State<_SequenceCanvas> with TickerProviderSta
         _UnfoldStyle.flip => const [0.05, 0.2, 0.35],
         _UnfoldStyle.towers => const [0.04, 0.17, 0.3],
         _UnfoldStyle.assemble => const [0.04, 0.2, 0.36],
+        _UnfoldStyle.carousel => const [0.05, 0.15, 0.25],
+        _UnfoldStyle.burst => const [0.05, 0.2, 0.35],
       };
       const notes = [0, 4, 7];
       for (var i = 0; i < 3; i++) {
@@ -696,7 +740,7 @@ class _SequenceCanvasState extends State<_SequenceCanvas> with TickerProviderSta
     return StudioPage(
       title: meta.title,
       accent: meta.glow,
-      help: 'A scene that builds itself. Everything on it is yours to change.\n\nStyle switches how it builds: Fold, Flip, Rise or Assemble. Theme changes the colours. Edit lets you write your own words and pick your own pictures for the three slabs.\n\nDrag the timeline to scrub through it, change the speed, pause on any moment, and Share saves a picture of your scene.',
+      help: 'A scene that builds itself. Everything on it is yours to change.\n\nStyle switches how it builds: Fold, Flip, Rise, Assemble, Spin or Pop. Theme changes the colours. Edit lets you write your own words and pick your own pictures for the three slabs.\n\nDrag the timeline to scrub through it, change the speed, pause on any moment, and Share saves a picture of your scene.',
       actions: [
         IconButton(onPressed: () => setState(() => _sound = !_sound), icon: Icon(_sound ? Icons.volume_up_rounded : Icons.volume_off_rounded, color: Colors.white70, size: 21), tooltip: 'Sound'),
         IconButton(onPressed: _edit, icon: const Icon(Icons.edit_rounded, color: Colors.white70, size: 21), tooltip: 'Edit words and pictures'),
@@ -729,6 +773,8 @@ class _SequenceCanvasState extends State<_SequenceCanvas> with TickerProviderSta
                         _UnfoldStyle.flip => _flip(meta, t, pulse, w),
                         _UnfoldStyle.towers => _towers(meta, t, pulse, w),
                         _UnfoldStyle.assemble => _assemble(meta, t, pulse, w),
+                        _UnfoldStyle.carousel => _carousel(meta, t, pulse, w),
+                        _UnfoldStyle.burst => _burst(meta, t, pulse, w),
                       },
                     );
                   },
@@ -776,7 +822,7 @@ class _SequenceCanvasState extends State<_SequenceCanvas> with TickerProviderSta
           if (_playing) _play();
         }),
         StudioRow(label: 'STYLE', children: [
-          for (final s in const [(_UnfoldStyle.accordion, 'Fold', Icons.unfold_more_rounded), (_UnfoldStyle.flip, 'Flip', Icons.flip_rounded), (_UnfoldStyle.towers, 'Rise', Icons.bar_chart_rounded), (_UnfoldStyle.assemble, 'Assemble', Icons.join_inner_rounded)])
+          for (final s in const [(_UnfoldStyle.accordion, 'Fold', Icons.unfold_more_rounded), (_UnfoldStyle.flip, 'Flip', Icons.flip_rounded), (_UnfoldStyle.towers, 'Rise', Icons.bar_chart_rounded), (_UnfoldStyle.assemble, 'Assemble', Icons.join_inner_rounded), (_UnfoldStyle.carousel, 'Spin', Icons.threed_rotation_rounded), (_UnfoldStyle.burst, 'Pop', Icons.celebration_rounded)])
             StudioChip(label: s.$2, icon: s.$3, selected: _style == s.$1, color: meta.glow, onTap: () {
               setState(() => _style = s.$1);
               _seq.value = 0;
@@ -936,7 +982,87 @@ class _SequenceCanvasState extends State<_SequenceCanvas> with TickerProviderSta
   }
 
   // 4. Assemble: slabs spiral in from three sides and lock into a neat stack with a ripple.
+  // 5. Carousel: the cards swing in around a glowing ring, and whichever is in front shines.
+  Widget _carousel(_UnfoldMeta m, double t, double pulse, double w) {
+    const h = 100.0;
+    final cw = w * 0.62;
+    final spinIn = Curves.easeOutCubic.transform(seg(t, 0.02, 0.5));
+    final rot = (1 - spinIn) * math.pi * 3 + t * 1.6;
+    final children = <Widget>[];
+    // The ring on the floor.
+    children.add(Positioned.fill(child: Center(child: Transform.translate(offset: const Offset(0, 118), child: CustomPaint(size: Size(w * 0.95, 70), painter: _RingPainter(m.colors.first, seg(t, 0.0, 0.2), pulse))))));
+    final items = <(double, Widget)>[];
+    for (var i = 0; i < 3; i++) {
+      final theta = i * 2 * math.pi / 3 + rot;
+      final depth = (math.cos(theta) + 1) / 2; // 1 = in front
+      final x = math.sin(theta) * w * 0.34;
+      final appear = seg(t, 0.02 + i * 0.06, 0.12 + i * 0.06);
+      final front = Curves.easeInOut.transform(((depth - 0.7) / 0.3).clamp(0.0, 1.0));
+      items.add((
+        depth,
+        Positioned.fill(
+          child: Center(
+            child: Opacity(
+              opacity: appear * (0.45 + 0.55 * depth),
+              child: Transform.translate(
+                offset: Offset(x, -depth * 18),
+                child: Transform(
+                  alignment: Alignment.center,
+                  transform: Matrix4.identity()
+                    ..setEntry(3, 2, 0.001)
+                    ..rotateY(-math.sin(theta) * 0.7)
+                    ..scale(0.68 + 0.32 * depth),
+                  child: _Slab(width: cw, height: h, colors: m.colors, icon: m.icons[i], label: m.labels[i], sub: m.subs[i], shade: 1 - depth, glow: front * (0.5 + 0.5 * pulse), spec: front > 0.5 ? (t * 3) % 1 : -1),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ));
+    }
+    items.sort((a, b) => a.$1.compareTo(b.$1));
+    children.addAll(items.map((e) => e.$2));
+    return SizedBox(width: w, height: 330, child: Stack(clipBehavior: Clip.none, children: children));
+  }
+
+  // 6. Burst: each card pops in with a springy bounce, a shockwave ring and flying sparks.
+  Widget _burst(_UnfoldMeta m, double t, double pulse, double w) {
+    const h = 92.0;
+    final cw = w * 0.86;
+    const ys = [-104.0, 0.0, 104.0];
+    const starts = [0.05, 0.2, 0.35];
+    final children = <Widget>[];
+    for (var i = 0; i < 3; i++) {
+      final raw = seg(t, starts[i], starts[i] + 0.22);
+      final p = Curves.elasticOut.transform(raw);
+      final wobble = math.sin(raw * math.pi * 6) * (1 - raw) * 0.06;
+      children.add(Positioned.fill(
+        child: Center(
+          child: Opacity(
+            opacity: seg(t, starts[i], starts[i] + 0.02),
+            child: Transform.translate(
+              offset: Offset(0, ys[i]),
+              child: Transform(
+                alignment: Alignment.center,
+                transform: Matrix4.identity()
+                  ..rotateZ(wobble)
+                  ..scale(math.max(0.01, p)),
+                child: _Slab(width: cw, height: h, colors: m.colors, icon: m.icons[i], label: m.labels[i], sub: m.subs[i], glow: seg(t, starts[i] + 0.1, starts[i] + 0.25) * (0.4 + 0.6 * pulse), spec: raw > 0.6 ? (raw - 0.6) / 0.4 : -1),
+              ),
+            ),
+          ),
+        ),
+      ));
+      final burstT = seg(t, starts[i] + 0.02, starts[i] + 0.3);
+      if (burstT > 0 && burstT < 1) {
+        children.add(Positioned.fill(child: Center(child: Transform.translate(offset: Offset(0, ys[i]), child: CustomPaint(size: Size(cw + 120, h + 120), painter: _BurstPainter(m.colors, burstT, i))))));
+      }
+    }
+    return SizedBox(width: w, height: 330, child: Stack(clipBehavior: Clip.none, children: children));
+  }
+
   Widget _assemble(_UnfoldMeta m, double t, double pulse, double w) {
+
     const h = 96.0;
     final cw = w * 0.84;
     const finals = [-92.0, 0.0, 92.0];
@@ -1013,7 +1139,50 @@ class _SeamPainter extends CustomPainter {
   bool shouldRepaint(covariant _SeamPainter old) => old.progress != progress || old.fade != fade;
 }
 
+class _RingPainter extends CustomPainter {
+  _RingPainter(this.color, this.appear, this.pulse);
+  final Color color;
+  final double appear;
+  final double pulse;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = Rect.fromCenter(center: size.center(Offset.zero), width: size.width * appear, height: size.height * appear);
+    canvas.drawOval(r, Paint()..style = PaintingStyle.stroke..strokeWidth = 10..color = color.withValues(alpha: 0.12 + 0.1 * pulse)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12));
+    canvas.drawOval(r, Paint()..style = PaintingStyle.stroke..strokeWidth = 2.5..color = color.withValues(alpha: 0.7));
+    canvas.drawOval(r.deflate(14), Paint()..style = PaintingStyle.stroke..strokeWidth = 1..color = color.withValues(alpha: 0.3));
+  }
+
+  @override
+  bool shouldRepaint(covariant _RingPainter old) => true;
+}
+
+class _BurstPainter extends CustomPainter {
+  _BurstPainter(this.colors, this.t, this.seed);
+  final List<Color> colors;
+  final double t;
+  final int seed;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = size.center(Offset.zero);
+    final e = Curves.easeOutCubic.transform(t);
+    canvas.drawCircle(c, 40 + e * size.width * 0.42, Paint()..style = PaintingStyle.stroke..strokeWidth = 5 * (1 - t)..color = colors.first.withValues(alpha: 0.6 * (1 - t)));
+    final r = math.Random(seed * 17 + 3);
+    for (var i = 0; i < 26; i++) {
+      final a = r.nextDouble() * math.pi * 2;
+      final dist = (40 + r.nextDouble() * 110) * e;
+      final p = c + Offset(math.cos(a) * dist * 1.6, math.sin(a) * dist + 40 * t * t * 3);
+      canvas.drawCircle(p, (2 + r.nextDouble() * 3) * (1 - t * 0.6), Paint()..color = (i.isEven ? colors.first : Colors.white).withValues(alpha: (1 - t).clamp(0.0, 1.0)));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _BurstPainter old) => true;
+}
+
 class _RipplePainter extends CustomPainter {
+
   _RipplePainter(this.color, this.t);
   final Color color;
   final double t;

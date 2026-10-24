@@ -59,6 +59,9 @@ const Map<String, String> kStudioSoundThemes = {
   'BALANCE LAB': 'click',
   'GEAR LAB': 'tech',
   'OPTICS LAB': 'sparkle',
+  'LASER MAZE': 'zap',
+  'LIGHT MIXER': 'sparkle',
+  'ATOM BUILDER': 'lab',
   'CIPHER LAB': 'tech',
   'PIXEL TV': 'tech',
 };

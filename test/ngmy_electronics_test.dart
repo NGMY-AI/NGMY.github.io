@@ -61,6 +61,27 @@ void main() {
     expect(b.of('capacitor').first.vc, greaterThan(0.5));
   });
 
+  test('a battery wired straight to a switch sparks and overheats', () {
+    final b = ElectronicsBoard();
+    final bat = b.add('battery', 0.2, 0.5)..volts = 9;
+    final sw = b.add('switch', 0.6, 0.5)..on = true;
+    b.connect(bat, 0, sw, 0);
+    b.connect(sw, 1, bat, 1);
+    var events = 0;
+    b.onEvent = (k, p) {
+      if (k == 'short') events++;
+    };
+    for (var i = 0; i < 20; i++) {
+      b.step(1 / 30);
+    }
+    expect(events, greaterThan(0));
+    expect(b.sparks, isNotEmpty);
+    for (var i = 0; i < 90; i++) {
+      b.step(1 / 30);
+    }
+    expect(bat.burnt, isTrue);
+  });
+
   test('the toaster glows', () {
     expect(run('Toaster').of('heater').first.glow, greaterThan(0.5));
   });

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'ngmy_electronics_board.dart';
 import 'ngmy_studio_kit.dart';
@@ -42,6 +43,11 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
   void initState() {
     super.initState();
     b.onEvent = (kind, p) {
+      if (kind == 'short') {
+        NgmyTone.play(1800, ms: 120, wave: 'noise', volume: 0.55);
+        NgmyTone.play(200, ms: 160, wave: 'saw', sweep: 2.2, volume: 0.4);
+        HapticFeedback.heavyImpact();
+      }
       if (kind == 'burn') {
         NgmyTone.play(140, ms: 320, wave: 'noise', volume: 0.6);
         NgmyTone.play(900, ms: 160, wave: 'square', sweep: 1.5, volume: 0.35);

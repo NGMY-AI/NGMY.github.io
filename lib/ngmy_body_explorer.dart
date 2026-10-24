@@ -197,16 +197,54 @@ class _BodyModel {
       ti += h.$6;
       p.vEnd = vi;
       p.tEnd = ti;
-      // Smooth shading: every point faces the average of the triangles around it.
+      // Smooth shading: every point faces the average of the triangles around it. Inside parts use the main
+      // direction of the surface around the point, which does not care which way a triangle was wound.
+      final tensor = h.$2 == 0 ? null : Float64List(h.$5 * 6);
       for (var t = p.tStart; t < p.tEnd; t++) {
         final a = tris[t * 3] * 3, b = tris[t * 3 + 1] * 3, c = tris[t * 3 + 2] * 3;
         final ux = pos[b] - pos[a], uy = pos[b + 1] - pos[a + 1], uz = pos[b + 2] - pos[a + 2];
         final vx = pos[c] - pos[a], vy = pos[c + 1] - pos[a + 1], vz = pos[c + 2] - pos[a + 2];
         final nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
-        for (final q in [a, b, c]) {
-          nrm[q] += nx;
-          nrm[q + 1] += ny;
-          nrm[q + 2] += nz;
+        if (tensor == null) {
+          for (final q in [a, b, c]) {
+            nrm[q] += nx;
+            nrm[q + 1] += ny;
+            nrm[q + 2] += nz;
+          }
+        } else {
+          final area = math.sqrt(nx * nx + ny * ny + nz * nz);
+          if (area > 1e-14) {
+            final ux2 = nx / area, uy2 = ny / area, uz2 = nz / area;
+            for (final q in [a, b, c]) {
+              final k = (q ~/ 3 - p.vStart) * 6;
+              tensor[k] += area * ux2 * ux2;
+              tensor[k + 1] += area * ux2 * uy2;
+              tensor[k + 2] += area * ux2 * uz2;
+              tensor[k + 3] += area * uy2 * uy2;
+              tensor[k + 4] += area * uy2 * uz2;
+              tensor[k + 5] += area * uz2 * uz2;
+            }
+          }
+        }
+      }
+      if (tensor != null) {
+        for (var v = 0; v < h.$5; v++) {
+          final k = v * 6;
+          var x = 0.577, y = 0.577, z = 0.577;
+          for (var it = 0; it < 12; it++) {
+            final nx = tensor[k] * x + tensor[k + 1] * y + tensor[k + 2] * z;
+            final ny = tensor[k + 1] * x + tensor[k + 3] * y + tensor[k + 4] * z;
+            final nz = tensor[k + 2] * x + tensor[k + 4] * y + tensor[k + 5] * z;
+            final l = math.sqrt(nx * nx + ny * ny + nz * nz);
+            if (l < 1e-12) break;
+            x = nx / l;
+            y = ny / l;
+            z = nz / l;
+          }
+          final q = (p.vStart + v) * 3;
+          nrm[q] = x;
+          nrm[q + 1] = y;
+          nrm[q + 2] = z;
         }
       }
       var sx = 0.0, sy = 0.0, sz = 0.0;
@@ -484,7 +522,7 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
       triTotal += p.tEnd - p.tStart;
       final a = p.anim == 1 ? heart : (p.anim == 2 ? breath : 1.0);
       final c = p.center;
-      final twoSided = p.layer == 'muscle' || p.layer == 'vessel';
+      final twoSided = p.layer != 'skin';
       for (var i = p.vStart; i < p.vEnd; i++) {
         var x = m.pos[i * 3], y = m.pos[i * 3 + 1], z = m.pos[i * 3 + 2];
         if (a != 1.0) {
@@ -530,8 +568,8 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
     for (final p in visible) {
       for (var t = p.tStart; t < p.tEnd; t++) {
         final a = m.tris[t * 3], b = m.tris[t * 3 + 1], c = m.tris[t * 3 + 2];
-        // Do not draw faces that point away from us: it keeps the picture clean.
-        if ((facing[a] + facing[b] + facing[c]) / 3 < -0.04) continue;
+        // Skin faces that point away are skipped. Inside parts are drawn whole, so no holes can open up.
+        if ((facing[a] + facing[b] + facing[c]) / 3 < -0.04 && m.parts[m.vPart[a]].layer == 'skin') continue;
         tz[n] = (zs[a] + zs[b] + zs[c]) / 3;
         tid[n] = t;
         zmin = math.min(zmin, tz[n]);
@@ -573,8 +611,14 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
       final a = _alpha(part);
       final selected = part.group == _sel;
       if (selected) base = Color.lerp(base, Colors.white, 0.25 + 0.2 * selPulse)!;
+      final ghost = part.layer == 'skin' && _skinMode == 1;
       for (var c = 0; c < 3; c++) {
         final s = shade[m.tris[t * 3 + c]];
+        if (ghost) {
+          final rim = math.pow(1 - facing[m.tris[t * 3 + c]].abs().clamp(0.0, 1.0), 1.6).toDouble();
+          cols[k * 3 + c] = Color.fromARGB((255 * (0.035 + 0.3 * rim)).round(), 170, 210, 240).toARGB32();
+          continue;
+        }
         final col = Color.fromARGB((a * 255).round().clamp(0, 255), (base.r * 255 * s).round().clamp(0, 255), (base.g * 255 * s).round().clamp(0, 255), (base.b * 255 * s).round().clamp(0, 255));
         cols[k * 3 + c] = col.toARGB32();
       }

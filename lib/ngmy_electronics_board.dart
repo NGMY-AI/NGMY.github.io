@@ -70,6 +70,7 @@ class Part {
   bool burnt = false;
   double spin = 0; // animation angle
   double vc = 0; // capacitor voltage
+  double hot = 0; // a power source being shorted heats up (0..1.4)
 
   // Results of the last solve.
   double v = 0; // volts across (a minus b)
@@ -79,7 +80,15 @@ class Part {
   PartInfo get info => kPartByKind[kind]!;
 }
 
+/// A flying spark, in board units plus a pixel offset (so it starts exactly on a terminal).
+class Spark {
+  Spark(this.x, this.y, this.ox, this.oy, this.vx, this.vy, this.life);
+  final double x, y;
+  double ox, oy, vx, vy, life;
+}
+
 class Wire {
+
   Wire(this.a, this.ta, this.b, this.tb);
   final Part a;
   final int ta;
@@ -100,6 +109,29 @@ class ElectronicsBoard {
   int _id = 0;
   double time = 0;
   void Function(String kind, Part p)? onEvent;
+  final List<Spark> sparks = [];
+  final math.Random _rnd = math.Random();
+  double _shortSignal = 0;
+
+  /// Throws [n] sparks from near the part, a terminal side (-1 left, 1 right) or both (0).
+  void emitSparks(Part p, int n, {int side = 0, double speed = 220}) {
+    for (var i = 0; i < n && sparks.length < 160; i++) {
+      final sx = side == 0 ? (_rnd.nextBool() ? -1 : 1) : side;
+      final a = _rnd.nextDouble() * math.pi * 2;
+      final v = speed * (0.3 + _rnd.nextDouble());
+      sparks.add(Spark(p.x, p.y, sx * kTerm.toDouble(), 0, math.cos(a) * v, math.sin(a) * v - 60, 0.35 + _rnd.nextDouble() * 0.45));
+    }
+  }
+
+  void _moveSparks(double dt) {
+    for (final s in sparks) {
+      s.ox += s.vx * dt;
+      s.oy += s.vy * dt;
+      s.vy += 520 * dt;
+      s.life -= dt;
+    }
+    sparks.removeWhere((s) => s.life <= 0);
+  }
 
   Part add(String kind, double x, double y) {
     final p = Part('p${_id++}', kind, x, y);
@@ -186,6 +218,8 @@ class ElectronicsBoard {
   /// Runs the circuit for [dt] seconds of real time.
   void step(double dt) {
     time += dt;
+    _moveSparks(dt);
+    _shortSignal = math.max(0, _shortSignal - dt);
     final h = math.min(dt * 6, 0.12); // the circuit runs a little faster than real life
     // Crank slows down; turbine stays at its wind setting.
     for (final p in parts) {
@@ -281,7 +315,7 @@ class ElectronicsBoard {
         final a = net(p, 0), b = net(p, 1);
         double gg;
         double inj = 0;
-        if (isSource(p)) {
+        if (isSource(p) && !p.burnt) {
           gg = 1 / _sourceR(p);
           inj = _sourceVolts(p) * gg;
         } else if (p.burnt && p.kind != 'capacitor') {
@@ -374,6 +408,21 @@ class ElectronicsBoard {
   /// What each part does with its voltage and current: glow, spin, burn out.
   void _effects(double dt) {
     for (final p in parts) {
+      if (isSource(p) && !p.burnt) {
+        // A big current from a power source means its wires are joined without anything to use the power: a short circuit.
+        final isc = _sourceVolts(p) / _sourceR(p);
+        if (isc > 0.3 && p.i.abs() > 0.4 && p.i.abs() > isc * 0.55) {
+          p.hot += dt * 0.9;
+          emitSparks(p, 3, speed: 260);
+          if (_shortSignal <= 0) {
+            _shortSignal = 0.35;
+            onEvent?.call('short', p);
+          }
+          if (p.hot > 1.4) _burn(p, 'source');
+        } else {
+          p.hot = math.max(0, p.hot - dt * 0.8);
+        }
+      }
       final power = (p.v * p.i).abs();
       final cur = p.i.abs();
       switch (p.kind) {
@@ -414,6 +463,7 @@ class ElectronicsBoard {
 
   void _burn(Part p, String why) {
     p.burnt = true;
+    emitSparks(p, 34, speed: 300);
     onEvent?.call('burn', p);
   }
 
@@ -468,6 +518,7 @@ class BoardPainter extends CustomPainter {
     }
     for (final p in board.parts) {
       final c = Offset(p.x * size.width, p.y * size.height);
+      if (p.hot > 0) canvas.drawCircle(c, 46 + 14 * math.sin(board.time * 30), Paint()..color = const Color(0xFFFF3B1F).withValues(alpha: (p.hot * 0.45).clamp(0.0, 0.6))..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14));
       final pop = popIn[p.id] ?? 1.0;
       canvas.save();
       canvas.translate(c.dx, c.dy);
@@ -483,6 +534,21 @@ class BoardPainter extends CustomPainter {
         }
       }
     }
+    // Sparks fly on top of everything.
+    for (final sp in board.sparks) {
+      final pos = Offset(sp.x * size.width + sp.ox, sp.y * size.height + sp.oy);
+      final k = (sp.life / 0.8).clamp(0.0, 1.0);
+      final col = Color.lerp(const Color(0xFFFF6A00), const Color(0xFFFFF3A0), k)!;
+      canvas.drawLine(pos, pos - Offset(sp.vx, sp.vy) * 0.035, Paint()..color = col..strokeWidth = 2.4..strokeCap = StrokeCap.round);
+      canvas.drawCircle(pos, 4.5 * k + 1, Paint()..color = col.withValues(alpha: 0.35 * k)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
+    }
+    final shorted = board.parts.any((p) => p.hot > 0.05);
+    if (shorted) {
+      final warn = board.parts.fold<double>(0, (m, p) => math.max(m, p.hot));
+      canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFFFF2A1A).withValues(alpha: 0.05 + 0.09 * warn * (0.5 + 0.5 * math.sin(board.time * 22))));
+      final tp = TextPainter(text: const TextSpan(text: '⚡ SHORT CIRCUIT! Too much current. Add a load or a fuse.', style: TextStyle(color: Color(0xFFFFE08A), fontSize: 13, fontWeight: FontWeight.w900)), textDirection: TextDirection.ltr)..layout(maxWidth: size.width - 24);
+      tp.paint(canvas, Offset(12, 10));
+    }
   }
 
   void _text(Canvas canvas, String t, Offset o, Color c, double s) {
@@ -496,7 +562,8 @@ class BoardPainter extends CustomPainter {
     path.quadraticBezierTo(mid.dx, mid.dy, b.dx, b.dy);
     final cur = w.a.i.abs() + w.b.i.abs();
     final flowing = (w.a.i.abs() > 0.003 && w.b.i.abs() > 0.003);
-    final hot = flowing ? Color.lerp(const Color(0xFF38BDF8), const Color(0xFFFBBF24), (cur * 1.2).clamp(0.0, 1.0))! : const Color(0xFF6B7280);
+    final heat = math.max(w.a.hot, w.b.hot);
+    final hot = heat > 0.05 ? Color.lerp(const Color(0xFFFBBF24), const Color(0xFFFF3B1F), (heat / 1.2).clamp(0.0, 1.0))! : (flowing ? Color.lerp(const Color(0xFF38BDF8), const Color(0xFFFBBF24), (cur * 1.2).clamp(0.0, 1.0))! : const Color(0xFF6B7280));
     canvas.drawPath(path, Paint()..style = PaintingStyle.stroke..strokeWidth = sel ? 7 : 5..strokeCap = StrokeCap.round..color = (sel ? Colors.white : hot).withValues(alpha: flowing ? 0.4 : 0.55));
     canvas.drawPath(path, Paint()..style = PaintingStyle.stroke..strokeWidth = 2.4..strokeCap = StrokeCap.round..color = sel ? Colors.white : hot);
     if (flowing) {

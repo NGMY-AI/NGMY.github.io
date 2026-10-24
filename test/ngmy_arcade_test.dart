@@ -5,6 +5,8 @@ import 'package:ngmy/ngmy_arcade_b.dart';
 import 'package:ngmy/ngmy_arcade_c.dart';
 import 'package:ngmy/ngmy_edu_a.dart';
 import 'package:ngmy/ngmy_edu_b.dart';
+import 'package:ngmy/ngmy_fun_a.dart';
+import 'package:ngmy/ngmy_fun_b.dart';
 import 'package:ngmy/ngmy_core_studios_b.dart';
 import 'package:ngmy/ngmy_play_hub.dart';
 import 'package:ngmy/ngmy_studio_kit.dart';
@@ -24,8 +26,13 @@ void main() {
     'BALANCE LAB': () => const NgmyBalanceStudio(),
     'GEAR LAB': () => const NgmyGearStudio(),
     'OPTICS LAB': () => const NgmyOpticsStudio(),
+    'LASER MAZE': () => const NgmyLaserMazeStudio(),
+    'LIGHT MIXER': () => const NgmyLightMixerStudio(),
+    'RADIO LAB': () => const NgmyRadioStudio(),
+    'PIXEL TV': () => const NgmyPixelScreenStudio(),
+    'ATOM BUILDER': () => const NgmyAtomStudio(),
     'CIPHER LAB': () => const NgmyCipherStudio(),
-    'MAGNET LAB': () => const NgmyMagnetLab(),
+    'MAGNET LAB': () => const NgmyMagnetCraneStudio(),
     'CHAIN BURST': () => const NgmyChainBurstStudio(),
   };
 
@@ -62,6 +69,21 @@ void main() {
     expect(gearRatio(16, 32, 12, 24), 0.25);
     expect(lensImageDistance(120, 60), closeTo(120, 1e-9));
     expect(lensImageDistance(60, 60), isNull);
+  });
+
+  test('every laser level can be won with the mirrors it gives you', () {
+    for (var n = 0; n < 60; n++) {
+      final lv = makeLaserLevel(n);
+      expect(lv.solution.length, lessThanOrEqualTo(lv.mirrors), reason: 'level $n');
+      final r = traceLaser(lv, lv.solution);
+      expect(r.hit.length, lv.targets.length, reason: 'level $n');
+    }
+    expect(colourGap([1, 0, 0], [1, 0, 0]), 0);
+    expect(electronShells(11), [2, 8, 1]);
+    expect(nucleusStable(6, 6), isTrue);
+    expect(nucleusStable(6, 8), isFalse);
+    expect(stationStrength(kStations[0], kStations[0].mhz, 1), closeTo(1, 1e-9));
+    expect(stationStrength(kStations[0], 100, 1), lessThan(0.01));
   });
 
   test('the ecosystem stays alive on its own and balance puzzles can be solved', () {
