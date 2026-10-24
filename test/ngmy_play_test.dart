@@ -117,6 +117,31 @@ void main() {
     await t.pumpWidget(const SizedBox());
   });
 
+  testWidgets('you can ask the AI about what it built', (t) async {
+    const reply = '{"title":"Test lamp","explain":"A battery lights a bulb.","honest":"","steps":["Add the battery","Add the bulb","Wire it up"],'
+        '"parts":[{"id":"a","kind":"battery","x":0.25,"y":0.3,"volts":3},{"id":"b","kind":"bulb","x":0.75,"y":0.3}],'
+        '"wires":[["a",0,"b",0],["b",1,"a",1]]}';
+    final prompts = <String>[];
+    await open(t, NgmyInventorStudio(ai: (p) async {
+      prompts.add(p);
+      return p.contains('Question:') ? 'The bulb glows because the battery pushes current round the loop.' : reply;
+    }));
+    await t.enterText(find.byType(TextField), 'a lamp');
+    await t.tap(find.text('Invent'));
+    for (var i = 0; i < 40; i++) {
+      await t.pump(const Duration(milliseconds: 150));
+    }
+    await t.enterText(find.byType(TextField), 'why does the bulb glow?');
+    await t.tap(find.text('Ask'));
+    for (var i = 0; i < 6; i++) {
+      await t.pump(const Duration(milliseconds: 150));
+    }
+    expect(find.textContaining('battery pushes current'), findsOneWidget);
+    expect(prompts.last, contains('Light bulb #2: working'));
+    expect(t.takeException(), isNull);
+    await t.pumpWidget(const SizedBox());
+  });
+
   test('inventor designs always work in the simulator', () {
     for (final w in ['a radio', 'a torch', 'a doorbell', 'free energy', 'a fan powered by wind', 'something strange']) {
       expect(designWorks(localDesign(w).recipe), isTrue, reason: w);

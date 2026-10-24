@@ -3,7 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_arcade_a.dart';
 import 'package:ngmy/ngmy_arcade_b.dart';
 import 'package:ngmy/ngmy_arcade_c.dart';
-import 'package:ngmy/ngmy_chord_wheel.dart';
+import 'package:ngmy/ngmy_edu_a.dart';
+import 'package:ngmy/ngmy_edu_b.dart';
 import 'package:ngmy/ngmy_core_studios_b.dart';
 import 'package:ngmy/ngmy_play_hub.dart';
 import 'package:ngmy/ngmy_studio_kit.dart';
@@ -14,18 +15,16 @@ void main() {
   setUpAll(() => NgmyTone.enabled = false);
 
   final studios = <String, Widget Function()>{
-    'BUG SMASHER': () => const NgmyBugSmasherStudio(),
     'ROCKET LANDER': () => const NgmyRocketLanderStudio(),
-    'DATA SNAKE': () => const NgmySnakeStudio(),
-    'BINARY 2048': () => const NgmyBinary2048Studio(),
-    'BUG HUNT': () => const NgmyBugHuntStudio(),
-    'SIGNAL BREAKER': () => const NgmyBreakerStudio(),
-    'PASSWORD LAB': () => const NgmyPasswordLabStudio(),
-    'WAVE LAB': () => const NgmyWaveLabStudio(),
-    'ROBOT CODER': () => const NgmyRobotCoderStudio(),
     'INTERNET JOURNEY': () => const NgmyInternetJourneyStudio(),
     'POWER GRID': () => const NgmyPowerGridStudio(),
-    'CHORD LAB': () => const NgmyChordWheelStudio(),
+    'MOLECULE MAKER': () => const NgmyMoleculeStudio(),
+    'DNA LAB': () => const NgmyDnaStudio(),
+    'ECOSYSTEM LAB': () => const NgmyEcosystemStudio(),
+    'BALANCE LAB': () => const NgmyBalanceStudio(),
+    'GEAR LAB': () => const NgmyGearStudio(),
+    'OPTICS LAB': () => const NgmyOpticsStudio(),
+    'CIPHER LAB': () => const NgmyCipherStudio(),
     'MAGNET LAB': () => const NgmyMagnetLab(),
     'CHAIN BURST': () => const NgmyChainBurstStudio(),
   };
@@ -44,6 +43,38 @@ void main() {
       expect(tester(t), isNull);
     });
   }
+
+  test('science rules behind the new labs', () {
+    final water = kMolecules.firstWhere((m) => m.name == 'Water');
+    final co2 = kMolecules.firstWhere((m) => m.name == 'Carbon dioxide');
+    expect(moleculeComplete(['O', 'H', 'H'], {1: 1, 2: 1}, water), isTrue);
+    expect(moleculeComplete(['O', 'H', 'H'], {1: 1}, water), isFalse);
+    expect(moleculeComplete(['C', 'O', 'O'], {1: 2, 2: 2}, co2), isTrue);
+    expect(moleculeComplete(['C', 'O', 'O'], {1: 1, 2: 1}, co2), isFalse);
+    expect(codonToAmino('AUG'), 'M');
+    expect(codonToAmino('UUU'), 'F');
+    expect(codonToAmino('UAA'), '*');
+    expect(rnaPartner('A'), 'U');
+    expect(dnaPartner('G'), 'C');
+    expect(caesar('ABC XYZ', 3), 'DEF ABC');
+    expect(caesar(caesar('HELLO', 7), -7), 'HELLO');
+    expect(vigenere(vigenere('ATTACKATDAWN', 'LEMON'), 'LEMON', decode: true), 'ATTACKATDAWN');
+    expect(gearRatio(16, 32, 12, 24), 0.25);
+    expect(lensImageDistance(120, 60), closeTo(120, 1e-9));
+    expect(lensImageDistance(60, 60), isNull);
+  });
+
+  test('the ecosystem stays alive on its own and balance puzzles can be solved', () {
+    var s = [80.0, 30.0, 6.0];
+    for (var i = 0; i < 8000; i++) {
+      s = ecoStep(s, 0.05);
+    }
+    expect(s[1], greaterThan(5));
+    expect(s[2], greaterThan(1));
+    for (final lv in balanceLevels()) {
+      expect(lv.torque, inInclusiveRange(1, 75));
+    }
+  });
 
   testWidgets('discovery hub has no AI inventor and lists new games', (t) async {
     await t.pumpWidget(const MaterialApp(home: NgmyDiscoveryHub()));

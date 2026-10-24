@@ -257,7 +257,41 @@ const List<_World> _kLanderWorlds = [
   _World('Jupiter', 24.79, Color(0xFFFB923C), 'Jupiter is so heavy that you would weigh two and a half times as much!'),
 ];
 
+/// Parts you bolt onto the rocket. Each has a real trade-off: more power or protection costs weight.
+class RocketPart {
+  const RocketPart(this.name, this.about, this.mass, this.value);
+  final String name;
+  final String about;
+  final double mass;
+  final double value;
+}
+
+const List<RocketPart> kEngines = [
+  RocketPart('Small engine', 'Light, but weak. Fine on small moons.', 0.2, 0.6),
+  RocketPart('Medium engine', 'A good all-rounder.', 0.3, 0.9),
+  RocketPart('Big engine', 'Strong enough for heavy planets, but heavy and thirsty.', 0.5, 1.6),
+];
+const List<RocketPart> kTanks = [
+  RocketPart('Small tank', 'Light, but runs dry quickly.', 0.2, 0.7),
+  RocketPart('Medium tank', 'Balanced.', 0.35, 1.0),
+  RocketPart('Large tank', 'Lots of fuel, but fuel is heavy to carry.', 0.6, 1.5),
+];
+// value = the fastest touchdown that is still safe; the second number is how tilted you may be.
+const List<RocketPart> kGears = [
+  RocketPart('Simple legs', 'Light. Land gently.', 0.15, 0.20),
+  RocketPart('Shock legs', 'Springs soak up a harder landing.', 0.3, 0.28),
+  RocketPart('Airbags', 'Bounce safely at higher speed and survive a tilt.', 0.4, 0.34),
+];
+const List<RocketPart> kExtras = [
+  RocketPart('Radar', 'Shows your height above the ground.', 0.1, 0),
+  RocketPart('Gyroscope', 'Keeps the rocket upright by itself.', 0.2, 0),
+  RocketPart('Parachute', 'Slows you in air. Useless on the Moon, where there is none.', 0.15, 0),
+];
+// How thick the air is on each world, in the same order as the worlds.
+const List<double> kAtmosphere = [0, 0.15, 0, 1.6, 1.0, 0.6, 0.8];
+
 class NgmyRocketLanderStudio extends StatefulWidget {
+
   const NgmyRocketLanderStudio({super.key});
 
   @override
@@ -278,6 +312,15 @@ class _NgmyRocketLanderStudioState extends State<NgmyRocketLanderStudio> with Si
   double _padW = 0.3;
   Size _size = Size.zero;
   double _t = 0;
+  int _eng = 1, _tank = 1, _gear = 0;
+  final Set<int> _extras = {};
+  bool _chute = false;
+
+  double get _mass => 0.8 + kEngines[_eng].mass + kTanks[_tank].mass + kGears[_gear].mass + [for (final e in _extras) kExtras[e].mass].fold(0.0, (a, b) => a + b);
+  double get _thrustAccel => kEngines[_eng].value / _mass;
+  double get _burn => 0.1 * (kEngines[_eng].value / 0.9) / kTanks[_tank].value;
+  double _gScreen(int world) => _kLanderWorlds[world].g / 9.81 * 0.28;
+  double get _twr => _thrustAccel / _gScreen(_world);
 
   @override
   void initState() {
@@ -296,6 +339,7 @@ class _NgmyRocketLanderStudioState extends State<NgmyRocketLanderStudio> with Si
     _v = Offset((r.nextDouble() - 0.5) * 0.08, 0);
     _angle = 0;
     _fuel = 1;
+    _chute = false;
     _state = 'flying';
     _why = '';
   }
@@ -312,12 +356,14 @@ class _NgmyRocketLanderStudioState extends State<NgmyRocketLanderStudio> with Si
     if (_left) _angle -= dt * 2.2;
     if (_right) _angle += dt * 2.2;
     _angle = _angle.clamp(-1.2, 1.2);
+    if (_extras.contains(1) && !_left && !_right) _angle *= math.max(0, 1 - dt * 2.5);
     var a = Offset(0, g);
     if (_thrust && _fuel > 0) {
-      const power = 0.62;
+      final power = _thrustAccel;
       a += Offset(math.sin(_angle) * power, -math.cos(_angle) * power);
-      _fuel = math.max(0, _fuel - dt * 0.16);
+      _fuel = math.max(0, _fuel - dt * _burn);
     }
+    if (_chute) a -= _v * (_v.distance * 6 * kAtmosphere[_world]);
     _v += a * dt;
     _p += _v * dt;
     if (_p.dx < 0.02 || _p.dx > 0.98) {
@@ -327,7 +373,7 @@ class _NgmyRocketLanderStudioState extends State<NgmyRocketLanderStudio> with Si
     if (_p.dy < 0.02) _p = Offset(_p.dx, 0.02);
     if (_p.dy >= 0.86) {
       final onPad = (_p.dx - _padX).abs() < _padW / 2;
-      final soft = _v.dy < 0.2 && _v.dx.abs() < 0.08 && _angle.abs() < 0.3;
+      final soft = _v.dy < kGears[_gear].value && _v.dx.abs() < 0.08 && _angle.abs() < (_gear == 2 ? 0.5 : 0.3);
       if (onPad && soft) {
         _state = 'landed';
         if (_world + 1 > _unlocked && _world + 1 < _kLanderWorlds.length) {
@@ -337,7 +383,7 @@ class _NgmyRocketLanderStudioState extends State<NgmyRocketLanderStudio> with Si
         NgmyTone.chord('bell', [0, 4, 7, 12], ms: 600, volume: 0.45);
       } else {
         _state = 'crashed';
-        _why = !onPad ? 'You missed the landing pad.' : (_v.dy >= 0.2 ? 'Too fast! Use the thruster to slow down.' : (_angle.abs() >= 0.3 ? 'Not upright. Level out before you land.' : 'Sideways drift was too big.'));
+        _why = !onPad ? 'You missed the landing pad.' : (_v.dy >= kGears[_gear].value ? (_twr < 1 ? 'Too fast, and with a thrust-to-weight ratio of ${_twr.toStringAsFixed(2)} this rocket can never hover here. Build with a bigger engine or less weight.' : (_fuel <= 0 ? 'You ran out of fuel. A bigger tank carries more, but weighs more.' : 'Too fast! Start the engine earlier to slow down.')) : (_angle.abs() >= (_gear == 2 ? 0.5 : 0.3) ? 'Not upright. Level out before you land.' : 'Sideways drift was too big.'));
         NgmyTone.play(80, ms: 500, wave: 'noise', volume: 0.6);
         HapticFeedback.heavyImpact();
       }
@@ -346,7 +392,55 @@ class _NgmyRocketLanderStudioState extends State<NgmyRocketLanderStudio> with Si
     setState(() {});
   }
 
-  Widget _btn(IconData icon, void Function(bool) set, bool on, {double size = 74}) => Listener(
+  Widget _partRow(String label, List<RocketPart> parts, bool Function(int) on, void Function(int) pick, Color c) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label, style: const TextStyle(color: Colors.white54, fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: 1)),
+          const SizedBox(height: 3),
+          Wrap(spacing: 6, runSpacing: 6, children: [for (var i = 0; i < parts.length; i++) StudioChip(label: parts[i].name, selected: on(i), color: c, onTap: () => setState(() => pick(i)))]),
+        ]),
+      );
+
+  Widget _buildPanel(_World w) {
+    final ok = _twr >= 1;
+    final fuelSecs = (1 / _burn).round();
+    final airy = kAtmosphere[_world] > 0;
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.all(10),
+        constraints: const BoxConstraints(maxWidth: 420),
+        decoration: BoxDecoration(color: const Color(0xF217171A), borderRadius: BorderRadius.circular(24), border: Border.all(color: w.color.withValues(alpha: 0.6))),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Build a rocket for ${w.name}', style: TextStyle(color: w.color, fontWeight: FontWeight.w900, fontSize: 19)),
+            const SizedBox(height: 4),
+            Text('${w.fact} Gravity here: ${w.g} m/s².', style: const TextStyle(color: Colors.white70, fontSize: 12.5, height: 1.4)),
+            const SizedBox(height: 10),
+            _partRow('ENGINE: ${kEngines[_eng].about}', kEngines, (i) => _eng == i, (i) => _eng = i, const Color(0xFFFB923C)),
+            _partRow('FUEL TANK: ${kTanks[_tank].about}', kTanks, (i) => _tank == i, (i) => _tank = i, const Color(0xFF4ADE80)),
+            _partRow('LANDING GEAR: ${kGears[_gear].about}', kGears, (i) => _gear == i, (i) => _gear = i, const Color(0xFF38BDF8)),
+            _partRow('EXTRAS (tap to add)', kExtras, (i) => _extras.contains(i), (i) => _extras.contains(i) ? _extras.remove(i) : _extras.add(i), const Color(0xFFA78BFA)),
+            if (_extras.contains(2) && !airy) const Text('⚠ There is no air here, so a parachute will not work.', style: TextStyle(color: Color(0xFFFBBF24), fontSize: 12)),
+            Container(
+              margin: const EdgeInsets.only(top: 6),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: (ok ? const Color(0xFF4ADE80) : const Color(0xFFF87171)).withValues(alpha: 0.14), borderRadius: BorderRadius.circular(12)),
+              child: Text(
+                'Weight (mass): ${_mass.toStringAsFixed(2)}\nThrust-to-weight ratio: ${_twr.toStringAsFixed(2)} ${ok ? '✔ the engine can beat gravity and slow you down' : '✖ under 1: the engine is too weak to hold the rocket up here!'}\nFuel lasts about $fuelSecs seconds of burning.\nSafe landing speed: ${(kGears[_gear].value * 100).round()}.',
+                style: const TextStyle(color: Colors.white, fontSize: 12.5, height: 1.45, fontWeight: FontWeight.w600),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Align(alignment: Alignment.center, child: StudioButton(icon: Icons.rocket_launch_rounded, label: 'Launch', color: const Color(0xFF4ADE80), onTap: () => setState(_reset))),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Widget _btn(IconData icon, void Function(bool) set, bool on, {double size = 74}) =>
+ Listener(
         onPointerDown: (_) => set(true),
         onPointerUp: (_) => set(false),
         onPointerCancel: (_) => set(false),
@@ -359,18 +453,18 @@ class _NgmyRocketLanderStudioState extends State<NgmyRocketLanderStudio> with Si
     return StudioPage(
       title: 'ROCKET LANDER',
       accent: const Color(0xFFFB923C),
-      help: 'Land your rocket softly on the green pad. Gravity pulls you down all the time. Press and hold THRUST to fire the engine and slow your fall (it uses fuel). Press the left and right buttons to tilt the rocket, then thrust to move sideways.\n\nTo land safely you must be on the pad, going slowly, and standing upright.\n\nEach world has different gravity: start on the Moon where it is gentle, and unlock harder worlds all the way to Jupiter, where gravity is 15 times stronger than on the Moon.',
+      help: 'First BUILD your rocket: pick an engine, a fuel tank, landing gear and extras. Everything has weight, and a heavy rocket needs a strong engine. The key number is the thrust-to-weight ratio: it must be above 1 or the engine cannot slow you down. Heavy worlds like Jupiter need a big engine; on the Moon a small one is enough. A parachute only works where there is air.\n\nThen land your rocket softly on the green pad. Gravity pulls you down all the time. Press and hold THRUST to fire the engine and slow your fall (it uses fuel). Press the left and right buttons to tilt the rocket, then thrust to move sideways.\n\nTo land safely you must be on the pad, going slowly, and standing upright.\n\nEach world has different gravity: start on the Moon where it is gentle, and unlock harder worlds all the way to Jupiter, where gravity is 15 times stronger than on the Moon.',
       stage: LayoutBuilder(builder: (context, box) {
         _size = Size(box.maxWidth, box.maxHeight);
         return Stack(fit: StackFit.expand, children: [
           CustomPaint(size: _size, painter: _LanderPainter(this)),
-          Positioned(left: 14, right: 14, top: 6, child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [_hudBox('WORLD', w.name, color: w.color), _hudBox('GRAVITY', '${w.g} m/s²'), _hudBox('FUEL', '${(_fuel * 100).round()}%', color: _fuel < 0.25 ? const Color(0xFFF87171) : const Color(0xFF4ADE80)), _hudBox('SPEED', '${(_v.dy * 100).round()}', color: _v.dy > 0.2 ? const Color(0xFFF87171) : Colors.white)])),
-          if (_state == 'ready') _overlayCard('Land on ${w.name}', '${w.fact}\nGravity here: ${w.g} m/s².', w.color, [StudioButton(icon: Icons.rocket_launch_rounded, label: 'Launch', color: const Color(0xFF4ADE80), onTap: () => setState(_reset))]),
-          if (_state == 'landed') _overlayCard('Perfect landing!', _world + 1 < _kLanderWorlds.length ? 'Next world unlocked: ${_kLanderWorlds[_world + 1].name}.' : 'You landed on every world!', const Color(0xFF4ADE80), [StudioButton(icon: Icons.replay_rounded, label: 'Again', onTap: () => setState(_reset)), if (_world + 1 < _kLanderWorlds.length) StudioButton(icon: Icons.arrow_forward_rounded, label: 'Next world', color: const Color(0xFF4ADE80), onTap: () => setState(() {
+          Positioned(left: 14, right: 14, top: 6, child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [_hudBox('WORLD', w.name, color: w.color), _hudBox('GRAVITY', '${w.g} m/s²'), _hudBox('FUEL', '${(_fuel * 100).round()}%', color: _fuel < 0.25 ? const Color(0xFFF87171) : const Color(0xFF4ADE80)), _hudBox('SPEED', '${(_v.dy * 100).round()}', color: _v.dy > kGears[_gear].value ? const Color(0xFFF87171) : Colors.white), if (_extras.contains(0)) _hudBox('HEIGHT', '${((0.86 - _p.dy).clamp(0, 1) * 1000).round()} m')])),
+          if (_state == 'ready') _buildPanel(w),
+          if (_state == 'landed') _overlayCard('Perfect landing!', _world + 1 < _kLanderWorlds.length ? 'Next world unlocked: ${_kLanderWorlds[_world + 1].name}.' : 'You landed on every world!', const Color(0xFF4ADE80), [StudioButton(icon: Icons.replay_rounded, label: 'Again', onTap: () => setState(_reset)), StudioButton(icon: Icons.build_rounded, label: 'Rebuild', color: const Color(0xFFFBBF24), onTap: () => setState(() => _state = 'ready')), if (_world + 1 < _kLanderWorlds.length) StudioButton(icon: Icons.arrow_forward_rounded, label: 'Next world', color: const Color(0xFF4ADE80), onTap: () => setState(() {
                     _world++;
                     _state = 'ready';
                   }))]),
-          if (_state == 'crashed') _overlayCard('Crash!', _why, const Color(0xFFF87171), [StudioButton(icon: Icons.replay_rounded, label: 'Try again', color: const Color(0xFF4ADE80), onTap: () => setState(_reset))]),
+          if (_state == 'crashed') _overlayCard('Crash!', _why, const Color(0xFFF87171), [StudioButton(icon: Icons.replay_rounded, label: 'Try again', color: const Color(0xFF4ADE80), onTap: () => setState(_reset)), StudioButton(icon: Icons.build_rounded, label: 'Rebuild', color: const Color(0xFFFBBF24), onTap: () => setState(() => _state = 'ready'))]),
         ]);
       }),
       tools: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -386,6 +480,10 @@ class _NgmyRocketLanderStudioState extends State<NgmyRocketLanderStudio> with Si
           _btn(Icons.local_fire_department_rounded, (v) => _thrust = v, _thrust, size: 130),
           const SizedBox(width: 12),
           _btn(Icons.rotate_right_rounded, (v) => _right = v, _right),
+          if (_extras.contains(2)) ...[
+            const SizedBox(width: 12),
+            GestureDetector(onTap: () => setState(() => _chute = !_chute), child: Container(width: 62, height: 62, decoration: BoxDecoration(color: _chute ? const Color(0xFF38BDF8) : Colors.white.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white24)), child: const Icon(Icons.paragliding_rounded, color: Colors.white, size: 28))),
+          ],
         ]),
       ]),
     );

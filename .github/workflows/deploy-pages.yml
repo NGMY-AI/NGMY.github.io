@@ -174,10 +174,18 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs
           if ! git diff --staged --quiet; then
-            git commit -m "Deploy web build to docs/ for ngmy.org [skip ci]"
-            # Avoid rejected push if another job updated main while we built.
-            git pull --rebase origin main || git pull --no-rebase origin main || true
-            git push origin HEAD:main
+            # Several pushes in a row each rebuild docs/. Never merge docs/ files (they conflict):
+            # take whatever main is now, and lay this build's docs/ on top of it.
+            for attempt in 1 2 3 4; do
+              git fetch origin main
+              git reset -q --mixed origin/main
+              git add docs
+              if git diff --staged --quiet; then echo "docs/ unchanged — skip push"; break; fi
+              git commit -q -m "Deploy web build to docs/ for ngmy.org [skip ci]"
+              if git push origin HEAD:main; then break; fi
+              echo "push rejected, retrying ($attempt)"
+              sleep 5
+            done
           else
             echo "docs/ unchanged — skip push"
           fi

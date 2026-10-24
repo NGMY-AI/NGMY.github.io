@@ -140,7 +140,72 @@ bool designWorks(Recipe r) {
   return b.parts.any((p) => !b.isSource(p) && (p.i.abs() > 0.002 || p.glow > 0.05)) && !b.parts.every((p) => p.burnt);
 }
 
+/// What is on the board right now, in words, so questions can be about the real thing.
+String describeBoard(ElectronicsBoard b) {
+  final names = <String, String>{};
+  var n = 0;
+  for (final p in b.parts) {
+    names[p.id] = '${p.info.name} #${++n}';
+  }
+  final lines = <String>[];
+  for (final p in b.parts) {
+    final set = <String>[];
+    if (p.kind == 'battery') set.add('${p.volts} V');
+    if (p.kind == 'resistor') set.add('${p.ohms.round()} ohms');
+    if (const ['solar', 'turbine', 'crank', 'pot'].contains(p.kind)) set.add('level ${(p.level * 100).round()}%');
+    if (p.kind == 'switch') set.add(p.on ? 'closed' : 'open');
+    final state = p.burnt ? 'BURNT OUT' : (p.glow > 0.05 ? 'working (glow ${(p.glow * 100).round()}%)' : 'not working');
+    lines.add('${names[p.id]}${set.isEmpty ? '' : ' (${set.join(', ')})'}: $state, current ${(p.i.abs() * 1000).toStringAsFixed(0)} mA');
+  }
+  final wires = [for (final w in b.wires) '${names[w.a.id]} terminal ${w.ta} to ${names[w.b.id]} terminal ${w.tb}'];
+  return 'Parts:\n${lines.join('\n')}\nWires: ${wires.join('; ')}';
+}
+
+String _askPrompt(Design d, String board, String q, List<(String, String)> history) {
+  final hist = history.isEmpty ? '' : 'Earlier questions:\n${[for (final h in history) 'Q: ${h.$1}\nA: ${h.$2}'].join('\n')}\n\n';
+  return '''
+You are a friendly electronics teacher. A person just had you build "${d.title}" in a circuit simulator. How it works: ${d.explain}
+Build steps: ${d.steps.join(' | ')}
+${d.honest.isEmpty ? '' : 'Honesty note already given: ${d.honest}\n'}
+This is exactly what is on the board right now:
+$board
+
+${hist}Answer their question about THIS invention in 2 to 5 short, simple sentences. Use the real parts and numbers above. Be truthful about physics (no free energy). If something is burnt out or not working, explain why and how to fix it. Do not reply with JSON.
+Question: "$q"
+''';
+}
+
+/// An answer from the parts library when the AI is not reachable.
+String localAnswer(Design d, ElectronicsBoard b, String question) {
+  final q = question.toLowerCase();
+  for (final p in b.parts) {
+    if (p.burnt) {
+      return 'The ${p.info.name.toLowerCase()} burnt out: too much current or too many volts went through it. Lower the battery volts, or add a resistor in the loop, then rebuild it.';
+    }
+  }
+  for (final info in kPartInfos) {
+    final on = b.parts.any((p) => p.kind == info.kind);
+    if (on && (q.contains(info.name.toLowerCase()) || q.contains(info.kind))) {
+      return '${info.about} ${info.made}';
+    }
+  }
+  if (RegExp(r'why|not (work|light|turn|run|on)|dark|nothing').hasMatch(q)) {
+    final working = b.parts.where((p) => !b.isSource(p) && (p.glow > 0.05 || p.i.abs() > 0.002)).isNotEmpty;
+    if (!working) return 'Nothing is flowing. Electricity needs a complete loop from the plus of the power source, through every part, and back to its minus. Check that every wire is joined and that any switch is closed.';
+    return 'It is working: current is flowing round the loop. If it looks dim, the power source may be weak. Try more volts, more light, or turn the crank faster.';
+  }
+  if (RegExp(r'volt|amp|current|power|watt').hasMatch(q)) {
+    final cur = b.parts.fold<double>(0, (m, p) => p.i.abs() > m ? p.i.abs() : m);
+    return 'Voltage is the push, current is how much charge flows each second. Right now the biggest current is about ${(cur * 1000).toStringAsFixed(0)} milliamps. Tap a power part to change its volts and watch the current change.';
+  }
+  if (RegExp(r'free|forever|perpetual|infinite').hasMatch(q)) {
+    return 'No machine can make energy from nothing. This design only turns energy that is already around (sunlight, wind or your muscles) into electricity.';
+  }
+  return '${d.explain} Ask me about a part, like "what does the ${b.parts.isEmpty ? 'battery' : b.parts.first.info.name.toLowerCase()} do?", or "why is it not working?".';
+}
+
 class NgmyInventorStudio extends StatefulWidget {
+
   const NgmyInventorStudio({super.key, this.ai});
 
   /// Asks the AI. Pass a fake in tests.
@@ -161,6 +226,10 @@ class _NgmyInventorStudioState extends State<NgmyInventorStudio> {
   int _step = 0;
   String _status = '';
   int _run = 0;
+  bool _askMode = false;
+  bool _answering = false;
+  final List<(String, String)> _qa = [];
+  final ScrollController _infoScroll = ScrollController();
 
   static const _ideas = [
     'A motor that works without a battery',
@@ -178,10 +247,34 @@ class _NgmyInventorStudioState extends State<NgmyInventorStudio> {
     for (final t in _timers) {
       t.cancel();
     }
+    _infoScroll.dispose();
     super.dispose();
   }
 
+  Future<void> _ask() async {
+    final d = _design;
+    final q = _ctl.text.trim();
+    if (d == null || q.isEmpty || _answering || _thinking) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    _ctl.clear();
+    setState(() => _answering = true);
+    final ask = widget.ai ?? _defaultAi;
+    final board = describeBoard(_board);
+    var a = (await ask(_askPrompt(d, board, q, _qa)))?.trim();
+    if (a == null || a.isEmpty || a.startsWith('{')) a = localAnswer(d, _board, q);
+    if (!mounted) return;
+    final answer = a;
+    setState(() {
+      _answering = false;
+      _qa.add((q, answer));
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_infoScroll.hasClients) _infoScroll.animateTo(_infoScroll.position.maxScrollExtent, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+    });
+  }
+
   Future<void> _invent([String? wish]) async {
+
     final w = (wish ?? _ctl.text).trim();
     if (w.isEmpty || _thinking || _building) return;
     FocusManager.instance.primaryFocus?.unfocus();
@@ -189,6 +282,8 @@ class _NgmyInventorStudioState extends State<NgmyInventorStudio> {
     setState(() {
       _thinking = true;
       _design = null;
+      _qa.clear();
+      _askMode = false;
       _status = 'Thinking about how to build it…';
     });
     NgmyTone.play(500, ms: 160, wave: 'square', sweep: -0.5, volume: 0.25);
@@ -208,6 +303,7 @@ class _NgmyInventorStudioState extends State<NgmyInventorStudio> {
       _thinking = false;
       _design = design;
       _status = note;
+      _askMode = true;
     });
     _build(design);
   }
@@ -290,7 +386,7 @@ class _NgmyInventorStudioState extends State<NgmyInventorStudio> {
           duration: const Duration(milliseconds: 250),
           child: Container(
             width: double.infinity,
-            constraints: const BoxConstraints(maxHeight: 200),
+            constraints: BoxConstraints(maxHeight: _qa.isEmpty ? 200 : 260),
             margin: const EdgeInsets.fromLTRB(10, 6, 10, 2),
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
             decoration: BoxDecoration(color: const Color(0xFFA78BFA).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFA78BFA).withValues(alpha: 0.35))),
@@ -299,6 +395,7 @@ class _NgmyInventorStudioState extends State<NgmyInventorStudio> {
                 : d == null
                     ? const Text('What do you want to invent? Type it below, or tap an idea.', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700, height: 1.4))
                     : SingleChildScrollView(
+                        controller: _infoScroll,
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Row(children: [
                             Expanded(child: Text(d.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15.5))),
@@ -318,26 +415,46 @@ class _NgmyInventorStudioState extends State<NgmyInventorStudio> {
                                 Expanded(child: Text(d.steps[i], style: TextStyle(color: i < _step ? Colors.white : Colors.white54, fontSize: 12, height: 1.3))),
                               ]),
                             ),
+                          for (final qa in _qa) ...[
+                            const SizedBox(height: 8),
+                            Align(alignment: Alignment.centerRight, child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: const Color(0xFFA78BFA).withValues(alpha: 0.3), borderRadius: BorderRadius.circular(12)), child: Text(qa.$1, style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w700)))),
+                            const SizedBox(height: 4),
+                            Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(12)), child: Text(qa.$2, style: const TextStyle(color: Colors.white, fontSize: 12.5, height: 1.4))),
+                          ],
+                          if (_answering) const Padding(padding: EdgeInsets.only(top: 8), child: Text('Thinking…', style: TextStyle(color: Colors.white54, fontSize: 12))),
                         ]),
                       ),
           ),
         ),
-        Expanded(child: BoardEditor(board: _board, popIn: _pop)),
+        Expanded(child: BoardEditor
+(board: _board, popIn: _pop)),
       ]),
       tools: Column(mainAxisSize: MainAxisSize.min, children: [
-        StudioRow(children: [for (final i in _ideas) StudioChip(label: i, selected: false, color: const Color(0xFFA78BFA), onTap: () => _invent(i))]),
+        if (d != null)
+          StudioRow(children: [
+            StudioChip(label: 'Ask about it', selected: _askMode, color: const Color(0xFFA78BFA), onTap: () => setState(() => _askMode = true)),
+            StudioChip(label: 'Invent something new', selected: !_askMode, color: const Color(0xFFA78BFA), onTap: () => setState(() => _askMode = false)),
+            if (_askMode)
+              for (final s in const ['How does it work?', 'Why is it not working?', 'What is the most important part?'])
+                StudioChip(label: s, selected: false, color: const Color(0xFFA78BFA), onTap: () {
+                  _ctl.text = s;
+                  _ask();
+                }),
+          ]),
+        if (d == null || !_askMode) StudioRow(children: [for (final i in _ideas) StudioChip(label: i, selected: false, color: const Color(0xFFA78BFA), onTap: () => _invent(i))]),
+
         Row(children: [
           Expanded(
             child: TextField(
               controller: _ctl,
-              onSubmitted: (_) => _invent(),
+              onSubmitted: (_) => _askMode && d != null ? _ask() : _invent(),
               textInputAction: TextInputAction.go,
               style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(hintText: 'I want to make…', hintStyle: const TextStyle(color: Colors.white38), isDense: true, filled: true, fillColor: Colors.white.withValues(alpha: 0.07), border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none), contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12)),
+              decoration: InputDecoration(hintText: _askMode && d != null ? 'Ask a question about it…' : 'I want to make…', hintStyle: const TextStyle(color: Colors.white38), isDense: true, filled: true, fillColor: Colors.white.withValues(alpha: 0.07), border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none), contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12)),
             ),
           ),
           const SizedBox(width: 8),
-          StudioButton(icon: Icons.auto_awesome_rounded, label: 'Invent', color: const Color(0xFFA78BFA), onTap: () => _invent()),
+          StudioButton(icon: _askMode && d != null ? Icons.question_answer_rounded : Icons.auto_awesome_rounded, label: _askMode && d != null ? 'Ask' : 'Invent', color: const Color(0xFFA78BFA), onTap: () => _askMode && d != null ? _ask() : _invent()),
         ]),
       ]),
     );

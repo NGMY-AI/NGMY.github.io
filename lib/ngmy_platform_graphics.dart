@@ -40,8 +40,49 @@ Widget ngmyCrispAppWrapper(BuildContext context, Widget child) {
       textScaler: mq.textScaler.clamp(minScaleFactor: 1.0, maxScaleFactor: 1.0),
       boldText: false,
     ),
-    child: child,
+    child: _StaleKeyboardGuard(child: child),
   );
+}
+
+/// iPhone web sometimes keeps reporting a keyboard after it closed, which shrinks every page and
+/// leaves a black band at the bottom. With no text box focused there is no keyboard, so the
+/// reported keyboard height is ignored.
+class _StaleKeyboardGuard extends StatefulWidget {
+  const _StaleKeyboardGuard({required this.child});
+  final Widget child;
+
+  @override
+  State<_StaleKeyboardGuard> createState() => _StaleKeyboardGuardState();
+}
+
+class _StaleKeyboardGuardState extends State<_StaleKeyboardGuard> {
+  bool _typing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    FocusManager.instance.addListener(_onFocus);
+  }
+
+  @override
+  void dispose() {
+    FocusManager.instance.removeListener(_onFocus);
+    super.dispose();
+  }
+
+  void _onFocus() {
+    final ctx = FocusManager.instance.primaryFocus?.context;
+    final typing = ctx != null && (ctx.widget is EditableText || ctx.findAncestorWidgetOfExactType<EditableText>() != null);
+    if (typing != _typing && mounted) setState(() => _typing = typing);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_typing) return widget.child;
+    final mq = MediaQuery.of(context);
+    if (mq.viewInsets.bottom == 0) return widget.child;
+    return MediaQuery(data: mq.copyWith(viewInsets: mq.viewInsets.copyWith(bottom: 0)), child: widget.child);
+  }
 }
 
 /// Drop-in [MaterialApp.builder] so standalone guest links receive the same
