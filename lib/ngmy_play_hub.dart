@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_block_builder.dart';
 import 'ngmy_body_explorer.dart';
-import 'ngmy_ai_inventor.dart';
+import 'ngmy_arcade_c.dart';
 import 'ngmy_electronics_lab.dart';
 import 'ngmy_play_studios_a.dart';
 import 'ngmy_tech_labs.dart';
@@ -74,8 +74,8 @@ class NgmyDiscoveryHub extends StatelessWidget {
         intro: 'Hands-on technology and science. Build, connect, spin and see how things really work.',
         tiles: [
           PlayTile('ELECTRONICS LAB', 'Batteries, wires, bulbs', Icons.electrical_services_rounded, const Color(0xFF38BDF8), () => const NgmyElectronicsLab()),
-          PlayTile('AI INVENTOR', 'Say it, watch it built', Icons.auto_awesome_rounded, const Color(0xFFA78BFA), () => const NgmyInventorStudio()),
-          PlayTile('POWER PLANT', 'How electricity is made', Icons.wind_power_rounded, const Color(0xFFFBBF24), () => const NgmyPowerPlantStudio()),
+          PlayTile('POWER GRID', 'Run a town on clean power', Icons.wind_power_rounded, const Color(0xFFFBBF24), () => const NgmyPowerGridStudio()),
+          PlayTile('INTERNET JOURNEY', 'Send a message across the net', Icons.public_rounded, const Color(0xFF60A5FA), () => const NgmyInternetJourneyStudio()),
           PlayTile('MAGNET LAB', 'Fields and electromagnets', Icons.sync_alt_rounded, const Color(0xFFEF4444), () => const NgmyMagnetLab()),
           PlayTile('RADIO LAB', 'Tune in the invisible', Icons.radio_rounded, const Color(0xFFE879F9), () => const NgmyRadioLab()),
           PlayTile('PIXEL TV', 'How a screen makes colour', Icons.live_tv_rounded, const Color(0xFF22D3EE), () => const NgmyPixelTvStudio()),

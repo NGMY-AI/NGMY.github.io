@@ -5,7 +5,10 @@ import 'dart:ui' as ui;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -39,6 +42,17 @@ const Map<String, String> kStudioSoundThemes = {
   'MAGNET LAB': 'tech',
   'RADIO LAB': 'tech',
   'POWER PLANT': 'tech',
+  'POWER GRID': 'tech',
+  'INTERNET JOURNEY': 'tech',
+  'ROBOT CODER': 'tech',
+  'BUG SMASHER': 'pop',
+  'ROCKET LANDER': 'space',
+  'DATA SNAKE': 'bubble',
+  'BINARY 2048': 'click',
+  'SIGNAL BREAKER': 'zap',
+  'PASSWORD LAB': 'click',
+  'WAVE LAB': 'tech',
+  'BUG HUNT': 'click',
   'PIXEL TV': 'tech',
 };
 
@@ -451,6 +465,7 @@ class NgmyTone {
           'square' => math.sin(phase) >= 0 ? 0.6 : -0.6,
           'noise' => (rnd.nextDouble() * 2 - 1) * 0.8,
           'tri' => (2 / math.pi) * math.asin(math.sin(phase)),
+          'saw' => ((phase / (2 * math.pi)) % 1.0) * 1.2 - 0.6,
           _ => math.sin(phase),
         };
         // A quick attack and a smooth fade so it does not click.
@@ -571,5 +586,28 @@ class NgmyTone {
       default:
         play(60 * k, ms: 300, wave: 'sine', volume: volume);
     }
+  }
+}
+
+/// Progress that stays on the phone (levels reached, high scores), kept apart from the account so
+/// logging out or closing the app never sends a player back.
+class NgmyProgress {
+  static Future<Map<String, dynamic>> load(String game) async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      final raw = p.getString('ngmy_play_progress_v1_$game');
+      if (raw == null) return {};
+      final d = jsonDecode(raw);
+      return d is Map ? Map<String, dynamic>.from(d) : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<void> save(String game, Map<String, dynamic> data) async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.setString('ngmy_play_progress_v1_$game', jsonEncode(data));
+    } catch (_) {}
   }
 }

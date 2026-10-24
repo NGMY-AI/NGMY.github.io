@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'ngmy_core_reaction_lab.dart';
 import 'ngmy_core_studios_a.dart';
 import 'ngmy_core_circuit_lab.dart';
-import 'ngmy_core_note_lab.dart';
 import 'ngmy_core_studios_b.dart';
 import 'ngmy_core_studios_c.dart';
 import 'ngmy_core_studios_e.dart';
@@ -15,6 +14,10 @@ import 'ngmy_studio_kit.dart';
 import 'ngmy_ai_inventor.dart';
 import 'ngmy_electronics_lab.dart';
 import 'ngmy_play_hub.dart';
+import 'ngmy_arcade_a.dart';
+import 'ngmy_arcade_b.dart';
+import 'ngmy_arcade_c.dart';
+import 'ngmy_chord_wheel.dart';
 import 'ngmy_universe_hub.dart';
 
 /// Core Protocol: four auto-playing "unfold" sequences. Each one builds three glass slabs in a
@@ -91,132 +94,6 @@ const _kSequences = <_UnfoldMeta>[
     labels: ['Launch', 'Charge', 'Shine'],
     subs: ['Lifts off', 'Powers up', 'Lights the sky'],
   ),
-  _UnfoldMeta(
-    style: _UnfoldStyle.accordion,
-    title: 'SHIELD STACK',
-    blurb: 'Three layers of protection fold down into place',
-    colors: [Color(0xFFFBBF24), Color(0xFFB45309)],
-    icons: [Icons.security_rounded, Icons.verified_user_rounded, Icons.gpp_good_rounded],
-    labels: ['Guard', 'Verify', 'Safe'],
-    subs: ['Watches the door', 'Checks who you are', 'Everything is locked'],
-  ),
-  _UnfoldMeta(
-    style: _UnfoldStyle.accordion,
-    title: 'NEWS FLASH',
-    blurb: 'A story unfolds from headline to share',
-    colors: [Color(0xFFF87171), Color(0xFFB91C1C)],
-    icons: [Icons.newspaper_rounded, Icons.notifications_active_rounded, Icons.share_rounded],
-    labels: ['Story', 'Alert', 'Share'],
-    subs: ['The headline', 'Everyone is told', 'It spreads'],
-  ),
-  _UnfoldMeta(
-    style: _UnfoldStyle.accordion,
-    title: 'SKY DECK',
-    blurb: 'Plan the trip: fly, find, stay',
-    colors: [Color(0xFF2DD4BF), Color(0xFF115E59)],
-    icons: [Icons.flight_rounded, Icons.map_rounded, Icons.hotel_rounded],
-    labels: ['Fly', 'Find', 'Stay'],
-    subs: ['Wheels up', 'Know the way', 'A bed waits'],
-  ),
-  _UnfoldMeta(
-    style: _UnfoldStyle.flip,
-    title: 'PAYMENT PATH',
-    blurb: 'Card, bank, done: three panels flip',
-    colors: [Color(0xFF60A5FA), Color(0xFF1D4ED8)],
-    icons: [Icons.credit_card_rounded, Icons.account_balance_rounded, Icons.check_circle_rounded],
-    labels: ['Card', 'Bank', 'Done'],
-    subs: ['Tap to pay', 'Moves the money', 'All paid'],
-  ),
-  _UnfoldMeta(
-    style: _UnfoldStyle.flip,
-    title: 'DREAM BOARD',
-    blurb: 'What you love, what shines, what you win',
-    colors: [Color(0xFFF472B6), Color(0xFFBE185D)],
-    icons: [Icons.favorite_rounded, Icons.star_rounded, Icons.emoji_events_rounded],
-    labels: ['Love', 'Shine', 'Win'],
-    subs: ['Keep it close', 'Be seen', 'Take the prize'],
-  ),
-  _UnfoldMeta(
-    style: _UnfoldStyle.flip,
-    title: 'STAGE LIGHTS',
-    blurb: 'Mic, music, curtain up',
-    colors: [Color(0xFFC084FC), Color(0xFF6B21A8)],
-    icons: [Icons.mic_rounded, Icons.headphones_rounded, Icons.theaters_rounded],
-    labels: ['Mic', 'Music', 'Show'],
-    subs: ['Say it loud', 'Feel the beat', 'The curtain rises'],
-  ),
-  _UnfoldMeta(
-    style: _UnfoldStyle.towers,
-    title: 'CITY BUILD',
-    blurb: 'A home, a block and a whole city rise',
-    colors: [Color(0xFFFB923C), Color(0xFF9A3412)],
-    icons: [Icons.home_rounded, Icons.apartment_rounded, Icons.location_city_rounded],
-    labels: ['Home', 'Block', 'City'],
-    subs: ['', '', ''],
-  ),
-  _UnfoldMeta(
-    style: _UnfoldStyle.towers,
-    title: 'SIGNAL RISE',
-    blurb: 'Wi-Fi, towers and satellites climb',
-    colors: [Color(0xFF22D3EE), Color(0xFF0E7490)],
-    icons: [Icons.wifi_rounded, Icons.cell_tower_rounded, Icons.satellite_alt_rounded],
-    labels: ['Wi-Fi', 'Tower', 'Space'],
-    subs: ['', '', ''],
-  ),
-  _UnfoldMeta(
-    style: _UnfoldStyle.assemble,
-    title: 'COMET CREW',
-    blurb: 'A crew arrives from every side',
-    colors: [Color(0xFF4ADE80), Color(0xFF15803D)],
-    icons: [Icons.flight_takeoff_rounded, Icons.public_rounded, Icons.groups_rounded],
-    labels: ['Depart', 'World', 'Crew'],
-    subs: ['Takes off', 'Crosses the globe', 'Everyone meets'],
-  ),
-  _UnfoldMeta(
-    style: _UnfoldStyle.assemble,
-    title: 'NEON DROP',
-    blurb: 'Music, sparks and a celebration drop in',
-    colors: [Color(0xFFFACC15), Color(0xFFEA580C)],
-    icons: [Icons.music_note_rounded, Icons.flash_on_rounded, Icons.celebration_rounded],
-    labels: ['Music', 'Spark', 'Party'],
-    subs: ['The first beat', 'Lights flash', 'Hands up'],
-  ),
-  _UnfoldMeta(
-    style: _UnfoldStyle.accordion,
-    title: 'HEALTH PATH',
-    blurb: 'Eat well, move, and get checked',
-    colors: [Color(0xFF4ADE80), Color(0xFF166534)],
-    icons: [Icons.restaurant_rounded, Icons.fitness_center_rounded, Icons.local_hospital_rounded],
-    labels: ['Eat', 'Move', 'Check'],
-    subs: ['Good food daily', 'Stay strong', 'See the doctor'],
-  ),
-  _UnfoldMeta(
-    style: _UnfoldStyle.flip,
-    title: 'SCHOOL DAY',
-    blurb: 'Learn, read and graduate',
-    colors: [Color(0xFFFACC15), Color(0xFFA16207)],
-    icons: [Icons.school_rounded, Icons.menu_book_rounded, Icons.workspace_premium_rounded],
-    labels: ['Learn', 'Read', 'Graduate'],
-    subs: ['Go to class', 'Open the book', 'Walk the stage'],
-  ),
-  _UnfoldMeta(
-    style: _UnfoldStyle.towers,
-    title: 'MARKET RUN',
-    blurb: 'Shop, deliver and get paid',
-    colors: [Color(0xFFF472B6), Color(0xFF9D174D)],
-    icons: [Icons.shopping_bag_rounded, Icons.local_shipping_rounded, Icons.payments_rounded],
-    labels: ['Shop', 'Deliver', 'Paid'],
-    subs: ['', '', ''],
-  ),
-  _UnfoldMeta(
-    style: _UnfoldStyle.assemble,
-    title: 'FAMILY TIES',
-    blurb: 'Family, a birthday and a celebration',
-    colors: [Color(0xFF38BDF8), Color(0xFF0369A1)],
-    icons: [Icons.family_restroom_rounded, Icons.cake_rounded, Icons.celebration_rounded],
-    labels: ['Family', 'Birthday', 'Party'],
-    subs: ['All together', 'Make a wish', 'Cheers!'],
-  ),
 ];
 
 class _NgmyCoreProtocolSimsScreenState extends State<NgmyCoreProtocolSimsScreen> {
@@ -258,30 +135,30 @@ final List<_StudioDef> _kStudios = [
   _StudioDef('UNIVERSE', 'Earth, space and gravity', Icons.travel_explore_rounded, const Color(0xFF38BDF8), () => const NgmyUniverseHub()),
   _StudioDef('ELECTRONICS LAB', 'Batteries, wires, real circuits', Icons.electrical_services_rounded, const Color(0xFF38BDF8), () => const NgmyElectronicsLab()),
   _StudioDef('AI INVENTOR', 'Say it, watch it get built', Icons.auto_awesome_rounded, const Color(0xFFA78BFA), () => const NgmyInventorStudio()),
-  _StudioDef('BLOCK BUILDER', 'Snap blocks, make games', Icons.extension_rounded, const Color(0xFFFACC15), ngmyBlockBuilderScreen),
-  _StudioDef('DISCOVERY LAB', 'Elements, sky, dinosaurs', Icons.biotech_rounded, const Color(0xFF4ADE80), () => const NgmyDiscoveryHub()),
+  _StudioDef('ROBOT CODER', 'Program a robot to the goal', Icons.smart_toy_rounded, const Color(0xFFFACC15), () => const NgmyRobotCoderStudio()),
+  _StudioDef('DISCOVERY LAB', 'Elements, magnets, power, internet', Icons.biotech_rounded, const Color(0xFF4ADE80), () => const NgmyDiscoveryHub()),
   _StudioDef('TOOLBOX', 'Converter, clock, games', Icons.build_circle_rounded, const Color(0xFFFB923C), () => const NgmyToolboxHub()),
   _StudioDef('REACTION LAB', 'Wire parts together', Icons.hub_rounded, const Color(0xFF34D399), () => const NgmyReactionLabScreen()),
   _StudioDef('SPARK PAINTER', 'Paint with light', Icons.brush_rounded, const Color(0xFFF472B6), () => const NgmySparkPainterStudio()),
-  _StudioDef('MANDALA MAKER', 'Draw once, it repeats', Icons.filter_vintage_rounded, const Color(0xFFA78BFA), () => const NgmyMandalaStudio()),
-  _StudioDef('GRAVITY TOY', 'Balls, ramps and push', Icons.sports_basketball_rounded, const Color(0xFF38BDF8), () => const NgmyGravityStudio()),
+  _StudioDef('BUG SMASHER', 'Squash bugs, save the app', Icons.bug_report_rounded, const Color(0xFFA78BFA), () => const NgmyBugSmasherStudio()),
+  _StudioDef('ROCKET LANDER', 'Land softly on the pad', Icons.rocket_launch_rounded, const Color(0xFF38BDF8), () => const NgmyRocketLanderStudio()),
   _StudioDef('ORBIT STUDIO', 'Slingshot planets', Icons.public_rounded, const Color(0xFFFB923C), () => const NgmyOrbitStudio()),
   _StudioDef('SWARM STUDIO', 'A living school of fish', Icons.bubble_chart_rounded, const Color(0xFF4ADE80), () => const NgmySwarmStudio()),
-  _StudioDef('FIREWORKS', 'Design a sky show', Icons.celebration_rounded, const Color(0xFFFACC15), () => const NgmyFireworkStudio()),
+  _StudioDef('BINARY 2048', 'Merge bits into bytes', Icons.looks_two_rounded, const Color(0xFFFACC15), () => const NgmyBinary2048Studio()),
   _StudioDef('CHAIN BURST', 'One tap, a whole chain', Icons.bolt_rounded, const Color(0xFFF472B6), () => const NgmyChainBurstStudio()),
-  _StudioDef('BEAT MAKER', 'Build a loop and hear it', Icons.graphic_eq_rounded, const Color(0xFF4ADE80), () => const NgmyBeatStudio()),
+  _StudioDef('DATA SNAKE', 'Eat data, dodge viruses', Icons.route_rounded, const Color(0xFF4ADE80), () => const NgmySnakeStudio()),
   _StudioDef('PALETTE LAB', 'Colours that go together', Icons.palette_rounded, const Color(0xFF2DD4BF), () => const NgmyPaletteStudio()),
   _StudioDef('TITLE ANIMATOR', 'Make a moving title', Icons.title_rounded, const Color(0xFFFACC15), () => const NgmyTitleStudio()),
   _StudioDef('PIANO STUDIO', 'Play and learn songs', Icons.piano_rounded, const Color(0xFFFACC15), () => const NgmyPianoStudio()),
-  _StudioDef('DRUM PADS', 'Tap and record a loop', Icons.album_rounded, const Color(0xFFF87171), () => const NgmyDrumStudio()),
-  _StudioDef('CHORD LAB', 'Learn how chords work', Icons.library_music_rounded, const Color(0xFFA78BFA), () => const NgmyChordStudio()),
-  _StudioDef('NOTE LAB', 'Connect notes, hear music', Icons.cable_rounded, const Color(0xFF4ADE80), () => const NgmyNoteLabScreen()),
+  _StudioDef('SIGNAL BREAKER', 'Break the code bricks', Icons.grid_view_rounded, const Color(0xFFF87171), () => const NgmyBreakerStudio()),
+  _StudioDef('CHORD LAB', 'See chords on a wheel', Icons.library_music_rounded, const Color(0xFFA78BFA), () => const NgmyChordWheelStudio()),
+  _StudioDef('PASSWORD LAB', 'Crack and build passwords', Icons.password_rounded, const Color(0xFF4ADE80), () => const NgmyPasswordLabStudio()),
   _StudioDef('CIRCUIT LAB', 'Connect logic, learn it', Icons.memory_rounded, const Color(0xFF60A5FA), () => const NgmyCircuitStudio()),
   _StudioDef('MARBLE MUSIC', 'Marbles ring the notes', Icons.blur_circular_rounded, const Color(0xFF22D3EE), () => const NgmyMarbleStudio()),
   _StudioDef('ORBIT SEQUENCER', 'Planets play the tune', Icons.track_changes_rounded, const Color(0xFFA78BFA), () => const NgmyOrbitSequencerStudio()),
   _StudioDef('LIFE MELODY', 'Music that grows alive', Icons.bubble_chart_rounded, const Color(0xFF4ADE80), () => const NgmyLifeMelodyStudio()),
-  _StudioDef('NAME MELODY', 'Your name as a tune', Icons.record_voice_over_rounded, const Color(0xFFF472B6), () => const NgmyNameMelodyStudio()),
-  _StudioDef('PENDULUM WAVES', 'Swinging notes drift', Icons.vibration_rounded, const Color(0xFFFB923C), () => const NgmyPendulumStudio()),
+  _StudioDef('WAVE LAB', 'Shape a wave, match it', Icons.waves_rounded, const Color(0xFFF472B6), () => const NgmyWaveLabStudio()),
+  _StudioDef('BUG HUNT', 'Find the bug in the code', Icons.search_rounded, const Color(0xFFFB923C), () => const NgmyBugHuntStudio()),
 ];
 
 class _SequencePicker extends StatelessWidget {

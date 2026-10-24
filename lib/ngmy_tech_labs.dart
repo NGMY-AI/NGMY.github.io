@@ -19,10 +19,20 @@ Widget _note(String t, {Color color = const Color(0xFF38BDF8)}) => Container(
 
 class _Mag {
   _Mag(this.x, this.y, this.angle);
-  double x; // 0..1
+  double x; // pixels
   double y;
+  double vx = 0, vy = 0;
   double angle;
   bool flipped = false;
+}
+
+class _Clip {
+  _Clip(this.x, this.y);
+  double x, y;
+  int on = -1; // magnet it is stuck to (-2 = the coil), -1 free
+  double ox = 0, oy = 0; // where it sits on that magnet, turned with it
+  bool boxed = false;
+  double spin = 0;
 }
 
 class NgmyMagnetLab extends StatefulWidget {
@@ -33,19 +43,25 @@ class NgmyMagnetLab extends StatefulWidget {
 }
 
 class _NgmyMagnetLabState extends State<NgmyMagnetLab> with SingleTickerProviderStateMixin, StudioFrames {
-  final List<_Mag> _mags = [_Mag(0.3, 0.45, 0), _Mag(0.7, 0.45, 0)..flipped = true];
+  final List<_Mag> _mags = [];
+  final List<_Clip> _clips = [];
   int _sel = 0;
   int _drag = -1;
   bool _filings = true;
   bool _electro = false;
   double _volts = 4;
   double _turns = 40;
-  Offset _compass = const Offset(0.5, 0.82);
+  Offset _compass = const Offset(0.5, 0.8);
   bool _dragCompass = false;
   Size _size = Size.zero;
-  final List<double> _clip = [0, 0, 0, 0, 0]; // 0 = on the floor, 1 = stuck to the coil
   double _humT = 0;
   bool _near = false;
+  int _boxed = 0;
+  bool _ready = false;
+
+  double get _strength => _electro ? _volts * _turns / 40 : 0;
+  Rect get _box => Rect.fromLTWH(10, _size.height - 74, 96, 64);
+  Offset get _coil => Offset(_size.width * 0.5, _size.height * 0.2);
 
   @override
   void initState() {
@@ -53,22 +69,35 @@ class _NgmyMagnetLabState extends State<NgmyMagnetLab> with SingleTickerProvider
     startFrames();
   }
 
-  double get _strength => _electro ? _volts * _turns / 40 : 0;
+  void _setup() {
+    _mags
+      ..clear()
+      ..addAll([_Mag(_size.width * 0.3, _size.height * 0.5, 0), _Mag(_size.width * 0.7, _size.height * 0.5, 0)..flipped = true]);
+    _scatter();
+    _ready = true;
+  }
 
-  /// The poles that make the magnetic field: position, and +1 for north / -1 for south.
+  void _scatter() {
+    final r = math.Random();
+    _clips.clear();
+    _boxed = 0;
+    for (var i = 0; i < 9; i++) {
+      _clips.add(_Clip(40 + r.nextDouble() * (_size.width - 80), _size.height * 0.34 + r.nextDouble() * (_size.height * 0.34))..spin = r.nextDouble() * math.pi);
+    }
+  }
+
   List<(Offset, double)> _poles() {
     final out = <(Offset, double)>[];
     for (final m in _mags) {
-      final c = Offset(m.x * _size.width, m.y * _size.height);
+      final c = Offset(m.x, m.y);
       final d = Offset(math.cos(m.angle), math.sin(m.angle)) * 46;
       final s = m.flipped ? -1.0 : 1.0;
       out.add((c + d, s));
       out.add((c - d, -s));
     }
     if (_electro) {
-      final c = Offset(_size.width * 0.5, _size.height * 0.22);
-      out.add((c + const Offset(0, -26), _strength * 1.2));
-      out.add((c + const Offset(0, 26), -_strength * 1.2));
+      out.add((_coil + const Offset(0, -26), _strength * 1.2));
+      out.add((_coil + const Offset(0, 26), -_strength * 1.2));
     }
     return out;
   }
@@ -85,10 +114,122 @@ class _NgmyMagnetLabState extends State<NgmyMagnetLab> with SingleTickerProvider
 
   @override
   void onFrame(double dt) {
-    final cx = _size.width * 0.5, cy = _size.height * 0.22;
-    for (var i = 0; i < _clip.length; i++) {
-      final target = _electro && _strength > 1.6 + i * 0.35 ? 1.0 : 0.0;
-      _clip[i] += (target - _clip[i]) * math.min(1, dt * 6);
+    if (_size == Size.zero) return;
+    if (!_ready) _setup();
+    dt = math.min(dt, 0.04);
+    // The magnets push and pull each other, so let go and they move on their own.
+    if (_mags.length >= 2) {
+      for (var i = 0; i < _mags.length; i++) {
+        if (i == _drag) continue;
+        var fx = 0.0, fy = 0.0;
+        final mi = _mags[i];
+        final pi = [(Offset(mi.x, mi.y) + Offset(math.cos(mi.angle), math.sin(mi.angle)) * 46, mi.flipped ? -1.0 : 1.0), (Offset(mi.x, mi.y) - Offset(math.cos(mi.angle), math.sin(mi.angle)) * 46, mi.flipped ? 1.0 : -1.0)];
+        for (var j = 0; j < _mags.length; j++) {
+          if (j == i) continue;
+          final mj = _mags[j];
+          final pj = [(Offset(mj.x, mj.y) + Offset(math.cos(mj.angle), math.sin(mj.angle)) * 46, mj.flipped ? -1.0 : 1.0), (Offset(mj.x, mj.y) - Offset(math.cos(mj.angle), math.sin(mj.angle)) * 46, mj.flipped ? 1.0 : -1.0)];
+          for (final a in pi) {
+            for (final b in pj) {
+              final d = a.$1 - b.$1;
+              final dist = math.sqrt(d.distanceSquared + 400);
+              // The same poles push apart (positive), opposite poles pull together.
+              final mag = a.$2 * b.$2 * 2.4e6 / (dist * dist);
+              fx += d.dx / dist * mag;
+              fy += d.dy / dist * mag;
+            }
+          }
+        }
+        mi.vx += fx * dt;
+        mi.vy += fy * dt;
+        mi.vx *= math.exp(-dt * 3.2);
+        mi.vy *= math.exp(-dt * 3.2);
+        mi.x += mi.vx * dt;
+        mi.y += mi.vy * dt;
+        if (mi.x < 60 || mi.x > _size.width - 60) {
+          mi.vx = -mi.vx * 0.5;
+          mi.x = mi.x.clamp(60.0, _size.width - 60);
+        }
+        if (mi.y < 40 || mi.y > _size.height - 40) {
+          mi.vy = -mi.vy * 0.5;
+          mi.y = mi.y.clamp(40.0, _size.height - 40);
+        }
+      }
+      final a = Offset(_mags[0].x, _mags[0].y), b = Offset(_mags[1].x, _mags[1].y);
+      final near = (a - b).distance < 112;
+      if (near != _near) {
+        _near = near;
+        if (near) NgmyTone.play(2200, ms: 30, wave: 'noise', volume: 0.5);
+      }
+    }
+    // Paper clips: pulled to a pole that is close enough, carried with the magnet, dropped in the box.
+    final poles = _poles();
+    for (final c in _clips) {
+      if (c.boxed) continue;
+      if (c.on >= 0) {
+        final m = _mags[c.on];
+        final ca = math.cos(m.angle), sa = math.sin(m.angle);
+        c.x = m.x + c.ox * ca - c.oy * sa;
+        c.y = m.y + c.ox * sa + c.oy * ca;
+        if (_box.contains(Offset(m.x, m.y))) {
+          c.boxed = true;
+          c.on = -1;
+          c.x = _box.left + 14 + (_boxed % 4) * 20;
+          c.y = _box.bottom - 12 - (_boxed ~/ 4) * 12;
+          _boxed++;
+          NgmyTone.chord('bell', [0, 7], ms: 300, volume: 0.3);
+        }
+        continue;
+      }
+      if (c.on == -2) continue;
+      Offset? best;
+      var bd = 1e9;
+      var bi = -1;
+      for (var k = 0; k < poles.length; k++) {
+        if (poles[k].$2.abs() < 0.2) continue;
+        final d = (poles[k].$1 - Offset(c.x, c.y)).distance;
+        if (d < bd) {
+          bd = d;
+          best = poles[k].$1;
+          bi = k;
+        }
+      }
+      if (best != null) {
+        final reach = bi >= _mags.length * 2 ? 40 + _strength * 40 : 105.0;
+        if (bd < reach) {
+          final dir = (best - Offset(c.x, c.y)) / math.max(bd, 1);
+          final sp = (reach - bd) / reach * 260 + 40;
+          c.x += dir.dx * sp * dt;
+          c.y += dir.dy * sp * dt;
+          if (bd < 22) {
+            if (bi < _mags.length * 2) {
+              final mi = bi ~/ 2;
+              final m = _mags[mi];
+              final ca = math.cos(-m.angle), sa = math.sin(-m.angle);
+              final dx = c.x - m.x, dy = c.y - m.y;
+              c.on = mi;
+              c.ox = dx * ca - dy * sa;
+              c.oy = dx * sa + dy * ca;
+              NgmyTone.play(1800, ms: 25, wave: 'noise', volume: 0.35);
+            } else {
+              c.on = -2;
+              c.ox = c.x - _coil.dx;
+              c.oy = c.y - _coil.dy;
+            }
+          }
+        }
+      }
+    }
+    // Clips hanging on the coil fall when the current is turned down.
+    for (final c in _clips) {
+      if (c.on == -2) {
+        if (!_electro || _strength < 1.4) {
+          c.on = -1;
+          c.y += 3;
+        } else {
+          c.x = _coil.dx + c.ox;
+          c.y = _coil.dy + c.oy;
+        }
+      }
     }
     if (_electro && _strength > 0.5) {
       _humT += dt;
@@ -97,25 +238,16 @@ class _NgmyMagnetLabState extends State<NgmyMagnetLab> with SingleTickerProvider
         NgmyTone.play(100 + _strength * 12, ms: 200, wave: 'tri', volume: 0.1);
       }
     }
-    if (_mags.length >= 2 && _size != Size.zero) {
-      final a = Offset(_mags[0].x * _size.width, _mags[0].y * _size.height), b = Offset(_mags[1].x * _size.width, _mags[1].y * _size.height);
-      final near = (a - b).distance < 110;
-      if (near != _near) {
-        _near = near;
-        if (near) NgmyTone.play(2200, ms: 30, wave: 'noise', volume: 0.5);
-      }
-    }
-    if (cx < 0 || cy < 0) return;
     setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    final attract = (_mags[0].flipped != _mags[1].flipped) == (_mags[0].x < _mags[1].x) ? false : true;
+    final attract = _mags.length < 2 ? false : (_mags[0].flipped != _mags[1].flipped) == (_mags[0].x < _mags[1].x) ? false : true;
     return StudioPage(
       title: 'MAGNET LAB',
       accent: const Color(0xFFEF4444),
-      help: 'Every magnet has a north end (red) and a south end (blue). Opposites attract and the same ends push apart. The grey lines are iron filings showing the invisible magnetic field around them. Drag the magnets and the compass around.\n\nTurn on Electromagnet: a coil of wire with current flowing becomes a magnet! Add more battery volts or more coil turns and it gets strong enough to pick up paper clips. That is how cranes in scrapyards and electric motors work.',
+      help: 'Every magnet has a north end (red) and a south end (blue). Opposites attract and the same ends push apart. Drag a magnet close to the other one, then let go: they pull together or shove apart on their own!\n\nCOLLECT THE PAPER CLIPS: drag a magnet over the clips and they jump onto it. Carry them into the box at the bottom left to drop them in. Can you collect all 9?\n\nELECTROMAGNET: turn it on, and the coil at the top becomes a magnet when current flows. Add more battery volts or more coil turns and it gets strong enough to pick up clips that are near it. Turn it down and they fall. This is how cranes in scrapyards work.\n\nThe grey lines are iron filings showing the invisible magnetic field. The compass always points along the field.',
       stage: LayoutBuilder(builder: (context, box) {
         _size = Size(box.maxWidth, box.maxHeight);
         return Stack(fit: StackFit.expand, children: [
@@ -128,9 +260,10 @@ class _NgmyMagnetLabState extends State<NgmyMagnetLab> with SingleTickerProvider
                 return;
               }
               for (var i = _mags.length - 1; i >= 0; i--) {
-                final c = Offset(_mags[i].x * _size.width, _mags[i].y * _size.height);
-                if ((c - d.localPosition).distance < 62) {
+                if ((Offset(_mags[i].x, _mags[i].y) - d.localPosition).distance < 66) {
                   _drag = i;
+                  _mags[i].vx = 0;
+                  _mags[i].vy = 0;
                   setState(() => _sel = i);
                   return;
                 }
@@ -141,8 +274,8 @@ class _NgmyMagnetLabState extends State<NgmyMagnetLab> with SingleTickerProvider
                 _compass = Offset((d.localPosition.dx / _size.width).clamp(0.05, 0.95), (d.localPosition.dy / _size.height).clamp(0.05, 0.95));
               } else if (_drag >= 0) {
                 _mags[_drag]
-                  ..x = (d.localPosition.dx / _size.width).clamp(0.12, 0.88)
-                  ..y = (d.localPosition.dy / _size.height).clamp(0.3, 0.92);
+                  ..x = d.localPosition.dx.clamp(50.0, _size.width - 50)
+                  ..y = d.localPosition.dy.clamp(34.0, _size.height - 34);
               }
             },
             onPanEnd: (_) {
@@ -151,7 +284,7 @@ class _NgmyMagnetLabState extends State<NgmyMagnetLab> with SingleTickerProvider
             },
             child: CustomPaint(size: _size, painter: _MagnetPainter(this)),
           ),
-          Positioned(left: 10, right: 10, bottom: 8, child: _note(_electro ? 'The coil is an electromagnet: ${_strength < 1 ? 'too weak to lift anything' : (_strength < 3 ? 'it can lift some paper clips' : 'strong! it lifts every clip')}. Change the volts and turns to see.' : (attract ? 'These two ends are opposite, so the magnets pull together.' : 'These two ends are the same, so the magnets push apart.'), color: const Color(0xFFEF4444))),
+          Positioned(left: 112, right: 10, bottom: 8, child: _note(_electro ? 'The coil is an electromagnet: ${_strength < 1.4 ? 'too weak to hold clips' : 'strong enough to hold clips!'} Clips in the box: $_boxed / ${_clips.length}.' : (_boxed == _clips.length && _clips.isNotEmpty ? 'You collected every clip! 🎉' : 'Clips in the box: $_boxed / ${_clips.length}. ${attract ? 'These two ends attract.' : 'These two ends repel.'}'), color: const Color(0xFFEF4444))),
         ]);
       }),
       tools: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -160,6 +293,7 @@ class _NgmyMagnetLabState extends State<NgmyMagnetLab> with SingleTickerProvider
           StudioChip(label: 'Electromagnet', icon: Icons.bolt_rounded, selected: _electro, color: const Color(0xFFFACC15), onTap: () => setState(() => _electro = !_electro)),
           StudioButton(icon: Icons.swap_horiz_rounded, label: 'Flip magnet', onTap: () => setState(() => _mags[_sel].flipped = !_mags[_sel].flipped)),
           StudioButton(icon: Icons.rotate_90_degrees_cw_rounded, label: 'Turn', onTap: () => setState(() => _mags[_sel].angle += math.pi / 4)),
+          StudioButton(icon: Icons.shuffle_rounded, label: 'Scatter clips', onTap: () => setState(_scatter)),
         ]),
         if (_electro) ...[
           StudioSlider(label: 'Battery', value: _volts, min: 0, max: 12, display: '${_volts.toStringAsFixed(1)} V', color: const Color(0xFF4ADE80), onChanged: (v) => setState(() => _volts = v)),
@@ -192,38 +326,45 @@ class _MagnetPainter extends CustomPainter {
         }
       }
     }
+    // The box for the clips.
+    final box = s._box;
+    canvas.drawRRect(RRect.fromRectAndRadius(box, const Radius.circular(12)), Paint()..color = const Color(0xFF1F2937));
+    canvas.drawRRect(RRect.fromRectAndRadius(box, const Radius.circular(12)), Paint()..style = PaintingStyle.stroke..strokeWidth = 2..color = const Color(0xFFFBBF24).withValues(alpha: 0.7));
+    final bt = TextPainter(text: const TextSpan(text: 'CLIP BOX', style: TextStyle(color: Color(0xFFFBBF24), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1)), textDirection: TextDirection.ltr)..layout();
+    bt.paint(canvas, box.topLeft + const Offset(8, 4));
     // The coil.
     if (s._electro) {
-      final c = Offset(size.width * 0.5, size.height * 0.22);
+      final c = s._coil;
       canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: c, width: 54, height: 66), const Radius.circular(10)), Paint()..color = const Color(0xFF475569));
       final turns = (s._turns / 12).clamp(2, 10).round();
       for (var i = 0; i < turns; i++) {
         final y = c.dy - 26 + i * (52 / turns);
         canvas.drawLine(Offset(c.dx - 30, y), Offset(c.dx + 30, y + 4), Paint()..color = const Color(0xFFFB923C)..strokeWidth = 3);
       }
-      final north = s._strength > 0;
-      canvas.drawCircle(c + const Offset(0, -38), 5, Paint()..color = north ? const Color(0xFFEF4444) : Colors.grey);
-      canvas.drawCircle(c + const Offset(0, 38), 5, Paint()..color = north ? const Color(0xFF3B82F6) : Colors.grey);
-      // Paper clips on the floor or stuck to the coil.
-      for (var i = 0; i < s._clip.length; i++) {
-        final floor = Offset(size.width * (0.28 + i * 0.11), size.height * 0.62);
-        final stuck = Offset(c.dx - 24 + i * 12, c.dy + 46 + (i % 2) * 7);
-        final pos = Offset.lerp(floor, stuck, Curves.easeInOut.transform(s._clip[i].clamp(0.0, 1.0)))!;
-        canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: pos, width: 8, height: 20), const Radius.circular(4)), Paint()..style = PaintingStyle.stroke..strokeWidth = 2..color = const Color(0xFFCBD5E1));
-      }
+      canvas.drawCircle(c + const Offset(0, -38), 5, Paint()..color = const Color(0xFFEF4444));
+      canvas.drawCircle(c + const Offset(0, 38), 5, Paint()..color = const Color(0xFF3B82F6));
+    }
+    // Paper clips.
+    for (final c in s._clips) {
+      canvas.save();
+      canvas.translate(c.x, c.y);
+      canvas.rotate(c.on >= 0 ? s._mags[c.on].angle + c.spin : c.spin);
+      final path = Path()..addRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(-4, -11, 8, 22), const Radius.circular(4)))..addRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(-2, -8, 4, 16), const Radius.circular(2)));
+      canvas.drawPath(path, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.8..color = const Color(0xFFE2E8F0));
+      canvas.restore();
     }
     // Bar magnets.
     for (var i = 0; i < s._mags.length; i++) {
       final m = s._mags[i];
-      final c = Offset(m.x * size.width, m.y * size.height);
       canvas.save();
-      canvas.translate(c.dx, c.dy);
+      canvas.translate(m.x, m.y);
       canvas.rotate(m.angle);
       final left = RRect.fromRectAndCorners(const Rect.fromLTWH(-58, -15, 58, 30), topLeft: const Radius.circular(8), bottomLeft: const Radius.circular(8));
       final right = RRect.fromRectAndCorners(const Rect.fromLTWH(0, -15, 58, 30), topRight: const Radius.circular(8), bottomRight: const Radius.circular(8));
       final nIsRight = !m.flipped;
       canvas.drawRRect(left, Paint()..color = nIsRight ? const Color(0xFF3B82F6) : const Color(0xFFEF4444));
       canvas.drawRRect(right, Paint()..color = nIsRight ? const Color(0xFFEF4444) : const Color(0xFF3B82F6));
+      canvas.drawRect(const Rect.fromLTWH(-58, -15, 116, 6), Paint()..color = Colors.white.withValues(alpha: 0.18));
       if (i == s._sel) canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(-58, -15, 116, 30), const Radius.circular(8)).inflate(3), Paint()..style = PaintingStyle.stroke..strokeWidth = 2..color = Colors.white);
       for (final e in [(-30.0, nIsRight ? 'S' : 'N'), (30.0, nIsRight ? 'N' : 'S')]) {
         final tp = TextPainter(text: TextSpan(text: e.$2, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)), textDirection: TextDirection.ltr)..layout();

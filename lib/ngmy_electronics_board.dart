@@ -512,128 +512,257 @@ class BoardPainter extends CustomPainter {
     }
   }
 
+  // ── Realistic parts ────────────────────────────────────────────────────────
+
+  Paint _metal(Rect r, {bool vertical = true, Color a = const Color(0xFF6B7280), Color b = const Color(0xFFF3F4F6)}) => Paint()
+    ..shader = LinearGradient(begin: vertical ? Alignment.topCenter : Alignment.centerLeft, end: vertical ? Alignment.bottomCenter : Alignment.centerRight, colors: [a, b, a, Color.lerp(a, Colors.black, 0.3)!], stops: const [0, 0.35, 0.65, 1]).createShader(r);
+
+  void _screw(Canvas canvas, Offset c) {
+    canvas.drawCircle(c, 4.2, Paint()..shader = const RadialGradient(colors: [Color(0xFFF3F4F6), Color(0xFF6B7280)]).createShader(Rect.fromCircle(center: c, radius: 4.2)));
+    canvas.drawLine(c + const Offset(-2.6, -1), c + const Offset(2.6, 1), Paint()..color = const Color(0xFF374151)..strokeWidth = 1.2);
+  }
+
   void _part(Canvas canvas, Part p, bool sel) {
-    final col = p.info.color;
-    final body = RRect.fromRectAndRadius(const Rect.fromLTWH(-34, -22, 68, 44), const Radius.circular(10));
-    if (sel) canvas.drawRRect(body.inflate(5), Paint()..color = Colors.white.withValues(alpha: 0.22));
-    canvas.drawRRect(body, Paint()..color = const Color(0xFF1A2029));
-    canvas.drawRRect(body, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.6..color = (p.burnt ? const Color(0xFF6B7280) : col).withValues(alpha: 0.85));
-    // Lead lines out to the terminals.
-    final lead = Paint()..color = Colors.white54..strokeWidth = 2.4;
-    canvas.drawLine(const Offset(-ElectronicsBoard.kTerm, 0), const Offset(-34, 0), lead);
-    canvas.drawLine(const Offset(34, 0), const Offset(ElectronicsBoard.kTerm, 0), lead);
-    final stroke = Paint()..style = PaintingStyle.stroke..strokeWidth = 2.4..strokeCap = StrokeCap.round..color = p.burnt ? Colors.grey : col;
+    final lead = Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFE5E7EB), Color(0xFF6B7280)]).createShader(const Rect.fromLTWH(-48, -3, 96, 6))..strokeWidth = 3.4..strokeCap = StrokeCap.round;
+    // A soft shadow on the board.
+    canvas.drawOval(const Rect.fromLTWH(-34, 14, 68, 12), Paint()..color = Colors.black.withValues(alpha: 0.45)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5));
+    if (sel) canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(-46, -34, 92, 62), const Radius.circular(14)), Paint()..color = Colors.white.withValues(alpha: 0.14));
+    canvas.drawLine(const Offset(-ElectronicsBoard.kTerm, 0), const Offset(-26, 0), lead);
+    canvas.drawLine(const Offset(26, 0), const Offset(ElectronicsBoard.kTerm, 0), lead);
+    final dead = p.burnt;
     switch (p.kind) {
       case 'battery':
-        canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(-24, -12, 44, 24), const Radius.circular(5)), Paint()..color = col.withValues(alpha: 0.85));
-        canvas.drawRect(const Rect.fromLTWH(20, -5, 5, 10), Paint()..color = Colors.white70);
-        _text(canvas, '${p.volts == p.volts.roundToDouble() ? p.volts.round() : p.volts}V', const Offset(-18, -9), Colors.black, 15);
+        _battery(canvas, p);
       case 'solar':
-        for (var r = 0; r < 2; r++) {
-          for (var c = 0; c < 4; c++) {
-            canvas.drawRect(Rect.fromLTWH(-26.0 + c * 13, -13.0 + r * 13, 11, 11), Paint()..color = Color.lerp(const Color(0xFF1E3A8A), const Color(0xFF60A5FA), 0.2 + 0.7 * p.level)!);
-          }
+        final frame = RRect.fromRectAndRadius(const Rect.fromLTWH(-38, -22, 76, 44), const Radius.circular(4));
+        canvas.drawRRect(frame, _metal(frame.outerRect, vertical: false, a: const Color(0xFF9CA3AF), b: const Color(0xFFE5E7EB)));
+        final cells = const Rect.fromLTWH(-34, -18, 68, 36);
+        canvas.drawRect(cells, Paint()..shader = LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color.lerp(const Color(0xFF0B1B4D), const Color(0xFF3B82F6), 0.25 + 0.55 * p.level)!, Color.lerp(const Color(0xFF050B24), const Color(0xFF1E40AF), 0.3 + 0.4 * p.level)!]).createShader(cells));
+        final grid = Paint()..color = Colors.white.withValues(alpha: 0.35)..strokeWidth = 0.8;
+        for (var i = 1; i < 6; i++) {
+          canvas.drawLine(Offset(-34 + i * 68 / 6, -18), Offset(-34 + i * 68 / 6, 18), grid);
         }
-        canvas.drawCircle(const Offset(-20, -18), 4 + 3 * p.level, Paint()..color = const Color(0xFFFACC15));
+        for (var i = 1; i < 4; i++) {
+          canvas.drawLine(Offset(-34, -18 + i * 9), Offset(34, -18 + i * 9), grid);
+        }
+        for (var i = 0; i < 6; i++) {
+          canvas.drawLine(Offset(-34 + (i + 0.5) * 68 / 6, -18), Offset(-34 + (i + 0.5) * 68 / 6, 18), Paint()..color = const Color(0xFFCBD5E1).withValues(alpha: 0.5)..strokeWidth = 0.6);
+        }
+        canvas.drawPath(Path()..moveTo(-34, 18)..lineTo(-6 + 40 * p.level, -18)..lineTo(4 + 40 * p.level, -18)..lineTo(-24, 18)..close(), Paint()..color = Colors.white.withValues(alpha: 0.10 + 0.22 * p.level));
+        canvas.drawCircle(const Offset(28, -30), 4 + 4 * p.level, Paint()..color = const Color(0xFFFDE047).withValues(alpha: 0.9));
       case 'crank':
-        canvas.drawCircle(Offset.zero, 14, stroke);
-        canvas.drawLine(Offset.zero, Offset(math.cos(p.spin) * 14, math.sin(p.spin) * 14), stroke..strokeWidth = 4);
-        canvas.drawCircle(Offset(math.cos(p.spin) * 14, math.sin(p.spin) * 14), 4, Paint()..color = col);
+        final base = RRect.fromRectAndRadius(const Rect.fromLTWH(-28, -16, 56, 32), const Radius.circular(8));
+        canvas.drawRRect(base, _metal(base.outerRect, a: const Color(0xFF475569), b: const Color(0xFF94A3B8)));
+        canvas.drawCircle(Offset.zero, 12, Paint()..shader = const RadialGradient(colors: [Color(0xFFE5E7EB), Color(0xFF4B5563)]).createShader(Rect.fromCircle(center: Offset.zero, radius: 12)));
+        final knob = Offset(math.cos(p.spin) * 22, math.sin(p.spin) * 22);
+        canvas.drawLine(Offset.zero, knob, Paint()..color = const Color(0xFFCBD5E1)..strokeWidth = 5..strokeCap = StrokeCap.round);
+        canvas.drawCircle(knob, 7, Paint()..shader = const RadialGradient(colors: [Color(0xFFFB923C), Color(0xFF9A3412)]).createShader(Rect.fromCircle(center: knob, radius: 7)));
+        _screw(canvas, const Offset(-22, -10));
+        _screw(canvas, const Offset(22, 10));
       case 'turbine':
+        canvas.drawPath(Path()..moveTo(-3, 24)..lineTo(3, 24)..lineTo(1.5, 0)..lineTo(-1.5, 0)..close(), Paint()..color = const Color(0xFFE5E7EB));
         for (var k = 0; k < 3; k++) {
           final a = p.spin + k * 2.094;
-          canvas.drawLine(Offset.zero, Offset(math.cos(a) * 17, math.sin(a) * 17), stroke..strokeWidth = 4);
+          canvas.save();
+          canvas.rotate(a);
+          canvas.drawPath(Path()..moveTo(0, -2)..quadraticBezierTo(6, -14, 2, -30)..quadraticBezierTo(-2, -14, 0, -2)..close(), Paint()..color = Colors.white);
+          canvas.restore();
         }
-        canvas.drawCircle(Offset.zero, 3, Paint()..color = Colors.white);
+        canvas.drawCircle(Offset.zero, 4.5, Paint()..shader = const RadialGradient(colors: [Colors.white, Color(0xFF94A3B8)]).createShader(Rect.fromCircle(center: Offset.zero, radius: 4.5)));
       case 'switch':
-        canvas.drawCircle(const Offset(-18, 4), 3, Paint()..color = Colors.white70);
-        canvas.drawCircle(const Offset(18, 4), 3, Paint()..color = Colors.white70);
-        canvas.drawLine(const Offset(-18, 4), p.on ? const Offset(18, 4) : const Offset(12, -12), stroke..strokeWidth = 3.2..color = p.on ? const Color(0xFF4ADE80) : col);
+        final base = RRect.fromRectAndRadius(const Rect.fromLTWH(-30, -2, 60, 20), const Radius.circular(5));
+        canvas.drawRRect(base, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF374151), Color(0xFF111827)]).createShader(base.outerRect));
+        _screw(canvas, const Offset(-22, 8));
+        _screw(canvas, const Offset(22, 8));
+        final tip = p.on ? const Offset(22, 8) : const Offset(14, -18);
+        canvas.drawLine(const Offset(-22, 8), tip, Paint()..color = const Color(0xFF111827)..strokeWidth = 6..strokeCap = StrokeCap.round);
+        canvas.drawLine(const Offset(-22, 8), tip, Paint()..color = p.on ? const Color(0xFF4ADE80) : const Color(0xFFE5E7EB)..strokeWidth = 4..strokeCap = StrokeCap.round);
+        canvas.drawCircle(Offset.lerp(const Offset(-22, 8), tip, 0.85)!, 5, Paint()..color = const Color(0xFFEF4444));
       case 'fuse':
-        canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(-22, -8, 44, 16), const Radius.circular(6)), Paint()..style = PaintingStyle.stroke..strokeWidth = 2..color = Colors.white54);
-        if (!p.burnt) {
-          canvas.drawLine(const Offset(-20, 0), const Offset(20, 0), Paint()..strokeWidth = 1.6..color = Color.lerp(Colors.white70, const Color(0xFFFB923C), p.glow)!);
+        final tube = RRect.fromRectAndRadius(const Rect.fromLTWH(-24, -9, 48, 18), const Radius.circular(9));
+        canvas.drawRRect(tube, Paint()..color = const Color(0xFFBAE6FD).withValues(alpha: 0.25));
+        canvas.drawRRect(tube, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.4..color = Colors.white54);
+        if (!dead) {
+          canvas.drawLine(const Offset(-20, 0), const Offset(20, 0), Paint()..strokeWidth = 1.6..color = Color.lerp(const Color(0xFFE5E7EB), const Color(0xFFFB923C), p.glow)!);
         } else {
-          canvas.drawLine(const Offset(-20, 0), const Offset(-6, 0), Paint()..strokeWidth = 1.6..color = Colors.white38);
-          canvas.drawLine(const Offset(6, 0), const Offset(20, 0), Paint()..strokeWidth = 1.6..color = Colors.white38);
+          canvas.drawLine(const Offset(-20, 0), const Offset(-5, 0), Paint()..strokeWidth = 1.6..color = Colors.white38);
+          canvas.drawLine(const Offset(5, 0), const Offset(20, 0), Paint()..strokeWidth = 1.6..color = Colors.white38);
+          canvas.drawCircle(Offset.zero, 6, Paint()..color = Colors.black45);
+        }
+        for (final sx in const [-1.0, 1.0]) {
+          final cap = Rect.fromCenter(center: Offset(sx * 22, 0), width: 9, height: 20);
+          canvas.drawRRect(RRect.fromRectAndRadius(cap, const Radius.circular(3)), _metal(cap, vertical: true, a: const Color(0xFFB45309), b: const Color(0xFFFCD34D)));
         }
       case 'pot':
+        canvas.drawCircle(Offset.zero, 21, Paint()..shader = const RadialGradient(colors: [Color(0xFF9CA3AF), Color(0xFF1F2937)]).createShader(Rect.fromCircle(center: Offset.zero, radius: 21)));
+        for (var k = 0; k <= 10; k++) {
+          final a = math.pi * 0.75 + k * math.pi * 1.5 / 10;
+          canvas.drawLine(Offset(math.cos(a) * 18, math.sin(a) * 18), Offset(math.cos(a) * 22, math.sin(a) * 22), Paint()..color = Colors.white54..strokeWidth = 1.2);
+        }
+        canvas.drawCircle(Offset.zero, 13, Paint()..shader = const RadialGradient(colors: [Color(0xFF374151), Color(0xFF0B0F17)]).createShader(Rect.fromCircle(center: Offset.zero, radius: 13)));
+        final ang = math.pi * 0.75 + p.level * math.pi * 1.5;
+        canvas.drawLine(Offset(math.cos(ang) * 3, math.sin(ang) * 3), Offset(math.cos(ang) * 12, math.sin(ang) * 12), Paint()..color = const Color(0xFFFBBF24)..strokeWidth = 3..strokeCap = StrokeCap.round);
       case 'resistor':
-        final z = Path()..moveTo(-26, 0);
-        for (var k = 0; k < 6; k++) {
-          z.lineTo(-22 + k * 8.0, k.isEven ? -9 : 9);
+        final body = RRect.fromRectAndRadius(const Rect.fromLTWH(-24, -9, 48, 18), const Radius.circular(9));
+        canvas.drawRRect(body, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFF5E6C8), Color(0xFFC9A66B), Color(0xFF8B6B3A)]).createShader(body.outerRect));
+        final bands = <double, List<Color>>{47.0: [Color(0xFFFACC15), Color(0xFF7C3AED), Colors.black], 100.0: [Color(0xFF8B5A2B), Colors.black, Color(0xFF8B5A2B)], 220.0: [Color(0xFFEF4444), Color(0xFFEF4444), Color(0xFF8B5A2B)], 470.0: [Color(0xFFFACC15), Color(0xFF7C3AED), Color(0xFF8B5A2B)], 1000.0: [Color(0xFF8B5A2B), Colors.black, Color(0xFFEF4444)]};
+        final cols = bands[p.ohms] ?? bands[100.0]!;
+        for (var i = 0; i < 3; i++) {
+          canvas.drawRect(Rect.fromLTWH(-14 + i * 9.0, -9, 4.5, 18), Paint()..color = cols[i]);
         }
-        z.lineTo(26, 0);
-        canvas.drawPath(z, stroke);
-        if (p.kind == 'pot') {
-          final x = -22 + 44 * p.level;
-          canvas.drawLine(Offset(x, -20), Offset(x, -8), Paint()..color = Colors.white..strokeWidth = 3);
-        } else {
-          _text(canvas, p.ohms >= 1000 ? '${(p.ohms / 1000).toStringAsFixed(0)}kΩ' : '${p.ohms.round()}Ω', const Offset(-14, 10), Colors.white70, 10);
-        }
+        canvas.drawRect(const Rect.fromLTWH(14, -9, 3.5, 18), Paint()..color = const Color(0xFFFBBF24));
+        _text(canvas, p.ohms >= 1000 ? '1kΩ' : '${p.ohms.round()}Ω', const Offset(-10, 12), Colors.white70, 10);
       case 'bulb':
-        if (p.glow > 0) canvas.drawCircle(Offset.zero, 30, Paint()..color = const Color(0xFFFDE047).withValues(alpha: 0.5 * p.glow)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12));
-        canvas.drawCircle(Offset.zero, 15, Paint()..color = p.burnt ? const Color(0xFF3A3A3A) : Color.lerp(const Color(0xFF3B3F4A), const Color(0xFFFEF08A), p.glow)!);
-        canvas.drawCircle(Offset.zero, 15, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.5..color = Colors.white54);
-        final f = Path()..moveTo(-7, 6)..lineTo(-4, -3)..lineTo(0, 4)..lineTo(4, -3)..lineTo(7, 6);
-        canvas.drawPath(f, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.6..color = p.burnt ? Colors.black45 : Color.lerp(Colors.white38, const Color(0xFFFB923C), p.glow)!);
-      case 'led':
-        if (p.glow > 0) canvas.drawCircle(Offset.zero, 26, Paint()..color = const Color(0xFFEF4444).withValues(alpha: 0.6 * p.glow)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10));
-        final tri = Path()..moveTo(-10, -12)..lineTo(-10, 12)..lineTo(12, 0)..close();
-        canvas.drawPath(tri, Paint()..color = p.burnt ? const Color(0xFF3A3A3A) : Color.lerp(const Color(0xFF5B1F1F), const Color(0xFFFF6B6B), p.glow)!);
-        canvas.drawPath(tri, stroke..strokeWidth = 2);
-        canvas.drawLine(const Offset(13, -12), const Offset(13, 12), stroke);
-      case 'motor':
-        canvas.drawCircle(Offset.zero, 17, Paint()..color = const Color(0xFF2A303B));
-        canvas.drawCircle(Offset.zero, 17, stroke..strokeWidth = 2);
-        for (var k = 0; k < 4; k++) {
-          final a = p.spin + k * math.pi / 2;
-          canvas.drawLine(Offset.zero, Offset(math.cos(a) * 13, math.sin(a) * 13), stroke..strokeWidth = 4..color = p.burnt ? Colors.grey : col);
+        if (p.glow > 0) canvas.drawCircle(const Offset(0, -6), 34, Paint()..color = const Color(0xFFFDE047).withValues(alpha: 0.55 * p.glow)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14));
+        final base = Rect.fromCenter(center: const Offset(0, 17), width: 18, height: 12);
+        canvas.drawRRect(RRect.fromRectAndRadius(base, const Radius.circular(3)), _metal(base, vertical: true, a: const Color(0xFF6B7280), b: const Color(0xFFD1D5DB)));
+        for (var i = 0; i < 3; i++) {
+          canvas.drawLine(Offset(-9, 13 + i * 3.5), Offset(9, 13 + i * 3.5), Paint()..color = Colors.black26..strokeWidth = 1);
         }
+        canvas.drawCircle(const Offset(0, -4), 17, Paint()..shader = RadialGradient(center: const Alignment(-0.3, -0.4), colors: [dead ? const Color(0xFF52525B) : Color.lerp(const Color(0xFFD1D5DB), const Color(0xFFFFFBEB), p.glow)!.withValues(alpha: dead ? 0.5 : 0.25 + 0.7 * p.glow), (dead ? const Color(0xFF27272A) : Color.lerp(const Color(0xFF9CA3AF), const Color(0xFFFDE047), p.glow)!).withValues(alpha: 0.18 + 0.5 * p.glow)]).createShader(Rect.fromCircle(center: const Offset(0, -4), radius: 17)));
+        canvas.drawCircle(const Offset(0, -4), 17, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.4..color = Colors.white.withValues(alpha: 0.6));
+        canvas.drawPath(Path()..moveTo(-9, -12)..quadraticBezierTo(-12, -4, -9, 0), Paint()..style = PaintingStyle.stroke..strokeWidth = 2..color = Colors.white.withValues(alpha: 0.45));
+        canvas.drawLine(const Offset(-4, 11), const Offset(-4, -2), Paint()..color = Colors.grey..strokeWidth = 1.4);
+        canvas.drawLine(const Offset(4, 11), const Offset(4, -2), Paint()..color = Colors.grey..strokeWidth = 1.4);
+        final fil = Path()..moveTo(-4, -2);
+        for (var k = 0; k < 6; k++) {
+          fil.lineTo(-4 + (k + 1) * 8 / 6, -2 + (k.isEven ? -6 : 1));
+        }
+        canvas.drawPath(fil, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.8..color = dead ? Colors.black54 : Color.lerp(const Color(0xFF9CA3AF), const Color(0xFFFFF7CC), p.glow)!);
+      case 'led':
+        if (p.glow > 0) canvas.drawCircle(const Offset(0, -4), 30, Paint()..color = const Color(0xFFEF4444).withValues(alpha: 0.6 * p.glow)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 11));
+        canvas.drawLine(const Offset(-5, 6), const Offset(-5, 20), Paint()..color = const Color(0xFFD1D5DB)..strokeWidth = 2.4);
+        canvas.drawLine(const Offset(5, 6), const Offset(5, 17), Paint()..color = const Color(0xFFD1D5DB)..strokeWidth = 2.4);
+        final dome = Path()..moveTo(-12, 8)..lineTo(-12, -6)..quadraticBezierTo(0, -26, 12, -6)..lineTo(12, 8)..close();
+        canvas.drawPath(dome, Paint()..shader = LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [dead ? const Color(0xFF3F3F46) : Color.lerp(const Color(0xFF7F1D1D), const Color(0xFFFF8A8A), p.glow)!, dead ? const Color(0xFF18181B) : Color.lerp(const Color(0xFF450A0A), const Color(0xFFEF4444), p.glow)!]).createShader(const Rect.fromLTWH(-12, -22, 24, 30)));
+        canvas.drawPath(dome, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.2..color = Colors.white30);
+        canvas.drawRect(const Rect.fromLTWH(-14, 6, 28, 4), Paint()..color = const Color(0xFFB91C1C));
+        canvas.drawPath(Path()..moveTo(-7, -4)..quadraticBezierTo(-6, -12, 0, -15), Paint()..style = PaintingStyle.stroke..strokeWidth = 2..color = Colors.white.withValues(alpha: 0.5));
+      case 'motor':
+        final can = Rect.fromLTWH(-28, -14, 48, 28);
+        canvas.drawRRect(RRect.fromRectAndRadius(can, const Radius.circular(6)), _metal(can, a: const Color(0xFF64748B), b: const Color(0xFFE2E8F0)));
+        canvas.drawRect(const Rect.fromLTWH(14, -14, 6, 28), Paint()..color = const Color(0xFF1F2937));
+        canvas.drawRect(const Rect.fromLTWH(20, -2, 10, 4), Paint()..color = const Color(0xFFCBD5E1));
+        canvas.save();
+        canvas.translate(31, 0);
+        for (var k = 0; k < 3; k++) {
+          canvas.save();
+          canvas.rotate(p.spin + k * 2.094);
+          canvas.drawOval(Rect.fromCenter(center: const Offset(0, -9), width: 7, height: 15), Paint()..color = const Color(0xFFFB923C).withValues(alpha: 0.9));
+          canvas.restore();
+        }
+        canvas.drawCircle(Offset.zero, 3, Paint()..color = const Color(0xFF111827));
+        canvas.restore();
+        _text(canvas, 'M', const Offset(-20, -9), const Color(0xFF111827), 14);
       case 'buzzer':
-        canvas.drawCircle(const Offset(-6, 0), 12, Paint()..color = col.withValues(alpha: 0.85));
+        final disc = Rect.fromCenter(center: Offset.zero, width: 42, height: 42);
+        canvas.drawOval(disc, Paint()..shader = const RadialGradient(center: Alignment(-0.3, -0.4), colors: [Color(0xFF4B5563), Color(0xFF0B0F17)]).createShader(disc));
+        canvas.drawCircle(Offset.zero, 6, Paint()..color = Colors.black);
+        canvas.drawCircle(Offset.zero, 6, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.4..color = Colors.white24);
+        _text(canvas, '+', const Offset(-17, -18), Colors.white70, 12);
         for (var k = 1; k <= 3; k++) {
-          canvas.drawArc(Rect.fromCircle(center: const Offset(8, 0), radius: 5.0 + k * 5), -0.8, 1.6, false, Paint()..style = PaintingStyle.stroke..strokeWidth = 2..color = col.withValues(alpha: p.glow * (1 - k * 0.2)));
+          canvas.drawArc(Rect.fromCircle(center: Offset.zero, radius: 24.0 + k * 5 + (p.glow > 0 ? (board.time * 14) % 5 : 0)), -0.7, 1.4, false, Paint()..style = PaintingStyle.stroke..strokeWidth = 2..color = const Color(0xFFF472B6).withValues(alpha: p.glow * (1 - k * 0.22)));
         }
       case 'heater':
+        final base = RRect.fromRectAndRadius(const Rect.fromLTWH(-30, -12, 60, 26), const Radius.circular(6));
+        canvas.drawRRect(base, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFD6D3D1), Color(0xFF78716C)]).createShader(base.outerRect));
         final z = Path()..moveTo(-24, 0);
-        for (var k = 0; k < 7; k++) {
-          z.quadraticBezierTo(-24 + k * 7.0 + 3.5, k.isEven ? -14 : 14, -24 + (k + 1) * 7.0, 0);
+        for (var k = 0; k < 8; k++) {
+          z.quadraticBezierTo(-24 + k * 6.0 + 3, k.isEven ? -10 : 10, -24 + (k + 1) * 6.0, 0);
         }
-        canvas.drawPath(z, Paint()..style = PaintingStyle.stroke..strokeWidth = 3.4..strokeCap = StrokeCap.round..color = Color.lerp(const Color(0xFF6B7280), const Color(0xFFFF7A18), p.glow)!);
-        if (p.glow > 0.1) canvas.drawPath(z, Paint()..style = PaintingStyle.stroke..strokeWidth = 8..color = const Color(0xFFFF7A18).withValues(alpha: 0.4 * p.glow)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6));
+        if (p.glow > 0.1) canvas.drawPath(z, Paint()..style = PaintingStyle.stroke..strokeWidth = 10..color = const Color(0xFFFF7A18).withValues(alpha: 0.5 * p.glow)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6));
+        canvas.drawPath(z, Paint()..style = PaintingStyle.stroke..strokeWidth = 3.2..strokeCap = StrokeCap.round..color = Color.lerp(const Color(0xFF57534E), const Color(0xFFFFB347), p.glow)!);
       case 'capacitor':
-        canvas.drawRect(const Rect.fromLTWH(-9, -15, 5, 30), Paint()..color = Colors.white70);
-        canvas.drawRect(const Rect.fromLTWH(4, -15, 5, 30), Paint()..color = Colors.white70);
-        canvas.drawRect(Rect.fromLTWH(-24, 14 - 28 * p.glow, 8, 28 * p.glow), Paint()..color = col);
-        canvas.drawRect(const Rect.fromLTWH(-24, -14, 8, 28), Paint()..style = PaintingStyle.stroke..strokeWidth = 1..color = Colors.white38);
+        final can = Rect.fromLTWH(-16, -22, 32, 40);
+        canvas.drawRRect(RRect.fromRectAndRadius(can, const Radius.circular(6)), Paint()..shader = const LinearGradient(begin: Alignment.centerLeft, end: Alignment.centerRight, colors: [Color(0xFF1E3A8A), Color(0xFF3B82F6), Color(0xFF1E3A8A)]).createShader(can));
+        canvas.drawRect(const Rect.fromLTWH(-16, -22, 7, 40), Paint()..color = const Color(0xFFE5E7EB));
+        for (var i = 0; i < 4; i++) {
+          _text(canvas, '−', Offset(-14, -18.0 + i * 9), const Color(0xFF111827), 11);
+        }
+        final top = Rect.fromLTWH(-16, -24, 32, 7);
+        canvas.drawRRect(RRect.fromRectAndRadius(top, const Radius.circular(3)), _metal(top, vertical: false));
+        canvas.drawRect(Rect.fromLTWH(-3, 18 - 38 * p.glow, 14, 38 * p.glow), Paint()..color = const Color(0xFF4ADE80).withValues(alpha: 0.5));
+        _text(canvas, '1F', const Offset(0, -6), Colors.white, 11);
       case 'radio':
-        canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(-24, -12, 48, 26), const Radius.circular(5)), Paint()..color = const Color(0xFF3B2A46));
-        canvas.drawCircle(const Offset(-10, 3), 7, Paint()..color = const Color(0xFF111111));
-        canvas.drawCircle(const Offset(12, 3), 4, Paint()..color = col);
-        canvas.drawLine(const Offset(16, -12), const Offset(24, -26), Paint()..color = Colors.white70..strokeWidth = 1.6);
+        final body = RRect.fromRectAndRadius(const Rect.fromLTWH(-34, -18, 68, 36), const Radius.circular(8));
+        canvas.drawRRect(body, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFB45309), Color(0xFF78350F)]).createShader(body.outerRect));
+        canvas.drawRRect(body, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.4..color = const Color(0xFFFCD34D).withValues(alpha: 0.6));
+        canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(-30, -14, 30, 28), const Radius.circular(4)), Paint()..color = const Color(0xFF1C1917));
+        for (var i = 0; i < 6; i++) {
+          canvas.drawLine(Offset(-27, -10.0 + i * 4.4), Offset(-3, -10.0 + i * 4.4), Paint()..color = const Color(0xFF57534E)..strokeWidth = 1.4);
+        }
+        canvas.drawRect(const Rect.fromLTWH(4, -13, 26, 10), Paint()..color = p.glow > 0 ? const Color(0xFFFEF3C7) : const Color(0xFF44403C));
+        if (p.glow > 0) canvas.drawLine(Offset(8 + (board.time * 7) % 18, -13), Offset(8 + (board.time * 7) % 18, -3), Paint()..color = const Color(0xFFDC2626)..strokeWidth = 1.6);
+        canvas.drawCircle(const Offset(11, 8), 6, Paint()..shader = const RadialGradient(colors: [Color(0xFFE5E7EB), Color(0xFF4B5563)]).createShader(Rect.fromCircle(center: const Offset(11, 8), radius: 6)));
+        canvas.drawCircle(const Offset(25, 8), 4, Paint()..color = const Color(0xFFFCD34D));
+        canvas.drawLine(const Offset(24, -18), const Offset(34, -32), Paint()..color = const Color(0xFFD1D5DB)..strokeWidth = 1.8);
         if (p.glow > 0) {
           for (var k = 1; k <= 2; k++) {
-            canvas.drawArc(Rect.fromCircle(center: const Offset(24, -26), radius: 5.0 + k * 5 + (board.time * 8) % 5), -2.4, 1.6, false, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.4..color = col.withValues(alpha: 0.7));
+            canvas.drawArc(Rect.fromCircle(center: const Offset(34, -32), radius: 4.0 + k * 5 + (board.time * 8) % 5), -2.4, 1.6, false, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.4..color = const Color(0xFFE879F9).withValues(alpha: 0.7));
           }
         }
       case 'tv':
-        canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(-26, -16, 52, 34), const Radius.circular(6)), Paint()..color = const Color(0xFF111418));
-        final screen = const Rect.fromLTWH(-22, -12, 44, 26);
+        canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(-36, -24, 72, 44), const Radius.circular(6)), Paint()..color = const Color(0xFF0B0F17));
+        final screen = RRect.fromRectAndRadius(const Rect.fromLTWH(-33, -21, 66, 38), const Radius.circular(3));
         if (p.glow > 0) {
           canvas.save();
-          canvas.clipRect(screen);
-          const cols = [Color(0xFFEF4444), Color(0xFFFACC15), Color(0xFF22C55E), Color(0xFF38BDF8), Color(0xFFA78BFA)];
-          for (var k = 0; k < 5; k++) {
-            canvas.drawRect(Rect.fromLTWH(-22.0 + k * 8.8, -12, 8.8, 26), Paint()..color = cols[(k + (board.time * 2).floor()) % 5]);
+          canvas.clipRRect(screen);
+          const cols = [Color(0xFFEF4444), Color(0xFFFACC15), Color(0xFF22C55E), Color(0xFF38BDF8), Color(0xFFA78BFA), Colors.white, Color(0xFF111827)];
+          for (var k = 0; k < 7; k++) {
+            canvas.drawRect(Rect.fromLTWH(-33.0 + k * 9.5, -21, 9.5, 28), Paint()..color = cols[(k + (board.time * 2).floor()) % 7]);
           }
+          canvas.drawRect(const Rect.fromLTWH(-33, 7, 66, 10), Paint()..color = const Color(0xFF111827));
+          canvas.drawRect(Rect.fromLTWH(-33, -21 + (board.time * 30) % 38, 66, 2), Paint()..color = Colors.white.withValues(alpha: 0.25));
           canvas.restore();
+          canvas.drawRRect(screen, Paint()..color = Colors.white.withValues(alpha: 0.06));
         } else {
-          canvas.drawRect(screen, Paint()..color = const Color(0xFF05070A));
+          canvas.drawRRect(screen, Paint()..color = const Color(0xFF05070A));
+          canvas.drawPath(Path()..moveTo(-33, -21)..lineTo(-10, -21)..lineTo(-33, 0)..close(), Paint()..color = Colors.white.withValues(alpha: 0.05));
         }
-        canvas.drawRect(screen, Paint()..style = PaintingStyle.stroke..strokeWidth = 1..color = Colors.white24);
+        canvas.drawRect(const Rect.fromLTWH(-14, 20, 28, 4), Paint()..color = const Color(0xFF475569));
+        canvas.drawCircle(const Offset(30, 18), 1.6, Paint()..color = p.glow > 0 ? const Color(0xFF4ADE80) : const Color(0xFFEF4444));
     }
-    if (p.burnt) _text(canvas, '✖', const Offset(-6, -36), const Color(0xFFEF4444), 14);
+    if (dead) _text(canvas, '✖', const Offset(-6, -42), const Color(0xFFEF4444), 14);
+  }
+
+  void _battery(Canvas canvas, Part p) {
+    final v = p.volts;
+    if (v <= 4.5) {
+      // A cell, like the ones in a torch: shiny can, coloured label, a bump on the plus end.
+      final can = Rect.fromLTWH(-28, -13, 56, 26);
+      canvas.drawRRect(RRect.fromRectAndRadius(can, const Radius.circular(5)), _metal(can, a: const Color(0xFF9CA3AF), b: const Color(0xFFF9FAFB)));
+      final label = Rect.fromLTWH(-22, -13, 44, 26);
+      canvas.drawRect(label, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1F2937), Color(0xFF030712)]).createShader(label));
+      canvas.drawRect(const Rect.fromLTWH(-22, -3, 44, 6), Paint()..color = const Color(0xFFD97706));
+      final nub = Rect.fromLTWH(28, -5, 6, 10);
+      canvas.drawRRect(RRect.fromRectAndRadius(nub, const Radius.circular(2)), _metal(nub, vertical: true, a: const Color(0xFF9CA3AF), b: const Color(0xFFF3F4F6)));
+      _text(canvas, '+', const Offset(18, -12), const Color(0xFFFBBF24), 11);
+      _text(canvas, '−', const Offset(-22, -11), Colors.white70, 11);
+      _text(canvas, '${v == v.roundToDouble() ? v.round() : v}V', const Offset(-14, -12), const Color(0xFFFBBF24), 13);
+      if (v > 2) {
+        canvas.drawLine(const Offset(0, -13), const Offset(0, 13), Paint()..color = Colors.white24..strokeWidth = 1);
+        _text(canvas, v > 3 ? '3 cells' : '2 cells', const Offset(-14, 2), Colors.white54, 8);
+      }
+    } else if (v <= 9) {
+      // The little 9 volt block with its snap studs on top.
+      final box = Rect.fromLTWH(-22, -17, 44, 34);
+      canvas.drawRRect(RRect.fromRectAndRadius(box, const Radius.circular(5)), Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF111827), Color(0xFF000000)]).createShader(box));
+      canvas.drawRect(const Rect.fromLTWH(-22, -4, 44, 16), Paint()..color = const Color(0xFF16A34A));
+      for (final sx in const [-8.0, 8.0]) {
+        canvas.drawCircle(Offset(sx, -18), sx < 0 ? 5 : 3.6, Paint()..shader = const RadialGradient(colors: [Color(0xFFF3F4F6), Color(0xFF6B7280)]).createShader(Rect.fromCircle(center: Offset(sx, -18), radius: 5)));
+      }
+      _text(canvas, '9V', const Offset(-11, -2), Colors.white, 16);
+    } else {
+      // A big car-style battery with two posts.
+      final box = Rect.fromLTWH(-34, -16, 68, 32);
+      canvas.drawRRect(RRect.fromRectAndRadius(box, const Radius.circular(4)), Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1F2937), Color(0xFF030712)]).createShader(box));
+      canvas.drawRect(const Rect.fromLTWH(-34, -4, 68, 11), Paint()..color = const Color(0xFFFACC15));
+      for (final sx in const [-24.0, 24.0]) {
+        canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: Offset(sx, -20), width: 10, height: 8), const Radius.circular(2)), Paint()..color = const Color(0xFFCBD5E1));
+      }
+      _text(canvas, '+', const Offset(20, -17), const Color(0xFFEF4444), 10);
+      _text(canvas, '12V', const Offset(-13, -5), const Color(0xFF111827), 15);
+    }
   }
 
   @override

@@ -1001,19 +1001,47 @@ class NgmyChainBurstStudio extends StatefulWidget {
 }
 
 class _NgmyChainBurstStudioState extends State<NgmyChainBurstStudio> with SingleTickerProviderStateMixin, StudioFrames {
+  static const int kLevels = 100;
   final List<_Dot> _dots = [];
   final math.Random _rnd = math.Random();
   Size _size = Size.zero;
   int _level = 1;
+  int _unlocked = 1;
+  Map<String, int> _stars = {};
   bool _fired = false;
   bool _done = false;
+  bool _loaded = false;
   int _blasts = 0;
-  int _best = 0;
   Offset? _firstBlast;
   int _firstAt = 0;
 
-  int get _goal => math.min(_dots.length, 2 + _level * 2);
-  static const double _maxR = 52;
+  /// How hard each of the 100 levels is.
+  int _dotCount(int l) => 18 + (l * 0.85).round();
+  int get _goal {
+    final n = _dotCount(_level);
+    return (n * (0.12 + 0.45 * (_level - 1) / 99)).round().clamp(3, n - 2);
+  }
+
+  double get _maxR => 54 - 8 * (_level / 100);
+  double get _speed => 30 + _level * 0.45;
+
+  @override
+  void initState() {
+    super.initState();
+    startFrames();
+    NgmyProgress.load('chain_burst').then((m) {
+      if (!mounted) return;
+      setState(() {
+        _unlocked = ((m['unlocked'] as num?)?.toInt() ?? 1).clamp(1, kLevels);
+        _level = ((m['level'] as num?)?.toInt() ?? _unlocked).clamp(1, _unlocked);
+        _stars = {for (final e in ((m['stars'] as Map?) ?? const {}).entries) '${e.key}': (e.value as num).toInt()};
+        _loaded = true;
+        _dots.clear();
+      });
+    });
+  }
+
+  Future<void> _save() => NgmyProgress.save('chain_burst', {'unlocked': _unlocked, 'level': _level, 'stars': _stars});
 
   void _setup() {
     _dots.clear();
@@ -1021,17 +1049,11 @@ class _NgmyChainBurstStudioState extends State<NgmyChainBurstStudio> with Single
     _done = false;
     _blasts = 0;
     _firstBlast = null;
-    final n = 14 + _level * 4;
+    final n = _dotCount(_level);
     for (var i = 0; i < n; i++) {
       final a = _rnd.nextDouble() * math.pi * 2;
-      _dots.add(_Dot(Offset(20 + _rnd.nextDouble() * (_size.width - 40), 20 + _rnd.nextDouble() * (_size.height - 40)), Offset(math.cos(a), math.sin(a)) * (30 + _rnd.nextDouble() * 50), HSVColor.fromAHSV(1, _rnd.nextDouble() * 360, 0.6, 1).toColor()));
+      _dots.add(_Dot(Offset(20 + _rnd.nextDouble() * (_size.width - 40), 20 + _rnd.nextDouble() * (_size.height - 40)), Offset(math.cos(a), math.sin(a)) * (_speed * (0.6 + _rnd.nextDouble() * 0.8)), HSVColor.fromAHSV(1, _rnd.nextDouble() * 360, 0.6, 1).toColor()));
     }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    startFrames();
   }
 
   double _radius(int? at) {
@@ -1045,7 +1067,7 @@ class _NgmyChainBurstStudioState extends State<NgmyChainBurstStudio> with Single
 
   @override
   void onFrame(double dt) {
-    if (_size == Size.zero) return;
+    if (_size == Size.zero || !_loaded) return;
     if (_dots.isEmpty) _setup();
     for (final d in _dots) {
       if (d.blastAt != null) continue;
@@ -1054,7 +1076,6 @@ class _NgmyChainBurstStudioState extends State<NgmyChainBurstStudio> with Single
       if (d.p.dy < 8 || d.p.dy > _size.height - 8) d.v = Offset(d.v.dx, -d.v.dy);
     }
     if (_fired) {
-      // Anything touching a blast becomes a blast.
       final live = <(Offset, double)>[];
       if (_firstBlast != null) live.add((_firstBlast!, _radius(_firstAt)));
       for (final b in _dots.where((d) => d.blastAt != null)) {
@@ -1073,26 +1094,87 @@ class _NgmyChainBurstStudioState extends State<NgmyChainBurstStudio> with Single
         }
       }
       final active = (_firstBlast != null && _radius(_firstAt) > 0) || _dots.any((d) => d.blastAt != null && _radius(d.blastAt) > 0);
-      if (!active && nowMs - _firstAt > 400) {
+      if (!active && nowMs - _firstAt > 400 && !_done) {
         _done = true;
-        if (_blasts > _best) _best = _blasts;
+        if (_blasts >= _goal) {
+          final stars = _blasts >= _goal * 1.5 ? 3 : (_blasts >= _goal * 1.25 ? 2 : 1);
+          if (stars > (_stars['$_level'] ?? 0)) _stars['$_level'] = stars;
+          if (_level < kLevels) _unlocked = math.max(_unlocked, _level + 1);
+          NgmyTone.chord('bell', [0, 4, 7, 12], ms: 600, volume: 0.45);
+          // Saved at once, so closing the app or logging out never sends you back.
+          _save();
+        } else {
+          NgmyTone.play(120, ms: 300, wave: 'saw', volume: 0.3);
+        }
       }
     }
+  }
+
+  void _go(int level) {
+    setState(() {
+      _level = level.clamp(1, _unlocked);
+      _setup();
+    });
+    _save();
+  }
+
+  Future<void> _pick() async {
+    final lv = await showDialog<int>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: const Color(0xFF17171C),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: SizedBox(
+            width: 340,
+            height: 480,
+            child: Column(children: [
+              Text('Pick a level  ·  $_unlocked of $kLevels unlocked', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+              const SizedBox(height: 10),
+              Expanded(
+                child: GridView.builder(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 5, mainAxisSpacing: 8, crossAxisSpacing: 8),
+                  itemCount: kLevels,
+                  itemBuilder: (context, i) {
+                    final l = i + 1;
+                    final open = l <= _unlocked;
+                    final st = _stars['$l'] ?? 0;
+                    return GestureDetector(
+                      onTap: open ? () => Navigator.pop(ctx, l) : null,
+                      child: Container(
+                        decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: open ? (l == _level ? const Color(0xFFF472B6) : Colors.white.withValues(alpha: 0.1)) : Colors.white.withValues(alpha: 0.03), border: Border.all(color: open ? Colors.white24 : Colors.white10)),
+                        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                          Text(open ? '$l' : '🔒', style: TextStyle(color: open ? Colors.white : Colors.white30, fontWeight: FontWeight.w900, fontSize: open ? 16 : 14)),
+                          if (open) Text('★' * st + '☆' * (3 - st), style: const TextStyle(color: Color(0xFFFBBF24), fontSize: 9)),
+                        ]),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ]),
+          ),
+        ),
+      ),
+    );
+    if (lv != null) _go(lv);
   }
 
   @override
   Widget build(BuildContext context) {
     final won = _done && _blasts >= _goal;
+    final stars = _stars['$_level'] ?? 0;
     return StudioPage(
       title: 'CHAIN BURST',
       accent: const Color(0xFFF472B6),
-      help: 'You get one tap each round. Tap to set off a blast. Every dot it touches blows up too, and those blasts set off more.\n\nReach the goal number of dots to pass the level. Each level has more dots and a higher goal. Pick your spot carefully: tap where dots are close together.',
+      help: 'You get one tap each round. Tap to set off a blast. Every dot it touches blows up too, and those blasts set off more.\n\nReach the goal number of dots to pass the level and unlock the next one. There are 100 levels, and each has more dots and a higher goal. Blast more than the goal for 2 or 3 stars.\n\nYour progress is saved on this phone automatically: you can close the app or log out and you will still be on the same level. Tap Levels to jump to any level you have unlocked.',
       stage: LayoutBuilder(builder: (context, box) {
         _size = Size(box.maxWidth, box.maxHeight);
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTapDown: (d) {
-            if (_fired) return;
+            if (_fired || !_loaded) return;
             _fired = true;
             _firstBlast = d.localPosition;
             _firstAt = nowMs;
@@ -1106,30 +1188,27 @@ class _NgmyChainBurstStudioState extends State<NgmyChainBurstStudio> with Single
               right: 16,
               top: 8,
               child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                _hud('LEVEL', '$_level'),
+                _hud('LEVEL', '$_level / $kLevels'),
                 _hud('GOAL', '$_blasts / $_goal', color: _blasts >= _goal ? const Color(0xFF4ADE80) : Colors.white),
-                _hud('BEST', '$_best'),
+                _hud('STARS', '${'★' * stars}${'☆' * (3 - stars)}', color: const Color(0xFFFBBF24)),
               ]),
             ),
-            if (!_fired)
-              const Align(alignment: Alignment(0, 0.85), child: Text('Tap once to start the chain', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w800))),
+            if (!_loaded) const Center(child: CircularProgressIndicator()),
+            if (_loaded && !_fired) const Align(alignment: Alignment(0, 0.85), child: Text('Tap once to start the chain', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w800))),
             if (_done)
               Center(
                 child: Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(color: const Color(0xEE17171A), borderRadius: BorderRadius.circular(24), border: Border.all(color: (won ? const Color(0xFF4ADE80) : const Color(0xFFF87171)).withValues(alpha: 0.6))),
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    Text(won ? 'Level complete!' : 'So close', style: TextStyle(color: won ? const Color(0xFF4ADE80) : const Color(0xFFF87171), fontWeight: FontWeight.w900, fontSize: 22)),
+                    Text(won ? (_level >= kLevels ? 'You beat all 100 levels!' : 'Level complete!') : 'So close', style: TextStyle(color: won ? const Color(0xFF4ADE80) : const Color(0xFFF87171), fontWeight: FontWeight.w900, fontSize: 22)),
                     const SizedBox(height: 6),
                     Text('You blasted $_blasts dots. The goal was $_goal.', style: const TextStyle(color: Colors.white70)),
+                    if (won) Text('★' * (_stars['$_level'] ?? 1), style: const TextStyle(color: Color(0xFFFBBF24), fontSize: 26)),
                     const SizedBox(height: 14),
                     Row(mainAxisSize: MainAxisSize.min, children: [
                       StudioButton(icon: Icons.replay_rounded, label: 'Try again', onTap: () => setState(_setup)),
-                      if (won)
-                        StudioButton(icon: Icons.arrow_forward_rounded, label: 'Next level', color: const Color(0xFF4ADE80), onTap: () => setState(() {
-                              _level++;
-                              _setup();
-                            })),
+                      if (won && _level < kLevels) StudioButton(icon: Icons.arrow_forward_rounded, label: 'Next level', color: const Color(0xFF4ADE80), onTap: () => _go(_level + 1)),
                     ]),
                   ]),
                 ),
@@ -1138,11 +1217,8 @@ class _NgmyChainBurstStudioState extends State<NgmyChainBurstStudio> with Single
         );
       }),
       tools: Row(children: [
+        StudioButton(icon: Icons.grid_view_rounded, label: 'Levels', color: const Color(0xFFF472B6), onTap: _pick),
         StudioButton(icon: Icons.refresh_rounded, label: 'New board', onTap: () => setState(_setup)),
-        StudioButton(icon: Icons.restart_alt_rounded, label: 'Back to level 1', color: const Color(0xFFF87171), onTap: () => setState(() {
-              _level = 1;
-              _setup();
-            })),
       ]),
     );
   }
