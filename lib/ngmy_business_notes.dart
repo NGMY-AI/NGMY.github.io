@@ -844,6 +844,8 @@ class NgmyBusinessNote {
     this.pinned = false,
     this.icon = '📝',
     this.openInPreview = false,
+    this.bookId = '',
+    this.order,
     this.titleFontSize = 28,
     this.leadFontSize = 16,
     List<NgmyNoteTextAnim>? textAnims,
@@ -869,6 +871,9 @@ class NgmyBusinessNote {
   bool pinned;
   String icon;
   bool openInPreview;
+  /// The book this note is stacked in ('' = loose), and its place when you arrange notes yourself.
+  String bookId;
+  double? order;
   double titleFontSize;
   double leadFontSize;
   List<NgmyNoteTextAnim> textAnims;
@@ -917,6 +922,8 @@ class NgmyBusinessNote {
         'pinned': pinned,
         'icon': icon,
         'openInPreview': openInPreview,
+        'bookId': bookId,
+        if (order != null) 'order': order,
         'titleFontSize': titleFontSize,
         'leadFontSize': leadFontSize,
         'textAnims': textAnims.map((a) => a.toJson()).toList(),
@@ -952,6 +959,8 @@ class NgmyBusinessNote {
       pinned: json['pinned'] == true,
       icon: (json['icon'] ?? '📝').toString(),
       openInPreview: json['openInPreview'] == true,
+      bookId: (json['bookId'] ?? '').toString(),
+      order: (json['order'] as num?)?.toDouble(),
       titleFontSize: (json['titleFontSize'] as num?)?.toDouble().clamp(18, 44) ?? 28,
       leadFontSize: (json['leadFontSize'] as num?)?.toDouble().clamp(12, 32) ?? 16,
       textAnims: (json['textAnims'] as List?)
@@ -1041,6 +1050,76 @@ class NgmyBusinessNote {
 /// Photos already read from or written to the blob store, kept in memory so a
 /// save never re-reads or re-writes pictures that did not change.
 final Map<String, String> _kNoteImgCache = {};
+
+
+/// A stack of notes, like a book on a shelf.
+class _NoteBook {
+  _NoteBook({required this.id, required this.name, required this.color, this.order});
+  final String id;
+  String name;
+  int color;
+  double? order;
+
+  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'color': color, if (order != null) 'order': order};
+
+  static _NoteBook? fromJson(dynamic j) {
+    if (j is! Map) return null;
+    final id = (j['id'] ?? '').toString();
+    if (id.isEmpty) return null;
+    return _NoteBook(id: id, name: (j['name'] ?? 'Book').toString(), color: (j['color'] as num?)?.toInt() ?? 0xFF8B5CF6, order: (j['order'] as num?)?.toDouble());
+  }
+}
+
+const List<Color> _kBookColors = [Color(0xFF7C3AED), Color(0xFF0EA5E9), Color(0xFFE11D48), Color(0xFF059669), Color(0xFFF59E0B), Color(0xFFDB2777), Color(0xFF4F46E5), Color(0xFF0D9488)];
+
+String _booksKey(String email) => '${_notesKey(email)}_books_v1';
+
+Future<List<_NoteBook>> _loadBooks(String email) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_booksKey(email));
+    if (raw == null) return [];
+    return [for (final j in jsonDecode(raw) as List) ?_NoteBook.fromJson(j)];
+  } catch (_) {
+    return [];
+  }
+}
+
+Future<void> _saveBooks(String email, List<_NoteBook> books) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_booksKey(email), jsonEncode([for (final b in books) b.toJson()]));
+  } catch (e) {
+    debugPrint('[notes] books save: $e');
+  }
+}
+
+/// One tile in the grid: a note, or a book of notes.
+class _NoteEntry {
+  _NoteEntry.note(NgmyBusinessNote n)
+      : note = n,
+        book = null,
+        inside = const [];
+  _NoteEntry.book(_NoteBook b, this.inside)
+      : book = b,
+        note = null;
+  final NgmyBusinessNote? note;
+  final _NoteBook? book;
+  final List<NgmyBusinessNote> inside;
+
+  String get id => note?.id ?? book!.id;
+  bool get pinned => note?.pinned ?? false;
+  String get title => note?.preview ?? book!.name;
+  DateTime get updated => note?.updatedAt ?? (inside.isEmpty ? DateTime.fromMillisecondsSinceEpoch(0) : inside.map((n) => n.updatedAt).reduce((a, b) => a.isAfter(b) ? a : b));
+  double? get order => note != null ? note!.order : book!.order;
+}
+
+class _NoteDrag {
+  const _NoteDrag(this.id, this.isBook);
+  final String id;
+  final bool isBook;
+}
+
 
 Future<List<NgmyBusinessNote>> _loadNotes(String userEmail) async {
   try {
@@ -1169,6 +1248,7 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
   static const _accent = Color(0xFF8B5CF6);
 
   List<NgmyBusinessNote> _notes = [];
+  List<_NoteBook> _books = [];
   bool _loading = true;
   String _query = '';
   String _folder = 'All';
@@ -1182,9 +1262,11 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
   Future<void> _reload() async {
     var list = await _loadNotes(widget.userEmail);
     list = await _purgeExpiredTrash(widget.userEmail, list);
+    final books = await _loadBooks(widget.userEmail);
     if (!mounted) return;
     setState(() {
       _notes = list;
+      _books = books;
       _loading = false;
     });
   }
@@ -1355,8 +1437,7 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
     final body = n.displayBody.trim();
     const fold = 30.0;
     return GestureDetector(
-      onTap: () => n.isTrashed ? _noteMenu(n) : _openEditor(note: n),
-      onLongPress: () => _noteMenu(n),
+      onTap: () => _tapNote(n),
       child: PhysicalShape(
         clipper: const _FoldClipper(fold),
         color: Colors.white,
@@ -1384,7 +1465,8 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
                   child: NgmyOfflineEmoji(n.icon.trim().isEmpty ? '📝' : n.icon.trim(), fontSize: 16),
                 ),
                 const Spacer(),
-                if (n.pinned) const Padding(padding: EdgeInsets.only(right: 22), child: Icon(Icons.push_pin_rounded, size: 16, color: Color(0xFF8B5CF6))),
+                if (n.pinned) const Padding(padding: EdgeInsets.only(right: 4), child: Icon(Icons.push_pin_rounded, size: 16, color: Color(0xFF8B5CF6))),
+                GestureDetector(onTap: () => _noteMenu(n), child: Padding(padding: const EdgeInsets.only(right: 22), child: Icon(Icons.more_horiz_rounded, size: 20, color: dark ? Colors.white70 : const Color(0xFF475569)))),
               ]),
               const SizedBox(height: 9),
               Text(n.preview, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: fg, fontWeight: FontWeight.w900, fontSize: 15.5, height: 1.2, letterSpacing: -0.2)),
@@ -1405,14 +1487,462 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
     );
   }
 
-  /// Notes sit in neat rows of two, all the same size.
-  Widget _grid(List<NgmyBusinessNote> list, NgmyHubTheme hub) {
+  // ── Books, arranging and selecting ─────────────────────────────────────────
+
+  final ScrollController _scroll = ScrollController();
+  final TextEditingController _quick = TextEditingController();
+  bool _selecting = false;
+  final Set<String> _picked = {};
+  String? _openBook;
+  String? _dragging; // id being dragged
+  String? _hoverId;
+  String _hoverZone = '';
+  String _sort = 'manual';
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    _quick.dispose();
+    super.dispose();
+  }
+
+  _NoteBook? _bookById(String id) {
+    for (final b in _books) {
+      if (b.id == id) return b;
+    }
+    return null;
+  }
+
+  /// What is shown now: books and loose notes (or, inside a book, that book's notes).
+  List<_NoteEntry> get _entries {
+    final list = <_NoteEntry>[];
+    final inTrash = _folder == _kTrashFolder;
+    final searching = _query.trim().isNotEmpty;
+    if (_openBook != null) {
+      for (final n in _visible) {
+        if (n.bookId == _openBook) list.add(_NoteEntry.note(n));
+      }
+      return list;
+    }
+    if (!inTrash && !searching && _folder == 'All') {
+      for (final b in _books) {
+        if (_notes.any((n) => n.bookId == b.id && !n.isTrashed)) list.add(_NoteEntry.book(b, _notes.where((n) => n.bookId == b.id && !n.isTrashed).toList()));
+      }
+    }
+    for (final n in _visible) {
+      if (inTrash || searching || n.bookId.isEmpty || _bookById(n.bookId) == null) list.add(_NoteEntry.note(n));
+    }
+    int cmp(_NoteEntry a, _NoteEntry b) {
+      if (inTrash) return 0;
+      if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
+      switch (_sort) {
+        case 'old':
+          return a.updated.compareTo(b.updated);
+        case 'az':
+          return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+        case 'new':
+          return b.updated.compareTo(a.updated);
+      }
+      // Manual: anything new (no place yet) comes first, then the order you chose.
+      final ao = a.order, bo = b.order;
+      if (ao == null && bo == null) return b.updated.compareTo(a.updated);
+      if (ao == null) return -1;
+      if (bo == null) return 1;
+      return ao.compareTo(bo);
+    }
+
+    list.sort(cmp);
+    return list;
+  }
+
+  Future<void> _saveAll() async {
+    await _saveNotes(widget.userEmail, _notes);
+    await _saveBooks(widget.userEmail, _books);
+  }
+
+  /// Gives every item a place (0, 1, 2...) in the order shown, so a move sticks.
+  void _stampOrder(List<_NoteEntry> ordered) {
+    for (var i = 0; i < ordered.length; i++) {
+      final e = ordered[i];
+      if (e.note != null) {
+        e.note!.order = i.toDouble();
+      } else {
+        e.book!.order = i.toDouble();
+      }
+    }
+  }
+
+  Future<void> _dropInsert(String dragId, String beforeId) async {
+    if (dragId == beforeId) return;
+    final all = _entries;
+    final moving = all.where((e) => e.id == dragId).toList();
+    if (moving.isEmpty) {
+      // A note from inside a book dropped between loose notes: take it out and place it there.
+      final n = _notes.where((x) => x.id == dragId).toList();
+      if (n.isEmpty) return;
+      n.first.bookId = '';
+      final ordered = [..._entries.where((e) => e.id != dragId)];
+      final at = ordered.indexWhere((e) => e.id == beforeId);
+      ordered.insert(at < 0 ? ordered.length : at, _NoteEntry.note(n.first));
+      _stampOrder(ordered);
+      setState(() => _sort = 'manual');
+      await _saveAll();
+      return;
+    }
+    final ordered = [...all.where((e) => e.id != dragId)];
+    final at = ordered.indexWhere((e) => e.id == beforeId);
+    ordered.insert(at < 0 ? ordered.length : at, moving.first);
+    _stampOrder(ordered);
+    setState(() => _sort = 'manual');
+    await _saveAll();
+  }
+
+  Future<String?> _askName(String title, String initial) async {
+    final ctl = TextEditingController(text: initial);
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final hub = NgmyHubTheme.of(ctx);
+        return AlertDialog(
+          backgroundColor: hub.scaffold,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          title: Text(title, style: TextStyle(color: hub.title, fontWeight: FontWeight.w900, fontSize: 18)),
+          content: TextField(controller: ctl, autofocus: true, style: TextStyle(color: hub.title), decoration: InputDecoration(filled: true, fillColor: hub.inputFill, border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none)), onSubmitted: (v) => Navigator.pop(ctx, v)),
+          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(ctx, ctl.text), style: FilledButton.styleFrom(backgroundColor: _accent), child: const Text('Save'))],
+        );
+      },
+    );
+  }
+
+  /// Stack notes together into a book.
+  Future<void> _makeBook(List<String> noteIds, {String? suggest}) async {
+    final name = await _askName('Name your book', suggest ?? 'My book');
+    if (name == null || name.trim().isEmpty) return;
+    final book = _NoteBook(id: 'book_${DateTime.now().microsecondsSinceEpoch}', name: name.trim(), color: _kBookColors[_books.length % _kBookColors.length].toARGB32());
+    final here = _entries;
+    final firstAt = here.indexWhere((e) => noteIds.contains(e.id));
+    for (final n in _notes.where((n) => noteIds.contains(n.id))) {
+      n.bookId = book.id;
+    }
+    _books.add(book);
+    final ordered = [...here.where((e) => !noteIds.contains(e.id))];
+    ordered.insert(firstAt < 0 ? 0 : math.min(firstAt, ordered.length), _NoteEntry.book(book, _notes.where((n) => n.bookId == book.id).toList()));
+    _stampOrder(ordered);
+    setState(() {
+      _selecting = false;
+      _picked.clear();
+    });
+    await _saveAll();
+  }
+
+  Future<void> _addToBook(List<String> noteIds, String bookId) async {
+    for (final n in _notes.where((n) => noteIds.contains(n.id))) {
+      n.bookId = bookId;
+    }
+    setState(() {
+      _selecting = false;
+      _picked.clear();
+    });
+    await _saveAll();
+  }
+
+  Future<void> _takeOut(List<String> noteIds) async {
+    for (final n in _notes.where((n) => noteIds.contains(n.id))) {
+      n.bookId = '';
+      n.order = null;
+    }
+    setState(() {
+      _selecting = false;
+      _picked.clear();
+    });
+    await _saveAll();
+  }
+
+  Future<void> _bookMenu(_NoteBook b) async {
+    final hub = NgmyHubTheme.of(context);
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: hub.scaffold,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(width: 40, height: 4, margin: const EdgeInsets.only(bottom: 8), decoration: BoxDecoration(color: hub.border, borderRadius: BorderRadius.circular(2))),
+            Padding(padding: const EdgeInsets.fromLTRB(8, 4, 8, 8), child: Text('📚 ${b.name}', style: TextStyle(color: hub.title, fontWeight: FontWeight.w900, fontSize: 16))),
+            ListTile(leading: const Icon(Icons.edit_rounded, color: _accent), title: Text('Rename', style: TextStyle(color: hub.title, fontWeight: FontWeight.w700)), onTap: () => Navigator.pop(ctx, 'rename')),
+            ListTile(leading: const Icon(Icons.palette_rounded, color: _accent), title: Text('Change colour', style: TextStyle(color: hub.title, fontWeight: FontWeight.w700)), onTap: () => Navigator.pop(ctx, 'color')),
+            ListTile(leading: const Icon(Icons.unarchive_rounded, color: Color(0xFFF59E0B)), title: Text('Open the book and spill the notes out', style: TextStyle(color: hub.title, fontWeight: FontWeight.w700)), onTap: () => Navigator.pop(ctx, 'spill')),
+          ]),
+        ),
+      ),
+    );
+    if (action == null || !mounted) return;
+    if (action == 'rename') {
+      final name = await _askName('Rename book', b.name);
+      if (name != null && name.trim().isNotEmpty) {
+        setState(() => b.name = name.trim());
+        await _saveBooks(widget.userEmail, _books);
+      }
+    } else if (action == 'color') {
+      setState(() => b.color = _kBookColors[(_kBookColors.indexWhere((c) => c.toARGB32() == b.color) + 1) % _kBookColors.length].toARGB32());
+      await _saveBooks(widget.userEmail, _books);
+    } else if (action == 'spill') {
+      await _takeOut([for (final n in _notes) if (n.bookId == b.id) n.id]);
+      setState(() {
+        _books.remove(b);
+        if (_openBook == b.id) _openBook = null;
+      });
+      await _saveAll();
+    }
+  }
+
+  void _tapNote(NgmyBusinessNote n) {
+    if (_selecting) {
+      setState(() => _picked.contains(n.id) ? _picked.remove(n.id) : _picked.add(n.id));
+      return;
+    }
+    n.isTrashed ? _noteMenu(n) : _openEditor(note: n);
+  }
+
+  void _tapBook(_NoteBook b) {
+    setState(() {
+      _openBook = b.id;
+      _selecting = false;
+      _picked.clear();
+    });
+  }
+
+  void _autoScroll(Offset global) {
+    if (!_scroll.hasClients) return;
+    final h = MediaQuery.of(context).size.height;
+    if (global.dy < 170) {
+      _scroll.jumpTo((_scroll.offset - 14).clamp(0.0, _scroll.position.maxScrollExtent));
+    } else if (global.dy > h - 150) {
+      _scroll.jumpTo((_scroll.offset + 14).clamp(0.0, _scroll.position.maxScrollExtent));
+    }
+  }
+
+  Future<void> _quickAdd() async {
+    final text = _quick.text.trim();
+    if (text.isEmpty) return;
+    final lines = text.split('\n');
+    final note = NgmyBusinessNote(
+      title: lines.first.length > 60 ? '' : lines.first,
+      body: lines.first.length > 60 ? text : lines.skip(1).join('\n'),
+      folder: _folder == 'All' || _folder == _kTrashFolder ? 'Personal' : _folder,
+    );
+    note.bookId = _openBook ?? '';
+    _quick.clear();
+    FocusManager.instance.primaryFocus?.unfocus();
+    _notes.insert(0, note);
+    setState(() {});
+    await _saveAll();
+    await _reload();
+  }
+
+  Future<void> _selectedAction(String what) async {
+    final ids = _picked.toList();
+    if (ids.isEmpty) return;
+    if (what == 'book') {
+      await _makeBook(ids);
+    } else if (what == 'out') {
+      await _takeOut(ids);
+    } else if (what == 'pin') {
+      final all = _notes.where((n) => ids.contains(n.id)).toList();
+      final pin = all.any((n) => !n.pinned);
+      for (final n in all) {
+        n.pinned = pin;
+      }
+      setState(() {
+        _selecting = false;
+        _picked.clear();
+      });
+      await _saveAll();
+    } else if (what == 'trash') {
+      for (final n in _notes.where((n) => ids.contains(n.id))) {
+        n.deletedAt = DateTime.now();
+      }
+      setState(() {
+        _selecting = false;
+        _picked.clear();
+      });
+      await _saveAll();
+    } else if (what == 'folder') {
+      final hub = NgmyHubTheme.of(context);
+      final f = await showModalBottomSheet<String>(
+        context: context,
+        backgroundColor: hub.scaffold,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        builder: (ctx) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text('Move to folder', style: TextStyle(color: hub.title, fontWeight: FontWeight.w900, fontSize: 16)),
+              const SizedBox(height: 8),
+              for (final f in _noteFolders.where((f) => f != 'All')) ListTile(leading: const Icon(Icons.folder_rounded, color: _accent), title: Text(f, style: TextStyle(color: hub.title, fontWeight: FontWeight.w700)), onTap: () => Navigator.pop(ctx, f)),
+            ]),
+          ),
+        ),
+      );
+      if (f == null) return;
+      for (final n in _notes.where((n) => ids.contains(n.id))) {
+        n.folder = f;
+      }
+      setState(() {
+        _selecting = false;
+        _picked.clear();
+      });
+      await _saveAll();
+    }
+  }
+
+  // ── Tiles ──────────────────────────────────────────────────────────────────
+
+  Widget _bookCard(_NoteEntry e) {
+    final b = e.book!;
+    final c = Color(b.color);
+    final titles = [for (final n in e.inside.take(3)) n.preview];
+    return LayoutBuilder(builder: (context, box) {
+      return Stack(clipBehavior: Clip.none, children: [
+        // Pages peeking out behind the cover.
+        Positioned.fill(child: Transform.rotate(angle: -0.05, child: Container(margin: const EdgeInsets.fromLTRB(4, 6, 10, 0), decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.92), borderRadius: BorderRadius.circular(18))))),
+        Positioned.fill(child: Transform.rotate(angle: 0.035, child: Container(margin: const EdgeInsets.fromLTRB(8, 3, 4, 3), decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(18))))),
+        Positioned.fill(
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color.lerp(c, Colors.white, 0.18)!, Color.lerp(c, Colors.black, 0.35)!]),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 14, offset: const Offset(0, 6))],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              child: Stack(children: [
+                Positioned(left: 0, top: 0, bottom: 0, child: Container(width: 14, color: Colors.black.withValues(alpha: 0.28))),
+                Positioned(left: 14, top: 0, bottom: 0, child: Container(width: 2, color: Colors.white.withValues(alpha: 0.25))),
+                Positioned(right: -12, bottom: -18, child: Opacity(opacity: 0.25, child: NgmyOfflineEmoji('📚', fontSize: 84))),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(28, 14, 12, 12),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.28), borderRadius: BorderRadius.circular(10)), child: Text('${e.inside.length} ${e.inside.length == 1 ? 'note' : 'notes'}', style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w900))),
+                      const Spacer(),
+                      GestureDetector(onTap: () => _bookMenu(b), child: const Padding(padding: EdgeInsets.all(2), child: Icon(Icons.more_horiz_rounded, color: Colors.white, size: 20))),
+                    ]),
+                    const SizedBox(height: 8),
+                    Text(b.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17, height: 1.15)),
+                    const SizedBox(height: 6),
+                    for (final t in titles) Padding(padding: const EdgeInsets.only(bottom: 2), child: Text('· $t', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 11.5, fontWeight: FontWeight.w600))),
+                    const Spacer(),
+                    Text('Tap to open', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 10, fontWeight: FontWeight.w700)),
+                  ]),
+                ),
+              ]),
+            ),
+          ),
+        ),
+      ]);
+    });
+  }
+
+  Widget _tile(_NoteEntry e, double w, NgmyHubTheme hub) {
+    final h = w * 1.12;
+    final isSel = e.note != null && _picked.contains(e.id);
+    Widget core = e.note != null ? _card(e.note!, hub) : GestureDetector(onTap: () => _tapBook(e.book!), child: _bookCard(e));
+    if (isSel) {
+      core = Stack(fit: StackFit.expand, children: [
+        core,
+        IgnorePointer(child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: _accent, width: 3), color: _accent.withValues(alpha: 0.12)))),
+        const Positioned(top: 10, left: 10, child: CircleAvatar(radius: 12, backgroundColor: _accent, child: Icon(Icons.check_rounded, color: Colors.white, size: 16))),
+      ]);
+    } else if (_selecting && e.note != null) {
+      core = Stack(fit: StackFit.expand, children: [core, Positioned(top: 10, left: 10, child: Container(width: 24, height: 24, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2), color: Colors.black26)))]);
+    }
+    final trash = e.note != null && e.note!.isTrashed;
+    if (trash || _selecting) return SizedBox(width: w, height: h, child: core);
+    final hovering = _hoverId == e.id;
+    return SizedBox(
+      width: w,
+      height: h,
+      child: LongPressDraggable<_NoteDrag>(
+        data: _NoteDrag(e.id, e.book != null),
+        delay: const Duration(milliseconds: 280),
+        hapticFeedbackOnStart: true,
+        onDragStarted: () => setState(() => _dragging = e.id),
+        onDragUpdate: (d) => _autoScroll(d.globalPosition),
+        onDragEnd: (_) => setState(() {
+          _dragging = null;
+          _hoverId = null;
+          _hoverZone = '';
+        }),
+        feedback: Material(color: Colors.transparent, child: Transform.rotate(angle: 0.05, child: SizedBox(width: w * 0.92, height: h * 0.92, child: Opacity(opacity: 0.95, child: e.note != null ? _card(e.note!, hub) : _bookCard(e))))),
+        childWhenDragging: Opacity(opacity: 0.25, child: core),
+        child: Stack(fit: StackFit.expand, children: [
+          core,
+          if (_dragging != null && _dragging != e.id) ...[
+            // Left edge: put the dragged note before this one. The rest: stack it onto this one.
+            Positioned(left: 0, top: 0, bottom: 0, width: w * 0.3, child: _zone(e, 'insert')),
+            Positioned(left: w * 0.3, top: 0, bottom: 0, right: 0, child: _zone(e, 'stack')),
+          ],
+          if (hovering && _hoverZone == 'insert') Positioned(left: -9, top: 6, bottom: 6, child: Container(width: 5, decoration: BoxDecoration(color: _accent, borderRadius: BorderRadius.circular(3), boxShadow: [BoxShadow(color: _accent.withValues(alpha: 0.7), blurRadius: 8)]))),
+          if (hovering && _hoverZone == 'stack')
+            IgnorePointer(
+              child: Container(
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFFBBF24), width: 3), color: const Color(0xFFFBBF24).withValues(alpha: 0.16)),
+                alignment: Alignment.center,
+                child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.7), borderRadius: BorderRadius.circular(12)), child: Text(e.book != null ? 'Add to this book' : 'Make a book', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12))),
+              ),
+            ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _zone(_NoteEntry target, String zone) {
+    return DragTarget<_NoteDrag>(
+      onWillAcceptWithDetails: (d) {
+        if (d.data.id == target.id) return false;
+        // A book can only be moved around, not stacked into something.
+        if (zone == 'stack' && d.data.isBook) return false;
+        return true;
+      },
+      onMove: (d) {
+        if (_hoverId != target.id || _hoverZone != zone) setState(() {
+          _hoverId = target.id;
+          _hoverZone = zone;
+        });
+      },
+      onLeave: (_) {
+        if (_hoverId == target.id && _hoverZone == zone) setState(() {
+          _hoverId = null;
+          _hoverZone = '';
+        });
+      },
+      onAcceptWithDetails: (d) async {
+        final drag = d.data;
+        setState(() {
+          _hoverId = null;
+          _hoverZone = '';
+        });
+        if (zone == 'insert') {
+          await _dropInsert(drag.id, target.id);
+        } else if (target.book != null) {
+          await _addToBook([drag.id], target.book!.id);
+        } else {
+          await _makeBook([drag.id, target.id], suggest: 'My book');
+        }
+      },
+      builder: (context, cand, rej) => const SizedBox.expand(),
+    );
+  }
+
+  Widget _grid(List<_NoteEntry> list, NgmyHubTheme hub) {
     return LayoutBuilder(builder: (context, box) {
       final w = (box.maxWidth - 14) / 2;
       return Wrap(
         spacing: 14,
         runSpacing: 16,
-        children: [for (final n in list) SizedBox(width: w, height: w * 1.12, child: _card(n, hub))],
+        children: [for (final e in list) _tile(e, w, hub)],
       );
     });
   }
@@ -1422,15 +1952,30 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
         child: Text(t, style: TextStyle(color: hub.subtitle, fontWeight: FontWeight.w900, fontSize: 11.5, letterSpacing: 1.2)),
       );
 
+  Widget _round(IconData icon, VoidCallback onTap, NgmyHubTheme hub, {bool on = false, String? tip}) => Tooltip(
+        message: tip ?? '',
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: on ? _accent : hub.iconButtonBg, border: Border.all(color: on ? Colors.transparent : hub.border)),
+            child: Icon(icon, size: 20, color: on ? Colors.white : hub.iconButtonIcon),
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final hub = NgmyHubTheme.of(context);
-    final visible = _visible;
-    final pinned = visible.where((n) => n.pinned && !n.isTrashed).toList();
-    final others = visible.where((n) => !(n.pinned && !n.isTrashed)).toList();
+    final entries = _entries;
+    final pinned = entries.where((e) => e.pinned && !(e.note?.isTrashed ?? false)).toList();
+    final others = entries.where((e) => !(e.pinned && !(e.note?.isTrashed ?? false))).toList();
     final total = _notes.where((n) => !n.isTrashed).length;
     int countFor(String f) => f == 'All' ? total : _notes.where((n) => !n.isTrashed && n.folder == f).length;
     final trashCount = _notes.where((n) => n.isTrashed).length;
+    final book = _openBook == null ? null : _bookById(_openBook!);
+    final inBook = book != null;
 
     Widget chip(String label, bool sel, VoidCallback onTap, {int? count, Color? color}) {
       final c = color ?? _accent;
@@ -1439,21 +1984,16 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: sel ? c : hub.chipIdleBg,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: sel ? Colors.transparent : hub.border),
-          ),
+          decoration: BoxDecoration(color: sel ? c : hub.chipIdleBg, borderRadius: BorderRadius.circular(22), border: Border.all(color: sel ? Colors.transparent : hub.border)),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             Text(label, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: sel ? Colors.white : hub.chipOffLabel)),
-            if (count != null && count > 0) ...[
-              const SizedBox(width: 6),
-              Text('$count', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11.5, color: sel ? Colors.white70 : hub.muted)),
-            ],
+            if (count != null && count > 0) ...[const SizedBox(width: 6), Text('$count', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11.5, color: sel ? Colors.white70 : hub.muted))],
           ]),
         ),
       );
     }
+
+    final sortLabels = {'manual': 'My order', 'new': 'Newest first', 'old': 'Oldest first', 'az': 'A to Z'};
 
     return Material(
       color: hub.scaffold,
@@ -1461,115 +2001,172 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
         SafeArea(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 8, 18, 0),
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
               child: Row(children: [
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: Container(
-                    padding: const EdgeInsets.all(9),
-                    decoration: BoxDecoration(color: hub.iconButtonBg, shape: BoxShape.circle, border: Border.all(color: hub.border)),
-                    child: Icon(Icons.arrow_back_ios_new_rounded, color: hub.iconButtonIcon, size: 16),
-                  ),
-                ),
+                _round(Icons.arrow_back_ios_new_rounded, () {
+                  if (_selecting) {
+                    setState(() {
+                      _selecting = false;
+                      _picked.clear();
+                    });
+                  } else if (inBook) {
+                    setState(() => _openBook = null);
+                  } else {
+                    Navigator.pop(context);
+                  }
+                }, hub),
                 const Spacer(),
-                Text('$total ${total == 1 ? 'note' : 'notes'}', style: TextStyle(color: hub.subtitle, fontWeight: FontWeight.w700, fontSize: 12.5)),
+                if (!inBook || true) ...[
+                  _round(Icons.checklist_rounded, () => setState(() {
+                        _selecting = !_selecting;
+                        _picked.clear();
+                      }), hub, on: _selecting, tip: 'Select notes'),
+                  const SizedBox(width: 8),
+                  PopupMenuButton<String>(
+                    tooltip: 'Sort',
+                    color: hub.scaffold,
+                    onSelected: (v) => setState(() => _sort = v),
+                    itemBuilder: (_) => [for (final e in sortLabels.entries) PopupMenuItem(value: e.key, child: Text(e.value, style: TextStyle(color: hub.title, fontWeight: _sort == e.key ? FontWeight.w900 : FontWeight.w600)))],
+                    child: Container(width: 42, height: 42, decoration: BoxDecoration(shape: BoxShape.circle, color: hub.iconButtonBg, border: Border.all(color: hub.border)), child: Icon(Icons.sort_rounded, size: 20, color: hub.iconButtonIcon)),
+                  ),
+                ],
               ]),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(22, 2, 22, 0),
-              child: Text('Notes', style: TextStyle(color: hub.title, fontWeight: FontWeight.w900, fontSize: 38, letterSpacing: -1.2, height: 1.1)),
+              padding: const EdgeInsets.fromLTRB(22, 6, 22, 0),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                Expanded(child: Text(inBook ? book.name : 'Notes', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: hub.title, fontWeight: FontWeight.w900, fontSize: 36, letterSpacing: -1.1, height: 1.1))),
+                const SizedBox(width: 8),
+                Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(inBook ? '${entries.length} in this book' : '$total ${total == 1 ? 'note' : 'notes'}  ·  ${sortLabels[_sort]}', style: TextStyle(color: hub.subtitle, fontWeight: FontWeight.w700, fontSize: 11.5))),
+              ]),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-              child: TextField(
-                onChanged: (v) => setState(() => _query = v),
-                style: TextStyle(color: hub.title, fontWeight: FontWeight.w600),
-                decoration: InputDecoration(
-                  hintText: 'Search your notes',
-                  hintStyle: TextStyle(color: hub.muted, fontWeight: FontWeight.w500),
-                  prefixIcon: Icon(Icons.search_rounded, color: hub.muted),
-                  filled: true,
-                  fillColor: hub.inputFill,
-                  isDense: true,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(26), borderSide: BorderSide.none),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 13),
+            if (!_selecting)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                child: Row(children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _quick,
+                      onSubmitted: (_) => _quickAdd(),
+                      textInputAction: TextInputAction.send,
+                      style: TextStyle(color: hub.title, fontWeight: FontWeight.w600),
+                      decoration: InputDecoration(hintText: inBook ? 'Jot a new note into this book' : 'Jot something down…', hintStyle: TextStyle(color: hub.muted, fontWeight: FontWeight.w500), filled: true, fillColor: hub.inputFill, isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(26), borderSide: BorderSide.none), contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(onTap: _quickAdd, child: Container(width: 46, height: 46, decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)])), child: const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 22))),
+                ]),
+              ),
+            if (!inBook)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                child: TextField(
+                  onChanged: (v) => setState(() => _query = v),
+                  style: TextStyle(color: hub.title, fontWeight: FontWeight.w600),
+                  decoration: InputDecoration(hintText: 'Search your notes', hintStyle: TextStyle(color: hub.muted, fontWeight: FontWeight.w500), prefixIcon: Icon(Icons.search_rounded, color: hub.muted), filled: true, fillColor: hub.inputFill, isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(26), borderSide: BorderSide.none), contentPadding: const EdgeInsets.symmetric(vertical: 13)),
                 ),
               ),
-            ),
-            SizedBox(
-              height: 52,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
-                children: [
-                  for (final f in _noteFolders) ...[
-                    chip(f, _folder == f, () => setState(() => _folder = f), count: countFor(f)),
-                    const SizedBox(width: 8),
+            if (!inBook)
+              SizedBox(
+                height: 52,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
+                  children: [
+                    for (final f in _noteFolders) ...[chip(f, _folder == f, () => setState(() => _folder = f), count: countFor(f)), const SizedBox(width: 8)],
+                    chip('Trash', _folder == _kTrashFolder, () => setState(() => _folder = _kTrashFolder), count: trashCount, color: const Color(0xFFEF4444)),
                   ],
-                  chip('Trash', _folder == _kTrashFolder, () => setState(() => _folder = _kTrashFolder), count: trashCount, color: const Color(0xFFEF4444)),
-                ],
+                ),
               ),
-            ),
+            if (_dragging != null && inBook)
+              DragTarget<_NoteDrag>(
+                onWillAcceptWithDetails: (d) => !d.data.isBook,
+                onAcceptWithDetails: (d) => _takeOut([d.data.id]),
+                builder: (context, cand, rej) => Container(
+                  margin: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), color: cand.isNotEmpty ? const Color(0xFFFBBF24).withValues(alpha: 0.25) : hub.chipIdleBg, border: Border.all(color: cand.isNotEmpty ? const Color(0xFFFBBF24) : hub.border, width: 2)),
+                  child: Text('Drop here to take it out of the book', style: TextStyle(color: hub.title, fontWeight: FontWeight.w800, fontSize: 12.5)),
+                ),
+              ),
+            if (!_selecting && !_loading && entries.length > 1 && !inBook && _folder != _kTrashFolder)
+              Padding(padding: const EdgeInsets.fromLTRB(24, 0, 24, 2), child: Text('Hold a note, then drag it: onto another note to make a book, or to a note\'s left edge to move it.', style: TextStyle(color: hub.muted, fontSize: 10.5, height: 1.3))),
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator(color: _accent))
-                  : visible.isEmpty
+                  : entries.isEmpty
                       ? Center(
                           child: Padding(
                             padding: const EdgeInsets.all(30),
                             child: Column(mainAxisSize: MainAxisSize.min, children: [
-                              Container(
-                                width: 110,
-                                height: 110,
-                                decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [_accent.withValues(alpha: 0.25), const Color(0xFF6366F1).withValues(alpha: 0.1)])),
-                                child: const Icon(Icons.edit_note_rounded, size: 58, color: _accent),
-                              ),
+                              Container(width: 110, height: 110, decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [_accent.withValues(alpha: 0.25), const Color(0xFF6366F1).withValues(alpha: 0.1)])), child: const Icon(Icons.edit_note_rounded, size: 58, color: _accent)),
                               const SizedBox(height: 18),
-                              Text(_folder == _kTrashFolder ? 'Trash is empty' : (_query.isEmpty ? 'Your notes live here' : 'No notes match'), style: TextStyle(color: hub.title, fontWeight: FontWeight.w900, fontSize: 20)),
+                              Text(_folder == _kTrashFolder ? 'Trash is empty' : (inBook ? 'This book is empty' : (_query.isEmpty ? 'Your notes live here' : 'No notes match')), style: TextStyle(color: hub.title, fontWeight: FontWeight.w900, fontSize: 20)),
                               const SizedBox(height: 6),
-                              Text(_folder == _kTrashFolder ? 'Deleted notes stay for 24 hours.' : 'Tap New note to write your first one.', textAlign: TextAlign.center, style: TextStyle(color: hub.subtitle, fontSize: 13.5)),
+                              Text(_folder == _kTrashFolder ? 'Deleted notes stay for 24 hours.' : 'Write above, or tap New note.', textAlign: TextAlign.center, style: TextStyle(color: hub.subtitle, fontSize: 13.5)),
                             ]),
                           ),
                         )
                       : ListView(
-                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
+                          controller: _scroll,
+                          padding: EdgeInsets.fromLTRB(20, 8, 20, _selecting ? 130 : 110),
                           children: [
                             if (pinned.isNotEmpty) ...[_label('PINNED', hub), _grid(pinned, hub), if (others.isNotEmpty) _label('OTHERS', hub)],
                             if (others.isNotEmpty) _grid(others, hub),
-                            Padding(padding: const EdgeInsets.only(top: 6), child: Center(child: Text('Press and hold a note for more options', style: TextStyle(color: hub.muted, fontSize: 11.5)))),
                           ],
                         ),
             ),
           ]),
         ),
-        Positioned(
-          right: 20,
-          bottom: 24,
-          child: SafeArea(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)]),
-                borderRadius: BorderRadius.circular(30),
-                boxShadow: [BoxShadow(color: _accent.withValues(alpha: 0.45), blurRadius: 18, offset: const Offset(0, 8))],
+        if (_selecting)
+          Positioned(
+            left: 12,
+            right: 12,
+            bottom: 14,
+            child: SafeArea(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                decoration: BoxDecoration(color: hub.scaffold, borderRadius: BorderRadius.circular(26), border: Border.all(color: hub.border), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 18, offset: const Offset(0, 6))]),
+                child: Row(children: [
+                  Padding(padding: const EdgeInsets.only(left: 10, right: 6), child: Text('${_picked.length}', style: const TextStyle(color: _accent, fontWeight: FontWeight.w900, fontSize: 20))),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(children: [
+                        for (final a in [
+                          ('pin', Icons.push_pin_rounded, 'Pin'),
+                          ('book', Icons.auto_stories_rounded, 'Make book'),
+                          if (inBook) ('out', Icons.unarchive_rounded, 'Take out'),
+                          ('folder', Icons.folder_rounded, 'Move'),
+                          ('trash', Icons.delete_rounded, 'Delete'),
+                        ])
+                          TextButton.icon(onPressed: _picked.isEmpty ? null : () => _selectedAction(a.$1), icon: Icon(a.$2, size: 18, color: a.$1 == 'trash' ? const Color(0xFFEF4444) : _accent), label: Text(a.$3, style: TextStyle(color: a.$1 == 'trash' ? const Color(0xFFEF4444) : hub.title, fontWeight: FontWeight.w800, fontSize: 12.5))),
+                      ]),
+                    ),
+                  ),
+                ]),
               ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: _pickTemplateAndCreate,
-                  borderRadius: BorderRadius.circular(30),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 22, vertical: 15),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.add_rounded, color: Colors.white, size: 22),
-                      SizedBox(width: 8),
-                      Text('New note', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
-                    ]),
+            ),
+          )
+        else
+          Positioned(
+            right: 20,
+            bottom: 24,
+            child: SafeArea(
+              child: Container(
+                decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)]), borderRadius: BorderRadius.circular(30), boxShadow: [BoxShadow(color: _accent.withValues(alpha: 0.45), blurRadius: 18, offset: const Offset(0, 8))]),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _pickTemplateAndCreate,
+                    borderRadius: BorderRadius.circular(30),
+                    child: const Padding(padding: EdgeInsets.symmetric(horizontal: 22, vertical: 15), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.add_rounded, color: Colors.white, size: 22), SizedBox(width: 8), Text('New note', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15))])),
                   ),
                 ),
               ),
             ),
           ),
-        ),
       ]),
     );
   }
