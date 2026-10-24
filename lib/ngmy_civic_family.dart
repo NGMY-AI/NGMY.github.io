@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'ngmy_civic_birthdays.dart';
+
 /// Civic Registry families.
 ///
 /// A member is a household. Their spouse and unmarried children are stored on
@@ -438,11 +440,12 @@ class _FamilyEditorSheetState extends State<_FamilyEditorSheet> {
     final spouse = r['relation'] == 'spouse';
     final status = '${r['status'] ?? (spouse ? 'married' : 'single')}';
     final g = _g(r['gender']);
-    final age = r['age'];
+    final age = ngmyRelativeAge(r);
     final details = [
       spouse ? (status == 'married' ? 'Spouse' : 'Former spouse ($status)') : (status == 'married' ? 'Child · married' : 'Child'),
       if (g.isNotEmpty) g == 'male' ? 'Male' : 'Female',
-      if ('${r['dob'] ?? ''}'.trim().isNotEmpty) 'Born ${r['dob']}' else if (age != null && '$age'.isNotEmpty) 'Age $age',
+      if ('${r['dob'] ?? ''}'.trim().isNotEmpty) 'Born ${r['dob']}',
+      if (age != null) 'Age $age',
       if ('${r['address'] ?? ''}'.trim().isNotEmpty) 'Lives at ${r['address']}',
       if (_splitOff(r)) 'Own family (${r['ownRegistryId']})',
       if (!spouse && status == 'married' && (r['relatives'] is List) && (r['relatives'] as List).isNotEmpty) '${(r['relatives'] as List).length} in their family',
@@ -523,8 +526,8 @@ class _RelativeDialogState extends State<_RelativeDialog> {
       return;
     }
     final dob = _dob.text.trim();
-    if (dob.isNotEmpty && !RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(dob)) {
-      setState(() => _error = 'Date of Birth must be in MM/DD/YYYY format.');
+    if (dob.isNotEmpty && ngmyParseDob(dob) == null) {
+      setState(() => _error = 'Enter a real date of birth, month/day/year, like 03/14/2002.');
       return;
     }
     final phone = _phone.text.replaceAll(RegExp(r'\D'), '');
@@ -546,7 +549,9 @@ class _RelativeDialogState extends State<_RelativeDialog> {
       setState(() => _error = 'Choose male or female.');
       return;
     }
-    final age = _spouse ? null : int.tryParse(_age.text.trim());
+    // With a date of birth the age is worked out from it (and keeps updating by itself on every birthday).
+    final dobDate = ngmyParseDob(dob);
+    final age = _spouse ? null : (dobDate != null ? ngmyAgeOn(dobDate, DateTime.now()) : int.tryParse(_age.text.trim()));
     final out = <String, dynamic>{
       ...?widget.existing,
       'id': widget.existing?['id'] ?? 'rel_${DateTime.now().microsecondsSinceEpoch}',
@@ -581,7 +586,14 @@ class _RelativeDialogState extends State<_RelativeDialog> {
         );
     final fixed = _fixedGender;
     final where = widget.home.where;
-    final dobField = TextField(controller: _dob, keyboardType: TextInputType.datetime, decoration: deco('Date of Birth', hint: 'MM/DD/YYYY'));
+    final dobDate = ngmyParseDob(_dob.text.trim());
+    final dobField = TextField(
+      controller: _dob,
+      keyboardType: TextInputType.number,
+      inputFormatters: [NgmyDobFormatter()],
+      onChanged: (_) => setState(() {}),
+      decoration: deco('Date of Birth', hint: 'MM/DD/YYYY'),
+    );
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       title: Text(widget.existing == null ? (_spouse ? 'Add spouse' : 'Add child') : 'Edit ${_spouse ? 'spouse' : 'child'}'),
@@ -625,12 +637,22 @@ class _RelativeDialogState extends State<_RelativeDialog> {
                     const SizedBox(width: 10),
                     Expanded(
                       flex: 2,
-                      child: TextField(
-                        controller: _age,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        decoration: deco('or Age'),
-                      ),
+                      child: dobDate != null
+                          ? Container(
+                              height: 56,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(color: const Color(0xFF00B25A).withValues(alpha: 0.14), borderRadius: BorderRadius.circular(14)),
+                              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                                Text('Age ${ngmyAgeOn(dobDate, DateTime.now())}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: Color(0xFF00B25A))),
+                                const Text('automatic', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700)),
+                              ]),
+                            )
+                          : TextField(
+                              controller: _age,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              decoration: deco('or Age'),
+                            ),
                     ),
                   ],
                 ),

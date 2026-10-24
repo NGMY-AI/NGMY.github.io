@@ -224,6 +224,7 @@ import 'ngmy_web_lifecycle_stub.dart' if (dart.library.html) 'ngmy_web_lifecycle
 import 'ngmy_media_delivery.dart';
 import 'ngmy_push_notification_prompt.dart';
 import 'ngmy_push_notifications.dart';
+import 'ngmy_civic_birthdays.dart';
 import 'ngmy_app_notifications.dart';
 import 'ngmy_announcement_reads.dart';
 import 'ngmy_local_deposit_qr.dart';
@@ -10670,6 +10671,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       final longAway = away > const Duration(minutes: 2);
       unawaited(_checkIncomingGameInvites());
       unawaited(_checkHouseCareExpiry());
+      unawaited(_checkCivicBirthdays());
       unawaited(_checkNewHouseJobs());
       unawaited(_flushTxnOutbox());
       // Do not force a viewport resettle on every resume — returning from the
@@ -12873,6 +12875,43 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   /// A House Care member whose paid time ends in 3 days or less sees a top notification every time
   /// they open the app (checked at most once a minute).
+  DateTime? _lastBirthdayCheck;
+
+  /// Civic Registry birthdays: a heads-up two days before, a note on the day, and a
+  /// congratulation pop-up for turning 18. Each one is shown once.
+  Future<void> _checkCivicBirthdays() async {
+    final u = _currentUser;
+    if (u == null) return;
+    final last = _lastBirthdayCheck;
+    if (last != null && DateTime.now().difference(last) < const Duration(minutes: 30)) return;
+    _lastBirthdayCheck = DateTime.now();
+    try {
+      final rec = NgmyCivicRegistryMembers.findByEmail(_config, u.email);
+      if (rec == null) return;
+      final events = ngmyCivicBirthdayEvents(
+        selfName: '${rec['fullName'] ?? u.fullName ?? ''}',
+        selfDob: '${rec['dob'] ?? u.dob ?? ''}',
+        relatives: ngmyCivicRelativesOf(rec),
+        today: DateTime.now(),
+      );
+      for (final e in events) {
+        if (!await ngmyCivicBirthdayClaim(u.email, e.key)) continue;
+        if (e.kind == 'turned18') {
+          final ctx = ngmyRootNavigatorKey.currentContext;
+          if (ctx != null && ctx.mounted) await ngmyShowTurned18Dialog(ctx, e);
+        } else {
+          await _pushInAppNotification(
+            title: e.kind == 'soon' ? '🎂 Birthday coming up' : '🎉 Birthday today',
+            body: ngmyBirthdayNotificationText(e),
+            tag: 'civic_bday_${e.key}',
+            cooldown: const Duration(hours: 1),
+            important: true,
+          );
+        }
+      }
+    } catch (_) {}
+  }
+
   Future<void> _checkHouseCareExpiry() async {
     final u = _currentUser;
     if (u == null) return;
@@ -14894,6 +14933,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       _scheduleAdminAlertSweep();
       unawaited(_checkIncomingGameInvites());
       unawaited(_checkHouseCareExpiry());
+      unawaited(_checkCivicBirthdays());
       unawaited(_checkNewHouseJobs());
       await _persistLocalSnapshot();
       unawaited(_notifyStoreMarketDayListings());
