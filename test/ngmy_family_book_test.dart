@@ -13,8 +13,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 const sp = 'C:/Users/appbu/AppData/Local/Temp/claude/C--Users-appbu-StudioProjects-ngmy/57c6e595-d6c4-43c4-9873-33fc75db63b1/scratchpad';
 
 void main() {
+  /// From the library into the first book on the shelf.
+  Future<void> enterFirstBook(WidgetTester t) async {
+    await t.tap(find.textContaining(RegExp(r'^\d+ pages?$')).first);
+    await t.pump(const Duration(milliseconds: 600));
+    await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
+    await t.pump(const Duration(milliseconds: 400));
+  }
+
   Future<void> openBook(WidgetTester t, {bool withPages = true}) async {
     SharedPreferences.setMockInitialValues({});
+    if (!withPages) await t.runAsync(() => addFamilyBookSlot('a@b.c', 'tree1'));
     if (withPages) {
       await t.runAsync(() async {
         await saveFamilyBookEntries('a@b.c', 'tree1', [
@@ -31,9 +40,11 @@ void main() {
     await t.pump(const Duration(milliseconds: 500));
     await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
     await t.pump(const Duration(milliseconds: 400));
+    await enterFirstBook(t);
   }
 
   Future<void> shot(WidgetTester t, String name) async {
+
     await t.runAsync(() async {
       final ro = t.renderObject(find.byType(RepaintBoundary).last) as RenderRepaintBoundary;
       final img = await ro.toImage(pixelRatio: 1.0);
@@ -81,19 +92,21 @@ void main() {
     t.view.devicePixelRatio = 2.0;
     addTearDown(t.view.reset);
     const longName = 'The Very Long Family Name Of The Descendants Of Ikungu Ele And Ekama Pele Of The Great Lake';
+    await t.runAsync(() => addFamilyBookSlot('a@b.c', 'tree2'));
     await t.pumpWidget(MaterialApp(home: Builder(builder: (c) => Scaffold(body: TextButton(onPressed: () => showFamilyBookSheet(c, userEmail: 'a@b.c', treeId: 'tree2', canEdit: true, bookTitle: longName, familyFacts: 'Anna, Bob'), child: const Text('open'))))));
     await t.tap(find.text('open'));
     await t.pump(const Duration(milliseconds: 500));
     await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
     await t.pump(const Duration(milliseconds: 400));
-    final header = t.widget<Text>(find.text(longName).first);
+    await enterFirstBook(t);
+    final header = t.widget<Text>(find.text(longName).at(1));
     expect(header.maxLines, 1);
     expect(find.text('AI'), findsOneWidget);
     expect(find.text('Cover'), findsOneWidget);
     await t.tap(find.text('AI'));
     await t.pump(const Duration(milliseconds: 400));
     await t.pump(const Duration(milliseconds: 400));
-    expect(find.text('Write new pages'), findsOneWidget);
+    expect(find.text('Write this book'), findsOneWidget);
     expect(t.takeException(), isNull);
   });
 
@@ -110,6 +123,7 @@ void main() {
     await t.pump(const Duration(milliseconds: 500));
     await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
     await t.pump(const Duration(milliseconds: 400));
+    await enterFirstBook(t);
     await t.tap(find.text('AI'));
     await t.pump(const Duration(milliseconds: 400));
     await t.pump(const Duration(milliseconds: 400));
@@ -210,5 +224,52 @@ void main() {
     expect(doc.chapters.single.body, contains('\n'));
     expect(ngmyEscapeJsonStrings('{"a":"x\ny"}'), r'{"a":"x\ny"}');
     expect(kNgmyBookAiMaxPages, 100);
+  });
+  testWidgets('the library lists the books two in a row and holds six at most', (t) async {
+    SharedPreferences.setMockInitialValues({});
+    await t.runAsync(() async {
+      for (var i = 0; i < kFamilyBookMax - 1; i++) {
+        final slot = await addFamilyBookSlot('a@b.c', 'lib1');
+        await saveFamilyBookEntries('a@b.c', familyBookStorageId('lib1', slot!), [FamilyBookEntry(id: '${i + 1}', title: 'Page', body: 'Text $i', updatedAt: DateTime(2026, 1, 2))]);
+        await saveFamilyBookCover('a@b.c', familyBookStorageId('lib1', slot), FamilyBookCover(title: 'Book number ${i + 1}'));
+      }
+    });
+    t.view.physicalSize = const Size(860, 2000);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(MaterialApp(home: Builder(builder: (c) => Scaffold(body: TextButton(onPressed: () => showFamilyBookSheet(c, userEmail: 'a@b.c', treeId: 'lib1', canEdit: true, bookTitle: 'Fam', familyFacts: 'Anna, Bob'), child: const Text('open'))))));
+    await t.tap(find.text('open'));
+    await t.pump(const Duration(milliseconds: 500));
+    await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+    await t.pump(const Duration(milliseconds: 400));
+    expect(find.text('FAMILY LIBRARY'), findsOneWidget);
+    expect(find.text('5 of 6'), findsOneWidget);
+    expect(find.text('Book number 1'), findsWidgets);
+    expect(find.text('Book number 5'), findsWidgets);
+    // Two books side by side: the first two share a row, the third sits lower.
+    final a = t.getTopLeft(find.text('Book number 1').last), b = t.getTopLeft(find.text('Book number 2').last), c = t.getTopLeft(find.text('Book number 3').last);
+    expect((a.dy - b.dy).abs(), lessThan(2));
+    expect(c.dy, greaterThan(a.dy + 50));
+    // One space left, so the "Write a new book" tile is there; after the sixth book it goes away.
+    expect(find.text('Write a new book'), findsOneWidget);
+    expect(find.text('1 space left'), findsOneWidget);
+    await t.runAsync(() async {
+      final slot = await addFamilyBookSlot('a@b.c', 'lib1');
+      expect(slot, isNotNull);
+      expect(await addFamilyBookSlot('a@b.c', 'lib1'), isNull, reason: 'a seventh book must be refused');
+    });
+    expect(t.takeException(), isNull);
+  });
+
+  testWidgets('old books stay: a book written before the library becomes the first one', (t) async {
+    SharedPreferences.setMockInitialValues({});
+    await t.runAsync(() async {
+      await saveFamilyBookEntries('a@b.c', 'old1', [FamilyBookEntry(id: '1', title: 'Old', body: 'Kept', updatedAt: DateTime(2026, 1, 2))]);
+      expect(await loadFamilyBookSlots('a@b.c', 'old1'), ['main']);
+      expect(familyBookStorageId('old1', 'main'), 'old1');
+      await removeFamilyBookSlot('a@b.c', 'old1', 'main');
+      expect(await loadFamilyBookSlots('a@b.c', 'old1'), isEmpty);
+      expect(await loadFamilyBookEntries('a@b.c', 'old1'), isEmpty);
+    });
   });
 }

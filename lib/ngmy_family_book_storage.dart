@@ -205,3 +205,52 @@ Future<void> saveFamilyBookCover(String userEmail, String treeId, FamilyBookCove
     await prefs.setString(_familyCoverKey(userEmail, treeId), jsonEncode(cover.toJson()));
   } catch (_) {}
 }
+
+// ── The library: up to six books per tree ────────────────────────────────────
+
+/// A family can keep this many books on its shelf.
+const int kFamilyBookMax = 6;
+
+String _familySlotsKey(String userEmail, String treeId) => 'ngmy_family_book_slots_v1_${userEmail.toLowerCase().trim()}_$treeId';
+
+/// The place a book's pages and cover are kept. The first book keeps the tree's own id, so books written
+/// before the library existed (and the tree backup) carry on working.
+String familyBookStorageId(String treeId, String slot) => slot == 'main' ? treeId : '$treeId~$slot';
+
+/// The books on the shelf, oldest first. A book written before the library existed is found and kept as the first one.
+Future<List<String>> loadFamilyBookSlots(String userEmail, String treeId) async {
+  if (userEmail.trim().isEmpty || treeId.isEmpty) return [];
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getStringList(_familySlotsKey(userEmail, treeId));
+    if (raw != null) return List<String>.of(raw);
+    final hasOld = (await loadFamilyBookEntries(userEmail, treeId)).isNotEmpty || prefs.containsKey(_familyCoverKey(userEmail, treeId));
+    final slots = hasOld ? <String>['main'] : <String>[];
+    await prefs.setStringList(_familySlotsKey(userEmail, treeId), slots);
+    return slots;
+  } catch (_) {
+    return [];
+  }
+}
+
+/// Puts a new book on the shelf. Returns its slot, or null when the shelf already holds [kFamilyBookMax].
+Future<String?> addFamilyBookSlot(String userEmail, String treeId) async {
+  final slots = await loadFamilyBookSlots(userEmail, treeId);
+  if (slots.length >= kFamilyBookMax) return null;
+  final slot = slots.contains('main') ? '${DateTime.now().microsecondsSinceEpoch}_${slots.length}' : 'main';
+  slots.add(slot);
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setStringList(_familySlotsKey(userEmail, treeId), slots);
+  return slot;
+}
+
+/// Takes a book off the shelf and deletes its pages and cover.
+Future<void> removeFamilyBookSlot(String userEmail, String treeId, String slot) async {
+  final slots = await loadFamilyBookSlots(userEmail, treeId);
+  slots.remove(slot);
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setStringList(_familySlotsKey(userEmail, treeId), slots);
+  final id = familyBookStorageId(treeId, slot);
+  await prefs.remove(_familyBookKey(userEmail, id));
+  await prefs.remove(_familyCoverKey(userEmail, id));
+}

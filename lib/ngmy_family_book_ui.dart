@@ -21,7 +21,7 @@ Future<void> showFamilyBookSheet(
   return Navigator.of(context).push<void>(
     MaterialPageRoute(
       fullscreenDialog: true,
-      builder: (_) => _FamilyBookScreen(
+      builder: (_) => _FamilyLibraryScreen(
         userEmail: userEmail,
         treeId: treeId,
         canEdit: canEdit,
@@ -37,6 +37,7 @@ class _FamilyBookScreen extends StatefulWidget {
   const _FamilyBookScreen({
     required this.userEmail,
     required this.treeId,
+    required this.shelfTreeId,
     required this.canEdit,
     this.bookTitle = '',
     this.membersPage = '',
@@ -45,6 +46,9 @@ class _FamilyBookScreen extends StatefulWidget {
 
   final String userEmail;
   final String treeId;
+
+  /// The tree whose shelf this book is on (treeId is where this one book is kept).
+  final String shelfTreeId;
   final bool canEdit;
   final String bookTitle;
 
@@ -197,11 +201,17 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
     if (mounted && _pageCtrl.hasClients) _pageCtrl.jumpToPage((_pageIndex + 1).clamp(0, _entries.length));
   }
 
-  /// The AI writes the family book from everyone in the tree (plus anything the user adds);
-  /// each page it writes becomes a Family Book page, after the ones already here.
+  /// The AI writes a NEW book from everyone in the tree (plus anything the user adds) and puts it on the shelf.
+  /// A book that is still empty is filled instead, so no empty book is left behind.
   Future<void> _writeWithAi() async {
     if (_editing) await _saveCurrentPage();
     if (!mounted) return;
+    if (_entries.isNotEmpty) {
+      final made = await _writeNewBookOnShelf(context, userEmail: widget.userEmail, treeId: widget.shelfTreeId, familyFacts: widget.familyFacts, bookTitle: widget.bookTitle);
+      // The new book is on the shelf: go back to the library, where it now sits.
+      if (made && mounted) Navigator.of(context).pop(true);
+      return;
+    }
     final doc = await showNgmyBookAiSheet(context, familyFacts: widget.familyFacts, familyName: widget.bookTitle);
     if (doc == null || !mounted) return;
     final base = DateTime.now().microsecondsSinceEpoch;
@@ -213,7 +223,7 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
     await saveFamilyBookEntries(widget.userEmail, widget.treeId, list);
     await _reload();
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('The AI wrote ${doc.chapters.length} pages for your family book.')));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('The AI wrote your book: ${doc.chapters.length} pages.')));
   }
 
   /// Fold-and-staple book: cover with the family name, the family members page, then
@@ -390,7 +400,7 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
         ]),
       );
 
-  /// What the AI can do for the book: write new pages (in English or Swahili), or translate it.
+  /// What the AI can do for the book: write a new book (in English or Swahili), or fix and translate this one.
   Future<void> _aiMenu() async {
     if (_editing) await _saveCurrentPage();
     if (!mounted) return;
@@ -407,7 +417,7 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text('What should the AI do?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
             const SizedBox(height: 12),
-            if (widget.familyFacts.trim().isNotEmpty) _menuTile(ctx, Icons.auto_awesome_rounded, 'Write new pages', 'Choose English or Swahili, then describe the book', 'write'),
+            if (widget.familyFacts.trim().isNotEmpty) _menuTile(ctx, Icons.auto_awesome_rounded, _entries.isEmpty ? 'Write this book' : 'Write a new book', _entries.isEmpty ? 'Choose English or Swahili, then describe the book' : 'A brand new book for your shelf. Choose English or Swahili, then describe it', 'write'),
             if (widget.canEdit) _menuTile(ctx, Icons.build_circle_rounded, 'Fix or change something', 'Correct a word, rewrite a page, add to it, or redesign the cover', 'fix'),
             if (_entries.isNotEmpty) ...[
               if (bookLang == 'en') Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('Your book is in English.', style: TextStyle(color: _paper.withValues(alpha: 0.7), fontSize: 12))),
@@ -742,6 +752,251 @@ class _FixDialogState extends State<_FixDialog> {
           const SizedBox(height: 4),
           const Text('You can undo it right after.', style: TextStyle(color: Colors.white38, fontSize: 11.5)),
         ]),
+      ),
+    );
+  }
+}
+
+/// Writes a new book with the AI and puts it on the shelf. Returns true when a book was added.
+Future<bool> _writeNewBookOnShelf(
+  BuildContext context, {
+  required String userEmail,
+  required String treeId,
+  required String familyFacts,
+  required String bookTitle,
+}) async {
+  final slots = await loadFamilyBookSlots(userEmail, treeId);
+  if (!context.mounted) return false;
+  if (slots.length >= kFamilyBookMax) {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Your shelf is full: six books is the most. Remove one to write another.')));
+    return false;
+  }
+  final doc = await showNgmyBookAiSheet(context, familyFacts: familyFacts, familyName: bookTitle);
+  if (doc == null || !context.mounted) return false;
+  final slot = await addFamilyBookSlot(userEmail, treeId);
+  if (slot == null) return false;
+  final id = familyBookStorageId(treeId, slot);
+  final base = DateTime.now().microsecondsSinceEpoch;
+  await saveFamilyBookEntries(userEmail, id, [
+    for (var i = 0; i < doc.chapters.length; i++)
+      FamilyBookEntry(id: '${base + i}', title: doc.chapters[i].title.trim().isEmpty ? 'Page ${i + 1}' : doc.chapters[i].title.trim(), body: doc.chapters[i].body.trim(), updatedAt: DateTime.now()),
+  ]);
+  if (doc.title.trim().isNotEmpty) await saveFamilyBookCover(userEmail, id, FamilyBookCover(title: doc.title.trim()));
+  return true;
+}
+
+/// The family library: the books on the shelf, two in a row, six at the most.
+class _FamilyLibraryScreen extends StatefulWidget {
+  const _FamilyLibraryScreen({
+    required this.userEmail,
+    required this.treeId,
+    required this.canEdit,
+    required this.bookTitle,
+    required this.membersPage,
+    required this.familyFacts,
+  });
+
+  final String userEmail;
+  final String treeId;
+  final bool canEdit;
+  final String bookTitle;
+  final String membersPage;
+  final String familyFacts;
+
+  @override
+  State<_FamilyLibraryScreen> createState() => _FamilyLibraryScreenState();
+}
+
+class _ShelfBook {
+  const _ShelfBook(this.slot, this.cover, this.pages);
+  final String slot;
+  final FamilyBookCover cover;
+  final int pages;
+}
+
+class _FamilyLibraryScreenState extends State<_FamilyLibraryScreen> {
+  static const Color _paper = Color(0xFFFBF3E0);
+  static const Color _gold = Color(0xFFE8C46A);
+  List<_ShelfBook> _books = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  Future<void> _reload() async {
+    final slots = await loadFamilyBookSlots(widget.userEmail, widget.treeId);
+    final books = <_ShelfBook>[];
+    for (final s in slots) {
+      final id = familyBookStorageId(widget.treeId, s);
+      books.add(_ShelfBook(s, await loadFamilyBookCover(widget.userEmail, id), (await loadFamilyBookEntries(widget.userEmail, id)).length));
+    }
+    if (!mounted) return;
+    setState(() {
+      _books = books;
+      _loading = false;
+    });
+  }
+
+  String _titleOf(_ShelfBook b) => b.cover.title.trim().isNotEmpty ? b.cover.title.trim() : (widget.bookTitle.trim().isEmpty ? 'Our Family Book' : widget.bookTitle.trim());
+
+  Future<void> _open(_ShelfBook b) async {
+    final wrote = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _FamilyBookScreen(
+          userEmail: widget.userEmail,
+          treeId: familyBookStorageId(widget.treeId, b.slot),
+          shelfTreeId: widget.treeId,
+          canEdit: widget.canEdit,
+          bookTitle: widget.bookTitle,
+          membersPage: widget.membersPage,
+          familyFacts: widget.familyFacts,
+        ),
+      ),
+    );
+    await _reload();
+    if (wrote == true && mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Your new book is on the shelf.')));
+  }
+
+  Future<void> _writeNew() async {
+    if (_books.length >= kFamilyBookMax) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Your shelf is full: six books is the most. Remove one to write another.')));
+      return;
+    }
+    if (widget.familyFacts.trim().isEmpty) {
+      // Nothing for the AI to read yet: start a blank book to write by hand.
+      final slot = await addFamilyBookSlot(widget.userEmail, widget.treeId);
+      await _reload();
+      if (slot != null && mounted) await _open(_books.firstWhere((b) => b.slot == slot));
+      return;
+    }
+    final made = await _writeNewBookOnShelf(context, userEmail: widget.userEmail, treeId: widget.treeId, familyFacts: widget.familyFacts, bookTitle: widget.bookTitle);
+    await _reload();
+    if (made && mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Your new book is on the shelf.')));
+  }
+
+  Future<void> _remove(_ShelfBook b) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF241409),
+        title: const Text('Remove this book?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+        content: Text('“${_titleOf(b)}” and its ${b.pages} ${b.pages == 1 ? 'page' : 'pages'} will be deleted from this device.', style: const TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await removeFamilyBookSlot(widget.userEmail, widget.treeId, b.slot);
+    await _reload();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canAdd = widget.canEdit && _books.length < kFamilyBookMax;
+    final tiles = <Widget>[
+      for (final b in _books) _bookTile(b),
+      if (canAdd) _newTile(),
+    ];
+    return Scaffold(
+      backgroundColor: const Color(0xFF1A0F08),
+      body: Stack(fit: StackFit.expand, children: [
+        const Positioned.fill(child: CustomPaint(painter: _LibraryPainter())),
+        SafeArea(
+          child: Column(children: [
+            Container(
+              margin: const EdgeInsets.fromLTRB(12, 6, 12, 8),
+              padding: const EdgeInsets.fromLTRB(10, 10, 14, 10),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF4A2A15), Color(0xFF2A170C)]),
+                border: Border.all(color: _gold.withValues(alpha: 0.85), width: 1.6),
+              ),
+              child: Row(children: [
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(width: 32, height: 32, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.black.withValues(alpha: 0.3), border: Border.all(color: _gold.withValues(alpha: 0.6))), child: const Icon(Icons.close_rounded, color: _paper, size: 18)),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(child: Text('FAMILY LIBRARY', style: TextStyle(color: _gold, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 1.2))),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), color: Colors.black.withValues(alpha: 0.3), border: Border.all(color: _gold.withValues(alpha: 0.5))),
+                  child: Text('${_books.length} of $kFamilyBookMax', style: const TextStyle(color: _paper, fontWeight: FontWeight.w800, fontSize: 12)),
+                ),
+              ]),
+            ),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator(color: _gold))
+                  : tiles.isEmpty
+                      ? const Center(child: Padding(padding: EdgeInsets.all(30), child: Text('No books on the shelf yet.', style: TextStyle(color: _paper, fontSize: 15))))
+                      : LayoutBuilder(builder: (context, box) {
+                          final w = (box.maxWidth - 16 * 2 - 14) / 2;
+                          return SingleChildScrollView(
+                            padding: const EdgeInsets.fromLTRB(16, 6, 16, 30),
+                            child: Wrap(spacing: 14, runSpacing: 18, children: [for (final t in tiles) SizedBox(width: w, child: t)]),
+                          );
+                        }),
+            ),
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  Widget _bookTile(_ShelfBook b) {
+    final title = _titleOf(b);
+    return GestureDetector(
+      onTap: () => _open(b),
+      child: Column(children: [
+        AspectRatio(
+          aspectRatio: 300 / 420,
+          child: Stack(children: [
+            Positioned.fill(child: FittedBox(fit: BoxFit.contain, child: SizedBox(width: 300, height: 420, child: _BookCover(design: b.cover, title: title, pages: b.pages)))),
+            if (widget.canEdit)
+              Positioned(
+                top: 6,
+                right: 6,
+                child: GestureDetector(
+                  onTap: () => _remove(b),
+                  child: Container(width: 28, height: 28, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.black.withValues(alpha: 0.55), border: Border.all(color: Colors.white24)), child: const Icon(Icons.delete_outline_rounded, color: Colors.white70, size: 16)),
+                ),
+              ),
+          ]),
+        ),
+        const SizedBox(height: 8),
+        Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _paper, fontWeight: FontWeight.w800, fontSize: 13)),
+        Text('${b.pages} ${b.pages == 1 ? 'page' : 'pages'}', style: TextStyle(color: _paper.withValues(alpha: 0.6), fontSize: 11)),
+      ]),
+    );
+  }
+
+  Widget _newTile() {
+    final left = kFamilyBookMax - _books.length;
+    return GestureDetector(
+      onTap: _writeNew,
+      child: AspectRatio(
+        aspectRatio: 300 / 420,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            color: Colors.white.withValues(alpha: 0.05),
+            border: Border.all(color: _gold.withValues(alpha: 0.6), width: 1.6),
+          ),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            const NgmyAiBadge(size: 46),
+            const SizedBox(height: 12),
+            const Padding(padding: EdgeInsets.symmetric(horizontal: 10), child: Text('Write a new book', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15))),
+            const SizedBox(height: 4),
+            Text('$left ${left == 1 ? 'space' : 'spaces'} left', style: TextStyle(color: _paper.withValues(alpha: 0.65), fontSize: 11.5)),
+          ]),
+        ),
       ),
     );
   }
