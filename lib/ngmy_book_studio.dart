@@ -109,7 +109,21 @@ Future<void> deleteNgmyBook(String email, String id) async {
 
 // ─── AI writer ────────────────────────────────────────────────────────────
 
-String ngmyBookAiPrompt({required String description, required int pages}) {
+/// The language rule for the AI. It follows what the USER typed (not the facts the app adds):
+/// English in, English book; Swahili in, Swahili book; a named language wins.
+String ngmyBookLanguageRule(String typed) {
+  final t = typed.trim();
+  final named = ngmyRequestedLanguage(t);
+  if (named != null) {
+    return '- LANGUAGE: write the WHOLE book, every title and sentence, in $named, with natural correct grammar. Do not mix in other languages (JSON keys stay as given).';
+  }
+  if (t.isEmpty) {
+    return '- LANGUAGE: write the whole book in English.';
+  }
+  return '- LANGUAGE: write the WHOLE book in the same language as this text the user typed: """$t""". If it is English, the whole book is English; if it is Swahili, the whole book is Swahili; for any other language, use that language. The facts and notes given in the request are only information, not the language to write in. Do not mix languages (JSON keys stay as given).';
+}
+
+String ngmyBookAiPrompt({required String description, required int pages, String? languageHint}) {
   final templates = kNgmyCoverTemplates.map((t) => t.id).join(', ');
   return '''
 You write printable books that are folded and stapled. Write a book from this request:
@@ -118,9 +132,8 @@ You write printable books that are folded and stapled. Write a book from this re
 Rules:
 - Exactly $pages pages ("chapters"). Each page has a short title and 230-300 words of body text, so the printed page is full.
 - Split the body into 3-5 paragraphs separated by a blank line. Plain words, no markdown, no emojis, no lists.
-- LANGUAGE: if the request names a language (e.g. "in Swahili", "kwa Kiswahili", "in English"), write the WHOLE book in it. Otherwise write in the language the request is written in.
-${ngmyLanguageDirective(description)}
-${ngmyCommunityKnowledgeFor(description)}
+${ngmyBookLanguageRule(languageHint ?? description)}
+${ngmyCommunityKnowledgeFor(languageHint ?? description)}
 - Give every page an "image_query": 2-3 simple ENGLISH words for a real photo that fits it (e.g. "family dinner", "african village").
 - Design the cover: "cover_template" is the best fit from: $templates (story = children's books, starry = bedtime/faith, vintage = history/family memories, royal = formal/gifts, photo/portrait/split = people and places, sunset/band/geo = modern and bold). "cover_query": 2-3 English words for a cover photo, or "" for none.
 Reply with JSON only:
@@ -202,6 +215,7 @@ Future<NgmyBookDoc> ngmyWriteBookWithAi({
   required String description,
   required int pages,
   String author = '',
+  String? languageHint,
   void Function(String status, double progress)? onStatus,
 }) async {
   pages = pages.clamp(1, kNgmyBookAiMaxPages);
@@ -229,7 +243,7 @@ Future<NgmyBookDoc> ngmyWriteBookWithAi({
   if (pages <= 12) {
     for (var attempt = 0; attempt < 2; attempt++) {
       onStatus?.call('Writing your $pages pages…', 0.15);
-      final text = await ask(ngmyBookAiPrompt(description: description, pages: pages));
+      final text = await ask(ngmyBookAiPrompt(description: description, pages: pages, languageHint: languageHint));
       if (text == null) continue;
       final doc = ngmyParseBookAi(text, author: author);
       if (doc != null) {
@@ -240,7 +254,7 @@ Future<NgmyBookDoc> ngmyWriteBookWithAi({
     fail();
   }
 
-  final lang = '- LANGUAGE: if the request names a language (e.g. "in Swahili", "kwa Kiswahili", "in English"), write in it; otherwise use the language the request is written in.\n${ngmyLanguageDirective(description)}\n${ngmyCommunityKnowledgeFor(description)}';
+  final lang = '${ngmyBookLanguageRule(languageHint ?? description)}\n${ngmyCommunityKnowledgeFor(languageHint ?? description)}';
   final templates = kNgmyCoverTemplates.map((t) => t.id).join(', ');
 
   // 1. Plan: title, cover and the parts (about 50 pages each).
@@ -1377,6 +1391,7 @@ class _BookAiSheetState extends State<_BookAiSheet> {
       final doc = await ngmyWriteBookWithAi(
         description: d,
         pages: _pages,
+        languageHint: typed,
         author: _author.text.trim(),
         onStatus: (s, p) {
           if (mounted) {

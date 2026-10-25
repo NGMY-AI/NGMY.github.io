@@ -1485,7 +1485,7 @@ class _LayoutNode {
 class _FamilyTreeLayout {
   static const nodeWidth = 84.0;
   static const avatarSize = 56.0;
-  static const nameBlockHeight = 28.0;
+  static const nameBlockHeight = 50.0; // room for a full name on up to three lines, plus the years
   static const nodeHeight = avatarSize + 6 + nameBlockHeight;
   static const rowGap = 44.0;
   static const verticalStep = nodeHeight + rowGap;
@@ -2088,10 +2088,10 @@ class _MemberNode extends StatelessWidget {
                 Text(
                   member.name.trim(),
                   textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  // The whole name is always shown: it wraps onto more lines, and shrinks a little when very long.
+                  maxLines: 4,
                   style: TextStyle(
-                    fontSize: 9.5,
+                    fontSize: member.name.trim().length <= 24 ? 9.5 : (member.name.trim().length <= 32 ? 8.2 : 7.2),
                     fontWeight: FontWeight.w800,
                     height: 1.15,
                     color: isDark ? Colors.white : const Color(0xFF1F2937),
@@ -2232,8 +2232,7 @@ class _OverflowChildrenNode extends StatelessWidget {
                     child: Text(
                       '#${m.birthOrder} ${m.name}',
                       textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      maxLines: 4,
                       style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w700),
                     ),
                   ),

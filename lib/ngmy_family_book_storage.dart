@@ -94,3 +94,48 @@ Future<void> deleteFamilyBookEntry(String userEmail, String treeId, String entry
   list.removeWhere((e) => e.id == entryId);
   await saveFamilyBookEntries(userEmail, treeId, list);
 }
+
+/// How the family book's cover looks. Saved on this device with the book.
+class FamilyBookCover {
+  const FamilyBookCover({this.style = 'leather', this.title = '', this.subtitle = '', this.emblem = 0, this.silver = false});
+  final String style;
+  final String title;
+  final String subtitle;
+  final int emblem;
+  final bool silver;
+
+  FamilyBookCover copyWith({String? style, String? title, String? subtitle, int? emblem, bool? silver}) =>
+      FamilyBookCover(style: style ?? this.style, title: title ?? this.title, subtitle: subtitle ?? this.subtitle, emblem: emblem ?? this.emblem, silver: silver ?? this.silver);
+
+  Map<String, dynamic> toJson() => {'style': style, 'title': title, 'subtitle': subtitle, 'emblem': emblem, 'silver': silver};
+
+  factory FamilyBookCover.fromJson(Map<String, dynamic> j) => FamilyBookCover(
+        style: (j['style'] ?? 'leather').toString(),
+        title: (j['title'] ?? '').toString(),
+        subtitle: (j['subtitle'] ?? '').toString(),
+        emblem: (j['emblem'] as num?)?.toInt() ?? 0,
+        silver: j['silver'] == true,
+      );
+}
+
+String _familyCoverKey(String userEmail, String treeId) => 'ngmy_family_book_cover_v1_${userEmail.toLowerCase().trim()}_$treeId';
+
+Future<FamilyBookCover> loadFamilyBookCover(String userEmail, String treeId) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_familyCoverKey(userEmail, treeId));
+    if (raw == null || raw.isEmpty) return const FamilyBookCover();
+    final d = jsonDecode(raw);
+    return d is Map ? FamilyBookCover.fromJson(Map<String, dynamic>.from(d)) : const FamilyBookCover();
+  } catch (_) {
+    return const FamilyBookCover();
+  }
+}
+
+Future<void> saveFamilyBookCover(String userEmail, String treeId, FamilyBookCover cover) async {
+  if (userEmail.trim().isEmpty || treeId.isEmpty) return;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_familyCoverKey(userEmail, treeId), jsonEncode(cover.toJson()));
+  } catch (_) {}
+}

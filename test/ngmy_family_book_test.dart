@@ -65,6 +65,32 @@ void main() {
     expect(t.takeException(), isNull);
   });
 
+  test('the book is written in the language the user typed', () {
+    expect(ngmyBookLanguageRule('A story about our family'), contains('same language'));
+    expect(ngmyBookLanguageRule('Hadithi ya familia yetu pamoja na babu na bibi'), contains('Swahili'));
+    expect(ngmyBookLanguageRule('write it in French please'), isNot(contains('Swahili')));
+    expect(ngmyBookLanguageRule(''), contains('English'));
+    final prompt = ngmyBookAiPrompt(description: 'FACTS in English: Anna, Bob', pages: 3, languageHint: 'Hadithi ya familia yetu pamoja na babu na bibi');
+    expect(prompt, contains('Swahili'));
+  });
+
+  testWidgets('the owner can design the cover and it is saved', (t) async {
+    await openBook(t);
+    await t.tap(find.byTooltip('Design the cover'));
+    await t.pump(const Duration(milliseconds: 400));
+    await t.pump(const Duration(milliseconds: 400));
+    expect(find.text('Design your cover'), findsOneWidget);
+    await t.tap(find.text('Midnight'));
+    await t.pump();
+    await t.scrollUntilVisible(find.text('Save the cover'), 300, scrollable: find.descendant(of: find.byType(BottomSheet), matching: find.byType(Scrollable)).first);
+    await t.tap(find.text('Save the cover'));
+    await t.pump(const Duration(milliseconds: 400));
+    await t.pump(const Duration(milliseconds: 400));
+    final saved = await t.runAsync(() => loadFamilyBookCover('a@b.c', 'tree1'));
+    expect(saved!.style, 'midnight');
+    expect(t.takeException(), isNull);
+  });
+
   test('the AI book can be read even with real line breaks inside its text', () {
     const reply = '```json\n{"title":"Our Story","subtitle":"Long ago","cover_template":"vintage","cover_query":"village","chapters":[{"title":"Start","body":"First paragraph.\n\nSecond paragraph.","image_query":"lake"}]}\n```';
     final doc = ngmyParseBookAi(reply);

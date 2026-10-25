@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -63,6 +64,7 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
   int _pageIndex = -1; // -1 is the cover; 0 and up are the pages
   bool _editing = false;
   bool _keepEditing = false;
+  FamilyBookCover _coverDesign = const FamilyBookCover();
   late TextEditingController _titleCtrl;
   late TextEditingController _bodyCtrl;
 
@@ -73,6 +75,9 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
     _titleCtrl = TextEditingController();
     _bodyCtrl = TextEditingController();
     _reload();
+    loadFamilyBookCover(widget.userEmail, widget.treeId).then((c) {
+      if (mounted) setState(() => _coverDesign = c);
+    });
   }
 
   @override
@@ -215,17 +220,30 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
   Future<void> _printBook() async {
     if (_editing) await _saveCurrentPage();
     if (!mounted) return;
-    final name = widget.bookTitle.trim();
     final doc = NgmyBookDoc(
-      title: name.isEmpty ? 'Our Family Book' : name,
-      subtitle: 'Family Book',
-      cover: const NgmyBookCover(template: 'vintage'),
+      title: _title,
+      subtitle: _coverDesign.subtitle.trim().isEmpty ? 'Family Book' : _coverDesign.subtitle.trim(),
+      cover: NgmyBookCover(template: kFamilyCoverStyles.firstWhere((x) => x.id == _coverDesign.style, orElse: () => kFamilyCoverStyles.first).printTemplate),
       chapters: [
         if (widget.membersPage.trim().isNotEmpty) NgmyBookChapter(title: 'Our Family', body: widget.membersPage),
         for (final e in _entries) NgmyBookChapter(title: e.title, body: e.body),
       ],
     );
     await showNgmyBookPrintSheet(context, doc);
+  }
+
+  Future<void> _designCover() async {
+    final next = await showModalBottomSheet<FamilyBookCover>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1F130B),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
+      builder: (_) => _CoverDesigner(start: _coverDesign, fallbackTitle: widget.bookTitle.trim().isEmpty ? 'Our Family Book' : widget.bookTitle.trim(), pages: _entries.length),
+    );
+    if (next == null || !mounted) return;
+    setState(() => _coverDesign = next);
+    await saveFamilyBookCover(widget.userEmail, widget.treeId, next);
+    if (_pageCtrl.hasClients) unawaited(_pageCtrl.animateToPage(0, duration: const Duration(milliseconds: 400), curve: Curves.easeOut));
   }
 
   String _formatDate(DateTime dt) {
@@ -240,7 +258,7 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
   static const Color _leather = Color(0xFF7A3E1D);
   static const Color _gold = Color(0xFFE8C46A);
 
-  String get _title => widget.bookTitle.trim().isEmpty ? 'Our Family Book' : widget.bookTitle.trim();
+  String get _title => _coverDesign.title.trim().isNotEmpty ? _coverDesign.title.trim() : (widget.bookTitle.trim().isEmpty ? 'Our Family Book' : widget.bookTitle.trim());
 
   @override
   Widget build(BuildContext context) {
@@ -270,6 +288,7 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
                 ),
               ),
             ),
+          if (widget.canEdit) IconButton(tooltip: 'Design the cover', onPressed: _designCover, icon: const Icon(Icons.palette_rounded, color: _paper, size: 20)),
           if (_entries.isNotEmpty || widget.membersPage.trim().isNotEmpty) IconButton(tooltip: 'Print as a book', onPressed: _printBook, icon: const Icon(Icons.print_rounded, color: _paper, size: 20)),
           if (widget.canEdit && _entries.isNotEmpty && _pageIndex >= 0)
             IconButton(tooltip: _editing ? 'Save page' : 'Edit page', onPressed: _editing ? _saveCurrentPage : () => setState(() => _editing = true), icon: Icon(_editing ? Icons.check_rounded : Icons.edit_outlined, color: _paper, size: 20)),
@@ -314,7 +333,7 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
                               child: Padding(
                                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                                 child: isCover
-                                    ? GestureDetector(onTap: () => _pageCtrl.nextPage(duration: const Duration(milliseconds: 420), curve: Curves.easeInOutCubic), child: _BookCover(title: _title, pages: _entries.length))
+                                    ? GestureDetector(onTap: () => _pageCtrl.nextPage(duration: const Duration(milliseconds: 420), curve: Curves.easeInOutCubic), child: _BookCover(design: _coverDesign, title: _title, pages: _entries.length))
                                     : _BookPageView(
                                         entry: _entries[vi - 1],
                                         number: vi,
@@ -341,7 +360,7 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          SizedBox(height: 330, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 36), child: _BookCover(title: _title, pages: 0))),
+          SizedBox(height: 330, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 36), child: _BookCover(design: _coverDesign, title: _title, pages: 0))),
           const SizedBox(height: 18),
           Text(widget.canEdit ? 'Your book is waiting for its first page' : 'No pages yet', style: const TextStyle(color: _paper, fontWeight: FontWeight.w800, fontSize: 18)),
           const SizedBox(height: 6),
@@ -397,17 +416,19 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
 
 /// The leather front cover: gold edges, an embossed title and a ribbon.
 class _BookCover extends StatelessWidget {
-  const _BookCover({required this.title, required this.pages});
+  const _BookCover({required this.design, required this.title, required this.pages});
+  final FamilyBookCover design;
   final String title;
   final int pages;
 
   @override
   Widget build(BuildContext context) {
-    const gold = _FamilyBookScreenState._gold;
+    final st = kFamilyCoverStyles.firstWhere((x) => x.id == design.style, orElse: () => kFamilyCoverStyles.first);
+    final gold = design.silver ? const Color(0xFFE5E7EB) : _FamilyBookScreenState._gold;
     return Container(
       decoration: BoxDecoration(
         borderRadius: const BorderRadius.horizontal(left: Radius.circular(8), right: Radius.circular(18)),
-        gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF9A5128), Color(0xFF6B3216), Color(0xFF4A2210)]),
+        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: st.colors),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.6), blurRadius: 28, offset: const Offset(8, 14))],
       ),
       child: Stack(children: [
@@ -422,19 +443,136 @@ class _BookCover extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(56, 40, 40, 40),
             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Icon(Icons.account_tree_rounded, color: gold.withValues(alpha: 0.95), size: 44),
+              Icon(kFamilyCoverEmblems[design.emblem.clamp(0, kFamilyCoverEmblems.length - 1)], color: gold.withValues(alpha: 0.95), size: 44),
               const SizedBox(height: 14),
-              Text(title, textAlign: TextAlign.center, maxLines: 4, overflow: TextOverflow.ellipsis, style: const TextStyle(color: gold, fontFamily: 'serif', fontWeight: FontWeight.w900, fontSize: 25, height: 1.2, letterSpacing: 0.5, shadows: [Shadow(color: Colors.black54, blurRadius: 3, offset: Offset(1, 2))])),
+              Text(title, textAlign: TextAlign.center, maxLines: 4, overflow: TextOverflow.ellipsis, style: TextStyle(color: gold, fontWeight: FontWeight.w900, fontSize: 25, height: 1.2, letterSpacing: 0.5, shadows: [Shadow(color: Colors.black54, blurRadius: 3, offset: Offset(1, 2))])),
               const SizedBox(height: 12),
               Container(width: 90, height: 2, color: gold.withValues(alpha: 0.7)),
               const SizedBox(height: 12),
-              Text(pages == 0 ? 'A family story' : '$pages ${pages == 1 ? 'page' : 'pages'} of our story', style: TextStyle(color: gold.withValues(alpha: 0.85), fontFamily: 'serif', fontStyle: FontStyle.italic, fontSize: 14)),
+              Text(design.subtitle.trim().isNotEmpty ? design.subtitle.trim() : (pages == 0 ? 'A family story' : '$pages ${pages == 1 ? 'page' : 'pages'} of our story'), style: TextStyle(color: gold.withValues(alpha: 0.85), fontStyle: FontStyle.italic, fontSize: 14)),
             ]),
           ),
         ),
         // The ribbon bookmark.
         Positioned(right: 46, top: 0, child: CustomPaint(size: const Size(22, 64), painter: _RibbonPainter())),
       ]),
+    );
+  }
+}
+
+class FamilyCoverStyle {
+  const FamilyCoverStyle(this.id, this.name, this.colors, this.printTemplate);
+  final String id;
+  final String name;
+  final List<Color> colors;
+  final String printTemplate;
+}
+
+const List<FamilyCoverStyle> kFamilyCoverStyles = [
+  FamilyCoverStyle('leather', 'Leather', [Color(0xFF9A5128), Color(0xFF6B3216), Color(0xFF4A2210)], 'vintage'),
+  FamilyCoverStyle('midnight', 'Midnight', [Color(0xFF1E3A8A), Color(0xFF172554), Color(0xFF0B1230)], 'starry'),
+  FamilyCoverStyle('forest', 'Forest', [Color(0xFF15803D), Color(0xFF14532D), Color(0xFF052E16)], 'story'),
+  FamilyCoverStyle('burgundy', 'Burgundy', [Color(0xFFB91C1C), Color(0xFF7F1D1D), Color(0xFF450A0A)], 'royal'),
+  FamilyCoverStyle('royal', 'Royal', [Color(0xFF7C3AED), Color(0xFF5B21B6), Color(0xFF2E1065)], 'royal'),
+  FamilyCoverStyle('charcoal', 'Charcoal', [Color(0xFF475569), Color(0xFF1F2937), Color(0xFF0B0F17)], 'geo'),
+  FamilyCoverStyle('sunset', 'Sunset', [Color(0xFFF97316), Color(0xFFDB2777), Color(0xFF7E22CE)], 'sunset'),
+  FamilyCoverStyle('ocean', 'Ocean', [Color(0xFF0891B2), Color(0xFF155E75), Color(0xFF083344)], 'band'),
+];
+
+const List<IconData> kFamilyCoverEmblems = [
+  Icons.account_tree_rounded, Icons.favorite_rounded, Icons.home_rounded, Icons.star_rounded, Icons.diversity_3_rounded, Icons.local_florist_rounded,
+  Icons.auto_stories_rounded, Icons.castle_rounded, Icons.church_rounded, Icons.pets_rounded, Icons.eco_rounded, Icons.emoji_events_rounded,
+];
+
+/// Lets the owner design the cover: colour, picture, words and foil.
+class _CoverDesigner extends StatefulWidget {
+  const _CoverDesigner({required this.start, required this.fallbackTitle, required this.pages});
+  final FamilyBookCover start;
+  final String fallbackTitle;
+  final int pages;
+
+  @override
+  State<_CoverDesigner> createState() => _CoverDesignerState();
+}
+
+class _CoverDesignerState extends State<_CoverDesigner> {
+  late FamilyBookCover _c = widget.start;
+  late final TextEditingController _title = TextEditingController(text: widget.start.title);
+  late final TextEditingController _sub = TextEditingController(text: widget.start.subtitle);
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _sub.dispose();
+    super.dispose();
+  }
+
+  InputDecoration _deco(String label) => InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.white54),
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.07),
+        isDense: true,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final shown = _c.copyWith(title: _title.text, subtitle: _sub.text);
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.92),
+          child: ListView(padding: const EdgeInsets.fromLTRB(18, 14, 18, 16), shrinkWrap: true, children: [
+            const Text('Design your cover', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 19)),
+            const SizedBox(height: 12),
+            Center(child: SizedBox(width: 190, height: 260, child: FittedBox(fit: BoxFit.contain, child: SizedBox(width: 270, height: 370, child: _BookCover(design: shown, title: shown.title.trim().isEmpty ? widget.fallbackTitle : shown.title.trim(), pages: widget.pages))))),
+            const SizedBox(height: 16),
+            TextField(controller: _title, onChanged: (_) => setState(() {}), style: const TextStyle(color: Colors.white), decoration: _deco('Title on the cover')),
+            const SizedBox(height: 10),
+            TextField(controller: _sub, onChanged: (_) => setState(() {}), style: const TextStyle(color: Colors.white), decoration: _deco('Small line under it (optional)')),
+            const SizedBox(height: 14),
+            const Text('COLOUR', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1)),
+            const SizedBox(height: 8),
+            Wrap(spacing: 10, runSpacing: 10, children: [
+              for (final st in kFamilyCoverStyles)
+                GestureDetector(
+                  onTap: () => setState(() => _c = _c.copyWith(style: st.id)),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Container(width: 46, height: 46, decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: st.colors), border: Border.all(color: _c.style == st.id ? Colors.white : Colors.white24, width: _c.style == st.id ? 3 : 1))),
+                    const SizedBox(height: 3),
+                    Text(st.name, style: TextStyle(color: _c.style == st.id ? Colors.white : Colors.white54, fontSize: 10.5, fontWeight: FontWeight.w700)),
+                  ]),
+                ),
+            ]),
+            const SizedBox(height: 14),
+            const Text('PICTURE', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1)),
+            const SizedBox(height: 8),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              for (var i = 0; i < kFamilyCoverEmblems.length; i++)
+                GestureDetector(
+                  onTap: () => setState(() => _c = _c.copyWith(emblem: i)),
+                  child: Container(width: 46, height: 46, decoration: BoxDecoration(color: _c.emblem == i ? const Color(0xFF8B5CF6).withValues(alpha: 0.35) : Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(14), border: Border.all(color: _c.emblem == i ? const Color(0xFFC4B5FD) : Colors.transparent, width: 2)), child: Icon(kFamilyCoverEmblems[i], color: Colors.white, size: 24)),
+                ),
+            ]),
+            const SizedBox(height: 14),
+            Row(children: [
+              const Text('LETTERING', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1)),
+              const Spacer(),
+              ChoiceChip(label: const Text('Gold'), selected: !_c.silver, onSelected: (_) => setState(() => _c = _c.copyWith(silver: false))),
+              const SizedBox(width: 8),
+              ChoiceChip(label: const Text('Silver'), selected: _c.silver, onSelected: (_) => setState(() => _c = _c.copyWith(silver: true))),
+            ]),
+            const SizedBox(height: 18),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, _c.copyWith(title: _title.text.trim(), subtitle: _sub.text.trim())),
+              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50), backgroundColor: const Color(0xFF8B5CF6), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+              child: const Text('Save the cover', style: TextStyle(fontWeight: FontWeight.w900)),
+            ),
+          ]),
+        ),
+      ),
     );
   }
 }
@@ -538,7 +676,7 @@ class _BookPageView extends StatelessWidget {
     const ink = _FamilyBookScreenState._ink;
     const leather = _FamilyBookScreenState._leather;
     const gold = _FamilyBookScreenState._gold;
-    final body = entry.body.trim();
+    final body = entry.body.trim().replaceAll(RegExp(r'[ 	]{2,}'), ' ');
     return Stack(children: [
       // The stack of pages showing on the right edge.
       for (var i = 3; i >= 1; i--)
@@ -577,7 +715,7 @@ class _BookPageView extends StatelessWidget {
                     Expanded(
                       child: editing
                           ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                              TextField(controller: titleCtrl, style: const TextStyle(color: ink, fontFamily: 'serif', fontWeight: FontWeight.w900, fontSize: 21), decoration: InputDecoration(hintText: 'Page title', hintStyle: TextStyle(color: ink.withValues(alpha: 0.35)), border: InputBorder.none)),
+                              TextField(controller: titleCtrl, style: const TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 21), decoration: InputDecoration(hintText: 'Page title', hintStyle: TextStyle(color: ink.withValues(alpha: 0.35)), border: InputBorder.none)),
                               Text(formatDate(entry.updatedAt), style: TextStyle(fontSize: 11, color: ink.withValues(alpha: 0.45))),
                               const SizedBox(height: 10),
                               Expanded(
@@ -586,21 +724,21 @@ class _BookPageView extends StatelessWidget {
                                   maxLines: null,
                                   expands: true,
                                   textAlignVertical: TextAlignVertical.top,
-                                  style: const TextStyle(color: ink, fontFamily: 'serif', fontSize: 16.5, height: 1.65),
+                                  style: const TextStyle(color: ink, fontSize: 16.5, height: 1.65),
                                   decoration: InputDecoration(hintText: 'Write your family story here…', hintStyle: TextStyle(color: ink.withValues(alpha: 0.35)), border: InputBorder.none),
                                 ),
                               ),
                             ])
                           : SingleChildScrollView(
                               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                Text(entry.title, style: const TextStyle(color: ink, fontFamily: 'serif', fontWeight: FontWeight.w900, fontSize: 23, height: 1.2)),
+                                Text(entry.title, style: const TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 23, height: 1.2)),
                                 const SizedBox(height: 4),
                                 Text(formatDate(entry.updatedAt), style: TextStyle(fontSize: 11, color: ink.withValues(alpha: 0.5), fontStyle: FontStyle.italic)),
                                 const SizedBox(height: 8),
                                 Row(children: [Expanded(child: Container(height: 1, color: leather.withValues(alpha: 0.35))), Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: Text('❦', style: TextStyle(color: leather.withValues(alpha: 0.7), fontSize: 16))), Expanded(child: Container(height: 1, color: leather.withValues(alpha: 0.35)))]),
                                 const SizedBox(height: 14),
                                 if (body.isEmpty)
-                                  Text('This page is blank. Tap the pencil to write.', style: TextStyle(color: ink.withValues(alpha: 0.4), fontFamily: 'serif', fontSize: 16, height: 1.7))
+                                  Text('This page is blank. Tap the pencil to write.', style: TextStyle(color: ink.withValues(alpha: 0.4), fontSize: 16, height: 1.7))
                                 else
                                   Text.rich(
                                     TextSpan(children: [
@@ -608,12 +746,12 @@ class _BookPageView extends StatelessWidget {
                                       TextSpan(text: body.substring(0, 1), style: const TextStyle(color: leather, fontSize: 40, fontWeight: FontWeight.w900, height: 1.0)),
                                       TextSpan(text: body.substring(1)),
                                     ]),
-                                    style: TextStyle(color: ink.withValues(alpha: 0.93), fontFamily: 'serif', fontSize: 16.5, height: 1.72),
+                                    style: TextStyle(color: ink.withValues(alpha: 0.93), fontSize: 16.5, height: 1.72),
                                   ),
                               ]),
                             ),
                     ),
-                    Padding(padding: const EdgeInsets.only(top: 6), child: Text('— $number —', textAlign: TextAlign.center, style: TextStyle(color: ink.withValues(alpha: 0.5), fontFamily: 'serif', fontSize: 12, letterSpacing: 1))),
+                    Padding(padding: const EdgeInsets.only(top: 6), child: Text('— $number —', textAlign: TextAlign.center, style: TextStyle(color: ink.withValues(alpha: 0.5), fontSize: 12, letterSpacing: 1))),
                   ]),
                 ),
                 // The curl of the page near the spine.
