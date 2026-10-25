@@ -41344,7 +41344,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                                 _recordDivider(isDark),
                                 _recordRow('Registry ID', registryId.isEmpty ? 'N/A' : registryId, isDark, copyable: true),
                                 _recordDivider(isDark),
-                                _recordRow('Date of Birth', dob.isEmpty ? 'N/A' : dob, isDark, copyable: true),
+                                _recordRow('Date of Birth', dob.isEmpty ? 'N/A' : dob, isDark, copyable: true, ageAt: deceasedAt),
                                 _recordDivider(isDark),
                                 _recordRow('Date of Death', deathLabel, isDark),
                                 _recordDivider(isDark),
@@ -41834,7 +41834,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                           ),
                           if (isDeceased) ...[
                             _recordDivider(isDark),
-                            _recordRow('Date of birth', (u.dob ?? raw?['dob'] ?? 'N/A').toString(), isDark),
+                            _recordRow('Date of birth', (u.dob ?? raw?['dob'] ?? 'N/A').toString(), isDark, ageAt: deceasedAt),
                             _recordDivider(isDark),
                             _recordRow(
                               'Date of death',
@@ -42430,8 +42430,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     return value.replaceAll(RegExp(r'[\r\n]+'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
   }
 
-  Widget _recordRow(String label, String value, bool isDark, {bool copyable = false}) {
+  Widget _recordRow(String label, String value, bool isDark, {bool copyable = false, DateTime? ageAt}) {
     final display = _recordDisplayValue(value);
+    // Next to a date of birth: the person's real age, counted from that date (up to their death, if they have died).
+    final born = label.toLowerCase() == 'date of birth' ? ngmyParseDob(display) : null;
+    final ageNow = born == null ? null : ngmyAgeOn(born, ageAt ?? DateTime.now());
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -42465,6 +42468,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
               ),
             ),
           ),
+          if (ageNow != null)
+            Container(
+              margin: const EdgeInsets.only(right: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFF00B25A).withValues(alpha: isDark ? 0.22 : 0.14),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFF00B25A).withValues(alpha: 0.6)),
+              ),
+              child: Text(ageAt == null ? 'Age $ageNow' : 'Age $ageNow at death', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, color: isDark ? const Color(0xFF86EFAC) : const Color(0xFF047857))),
+            ),
           if (copyable &&
               (_hasRegistrarAccess() || _isGlobalCivicRegistryAdmin()) &&
               display.isNotEmpty &&
@@ -46369,12 +46383,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
               const SizedBox(height: 8),
               TextField(
                 controller: _dobC,
+                onChanged: (_) => setState(() {}),
                 keyboardType: TextInputType.number,
                 inputFormatters: [
                   const NgmyCivicDobInputFormatter(),
                   LengthLimitingTextInputFormatter(10),
                 ],
-                decoration: InputDecoration(hintText: 'MM/DD/YYYY', hintStyle: const TextStyle(fontSize: 13, color: Colors.grey), filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)),
+                decoration: InputDecoration(suffixIcon: ngmyParseDob(_dobC.text.trim()) == null ? null : Padding(padding: const EdgeInsets.only(right: 10), child: Center(widthFactor: 1, child: Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4), decoration: BoxDecoration(color: const Color(0xFF00B25A).withValues(alpha: 0.16), borderRadius: BorderRadius.circular(9), border: Border.all(color: const Color(0xFF00B25A).withValues(alpha: 0.6))), child: Text('Age ${ngmyAgeOn(ngmyParseDob(_dobC.text.trim())!, DateTime.now())}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFF00B25A)))))), hintText: 'MM/DD/YYYY', hintStyle: const TextStyle(fontSize: 13, color: Colors.grey), filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)),
               ),
               const SizedBox(height: 20),
 
