@@ -412,6 +412,7 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
             if (_entries.isNotEmpty) ...[
               if (bookLang == 'en') Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('Your book is in English.', style: TextStyle(color: _paper.withValues(alpha: 0.7), fontSize: 12))),
               if (bookLang == 'sw') Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('Your book is in Swahili.', style: TextStyle(color: _paper.withValues(alpha: 0.7), fontSize: 12))),
+              if (bookLang == 'sw') _menuTile(ctx, Icons.spellcheck_rounded, 'Make my Swahili sound natural', 'A native-speaker editor rewrites every page so it reads like real Swahili', 'polish'),
               if (bookLang != 'sw') _menuTile(ctx, Icons.translate_rounded, 'Translate my book to Swahili', 'Every page, from English into Kiswahili', 'sw'),
               if (bookLang != 'en') _menuTile(ctx, Icons.translate_rounded, 'Translate my book to English', 'Every page, from Swahili into English', 'en'),
             ],
@@ -425,6 +426,8 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
       await _writeWithAi();
     } else if (choice == 'fix') {
       await _fixWithAi();
+    } else if (choice == 'polish') {
+      await _translateAll('Swahili (Kiswahili)', polishOnly: true);
     } else {
       await _translateAll(choice == 'sw' ? 'Swahili (Kiswahili)' : 'English');
     }
@@ -537,7 +540,7 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
   }
 
   /// Turns every page into the other language. The old text is kept so it can be brought back.
-  Future<void> _translateAll(String target) async {
+  Future<void> _translateAll(String target, {bool polishOnly = false}) async {
     final before = List<FamilyBookEntry>.of(_entries);
     final status = ValueNotifier<String>('Starting…');
     var showing = true;
@@ -562,7 +565,8 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
     String? error;
     List<(String, String)>? done;
     try {
-      done = await ngmyTranslateBookPages(pages: [for (final e in before) (e.title, e.body)], target: target, onStatus: (s, _) => status.value = s);
+      final src = [for (final e in before) (e.title, e.body)];
+      done = polishOnly ? await ngmyPolishSwahili(src, onStatus: (s, _) => status.value = s) : await ngmyTranslateBookPages(pages: src, target: target, onStatus: (s, _) => status.value = s);
     } catch (e) {
       error = '$e';
     }
@@ -578,7 +582,7 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
     await _reload();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Your book is now in ${target.startsWith('Swahili') ? 'Swahili' : 'English'}.'),
+      content: Text(polishOnly ? 'I rewrote your Swahili so it reads naturally.' : 'Your book is now in ${target.startsWith('Swahili') ? 'Swahili' : 'English'}.'),
       action: SnackBarAction(
         label: 'Undo',
         onPressed: () async {
@@ -672,8 +676,8 @@ class _FixDialogState extends State<_FixDialog> {
 
   List<String> get _examples => switch (_scope) {
         'cover' => const ['Make the cover dark blue with silver letters', 'Put the title at the top and make it bigger', 'Use a star sky and a heart picture', 'Add our family name under the title'],
-        'book' => const ['Correct the spelling in the whole book', 'Change the word "tree" to the right Swahili word', 'Use simple words everyone understands', 'Make every page a little shorter'],
-        _ => const ['Correct the spelling', 'Rewrite this page in simpler words', 'Add a paragraph about the family farm', 'Make this page shorter'],
+        'book' => const ['Rewrite the whole book in natural, professional Swahili', 'Correct the spelling in the whole book', 'Change the word "tree" to the right Swahili word', 'Use simple words everyone understands', 'Make every page a little shorter'],
+        _ => const ['Rewrite this page in natural, professional Swahili', 'Correct the spelling', 'Rewrite this page in simpler words', 'Add a paragraph about the family farm', 'Make this page shorter'],
       };
 
   @override
