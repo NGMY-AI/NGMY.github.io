@@ -1,0 +1,74 @@
+import 'ngmy_advisor_app_knowledge.dart';
+import 'ngmy_ai_community_knowledge.dart';
+
+// ═════════════════════════════════════════════════════════════════════════════
+// EVERYTHING THE NGMY NEWSPAPER AI KNOWS ABOUT NGMY.
+//
+// ADD EVERY NEW FEATURE HERE. A new studio, hub tool, tab, game or program goes into
+// [kNgmyFeatureFacts] with one line saying what it is and where to find it, so the AI can
+// write news about it. A test (test/ngmy_master_knowledge_test.dart) reads the app's studio
+// and tool lists and fails when one of them is missing from this file.
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// Who made NGMY. Never changes.
+const String kNgmyFounderFacts = '''
+THE FOUNDER: NGMY stands for New Global Movement for Youth. It was created by KB PABLO QR (always written in capital letters), the Founder, President and CEO of NGMY. The "QR" in his name comes from QR codes, which NGMY and his business use a lot, and it is part of his brand. He built NGMY as one app (ngmy.org) that gives young people and families tools for work, money, learning, community and creativity. When a story is about the CEO, call him KB PABLO QR, Founder, President and CEO of NGMY. Do not give him a different name, age, birthplace, degrees, awards or family details, and do not make up quotes from him.''';
+
+/// One line per feature: what it is, where to find it.
+const List<String> kNgmyFeatureFacts = [
+  // The main tabs
+  'HOME: the first tab. It has the NGMY brand, the Helper AI, loans, and the tech frames: Neural Link, Signal Grid, Core Protocol and the Vault Channel arcade.',
+  'TOOL HUB: the second tab. It holds the Business Card Creator, Menu Studio (restaurant menus and Bio link pages) and Business Essentials (invoices, receipts, flyers and other business papers).',
+  'SLIDES: the third tab. Presentations with many designs, an AI that makes decks, and Marriage documents.',
+  'NGMY HUB: the centre tab. Civic Registry, NGMY Store, Help Center and Insurance, Document Scanner, and the App Builder when it is switched on.',
+  'ADVISORS: the fifth tab. AI advisors you can chat with like real people. They help with jobs, applications, benefits and everyday questions, and they can answer in Swahili when you write Swahili.',
+  'CREATOR HUB: the sixth tab. Doc Share, Quote Calc, QR Generator, Play Zone, Kiswahili School, Recorder Studio, Video Studio and Phone Unlock.',
+  'PROFILE: the seventh tab. Theme, logout, legal pages and Worksheets (Projects, Cashier IOUs and receipts, and the Family Tree).',
+  // Money
+  'GROWTH INCOME: members buy an investment plan and earn daily by clocking in, on work days only (Monday to Friday, there is no clock-in on Saturday and Sunday). The wallet shows the balance, deposits, withdrawals and a history of the last two months, with the balance before and after each move.',
+  'KING AND QUEEN CROWN: a crown badge for special members. A King or Queen receives a daily crown reward of one dollar, and the receipt shows in the wallet history.',
+  'WALLET: one balance everywhere in the app. The server keeps the balance so every phone shows the same number.',
+  'LOANS: loan applications and loan services from the Home tab.',
+  'NGMY STORE: buy and sell items inside the app. Approved members can open a store.',
+  // Community
+  'CIVIC REGISTRY: the community system for the M\'MBONDO community. It registers members with a Registry ID card, counts members by state, records contributions with receipts, and lets Authorized Registrars enroll families. Registrars can print the community roster as a PDF.',
+  'CIVIC BIRTHDAYS AND FAMILY: the registry records children and their ages, shows a birthday reminder two days before, and congratulates a child on turning 18. Members can have a nickname that others search for, while registrars see the real name.',
+  'CIVIC VOTING AND STATE WALLET: the community votes on decisions inside the app, and each state has a wallet showing its funds, spending and trust deposits so the money is visible to everyone.',
+  'LIGHTNING GROUPS: groups inside the Civic Registry where people give together. A person asks to join with a name, phone number, state and address, and the group owner approves. The group shows named contribution rounds, receipts, who gave, who missed and how many times.',
+  'JOBS AND HELP: help finding jobs, house repairs and house workers, a Help Center with insurance, and the Helper AI for support.',
+  // Studios and learning
+  'CORE PROTOCOL: a collection of studios for curious minds: Universe, Electronics Lab, AI Inventor, Discovery Lab (Body Explorer, a real 3D human you can turn and look inside), Toolbox, Molecule Maker, DNA Lab, Ecosystem Lab, Balance Lab, Gear Lab, Laser Maze, Light Mixer, Cipher Lab, Reaction Lab, Spark Painter, Rocket Lander, Orbit Studio, Swarm Studio, Chain Burst, Title Animator, Circuit Lab, Marble Music and Orbit Sequencer.',
+  'BODY EXPLORER: a real 3D human body built from medical anatomy data. You can turn it, zoom in, switch layers (skin, muscles, organs, skeleton, blood vessels), tap any part to learn about it, hear the heart beat, and take a quiz.',
+  'KISWAHILI SCHOOL: learn English and Swahili with pictures and the teacher Mwalimu Amina.',
+  'FAMILY TREE AND FAMILY BOOK: build a family tree, then keep a Family Book library of up to six books. The AI can write a whole new book from the tree, in English or Swahili, and the cover can be designed.',
+  'NOTES: business notes with search, photos and cards.',
+  // Creating
+  'NGMY QUOTES: make a picture quote with many designs, word sizes, text styles, your own photo and the NGMY logo. It also makes NEWS: a newspaper page with a headline, article and your picture, written by an AI that knows NGMY.',
+  'BIO STUDIO: link-in-bio pages with designs such as Neural Core, Quantum Grid and Mech Terminal, and visitors can react to a page.',
+  'MENU STUDIO: restaurant menus published as a link.',
+  'BUSINESS CARD CREATOR: design and download business cards.',
+  'INVOICES AND QUOTE CALC: invoices, receipts and estimates with NGMY watermarks.',
+  'DOC SHARE, QR GENERATOR, RECORDER STUDIO, VIDEO STUDIO, PLAY ZONE AND PHONE UNLOCK: tools in the Creator Hub.',
+  'APP BUILDER: describe an app and the AI builds it, including real web apps you can publish.',
+  'DOCUMENT SCANNER: scan papers with the phone camera.',
+  'GAME CENTER AND VAULT ARCADE: arcade games you can play. Game bets and wins have their own receipts and do not appear in the wallet history.',
+];
+
+/// The whole knowledge block for the AI writers.
+String ngmyMasterKnowledge() {
+  final b = StringBuffer()
+    ..writeln('=== EVERYTHING YOU KNOW ABOUT NGMY (use only this; never invent features, numbers, prices, names or dates) ===')
+    ..writeln(kNgmyFounderFacts)
+    ..writeln()
+    ..writeln('FEATURES:');
+  for (final f in kNgmyFeatureFacts) {
+    b.writeln('- $f');
+  }
+  b
+    ..writeln()
+    ..writeln(kNgmyCommunityKnowledge)
+    ..writeln()
+    ..writeln('HOW MEMBERS USE THE APP:')
+    ..writeln(NgmyAdvisorAppKnowledge.publicGuide);
+  return b.toString().trim();
+}

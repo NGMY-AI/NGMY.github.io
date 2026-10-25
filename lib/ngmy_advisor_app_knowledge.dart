@@ -11,6 +11,9 @@ import 'ngmy_stripe_payments.dart';
 /// update automatically on the next message. Update [_userHowTo] / [_ownerDeep]
 /// prose when you add or move major features.
 class NgmyAdvisorAppKnowledge {
+  /// The member-facing guide (no owner-only prices), for AI writers outside the advisor chat.
+  static String get publicGuide => _userHowTo;
+
   /// Build the knowledge block for one outbound advisor reply.
   static String forChat({
     required bool chatterIsBoss,
