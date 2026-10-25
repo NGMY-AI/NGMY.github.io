@@ -1,10 +1,14 @@
+import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 
+import 'ngmy_body_viewer.dart';
 import 'ngmy_studio_kit.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -143,10 +147,39 @@ class _BodyModel {
   static Future<_BodyModel>? _loading;
   static Future<_BodyModel> load() => _loading ??= _read();
 
+  /// The raw anatomy file, kept so the 3D page can be given it.
+  static Uint8List? rawBytes;
+  static Future<_BodyModel>? _lightLoading;
+
+  /// The web build draws with a real 3D engine in its own page, so here only the list of parts is needed.
+  static Future<_BodyModel> loadLight() => _lightLoading ??= _readLight();
+
+  static Future<_BodyModel> _readLight() async {
+    final raw = await rootBundle.load('assets/data/body3d.bin');
+    rawBytes = raw.buffer.asUint8List(raw.offsetInBytes, raw.lengthInBytes);
+    final d = ByteData.sublistView(raw);
+    var o = 4;
+    final n = d.getUint32(o, Endian.little);
+    o += 4;
+    final parts = <BodyPart>[];
+    for (var i = 0; i < n; i++) {
+      final len = d.getUint8(o++);
+      final name = String.fromCharCodes([for (var k = 0; k < len; k++) d.getUint8(o + k)]);
+      o += len;
+      final layer = d.getUint8(o++);
+      final rgb = (d.getUint8(o) << 16) | (d.getUint8(o + 1) << 8) | d.getUint8(o + 2);
+      o += 3;
+      final anim = d.getUint8(o++);
+      o += 8;
+      parts.add(BodyPart(name, _layers[layer], Color(0xFF000000 | rgb), anim: anim, fixed: name == 'Hair' || name == 'Lips' || name == 'Eyes'));
+    }
+    return _BodyModel(Float32List(0), Float32List(0), Int32List(0), Int32List(0), parts);
+  }
+
   static const _layers = ['skin', 'muscle', 'organ', 'bone', 'vessel'];
 
   static Future<_BodyModel> _read() async {
-    final raw = await rootBundle.load('assets/data/body3d.bin');
+    final raw = await rootBundle.load('assets/data/body3d_lite.bin');
     final d = ByteData.sublistView(raw);
     var o = 4; // 'BDY3'
     final n = d.getUint32(o, Endian.little);
@@ -284,6 +317,12 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
   Int32List _tid = Int32List(0), _cols = Int32List(0);
   final GlobalKey _shot = GlobalKey();
 
+  // The web build: a real 3D engine in its own page, driven with messages.
+  NgmyBodyViewerLink? _link;
+  bool _viewerReady = false;
+  String _lastSig = '';
+  bool get _web => kIsWeb && kNgmyBodyViewerSupported;
+
   // Which layers are showing.
   final Set<String> _layers = {'skin'};
   int _skinMode = 2; // 0 off, 1 ghost, 2 solid
@@ -323,9 +362,70 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
   void initState() {
     super.initState();
     startFrames();
+    if (_web) {
+      _link = NgmyBodyViewerLink(onEvent: _onViewer);
+      () async {
+        final got = await Future.wait<Object>([_BodyModel.loadLight(), rootBundle.loadString('assets/data/three.min.js')]);
+        if (!mounted) return;
+        _link!.start(got[1] as String);
+        setState(() => _modelN = got[0] as _BodyModel);
+      }();
+      return;
+    }
     _BodyModel.load().then((m) {
       if (mounted) setState(() => _modelN = m);
     });
+  }
+
+  @override
+  void dispose() {
+    _link?.dispose();
+    super.dispose();
+  }
+
+  void _onViewer(Map<dynamic, dynamic> m) {
+    if (!mounted) return;
+    switch (m['ngmyBody']) {
+      case 'ready':
+        _link?.send({'t': 'init', 'data': _BodyModel.rawBytes});
+        _viewerReady = true;
+        _lastSig = '';
+        _pushState();
+      case 'pick':
+        setState(() => _handlePick(m['group'] as String?));
+      case 'shot':
+        _shareShot('${m['data']}');
+      case 'error':
+        debugPrint('[body viewer] ${m['text']}');
+    }
+  }
+
+  /// Tells the 3D page what is switched on (only when something changed).
+  void _pushState() {
+    if (!_viewerReady) return;
+    final c = _tones[_tone];
+    String h(double v) => (v * 255).round().clamp(0, 255).toRadixString(16).padLeft(2, '0');
+    final msg = {
+      'layers': _layers.toList()..sort(),
+      'skinMode': _skinMode,
+      'tone': '#${h(c.r)}${h(c.g)}${h(c.b)}',
+      'sel': _sel,
+      'bpm': _bpm.round(),
+      'spin': _spin,
+    };
+    final sig = jsonEncode(msg);
+    if (sig == _lastSig) return;
+    _lastSig = sig;
+    _link?.send({'t': 'state', ...msg});
+  }
+
+  Future<void> _shareShot(String dataUrl) async {
+    try {
+      final bytes = base64Decode(dataUrl.substring(dataUrl.indexOf(',') + 1));
+      await Share.shareXFiles([XFile.fromData(bytes, mimeType: 'image/png', name: 'body.png')], text: 'Made in NGMY Core Protocol');
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not share the picture here. Try a screenshot instead.')));
+    }
   }
 
   bool _partOn(BodyPart p) {
@@ -344,6 +444,16 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
   void onFrame(double dt) {
     if (_modelN == null) return;
     _t += dt;
+    if (_web) {
+      // The 3D page draws and animates itself; only the heartbeat sound is timed here.
+      final b = _t * _bpm / 60;
+      if (_beatSound && _layers.contains('organ') && b.floor() != _lastBeat.floor()) {
+        NgmyTone.drum('kick', volume: 0.4);
+        later(170, () => NgmyTone.drum('kick', volume: 0.25));
+      }
+      _lastBeat = b;
+      return;
+    }
     _idle += dt;
     if (_spin && _idle > 1.5 && _sel == null) _yaw += dt * 0.35;
     final k = 1 - math.exp(-dt * 5);
@@ -365,6 +475,7 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
     if (group == null) {
       _targetGoal = const BodyP3(0, 0.5, 0);
       _zoomGoal = 1;
+      _link?.send({'t': 'focus', 'group': null});
       return;
     }
     final ps = _model.parts.where((p) => p.group == group).toList();
@@ -373,6 +484,13 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
     if (layer != 'skin' && !_layers.contains(layer)) {
       _layers.add(layer);
       if (_skinMode == 2) _skinMode = 1;
+    }
+    if (_web) {
+      _pushState();
+      if (focus) _link?.send({'t': 'focus', 'group': group});
+      _idle = 0;
+      _sound(layer, group);
+      return;
     }
     var minX = 9.0, maxX = -9.0, minY = 9.0, maxY = -9.0, sz = 0.0, n = 0;
     var cz = 0.0;
@@ -476,7 +594,11 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
 
   void _tap(Offset pos) {
     _idle = 0;
-    final g = _pick(pos);
+    _handlePick(_pick(pos));
+  }
+
+  void _handlePick(String? g) {
+    _idle = 0;
     if (_quiz && _target3 != null) {
       if (g == null) return;
       final ok = g == _target3;
@@ -632,10 +754,32 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
     canvas.drawOval(Rect.fromCenter(center: Offset(cx0 - _target.x * scale, fy + 6), width: scale * 0.3, height: scale * 0.03), Paint()..color = Colors.black.withValues(alpha: 0.35)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10));
   }
 
+  Widget _infoBox(String? sel, (String, String)? info) {
+    return Container(
+                padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+                decoration: BoxDecoration(color: const Color(0xEE111318), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFF472B6).withValues(alpha: 0.5))),
+                child: _quiz
+                    ? Text(_target3 == null ? 'Turn the quiz off and on to start' : 'Find the ${_target3!.toLowerCase()}   ·   score $_score\n$_fb', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13.5, height: 1.4))
+                    : (sel == null || info == null
+                        ? const Text('Drag to turn · pinch to zoom · tap a part to learn about it', style: TextStyle(color: Colors.white54, fontSize: 12.5))
+                        : Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Expanded(
+                              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                                Text('$sel  ·  ${info.$1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+                                const SizedBox(height: 3),
+                                Text(info.$2, style: const TextStyle(color: Colors.white70, fontSize: 12.5, height: 1.35)),
+                              ]),
+                            ),
+                            IconButton(visualDensity: VisualDensity.compact, tooltip: 'Back to the whole body', onPressed: () => _select(null), icon: const Icon(Icons.zoom_out_map_rounded, color: Colors.white70, size: 21)),
+                          ])),
+              );
+  }
+
   @override
   Widget build(BuildContext context) {
     final sel = _sel;
     final info = sel == null ? null : kBodyFacts[sel];
+    if (_web) _pushState();
     final names = <String>[];
     for (final p in (_modelN?.parts ?? const <BodyPart>[])) {
       if (!_partOn(p) || (p.layer == 'skin' && _layers.isNotEmpty)) continue;
@@ -645,8 +789,13 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
       title: 'BODY EXPLORER',
       accent: const Color(0xFFF472B6),
       help: 'A 3D human you can explore.\n\nDrag with one finger to turn the body all the way round. Pinch with two fingers to zoom in and out. Tap any part of the body to fly in close and read about it.\n\nUse the layer buttons to look inside: Skin, Muscles, Organs, Skeleton and Blood vessels. You can have several on at once. The skin turns see-through so you can see what is inside. Tap Skin again to make it solid or switch it off.\n\nReal 3D anatomy from BodyParts3D, (c) The Database Center for Life Science, licensed under CC Attribution 4.0 International. The model is an adult male reference.\n\nThe list under the buttons names every part: tap a name to find it. In Organs you can watch the lungs breathe and the heart beat, and change the heart rate.\n\nTurn on Quiz and tap the part you are asked to find.',
-      actions: [IconButton(onPressed: () => studioShare(context, _shot, name: 'body'), icon: const Icon(Icons.ios_share_rounded, color: Colors.white70, size: 21), tooltip: 'Share')],
-      stage: LayoutBuilder(builder: (context, box) {
+      actions: [IconButton(onPressed: _web ? () => _link?.send({'t': 'shot'}) : () => studioShare(context, _shot, name: 'body'), icon: const Icon(Icons.ios_share_rounded, color: Colors.white70, size: 21), tooltip: 'Share')],
+      stage: _web
+          ? Column(children: [
+              Expanded(child: _link?.started == true ? _link!.build() : const SizedBox.expand()),
+              Padding(padding: const EdgeInsets.fromLTRB(10, 6, 10, 8), child: _infoBox(sel, info)),
+            ])
+          : LayoutBuilder(builder: (context, box) {
         _size = Size(box.maxWidth, box.maxHeight);
         return RepaintBoundary(
           key: _shot,
@@ -669,29 +818,7 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
               onTapUp: (d) => _tap(d.localPosition),
               child: CustomPaint(size: _size, painter: _BodyPainter(this)),
             ),
-            Positioned(
-              left: 10,
-              right: 10,
-              bottom: 8,
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
-                decoration: BoxDecoration(color: const Color(0xEE111318), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFF472B6).withValues(alpha: 0.5))),
-                child: _quiz
-                    ? Text(_target3 == null ? 'Turn the quiz off and on to start' : 'Find the ${_target3!.toLowerCase()}   ·   score $_score\n$_fb', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13.5, height: 1.4))
-                    : (sel == null || info == null
-                        ? const Text('Drag to turn · pinch to zoom · tap a part to learn about it', style: TextStyle(color: Colors.white54, fontSize: 12.5))
-                        : Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Expanded(
-                              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                                Text('$sel  ·  ${info.$1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
-                                const SizedBox(height: 3),
-                                Text(info.$2, style: const TextStyle(color: Colors.white70, fontSize: 12.5, height: 1.35)),
-                              ]),
-                            ),
-                            IconButton(visualDensity: VisualDensity.compact, tooltip: 'Back to the whole body', onPressed: () => _select(null), icon: const Icon(Icons.zoom_out_map_rounded, color: Colors.white70, size: 21)),
-                          ])),
-              ),
-            ),
+            if (!_web) Positioned(left: 10, right: 10, bottom: 8, child: _infoBox(sel, info)),
           ]),
         );
       }),
@@ -712,6 +839,7 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
         StudioRow(children: [
           StudioChip(label: 'Spin', icon: Icons.threed_rotation_rounded, selected: _spin, color: const Color(0xFF38BDF8), onTap: () => setState(() => _spin = !_spin)),
           StudioButton(icon: Icons.refresh_rounded, label: 'Reset view', onTap: () => setState(() {
+                _link?.send({'t': 'reset'});
                 _sel = null;
                 _yaw = 0.5;
                 _pitch = 0.05;

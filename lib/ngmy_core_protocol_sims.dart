@@ -12,6 +12,7 @@ import 'ngmy_core_studios_e.dart';
 import 'ngmy_studio_kit.dart';
 import 'ngmy_ai_inventor.dart';
 import 'ngmy_electronics_lab.dart';
+import 'ngmy_body_explorer.dart';
 import 'ngmy_play_hub.dart';
 import 'ngmy_arcade_a.dart';
 import 'ngmy_edu_a.dart';
@@ -175,7 +176,7 @@ final List<_StudioDef> _kStudios = [
   _StudioDef('UNIVERSE', 'Earth, space and gravity', Icons.travel_explore_rounded, const Color(0xFF38BDF8), () => const NgmyUniverseHub()),
   _StudioDef('ELECTRONICS LAB', 'Batteries, wires, real circuits', Icons.electrical_services_rounded, const Color(0xFF38BDF8), () => const NgmyElectronicsLab()),
   _StudioDef('AI INVENTOR', 'Say it, watch it get built', Icons.auto_awesome_rounded, const Color(0xFFA78BFA), () => const NgmyInventorStudio()),
-  _StudioDef('DISCOVERY LAB', 'Elements, magnets, power, internet', Icons.biotech_rounded, const Color(0xFF4ADE80), () => const NgmyDiscoveryHub()),
+  _StudioDef('DISCOVERY LAB', 'Body Explorer: a real 3D human', Icons.biotech_rounded, const Color(0xFF4ADE80), () => const NgmyBodyExplorer()),
   _StudioDef('TOOLBOX', 'Converter, clock, games', Icons.build_circle_rounded, const Color(0xFFFB923C), () => const NgmyToolboxHub()),
   _StudioDef('MOLECULE MAKER', 'Join atoms into real molecules', Icons.bubble_chart_rounded, const Color(0xFF2DD4BF), () => const NgmyMoleculeStudio()),
   _StudioDef('DNA LAB', 'Copy DNA, build a protein', Icons.biotech_rounded, const Color(0xFFF472B6), () => const NgmyDnaStudio()),

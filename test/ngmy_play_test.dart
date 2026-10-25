@@ -85,9 +85,6 @@ void main() {
   });
 
   testWidgets('hubs show their tiles', (t) async {
-    await open(t, const NgmyDiscoveryHub());
-    expect(find.text('ATOM BUILDER'), findsOneWidget);
-    expect(find.text('BODY EXPLORER'), findsOneWidget);
     await open(t, const NgmyToolboxHub());
     expect(find.text('Spin the Wheel'), findsOneWidget);
   });

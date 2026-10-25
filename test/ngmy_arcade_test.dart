@@ -98,12 +98,6 @@ void main() {
     }
   });
 
-  testWidgets('discovery hub has no AI inventor and lists new games', (t) async {
-    await t.pumpWidget(const MaterialApp(home: NgmyDiscoveryHub()));
-    await t.pump(const Duration(milliseconds: 300));
-    expect(find.text('AI INVENTOR'), findsNothing);
-    expect(find.text('POWER GRID'), findsOneWidget);
-  });
 }
 
 Object? tester(WidgetTester t) => t.takeException();

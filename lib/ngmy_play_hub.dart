@@ -1,11 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'ngmy_block_builder.dart';
-import 'ngmy_body_explorer.dart';
-import 'ngmy_arcade_c.dart';
-import 'ngmy_fun_a.dart';
-import 'ngmy_fun_b.dart';
-import 'ngmy_electronics_lab.dart';
 import 'ngmy_play_toolbox.dart';
 
 class PlayTile {
@@ -63,26 +58,6 @@ class NgmyTileHub extends StatelessWidget {
       ]),
     );
   }
-}
-
-class NgmyDiscoveryHub extends StatelessWidget {
-  const NgmyDiscoveryHub({super.key});
-
-  @override
-  Widget build(BuildContext context) => NgmyTileHub(
-        title: 'DISCOVERY LAB',
-        intro: 'Hands-on technology and science. Build, connect, spin and see how things really work.',
-        tiles: [
-          PlayTile('ELECTRONICS LAB', 'Batteries, wires, bulbs', Icons.electrical_services_rounded, const Color(0xFF38BDF8), () => const NgmyElectronicsLab()),
-          PlayTile('POWER GRID', 'Run a town on clean power', Icons.wind_power_rounded, const Color(0xFFFBBF24), () => const NgmyPowerGridStudio()),
-          PlayTile('INTERNET JOURNEY', 'Send a message across the net', Icons.public_rounded, const Color(0xFF60A5FA), () => const NgmyInternetJourneyStudio()),
-          PlayTile('MAGNET LAB', 'Lift iron with a magnet', Icons.sync_alt_rounded, const Color(0xFFEF4444), () => const NgmyMagnetCraneStudio()),
-          PlayTile('RADIO LAB', 'Find the hidden stations', Icons.radio_rounded, const Color(0xFFE879F9), () => const NgmyRadioStudio()),
-          PlayTile('PIXEL TV', 'Paint with red, green, blue', Icons.live_tv_rounded, const Color(0xFF22D3EE), () => const NgmyPixelScreenStudio()),
-          PlayTile('ATOM BUILDER', 'Build any element', Icons.science_rounded, const Color(0xFF4ADE80), () => const NgmyAtomStudio()),
-          PlayTile('BODY EXPLORER', '3D human, inside and out', Icons.accessibility_new_rounded, const Color(0xFFF472B6), () => const NgmyBodyExplorer()),
-        ],
-      );
 }
 
 class _ToolCard {
