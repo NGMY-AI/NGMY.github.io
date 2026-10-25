@@ -1,20 +1,21 @@
 import 'dart:async';
+import 'ngmy_deferred.dart';
 
 import 'package:flutter/material.dart';
 
 import 'ngmy_desktop_frame.dart';
 import 'ngmy_studio_colors.dart';
-import 'ngmy_doc_share_gate_ui.dart';
-import 'ngmy_fun_games.dart';
+import 'ngmy_doc_share_gate_ui.dart' deferred as docgate;
+import 'ngmy_fun_games.dart' deferred as fungames;
 import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_iron_triangle_panel.dart';
-import 'ngmy_invoice_creator.dart';
+import 'ngmy_invoice_creator.dart' deferred as invoicecreator;
 import 'ngmy_swahili_school.dart';
-import 'ngmy_creator_recorder_studio.dart';
+import 'ngmy_creator_recorder_studio.dart' deferred as recorder;
 import 'ngmy_price_calculator_panel.dart';
-import 'ngmy_price_product_scanner.dart';
+import 'ngmy_price_product_scanner.dart' deferred as pricescan;
 import 'ngmy_qr_generator.dart';
-import 'ngmy_video_studio.dart';
+import 'ngmy_video_studio.dart' deferred as video;
 import 'ngmy_phone_unlock.dart';
 import 'ngmy_stripe_payments.dart';
 export 'ngmy_studio_colors.dart';
@@ -99,14 +100,14 @@ class NgmyCreatorHubTab extends StatelessWidget {
           subtitle: 'Upload & share any file',
           onTap: () {
             if (userEmail.trim().isEmpty) return;
-          openNgmyDocShare(
+          ngmyRunDeferred(docgate.loadLibrary, () => docgate.openNgmyDocShare(
             context: context,
             user: user ?? _HubGuestUser(userEmail),
             config: config,
             onCharge: onCharge ?? (amount, description) async => false,
             onDataChanged: onDataChanged ?? () {},
             onPersistConfig: onPersistConfig ?? () async => false,
-          );
+          ));
         },
       ),
       _CreatorTool(
@@ -144,7 +145,7 @@ class NgmyCreatorHubTab extends StatelessWidget {
         title: 'Play Zone',
         subtitle: 'Love match · riddles · daily fun',
         onTap: () {
-          showNgmyFunGamesDialog(context, userEmail: userEmail.isEmpty ? null : userEmail);
+          ngmyRunDeferred(fungames.loadLibrary, () => fungames.showNgmyFunGamesDialog(context, userEmail: userEmail.isEmpty ? null : userEmail));
         },
       ),
       _CreatorTool(
@@ -164,7 +165,7 @@ class NgmyCreatorHubTab extends StatelessWidget {
         title: 'Recorder Studio',
         subtitle: 'Video · record · play',
         onTap: () {
-          showNgmyCreatorRecorderStudio(context, userEmail: userEmail);
+          ngmyRunDeferred(recorder.loadLibrary, () => recorder.showNgmyCreatorRecorderStudio(context, userEmail: userEmail));
         },
       ),
       _CreatorTool(
@@ -172,7 +173,7 @@ class NgmyCreatorHubTab extends StatelessWidget {
         colors: const [Color(0xFF6D28D9), Color(0xFF9333EA)],
         title: 'Video Studio',
         subtitle: 'Templates, clips & export',
-        onTap: () => showNgmyVideoStudio(context),
+        onTap: () => ngmyRunDeferred(video.loadLibrary, () => video.showNgmyVideoStudio(context)),
       ),
       _CreatorTool(
         icon: Icons.phonelink_lock_rounded,
@@ -598,7 +599,7 @@ class _StandaloneQuoteCalcDialogState extends State<_StandaloneQuoteCalcDialog> 
                         service: service,
                         amount: netMine > 0 ? netMine : mine,
                       ),
-                      onScanTap: () => openNgmyPriceProductScanner(
+                      onScanTap: () => ngmyRunDeferred(pricescan.loadLibrary, () => pricescan.openNgmyPriceProductScanner(
                         context,
                         onApplyPrice: (name, price, type) {
                           if (name.isNotEmpty) _serviceC.text = name;
@@ -606,7 +607,7 @@ class _StandaloneQuoteCalcDialogState extends State<_StandaloneQuoteCalcDialog> 
                           if (price > 0) _myPriceC.text = price.toStringAsFixed(2);
                           setState(() {});
                         },
-                      ),
+                      )),
                     ),
                   ),
                 ],
@@ -629,7 +630,7 @@ void showNgmyStandaloneInvoiceTool(
   String service = '',
   double amount = 0,
 }) {
-  showNgmyInvoiceCreator(
+  ngmyRunDeferred(invoicecreator.loadLibrary, () => invoicecreator.showNgmyInvoiceCreator(
     context,
     userEmail: userEmail,
     user: user,
@@ -638,7 +639,7 @@ void showNgmyStandaloneInvoiceTool(
     onDataChanged: onDataChanged,
     initialService: service,
     initialAmount: amount,
-  );
+  ));
 }
 
 class _HubGuestUser {

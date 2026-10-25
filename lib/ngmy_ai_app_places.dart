@@ -91,7 +91,7 @@ extension _NgmyAiAppPlaces on _MainScreenState {
         'civic_groups': NgmyAiPlace(
           description: 'Civic user groups — join or manage groups',
           open: (ctx, _) async {
-            unawaited(openNgmyCivicUserGroupsHub(ctx, userEmail: u.email, userName: u.username, isAdmin: u.isAdmin));
+            unawaited(ngmyRunDeferred(lightning.loadLibrary, () => lightning.openNgmyCivicUserGroupsHub(ctx, userEmail: u.email, userName: u.username, isAdmin: u.isAdmin)));
             return 'Opened Civic groups.';
           },
         ),
@@ -114,7 +114,7 @@ extension _NgmyAiAppPlaces on _MainScreenState {
           description: 'Help + Insurance — house workers, home help, insurance',
           open: (ctx, _) => push(
             ctx,
-            NgmyHelpCenterScreen(
+            NgmyDeferred(load: helpcenter.loadLibrary, build: () => helpcenter.NgmyHelpCenterScreen(
               configMap: widget.config.helpCenterHub,
               clientName: u.username.trim().isNotEmpty ? u.username.trim() : u.email,
               clientEmail: u.email,
@@ -138,7 +138,7 @@ extension _NgmyAiAppPlaces on _MainScreenState {
                 } catch (_) {}
                 return true;
               },
-            ),
+            )),
             'NgmyHelpCenterScreen',
             'Opened Help + Insurance.',
           ),
@@ -153,14 +153,14 @@ extension _NgmyAiAppPlaces on _MainScreenState {
         'menu_studio': NgmyAiPlace(
           description: 'Menu Studio — restaurant menus and Bio link pages',
           open: (ctx, _) async {
-            unawaited(showNgmyMenuStudioDialog(ctx, userEmail: u.email, isAdmin: u.isAdmin));
+            unawaited(ngmyRunDeferred(menustudio.loadLibrary, () => menustudio.showNgmyMenuStudioDialog(ctx, userEmail: u.email, isAdmin: u.isAdmin)));
             return 'Opened Menu Studio.';
           },
         ),
         'business_essentials': NgmyAiPlace(
           description: 'Business Essentials — invoices, receipts, flyers and other business papers',
           open: (ctx, _) async {
-            unawaited(showNgmyBusinessEssentialsHub(ctx, userEmail: u.email));
+            unawaited(ngmyRunDeferred(bizess.loadLibrary, () => bizess.showNgmyBusinessEssentialsHub(ctx, userEmail: u.email)));
             return 'Opened Business Essentials.';
           },
         ),

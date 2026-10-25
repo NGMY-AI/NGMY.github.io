@@ -1,4 +1,5 @@
 import 'ngmy_home_install_guide_card.dart';
+import 'ngmy_deferred.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
@@ -19,7 +20,7 @@ import 'ngmy_db_relay.dart';
 import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_helper_alarm_memory.dart';
 import 'ngmy_home_card_image_crop.dart';
-import 'ngmy_home_essentials_hub.dart';
+import 'ngmy_home_essentials_hub.dart' deferred as essentials;
 import 'ngmy_house_care_card.dart';
 import 'ngmy_house_workers.dart' show NgmyHouseWorkersApi;
 import 'ngmy_home_vote_ad_card.dart';
@@ -5169,7 +5170,7 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
   }
 
   Future<void> _pickEssentialsPin() async {
-    final picked = await showNgmyHomeRoboticEssentialsHub(context, userEmail: widget.userEmail);
+    final picked = await ngmyRunDeferred(essentials.loadLibrary, () => essentials.showNgmyHomeRoboticEssentialsHub(context, userEmail: widget.userEmail));
     if (picked == null || !mounted) return;
     setState(() {
       _pinnedKind = picked.kind;

@@ -10,12 +10,13 @@ import 'ngmy_civic_identity.dart';
 import 'ngmy_civic_registry_cloud.dart';
 import 'ngmy_civic_registry_gate.dart';
 import 'ngmy_civic_registry_members.dart';
-import 'ngmy_civic_state_wallet_ui.dart';
+import 'ngmy_civic_state_wallet_ui.dart' deferred as walletui;
+import 'ngmy_deferred.dart';
+import 'ngmy_wallet_unlock_background.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_state_picker.dart';
 
 export 'ngmy_civic_identity.dart' show NgmyCivicWalletIdentity, NgmyCivicDobInputFormatter;
-export 'ngmy_civic_state_wallet_ui.dart' show NgmyCivicStateWalletScreen;
 
 /// Notifies open State Wallet screens to reload contribution-case totals immediately.
 class NgmyCivicWalletRefresh {
@@ -458,7 +459,7 @@ Future<void> openNgmyCivicStateWalletFlow({
   if (!context.mounted) return;
   await NgmyNavigator.push<void>(
     context,
-    NgmyCivicStateWalletScreen(
+    NgmyDeferred(load: walletui.loadLibrary, build: () => walletui.NgmyCivicStateWalletScreen(
       state: state,
       canEdit: canEdit,
       snapshotBuilder: snapshotBuilder,
@@ -486,7 +487,7 @@ Future<void> openNgmyCivicStateWalletFlow({
       onAdminResetContributionCount: onAdminResetContributionCount,
       onAdminDeleteContribution: onAdminDeleteContribution,
       onOpenNationwideDeceased: onOpenNationwideDeceased,
-    ),
+    )),
     routeName: 'NgmyCivicStateWalletScreen',
   );
 }

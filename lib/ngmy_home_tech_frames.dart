@@ -2,9 +2,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import 'ngmy_core_protocol_sims.dart';
+import 'ngmy_core_protocol_sims.dart' deferred as sims;
+import 'ngmy_deferred.dart';
 import 'ngmy_platform_graphics.dart';
-import 'ngmy_vault_arcade.dart';
+import 'ngmy_vault_arcade.dart' deferred as vault;
 
 /// Home “tech deck” under the spending cards — robotic HUD frames with motion.
 /// Tapping a frame opens a full-screen pulse / scan animation.
@@ -47,7 +48,7 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
           reverseTransitionDuration: const Duration(milliseconds: 320),
           pageBuilder: (_, anim, secondary) => FadeTransition(
             opacity: CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
-            child: const NgmyVaultArcadeScreen(),
+            child: NgmyDeferred(load: vault.loadLibrary, build: () => vault.NgmyVaultArcadeScreen()),
           ),
         ),
       );
@@ -61,7 +62,7 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
           reverseTransitionDuration: const Duration(milliseconds: 320),
           pageBuilder: (_, anim, secondary) => FadeTransition(
             opacity: CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
-            child: const NgmyCoreProtocolSimsScreen(),
+            child: NgmyDeferred(load: sims.loadLibrary, build: () => sims.NgmyCoreProtocolSimsScreen()),
           ),
         ),
       );

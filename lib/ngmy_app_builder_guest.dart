@@ -5,7 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'ngmy_app_builder.dart';
+import 'ngmy_app_builder.dart' deferred as builder;
+import 'ngmy_deferred.dart';
 import 'ngmy_app_builder_launch_stub.dart' if (dart.library.html) 'ngmy_app_builder_launch_web.dart';
 import 'ngmy_app_builder_open_stub.dart' if (dart.library.html) 'ngmy_app_builder_open_web.dart';
 import 'ngmy_app_builder_models.dart';
@@ -189,7 +190,7 @@ class _NgmyPublishedAppHostScreenState extends State<NgmyPublishedAppHostScreen>
           colorScheme: ColorScheme.fromSeed(seedColor: app.theme),
           useMaterial3: true,
         ),
-        child: NgmyAppRuntimeScreen(project: app),
+        child: NgmyDeferred(load: builder.loadLibrary, build: () => builder.NgmyAppRuntimeScreen(project: app), background: Colors.white),
       );
     }
     return Scaffold(

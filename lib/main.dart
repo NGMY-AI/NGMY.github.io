@@ -40,7 +40,7 @@ import 'ngmy_weekend_clock_overlay.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_back_scope.dart';
 import 'ngmy_barcode_lookup.dart';
-import 'ngmy_price_product_scanner.dart';
+import 'ngmy_price_product_scanner.dart' deferred as pricescan;
 import 'ngmy_iron_triangle_panel.dart';
 import 'ngmy_invoice_guest.dart';
 import 'ngmy_menu_guest.dart';
@@ -90,7 +90,7 @@ import 'ngmy_pro_games.dart';
 import 'ngmy_typing_game.dart';
 import 'ngmy_dice_admin.dart';
 import 'ngmy_dice_config.dart';
-import 'ngmy_fun_games.dart';
+import 'ngmy_fun_games.dart' deferred as fungames;
 import 'ngmy_fun_games_popups.dart';
 import 'ngmy_invoice_storage.dart';
 import 'ngmy_helper_ai_limit.dart';
@@ -131,11 +131,15 @@ import 'ngmy_document_scan_payments.dart';
 import 'ngmy_doc_share_payments.dart';
 import 'ngmy_doc_share_school.dart';
 import 'ngmy_oauth.dart';
-import 'ngmy_worksheets.dart';
+import 'ngmy_worksheets.dart' deferred as worksheets;
+import 'ngmy_deferred.dart';
+import 'ngmy_civic_state_wallet_ui.dart' deferred as walletui;
+import 'ngmy_menu_studio.dart' deferred as menustudio;
+import 'ngmy_business_essentials.dart' deferred as bizess;
 import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_share_image.dart';
-import 'ngmy_local_growth_income_ui.dart';
+import 'ngmy_local_growth_income_ui.dart' deferred as growthui;
 import 'ngmy_local_growth_income.dart';
 import 'ngmy_feature_sync_session.dart';
 import 'ngmy_virtual_device_media.dart';
@@ -144,10 +148,10 @@ import 'ngmy_studio_hub.dart';
 import 'ngmy_home_glass_cards.dart';
 import 'ngmy_home_tech_frames.dart';
 import 'ngmy_hud_tech_shell.dart';
-import 'ngmy_slides_studio.dart';
+import 'ngmy_slides_studio.dart' deferred as slides;
 import 'ngmy_hub_tools_bridge.dart';
 import 'ngmy_help_center.dart';
-import 'ngmy_help_center_ui.dart';
+import 'ngmy_help_center_ui.dart' deferred as helpcenter;
 import 'ngmy_help_center_admin.dart';
 import 'ngmy_phone_format.dart';
 import 'ngmy_phone_required_gate.dart';
@@ -181,7 +185,7 @@ import 'package:file_picker/file_picker.dart';
 import 'ngmy_civic_id_photo.dart';
 import 'ngmy_civic_contribution_report.dart';
 import 'ngmy_civic_state_wallet.dart';
-import 'ngmy_civic_user_groups_ui.dart';
+import 'ngmy_civic_user_groups_ui.dart' deferred as lightning;
 import 'ngmy_civic_voting_ui.dart';
 import 'ngmy_civic_voting_admin.dart';
 import 'ngmy_civic_member_report.dart';
@@ -205,7 +209,7 @@ import 'ngmy_app_studio_payments.dart';
 import 'ngmy_admin_domain_calendar.dart';
 import 'ngmy_communicate.dart';
 import 'ngmy_communicate_admin.dart';
-import 'ngmy_app_builder.dart';
+import 'ngmy_app_builder.dart' deferred as appbuilder;
 import 'ngmy_app_builder_admin.dart';
 import 'ngmy_app_builder_guest.dart';
 import 'ngmy_app_builder_models.dart';
@@ -230,11 +234,9 @@ import 'ngmy_app_notifications.dart';
 import 'ngmy_announcement_reads.dart';
 import 'ngmy_local_deposit_qr.dart';
 import 'ngmy_desktop_frame.dart';
-import 'ngmy_market_hub_screen.dart';
+import 'ngmy_market_hub_screen.dart' deferred as markethub;
 import 'ngmy_message_taps.dart';
 import 'ngmy_business_card_studio.dart' show showNgmyBusinessCardStudioDialog;
-import 'ngmy_business_essentials.dart' show showNgmyBusinessEssentialsHub;
-import 'ngmy_menu_studio.dart' show showNgmyMenuStudioDialog;
 import 'ngmy_item_reminder_service.dart';
 import 'ngmy_cashier_reminder_service.dart';
 import 'ngmy_overlay_guard.dart';
@@ -18342,12 +18344,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       applications: widget.config.civicRegistrarApplications,
     );
     _tabContentBuilders = {
-      1: () => NgmyMarketHubScreen(
+      1: () => NgmyDeferred(load: markethub.loadLibrary, build: () => markethub.NgmyMarketHubScreen(
                 userEmail: widget.user.email,
         username: widget.user.username,
         isAdmin: widget.user.isAdmin,
-      ),
-      2: () => NgmySlidesStudioScreen(
+      )),
+      2: () => NgmyDeferred(load: slides.loadLibrary, build: () => slides.NgmySlidesStudioScreen(
         userEmail: widget.user.email,
         isAdmin: widget.user.isAdmin,
         bottomScrollPadding: _ngmyBottomNavScrollPadding(context),
@@ -18357,7 +18359,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         isCivicRegistryAdmin: widget.user.isCivicRegistryAdmin,
         memberState: widget.user.state,
         registrarServingState: registrarServing,
-      ),
+      )),
       3: () => NgmyHubScreen(
         user: widget.user,
         allUsers: widget.allUsers,
@@ -19089,7 +19091,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       );
       return;
     }
-    await showNgmyLocalGrowthIncomePage(
+    await ngmyRunDeferred(growthui.loadLibrary, () => growthui.showNgmyLocalGrowthIncomePage(
       context,
       liveUser: widget.user,
       config: widget.config,
@@ -19111,7 +19113,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         await widget.onPushBalanceToCloud?.call(widget.user, allowDecrease: allowDecrease);
         widget.onDataChanged();
       },
-    );
+    ));
   }
 
   @override Widget build(BuildContext context) {
@@ -30529,7 +30531,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: InkWell(
         onTap: () => NgmyNavigator.push(
           ctx,
-          NgmyWorksheetsScreen(
+          NgmyDeferred(load: worksheets.loadLibrary, build: () => worksheets.NgmyWorksheetsScreen(
             userEmail: widget.user.email,
             user: widget.user,
             config: widget.config,
@@ -30541,7 +30543,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onAddTransaction: widget.onAddTransaction,
             ),
             onDataChanged: widget.onDataChanged,
-          ),
+          )),
           routeName: 'NgmyWorksheetsScreen',
         ),
         borderRadius: BorderRadius.circular(12),
@@ -30948,12 +30950,12 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                             : (widget.user.username.trim().isNotEmpty
                                 ? widget.user.username.trim()
                                 : widget.user.email.split('@').first);
-                    openNgmyCivicUserGroupsHub(
+                    ngmyRunDeferred(lightning.loadLibrary, () => lightning.openNgmyCivicUserGroupsHub(
                       context,
                       userEmail: widget.user.email,
                       userName: display,
                       isAdmin: widget.user.isAdmin,
-                    );
+                    ));
                   },
                   icon: Icon(
                     Icons.bolt_rounded,
@@ -31047,7 +31049,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                         0.36,
                         () => NgmyNavigator.push(
                           context,
-                          NgmyHelpCenterScreen(
+                          NgmyDeferred(load: helpcenter.loadLibrary, build: () => helpcenter.NgmyHelpCenterScreen(
                             configMap: widget.config.helpCenterHub,
                             clientName: widget.user.username.trim().isNotEmpty ? widget.user.username.trim() : widget.user.email,
                             clientEmail: widget.user.email,
@@ -31071,7 +31073,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                               } catch (_) {}
                               return true;
                             },
-                          ),
+                          )),
                           routeName: 'NgmyHelpCenterScreen',
                         ),
                       ),
@@ -31552,7 +31554,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     );
   }
 
-  void _openMFunGames() => showNgmyFunGamesDialog(context, userEmail: widget.user.email);
+  void _openMFunGames() => ngmyRunDeferred(fungames.loadLibrary, () => fungames.showNgmyFunGamesDialog(context, userEmail: widget.user.email));
 
   bool get _canOpenAppBuilder => ngmyUserCanAccessAppBuilder(
         isAdmin: widget.user.isAdmin,
@@ -31560,7 +31562,9 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
       );
 
   Future<void> _openAppBuilder() async {
-    await showNgmyAppBuilder(
+    await appbuilder.loadLibrary();
+    if (!mounted) return;
+    await appbuilder.showNgmyAppBuilder(
       context: context,
       user: widget.user,
       config: widget.config,
@@ -31694,7 +31698,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                       belowMarket: belowMarket,
                       showPriceResult: showPriceResult,
                       onEstimateTap: () => _openRepairEstimateFromCalculator(ctx),
-                      onScanTap: () => openNgmyPriceProductScanner(
+                      onScanTap: () => ngmyRunDeferred(pricescan.loadLibrary, () => pricescan.openNgmyPriceProductScanner(
                         ctx,
                         onApplyPrice: (name, price, type) {
                           if (name.isNotEmpty) _calcServiceC.text = name;
@@ -31706,7 +31710,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                           }
                           refresh();
                         },
-                      ),
+                      )),
                       onInvoiceTap: () => _openInvoiceFromGDialog(ctx),
                     ),
                   ],
@@ -38000,7 +38004,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     final canEdit = _canUseRegistrarToolsHere(st);
     await NgmyNavigator.push<void>(
       context,
-      NgmyCivicStateWalletScreen(
+      NgmyDeferred(load: walletui.loadLibrary, build: () => walletui.NgmyCivicStateWalletScreen(
         state: st,
         canEdit: canEdit,
         snapshotBuilder: () => _buildCivicStateWalletSnapshot(st),
@@ -38076,7 +38080,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
         onAdminResetContributionCount: _isGlobalCivicRegistryAdmin() ? _adminResetNationwideContributionCount : null,
         onAdminDeleteContribution: _isGlobalCivicRegistryAdmin() ? _adminDeleteNationwideContribution : null,
         onOpenNationwideDeceased: _showNationwideDeceasedMembersDialog,
-      ),
+      )),
       routeName: 'NgmyCivicStateWalletScreen',
     );
   }
