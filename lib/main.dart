@@ -32822,7 +32822,7 @@ double _ngmyCivicExactishFieldScore(String query, String field) {
 
 /// Civic Registry member search: names must be the same or close (1–2 letter typos).
 /// ID / city / phone only match as exact-ish substrings — not fuzzy against city names.
-double _ngmyCivicMemberSearchScore(String query, UserData u, List<String> nicks) {
+double _ngmyCivicMemberSearchScore(String query, UserData u, List<String> nicks, {List<String> otherNames = const []}) {
   final q = query.trim().toLowerCase();
   if (q.isEmpty) return 1;
 
@@ -32830,6 +32830,7 @@ double _ngmyCivicMemberSearchScore(String query, UserData u, List<String> nicks)
     u.fullName ?? '',
     u.username,
     ...nicks,
+    ...otherNames,
   ]);
 
   final idScore = _ngmyCivicExactishFieldScore(q, u.registryId ?? '');
@@ -35163,9 +35164,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
 
     final scored = <({UserData u, double score})>[];
     for (final u in pool) {
-      final raw = _civicMemberOrDeceasedRaw(widget.config, u);
+      // Anyone is found by ANY name that is theirs: real name, username or nickname. Members get the row from
+      // the shared directory, which also holds the real name even when a nickname is what they see.
+      final raw = _civicMemberOrDeceasedRaw(widget.config, u) ?? _rankingSourceRow(u);
       final nicks = raw == null ? const <String>[] : NgmyCivicRegistryMembers.nicknamesOf(raw);
-      final score = _ngmyCivicMemberSearchScore(q, u, nicks);
+      final others = <String>[
+        if (raw != null) '${raw['fullName'] ?? ''}',
+        if (raw != null) '${raw['username'] ?? ''}',
+      ].where((n) => n.trim().isNotEmpty && !n.contains('*')).toList();
+      final score = _ngmyCivicMemberSearchScore(q, u, nicks, otherNames: others);
       // Keep close name matches only (exact / prefix / 1–2 letter typos).
       if (score >= 0.75) scored.add((u: u, score: score));
     }
@@ -45977,6 +45984,25 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
       final liveRows = rankings.members
           .map((e) => Map<String, dynamic>.from(e))
           .toList();
+      // The rankings list has no nicknames. The member directory does, so copy them across: that is how
+      // every phone can find a person by a nickname and show it instead of the real name.
+      try {
+        final dir = await ngmyCivicFetchRoster(email: email, state: wanted, pinSig: pin);
+        final dm = dir?['members'];
+        if (dm is List) {
+          final byRid = <String, Map<String, dynamic>>{
+            for (final m in dm.whereType<Map>())
+              NgmyCivicWalletIdentity.normalizeId((m['registryId'] ?? '').toString()): Map<String, dynamic>.from(m),
+          };
+          for (final row in liveRows) {
+            final d = byRid[NgmyCivicWalletIdentity.normalizeId((row['registryId'] ?? '').toString())];
+            if (d == null) continue;
+            row['nicknames'] = d['nicknames'] is List ? d['nicknames'] : const <String>[];
+            row['showNicknames'] = d['showNicknames'] == true;
+          }
+        }
+      } catch (_) {}
+      if (!mounted || gen != _sharedDirectoryLoadGen) return;
       setState(() {
         _sharedDirectoryRows = liveRows;
         _sharedDirectoryUsers = _usersFromDirectoryRows(liveRows);
@@ -60032,7 +60058,19 @@ class _NicknameAdminPanelState extends State<_NicknameAdminPanel> {
       showNicknames: _showNicks,
     );
     await NgmyCivicRegistryMembers.saveLocalBackup(widget.config);
-    await ngmyPersistCivicRegistryMembers(widget.config);
+    // The one member goes to the server on its own (like enrolling does), then the roster as a second try.
+    var cloudOk = false;
+    final row = NgmyCivicRegistryMembers.findByEmail(widget.config, widget.email);
+    if (row != null) {
+      final r = await ngmyCivicUpsertMember(
+        email: ngmyCurrentAuthEmail(),
+        member: row,
+        state: (row['state'] ?? '').toString(),
+        heal: false,
+      );
+      cloudOk = r.ok;
+    }
+    if (!cloudOk) cloudOk = await ngmyPersistCivicRegistryMembers(widget.config);
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
@@ -60040,9 +60078,13 @@ class _NicknameAdminPanelState extends State<_NicknameAdminPanel> {
     widget.onDataChanged();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Nicknames saved.'), backgroundColor: Colors.green),
+      SnackBar(
+        content: Text(cloudOk ? 'Nicknames saved. Everyone can find them now.' : 'Saved on this phone only. The server could not be reached, so other phones will not see it yet. Press Save again when you are online.'),
+        backgroundColor: cloudOk ? Colors.green : Colors.orange.shade800,
+      ),
     );
   }
+
 
   @override
   Widget build(BuildContext context) {
