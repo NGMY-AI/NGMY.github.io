@@ -222,7 +222,9 @@ Future<NgmyBookDoc> ngmyWriteBookWithAi({
 
   Never fail() => throw lastError != null && ngmyIsOfflineOrNetworkError(lastError!)
       ? 'No internet connection — try again when you are online.'
-      : 'The AI could not write the book. Try describing it again.';
+      : (lastError != null && lastError!.toLowerCase().contains('timeout')
+          ? 'The AI took too long. Try fewer pages, or try again in a moment.'
+          : 'The AI could not write the book. Try describing it again.${lastError == null || lastError!.trim().isEmpty ? '' : '\n(${lastError!.trim()})'}');
 
   if (pages <= 12) {
     for (var attempt = 0; attempt < 2; attempt++) {
