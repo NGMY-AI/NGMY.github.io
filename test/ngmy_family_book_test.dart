@@ -43,7 +43,7 @@ void main() {
 
   testWidgets('the family book opens on a cover, then turns to its pages', (t) async {
     await openBook(t);
-    expect(find.text('Family Library'), findsOneWidget);
+    expect(find.text('The Smith Family'), findsWidgets);
     expect(find.textContaining('Tap the cover'), findsOneWidget);
     await shot(t, 'book_cover');
     await t.tap(find.byTooltip('Next page'));
@@ -74,9 +74,31 @@ void main() {
     expect(prompt, contains('Swahili'));
   });
 
+  testWidgets('the framed header keeps a very long name on one line, and the AI menu offers languages', (t) async {
+    SharedPreferences.setMockInitialValues({});
+    t.view.physicalSize = const Size(860, 1700);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    const longName = 'The Very Long Family Name Of The Descendants Of Ikungu Ele And Ekama Pele Of The Great Lake';
+    await t.pumpWidget(MaterialApp(home: Builder(builder: (c) => Scaffold(body: TextButton(onPressed: () => showFamilyBookSheet(c, userEmail: 'a@b.c', treeId: 'tree2', canEdit: true, bookTitle: longName, familyFacts: 'Anna, Bob'), child: const Text('open'))))));
+    await t.tap(find.text('open'));
+    await t.pump(const Duration(milliseconds: 500));
+    await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
+    await t.pump(const Duration(milliseconds: 400));
+    final header = t.widget<Text>(find.text(longName).first);
+    expect(header.maxLines, 1);
+    expect(find.text('AI'), findsOneWidget);
+    expect(find.text('Cover'), findsOneWidget);
+    await t.tap(find.text('AI'));
+    await t.pump(const Duration(milliseconds: 400));
+    await t.pump(const Duration(milliseconds: 400));
+    expect(find.text('Write new pages'), findsOneWidget);
+    expect(t.takeException(), isNull);
+  });
+
   testWidgets('the owner can design the cover and it is saved', (t) async {
     await openBook(t);
-    await t.tap(find.byTooltip('Design the cover'));
+    await t.tap(find.text('Cover'));
     await t.pump(const Duration(milliseconds: 400));
     await t.pump(const Duration(milliseconds: 400));
     expect(find.text('Design your cover'), findsOneWidget);

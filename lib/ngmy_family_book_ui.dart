@@ -263,42 +263,14 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true,
       backgroundColor: const Color(0xFF1A0F08),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(icon: const Icon(Icons.close_rounded, color: _paper), onPressed: () => Navigator.pop(context)),
-        title: const Text('Family Library', style: TextStyle(color: _paper, fontWeight: FontWeight.w800, fontSize: 16, letterSpacing: 0.4)),
-        centerTitle: true,
-        actions: [
-          if (widget.canEdit && widget.familyFacts.trim().isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Tooltip(
-                message: 'Write the family book with AI',
-                child: GestureDetector(
-                  onTap: _writeWithAi,
-                  child: Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(shape: BoxShape.circle, gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]), boxShadow: [BoxShadow(color: const Color(0xFFDB2777).withValues(alpha: 0.5), blurRadius: 12)]),
-                    child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 17),
-                  ),
-                ),
-              ),
-            ),
-          if (widget.canEdit) IconButton(tooltip: 'Design the cover', onPressed: _designCover, icon: const Icon(Icons.palette_rounded, color: _paper, size: 20)),
-          if (_entries.isNotEmpty || widget.membersPage.trim().isNotEmpty) IconButton(tooltip: 'Print as a book', onPressed: _printBook, icon: const Icon(Icons.print_rounded, color: _paper, size: 20)),
-          if (widget.canEdit && _entries.isNotEmpty && _pageIndex >= 0)
-            IconButton(tooltip: _editing ? 'Save page' : 'Edit page', onPressed: _editing ? _saveCurrentPage : () => setState(() => _editing = true), icon: Icon(_editing ? Icons.check_rounded : Icons.edit_outlined, color: _paper, size: 20)),
-          if (widget.canEdit) IconButton(tooltip: 'Add page', onPressed: _addPage, icon: const Icon(Icons.add_circle_outline_rounded, color: _paper, size: 20)),
-        ],
-      ),
       body: Stack(fit: StackFit.expand, children: [
         const Positioned.fill(child: CustomPaint(painter: _LibraryPainter())),
         SafeArea(
-          child: _loading
+          child: Column(children: [
+            _header(),
+            Expanded(
+              child: _loading
               ? const Center(child: CircularProgressIndicator(color: _gold))
               : _entries.isEmpty
                   ? _emptyBook()
@@ -350,9 +322,178 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
                       ),
                       _bookFooter(),
                     ]),
+            ),
+          ]),
         ),
       ]),
     );
+  }
+
+  /// The top of the book in a gold-edged leather frame: the family name on one line (it shrinks if it is long),
+  /// and the tools laid out under it with their names.
+  Widget _header() {
+    final canAi = widget.canEdit && (widget.familyFacts.trim().isNotEmpty || _entries.isNotEmpty);
+    final tools = <_HeaderTool>[
+      if (canAi) _HeaderTool(Icons.auto_awesome_rounded, 'AI', _aiMenu, hot: true),
+      if (widget.canEdit) _HeaderTool(Icons.palette_rounded, 'Cover', _designCover),
+      if (_entries.isNotEmpty || widget.membersPage.trim().isNotEmpty) _HeaderTool(Icons.print_rounded, 'Print', _printBook),
+      if (widget.canEdit && _entries.isNotEmpty && _pageIndex >= 0) _HeaderTool(_editing ? Icons.check_rounded : Icons.edit_rounded, _editing ? 'Save' : 'Edit', _editing ? _saveCurrentPage : () => setState(() => _editing = true)),
+      if (widget.canEdit) _HeaderTool(Icons.add_rounded, 'Add page', _addPage),
+    ];
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF4A2A15), Color(0xFF2A170C)]),
+        border: Border.all(color: _gold.withValues(alpha: 0.85), width: 1.6),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 16, offset: const Offset(0, 6)), BoxShadow(color: _gold.withValues(alpha: 0.12), blurRadius: 18)],
+      ),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Row(children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(width: 38, height: 38, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.black.withValues(alpha: 0.3), border: Border.all(color: _gold.withValues(alpha: 0.6))), child: const Icon(Icons.close_rounded, color: _paper, size: 20)),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(_title, maxLines: 1, softWrap: false, style: const TextStyle(color: _gold, fontWeight: FontWeight.w900, fontSize: 22, letterSpacing: 0.6, shadows: [Shadow(color: Colors.black54, blurRadius: 3, offset: Offset(1, 2))])),
+              ),
+            ),
+          ),
+          const SizedBox(width: 38),
+        ]),
+        Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Container(height: 1, decoration: BoxDecoration(gradient: LinearGradient(colors: [Colors.transparent, _gold.withValues(alpha: 0.7), Colors.transparent])))),
+        Row(children: [for (final t in tools) Expanded(child: _headerButton(t))]),
+      ]),
+    );
+  }
+
+  Widget _headerButton(_HeaderTool t) => GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: t.onTap,
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              gradient: t.hot ? const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]) : LinearGradient(colors: [Colors.white.withValues(alpha: 0.14), Colors.white.withValues(alpha: 0.05)]),
+              border: Border.all(color: t.hot ? Colors.white54 : _gold.withValues(alpha: 0.5)),
+              boxShadow: t.hot ? [BoxShadow(color: const Color(0xFFDB2777).withValues(alpha: 0.45), blurRadius: 12)] : null,
+            ),
+            child: Icon(t.icon, color: t.hot ? Colors.white : _paper, size: 22),
+          ),
+          const SizedBox(height: 4),
+          Text(t.label, maxLines: 1, style: TextStyle(color: _paper.withValues(alpha: 0.85), fontSize: 10.5, fontWeight: FontWeight.w800)),
+        ]),
+      );
+
+  /// What the AI can do for the book: write new pages (in English or Swahili), or translate it.
+  Future<void> _aiMenu() async {
+    if (_editing) await _saveCurrentPage();
+    if (!mounted) return;
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF241409),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('What should the AI do?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+            const SizedBox(height: 12),
+            if (widget.familyFacts.trim().isNotEmpty) _menuTile(ctx, Icons.auto_awesome_rounded, 'Write new pages', 'Choose English or Swahili, then describe the book', 'write'),
+            if (_entries.isNotEmpty) ...[
+              _menuTile(ctx, Icons.translate_rounded, 'Translate my book to Swahili', 'Every page, from English into Kiswahili', 'sw'),
+              _menuTile(ctx, Icons.translate_rounded, 'Translate my book to English', 'Every page, from Swahili into English', 'en'),
+            ],
+          ]),
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+    if (choice == 'write') {
+      await _writeWithAi();
+    } else {
+      await _translateAll(choice == 'sw' ? 'Swahili (Kiswahili)' : 'English');
+    }
+  }
+
+  Widget _menuTile(BuildContext ctx, IconData icon, String title, String sub, String value) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => Navigator.pop(ctx, value),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(16), border: Border.all(color: _gold.withValues(alpha: 0.3))),
+            child: Row(children: [
+              Container(width: 42, height: 42, decoration: BoxDecoration(shape: BoxShape.circle, gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)])), child: Icon(icon, color: Colors.white, size: 21)),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14.5)),
+                Text(sub, style: const TextStyle(color: Colors.white60, fontSize: 12)),
+              ])),
+            ]),
+          ),
+        ),
+      );
+
+  /// Turns every page into the other language. The old text is kept so it can be brought back.
+  Future<void> _translateAll(String target) async {
+    final before = List<FamilyBookEntry>.of(_entries);
+    final status = ValueNotifier<String>('Starting…');
+    var showing = true;
+    unawaited(showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          backgroundColor: const Color(0xFF241409),
+          content: ValueListenableBuilder<String>(
+            valueListenable: status,
+            builder: (_, v, __) => Row(children: [
+              const SizedBox(width: 26, height: 26, child: CircularProgressIndicator(strokeWidth: 3, color: _gold)),
+              const SizedBox(width: 16),
+              Expanded(child: Text(v, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
+            ]),
+          ),
+        ),
+      ),
+    ).whenComplete(() => showing = false));
+    String? error;
+    List<(String, String)>? done;
+    try {
+      done = await ngmyTranslateBookPages(pages: [for (final e in before) (e.title, e.body)], target: target, onStatus: (s, _) => status.value = s);
+    } catch (e) {
+      error = '$e';
+    }
+    if (mounted && showing) Navigator.of(context, rootNavigator: true).pop();
+    status.dispose();
+    if (!mounted) return;
+    if (done == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error ?? 'The AI could not translate the book. Nothing was changed.')));
+      return;
+    }
+    final next = [for (var i = 0; i < before.length; i++) before[i].copyWith(title: done[i].$1, body: done[i].$2, updatedAt: DateTime.now())];
+    await saveFamilyBookEntries(widget.userEmail, widget.treeId, next);
+    await _reload();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('Your book is now in ${target.startsWith('Swahili') ? 'Swahili' : 'English'}.'),
+      action: SnackBarAction(
+        label: 'Undo',
+        onPressed: () async {
+          await saveFamilyBookEntries(widget.userEmail, widget.treeId, before);
+          await _reload();
+        },
+      ),
+    ));
   }
 
   Widget _emptyBook() {
@@ -415,6 +556,14 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
 }
 
 /// The leather front cover: gold edges, an embossed title and a ribbon.
+class _HeaderTool {
+  const _HeaderTool(this.icon, this.label, this.onTap, {this.hot = false});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool hot;
+}
+
 class _BookCover extends StatelessWidget {
   const _BookCover({required this.design, required this.title, required this.pages});
   final FamilyBookCover design;

@@ -204,6 +204,52 @@ String _coverQueryOf(String text) {
   return m?.group(1)?.trim() ?? '';
 }
 
+/// Translates book pages into [target] ("English" or "Swahili (Kiswahili)"). Names of people and
+/// places stay as they are, and the paragraphs stay as they were. Returns one (title, body) per page.
+Future<List<(String, String)>> ngmyTranslateBookPages({
+  required List<(String, String)> pages,
+  required String target,
+  void Function(String status, double progress)? onStatus,
+}) async {
+  final key = await ngmyResolveGeminiApiKey();
+  if (key.trim().isEmpty) throw 'AI is not available right now. Please try again later.';
+  final creds = ngmyParseAiCredentials(key);
+  final out = List<(String, String)?>.filled(pages.length, null);
+  const batch = 3;
+  String? lastError;
+  for (var from = 0; from < pages.length; from += batch) {
+    final part = pages.sublist(from, math.min(from + batch, pages.length));
+    onStatus?.call('Translating pages ${from + 1} to ${from + part.length} of ${pages.length}…', from / pages.length);
+    final prompt = '''
+Translate these book pages into $target. Keep the meaning, the warm tone, every person's name and every place name exactly as written, and keep the paragraph breaks (a blank line between paragraphs). Do not add or remove anything. Write natural, correct $target.
+Reply with JSON only, with exactly ${part.length} pages in the same order: {"pages":[{"title":"...","body":"..."}]}
+Pages:
+${jsonEncode([for (final p in part) {'title': p.$1, 'body': p.$2}])}
+''';
+    List? got;
+    for (var attempt = 0; attempt < 2 && got == null; attempt++) {
+      final r = await ngmyAiGenerateWithCredentials(creds, prompt, timeout: const Duration(seconds: 150));
+      lastError = r.error;
+      final text = r.text;
+      if (text == null) continue;
+      final obj = _jsonObject(text);
+      if (obj != null && obj['pages'] is List && (obj['pages'] as List).length >= part.length) got = obj['pages'] as List;
+    }
+    if (got == null) {
+      throw lastError != null && ngmyIsOfflineOrNetworkError(lastError)
+          ? 'No internet connection. Try again when you are online.'
+          : 'The AI could not translate the book. Nothing was changed.';
+    }
+    for (var i = 0; i < part.length; i++) {
+      final m = got[i] is Map ? Map<String, dynamic>.from(got[i] as Map) : const <String, dynamic>{};
+      final t = '${m['title'] ?? ''}'.trim(), b = '${m['body'] ?? ''}'.trim();
+      out[from + i] = (t.isEmpty ? part[i].$1 : t, b.isEmpty ? part[i].$2 : b);
+    }
+  }
+  onStatus?.call('Done', 1);
+  return [for (var i = 0; i < pages.length; i++) out[i] ?? pages[i]];
+}
+
 /// Most pages the AI can write in one book.
 const int kNgmyBookAiMaxPages = 100;
 
@@ -1336,6 +1382,7 @@ class _BookAiSheetState extends State<_BookAiSheet> {
   double _progress = 0;
 
   static const _quick = [3, 5, 8, 10, 25, 50, 100];
+  String _lang = 'auto'; // auto = the language you type, en = English, sw = Swahili
   bool get _family => widget.familyFacts.trim().isNotEmpty;
   List<String> get _ideas => _family
       ? const [
@@ -1391,7 +1438,7 @@ class _BookAiSheetState extends State<_BookAiSheet> {
       final doc = await ngmyWriteBookWithAi(
         description: d,
         pages: _pages,
-        languageHint: typed,
+        languageHint: _lang == 'en' ? 'in English' : (_lang == 'sw' ? 'in Swahili' : typed),
         author: _author.text.trim(),
         onStatus: (s, p) {
           if (mounted) {
@@ -1524,7 +1571,21 @@ class _BookAiSheetState extends State<_BookAiSheet> {
                       ),
                   ]),
                   const SizedBox(height: 14),
+                  const Text('Language of the book', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13.5)),
+                  const SizedBox(height: 6),
+                  Wrap(spacing: 8, runSpacing: 6, children: [
+                    for (final l in const [('auto', 'Same as I type'), ('en', 'English'), ('sw', 'Swahili')])
+                      ChoiceChip(
+                        label: Text(l.$2, style: TextStyle(fontWeight: FontWeight.w800, color: _lang == l.$1 ? Colors.white : const Color(0xCCFFFFFF))),
+                        selected: _lang == l.$1,
+                        selectedColor: const Color(0xFF8B5CF6),
+                        backgroundColor: Colors.white.withValues(alpha: 0.08),
+                        onSelected: (_) => setState(() => _lang = l.$1),
+                      ),
+                  ]),
+                  const SizedBox(height: 12),
                   TextField(controller: _author, style: const TextStyle(color: Colors.white), decoration: _deco('Author (optional)', icon: Icons.person_outline_rounded)),
+
                   const SizedBox(height: 18),
                   Row(children: [
                     const Text('Pages', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
