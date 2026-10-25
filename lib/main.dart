@@ -40822,7 +40822,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     );
   }
 
-  void _showMemberProfile(UserData u) {
+  void _showMemberProfile(UserData u, {bool fromSearch = false}) {
+    // From the search: everyone, registrars too, sees what the public sees (the nickname when one is switched on).
+    // From the Members list: a registrar always sees the real name.
+    if (fromSearch) {
+      _showPublicMemberProfile(u);
+      return;
+    }
     // Deceased full profile is registrar / admin only — members get public directory view.
     if (_civicMemberIsDeceased(widget.config, u)) {
       if (_canUseRegistrarToolsHere(u.state)) {
@@ -41757,7 +41763,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     final openClaims = claims.where((t) => t.status == TransactionStatus.pending).length;
     final familyRaw = raw?['familyMembers'];
     final familyCount = familyRaw is num ? familyRaw.toInt() : int.tryParse('${familyRaw ?? ''}') ?? 1;
-    final usernameLabel = u.username.trim().isNotEmpty ? u.username.trim() : displayName;
+    // With a public nickname the real name must not show anywhere, so the account username (which can be the name) is left out.
+    final nickIsPublic = raw != null && NgmyCivicRegistryMembers.showNicknamesPublicly(raw) && NgmyCivicRegistryMembers.nicknamesOf(raw).isNotEmpty;
+    final usernameLabel = nickIsPublic ? '' : (u.username.trim().isNotEmpty ? u.username.trim() : displayName);
     final cityLabel = (u.city ?? raw?['city'] ?? '').toString().trim();
 
     showDialog(
@@ -41823,8 +41831,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                             style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: ink),
                           ),
                           const SizedBox(height: 10),
-                          _recordRow('Username', usernameLabel.isEmpty ? 'N/A' : usernameLabel, isDark),
-                          _recordDivider(isDark),
+                          if (!nickIsPublic) ...[
+                            _recordRow('Username', usernameLabel.isEmpty ? 'N/A' : usernameLabel, isDark),
+                            _recordDivider(isDark),
+                          ],
                           _recordRow('City', cityLabel.isEmpty ? 'N/A' : cityLabel, isDark),
                           _recordDivider(isDark),
                           _recordRow(
@@ -41898,6 +41908,21 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                     else
                       ...claims.take(12).map((t) => _civicClaimRecordCard(ctx, t)),
                     const SizedBox(height: 16),
+                    // A registrar who found this person in the search can still open the full record (real name) to manage it.
+                    if (!isDeceased && _canUseRegistrarToolsHere(u.state)) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _showRegistrarMemberProfile(u);
+                          },
+                          icon: const Icon(Icons.manage_accounts_rounded, size: 18),
+                          label: const Text('Open full record (registrar)'),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton(
@@ -46108,7 +46133,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
         // read-only public profile otherwise — a manager searching live
         // now gets the same capabilities they'd have had from the
         // Members tab, without needing to switch to it first.
-        onTap: () => _showMemberProfile(u),
+        onTap: () => _showMemberProfile(u, fromSearch: true),
         borderRadius: BorderRadius.circular(22),
         child: _AliveSearchFrame(
           isDark: isDark,
