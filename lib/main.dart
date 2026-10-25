@@ -10698,8 +10698,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       unawaited(_persistSessionImmediately());
       _pauseBackgroundSync();
       _awaySince ??= DateTime.now();
+      // Away for a while: hand picture memory back, so the phone has less reason to close the page. A quick
+      // trip to another app keeps everything exactly as it was.
+      _memoryReliefTimer?.cancel();
+      _memoryReliefTimer = Timer(const Duration(seconds: 40), () {
+        PaintingBinding.instance.imageCache
+          ..clear()
+          ..clearLiveImages();
+      });
     }
     if (state == AppLifecycleState.resumed) {
+      _memoryReliefTimer?.cancel();
       // A quick trip to another app: keep what is on screen. The heavy reload of cloud data below
       // only runs after a real absence, so the app does not flash and redraw every time.
       final away = _awaySince == null ? const Duration(days: 1) : DateTime.now().difference(_awaySince!);
@@ -10764,6 +10773,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   Timer? _serverBalanceReadTimer;
+  Timer? _memoryReliefTimer;
 
   /// Reads the account's balance from the server shortly after another phone played a game, so
   /// every phone on the account moves together.

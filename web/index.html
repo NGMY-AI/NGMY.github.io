@@ -908,8 +908,22 @@
         return false;
       }
 
+      // What the browser reports about the screen the last time we told the engine. Coming back after a few
+      // seconds with the same numbers needs no resize at all, and sending one makes the engine rebuild its
+      // drawing surface, which is what looked like the app refreshing every time you left and returned.
+      var lastSig = '';
+      function viewportSig() {
+        var vv = window.visualViewport;
+        var de = document.documentElement;
+        return [window.innerWidth, window.innerHeight, de ? de.clientWidth : 0, de ? de.clientHeight : 0,
+          vv ? Math.round(vv.width) : 0, vv ? Math.round(vv.height) : 0, window.devicePixelRatio || 1].join('x');
+      }
+
       function remeasure() {
         if (firing || isEditingText()) return;
+        var sig = viewportSig();
+        if (sig === lastSig) return;
+        lastSig = sig;
         firing = true;
         try {
           var vv = window.visualViewport;
