@@ -1308,7 +1308,10 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
   Widget _linkBar(NgmyHubTheme t, String url) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Container(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => _copyLink(url),
+        child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: _kBioAccent.withValues(alpha: 0.1),
@@ -1332,6 +1335,7 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -2179,10 +2183,14 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                           isDense: true,
                           filled: true,
                           fillColor: t.fieldFill,
-                          prefixIcon: Icon(
-                            Icons.link_rounded,
-                            size: 18,
-                            color: hasUrl ? _kBioAccent : t.muted,
+                          prefixIcon: InkWell(
+                            borderRadius: BorderRadius.circular(20),
+                            onTap: () => _copyLink(link.url),
+                            child: Icon(
+                              Icons.link_rounded,
+                              size: 18,
+                              color: hasUrl ? _kBioAccent : t.muted,
+                            ),
                           ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),

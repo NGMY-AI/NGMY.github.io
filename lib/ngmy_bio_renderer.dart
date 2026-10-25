@@ -14,6 +14,7 @@ import 'ngmy_bio_link_icons.dart';
 import 'ngmy_bio_models.dart';
 import 'ngmy_bio_ring_frames.dart';
 import 'ngmy_bio_social.dart';
+import 'ngmy_bio_tech_kit.dart';
 import 'ngmy_bio_templates.dart';
 
 /// Link-in-bio page preview (studio + guest).
@@ -1528,69 +1529,61 @@ class NgmyBioPreview extends StatelessWidget {
     );
   }
 
-  // ── Arcade (8-bit) ────────────────────────────────────────────────────────
+  // ── Mech Terminal ──
+  // Mech Terminal: circuit traces, live telemetry, an octagon portrait and armoured panel links.
   Widget _proArcade(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
     final a = tpl.accent;
-    final score = (name.codeUnits.fold<int>(0, (s, c) => s + c) * 37 % 99999).toString().padLeft(6, '0');
-    return _proScroll(
-      Padding(
-        padding: EdgeInsets.all(pad),
-        child: Column(
-          children: [
-            Row(
+    final b = tpl.subtitleColor;
+    final unit = (name.codeUnits.fold<int>(0, (s, c) => s + c) * 37 % 9999).toString().padLeft(4, '0');
+    final d = avatarSize * 2.0;
+    return _ProTicker(
+      animate: !lightweight,
+      seconds: 18,
+      builder: (t) => _proPage(
+        tpl,
+        pad,
+        [
+          Row(children: [
+            Text('UNIT-$unit', style: _mono(a, 12, weight: FontWeight.w900)),
+            const Spacer(),
+            _ProBlinkText(text: '● ONLINE', style: _mono(const Color(0xFF4ADE80), 10.5, weight: FontWeight.w900), animate: !lightweight),
+          ]),
+          const SizedBox(height: 6),
+          NgmyTechTelemetry(color: a, t: t, labels: const ['CPU', 'SIGNAL', 'POWER']),
+          SizedBox(height: compact ? 12 : 18),
+          SizedBox(
+            width: d,
+            height: d,
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                Text('1UP', style: _mono(const Color(0xFFEF4444), 12, weight: FontWeight.w900)),
-                const SizedBox(width: 8),
-                Text(score, style: _mono(Colors.white, 12, weight: FontWeight.w900)),
-                const Spacer(),
-                Text('HI-SCORE', style: _mono(a, 12, weight: FontWeight.w900)),
+                CustomPaint(size: Size.square(d), painter: NgmyTechHudRingPainter(a, b, t, sweep: false)),
+                Container(
+                  width: d * 0.7,
+                  height: d * 0.7,
+                  decoration: BoxDecoration(boxShadow: [BoxShadow(color: a.withValues(alpha: 0.45), blurRadius: 22)]),
+                  child: ClipPath(clipper: const NgmyPolyClipper(8), child: _rawAvatar(d * 0.7)),
+                ),
               ],
             ),
-            SizedBox(height: compact ? 16 : 24),
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(border: Border.all(color: a, width: 4)),
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(border: Border.all(color: Colors.white, width: 2)),
-                child: SizedBox(
-                  width: avatarSize,
-                  height: avatarSize,
-                  child: document.avatarImageBase64.isNotEmpty
-                      ? _bioImage(document.avatarImageBase64, fit: BoxFit.cover, width: avatarSize, height: avatarSize)
-                      : Icon(Icons.videogame_asset_rounded, color: a, size: avatarSize * 0.6),
-                ),
-              ),
+          ),
+          const SizedBox(height: 10),
+          Text(name.toUpperCase(), textAlign: TextAlign.center, style: _mono(tpl.titleColor, compact ? 19 : 24, weight: FontWeight.w900).copyWith(letterSpacing: 3)),
+          if (tagline.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text('[ ${tagline.toUpperCase()} ]', textAlign: TextAlign.center, style: _mono(b, 10.5)),
             ),
-            SizedBox(height: compact ? 12 : 16),
-            Text('PLAYER 1', style: _mono(const Color(0xFFFACC15), 11, weight: FontWeight.w900).copyWith(letterSpacing: 3)),
-            const SizedBox(height: 4),
-            Text(name.toUpperCase(), textAlign: TextAlign.center, style: _mono(tpl.titleColor, compact ? 18 : 22, weight: FontWeight.w900).copyWith(letterSpacing: 2)),
-            if (tagline.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(tagline.toUpperCase(), textAlign: TextAlign.center, style: _mono(tpl.subtitleColor, 10.5)),
-              ),
-            NgmyBioSocialRow(links: document.socialLinks, compact: compact, lightBackground: false),
-            SizedBox(height: compact ? 12 : 16),
-            for (var i = 0; i < links.length; i++) ...[
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text('LEVEL ${i + 1}', style: _mono(a, 9.5, weight: FontWeight.w900)),
-              ),
-              const SizedBox(height: 2),
-              _linkCard(links[i], tpl),
-            ],
-            SizedBox(height: compact ? 8 : 12),
-            _ProBlinkText(text: 'INSERT COIN', style: _mono(const Color(0xFFFACC15), 11, weight: FontWeight.w900), animate: !lightweight),
-            if (!fullBleed) ...[
-              const SizedBox(height: 14),
-              _madeByNgmyWatermark(tpl),
-            ],
-          ],
-        ),
+          _social(tpl),
+          SizedBox(height: compact ? 12 : 18),
+          for (var i = 0; i < links.length; i++) _techLink(links[i], tpl, i, a, b, t),
+          _techReactions(a),
+          SizedBox(height: compact ? 6 : 10),
+          _ProBlinkText(text: '> SYSTEM READY_', style: _mono(a, 10.5, weight: FontWeight.w900), animate: !lightweight),
+        ],
+        minPageHeight,
+        background: CustomPaint(painter: NgmyTechCircuitPainter(a, b, t)),
       ),
-      minPageHeight,
     );
   }
 
@@ -4116,181 +4109,156 @@ class NgmyBioPreview extends StatelessWidget {
     );
   }
 
-  // Zen koi: koi circle the photo in a rippling pond, pebble-glass links.
+  // ── Robotic / technology templates ───────────────────────────────────────
+
+  /// A link as a chamfered control panel: index, icon, title, live status light and a scan sweep.
+  Widget _techLink(NgmyBioLink link, NgmyBioTemplate tpl, int i, Color a, Color b, double t, {bool flip = false}) {
+    final blink = 0.45 + 0.55 * (0.5 + 0.5 * math.sin((t * 6 + i * 0.7) * math.pi));
+    final sweep = (t * 2 + i * 0.23) % 1;
+    return _tapLink(
+      link,
+      NgmyChamferBox(
+        color: a,
+        flip: flip,
+        height: compact ? 54 : 60,
+        fill: LinearGradient(colors: [a.withValues(alpha: 0.2), Colors.black.withValues(alpha: 0.55)]),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Align(
+                alignment: Alignment(-1.2 + 2.4 * sweep, 0),
+                child: Container(width: 46, decoration: BoxDecoration(gradient: LinearGradient(colors: [b.withValues(alpha: 0), b.withValues(alpha: 0.16), b.withValues(alpha: 0)]))),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                children: [
+                  Text((i + 1).toString().padLeft(2, '0'), style: _mono(a.withValues(alpha: 0.7), 11, weight: FontWeight.w900)),
+                  const SizedBox(width: 10),
+                  _linkThumb(link, tpl, 34, bg: a.withValues(alpha: 0.18), fg: b, radius: 6),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(_lt(link), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: tpl.linkTextColor, fontWeight: FontWeight.w800, fontSize: 15, letterSpacing: 0.4))),
+                  Container(width: 7, height: 7, decoration: BoxDecoration(shape: BoxShape.circle, color: b.withValues(alpha: blink), boxShadow: [BoxShadow(color: b.withValues(alpha: 0.7 * blink), blurRadius: 8)])),
+                  const SizedBox(width: 6),
+                  Icon(Icons.chevron_right_rounded, color: a),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      radius: 8,
+    );
+  }
+
+  Widget _techReactions(Color c) => Padding(
+        padding: EdgeInsets.only(top: compact ? 4 : 8),
+        child: Column(children: [
+          Text('// REACT', style: _mono(c.withValues(alpha: 0.7), 9.5, weight: FontWeight.w900)),
+          const SizedBox(height: 8),
+          NgmyTechReactions(color: c, interactive: interactive, seed: document.displayName.hashCode.abs()),
+        ]),
+      );
+
+  // Neural Core: a living network behind a scanning HUD ring; links are control panels.
   Widget _proKoiPond(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
-    final d = avatarSize * 2.5;
+    final a = tpl.accent;
+    final b = tpl.subtitleColor;
+    final d = avatarSize * 2.35;
     return _ProTicker(
       animate: !lightweight,
-      seconds: 14,
+      seconds: 24,
       builder: (t) => _proPage(
         tpl,
         pad,
         [
+          Row(children: [
+            Container(width: 7, height: 7, decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF34D399), boxShadow: [BoxShadow(color: const Color(0xFF34D399).withValues(alpha: 0.8), blurRadius: 8)])),
+            const SizedBox(width: 6),
+            Text('NEURAL LINK ACTIVE', style: _mono(a, 10, weight: FontWeight.w900)),
+            const Spacer(),
+            Text('${(11 + (t * 40).floor() % 9)}ms', style: _mono(b.withValues(alpha: 0.8), 10)),
+          ]),
+          SizedBox(height: compact ? 8 : 14),
           SizedBox(
             width: d,
             height: d,
             child: Stack(
               alignment: Alignment.center,
               children: [
-                CustomPaint(size: Size.square(d), painter: _ProKoiPainter(tpl.accent, t)),
+                CustomPaint(size: Size.square(d), painter: NgmyTechHudRingPainter(a, b, t)),
                 Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const LinearGradient(colors: [Color(0xFFE7E5E4), Color(0xFF78716C), Color(0xFFD6D3D1)]),
-                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.45), blurRadius: 18, offset: const Offset(0, 6))],
-                  ),
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.black, border: Border.all(color: a, width: 1.5), boxShadow: [BoxShadow(color: a.withValues(alpha: 0.5), blurRadius: 22)]),
                   child: ClipOval(child: _rawAvatar(avatarSize * 0.98)),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 6),
-          Text(name, textAlign: TextAlign.center, style: _serif(tpl.titleColor, compact ? 25 : 31, weight: FontWeight.w600, spacing: 0.5)),
+          const SizedBox(height: 8),
+          Text(name.toUpperCase(), textAlign: TextAlign.center, style: _mono(tpl.titleColor, compact ? 20 : 25, weight: FontWeight.w900).copyWith(letterSpacing: 3, shadows: [Shadow(color: a.withValues(alpha: 0.7), blurRadius: 14)])),
           if (tagline.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(width: 18, height: 1, color: tpl.accent),
-                const SizedBox(width: 8),
-                Flexible(child: Text(tagline, textAlign: TextAlign.center, style: TextStyle(color: tpl.subtitleColor, fontSize: 12.5, letterSpacing: 1.2, fontWeight: FontWeight.w600))),
-                const SizedBox(width: 8),
-                Container(width: 18, height: 1, color: tpl.accent),
-              ],
-            ),
+            Text('> $tagline', textAlign: TextAlign.center, style: _mono(b, compact ? 11 : 12.5)),
           ],
           _social(tpl),
+          SizedBox(height: compact ? 10 : 16),
+          NgmyTechTelemetry(color: a, t: t),
           SizedBox(height: compact ? 12 : 18),
-          for (var i = 0; i < links.length; i++)
-            _tapLink(
-              links[i],
-              Container(
-                height: compact ? 52 : 58,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Colors.white.withValues(alpha: 0.16), Colors.white.withValues(alpha: 0.05)],
-                  ),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 14, offset: const Offset(0, 6))],
-                ),
-                child: Row(
-                  children: [
-                    _linkThumb(links[i], tpl, 36, bg: tpl.accent.withValues(alpha: 0.2), fg: tpl.accent),
-                    const SizedBox(width: 12),
-                    Expanded(child: Text(_lt(links[i]), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: tpl.linkTextColor, fontWeight: FontWeight.w700, fontSize: 15))),
-                    SizedBox(
-                      width: 26,
-                      height: 26,
-                      child: CustomPaint(painter: _ProRipplePainter(tpl.accent, (t * 2 + i * 0.27) % 1)),
-                    ),
-                  ],
-                ),
-              ),
-              radius: 20,
-            ),
+          for (var i = 0; i < links.length; i++) _techLink(links[i], tpl, i, a, b, t, flip: i.isOdd),
+          _techReactions(a),
         ],
         minPageHeight,
-        background: CustomPaint(painter: _ProPondPainter(tpl.subtitleColor, t)),
+        background: CustomPaint(painter: NgmyTechNetPainter(a, b, t)),
       ),
     );
   }
 
-  // Cathedral light: a stained-glass arch with a rose window, jewel-glass links.
+  // Quantum Grid: a neon grid horizon, a hexagon portrait and slanted neon bars.
   Widget _proStainedGlass(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
-    final jewels = tpl.headerGradient ?? const [Color(0xFFB91C1C), Color(0xFF1D4ED8), Color(0xFF047857), Color(0xFF7E22CE), Color(0xFFD97706)];
-    final w = avatarSize * 2.2;
-    final h = avatarSize * 2.75;
+    final neon = tpl.headerGradient ?? const [Color(0xFFFF2E93), Color(0xFF8B5CF6), Color(0xFF22D3EE)];
+    final a = tpl.accent;
+    final b = neon.last;
+    final d = avatarSize * 1.9;
     return _ProTicker(
       animate: !lightweight,
-      seconds: 10,
+      seconds: 16,
       builder: (t) => _proPage(
         tpl,
         pad,
         [
+          Text('QUANTUM // GRID', style: _mono(a.withValues(alpha: 0.85), 10, weight: FontWeight.w900).copyWith(letterSpacing: 4)),
+          SizedBox(height: compact ? 10 : 16),
           SizedBox(
-            width: w,
-            height: h,
+            width: d,
+            height: d,
             child: Stack(
+              alignment: Alignment.center,
               children: [
-                Positioned.fill(child: CustomPaint(painter: _ProStainedGlassPainter(jewels, tpl.accent, t))),
-                Positioned(
-                  left: (w - avatarSize * 1.12) / 2,
-                  top: h * 0.4,
-                  child: Container(
-                    padding: const EdgeInsets.all(3),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFF1C1917),
-                      boxShadow: [BoxShadow(color: tpl.accent.withValues(alpha: 0.55), blurRadius: 20)],
-                    ),
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: tpl.accent, width: 2)),
-                      child: ClipOval(child: _rawAvatar(avatarSize * 1.0)),
-                    ),
-                  ),
+                Transform.rotate(angle: t * math.pi * 2, child: CustomPaint(size: Size.square(d), painter: _TechHexRingPainter(a, b))),
+                Container(
+                  width: d * 0.78,
+                  height: d * 0.78,
+                  decoration: BoxDecoration(boxShadow: [BoxShadow(color: a.withValues(alpha: 0.5), blurRadius: 24)]),
+                  child: ClipPath(clipper: const NgmyPolyClipper(6), child: _rawAvatar(d * 0.78)),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 14),
-          Text(name.toUpperCase(), textAlign: TextAlign.center, style: _serif(tpl.titleColor, compact ? 21 : 26, spacing: 3)),
+          const SizedBox(height: 12),
+          Text(name.toUpperCase(), textAlign: TextAlign.center, style: _mono(tpl.titleColor, compact ? 20 : 25, weight: FontWeight.w900).copyWith(letterSpacing: 4, shadows: [Shadow(color: a, blurRadius: 12), Shadow(color: b.withValues(alpha: 0.8), blurRadius: 26)])),
           if (tagline.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text(tagline, textAlign: TextAlign.center, style: _serif(tpl.subtitleColor, 13.5, italic: true, weight: FontWeight.w400)),
+            Text(tagline, textAlign: TextAlign.center, style: _mono(tpl.subtitleColor, compact ? 11 : 12.5)),
           ],
-          const SizedBox(height: 8),
-          Text('✦  ✦  ✦', style: TextStyle(color: tpl.accent, fontSize: 10, letterSpacing: 4)),
           _social(tpl),
-          SizedBox(height: compact ? 12 : 16),
-          for (var i = 0; i < links.length; i++)
-            _tapLink(
-              links[i],
-              Container(
-                height: compact ? 52 : 58,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1C1917),
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: [BoxShadow(color: jewels[i % jewels.length].withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 5))],
-                ),
-                padding: const EdgeInsets.all(3),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(7),
-                  child: Stack(
-                    children: [
-                      Positioned.fill(child: CustomPaint(painter: _ProGlassBarPainter(jewels[i % jewels.length], jewels[(i + 2) % jewels.length], (t + i * 0.18) % 1))),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Row(
-                          children: [
-                            _linkThumb(links[i], tpl, 32, bg: Colors.black.withValues(alpha: 0.35), fg: Colors.white),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                _lt(links[i]),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: _serif(Colors.white, 15.5).copyWith(shadows: const [Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1))]),
-                              ),
-                            ),
-                            Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.85)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              radius: 10,
-            ),
+          SizedBox(height: compact ? 12 : 18),
+          for (var i = 0; i < links.length; i++) _techLink(links[i], tpl, i, neon[i % neon.length], neon[(i + 1) % neon.length], t, flip: i.isOdd),
+          _techReactions(b),
         ],
         minPageHeight,
-        background: CustomPaint(painter: _ProLightBeamsPainter(jewels, t)),
+        background: CustomPaint(painter: NgmyTechGridPainter(a, b, t)),
       ),
     );
   }
@@ -6657,293 +6625,27 @@ class _ProFlowerPainter extends CustomPainter {
   bool shouldRepaint(covariant _ProFlowerPainter old) => old.color != color;
 }
 
-// ── Zen koi ─────────────────────────────────────────────────────────────────
-
-class _ProKoiPainter extends CustomPainter {
-  _ProKoiPainter(this.accent, this.t);
-  final Color accent;
-  final double t;
-
-  void _koi(Canvas canvas, Offset at, double heading, double len, Color body, Color spot, double wiggle) {
-    canvas.save();
-    canvas.translate(at.dx, at.dy);
-    canvas.rotate(heading);
-    final w = len * 0.34;
-    // Shadow under the water.
-    canvas.drawOval(Rect.fromCenter(center: const Offset(3, 4), width: len, height: w), Paint()..color = Colors.black.withValues(alpha: 0.18));
-    // Tail fan, swishing.
-    final tail = Path()
-      ..moveTo(-len * 0.42, 0)
-      ..quadraticBezierTo(-len * 0.62, -w * 0.2 + wiggle, -len * 0.78, -w * 0.62 + wiggle)
-      ..quadraticBezierTo(-len * 0.66, wiggle * 0.5, -len * 0.78, w * 0.62 + wiggle)
-      ..quadraticBezierTo(-len * 0.62, w * 0.2 + wiggle, -len * 0.42, 0)
-      ..close();
-    canvas.drawPath(tail, Paint()..color = body.withValues(alpha: 0.8));
-    // Side fins.
-    for (final s in [-1.0, 1.0]) {
-      canvas.drawOval(
-        Rect.fromCenter(center: Offset(len * 0.1, s * w * 0.55), width: len * 0.22, height: w * 0.4),
-        Paint()..color = body.withValues(alpha: 0.65),
-      );
-    }
-    // Body: rounded head, tapering to the tail.
-    final bodyPath = Path()
-      ..moveTo(len * 0.5, 0)
-      ..cubicTo(len * 0.45, -w * 0.55, -len * 0.1, -w * 0.6, -len * 0.45, 0)
-      ..cubicTo(-len * 0.1, w * 0.6, len * 0.45, w * 0.55, len * 0.5, 0)
-      ..close();
-    canvas.drawPath(bodyPath, Paint()..color = body);
-    canvas.save();
-    canvas.clipPath(bodyPath);
-    canvas.drawCircle(Offset(len * 0.18, -w * 0.12), w * 0.3, Paint()..color = spot);
-    canvas.drawCircle(Offset(-len * 0.15, w * 0.15), w * 0.26, Paint()..color = spot);
-    canvas.drawOval(Rect.fromCenter(center: Offset(len * 0.1, -w * 0.18), width: len * 0.5, height: w * 0.18), Paint()..color = Colors.white.withValues(alpha: 0.35));
-    canvas.restore();
-    // Eyes.
-    for (final s in [-1.0, 1.0]) {
-      canvas.drawCircle(Offset(len * 0.36, s * w * 0.2), w * 0.06, Paint()..color = const Color(0xFF111827));
-    }
-    canvas.restore();
-  }
-
-  @override
-  void paint(Canvas canvas, Size s) {
-    final c = s.center(Offset.zero);
-    final r = s.width / 2;
-    // Pond.
-    canvas.drawCircle(c, r, Paint()
-      ..shader = RadialGradient(colors: [const Color(0xFF14B8A6).withValues(alpha: 0.45), const Color(0xFF0E7490).withValues(alpha: 0.25), Colors.transparent], stops: const [0, 0.7, 1])
-          .createShader(Rect.fromCircle(center: c, radius: r)));
-    // Ripples spreading from the photo.
-    for (var i = 0; i < 3; i++) {
-      final p = (t * 1.5 + i / 3) % 1;
-      canvas.drawCircle(c, r * (0.42 + p * 0.55), Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.4
-        ..color = Colors.white.withValues(alpha: 0.35 * (1 - p)));
-    }
-    // Lily pads.
-    final pad = Paint()..color = const Color(0xFF15803D).withValues(alpha: 0.9);
-    for (final (a, rr, size) in [(0.6, 0.86, 0.13), (2.6, 0.84, 0.1), (4.4, 0.88, 0.12)]) {
-      final o = c + Offset(math.cos(a), math.sin(a)) * r * rr;
-      canvas.drawArc(Rect.fromCircle(center: o, radius: r * size), a + 0.3, math.pi * 2 - 0.6, true, pad);
-    }
-    canvas.drawCircle(c + Offset(math.cos(0.6), math.sin(0.6)) * r * 0.86 + Offset(-r * 0.03, -r * 0.03), r * 0.035, Paint()..color = const Color(0xFFF9A8D4));
-    // Koi swimming around.
-    final koi = [
-      (0.72, 1.0, accent, Colors.white, 0.0),
-      (0.66, -1.0, Colors.white, accent, 2.1),
-      (0.78, 1.0, const Color(0xFFFDE68A), const Color(0xFF111827), 4.2),
-    ];
-    for (final (rad, dir, body, spot, off) in koi) {
-      final a = off + dir * t * math.pi * 2;
-      final pos = c + Offset(math.cos(a), math.sin(a)) * r * rad;
-      final heading = a + dir * math.pi / 2;
-      _koi(canvas, pos, heading, r * 0.46, body, spot, math.sin(t * math.pi * 2 * 6 + off) * r * 0.035);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _ProKoiPainter old) => old.t != t || old.accent != accent;
-}
-
-class _ProRipplePainter extends CustomPainter {
-  _ProRipplePainter(this.color, this.p);
-  final Color color;
-  final double p;
-  @override
-  void paint(Canvas canvas, Size s) {
-    final c = s.center(Offset.zero);
-    for (var i = 0; i < 2; i++) {
-      final q = (p + i * 0.5) % 1;
-      canvas.drawCircle(c, s.width * 0.5 * q, Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5
-        ..color = color.withValues(alpha: 1 - q));
-    }
-    canvas.drawCircle(c, 2.5, Paint()..color = color);
-  }
-
-  @override
-  bool shouldRepaint(covariant _ProRipplePainter old) => old.p != p;
-}
-
-class _ProPondPainter extends CustomPainter {
-  _ProPondPainter(this.color, this.t);
-  final Color color;
-  final double t;
-  @override
-  void paint(Canvas canvas, Size s) {
-    // Soft caustic light drifting across the water.
-    final rnd = math.Random(7);
-    for (var i = 0; i < 14; i++) {
-      final x = rnd.nextDouble() * s.width;
-      final y = rnd.nextDouble() * s.height;
-      final ph = (t + rnd.nextDouble()) % 1;
-      final rr = 30 + rnd.nextDouble() * 60;
-      canvas.drawOval(
-        Rect.fromCenter(center: Offset(x + math.sin(ph * math.pi * 2) * 12, y), width: rr * 2, height: rr * 0.7),
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1
-          ..color = color.withValues(alpha: 0.07 + 0.06 * math.sin(ph * math.pi)),
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _ProPondPainter old) => old.t != t;
-}
-
-// ── Cathedral light ─────────────────────────────────────────────────────────
-
-class _ProStainedGlassPainter extends CustomPainter {
-  _ProStainedGlassPainter(this.jewels, this.gold, this.t);
-  final List<Color> jewels;
-  final Color gold;
-  final double t;
-
-  @override
-  void paint(Canvas canvas, Size s) {
-    final w = s.width;
-    final h = s.height;
-    // Pointed gothic arch.
-    final arch = Path()
-      ..moveTo(0, h)
-      ..lineTo(0, h * 0.42)
-      ..quadraticBezierTo(0, h * 0.06, w / 2, 0)
-      ..quadraticBezierTo(w, h * 0.06, w, h * 0.42)
-      ..lineTo(w, h)
-      ..close();
-    canvas.drawShadow(arch, gold, 10, false);
-    canvas.save();
-    canvas.clipPath(arch);
-    // Panes: a grid of jewel glass, each a little different.
-    final rnd = math.Random(11);
-    const cols = 4;
-    const rows = 6;
-    final cw = w / cols;
-    final rh = h / rows;
-    for (var r = 0; r < rows; r++) {
-      for (var c = 0; c < cols; c++) {
-        final col = jewels[(r * 3 + c * 2 + rnd.nextInt(2)) % jewels.length];
-        final rect = Rect.fromLTWH(c * cw, r * rh, cw, rh);
-        canvas.drawRect(rect, Paint()
-          ..shader = LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color.lerp(col, Colors.white, 0.25)!, col, Color.lerp(col, Colors.black, 0.35)!],
-          ).createShader(rect));
-        // Diagonal split inside some panes.
-        if ((r + c).isEven) {
-          canvas.drawLine(rect.topLeft, rect.bottomRight, Paint()
-            ..color = const Color(0xFF1C1917)
-            ..strokeWidth = 1.6);
-        }
-      }
-    }
-    // Rose window behind the photo.
-    final rc = Offset(w / 2, h * 0.4 + w * 0.255);
-    final rr = w * 0.43;
-    for (var i = 0; i < 12; i++) {
-      final a0 = i * math.pi / 6 + t * math.pi * 2 / 6;
-      canvas.drawArc(Rect.fromCircle(center: rc, radius: rr), a0, math.pi / 6, true, Paint()..color = jewels[i % jewels.length]);
-    }
-    canvas.drawCircle(rc, rr, Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
-      ..color = const Color(0xFF1C1917));
-    for (var i = 0; i < 12; i++) {
-      final a = i * math.pi / 6 + t * math.pi * 2 / 6;
-      canvas.drawLine(rc, rc + Offset(math.cos(a), math.sin(a)) * rr, Paint()
-        ..color = const Color(0xFF1C1917)
-        ..strokeWidth = 2);
-    }
-    // Lead lines.
-    final lead = Paint()
-      ..color = const Color(0xFF1C1917)
-      ..strokeWidth = 2.4;
-    for (var c = 1; c < cols; c++) {
-      canvas.drawLine(Offset(c * cw, 0), Offset(c * cw, h), lead);
-    }
-    for (var r = 1; r < rows; r++) {
-      canvas.drawLine(Offset(0, r * rh), Offset(w, r * rh), lead);
-    }
-    // Sunlight sweeping across the glass.
-    final x = -w + (w * 3) * t;
-    canvas.drawRect(Offset.zero & s, Paint()
-      ..shader = LinearGradient(
-        colors: [Colors.white.withValues(alpha: 0), Colors.white.withValues(alpha: 0.35), Colors.white.withValues(alpha: 0)],
-        stops: const [0.35, 0.5, 0.65],
-        transform: GradientRotation(-0.5),
-      ).createShader(Rect.fromLTWH(x, 0, w, h)));
-    canvas.restore();
-    // Gold frame.
-    canvas.drawPath(arch, Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4
-      ..color = gold);
-    canvas.drawPath(arch, Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2
-      ..color = const Color(0xFF1C1917));
-  }
-
-  @override
-  bool shouldRepaint(covariant _ProStainedGlassPainter old) => old.t != t;
-}
-
-class _ProGlassBarPainter extends CustomPainter {
-  _ProGlassBarPainter(this.a, this.b, this.t);
+class _TechHexRingPainter extends CustomPainter {
+  _TechHexRingPainter(this.a, this.b);
   final Color a;
   final Color b;
-  final double t;
   @override
-  void paint(Canvas canvas, Size s) {
-    final rect = Offset.zero & s;
-    canvas.drawRect(rect, Paint()
-      ..shader = LinearGradient(colors: [Color.lerp(a, Colors.black, 0.2)!, a, Color.lerp(a, b, 0.35)!]).createShader(rect));
-    final lead = Paint()
-      ..color = const Color(0xFF1C1917)
-      ..strokeWidth = 2;
-    // Small panes at each end, like a leaded window strip.
-    for (final x in [s.height * 0.9, s.width - s.height * 0.9]) {
-      canvas.drawLine(Offset(x, 0), Offset(x, s.height), lead);
-    }
-    canvas.drawLine(Offset(s.width - s.height * 0.9, s.height / 2), Offset(s.width, s.height / 2), lead);
-    // Light passing through.
-    final x = -s.width * 0.4 + s.width * 1.8 * t;
-    canvas.drawRect(rect, Paint()
-      ..shader = LinearGradient(colors: [Colors.white.withValues(alpha: 0), Colors.white.withValues(alpha: 0.28), Colors.white.withValues(alpha: 0)])
-          .createShader(Rect.fromLTWH(x, 0, s.width * 0.35, s.height)));
-  }
-
-  @override
-  bool shouldRepaint(covariant _ProGlassBarPainter old) => old.t != t;
-}
-
-class _ProLightBeamsPainter extends CustomPainter {
-  _ProLightBeamsPainter(this.jewels, this.t);
-  final List<Color> jewels;
-  final double t;
-  @override
-  void paint(Canvas canvas, Size s) {
-    // Coloured light falling from the window across the page.
-    for (var i = 0; i < jewels.length; i++) {
-      final sway = math.sin((t + i * 0.2) * math.pi * 2) * 12;
-      final top = s.width * (0.3 + i * 0.1);
-      final beam = Path()
-        ..moveTo(top, 0)
-        ..lineTo(top + s.width * 0.06, 0)
-        ..lineTo(top + s.width * 0.3 + sway, s.height)
-        ..lineTo(top + s.width * 0.12 + sway, s.height)
-        ..close();
-      canvas.drawPath(beam, Paint()
-        ..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [jewels[i].withValues(alpha: 0.18), jewels[i].withValues(alpha: 0)])
-            .createShader(Offset.zero & s));
+  void paint(Canvas canvas, Size size) {
+    final c = size.center(Offset.zero);
+    final r = size.width / 2 - 2;
+    for (var k = 0; k < 2; k++) {
+      final rr = r * (k == 0 ? 1 : 0.9);
+      final p = Path();
+      for (var i = 0; i < 6; i++) {
+        final ang = math.pi / 2 + i * math.pi / 3;
+        final pt = Offset(c.dx + rr * math.cos(ang), c.dy + rr * math.sin(ang));
+        i == 0 ? p.moveTo(pt.dx, pt.dy) : p.lineTo(pt.dx, pt.dy);
+      }
+      p.close();
+      canvas.drawPath(p, Paint()..style = PaintingStyle.stroke..strokeWidth = k == 0 ? 2.4 : 1.2..color = (k == 0 ? a : b).withValues(alpha: 0.85)..maskFilter = k == 0 ? const MaskFilter.blur(BlurStyle.solid, 2) : null);
     }
   }
 
   @override
-  bool shouldRepaint(covariant _ProLightBeamsPainter old) => old.t != t;
+  bool shouldRepaint(covariant _TechHexRingPainter old) => old.a != a || old.b != b;
 }

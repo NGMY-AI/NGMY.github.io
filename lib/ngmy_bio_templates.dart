@@ -559,22 +559,21 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
   ),
   NgmyBioTemplate(
     id: 'wow_arcade',
-    name: 'Arcade 8-Bit',
+    name: 'Mech Terminal',
     layout: NgmyBioLayoutStyle.proArcade,
-    pageBg: Color(0xFF000000),
-    pageBgEnd: Color(0xFF0B0221),
-    panelBg: Color(0xFF0B0221),
+    pageBg: Color(0xFF050505),
+    pageBgEnd: Color(0xFF1C1204),
+    panelBg: Color(0xFF110C03),
     cardBg: Color(0xFF111111),
-    cardBorder: Color(0xFF4ADE80),
-    accent: Color(0xFF4ADE80),
+    cardBorder: Color(0xFFFFB020),
+    accent: Color(0xFFFFB020),
     titleColor: Colors.white,
-    subtitleColor: Color(0xFFA7F3D0),
-    linkTextColor: Color(0xFF4ADE80),
+    subtitleColor: Color(0xFFFDE68A),
+    linkTextColor: Colors.white,
     linkStyle: NgmyBioLinkStyle.outline,
     cardRadius: 0,
     cardShadow: false,
     serifTitle: false,
-    sceneEffect: NgmyBioSceneEffect.starfield,
   ),
   NgmyBioTemplate(
     id: 'wow_boarding_pass',
@@ -615,8 +614,8 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
     sceneEffect: NgmyBioSceneEffect.prismShimmer,
   ),
   // ── Showpieces: koi pond and stained glass ───────────────────────────────
-  NgmyBioTemplate(id: 'pro_zen_koi', name: 'Zen Koi', layout: NgmyBioLayoutStyle.proKoiPond, pageBg: Color(0xFF0B4A54), pageBgEnd: Color(0xFF062026), panelBg: Color(0xFF0B3B46), cardBg: Color(0x1FFFFFFF), cardBorder: Color(0x5599F6E4), accent: Color(0xFFFB923C), titleColor: Colors.white, subtitleColor: Color(0xFF99F6E4), linkTextColor: Colors.white, linkStyle: NgmyBioLinkStyle.glass, cardRadius: 20, cardShadow: false),
-  NgmyBioTemplate(id: 'pro_cathedral_light', name: 'Cathedral Light', layout: NgmyBioLayoutStyle.proStainedGlass, pageBg: Color(0xFF120B22), pageBgEnd: Color(0xFF1E1233), panelBg: Color(0xFF1E1233), cardBg: Color(0x1AFFFFFF), cardBorder: Color(0x88FBBF24), accent: Color(0xFFFBBF24), titleColor: Color(0xFFFFF7E6), subtitleColor: Color(0xFFE9D5FF), linkTextColor: Colors.white, linkStyle: NgmyBioLinkStyle.goldBar, headerGradient: [Color(0xFFB91C1C), Color(0xFF1D4ED8), Color(0xFF047857), Color(0xFF7E22CE), Color(0xFFD97706)], cardRadius: 10, cardShadow: false),
+  NgmyBioTemplate(id: 'pro_zen_koi', name: 'Neural Core', layout: NgmyBioLayoutStyle.proKoiPond, pageBg: Color(0xFF030A14), pageBgEnd: Color(0xFF0A2236), panelBg: Color(0xFF0A1B2C), cardBg: Color(0x1F22D3EE), cardBorder: Color(0x8822D3EE), accent: Color(0xFF22D3EE), titleColor: Colors.white, subtitleColor: Color(0xFF7DD3FC), linkTextColor: Colors.white, linkStyle: NgmyBioLinkStyle.glass, cardRadius: 8, cardShadow: false, serifTitle: false),
+  NgmyBioTemplate(id: 'pro_cathedral_light', name: 'Quantum Grid', layout: NgmyBioLayoutStyle.proStainedGlass, pageBg: Color(0xFF08011C), pageBgEnd: Color(0xFF220A47), panelBg: Color(0xFF1B0638), cardBg: Color(0x1AFFFFFF), cardBorder: Color(0x88FF2E93), accent: Color(0xFFFF2E93), titleColor: Colors.white, subtitleColor: Color(0xFFC4B5FD), linkTextColor: Colors.white, linkStyle: NgmyBioLinkStyle.glass, headerGradient: [Color(0xFFFF2E93), Color(0xFF8B5CF6), Color(0xFF22D3EE)], cardRadius: 8, cardShadow: false, serifTitle: false),
 ];
 
 NgmyBioTemplate ngmyBioTemplateById(String id) {

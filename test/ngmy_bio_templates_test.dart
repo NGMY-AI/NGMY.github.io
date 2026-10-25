@@ -44,4 +44,24 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     expect(failed, isEmpty, reason: 'bio templates that failed to render: $failed');
   });
+
+  testWidgets('the robotic templates animate and take reactions', (tester) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    for (final id in ['pro_zen_koi', 'pro_cathedral_light', 'wow_arcade']) {
+      final doc = NgmyBioDocument(
+        id: 'test_$id',
+        displayName: 'KB Pablo QR',
+        tagline: 'Founder',
+        templateId: id,
+        links: [NgmyBioLink(id: 'a', title: 'Website', url: 'https://ngmy.org')],
+      );
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: NgmyBioPreview(document: doc, interactive: true)))));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(tester.takeException(), isNull, reason: id);
+      expect(find.text('0'), findsWidgets, reason: id);
+    }
+    await tester.pumpWidget(const SizedBox());
+  });
 }
