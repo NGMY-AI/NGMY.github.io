@@ -212,8 +212,12 @@ Future<Uint8List> ngmyBuildCivicRosterPdfBytes({
 
     doc.addPage(
       pw.Page(
-        pageFormat: format,
-        margin: const pw.EdgeInsets.all(margin),
+        pageTheme: pw.PageTheme(
+          pageFormat: format,
+          margin: const pw.EdgeInsets.all(margin),
+          buildBackground: (_) => ngmyRosterWatermark(),
+          buildForeground: (_) => ngmyRosterFooter(),
+        ),
         build: (_) => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.stretch,
           children: [
@@ -239,3 +243,29 @@ Future<Uint8List> ngmyBuildCivicRosterPdfBytes({
 
   return doc.save();
 }
+
+/// A big faint NGMY across every roster page.
+pw.Widget ngmyRosterWatermark() => pw.FullPage(
+      ignoreMargins: true,
+      child: pw.Center(
+        child: pw.Transform.rotate(
+          angle: 0.6,
+          child: pw.Opacity(
+            opacity: 0.07,
+            child: pw.Text('NGMY', style: pw.TextStyle(fontSize: 190, fontWeight: pw.FontWeight.bold, color: PdfColors.black)),
+          ),
+        ),
+      ),
+    );
+
+/// Bottom corner of every roster page.
+pw.Widget ngmyRosterFooter() => pw.FullPage(
+      ignoreMargins: true,
+      child: pw.Align(
+        alignment: pw.Alignment.bottomRight,
+        child: pw.Padding(
+          padding: const pw.EdgeInsets.only(right: 14, bottom: 8),
+          child: pw.Text('CREATED BY NGMY.ORG', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700, letterSpacing: 1)),
+        ),
+      ),
+    );
