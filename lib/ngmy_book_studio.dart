@@ -128,13 +128,47 @@ Reply with JSON only:
 ''';
 }
 
+/// The AI often puts real line breaks inside a JSON string (the blank line between paragraphs),
+/// which strict JSON refuses. This turns them into \n so the book still reads.
+String ngmyEscapeJsonStrings(String s) {
+  final b = StringBuffer();
+  var inStr = false, esc = false;
+  for (final u in s.runes) {
+    final c = String.fromCharCode(u);
+    if (inStr) {
+      if (esc) {
+        esc = false;
+        b.write(c);
+      } else if (c == r'\') {
+        esc = true;
+        b.write(c);
+      } else if (c == '"') {
+        inStr = false;
+        b.write(c);
+      } else if (c == '\n') {
+        b.write(r'\n');
+      } else if (c == '\r') {
+        // dropped
+      } else if (c == '\t') {
+        b.write(r'\t');
+      } else {
+        b.write(c);
+      }
+    } else {
+      if (c == '"') inStr = true;
+      b.write(c);
+    }
+  }
+  return b.toString();
+}
+
 /// Reads the AI's JSON (tolerates code fences and text around it).
 NgmyBookDoc? ngmyParseBookAi(String text, {String author = ''}) {
   final start = text.indexOf('{');
   final end = text.lastIndexOf('}');
   if (start < 0 || end <= start) return null;
   try {
-    final j = jsonDecode(text.substring(start, end + 1));
+    final j = jsonDecode(ngmyEscapeJsonStrings(text.substring(start, end + 1)));
     if (j is! Map) return null;
     final doc = NgmyBookDoc.fromJson(Map<String, dynamic>.from(j));
     final chapters = doc.chapters.where((c) => c.title.trim().isNotEmpty || c.body.trim().isNotEmpty).toList();
@@ -158,7 +192,7 @@ String _coverQueryOf(String text) {
 }
 
 /// Most pages the AI can write in one book.
-const int kNgmyBookAiMaxPages = 1000;
+const int kNgmyBookAiMaxPages = 100;
 
 /// Writes the book. Up to 12 pages is one AI request; longer books (up to
 /// [kNgmyBookAiMaxPages]) are planned first, outlined in parts and then written a few pages
@@ -178,7 +212,8 @@ Future<NgmyBookDoc> ngmyWriteBookWithAi({
 
   Future<String?> ask(String prompt) async {
     for (var attempt = 0; attempt < 2; attempt++) {
-      final r = await ngmyAiGenerateWithCredentials(creds, prompt);
+      // A page of writing takes a while: give the AI up to two and a half minutes, not the usual 18 seconds.
+      final r = await ngmyAiGenerateWithCredentials(creds, prompt, timeout: const Duration(seconds: 150));
       if (r.text != null && r.text!.trim().isNotEmpty) return r.text;
       lastError = r.error;
     }
@@ -317,7 +352,7 @@ Map<String, dynamic>? _jsonObject(String text) {
   final end = text.lastIndexOf('}');
   if (start < 0 || end <= start) return null;
   try {
-    final j = jsonDecode(text.substring(start, end + 1));
+    final j = jsonDecode(ngmyEscapeJsonStrings(text.substring(start, end + 1)));
     return j is Map ? Map<String, dynamic>.from(j) : null;
   } catch (_) {
     return null;
@@ -1284,7 +1319,7 @@ class _BookAiSheetState extends State<_BookAiSheet> {
   String _status = '';
   double _progress = 0;
 
-  static const _quick = [10, 25, 50, 100, 250, 500, 1000];
+  static const _quick = [3, 5, 8, 10, 25, 50, 100];
   bool get _family => widget.familyFacts.trim().isNotEmpty;
   List<String> get _ideas => _family
       ? const [

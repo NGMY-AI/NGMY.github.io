@@ -489,6 +489,7 @@ Future<({String? text, String? error})> _callAiViaSupabaseProxy({
   String? openAiBaseUrl,
   List<NgmyAiImagePart> images = const [],
   String? mode,
+  Duration? timeout,
 }) async {
   try {
     final body = <String, dynamic>{
@@ -506,7 +507,7 @@ Future<({String? text, String? error})> _callAiViaSupabaseProxy({
                 })
             .toList(),
     };
-    final data = await ngmyEdgeInvoke(body);
+    final data = timeout == null ? await ngmyEdgeInvoke(body) : await ngmyEdgeInvoke(body, timeout: timeout);
     if (data != null) {
       final text = data['text']?.toString();
       if (text != null && text.trim().isNotEmpty) {
@@ -526,6 +527,7 @@ Future<({String? text, String? error})> ngmyAiGenerateWithCredentials(
   NgmyAiCredentials creds,
   String prompt, {
   List<NgmyAiImagePart> images = const [],
+  Duration? timeout,
 }) async {
   Future<({String? text, String? error})> runDirect() async {
     if (ngmyIsServerManagedAiKey(creds.apiKey)) {
@@ -556,6 +558,7 @@ Future<({String? text, String? error})> ngmyAiGenerateWithCredentials(
     provider: creds.provider,
     openAiBaseUrl: creds.openAiBaseUrl,
     images: images,
+    timeout: timeout,
   );
   if (proxied.text != null) return proxied;
   if (ngmyIsServerManagedAiKey(creds.apiKey) || kIsWeb) {

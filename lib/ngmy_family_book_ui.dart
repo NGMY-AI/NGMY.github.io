@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'ngmy_book_studio.dart';
@@ -58,8 +60,9 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
   List<FamilyBookEntry> _entries = [];
   bool _loading = true;
   late PageController _pageCtrl;
-  int _pageIndex = 0;
+  int _pageIndex = -1; // -1 is the cover; 0 and up are the pages
   bool _editing = false;
+  bool _keepEditing = false;
   late TextEditingController _titleCtrl;
   late TextEditingController _bodyCtrl;
 
@@ -104,8 +107,9 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
 
   void _onPageChanged(int index) {
     setState(() {
-      _pageIndex = index;
-      _editing = false;
+      _pageIndex = index - 1;
+      _editing = _keepEditing;
+      _keepEditing = false;
     });
     _loadPageIntoEditors();
   }
@@ -126,11 +130,12 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
     setState(() {
       _pageIndex = target;
       _editing = true;
+      _keepEditing = true;
     });
     _loadPageIntoEditors();
     if (_pageCtrl.hasClients) {
       await _pageCtrl.animateToPage(
-        target,
+        target + 1,
         duration: const Duration(milliseconds: 280),
         curve: Curves.easeOutCubic,
       );
@@ -180,9 +185,10 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
     await deleteFamilyBookEntry(widget.userEmail, widget.treeId, entry.id);
     setState(() {
       _editing = false;
-      _pageIndex = (_pageIndex - 1).clamp(0, 999);
+      _pageIndex = (_pageIndex - 1).clamp(-1, 999);
     });
     await _reload();
+    if (mounted && _pageCtrl.hasClients) _pageCtrl.jumpToPage((_pageIndex + 1).clamp(0, _entries.length));
   }
 
   /// The AI writes the family book from everyone in the tree (plus anything the user adds);
@@ -229,27 +235,23 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
     return '${local.year}-$m-$d';
   }
 
+  static const Color _paper = Color(0xFFFBF3E0);
+  static const Color _ink = Color(0xFF3D2E1F);
+  static const Color _leather = Color(0xFF7A3E1D);
+  static const Color _gold = Color(0xFFE8C46A);
+
+  String get _title => widget.bookTitle.trim().isEmpty ? 'Our Family Book' : widget.bookTitle.trim();
+
   @override
   Widget build(BuildContext context) {
-    final p = WorksheetPalette.of(context);
-    final isDark = p.isDark;
-    final paper = isDark ? const Color(0xFF2A241C) : const Color(0xFFFAF3E8);
-    final ink = isDark ? const Color(0xFFF5EDE0) : const Color(0xFF3D2E1F);
-    final cover = isDark ? const Color(0xFF5C3D2E) : const Color(0xFF8B4513);
-
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF14110E) : const Color(0xFF3E2723),
+      extendBodyBehindAppBar: true,
+      backgroundColor: const Color(0xFF1A0F08),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.close_rounded, color: paper),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Family Book',
-          style: TextStyle(color: paper, fontWeight: FontWeight.w800, fontSize: 16),
-        ),
+        leading: IconButton(icon: const Icon(Icons.close_rounded, color: _paper), onPressed: () => Navigator.pop(context)),
+        title: const Text('Family Library', style: TextStyle(color: _paper, fontWeight: FontWeight.w800, fontSize: 16, letterSpacing: 0.4)),
         centerTitle: true,
         actions: [
           if (widget.canEdit && widget.familyFacts.trim().isNotEmpty)
@@ -260,195 +262,271 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
                 child: GestureDetector(
                   onTap: _writeWithAi,
                   child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]),
-                    ),
-                    child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 16),
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(shape: BoxShape.circle, gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]), boxShadow: [BoxShadow(color: const Color(0xFFDB2777).withValues(alpha: 0.5), blurRadius: 12)]),
+                    child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 17),
                   ),
                 ),
               ),
             ),
-          if (_entries.isNotEmpty || widget.membersPage.trim().isNotEmpty)
-            IconButton(
-              tooltip: 'Print as a book',
-              onPressed: _printBook,
-              icon: Icon(Icons.print_rounded, color: paper, size: 20),
-            ),
-          if (widget.canEdit && _entries.isNotEmpty)
-            IconButton(
-              tooltip: _editing ? 'Save page' : 'Edit page',
-              onPressed: _editing ? _saveCurrentPage : () => setState(() => _editing = true),
-              icon: Icon(_editing ? Icons.check_rounded : Icons.edit_outlined, color: paper, size: 20),
-            ),
-          if (widget.canEdit)
-            IconButton(
-              tooltip: 'Add page',
-              onPressed: _addPage,
-              icon: Icon(Icons.add_circle_outline_rounded, color: paper, size: 20),
-            ),
+          if (_entries.isNotEmpty || widget.membersPage.trim().isNotEmpty) IconButton(tooltip: 'Print as a book', onPressed: _printBook, icon: const Icon(Icons.print_rounded, color: _paper, size: 20)),
+          if (widget.canEdit && _entries.isNotEmpty && _pageIndex >= 0)
+            IconButton(tooltip: _editing ? 'Save page' : 'Edit page', onPressed: _editing ? _saveCurrentPage : () => setState(() => _editing = true), icon: Icon(_editing ? Icons.check_rounded : Icons.edit_outlined, color: _paper, size: 20)),
+          if (widget.canEdit) IconButton(tooltip: 'Add page', onPressed: _addPage, icon: const Icon(Icons.add_circle_outline_rounded, color: _paper, size: 20)),
         ],
       ),
-      body: _loading
-          ? Center(child: CircularProgressIndicator(color: paper))
-          : _entries.isEmpty
-              ? _emptyBook(p, paper, cover)
-              : Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                      child: Text(
-                        _entries.isEmpty
-                            ? ''
-                            : 'Page ${_pageIndex + 1} of ${_entries.length}',
-                        style: TextStyle(color: paper.withValues(alpha: 0.75), fontSize: 12, fontWeight: FontWeight.w600),
+      body: Stack(fit: StackFit.expand, children: [
+        const Positioned.fill(child: CustomPaint(painter: _LibraryPainter())),
+        SafeArea(
+          child: _loading
+              ? const Center(child: CircularProgressIndicator(color: _gold))
+              : _entries.isEmpty
+                  ? _emptyBook()
+                  : Column(children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+                        child: Text(_pageIndex < 0 ? 'Tap the cover to open the book' : 'Page ${_pageIndex + 1} of ${_entries.length}', style: TextStyle(color: _paper.withValues(alpha: 0.8), fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.4)),
                       ),
-                    ),
-                    Expanded(
-                      child: PageView.builder(
-                        controller: _pageCtrl,
-                        physics: _editing ? const NeverScrollableScrollPhysics() : const BouncingScrollPhysics(),
-                        itemCount: _entries.length,
-                        onPageChanged: _onPageChanged,
-                        itemBuilder: (_, index) {
-                          final entry = _entries[index];
-                          final isActive = index == _pageIndex;
-                          return Padding(
-                            padding: const EdgeInsets.fromLTRB(14, 4, 14, 12),
-                            child: _BookPageView(
-                              paper: paper,
-                              ink: ink,
-                              cover: cover,
-                              entry: entry,
-                              editing: isActive && _editing && widget.canEdit,
-                              titleCtrl: _titleCtrl,
-                              bodyCtrl: _bodyCtrl,
-                              formatDate: _formatDate,
-                            ),
-                          );
-                        },
+                      Expanded(
+                        child: PageView.builder(
+                          controller: _pageCtrl,
+                          physics: _editing ? const NeverScrollableScrollPhysics() : const BouncingScrollPhysics(),
+                          itemCount: _entries.length + 1,
+                          onPageChanged: _onPageChanged,
+                          itemBuilder: (_, vi) {
+                            final isCover = vi == 0;
+                            return AnimatedBuilder(
+                              animation: _pageCtrl,
+                              builder: (context, child) {
+                                var delta = 0.0;
+                                if (_pageCtrl.hasClients && _pageCtrl.position.haveDimensions) delta = vi - (_pageCtrl.page ?? vi.toDouble());
+                                // The page that is leaving swings away on its spine like a real page turning.
+                                final a = delta.clamp(-1.0, 0.0);
+                                return Transform(
+                                  alignment: Alignment.centerLeft,
+                                  transform: Matrix4.identity()
+                                    ..setEntry(3, 2, 0.0013)
+                                    ..rotateY(a * math.pi * 0.5),
+                                  child: Opacity(opacity: (1 + a * 0.5).clamp(0.0, 1.0), child: child),
+                                );
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                                child: isCover
+                                    ? GestureDetector(onTap: () => _pageCtrl.nextPage(duration: const Duration(milliseconds: 420), curve: Curves.easeInOutCubic), child: _BookCover(title: _title, pages: _entries.length))
+                                    : _BookPageView(
+                                        entry: _entries[vi - 1],
+                                        number: vi,
+                                        total: _entries.length,
+                                        editing: (vi - 1) == _pageIndex && _editing && widget.canEdit,
+                                        titleCtrl: _titleCtrl,
+                                        bodyCtrl: _bodyCtrl,
+                                        formatDate: _formatDate,
+                                      ),
+                              ),
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                    _bookFooter(p, paper, cover),
-                  ],
-                ),
+                      _bookFooter(),
+                    ]),
+        ),
+      ]),
     );
   }
 
-  Widget _emptyBook(WorksheetPalette p, Color paper, Color cover) {
+  Widget _emptyBook() {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 120,
-              height: 150,
-              decoration: BoxDecoration(
-                color: cover,
-                borderRadius: const BorderRadius.horizontal(left: Radius.circular(6), right: Radius.circular(14)),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 18, offset: const Offset(4, 8)),
-                ],
-              ),
-              child: Icon(Icons.menu_book_rounded, color: paper, size: 48),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              widget.canEdit ? 'Start your family book' : 'No pages yet',
-              style: TextStyle(color: paper, fontWeight: FontWeight.w800, fontSize: 18),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              widget.canEdit
-                  ? 'Add pages and swipe through them like a real book — stories, memories, and notes about your family.'
-                  : 'The tree owner has not written any pages on this device.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: paper.withValues(alpha: 0.75), height: 1.4),
-            ),
-            if (widget.canEdit) ...[
-              const SizedBox(height: 20),
-              FilledButton.icon(
-                onPressed: _addPage,
-                style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.teal),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Add first page'),
-              ),
-              if (widget.familyFacts.trim().isNotEmpty) ...[
-                const SizedBox(height: 10),
-                TextButton.icon(
-                  onPressed: _writeWithAi,
-                  icon: const Icon(Icons.auto_awesome_rounded, size: 18, color: Color(0xFFC4B5FD)),
-                  label: const Text('Or let AI write it from your tree', style: TextStyle(color: Color(0xFFE9D5FF), fontWeight: FontWeight.w700)),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          SizedBox(height: 330, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 36), child: _BookCover(title: _title, pages: 0))),
+          const SizedBox(height: 18),
+          Text(widget.canEdit ? 'Your book is waiting for its first page' : 'No pages yet', style: const TextStyle(color: _paper, fontWeight: FontWeight.w800, fontSize: 18)),
+          const SizedBox(height: 6),
+          Text(
+            widget.canEdit ? 'Add pages and turn them like a real book: stories, memories and notes about your family.' : 'The tree owner has not written any pages on this device.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: _paper.withValues(alpha: 0.8), height: 1.4),
+          ),
+          if (widget.canEdit) ...[
+            const SizedBox(height: 18),
+            if (widget.familyFacts.trim().isNotEmpty)
+              GestureDetector(
+                onTap: _writeWithAi,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]), boxShadow: [BoxShadow(color: const Color(0xFFDB2777).withValues(alpha: 0.45), blurRadius: 18)]),
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20),
+                    SizedBox(width: 8),
+                    Flexible(child: Text('Let the AI write it from your tree', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900))),
+                  ]),
                 ),
-              ],
-            ],
+              ),
+            const SizedBox(height: 10),
+            TextButton.icon(onPressed: _addPage, icon: const Icon(Icons.edit_rounded, size: 18, color: _gold), label: const Text('Write the first page myself', style: TextStyle(color: _gold, fontWeight: FontWeight.w800))),
           ],
-        ),
+        ]),
       ),
     );
   }
 
-  Widget _bookFooter(WorksheetPalette p, Color paper, Color cover) {
+  Widget _bookFooter() {
+    final vi = _pageIndex + 1;
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-        child: Row(
-          children: [
-            IconButton(
-              tooltip: 'Previous page',
-              onPressed: _pageIndex > 0
-                  ? () => _pageCtrl.previousPage(duration: const Duration(milliseconds: 260), curve: Curves.easeOut)
-                  : null,
-              icon: Icon(Icons.chevron_left_rounded, color: paper, size: 28),
+        padding: const EdgeInsets.fromLTRB(16, 2, 16, 10),
+        child: Row(children: [
+          IconButton(tooltip: 'Previous page', onPressed: vi > 0 ? () => _pageCtrl.previousPage(duration: const Duration(milliseconds: 360), curve: Curves.easeInOutCubic) : null, icon: Icon(Icons.chevron_left_rounded, color: vi > 0 ? _paper : Colors.white24, size: 30)),
+          Expanded(
+            child: Center(
+              child: widget.canEdit && _entries.isNotEmpty && !_editing && _pageIndex >= 0
+                  ? TextButton.icon(onPressed: _deleteCurrentPage, icon: Icon(Icons.delete_outline, size: 16, color: Colors.red.shade300), label: Text('Delete page', style: TextStyle(color: Colors.red.shade300, fontSize: 12)))
+                  : Text(_editing ? 'Writing… swiping is off while you edit' : 'Swipe to turn the page', style: TextStyle(color: _paper.withValues(alpha: 0.65), fontSize: 11.5)),
             ),
-            Expanded(
-              child: Center(
-                child: widget.canEdit && _entries.isNotEmpty && !_editing
-                    ? TextButton.icon(
-                        onPressed: _deleteCurrentPage,
-                        icon: Icon(Icons.delete_outline, size: 16, color: Colors.red.shade300),
-                        label: Text('Delete page', style: TextStyle(color: Colors.red.shade300, fontSize: 12)),
-                      )
-                    : _editing
-                        ? Text('Writing… swipe disabled while editing', style: TextStyle(color: paper.withValues(alpha: 0.6), fontSize: 11))
-                        : Text('Swipe left or right to turn pages', style: TextStyle(color: paper.withValues(alpha: 0.65), fontSize: 11)),
-              ),
-            ),
-            IconButton(
-              tooltip: 'Next page',
-              onPressed: _pageIndex < _entries.length - 1
-                  ? () => _pageCtrl.nextPage(duration: const Duration(milliseconds: 260), curve: Curves.easeOut)
-                  : null,
-              icon: Icon(Icons.chevron_right_rounded, color: paper, size: 28),
-            ),
-          ],
-        ),
+          ),
+          IconButton(tooltip: 'Next page', onPressed: vi < _entries.length ? () => _pageCtrl.nextPage(duration: const Duration(milliseconds: 360), curve: Curves.easeInOutCubic) : null, icon: Icon(Icons.chevron_right_rounded, color: vi < _entries.length ? _paper : Colors.white24, size: 30)),
+        ]),
       ),
     );
   }
 }
 
+/// The leather front cover: gold edges, an embossed title and a ribbon.
+class _BookCover extends StatelessWidget {
+  const _BookCover({required this.title, required this.pages});
+  final String title;
+  final int pages;
+
+  @override
+  Widget build(BuildContext context) {
+    const gold = _FamilyBookScreenState._gold;
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: const BorderRadius.horizontal(left: Radius.circular(8), right: Radius.circular(18)),
+        gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF9A5128), Color(0xFF6B3216), Color(0xFF4A2210)]),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.6), blurRadius: 28, offset: const Offset(8, 14))],
+      ),
+      child: Stack(children: [
+        Positioned.fill(child: CustomPaint(painter: _LeatherPainter())),
+        // The spine, with its stitches.
+        Positioned(left: 0, top: 0, bottom: 0, width: 26, child: Container(decoration: BoxDecoration(borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)), gradient: LinearGradient(colors: [Colors.black.withValues(alpha: 0.45), Colors.transparent])))),
+        for (var i = 0; i < 6; i++) Positioned(left: 8, top: 40.0 + i * 46, child: Container(width: 6, height: 22, decoration: BoxDecoration(color: gold.withValues(alpha: 0.7), borderRadius: BorderRadius.circular(3)))),
+        // Gold frame.
+        Positioned.fill(child: Padding(padding: const EdgeInsets.fromLTRB(40, 24, 24, 24), child: DecoratedBox(decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: gold.withValues(alpha: 0.85), width: 2.2))))),
+        Positioned.fill(child: Padding(padding: const EdgeInsets.fromLTRB(46, 30, 30, 30), child: DecoratedBox(decoration: BoxDecoration(borderRadius: BorderRadius.circular(5), border: Border.all(color: gold.withValues(alpha: 0.45), width: 1))))),
+        Positioned.fill(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(56, 40, 40, 40),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Icon(Icons.account_tree_rounded, color: gold.withValues(alpha: 0.95), size: 44),
+              const SizedBox(height: 14),
+              Text(title, textAlign: TextAlign.center, maxLines: 4, overflow: TextOverflow.ellipsis, style: const TextStyle(color: gold, fontFamily: 'serif', fontWeight: FontWeight.w900, fontSize: 25, height: 1.2, letterSpacing: 0.5, shadows: [Shadow(color: Colors.black54, blurRadius: 3, offset: Offset(1, 2))])),
+              const SizedBox(height: 12),
+              Container(width: 90, height: 2, color: gold.withValues(alpha: 0.7)),
+              const SizedBox(height: 12),
+              Text(pages == 0 ? 'A family story' : '$pages ${pages == 1 ? 'page' : 'pages'} of our story', style: TextStyle(color: gold.withValues(alpha: 0.85), fontFamily: 'serif', fontStyle: FontStyle.italic, fontSize: 14)),
+            ]),
+          ),
+        ),
+        // The ribbon bookmark.
+        Positioned(right: 46, top: 0, child: CustomPaint(size: const Size(22, 64), painter: _RibbonPainter())),
+      ]),
+    );
+  }
+}
+
+class _RibbonPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Path()..moveTo(0, 0)..lineTo(size.width, 0)..lineTo(size.width, size.height)..lineTo(size.width / 2, size.height - 12)..lineTo(0, size.height)..close();
+    canvas.drawPath(p, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFDC2626), Color(0xFF991B1B)]).createShader(Offset.zero & size));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
+}
+
+class _LeatherPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = math.Random(11);
+    final p = Paint()..color = Colors.black.withValues(alpha: 0.07);
+    for (var i = 0; i < 260; i++) {
+      canvas.drawCircle(Offset(r.nextDouble() * size.width, r.nextDouble() * size.height), 0.8 + r.nextDouble() * 1.8, p);
+    }
+    final hi = Paint()..color = Colors.white.withValues(alpha: 0.035);
+    for (var i = 0; i < 120; i++) {
+      canvas.drawCircle(Offset(r.nextDouble() * size.width, r.nextDouble() * size.height), 0.6 + r.nextDouble() * 1.2, hi);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
+}
+
+/// A cosy library behind the book: dark wooden shelves full of books and a warm lamp glow.
+class _LibraryPainter extends CustomPainter {
+  const _LibraryPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(Offset.zero & size, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF2A170C), Color(0xFF160B05)]).createShader(Offset.zero & size));
+    final rowH = 112.0;
+    final rows = (size.height / rowH).ceil();
+    final spines = const [Color(0xFF7F1D1D), Color(0xFF14532D), Color(0xFF1E3A8A), Color(0xFF78350F), Color(0xFF581C87), Color(0xFF0F766E), Color(0xFF9A3412), Color(0xFF374151), Color(0xFFB45309)];
+    final r = math.Random(4);
+    for (var row = 0; row < rows; row++) {
+      final base = (row + 1) * rowH;
+      var x = 6.0;
+      while (x < size.width) {
+        final w = 14 + r.nextDouble() * 20;
+        final h = 56 + r.nextDouble() * 40;
+        final c = spines[r.nextInt(spines.length)];
+        final lean = r.nextInt(14) == 0;
+        canvas.save();
+        if (lean) {
+          canvas.translate(x + w, base);
+          canvas.rotate(-0.18);
+          canvas.translate(-(x + w), -base);
+        }
+        final rect = Rect.fromLTWH(x, base - h, w, h);
+        canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(2)), Paint()..shader = LinearGradient(colors: [Color.lerp(c, Colors.white, 0.12)!, c, Color.lerp(c, Colors.black, 0.45)!]).createShader(rect));
+        canvas.drawRect(Rect.fromLTWH(x + 2, base - h + 10, w - 4, 2), Paint()..color = const Color(0xFFE8C46A).withValues(alpha: 0.55));
+        canvas.drawRect(Rect.fromLTWH(x + 2, base - 14, w - 4, 2), Paint()..color = const Color(0xFFE8C46A).withValues(alpha: 0.4));
+        canvas.restore();
+        x += w + 1 + (r.nextInt(9) == 0 ? 18 : 0);
+      }
+      // The shelf board.
+      canvas.drawRect(Rect.fromLTWH(0, base, size.width, 10), Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF8A5A2B), Color(0xFF3B2312)]).createShader(Rect.fromLTWH(0, base, size.width, 10)));
+      canvas.drawRect(Rect.fromLTWH(0, base + 10, size.width, 14), Paint()..color = Colors.black.withValues(alpha: 0.5)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6));
+    }
+    // Keep the books in the background: a dark veil, then a warm lamp glow.
+    canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFF120804).withValues(alpha: 0.72));
+    canvas.drawCircle(Offset(size.width * 0.5, size.height * 0.36), size.width * 0.95, Paint()..shader = RadialGradient(colors: [const Color(0xFFFFB454).withValues(alpha: 0.22), Colors.transparent]).createShader(Rect.fromCircle(center: Offset(size.width * 0.5, size.height * 0.36), radius: size.width * 0.95)));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
+}
+
 class _BookPageView extends StatelessWidget {
   const _BookPageView({
-    required this.paper,
-    required this.ink,
-    required this.cover,
     required this.entry,
+    required this.number,
+    required this.total,
     required this.editing,
     required this.titleCtrl,
     required this.bodyCtrl,
     required this.formatDate,
   });
 
-  final Color paper;
-  final Color ink;
-  final Color cover;
   final FamilyBookEntry entry;
+  final int number;
+  final int total;
   final bool editing;
   final TextEditingController titleCtrl;
   final TextEditingController bodyCtrl;
@@ -456,118 +534,95 @@ class _BookPageView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
+    const paper = _FamilyBookScreenState._paper;
+    const ink = _FamilyBookScreenState._ink;
+    const leather = _FamilyBookScreenState._leather;
+    const gold = _FamilyBookScreenState._gold;
+    final body = entry.body.trim();
+    return Stack(children: [
+      // The stack of pages showing on the right edge.
+      for (var i = 3; i >= 1; i--)
+        Positioned(
+          left: 14,
+          right: -i * 2.2,
+          top: i * 2.0,
+          bottom: -i * 2.0,
+          child: DecoratedBox(decoration: BoxDecoration(color: Color.lerp(paper, const Color(0xFFD9C8A0), i / 4), borderRadius: const BorderRadius.horizontal(right: Radius.circular(12)), border: Border(right: BorderSide(color: Colors.black.withValues(alpha: 0.12))))),
+        ),
+      Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Container(
-          width: 10,
+          width: 14,
           decoration: BoxDecoration(
-            color: cover.withValues(alpha: 0.95),
+            gradient: const LinearGradient(colors: [Color(0xFF9A5128), Color(0xFF5A2A12)]),
             borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
-            boxShadow: [
-              BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 6, offset: const Offset(2, 0)),
-            ],
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(2, 0))],
           ),
+          child: Column(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [for (var i = 0; i < 5; i++) Container(width: 3, height: 14, decoration: BoxDecoration(color: gold.withValues(alpha: 0.6), borderRadius: BorderRadius.circular(2)))]),
         ),
         Expanded(
           child: Container(
             decoration: BoxDecoration(
-              color: paper,
-              borderRadius: const BorderRadius.horizontal(right: Radius.circular(10)),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 16, offset: const Offset(0, 6)),
-              ],
+              gradient: const LinearGradient(begin: Alignment.centerLeft, end: Alignment.centerRight, colors: [Color(0xFFE9D9B3), paper, paper, Color(0xFFF3E7C8)], stops: [0, 0.07, 0.9, 1]),
+              borderRadius: const BorderRadius.horizontal(right: Radius.circular(12)),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 18, offset: const Offset(0, 8))],
             ),
             child: ClipRRect(
-              borderRadius: const BorderRadius.horizontal(right: Radius.circular(10)),
-              child: Stack(
-                children: [
-                  Positioned(
-                    right: -30,
-                    top: 0,
-                    bottom: 0,
-                    child: Container(
-                      width: 60,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Colors.transparent, Colors.black.withValues(alpha: 0.04)],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
-                    child: editing
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              TextField(
-                                controller: titleCtrl,
-                                style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 20),
-                                decoration: InputDecoration(
-                                  hintText: 'Page title',
-                                  hintStyle: TextStyle(color: ink.withValues(alpha: 0.35)),
-                                  border: InputBorder.none,
-                                ),
-                              ),
-                              Text(
-                                formatDate(entry.updatedAt),
-                                style: TextStyle(fontSize: 11, color: ink.withValues(alpha: 0.45)),
-                              ),
-                              const SizedBox(height: 12),
+              borderRadius: const BorderRadius.horizontal(right: Radius.circular(12)),
+              child: Stack(children: [
+                // A ribbon marking the page.
+                Positioned(right: 26, top: -2, child: CustomPaint(size: const Size(16, 40), painter: _RibbonPainter())),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(26, 26, 24, 14),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    Expanded(
+                      child: editing
+                          ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                              TextField(controller: titleCtrl, style: const TextStyle(color: ink, fontFamily: 'serif', fontWeight: FontWeight.w900, fontSize: 21), decoration: InputDecoration(hintText: 'Page title', hintStyle: TextStyle(color: ink.withValues(alpha: 0.35)), border: InputBorder.none)),
+                              Text(formatDate(entry.updatedAt), style: TextStyle(fontSize: 11, color: ink.withValues(alpha: 0.45))),
+                              const SizedBox(height: 10),
                               Expanded(
                                 child: TextField(
                                   controller: bodyCtrl,
                                   maxLines: null,
                                   expands: true,
                                   textAlignVertical: TextAlignVertical.top,
-                                  style: TextStyle(color: ink, fontSize: 16, height: 1.65),
-                                  decoration: InputDecoration(
-                                    hintText: 'Write your family story here…',
-                                    hintStyle: TextStyle(color: ink.withValues(alpha: 0.35)),
-                                    border: InputBorder.none,
-                                  ),
+                                  style: const TextStyle(color: ink, fontFamily: 'serif', fontSize: 16.5, height: 1.65),
+                                  decoration: InputDecoration(hintText: 'Write your family story here…', hintStyle: TextStyle(color: ink.withValues(alpha: 0.35)), border: InputBorder.none),
                                 ),
                               ),
-                            ],
-                          )
-                        : SingleChildScrollView(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  entry.title,
-                                  style: TextStyle(
-                                    color: ink,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 22,
-                                    height: 1.2,
+                            ])
+                          : SingleChildScrollView(
+                              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Text(entry.title, style: const TextStyle(color: ink, fontFamily: 'serif', fontWeight: FontWeight.w900, fontSize: 23, height: 1.2)),
+                                const SizedBox(height: 4),
+                                Text(formatDate(entry.updatedAt), style: TextStyle(fontSize: 11, color: ink.withValues(alpha: 0.5), fontStyle: FontStyle.italic)),
+                                const SizedBox(height: 8),
+                                Row(children: [Expanded(child: Container(height: 1, color: leather.withValues(alpha: 0.35))), Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: Text('❦', style: TextStyle(color: leather.withValues(alpha: 0.7), fontSize: 16))), Expanded(child: Container(height: 1, color: leather.withValues(alpha: 0.35)))]),
+                                const SizedBox(height: 14),
+                                if (body.isEmpty)
+                                  Text('This page is blank. Tap the pencil to write.', style: TextStyle(color: ink.withValues(alpha: 0.4), fontFamily: 'serif', fontSize: 16, height: 1.7))
+                                else
+                                  Text.rich(
+                                    TextSpan(children: [
+                                      // A big first letter, like the start of a chapter in a storybook.
+                                      TextSpan(text: body.substring(0, 1), style: const TextStyle(color: leather, fontSize: 40, fontWeight: FontWeight.w900, height: 1.0)),
+                                      TextSpan(text: body.substring(1)),
+                                    ]),
+                                    style: TextStyle(color: ink.withValues(alpha: 0.93), fontFamily: 'serif', fontSize: 16.5, height: 1.72),
                                   ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  formatDate(entry.updatedAt),
-                                  style: TextStyle(fontSize: 11, color: ink.withValues(alpha: 0.45)),
-                                ),
-                                const SizedBox(height: 18),
-                                Text(
-                                  entry.body.trim().isEmpty ? 'This page is blank. Tap edit to write.' : entry.body,
-                                  style: TextStyle(
-                                    color: ink.withValues(alpha: entry.body.trim().isEmpty ? 0.4 : 0.92),
-                                    fontSize: 16,
-                                    height: 1.7,
-                                  ),
-                                ),
-                              ],
+                              ]),
                             ),
-                          ),
-                  ),
-                ],
-              ),
+                    ),
+                    Padding(padding: const EdgeInsets.only(top: 6), child: Text('— $number —', textAlign: TextAlign.center, style: TextStyle(color: ink.withValues(alpha: 0.5), fontFamily: 'serif', fontSize: 12, letterSpacing: 1))),
+                  ]),
+                ),
+                // The curl of the page near the spine.
+                Positioned(left: 0, top: 0, bottom: 0, width: 22, child: DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(colors: [Colors.black.withValues(alpha: 0.16), Colors.transparent])))),
+              ]),
             ),
           ),
         ),
-      ],
-    );
+      ]),
+    ]);
   }
 }
