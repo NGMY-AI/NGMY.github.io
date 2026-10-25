@@ -1664,8 +1664,12 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
   /// Coins, sparks and ripples fly out of the circle while a session is running (and gently after payout).
   late final AnimationController _fxCtrl;
 
+  /// Saturday / Sunday with no session: the frame shows a calm night scene instead of the clock-in glow.
+  bool get _weekendRest =>
+      NgmyLocalGrowthIncomeStore.isWeekend(DateTime.now()) && !widget.clockedIn && !widget.sessionComplete && !widget.canClockIn;
+
   void _syncFx() {
-    final on = widget.clockedIn || widget.sessionComplete;
+    final on = widget.clockedIn || widget.sessionComplete || _weekendRest;
     if (on && !_fxCtrl.isAnimating) {
       _fxCtrl.repeat();
     } else if (!on && _fxCtrl.isAnimating) {
@@ -1692,10 +1696,7 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
     // Gold while filling AND after noon payout so the bowl stays full/gold.
     final filledGold = widget.clockedIn || widget.sessionComplete;
     // Saturday and Sunday are rest days: no clock-in, no earnings. Say so plainly.
-    final weekendRest = NgmyLocalGrowthIncomeStore.isWeekend(DateTime.now()) &&
-        !widget.clockedIn &&
-        !widget.sessionComplete &&
-        !widget.canClockIn;
+    final weekendRest = _weekendRest;
     final status = widget.clockedIn
         ? 'COUNTING TO 12 PM'
         : (widget.sessionComplete
@@ -1709,7 +1710,7 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
       borderRadius: BorderRadius.circular(32),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 520),
-        height: weekendRest ? 480 : 392,
+        height: 392,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(32),
           gradient: LinearGradient(
@@ -1741,6 +1742,20 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
               Positioned(right: -30, top: -36, child: _glowBlob(const Color(0xFF22D3EE), 120)),
               Positioned(left: -36, bottom: -40, child: _glowBlob(widget.green, 130)),
             ],
+            if (weekendRest)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(32),
+                    child: RepaintBoundary(
+                      child: AnimatedBuilder(
+                        animation: _fxCtrl,
+                        builder: (context, _) => CustomPaint(painter: _WeekendRestPainter(t: _fxCtrl.value)),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             // Things flying out of the circle, all over the frame.
             if (filledGold)
               Positioned.fill(
@@ -1871,7 +1886,7 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Icon(
-                                    filledGold ? Icons.local_fire_department_rounded : Icons.fingerprint_rounded,
+                                    filledGold ? Icons.local_fire_department_rounded : (weekendRest ? Icons.nightlight_round : Icons.fingerprint_rounded),
                                     color: filledGold ? _goldLight : const Color(0xFF67E8F9),
                                     size: 26,
                                   ),
@@ -1879,7 +1894,7 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
                                   Text(
                                     widget.clockedIn
                                         ? 'FILLING TO 12 PM'
-                                        : (widget.sessionComplete ? 'FULL DAY EARNED' : (weekendRest ? 'REST DAY' : 'DAILY EARNINGS')),
+                                        : (widget.sessionComplete ? 'FULL DAY EARNED' : (weekendRest ? 'NO WORK SAT & SUN' : 'DAILY EARNINGS')),
                                     style: TextStyle(
                                       color: Colors.white.withValues(alpha: 0.62),
                                       fontSize: 9,
@@ -1889,10 +1904,10 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '\$${formatCurrency(widget.sessionComplete && widget.dailyGoal > 0 ? widget.dailyGoal : live)}',
+                                    weekendRest ? 'Back Monday' : '\$${formatCurrency(widget.sessionComplete && widget.dailyGoal > 0 ? widget.dailyGoal : live)}',
                                     style: TextStyle(
                                       color: filledGold ? _goldLight : Colors.white,
-                                      fontSize: 28,
+                                      fontSize: weekendRest ? 22 : 28,
                                       fontWeight: FontWeight.w900,
                                       letterSpacing: -0.6,
                                     ),
@@ -1926,40 +1941,6 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
                 );
               },
             ),
-            if (weekendRest)
-              Positioned(
-                left: 14,
-                right: 14,
-                bottom: 14,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(18),
-                    color: const Color(0xFF0C1016).withValues(alpha: 0.82),
-                    border: Border.all(color: const Color(0xFF67E8F9).withValues(alpha: 0.35)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.event_busy_rounded, color: Color(0xFF67E8F9), size: 20),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text('Weekend rest day', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12.5)),
-                            const SizedBox(height: 2),
-                            Text(
-                              'We do not work on Saturdays and Sundays, so there is no clock-in or earnings today. Your balance is safe, and earning resumes Monday.',
-                              style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 11, height: 1.3),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
           ],
         ),
       ),
@@ -2894,6 +2875,16 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
   Widget _historyPanel() {
     final wallet = widget.transactions.where(_isGrowthIncomeHistoryRow).toList()
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    // The balance before and after every move, worked back from today's balance through everything
+    // on the account (games included, since they moved the balance too).
+    final me = widget.realEmail.toLowerCase().trim();
+    final every = <String, AppTransaction>{
+      for (final t in ngmyAppTransactionsForWallet?.call() ?? const <AppTransaction>[])
+        if (t.id.isNotEmpty && t.userEmail.toLowerCase().trim() == me) t.id: t,
+      for (final t in widget.transactions)
+        if (t.id.isNotEmpty) t.id: t,
+    };
+    final trail = ngmyBalanceTrail(every.values.toList(), ngmyLiveBalanceFor(widget.realEmail, fallback: () => widget.user.accountBalance));
     return Container(
       key: const ValueKey('history'),
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
@@ -2952,7 +2943,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
               ),
             )
           else ...[
-            for (final t in wallet.take(_historyShown)) _historyRow(t),
+            for (final t in wallet.take(_historyShown)) _historyRow(t, trail[t.id]),
             // Older rows are never dropped — load them on request.
             if (wallet.length > _historyShown)
               TextButton.icon(
@@ -2967,7 +2958,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
     );
   }
 
-  Widget _historyRow(AppTransaction t) {
+  Widget _historyRow(AppTransaction t, ({double before, double after})? trail) {
     final approved = t.status == TransactionStatus.approved;
     final pending = t.status == TransactionStatus.pending;
     final outgoing = t.type == TransactionType.withdrawal || t.type == TransactionType.adminRemove || t.type == TransactionType.contribution;
@@ -3008,6 +2999,18 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 10.5),
                   ),
+                if (trail != null && t.status != TransactionStatus.rejected)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 5),
+                    child: Wrap(
+                      spacing: 5,
+                      runSpacing: 4,
+                      children: [
+                        _balanceChip('Before', trail.before),
+                        _balanceChip('After', trail.after),
+                      ],
+                    ),
+                  ),
               ],
             ),
           ),
@@ -3035,7 +3038,27 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
     );
   }
 
+  /// A tiny frame showing the balance before or after a move.
+  Widget _balanceChip(String label, double value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(7),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+      ),
+      child: Text.rich(
+        TextSpan(children: [
+          TextSpan(text: '$label ', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontWeight: FontWeight.w700)),
+          TextSpan(text: '\$${formatCurrency(value)}', style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontWeight: FontWeight.w900)),
+        ]),
+        style: const TextStyle(fontSize: 9.5),
+      ),
+    );
+  }
+
   bool _isGrowthIncomeHistoryRow(AppTransaction t) {
+
     // Rejected requests stay in history (marked Rejected) instead of vanishing.
     final details = (t.sourceDetails ?? '').toLowerCase();
     if (details.contains('clock-in session started')) return false;
@@ -3122,4 +3145,92 @@ String ngmyActivityTitle(AppTransaction t) {
   if (t.type == TransactionType.deposit) return 'Deposit';
   if (t.type == TransactionType.withdrawal) return 'Withdrawal';
   return d.isNotEmpty ? d : t.type.name;
+}
+
+/// How much each move changed the balance (null = none): deposits, rewards and credits add, spending
+/// and approved withdrawals take away, a waiting withdrawal is already held, refused requests do nothing.
+double _ngmyBalanceEffect(AppTransaction t) {
+  final adds = t.type == TransactionType.deposit ||
+      t.type == TransactionType.adminAdd ||
+      t.type == TransactionType.reimbursement ||
+      t.type == TransactionType.claim;
+  if (t.status == TransactionStatus.pending) return t.type == TransactionType.withdrawal ? -t.amount : 0.0;
+  if (t.status != TransactionStatus.approved) return 0.0;
+  return adds ? t.amount : -t.amount;
+}
+
+/// The balance before and after every transaction, worked backwards from [current].
+Map<String, ({double before, double after})> ngmyBalanceTrail(List<AppTransaction> all, double current) {
+  final sorted = [...all]..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+  final out = <String, ({double before, double after})>{};
+  var running = current < 0 ? 0.0 : current;
+  for (final t in sorted) {
+    final after = running;
+    var before = after - _ngmyBalanceEffect(t);
+    if (before < 0) before = 0.0;
+    out[t.id] = (before: before, after: after);
+    running = before;
+  }
+  return out;
+}
+
+/// Weekend rest scene: twinkling stars, a slow glow of light, drifting "z" letters and a few shooting stars.
+class _WeekendRestPainter extends CustomPainter {
+  _WeekendRestPainter({required this.t});
+  final double t;
+
+  double _h(int i, int salt) {
+    final x = math.sin(i * 12.9898 + salt * 78.233) * 43758.5453;
+    return x - x.floorToDouble();
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final tau = math.pi * 2;
+    // Slow northern-light bands.
+    for (var k = 0; k < 3; k++) {
+      final y = size.height * (0.2 + 0.25 * k) + math.sin(t * tau + k * 2) * 14;
+      final rect = Rect.fromLTWH(0, y - 40, size.width, 80);
+      final c = [const Color(0xFF22D3EE), const Color(0xFF818CF8), const Color(0xFF34D399)][k];
+      canvas.drawRect(
+        rect,
+        Paint()..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [c.withValues(alpha: 0), c.withValues(alpha: 0.10), c.withValues(alpha: 0)]).createShader(rect),
+      );
+    }
+    // Twinkling stars (whole cycles, so the loop has no jump).
+    for (var i = 0; i < 46; i++) {
+      final x = _h(i, 1) * size.width;
+      final y = _h(i, 2) * size.height;
+      final tw = 0.25 + 0.75 * (0.5 + 0.5 * math.sin(t * tau * (1 + i % 3) + i));
+      final r = 0.7 + _h(i, 3) * 1.5;
+      canvas.drawCircle(Offset(x, y), r, Paint()..color = Colors.white.withValues(alpha: 0.55 * tw));
+      if (i % 9 == 0) {
+        final p = Paint()..color = const Color(0xFFA5F3FC).withValues(alpha: 0.35 * tw)..strokeWidth = 1;
+        canvas.drawLine(Offset(x - 4, y), Offset(x + 4, y), p);
+        canvas.drawLine(Offset(x, y - 4), Offset(x, y + 4), p);
+      }
+    }
+    // Shooting stars.
+    for (var i = 0; i < 2; i++) {
+      final p = (t * 2 + i * 0.5) % 1.0;
+      if (p > 0.35) continue;
+      final k = p / 0.35;
+      final start = Offset(size.width * (0.75 - i * 0.4) , size.height * (0.1 + i * 0.12));
+      final head = start + Offset(-size.width * 0.35 * k, size.height * 0.2 * k);
+      final tail = head + Offset(size.width * 0.08, -size.height * 0.02);
+      canvas.drawLine(tail, head, Paint()..color = Colors.white.withValues(alpha: 0.7 * (1 - k))..strokeWidth = 1.6..strokeCap = StrokeCap.round);
+    }
+    // Drifting z's.
+    for (var i = 0; i < 4; i++) {
+      final p = (t * 2 + i * 0.25) % 1.0;
+      final tp = TextPainter(
+        text: TextSpan(text: 'z', style: TextStyle(color: const Color(0xFFA5F3FC).withValues(alpha: 0.5 * math.sin(p * math.pi)), fontSize: 12 + p * 14, fontWeight: FontWeight.w900)),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, Offset(size.width * 0.62 + math.sin(p * tau + i) * 12 + i * 8, size.height * 0.36 - p * 90));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _WeekendRestPainter old) => old.t != t;
 }
