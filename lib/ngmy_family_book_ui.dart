@@ -408,6 +408,7 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
             const Text('What should the AI do?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
             const SizedBox(height: 12),
             if (widget.familyFacts.trim().isNotEmpty) _menuTile(ctx, Icons.auto_awesome_rounded, 'Write new pages', 'Choose English or Swahili, then describe the book', 'write'),
+            if (widget.canEdit) _menuTile(ctx, Icons.build_circle_rounded, 'Fix or change something', 'Correct a word, rewrite a page, add to it, or redesign the cover', 'fix'),
             if (_entries.isNotEmpty) ...[
               if (bookLang == 'en') Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('Your book is in English.', style: TextStyle(color: _paper.withValues(alpha: 0.7), fontSize: 12))),
               if (bookLang == 'sw') Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('Your book is in Swahili.', style: TextStyle(color: _paper.withValues(alpha: 0.7), fontSize: 12))),
@@ -422,6 +423,8 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
     if (choice == null || !mounted) return;
     if (choice == 'write') {
       await _writeWithAi();
+    } else if (choice == 'fix') {
+      await _fixWithAi();
     } else {
       await _translateAll(choice == 'sw' ? 'Swahili (Kiswahili)' : 'English');
     }
@@ -446,6 +449,92 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
           ),
         ),
       );
+
+  /// The person says what they do not like; the AI changes that page, the whole book, or the cover. Undo brings it back.
+  Future<void> _fixWithAi() async {
+    final ask = await showDialog<({String text, String scope})>(
+      context: context,
+      builder: (ctx) => _FixDialog(canPage: _pageIndex >= 0 && _entries.isNotEmpty, hasPages: _entries.isNotEmpty, onPage: _pageIndex + 1),
+    );
+    if (ask == null || !mounted) return;
+    final beforeEntries = List<FamilyBookEntry>.of(_entries);
+    final beforeCover = _coverDesign;
+    final status = ValueNotifier<String>('Working on it…');
+    var showing = true;
+    unawaited(showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          backgroundColor: const Color(0xFF241409),
+          content: ValueListenableBuilder<String>(
+            valueListenable: status,
+            builder: (_, v, __) => Row(children: [
+              const SizedBox(width: 26, height: 26, child: CircularProgressIndicator(strokeWidth: 3, color: _gold)),
+              const SizedBox(width: 16),
+              Expanded(child: Text(v, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
+            ]),
+          ),
+        ),
+      ),
+    ).whenComplete(() => showing = false));
+    String? error;
+    NgmyBookEditResult? result;
+    try {
+      result = await ngmyEditBookWithAi(
+        instruction: ask.text,
+        scope: ask.scope,
+        pages: [for (final e in beforeEntries) (e.title, e.body)],
+        pageIndex: _pageIndex,
+        cover: _coverDesign.toJson(),
+        styleIds: [for (final st in kFamilyCoverStyles) st.id],
+        onStatus: (s, _) => status.value = s,
+      );
+    } catch (e) {
+      error = '$e';
+    }
+    if (mounted && showing) Navigator.of(context, rootNavigator: true).pop();
+    status.dispose();
+    if (!mounted) return;
+    if (result == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error ?? 'The AI could not do that just now. Nothing was changed.')));
+      return;
+    }
+    var touched = false;
+    if (result.pages.isNotEmpty) {
+      final next = [
+        for (var i = 0; i < beforeEntries.length; i++)
+          result.pages.containsKey(i) ? beforeEntries[i].copyWith(title: result.pages[i]!.$1, body: result.pages[i]!.$2, updatedAt: DateTime.now()) : beforeEntries[i],
+      ];
+      await saveFamilyBookEntries(widget.userEmail, widget.treeId, next);
+      await _reload();
+      touched = true;
+    }
+    if (result.cover != null && result.cover!.isNotEmpty) {
+      final nc = _coverDesign.applyAi(result.cover!, styleIds: [for (final st in kFamilyCoverStyles) st.id], emblemCount: kFamilyCoverEmblems.length);
+      await saveFamilyBookCover(widget.userEmail, widget.treeId, nc);
+      if (mounted) setState(() => _coverDesign = nc);
+      if (_pageCtrl.hasClients && ask.scope == 'cover') unawaited(_pageCtrl.animateToPage(0, duration: const Duration(milliseconds: 400), curve: Curves.easeOut));
+      touched = true;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(result.message),
+      duration: const Duration(seconds: 8),
+      action: touched
+          ? SnackBarAction(
+              label: 'Undo',
+              onPressed: () async {
+                await saveFamilyBookEntries(widget.userEmail, widget.treeId, beforeEntries);
+                await saveFamilyBookCover(widget.userEmail, widget.treeId, beforeCover);
+                if (mounted) setState(() => _coverDesign = beforeCover);
+                await _reload();
+              },
+            )
+          : null,
+    ));
+  }
 
   /// Turns every page into the other language. The old text is kept so it can be brought back.
   Future<void> _translateAll(String target) async {
@@ -560,6 +649,100 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
 }
 
 /// The leather front cover: gold edges, an embossed title and a ribbon.
+/// Where the person types what they want changed, and chooses what the AI may change.
+class _FixDialog extends StatefulWidget {
+  const _FixDialog({required this.canPage, required this.hasPages, required this.onPage});
+  final bool canPage;
+  final bool hasPages;
+  final int onPage;
+
+  @override
+  State<_FixDialog> createState() => _FixDialogState();
+}
+
+class _FixDialogState extends State<_FixDialog> {
+  final TextEditingController _text = TextEditingController();
+  late String _scope = widget.canPage ? 'page' : (widget.hasPages ? 'book' : 'cover');
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  List<String> get _examples => switch (_scope) {
+        'cover' => const ['Make the cover dark blue with silver letters', 'Put the title at the top and make it bigger', 'Use a star sky and a heart picture', 'Add our family name under the title'],
+        'book' => const ['Correct the spelling in the whole book', 'Change the word "tree" to the right Swahili word', 'Use simple words everyone understands', 'Make every page a little shorter'],
+        _ => const ['Correct the spelling', 'Rewrite this page in simpler words', 'Add a paragraph about the family farm', 'Make this page shorter'],
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    const gold = Color(0xFFE8C46A);
+    return Dialog(
+      backgroundColor: const Color(0xFF241409),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26), side: BorderSide(color: gold.withValues(alpha: 0.5), width: 1.4)),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(18),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const NgmyAiBadge(size: 40),
+            const SizedBox(width: 10),
+            const Expanded(child: Text('Tell the AI what to fix', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18))),
+            IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, color: Colors.white70)),
+          ]),
+          const SizedBox(height: 10),
+          const Text('WHAT SHOULD IT CHANGE?', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1)),
+          const SizedBox(height: 6),
+          Wrap(spacing: 8, runSpacing: 6, children: [
+            if (widget.canPage) ChoiceChip(label: Text('This page (${widget.onPage})'), selected: _scope == 'page', onSelected: (_) => setState(() => _scope = 'page')),
+            if (widget.hasPages) ChoiceChip(label: const Text('The whole book'), selected: _scope == 'book', onSelected: (_) => setState(() => _scope = 'book')),
+            ChoiceChip(label: const Text('The cover design'), selected: _scope == 'cover', onSelected: (_) => setState(() => _scope = 'cover')),
+          ]),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _text,
+            minLines: 3,
+            maxLines: 6,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'Say it in your own words…',
+              hintStyle: const TextStyle(color: Colors.white38),
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: 0.07),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(spacing: 6, runSpacing: 6, children: [
+            for (final e in _examples)
+              ActionChip(
+                label: Text(e, style: const TextStyle(fontSize: 11.5)),
+                backgroundColor: Colors.white.withValues(alpha: 0.08),
+                labelStyle: const TextStyle(color: Colors.white70),
+                onPressed: () => setState(() => _text.text = e),
+              ),
+          ]),
+          const SizedBox(height: 14),
+          FilledButton.icon(
+            onPressed: () {
+              final t = _text.text.trim();
+              if (t.isEmpty) return;
+              Navigator.pop(context, (text: t, scope: _scope));
+            },
+            icon: const Icon(Icons.auto_fix_high_rounded),
+            label: const Text('Do it', style: TextStyle(fontWeight: FontWeight.w900)),
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50), backgroundColor: const Color(0xFF8B5CF6), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+          ),
+          const SizedBox(height: 4),
+          const Text('You can undo it right after.', style: TextStyle(color: Colors.white38, fontSize: 11.5)),
+        ]),
+      ),
+    );
+  }
+}
+
 class _HeaderTool {
   const _HeaderTool(this.icon, this.label, this.onTap, {this.hot = false});
   final IconData icon;
@@ -577,40 +760,122 @@ class _BookCover extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final st = kFamilyCoverStyles.firstWhere((x) => x.id == design.style, orElse: () => kFamilyCoverStyles.first);
-    final gold = design.silver ? const Color(0xFFE5E7EB) : _FamilyBookScreenState._gold;
+    final gold = Color(kCoverFoils[design.foil] ?? 0xFFE8C46A);
+    final align = design.position == 'top' ? MainAxisAlignment.start : (design.position == 'bottom' ? MainAxisAlignment.end : MainAxisAlignment.center);
+    Widget frame(EdgeInsets pad, double radius, double alpha, double width) => Positioned.fill(child: Padding(padding: pad, child: DecoratedBox(decoration: BoxDecoration(borderRadius: BorderRadius.circular(radius), border: Border.all(color: gold.withValues(alpha: alpha), width: width)))));
     return Container(
       decoration: BoxDecoration(
         borderRadius: const BorderRadius.horizontal(left: Radius.circular(8), right: Radius.circular(18)),
         gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: st.colors),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.6), blurRadius: 28, offset: const Offset(8, 14))],
       ),
-      child: Stack(children: [
-        Positioned.fill(child: CustomPaint(painter: _LeatherPainter())),
-        // The spine, with its stitches.
-        Positioned(left: 0, top: 0, bottom: 0, width: 26, child: Container(decoration: BoxDecoration(borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)), gradient: LinearGradient(colors: [Colors.black.withValues(alpha: 0.45), Colors.transparent])))),
-        for (var i = 0; i < 6; i++) Positioned(left: 8, top: 40.0 + i * 46, child: Container(width: 6, height: 22, decoration: BoxDecoration(color: gold.withValues(alpha: 0.7), borderRadius: BorderRadius.circular(3)))),
-        // Gold frame.
-        Positioned.fill(child: Padding(padding: const EdgeInsets.fromLTRB(40, 24, 24, 24), child: DecoratedBox(decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: gold.withValues(alpha: 0.85), width: 2.2))))),
-        Positioned.fill(child: Padding(padding: const EdgeInsets.fromLTRB(46, 30, 30, 30), child: DecoratedBox(decoration: BoxDecoration(borderRadius: BorderRadius.circular(5), border: Border.all(color: gold.withValues(alpha: 0.45), width: 1))))),
-        Positioned.fill(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(56, 40, 40, 40),
-            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Icon(kFamilyCoverEmblems[design.emblem.clamp(0, kFamilyCoverEmblems.length - 1)], color: gold.withValues(alpha: 0.95), size: 44),
-              const SizedBox(height: 14),
-              Text(title, textAlign: TextAlign.center, maxLines: 4, overflow: TextOverflow.ellipsis, style: TextStyle(color: gold, fontWeight: FontWeight.w900, fontSize: 25, height: 1.2, letterSpacing: 0.5, shadows: [Shadow(color: Colors.black54, blurRadius: 3, offset: Offset(1, 2))])),
-              const SizedBox(height: 12),
-              Container(width: 90, height: 2, color: gold.withValues(alpha: 0.7)),
-              const SizedBox(height: 12),
-              Text(design.subtitle.trim().isNotEmpty ? design.subtitle.trim() : (pages == 0 ? 'A family story' : '$pages ${pages == 1 ? 'page' : 'pages'} of our story'), style: TextStyle(color: gold.withValues(alpha: 0.85), fontStyle: FontStyle.italic, fontSize: 14)),
-            ]),
+      child: ClipRRect(
+        borderRadius: const BorderRadius.horizontal(left: Radius.circular(8), right: Radius.circular(18)),
+        child: Stack(children: [
+          Positioned.fill(child: CustomPaint(painter: _CoverTexturePainter(design.texture, gold))),
+          // The spine, with its stitches.
+          Positioned(left: 0, top: 0, bottom: 0, width: 26, child: Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [Colors.black.withValues(alpha: 0.45), Colors.transparent])))),
+          for (var i = 0; i < 6; i++) Positioned(left: 8, top: 40.0 + i * 46, child: Container(width: 6, height: 22, decoration: BoxDecoration(color: gold.withValues(alpha: 0.7), borderRadius: BorderRadius.circular(3)))),
+          if (design.frame == 'double') ...[
+            frame(const EdgeInsets.fromLTRB(40, 24, 24, 24), 8, 0.85, 2.2),
+            frame(const EdgeInsets.fromLTRB(46, 30, 30, 30), 5, 0.45, 1),
+          ] else if (design.frame == 'single')
+            frame(const EdgeInsets.fromLTRB(40, 24, 24, 24), 8, 0.85, 2.4)
+          else if (design.frame == 'corners')
+            Positioned.fill(child: Padding(padding: const EdgeInsets.fromLTRB(38, 22, 22, 22), child: CustomPaint(painter: _CornerPainter(gold)))),
+          Positioned.fill(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(56, 40, 40, 40),
+              child: Column(mainAxisAlignment: align, children: [
+                Icon(kFamilyCoverEmblems[design.emblem.clamp(0, kFamilyCoverEmblems.length - 1)], color: gold.withValues(alpha: 0.95), size: 44),
+                const SizedBox(height: 14),
+                Text(title, textAlign: TextAlign.center, maxLines: 4, overflow: TextOverflow.ellipsis, style: TextStyle(color: gold, fontWeight: FontWeight.w900, fontSize: design.titleSize, height: 1.2, letterSpacing: 0.5, shadows: const [Shadow(color: Colors.black54, blurRadius: 3, offset: Offset(1, 2))])),
+                const SizedBox(height: 12),
+                Container(width: 90, height: 2, color: gold.withValues(alpha: 0.7)),
+                const SizedBox(height: 12),
+                Text(design.subtitle.trim().isNotEmpty ? design.subtitle.trim() : (pages == 0 ? 'A family story' : '$pages ${pages == 1 ? 'page' : 'pages'} of our story'), textAlign: TextAlign.center, style: TextStyle(color: gold.withValues(alpha: 0.85), fontStyle: FontStyle.italic, fontSize: 14)),
+                if (design.author.trim().isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Text(design.author.trim(), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: gold.withValues(alpha: 0.9), fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 1.2)),
+                ],
+              ]),
+            ),
           ),
-        ),
-        // The ribbon bookmark.
-        Positioned(right: 46, top: 0, child: CustomPaint(size: const Size(22, 64), painter: _RibbonPainter())),
-      ]),
+          // The ribbon bookmark.
+          if (design.ribbon) Positioned(right: 46, top: 0, child: CustomPaint(size: const Size(22, 64), painter: _RibbonPainter())),
+        ]),
+      ),
     );
   }
+}
+
+/// The feel of the cover material: leather grain, linen weave, stars or soft rays of light.
+class _CoverTexturePainter extends CustomPainter {
+  _CoverTexturePainter(this.texture, this.foil);
+  final String texture;
+  final Color foil;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = math.Random(11);
+    switch (texture) {
+      case 'plain':
+        return;
+      case 'linen':
+        final p = Paint()..color = Colors.black.withValues(alpha: 0.07)..strokeWidth = 1;
+        for (var y = 0.0; y < size.height; y += 4) {
+          canvas.drawLine(Offset(0, y), Offset(size.width, y), p);
+        }
+        final q = Paint()..color = Colors.white.withValues(alpha: 0.05)..strokeWidth = 1;
+        for (var x = 0.0; x < size.width; x += 4) {
+          canvas.drawLine(Offset(x, 0), Offset(x, size.height), q);
+        }
+      case 'stars':
+        for (var i = 0; i < 70; i++) {
+          final c = Offset(r.nextDouble() * size.width, r.nextDouble() * size.height);
+          canvas.drawCircle(c, 0.6 + r.nextDouble() * 1.6, Paint()..color = foil.withValues(alpha: 0.25 + r.nextDouble() * 0.5));
+        }
+      case 'rays':
+        final c = Offset(size.width * 0.55, size.height * 0.1);
+        for (var i = 0; i < 14; i++) {
+          final a = math.pi * 0.15 + i * (math.pi * 0.7 / 13);
+          final path = Path()..moveTo(c.dx, c.dy)..lineTo(c.dx + math.cos(a - 0.04) * size.height * 1.4, c.dy + math.sin(a - 0.04) * size.height * 1.4)..lineTo(c.dx + math.cos(a + 0.04) * size.height * 1.4, c.dy + math.sin(a + 0.04) * size.height * 1.4)..close();
+          canvas.drawPath(path, Paint()..color = foil.withValues(alpha: i.isEven ? 0.09 : 0.03));
+        }
+      default:
+        final p = Paint()..color = Colors.black.withValues(alpha: 0.07);
+        for (var i = 0; i < 260; i++) {
+          canvas.drawCircle(Offset(r.nextDouble() * size.width, r.nextDouble() * size.height), 0.8 + r.nextDouble() * 1.8, p);
+        }
+        final hi = Paint()..color = Colors.white.withValues(alpha: 0.035);
+        for (var i = 0; i < 120; i++) {
+          canvas.drawCircle(Offset(r.nextDouble() * size.width, r.nextDouble() * size.height), 0.6 + r.nextDouble() * 1.2, hi);
+        }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CoverTexturePainter old) => old.texture != texture || old.foil != foil;
+}
+
+/// Gold corner brackets instead of a full frame.
+class _CornerPainter extends CustomPainter {
+  _CornerPainter(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()..color = color.withValues(alpha: 0.9)..style = PaintingStyle.stroke..strokeWidth = 2.4..strokeCap = StrokeCap.round;
+    const l = 34.0;
+    for (final corner in [(0.0, 0.0, 1.0, 1.0), (size.width, 0.0, -1.0, 1.0), (0.0, size.height, 1.0, -1.0), (size.width, size.height, -1.0, -1.0)]) {
+      final x = corner.$1, y = corner.$2, dx = corner.$3, dy = corner.$4;
+      canvas.drawPath(Path()..moveTo(x + dx * l, y)..lineTo(x, y)..lineTo(x, y + dy * l), p);
+      canvas.drawCircle(Offset(x + dx * 9, y + dy * 9), 3, Paint()..color = color.withValues(alpha: 0.9));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CornerPainter old) => old.color != color;
 }
 
 class FamilyCoverStyle {
@@ -652,13 +917,21 @@ class _CoverDesignerState extends State<_CoverDesigner> {
   late FamilyBookCover _c = widget.start;
   late final TextEditingController _title = TextEditingController(text: widget.start.title);
   late final TextEditingController _sub = TextEditingController(text: widget.start.subtitle);
+  late final TextEditingController _author = TextEditingController(text: widget.start.author);
 
   @override
   void dispose() {
     _title.dispose();
     _sub.dispose();
+    _author.dispose();
     super.dispose();
   }
+
+  Widget _label(String t) => Text(t, style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1));
+
+  Widget _chips(List<String> ids, String current, void Function(String) pick, Map<String, String> names) => Wrap(spacing: 8, runSpacing: 6, children: [
+        for (final id in ids) ChoiceChip(label: Text(names[id] ?? id), selected: current == id, onSelected: (_) => setState(() => pick(id))),
+      ]);
 
   InputDecoration _deco(String label) => InputDecoration(
         labelText: label,
@@ -671,7 +944,7 @@ class _CoverDesignerState extends State<_CoverDesigner> {
 
   @override
   Widget build(BuildContext context) {
-    final shown = _c.copyWith(title: _title.text, subtitle: _sub.text);
+    final shown = _c.copyWith(title: _title.text, subtitle: _sub.text, author: _author.text);
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: SafeArea(
@@ -710,16 +983,40 @@ class _CoverDesignerState extends State<_CoverDesigner> {
                 ),
             ]),
             const SizedBox(height: 14),
-            Row(children: [
-              const Text('LETTERING', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1)),
-              const Spacer(),
-              ChoiceChip(label: const Text('Gold'), selected: !_c.silver, onSelected: (_) => setState(() => _c = _c.copyWith(silver: false))),
-              const SizedBox(width: 8),
-              ChoiceChip(label: const Text('Silver'), selected: _c.silver, onSelected: (_) => setState(() => _c = _c.copyWith(silver: true))),
+            TextField(controller: _author, onChanged: (_) => setState(() {}), style: const TextStyle(color: Colors.white), decoration: _deco('Author or family name line (optional)')),
+            const SizedBox(height: 14),
+            _label('LETTERING COLOUR'),
+            const SizedBox(height: 8),
+            Wrap(spacing: 10, runSpacing: 8, children: [
+              for (final f in kCoverFoils.entries)
+                GestureDetector(
+                  onTap: () => setState(() => _c = _c.copyWith(foil: f.key)),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Container(width: 34, height: 34, decoration: BoxDecoration(shape: BoxShape.circle, color: Color(f.value), border: Border.all(color: _c.foil == f.key ? const Color(0xFFC4B5FD) : Colors.white24, width: _c.foil == f.key ? 3 : 1))),
+                    const SizedBox(height: 2),
+                    Text(f.key, style: TextStyle(color: _c.foil == f.key ? Colors.white : Colors.white54, fontSize: 10, fontWeight: FontWeight.w700)),
+                  ]),
+                ),
             ]),
+            const SizedBox(height: 14),
+            _label('TITLE SIZE'),
+            Slider(value: _c.titleSize, min: 18, max: 36, divisions: 9, label: '${_c.titleSize.round()}', onChanged: (v) => setState(() => _c = _c.copyWith(titleSize: v))),
+            _label('WHERE THE WORDS SIT'),
+            const SizedBox(height: 6),
+            _chips(kCoverPositions, _c.position, (v) => _c = _c.copyWith(position: v), const {'top': 'Top', 'middle': 'Middle', 'bottom': 'Bottom'}),
+            const SizedBox(height: 12),
+            _label('BORDER'),
+            const SizedBox(height: 6),
+            _chips(kCoverFrames, _c.frame, (v) => _c = _c.copyWith(frame: v), const {'double': 'Double line', 'single': 'One line', 'corners': 'Corners', 'none': 'None'}),
+            const SizedBox(height: 12),
+            _label('COVER MATERIAL'),
+            const SizedBox(height: 6),
+            _chips(kCoverTextures, _c.texture, (v) => _c = _c.copyWith(texture: v), const {'leather': 'Leather', 'linen': 'Linen', 'plain': 'Smooth', 'stars': 'Stars', 'rays': 'Light rays'}),
+            const SizedBox(height: 6),
+            SwitchListTile(contentPadding: EdgeInsets.zero, activeThumbColor: const Color(0xFF8B5CF6), title: const Text('Ribbon bookmark', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)), value: _c.ribbon, onChanged: (v) => setState(() => _c = _c.copyWith(ribbon: v))),
             const SizedBox(height: 18),
             FilledButton(
-              onPressed: () => Navigator.pop(context, _c.copyWith(title: _title.text.trim(), subtitle: _sub.text.trim())),
+              onPressed: () => Navigator.pop(context, _c.copyWith(title: _title.text.trim(), subtitle: _sub.text.trim(), author: _author.text.trim())),
               style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50), backgroundColor: const Color(0xFF8B5CF6), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
               child: const Text('Save the cover', style: TextStyle(fontWeight: FontWeight.w900)),
             ),
@@ -735,24 +1032,6 @@ class _RibbonPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final p = Path()..moveTo(0, 0)..lineTo(size.width, 0)..lineTo(size.width, size.height)..lineTo(size.width / 2, size.height - 12)..lineTo(0, size.height)..close();
     canvas.drawPath(p, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFDC2626), Color(0xFF991B1B)]).createShader(Offset.zero & size));
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter old) => false;
-}
-
-class _LeatherPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final r = math.Random(11);
-    final p = Paint()..color = Colors.black.withValues(alpha: 0.07);
-    for (var i = 0; i < 260; i++) {
-      canvas.drawCircle(Offset(r.nextDouble() * size.width, r.nextDouble() * size.height), 0.8 + r.nextDouble() * 1.8, p);
-    }
-    final hi = Paint()..color = Colors.white.withValues(alpha: 0.035);
-    for (var i = 0; i < 120; i++) {
-      canvas.drawCircle(Offset(r.nextDouble() * size.width, r.nextDouble() * size.height), 0.6 + r.nextDouble() * 1.2, hi);
-    }
   }
 
   @override

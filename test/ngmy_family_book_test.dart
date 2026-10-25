@@ -128,6 +128,50 @@ void main() {
     expect(t.takeException(), isNull);
   });
 
+  test('Swahili is written the way people say it, and cover settings from the AI are checked', () {
+    expect(ngmyBookLanguageRule('write it in Swahili'), contains('ukoo'));
+    expect(ngmyBookLanguageRule('A story about our family'), contains('SWAHILI THAT REAL SWAHILI SPEAKERS USE'));
+    expect(kNgmySwahiliStyleGuide, contains('NEVER translate word for word'));
+    final c = const FamilyBookCover().applyAi(
+      {'style': 'midnight', 'foil': 'silver', 'frame': 'corners', 'texture': 'stars', 'position': 'top', 'titleSize': 99, 'emblem': 3, 'ribbon': false, 'author': 'The Smiths', 'bogus': 1, 'frame2': 'x'},
+      styleIds: const ['leather', 'midnight'],
+    );
+    expect(c.style, 'midnight');
+    expect(c.foil, 'silver');
+    expect(c.silver, isTrue);
+    expect(c.frame, 'corners');
+    expect(c.texture, 'stars');
+    expect(c.position, 'top');
+    expect(c.titleSize, 36);
+    expect(c.emblem, 3);
+    expect(c.ribbon, isFalse);
+    expect(c.author, 'The Smiths');
+    // Anything invalid is ignored.
+    final d = c.applyAi({'style': 'nope', 'foil': 'neon', 'frame': 'wavy', 'emblem': 99}, styleIds: const ['leather', 'midnight']);
+    expect(d.style, 'midnight');
+    expect(d.foil, 'silver');
+    expect(d.frame, 'corners');
+    expect(d.emblem, 3);
+    // An old saved cover (silver on/off) still opens.
+    expect(FamilyBookCover.fromJson({'style': 'forest', 'silver': true}).foil, 'silver');
+    expect(FamilyBookCover.fromJson(c.toJson()).texture, 'stars');
+  });
+
+  testWidgets('the AI menu has a place to say what to fix, with a choice of page, book or cover', (t) async {
+    await menuFor(t, 'fix1', 'The story of our family began in a small village, and the people of the village were kind to them.');
+    expect(find.text('Fix or change something'), findsOneWidget);
+    await t.tap(find.text('Fix or change something'));
+    await t.pump(const Duration(milliseconds: 400));
+    await t.pump(const Duration(milliseconds: 400));
+    expect(find.text('Tell the AI what to fix'), findsOneWidget);
+    expect(find.text('The whole book'), findsOneWidget);
+    expect(find.text('The cover design'), findsOneWidget);
+    await t.tap(find.text('The cover design'));
+    await t.pump();
+    expect(find.text('Make the cover dark blue with silver letters'), findsOneWidget);
+    expect(t.takeException(), isNull);
+  });
+
   test('any Swahili word makes an advisor answer in Swahili', () {
     expect(ngmyHasSwahiliWord('Hey, habari my friend'), isTrue);
     expect(ngmyHasSwahiliWord('can you help me, asante'), isTrue);

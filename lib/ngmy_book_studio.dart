@@ -115,12 +115,12 @@ String ngmyBookLanguageRule(String typed) {
   final t = typed.trim();
   final named = ngmyRequestedLanguage(t);
   if (named != null) {
-    return '- LANGUAGE: write the WHOLE book, every title and sentence, in $named, with natural correct grammar. Do not mix in other languages (JSON keys stay as given).';
+    return '- LANGUAGE: write the WHOLE book, every title and sentence, in $named, with natural correct grammar. Do not mix in other languages (JSON keys stay as given).${named.contains('Swahili') ? '\n$kNgmySwahiliStyleGuide' : ''}';
   }
   if (t.isEmpty) {
     return '- LANGUAGE: write the whole book in English.';
   }
-  return '- LANGUAGE: write the WHOLE book in the same language as this text the user typed: """$t""". If it is English, the whole book is English; if it is Swahili, the whole book is Swahili; for any other language, use that language. The facts and notes given in the request are only information, not the language to write in. Do not mix languages (JSON keys stay as given).';
+  return '- LANGUAGE: write the WHOLE book in the same language as this text the user typed: """$t""". If it is English, the whole book is English; if it is Swahili, the whole book is Swahili; for any other language, use that language. The facts and notes given in the request are only information, not the language to write in. Do not mix languages (JSON keys stay as given). If you write Swahili:\n$kNgmySwahiliStyleGuide';
 }
 
 String ngmyBookAiPrompt({required String description, required int pages, String? languageHint}) {
@@ -221,7 +221,7 @@ Future<List<(String, String)>> ngmyTranslateBookPages({
     final part = pages.sublist(from, math.min(from + batch, pages.length));
     onStatus?.call('Translating pages ${from + 1} to ${from + part.length} of ${pages.length}…', from / pages.length);
     final prompt = '''
-Translate these book pages into $target. Keep the meaning, the warm tone, every person's name and every place name exactly as written, and keep the paragraph breaks (a blank line between paragraphs). Do not add or remove anything. Write natural, correct $target.
+Translate these book pages into $target. Translate the MEANING, not the words: write what a native speaker would naturally say, never a literal copy of the other language (many phrases, like "family tree", have no word-for-word twin and would not be understood). Keep the warm tone, every person's name and every place name exactly as written, and keep the paragraph breaks (a blank line between paragraphs). Do not add or remove anything. Write natural, correct $target.${target.contains('Swahili') ? '\n$kNgmySwahiliStyleGuide' : ''}
 Reply with JSON only, with exactly ${part.length} pages in the same order: {"pages":[{"title":"...","body":"..."}]}
 Pages:
 ${jsonEncode([for (final p in part) {'title': p.$1, 'body': p.$2}])}
@@ -248,6 +248,103 @@ ${jsonEncode([for (final p in part) {'title': p.$1, 'body': p.$2}])}
   }
   onStatus?.call('Done', 1);
   return [for (var i = 0; i < pages.length; i++) out[i] ?? pages[i]];
+}
+
+class NgmyBookEditResult {
+  const NgmyBookEditResult({required this.message, this.pages = const {}, this.cover});
+  final String message;
+
+  /// Changed pages only: page number (0 based) -> (title, body).
+  final Map<int, (String, String)> pages;
+
+  /// Cover settings the AI wants to change (only the ones it names).
+  final Map<String, dynamic>? cover;
+}
+
+/// Lets the person tell the AI what to fix: a word they dislike, a page to rewrite or add to, or the cover design.
+/// [scope] is 'page' (only [pageIndex]), 'book' (all pages, a few at a time) or 'cover'.
+Future<NgmyBookEditResult> ngmyEditBookWithAi({
+  required String instruction,
+  required String scope,
+  required List<(String, String)> pages,
+  int pageIndex = -1,
+  Map<String, dynamic> cover = const {},
+  List<String> styleIds = const [],
+  void Function(String status, double progress)? onStatus,
+}) async {
+  final key = await ngmyResolveGeminiApiKey();
+  if (key.trim().isEmpty) throw 'AI is not available right now. Please try again later.';
+  final creds = ngmyParseAiCredentials(key);
+  final sample = pages.take(4).map((p) => '${p.$1} ${p.$2}').join(' ');
+  final lang = ngmyDetectTextLanguage(sample);
+  final wantsSwahili = lang == 'sw' || RegExp(r'swahili|kiswahili', caseSensitive: false).hasMatch(instruction);
+  final langLine = (lang == 'sw'
+          ? 'The book is written in Swahili: keep it in Swahili unless they ask for another language.'
+          : (lang == 'en' ? 'The book is written in English: keep it in English unless they ask for another language.' : 'Keep the language the book is already written in unless they ask for another.')) +
+      (wantsSwahili ? '\n$kNgmySwahiliStyleGuide' : '');
+
+  Future<String?> ask(String prompt) async {
+    String? error;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final r = await ngmyAiGenerateWithCredentials(creds, prompt, timeout: const Duration(seconds: 150));
+      if (r.text != null && r.text!.trim().isNotEmpty) return r.text;
+      error = r.error;
+    }
+    throw error != null && ngmyIsOfflineOrNetworkError(error) ? 'No internet connection. Try again when you are online.' : 'The AI could not do that just now. Nothing was changed.';
+  }
+
+  if (scope == 'cover') {
+    onStatus?.call('Designing the cover…', 0.3);
+    final text = await ask('''
+You design the cover of a family book. The person asked: """$instruction"""
+Current cover settings: ${jsonEncode(cover)}
+Allowed values: style one of ${styleIds.join(', ')}; emblem a number 0 to 11 (0 family tree, 1 heart, 2 home, 3 star, 4 people, 5 flower, 6 open book, 7 castle, 8 church, 9 paw, 10 leaf, 11 trophy); titleSize 18 to 36; position top, middle or bottom; frame double, single, corners or none; texture leather, linen, plain, stars or rays; foil gold, silver, rose, white, copper or black; ribbon true or false.
+Also allowed: title and subtitle (the words on the cover) and author (a name line). Change ONLY what they asked for; leave the other settings out.
+$langLine
+Reply with JSON only: {"message":"one or two friendly sentences saying what you changed","cover":{...only the settings you change...}}
+''');
+    final obj = _jsonObject(text ?? '');
+    if (obj == null) throw 'The AI could not design the cover just now. Nothing was changed.';
+    return NgmyBookEditResult(message: '${obj['message'] ?? 'I updated the cover.'}', cover: obj['cover'] is Map ? Map<String, dynamic>.from(obj['cover'] as Map) : null);
+  }
+
+  final targets = scope == 'page'
+      ? [if (pageIndex >= 0 && pageIndex < pages.length) pageIndex]
+      : [for (var i = 0; i < pages.length; i++) i];
+  if (targets.isEmpty) throw 'There is no page to change.';
+  const batch = 5;
+  final changed = <int, (String, String)>{};
+  var message = '';
+  for (var from = 0; from < targets.length; from += batch) {
+    final part = targets.sublist(from, math.min(from + batch, targets.length));
+    onStatus?.call(scope == 'page' ? 'Changing the page…' : 'Checking pages ${from + 1} to ${from + part.length} of ${targets.length}…', from / targets.length);
+    final text = await ask('''
+You edit a family book. The person asked: """$instruction"""
+Rules: change ONLY what they asked for and keep everything else word for word. Keep every person's name, date and fact exactly. Keep the paragraph breaks (a blank line between paragraphs). If they ask to correct or replace a word, change it everywhere it appears in these pages, including in the titles. If they ask to rewrite, shorten, add to or improve a page, do it properly with good, natural writing.
+$langLine
+Pages: ${jsonEncode([for (final i in part) {'index': i, 'title': pages[i].$1, 'body': pages[i].$2}])}
+Reply with JSON only: {"message":"one or two friendly sentences saying what you changed","pages":[{"index":0,"title":"...","body":"..."}]}
+Include ONLY the pages you changed, each with its full new text. If nothing needs changing in these pages, use "pages":[].
+''');
+    final obj = text == null ? null : _jsonObject(text);
+    if (obj == null) throw 'The AI could not do that just now. Nothing was changed.';
+    if (message.isEmpty && '${obj['message'] ?? ''}'.trim().isNotEmpty) message = '${obj['message']}'.trim();
+    final list = obj['pages'];
+    if (list is List) {
+      for (final m in list.whereType<Map>()) {
+        final i = (m['index'] as num?)?.toInt();
+        if (i == null || !part.contains(i)) continue;
+        final t = '${m['title'] ?? ''}'.trim(), b = '${m['body'] ?? ''}'.trim();
+        if (t.isEmpty && b.isEmpty) continue;
+        changed[i] = (t.isEmpty ? pages[i].$1 : t, b.isEmpty ? pages[i].$2 : b);
+      }
+    }
+  }
+  onStatus?.call('Done', 1);
+  return NgmyBookEditResult(
+    message: message.isEmpty ? (changed.isEmpty ? 'I looked, and nothing needed changing.' : 'Done. I updated ${changed.length} ${changed.length == 1 ? 'page' : 'pages'}.') : message,
+    pages: changed,
+  );
 }
 
 /// Most pages the AI can write in one book.

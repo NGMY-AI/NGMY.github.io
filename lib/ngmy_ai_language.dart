@@ -61,7 +61,7 @@ bool ngmyHasSwahiliWord(String text) {
 /// The instruction added to an advisor's reply request when the person wrote any Swahili.
 const String kNgmySwahiliReplyRule =
     'LANGUAGE (mandatory): the person used Swahili, which means they speak Swahili. Reply fully in natural, everyday '
-    'Swahili (Kiswahili), even if part of their message was in English. Only use English if they clearly ask for English. ';
+    'Swahili (Kiswahili), even if part of their message was in English. Only use English if they clearly ask for English. Write Swahili the way people really say it, never a word-for-word copy of English phrases. ';
 
 const Set<String> _kSwahiliGlue = {'na', 'ya', 'wa', 'za', 'ni', 'la', 'katika', 'ambao', 'ambayo', 'hawa', 'yake', 'wake', 'zao', 'yao', 'kuwa', 'alikuwa', 'walikuwa', 'mtu', 'watu', 'wakati', 'baada', 'kila'};
 const Set<String> _kEnglishGlue = {'the', 'and', 'of', 'to', 'was', 'is', 'in', 'that', 'he', 'she', 'his', 'her', 'with', 'for', 'as', 'they', 'their', 'from', 'by', 'were', 'are', 'it', 'this', 'be', 'on', 'at', 'who', 'had', 'have', 'our', 'we'};
@@ -77,3 +77,13 @@ String? ngmyDetectTextLanguage(String text) {
   if (sw + en < 4) return null;
   return sw > en ? 'sw' : 'en';
 }
+
+/// How to write Swahili that Swahili speakers really understand: the meaning, never a word-for-word copy of English.
+const String kNgmySwahiliStyleGuide = r'''
+SWAHILI THAT REAL SWAHILI SPEAKERS USE (critical): translate the MEANING and write the way a Swahili speaker in Tanzania, Kenya or eastern Congo would say it. NEVER translate word for word. Many English phrases have no literal Swahili twin and sound strange or are not understood if copied. Examples:
+- "family tree" is NOT "mti wa familia": say "ukoo" (the family line), "nasaba", or "historia ya ukoo wetu". "family book" -> "kitabu cha familia" or "kitabu cha ukoo".
+- ancestors -> "mababu" / "wazee wa zamani"; grandparents -> "babu na bibi"; great-grandparent -> "babu/bibi mkubwa"; descendants -> "wazao" / "vizazi vyetu"; generation -> "kizazi"; heritage / legacy -> "urithi", "mila na desturi"; bloodline -> "ukoo", "damu moja"; roots -> "asili yetu".
+- relatives: cousin -> "binamu"; father's brother -> "baba mdogo" / "baba mkubwa"; mother's brother -> "mjomba"; father's sister -> "shangazi"; mother's sister -> "mama mdogo" / "mama mkubwa"; nephew or niece -> "mpwa"; in-laws -> "wakwe"; brother- or sister-in-law -> "shemeji"; spouse -> "mke" (wife) / "mume" (husband) / "mwenzi wake"; firstborn -> "mzaliwa wa kwanza" / "kifungua mimba"; last-born -> "kitinda mimba"; elders -> "wazee"; clan -> "ukoo" / "kabila".
+- life events: was born -> "alizaliwa"; passed away / died -> "alifariki" / "alifariki dunia"; he married -> "alimuoa", she married -> "aliolewa na"; raised -> "alilea"; moved -> "alihamia"; blessing -> "baraka"; memories -> "kumbukumbu"; story -> "hadithi" / "simulizi"; chapter -> "sura"; page -> "ukurasa"; "our family" -> "familia yetu".
+- Use everyday words, short clear sentences and natural word order. Keep people's names and place names exactly as they are. If an idea has no good Swahili word, explain it simply instead of inventing a word.
+''';

@@ -95,27 +95,93 @@ Future<void> deleteFamilyBookEntry(String userEmail, String treeId, String entry
   await saveFamilyBookEntries(userEmail, treeId, list);
 }
 
+const List<String> kCoverFrames = ['double', 'single', 'corners', 'none'];
+const List<String> kCoverTextures = ['leather', 'linen', 'plain', 'stars', 'rays'];
+const List<String> kCoverPositions = ['top', 'middle', 'bottom'];
+const Map<String, int> kCoverFoils = {'gold': 0xFFE8C46A, 'silver': 0xFFE5E7EB, 'rose': 0xFFF0A8B8, 'white': 0xFFFFFFFF, 'copper': 0xFFE08A4C, 'black': 0xFF111827};
+
 /// How the family book's cover looks. Saved on this device with the book.
 class FamilyBookCover {
-  const FamilyBookCover({this.style = 'leather', this.title = '', this.subtitle = '', this.emblem = 0, this.silver = false});
+  const FamilyBookCover({
+    this.style = 'leather',
+    this.title = '',
+    this.subtitle = '',
+    this.emblem = 0,
+    this.foil = 'gold',
+    this.titleSize = 25,
+    this.position = 'middle',
+    this.frame = 'double',
+    this.texture = 'leather',
+    this.author = '',
+    this.ribbon = true,
+  });
   final String style;
   final String title;
   final String subtitle;
   final int emblem;
-  final bool silver;
+  final String foil;
+  final double titleSize;
+  final String position;
+  final String frame;
+  final String texture;
+  final String author;
+  final bool ribbon;
 
-  FamilyBookCover copyWith({String? style, String? title, String? subtitle, int? emblem, bool? silver}) =>
-      FamilyBookCover(style: style ?? this.style, title: title ?? this.title, subtitle: subtitle ?? this.subtitle, emblem: emblem ?? this.emblem, silver: silver ?? this.silver);
+  bool get silver => foil == 'silver';
 
-  Map<String, dynamic> toJson() => {'style': style, 'title': title, 'subtitle': subtitle, 'emblem': emblem, 'silver': silver};
+  FamilyBookCover copyWith({String? style, String? title, String? subtitle, int? emblem, String? foil, double? titleSize, String? position, String? frame, String? texture, String? author, bool? ribbon}) => FamilyBookCover(
+        style: style ?? this.style,
+        title: title ?? this.title,
+        subtitle: subtitle ?? this.subtitle,
+        emblem: emblem ?? this.emblem,
+        foil: foil ?? this.foil,
+        titleSize: titleSize ?? this.titleSize,
+        position: position ?? this.position,
+        frame: frame ?? this.frame,
+        texture: texture ?? this.texture,
+        author: author ?? this.author,
+        ribbon: ribbon ?? this.ribbon,
+      );
+
+  Map<String, dynamic> toJson() => {'style': style, 'title': title, 'subtitle': subtitle, 'emblem': emblem, 'foil': foil, 'titleSize': titleSize, 'position': position, 'frame': frame, 'texture': texture, 'author': author, 'ribbon': ribbon};
 
   factory FamilyBookCover.fromJson(Map<String, dynamic> j) => FamilyBookCover(
         style: (j['style'] ?? 'leather').toString(),
         title: (j['title'] ?? '').toString(),
         subtitle: (j['subtitle'] ?? '').toString(),
         emblem: (j['emblem'] as num?)?.toInt() ?? 0,
-        silver: j['silver'] == true,
+        foil: kCoverFoils.containsKey(j['foil']) ? j['foil'] as String : (j['silver'] == true ? 'silver' : 'gold'),
+        titleSize: ((j['titleSize'] as num?)?.toDouble() ?? 25).clamp(18.0, 36.0),
+        position: kCoverPositions.contains(j['position']) ? j['position'] as String : 'middle',
+        frame: kCoverFrames.contains(j['frame']) ? j['frame'] as String : 'double',
+        texture: kCoverTextures.contains(j['texture']) ? j['texture'] as String : 'leather',
+        author: (j['author'] ?? '').toString(),
+        ribbon: j['ribbon'] != false,
       );
+
+  /// Applies the settings an AI suggested (only the valid ones; anything else is ignored).
+  FamilyBookCover applyAi(Map<String, dynamic> m, {required List<String> styleIds, int emblemCount = 12}) {
+    String? pick(String key, Iterable<String> allowed) {
+      final v = m[key]?.toString().trim().toLowerCase();
+      return v != null && allowed.contains(v) ? v : null;
+    }
+
+    final em = (m['emblem'] as num?)?.toInt();
+    final size = (m['titleSize'] as num?)?.toDouble();
+    return copyWith(
+      style: pick('style', styleIds),
+      title: m['title'] is String && (m['title'] as String).trim().isNotEmpty ? (m['title'] as String).trim() : null,
+      subtitle: m['subtitle'] is String ? (m['subtitle'] as String).trim() : null,
+      emblem: em != null && em >= 0 && em < emblemCount ? em : null,
+      foil: pick('foil', kCoverFoils.keys),
+      titleSize: size?.clamp(18.0, 36.0),
+      position: pick('position', kCoverPositions),
+      frame: pick('frame', kCoverFrames),
+      texture: pick('texture', kCoverTextures),
+      author: m['author'] is String ? (m['author'] as String).trim() : null,
+      ribbon: m['ribbon'] is bool ? m['ribbon'] as bool : null,
+    );
+  }
 }
 
 String _familyCoverKey(String userEmail, String treeId) => 'ngmy_family_book_cover_v1_${userEmail.toLowerCase().trim()}_$treeId';
