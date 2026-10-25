@@ -42263,89 +42263,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
   }
 
   Widget _nicknameAdminPanel(UserData member, bool isDark) {
-    final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, member.email);
-    final existing = raw == null ? const <String>[] : NgmyCivicRegistryMembers.nicknamesOf(raw);
-    final nick1 = TextEditingController(text: existing.isNotEmpty ? existing[0] : '');
-    final nick2 = TextEditingController(text: existing.length > 1 ? existing[1] : '');
-    var showNicks = raw != null && NgmyCivicRegistryMembers.showNicknamesPublicly(raw);
-
-    return StatefulBuilder(
-      builder: (ctx, setLocal) {
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1A2233) : const Color(0xFFFFF7ED),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFFDBA74)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Public nicknames',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: isDark ? Colors.white : const Color(0xFF9A3412)),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: nick1,
-                decoration: InputDecoration(
-                  labelText: 'Nickname 1',
-                  filled: true,
-                  fillColor: isDark ? const Color(0xFF0F172A) : Colors.white,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: nick2,
-                decoration: InputDecoration(
-                  labelText: 'Nickname 2',
-                  filled: true,
-                  fillColor: isDark ? const Color(0xFF0F172A) : Colors.white,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  'Show nicknames when others search',
-                  style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black87),
-                ),
-                value: showNicks,
-                onChanged: (v) => setLocal(() => showNicks = v),
-              ),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () async {
-                    NgmyCivicRegistryMembers.setNicknames(
-                      widget.config,
-                      member.email,
-                      nicknames: [nick1.text, nick2.text],
-                      showNicknames: showNicks,
-                    );
-                    await NgmyCivicRegistryMembers.saveLocalBackup(widget.config);
-                    await ngmyPersistCivicRegistryMembers(widget.config);
-                    try {
-                      final prefs = await SharedPreferences.getInstance();
-                      await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
-                    } catch (_) {}
-                    widget.onDataChanged();
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Nicknames saved.'), backgroundColor: Colors.green),
-                    );
-                    setLocal(() {});
-                  },
-                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEA580C)),
-                  child: const Text('Save nicknames'),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+    return _NicknameAdminPanel(
+      key: ValueKey('nick_${member.email.toLowerCase()}'),
+      config: widget.config,
+      email: member.email,
+      isDark: isDark,
+      onDataChanged: widget.onDataChanged,
     );
   }
 
@@ -60040,3 +59963,103 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   }
 }
 
+
+/// The two public nickname boxes in a member's record. The boxes live in this State so what is being
+/// typed is kept while the rest of the screen refreshes (before, a refresh rebuilt them empty).
+class _NicknameAdminPanel extends StatefulWidget {
+  const _NicknameAdminPanel({super.key, required this.config, required this.email, required this.isDark, required this.onDataChanged});
+  final AppConfig config;
+  final String email;
+  final bool isDark;
+  final VoidCallback onDataChanged;
+
+  @override
+  State<_NicknameAdminPanel> createState() => _NicknameAdminPanelState();
+}
+
+class _NicknameAdminPanelState extends State<_NicknameAdminPanel> {
+  late final TextEditingController _nick1;
+  late final TextEditingController _nick2;
+  late bool _showNicks;
+
+  @override
+  void initState() {
+    super.initState();
+    final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, widget.email);
+    final existing = raw == null ? const <String>[] : NgmyCivicRegistryMembers.nicknamesOf(raw);
+    _nick1 = TextEditingController(text: existing.isNotEmpty ? existing[0] : '');
+    _nick2 = TextEditingController(text: existing.length > 1 ? existing[1] : '');
+    _showNicks = raw != null && NgmyCivicRegistryMembers.showNicknamesPublicly(raw);
+  }
+
+  @override
+  void dispose() {
+    _nick1.dispose();
+    _nick2.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    NgmyCivicRegistryMembers.setNicknames(
+      widget.config,
+      widget.email,
+      nicknames: [_nick1.text, _nick2.text],
+      showNicknames: _showNicks,
+    );
+    await NgmyCivicRegistryMembers.saveLocalBackup(widget.config);
+    await ngmyPersistCivicRegistryMembers(widget.config);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
+    } catch (_) {}
+    widget.onDataChanged();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Nicknames saved.'), backgroundColor: Colors.green),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    InputDecoration deco(String label) => InputDecoration(
+          labelText: label,
+          filled: true,
+          fillColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        );
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A2233) : const Color(0xFFFFF7ED),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFFDBA74)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Public nicknames', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: isDark ? Colors.white : const Color(0xFF9A3412))),
+          const SizedBox(height: 10),
+          TextField(controller: _nick1, decoration: deco('Nickname 1')),
+          const SizedBox(height: 8),
+          TextField(controller: _nick2, decoration: deco('Nickname 2')),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('Show nicknames when others search', style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black87)),
+            value: _showNicks,
+            onChanged: (v) => setState(() => _showNicks = v),
+          ),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _save,
+              style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEA580C)),
+              child: const Text('Save nicknames'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
