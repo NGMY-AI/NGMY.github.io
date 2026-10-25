@@ -980,7 +980,25 @@ bool ngmyIsGameLedgerTransaction(AppTransaction t) {
   return false;
 }
 
+/// The King / Queen daily $1 and the clock-in daily earnings. Every phone on the account tries to
+/// pay these once a day, so they are applied on the server exactly once (by receipt id) instead of
+/// each phone adding the money on top of the balance it sees; that is how one phone ended up with a
+/// dollar more than another.
+bool ngmyIsServerRewardTransaction(AppTransaction t) {
+  if (t.status != TransactionStatus.approved || t.type != TransactionType.reimbursement) return false;
+  if (t.amount <= 0 || t.amount > 100000) return false;
+  final id = t.id;
+  final d = (t.sourceDetails ?? '').toLowerCase();
+  if (id.startsWith('crown_') && d.contains('crown daily reward')) return true;
+  if (id.startsWith('clock_') && d.contains('clock-in daily earnings') && !d.contains('(local)')) return true;
+  return false;
+}
+
+/// Money the server applies in one step (game bets and payouts, daily rewards).
+bool ngmyIsServerSettledTransaction(AppTransaction t) => ngmyIsGameLedgerTransaction(t) || ngmyIsServerRewardTransaction(t);
+
 /// The account's transactions, for Growth Income's wallet history (set by the app shell).
+
 List<AppTransaction> Function()? ngmyAppTransactionsForWallet;
 
 String _ngmyBaseGameEmail(String e) {
@@ -11115,7 +11133,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   double _pendingGameNet(String key) {
     var sum = ngmyUnsettledGameNetFor(key);
     for (final t in _allTransactions) {
-      if (!_txnOutbox.contains(t.id) || !ngmyIsGameLedgerTransaction(t)) continue;
+      if (!_txnOutbox.contains(t.id) || !ngmyIsServerSettledTransaction(t)) continue;
       if (ngmyNormalizeEmail(t.userEmail) != key || ngmyUnsettledGameTxns.containsKey(t.id)) continue;
       sum += _ngmyTxnIncreasesBalance(t) ? t.amount : -t.amount;
     }
@@ -11139,7 +11157,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     NgmyServerWalletResult? result;
     for (var attempt = 0; attempt < 3 && result == null; attempt++) {
       result = await ngmySettleGameTxnOnServer(payload);
-      if (result != null && result.serverError) {
+      // Rewards need the newer server step; until it is installed, save them the older way.
+      if (result != null && (result.serverError || (result.reason == 'not_game_txn' && !ngmyIsGameLedgerTransaction(t)))) {
         await _settleGameTxnWithoutServerStep(t, email);
         return;
       }
@@ -11195,8 +11214,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _txnOutboxFlushing = true;
     try {
       final queued = _allTransactions.where((t) => _txnOutbox.contains(t.id)).toList();
-      final waiting = queued.where((t) => !ngmyIsGameLedgerTransaction(t)).toList();
-      final waitingGames = queued.where(ngmyIsGameLedgerTransaction).toList();
+      final waiting = queued.where((t) => !ngmyIsServerSettledTransaction(t)).toList();
+      final waitingGames = queued.where(ngmyIsServerSettledTransaction).toList();
       // Ids no longer on this phone (deleted / replaced) have nothing to send.
       _txnOutbox.removeWhere((id) => !queued.any((t) => t.id == id));
       for (final g in waitingGames) {
@@ -13956,13 +13975,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           final userIdx = _allUsers.indexWhere(
             (u) => ngmyNormalizeEmail(u.email) == ngmyNormalizeEmail(_currentUser!.email),
           );
-          if (userIdx >= 0 && (becameApproved || previous == null) && ngmyIsGameLedgerTransaction(tx)) {
+          if (userIdx >= 0 && (becameApproved || previous == null) && ngmyIsServerSettledTransaction(tx)) {
             unawaited(_pushUserToCloudFast(_allUsers[userIdx], includeFreeTrial: true));
           }
           if (userIdx >= 0 &&
               (previous == null || statusChanged || becameApproved) &&
               ngmyNormalizeEmail(tx.userEmail) == ngmyNormalizeEmail(_currentUser!.email)) {
-            if (ngmyIsGameLedgerTransaction(tx)) {
+            if (ngmyIsServerSettledTransaction(tx)) {
               // The server already applied this game. A game another phone played only needs this
               // phone to read the new balance, never to save its own figure back.
               if (previous == null) _scheduleServerBalanceRead();
@@ -15474,7 +15493,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   });
                   // Game bets/payouts go through the server balance step; everything else
                   // saves as before. Saved → out of the outbox; failed → stays there and is sent later.
-                  final isGameTxn = ngmyIsGameLedgerTransaction(t);
+                  final isGameTxn = ngmyIsServerSettledTransaction(t);
                   if (isGameTxn) {
                     unawaited(_settleGameTxnOnServer(t));
                   } else {
@@ -15519,7 +15538,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     // amount/note edits, etc.). Replace the list entry so final
                     // fields like amount/sourceDetails actually change.
                     _allTransactions[existingIdx] = t;
-                    if (!ngmyIsGameLedgerTransaction(t)) {
+                    if (!ngmyIsServerSettledTransaction(t)) {
                       unawaited(_pushTransactionToCloudReliable(t).then((ok) => ok ? _txnOutboxDone(t.id) : null));
                       unawaited(_pushTransactionToCloudFast(t));
                       _markTransactionDirty(t.id);

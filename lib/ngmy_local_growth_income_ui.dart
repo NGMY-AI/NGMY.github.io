@@ -864,7 +864,9 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
           user: _user!,
           realEmail: widget.liveUser.email,
           config: widget.config,
-          transactions: List<AppTransaction>.from(_transactions),
+          // Everything that moved money on the account (crown rewards, store, fees…), not only
+          // this wallet's own rows. Games stay out; they have receipts in the Game Center.
+          transactions: sorted,
           onAdd: (t, {bool cloudRequest = false}) => _onAddTransaction(t, cloudRequest: cloudRequest),
           onBackup: _openBackup,
           onRefreshBalance: () => _pullApprovedBalanceFromCloud(),
@@ -1689,11 +1691,16 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
   Widget build(BuildContext context) {
     // Gold while filling AND after noon payout so the bowl stays full/gold.
     final filledGold = widget.clockedIn || widget.sessionComplete;
+    // Saturday and Sunday are rest days: no clock-in, no earnings. Say so plainly.
+    final weekendRest = NgmyLocalGrowthIncomeStore.isWeekend(DateTime.now()) &&
+        !widget.clockedIn &&
+        !widget.sessionComplete &&
+        !widget.canClockIn;
     final status = widget.clockedIn
         ? 'COUNTING TO 12 PM'
         : (widget.sessionComplete
             ? 'SESSION COMPLETE'
-            : (widget.hasPlan ? 'CLOCK IN' : 'NO PLAN'));
+            : (weekendRest ? 'WEEKEND REST' : (widget.hasPlan ? 'CLOCK IN' : 'NO PLAN')));
     final name = widget.profileDisplayName.trim().isEmpty ? 'Member' : widget.profileDisplayName.trim().toUpperCase();
     final accent = filledGold ? _gold : widget.green;
 
@@ -1702,7 +1709,7 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
       borderRadius: BorderRadius.circular(32),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 520),
-        height: 392,
+        height: weekendRest ? 480 : 392,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(32),
           gradient: LinearGradient(
@@ -1872,7 +1879,7 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
                                   Text(
                                     widget.clockedIn
                                         ? 'FILLING TO 12 PM'
-                                        : (widget.sessionComplete ? 'FULL DAY EARNED' : 'DAILY EARNINGS'),
+                                        : (widget.sessionComplete ? 'FULL DAY EARNED' : (weekendRest ? 'REST DAY' : 'DAILY EARNINGS')),
                                     style: TextStyle(
                                       color: Colors.white.withValues(alpha: 0.62),
                                       fontSize: 9,
@@ -1919,6 +1926,40 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
                 );
               },
             ),
+            if (weekendRest)
+              Positioned(
+                left: 14,
+                right: 14,
+                bottom: 14,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    color: const Color(0xFF0C1016).withValues(alpha: 0.82),
+                    border: Border.all(color: const Color(0xFF67E8F9).withValues(alpha: 0.35)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.event_busy_rounded, color: Color(0xFF67E8F9), size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text('Weekend rest day', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12.5)),
+                            const SizedBox(height: 2),
+                            Text(
+                              'We do not work on Saturdays and Sundays, so there is no clock-in or earnings today. Your balance is safe, and earning resumes Monday.',
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 11, height: 1.3),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -2405,7 +2446,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
     var outflow = 0.0;
     for (final t in widget.transactions) {
       if (t.status != TransactionStatus.approved || !_isGrowthIncomeHistoryRow(t)) continue;
-      final out = t.type == TransactionType.withdrawal || t.type == TransactionType.adminRemove;
+      final out = t.type == TransactionType.withdrawal || t.type == TransactionType.adminRemove || t.type == TransactionType.contribution;
       if (out) {
         outflow += t.amount;
       } else {
@@ -2929,7 +2970,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
   Widget _historyRow(AppTransaction t) {
     final approved = t.status == TransactionStatus.approved;
     final pending = t.status == TransactionStatus.pending;
-    final outgoing = t.type == TransactionType.withdrawal || t.type == TransactionType.adminRemove;
+    final outgoing = t.type == TransactionType.withdrawal || t.type == TransactionType.adminRemove || t.type == TransactionType.contribution;
     final color = approved
         ? (outgoing ? const Color(0xFFF87171) : _green)
         : (pending ? Colors.orangeAccent : Colors.redAccent);
@@ -2998,7 +3039,8 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
     // Rejected requests stay in history (marked Rejected) instead of vanishing.
     final details = (t.sourceDetails ?? '').toLowerCase();
     if (details.contains('clock-in session started')) return false;
-    if (t.type == TransactionType.contribution) return false;
+    // Contributions leave the balance too, so they are part of the history.
+    if (t.type == TransactionType.contribution) return t.amount > 0;
     // Games have their own receipts in the Game Center — the wallet shows normal transactions only.
     if (ngmyIsGameLedgerTransaction(t)) return false;
     if (t.type == TransactionType.deposit || t.type == TransactionType.withdrawal) return true;
@@ -3013,6 +3055,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
   String _growthIncomeHistoryTitle(AppTransaction t) {
     final details = (t.sourceDetails ?? '').toLowerCase();
     if (details.contains('clock-in')) return 'Clock-in earnings';
+    if (details.contains('crown daily reward')) return details.contains('queen') ? 'Queen crown reward' : 'King crown reward';
     if (details.contains('investment')) return 'Investment';
     switch (t.type) {
       case TransactionType.deposit:
