@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -424,7 +423,7 @@ class NgmyNewspaperView extends StatelessWidget {
     const gap = 22.0;
     final colW = (innerW - gap * (cols - 1)) / cols;
     const colH = 335.0;
-    var bodySize = 15.5;
+    var bodySize = 18.0;
     List<String> columns = const [];
     final sidebarOn = doc.sidebarText.trim().isNotEmpty || doc.pullQuote.trim().isNotEmpty;
     final sideH = sidebarOn ? 150.0 : 0.0;

@@ -9,6 +9,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'ngmy_news_maker.dart';
 import 'ngmy_quote_templates.dart';
 import 'ngmy_slides_models.dart';
 import 'ngmy_slides_render.dart';
@@ -183,6 +184,7 @@ class _QuoteMakerScreenState extends State<_QuoteMakerScreen> {
     (Icons.text_fields_rounded, 'Text'),
     (Icons.photo_filter_rounded, 'Photo'),
     (Icons.verified_rounded, 'Logo'),
+    (Icons.newspaper_rounded, 'News'),
   ];
   static const _photoTabs = [
     (Icons.auto_awesome_rounded, 'Looks'),
@@ -1091,6 +1093,40 @@ class _QuoteMakerScreenState extends State<_QuoteMakerScreen> {
         ]),
       ]);
 
+  /// NEWS: a newspaper page about NGMY, written by the AI around the picture.
+  Widget _newsTab() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: _cardBg, borderRadius: BorderRadius.circular(22), border: Border.all(color: _line)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Row(children: [
+          Icon(Icons.newspaper_rounded, color: Color(0xFFFACC15), size: 28),
+          SizedBox(width: 10),
+          Expanded(child: Text('NGMY News', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18))),
+        ]),
+        const SizedBox(height: 10),
+        const Text(
+          'Add a picture and the AI writes a whole newspaper page about NGMY around it: the headline, the story and the caption. It knows the app, the Civic Registry, the Advisors and KB PABLO QR, the CEO. Pick old or modern designs, then tell the AI what to change.',
+          style: TextStyle(color: Colors.white70, height: 1.4, fontSize: 13),
+        ),
+        const SizedBox(height: 14),
+        GestureDetector(
+          onTap: () => showNgmyNewsMaker(context, photo: _bg),
+          child: Container(
+            height: 52,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(gradient: _hot, borderRadius: BorderRadius.circular(16)),
+            child: const Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20),
+              SizedBox(width: 8),
+              Text('Make a newspaper', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15.5)),
+            ]),
+          ),
+        ),
+      ]),
+    );
+  }
+
   Widget _logoTab() {
     Widget sample(String frame, String ring) {
       final bytes = _logoBytes;
@@ -1232,7 +1268,8 @@ class _QuoteMakerScreenState extends State<_QuoteMakerScreen> {
                   1 => _wordsTab(),
                   2 => _textTab(),
                   3 => _photoTabView(),
-                  _ => _logoTab(),
+                  4 => _logoTab(),
+                  _ => _newsTab(),
                 },
               ],
             ),
