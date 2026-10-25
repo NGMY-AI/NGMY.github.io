@@ -13,6 +13,7 @@ import 'ngmy_civic_user_groups_payments.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_phone_format.dart';
 import 'ngmy_qr_download.dart';
+import 'ngmy_state_picker.dart';
 
 const _kBolt = Color(0xFF67E8F9);
 const _kBoltHot = Color(0xFFE0F2FE);
@@ -224,13 +225,17 @@ class _NgmyCivicUserGroupsHubScreenState
     super.dispose();
   }
 
+  List<NgmyCivicUserGroup> _waiting = [];
+
   Future<void> _reload() async {
     final owned = await NgmyCivicUserGroupsStore.ownedBy(widget.userEmail);
     final joined = await NgmyCivicUserGroupsStore.joinedBy(widget.userEmail);
+    final waiting = await NgmyCivicUserGroupsStore.waitingFor(widget.userEmail);
     if (!mounted) return;
     setState(() {
       _owned = owned;
       _joined = joined;
+      _waiting = waiting;
     });
   }
 
@@ -312,6 +317,13 @@ class _NgmyCivicUserGroupsHubScreenState
       await _reload();
       return;
     }
+    if (found.isPending(widget.userEmail)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Your request is already waiting. The group owner has to approve you.')),
+      );
+      return;
+    }
     final underCap = await NgmyCivicUserGroupsPayments.canAcceptAnotherMember(
       ownerEmail: found.ownerEmail,
       groupId: found.id,
@@ -329,45 +341,46 @@ class _NgmyCivicUserGroupsHubScreenState
       );
       return;
     }
-    NgmyCivicUserGroup? joined;
+    // Having the code is not enough: the person gives their details and the owner approves them.
+    final details = await _showLightningJoinRequestSheet(context, found, defaultName: widget.userName, myEmail: widget.userEmail);
+    if (details == null || !mounted) return;
     try {
-      joined = await NgmyCivicUserGroupsStore.joinByCode(
+      final sent = await NgmyCivicUserGroupsStore.requestJoin(
         inviteCode: found.inviteCode,
         email: widget.userEmail,
-        name: widget.userName,
+        name: details.name,
+        phone: details.phone,
+        state: details.state,
+        address: details.address,
+        family: details.family,
       );
+      if (sent == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not send your request.')));
+        return;
+      }
     } on StateError catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
       return;
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not join that group. $e')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not send your request. $e')));
       return;
     }
     if (!mounted) return;
-    if (joined == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not join that group.')),
-      );
-      return;
-    }
     await _reload();
     if (!mounted) return;
-    await NgmyNavigator.push(
-      context,
-      NgmyCivicUserGroupHomeScreen(
-        groupId: joined.id,
-        userEmail: widget.userEmail,
-        userName: widget.userName,
-        isAdmin: widget.isAdmin,
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _kPanel,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22), side: BorderSide(color: _kBolt.withValues(alpha: 0.4))),
+        title: const Text('Request sent', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+        content: Text('The owner of this group, \${found.ownerName}, has to approve you before you can enter. You will find the group under YOU JOINED as soon as you are approved.', style: const TextStyle(color: Colors.white70, height: 1.4)),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
       ),
     );
-    await _reload();
   }
 
   Future<void> _scanQr() async {
@@ -458,6 +471,7 @@ class _NgmyCivicUserGroupsHubScreenState
                                             'Owner · ${e.value.memberCount}/$kNgmyCivicUserGroupFreeMemberCap seats',
                                         pulse: _pulse,
                                         orbit: _orbit,
+                                        badgeCount: e.value.pendingMembers.length,
                                         onTap: () async {
                                           await NgmyNavigator.push(
                                             context,
@@ -473,6 +487,19 @@ class _NgmyCivicUserGroupsHubScreenState
                                       ),
                                     ),
                                   ),
+                            if (_waiting.isNotEmpty) ...[
+                              const SizedBox(height: 18),
+                              _sectionTitle('WAITING FOR APPROVAL'),
+                              for (final w in _waiting)
+                                _GroupCard(
+                                  group: w,
+                                  subtitle: 'Request sent · ${w.ownerName} has to approve you',
+                                  pulse: _pulse,
+                                  orbit: _orbit,
+                                  badgeText: '...',
+                                  onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Your request is waiting. The group owner has to approve you first.'))),
+                                ),
+                            ],
                             const SizedBox(height: 18),
                             _sectionTitle('YOU JOINED'),
                             if (_joined.isEmpty)
@@ -975,6 +1002,8 @@ class _GroupCard extends StatelessWidget {
     required this.onTap,
     required this.pulse,
     required this.orbit,
+    this.badgeCount = 0,
+    this.badgeText = '',
   });
 
   final NgmyCivicUserGroup group;
@@ -982,6 +1011,10 @@ class _GroupCard extends StatelessWidget {
   final VoidCallback onTap;
   final Animation<double> pulse;
   final Animation<double> orbit;
+
+  /// People waiting to be approved, shown as a number in the corner.
+  final int badgeCount;
+  final String badgeText;
 
   @override
   Widget build(BuildContext context) {
@@ -1068,6 +1101,15 @@ class _GroupCard extends StatelessWidget {
                           ],
                         ),
                       ),
+                      if (badgeCount > 0)
+                        Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(color: const Color(0xFFEF4444), borderRadius: BorderRadius.circular(12)),
+                          child: Text('$badgeCount new', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11)),
+                        )
+                      else if (badgeText.isNotEmpty)
+                        const Padding(padding: EdgeInsets.only(right: 8), child: Icon(Icons.hourglass_top_rounded, color: Colors.orangeAccent, size: 20)),
                       Icon(Icons.chevron_right_rounded,
                           color: _kBolt.withValues(alpha: 0.7)),
                     ],
@@ -1276,7 +1318,7 @@ class _NgmyCivicUserGroupHomeScreenState
     }
     final people = <({String name, String email})>[
       (name: _group!.ownerName, email: _group!.ownerEmail),
-      ..._group!.members.map((m) => (name: m.name, email: m.email)),
+      ..._group!.activeMembers.map((m) => (name: m.name, email: m.email)),
     ];
     final campaignId = _group!.helpModeActive ? _group!.helpCampaignId.trim() : '';
     // One contribution per person per help round.
@@ -1337,6 +1379,7 @@ class _NgmyCivicUserGroupHomeScreenState
                 _group!.helpModeActive
             ? _group!.helpCampaignId
             : '',
+        campaignName: kind == NgmyCivicUserGroupLedgerKind.contribution && _group!.helpModeActive ? _group!.helpPurpose.trim() : '',
         memberEmail: _group!.emailForMemberName(result.label) ?? '',
       ),
     );
@@ -1368,6 +1411,182 @@ class _NgmyCivicUserGroupHomeScreenState
       return;
     }
     await _reload();
+  }
+
+  Future<void> _approve(NgmyCivicUserGroupMember m) async {
+    final g = _group;
+    if (g == null) return;
+    try {
+      final ok = await NgmyCivicUserGroupsStore.approveRequest(groupId: g.id, memberEmail: m.email);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ok ? '${m.name} is in the group now.' : 'Could not approve ${m.name}.')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not approve. $e')));
+    }
+    await _reload();
+  }
+
+  Future<void> _decline(NgmyCivicUserGroupMember m) async {
+    final g = _group;
+    if (g == null) return;
+    final sure = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _kPanel,
+        title: const Text('Decline this request?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+        content: Text('${m.name} will not be added to the group. They can ask again later.', style: const TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)), child: const Text('Decline')),
+        ],
+      ),
+    );
+    if (sure != true) return;
+    try {
+      await NgmyCivicUserGroupsStore.declineRequest(groupId: g.id, memberEmail: m.email, declinedByEmail: widget.userEmail);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not decline. $e')));
+    }
+    await _reload();
+  }
+
+  /// People who asked to join, with what they told us, waiting for the owner.
+  Widget _requestsSection(NgmyCivicUserGroup g) {
+    final waiting = g.pendingMembers;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEF4444).withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.4)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(color: const Color(0xFFEF4444), borderRadius: BorderRadius.circular(12)),
+            child: Text('${waiting.length}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13)),
+          ),
+          const SizedBox(width: 8),
+          const Expanded(child: Text('Waiting to join', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15))),
+        ]),
+        const SizedBox(height: 8),
+        for (final m in waiting)
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: _kPanel, borderRadius: BorderRadius.circular(14), border: Border.all(color: _kBolt.withValues(alpha: 0.25))),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(m.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+              const SizedBox(height: 4),
+              _requestLine(Icons.alternate_email_rounded, m.email),
+              if (m.phone.isNotEmpty) _requestLine(Icons.phone_rounded, ngmyPhoneDashed(m.phone)),
+              if (m.state.isNotEmpty) _requestLine(Icons.map_rounded, m.state),
+              if (m.address.isNotEmpty) _requestLine(Icons.home_rounded, m.address),
+              for (final f in m.family) _requestLine(Icons.family_restroom_rounded, '${_relationLabel(f['relation'] ?? '')}: ${f['name'] ?? ''}'),
+              const SizedBox(height: 10),
+              Row(children: [
+                Expanded(child: FilledButton.icon(onPressed: () => _approve(m), icon: const Icon(Icons.check_rounded, size: 18), label: const Text('Approve'), style: FilledButton.styleFrom(backgroundColor: const Color(0xFF22C55E), foregroundColor: Colors.white))),
+                const SizedBox(width: 8),
+                Expanded(child: OutlinedButton.icon(onPressed: () => _decline(m), icon: const Icon(Icons.close_rounded, size: 18), label: const Text('Decline'), style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFFF87171), side: const BorderSide(color: Color(0xFFF87171))))),
+              ]),
+            ]),
+          ),
+      ]),
+    );
+  }
+
+  Widget _requestLine(IconData icon, String text) => Padding(
+        padding: const EdgeInsets.only(top: 3),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(icon, size: 14, color: Colors.white38),
+          const SizedBox(width: 6),
+          Expanded(child: Text(text, style: const TextStyle(color: Colors.white70, fontSize: 12.5))),
+        ]),
+      );
+
+  /// Everything in the ledger. Contributions are grouped by what they were for; tapping one shows who gave and who did not.
+  List<Widget> _ledgerItems(NgmyCivicUserGroup g) {
+    final out = <Widget>[];
+    final seenRounds = <String>{};
+    for (final e in g.ledger) {
+      if (e.kind == NgmyCivicUserGroupLedgerKind.contribution) {
+        final key = e.campaignId.isEmpty ? 'other' : e.campaignId;
+        if (!seenRounds.add(key)) continue;
+        out.add(_roundCard(g, key));
+        continue;
+      }
+      final removal = e.kind == NgmyCivicUserGroupLedgerKind.memberRemoved;
+      final accent = removal ? const Color(0xFFF87171) : Colors.orangeAccent;
+      out.add(Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: _kPanel, borderRadius: BorderRadius.circular(12), border: Border.all(color: accent.withValues(alpha: 0.25))),
+        child: Row(children: [
+          Icon(removal ? Icons.person_remove_alt_1_rounded : Icons.north_east_rounded, color: accent, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(removal ? (e.note.contains('declined') ? '${e.label}: request declined' : '${e.label} removed') : 'Spending: ${e.label}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+              if (e.note.isNotEmpty && !removal) Text(e.note, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+            ]),
+          ),
+          Text(removal ? '' : '-\$${e.amount.toStringAsFixed(2)}', style: TextStyle(color: accent, fontWeight: FontWeight.w900)),
+        ]),
+      ));
+    }
+    return out;
+  }
+
+  Widget _roundCard(NgmyCivicUserGroup g, String key) {
+    final entries = _roundEntries(g, key);
+    final name = _roundName(g, key, entries);
+    final total = entries.fold<double>(0, (s, e) => s + e.amount);
+    final open = key != 'other' && g.helpModeActive && g.helpCampaignId == key;
+    final people = g.memberCount;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: (open ? _kHelpGreen : _kBolt).withValues(alpha: 0.35))),
+      child: Material(
+        color: _kPanel,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => _showLightningRoundSheet(context, g, key, name, entries, open),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: (open ? _kHelpGreen : _kBolt).withValues(alpha: 0.14), border: Border.all(color: (open ? _kHelpGreen : _kBolt).withValues(alpha: 0.5))),
+                child: Icon(Icons.volunteer_activism_rounded, color: open ? _kHelpGreen : _kBolt, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Flexible(child: Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14.5))),
+                    if (open) ...[
+                      const SizedBox(width: 6),
+                      Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: _kHelpGreen.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(8)), child: const Text('OPEN', style: TextStyle(color: _kHelpGreen, fontSize: 9.5, fontWeight: FontWeight.w900))),
+                    ],
+                  ]),
+                  const SizedBox(height: 3),
+                  Text('${entries.length} of $people gave · tap to see who', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                ]),
+              ),
+              Text('+\$${total.toStringAsFixed(2)}', style: TextStyle(color: open ? _kHelpGreen : _kBolt, fontWeight: FontWeight.w900)),
+              const SizedBox(width: 4),
+              Icon(Icons.chevron_right_rounded, color: _kBolt.withValues(alpha: 0.6)),
+            ]),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _openHelpMode() async {
@@ -1584,6 +1803,7 @@ class _NgmyCivicUserGroupHomeScreenState
                               selected: _tab == e.$1,
                               pulse: _pulse,
                               orbit: _orbit,
+                              badge: e.$1 == 1 && _isOwner ? g.pendingMembers.length : 0,
                               onTap: () => setState(() => _tab = e.$1),
                             ),
                           ),
@@ -1644,7 +1864,8 @@ class _NgmyCivicUserGroupHomeScreenState
                 joinedAt: g.createdAt,
               ),
             ),
-            ...g.members.map(
+            if (_isOwner && g.pendingMembers.isNotEmpty) _requestsSection(g),
+            ...g.activeMembers.map(
               (m) => _personTile(
                 g,
                 m.name,
@@ -1811,81 +2032,7 @@ class _NgmyCivicUserGroupHomeScreenState
               const Text('No contributions or spending yet.',
                   style: TextStyle(color: Colors.white38))
             else
-              ...entries.map((e) {
-                final isRemoval =
-                    e.kind == NgmyCivicUserGroupLedgerKind.memberRemoved;
-                final inMoney =
-                    e.kind == NgmyCivicUserGroupLedgerKind.contribution;
-                final accent = isRemoval
-                    ? const Color(0xFFF87171)
-                    : (inMoney ? _kBolt : Colors.orangeAccent);
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: _kPanel,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: accent.withValues(alpha: 0.25),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        isRemoval
-                            ? Icons.person_remove_alt_1_rounded
-                            : (inMoney
-                                ? Icons.south_west_rounded
-                                : Icons.north_east_rounded),
-                        color: accent,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              isRemoval
-                                  ? '${e.label} removed'
-                                  : e.label,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            if (e.note.isNotEmpty)
-                              Text(
-                                e.note,
-                                style: const TextStyle(
-                                  color: Colors.white54,
-                                  fontSize: 12,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      if (isRemoval)
-                        Text(
-                          'Removed',
-                          style: TextStyle(
-                            color: accent,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 12,
-                          ),
-                        )
-                      else
-                        Text(
-                          '${inMoney ? '+' : '-'}\$${e.amount.toStringAsFixed(2)}',
-                          style: TextStyle(
-                            color: accent,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                    ],
-                  ),
-                );
-              }),
+              ..._ledgerItems(g),
           ],
         );
     }
@@ -1958,12 +2105,10 @@ class _NgmyCivicUserGroupHomeScreenState
                       const SizedBox(height: 2),
                       Text(
                         missedThisRound
-                            ? 'Missed this help round · tap for profile'
+                            ? 'Has not given this round · gave ${group.timesContributed(name, email)}x · missed $missedTotal'
                             : hasPaid
-                                ? 'Contributed \$${total.toStringAsFixed(2)} · tap for profile'
-                                : missedTotal > 0
-                                    ? '$missedTotal missed · tap for profile'
-                                    : 'No contributions yet · tap for profile',
+                                ? 'Gave ${group.timesContributed(name, email)}x (\$${total.toStringAsFixed(2)}) · missed $missedTotal'
+                                : 'Has not given yet · missed $missedTotal',
                         style: TextStyle(
                           color: missedThisRound
                               ? Colors.orangeAccent.withValues(alpha: 0.9)
@@ -2248,6 +2393,7 @@ class _LightningTabFrame extends StatelessWidget {
     required this.pulse,
     required this.orbit,
     required this.onTap,
+    this.badge = 0,
   });
 
   final String label;
@@ -2255,6 +2401,9 @@ class _LightningTabFrame extends StatelessWidget {
   final Animation<double> pulse;
   final Animation<double> orbit;
   final VoidCallback onTap;
+
+  /// A red number in the corner (people waiting to be approved).
+  final int badge;
 
   @override
   Widget build(BuildContext context) {
@@ -2286,17 +2435,30 @@ class _LightningTabFrame extends StatelessWidget {
                         : _kBolt.withValues(alpha: 0.18),
                   ),
                 ),
-                child: Center(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      color: selected ? _kBoltHot : Colors.white38,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 12,
-                      letterSpacing: 0.6,
+                child: Stack(clipBehavior: Clip.none, children: [
+                  Center(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        color: selected ? _kBoltHot : Colors.white38,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                        letterSpacing: 0.6,
+                      ),
                     ),
                   ),
-                ),
+                  if (badge > 0)
+                    Positioned(
+                      right: 6,
+                      top: -6,
+                      child: Container(
+                        constraints: const BoxConstraints(minWidth: 20),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(color: const Color(0xFFEF4444), borderRadius: BorderRadius.circular(11), border: Border.all(color: _kInk, width: 1.5)),
+                        child: Text('$badge', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11)),
+                      ),
+                    ),
+                ]),
               ),
             ),
           ),
@@ -4500,3 +4662,359 @@ InputDecoration _lightningFieldDecoration(String hint) {
   );
 }
 
+
+// ── Contribution rounds: what each one was for, who gave, who did not ─────────
+
+List<NgmyCivicUserGroupLedgerEntry> _roundEntries(NgmyCivicUserGroup g, String key) => [
+      for (final e in g.ledger)
+        if (e.kind == NgmyCivicUserGroupLedgerKind.contribution && (key == 'other' ? e.campaignId.isEmpty : e.campaignId == key)) e,
+    ];
+
+String _roundName(NgmyCivicUserGroup g, String key, List<NgmyCivicUserGroupLedgerEntry> entries) {
+  for (final e in entries) {
+    if (e.campaignName.trim().isNotEmpty) return e.campaignName.trim();
+  }
+  if (key != 'other' && key == g.helpCampaignId && g.helpPurpose.trim().isNotEmpty) return g.helpPurpose.trim();
+  if (key == 'other') return 'Other contributions';
+  if (entries.isNotEmpty) {
+    final d = entries.last.at.toLocal();
+    return 'Contribution round · ${d.month}/${d.day}/${d.year}';
+  }
+  return 'Contribution round';
+}
+
+String _relationLabel(String r) => switch (r.toLowerCase()) {
+      'mother' => 'Mother',
+      'father' => 'Father',
+      'spouse' => 'Spouse',
+      'child' => 'Child',
+      'brother' => 'Brother',
+      'sister' => 'Sister',
+      _ => r.isEmpty ? 'Family' : r,
+    };
+
+String _lightningDate(DateTime d) {
+  final l = d.toLocal();
+  return '${l.month}/${l.day}/${l.year}';
+}
+
+Future<void> _showLightningRoundSheet(
+  BuildContext context,
+  NgmyCivicUserGroup g,
+  String key,
+  String name,
+  List<NgmyCivicUserGroupLedgerEntry> entries,
+  bool open,
+) {
+  final people = <({String name, String email})>[
+    (name: g.ownerName, email: g.ownerEmail),
+    ...g.activeMembers.map((m) => (name: m.name, email: m.email)),
+  ];
+  final gavePeople = <(({String name, String email}), NgmyCivicUserGroupLedgerEntry)>[];
+  final notYet = <({String name, String email})>[];
+  for (final p in people) {
+    NgmyCivicUserGroupLedgerEntry? hit;
+    for (final e in entries) {
+      if (e.label.trim().toLowerCase() == p.name.trim().toLowerCase() || (e.memberEmail.isNotEmpty && e.memberEmail == p.email.toLowerCase().trim())) {
+        hit = e;
+        break;
+      }
+    }
+    if (hit != null) {
+      gavePeople.add((p, hit));
+    } else {
+      notYet.add(p);
+    }
+  }
+  // Gifts from someone no longer in the group still count.
+  for (final e in entries) {
+    if (!people.any((p) => e.label.trim().toLowerCase() == p.name.trim().toLowerCase() || (e.memberEmail.isNotEmpty && e.memberEmail == p.email.toLowerCase().trim()))) {
+      gavePeople.add(((name: e.label, email: e.memberEmail), e));
+    }
+  }
+  final total = entries.fold<double>(0, (s, e) => s + e.amount);
+  final ratio = people.isEmpty ? 0.0 : (gavePeople.length / people.length).clamp(0.0, 1.0);
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.88),
+      child: _LightningSheetShell(
+        child: SingleChildScrollView(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            _sheetHeader(icon: Icons.volunteer_activism_rounded, title: name, subtitle: '${gavePeople.length} of ${people.length} gave · total \$${total.toStringAsFixed(2)}${open ? ' · round is open' : ''}'),
+            const SizedBox(height: 12),
+            ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: ratio, minHeight: 10, backgroundColor: Colors.white10, valueColor: const AlwaysStoppedAnimation(_kHelpGreen))),
+            const SizedBox(height: 16),
+            Text('GAVE (${gavePeople.length})', style: const TextStyle(color: _kHelpGreen, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1)),
+            const SizedBox(height: 6),
+            if (gavePeople.isEmpty) const Text('Nobody yet.', style: TextStyle(color: Colors.white38)),
+            for (final it in gavePeople)
+              InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => _showLightningReceiptSheet(ctx, g, it.$2),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: _kHelpGreen.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(12), border: Border.all(color: _kHelpGreen.withValues(alpha: 0.3))),
+                  child: Row(children: [
+                    const Icon(Icons.check_circle_rounded, color: _kHelpGreen, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(it.$1.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                        Text('${_lightningDate(it.$2.at)} · gave ${g.timesContributed(it.$1.name, it.$1.email)}x in all · missed ${g.missedFor(it.$1.name, it.$1.email)} · tap for receipt', style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                      ]),
+                    ),
+                    Text('\$${it.$2.amount.toStringAsFixed(2)}', style: const TextStyle(color: _kHelpGreen, fontWeight: FontWeight.w900)),
+                  ]),
+                ),
+              ),
+            const SizedBox(height: 12),
+            Text(open ? 'NOT YET (${notYet.length})' : 'DID NOT GIVE (${notYet.length})', style: const TextStyle(color: Colors.orangeAccent, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1)),
+            const SizedBox(height: 6),
+            if (notYet.isEmpty) const Text('Everyone gave. Wonderful!', style: TextStyle(color: Colors.white38)),
+            for (final p in notYet)
+              Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: Colors.orangeAccent.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.orangeAccent.withValues(alpha: 0.3))),
+                child: Row(children: [
+                  const Icon(Icons.hourglass_empty_rounded, color: Colors.orangeAccent, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(p.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                      Text('gave ${g.timesContributed(p.name, p.email)}x in all · missed ${g.missedFor(p.name, p.email)}', style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                    ]),
+                  ),
+                ]),
+              ),
+          ]),
+        ),
+      ),
+    ),
+  );
+}
+
+/// A receipt for one contribution, like the Civic Registry receipts.
+Future<void> _showLightningReceiptSheet(BuildContext context, NgmyCivicUserGroup g, NgmyCivicUserGroupLedgerEntry e) {
+  final purpose = e.campaignName.trim().isNotEmpty ? e.campaignName.trim() : (e.campaignId == g.helpCampaignId && g.helpPurpose.trim().isNotEmpty ? g.helpPurpose.trim() : 'Group contribution');
+  final no = 'LG-${g.inviteCode}-${e.id.replaceAll(RegExp(r'[^0-9]'), '').padLeft(6, '0').substring(0, 6)}';
+  final when = e.at.toLocal();
+  final time = '${when.month}/${when.day}/${when.year} ${when.hour.toString().padLeft(2, '0')}:${when.minute.toString().padLeft(2, '0')}';
+  final text = 'RECEIPT $no\nGroup: ${g.inviteCode} (${g.ownerName})\nFrom: ${e.label}\nFor: $purpose\nAmount: \$${e.amount.toStringAsFixed(2)}\nDate: $time${e.note.isNotEmpty ? '\nNote: ${e.note}' : ''}\nRecorded by: ${e.byEmail.isEmpty ? g.ownerEmail : e.byEmail}';
+  Widget row(String k, String v) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SizedBox(width: 96, child: Text(k, style: const TextStyle(color: Colors.white38, fontSize: 12))),
+          Expanded(child: Text(v, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13))),
+        ]),
+      );
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => _LightningSheetShell(
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _sheetHeader(icon: Icons.receipt_long_rounded, title: 'Receipt', subtitle: no),
+        const SizedBox(height: 12),
+        row('From', e.label),
+        row('For', purpose),
+        row('Amount', '\$${e.amount.toStringAsFixed(2)}'),
+        row('Date', time),
+        if (e.note.isNotEmpty) row('Note', e.note),
+        row('Group', '${g.inviteCode} · owner ${g.ownerName}'),
+        row('Recorded by', e.byEmail.isEmpty ? g.ownerEmail : e.byEmail),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          onPressed: () async {
+            await Clipboard.setData(ClipboardData(text: text));
+            if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Receipt copied.')));
+          },
+          icon: const Icon(Icons.copy_rounded, size: 18),
+          label: const Text('Copy receipt'),
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(46), backgroundColor: _kBolt, foregroundColor: Colors.black),
+        ),
+      ]),
+    ),
+  );
+}
+
+// ── Asking to join: details the owner needs, and who the person is in this group ──
+
+class _JoinRequestData {
+  const _JoinRequestData({required this.name, required this.phone, required this.state, required this.address, required this.family});
+  final String name;
+  final String phone;
+  final String state;
+  final String address;
+  final List<Map<String, String>> family;
+}
+
+Future<_JoinRequestData?> _showLightningJoinRequestSheet(
+  BuildContext context,
+  NgmyCivicUserGroup group, {
+  required String defaultName,
+  required String myEmail,
+}) {
+  return showModalBottomSheet<_JoinRequestData>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.92),
+        child: _LightningSheetShell(child: _JoinRequestForm(group: group, defaultName: defaultName, myEmail: myEmail)),
+      ),
+    ),
+  );
+}
+
+class _JoinRequestForm extends StatefulWidget {
+  const _JoinRequestForm({required this.group, required this.defaultName, required this.myEmail});
+  final NgmyCivicUserGroup group;
+  final String defaultName;
+  final String myEmail;
+
+  @override
+  State<_JoinRequestForm> createState() => _JoinRequestFormState();
+}
+
+class _JoinRequestFormState extends State<_JoinRequestForm> {
+  late final TextEditingController _name = TextEditingController(text: widget.defaultName);
+  final TextEditingController _phone = TextEditingController();
+  final TextEditingController _address = TextEditingController();
+  String _state = '';
+  String? _error;
+  final List<({String relation, int person})> _family = [];
+
+  static const _relations = ['mother', 'father', 'spouse', 'child', 'brother', 'sister'];
+
+  List<({String name, String email})> get _people => [
+        (name: widget.group.ownerName, email: widget.group.ownerEmail),
+        ...widget.group.activeMembers.map((m) => (name: m.name, email: m.email)),
+      ].where((p) => p.email != widget.myEmail.toLowerCase().trim()).toList();
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _phone.dispose();
+    _address.dispose();
+    super.dispose();
+  }
+
+  void _send() {
+    final digits = _phone.text.replaceAll(RegExp(r'\D'), '');
+    if (_name.text.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length < 2) {
+      setState(() => _error = 'Write your first and last name.');
+      return;
+    }
+    if (digits.length < 7) {
+      setState(() => _error = 'Your phone number is needed.');
+      return;
+    }
+    if (_state.isEmpty) {
+      setState(() => _error = 'Choose the state you live in.');
+      return;
+    }
+    if (_address.text.trim().length < 5) {
+      setState(() => _error = 'Your home address is needed.');
+      return;
+    }
+    final people = _people;
+    Navigator.pop(
+      context,
+      _JoinRequestData(
+        name: _name.text.trim(),
+        phone: digits,
+        state: _state,
+        address: _address.text.trim(),
+        family: [
+          for (final f in _family)
+            if (f.person >= 0 && f.person < people.length) {'relation': f.relation, 'name': people[f.person].name, 'email': people[f.person].email},
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final people = _people;
+    InputDecoration deco(String label) => _lightningFieldDecoration(label);
+    return SingleChildScrollView(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        _sheetHeader(icon: Icons.person_add_alt_1_rounded, title: 'Ask to join ${widget.group.inviteCode}', subtitle: 'The group owner, ${widget.group.ownerName}, will see this and has to approve you.'),
+        const SizedBox(height: 14),
+        TextField(controller: _name, textCapitalization: TextCapitalization.words, style: const TextStyle(color: Colors.white), decoration: deco('Full name *')),
+        const SizedBox(height: 10),
+        TextField(controller: _phone, keyboardType: TextInputType.phone, style: const TextStyle(color: Colors.white), decoration: deco('Phone number *')),
+        const SizedBox(height: 10),
+        DropdownButtonFormField<String>(
+          initialValue: _state.isEmpty ? null : _state,
+          isExpanded: true,
+          dropdownColor: _kPanel,
+          style: const TextStyle(color: Colors.white),
+          decoration: deco('State you live in *'),
+          items: [for (final s in kNgmyUsStates) DropdownMenuItem(value: s, child: Text(s))],
+          onChanged: (v) => setState(() => _state = v ?? ''),
+        ),
+        const SizedBox(height: 10),
+        TextField(controller: _address, textCapitalization: TextCapitalization.words, style: const TextStyle(color: Colors.white), decoration: deco('Home address * (street, city)')),
+        const SizedBox(height: 16),
+        const Text('FAMILY IN THIS GROUP (optional)', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1)),
+        const SizedBox(height: 4),
+        const Text('Are your mother, father, spouse, children or brothers and sisters already here? Choose them.', style: TextStyle(color: Colors.white38, fontSize: 12, height: 1.35)),
+        const SizedBox(height: 8),
+        if (people.isEmpty) const Text('Nobody else is in this group yet.', style: TextStyle(color: Colors.white38)),
+        for (var i = 0; i < _family.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(children: [
+              SizedBox(
+                width: 108,
+                child: DropdownButtonFormField<String>(
+                  initialValue: _family[i].relation,
+                  isExpanded: true,
+                  dropdownColor: _kPanel,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  decoration: deco('Who'),
+                  items: [for (final r in _relations) DropdownMenuItem(value: r, child: Text(_relationLabel(r)))],
+                  onChanged: (v) => setState(() => _family[i] = (relation: v ?? 'mother', person: _family[i].person)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: DropdownButtonFormField<int>(
+                  initialValue: _family[i].person < people.length ? _family[i].person : null,
+                  isExpanded: true,
+                  dropdownColor: _kPanel,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  decoration: deco('Person in group'),
+                  items: [for (var p = 0; p < people.length; p++) DropdownMenuItem(value: p, child: Text(people[p].name, overflow: TextOverflow.ellipsis))],
+                  onChanged: (v) => setState(() => _family[i] = (relation: _family[i].relation, person: v ?? -1)),
+                ),
+              ),
+              IconButton(onPressed: () => setState(() => _family.removeAt(i)), icon: const Icon(Icons.close_rounded, color: Colors.white54)),
+            ]),
+          ),
+        if (people.isNotEmpty)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(onPressed: () => setState(() => _family.add((relation: 'mother', person: -1))), icon: const Icon(Icons.add_rounded, color: _kBolt), label: const Text('Add a family member from the group', style: TextStyle(color: _kBolt, fontWeight: FontWeight.w800))),
+          ),
+        if (_error != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text(_error!, style: const TextStyle(color: Color(0xFFFCA5A5), fontWeight: FontWeight.w700))),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          onPressed: _send,
+          icon: const Icon(Icons.send_rounded, size: 18),
+          label: const Text('Send my request', style: TextStyle(fontWeight: FontWeight.w900)),
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50), backgroundColor: _kBolt, foregroundColor: Colors.black, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+        ),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+      ]),
+    );
+  }
+}

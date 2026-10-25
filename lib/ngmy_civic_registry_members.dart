@@ -796,6 +796,10 @@ class NgmyCivicRegistryMembers {
     }
     if (idx >= 0) {
       final keep = members[idx];
+      // Anything the new record does not mention (family, gender, marital status...) stays as it was.
+      for (final e in keep.entries) {
+        next.putIfAbsent(e.key, () => e.value);
+      }
       next['helps'] = next['helps'] ?? keep['helps'] ?? 0;
       next['missed'] = next['missed'] ?? keep['missed'] ?? 0;
       // Stamp deliberate help/missed changes so no later merge can undo them.
@@ -1709,25 +1713,32 @@ class NgmyCivicRegistryMembers {
         ? registryId.trim()
         : (existing['registryId'] ?? '').toString().trim();
     if (emailKey(email).isEmpty && rid.isEmpty) return;
+    int count(dynamic v) => v is num ? v.toInt() : int.tryParse('${v ?? ''}') ?? 0;
+    // Keep everything else on the row (males, females, who is in the family, gender...): this only refreshes contact details.
     upsert(
       config,
-      buildRecord(
-        email: email,
-        fullName: fullName,
-        dob: dob,
-        idType: idType,
-        homeAddress: homeAddress,
-        phone: phone,
-        city: city,
-        room: room,
-        state: state,
-        registryId: rid,
-        familyMembers: family,
-        helps: helps,
-        missed: missed,
-        enrolledAt: existing['enrolledAt']?.toString(),
-        enrollmentSource: (existing['enrollmentSource'] ?? existing['source'] ?? '').toString(),
-      ),
+      {
+        ...existing,
+        ...buildRecord(
+          email: email,
+          fullName: fullName,
+          dob: dob,
+          idType: idType,
+          homeAddress: homeAddress,
+          phone: phone,
+          city: city,
+          room: room,
+          state: state,
+          registryId: rid,
+          familyMembers: family,
+          familyMales: count(existing['familyMales']),
+          familyFemales: count(existing['familyFemales']),
+          helps: helps,
+          missed: missed,
+          enrolledAt: existing['enrolledAt']?.toString(),
+          enrollmentSource: (existing['enrollmentSource'] ?? existing['source'] ?? '').toString(),
+        ),
+      },
     );
   }
 

@@ -35,33 +35,67 @@ String? ngmyParseCivicUserGroupInviteCode(String raw) {
   return null;
 }
 
+/// Someone in a group. A person who has asked to join but is not approved yet has status 'pending'.
 class NgmyCivicUserGroupMember {
   NgmyCivicUserGroupMember({
     required this.email,
     required this.name,
     required this.joinedAt,
     this.missed = 0,
-  });
+    this.status = 'active',
+    this.phone = '',
+    this.state = '',
+    this.address = '',
+    List<Map<String, String>>? family,
+    this.requestedAt,
+  }) : family = family ?? <Map<String, String>>[];
 
   final String email;
   final String name;
   final DateTime joinedAt;
   int missed;
 
+  /// 'active' (in the group) or 'pending' (waiting for the owner to approve).
+  String status;
+  final String phone;
+  final String state;
+  final String address;
+
+  /// Family in this group, picked by the person when they asked to join: {relation, name, email}.
+  final List<Map<String, String>> family;
+  final DateTime? requestedAt;
+
+  bool get isPending => status == 'pending';
+
   Map<String, dynamic> toJson() => {
         'email': email,
         'name': name,
         'joinedAt': joinedAt.toUtc().toIso8601String(),
         'missed': missed,
+        if (status != 'active') 'status': status,
+        if (phone.isNotEmpty) 'phone': phone,
+        if (state.isNotEmpty) 'state': state,
+        if (address.isNotEmpty) 'address': address,
+        if (family.isNotEmpty) 'family': family,
+        if (requestedAt != null) 'requestedAt': requestedAt!.toUtc().toIso8601String(),
       };
 
-  factory NgmyCivicUserGroupMember.fromJson(Map<String, dynamic> j) =>
-      NgmyCivicUserGroupMember(
+  factory NgmyCivicUserGroupMember.fromJson(Map<String, dynamic> j) => NgmyCivicUserGroupMember(
         email: (j['email'] ?? '').toString().toLowerCase().trim(),
         name: (j['name'] ?? '').toString().trim(),
-        joinedAt: DateTime.tryParse((j['joinedAt'] ?? '').toString()) ??
-            DateTime.now().toUtc(),
+        joinedAt: DateTime.tryParse((j['joinedAt'] ?? '').toString()) ?? DateTime.now().toUtc(),
         missed: j['missed'] is num ? (j['missed'] as num).toInt() : 0,
+        status: (j['status'] ?? '').toString() == 'pending' ? 'pending' : 'active',
+        phone: (j['phone'] ?? '').toString(),
+        state: (j['state'] ?? '').toString(),
+        address: (j['address'] ?? '').toString(),
+        family: j['family'] is List
+            ? [
+                for (final f in (j['family'] as List).whereType<Map>())
+                  {for (final e in f.entries) '${e.key}': '${e.value}'}
+              ]
+            : null,
+        requestedAt: DateTime.tryParse((j['requestedAt'] ?? '').toString()),
       );
 }
 
@@ -107,6 +141,7 @@ class NgmyCivicUserGroupLedgerEntry {
     required this.byEmail,
     this.campaignId = '',
     this.memberEmail = '',
+    this.campaignName = '',
   });
 
   final String id;
@@ -118,6 +153,9 @@ class NgmyCivicUserGroupLedgerEntry {
   final String byEmail;
   final String campaignId;
   final String memberEmail;
+
+  /// What the contribution round was for ("School fees", "Funeral help"...).
+  final String campaignName;
 
   static String _kindToJson(NgmyCivicUserGroupLedgerKind kind) {
     switch (kind) {
@@ -152,6 +190,7 @@ class NgmyCivicUserGroupLedgerEntry {
         'byEmail': byEmail,
         if (campaignId.isNotEmpty) 'campaignId': campaignId,
         if (memberEmail.isNotEmpty) 'memberEmail': memberEmail,
+        if (campaignName.isNotEmpty) 'campaignName': campaignName,
       };
 
   factory NgmyCivicUserGroupLedgerEntry.fromJson(Map<String, dynamic> j) {
@@ -167,6 +206,7 @@ class NgmyCivicUserGroupLedgerEntry {
       byEmail: (j['byEmail'] ?? '').toString().toLowerCase().trim(),
       campaignId: (j['campaignId'] ?? '').toString().trim(),
       memberEmail: (j['memberEmail'] ?? '').toString().toLowerCase().trim(),
+      campaignName: (j['campaignName'] ?? '').toString().trim(),
     );
   }
 }
@@ -258,19 +298,48 @@ class NgmyCivicUserGroup {
   bool isOwner(String email) =>
       ownerEmail.toLowerCase().trim() == email.toLowerCase().trim();
 
+  /// In the group: the owner and approved people. Someone waiting for approval is not in yet.
   bool isMember(String email) {
     final e = email.toLowerCase().trim();
     if (isOwner(e)) return true;
-    return members.any((m) => m.email == e);
+    return members.any((m) => m.email == e && !m.isPending);
   }
+
+  bool isPending(String email) {
+    final e = email.toLowerCase().trim();
+    return members.any((m) => m.email == e && m.isPending);
+  }
+
+  List<NgmyCivicUserGroupMember> get activeMembers => [for (final m in members) if (!m.isPending) m];
+  List<NgmyCivicUserGroupMember> get pendingMembers => [for (final m in members) if (m.isPending) m];
 
   int get memberCount {
     final emails = <String>{ownerEmail.toLowerCase().trim()};
-    for (final m in members) {
+    for (final m in activeMembers) {
       emails.add(m.email);
     }
     return emails.length;
   }
+
+  /// How many different contribution rounds this person gave to (plus single gifts outside a round).
+  int timesContributed(String name, String email) {
+    final key = name.trim().toLowerCase();
+    final e = email.toLowerCase().trim();
+    final rounds = <String>{};
+    var single = 0;
+    for (final x in ledger) {
+      if (x.kind != NgmyCivicUserGroupLedgerKind.contribution) continue;
+      final mine = x.label.trim().toLowerCase() == key || (e.isNotEmpty && x.memberEmail == e);
+      if (!mine) continue;
+      if (x.campaignId.isEmpty) {
+        single++;
+      } else {
+        rounds.add(x.campaignId);
+      }
+    }
+    return rounds.length + single;
+  }
+
 
   double get totalContributions => ledger
       .where((e) => e.kind == NgmyCivicUserGroupLedgerKind.contribution)
@@ -350,7 +419,7 @@ class NgmyCivicUserGroup {
       ownerMissed += 1;
       recordMissed(ownerName, ownerEmail);
     }
-    for (final m in members) {
+    for (final m in activeMembers) {
       if (!contributedToCampaign(m.name, campaignId)) {
         m.missed += 1;
         recordMissed(m.name, m.email);
@@ -423,7 +492,7 @@ class NgmyCivicUserGroup {
   String? emailForMemberName(String name) {
     final key = name.trim().toLowerCase();
     if (ownerName.trim().toLowerCase() == key) return ownerEmail;
-    for (final m in members) {
+    for (final m in activeMembers) {
       if (m.name.trim().toLowerCase() == key) return m.email;
     }
     return null;
@@ -495,6 +564,99 @@ class NgmyCivicUserGroup {
   }
 }
 
+/// A Lightning group person, as the Civic Registry registrar sees them when enrolling.
+class NgmyLightningUser {
+  const NgmyLightningUser({required this.email, required this.name, required this.phone, required this.state, required this.address, required this.family, required this.groupCode});
+  final String email;
+  final String name;
+  final String phone;
+  final String state;
+  final String address;
+  final List<Map<String, String>> family;
+  final String groupCode;
+
+  factory NgmyLightningUser.fromMap(Map<String, dynamic> m) => NgmyLightningUser(
+        email: (m['email'] ?? '').toString().toLowerCase().trim(),
+        name: (m['name'] ?? '').toString().trim(),
+        phone: (m['phone'] ?? '').toString(),
+        state: (m['state'] ?? '').toString().trim(),
+        address: (m['address'] ?? '').toString().trim(),
+        family: m['family'] is List
+            ? [
+                for (final f in (m['family'] as List).whereType<Map>()) {for (final e in f.entries) '${e.key}': '${e.value}'}
+              ]
+            : const [],
+        groupCode: (m['groupCode'] ?? '').toString(),
+      );
+}
+
+String _lgState(String s) => s.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
+
+/// Everyone in Lightning groups who lives in [state]: what the server sent a registrar, plus the approved
+/// people of every group this phone can see. One row per person.
+List<NgmyLightningUser> ngmyLightningUsersForState(String state, {List<Map<String, dynamic>> fromServer = const [], List<NgmyCivicUserGroup> groups = const []}) {
+  final want = _lgState(state);
+  final out = <String, NgmyLightningUser>{};
+  void add(NgmyLightningUser u) {
+    if (u.email.isEmpty || u.name.isEmpty) return;
+    if (want.isNotEmpty && _lgState(u.state) != want) return;
+    final prev = out[u.email];
+    // Keep the row that knows the most.
+    if (prev == null || (u.phone.isNotEmpty && prev.phone.isEmpty) || (u.family.length > prev.family.length)) out[u.email] = u;
+  }
+
+  for (final m in fromServer) {
+    add(NgmyLightningUser.fromMap(m));
+  }
+  for (final g in groups) {
+    for (final m in g.activeMembers) {
+      add(NgmyLightningUser(email: m.email, name: m.name, phone: m.phone, state: m.state, address: m.address, family: m.family, groupCode: g.inviteCode));
+    }
+  }
+  return out.values.toList()..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+}
+
+/// The spouse and children the registrar should see when enrolling [person]: what they chose themselves, plus
+/// what other group people said about them ("this is my mother" makes that person a child here).
+List<Map<String, dynamic>> ngmyLightningRelatives(NgmyLightningUser person, List<NgmyLightningUser> everyone) {
+  final out = <Map<String, dynamic>>[];
+  final seen = <String>{};
+  void add(String relation, String name, {String phone = '', String gender = ''}) {
+    final key = '$relation|${name.trim().toLowerCase()}';
+    if (name.trim().isEmpty || !seen.add(key)) return;
+    out.add({
+      'id': 'rel_lg_${out.length}_${name.hashCode.abs()}',
+      'relation': relation,
+      'fullName': name.trim(),
+      'gender': gender,
+      'dob': '',
+      'age': null,
+      'phone': phone.replaceAll(RegExp(r'\D'), ''),
+      'idType': '',
+      'address': '',
+      'email': '',
+      'status': relation == 'spouse' ? 'married' : 'single',
+    });
+  }
+
+  for (final f in person.family) {
+    final rel = (f['relation'] ?? '').toLowerCase();
+    final name = f['name'] ?? '';
+    if (rel == 'spouse') add('spouse', name);
+    if (rel == 'child') add('child', name);
+  }
+  for (final other in everyone) {
+    if (other.email == person.email) continue;
+    for (final f in other.family) {
+      if ((f['email'] ?? '').toLowerCase() != person.email && (f['name'] ?? '').trim().toLowerCase() != person.name.trim().toLowerCase()) continue;
+      final rel = (f['relation'] ?? '').toLowerCase();
+      if (rel == 'mother' || rel == 'father') add('child', other.name, phone: other.phone);
+      if (rel == 'spouse') add('spouse', other.name, phone: other.phone);
+    }
+  }
+  return out;
+}
+
 /// Local + settings-cloud store for lightning user groups.
 abstract final class NgmyCivicUserGroupsStore {
   static const settingsKey = 'civic_user_groups_v1';
@@ -505,6 +667,9 @@ abstract final class NgmyCivicUserGroupsStore {
   static const _inviteIndexKind = 'ngmy_lightning_group';
 
   static List<NgmyCivicUserGroup>? _memoryCache;
+
+  /// Lightning users in the registrar's state, as sent by the server (an Authorized Registrar only).
+  static List<Map<String, dynamic>> registrarLightningUsers = const [];
 
   static List<NgmyCivicUserGroup> get cachedGroups =>
       List.unmodifiable(_memoryCache ?? const []);
@@ -572,12 +737,28 @@ abstract final class NgmyCivicUserGroupsStore {
     }
   }
 
+  /// The group as the public invite lookup may show it: no phone numbers, home addresses or family details.
+  static Map<String, dynamic> _publicGroupJson(NgmyCivicUserGroup group) {
+    final j = group.toJson();
+    final members = j['members'];
+    if (members is List) {
+      j['members'] = [
+        for (final m in members.whereType<Map>())
+          {
+            for (final e in m.entries)
+              if (e.key != 'phone' && e.key != 'address' && e.key != 'family' && e.key != 'requestedAt') e.key: e.value,
+          },
+      ];
+    }
+    return j;
+  }
+
   static Future<void> _publishInviteIndex(NgmyCivicUserGroup group) async {
     final ok = await ngmyUpsertSettingsRowReliable(
       _inviteIndexKey(group.inviteCode),
       {
         'kind': _inviteIndexKind,
-        'group': group.toJson(),
+        'group': _publicGroupJson(group),
         'updatedAt': DateTime.now().toUtc().toIso8601String(),
       },
     );
@@ -657,6 +838,9 @@ abstract final class NgmyCivicUserGroupsStore {
     }
     var root = local;
     final remote = await _fetchCloudRoot();
+    if (remote != null && remote['registrarLightningUsers'] is List) {
+      registrarLightningUsers = [for (final u in (remote['registrarLightningUsers'] as List).whereType<Map>()) Map<String, dynamic>.from(u)];
+    }
     if (remote != null) {
       final remoteGroups = _groupsFromRoot(remote);
       final localGroups = _groupsFromRoot(local);
@@ -766,6 +950,12 @@ abstract final class NgmyCivicUserGroupsStore {
     return (await loadAll()).where((g) => g.ownerEmail == e).toList();
   }
 
+  /// Groups this person has asked to join and is still waiting to be approved for.
+  static Future<List<NgmyCivicUserGroup>> waitingFor(String email) async {
+    final e = email.toLowerCase().trim();
+    return (await loadAll()).where((g) => g.isPending(e)).toList();
+  }
+
   static Future<List<NgmyCivicUserGroup>> joinedBy(String email) async {
     final e = email.toLowerCase().trim();
     return (await loadAll())
@@ -849,6 +1039,57 @@ abstract final class NgmyCivicUserGroupsStore {
     _removeMemoryGroup(id);
   }
 
+  /// Asks to join. Nobody gets in just by having the code: the person is added as 'pending' with their details,
+  /// and the group owner has to approve them.
+  static Future<NgmyCivicUserGroup?> requestJoin({
+    required String inviteCode,
+    required String email,
+    required String name,
+    required String phone,
+    required String state,
+    required String address,
+    List<Map<String, String>> family = const [],
+  }) async {
+    final code = ngmyParseCivicUserGroupInviteCode(inviteCode) ?? inviteCode.trim().toUpperCase();
+    if (code.isEmpty) return null;
+    final group = await findByInviteCode(code);
+    if (group == null) return null;
+    final e = email.toLowerCase().trim();
+    if (group.isMember(e) || group.isPending(e)) return group;
+    group.members.removeWhere((m) => m.email == e);
+    group.members.add(
+      NgmyCivicUserGroupMember(
+        email: e,
+        name: name.trim().isEmpty ? e.split('@').first : name.trim(),
+        joinedAt: DateTime.now().toUtc(),
+        status: 'pending',
+        phone: phone.trim(),
+        state: state.trim(),
+        address: address.trim(),
+        family: family,
+        requestedAt: DateTime.now().toUtc(),
+      ),
+    );
+    await saveGroup(group);
+    return cachedById(group.id) ?? group;
+  }
+
+  /// The owner lets a waiting person in.
+  static Future<bool> approveRequest({required String groupId, required String memberEmail}) async {
+    final group = await findById(groupId);
+    if (group == null) return false;
+    final e = memberEmail.toLowerCase().trim();
+    final i = group.members.indexWhere((m) => m.email == e && m.isPending);
+    if (i < 0) return false;
+    group.members[i].status = 'active';
+    await saveGroup(group);
+    return true;
+  }
+
+  /// The owner says no. The person can ask again later.
+  static Future<bool> declineRequest({required String groupId, required String memberEmail, String? declinedByEmail}) =>
+      removeMember(groupId: groupId, memberEmail: memberEmail, removedByEmail: declinedByEmail, note: 'Join request declined');
+
   static Future<NgmyCivicUserGroup?> joinByCode({
     required String inviteCode,
     required String email,
@@ -913,6 +1154,7 @@ abstract final class NgmyCivicUserGroupsStore {
     required String memberEmail,
     String? memberName,
     String? removedByEmail,
+    String note = 'Removed from group',
   }) async {
     final group = await findById(groupId);
     if (group == null) return false;
@@ -937,7 +1179,7 @@ abstract final class NgmyCivicUserGroupsStore {
         kind: NgmyCivicUserGroupLedgerKind.memberRemoved,
         amount: 0,
         label: display,
-        note: 'Removed from group',
+        note: note,
         at: DateTime.now().toUtc(),
         byEmail: (removedByEmail ?? '').toLowerCase().trim(),
         memberEmail: e,

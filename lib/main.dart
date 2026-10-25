@@ -225,6 +225,7 @@ import 'ngmy_media_delivery.dart';
 import 'ngmy_push_notification_prompt.dart';
 import 'ngmy_push_notifications.dart';
 import 'ngmy_civic_birthdays.dart';
+import 'ngmy_civic_lightning_enroll.dart';
 import 'ngmy_app_notifications.dart';
 import 'ngmy_announcement_reads.dart';
 import 'ngmy_local_deposit_qr.dart';
@@ -33207,6 +33208,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
   final _emailC = TextEditingController();
   final _cityC = TextEditingController();
   final _roomC = TextEditingController();
+  final GlobalKey _enrollFormKey = GlobalKey();
   final _familyMembersC = TextEditingController();
   final _familyMalesC = TextEditingController();
   final _familyFemalesC = TextEditingController();
@@ -46302,6 +46304,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     return Column(
       children: [
         // MANUAL ENROLLMENT FORM
+        SizedBox.shrink(key: _enrollFormKey),
         Container(
           key: ValueKey('enroll-form-${_editingMemberOriginalEmail ?? 'new'}-${_cityC.text}-${_roomC.text}-${_idTypeC.text}'),
           padding: const EdgeInsets.all(25),
@@ -46345,11 +46348,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
               ],
               const SizedBox(height: 25),
 
+Container(
+                padding: const EdgeInsets.all(16),
+                decoration: _enrollCardDeco(isDark),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  _enrollSectionTitle(Icons.badge_rounded, ngmyT('Who they are', 'Mtu mwenyewe'), isDark),
+                  const SizedBox(height: 14),
               _enrollFlagLabel('Full Name *', 'fullName'),
               const SizedBox(height: 8),
               TextField(
                 controller: _fullNameC,
-                decoration: InputDecoration(hintText: 'First name and last name', hintStyle: const TextStyle(fontSize: 13, color: Colors.grey), filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)),
+                decoration: InputDecoration(hintText: 'First name and last name', hintStyle: const TextStyle(fontSize: 13, color: Colors.grey), filled: true, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16), fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
               ),
               const SizedBox(height: 20),
 
@@ -46363,7 +46372,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                   const NgmyCivicDobInputFormatter(),
                   LengthLimitingTextInputFormatter(10),
                 ],
-                decoration: InputDecoration(suffixIcon: ngmyParseDob(_dobC.text.trim()) == null ? null : Padding(padding: const EdgeInsets.only(right: 10), child: Center(widthFactor: 1, child: Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4), decoration: BoxDecoration(color: const Color(0xFF00B25A).withValues(alpha: 0.16), borderRadius: BorderRadius.circular(9), border: Border.all(color: const Color(0xFF00B25A).withValues(alpha: 0.6))), child: Text('Age ${ngmyAgeOn(ngmyParseDob(_dobC.text.trim())!, DateTime.now())}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFF00B25A)))))), hintText: 'MM/DD/YYYY', hintStyle: const TextStyle(fontSize: 13, color: Colors.grey), filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)),
+                decoration: InputDecoration(suffixIcon: ngmyParseDob(_dobC.text.trim()) == null ? null : Padding(padding: const EdgeInsets.only(right: 10), child: Center(widthFactor: 1, child: Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4), decoration: BoxDecoration(color: const Color(0xFF00B25A).withValues(alpha: 0.16), borderRadius: BorderRadius.circular(9), border: Border.all(color: const Color(0xFF00B25A).withValues(alpha: 0.6))), child: Text('Age ${ngmyAgeOn(ngmyParseDob(_dobC.text.trim())!, DateTime.now())}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFF00B25A)))))), hintText: 'MM/DD/YYYY', hintStyle: const TextStyle(fontSize: 13, color: Colors.grey), filled: true, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16), fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
               ),
               const SizedBox(height: 20),
 
@@ -46371,12 +46380,21 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 value: _idTypeC.text,
-                decoration: InputDecoration(filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none)),
+                decoration: InputDecoration(filled: true, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16), fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
                 items: ['National ID', 'Passport', 'Drivers License', 'Voters Card'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
                 onChanged: (v) { if (v != null) setState(() => _idTypeC.text = v); },
               ),
               const SizedBox(height: 20),
 
+                ]),
+              ),
+              const SizedBox(height: 16),
+Container(
+                padding: const EdgeInsets.all(16),
+                decoration: _enrollCardDeco(isDark),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  _enrollSectionTitle(Icons.contact_phone_rounded, ngmyT('How to reach them', 'Mawasiliano'), isDark),
+                  const SizedBox(height: 14),
               _enrollField('Home Address *', _addressC, 'Street address, Apt...', fieldKey: 'homeAddress'),
 
               _enrollFlagLabel('Phone Number *', 'phone'),
@@ -46385,7 +46403,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                 controller: _phoneC,
                 keyboardType: TextInputType.phone,
                 inputFormatters: [PhoneDashFormatter()],
-                decoration: InputDecoration(hintText: '123-456-7890', hintStyle: const TextStyle(fontSize: 13, color: Colors.grey), filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)),
+                decoration: InputDecoration(hintText: '123-456-7890', hintStyle: const TextStyle(fontSize: 13, color: Colors.grey), filled: true, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16), fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
               ),
               const SizedBox(height: 20),
 
@@ -46394,17 +46412,26 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
               TextField(
                 controller: _emailC,
                 keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(hintText: 'member@email.com', hintStyle: const TextStyle(fontSize: 13, color: Colors.grey), filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)),
+                decoration: InputDecoration(hintText: 'member@email.com', hintStyle: const TextStyle(fontSize: 13, color: Colors.grey), filled: true, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16), fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
               ),
               const SizedBox(height: 20),
 
+                ]),
+              ),
+              const SizedBox(height: 16),
+Container(
+                padding: const EdgeInsets.all(16),
+                decoration: _enrollCardDeco(isDark),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  _enrollSectionTitle(Icons.location_city_rounded, ngmyT('Where they live', 'Anapoishi'), isDark),
+                  const SizedBox(height: 14),
               _enrollFlagLabel(ngmyT('City', 'Jiji'), 'city'),
               const SizedBox(height: 8),
               DropdownMenu<String>(
                 width: double.infinity,
                 initialSelection: _cityC.text.isNotEmpty ? _cityC.text : null,
                 hintText: ngmyT('Select city', 'Chagua jiji'),
-                inputDecorationTheme: InputDecorationTheme(filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)),
+                inputDecorationTheme: InputDecorationTheme(filled: true, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16), fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
                 dropdownMenuEntries: cityOptions.map((c) => DropdownMenuEntry(value: c, label: c)).toList(),
                 onSelected: (v) { if (v != null) setState(() => _cityC.text = v); },
               ),
@@ -46416,12 +46443,21 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                 width: double.infinity,
                 initialSelection: _roomC.text.isNotEmpty ? _roomC.text : null,
                 hintText: ngmyT('Select room (optional)', 'Chagua chumba (si lazima)'),
-                inputDecorationTheme: InputDecorationTheme(filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)),
+                inputDecorationTheme: InputDecorationTheme(filled: true, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16), fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
                 dropdownMenuEntries: roomOptions.map((r) => DropdownMenuEntry(value: r, label: r)).toList(),
                 onSelected: (v) { if (v != null) setState(() => _roomC.text = v); },
               ),
               const SizedBox(height: 20),
 
+                ]),
+              ),
+              const SizedBox(height: 16),
+Container(
+                padding: const EdgeInsets.all(16),
+                decoration: _enrollCardDeco(isDark),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  _enrollSectionTitle(Icons.family_restroom_rounded, ngmyT('Family', 'Familia'), isDark),
+                  const SizedBox(height: 14),
               Text(ngmyT('Gender', 'Jinsia'), style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               NgmyCivicGenderPicker(value: _enrollGender, isDark: isDark, onChanged: (v) => _setEnrollFamily(gender: v)),
@@ -46442,7 +46478,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                   hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
                   filled: true,
                   fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                 ),
               ),
               const SizedBox(height: 12),
@@ -46468,7 +46504,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                             hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
                             filled: true,
                             fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                           ),
                         ),
                       ],
@@ -46490,7 +46526,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                             hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
                             filled: true,
                             fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                           ),
                         ),
                       ],
@@ -46517,6 +46553,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                   );
                   if (next != null && mounted) _setEnrollFamily(relatives: next);
                 },
+              ),
+                ]),
               ),
               const SizedBox(height: 30),
 
@@ -46590,9 +46628,47 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
           ),
         ),
         ],
+        const SizedBox(height: 28),
+        NgmyLightningEnrollFrame(
+          state: _selectedState,
+          isDark: isDark,
+          enrolled: NgmyCivicRegistryMembers.listFrom(widget.config),
+          onEnroll: (u, rels) {
+            setState(() {
+              _editingMemberOriginalEmail = null;
+              _editingMemberRegistryId = null;
+              _fullNameC.text = u.name;
+              _emailC.text = u.email;
+              _phoneC.text = ngmyFormatPhoneDisplay(u.phone);
+              _addressC.text = u.address;
+            });
+            if (rels.isNotEmpty) _setEnrollFamily(relatives: rels);
+            final ctx = _enrollFormKey.currentContext;
+            if (ctx != null) Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 350), curve: Curves.easeOut);
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${u.name}\'s details are in the form above. Check them and press Register Member.')));
+          },
+        ),
       ],
     );
   }
+
+  BoxDecoration _enrollCardDeco(bool isDark) => BoxDecoration(
+        color: isDark ? Colors.white.withValues(alpha: 0.04) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+      );
+
+  Widget _enrollSectionTitle(IconData icon, String title, bool isDark) => Row(children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF00B25A).withValues(alpha: 0.14)),
+          child: Icon(icon, size: 18, color: const Color(0xFF00B25A)),
+        ),
+        const SizedBox(width: 10),
+        Text(title.toUpperCase(), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5, letterSpacing: 1, color: isDark ? Colors.white70 : const Color(0xFF334155))),
+      ]);
+
   Widget _enrollField(String label, TextEditingController c, String hint, {String? fieldKey}) {
     bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

@@ -164,22 +164,43 @@ class NgmyCivicMaritalPicker extends StatelessWidget {
   final ValueChanged<String> onChanged;
   final bool isDark;
 
+  static const _icons = {'single': Icons.person_outline_rounded, 'married': Icons.favorite_rounded, 'divorced': Icons.heart_broken_rounded, 'separated': Icons.call_split_rounded, 'widowed': Icons.spa_rounded};
+
+  /// Every choice is the same size as the male / female boxes: three to a row, 48 tall.
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        for (final (id, label) in kNgmyCivicMaritalStatuses)
-          ChoiceChip(
-            label: Text(label),
-            selected: value == id,
-            onSelected: (_) => onChanged(value == id ? '' : id),
-            selectedColor: const Color(0xFF00B25A).withValues(alpha: 0.25),
-            labelStyle: TextStyle(fontWeight: FontWeight.w700, color: value == id ? const Color(0xFF00B25A) : (isDark ? Colors.white70 : Colors.black87)),
-          ),
-      ],
-    );
+    const green = Color(0xFF00B25A);
+    return LayoutBuilder(builder: (context, c) {
+      final w = (c.maxWidth - 16) / 3;
+      return Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final (id, label) in kNgmyCivicMaritalStatuses)
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                onChanged(value == id ? '' : id);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                width: w,
+                height: 48,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  color: value == id ? green.withValues(alpha: 0.18) : (isDark ? Colors.black26 : Colors.grey.shade100),
+                  border: Border.all(color: value == id ? green : Colors.transparent, width: 1.6),
+                ),
+                child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Icon(_icons[id] ?? Icons.circle_outlined, size: 16, color: value == id ? green : Colors.grey),
+                  const SizedBox(width: 5),
+                  Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: value == id ? green : (isDark ? Colors.white70 : Colors.black54)))),
+                ]),
+              ),
+            ),
+        ],
+      );
+    });
   }
 }
 

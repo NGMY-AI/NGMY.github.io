@@ -9915,6 +9915,36 @@ function civicGroupHasMember(g: Record<string, unknown>, email: string): boolean
   });
 }
 
+/** True when [email] is the owner or an APPROVED member (a person waiting for approval is not in yet). */
+function civicGroupHasApprovedMember(g: Record<string, unknown>, email: string): boolean {
+  const want = emailKey(email);
+  if (!want) return false;
+  if (civicGroupOwnerEmail(g) === want) return true;
+  const members = Array.isArray(g.members) ? g.members : [];
+  return members.some((m) => {
+    if (!m || typeof m !== "object") return false;
+    const r = m as Record<string, unknown>;
+    return emailKey(String(r.email ?? "")) === want && String(r.status ?? "") !== "pending";
+  });
+}
+
+/** What a person who is only WAITING for approval may see: their own request, nothing about the group's money or people. */
+function civicGroupRedactedForPending(g: Record<string, unknown>, email: string): Record<string, unknown> {
+  const want = emailKey(email);
+  const members = (Array.isArray(g.members) ? g.members : []).filter((m) => civicGroupMemberEmail(m) === want);
+  return {
+    id: g.id,
+    name: g.name,
+    ownerEmail: g.ownerEmail,
+    ownerName: g.ownerName,
+    inviteCode: g.inviteCode,
+    createdAt: g.createdAt,
+    members,
+    notes: [],
+    ledger: [],
+  };
+}
+
 function civicGroupMemberEmail(m: unknown): string {
   if (!m || typeof m !== "object") return "";
   return emailKey(String((m as Record<string, unknown>).email ?? ""));
@@ -9951,8 +9981,10 @@ function filterCivicUserGroupsForCaller(
   for (const [id, raw] of Object.entries(groups)) {
     if (!raw || typeof raw !== "object") continue;
     const g = raw as Record<string, unknown>;
-    if (civicGroupOwnerEmail(g) === callerE || civicGroupHasMember(g, callerE)) {
+    if (civicGroupOwnerEmail(g) === callerE || civicGroupHasApprovedMember(g, callerE)) {
       mine[id] = g;
+    } else if (civicGroupHasMember(g, callerE)) {
+      mine[id] = civicGroupRedactedForPending(g, callerE);
     }
   }
   return { ...value, groups: mine };
@@ -10062,10 +10094,40 @@ async function handleCivicUserGroupsFetch(req: Request): Promise<Response> {
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
   const role = await resolveCivicRole(admin, email);
   const value = await loadSettingsObject(admin, CIVIC_USER_GROUPS_KEY);
-  return jsonOk({
-    ok: true,
-    value: filterCivicUserGroupsForCaller(value, email, role.isAdmin),
-  });
+  const filtered = filterCivicUserGroupsForCaller(value, email, role.isAdmin) as Record<string, unknown>;
+  // An Authorized Registrar also gets the (approved) Lightning users who live in their state.
+  if ((role.isRegistrar && role.registrarState) || role.isAdmin) {
+    const want = role.isAdmin ? "" : canonicalStateKey(role.registrarState);
+    const users: Record<string, unknown>[] = [];
+    const groups = value.groups && typeof value.groups === "object" && !Array.isArray(value.groups)
+      ? (value.groups as Record<string, unknown>)
+      : {};
+    for (const raw of Object.values(groups)) {
+      if (!raw || typeof raw !== "object") continue;
+      const g = raw as Record<string, unknown>;
+      const members = Array.isArray(g.members) ? g.members : [];
+      for (const m of members) {
+        if (!m || typeof m !== "object") continue;
+        const r = m as Record<string, unknown>;
+        if (String(r.status ?? "") === "pending") continue;
+        if (want && canonicalStateKey(String(r.state ?? "")) !== want) continue;
+        if (!String(r.state ?? "").trim()) continue;
+        users.push({
+          email: emailKey(String(r.email ?? "")),
+          name: String(r.name ?? ""),
+          phone: String(r.phone ?? ""),
+          state: String(r.state ?? ""),
+          address: String(r.address ?? ""),
+          family: Array.isArray(r.family) ? r.family : [],
+          groupCode: String(g.inviteCode ?? ""),
+          groupName: String(g.name ?? ""),
+        });
+      }
+    }
+    filtered.registrarLightningUsers = users;
+  }
+  return jsonOk({ ok: true, value: filtered });
+
 }
 
 async function handleCivicUserGroupsFind(
@@ -10124,18 +10186,28 @@ async function handleCivicUserGroupsJoin(
     }
   }
   if (!found || !foundId) return jsonOk({ ok: false, error: "No group found for that code." });
-  if (civicGroupHasMember(found, email)) {
+  if (civicGroupHasApprovedMember(found, email)) {
     return jsonOk({ ok: true, group: found, alreadyMember: true });
+  }
+  if (civicGroupHasMember(found, email)) {
+    return jsonOk({ ok: true, group: civicGroupRedactedForPending(found, email), alreadyMember: false, pending: true });
   }
   if (civicGroupMemberCount(found) >= 500) {
     return jsonOk({ ok: false, error: "This group is full." }, 400);
   }
   const members = Array.isArray(found.members) ? [...found.members] : [];
+  // Having the code is not enough: the person is added as PENDING and the group owner has to approve them.
   members.push({
     email: emailKey(email),
     name: displayName,
     joinedAt: new Date().toISOString(),
     missed: 0,
+    status: "pending",
+    phone: String(body.phone ?? "").replace(/\D/g, "").slice(0, 15),
+    state: String(body.state ?? "").trim().slice(0, 40),
+    address: String(body.address ?? "").trim().slice(0, 200),
+    family: Array.isArray(body.family) ? (body.family as unknown[]).slice(0, 12) : [],
+    requestedAt: new Date().toISOString(),
   });
   const next = { ...found, members };
   groups[foundId] = next;
@@ -10144,7 +10216,7 @@ async function handleCivicUserGroupsJoin(
     updatedAt: new Date().toISOString(),
   });
   if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
-  return jsonOk({ ok: true, group: next, alreadyMember: true });
+  return jsonOk({ ok: true, group: civicGroupRedactedForPending(next, email), alreadyMember: false, pending: true });
 }
 
 async function handleCivicUserGroupsPersist(
