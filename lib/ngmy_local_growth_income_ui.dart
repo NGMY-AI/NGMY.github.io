@@ -2426,7 +2426,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
     var inflow = 0.0;
     var outflow = 0.0;
     for (final t in widget.transactions) {
-      if (t.status != TransactionStatus.approved || !_isGrowthIncomeHistoryRow(t)) continue;
+      if (t.status != TransactionStatus.approved || !_isGrowthIncomeHistoryRow(t) || ngmyWalletRowTooOld(t)) continue;
       final out = t.type == TransactionType.withdrawal || t.type == TransactionType.adminRemove || t.type == TransactionType.contribution;
       if (out) {
         outflow += t.amount;
@@ -2873,7 +2873,8 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
   }
 
   Widget _historyPanel() {
-    final wallet = widget.transactions.where(_isGrowthIncomeHistoryRow).toList()
+    // Nothing older than 2 months is kept or shown.
+    final wallet = widget.transactions.where((t) => _isGrowthIncomeHistoryRow(t) && !ngmyWalletRowTooOld(t)).toList()
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     // The balance before and after every move, worked back from today's balance through everything
     // on the account (games included, since they moved the balance too).

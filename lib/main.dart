@@ -1363,8 +1363,9 @@ enum TransactionType { deposit, withdrawal, adminAdd, adminRemove, reimbursement
 enum TransactionStatus { pending, approved, rejected }
 enum PaymentMethod { cashApp, bitcoin, system }
 
-/// Wallet deposit/withdraw receipts (with screenshots) auto-delete after 5 days.
-const int kNgmyWalletReceiptRetentionDays = 5;
+/// Wallet history (deposits, withdrawals, spending, rewards) and their receipts are deleted for good
+/// after 2 months, to save space.
+const int kNgmyWalletReceiptRetentionDays = 60;
 const int kNgmyWalletHistoryDisplayMax = 500;
 
 /// Civic help-mode / contribution campaigns may run this long before the app
@@ -1414,8 +1415,24 @@ bool ngmyIsWalletReceiptTransaction(AppTransaction t) {
       t.type == TransactionType.adminAdd;
 }
 
+/// Everything the wallet history shows. Games (their receipts live in the Game Center), civic
+/// contributions and claims, and requests still waiting are never purged.
+bool ngmyIsPurgeableWalletTransaction(AppTransaction t) {
+  if (t.status == TransactionStatus.pending) return false;
+  if (ngmyIsGameLedgerTransaction(t)) return false;
+  if (t.type == TransactionType.contribution || t.type == TransactionType.claim) return false;
+  return true;
+}
+
+/// True when a wallet history row is older than the 2-month limit.
+bool ngmyWalletRowTooOld(AppTransaction t, [DateTime? now]) {
+  if (!ngmyIsPurgeableWalletTransaction(t)) return false;
+  final cutoff = (now ?? DateTime.now()).subtract(const Duration(days: kNgmyWalletReceiptRetentionDays));
+  return t.timestamp.isBefore(cutoff);
+}
+
 bool ngmyWalletReceiptExpired(AppTransaction t, DateTime cutoff, Map<String, DateTime> decisionTimes) {
-  if (!ngmyIsWalletReceiptTransaction(t)) return false;
+  if (!ngmyIsPurgeableWalletTransaction(t)) return false;
   final decidedAt = decisionTimes[t.id] ?? t.timestamp;
   return decidedAt.isBefore(cutoff);
 }

@@ -341,6 +341,7 @@ class NgmyLocalGrowthIncomeStore {
     return raw
         .map((e) => e is Map ? _txnFromMap(Map<String, dynamic>.from(e)) : null)
         .whereType<AppTransaction>()
+        .where((t) => !ngmyWalletRowTooOld(t)) // wallet history keeps 2 months only
         .toList();
   }
 

@@ -15,6 +15,7 @@ AppTransaction _t(String id, String details, {double amount = 1, TransactionType
 
 void main() {
   trailTests();
+  retentionTests();
   test('crown and clock-in rewards are settled once on the server, other money is not', () {
     expect(ngmyIsServerRewardTransaction(_t('crown_a@x.com_20261025', 'Crown daily reward (King)')), isTrue);
     expect(ngmyIsServerRewardTransaction(_t('clock_a@x.com_20261025', 'Clock-in daily earnings', amount: 4.5)), isTrue);
@@ -51,5 +52,30 @@ void trailTests() {
     expect(trail['rej'], (before: 16.0, after: 16.0));
     expect(trail['bet'], (before: 20.0, after: 15.0));
     expect(trail['dep'], (before: 0.0, after: 20.0));
+  });
+}
+
+void retentionTests() {
+  test('wallet history keeps two months; games, civic and waiting requests are not purged', () {
+    final now = DateTime(2026, 10, 25);
+    AppTransaction mk(TransactionType type, DateTime at, {String d = 'x', TransactionStatus s = TransactionStatus.approved}) => AppTransaction(
+          id: 'i${at.millisecondsSinceEpoch}${type.index}',
+          userEmail: 'a@x.com',
+          amount: 5,
+          type: type,
+          method: PaymentMethod.system,
+          sourceDetails: d,
+          status: s,
+          timestamp: at,
+        );
+    final old = DateTime(2026, 8, 1);
+    final recent = DateTime(2026, 10, 1);
+    expect(ngmyWalletRowTooOld(mk(TransactionType.deposit, old), now), isTrue);
+    expect(ngmyWalletRowTooOld(mk(TransactionType.reimbursement, old, d: 'Crown daily reward (King)'), now), isTrue);
+    expect(ngmyWalletRowTooOld(mk(TransactionType.adminRemove, old, d: 'NGMY Store purchase'), now), isTrue);
+    expect(ngmyWalletRowTooOld(mk(TransactionType.deposit, recent), now), isFalse);
+    expect(ngmyWalletRowTooOld(mk(TransactionType.adminRemove, old, d: 'Game bet: Dice'), now), isFalse);
+    expect(ngmyWalletRowTooOld(mk(TransactionType.contribution, old), now), isFalse);
+    expect(ngmyWalletRowTooOld(mk(TransactionType.withdrawal, old, s: TransactionStatus.pending), now), isFalse);
   });
 }
