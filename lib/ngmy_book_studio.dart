@@ -1354,14 +1354,54 @@ class _BookStudioScreenState extends State<_BookStudioScreen> {
 /// Opens "Write a book with AI". With [familyFacts] (everyone in a family tree), the AI uses
 /// those people — names, dates, places, notes, who is married to and child of whom.
 Future<NgmyBookDoc?> showNgmyBookAiSheet(BuildContext context, {String familyFacts = '', String familyName = ''}) {
-  return showModalBottomSheet<NgmyBookDoc>(
+  return showDialog<NgmyBookDoc>(
     context: context,
-    isScrollControlled: true,
-    isDismissible: false,
-    enableDrag: false,
-    backgroundColor: Colors.transparent,
-    builder: (_) => _BookAiSheet(familyFacts: familyFacts, familyName: familyName),
+    barrierDismissible: false,
+    barrierColor: Colors.black.withValues(alpha: 0.65),
+    builder: (_) => Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 24),
+      child: _BookAiSheet(familyFacts: familyFacts, familyName: familyName),
+    ),
   );
+}
+
+/// The AI badge: a glowing violet-to-pink orb with a big four-point sparkle and two little ones.
+class NgmyAiBadge extends StatelessWidget {
+  const NgmyAiBadge({super.key, this.size = 44});
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(width: size, height: size, child: CustomPaint(painter: _AiBadgePainter()));
+}
+
+class _AiBadgePainter extends CustomPainter {
+  Path _star(Offset c, double r) {
+    final p = Path()..moveTo(c.dx, c.dy - r);
+    p.quadraticBezierTo(c.dx + r * 0.12, c.dy - r * 0.12, c.dx + r, c.dy);
+    p.quadraticBezierTo(c.dx + r * 0.12, c.dy + r * 0.12, c.dx, c.dy + r);
+    p.quadraticBezierTo(c.dx - r * 0.12, c.dy + r * 0.12, c.dx - r, c.dy);
+    p.quadraticBezierTo(c.dx - r * 0.12, c.dy - r * 0.12, c.dx, c.dy - r);
+    return p..close();
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width;
+    final c = size.center(Offset.zero);
+    canvas.drawCircle(c, s * 0.5, Paint()..color = const Color(0xFFDB2777).withValues(alpha: 0.5)..maskFilter = MaskFilter.blur(BlurStyle.normal, s * 0.3));
+    final orb = Rect.fromCircle(center: c, radius: s * 0.46);
+    canvas.drawCircle(c, s * 0.46, Paint()..shader = const RadialGradient(center: Alignment(-0.4, -0.5), colors: [Color(0xFFC4B5FD), Color(0xFF7C3AED), Color(0xFFBE185D)], stops: [0, 0.55, 1]).createShader(orb));
+    canvas.drawCircle(c, s * 0.46, Paint()..style = PaintingStyle.stroke..strokeWidth = s * 0.035..color = Colors.white.withValues(alpha: 0.55));
+    canvas.drawPath(_star(c + Offset(-s * 0.04, s * 0.02), s * 0.27), Paint()..color = Colors.white);
+    canvas.drawPath(_star(c + Offset(s * 0.2, -s * 0.2), s * 0.11), Paint()..color = Colors.white.withValues(alpha: 0.92));
+    canvas.drawPath(_star(c + Offset(s * 0.17, s * 0.2), s * 0.075), Paint()..color = Colors.white.withValues(alpha: 0.85));
+    canvas.drawArc(Rect.fromCircle(center: c, radius: s * 0.38), 3.5, 1.1, false, Paint()..style = PaintingStyle.stroke..strokeWidth = s * 0.04..strokeCap = StrokeCap.round..color = Colors.white.withValues(alpha: 0.35));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
 }
 
 class _BookAiSheet extends StatefulWidget {
@@ -1470,35 +1510,26 @@ class _BookAiSheetState extends State<_BookAiSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.of(context).viewInsets.bottom;
     return PopScope(
       canPop: !_busy,
       child: Padding(
-        padding: EdgeInsets.only(bottom: bottom),
+        padding: EdgeInsets.zero,
         child: Container(
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.92),
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1E1036), Color(0xFF120A22)]),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.84, maxWidth: 520),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF241247), Color(0xFF120A22)]),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: const Color(0xFFA78BFA).withValues(alpha: 0.5), width: 1.4),
+            boxShadow: [BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.35), blurRadius: 40), BoxShadow(color: Colors.black.withValues(alpha: 0.6), blurRadius: 30, offset: const Offset(0, 14))],
           ),
           child: SafeArea(
             top: false,
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
               child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(9)))),
-                const SizedBox(height: 18),
+                const SizedBox(height: 6),
                 Row(children: [
-                  Container(
-                    width: 46,
-                    height: 46,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
-                      gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]),
-                      boxShadow: [BoxShadow(color: const Color(0xFFDB2777).withValues(alpha: 0.45), blurRadius: 16)],
-                    ),
-                    child: const Icon(Icons.auto_awesome_rounded, color: Colors.white),
-                  ),
+                  const NgmyAiBadge(size: 50),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

@@ -34,3 +34,46 @@ String ngmyLanguageDirective(String request) {
   if (lang == null) return '';
   return '- WRITE EVERYTHING THE READER SEES IN $lang — every title, subtitle, sentence and note, with natural, correct grammar. Do not mix in English (JSON keys stay as given).';
 }
+
+/// Common Swahili words that are not also everyday English. One of these in a message means the
+/// person speaks Swahili, so a reply in Swahili is the polite one.
+final Set<String> kNgmySwahiliWords = {
+  'habari', 'mambo', 'poa', 'asante', 'karibu', 'pole', 'sawa', 'rafiki', 'mama', 'baba', 'kwa', 'nini', 'sana', 'tafadhali',
+  'nataka', 'naomba', 'ninaomba', 'nipe', 'nifanye', 'mimi', 'wewe', 'yako', 'yangu', 'yetu', 'wetu', 'zetu', 'hapana', 'ndiyo',
+  'ndio', 'pia', 'lakini', 'kwamba', 'hii', 'hiyo', 'huyu', 'mtoto', 'watoto', 'familia', 'nyumba', 'kazi', 'pesa', 'leo',
+  'kesho', 'jana', 'sasa', 'bado', 'tena', 'vizuri', 'nzuri', 'mzuri', 'siku', 'usiku', 'asubuhi', 'jioni', 'mungu', 'upendo',
+  'mpenzi', 'nakupenda', 'kiswahili', 'kitabu', 'hadithi', 'shule', 'kanisa', 'jamii', 'biashara', 'ndugu', 'dada',
+  'kaka', 'bibi', 'babu', 'mjomba', 'shangazi', 'sema', 'sikia', 'angalia', 'nisaidie', 'nisaidieni', 'tusaidie', 'saidia',
+  'andika', 'tengeneza', 'eleza', 'nieleze', 'unaweza', 'naweza', 'tunaweza', 'nina', 'una', 'ana', 'tuna', 'hakuna', 'kuna',
+  'vipi', 'namna', 'gani', 'wapi', 'lini', 'nani', 'kwanini', 'mbona', 'basi', 'kidogo', 'kubwa', 'ndogo', 'mpya', 'zamani',
+  'mwanangu', 'mwanamke', 'mwanaume', 'mume', 'mke', 'harusi', 'salamu', 'shikamoo', 'marahaba', 'hongera', 'pongezi',
+  'safari', 'chakula', 'maji', 'jina', 'kwaheri', 'tutaonana', 'samahani', 'ahsante', 'wiki', 'mwezi', 'mwaka', 'saa',
+};
+
+/// True when the text has at least one Swahili word from [kNgmySwahiliWords].
+bool ngmyHasSwahiliWord(String text) {
+  for (final w in text.toLowerCase().split(RegExp(r"[^a-z']+"))) {
+    if (w.isNotEmpty && kNgmySwahiliWords.contains(w)) return true;
+  }
+  return false;
+}
+
+/// The instruction added to an advisor's reply request when the person wrote any Swahili.
+const String kNgmySwahiliReplyRule =
+    'LANGUAGE (mandatory): the person used Swahili, which means they speak Swahili. Reply fully in natural, everyday '
+    'Swahili (Kiswahili), even if part of their message was in English. Only use English if they clearly ask for English. ';
+
+const Set<String> _kSwahiliGlue = {'na', 'ya', 'wa', 'za', 'ni', 'la', 'katika', 'ambao', 'ambayo', 'hawa', 'yake', 'wake', 'zao', 'yao', 'kuwa', 'alikuwa', 'walikuwa', 'mtu', 'watu', 'wakati', 'baada', 'kila'};
+const Set<String> _kEnglishGlue = {'the', 'and', 'of', 'to', 'was', 'is', 'in', 'that', 'he', 'she', 'his', 'her', 'with', 'for', 'as', 'they', 'their', 'from', 'by', 'were', 'are', 'it', 'this', 'be', 'on', 'at', 'who', 'had', 'have', 'our', 'we'};
+
+/// 'sw' when the text is written in Swahili, 'en' when it is English, null when there is too little to tell.
+String? ngmyDetectTextLanguage(String text) {
+  final words = text.toLowerCase().split(RegExp(r"[^a-z']+")).where((w) => w.isNotEmpty).take(2000);
+  var sw = 0, en = 0;
+  for (final w in words) {
+    if (kNgmySwahiliWords.contains(w) || _kSwahiliGlue.contains(w)) sw++;
+    if (_kEnglishGlue.contains(w)) en++;
+  }
+  if (sw + en < 4) return null;
+  return sw > en ? 'sw' : 'en';
+}

@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ngmy/ngmy_ai_language.dart';
 import 'package:ngmy/ngmy_book_studio.dart';
 import 'package:ngmy/ngmy_family_book_storage.dart';
 import 'package:ngmy/ngmy_family_book_ui.dart';
@@ -94,6 +95,47 @@ void main() {
     await t.pump(const Duration(milliseconds: 400));
     expect(find.text('Write new pages'), findsOneWidget);
     expect(t.takeException(), isNull);
+  });
+
+  Future<void> menuFor(WidgetTester t, String treeId, String body) async {
+    SharedPreferences.setMockInitialValues({});
+    await t.runAsync(() async {
+      await saveFamilyBookEntries('a@b.c', treeId, [FamilyBookEntry(id: '1', title: 'Start', body: body, updatedAt: DateTime(2026, 1, 2))]);
+    });
+    t.view.physicalSize = const Size(860, 1700);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(MaterialApp(home: Builder(builder: (c) => Scaffold(body: TextButton(onPressed: () => showFamilyBookSheet(c, userEmail: 'a@b.c', treeId: treeId, canEdit: true, bookTitle: 'Fam', familyFacts: 'Anna, Bob'), child: const Text('open'))))));
+    await t.tap(find.text('open'));
+    await t.pump(const Duration(milliseconds: 500));
+    await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
+    await t.pump(const Duration(milliseconds: 400));
+    await t.tap(find.text('AI'));
+    await t.pump(const Duration(milliseconds: 400));
+    await t.pump(const Duration(milliseconds: 400));
+  }
+
+  testWidgets('an English book is only offered Swahili, and a Swahili book only English', (t) async {
+    await menuFor(t, 'en1', 'The story of our family began in a small village, and the people of the village were kind to them. They had a farm by the lake and it was a good life for all of them.');
+    expect(find.text('Translate my book to Swahili'), findsOneWidget);
+    expect(find.text('Translate my book to English'), findsNothing);
+    expect(find.text('Your book is in English.'), findsOneWidget);
+    await t.pumpWidget(const SizedBox());
+    await menuFor(t, 'sw1', 'Hadithi ya familia yetu ilianza katika kijiji kidogo, na watu wa kijiji walikuwa wema sana kwa wazazi wetu. Walikuwa na shamba karibu na ziwa na maisha yalikuwa mazuri kwa wote.');
+    expect(find.text('Translate my book to English'), findsOneWidget);
+    expect(find.text('Translate my book to Swahili'), findsNothing);
+    expect(find.text('Your book is in Swahili.'), findsOneWidget);
+    expect(t.takeException(), isNull);
+  });
+
+  test('any Swahili word makes an advisor answer in Swahili', () {
+    expect(ngmyHasSwahiliWord('Hey, habari my friend'), isTrue);
+    expect(ngmyHasSwahiliWord('can you help me, asante'), isTrue);
+    expect(ngmyHasSwahiliWord('I want to know about my balance'), isFalse);
+    expect(kNgmySwahiliReplyRule, contains('Swahili'));
+    expect(ngmyDetectTextLanguage('The cat is on the mat and the dog was in the garden with her'), 'en');
+    expect(ngmyDetectTextLanguage('Mtoto wa familia ni mzuri sana na watu wa kijiji wana furaha kwa kila siku'), 'sw');
+    expect(ngmyDetectTextLanguage('hi'), isNull);
   });
 
   testWidgets('the owner can design the cover and it is saved', (t) async {

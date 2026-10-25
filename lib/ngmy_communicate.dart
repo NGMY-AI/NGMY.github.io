@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_ai_language.dart';
 import 'ngmy_advisor_app_knowledge.dart';
 import 'ngmy_advisor_badge_copy.dart';
 import 'ngmy_advisor_dating.dart';
@@ -4704,7 +4705,15 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     return 'They sent a homework photo.\n';
   }
 
+  /// The reply instruction, plus: if the person wrote any Swahili word, the advisor answers in Swahili.
   String _replyStyleSuffix() {
+    final core = _replyStyleSuffixCore();
+    if (_isTextCoach) return core;
+    final lastUser = _messages.reversed.where((m) => m['role'] == 'user').map((m) => (m['text'] ?? '').toString()).firstWhere((t) => t.trim().isNotEmpty, orElse: () => '');
+    return ngmyHasSwahiliWord(lastUser) ? '$kNgmySwahiliReplyRule$core' : core;
+  }
+
+  String _replyStyleSuffixCore() {
     if (_isTextCoach) {
       return 'Reply as ${widget.profile.name} — output ONLY the exact text to send, no explanation:';
     }

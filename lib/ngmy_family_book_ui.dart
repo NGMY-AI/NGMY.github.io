@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_ai_language.dart';
 import 'ngmy_book_studio.dart';
 import 'ngmy_family_book_storage.dart';
 import 'ngmy_print_booklet.dart';
@@ -341,8 +342,8 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
       if (widget.canEdit) _HeaderTool(Icons.add_rounded, 'Add page', _addPage),
     ];
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+      margin: const EdgeInsets.fromLTRB(12, 6, 12, 2),
+      padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(22),
         gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF4A2A15), Color(0xFF2A170C)]),
@@ -353,20 +354,20 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
         Row(children: [
           GestureDetector(
             onTap: () => Navigator.pop(context),
-            child: Container(width: 38, height: 38, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.black.withValues(alpha: 0.3), border: Border.all(color: _gold.withValues(alpha: 0.6))), child: const Icon(Icons.close_rounded, color: _paper, size: 20)),
+            child: Container(width: 30, height: 30, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.black.withValues(alpha: 0.3), border: Border.all(color: _gold.withValues(alpha: 0.6))), child: const Icon(Icons.close_rounded, color: _paper, size: 17)),
           ),
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: FittedBox(
                 fit: BoxFit.scaleDown,
-                child: Text(_title, maxLines: 1, softWrap: false, style: const TextStyle(color: _gold, fontWeight: FontWeight.w900, fontSize: 22, letterSpacing: 0.6, shadows: [Shadow(color: Colors.black54, blurRadius: 3, offset: Offset(1, 2))])),
+                child: Text(_title, maxLines: 1, softWrap: false, style: const TextStyle(color: _gold, fontWeight: FontWeight.w900, fontSize: 19, letterSpacing: 0.5, shadows: [Shadow(color: Colors.black54, blurRadius: 3, offset: Offset(1, 2))])),
               ),
             ),
           ),
-          const SizedBox(width: 38),
+          const SizedBox(width: 30),
         ]),
-        Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Container(height: 1, decoration: BoxDecoration(gradient: LinearGradient(colors: [Colors.transparent, _gold.withValues(alpha: 0.7), Colors.transparent])))),
+        Padding(padding: const EdgeInsets.symmetric(vertical: 5), child: Container(height: 1, decoration: BoxDecoration(gradient: LinearGradient(colors: [Colors.transparent, _gold.withValues(alpha: 0.7), Colors.transparent])))),
         Row(children: [for (final t in tools) Expanded(child: _headerButton(t))]),
       ]),
     );
@@ -376,19 +377,16 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
         behavior: HitTestBehavior.opaque,
         onTap: t.onTap,
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              gradient: t.hot ? const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]) : LinearGradient(colors: [Colors.white.withValues(alpha: 0.14), Colors.white.withValues(alpha: 0.05)]),
-              border: Border.all(color: t.hot ? Colors.white54 : _gold.withValues(alpha: 0.5)),
-              boxShadow: t.hot ? [BoxShadow(color: const Color(0xFFDB2777).withValues(alpha: 0.45), blurRadius: 12)] : null,
-            ),
-            child: Icon(t.icon, color: t.hot ? Colors.white : _paper, size: 22),
-          ),
-          const SizedBox(height: 4),
-          Text(t.label, maxLines: 1, style: TextStyle(color: _paper.withValues(alpha: 0.85), fontSize: 10.5, fontWeight: FontWeight.w800)),
+          t.hot
+              ? const NgmyAiBadge(size: 32)
+              : Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), gradient: LinearGradient(colors: [Colors.white.withValues(alpha: 0.14), Colors.white.withValues(alpha: 0.05)]), border: Border.all(color: _gold.withValues(alpha: 0.5))),
+                  child: Icon(t.icon, color: _paper, size: 17),
+                ),
+          const SizedBox(height: 2),
+          Text(t.label, maxLines: 1, style: TextStyle(color: _paper.withValues(alpha: 0.85), fontSize: 9.5, fontWeight: FontWeight.w800)),
         ]),
       );
 
@@ -396,11 +394,14 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
   Future<void> _aiMenu() async {
     if (_editing) await _saveCurrentPage();
     if (!mounted) return;
-    final choice = await showModalBottomSheet<String>(
+    final bookLang = ngmyDetectTextLanguage([for (final e in _entries) '${e.title} ${e.body}'].join(' '));
+    final choice = await showDialog<String>(
       context: context,
-      backgroundColor: const Color(0xFF241409),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => SafeArea(
+      builder: (ctx) => Dialog(
+        backgroundColor: const Color(0xFF241409),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26), side: BorderSide(color: _gold.withValues(alpha: 0.5), width: 1.4)),
+        child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -408,10 +409,13 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
             const SizedBox(height: 12),
             if (widget.familyFacts.trim().isNotEmpty) _menuTile(ctx, Icons.auto_awesome_rounded, 'Write new pages', 'Choose English or Swahili, then describe the book', 'write'),
             if (_entries.isNotEmpty) ...[
-              _menuTile(ctx, Icons.translate_rounded, 'Translate my book to Swahili', 'Every page, from English into Kiswahili', 'sw'),
-              _menuTile(ctx, Icons.translate_rounded, 'Translate my book to English', 'Every page, from Swahili into English', 'en'),
+              if (bookLang == 'en') Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('Your book is in English.', style: TextStyle(color: _paper.withValues(alpha: 0.7), fontSize: 12))),
+              if (bookLang == 'sw') Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('Your book is in Swahili.', style: TextStyle(color: _paper.withValues(alpha: 0.7), fontSize: 12))),
+              if (bookLang != 'sw') _menuTile(ctx, Icons.translate_rounded, 'Translate my book to Swahili', 'Every page, from English into Kiswahili', 'sw'),
+              if (bookLang != 'en') _menuTile(ctx, Icons.translate_rounded, 'Translate my book to English', 'Every page, from Swahili into English', 'en'),
             ],
           ]),
+        ),
         ),
       ),
     );
