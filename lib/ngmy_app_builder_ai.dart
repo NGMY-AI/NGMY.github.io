@@ -8,6 +8,7 @@ import 'ngmy_app_builder_invoice_templates.dart';
 import 'ngmy_app_builder_layout_utils.dart';
 import 'ngmy_app_builder_runtime.dart';
 import 'ngmy_app_builder_social_blueprints.dart';
+import 'ngmy_book_studio.dart' show ngmyEscapeJsonStrings;
 
 class NgmyAppBuilderCopilotResult {
   final String message;
@@ -15,6 +16,28 @@ class NgmyAppBuilderCopilotResult {
 
   const NgmyAppBuilderCopilotResult({required this.message, this.updatedProject});
 }
+
+/// What lets the builder make ANY app: when the ready-made widgets are not enough, the AI writes the whole app itself.
+const String kNgmyAppBuilderWebAppHelp = r'''
+UNLIMITED BUILDS — THE webApp WIDGET (this is how you build ANYTHING):
+The ready-made widgets (forms, lists, stats, menus...) cover ordinary business apps. For ANYTHING that needs its own logic, visuals or interaction — games (snake, tetris, memory, quiz, puzzles, platformers, card games), calculators, converters, timers, stopwatches, drawing boards, music or drum machines, animations, simulators, charts and graph tools, generators, flashcards, planners with custom layouts, scoreboards, brackets, trackers with custom UI, mini tools, anything unusual — you MUST write it as a real, fully working web app inside a "webApp" widget. YOU write the whole app yourself in HTML, CSS and JavaScript. Never say you cannot. Never answer with a menu of links or a template for these. If you are unsure whether the ready-made widgets can do it, use webApp.
+The widget (in a screen's data.layout, or as the whole layout): {"type":"webApp","id":"game","htmlRef":"game","height":640}
+For a full-screen app, make that one widget the whole layout and set "fullBleed": true and "hideAppBar": true next to "layout" inside the screen's "data".
+Write the code AFTER the JSON, one block per htmlRef, exactly in this form (not inside the JSON, not in a code fence):
+---HTML:game---
+<!doctype html>
+<html>...the complete app...</html>
+---END_HTML---
+Rules for the code:
+- One self-contained file. No external files, libraries, fonts, images or network calls: inline everything and draw with canvas, SVG, CSS and emoji.
+- Mobile first: touch and tap, big buttons, works at any width (use flex/grid, vh/vw units), no hover-only features, no tiny text. For keyboard games also add on-screen buttons or swipe controls.
+- Make it look polished: a nice dark theme that matches the app colour, rounded corners, smooth animation, readable fonts, satisfying feedback.
+- Make it COMPLETE and truly working: real game or tool logic, scoring, levels or difficulty, win and lose states, restart button, input validation, all the features the user asked for. No placeholders or "coming soon".
+- Use localStorage for anything worth remembering (high scores, lists, settings). It is saved for the user.
+- Do not use alert(), confirm() or prompt(): use on-screen UI instead.
+- Keep each file under about 800 lines.
+You can mix kinds: ready-made screens (forms, lists) for data, plus webApp screens for the custom parts, wired together with shell.bottomNav and button targets.
+''';
 
 Future<NgmyAppBuilderCopilotResult> ngmyAppBuilderAiCopilot({
   required String apiKey,
@@ -24,32 +47,34 @@ Future<NgmyAppBuilderCopilotResult> ngmyAppBuilderAiCopilot({
   List<Map<String, String>> history = const [],
 }) async {
   final resolvedOwnerEmail = ownerEmail.isNotEmpty ? ownerEmail : (project?.ownerEmail ?? '');
+  // The AI designs the app first, whatever it is. A ready-made layout is only a fallback for when the AI is unreachable.
   final blueprintKind = NgmyAppSocialBlueprints.detectKind(userMessage);
-  if (blueprintKind != null && (project == null || _looksLikeBuildRequest(userMessage))) {
+  NgmyAppBuilderCopilotResult? blueprintFallback() {
+    if (blueprintKind == null || !(project == null || _looksLikeBuildRequest(userMessage))) return null;
     final built = NgmyAppSocialBlueprints.build(blueprintKind, ownerEmail: resolvedOwnerEmail, name: project?.name);
-    if (built != null) {
-      final merged = project == null
-          ? built
-          : built.copyWith(
-              id: project.id,
-              status: project.status,
-              slug: project.slug,
-              publicUrl: project.publicUrl,
-              publishedAt: project.publishedAt,
-              reviewNote: project.reviewNote,
-            );
-      return NgmyAppBuilderCopilotResult(
-        message: 'Built your ${NgmyAppSocialBlueprints.label(blueprintKind)} app — real screens, navigation, and working data are wired up. Check Preview, then ask me to tweak colors, text, or add more screens anytime.',
-        updatedProject: merged,
-      );
-    }
+    if (built == null) return null;
+    final merged = project == null
+        ? built
+        : built.copyWith(
+            id: project.id,
+            status: project.status,
+            slug: project.slug,
+            publicUrl: project.publicUrl,
+            publishedAt: project.publishedAt,
+            reviewNote: project.reviewNote,
+          );
+    return NgmyAppBuilderCopilotResult(
+      message: 'The AI could not answer right now, so I started you with a ready-made ${NgmyAppSocialBlueprints.label(blueprintKind)} app. Check Preview, and ask me again in a moment to make it exactly how you want.',
+      updatedProject: merged,
+    );
   }
 
   final creds = ngmyParseAiCredentials(apiKey);
   if (creds.apiKey.isEmpty) {
-    return const NgmyAppBuilderCopilotResult(
-      message: 'AI is not available right now. Please try again later.',
-    );
+    return blueprintFallback() ??
+        const NgmyAppBuilderCopilotResult(
+          message: 'AI is not available right now. Please try again later.',
+        );
   }
 
   final actor = kNgmyAppBuilderActors.firstWhere((a) => a.id == 'builder');
@@ -172,6 +197,8 @@ IMPORTANT RESPONSE FORMAT:
 7) If the user says "change", "add", "remove", "fix", or "make it like" — always emit ---APP_JSON--- with the full updated app.
 8) You may add appIcon (emoji), themeColorHex, tagline, seoDescription, and multiple screens in one reply.
 
+$kNgmyAppBuilderWebAppHelp
+
 $kNgmyAppBuilderCodeSchemaHelp
 
 $projectBlock
@@ -184,25 +211,81 @@ User: $userMessage
     final reply = await ngmyAiGenerateForAppBuilder(creds, prompt);
     final text = reply.text?.trim();
     if (text == null || text.isEmpty) {
-      return NgmyAppBuilderCopilotResult(message: reply.error ?? 'AI returned an empty reply. Try again.');
+      return blueprintFallback() ?? NgmyAppBuilderCopilotResult(message: reply.error ?? 'AI returned an empty reply. Try again.');
     }
     final email = ownerEmail.isNotEmpty ? ownerEmail : (project?.ownerEmail ?? '');
-    return _maybeUpgradeGenericDemo(_parseCopilotReply(text, project, email), userMessage, project, email);
+    final parsed = _parseCopilotReply(text, project, email);
+    if (parsed.updatedProject == null && _looksLikeBuildRequest(userMessage)) {
+      final fallback = blueprintFallback();
+      if (fallback != null) return fallback;
+    }
+    return _maybeUpgradeGenericDemo(parsed, userMessage, project, email);
   } catch (e) {
     debugPrint('[app builder copilot] $e');
-    return NgmyAppBuilderCopilotResult(message: 'AI error: $e');
+    return blueprintFallback() ?? NgmyAppBuilderCopilotResult(message: 'AI error: $e');
   }
+
+}
+
+/// The code of each webApp, written after the JSON as `---HTML:name--- ... ---END_HTML---`, so it never has to be squeezed into JSON text.
+final RegExp _kHtmlBlock = RegExp(r'---HTML:([A-Za-z0-9_\-]+)---\s*([\s\S]*?)\s*---END_HTML---');
+
+/// Takes the html blocks out of [raw]. Returns the text without them, and name -> code.
+({String text, Map<String, String> blocks}) ngmySplitHtmlBlocks(String raw) {
+  final blocks = <String, String>{};
+  var text = raw.replaceAllMapped(_kHtmlBlock, (m) {
+    var code = (m.group(2) ?? '').trim();
+    // Some replies wrap the code in a markdown fence.
+    if (code.startsWith('```')) {
+      code = code.replaceFirst(RegExp(r'^```[a-zA-Z]*\s*'), '');
+      if (code.endsWith('```')) code = code.substring(0, code.length - 3);
+    }
+    blocks[m.group(1)!] = code.trim();
+    return '';
+  });
+  // A reply cut off before its closing line still has usable code: keep what is there.
+  final open = RegExp(r'---HTML:([A-Za-z0-9_\-]+)---\s*([\s\S]*)$').firstMatch(text);
+  if (open != null) {
+    var code = (open.group(2) ?? '').trim();
+    if (code.startsWith('```')) code = code.replaceFirst(RegExp(r'^```[a-zA-Z]*\s*'), '');
+    if (code.contains('</html>') || code.length > 400) blocks[open.group(1)!] = code.trim();
+    text = text.substring(0, open.start);
+  }
+  return (text: text.trim(), blocks: blocks);
+}
+
+/// Puts each block's code into the webApp widget that points at it with "htmlRef" (anywhere in the layouts).
+void ngmyAttachHtmlBlocks(Map<String, dynamic> app, Map<String, String> blocks) {
+  if (blocks.isEmpty) return;
+  void walk(dynamic node) {
+    if (node is Map) {
+      final ref = node['htmlRef'];
+      if (ref is String && blocks.containsKey(ref) && (node['html'] == null || '${node['html']}'.trim().isEmpty)) {
+        node['html'] = blocks[ref];
+      }
+      node.values.toList().forEach(walk);
+    } else if (node is List) {
+      node.forEach(walk);
+    }
+  }
+
+  walk(app['screens']);
 }
 
 NgmyAppBuilderCopilotResult _parseCopilotReply(String raw, NgmyAppProject? base, [String ownerEmail = '']) {
+  final split = ngmySplitHtmlBlocks(raw);
+  raw = split.text;
+  final htmlBlocks = split.blocks;
   final marker = '---APP_JSON---';
   if (!raw.contains(marker)) {
     final fallback = _extractJson(raw);
     if (fallback != null) {
       try {
-        final decoded = jsonDecode(fallback);
+        final decoded = jsonDecode(ngmyEscapeJsonStrings(fallback));
         if (decoded is Map) {
-          final updated = _projectFromAiMap(Map<String, dynamic>.from(decoded), base, ownerEmail);
+          final decodedMap = Map<String, dynamic>.from(decoded);
+          ngmyAttachHtmlBlocks(decodedMap, htmlBlocks);
+          final updated = _projectFromAiMap(decodedMap, base, ownerEmail);
           if (updated != null && _projectHasUsableScreens(updated)) {
             return NgmyAppBuilderCopilotResult(
               message: '${raw.trim()}\n\n(Done — I applied the app JSON from your reply.)',
@@ -226,11 +309,13 @@ NgmyAppBuilderCopilotResult _parseCopilotReply(String raw, NgmyAppProject? base,
     );
   }
   try {
-    final decoded = jsonDecode(jsonText);
+    final decoded = jsonDecode(ngmyEscapeJsonStrings(jsonText));
     if (decoded is! Map) {
       return NgmyAppBuilderCopilotResult(message: message.isEmpty ? raw.trim() : message);
     }
-    final updated = _projectFromAiMap(Map<String, dynamic>.from(decoded), base, ownerEmail);
+    final decodedMap = Map<String, dynamic>.from(decoded);
+    ngmyAttachHtmlBlocks(decodedMap, htmlBlocks);
+    final updated = _projectFromAiMap(decodedMap, base, ownerEmail);
     if (updated == null) {
       return NgmyAppBuilderCopilotResult(message: message.isEmpty ? 'Could not parse app changes.' : message);
     }
@@ -400,6 +485,8 @@ RULES:
 Current screen JSON:
 ${jsonEncode(screen.toMap())}
 
+$kNgmyAppBuilderWebAppHelp
+
 $kNgmyAppBuilderCodeSchemaHelp
 
 User request: $userMessage
@@ -411,11 +498,12 @@ User request: $userMessage
     if (text == null || text.isEmpty) {
       return NgmyAppScreenAiResult(message: reply.error ?? 'AI returned an empty reply. Try again.');
     }
+    final htmlSplit = ngmySplitHtmlBlocks(text);
     const marker = '---SCREEN_JSON---';
-    if (!text.contains(marker)) {
-      return NgmyAppScreenAiResult(message: text);
+    if (!htmlSplit.text.contains(marker)) {
+      return NgmyAppScreenAiResult(message: htmlSplit.text);
     }
-    final parts = text.split(marker);
+    final parts = htmlSplit.text.split(marker);
     final message = parts.first.trim();
     final jsonPart = parts.length > 1 ? parts.sublist(1).join(marker).trim() : '';
     final jsonText = _extractJson(jsonPart);
@@ -424,11 +512,12 @@ User request: $userMessage
         message: message.isEmpty ? 'Could not apply that change — try being more specific.' : message,
       );
     }
-    final map = jsonDecode(jsonText);
+    final map = jsonDecode(ngmyEscapeJsonStrings(jsonText));
     if (map is! Map) {
       return NgmyAppScreenAiResult(message: message.isEmpty ? 'Invalid screen JSON from AI.' : message);
     }
     final screenMap = Map<String, dynamic>.from(map);
+    ngmyAttachHtmlBlocks({'screens': [screenMap]}, htmlSplit.blocks);
     screenMap['id'] = screen.id;
     final updated = NgmyAppScreen.fromMap(screenMap);
     return NgmyAppScreenAiResult(
@@ -513,6 +602,8 @@ Screen ids for navigation: ${jsonEncode(screensList)}
 Current full screen JSON:
 ${jsonEncode(screen.toMap())}
 
+$kNgmyAppBuilderWebAppHelp
+
 $kNgmyAppBuilderCodeSchemaHelp
 
 User request for widget at index $widgetIndex: $userMessage
@@ -524,11 +615,12 @@ User request for widget at index $widgetIndex: $userMessage
     if (text == null || text.isEmpty) {
       return NgmyAppScreenAiResult(message: reply.error ?? 'AI returned an empty reply. Try again.');
     }
+    final htmlSplit = ngmySplitHtmlBlocks(text);
     const marker = '---SCREEN_JSON---';
-    if (!text.contains(marker)) {
-      return NgmyAppScreenAiResult(message: text);
+    if (!htmlSplit.text.contains(marker)) {
+      return NgmyAppScreenAiResult(message: htmlSplit.text);
     }
-    final parts = text.split(marker);
+    final parts = htmlSplit.text.split(marker);
     final message = parts.first.trim();
     final jsonPart = parts.length > 1 ? parts.sublist(1).join(marker).trim() : '';
     final jsonText = _extractJson(jsonPart);
@@ -537,11 +629,12 @@ User request for widget at index $widgetIndex: $userMessage
         message: message.isEmpty ? 'Could not apply that change — try being more specific.' : message,
       );
     }
-    final map = jsonDecode(jsonText);
+    final map = jsonDecode(ngmyEscapeJsonStrings(jsonText));
     if (map is! Map) {
       return NgmyAppScreenAiResult(message: message.isEmpty ? 'Invalid screen JSON from AI.' : message);
     }
     final screenMap = Map<String, dynamic>.from(map);
+    ngmyAttachHtmlBlocks({'screens': [screenMap]}, htmlSplit.blocks);
     screenMap['id'] = screen.id;
     var updated = NgmyAppScreen.fromMap(screenMap);
     final newChildren = ngmyLayoutChildren(updated);
@@ -576,7 +669,7 @@ Future<NgmyAppProject?> ngmyAppBuilderAiGenerateApp({
 }) async {
   final result = await ngmyAppBuilderAiCopilot(
     apiKey: apiKey,
-    userMessage: 'Create a complete WORKING app for: $idea. Use custom layouts with form (collection saves data), dataList (shows saved items), switch (settings), workoutPlan (if fitness). No text-only screens for interactive features.',
+    userMessage: 'Create a complete WORKING app for: $idea. If it needs its own logic or visuals (a game, calculator, tool, simulator, anything custom), write it yourself as a webApp with full HTML, CSS and JavaScript. Otherwise use custom layouts with form (collection saves data), dataList (shows saved items), switch (settings), workoutPlan (if fitness). No text-only screens for interactive features.',
     project: base,
   );
   final p = result.updatedProject;
@@ -653,3 +746,6 @@ extension _TakeLast<T> on List<T> {
     return sublist(length - count);
   }
 }
+
+/// Reads an AI reply into a project (public so tests can check the whole path).
+NgmyAppBuilderCopilotResult ngmyParseCopilotReply(String raw, NgmyAppProject? base, [String ownerEmail = '']) => _parseCopilotReply(raw, base, ownerEmail);

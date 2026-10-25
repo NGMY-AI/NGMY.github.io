@@ -7,6 +7,7 @@ import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_runtime_extras.dart';
 import 'ngmy_app_builder_runtime_map.dart';
 import 'ngmy_app_builder_runtime_social.dart';
+import 'ngmy_app_builder_webapp.dart';
 
 /// Renders interactive app screens from JSON — forms save, lists show data, settings work.
 class NgmyAppLayoutRenderer extends StatefulWidget {
@@ -67,6 +68,14 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
       case 'mapview':
       case 'map_view':
       case 'map':
+        return true;
+      case 'webapp':
+      case 'web_app':
+      case 'html':
+      case 'htmlapp':
+      case 'html_app':
+      case 'customapp':
+      case 'custom_app':
         return true;
       default:
         return false;
@@ -434,6 +443,29 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
             },
           ),
         );
+      // A whole app the AI wrote itself (games, calculators, tools, anything): it runs in a locked-down frame.
+      case 'webapp':
+      case 'web_app':
+      case 'html':
+      case 'htmlapp':
+      case 'html_app':
+      case 'customapp':
+      case 'custom_app':
+        final code = (node['html'] ?? '').toString();
+        if (code.trim().isEmpty) {
+          return Container(
+            height: 160,
+            width: double.infinity,
+            decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(12)),
+            alignment: Alignment.center,
+            child: const Text('Ask the AI to build this part'),
+          );
+        }
+        final frame = ngmyWebAppView(html: code, storageKey: '${widget.appId}_${node['id'] ?? 'main'}');
+        if (isRoot && !widget.embedded) return SizedBox.expand(child: frame);
+        final wanted = node['height'];
+        final h = wanted is num ? wanted.toDouble().clamp(200.0, 2000.0) : (widget.embedded ? 460.0 : math.max(460.0, MediaQuery.of(context).size.height * 0.72));
+        return ClipRRect(borderRadius: BorderRadius.circular(12), child: SizedBox(height: h, child: frame));
       case 'video':
         final url = (node['url'] ?? '').toString();
         final caption = (node['caption'] ?? '').toString();

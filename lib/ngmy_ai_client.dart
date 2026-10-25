@@ -373,6 +373,8 @@ Future<({String? text, String? error})> ngmyAiGenerateForAppBuilder(
     provider: creds.provider,
     openAiBaseUrl: creds.openAiBaseUrl,
     mode: 'appBuilder',
+    // Writing a whole app takes much longer than a chat reply (the usual wait is 20 seconds).
+    timeout: const Duration(seconds: 170),
   );
   if (proxied.text != null) return proxied;
   if (ngmyIsServerManagedAiKey(creds.apiKey)) {
