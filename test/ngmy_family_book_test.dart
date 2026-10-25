@@ -132,6 +132,9 @@ void main() {
     expect(ngmyBookLanguageRule('write it in Swahili'), contains('ukoo'));
     expect(ngmyBookLanguageRule('A story about our family'), contains('SWAHILI THAT REAL SWAHILI SPEAKERS USE'));
     expect(kNgmySwahiliStyleGuide, contains('NEVER translate word for word'));
+    expect(kNgmySwahiliStyleGuide, contains('NATIVE AUTHOR'));
+    expect(kNgmySwahiliStyleGuide, contains('never in ALL CAPITALS'));
+    expect(ngmyBookAiPrompt(description: 'x', pages: 3), contains('never invent achievements'));
     final c = const FamilyBookCover().applyAi(
       {'style': 'midnight', 'foil': 'silver', 'frame': 'corners', 'texture': 'stars', 'position': 'top', 'titleSize': 99, 'emblem': 3, 'ribbon': false, 'author': 'The Smiths', 'bogus': 1, 'frame2': 'x'},
       styleIds: const ['leather', 'midnight'],

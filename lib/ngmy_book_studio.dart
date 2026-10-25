@@ -132,6 +132,7 @@ You write printable books that are folded and stapled. Write a book from this re
 Rules:
 - Exactly $pages pages ("chapters"). Each page has a short title and 230-300 words of body text, so the printed page is full.
 - Split the body into 3-5 paragraphs separated by a blank line. Plain words, no markdown, no emojis, no lists.
+- Tell it warmly and simply, like a loving relative. Stay with the facts you were given: never invent achievements, titles, destinies or grand claims (nothing like "shaped nations" or "sacred"). Write people's names with normal capitals (Ikungu Ele), not in ALL CAPITALS.
 ${ngmyBookLanguageRule(languageHint ?? description)}
 ${ngmyCommunityKnowledgeFor(languageHint ?? description)}
 - Give every page an "image_query": 2-3 simple ENGLISH words for a real photo that fits it (e.g. "family dinner", "african village").
@@ -204,6 +205,55 @@ String _coverQueryOf(String text) {
   return m?.group(1)?.trim() ?? '';
 }
 
+/// A second look by a "native Swahili editor": rewrites machine-made or word-for-word Swahili so it reads as if a good
+/// Swahili author wrote it. Pages it cannot improve (or if the AI fails) are kept exactly as they were.
+Future<List<(String, String)>> ngmyPolishSwahili(
+  List<(String, String)> pages, {
+  void Function(String status, double progress)? onStatus,
+}) async {
+  if (pages.isEmpty) return pages;
+  final key = await ngmyResolveGeminiApiKey();
+  if (key.trim().isEmpty) return pages;
+  final creds = ngmyParseAiCredentials(key);
+  final out = List<(String, String)>.of(pages);
+  const batch = 3;
+  var done = 0;
+  final jobs = <Future<void> Function()>[];
+  for (var from = 0; from < pages.length; from += batch) {
+    final start = from;
+    final part = pages.sublist(start, math.min(start + batch, pages.length));
+    jobs.add(() async {
+      final prompt = '''
+You are a professional Swahili editor and author: a native speaker from Tanzania or Kenya who writes family histories that everyone understands.
+The pages below were written or translated by a machine, so they may sound unnatural, stiff or foreign. Rewrite EACH page so it reads as if a skilled native Swahili author wrote it first: natural, warm, clear and correct.
+Fix every word-for-word translation, odd or invented word, wrong grammar (noun classes, verb agreement, tenses) and every exaggeration or picture that does not work in Swahili. Keep every fact, date and number, and do not add new facts. Keep the paragraph breaks (a blank line between paragraphs) and the same number of pages. Write people's names with normal capitals, not ALL CAPITALS.
+$kNgmySwahiliStyleGuide
+Pages: ${jsonEncode([for (final p in part) {'title': p.$1, 'body': p.$2}])}
+Reply with JSON only, with exactly ${part.length} pages in the same order: {"pages":[{"title":"...","body":"..."}]}
+''';
+      for (var attempt = 0; attempt < 2; attempt++) {
+        final r = await ngmyAiGenerateWithCredentials(creds, prompt, timeout: const Duration(seconds: 150));
+        final text = r.text;
+        if (text == null) continue;
+        final obj = _jsonObject(text);
+        final list = obj?['pages'];
+        if (list is! List || list.length < part.length) continue;
+        for (var i = 0; i < part.length; i++) {
+          final m = list[i] is Map ? Map<String, dynamic>.from(list[i] as Map) : const <String, dynamic>{};
+          final t = '${m['title'] ?? ''}'.trim(), b = '${m['body'] ?? ''}'.trim();
+          // Only accept a real rewrite, not an empty or cut-off one.
+          if (b.length >= part[i].$2.length * 0.4) out[start + i] = (t.isEmpty ? part[i].$1 : t, b);
+        }
+        break;
+      }
+      done += part.length;
+      onStatus?.call('Polishing the Swahili ($done of ${pages.length} pages)…', done / pages.length);
+    });
+  }
+  await _pool(jobs, 3);
+  return out;
+}
+
 /// Translates book pages into [target] ("English" or "Swahili (Kiswahili)"). Names of people and
 /// places stay as they are, and the paragraphs stay as they were. Returns one (title, body) per page.
 Future<List<(String, String)>> ngmyTranslateBookPages({
@@ -221,7 +271,7 @@ Future<List<(String, String)>> ngmyTranslateBookPages({
     final part = pages.sublist(from, math.min(from + batch, pages.length));
     onStatus?.call('Translating pages ${from + 1} to ${from + part.length} of ${pages.length}…', from / pages.length);
     final prompt = '''
-Translate these book pages into $target. Translate the MEANING, not the words: write what a native speaker would naturally say, never a literal copy of the other language (many phrases, like "family tree", have no word-for-word twin and would not be understood). Keep the warm tone, every person's name and every place name exactly as written, and keep the paragraph breaks (a blank line between paragraphs). Do not add or remove anything. Write natural, correct $target.${target.contains('Swahili') ? '\n$kNgmySwahiliStyleGuide' : ''}
+Translate these book pages into $target. Translate the MEANING, not the words: write what a native speaker would naturally say, never a literal copy of the other language (many phrases, like "family tree", have no word-for-word twin and would not be understood). Keep the warm tone, every person's name and every place name exactly as written, and keep the paragraph breaks (a blank line between paragraphs). Do not add or remove any fact. If the source is flowery or exaggerated, say it plainly and warmly. Write people's names with normal capitals (Ikungu Ele), not in ALL CAPITALS. Write natural, correct $target.${target.contains('Swahili') ? '\n$kNgmySwahiliStyleGuide' : ''}
 Reply with JSON only, with exactly ${part.length} pages in the same order: {"pages":[{"title":"...","body":"..."}]}
 Pages:
 ${jsonEncode([for (final p in part) {'title': p.$1, 'body': p.$2}])}
@@ -246,8 +296,12 @@ ${jsonEncode([for (final p in part) {'title': p.$1, 'body': p.$2}])}
       out[from + i] = (t.isEmpty ? part[i].$1 : t, b.isEmpty ? part[i].$2 : b);
     }
   }
+  final translated = [for (var i = 0; i < pages.length; i++) out[i] ?? pages[i]];
+  if (target.contains('Swahili')) {
+    return ngmyPolishSwahili(translated, onStatus: onStatus);
+  }
   onStatus?.call('Done', 1);
-  return [for (var i = 0; i < pages.length; i++) out[i] ?? pages[i]];
+  return translated;
 }
 
 class NgmyBookEditResult {
@@ -320,7 +374,7 @@ Reply with JSON only: {"message":"one or two friendly sentences saying what you 
     onStatus?.call(scope == 'page' ? 'Changing the page…' : 'Checking pages ${from + 1} to ${from + part.length} of ${targets.length}…', from / targets.length);
     final text = await ask('''
 You edit a family book. The person asked: """$instruction"""
-Rules: change ONLY what they asked for and keep everything else word for word. Keep every person's name, date and fact exactly. Keep the paragraph breaks (a blank line between paragraphs). If they ask to correct or replace a word, change it everywhere it appears in these pages, including in the titles. If they ask to rewrite, shorten, add to or improve a page, do it properly with good, natural writing.
+Rules: change ONLY what they asked for and keep everything else word for word. Keep every person's name, date and fact exactly (a name may be written with normal capitals, not ALL CAPITALS). Keep the paragraph breaks (a blank line between paragraphs). If they ask to correct or replace a word, change it everywhere it appears in these pages, including in the titles. If they ask to rewrite, shorten, add to or improve a page, do it properly with good, natural writing.
 $langLine
 Pages: ${jsonEncode([for (final i in part) {'index': i, 'title': pages[i].$1, 'body': pages[i].$2}])}
 Reply with JSON only: {"message":"one or two friendly sentences saying what you changed","pages":[{"index":0,"title":"...","body":"..."}]}
@@ -340,6 +394,13 @@ Include ONLY the pages you changed, each with its full new text. If nothing need
       }
     }
   }
+  if (changed.isNotEmpty && ngmyDetectTextLanguage(changed.values.map((p) => p.$2).take(3).join(' ')) == 'sw') {
+    final keys = changed.keys.toList();
+    final polished = await ngmyPolishSwahili([for (final k in keys) changed[k]!], onStatus: onStatus);
+    for (var i = 0; i < keys.length; i++) {
+      changed[keys[i]] = polished[i];
+    }
+  }
   onStatus?.call('Done', 1);
   return NgmyBookEditResult(
     message: message.isEmpty ? (changed.isEmpty ? 'I looked, and nothing needed changing.' : 'Done. I updated ${changed.length} ${changed.length == 1 ? 'page' : 'pages'}.') : message,
@@ -355,6 +416,24 @@ const int kNgmyBookAiMaxPages = 100;
 /// at a time in parallel, so even a 500-page book comes out whole and in order.
 /// [onStatus] gets a message and how far along it is (0-1).
 Future<NgmyBookDoc> ngmyWriteBookWithAi({
+  required String description,
+  required int pages,
+  String author = '',
+  String? languageHint,
+  void Function(String status, double progress)? onStatus,
+}) async {
+  final doc = await _ngmyWriteBookRaw(description: description, pages: pages, author: author, languageHint: languageHint, onStatus: onStatus);
+  final sample = doc.chapters.take(3).map((c) => '${c.title} ${c.body}').join(' ');
+  if (ngmyDetectTextLanguage(sample) != 'sw') return doc;
+  try {
+    final polished = await ngmyPolishSwahili([for (final c in doc.chapters) (c.title, c.body)], onStatus: onStatus);
+    return doc.copyWith(chapters: [for (var i = 0; i < doc.chapters.length; i++) doc.chapters[i].copyWith(title: polished[i].$1, body: polished[i].$2)]);
+  } catch (_) {
+    return doc;
+  }
+}
+
+Future<NgmyBookDoc> _ngmyWriteBookRaw({
   required String description,
   required int pages,
   String author = '',
