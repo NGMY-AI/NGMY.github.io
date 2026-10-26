@@ -6710,6 +6710,10 @@ bool ngmyIsCivicRegistryOnlyAccount(UserData u, AppConfig config) {
   return true;
 }
 
+/// Why the admin Users list could not load from the cloud (shown above the list), empty when it loaded.
+String ngmyAdminUsersLoadNote = '';
+String ngmyAdminUsersLoadError = '';
+
 bool ngmyShowInAdminLoginUsersList(UserData u, AppConfig config) {
   if (u.email.trim().isEmpty) return false;
   if (ngmyIsAdminDeletedUser(config, u.email)) return false;
@@ -9373,19 +9377,37 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   Future<List<UserData>> _fetchAllUsersFromCloud() async {
     final email = ngmyCurrentAuthEmail();
-    if (email.isEmpty || !ngmyEmailIsAdmin(email)) {
+    if (email.isEmpty) {
+      ngmyAdminUsersLoadNote = 'Not signed in to the cloud on this phone. Log out and log in again to load all users.';
+      return const [];
+    }
+    if (!ngmyEmailIsAdmin(email)) {
       // Non-admins must never pull the full users directory.
       return const [];
     }
     try {
       var rows = await ngmyAdminUsersListFetch(email: email);
       if (rows.isEmpty) rows = await _fetchAllUserRowsAsAdmin();
-      if (rows.isEmpty) return const [];
-      final all = rows.map((e) => UserData.fromJson(e)).toList();
+      if (rows.isEmpty) {
+        ngmyAdminUsersLoadNote = 'Could not load users from the cloud${ngmyAdminUsersLoadError.isEmpty ? '' : ': $ngmyAdminUsersLoadError'}. Showing the users saved on this phone.';
+        return const [];
+      }
+      final all = <UserData>[];
+      for (final e in rows) {
+        try {
+          all.add(UserData.fromJson(e));
+        } catch (_) {
+          // One odd row must not hide everybody else.
+          final mail = '${e['email'] ?? ''}'.trim();
+          if (mail.isNotEmpty) all.add(UserData(email: mail, username: '${e['username'] ?? mail.split('@').first}'));
+        }
+      }
+      ngmyAdminUsersLoadNote = '';
       _registerCloudUsersAsAppLogins(all);
       return all;
     } catch (e) {
       debugPrint('[admin] users Edge fetch: $e');
+      ngmyAdminUsersLoadNote = 'Could not load users from the cloud: $e';
       return const [];
     }
   }
@@ -9424,6 +9446,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         if (rows.isNotEmpty) return rows;
       } catch (e) {
         debugPrint('[admin] users relay fetch (${attempt.$1.length}): $e');
+        ngmyAdminUsersLoadError = '$e'.replaceAll(RegExp(r's+'), ' ');
+        if (ngmyAdminUsersLoadError.length > 140) ngmyAdminUsersLoadError = ngmyAdminUsersLoadError.substring(0, 140);
       }
     }
     return const [];
@@ -26157,6 +26181,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
 
     return Column(children: [
+      if (ngmyAdminUsersLoadNote.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+          child: Text(ngmyAdminUsersLoadNote, style: const TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.w700, fontSize: 12)),
+        ),
       // Toolbar: search, which list, how many.
       Padding(
         padding: const EdgeInsets.fromLTRB(14, 2, 14, 10),
