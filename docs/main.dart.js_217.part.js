@@ -1,20 +1,20 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var J,A,B,L,M,N,O,P,F,H,Q,R,E,I,C={
-fWn(d){switch(d.a){case 0:return"Instant"
+fWA(d){switch(d.a){case 0:return"Instant"
 case 1:return"Slide left/right"
 case 2:return"Slide up/down"
 case 3:return"Fade"}},
-hu1(d){switch(d.a){case 0:return B.rR
+huf(d){switch(d.a){case 0:return B.rR
 case 1:return B.ky
-case 2:return T.Ev
+case 2:return T.EA
 case 3:return B.wN}},
-h3N(d,e){return A.a7(d,!1).cs(A.eH(new C.fsG(e),!1,null,x.H))},
-Ai:function Ai(d,e){this.a=d
+h40(d,e){return A.a7(d,!1).cs(A.eH(new C.fsT(e),!1,null,x.H))},
+Aj:function Aj(d,e){this.a=d
 this.b=e},
-fsG:function fsG(d){this.a=d},
-SC:function SC(d,e){this.c=d
+fsT:function fsT(d){this.a=d},
+SF:function SF(d,e){this.c=d
 this.a=e},
-azW:function azW(d,e,f,g){var _=this
+azZ:function azZ(d,e,f,g){var _=this
 _.d=$
 _.e=d
 _.f=!0
@@ -24,96 +24,96 @@ _.z=1
 _.cO$=f
 _.aX$=g
 _.c=_.a=null},
-dEQ:function dEQ(d){this.a=d},
-dEP:function dEP(){},
-dEq:function dEq(d){this.a=d},
-dEr:function dEr(){},
-dEs:function dEs(d,e){this.a=d
-this.b=e},
-dEg:function dEg(d,e){this.a=d
-this.b=e},
-dEt:function dEt(){},
-dEw:function dEw(d,e){this.a=d
-this.b=e},
-dEv:function dEv(){},
+dF0:function dF0(d){this.a=d},
+dF_:function dF_(){},
 dEB:function dEB(d){this.a=d},
-dEC:function dEC(d){this.a=d},
-dED:function dED(d){this.a=d},
-dEE:function dEE(d){this.a=d},
-dEu:function dEu(d,e){this.a=d
+dEC:function dEC(){},
+dED:function dED(d,e){this.a=d
 this.b=e},
-dEO:function dEO(d,e){this.a=d
+dEr:function dEr(d,e){this.a=d
 this.b=e},
-dEl:function dEl(d){this.a=d},
-dEA:function dEA(){},
-dEI:function dEI(d,e){this.a=d
+dEE:function dEE(){},
+dEH:function dEH(d,e){this.a=d
 this.b=e},
-dEF:function dEF(d){this.a=d},
-dEG:function dEG(d){this.a=d},
-dEH:function dEH(d){this.a=d},
-dEp:function dEp(d,e){this.a=d
-this.b=e},
-dEn:function dEn(d,e){this.a=d
-this.b=e},
-dEm:function dEm(d){this.a=d},
-dEo:function dEo(d,e){this.a=d
-this.b=e},
-dEf:function dEf(d){this.a=d},
-dEk:function dEk(d){this.a=d},
-dEj:function dEj(d){this.a=d},
-dEJ:function dEJ(d){this.a=d},
+dEG:function dEG(){},
 dEM:function dEM(d){this.a=d},
 dEN:function dEN(d){this.a=d},
-dEK:function dEK(d){this.a=d},
-dEL:function dEL(d){this.a=d},
+dEO:function dEO(d){this.a=d},
+dEP:function dEP(d){this.a=d},
+dEF:function dEF(d,e){this.a=d
+this.b=e},
+dEZ:function dEZ(d,e){this.a=d
+this.b=e},
+dEw:function dEw(d){this.a=d},
+dEL:function dEL(){},
+dET:function dET(d,e){this.a=d
+this.b=e},
+dEQ:function dEQ(d){this.a=d},
+dER:function dER(d){this.a=d},
+dES:function dES(d){this.a=d},
+dEA:function dEA(d,e){this.a=d
+this.b=e},
 dEy:function dEy(d,e){this.a=d
 this.b=e},
-dEz:function dEz(d){this.a=d},
-dEx:function dEx(){},
-dEh:function dEh(d){this.a=d},
-dEi:function dEi(d){this.a=d},
-Zr:function Zr(d,e,f,g){var _=this
+dEx:function dEx(d){this.a=d},
+dEz:function dEz(d,e){this.a=d
+this.b=e},
+dEq:function dEq(d){this.a=d},
+dEv:function dEv(d){this.a=d},
+dEu:function dEu(d){this.a=d},
+dEU:function dEU(d){this.a=d},
+dEX:function dEX(d){this.a=d},
+dEY:function dEY(d){this.a=d},
+dEV:function dEV(d){this.a=d},
+dEW:function dEW(d){this.a=d},
+dEJ:function dEJ(d,e){this.a=d
+this.b=e},
+dEK:function dEK(d){this.a=d},
+dEI:function dEI(){},
+dEs:function dEs(d){this.a=d},
+dEt:function dEt(d){this.a=d},
+Zu:function Zu(d,e,f,g){var _=this
 _.c=d
 _.d=e
 _.e=f
 _.a=g},
-aEV:function aEV(){var _=this
+aEY:function aEY(){var _=this
 _.d=$
 _.e=!1
 _.f=!0
 _.c=_.a=null},
-eLX:function eLX(d){this.a=d},
-eLY:function eLY(d){this.a=d},
-eM1:function eM1(d){this.a=d},
-eLZ:function eLZ(d){this.a=d},
-eM_:function eM_(d){this.a=d},
-eM0:function eM0(d,e){this.a=d
+eM7:function eM7(d){this.a=d},
+eM8:function eM8(d){this.a=d},
+eMc:function eMc(d){this.a=d},
+eM9:function eM9(d){this.a=d},
+eMa:function eMa(d){this.a=d},
+eMb:function eMb(d,e){this.a=d
 this.b=e},
-eM2:function eM2(d){this.a=d},
-eM3:function eM3(){},
-eM4:function eM4(d){this.a=d},
-eM5:function eM5(d){this.a=d},
-ayL:function ayL(d,e){this.a=d
+eMd:function eMd(d){this.a=d},
+eMe:function eMe(){},
+eMf:function eMf(d){this.a=d},
+eMg:function eMg(d){this.a=d},
+ayO:function ayO(d,e){this.a=d
 this.b=e},
-XK:function XK(d){this.a=d},
-ayM:function ayM(d){this.d=d
+XN:function XN(d){this.a=d},
+ayP:function ayP(d){this.d=d
 this.c=this.a=null},
-dga:function dga(d){this.a=d},
-dg9:function dg9(d,e){this.a=d
+dgl:function dgl(d){this.a=d},
+dgk:function dgk(d,e){this.a=d
 this.b=e},
-dg8:function dg8(d,e){this.a=d
+dgj:function dgj(d,e){this.a=d
 this.b=e},
-aI8:function aI8(){},
-fQv(d){var w=B.a.i(d)
+aIb:function aIb(){},
+fQI(d){var w=B.a.i(d)
 return"ngmy_live_capture_v1_"+A.t(w.length===0?"guest":Math.abs(B.a.gV(w.toLowerCase())))},
-Tu(d){return C.hjE(d)},
-hjE(d){var w=0,v=A.j(x.F),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g
-var $async$Tu=A.e(function(e,f){if(e===1){s.push(f)
+Tx(d){return C.hjS(d)},
+hjS(d){var w=0,v=A.j(x.F),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g
+var $async$Tx=A.e(function(e,f){if(e===1){s.push(f)
 w=t}for(;;)switch(w){case 0:t=4
 w=7
-return A.b(A.aw(),$async$Tu)
+return A.b(A.aw(),$async$Tx)
 case 7:r=f
-l=C.fQv(d)
+l=C.fQI(d)
 q=A.aR(J.q(r.a,l))
 if(q==null||q.length===0){l=A.a([],x.G)
 u=l
@@ -122,16 +122,16 @@ break}p=B.Q.aE(0,q,null)
 if(!x.j.b(p)){l=A.a([],x.G)
 u=l
 w=1
-break}l=J.d1(p,x.M)
-l=A.cy(l,new C.c5k(),l.$ti.k("G.E"),x.m)
+break}l=J.d2(p,x.M)
+l=A.cy(l,new C.c5p(),l.$ti.k("G.E"),x.m)
 k=A.A(l,A.a2(l).k("G.E"))
-B.d.aZ(k,new C.c5l())
+B.d.aZ(k,new C.c5q())
 o=k
 l=o,j=l.length,i=0
 case 8:if(!(i<l.length)){w=10
 break}n=l[i]
 w=11
-return A.b(C.D8(n.a,n.f),$async$Tu)
+return A.b(C.Da(n.a,n.f),$async$Tx)
 case 11:m=f
 if(m!=null&&m.length!==0)n.e=m
 case 9:l.length===j||(0,A.K)(l),++i
@@ -155,10 +155,10 @@ case 3:w=2
 break
 case 6:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
-return A.i($async$Tu,v)},
-LP(d,e){return C.hjF(d,e)},
-hjF(d,e){var w=0,v=A.j(x.y),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i
-var $async$LP=A.e(function(f,g){if(f===1){s.push(g)
+return A.i($async$Tx,v)},
+LR(d,e){return C.hjT(d,e)},
+hjT(d,e){var w=0,v=A.j(x.y),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i
+var $async$LR=A.e(function(f,g){if(f===1){s.push(g)
 w=t}for(;;)switch(w){case 0:k=e
 j=!0
 p=J.aU(k)
@@ -168,26 +168,26 @@ n=o.e
 w=n.length===0?5:6
 break
 case 5:w=7
-return A.b(C.D8(o.a,o.f),$async$LP)
+return A.b(C.Da(o.a,o.f),$async$LR)
 case 7:m=g
 if(m==null||m.length===0)j=!1
 w=3
 break
 case 6:w=8
-return A.b(C.c52(o.a,n,o.f),$async$LP)
+return A.b(C.c57(o.a,n,o.f),$async$LR)
 case 8:if(g)o.e=""
 else j=!1
 w=3
 break
 case 4:t=10
 w=13
-return A.b(A.aw(),$async$LP)
+return A.b(A.aw(),$async$LR)
 case 13:r=g
-p=C.fQv(d)
-o=J.b4(k,new C.c5m(),x.P)
+p=C.fQI(d)
+o=J.b4(k,new C.c5r(),x.P)
 o=A.A(o,o.$ti.k("ai.E"))
 w=14
-return A.b(r.an("String",p,B.Q.aj(o,null)),$async$LP)
+return A.b(r.an("String",p,B.Q.aj(o,null)),$async$LR)
 case 14:p=j
 u=p
 w=1
@@ -208,20 +208,20 @@ case 9:w=2
 break
 case 12:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
-return A.i($async$LP,v)},
-a5l(d,e){var w=0,v=A.j(x.H),u
-var $async$a5l=A.e(function(f,g){if(f===1)return A.f(g,v)
+return A.i($async$LR,v)},
+a5n(d,e){var w=0,v=A.j(x.H),u
+var $async$a5n=A.e(function(f,g){if(f===1)return A.f(g,v)
 for(;;)switch(w){case 0:w=2
-return A.b(C.Tu(d),$async$a5l)
+return A.b(C.Tx(d),$async$a5n)
 case 2:u=g
-J.n_(u,new C.c5j(e))
+J.n_(u,new C.c5o(e))
 w=3
-return A.b(C.LP(d,u),$async$a5l)
+return A.b(C.LR(d,u),$async$a5n)
 case 3:w=4
-return A.b(C.aXn(e),$async$a5l)
+return A.b(C.aXr(e),$async$a5n)
 case 4:return A.h(null,v)}})
-return A.i($async$a5l,v)},
-anF(d){return B.a.aT(B.o.u(B.o.ak(d,60)),2,"0")+":"+B.a.aT(B.o.u(B.o.J(d,60)),2,"0")},
+return A.i($async$a5n,v)},
+anI(d){return B.a.aT(B.o.u(B.o.ak(d,60)),2,"0")+":"+B.a.aT(B.o.u(B.o.J(d,60)),2,"0")},
 ov:function ov(d,e,f,g,h,i,j){var _=this
 _.a=d
 _.b=e
@@ -230,11 +230,11 @@ _.d=g
 _.e=h
 _.f=i
 _.r=j},
-c5k:function c5k(){},
-c5l:function c5l(){},
-c5m:function c5m(){},
-c5j:function c5j(d){this.a=d},
-aXq:function aXq(d,e,f){var _=this
+c5p:function c5p(){},
+c5q:function c5q(){},
+c5r:function c5r(){},
+c5o:function c5o(d){this.a=d},
+aXu:function aXu(d,e,f){var _=this
 _.a=d
 _.f=_.e=_.d=_.c=_.b=null
 _.r=!1
@@ -247,27 +247,27 @@ _.ay=null
 _.O$=0
 _.R$=f
 _.bs$=_.bI$=0},
-c5i:function c5i(d){this.a=d},
-aXm(){var w,v,u,t=$.fAx
+c5n:function c5n(d){this.a=d},
+aXq(){var w,v,u,t=$.fAK
 if(t!=null)return t
 w=window
 w.toString
 v=w.indexedDB||w.webkitIndexedDB||w.mozIndexedDB
-if(v==null){w=A.vG(new A.lp("IndexedDB unavailable"),null)
+if(v==null){w=A.vH(new A.lp("IndexedDB unavailable"),null)
 u=new A.bd($.bs,x.g)
 u.mT(w)
-return $.fAx=u}return $.fAx=B.xj.Kl(v,"ngmy_live_capture_blobs_v1",new C.c50(),1)},
-a5k(d,e){return C.hjz(d,e)},
-hjz(d,e){var w=0,v=A.j(x.y),u,t=2,s=[],r,q,p,o
-var $async$a5k=A.e(function(f,g){if(f===1){s.push(g)
+return $.fAK=u}return $.fAK=B.xk.Kl(v,"ngmy_live_capture_blobs_v1",new C.c55(),1)},
+a5m(d,e){return C.hjN(d,e)},
+hjN(d,e){var w=0,v=A.j(x.y),u,t=2,s=[],r,q,p,o
+var $async$a5m=A.e(function(f,g){if(f===1){s.push(g)
 w=t}for(;;)switch(w){case 0:t=4
 w=7
-return A.b(C.aXm(),$async$a5k)
+return A.b(C.aXq(),$async$a5m)
 case 7:r=g
 q=J.mg(r,"blobs","readwrite")
-B.io.lL(J.me(q,"blobs"),e,d)
+B.ip.lL(J.me(q,"blobs"),e,d)
 w=8
-return A.b(J.oY(q),$async$a5k)
+return A.b(J.oY(q),$async$a5m)
 case 8:u=!0
 w=1
 break
@@ -285,20 +285,20 @@ case 3:w=2
 break
 case 6:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
-return A.i($async$a5k,v)},
-a5j(d,e,f){return C.hjy(d,e,f)},
-hjy(d,e,f){var w=0,v=A.j(x.y),u,t=2,s=[],r,q,p,o,n
-var $async$a5j=A.e(function(g,h){if(g===1){s.push(h)
+return A.i($async$a5m,v)},
+a5l(d,e,f){return C.hjM(d,e,f)},
+hjM(d,e,f){var w=0,v=A.j(x.y),u,t=2,s=[],r,q,p,o,n
+var $async$a5l=A.e(function(g,h){if(g===1){s.push(h)
 w=t}for(;;)switch(w){case 0:o=e
 if(o.type.length===0&&B.a.i(f).length!==0)o=A.hB([o],B.a.i(f))
 t=4
 w=7
-return A.b(C.aXm(),$async$a5j)
+return A.b(C.aXq(),$async$a5l)
 case 7:r=h
 q=J.mg(r,"blobs","readwrite")
-B.io.lL(J.me(q,"blobs"),o,d)
+B.ip.lL(J.me(q,"blobs"),o,d)
 w=8
-return A.b(J.oY(q),$async$a5j)
+return A.b(J.oY(q),$async$a5l)
 case 8:u=!0
 w=1
 break
@@ -316,23 +316,23 @@ case 3:w=2
 break
 case 6:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
-return A.i($async$a5j,v)},
-c52(d,e,f){return C.hjA(d,e,f)},
-hjA(a0,a1,a2){var w=0,v=A.j(x.y),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f,e,d
-var $async$c52=A.e(function(a4,a5){if(a4===1){s.push(a5)
+return A.i($async$a5l,v)},
+c57(d,e,f){return C.hjO(d,e,f)},
+hjO(a0,a1,a2){var w=0,v=A.j(x.y),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f,e,d
+var $async$c57=A.e(function(a4,a5){if(a4===1){s.push(a5)
 w=t}for(;;)switch(w){case 0:if(a1.length===0){u=!1
 w=1
 break}w=B.a.a_(a1,"blob:")?3:4
 break
 case 3:t=6
 w=9
-return A.b(E.aiK(a1,"blob"),$async$c52)
+return A.b(E.aiN(a1,"blob"),$async$c57)
 case 9:r=a5
-q=A.aKf(r.response)
+q=A.aKi(r.response)
 if(x.d.b(q)){g=q.size
 g.toString
 g=g>0}else g=!1
-if(g){g=C.a5j(a0,q,"")
+if(g){g=C.a5l(a0,q,"")
 u=g
 w=1
 break}t=2
@@ -345,7 +345,7 @@ break
 case 5:w=2
 break
 case 8:case 4:if(B.a.a_(a1,"data:")){try{p=B.a.cP(a1,",")
-if(p<0){g=C.a5k(a0,a1)
+if(p<0){g=C.a5m(a0,a1)
 u=g
 w=1
 break}o=B.a.al(a1,0,p).toLowerCase()
@@ -361,32 +361,32 @@ g=j
 g=A.aI(g,"-","+")
 j=A.aI(g,"_","/")
 i=B.o.J(J.a9(j),4)
-if(i>0)j=J.bzZ(j,J.a9(j)+(4-i),"=")
+if(i>0)j=J.bA3(j,J.a9(j)+(4-i),"=")
 k=B.cw.aF(j)}else{g=n
 k=new Uint8Array(A.cl(new A.cX(A.qe(g,0,g.length,B.c0,!1))))}if(!J.ci(k)){h=A.hB([k],l)
 g=h.size
 g.toString
-if(g>3145728){g=C.a5j(a0,h,"")
+if(g>3145728){g=C.a5l(a0,h,"")
 u=g
 w=1
-break}}}catch(a3){}u=C.a5k(a0,a1)
+break}}}catch(a3){}u=C.a5m(a0,a1)
 w=1
-break}u=C.a5k(a0,a1)
+break}u=C.a5m(a0,a1)
 w=1
 break
 case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
-return A.i($async$c52,v)},
-D8(d,e){return C.hjx(d,e)},
-hjx(d,e){var w=0,v=A.j(x.T),u,t=2,s=[],r,q,p,o,n,m,l
-var $async$D8=A.e(function(f,g){if(f===1){s.push(g)
+return A.i($async$c57,v)},
+Da(d,e){return C.hjL(d,e)},
+hjL(d,e){var w=0,v=A.j(x.T),u,t=2,s=[],r,q,p,o,n,m,l
+var $async$Da=A.e(function(f,g){if(f===1){s.push(g)
 w=t}for(;;)switch(w){case 0:t=4
 w=7
-return A.b(C.aXm(),$async$D8)
+return A.b(C.aXq(),$async$Da)
 case 7:r=g
 q=J.mg(r,"blobs","readonly")
 w=8
-return A.b(B.io.yv(J.me(q,"blobs"),d),$async$D8)
+return A.b(B.ip.yw(J.me(q,"blobs"),d),$async$Da)
 case 8:p=g
 if(x.d.b(p)){o=p
 if(o.type.length===0)n=B.a.i(e).length!==0
@@ -415,20 +415,20 @@ case 3:w=2
 break
 case 6:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
-return A.i($async$D8,v)},
-anE(d){return C.hjw(d)},
-hjw(d){var w=0,v=A.j(x.K),u,t=2,s=[],r,q,p,o,n,m
-var $async$anE=A.e(function(e,f){if(e===1){s.push(f)
+return A.i($async$Da,v)},
+anH(d){return C.hjK(d)},
+hjK(d){var w=0,v=A.j(x.K),u,t=2,s=[],r,q,p,o,n,m
+var $async$anH=A.e(function(e,f){if(e===1){s.push(f)
 w=t}for(;;)switch(w){case 0:t=4
 w=7
-return A.b(C.aXm(),$async$anE)
+return A.b(C.aXq(),$async$anH)
 case 7:r=f
 q=J.mg(r,"blobs","readonly")
 w=8
-return A.b(B.io.yv(J.me(q,"blobs"),d),$async$anE)
+return A.b(B.ip.yw(J.me(q,"blobs"),d),$async$anH)
 case 8:p=f
 w=9
-return A.b(C.fAw(p),$async$anE)
+return A.b(C.fAJ(p),$async$anH)
 case 9:o=f
 u=o
 w=1
@@ -447,18 +447,18 @@ case 3:w=2
 break
 case 6:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
-return A.i($async$anE,v)},
-c51(d){return C.hjv(d)},
-hjv(d){var w=0,v=A.j(x.K),u,t=2,s=[],r,q,p,o,n,m
-var $async$c51=A.e(function(e,f){if(e===1){s.push(f)
+return A.i($async$anH,v)},
+c56(d){return C.hjJ(d)},
+hjJ(d){var w=0,v=A.j(x.K),u,t=2,s=[],r,q,p,o,n,m
+var $async$c56=A.e(function(e,f){if(e===1){s.push(f)
 w=t}for(;;)switch(w){case 0:if(!B.a.a_(d,"blob:")){u=null
 w=1
 break}t=4
 w=7
-return A.b(E.aiK(d,"blob").cJ(0,B.nf),$async$c51)
+return A.b(E.aiN(d,"blob").cJ(0,B.nf),$async$c56)
 case 7:r=f
-q=A.aKf(r.response)
-if(x.d.b(q)){o=C.c4X(q)
+q=A.aKi(r.response)
+if(x.d.b(q)){o=C.c51(q)
 u=o
 w=1
 break}t=2
@@ -477,11 +477,11 @@ w=1
 break
 case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
-return A.i($async$c51,v)},
-fAw(d){return C.hjt(d)},
-hjt(d){var w=0,v=A.j(x.K),u,t,s,r,q,p,o,n
-var $async$fAw=A.e(function(e,f){if(e===1)return A.f(f,v)
-for(;;)switch(w){case 0:if(x.d.b(d)){u=C.c4X(d)
+return A.i($async$c56,v)},
+fAJ(d){return C.hjH(d)},
+hjH(d){var w=0,v=A.j(x.K),u,t,s,r,q,p,o,n
+var $async$fAJ=A.e(function(e,f){if(e===1)return A.f(f,v)
+for(;;)switch(w){case 0:if(x.d.b(d)){u=C.c51(d)
 w=1
 break}if(typeof d=="string"&&B.a.a_(d,"data:"))try{t=B.a.cP(d,",")
 if(t<0){u=null
@@ -494,7 +494,7 @@ o=q
 o=A.aI(o,"-","+")
 q=A.aI(o,"_","/")
 p=B.o.J(J.a9(q),4)
-if(p>0)q=J.bzZ(q,J.a9(q)+(4-p),"=")
+if(p>0)q=J.bA3(q,J.a9(q)+(4-p),"=")
 o=B.cw.aF(q)
 u=o
 w=1
@@ -512,33 +512,33 @@ break}u=null
 w=1
 break
 case 1:return A.h(u,v)}})
-return A.i($async$fAw,v)},
-c4X(d){var w=0,v=A.j(x.K),u,t,s,r,q
-var $async$c4X=A.e(function(e,f){if(e===1)return A.f(f,v)
+return A.i($async$fAJ,v)},
+c51(d){var w=0,v=A.j(x.K),u,t,s,r,q
+var $async$c51=A.e(function(e,f){if(e===1)return A.f(f,v)
 for(;;)switch(w){case 0:q=new FileReader()
 q.toString
 t=new A.bd($.bs,x.U)
 s=new A.bL(t,x.h)
 r=x._
-A.fA(q,"loadend",new C.c4Y(q,s),!1,r)
-A.fA(q,"error",new C.c4Z(s),!1,r)
+A.fA(q,"loadend",new C.c52(q,s),!1,r)
+A.fA(q,"error",new C.c53(s),!1,r)
 q.readAsArrayBuffer(d)
-u=t.i0(0,B.wg,new C.c5_(s))
+u=t.i0(0,B.wg,new C.c54(s))
 w=1
 break
 case 1:return A.h(u,v)}})
-return A.i($async$c4X,v)},
-aXn(d){return C.hju(d)},
-hju(d){var w=0,v=A.j(x.H),u=1,t=[],s,r,q,p
-var $async$aXn=A.e(function(e,f){if(e===1){t.push(f)
+return A.i($async$c51,v)},
+aXr(d){return C.hjI(d)},
+hjI(d){var w=0,v=A.j(x.H),u=1,t=[],s,r,q,p
+var $async$aXr=A.e(function(e,f){if(e===1){t.push(f)
 w=u}for(;;)switch(w){case 0:u=3
 w=6
-return A.b(C.aXm(),$async$aXn)
+return A.b(C.aXq(),$async$aXr)
 case 6:s=f
 r=J.mg(s,"blobs","readwrite")
-B.io.Eq(J.me(r,"blobs"),d)
+B.ip.Eq(J.me(r,"blobs"),d)
 w=7
-return A.b(J.oY(r),$async$aXn)
+return A.b(J.oY(r),$async$aXr)
 case 7:u=1
 w=5
 break
@@ -550,19 +550,19 @@ case 2:w=1
 break
 case 5:return A.h(null,v)
 case 1:return A.f(t.at(-1),v)}})
-return A.i($async$aXn,v)},
-c50:function c50(){},
-c4Y:function c4Y(d,e){this.a=d
+return A.i($async$aXr,v)},
+c55:function c55(){},
+c52:function c52(d,e){this.a=d
 this.b=e},
-c4Z:function c4Z(d){this.a=d},
-c5_:function c5_(d){this.a=d},
-Tt(){var w=window.navigator.userAgent.toLowerCase(),v=!0
+c53:function c53(d){this.a=d},
+c54:function c54(d){this.a=d},
+Tw(){var w=window.navigator.userAgent.toLowerCase(),v=!0
 if(!B.a.q(w,"iphone"))if(!B.a.q(w,"ipad"))if(!B.a.q(w,"ipod"))v=B.a.q(w,"safari")&&!B.a.q(w,"chrome")&&!B.a.q(w,"chromium")&&!B.a.q(w,"android")
 return v},
-aXp:function aXp(d,e,f){this.a=d
+aXt:function aXt(d,e,f){this.a=d
 this.b=e
 this.c=f},
-aXo:function aXo(d){var _=this
+aXs:function aXs(d){var _=this
 _.d=_.c=_.b=_.a=null
 _.e=d
 _.f="audio/webm"
@@ -578,27 +578,27 @@ _.ok=1280
 _.p1=720
 _.p2="user"
 _.p3="youtube"},
-c57:function c57(d,e,f,g){var _=this
+c5c:function c5c(d,e,f,g){var _=this
 _.a=d
 _.b=e
 _.c=f
 _.d=g},
-c59:function c59(d){this.a=d},
-c56:function c56(d){this.a=d},
-c53:function c53(){},
-c5c:function c5c(d){this.a=d},
-c5d:function c5d(d){this.a=d},
 c5e:function c5e(d){this.a=d},
-c5a:function c5a(d){this.a=d},
 c5b:function c5b(d){this.a=d},
-c5f:function c5f(d){this.a=d},
 c58:function c58(){},
-c54:function c54(){},
-c55:function c55(){},
-bxJ(d){var w=B.a.i(B.d.gI(d.split(";"))).toLowerCase()
+c5h:function c5h(d){this.a=d},
+c5i:function c5i(d){this.a=d},
+c5j:function c5j(d){this.a=d},
+c5f:function c5f(d){this.a=d},
+c5g:function c5g(d){this.a=d},
+c5k:function c5k(d){this.a=d},
+c5d:function c5d(){},
+c59:function c59(){},
+c5a:function c5a(){},
+bxO(d){var w=B.a.i(B.d.gI(d.split(";"))).toLowerCase()
 if(B.a.a_(w,"audio/")||B.a.a_(w,"video/")||B.a.a_(w,"application/"))return w
 return"application/octet-stream"},
-fWO(d){var w,v,u,t,s,r,q,p
+fX0(d){var w,v,u,t,s,r,q,p
 try{w=B.a.cP(d,",")
 if(w<0){q=B.cw.aF(d)
 return q}v=B.a.al(d,0,w).toLowerCase()
@@ -609,33 +609,33 @@ q=t
 q=A.aI(q,"-","+")
 t=A.aI(q,"_","/")
 s=B.o.J(J.a9(t),4)
-if(s>0)t=J.bzZ(t,J.a9(t)+(4-s),"=")
+if(s>0)t=J.bA3(t,J.a9(t)+(4-s),"=")
 q=B.cw.aF(t)
 return q}q=u
 q=new Uint8Array(A.cl(new A.cX(A.qe(q,0,q.length,B.c0,!1))))
 return q}catch(p){r=A.a4(p)
 $.al.$1("[live_capture] decode dataUrl: "+A.t(r))
 return null}},
-hjD(d,e){var w,v,u,t
+hjR(d,e){var w,v,u,t
 if(B.a.a_(d,"blob:")||B.a.a_(d,"http://")||B.a.a_(d,"https://"))return d
-try{w=C.fQu(d,e)
+try{w=C.fQH(d,e)
 u=(self.URL||self.webkitURL).createObjectURL(w)
 u.toString
 return u}catch(t){v=A.a4(t)
 $.al.$1("[live_capture] toPlayableUrl: "+A.t(v))
 return d}},
-c5g(d,e,f){return C.hjC(d,e,f)},
-hjC(d,e,a0){var w=0,v=A.j(x.y),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f
-var $async$c5g=A.e(function(a1,a2){if(a1===1){s.push(a2)
+c5l(d,e,f){return C.hjQ(d,e,f)},
+hjQ(d,e,a0){var w=0,v=A.j(x.y),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f
+var $async$c5l=A.e(function(a1,a2){if(a1===1){s.push(a2)
 w=t}for(;;)switch(w){case 0:t=4
-r=C.bxJ(e)
+r=C.bxO(e)
 q=null
 w=B.a.a_(d,"blob:")?7:9
 break
 case 7:w=10
-return A.b(E.aiK(d,"blob").cJ(0,B.nf),$async$c5g)
+return A.b(E.aiN(d,"blob").cJ(0,B.nf),$async$c5l)
 case 10:p=a2
-o=A.aKf(p.response)
+o=A.aKi(p.response)
 if(x.d.b(o)){j=o.size
 j.toString
 j=j<=0}else j=!0
@@ -645,7 +645,7 @@ w=1
 break}q=o.type.length!==0?o:A.hB([o],r)
 w=8
 break
-case 9:q=C.fQu(d,r)
+case 9:q=C.fQH(d,r)
 case 8:j=(self.URL||self.webkitURL).createObjectURL(q)
 j.toString
 n=j
@@ -656,7 +656,7 @@ B.l9.tT(j,n,"_blank")
 u=!0
 w=1
 break}j=A.ad("[^a-zA-Z0-9_-]+",!0,!1,!1,!1)
-m=A.aI(a0,j,"_")+"."+C.hjB(r)
+m=A.aI(a0,j,"_")+"."+C.hjP(r)
 h=A.mH(n)
 h.download=m
 j=h.style
@@ -664,8 +664,8 @@ j.display="none"
 l=h
 j=document.body
 if(j!=null)j.appendChild(l).toString
-J.Jx(l)
-A.cV(B.fE,new C.c5h(l,n))
+J.Jz(l)
+A.cV(B.fE,new C.c5m(l,n))
 u=!0
 w=1
 break
@@ -685,11 +685,11 @@ case 3:w=2
 break
 case 6:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
-return A.i($async$c5g,v)},
-fQu(d,e){var w=B.a.cP(d,","),v=w>=0?B.a.al(d,0,w):"",u=A.ad("data:([^;,]+)",!0,!1,!1,!1).cz(v),t=u==null?null:u.b[1],s=C.bxJ(t==null?e:t),r=C.fWO(d)
+return A.i($async$c5l,v)},
+fQH(d,e){var w=B.a.cP(d,","),v=w>=0?B.a.al(d,0,w):"",u=A.ad("data:([^;,]+)",!0,!1,!1,!1).cz(v),t=u==null?null:u.b[1],s=C.bxO(t==null?e:t),r=C.fX0(d)
 if(r==null||r.length===0)throw A.P(A.b9("Could not decode capture data URL"))
 return A.hB([r],s)},
-hjB(d){var w=C.bxJ(d)
+hjP(d){var w=C.bxO(d)
 if(B.a.q(w,"jpeg")||B.a.q(w,"jpg"))return"jpg"
 if(B.a.q(w,"png"))return"png"
 if(B.a.q(w,"audio/mp4")||B.a.q(w,"audio/aac")||B.a.q(w,"audio/m4a"))return"m4a"
@@ -699,9 +699,9 @@ if(B.a.q(w,"wav"))return"wav"
 if(B.a.q(w,"mpeg")||B.a.q(w,"mp3"))return"mp3"
 if(B.a.q(w,"video"))return"webm"
 return"webm"},
-c5h:function c5h(d,e){this.a=d
+c5m:function c5m(d,e){this.a=d
 this.b=e},
-aEA:function aEA(d,e,f,g,h,i,j){var _=this
+aED:function aED(d,e,f,g,h,i,j){var _=this
 _.c=d
 _.d=e
 _.e=f
@@ -709,20 +709,20 @@ _.f=g
 _.r=h
 _.w=i
 _.a=j},
-bnZ:function bnZ(){var _=this
+bo3:function bo3(){var _=this
 _.d=$
 _.e=null
 _.f=!1
 _.c=_.a=null},
-eJT:function eJT(d){this.a=d},
-eJS:function eJS(){},
-eJU:function eJU(){},
-bqK:function bqK(d,e,f,g){var _=this
+eK3:function eK3(d){this.a=d},
+eK2:function eK2(){},
+eK4:function eK4(){},
+bqP:function bqP(d,e,f,g){var _=this
 _.c=d
 _.d=e
 _.e=f
 _.a=g},
-hJf(d,e){var w=B.a.i(B.d.gI(d.split(";"))).toLowerCase()
+hJt(d,e){var w=B.a.i(B.d.gI(d.split(";"))).toLowerCase()
 if(e==="photo"||B.a.q(w,"jpeg")||B.a.q(w,"jpg"))return"jpg"
 if(B.a.q(w,"png"))return"png"
 if(B.a.q(w,"audio/mp4")||B.a.q(w,"audio/aac")||B.a.q(w,"audio/m4a"))return"m4a"
@@ -734,22 +734,22 @@ if(B.a.q(w,"video/webm"))return"webm"
 if(B.a.q(w,"video"))return"mp4"
 if(B.a.q(w,"audio"))return"m4a"
 return"bin"},
-fDO(d){var w,v=B.a.i(B.d.gI(d.split(";"))).toLowerCase()
+fE0(d){var w,v=B.a.i(B.d.gI(d.split(";"))).toLowerCase()
 if(B.a.a_(v,"video/")||B.a.a_(v,"audio/"))return v
 w=v.length===0
 if(w&&B.a.q(d.toLowerCase(),"video"))return"video/mp4"
 return w?"application/octet-stream":v},
-hBj(d){var w=d.c
+hBx(d){var w=d.c
 if(w==="photo")return"NGMY photo"
 if(w==="video")return"NGMY video"
 return"NGMY voice memo"},
-fj_(d){var w=0,v=A.j(x.N),u,t
-var $async$fj_=A.e(function(e,f){if(e===1)return A.f(f,v)
+fjc(d){var w=0,v=A.j(x.N),u,t
+var $async$fjc=A.e(function(e,f){if(e===1)return A.f(f,v)
 for(;;)switch(w){case 0:t=B.a.i(d.e)
 if(t.length!==0){u=t
 w=1
 break}w=3
-return A.b(C.D8(d.a,C.fDO(d.f)),$async$fj_)
+return A.b(C.Da(d.a,C.fE0(d.f)),$async$fjc)
 case 3:t=f
 if(t==null)t=""
 if(t.length!==0)d.e=t
@@ -757,13 +757,13 @@ u=t
 w=1
 break
 case 1:return A.h(u,v)}})
-return A.i($async$fj_,v)},
-aMd(d){var w=0,v=A.j(x.K),u,t,s,r,q,p,o,n,m
-var $async$aMd=A.e(function(e,f){if(e===1)return A.f(f,v)
-for(;;)switch(w){case 0:o=C.fDO(d.f)
+return A.i($async$fjc,v)},
+aMg(d){var w=0,v=A.j(x.K),u,t,s,r,q,p,o,n,m
+var $async$aMg=A.e(function(e,f){if(e===1)return A.f(f,v)
+for(;;)switch(w){case 0:o=C.fE0(d.f)
 n=d.a
 w=3
-return A.b(C.anE(n),$async$aMd)
+return A.b(C.anH(n),$async$aMg)
 case 3:m=f
 if(m!=null&&!B.aE.gah(m)){u=m
 w=1
@@ -771,18 +771,18 @@ break}t=B.a.i(d.e)
 w=J.a9(t)===0?4:5
 break
 case 4:w=6
-return A.b(C.D8(n,o),$async$aMd)
+return A.b(C.Da(n,o),$async$aMg)
 case 6:r=f
 t=r==null?"":r
 case 5:n=J.cS(t,"blob:")
 w=n?7:8
 break
 case 7:w=9
-return A.b(C.c51(t),$async$aMd)
+return A.b(C.c56(t),$async$aMg)
 case 9:q=f
 if(q!=null&&!B.aE.gah(q)){u=q
 w=1
-break}case 8:if(J.cS(t,"data:"))try{n=C.fWO(t)
+break}case 8:if(J.cS(t,"data:"))try{n=C.fX0(t)
 u=n
 w=1
 break}catch(l){s=A.a4(l)
@@ -790,67 +790,67 @@ $.al.$1("[live_capture export] dataUrl decode: "+A.t(s))}u=null
 w=1
 break
 case 1:return A.h(u,v)}})
-return A.i($async$aMd,v)},
-a_Y(d){var w=0,v=A.j(x.y),u,t,s,r,q,p,o,n,m,l,k,j
-var $async$a_Y=A.e(function(e,f){if(e===1)return A.f(f,v)
+return A.i($async$aMg,v)},
+a00(d){var w=0,v=A.j(x.y),u,t,s,r,q,p,o,n,m,l,k,j
+var $async$a00=A.e(function(e,f){if(e===1)return A.f(f,v)
 for(;;)switch(w){case 0:n=d.f
-m=C.fDO(n)
+m=C.fE0(n)
 l=d.b
 k=A.ad("[^a-zA-Z0-9_-]+",!0,!1,!1,!1)
 l=A.aI(l,k,"_")
 k=A.ad("_+",!0,!1,!1,!1)
 t=A.aI(l,k,"_")
 s=t.length>48?B.a.al(t,0,48):t
-r=s+"."+C.hJf(n,d.c)
-q=C.hBj(d)
+r=s+"."+C.hJt(n,d.c)
+q=C.hBx(d)
 w=3
-return A.b(C.fj_(d),$async$a_Y)
+return A.b(C.fjc(d),$async$a00)
 case 3:p=f
 n=p.length!==0
 w=n?4:5
 break
 case 4:j=B.a
 w=6
-return A.b(C.bz7(p,r,m,d.b,q),$async$a_Y)
+return A.b(C.bzc(p,r,m,d.b,q),$async$a00)
 case 6:if(!j.q(f.toLowerCase(),"could not")){u=!0
 w=1
 break}case 5:w=7
-return A.b(C.aMd(d),$async$a_Y)
+return A.b(C.aMg(d),$async$a00)
 case 7:o=f
 l=o!=null
 w=l&&!B.aE.gah(o)?8:9
 break
 case 8:j=B.a
 w=10
-return A.b(A.af2(o,r,m,d.b,q),$async$a_Y)
+return A.b(A.af4(o,r,m,d.b,q),$async$a00)
 case 10:if(!j.q(f.toLowerCase(),"could not")){u=!0
 w=1
 break}case 9:w=n?11:12
 break
 case 11:w=13
-return A.b(C.c5g(p,m,d.b),$async$a_Y)
+return A.b(C.c5l(p,m,d.b),$async$a00)
 case 13:if(f){u=!0
 w=1
-break}case 12:if(l&&!B.aE.gah(o)){u=N.adS(o,r,m)
+break}case 12:if(l&&!B.aE.gah(o)){u=N.adU(o,r,m)
 w=1
 break}u=!1
 w=1
 break
 case 1:return A.h(u,v)}})
-return A.i($async$a_Y,v)},
-bz7(d,e,f,g,h){return C.hNZ(d,e,f,g,h)},
-hNZ(a7,a8,a9,b0,b1){var w=0,v=A.j(x.N),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6
-var $async$bz7=A.e(function(b2,b3){if(b2===1){s.push(b3)
-w=t}for(;;)switch(w){case 0:a4=A.fX2(a8,a9)
+return A.i($async$a00,v)},
+bzc(d,e,f,g,h){return C.hOc(d,e,f,g,h)},
+hOc(a7,a8,a9,b0,b1){var w=0,v=A.j(x.N),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6
+var $async$bzc=A.e(function(b2,b3){if(b2===1){s.push(b3)
+w=t}for(;;)switch(w){case 0:a4=A.fXf(a8,a9)
 a5=B.a.i(B.d.gI(a9.split(";")))
 t=4
 r=null
 w=B.a.a_(a7,"blob:")?7:9
 break
 case 7:w=10
-return A.b(E.aiK(a7,"blob").cJ(0,B.nf),$async$bz7)
+return A.b(E.aiN(a7,"blob").cJ(0,B.nf),$async$bzc)
 case 10:q=b3
-p=A.aKf(q.response)
+p=A.aKi(q.response)
 if(x.d.b(p)){j=p.size
 j.toString
 j=j<=0}else j=!0
@@ -873,10 +873,10 @@ j=A.aI(a1,"-","+")
 a1=A.aI(j,"_","/")
 j=a1.length
 a2=B.o.J(j,4)
-a0.b=B.cw.aF(a2>0?B.a.aDi(a1,j+(4-a2),"="):a1)}else a0.b=new A.cX(A.qe(g,0,g.length,B.c0,!1))
+a0.b=B.cw.aF(a2>0?B.a.aDj(a1,j+(4-a2),"="):a1)}else a0.b=new A.cX(A.qe(g,0,g.length,B.c0,!1))
 r=A.hB([new Uint8Array(A.cl(a0.b7()))],d)}else{j=A.b9("unsupported url")
 throw A.P(j)}case 8:j=x.z
-o=A.aQS(A.a([r],x.f),a4,A.E(["type",a5],j,j))
+o=A.aQW(A.a([r],x.f),a4,A.E(["type",a5],j,j))
 j=window.navigator
 j.toString
 n=j
@@ -886,7 +886,7 @@ k=B.a.i(b0)
 if(J.a9(l)!==0)J.aE(m,"title",l)
 if(J.a9(k)!==0)J.aE(m,"text",k)
 w=11
-return A.b(J.fKg(n,m),$async$bz7)
+return A.b(J.fKt(n,m),$async$bzc)
 case 11:j=A.t(a4)
 u="Shared "+j
 w=1
@@ -900,12 +900,12 @@ w=6
 break
 case 3:w=2
 break
-case 6:u=A.fWZ(null,a4,a7,a5)
+case 6:u=A.fXb(null,a4,a7,a5)
 w=1
 break
 case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
-return A.i($async$bz7,v)}},D,G,S,K,T
+return A.i($async$bzc,v)}},D,G,S,K,T
 J=c[1]
 A=c[0]
 B=c[2]
@@ -926,19 +926,19 @@ G=c[110]
 S=c[195]
 K=c[217]
 T=c[95]
-C.Ai.prototype={
+C.Aj.prototype={
 a3(){return"NgmyCameraFlipStyle."+this.b}}
-C.SC.prototype={
-S(){return new C.azW(A.a([],x.G),D.a0x,null,null)},
+C.SF.prototype={
+S(){return new C.azZ(A.a([],x.G),D.a0z,null,null)},
 gdS(){return this.c}}
-C.azW.prototype={
-aXx(d){var w,v=A.aG(d,B.bO,x.w).w.a.a-72
+C.azZ.prototype={
+aXy(d){var w,v=A.aG(d,B.bO,x.w).w.a.a-72
 switch($.nA().x){case"tiktok":w=B.k.D(v,200,360)
 return new A.z(w,w*16/9)
 case"square":w=B.k.D(v,220,340)
 return new A.z(w,w)
 case"youtube":default:return new A.z(v,v*9/16)}},
-gbvo(){switch($.nA().x){case"tiktok":return"TikTok \u2014 hold your phone upright for full-screen vertical video."
+gbvp(){switch($.nA().x){case"tiktok":return"TikTok \u2014 hold your phone upright for full-screen vertical video."
 case"square":return"Square \u2014 centered 1:1 video, like Instagram posts."
 case"youtube":default:return"YouTube \u2014 turn your phone sideways for full-screen wide video."}},
 Z(){var w,v,u=this
@@ -952,19 +952,19 @@ w.r=!0
 w.y=!1
 v=w.x
 if(v!=="tiktok"&&v!=="youtube"&&v!=="square")w.x="tiktok"
-w.aJ(0,u.gaVI())
-u.a9v()
-u.CU().bw(new C.dEQ(u),x.H)},
-a9v(){var w=0,v=A.j(x.H),u,t=2,s=[],r=this,q,p,o,n,m
-var $async$a9v=A.e(function(d,e){if(d===1){s.push(e)
+w.aJ(0,u.gaVJ())
+u.a9w()
+u.CX().bw(new C.dF0(u),x.H)},
+a9w(){var w=0,v=A.j(x.H),u,t=2,s=[],r=this,q,p,o,n,m
+var $async$a9w=A.e(function(d,e){if(d===1){s.push(e)
 w=t}for(;;)switch(w){case 0:t=4
 w=7
-return A.b(A.aw(),$async$a9v)
+return A.b(A.aw(),$async$a9w)
 case 7:q=e
 p=A.aR(J.q(q.a,"ngmy_recorder_camera_flip_style_v1"))
 if(p==null||r.c==null){w=1
-break}o=B.d.dN(D.a_i,new C.dEq(p),new C.dEr())
-r.n(new C.dEs(r,o))
+break}o=B.d.dI(D.a_k,new C.dEB(p),new C.dEC())
+r.n(new C.dED(r,o))
 t=2
 w=6
 break
@@ -976,16 +976,16 @@ case 3:w=2
 break
 case 6:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
-return A.i($async$a9v,v)},
-YG(d){return this.c9g(d)},
-c9g(d){var w=0,v=A.j(x.H),u=1,t=[],s,r,q
-var $async$YG=A.e(function(e,f){if(e===1){t.push(f)
+return A.i($async$a9w,v)},
+YH(d){return this.c9j(d)},
+c9j(d){var w=0,v=A.j(x.H),u=1,t=[],s,r,q
+var $async$YH=A.e(function(e,f){if(e===1){t.push(f)
 w=u}for(;;)switch(w){case 0:u=3
 w=6
-return A.b(A.aw(),$async$YG)
+return A.b(A.aw(),$async$YH)
 case 6:s=f
 w=7
-return A.b(s.an("String","ngmy_recorder_camera_flip_style_v1",d.b),$async$YG)
+return A.b(s.an("String","ngmy_recorder_camera_flip_style_v1",d.b),$async$YH)
 case 7:u=1
 w=5
 break
@@ -997,236 +997,236 @@ case 2:w=1
 break
 case 5:return A.h(null,v)
 case 1:return A.f(t.at(-1),v)}})
-return A.i($async$YG,v)},
-bCt(){var w,v=this,u=null,t=D.a_i[B.o.J(B.d.cP(D.a_i,v.y)+1,4)]
-v.n(new C.dEg(v,t))
-v.YG(t)
+return A.i($async$YH,v)},
+bCv(){var w,v=this,u=null,t=D.a_k[B.o.J(B.d.cP(D.a_k,v.y)+1,4)]
+v.n(new C.dEr(v,t))
+v.YH(t)
 w=v.c
 if(w==null)return
-w.F(x.q).f.P(A.b_(u,u,u,B.fQ,B.i_,B.q,u,A.d("Camera switch: "+C.fWn(t),u,u,u,u,u,u,u,u,u,u),u,B.fE,u,u,u,u,u,u,u,u,u,u))},
-c3h(){if(this.c==null)return
-this.n(new C.dEt())},
+w.F(x.q).f.P(A.b_(u,u,u,B.fQ,B.i_,B.q,u,A.d("Camera switch: "+C.fWA(t),u,u,u,u,u,u,u,u,u,u),u,B.fE,u,u,u,u,u,u,u,u,u,u))},
+c3k(){if(this.c==null)return
+this.n(new C.dEE())},
 p(){var w,v=$.nA()
-v.a1(0,this.gaVI())
+v.a1(0,this.gaVJ())
 w=this.d
 w===$&&A.c()
 w.p()
-v.aho()
-this.bp0()},
-CU(){var w=0,v=A.j(x.H),u,t=this,s
-var $async$CU=A.e(function(d,e){if(d===1)return A.f(e,v)
+v.ahp()
+this.bp1()},
+CX(){var w=0,v=A.j(x.H),u,t=this,s
+var $async$CX=A.e(function(d,e){if(d===1)return A.f(e,v)
 for(;;)switch(w){case 0:w=3
-return A.b(C.Tu(t.a.c),$async$CU)
+return A.b(C.Tx(t.a.c),$async$CX)
 case 3:s=e
 if(t.c==null){w=1
-break}t.n(new C.dEw(t,s))
+break}t.n(new C.dEH(t,s))
 case 1:return A.h(u,v)}})
-return A.i($async$CU,v)},
-Xi(d){return this.bE_(d)},
-bE_(d){var w=0,v=A.j(x.H),u=this
-var $async$Xi=A.e(function(e,f){if(e===1)return A.f(f,v)
+return A.i($async$CX,v)},
+Xj(d){return this.bE1(d)},
+bE1(d){var w=0,v=A.j(x.H),u=this
+var $async$Xj=A.e(function(e,f){if(e===1)return A.f(f,v)
 for(;;)switch(w){case 0:w=2
-return A.b(C.a5l(u.a.c,d.a),$async$Xi)
+return A.b(C.a5n(u.a.c,d.a),$async$Xj)
 case 2:w=3
-return A.b(u.CU(),$async$Xi)
+return A.b(u.CX(),$async$Xj)
 case 3:return A.h(null,v)}})
-return A.i($async$Xi,v)},
-afg(){var w=0,v=A.j(x.H),u,t=this,s,r
-var $async$afg=A.e(function(d,e){if(d===1)return A.f(e,v)
+return A.i($async$Xj,v)},
+afh(){var w=0,v=A.j(x.H),u,t=this,s,r
+var $async$afh=A.e(function(d,e){if(d===1)return A.f(e,v)
 for(;;)switch(w){case 0:if(t.r||$.nA().Q){w=1
 break}s=$.nA()
 s.f=s.e=null
 s.r=!0
-t.n(new C.dEB(t))
+t.n(new C.dEM(t))
 w=3
-return A.b(s.a55(0,t.a.c,!0),$async$afg)
-case 3:if(t.c!=null){t.n(new C.dEC(t))
+return A.b(s.a56(0,t.a.c,!0),$async$afh)
+case 3:if(t.c!=null){t.n(new C.dEN(t))
 if(s.Q)if(s.z)s.f="Recording with noise cancel \u2014 background sounds are filtered."
 else{r=s.x
 if(r==="youtube")s.f="Recording wide video \u2014 keep your phone sideways."
 else if(r==="tiktok")s.f="Recording vertical video \u2014 keep your phone upright."}}case 1:return A.h(u,v)}})
-return A.i($async$afg,v)},
-PR(){var w=0,v=A.j(x.H),u,t=this,s
-var $async$PR=A.e(function(d,e){if(d===1)return A.f(e,v)
+return A.i($async$afh,v)},
+PS(){var w=0,v=A.j(x.H),u,t=this,s
+var $async$PS=A.e(function(d,e){if(d===1)return A.f(e,v)
 for(;;)switch(w){case 0:if(t.r||!$.nA().Q){w=1
-break}t.n(new C.dED(t))
+break}t.n(new C.dEO(t))
 w=3
-return A.b($.nA().BF(),$async$PR)
+return A.b($.nA().BH(),$async$PS)
 case 3:s=e
 if(t.c==null){w=1
-break}t.n(new C.dEE(t))
+break}t.n(new C.dEP(t))
 w=s!=null?4:5
 break
 case 4:w=6
-return A.b(t.CU(),$async$PR)
+return A.b(t.CX(),$async$PS)
 case 6:w=t.c!=null?7:8
 break
 case 7:w=9
-return A.b(t.Hn(s),$async$PR)
+return A.b(t.Hn(s),$async$PS)
 case 9:case 8:case 5:case 1:return A.h(u,v)}})
-return A.i($async$PR,v)},
-Hn(d){return this.c5g(d)},
-c5g(d){var w=0,v=A.j(x.H),u=this,t
+return A.i($async$PS,v)},
+Hn(d){return this.c5j(d)},
+c5j(d){var w=0,v=A.j(x.H),u=this,t
 var $async$Hn=A.e(function(e,f){if(e===1)return A.f(f,v)
 for(;;)switch(w){case 0:w=d.e.length===0?2:3
 break
 case 2:w=4
-return A.b(C.D8(d.a,d.f),$async$Hn)
+return A.b(C.Da(d.a,d.f),$async$Hn)
 case 4:t=f
 d.e=t==null?"":t
 case 3:t=u.c
 t.toString
 w=5
-return A.b(A.c0(B.K,null,new C.dEu(u,d),t,!0,!0,!0,null,!1,!1,x.H),$async$Hn)
+return A.b(A.c0(B.K,null,new C.dEF(u,d),t,!0,!0,!0,null,!1,!1,x.H),$async$Hn)
 case 5:w=u.c!=null?6:7
 break
 case 6:w=8
-return A.b(u.CU(),$async$Hn)
+return A.b(u.CX(),$async$Hn)
 case 8:case 7:return A.h(null,v)}})
 return A.i($async$Hn,v)},
-B(d){return new A.lk(new C.dEO(this,$.nA().Q),null)},
-bZn(d){var w,v,u,t,s,r,q,p,o=null,n=A.aq(B.bR,B.br,0.35)
+B(d){return new A.lk(new C.dEZ(this,$.nA().Q),null)},
+bZq(d){var w,v,u,t,s,r,q,p,o=null,n=A.aq(B.bR,B.br,0.35)
 n.toString
 n=A.a([B.fQ,B.aW,n],x.W)
 w=A.a([new A.aa(0,B.G,B.aW.j(0.35),B.dl,24)],x.V)
-v=A.aF(o,o,o,o,D.bwe,o,o,o,new C.dEl(this),o,o,o,o,o,o)
+v=A.aF(o,o,o,o,D.bwD,o,o,o,new C.dEw(this),o,o,o,o,o,o)
 u=x.p
-t=A.D(A.u(A.a([D.eOa,A.d(d?"Recording in progress \u2014 come back here to stop & save.":"Video studio \u2014 record with front or back camera.",o,o,o,o,o,o,Q.a3D,o,o,o)],u),B.F,o,B.e,B.j,0,B.p),1)
+t=A.D(A.u(A.a([D.eOF,A.d(d?"Recording in progress \u2014 come back here to stop & save.":"Video studio \u2014 record with front or back camera.",o,o,o,o,o,o,Q.a3F,o,o,o)],u),B.F,o,B.e,B.j,0,B.p),1)
 s=B.c.j(0.14)
 r=A.m(14)
-r=A.p(o,D.btR,B.h,o,o,new A.o(s,o,A.H(B.be,B.r,1),r,o,o,B.n),o,o,o,o,B.bT,o,o,o)
+r=A.p(o,D.buf,B.h,o,o,new A.o(s,o,A.H(B.be,B.r,1),r,o,o,B.n),o,o,o,o,B.bT,o,o,o)
 s=A.m(10)
 q=B.c.j(0.12)
 p=A.m(10)
-return A.p(o,A.B(A.a([v,t,A.B(A.a([r,B.bp,A.aD(!1,B.X,!0,o,A.aH(!1,s,!0,A.hI(A.p(o,D.bv1,B.h,o,o,new A.o(q,o,A.H(B.be,B.r,1),p,o,o,B.n),o,o,o,o,B.DG,o,o,o),o,"How to turn on the microphone",o,o),o,!0,o,o,o,o,o,o,o,o,o,o,o,this.gcld(),o,o,o,o,o,o,o),B.h,B.K,0,o,o,o,o,o,B.ac)],u),B.m,o,B.e,B.R,0,o,o)],u),B.m,o,B.e,B.j,0,o,o),B.h,o,o,new A.o(o,o,o,o,w,new A.a8(B.ax,B.aC,B.x,n,o,o),B.n),o,o,o,o,D.bjI,o,o,o)},
-cle(){var w=this.c
+return A.p(o,A.B(A.a([v,t,A.B(A.a([r,B.bo,A.aD(!1,B.X,!0,o,A.aH(!1,s,!0,A.hI(A.p(o,D.bvq,B.h,o,o,new A.o(q,o,A.H(B.be,B.r,1),p,o,o,B.n),o,o,o,o,B.DK,o,o,o),o,"How to turn on the microphone",o,o),o,!0,o,o,o,o,o,o,o,o,o,o,o,this.gclg(),o,o,o,o,o,o,o),B.h,B.K,0,o,o,o,o,o,B.ac)],u),B.m,o,B.e,B.R,0,o,o)],u),B.m,o,B.e,B.j,0,o,o),B.h,o,o,new A.o(o,o,o,o,w,new A.a8(B.ax,B.aC,B.x,n,o,o),B.n),o,o,o,o,D.bk_,o,o,o)},
+clh(){var w=this.c
 w.toString
-A.c0(B.K,null,new C.dEA(),w,!0,!0,!0,null,!1,!1,x.H)},
-cnZ(d,e){var w=this.d
+A.c0(B.K,null,new C.dEL(),w,!0,!0,!0,null,!1,!1,x.H)},
+co1(d,e){var w=this.d
 w===$&&A.c()
-return A.c4(w,new C.dEI(this,d),null)},
-bTx(d){var w=null,v=C.anF(d.r),u=A.p(B.a7,D.eir,B.h,w,w,new A.o(B.bS,w,w,A.m(16),w,w,B.n),w,w,w,w,K.abU,w,w,w),t=B.c.j(0.05),s=x.p
-return new A.C(B.d7,A.bFM(u,B.c4,A.aD(!1,B.X,!0,A.m(16),A.aH(!1,A.m(16),!0,new A.C(B.bA,A.B(A.a([A.V(B.pa,B.bR,w,w,w,w),B.ba,A.D(A.u(A.a([A.d(d.b,w,w,w,w,w,w,B.h7,w,w,w),A.d("VIDEO \xb7 "+v+" \xb7 Tap to play",w,w,w,w,w,w,B.BB,w,w,w)],s),B.F,w,B.e,B.j,0,B.p),1),H.ahT],s),B.m,w,B.e,B.j,0,w,w),w),w,!0,w,w,w,w,w,w,w,w,w,w,w,new C.dEo(this,d),w,w,w,w,w,w,w),B.h,t,0,w,w,w,w,w,B.ac),w,B.zl,new A.cv("studio-cap-"+d.a,x.O),new C.dEp(this,d),B.eT,w),w)},
-aJz(d){var w,v,u,t,s,r,q,p,o,n,m,l,k,j=this,i=null,h=j.c
+return A.c4(w,new C.dET(this,d),null)},
+bTA(d){var w=null,v=C.anI(d.r),u=A.p(B.a7,D.eiX,B.h,w,w,new A.o(B.bS,w,w,A.m(16),w,w,B.n),w,w,w,w,K.abZ,w,w,w),t=B.c.j(0.05),s=x.p
+return new A.C(B.d7,A.bFR(u,B.c4,A.aD(!1,B.X,!0,A.m(16),A.aH(!1,A.m(16),!0,new A.C(B.bA,A.B(A.a([A.V(B.pa,B.bR,w,w,w,w),B.ba,A.D(A.u(A.a([A.d(d.b,w,w,w,w,w,w,B.h8,w,w,w),A.d("VIDEO \xb7 "+v+" \xb7 Tap to play",w,w,w,w,w,w,B.BF,w,w,w)],s),B.F,w,B.e,B.j,0,B.p),1),H.ahY],s),B.m,w,B.e,B.j,0,w,w),w),w,!0,w,w,w,w,w,w,w,w,w,w,w,new C.dEz(this,d),w,w,w,w,w,w,w),B.h,t,0,w,w,w,w,w,B.ac),w,B.zn,new A.cv("studio-cap-"+d.a,x.O),new C.dEA(this,d),B.eT,w),w)},
+aJA(d){var w,v,u,t,s,r,q,p,o,n,m,l,k,j=this,i=null,h=j.c
 h.toString
-w=j.aXx(h)
+w=j.aXy(h)
 v=d==null?w.b:d
 h=$.nA()
 u=h.a.b
 t=h.w
-s=new C.aEA(u,v,t==="user",D.aOZ,"cover",1,i)
+s=new C.aED(u,v,t==="user",D.aP4,"cover",1,i)
 u=j.y
-if(u===D.a0w)r=new A.n8(s,new A.cv("cam-"+t+"-"+h.x,x.O))
-else{A:{if(D.az2===u){u=B.jd
-break A}if(D.az1===u){u=B.ry
-break A}u=R.Ju
-break A}r=A.qk(new A.n8(s,new A.cv("cam-"+t+"-"+h.x,x.O)),u,A.tg(),B.co,B.rr,new C.dEf(j))}u=A.bu(A.m(18),new A.a3(w.a,v,r,i),B.ap)
+if(u===D.a0y)r=new A.n8(s,new A.cv("cam-"+t+"-"+h.x,x.O))
+else{A:{if(D.az8===u){u=B.jc
+break A}if(D.az7===u){u=B.ry
+break A}u=R.Jw
+break A}r=A.qk(new A.n8(s,new A.cv("cam-"+t+"-"+h.x,x.O)),u,A.tg(),B.co,B.rr,new C.dEq(j))}u=A.bv(A.m(18),new A.a3(w.a,v,r,i),B.ap)
 t=B.w.j(0.42)
 q=A.m(10)
 p=A.H(B.c.j(0.12),B.r,1)
 o=h.z
-n=o?D.brn:D.bpu
+n=o?D.brN:D.bpU
 m=o?"Noise cancel on":"Turn on noise cancel"
 l=x.p
-m=A.a([j.adl(o,n,j.w?i:j.gcqZ(),m)],l)
+m=A.a([j.adm(o,n,j.w?i:j.gcr1(),m)],l)
 if(h.Q){o=h.as
-n=o?B.iE:O.wZ
+n=o?B.iG:O.wZ
 k=o?"Resume recording":"Pause recording"
-m.push(j.adl(o,n,j.w?i:j.gcr4(),k))}o=j.y
-m.push(j.adl(o!==D.a0w,C.hu1(o),j.gbCs(),"Camera switch style: "+C.fWn(o)+" (tap to change)"))
+m.push(j.adm(o,n,j.w?i:j.gcr7(),k))}o=j.y
+m.push(j.adm(o!==D.a0y,C.huf(o),j.gbCu(),"Camera switch style: "+C.fWA(o)+" (tap to change)"))
 h=h.w==="user"?"Switch to back camera":"Switch to front camera"
-m.push(j.aXv(D.bov,j.w?i:j.gbIq(),h))
+m.push(j.aXw(D.boV,j.w?i:j.gbIs(),h))
 h=j.x
-o=h?D.ag8:B.L3
+o=h?D.agd:B.L4
 h=h?"Exit full screen":"Full screen preview"
-m.push(j.aXv(o,j.gcqO(),h))
-return new A.am(B.B,i,B.a9,B.h,A.a([u,A.an(i,A.bQ(new A.C(B.hd,A.B(m,B.m,i,B.e,B.R,0,i,i),i),new A.o(t,i,p,q,i,i,B.n),B.b7),i,i,i,6,6,i)],l),i)},
-bwD(){return this.aJz(null)},
-adl(d,e,f,g){var w,v=null,u=A.m(7),t=A.m(7),s=d?B.br.j(0.28):B.K
+m.push(j.aXw(o,j.gcqR(),h))
+return new A.am(B.B,i,B.a9,B.h,A.a([u,A.an(i,A.bQ(new A.C(B.h2,A.B(m,B.m,i,B.e,B.R,0,i,i),i),new A.o(t,i,p,q,i,i,B.n),B.b7),i,i,i,6,6,i)],l),i)},
+bwE(){return this.aJA(null)},
+adm(d,e,f,g){var w,v=null,u=A.m(7),t=A.m(7),s=d?B.br.j(0.28):B.K
 if(f!=null)w=d?1:0.92
 else w=0.4
 return A.hI(A.aD(!1,B.X,!0,v,A.aH(!1,u,!0,A.p(v,A.V(e,B.c.j(w),v,v,v,13),B.h,v,v,new A.o(s,v,v,t,v,v,B.n),v,24,v,v,v,v,v,24),v,!0,v,v,v,v,v,v,v,v,v,v,v,f,v,v,v,v,v,v,v),B.h,B.K,0,v,v,v,v,v,B.ac),v,g,v,v)},
-aXv(d,e,f){return this.adl(!1,d,e,f)},
-bJ7(d){var w,v,u,t,s=null,r=this.c
+aXw(d,e,f){return this.adm(!1,d,e,f)},
+bJ9(d){var w,v,u,t,s=null,r=this.c
 r.toString
 r=A.aG(r,B.bO,x.w).w
 w=B.w.j(0.96)
 if(d){v=$.nA()
 u=v.as
 v=v.at
-v=u?"\u23f8 PAUSED "+C.anF(v):"\u25cf RECORDING "+C.anF(v)}else v="PREVIEW"
-if(d)u=$.nA().as?B.z6:B.br
-else u=B.ak
+v=u?"\u23f8 PAUSED "+C.anI(v):"\u25cf RECORDING "+C.anI(v)}else v="PREVIEW"
+if(d)u=$.nA().as?B.z7:B.br
+else u=B.aj
 t=x.p
-return A.aD(!1,B.X,!0,s,A.br(!0,A.u(A.a([new A.C(B.zx,A.B(A.a([A.d(v,s,s,s,s,s,s,A.l(s,s,u,s,s,s,s,s,s,s,s,12,s,s,B.u,s,s,!0,s,1.1,s,s,s,s,s,s),s,s,s),B.b6,A.aF(s,s,s,s,D.buE,s,s,s,new C.dEk(this),s,s,s,s,s,s)],t),B.m,s,B.e,B.j,0,s,s),s),A.D(new A.C(D.beK,A.as(this.aJz(r.a.b*0.72),s,s,s),s),1)],t),B.m,s,B.e,B.j,0,B.p),!0,!1,B.ag,!0,!0),B.h,w,0,s,s,s,s,s,B.ac)},
-cqP(){this.n(new C.dEJ(this))},
-afV(){var w=0,v=A.j(x.H),u,t=this,s,r
-var $async$afV=A.e(function(d,e){if(d===1)return A.f(e,v)
+return A.aD(!1,B.X,!0,s,A.br(!0,A.u(A.a([new A.C(B.zA,A.B(A.a([A.d(v,s,s,s,s,s,s,A.l(s,s,u,s,s,s,s,s,s,s,s,12,s,s,B.u,s,s,!0,s,1.1,s,s,s,s,s,s),s,s,s),B.b6,A.aF(s,s,s,s,D.bv2,s,s,s,new C.dEv(this),s,s,s,s,s,s)],t),B.m,s,B.e,B.j,0,s,s),s),A.D(new A.C(D.beZ,A.as(this.aJA(r.a.b*0.72),s,s,s),s),1)],t),B.m,s,B.e,B.j,0,B.p),!0,!1,B.ag,!0,!0),B.h,w,0,s,s,s,s,s,B.ac)},
+cqS(){this.n(new C.dEU(this))},
+afW(){var w=0,v=A.j(x.H),u,t=this,s,r
+var $async$afW=A.e(function(d,e){if(d===1)return A.f(e,v)
 for(;;)switch(w){case 0:if(t.w||!$.nA().Q){w=1
-break}t.n(new C.dEM(t))
+break}t.n(new C.dEX(t))
 s=$.nA()
 w=3
-return A.b(s.a3N(),$async$afV)
-case 3:if(t.c!=null){t.n(new C.dEN(t))
+return A.b(s.a3O(),$async$afW)
+case 3:if(t.c!=null){t.n(new C.dEY(t))
 if(s.e!=null){r=t.c.F(x.q).f
 s=s.e
 s.toString
-r.P(A.b_(null,null,null,B.fr,B.i_,B.q,null,A.d(s,null,null,null,null,null,null,null,null,null,null),null,B.mu,null,null,null,null,null,null,null,null,null,null))}else if(s.as)t.c.F(x.q).f.P(D.erV)}case 1:return A.h(u,v)}})
-return A.i($async$afV,v)},
-afU(){var w=0,v=A.j(x.H),u,t=this,s,r
-var $async$afU=A.e(function(d,e){if(d===1)return A.f(e,v)
+r.P(A.b_(null,null,null,B.fg,B.i_,B.q,null,A.d(s,null,null,null,null,null,null,null,null,null,null),null,B.mv,null,null,null,null,null,null,null,null,null,null))}else if(s.as)t.c.F(x.q).f.P(D.esq)}case 1:return A.h(u,v)}})
+return A.i($async$afW,v)},
+afV(){var w=0,v=A.j(x.H),u,t=this,s,r
+var $async$afV=A.e(function(d,e){if(d===1)return A.f(e,v)
 for(;;)switch(w){case 0:if(t.w){w=1
-break}t.n(new C.dEK(t))
+break}t.n(new C.dEV(t))
 s=$.nA()
 r=!s.z
 w=3
-return A.b(s.yA(r),$async$afU)
-case 3:if(t.c!=null){t.n(new C.dEL(t))
+return A.b(s.yB(r),$async$afV)
+case 3:if(t.c!=null){t.n(new C.dEW(t))
 if(s.Q&&s.e==null){s=t.c.F(x.q).f
 s.P(A.b_(null,null,null,B.fQ,B.i_,B.q,null,A.d(r?"Noise cancel on \u2014 still recording.":"Noise cancel off \u2014 still recording.",null,null,null,null,null,null,null,null,null,null),null,B.fE,null,null,null,null,null,null,null,null,null,null))}}case 1:return A.h(u,v)}})
-return A.i($async$afU,v)},
-awa(d){var w=$.nA()
+return A.i($async$afV,v)},
+awb(d){var w=$.nA()
 if(w.Q)return
-this.n(new C.dEy(this,d))
-w.a3v().bw(new C.dEz(this),x.H)},
-a82(){var w=0,v=A.j(x.H),u,t=this,s
-var $async$a82=A.e(function(d,e){if(d===1)return A.f(e,v)
+this.n(new C.dEJ(this,d))
+w.a3w().bw(new C.dEK(this),x.H)},
+a83(){var w=0,v=A.j(x.H),u,t=this,s
+var $async$a83=A.e(function(d,e){if(d===1)return A.f(e,v)
 for(;;)switch(w){case 0:if(t.w){w=1
 break}s=$.nA()
 t.z=s.w==="user"?1:-1
-t.n(new C.dEh(t))
+t.n(new C.dEs(t))
 w=3
-return A.b(s.a5q(),$async$a82)
-case 3:if(t.c!=null)t.n(new C.dEi(t))
+return A.b(s.a5r(),$async$a83)
+case 3:if(t.c!=null)t.n(new C.dEt(t))
 case 1:return A.h(u,v)}})
-return A.i($async$a82,v)},
-awD(d,e,f){var w=null,v=A.m(999),u=A.m(999),t=e?B.c.j(0.12):B.K,s=A.H(e?B.bR:B.be,B.r,1)
+return A.i($async$a83,v)},
+awE(d,e,f){var w=null,v=A.m(999),u=A.m(999),t=e?B.c.j(0.12):B.K,s=A.H(e?B.bR:B.be,B.r,1)
 return A.aH(!1,v,!0,A.p(w,A.d(d,w,w,w,w,w,w,A.l(w,w,B.c,w,w,w,w,w,w,w,w,11,w,w,e?B.I:B.a0,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),B.h,w,w,new A.o(t,w,s,u,w,w,B.n),w,w,w,w,B.wm,w,w,w),w,!0,w,w,w,w,w,w,w,w,w,w,w,f,w,w,w,w,w,w,w)}}
-C.Zr.prototype={
-S(){return new C.aEV()},
+C.Zu.prototype={
+S(){return new C.aEY()},
 p_(){return this.e.$0()},
 gdS(){return this.d}}
-C.aEV.prototype={
+C.aEY.prototype={
 Z(){var w,v,u=this
 u.a0()
 w=u.a.c.b
 v=$.at()
 u.d!==$&&A.aO()
 u.d=new A.ao(new A.bb(w,B.b_,B.aL),v)
-u.Vb()},
-Vb(){var w=0,v=A.j(x.H),u,t=this,s,r
-var $async$Vb=A.e(function(d,e){if(d===1)return A.f(e,v)
+u.Vc()},
+Vc(){var w=0,v=A.j(x.H),u,t=this,s,r
+var $async$Vc=A.e(function(d,e){if(d===1)return A.f(e,v)
 for(;;)switch(w){case 0:r=t.a.c
-if(r.e.length!==0){if(t.c!=null)t.n(new C.eLX(t))
+if(r.e.length!==0){if(t.c!=null)t.n(new C.eM7(t))
 w=1
 break}w=3
-return A.b(C.D8(r.a,r.f),$async$Vb)
+return A.b(C.Da(r.a,r.f),$async$Vc)
 case 3:s=e
 if(t.c==null){w=1
 break}if(s!=null&&s.length!==0)t.a.c.e=s
-t.n(new C.eLY(t))
+t.n(new C.eM8(t))
 case 1:return A.h(u,v)}})
-return A.i($async$Vb,v)},
+return A.i($async$Vc,v)},
 p(){var w=this.d
 w===$&&A.c()
 w.R$=$.at()
@@ -1242,7 +1242,7 @@ q=new A.ao(new A.bb(s,B.b_,B.aL),r)
 s=t.c
 s.toString
 w=3
-return A.b(A.ce(null,null,!0,null,new C.eM1(q),s,null,!0,!0,x.N),$async$Id)
+return A.b(A.ce(null,null,!0,null,new C.eMc(q),s,null,!0,!0,x.N),$async$Id)
 case 3:p=e
 q.R$=r
 q.O$=0
@@ -1251,45 +1251,45 @@ break}m.saR(0,p)
 m=t.a
 m.c.b=p
 w=4
-return A.b(C.Tu(m.d),$async$Id)
+return A.b(C.Tx(m.d),$async$Id)
 case 4:o=e
 m=J.cB(o)
-n=m.bg(o,new C.eM2(t))
+n=m.bg(o,new C.eMd(t))
 w=n>=0?5:6
 break
 case 5:m.h(o,n).b=p
 w=7
-return A.b(C.LP(t.a.d,o),$async$Id)
+return A.b(C.LR(t.a.d,o),$async$Id)
 case 7:case 6:w=8
 return A.b(t.a.p_(),$async$Id)
-case 8:if(t.c!=null)t.n(new C.eM3())
+case 8:if(t.c!=null)t.n(new C.eMe())
 case 1:return A.h(u,v)}})
 return A.i($async$Id,v)},
-Xj(){var w=0,v=A.j(x.H),u=this,t,s,r
-var $async$Xj=A.e(function(d,e){if(d===1)return A.f(e,v)
-for(;;)switch(w){case 0:u.n(new C.eM4(u))
+Xk(){var w=0,v=A.j(x.H),u=this,t,s,r
+var $async$Xk=A.e(function(d,e){if(d===1)return A.f(e,v)
+for(;;)switch(w){case 0:u.n(new C.eMf(u))
 w=2
-return A.b(u.Vb(),$async$Xj)
+return A.b(u.Vc(),$async$Xk)
 case 2:w=3
-return A.b(C.a_Y(u.a.c),$async$Xj)
+return A.b(C.a00(u.a.c),$async$Xk)
 case 3:t=e
-if(u.c!=null){u.n(new C.eM5(u))
+if(u.c!=null){u.n(new C.eMg(u))
 s=x.q
 r=u.c
-if(t)r.F(s).f.P(D.esz)
-else r.F(s).f.P(D.eq2)}return A.h(null,v)}})
-return A.i($async$Xj,v)},
-Xh(d){var w=0,v=A.j(x.H),u=this,t
-var $async$Xh=A.e(function(e,f){if(e===1)return A.f(f,v)
+if(t)r.F(s).f.P(D.et4)
+else r.F(s).f.P(D.eqy)}return A.h(null,v)}})
+return A.i($async$Xk,v)},
+Xi(d){var w=0,v=A.j(x.H),u=this,t
+var $async$Xi=A.e(function(e,f){if(e===1)return A.f(f,v)
 for(;;)switch(w){case 0:t=u.a
 w=2
-return A.b(C.a5l(t.d,t.c.a),$async$Xh)
+return A.b(C.a5n(t.d,t.c.a),$async$Xi)
 case 2:w=3
-return A.b(u.a.p_(),$async$Xh)
+return A.b(u.a.p_(),$async$Xi)
 case 3:t=u.c
 if(t!=null)A.a7(t,!1).K(null)
 return A.h(null,v)}})
-return A.i($async$Xh,v)},
+return A.i($async$Xi,v)},
 B(d){var w,v,u,t,s,r,q,p,o=this,n=null,m=o.a.c,l=m.c==="video"||B.a.a_(m.f,"video/")
 m=A.aG(d,B.bO,x.w).w
 w=A.m(28)
@@ -1297,51 +1297,51 @@ v=A.H(B.bR.j(0.35),B.r,1)
 u=A.as(A.p(n,n,B.h,n,n,new A.o(B.be,n,n,A.m(99),n,n,B.n),n,4,n,n,n,n,n,40),n,n,n)
 t=o.d
 t===$&&A.c()
-t=A.d(t.a.a,n,n,n,n,n,n,B.h8,n,n,n)
+t=A.d(t.a.a,n,n,n,n,n,n,B.h9,n,n,n)
 s=o.a.c.r
 r=x.p
-s=A.a([u,B.ay,t,A.d("Video \xb7 "+C.anF(isNaN(s)||s==1/0||s==-1/0?0:B.o.D(B.o.bK(s),0,99999)),n,n,n,n,n,n,D.eFn,n,n,n),B.aN],r)
-if(o.f)s.push(new A.a3(n,l?280:140,D.aW5,n))
+s=A.a([u,B.ay,t,A.d("Video \xb7 "+C.anI(isNaN(s)||s==1/0||s==-1/0?0:B.o.D(B.o.bK(s),0,99999)),n,n,n,n,n,n,D.eFS,n,n,n),B.aN],r)
+if(o.f)s.push(new A.a3(n,l?280:140,D.aWb,n))
 else{u=o.a.c
 t=u.e
-if(t.length===0)s.push(D.eMl)
+if(t.length===0)s.push(D.eMQ)
 else{t=B.a.gV(t)
 q=o.a.c
 p=q.e
-s.push(new C.bqK(p,q.f,280,new A.cv("media-"+u.a+"-"+t,x.O)))}}s.push(B.d1)
-u=o.e?n:o.gbZp()
-s.push(new A.a3(1/0,n,A.dk(B.Ah,D.eTV,u,A.bk(B.aW,n,n,n,B.c,B.fL,n,n,new A.b5(A.m(14),B.W),n,n,n)),n))
+s.push(new C.bqP(p,q.f,280,new A.cv("media-"+u.a+"-"+t,x.O)))}}s.push(B.d1)
+u=o.e?n:o.gbZs()
+s.push(new A.a3(1/0,n,A.dk(B.Ak,D.eUq,u,A.bk(B.aW,n,n,n,B.c,B.fL,n,n,new A.b5(A.m(14),B.W),n,n,n)),n))
 s.push(B.T)
 u=B.bR.j(0.6)
-s.push(A.B(A.a([A.D(A.ey(B.Ls,D.f2O,o.gcfp(),A.d9(n,n,n,n,n,n,n,n,n,B.br,n,B.fL,n,n,new A.b5(A.m(14),B.W),new A.ax(u,1,B.r,-1),n,n,n,n)),1)],r),B.m,n,B.e,B.j,0,n,n))
+s.push(A.B(A.a([A.D(A.ey(B.Ls,D.f3k,o.gcfs(),A.d9(n,n,n,n,n,n,n,n,n,B.br,n,B.fL,n,n,new A.b5(A.m(14),B.W),new A.ax(u,1,B.r,-1),n,n,n,n)),1)],r),B.m,n,B.e,B.j,0,n,n))
 s.push(B.T)
-s.push(A.hf(G.aia,D.eJR,o.gbZm(o),n))
-return A.br(!0,new A.bE(B.bb,n,n,A.p(n,A.cg(A.u(s,B.ad,n,B.e,B.j,0,B.p),B.q,n,B.z,n,n,n,n,B.ah),B.h,n,new A.aW(0,520,0,m.a.b*0.88),new A.o(B.eO,n,v,w,n,n,B.n),n,n,n,B.bk,D.bgl,n,n,n),n),!0,!1,B.ag,!0,!0)}}
-C.ayL.prototype={
+s.push(A.hf(G.aif,D.eKl,o.gbZp(o),n))
+return A.br(!0,new A.bF(B.bb,n,n,A.p(n,A.cg(A.u(s,B.ad,n,B.e,B.j,0,B.p),B.q,n,B.z,n,n,n,n,B.ah),B.h,n,new A.aW(0,520,0,m.a.b*0.88),new A.o(B.eO,n,v,w,n,n,B.n),n,n,n,B.bk,D.bgC,n,n,n),n),!0,!1,B.ag,!0,!0)}}
+C.ayO.prototype={
 a3(){return"_MicGuideDevice."+this.b}}
-C.XK.prototype={
-S(){return new C.ayM(D.aMA)}}
-C.ayM.prototype={
+C.XN.prototype={
+S(){return new C.ayP(D.aMG)}}
+C.ayP.prototype={
 B(d){var w,v,u=this,t=null,s=A.aG(d,B.bO,x.w).w,r=A.m(28),q=A.H(B.bR.j(0.35),B.r,1),p=x.p
-p=A.a([A.as(A.p(t,t,B.h,t,t,new A.o(B.be,t,t,A.m(99),t,t,B.n),t,4,t,t,t,t,t,40),t,t,t),B.ay,D.eiy,B.ar,D.eVL,B.aN,A.cb(B.bH,A.a([u.ap6("iPhone",B.x0,D.aMA),u.ap6("Android",D.bob,D.fbe),u.ap6("Computer",K.afM,D.fbf)],p),B.bw,8,8),B.bs],p)
-w=u.cns(u.d)
-B.d.v(p,new A.J(w,u.gcnq(),A.T(w).k("J<1,r>")))
+p=A.a([A.as(A.p(t,t,B.h,t,t,new A.o(B.be,t,t,A.m(99),t,t,B.n),t,4,t,t,t,t,t,40),t,t,t),B.ay,D.ej3,B.ar,D.eWg,B.aN,A.cb(B.bH,A.a([u.ap7("iPhone",B.x0,D.aMG),u.ap7("Android",D.boB,D.fbM),u.ap7("Computer",K.afR,D.fbN)],p),B.bw,8,8),B.bs],p)
+w=u.cnv(u.d)
+B.d.v(p,new A.J(w,u.gcnt(),A.T(w).k("J<1,r>")))
 p.push(B.ay)
 w=B.aW.j(0.15)
 v=A.m(14)
-p.push(A.p(t,D.f1b,B.h,t,t,new A.o(w,t,A.H(B.br.j(0.35),B.r,1),v,t,t,B.n),t,t,t,t,B.bk,t,t,t))
-p.push(B.aa)
-p.push(new A.a3(1/0,t,A.bI(B.aKT,new C.dga(d),A.bk(B.aW,t,t,t,B.c,B.fL,t,t,new A.b5(A.m(14),B.W),t,t,t)),t))
-return A.br(!0,new A.bE(B.bb,t,t,A.p(t,A.cg(A.u(p,B.ad,t,B.e,B.j,0,B.p),B.q,t,B.z,t,t,t,t,B.ah),B.h,t,new A.aW(0,520,0,s.a.b*0.88),new A.o(B.eO,t,q,r,t,t,B.n),t,t,t,B.bk,D.bgm,t,t,t),t),!0,!1,B.ag,!0,!0)},
-ap6(d,e,f){var w=null,v=this.d===f,u=A.m(12),t=A.m(12),s=v?B.aW.j(0.35):B.c.j(0.06),r=A.H(v?B.br:B.be,B.r,1),q=A.V(e,v?B.c:B.aQ,w,w,w,16)
-return A.aD(!1,B.X,!0,w,A.aH(!1,u,!0,A.p(w,A.B(A.a([q,B.bp,A.d(d,w,w,w,w,w,w,A.l(w,w,v?B.c:B.aQ,w,w,w,w,w,w,w,w,12,w,w,B.I,w,w,!0,w,w,w,w,w,w,w,w),w,w,w)],x.p),B.m,w,B.e,B.R,0,w,w),B.h,w,w,new A.o(s,w,r,t,w,w,B.n),w,w,w,w,B.h1,w,w,w),w,!0,w,w,w,w,w,w,w,w,w,w,w,new C.dg9(this,f),w,w,w,w,w,w,w),B.h,B.K,0,w,w,w,w,w,B.ac)},
-cnr(d){var w=null,v=B.a.cP(d,"."),u=v>0,t=u?B.a.al(d,0,v):"\u2022",s=u?B.a.i(B.a.aV(d,v+1)):d
+p.push(A.p(t,D.f1H,B.h,t,t,new A.o(w,t,A.H(B.br.j(0.35),B.r,1),v,t,t,B.n),t,t,t,t,B.bk,t,t,t))
+p.push(B.ab)
+p.push(new A.a3(1/0,t,A.bH(B.aKZ,new C.dgl(d),A.bk(B.aW,t,t,t,B.c,B.fL,t,t,new A.b5(A.m(14),B.W),t,t,t)),t))
+return A.br(!0,new A.bF(B.bb,t,t,A.p(t,A.cg(A.u(p,B.ad,t,B.e,B.j,0,B.p),B.q,t,B.z,t,t,t,t,B.ah),B.h,t,new A.aW(0,520,0,s.a.b*0.88),new A.o(B.eO,t,q,r,t,t,B.n),t,t,t,B.bk,D.bgD,t,t,t),t),!0,!1,B.ag,!0,!0)},
+ap7(d,e,f){var w=null,v=this.d===f,u=A.m(12),t=A.m(12),s=v?B.aW.j(0.35):B.c.j(0.06),r=A.H(v?B.br:B.be,B.r,1),q=A.V(e,v?B.c:B.aQ,w,w,w,16)
+return A.aD(!1,B.X,!0,w,A.aH(!1,u,!0,A.p(w,A.B(A.a([q,B.bo,A.d(d,w,w,w,w,w,w,A.l(w,w,v?B.c:B.aQ,w,w,w,w,w,w,w,w,12,w,w,B.I,w,w,!0,w,w,w,w,w,w,w,w),w,w,w)],x.p),B.m,w,B.e,B.R,0,w,w),B.h,w,w,new A.o(s,w,r,t,w,w,B.n),w,w,w,w,B.h1,w,w,w),w,!0,w,w,w,w,w,w,w,w,w,w,w,new C.dgk(this,f),w,w,w,w,w,w,w),B.h,B.K,0,w,w,w,w,w,B.ac)},
+cnu(d){var w=null,v=B.a.cP(d,"."),u=v>0,t=u?B.a.al(d,0,v):"\u2022",s=u?B.a.i(B.a.aV(d,v+1)):d
 u=B.bR.j(0.35)
-return new A.C(B.d7,A.B(A.a([A.p(B.B,A.d(t,w,w,w,w,w,w,B.va,w,w,w),B.h,w,w,new A.o(u,w,w,w,w,w,B.a5),w,24,w,w,w,w,w,24),B.av,A.D(A.d(s,w,w,w,w,w,w,D.eAx,w,w,w),1)],x.p),B.F,w,B.e,B.j,0,w,w),w)},
-cns(d){switch(d.a){case 0:return D.cW6
-case 1:return D.cS4
-case 2:return D.cJW}}}
-C.aI8.prototype={
+return new A.C(B.d7,A.B(A.a([A.p(B.B,A.d(t,w,w,w,w,w,w,B.va,w,w,w),B.h,w,w,new A.o(u,w,w,w,w,w,B.a5),w,24,w,w,w,w,w,24),B.av,A.D(A.d(s,w,w,w,w,w,w,D.eB1,w,w,w),1)],x.p),B.F,w,B.e,B.j,0,w,w),w)},
+cnv(d){switch(d.a){case 0:return D.cWB
+case 1:return D.cSx
+case 2:return D.cKm}}}
+C.aIb.prototype={
 aO(){this.aU()
 this.aS()
 this.dD()},
@@ -1352,8 +1352,8 @@ w.a2()}}
 C.ov.prototype={
 ad(){var w=this
 return A.E(["id",w.a,"title",w.b,"kind",w.c,"createdAt",w.d.a4().aa(),"dataUrl","","mimeType",w.f,"durationSec",w.r],x.N,x.z)}}
-C.aXq.prototype={
-apt(){var w,v,u,t=this
+C.aXu.prototype={
+apu(){var w,v,u,t=this
 if(t.c==null)return t.at
 w=Date.now()
 v=t.c
@@ -1363,19 +1363,19 @@ if(t.as&&t.ay!=null){w=Date.now()
 v=t.ay
 v.toString
 u-=B.o.ak(new A.O(w,0,!1).bv(v).a,1000)}return B.o.D(B.k.bK(u/1000),0,99999)},
-a3N(){var w=0,v=A.j(x.H),u,t=this
-var $async$a3N=A.e(function(d,e){if(d===1)return A.f(e,v)
+a3O(){var w=0,v=A.j(x.H),u,t=this
+var $async$a3O=A.e(function(d,e){if(d===1)return A.f(e,v)
 for(;;)switch(w){case 0:if(!t.Q){w=1
 break}w=t.as?3:5
 break
 case 3:w=6
-return A.b(t.F9(),$async$a3N)
+return A.b(t.F9(),$async$a3O)
 case 6:w=4
 break
 case 5:w=7
-return A.b(t.F0(),$async$a3N)
+return A.b(t.F0(),$async$a3O)
 case 7:case 4:case 1:return A.h(u,v)}})
-return A.i($async$a3N,v)},
+return A.i($async$a3O,v)},
 F0(){var w=0,v=A.j(x.H),u,t=this,s
 var $async$F0=A.e(function(d,e){if(d===1)return A.f(e,v)
 for(;;)switch(w){case 0:if(!t.Q||t.as){w=1
@@ -1410,37 +1410,37 @@ q=t.ay
 q.toString
 t.ax=new A.b7(s.a+new A.O(r,0,!1).bv(q).a)
 t.ay=null}t.as=!1
-t.at=t.apt()
+t.at=t.apu()
 t.f=y.j
 t.b_()
 case 1:return A.h(u,v)}})
 return A.i($async$F9,v)},
-a3v(){var w=0,v=A.j(x.H),u,t=this,s
-var $async$a3v=A.e(function(d,e){if(d===1)return A.f(e,v)
+a3w(){var w=0,v=A.j(x.H),u,t=this,s
+var $async$a3w=A.e(function(d,e){if(d===1)return A.f(e,v)
 for(;;)switch(w){case 0:if(t.Q||!t.r){w=1
 break}s=t.w
 w=3
-return A.b(t.a.ng(t.x,s,t.z,!1),$async$a3v)
+return A.b(t.a.ng(t.x,s,t.z,!1),$async$a3w)
 case 3:t.b_()
 case 1:return A.h(u,v)}})
-return A.i($async$a3v,v)},
-aho(){var w=0,v=A.j(x.H),u,t=this
-var $async$aho=A.e(function(d,e){if(d===1)return A.f(e,v)
+return A.i($async$a3w,v)},
+ahp(){var w=0,v=A.j(x.H),u,t=this
+var $async$ahp=A.e(function(d,e){if(d===1)return A.f(e,v)
 for(;;)switch(w){case 0:if(t.Q){w=1
 break}t.y=!1
 w=3
-return A.b(t.a.a0Z(),$async$aho)
+return A.b(t.a.a1_(),$async$ahp)
 case 3:t.b_()
 case 1:return A.h(u,v)}})
-return A.i($async$aho,v)},
-a5q(){var w=0,v=A.j(x.y),u,t=this,s,r,q
-var $async$a5q=A.e(function(d,e){if(d===1)return A.f(e,v)
+return A.i($async$ahp,v)},
+a5r(){var w=0,v=A.j(x.y),u,t=this,s,r,q
+var $async$a5r=A.e(function(d,e){if(d===1)return A.f(e,v)
 for(;;)switch(w){case 0:t.e=null
 s=t.w==="user"?"environment":"user"
 t.w=s
 r=t.a
 w=3
-return A.b(r.BN(t.x,s),$async$a5q)
+return A.b(r.BP(t.x,s),$async$a5r)
 case 3:q=e
 if(!q){t.w=t.w==="user"?"environment":"user"
 s=r.a
@@ -1449,29 +1449,29 @@ u=q
 w=1
 break
 case 1:return A.h(u,v)}})
-return A.i($async$a5q,v)},
-yA(d){return this.bhD(d)},
-bhD(d){var w=0,v=A.j(x.H),u=this,t
-var $async$yA=A.e(function(e,f){if(e===1)return A.f(f,v)
+return A.i($async$a5r,v)},
+yB(d){return this.bhE(d)},
+bhE(d){var w=0,v=A.j(x.H),u=this,t
+var $async$yB=A.e(function(e,f){if(e===1)return A.f(f,v)
 for(;;)switch(w){case 0:u.z=d
 t=u.a
 w=2
-return A.b(t.yA(d),$async$yA)
+return A.b(t.yB(d),$async$yB)
 case 2:if(!f){u.z=t.cx
 t=t.a
 u.e=t==null?"Could not enable noise cancellation on this device.":t}else if(d)u.f="Noise cancel on \u2014 background sounds are filtered in your recording."
 else u.f="Noise cancel off \u2014 raw microphone audio."
 u.b_()
 return A.h(null,v)}})
-return A.i($async$yA,v)},
-a55(d,e,f){return this.biX(0,e,!0)},
-biX(d,e,f){var w=0,v=A.j(x.y),u,t=this,s,r
-var $async$a55=A.e(function(g,h){if(g===1)return A.f(h,v)
+return A.i($async$yB,v)},
+a56(d,e,f){return this.biY(0,e,!0)},
+biY(d,e,f){var w=0,v=A.j(x.y),u,t=this,s,r
+var $async$a56=A.e(function(g,h){if(g===1)return A.f(h,v)
 for(;;)switch(w){case 0:t.f=t.e=null
 s=t.a
 r=t.w
 w=3
-return A.b(s.lW(0,t.x,r,t.z,!1,!0),$async$a55)
+return A.b(s.lW(0,t.x,r,t.z,!1,!0),$async$a56)
 case 3:if(!h){s=s.a
 t.e=s==null?"Could not start recording on this device.":s
 t.b_()
@@ -1486,25 +1486,25 @@ t.at=0
 t.c=new A.O(Date.now(),0,!1)
 s=t.b
 if(s!=null)s.a9(0)
-t.b=A.dD(B.h_,new C.c5i(t))
+t.b=A.dD(B.h_,new C.c5n(t))
 t.f=y.j
 t.b_()
 u=!0
 w=1
 break
 case 1:return A.h(u,v)}})
-return A.i($async$a55,v)},
-BF(){var w=0,v=A.j(x.R),u,t=this,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d
-var $async$BF=A.e(function(a0,a1){if(a0===1)return A.f(a1,v)
+return A.i($async$a56,v)},
+BH(){var w=0,v=A.j(x.R),u,t=this,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d
+var $async$BH=A.e(function(a0,a1){if(a0===1)return A.f(a1,v)
 for(;;)switch(w){case 0:d=t.b
 if(d!=null)d.a9(0)
-s=t.apt()
+s=t.apu()
 t.as=!1
 t.ay=null
 t.ax=B.bu
 d=t.a
 w=3
-return A.b(d.bT(0),$async$BF)
+return A.b(d.bT(0),$async$BH)
 case 3:r=a1
 t.Q=!1
 t.at=s
@@ -1519,30 +1519,30 @@ p=B.o.u(1000*Date.now())
 o=r.c
 d=r.b
 w=4
-return A.b(C.a5j(p,o,d),$async$BF)
+return A.b(C.a5l(p,o,d),$async$BH)
 case 4:n=a1
 w=n?5:7
 break
 case 5:w=8
-return A.b(C.D8(p,d),$async$BF)
+return A.b(C.Da(p,d),$async$BH)
 case 8:m=a1
 l=m==null?r.a:m
 w=6
 break
 case 7:l=r.a
 case 6:m=t.r?"Video":"Voice Memo"
-k=C.anF(t.at)
+k=C.anI(t.at)
 j=t.r?"video":"audio"
 i=Date.now()
 h=n?"":l
 g=new C.ov(p,m+" "+k,j,new A.O(i,0,!1),h,d,t.at)
 w=9
-return A.b(C.Tu(q),$async$BF)
+return A.b(C.Tx(q),$async$BH)
 case 9:f=a1
 d=A.a([g],x.G)
 B.d.v(d,f)
 w=10
-return A.b(C.LP(q,d),$async$BF)
+return A.b(C.LR(q,d),$async$BH)
 case 10:e=a1
 if(n)g.e=l
 if(n&&e){t.e=null
@@ -1553,12 +1553,12 @@ u=g
 w=1
 break
 case 1:return A.h(u,v)}})
-return A.i($async$BF,v)}}
-C.aXp.prototype={}
-C.aXo.prototype={
-ng(d,e,f,g){return this.cIw(d,e,f,g)},
-cIv(d,e,f){return this.ng(d,e,!1,f)},
-cIw(d,e,f,g){var w=0,v=A.j(x.y),u,t=2,s=[],r=this,q,p,o,n,m,l
+return A.i($async$BH,v)}}
+C.aXt.prototype={}
+C.aXs.prototype={
+ng(d,e,f,g){return this.cIB(d,e,f,g)},
+cIA(d,e,f){return this.ng(d,e,!1,f)},
+cIB(d,e,f,g){var w=0,v=A.j(x.y),u,t=2,s=[],r=this,q,p,o,n,m,l
 var $async$ng=A.e(function(h,i){if(h===1){s.push(i)
 w=t}for(;;)switch(w){case 0:m=r.d
 if(m!=null&&m.state==="recording"){u=!1
@@ -1571,27 +1571,27 @@ r.cx=f
 w=3
 return A.b(r.ve(),$async$ng)
 case 3:w=4
-return A.b(r.x4(),$async$ng)
+return A.b(r.x5(),$async$ng)
 case 4:w=5
-return A.b(r.Dx(),$async$ng)
+return A.b(r.Dz(),$async$ng)
 case 5:r.y=r.at=!0
 t=7
 w=10
-return A.b(r.Yt(d,e,!0),$async$ng)
+return A.b(r.Yu(d,e,!0),$async$ng)
 case 10:m=i
 r.b=m
 m.toString
-r.Vd(m)
+r.Ve(m)
 m=r.b
 m.toString
 w=11
-return A.b(r.TV(m),$async$ng)
+return A.b(r.TW(m),$async$ng)
 case 11:w=r.cx?12:13
 break
 case 12:m=r.b
 m.toString
 w=14
-return A.b(r.BX(m,!0),$async$ng)
+return A.b(r.BZ(m,!0),$async$ng)
 case 14:case 13:m=r.b
 m.toString
 w=15
@@ -1601,7 +1601,7 @@ w=!q?16:17
 break
 case 16:r.a="Allow microphone access so your videos record with sound."
 w=18
-return A.b(r.x4(),$async$ng)
+return A.b(r.x5(),$async$ng)
 case 18:r.at=!1
 u=!1
 w=1
@@ -1615,7 +1615,7 @@ w=!p?20:21
 break
 case 20:r.a="Camera is not ready. Allow camera access for ngmy.org."
 w=22
-return A.b(r.x4(),$async$ng)
+return A.b(r.x5(),$async$ng)
 case 22:r.at=!1
 u=!1
 w=1
@@ -1623,7 +1623,7 @@ break
 case 21:w=r.CW?23:24
 break
 case 23:w=25
-return A.b(r.Dx(),$async$ng)
+return A.b(r.Dz(),$async$ng)
 case 25:r.CW=!1
 case 24:u=!0
 w=1
@@ -1634,10 +1634,10 @@ break
 case 7:t=6
 l=s.pop()
 o=A.a4(l)
-r.a=r.ap4(o)
+r.a=r.ap5(o)
 r.at=!1
 w=26
-return A.b(r.x4(),$async$ng)
+return A.b(r.x5(),$async$ng)
 case 26:u=!1
 w=1
 break
@@ -1648,24 +1648,24 @@ break
 case 9:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
 return A.i($async$ng,v)},
-a0Z(){var w=0,v=A.j(x.H),u,t=this,s
-var $async$a0Z=A.e(function(d,e){if(d===1)return A.f(e,v)
+a1_(){var w=0,v=A.j(x.H),u,t=this,s
+var $async$a1_=A.e(function(d,e){if(d===1)return A.f(e,v)
 for(;;)switch(w){case 0:s=t.d
 if(s!=null&&s.state==="recording"){w=1
 break}t.CW=t.at=!1
 w=3
-return A.b(t.Dx(),$async$a0Z)
+return A.b(t.Dz(),$async$a1_)
 case 3:w=4
-return A.b(t.x4(),$async$a0Z)
+return A.b(t.x5(),$async$a1_)
 case 4:case 1:return A.h(u,v)}})
-return A.i($async$a0Z,v)},
-BN(d,e){return this.brg(d,e)},
-brg(d,e){var w=0,v=A.j(x.y),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i,h,g
-var $async$BN=A.e(function(a0,a1){if(a0===1){s.push(a1)
+return A.i($async$a1_,v)},
+BP(d,e){return this.brh(d,e)},
+brh(d,e){var w=0,v=A.j(x.y),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i,h,g
+var $async$BP=A.e(function(a0,a1){if(a0===1){s.push(a1)
 w=t}for(;;)switch(w){case 0:r.a=null
 r.p2=e
 r.p3=d
-if(r.b==null){if(r.at){u=r.cIv(d,e,r.CW)
+if(r.b==null){if(r.at){u=r.cIA(d,e,r.CW)
 w=1
 break}u=!1
 w=1
@@ -1674,23 +1674,23 @@ if(r.CW){l=r.ay
 l=l!=null&&l.getVideoTracks().length!==0&&r.b.getVideoTracks().length!==0}else l=!1
 w=l?7:8
 break
-case 7:r.cok()
+case 7:r.con()
 n=r.b
 n.toString
-r.Vd(n)
+r.Ve(n)
 n=r.ay
 n.toString
-r.Vd(n)
+r.Ve(n)
 w=9
-return A.b(r.Zx(),$async$BN)
+return A.b(r.Zy(),$async$BP)
 case 9:r.at=!1
 u=!0
 w=1
 break
 case 8:w=10
-return A.b(r.Yw(d,e),$async$BN)
+return A.b(r.Yx(d,e),$async$BP)
 case 10:q=a1
-p=J.bzY(q).length!==0?B.d.gI(J.bzY(q)):null
+p=J.bA2(q).length!==0?B.d.gI(J.bA2(q)):null
 if(p==null){r.a="Could not switch camera."
 u=!1
 w=1
@@ -1701,12 +1701,12 @@ k=l.length
 j=0
 for(;j<k;++j){o=l[j]
 r.b.removeTrack(o)
-try{J.fxI(o)}catch(f){}}r.b.addTrack(p)
+try{J.fxV(o)}catch(f){}}r.b.addTrack(p)
 l=r.b
 l.toString
-r.Vd(l)
-for(l=J.bzX(q),k=l.length,j=0;j<l.length;l.length===k||(0,A.K)(l),++j){n=l[j]
-try{J.fxI(n)}catch(f){}}n=r.id
+r.Ve(l)
+for(l=J.bA1(q),k=l.length,j=0;j<l.length;l.length===k||(0,A.K)(l),++j){n=l[j]
+try{J.fxV(n)}catch(f){}}n=r.id
 w=n!=null?11:12
 break
 case 11:n.srcObject=r.b
@@ -1714,7 +1714,7 @@ t=14
 n=r.id.play()
 n.toString
 w=17
-return A.b(A.ea(n,x.z),$async$BN)
+return A.b(A.ea(n,x.z),$async$BP)
 case 17:t=4
 w=16
 break
@@ -1727,13 +1727,13 @@ break
 case 16:case 12:w=r.CW?18:19
 break
 case 18:w=20
-return A.b(r.a_Y(d,e),$async$BN)
+return A.b(r.a_Z(d,e),$async$BP)
 case 20:w=r.k3&&r.ay!=null?21:22
 break
 case 21:n=r.ay
 n.toString
 w=23
-return A.b(r.U_(n),$async$BN)
+return A.b(r.U0(n),$async$BP)
 case 23:case 22:case 19:r.at=!1
 u=!0
 w=1
@@ -1744,7 +1744,7 @@ break
 case 4:t=3
 g=s.pop()
 m=A.a4(g)
-r.a=r.ap4(m)
+r.a=r.ap5(m)
 $.al.$1("[live_capture] switchVideoFacing: "+A.t(m))
 u=!1
 w=1
@@ -1755,8 +1755,8 @@ case 3:w=2
 break
 case 6:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
-return A.i($async$BN,v)},
-cok(){var w,v,u,t=this,s=t.b
+return A.i($async$BP,v)},
+con(){var w,v,u,t=this,s=t.b
 if(s==null||t.ay==null)return
 s=s.getVideoTracks()
 s.toString
@@ -1769,8 +1769,8 @@ t.b.removeTrack(v)
 t.ay.removeTrack(u)
 t.b.addTrack(u)
 t.ay.addTrack(v)},
-Zx(){var w=0,v=A.j(x.H),u=1,t=[],s=this,r,q,p,o
-var $async$Zx=A.e(function(d,e){if(d===1){t.push(e)
+Zy(){var w=0,v=A.j(x.H),u=1,t=[],s=this,r,q,p,o
+var $async$Zy=A.e(function(d,e){if(d===1){t.push(e)
 w=u}for(;;)switch(w){case 0:q=s.id
 w=q!=null&&s.b!=null?2:3
 break
@@ -1779,7 +1779,7 @@ u=5
 q=s.id.play()
 q.toString
 w=8
-return A.b(A.ea(q,x.z),$async$Zx)
+return A.b(A.ea(q,x.z),$async$Zy)
 case 8:u=1
 w=7
 break
@@ -1797,7 +1797,7 @@ u=12
 q=s.k1.play()
 q.toString
 w=15
-return A.b(A.ea(q,x.z),$async$Zx)
+return A.b(A.ea(q,x.z),$async$Zy)
 case 15:u=1
 w=14
 break
@@ -1809,21 +1809,21 @@ case 11:w=1
 break
 case 14:case 10:return A.h(null,v)
 case 1:return A.f(t.at(-1),v)}})
-return A.i($async$Zx,v)},
-yA(d){return this.bhC(d)},
-bhC(d){var w=0,v=A.j(x.y),u,t=this,s,r,q
-var $async$yA=A.e(function(e,f){if(e===1)return A.f(f,v)
+return A.i($async$Zy,v)},
+yB(d){return this.bhD(d)},
+bhD(d){var w=0,v=A.j(x.y),u,t=this,s,r,q
+var $async$yB=A.e(function(e,f){if(e===1)return A.f(f,v)
 for(;;)switch(w){case 0:q=t.cx
 t.cx=d
 s=t.b
 if(s==null){u=!0
 w=1
 break}r=t.d
-if((r==null?null:r.state)==="recording"){u=t.a_l(d,q)
+if((r==null?null:r.state)==="recording"){u=t.a_m(d,q)
 w=1
 break}w=3
-return A.b(t.BX(s,d),$async$yA)
-case 3:if(f){if(t.ch!=null)t.coS()
+return A.b(t.BZ(s,d),$async$yB)
+case 3:if(f){if(t.ch!=null)t.coV()
 u=!0
 w=1
 break}t.cx=q
@@ -1837,10 +1837,10 @@ break}u=!1
 w=1
 break
 case 1:return A.h(u,v)}})
-return A.i($async$yA,v)},
-a_l(d,e){return this.cjH(d,e)},
-cjH(d,e){var w=0,v=A.j(x.y),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i
-var $async$a_l=A.e(function(f,g){if(f===1){s.push(g)
+return A.i($async$yB,v)},
+a_m(d,e){return this.cjK(d,e)},
+cjK(d,e){var w=0,v=A.j(x.y),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i
+var $async$a_m=A.e(function(f,g){if(f===1){s.push(g)
 w=t}for(;;)switch(w){case 0:k=r.b
 if(k==null){u=!0
 w=1
@@ -1851,7 +1851,7 @@ w=q!=null?5:6
 break
 case 5:t=8
 w=11
-return A.b(J.bzS(q,r.U0(d)),$async$a_l)
+return A.b(J.bzX(q,r.U1(d)),$async$a_m)
 case 11:t=2
 w=10
 break
@@ -1865,7 +1865,7 @@ case 7:w=2
 break
 case 10:case 6:if(d){if(r.fx!=null&&r.fr!=null){l=r.cy
 l.toString
-r.b0P(l)}}else{l=r.fy
+r.b0Q(l)}}else{l=r.fy
 if(l!=null)l.a9(0)
 r.fy=null
 l=r.fr
@@ -1873,14 +1873,14 @@ if(l!=null)r.v6(l,"gain",1)}u=!0
 w=1
 break
 case 4:q=r.dx
-o=q==null?r.apU(k):q
+o=q==null?r.apV(k):q
 if(o==null){r.cx=e
 r.a="Microphone track is not available."
 u=!1
 w=1
 break}t=13
 w=16
-return A.b(J.bzS(o,r.U0(d)),$async$a_l)
+return A.b(J.bzX(o,r.U1(d)),$async$a_m)
 case 16:u=!0
 w=1
 break
@@ -1902,19 +1902,19 @@ case 12:w=2
 break
 case 15:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
-return A.i($async$a_l,v)},
-U0(d){var w,v,u="echoCancellation",t="noiseSuppression"
+return A.i($async$a_m,v)},
+U1(d){var w,v,u="echoCancellation",t="noiseSuppression"
 if(d){w=x.N
 v=x.S
 return A.E([u,!0,t,!0,"autoGainControl",!0,"channelCount",A.E(["ideal",1],w,v),"sampleRate",A.E(["ideal",48e3],w,v)],w,x.z)}return A.E([u,!1,t,!1,"autoGainControl",!1],x.N,x.z)},
-ae2(d){return this.cgj(d)},
-cgj(d){var w=0,v=A.j(x.H),u=1,t=[],s,r,q
-var $async$ae2=A.e(function(e,f){if(e===1){t.push(f)
+ae3(d){return this.cgm(d)},
+cgm(d){var w=0,v=A.j(x.H),u=1,t=[],s,r,q
+var $async$ae3=A.e(function(e,f){if(e===1){t.push(f)
 w=u}for(;;)switch(w){case 0:u=3
 w=J.y(d.state,"suspended")?6:7
 break
 case 6:w=8
-return A.b(A.ea(d.resume(),x.H),$async$ae2)
+return A.b(A.ea(d.resume(),x.H),$async$ae3)
 case 8:case 7:u=1
 w=5
 break
@@ -1928,22 +1928,22 @@ case 2:w=1
 break
 case 5:return A.h(null,v)
 case 1:return A.f(t.at(-1),v)}})
-return A.i($async$ae2,v)},
+return A.i($async$ae3,v)},
 v6(d,e,f){d[e].value=f},
-BX(d,e){return this.buW(d,e)},
-buW(d,e){var w=0,v=A.j(x.y),u,t=2,s=[],r=this,q,p,o,n,m,l,k
-var $async$BX=A.e(function(f,g){if(f===1){s.push(g)
+BZ(d,e){return this.buX(d,e)},
+buX(d,e){var w=0,v=A.j(x.y),u,t=2,s=[],r=this,q,p,o,n,m,l,k
+var $async$BZ=A.e(function(f,g){if(f===1){s.push(g)
 w=t}for(;;)switch(w){case 0:w=!e?3:4
 break
 case 3:w=5
-return A.b(r.b1J(d),$async$BX)
+return A.b(r.b1K(d),$async$BZ)
 case 5:o=r.dx
-q=o==null?r.apU(d):o
+q=o==null?r.apV(d):o
 w=q!=null?6:7
 break
 case 6:t=9
 w=12
-return A.b(J.bzS(q,r.U0(!1)),$async$BX)
+return A.b(J.bzX(q,r.U1(!1)),$async$BZ)
 case 12:t=2
 w=11
 break
@@ -1958,13 +1958,13 @@ break
 case 11:case 7:u=!0
 w=1
 break
-case 4:q=r.apU(d)
+case 4:q=r.apV(d)
 o=q==null?r.dx:q
 if(o==null){u=!1
 w=1
 break}t=14
 w=17
-return A.b(J.bzS(o,r.U0(!0)),$async$BX)
+return A.b(J.bzX(o,r.U1(!0)),$async$BZ)
 case 17:t=2
 w=16
 break
@@ -1981,19 +1981,19 @@ w=1
 break
 case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
-return A.i($async$BX,v)},
-apU(d){var w=d.getAudioTracks(),v=w.length
+return A.i($async$BZ,v)},
+apV(d){var w=d.getAudioTracks(),v=w.length
 if(v===0)return null
 if(this.dy!=null&&v===1&&B.d.gI(w).id==this.dy.id)return this.dx
 return B.d.gI(w)},
-GY(d,e){return this.bSi(d,e)},
-bSi(a5,a6){var w=0,v=A.j(x.y),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4
+GY(d,e){return this.bSl(d,e)},
+bSl(a5,a6){var w=0,v=A.j(x.y),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4
 var $async$GY=A.e(function(a7,a8){if(a7===1){s.push(a8)
 w=t}for(;;)switch(w){case 0:w=3
-return A.b(r.axp(!1),$async$GY)
+return A.b(r.axq(!1),$async$GY)
 case 3:r.dx=a6
 t=5
-e=E.fzb()
+e=E.fzo()
 e.addTrack(a6)
 r.db=e
 d=window.AudioContext
@@ -2003,7 +2003,7 @@ a0=new d()
 r.cy=a0
 q=a0
 w=8
-return A.b(r.ae2(q),$async$GY)
+return A.b(r.ae3(q),$async$GY)
 case 8:p=q.createMediaStreamSource(r.db)
 o=q.createBiquadFilter()
 o.type="highpass"
@@ -2040,14 +2040,14 @@ A.jJ(n,"connect",[m])
 A.jJ(m,"connect",[k])
 A.jJ(k,"connect",[j])
 A.jJ(j,"connect",[l])
-r.b0P(q)
+r.b0Q(q)
 i=x.E.a(l.stream)
-h=J.bzX(i)
+h=J.bA1(i)
 w=J.a9(h)===0?9:10
 break
 case 9:r.a="Noise cancellation could not start on this browser."
 w=11
-return A.b(r.axp(!1),$async$GY)
+return A.b(r.axq(!1),$async$GY)
 case 11:u=!1
 w=1
 break
@@ -2074,7 +2074,7 @@ f=A.a4(a4)
 r.a="Noise cancellation failed: "+A.t(f)
 $.al.$1("[live_capture] installNoisePipeline: "+A.t(f))
 w=12
-return A.b(r.b1J(a5),$async$GY)
+return A.b(r.b1K(a5),$async$GY)
 case 12:u=!1
 w=1
 break
@@ -2085,19 +2085,19 @@ break
 case 7:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
 return A.i($async$GY,v)},
-b0P(d){var w,v,u,t=this,s=t.fy
+b0Q(d){var w,v,u,t=this,s=t.fy
 if(s!=null)s.a9(0)
 w=t.fx
 v=t.fr
 if(w==null||v==null)return
 u=A.eW(w.fftSize)
 if(u==null)u=512
-t.fy=A.dD(D.bcA,new C.c57(w,new Float32Array(u),v,d))},
-a00(d,e){return this.cpx(d,e)},
-axp(d){return this.a00(null,d)},
-b1J(d){return this.a00(d,!0)},
-cpx(d,e){var w=0,v=A.j(x.H),u=1,t=[],s=this,r,q,p,o,n,m,l,k
-var $async$a00=A.e(function(f,g){if(f===1){t.push(g)
+t.fy=A.dD(D.bcO,new C.c5c(w,new Float32Array(u),v,d))},
+a01(d,e){return this.cpA(d,e)},
+axq(d){return this.a01(null,d)},
+b1K(d){return this.a01(d,!0)},
+cpA(d,e){var w=0,v=A.j(x.H),u=1,t=[],s=this,r,q,p,o,n,m,l,k
+var $async$a01=A.e(function(f,g){if(f===1){t.push(g)
 w=u}for(;;)switch(w){case 0:l=s.fy
 if(l!=null)l.a9(0)
 s.fr=s.fx=s.fy=null
@@ -2109,16 +2109,16 @@ o=0
 for(;o<p;++o){r=l[o]
 n=s.dy
 if(n!=null&&r.id==n.id){d.removeTrack(r)
-try{J.fxI(r)}catch(j){}}}l=d.getAudioTracks()
+try{J.fxV(r)}catch(j){}}}l=d.getAudioTracks()
 l.toString
-if(!B.d.bf(l,new C.c59(s))){l=s.dx
+if(!B.d.bf(l,new C.c5e(s))){l=s.dx
 l.toString
 d.addTrack(l)}}q=s.cy
 w=q!=null?2:3
 break
 case 2:u=5
 w=8
-return A.b(A.ea(q.close(),x.H),$async$a00)
+return A.b(A.ea(q.close(),x.H),$async$a01)
 case 8:u=1
 w=7
 break
@@ -2131,8 +2131,8 @@ break
 case 7:case 3:s.dy=s.db=s.cy=null
 return A.h(null,v)
 case 1:return A.f(t.at(-1),v)}})
-return A.i($async$a00,v)},
-coS(){var w,v,u,t=this.ch,s=this.b
+return A.i($async$a01,v)},
+coV(){var w,v,u,t=this.ch,s=this.b
 if(t==null||s==null)return
 w=t.getAudioTracks()
 w.toString
@@ -2141,15 +2141,15 @@ v=w.length
 u=0
 for(;u<v;++u)t.removeTrack(w[u])
 for(w=s.getAudioTracks(),v=w.length,u=0;u<w.length;w.length===v||(0,A.K)(w),++u)t.addTrack(w[u])},
-a_Y(d,e){return this.coR(d,e)},
-coR(d,e){var w=0,v=A.j(x.H),u=1,t=[],s=this,r,q,p,o
-var $async$a_Y=A.e(function(f,g){if(f===1){t.push(g)
+a_Z(d,e){return this.coU(d,e)},
+coU(d,e){var w=0,v=A.j(x.H),u=1,t=[],s=this,r,q,p,o
+var $async$a_Z=A.e(function(f,g){if(f===1){t.push(g)
 w=u}for(;;)switch(w){case 0:w=2
-return A.b(s.Dx(),$async$a_Y)
+return A.b(s.Dz(),$async$a_Z)
 case 2:r=e==="user"?"environment":"user"
 u=4
 w=7
-return A.b(s.Yw(d,r),$async$a_Y)
+return A.b(s.Yx(d,r),$async$a_Z)
 case 7:s.ay=g
 u=1
 w=6
@@ -2165,21 +2165,21 @@ case 3:w=1
 break
 case 6:return A.h(null,v)
 case 1:return A.f(t.at(-1),v)}})
-return A.i($async$a_Y,v)},
-b3Q(d,e){var w=this.awx(e),v=x.N,u=w.a,t=x.S,s=w.b,r=x.i
+return A.i($async$a_Z,v)},
+b3R(d,e){var w=this.awy(e),v=x.N,u=w.a,t=x.S,s=w.b,r=x.i
 return A.E(["facingMode",A.E(["ideal",d],v,v),"width",A.E(["ideal",u],v,t),"height",A.E(["ideal",s],v,t),"aspectRatio",A.E(["ideal",u/s],v,r),"frameRate",A.E(["ideal",30,"max",30],v,t),"zoom",A.E(["ideal",1],v,r)],v,x.z)},
-TV(d){return this.buS(d)},
-buS(d){var w=0,v=A.j(x.H),u=1,t=[],s,r,q,p,o,n,m,l,k,j
-var $async$TV=A.e(function(e,f){if(e===1){t.push(f)
+TW(d){return this.buT(d)},
+buT(d){var w=0,v=A.j(x.H),u=1,t=[],s,r,q,p,o,n,m,l,k,j
+var $async$TW=A.e(function(e,f){if(e===1){t.push(f)
 w=u}for(;;)switch(w){case 0:r=d.getVideoTracks(),q=r.length,p=x.z,o=x.N,n=0
 case 2:if(!(n<r.length)){w=4
 break}s=r[n]
 u=6
-m=A.By(A.E(["zoom",1],o,p))
+m=A.Bz(A.E(["zoom",1],o,p))
 l=s.applyConstraints(m)
 l.toString
 w=9
-return A.b(A.ea(l,p),$async$TV)
+return A.b(A.ea(l,p),$async$TW)
 case 9:u=1
 w=8
 break
@@ -2194,28 +2194,28 @@ w=2
 break
 case 4:return A.h(null,v)
 case 1:return A.f(t.at(-1),v)}})
-return A.i($async$TV,v)},
-b18(d,e,f){var w=this.awx(d),v=x.N,u=x.i,t=x.S,s=x.z
-t=A.a([A.E(["audio",e,"video",A.E(["facingMode",A.E(["ideal",f],v,v),"aspectRatio",A.E(["ideal",1.3333333333333333],v,u),"width",A.E(["ideal",640,"min",320],v,t),"height",A.E(["ideal",480,"min",240],v,t),"frameRate",A.E(["ideal",30,"max",30],v,t),"zoom",A.E(["ideal",1],v,u)],v,s)],v,s),A.E(["audio",e,"video",A.E(["facingMode",A.E(["ideal",f],v,v),"frameRate",A.E(["ideal",30,"max",30],v,t),"zoom",A.E(["ideal",1],v,u)],v,s)],v,s),A.E(["audio",e,"video",A.E(["facingMode",f],v,v)],v,s),A.E(["audio",e,"video",A.E(["facingMode",A.E(["ideal",f],v,v),"aspectRatio",A.E(["ideal",w.a/w.b],v,u),"zoom",A.E(["ideal",1],v,u),"frameRate",A.E(["ideal",30,"max",30],v,t)],v,x.Y)],v,s),A.E(["audio",e,"video",this.b3Q(f,d)],v,s)],x.t)
+return A.i($async$TW,v)},
+b19(d,e,f){var w=this.awy(d),v=x.N,u=x.i,t=x.S,s=x.z
+t=A.a([A.E(["audio",e,"video",A.E(["facingMode",A.E(["ideal",f],v,v),"aspectRatio",A.E(["ideal",1.3333333333333333],v,u),"width",A.E(["ideal",640,"min",320],v,t),"height",A.E(["ideal",480,"min",240],v,t),"frameRate",A.E(["ideal",30,"max",30],v,t),"zoom",A.E(["ideal",1],v,u)],v,s)],v,s),A.E(["audio",e,"video",A.E(["facingMode",A.E(["ideal",f],v,v),"frameRate",A.E(["ideal",30,"max",30],v,t),"zoom",A.E(["ideal",1],v,u)],v,s)],v,s),A.E(["audio",e,"video",A.E(["facingMode",f],v,v)],v,s),A.E(["audio",e,"video",A.E(["facingMode",A.E(["ideal",f],v,v),"aspectRatio",A.E(["ideal",w.a/w.b],v,u),"zoom",A.E(["ideal",1],v,u),"frameRate",A.E(["ideal",30,"max",30],v,t)],v,x.Y)],v,s),A.E(["audio",e,"video",this.b3R(f,d)],v,s)],x.t)
 if(e!==!1)t.push(A.E(["audio",e,"video",!0],v,s))
 return t},
-Yw(d,e){return this.c69(d,e)},
-c69(d,e){var w=0,v=A.j(x.E),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i,h,g,f
-var $async$Yw=A.e(function(a0,a1){if(a0===1){s.push(a1)
+Yx(d,e){return this.c6c(d,e)},
+c6c(d,e){var w=0,v=A.j(x.E),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i,h,g,f
+var $async$Yx=A.e(function(a0,a1){if(a0===1){s.push(a1)
 w=t}for(;;)switch(w){case 0:g=window.navigator.mediaDevices
 if(g==null)throw A.P(A.b9("Secure media devices API unavailable"))
-n=r.b18(d,!1,e==="environment"?"environment":"user")
+n=r.b19(d,!1,e==="environment"?"environment":"user")
 q=null
 m=n.length,l=x.E,k=0
 case 3:if(!(k<n.length)){w=5
 break}p=n[k]
 t=7
 j=p
-i=j!=null?A.By(j):null
+i=j!=null?A.Bz(j):null
 j=g.getUserMedia(i)
 j.toString
 w=10
-return A.b(A.ea(j,l),$async$Yw)
+return A.b(A.ea(j,l),$async$Yx)
 case 10:j=a1
 u=j
 w=1
@@ -2238,10 +2238,10 @@ case 5:m=q
 throw A.P(m==null?A.b9("Could not open camera"):m)
 case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
-return A.i($async$Yw,v)},
-agq(d){return this.ctR(d)},
-ctR(d){var w=0,v=A.j(x.H),u,t,s,r
-var $async$agq=A.e(function(e,f){if(e===1)return A.f(f,v)
+return A.i($async$Yx,v)},
+agr(d){return this.ctU(d)},
+ctU(d){var w=0,v=A.j(x.H),u,t,s,r
+var $async$agr=A.e(function(e,f){if(e===1)return A.f(f,v)
 for(;;)switch(w){case 0:t=x.H,s=0
 case 3:if(!(s<80)){w=5
 break}r=d.videoWidth
@@ -2251,16 +2251,16 @@ r.toString
 r=r>0}else r=!1
 if(r){w=1
 break}w=6
-return A.b(A.bK(new A.b7(1000*(C.Tt()?80:50)),null,t),$async$agq)
+return A.b(A.bK(new A.b7(1000*(C.Tw()?80:50)),null,t),$async$agr)
 case 6:case 4:++s
 w=3
 break
 case 5:case 1:return A.h(u,v)}})
-return A.i($async$agq,v)},
-a_G(d,e,f,g){return this.cmU(d,e,f,!1)},
-cmU(a1,a2,a3,a4){var w=0,v=A.j(x.u),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0
-var $async$a_G=A.e(function(a6,a7){if(a6===1){s.push(a7)
-w=t}for(;;)switch(w){case 0:r.afG()
+return A.i($async$agr,v)},
+a_H(d,e,f,g){return this.cmX(d,e,f,!1)},
+cmX(a1,a2,a3,a4){var w=0,v=A.j(x.u),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0
+var $async$a_H=A.e(function(a6,a7){if(a6===1){s.push(a7)
+w=t}for(;;)switch(w){case 0:r.afH()
 r.k3=!1
 m=document
 l=m.createElement("video")
@@ -2275,7 +2275,7 @@ t=4
 k=q.play()
 k.toString
 w=7
-return A.b(A.ea(k,x.z),$async$a_G)
+return A.b(A.ea(k,x.z),$async$a_H)
 case 7:t=2
 w=6
 break
@@ -2286,13 +2286,13 @@ break
 case 3:w=2
 break
 case 6:w=8
-return A.b(r.agq(q),$async$a_G)
-case 8:i=r.awx(a3)
+return A.b(r.agr(q),$async$a_H)
+case 8:i=r.awy(a3)
 h=i.a
 g=i.b
 r.ok=h
 r.p1=g
-p=L.aOV(g,h)
+p=L.aOY(g,h)
 k=p
 f=k.style
 f.display="none"
@@ -2303,15 +2303,15 @@ k.left="-9999px"
 m=m.body
 if(m!=null)m.appendChild(p).toString
 r.go=p
-r.a6K()
-r.k2=A.dD(I.Uz,new C.c56(r))
+r.a6L()
+r.k2=A.dD(I.UA,new C.c5b(r))
 o=null
-try{o=J.fxs(p,30)}catch(a5){n=A.a4(a5)
+try{o=J.fxF(p,30)}catch(a5){n=A.a4(a5)
 $.al.$1("[live_capture] composite captureStream failed: "+A.t(n))
-r.afG()
+r.afH()
 u=null
 w=1
-break}e=E.fzb()
+break}e=E.fzo()
 for(m=o.getVideoTracks(),k=m.length,d=0;d<m.length;m.length===k||(0,A.K)(m),++d)e.addTrack(m[d])
 for(m=a1.getAudioTracks(),k=m.length,d=0;d<m.length;m.length===k||(0,A.K)(m),++d)e.addTrack(m[d])
 u=e
@@ -2319,10 +2319,10 @@ w=1
 break
 case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
-return A.i($async$a_G,v)},
-U_(d){return this.bvv(d)},
-bvv(d){var w=0,v=A.j(x.H),u,t=2,s=[],r=this,q,p,o,n,m,l
-var $async$U_=A.e(function(e,f){if(e===1){s.push(f)
+return A.i($async$a_H,v)},
+U0(d){return this.bvw(d)},
+bvw(d){var w=0,v=A.j(x.H),u,t=2,s=[],r=this,q,p,o,n,m,l
+var $async$U0=A.e(function(e,f){if(e===1){s.push(f)
 w=t}for(;;)switch(w){case 0:if(r.go==null){w=1
 break}p=r.k1
 w=p!=null?3:4
@@ -2332,7 +2332,7 @@ t=6
 p=r.k1.play()
 p.toString
 w=9
-return A.b(A.ea(p,x.z),$async$U_)
+return A.b(A.ea(p,x.z),$async$U0)
 case 9:t=2
 w=8
 break
@@ -2356,7 +2356,7 @@ t=11
 p=q.play()
 p.toString
 w=14
-return A.b(A.ea(p,x.z),$async$U_)
+return A.b(A.ea(p,x.z),$async$U0)
 case 14:t=2
 w=13
 break
@@ -2368,8 +2368,8 @@ case 10:w=2
 break
 case 13:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
-return A.i($async$U_,v)},
-bFO(d,e,f,g,h,i){var w,v,u,t,s=e.videoWidth
+return A.i($async$U0,v)},
+bFQ(d,e,f,g,h,i){var w,v,u,t,s=e.videoWidth
 s.toString
 w=e.videoHeight
 w.toString
@@ -2378,7 +2378,7 @@ return}v=s/w
 if(v>h/i){u=i*v
 t=i}else{t=h/v
 u=h}d.drawImage(e,f+(h-u)/2,g+(i-t)/2,u,t)},
-a6K(){var w,v,u,t,s,r,q,p=this,o=p.go
+a6L(){var w,v,u,t,s,r,q,p=this,o=p.go
 if(o==null||p.id==null)return
 o=o.getContext("2d")
 o.toString
@@ -2386,7 +2386,7 @@ w=o
 v=p.ok
 u=p.p1
 try{w.fillStyle="#000000"
-J.h8C(w,0,0,v,u)
+J.h8Q(w,0,0,v,u)
 o=w
 t=p.id
 t.toString
@@ -2396,9 +2396,9 @@ o.save()
 o.beginPath()
 o.rect(0,0,s,r)
 o.clip()
-p.bFO(o,t,0+(s-s)/2,0+(r-r)/2,s,r)
+p.bFQ(o,t,0+(s-s)/2,0+(r-r)/2,s,r)
 o.restore()}catch(q){}},
-afG(){var w,v=this,u=v.k2
+afH(){var w,v=this,u=v.k2
 if(u!=null)u.a9(0)
 v.k2=null
 try{u=v.id
@@ -2412,16 +2412,16 @@ try{u=v.go
 if(u!=null)B.SD.f1(u)}catch(w){}v.go=null
 v.k3=!1
 v.ch=null},
-Dx(){var w=0,v=A.j(x.H),u=this,t,s
-var $async$Dx=A.e(function(d,e){if(d===1)return A.f(e,v)
+Dz(){var w=0,v=A.j(x.H),u=this,t,s
+var $async$Dz=A.e(function(d,e){if(d===1)return A.f(e,v)
 for(;;)switch(w){case 0:try{t=u.ay
 if(t!=null){t=t.getTracks()
 t.toString
-J.ic(t,new C.c53())}}catch(r){}u.ay=null
+J.ic(t,new C.c58())}}catch(r){}u.ay=null
 return A.h(null,v)}})
-return A.i($async$Dx,v)},
-lW(d,e,f,g,h,i){return this.biW(0,e,f,g,!1,!0)},
-biW(a2,a3,a4,a5,a6,a7){var w=0,v=A.j(x.y),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1
+return A.i($async$Dz,v)},
+lW(d,e,f,g,h,i){return this.biX(0,e,f,g,!1,!0)},
+biX(a2,a3,a4,a5,a6,a7){var w=0,v=A.j(x.y),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1
 var $async$lW=A.e(function(a9,b0){if(a9===1){s.push(b0)
 w=t}for(;;)switch(w){case 0:r.a=null
 r.y=!0
@@ -2434,22 +2434,22 @@ w=3
 return A.b(r.p(),$async$lW)
 case 3:t=5
 w=8
-return A.b(r.Yt(a3,a4,!0),$async$lW)
+return A.b(r.Yu(a3,a4,!0),$async$lW)
 case 8:g=b0
 r.b=g
 g.toString
-r.Vd(g)
+r.Ve(g)
 g=r.b
 g.toString
 w=9
-return A.b(r.TV(g),$async$lW)
+return A.b(r.TW(g),$async$lW)
 case 9:w=r.cx?10:11
 break
 case 10:g=r.b
 g.toString
 w=12
-return A.b(r.BX(g,!0),$async$lW)
-case 12:case 11:r.bUj("after openStream")
+return A.b(r.BZ(g,!0),$async$lW)
+case 12:case 11:r.bUm("after openStream")
 g=r.b
 g.toString
 w=13
@@ -2477,7 +2477,7 @@ return A.b(r.p(),$async$lW)
 case 20:u=!1
 w=1
 break
-case 19:r.f=r.ca4(!0)
+case 19:r.f=r.ca7(!0)
 B.d.a8(r.e)
 g=r.b
 g.toString
@@ -2485,7 +2485,7 @@ o=g
 w=r.y?21:22
 break
 case 21:w=23
-return A.b(r.a_G(g,null,a3,!1),$async$lW)
+return A.b(r.a_H(g,null,a3,!1),$async$lW)
 case 23:n=b0
 w=n==null?24:25
 break
@@ -2497,7 +2497,7 @@ w=1
 break
 case 25:r.ch=n
 o=n
-case 22:m=r.bCe(o,r.f)
+case 22:m=r.bCg(o,r.f)
 w=m==null?27:28
 break
 case 27:r.a="This browser cannot record "+(r.y?"video":"audio")+". Try Chrome or Safari 14.5+."
@@ -2509,10 +2509,10 @@ break
 case 28:r.d=m
 try{l=m.mimeType
 if(l!=null&&B.a.i(l).length!==0)r.f=B.a.i(l)}catch(a8){}g=x.B
-r.r=A.fA(m,"dataavailable",new C.c5c(r),!1,g)
-r.w=A.fA(m,"error",new C.c5d(r),!1,g)
+r.r=A.fA(m,"dataavailable",new C.c5h(r),!1,g)
+r.w=A.fA(m,"error",new C.c5i(r),!1,g)
 t=31
-if(C.Tt())m.start(1000)
+if(C.Tw())m.start(1000)
 else if(r.y)m.start(500)
 else m.start(500)
 t=5
@@ -2544,7 +2544,7 @@ case 30:w=5
 break
 case 33:g=r.as
 if(g!=null)g.a9(0)
-r.as=A.dD(B.ea,new C.c5e(r))
+r.as=A.dD(B.ea,new C.c5j(r))
 w=39
 return A.b(A.bK(B.fR,null,x.H),$async$lW)
 case 39:w=m.state!=="recording"?40:41
@@ -2575,7 +2575,7 @@ break
 case 5:t=4
 a1=s.pop()
 h=A.a4(a1)
-r.a=r.ap4(h)
+r.a=r.ap5(h)
 $.al.$1("[live_capture] start: "+A.t(h))
 w=46
 return A.b(r.ve(),$async$lW)
@@ -2632,10 +2632,10 @@ break}if(!J.y(r,"paused")){t.a="Cannot resume right now (recorder state: "+A.t(r
 u=!1
 w=1
 break}s.resume()
-if(t.go!=null&&t.k2==null){t.a6K()
-t.k2=A.dD(I.Uz,new C.c5a(t))}p=t.as
+if(t.go!=null&&t.k2==null){t.a6L()
+t.k2=A.dD(I.UA,new C.c5f(t))}p=t.as
 if(p!=null)p.a9(0)
-t.as=A.dD(B.ea,new C.c5b(t))
+t.as=A.dD(B.ea,new C.c5g(t))
 u=!0
 w=1
 break}catch(n){q=A.a4(n)
@@ -2645,7 +2645,7 @@ u=!1
 w=1
 break}case 1:return A.h(u,v)}})
 return A.i($async$F9,v)},
-bRL(d){var w,v,u,t,s,r,q,p
+bRO(d){var w,v,u,t,s,r,q,p
 try{w=x.Q.a(d).data
 if(w!=null){s=w.size
 s.toString
@@ -2657,30 +2657,30 @@ q=w.size
 q.toString
 r.$1("[live_capture] chunk +"+q+"b (total "+s.length+")")
 return}}catch(p){}try{v=d
-u=J.h8G(v)
-if(u!=null&&J.h8r(J.h8K(u),0)){s=this.e
+u=J.h8U(v)
+if(u!=null&&J.h8F(J.h8Y(u),0)){s=this.e
 s.push(x.d.a(u))
 r=$.al
 q=u.size
 q.toString
 r.$1("[live_capture] chunk(dyn) +"+q+"b (total "+s.length+")")}}catch(p){t=A.a4(p)
 $.al.$1("[live_capture] dataavailable parse: "+A.t(t))}},
-crq(d){var w,v,u
+crt(d){var w,v,u
 try{if(d.enabled!==!0)return!1
 w=d.readyState
 v=J.y(w,"ended")
 return!v}catch(u){return!0}},
-bQz(d,e){var w,v
+bQB(d,e){var w,v
 if(e){w=d.getAudioTracks()
 w.toString
 v=w}else{w=d.getVideoTracks()
 w.toString
-v=w}return v.length!==0&&B.d.bf(v,this.gb2o())},
-IK(d,e){return this.ctP(d,e)},
-ctP(d,e){var w=0,v=A.j(x.y),u,t=this,s,r,q,p,o,n
+v=w}return v.length!==0&&B.d.bf(v,this.gb2p())},
+IK(d,e){return this.ctS(d,e)},
+ctS(d,e){var w=0,v=A.j(x.y),u,t=this,s,r,q,p,o,n
 var $async$IK=A.e(function(f,g){if(f===1)return A.f(g,v)
-for(;;)switch(w){case 0:n=C.Tt()?50:15
-s=x.H,r=t.gb2o(),q=0
+for(;;)switch(w){case 0:n=C.Tw()?50:15
+s=x.H,r=t.gb2p(),q=0
 case 3:if(!(q<n)){w=5
 break}if(e){p=d.getAudioTracks()
 p.toString
@@ -2689,41 +2689,41 @@ p.toString
 o=p}if(o.length!==0&&B.d.bf(o,r)){u=!0
 w=1
 break}w=6
-return A.b(A.bK(new A.b7(1000*(C.Tt()?120:80)),null,s),$async$IK)
+return A.b(A.bK(new A.b7(1000*(C.Tw()?120:80)),null,s),$async$IK)
 case 6:case 4:++q
 w=3
 break
-case 5:u=t.bQz(d,e)
+case 5:u=t.bQB(d,e)
 w=1
 break
 case 1:return A.h(u,v)}})
 return A.i($async$IK,v)},
-avi(){var w
+avj(){var w
 this.Q=null
 try{}catch(w){}this.ax=null},
-bvy(d){var w=this.U0(this.cx)
+bvz(d){var w=this.U1(this.cx)
 return w},
-Yt(d,e,f){return this.c60(d,e,!0)},
-c60(d,a0,a1){var w=0,v=A.j(x.E),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i,h,g,f,e
-var $async$Yt=A.e(function(a2,a3){if(a2===1){s.push(a3)
+Yu(d,e,f){return this.c63(d,e,!0)},
+c63(d,a0,a1){var w=0,v=A.j(x.E),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i,h,g,f,e
+var $async$Yu=A.e(function(a2,a3){if(a2===1){s.push(a3)
 w=t}for(;;)switch(w){case 0:f=window.navigator.mediaDevices
 if(f==null)throw A.P(A.b9("Secure media devices API unavailable"))
 n=a0==="environment"?"environment":"user"
-m=r.b18(d,r.bvy(!0),n)
+m=r.b19(d,r.bvz(!0),n)
 l=x.N
 k=x.z
-B.d.v(m,A.a([A.E(["audio",!0,"video",r.b3Q(n,d)],l,k),A.E(["audio",!0,"video",!0],l,k)],x.t))
+B.d.v(m,A.a([A.E(["audio",!0,"video",r.b3R(n,d)],l,k),A.E(["audio",!0,"video",!0],l,k)],x.t))
 q=null
 l=m.length,k=x.E,j=0
 case 3:if(!(j<m.length)){w=5
 break}p=m[j]
 t=7
 i=p
-h=i!=null?A.By(i):null
+h=i!=null?A.Bz(i):null
 i=f.getUserMedia(h)
 i.toString
 w=10
-return A.b(A.ea(i,k),$async$Yt)
+return A.b(A.ea(i,k),$async$Yu)
 case 10:i=a3
 u=i
 w=1
@@ -2747,43 +2747,43 @@ case 5:l=q
 throw A.P(l==null?A.b9("Could not open camera"):l)
 case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
-return A.i($async$Yt,v)},
-awx(d){switch(d){case"tiktok":return D.dRL
-case"square":return D.dRK
-case"youtube":default:return D.dRS}},
-bUj(d){var w,v,u,t,s,r=this.b
+return A.i($async$Yu,v)},
+awy(d){switch(d){case"tiktok":return D.dSh
+case"square":return D.dSg
+case"youtube":default:return D.dSo}},
+bUm(d){var w,v,u,t,s,r=this.b
 if(r==null)return
 for(r=r.getAudioTracks(),w=r.length,v="[live_capture] "+d,u=v+" audio id=",t=0;t<r.length;r.length===w||(0,A.K)(r),++t){s=r[t]
 $.al.$1(u+A.t(s.id)+" state="+A.t(s.readyState)+" enabled="+A.t(s.enabled)+" muted="+A.t(s.muted))}for(r=this.b.getVideoTracks(),w=r.length,v+=" video id=",t=0;t<r.length;r.length===w||(0,A.K)(r),++t){s=r[t]
 $.al.$1(v+A.t(s.id)+" state="+A.t(s.readyState)+" enabled="+A.t(s.enabled)+" muted="+A.t(s.muted))}},
-Vd(d){var w,v,u=d.getTracks()
+Ve(d){var w,v,u=d.getTracks()
 u.toString
 u=J.aU(u)
 while(u.C()){w=u.gT(u)
 try{w.enabled=!0}catch(v){}}},
-bCe(d,e){var w,v,u,t,s="audioBitsPerSecond",r="videoBitsPerSecond",q=this.y||this.z,p=x.z,o=A.R(x.N,p),n=e.length!==0
+bCg(d,e){var w,v,u,t,s="audioBitsPerSecond",r="videoBitsPerSecond",q=this.y||this.z,p=x.z,o=A.S(x.N,p),n=e.length!==0
 if(n)o.m(0,"mimeType",e)
 o.m(0,s,128e3)
 if(q)o.m(0,r,25e5)
 w=o
-if(n)try{if(F.bRt(e)){o=F.aTE(d,w)
+if(n)try{if(F.bRy(e)){o=F.aTI(d,w)
 return o}}catch(t){v=A.a4(t)
-$.al.$1("[live_capture] MediaRecorder mime "+e+" failed: "+A.t(v))}try{p=F.aTE(d,q?A.E([s,128e3,r,25e5],p,p):A.E([s,128e3],p,p))
+$.al.$1("[live_capture] MediaRecorder mime "+e+" failed: "+A.t(v))}try{p=F.aTI(d,q?A.E([s,128e3,r,25e5],p,p):A.E([s,128e3],p,p))
 return p}catch(t){u=A.a4(t)
 $.al.$1("[live_capture] MediaRecorder default failed: "+A.t(u))
 return null}},
-ap4(d){switch(x.v.b(d)?B.bbY.gvR(d):""){case"NotAllowedError":return"Microphone/camera access was blocked. Allow it for ngmy.org in your browser or phone Settings, then try again."
+ap5(d){switch(x.v.b(d)?B.bcb.gvS(d):""){case"NotAllowedError":return"Microphone/camera access was blocked. Allow it for ngmy.org in your browser or phone Settings, then try again."
 case"NotFoundError":return"No microphone or camera was found on this device."
 case"NotReadableError":return"Your camera or microphone is already being used by another app. Close it and try again."
 case"OverconstrainedError":return"This device could not meet the recording settings. Try another size (YouTube/TikTok) or switch cameras."
 case"SecurityError":return"Recording is blocked on this connection. Make sure you are on https://ngmy.org."
 case"NotSupportedError":return"Recording is not supported in this browser. Try Chrome or Safari."
 default:return"Could not start recording: "+A.t(d)}},
-ca4(d){var w,v,u,t,s,r,q="video/mp4;codecs=avc1.42E01E,mp4a.40.2",p="video/webm;codecs=vp8,opus",o="audio/webm;codecs=opus"
-if(C.Tt()){v=x.s
+ca7(d){var w,v,u,t,s,r,q="video/mp4;codecs=avc1.42E01E,mp4a.40.2",p="video/webm;codecs=vp8,opus",o="audio/webm;codecs=opus"
+if(C.Tw()){v=x.s
 u=d?A.a(["video/mp4",q,p,"video/webm"],v):A.a(["video/mp4",q,"audio/mp4","audio/aac",o,"audio/webm"],v)}else{v=x.s
 u=d?A.a(["video/webm;codecs=vp9,opus",p,"video/webm",q,"video/mp4"],v):A.a([o,"audio/webm","audio/ogg;codecs=opus","audio/ogg","audio/mp4"],v)}for(v=u.length,t=0;t<u.length;u.length===v||(0,A.K)(u),++t){w=u[t]
-try{if(F.bRt(w)){s=w
+try{if(F.bRy(w)){s=w
 return s}}catch(r){}}return""},
 bT(a2){var w=0,v=A.j(x.l),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1
 var $async$bT=A.e(function(a4,a5){if(a4===1){s.push(a5)
@@ -2796,17 +2796,17 @@ if(m!=null)m.a9(0)
 r.as=null
 q=new A.bL(new A.bd($.bs,x.b),x.a)
 p=A.da()
-p.sew(A.fA(e,"stop",new C.c5f(q),!1,x.B))
+p.sew(A.fA(e,"stop",new C.c5k(q),!1,x.B))
 t=4
 o=e.state
 w=J.y(o,"recording")||J.y(o,"paused")?7:9
 break
 case 7:try{e.requestData()}catch(a3){}w=10
-return A.b(A.bK(A.dB(0,0,0,C.Tt()?250:120,0,0),null,x.H),$async$bT)
+return A.b(A.bK(A.dB(0,0,0,C.Tw()?250:120,0,0),null,x.H),$async$bT)
 case 10:try{e.requestData()}catch(a3){}e.stop()
 w=8
 break
-case 9:if((q.a.a&30)===0)J.a0z(q)
+case 9:if((q.a.a&30)===0)J.a0B(q)
 case 8:t=2
 w=6
 break
@@ -2815,14 +2815,14 @@ d=s.pop()
 n=A.a4(d)
 r.a="Stop failed: "+A.t(n)
 $.al.$1("[live_capture] stop call: "+A.t(n))
-if((q.a.a&30)===0)J.a0z(q)
+if((q.a.a&30)===0)J.a0B(q)
 w=6
 break
 case 3:w=2
 break
 case 6:t=12
 w=15
-return A.b(q.a.cJ(0,B.hr),$async$bT)
+return A.b(q.a.cJ(0,B.hs),$async$bT)
 case 15:t=2
 w=14
 break
@@ -2838,15 +2838,15 @@ k=r.e
 j=0
 case 16:if(!(j<20&&k.length===0)){w=17
 break}try{e.requestData()}catch(a3){}w=18
-return A.b(A.bK(new A.b7(1000*(C.Tt()?900:400)),null,m),$async$bT)
+return A.b(A.bK(new A.b7(1000*(C.Tw()?900:400)),null,m),$async$bT)
 case 18:++j
 w=16
 break
 case 17:w=19
-return A.b(A.bK(A.dB(0,0,0,C.Tt()?5000:900,0,0),null,m),$async$bT)
+return A.b(A.bK(A.dB(0,0,0,C.Tw()?5000:900,0,0),null,m),$async$bT)
 case 19:t=21
 w=24
-return A.b(J.afg(p.b7()),$async$bT)
+return A.b(J.afi(p.b7()),$async$bT)
 case 24:t=2
 w=23
 break
@@ -2859,22 +2859,22 @@ break
 case 23:m=r.f
 if(!(B.a.i(m).length!==0)){m=e.mimeType
 if(m==null)m=r.y||r.z?"video/mp4":"audio/webm"}i=B.a.i(m)
-h=C.bxJ(i)
+h=C.bxO(i)
 w=25
 return A.b(r.LY(),$async$bT)
 case 25:r.d=null
-r.avi()
-r.afG()
+r.avj()
+r.afH()
 w=r.y?26:28
 break
 case 26:w=29
-return A.b(r.Dx(),$async$bT)
+return A.b(r.Dz(),$async$bT)
 case 29:w=30
-return A.b(r.x4(),$async$bT)
+return A.b(r.x5(),$async$bT)
 case 30:r.c=null
 w=27
 break
-case 28:r.b12()
+case 28:r.b13()
 r.b=null
 case 27:if(k.length===0){r.a="No audio was captured. Stay on ngmy.org while recording, then tap Stop & Save. If this keeps happening, refresh once and allow the mic again."
 $.al.$1("[live_capture] empty chunks after stop")
@@ -2893,7 +2893,7 @@ if(f.length===0){r.a="Captured, but could not read the recording data."
 u=null
 w=1
 break}r.f=h
-r.x=new C.aXp(f,h,g)
+r.x=new C.aXt(f,h,g)
 B.d.a8(k)
 u=r.x
 w=1
@@ -2901,23 +2901,23 @@ break
 case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
 return A.i($async$bT,v)},
-b12(){var w,v
+b13(){var w,v
 try{w=this.b
 if(w!=null){w=w.getVideoTracks()
 w.toString
-B.d.bD(w,new C.c58())}}catch(v){}},
+B.d.bD(w,new C.c5d())}}catch(v){}},
 ve(){var w=0,v=A.j(x.H),u=this,t,s
 var $async$ve=A.e(function(d,e){if(d===1)return A.f(e,v)
 for(;;)switch(w){case 0:s=u.as
 if(s!=null)s.a9(0)
 u.as=null
-u.avi()
+u.avj()
 try{s=u.d
 if(s!=null&&s.state!=="inactive")s.stop()}catch(r){}w=2
 return A.b(u.LY(),$async$ve)
 case 2:u.d=null
 B.d.a8(u.e)
-u.b12()
+u.b13()
 u.b=null
 return A.h(null,v)}})
 return A.i($async$ve,v)},
@@ -2955,52 +2955,52 @@ case 10:s.w=s.r=null
 return A.h(null,v)
 case 1:return A.f(t.at(-1),v)}})
 return A.i($async$LY,v)},
-x4(){var w=0,v=A.j(x.H),u=this,t,s
-var $async$x4=A.e(function(d,e){if(d===1)return A.f(e,v)
-for(;;)switch(w){case 0:u.avi()
+x5(){var w=0,v=A.j(x.H),u=this,t,s
+var $async$x5=A.e(function(d,e){if(d===1)return A.f(e,v)
+for(;;)switch(w){case 0:u.avj()
 w=2
-return A.b(u.axp(!1),$async$x4)
+return A.b(u.axq(!1),$async$x5)
 case 2:try{t=u.dx
 if(t!=null)t.stop()}catch(r){}u.dx=null
 try{t=u.b
 if(t!=null){t=t.getTracks()
 t.toString
-J.ic(t,new C.c54())}}catch(r){}u.b=null
+J.ic(t,new C.c59())}}catch(r){}u.b=null
 try{t=u.c
 if(t!=null){t=t.getTracks()
 t.toString
-J.ic(t,new C.c55())}}catch(r){}u.c=null
+J.ic(t,new C.c5a())}}catch(r){}u.c=null
 return A.h(null,v)}})
-return A.i($async$x4,v)},
+return A.i($async$x5,v)},
 p(){var w=0,v=A.j(x.H),u=this
 var $async$p=A.e(function(d,e){if(d===1)return A.f(e,v)
 for(;;)switch(w){case 0:u.CW=u.at=!1
 w=2
 return A.b(u.ve(),$async$p)
-case 2:u.afG()
+case 2:u.afH()
 w=3
-return A.b(u.Dx(),$async$p)
+return A.b(u.Dz(),$async$p)
 case 3:w=4
-return A.b(u.x4(),$async$p)
+return A.b(u.x5(),$async$p)
 case 4:return A.h(null,v)}})
 return A.i($async$p,v)}}
-C.aEA.prototype={
-S(){return new C.bnZ()}}
-C.bnZ.prototype={
+C.aED.prototype={
+S(){return new C.bo3()}}
+C.bo3.prototype={
 Z(){var w,v,u=this
 u.a0()
-w=A.vU(u.a.c)
+w=A.vV(u.a.c)
 v=Date.now()
 u.d!==$&&A.aO()
 u.d="ngmy-live-cam-"+w+"-"+1000*v
-u.ceI()},
-ceI(){var w,v=this
+u.ceL()},
+ceL(){var w,v=this
 if(v.f)return
 v.f=!0
-$.xE()
+$.xF()
 w=v.d
 w===$&&A.c()
-$.pH().p6(w,new C.eJT(v),!0)},
+$.pH().p6(w,new C.eK3(v),!0)},
 bo(d){var w,v,u,t,s=this
 s.bA(d)
 w=d.c
@@ -3008,7 +3008,7 @@ v=s.a.c
 if((w==null?v!=null:w!==v)&&s.e!=null&&x.E.b(v)){s.e.srcObject=v
 w=s.e.play()
 w.toString
-A.ea(w,x.z).eM(new C.eJU())}w=s.a.e
+A.ea(w,x.z).eM(new C.eK4())}w=s.a.e
 if(d.e!==w&&s.e!=null){u=w?" scaleX(-1)":""
 w=s.e.style
 w.toString
@@ -3024,109 +3024,109 @@ w=s.e.style
 w.height=v}},
 B(d){var w,v,u=null,t=this.a
 if(!x.E.b(t.c)){t=t.d
-return A.p(B.B,D.eJL,B.h,u,u,new A.o(B.hT,u,u,A.m(18),u,u,B.n),u,t,u,u,u,u,u,u)}w=t.f
+return A.p(B.B,D.eKf,B.h,u,u,new A.o(B.hT,u,u,A.m(18),u,u,B.n),u,t,u,u,u,u,u,u)}w=t.f
 t=t.d
 v=this.d
 v===$&&A.c()
-return A.bu(w,new A.a3(1/0,t,A.Cv(u,B.pp,v),u),B.ap)}}
-C.bqK.prototype={
-B(d){var w,v=this,u=null,t=C.bxJ(v.d),s=v.c
-if(B.a.i(s).length===0)return A.p(B.B,D.f4l,B.h,u,u,new A.o(B.M,u,u,A.m(16),u,u,B.n),u,v.e,u,u,u,u,u,u)
-w=C.hjD(s,t)
-if(w.length===0)return A.p(B.B,D.eJY,B.h,u,u,new A.o(B.M,u,u,A.m(16),u,u,B.n),u,v.e,u,u,u,u,u,u)
-return A.bu(A.m(16),A.ec(new A.a3(1/0,v.e,new M.a63(w,t,u),u),B.w,!0),B.ap)}}
-var z=a.updateTypes(["au<~>()","~()","S(ov)","SC(Y)","r(ov)","S(Ai)","Ai()","Zr(Y)","XK(Y)","r(n)","ov(a0<@,@>)","I(ov,ov)","a0<n,@>(ov)","S(uX)"])
-C.fsG.prototype={
-$1(d){return new C.SC(this.a,null)},
+return A.bv(w,new A.a3(1/0,t,A.Cw(u,B.pp,v),u),B.ap)}}
+C.bqP.prototype={
+B(d){var w,v=this,u=null,t=C.bxO(v.d),s=v.c
+if(B.a.i(s).length===0)return A.p(B.B,D.f4T,B.h,u,u,new A.o(B.M,u,u,A.m(16),u,u,B.n),u,v.e,u,u,u,u,u,u)
+w=C.hjR(s,t)
+if(w.length===0)return A.p(B.B,D.eKs,B.h,u,u,new A.o(B.M,u,u,A.m(16),u,u,B.n),u,v.e,u,u,u,u,u,u)
+return A.bv(A.m(16),A.ec(new A.a3(1/0,v.e,new M.a65(w,t,u),u),B.w,!0),B.ap)}}
+var z=a.updateTypes(["au<~>()","~()","R(ov)","SF(X)","r(ov)","R(Aj)","Aj()","Zu(X)","XN(X)","r(n)","ov(a0<@,@>)","I(ov,ov)","a0<n,@>(ov)","R(uY)"])
+C.fsT.prototype={
+$1(d){return new C.SF(this.a,null)},
 $S:z+3}
-C.dEQ.prototype={
+C.dF0.prototype={
 $1(d){var w=0,v=A.j(x.H),u=this,t
 var $async$$1=A.e(function(e,f){if(e===1)return A.f(f,v)
 for(;;)switch(w){case 0:t=$.nA()
 w=!t.Q?2:3
 break
 case 2:w=4
-return A.b(t.a3v(),$async$$1)
+return A.b(t.a3w(),$async$$1)
 case 4:t=u.a
-if(t.c!=null)t.n(new C.dEP())
+if(t.c!=null)t.n(new C.dF_())
 case 3:return A.h(null,v)}})
 return A.i($async$$1,v)},
 $S:99}
-C.dEP.prototype={
+C.dF_.prototype={
 $0(){},
 $S:0}
-C.dEq.prototype={
+C.dEB.prototype={
 $1(d){return d.b===this.a},
 $S:z+5}
-C.dEr.prototype={
-$0(){return D.a0x},
+C.dEC.prototype={
+$0(){return D.a0z},
 $S:z+6}
-C.dEs.prototype={
+C.dED.prototype={
 $0(){return this.a.y=this.b},
 $S:0}
-C.dEg.prototype={
+C.dEr.prototype={
 $0(){return this.a.y=this.b},
 $S:0}
-C.dEt.prototype={
+C.dEE.prototype={
 $0(){},
 $S:0}
-C.dEw.prototype={
-$0(){var w=this.a,v=J.dE(this.b,new C.dEv())
+C.dEH.prototype={
+$0(){var w=this.a,v=J.dE(this.b,new C.dEG())
 v=A.A(v,v.$ti.k("G.E"))
 w.e=v
 w.f=!1},
 $S:0}
-C.dEv.prototype={
+C.dEG.prototype={
 $1(d){return d.c==="video"||B.a.a_(d.f,"video/")},
 $S:z+2}
-C.dEB.prototype={
+C.dEM.prototype={
 $0(){return this.a.r=!0},
 $S:0}
-C.dEC.prototype={
+C.dEN.prototype={
 $0(){return this.a.r=!1},
 $S:0}
-C.dED.prototype={
-$0(){return this.a.r=!0},
-$S:0}
-C.dEE.prototype={
-$0(){return this.a.r=!1},
-$S:0}
-C.dEu.prototype={
-$1(d){var w=this.a
-return new C.Zr(this.b,w.a.c,w.gbZo(),null)},
-$S:z+7}
 C.dEO.prototype={
-$4(d,e,f,g){var w,v=null,u=this.a,t=this.b,s=u.bZn(t),r=x.p,q=A.a([u.cnZ(t,e)],r),p=$.nA(),o=p.e
-if(o!=null)B.d.v(q,A.a([B.aa,A.d(o,v,v,v,v,v,v,D.eDP,v,v,v)],r))
+$0(){return this.a.r=!0},
+$S:0}
+C.dEP.prototype={
+$0(){return this.a.r=!1},
+$S:0}
+C.dEF.prototype={
+$1(d){var w=this.a
+return new C.Zu(this.b,w.a.c,w.gbZr(),null)},
+$S:z+7}
+C.dEZ.prototype={
+$4(d,e,f,g){var w,v=null,u=this.a,t=this.b,s=u.bZq(t),r=x.p,q=A.a([u.co1(t,e)],r),p=$.nA(),o=p.e
+if(o!=null)B.d.v(q,A.a([B.ab,A.d(o,v,v,v,v,v,v,D.eEj,v,v,v)],r))
 else{o=p.f
-if(o!=null)B.d.v(q,A.a([B.aa,A.d(o,v,v,v,v,v,v,D.eI5,v,v,v)],r))}q.push(B.dW)
-q.push(D.eYE)
+if(o!=null)B.d.v(q,A.a([B.ab,A.d(o,v,v,v,v,v,v,D.eIA,v,v,v)],r))}q.push(B.dW)
+q.push(D.eZ9)
 q.push(B.au)
-q.push(D.eJm)
-q.push(B.aa)
-if(u.f)q.push(D.dLf)
+q.push(D.eJR)
+q.push(B.ab)
+if(u.f)q.push(D.dLK)
 else{o=u.e
 if(o.length===0){o=B.c.j(0.04)
 w=A.m(16)
-q.push(A.p(v,D.f1V,B.h,v,v,new A.o(o,v,A.H(B.bR.j(0.25),B.r,1),w,v,v,B.n),v,v,v,v,B.a8,v,v,1/0))}else B.d.v(q,new A.J(o,u.gbTw(),A.T(o).k("J<1,r>")))}s=A.a([A.br(!0,A.u(A.a([s,A.D(A.cL(q,v,S.ad9,v,v,B.ah,!1),1)],r),B.ad,v,B.e,B.j,0,B.p),!0,!1,B.ag,!0,!0)],r)
+q.push(A.p(v,D.f2r,B.h,v,v,new A.o(o,v,A.H(B.bR.j(0.25),B.r,1),w,v,v,B.n),v,v,v,v,B.a8,v,v,1/0))}else B.d.v(q,new A.J(o,u.gbTz(),A.T(o).k("J<1,r>")))}s=A.a([A.br(!0,A.u(A.a([s,A.D(A.cK(q,v,S.ade,v,v,B.ah,!1),1)],r),B.ad,v,B.e,B.j,0,B.p),!0,!1,B.ag,!0,!0)],r)
 if(u.x)if(!p.Q){r=p.a
 r=r.at&&r.b!=null}else r=!0
 else r=!1
-if(r)s.push(u.bJ7(t))
+if(r)s.push(u.bJ9(t))
 return A.cf(v,B.na,new A.am(B.V,v,B.a9,B.q,s,v),v,!1,!1,v,v)},
 $C:"$4",
 $R:4,
 $S:399}
-C.dEl.prototype={
+C.dEw.prototype={
 $0(){var w=this.a.c
 w.toString
 A.a7(w,!1).K(null)
 return null},
 $S:0}
-C.dEA.prototype={
-$1(d){return D.fbg},
+C.dEL.prototype={
+$1(d){return D.fbO},
 $S:z+8}
-C.dEI.prototype={
+C.dET.prototype={
 $2(d,e){var w,v,u,t,s,r,q,p,o,n,m=null,l=this.a,k=l.d
 k===$&&A.c()
 k=k.x
@@ -3143,150 +3143,150 @@ t=A.a([B.eO,B.na,t],x.W)
 s=x.p
 r=A.a([],s)
 if(!v){q=$.nA()
-r.push(A.D(A.cb(B.bH,A.a([l.awD("YouTube 16:9",q.x==="youtube",new C.dEF(l)),l.awD("TikTok 9:16",q.x==="tiktok",new C.dEG(l)),l.awD("Square",q.x==="square",new C.dEH(l))],s),B.qV,8,8),1))}else r.push(D.bkR)
+r.push(A.D(A.cb(B.bH,A.a([l.awE("YouTube 16:9",q.x==="youtube",new C.dEQ(l)),l.awE("TikTok 9:16",q.x==="tiktok",new C.dER(l)),l.awE("Square",q.x==="square",new C.dES(l))],s),B.qV,8,8),1))}else r.push(D.bl8)
 q=$.nA()
-p=C.anF(q.at)
+p=C.anI(q.at)
 r.push(A.d(p,m,m,m,m,m,m,A.l(m,m,v?B.br:B.c,m,m,m,m,m,m,m,m,26,m,m,B.u,m,m,!0,m,1.1,m,m,m,m,m,m),m,m,m))
 s=A.a([A.B(r,B.m,m,B.e,B.j,0,m,m),B.aN],s)
 if(!q.Q){r=q.a
 r=r.at&&r.b!=null}else r=!0
-if(r)s.push(l.bwD())
-else{o=l.aXx(d)
+if(r)s.push(l.bwE())
+else{o=l.aXy(d)
 r=B.w.j(0.18)
 p=A.m(18)
 n=A.H(B.bG,B.r,1)
 s.push(A.p(B.B,A.V(B.pa,B.bR.j(0.85),m,m,m,52),B.h,m,m,new A.o(r,m,n,p,m,m,B.n),m,o.b,m,m,m,m,m,o.a))}s.push(B.aN)
 if(v){r=q.as
 q=r?"\u23f8 PAUSED":"\u25cf LIVE"
-s.push(A.d(q,m,m,m,m,m,m,A.l(m,m,r?B.z6:B.br,m,m,m,m,m,m,m,m,m,m,m,B.u,m,m,!0,m,1.4,m,m,m,m,m,m),m,m,m))}else s.push(A.d(l.gbvo(),m,m,m,m,m,m,D.eHd,B.L,m,m))
+s.push(A.d(q,m,m,m,m,m,m,A.l(m,m,r?B.z7:B.br,m,m,m,m,m,m,m,m,m,m,m,B.u,m,m,!0,m,1.4,m,m,m,m,m,m),m,m,m))}else s.push(A.d(l.gbvp(),m,m,m,m,m,m,D.eHI,B.L,m,m))
 s.push(B.aN)
 if(l.r)l=m
-else l=v?l.gcnx():l.gcnb()
+else l=v?l.gcnA():l.gcne()
 r=v?B.bS:B.aW
 r=A.bk(r,m,m,m,B.c,m,m,m,new A.b5(A.m(16),B.W),m,m,m)
-q=A.V(v?B.XR:B.pa,m,m,m,m,m)
+q=A.V(v?B.XS:B.pa,m,m,m,m,m)
 s.push(new A.a3(1/0,52,A.dk(q,A.d(v?"Stop & Save":"Start Video",m,m,m,m,m,m,B.op,m,m,m),l,r),m))
 return A.p(m,A.u(s,B.m,m,B.e,B.j,0,B.p),B.h,m,m,new A.o(m,m,u,k,m,new A.a8(new A.d3(-1+w,-0.3),new A.d3(1-w,0.7),B.x,t,m,m),B.n),m,m,m,m,B.fv,m,m,m)},
 $S:90}
-C.dEF.prototype={
-$0(){return this.a.awa("youtube")},
+C.dEQ.prototype={
+$0(){return this.a.awb("youtube")},
 $S:0}
-C.dEG.prototype={
-$0(){return this.a.awa("tiktok")},
+C.dER.prototype={
+$0(){return this.a.awb("tiktok")},
 $S:0}
-C.dEH.prototype={
-$0(){return this.a.awa("square")},
+C.dES.prototype={
+$0(){return this.a.awb("square")},
 $S:0}
-C.dEp.prototype={
+C.dEA.prototype={
 $1(d){var w=this.a,v=this.b
-w.n(new C.dEn(w,v))
-w.Xi(v)},
+w.n(new C.dEy(w,v))
+w.Xj(v)},
 $S:346}
-C.dEn.prototype={
-$0(){return B.d.bm(this.a.e,new C.dEm(this.b))},
+C.dEy.prototype={
+$0(){return B.d.bm(this.a.e,new C.dEx(this.b))},
 $S:0}
-C.dEm.prototype={
+C.dEx.prototype={
 $1(d){return d.a===this.a.a},
 $S:z+2}
-C.dEo.prototype={
+C.dEz.prototype={
 $0(){return this.a.Hn(this.b)},
 $S:0}
-C.dEf.prototype={
+C.dEq.prototype={
 $2(d,e){var w,v=this.a
-switch(v.y.a){case 3:return new A.cZ(e,!1,d,null)
+switch(v.y.a){case 3:return new A.d_(e,!1,d,null)
 case 2:w=x.L
 return A.jc(d,new A.bc(e,new A.bm(new A.v(0,v.z*0.35),B.J,w),w.k("bc<bC.T>")),null,!0)
 case 1:w=x.L
 return A.jc(d,new A.bc(e,new A.bm(new A.v(v.z*0.45,0),B.J,w),w.k("bc<bC.T>")),null,!0)
 case 0:return d}},
 $S:446}
-C.dEk.prototype={
+C.dEv.prototype={
 $0(){var w=this.a
-return w.n(new C.dEj(w))},
+return w.n(new C.dEu(w))},
 $S:0}
-C.dEj.prototype={
+C.dEu.prototype={
 $0(){return this.a.x=!1},
 $S:0}
-C.dEJ.prototype={
+C.dEU.prototype={
 $0(){var w=this.a
 return w.x=!w.x},
 $S:0}
-C.dEM.prototype={
+C.dEX.prototype={
 $0(){return this.a.w=!0},
 $S:0}
-C.dEN.prototype={
+C.dEY.prototype={
 $0(){return this.a.w=!1},
 $S:0}
-C.dEK.prototype={
+C.dEV.prototype={
 $0(){return this.a.w=!0},
 $S:0}
-C.dEL.prototype={
+C.dEW.prototype={
 $0(){return this.a.w=!1},
 $S:0}
-C.dEy.prototype={
+C.dEJ.prototype={
 $0(){return $.nA().x=this.b},
 $S:0}
-C.dEz.prototype={
+C.dEK.prototype={
 $1(d){var w=this.a
-if(w.c!=null)w.n(new C.dEx())},
+if(w.c!=null)w.n(new C.dEI())},
 $S:28}
-C.dEx.prototype={
+C.dEI.prototype={
 $0(){},
 $S:0}
-C.dEh.prototype={
+C.dEs.prototype={
 $0(){return this.a.w=!0},
 $S:0}
-C.dEi.prototype={
+C.dEt.prototype={
 $0(){return this.a.w=!1},
 $S:0}
-C.eLX.prototype={
+C.eM7.prototype={
 $0(){return this.a.f=!1},
 $S:0}
-C.eLY.prototype={
+C.eM8.prototype={
 $0(){return this.a.f=!1},
 $S:0}
-C.eM1.prototype={
-$1(d){var w=null,v=this.a,u=A.aK(w,B.U,!0,w,!0,B.q,w,A.aL(),v,w,w,w,w,w,2,A.bl(w,w,w,w,w,w,w,w,!0,new A.uk(B.yE,new A.ax(B.bR.j(0.5),1,B.r,-1)),w,w,w,w,w,w,w,w,w,w,w,D.f7n,w,w,w,w,w,w,w,w,B.kd,"Name",w,w,w,w,w,w,w,w,w,!0,!0,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w),B.z,!0,w,!0,w,!1,w,B.ae,w,w,w,w,w,w,w,w,w,1,w,w,!1,"\u2022",w,w,w,new C.eLZ(d),w,!1,w,w,!1,w,!0,w,B.a8,w,w,w,w,w,w,w,w,w,w,w,B.is,!0,B.a6,w,B.am,w,w,w,w)
-return A.eo(A.a([A.bG(!1,H.Hf,w,w,!0,w,w,new C.eM_(d),w,w),A.bG(!1,D.ePw,w,w,!0,w,w,new C.eM0(d,v),w,w)],x.p),w,w,B.eO,u,w,w,w,w,D.f0N,w)},
+C.eMc.prototype={
+$1(d){var w=null,v=this.a,u=A.aK(w,B.U,!0,w,!0,B.q,w,A.aL(),v,w,w,w,w,w,2,A.bl(w,w,w,w,w,w,w,w,!0,new A.ul(B.yF,new A.ax(B.bR.j(0.5),1,B.r,-1)),w,w,w,w,w,w,w,w,w,w,w,D.f7V,w,w,w,w,w,w,w,w,B.ke,"Name",w,w,w,w,w,w,w,w,w,!0,!0,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w),B.z,!0,w,!0,w,!1,w,B.af,w,w,w,w,w,w,w,w,w,1,w,w,!1,"\u2022",w,w,w,new C.eM9(d),w,!1,w,w,!1,w,!0,w,B.a8,w,w,w,w,w,w,w,w,w,w,w,B.it,!0,B.a6,w,B.am,w,w,w,w)
+return A.eo(A.a([A.bG(!1,H.Hi,w,w,!0,w,w,new C.eMa(d),w,w),A.bG(!1,D.eQ0,w,w,!0,w,w,new C.eMb(d,v),w,w)],x.p),w,w,B.eO,u,w,w,w,w,D.f1i,w)},
 $S:20}
-C.eLZ.prototype={
+C.eM9.prototype={
 $1(d){var w=B.a.i(d)
 A.a7(this.a,!1).K(w)
 return null},
 $S:2}
-C.eM_.prototype={
+C.eMa.prototype={
 $0(){A.a7(this.a,!1).K(null)
 return null},
 $S:0}
-C.eM0.prototype={
+C.eMb.prototype={
 $0(){var w=B.a.i(this.b.a.a)
 A.a7(this.a,!1).K(w)
 return null},
 $S:0}
-C.eM2.prototype={
+C.eMd.prototype={
 $1(d){return d.a===this.a.a.c.a},
 $S:z+2}
-C.eM3.prototype={
+C.eMe.prototype={
 $0(){},
 $S:0}
-C.eM4.prototype={
+C.eMf.prototype={
 $0(){return this.a.e=!0},
 $S:0}
-C.eM5.prototype={
+C.eMg.prototype={
 $0(){return this.a.e=!1},
 $S:0}
-C.dga.prototype={
+C.dgl.prototype={
 $0(){A.a7(this.a,!1).K(null)
 return null},
 $S:0}
-C.dg9.prototype={
+C.dgk.prototype={
 $0(){var w=this.a
-return w.n(new C.dg8(w,this.b))},
+return w.n(new C.dgj(w,this.b))},
 $S:0}
-C.dg8.prototype={
+C.dgj.prototype={
 $0(){return this.a.d=this.b},
 $S:0}
-C.c5k.prototype={
+C.c5p.prototype={
 $1(d){var w,v,u,t,s,r=A.Z(d,x.N,x.z),q=r.h(0,"id")
 q=J.k(q==null?"":q)
 w=r.h(0,"title")
@@ -3305,42 +3305,42 @@ r=A.aQ(r.h(0,"durationSec"))
 r=r==null?null:B.k.L(r)
 return new C.ov(q,w,v,u,t,s,r==null?0:r)},
 $S:z+10}
-C.c5l.prototype={
+C.c5q.prototype={
 $2(d,e){return e.d.aI(0,d.d)},
 $S:z+11}
-C.c5m.prototype={
+C.c5r.prototype={
 $1(d){return d.ad()},
 $S:z+12}
-C.c5j.prototype={
+C.c5o.prototype={
 $1(d){return d.a===this.a},
 $S:z+2}
-C.c5i.prototype={
+C.c5n.prototype={
 $1(d){var w=this.a
 if(!w.Q||w.c==null||w.as)return
-w.at=w.apt()
+w.at=w.apu()
 w.b_()},
 $S:14}
-C.c50.prototype={
+C.c55.prototype={
 $1(d){var w=x.C.a(new A.r6([],[]).oP(d.target.result,!1)),v=w.objectStoreNames
 if(!B.wc.q(v,"blobs"))B.w8.Jc(w,"blobs")},
 $S:198}
-C.c4Y.prototype={
-$1(d){var w,v=B.DO.ga3A(this.a)
+C.c52.prototype={
+$1(d){var w,v=B.DT.ga3B(this.a)
 if(x.J.b(v))this.b.d0(0,J.eO(v,0,null))
 else{w=this.b
 if(x.D.b(v))w.d0(0,new Uint8Array(A.cl(v)))
 else w.d0(0,null)}},
 $S:120}
-C.c4Z.prototype={
+C.c53.prototype={
 $1(d){var w=this.a
 if((w.a.a&30)===0)w.d0(0,null)},
 $S:120}
-C.c5_.prototype={
+C.c54.prototype={
 $0(){var w=this.a
 if((w.a.a&30)===0)w.d0(0,null)
 return null},
 $S:11}
-C.c57.prototype={
+C.c5c.prototype={
 $1(d){var w,v,u,t,s,r,q,p,o,n,m,l=this
 try{q=l.b
 l.a.getFloatTimeDomainData(q)
@@ -3353,57 +3353,57 @@ n=A.aQ(l.d.currentTime)
 r=n==null?0:n
 s.setTargetAtTime(t,r,0.02)}catch(m){}},
 $S:14}
-C.c59.prototype={
+C.c5e.prototype={
 $1(d){return d.id==this.a.dx.id},
 $S:1895}
-C.c56.prototype={
-$1(d){return this.a.a6K()},
+C.c5b.prototype={
+$1(d){return this.a.a6L()},
 $S:14}
-C.c53.prototype={
+C.c58.prototype={
 $1(d){var w
 try{d.stop()}catch(w){}},
 $S:335}
-C.c5c.prototype={
-$1(d){this.a.bRL(d)},
+C.c5h.prototype={
+$1(d){this.a.bRO(d)},
 $S:31}
-C.c5d.prototype={
+C.c5i.prototype={
 $1(d){this.a.a="Recorder error while capturing."
 $.al.$1("[live_capture] recorder error: "+A.t(d))},
 $S:31}
-C.c5e.prototype={
-$1(d){var w,v
-try{w=this.a.d
-if((w==null?null:w.state)==="recording")w.requestData()}catch(v){}},
-$S:14}
-C.c5a.prototype={
-$1(d){return this.a.a6K()},
-$S:14}
-C.c5b.prototype={
+C.c5j.prototype={
 $1(d){var w,v
 try{w=this.a.d
 if((w==null?null:w.state)==="recording")w.requestData()}catch(v){}},
 $S:14}
 C.c5f.prototype={
+$1(d){return this.a.a6L()},
+$S:14}
+C.c5g.prototype={
+$1(d){var w,v
+try{w=this.a.d
+if((w==null?null:w.state)==="recording")w.requestData()}catch(v){}},
+$S:14}
+C.c5k.prototype={
 $1(d){var w=this.a
 if((w.a.a&30)===0)w.fB(0)},
 $S:31}
-C.c58.prototype={
+C.c5d.prototype={
 $1(d){var w
 try{d.stop()}catch(w){}},
 $S:335}
-C.c54.prototype={
+C.c59.prototype={
 $1(d){var w
 try{d.stop()}catch(w){}},
 $S:335}
-C.c55.prototype={
+C.c5a.prototype={
 $1(d){var w
 try{d.stop()}catch(w){}},
 $S:335}
-C.c5h.prototype={
+C.c5m.prototype={
 $0(){var w
-try{B.yx.f1(this.a)}catch(w){}try{(self.URL||self.webkitURL).revokeObjectURL(this.b)}catch(w){}},
+try{B.yy.f1(this.a)}catch(w){}try{(self.URL||self.webkitURL).revokeObjectURL(this.b)}catch(w){}},
 $S:0}
-C.eJT.prototype={
+C.eK3.prototype={
 $1(d){var w,v,u,t,s="true",r=document,q=r.createElement("div"),p=q.style
 p.width="100%"
 p=q.style
@@ -3450,126 +3450,126 @@ r=p.a.c
 if(x.E.b(r))u.srcObject=r
 r=u.play()
 r.toString
-A.ea(r,x.z).eM(new C.eJS())
+A.ea(r,x.z).eM(new C.eK2())
 p.e=u
 q.appendChild(u).toString
 return q},
 $S:479}
-C.eJS.prototype={
+C.eK2.prototype={
 $1(d){$.al.$1("[live_capture] preview play: "+A.t(d))},
 $S:29}
-C.eJU.prototype={
+C.eK4.prototype={
 $1(d){},
-$S:29};(function aliases(){var w=C.aI8.prototype
-w.bp0=w.p})();(function installTearOffs(){var w=a._instance_0u,v=a._instance_1u,u=a._instance_0i
+$S:29};(function aliases(){var w=C.aIb.prototype
+w.bp1=w.p})();(function installTearOffs(){var w=a._instance_0u,v=a._instance_1u,u=a._instance_0i
 var t
-w(t=C.azW.prototype,"gbCs","bCt",1)
-w(t,"gaVI","c3h",1)
-w(t,"gbZo","CU",0)
-w(t,"gcnb","afg",0)
-w(t,"gcnx","PR",0)
-w(t,"gcld","cle",1)
-v(t,"gbTw","bTx",4)
-w(t,"gcqO","cqP",1)
-w(t,"gcr4","afV",0)
-w(t,"gcqZ","afU",0)
-w(t,"gbIq","a82",0)
-w(t=C.aEV.prototype,"gcfp","Id",0)
-w(t,"gbZp","Xj",0)
-u(t,"gbZm","Xh",0)
-v(C.ayM.prototype,"gcnq","cnr",9)
-v(C.aXo.prototype,"gb2o","crq",13)})();(function inheritance(){var w=a.mixinHard,v=a.inheritMany,u=a.inherit
-v(A.mb,[C.Ai,C.ayL])
-v(A.i2,[C.fsG,C.dEQ,C.dEq,C.dEv,C.dEu,C.dEO,C.dEA,C.dEp,C.dEm,C.dEz,C.eM1,C.eLZ,C.eM2,C.c5k,C.c5m,C.c5j,C.c5i,C.c50,C.c4Y,C.c4Z,C.c57,C.c59,C.c56,C.c53,C.c5c,C.c5d,C.c5e,C.c5a,C.c5b,C.c5f,C.c58,C.c54,C.c55,C.eJT,C.eJS,C.eJU])
-v(A.ae,[C.SC,C.Zr,C.XK,C.aEA])
-v(A.ag,[C.aI8,C.aEV,C.ayM,C.bnZ])
-u(C.azW,C.aI8)
-v(A.jk,[C.dEP,C.dEr,C.dEs,C.dEg,C.dEt,C.dEw,C.dEB,C.dEC,C.dED,C.dEE,C.dEl,C.dEF,C.dEG,C.dEH,C.dEn,C.dEo,C.dEk,C.dEj,C.dEJ,C.dEM,C.dEN,C.dEK,C.dEL,C.dEy,C.dEx,C.dEh,C.dEi,C.eLX,C.eLY,C.eM_,C.eM0,C.eM3,C.eM4,C.eM5,C.dga,C.dg9,C.dg8,C.c5_,C.c5h])
-v(A.kx,[C.dEI,C.dEf,C.c5l])
-v(A.aB,[C.ov,C.aXp,C.aXo])
-u(C.aXq,A.p0)
-u(C.bqK,A.ar)
-w(C.aI8,A.eJ)})()
-A.kd(b.typeUniverse,JSON.parse('{"SC":{"ae":[],"r":[]},"Zr":{"ae":[],"r":[]},"XK":{"ae":[],"r":[]},"azW":{"ag":["SC"]},"aEV":{"ag":["Zr"]},"ayM":{"ag":["XK"]},"aXq":{"az":[]},"aEA":{"ae":[],"r":[]},"bnZ":{"ag":["aEA"]},"bqK":{"ar":[],"r":[]}}'))
+w(t=C.azZ.prototype,"gbCu","bCv",1)
+w(t,"gaVJ","c3k",1)
+w(t,"gbZr","CX",0)
+w(t,"gcne","afh",0)
+w(t,"gcnA","PS",0)
+w(t,"gclg","clh",1)
+v(t,"gbTz","bTA",4)
+w(t,"gcqR","cqS",1)
+w(t,"gcr7","afW",0)
+w(t,"gcr1","afV",0)
+w(t,"gbIs","a83",0)
+w(t=C.aEY.prototype,"gcfs","Id",0)
+w(t,"gbZs","Xk",0)
+u(t,"gbZp","Xi",0)
+v(C.ayP.prototype,"gcnt","cnu",9)
+v(C.aXs.prototype,"gb2p","crt",13)})();(function inheritance(){var w=a.mixinHard,v=a.inheritMany,u=a.inherit
+v(A.mb,[C.Aj,C.ayO])
+v(A.i2,[C.fsT,C.dF0,C.dEB,C.dEG,C.dEF,C.dEZ,C.dEL,C.dEA,C.dEx,C.dEK,C.eMc,C.eM9,C.eMd,C.c5p,C.c5r,C.c5o,C.c5n,C.c55,C.c52,C.c53,C.c5c,C.c5e,C.c5b,C.c58,C.c5h,C.c5i,C.c5j,C.c5f,C.c5g,C.c5k,C.c5d,C.c59,C.c5a,C.eK3,C.eK2,C.eK4])
+v(A.ae,[C.SF,C.Zu,C.XN,C.aED])
+v(A.ag,[C.aIb,C.aEY,C.ayP,C.bo3])
+u(C.azZ,C.aIb)
+v(A.jk,[C.dF_,C.dEC,C.dED,C.dEr,C.dEE,C.dEH,C.dEM,C.dEN,C.dEO,C.dEP,C.dEw,C.dEQ,C.dER,C.dES,C.dEy,C.dEz,C.dEv,C.dEu,C.dEU,C.dEX,C.dEY,C.dEV,C.dEW,C.dEJ,C.dEI,C.dEs,C.dEt,C.eM7,C.eM8,C.eMa,C.eMb,C.eMe,C.eMf,C.eMg,C.dgl,C.dgk,C.dgj,C.c54,C.c5m])
+v(A.kx,[C.dET,C.dEq,C.c5q])
+v(A.aB,[C.ov,C.aXt,C.aXs])
+u(C.aXu,A.p0)
+u(C.bqP,A.ar)
+w(C.aIb,A.eJ)})()
+A.kd(b.typeUniverse,JSON.parse('{"SF":{"ae":[],"r":[]},"Zu":{"ae":[],"r":[]},"XN":{"ae":[],"r":[]},"azZ":{"ag":["SF"]},"aEY":{"ag":["Zu"]},"ayP":{"ag":["XN"]},"aXu":{"az":[]},"aED":{"ae":[],"r":[]},"bo3":{"ag":["aED"]},"bqP":{"ar":[],"r":[]}}'))
 var y={k:"2. Open Recorder Studio and tap Start Video.",j:"Recording \u2014 tap Stop & Save when finished.",d:"Saved. Open it below to play, edit, or download."}
 var x=(function rtii(){var w=A.aA
-return{d:w("mI"),Q:w("JU"),J:w("tu"),C:w("qp"),v:w("Qx"),B:w("dQ"),x:w("au<~>"),V:w("N<aa>"),W:w("N<x>"),k:w("N<lf>"),t:w("N<a0<n,@>>"),G:w("N<ov>"),f:w("N<aB>"),s:w("N<n>"),p:w("N<r>"),F:w("ak<ov>"),j:w("ak<@>"),I:w("ak<I>"),Y:w("a0<n,aB>"),P:w("a0<n,@>"),M:w("a0<@,@>"),w:w("iA"),E:w("KZ"),A:w("uX"),m:w("ov"),Z:w("aB"),_:w("vf"),N:w("n"),L:w("bm<v>"),D:w("dz"),O:w("cv<n>"),h:w("bL<dz?>"),a:w("bL<~>"),g:w("bd<qp>"),U:w("bd<dz?>"),b:w("bd<~>"),q:w("mz"),y:w("S"),i:w("Q"),z:w("@"),S:w("I"),u:w("KZ?"),R:w("ov?"),l:w("aXp?"),X:w("aB?"),T:w("n?"),K:w("dz?"),H:w("~")}})();(function constants(){var w=a.makeConstList
-D.aOZ=new A.bv(B.jL,B.jL,B.jL,B.jL)
-D.aYe=new A.f9(2.5,null,null,null,null,B.br,null,null,null,null)
-D.aW5=new A.cw(B.B,null,null,D.aYe,null)
-D.bcA=new A.b7(35e3)
-D.beK=new A.M(12,8,12,16)
-D.bgl=new A.M(18,14,18,20)
-D.bgm=new A.M(18,14,18,22)
-D.bjI=new A.M(8,8,8,18)
-D.ex9=new A.F(!0,B.br,null,null,null,null,12,B.u,null,1.2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.eNg=new A.w("VIDEO",null,D.ex9,null,null,null,null,null,null,null,null,null)
-D.bkR=new A.bF(1,B.bn,D.eNg,null)
-D.bob=new A.a_(62819,"MaterialIcons",!1)
-D.bov=new A.a_(62995,"MaterialIcons",!1)
-D.ag8=new A.a_(63397,"MaterialIcons",!1)
-D.bpu=new A.a_(63457,"MaterialIcons",!1)
-D.brn=new A.a_(985101,"MaterialIcons",!1)
-D.btR=new A.ac(B.p6,22,B.c,null,null,null)
-D.buE=new A.ac(D.ag8,22,B.c,null,null,null)
-D.bv1=new A.ac(B.kY,16,B.c,null,null,null)
-D.bwe=new A.ac(B.rN,null,B.c,null,null,null)
-D.cJW=w(["1. Open ngmy.org in Chrome, Edge, or Safari.","2. Click Start Video in Recorder Studio.","3. Click Allow in the browser microphone prompt.","4. If blocked: click the lock icon in the address bar \u2192 Site settings \u2192 Microphone \u2192 Allow.","5. On Mac: System Settings \u2192 Privacy & Security \u2192 Microphone \u2192 enable your browser.","6. On Windows: Settings \u2192 Privacy \u2192 Microphone \u2192 allow desktop apps and your browser.","7. Refresh ngmy.org and click Start Video again."],x.s)
-D.a0w=new C.Ai(0,"instant")
-D.a0x=new C.Ai(1,"slideHorizontal")
-D.az1=new C.Ai(2,"slideVertical")
-D.az2=new C.Ai(3,"fade")
-D.a_i=w([D.a0w,D.a0x,D.az1,D.az2],A.aA("N<Ai>"))
-D.cS4=w(["1. Open ngmy.org in Chrome (recommended).",y.k,"3. When Android asks, tap Allow while using the app.","4. If blocked: tap the lock icon in the address bar \u2192 Permissions \u2192 Microphone \u2192 Allow.","5. Or go to Settings \u2192 Apps \u2192 Chrome \u2192 Permissions \u2192 Microphone \u2192 Allow.","6. Refresh the page and tap Start Video again."],x.s)
-D.cW6=w(["1. Open ngmy.org in Safari (Add to Home Screen works too).",y.k,"3. Tap Allow when ngmy.org asks \u2014 this works with Safari set to Ask or Allow.","4. Recommended: Settings \u2192 Safari \u2192 Microphone \u2192 Ask, then Allow inside ngmy.org when recording.","5. If no prompt appears: tap the AA icon in the address bar \u2192 Website Settings \u2192 Microphone \u2192 Allow.","6. Also check: Settings \u2192 Privacy & Security \u2192 Microphone \u2192 Safari ON.","7. Close Safari completely, reopen ngmy.org, tap Start Video, then Allow."],x.s)
-D.aYd=new A.f9(null,null,null,null,null,B.bR,null,null,null,null)
-D.aWP=new A.cw(B.B,null,null,D.aYd,null)
-D.dLf=new A.C(B.em,D.aWP,null)
-D.dRK=new A.z(1080,1080)
-D.dRL=new A.z(1080,1920)
-D.dRS=new A.z(1920,1080)
-D.bsu=new A.ac(B.e4,null,B.c,null,null,null)
-D.eJq=new A.w("Delete",null,B.h7,null,null,null,null,null,null,null,null,null)
-D.cvV=w([D.bsu,B.ab,D.eJq],x.p)
-D.eir=new A.cC(B.aY,B.m2,B.j,B.m,null,B.p,null,0,D.cvV,null)
-D.by2=new A.ac(B.kY,22,B.br,null,null,null)
-D.f07=new A.w("Turn on the microphone",null,B.h8,null,null,null,null,null,null,null,null,null)
-D.bkv=new A.bF(1,B.bn,D.f07,null)
-D.cyB=w([D.by2,B.av,D.bkv],x.p)
-D.eiy=new A.cC(B.aY,B.e,B.j,B.m,null,B.p,null,0,D.cyB,null)
-D.eRC=new A.w("Could not share this recording. Try again after the video finishes loading.",null,null,null,null,null,null,null,null,null,null,null)
-D.eq2=new A.aY(D.eRC,B.bS,null,null,null,null,null,null,B.i_,null,null,null,null,B.S,!1,null,null,null,B.q,null)
-D.f3p=new A.w("Recording paused \u2014 tap Resume when you are ready to continue.",null,null,null,null,null,null,null,null,null,null,null)
-D.erV=new A.aY(D.f3p,B.fQ,null,null,null,null,null,null,B.i_,null,null,null,null,B.fE,!1,null,null,null,B.q,null)
-D.eOn=new A.w("Video ready \u2014 use the share sheet or save from your gallery.",null,null,null,null,null,null,null,null,null,null,null)
-D.esz=new A.aY(D.eOn,B.aW,null,null,null,null,null,null,B.i_,null,null,null,null,B.S,!1,null,null,null,B.q,null)
-D.eAx=new A.F(!0,B.c,null,null,null,null,13,B.a0,null,null,null,null,1.45,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.eDP=new A.F(!0,B.fP,null,null,null,null,12,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.eFn=new A.F(!0,B.aA,null,null,null,null,null,B.a0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.eHd=new A.F(!0,B.aQ,null,null,null,null,12,null,null,null,null,null,1.45,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.eI5=new A.F(!0,B.br,null,null,null,null,12,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.eJm=new A.w("Videos \u2014 tap to play, swipe left to delete.",null,G.a3E,null,null,null,null,null,null,null,null,null)
-D.eJL=new A.w("Waiting for camera\u2026",null,B.l7,null,null,null,null,null,null,null,null,null)
-D.eJR=new A.w("Delete",null,G.aIL,null,null,null,null,null,null,null,null,null)
-D.eJY=new A.w("Could not load this video.",null,B.i0,null,B.L,null,null,null,null,null,null,null)
-D.eMl=new A.w("Media unavailable \u2014 storage was full when saved.",null,B.i0,null,null,null,null,null,null,null,null,null)
-D.eOa=new A.w("Recorder Studio",null,B.oo,null,null,null,null,null,null,null,null,null)
-D.eEB=new A.F(!0,B.br,null,null,null,null,null,B.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.ePw=new A.w("Save",null,D.eEB,null,null,null,null,null,null,null,null,null)
-D.eTV=new A.w("Share",null,B.cc,null,null,null,null,null,null,null,null,null)
-D.evQ=new A.F(!0,B.aA,null,null,null,null,12,null,null,null,null,null,1.45,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.eVL=new A.w("Pick your device below. Follow the steps so videos record with sound.",null,D.evQ,null,null,null,null,null,null,null,null,null)
-D.eYE=new A.w("Your studio library",null,B.fM,null,null,null,null,null,null,null,null,null)
-D.f0N=new A.w("Rename",null,B.kc,null,null,null,null,null,null,null,null,null)
-D.eBy=new A.F(!0,B.ak,null,null,null,null,12,B.a0,null,null,null,null,1.45,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.f1b=new A.w("Tip: Always tap Start Video first \u2014 then allow the mic when your device asks. Recordings made before the mic is allowed will have no sound.",null,D.eBy,null,null,null,null,null,null,null,null,null)
-D.f1V=new A.w("Nothing here yet \u2014 record your first video.",null,B.l7,null,null,null,null,null,null,null,null,null)
-D.f2O=new A.w("Rename",null,B.cc,null,null,null,null,null,null,null,null,null)
-D.f4l=new A.w("Loading video\u2026",null,B.i0,null,null,null,null,null,null,null,null,null)
-D.f7n=new A.uk(B.yE,P.a6l)
-D.aMA=new C.ayL(0,"iphone")
-D.fbe=new C.ayL(1,"android")
-D.fbf=new C.ayL(2,"computer")
-D.fbg=new C.XK(null)})();(function staticFields(){$.fAx=null})();(function lazyInitializers(){var w=a.lazyFinal
-w($,"hYM","nA",()=>new C.aXq(new C.aXo(A.a([],A.aA("N<mI>"))),B.bu,$.at()))})()};
-(a=>{a["jnfWQwl0Ia2oGxIlKVltSEhLgsQ="]=a.current})($__dart_deferred_initializers__);
+return{d:w("mI"),Q:w("JW"),J:w("tu"),C:w("qp"),v:w("Qz"),B:w("dQ"),x:w("au<~>"),V:w("N<aa>"),W:w("N<x>"),k:w("N<lf>"),t:w("N<a0<n,@>>"),G:w("N<ov>"),f:w("N<aB>"),s:w("N<n>"),p:w("N<r>"),F:w("ak<ov>"),j:w("ak<@>"),I:w("ak<I>"),Y:w("a0<n,aB>"),P:w("a0<n,@>"),M:w("a0<@,@>"),w:w("iA"),E:w("L0"),A:w("uY"),m:w("ov"),Z:w("aB"),_:w("vg"),N:w("n"),L:w("bm<v>"),D:w("dz"),O:w("cv<n>"),h:w("bL<dz?>"),a:w("bL<~>"),g:w("bd<qp>"),U:w("bd<dz?>"),b:w("bd<~>"),q:w("mz"),y:w("R"),i:w("Q"),z:w("@"),S:w("I"),u:w("L0?"),R:w("ov?"),l:w("aXt?"),X:w("aB?"),T:w("n?"),K:w("dz?"),H:w("~")}})();(function constants(){var w=a.makeConstList
+D.aP4=new A.bu(B.jK,B.jK,B.jK,B.jK)
+D.aYk=new A.f9(2.5,null,null,null,null,B.br,null,null,null,null)
+D.aWb=new A.cw(B.B,null,null,D.aYk,null)
+D.bcO=new A.b7(35e3)
+D.beZ=new A.M(12,8,12,16)
+D.bgC=new A.M(18,14,18,20)
+D.bgD=new A.M(18,14,18,22)
+D.bk_=new A.M(8,8,8,18)
+D.exE=new A.F(!0,B.br,null,null,null,null,12,B.u,null,1.2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.eNL=new A.w("VIDEO",null,D.exE,null,null,null,null,null,null,null,null,null)
+D.bl8=new A.bE(1,B.bn,D.eNL,null)
+D.boB=new A.a_(62819,"MaterialIcons",!1)
+D.boV=new A.a_(62995,"MaterialIcons",!1)
+D.agd=new A.a_(63397,"MaterialIcons",!1)
+D.bpU=new A.a_(63457,"MaterialIcons",!1)
+D.brN=new A.a_(985101,"MaterialIcons",!1)
+D.buf=new A.ac(B.p6,22,B.c,null,null,null)
+D.bv2=new A.ac(D.agd,22,B.c,null,null,null)
+D.bvq=new A.ac(B.kY,16,B.c,null,null,null)
+D.bwD=new A.ac(B.rN,null,B.c,null,null,null)
+D.cKm=w(["1. Open ngmy.org in Chrome, Edge, or Safari.","2. Click Start Video in Recorder Studio.","3. Click Allow in the browser microphone prompt.","4. If blocked: click the lock icon in the address bar \u2192 Site settings \u2192 Microphone \u2192 Allow.","5. On Mac: System Settings \u2192 Privacy & Security \u2192 Microphone \u2192 enable your browser.","6. On Windows: Settings \u2192 Privacy \u2192 Microphone \u2192 allow desktop apps and your browser.","7. Refresh ngmy.org and click Start Video again."],x.s)
+D.a0y=new C.Aj(0,"instant")
+D.a0z=new C.Aj(1,"slideHorizontal")
+D.az7=new C.Aj(2,"slideVertical")
+D.az8=new C.Aj(3,"fade")
+D.a_k=w([D.a0y,D.a0z,D.az7,D.az8],A.aA("N<Aj>"))
+D.cSx=w(["1. Open ngmy.org in Chrome (recommended).",y.k,"3. When Android asks, tap Allow while using the app.","4. If blocked: tap the lock icon in the address bar \u2192 Permissions \u2192 Microphone \u2192 Allow.","5. Or go to Settings \u2192 Apps \u2192 Chrome \u2192 Permissions \u2192 Microphone \u2192 Allow.","6. Refresh the page and tap Start Video again."],x.s)
+D.cWB=w(["1. Open ngmy.org in Safari (Add to Home Screen works too).",y.k,"3. Tap Allow when ngmy.org asks \u2014 this works with Safari set to Ask or Allow.","4. Recommended: Settings \u2192 Safari \u2192 Microphone \u2192 Ask, then Allow inside ngmy.org when recording.","5. If no prompt appears: tap the AA icon in the address bar \u2192 Website Settings \u2192 Microphone \u2192 Allow.","6. Also check: Settings \u2192 Privacy & Security \u2192 Microphone \u2192 Safari ON.","7. Close Safari completely, reopen ngmy.org, tap Start Video, then Allow."],x.s)
+D.aYj=new A.f9(null,null,null,null,null,B.bR,null,null,null,null)
+D.aWV=new A.cw(B.B,null,null,D.aYj,null)
+D.dLK=new A.C(B.em,D.aWV,null)
+D.dSg=new A.z(1080,1080)
+D.dSh=new A.z(1080,1920)
+D.dSo=new A.z(1920,1080)
+D.bsU=new A.ac(B.e4,null,B.c,null,null,null)
+D.eJV=new A.w("Delete",null,B.h8,null,null,null,null,null,null,null,null,null)
+D.cwk=w([D.bsU,B.aa,D.eJV],x.p)
+D.eiX=new A.cC(B.aY,B.m3,B.j,B.m,null,B.p,null,0,D.cwk,null)
+D.byr=new A.ac(B.kY,22,B.br,null,null,null)
+D.f0D=new A.w("Turn on the microphone",null,B.h9,null,null,null,null,null,null,null,null,null)
+D.bkN=new A.bE(1,B.bn,D.f0D,null)
+D.cz_=w([D.byr,B.av,D.bkN],x.p)
+D.ej3=new A.cC(B.aY,B.e,B.j,B.m,null,B.p,null,0,D.cz_,null)
+D.eS7=new A.w("Could not share this recording. Try again after the video finishes loading.",null,null,null,null,null,null,null,null,null,null,null)
+D.eqy=new A.aY(D.eS7,B.bS,null,null,null,null,null,null,B.i_,null,null,null,null,B.S,!1,null,null,null,B.q,null)
+D.f3W=new A.w("Recording paused \u2014 tap Resume when you are ready to continue.",null,null,null,null,null,null,null,null,null,null,null)
+D.esq=new A.aY(D.f3W,B.fQ,null,null,null,null,null,null,B.i_,null,null,null,null,B.fE,!1,null,null,null,B.q,null)
+D.eOS=new A.w("Video ready \u2014 use the share sheet or save from your gallery.",null,null,null,null,null,null,null,null,null,null,null)
+D.et4=new A.aY(D.eOS,B.aW,null,null,null,null,null,null,B.i_,null,null,null,null,B.S,!1,null,null,null,B.q,null)
+D.eB1=new A.F(!0,B.c,null,null,null,null,13,B.a0,null,null,null,null,1.45,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.eEj=new A.F(!0,B.fP,null,null,null,null,12,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.eFS=new A.F(!0,B.aA,null,null,null,null,null,B.a0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.eHI=new A.F(!0,B.aQ,null,null,null,null,12,null,null,null,null,null,1.45,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.eIA=new A.F(!0,B.br,null,null,null,null,12,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.eJR=new A.w("Videos \u2014 tap to play, swipe left to delete.",null,G.a3G,null,null,null,null,null,null,null,null,null)
+D.eKf=new A.w("Waiting for camera\u2026",null,B.l7,null,null,null,null,null,null,null,null,null)
+D.eKl=new A.w("Delete",null,G.aIS,null,null,null,null,null,null,null,null,null)
+D.eKs=new A.w("Could not load this video.",null,B.i0,null,B.L,null,null,null,null,null,null,null)
+D.eMQ=new A.w("Media unavailable \u2014 storage was full when saved.",null,B.i0,null,null,null,null,null,null,null,null,null)
+D.eOF=new A.w("Recorder Studio",null,B.oo,null,null,null,null,null,null,null,null,null)
+D.eF5=new A.F(!0,B.br,null,null,null,null,null,B.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.eQ0=new A.w("Save",null,D.eF5,null,null,null,null,null,null,null,null,null)
+D.eUq=new A.w("Share",null,B.cc,null,null,null,null,null,null,null,null,null)
+D.ewl=new A.F(!0,B.aA,null,null,null,null,12,null,null,null,null,null,1.45,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.eWg=new A.w("Pick your device below. Follow the steps so videos record with sound.",null,D.ewl,null,null,null,null,null,null,null,null,null)
+D.eZ9=new A.w("Your studio library",null,B.fM,null,null,null,null,null,null,null,null,null)
+D.f1i=new A.w("Rename",null,B.kd,null,null,null,null,null,null,null,null,null)
+D.eC2=new A.F(!0,B.aj,null,null,null,null,12,B.a0,null,null,null,null,1.45,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.f1H=new A.w("Tip: Always tap Start Video first \u2014 then allow the mic when your device asks. Recordings made before the mic is allowed will have no sound.",null,D.eC2,null,null,null,null,null,null,null,null,null)
+D.f2r=new A.w("Nothing here yet \u2014 record your first video.",null,B.l7,null,null,null,null,null,null,null,null,null)
+D.f3k=new A.w("Rename",null,B.cc,null,null,null,null,null,null,null,null,null)
+D.f4T=new A.w("Loading video\u2026",null,B.i0,null,null,null,null,null,null,null,null,null)
+D.f7V=new A.ul(B.yF,P.a6o)
+D.aMG=new C.ayO(0,"iphone")
+D.fbM=new C.ayO(1,"android")
+D.fbN=new C.ayO(2,"computer")
+D.fbO=new C.XN(null)})();(function staticFields(){$.fAK=null})();(function lazyInitializers(){var w=a.lazyFinal
+w($,"hZ_","nA",()=>new C.aXu(new C.aXs(A.a([],A.aA("N<mI>"))),B.bu,$.at()))})()};
+(a=>{a["1XyD0lLMjoedi2sZs64xVJRYIzs="]=a.current})($__dart_deferred_initializers__);
