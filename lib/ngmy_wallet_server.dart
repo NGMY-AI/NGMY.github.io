@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_game_queue.dart';
 import 'ngmy_game_session.dart';
 import 'ngmy_network_resilience.dart';
 
@@ -103,7 +104,8 @@ double ngmyUnsettledGameNetFor(String key) {
   for (final e in ngmyUnsettledGameTxns.values) {
     if (e.key == key) sum += e.delta;
   }
-  return sum;
+  // Games waiting in the phone's offline queue count too (after a restart the map above is empty).
+  return sum + ngmyGameQueueNetFor(key, ngmyUnsettledGameTxns.keys.toSet());
 }
 
 /// When this phone last saved a spend (a lower balance) for an account. Debits older than this have

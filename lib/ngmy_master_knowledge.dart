@@ -51,7 +51,7 @@ const List<String> kNgmyFeatureFacts = [
   'DOC SHARE, QR GENERATOR, RECORDER STUDIO, VIDEO STUDIO, PLAY ZONE AND PHONE UNLOCK: tools in the Creator Hub.',
   'APP BUILDER: describe an app and the AI builds it, including real web apps you can publish.',
   'DOCUMENT SCANNER: scan papers with the phone camera.',
-  'GAME CENTER AND VAULT ARCADE: arcade games you can play. Game bets and wins have their own receipts and do not appear in the wallet history.',
+  'GAME CENTER AND VAULT ARCADE: arcade games you can play. Game bets and wins have their own receipts and do not appear in the wallet history. Games played offline are saved on the phone and counted on the balance, then applied to the account in order as soon as the phone is online again, and every device updates.',
 ];
 
 /// The whole knowledge block for the AI writers.

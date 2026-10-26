@@ -82,6 +82,7 @@ import 'ngmy_supabase_columns.dart';
 import 'ngmy_password_reset_otp.dart';
 import 'ngmy_db_relay.dart';
 import 'ngmy_admin_sheets.dart';
+import 'ngmy_game_queue.dart';
 import 'ngmy_wallet_server.dart';
 import 'ngmy_supabase_config.dart';
 import 'ngmy_supabase_auth.dart';
@@ -11140,11 +11141,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       final prefs = await SharedPreferences.getInstance();
       final ids = prefs.getStringList(_kTxnOutboxKey) ?? const [];
       _txnOutbox.addAll(ids);
+      await ngmyGameQueueLoad();
       // Reloading from the database keeps anything still waiting here.
       _dirtyTransactionIds.addAll(ids);
     } catch (_) {}
     _txnOutboxFlushTimer ??= Timer.periodic(const Duration(minutes: 1), (_) {
-      if (_txnOutbox.isNotEmpty) unawaited(_flushTxnOutbox());
+      if (_txnOutbox.isNotEmpty || ngmyGameQueue.isNotEmpty) unawaited(_flushTxnOutbox());
     });
   }
 
@@ -11163,15 +11165,42 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   /// shows. Falls back to the outbox when the server cannot be reached.
   Future<void> _settleGameTxnOnServer(AppTransaction t) async {
     ngmyBeginGameSettle();
-    ngmyUnsettledGameTxns[t.id] = (
-      key: ngmyNormalizeEmail(t.userEmail),
-      delta: _ngmyTxnIncreasesBalance(t) ? t.amount : -t.amount,
-    );
+    final gameKey = ngmyNormalizeEmail(t.userEmail);
+    final gameDelta = _ngmyTxnIncreasesBalance(t) ? t.amount : -t.amount;
+    ngmyUnsettledGameTxns[t.id] = (key: gameKey, delta: gameDelta);
+    // Kept in full on the phone until the server has applied it, so offline games are replayed later.
+    ngmyGameQueueAdd(NgmyQueuedGameTxn(id: t.id, key: gameKey, delta: gameDelta, at: t.timestamp, txn: Map<String, dynamic>.from(t.toJson())));
     try {
       await _settleGameTxnOnServerInner(t);
     } finally {
+      // Applied (or refused for good) on the server: nothing left to replay.
+      if (!ngmyUnsettledGameTxns.containsKey(t.id)) ngmyGameQueueRemove(t.id);
       ngmyEndGameSettle();
     }
+  }
+
+  bool _gameQueueFlushing = false;
+
+  /// Replays the games waiting on this phone (played offline, or whose save failed), oldest first, once the
+  /// server can be reached, so the balance changes exactly as if they had been played online.
+  Future<void> _flushGameQueue() async {
+    await ngmyGameQueueLoad();
+    if (_gameQueueFlushing || ngmyGameQueue.isEmpty) return;
+    if (!await ngmyCanReachCloud()) return;
+    _gameQueueFlushing = true;
+    try {
+      for (final q in ngmyGameQueueOrdered()) {
+        if (!ngmyGameQueue.containsKey(q.id)) continue;
+        await _settleGameTxnOnServer(AppTransaction.fromJson(q.txn));
+        // Still waiting after the try: the server cannot be reached, so the rest would fail too.
+        if (ngmyGameQueue.containsKey(q.id)) break;
+      }
+    } catch (e) {
+      debugPrint('[game queue] flush: $e');
+    } finally {
+      _gameQueueFlushing = false;
+    }
+    if (mounted) setState(() {});
   }
 
   Future<void> _legacyGameSettleChain = Future<void>.value();
@@ -11231,7 +11260,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     var sum = ngmyUnsettledGameNetFor(key);
     for (final t in _allTransactions) {
       if (!_txnOutbox.contains(t.id) || !ngmyIsServerSettledTransaction(t)) continue;
-      if (ngmyNormalizeEmail(t.userEmail) != key || ngmyUnsettledGameTxns.containsKey(t.id)) continue;
+      if (ngmyNormalizeEmail(t.userEmail) != key || ngmyUnsettledGameTxns.containsKey(t.id) || ngmyGameQueue.containsKey(t.id)) continue;
       sum += _ngmyTxnIncreasesBalance(t) ? t.amount : -t.amount;
     }
     return sum;
@@ -11306,6 +11335,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   /// Sends everything waiting in the outbox (in batches) and clears what got saved.
   Future<void> _flushTxnOutbox() async {
+    await _flushGameQueue();
     if (_txnOutboxFlushing || _txnOutbox.isEmpty) return;
     if (!await ngmyCanReachCloud()) return;
     _txnOutboxFlushing = true;
