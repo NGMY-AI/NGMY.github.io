@@ -81,6 +81,7 @@ import 'ngmy_supabase_sync_throttle.dart';
 import 'ngmy_supabase_columns.dart';
 import 'ngmy_password_reset_otp.dart';
 import 'ngmy_db_relay.dart';
+import 'ngmy_admin_sheets.dart';
 import 'ngmy_wallet_server.dart';
 import 'ngmy_supabase_config.dart';
 import 'ngmy_supabase_auth.dart';
@@ -25796,7 +25797,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           children: [
                             Text('Balance', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isDark ? Colors.white54 : Colors.black45)),
                             const SizedBox(height: 4),
-                            Text('\$${formatCurrency(displayBalance)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Color(0xFF00B25A))),
+                            TweenAnimationBuilder<double>(
+                              tween: Tween<double>(end: displayBalance),
+                              duration: const Duration(milliseconds: 700),
+                              curve: Curves.easeOutCubic,
+                              builder: (context, v, _) => Text('\$${formatCurrency(v)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Color(0xFF00B25A))),
+                            ),
                           ],
                         ),
                       ),
@@ -25835,22 +25841,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
               _adminActionBtn('Suspend', Icons.block, const Color(0xFFF59E0B), () => unawaited(_applyAdminUserAccountChange(u, apply: () => u.status = 'suspended', snack: '${u.username} suspended.'))),
               _adminActionBtn('Verify', Icons.verified_user, const Color(0xFF3B82F6), () => unawaited(_applyAdminUserAccountChange(u, apply: () { u.status = 'verified'; u.isApprovedWorker = true; }, snack: '${u.username} verified.'))),
               _adminActionBtn('Disable', Icons.person_off, const Color(0xFFEF4444), () => unawaited(_applyAdminUserAccountChange(u, apply: () => u.status = 'disabled', snack: '${u.username} disabled.'))),
-              _adminActionBtn('Add', Icons.add, const Color(0xFF14B8A6), () => _prompt(context, 'Add Money (\$)', (val) {
-                final amt = double.tryParse(val) ?? 0;
-                if (amt <= 0) return;
-                widget.onAddTransaction(AppTransaction(id: DateTime.now().toString(), userEmail: u.email, amount: amt, type: TransactionType.adminAdd, method: PaymentMethod.system, sourceDetails: 'Admin credit', status: TransactionStatus.approved, timestamp: DateTime.now()));
-                ngmyReconcileUserAccountBalance(u, widget.allTransactions);
-                widget.onDataChanged();
-                setState(() {});
-              })),
-              _adminActionBtn('Remove', Icons.remove, const Color(0xFFEA580C), () => _prompt(context, 'Remove Money (\$)', (val) {
-                final amt = double.tryParse(val) ?? 0;
-                if (amt <= 0) return;
-                widget.onAddTransaction(AppTransaction(id: DateTime.now().toString(), userEmail: u.email, amount: amt, type: TransactionType.adminRemove, method: PaymentMethod.system, sourceDetails: 'Admin debit', status: TransactionStatus.approved, timestamp: DateTime.now()));
-                ngmyReconcileUserAccountBalance(u, widget.allTransactions);
-                widget.onDataChanged();
-                setState(() {});
-              })),
+              _adminActionBtn('Add', Icons.add, const Color(0xFF14B8A6), () => unawaited(_adminMoney(u, isDark, type: TransactionType.adminAdd, sign: 1, title: 'Add money', icon: Icons.add_circle_rounded, color: const Color(0xFF14B8A6), confirmLabel: 'Add money', detail: 'Admin credit'))),
+              _adminActionBtn('Remove', Icons.remove, const Color(0xFFEA580C), () => unawaited(_adminMoney(u, isDark, type: TransactionType.adminRemove, sign: -1, title: 'Remove money', icon: Icons.remove_circle_rounded, color: const Color(0xFFEA580C), confirmLabel: 'Remove money', detail: 'Admin debit'))),
               _adminActionBtn('Reset', Icons.refresh, const Color(0xFF8B5CF6), () => unawaited(_applyAdminUserAccountChange(u, apply: () {
                 u.isClockedIn = false;
                 u.clockInStartTime = null;
@@ -25859,16 +25851,27 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 u.clockInPenaltyPercent = 0.0;
                 u.forceLogout = false;
               }, snack: '${u.username} clock-in and session reset.'))),
+              if (_adminUserListMode == 'civic')
+                _adminActionBtn('Registry record', Icons.shield_outlined, const Color(0xFF22C55E), () {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Civic Registry records are protected here. They are only changed inside the Civic Registry.')));
+                })
+              else
               _adminActionBtn('Delete', Icons.delete_outline, const Color(0xFF374151), () async {
-                final ok = await showDialog<bool>(context: context, builder: (c) => AlertDialog(
-                  title: const Text('Delete User?'),
-                  content: Text('Permanently remove ${u.username} (${u.email})?'),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('CANCEL')),
-                    TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('DELETE', style: TextStyle(color: Colors.red))),
+                final inRegistry = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email) != null;
+                final ok = await ngmyAdminConfirmSheet(
+                  context,
+                  isDark: isDark,
+                  title: 'Delete this account?',
+                  message: '${u.username} (${u.email}) will be removed from the app. They will no longer be able to use this account.',
+                  icon: Icons.delete_forever_rounded,
+                  color: const Color(0xFFEF4444),
+                  confirmLabel: 'Delete account',
+                  notes: [
+                    if (inRegistry) 'Their Civic Registry record is kept exactly as it is.' else 'Civic Registry records are never changed by deleting an account.',
                   ],
-                ));
-                if (ok != true) return;
+                );
+                if (!ok) return;
+                final registrySnapshot = inRegistry ? Map<String, dynamic>.from(NgmyCivicRegistryMembers.findByEmail(widget.config, u.email)!) : null;
                 final emailKey = u.email.toLowerCase().trim();
                 final deletedName = u.username;
                 ngmyMarkAdminDeletedUser(widget.config, u.email);
@@ -25877,6 +25880,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ngmyAppLoginUserEmails.remove(emailKey);
                 unawaited(ngmyPersistAppLoginUserRegistry());
                 _selectedUserEmail = null;
+                // Safety net: an account delete never takes the Civic Registry record with it.
+                if (registrySnapshot != null && NgmyCivicRegistryMembers.findByEmail(widget.config, emailKey) == null) {
+                  NgmyCivicRegistryMembers.upsert(widget.config, registrySnapshot);
+                }
                 widget.onDataChanged();
                 setState(() {});
                 final configOk = await (widget.onPersistManagementConfig?.call() ?? ngmyAdminPersistManagementConfig(widget.config));
@@ -25897,33 +25904,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
               _adminActionBtn('Referrals', Icons.link, const Color(0xFF06B6D4), () {
                 final code = 'REFD${u.email.hashCode.abs().toString().padLeft(6, '0').substring(0, 6)}';
                 final refs = widget.allUsers.where((x) => x.referredByCode.trim().toUpperCase() == code.toUpperCase()).toList();
-                showDialog(context: context, builder: (c) => AlertDialog(
-                  title: Text('Referrals — ${u.username}'),
-                  content: SizedBox(
-                    width: 320,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Code: $code', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        Text('Total referrals: ${u.referralCount}', style: const TextStyle(fontSize: 12)),
-                        const SizedBox(height: 10),
-                        if (refs.isEmpty) const Text('No referred users yet.')
-                        else ...refs.map((r) => Padding(padding: const EdgeInsets.only(bottom: 4), child: Text('• ${r.username} (${r.email})', style: const TextStyle(fontSize: 12)))),
-                      ],
-                    ),
-                  ),
-                  actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('CLOSE'))],
-                ));
+                unawaited(ngmyAdminReferralsSheet(context, isDark: isDark, name: u.username, code: code, total: u.referralCount, people: [for (final r in refs) (r.username, r.email)]));
               }),
-              _adminActionBtn('Reimburse', Icons.sync, const Color(0xFF14B8A6), () => _prompt(context, 'Reimburse Amount (\$)', (val) {
-                final amt = double.tryParse(val) ?? 0;
-                if (amt <= 0) return;
-                widget.onAddTransaction(AppTransaction(id: DateTime.now().toString(), userEmail: u.email, amount: amt, type: TransactionType.reimbursement, method: PaymentMethod.system, sourceDetails: 'Admin reimbursement', status: TransactionStatus.approved, timestamp: DateTime.now()));
-                ngmyReconcileUserAccountBalance(u, widget.allTransactions);
-                widget.onDataChanged();
-                setState(() {});
-              })),
+              _adminActionBtn('Reimburse', Icons.sync, const Color(0xFF14B8A6), () => unawaited(_adminMoney(u, isDark, type: TransactionType.reimbursement, sign: 1, title: 'Reimburse', icon: Icons.sync_rounded, color: const Color(0xFF14B8A6), confirmLabel: 'Reimburse', detail: 'Admin reimbursement'))),
               _adminActionBtn('Force Logout', Icons.logout, const Color(0xFFDC2626), () => unawaited(_applyAdminUserAccountChange(u, apply: () => u.forceLogout = true, snack: '${u.username} will be logged out on next refresh.'))),
               _adminActionBtn('Edit User', Icons.edit, const Color(0xFF6366F1), () => _showEditUserDialog(u, isDark)),
             ],
@@ -25963,11 +25946,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () => _prompt(context, 'Free Fix Credit (\$)', (val) {
-                      final amt = double.tryParse(val) ?? 0;
-                      if (amt <= 0) return;
+                    onPressed: () async {
+                      final amt = await ngmyAdminMoneySheet(context, isDark: isDark, title: 'Grant free fix credit', subtitle: 'Work value covered for free for ${u.username}', icon: Icons.build_rounded, color: const Color(0xFF14B8A6), confirmLabel: 'Grant credit', balance: u.freeFixCredit, sign: 0);
+                      if (amt == null || amt <= 0) return;
                       unawaited(_applyAdminUserAccountChange(u, apply: () => u.freeFixCredit += amt, snack: 'Granted \$${formatCurrency(amt)} free fix credit to ${u.username}.'));
-                    }),
+                    },
                     icon: const Icon(Icons.build, size: 18),
                     label: const Text('Grant Free Fix', style: TextStyle(fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF14B8A6), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
@@ -26054,48 +26037,70 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  void _showEditUserDialog(UserData u, bool isDark) {
-    final nameC = TextEditingController(text: u.username);
-    final emailC = TextEditingController(text: u.email);
-    final phoneC = TextEditingController(text: ngmyFormatPhoneDisplay(u.phone));
-    final fullC = TextEditingController(text: u.fullName ?? '');
-    showDialog(context: context, builder: (c) => AlertDialog(
-      title: const Text('Edit User'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: nameC, decoration: const InputDecoration(labelText: 'Username')),
-            TextField(controller: emailC, decoration: const InputDecoration(labelText: 'Email')),
-            TextField(
-              controller: phoneC,
-              keyboardType: TextInputType.phone,
-              inputFormatters: const [PhoneDashFormatter()],
-              decoration: const InputDecoration(labelText: 'Phone Number', hintText: '123-456-7890'),
-            ),
-            TextField(controller: fullC, decoration: const InputDecoration(labelText: 'Full Name')),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(c), child: const Text('CANCEL')),
-        ElevatedButton(
-          onPressed: () async {
-            u.username = nameC.text.trim().isEmpty ? u.username : nameC.text.trim();
-            u.email = emailC.text.trim().isEmpty ? u.email : emailC.text.trim();
-            u.phone = ngmyPhoneDigits(phoneC.text);
-            u.fullName = fullC.text.trim().isEmpty ? u.fullName : fullC.text.trim();
-            await _applyAdminUserAccountChange(
-              u,
-              apply: () {},
-              snack: '${u.username} updated.',
-            );
-            unawaited(_pushUserProfileBasicsToCloud(u));
-            if (c.mounted) Navigator.pop(c);
-          },
-          child: const Text('SAVE'),
-        ),
-      ],
+  Future<void> _showEditUserDialog(UserData u, bool isDark) async {
+    final r = await ngmyAdminEditUserSheet(
+      context,
+      isDark: isDark,
+      username: u.username,
+      email: u.email,
+      phone: ngmyFormatPhoneDisplay(u.phone),
+      fullName: u.fullName ?? '',
+      phoneFormatters: const [PhoneDashFormatter()],
+    );
+    if (r == null || !mounted) return;
+    final name = (r['username'] ?? '').trim(), mail = (r['email'] ?? '').trim(), full = (r['fullName'] ?? '').trim();
+    await _applyAdminUserAccountChange(
+      u,
+      apply: () {
+        u.username = name.isEmpty ? u.username : name;
+        u.email = mail.isEmpty ? u.email : mail;
+        u.phone = ngmyPhoneDigits(r['phone'] ?? '');
+        u.fullName = full.isEmpty ? u.fullName : full;
+      },
+      snack: '${u.username} updated.',
+    );
+  }
+
+  /// Adds, removes or reimburses money and shows the new balance on the spot, without waiting for a refresh.
+  Future<void> _adminMoney(
+    UserData u,
+    bool isDark, {
+    required TransactionType type,
+    required int sign,
+    required String title,
+    required IconData icon,
+    required Color color,
+    required String confirmLabel,
+    required String detail,
+  }) async {
+    // From the Civic Registry list this is a copy of the person; money always goes to the real account.
+    final key = ngmyNormalizeEmail(u.email);
+    u = widget.allUsers.firstWhere((x) => ngmyNormalizeEmail(x.email) == key, orElse: () => u);
+    final before = ngmyAdminDisplayBalance(u, widget.allTransactions);
+    final amt = await ngmyAdminMoneySheet(
+      context,
+      isDark: isDark,
+      title: title,
+      subtitle: '@${u.username}  ·  ${u.email}',
+      icon: icon,
+      color: color,
+      confirmLabel: confirmLabel,
+      balance: before,
+      sign: sign,
+    );
+    if (amt == null || amt <= 0 || !mounted) return;
+    final expected = (before + sign * amt).clamp(0.0, double.infinity).toDouble();
+    widget.onAddTransaction(AppTransaction(id: DateTime.now().toString(), userEmail: u.email, amount: amt, type: type, method: PaymentMethod.system, sourceDetails: detail, status: TransactionStatus.approved, timestamp: DateTime.now()));
+    // The balance on screen is the new one right now; background syncing must not paint an older figure over it.
+    u.accountBalance = expected;
+    ngmyNotifyBalanceChanged(email: u.email, balance: expected, allowIncrease: true, authoritative: true);
+    widget.onDataChanged();
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: color,
+      content: Text('${sign < 0 ? '-' : '+'}\$${formatCurrency(amt)}  ·  ${u.username} now has \$${formatCurrency(expected)}', style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
     ));
   }
 
