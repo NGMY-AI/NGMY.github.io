@@ -23848,7 +23848,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Widget _adminHome(bool isDark) {
     final ink = isDark ? Colors.white : const Color(0xFF0F172A);
     final mute = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-    final pendingTx = widget.allTransactions.where((t) => t.status == TransactionStatus.pending).length;
     final revenue = widget.allTransactions
         .where((t) => t.status == TransactionStatus.approved && t.type == TransactionType.deposit)
         .fold(0.0, (s, t) => s + t.amount);
@@ -23859,6 +23858,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final pendingWithdrawals = widget.allTransactions
         .where((t) => t.type == TransactionType.withdrawal && t.status == TransactionStatus.pending)
         .length;
+    // "Waiting for you" counts only deposits and withdrawals that need a decision.
+    final pendingTx = pendingDeposits + pendingWithdrawals;
     final giftsPending = NgmyCivicHelperGifts.openPendingCount(widget.config);
     final loansPending = NgmyAdminMenuCounts.pendingLoanApplications(widget.config.loanApplications);
     final activeUsers = widget.allUsers.where((u) => u.status == 'active' || u.status == 'verified').length;
