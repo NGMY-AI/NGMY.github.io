@@ -20346,8 +20346,16 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
     );
   }
 
+  /// The game colours, deepened so the cards read dark and rich instead of pastel.
+  Color _deepGameColor(Color c) {
+    final hsl = HSLColor.fromColor(c);
+    return hsl.withLightness((hsl.lightness * 0.58).clamp(0.12, 0.30)).withSaturation((hsl.saturation * 0.92).clamp(0.0, 0.9)).toColor();
+  }
+
   Widget _gameTile(_GameDef g) {
     final mp = kNgmyMultiplayerGameIds.contains(g.id);
+    final deep = [for (final c in g.colors) _deepGameColor(c)];
+    final accent = g.colors.first;
     return InkWell(
       onTap: () => _openGame(g),
       borderRadius: BorderRadius.circular(16),
@@ -20355,10 +20363,10 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
         margin: const EdgeInsets.only(bottom: 12),
         height: 92,
         decoration: BoxDecoration(
-          gradient: LinearGradient(colors: g.colors),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withOpacity(0.28)),
-          boxShadow: [BoxShadow(color: g.colors.first.withOpacity(0.4), blurRadius: 12)],
+          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: deep),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: accent.withOpacity(0.35)),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.35), blurRadius: 12, offset: const Offset(0, 5))],
         ),
         child: Row(
           children: [
@@ -20394,9 +20402,19 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
                   onSend: (id, total) => _sendInvite(g, id, total),
                 ),
               ),
-            const Padding(
-              padding: EdgeInsets.only(right: 10),
-              child: Text('▶️', style: TextStyle(fontSize: 28)),
+            Padding(
+              padding: const EdgeInsets.only(right: 14),
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.black.withOpacity(0.28),
+                  border: Border.all(color: accent.withOpacity(0.9), width: 1.6),
+                  boxShadow: [BoxShadow(color: accent.withOpacity(0.35), blurRadius: 10)],
+                ),
+                child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 28),
+              ),
             ),
           ],
         ),

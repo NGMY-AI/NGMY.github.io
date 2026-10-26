@@ -2937,7 +2937,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
               ),
             )
           else ...[
-            for (final t in wallet.take(_historyShown)) _historyRow(t, trail[t.id]),
+            ..._historyRowsWithGaps(wallet.take(_historyShown).toList(), every.values.toList(), trail),
             // Older rows are never dropped — load them on request.
             if (wallet.length > _historyShown)
               TextButton.icon(
@@ -3029,6 +3029,67 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
           ),
         ],
       ),
+    );
+  }
+
+  /// The rows, with a small summary row wherever games or other hidden moves changed the balance between two
+  /// rows, so every Before and After in the list follows on from the one above it.
+  List<Widget> _historyRowsWithGaps(List<AppTransaction> shown, List<AppTransaction> all, Map<String, ({double before, double after})> trail) {
+    final shownIds = {for (final t in shown) t.id};
+    final hiddenSorted = all.where((t) => !shownIds.contains(t.id) && _ngmyBalanceEffect(t).abs() > 0.004).toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final out = <Widget>[];
+    for (var i = 0; i < shown.length; i++) {
+      final a = shown[i];
+      final ta = trail[a.id];
+      if (i == 0 && ta != null) {
+        final newer = hiddenSorted.where((h) => h.timestamp.isAfter(a.timestamp)).length;
+        final now = ngmyLiveBalanceFor(widget.realEmail, fallback: () => widget.user.accountBalance);
+        final net = now - ta.after;
+        if (newer > 0 && net.abs() >= 0.005) out.add(_gapRow(newer, net, ta.after, now));
+      }
+      out.add(_historyRow(a, trail[a.id]));
+      if (i + 1 < shown.length && ta != null) {
+        final b = shown[i + 1];
+        final tb = trail[b.id];
+        if (tb != null) {
+          final between = hiddenSorted.where((h) => h.timestamp.isBefore(a.timestamp) && h.timestamp.isAfter(b.timestamp)).length;
+          final net = ta.before - tb.after;
+          if (between > 0 && net.abs() >= 0.005) out.add(_gapRow(between, net, tb.after, ta.before));
+        }
+      }
+    }
+    return out;
+  }
+
+  Widget _gapRow(int count, double net, double before, double after) {
+    final up = net >= 0;
+    final color = up ? const Color(0xFFA78BFA) : const Color(0xFFFB923C);
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 11),
+      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06)))),
+      child: Row(children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: color.withValues(alpha: 0.14), border: Border.all(color: color.withValues(alpha: 0.4))),
+          child: Icon(Icons.sports_esports_rounded, size: 19, color: color),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Games & other activity', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
+            const SizedBox(height: 2),
+            Text('$count moves in between, see Game Receipts', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11, fontWeight: FontWeight.w600)),
+            Padding(
+              padding: const EdgeInsets.only(top: 5),
+              child: Wrap(spacing: 5, runSpacing: 4, children: [_balanceChip('Before', before), _balanceChip('After', after)]),
+            ),
+          ]),
+        ),
+        const SizedBox(width: 8),
+        Text('${up ? '+' : '-'}\$${formatCurrency(net.abs())}', style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 15)),
+      ]),
     );
   }
 
