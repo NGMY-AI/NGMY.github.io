@@ -1,6 +1,6 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var J,A,C,E,R,G,I,K,U,F,L,V,W,M,N,O,X,B={
-fWd(d){var w,v
+fWe(d){var w,v
 if(d==null)return"No expiry"
 w=d.a
 v=C.o.ak(w,6e7)
@@ -70,7 +70,7 @@ break}w=3
 return A.b(A.cb(null,null,!0,null,new B.f2B(e,r,d,t),d,null,!0,!0,x.H),$async$f2y)
 case 3:case 1:return A.h(u,v)}})
 return A.i($async$f2y,v)},
-hNk(d,e,f,g,h,i){return A.hl(e,new B.al4(i,d,g,h,f,null),!1,"NgmyAppBuilderScreen",x.R)},
+hNl(d,e,f,g,h,i){return A.hl(e,new B.al4(i,d,g,h,f,null),!1,"NgmyAppBuilderScreen",x.R)},
 f2B:function f2B(d,e,f,g){var _=this
 _.a=d
 _.b=e
@@ -149,8 +149,8 @@ dre:function dre(){},
 drf:function drf(d){this.a=d},
 drg:function drg(d){this.a=d},
 drh:function drh(d){this.a=d},
-fda(d,e,f,g){return B.hFO(d,e,f,g)},
-hFO(b0,b1,b2,b3){var w=0,v=A.j(x.U),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9
+fda(d,e,f,g){return B.hFP(d,e,f,g)},
+hFP(b0,b1,b2,b3){var w=0,v=A.j(x.U),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9
 var $async$fda=A.e(function(b4,b5){if(b4===1){s.push(b5)
 w=t}for(;;)switch(w){case 0:a8=A.mD(b1)
 if(a8.b.length===0){u=D.ayV
@@ -162,7 +162,7 @@ a5=J.a6(a4)
 a6=a5.h(a4,"role")==="ai"?"Bolt":"User"
 a3+=a6+": "+A.t(a5.h(a4,"text"))+"\n"}e=a3.length===0?"(none)":a3.charCodeAt(0)==0?a3:a3
 a2=b2.a
-r="You are Bolt editing ONE screen in NGMY App Studio.\nThe user describes how buttons, text, widgets, colors, or designs should look or behave on this screen.\nRemember prior conversation below \u2014 continue from context, do not forget earlier requests.\n\nPRIOR CHAT:\n"+e+'\n\nDESIGN POWERS \u2014 you CAN change:\n- Any widget text, labels, URLs, collections, navigation\n- Colors on widgets: "backgroundColor", "textColor", "accentColor" as hex (#RRGGBB or #AARRGGBB)\n- Button look: large, outlined_button, custom colors\n- Images: image url, profile handle, hero emoji\n- Invoice templateId: '+B.h_X()+'\n- Map: "inApp": true (stay in app), centerLat, centerLng, height\n- QR generator: mode, placeholder, colors, title\n\nRESPONSE FORMAT:\n1) Short friendly reply (1-3 sentences).\n2) Append exactly ---SCREEN_JSON---\n3) Then ONE screen JSON object:\n   {"id":"'+a2+'","title":"...","kind":"custom","data":{"layout":{"type":"column","children":[...]}}}\n\nRULES:\n- Keep screen id "'+a2+'" unchanged.\n- Use kind "custom" with data.layout.children for all widgets.\n- Buttons: {"type":"button","label":"...","target":"<screenId>","action":"navigate|snack|clear"}\n- Text: {"type":"text","text":"...","style":"title|subtitle|body"}\n- Wire "target" to real ids: '+C.Q.aj(f,null)+'\n- If user wants a button to show a message, use action "snack" with "message".\n- Build working widgets \u2014 not placeholder-only text.\n\nCurrent screen JSON:\n'+C.Q.aj(b2.eD(),null)+'\n\nUNLIMITED BUILDS \u2014 THE webApp WIDGET (this is how you build ANYTHING):\nThe ready-made widgets (forms, lists, stats, menus...) cover ordinary business apps. For ANYTHING that needs its own logic, visuals or interaction \u2014 games (snake, tetris, memory, quiz, puzzles, platformers, card games), calculators, converters, timers, stopwatches, drawing boards, music or drum machines, animations, simulators, charts and graph tools, generators, flashcards, planners with custom layouts, scoreboards, brackets, trackers with custom UI, mini tools, anything unusual \u2014 you MUST write it as a real, fully working web app inside a "webApp" widget. YOU write the whole app yourself in HTML, CSS and JavaScript. Never say you cannot. Never answer with a menu of links or a template for these. If you are unsure whether the ready-made widgets can do it, use webApp.\nThe widget (in a screen\'s data.layout, or as the whole layout): {"type":"webApp","id":"game","htmlRef":"game","height":640}\nFor a full-screen app, make that one widget the whole layout and set "fullBleed": true and "hideAppBar": true next to "layout" inside the screen\'s "data".\nWrite the code AFTER the JSON, one block per htmlRef, exactly in this form (not inside the JSON, not in a code fence):\n---HTML:game---\n<!doctype html>\n<html>...the complete app...</html>\n---END_HTML---\nRules for the code:\n- One self-contained file. No external files, libraries, fonts, images or network calls: inline everything and draw with canvas, SVG, CSS and emoji.\n- Mobile first: touch and tap, big buttons, works at any width (use flex/grid, vh/vw units), no hover-only features, no tiny text. For keyboard games also add on-screen buttons or swipe controls.\n- Make it look polished: a nice dark theme that matches the app colour, rounded corners, smooth animation, readable fonts, satisfying feedback.\n- Make it COMPLETE and truly working: real game or tool logic, scoring, levels or difficulty, win and lose states, restart button, input validation, all the features the user asked for. No placeholders or "coming soon".\n- Use localStorage for anything worth remembering (high scores, lists, settings). It is saved for the user.\n- Do not use alert(), confirm() or prompt(): use on-screen UI instead.\n- Keep each file under about 800 lines.\nYou can mix kinds: ready-made screens (forms, lists) for data, plus webApp screens for the custom parts, wired together with shell.bottomNav and button targets.\n\n\nNGMY App Builder \u2014 FUNCTIONAL apps (not just text!)\n\nRULE: Every app must WORK. Forms SAVE data. Lists SHOW saved data. Settings TOGGLE. Workouts are CHECKABLE.\n\nSCREEN kind: use "custom" with data.layout for interactive apps.\n\nWIDGET TYPES (all functional):\n  column, row, wrap, card, hero, text, button, spacer, divider, image,\n  list, menuGrid, tabs, chip, link, banner, progress, rating, contact, video,\n  form \u2014 MUST include "collection" to save data,\n  dataList \u2014 shows saved records from "collection",\n  switch \u2014 toggles a setting (persists),\n  workoutPlan \u2014 checkable exercises with progress bar,\n  checklist \u2014 checkable items (persists),\n  stat \u2014 shows count from a collection\n\nFORM (saves data):\n{"type":"form","collection":"venues","fields":[\n  {"id":"name","label":"Venue name","type":"text"},\n  {"id":"capacity","label":"Capacity","type":"number"}\n],"submitLabel":"Create Venue","successMessage":"Venue created!","navigateAfter":"venues_list","clearOnSubmit":true}\n\nDATA LIST (shows saved items):\n{"type":"dataList","collection":"venues","titleField":"name","subtitleField":"capacity",\n "emptyText":"No venues yet. Tap Add to create one.","addTarget":"create_venue","addLabel":"Add Venue","allowDelete":true}\n\nDATA LIST ITEM ACTIONS (REAL buttons \u2014 turn one record into another WITHOUT retyping anything):\nUse this any time an item in a list needs to become a record in a different collection (a listing becomes a sale, an applicant becomes a hire, a quote becomes an invoice, a booking becomes a completed session). NEVER make the user re-type data that is already on the record \u2014 copy it.\n{"type":"dataList","collection":"listings","titleField":"title","subtitleField":"price","itemActions":[\n  {"label":"Mark sold","targetCollection":"sales","copyFields":{"title":"item","price":"amount"},"extraFields":{},"removeSource":true,"successMessage":"Sale recorded!"}\n]}\n- copyFields: {"sourceFieldOnThisRecord":"targetFieldOnNewRecord"} \u2014 values are copied as-is, the user never retypes them.\n- extraFields: literal values merged into the new record (e.g. a fixed "status":"sold").\n- removeSource: true deletes the original record after creating the linked one (use for one-shot conversions like "sold"); omit/false to keep both (use for "applied", "booked", etc. where the source should stay).\n- A button per action renders under the row\'s title/subtitle. Tapping it creates the linked record immediately \u2014 no form, no retyping.\n\nSETTINGS (working toggles):\n{"type":"switch","setting":"notifications","label":"Push notifications","subtitle":"Get alerts for bookings","default":true}\n\nDARK / LIGHT MODE (works at runtime \u2014 use setting key dark_mode):\n{"type":"switch","setting":"dark_mode","label":"Dark mode","subtitle":"Turn off for light theme across the whole app","default":true}\nWhen user toggles dark_mode, the app instantly switches light/dark backgrounds and text. Always implement this when user asks for theme settings.\n\nWORKOUT PLAN (interactive):\n{"type":"workoutPlan","planId":"strength_day1","title":"Strength Day 1","exercises":[\n  {"id":"sq","name":"Squats","sets":"3x12"},\n  {"id":"bp","name":"Bench Press","sets":"3x10"}\n]}\n\nVENUE APP EXAMPLE \u2014 home screen:\n{"type":"column","children":[\n  {"type":"hero","emoji":"\ud83c\udfdf\ufe0f","title":"Venue Manager","subtitle":"Create and manage venues"},\n  {"type":"stat","collection":"venues","label":"Venues created"},\n  {"type":"menuGrid","columns":2,"items":[\n    {"label":"My Venues","icon":"venue","target":"venues_list"},\n    {"label":"Add Venue","icon":"add","target":"create_venue"},\n    {"label":"Settings","icon":"settings","target":"settings"},\n    {"label":"Contact","icon":"mail","target":"contact"}\n  ]}\n]}\n\nNEVER use plain text screens for features users can interact with. Use forms + dataList + switches.\n\nBUTTON WIRING:\n{"type":"button","label":"Go to cart","target":"cart","action":"navigate","large":true}\n{"type":"button","label":"Show tip","action":"snack","message":"Thanks for visiting!"}\n{"type":"button","label":"Clear all","action":"clear","collection":"cart"}\n\nSTORE APP MINIMUM SCREENS (when user asks for shop/store):\nhome, add_product (form collection:products), products_list (dataList), cart (dataList collection:cart), checkout (form), settings (switches).\nHome menuGrid: Browse\u2192products_list, Sell\u2192add_product, Cart\u2192cart, Settings\u2192settings.\n\nQR CODE (WORKING \u2014 renders real scannable QR):\nStatic: {"type":"qrCode","data":"https://example.com","label":"Scan to visit"}\nLive generator URL: {"type":"qrGenerator","mode":"url","placeholder":"https://yoursite.com","collection":"qr_codes","allowSave":true}\nLive generator text: {"type":"qrGenerator","mode":"text","placeholder":"Your message","collection":"qr_codes"}\n\nINVOICE APP (use invoiceBuilder \u2014 creates real invoice + optional payment QR):\n{"type":"invoiceBuilder","collection":"invoices","title":"New Invoice"}\nPlus dataList screen: collection invoices, titleField client, subtitleField amount\n\nVIDEO / LINK HUB: form saves video URLs to collection "videos", dataList shows them, button {"action":"openUrl","url":"{{field}}"} or per-item open button on list screen with link field.\n\nWHEN USER ASKS FOR QR / INVOICE / VIDEO APP \u2014 you MUST use qrGenerator, qrCode, invoiceBuilder widgets. Never reply without ---APP_JSON--- when they want to create or change an app.\n\nTIKTOK / REELS / SHORT VIDEO (NEVER use hero+stat+menuGrid \u2014 that is WRONG):\nHome screen MUST be: {"id":"feed","kind":"custom","data":{"fullBleed":true,"hideAppBar":true,"layout":{"type":"reelFeed","collection":"reels"}}}\nInclude shell.bottomNav: Home\u2192feed, Discover\u2192discover, Post\u2192create, Inbox\u2192inbox, Profile\u2192profile\nScreens: feed (reelFeed), create (postComposer mode reel), profile (profile widget). Theme #FE2C55.\n\nFACEBOOK / SOCIAL FEED:\nHome: {"type":"socialFeed","collection":"posts"} with fullBleed. Create screen: postComposer mode post. shell.bottomNav.\n\nGOOGLE / SEARCH:\nHome: {"type":"searchHub","collection":"bookmarks"} fullBleed hideAppBar. Form screen to save bookmarks.\n\nMAPS / NAVIGATION / TRAVEL / UBER-LIKE (NEVER hero+menuGrid):\nHome MUST use mapView fullBleed hideAppBar:\n{"type":"mapView","collection":"places","titleField":"name","subtitleField":"address","latField":"lat","lngField":"lng","height":420,"placeholder":"Search destinations\u2026"}\nAdd form to save places (name, address, lat, lng). dataList of saved trips/places. shell.bottomNav: Map\u2192home, Saved\u2192list, Add\u2192form, Profile\u2192profile.\nPins open Google Maps directions. User can ask for ANY map style app \u2014 delivery, travel, fleet, real estate.\n\nAI CUSTOM TEMPLATES: When user describes ANY app type, design unique layouts \u2014 do NOT default to hero+menuGrid. Use mapView, socialFeed, reelFeed, searchHub, tabs, dataList-first, stat dashboards, or mixed columns as appropriate.\n\nFORBIDDEN for TikTok/Facebook/Google/Map requests: hero + menuGrid hub as the only home screen.\n\n\nUser request: '+b3+"\n"
+r="You are Bolt editing ONE screen in NGMY App Studio.\nThe user describes how buttons, text, widgets, colors, or designs should look or behave on this screen.\nRemember prior conversation below \u2014 continue from context, do not forget earlier requests.\n\nPRIOR CHAT:\n"+e+'\n\nDESIGN POWERS \u2014 you CAN change:\n- Any widget text, labels, URLs, collections, navigation\n- Colors on widgets: "backgroundColor", "textColor", "accentColor" as hex (#RRGGBB or #AARRGGBB)\n- Button look: large, outlined_button, custom colors\n- Images: image url, profile handle, hero emoji\n- Invoice templateId: '+B.h_Y()+'\n- Map: "inApp": true (stay in app), centerLat, centerLng, height\n- QR generator: mode, placeholder, colors, title\n\nRESPONSE FORMAT:\n1) Short friendly reply (1-3 sentences).\n2) Append exactly ---SCREEN_JSON---\n3) Then ONE screen JSON object:\n   {"id":"'+a2+'","title":"...","kind":"custom","data":{"layout":{"type":"column","children":[...]}}}\n\nRULES:\n- Keep screen id "'+a2+'" unchanged.\n- Use kind "custom" with data.layout.children for all widgets.\n- Buttons: {"type":"button","label":"...","target":"<screenId>","action":"navigate|snack|clear"}\n- Text: {"type":"text","text":"...","style":"title|subtitle|body"}\n- Wire "target" to real ids: '+C.Q.aj(f,null)+'\n- If user wants a button to show a message, use action "snack" with "message".\n- Build working widgets \u2014 not placeholder-only text.\n\nCurrent screen JSON:\n'+C.Q.aj(b2.eD(),null)+'\n\nUNLIMITED BUILDS \u2014 THE webApp WIDGET (this is how you build ANYTHING):\nThe ready-made widgets (forms, lists, stats, menus...) cover ordinary business apps. For ANYTHING that needs its own logic, visuals or interaction \u2014 games (snake, tetris, memory, quiz, puzzles, platformers, card games), calculators, converters, timers, stopwatches, drawing boards, music or drum machines, animations, simulators, charts and graph tools, generators, flashcards, planners with custom layouts, scoreboards, brackets, trackers with custom UI, mini tools, anything unusual \u2014 you MUST write it as a real, fully working web app inside a "webApp" widget. YOU write the whole app yourself in HTML, CSS and JavaScript. Never say you cannot. Never answer with a menu of links or a template for these. If you are unsure whether the ready-made widgets can do it, use webApp.\nThe widget (in a screen\'s data.layout, or as the whole layout): {"type":"webApp","id":"game","htmlRef":"game","height":640}\nFor a full-screen app, make that one widget the whole layout and set "fullBleed": true and "hideAppBar": true next to "layout" inside the screen\'s "data".\nWrite the code AFTER the JSON, one block per htmlRef, exactly in this form (not inside the JSON, not in a code fence):\n---HTML:game---\n<!doctype html>\n<html>...the complete app...</html>\n---END_HTML---\nRules for the code:\n- One self-contained file. No external files, libraries, fonts, images or network calls: inline everything and draw with canvas, SVG, CSS and emoji.\n- Mobile first: touch and tap, big buttons, works at any width (use flex/grid, vh/vw units), no hover-only features, no tiny text. For keyboard games also add on-screen buttons or swipe controls.\n- Make it look polished: a nice dark theme that matches the app colour, rounded corners, smooth animation, readable fonts, satisfying feedback.\n- Make it COMPLETE and truly working: real game or tool logic, scoring, levels or difficulty, win and lose states, restart button, input validation, all the features the user asked for. No placeholders or "coming soon".\n- Use localStorage for anything worth remembering (high scores, lists, settings). It is saved for the user.\n- Do not use alert(), confirm() or prompt(): use on-screen UI instead.\n- Keep each file under about 800 lines.\nYou can mix kinds: ready-made screens (forms, lists) for data, plus webApp screens for the custom parts, wired together with shell.bottomNav and button targets.\n\n\nNGMY App Builder \u2014 FUNCTIONAL apps (not just text!)\n\nRULE: Every app must WORK. Forms SAVE data. Lists SHOW saved data. Settings TOGGLE. Workouts are CHECKABLE.\n\nSCREEN kind: use "custom" with data.layout for interactive apps.\n\nWIDGET TYPES (all functional):\n  column, row, wrap, card, hero, text, button, spacer, divider, image,\n  list, menuGrid, tabs, chip, link, banner, progress, rating, contact, video,\n  form \u2014 MUST include "collection" to save data,\n  dataList \u2014 shows saved records from "collection",\n  switch \u2014 toggles a setting (persists),\n  workoutPlan \u2014 checkable exercises with progress bar,\n  checklist \u2014 checkable items (persists),\n  stat \u2014 shows count from a collection\n\nFORM (saves data):\n{"type":"form","collection":"venues","fields":[\n  {"id":"name","label":"Venue name","type":"text"},\n  {"id":"capacity","label":"Capacity","type":"number"}\n],"submitLabel":"Create Venue","successMessage":"Venue created!","navigateAfter":"venues_list","clearOnSubmit":true}\n\nDATA LIST (shows saved items):\n{"type":"dataList","collection":"venues","titleField":"name","subtitleField":"capacity",\n "emptyText":"No venues yet. Tap Add to create one.","addTarget":"create_venue","addLabel":"Add Venue","allowDelete":true}\n\nDATA LIST ITEM ACTIONS (REAL buttons \u2014 turn one record into another WITHOUT retyping anything):\nUse this any time an item in a list needs to become a record in a different collection (a listing becomes a sale, an applicant becomes a hire, a quote becomes an invoice, a booking becomes a completed session). NEVER make the user re-type data that is already on the record \u2014 copy it.\n{"type":"dataList","collection":"listings","titleField":"title","subtitleField":"price","itemActions":[\n  {"label":"Mark sold","targetCollection":"sales","copyFields":{"title":"item","price":"amount"},"extraFields":{},"removeSource":true,"successMessage":"Sale recorded!"}\n]}\n- copyFields: {"sourceFieldOnThisRecord":"targetFieldOnNewRecord"} \u2014 values are copied as-is, the user never retypes them.\n- extraFields: literal values merged into the new record (e.g. a fixed "status":"sold").\n- removeSource: true deletes the original record after creating the linked one (use for one-shot conversions like "sold"); omit/false to keep both (use for "applied", "booked", etc. where the source should stay).\n- A button per action renders under the row\'s title/subtitle. Tapping it creates the linked record immediately \u2014 no form, no retyping.\n\nSETTINGS (working toggles):\n{"type":"switch","setting":"notifications","label":"Push notifications","subtitle":"Get alerts for bookings","default":true}\n\nDARK / LIGHT MODE (works at runtime \u2014 use setting key dark_mode):\n{"type":"switch","setting":"dark_mode","label":"Dark mode","subtitle":"Turn off for light theme across the whole app","default":true}\nWhen user toggles dark_mode, the app instantly switches light/dark backgrounds and text. Always implement this when user asks for theme settings.\n\nWORKOUT PLAN (interactive):\n{"type":"workoutPlan","planId":"strength_day1","title":"Strength Day 1","exercises":[\n  {"id":"sq","name":"Squats","sets":"3x12"},\n  {"id":"bp","name":"Bench Press","sets":"3x10"}\n]}\n\nVENUE APP EXAMPLE \u2014 home screen:\n{"type":"column","children":[\n  {"type":"hero","emoji":"\ud83c\udfdf\ufe0f","title":"Venue Manager","subtitle":"Create and manage venues"},\n  {"type":"stat","collection":"venues","label":"Venues created"},\n  {"type":"menuGrid","columns":2,"items":[\n    {"label":"My Venues","icon":"venue","target":"venues_list"},\n    {"label":"Add Venue","icon":"add","target":"create_venue"},\n    {"label":"Settings","icon":"settings","target":"settings"},\n    {"label":"Contact","icon":"mail","target":"contact"}\n  ]}\n]}\n\nNEVER use plain text screens for features users can interact with. Use forms + dataList + switches.\n\nBUTTON WIRING:\n{"type":"button","label":"Go to cart","target":"cart","action":"navigate","large":true}\n{"type":"button","label":"Show tip","action":"snack","message":"Thanks for visiting!"}\n{"type":"button","label":"Clear all","action":"clear","collection":"cart"}\n\nSTORE APP MINIMUM SCREENS (when user asks for shop/store):\nhome, add_product (form collection:products), products_list (dataList), cart (dataList collection:cart), checkout (form), settings (switches).\nHome menuGrid: Browse\u2192products_list, Sell\u2192add_product, Cart\u2192cart, Settings\u2192settings.\n\nQR CODE (WORKING \u2014 renders real scannable QR):\nStatic: {"type":"qrCode","data":"https://example.com","label":"Scan to visit"}\nLive generator URL: {"type":"qrGenerator","mode":"url","placeholder":"https://yoursite.com","collection":"qr_codes","allowSave":true}\nLive generator text: {"type":"qrGenerator","mode":"text","placeholder":"Your message","collection":"qr_codes"}\n\nINVOICE APP (use invoiceBuilder \u2014 creates real invoice + optional payment QR):\n{"type":"invoiceBuilder","collection":"invoices","title":"New Invoice"}\nPlus dataList screen: collection invoices, titleField client, subtitleField amount\n\nVIDEO / LINK HUB: form saves video URLs to collection "videos", dataList shows them, button {"action":"openUrl","url":"{{field}}"} or per-item open button on list screen with link field.\n\nWHEN USER ASKS FOR QR / INVOICE / VIDEO APP \u2014 you MUST use qrGenerator, qrCode, invoiceBuilder widgets. Never reply without ---APP_JSON--- when they want to create or change an app.\n\nTIKTOK / REELS / SHORT VIDEO (NEVER use hero+stat+menuGrid \u2014 that is WRONG):\nHome screen MUST be: {"id":"feed","kind":"custom","data":{"fullBleed":true,"hideAppBar":true,"layout":{"type":"reelFeed","collection":"reels"}}}\nInclude shell.bottomNav: Home\u2192feed, Discover\u2192discover, Post\u2192create, Inbox\u2192inbox, Profile\u2192profile\nScreens: feed (reelFeed), create (postComposer mode reel), profile (profile widget). Theme #FE2C55.\n\nFACEBOOK / SOCIAL FEED:\nHome: {"type":"socialFeed","collection":"posts"} with fullBleed. Create screen: postComposer mode post. shell.bottomNav.\n\nGOOGLE / SEARCH:\nHome: {"type":"searchHub","collection":"bookmarks"} fullBleed hideAppBar. Form screen to save bookmarks.\n\nMAPS / NAVIGATION / TRAVEL / UBER-LIKE (NEVER hero+menuGrid):\nHome MUST use mapView fullBleed hideAppBar:\n{"type":"mapView","collection":"places","titleField":"name","subtitleField":"address","latField":"lat","lngField":"lng","height":420,"placeholder":"Search destinations\u2026"}\nAdd form to save places (name, address, lat, lng). dataList of saved trips/places. shell.bottomNav: Map\u2192home, Saved\u2192list, Add\u2192form, Profile\u2192profile.\nPins open Google Maps directions. User can ask for ANY map style app \u2014 delivery, travel, fleet, real estate.\n\nAI CUSTOM TEMPLATES: When user describes ANY app type, design unique layouts \u2014 do NOT default to hero+menuGrid. Use mapView, socialFeed, reelFeed, searchHub, tabs, dataList-first, stat dashboards, or mixed columns as appropriate.\n\nFORBIDDEN for TikTok/Facebook/Google/Map requests: hero + menuGrid hub as the only home screen.\n\n\nUser request: '+b3+"\n"
 t=4
 w=7
 return A.b(E.ae1(a8,r),$async$fda)
@@ -173,7 +173,7 @@ if(p==null||p.length===0){f=q.a
 if(f==null)f="AI returned an empty reply. Try again."
 u=new B.qG(f,null)
 w=1
-break}o=E.fH9(p)
+break}o=E.fHa(p)
 if(!C.a.q(o.b,"---SCREEN_JSON---")){f=o.b
 u=new B.qG(f,null)
 w=1
@@ -192,7 +192,7 @@ break}f=x.z
 i=A.Z(j,d,f)
 E.fdr(A.D(["screens",A.a([i],x.t)],d,f),o.a)
 J.aE(i,"id",a2)
-h=A.bUu(i)
+h=A.bUv(i)
 f=J.aa(m)===0?"Screen updated!":m
 u=new B.qG(f,h)
 w=1
@@ -215,9 +215,9 @@ break
 case 6:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
 return A.i($async$fda,v)},
-bxh(d,e,f,g,h,i,j){return B.hFP(d,e,f,g,h,i,j)},
-hFP(b4,b5,b6,b7,b8,b9,c0){var w=0,v=A.j(x.U),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3
-var $async$bxh=A.e(function(c1,c2){if(c1===1){s.push(c2)
+bxi(d,e,f,g,h,i,j){return B.hFQ(d,e,f,g,h,i,j)},
+hFQ(b4,b5,b6,b7,b8,b9,c0){var w=0,v=A.j(x.U),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3
+var $async$bxi=A.e(function(c1,c2){if(c1===1){s.push(c2)
 w=t}for(;;)switch(w){case 0:b2=A.mD(b5)
 if(b2.b.length===0){u=D.ayV
 w=1
@@ -236,10 +236,10 @@ a6=J.aa(r)
 a8=""+b9
 a9=a5.a
 a9=a9.length===0?"(none)":a9.charCodeAt(0)==0?a9:a9
-q='You are Bolt editing ONE widget in NGMY App Studio.\n\nCRITICAL \u2014 follow exactly:\n- Screen id MUST stay "'+a1+'".\n- layout.children MUST have EXACTLY '+a6+" widgets (same count, same order).\n- ONLY change the widget at index "+a8+" (0-based). Every other child must be identical to the current screen JSON.\n- Apply whatever the user asks: text, labels, colors, design, templates, URLs, fields, collections, navigation.\n- Remember prior conversation \u2014 user expects you to recall earlier messages in this widget chat.\n\nPRIOR CHAT FOR THIS WIDGET:\n"+a9+"\n\nDESIGN \u2014 add any of these to the widget JSON when user asks:\n- backgroundColor, textColor, accentColor (hex #RRGGBB)\n- image url, profile handle, hero emoji/title/subtitle\n- invoiceBuilder: templateId one of "+B.h_X()+"\n- mapView: inApp true (map stays in app), centerLat, centerLng, height, placeholder\n- qrGenerator: mode url|text, placeholder, title, defaultValue, accentColor\n- button: large true/false, action navigate|snack|openurl|clear\n\nWidget at index "+a8+" (edit this):\n"+C.Q.aj(c0,null)+'\n\nRESPONSE FORMAT:\n1) Short friendly reply (1-2 sentences).\n2) Append exactly ---SCREEN_JSON---\n3) Full screen JSON:\n   {"id":"'+a1+'","title":"...","kind":"custom","data":{"layout":{"type":"column","children":[...]}}}\n\nButtons: {"type":"button","label":"...","target":"<screenId>","action":"navigate|snack|clear|openurl","url":"..."}\nText: {"type":"text","text":"...","style":"title|subtitle|body"}\nLink: {"type":"link","label":"...","url":"https://..."}\nBanner: {"type":"banner","text":"...","variant":"info|warning|success"}\nProgress: {"type":"progress","label":"...","value":0.0-1.0}\nRating: {"type":"rating","label":"...","value":1-5}\nContact: {"type":"contact","name":"...","phone":"...","email":"..."}\nVideo: {"type":"video","url":"https://...mp4","caption":"..."}\nInvoice: {"type":"invoiceBuilder","collection":"invoices","title":"Create invoice","templateId":"modern"}\nMap: {"type":"mapView","collection":"places","inApp":true,"centerLat":40.71,"centerLng":-74.0,"height":280}\nQR: {"type":"qrGenerator","mode":"url","placeholder":"https://...","title":"Scan me","accentColor":"#6366F1"}\n\nScreen ids for navigation: '+C.Q.aj(a0,null)+"\n\nCurrent full screen JSON:\n"+C.Q.aj(b7.eD(),null)+'\n\nUNLIMITED BUILDS \u2014 THE webApp WIDGET (this is how you build ANYTHING):\nThe ready-made widgets (forms, lists, stats, menus...) cover ordinary business apps. For ANYTHING that needs its own logic, visuals or interaction \u2014 games (snake, tetris, memory, quiz, puzzles, platformers, card games), calculators, converters, timers, stopwatches, drawing boards, music or drum machines, animations, simulators, charts and graph tools, generators, flashcards, planners with custom layouts, scoreboards, brackets, trackers with custom UI, mini tools, anything unusual \u2014 you MUST write it as a real, fully working web app inside a "webApp" widget. YOU write the whole app yourself in HTML, CSS and JavaScript. Never say you cannot. Never answer with a menu of links or a template for these. If you are unsure whether the ready-made widgets can do it, use webApp.\nThe widget (in a screen\'s data.layout, or as the whole layout): {"type":"webApp","id":"game","htmlRef":"game","height":640}\nFor a full-screen app, make that one widget the whole layout and set "fullBleed": true and "hideAppBar": true next to "layout" inside the screen\'s "data".\nWrite the code AFTER the JSON, one block per htmlRef, exactly in this form (not inside the JSON, not in a code fence):\n---HTML:game---\n<!doctype html>\n<html>...the complete app...</html>\n---END_HTML---\nRules for the code:\n- One self-contained file. No external files, libraries, fonts, images or network calls: inline everything and draw with canvas, SVG, CSS and emoji.\n- Mobile first: touch and tap, big buttons, works at any width (use flex/grid, vh/vw units), no hover-only features, no tiny text. For keyboard games also add on-screen buttons or swipe controls.\n- Make it look polished: a nice dark theme that matches the app colour, rounded corners, smooth animation, readable fonts, satisfying feedback.\n- Make it COMPLETE and truly working: real game or tool logic, scoring, levels or difficulty, win and lose states, restart button, input validation, all the features the user asked for. No placeholders or "coming soon".\n- Use localStorage for anything worth remembering (high scores, lists, settings). It is saved for the user.\n- Do not use alert(), confirm() or prompt(): use on-screen UI instead.\n- Keep each file under about 800 lines.\nYou can mix kinds: ready-made screens (forms, lists) for data, plus webApp screens for the custom parts, wired together with shell.bottomNav and button targets.\n\n\nNGMY App Builder \u2014 FUNCTIONAL apps (not just text!)\n\nRULE: Every app must WORK. Forms SAVE data. Lists SHOW saved data. Settings TOGGLE. Workouts are CHECKABLE.\n\nSCREEN kind: use "custom" with data.layout for interactive apps.\n\nWIDGET TYPES (all functional):\n  column, row, wrap, card, hero, text, button, spacer, divider, image,\n  list, menuGrid, tabs, chip, link, banner, progress, rating, contact, video,\n  form \u2014 MUST include "collection" to save data,\n  dataList \u2014 shows saved records from "collection",\n  switch \u2014 toggles a setting (persists),\n  workoutPlan \u2014 checkable exercises with progress bar,\n  checklist \u2014 checkable items (persists),\n  stat \u2014 shows count from a collection\n\nFORM (saves data):\n{"type":"form","collection":"venues","fields":[\n  {"id":"name","label":"Venue name","type":"text"},\n  {"id":"capacity","label":"Capacity","type":"number"}\n],"submitLabel":"Create Venue","successMessage":"Venue created!","navigateAfter":"venues_list","clearOnSubmit":true}\n\nDATA LIST (shows saved items):\n{"type":"dataList","collection":"venues","titleField":"name","subtitleField":"capacity",\n "emptyText":"No venues yet. Tap Add to create one.","addTarget":"create_venue","addLabel":"Add Venue","allowDelete":true}\n\nDATA LIST ITEM ACTIONS (REAL buttons \u2014 turn one record into another WITHOUT retyping anything):\nUse this any time an item in a list needs to become a record in a different collection (a listing becomes a sale, an applicant becomes a hire, a quote becomes an invoice, a booking becomes a completed session). NEVER make the user re-type data that is already on the record \u2014 copy it.\n{"type":"dataList","collection":"listings","titleField":"title","subtitleField":"price","itemActions":[\n  {"label":"Mark sold","targetCollection":"sales","copyFields":{"title":"item","price":"amount"},"extraFields":{},"removeSource":true,"successMessage":"Sale recorded!"}\n]}\n- copyFields: {"sourceFieldOnThisRecord":"targetFieldOnNewRecord"} \u2014 values are copied as-is, the user never retypes them.\n- extraFields: literal values merged into the new record (e.g. a fixed "status":"sold").\n- removeSource: true deletes the original record after creating the linked one (use for one-shot conversions like "sold"); omit/false to keep both (use for "applied", "booked", etc. where the source should stay).\n- A button per action renders under the row\'s title/subtitle. Tapping it creates the linked record immediately \u2014 no form, no retyping.\n\nSETTINGS (working toggles):\n{"type":"switch","setting":"notifications","label":"Push notifications","subtitle":"Get alerts for bookings","default":true}\n\nDARK / LIGHT MODE (works at runtime \u2014 use setting key dark_mode):\n{"type":"switch","setting":"dark_mode","label":"Dark mode","subtitle":"Turn off for light theme across the whole app","default":true}\nWhen user toggles dark_mode, the app instantly switches light/dark backgrounds and text. Always implement this when user asks for theme settings.\n\nWORKOUT PLAN (interactive):\n{"type":"workoutPlan","planId":"strength_day1","title":"Strength Day 1","exercises":[\n  {"id":"sq","name":"Squats","sets":"3x12"},\n  {"id":"bp","name":"Bench Press","sets":"3x10"}\n]}\n\nVENUE APP EXAMPLE \u2014 home screen:\n{"type":"column","children":[\n  {"type":"hero","emoji":"\ud83c\udfdf\ufe0f","title":"Venue Manager","subtitle":"Create and manage venues"},\n  {"type":"stat","collection":"venues","label":"Venues created"},\n  {"type":"menuGrid","columns":2,"items":[\n    {"label":"My Venues","icon":"venue","target":"venues_list"},\n    {"label":"Add Venue","icon":"add","target":"create_venue"},\n    {"label":"Settings","icon":"settings","target":"settings"},\n    {"label":"Contact","icon":"mail","target":"contact"}\n  ]}\n]}\n\nNEVER use plain text screens for features users can interact with. Use forms + dataList + switches.\n\nBUTTON WIRING:\n{"type":"button","label":"Go to cart","target":"cart","action":"navigate","large":true}\n{"type":"button","label":"Show tip","action":"snack","message":"Thanks for visiting!"}\n{"type":"button","label":"Clear all","action":"clear","collection":"cart"}\n\nSTORE APP MINIMUM SCREENS (when user asks for shop/store):\nhome, add_product (form collection:products), products_list (dataList), cart (dataList collection:cart), checkout (form), settings (switches).\nHome menuGrid: Browse\u2192products_list, Sell\u2192add_product, Cart\u2192cart, Settings\u2192settings.\n\nQR CODE (WORKING \u2014 renders real scannable QR):\nStatic: {"type":"qrCode","data":"https://example.com","label":"Scan to visit"}\nLive generator URL: {"type":"qrGenerator","mode":"url","placeholder":"https://yoursite.com","collection":"qr_codes","allowSave":true}\nLive generator text: {"type":"qrGenerator","mode":"text","placeholder":"Your message","collection":"qr_codes"}\n\nINVOICE APP (use invoiceBuilder \u2014 creates real invoice + optional payment QR):\n{"type":"invoiceBuilder","collection":"invoices","title":"New Invoice"}\nPlus dataList screen: collection invoices, titleField client, subtitleField amount\n\nVIDEO / LINK HUB: form saves video URLs to collection "videos", dataList shows them, button {"action":"openUrl","url":"{{field}}"} or per-item open button on list screen with link field.\n\nWHEN USER ASKS FOR QR / INVOICE / VIDEO APP \u2014 you MUST use qrGenerator, qrCode, invoiceBuilder widgets. Never reply without ---APP_JSON--- when they want to create or change an app.\n\nTIKTOK / REELS / SHORT VIDEO (NEVER use hero+stat+menuGrid \u2014 that is WRONG):\nHome screen MUST be: {"id":"feed","kind":"custom","data":{"fullBleed":true,"hideAppBar":true,"layout":{"type":"reelFeed","collection":"reels"}}}\nInclude shell.bottomNav: Home\u2192feed, Discover\u2192discover, Post\u2192create, Inbox\u2192inbox, Profile\u2192profile\nScreens: feed (reelFeed), create (postComposer mode reel), profile (profile widget). Theme #FE2C55.\n\nFACEBOOK / SOCIAL FEED:\nHome: {"type":"socialFeed","collection":"posts"} with fullBleed. Create screen: postComposer mode post. shell.bottomNav.\n\nGOOGLE / SEARCH:\nHome: {"type":"searchHub","collection":"bookmarks"} fullBleed hideAppBar. Form screen to save bookmarks.\n\nMAPS / NAVIGATION / TRAVEL / UBER-LIKE (NEVER hero+menuGrid):\nHome MUST use mapView fullBleed hideAppBar:\n{"type":"mapView","collection":"places","titleField":"name","subtitleField":"address","latField":"lat","lngField":"lng","height":420,"placeholder":"Search destinations\u2026"}\nAdd form to save places (name, address, lat, lng). dataList of saved trips/places. shell.bottomNav: Map\u2192home, Saved\u2192list, Add\u2192form, Profile\u2192profile.\nPins open Google Maps directions. User can ask for ANY map style app \u2014 delivery, travel, fleet, real estate.\n\nAI CUSTOM TEMPLATES: When user describes ANY app type, design unique layouts \u2014 do NOT default to hero+menuGrid. Use mapView, socialFeed, reelFeed, searchHub, tabs, dataList-first, stat dashboards, or mixed columns as appropriate.\n\nFORBIDDEN for TikTok/Facebook/Google/Map requests: hero + menuGrid hub as the only home screen.\n\n\nUser request for widget at index '+a8+": "+b8+"\n"
+q='You are Bolt editing ONE widget in NGMY App Studio.\n\nCRITICAL \u2014 follow exactly:\n- Screen id MUST stay "'+a1+'".\n- layout.children MUST have EXACTLY '+a6+" widgets (same count, same order).\n- ONLY change the widget at index "+a8+" (0-based). Every other child must be identical to the current screen JSON.\n- Apply whatever the user asks: text, labels, colors, design, templates, URLs, fields, collections, navigation.\n- Remember prior conversation \u2014 user expects you to recall earlier messages in this widget chat.\n\nPRIOR CHAT FOR THIS WIDGET:\n"+a9+"\n\nDESIGN \u2014 add any of these to the widget JSON when user asks:\n- backgroundColor, textColor, accentColor (hex #RRGGBB)\n- image url, profile handle, hero emoji/title/subtitle\n- invoiceBuilder: templateId one of "+B.h_Y()+"\n- mapView: inApp true (map stays in app), centerLat, centerLng, height, placeholder\n- qrGenerator: mode url|text, placeholder, title, defaultValue, accentColor\n- button: large true/false, action navigate|snack|openurl|clear\n\nWidget at index "+a8+" (edit this):\n"+C.Q.aj(c0,null)+'\n\nRESPONSE FORMAT:\n1) Short friendly reply (1-2 sentences).\n2) Append exactly ---SCREEN_JSON---\n3) Full screen JSON:\n   {"id":"'+a1+'","title":"...","kind":"custom","data":{"layout":{"type":"column","children":[...]}}}\n\nButtons: {"type":"button","label":"...","target":"<screenId>","action":"navigate|snack|clear|openurl","url":"..."}\nText: {"type":"text","text":"...","style":"title|subtitle|body"}\nLink: {"type":"link","label":"...","url":"https://..."}\nBanner: {"type":"banner","text":"...","variant":"info|warning|success"}\nProgress: {"type":"progress","label":"...","value":0.0-1.0}\nRating: {"type":"rating","label":"...","value":1-5}\nContact: {"type":"contact","name":"...","phone":"...","email":"..."}\nVideo: {"type":"video","url":"https://...mp4","caption":"..."}\nInvoice: {"type":"invoiceBuilder","collection":"invoices","title":"Create invoice","templateId":"modern"}\nMap: {"type":"mapView","collection":"places","inApp":true,"centerLat":40.71,"centerLng":-74.0,"height":280}\nQR: {"type":"qrGenerator","mode":"url","placeholder":"https://...","title":"Scan me","accentColor":"#6366F1"}\n\nScreen ids for navigation: '+C.Q.aj(a0,null)+"\n\nCurrent full screen JSON:\n"+C.Q.aj(b7.eD(),null)+'\n\nUNLIMITED BUILDS \u2014 THE webApp WIDGET (this is how you build ANYTHING):\nThe ready-made widgets (forms, lists, stats, menus...) cover ordinary business apps. For ANYTHING that needs its own logic, visuals or interaction \u2014 games (snake, tetris, memory, quiz, puzzles, platformers, card games), calculators, converters, timers, stopwatches, drawing boards, music or drum machines, animations, simulators, charts and graph tools, generators, flashcards, planners with custom layouts, scoreboards, brackets, trackers with custom UI, mini tools, anything unusual \u2014 you MUST write it as a real, fully working web app inside a "webApp" widget. YOU write the whole app yourself in HTML, CSS and JavaScript. Never say you cannot. Never answer with a menu of links or a template for these. If you are unsure whether the ready-made widgets can do it, use webApp.\nThe widget (in a screen\'s data.layout, or as the whole layout): {"type":"webApp","id":"game","htmlRef":"game","height":640}\nFor a full-screen app, make that one widget the whole layout and set "fullBleed": true and "hideAppBar": true next to "layout" inside the screen\'s "data".\nWrite the code AFTER the JSON, one block per htmlRef, exactly in this form (not inside the JSON, not in a code fence):\n---HTML:game---\n<!doctype html>\n<html>...the complete app...</html>\n---END_HTML---\nRules for the code:\n- One self-contained file. No external files, libraries, fonts, images or network calls: inline everything and draw with canvas, SVG, CSS and emoji.\n- Mobile first: touch and tap, big buttons, works at any width (use flex/grid, vh/vw units), no hover-only features, no tiny text. For keyboard games also add on-screen buttons or swipe controls.\n- Make it look polished: a nice dark theme that matches the app colour, rounded corners, smooth animation, readable fonts, satisfying feedback.\n- Make it COMPLETE and truly working: real game or tool logic, scoring, levels or difficulty, win and lose states, restart button, input validation, all the features the user asked for. No placeholders or "coming soon".\n- Use localStorage for anything worth remembering (high scores, lists, settings). It is saved for the user.\n- Do not use alert(), confirm() or prompt(): use on-screen UI instead.\n- Keep each file under about 800 lines.\nYou can mix kinds: ready-made screens (forms, lists) for data, plus webApp screens for the custom parts, wired together with shell.bottomNav and button targets.\n\n\nNGMY App Builder \u2014 FUNCTIONAL apps (not just text!)\n\nRULE: Every app must WORK. Forms SAVE data. Lists SHOW saved data. Settings TOGGLE. Workouts are CHECKABLE.\n\nSCREEN kind: use "custom" with data.layout for interactive apps.\n\nWIDGET TYPES (all functional):\n  column, row, wrap, card, hero, text, button, spacer, divider, image,\n  list, menuGrid, tabs, chip, link, banner, progress, rating, contact, video,\n  form \u2014 MUST include "collection" to save data,\n  dataList \u2014 shows saved records from "collection",\n  switch \u2014 toggles a setting (persists),\n  workoutPlan \u2014 checkable exercises with progress bar,\n  checklist \u2014 checkable items (persists),\n  stat \u2014 shows count from a collection\n\nFORM (saves data):\n{"type":"form","collection":"venues","fields":[\n  {"id":"name","label":"Venue name","type":"text"},\n  {"id":"capacity","label":"Capacity","type":"number"}\n],"submitLabel":"Create Venue","successMessage":"Venue created!","navigateAfter":"venues_list","clearOnSubmit":true}\n\nDATA LIST (shows saved items):\n{"type":"dataList","collection":"venues","titleField":"name","subtitleField":"capacity",\n "emptyText":"No venues yet. Tap Add to create one.","addTarget":"create_venue","addLabel":"Add Venue","allowDelete":true}\n\nDATA LIST ITEM ACTIONS (REAL buttons \u2014 turn one record into another WITHOUT retyping anything):\nUse this any time an item in a list needs to become a record in a different collection (a listing becomes a sale, an applicant becomes a hire, a quote becomes an invoice, a booking becomes a completed session). NEVER make the user re-type data that is already on the record \u2014 copy it.\n{"type":"dataList","collection":"listings","titleField":"title","subtitleField":"price","itemActions":[\n  {"label":"Mark sold","targetCollection":"sales","copyFields":{"title":"item","price":"amount"},"extraFields":{},"removeSource":true,"successMessage":"Sale recorded!"}\n]}\n- copyFields: {"sourceFieldOnThisRecord":"targetFieldOnNewRecord"} \u2014 values are copied as-is, the user never retypes them.\n- extraFields: literal values merged into the new record (e.g. a fixed "status":"sold").\n- removeSource: true deletes the original record after creating the linked one (use for one-shot conversions like "sold"); omit/false to keep both (use for "applied", "booked", etc. where the source should stay).\n- A button per action renders under the row\'s title/subtitle. Tapping it creates the linked record immediately \u2014 no form, no retyping.\n\nSETTINGS (working toggles):\n{"type":"switch","setting":"notifications","label":"Push notifications","subtitle":"Get alerts for bookings","default":true}\n\nDARK / LIGHT MODE (works at runtime \u2014 use setting key dark_mode):\n{"type":"switch","setting":"dark_mode","label":"Dark mode","subtitle":"Turn off for light theme across the whole app","default":true}\nWhen user toggles dark_mode, the app instantly switches light/dark backgrounds and text. Always implement this when user asks for theme settings.\n\nWORKOUT PLAN (interactive):\n{"type":"workoutPlan","planId":"strength_day1","title":"Strength Day 1","exercises":[\n  {"id":"sq","name":"Squats","sets":"3x12"},\n  {"id":"bp","name":"Bench Press","sets":"3x10"}\n]}\n\nVENUE APP EXAMPLE \u2014 home screen:\n{"type":"column","children":[\n  {"type":"hero","emoji":"\ud83c\udfdf\ufe0f","title":"Venue Manager","subtitle":"Create and manage venues"},\n  {"type":"stat","collection":"venues","label":"Venues created"},\n  {"type":"menuGrid","columns":2,"items":[\n    {"label":"My Venues","icon":"venue","target":"venues_list"},\n    {"label":"Add Venue","icon":"add","target":"create_venue"},\n    {"label":"Settings","icon":"settings","target":"settings"},\n    {"label":"Contact","icon":"mail","target":"contact"}\n  ]}\n]}\n\nNEVER use plain text screens for features users can interact with. Use forms + dataList + switches.\n\nBUTTON WIRING:\n{"type":"button","label":"Go to cart","target":"cart","action":"navigate","large":true}\n{"type":"button","label":"Show tip","action":"snack","message":"Thanks for visiting!"}\n{"type":"button","label":"Clear all","action":"clear","collection":"cart"}\n\nSTORE APP MINIMUM SCREENS (when user asks for shop/store):\nhome, add_product (form collection:products), products_list (dataList), cart (dataList collection:cart), checkout (form), settings (switches).\nHome menuGrid: Browse\u2192products_list, Sell\u2192add_product, Cart\u2192cart, Settings\u2192settings.\n\nQR CODE (WORKING \u2014 renders real scannable QR):\nStatic: {"type":"qrCode","data":"https://example.com","label":"Scan to visit"}\nLive generator URL: {"type":"qrGenerator","mode":"url","placeholder":"https://yoursite.com","collection":"qr_codes","allowSave":true}\nLive generator text: {"type":"qrGenerator","mode":"text","placeholder":"Your message","collection":"qr_codes"}\n\nINVOICE APP (use invoiceBuilder \u2014 creates real invoice + optional payment QR):\n{"type":"invoiceBuilder","collection":"invoices","title":"New Invoice"}\nPlus dataList screen: collection invoices, titleField client, subtitleField amount\n\nVIDEO / LINK HUB: form saves video URLs to collection "videos", dataList shows them, button {"action":"openUrl","url":"{{field}}"} or per-item open button on list screen with link field.\n\nWHEN USER ASKS FOR QR / INVOICE / VIDEO APP \u2014 you MUST use qrGenerator, qrCode, invoiceBuilder widgets. Never reply without ---APP_JSON--- when they want to create or change an app.\n\nTIKTOK / REELS / SHORT VIDEO (NEVER use hero+stat+menuGrid \u2014 that is WRONG):\nHome screen MUST be: {"id":"feed","kind":"custom","data":{"fullBleed":true,"hideAppBar":true,"layout":{"type":"reelFeed","collection":"reels"}}}\nInclude shell.bottomNav: Home\u2192feed, Discover\u2192discover, Post\u2192create, Inbox\u2192inbox, Profile\u2192profile\nScreens: feed (reelFeed), create (postComposer mode reel), profile (profile widget). Theme #FE2C55.\n\nFACEBOOK / SOCIAL FEED:\nHome: {"type":"socialFeed","collection":"posts"} with fullBleed. Create screen: postComposer mode post. shell.bottomNav.\n\nGOOGLE / SEARCH:\nHome: {"type":"searchHub","collection":"bookmarks"} fullBleed hideAppBar. Form screen to save bookmarks.\n\nMAPS / NAVIGATION / TRAVEL / UBER-LIKE (NEVER hero+menuGrid):\nHome MUST use mapView fullBleed hideAppBar:\n{"type":"mapView","collection":"places","titleField":"name","subtitleField":"address","latField":"lat","lngField":"lng","height":420,"placeholder":"Search destinations\u2026"}\nAdd form to save places (name, address, lat, lng). dataList of saved trips/places. shell.bottomNav: Map\u2192home, Saved\u2192list, Add\u2192form, Profile\u2192profile.\nPins open Google Maps directions. User can ask for ANY map style app \u2014 delivery, travel, fleet, real estate.\n\nAI CUSTOM TEMPLATES: When user describes ANY app type, design unique layouts \u2014 do NOT default to hero+menuGrid. Use mapView, socialFeed, reelFeed, searchHub, tabs, dataList-first, stat dashboards, or mixed columns as appropriate.\n\nFORBIDDEN for TikTok/Facebook/Google/Map requests: hero + menuGrid hub as the only home screen.\n\n\nUser request for widget at index '+a8+": "+b8+"\n"
 t=4
 w=7
-return A.b(E.ae1(b2,q),$async$bxh)
+return A.b(E.ae1(b2,q),$async$bxi)
 case 7:p=c2
 a0=p.b
 o=a0==null?null:C.a.i(a0)
@@ -247,7 +247,7 @@ if(o==null||o.length===0){a0=p.a
 if(a0==null)a0="AI returned an empty reply. Try again."
 u=new B.qG(a0,null)
 w=1
-break}n=E.fH9(o)
+break}n=E.fHa(o)
 if(!C.a.q(n.b,"---SCREEN_JSON---")){a0=n.b
 u=new B.qG(a0,null)
 w=1
@@ -266,7 +266,7 @@ break}a0=x.z
 h=A.Z(i,a2,a0)
 E.fdr(A.D(["screens",A.a([h],x.t)],a2,a0),n.a)
 J.aE(h,"id",a1)
-g=A.bUu(h)
+g=A.bUv(h)
 f=B.aM4(g)
 if(J.aa(f)!==J.aa(r))if(b9>=0&&b9<J.aa(f)){e=A.bi(r,!0,x.P)
 J.aE(e,b9,J.q(f,b9))
@@ -295,11 +295,11 @@ case 3:w=2
 break
 case 6:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
-return A.i($async$bxh,v)},
+return A.i($async$bxi,v)},
 qG:function qG(d,e){this.a=d
 this.b=e},
-aUj(d){return B.heg(d)},
-heg(d){var w=0,v=A.j(x.S),u,t=2,s=[],r,q,p,o,n
+aUj(d){return B.heh(d)},
+heh(d){var w=0,v=A.j(x.S),u,t=2,s=[],r,q,p,o,n
 var $async$aUj=A.e(function(e,f){if(e===1){s.push(f)
 w=t}for(;;)switch(w){case 0:if(C.a.i(d).length===0){u=0
 w=1
@@ -330,18 +330,18 @@ break
 case 6:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
 return A.i($async$aUj,v)},
-bUf(d){var w=0,v=A.j(x.S),u,t
-var $async$bUf=A.e(function(e,f){if(e===1)return A.f(f,v)
+bUg(d){var w=0,v=A.j(x.S),u,t
+var $async$bUg=A.e(function(e,f){if(e===1)return A.f(f,v)
 for(;;)switch(w){case 0:w=3
-return A.b(B.aUh(d),$async$bUf)
+return A.b(B.aUh(d),$async$bUg)
 case 3:t=f
 u=t.gG(t)
 w=1
 break
 case 1:return A.h(u,v)}})
-return A.i($async$bUf,v)},
-aUh(d){return B.hef(d)},
-hef(d){var w=0,v=A.j(x.C),u,t=2,s=[],r,q,p,o,n,m,l
+return A.i($async$bUg,v)},
+aUh(d){return B.heg(d)},
+heg(d){var w=0,v=A.j(x.C),u,t=2,s=[],r,q,p,o,n,m,l
 var $async$aUh=A.e(function(e,f){if(e===1){s.push(f)
 w=t}for(;;)switch(w){case 0:if(C.a.i(d).length===0){u=A.aZ(x.N)
 w=1
@@ -356,7 +356,7 @@ w=1
 break}p=C.Q.aC(0,q,null)
 if(!x.j.b(p)){u=A.aZ(x.N)
 w=1
-break}n=J.b4(p,new B.bUa(),x.N).bZ(0,new B.bUb())
+break}n=J.b4(p,new B.bUb(),x.N).bZ(0,new B.bUc())
 n=A.d8(n,n.$ti.k("E.E"))
 u=n
 w=1
@@ -378,8 +378,8 @@ break
 case 6:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
 return A.i($async$aUh,v)},
-S6(d){return B.hei(d)},
-hei(d){var w=0,v=A.j(x.H),u,t=2,s=[],r,q,p,o,n,m
+S6(d){return B.hej(d)},
+hej(d){var w=0,v=A.j(x.H),u,t=2,s=[],r,q,p,o,n,m
 var $async$S6=A.e(function(e,f){if(e===1){s.push(f)
 w=t}for(;;)switch(w){case 0:if(C.a.i(d).length===0){w=1
 break}t=4
@@ -405,15 +405,15 @@ break
 case 6:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
 return A.i($async$S6,v)},
-al3(d,e){return B.heh(d,e)},
-heh(d,e){var w=0,v=A.j(x.H),u,t=2,s=[],r,q,p,o,n
+al3(d,e){return B.hei(d,e)},
+hei(d,e){var w=0,v=A.j(x.H),u,t=2,s=[],r,q,p,o,n
 var $async$al3=A.e(function(f,g){if(f===1){s.push(g)
 w=t}for(;;)switch(w){case 0:if(C.a.i(d).length===0||C.a.i(e).length===0){w=1
 break}t=4
 w=7
 return A.b(B.aUh(d),$async$al3)
 case 7:r=g
-J.ci(r,C.a.i(e))
+J.ch(r,C.a.i(e))
 w=8
 return A.b(A.aw(),$async$al3)
 case 8:q=g
@@ -433,8 +433,8 @@ break
 case 6:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
 return A.i($async$al3,v)},
-aUk(d){return B.hej(d)},
-hej(d){var w=0,v=A.j(x.H),u,t=2,s=[],r,q,p,o
+aUk(d){return B.hek(d)},
+hek(d){var w=0,v=A.j(x.H),u,t=2,s=[],r,q,p,o
 var $async$aUk=A.e(function(e,f){if(e===1){s.push(f)
 w=t}for(;;)switch(w){case 0:if(C.a.i(d).length===0){w=1
 break}t=4
@@ -457,20 +457,20 @@ break
 case 6:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
 return A.i($async$aUk,v)},
-fNo(d,e,f){if(f)return!0
-return B.fND(d,e)},
+fNp(d,e,f){if(f)return!0
+return B.fNE(d,e)},
 aUi(d,e,f,g){var w=0,v=A.j(x.T),u,t,s,r
 var $async$aUi=A.e(function(h,i){if(h===1)return A.f(i,v)
-for(;;)switch(w){case 0:if(B.fNo(d,e,f)){u=null
+for(;;)switch(w){case 0:if(B.fNp(d,e,f)){u=null
 w=1
 break}t=B.fyM(d)
-s=B.fNC(d)
-if(B.bUz(d)<=0&&t<=0&&s<=0){u=null
+s=B.fND(d)
+if(B.bUA(d)<=0&&t<=0&&s<=0){u=null
 w=1
 break}w=g&&s>0?3:4
 break
 case 3:w=5
-return A.b(B.bUf(e),$async$aUi)
+return A.b(B.bUg(e),$async$aUi)
 case 5:if(i>=s){r=s===1?"":"s"
 u="Free tier includes "+s+" AI-built app"+r+". Subscribe to Bolt AI to create more apps with AI."
 w=1
@@ -485,9 +485,9 @@ w=1
 break
 case 1:return A.h(u,v)}})
 return A.i($async$aUi,v)},
-bUg(d,e,f){var w=0,v=A.j(x.S),u,t,s,r
-var $async$bUg=A.e(function(g,h){if(g===1)return A.f(h,v)
-for(;;)switch(w){case 0:if(B.fNo(d,e,f)){u=-1
+bUh(d,e,f){var w=0,v=A.j(x.S),u,t,s,r
+var $async$bUh=A.e(function(g,h){if(g===1)return A.f(h,v)
+for(;;)switch(w){case 0:if(B.fNp(d,e,f)){u=-1
 w=1
 break}t=B.fyM(d)
 if(t<=0){u=-1
@@ -495,12 +495,12 @@ w=1
 break}s=C.o
 r=t
 w=3
-return A.b(B.aUj(e),$async$bUg)
+return A.b(B.aUj(e),$async$bUh)
 case 3:u=s.D(r-h,0,t)
 w=1
 break
 case 1:return A.h(u,v)}})
-return A.i($async$bUg,v)},
+return A.i($async$bUh,v)},
 S5(d,e,f,g,h,i,j,k,l){var w=0,v=A.j(x.y),u,t
 var $async$S5=A.e(function(m,n){if(m===1)return A.f(n,v)
 for(;;)switch(w){case 0:w=3
@@ -511,7 +511,7 @@ w=1
 break}if(e.e==null){u=!1
 w=1
 break}w=4
-return A.b(A.cb(null,null,!0,null,new B.bUe(t),e,null,!0,!0,x.y),$async$S5)
+return A.b(A.cb(null,null,!0,null,new B.bUf(t),e,null,!0,!0,x.y),$async$S5)
 case 4:if(n!==!0||e.e==null){u=!1
 w=1
 break}u=B.alc(d,e,i,j,k,l)
@@ -519,13 +519,13 @@ w=1
 break
 case 1:return A.h(u,v)}})
 return A.i($async$S5,v)},
-bUa:function bUa(){},
 bUb:function bUb(){},
-bUe:function bUe(d){this.a=d},
-bUc:function bUc(d){this.a=d},
+bUc:function bUc(){},
+bUf:function bUf(d){this.a=d},
 bUd:function bUd(d){this.a=d},
-fNA(d){var w=d.h(0,"apps"),v=x.f
-if(v.b(w))return J.of(w,new B.bUx(),x.N,x.z)
+bUe:function bUe(d){this.a=d},
+fNB(d){var w=d.h(0,"apps"),v=x.f
+if(v.b(w))return J.of(w,new B.bUy(),x.N,x.z)
 if(v.b(d.h(0,"project"))){v=d.h(0,"projectId")
 return A.D([J.k(v==null?"legacy":v),d],x.N,x.z)}return A.R(x.N,x.z)},
 ala(){var w=0,v=A.j(x.h),u,t=2,s=[],r,q,p,o,n,m
@@ -576,15 +576,15 @@ w=1
 break}s=J.q(t,C.a.i(d.toLowerCase()))
 if(!x.f.b(s)){u=A.aZ(x.N)
 w=1
-break}r=B.fNA(A.Z(s,x.N,x.z))
+break}r=B.fNB(A.Z(s,x.N,x.z))
 q=A.a2(r).k("cu<1>")
 u=A.d8(new A.cu(r,q),q.k("E.E"))
 w=1
 break
 case 1:return A.h(u,v)}})
 return A.i($async$aUs,v)},
-aUr(d,e){return B.hex(d,e)},
-hex(d,e){var w=0,v=A.j(x.cj),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f
+aUr(d,e){return B.hey(d,e)},
+hey(d,e){var w=0,v=A.j(x.cj),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f
 var $async$aUr=A.e(function(a0,a1){if(a0===1){s.push(a1)
 w=t}for(;;)switch(w){case 0:w=3
 return A.b(A.bZ(),$async$aUr)
@@ -602,7 +602,7 @@ if(!j.b(q)){u=null
 w=1
 break}i=x.N
 h=x.z
-p=B.fNA(A.Z(q,i,h))
+p=B.fNB(A.Z(q,i,h))
 o=J.q(p,e)
 if(o==null){u=null
 w=1
@@ -660,8 +660,8 @@ w=1
 break
 case 1:return A.h(u,v)}})
 return A.i($async$a3Q,v)},
-bUx:function bUx(){},
-heq(d){var w,v,u,t,s,r,q,p=d.h(0,"project"),o=x.f
+bUy:function bUy(){},
+her(d){var w,v,u,t,s,r,q,p=d.h(0,"project"),o=x.f
 if(o.b(p))try{s=x.N
 r=x.z
 w=A.a3P(A.Z(p,s,r))
@@ -671,16 +671,16 @@ return new B.L8(w,o)}catch(q){u=A.a5(q)
 $.ak.$1("[app bundle fromMap project] "+A.t(u))}if(x.j.b(d.h(0,"screens"))&&d.h(0,"name")!=null)try{o=A.a3P(d)
 return new B.L8(o,C.cr)}catch(q){t=A.a5(q)
 $.ak.$1("[app bundle fromMap flat] "+A.t(t))}return null},
-her(d){var w,v,u,t,s
+hes(d){var w,v,u,t,s
 try{w=C.a.i(d)
 if(J.cT(w,"\ufeff"))w=J.mf(w,1)
 v=C.Q.aC(0,w,null)
 if(!x.f.b(v))return null
-t=B.heq(A.Z(v,x.N,x.z))
+t=B.her(A.Z(v,x.N,x.z))
 return t}catch(s){u=A.a5(s)
 $.ak.$1("[app bundle parse] "+A.t(u))
 return null}},
-fNq(d){var w,v,u=C.a.i(d)
+fNr(d){var w,v,u=C.a.i(d)
 if(!C.a.a_(u,"{"))return!1
 w=u.toLowerCase()
 v=!0
@@ -694,7 +694,7 @@ return A.b(A.aUo(t).oR(),$async$aLG)
 case 3:s=B
 r=d
 w=4
-return A.b(B.bUl(t),$async$aLG)
+return A.b(B.bUm(t),$async$aLG)
 case 4:u=new s.L8(r,f)
 w=1
 break
@@ -708,7 +708,7 @@ case 3:s=f
 r=d.Q
 r=C.a.i(r).length!==0?r:d.b
 t=A.ad("[^\\w\\-.]+",!0,!1,!1,!1)
-t=A.aJ(r,t,"_")
+t=A.aI(r,t,"_")
 u=B.fFo(A.Id(A.D(["ngmyAppBundle",1,"exportedAt",new A.N(Date.now(),0,!1).a4().aa(),"project",s.a.eD(),"runtimeData",s.b],x.N,x.z),null,"  "),t.toLowerCase()+".ngmy.json")
 w=1
 break
@@ -716,7 +716,7 @@ case 1:return A.h(u,v)}})
 return A.i($async$fg2,v)},
 aM_(d,e){var w=0,v=A.j(x.Z),u,t=2,s=[],r,q,p,o,n,m,l
 var $async$aM_=A.e(function(f,g){if(f===1){s.push(g)
-w=t}for(;;)switch(w){case 0:m=B.her(e)
+w=t}for(;;)switch(w){case 0:m=B.hes(e)
 if(m==null){u=null
 w=1
 break}t=4
@@ -798,7 +798,7 @@ adc(){var w=0,v=A.j(x.T),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g
 var $async$adc=A.e(function(d,e){if(d===1){s.push(e)
 w=t}for(;;)switch(w){case 0:t=4
 w=7
-return A.b($.wf.c2().Kt(!1,D.cRz,C.rL,!0),$async$adc)
+return A.b($.wf.c2().Kt(!1,D.cRA,C.rL,!0),$async$adc)
 case 7:r=e
 w=r!=null&&J.cs(r.a)?8:9
 break
@@ -839,7 +839,7 @@ case 14:t=17
 w=20
 return A.b($.wf.c2().ak4(!1,C.Wn,!0),$async$adc)
 case 20:m=e
-if(m==null||J.ch(m.a)){u=null
+if(m==null||J.ci(m.a)){u=null
 w=1
 break}j=B.aKU(J.fn(m.a))
 u=j
@@ -863,21 +863,21 @@ break
 case 19:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
 return A.i($async$adc,v)},
-aez(d){return B.hJo(d)},
-hJo(d){var w=0,v=A.j(x.b2),u,t=2,s=[],r,q,p,o,n,m,l,k,j
+aez(d){return B.hJp(d)},
+hJp(d){var w=0,v=A.j(x.b2),u,t=2,s=[],r,q,p,o,n,m,l,k,j
 var $async$aez=A.e(function(e,f){if(e===1){s.push(f)
 w=t}for(;;)switch(w){case 0:t=4
 w=7
 return A.b(B.adc(),$async$aez)
 case 7:r=f
-if(r==null||C.a.i(r).length===0){u=D.d5C
+if(r==null||C.a.i(r).length===0){u=D.d5D
 w=1
-break}if(!B.fNq(r)){u=D.d5B
+break}if(!B.fNr(r)){u=D.d5C
 w=1
 break}w=8
 return A.b(B.aM_(d,r),$async$aez)
 case 8:q=f
-if(q==null){u=D.d5A
+if(q==null){u=D.d5B
 w=1
 break}u=new B.CP(q,null)
 w=1
@@ -897,7 +897,7 @@ t=10
 w=13
 return A.b(A.F2(),$async$aez)
 case 13:n=f
-w=n!=null&&C.a.i(n).length!==0&&B.fNq(n)?14:15
+w=n!=null&&C.a.i(n).length!==0&&B.fNr(n)?14:15
 break
 case 14:w=16
 return A.b(B.aM_(d,n),$async$aez)
@@ -913,7 +913,7 @@ w=12
 break
 case 9:w=3
 break
-case 12:u=D.d5D
+case 12:u=D.d5E
 w=1
 break
 w=6
@@ -927,13 +927,13 @@ L8:function L8(d,e){this.a=d
 this.b=e},
 CP:function CP(d,e){this.a=d
 this.b=e},
-fNt(d,e,f){return new B.aUp(e,f,d,null)},
+fNu(d,e,f){return new B.aUp(e,f,d,null)},
 aUp:function aUp(d,e,f,g){var _=this
 _.c=d
 _.d=e
 _.e=f
 _.a=g},
-h_X(){return new A.I(F.Fm,new B.fdc(),x.k).aF(0,", ")},
+h_Y(){return new A.I(F.Fm,new B.fdc(),x.k).aF(0,", ")},
 fdc:function fdc(){},
 aM4(d){var w,v,u=E.aeJ(d)
 if(u==null)return A.a([],x.t)
@@ -953,7 +953,7 @@ u.m(0,"children",e)
 t=A.dQ(d.d,w,v)
 t.m(0,"layout",u)
 return d.cyK(t,C.hx)},
-fGY(d){var w,v,u,t,s,r,q,p,o,n
+fGZ(d){var w,v,u,t,s,r,q,p,o,n
 if(E.aeJ(d)!=null)return d
 switch(d.c.a){case 1:w=x.t
 v=A.a([],w)
@@ -992,7 +992,7 @@ s.push(A.D(["type","form","collection",q,"fields",o,"submitLabel",n,"successMess
 default:w=x.N
 t=x.z
 return B.aeK(d,A.a([A.D(["type","text","text",d.b,"style","title"],w,t),A.D(["type","text","text","Tap + Add widget below to build this screen.","style","subtitle"],w,t)],x.t))}},
-h1l(d,e){var w,v,u,t,s,r="https://example.com",q=e.length!==0?C.d.gI(e).a:""
+h1m(d,e){var w,v,u,t,s,r="https://example.com",q=e.length!==0?C.d.gI(e).a:""
 switch(d){case"button":return A.D(["type","button","label","Continue","target",q,"action","navigate","large",!0],x.N,x.z)
 case"outlined_button":return A.D(["type","outlined_button","label","Learn more","target",q],x.N,x.z)
 case"text":return A.D(["type","text","text","Your text here","style","subtitle"],x.N,x.z)
@@ -1039,7 +1039,7 @@ case"rating":return A.D(["type","rating","label","Rating","value",4.5],x.N,x.z)
 case"contact":return A.D(["type","contact","name","Support","phone","+1 555 0100","email","help@example.com"],x.N,x.z)
 case"video":return A.D(["type","video","url","","caption","Your video"],x.N,x.z)
 default:return A.D(["type","text","text","Widget","style","subtitle"],x.N,x.z)}},
-h2j(d){if(d<=0)return 0
+h2k(d){if(d<=0)return 0
 return C.o.ak(d+5-1,5)*5},
 Jq(d){switch(d.toLowerCase()){case"button":return"Button"
 case"outlined_button":return"Outlined button"
@@ -1189,10 +1189,10 @@ this.b=e},
 a91:function a91(d,e,f){this.c=d
 this.d=e
 this.a=f},
-cqE:function cqE(d){this.a=d},
-cqF:function cqF(d,e){this.a=d
+cqF:function cqF(d){this.a=d},
+cqG:function cqG(d,e){this.a=d
 this.b=e},
-cqD:function cqD(d,e){this.a=d
+cqE:function cqE(d,e){this.a=d
 this.b=e},
 bhs:function bhs(d,e,f,g,h){var _=this
 _.d=d
@@ -1317,19 +1317,19 @@ this.d=e
 this.a=f},
 bb4:function bb4(){this.d=$
 this.c=this.a=null},
-d0O:function d0O(d,e){this.a=d
-this.b=e},
 d0P:function d0P(d,e){this.a=d
 this.b=e},
-d0N:function d0N(d,e,f){this.a=d
-this.b=e
-this.c=f},
 d0Q:function d0Q(d,e){this.a=d
 this.b=e},
-d0M:function d0M(d,e){this.a=d
+d0O:function d0O(d,e,f){this.a=d
+this.b=e
+this.c=f},
+d0R:function d0R(d,e){this.a=d
 this.b=e},
-d0R:function d0R(d){this.a=d},
-d0L:function d0L(d){this.a=d},
+d0N:function d0N(d,e){this.a=d
+this.b=e},
+d0S:function d0S(d){this.a=d},
+d0M:function d0M(d){this.a=d},
 ayC:function ayC(d,e,f,g){var _=this
 _.c=d
 _.d=e
@@ -1337,30 +1337,30 @@ _.e=f
 _.a=g},
 beb:function beb(){this.d=$
 this.c=this.a=null},
-dfm:function dfm(d,e){this.a=d
-this.b=e},
 dfn:function dfn(d,e){this.a=d
 this.b=e},
 dfo:function dfo(d,e){this.a=d
 this.b=e},
+dfp:function dfp(d,e){this.a=d
+this.b=e},
+dfm:function dfm(d,e,f){this.a=d
+this.b=e
+this.c=f},
+dfq:function dfq(d,e){this.a=d
+this.b=e},
+dfr:function dfr(d,e){this.a=d
+this.b=e},
 dfl:function dfl(d,e,f){this.a=d
 this.b=e
 this.c=f},
-dfp:function dfp(d,e){this.a=d
+dfs:function dfs(d,e){this.a=d
 this.b=e},
-dfq:function dfq(d,e){this.a=d
+dfk:function dfk(d,e){this.a=d
 this.b=e},
-dfk:function dfk(d,e,f){this.a=d
-this.b=e
-this.c=f},
-dfr:function dfr(d,e){this.a=d
-this.b=e},
-dfj:function dfj(d,e){this.a=d
-this.b=e},
-dfs:function dfs(d){this.a=d},
-dfi:function dfi(d){this.a=d},
-a_i(d,e){return B.hAd(d,e)},
-hAd(d,e){var w=0,v=A.j(x.H),u=1,t=[],s,r,q,p,o
+dft:function dft(d){this.a=d},
+dfj:function dfj(d){this.a=d},
+a_i(d,e){return B.hAe(d,e)},
+hAe(d,e){var w=0,v=A.j(x.H),u=1,t=[],s,r,q,p,o
 var $async$a_i=A.e(function(f,g){if(f===1){t.push(g)
 w=u}for(;;)switch(w){case 0:u=3
 w=6
@@ -1384,8 +1384,8 @@ break
 case 5:return A.h(null,v)
 case 1:return A.f(t.at(-1),v)}})
 return A.i($async$a_i,v)},
-aM6(d){return B.hIq(d)},
-hIq(d){var w=0,v=A.j(x.Y),u,t=2,s=[],r,q,p,o,n,m,l
+aM6(d){return B.hIr(d)},
+hIr(d){var w=0,v=A.j(x.Y),u,t=2,s=[],r,q,p,o,n,m,l
 var $async$aM6=A.e(function(e,f){if(e===1){s.push(f)
 w=t}for(;;)switch(w){case 0:if(C.a.i(d).length===0){u=A.a([],x.o)
 w=1
@@ -1403,7 +1403,7 @@ if(!x.j.b(p)){n=A.a([],x.o)
 u=n
 w=1
 break}n=x.aU
-n=A.cy(new A.e2(J.b4(p,new B.fiB(),x.Z),n),A.h2n(),n.k("E.E"),x.A)
+n=A.cy(new A.e2(J.b4(p,new B.fiB(),x.Z),n),A.h2o(),n.k("E.E"),x.A)
 n=A.z(n,A.a2(n).k("E.E"))
 u=n
 w=1
@@ -1485,8 +1485,8 @@ w=14
 break
 case 16:case 12:return A.h(null,v)}})
 return A.i($async$Pa,v)},
-aKQ(d,e){return B.hyL(d,e)},
-hyL(d,e){var w=0,v=A.j(x.H),u=1,t=[],s,r,q,p,o,n
+aKQ(d,e){return B.hyM(d,e)},
+hyM(d,e){var w=0,v=A.j(x.H),u=1,t=[],s,r,q,p,o,n
 var $async$aKQ=A.e(function(f,g){if(f===1){t.push(g)
 w=u}for(;;)switch(w){case 0:u=3
 w=6
@@ -1533,10 +1533,10 @@ w=3
 return A.b(B.fd3(),$async$F5)
 case 3:p=l.dF(h,new B.fkw(f))
 o=C.a.i(f.Q)
-n=o.length!==0?o.toLowerCase():B.hGf(f.b,f.d,p)
+n=o.length!==0?o.toLowerCase():B.hGg(f.b,f.d,p)
 m=C.a.i(f.at)
 if(!(m.length!==0)){p=C.a.i(f.c)
-m=p.length!==0?p:f.b+" \u2014 created with NGMY App Builder"}t=f.czb(A.fdd(n),m,n).czl(new A.N(Date.now(),0,!1).a4().aa(),null,C.OH,new A.N(Date.now(),0,!1).a4().aa())
+m=p.length!==0?p:f.b+" \u2014 created with NGMY App Builder"}t=f.czb(A.fdd(n),m,n).czl(new A.N(Date.now(),0,!1).a4().aa(),null,C.OI,new A.N(Date.now(),0,!1).a4().aa())
 w=4
 return A.b(A.IQ("ngmy_app_builder_published_local"),$async$F5)
 case 4:s=h
@@ -1615,8 +1615,8 @@ faZ:function faZ(){},
 fb_:function fb_(){},
 fb0:function fb0(){},
 fb1:function fb1(){},
-fGV(d){if(C.a.i(d.Q).length===0)return!1
-if(d.r===C.OH)return!0
+fGW(d){if(C.a.i(d.Q).length===0)return!1
+if(d.r===C.OI)return!0
 return C.a.i(A.Py(d).as).length!==0},
 fjL(d){var w=0,v=A.j(x.y),u,t,s
 var $async$fjL=A.e(function(e,f){if(e===1)return A.f(f,v)
@@ -1626,27 +1626,27 @@ w=1
 break}t=C.a.i(A.Py(d).as).length!==0?C.a.i(A.Py(d).as):A.fdd(s)
 if(t.length===0){u=!1
 w=1
-break}u=B.fGw(t,!1)
+break}u=B.fGx(t,!1)
 w=1
 break
 case 1:return A.h(u,v)}})
 return A.i($async$fjL,v)},
-hJ4(d){var w,v,u,t,s,r=C.a.i(d.toLowerCase())
+hJ5(d){var w,v,u,t,s,r=C.a.i(d.toLowerCase())
 if(r.length===0)return"user"
 w=C.d.gI(r.split("@"))
 v=A.ad("[^a-z0-9]",!0,!1,!1,!1)
-u=A.aJ(w,v,"")
+u=A.aI(w,v,"")
 t=C.o.fE(Math.abs(C.a.gV(r)),36)
 s=t.length>5?C.a.al(t,0,5):t
 return(u.length===0?"user":u)+"-"+s},
-hGf(d,e,f){var w,v,u,t,s,r,q=B.hJ4(e),p=C.a.i(d.toLowerCase()),o=A.ad("[^a-z0-9\\s-]",!0,!1,!1,!1)
-p=A.aJ(p,o,"")
+hGg(d,e,f){var w,v,u,t,s,r,q=B.hJ5(e),p=C.a.i(d.toLowerCase()),o=A.ad("[^a-z0-9\\s-]",!0,!1,!1,!1)
+p=A.aI(p,o,"")
 o=A.ad("\\s+",!0,!1,!1,!1)
-p=A.aJ(p,o,"-")
+p=A.aI(p,o,"-")
 o=A.ad("-+",!0,!1,!1,!1)
-p=A.aJ(p,o,"-")
+p=A.aI(p,o,"-")
 o=A.ad("^-|-$",!0,!1,!1,!1)
-w=A.aJ(p,o,"")
+w=A.aI(p,o,"")
 v=w.length===0?"my-app":w
 u=q+"-"+v
 p=f.$ti.k("cR<1,n>")
@@ -1955,28 +1955,28 @@ dtz:function dtz(d,e){this.a=d
 this.b=e},
 dty:function dty(d){this.a=d},
 bbx:function bbx(d){this.a=d},
-bUz(d){var w=d.ed
+bUA(d){var w=d.ed
 if(w>=0)return w
 return 3},
 fyM(d){var w=d.eR
 if(w>=0)return C.o.M(w)
 return 10},
-fNC(d){var w=d.eS
+fND(d){var w=d.eS
 if(w>=0)return C.o.M(w)
 return 1},
-fNB(d){var w=d.a7,v=x.N
-v=w.iC(w,new B.bUy(),v,v)
+fNC(d){var w=d.a7,v=x.N
+v=w.iC(w,new B.bUz(),v,v)
 return v},
-fND(d,e){var w,v,u=C.a.i(e.toLowerCase())
-if(u.length===0)return B.bUz(d)<=0
-w=B.fNB(d).h(0,u)
-if(w==null||w.length===0)return B.bUz(d)<=0
+fNE(d,e){var w,v,u=C.a.i(e.toLowerCase())
+if(u.length===0)return B.bUA(d)<=0
+w=B.fNC(d).h(0,u)
+if(w==null||w.length===0)return B.bUA(d)<=0
 v=A.bg(w)
 return v!=null&&v.c9(new A.N(Date.now(),0,!1))},
-hey(d,e){var w,v,u,t,s=C.a.i(e.toLowerCase())
+hez(d,e){var w,v,u,t,s=C.a.i(e.toLowerCase())
 if(s.length===0)return
 w=x.N
-v=A.Z(B.fNB(d),w,w)
+v=A.Z(B.fNC(d),w,w)
 w=v.h(0,s)
 u=A.bg(w==null?"":w)
 t=u!=null&&u.c9(new A.N(Date.now(),0,!1))?u:new A.N(Date.now(),0,!1)
@@ -1984,14 +1984,14 @@ v.m(0,s,t.bL(A.dB(30,0,0,0,0,0).a).a4().aa())
 d.a7=v},
 alc(d,e,f,g,h,i){var w=0,v=A.j(x.y),u,t,s,r,q,p,o,n,m
 var $async$alc=A.e(function(j,k){if(j===1)return A.f(k,v)
-for(;;)switch(w){case 0:m=B.bUz(d)
+for(;;)switch(w){case 0:m=B.bUA(d)
 if(!(m<=0)){t=i.gd6()
-t=B.fND(d,t)}else t=!0
+t=B.fNE(d,t)}else t=!0
 if(t){u=!0
 w=1
 break}s=i.gd6()
 r=B.fyM(d)
-q=B.fNC(d)
+q=B.fND(d)
 t=C.k.ab(m,2)
 p=""+q
 o=q===1
@@ -2001,7 +2001,7 @@ w=3
 return A.b(N.anV(m,d,e,"Unlock unlimited Bolt AI for 30 days ($"+t+"/month). Build any app with AI \u2014 no prompt cap, create more than "+p+" AI app"+n+". Free tier: "+r+" prompts and "+p+" AI-built app"+o+".",f,"Bolt AI \u2014 monthly",i),$async$alc)
 case 3:if(!k){u=!1
 w=1
-break}B.hey(d,s)
+break}B.hez(d,s)
 w=4
 return A.b(B.aUk(s),$async$alc)
 case 4:g.$0()
@@ -2012,23 +2012,23 @@ w=1
 break
 case 1:return A.h(u,v)}})
 return A.i($async$alc,v)},
-bUy:function bUy(){},
+bUz:function bUz(){},
 aUt:function aUt(d,e,f){this.c=d
 this.d=e
 this.a=f},
-fLt(d,e,f,g,h){return new I.a2s(e,h,null,d,f,g,!1,K.f2y,null,null)},
-fNp(d,e){var w,v=C.a.i(d.toLowerCase())
+fLu(d,e,f,g,h){return new I.a2s(e,h,null,d,f,g,!1,K.f2y,null,null)},
+fNq(d,e){var w,v=C.a.i(d.toLowerCase())
 if(C.a.i(e==null?"new":e).length===0)w="new"
 else{e.toString
 w=C.a.i(e)}return"ngmy_bolt_chat_"+v+"_"+w},
-bUi(d,e){return B.hem(d,e)},
-hem(d,a0){var w=0,v=A.j(x.x),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f,e
-var $async$bUi=A.e(function(a1,a2){if(a1===1){s.push(a2)
+bUj(d,e){return B.hen(d,e)},
+hen(d,a0){var w=0,v=A.j(x.x),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f,e
+var $async$bUj=A.e(function(a1,a2){if(a1===1){s.push(a2)
 w=t}for(;;)switch(w){case 0:if(C.a.i(d).length===0||C.a.i(a0).length===0){u=A.a([],x.m)
 w=1
 break}t=4
 w=7
-return A.b(A.aw(),$async$bUi)
+return A.b(A.aw(),$async$bUj)
 case 7:r=a2
 j=C.a.i(d.toLowerCase())
 q=A.aR(J.q(r.a,"ngmy_bolt_chat_"+j+"_"+a0))
@@ -2049,7 +2049,7 @@ l=C.a.i(J.k(g==null?"":g))
 if(J.aa(l)!==0)g=!J.y(m,"user")&&!J.y(m,"ai")
 else g=!0
 if(g)continue
-J.ci(o,A.D(["role",m,"text",l],i,i))}u=o
+J.ch(o,A.D(["role",m,"text",l],i,i))}u=o
 w=1
 break
 t=2
@@ -2069,9 +2069,9 @@ case 3:w=2
 break
 case 6:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
-return A.i($async$bUi,v)},
-aUn(d,e,f){return B.heo(d,e,f)},
-heo(d,e,f){var w=0,v=A.j(x.H),u,t=2,s=[],r,q,p,o,n
+return A.i($async$bUj,v)},
+aUn(d,e,f){return B.hep(d,e,f)},
+hep(d,e,f){var w=0,v=A.j(x.H),u,t=2,s=[],r,q,p,o,n
 var $async$aUn=A.e(function(g,h){if(g===1){s.push(h)
 w=t}for(;;)switch(w){case 0:if(C.a.i(d).length===0||C.a.i(e).length===0){w=1
 break}t=4
@@ -2096,8 +2096,8 @@ break
 case 6:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
 return A.i($async$aUn,v)},
-aUl(d,e){return B.hek(d,e)},
-hek(d,e){var w=0,v=A.j(x.H),u,t=2,s=[],r,q,p
+aUl(d,e){return B.hel(d,e)},
+hel(d,e){var w=0,v=A.j(x.H),u,t=2,s=[],r,q,p
 var $async$aUl=A.e(function(f,g){if(f===1){s.push(g)
 w=t}for(;;)switch(w){case 0:if(C.a.i(d).length===0||C.a.i(e).length===0){w=1
 break}t=4
@@ -2118,16 +2118,16 @@ break
 case 6:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
 return A.i($async$aUl,v)},
-bUh(d,e){return B.hel(d,e)},
-hel(d,a0){var w=0,v=A.j(x.x),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f,e
-var $async$bUh=A.e(function(a1,a2){if(a1===1){s.push(a2)
+bUi(d,e){return B.hem(d,e)},
+hem(d,a0){var w=0,v=A.j(x.x),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f,e
+var $async$bUi=A.e(function(a1,a2){if(a1===1){s.push(a2)
 w=t}for(;;)switch(w){case 0:if(C.a.i(d).length===0){u=A.a([],x.m)
 w=1
 break}t=4
 w=7
-return A.b(A.aw(),$async$bUh)
+return A.b(A.aw(),$async$bUi)
 case 7:r=a2
-j=B.fNp(d,a0)
+j=B.fNq(d,a0)
 q=A.aR(J.q(r.a,j))
 if(q==null||q.length===0){j=A.a([],x.m)
 u=j
@@ -2146,7 +2146,7 @@ l=C.a.i(J.k(g==null?"":g))
 if(J.aa(l)!==0)g=!J.y(m,"user")&&!J.y(m,"ai")
 else g=!0
 if(g)continue
-J.ci(o,A.D(["role",m,"text",l],i,i))}u=o
+J.ch(o,A.D(["role",m,"text",l],i,i))}u=o
 w=1
 break
 t=2
@@ -2166,9 +2166,9 @@ case 3:w=2
 break
 case 6:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
-return A.i($async$bUh,v)},
-aUm(d,e,f){return B.hen(d,e,f)},
-hen(d,e,f){var w=0,v=A.j(x.H),u,t=2,s=[],r,q,p,o,n
+return A.i($async$bUi,v)},
+aUm(d,e,f){return B.heo(d,e,f)},
+heo(d,e,f){var w=0,v=A.j(x.H),u,t=2,s=[],r,q,p,o,n
 var $async$aUm=A.e(function(g,h){if(g===1){s.push(h)
 w=t}for(;;)switch(w){case 0:if(C.a.i(d).length===0){w=1
 break}t=4
@@ -2178,7 +2178,7 @@ w=7
 return A.b(A.aw(),$async$aUm)
 case 7:q=h
 w=8
-return A.b(q.an("String",B.fNp(d,f),C.Q.aj(r,null)),$async$aUm)
+return A.b(q.an("String",B.fNq(d,f),C.Q.aj(r,null)),$async$aUm)
 case 8:t=2
 w=6
 break
@@ -2193,11 +2193,11 @@ break
 case 6:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
 return A.i($async$aUm,v)},
-bUl(d){var w=0,v=A.j(x.P),u,t,s,r,q,p
-var $async$bUl=A.e(function(e,f){if(e===1)return A.f(f,v)
+bUm(d){var w=0,v=A.j(x.P),u,t,s,r,q,p
+var $async$bUm=A.e(function(e,f){if(e===1)return A.f(f,v)
 for(;;)switch(w){case 0:p=A.aUo(d)
 w=3
-return A.b(p.oR(),$async$bUl)
+return A.b(p.oR(),$async$bUm)
 case 3:t=x.a5
 s=t.a(p.b.h(0,"collections"))
 if(s==null){s=x.z
@@ -2209,11 +2209,11 @@ u=A.D(["collections",s,"settings",A.Z(t==null?A.R(q,q):t,r,q)],r,q)
 w=1
 break
 case 1:return A.h(u,v)}})
-return A.i($async$bUl,v)},
+return A.i($async$bUm,v)},
 fFo(d,e){var w=0,v=A.j(x.N),u,t,s,r,q
 var $async$fFo=A.e(function(f,g){if(f===1)return A.f(g,v)
 for(;;)switch(w){case 0:s=A.ad("[^\\w\\-.]+",!0,!1,!1,!1)
-r=A.aJ(e,s,"_")
+r=A.aI(e,s,"_")
 q=C.a.c5(r,".json")?r:r+".json"
 s=(self.URL||self.webkitURL).createObjectURL(A.hC([C.dB.aE(d)],"application/json"))
 s.toString
@@ -2225,7 +2225,7 @@ w=1
 break
 case 1:return A.h(u,v)}})
 return A.i($async$fFo,v)},
-hep(d){var w
+heq(d){var w
 switch(d.a){case 0:w="Draft"
 break
 case 1:w="In review"
@@ -2235,7 +2235,7 @@ break
 case 3:w="Needs changes"
 break
 default:w=null}return w},
-het(d){var w
+heu(d){var w
 switch(d.a){case 0:w="No database"
 break
 case 1:w="Firebase"
@@ -2247,10 +2247,10 @@ break
 case 4:w="Custom API"
 break
 default:w=null}return w},
-fNu(d){var w=new A.N(Date.now(),0,!1).a4().aa(),v=x.N,u=x.m,t=x.z
-return A.CQ("",w,"",C.td,"app_"+Date.now(),"My New App",C.a.i(d.toLowerCase()),"",null,null,A.a([A.aUq("menu","home","Welcome"),new A.hH("menu","Main Menu",C.ayW,A.D(["items",A.a([A.D(["label","About","targetScreenId","about","icon","info"],v,v),A.D(["label","Contact","targetScreenId","contact","icon","mail"],v,v)],u)],v,t)),D.d5J,new A.hH("contact","Contact",C.ayX,A.D(["fields",A.a([A.D(["id","name","label","Your name","type","text"],v,v),A.D(["id","message","label","Message","type","text"],v,v)],u),"submitLabel","Send","successMessage","Thanks! We received your message."],v,t))],x.X),"",C.cr,"",C.qz,"Built with NGMY App Builder",4284704497,w)},
-fGw(d,e){var w=0,v=A.j(x.y),u,t,s
-var $async$fGw=A.e(function(f,g){if(f===1)return A.f(g,v)
+fNv(d){var w=new A.N(Date.now(),0,!1).a4().aa(),v=x.N,u=x.m,t=x.z
+return A.CQ("",w,"",C.td,"app_"+Date.now(),"My New App",C.a.i(d.toLowerCase()),"",null,null,A.a([A.aUq("menu","home","Welcome"),new A.hH("menu","Main Menu",C.ayW,A.D(["items",A.a([A.D(["label","About","targetScreenId","about","icon","info"],v,v),A.D(["label","Contact","targetScreenId","contact","icon","mail"],v,v)],u)],v,t)),D.d5K,new A.hH("contact","Contact",C.ayX,A.D(["fields",A.a([A.D(["id","name","label","Your name","type","text"],v,v),A.D(["id","message","label","Message","type","text"],v,v)],u),"submitLabel","Send","successMessage","Thanks! We received your message."],v,t))],x.X),"",C.cr,"",C.qz,"Built with NGMY App Builder",4284704497,w)},
+fGx(d,e){var w=0,v=A.j(x.y),u,t,s
+var $async$fGx=A.e(function(f,g){if(f===1)return A.f(g,v)
 for(;;)switch(w){case 0:s=C.a.i(d)
 if(s.length===0){u=!1
 w=1
@@ -2260,7 +2260,7 @@ u=!0
 w=1
 break
 case 1:return A.h(u,v)}})
-return A.i($async$fGw,v)},
+return A.i($async$fGx,v)},
 ald(){var w=0,v=A.j(x.h),u,t=2,s=[],r,q,p,o
 var $async$ald=A.e(function(d,e){if(d===1){s.push(e)
 w=t}for(;;)switch(w){case 0:w=3
@@ -2268,7 +2268,7 @@ return A.b(A.bZ(),$async$ald)
 case 3:if(!e){u=null
 w=1
 break}w=4
-return A.b(A.lx(C.bD),$async$ald)
+return A.b(A.lz(C.bD),$async$ald)
 case 4:t=6
 w=9
 return A.b(A.eU("ngmy_app_studio_published_registry",null,!1,C.bD),$async$ald)
@@ -2294,8 +2294,8 @@ break
 case 8:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
 return A.i($async$ald,v)},
-L9(d){return B.hez(d)},
-hez(d){var w=0,v=A.j(x.T),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f
+L9(d){return B.heA(d)},
+heA(d){var w=0,v=A.j(x.T),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f
 var $async$L9=A.e(function(e,a0){if(e===1){s.push(a0)
 w=t}for(;;)switch(w){case 0:i=d.Q
 h=C.a.i(i).toLowerCase()
@@ -2306,7 +2306,7 @@ return A.b(A.bZ(),$async$L9)
 case 3:if(!a0){u="No internet \u2014 publish again when online so your link works on other devices."
 w=1
 break}w=4
-return A.b(A.lx(C.bD),$async$L9)
+return A.b(A.lz(C.bD),$async$L9)
 case 4:t=6
 w=9
 return A.b(B.aLG(d),$async$L9)
@@ -2332,7 +2332,7 @@ w=13
 break
 case 10:w=6
 break
-case 13:n=A.bUA(q)
+case 13:n=A.bUB(q)
 J.aE(n,h,A.D(["project",r.a.eD(),"runtimeData",r.b,"publishedAt",new A.N(Date.now(),0,!1).a4().aa(),"projectId",r.a.a,"ownerEmail",C.a.i(r.a.d.toLowerCase())],l,x.K))
 J.aE(q,"apps",n)
 J.aE(q,"savedAt",new A.N(Date.now(),0,!1).a4().aa())
@@ -2358,8 +2358,8 @@ break
 case 8:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
 return A.i($async$L9,v)},
-S9(d){return B.heA(d)},
-heA(d){var w=0,v=A.j(x.H),u,t=2,s=[],r,q,p,o,n,m
+S9(d){return B.heB(d)},
+heB(d){var w=0,v=A.j(x.H),u,t=2,s=[],r,q,p,o,n,m
 var $async$S9=A.e(function(e,f){if(e===1){s.push(f)
 w=t}for(;;)switch(w){case 0:n=C.a.i(d).toLowerCase()
 if(J.aa(n)===0){w=1
@@ -2367,13 +2367,13 @@ break}w=3
 return A.b(A.bZ(),$async$S9)
 case 3:if(!f){w=1
 break}w=4
-return A.b(A.lx(C.bD),$async$S9)
+return A.b(A.lz(C.bD),$async$S9)
 case 4:t=6
 w=9
 return A.b(B.ald(),$async$S9)
 case 9:r=f
 if(r==null){w=1
-break}q=A.bUA(r)
+break}q=A.bUB(r)
 if(!J.l7(q,n)){w=1
 break}J.hB(q,n)
 J.aE(r,"apps",q)
@@ -2394,8 +2394,8 @@ break
 case 8:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
 return A.i($async$S9,v)},
-To(d,e,f,g){return B.hiE(d,e,f,g)},
-hiE(d,e,a0,a1){var w=0,v=A.j(x.T),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f
+To(d,e,f,g){return B.hiF(d,e,f,g)},
+hiF(d,e,a0,a1){var w=0,v=A.j(x.T),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f
 var $async$To=A.e(function(a2,a3){if(a2===1){s.push(a3)
 w=t}for(;;)switch(w){case 0:h=C.a.i(a1).toLowerCase()
 if(J.aa(h)===0){u="Invoice needs a link slug before publishing."
@@ -2405,7 +2405,7 @@ return A.b(A.bZ(),$async$To)
 case 3:if(!a3){u="No internet \u2014 publish again when online so the link works for customers."
 w=1
 break}w=4
-return A.b(A.lx(C.bD),$async$To)
+return A.b(A.lz(C.bD),$async$To)
 case 4:t=6
 m=x.N
 r=A.R(m,x.z)
@@ -2428,7 +2428,7 @@ w=12
 break
 case 9:w=6
 break
-case 12:o=A.c4r(r)
+case 12:o=A.c4s(r)
 j=new A.N(Date.now(),0,!1).a4().aa()
 i=a0==null?null:a0.a4().aa()
 J.aE(o,h,A.D(["data",e,"publishedAt",j,"expiresAt",i,"createdByEmail",C.a.i(d.toLowerCase())],m,x.R))
@@ -2456,8 +2456,8 @@ break
 case 8:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
 return A.i($async$To,v)},
-a5c(d){return B.hiF(d)},
-hiF(d){var w=0,v=A.j(x.H),u,t=2,s=[],r,q,p,o,n,m
+a5c(d){return B.hiG(d)},
+hiG(d){var w=0,v=A.j(x.H),u,t=2,s=[],r,q,p,o,n,m
 var $async$a5c=A.e(function(e,f){if(e===1){s.push(f)
 w=t}for(;;)switch(w){case 0:n=C.a.i(d).toLowerCase()
 if(J.aa(n)===0){w=1
@@ -2465,13 +2465,13 @@ break}w=3
 return A.b(A.bZ(),$async$a5c)
 case 3:if(!f){w=1
 break}w=4
-return A.b(A.lx(C.bD),$async$a5c)
+return A.b(A.lz(C.bD),$async$a5c)
 case 4:t=6
 w=9
 return A.b(A.a5b(),$async$a5c)
 case 9:r=f
 if(r==null){w=1
-break}q=A.c4r(r)
+break}q=A.c4s(r)
 if(!J.l7(q,n)){w=1
 break}J.hB(q,n)
 J.aE(r,"invoices",q)
@@ -2519,7 +2519,7 @@ Y=c[67]
 Q=c[69]
 B.akQ.prototype={
 S(){var w=$.at()
-return new B.azd(new A.ao(C.aq,w),new A.ao(C.aq,w),new A.ao(C.aq,w),new A.ao(C.aq,w),new A.ao(C.aq,w),new A.ao(C.aq,w),new A.cn(null,x.B),C.Uy,A.a([],x.t))}}
+return new B.azd(new A.ao(C.aq,w),new A.ao(C.aq,w),new A.ao(C.aq,w),new A.ao(C.aq,w),new A.ao(C.aq,w),new A.ao(C.aq,w),new A.cn(null,x.B),C.Uz,A.a([],x.t))}}
 B.azd.prototype={
 Z(){this.a0()
 this.Nb()},
@@ -2605,7 +2605,7 @@ case 2:return A.f(s.at(-1),v)}})
 return A.i($async$Cj,v)},
 Ha(){var w=0,v=A.j(x.H),u,t=this,s,r,q,p,o,n,m,l
 var $async$Ha=A.e(function(d,e){if(d===1)return A.f(e,v)
-for(;;)switch(w){case 0:if(C.a.i(t.e.a.a).length===0||C.a.i(t.r.a.a).length===0){t.c.F(x.q).f.P(D.elf)
+for(;;)switch(w){case 0:if(C.a.i(t.e.a.a).length===0||C.a.i(t.r.a.a).length===0){t.c.F(x.q).f.P(D.elg)
 w=1
 break}t.n(new B.doR(t))
 s=t.aY8()
@@ -2673,8 +2673,8 @@ o=g.y
 n=g.aan(o,"Text shown under the QR (optional \u2014 link itself stays hidden)")
 m=g.Q
 l=x.e
-l=A.z(new A.I(D.cJo,new B.dp1(),l),l.k("ai.E"))
-m=A.C(A.mJ(D.bCU,C.d3,m,!1,l,f,new B.dp2(g),C.di,f,x.W),1)
+l=A.z(new A.I(D.cJp,new B.dp1(),l),l.k("ai.E"))
+m=A.C(A.mJ(D.bCV,C.d3,m,!1,l,f,new B.dp2(g),C.di,f,x.W),1)
 l=g.as?f:g.gbXf()
 g.a.toString
 k=A.bk(C.bh,f,f,f,f,f,f,f,f,f,f,f)
@@ -2690,7 +2690,7 @@ l=A.A(A.a([l,C.b6,A.ey(i,A.d(m?"Downloading\u2026":"Download",f,f,f,f,f,f,f,f,f,
 j=g.d
 g.a.toString
 o=C.a.i(o.a.a)
-w=A.a([D.ePd,C.au,w,C.bu,v,C.P,new A.a3(f,88,u,f),C.az,t,s,r,q,p,n,C.aO,k,C.dW,l,C.T,new A.ep(A.fFN(!1,o.length===0?f:o,e,!1,j,C.bh),g.z),C.a3m,A.d("Published invoices on this device",f,f,f,f,f,f,A.l(f,f,C.c.j(0.7),f,f,f,f,f,f,f,f,12,f,f,C.O,f,f,!0,f,f,f,f,f,f,f,f),f,f,f),C.P],h)
+w=A.a([D.ePd,C.au,w,C.bu,v,C.P,new A.a3(f,88,u,f),C.az,t,s,r,q,p,n,C.aO,k,C.dW,l,C.T,new A.ep(A.fFO(!1,o.length===0?f:o,e,!1,j,C.bh),g.z),C.a3m,A.d("Published invoices on this device",f,f,f,f,f,f,A.l(f,f,C.c.j(0.7),f,f,f,f,f,f,f,f,12,f,f,C.O,f,f,!0,f,f,f,f,f,f,f,f),f,f,f),C.P],h)
 if(g.ay.length===0)w.push(A.d("None yet.",f,f,f,f,f,f,A.l(f,f,C.c.j(0.4),f,f,f,f,f,f,f,f,12,f,f,f,f,f,!0,f,f,f,f,f,f,f,f),f,f,f))
 v=g.ay
 C.d.v(w,new A.I(v,new B.dp3(g,d),A.S(v).k("I<1,r>")))
@@ -2730,7 +2730,7 @@ return A.h(null,v)}})
 return A.i($async$ot,v)},
 UH(){var w=0,v=A.j(x.H),u=this,t
 var $async$UH=A.e(function(d,e){if(d===1)return A.f(e,v)
-for(;;)switch(w){case 0:t=B.fNu(u.gmm())
+for(;;)switch(w){case 0:t=B.fNv(u.gmm())
 w=2
 return A.b(B.vT(u.gmm(),t),$async$UH)
 case 2:w=3
@@ -2806,7 +2806,7 @@ case 5:w=11
 return A.b(B.aMx(p,t.gmm(),d),$async$xd)
 case 11:p=t.c
 if(p==null){w=1
-break}p.F(x.q).f.P(D.ei1)
+break}p.F(x.q).f.P(D.ei2)
 case 4:w=12
 return A.b(t.ot(),$async$xd)
 case 12:case 1:return A.h(u,v)}})
@@ -2889,7 +2889,7 @@ return A.i($async$Oo,v)},
 acd(){var w=0,v=A.j(x.H),u,t=this,s
 var $async$acd=A.e(function(d,e){if(d===1)return A.f(e,v)
 for(;;)switch(w){case 0:s=t.x
-if(s==null){t.c.F(x.q).f.P(D.ekt)
+if(s==null){t.c.F(x.q).f.P(D.eku)
 w=1
 break}w=3
 return A.b(t.a_s(s),$async$acd)
@@ -2922,7 +2922,7 @@ m.O$=0
 w=3
 return A.b(B.vT(u.gmm(),s.b),$async$a_s)
 case 3:if(u.c!=null){u.n(new B.dr8(s,u))
-u.c.F(x.q).f.P(D.ehs)}return A.h(null,v)}})
+u.c.F(x.q).f.P(D.eht)}return A.h(null,v)}})
 return A.i($async$a_s,v)},
 B(d){var w,v,u,t,s,r,q,p,o,n=this
 A.K(d)
@@ -2958,7 +2958,7 @@ gd6(){return this.w}}
 B.azq.prototype={
 Z(){var w,v=this
 v.a0()
-w=v.e=B.fGY(v.a.c)
+w=v.e=B.fGZ(v.a.c)
 v.d=new A.ao(new A.bb(w.b,C.aZ,C.aL),$.at())
 v.f=B.aM4(w)},
 p(){var w=this.d
@@ -3044,7 +3044,7 @@ break
 case 6:w=8
 return A.b(B.S6(j.w),$async$G0)
 case 8:case 7:j=k.b
-if(j!=null)t.n(new B.drT(t,B.fGY(j)))
+if(j!=null)t.n(new B.drT(t,B.fGZ(j)))
 t.c.F(x.q).f.P(A.b0(null,null,null,null,C.iq,C.q,null,A.d(k.a,null,null,null,null,null,null,null,null,null,null),null,C.S,null,null,null,null,null,null,null,null,null,null))
 case 1:return A.h(u,v)}})
 return A.i($async$G0,v)},
@@ -3079,7 +3079,7 @@ case 3:g=f
 if(g!=null&&t.c!=null)t.n(new B.drP(t,d,g))
 case 1:return A.h(u,v)}})
 return A.i($async$a5V,v)},
-B(a3){var w,v,u,t,s,r,q,p,o,n,m=this,l=null,k="screen_ai",j="screen_add",i=m.a.e,h=A.K(a3).ax.a===C.H,g=h?X.b5r:D.aZL,f=h?C.aQ:C.f6,e=h?C.c:C.lK,d=h?C.aG:C.fr,a0=x.l,a1=A.aG(a3,C.bN,a0).w.a.a<520,a2=m.f
+B(a3){var w,v,u,t,s,r,q,p,o,n,m=this,l=null,k="screen_ai",j="screen_add",i=m.a.e,h=A.K(a3).ax.a===C.H,g=h?X.b5s:D.aZM,f=h?C.aQ:C.f6,e=h?C.c:C.lK,d=h?C.aG:C.fr,a0=x.l,a1=A.aG(a3,C.bN,a0).w.a.a<520,a2=m.f
 a2===$&&A.c()
 w=x.N
 v=A.D(["type","column","children",a2],w,x.K)
@@ -3092,7 +3092,7 @@ r=h?C.aG:C.c
 q=A.m(14)
 p=A.G(h?C.du:C.li,C.r,1)
 o=A.m(14)
-a0=A.u(A.a([s,C.P,A.p(l,A.bu(o,m.f.length===0?new A.B(C.em,A.as(A.d("Add widgets from the toolbar below",l,l,l,l,l,l,A.l(l,l,f,l,l,l,l,l,l,l,l,13,l,l,l,l,l,!0,l,l,l,l,l,l,l,l),l,l,l),l,l,l),l):A.cg(E.fNs("editor_preview_"+m.a.c.a,!0,!1,h,v,new B.ds9(),new B.dsa(a3),i),C.q,l,C.z,l,C.bk,l,l,C.ag),C.ap),C.h,l,new A.aV(0,1/0,220,a0.a.b*0.42),new A.o(r,l,p,q,l,l,C.n),l,l,l,l,l,l,l,l)],t),C.F,l,C.e,C.j,0,C.p)
+a0=A.u(A.a([s,C.P,A.p(l,A.bu(o,m.f.length===0?new A.B(C.em,A.as(A.d("Add widgets from the toolbar below",l,l,l,l,l,l,A.l(l,l,f,l,l,l,l,l,l,l,l,13,l,l,l,l,l,!0,l,l,l,l,l,l,l,l),l,l,l),l,l,l),l):A.cg(E.fNt("editor_preview_"+m.a.c.a,!0,!1,h,v,new B.ds9(),new B.dsa(a3),i),C.q,l,C.z,l,C.bk,l,l,C.ag),C.ap),C.h,l,new A.aV(0,1/0,220,a0.a.b*0.42),new A.o(r,l,p,q,l,l,C.n),l,l,l,l,l,l,l,l)],t),C.F,l,C.e,C.j,0,C.p)
 s=m.gbtp()
 r=A.d("Screen name",l,l,l,l,l,l,A.l(l,l,f,l,l,l,l,l,l,l,l,12,l,l,C.O,l,l,!0,l,l,l,l,l,l,l,l),l,l,l)
 q=m.d
@@ -3103,14 +3103,14 @@ r=C.b_.j(h?0.15:0.1)
 q=A.m(14)
 o=m.gbv7()
 n=A.m(14)
-a0=A.a([new B.Iv(a0,h,l),C.T,new B.br4(i,h,s,l),C.T,new B.Iv(p,h,l),C.T,A.aD(!1,C.X,!0,q,A.aH(!1,n,!0,new A.B(C.bC,A.A(A.a([D.Ls,C.ba,A.C(A.u(A.a([A.d("Ask AI about this screen",l,l,l,l,l,l,A.l(l,l,h?C.c:C.bi,l,l,l,l,l,l,l,l,l,l,l,C.I,l,l,!0,l,l,l,l,l,l,l,l),l,l,l),A.d("Tell Bolt how buttons should work or how text should read",l,l,l,l,l,l,A.l(l,l,f,l,l,l,l,l,l,l,l,12,l,l,l,l,l,!0,l,l,l,l,l,l,l,l),l,l,l)],t),C.F,l,C.e,C.j,0,C.p),1),A.V(C.ek,f,l,l,l,l)],t),C.m,l,C.e,C.j,0,l,l),l),l,!0,l,l,l,l,l,l,l,l,l,l,l,o,l,l,l,l,l,l,l),C.h,r,0,l,l,l,l,l,C.ac),C.aa,A.A(A.a([A.d("Widgets on this screen",l,l,l,l,l,l,A.l(l,l,e,l,l,l,l,l,l,l,l,14,l,l,C.I,l,l,!0,l,l,l,l,l,l,l,l),l,l,l),C.b6,A.d(""+m.f.length,l,l,l,l,l,l,A.l(l,l,i,l,l,l,l,l,l,l,l,13,l,l,C.O,l,l,!0,l,l,l,l,l,l,l,l),l,l,l)],t),C.m,l,C.e,C.j,0,l,l),C.P],t)
+a0=A.a([new B.Iv(a0,h,l),C.T,new B.br4(i,h,s,l),C.T,new B.Iv(p,h,l),C.T,A.aD(!1,C.X,!0,q,A.aH(!1,n,!0,new A.B(C.bC,A.A(A.a([D.Lt,C.ba,A.C(A.u(A.a([A.d("Ask AI about this screen",l,l,l,l,l,l,A.l(l,l,h?C.c:C.bi,l,l,l,l,l,l,l,l,l,l,l,C.I,l,l,!0,l,l,l,l,l,l,l,l),l,l,l),A.d("Tell Bolt how buttons should work or how text should read",l,l,l,l,l,l,A.l(l,l,f,l,l,l,l,l,l,l,l,12,l,l,l,l,l,!0,l,l,l,l,l,l,l,l),l,l,l)],t),C.F,l,C.e,C.j,0,C.p),1),A.V(C.ek,f,l,l,l,l)],t),C.m,l,C.e,C.j,0,l,l),l),l,!0,l,l,l,l,l,l,l,l,l,l,l,o,l,l,l,l,l,l,l),C.h,r,0,l,l,l,l,l,C.ac),C.aa,A.A(A.a([A.d("Widgets on this screen",l,l,l,l,l,l,A.l(l,l,e,l,l,l,l,l,l,l,l,14,l,l,C.I,l,l,!0,l,l,l,l,l,l,l,l),l,l,l),C.b6,A.d(""+m.f.length,l,l,l,l,l,l,A.l(l,l,i,l,l,l,l,l,l,l,l,13,l,l,C.O,l,l,!0,l,l,l,l,l,l,l,l),l,l,l)],t),C.m,l,C.e,C.j,0,l,l),C.P],t)
 if(m.f.length===0)a0.push(H.aQf(new B.dsb(h,i,f),new B.dsc(m),l,l,l,w))
 else a0.push(H.aQf(new B.dsd(m,i,h),new B.dse(m),l,l,l,w))
 a0.push(C.aa)
 a0.push(new B.bjJ(i,s,l))
 a0=A.br(!0,A.u(A.a([new B.b9X(i,"Drag & drop editor",a2,new B.dsf(a3),m.gcgY(),l),A.C(new B.aUt(A.cL(a0,l,new A.L(12,12,12,u),l,l,C.ag,!1),h,l),1)],t),C.m,l,C.e,C.j,0,C.p),!0,!1,C.ah,!0,!0)
 a2=m.gc4_()
-return A.cf(l,g,a0,l,!1,!1,a1?A.u(A.a([B.fLt(C.b_,C.EE,k,o,"Ask AI"),C.T,B.fLt(i,D.Lq,j,a2,"Add widget")],t),C.dE,l,C.e,C.R,0,C.p):A.u(A.a([I.aQU(C.b_,l,k,C.EE,D.eSC,o),C.T,I.aQU(i,l,j,D.Lq,D.eIr,a2)],t),C.dE,l,C.e,C.R,0,C.p),l)},
+return A.cf(l,g,a0,l,!1,!1,a1?A.u(A.a([B.fLu(C.b_,C.EE,k,o,"Ask AI"),C.T,B.fLu(i,D.Lr,j,a2,"Add widget")],t),C.dE,l,C.e,C.R,0,C.p):A.u(A.a([I.aQU(C.b_,l,k,C.EE,D.eSC,o),C.T,I.aQU(i,l,j,D.Lr,D.eIr,a2)],t),C.dE,l,C.e,C.R,0,C.p),l)},
 ctU(d){var w,v,u,t,s,r,q="collection",p=J.a6(d),o=p.h(d,"type"),n=J.k(o==null?"":o)
 switch(n){case"button":case"outlined_button":o=p.h(d,"label")
 w=J.k(o==null?"Button":o)
@@ -3144,7 +3144,7 @@ return"Stat \xb7 "+A.t(p==null?"":p)
 default:return B.Jq(n)}}}
 B.b9X.prototype={
 B(d){var w=this,v=null,u=w.c,t=A.a([u,u.j(0.85)],x.O),s=A.a([new A.a9(0,C.G,u.j(0.25),C.cD,12)],x.V),r=x.p
-return A.p(v,A.A(A.a([A.aF(v,v,v,v,D.bvb,v,v,v,w.f,v,v,v,v,v,v),A.C(A.u(A.a([A.d(w.d,v,v,v,v,v,v,C.QB,v,v,v),A.d(w.e,v,v,v,v,v,v,A.l(v,v,C.c.j(0.9),v,v,v,v,v,v,v,v,12,v,v,v,v,v,!0,v,v,v,v,v,v,v,v),v,v,v)],r),C.F,v,C.e,C.j,0,C.p),1),A.bJ(C.yi,w.r,A.bk(C.c,v,v,v,u,v,G.ad8,v,v,v,v,v))],r),C.m,v,C.e,C.j,0,v,v),C.h,v,v,new A.o(v,v,v,D.aOZ,s,new A.a8(C.a_,C.a7,C.w,t,v,v),C.n),v,v,v,v,D.bjN,v,v,v)}}
+return A.p(v,A.A(A.a([A.aF(v,v,v,v,D.bvc,v,v,v,w.f,v,v,v,v,v,v),A.C(A.u(A.a([A.d(w.d,v,v,v,v,v,v,C.QC,v,v,v),A.d(w.e,v,v,v,v,v,v,A.l(v,v,C.c.j(0.9),v,v,v,v,v,v,v,v,12,v,v,v,v,v,!0,v,v,v,v,v,v,v,v),v,v,v)],r),C.F,v,C.e,C.j,0,C.p),1),A.bJ(C.yi,w.r,A.bk(C.c,v,v,v,u,v,G.ad8,v,v,v,v,v))],r),C.m,v,C.e,C.j,0,v,v),C.h,v,v,new A.o(v,v,v,D.aP_,s,new A.a8(C.a_,C.a7,C.w,t,v,v),C.n),v,v,v,v,D.bjO,v,v,v)}}
 B.Iv.prototype={
 B(d){var w=null,v=this.d,u=v?C.bj:C.c,t=A.m(16)
 return A.p(w,this.c,C.h,w,w,new A.o(u,w,A.G(v?C.du:C.li,C.r,1),t,w,w,C.n),w,w,w,w,C.c1,w,w,1/0)}}
@@ -3159,34 +3159,34 @@ case"stat":return G.WP
 case"mapView":case"map":return D.afo
 case"reelFeed":return L.WZ
 case"socialFeed":return D.afl
-case"searchHub":return C.Kw
+case"searchHub":return C.Kx
 case"qrGenerator":return D.WJ
-case"invoiceBuilder":return F.Ku
+case"invoiceBuilder":return F.Kv
 case"image":return C.p_
 default:return D.WM}},
-B(d){var w,v=this,u=null,t=v.r,s=t?C.bj:C.c,r=A.m(14),q=A.m(14),p=A.m(14),o=A.G(t?C.du:C.li,C.r,1),n=A.V(O.bmS,t?C.c3:C.r9,u,u,u,u),m=v.f,l=m.j(0.12),k=A.m(10)
+B(d){var w,v=this,u=null,t=v.r,s=t?C.bj:C.c,r=A.m(14),q=A.m(14),p=A.m(14),o=A.G(t?C.du:C.li,C.r,1),n=A.V(O.bmT,t?C.c3:C.r9,u,u,u,u),m=v.f,l=m.j(0.12),k=A.m(10)
 k=A.p(u,A.V(v.gbR9(),m,u,u,u,20),C.h,u,u,new A.o(l,u,u,k,u,u,C.n),u,u,u,u,C.ch,u,u,u)
 m=A.d(B.Jq(v.d),u,u,u,u,u,u,A.l(u,u,m,u,u,u,u,u,u,u,u,11,u,u,C.O,u,u,!0,u,u,u,u,u,u,u,u),u,u,u)
 l=x.p
-w=new A.B(C.cK,A.aD(!1,C.X,!0,r,A.aH(!1,q,!0,A.p(u,A.A(A.a([new N.arn(n,v.c,!0,u),C.ab,k,C.aw,A.C(A.u(A.a([m,A.d(v.e,u,2,C.Z,u,u,u,A.l(u,u,t?C.ak:C.lK,u,u,u,u,u,u,u,u,13,u,u,u,u,u,!0,u,u,u,u,u,u,u,u),u,u,u)],l),C.F,u,C.e,C.j,0,C.p),1),A.aF(C.b_,u,u,u,D.bwo,u,u,u,v.x,u,u,u,u,"Ask AI to update this widget",u),A.aF(u,u,u,u,A.V(C.ul,C.D6,u,u,u,20),u,u,u,v.y,u,u,u,u,u,u)],l),C.m,u,C.e,C.j,0,u,u),C.h,u,u,new A.o(u,u,o,p,u,u,C.n),u,u,u,u,C.ei,u,u,u),u,!0,u,u,u,u,u,u,u,u,u,u,u,v.w,u,u,u,u,u,u,u),C.h,s,0,u,u,u,u,u,C.ac),u)
+w=new A.B(C.cK,A.aD(!1,C.X,!0,r,A.aH(!1,q,!0,A.p(u,A.A(A.a([new N.arn(n,v.c,!0,u),C.ab,k,C.aw,A.C(A.u(A.a([m,A.d(v.e,u,2,C.Z,u,u,u,A.l(u,u,t?C.ak:C.lK,u,u,u,u,u,u,u,u,13,u,u,u,u,u,!0,u,u,u,u,u,u,u,u),u,u,u)],l),C.F,u,C.e,C.j,0,C.p),1),A.aF(C.b_,u,u,u,D.bwp,u,u,u,v.x,u,u,u,u,"Ask AI to update this widget",u),A.aF(u,u,u,u,A.V(C.ul,C.D6,u,u,u,20),u,u,u,v.y,u,u,u,u,u,u)],l),C.m,u,C.e,C.j,0,u,u),C.h,u,u,new A.o(u,u,o,p,u,u,C.n),u,u,u,u,C.ei,u,u,u),u,!0,u,u,u,u,u,u,u,u,u,u,u,v.w,u,u,u,u,u,u,u),C.h,s,0,u,u,u,u,u,C.ac),u)
 return H.aQf(new B.eTs(v,w),new B.eTt(v),u,u,u,x.N)}}
 B.bjJ.prototype={
 B(d){var w,v,u,t,s=null,r=A.a([],x.p)
 for(w=this.c,v=0;v<11;++v){u={}
-t=D.cBN[v]
+t=D.cBO[v]
 u.a=null
 u.a=t.a
 r.push(A.n_(A.V(C.wH,w,s,s,s,16),s,new A.w(t.b,s,C.lB,s,s,s,s,s,s,s,s,s),s,new B.eAw(u,this),s,s,s))}return A.cd(C.bH,r,C.by,8,8)}}
 B.br4.prototype={
 B(d){var w=null,v=this.d,u=v?C.aQ:C.f6
-return new B.Iv(A.u(A.a([A.d("Widget tools",w,w,w,w,w,w,A.l(w,w,u,w,w,w,w,w,w,w,w,12,w,w,C.O,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),C.au,A.d("Tap to add \xb7 long-press and drag onto the list",w,w,w,w,w,w,A.l(w,w,u,w,w,w,w,w,w,w,w,11,w,w,w,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),C.T,A.ig(!0,w,w,C.z,D.egj,new B.eTv(this),B.h2j(35),w,C.dJ,C.ag,!0)],x.p),C.F,w,C.e,C.j,0,C.p),v,w)},
+return new B.Iv(A.u(A.a([A.d("Widget tools",w,w,w,w,w,w,A.l(w,w,u,w,w,w,w,w,w,w,w,12,w,w,C.O,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),C.au,A.d("Tap to add \xb7 long-press and drag onto the list",w,w,w,w,w,w,A.l(w,w,u,w,w,w,w,w,w,w,w,11,w,w,w,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),C.T,A.ig(!0,w,w,C.z,D.egk,new B.eTv(this),B.h2k(35),w,C.dJ,C.ag,!0)],x.p),C.F,w,C.e,C.j,0,C.p),v,w)},
 b28(d,e,f,g){var w=null,v=this.d,u=v?C.aG:C.fr,t=A.m(14),s=A.m(14),r=A.m(14),q=A.G(v?C.bG:C.ix,C.r,1),p=A.V(e,this.c,w,w,w,20)
 return A.hJ(A.aD(!1,C.X,!0,t,A.aH(!1,s,!0,A.p(w,A.u(A.a([p,C.au,A.d(f,w,1,C.Z,w,w,w,A.l(w,w,v?C.ak:C.jR,w,w,w,w,w,w,w,w,8,w,w,C.O,w,w,!0,w,w,w,w,w,w,w,w),C.L,w,w)],x.p),C.m,w,C.b5,C.j,0,C.p),C.h,w,w,new A.o(w,w,q,r,w,w,C.n),w,w,w,w,new A.L(4,6,4,6),w,w,1/0),w,!0,w,w,w,w,w,w,w,w,w,w,w,new B.eTu(this,d),w,w,w,w,w,w,w),C.h,u,0,w,w,w,w,w,C.ac),w,f,w,w)}}
 B.a91.prototype={
-B(d){var w,v,u,t,s=null,r=A.aG(d,C.bN,x.l).w,q=A.p(s,s,C.h,s,s,new A.o(C.ix,s,s,A.m(2),s,s,C.n),s,4,s,s,s,s,s,40),p=x.p,o=A.A(A.a([A.d("Add widget",s,s,s,s,s,s,A.l(s,s,C.IA,s,s,s,s,s,s,s,s,18,s,s,C.I,s,s,!0,s,s,s,s,s,s,s,s),s,s,s),C.b6,A.aF(s,s,s,s,C.Lr,s,s,s,new B.cqE(d),s,s,s,s,s,s)],p),C.m,s,C.e,C.j,0,s,s),n=A.a([],p)
+B(d){var w,v,u,t,s=null,r=A.aG(d,C.bN,x.l).w,q=A.p(s,s,C.h,s,s,new A.o(C.ix,s,s,A.m(2),s,s,C.n),s,4,s,s,s,s,s,40),p=x.p,o=A.A(A.a([A.d("Add widget",s,s,s,s,s,s,A.l(s,s,C.IA,s,s,s,s,s,s,s,s,18,s,s,C.I,s,s,!0,s,s,s,s,s,s,s,s),s,s,s),C.b6,A.aF(s,s,s,s,C.Ls,s,s,s,new B.cqF(d),s,s,s,s,s,s)],p),C.m,s,C.e,C.j,0,s,s),n=A.a([],p)
 for(w=D.ay_.gdH(D.ay_),w=w.gaf(w),v=this.c;w.C();){u=w.gT(w)
 t=u.a
-C.d.v(n,A.a([new A.w(t,s,new A.F(!0,v,s,s,s,s,12,C.I,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s),s,s,s,s,s,s,s,s,s),C.P,A.ig(!0,s,s,C.z,D.egu,new B.cqF(this,u),B.h2j(J.aa(u.b)),s,C.dJ,C.ag,!0),C.aO],p))}return A.p(s,A.u(A.a([C.T,q,new A.B(C.a8,o,s),new A.dk(1,C.cj,A.cL(n,s,C.wn,s,s,C.ag,!1),s)],p),C.m,s,C.e,C.R,0,C.p),C.h,s,new A.aV(0,1/0,0,r.a.b*0.75),D.aSw,s,s,s,s,s,s,s,s)}}
+C.d.v(n,A.a([new A.w(t,s,new A.F(!0,v,s,s,s,s,12,C.I,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s),s,s,s,s,s,s,s,s,s),C.P,A.ig(!0,s,s,C.z,D.egv,new B.cqG(this,u),B.h2k(J.aa(u.b)),s,C.dJ,C.ag,!0),C.aO],p))}return A.p(s,A.u(A.a([C.T,q,new A.B(C.a8,o,s),new A.dk(1,C.cj,A.cL(n,s,C.wn,s,s,C.ag,!1),s)],p),C.m,s,C.e,C.R,0,C.p),C.h,s,new A.aV(0,1/0,0,r.a.b*0.75),D.aSx,s,s,s,s,s,s,s,s)}}
 B.bhs.prototype={
 B(d){var w=this,v=null,u=w.f,t=u.j(0.08)
 return A.aD(!1,C.X,!0,A.m(12),A.aH(!1,A.m(12),!0,new A.B(C.wv,A.u(A.a([A.V(w.e,u,v,v,v,22),C.ar,A.d(w.d,v,2,C.Z,v,v,v,A.l(v,v,C.lK,v,v,v,v,v,v,v,v,10,v,v,C.a1,v,v,!0,v,v,v,v,v,v,v,v),C.L,v,v)],x.p),C.m,v,C.b5,C.j,0,C.p),v),v,!0,v,v,v,v,v,v,v,v,v,v,v,w.r,v,v,v,v,v,v,v),C.h,t,0,v,v,v,v,v,C.ac)}}
@@ -3227,7 +3227,7 @@ n=s.d
 m=t.d
 m===$&&A.c()
 w=5
-return A.b(B.bxh(s.e,q,C.AD,o,p,n,m),$async$G1)
+return A.b(B.bxi(s.e,q,C.AD,o,p,n,m),$async$G1)
 case 5:k=e
 if(t.c==null){w=1
 break}s=t.a
@@ -3255,9 +3255,9 @@ o=A.aG(d,C.bN,x.l).w
 t=A.p(p,p,C.h,p,p,new A.o(C.ix,p,p,A.m(2),p,p,C.n),p,4,p,p,p,p,p,40)
 s=x.p
 r=A.a([A.C(A.d("Edit "+B.Jq(w),p,p,p,p,p,p,A.l(p,p,u,p,p,p,p,p,p,p,p,18,p,p,C.I,p,p,!0,p,p,p,p,p,p,p,p),p,p,p),1)],s)
-if(q.a.w.length!==0)r.push(A.aF(p,p,p,p,D.Ls,p,p,p,q.gbv8(),p,p,p,p,"Ask AI",p))
+if(q.a.w.length!==0)r.push(A.aF(p,p,p,p,D.Lt,p,p,p,q.gbv8(),p,p,p,p,"Ask AI",p))
 r.push(A.bJ(C.pB,new B.eTr(q,d),p))
-return A.p(p,A.u(A.a([C.T,t,new A.B(C.Vq,A.A(r,C.m,p,C.e,C.j,0,p,p),p),new A.dk(1,C.cj,A.cL(q.bHw(w),p,V.JX,p,p,C.ag,!1),p)],s),C.m,p,C.e,C.R,0,C.p),C.h,p,new A.aV(0,1/0,0,o.a.b*0.85),new A.o(v,p,p,C.kh,p,p,C.n),p,p,p,p,p,p,p,p)},
+return A.p(p,A.u(A.a([C.T,t,new A.B(C.Vq,A.A(r,C.m,p,C.e,C.j,0,p,p),p),new A.dk(1,C.cj,A.cL(q.bHw(w),p,V.JY,p,p,C.ag,!1),p)],s),C.m,p,C.e,C.R,0,C.p),C.h,p,new A.aV(0,1/0,0,o.a.b*0.85),new A.o(v,p,p,C.kh,p,p,C.n),p,p,p,p,p,p,p,p)},
 bHw(b1){var w,v,u,t,s,r,q,p,o=this,n="Label",m=null,l="label",k="action",j="navigate",i="collection",h="Style",g="subtitle",f="title",e="Subtitle",d="entries",a0="navigateAfter",a1="Collection",a2="Title field",a3="titleField",a4="name",a5="classic",a6="height",a7="reels",a8="Posts collection",a9="placeholder",b0="templateId"
 switch(b1){case"button":case"outlined_button":w=o.d
 w===$&&A.c()
@@ -3270,7 +3270,7 @@ if(v==null)v=o.d.h(0,"targetScreenId")
 u=x.p
 v=A.a([w,o.ci_("Opens screen",J.k(v==null?"":v),new B.eSc(o))],u)
 if(b1==="button"){w=o.d.h(0,k)
-w=A.a([o.GF("Action",J.k(w==null?j:w),D.cTG,new B.eSd(o))],u)
+w=A.a([o.GF("Action",J.k(w==null?j:w),D.cTH,new B.eSd(o))],u)
 u=o.d.h(0,k)
 if(J.y(u==null?j:u,"snack")){u=o.d.h(0,"message")
 w.push(o.eo("Snack message",J.k(u==null?"":u),new B.eSo(o)))}u=o.d.h(0,k)
@@ -3282,7 +3282,7 @@ w===$&&A.c()
 w=w.h(0,"text")
 w=o.afE("Text",J.k(w==null?"":w),new B.eSV(o),3)
 v=o.d.h(0,"style")
-return A.a([w,o.GF(h,J.k(v==null?g:v),D.cWX,new B.eT5(o))],x.p)
+return A.a([w,o.GF(h,J.k(v==null?g:v),D.cWY,new B.eT5(o))],x.p)
 case"hero":w=o.d
 w===$&&A.c()
 w=w.h(0,"emoji")
@@ -3318,9 +3318,9 @@ return A.a([w,v,u,t,s,o.avJ("Add button opens",J.k(r==null?"":r),new B.eSp(o),!0
 case"menuGrid":w=o.d
 w===$&&A.c()
 w=w.h(0,"style")
-w=o.GF(h,J.k(w==null?a5:w),D.cNs,new B.eSr(o))
+w=o.GF(h,J.k(w==null?a5:w),D.cNt,new B.eSr(o))
 v=o.d.h(0,"columns")
-return A.a([w,o.GF("Columns",J.k(v==null?2:v),D.czQ,new B.eSs(o)),C.P,A.d("Menu items",m,m,m,m,m,m,A.l(m,m,C.jR,m,m,m,m,m,m,m,m,13,m,m,C.O,m,m,!0,m,m,m,m,m,m,m,m),m,m,m),new B.ayC(o.d.h(0,"items"),o.a.e,new B.eSt(o),m)],x.p)
+return A.a([w,o.GF("Columns",J.k(v==null?2:v),D.czR,new B.eSs(o)),C.P,A.d("Menu items",m,m,m,m,m,m,A.l(m,m,C.jR,m,m,m,m,m,m,m,m,13,m,m,C.O,m,m,!0,m,m,m,m,m,m,m,m),m,m,m),new B.ayC(o.d.h(0,"items"),o.a.e,new B.eSt(o),m)],x.p)
 case"switch":w=o.d
 w===$&&A.c()
 w=w.h(0,"setting")
@@ -3383,7 +3383,7 @@ w===$&&A.c()
 w=w.h(0,i)
 w=o.eo("Save to collection",J.k(w==null?a7:w),new B.eSR(o))
 v=o.d.h(0,"mode")
-v=o.GF("Mode",J.k(v==null?"reel":v),D.cVZ,new B.eSS(o))
+v=o.GF("Mode",J.k(v==null?"reel":v),D.cW_,new B.eSS(o))
 u=o.d.h(0,a0)
 return A.a([w,v,o.eo("After post go to screen ID",J.k(u==null?"":u),new B.eST(o))],x.p)
 case"profile":w=o.d
@@ -3436,7 +3436,7 @@ w===$&&A.c()
 w=w.h(0,"text")
 w=o.afE("Banner text",J.k(w==null?"":w),new B.eT8(o),3)
 v=o.d.h(0,"variant")
-return A.a([w,o.GF(h,J.k(v==null?"info":v),D.cQR,new B.eT9(o))],x.p)
+return A.a([w,o.GF(h,J.k(v==null?"info":v),D.cQS,new B.eT9(o))],x.p)
 case"progress":w=o.d
 w===$&&A.c()
 w=w.h(0,l)
@@ -3514,9 +3514,9 @@ w===$&&A.c()
 if(!(p<w.length))break
 w=J.q(w[p],"label")
 w=J.k(w==null?"":w)
-w=A.aK(t,C.U,!1,t,!0,C.q,t,A.aL(),new A.ao(new A.bb(w,C.aZ,C.aL),$.at()),t,t,t,t,t,2,D.aiV,C.z,!0,t,!0,t,!1,t,C.ad,t,t,t,t,t,t,t,t,t,1,t,t,!1,"\u2022",t,new B.d0O(u,p),t,t,t,!1,t,t,!1,t,!0,t,C.a8,t,t,t,t,t,t,t,t,t,t,t,t,!0,C.a5,t,C.am,t,t,t,t)
+w=A.aK(t,C.U,!1,t,!0,C.q,t,A.aL(),new A.ao(new A.bb(w,C.aZ,C.aL),$.at()),t,t,t,t,t,2,D.aiV,C.z,!0,t,!0,t,!1,t,C.ad,t,t,t,t,t,t,t,t,t,1,t,t,!1,"\u2022",t,new B.d0P(u,p),t,t,t,!1,t,t,!1,t,!0,t,C.a8,t,t,t,t,t,t,t,t,t,t,t,t,!0,C.a5,t,C.am,t,t,t,t)
 v=J.q(u.d[p],"type")
-r.push(new A.B(C.cK,new A.cD(C.aY,C.e,C.j,C.m,t,C.p,t,0,A.a([new A.bG(1,C.bp,w,t),C.ab,A.a24(t,t,t,t,!1,!1,D.cQ_,new B.d0P(u,p),t,t,J.k(v==null?"text":v),q),A.aF(t,t,t,t,D.bzP,t,t,t,new B.d0Q(u,p),t,t,t,t,t,t)],s),t),t));++p}r.push(A.hg(D.Lq,D.eCD,new B.d0R(u),t))
+r.push(new A.B(C.cK,new A.cD(C.aY,C.e,C.j,C.m,t,C.p,t,0,A.a([new A.bG(1,C.bp,w,t),C.ab,A.a24(t,t,t,t,!1,!1,D.cQ0,new B.d0Q(u,p),t,t,J.k(v==null?"text":v),q),A.aF(t,t,t,t,D.bzQ,t,t,t,new B.d0R(u,p),t,t,t,t,t,t)],s),t),t));++p}r.push(A.hg(D.Lr,D.eCD,new B.d0S(u),t))
 return A.u(r,C.m,t,C.e,C.j,0,C.p)}}
 B.ayC.prototype={
 S(){return new B.beb()},
@@ -3543,24 +3543,24 @@ if(!(g<w.length))break
 w=J.q(w[g],"label")
 w=J.k(w==null?"":w)
 v=$.at()
-w=A.aK(m,C.U,!1,m,!0,C.q,m,A.aL(),new A.ao(new A.bb(w,C.aZ,C.aL),v),m,m,m,m,m,2,D.aiV,C.z,!0,m,!0,m,!1,m,C.ad,m,m,m,m,m,m,m,m,m,1,m,m,!1,"\u2022",m,new B.dfm(n,g),m,m,m,!1,m,m,!1,m,!0,m,C.a8,m,m,m,m,m,m,m,m,m,m,m,m,!0,C.a5,m,C.am,m,m,m,m)
+w=A.aK(m,C.U,!1,m,!0,C.q,m,A.aL(),new A.ao(new A.bb(w,C.aZ,C.aL),v),m,m,m,m,m,2,D.aiV,C.z,!0,m,!0,m,!1,m,C.ad,m,m,m,m,m,m,m,m,m,1,m,m,!1,"\u2022",m,new B.dfn(n,g),m,m,m,!1,m,m,!1,m,!0,m,C.a8,m,m,m,m,m,m,m,m,m,m,m,m,!0,C.a5,m,C.am,m,m,m,m)
 u=J.q(n.d[g],"emoji")
 u=J.k(u==null?"":u)
-v=A.aK(m,C.U,!1,m,!0,C.q,m,A.aL(),new A.ao(new A.bb(u,C.aZ,C.aL),v),m,m,m,m,m,2,D.bDc,C.z,!0,m,!0,m,!1,m,C.ad,m,m,m,m,m,m,m,m,m,1,m,m,!1,"\u2022",m,new B.dfn(n,g),m,m,m,!1,m,m,!1,m,!0,m,C.a8,m,m,m,m,m,m,m,m,m,m,m,m,!0,C.a5,m,C.am,m,m,m,m)
+v=A.aK(m,C.U,!1,m,!0,C.q,m,A.aL(),new A.ao(new A.bb(u,C.aZ,C.aL),v),m,m,m,m,m,2,D.bDd,C.z,!0,m,!0,m,!1,m,C.ad,m,m,m,m,m,m,m,m,m,1,m,m,!1,"\u2022",m,new B.dfo(n,g),m,m,m,!1,m,m,!1,m,!0,m,C.a8,m,m,m,m,m,m,m,m,m,m,m,m,!0,C.a5,m,C.am,m,m,m,m)
 u=J.q(n.d[g],"icon")
 t=J.k(u==null?"menu":u).toLowerCase()
 u=C.d.q(D.asT,t)?t:"menu"
 s=A.a([],h)
 for(r=0;r<26;++r){t=D.asT[r]
-s.push(new A.eq(t,new A.w(t,m,m,m,m,m,m,m,m,m,m,m),C.eR,m,i))}v=A.a([new A.bG(1,C.bp,v,m),C.ab,new A.bG(1,C.bp,A.mJ(D.bDj,m,m,!1,s,m,new B.dfo(n,g),m,u,j),m)],l)
-if(C.d.be(n.a.d,new B.dfp(n,g))){u=n.d[g]
+s.push(new A.eq(t,new A.w(t,m,m,m,m,m,m,m,m,m,m,m),C.eR,m,i))}v=A.a([new A.bG(1,C.bp,v,m),C.ab,new A.bG(1,C.bp,A.mJ(D.bDk,m,m,!1,s,m,new B.dfp(n,g),m,u,j),m)],l)
+if(C.d.be(n.a.d,new B.dfq(n,g))){u=n.d[g]
 s=J.a6(u)
 q=s.h(u,"target")
 u=q==null?s.h(u,"targetScreenId"):q
 u=J.k(u==null?"":u)}else{u=A.qD(n.a.d)
 u=u==null?m:u.a}s=A.a([],h)
 for(q=n.a.d,p=q.length,r=0;r<q.length;q.length===p||(0,A.J)(q),++r){o=q[r]
-s.push(new A.eq(o.a,new A.w(o.b,m,m,m,m,m,m,m,m,m,m,m),C.eR,m,i))}k.push(new A.rp(m,m,m,C.cK,new A.B(C.bk,A.u(A.a([w,C.P,new A.cD(C.aY,C.e,C.j,C.m,m,C.p,m,0,v,m),C.P,A.mJ(D.bCV,m,m,!1,s,m,new B.dfq(n,g),m,u,j),new A.bF(C.a7,m,m,A.bE(!1,D.eFg,m,m,!0,m,m,new B.dfr(n,g),m,m),m)],l),C.m,m,C.e,C.j,0,C.p),m),m));++g}k.push(A.hg(D.Lq,D.eDR,new B.dfs(n),m))
+s.push(new A.eq(o.a,new A.w(o.b,m,m,m,m,m,m,m,m,m,m,m),C.eR,m,i))}k.push(new A.rp(m,m,m,C.cK,new A.B(C.bk,A.u(A.a([w,C.P,new A.cD(C.aY,C.e,C.j,C.m,m,C.p,m,0,v,m),C.P,A.mJ(D.bCW,m,m,!1,s,m,new B.dfr(n,g),m,u,j),new A.bF(C.a7,m,m,A.bE(!1,D.eFg,m,m,!0,m,m,new B.dfs(n,g),m,m),m)],l),C.m,m,C.e,C.j,0,C.p),m),m));++g}k.push(A.hg(D.Lr,D.eDR,new B.dft(n),m))
 return A.u(k,C.m,m,C.e,C.j,0,C.p)}}
 B.a3R.prototype={}
 B.Ui.prototype={
@@ -3578,7 +3578,7 @@ w.a9w()},
 a9w(){var w=0,v=A.j(x.H),u,t=this,s
 var $async$a9w=A.e(function(d,e){if(d===1)return A.f(e,v)
 for(;;)switch(w){case 0:w=3
-return A.b(B.bUi(t.a.y,t.gasL()),$async$a9w)
+return A.b(B.bUj(t.a.y,t.gasL()),$async$a9w)
 case 3:s=e
 if(t.c==null){w=1
 break}t.n(new B.etf(t,s))
@@ -3624,7 +3624,7 @@ o=t.f
 n=A.S(o).k("a4<1>")
 o=A.z(new A.a4(o,new B.etj(),n),n.k("E.E"))
 w=5
-return A.b(B.bxh(r,s,o,k,j,q,p),$async$zi)
+return A.b(B.bxi(r,s,o,k,j,q,p),$async$zi)
 case 5:m=e
 if(t.c==null){w=1
 break}k=t.a
@@ -3659,7 +3659,7 @@ m=x.l
 t=A.aG(d,C.bN,m).w
 s=A.p(n,n,C.h,n,n,new A.o(C.r9,n,n,A.m(2),n,n,C.n),n,4,n,n,n,n,n,40)
 r=x.p
-s=A.a([C.T,s,new A.B(D.acS,A.A(A.a([D.Ls,C.ab,A.C(A.d("AI \xb7 "+w,n,n,n,n,n,n,A.l(n,n,o.a.w?C.c:C.bi,n,n,n,n,n,n,n,n,17,n,n,C.u,n,n,!0,n,n,n,n,n,n,n,n),n,n,n),1),A.aF(n,n,n,n,A.V(D.bnB,u,n,n,n,20),n,n,n,new B.etm(o),n,n,n,n,"Clear chat history",n),A.aF(n,n,n,n,A.V(C.nn,u,n,n,n,n),n,n,n,new B.etn(o,d),n,n,n,n,n,n)],r),C.m,n,C.e,C.j,0,n,n),n),new A.B(C.fu,A.d("Conversation saved on this device \u2014 Bolt remembers what you asked before.",n,n,n,n,n,n,A.l(n,n,u,n,n,n,n,n,n,n,n,11,n,n,n,n,n,!0,n,n,n,n,n,n,n,n),n,n,n),n),C.P,A.C(A.jT(!0,n,o.e,new B.eto(o,d),o.f.length,n,C.ln,n,n,!1,!1),1)],r)
+s=A.a([C.T,s,new A.B(D.acS,A.A(A.a([D.Lt,C.ab,A.C(A.d("AI \xb7 "+w,n,n,n,n,n,n,A.l(n,n,o.a.w?C.c:C.bi,n,n,n,n,n,n,n,n,17,n,n,C.u,n,n,!0,n,n,n,n,n,n,n,n),n,n,n),1),A.aF(n,n,n,n,A.V(D.bnC,u,n,n,n,20),n,n,n,new B.etm(o),n,n,n,n,"Clear chat history",n),A.aF(n,n,n,n,A.V(C.no,u,n,n,n,n),n,n,n,new B.etn(o,d),n,n,n,n,n,n)],r),C.m,n,C.e,C.j,0,n,n),n),new A.B(C.fu,A.d("Conversation saved on this device \u2014 Bolt remembers what you asked before.",n,n,n,n,n,n,A.l(n,n,u,n,n,n,n,n,n,n,n,11,n,n,n,n,n,!0,n,n,n,n,n,n,n,n),n,n,n),n),C.P,A.C(A.jT(!0,n,o.e,new B.eto(o,d),o.f.length,n,C.ln,n,n,!1,!1),1)],r)
 if(o.r)s.push(new A.B(C.ch,A.A(A.a([new A.a3(18,18,A.mi(n,o.a.r,n,n,n,n,n,2,n,n),n),C.aw,A.d("Bolt is updating\u2026",n,n,n,n,n,n,A.l(n,n,u,n,n,n,n,n,n,n,n,12,n,n,n,n,n,!0,n,n,n,n,n,n,n,n),n,n,n)],r),C.m,n,C.b5,C.j,0,n,n),n))
 m=A.aG(d,C.en,m).w
 q=o.a.w?C.aG:C.fr
@@ -3688,7 +3688,7 @@ ZD(){var w=0,v=A.j(x.H),u=this,t,s
 var $async$ZD=A.e(function(d,e){if(d===1)return A.f(e,v)
 for(;;)switch(w){case 0:t=u.a
 w=2
-return A.b(B.bUg(t.f,t.e,t.w),$async$ZD)
+return A.b(B.bUh(t.f,t.e,t.w),$async$ZD)
 case 2:s=e
 if(u.c!=null)u.n(new B.dsi(u,s))
 return A.h(null,v)}})
@@ -3698,7 +3698,7 @@ var $async$Wn=A.e(function(d,e){if(d===1)return A.f(e,v)
 for(;;)switch(w){case 0:s=t.a.e
 r=t.r
 w=3
-return A.b(B.bUh(s,r==null?null:r.a),$async$Wn)
+return A.b(B.bUi(s,r==null?null:r.a),$async$Wn)
 case 3:q=e
 if(t.c==null){w=1
 break}if(J.cs(q)){t.n(new B.dsg(t,q))
@@ -3781,7 +3781,7 @@ return A.b(t.ZD(),$async$qq)
 case 15:w=16
 return A.b(t.Ou(),$async$qq)
 case 16:w=17
-return A.b(A.bK(C.nh,null,x.H),$async$qq)
+return A.b(A.bK(C.ni,null,x.H),$async$qq)
 case 17:k=t.e
 s=k.f
 if(s.length!==0){s=C.d.gcV(s).Q
@@ -3795,7 +3795,7 @@ w.c.F(x.q).f.P(A.b0(v,v,v,v,C.iq,C.q,v,A.d('"'+w.r.b+'" applied to canvas.',v,v,
 B(d){var w,v,u,t,s,r=this,q=null,p=r.a.as,o=p?12:20
 p=p?12:20
 w=C.c.j(0.06)
-v=A.p(q,D.bst,C.h,q,q,new A.o(C.bh.j(0.2),q,q,A.m(10),q,q,C.n),q,q,q,q,C.ch,q,q,q)
+v=A.p(q,D.bsu,C.h,q,q,new A.o(C.bh.j(0.2),q,q,A.m(10),q,q,C.n),q,q,q,q,C.ch,q,q,q)
 u=A.d("NGMY AI Assistant",q,q,q,q,q,q,A.l(q,q,C.c,q,q,q,q,q,q,q,q,r.a.as?15:17,q,q,C.u,q,q,!0,q,q,q,q,q,q,q,q),q,q,q)
 t=r.r
 t=t==null?q:t.b
@@ -3810,15 +3810,15 @@ o=r.r
 if(o!=null)p.push(new A.B(S.Vh,A.d(""+o.f.length+" screens \xb7 "+o.b,q,q,q,q,q,q,D.etn,q,q,q),q))
 o=r.a.as?12:16
 p.push(A.C(A.jT(!0,q,r.e,new B.dsm(r),r.f.length,q,new A.L(o,o,o,o),q,q,!1,!1),1))
-if(r.w)p.push(D.bHP)
+if(r.w)p.push(D.bHQ)
 o=x.G
-o=A.z(new A.I(D.cQL,new B.dsn(r),o),o.k("ai.E"))
+o=A.z(new A.I(D.cQM,new B.dsn(r),o),o.k("ai.E"))
 p.push(new A.a3(q,40,A.cL(o,q,C.ie,q,q,C.aY,!1),q))
 o=r.a.as?10:14
 w=A.m(16)
 v=A.G(C.c.j(0.1),C.r,1)
 u=A.C(A.aK(q,C.U,!1,q,!0,C.q,q,A.aL(),r.d,q,q,q,q,q,2,A.bn(q,C.et,q,C.ch,q,q,q,q,!0,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,A.l(q,q,C.c.j(0.4),q,q,q,q,q,q,q,q,13,q,q,q,q,q,!0,q,q,q,q,q,q,q,q),"Describe your app or changes\u2026",q,q,q,q,q,q,q,q,q,!0,!0,!1,q,q,q,q,q,q,q,q,q,q,q,q,q,q),C.z,!0,q,!0,q,!1,q,C.ad,q,q,q,q,q,q,q,q,q,3,1,q,!1,"\u2022",q,q,q,new B.dso(r),q,!1,q,q,!1,q,!0,q,C.a8,q,q,q,q,q,q,q,q,q,q,q,C.a4p,!0,C.a5,q,C.am,q,q,q,q),1)
-t=A.ok(q,C.bh,q,q,q,q,q,q,q,q,q,q,C.Qf,q,q,q,q)
+t=A.ok(q,C.bh,q,q,q,q,q,q,q,q,q,q,C.Qg,q,q,q,q)
 p.push(new A.B(new A.L(12,4,12,o),A.p(q,A.A(A.a([u,A.G5(C.Yb,r.w?q:new B.dsp(r),t,q)],s),C.m,q,C.e,C.j,0,q,q),C.h,q,q,new A.o(C.d3,q,v,w,q,q,C.n),q,q,q,q,C.ew,q,q,q),q))
 return A.p(q,A.u(p,C.af,q,C.e,C.j,0,C.p),C.h,C.aG,q,q,q,q,q,q,q,q,q,q)}}
 B.H7.prototype={}
@@ -3829,7 +3829,7 @@ a3(){return"NgmyStudioBuildMode."+this.b}}
 B.aYI.prototype={
 a3(){return"NgmyStudioCanvasMode."+this.b}}
 B.alb.prototype={
-S(){return new B.azs(D.Bb,D.Pe,A.a([D.kE],x.L))},
+S(){return new B.azs(D.Bb,D.Pf,A.a([D.kE],x.L))},
 cGY(d){return this.at.$0()},
 aD2(d){return this.ax.$1(d)},
 cIa(d){return this.ch.$1(d)},
@@ -3857,11 +3857,11 @@ if(v.ax.length>1){v.n(new B.dsJ(v))
 return}w=v.d
 w===$&&A.c()
 if(w!==D.Bc){v.n(new B.dsK(v))
-return}v.c.F(x.q).f.P(D.egU)},
-b3K(d){if(B.fGV(d)){this.a.cy.$1(d)
+return}v.c.F(x.q).f.P(D.egV)},
+b3K(d){if(B.fGW(d)){this.a.cy.$1(d)
 return}this.a.aCX(d)},
 atV(){var w,v=this,u=v.a.x
-if(u==null){v.c.F(x.q).f.P(D.ej7)
+if(u==null){v.c.F(x.q).f.P(D.ej8)
 return}v.n(new B.dt5(v))
 w=v.a
 w.toString
@@ -3869,7 +3869,7 @@ w.aCR(u,C.o.D(v.y,0,u.f.length-1))},
 M7(){var w=0,v=A.j(x.H),u,t=this,s
 var $async$M7=A.e(function(d,e){if(d===1)return A.f(e,v)
 for(;;)switch(w){case 0:s=t.a.x
-if(s==null){t.c.F(x.q).f.P(D.eia)
+if(s==null){t.c.F(x.q).f.P(D.eib)
 w=1
 break}w=3
 return A.b(t.Uv(s),$async$M7)
@@ -3890,7 +3890,7 @@ v.bA(d)
 w=v.a.x
 if(w!=null&&v.y>=w.f.length)v.y=0},
 cpl(d){var w,v,u
-for(w=$.h7p(),v=0;v<26;++v){u=w[v]
+for(w=$.h7q(),v=0;v<26;++v){u=w[v]
 if(u.a===d)return u}return null},
 auq(d){if(this.cwF(d))return
 this.n(new B.dtc(this,d))},
@@ -3925,7 +3925,7 @@ return A.b(u.a.cGI(d),$async$WU)
 case 5:case 3:return A.h(null,v)}})
 return A.i($async$WU,v)},
 cls(){var w,v=this,u=v.a.x
-if(u==null||u.f.length===0){v.c.F(x.q).f.P(D.eln)
+if(u==null||u.f.length===0){v.c.F(x.q).f.P(D.elo)
 return}w=v.c
 w.toString
 A.c1(C.d3,new B.dtp(v,u),w,!0,!0,!1,null,!1,!1,x.H)},
@@ -3934,7 +3934,7 @@ aHZ(){var w,v,u=this.a.x
 if(u==null||u.f.length===0)return C.c2
 w=this.y
 v=u.f
-return B.aM4(B.fGY(v[C.o.D(w,0,v.length-1)]))},
+return B.aM4(B.fGZ(v[C.o.D(w,0,v.length-1)]))},
 B(d){var w,v,u,t,s,r,q,p=this,o=null,n=A.aG(d,C.bN,x.l).w.a.a,m=n<960,l=!m||p.as
 if(m)w=n>=720&&p.at
 else w=p.at
@@ -3952,7 +3952,7 @@ if(w){q=m?240:280
 r.push(new A.a3(q,o,p.cgo(),o))}s.push(A.C(A.A(r,C.m,o,C.e,C.j,0,o,o),1))
 u.push(A.C(A.u(s,C.m,o,C.e,C.j,0,C.p),1))
 u=A.a([A.A(u,C.m,o,C.e,C.j,0,o,o)],v)
-if(m&&p.as)C.d.v(u,A.a([A.aI(o,A.p(o,o,C.h,C.aV,o,o,o,o,o,o,o,o,o,o),C.z,!1,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,new B.dtN(p),o,o,o,o,o,o,!1,C.ae),new A.a3(280,o,p.aRC(!0),o)],v))
+if(m&&p.as)C.d.v(u,A.a([A.aJ(o,A.p(o,o,C.h,C.aV,o,o,o,o,o,o,o,o,o,o),C.z,!1,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,new B.dtN(p),o,o,o,o,o,o,!1,C.ae),new A.a3(280,o,p.aRC(!0),o)],v))
 if(p.r){v=p.d
 v===$&&A.c()
 v=v===D.kE&&t}else v=!1
@@ -3960,14 +3960,14 @@ if(v)u.push(p.bwJ(m))
 if(p.w)u.push(p.cpp())
 return A.cf(o,C.dc,new A.am(C.V,o,C.a9,C.q,u,o),o,!1,!1,o,o)},
 bXq(d){var w,v,u,t,s=this,r=null,q=s.a.x,p=d?4:16,o=d?4:16,n=C.c.j(0.06),m=x.p,l=A.a([],m)
-if(d)l.push(A.aF(r,r,r,r,D.bzI,r,r,r,new B.dtF(s),r,r,r,r,r,r))
-l.push(A.aF(r,r,r,r,D.bsB,r,r,r,s.gbKx(),r,r,r,r,"Back",r))
+if(d)l.push(A.aF(r,r,r,r,D.bzJ,r,r,r,new B.dtF(s),r,r,r,r,r,r))
+l.push(A.aF(r,r,r,r,D.bsC,r,r,r,s.gbKx(),r,r,r,r,"Back",r))
 w=!d
 if(w)C.d.v(l,A.a([C.ab,s.aSw(!1)],m))
 l.push(C.b6)
 if(d)l.push(s.aSw(!0))
 v=q==null
-u=!v&&B.fGV(q)?"Open live app":"Preview in builder"
+u=!v&&B.fGW(q)?"Open live app":"Preview in builder"
 t=v?r:new B.dtG(s,q)
 l.push(A.aF(r,r,r,r,A.V(C.x0,v?C.be:C.cJ,r,r,r,22),r,r,r,t,r,r,r,r,u,r))
 if(w){w=v?r:new B.dtH(s,q)
@@ -3981,7 +3981,7 @@ if(d)l.push(A.AA(r,C.d3,D.ahM,new B.dtK(),C.J,new B.dtL(s,q),C.ch,r,x.N))
 else{m=s.a.c
 l.push(new A.B(U.uh,A.hh(C.cf,r,A.d(m.length!==0?m[0].toUpperCase():"U",r,r,r,r,r,r,C.qP,r,r,r),r,15),r))}return A.p(r,A.A(l,C.m,r,C.e,C.j,0,r,r),C.h,r,r,new A.o(C.aG,r,new A.c2(C.W,C.W,new A.ay(n,1,C.r,-1),C.W),r,r,r,C.n),r,r,r,r,new A.L(p,6,o,6),r,r,r)},
 aSw(d){var w=this,v=null,u=A.m(10),t=A.G(C.c.j(0.08),C.r,1)
-return A.p(v,A.A(A.a([w.aSu("Design",D.bnr,w.f===D.Pe,new B.dsX(w),d),w.aSu("Code",C.Xf,w.f===D.a1m,new B.dsY(w),d)],x.p),C.m,v,C.e,C.R,0,v,v),C.h,v,v,new A.o(C.d3,v,t,u,v,v,C.n),v,v,v,v,C.hc,v,v,v)},
+return A.p(v,A.A(A.a([w.aSu("Design",D.bns,w.f===D.Pf,new B.dsX(w),d),w.aSu("Code",C.Xf,w.f===D.a1m,new B.dsY(w),d)],x.p),C.m,v,C.e,C.R,0,v,v),C.h,v,v,new A.o(C.d3,v,t,u,v,v,C.n),v,v,v,v,C.hc,v,v,v)},
 aSu(d,e,f,g,h){var w=null,v=f?C.fs:C.K,u=A.m(8),t=A.m(8),s=h?8:12,r=h?6:8,q=h?14:16,p=x.p
 q=A.a([A.V(e,f?C.c:C.aB,w,w,w,q)],p)
 if(!h)C.d.v(q,A.a([C.bq,A.d(d,w,w,w,w,w,w,A.l(w,w,f?C.c:C.aB,w,w,w,w,w,w,w,w,12,w,w,C.O,w,w,!0,w,w,w,w,w,w,w,w),w,w,w)],p))
@@ -3995,7 +3995,7 @@ u=A.hh(C.be,r,A.d(!v?w[0].toUpperCase():"U",r,r,r,r,r,r,C.kc,r,r,r),r,22)
 w=A.A(A.a([u,C.aw,A.C(A.u(A.a([A.d(v?"User name":w,r,1,C.Z,r,r,r,C.py,r,r,r),A.d("NGMY AI Builder",r,r,r,r,r,r,A.l(r,r,C.c.j(0.65),r,r,r,r,r,r,r,r,11,r,r,r,r,r,!0,r,r,r,r,r,r,r,r),r,r,r)],p),C.F,r,C.e,C.j,0,C.p),1),A.AA(r,C.bj,D.ahM,new B.dsO(),C.J,new B.dsP(s),C.ch,r,x.N)],p),C.m,r,C.e,C.j,0,r,r)
 u=C.dy.j(0.18)
 u=A.aD(!1,C.X,!0,A.m(12),A.aH(!1,A.m(12),!0,new A.B(C.eF,A.A(A.a([A.V(C.Aa,C.a8l,r,r,r,22),C.ba,A.d("Exit App Builder",r,r,r,r,r,r,A.l(r,r,C.ID,r,r,r,r,r,r,r,r,14,r,r,C.I,r,r,!0,r,r,r,r,r,r,r,r),r,r,r)],p),C.m,r,C.e,C.j,0,r,r),r),r,!0,r,r,r,r,r,r,r,r,r,r,r,new B.dsQ(s,d),r,r,r,r,r,r,r),C.h,u,0,r,r,r,r,r,C.ac)
-t=A.a([s.zd(D.Bc,C.rU,"My Projects"),s.aSN(D.kE,D.bnC,"Build & Design",!0),s.zd(D.uW,C.dO,"AI Assistant"),s.zd(D.Ga,S.WR,"Templates"),s.zd(D.a1n,D.afC,"Component Library"),s.zd(D.a1o,D.bru,"Integrations"),s.zd(D.a1p,T.XM,"Preview & Test"),s.zd(D.a1q,D.brw,"Publish App")],p)
+t=A.a([s.zd(D.Bc,C.rU,"My Projects"),s.aSN(D.kE,D.bnD,"Build & Design",!0),s.zd(D.uW,C.dO,"AI Assistant"),s.zd(D.Ga,S.WR,"Templates"),s.zd(D.a1n,D.afC,"Component Library"),s.zd(D.a1o,D.brv,"Integrations"),s.zd(D.a1p,T.XM,"Preview & Test"),s.zd(D.a1q,D.brx,"Publish App")],p)
 if(s.a.y)t.push(s.zd(D.aAl,C.fR,"Invoices"))
 t.push(s.zd(D.a1r,P.WX,"Settings"))
 return A.p(r,A.br(!0,A.u(A.a([new A.B(D.acS,o,r),new A.B(C.fu,w,r),C.P,new A.B(C.lT,u,r),C.aa,A.C(A.cL(t,r,C.lT,r,r,C.ag,!1),1)],p),C.af,r,C.e,C.j,0,C.p),!0,!1,C.ah,!1,!0),C.h,r,r,new A.o(r,r,r,r,r,new A.a8(C.ax,C.aE,C.w,q,r,r),C.n),r,r,r,r,r,r,r,280)},
@@ -4009,7 +4009,7 @@ t=A.V(e,w?C.c:C.c.j(0.75),r,r,r,20)
 s=w?C.c:C.c.j(0.85)
 t=A.a([t,C.ba,A.C(A.d(f,r,r,r,r,r,r,A.l(r,r,s,r,r,r,r,r,r,r,r,14,r,r,w?C.I:C.a1,r,r,!0,r,r,r,r,r,r,r,r),r,r,r),1)],x.p)
 if(g)t.push(A.V(C.ek,C.c.j(0.5),r,r,r,20))
-return new A.B(C.ni,A.aD(!1,C.X,!0,v,A.aH(!1,u,!0,new A.B(C.eF,A.A(t,C.m,r,C.e,C.j,0,r,r),r),r,!0,r,r,r,r,r,r,r,r,r,r,r,new B.dt4(this,d),r,r,r,r,r,r,r),C.h,q,0,r,r,r,r,r,C.ac),r)},
+return new A.B(C.nj,A.aD(!1,C.X,!0,v,A.aH(!1,u,!0,new A.B(C.eF,A.A(t,C.m,r,C.e,C.j,0,r,r),r),r,!0,r,r,r,r,r,r,r,r,r,r,r,new B.dt4(this,d),r,r,r,r,r,r,r),C.h,q,0,r,r,r,r,r,C.ac),r)},
 zd(d,e,f){return this.aSN(d,e,f,!1)},
 bW3(){var w,v=this,u=null,t=C.c.j(0.06),s=v.aJI(C.Em,new B.dsT(v),v.e===D.Bb,"Drag-and-drop editor")
 if(v.e!==D.G8){w=v.d
@@ -4019,7 +4019,7 @@ return A.p(u,A.A(A.a([s,C.nC,v.aJI(C.dO,new B.dsU(v),w,"AI layout generator")],x
 aJI(d,e,f,g){var w=null,v=f?C.bh.j(0.25):C.d3,u=A.m(14),t=A.m(14),s=A.m(14),r=A.G(f?C.cJ:C.c.j(0.08),C.r,1)
 return A.hJ(A.aD(!1,C.X,!0,u,A.aH(!1,t,!0,A.p(w,A.V(d,f?C.cJ:C.ak,w,w,w,26),C.h,w,w,new A.o(w,w,r,s,w,w,C.n),w,52,w,w,w,w,w,52),w,!0,w,w,w,w,w,w,w,w,w,w,w,e,w,w,w,w,w,w,w),C.h,v,0,w,w,w,w,w,C.ac),w,g,w,w)},
 bwJ(d){var w=this,v=null,u=d?288:280,t=d?56:72,s=d?12:v,r=A.m(16),q=C.d3.j(0.98),p=d?v:260,o=A.m(16),n=A.G(C.c.j(0.1),C.r,1)
-return A.an(v,A.aD(!1,C.X,!0,r,A.p(v,A.u(A.a([w.aOl("Drag-and-Drop Editor",C.Em,w.e===D.Bb,new B.dss(w),d),C.ar,w.aOl("AI Layout Generator",D.bnX,w.e===D.G8,new B.dst(w),d)],x.p),C.m,v,C.e,C.R,0,C.p),C.h,v,v,new A.o(v,v,n,o,v,v,C.n),v,v,v,v,C.ch,v,v,p),C.h,q,12,v,v,v,v,v,C.ac),v,v,u+8,s,t,v)},
+return A.an(v,A.aD(!1,C.X,!0,r,A.p(v,A.u(A.a([w.aOl("Drag-and-Drop Editor",C.Em,w.e===D.Bb,new B.dss(w),d),C.ar,w.aOl("AI Layout Generator",D.bnY,w.e===D.G8,new B.dst(w),d)],x.p),C.m,v,C.e,C.R,0,C.p),C.h,v,v,new A.o(v,v,n,o,v,v,C.n),v,v,v,v,C.ch,v,v,p),C.h,q,12,v,v,v,v,v,C.ac),v,v,u+8,s,t,v)},
 aOl(d,e,f,g,h){var w,v,u,t,s=null
 if(h){w=f?C.fs:C.K
 v=A.m(12)
@@ -4050,7 +4050,7 @@ d=A.m(a1?28:36)
 v=A.G(C.x.j(0.08),C.r,2)
 u=A.a([new A.a9(0,C.G,C.x.j(0.35),C.fz,24)],x.V)
 t=x.p
-q=A.p(C.a_,A.A(A.a([B.fNt(12,e,24),C.ab,A.C(A.d(r.b,f,1,C.Z,f,f,f,C.tB,f,f,f),1),A.V(D.bq6,C.f6,f,f,f,18)],t),C.m,f,C.e,C.j,0,f,f),C.h,C.iP,f,f,f,44,f,f,C.fu,f,f,f)
+q=A.p(C.a_,A.A(A.a([B.fNu(12,e,24),C.ab,A.C(A.d(r.b,f,1,C.Z,f,f,f,C.tB,f,f,f),1),A.V(D.bq7,C.f6,f,f,f,18)],t),C.m,f,C.e,C.j,0,f,f),C.h,C.iP,f,f,f,44,f,f,C.fu,f,f,f)
 p=A.a([],t)
 for(o=0;n=s.length,o<n;++o){n=s[o]
 m=g.z
@@ -4063,18 +4063,18 @@ n=k==null?l.h(n,"title"):k
 i=J.k(n==null?"":n)
 n=new A.b3(10,10)
 h=new A.ay(m===o?C.bh:C.K,2,C.r,-1)
-l=A.a([new A.w(j,f,D.epq,f,f,f,f,f,f,f,f,f)],t)
+l=A.a([new A.w(j,f,D.epr,f,f,f,f,f,f,f,f,f)],t)
 if(i.length!==0)C.d.v(l,A.a([C.au,new A.w(i,f,C.aJ8,f,f,f,f,C.Z,f,2,f,f)],t))
-p.push(new A.B(C.d6,A.aI(f,A.p(f,A.u(l,C.F,f,C.e,C.j,0,C.p),C.h,f,f,new A.o(C.cg,f,new A.c2(h,h,h,h),new A.bx(n,n,n,n),f,f,C.n),f,f,f,f,C.bk,f,f,f),C.z,!1,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,new B.dta(g,o),f,f,f,f,f,f,!1,C.ae),f))}if(n===0){n=A.m(12)
-p.push(A.p(C.B,A.d("Tap to edit screen",f,f,f,f,f,f,A.l(f,f,C.f6,f,f,f,f,f,f,f,f,12,f,f,f,f,f,!0,f,f,f,f,f,f,f,f),f,f,f),C.h,f,f,new A.o(C.iP,f,f,n,f,f,C.n),f,80,f,f,f,f,f,f))}return A.aI(f,A.p(f,A.u(A.a([q,A.C(A.cL(p,f,C.bC,f,f,C.ag,!1),1)],t),C.af,f,C.e,C.j,0,C.p),C.ap,f,f,new A.o(C.c,f,v,d,u,f,C.n),f,w,f,f,f,f,f,a0),C.z,!1,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,new B.dtb(g,e),f,f,f,f,f,f,!1,C.ae)},
+p.push(new A.B(C.d6,A.aJ(f,A.p(f,A.u(l,C.F,f,C.e,C.j,0,C.p),C.h,f,f,new A.o(C.cg,f,new A.c2(h,h,h,h),new A.bx(n,n,n,n),f,f,C.n),f,f,f,f,C.bk,f,f,f),C.z,!1,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,new B.dta(g,o),f,f,f,f,f,f,!1,C.ae),f))}if(n===0){n=A.m(12)
+p.push(A.p(C.B,A.d("Tap to edit screen",f,f,f,f,f,f,A.l(f,f,C.f6,f,f,f,f,f,f,f,f,12,f,f,f,f,f,!0,f,f,f,f,f,f,f,f),f,f,f),C.h,f,f,new A.o(C.iP,f,f,n,f,f,C.n),f,80,f,f,f,f,f,f))}return A.aJ(f,A.p(f,A.u(A.a([q,A.C(A.cL(p,f,C.bC,f,f,C.ag,!1),1)],t),C.af,f,C.e,C.j,0,C.p),C.ap,f,f,new A.o(C.c,f,v,d,u,f,C.n),f,w,f,f,f,f,f,a0),C.z,!1,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,new B.dtb(g,e),f,f,f,f,f,f,!1,C.ae)},
 bya(d){var w,v=this,u=null,t=new B.dsx(),s=C.c.j(0.95),r=A.m(28),q=A.a([new A.a9(0,C.G,C.x.j(0.12),C.J,12)],x.V),p=v.d
 p===$&&A.c()
 p=p===D.kE&&v.y===0
 w=x.p
-p=A.a([t.$4$on$tooltip(D.bnK,v.gcfx(),p,"Home screen")],w)
+p=A.a([t.$4$on$tooltip(D.bnL,v.gcfx(),p,"Home screen")],w)
 if(d&&v.d===D.kE)C.d.v(p,A.a([t.$3$tooltip(C.Em,v.gc4r(),"Drag editor"),t.$4$on$tooltip(C.dO,new B.dsy(v),v.d===D.uW,"AI generator")],w))
 p.push(t.$4$on$tooltip(C.qi,new B.dsz(v),v.x,"Grid"))
-p.push(t.$4$on$tooltip(D.bnM,new B.dsA(v),v.at,"Components"))
+p.push(t.$4$on$tooltip(D.bnN,new B.dsA(v),v.at,"Components"))
 p.push(t.$3$tooltip(F.agj,v.gclr(),"Screens"))
 p.push(t.$3$tooltip(P.WX,v.gclv(),"Settings"))
 return A.p(u,A.A(p,C.m,u,C.e,C.R,0,u,u),C.h,u,u,new A.o(s,u,u,r,q,u,C.n),u,u,u,u,C.ew,u,u,u)},
@@ -4085,26 +4085,26 @@ v=A.d("My Projects",r,r,r,r,r,r,A.l(r,r,C.c,r,r,r,r,r,r,r,r,d?18:22,r,r,C.u,r,r,
 u=s.a.ay
 t=x.p
 t=A.a([A.A(A.a([v,C.b6,A.dj(Y.Yo,A.d(d?"New":"New app",r,r,r,r,r,r,r,r,r,r),u,r)],t),C.m,r,C.e,C.j,0,r,r),C.aO],t)
-if(J.ch(s.a.r))t.push(A.as(new A.B(C.DE,A.d("No projects yet \u2014 create one or pick a template.",r,r,r,r,r,r,A.l(r,r,C.c.j(0.6),r,r,r,r,r,r,r,r,r,r,r,r,r,r,!0,r,r,r,r,r,r,r,r),r,r,r),r),r,r,r))
+if(J.ci(s.a.r))t.push(A.as(new A.B(C.DE,A.d("No projects yet \u2014 create one or pick a template.",r,r,r,r,r,r,A.l(r,r,C.c.j(0.6),r,r,r,r,r,r,r,r,r,r,r,r,r,r,!0,r,r,r,r,r,r,r,r),r,r,r),r),r,r,r))
 else C.d.v(t,J.b4(s.a.r,new B.dt3(s),x.c7))
 w=A.cL(t,r,new A.L(w,w,w,w),r,r,C.ag,!1)}return A.p(r,w,C.h,C.aG,r,r,r,r,r,r,r,r,r,r)},
-bzY(d){var w=null,v=this.a.x,u=v==null,t=u?"// Open a project to view generated Flutter layout JSON":A.Id(v.eD(),w,"  "),s=d?10:16,r=A.d("Generated code",w,w,w,w,w,w,A.l(w,w,C.c,w,w,w,w,w,w,w,w,d?14:16,w,w,C.I,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),q=A.hg(D.bBp,D.eCg,u?w:new B.dsE(this,t),w),p=x.p
-q=A.A(A.a([r,C.b6,q,A.hg(D.byT,D.eBJ,u?w:new B.dsF(this,v),w)],p),C.m,w,C.e,C.j,0,w,w)
+bzY(d){var w=null,v=this.a.x,u=v==null,t=u?"// Open a project to view generated Flutter layout JSON":A.Id(v.eD(),w,"  "),s=d?10:16,r=A.d("Generated code",w,w,w,w,w,w,A.l(w,w,C.c,w,w,w,w,w,w,w,w,d?14:16,w,w,C.I,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),q=A.hg(D.bBq,D.eCg,u?w:new B.dsE(this,t),w),p=x.p
+q=A.A(A.a([r,C.b6,q,A.hg(D.byU,D.eBJ,u?w:new B.dsF(this,v),w)],p),C.m,w,C.e,C.j,0,w,w)
 return A.p(w,A.u(A.a([q,A.C(A.cg(A.yH(t,A.l(w,w,C.ct,w,w,w,w,w,"monospace",w,w,d?10:11,w,w,w,w,1.4,!0,w,w,w,w,w,w,w,w),w),C.q,w,C.z,w,w,w,w,C.ag),1)],p),C.af,w,C.e,C.j,0,C.p),C.h,C.M,w,w,w,w,w,w,new A.L(s,s,s,s),w,w,w)},
 cgo(){var w,v,u,t,s,r,q,p=this,o=null,n=p.aHZ(),m=new A.hw(n,A.S(n).k("hw<1>")),l=m.gdH(m).dz(0)
 if(C.a.i(p.Q).length===0)w=l
 else{m=A.S(l).k("a4<1>")
 w=A.z(new A.a4(l,new B.dth(p),m),m.k("E.E"))}m=C.x.j(0.06)
 v=x.p
-u=A.A(A.a([D.eIx,C.b6,A.aF(o,o,o,o,D.bsJ,o,o,o,new B.dti(p),o,o,o,o,o,o)],v),C.m,o,C.e,C.j,0,o,o)
-t=A.aK(o,C.U,!1,o,!0,C.q,o,A.aL(),o,o,o,o,o,o,2,A.bn(o,new A.b2(4,A.m(12),C.W),o,C.ah,o,o,o,o,!0,o,o,o,o,o,o,C.iP,!0,o,o,o,o,o,o,o,o,o,o,o,o,o,o,"Search",o,o,o,o,o,o,o,o,o,!0,!0,!1,o,D.bAE,o,o,o,o,o,o,o,o,o,o,o,o),C.z,!0,o,!0,o,!1,o,C.ad,o,o,o,o,o,o,o,o,o,1,o,o,!1,"\u2022",o,new B.dtj(p),o,o,o,!1,o,o,!1,o,!0,o,C.a8,o,o,o,o,o,o,o,o,o,o,o,o,!0,C.a5,o,C.am,o,o,o,o)
+u=A.A(A.a([D.eIx,C.b6,A.aF(o,o,o,o,D.bsK,o,o,o,new B.dti(p),o,o,o,o,o,o)],v),C.m,o,C.e,C.j,0,o,o)
+t=A.aK(o,C.U,!1,o,!0,C.q,o,A.aL(),o,o,o,o,o,o,2,A.bn(o,new A.b2(4,A.m(12),C.W),o,C.ah,o,o,o,o,!0,o,o,o,o,o,o,C.iP,!0,o,o,o,o,o,o,o,o,o,o,o,o,o,o,"Search",o,o,o,o,o,o,o,o,o,!0,!0,!1,o,D.bAF,o,o,o,o,o,o,o,o,o,o,o,o),C.z,!0,o,!0,o,!1,o,C.ad,o,o,o,o,o,o,o,o,o,1,o,o,!1,"\u2022",o,new B.dtj(p),o,o,o,!1,o,o,!1,o,!0,o,C.a8,o,o,o,o,o,o,o,o,o,o,o,o,!0,C.a5,o,C.am,o,o,o,o)
 s=A.a([p.crr("Ennox",!0,0),p.a09("Componentrd",1),p.a09("Drag-and-Drop",2)],v)
 for(r=0;r<w.length;++r){q=J.q(w[r].b,"type")
 s.push(p.crt(B.Jq(J.k(q==null?"Widget":q)),3,new B.dtk(p,w,r),p.z===w[r].a))}if(n.length===0)s.push(p.crs("Text Widget",3,!0))
 s.push(p.a09("Sidebar",3))
 s.push(p.a09("Text",4))
 s.push(p.a09("Widget",4))
-return A.p(o,A.u(A.a([new A.B(D.bfd,u,o),new A.B(C.ln,t,o),A.C(A.cL(s,o,C.ud,o,o,C.ag,!1),1)],v),C.af,o,C.e,C.j,0,C.p),C.h,o,o,new A.o(C.c,o,new A.c2(C.W,C.W,C.W,new A.ay(m,1,C.r,-1)),o,o,o,C.n),o,o,o,o,o,o,o,o)},
+return A.p(o,A.u(A.a([new A.B(D.bfe,u,o),new A.B(C.ln,t,o),A.C(A.cL(s,o,C.ud,o,o,C.ag,!1),1)],v),C.af,o,C.e,C.j,0,C.p),C.h,o,o,new A.o(C.c,o,new A.c2(C.W,C.W,C.W,new A.ay(m,1,C.r,-1)),o,o,o,C.n),o,o,o,o,o,o,o,o)},
 afT(d,e,f,g,h){var w=null,v=h?C.pT:C.K,u=A.m(8),t=A.m(8),s=A.V(D.afC,h?C.bh:C.f6,w,w,w,16),r=e||h?C.I:C.a1
 return A.aD(!1,C.X,!0,u,A.aH(!1,t,!0,new A.B(new A.L(8+f*14,8,8,8),A.A(A.a([s,C.ab,A.C(A.d(d,w,w,w,w,w,w,A.l(w,w,h?C.e9:C.fs,w,w,w,w,w,w,w,w,13,w,w,r,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),1)],x.p),C.m,w,C.e,C.j,0,w,w),w),w,!0,w,w,w,w,w,w,w,w,w,w,w,g,w,w,w,w,w,w,w),C.h,v,0,w,w,w,w,w,C.ac)},
 crr(d,e,f){return this.afT(d,e,f,null,!1)},
@@ -4176,7 +4176,7 @@ B.doT.prototype={
 $0(){return this.a.as=!1},
 $S:0}
 B.doU.prototype={
-$1(d){var w=this,v=null,u=A.d("Share this link \u2014 anyone who opens it can view the invoice and pay, no login needed.",v,v,v,v,v,v,A.l(v,v,C.c.j(0.85),v,v,v,v,v,v,v,v,v,v,v,v,v,v,!0,v,v,v,v,v,v,v,v),v,v,v),t=w.b,s=A.yH(t,C.ir,v),r=w.c==null?"This link never expires.":"Expires "+B.fWd(w.a.Q)+" from now.",q=x.p
+$1(d){var w=this,v=null,u=A.d("Share this link \u2014 anyone who opens it can view the invoice and pay, no login needed.",v,v,v,v,v,v,A.l(v,v,C.c.j(0.85),v,v,v,v,v,v,v,v,v,v,v,v,v,v,!0,v,v,v,v,v,v,v,v),v,v,v),t=w.b,s=A.yH(t,C.ir,v),r=w.c==null?"This link never expires.":"Expires "+B.fWe(w.a.Q)+" from now.",q=x.p
 r=A.u(A.a([u,C.aa,s,C.P,A.d(r,v,v,v,v,v,v,A.l(v,v,C.c.j(0.5),v,v,v,v,v,v,v,v,12,v,v,v,v,v,!0,v,v,v,v,v,v,v,v),v,v,v)],q),C.F,v,C.e,C.R,0,C.p)
 return A.ei(A.a([A.bE(!1,D.eTI,v,v,!0,v,v,new B.doP(w.a,t,d),v,v),A.bJ(C.BQ,new B.doQ(d),v)],q),v,v,C.d3,r,v,v,v,v,D.eWG,v)},
 $S:19}
@@ -4213,7 +4213,7 @@ $0(){return this.a.d=this.b.a},
 $S:0}
 B.dp1.prototype={
 $1(d){var w=null
-return A.p8(A.d(B.fWd(d),w,w,w,w,w,w,w,w,w,w),d,x.W)},
+return A.p8(A.d(B.fWe(d),w,w,w,w,w,w,w,w,w,w),d,x.W)},
 $S:1773}
 B.dp2.prototype={
 $1(d){var w=this.a
@@ -4231,7 +4231,7 @@ s=s.h(d,"amount")
 s=A.d(w+" \xb7 $"+A.t(s==null?"":s),v,v,v,v,v,v,C.ir,v,v,v)
 w=t?"Expired \xb7 "+q:q
 w=A.d(w,v,v,v,v,v,v,A.l(v,v,t?C.aH:C.aB,v,v,v,v,v,v,v,v,11,v,v,v,v,v,!0,v,v,v,v,v,v,v,v),v,v,v)
-return A.p(v,A.dK(!1,v,v,v,!0,v,v,v,!0,v,v,v,v,v,v,v,!1,v,v,v,v,v,w,v,s,v,A.cd(C.bH,A.a([A.aF(v,v,v,v,D.brR,v,v,v,q.length===0?v:new B.doW(q,this.b),v,v,v,v,v,v),A.aF(v,v,v,v,D.brL,v,v,v,new B.doX(u,d),v,v,v,v,v,v)],x.p),C.by,0,4),v),C.h,v,v,new A.o(C.d3,v,v,r,v,v,C.n),v,v,v,C.cK,v,v,v,v)},
+return A.p(v,A.dK(!1,v,v,v,!0,v,v,v,!0,v,v,v,v,v,v,v,!1,v,v,v,v,v,w,v,s,v,A.cd(C.bH,A.a([A.aF(v,v,v,v,D.brS,v,v,v,q.length===0?v:new B.doW(q,this.b),v,v,v,v,v,v),A.aF(v,v,v,v,D.brM,v,v,v,new B.doX(u,d),v,v,v,v,v,v)],x.p),C.by,0,4),v),C.h,v,v,new A.o(C.d3,v,v,r,v,v,C.n),v,v,v,C.cK,v,v,v,v)},
 $S:230}
 B.doW.prototype={
 $0(){A.fB(new A.fu(this.a))
@@ -4251,11 +4251,11 @@ $1(d){var w=this,v=null,u=w.a,t=w.b,s=x.p,r=A.a([A.d('"'+u.b+'" is hosted on ngm
 u=u.at
 if(u.length!==0)C.d.v(r,A.a([C.T,A.d("Google description: "+u,v,v,v,v,v,v,C.lB,v,v,v)],s))
 u=A.u(r,C.F,v,C.e,C.R,0,C.p)
-return A.ei(A.a([A.bE(!1,T.Ra,v,v,!0,v,v,new B.f2z(t,w.c),v,v),A.bJ(D.eK0,new B.f2A(d,w.d),v)],s),v,v,v,u,v,v,v,v,D.eCw,v)},
+return A.ei(A.a([A.bE(!1,T.Rb,v,v,!0,v,v,new B.f2z(t,w.c),v,v),A.bJ(D.eK0,new B.f2A(d,w.d),v)],s),v,v,v,u,v,v,v,v,D.eCw,v)},
 $S:19}
 B.f2z.prototype={
 $0(){A.fB(new A.fu(this.a))
-this.b.F(x.q).f.P(D.ehF)},
+this.b.F(x.q).f.P(D.ehG)},
 $S:0}
 B.f2A.prototype={
 $0(){A.a7(this.a,!1).K(null)
@@ -4303,19 +4303,19 @@ v=r.c
 u=r.d
 t=r.e
 s=x.p
-o=A.cg(A.u(A.a([A.mJ(D.bDf,C.fs,q,!1,n,q,new B.dr3(p,e),C.di,o,x.a),C.P,A.aK(q,C.U,!1,q,!0,C.q,q,A.aL(),w,q,q,q,q,q,2,D.bDd,C.z,!0,q,!0,q,!1,q,C.ad,q,q,q,q,q,q,q,q,q,1,q,q,!1,"\u2022",q,q,q,q,q,!1,q,q,!1,q,!0,q,C.a8,q,q,q,q,q,q,q,q,q,q,q,C.di,!0,C.a5,q,C.am,q,q,q,q),A.aK(q,C.U,!1,q,!0,C.q,q,A.aL(),v,q,q,q,q,q,2,D.bD7,C.z,!0,q,!0,q,!1,q,C.ad,q,q,q,q,q,q,q,q,q,1,q,q,!1,"\u2022",q,q,q,q,q,!1,q,q,!1,q,!0,q,C.a8,q,q,q,q,q,q,q,q,q,q,q,C.di,!0,C.a5,q,C.am,q,q,q,q),A.aK(q,C.U,!1,q,!0,C.q,q,A.aL(),u,q,q,q,q,q,2,D.bDq,C.z,!0,q,!0,q,!1,q,C.ad,q,q,q,q,q,q,q,q,q,1,q,q,!1,"\u2022",q,q,q,q,q,!1,q,q,!1,q,!0,q,C.a8,q,q,q,q,q,q,q,q,q,q,q,C.di,!0,C.a5,q,C.am,q,q,q,q),A.aK(q,C.U,!1,q,!0,C.q,q,A.aL(),t,q,q,q,q,q,2,D.bCZ,C.z,!0,q,!0,q,!1,q,C.ad,q,q,q,q,q,q,q,q,q,2,q,q,!1,"\u2022",q,q,q,q,q,!1,q,q,!1,q,!0,q,C.a8,q,q,q,q,q,q,q,q,q,q,q,C.di,!0,C.a5,q,C.am,q,q,q,q)],s),C.m,q,C.e,C.R,0,C.p),C.q,q,C.z,q,q,q,q,C.ag)
+o=A.cg(A.u(A.a([A.mJ(D.bDg,C.fs,q,!1,n,q,new B.dr3(p,e),C.di,o,x.a),C.P,A.aK(q,C.U,!1,q,!0,C.q,q,A.aL(),w,q,q,q,q,q,2,D.bDe,C.z,!0,q,!0,q,!1,q,C.ad,q,q,q,q,q,q,q,q,q,1,q,q,!1,"\u2022",q,q,q,q,q,!1,q,q,!1,q,!0,q,C.a8,q,q,q,q,q,q,q,q,q,q,q,C.di,!0,C.a5,q,C.am,q,q,q,q),A.aK(q,C.U,!1,q,!0,C.q,q,A.aL(),v,q,q,q,q,q,2,D.bD8,C.z,!0,q,!0,q,!1,q,C.ad,q,q,q,q,q,q,q,q,q,1,q,q,!1,"\u2022",q,q,q,q,q,!1,q,q,!1,q,!0,q,C.a8,q,q,q,q,q,q,q,q,q,q,q,C.di,!0,C.a5,q,C.am,q,q,q,q),A.aK(q,C.U,!1,q,!0,C.q,q,A.aL(),u,q,q,q,q,q,2,D.bDr,C.z,!0,q,!0,q,!1,q,C.ad,q,q,q,q,q,q,q,q,q,1,q,q,!1,"\u2022",q,q,q,q,q,!1,q,q,!1,q,!0,q,C.a8,q,q,q,q,q,q,q,q,q,q,q,C.di,!0,C.a5,q,C.am,q,q,q,q),A.aK(q,C.U,!1,q,!0,C.q,q,A.aL(),t,q,q,q,q,q,2,D.bD_,C.z,!0,q,!0,q,!1,q,C.ad,q,q,q,q,q,q,q,q,q,2,q,q,!1,"\u2022",q,q,q,q,q,!1,q,q,!1,q,!0,q,C.a8,q,q,q,q,q,q,q,q,q,q,q,C.di,!0,C.a5,q,C.am,q,q,q,q)],s),C.m,q,C.e,C.R,0,C.p),C.q,q,C.z,q,q,q,q,C.ag)
 return A.ei(A.a([A.bE(!1,C.de,q,q,!0,q,q,new B.dr4(d),q,q),A.bJ(C.pB,new B.dr5(p,r.f,w,v,u,t,d),q)],s),q,q,C.d3,o,q,q,q,q,D.eK6,q)},
 $S:169}
 B.dr2.prototype={
 $1(d){var w=null
-return A.p8(A.d(B.het(d),w,w,w,w,w,w,C.di,w,w,w),d,x.a)},
+return A.p8(A.d(B.heu(d),w,w,w,w,w,w,C.di,w,w,w),d,x.a)},
 $S:1775}
 B.dr3.prototype={
 $1(d){return this.b.$1(new B.dr1(this.a,d))},
 $S:1776}
 B.dr1.prototype={
 $0(){var w=this.b
-if(w==null)w=C.OI
+if(w==null)w=C.OJ
 return this.a.a=w},
 $S:0}
 B.dr4.prototype={
@@ -4358,25 +4358,25 @@ B.drh.prototype={
 $2(d,e){this.a.Oo(d,e)
 return null},
 $S:1779}
-B.bUa.prototype={
+B.bUb.prototype={
 $1(d){return J.k(d)},
 $S:17}
-B.bUb.prototype={
+B.bUc.prototype={
 $1(d){return d.length!==0},
 $S:3}
-B.bUe.prototype={
+B.bUf.prototype={
 $1(d){var w=null,v=A.d(this.a+"\n\nSubscribe to continue?",w,w,w,w,w,w,w,w,w,w)
-return A.ei(A.a([A.bE(!1,C.de,w,w,!0,w,w,new B.bUc(d),w,w),A.bJ(D.ePb,new B.bUd(d),w)],x.p),w,w,w,v,w,w,w,w,D.eEr,w)},
+return A.ei(A.a([A.bE(!1,C.de,w,w,!0,w,w,new B.bUd(d),w,w),A.bJ(D.ePb,new B.bUe(d),w)],x.p),w,w,w,v,w,w,w,w,D.eEr,w)},
 $S:19}
-B.bUc.prototype={
+B.bUd.prototype={
 $0(){A.a7(this.a,!1).K(!1)
 return null},
 $S:0}
-B.bUd.prototype={
+B.bUe.prototype={
 $0(){A.a7(this.a,!1).K(!0)
 return null},
 $S:0}
-B.bUx.prototype={
+B.bUy.prototype={
 $2(d,e){var w=J.k(d),v=x.N,u=x.z
 v=x.f.b(e)?A.Z(e,v,u):A.R(v,u)
 return new A.bq(w,v,x.E)},
@@ -4388,7 +4388,7 @@ B.fid.prototype={
 $1(d){return A.Z(d,x.N,x.z)},
 $S:26}
 B.drW.prototype={
-$0(){var w,v=this.a,u=B.h1l(this.b,v.a.d),t=this.c
+$0(){var w,v=this.a,u=B.h1m(this.b,v.a.d),t=this.c
 if(t!=null){w=v.f
 w===$&&A.c()
 w=t<=w.length}else w=!1
@@ -4470,7 +4470,7 @@ $3(d,e,f){var w,v,u,t=this,s=null,r=e.length!==0,q=t.a,p=A.m(12)
 if(r)w=t.b
 else w=q?C.bG:C.ix
 w=A.G(w,C.r,r?2:1)
-v=A.V(D.bo3,r?t.b:t.c,s,s,s,40)
+v=A.V(D.bo4,r?t.b:t.c,s,s,s,40)
 u=r?"Drop to add widget":"No widgets yet"
 return new B.Iv(A.p(s,A.u(A.a([v,C.P,A.d(u,s,s,s,s,s,s,A.l(s,s,q?C.c:C.jR,s,s,s,s,s,s,s,s,s,s,s,C.O,s,s,!0,s,s,s,s,s,s,s,s),s,s,s),C.au,A.d("Tap a tool above or drag it here \xb7 or ask AI below.",s,s,s,s,s,s,A.l(s,s,t.c,s,s,s,s,s,s,s,s,13,s,s,s,s,s,!0,s,s,s,s,s,s,s,s),C.L,s,s)],x.p),C.m,s,C.e,C.j,0,C.p),C.h,s,s,new A.o(s,s,w,p,s,s,C.n),s,s,s,s,C.a8,s,s,s),q,s)},
 $S:z+11}
@@ -4488,7 +4488,7 @@ t=A.G(w,C.r,1)
 q.push(A.p(r,A.d("Drop here to add at bottom",r,r,r,r,r,r,A.l(r,r,w,r,r,r,r,r,r,r,r,12,r,r,C.O,r,r,!0,r,r,r,r,r,r,r,r),r,r,r),C.h,r,r,new A.o(v,r,t,u,r,r,C.n),r,r,r,C.cK,C.bk,r,r,r))}w=s.a
 v=w.f
 v===$&&A.c()
-q.push(N.fS3(!1,new B.ds7(w,s.b,s.c),v.length,new B.ds8(w),r,C.dJ,!0))
+q.push(N.fS4(!1,new B.ds7(w,s.b,s.c),v.length,new B.ds8(w),r,C.dJ,!0))
 return A.u(q,C.af,r,C.e,C.j,0,C.p)},
 $S:541}
 B.ds8.prototype={
@@ -4537,7 +4537,7 @@ $S:2}
 B.ds0.prototype={
 $0(){var w=this.a,v=w.f
 v===$&&A.c()
-C.d.cj(v,this.b+1,B.h1l(this.c,w.a.d))},
+C.d.cj(v,this.b+1,B.h1m(this.c,w.a.d))},
 $S:0}
 B.drZ.prototype={
 $1(d){return d.a===this.a},
@@ -4550,7 +4550,7 @@ $1(d){return this.a.z.$1(d.a)},
 $S:z+3}
 B.eTs.prototype={
 $3(d,e,f){var w=null,v=A.a([],x.p)
-if(e.length!==0)v.push(A.p(w,w,C.h,w,w,new A.o(this.a.f,w,w,A.m(2),w,w,C.n),w,3,w,C.ni,w,w,w,w))
+if(e.length!==0)v.push(A.p(w,w,C.h,w,w,new A.o(this.a.f,w,w,A.m(2),w,w,C.n),w,3,w,C.nj,w,w,w,w))
 v.push(this.b)
 return A.u(v,C.m,w,C.e,C.j,0,C.p)},
 $S:541}
@@ -4560,32 +4560,32 @@ $S:0}
 B.eTv.prototype={
 $2(d,e){var w,v,u,t,s,r,q,p=null
 if(e>=35)return C.bF
-w=D.cI4[e]
+w=D.cI5[e]
 v=w.a
 u=w.b
 t=w.c
 s=this.a
 r=A.aD(!1,C.X,!0,A.m(14),new A.a3(56,56,A.V(u,C.c,p,p,p,28),p),C.h,s.c,8,p,p,p,p,p,C.ac)
 q=A.d5(s.b28(v,u,t,!0),0.35)
-return H.fML(s.b28(v,u,t,!0),q,v,C.kT,r,!0,p,p,p,x.N)},
+return H.fMM(s.b28(v,u,t,!0),q,v,C.kT,r,!0,p,p,p,x.N)},
 $S:42}
 B.eTu.prototype={
 $0(){return this.a.e.$1(this.b)},
 $S:0}
-B.cqE.prototype={
+B.cqF.prototype={
 $0(){A.a7(this.a,!1).K(null)
 return null},
 $S:0}
-B.cqF.prototype={
+B.cqG.prototype={
 $2(d,e){var w,v={},u=this.b.b,t=J.a6(u)
 if(e>=t.gG(u))return C.bF
 v.a=null
 w=t.h(u,e)
 v.a=w.a
 u=this.a
-return new B.bhs(w.b,w.c,u.c,new B.cqD(v,u),null)},
+return new B.bhs(w.b,w.c,u.c,new B.cqE(v,u),null)},
 $S:42}
-B.cqD.prototype={
+B.cqE.prototype={
 $0(){return this.b.d.$1(this.a.a)},
 $S:0}
 B.eTq.prototype={
@@ -4596,7 +4596,7 @@ v.m(0,this.b,w)
 return w},
 $S:0}
 B.eS5.prototype={
-$1(d){var w=null,v=this.a.a.r,u=v?C.bj:C.c,t=x.p,s=A.A(A.a([D.Ls,C.ab,A.C(A.d("Ask AI",w,w,w,w,w,w,A.l(w,w,v?C.c:C.bi,w,w,w,w,w,w,w,w,w,w,w,w,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),1)],t),C.m,w,C.e,C.j,0,w,w),r=this.b,q=A.aK(w,C.U,!0,w,!0,C.q,w,A.aL(),r,w,w,w,w,w,2,A.bn(w,new A.b2(4,A.m(12),C.d9),w,w,w,w,w,w,!0,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,"Tell Bolt anything to change in this widget \u2014 text, links, colors, actions\u2026",w,w,w,w,w,w,w,w,w,!0,!0,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w),C.z,!0,w,!0,w,!1,w,C.ad,w,w,w,w,w,w,w,w,w,4,w,w,!1,"\u2022",w,w,w,w,w,!1,w,w,!1,w,!0,w,C.a8,w,w,w,w,w,w,w,w,w,w,w,w,!0,C.a5,w,C.am,w,w,w,w)
+$1(d){var w=null,v=this.a.a.r,u=v?C.bj:C.c,t=x.p,s=A.A(A.a([D.Lt,C.ab,A.C(A.d("Ask AI",w,w,w,w,w,w,A.l(w,w,v?C.c:C.bi,w,w,w,w,w,w,w,w,w,w,w,w,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),1)],t),C.m,w,C.e,C.j,0,w,w),r=this.b,q=A.aK(w,C.U,!0,w,!0,C.q,w,A.aL(),r,w,w,w,w,w,2,A.bn(w,new A.b2(4,A.m(12),C.d9),w,w,w,w,w,w,!0,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,"Tell Bolt anything to change in this widget \u2014 text, links, colors, actions\u2026",w,w,w,w,w,w,w,w,w,!0,!0,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w),C.z,!0,w,!0,w,!1,w,C.ad,w,w,w,w,w,w,w,w,w,4,w,w,!1,"\u2022",w,w,w,w,w,!1,w,w,!1,w,!0,w,C.a8,w,w,w,w,w,w,w,w,w,w,w,w,!0,C.a5,w,C.am,w,w,w,w)
 return A.ei(A.a([A.bE(!1,C.de,w,w,!0,w,w,new B.eS3(d),w,w),A.bJ(C.a4A,new B.eS4(d,r),w)],t),w,w,u,q,w,w,w,w,s,w)},
 $S:19}
 B.eS3.prototype={
@@ -4885,108 +4885,108 @@ B.eTp.prototype={
 $1(d){var w=d==null?"":d
 return this.a.$1(w)},
 $S:30}
-B.d0O.prototype={
+B.d0P.prototype={
 $1(d){var w,v=this.a,u=v.d
 u===$&&A.c()
 w=this.b
 J.aE(u[w],"label",d)
 w=v.d[w]
 u=A.ad("[^a-z0-9]",!0,!1,!1,!1)
-J.aE(w,"id",A.aJ(d.toLowerCase(),u,"_"))
+J.aE(w,"id",A.aI(d.toLowerCase(),u,"_"))
 v.vc()},
 $S:2}
-B.d0P.prototype={
+B.d0Q.prototype={
 $1(d){var w
 if(d!=null){w=this.a
-w.n(new B.d0N(w,this.b,d))
+w.n(new B.d0O(w,this.b,d))
 w.vc()}},
 $S:30}
-B.d0N.prototype={
+B.d0O.prototype={
 $0(){var w,v=this.a.d
 v===$&&A.c()
 w=this.c
 J.aE(v[this.b],"type",w)
 return w},
 $S:0}
-B.d0Q.prototype={
+B.d0R.prototype={
 $0(){var w=this.a
-w.n(new B.d0M(w,this.b))
+w.n(new B.d0N(w,this.b))
+w.vc()},
+$S:0}
+B.d0N.prototype={
+$0(){var w=this.a.d
+w===$&&A.c()
+return C.d.cu(w,this.b)},
+$S:0}
+B.d0S.prototype={
+$0(){var w=this.a
+w.n(new B.d0M(w))
 w.vc()},
 $S:0}
 B.d0M.prototype={
 $0(){var w=this.a.d
 w===$&&A.c()
-return C.d.cu(w,this.b)},
-$S:0}
-B.d0R.prototype={
-$0(){var w=this.a
-w.n(new B.d0L(w))
-w.vc()},
-$S:0}
-B.d0L.prototype={
-$0(){var w=this.a.d
-w===$&&A.c()
 return w.push(A.D(["id","field_"+w.length,"label","New field","type","text"],x.N,x.z))},
 $S:0}
-B.dfm.prototype={
+B.dfn.prototype={
 $1(d){var w=this.a,v=w.d
 v===$&&A.c()
 J.aE(v[this.b],"label",d)
 w.vc()},
 $S:2}
-B.dfn.prototype={
+B.dfo.prototype={
 $1(d){var w=C.a.i(d),v=this.a,u=this.b,t=v.d
 if(w.length===0){t===$&&A.c()
 J.hB(t[u],"emoji")}else{t===$&&A.c()
 J.aE(t[u],"emoji",w)}v.vc()},
 $S:2}
-B.dfo.prototype={
+B.dfp.prototype={
 $1(d){var w
 if(d!=null){w=this.a
-w.n(new B.dfl(w,this.b,d))
+w.n(new B.dfm(w,this.b,d))
 w.vc()}},
 $S:30}
-B.dfl.prototype={
+B.dfm.prototype={
 $0(){var w,v=this.a.d
 v===$&&A.c()
 w=this.c
 J.aE(v[this.b],"icon",w)
 return w},
 $S:0}
-B.dfp.prototype={
+B.dfq.prototype={
 $1(d){var w=this.a,v=w.d
 v===$&&A.c()
 return d.a===w.bSG(v[this.b])},
 $S:404}
-B.dfq.prototype={
+B.dfr.prototype={
 $1(d){var w
 if(d!=null){w=this.a
-w.n(new B.dfk(w,this.b,d))
+w.n(new B.dfl(w,this.b,d))
 w.vc()}},
 $S:30}
-B.dfk.prototype={
+B.dfl.prototype={
 $0(){var w,v=this.a,u=v.d
 u===$&&A.c()
 w=this.b
 J.aE(u[w],"target",this.c)
 J.hB(v.d[w],"targetScreenId")},
 $S:0}
-B.dfr.prototype={
+B.dfs.prototype={
 $0(){var w=this.a
-w.n(new B.dfj(w,this.b))
+w.n(new B.dfk(w,this.b))
 w.vc()},
 $S:0}
-B.dfj.prototype={
+B.dfk.prototype={
 $0(){var w=this.a.d
 w===$&&A.c()
 return C.d.cu(w,this.b)},
 $S:0}
-B.dfs.prototype={
+B.dft.prototype={
 $0(){var w=this.a
-w.n(new B.dfi(w))
+w.n(new B.dfj(w))
 w.vc()},
 $S:0}
-B.dfi.prototype={
+B.dfj.prototype={
 $0(){var w=this.a,v=w.d
 v===$&&A.c()
 w=A.qD(w.a.d)
@@ -5031,15 +5031,15 @@ $1(d){return d.a===this.a.a},
 $S:150}
 B.faK.prototype={
 $1(d){var w=x.N,v=x.z,u=x.K,t=x.J
-return B.mz(d,"Travel Explorer","Maps, trips & reservations",4279150057,A.a([B.d1("home","Map",A.D(["type","mapView","collection","places","titleField","name","subtitleField","address","latField","lat","lngField","lng","height",440,"placeholder","Search cities, hotels, airports\u2026","centerLat",48.8566,"centerLng",2.3522],w,v),!0,!0),B.d1("add_place","Add destination",A.D(["type","column","children",A.a([A.D(["type","text","text","Save a place","style","title"],w,w),A.D(["type","form","collection","places","submitLabel","Save on map","successMessage","Place saved!","navigateAfter","home","fields",A.a([A.D(["id","name","label","Place name","type","text"],w,w),A.D(["id","address","label","Address","type","text"],w,w),A.D(["id","lat","label","Latitude","type","text"],w,w),A.D(["id","lng","label","Longitude","type","text"],w,w)],x.m)],w,u)],t)],w,v),!1,!1),B.d1("trips","My trips",A.D(["type","column","children",A.a([A.D(["type","text","text","Saved trips","style","title"],w,w),A.D(["type","dataList","collection","places","titleField","name","subtitleField","address","emptyText","No trips yet \u2014 add a destination on the map.","addTarget","add_place","addLabel","Add trip","allowDelete",!0],w,u)],t)],w,v),!1,!1),B.d1("settings","Settings",B.mB("home"),!1,!1)],x.X),"\u2708\ufe0f",A.D(["bottomNav",D.cJc],w,v))},
+return B.mz(d,"Travel Explorer","Maps, trips & reservations",4279150057,A.a([B.d1("home","Map",A.D(["type","mapView","collection","places","titleField","name","subtitleField","address","latField","lat","lngField","lng","height",440,"placeholder","Search cities, hotels, airports\u2026","centerLat",48.8566,"centerLng",2.3522],w,v),!0,!0),B.d1("add_place","Add destination",A.D(["type","column","children",A.a([A.D(["type","text","text","Save a place","style","title"],w,w),A.D(["type","form","collection","places","submitLabel","Save on map","successMessage","Place saved!","navigateAfter","home","fields",A.a([A.D(["id","name","label","Place name","type","text"],w,w),A.D(["id","address","label","Address","type","text"],w,w),A.D(["id","lat","label","Latitude","type","text"],w,w),A.D(["id","lng","label","Longitude","type","text"],w,w)],x.m)],w,u)],t)],w,v),!1,!1),B.d1("trips","My trips",A.D(["type","column","children",A.a([A.D(["type","text","text","Saved trips","style","title"],w,w),A.D(["type","dataList","collection","places","titleField","name","subtitleField","address","emptyText","No trips yet \u2014 add a destination on the map.","addTarget","add_place","addLabel","Add trip","allowDelete",!0],w,u)],t)],w,v),!1,!1),B.d1("settings","Settings",B.mB("home"),!1,!1)],x.X),"\u2708\ufe0f",A.D(["bottomNav",D.cJd],w,v))},
 $S:56}
 B.faL.prototype={
 $1(d){var w=x.N,v=x.m,u=x.K,t=x.J,s=x.z
-return B.mz(d,"Luxe Store","Curated shop with cart & checkout",4293675161,A.a([B.d1("home","Shop",A.D(["type","column","children",A.a([A.D(["type","text","text","Discover","style","title"],w,w),A.D(["type","wrap","children",A.a([A.D(["type","chip","label","New arrivals"],w,w),A.D(["type","chip","label","Best sellers"],w,w),A.D(["type","chip","label","Sale"],w,w)],v)],w,u),A.D(["type","stat","collection","products","label","Products live"],w,w),A.D(["type","dataList","collection","products","titleField","name","subtitleField","price","emptyText","Your catalog is empty.","addTarget","add_product","addLabel","Add product","allowDelete",!0],w,u)],t)],w,s),!1,!1),B.d1("add_product","Add Product",A.D(["type","column","children",A.a([A.D(["type","form","collection","products","submitLabel","List product","successMessage","Listed!","navigateAfter","home","fields",A.a([A.D(["id","name","label","Product name","type","text"],w,w),A.D(["id","price","label","Price","type","text"],w,w),A.D(["id","desc","label","Description","type","text"],w,w)],v)],w,u)],t)],w,s),!1,!1),B.d1("cart","Cart",A.D(["type","column","children",A.a([A.D(["type","text","text","Your cart","style","title"],w,w),A.D(["type","dataList","collection","cart","titleField","name","subtitleField","price","emptyText","Cart is empty."],w,w),A.D(["type","button","label","Checkout","target","checkout","large",!0],w,u)],t)],w,s),!1,!1),B.d1("checkout","Checkout",A.D(["type","column","children",A.a([A.D(["type","form","collection","orders","submitLabel","Place order","successMessage","Order placed!","navigateAfter","home","fields",A.a([A.D(["id","name","label","Name","type","text"],w,w),A.D(["id","address","label","Shipping address","type","text"],w,w)],v)],w,u)],t)],w,s),!1,!1),B.d1("profile","Profile",A.D(["type","column","children",A.a([A.D(["type","profile","collection","orders","handle","Shopper"],w,w),A.D(["type","button","label","Settings","target","settings"],w,w)],v)],w,s),!1,!1),B.d1("settings","Settings",B.mB("home"),!1,!1)],x.X),"\ud83d\udecd\ufe0f",A.D(["bottomNav",D.cVC],w,s))},
+return B.mz(d,"Luxe Store","Curated shop with cart & checkout",4293675161,A.a([B.d1("home","Shop",A.D(["type","column","children",A.a([A.D(["type","text","text","Discover","style","title"],w,w),A.D(["type","wrap","children",A.a([A.D(["type","chip","label","New arrivals"],w,w),A.D(["type","chip","label","Best sellers"],w,w),A.D(["type","chip","label","Sale"],w,w)],v)],w,u),A.D(["type","stat","collection","products","label","Products live"],w,w),A.D(["type","dataList","collection","products","titleField","name","subtitleField","price","emptyText","Your catalog is empty.","addTarget","add_product","addLabel","Add product","allowDelete",!0],w,u)],t)],w,s),!1,!1),B.d1("add_product","Add Product",A.D(["type","column","children",A.a([A.D(["type","form","collection","products","submitLabel","List product","successMessage","Listed!","navigateAfter","home","fields",A.a([A.D(["id","name","label","Product name","type","text"],w,w),A.D(["id","price","label","Price","type","text"],w,w),A.D(["id","desc","label","Description","type","text"],w,w)],v)],w,u)],t)],w,s),!1,!1),B.d1("cart","Cart",A.D(["type","column","children",A.a([A.D(["type","text","text","Your cart","style","title"],w,w),A.D(["type","dataList","collection","cart","titleField","name","subtitleField","price","emptyText","Cart is empty."],w,w),A.D(["type","button","label","Checkout","target","checkout","large",!0],w,u)],t)],w,s),!1,!1),B.d1("checkout","Checkout",A.D(["type","column","children",A.a([A.D(["type","form","collection","orders","submitLabel","Place order","successMessage","Order placed!","navigateAfter","home","fields",A.a([A.D(["id","name","label","Name","type","text"],w,w),A.D(["id","address","label","Shipping address","type","text"],w,w)],v)],w,u)],t)],w,s),!1,!1),B.d1("profile","Profile",A.D(["type","column","children",A.a([A.D(["type","profile","collection","orders","handle","Shopper"],w,w),A.D(["type","button","label","Settings","target","settings"],w,w)],v)],w,s),!1,!1),B.d1("settings","Settings",B.mB("home"),!1,!1)],x.X),"\ud83d\udecd\ufe0f",A.D(["bottomNav",D.cVD],w,s))},
 $S:56}
 B.faM.prototype={
 $1(d){var w=x.N,v=x.z
-return B.mz(d,"Social Pulse","Share posts and connect",4287323382,A.a([B.d1("feed","Feed",A.D(["type","socialFeed","collection","posts"],w,v),!0,!0),B.d1("create","Create",A.D(["type","postComposer","mode","post","collection","posts","captionField","body","videoField","imageUrl","navigateAfter","feed","submitLabel","Share post"],w,v),!1,!1),B.d1("profile","Profile",A.D(["type","profile","collection","posts","handle","@you"],w,v),!1,!1),B.d1("settings","Settings",B.mB("feed"),!1,!1)],x.X),"\ud83d\udcac",A.D(["bottomNav",D.cP9],w,v))},
+return B.mz(d,"Social Pulse","Share posts and connect",4287323382,A.a([B.d1("feed","Feed",A.D(["type","socialFeed","collection","posts"],w,v),!0,!0),B.d1("create","Create",A.D(["type","postComposer","mode","post","collection","posts","captionField","body","videoField","imageUrl","navigateAfter","feed","submitLabel","Share post"],w,v),!1,!1),B.d1("profile","Profile",A.D(["type","profile","collection","posts","handle","@you"],w,v),!1,!1),B.d1("settings","Settings",B.mB("feed"),!1,!1)],x.X),"\ud83d\udcac",A.D(["bottomNav",D.cPa],w,v))},
 $S:56}
 B.faX.prototype={
 $1(d){var w=x.N,v=x.m,u=x.K,t=x.J,s=x.z
@@ -5130,7 +5130,7 @@ $1(d){var w=x.N,v=x.m,u=x.K,t=x.J,s=x.z
 return B.mz(d,"MemberFlow","Memberships, simplified",4278483031,A.a([B.d1("home","Dashboard",A.D(["type","column","children",A.a([A.D(["type","text","text","Membership overview","style","title"],w,w),A.D(["type","stat","collection","members","label","Active members"],w,w),A.D(["type","stat","collection","payments","sumField","amount","prefix","$","label","Revenue collected"],w,w),A.D(["type","menuGrid","style","hologram","items",A.a([A.D(["icon","add","label","Add member","target","add_member"],w,w),A.D(["icon","list","label","Members","target","members"],w,w),A.D(["icon","history","label","Payments","target","payments"],w,w),A.D(["icon","settings","label","Settings","target","settings"],w,w)],v)],w,u)],t)],w,s),!1,!1),B.d1("add_member","Add member",A.D(["type","form","collection","members","submitLabel","Save member","successMessage","Member added!","navigateAfter","members","fields",A.a([A.D(["id","name","label","Member name","type","text"],w,w),A.D(["id","plan","label","Plan","type","text"],w,w),A.D(["id","fee","label","Monthly fee ($)","type","number"],w,w)],v)],w,s),!1,!1),B.d1("members","Members",A.D(["type","dataList","collection","members","titleField","name","subtitleField","plan","emptyText","No members yet.","addTarget","add_member","addLabel","Add member","allowDelete",!0,"itemActions",A.a([A.D(["label","Renew","targetCollection","payments","copyFields",A.D(["name","member","fee","amount"],w,w),"extraFields",A.R(s,s),"removeSource",!1,"successMessage","Payment logged!"],w,u)],t)],w,s),!1,!1),B.d1("payments","Payments",A.D(["type","dataList","collection","payments","titleField","member","subtitleField","amount","emptyText","No payments logged yet.","allowDelete",!0],w,s),!1,!1),B.d1("settings","Settings",B.mB("home"),!1,!1)],x.X),"\ud83e\udeaa",C.cr)},
 $S:56}
 B.fb1.prototype={
-$1(d){return B.fNu(d).cx7("\ud83d\ude80")},
+$1(d){return B.fNv(d).cx7("\ud83d\ude80")},
 $S:56}
 B.fep.prototype={
 $1(d){return d.toLowerCase()},
@@ -5267,7 +5267,7 @@ this.a.a=!0}e.w=!1},
 $S:0}
 B.dsm.prototype={
 $2(d,e){var w,v,u,t,s,r=null,q=this.a,p=q.f[e],o=J.a6(p),n=o.h(p,"role")==="user",m=n?C.m3:C.e,l=x.p,k=A.a([],l)
-if(!n)C.d.v(k,A.a([A.hh(C.bh.j(0.25),r,D.bCc,r,14),C.ab],l))
+if(!n)C.d.v(k,A.a([A.hh(C.bh.j(0.25),r,D.bCd,r,14),C.ab],l))
 w=n?C.bh:C.d3
 v=n?14:4
 u=n?4:14
@@ -5276,7 +5276,7 @@ o=o.h(p,"text")
 if(o==null)o=""
 s=n?C.c:C.c.j(0.9)
 k.push(new A.dk(1,C.cj,A.p(r,A.d(o,r,r,r,r,r,r,A.l(r,r,s,r,r,r,r,r,r,r,r,q.a.as?13:14,r,r,r,r,1.35,!0,r,r,r,r,r,r,r,r),r,r,r),C.h,r,r,new A.o(w,r,t,new A.bx(C.k6,C.k6,new A.b3(v,v),new A.b3(u,u)),r,r,C.n),r,r,r,r,C.ei,r,r,r),r))
-if(n)C.d.v(k,A.a([C.ab,A.hh(C.cf.j(0.25),r,D.by_,r,14)],l))
+if(n)C.d.v(k,A.a([C.ab,A.hh(C.cf.j(0.25),r,D.by0,r,14)],l))
 return new A.B(C.d6,A.A(k,C.dE,r,m,C.j,0,r,r),r)},
 $S:113}
 B.dsn.prototype={
@@ -5367,8 +5367,8 @@ return A.C0(w,C.fs,w,A.d(B.Jq(d),w,w,w,w,w,w,w,w,w,w),C.di,w,w)},
 $S:309}
 B.dtx.prototype={
 $1(d){var w=null,v=this.a,u=A.a([D.eVn,A.it(w,C.bh,w,w,w,new B.dtt(v,d),w,w,w,D.eIX,v.x),A.it(w,C.bh,w,w,w,new B.dtu(v,d),w,w,w,D.eJc,v.at)],x.p)
-if(v.a.x!=null)u.push(A.dK(!1,w,w,w,!0,w,w,w,!0,w,D.brK,w,w,w,w,new B.dtv(v,d),!1,w,w,w,w,w,w,w,D.eH0,w,w,w))
-u.push(A.dK(!1,w,w,w,!0,w,w,w,!0,w,D.bu9,w,w,w,w,new B.dtw(v,d),!1,w,w,w,w,w,w,w,D.eSs,w,w,w))
+if(v.a.x!=null)u.push(A.dK(!1,w,w,w,!0,w,w,w,!0,w,D.brL,w,w,w,w,new B.dtv(v,d),!1,w,w,w,w,w,w,w,D.eH0,w,w,w))
+u.push(A.dK(!1,w,w,w,!0,w,w,w,!0,w,D.bua,w,w,w,w,new B.dtw(v,d),!1,w,w,w,w,w,w,w,D.eSs,w,w,w))
 return A.br(!0,new A.B(C.zB,A.u(u,C.af,w,C.e,C.R,0,C.p),w),!0,!1,C.ah,!0,!0)},
 $S:33}
 B.dtt.prototype={
@@ -5400,12 +5400,12 @@ $0(){A.a7(this.b,!1).K(null)
 this.a.auq(D.Bc)},
 $S:0}
 B.dtp.prototype={
-$1(d){var w,v,u,t,s,r,q,p=null,o=A.a([D.dMB],x.p)
+$1(d){var w,v,u,t,s,r,q,p=null,o=A.a([D.dMC],x.p)
 for(w=this.b.f,v=this.a,u=0;u<w.length;u=r){t=v.y===u
 s=t?C.bh:C.fs
 r=u+1
 q=w[u]
-t=t?D.bBC:p
+t=t?D.bBD:p
 o.push(A.dK(!1,p,p,p,!0,p,p,p,!0,p,new A.uC(new A.w(""+r,p,C.qP,p,p,p,p,p,p,p,p,p),s,p,p,p),p,p,p,p,new B.dto(v,u,d),!1,p,p,p,p,p,p,p,new A.w(q.b,p,C.di,p,p,p,p,p,p,p,p,p),p,t,p))}return A.br(!0,A.cL(o,p,p,p,p,C.ag,!0),!0,!1,C.ah,!0,!0)},
 $S:33}
 B.dto.prototype={
@@ -5422,7 +5422,7 @@ $S:0}
 B.dtd.prototype={
 $0(){var w=this.a
 w.HV(D.kE)
-w.f=D.Pe
+w.f=D.Pf
 w.y=0
 w.z=null},
 $S:0}
@@ -5466,14 +5466,14 @@ $0(){var w=this.a
 return w.at=!w.at},
 $S:0}
 B.dtK.prototype={
-$1(d){return A.a([D.dQA,D.dQH,D.dQB,D.dQv],x.Q)},
+$1(d){return A.a([D.dQB,D.dQI,D.dQC,D.dQw],x.Q)},
 $S:133}
 B.dsX.prototype={
 $0(){var w=this.a
 w.n(new B.dsW(w))},
 $S:0}
 B.dsW.prototype={
-$0(){return this.a.f=D.Pe},
+$0(){return this.a.f=D.Pf},
 $S:0}
 B.dsY.prototype={
 $0(){var w=this.a
@@ -5493,7 +5493,7 @@ B.dsP.prototype={
 $1(d){if(d==="import")this.a.a.cHc()},
 $S:2}
 B.dsO.prototype={
-$1(d){return A.a([D.dQu],x.Q)},
+$1(d){return A.a([D.dQv],x.Q)},
 $S:133}
 B.dsQ.prototype={
 $0(){if(this.b){var w=this.a
@@ -5619,9 +5619,9 @@ w=p===d.a
 p=w?C.dH.j(0.35):C.d3
 v=A.m(14)
 u=A.G(w?C.db:C.du,C.r,1)
-t=B.fNt(22,d,44)
+t=B.fNu(22,d,44)
 s=A.d(d.b,r,r,r,r,r,r,C.hi,r,r,r)
-return A.p(r,A.dK(!1,r,r,r,!0,r,r,r,!0,r,t,r,r,r,r,new B.dt0(q,d),!1,r,r,r,r,r,A.d(""+d.f.length+" screens \xb7 "+B.hep(d.r),r,r,r,r,r,r,A.l(r,r,C.c.j(0.55),r,r,r,r,r,r,r,r,12,r,r,r,r,r,!0,r,r,r,r,r,r,r,r),r,r,r),r,s,r,A.AA(r,r,D.btY,new B.dt1(q,d),C.J,new B.dt2(q,d),C.ch,r,x.N),r),C.h,r,r,new A.o(p,r,u,v,r,r,C.n),r,r,r,C.d6,r,r,r,r)},
+return A.p(r,A.dK(!1,r,r,r,!0,r,r,r,!0,r,t,r,r,r,r,new B.dt0(q,d),!1,r,r,r,r,r,A.d(""+d.f.length+" screens \xb7 "+B.heq(d.r),r,r,r,r,r,r,A.l(r,r,C.c.j(0.55),r,r,r,r,r,r,r,r,12,r,r,r,r,r,!0,r,r,r,r,r,r,r,r),r,r,r),r,s,r,A.AA(r,r,D.btZ,new B.dt1(q,d),C.J,new B.dt2(q,d),C.ch,r,x.N),r),C.h,r,r,new A.o(p,r,u,v,r,r,C.n),r,r,r,C.d6,r,r,r,r)},
 $S:1789}
 B.dt2.prototype={
 $1(d){var w,v=this
@@ -5637,8 +5637,8 @@ B.dsZ.prototype={
 $0(){return this.a.d=D.kE},
 $S:0}
 B.dt1.prototype={
-$1(d){var w=null,v=x.N,u=A.yB(A.d(B.fGV(this.b)?"Open live app":"Preview in builder",w,w,w,w,w,w,w,w,w,w),48,"view",v)
-return A.a([D.dQG,D.dQL,u,A.yB(A.d(this.a.a.y?"Publish app":"Submit for review",w,w,w,w,w,w,w,w,w,w),48,"publish",v),D.dQy],x.Q)},
+$1(d){var w=null,v=x.N,u=A.yB(A.d(B.fGW(this.b)?"Open live app":"Preview in builder",w,w,w,w,w,w,w,w,w,w),48,"view",v)
+return A.a([D.dQH,D.dQM,u,A.yB(A.d(this.a.a.y?"Publish app":"Submit for review",w,w,w,w,w,w,w,w,w,w),48,"publish",v),D.dQz],x.Q)},
 $S:133}
 B.dt0.prototype={
 $0(){var w=this.a
@@ -5653,7 +5653,7 @@ w.z=null},
 $S:0}
 B.dsE.prototype={
 $0(){A.fB(new A.fu(this.b))
-this.a.c.F(x.q).f.P(D.egZ)},
+this.a.c.F(x.q).f.P(D.eh_)},
 $S:0}
 B.dsF.prototype={
 $0(){return this.a.a.aCJ(this.b)},
@@ -5695,7 +5695,7 @@ w===$&&A.c()
 if(w===D.Ga)v.d=D.kE},
 $S:0}
 B.dtC.prototype={
-$2(d,e){return this.a.cpm(D.cvB[e],this.b)},
+$2(d,e){return this.a.cpm(D.cvC[e],this.b)},
 $S:42}
 B.dtz.prototype={
 $0(){var w=this.a,v=w.cpl(this.b.d)
@@ -5707,7 +5707,7 @@ $0(){var w=this.a
 w.w=!1
 w.d=D.kE},
 $S:0}
-B.bUy.prototype={
+B.bUz.prototype={
 $2(d,e){return new A.bq(J.k(d),J.k(e),x.M)},
 $S:88};(function installTearOffs(){var w=a._instance_0u,v=a._instance_1u
 var u
@@ -5735,9 +5735,9 @@ w(u,"gclr","cls",0)
 w(u,"gcfx","cfy",0)})();(function inheritance(){var w=a.inheritMany,v=a.inherit
 w(A.ae,[B.akQ,B.al4,B.al8,B.ZI,B.awV,B.ayC,B.Ui,B.al9,B.alb])
 w(A.ag,[B.azd,B.azn,B.azq,B.aFZ,B.bb4,B.beb,B.aBt,B.azr,B.azs])
-w(A.jk,[B.doO,B.doJ,B.doK,B.doR,B.doS,B.doT,B.doP,B.doQ,B.doZ,B.doV,B.doY,B.doW,B.doX,B.doL,B.f2z,B.f2A,B.dqY,B.dr_,B.dqT,B.dr9,B.dr0,B.dqU,B.dqW,B.dqV,B.dqX,B.dr1,B.dr4,B.dr5,B.dr8,B.drb,B.dra,B.drg,B.bUc,B.bUd,B.drW,B.drV,B.drQ,B.drT,B.drP,B.dsf,B.ds2,B.ds3,B.ds4,B.ds5,B.ds1,B.ds0,B.eAw,B.eTu,B.cqE,B.cqD,B.eTq,B.eS3,B.eS4,B.eS6,B.eTr,B.eTo,B.d0N,B.d0Q,B.d0M,B.d0R,B.d0L,B.dfl,B.dfk,B.dfr,B.dfj,B.dfs,B.dfi,B.etf,B.eth,B.eti,B.etk,B.etm,B.etl,B.etn,B.dsi,B.dsg,B.dsh,B.dsj,B.dsk,B.dsl,B.dsp,B.dtP,B.dsJ,B.dsK,B.dt5,B.dsG,B.dsH,B.dtc,B.dtO,B.dts,B.dtr,B.dtv,B.dtq,B.dtw,B.dto,B.dtn,B.dtd,B.dtN,B.dtM,B.dtF,B.dtE,B.dtG,B.dtH,B.dtI,B.dtJ,B.dtD,B.dsX,B.dsW,B.dsY,B.dsV,B.dsN,B.dsM,B.dsQ,B.dsL,B.dt4,B.dsT,B.dsS,B.dsU,B.dsR,B.dss,B.dsr,B.dst,B.dsq,B.dsB,B.dt8,B.dt9,B.dt7,B.dtb,B.dta,B.dt6,B.dsy,B.dsw,B.dsz,B.dsv,B.dsA,B.dsu,B.dsZ,B.dt0,B.dt_,B.dsE,B.dsF,B.dti,B.dtg,B.dtf,B.dtk,B.dte,B.dtB,B.dtA,B.dtz,B.dty])
-w(A.i2,[B.doN,B.doU,B.dp1,B.dp2,B.dp3,B.doM,B.f2B,B.dqZ,B.dr7,B.dr2,B.dr3,B.drc,B.drd,B.dre,B.drf,B.bUa,B.bUb,B.bUe,B.fdc,B.fid,B.drY,B.drX,B.drU,B.drR,B.drS,B.ds9,B.dsa,B.dsc,B.dsb,B.dse,B.dsd,B.ds6,B.drZ,B.ds_,B.eTt,B.eTs,B.eS5,B.eSb,B.eSc,B.eSd,B.eSo,B.eSz,B.eSK,B.eSV,B.eT5,B.eTg,B.eTk,B.eTl,B.eSe,B.eSf,B.eSg,B.eSh,B.eSi,B.eSj,B.eSk,B.eSl,B.eSm,B.eSn,B.eSp,B.eSq,B.eSr,B.eSs,B.eSt,B.eSu,B.eSv,B.eSw,B.eSx,B.eSy,B.eSA,B.eSB,B.eSC,B.eSD,B.eSE,B.eS9,B.eSa,B.eSF,B.eSG,B.eSH,B.eSI,B.eSJ,B.eSL,B.eSM,B.eSN,B.eSO,B.eSP,B.eSQ,B.eSR,B.eSS,B.eST,B.eSU,B.eSW,B.eSX,B.eSY,B.eSZ,B.eT_,B.eT0,B.eT1,B.eT2,B.eT3,B.eT4,B.eT6,B.eT7,B.eT8,B.eT9,B.eTa,B.eTb,B.eTc,B.eTd,B.eTe,B.eTf,B.eTh,B.eTi,B.eTj,B.eS7,B.eS8,B.eTm,B.eTn,B.eTp,B.d0O,B.d0P,B.dfm,B.dfn,B.dfo,B.dfp,B.dfq,B.f5j,B.fiB,B.fll,B.ffW,B.ffX,B.ffY,B.ffZ,B.f3o,B.fmv,B.fkw,B.fkx,B.fky,B.faK,B.faL,B.faM,B.faX,B.fb2,B.fb3,B.fb4,B.fb5,B.fb6,B.fb7,B.fb8,B.faN,B.faO,B.faP,B.faQ,B.faR,B.faS,B.faT,B.faU,B.faV,B.faW,B.faY,B.faZ,B.fb_,B.fb0,B.fb1,B.fep,B.fd4,B.fd5,B.etj,B.etg,B.etp,B.fvk,B.dsn,B.dso,B.dtQ,B.dsI,B.dtm,B.dtl,B.dtx,B.dtt,B.dtu,B.dtp,B.dtL,B.dtK,B.dsP,B.dsO,B.dsC,B.dsx,B.dt3,B.dt2,B.dt1,B.dth,B.dtj])
-w(A.kw,[B.dp0,B.dp_,B.dr6,B.drh,B.bUx,B.ds8,B.ds7,B.eTv,B.cqF,B.eto,B.dsm,B.dsD,B.dtC,B.bUy])
+w(A.jk,[B.doO,B.doJ,B.doK,B.doR,B.doS,B.doT,B.doP,B.doQ,B.doZ,B.doV,B.doY,B.doW,B.doX,B.doL,B.f2z,B.f2A,B.dqY,B.dr_,B.dqT,B.dr9,B.dr0,B.dqU,B.dqW,B.dqV,B.dqX,B.dr1,B.dr4,B.dr5,B.dr8,B.drb,B.dra,B.drg,B.bUd,B.bUe,B.drW,B.drV,B.drQ,B.drT,B.drP,B.dsf,B.ds2,B.ds3,B.ds4,B.ds5,B.ds1,B.ds0,B.eAw,B.eTu,B.cqF,B.cqE,B.eTq,B.eS3,B.eS4,B.eS6,B.eTr,B.eTo,B.d0O,B.d0R,B.d0N,B.d0S,B.d0M,B.dfm,B.dfl,B.dfs,B.dfk,B.dft,B.dfj,B.etf,B.eth,B.eti,B.etk,B.etm,B.etl,B.etn,B.dsi,B.dsg,B.dsh,B.dsj,B.dsk,B.dsl,B.dsp,B.dtP,B.dsJ,B.dsK,B.dt5,B.dsG,B.dsH,B.dtc,B.dtO,B.dts,B.dtr,B.dtv,B.dtq,B.dtw,B.dto,B.dtn,B.dtd,B.dtN,B.dtM,B.dtF,B.dtE,B.dtG,B.dtH,B.dtI,B.dtJ,B.dtD,B.dsX,B.dsW,B.dsY,B.dsV,B.dsN,B.dsM,B.dsQ,B.dsL,B.dt4,B.dsT,B.dsS,B.dsU,B.dsR,B.dss,B.dsr,B.dst,B.dsq,B.dsB,B.dt8,B.dt9,B.dt7,B.dtb,B.dta,B.dt6,B.dsy,B.dsw,B.dsz,B.dsv,B.dsA,B.dsu,B.dsZ,B.dt0,B.dt_,B.dsE,B.dsF,B.dti,B.dtg,B.dtf,B.dtk,B.dte,B.dtB,B.dtA,B.dtz,B.dty])
+w(A.i2,[B.doN,B.doU,B.dp1,B.dp2,B.dp3,B.doM,B.f2B,B.dqZ,B.dr7,B.dr2,B.dr3,B.drc,B.drd,B.dre,B.drf,B.bUb,B.bUc,B.bUf,B.fdc,B.fid,B.drY,B.drX,B.drU,B.drR,B.drS,B.ds9,B.dsa,B.dsc,B.dsb,B.dse,B.dsd,B.ds6,B.drZ,B.ds_,B.eTt,B.eTs,B.eS5,B.eSb,B.eSc,B.eSd,B.eSo,B.eSz,B.eSK,B.eSV,B.eT5,B.eTg,B.eTk,B.eTl,B.eSe,B.eSf,B.eSg,B.eSh,B.eSi,B.eSj,B.eSk,B.eSl,B.eSm,B.eSn,B.eSp,B.eSq,B.eSr,B.eSs,B.eSt,B.eSu,B.eSv,B.eSw,B.eSx,B.eSy,B.eSA,B.eSB,B.eSC,B.eSD,B.eSE,B.eS9,B.eSa,B.eSF,B.eSG,B.eSH,B.eSI,B.eSJ,B.eSL,B.eSM,B.eSN,B.eSO,B.eSP,B.eSQ,B.eSR,B.eSS,B.eST,B.eSU,B.eSW,B.eSX,B.eSY,B.eSZ,B.eT_,B.eT0,B.eT1,B.eT2,B.eT3,B.eT4,B.eT6,B.eT7,B.eT8,B.eT9,B.eTa,B.eTb,B.eTc,B.eTd,B.eTe,B.eTf,B.eTh,B.eTi,B.eTj,B.eS7,B.eS8,B.eTm,B.eTn,B.eTp,B.d0P,B.d0Q,B.dfn,B.dfo,B.dfp,B.dfq,B.dfr,B.f5j,B.fiB,B.fll,B.ffW,B.ffX,B.ffY,B.ffZ,B.f3o,B.fmv,B.fkw,B.fkx,B.fky,B.faK,B.faL,B.faM,B.faX,B.fb2,B.fb3,B.fb4,B.fb5,B.fb6,B.fb7,B.fb8,B.faN,B.faO,B.faP,B.faQ,B.faR,B.faS,B.faT,B.faU,B.faV,B.faW,B.faY,B.faZ,B.fb_,B.fb0,B.fb1,B.fep,B.fd4,B.fd5,B.etj,B.etg,B.etp,B.fvk,B.dsn,B.dso,B.dtQ,B.dsI,B.dtm,B.dtl,B.dtx,B.dtt,B.dtu,B.dtp,B.dtL,B.dtK,B.dsP,B.dsO,B.dsC,B.dsx,B.dt3,B.dt2,B.dt1,B.dth,B.dtj])
+w(A.kw,[B.dp0,B.dp_,B.dr6,B.drh,B.bUy,B.ds8,B.ds7,B.eTv,B.cqG,B.eto,B.dsm,B.dsD,B.dtC,B.bUz])
 w(A.aC,[B.qG,B.L8,B.CP,B.a3R,B.bgK,B.H7])
 w(A.ar,[B.aUp,B.b9X,B.Iv,B.acK,B.bjJ,B.br4,B.a91,B.bhs,B.aUt])
 w(A.mb,[B.wJ,B.aYH,B.aYI])
@@ -5746,241 +5746,241 @@ A.kd(b.typeUniverse,JSON.parse('{"akQ":{"ae":[],"r":[]},"azd":{"ag":["akQ"]},"al
 var y={h:"Could not apply that change \u2014 try being more specific.",g:"Could not publish link to cloud. Check connection and try again."}
 var x=(function rtii(){var w=A.aA
 return{w:w("bt<n,n>"),r:w("eq<n>"),V:w("M<a9>"),O:w("M<x>"),I:w("M<eq<n>>"),J:w("M<a0<n,aC>>"),m:w("M<a0<n,n>>"),t:w("M<a0<n,@>>"),o:w("M<ij>"),X:w("M<hH>"),L:w("M<wJ>"),Q:w("M<oC<n>>"),c:w("M<+(n,n,a_)>"),s:w("M<n>"),p:w("M<r>"),d:w("M<H>"),u:w("M<n?>"),B:w("cn<ag<ae>>"),x:w("al<a0<n,n>>"),Y:w("al<ij>"),i:w("al<n>"),j:w("al<@>"),M:w("bq<n,n>"),E:w("bq<n,@>"),P:w("a0<n,@>"),f:w("a0<@,@>"),n:w("cR<n,a0<n,n>>"),k:w("I<rD,n>"),b:w("I<n,w8>"),G:w("I<n,B>"),v:w("I<nN,eq<nN>>"),e:w("I<b7?,eq<b7?>>"),l:w("iA"),g:w("L8"),b2:w("CP"),a:w("nN"),A:w("ij"),F:w("hH"),U:w("qG"),K:w("aC"),_:w("jb<n>"),bH:w("+cloudWarning,project(n?,ij)"),C:w("dV<n>"),N:w("n"),aw:w("cv<n>"),bw:w("a4<n>"),aU:w("e2<ij>"),c7:w("r"),a_:w("bgK"),q:w("my"),y:w("Q"),z:w("@"),S:w("H"),W:w("b7?"),h:w("a0<n,@>?"),a5:w("a0<@,@>?"),cj:w("L8?"),Z:w("ij?"),R:w("aC?"),D:w("q1?"),T:w("n?"),H:w("~")}})();(function constants(){var w=a.makeConstList
-D.aOZ=new A.bx(C.bB,C.bB,C.ol,C.ol)
-D.aSw=new A.o(C.c,null,null,C.kh,null,null,C.n)
-D.aZL=new A.x(1,0.9098039215686274,0.9294117647058824,0.9607843137254902,C.t)
-D.bfd=new A.L(14,12,8,0)
+D.aP_=new A.bx(C.bB,C.bB,C.ol,C.ol)
+D.aSx=new A.o(C.c,null,null,C.kh,null,null,C.n)
+D.aZM=new A.x(1,0.9098039215686274,0.9294117647058824,0.9607843137254902,C.t)
+D.bfe=new A.L(14,12,8,0)
 D.acS=new A.L(16,12,8,8)
-D.bjN=new A.L(8,8,12,16)
+D.bjO=new A.L(8,8,12,16)
 D.af1=new A.a_(58245,"MaterialIcons",!0)
 D.WJ=new A.a_(58614,"MaterialIcons",!1)
 D.WM=new A.a_(58953,"MaterialIcons",!1)
-D.bnr=new A.a_(61186,"MaterialIcons",!1)
-D.bnB=new A.a_(61355,"MaterialIcons",!1)
-D.bnC=new A.a_(61359,"MaterialIcons",!1)
+D.bns=new A.a_(61186,"MaterialIcons",!1)
+D.bnC=new A.a_(61355,"MaterialIcons",!1)
+D.bnD=new A.a_(61359,"MaterialIcons",!1)
 D.afl=new A.a_(61439,"MaterialIcons",!1)
-D.bnK=new A.a_(61703,"MaterialIcons",!1)
-D.bnM=new A.a_(61783,"MaterialIcons",!1)
+D.bnL=new A.a_(61703,"MaterialIcons",!1)
+D.bnN=new A.a_(61783,"MaterialIcons",!1)
 D.afo=new A.a_(61870,"MaterialIcons",!1)
-D.bnX=new A.a_(62162,"MaterialIcons",!1)
+D.bnY=new A.a_(62162,"MaterialIcons",!1)
 D.afx=new A.a_(62373,"MaterialIcons",!1)
 D.afA=new A.a_(62543,"MaterialIcons",!1)
-D.bo3=new A.a_(62547,"MaterialIcons",!1)
+D.bo4=new A.a_(62547,"MaterialIcons",!1)
 D.afC=new A.a_(62663,"MaterialIcons",!1)
-D.bq6=new A.a_(983079,"MaterialIcons",!1)
+D.bq7=new A.a_(983079,"MaterialIcons",!1)
 D.aho=new A.a_(984560,"MaterialIcons",!1)
-D.bru=new A.a_(984598,"MaterialIcons",!1)
-D.brw=new A.a_(984659,"MaterialIcons",!1)
-D.brK=new A.ac(C.dO,null,C.cJ,null,null,null)
-D.brL=new A.ac(C.e4,18,C.aQ,null,null,null)
-D.brR=new A.ac(C.fx,18,C.aQ,null,null,null)
-D.bst=new A.ac(C.dO,20,C.cJ,null,null,null)
-D.bsB=new A.ac(C.rP,20,C.ak,null,null,null)
-D.bsJ=new A.ac(C.cu,20,null,null,null,null)
-D.btY=new A.ac(C.no,null,C.aB,null,null,null)
-D.bu9=new A.ac(C.rU,null,C.ak,null,null,null)
-D.ahM=new A.ac(W.La,20,C.ak,null,null,null)
-D.bvb=new A.ac(P.WB,20,C.c,null,null,null)
-D.bwo=new A.ac(C.dO,20,null,null,null,null)
-D.Lq=new A.ac(C.wH,null,null,null,null,null)
-D.by_=new A.ac(C.eG,14,C.fY,null,null,null)
-D.Ls=new A.ac(C.dO,null,C.b_,null,null,null)
-D.byT=new A.ac(C.hf,16,C.cJ,null,null,null)
-D.bzI=new A.ac(F.agw,22,C.ak,null,null,null)
-D.bzP=new A.ac(C.Kv,null,C.dy,null,null,null)
-D.bAE=new A.ac(C.fy,20,null,null,null,null)
-D.bBp=new A.ac(C.fx,16,C.ak,null,null,null)
-D.bBC=new A.ac(C.hs,null,C.cJ,null,null,null)
-D.bCc=new A.ac(C.dO,14,C.cJ,null,null,null)
-D.bCU=new A.dZ(null,null,null,"Link expires after",C.hj,null,null,null,null,null,null,null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,!0,null,null,null,null)
-D.bCV=new A.dZ(null,null,null,"Opens screen",null,null,null,null,null,null,null,null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,C.tr,!0,null,null,null,null)
-D.bCZ=new A.dZ(null,null,null,"Notes",C.hj,null,null,null,null,null,null,null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,!0,null,null,null,null)
-D.bD7=new A.dZ(null,null,null,"API key (optional)",C.hj,null,null,null,null,null,null,null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,!0,null,null,null,null)
-D.bDc=new A.dZ(null,null,null,"Emoji (optional)",null,null,null,null,null,null,"e.g. \ud83d\uded2",null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,!0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,C.tr,!0,null,null,null,null)
-D.bDd=new A.dZ(null,null,null,"Project URL / API endpoint",C.hj,null,null,null,null,null,null,null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,!0,null,null,null,null)
-D.bDf=new A.dZ(null,null,null,"Database",C.hj,null,null,null,null,null,null,null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,!0,null,null,null,null)
-D.bDj=new A.dZ(null,null,null,"Icon",null,null,null,null,null,null,null,null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,C.tr,!0,null,null,null,null)
+D.brv=new A.a_(984598,"MaterialIcons",!1)
+D.brx=new A.a_(984659,"MaterialIcons",!1)
+D.brL=new A.ac(C.dO,null,C.cJ,null,null,null)
+D.brM=new A.ac(C.e4,18,C.aQ,null,null,null)
+D.brS=new A.ac(C.fx,18,C.aQ,null,null,null)
+D.bsu=new A.ac(C.dO,20,C.cJ,null,null,null)
+D.bsC=new A.ac(C.rP,20,C.ak,null,null,null)
+D.bsK=new A.ac(C.cu,20,null,null,null,null)
+D.btZ=new A.ac(C.np,null,C.aB,null,null,null)
+D.bua=new A.ac(C.rU,null,C.ak,null,null,null)
+D.ahM=new A.ac(W.Lb,20,C.ak,null,null,null)
+D.bvc=new A.ac(P.WB,20,C.c,null,null,null)
+D.bwp=new A.ac(C.dO,20,null,null,null,null)
+D.Lr=new A.ac(C.wH,null,null,null,null,null)
+D.by0=new A.ac(C.eG,14,C.fY,null,null,null)
+D.Lt=new A.ac(C.dO,null,C.b_,null,null,null)
+D.byU=new A.ac(C.hf,16,C.cJ,null,null,null)
+D.bzJ=new A.ac(F.agw,22,C.ak,null,null,null)
+D.bzQ=new A.ac(C.Kw,null,C.dy,null,null,null)
+D.bAF=new A.ac(C.fy,20,null,null,null,null)
+D.bBq=new A.ac(C.fx,16,C.ak,null,null,null)
+D.bBD=new A.ac(C.hs,null,C.cJ,null,null,null)
+D.bCd=new A.ac(C.dO,14,C.cJ,null,null,null)
+D.bCV=new A.dZ(null,null,null,"Link expires after",C.hj,null,null,null,null,null,null,null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,!0,null,null,null,null)
+D.bCW=new A.dZ(null,null,null,"Opens screen",null,null,null,null,null,null,null,null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,C.tr,!0,null,null,null,null)
+D.bD_=new A.dZ(null,null,null,"Notes",C.hj,null,null,null,null,null,null,null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,!0,null,null,null,null)
+D.bD8=new A.dZ(null,null,null,"API key (optional)",C.hj,null,null,null,null,null,null,null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,!0,null,null,null,null)
+D.bDd=new A.dZ(null,null,null,"Emoji (optional)",null,null,null,null,null,null,"e.g. \ud83d\uded2",null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,!0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,C.tr,!0,null,null,null,null)
+D.bDe=new A.dZ(null,null,null,"Project URL / API endpoint",C.hj,null,null,null,null,null,null,null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,!0,null,null,null,null)
+D.bDg=new A.dZ(null,null,null,"Database",C.hj,null,null,null,null,null,null,null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,!0,null,null,null,null)
+D.bDk=new A.dZ(null,null,null,"Icon",null,null,null,null,null,null,null,null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,C.tr,!0,null,null,null,null)
 D.aiV=new A.dZ(null,null,null,"Label",null,null,null,null,null,null,null,null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,!0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,C.tr,!0,null,null,null,null)
-D.bDq=new A.dZ(null,null,null,"Collection / table path",C.hj,null,null,null,null,null,null,null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,!0,null,null,null,null)
-D.bHP=new A.KU(2,null,null,null,C.bh,null,null,null,null)
-D.dEM=new B.H7("E-Commerce App","Product grid, cart & checkout flow",C.afw,"luxe_store",C.db)
-D.bnJ=new A.a_(61616,"MaterialIcons",!1)
-D.dEQ=new B.H7("Social Media Feed","Posts, profiles & engagement",D.bnJ,"creator_hub",C.b0)
-D.brv=new A.a_(984629,"MaterialIcons",!1)
-D.dEO=new B.H7("Health & Fitness Tracker","Workouts, progress & goals",D.brv,"pulse_fitness",C.aS)
-D.bnx=new A.a_(61310,"MaterialIcons",!1)
-D.dEN=new B.H7("CRM Dashboard","Clients, charts & pipeline",D.bnx,"invoice_pro",C.cf)
-D.bo9=new A.a_(62657,"MaterialIcons",!1)
-D.dER=new B.H7("Portfolio Web App","Showcase work & contact",D.bo9,"video_hub",C.cB)
-D.bnH=new A.a_(61573,"MaterialIcons",!1)
-D.dEP=new B.H7("Travel Booking App","Trips, maps & reservations",D.bnH,"qr_studio",C.b_)
-D.cvB=w([D.dEM,D.dEQ,D.dEO,D.dEN,D.dER,D.dEP],A.aA("M<H7>"))
-D.czQ=w(["2","3","4"],x.s)
-D.e_h=new A.T("button","Button")
-D.e0m=new A.T("form","Form")
-D.e_H=new A.T("dataList","List")
-D.e1y=new A.T("mapView","Map")
-D.e1B=new A.T("menuGrid","Menu")
-D.e0H=new A.T("hero","Hero")
-D.e2W=new A.T("switch","Switch")
-D.e2t=new A.T("reelFeed","Reels")
-D.e2L=new A.T("socialFeed","Feed")
-D.e2l=new A.T("qrGenerator","QR")
-D.e2S=new A.T("stat","Stat")
-D.cBN=w([D.e_h,D.e0m,D.e_H,D.e1y,D.e1B,D.e0H,D.e2W,D.e2t,D.e2L,D.e2l,D.e2S],A.aA("M<+(n,n)>"))
-D.e4W=new A.bz("button",D.afx,"Button")
-D.bny=new A.a_(61341,"MaterialIcons",!1)
-D.e50=new A.bz("outlined_button",D.bny,"Outline")
-D.e5z=new A.bz("title",O.WN,"Title")
-D.e6j=new A.bz("text",D.WM,"Text")
-D.e5X=new A.bz("hero",G.X0,"Hero")
-D.e6w=new A.bz("form",D.aho,"Form")
-D.e4Y=new A.bz("dataList",D.af1,"List")
-D.e4h=new A.bz("menuGrid",C.qi,"Menu")
-D.e5s=new A.bz("stat",G.WP,"Stat")
+D.bDr=new A.dZ(null,null,null,"Collection / table path",C.hj,null,null,null,null,null,null,null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,!0,null,null,null,null)
+D.bHQ=new A.KU(2,null,null,null,C.bh,null,null,null,null)
+D.dEN=new B.H7("E-Commerce App","Product grid, cart & checkout flow",C.afw,"luxe_store",C.db)
+D.bnK=new A.a_(61616,"MaterialIcons",!1)
+D.dER=new B.H7("Social Media Feed","Posts, profiles & engagement",D.bnK,"creator_hub",C.b0)
+D.brw=new A.a_(984629,"MaterialIcons",!1)
+D.dEP=new B.H7("Health & Fitness Tracker","Workouts, progress & goals",D.brw,"pulse_fitness",C.aS)
+D.bny=new A.a_(61310,"MaterialIcons",!1)
+D.dEO=new B.H7("CRM Dashboard","Clients, charts & pipeline",D.bny,"invoice_pro",C.cf)
+D.boa=new A.a_(62657,"MaterialIcons",!1)
+D.dES=new B.H7("Portfolio Web App","Showcase work & contact",D.boa,"video_hub",C.cB)
+D.bnI=new A.a_(61573,"MaterialIcons",!1)
+D.dEQ=new B.H7("Travel Booking App","Trips, maps & reservations",D.bnI,"qr_studio",C.b_)
+D.cvC=w([D.dEN,D.dER,D.dEP,D.dEO,D.dES,D.dEQ],A.aA("M<H7>"))
+D.czR=w(["2","3","4"],x.s)
+D.e_i=new A.T("button","Button")
+D.e0n=new A.T("form","Form")
+D.e_I=new A.T("dataList","List")
+D.e1z=new A.T("mapView","Map")
+D.e1C=new A.T("menuGrid","Menu")
+D.e0I=new A.T("hero","Hero")
+D.e2X=new A.T("switch","Switch")
+D.e2u=new A.T("reelFeed","Reels")
+D.e2M=new A.T("socialFeed","Feed")
+D.e2m=new A.T("qrGenerator","QR")
+D.e2T=new A.T("stat","Stat")
+D.cBO=w([D.e_i,D.e0n,D.e_I,D.e1z,D.e1C,D.e0I,D.e2X,D.e2u,D.e2M,D.e2m,D.e2T],A.aA("M<+(n,n)>"))
+D.e4X=new A.bz("button",D.afx,"Button")
+D.bnz=new A.a_(61341,"MaterialIcons",!1)
+D.e51=new A.bz("outlined_button",D.bnz,"Outline")
+D.e5A=new A.bz("title",O.WN,"Title")
+D.e6k=new A.bz("text",D.WM,"Text")
+D.e5Y=new A.bz("hero",G.X0,"Hero")
+D.e6x=new A.bz("form",D.aho,"Form")
+D.e4Z=new A.bz("dataList",D.af1,"List")
+D.e4i=new A.bz("menuGrid",C.qi,"Menu")
+D.e5t=new A.bz("stat",G.WP,"Stat")
 D.aeQ=new A.a_(57691,"MaterialIcons",!1)
-D.e6f=new A.bz("checklist",D.aeQ,"Tasks")
-D.e6N=new A.bz("switch",D.afA,"Toggle")
+D.e6g=new A.bz("checklist",D.aeQ,"Tasks")
+D.e6O=new A.bz("switch",D.afA,"Toggle")
 D.aeR=new A.a_(57759,"MaterialIcons",!1)
-D.e6M=new A.bz("card",D.aeR,"Card")
-D.e5O=new A.bz("image",C.p_,"Image")
-D.e7_=new A.bz("divider",Q.Ks,"Divider")
+D.e6N=new A.bz("card",D.aeR,"Card")
+D.e5P=new A.bz("image",C.p_,"Image")
+D.e70=new A.bz("divider",Q.Kt,"Divider")
 D.afa=new A.a_(58841,"MaterialIcons",!1)
-D.e5q=new A.bz("spacer",D.afa,"Spacer")
-D.e7j=new A.bz("mapView",D.afo,"Map")
-D.e6k=new A.bz("searchHub",C.Kw,"Search")
-D.e4y=new A.bz("socialFeed",D.afl,"Feed")
-D.e5K=new A.bz("reelFeed",L.WZ,"Reels")
-D.bo5=new A.a_(62596,"MaterialIcons",!1)
-D.e5y=new A.bz("postComposer",D.bo5,"Post")
-D.e68=new A.bz("profile",C.DW,"Profile")
+D.e5r=new A.bz("spacer",D.afa,"Spacer")
+D.e7k=new A.bz("mapView",D.afo,"Map")
+D.e6l=new A.bz("searchHub",C.Kx,"Search")
+D.e4z=new A.bz("socialFeed",D.afl,"Feed")
+D.e5L=new A.bz("reelFeed",L.WZ,"Reels")
+D.bo6=new A.a_(62596,"MaterialIcons",!1)
+D.e5z=new A.bz("postComposer",D.bo6,"Post")
+D.e69=new A.bz("profile",C.DW,"Profile")
 D.af7=new A.a_(58613,"MaterialIcons",!1)
-D.e5l=new A.bz("qrCode",D.af7,"QR")
-D.e6t=new A.bz("qrGenerator",D.WJ,"QR gen")
-D.e6K=new A.bz("invoiceBuilder",F.Ku,"Invoice")
+D.e5m=new A.bz("qrCode",D.af7,"QR")
+D.e6u=new A.bz("qrGenerator",D.WJ,"QR gen")
+D.e6L=new A.bz("invoiceBuilder",F.Kv,"Invoice")
 D.aeU=new A.a_(57997,"MaterialIcons",!1)
-D.e6I=new A.bz("workout",D.aeU,"Workout")
-D.bo1=new A.a_(62491,"MaterialIcons",!1)
-D.e5g=new A.bz("tabs",D.bo1,"Tabs")
-D.bn2=new A.a_(58212,"MaterialIcons",!0)
-D.e6p=new A.bz("chip",D.bn2,"Chip")
-D.e5R=new A.bz("list",K.Kr,"Links")
-D.bnz=new A.a_(61343,"MaterialIcons",!1)
-D.e4m=new A.bz("dark_mode",D.bnz,"Dark")
-D.e4l=new A.bz("link",C.DV,"Link")
-D.bnu=new A.a_(61223,"MaterialIcons",!1)
-D.e5M=new A.bz("banner",D.bnu,"Banner")
+D.e6J=new A.bz("workout",D.aeU,"Workout")
+D.bo2=new A.a_(62491,"MaterialIcons",!1)
+D.e5h=new A.bz("tabs",D.bo2,"Tabs")
+D.bn3=new A.a_(58212,"MaterialIcons",!0)
+D.e6q=new A.bz("chip",D.bn3,"Chip")
+D.e5S=new A.bz("list",K.Ks,"Links")
+D.bnA=new A.a_(61343,"MaterialIcons",!1)
+D.e4n=new A.bz("dark_mode",D.bnA,"Dark")
+D.e4m=new A.bz("link",C.DV,"Link")
+D.bnv=new A.a_(61223,"MaterialIcons",!1)
+D.e5N=new A.bz("banner",D.bnv,"Banner")
 D.af0=new A.a_(58239,"MaterialIcons",!1)
-D.e69=new A.bz("progress",D.af0,"Progress")
-D.bnf=new A.a_(58877,"MaterialIcons",!1)
-D.e7n=new A.bz("rating",D.bnf,"Rating")
-D.e54=new A.bz("contact",C.WQ,"Contact")
-D.e5J=new A.bz("video",Q.X_,"Video")
-D.cI4=w([D.e4W,D.e50,D.e5z,D.e6j,D.e5X,D.e6w,D.e4Y,D.e4h,D.e5s,D.e6f,D.e6N,D.e6M,D.e5O,D.e7_,D.e5q,D.e7j,D.e6k,D.e4y,D.e5K,D.e5y,D.e68,D.e5l,D.e6t,D.e6K,D.e6I,D.e5g,D.e6p,D.e5R,D.e4m,D.e4l,D.e5M,D.e69,D.e7n,D.e54,D.e5J],A.aA("M<+(n,a_,n)>"))
+D.e6a=new A.bz("progress",D.af0,"Progress")
+D.bng=new A.a_(58877,"MaterialIcons",!1)
+D.e7o=new A.bz("rating",D.bng,"Rating")
+D.e55=new A.bz("contact",C.WQ,"Contact")
+D.e5K=new A.bz("video",Q.X_,"Video")
+D.cI5=w([D.e4X,D.e51,D.e5A,D.e6k,D.e5Y,D.e6x,D.e4Z,D.e4i,D.e5t,D.e6g,D.e6O,D.e6N,D.e5P,D.e70,D.e5r,D.e7k,D.e6l,D.e4z,D.e5L,D.e5z,D.e69,D.e5m,D.e6u,D.e6L,D.e6J,D.e5h,D.e6q,D.e5S,D.e4n,D.e4m,D.e5N,D.e6a,D.e7o,D.e55,D.e5K],A.aA("M<+(n,a_,n)>"))
 D.qE={icon:0,label:1,target:2}
-D.d2P=new A.bt(D.qE,["map","Map","home"],x.w)
-D.d2Q=new A.bt(D.qE,["list","Trips","trips"],x.w)
-D.d2O=new A.bt(D.qE,["add","Add","add_place"],x.w)
-D.d2L=new A.bt(D.qE,["settings","Settings","settings"],x.w)
-D.cJc=w([D.d2P,D.d2Q,D.d2O,D.d2L],x.m)
-D.cJo=w([C.Do,C.Jx,C.oX,C.Uy,C.abR,null],A.aA("M<b7?>"))
-D.cNs=w(["classic","neon","hologram","pulse"],x.s)
+D.d2Q=new A.bt(D.qE,["map","Map","home"],x.w)
+D.d2R=new A.bt(D.qE,["list","Trips","trips"],x.w)
+D.d2P=new A.bt(D.qE,["add","Add","add_place"],x.w)
+D.d2M=new A.bt(D.qE,["settings","Settings","settings"],x.w)
+D.cJd=w([D.d2Q,D.d2R,D.d2P,D.d2M],x.m)
+D.cJp=w([C.Do,C.Jx,C.oX,C.Uz,C.abR,null],A.aA("M<b7?>"))
+D.cNt=w(["classic","neon","hologram","pulse"],x.s)
 D.faO=w([],x.X)
-D.d2R=new A.bt(D.qE,["feed","Feed","feed"],x.w)
-D.d2N=new A.bt(D.qE,["create","Post","create"],x.w)
+D.d2S=new A.bt(D.qE,["feed","Feed","feed"],x.w)
+D.d2O=new A.bt(D.qE,["create","Post","create"],x.w)
 D.ay7=new A.bt(D.qE,["profile","Profile","profile"],x.w)
-D.cP9=w([D.d2R,D.d2N,D.ay7],x.m)
+D.cPa=w([D.d2S,D.d2O,D.ay7],x.m)
 D.eR7=new A.w("Text",null,null,null,null,null,null,null,null,null,null,null)
-D.bce=new A.eq("text",D.eR7,C.eR,null,x.r)
+D.bcf=new A.eq("text",D.eR7,C.eR,null,x.r)
 D.eCX=new A.w("Number",null,null,null,null,null,null,null,null,null,null,null)
-D.bcj=new A.eq("number",D.eCX,C.eR,null,x.r)
+D.bck=new A.eq("number",D.eCX,C.eR,null,x.r)
 D.eFe=new A.w("Email",null,null,null,null,null,null,null,null,null,null,null)
-D.bca=new A.eq("email",D.eFe,C.eR,null,x.r)
+D.bcb=new A.eq("email",D.eFe,C.eR,null,x.r)
 D.eOW=new A.w("Long text",null,null,null,null,null,null,null,null,null,null,null)
-D.bci=new A.eq("multiline",D.eOW,C.eR,null,x.r)
-D.cQ_=w([D.bce,D.bcj,D.bca,D.bci],x.I)
-D.cQL=w(["Build a map app with saved places and directions","Create a store with product feed and cart","Make a TikTok-style video feed with posting","Design a fitness app with workouts and check-ins","Build a booking app with calendar and payments","Create a game score tracker with leaderboards"],x.s)
-D.cQR=w(["info","warning","success"],x.s)
-D.cRz=w(["json"],x.s)
-D.cTG=w(["navigate","snack","clear"],x.s)
-D.d2M=new A.bt(D.qE,["shop","Shop","home"],x.w)
-D.d2K=new A.bt(D.qE,["cart","Cart","cart"],x.w)
-D.d2J=new A.bt(D.qE,["add","Sell","add_product"],x.w)
-D.cVC=w([D.d2M,D.d2K,D.d2J,D.ay7],x.m)
-D.cVZ=w(["reel","post"],x.s)
-D.cWX=w(["title","subtitle","body"],x.s)
+D.bcj=new A.eq("multiline",D.eOW,C.eR,null,x.r)
+D.cQ0=w([D.bcf,D.bck,D.bcb,D.bcj],x.I)
+D.cQM=w(["Build a map app with saved places and directions","Create a store with product feed and cart","Make a TikTok-style video feed with posting","Design a fitness app with workouts and check-ins","Build a booking app with calendar and payments","Create a game score tracker with leaderboards"],x.s)
+D.cQS=w(["info","warning","success"],x.s)
+D.cRA=w(["json"],x.s)
+D.cTH=w(["navigate","snack","clear"],x.s)
+D.d2N=new A.bt(D.qE,["shop","Shop","home"],x.w)
+D.d2L=new A.bt(D.qE,["cart","Cart","cart"],x.w)
+D.d2K=new A.bt(D.qE,["add","Sell","add_product"],x.w)
+D.cVD=w([D.d2N,D.d2L,D.d2K,D.ay7],x.m)
+D.cW_=w(["reel","post"],x.s)
+D.cWY=w(["title","subtitle","body"],x.s)
 D.asT=w(["add","calendar","cart","chat","earnings","fitness","food","history","home","info","list","mail","menu","music","person","phone","referral","sales","settings","share","shop","star","venue","video","wallet","withdraw"],x.s)
-D.dIa={Actions:0,Content:1,"Data & forms":2,Navigation:3,Interactive:4,"QR & Invoices":5,"Social & Video":6,Layout:7,"More widgets":8}
-D.bne=new A.a_(58818,"MaterialIcons",!1)
-D.e7b=new A.bz("button","Button",D.bne)
-D.bmQ=new A.a_(57774,"MaterialIcons",!1)
-D.e4V=new A.bz("outlined_button","Outlined button",D.bmQ)
-D.cMJ=w([D.e7b,D.e4V],x.c)
-D.e4q=new A.bz("title","Title text",O.WN)
-D.e6z=new A.bz("text","Body text",D.WM)
-D.bnm=new A.a_(59054,"MaterialIcons",!1)
-D.e5m=new A.bz("hero","Hero banner",D.bnm)
-D.bn0=new A.a_(58162,"MaterialIcons",!1)
-D.e4U=new A.bz("image","Image",D.bn0)
-D.e5E=new A.bz("card","Card",D.aeR)
-D.c7A=w([D.e4q,D.e6z,D.e5m,D.e4U,D.e5E],x.c)
-D.brq=new A.a_(984310,"MaterialIcons",!1)
-D.e4Q=new A.bz("form","Form (save data)",D.brq)
-D.bn4=new A.a_(58244,"MaterialIcons",!0)
-D.e4M=new A.bz("dataList","Data list",D.bn4)
-D.bmu=new A.a_(57475,"MaterialIcons",!1)
-D.e72=new A.bz("stat","Stat counter",D.bmu)
-D.cGP=w([D.e4Q,D.e4M,D.e72],x.c)
-D.bn_=new A.a_(58090,"MaterialIcons",!1)
-D.e5r=new A.bz("menuGrid","Menu grid",D.bn_)
-D.e7e=new A.bz("list","Link list",K.Kr)
-D.bnh=new A.a_(58936,"MaterialIcons",!1)
-D.e4Z=new A.bz("tabs","Tabs",D.bnh)
-D.c7Q=w([D.e5r,D.e7e,D.e4Z],x.c)
-D.bnj=new A.a_(58988,"MaterialIcons",!1)
-D.e6v=new A.bz("switch","Toggle",D.bnj)
-D.e6r=new A.bz("dark_mode","Dark mode",C.aeS)
-D.e7i=new A.bz("checklist","Checklist",D.aeQ)
-D.e5d=new A.bz("workout","Workout plan",D.aeU)
-D.bn1=new A.a_(58208,"MaterialIcons",!0)
-D.e4L=new A.bz("chip","Chip tag",D.bn1)
-D.cQz=w([D.e6v,D.e6r,D.e7i,D.e5d,D.e4L],x.c)
-D.e5j=new A.bz("qrGenerator","QR generator",D.WJ)
-D.e5u=new A.bz("qrCode","Static QR",D.af7)
-D.e5V=new A.bz("invoiceBuilder","Invoice",F.Ku)
-D.cEo=w([D.e5j,D.e5u,D.e5V],x.c)
-D.e78=new A.bz("reelFeed","TikTok feed",L.agP)
-D.e5e=new A.bz("socialFeed","Social feed",F.ag2)
-D.e4N=new A.bz("postComposer","Post / reel",C.ah2)
-D.e4S=new A.bz("searchHub","Search hub",C.fy)
-D.e57=new A.bz("mapView","Map view",C.kv)
-D.e4u=new A.bz("profile","Profile",C.eG)
-D.csd=w([D.e78,D.e5e,D.e4N,D.e4S,D.e57,D.e4u],x.c)
-D.e5T=new A.bz("spacer","Spacer",D.afa)
-D.e7c=new A.bz("divider","Divider",Q.Ks)
-D.cOW=w([D.e5T,D.e7c],x.c)
-D.e6Y=new A.bz("link","Link button",C.DV)
-D.bmG=new A.a_(57656,"MaterialIcons",!1)
-D.e5o=new A.bz("banner","Banner alert",D.bmG)
-D.e7g=new A.bz("progress","Progress bar",D.af0)
-D.e4w=new A.bz("rating","Star rating",C.afb)
-D.bmO=new A.a_(57740,"MaterialIcons",!1)
-D.e6c=new A.bz("contact","Contact card",D.bmO)
-D.bnl=new A.a_(59048,"MaterialIcons",!1)
-D.e6l=new A.bz("video","Video",D.bnl)
-D.cU9=w([D.e6Y,D.e5o,D.e7g,D.e4w,D.e6c,D.e6l],x.c)
-D.ay_=new A.bt(D.dIa,[D.cMJ,D.c7A,D.cGP,D.c7Q,D.cQz,D.cEo,D.csd,D.cOW,D.cU9],A.aA("bt<n,al<+(n,n,a_)>>"))
-D.d5A=new B.CP(null,"Invalid backup format. Export again from App Studio \u2192 menu \u2192 Download backup.")
-D.d5B=new B.CP(null,"Invalid backup \u2014 choose a .ngmy.json file exported from App Studio.")
-D.d5C=new B.CP(null,"No file selected.")
-D.d5D=new B.CP(null,"Could not open file picker. Try again or use Chrome/Safari private tab after updating the app.")
+D.dIb={Actions:0,Content:1,"Data & forms":2,Navigation:3,Interactive:4,"QR & Invoices":5,"Social & Video":6,Layout:7,"More widgets":8}
+D.bnf=new A.a_(58818,"MaterialIcons",!1)
+D.e7c=new A.bz("button","Button",D.bnf)
+D.bmR=new A.a_(57774,"MaterialIcons",!1)
+D.e4W=new A.bz("outlined_button","Outlined button",D.bmR)
+D.cMK=w([D.e7c,D.e4W],x.c)
+D.e4r=new A.bz("title","Title text",O.WN)
+D.e6A=new A.bz("text","Body text",D.WM)
+D.bnn=new A.a_(59054,"MaterialIcons",!1)
+D.e5n=new A.bz("hero","Hero banner",D.bnn)
+D.bn1=new A.a_(58162,"MaterialIcons",!1)
+D.e4V=new A.bz("image","Image",D.bn1)
+D.e5F=new A.bz("card","Card",D.aeR)
+D.c7B=w([D.e4r,D.e6A,D.e5n,D.e4V,D.e5F],x.c)
+D.brr=new A.a_(984310,"MaterialIcons",!1)
+D.e4R=new A.bz("form","Form (save data)",D.brr)
+D.bn5=new A.a_(58244,"MaterialIcons",!0)
+D.e4N=new A.bz("dataList","Data list",D.bn5)
+D.bmv=new A.a_(57475,"MaterialIcons",!1)
+D.e73=new A.bz("stat","Stat counter",D.bmv)
+D.cGQ=w([D.e4R,D.e4N,D.e73],x.c)
+D.bn0=new A.a_(58090,"MaterialIcons",!1)
+D.e5s=new A.bz("menuGrid","Menu grid",D.bn0)
+D.e7f=new A.bz("list","Link list",K.Ks)
+D.bni=new A.a_(58936,"MaterialIcons",!1)
+D.e5_=new A.bz("tabs","Tabs",D.bni)
+D.c7R=w([D.e5s,D.e7f,D.e5_],x.c)
+D.bnk=new A.a_(58988,"MaterialIcons",!1)
+D.e6w=new A.bz("switch","Toggle",D.bnk)
+D.e6s=new A.bz("dark_mode","Dark mode",C.aeS)
+D.e7j=new A.bz("checklist","Checklist",D.aeQ)
+D.e5e=new A.bz("workout","Workout plan",D.aeU)
+D.bn2=new A.a_(58208,"MaterialIcons",!0)
+D.e4M=new A.bz("chip","Chip tag",D.bn2)
+D.cQA=w([D.e6w,D.e6s,D.e7j,D.e5e,D.e4M],x.c)
+D.e5k=new A.bz("qrGenerator","QR generator",D.WJ)
+D.e5v=new A.bz("qrCode","Static QR",D.af7)
+D.e5W=new A.bz("invoiceBuilder","Invoice",F.Kv)
+D.cEp=w([D.e5k,D.e5v,D.e5W],x.c)
+D.e79=new A.bz("reelFeed","TikTok feed",L.agP)
+D.e5f=new A.bz("socialFeed","Social feed",F.ag2)
+D.e4O=new A.bz("postComposer","Post / reel",C.ah2)
+D.e4T=new A.bz("searchHub","Search hub",C.fy)
+D.e58=new A.bz("mapView","Map view",C.kv)
+D.e4v=new A.bz("profile","Profile",C.eG)
+D.cse=w([D.e79,D.e5f,D.e4O,D.e4T,D.e58,D.e4v],x.c)
+D.e5U=new A.bz("spacer","Spacer",D.afa)
+D.e7d=new A.bz("divider","Divider",Q.Kt)
+D.cOX=w([D.e5U,D.e7d],x.c)
+D.e6Z=new A.bz("link","Link button",C.DV)
+D.bmH=new A.a_(57656,"MaterialIcons",!1)
+D.e5p=new A.bz("banner","Banner alert",D.bmH)
+D.e7h=new A.bz("progress","Progress bar",D.af0)
+D.e4x=new A.bz("rating","Star rating",C.afb)
+D.bmP=new A.a_(57740,"MaterialIcons",!1)
+D.e6d=new A.bz("contact","Contact card",D.bmP)
+D.bnm=new A.a_(59048,"MaterialIcons",!1)
+D.e6m=new A.bz("video","Video",D.bnm)
+D.cUa=w([D.e6Z,D.e5p,D.e7h,D.e4x,D.e6d,D.e6m],x.c)
+D.ay_=new A.bt(D.dIb,[D.cMK,D.c7B,D.cGQ,D.c7R,D.cQA,D.cEp,D.cse,D.cOX,D.cUa],A.aA("bt<n,al<+(n,n,a_)>>"))
+D.d5B=new B.CP(null,"Invalid backup format. Export again from App Studio \u2192 menu \u2192 Download backup.")
+D.d5C=new B.CP(null,"Invalid backup \u2014 choose a .ngmy.json file exported from App Studio.")
+D.d5D=new B.CP(null,"No file selected.")
+D.d5E=new B.CP(null,"Could not open file picker. Try again or use Chrome/Safari private tab after updating the app.")
 D.ayV=new B.qG("AI is not available right now. Please try again later.",null)
-D.dI6={body:0}
-D.d3a=new A.bt(D.dI6,["Tell your story here."],A.aA("bt<n,@>"))
-D.d5J=new A.hH("about","About",C.a0x,D.d3a)
+D.dI7={body:0}
+D.d3b=new A.bt(D.dI7,["Tell your story here."],A.aA("bt<n,@>"))
+D.d5K=new A.hH("about","About",C.a0x,D.d3b)
 D.Bb=new B.aYH(0,"dragDrop")
 D.G8=new B.aYH(1,"aiLayout")
-D.Pe=new B.aYI(0,"design")
+D.Pf=new B.aYI(0,"design")
 D.a1m=new B.aYI(1,"code")
 D.Bc=new B.wJ(0,"myProjects")
 D.kE=new B.wJ(1,"buildDesign")
@@ -5993,49 +5993,49 @@ D.a1q=new B.wJ(7,"publishApp")
 D.aAl=new B.wJ(8,"invoiceLinks")
 D.a1r=new B.wJ(9,"settings")
 D.eUM=new A.w("Screens",null,C.dP,null,null,null,null,null,null,null,null,null)
-D.dMB=new A.B(C.c1,D.eUM,null)
+D.dMC=new A.B(C.c1,D.eUM,null)
 D.eFE=new A.w("Import backup",null,null,null,null,null,null,null,null,null,null,null)
-D.dQu=new A.jb("import",48,D.eFE,null,x._)
+D.dQv=new A.jb("import",48,D.eFE,null,x._)
 D.eCf=new A.w("Toggle components",null,null,null,null,null,null,null,null,null,null,null)
-D.dQv=new A.jb("inspector",48,D.eCf,null,x._)
+D.dQw=new A.jb("inspector",48,D.eCf,null,x._)
 D.er9=new A.F(!0,C.bR,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.eHk=new A.w("Delete",null,D.er9,null,null,null,null,null,null,null,null,null)
-D.dQy=new A.jb("delete",48,D.eHk,null,x._)
+D.dQz=new A.jb("delete",48,D.eHk,null,x._)
 D.eMA=new A.w("Save project",null,null,null,null,null,null,null,null,null,null,null)
-D.dQA=new A.jb("save",48,D.eMA,null,x._)
+D.dQB=new A.jb("save",48,D.eMA,null,x._)
 D.eJV=new A.w("Publish app",null,null,null,null,null,null,null,null,null,null,null)
-D.dQB=new A.jb("publish",48,D.eJV,null,x._)
+D.dQC=new A.jb("publish",48,D.eJV,null,x._)
 D.eTC=new A.w("Open in canvas",null,null,null,null,null,null,null,null,null,null,null)
-D.dQG=new A.jb("canvas",48,D.eTC,null,x._)
+D.dQH=new A.jb("canvas",48,D.eTC,null,x._)
 D.eNX=new A.w("Download code",null,null,null,null,null,null,null,null,null,null,null)
-D.dQH=new A.jb("download",48,D.eNX,null,x._)
+D.dQI=new A.jb("download",48,D.eNX,null,x._)
 D.eK7=new A.w("Edit screen",null,null,null,null,null,null,null,null,null,null,null)
-D.dQL=new A.jb("edit",48,D.eK7,null,x._)
-D.egj=new A.hI(5,8,8,0.82,null)
-D.egu=new A.hI(5,8,8,0.85,null)
+D.dQM=new A.jb("edit",48,D.eK7,null,x._)
+D.egk=new A.hI(5,8,8,0.82,null)
+D.egv=new A.hI(5,8,8,0.85,null)
 D.eLC=new A.w("Use Exit in the menu to leave App Builder.",null,null,null,null,null,null,null,null,null,null,null)
-D.egU=new A.aY(D.eLC,null,null,null,null,null,null,null,null,null,null,null,null,C.S,!1,null,null,null,C.q,null)
+D.egV=new A.aY(D.eLC,null,null,null,null,null,null,null,null,null,null,null,null,C.S,!1,null,null,null,C.q,null)
 D.eI4=new A.w("Copied JSON",null,null,null,null,null,null,null,null,null,null,null)
-D.egZ=new A.aY(D.eI4,null,null,null,null,null,null,null,null,null,null,null,null,C.S,!1,null,null,null,C.q,null)
+D.eh_=new A.aY(D.eI4,null,null,null,null,null,null,null,null,null,null,null,null,C.S,!1,null,null,null,C.q,null)
 D.eRe=new A.w("Link copied.",null,null,null,null,null,null,null,null,null,null,null)
 D.aI3=new A.aY(D.eRe,null,null,null,null,null,null,null,null,null,null,null,null,C.S,!1,null,null,null,C.q,null)
 D.eMN=new A.w("Integrations saved.",null,null,null,null,null,null,null,null,null,null,null)
-D.ehs=new A.aY(D.eMN,null,null,null,null,null,null,null,null,null,null,null,null,C.S,!1,null,null,null,C.q,null)
+D.eht=new A.aY(D.eMN,null,null,null,null,null,null,null,null,null,null,null,null,C.S,!1,null,null,null,C.q,null)
 D.eT5=new A.w("Link copied!",null,null,null,null,null,null,null,null,null,null,null)
-D.ehF=new A.aY(D.eT5,null,null,null,null,null,null,null,null,null,null,null,null,C.S,!1,null,null,null,C.q,null)
+D.ehG=new A.aY(D.eT5,null,null,null,null,null,null,null,null,null,null,null,null,C.S,!1,null,null,null,C.q,null)
 D.eWq=new A.w("Saved on this device. Admin can review on this device.",null,null,null,null,null,null,null,null,null,null,null)
-D.ei1=new A.aY(D.eWq,null,null,null,null,null,null,null,null,null,null,null,null,C.S,!1,null,null,null,C.q,null)
+D.ei2=new A.aY(D.eWq,null,null,null,null,null,null,null,null,null,null,null,null,C.S,!1,null,null,null,C.q,null)
 D.eCO=new A.w("Open a project to publish.",null,null,null,null,null,null,null,null,null,null,null)
-D.eia=new A.aY(D.eCO,null,null,null,null,null,null,null,null,null,null,null,null,C.S,!1,null,null,null,C.q,null)
+D.eib=new A.aY(D.eCO,null,null,null,null,null,null,null,null,null,null,null,null,C.S,!1,null,null,null,C.q,null)
 D.eI7=new A.w("Open or create a project first (My Projects or Templates).",null,null,null,null,null,null,null,null,null,null,null)
-D.ej7=new A.aY(D.eI7,null,null,null,null,null,null,null,null,null,null,null,null,C.S,!1,null,null,null,C.q,null)
+D.ej8=new A.aY(D.eI7,null,null,null,null,null,null,null,null,null,null,null,null,C.S,!1,null,null,null,C.q,null)
 D.eN8=new A.w("Open a project first \u2014 then connect Supabase or other backends.",null,null,null,null,null,null,null,null,null,null,null)
-D.ekt=new A.aY(D.eN8,null,null,null,null,null,null,null,null,null,null,null,null,C.S,!1,null,null,null,C.q,null)
+D.eku=new A.aY(D.eN8,null,null,null,null,null,null,null,null,null,null,null,null,C.S,!1,null,null,null,C.q,null)
 D.eII=new A.w("Client name and amount are required.",null,null,null,null,null,null,null,null,null,null,null)
-D.elf=new A.aY(D.eII,C.aH,null,null,null,null,null,null,null,null,null,null,null,C.S,!1,null,null,null,C.q,null)
+D.elg=new A.aY(D.eII,C.aH,null,null,null,null,null,null,null,null,null,null,null,C.S,!1,null,null,null,C.q,null)
 D.eLU=new A.w("Open a project with screens first.",null,null,null,null,null,null,null,null,null,null,null)
-D.eln=new A.aY(D.eLU,null,null,null,null,null,null,null,null,null,null,null,null,C.S,!1,null,null,null,C.q,null)
-D.epq=new A.F(!0,C.bh,null,null,null,null,10,C.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.elo=new A.aY(D.eLU,null,null,null,null,null,null,null,null,null,null,null,null,C.S,!1,null,null,null,C.q,null)
+D.epr=new A.F(!0,C.bh,null,null,null,null,10,C.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.etn=new A.F(!0,C.bo,null,null,null,null,12,C.O,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.eB0=new A.F(!0,C.bh,null,null,null,null,13,C.O,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.esy=new A.F(!0,C.cJ,null,null,null,null,null,C.O,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
@@ -6057,8 +6057,8 @@ D.eIX=new A.w("Show alignment grid",null,C.di,null,null,null,null,null,null,null
 D.eJa=new A.w("Pins open inside app, not Google Maps",null,null,null,null,null,null,null,null,null,null,null)
 D.eJc=new A.w("Show components panel",null,C.di,null,null,null,null,null,null,null,null,null)
 D.eJj=new A.w("Templates",null,null,null,null,null,null,null,null,null,null,null)
-D.enq=new A.F(!0,C.cJ,null,null,null,null,null,C.I,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.eJp=new A.w("Use on canvas",null,D.enq,null,null,null,null,null,null,null,null,null)
+D.enr=new A.F(!0,C.cJ,null,null,null,null,null,C.I,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.eJp=new A.w("Use on canvas",null,D.enr,null,null,null,null,null,null,null,null,null)
 D.eK0=new A.w("Open live app",null,null,null,null,null,null,null,null,null,null,null)
 D.eK6=new A.w("Integrations",null,C.kc,null,null,null,null,null,null,null,null,null)
 D.eMB=new A.w("Large button",null,null,null,null,null,null,null,null,null,null,null)
@@ -6072,6 +6072,6 @@ D.eTZ=new A.w("Component Library",null,C.dP,null,null,null,null,null,null,null,n
 D.eVn=new A.w("Canvas settings",null,C.dP,null,null,null,null,null,null,null,null,null)
 D.eVt=new A.w("My Projects",null,null,null,null,null,null,null,null,null,null,null)
 D.eWG=new A.w("Invoice published",null,C.kc,null,null,null,null,null,null,null,null,null)})();(function lazyInitializers(){var w=a.lazyFinal
-w($,"hXw","h7p",()=>{var v=4279150057,u=4284704497
+w($,"hXx","h7q",()=>{var v=4279150057,u=4284704497
 return A.a([B.m_("Featured",new B.faK(),"Map, saved trips & destinations.","\u2708\ufe0f","qr_studio","Travel Explorer",v),B.m_("",new B.faL(),"Product feed, cart & checkout.","\ud83d\udecd\ufe0f","luxe_store","Luxe Store",4293675161),B.m_("",new B.faM(),"Posts, profiles & engagement.","\ud83d\udcac","creator_hub","Social Pulse",4287323382),B.m_("",new B.faX(),"Workouts, check-ins & nutrition.","\ud83d\udcaa","pulse_fitness","Pulse Fitness",4279286145),B.m_("",new B.fb2(),"Clients, invoices & pipeline.","\ud83d\udcca","invoice_pro","CRM Dashboard",u),B.m_("",new B.fb3(),"Showcase work & contact.","\ud83c\udf10","video_hub","Portfolio Hub",v),B.m_("",new B.fb4(),"Live QR for websites & text.","\ud83d\udcf1","qr_code_studio","QR Code Studio",4278630100),B.m_("New",new B.fb5(),"Sell, track sales & get paid.","\ud83d\udcb5","side_hustle","Side Hustle Marketplace",4279673674),B.m_("",new B.fb6(),"Services, bookings & client earnings.","\ud83d\udcc5","booking_pro","Booking & Services",4286331629),B.m_("",new B.fb7(),"Daily checklist, streaks & progress.","\ud83d\udd25","habit_tracker","Habit Tracker",4279548070),B.m_("",new B.fb8(),"Income, spending & budget at a glance.","\ud83d\udcb0","finance_dash","Money Tracker",4282090230),B.m_("",new B.faN(),"Post roles, track applicants.","\ud83d\udcbc","job_board","Job Board",4281549141),B.m_("",new B.faO(),"Discussion feed, posts & replies.","\ud83d\udde3\ufe0f","community_forum","Community Forum",4288814255),B.m_("",new B.faP(),"Episodes, categories & playback links.","\ud83c\udf99\ufe0f","podcast_hub","Podcast Hub",4280232247),B.m_("",new B.faQ(),"Events, RSVPs & shareable QR codes.","\ud83c\udfab","event_tickets","Event Ticketing",4294286859),B.m_("New",new B.faR(),"Raise funds, track donors, share a link.","\u2764\ufe0f","donate_nonprofit","Giving Campaign",4292943176),B.m_("",new B.faS(),"Sessions, bookings & client roster.","\ud83e\uddd8","coaching_booking","Coaching Studio",4286456526),B.m_("",new B.faT(),"Showcase galleries & booking requests.","\ud83d\udcf7","photo_portfolio","Photo Portfolio",4279310375),B.m_("",new B.faU(),"Save recipes, ingredients & steps.","\ud83c\udf73","recipe_box","Recipe Box",4293548044),B.m_("",new B.faV(),"Daily care, vet visits & reminders.","\ud83d\udc3e","pet_care","Pet Care Tracker",4284850957),B.m_("",new B.faW(),"Create invoices, track clients & income.","\ud83e\uddfe","freelance_invoicing","Freelancer Invoicing",4280171146),B.m_("",new B.faY(),"Log rounds, track scores & leaderboard.","\ud83c\udfc6","trivia_game","Trivia Night Scorekeeper",4292552567),B.m_("New",new B.faZ(),"Map of properties, inquiries & saves.","\ud83c\udfe0","real_estate","Real Estate Listings",4278995566),B.m_("",new B.fb_(),"Menu by category, tap to add to order.","\ud83c\udf7d\ufe0f","restaurant_menu","Restaurant Menu & Orders",4290321436),B.m_("",new B.fb0(),"Members, renewals & revenue.","\ud83e\udeaa","membership_manager","Membership Manager",4278483031),B.m_("",new B.fb1(),"Start fresh \u2014 describe any app to NGMY AI.","\ud83d\ude80","blank","Blank Canvas",u)],A.aA("M<a3R>"))})})()};
-(a=>{a["pUOYuCKyt+VQ3/NCzmb3ItxAvaM="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["m6GayHGviwCKUuxW5v3q4Z//2lA="]=a.current})($__dart_deferred_initializers__);
