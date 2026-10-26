@@ -13,7 +13,6 @@ import 'ngmy_arcade_host.dart';
 const kNgmyArcadeGamesMore = <NgmyArcadeDef>[
   // Action & reflex
   NgmyArcadeDef('air_hockey', 'Air Hockey', 'Beat the computer to 5 goals', '🏒', Icons.sports_hockey_rounded, [Color(0xFF0EA5E9), Color(0xFF1E3A8A)], 150),
-  NgmyArcadeDef('quick_draw', 'Quick Draw', 'Draw faster than the gunslinger, 5 duels', '🤠', Icons.bolt_rounded, [Color(0xFFF59E0B), Color(0xFF7C2D12)], 90),
   NgmyArcadeDef('paddle_duel', 'Paddle Duel', 'Beat the computer at table tennis', '🏓', Icons.sports_tennis_rounded, [Color(0xFF0EA5E9), Color(0xFF0C4A6E)], 120),
   NgmyArcadeDef('beat_tiles', 'Beat Tiles', 'Tap 30 music tiles before they fall', '🎹', Icons.piano_rounded, [Color(0xFFE879F9), Color(0xFF6D28D9)], 60),
   NgmyArcadeDef('perfect_stop', 'Perfect Stop', 'Stop the bar in the green 10 times', '🟩', Icons.linear_scale_rounded, [Color(0xFF22C55E), Color(0xFF312E81)], 60),
@@ -47,7 +46,7 @@ const kNgmyArcadeGamesMore = <NgmyArcadeDef>[
 ];
 
 const kNgmyArcadeGameIdsMore = <String>{
-  'air_hockey', 'quick_draw',
+  'air_hockey',
   'paddle_duel', 'beat_tiles', 'perfect_stop', 'hoop_shot', 'color_flood', 'true_false', 'clock_reader', 'quick_count', 'shell_game',
   'ball_sort', 'burger_builder', 'deep_fishing', 'moon_lander', 'jelly_jump', 'mini_golf',
   'gold_miner', 'cash_counter', 'slot_stopper', 'change_maker', 'find_it',

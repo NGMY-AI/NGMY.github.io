@@ -177,3 +177,65 @@ class NgmyClockInMissResetDialog extends StatelessWidget {
     );
   }
 }
+
+/// Shown when the investment plan is one missed day away from being removed this month.
+class NgmyClockInMissWarnDialog extends StatelessWidget {
+  const NgmyClockInMissWarnDialog({super.key});
+
+  static Future<void> show(BuildContext context) {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withValues(alpha: 0.82),
+      builder: (_) => const NgmyClockInMissWarnDialog(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const amber = Color(0xFFF59E0B);
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(22, 22, 22, 16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(26),
+          gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF1C1407), Color(0xFF2A1A05), Color(0xFF0F172A)]),
+          border: Border.all(color: amber.withValues(alpha: 0.5)),
+          boxShadow: [BoxShadow(color: amber.withValues(alpha: 0.22), blurRadius: 26)],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 68,
+              height: 68,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: amber.withValues(alpha: 0.16), border: Border.all(color: amber, width: 2)),
+              child: const Icon(Icons.notifications_active_rounded, color: amber, size: 34),
+            ),
+            const SizedBox(height: 14),
+            const Text('One day left', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 8),
+            Text(
+              'You have missed 2 weekdays this month. If you miss one more weekday without clocking in, your investment plan will be removed and you will need to buy a new plan.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 13.5, height: 1.45),
+            ),
+            const SizedBox(height: 8),
+            Text('The count starts again from zero next month.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12)),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.pop(context),
+                style: FilledButton.styleFrom(backgroundColor: amber, foregroundColor: Colors.black, minimumSize: const Size(double.infinity, 48), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                child: const Text('I understand', style: TextStyle(fontWeight: FontWeight.w900)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

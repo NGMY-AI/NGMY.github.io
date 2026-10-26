@@ -6810,7 +6810,7 @@ bool _ngmyShowLateClockUi(DateTime now) =>
 double _ngmyClockInLatePenaltyPercent(DateTime now) {
   final minutesLate = _ngmyMinutesSinceMidnight(now);
   if (minutesLate < kNgmyLateClockUiStartMinutes) return 0;
-  if (minutesLate >= 30) return 20;
+  if (minutesLate >= 30) return 30;
   if (minutesLate >= 10) return 15;
   return 0;
 }
@@ -18191,26 +18191,24 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     }
   }
 
+  /// Three missed weekday check-ins in a month remove the investment plan. The Growth Income wallet is the one
+  /// source of truth for the plan, so the check is made there, then the result is copied onto this account.
   void _evaluateClockInMissPolicy() {
     final user = widget.user;
-    final now = DateTime.now();
-    NgmyClockInMissPolicy.rolloverMonthIfNeeded(user);
-    if (!NgmyClockInMissPolicy.shouldEvaluateMiss(user, now)) return;
-    final action = NgmyClockInMissPolicy.recordMissIfNeeded(user, now);
-    if (action == null) return;
-    widget.onDataChanged();
-    unawaited(widget.onPushUserToCloud?.call(user) ?? Future.value());
-    if (action == 'warn2') {
-      unawaited(NgmyClockInMissPolicy.notifySecondMiss(user.email));
-    } else if (action == 'reset') {
-      unawaited(NgmyClockInMissPolicy.notifyPlanReset(user.email));
-      if (mounted) {
+    unawaited(NgmyLocalGrowthIncomeStore.evaluateMissesForLiveUser(user).then((action) {
+      if (action == null || !mounted) return;
+      widget.onDataChanged();
+      unawaited(widget.onPushUserToCloud?.call(user) ?? Future.value());
+      if (action == 'warn2') {
+        unawaited(NgmyClockInMissPolicy.notifySecondMiss(user.email));
+      } else if (action == 'reset') {
+        unawaited(NgmyClockInMissPolicy.notifyPlanReset(user.email));
         unawaited(NgmyClockInMissResetDialog.show(
           context,
           onGoToInvest: () => _goToMainTab(1, refreshLegal: true),
         ));
       }
-    }
+    }));
   }
   @override
   void dispose() {
@@ -20084,7 +20082,21 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
 
   List<String> get _missedDaysForPaywall => ngmyGamePaywallMissedDays(widget.user);
 
+  /// The warning pop-up: on the second missed weekday of the month, opening the Game Center says one more miss
+  /// removes the investment plan.
+  Future<void> _maybeShowMissWarning() async {
+    final u = widget.user;
+    NgmyClockInMissPolicy.rolloverMonthIfNeeded(u);
+    if (u.activeInvestment == null || u.clockInMissedDays.length != 2 || !mounted) return;
+    await NgmyClockInMissWarnDialog.show(context);
+  }
+
   Future<void> _evaluateGameGate() async {
+    // Count the weekdays missed so far this month first, so a removed plan is seen straight away.
+    final action = await NgmyLocalGrowthIncomeStore.evaluateMissesForLiveUser(widget.user);
+    if (action != null && mounted) {
+      widget.onDataChanged();
+    }
     final blocked = !NgmyGameAccess.hasActiveInvestment(widget.user) &&
         !await NgmyGameAccess.canStartGame(widget.user);
     if (!mounted) return;
@@ -20092,6 +20104,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
       _showInvestmentGate = blocked;
       _gateChecked = true;
     });
+    if (!blocked) unawaited(_maybeShowMissWarning());
   }
 
   Future<void> _loadUsernameMap() async {

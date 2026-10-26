@@ -7,13 +7,11 @@ import 'ngmy_arcade_games.dart';
 import 'ngmy_arcade_host.dart';
 import 'ngmy_arcade_kit.dart';
 
-/// Two head-to-head games against the computer, in the same spirit as Paddle Duel.
+/// A head-to-head game against the computer, in the same spirit as Paddle Duel.
 Widget? ngmyBuildArcadeGameH(String id, NgmyArcadeArgs a) {
   switch (id) {
     case 'air_hockey':
       return AirHockeyGame(args: a);
-    case 'quick_draw':
-      return QuickDrawGame(args: a);
   }
   return null;
 }
@@ -180,114 +178,3 @@ class _AirHockeyState extends State<AirHockeyGame> with SingleTickerProviderStat
       });
 }
 
-// ── Quick Draw ────────────────────────────────────────────────────────────
-enum _DrawPhase { wait, signal, result }
-
-class QuickDrawGame extends StatefulWidget {
-  const QuickDrawGame({super.key, required this.args});
-  final NgmyArcadeArgs args;
-  @override
-  State<QuickDrawGame> createState() => _QuickDrawState();
-}
-
-class _QuickDrawState extends State<QuickDrawGame> with SingleTickerProviderStateMixin, ArcadeLoop, ArcadeScore {
-  @override
-  NgmyArcadeArgs get args => widget.args;
-  @override
-  int get goal => 5;
-  var _phase = _DrawPhase.wait;
-  double _t = 0, _delay = 1.5, _cpuTime = 0.4, _mine = 0;
-  String _msg = 'Wait for it…';
-  bool? _won;
-
-  double _nextDelay() => 1.1 + args.rng.nextDouble() * 2.4;
-  // The gunslinger gets quicker with every duel you win.
-  double _nextCpuTime() => math.max(0.19, 0.52 - score * 0.07) + args.rng.nextDouble() * 0.1;
-
-  @override
-  void initState() {
-    super.initState();
-    startScore();
-    _delay = _nextDelay();
-    startLoop((dt) {
-      _t += dt;
-      switch (_phase) {
-        case _DrawPhase.wait:
-          if (_t >= _delay) {
-            _phase = _DrawPhase.signal;
-            _t = 0;
-            _msg = 'DRAW!';
-            _cpuTime = _nextCpuTime();
-            HapticFeedback.heavyImpact();
-          }
-        case _DrawPhase.signal:
-          // If you take too long, the gunslinger shoots first.
-          if (_t >= _cpuTime) _finish(false, 'Too slow, he shot first');
-        case _DrawPhase.result:
-          if (_t >= 1.3) {
-            _phase = _DrawPhase.wait;
-            _t = 0;
-            _delay = _nextDelay();
-            _msg = 'Wait for it…';
-            _won = null;
-          }
-      }
-      setState(() {});
-    });
-  }
-
-  void _finish(bool win, String why) {
-    _phase = _DrawPhase.result;
-    _t = 0;
-    _won = win;
-    _msg = win ? 'You were faster! (${(_mine * 1000).round()} ms)' : why;
-    if (win) {
-      addPoint();
-    } else {
-      loseHeart(why);
-    }
-  }
-
-  void _tap() {
-    if (ended) return;
-    if (_phase == _DrawPhase.wait) {
-      _finish(false, 'Too early, you drew before the signal');
-    } else if (_phase == _DrawPhase.signal) {
-      _mine = _t;
-      _finish(true, '');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final signal = _phase == _DrawPhase.signal;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => _tap(),
-      child: Stack(children: [
-        arcadeBackdrop(signal ? const [Color(0xFFDC2626), Color(0xFF7F1D1D)] : const [Color(0xFFFB923C), Color(0xFF7C2D12)]),
-        Center(
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-              Transform(alignment: Alignment.center, transform: Matrix4.diagonal3Values(-1, 1, 1), child: const Text('🤠', style: TextStyle(fontSize: 76))),
-              const Text('🤠', style: TextStyle(fontSize: 76)),
-            ]),
-            const SizedBox(height: 18),
-            Text(
-              _msg,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: _won == null ? Colors.white : (_won! ? const Color(0xFF86EFAC) : const Color(0xFFFCA5A5)),
-                fontSize: signal ? 56 : 24,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(signal ? 'TAP NOW' : 'Tap only after you see DRAW', style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
-          ]),
-        ),
-        arcadeTopBar('You $score · first to $goal', hearts: hearts),
-      ]),
-    );
-  }
-}

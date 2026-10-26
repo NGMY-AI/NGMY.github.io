@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_clock_day.dart';
+import 'ngmy_clock_in_miss_policy.dart';
 
 import 'main.dart';
 import 'ngmy_account_snapshot_ui.dart';
@@ -285,6 +286,9 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     widget.liveUser.lastClockInDate = user.lastClockInDate;
     widget.liveUser.lastClockInEarningsDate = user.lastClockInEarningsDate;
     widget.liveUser.todayClockInEarned = user.todayClockInEarned;
+    widget.liveUser.clockInMissMonth = user.clockInMissMonth;
+    widget.liveUser.clockInMissedDays = List<String>.from(user.clockInMissedDays);
+    widget.liveUser.clockInMissCount = user.clockInMissedDays.length;
     widget.liveUser.pendingInvestmentName = user.pendingInvestmentName;
     widget.liveUser.pendingInvestmentAmount = user.pendingInvestmentAmount;
     widget.liveUser.pendingInvestmentRoi = user.pendingInvestmentRoi;
@@ -493,6 +497,12 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       _publishAppBalance(user.accountBalance, allowDecrease: false);
     }
 
+    // Weekdays with no clock-in: three in a month remove the plan.
+    final missAction = NgmyLocalGrowthIncomeStore.evaluateMisses(user, transactions, DateTime.now(), skip: widget.liveUser.isAdmin || widget.liveUser.isOnFreeTrial);
+    if (missAction != null) {
+      widget.liveUser.activeInvestment = user.activeInvestment;
+    }
+
     _mirrorWalletOntoLiveUser();
 
     // Admin "Send money now" credits are collected app-wide by MainScreen into
@@ -504,7 +514,16 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       _transactions = transactions;
       _walletStateRevision = revision;
     });
-    if (payoutAdded) {
+    if (missAction != null) {
+      unawaited(_persist(bumpWalletRevision: true, syncBalance: true, allowDecrease: false));
+      if (missAction == 'reset') {
+        unawaited(NgmyClockInMissPolicy.notifyPlanReset(widget.liveUser.email));
+        if (mounted) unawaited(NgmyClockInMissResetDialog.show(context));
+      } else if (missAction == 'warn2') {
+        unawaited(NgmyClockInMissPolicy.notifySecondMiss(widget.liveUser.email));
+        if (mounted) unawaited(NgmyClockInMissWarnDialog.show(context));
+      }
+    } else if (payoutAdded) {
       unawaited(_persist(bumpWalletRevision: true, syncBalance: true, allowDecrease: false));
     } else {
       // Just opening the wallet must not re-stamp it as "newest" — that let a

@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'main.dart';
 import 'ngmy_db_relay.dart';
+import 'ngmy_clock_in_miss_policy.dart';
 import 'ngmy_game_session.dart';
 import 'ngmy_local_snapshot_sync.dart';
 import 'ngmy_network_resilience.dart';
@@ -256,6 +257,8 @@ class NgmyLocalGrowthIncomeStore {
         'lastClockInDate': user.lastClockInDate?.toUtc().toIso8601String(),
         'lastClockInEarningsDate': user.lastClockInEarningsDate?.toUtc().toIso8601String(),
         'todayClockInEarned': user.todayClockInEarned,
+        'clockInMissMonth': user.clockInMissMonth,
+        'clockInMissedDays': user.clockInMissedDays,
         'pendingInvestmentName': user.pendingInvestmentName,
         'pendingInvestmentAmount': user.pendingInvestmentAmount,
         'pendingInvestmentRoi': user.pendingInvestmentRoi,
@@ -298,6 +301,9 @@ class NgmyLocalGrowthIncomeStore {
       lastClockInDate: parseDate(map['lastClockInDate']),
       lastClockInEarningsDate: parseDate(map['lastClockInEarningsDate']),
       todayClockInEarned: (map['todayClockInEarned'] as num? ?? 0).toDouble(),
+      clockInMissMonth: (map['clockInMissMonth'] ?? '').toString(),
+      clockInMissCount: map['clockInMissedDays'] is List ? (map['clockInMissedDays'] as List).length : 0,
+      clockInMissedDays: map['clockInMissedDays'] is List ? [for (final e in map['clockInMissedDays'] as List) e.toString()] : null,
       pendingInvestmentName: map['pendingInvestmentName'] as String?,
       pendingInvestmentAmount: (map['pendingInvestmentAmount'] as num?)?.toDouble(),
       pendingInvestmentRoi: (map['pendingInvestmentRoi'] as num?)?.toDouble(),
@@ -418,12 +424,100 @@ class NgmyLocalGrowthIncomeStore {
   static double latePenaltyPercent(DateTime now) {
     final minutesLate = _minutesSinceMidnight(now);
     if (minutesLate < 10) return 0;
-    if (minutesLate >= 30) return 20;
+    if (minutesLate >= 30) return 30;
     if (minutesLate >= 10) return 15;
     return 0;
   }
 
+  /// The weekday check-ins missed this month. Three missed weekdays in a calendar month remove the investment plan
+  /// (it only comes back when a new plan is bought); the count starts again from zero every month.
+  /// Returns 'warn2' when the second miss is just recorded, 'reset' when the plan was just removed, 'miss1' for the
+  /// first miss, and null when nothing changed. [skip] is for admins and free-trial accounts.
+  static String? evaluateMisses(UserData user, List<AppTransaction> transactions, DateTime now, {bool skip = false}) {
+    final mk = NgmyClockInMissPolicy.monthKey(now);
+    if (user.clockInMissMonth != mk) {
+      user.clockInMissMonth = mk;
+      user.clockInMissedDays = <String>[];
+      user.clockInMissCount = 0;
+    }
+    final inv = user.activeInvestment;
+    if (skip || inv == null) return null;
+    String keyOf(DateTime d) => NgmyClockInMissPolicy.dayKey(d.isUtc ? d.toLocal() : d);
+    // A day counts as clocked in when a session was started or paid on it.
+    final clocked = <String>{};
+    for (final t in transactions) {
+      final d = (t.sourceDetails ?? '').toLowerCase();
+      if (d.contains('clock-in') && t.status != TransactionStatus.rejected) clocked.add(keyOf(t.timestamp));
+    }
+    for (final d in [user.lastClockInDate, user.lastClockInEarningsDate, if (user.isClockedIn) user.clockInStartTime]) {
+      if (d != null) clocked.add(keyOf(d));
+    }
+    final today = DateTime(now.year, now.month, now.day);
+    final buy = inv.purchaseDate.isUtc ? inv.purchaseDate.toLocal() : inv.purchaseDate;
+    final afterBuy = DateTime(buy.year, buy.month, buy.day).add(const Duration(days: 1));
+    final monthStart = DateTime(now.year, now.month, 1);
+    var day = afterBuy.isAfter(monthStart) ? afterBuy : monthStart;
+    // Today only counts once its 12:00 PM window has closed.
+    final lastDay = now.hour >= 12 ? today : today.subtract(const Duration(days: 1));
+    final missed = List<String>.from(user.clockInMissedDays);
+    final before = missed.length;
+    while (!day.isAfter(lastDay)) {
+      if (!isWeekend(day)) {
+        final k = keyOf(day);
+        if (!clocked.contains(k) && !missed.contains(k)) missed.add(k);
+      }
+      day = DateTime(day.year, day.month, day.day + 1);
+    }
+    user.clockInMissedDays = missed;
+    user.clockInMissCount = missed.length;
+    if (missed.length >= NgmyClockInMissPolicy.maxMissesPerMonth) {
+      user.activeInvestment = null;
+      clearUnpayableSession(user);
+      return 'reset';
+    }
+    if (missed.length == before) return null;
+    return missed.length == 2 ? 'warn2' : 'miss1';
+  }
+
+  /// Checks the missed days on the saved wallet of a signed-in account (used by the shell and the Game Center),
+  /// saves any change, and copies the plan and the miss count onto [live]. Returns what happened, as [evaluateMisses].
+  static Future<String?> evaluateMissesForLiveUser(UserData live) async {
+    final real = live.email.trim();
+    if (real.isEmpty) return null;
+    try {
+      final loaded = await load(real, live);
+      final user = loaded.user;
+      final action = evaluateMisses(user, loaded.transactions, DateTime.now(), skip: live.isAdmin || live.isOnFreeTrial);
+      live.clockInMissMonth = user.clockInMissMonth;
+      live.clockInMissedDays = List<String>.from(user.clockInMissedDays);
+      live.clockInMissCount = user.clockInMissedDays.length;
+      if (action == null) return null;
+      if (action == 'reset') {
+        live.activeInvestment = null;
+        live.isClockedIn = false;
+        live.clockInStartTime = null;
+        live.clockInPenaltyPercent = 0;
+      }
+      final at = DateTime.now().toUtc();
+      final revision = loaded.walletStateRevision + 1;
+      await save(real, user, loaded.transactions, walletStateRevision: revision, updatedAt: at, creditedTxnIds: loaded.creditedTxnIds);
+      unawaited(pushCloudWallet(
+        realEmail: real,
+        user: user,
+        transactions: loaded.transactions,
+        walletStateRevision: revision,
+        updatedAt: at,
+        creditedTxnIds: loaded.creditedTxnIds,
+      ));
+      return action;
+    } catch (e) {
+      debugPrint('[growth income] missed days: $e');
+      return null;
+    }
+  }
+
   static bool isClockInWindowOpen(DateTime now) {
+
     final isPastNoon = now.hour >= 12;
     if (isPastNoon) return false;
     if (isWeekend(now)) return false;
