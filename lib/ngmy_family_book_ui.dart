@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_ai_language.dart';
 import 'ngmy_book_studio.dart';
+import 'ngmy_family_book_header.dart';
 import 'ngmy_family_book_storage.dart';
 import 'ngmy_print_booklet.dart';
 import 'ngmy_worksheet_helpers.dart';
@@ -243,6 +244,22 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
     await showNgmyBookPrintSheet(context, doc);
   }
 
+  Future<void> _chooseHeader() async {
+    if (_editing) await _saveCurrentPage();
+    if (!mounted) return;
+    final id = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1F130B),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
+      builder: (_) => FamilyBookHeaderPicker(start: _coverDesign.header, title: _title, kicker: 'Family Book · ${_entries.length} ${_entries.length == 1 ? 'page' : 'pages'}'),
+    );
+    if (id == null || !mounted) return;
+    final next = _coverDesign.copyWith(header: id);
+    setState(() => _coverDesign = next);
+    await saveFamilyBookCover(widget.userEmail, widget.treeId, next);
+  }
+
   Future<void> _designCover() async {
     final next = await showModalBottomSheet<FamilyBookCover>(
       context: context,
@@ -325,6 +342,8 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
                                         titleCtrl: _titleCtrl,
                                         bodyCtrl: _bodyCtrl,
                                         formatDate: _formatDate,
+                                        headStyle: familyBookHeaderStyleOf(_coverDesign.header),
+                                        bookTitle: _title,
                                       ),
                               ),
                             );
@@ -347,39 +366,17 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
     final tools = <_HeaderTool>[
       if (canAi) _HeaderTool(Icons.auto_awesome_rounded, 'AI', _aiMenu, hot: true),
       if (widget.canEdit) _HeaderTool(Icons.palette_rounded, 'Cover', _designCover),
+      if (widget.canEdit) _HeaderTool(Icons.title_rounded, 'Header', _chooseHeader),
       if (_entries.isNotEmpty || widget.membersPage.trim().isNotEmpty) _HeaderTool(Icons.print_rounded, 'Print', _printBook),
       if (widget.canEdit && _entries.isNotEmpty && _pageIndex >= 0) _HeaderTool(_editing ? Icons.check_rounded : Icons.edit_rounded, _editing ? 'Save' : 'Edit', _editing ? _saveCurrentPage : () => setState(() => _editing = true)),
       if (widget.canEdit) _HeaderTool(Icons.add_rounded, 'Add page', _addPage),
     ];
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 6, 12, 2),
-      padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF4A2A15), Color(0xFF2A170C)]),
-        border: Border.all(color: _gold.withValues(alpha: 0.85), width: 1.6),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 16, offset: const Offset(0, 6)), BoxShadow(color: _gold.withValues(alpha: 0.12), blurRadius: 18)],
-      ),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Row(children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(width: 30, height: 30, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.black.withValues(alpha: 0.3), border: Border.all(color: _gold.withValues(alpha: 0.6))), child: const Icon(Icons.close_rounded, color: _paper, size: 17)),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(_title, maxLines: 1, softWrap: false, style: const TextStyle(color: _gold, fontWeight: FontWeight.w900, fontSize: 19, letterSpacing: 0.5, shadows: [Shadow(color: Colors.black54, blurRadius: 3, offset: Offset(1, 2))])),
-              ),
-            ),
-          ),
-          const SizedBox(width: 30),
-        ]),
-        Padding(padding: const EdgeInsets.symmetric(vertical: 5), child: Container(height: 1, decoration: BoxDecoration(gradient: LinearGradient(colors: [Colors.transparent, _gold.withValues(alpha: 0.7), Colors.transparent])))),
-        Row(children: [for (final t in tools) Expanded(child: _headerButton(t))]),
-      ]),
+    return FamilyBookHeaderBar(
+      style: familyBookHeaderStyleOf(_coverDesign.header),
+      title: _title,
+      kicker: '${_coverDesign.subtitle.trim().isEmpty ? 'Family Book' : _coverDesign.subtitle.trim()} · ${_entries.length} ${_entries.length == 1 ? 'page' : 'pages'}',
+      onClose: () => Navigator.pop(context),
+      tools: Row(children: [for (final t in tools) Expanded(child: _headerButton(t))]),
     );
   }
 
@@ -1351,6 +1348,8 @@ class _BookPageView extends StatelessWidget {
     required this.titleCtrl,
     required this.bodyCtrl,
     required this.formatDate,
+    this.headStyle,
+    this.bookTitle = '',
   });
 
   final FamilyBookEntry entry;
@@ -1360,6 +1359,8 @@ class _BookPageView extends StatelessWidget {
   final TextEditingController titleCtrl;
   final TextEditingController bodyCtrl;
   final String Function(DateTime) formatDate;
+  final FamilyBookHeaderStyle? headStyle;
+  final String bookTitle;
 
   @override
   Widget build(BuildContext context) {
@@ -1403,6 +1404,7 @@ class _BookPageView extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(26, 26, 24, 14),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    if (headStyle != null && bookTitle.trim().isNotEmpty) FamilyBookRunningHead(style: headStyle!, title: bookTitle, ink: ink),
                     Expanded(
                       child: editing
                           ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [

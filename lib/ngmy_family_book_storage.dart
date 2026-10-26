@@ -98,6 +98,7 @@ Future<void> deleteFamilyBookEntry(String userEmail, String treeId, String entry
 const List<String> kCoverFrames = ['double', 'single', 'corners', 'none'];
 const List<String> kCoverTextures = ['leather', 'linen', 'plain', 'stars', 'rays'];
 const List<String> kCoverPositions = ['top', 'middle', 'bottom'];
+const List<String> kFamilyBookHeaderIds = ['classic', 'ornate', 'parchment', 'minimal', 'midnight', 'emerald', 'rose', 'modern'];
 const Map<String, int> kCoverFoils = {'gold': 0xFFE8C46A, 'silver': 0xFFE5E7EB, 'rose': 0xFFF0A8B8, 'white': 0xFFFFFFFF, 'copper': 0xFFE08A4C, 'black': 0xFF111827};
 
 /// How the family book's cover looks. Saved on this device with the book.
@@ -114,6 +115,7 @@ class FamilyBookCover {
     this.texture = 'leather',
     this.author = '',
     this.ribbon = true,
+    this.header = 'classic',
   });
   final String style;
   final String title;
@@ -127,9 +129,12 @@ class FamilyBookCover {
   final String author;
   final bool ribbon;
 
+  /// The look of the top of the open book (one of [kFamilyBookHeaderIds]).
+  final String header;
+
   bool get silver => foil == 'silver';
 
-  FamilyBookCover copyWith({String? style, String? title, String? subtitle, int? emblem, String? foil, double? titleSize, String? position, String? frame, String? texture, String? author, bool? ribbon}) => FamilyBookCover(
+  FamilyBookCover copyWith({String? style, String? title, String? subtitle, int? emblem, String? foil, double? titleSize, String? position, String? frame, String? texture, String? author, bool? ribbon, String? header}) => FamilyBookCover(
         style: style ?? this.style,
         title: title ?? this.title,
         subtitle: subtitle ?? this.subtitle,
@@ -141,9 +146,10 @@ class FamilyBookCover {
         texture: texture ?? this.texture,
         author: author ?? this.author,
         ribbon: ribbon ?? this.ribbon,
+        header: header ?? this.header,
       );
 
-  Map<String, dynamic> toJson() => {'style': style, 'title': title, 'subtitle': subtitle, 'emblem': emblem, 'foil': foil, 'titleSize': titleSize, 'position': position, 'frame': frame, 'texture': texture, 'author': author, 'ribbon': ribbon};
+  Map<String, dynamic> toJson() => {'style': style, 'title': title, 'subtitle': subtitle, 'emblem': emblem, 'foil': foil, 'titleSize': titleSize, 'position': position, 'frame': frame, 'texture': texture, 'author': author, 'ribbon': ribbon, 'header': header};
 
   factory FamilyBookCover.fromJson(Map<String, dynamic> j) => FamilyBookCover(
         style: (j['style'] ?? 'leather').toString(),
@@ -157,6 +163,7 @@ class FamilyBookCover {
         texture: kCoverTextures.contains(j['texture']) ? j['texture'] as String : 'leather',
         author: (j['author'] ?? '').toString(),
         ribbon: j['ribbon'] != false,
+        header: kFamilyBookHeaderIds.contains(j['header']) ? j['header'] as String : 'classic',
       );
 
   /// Applies the settings an AI suggested (only the valid ones; anything else is ignored).

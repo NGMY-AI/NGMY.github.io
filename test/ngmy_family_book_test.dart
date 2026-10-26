@@ -216,6 +216,32 @@ void main() {
     expect(t.takeException(), isNull);
   });
 
+  testWidgets('the owner can pick a header design and it is saved with the book', (t) async {
+    await openBook(t);
+    await t.tap(find.text('Header'));
+    await t.pump(const Duration(milliseconds: 400));
+    await t.pump(const Duration(milliseconds: 400));
+    expect(find.text('Choose your header'), findsOneWidget);
+    expect(find.text('Ornate gold'), findsOneWidget);
+    await t.tap(find.text('Ornate gold'));
+    await t.pump();
+    await t.scrollUntilVisible(find.text('Use this header'), 300, scrollable: find.descendant(of: find.byType(BottomSheet), matching: find.byType(Scrollable)).first);
+    await t.tap(find.text('Use this header'));
+    await t.pump(const Duration(milliseconds: 400));
+    await t.pump(const Duration(milliseconds: 400));
+    final saved = await t.runAsync(() => loadFamilyBookCover('a@b.c', 'tree1'));
+    expect(saved!.header, 'ornate');
+    expect(find.textContaining('FAMILY BOOK'), findsNothing);
+    expect(find.text('THE SMITH FAMILY'), findsWidgets);
+    expect(t.takeException(), isNull);
+  });
+
+  test('every header design is a valid saved choice', () {
+    expect(kFamilyBookHeaderIds.length, 8);
+    expect(FamilyBookCover.fromJson({'header': 'nope'}).header, 'classic');
+    expect(FamilyBookCover.fromJson({'header': 'rose'}).header, 'rose');
+  });
+
   test('the AI book can be read even with real line breaks inside its text', () {
     const reply = '```json\n{"title":"Our Story","subtitle":"Long ago","cover_template":"vintage","cover_query":"village","chapters":[{"title":"Start","body":"First paragraph.\n\nSecond paragraph.","image_query":"lake"}]}\n```';
     final doc = ngmyParseBookAi(reply);
