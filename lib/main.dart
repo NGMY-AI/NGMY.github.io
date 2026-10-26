@@ -8812,6 +8812,8 @@ class UserData {
   String savedCashAppTag;
   String savedZelleInfo;
   String savedBitcoinAddress;
+  /// When the account was created (cloud "created_at"); the admin lists the newest sign-ups first.
+  DateTime? createdAt;
   String crownBadge;
   double freeFixCredit;
   bool freeTrialActive;
@@ -8831,7 +8833,7 @@ class UserData {
   /// True when this row was created via the login/sign-up page (not civic-only manual enroll).
   bool isAppLoginAccount;
 
-  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isCivicRegistryKing = false, this.isCivicRegistryAdmin = false, this.civicRegistryStateSwitchesUsed = 0, this.civicRegistryAnchorState = '', this.isApprovedWorker = false, this.isApprovedHelper = false, this.canSellOnStore = false, this.lastClockInDate, this.lastClockInEarningsDate, this.todayClockInEarned = 0.0, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0, this.pendingInvestmentName, this.pendingInvestmentAmount, this.pendingInvestmentRoi, this.savedCashAppTag = '', this.savedZelleInfo = '', this.savedBitcoinAddress = '', this.crownBadge = '', this.freeFixCredit = 0.0, this.freeTrialActive = false, this.freeTrialDailyAmount = 0.0, this.mediaBio = '', this.isAppLoginAccount = false, List<String>? mediaFollowers, List<String>? mediaFollowing, List<Map<String, dynamic>>? mediaHighlights, List<Map<String, dynamic>>? mediaStories, List<String>? readAnnouncementIds,
+  UserData({this.createdAt, this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isCivicRegistryKing = false, this.isCivicRegistryAdmin = false, this.civicRegistryStateSwitchesUsed = 0, this.civicRegistryAnchorState = '', this.isApprovedWorker = false, this.isApprovedHelper = false, this.canSellOnStore = false, this.lastClockInDate, this.lastClockInEarningsDate, this.todayClockInEarned = 0.0, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0, this.pendingInvestmentName, this.pendingInvestmentAmount, this.pendingInvestmentRoi, this.savedCashAppTag = '', this.savedZelleInfo = '', this.savedBitcoinAddress = '', this.crownBadge = '', this.freeFixCredit = 0.0, this.freeTrialActive = false, this.freeTrialDailyAmount = 0.0, this.mediaBio = '', this.isAppLoginAccount = false, List<String>? mediaFollowers, List<String>? mediaFollowing, List<Map<String, dynamic>>? mediaHighlights, List<Map<String, dynamic>>? mediaStories, List<String>? readAnnouncementIds,
     List<String>? openedContributionReceiptKeys,
     List<String>? dismissedContributionReceiptKeys,
     this.clockInMissMonth = '',
@@ -8928,6 +8930,7 @@ class UserData {
       return null;
     }
     return UserData(
+      createdAt: parseDate(json['created_at'] ?? json['createdAt']),
       email: json['email'] ?? '',
       phone: json['phone'] ?? '',
       username: json['username'] ?? 'User',
@@ -9375,7 +9378,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       return const [];
     }
     try {
-      final rows = await ngmyAdminUsersListFetch(email: email);
+      var rows = await ngmyAdminUsersListFetch(email: email);
+      if (rows.isEmpty) rows = await _fetchAllUserRowsAsAdmin();
       if (rows.isEmpty) return const [];
       final all = rows.map((e) => UserData.fromJson(e)).toList();
       _registerCloudUsersAsAppLogins(all);
@@ -9383,6 +9387,39 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('[admin] users Edge fetch: $e');
       return const [];
+    }
+  }
+
+  /// Every account, read page by page with the admin's own sign-in (the database lets an admin read all users).
+  /// Newest sign-ups come first when the table has a created_at column.
+  Future<List<Map<String, dynamic>>> _fetchAllUserRowsAsAdmin() async {
+    Future<List<Map<String, dynamic>>> pages(String? orderBy) async {
+      final out = <Map<String, dynamic>>[];
+      var from = 0;
+      while (from < 20000) {
+        final chunk = await ngmyDbRelaySelect(
+          'users',
+          orderBy: orderBy ?? 'email',
+          orderAscending: orderBy == null,
+          range: (from, from + 499),
+          timeout: kNgmyCloudLoadTimeout,
+        );
+        out.addAll(chunk);
+        if (chunk.length < 500) break;
+        from += 500;
+      }
+      return out;
+    }
+
+    try {
+      return await pages('created_at');
+    } catch (_) {
+      try {
+        return await pages(null);
+      } catch (e) {
+        debugPrint('[admin] users relay fetch: $e');
+        return const [];
+      }
     }
   }
 
@@ -18819,6 +18856,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _homeMountedAt = DateTime.now();
+    // Growth Income is opened often: fetch its code in the background so the first tap is instant.
+    Future<void>.delayed(const Duration(seconds: 3), () {
+      if (mounted) unawaited(growthui.loadLibrary().catchError((_) {}));
+    });
     _smokeCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 10));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -26041,7 +26082,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final filtered = modeUsers
         .where((u) => _userMatchesQuery(u, q))
         .toList()
-      ..sort((a, b) => a.username.toLowerCase().compareTo(b.username.toLowerCase()));
+      ..sort((a, b) {
+        // Newest sign-ups first; accounts without a sign-up time follow, in name order.
+        final x = a.createdAt, y = b.createdAt;
+        if (x != null && y != null) {
+          final c = y.compareTo(x);
+          if (c != 0) return c;
+        } else if (x != null) {
+          return -1;
+        } else if (y != null) {
+          return 1;
+        }
+        return a.username.toLowerCase().compareTo(b.username.toLowerCase());
+      });
     if (_selectedUserEmail != null) {
       UserData? selected;
       for (final x in modeUsers) {

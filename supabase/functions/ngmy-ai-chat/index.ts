@@ -9875,11 +9875,11 @@ async function handleAdminUsersList(
   const columns =
     "email,username,phone,isAdmin,status,forceLogout,accountBalance,totalProfit," +
     "canSellOnStore,freeTrialActive,freeTrialDailyAmount,profilePicturePath,referredByCode,referralCount," +
-    "points,mediaBio,isEnrolledInRegistry,fullName,state,isAuthorizedRegistrar,isApprovedWorker,isApprovedHelper";
+    "points,mediaBio,isEnrolledInRegistry,fullName,state,isAuthorizedRegistrar,isApprovedWorker,isApprovedHelper,created_at";
 
   let rows: Record<string, unknown>[] = [];
   try {
-    const { data, error } = await admin.from("users").select(columns).order("email").limit(5000);
+    const { data, error } = await admin.from("users").select(columns).order("created_at", { ascending: false }).limit(5000);
     if (error) {
       const { data: fallback, error: err2 } = await admin
         .from("users")
@@ -9895,7 +9895,7 @@ async function handleAdminUsersList(
     return jsonOk({ error: String(e) }, 500);
   }
 
-  return networkFetchOk({ count: rows.length });
+  return jsonOk({ ok: true, users: rows });
 }
 
 const CIVIC_USER_GROUPS_KEY = "civic_user_groups_v1";
