@@ -2,6 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_electronics_more_parts.dart';
+import 'ngmy_electronics_tv.dart';
+
 
 // ═════════════════════════════════════════════════════════════════════════════
 // A small but real electronics simulator: parts, wires, and a circuit solver.
@@ -36,7 +39,8 @@ const List<PartInfo> kPartInfos = [
   PartInfo('heater', 'Heater', '🔥', Color(0xFFFB923C), 'Turns electricity into heat. Toasters and kettles work like this. More power makes it glow hotter.', 'A long coil of special wire that resists the current. The current has to push through it, and that makes it hot.'),
   PartInfo('capacitor', 'Capacitor', '🪫', Color(0xFF60A5FA), 'Stores electric charge like a tiny rechargeable tank. It fills up from a battery, then can give the charge back.', 'Two sheets of metal foil, rolled up with a thin plastic sheet between them.'),
   PartInfo('radio', 'Radio', '📻', Color(0xFFE879F9), 'Needs about 3 volts or more. When it has power it picks up stations and plays them.', 'An aerial catches invisible radio waves. A tuner picks one station, and a chip turns it back into sound for the speaker.'),
-  PartInfo('tv', 'TV', '📺', Color(0xFF22D3EE), 'Needs about 6 volts or more. With power it shows a picture made of millions of tiny coloured dots.', 'Millions of tiny red, green and blue lights, called pixels, that glow at different strengths to make every colour.'),
+  PartInfo('tv', 'TV', '📺', Color(0xFF22D3EE), 'Needs 5.5 to 13.5 volts and the + (left) dot towards the battery +. When it switches on it shows NGMY animation channels. Tap it 3 times quickly to open the big screen.', 'Millions of tiny red, green and blue lights, called pixels, that glow at different strengths to make every colour.'),
+  ...kMorePartInfos,
 ];
 
 final Map<String, PartInfo> kPartByKind = {for (final p in kPartInfos) p.kind: p};
@@ -71,6 +75,10 @@ class Part {
   double spin = 0; // animation angle
   double vc = 0; // capacitor voltage
   double hot = 0; // a power source being shorted heats up (0..1.4)
+  double charge = 1; // a 1.5 V battery starts flat and has to be charged
+  int channel = 0; // the TV channel
+  double onAge = 0; // seconds a gadget has been switched on
+  String burnWhy = ''; // why it burnt out
 
   // Results of the last solve.
   double v = 0; // volts across (a minus b)
@@ -167,7 +175,7 @@ class ElectronicsBoard {
   double _sourceVolts(Part p) {
     switch (p.kind) {
       case 'battery':
-        return p.volts;
+        return p.volts == 1.5 && p.charge <= 0.02 ? 0 : p.volts;
       case 'solar':
         return 5 * p.level;
       case 'crank':
@@ -211,7 +219,13 @@ class ElectronicsBoard {
         return p.ohms;
       case 'pot':
         return 1 + 99 * p.level;
+      case 'voltmeter':
+        return 1e6;
+      case 'ammeter':
+        return 0.02;
     }
+    final spec = kDeviceSpecs[p.kind];
+    if (spec != null) return spec.load;
     return 100;
   }
 
@@ -408,30 +422,50 @@ class ElectronicsBoard {
   /// What each part does with its voltage and current: glow, spin, burn out.
   void _effects(double dt) {
     for (final p in parts) {
+      if (p.kind == 'battery' && p.volts == 1.5 && !p.burnt) {
+        // A 1.5 V cell is rechargeable: current pushed into it by a solar panel (or crank, or wind turbine) fills it up.
+        if (p.i > 0.003) {
+          p.charge = math.min(1.0, p.charge + dt * 0.2 * math.min(p.i, 1.0));
+        } else if (p.i < -0.003) {
+          p.charge = math.max(0.0, p.charge - dt * 0.015 * math.min(-p.i, 1.0));
+        }
+      }
       if (isSource(p) && !p.burnt) {
         // A big current from a power source means its wires are joined without anything to use the power: a short circuit.
         final isc = _sourceVolts(p) / _sourceR(p);
-        if (isc > 0.3 && p.i.abs() > 0.4 && p.i.abs() > isc * 0.55) {
+        if (isc > 0.3 && p.i.abs() > 0.4 && p.i.abs() > isc * 0.55 && !_chargingPair(p)) {
           p.hot += dt * 0.9;
           emitSparks(p, 3, speed: 260);
           if (_shortSignal <= 0) {
             _shortSignal = 0.35;
             onEvent?.call('short', p);
           }
-          if (p.hot > 1.4) _burn(p, 'source');
+          if (p.hot > 1.4) _burn(p, 'The power source was joined straight back to itself with nothing using the power (a short circuit), so it overheated and burnt out. Always put a part such as a bulb between the + and the −.');
         } else {
           p.hot = math.max(0, p.hot - dt * 0.8);
         }
       }
       final power = (p.v * p.i).abs();
       final cur = p.i.abs();
+      final spec = kDeviceSpecs[p.kind];
+      if (spec != null) {
+        final vv = spec.polar ? p.v : p.v.abs();
+        final on = !p.burnt && vv >= spec.minV;
+        if (!p.burnt && p.v.abs() > spec.maxV) _burn(p, 'The ${p.info.name} is made for ${_fmtV(spec.minV)} to ${_fmtV(spec.maxV)} volts but got ${p.v.abs().toStringAsFixed(1)} V, so it burnt out.');
+        p.glow = (on && !p.burnt) ? 1.0 : 0.0;
+        p.onAge = p.glow > 0 ? p.onAge + dt : 0;
+        if (p.kind == 'fan' || p.kind == 'toycar') {
+          p.glow = p.glow > 0 ? ((p.v.abs() - 1.0) / 6).clamp(0.15, 1.4) : 0.0;
+          p.spin += p.glow * dt * (p.kind == 'fan' ? 30 : 26);
+        }
+      }
       switch (p.kind) {
         case 'bulb':
           p.glow = p.burnt ? 0 : (power / 0.9).clamp(0.0, 1.0);
-          if (!p.burnt && power > 2.4) _burn(p, 'bulb');
+          if (!p.burnt && power > 2.4) _burn(p, 'The bulb got ${p.v.abs().toStringAsFixed(1)} V but it is made for about 3 V, so its thin wire melted. Add a resistor or use a smaller battery.');
         case 'led':
           p.glow = p.burnt ? 0 : ((cur - 0.001) / 0.02).clamp(0.0, 1.0);
-          if (!p.burnt && cur > 0.045) _burn(p, 'led');
+          if (!p.burnt && cur > 0.045) _burn(p, 'The LED had ${(cur * 1000).round()} milliamps going through it, far too much (it can take about 20). An LED always needs a resistor in the loop.');
         case 'heater':
           p.glow = (power / 14).clamp(0.0, 1.0);
         case 'motor':
@@ -439,18 +473,16 @@ class ElectronicsBoard {
           p.spin += p.glow * dt * 24;
         case 'buzzer':
           p.glow = (cur / 0.05).clamp(0.0, 1.0);
-        case 'radio':
-          p.glow = p.v >= 2.5 ? 1.0 : 0.0;
-        case 'tv':
-          p.glow = p.v >= 5.5 ? 1.0 : 0.0;
+        case 'ammeter':
+          if (!p.burnt && cur > 1.5) _burn(p, 'The ammeter was wired straight across a power source, so far too much current went through it. An ammeter must go in the loop one after another with a part, never straight across a battery.');
         case 'fuse':
           p.glow = p.burnt ? 0 : (cur / 1).clamp(0.0, 1.0);
-          if (!p.burnt && cur > 1.0) _burn(p, 'fuse');
+          if (!p.burnt && cur > 1.0) _burn(p, 'More than 1 amp flowed, so the fuse wire melted. That is exactly what a fuse is for: it breaks the loop to protect the other parts.');
         case 'resistor':
-          if (!p.burnt && power > 0.8) _burn(p, 'resistor');
+          if (!p.burnt && power > 0.8) _burn(p, 'The resistor had to hold back too much power and got too hot. Use a bigger resistor or a smaller battery.');
         case 'capacitor':
           p.glow = (p.vc.abs() / 9).clamp(0.0, 1.0);
-          if (!p.burnt && p.vc.abs() > 13) _burn(p, 'capacitor');
+          if (!p.burnt && p.vc.abs() > 13) _burn(p, 'The capacitor was charged to ${p.vc.abs().toStringAsFixed(1)} V, more than it can hold.');
         case 'crank':
           p.spin += p.level * dt * 22;
         case 'turbine':
@@ -461,8 +493,12 @@ class ElectronicsBoard {
     }
   }
 
+  /// A source pushing current into a rechargeable 1.5 V cell is charging it, which is not a short circuit.
+  bool _chargingPair(Part p) => parts.any((q) => q != p && q.kind == 'battery' && q.volts == 1.5 && !q.burnt && q.i.abs() > 0.5 * p.i.abs());
+
   void _burn(Part p, String why) {
     p.burnt = true;
+    p.burnWhy = why;
     emitSparks(p, 34, speed: 300);
     onEvent?.call('burn', p);
   }
@@ -470,9 +506,70 @@ class ElectronicsBoard {
   void repairAll() {
     for (final p in parts) {
       p.burnt = false;
+      p.burnWhy = '';
       p.vc = 0;
     }
     _ledOn.clear();
+  }
+
+  // ── Why is it not working? ───────────────────────────────────────────────
+
+  static String _fmtV(double x) => x == x.roundToDouble() ? '${x.round()}' : '$x';
+
+  /// Parts that do something only when they are powered.
+  bool needsPower(Part p) => const {'bulb', 'led', 'motor', 'buzzer', 'heater'}.contains(p.kind) || kDeviceSpecs.containsKey(p.kind);
+
+  /// Has a left (+) dot that must go towards the battery +.
+  bool hasPolarity(Part p) => isSource(p) || p.kind == 'led' || (kDeviceSpecs[p.kind]?.polar ?? false);
+
+  int wireCount(Part p, int t) => wires.where((w) => (w.a == p && w.ta == t) || (w.b == p && w.tb == t)).length;
+
+  bool works(Part p) {
+    if (p.burnt) return false;
+    if (kDeviceSpecs.containsKey(p.kind)) return p.glow > 0;
+    return p.glow > (p.kind == 'led' ? 0.02 : 0.05);
+  }
+
+  /// A gadget that is wired to something but is not working: worth a warning badge on the board.
+  bool needsAttention(Part p) => !p.burnt && needsPower(p) && !works(p) && (wireCount(p, 0) + wireCount(p, 1)) > 0;
+
+  /// The reason a part is not working, in plain words, or null when nothing is wrong.
+  String? diagnose(Part p) {
+    final name = p.info.name;
+    if (p.burnt) return '${p.burnWhy.isEmpty ? 'The $name burnt out.' : p.burnWhy} Press the spanner at the top to fit a new one.';
+    if (!needsPower(p) || works(p)) return null;
+    final a = wireCount(p, 0), b = wireCount(p, 1);
+    if (a == 0 && b == 0) return 'The $name is not connected to anything yet. Drag a wire from one of its round dots to a battery, and another wire from its other dot back to the battery, so the electricity can go round a full loop.';
+    if (a == 0 || b == 0) return 'Only one end of the $name is wired. Electricity needs a full loop, so wire the ${a == 0 ? 'left (+)' : 'right'} dot as well, and bring it back to the battery.';
+    final sources = parts.where(isSource).toList();
+    if (sources.isEmpty) return 'There is no power. Add a battery, a solar panel, a hand crank or a wind turbine.';
+    final spec = kDeviceSpecs[p.kind];
+    final polar = p.kind == 'led' || (spec?.polar ?? false);
+    if (polar && p.v < -0.3) return 'The $name is plugged in backwards. Its left dot is the + side and must go towards the + of the battery, and the right dot back to the −. Swap its two wires.';
+    for (final s in of('battery')) {
+      if (s.volts == 1.5 && s.charge <= 0.02 && wireCount(s, 0) + wireCount(s, 1) > 0) {
+        if (s.v < -0.3) return 'The flat 1.5 V battery is wired backwards. Join the + of the solar panel to the + of the battery, and the − to the −, to charge it.';
+        return 'The 1.5 V battery is flat (empty), so it gives no power yet. Charge it first: wire a solar panel to it (+ to +, − to −) and wait until it is full, then wire it to the $name.';
+      }
+    }
+    for (final s in of('switch')) {
+      if (!s.on) return 'A switch in the circuit is open (off), so the loop is broken. Tap the switch to close it.';
+    }
+    for (final q in parts) {
+      if (q.burnt && q != p) return 'The ${q.info.name} in the circuit has burnt out, which breaks the loop. Press the spanner at the top to repair it.';
+    }
+    for (final s in sources) {
+      if (s.kind == 'solar' && s.level < 0.05) return 'The solar panel has no light. Turn the sunlight up.';
+      if (s.kind == 'turbine' && s.level < 0.05) return 'The wind turbine has no wind. Turn the wind up.';
+      if (s.kind == 'crank' && s.level < 0.05) return 'The hand crank has stopped. Tap it again and again to spin it.';
+    }
+    if (spec != null && p.v.abs() < spec.minV && p.i.abs() > 0.0005) {
+      final others = parts.any((q) => q != p && needsPower(q) && (q.i.abs() > 0.0005));
+      return 'The $name needs at least ${_fmtV(spec.minV)} volts but only gets ${p.v.abs().toStringAsFixed(1)} V. Use a bigger battery${others ? ', or take out parts that share the voltage with it' : ''}.';
+    }
+    if (p.kind == 'led' && p.i.abs() > 0.0005) return 'An LED needs about 2 volts to light up but only gets ${p.v.abs().toStringAsFixed(1)} V. Use a bigger battery.';
+    if (p.i.abs() < 0.0005) return 'No current is flowing through the $name. The loop is not complete: follow the wires from the battery + through every part and back to the battery −. A wire is probably missing or on the wrong dot.';
+    return 'The $name is not getting enough power (${p.v.abs().toStringAsFixed(1)} V). Try a bigger battery.';
   }
 
   // ── Checks used by the challenges ────────────────────────────────────────
@@ -525,11 +622,16 @@ class BoardPainter extends CustomPainter {
       canvas.scale(Curves.elasticOut.transform(pop.clamp(0.0, 1.0)).clamp(0.01, 1.4));
       _part(canvas, p, identical(p, selected));
       canvas.restore();
+      if (board.needsAttention(p)) {
+        final bp = c + const Offset(0, -40);
+        canvas.drawCircle(bp, 10, Paint()..color = const Color(0xFFF59E0B));
+        _text(canvas, '!', bp + const Offset(-3, -8), Colors.black, 14);
+      }
       for (var t = 0; t < 2; t++) {
         final tp = ElectronicsBoard.terminal(p, t, size);
         canvas.drawCircle(tp, 7, Paint()..color = const Color(0xFF0E1218));
-        canvas.drawCircle(tp, 6, Paint()..style = PaintingStyle.stroke..strokeWidth = 2.4..color = t == 0 && (board.isSource(p) || p.kind == 'led') ? const Color(0xFFF87171) : Colors.white70);
-        if (t == 0 && (board.isSource(p) || p.kind == 'led')) {
+        canvas.drawCircle(tp, 6, Paint()..style = PaintingStyle.stroke..strokeWidth = 2.4..color = t == 0 && board.hasPolarity(p) ? const Color(0xFFF87171) : Colors.white70);
+        if (t == 0 && board.hasPolarity(p)) {
           _text(canvas, '+', tp + const Offset(-4, -22), const Color(0xFFF87171), 13);
         }
       }
@@ -771,24 +873,20 @@ class BoardPainter extends CustomPainter {
       case 'tv':
         canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(-36, -24, 72, 44), const Radius.circular(6)), Paint()..color = const Color(0xFF0B0F17));
         final screen = RRect.fromRectAndRadius(const Rect.fromLTWH(-33, -21, 66, 38), const Radius.circular(3));
-        if (p.glow > 0) {
+        if (p.glow > 0 && !p.burnt) {
           canvas.save();
           canvas.clipRRect(screen);
-          const cols = [Color(0xFFEF4444), Color(0xFFFACC15), Color(0xFF22C55E), Color(0xFF38BDF8), Color(0xFFA78BFA), Colors.white, Color(0xFF111827)];
-          for (var k = 0; k < 7; k++) {
-            canvas.drawRect(Rect.fromLTWH(-33.0 + k * 9.5, -21, 9.5, 28), Paint()..color = cols[(k + (board.time * 2).floor()) % 7]);
-          }
-          canvas.drawRect(const Rect.fromLTWH(-33, 7, 66, 10), Paint()..color = const Color(0xFF111827));
-          canvas.drawRect(Rect.fromLTWH(-33, -21 + (board.time * 30) % 38, 66, 2), Paint()..color = Colors.white.withValues(alpha: 0.25));
+          canvas.translate(-33, -21);
+          paintNgmyTv(canvas, const Size(66, 38), p.channel, board.time, age: p.onAge);
           canvas.restore();
-          canvas.drawRRect(screen, Paint()..color = Colors.white.withValues(alpha: 0.06));
+          canvas.drawCircle(const Offset(30, 18), 1.6, Paint()..color = const Color(0xFF4ADE80));
         } else {
           canvas.drawRRect(screen, Paint()..color = const Color(0xFF05070A));
           canvas.drawPath(Path()..moveTo(-33, -21)..lineTo(-10, -21)..lineTo(-33, 0)..close(), Paint()..color = Colors.white.withValues(alpha: 0.05));
         }
         canvas.drawRect(const Rect.fromLTWH(-14, 20, 28, 4), Paint()..color = const Color(0xFF475569));
-        canvas.drawCircle(const Offset(30, 18), 1.6, Paint()..color = p.glow > 0 ? const Color(0xFF4ADE80) : const Color(0xFFEF4444));
     }
+    paintMorePart(canvas, p, board.time, _text);
     if (dead) _text(canvas, '✖', const Offset(-6, -42), const Color(0xFFEF4444), 14);
   }
 
@@ -806,6 +904,11 @@ class BoardPainter extends CustomPainter {
       _text(canvas, '+', const Offset(18, -12), const Color(0xFFFBBF24), 11);
       _text(canvas, '−', const Offset(-22, -11), Colors.white70, 11);
       _text(canvas, '${v == v.roundToDouble() ? v.round() : v}V', const Offset(-14, -12), const Color(0xFFFBBF24), 13);
+      if (v == 1.5) {
+        canvas.drawRect(const Rect.fromLTWH(-22, 14, 44, 4), Paint()..color = Colors.white12);
+        canvas.drawRect(Rect.fromLTWH(-22, 14, 44 * p.charge, 4), Paint()..color = Color.lerp(const Color(0xFFEF4444), const Color(0xFF4ADE80), p.charge)!);
+        if (p.charge <= 0.02) _text(canvas, 'FLAT', const Offset(-10, 0), const Color(0xFFF87171), 9);
+      }
       if (v > 2) {
         canvas.drawLine(const Offset(0, -13), const Offset(0, 13), Paint()..color = Colors.white24..strokeWidth = 1);
         _text(canvas, v > 3 ? '3 cells' : '2 cells', const Offset(-14, 2), Colors.white54, 8);
@@ -860,6 +963,8 @@ class Recipe {
             part.ohms = v;
           case 'on':
             part.on = v > 0;
+          case 'charge':
+            part.charge = v;
         }
       });
       byId[p.$1] = part;
@@ -931,4 +1036,24 @@ const List<Recipe> kRecipes = [
     ('l1', 'bulb', 0.5, 0.3, {}),
     ('l2', 'bulb', 0.85, 0.3, {}),
   ], [('b', 0, 'l1', 0), ('l1', 1, 'l2', 0), ('l2', 1, 'b', 1)], keys: ['series', 'two bulbs', 'dim']),
+  Recipe('Charge a flat battery', 'A 1.5 V battery starts flat. A solar panel pushes current into it (+ to +, − to −) and the charge bar fills up. When it is full, take it off the panel and use it to run a bulb or a calculator.', [
+    ('s', 'solar', 0.25, 0.3, {'level': 0.9}),
+    ('b', 'battery', 0.75, 0.3, {'volts': 1.5, 'charge': 0}),
+  ], [('s', 0, 'b', 0), ('b', 1, 's', 1)], keys: ['charge', 'rechargeable', 'flat', 'recharge']),
+  Recipe('Phone charger', 'A phone charges with 4 to 7 volts. A 4.5 V battery does it. Nine volts would burn it out!', [
+    ('b', 'battery', 0.2, 0.3, {'volts': 4.5}),
+    ('s', 'switch', 0.5, 0.3, {'on': 1}),
+    ('p', 'phone', 0.8, 0.3, {}),
+  ], [('b', 0, 's', 0), ('s', 1, 'p', 0), ('p', 1, 'b', 1)], keys: ['phone', 'charger', 'usb', 'mobile']),
+  Recipe('Cooling fan', 'A motor turns the blades. More volts, faster fan. It works either way round.', [
+    ('b', 'battery', 0.2, 0.3, {'volts': 3}),
+    ('f', 'fan', 0.8, 0.3, {}),
+  ], [('b', 0, 'f', 0), ('f', 1, 'b', 1)], keys: ['fan', 'cool', 'air', 'wind']),
+  Recipe('Measure a bulb', 'The ammeter is in the loop (in a row with the bulb) to read the current. The voltmeter goes across the bulb to read its volts. Multiply them to get the watts!', [
+    ('b', 'battery', 0.15, 0.2, {'volts': 3}),
+    ('a', 'ammeter', 0.5, 0.2, {}),
+    ('l', 'bulb', 0.85, 0.2, {}),
+    ('v', 'voltmeter', 0.5, 0.6, {}),
+  ], [('b', 0, 'a', 0), ('a', 1, 'l', 0), ('l', 1, 'b', 1), ('v', 0, 'l', 0), ('v', 1, 'l', 1)], keys: ['meter', 'measure', 'volt', 'amp', 'current', 'power', 'watt']),
 ];
+

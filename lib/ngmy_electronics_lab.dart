@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'ngmy_electronics_board.dart';
+import 'ngmy_electronics_tv.dart';
 import 'ngmy_studio_kit.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -13,7 +15,7 @@ import 'ngmy_studio_kit.dart';
 /// The board itself: parts you can move, wires you can draw, and a card that explains
 /// the part you tap. Used by the Electronics Lab and by the AI Inventor.
 class BoardEditor extends StatefulWidget {
-  const BoardEditor({super.key, required this.board, this.popIn, this.paletteKinds, this.header, this.onChanged, this.onTick, this.readOnlyPalette = false});
+  const BoardEditor({super.key, required this.board, this.popIn, this.paletteKinds, this.header, this.onChanged, this.onTick, this.readOnlyPalette = false, this.tvPopUp = true});
 
   final ElectronicsBoard board;
   final Map<String, double>? popIn;
@@ -22,6 +24,9 @@ class BoardEditor extends StatefulWidget {
   final VoidCallback? onChanged;
   final VoidCallback? onTick;
   final bool readOnlyPalette;
+
+  /// A TV that has just switched on opens on the big screen for a minute by itself.
+  final bool tvPopUp;
 
   @override
   State<BoardEditor> createState() => BoardEditorState();
@@ -36,6 +41,49 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
   Offset _grab = Offset.zero;
   Size _size = Size.zero;
   double _hum = 0;
+  String? _notice;
+  Timer? _noticeTimer;
+  final Map<String, List<DateTime>> _taps = {};
+  final Set<String> _tvAuto = {};
+  bool _tvOpen = false;
+
+  void _say(String text) {
+    _noticeTimer?.cancel();
+    setState(() => _notice = text);
+    _noticeTimer = Timer(const Duration(seconds: 9), () {
+      if (mounted) setState(() => _notice = null);
+    });
+  }
+
+  
+  @override
+  void dispose() {
+    _noticeTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _openTv(Part p, {bool auto = false}) async {
+    if (_tvOpen || !mounted) return;
+    _tvOpen = true;
+    final ch = await showNgmyTvScreen(context, channel: p.channel, stayFor: auto ? const Duration(seconds: 60) : const Duration(hours: 1), showBoot: p.onAge < 3.2);
+    _tvOpen = false;
+    if (ch != null) p.channel = ch;
+  }
+
+  /// Three quick taps on a TV that is on open the big screen; on a TV that is off they explain why.
+  void _tvTap(Part p) {
+    final now = DateTime.now();
+    final l = _taps.putIfAbsent(p.id, () => []);
+    l.add(now);
+    l.removeWhere((t) => now.difference(t) > const Duration(milliseconds: 1000));
+    if (l.length < 3) return;
+    l.clear();
+    if (b.works(p)) {
+      _openTv(p);
+    } else {
+      _say(b.diagnose(p) ?? 'The TV is off. Give it power first.');
+    }
+  }
 
   ElectronicsBoard get b => widget.board;
 
@@ -47,8 +95,10 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
         NgmyTone.play(1800, ms: 120, wave: 'noise', volume: 0.55);
         NgmyTone.play(200, ms: 160, wave: 'saw', sweep: 2.2, volume: 0.4);
         HapticFeedback.heavyImpact();
+        if (mounted) _say('Short circuit! The power source was joined straight back to itself with nothing to use the power, so it is getting very hot. Put a bulb or another part between the + and the −, or add a fuse.');
       }
       if (kind == 'burn') {
+        if (mounted) _say('Burnt out! ${p.burnWhy}');
         NgmyTone.play(140, ms: 320, wave: 'noise', volume: 0.6);
         NgmyTone.play(900, ms: 160, wave: 'square', sweep: 1.5, volume: 0.35);
       }
@@ -59,6 +109,17 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
   @override
   void onFrame(double dt) {
     b.step(dt);
+    for (final p in b.parts) {
+      if (p.kind != 'tv') continue;
+      if (p.glow > 0 && !p.burnt) {
+        if (widget.tvPopUp && !_tvAuto.contains(p.id) && !_tvOpen) {
+          _tvAuto.add(p.id);
+          _openTv(p, auto: true);
+        }
+      } else {
+        _tvAuto.remove(p.id);
+      }
+    }
     _hum += dt;
     if (_hum > 0.16) {
       _hum = 0;
@@ -78,6 +139,16 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
             }
           case 'tv':
             if (p.glow > 0 && math.Random().nextDouble() < 0.4) NgmyTone.play(3000, ms: 40, wave: 'noise', volume: 0.07);
+          case 'speaker':
+            if (p.glow > 0) NgmyTone.play(330.0 + 110 * (b.time * 3).floor() % 4 * 1.0, ms: 140, wave: 'tri', volume: 0.14);
+          case 'siren':
+            if (p.glow > 0) NgmyTone.play((b.time * 2).floor().isEven ? 700 : 950, ms: 150, wave: 'square', volume: 0.12);
+          case 'fan':
+            if (p.glow > 0.1) NgmyTone.play(90 + p.glow * 40, ms: 140, wave: 'noise', volume: 0.04);
+          case 'toycar':
+            if (p.glow > 0.1) NgmyTone.play(70 + p.glow * 60, ms: 130, wave: 'tri', volume: 0.1);
+          case 'kettle':
+            if (p.glow > 0 && math.Random().nextDouble() < 0.5) NgmyTone.play(1200, ms: 30, wave: 'noise', volume: 0.07);
           case 'turbine':
             if (p.level > 0.1) NgmyTone.play(80, ms: 150, wave: 'noise', volume: 0.05 * p.level);
           case 'crank':
@@ -163,6 +234,10 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
   Widget build(BuildContext context) {
     final sel = _sel;
     final kinds = widget.paletteKinds ?? [for (final p in kPartInfos) p.kind];
+    // Plenty of tools: half in a row above the board and half in a row below it.
+    final two = kinds.length > 8;
+    final topKinds = two ? kinds.sublist(0, (kinds.length + 1) ~/ 2) : const <String>[];
+    final bottomKinds = two ? kinds.sublist((kinds.length + 1) ~/ 2) : kinds;
     // Pop-in animation progress.
     final pop = widget.popIn;
     if (pop != null) {
@@ -172,6 +247,7 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
     }
     return Column(children: [
       if (widget.header != null) widget.header!,
+      if (!widget.readOnlyPalette && two) _paletteRow(topKinds, top: true),
       Expanded(
         child: LayoutBuilder(builder: (context, box) {
           _size = Size(box.maxWidth, box.maxHeight);
@@ -235,6 +311,7 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
                         NgmyTone.play(200, ms: 70, wave: 'saw', volume: 0.2);
                       }
                     });
+                    if (p.kind == 'tv') _tvTap(p);
                     widget.onChanged?.call();
                     return;
                   }
@@ -248,6 +325,23 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
               ),
               if (b.parts.isEmpty)
                 const Center(child: Padding(padding: EdgeInsets.all(30), child: Text('Tap a part below to put it on the board.\nThen drag from a round dot on one part to a dot on another to join them with a wire.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white38, height: 1.5)))),
+              if (_notice != null)
+                Positioned(
+                  top: 8,
+                  left: 10,
+                  right: 10,
+                  child: GestureDetector(
+                    onTap: () => setState(() => _notice = null),
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
+                      decoration: BoxDecoration(color: const Color(0xF2431407), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFFB923C))),
+                      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        const Text('⚠️ ', style: TextStyle(fontSize: 15)),
+                        Expanded(child: Text(_notice!, style: const TextStyle(color: Color(0xFFFFEDD5), fontSize: 12.5, height: 1.35, fontWeight: FontWeight.w700))),
+                      ]),
+                    ),
+                  ),
+                ),
               if (_selWire != null)
                 Positioned(
                   left: 12,
@@ -269,29 +363,30 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
           );
         }),
       ),
-      if (!widget.readOnlyPalette)
-        Container(
-          height: 78,
-          decoration: BoxDecoration(color: kStudioPanel, border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.08)))),
-          child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.fromLTRB(10, 8, 10, 8), children: [
-            for (final k in kinds)
-              GestureDetector(
-                onTap: () => spawn(k),
-                child: Container(
-                  width: 68,
-                  margin: const EdgeInsets.only(right: 8),
-                  decoration: BoxDecoration(color: kPartByKind[k]!.color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(14), border: Border.all(color: kPartByKind[k]!.color.withValues(alpha: 0.5))),
-                  child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    Text(kPartByKind[k]!.emoji, style: const TextStyle(fontSize: 22)),
-                    const SizedBox(height: 2),
-                    Text(kPartByKind[k]!.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w800)),
-                  ]),
-                ),
-              ),
-          ]),
-        ),
+      if (!widget.readOnlyPalette) _paletteRow(bottomKinds),
     ]);
   }
+
+  Widget _paletteRow(List<String> ks, {bool top = false}) => Container(
+        height: 66,
+        decoration: BoxDecoration(color: kStudioPanel, border: Border(top: top ? BorderSide.none : BorderSide(color: Colors.white.withValues(alpha: 0.08)), bottom: top ? BorderSide(color: Colors.white.withValues(alpha: 0.08)) : BorderSide.none)),
+        child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.fromLTRB(10, 6, 10, 6), children: [
+          for (final k in ks)
+            GestureDetector(
+              onTap: () => spawn(k),
+              child: Container(
+                width: 66,
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(color: kPartByKind[k]!.color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(14), border: Border.all(color: kPartByKind[k]!.color.withValues(alpha: 0.5))),
+                child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Text(kPartByKind[k]!.emoji, style: const TextStyle(fontSize: 20)),
+                  const SizedBox(height: 1),
+                  Text(kPartByKind[k]!.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800)),
+                ]),
+              ),
+            ),
+        ]),
+      );
 
   Widget _card({required Widget child}) => Container(
         padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
@@ -311,7 +406,7 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
         ]);
     return _card(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 250),
+        constraints: const BoxConstraints(maxHeight: 290),
         child: SingleChildScrollView(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
             Row(children: [
@@ -331,9 +426,36 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
             Text('How it is made: ${info.made}', style: const TextStyle(color: Colors.white38, fontSize: 11.5, height: 1.35)),
             const SizedBox(height: 6),
             Text(p.burnt ? 'Burnt out! Press Repair.' : 'Now: ${p.v.abs().toStringAsFixed(2)} volts  ·  ${(p.i.abs() * 1000).toStringAsFixed(0)} milliamps  ·  ${w.toStringAsFixed(2)} watts', style: TextStyle(color: p.burnt ? const Color(0xFFF87171) : const Color(0xFFFBBF24), fontWeight: FontWeight.w800, fontSize: 12.5)),
+            if (b.diagnose(p) case final why?) Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: (p.burnt ? const Color(0xFFEF4444) : const Color(0xFFF59E0B)).withValues(alpha: 0.14), borderRadius: BorderRadius.circular(10), border: Border.all(color: (p.burnt ? const Color(0xFFEF4444) : const Color(0xFFF59E0B)).withValues(alpha: 0.5))),
+                child: Text('${p.burnt ? 'Why it burnt out' : 'Why it is not working'}: $why', style: const TextStyle(color: Color(0xFFFFEDD5), fontSize: 12, height: 1.35)),
+              ),
+            ),
+            if (p.kind == 'tv') ...[
+              const SizedBox(height: 6),
+              Wrap(spacing: 6, runSpacing: 4, children: [
+                for (var c = 0; c < kNgmyTvChannels.length; c++) StudioChip(label: 'CH ${c + 1}', selected: p.channel == c, color: info.color, onTap: () {
+                  setState(() => p.channel = c);
+                  NgmyTone.play(900, ms: 40, wave: 'noise', volume: 0.3);
+                }),
+              ]),
+              const SizedBox(height: 4),
+              Text(b.works(p) ? 'Showing: ${kNgmyTvChannels[p.channel % kNgmyTvChannels.length].title}. Tap the TV 3 times quickly to open the big screen.' : 'The TV is off. Give it power with the + dot towards the battery +.', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+              if (b.works(p)) StudioButton(icon: Icons.fullscreen_rounded, label: 'Open big screen', color: info.color, onTap: () => _openTv(p)),
+            ],
+            if (p.kind == 'battery' && p.volts == 1.5) Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text('Charge: ${(p.charge * 100).round()}%${p.charge <= 0.02 ? '  (flat: charge it first with a solar panel, + to +, − to −)' : (p.charge >= 0.99 ? '  (full)' : '  (charging fills it up)')}', style: const TextStyle(color: Color(0xFF86EFAC), fontWeight: FontWeight.w800, fontSize: 12.5)),
+            ),
             if (p.kind == 'battery')
-              Wrap(spacing: 6, children: [for (final v in const [1.5, 3.0, 4.5, 9.0, 12.0]) StudioChip(label: '$v V', selected: p.volts == v, color: info.color, onTap: () {
-                setState(() => p.volts = v);
+              Wrap(spacing: 6, children: [for (final v in const [1.5, 3.0, 4.5, 9.0, 12.0]) StudioChip(label: v == 1.5 ? '1.5 V (rechargeable)' : '$v V', selected: p.volts == v, color: info.color, onTap: () {
+                setState(() {
+                  p.volts = v;
+                  p.charge = v == 1.5 ? 0 : 1;
+                });
                 widget.onChanged?.call();
               })]),
             if (p.kind == 'resistor')
@@ -369,7 +491,8 @@ final List<_Challenge> _kChallenges = [
   _Challenge('Light an LED safely', 'An LED burns out on its own. Put a resistor in the loop with it. Mind the + side of the LED!', (b) => b.has('resistor') && b.parts.any((p) => p.kind == 'led' && p.glow > 0.3 && !p.burnt)),
   _Challenge('Light a bulb with no battery', 'Use a solar panel, a hand crank or a wind turbine instead of a battery.', (b) => !b.has('battery') && b.lit('bulb')),
   _Challenge('Play the radio', 'A radio needs about 3 volts or more. Try a 9 volt battery.', (b) => b.parts.any((p) => p.kind == 'radio' && p.glow > 0)),
-  _Challenge('Watch TV', 'A TV needs more power. Set a battery to 12 volts.', (b) => b.parts.any((p) => p.kind == 'tv' && p.glow > 0)),
+  _Challenge('Watch TV', 'A TV needs 6 volts or more. Set a battery to 12 volts, and wire the TV\'s + (left) dot towards the battery +.', (b) => b.parts.any((p) => p.kind == 'tv' && p.glow > 0)),
+  _Challenge('Charge a battery', 'A 1.5 V battery starts flat. Join it to a solar panel (+ to +, − to −) until its charge bar is full.', (b) => b.parts.any((p) => p.kind == 'battery' && p.volts == 1.5 && p.charge > 0.95)),
   _Challenge('Make toast', 'A heater turns electricity into heat. Make it glow bright orange.', (b) => b.parts.any((p) => p.kind == 'heater' && p.glow > 0.5)),
 ];
 
@@ -447,7 +570,7 @@ class _NgmyElectronicsLabState extends State<NgmyElectronicsLab> {
     return StudioPage(
       title: 'ELECTRONICS LAB',
       accent: const Color(0xFF38BDF8),
-      help: 'Build real circuits.\n\n1. Tap a part at the bottom to put it on the board. Drag it around.\n2. Drag from a round dot on one part to a round dot on another to join them with a wire. A circuit only works when it makes a complete loop from the battery, through the parts, and back.\n3. Tap a part to read what it does and how it is made, and to change it (battery volts, sunlight, resistor size). Tap a switch to flip it, and a crank to spin it.\n\nThe maths is real: bulbs get brighter with more volts and burn out with too many, LEDs need a resistor, and moving dots on the wires show current flowing.\n\nTry the challenges at the top, or open Ready-made circuits to see how a flashlight, radio, TV or solar lamp is wired.',
+      help: 'Build real circuits.\n\n1. Tap a part at the bottom to put it on the board. Drag it around.\n2. Drag from a round dot on one part to a round dot on another to join them with a wire. A circuit only works when it makes a complete loop from the battery, through the parts, and back.\n3. Tap a part to read what it does and how it is made, and to change it (battery volts, sunlight, resistor size). Tap a switch to flip it, and a crank to spin it.\n\nThe maths is real: bulbs get brighter with more volts and burn out with too many, LEDs need a resistor, and moving dots on the wires show current flowing.\n\nLots of tools: one row above the board and one below it. A TV needs 6+ volts and shows NGMY animations: tap it 3 times quickly for the big screen. A 1.5 V battery starts flat and must be charged with a solar panel first. If something does not work, tap it: it tells you why (backwards, burnt, flat battery, loop not finished...).\n\nTry the challenges at the top, or open Ready-made circuits to see how a flashlight, radio, TV or solar lamp is wired.',
       stage: BoardEditor(
         key: _editor,
         board: _board,
