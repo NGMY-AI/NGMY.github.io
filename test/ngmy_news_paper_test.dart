@@ -21,6 +21,8 @@ const doc = NgmyNewsDoc(
     'In the Civic Registry, every contribution gets a receipt, and members can see where the money goes. Authorized Registrars enroll families state by state, and the community can print its roster whenever it is needed. The result is something simple and powerful: trust you can see.',
     'Away from the registry, NGMY Hub offers a store, a Help Center, a Document Scanner and more, while the Creator Hub holds studios for video, quotes, QR codes and learning Kiswahili. Growth Income lets members earn on work days, and every receipt shows the balance before and after.',
     'The Core Protocol studios turn curiosity into play: a real 3D body to explore, an electronics lab, a DNA lab and a rocket to land. NGMY says the movement is only beginning, and everyone is welcome to join.',
+    'NGMY Advisors are AI advisors you can chat with like real people. They help with jobs, applications, benefits and everyday questions, and they can answer in Swahili whenever you write Swahili. Members say the advice feels warm and personal, and the advisors never lose sight of who built the app.',
+    'Families also keep the Family Book, a library of up to six books. The AI can write a whole new book from the family tree, in English or Swahili, and the cover can be designed to match the family. It is one more way NGMY helps people keep their story.',
   ],
   pullQuote: 'Trust you can see.',
   sidebarTitle: 'Did you know?',
