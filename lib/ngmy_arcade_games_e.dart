@@ -1135,7 +1135,7 @@ class _MiniGolfState extends State<MiniGolfGame> with SingleTickerProviderStateM
   NgmyArcadeArgs get args => widget.args;
   @override
   int get goal => 6;
-  static const par = 4, br = 9.0, hr = 15.0;
+  static const par = 1, br = 9.0, hr = 15.0;
   Size _size = Size.zero;
   Offset _ball = Offset.zero, _vel = Offset.zero, _hole = Offset.zero;
   List<Rect> _walls = [];
@@ -1200,7 +1200,7 @@ class _MiniGolfState extends State<MiniGolfGame> with SingleTickerProviderStateM
           if (addPoint()) return;
         } else if (_vel == Offset.zero && _strokes >= par) {
           _sink = 0.9;
-          if (loseHeart('Over par on this hole')) return;
+          if (loseHeart('Missed the hole')) return;
         }
       }
       setState(() {});

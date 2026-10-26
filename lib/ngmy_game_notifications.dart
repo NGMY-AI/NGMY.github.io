@@ -9,11 +9,10 @@ import 'ngmy_db_relay.dart';
 import 'ngmy_game_session.dart';
 import 'ngmy_network_resilience.dart';
 
-/// Game receipts are kept for good (the user wants every one). A very high cap only guards
-/// the phone's storage.
-const int kNgmyGameNotificationMax = 5000;
-/// Kept for the "today" badge and old callers; receipts themselves no longer expire.
-const Duration kNgmyGameNotificationRetention = Duration(days: 36500);
+/// A game receipt lasts one week, and only the newest 59 are kept. Anything older, or past 59, is deleted for good,
+/// on this phone and in the cloud copy (every save and every sync prunes the same way).
+const int kNgmyGameNotificationMax = 59;
+const Duration kNgmyGameNotificationRetention = Duration(days: 7);
 const Duration _kGameReceiptCloudTimeout = Duration(seconds: 12);
 
 /// Set by the app: works out a receipt's missing stake / balances from the transaction history.
@@ -123,9 +122,10 @@ class NgmyGameNotification {
 }
 
 class NgmyGameNotifications {
-  /// Newest first; only a very high cap (receipts don't expire).
+  /// Newest first. Drops receipts older than a week, then keeps only the newest 59.
   static List<NgmyGameNotification> _prune(List<NgmyGameNotification> items) {
-    final sorted = List<NgmyGameNotification>.from(items)..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final cutoff = DateTime.now().subtract(kNgmyGameNotificationRetention);
+    final sorted = items.where((e) => e.timestamp.isAfter(cutoff)).toList()..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return sorted.length > kNgmyGameNotificationMax ? sorted.sublist(0, kNgmyGameNotificationMax) : sorted;
   }
 
@@ -366,7 +366,11 @@ class NgmyGameNotifications {
     final key = _emailKey(email);
     if (key.isEmpty) return [];
     if (syncCloud) await syncFromCloud(email);
-    return _prune(await _loadRaw(key));
+    final raw = await _loadRaw(key);
+    final pruned = _prune(raw);
+    // Receipts past a week or past 59 are removed for good, here and in the cloud copy.
+    if (pruned.length != raw.length) unawaited(_saveMerged(key, pruned));
+    return pruned;
   }
 }
 
@@ -459,7 +463,7 @@ class _NgmyGameReceiptsSheet extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Game Receipts', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 19)),
-                      Text('Every game you play · kept for good', style: TextStyle(color: Colors.white60, fontSize: 11.5)),
+                      Text('Your last 59 games · kept for 7 days', style: TextStyle(color: Colors.white60, fontSize: 11.5)),
                     ],
                   ),
                 ),

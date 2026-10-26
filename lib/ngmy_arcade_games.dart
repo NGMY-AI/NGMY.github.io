@@ -25,25 +25,19 @@ class NgmyArcadeDef {
 const kNgmyArcadeGames = <NgmyArcadeDef>[
   NgmyArcadeDef('bubble_pop', 'Bubble Pop', 'Pop only the target colour — 15 to win', '🫧', Icons.bubble_chart_rounded, [Color(0xFF06B6D4), Color(0xFF3B82F6)], 60),
   NgmyArcadeDef('fruit_slash', 'Fruit Slash', 'Slice flying fruit, dodge the bombs', '🍉', Icons.content_cut_rounded, [Color(0xFF22C55E), Color(0xFFEF4444)], 60),
-  NgmyArcadeDef('whack_mole', 'Whack-a-Mole', 'Bonk 20 moles — never the bombs', '🐹', Icons.sports_mma_rounded, [Color(0xFF84CC16), Color(0xFF65A30D)], 50),
   NgmyArcadeDef('sky_stack', 'Sky Stack', 'Drop blocks to build 12 floors high', '🏗️', Icons.layers_rounded, [Color(0xFFF59E0B), Color(0xFFEA580C)], 75),
   NgmyArcadeDef('sky_hopper', 'Sky Hopper', 'Tap to fly through 10 gates', '🐤', Icons.flight_takeoff_rounded, [Color(0xFF38BDF8), Color(0xFF0EA5E9)], 75),
   NgmyArcadeDef('brick_breaker', 'Brick Breaker', 'Smash all 24 bricks with the ball', '🧱', Icons.view_module_rounded, [Color(0xFFDB2777), Color(0xFF7C3AED)], 90),
-  NgmyArcadeDef('merge_2048', '2048 Merge', 'Slide and merge tiles up to 256', '🔢', Icons.apps_rounded, [Color(0xFFEAB308), Color(0xFFCA8A04)], 150),
   NgmyArcadeDef('odd_one', 'Spot the Odd One', 'Find the emoji that\'s different', '👀', Icons.visibility_rounded, [Color(0xFFEC4899), Color(0xFFBE185D)], 60),
   NgmyArcadeDef('flag_frenzy', 'Flag Frenzy', 'Name 10 countries from their flags', '🏳️', Icons.flag_rounded, [Color(0xFF2563EB), Color(0xFFDC2626)], 75),
-  NgmyArcadeDef('balloon_darts', 'Balloon Darts', 'Throw darts to pop 10 balloons', '🎈', Icons.my_location_rounded, [Color(0xFFF43F5E), Color(0xFFF97316)], 60),
   NgmyArcadeDef('coin_catcher', 'Coin Catcher', 'Catch 25 coins, dodge the rocks', '🪙', Icons.savings_rounded, [Color(0xFFF59E0B), Color(0xFFB45309)], 60),
   NgmyArcadeDef('number_rush', 'Number Rush', 'Tap 1 to 25 in order, fast', '🔟', Icons.format_list_numbered_rounded, [Color(0xFF8B5CF6), Color(0xFF6D28D9)], 60),
-  NgmyArcadeDef('mini_sudoku', 'Mini Sudoku', 'Solve 2 quick 4×4 sudokus', '🧮', Icons.grid_on_rounded, [Color(0xFF0EA5E9), Color(0xFF075985)], 150),
-  NgmyArcadeDef('space_dodge', 'Space Dodge', 'Steer through asteroids for 30 seconds', '🚀', Icons.rocket_launch_rounded, [Color(0xFF1E1B4B), Color(0xFF7C3AED)], 45),
   ...kNgmyArcadeGamesMore,
 ];
 
 const kNgmyArcadeGameIds = <String>{
-  'bubble_pop', 'fruit_slash', 'whack_mole', 'sky_stack', 'sky_hopper', 'brick_breaker',
-  'merge_2048', 'odd_one', 'flag_frenzy', 'balloon_darts', 'coin_catcher', 'number_rush', 'mini_sudoku', 'space_dodge',
-  ...kNgmyArcadeGameIdsMore,
+  'bubble_pop', 'fruit_slash', 'sky_stack', 'sky_hopper', 'brick_breaker',
+  'odd_one', 'flag_frenzy', 'coin_catcher', 'number_rush', ...kNgmyArcadeGameIdsMore,
 };
 
 int ngmyArcadeDefaultSeconds(String id) =>

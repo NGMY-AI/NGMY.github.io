@@ -699,7 +699,7 @@ class _CoinCatcherState extends State<CoinCatcherGame> with SingleTickerProvider
       if (_spawn <= 0) {
         _spawn = math.max(0.2, 0.5 - _score * 0.014);
         final r = widget.args.rng.nextDouble();
-        _drops.add((x: 0.06 + widget.args.rng.nextDouble() * 0.88, y: -0.05, v: 0.5 + widget.args.rng.nextDouble() * 0.3 + _score * 0.016, kind: r < 0.34 ? 2 : (r < 0.42 ? 1 : 0)));
+        _drops.add((x: 0.06 + widget.args.rng.nextDouble() * 0.88, y: -0.05, v: 0.5 + widget.args.rng.nextDouble() * 0.3 + _score * 0.016, kind: r < 0.45 ? 2 : (r < 0.50 ? 1 : 0)));
       }
       final kept = <({double x, double y, double v, int kind})>[];
       for (final d in _drops) {

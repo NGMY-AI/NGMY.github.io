@@ -20140,10 +20140,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
     _GameDef(id: 'puzzle', title: '8-Puzzle Solver', subtitle: 'Solve puzzle, win up to \$10', emoji: '🧩', icon: Icons.grid_view_rounded, colors: [Color(0xFF0EA5E9), Color(0xFF1D4ED8)]),
     _GameDef(id: 'typing', title: 'Sentence Typing', subtitle: 'Type sentences — solo or invite a friend', emoji: '⌨️', icon: Icons.keyboard_rounded, colors: [Color(0xFF16A34A), Color(0xFF2563EB)]),
     _GameDef(id: 'memory', title: 'Memory Match', subtitle: 'Match pairs — solo or multiplayer', emoji: '🧠', icon: Icons.psychology_rounded, colors: [Color(0xFFDB2777), Color(0xFF9333EA)]),
-    _GameDef(id: 'math', title: 'Math Quiz', subtitle: '200+ questions, rewards', emoji: '➕', icon: Icons.calculate_rounded, colors: [Color(0xFF2563EB), Color(0xFF4F46E5)]),
-    _GameDef(id: 'scramble', title: 'Word Scramble', subtitle: 'Place letters in order — solo or invite', emoji: '🔤', icon: Icons.abc_rounded, colors: [Color(0xFF7C3AED), Color(0xFF9333EA)]),
     _GameDef(id: 'pattern', title: 'Pattern Memory', subtitle: 'Remember the pattern — solo or multiplayer', emoji: '🎯', icon: Icons.extension_rounded, colors: [Color(0xFF4F46E5), Color(0xFF4338CA)]),
-    _GameDef(id: 'sequence', title: 'Number Sequence', subtitle: 'Find patterns, win rewards', emoji: '🔢', icon: Icons.numbers_rounded, colors: [Color(0xFF2563EB), Color(0xFF4F46E5)]),
     _GameDef(id: 'checkers_deluxe', title: 'Checkers Deluxe', subtitle: 'Wood board — play solo or invite a friend', emoji: '⚫', icon: Icons.grid_on_rounded, colors: [Color(0xFF8B4513), Color(0xFF5D4037)]),
     _GameDef(id: 'tic_tac_go', title: 'Tic Tac Go', subtitle: '3 in a row — real-time multiplayer', emoji: '❌', icon: Icons.close_rounded, colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)]),
   ];
