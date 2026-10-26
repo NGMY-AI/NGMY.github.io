@@ -1440,22 +1440,24 @@ class _LocalGrowthHomeTab extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
+          // A quiet, dark button in the same green as the rest of the frame (no bright orange).
           InkWell(
             onTap: onOpenGameCenter,
             borderRadius: BorderRadius.circular(16),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+              width: 50,
+              height: 50,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
-                gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFEF4444)]),
-                boxShadow: [BoxShadow(color: const Color(0xFFEF4444).withValues(alpha: 0.35), blurRadius: 14, offset: const Offset(0, 4))],
+                color: Colors.black.withValues(alpha: 0.30),
+                border: Border.all(color: green.withValues(alpha: 0.45), width: 1.2),
               ),
-              child: const Column(
-                mainAxisSize: MainAxisSize.min,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.sports_esports_rounded, color: Colors.white, size: 20),
-                  SizedBox(height: 2),
-                  Text('PLAY', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+                  Icon(Icons.sports_esports_rounded, color: green.withValues(alpha: 0.95), size: 21),
+                  const SizedBox(height: 1),
+                  Text('PLAY', style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 8.5, fontWeight: FontWeight.w800, letterSpacing: 1.1)),
                 ],
               ),
             ),
@@ -2937,7 +2939,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
               ),
             )
           else ...[
-            ..._historyRowsWithGaps(wallet.take(_historyShown).toList(), every.values.toList(), trail),
+            for (final t in wallet.take(_historyShown)) _historyRow(t, trail[t.id]),
             // Older rows are never dropped — load them on request.
             if (wallet.length > _historyShown)
               TextButton.icon(
@@ -3029,67 +3031,6 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
           ),
         ],
       ),
-    );
-  }
-
-  /// The rows, with a small summary row wherever games or other hidden moves changed the balance between two
-  /// rows, so every Before and After in the list follows on from the one above it.
-  List<Widget> _historyRowsWithGaps(List<AppTransaction> shown, List<AppTransaction> all, Map<String, ({double before, double after})> trail) {
-    final shownIds = {for (final t in shown) t.id};
-    final hiddenSorted = all.where((t) => !shownIds.contains(t.id) && _ngmyBalanceEffect(t).abs() > 0.004).toList()
-      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    final out = <Widget>[];
-    for (var i = 0; i < shown.length; i++) {
-      final a = shown[i];
-      final ta = trail[a.id];
-      if (i == 0 && ta != null) {
-        final newer = hiddenSorted.where((h) => h.timestamp.isAfter(a.timestamp)).length;
-        final now = ngmyLiveBalanceFor(widget.realEmail, fallback: () => widget.user.accountBalance);
-        final net = now - ta.after;
-        if (newer > 0 && net.abs() >= 0.005) out.add(_gapRow(newer, net, ta.after, now));
-      }
-      out.add(_historyRow(a, trail[a.id]));
-      if (i + 1 < shown.length && ta != null) {
-        final b = shown[i + 1];
-        final tb = trail[b.id];
-        if (tb != null) {
-          final between = hiddenSorted.where((h) => h.timestamp.isBefore(a.timestamp) && h.timestamp.isAfter(b.timestamp)).length;
-          final net = ta.before - tb.after;
-          if (between > 0 && net.abs() >= 0.005) out.add(_gapRow(between, net, tb.after, ta.before));
-        }
-      }
-    }
-    return out;
-  }
-
-  Widget _gapRow(int count, double net, double before, double after) {
-    final up = net >= 0;
-    final color = up ? const Color(0xFFA78BFA) : const Color(0xFFFB923C);
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 11),
-      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06)))),
-      child: Row(children: [
-        Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(shape: BoxShape.circle, color: color.withValues(alpha: 0.14), border: Border.all(color: color.withValues(alpha: 0.4))),
-          child: Icon(Icons.sports_esports_rounded, size: 19, color: color),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Games & other activity', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
-            const SizedBox(height: 2),
-            Text('$count moves in between, see Game Receipts', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11, fontWeight: FontWeight.w600)),
-            Padding(
-              padding: const EdgeInsets.only(top: 5),
-              child: Wrap(spacing: 5, runSpacing: 4, children: [_balanceChip('Before', before), _balanceChip('After', after)]),
-            ),
-          ]),
-        ),
-        const SizedBox(width: 8),
-        Text('${up ? '+' : '-'}\$${formatCurrency(net.abs())}', style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 15)),
-      ]),
     );
   }
 
