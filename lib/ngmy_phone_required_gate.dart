@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 bool ngmyUserPhoneOnFile(String phone) {
@@ -30,7 +32,7 @@ String ngmyFormatPhoneDisplay(String phone) {
 
 /// Kept for call-sites compatibility. Phone is collected in Profile → Contact
 /// (no blocking popup on app entry).
-class NgmyPhoneRequiredGate extends StatelessWidget {
+class NgmyPhoneRequiredGate extends StatefulWidget {
   const NgmyPhoneRequiredGate({
     super.key,
     required this.phone,
@@ -47,5 +49,34 @@ class NgmyPhoneRequiredGate extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => child;
+  State<NgmyPhoneRequiredGate> createState() => _NgmyPhoneRequiredGateState();
+}
+
+class _NgmyPhoneRequiredGateState extends State<NgmyPhoneRequiredGate> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    // The phone lives in the account in the cloud: fetch it when the app opens and keep checking, so every
+    // device shows the same number and a number typed on another phone appears here too.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _resolve());
+    _timer = Timer.periodic(const Duration(minutes: 2), (_) => _resolve());
+  }
+
+  Future<void> _resolve() async {
+    if (!mounted) return;
+    try {
+      await widget.onResolvePhoneFromCloud?.call();
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

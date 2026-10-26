@@ -18523,7 +18523,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       );
       if (rows.isEmpty) return null;
       final phone = (rows.first['phone'] ?? '').toString().trim();
-      if (!ngmyUserPhoneOnFile(phone)) return null;
+      if (!ngmyUserPhoneOnFile(phone)) {
+        // The cloud has no number yet but this phone does (saved while offline): send it up so other devices get it.
+        if (ngmyUserPhoneOnFile(widget.user.phone)) unawaited(_pushUserPhoneToCloud(widget.user));
+        return null;
+      }
+      if (ngmyPhoneDigits(phone) == ngmyPhoneDigits(widget.user.phone)) return phone;
       final key = email.toLowerCase().trim();
       widget.user.phone = phone;
       final idx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
