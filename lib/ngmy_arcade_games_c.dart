@@ -77,10 +77,10 @@ class _ColorGateState extends State<ColorGateGame> with SingleTickerProviderStat
     startLoop((dt) {
       _spawn -= dt;
       if (_spawn <= 0) {
-        _spawn = math.max(0.85, 1.7 - score * 0.04);
+        _spawn = math.max(0.6, 1.2 - score * 0.04);
         _gates.add(_Gate(-0.06, args.rng.nextInt(cols.length)));
       }
-      final speed = 0.2 + score * 0.008;
+      final speed = 0.3 + score * 0.014;
       for (final g in _gates) {
         g.y += speed * dt;
         if (!g.done && g.y >= 0.74) {
@@ -164,15 +164,16 @@ class _PaddleDuelState extends State<PaddleDuelGame> with SingleTickerProviderSt
   NgmyArcadeArgs get args => widget.args;
   @override
   int get goal => 5;
-  static const r = 11.0, pw = 92.0;
+  static const r = 11.0, pw = 78.0;
   Size _size = Size.zero;
   double bx = 0, by = 0, vx = 0, vy = 0, px = 0, cx = 0;
   bool _served = false;
+  double _clock = 0;
 
   void _serve() {
     bx = _size.width / 2;
     by = _size.height / 2;
-    vy = 270.0 + score * 25;
+    vy = 330.0 + score * 30;
     vx = (args.rng.nextDouble() * 2 - 1) * 160;
   }
 
@@ -188,8 +189,11 @@ class _PaddleDuelState extends State<PaddleDuelGame> with SingleTickerProviderSt
         px = cx = w / 2;
         _serve();
       }
-      bx += vx * dt;
-      by += vy * dt;
+      _clock += dt;
+      // Everything speeds up as the seconds pass.
+      final k = 1 + math.min(_clock * 0.012, 0.9);
+      bx += vx * dt * k;
+      by += vy * dt * k;
       if (bx < r) {
         bx = r;
         vx = vx.abs();
@@ -209,7 +213,7 @@ class _PaddleDuelState extends State<PaddleDuelGame> with SingleTickerProviderSt
         vx += (bx - cx) * 4;
       }
       vx = vx.clamp(-520.0, 520.0);
-      final cpu = 185.0 + score * 22;
+      final cpu = (215.0 + score * 26) * k;
       final target = vy < 0 ? bx : w / 2;
       cx = (cx + (target - cx).clamp(-cpu * dt, cpu * dt)).clamp(pw / 2, w - pw / 2);
       if (by < -20) {
@@ -282,18 +286,19 @@ class _BeatTilesState extends State<BeatTilesGame> with SingleTickerProviderStat
   void initState() {
     super.initState();
     startScore();
+    hearts = 2;
     startLoop((dt) {
       if (_size.isEmpty) return;
       final h = _size.height, th = h / 4.6;
       _spawn -= dt;
       if (_spawn <= 0) {
-        _spawn = math.max(0.34, 0.66 - score * 0.01);
+        _spawn = math.max(0.22, 0.56 - score * 0.013);
         var lane = args.rng.nextInt(4);
         if (lane == _lastLane) lane = (lane + 1 + args.rng.nextInt(3)) % 4;
         _lastLane = lane;
         _tiles.add(_BeatTile(lane, -th));
       }
-      final speed = h * (0.4 + score * 0.011);
+      final speed = h * (0.5 + score * 0.02);
       for (final t in _tiles) {
         t.y += speed * dt;
         if (t.hit) t.fade += dt * 4;
@@ -325,6 +330,10 @@ class _BeatTilesState extends State<BeatTilesGame> with SingleTickerProviderStat
     if (best != null) {
       best.hit = true;
       addPoint();
+    } else {
+      // Tapping anywhere that is not a tile costs a heart.
+      setState(() {});
+      loseHeart('Tapped the wrong spot');
     }
   }
 
@@ -490,7 +499,7 @@ class _PerfectStopState extends State<PerfectStopGame> with SingleTickerProvider
   bool? _last;
 
   void _newZone() {
-    _zw = math.max(0.08, 0.22 - score * 0.014);
+    _zw = math.max(0.05, 0.15 - score * 0.011);
     _zone = args.rng.nextDouble() * (1 - _zw);
   }
 
@@ -504,7 +513,7 @@ class _PerfectStopState extends State<PerfectStopGame> with SingleTickerProvider
         _pause -= dt;
         if (_pause <= 0) _newZone();
       } else {
-        _pos += _dir * (0.55 + score * 0.07) * dt;
+        _pos += _dir * (1.0 + score * 0.12) * dt;
         if (_pos > 1) {
           _pos = 1;
           _dir = -1;
@@ -521,7 +530,7 @@ class _PerfectStopState extends State<PerfectStopGame> with SingleTickerProvider
     if (_pause > 0 || ended) return;
     final hit = _pos >= _zone && _pos <= _zone + _zw;
     _last = hit;
-    _pause = 0.5;
+    _pause = 0.35;
     if (hit) {
       addPoint();
     } else {
@@ -586,7 +595,10 @@ class _HoopShotState extends State<HoopShotGame> with SingleTickerProviderStateM
   NgmyArcadeArgs get args => widget.args;
   @override
   int get goal => 10;
-  double _hoop = 0.5, _hdir = 1, _ballT = -1, _flash = 0;
+  // The hoop swings side to side. After a throw the ball flies towards where the hoop was and follows it a little, so
+  // you have to throw when the hoop is about to slow down at the edge, or it will be gone by the time the ball arrives.
+  double _phase = 0, _hoop = 0.5, _ballT = -1, _flash = 0, _release = 0.5, _post = -1, _ballX = 0.5, _missDir = 1;
+  bool _madeNow = false;
   bool? _last;
 
   @override
@@ -594,18 +606,29 @@ class _HoopShotState extends State<HoopShotGame> with SingleTickerProviderStateM
     super.initState();
     startScore();
     startLoop((dt) {
-      _hoop += _hdir * (0.28 + score * 0.04) * dt;
-      if (_hoop > 0.82) _hdir = -1;
-      if (_hoop < 0.18) _hdir = 1;
+      _phase += (1.5 + score * 0.24) * dt;
+      _hoop = 0.5 + 0.30 * math.sin(_phase);
       if (_flash > 0) _flash -= dt;
-      if (_ballT >= 0) {
+      if (_ballT >= 0 && _post < 0) {
         _ballT += dt / 0.55;
+        final t = math.min(_ballT, 1.0);
+        _ballX = _release + (_hoop - _release) * 0.55 * t;
         if (_ballT >= 1) {
+          _ballT = 1;
+          final err = _ballX - _hoop;
+          _madeNow = err.abs() < 0.055;
+          _missDir = err >= 0 ? 1 : -1;
+          _post = 0;
+        }
+      } else if (_post >= 0) {
+        _post += dt / 0.55;
+        if (_madeNow) _ballX = _hoop;
+        if (_post >= 1) {
+          _post = -1;
           _ballT = -1;
-          final made = (_hoop - 0.5).abs() < 0.075;
-          _last = made;
+          _last = _madeNow;
           _flash = 0.7;
-          if (made) {
+          if (_madeNow) {
             if (addPoint()) return;
           } else if (loseHeart('Missed the hoop')) {
             return;
@@ -619,23 +642,44 @@ class _HoopShotState extends State<HoopShotGame> with SingleTickerProviderStateM
   @override
   Widget build(BuildContext context) => LayoutBuilder(builder: (context, c) {
         final w = c.maxWidth, h = c.maxHeight;
-        final t = _ballT < 0 ? 0.0 : _ballT;
-        final ballY = 0.84 - 0.62 * t - math.sin(t * math.pi) * 0.08;
-        final ballSize = 64 - 26 * t;
+        final t = _ballT < 0 ? 0.0 : math.min(_ballT, 1.0);
+        var bx = _ballT < 0 ? 0.5 : _ballX;
+        var by = 0.84 - 0.62 * t - math.sin(t * math.pi) * 0.08;
+        var ballSize = 64 - 26 * t;
+        final inPost = _post >= 0;
+        if (inPost) {
+          final p = Curves.easeIn.transform(_post.clamp(0.0, 1.0));
+          ballSize = 38;
+          if (_madeNow) {
+            // Straight down through the net.
+            by = 0.215 + 0.19 * p;
+          } else {
+            // Off the rim and away.
+            bx = _ballX + _missDir * 0.2 * p;
+            by = 0.215 + 0.55 * p * p - 0.06 * math.sin(p * math.pi);
+          }
+        }
+        final ball = Positioned(left: bx * w - ballSize / 2, top: by * h - ballSize / 2, child: IgnorePointer(child: Transform.rotate(angle: t * 6 + _post.clamp(0.0, 1.0) * 4, child: emojiText('🏀', ballSize))));
+        final behindNet = inPost && _madeNow;
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTapDown: (_) {
-            if (_ballT < 0 && !ended) _ballT = 0;
+            if (_ballT < 0 && !ended) {
+              _release = _hoop;
+              _ballX = 0.5;
+              _ballT = 0;
+            }
           },
           child: Stack(children: [
             arcadeBackdrop(const [Color(0xFF7C2D12), Color(0xFF1C1917)]),
             Positioned(left: 0, right: 0, bottom: 0, height: h * 0.25, child: Container(color: const Color(0xFFB45309).withValues(alpha: 0.5))),
             Positioned(left: _hoop * w - 60, top: h * 0.08, child: Container(width: 120, height: 78, decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.9), borderRadius: BorderRadius.circular(6), border: Border.all(color: const Color(0xFFDC2626), width: 4)))),
+            if (behindNet) ball,
             Positioned(left: _hoop * w - 38, top: h * 0.2, child: Container(width: 76, height: 12, decoration: BoxDecoration(color: const Color(0xFFF97316), borderRadius: BorderRadius.circular(6), boxShadow: const [BoxShadow(color: Color(0x88F97316), blurRadius: 10)]))),
             Positioned(left: _hoop * w - 30, top: h * 0.2 + 12, child: CustomPaint(size: const Size(60, 34), painter: _NetPainter(Colors.white70, cols: 5, rows: 3))),
-            Positioned(left: w / 2 - ballSize / 2, top: ballY * h - ballSize / 2, child: Transform.rotate(angle: t * 6, child: emojiText('🏀', ballSize))),
+            if (!behindNet) ball,
             if (_flash > 0) Center(child: Text(_last == true ? 'SWISH!' : 'MISS', style: TextStyle(color: _last == true ? const Color(0xFF4ADE80) : const Color(0xFFF87171), fontSize: 38, fontWeight: FontWeight.w900))),
-            arcadeTopBar('Tap when the hoop is above the ball · $score/$goal', hearts: hearts, bottom: true),
+            arcadeTopBar('Throw as the hoop slows at the edge · $score/$goal', hearts: hearts, bottom: true),
           ]),
         );
       });
@@ -688,7 +732,7 @@ class _PenaltyKickState extends State<PenaltyKickGame> with SingleTickerProvider
     startLoop((dt) {
       _idle += dt;
       if (_shot != null && _t < 1) {
-        _t = math.min(1, _t + dt / 0.6);
+        _t = math.min(1, _t + dt / 0.42);
         if (_t >= 1) {
           final scored = _shot != _keeper;
           _last = scored;
@@ -714,7 +758,7 @@ class _PenaltyKickState extends State<PenaltyKickGame> with SingleTickerProvider
   void _kick(int zone) {
     if (_shot != null || ended) return;
     _shot = zone;
-    _keeper = args.rng.nextDouble() < 0.3 ? zone : (zone + 1 + args.rng.nextInt(5)) % 6;
+    _keeper = args.rng.nextDouble() < 0.5 ? zone : (zone + 1 + args.rng.nextInt(5)) % 6;
     _t = 0;
   }
 
@@ -797,11 +841,13 @@ class _DinoDashState extends State<DinoDashGame> with SingleTickerProviderStateM
       }
       if (_inv > 0) _inv -= dt;
       _clouds += dt;
-      final speed = 250.0 + score * 9;
+      final speed = 340.0 + score * 14;
       _spawn -= dt;
       if (_spawn <= 0) {
-        _spawn = math.max(0.65, 0.95 + args.rng.nextDouble() * 0.9 - score * 0.02);
+        _spawn = math.max(0.55, 0.8 + args.rng.nextDouble() * 0.6 - score * 0.02);
         _obs.add(_Ob(w + 40, args.rng.nextDouble() < 0.75 ? '🌵' : '🪨'));
+        // Sometimes two in a row, close together.
+        if (score >= 4 && args.rng.nextDouble() < 0.3) _obs.add(_Ob(w + 40 + 62, '🌵'));
       }
       for (final o in _obs) {
         o.x -= speed * dt;

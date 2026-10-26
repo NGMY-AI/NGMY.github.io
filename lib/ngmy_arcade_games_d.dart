@@ -4,12 +4,15 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'ngmy_arcade_banks.dart';
 import 'ngmy_arcade_games.dart';
 import 'ngmy_arcade_host.dart';
 import 'ngmy_arcade_kit.dart';
 
 /// Arcade games 31–40: puzzles and brain teasers.
 Widget? ngmyBuildArcadeGameD(String id, NgmyArcadeArgs a) {
+  // Loads the remembered question decks while the game screen opens.
+  NgmyQuestionDeck.warmUp();
   switch (id) {
     case 'pipe_flow':
       return PipeFlowGame(args: a);
@@ -452,60 +455,57 @@ class _HanoiTowerState extends State<HanoiTowerGame> {
 }
 
 // 34 ── Emoji Riddles ────────────────────────────────────────────────────────
-const _riddles = <(String, String)>[
-  ('🌧️🎀', 'Rainbow'),
-  ('☀️🌻', 'Sunflower'),
-  ('⭐🐟', 'Starfish'),
-  ('🐝🏠', 'Beehive'),
-  ('🍯🌙', 'Honeymoon'),
-  ('🦷🧚', 'Tooth fairy'),
-  ('🔥🪵', 'Campfire'),
-  ('🧠🌪️', 'Brainstorm'),
-  ('🐟🥣', 'Fishbowl'),
-  ('👁️🍭', 'Eye candy'),
-  ('🔑🪵', 'Keyboard'),
-  ('🥜🧈', 'Peanut butter'),
-  ('🧊🏒', 'Ice hockey'),
-  ('🐱🐟', 'Catfish'),
-  ('🐶🏠', 'Doghouse'),
-  ('🚪🔔', 'Doorbell'),
-  ('🦷🪥', 'Toothbrush'),
-  ('💡🏠', 'Lighthouse'),
-  ('❄️⛄', 'Snowman'),
-  ('🌽🐕', 'Corn dog'),
-  ('⏰💰', 'Time is money'),
-  ('🌧️🐱🐶', 'Raining cats and dogs'),
-  ('🎂🎉', 'Birthday party'),
-  ('🌊🏄', 'Surfing'),
-  ('🔥🚒', 'Fire truck'),
-  ('🌍🌡️', 'Global warming'),
-  ('🐞🐞', 'Ladybugs'),
-  ('⭐🌙', 'Night sky'),
-  ('🍿🎬', 'Movie night'),
-  ('🎅🎄', 'Christmas'),
-];
-
 ArcadeQ _emojiRiddle(int round, math.Random r) {
-  final q = _riddles[r.nextInt(_riddles.length)];
-  final (opts, ans) = arcadeOptions(q.$2, _riddles.map((e) => e.$2), r);
+  // A remembered shuffled deck: no riddle comes back until all 300 have been seen, and the order changes each round.
+  final q = kNgmyEmojiRiddles[NgmyQuestionDeck.next('emoji_riddle', kNgmyEmojiRiddles.length, r)];
+  final (opts, ans) = arcadeOptions(q.$2, kNgmyEmojiRiddles.map((e) => e.$2), r);
   return ArcadeQ(Text(q.$1, style: const TextStyle(fontSize: 64)), opts, ans);
 }
 
 // 35 ── Bigger Sum ───────────────────────────────────────────────────────────
 ArcadeQ _biggerSum(int round, math.Random r) {
-  final hard = round > 6;
   (String, int) expr() {
-    if (hard && r.nextBool()) {
-      final a = 2 + r.nextInt(11), b = 2 + r.nextInt(9);
-      return ('$a × $b', a * b);
+    final kind = r.nextInt(round < 3 ? 3 : 8);
+    switch (kind) {
+      case 0:
+        final a = 12 + r.nextInt(88), b = 12 + r.nextInt(88);
+        return ('$a + $b', a + b);
+      case 1:
+        final a = 3 + r.nextInt(12), b = 3 + r.nextInt(10);
+        return ('$a × $b', a * b);
+      case 2:
+        final a = 60 + r.nextInt(140), b = 10 + r.nextInt(60);
+        return ('$a − $b', a - b);
+      case 3:
+        final a = 11 + r.nextInt(9), b = 6 + r.nextInt(10);
+        return ('$a × $b', a * b);
+      case 4:
+        final a = 8 + r.nextInt(40), b = 8 + r.nextInt(40), c = 8 + r.nextInt(40);
+        return ('$a + $b + $c', a + b + c);
+      case 5:
+        final a = 6 + r.nextInt(12);
+        return ('$a²', a * a);
+      case 6:
+        final a = 4 + r.nextInt(10), b = 4 + r.nextInt(10), c = 1 + r.nextInt(30);
+        return ('$a × $b − $c', a * b - c);
+      default:
+        final a = 100 + r.nextInt(300), b = 20 + r.nextInt(80), c = 10 + r.nextInt(40);
+        return ('$a − $b + $c', a - b + c);
     }
-    final a = 5 + r.nextInt(hard ? 90 : 40), b = 5 + r.nextInt(hard ? 90 : 40);
-    return ('$a + $b', a + b);
   }
 
-  final left = expr();
+  // Keep the two answers close, so it takes real working out to tell which is bigger.
+  final tol = math.max(3, 22 - round * 2);
+  var left = expr();
   var right = expr();
-  while (right.$2 == left.$2) {
+  for (var i = 0; i < 40; i++) {
+    final diff = (left.$2 - right.$2).abs();
+    if (diff != 0 && diff <= tol && left.$2 != 0 && right.$2 != 0) break;
+    right = expr();
+    if (i % 5 == 4) left = expr();
+  }
+  while (right.$2 == left.$2 || left.$2 == 0 || right.$2 == 0) {
+    left = expr();
     right = expr();
   }
   return ArcadeQ(
@@ -516,47 +516,8 @@ ArcadeQ _biggerSum(int round, math.Random r) {
 }
 
 // 36 ── True or False ────────────────────────────────────────────────────────
-const _facts = <(String, bool)>[
-  ('The sun is a star.', true),
-  ('Spiders have six legs.', false),
-  ('Water boils at 100 °C at sea level.', true),
-  ('The Pacific is the largest ocean.', true),
-  ('Bats are blind.', false),
-  ('A year has 52 weeks.', true),
-  ('Penguins can fly.', false),
-  ('Light travels faster than sound.', true),
-  ('The moon has its own light.', false),
-  ('Humans have 206 bones as adults.', true),
-  ('Mount Everest is the tallest mountain above sea level.', true),
-  ('A triangle has four sides.', false),
-  ('Honey never really spoils.', true),
-  ('Diamonds are made of carbon.', true),
-  ('The heart has three chambers.', false),
-  ('Africa is a country.', false),
-  ('Octopuses have three hearts.', true),
-  ('Ice is heavier than the same amount of water.', false),
-  ('Plants take in carbon dioxide.', true),
-  ('A leap year has 366 days.', true),
-  ('Lightning never strikes the same place twice.', false),
-  ('Sharks are mammals.', false),
-  ('Venus is the hottest planet.', true),
-  ('There are 7 continents.', true),
-  ('The Great Wall is visible from the Moon with bare eyes.', false),
-  ('Bananas grow on trees.', false),
-  ('Sound can travel through space.', false),
-  ('The human body is mostly water.', true),
-  ('Gold is a liquid at room temperature.', false),
-  ('A dozen is 12.', true),
-  ('Cows have four stomach compartments.', true),
-  ('The Sahara is the largest hot desert.', true),
-  ('Antarctica is the driest continent.', true),
-  ('Goldfish only remember for 3 seconds.', false),
-  ('Kangaroos can walk backwards easily.', false),
-  ('Saturn has rings.', true),
-];
-
 ArcadeQ _trueFalse(int round, math.Random r) {
-  final f = _facts[r.nextInt(_facts.length)];
+  final f = kNgmyTrueFalseFacts[NgmyQuestionDeck.next('true_false', kNgmyTrueFalseFacts.length, r)];
   return ArcadeQ(Text(f.$1, style: const TextStyle(fontSize: 22)), const ['TRUE', 'FALSE'], f.$2 ? 0 : 1);
 }
 
@@ -735,20 +696,21 @@ class _ShellGameState extends State<ShellGame> with SingleTickerProviderStateMix
   int _swapsLeft = 0, _a = 0, _b = 1;
   double _swapT = 0;
 
-  double get _swapTime => math.max(0.22, 0.5 - score * 0.035);
+  double get _swapTime => math.max(0.1, 0.3 - score * 0.03);
 
   @override
   void initState() {
     super.initState();
     startScore();
+    hearts = 2;
     _ball = args.rng.nextInt(3);
     startLoop((dt) {
       _t += dt;
       switch (_phase) {
         case _ShellPhase.show:
-          if (_t > 1.2) {
+          if (_t > 0.95) {
             _phase = _ShellPhase.shuffle;
-            _swapsLeft = 5 + score;
+            _swapsLeft = 10 + score * 3;
             _nextSwap();
           }
         case _ShellPhase.shuffle:

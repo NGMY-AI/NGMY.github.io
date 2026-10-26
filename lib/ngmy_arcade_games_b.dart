@@ -304,10 +304,11 @@ class _OddOneState extends State<OddOneGame> {
     ('😀', '😃'), ('🐶', '🐺'), ('🍎', '🍅'), ('⭐', '🌟'), ('🌙', '🌛'), ('🐱', '🐯'), ('🚗', '🚙'), ('🍩', '🍪'),
     ('😺', '😸'), ('🌲', '🌳'), ('🐠', '🐟'), ('🍊', '🍑'), ('⚽', '🏐'), ('🎈', '🔴'), ('🐸', '🐢'), ('💙', '💜'),
     ('🌼', '🌻'), ('🥑', '🥝'), ('🐻', '🐨'), ('🔑', '🗝️'),
+    ('🙂', '🙃'), ('😊', '☺️'), ('🕐', '🕑'), ('🔵', '🟦'), ('🍓', '🍒'), ('🐭', '🐹'), ('🌕', '🌝'), ('🧡', '❤️'),
   ];
-  int _round = 0, _hearts = 3, _odd = 0;
+  int _round = 0, _hearts = 2, _odd = 0;
   late (String, String) _pair;
-  int get _size => math.min(3 + _round ~/ 2, 7);
+  int get _size => math.min(5 + _round ~/ 3, 8);
 
   @override
   void initState() {
@@ -574,7 +575,7 @@ class BalloonDartsGame extends StatefulWidget {
 }
 
 class _BalloonDartsState extends State<BalloonDartsGame> with SingleTickerProviderStateMixin, ArcadeLoop {
-  static const goal = 10, darts = 16;
+  static const goal = 10, darts = 14;
   final _balloons = <({double x, double y, double speed, int color})>[];
   double _aim = 0.5, _aimDir = 1;
   final _flying = <({double x, double y})>[];
@@ -588,9 +589,9 @@ class _BalloonDartsState extends State<BalloonDartsGame> with SingleTickerProvid
     widget.args.onProgress(0, goal);
     startLoop((dt) {
       if (_size.isEmpty) return;
-      while (_balloons.length < 4) {
+      while (_balloons.length < 6) {
         final r = widget.args.rng;
-        _balloons.add((x: r.nextDouble(), y: 0.12 + r.nextDouble() * 0.35, speed: (r.nextBool() ? 1 : -1) * (0.12 + r.nextDouble() * 0.18), color: r.nextInt(_colors.length)));
+        _balloons.add((x: r.nextDouble(), y: 0.12 + r.nextDouble() * 0.35, speed: (r.nextBool() ? 1 : -1) * (0.26 + r.nextDouble() * 0.30), color: r.nextInt(_colors.length)));
       }
       for (var i = 0; i < _balloons.length; i++) {
         final b = _balloons[i];
@@ -600,7 +601,7 @@ class _BalloonDartsState extends State<BalloonDartsGame> with SingleTickerProvid
         x = x.clamp(0.05, 0.95);
         _balloons[i] = (x: x, y: b.y, speed: s, color: b.color);
       }
-      _aim += _aimDir * 0.45 * dt;
+      _aim += _aimDir * 0.8 * dt;
       if (_aim > 0.92 || _aim < 0.08) _aimDir = -_aimDir;
       for (var i = 0; i < _flying.length; i++) {
         _flying[i] = (x: _flying[i].x, y: _flying[i].y - 1.4 * dt);
@@ -608,7 +609,7 @@ class _BalloonDartsState extends State<BalloonDartsGame> with SingleTickerProvid
       // Hits.
       for (final d in List.of(_flying)) {
         for (final b in List.of(_balloons)) {
-          if ((d.x - b.x).abs() < 0.06 && (d.y - b.y).abs() < 0.06) {
+          if ((d.x - b.x).abs() < 0.045 && (d.y - b.y).abs() < 0.045) {
             _balloons.remove(b);
             _flying.remove(d);
             HapticFeedback.mediumImpact();
@@ -696,14 +697,14 @@ class _CoinCatcherState extends State<CoinCatcherGame> with SingleTickerProvider
     startLoop((dt) {
       _spawn -= dt;
       if (_spawn <= 0) {
-        _spawn = math.max(0.35, 0.7 - _score * 0.012);
+        _spawn = math.max(0.2, 0.5 - _score * 0.014);
         final r = widget.args.rng.nextDouble();
-        _drops.add((x: 0.06 + widget.args.rng.nextDouble() * 0.88, y: -0.05, v: 0.32 + widget.args.rng.nextDouble() * 0.2 + _score * 0.008, kind: r < 0.22 ? 2 : (r < 0.32 ? 1 : 0)));
+        _drops.add((x: 0.06 + widget.args.rng.nextDouble() * 0.88, y: -0.05, v: 0.5 + widget.args.rng.nextDouble() * 0.3 + _score * 0.016, kind: r < 0.34 ? 2 : (r < 0.42 ? 1 : 0)));
       }
       final kept = <({double x, double y, double v, int kind})>[];
       for (final d in _drops) {
         final y = d.y + d.v * dt;
-        if (y > 0.86 && y < 0.95 && (d.x - _basket).abs() < 0.11) {
+        if (y > 0.86 && y < 0.95 && (d.x - _basket).abs() < 0.09) {
           if (d.kind == 2) {
             HapticFeedback.heavyImpact();
             _hearts--;
@@ -780,6 +781,8 @@ class _NumberRushState extends State<NumberRushGame> {
       setState(() {
         _next++;
         _wrong = null;
+        // The numbers move to new places after every tap, so you have to look again each time.
+        _grid.shuffle(widget.args.rng);
       });
       widget.args.onProgress(_next - 1, goal);
       if (_next > goal) widget.args.onComplete();
@@ -1019,8 +1022,8 @@ class _SpaceDodgeState extends State<SpaceDodgeGame> with SingleTickerProviderSt
       }
       _spawn -= dt;
       if (_spawn <= 0) {
-        _spawn = math.max(0.22, 0.6 - _alive * 0.012);
-        _rocks.add((x: r.nextDouble(), y: -0.08, v: 0.35 + r.nextDouble() * 0.3 + _alive * 0.01, size: 30 + r.nextDouble() * 26, spin: r.nextDouble() * 6));
+        _spawn = math.max(0.11, 0.4 - _alive * 0.012);
+        _rocks.add((x: r.nextDouble(), y: -0.08, v: 0.55 + r.nextDouble() * 0.4 + _alive * 0.022, size: 34 + r.nextDouble() * 30, spin: r.nextDouble() * 6));
       }
       for (var i = 0; i < _stars.length; i++) {
         final s = _stars[i];
@@ -1029,7 +1032,7 @@ class _SpaceDodgeState extends State<SpaceDodgeGame> with SingleTickerProviderSt
       final kept = <({double x, double y, double v, double size, double spin})>[];
       for (final k in _rocks) {
         final y = k.y + k.v * dt;
-        if (y > 0.8 && y < 0.92 && (k.x - _ship).abs() < 0.07) {
+        if (y > 0.8 && y < 0.92 && (k.x - _ship).abs() < 0.08) {
           stopLoop();
           HapticFeedback.heavyImpact();
           widget.args.onKnockout('Hit by an asteroid');

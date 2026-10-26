@@ -55,13 +55,13 @@ class _KnifeThrowState extends State<KnifeThrowGame> with SingleTickerProviderSt
   int get goal => 21;
   static const perLog = 7;
   final _knives = <double>[]; // angles in the log's own frame
-  double _rot = 0, _spin = 2.2, _t = 0, _fly = -1, _bounce = 0;
+  double _rot = 0, _spin = 3.0, _t = 0, _fly = -1, _bounce = 0;
   int _thrown = 0;
 
   void _newLog() {
     _knives.clear();
     _thrown = 0;
-    final pre = math.min(score ~/ perLog + 1, 3);
+    final pre = math.min(score ~/ perLog + 3, 6);
     for (var i = 0; i < pre; i++) {
       _knives.add(args.rng.nextDouble() * math.pi * 2);
     }
@@ -71,6 +71,7 @@ class _KnifeThrowState extends State<KnifeThrowGame> with SingleTickerProviderSt
   void initState() {
     super.initState();
     startScore();
+    hearts = 2;
     _newLog();
     startLoop((dt) {
       _t += dt;
@@ -82,7 +83,7 @@ class _KnifeThrowState extends State<KnifeThrowGame> with SingleTickerProviderSt
         if (_fly >= 1) {
           _fly = -1;
           final local = _wrapAngle(math.pi / 2 - _rot);
-          final clash = _knives.any((k) => _wrapAngle(k - local).abs() < 0.24);
+          final clash = _knives.any((k) => _wrapAngle(k - local).abs() < 0.3);
           if (clash) {
             _bounce = 0.5;
             if (loseHeart('Hit another knife')) return;
@@ -289,7 +290,7 @@ class _StickBridgeState extends State<StickBridgeGame> with SingleTickerProvider
 
   void _newGap() {
     final w = _size.width;
-    _nextW = math.max(26, 80 - score * 4.0) + args.rng.nextDouble() * 30;
+    _nextW = math.max(16, 58 - score * 4.0) + args.rng.nextDouble() * 16;
     _gap = 50 + args.rng.nextDouble() * (w - baseX - curW - _nextW - 70);
   }
 
@@ -312,7 +313,7 @@ class _StickBridgeState extends State<StickBridgeGame> with SingleTickerProvider
         case _StickPhase.idle:
           break;
         case _StickPhase.grow:
-          _len += 260 * dt;
+          _len += 340 * dt;
         case _StickPhase.fall:
           _angle = math.min(math.pi / 2, _angle + dt * 5);
           if (_angle >= math.pi / 2) {
@@ -935,7 +936,7 @@ class _AsteroidBlasterState extends State<AsteroidBlasterGame> with SingleTicker
   @override
   NgmyArcadeArgs get args => widget.args;
   @override
-  int get goal => 30;
+  int get goal => 36;
   final _rocks = <_Rock>[];
   final _shots = <Offset>[]; // fractions
   double _ship = 0.5, _fire = 0, _spawn = 0.5;
@@ -950,13 +951,13 @@ class _AsteroidBlasterState extends State<AsteroidBlasterGame> with SingleTicker
       final aspect = _size.height / _size.width;
       _fire -= dt;
       if (_fire <= 0) {
-        _fire = 0.22;
+        _fire = 0.32;
         _shots.add(Offset(_ship, 0.84));
       }
       _spawn -= dt;
       if (_spawn <= 0) {
-        _spawn = math.max(0.4, 0.9 - score * 0.015);
-        _rocks.add(_Rock(0.08 + args.rng.nextDouble() * 0.84, -0.06, 0.12 + args.rng.nextDouble() * 0.1 + score * 0.004, 34 + args.rng.nextDouble() * 22));
+        _spawn = math.max(0.2, 0.6 - score * 0.014);
+        _rocks.add(_Rock(0.08 + args.rng.nextDouble() * 0.84, -0.06, 0.2 + args.rng.nextDouble() * 0.15 + score * 0.008, 34 + args.rng.nextDouble() * 22));
       }
       for (var i = 0; i < _shots.length; i++) {
         _shots[i] = _shots[i] - Offset(0, 1.2 * dt);

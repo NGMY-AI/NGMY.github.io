@@ -312,7 +312,7 @@ class _GoldMinerState extends State<GoldMinerGame> with SingleTickerProviderStat
   @override
   NgmyArcadeArgs get args => widget.args;
   @override
-  int get goal => 600;
+  int get goal => 900;
   final _loot = <_Loot>[];
   Size _size = Size.zero;
   double _t = 0, _angle = 0, _len = 40, _dir = 0; // dir: 0 swing, 1 out, -1 back
@@ -326,15 +326,15 @@ class _GoldMinerState extends State<GoldMinerGame> with SingleTickerProviderStat
   void _fill() {
     final r = args.rng;
     final w = _size.width, h = _size.height;
-    while (_loot.length < 9) {
+    while (_loot.length < 8) {
       final roll = r.nextDouble();
-      final kind = roll < 0.35
-          ? ('🪙', 34.0, 50, 0.4)
-          : roll < 0.6
-              ? ('🟨', 58.0, 150, 1.6)
-              : roll < 0.75
-                  ? ('💎', 32.0, 200, 0.2)
-                  : ('🪨', 54.0, 10, 2.2);
+      final kind = roll < 0.28
+          ? ('🪙', 30.0, 50, 0.5)
+          : roll < 0.48
+              ? ('🟨', 54.0, 150, 2.0)
+              : roll < 0.56
+                  ? ('💎', 28.0, 200, 0.3)
+                  : ('🪨', 56.0, 10, 2.8);
       final p = Offset(30 + r.nextDouble() * (w - 60), h * 0.35 + r.nextDouble() * (h * 0.58));
       if (_loot.any((l) => (l.p - p).distance < 56)) continue;
       _loot.add(_Loot(p, kind.$1, kind.$2, kind.$3, kind.$4));
@@ -351,7 +351,7 @@ class _GoldMinerState extends State<GoldMinerGame> with SingleTickerProviderStat
       if (_popT > 0) _popT -= dt;
       if (_dir == 0) {
         _t += dt;
-        _angle = math.sin(_t * 1.6) * 1.2;
+        _angle = math.sin(_t * (2.1 + score / 450)) * 1.25;
       } else if (_dir == 1) {
         _len += 460 * dt;
         final tip = _tip;
@@ -422,11 +422,11 @@ class _RopePainter extends CustomPainter {
 const _cash = <(String, int)>[('\$20', 2000), ('\$10', 1000), ('\$5', 500), ('\$1', 100), ('25¢', 25), ('10¢', 10), ('5¢', 5)];
 
 ArcadeQ _cashCount(int round, math.Random r) {
-  final kinds = (List.of(_cash)..shuffle(r)).take(2 + math.min(round ~/ 3, 2)).toList();
+  final kinds = (List.of(_cash)..shuffle(r)).take(3 + math.min(round ~/ 2, 3)).toList();
   var total = 0;
   final chips = <Widget>[];
   for (final k in kinds) {
-    final count = 1 + r.nextInt(4);
+    final count = 1 + r.nextInt(5);
     total += k.$2 * count;
     final bill = k.$2 >= 100;
     for (var i = 0; i < count; i++) {
@@ -444,7 +444,7 @@ ArcadeQ _cashCount(int round, math.Random r) {
       ));
     }
   }
-  final wrong = <String>{for (final d in [-100, -25, -10, 5, 10, 25, 100, 500]) if (total + d > 0) _money(total + d)};
+  final wrong = <String>{for (final d in [-25, -15, -10, -5, 5, 10, 15, 25]) if (total + d > 0) _money(total + d)};
   final (opts, ans) = arcadeOptions(_money(total), wrong, r);
   return ArcadeQ(SizedBox(width: 260, child: Wrap(alignment: WrapAlignment.center, children: chips)), opts, ans);
 }
@@ -461,8 +461,8 @@ class _PlinkoDropState extends State<PlinkoDropGame> with SingleTickerProviderSt
   @override
   NgmyArcadeArgs get args => widget.args;
   @override
-  int get goal => 20;
-  static const slots = [3, 1, 0, 1, 5, 1, 0, 1, 3];
+  int get goal => 22;
+  static const slots = [4, 1, 0, 1, 3, 1, 0, 1, 4];
   static const rows = 8, balls = 12;
   int _used = 0;
   List<double>? _path; // column (0..8) at each row
@@ -574,14 +574,14 @@ class _SlotStopperState extends State<SlotStopperGame> with SingleTickerProvider
   @override
   int get goal => 4;
   static const symbols = ['🍒', '🍋', '🔔', '⭐', '7️⃣', '💎'];
-  static const spins = 12;
+  static const spins = 10;
   final _pos = [0.0, 2.0, 4.0];
   final _stopped = [false, false, false];
   int _spinsLeft = spins;
   double _result = 0;
   bool? _win;
 
-  double get _speed => 3.2 + score * 0.6; // symbols per second
+  double get _speed => 4.8 + score * 0.9; // symbols per second
 
   @override
   void initState() {
@@ -598,7 +598,7 @@ class _SlotStopperState extends State<SlotStopperGame> with SingleTickerProvider
         }
       } else {
         for (var i = 0; i < 3; i++) {
-          if (!_stopped[i]) _pos[i] = (_pos[i] + _speed * (1 + i * 0.15) * dt) % symbols.length;
+          if (!_stopped[i]) _pos[i] = (_pos[i] + _speed * (1 + i * 0.28) * dt) % symbols.length;
         }
       }
       setState(() {});
@@ -996,7 +996,7 @@ class _FindItState extends State<FindItGame> with ArcadeScore {
     '🐧', '🦉', '🐢', '🐍', '🐙', '🦀', '🐳', '🦋', '🐞', '⚽', '🏀', '🎸', '🎺', '🎲', '🧩', '🎁', '🎈', '🔑', '🔔', '💡',
     '📷', '⏰', '✂️', '📌', '🧲', '🪁', '🚗', '🚲', '🚀', '⛵', '🏠', '⭐', '🌙', '☂️', '👑', '👓', '🧢', '👟', '🧦', '🍩',
   ];
-  static const cols = 6, rows = 8;
+  static const cols = 7, rows = 8;
   late List<String> _scene;
   late List<Offset> _jitter;
   late List<String> _want;
@@ -1007,7 +1007,7 @@ class _FindItState extends State<FindItGame> with ArcadeScore {
     final p = List.of(pool)..shuffle(args.rng);
     _scene = p.take(cols * rows).toList();
     _jitter = List.generate(_scene.length, (_) => Offset(args.rng.nextDouble() * 0.4 - 0.2, args.rng.nextDouble() * 0.4 - 0.2));
-    _want = (List.of(_scene)..shuffle(args.rng)).take(5).toList();
+    _want = (List.of(_scene)..shuffle(args.rng)).take(6).toList();
     _found.clear();
   }
 
@@ -1015,6 +1015,7 @@ class _FindItState extends State<FindItGame> with ArcadeScore {
   void initState() {
     super.initState();
     startScore();
+    hearts = 2;
     _newScene();
   }
 
@@ -1047,7 +1048,7 @@ class _FindItState extends State<FindItGame> with ArcadeScore {
           Expanded(
             child: LayoutBuilder(builder: (context, c) {
               final cw = c.maxWidth / cols, ch = c.maxHeight / rows;
-              final s = math.min(cw, ch) * 0.72;
+              final s = math.min(cw, ch) * 0.6;
               return Stack(children: [
                 for (var i = 0; i < _scene.length; i++)
                   Positioned(

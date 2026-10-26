@@ -27,16 +27,10 @@ const kNgmyArcadeGames = <NgmyArcadeDef>[
   NgmyArcadeDef('fruit_slash', 'Fruit Slash', 'Slice flying fruit, dodge the bombs', '🍉', Icons.content_cut_rounded, [Color(0xFF22C55E), Color(0xFFEF4444)], 60),
   NgmyArcadeDef('whack_mole', 'Whack-a-Mole', 'Bonk 20 moles — never the bombs', '🐹', Icons.sports_mma_rounded, [Color(0xFF84CC16), Color(0xFF65A30D)], 50),
   NgmyArcadeDef('sky_stack', 'Sky Stack', 'Drop blocks to build 12 floors high', '🏗️', Icons.layers_rounded, [Color(0xFFF59E0B), Color(0xFFEA580C)], 75),
-  NgmyArcadeDef('snake_rush', 'Snake Rush', 'Eat 10 apples without crashing', '🐍', Icons.timeline_rounded, [Color(0xFF16A34A), Color(0xFF14532D)], 90),
   NgmyArcadeDef('sky_hopper', 'Sky Hopper', 'Tap to fly through 10 gates', '🐤', Icons.flight_takeoff_rounded, [Color(0xFF38BDF8), Color(0xFF0EA5E9)], 75),
   NgmyArcadeDef('brick_breaker', 'Brick Breaker', 'Smash all 24 bricks with the ball', '🧱', Icons.view_module_rounded, [Color(0xFFDB2777), Color(0xFF7C3AED)], 90),
-  NgmyArcadeDef('mystery_word', 'Mystery Word', 'Guess 3 hidden words letter by letter', '🕵️', Icons.spellcheck_rounded, [Color(0xFF6366F1), Color(0xFF4338CA)], 120),
-  NgmyArcadeDef('higher_lower', 'Higher or Lower', 'Call 8 cards in a row', '🃏', Icons.unfold_more_rounded, [Color(0xFFDC2626), Color(0xFF7F1D1D)], 60),
-  NgmyArcadeDef('mine_sweep', 'Mine Sweep', 'Clear the field — don\'t touch a mine', '💣', Icons.grid_4x4_rounded, [Color(0xFF64748B), Color(0xFF334155)], 120),
   NgmyArcadeDef('merge_2048', '2048 Merge', 'Slide and merge tiles up to 256', '🔢', Icons.apps_rounded, [Color(0xFFEAB308), Color(0xFFCA8A04)], 150),
-  NgmyArcadeDef('lights_out', 'Lights Out', 'Turn every light off — 3 boards', '💡', Icons.lightbulb_rounded, [Color(0xFFFACC15), Color(0xFF854D0E)], 120),
   NgmyArcadeDef('odd_one', 'Spot the Odd One', 'Find the emoji that\'s different', '👀', Icons.visibility_rounded, [Color(0xFFEC4899), Color(0xFFBE185D)], 60),
-  NgmyArcadeDef('speed_sort', 'Speed Sort', 'Swipe things into the right side fast', '↔️', Icons.swap_horiz_rounded, [Color(0xFF0D9488), Color(0xFF115E59)], 50),
   NgmyArcadeDef('flag_frenzy', 'Flag Frenzy', 'Name 10 countries from their flags', '🏳️', Icons.flag_rounded, [Color(0xFF2563EB), Color(0xFFDC2626)], 75),
   NgmyArcadeDef('balloon_darts', 'Balloon Darts', 'Throw darts to pop 10 balloons', '🎈', Icons.my_location_rounded, [Color(0xFFF43F5E), Color(0xFFF97316)], 60),
   NgmyArcadeDef('coin_catcher', 'Coin Catcher', 'Catch 25 coins, dodge the rocks', '🪙', Icons.savings_rounded, [Color(0xFFF59E0B), Color(0xFFB45309)], 60),
@@ -47,9 +41,8 @@ const kNgmyArcadeGames = <NgmyArcadeDef>[
 ];
 
 const kNgmyArcadeGameIds = <String>{
-  'bubble_pop', 'fruit_slash', 'whack_mole', 'sky_stack', 'snake_rush', 'sky_hopper', 'brick_breaker',
-  'mystery_word', 'higher_lower', 'mine_sweep', 'merge_2048', 'lights_out', 'odd_one', 'speed_sort',
-  'flag_frenzy', 'balloon_darts', 'coin_catcher', 'number_rush', 'mini_sudoku', 'space_dodge',
+  'bubble_pop', 'fruit_slash', 'whack_mole', 'sky_stack', 'sky_hopper', 'brick_breaker',
+  'merge_2048', 'odd_one', 'flag_frenzy', 'balloon_darts', 'coin_catcher', 'number_rush', 'mini_sudoku', 'space_dodge',
   ...kNgmyArcadeGameIdsMore,
 };
 
@@ -177,16 +170,16 @@ class _BubblePopState extends State<BubblePopGame> with SingleTickerProviderStat
       if (_size.isEmpty) return;
       _spawn -= dt;
       if (_spawn <= 0) {
-        _spawn = 0.45;
-        final s = 50 + widget.args.rng.nextDouble() * 30;
+        _spawn = math.max(0.22, 0.34 - _popped * 0.008);
+        final s = 34 + widget.args.rng.nextDouble() * 22;
         // Make sure the target colour shows up often.
-        final kind = widget.args.rng.nextDouble() < 0.4 ? _target : widget.args.rng.nextInt(colors.length);
-        _bubbles.add(_Thing(widget.args.rng.nextDouble() * (_size.width - s), _size.height + s, 0, -(70 + widget.args.rng.nextDouble() * 70 + _popped * 4), kind, size: s));
+        final kind = widget.args.rng.nextDouble() < 0.22 ? _target : widget.args.rng.nextInt(colors.length);
+        _bubbles.add(_Thing(widget.args.rng.nextDouble() * (_size.width - s), _size.height + s, 0, -(130 + widget.args.rng.nextDouble() * 110 + _popped * 11), kind, size: s));
       }
       for (final b in _bubbles) {
         b.t += dt;
         b.y += b.vy * dt;
-        b.x += math.sin(b.t * 2 + b.size) * 20 * dt;
+        b.x += math.sin(b.t * 3 + b.size) * 38 * dt;
       }
       _bubbles.removeWhere((b) => b.y < -b.size || b.gone);
       setState(() {});
@@ -288,14 +281,14 @@ class _FruitSlashState extends State<FruitSlashGame> with SingleTickerProviderSt
       if (_size.isEmpty) return;
       _spawn -= dt;
       if (_spawn <= 0) {
-        _spawn = 0.75 - math.min(_sliced * 0.02, 0.3);
+        _spawn = 0.55 - math.min(_sliced * 0.025, 0.28);
         final r = widget.args.rng;
-        final bomb = r.nextDouble() < 0.18;
+        final bomb = r.nextDouble() < math.min(0.34 + _sliced * 0.01, 0.42);
         final x = _size.width * (0.15 + r.nextDouble() * 0.7);
-        _items.add(_Thing(x, _size.height + 30, (r.nextDouble() - 0.5) * 160, -(_size.height * (1.05 + r.nextDouble() * 0.35)), bomb ? -1 : r.nextInt(fruits.length), size: 58));
+        _items.add(_Thing(x, _size.height + 30, (r.nextDouble() - 0.5) * 160, -(_size.height * (1.25 + r.nextDouble() * 0.4)), bomb ? -1 : r.nextInt(fruits.length), size: 50));
       }
       for (final f in _items) {
-        f.vy += _size.height * 1.15 * dt;
+        f.vy += _size.height * 1.55 * dt;
         f.x += f.vx * dt;
         f.y += f.vy * dt;
         f.t += dt;
@@ -396,13 +389,13 @@ class _WhackMoleState extends State<WhackMoleGame> with SingleTickerProviderStat
     startLoop((dt) {
       _spawn -= dt;
       if (_spawn <= 0) {
-        _spawn = math.max(0.35, 0.8 - _score * 0.02);
+        _spawn = math.max(0.22, 0.55 - _score * 0.02);
         final free = [for (var i = 0; i < 9; i++) if (_up[i] <= 0) i];
         if (free.isNotEmpty) {
           final i = free[widget.args.rng.nextInt(free.length)];
           final r = widget.args.rng.nextDouble();
-          _kind[i] = r < 0.15 ? 2 : (r < 0.25 ? 1 : 0);
-          _up[i] = math.max(0.6, 1.2 - _score * 0.025);
+          _kind[i] = r < 0.30 ? 2 : (r < 0.36 ? 1 : 0);
+          _up[i] = math.max(0.38, 0.8 - _score * 0.025);
         }
       }
       for (var i = 0; i < 9; i++) {
@@ -487,15 +480,15 @@ class SkyStackGame extends StatefulWidget {
 class _SkyStackState extends State<SkyStackGame> with SingleTickerProviderStateMixin, ArcadeLoop {
   static const goal = 12;
   final _floors = <({double x, double w})>[]; // in 0..1 of width
-  double _x = 0, _w = 0.6, _dir = 1;
+  double _x = 0, _w = 0.5, _dir = 1;
 
   @override
   void initState() {
     super.initState();
-    _floors.add((x: 0.2, w: 0.6));
+    _floors.add((x: 0.25, w: 0.5));
     widget.args.onProgress(0, goal);
     startLoop((dt) {
-      final speed = 0.45 + _floors.length * 0.06;
+      final speed = 0.75 + _floors.length * 0.11;
       _x += _dir * speed * dt;
       if (_x + _w > 1) {
         _x = 1 - _w;
@@ -519,7 +512,7 @@ class _SkyStackState extends State<SkyStackGame> with SingleTickerProviderStateM
     }
     HapticFeedback.mediumImpact();
     // Nearly perfect drops snap and keep their full width.
-    final perfect = (_x - top.x).abs() < 0.015;
+    final perfect = (_x - top.x).abs() < 0.006;
     final placed = perfect ? top : (x: left, w: right - left);
     _floors.add(placed);
     _w = placed.w;
@@ -836,24 +829,28 @@ class _BrickBreakerState extends State<BrickBreakerGame> with SingleTickerProvid
   double _px = 0.5, _bx = 0.5, _by = 0.7, _vx = 0.35, _vy = -0.55;
   int _broken = 0, _lives = 2;
   bool _launched = false;
+  double _elapsed = 0;
 
   @override
   void initState() {
     super.initState();
     widget.args.onProgress(0, goal);
     startLoop((dt) {
+      if (_launched) _elapsed += dt;
+      // The ball gets faster the longer the game goes on.
+      final k = 1 + math.min(_elapsed * 0.035, 1.3);
       if (!_launched) {
         _bx = _px;
         _by = 0.86;
         setState(() {});
         return;
       }
-      _bx += _vx * dt;
-      _by += _vy * dt;
+      _bx += _vx * dt * k;
+      _by += _vy * dt * k;
       if (_bx < 0.02 || _bx > 0.98) _vx = -_vx;
       if (_by < 0.02) _vy = _vy.abs();
       // Paddle.
-      if (_by > 0.88 && _by < 0.92 && (_bx - _px).abs() < 0.13 && _vy > 0) {
+      if (_by > 0.88 && _by < 0.92 && (_bx - _px).abs() < 0.11 && _vy > 0) {
         _vy = -_vy.abs() * 1.02;
         _vx = (_bx - _px) * 4;
       }

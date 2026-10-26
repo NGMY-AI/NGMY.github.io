@@ -21607,7 +21607,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
       case NgmyProMoveResult.youLose:
         await _gameLose(reason: label, outcomeLabel: label);
       case NgmyProMoveResult.draw:
-        await _gameLose(reason: label, outcomeLabel: label);
+        await _gameDraw(reason: label, outcomeLabel: label);
       case NgmyProMoveResult.continueGame:
         break;
     }
@@ -22528,6 +22528,39 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
       stake: widget.wager,
       detail: 'Left early · +\$${payout.toStringAsFixed(2)} ($done/$total)',
     ));
+  }
+
+  /// A draw: nobody won and nobody lost, so the stake goes straight back to the player's balance.
+  Future<void> _gameDraw({String reason = 'Draw', String? outcomeLabel}) async {
+    if (_won) return;
+    _won = true;
+    _simonPlayGen++;
+    _roundTimer?.cancel();
+    _miniTicker?.cancel();
+    final txnId = DateTime.now().microsecondsSinceEpoch.toString();
+    final refund = AppTransaction(
+      id: txnId,
+      userEmail: widget.user.email,
+      amount: widget.wager,
+      type: TransactionType.reimbursement,
+      method: PaymentMethod.system,
+      sourceDetails: 'Game payout: ${widget.gameTitle} (draw, stake returned)',
+      status: TransactionStatus.approved,
+      timestamp: DateTime.now(),
+    );
+    widget.onAddTransaction(refund);
+    widget.onDataChanged();
+    unawaited(NgmyGameNotifications.record(
+      email: widget.user.email,
+      gameTitle: widget.gameTitle,
+      stake: widget.wager,
+      won: true,
+      amount: widget.wager,
+      detail: 'Draw. Your \$${widget.wager.toStringAsFixed(2)} stake was returned.',
+      txnId: txnId,
+    ));
+    if (!mounted) return;
+    await _showEndPopup(win: false, title: 'DRAW', subtitle: 'Nobody won, so your \$${widget.wager.toStringAsFixed(2)} stake was returned.', outcomeLabel: outcomeLabel);
   }
 
   Future<void> _gameLose({String reason = 'Try again next time!', String? outcomeLabel}) async {

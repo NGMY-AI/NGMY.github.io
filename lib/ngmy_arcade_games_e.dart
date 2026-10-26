@@ -699,15 +699,16 @@ class _DeepFishingState extends State<DeepFishingGame> with SingleTickerProvider
   void initState() {
     super.initState();
     startScore();
+    hearts = 2;
     startLoop((dt) {
       _wave += dt;
       _spawn -= dt;
       if (_spawn <= 0) {
-        _spawn = 0.7;
+        _spawn = 0.5;
         final left = args.rng.nextBool();
-        final bad = args.rng.nextDouble() < 0.28;
+        final bad = args.rng.nextDouble() < 0.4;
         final e = bad ? (args.rng.nextBool() ? '🪼' : '🦈') : ['🐟', '🐠', '🐡'][args.rng.nextInt(3)];
-        _fish.add(_Fish(left ? -0.1 : 1.1, 0.35 + args.rng.nextDouble() * 0.55, (left ? 1 : -1) * (0.12 + args.rng.nextDouble() * 0.15 + score * 0.01), e, bad));
+        _fish.add(_Fish(left ? -0.1 : 1.1, 0.35 + args.rng.nextDouble() * 0.55, (left ? 1 : -1) * (0.22 + args.rng.nextDouble() * 0.22 + score * 0.025), e, bad));
       }
       for (final f in _fish) {
         if (f != _caught) f.x += f.v * dt;
@@ -717,7 +718,7 @@ class _DeepFishingState extends State<DeepFishingGame> with SingleTickerProvider
         _hook += _hookV * dt;
         if (_hookV > 0 && _caught == null) {
           for (final f in _fish) {
-            if ((f.x - _boat).abs() < 0.07 && (f.y - (0.18 + _hook)).abs() < 0.04) {
+            if ((f.x - _boat).abs() < 0.055 && (f.y - (0.18 + _hook)).abs() < 0.033) {
               _caught = f;
               _hookV = -1.2;
               break;
@@ -1139,13 +1140,13 @@ class _MiniGolfState extends State<MiniGolfGame> with SingleTickerProviderStateM
   Offset _ball = Offset.zero, _vel = Offset.zero, _hole = Offset.zero;
   List<Rect> _walls = [];
   int _strokes = 0;
-  Offset? _pull;
+  Offset? _pull, _dragStart;
   bool _ready = false;
   double _sink = 0;
 
   void _newHole() {
     final w = _size.width, h = _size.height;
-    _ball = Offset(w / 2, h - 70);
+    _ball = Offset(w / 2, h * 0.62);
     _hole = Offset(60 + args.rng.nextDouble() * (w - 120), 110);
     _vel = Offset.zero;
     _strokes = 0;
@@ -1153,7 +1154,7 @@ class _MiniGolfState extends State<MiniGolfGame> with SingleTickerProviderStateM
     final count = 1 + math.min(score, 2);
     for (var i = 0; i < count; i++) {
       final ww = 90 + args.rng.nextDouble() * (w * 0.35);
-      final y = h * (0.35 + i * 0.18) + args.rng.nextDouble() * 30;
+      final y = h * (0.27 + i * 0.12) + args.rng.nextDouble() * 24;
       final x = args.rng.nextDouble() * (w - ww);
       _walls.add(Rect.fromLTWH(x, y, ww, 16));
     }
@@ -1213,21 +1214,27 @@ class _MiniGolfState extends State<MiniGolfGame> with SingleTickerProviderStateM
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onPanStart: (d) {
-            if (canShoot) _pull = d.localPosition;
+            if (canShoot) {
+              _dragStart = d.localPosition;
+              _pull = d.localPosition;
+            }
           },
           onPanUpdate: (d) {
             if (_pull != null) setState(() => _pull = d.localPosition);
           },
           onPanEnd: (_) {
             if (_pull != null && canShoot) {
-              var v = (_ball - _pull!) * 4;
+              var v = (_dragStart! - _pull!) * 4;
               if (v.distance > 1100) v = v / v.distance * 1100;
               if (v.distance > 40) {
                 _vel = v;
                 _strokes++;
               }
             }
-            setState(() => _pull = null);
+            setState(() {
+              _pull = null;
+              _dragStart = null;
+            });
           },
           child: Stack(children: [
             arcadeBackdrop(const [Color(0xFF16A34A), Color(0xFF15803D)]),
@@ -1236,13 +1243,13 @@ class _MiniGolfState extends State<MiniGolfGame> with SingleTickerProviderStateM
             Positioned(left: _hole.dx - hr, top: _hole.dy - hr, child: Container(width: hr * 2, height: hr * 2, decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF052E16)))),
             Positioned(left: _hole.dx - 2, top: _hole.dy - 54, child: Container(width: 3, height: 52, color: Colors.white)),
             Positioned(left: _hole.dx + 1, top: _hole.dy - 54, child: Container(width: 26, height: 16, color: const Color(0xFFDC2626))),
-            if (_pull != null) Positioned.fill(child: CustomPaint(painter: _AimPainter(_ball, _ball + (_ball - _pull!)))),
+            if (_pull != null && _dragStart != null) Positioned.fill(child: CustomPaint(painter: _AimPainter(_ball, _ball + (_dragStart! - _pull!)))),
             Positioned(
               left: _ball.dx - br,
               top: _ball.dy - br,
               child: AnimatedScale(duration: const Duration(milliseconds: 300), scale: _sink > 0 && _ball == _hole ? 0.3 : 1, child: Container(width: br * 2, height: br * 2, decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white, boxShadow: [BoxShadow(color: Colors.black38, blurRadius: 3, offset: Offset(0, 2))]))),
             ),
-            arcadeTopBar('Hole ${math.min(score + 1, goal)}/$goal · strokes $_strokes/$par · drag back to putt', hearts: hearts),
+            arcadeTopBar('Hole ${math.min(score + 1, goal)}/$goal · strokes $_strokes/$par · drag back anywhere to putt', hearts: hearts),
           ]),
         );
       });

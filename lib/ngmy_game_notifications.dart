@@ -534,10 +534,11 @@ class _NgmyGameReceiptCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final partial = n.won && (n.detail.toLowerCase().contains('%') || (n.stake != null && n.amount < n.stake!));
-    final label = !n.won ? 'LOST' : (partial ? 'PARTIAL' : 'WON');
+    final draw = n.won && n.detail.toLowerCase().startsWith('draw');
+    final label = !n.won ? 'LOST' : (draw ? 'DRAW' : (partial ? 'PARTIAL' : 'WON'));
     final accent = !n.won
         ? const Color(0xFFF87171)
-        : (partial ? const Color(0xFFFBBF24) : const Color(0xFF34D399));
+        : (draw ? const Color(0xFF93C5FD) : (partial ? const Color(0xFFFBBF24) : const Color(0xFF34D399)));
     final net = n.net;
     String m(double? v) => v == null ? '…' : _money(v);
     return Container(
