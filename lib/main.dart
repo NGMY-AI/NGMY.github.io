@@ -9393,14 +9393,21 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   /// Every account, read page by page with the admin's own sign-in (the database lets an admin read all users).
   /// Newest sign-ups come first when the table has a created_at column.
   Future<List<Map<String, dynamic>>> _fetchAllUserRowsAsAdmin() async {
-    Future<List<Map<String, dynamic>>> pages(String? orderBy) async {
+    // Named columns only: the password column is locked, so a "*" read would be refused for everyone.
+    const full = 'email,username,phone,isAdmin,status,forceLogout,accountBalance,totalProfit,canSellOnStore,freeTrialActive,freeTrialDailyAmount,'
+        'profilePicturePath,referredByCode,referralCount,points,mediaBio,isEnrolledInRegistry,fullName,state,isAuthorizedRegistrar,'
+        'isApprovedWorker,isApprovedHelper,isAppLoginAccount,created_at';
+    const small = 'email,username,phone,isAdmin,status,accountBalance,created_at';
+    const smallest = 'email,username,phone,isAdmin,status,accountBalance';
+    Future<List<Map<String, dynamic>>> pages(String cols, String orderBy, bool asc) async {
       final out = <Map<String, dynamic>>[];
       var from = 0;
       while (from < 20000) {
         final chunk = await ngmyDbRelaySelect(
           'users',
-          orderBy: orderBy ?? 'email',
-          orderAscending: orderBy == null,
+          cols: cols,
+          orderBy: orderBy,
+          orderAscending: asc,
           range: (from, from + 499),
           timeout: kNgmyCloudLoadTimeout,
         );
@@ -9411,16 +9418,15 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       return out;
     }
 
-    try {
-      return await pages('created_at');
-    } catch (_) {
+    for (final attempt in [(full, 'created_at', false), (small, 'created_at', false), (smallest, 'email', true)]) {
       try {
-        return await pages(null);
+        final rows = await pages(attempt.$1, attempt.$2, attempt.$3);
+        if (rows.isNotEmpty) return rows;
       } catch (e) {
-        debugPrint('[admin] users relay fetch: $e');
-        return const [];
+        debugPrint('[admin] users relay fetch (${attempt.$1.length}): $e');
       }
     }
+    return const [];
   }
 
   void _mergeUsersDiscoveredFromTransactions(List<UserData> users, List<AppTransaction> txns) {
