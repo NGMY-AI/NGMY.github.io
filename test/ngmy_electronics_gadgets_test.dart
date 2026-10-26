@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_electronics_board.dart';
 import 'package:ngmy/ngmy_electronics_lab.dart';
+import 'package:ngmy/ngmy_electronics_extra_parts.dart';
 import 'package:ngmy/ngmy_electronics_more_parts.dart';
 import 'package:ngmy/ngmy_electronics_tv.dart';
 
@@ -25,6 +26,22 @@ ElectronicsBoard loop(String kind, {double volts = 3, bool backwards = false, in
 }
 
 void main() {
+  test('every new appliance runs on a battery in its range, and burns with too many volts', () {
+    for (final k in kExtraDeviceSpecs.keys) {
+      final spec = kExtraDeviceSpecs[k]!;
+      final ok = [for (final v in const [3.0, 4.5, 9.0, 12.0]) if (v >= spec.minV + 0.8 && v <= spec.maxV) v];
+      expect(ok, isNotEmpty, reason: k);
+      final b = loop(k, volts: ok.first);
+      expect(b.of(k).first.glow, greaterThan(0), reason: '$k should run on ${ok.first} V');
+      expect(b.of(k).first.burnt, isFalse, reason: k);
+      expect(b.diagnose(b.of(k).first), isNull, reason: k);
+      if (spec.maxV < 12) {
+        final hot = loop(k, volts: 12);
+        expect(hot.of(k).first.burnt, isTrue, reason: '$k should burn at 12 V');
+      }
+    }
+  });
+
   test('the TV turns on at 12 V and shows its channel; it stays dark with too few volts', () {
     final on = loop('tv', volts: 12);
     expect(on.of('tv').first.glow, 1);
@@ -115,7 +132,7 @@ void main() {
     await t.pumpWidget(const MaterialApp(home: NgmyElectronicsLab()));
     await t.pump(const Duration(milliseconds: 300));
     expect(find.text('Voltmeter').evaluate().length + find.text('Party lights').evaluate().length, greaterThan(0));
-    expect(kPartInfos.length, 29);
+    expect(kPartInfos.length, 46);
     // Every part can be put on the board and drawn.
     for (final k in [for (final p in kPartInfos) p.kind]) {
       final b = ElectronicsBoard()..add(k, 0.5, 0.5);

@@ -234,10 +234,10 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
   Widget build(BuildContext context) {
     final sel = _sel;
     final kinds = widget.paletteKinds ?? [for (final p in kPartInfos) p.kind];
-    // Plenty of tools: half in a row above the board and half in a row below it.
+    // Plenty of tools: all of them sit above the board, in two rows.
     final two = kinds.length > 8;
-    final topKinds = two ? kinds.sublist(0, (kinds.length + 1) ~/ 2) : const <String>[];
-    final bottomKinds = two ? kinds.sublist((kinds.length + 1) ~/ 2) : kinds;
+    final topKinds = two ? kinds.sublist(0, (kinds.length + 1) ~/ 2) : kinds;
+    final bottomKinds = two ? kinds.sublist((kinds.length + 1) ~/ 2) : const <String>[];
     // Pop-in animation progress.
     final pop = widget.popIn;
     if (pop != null) {
@@ -247,7 +247,8 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
     }
     return Column(children: [
       if (widget.header != null) widget.header!,
-      if (!widget.readOnlyPalette && two) _paletteRow(topKinds, top: true),
+      if (!widget.readOnlyPalette) _paletteRow(topKinds, top: true),
+      if (!widget.readOnlyPalette && two) _paletteRow(bottomKinds, top: true),
       Expanded(
         child: LayoutBuilder(builder: (context, box) {
           _size = Size(box.maxWidth, box.maxHeight);
@@ -363,24 +364,22 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
           );
         }),
       ),
-      if (!widget.readOnlyPalette) _paletteRow(bottomKinds),
     ]);
   }
 
   Widget _paletteRow(List<String> ks, {bool top = false}) => Container(
-        height: 66,
+        height: 58,
         decoration: BoxDecoration(color: kStudioPanel, border: Border(top: top ? BorderSide.none : BorderSide(color: Colors.white.withValues(alpha: 0.08)), bottom: top ? BorderSide(color: Colors.white.withValues(alpha: 0.08)) : BorderSide.none)),
-        child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.fromLTRB(10, 6, 10, 6), children: [
+        child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.fromLTRB(10, 5, 10, 5), children: [
           for (final k in ks)
             GestureDetector(
               onTap: () => spawn(k),
               child: Container(
-                width: 66,
-                margin: const EdgeInsets.only(right: 8),
+                width: 62,
+                margin: const EdgeInsets.only(right: 7),
                 decoration: BoxDecoration(color: kPartByKind[k]!.color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(14), border: Border.all(color: kPartByKind[k]!.color.withValues(alpha: 0.5))),
                 child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Text(kPartByKind[k]!.emoji, style: const TextStyle(fontSize: 20)),
-                  const SizedBox(height: 1),
+                  Text(kPartByKind[k]!.emoji, style: const TextStyle(fontSize: 18)),
                   Text(kPartByKind[k]!.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800)),
                 ]),
               ),
@@ -509,9 +508,21 @@ class _NgmyElectronicsLabState extends State<NgmyElectronicsLab> {
   int _ch = 0;
   final Set<int> _done = {};
   int _frame = 0;
+  int _working = 0;
+  int _broken = 0;
 
   void _tick() {
     _frame++;
+    if (_frame % 15 == 0) {
+      final w = _board.parts.where((p) => _board.needsPower(p) && _board.works(p)).length;
+      final x = _board.parts.where((p) => p.burnt).length;
+      if (w != _working || x != _broken) {
+        setState(() {
+          _working = w;
+          _broken = x;
+        });
+      }
+    }
     if (_frame % 10 != 0 || _ch >= _kChallenges.length) return;
     if (!_done.contains(_ch) && _kChallenges[_ch].check(_board)) {
       _done.add(_ch);
@@ -563,40 +574,112 @@ class _NgmyElectronicsLabState extends State<NgmyElectronicsLab> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _barButton(IconData icon, String label, Color col, VoidCallback onTap) => GestureDetector(
+        onTap: onTap,
+        child: Tooltip(
+          message: label,
+          child: Container(
+            width: 34,
+            height: 34,
+            margin: const EdgeInsets.only(left: 4),
+            decoration: BoxDecoration(color: col.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(12), border: Border.all(color: col.withValues(alpha: 0.5))),
+            child: Icon(icon, color: col, size: 18),
+          ),
+        ),
+      );
+
+  Widget _topBar(BuildContext context, String help) {
+    const accent = Color(0xFF38BDF8);
     final c = _ch < _kChallenges.length ? _kChallenges[_ch] : null;
     final done = c != null && _done.contains(_ch);
-    return StudioPage(
-      title: 'ELECTRONICS LAB',
-      accent: const Color(0xFF38BDF8),
-      help: 'Build real circuits.\n\n1. Tap a part at the bottom to put it on the board. Drag it around.\n2. Drag from a round dot on one part to a round dot on another to join them with a wire. A circuit only works when it makes a complete loop from the battery, through the parts, and back.\n3. Tap a part to read what it does and how it is made, and to change it (battery volts, sunlight, resistor size). Tap a switch to flip it, and a crank to spin it.\n\nThe maths is real: bulbs get brighter with more volts and burn out with too many, LEDs need a resistor, and moving dots on the wires show current flowing.\n\nLots of tools: one row above the board and one below it. A TV needs 6+ volts and shows NGMY animations: tap it 3 times quickly for the big screen. A 1.5 V battery starts flat and must be charged with a solar panel first. If something does not work, tap it: it tells you why (backwards, burnt, flat battery, loop not finished...).\n\nTry the challenges at the top, or open Ready-made circuits to see how a flashlight, radio, TV or solar lamp is wired.',
-      stage: BoardEditor(
-        key: _editor,
-        board: _board,
-        onTick: _tick,
-        header: Container(
-          margin: const EdgeInsets.fromLTRB(10, 6, 10, 2),
-          padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
-          decoration: BoxDecoration(color: (done ? const Color(0xFF4ADE80) : const Color(0xFF38BDF8)).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(16), border: Border.all(color: (done ? const Color(0xFF4ADE80) : const Color(0xFF38BDF8)).withValues(alpha: 0.4))),
-          child: Row(children: [
-            Expanded(
-              child: c == null
-                  ? const Text('All challenges done! Keep inventing.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800))
-                  : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('${done ? '✅' : '🎯'} Challenge ${_ch + 1}: ${c.title}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13.5)),
-                      Text(done ? 'Well done!' : c.hint, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, fontSize: 11.5, height: 1.25)),
-                    ]),
-            ),
-            if (c != null) TextButton(onPressed: () => setState(() => _ch = done ? _ch + 1 : math.min(_kChallenges.length, _ch + 1)), child: Text(done ? 'Next' : 'Skip')),
-          ]),
-        ),
+    final tone = done ? const Color(0xFF4ADE80) : accent;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 8, 10, 10),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF0C4A6E), Color(0xFF111827), Color(0xFF1E1B4B)]),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(22)),
+        border: Border(bottom: BorderSide(color: accent.withValues(alpha: 0.45), width: 1.4)),
+        boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.18), blurRadius: 14, offset: const Offset(0, 4))],
       ),
-      actions: [
-        IconButton(onPressed: _recipes, icon: const Icon(Icons.menu_book_rounded, color: Colors.white70, size: 22), tooltip: 'Ready-made circuits'),
-        IconButton(onPressed: () => setState(_board.repairAll), icon: const Icon(Icons.build_rounded, color: Colors.white70, size: 21), tooltip: 'Repair burnt parts'),
-        IconButton(onPressed: () => setState(_board.clear), icon: const Icon(Icons.delete_sweep_rounded, color: Colors.white70, size: 23), tooltip: 'Clear the board'),
-      ],
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Row(children: [
+          GestureDetector(
+            onTap: () => Navigator.of(context).maybePop(),
+            child: Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), shape: BoxShape.circle),
+              child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 17),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF38BDF8), Color(0xFF6366F1)]), borderRadius: BorderRadius.circular(13), boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.5), blurRadius: 10)]),
+            child: const Center(child: Text('⚡', style: TextStyle(fontSize: 21))),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Electronics Lab', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 0.2)),
+              Text(
+                _board.parts.isEmpty ? 'Pick a part to start' : '${_board.parts.length} parts · $_working working${_broken > 0 ? ' · $_broken burnt' : ''}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: _broken > 0 ? const Color(0xFFFCA5A5) : const Color(0xFF7DD3FC), fontSize: 11.5, fontWeight: FontWeight.w700),
+              ),
+            ]),
+          ),
+          _barButton(Icons.menu_book_rounded, 'Ready-made circuits', const Color(0xFFA78BFA), _recipes),
+          _barButton(Icons.build_rounded, 'Repair burnt parts', const Color(0xFFFBBF24), () => setState(_board.repairAll)),
+          _barButton(Icons.delete_sweep_rounded, 'Clear the board', const Color(0xFFF87171), () => setState(_board.clear)),
+          _barButton(Icons.help_outline_rounded, 'How to play', accent, () => showStudioHelp(context, 'ELECTRONICS LAB', help, accent)),
+        ]),
+        const SizedBox(height: 9),
+        Container(
+          padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
+          decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.28), borderRadius: BorderRadius.circular(14), border: Border.all(color: tone.withValues(alpha: 0.45))),
+          child: c == null
+              ? const Text('🏆 All challenges done! Keep inventing.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800))
+              : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Expanded(child: Text('${done ? '✅' : '🎯'} ${c.title}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13.5))),
+                    Text('${_ch + 1}/${_kChallenges.length}', style: TextStyle(color: tone, fontWeight: FontWeight.w900, fontSize: 12)),
+                    SizedBox(
+                      height: 28,
+                      child: TextButton(
+                        style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10), minimumSize: Size.zero),
+                        onPressed: () => setState(() => _ch = math.min(_kChallenges.length, _ch + 1)),
+                        child: Text(done ? 'Next ▶' : 'Skip', style: TextStyle(color: tone, fontWeight: FontWeight.w800)),
+                      ),
+                    ),
+                  ]),
+                  Text(done ? 'Well done!' : c.hint, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, fontSize: 11.5, height: 1.25)),
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(value: _done.length / _kChallenges.length, minHeight: 4, backgroundColor: Colors.white12, valueColor: AlwaysStoppedAnimation(tone)),
+                  ),
+                ]),
+        ),
+      ]),
+    );
+  }
+
+  static const String _help = 'Build real circuits.\n\n1. Tap a part in the tool rows at the top to put it on the board. Drag it around.\n2. Drag from a round dot on one part to a round dot on another to join them with a wire. A circuit only works when it makes a complete loop from the battery, through the parts, and back.\n3. Tap a part to read what it does and how it is made, and to change it (battery volts, sunlight, resistor size). Tap a switch to flip it, and a crank to spin it.\n\nThe maths is real: bulbs get brighter with more volts and burn out with too many, LEDs need a resistor, and moving dots on the wires show current flowing.\n\nLots of tools: two rows above the board (swipe sideways to see them all). Appliances, toys and machines each need the right volts. A TV needs 6+ volts and shows NGMY animations: tap it 3 times quickly for the big screen. A 1.5 V battery starts flat and must be charged with a solar panel first. If something does not work, tap it: it tells you why (backwards, burnt, flat battery, loop not finished...).\n\nTry the challenges at the top bar, or open Ready-made circuits to see how a flashlight, radio, TV or solar lamp is wired.';
+
+  @override
+  Widget build(BuildContext context) {
+    NgmyTone.theme = kStudioSoundThemes['ELECTRONICS LAB'] ?? 'music';
+    return Scaffold(
+      backgroundColor: kStudioBg,
+      body: SafeArea(
+        child: Column(children: [
+          _topBar(context, _help),
+          Expanded(child: BoardEditor(key: _editor, board: _board, onTick: _tick)),
+        ]),
+      ),
     );
   }
 }

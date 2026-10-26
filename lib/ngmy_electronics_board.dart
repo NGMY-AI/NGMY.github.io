@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_electronics_extra_parts.dart';
 import 'ngmy_electronics_more_parts.dart';
 import 'ngmy_electronics_tv.dart';
 
@@ -41,6 +42,7 @@ const List<PartInfo> kPartInfos = [
   PartInfo('radio', 'Radio', '📻', Color(0xFFE879F9), 'Needs about 3 volts or more. When it has power it picks up stations and plays them.', 'An aerial catches invisible radio waves. A tuner picks one station, and a chip turns it back into sound for the speaker.'),
   PartInfo('tv', 'TV', '📺', Color(0xFF22D3EE), 'Needs 5.5 to 13.5 volts and the + (left) dot towards the battery +. When it switches on it shows NGMY animation channels. Tap it 3 times quickly to open the big screen.', 'Millions of tiny red, green and blue lights, called pixels, that glow at different strengths to make every colour.'),
   ...kMorePartInfos,
+  ...kExtraPartInfos,
 ];
 
 final Map<String, PartInfo> kPartByKind = {for (final p in kPartInfos) p.kind: p};
@@ -454,7 +456,7 @@ class ElectronicsBoard {
         if (!p.burnt && p.v.abs() > spec.maxV) _burn(p, 'The ${p.info.name} is made for ${_fmtV(spec.minV)} to ${_fmtV(spec.maxV)} volts but got ${p.v.abs().toStringAsFixed(1)} V, so it burnt out.');
         p.glow = (on && !p.burnt) ? 1.0 : 0.0;
         p.onAge = p.glow > 0 ? p.onAge + dt : 0;
-        if (p.kind == 'fan' || p.kind == 'toycar') {
+        if (kSpinners.contains(p.kind)) {
           p.glow = p.glow > 0 ? ((p.v.abs() - 1.0) / 6).clamp(0.15, 1.4) : 0.0;
           p.spin += p.glow * dt * (p.kind == 'fan' ? 30 : 26);
         }

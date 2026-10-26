@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'ngmy_electronics_board.dart';
+import 'ngmy_electronics_extra_parts.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
 // More parts for the Electronics Lab: gadgets that need the right power, plus meters.
@@ -20,6 +21,7 @@ class DeviceSpec {
 }
 
 const Map<String, DeviceSpec> kDeviceSpecs = {
+  ...kExtraDeviceSpecs,
   'radio': DeviceSpec(30, 2.5, 10.5),
   'tv': DeviceSpec(50, 5.5, 13.5),
   'fan': DeviceSpec(12, 2.0, 9.5, polar: false),
@@ -239,5 +241,5 @@ bool paintMorePart(Canvas c, Part p, double time, void Function(Canvas, String, 
       }
       return true;
   }
-  return false;
+  return paintExtraPart(c, p, time, text);
 }
