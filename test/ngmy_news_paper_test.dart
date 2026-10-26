@@ -12,6 +12,7 @@ const sp = 'C:/Users/appbu/AppData/Local/Temp/claude/C--Users-appbu-StudioProjec
 
 const doc = NgmyNewsDoc(
   paper: 'The NGMY Times',
+  category: 'COMMUNITY',
   headline: 'NGMY Opens Its Doors To Young Builders Everywhere',
   subhead: 'One app now brings work, money, learning and community together for families across the country',
   byline: 'By the NGMY Newsroom',

@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'ngmy_book_studio.dart' show NgmyAiBadge;
 import 'ngmy_news_ai.dart';
 import 'ngmy_news_paper.dart';
+import 'ngmy_photo_crop.dart';
 import 'ngmy_vault_web_io.dart';
 
 /// NGMY News: add a picture, and the AI writes a newspaper page about NGMY around it.
@@ -46,6 +47,7 @@ class _NgmyNewsMakerScreenState extends State<NgmyNewsMakerScreen> {
   Uint8List? _logo;
   NgmyNewsTemplate _template = kNgmyNewsTemplates.first;
   NgmyNewsDoc _doc = const NgmyNewsDoc();
+  String _lang = 'en';
   bool _busy = false;
   String _status = '';
   final List<(String, String)> _talk = [];
@@ -82,11 +84,24 @@ class _NgmyNewsMakerScreenState extends State<NgmyNewsMakerScreen> {
       if (f == null) return;
       final b = await f.readAsBytes();
       if (!mounted) return;
-      await precacheImage(MemoryImage(b), context);
-      if (mounted) setState(() => _photo = b);
+      if (!mounted) return;
+      // The picture opens in the crop screen first. "Use the whole picture" keeps it as it is.
+      final cropped = await showNgmyPhotoCrop(context, b);
+      if (cropped == null || !mounted) return;
+      await precacheImage(MemoryImage(cropped), context);
+      if (mounted) setState(() => _photo = cropped);
     } catch (e) {
       _say('Could not open that picture. $e');
     }
+  }
+
+  Future<void> _crop() async {
+    final p = _photo;
+    if (p == null || _busy) return;
+    final cropped = await showNgmyPhotoCrop(context, p);
+    if (cropped == null || !mounted) return;
+    await precacheImage(MemoryImage(cropped), context);
+    if (mounted) setState(() => _photo = cropped);
   }
 
   Future<void> _write() async {
@@ -97,7 +112,8 @@ class _NgmyNewsMakerScreenState extends State<NgmyNewsMakerScreen> {
     });
     try {
       final write = widget.writer ?? ngmyWriteNews;
-      final doc = await write(template: _template, photo: _photo, request: _request.text, paper: null);
+      final asked = _lang == 'sw' ? '${_request.text.trim()} Write the whole newspaper in Swahili (Kiswahili).'.trim() : _request.text;
+      final doc = await write(template: _template, photo: _photo, request: asked, paper: null);
       if (!mounted) return;
       setState(() {
         _undo.clear();
@@ -221,6 +237,7 @@ class _NgmyNewsMakerScreenState extends State<NgmyNewsMakerScreen> {
             if (_photo != null) ...[
               const SizedBox(width: 10),
               ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.memory(_photo!, width: 48, height: 48, fit: BoxFit.cover)),
+              IconButton(tooltip: 'Crop the picture', onPressed: _busy ? null : _crop, icon: const Icon(Icons.crop_rounded, color: Colors.white70)),
             ],
           ]),
           const SizedBox(height: 14),
@@ -243,12 +260,20 @@ class _NgmyNewsMakerScreenState extends State<NgmyNewsMakerScreen> {
                 onPressed: () => setState(() => _request.text = i.$2),
               ),
           ]),
+          const SizedBox(height: 10),
+          Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, children: [
+            const Text('LANGUAGE', style: TextStyle(color: Colors.white54, fontSize: 11.5, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+            const SizedBox(width: 12),
+            ChoiceChip(label: const Text('English'), selected: _lang == 'en', onSelected: (_) => setState(() => _lang = 'en')),
+            const SizedBox(width: 8),
+            ChoiceChip(label: const Text('Kiswahili'), selected: _lang == 'sw', onSelected: (_) => setState(() => _lang = 'sw')),
+          ]),
           const SizedBox(height: 14),
           _section('3  PICK A DESIGN'),
-          SizedBox(
-            height: 78,
-            child: ListView(scrollDirection: Axis.horizontal, children: [for (final t in kNgmyNewsTemplates) _designTile(t)]),
-          ),
+          // Two lines of designs, one above the other, so each one is easy to find.
+          SizedBox(height: 78, child: ListView(scrollDirection: Axis.horizontal, children: [for (final t in kNgmyNewsTemplates.take(10)) _designTile(t)])),
+          const SizedBox(height: 8),
+          SizedBox(height: 78, child: ListView(scrollDirection: Axis.horizontal, children: [for (final t in kNgmyNewsTemplates.skip(10)) _designTile(t)])),
           const SizedBox(height: 16),
           GestureDetector(
             onTap: _busy ? null : _write,

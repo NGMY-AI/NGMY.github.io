@@ -28,13 +28,13 @@ void main() {
     await t.tap(find.ancestor(of: find.text('Write my newspaper'), matching: find.byType(GestureDetector)).first);
     await t.pump(const Duration(milliseconds: 100));
     await t.pump(const Duration(milliseconds: 300));
-    expect(find.text('BIG NEWS FROM NGMY'), findsOneWidget);
+    expect(find.text('Big News From NGMY'), findsOneWidget);
     expect(find.text('TALK TO THE EDITOR'), findsOneWidget);
     await t.enterText(find.byType(TextField).last, 'make the headline shorter');
     await t.tap(find.byIcon(Icons.send_rounded));
     await t.pump(const Duration(milliseconds: 300));
     expect(asked, 'make the headline shorter');
-    expect(find.text('SHORT NEWS'), findsOneWidget);
+    expect(find.text('Short News'), findsOneWidget);
     expect(find.text('Shortened it.'), findsOneWidget);
     expect(find.text('CREATED BY NGMY.ORG'), findsOneWidget);
     expect(t.takeException(), isNull);

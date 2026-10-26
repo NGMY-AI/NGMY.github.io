@@ -44,7 +44,6 @@ Future<void> showNgmyLocalGrowthIncomePage(
   void Function(AppTransaction transaction)? onCloudAddTransaction,
   Future<void> Function(double balance, {required bool allowDecrease})? onPersistBalanceToCloud,
 }) {
-  if (!liveUser.isAdmin) return Future.value();
   return NgmyNavigator.push<void>(
     context,
     NgmyLocalGrowthIncomeScreen(
@@ -144,12 +143,6 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
   @override
   void initState() {
     super.initState();
-    if (!widget.liveUser.isAdmin) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) NgmyNavigator.pop(context);
-      });
-      return;
-    }
     WidgetsBinding.instance.addObserver(this);
     NgmyFeatureSyncSession.enterGrowthIncomeUser();
     final remembered = NgmyLocalGrowthIncomeStore.memoryFor(widget.liveUser.email);

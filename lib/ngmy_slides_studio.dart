@@ -4198,24 +4198,29 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
           _topIconBtn(Icons.arrow_back_ios_new_rounded, 'Back', _closeEditor, isDark),
           const SizedBox(width: 4),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+            // The title and the slide count sit on one line, on the same baseline.
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
               children: [
-                Text(
-                  deck.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: compact ? 14 : 15,
-                    letterSpacing: -0.2,
-                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                Flexible(
+                  child: Text(
+                    deck.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: compact ? 14 : 15,
+                      letterSpacing: -0.2,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
                   ),
                 ),
+                const SizedBox(width: 8),
                 Text(
-                  '${deck.slides.length} slides · ${_slideIndex + 1} of ${deck.slides.length}',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isDark ? Colors.white38 : const Color(0xFF64748B)),
+                  '${_slideIndex + 1} of ${deck.slides.length}',
+                  maxLines: 1,
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isDark ? Colors.white38 : const Color(0xFF64748B)),
                 ),
               ],
             ),

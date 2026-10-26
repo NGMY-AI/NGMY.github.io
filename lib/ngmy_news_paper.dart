@@ -15,9 +15,11 @@ class NgmyNewsDoc {
     this.pullQuote = '',
     this.sidebarTitle = '',
     this.sidebarText = '',
+    this.category = 'NGMY NEWS',
   });
 
   final String paper;
+  final String category;
   final String headline;
   final String subhead;
   final String byline;
@@ -29,7 +31,8 @@ class NgmyNewsDoc {
 
   bool get isEmpty => headline.trim().isEmpty && body.isEmpty;
 
-  NgmyNewsDoc copyWith({String? paper, String? headline, String? subhead, String? byline, String? caption, List<String>? body, String? pullQuote, String? sidebarTitle, String? sidebarText}) => NgmyNewsDoc(
+  NgmyNewsDoc copyWith({String? paper, String? headline, String? subhead, String? byline, String? caption, List<String>? body, String? pullQuote, String? sidebarTitle, String? sidebarText, String? category}) => NgmyNewsDoc(
+        category: category ?? this.category,
         paper: paper ?? this.paper,
         headline: headline ?? this.headline,
         subhead: subhead ?? this.subhead,
@@ -51,6 +54,7 @@ class NgmyNewsDoc {
         'pullQuote': pullQuote,
         'sidebarTitle': sidebarTitle,
         'sidebarText': sidebarText,
+        'category': category,
       };
 
   /// Takes what the AI sent. Anything missing keeps its old value, so a small change does not wipe the page.
@@ -73,6 +77,7 @@ class NgmyNewsDoc {
       pullQuote: s('pullQuote'),
       sidebarTitle: s('sidebarTitle'),
       sidebarText: s('sidebarText'),
+      category: (s('category') ?? '').isEmpty ? null : s('category')!.toUpperCase(),
     );
   }
 
@@ -80,7 +85,7 @@ class NgmyNewsDoc {
 }
 
 /// How the page is built: where the headline, picture and columns go.
-enum NewsLayout { classic, sideBySide, splash, magazine, wrap, scrapbook, circle, rail, banner, minimal }
+enum NewsLayout { classic, sideBySide, splash, magazine, wrap, scrapbook, circle, rail, banner, minimal, cardWorld, cardSplit, cardBreaking, cardFeature }
 
 /// How the picture is framed.
 enum NewsFrame { plain, double, polaroid, rounded, circle, tape, cutCorner, film, arch, shadow, torn }
@@ -141,28 +146,28 @@ const String kNewsOldStandard = 'NgmyOldStandard';
 const String kNewsAbril = 'NgmyAbril';
 
 const List<NgmyNewsTemplate> kNgmyNewsTemplates = [
-  // ── Old papers ──
-  NgmyNewsTemplate(id: 'gazette', name: 'Old Gazette', group: 'Old', layout: NewsLayout.classic, frame: NewsFrame.double, paper: 0xFFEFDDB0, paper2: 0xFFD9BE86, ink: 0xFF2A1B0E, accent: 0xFF7A1F12, mast: 'blackletter', mastFont: kNewsBlackletter, headFont: kNewsOldStandard, bodyFont: kNewsOldStandard, vintage: true, photoFilter: 'sepia', caps: true, voice: 'an old-fashioned town gazette from the 1920s: formal, dignified, a little poetic, with a bold dramatic headline'),
-  NgmyNewsTemplate(id: 'chronicle', name: 'Sepia Chronicle', group: 'Old', layout: NewsLayout.wrap, frame: NewsFrame.torn, paper: 0xFFE8D2A4, paper2: 0xFFC9A66B, ink: 0xFF3B2412, accent: 0xFF5B3A1A, mast: 'centered', mastFont: kNewsOldStandard, headFont: kNewsOldStandard, bodyFont: kNewsOldStandard, vintage: true, photoFilter: 'sepia', caps: true, voice: 'a classic sepia chronicle from long ago: warm, storytelling, with a grand headline'),
-  NgmyNewsTemplate(id: 'times', name: 'Classic Times', group: 'Old', layout: NewsLayout.sideBySide, frame: NewsFrame.plain, paper: 0xFFF3EEE0, paper2: 0xFFE6DFCB, ink: 0xFF16130E, accent: 0xFF16130E, mast: 'blackletter', mastFont: kNewsBlackletter, headFont: kNewsOldStandard, bodyFont: kNewsOldStandard, photoFilter: 'bw', voice: 'a serious classic broadsheet: calm, factual, authoritative, with a strong headline and a clear subhead'),
-  NgmyNewsTemplate(id: 'telegraph', name: 'Daily Telegraph', group: 'Old', layout: NewsLayout.rail, frame: NewsFrame.film, paper: 0xFFEADFC3, paper2: 0xFFD8C79F, ink: 0xFF1F1A12, accent: 0xFF8A2B14, mast: 'centered', mastFont: kNewsBlackletter, headFont: kNewsOldStandard, bodyFont: kNewsOldStandard, vintage: true, photoFilter: 'bw', voice: 'a 1940s telegraph newspaper: urgent, crisp and official, with a strong headline'),
-  NgmyNewsTemplate(id: 'scrapbook', name: 'Memory Scrapbook', group: 'Old', layout: NewsLayout.scrapbook, frame: NewsFrame.polaroid, paper: 0xFFF1E3C0, paper2: 0xFFE0C896, ink: 0xFF3A2A1A, accent: 0xFFB45309, mast: 'split', mastFont: kNewsOldStandard, headFont: kNewsOldStandard, bodyFont: kNewsOldStandard, vintage: true, photoFilter: 'sepia', voice: 'a warm scrapbook clipping: personal, nostalgic and heartfelt'),
-  NgmyNewsTemplate(id: 'victory', name: 'Victory Extra', group: 'Old', layout: NewsLayout.banner, frame: NewsFrame.tape, paper: 0xFFEEDDB2, paper2: 0xFFD6BA82, ink: 0xFF241608, accent: 0xFFA3190B, mast: 'blackletter', mastFont: kNewsBlackletter, headFont: kNewsAbril, bodyFont: kNewsOldStandard, vintage: true, photoFilter: 'sepia', caps: true, voice: 'a special "extra edition" announcing big news: exciting, proud and dramatic'),
-  NgmyNewsTemplate(id: 'parchment', name: 'Royal Parchment', group: 'Old', layout: NewsLayout.circle, frame: NewsFrame.circle, paper: 0xFFF0E2BB, paper2: 0xFFDCC590, ink: 0xFF2F2210, accent: 0xFF6B21A8, mast: 'centered', mastFont: kNewsBlackletter, headFont: kNewsOldStandard, bodyFont: kNewsOldStandard, vintage: true, photoFilter: 'sepia', voice: 'a royal proclamation printed on parchment: stately, noble and ceremonial'),
-  NgmyNewsTemplate(id: 'broadsheet', name: 'City Broadsheet', group: 'Old', layout: NewsLayout.wrap, frame: NewsFrame.shadow, paper: 0xFFF6F2E6, paper2: 0xFFEAE3CF, ink: 0xFF111111, accent: 0xFF1D4ED8, mast: 'blackletter', mastFont: kNewsBlackletter, headFont: kNewsOldStandard, bodyFont: kNewsOldStandard, photoFilter: 'bw', voice: 'a dense city broadsheet: precise, trustworthy and well informed'),
-  // ── Modern papers ──
-  NgmyNewsTemplate(id: 'daily', name: 'The Daily', group: 'Modern', layout: NewsLayout.classic, frame: NewsFrame.plain, paper: 0xFFFFFFFF, paper2: 0xFFF4F4F2, ink: 0xFF111111, accent: 0xFFD62828, mast: 'bar', mastFont: kNewsAbril, headFont: kNewsAbril, bodyFont: kNewsOldStandard, caps: true, voice: 'a modern daily newspaper: crisp, clear and energetic, with a punchy headline'),
-  NgmyNewsTemplate(id: 'tabloid', name: 'Big Tabloid', group: 'Modern', layout: NewsLayout.splash, frame: NewsFrame.cutCorner, paper: 0xFFFFFFFF, paper2: 0xFFFFF7E0, ink: 0xFF111111, accent: 0xFFE11D48, mast: 'bar', mastFont: 'Roboto', headFont: kNewsAbril, bodyFont: 'Roboto', caps: true, voice: 'a bold tabloid: exciting, short punchy sentences and a loud, attention-grabbing headline (still truthful)'),
-  NgmyNewsTemplate(id: 'modern', name: 'Modern Digest', group: 'Modern', layout: NewsLayout.minimal, frame: NewsFrame.rounded, paper: 0xFFF8FAFC, paper2: 0xFFE2E8F0, ink: 0xFF0F172A, accent: 0xFF0D9488, mast: 'split', mastFont: 'Roboto', headFont: 'Roboto', bodyFont: 'Roboto', voice: 'a clean modern digest: simple words, short paragraphs, friendly and clear'),
-  NgmyNewsTemplate(id: 'midnight', name: 'Midnight Edition', group: 'Modern', layout: NewsLayout.magazine, frame: NewsFrame.plain, paper: 0xFF111827, paper2: 0xFF0B1020, ink: 0xFFF1F5F9, accent: 0xFFFACC15, mast: 'centered', mastFont: kNewsOldStandard, headFont: kNewsAbril, bodyFont: kNewsOldStandard, dark: true, caps: true, voice: 'a dramatic late-night edition: confident, cinematic and polished'),
-  NgmyNewsTemplate(id: 'herald', name: 'NGMY Herald', group: 'Modern', layout: NewsLayout.sideBySide, frame: NewsFrame.rounded, paper: 0xFFFFFFFF, paper2: 0xFFF5F3FF, ink: 0xFF1E1B4B, accent: 0xFF7C3AED, mast: 'split', mastFont: kNewsAbril, headFont: kNewsAbril, bodyFont: kNewsOldStandard, voice: 'the proud NGMY Herald: warm, hopeful and community-minded, in NGMY purple'),
-  NgmyNewsTemplate(id: 'metro', name: 'Metro Wire', group: 'Modern', layout: NewsLayout.banner, frame: NewsFrame.cutCorner, paper: 0xFFF1F5F9, paper2: 0xFFE2E8F0, ink: 0xFF0B1220, accent: 0xFF2563EB, mast: 'bar', mastFont: 'Roboto', headFont: 'Roboto', bodyFont: 'Roboto', caps: true, voice: 'a modern news wire: fast, factual and direct, like breaking news'),
-  NgmyNewsTemplate(id: 'sunrise', name: 'Sunrise Post', group: 'Modern', layout: NewsLayout.magazine, frame: NewsFrame.arch, paper: 0xFFFFF7ED, paper2: 0xFFFFEDD5, ink: 0xFF3B1D08, accent: 0xFFEA580C, mast: 'split', mastFont: kNewsAbril, headFont: kNewsAbril, bodyFont: kNewsOldStandard, voice: 'a cheerful morning paper: bright, optimistic and welcoming'),
-  NgmyNewsTemplate(id: 'forest', name: 'Green Leaf', group: 'Modern', layout: NewsLayout.rail, frame: NewsFrame.double, paper: 0xFFF0FDF4, paper2: 0xFFDCFCE7, ink: 0xFF052E16, accent: 0xFF15803D, mast: 'centered', mastFont: kNewsAbril, headFont: kNewsAbril, bodyFont: kNewsOldStandard, voice: 'a calm community paper about growth and togetherness: gentle, hopeful and clear'),
-  NgmyNewsTemplate(id: 'neon', name: 'Neon Beat', group: 'Modern', layout: NewsLayout.scrapbook, frame: NewsFrame.tape, paper: 0xFF1E1B4B, paper2: 0xFF0F0A2E, ink: 0xFFF5F3FF, accent: 0xFFEC4899, mast: 'split', mastFont: kNewsAbril, headFont: kNewsAbril, bodyFont: 'Roboto', dark: true, voice: 'a youthful neon culture paper: fresh, bold, energetic and fun'),
-  NgmyNewsTemplate(id: 'ocean', name: 'Blue Ocean', group: 'Modern', layout: NewsLayout.circle, frame: NewsFrame.circle, paper: 0xFFEFF6FF, paper2: 0xFFDBEAFE, ink: 0xFF0C1E3E, accent: 0xFF0369A1, mast: 'centered', mastFont: kNewsAbril, headFont: kNewsAbril, bodyFont: kNewsOldStandard, voice: 'a calm, trustworthy paper: clear, steady and reassuring'),
-  NgmyNewsTemplate(id: 'gold', name: 'Golden Press', group: 'Modern', layout: NewsLayout.wrap, frame: NewsFrame.film, paper: 0xFF16130A, paper2: 0xFF0A0904, ink: 0xFFFEF3C7, accent: 0xFFFACC15, mast: 'blackletter', mastFont: kNewsBlackletter, headFont: kNewsAbril, bodyFont: kNewsOldStandard, dark: true, photoFilter: 'bw', caps: true, voice: 'a luxurious golden press edition: grand, elegant and prestigious'),
-  NgmyNewsTemplate(id: 'minimal', name: 'Paper White', group: 'Modern', layout: NewsLayout.minimal, frame: NewsFrame.shadow, paper: 0xFFFFFFFF, paper2: 0xFFFAFAFA, ink: 0xFF18181B, accent: 0xFF18181B, mast: 'split', mastFont: kNewsOldStandard, headFont: kNewsOldStandard, bodyFont: kNewsOldStandard, voice: 'a quiet, elegant long-read: thoughtful, simple and beautifully written'),
+  // ── Row one ──
+  NgmyNewsTemplate(id: 'world', name: 'NGMY World', group: 'Cards', layout: NewsLayout.cardWorld, frame: NewsFrame.rounded, paper: 0xFF0B1F44, paper2: 0xFF050E22, ink: 0xFFFFFFFF, accent: 0xFF1D6BFF, mast: 'logo', mastFont: 'Roboto', headFont: 'Roboto', bodyFont: 'Roboto', dark: true, voice: 'a modern digital news site: clear, confident and direct, a strong plain headline and a one-sentence summary'),
+  NgmyNewsTemplate(id: 'business', name: 'Business Wire', group: 'Cards', layout: NewsLayout.cardSplit, frame: NewsFrame.rounded, paper: 0xFFFFFFFF, paper2: 0xFFF8FAFC, ink: 0xFF0F172A, accent: 0xFFE11D2E, mast: 'logo', mastFont: 'Roboto', headFont: 'Roboto', bodyFont: 'Roboto', voice: 'a clean business news site: precise, informative and professional, with a plain, strong headline'),
+  NgmyNewsTemplate(id: 'breaking', name: 'Breaking Red', group: 'Cards', layout: NewsLayout.cardBreaking, frame: NewsFrame.rounded, paper: 0xFF0B0B0F, paper2: 0xFF2A060B, ink: 0xFFFFFFFF, accent: 0xFFE11D2E, mast: 'logo', mastFont: 'Roboto', headFont: 'Roboto', bodyFont: 'Roboto', dark: true, voice: 'a breaking-news broadcast: urgent, factual and clear, a punchy headline and a tight summary'),
+  NgmyNewsTemplate(id: 'feature', name: 'Tech Feature', group: 'Cards', layout: NewsLayout.cardFeature, frame: NewsFrame.rounded, paper: 0xFFFFFFFF, paper2: 0xFFF1F5F9, ink: 0xFF0F172A, accent: 0xFF2563EB, mast: 'logo', mastFont: 'Roboto', headFont: 'Roboto', bodyFont: 'Roboto', voice: 'a modern feature article: informative, engaging and well explained'),
+  NgmyNewsTemplate(id: 'parchment', name: 'Royal Circle', group: 'Classic', layout: NewsLayout.circle, frame: NewsFrame.circle, paper: 0xFFF4EBD2, paper2: 0xFFE8D9B0, ink: 0xFF2F2210, accent: 0xFF6B21A8, mast: 'centered', mastFont: kNewsOldStandard, headFont: kNewsOldStandard, bodyFont: kNewsOldStandard, vintage: true, photoFilter: 'sepia', voice: 'a stately royal edition: dignified, noble and ceremonial'),
+  NgmyNewsTemplate(id: 'ocean', name: 'Blue Ocean', group: 'Fresh', layout: NewsLayout.circle, frame: NewsFrame.circle, paper: 0xFFEFF6FF, paper2: 0xFFDBEAFE, ink: 0xFF0C1E3E, accent: 0xFF0369A1, mast: 'centered', mastFont: kNewsAbril, headFont: kNewsAbril, bodyFont: kNewsOldStandard, voice: 'a calm, trustworthy paper: clear, steady and reassuring'),
+  NgmyNewsTemplate(id: 'forest', name: 'Green Leaf', group: 'Fresh', layout: NewsLayout.rail, frame: NewsFrame.double, paper: 0xFFF0FDF4, paper2: 0xFFDCFCE7, ink: 0xFF052E16, accent: 0xFF15803D, mast: 'centered', mastFont: kNewsAbril, headFont: kNewsAbril, bodyFont: kNewsOldStandard, voice: 'a calm community paper about growth and togetherness: gentle, hopeful and clear'),
+  NgmyNewsTemplate(id: 'herald', name: 'NGMY Herald', group: 'Fresh', layout: NewsLayout.sideBySide, frame: NewsFrame.rounded, paper: 0xFFFFFFFF, paper2: 0xFFF5F3FF, ink: 0xFF1E1B4B, accent: 0xFF7C3AED, mast: 'split', mastFont: kNewsAbril, headFont: kNewsAbril, bodyFont: kNewsOldStandard, voice: 'the proud NGMY Herald: warm, hopeful and community-minded, in NGMY purple'),
+  NgmyNewsTemplate(id: 'daily', name: 'The Daily', group: 'Fresh', layout: NewsLayout.classic, frame: NewsFrame.shadow, paper: 0xFFFFFFFF, paper2: 0xFFF4F4F2, ink: 0xFF111111, accent: 0xFFD62828, mast: 'bar', mastFont: kNewsAbril, headFont: kNewsAbril, bodyFont: kNewsOldStandard, caps: true, voice: 'a modern daily newspaper: crisp, clear and energetic, with a punchy headline'),
+  NgmyNewsTemplate(id: 'tabloid', name: 'Big Tabloid', group: 'Fresh', layout: NewsLayout.splash, frame: NewsFrame.cutCorner, paper: 0xFFFFFFFF, paper2: 0xFFFFF7E0, ink: 0xFF111111, accent: 0xFFE11D48, mast: 'bar', mastFont: 'Roboto', headFont: kNewsAbril, bodyFont: 'Roboto', caps: true, voice: 'a bold tabloid: exciting, short punchy sentences and a loud, attention-grabbing headline (still truthful)'),
+  // ── Row two ──
+  NgmyNewsTemplate(id: 'modern', name: 'Modern Digest', group: 'Fresh', layout: NewsLayout.minimal, frame: NewsFrame.rounded, paper: 0xFFF8FAFC, paper2: 0xFFE2E8F0, ink: 0xFF0F172A, accent: 0xFF0D9488, mast: 'logo', mastFont: 'Roboto', headFont: 'Roboto', bodyFont: 'Roboto', voice: 'a clean modern digest: simple words, short paragraphs, friendly and clear'),
+  NgmyNewsTemplate(id: 'midnight', name: 'Midnight Edition', group: 'Dark', layout: NewsLayout.magazine, frame: NewsFrame.plain, paper: 0xFF111827, paper2: 0xFF0B1020, ink: 0xFFF1F5F9, accent: 0xFFFACC15, mast: 'logo', mastFont: 'Roboto', headFont: kNewsAbril, bodyFont: kNewsOldStandard, dark: true, caps: true, voice: 'a dramatic late-night edition: confident, cinematic and polished'),
+  NgmyNewsTemplate(id: 'metro', name: 'Metro Wire', group: 'Fresh', layout: NewsLayout.banner, frame: NewsFrame.cutCorner, paper: 0xFFF1F5F9, paper2: 0xFFE2E8F0, ink: 0xFF0B1220, accent: 0xFF2563EB, mast: 'logo', mastFont: 'Roboto', headFont: 'Roboto', bodyFont: 'Roboto', caps: true, voice: 'a modern news wire: fast, factual and direct, like breaking news'),
+  NgmyNewsTemplate(id: 'sunrise', name: 'Sunrise Post', group: 'Fresh', layout: NewsLayout.magazine, frame: NewsFrame.arch, paper: 0xFFFFF7ED, paper2: 0xFFFFEDD5, ink: 0xFF3B1D08, accent: 0xFFEA580C, mast: 'split', mastFont: kNewsAbril, headFont: kNewsAbril, bodyFont: kNewsOldStandard, voice: 'a cheerful morning paper: bright, optimistic and welcoming'),
+  NgmyNewsTemplate(id: 'neon', name: 'Neon Beat', group: 'Dark', layout: NewsLayout.scrapbook, frame: NewsFrame.tape, paper: 0xFF1E1B4B, paper2: 0xFF0F0A2E, ink: 0xFFF5F3FF, accent: 0xFFEC4899, mast: 'split', mastFont: kNewsAbril, headFont: kNewsAbril, bodyFont: 'Roboto', dark: true, voice: 'a youthful neon culture paper: fresh, bold, energetic and fun'),
+  NgmyNewsTemplate(id: 'gold', name: 'Golden Press', group: 'Dark', layout: NewsLayout.wrap, frame: NewsFrame.shadow, paper: 0xFF14110A, paper2: 0xFF0A0904, ink: 0xFFFEF3C7, accent: 0xFFFACC15, mast: 'logo', mastFont: 'Roboto', headFont: kNewsAbril, bodyFont: kNewsOldStandard, dark: true, caps: true, voice: 'a luxurious golden press edition: grand, elegant and prestigious'),
+  NgmyNewsTemplate(id: 'minimal', name: 'Paper White', group: 'Fresh', layout: NewsLayout.minimal, frame: NewsFrame.shadow, paper: 0xFFFFFFFF, paper2: 0xFFFAFAFA, ink: 0xFF18181B, accent: 0xFF18181B, mast: 'split', mastFont: kNewsOldStandard, headFont: kNewsOldStandard, bodyFont: kNewsOldStandard, voice: 'a quiet, elegant long-read: thoughtful, simple and beautifully written'),
+  NgmyNewsTemplate(id: 'gazette', name: 'Fresh Gazette', group: 'Classic', layout: NewsLayout.classic, frame: NewsFrame.double, paper: 0xFFF6EFDD, paper2: 0xFFEADFC2, ink: 0xFF2A1B0E, accent: 0xFF9A3412, mast: 'centered', mastFont: kNewsOldStandard, headFont: kNewsOldStandard, bodyFont: kNewsOldStandard, caps: true, voice: 'a refined town gazette: formal, dignified and warm, with a strong headline'),
+  NgmyNewsTemplate(id: 'times', name: 'Classic Times', group: 'Classic', layout: NewsLayout.sideBySide, frame: NewsFrame.plain, paper: 0xFFFAF8F2, paper2: 0xFFEFEBDD, ink: 0xFF16130E, accent: 0xFF1E3A8A, mast: 'centered', mastFont: kNewsOldStandard, headFont: kNewsOldStandard, bodyFont: kNewsOldStandard, photoFilter: 'bw', voice: 'a serious classic broadsheet: calm, factual, authoritative, with a strong headline and a clear subhead'),
+  NgmyNewsTemplate(id: 'scrapbook', name: 'Memory Scrapbook', group: 'Classic', layout: NewsLayout.scrapbook, frame: NewsFrame.polaroid, paper: 0xFFF7EBCB, paper2: 0xFFEAD7A6, ink: 0xFF3A2A1A, accent: 0xFFB45309, mast: 'split', mastFont: kNewsOldStandard, headFont: kNewsOldStandard, bodyFont: kNewsOldStandard, photoFilter: 'sepia', voice: 'a warm scrapbook clipping: personal, nostalgic and heartfelt'),
 ];
 
 NgmyNewsTemplate ngmyNewsTemplateById(String id) => kNgmyNewsTemplates.firstWhere((t) => t.id == id, orElse: () => kNgmyNewsTemplates.first);
@@ -291,7 +296,7 @@ List<String> ngmyFlowText(List<String> paragraphs, TextStyle style, List<(double
 /// True when [flowed] holds (nearly) every word of [paragraphs].
 bool _flowKeptEverything(List<String> paragraphs, List<String> flowed) {
   int n(String s) => s.split(RegExp(r'\s+')).where((e) => e.isNotEmpty).length;
-  return flowed.fold<int>(0, (a, b) => a + n(b)) >= paragraphs.fold<int>(0, (a, b) => a + n(b)) - 2;
+  return flowed.fold<int>(0, (a, b) => a + n(b)) >= paragraphs.fold<int>(0, (a, b) => a + n(b));
 }
 
 /// One newspaper page, drawn at [kNewsPageW] x [kNewsPageH]. Scale it with a FittedBox.
@@ -397,6 +402,8 @@ class NgmyNewspaperView extends StatelessWidget {
           const SizedBox(height: 8),
           _rule(thick: 3, color: accent),
         ]);
+      case 'logo':
+        return _logoMasthead(w, compact: compact);
       case 'blackletter':
         return Column(children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(vol, style: info), Text('PRICE: FREE · NGMY.ORG', style: info)]),
@@ -422,6 +429,65 @@ class NgmyNewspaperView extends StatelessWidget {
           _rule(thick: 3),
         ]);
     }
+  }
+
+  /// The "NGMY NEWS" logo: heavy NGMY, a coloured NEWS tag, and the paper's name as a tagline.
+  Widget _logoMasthead(double w, {bool compact = false}) {
+    final sz = compact ? 52.0 : 64.0;
+    final tag = _paperName.toUpperCase();
+    return Column(children: [
+      Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+        Text('NGMY', style: _t('Roboto', sz, weight: FontWeight.w900, height: 1.0, spacing: -1.5)),
+        const SizedBox(width: 8),
+        Transform.rotate(
+          angle: -0.03,
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: sz * 0.2, vertical: sz * 0.04),
+            decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(sz * 0.16)),
+            child: Text('NEWS', style: _t('Roboto', sz * 0.72, weight: FontWeight.w900, style: FontStyle.italic, color: t.dark && t.id == 'midnight' || t.id == 'gold' ? Colors.black : Colors.white, height: 1.05, spacing: -0.5)),
+          ),
+        ),
+        const Spacer(),
+        Flexible(child: Text(tag, textAlign: TextAlign.right, maxLines: 2, overflow: TextOverflow.ellipsis, style: _t('Roboto', 12.5, weight: FontWeight.w700, color: ink.withValues(alpha: 0.85), spacing: 1.2, height: 1.3))),
+      ]),
+      const SizedBox(height: 8),
+      Container(height: 1.4, color: ink.withValues(alpha: 0.25)),
+    ]);
+  }
+
+  /// A small rounded label, like the category on a news site.
+  Widget _pill(String text, {Color? color, Color? textColor, double size = 14}) => Container(
+        padding: EdgeInsets.symmetric(horizontal: size * 0.9, vertical: size * 0.45),
+        decoration: BoxDecoration(color: color ?? accent, borderRadius: BorderRadius.circular(size)),
+        child: Text(text, style: _t('Roboto', size, weight: FontWeight.w900, color: textColor ?? Colors.white, spacing: 0.4, height: 1.0)),
+      );
+
+  /// Date and time on the left, the source on the right, like the bottom of a news card.
+  Widget _meta({IconData right = Icons.public_rounded, Color? color}) {
+    final d = date ?? DateTime.now();
+    final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
+    final c = color ?? ink.withValues(alpha: 0.75);
+    final st = _t('Roboto', 15, weight: FontWeight.w500, color: c, height: 1.0);
+    return Row(children: [
+      Icon(Icons.calendar_today_outlined, size: 18, color: c),
+      const SizedBox(width: 8),
+      Text('${_months[d.month - 1].substring(0, 3)} ${d.day}, ${d.year}  ·  $h:${d.minute.toString().padLeft(2, '0')} ${d.hour >= 12 ? 'PM' : 'AM'}', style: st),
+      Container(width: 1, height: 20, margin: const EdgeInsets.symmetric(horizontal: 16), color: c.withValues(alpha: 0.4)),
+      Icon(right, size: 19, color: c),
+      const SizedBox(width: 8),
+      Text('NGMY News', style: st),
+    ]);
+  }
+
+  Widget _sansHeadline(double w, {int lines = 3, double max = 64, double min = 30, Color? color}) {
+    final text = doc.headline.trim().isEmpty ? 'Your headline appears here' : doc.headline.trim();
+    final size = _fit(text, 'Roboto', FontWeight.w800, w, lines, max, min, height: 1.08);
+    return Text(text, maxLines: lines, overflow: TextOverflow.ellipsis, style: _t('Roboto', size, weight: FontWeight.w800, height: 1.08, spacing: -0.8, color: color));
+  }
+
+  Widget _summary(double w, {int lines = 3, double size = 22}) {
+    if (doc.subhead.trim().isEmpty) return const SizedBox.shrink();
+    return Padding(padding: const EdgeInsets.only(top: 10), child: Text(doc.subhead.trim(), maxLines: lines, overflow: TextOverflow.ellipsis, style: _t('Roboto', size, color: ink.withValues(alpha: 0.88), height: 1.35)));
   }
 
   // ── The picture and its frame ──
@@ -791,6 +857,113 @@ class NgmyNewspaperView extends StatelessWidget {
           const SizedBox(height: 10),
           Expanded(child: _columns(3)),
         ]);
+      case NewsLayout.cardWorld:
+        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          _masthead(w, compact: true),
+          const SizedBox(height: 16),
+          Stack(children: [
+            _photo(w, 430),
+            Positioned(left: 18, bottom: 18, child: _pill(doc.category, size: 17)),
+          ]),
+          const SizedBox(height: 18),
+          _sansHeadline(w, lines: 3, max: 66),
+          _summary(w),
+          const SizedBox(height: 12),
+          Container(height: 1, color: ink.withValues(alpha: 0.25)),
+          const SizedBox(height: 12),
+          _meta(),
+          const SizedBox(height: 14),
+          Expanded(child: _columns(2, startSize: 18)),
+        ]);
+      case NewsLayout.cardSplit:
+        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          _masthead(w, compact: true),
+          const SizedBox(height: 18),
+          SizedBox(
+            height: 500,
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              SizedBox(
+                width: 410,
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  _pill(doc.category, color: accent.withValues(alpha: 0.14), textColor: accent, size: 15),
+                  const SizedBox(height: 16),
+                  _sansHeadline(410, lines: 4, max: 58, min: 28),
+                  _summary(410, lines: 6, size: 20),
+                  const Spacer(),
+                ]),
+              ),
+              const SizedBox(width: 24),
+              _photo(390, 500),
+            ]),
+          ),
+          const SizedBox(height: 14),
+          _meta(),
+          const SizedBox(height: 16),
+          Expanded(child: _columns(2, startSize: 18)),
+        ]);
+      case NewsLayout.cardBreaking:
+        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          _masthead(w, compact: true),
+          const SizedBox(height: 16),
+          Stack(children: [
+            _photo(w, 420),
+            Positioned(
+              left: 0,
+              bottom: 22,
+              child: Transform(
+                transform: Matrix4.skewX(-0.25),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(26, 10, 60, 10),
+                  decoration: BoxDecoration(color: accent, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 10)]),
+                  child: Text('BREAKING NEWS', style: _t('Roboto', 30, weight: FontWeight.w900, style: FontStyle.italic, color: Colors.white, height: 1.0)),
+                ),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 18),
+          _sansHeadline(w, lines: 3, max: 62),
+          _summary(w),
+          const SizedBox(height: 12),
+          Container(height: 1, color: ink.withValues(alpha: 0.25)),
+          const SizedBox(height: 12),
+          _meta(right: Icons.send_rounded),
+          const SizedBox(height: 14),
+          Expanded(child: _columns(2, startSize: 18)),
+        ]);
+      case NewsLayout.cardFeature:
+        final related = doc.sidebarTitle.trim().isNotEmpty ? doc.sidebarTitle.trim() : (doc.pullQuote.trim().isNotEmpty ? doc.pullQuote.trim() : 'More from NGMY News');
+        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          _masthead(w, compact: true),
+          const SizedBox(height: 16),
+          Stack(children: [
+            _photo(w, 380),
+            Positioned(left: 16, top: 16, child: _pill(doc.category, color: ink.withValues(alpha: 0.85), textColor: paperC, size: 15)),
+          ]),
+          const SizedBox(height: 16),
+          _sansHeadline(w, lines: 2, max: 60),
+          _summary(w, lines: 2),
+          const SizedBox(height: 10),
+          _meta(),
+          const SizedBox(height: 14),
+          Expanded(child: _columns(2, startSize: 18, sidebar: false)),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(border: Border.all(color: ink.withValues(alpha: 0.18)), borderRadius: BorderRadius.circular(18), color: accent.withValues(alpha: 0.05)),
+            child: Row(children: [
+              ClipRRect(borderRadius: BorderRadius.circular(14), child: _image(150, 104)),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                  _pill('RELATED', color: accent.withValues(alpha: 0.14), textColor: accent, size: 12),
+                  const SizedBox(height: 8),
+                  Text(related, maxLines: 2, overflow: TextOverflow.ellipsis, style: _t('Roboto', 19, weight: FontWeight.w800, height: 1.15)),
+                ]),
+              ),
+              Icon(Icons.chevron_right_rounded, size: 30, color: ink.withValues(alpha: 0.6)),
+            ]),
+          ),
+        ]);
       case NewsLayout.minimal:
         return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           _masthead(w, compact: true),
@@ -925,12 +1098,6 @@ class _AgedPaperPainter extends CustomPainter {
       canvas.drawCircle(c, rad, p);
     }
     p.shader = null;
-    // The fold across the middle.
-    p.color = const Color(0xFF3B2412).withValues(alpha: 0.10);
-    canvas.drawRect(Rect.fromLTWH(0, size.height / 2 - 1.5, size.width, 3), p);
-    // Burnt edges.
-    final rect = Offset.zero & size;
-    canvas.drawRect(rect, Paint()..shader = RadialGradient(radius: 0.85, colors: [Colors.transparent, const Color(0xFF4A2C0F).withValues(alpha: 0.30)], stops: const [0.62, 1.0]).createShader(rect));
   }
 
   @override

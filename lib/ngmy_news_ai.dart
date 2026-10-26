@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'ngmy_ai_client.dart';
+import 'ngmy_ai_language.dart';
 import 'ngmy_book_studio.dart' show ngmyBookLanguageRule, ngmyEscapeJsonStrings;
 import 'ngmy_master_knowledge.dart';
 import 'ngmy_news_paper.dart';
@@ -67,14 +68,45 @@ Future<String> _ask(String prompt, Uint8List? photo) async {
   throw error != null && ngmyIsOfflineOrNetworkError(error) ? 'No internet connection. Try again when you are online.' : 'The AI could not do that just now. Try again.';
 }
 
-const String _jsonShape = '{"paper":"newspaper name","headline":"...","subhead":"...","byline":"By ...","caption":"one sentence about the picture","body":["paragraph 1","paragraph 2","paragraph 3","paragraph 4"],"pullQuote":"a short line from the story","sidebarTitle":"Did you know?","sidebarText":"two short sentences"}';
+/// What a professional human journalist does and does not do. Keeps the English clean and natural.
+const String _styleRules = '''
+- STYLE: write like an experienced human newspaper journalist in the style of a quality wire service (Associated Press, Reuters): polished, precise, natural and professional. Open with the most important fact. Use the active voice, concrete nouns and strong verbs. Mix short and longer sentences. Plain, grown-up words.
+- NEVER sound like an AI. Do not use: delve, tapestry, testament, beacon, realm, landscape, journey, game-changer, groundbreaking, revolutionize, unlock, empower, seamless, vibrant, bustling, in today's fast-paced world, it is worth noting, not just X but Y, whether you are X or Y. No exclamation marks, no rhetorical questions, no lists of three adjectives, no filler, no hype, no dashes for drama. Every sentence must say something real.
+- Check spelling, grammar and punctuation. Names are written with normal capitals, except KB PABLO QR.''';
+
+bool _isSwahili(String text) => ngmyDetectTextLanguage(text) == 'sw' || RegExp(r'swahili|kiswahili', caseSensitive: false).hasMatch(text);
+
+/// A second look by a native Swahili editor, like the one used for the family books, so the Swahili reads as if a good
+/// Swahili journalist wrote it. If the AI fails, the page is kept exactly as it was.
+Future<NgmyNewsDoc> ngmyPolishSwahiliNews(NgmyNewsDoc doc) async {
+  try {
+    final prompt = '''
+You are a professional Swahili newspaper editor and journalist: a native speaker from Tanzania or Kenya whose writing every Swahili reader finds natural, warm and correct.
+The newspaper page below was written or translated by a machine, so it may sound stiff, foreign or word-for-word. Rewrite EVERY field so it reads as if a skilled native Swahili journalist wrote it first: natural, clear, correct and professional. Fix wrong grammar (noun classes, verb agreement, tenses), odd or invented words and any English sentence structure. Keep every fact, name and number and do not add facts. Keep the same fields and the same number of paragraphs. Write people's names with normal capitals, except KB PABLO QR.
+$kNgmySwahiliStyleGuide
+Page: ${jsonEncode(doc.toJson())}
+Reply with JSON only, with exactly the same fields: $_jsonShape
+''';
+    final text = await _ask(prompt, null);
+    final obj = _json(text);
+    if (obj == null) return doc;
+    final next = doc.applyJson(obj);
+    if (next.body.isEmpty || next.body.join(' ').length < doc.body.join(' ').length * 0.5) return doc;
+    return next;
+  } catch (_) {
+    return doc;
+  }
+}
+
+const String _jsonShape = '{"paper":"newspaper name","category":"ONE of COMMUNITY, TECHNOLOGY, BUSINESS, EDUCATION, WORLD NEWS, FEATURE","headline":"...","subhead":"...","byline":"By ...","caption":"one sentence about the picture","body":["paragraph 1","paragraph 2","paragraph 3","paragraph 4"],"pullQuote":"a short line from the story","sidebarTitle":"Did you know?","sidebarText":"two short sentences"}';
 
 String _rules(String typed) => '''
 - Write like a real newspaper: a strong headline (max 12 words), a subhead (max 25 words), a byline, then 4 or 5 paragraphs, about 330 to 400 words in all. Plain text only: no markdown, no emojis, no lists.
 - Use ONLY the facts in the knowledge above. Never invent numbers, prices, dates, awards, places or quotes. Do not put made-up words in anyone's mouth.
 - KB PABLO QR is the Founder, President and CEO of NGMY. Always write his name in capital letters.
 - Never mention secret or admin details, passwords or the price list.
-${ngmyBookLanguageRule(typed).replaceAll('book', 'newspaper')}''';
+$_styleRules
+${ngmyBookLanguageRule(typed).replaceAll('book', 'newspaper')}${_isSwahili(typed) ? kNgmySwahiliStyleGuide : ''}''';
 
 /// Writes a whole newspaper page. The picture (if any) is shown to the AI so the caption and story fit it.
 Future<NgmyNewsDoc> ngmyWriteNews({required NgmyNewsTemplate template, Uint8List? photo, String request = '', String? paper}) async {
@@ -97,7 +129,7 @@ Reply with JSON only, in exactly this shape: $_jsonShape
   if (obj == null) throw 'The AI sent something I could not read. Try again.';
   final doc = NgmyNewsDoc(paper: name).applyJson(obj);
   if (doc.body.isEmpty) throw 'The AI did not write a story. Try again.';
-  return doc;
+  return _isSwahili('$ask ${doc.body.join(' ')}') && ngmyDetectTextLanguage(doc.body.join(' ')) == 'sw' ? ngmyPolishSwahiliNews(doc) : doc;
 }
 
 /// The owner talks to the AI about the page: a question gets an answer, a change request edits only what was asked.
@@ -131,5 +163,6 @@ Reply with JSON only: {"message":"one or two friendly sentences: your answer, or
     next = doc.applyJson(Map<String, dynamic>.from(changes));
     changed = jsonEncode(next.toJson()) != jsonEncode(doc.toJson());
   }
+  if (changed && ngmyDetectTextLanguage(next.body.join(' ')) == 'sw') next = await ngmyPolishSwahiliNews(next);
   return NgmyNewsEdit(message: '${obj['message'] ?? (changed ? 'Done.' : 'Okay.')}'.trim(), doc: next, changed: changed);
 }
