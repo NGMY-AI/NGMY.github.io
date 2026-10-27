@@ -62,37 +62,90 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
   @override
   void dispose() {
     _noticeTimer?.cancel();
+    _tapTimer?.cancel();
     super.dispose();
   }
 
   Future<void> _openTv(Part p, {bool auto = false}) async {
     if (_tvOpen || !mounted) return;
     _tvOpen = true;
-    final ch = await showNgmyTvScreen(context, channel: p.channel, stayFor: auto ? const Duration(seconds: 60) : const Duration(hours: 1), showBoot: p.onAge < 3.2);
+    final ch = await showNgmyTvScreen(context, channel: p.channel, stayFor: auto ? const Duration(seconds: 60) : const Duration(hours: 1), showBoot: p.onAge < 3.2, title: p.info.name);
     _tvOpen = false;
     if (ch != null) p.channel = ch;
   }
 
-  /// Three quick taps on a TV that is on open the big screen; on a TV that is off they explain why.
-  void _tvTap(Part p) {
+  Timer? _tapTimer;
+
+  /// Three quick taps on a screen that is on open its big screen (a moment later, in case a fourth tap follows).
+  /// Four quick taps open the size sheet so the screen can be made bigger.
+  void _screenTap(Part p) {
     final now = DateTime.now();
     final l = _taps.putIfAbsent(p.id, () => []);
     l.add(now);
-    l.removeWhere((t) => now.difference(t) > const Duration(milliseconds: 1000));
-    if (l.length < 3) return;
-    l.clear();
-    if (b.works(p)) {
-      p.kind == 'tv' ? _openTv(p) : _openPhone(p);
-    } else {
-      _say(b.diagnose(p) ?? 'The ${p.info.name} is off. Give it power first.');
+    l.removeWhere((t) => now.difference(t) > const Duration(milliseconds: 1500));
+    if (l.length >= 4) {
+      l.clear();
+      _tapTimer?.cancel();
+      _resizeSheet(p);
+      return;
+    }
+    if (l.length == 3) {
+      _tapTimer?.cancel();
+      _tapTimer = Timer(const Duration(milliseconds: 500), () {
+        l.clear();
+        if (!mounted) return;
+        if (b.works(p)) {
+          isTvKind(p.kind) ? _openTv(p) : _openDevice(p);
+        } else {
+          _say(b.diagnose(p) ?? 'The ${p.info.name} is off. Give it power first.');
+        }
+      });
     }
   }
 
-  Future<void> _openPhone(Part p) async {
+  Future<void> _openDevice(Part p) async {
     if (_tvOpen || !mounted) return;
     _tvOpen = true;
-    await showNgmyPhoneScreen(context, charge: ((b.time * 0.12) % 1.0 * 100).round());
+    await showNgmyDeviceScreen(context, p.kind, charge: ((b.time * 0.12) % 1.0 * 100).round());
     _tvOpen = false;
+  }
+
+  /// A screen starts at its normal size and can only be made bigger.
+  Future<void> _resizeSheet(Part p) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF17171C),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      builder: (ctx) => StatefulBuilder(builder: (ctx, set) {
+        void change(double v) {
+          setState(() => p.scale = v.clamp(1.0, 2.6));
+          set(() {});
+          widget.onChanged?.call();
+        }
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Resize the ${p.info.name}', style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 4),
+              const Text('Make it bigger to see it better. It can never be smaller than its normal size.', style: TextStyle(color: Colors.white54, fontSize: 12.5)),
+              const SizedBox(height: 10),
+              Row(children: [
+                IconButton(onPressed: () => change(p.scale - 0.2), icon: const Icon(Icons.remove_circle_outline_rounded, color: Colors.white70)),
+                Expanded(child: Slider(value: p.scale.clamp(1.0, 2.6), min: 1.0, max: 2.6, activeColor: p.info.color, onChanged: change)),
+                IconButton(onPressed: () => change(p.scale + 0.2), icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.white70)),
+              ]),
+              Row(children: [
+                Text('${(p.scale * 100).round()}%', style: TextStyle(color: p.info.color, fontWeight: FontWeight.w900)),
+                const Spacer(),
+                TextButton(onPressed: () => change(1.0), child: const Text('Normal size')),
+                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Done')),
+              ]),
+            ]),
+          ),
+        );
+      }),
+    );
   }
 
   ElectronicsBoard get b => widget.board;
@@ -129,7 +182,7 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
   void onFrame(double dt) {
     b.step(dt);
     for (final p in b.parts) {
-      if (p.kind != 'tv') continue;
+      if (!isTvKind(p.kind)) continue;
       if (p.glow > 0 && !p.burnt) {
         if (widget.tvPopUp && !_tvAuto.contains(p.id) && !_tvOpen) {
           _tvAuto.add(p.id);
@@ -199,7 +252,8 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
   Part? _partAt(Offset pos) {
     for (final p in b.parts.reversed) {
       final c = Offset(p.x * _size.width, p.y * _size.height);
-      if ((pos.dx - c.dx).abs() < 36 && (pos.dy - c.dy).abs() < 26) return p;
+      final grow = isScreenKind(p.kind) ? p.scale : 1.0;
+      if ((pos.dx - c.dx).abs() < 36 * grow && (pos.dy - c.dy).abs() < 26 * grow) return p;
     }
     return null;
   }
@@ -331,7 +385,7 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
                         NgmyTone.play(200, ms: 70, wave: 'saw', volume: 0.2);
                       }
                     });
-                    if (p.kind == 'tv' || p.kind == 'phone' || p.kind == 'tablet') _tvTap(p);
+                    if (isScreenKind(p.kind)) _screenTap(p);
                     widget.onChanged?.call();
                     return;
                   }
@@ -452,7 +506,7 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
                 child: Text('${p.burnt ? 'Why it burnt out' : 'Why it is not working'}: $why', style: const TextStyle(color: Color(0xFFFFEDD5), fontSize: 12, height: 1.35)),
               ),
             ),
-            if (p.kind == 'tv') ...[
+            if (isTvKind(p.kind)) ...[
               const SizedBox(height: 6),
               Wrap(spacing: 6, runSpacing: 4, children: [
                 for (var c = 0; c < kNgmyTvChannels.length; c++) StudioChip(label: 'CH ${c + 1}', selected: p.channel == c, color: info.color, onTap: () {
@@ -464,10 +518,14 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
               Text(b.works(p) ? 'Showing: ${kNgmyTvChannels[p.channel % kNgmyTvChannels.length].title}. Tap the TV 3 times quickly to open the big screen.' : 'The TV is off. Give it power with the + dot towards the battery +.', style: const TextStyle(color: Colors.white54, fontSize: 12)),
               if (b.works(p)) StudioButton(icon: Icons.fullscreen_rounded, label: 'Open big screen', color: info.color, onTap: () => _openTv(p)),
             ],
-            if (p.kind == 'phone' || p.kind == 'tablet') ...[
+            if (isScreenKind(p.kind) && !isTvKind(p.kind)) ...[
               const SizedBox(height: 6),
-              Text(b.works(p) ? 'Playing NGMY ads. Tap it 3 times quickly, or press the button, to open it and use its apps.' : 'It is off. Too few volts and it stays dark, too many and it burns out. Bring big battery volts down with a step-down converter.', style: const TextStyle(color: Colors.white54, fontSize: 12)),
-              if (b.works(p)) StudioButton(icon: Icons.phone_android_rounded, label: 'Open ${p.kind == 'tablet' ? 'tablet' : 'phone'}', color: info.color, onTap: () => _openPhone(p)),
+              Text(b.works(p) ? 'Playing NGMY ads. Tap it 3 times quickly, or press the button, to open it and use its apps. Tap it 4 times to make it bigger.' : 'It is off. Too few volts and it stays dark, too many and it burns out. Bring big battery volts down with a step-down converter.', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+              if (b.works(p)) StudioButton(icon: Icons.phone_android_rounded, label: 'Open the ${p.info.name}', color: info.color, onTap: () => _openDevice(p)),
+            ],
+            if (isScreenKind(p.kind)) ...[
+              const SizedBox(height: 6),
+              StudioButton(icon: Icons.open_in_full_rounded, label: 'Make it bigger (or tap it 4 times)', color: info.color, onTap: () => _resizeSheet(p)),
             ],
             if (b.isReducer(p)) ...[
               const SizedBox(height: 6),

@@ -134,8 +134,8 @@ void main() {
     addTearDown(t.view.reset);
     await t.pumpWidget(const MaterialApp(home: NgmyElectronicsLab()));
     await t.pump(const Duration(milliseconds: 300));
-    expect(find.text('Voltmeter').evaluate().length + find.text('Party lights').evaluate().length, greaterThan(0));
-    expect(kPartInfos.length, 56);
+    expect(find.byType(ListView), findsWidgets);
+    expect(kPartInfos.length, 76);
     // Every part can be put on the board and drawn.
     for (final k in [for (final p in kPartInfos) p.kind]) {
       final b = ElectronicsBoard()..add(k, 0.5, 0.5);
@@ -249,22 +249,22 @@ void reducerTests() {
     t.view.devicePixelRatio = 2.0;
     addTearDown(t.view.reset);
     expect(kNgmyTvChannels.length, 10);
-    expect(kNgmyApps.length, greaterThanOrEqualTo(8));
+    expect(kNgmyApps.length, greaterThanOrEqualTo(9));
     await t.pumpWidget(MaterialApp(home: NgmyTvScreen(channel: 8, stayFor: const Duration(seconds: 60), showBoot: false)));
     await t.pump(const Duration(seconds: 1));
     expect(find.text('APPS'), findsOneWidget);
     await t.tap(find.text('APPS'));
     await t.pump(const Duration(milliseconds: 300));
     expect(find.text('NGMY Apps'), findsOneWidget);
-    await t.tap(find.text('School').first);
+    await t.tap(find.text('Jobs').first);
     await t.pump(const Duration(seconds: 1));
-    expect(find.textContaining('NGMY TV · School'), findsOneWidget);
+    expect(find.textContaining('NGMY TV · Jobs'), findsOneWidget);
     await t.tap(find.text('ADS'));
     await t.pump(const Duration(seconds: 1));
-    await t.pumpWidget(MaterialApp(home: NgmyPhoneScreen(charge: 40)));
+    await t.pumpWidget(MaterialApp(home: NgmyDeviceScreen(kind: 'phone', charge: 40)));
     await t.pump(const Duration(seconds: 1));
-    expect(find.text('NGMY Phone'), findsOneWidget);
-    await t.tap(find.text('Clock'));
+    expect(find.text('iPhone 18 Pro Max'), findsOneWidget);
+    await t.tap(find.text('Calendar'));
     await t.pump(const Duration(seconds: 1));
     await t.pumpWidget(const SizedBox());
     await t.pump(const Duration(seconds: 61));
@@ -378,5 +378,97 @@ void realityTests() {
     expect(find.textContaining('1 parts'), findsOneWidget);
     await t.pumpWidget(const SizedBox());
     await t.pump(const Duration(milliseconds: 300));
+  });
+}
+
+void screenTests() {
+  test('every screen device has a name, a spec and can be drawn on the board', () {
+    expect(kScreenDevices.length, greaterThanOrEqualTo(24));
+    for (final k in kScreenDevices.keys) {
+      expect(kPartByKind.containsKey(k), isTrue, reason: k);
+      expect(kDeviceSpecs.containsKey(k) || k == 'tv', isTrue, reason: k);
+      final b = ElectronicsBoard()..add(k, 0.5, 0.5);
+      b.parts.first.scale = 2.0;
+      BoardPainter(b).paint(Canvas(PictureRecorder()), const Size(400, 400));
+    }
+    expect(kPartByKind['phone']!.name, 'iPhone 18 Pro Max');
+    expect(kPartByKind['tv']!.name, contains('Samsung'));
+    expect(kScreenDevices.values.where((d) => d.style == ScreenStyle.tv).length, greaterThanOrEqualTo(5));
+  });
+
+  test('an expensive phone needs a step-down converter on a 9 V battery', () {
+    for (final k in const ['galaxy', 'pixel', 'xiaomi', 'huawei', 'oppo', 'vivo', 'zfold', 'honor', 'iphonefold']) {
+      expect(loop(k, volts: 9).of(k).first.burnt, isTrue, reason: '$k bare on 9 V');
+      final ok = converterLoop('buck', k);
+      expect(ok.of(k).first.burnt, isFalse, reason: k);
+      expect(ok.of(k).first.glow, greaterThan(0), reason: k);
+    }
+    expect(loop('laptop', volts: 12).of('laptop').first.glow, greaterThan(0));
+  });
+
+  test('a screen can be made bigger but never smaller, and its dots move out with it', () {
+    final b = ElectronicsBoard();
+    final tv = b.add('tv', 0.5, 0.5);
+    const size = Size(400, 400);
+    final normal = ElectronicsBoard.terminal(tv, 1, size).dx - ElectronicsBoard.terminal(tv, 0, size).dx;
+    tv.scale = 2.0;
+    final big = ElectronicsBoard.terminal(tv, 1, size).dx - ElectronicsBoard.terminal(tv, 0, size).dx;
+    expect(big, greaterThan(normal));
+    final bulb = b.add('bulb', 0.2, 0.2);
+    expect(ElectronicsBoard.termOffset(bulb), ElectronicsBoard.kTerm);
+    final raw = encodeLab(b, 0, {});
+    final back = ElectronicsBoard();
+    restoreLab(back, raw);
+    expect(back.parts.first.scale, 2.0);
+  });
+
+  testWidgets('every big screen opens: phones, tablets and computers with their apps', (t) async {
+    t.view.physicalSize = const Size(1000, 1800);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    for (final k in kScreenDevices.keys.where((k) => !isTvKind(k))) {
+      await t.pumpWidget(MaterialApp(home: NgmyDeviceScreen(kind: k, charge: 30)));
+      await t.pump(const Duration(milliseconds: 600));
+      expect(find.text(kScreenDevices[k]!.name), findsOneWidget, reason: k);
+      expect(t.takeException(), isNull, reason: k);
+      await t.tap(find.text('Jobs').first, warnIfMissed: false);
+      await t.pump(const Duration(milliseconds: 600));
+      expect(t.takeException(), isNull, reason: '$k with an app open');
+    }
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('tapping a screen four times opens the size sheet, three times opens the big screen', (t) async {
+    t.view.physicalSize = const Size(900, 1600);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    final b = ElectronicsBoard();
+    final bat = b.add('battery', 0.15, 0.5)..volts = 12;
+    final tv = b.add('tv', 0.6, 0.5);
+    b.connect(bat, 0, tv, 0);
+    b.connect(tv, 1, bat, 1);
+    await t.pumpWidget(MaterialApp(home: Scaffold(body: BoardEditor(board: b, tvPopUp: false))));
+    await t.pump(const Duration(milliseconds: 500));
+    final board = find.byType(CustomPaint).evaluate().map((e) => e.widget).length;
+    expect(board, greaterThan(0));
+    final area = t.getRect(find.byType(LayoutBuilder).last);
+    final at = Offset(area.left + area.width * 0.6, area.top + area.height * 0.5);
+    for (var i = 0; i < 4; i++) {
+      await t.tapAt(at);
+      await t.pump(const Duration(milliseconds: 120));
+    }
+    await t.pump(const Duration(milliseconds: 700));
+    expect(find.textContaining('Resize the'), findsOneWidget);
+    await t.tap(find.text('Done'));
+    await t.pump(const Duration(milliseconds: 600));
+    for (var i = 0; i < 3; i++) {
+      await t.tapAt(at);
+      await t.pump(const Duration(milliseconds: 120));
+    }
+    await t.pump(const Duration(milliseconds: 900));
+    expect(find.byType(NgmyTvScreen), findsOneWidget);
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(seconds: 61));
   });
 }

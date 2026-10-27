@@ -466,17 +466,18 @@ void _garden(Canvas c, Size s, double t) {
 
 /// Opens the TV full screen. It starts with the NGMY logo for 3 seconds, plays the chosen channel and
 /// goes back to the board by itself after [stayFor] (or when the person taps the close button).
-Future<int?> showNgmyTvScreen(BuildContext context, {int channel = 0, Duration stayFor = const Duration(seconds: 60), bool showBoot = true}) {
+Future<int?> showNgmyTvScreen(BuildContext context, {int channel = 0, Duration stayFor = const Duration(seconds: 60), bool showBoot = true, String title = 'NGMY TV'}) {
   return Navigator.of(context).push<int>(PageRouteBuilder(
     opaque: true,
     transitionDuration: const Duration(milliseconds: 260),
-    pageBuilder: (_, __, ___) => NgmyTvScreen(channel: channel, stayFor: stayFor, showBoot: showBoot),
+    pageBuilder: (_, __, ___) => NgmyTvScreen(channel: channel, stayFor: stayFor, showBoot: showBoot, title: title),
     transitionsBuilder: (_, a, __, child) => FadeTransition(opacity: a, child: ScaleTransition(scale: Tween(begin: 0.85, end: 1.0).animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)), child: child)),
   ));
 }
 
 class NgmyTvScreen extends StatefulWidget {
-  const NgmyTvScreen({super.key, this.channel = 0, this.stayFor = const Duration(seconds: 60), this.showBoot = true});
+  const NgmyTvScreen({super.key, this.channel = 0, this.stayFor = const Duration(seconds: 60), this.showBoot = true, this.title = 'NGMY TV'});
+  final String title;
   final int channel;
   final bool showBoot;
   final Duration stayFor;
@@ -594,7 +595,7 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
                     child: Row(children: [
                       _round(Icons.close_rounded, 'Back to the board', _close),
                       const Spacer(),
-                      Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)), child: Text(_app >= 0 ? 'NGMY TV · ${kNgmyApps[_app].name}' : 'NGMY TV · CH ${_ch + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12.5))),
+                      Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)), child: Text(_app >= 0 ? '${widget.title} · ${kNgmyApps[_app].name}' : '${widget.title} · CH ${_ch + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12.5))),
                     ]),
                   ),
                   const SizedBox(height: 6),

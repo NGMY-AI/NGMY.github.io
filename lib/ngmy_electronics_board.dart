@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_electronics_extra_parts.dart';
 import 'ngmy_electronics_more_parts.dart';
+import 'ngmy_electronics_screens.dart';
 import 'ngmy_electronics_tv.dart';
 
 
@@ -41,7 +42,7 @@ const List<PartInfo> kPartInfos = [
   PartInfo('heater', 'Heater', '🔥', Color(0xFFFB923C), 'Turns electricity into heat. Toasters and kettles work like this. More power makes it glow hotter.', 'A long coil of special wire that resists the current. The current has to push through it, and that makes it hot.'),
   PartInfo('capacitor', 'Capacitor', '🪫', Color(0xFF60A5FA), 'Stores electric charge like a tiny rechargeable tank. It fills up from a battery, then can give the charge back.', 'Two sheets of metal foil, rolled up with a thin plastic sheet between them.'),
   PartInfo('radio', 'Radio', '📻', Color(0xFFE879F9), 'Needs about 3 volts or more. When it has power it picks up stations and plays them.', 'An aerial catches invisible radio waves. A tuner picks one station, and a chip turns it back into sound for the speaker.'),
-  PartInfo('tv', 'TV', '📺', Color(0xFF22D3EE), 'Needs 5.5 to 13.5 volts and the + (left) dot towards the battery +. When it switches on it shows NGMY animation channels. Tap it 3 times quickly to open the big screen.', 'Millions of tiny red, green and blue lights, called pixels, that glow at different strengths to make every colour.'),
+  PartInfo('tv', 'Samsung Neo QLED 8K', '📺', Color(0xFF22D3EE), 'Needs 5.5 to 13.5 volts and the + (left) dot towards the battery +. When it switches on it shows NGMY animation channels. Tap it 3 times quickly to open the big screen.', 'Millions of tiny red, green and blue lights, called pixels, that glow at different strengths to make every colour.'),
   ...kMorePartInfos,
   ...kExtraPartInfos,
 ];
@@ -88,6 +89,7 @@ class Part {
   int channel = 0; // the TV channel
   double onAge = 0; // seconds a gadget has been switched on
   String burnWhy = ''; // why it burnt out
+  double scale = 1; // a screen can be made bigger (1 is the normal size)
   double sag = 0; // an overloaded power source: how much its volts collapse
   double demand = 0; // amps the circuit is asking a power source for
   double drop = 0; // a voltage reducer: how many volts it takes off right now
@@ -182,7 +184,10 @@ class ElectronicsBoard {
   }
 
   /// Offset of a terminal in board pixels.
-  static Offset terminal(Part p, int t, Size size) => Offset(p.x * size.width + (t == 0 ? -kTerm : kTerm), p.y * size.height);
+  static Offset terminal(Part p, int t, Size size) => Offset(p.x * size.width + (t == 0 ? -1 : 1) * termOffset(p), p.y * size.height);
+
+  /// How far each round dot sits from the middle of a part. A bigger screen pushes its dots out.
+  static double termOffset(Part p) => kTerm + (isScreenKind(p.kind) ? (p.scale - 1) * 38 : 0);
   static const double kTerm = 42;
 
   // ── Circuit maths ────────────────────────────────────────────────────────
@@ -812,9 +817,15 @@ class BoardPainter extends CustomPainter {
     // A soft shadow on the board.
     canvas.drawOval(const Rect.fromLTWH(-34, 14, 68, 12), Paint()..color = Colors.black.withValues(alpha: 0.45)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5));
     if (sel) canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(-46, -34, 92, 62), const Radius.circular(14)), Paint()..color = Colors.white.withValues(alpha: 0.14));
-    canvas.drawLine(const Offset(-ElectronicsBoard.kTerm, 0), const Offset(-26, 0), lead);
-    canvas.drawLine(const Offset(26, 0), const Offset(ElectronicsBoard.kTerm, 0), lead);
+    final reach = ElectronicsBoard.termOffset(p);
+    canvas.drawLine(Offset(-reach, 0), const Offset(-26, 0), lead);
+    canvas.drawLine(const Offset(26, 0), Offset(reach, 0), lead);
     final dead = p.burnt;
+    final grown = isScreenKind(p.kind) && p.scale != 1.0;
+    if (grown) {
+      canvas.save();
+      canvas.scale(p.scale);
+    }
     switch (p.kind) {
       case 'battery':
         _battery(canvas, p);
@@ -1004,6 +1015,7 @@ class BoardPainter extends CustomPainter {
     }
     paintMorePart(canvas, p, board.time, _text);
     if (dead) _text(canvas, '✖', const Offset(-6, -42), const Color(0xFFEF4444), 14);
+    if (grown) canvas.restore();
   }
 
   void _battery(Canvas canvas, Part p) {

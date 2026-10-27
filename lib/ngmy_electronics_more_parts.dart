@@ -45,7 +45,7 @@ const List<PartInfo> kMorePartInfos = [
   PartInfo('speaker', 'Speaker', '🔊', Color(0xFFF472B6), 'Plays a sound when powered (1.5 to 9 volts). The + dot goes to the battery +.', 'A coil and magnet shake a paper cone back and forth. The cone pushes the air to make sound.'),
   PartInfo('clock', 'Digital clock', '⏰', Color(0xFF4ADE80), 'Shows the real time once it has 2.5 to 7 volts. Too many volts and it burns out. The + dot goes to the battery +.', 'A quartz crystal ticks exactly 32,768 times a second, and a chip counts the ticks to show the time.'),
   PartInfo('calculator', 'Calculator', '🧮', Color(0xFFA3E635), 'Sips power: it works from 1.2 to 4.8 volts. A 9 volt battery would burn it out. The + dot goes to the battery +.', 'A tiny chip does the sums and a liquid-crystal screen shows the numbers. A little solar cell can power it.'),
-  PartInfo('phone', 'Phone charging', '📱', Color(0xFF60A5FA), 'Charges when it gets 4 to 7 volts (a USB charger gives 5). Too little and it will not charge; too much and it burns. The + dot goes to the battery +.', 'A lithium battery is filled slowly by a charging chip that keeps the voltage just right.'),
+  PartInfo('phone', 'iPhone 18 Pro Max', '📱', Color(0xFF60A5FA), 'The newest iPhone with a Dynamic Island. Tap it 3 times for the big phone, 4 times to make it bigger. It charges when it gets 4 to 7 volts (a USB charger gives 5). Too little and it will not charge; too much and it burns. The + dot goes to the battery +.', 'A lithium battery is filled slowly by a charging chip that keeps the voltage just right.'),
   PartInfo('router', 'WiFi router', '📶', Color(0xFF2DD4BF), 'Needs 8 to 14 volts. Its lights blink when it is working. The + dot goes to the battery +.', 'A small computer plus a radio that sends and receives the internet through the air.'),
   PartInfo('siren', 'Siren', '🚨', Color(0xFFEF4444), 'A loud alarm that needs 5 to 13.5 volts. Lights flash and the sound goes up and down. The + dot goes to the battery +.', 'A motor spins a mirror that sweeps the light, and an oscillator makes the rising and falling tone.'),
   PartInfo('toycar', 'Toy car', '🚗', Color(0xFFFB923C), 'A little motor drives the wheels once it gets 2 to 9 volts. Works either way round.', 'A small motor turns a gear that spins the back wheels.'),
@@ -132,7 +132,7 @@ bool paintMorePart(Canvas c, Part p, double time, void Function(Canvas, String, 
     case 'phone':
       final body = RRect.fromRectAndRadius(const Rect.fromLTWH(-15, -29, 30, 54), const Radius.circular(6));
       c.drawRRect(body, Paint()..color = const Color(0xFF0B0F17));
-      c.drawRRect(body, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.6..color = const Color(0xFF94A3B8));
+      c.drawRRect(body, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.9..color = const Color(0xFF8A8580));
       final screen = RRect.fromRectAndRadius(const Rect.fromLTWH(-12, -25, 24, 44), const Radius.circular(3));
       if (on) {
         c.drawRRect(screen, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1E3A8A), Color(0xFF0B1230)]).createShader(screen.outerRect));
@@ -149,6 +149,7 @@ bool paintMorePart(Canvas c, Part p, double time, void Function(Canvas, String, 
       } else {
         c.drawRRect(screen, Paint()..color = const Color(0xFF05070A));
       }
+      c.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(-4.5, -24, 9, 2.8), const Radius.circular(1.4)), Paint()..color = Colors.black);
       return true;
     case 'router':
       final body = RRect.fromRectAndRadius(const Rect.fromLTWH(-30, -4, 60, 22), const Radius.circular(5));

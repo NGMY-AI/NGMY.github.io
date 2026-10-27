@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'ngmy_electronics_board.dart';
 import 'ngmy_electronics_more_parts.dart';
 import 'ngmy_electronics_screens.dart';
+import 'ngmy_electronics_tv.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Even more parts for the Electronics Lab: appliances, toys and machines.
@@ -35,6 +36,26 @@ const Map<String, DeviceSpec> kExtraDeviceSpecs = {
   'headphones': DeviceSpec(30, 1.2, 5.0),
   'smartwatch': DeviceSpec(35, 3.0, 4.5),
   'tablet': DeviceSpec(20, 4.5, 7.5),
+  'lgtv': DeviceSpec(55, 5.5, 13.5),
+  'sonytv': DeviceSpec(45, 5.5, 13.5),
+  'appletv': DeviceSpec(40, 5.5, 13.5),
+  'bangtv': DeviceSpec(60, 6.0, 13.5),
+  'iphonefold': DeviceSpec(28, 4.0, 7.0),
+  'galaxy': DeviceSpec(25, 4.0, 7.0),
+  'zfold': DeviceSpec(30, 4.0, 7.0),
+  'pixel': DeviceSpec(25, 4.0, 7.0),
+  'xiaomi': DeviceSpec(22, 4.0, 7.0),
+  'huawei': DeviceSpec(25, 4.0, 7.0),
+  'oppo': DeviceSpec(24, 4.0, 7.0),
+  'honor': DeviceSpec(28, 4.0, 7.0),
+  'vivo': DeviceSpec(25, 4.0, 7.0),
+  'ereader': DeviceSpec(60, 3.0, 5.5),
+  'laptop': DeviceSpec(18, 9.0, 14.0),
+  'imac': DeviceSpec(25, 9.0, 14.0),
+  'monitor': DeviceSpec(30, 8.0, 14.0),
+  'projector': DeviceSpec(20, 8.0, 14.0),
+  'carscreen': DeviceSpec(30, 9.0, 14.0),
+  'vision': DeviceSpec(22, 5.0, 9.5),
 };
 
 /// Machines whose blades or wheels turn faster with more volts.
@@ -62,8 +83,28 @@ const List<PartInfo> kExtraPartInfos = [
   PartInfo('pump', 'Water pump', '🚰', Color(0xFF38BDF8), 'Pushes water round a pipe. Needs 2.5 to 9 volts. Works either way round.', 'A small motor spins a paddle wheel inside a sealed case and flings water out of the pipe.'),
   PartInfo('hairdryer', 'Hair dryer', '💨', Color(0xFFFB7185), 'Blows warm air. A hungry gadget: it needs 6 to 13 volts and a strong battery. Works either way round.', 'A fan blows air past a hot coil of wire, the same coil idea as a toaster.'),
   PartInfo('headphones', 'Headphones', '🎧', Color(0xFFA78BFA), 'Play music into your ears. They are quiet and need only 1.2 to 5 volts, so 9 volts would burn them. Use a step-down converter! The + dot goes to the battery +.', 'Two tiny speakers, one for each ear, shake the air with a coil and a thin cone.'),
-  PartInfo('smartwatch', 'Smart watch', '⌚', Color(0xFF34D399), 'Shows the time and your heartbeat. It sips power: 3 to 4.5 volts only. Use a step-down converter on bigger batteries. The + dot goes to the battery +.', 'A tiny chip, a screen and a sensor that shines green light on your wrist to feel your pulse.'),
-  PartInfo('tablet', 'Tablet', '📲', Color(0xFF60A5FA), 'A big screen playing NGMY ads. Needs 4.5 to 7.5 volts, so a 9 volt battery needs a step-down converter. The + dot goes to the battery +.', 'A bright flat screen, a fast chip and a lithium battery in a thin case.'),
+  PartInfo('smartwatch', 'Apple Watch Ultra', '⌚', Color(0xFF34D399), 'Shows the time and your heartbeat. It sips power: 3 to 4.5 volts only. Use a step-down converter on bigger batteries. The + dot goes to the battery +.', 'A tiny chip, a screen and a sensor that shines green light on your wrist to feel your pulse.'),
+  PartInfo('tablet', 'iPad Pro M5', '📲', Color(0xFF60A5FA), 'A big screen playing NGMY ads. Needs 4.5 to 7.5 volts, so a 9 volt battery needs a step-down converter. The + dot goes to the battery +.', 'A bright flat screen, a fast chip and a lithium battery in a thin case.'),
+  PartInfo('lgtv', 'LG OLED evo G5', '📺', Color(0xFFF43F5E), 'A premium OLED TV where every pixel makes its own light, so black is truly black. Needs 5.5 to 13.5 volts. The + dot goes to the battery +. Tap it 3 times for the big screen, 4 times to make it bigger.', 'Each tiny pixel is an organic LED that glows by itself, so there is no backlight at all.'),
+  PartInfo('sonytv', 'Sony Bravia 9', '📺', Color(0xFFA3A3A3), 'A top Mini LED TV with thousands of tiny lights behind the screen for bright, rich pictures. Needs 5.5 to 13.5 volts. The + dot goes to the battery +.', 'Thousands of small LED zones switch on and off to light only the bright parts of the picture.'),
+  PartInfo('appletv', 'Apple TV 4K', '📺', Color(0xFFE5E7EB), 'A slim silver TV with the Apple TV app screen. Needs 5.5 to 13.5 volts. The + dot goes to the battery +.', 'A fast chip decodes the video and a very thin panel shows it with wide, rich colour.'),
+  PartInfo('bangtv', 'Bang and Olufsen Beovision', '📺', Color(0xFFD6B77B), 'A luxury TV in brushed aluminium with a fabric speaker below the screen. Needs 6 to 13.5 volts. The + dot goes to the battery +.', 'A hand-finished frame, a big OLED panel and a speaker wrapped in wool fabric.'),
+  PartInfo('iphonefold', 'iPhone Fold', '📱', Color(0xFF8B5CF6), 'A phone that opens like a book into a big screen. Needs 4 to 7 volts, so a 9 volt battery would burn it: use a step-down converter. The + dot goes to the battery +. Tap 3 times for the big phone, 4 times to make it bigger.', 'A bendable glass screen folds along a hinge made of tiny gears.'),
+  PartInfo('galaxy', 'Samsung Galaxy S26 Ultra', '📱', Color(0xFF3B82F6), 'A top Android phone with a huge flat screen and a punch-hole camera. Needs 4 to 7 volts: use a step-down converter on bigger batteries. The + dot goes to the battery +.', 'A bright AMOLED screen where each pixel makes its own light, with a titanium frame.'),
+  PartInfo('zfold', 'Samsung Galaxy Z Fold7', '📱', Color(0xFF0EA5E9), 'A foldable Samsung that opens into a small tablet. Needs 4 to 7 volts: use a step-down converter. The + dot goes to the battery +.', 'A flexible screen and a strong hinge let it fold flat and open again many thousands of times.'),
+  PartInfo('pixel', 'Google Pixel 10 Pro XL', '📱', Color(0xFF22C55E), 'Google\'s top phone with a smart camera bar. Needs 4 to 7 volts: use a step-down converter. The + dot goes to the battery +.', 'A chip made for AI helps the camera and the phone understand what you need.'),
+  PartInfo('xiaomi', 'Xiaomi 16 Ultra', '📱', Color(0xFFF97316), 'A top Chinese phone built around a big camera. Needs 4 to 7 volts: use a step-down converter. The + dot goes to the battery +.', 'A one-inch camera sensor catches a lot of light, so photos look good even at night.'),
+  PartInfo('huawei', 'Huawei Mate 80 Pro Max', '📱', Color(0xFFEF4444), 'A premium Huawei flagship with a round camera ring. Needs 4 to 7 volts: use a step-down converter. The + dot goes to the battery +.', 'A tough glass front, a big battery and a camera made with a famous camera maker.'),
+  PartInfo('oppo', 'OPPO Find X9 Ultra', '📱', Color(0xFF4ADE80), 'A top OPPO with a super fast charger and two zoom cameras. Needs 4 to 7 volts: use a step-down converter. The + dot goes to the battery +.', 'A curved glass screen, a big battery and a charger that fills it very quickly.'),
+  PartInfo('honor', 'Honor Magic V5', '📱', Color(0xFF60A5FA), 'One of the thinnest foldable phones. Needs 4 to 7 volts: use a step-down converter. The + dot goes to the battery +.', 'A very thin hinge and a carbon-fibre frame keep it light even when it opens into a big screen.'),
+  PartInfo('vivo', 'vivo X300 Pro', '📱', Color(0xFFFB923C), 'A premium vivo phone with a pro camera. Needs 4 to 7 volts: use a step-down converter. The + dot goes to the battery +.', 'A big camera sensor and a special lens system make sharp photos and portraits.'),
+  PartInfo('ereader', 'Kindle Scribe', '📖', Color(0xFFA3A3A3), 'A paper-like screen you can read in sunlight and write on. It sips power: 3 to 5.5 volts. The + dot goes to the battery +.', 'Tiny black and white capsules move up and down to make the page. It only uses power to change the page.'),
+  PartInfo('laptop', 'MacBook Pro M5 Max', '💻', Color(0xFF6366F1), 'A top laptop with a bright screen. Needs 9 to 14 volts: use a 12 volt battery. The + dot goes to the battery +. Tap it 3 times to open its desktop, 4 times to make it bigger.', 'A very fast chip, a bright mini LED screen and a big battery in a thin aluminium case.'),
+  PartInfo('imac', 'iMac 32 inch', '🖥️', Color(0xFF0EA5E9), 'A beautiful all-in-one computer with a big screen. Needs 9 to 14 volts: use a 12 volt battery. The + dot goes to the battery +.', 'The whole computer is hidden behind the screen, which is only a few millimetres thick.'),
+  PartInfo('monitor', 'Pro Display XDR 8K', '🖥️', Color(0xFF22D3EE), 'A studio monitor with a huge, super sharp screen. Needs 8 to 14 volts. The + dot goes to the battery +.', 'Thousands of LED zones give very bright whites and deep blacks, with millions of pixels.'),
+  PartInfo('projector', 'Sony Laser Projector', '📽️', Color(0xFFFDE047), 'Throws a giant picture onto a wall using a laser light. Needs 8 to 14 volts. The + dot goes to the battery +.', 'A laser lights up a glowing plate, and a lens spreads the picture across the wall.'),
+  PartInfo('carscreen', 'Luxury car touchscreen', '🚘', Color(0xFFEF4444), 'The big screen in a luxury car with a map and the speed. Needs 9 to 14 volts: a 12 volt car battery. The + dot goes to the battery +.', 'A touch screen made to survive heat, cold and bumps, joined to the car computer.'),
+  PartInfo('vision', 'Apple Vision Pro', '🥽', Color(0xFFA78BFA), 'Goggles with two tiny screens, one for each eye. Needs 5 to 9.5 volts. The + dot goes to the battery +.', 'Two screens with more pixels than a TV each sit very close to your eyes behind special lenses.'),
 ];
 
 /// Draws one of the extra appliances around the origin. Returns false for a kind that is not handled here.
@@ -462,6 +503,178 @@ bool paintExtraPart(Canvas c, Part p, double time, void Function(Canvas, String,
       c.drawPath(zig, line(const Color(0xFFFDE68A), 1.4));
       text(c, '☀', Offset(-6, -26), Color.lerp(const Color(0xFF475569), const Color(0xFFFDE047), p.level)!, 14);
       text(c, '${(20 + 980 * (1 - p.level)).round()}Ω', const Offset(-14, 13), Colors.white70, 8.5);
+      return true;
+    case 'lgtv':
+    case 'sonytv':
+    case 'appletv':
+    case 'bangtv':
+      final bez = switch (p.kind) { 'lgtv' => const Color(0xFF0A0A0A), 'sonytv' => const Color(0xFF1C1C1E), 'appletv' => const Color(0xFFD1D5DB), _ => const Color(0xFFB8B2A7) };
+      final thin = p.kind == 'lgtv' || p.kind == 'appletv';
+      c.drawRRect(rr(-36, -24, 72, thin ? 42 : 44, 6), fill(bez));
+      final scr = rr(thin ? -35 : -33, thin ? -23 : -21, thin ? 70 : 66, thin ? 40 : 38, 3);
+      if (on) {
+        c.save();
+        c.clipRRect(scr);
+        c.translate(scr.left, scr.top);
+        paintNgmyTv(c, Size(scr.width, scr.height), p.channel, time, age: p.onAge);
+        c.restore();
+        c.drawCircle(const Offset(31, 19), 1.6, fill(const Color(0xFF4ADE80)));
+      } else {
+        c.drawRRect(scr, fill(const Color(0xFF05070A)));
+        c.drawPath(Path()..moveTo(scr.left, scr.top)..lineTo(scr.left + 24, scr.top)..lineTo(scr.left, scr.top + 22)..close(), fill(Colors.white.withValues(alpha: 0.05)));
+      }
+      switch (p.kind) {
+        case 'lgtv':
+          c.drawRRect(rr(-22, 19, 44, 3, 1.5), fill(const Color(0xFF9CA3AF)));
+        case 'sonytv':
+          for (final x in const [-1.0, 1.0]) {
+            c.drawPath(Path()..moveTo(x * 30, 20)..lineTo(x * 22, 20)..lineTo(x * 26, 26)..close(), fill(const Color(0xFF9CA3AF)));
+          }
+          text(c, 'SONY', const Offset(-9, 20.5), const Color(0xFFE5E7EB), 5.5);
+        case 'appletv':
+          c.drawPath(Path()..moveTo(-8, 18)..lineTo(8, 18)..lineTo(12, 25)..lineTo(-12, 25)..close(), fill(const Color(0xFFB6BBC2)));
+          text(c, 'Apple TV', const Offset(-9, 18.5), const Color(0xFF475569), 4.8);
+        default:
+          c.drawRRect(rr(-34, 19, 68, 7, 3), fill(const Color(0xFF6B5B45)));
+          for (var k = 0; k < 14; k++) {
+            c.drawLine(Offset(-32 + k * 4.9, 20), Offset(-32 + k * 4.9, 25), line(Colors.black26, 0.6));
+          }
+          text(c, 'B&O', const Offset(-6, 26), const Color(0xFFD6B77B), 5);
+      }
+      return true;
+    case 'iphonefold':
+    case 'galaxy':
+    case 'zfold':
+    case 'pixel':
+    case 'xiaomi':
+    case 'huawei':
+    case 'oppo':
+    case 'honor':
+    case 'vivo':
+      final dev = kScreenDevices[p.kind]!;
+      final fold = dev.style == ScreenStyle.fold;
+      final bw = fold ? 44.0 : 30.0, bh = fold ? 48.0 : 54.0;
+      final body = rr(-bw / 2, -bh / 2 - 2, bw, bh, fold ? 5 : 6.5);
+      c.drawRRect(body, grad(body.outerRect, Color.lerp(dev.frame, Colors.white, 0.35)!, dev.frame));
+      final scr = rr(-bw / 2 + 2, -bh / 2, bw - 4, bh - 4, 3.5);
+      if (on) {
+        c.save();
+        c.clipRRect(scr);
+        c.translate(scr.left, scr.top);
+        paintNgmyAd(c, Size(scr.width, scr.height), time);
+        c.restore();
+      } else {
+        c.drawRRect(scr, fill(const Color(0xFF05070A)));
+      }
+      if (fold) c.drawLine(Offset(0, scr.top), Offset(0, scr.bottom), line(Colors.black.withValues(alpha: on ? 0.45 : 0.7), 0.9));
+      if (p.kind == 'iphonefold' || p.kind == 'huawei') {
+        c.drawRRect(rr(-4, scr.top + 1.2, 8, 2.6, 1.3), fill(Colors.black));
+      } else {
+        c.drawCircle(Offset(fold ? bw / 2 - 7 : 0, scr.top + 3), 1.3, fill(Colors.black));
+      }
+      return true;
+    case 'ereader':
+      c.drawRRect(rr(-17, -28, 34, 52, 4), fill(const Color(0xFF374151)));
+      c.drawRRect(rr(-14.5, -25.5, 29, 45, 2), fill(const Color(0xFFE5E7EB)));
+      if (on) {
+        text(c, 'NGMY', const Offset(-9, -23), const Color(0xFF111827), 9);
+        for (var k = 0; k < 9; k++) {
+          c.drawRect(Rect.fromLTWH(-11, -9 + k * 3.6, k % 4 == 3 ? 14 : 22, 1.4), fill(const Color(0xFF6B7280)));
+        }
+        c.drawCircle(const Offset(0, -12), 1.6, fill(const Color(0xFF111827)));
+      }
+      return true;
+    case 'laptop':
+      c.drawRRect(rr(-30, -28, 60, 42, 4), grad(const Rect.fromLTWH(-30, -28, 60, 42), const Color(0xFFCBD5E1), const Color(0xFF6B7280)));
+      final lscr = rr(-27, -25, 54, 34, 2);
+      if (on) {
+        c.save();
+        c.clipRRect(lscr);
+        c.translate(lscr.left, lscr.top);
+        paintNgmyAd(c, Size(lscr.width, lscr.height), time);
+        c.restore();
+      } else {
+        c.drawRRect(lscr, fill(const Color(0xFF05070A)));
+      }
+      c.drawPath(Path()..moveTo(-38, 16)..lineTo(38, 16)..lineTo(34, 21)..lineTo(-34, 21)..close(), fill(const Color(0xFFB6BBC2)));
+      c.drawRRect(rr(-7, 16, 14, 2, 1), fill(const Color(0xFF6B7280)));
+      return true;
+    case 'imac':
+      c.drawRRect(rr(-32, -28, 64, 46, 5), grad(const Rect.fromLTWH(-32, -28, 64, 46), const Color(0xFFF1F5F9), const Color(0xFFCBD5E1)));
+      final iscr = rr(-29, -25, 58, 33, 2);
+      if (on) {
+        c.save();
+        c.clipRRect(iscr);
+        c.translate(iscr.left, iscr.top);
+        paintNgmyAd(c, Size(iscr.width, iscr.height), time);
+        c.restore();
+      } else {
+        c.drawRRect(iscr, fill(const Color(0xFF05070A)));
+      }
+      c.drawCircle(const Offset(0, 13), 2, fill(const Color(0xFF94A3B8)));
+      c.drawPath(Path()..moveTo(-6, 18)..lineTo(6, 18)..lineTo(10, 26)..lineTo(-10, 26)..close(), fill(const Color(0xFFB6BBC2)));
+      return true;
+    case 'monitor':
+      c.drawRRect(rr(-34, -28, 68, 40, 3), fill(const Color(0xFF0A0A0A)));
+      final mscr = rr(-32, -26, 64, 36, 2);
+      if (on) {
+        c.save();
+        c.clipRRect(mscr);
+        c.translate(mscr.left, mscr.top);
+        paintNgmyAd(c, Size(mscr.width, mscr.height), time);
+        c.restore();
+      } else {
+        c.drawRRect(mscr, fill(const Color(0xFF05070A)));
+      }
+      c.drawRect(const Rect.fromLTWH(-3, 12, 6, 10), fill(const Color(0xFF6B7280)));
+      c.drawRRect(rr(-14, 22, 28, 3.5, 1.5), fill(const Color(0xFF9CA3AF)));
+      return true;
+    case 'projector':
+      if (on) {
+        c.drawPath(Path()..moveTo(14, 4)..lineTo(-32, -42)..lineTo(34, -42)..close(), fill(const Color(0xFFFDE047).withValues(alpha: 0.16)));
+        final img = rr(-32, -46, 66, 26, 2);
+        c.save();
+        c.clipRRect(img);
+        c.translate(img.left, img.top);
+        paintNgmyAd(c, Size(img.width, img.height), time);
+        c.restore();
+      }
+      c.drawRRect(rr(-26, -4, 52, 24, 6), grad(const Rect.fromLTWH(-26, -4, 52, 24), const Color(0xFFF3F4F6), const Color(0xFF9CA3AF)));
+      c.drawCircle(const Offset(14, 8), 7, fill(const Color(0xFF111827)));
+      c.drawCircle(const Offset(14, 8), 4, fill(on ? const Color(0xFFFDE047) : const Color(0xFF1F2937)));
+      for (var k = 0; k < 4; k++) {
+        c.drawLine(Offset(-20 + k * 4.0, 2), Offset(-20 + k * 4.0, 14), line(Colors.black26, 1));
+      }
+      return true;
+    case 'carscreen':
+      c.drawRRect(rr(-34, -10, 68, 32, 12), fill(const Color(0xFF111827)));
+      final cscr = rr(-30, -20, 60, 28, 8);
+      c.drawRRect(cscr, fill(const Color(0xFF0B0F17)));
+      c.drawRRect(cscr, line(const Color(0xFF475569), 1.2));
+      if (on) {
+        final route = Path()..moveTo(-26, 4)..quadraticBezierTo(-10, -14 + math.sin(time) * 3, 6, -6)..lineTo(22, -16);
+        c.drawPath(route, line(const Color(0xFF38BDF8), 2.2));
+        c.drawCircle(Offset(-26 + ((time * 6) % 48), 4 - ((time * 6) % 48) * 0.1), 2.4, fill(const Color(0xFF4ADE80)));
+        text(c, '${88 + (time * 2).floor() % 5}', const Offset(8, -3), Colors.white, 10);
+        text(c, 'km/h', const Offset(8, 7), Colors.white54, 5);
+      }
+      return true;
+    case 'vision':
+      final visor = rr(-32, -14, 64, 28, 13);
+      c.drawRRect(visor, grad(visor.outerRect, const Color(0xFF9CA3AF), const Color(0xFF374151)));
+      final glass = rr(-29, -11, 58, 22, 10);
+      if (on) {
+        c.save();
+        c.clipRRect(glass);
+        c.translate(glass.left, glass.top);
+        paintNgmyAd(c, Size(glass.width, glass.height), time);
+        c.restore();
+        c.drawCircle(const Offset(0, 0), 26, fill(const Color(0xFFA78BFA).withValues(alpha: 0.2))..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8));
+      } else {
+        c.drawRRect(glass, fill(const Color(0xFF0F172A)));
+      }
+      c.drawLine(const Offset(-32, 0), const Offset(-40, 3), line(const Color(0xFF6B7280), 4));
+      c.drawLine(const Offset(32, 0), const Offset(40, 3), line(const Color(0xFF6B7280), 4));
       return true;
   }
   return false;
