@@ -1,9 +1,9 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var D,A,E,C={
-fUw(d){switch(d.a){case 1:return B.dK1
-case 2:return B.dK3
-case 0:return B.dK2}},
-apL:function apL(d,e,f,g,h,i){var _=this
+fUI(d){switch(d.a){case 1:return B.dKc
+case 2:return B.dKe
+case 0:return B.dKd}},
+apM:function apM(d,e,f,g,h,i){var _=this
 _.a=d
 _.b=e
 _.c=f
@@ -15,23 +15,23 @@ A=c[2]
 E=c[47]
 C=a.updateHolder(c[33],C)
 B=c[148]
-C.apL.prototype={}
+C.apM.prototype={}
 var z=a.updateTypes([]);(function inheritance(){var x=a.inherit
-x(C.apL,D.aB)})()
+x(C.apM,D.aB)})()
 var y={c:D.az("O<x>")};(function constants(){var x=a.makeConstList
-B.aKl=new D.F(!0,A.c,null,null,null,null,9,A.u,null,2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-B.cBk=x([A.dt,A.jg,A.aC],y.c)
-B.d2s=x([A.aC,A.fc],y.c)
-B.cIE=x([A.k_,A.oU,A.aC],y.c)
-B.dK1=new C.apL(B.cBk,B.d2s,A.fc,A.iR,"PREMIUM",B.cIE)
-B.cWT=x([A.cY,A.f5,A.bS],y.c)
-B.cT8=x([A.bS,A.aS],y.c)
-B.cHx=x([A.wk,A.bS,A.f5],y.c)
-B.dK2=new C.apL(B.cWT,B.cT8,A.bS,A.jL,"NGMY WALLET",B.cHx)
-B.cUF=x([A.ed,A.dB,A.o1],y.c)
-B.cYn=x([A.au,A.aL],y.c)
-B.cJk=x([A.zr,A.au,A.bU],y.c)
-B.dK3=new C.apL(B.cUF,B.cYn,A.au,A.lx,"LUXURY",B.cJk)
-B.dK5=new E.apK(1,"premium")
-B.dK6=new E.apK(2,"luxury")})()};
-(a=>{a["EkGAPa1ss69dhuvO0dUqwPX0gts="]=a.current})($__dart_deferred_initializers__);
+B.aKn=new D.F(!0,A.c,null,null,null,null,9,A.u,null,2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+B.cBs=x([A.dt,A.jg,A.aD],y.c)
+B.d2D=x([A.aD,A.fc],y.c)
+B.cIO=x([A.k_,A.oW,A.aD],y.c)
+B.dKc=new C.apM(B.cBs,B.d2D,A.fc,A.iO,"PREMIUM",B.cIO)
+B.cX1=x([A.cY,A.f5,A.bS],y.c)
+B.cTh=x([A.bS,A.aS],y.c)
+B.cHH=x([A.wk,A.bS,A.f5],y.c)
+B.dKd=new C.apM(B.cX1,B.cTh,A.bS,A.jo,"NGMY WALLET",B.cHH)
+B.cUO=x([A.ec,A.dB,A.o0],y.c)
+B.cYw=x([A.au,A.aL],y.c)
+B.cJu=x([A.zq,A.au,A.bT],y.c)
+B.dKe=new C.apM(B.cUO,B.cYw,A.au,A.lx,"LUXURY",B.cJu)
+B.dKg=new E.apL(1,"premium")
+B.dKh=new E.apL(2,"luxury")})()};
+(a=>{a["eDo9E3Ea63jwv3Ked5ncl/N096I="]=a.current})($__dart_deferred_initializers__);
