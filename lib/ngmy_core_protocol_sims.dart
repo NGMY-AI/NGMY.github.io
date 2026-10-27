@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_construction_lab.dart';
 import 'ngmy_core_reaction_lab.dart';
 import 'ngmy_core_studios_a.dart';
 import 'ngmy_core_circuit_lab.dart';
@@ -174,6 +175,7 @@ class _StudioDef {
 final List<_StudioDef> _kStudios = [
   _StudioDef('UNIVERSE', 'Earth, space and gravity', Icons.travel_explore_rounded, const Color(0xFF38BDF8), () => const NgmyUniverseHub()),
   _StudioDef('ELECTRONICS LAB', 'Batteries, wires, real circuits', Icons.electrical_services_rounded, const Color(0xFF38BDF8), () => const NgmyElectronicsLab()),
+  _StudioDef('CONSTRUCTION LAB', 'Wiring, plumbing and a real 3D house', Icons.construction_rounded, const Color(0xFFF59E0B), () => const NgmyConstructionLab()),
   _StudioDef('DISCOVERY LAB', 'Body Explorer: a real 3D human', Icons.biotech_rounded, const Color(0xFF4ADE80), () => const NgmyBodyExplorer()),
   _StudioDef('TOOLBOX', 'Converter, clock, games', Icons.build_circle_rounded, const Color(0xFFFB923C), () => const NgmyToolboxHub()),
   _StudioDef('MOLECULE MAKER', 'Join atoms into real molecules', Icons.bubble_chart_rounded, const Color(0xFF2DD4BF), () => const NgmyMoleculeStudio()),

@@ -1,0 +1,1170 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+
+import 'ngmy_3d.dart';
+import 'ngmy_construction_electrical.dart';
+import 'ngmy_construction_house.dart';
+import 'ngmy_construction_plumbing.dart';
+import 'ngmy_studio_kit.dart';
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CONSTRUCTION LAB: learn the trades on real looking 3D models. Wire an outlet, a switch and a GFCI,
+// build a sink drain, connect a faucet, and walk through a whole house stage by stage.
+// ═════════════════════════════════════════════════════════════════════════════
+
+const Color _bg = Color(0xFF0E1218);
+const Color _panel = Color(0xFF161B24);
+const Color _amber = Color(0xFFF59E0B);
+
+void _beep(double f, {int ms = 90, String wave = 'tri', double volume = 0.25}) {
+  try {
+    NgmyTone.play(f, ms: ms, wave: wave, volume: volume);
+  } catch (_) {}
+}
+
+void _good() {
+  _beep(880, ms: 80);
+  Future.delayed(const Duration(milliseconds: 90), () => _beep(1320, ms: 120));
+}
+
+void _bad() => _beep(180, ms: 220, wave: 'square', volume: 0.25);
+
+class _LessonInfo {
+  const _LessonInfo(this.id, this.group, this.title, this.blurb, this.icon, this.color);
+  final String id, group, title, blurb;
+  final IconData icon;
+  final Color color;
+}
+
+const List<_LessonInfo> _lessons = [
+  _LessonInfo('outlet', 'Electrical wiring', 'Wall outlet', 'Wire a 120 volt receptacle. Black to brass, white to silver, bare copper to green.', Icons.electrical_services_rounded, Color(0xFFF59E0B)),
+  _LessonInfo('switch', 'Electrical wiring', 'Light switch', 'Two cables, two black wires and a wire nut. Learn what a switch really cuts.', Icons.toggle_on_rounded, Color(0xFF38BDF8)),
+  _LessonInfo('gfci', 'Electrical wiring', 'GFCI outlet', 'LINE and LOAD: the outlet that protects you near water.', Icons.shield_rounded, Color(0xFF34D399)),
+  _LessonInfo('ptrap', 'Plumbing', 'Sink drain (P-trap)', 'Build the drain under a sink and stop sewer gas with a water seal.', Icons.plumbing_rounded, Color(0xFF60A5FA)),
+  _LessonInfo('faucet', 'Plumbing', 'Faucet supply lines', 'Hot on the left, cold on the right: connect the hoses and open the valves.', Icons.water_drop_rounded, Color(0xFFF87171)),
+  _LessonInfo('house', 'The whole house', 'Build and fix a house', 'Build it stage by stage, look inside the walls and fix a tripped breaker and a leak.', Icons.home_work_rounded, Color(0xFFA78BFA)),
+];
+
+// ─── The landing page ────────────────────────────────────────────────────────
+
+class NgmyConstructionLab extends StatelessWidget {
+  const NgmyConstructionLab({super.key});
+
+  void _open(BuildContext context, String id) {
+    final Widget page = switch (id) {
+      'ptrap' => const _PtrapPage(),
+      'faucet' => const _FaucetPage(),
+      'house' => const _HousePage(),
+      _ => _ElectricalPage(id: id),
+    };
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    NgmyTone.theme = kStudioSoundThemes['CONSTRUCTION LAB'] ?? 'tech';
+    final groups = <String>[];
+    for (final l in _lessons) {
+      if (!groups.contains(l.group)) groups.add(l.group);
+    }
+    return Scaffold(
+      backgroundColor: kStudioBg,
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
+          children: [
+            Row(children: [
+              IconButton(onPressed: () => Navigator.of(context).maybePop(), icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20)),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(color: _amber.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(13), border: Border.all(color: _amber.withValues(alpha: 0.6))),
+                child: const Center(child: Text('🏗️', style: TextStyle(fontSize: 22))),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Construction Lab', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 19)),
+                  Text('Learn the trades on real looking 3D models', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                ]),
+              ),
+            ]),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(color: _panel, borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white12)),
+              child: const Text(
+                'Turn every model with your finger, pinch to zoom, and tap any part to zoom in and learn what it is. Pick a wire, then tap the screw it belongs on. Wires have their real colours, and every mistake is explained.',
+                style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.45),
+              ),
+            ),
+            for (final g in groups) ...[
+              Padding(padding: const EdgeInsets.fromLTRB(4, 18, 4, 8), child: Text(g.toUpperCase(), style: const TextStyle(color: _amber, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.2))),
+              for (final l in _lessons.where((e) => e.group == g)) _card(context, l),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _card(BuildContext context, _LessonInfo l) {
+    return GestureDetector(
+      onTap: () => _open(context, l.id),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(color: _panel, borderRadius: BorderRadius.circular(18), border: Border.all(color: l.color.withValues(alpha: 0.45))),
+        child: Row(children: [
+          ClipRRect(borderRadius: BorderRadius.circular(14), child: SizedBox(width: 116, height: 92, child: _Thumb(l.id))),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Icon(l.icon, color: l.color, size: 18),
+                const SizedBox(width: 6),
+                Expanded(child: Text(l.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15))),
+              ]),
+              const SizedBox(height: 4),
+              Text(l.blurb, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.35)),
+            ]),
+          ),
+          Icon(Icons.chevron_right_rounded, color: l.color),
+        ]),
+      ),
+    );
+  }
+}
+
+/// A small still picture of a lesson's 3D model.
+class _Thumb extends StatelessWidget {
+  const _Thumb(this.id);
+  final String id;
+
+  @override
+  Widget build(BuildContext context) {
+    final Scene3D scene;
+    final Cam3 cam;
+    switch (id) {
+      case 'ptrap':
+        scene = buildPtrapScene(PlumbState()..placed.addAll({'tail', 'trap', 'arm'})..tight.updateAll((k, v) => true));
+        cam = Cam3(yaw: -0.4, pitch: 0.2, dist: 40, target: const V3(8, 3, 0));
+      case 'faucet':
+        scene = buildFaucetScene(PlumbState()..attached.addAll({idValveHot: 'hot', idInletHot: 'hot', idValveCold: 'cold', idInletCold: 'cold'}));
+        cam = Cam3(yaw: -0.3, pitch: 0.22, dist: 42, target: const V3(0, 9, -3));
+      case 'house':
+        scene = buildHouseScene(HouseState()..stage = 6);
+        cam = Cam3(yaw: -0.3, pitch: 0.5, dist: 50, target: const V3(0, 4.5, -2));
+      default:
+        scene = buildElectricalScene(electricalLesson(id), WiringState()..power = false..attached.addAll(id == 'gfci' ? const {idGreen: 'ground'} : const {idGreen: 'ground', idSilverTop: 'white'}));
+        cam = Cam3(yaw: 0.45, pitch: 0.25, dist: 12.5, target: const V3(0, -0.2, 3.2));
+    }
+    return RepaintBoundary(
+      child: CustomPaint(
+        painter: Scene3DPainter(scene: scene, cam: cam, hits: HitCache(), layerOn: id == 'house' ? (_) => true : null),
+        size: Size.infinite,
+      ),
+    );
+  }
+}
+
+// ─── Shared pieces ───────────────────────────────────────────────────────────
+
+/// The 3D view with a message banner, an info card and zoom buttons on top of it.
+class _Stage3D extends StatelessWidget {
+  const _Stage3D({required this.scene, required this.cam, required this.onPick, required this.onHome, this.highlight = 0, this.dynamicPolys, this.layerOn, this.message, this.good = false, this.info, this.topLeft, this.topRight, this.infoAction});
+  final Scene3D scene;
+  final Cam3 cam;
+  final void Function(int id) onPick;
+  final VoidCallback onHome;
+  final int highlight;
+  final List<Poly> Function(double t)? dynamicPolys;
+  final bool Function(int layer)? layerOn;
+  final String? message;
+  final bool good;
+  final ObjInfo? info;
+  final List<Widget>? topLeft;
+  final List<Widget>? topRight;
+  final Widget? infoAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(children: [
+      Positioned.fill(child: Scene3DView(scene: scene, cam: cam, highlight: highlight, onPick: onPick, dynamicPolys: dynamicPolys, layerOn: layerOn, background: _bg)),
+      if (topLeft != null) Positioned(left: 8, top: 8, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: topLeft!)),
+      Positioned(
+        right: 8,
+        top: 8,
+        child: Column(children: [
+          ...?topRight,
+          _round(Icons.add_rounded, 'Zoom in', () => cam.zoomBy(0.8)),
+          _round(Icons.remove_rounded, 'Zoom out', () => cam.zoomBy(1.25)),
+          _round(Icons.center_focus_strong_rounded, 'Back to the whole view', onHome),
+        ]),
+      ),
+      if (message != null)
+        Positioned(
+          left: 10,
+          right: 62,
+          top: topLeft != null ? 60 : 10,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
+            decoration: BoxDecoration(color: (good ? const Color(0xFF14532D) : const Color(0xFF7F1D1D)).withValues(alpha: 0.95), borderRadius: BorderRadius.circular(14), border: Border.all(color: good ? const Color(0xFF4ADE80) : const Color(0xFFF87171))),
+            child: Text(message!, style: const TextStyle(color: Colors.white, fontSize: 12.5, height: 1.35, fontWeight: FontWeight.w700)),
+          ),
+        ),
+      if (info != null)
+        Positioned(
+          left: 10,
+          right: 10,
+          bottom: 8,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+            decoration: BoxDecoration(color: const Color(0xF2111318), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white24)),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(info!.name, style: const TextStyle(color: Color(0xFF67E8F9), fontWeight: FontWeight.w900, fontSize: 14.5)),
+                  const SizedBox(height: 3),
+                  Text(info!.about, style: const TextStyle(color: Colors.white70, fontSize: 12.5, height: 1.4)),
+                  if (infoAction != null) ...[const SizedBox(height: 6), infoAction!],
+                ]),
+              ),
+              IconButton(visualDensity: VisualDensity.compact, onPressed: onHome, icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 20)),
+            ]),
+          ),
+        ),
+    ]);
+  }
+
+  Widget _round(IconData icon, String tip, VoidCallback f) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Tooltip(
+          message: tip,
+          child: GestureDetector(
+            onTap: f,
+            child: Container(width: 38, height: 38, decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.55), shape: BoxShape.circle, border: Border.all(color: Colors.white24)), child: Icon(icon, color: Colors.white, size: 20)),
+          ),
+        ),
+      );
+}
+
+Widget _pill(String label, {required bool on, required VoidCallback onTap, Color color = _amber, IconData? icon}) => GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(color: on ? color.withValues(alpha: 0.25) : Colors.black.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(18), border: Border.all(color: on ? color : Colors.white24)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          if (icon != null) ...[Icon(icon, color: on ? color : Colors.white70, size: 16), const SizedBox(width: 5)],
+          Text(label, style: TextStyle(color: on ? color : Colors.white70, fontWeight: FontWeight.w800, fontSize: 12)),
+        ]),
+      ),
+    );
+
+Widget _bigButton(String label, IconData icon, VoidCallback? onTap, {Color color = _amber}) => Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          decoration: BoxDecoration(color: onTap == null ? Colors.white10 : color.withValues(alpha: 0.9), borderRadius: BorderRadius.circular(14)),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(icon, size: 18, color: onTap == null ? Colors.white38 : Colors.black),
+            const SizedBox(width: 6),
+            Flexible(child: Text(label, textAlign: TextAlign.center, style: TextStyle(color: onTap == null ? Colors.white38 : Colors.black, fontWeight: FontWeight.w900, fontSize: 12.5))),
+          ]),
+        ),
+      ),
+    );
+
+Future<void> _showSteps(BuildContext context, String title, List<String> steps, List<bool> done) {
+  return showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: const Color(0xFF17171C),
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+    builder: (ctx) => SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.75),
+        child: ListView(shrinkWrap: true, padding: const EdgeInsets.fromLTRB(16, 16, 16, 16), children: [
+          Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 4),
+          Text('${done.where((d) => d).length} of ${steps.length} steps done', style: const TextStyle(color: _amber, fontWeight: FontWeight.w800, fontSize: 12.5)),
+          const SizedBox(height: 10),
+          for (var i = 0; i < steps.length; i++)
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(14), border: Border.all(color: done[i] ? const Color(0xFF4ADE80).withValues(alpha: 0.6) : Colors.white12)),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(done[i] ? '✅' : '${i + 1}.', style: TextStyle(color: done[i] ? Colors.white : _amber, fontWeight: FontWeight.w900, fontSize: 14)),
+                const SizedBox(width: 10),
+                Expanded(child: Text(steps[i], style: TextStyle(color: done[i] ? Colors.white54 : Colors.white, fontSize: 13, height: 1.4))),
+              ]),
+            ),
+        ]),
+      ),
+    ),
+  );
+}
+
+/// A lesson page: a header with the title, then the 3D area and a bottom panel.
+class _LessonScaffold extends StatelessWidget {
+  const _LessonScaffold({required this.title, required this.color, required this.stage, required this.panel, required this.onSteps, required this.stepText});
+  final String title;
+  final Color color;
+  final Widget stage;
+  final Widget panel;
+  final VoidCallback onSteps;
+  final String stepText;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: kStudioBg,
+      body: SafeArea(
+        child: Column(children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 4, 8, 4),
+            child: Row(children: [
+              IconButton(onPressed: () => Navigator.of(context).maybePop(), icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20)),
+              Expanded(child: Text(title, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 16))),
+              GestureDetector(
+                onTap: onSteps,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(16), border: Border.all(color: color.withValues(alpha: 0.6))),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.checklist_rounded, color: color, size: 17), const SizedBox(width: 5), Text(stepText, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12))]),
+                ),
+              ),
+            ]),
+          ),
+          Expanded(child: ClipRRect(borderRadius: const BorderRadius.vertical(top: Radius.circular(20)), child: stage)),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+            decoration: const BoxDecoration(color: _panel, border: Border(top: BorderSide(color: Colors.white12))),
+            child: panel,
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+// ─── Electrical lessons ──────────────────────────────────────────────────────
+
+class _ElectricalPage extends StatefulWidget {
+  const _ElectricalPage({required this.id});
+  final String id;
+
+  @override
+  State<_ElectricalPage> createState() => _ElectricalPageState();
+}
+
+class _ElectricalPageState extends State<_ElectricalPage> {
+  late final ElectricalLesson lesson = electricalLesson(widget.id);
+  final WiringState s = WiringState();
+  late final Cam3 cam = Cam3(yaw: 0.42, pitch: 0.26, dist: 12, target: const V3(0, 0.2, 2.8));
+  late Scene3D scene = buildElectricalScene(lesson, s);
+  String chip = '';
+  int hl = 0;
+  String? msg;
+  bool good = false;
+  int mistakes = 0;
+  Timer? _msgTimer;
+
+  @override
+  void dispose() {
+    _msgTimer?.cancel();
+    super.dispose();
+  }
+
+  void _say(String text, {bool ok = false}) {
+    _msgTimer?.cancel();
+    setState(() {
+      msg = text;
+      good = ok;
+    });
+    _msgTimer = Timer(const Duration(seconds: 9), () {
+      if (mounted) setState(() => msg = null);
+    });
+  }
+
+  void _rebuild() {
+    s.testing = s.testing && s.power && s.stage >= 2;
+    scene = buildElectricalScene(lesson, s);
+  }
+
+  void _home() {
+    cam.glideTo(target: V3(0, 0.1, s.stage == 0 ? 2.8 : 0.4), dist: s.stage == 0 ? 12 : 10, yaw: 0.42, pitch: 0.26);
+    setState(() => hl = 0);
+  }
+
+  /// Turns the device so the screws that wire belongs on are in view: brass on the right, silver on the left, green at the bottom.
+  void _lookFor(String key) {
+    if (key == 'ground') {
+      cam.glideTo(target: const V3(0, -1.2, 5.0), dist: 8, yaw: 0.15, pitch: 0.55);
+    } else if (key == 'white') {
+      cam.glideTo(target: const V3(-0.9, 0.0, 4.4), dist: 8.5, yaw: 0.95, pitch: 0.2);
+    } else {
+      cam.glideTo(target: const V3(0.9, 0.0, 4.4), dist: 8.5, yaw: -0.95, pitch: 0.2);
+    }
+  }
+
+  List<bool> _done() {
+    final off = !s.power || s.stage > 0;
+    bool has(String k) => s.attached.values.contains(k);
+    switch (lesson.id) {
+      case 'switch':
+        return [off, off, off, has('ground'), has('blackLine'), has('blackLoad'), s.stage >= 2 && s.testing];
+      case 'gfci':
+        return [off, off, has('ground'), has('white'), has('black'), s.stage >= 2, s.stage >= 2 && s.testing];
+      default:
+        return [off, off, has('ground'), has('white'), has('black'), s.stage >= 1, s.stage >= 2 && s.testing];
+    }
+  }
+
+  void _pick(int id) {
+    if (id == 0) {
+      _home();
+      return;
+    }
+    final hook = lesson.hookups.where((h) => h.id == id).toList();
+    // A tap on a wire that is fastened takes it off the screw.
+    final key = wireKeyForId(lesson.id, id);
+    if (key != null && s.stage == 0 && s.attached.containsValue(key)) {
+      if (s.power) {
+        _bad();
+        _say('STOP! The power is still on. Turn the breaker OFF before you touch any wire.');
+        return;
+      }
+      s.attached.removeWhere((_, v) => v == key);
+      setState(_rebuild);
+      _say('Wire taken off the screw.', ok: true);
+      return;
+    }
+    if (hook.isNotEmpty && chip.isNotEmpty && s.stage == 0) {
+      final err = tryFasten(lesson, s, chip, hook.first);
+      if (err != null) {
+        mistakes++;
+        _bad();
+        _say(err);
+      } else {
+        _good();
+        setState(() {
+          _rebuild();
+          hl = id;
+        });
+        if (wiringComplete(lesson, s)) {
+          _say('Every wire is on the right screw. Now push the device into the box.', ok: true);
+        } else {
+          _say('${hook.first.name}: fastened correctly.', ok: true);
+        }
+        cam.glideTo(target: hookupPoint(lesson.id, id, s), dist: 7);
+        chip = '';
+      }
+      return;
+    }
+    final info = scene.info[id];
+    if (info != null) {
+      setState(() => hl = id);
+      cam.glideTo(target: info.focus, dist: info.dist);
+    }
+  }
+
+  void _power() {
+    setState(() {
+      s.power = !s.power;
+      if (!s.power) s.testing = false;
+      _rebuild();
+    });
+    if (s.power) {
+      _beep(120, ms: 200, wave: 'saw');
+      if (s.stage == 0) _say('The breaker is ON. The wires are LIVE at 120 volts. Turn it OFF before you touch anything.');
+    } else {
+      _beep(600, ms: 100);
+      _say('Breaker OFF. It is safe to work on the wires. (In real life, always test them with a tester first.)', ok: true);
+    }
+  }
+
+  void _test() {
+    setState(() {
+      s.power = true;
+      s.testing = true;
+      _rebuild();
+    });
+    _good();
+    _say(
+      switch (lesson.id) {
+        'switch' => 'Power on. Flip the switch and the light turns on: both black wires are on brass screws, so the switch opens and closes the hot wire. The lesson is complete! Mistakes: $mistakes.',
+        'gfci' => 'Power on. Press RESET (it clicks), then TEST: it must shut the outlet off. Wired on LINE, it protects the whole circuit. The lesson is complete! Mistakes: $mistakes.',
+        _ => 'The tester glows: this outlet has 120 volts and is wired correctly. The lesson is complete! Mistakes: $mistakes.',
+      },
+      ok: true,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final done = _done();
+    final next = done.indexWhere((d) => !d);
+    final stepText = next < 0 ? 'All done' : 'Step ${next + 1}/${lesson.steps.length}';
+    final canPush = wiringComplete(lesson, s) && !s.power;
+    return _LessonScaffold(
+      title: lesson.title,
+      color: _amber,
+      stepText: stepText,
+      onSteps: () => _showSteps(context, lesson.title, lesson.steps, done),
+      stage: _Stage3D(
+        scene: scene,
+        cam: cam,
+        highlight: hl,
+        onPick: _pick,
+        onHome: _home,
+        message: msg,
+        good: good,
+        info: hl != 0 ? scene.info[hl] : null,
+        topLeft: [
+          GestureDetector(
+            onTap: _power,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(color: (s.power ? const Color(0xFF7F1D1D) : const Color(0xFF14532D)).withValues(alpha: 0.95), borderRadius: BorderRadius.circular(18), border: Border.all(color: s.power ? const Color(0xFFF87171) : const Color(0xFF4ADE80), width: 1.5)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(s.power ? Icons.bolt_rounded : Icons.power_off_rounded, color: Colors.white, size: 18),
+                const SizedBox(width: 5),
+                Text(s.power ? 'Breaker ON (live)' : 'Breaker OFF (safe)', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+              ]),
+            ),
+          ),
+        ],
+        topRight: [
+          _pill('Hints', on: s.hints, icon: Icons.lightbulb_rounded, onTap: () => setState(() {
+                s.hints = !s.hints;
+                _rebuild();
+              })),
+          const SizedBox(height: 6),
+          _pill('Labels', on: s.labels, icon: Icons.label_rounded, color: const Color(0xFF38BDF8), onTap: () => setState(() {
+                s.labels = !s.labels;
+                _rebuild();
+              })),
+          const SizedBox(height: 6),
+          _pill('Brass side', on: false, icon: Icons.rotate_left_rounded, color: const Color(0xFFCDA033), onTap: () => cam.glideTo(target: V3(0.6, 0, s.stage == 0 ? 4.2 : 0.4), dist: 10, yaw: -0.95, pitch: 0.2)),
+          const SizedBox(height: 6),
+          _pill('Silver side', on: false, icon: Icons.rotate_right_rounded, color: const Color(0xFFCBD0D6), onTap: () => cam.glideTo(target: V3(-0.6, 0, s.stage == 0 ? 4.2 : 0.4), dist: 10, yaw: 0.95, pitch: 0.2)),
+          const SizedBox(height: 8),
+        ],
+      ),
+      panel: Column(mainAxisSize: MainAxisSize.min, children: [
+        if (s.stage == 0) ...[
+          Wrap(spacing: 8, runSpacing: 6, children: [
+              for (final c in lesson.chips)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: GestureDetector(
+                    onTap: () {
+                      if (s.attached.containsValue(c.key)) {
+                        _say('That wire is already fastened. Tap the wire in the 3D view to take it off if you want to move it.');
+                        return;
+                      }
+                      setState(() => chip = chip == c.key ? '' : c.key);
+                      if (chip.isNotEmpty) {
+                        _lookFor(c.key);
+                        _say('${c.label}: now tap the screw it belongs on.', ok: true);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(color: c.color, borderRadius: BorderRadius.circular(14), border: Border.all(color: chip == c.key ? const Color(0xFF67E8F9) : Colors.white24, width: chip == c.key ? 3 : 1)),
+                      child: Row(children: [
+                        if (s.attached.containsValue(c.key)) Padding(padding: const EdgeInsets.only(right: 6), child: Icon(Icons.check_circle_rounded, size: 18, color: c.ink)),
+                        Text(c.label, style: TextStyle(color: c.ink, fontWeight: FontWeight.w900, fontSize: 13)),
+                      ]),
+                    ),
+                  ),
+                ),
+            ]),
+          const SizedBox(height: 8),
+          Row(children: [
+            _bigButton(canPush ? 'Push it into the box' : (s.power ? 'Turn the breaker OFF first' : 'Fasten every wire first'), Icons.move_down_rounded, canPush
+                ? () {
+                    setState(() {
+                      s.stage = 1;
+                      _rebuild();
+                    });
+                    _good();
+                    _say('The wires are folded back and the device is pushed into the box. Now put the cover plate on.', ok: true);
+                    _home();
+                  }
+                : null),
+          ]),
+        ] else if (s.stage == 1) ...[
+          Row(children: [
+            _bigButton('Pull it back out', Icons.undo_rounded, () {
+              setState(() {
+                s.stage = 0;
+                _rebuild();
+              });
+              _home();
+            }, color: Colors.white70),
+            const SizedBox(width: 8),
+            _bigButton('Put the cover plate on', Icons.crop_square_rounded, () {
+              setState(() {
+                s.stage = 2;
+                _rebuild();
+              });
+              _good();
+              _say('Cover plate on. Now turn the power on and test.', ok: true);
+            }),
+          ]),
+        ] else ...[
+          Row(children: [
+            _bigButton('Start over', Icons.restart_alt_rounded, () {
+              setState(() {
+                s.stage = 0;
+                s.attached.clear();
+                s.power = true;
+                s.testing = false;
+                mistakes = 0;
+                chip = '';
+                hl = 0;
+                _rebuild();
+              });
+              _home();
+            }, color: Colors.white70),
+            const SizedBox(width: 8),
+            _bigButton(s.testing ? 'Tested ✓' : 'Power on and test', Icons.bolt_rounded, s.testing ? null : _test),
+          ]),
+        ],
+      ]),
+    );
+  }
+}
+
+// ─── Sink drain (P-trap) ─────────────────────────────────────────────────────
+
+class _PtrapPage extends StatefulWidget {
+  const _PtrapPage();
+
+  @override
+  State<_PtrapPage> createState() => _PtrapPageState();
+}
+
+class _PtrapPageState extends State<_PtrapPage> {
+  final PlumbState s = PlumbState();
+  late final Cam3 cam = Cam3(yaw: -0.3, pitch: 0.18, dist: 40, target: const V3(7, 3, 0));
+  late Scene3D scene = buildPtrapScene(s);
+  String chip = '';
+  int hl = 0;
+  String? msg;
+  bool good = false;
+  Timer? _t;
+  static const steps = [
+    'Look at the pieces: the tailpiece, the P-trap and the trap arm. Pick the tailpiece first and tap its glowing outline under the sink.',
+    'Pick the P-trap (the U-shaped bend) and tap its glowing outline. It joins the tailpiece.',
+    'Pick the trap arm and tap its outline. It joins the trap to the wall drain.',
+    'Slide each slip nut up to its joint and hand tighten it: tap the nuts.',
+    'Run the water and look for leaks. The U-bend keeps a plug of water that blocks sewer gas.',
+  ];
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  void _say(String t, {bool ok = false}) {
+    _t?.cancel();
+    setState(() {
+      msg = t;
+      good = ok;
+    });
+    _t = Timer(const Duration(seconds: 9), () {
+      if (mounted) setState(() => msg = null);
+    });
+  }
+
+  void _home() {
+    cam.glideTo(target: const V3(7, 3, 0), dist: 40, yaw: -0.3, pitch: 0.18);
+    setState(() => hl = 0);
+  }
+
+  List<bool> _done() => [
+        s.placed.contains('tail'),
+        s.placed.contains('trap'),
+        s.placed.contains('arm'),
+        s.tight['n1'] == true && s.tight['n2'] == true,
+        s.running && s.leakAt.isEmpty,
+      ];
+
+  void _rebuild() => scene = buildPtrapScene(s);
+
+  void _pick(int id) {
+    if (id == 0) {
+      _home();
+      return;
+    }
+    final pieces = {idTail: 'tail', idTrap: 'trap', idArm: 'arm'};
+    final key = pieces[id];
+    if (key != null && !s.placed.contains(key)) {
+      if (chip.isEmpty) {
+        _say('Pick the ${key == 'tail' ? 'tailpiece' : (key == 'trap' ? 'P-trap' : 'trap arm')} from the buttons below first, then tap its glowing outline.');
+        return;
+      }
+      if (chip != key) {
+        _bad();
+        _say(switch (chip) {
+          'tail' => 'The tailpiece is the straight pipe that hangs from the sink. It goes at the very top, under the drain.',
+          'trap' => 'The P-trap is the U-shaped bend. It goes right under the tailpiece, in the middle.',
+          _ => 'The trap arm is the long straight pipe that goes into the wall. It goes last, on the right.',
+        });
+        return;
+      }
+      if (key == 'trap' && !s.placed.contains('tail')) {
+        _bad();
+        _say('Start from the top: put the tailpiece on first, then the trap under it.');
+        return;
+      }
+      if (key == 'arm' && !s.placed.contains('trap')) {
+        _bad();
+        _say('The trap arm joins the trap. Put the P-trap on first.');
+        return;
+      }
+      setState(() {
+        s.placed.add(key);
+        s.running = false;
+        s.leakAt = '';
+        _rebuild();
+        chip = '';
+      });
+      _good();
+      _say('Piece in place. ${s.placed.length == 3 ? 'Now tighten the two slip nuts: tap each nut.' : 'Pick the next piece.'}', ok: true);
+      return;
+    }
+    if ((id == idNut1 || id == idNut2)) {
+      final nk = id == idNut1 ? 'n1' : 'n2';
+      if (s.tight[nk] != true) {
+        setState(() {
+          s.tight[nk] = true;
+          s.leakAt = '';
+          _rebuild();
+        });
+        _good();
+        _say('Slip nut hand tightened. In real life give it a quarter turn more with pliers, but never over-tighten plastic.', ok: true);
+        return;
+      }
+    }
+    final info = scene.info[id];
+    if (info != null) {
+      setState(() => hl = id);
+      cam.glideTo(target: info.focus, dist: info.dist);
+    }
+  }
+
+  void _run() {
+    final loose = ['n1', 'n2'].where((k) => s.tight[k] != true).toList();
+    setState(() {
+      s.running = true;
+      s.leakAt = loose.isEmpty ? '' : loose.first;
+      _rebuild();
+    });
+    if (loose.isNotEmpty) {
+      _bad();
+      _say('It is dripping from a loose slip nut! Tap the nut and tighten it, then run the water again.');
+    } else {
+      _good();
+      _say('No leaks. The water flows through the trap and into the wall. The little pool in the U-bend stays there and blocks sewer gas. The lesson is complete!', ok: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final done = _done();
+    final next = done.indexWhere((d) => !d);
+    final allPlaced = s.placed.length == 3;
+    const names = {'tail': 'Tailpiece', 'trap': 'P-trap', 'arm': 'Trap arm'};
+    return _LessonScaffold(
+      title: 'Sink drain (P-trap)',
+      color: const Color(0xFF60A5FA),
+      stepText: next < 0 ? 'All done' : 'Step ${next + 1}/${steps.length}',
+      onSteps: () => _showSteps(context, 'Sink drain (P-trap)', steps, done),
+      stage: _Stage3D(
+        scene: scene,
+        cam: cam,
+        highlight: hl,
+        onPick: _pick,
+        onHome: _home,
+        message: msg,
+        good: good,
+        info: hl != 0 ? scene.info[hl] : null,
+        dynamicPolys: (t) => ptrapWater(s, t),
+      ),
+      panel: Column(mainAxisSize: MainAxisSize.min, children: [
+        Wrap(spacing: 8, runSpacing: 6, children: [
+            for (final k in const ['tail', 'trap', 'arm'])
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: GestureDetector(
+                  onTap: s.placed.contains(k) ? null : () => setState(() => chip = chip == k ? '' : k),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(color: s.placed.contains(k) ? Colors.white10 : const Color(0xFF1E3A5F), borderRadius: BorderRadius.circular(14), border: Border.all(color: chip == k ? const Color(0xFF67E8F9) : Colors.white24, width: chip == k ? 3 : 1)),
+                    child: Row(children: [
+                      if (s.placed.contains(k)) const Padding(padding: EdgeInsets.only(right: 6), child: Icon(Icons.check_circle_rounded, size: 18, color: Color(0xFF4ADE80))),
+                      Text(names[k]!, style: TextStyle(color: s.placed.contains(k) ? Colors.white38 : Colors.white, fontWeight: FontWeight.w900, fontSize: 13)),
+                    ]),
+                  ),
+                ),
+              ),
+          ]),
+        const SizedBox(height: 8),
+        Row(children: [
+          _bigButton('Start over', Icons.restart_alt_rounded, () {
+            setState(() {
+              s.placed.clear();
+              s.tight.updateAll((k, v) => false);
+              s.running = false;
+              s.leakAt = '';
+              chip = '';
+              hl = 0;
+              _rebuild();
+            });
+            _home();
+          }, color: Colors.white70),
+          const SizedBox(width: 8),
+          _bigButton(allPlaced ? 'Run the water' : 'Build the drain first', Icons.water_drop_rounded, allPlaced ? _run : null, color: const Color(0xFF60A5FA)),
+        ]),
+      ]),
+    );
+  }
+}
+
+// ─── Faucet supply lines ─────────────────────────────────────────────────────
+
+class _FaucetPage extends StatefulWidget {
+  const _FaucetPage();
+
+  @override
+  State<_FaucetPage> createState() => _FaucetPageState();
+}
+
+class _FaucetPageState extends State<_FaucetPage> {
+  final PlumbState s = PlumbState();
+  late final Cam3 cam = Cam3(yaw: -0.25, pitch: 0.2, dist: 36, target: const V3(0, 9, -3));
+  late Scene3D scene = buildFaucetScene(s);
+  String chip = '';
+  int hl = 0;
+  String? msg;
+  bool good = false;
+  Timer? _t;
+  static const steps = [
+    'Look under the sink. The wall has two shut-off valves: hot on the LEFT (red handle) and cold on the RIGHT (blue handle).',
+    'Pick the red hot hose. Tap the left shut-off valve, then the left faucet inlet.',
+    'Pick the blue cold hose. Tap the right shut-off valve, then the right faucet inlet.',
+    'Open the valves slowly and turn on the faucet. Check every connection for drips.',
+  ];
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  void _say(String t, {bool ok = false}) {
+    _t?.cancel();
+    setState(() {
+      msg = t;
+      good = ok;
+    });
+    _t = Timer(const Duration(seconds: 9), () {
+      if (mounted) setState(() => msg = null);
+    });
+  }
+
+  void _home() {
+    cam.glideTo(target: const V3(0, 9, -3), dist: 36, yaw: -0.25, pitch: 0.2);
+    setState(() => hl = 0);
+  }
+
+  void _rebuild() => scene = buildFaucetScene(s);
+
+  List<bool> _done() => [
+        s.hints || s.attached.isNotEmpty,
+        s.attached[idValveHot] == 'hot' && s.attached[idInletHot] == 'hot',
+        s.attached[idValveCold] == 'cold' && s.attached[idInletCold] == 'cold',
+        s.valvesOpen && faucetComplete(s),
+      ];
+
+  void _pick(int id) {
+    if (id == 0) {
+      _home();
+      return;
+    }
+    final hooks = kFaucetHooks.where((h) => h.id == id).toList();
+    if (hooks.isNotEmpty && chip.isNotEmpty) {
+      final err = tryHose(s, chip, hooks.first);
+      if (err != null) {
+        _bad();
+        _say(err);
+      } else {
+        _good();
+        setState(() {
+          s.valvesOpen = false;
+          _rebuild();
+          hl = id;
+        });
+        cam.glideTo(target: faucetHookPoint(id), dist: 12);
+        _say(faucetComplete(s) ? 'All four ends are connected. Now open the valves.' : '${hooks.first.name}: connected.', ok: true);
+      }
+      return;
+    }
+    // A tap on a hose takes it off.
+    if (id == idHoseHot || id == idHoseCold) {
+      final k = id == idHoseHot ? 'hot' : 'cold';
+      if (s.attached.containsValue(k)) {
+        setState(() {
+          s.attached.removeWhere((_, v) => v == k);
+          s.valvesOpen = false;
+          _rebuild();
+        });
+        _say('Hose taken off.', ok: true);
+        return;
+      }
+    }
+    final info = scene.info[id];
+    if (info != null) {
+      setState(() => hl = id);
+      cam.glideTo(target: info.focus, dist: info.dist);
+    }
+  }
+
+  void _open() {
+    setState(() {
+      s.valvesOpen = !s.valvesOpen;
+      _rebuild();
+    });
+    if (!s.valvesOpen) {
+      _say('Valves closed.', ok: true);
+      return;
+    }
+    if (faucetComplete(s)) {
+      _good();
+      _say('Hot and cold flow through the hoses and out of the faucet. No leaks. The lesson is complete!', ok: true);
+    } else {
+      _bad();
+      _say('Water is spraying out of a valve that has no hose! Close the valves and finish connecting the hoses first.');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final done = _done();
+    final next = done.indexWhere((d) => !d);
+    return _LessonScaffold(
+      title: 'Faucet supply lines',
+      color: const Color(0xFFF87171),
+      stepText: next < 0 ? 'All done' : 'Step ${next + 1}/${steps.length}',
+      onSteps: () => _showSteps(context, 'Faucet supply lines', steps, done),
+      stage: _Stage3D(
+        scene: scene,
+        cam: cam,
+        highlight: hl,
+        onPick: _pick,
+        onHome: _home,
+        message: msg,
+        good: good,
+        info: hl != 0 ? scene.info[hl] : null,
+        dynamicPolys: (t) => faucetWater(s, t),
+        topRight: [
+          _pill('Hints', on: s.hints, icon: Icons.lightbulb_rounded, onTap: () => setState(() {
+                s.hints = !s.hints;
+                _rebuild();
+              })),
+          const SizedBox(height: 8),
+        ],
+      ),
+      panel: Column(mainAxisSize: MainAxisSize.min, children: [
+        Wrap(spacing: 8, runSpacing: 6, children: [
+            for (final (k, label, col) in const [('hot', 'Hot hose (red)', kHot), ('cold', 'Cold hose (blue)', kCold)])
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: GestureDetector(
+                  onTap: () => setState(() => chip = chip == k ? '' : k),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(color: col, borderRadius: BorderRadius.circular(14), border: Border.all(color: chip == k ? const Color(0xFF67E8F9) : Colors.white24, width: chip == k ? 3 : 1)),
+                    child: Row(children: [
+                      if (s.attached.values.where((v) => v == k).length == 2) const Padding(padding: EdgeInsets.only(right: 6), child: Icon(Icons.check_circle_rounded, size: 18, color: Colors.white)),
+                      Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13)),
+                    ]),
+                  ),
+                ),
+              ),
+          ]),
+        const SizedBox(height: 8),
+        Row(children: [
+          _bigButton('Start over', Icons.restart_alt_rounded, () {
+            setState(() {
+              s.attached.clear();
+              s.valvesOpen = false;
+              chip = '';
+              hl = 0;
+              _rebuild();
+            });
+            _home();
+          }, color: Colors.white70),
+          const SizedBox(width: 8),
+          _bigButton(s.valvesOpen ? 'Close the valves' : 'Open the valves', Icons.water_drop_rounded, _open, color: const Color(0xFFF87171)),
+        ]),
+      ]),
+    );
+  }
+}
+
+// ─── The whole house ─────────────────────────────────────────────────────────
+
+class _HousePage extends StatefulWidget {
+  const _HousePage();
+
+  @override
+  State<_HousePage> createState() => _HousePageState();
+}
+
+class _HousePageState extends State<_HousePage> {
+  final HouseState s = HouseState();
+  late final Cam3 cam = Cam3(yaw: -0.3, pitch: 0.48, dist: 46, target: const V3(0, 4, -2))..maxDist = 80;
+  late Scene3D scene = buildHouseScene(s);
+  int hl = 0;
+  String tool = '';
+  String? msg;
+  bool good = false;
+  Timer? _t;
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  void _say(String t, {bool ok = false}) {
+    _t?.cancel();
+    setState(() {
+      msg = t;
+      good = ok;
+    });
+    _t = Timer(const Duration(seconds: 9), () {
+      if (mounted) setState(() => msg = null);
+    });
+  }
+
+  void _home() {
+    cam.glideTo(target: const V3(0, 4, -2), dist: 46, yaw: -0.3, pitch: 0.48);
+    setState(() => hl = 0);
+  }
+
+  void _rebuild() => scene = buildHouseScene(s);
+
+  void _pick(int id) {
+    if (id == 0) {
+      _home();
+      return;
+    }
+    if (id == idBreakerLiving && s.breakerTripped && s.stage >= 5) {
+      setState(() {
+        s.breakerTripped = false;
+        _rebuild();
+        hl = id;
+      });
+      _good();
+      _say('You flipped the breaker fully OFF and then ON. The living room light is back on. A breaker trips when a circuit is overloaded: find out why before it trips again.', ok: true);
+      cam.glideTo(target: const V3(-6.5, 5, -3), dist: 22);
+      return;
+    }
+    if ((id == idHNut || id == idHTrap) && s.leaking && !s.nutFixed && s.stage >= 5) {
+      if (tool == 'wrench' && id == idHNut) {
+        setState(() {
+          s.nutFixed = true;
+          s.leaking = false;
+          _rebuild();
+          hl = id;
+        });
+        _good();
+        _say('You tightened the slip nut with the wrench. The drip has stopped.', ok: true);
+        return;
+      }
+      _bad();
+      _say(id == idHNut ? 'Hand tightening is not enough here. Pick the wrench first, then tap the nut.' : 'The water is dripping from the slip nut on the trap. Pick the wrench, then tap the nut.');
+    }
+    final info = scene.info[id];
+    if (info != null) {
+      setState(() => hl = id);
+      cam.glideTo(target: info.focus, dist: info.dist);
+    }
+  }
+
+  void _openLesson(String id) {
+    final Widget page = switch (id) {
+      'ptrap' => const _PtrapPage(),
+      'faucet' => const _FaucetPage(),
+      _ => _ElectricalPage(id: id),
+    };
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stage = kHouseStages[s.stage];
+    final lesson = hl == 0 ? null : houseLessonFor(hl);
+    final fixed = [!s.breakerTripped, !s.leaking || s.nutFixed];
+    return _LessonScaffold(
+      title: 'Build and fix a house',
+      color: const Color(0xFFA78BFA),
+      stepText: 'Stage ${s.stage + 1}/${kHouseStages.length}',
+      onSteps: () => _showSteps(context, 'Fix the house', const ['The living room has no power: find the tripped breaker in the panel and reset it.', 'The kitchen sink drips: pick the wrench and tighten the slip nut under the sink. (Build the house up to Fixtures to see the problems.)'], fixed),
+      stage: _Stage3D(
+        scene: scene,
+        cam: cam,
+        highlight: hl,
+        onPick: _pick,
+        onHome: _home,
+        message: msg,
+        good: good,
+        info: hl != 0 ? scene.info[hl] : null,
+        infoAction: lesson == null
+            ? null
+            : GestureDetector(
+                onTap: () => _openLesson(lesson),
+                child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7), decoration: BoxDecoration(color: _amber, borderRadius: BorderRadius.circular(12)), child: const Text('Open the 3D lesson', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 12))),
+              ),
+        layerOn: (l) => l <= s.stage,
+        dynamicPolys: (t) => houseWater(s, t),
+      ),
+      panel: Column(mainAxisSize: MainAxisSize.min, children: [
+        Row(children: [
+          Expanded(child: Text('${s.stage + 1}. ${stage.$1}', style: const TextStyle(color: Color(0xFFC4B5FD), fontWeight: FontWeight.w900, fontSize: 14))),
+          _pill('Wrench', on: tool == 'wrench', icon: Icons.build_rounded, color: const Color(0xFF38BDF8), onTap: () => setState(() => tool = tool == 'wrench' ? '' : 'wrench')),
+        ]),
+        const SizedBox(height: 2),
+        Text(stage.$2, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.35)),
+        Slider(
+          value: s.stage.toDouble(),
+          min: 0,
+          max: (kHouseStages.length - 1).toDouble(),
+          divisions: kHouseStages.length - 1,
+          activeColor: const Color(0xFFA78BFA),
+          label: stage.$1,
+          onChanged: (v) => setState(() {
+            s.stage = v.round();
+            if (s.stage < 5) hl = 0;
+            _rebuild();
+          }),
+        ),
+        Row(children: [
+          Expanded(child: Text(fixed[0] ? '✅ Living room power fixed' : '⚠ Living room has no power', style: TextStyle(color: fixed[0] ? const Color(0xFF86EFAC) : const Color(0xFFFCA5A5), fontSize: 11.5, fontWeight: FontWeight.w800))),
+          Expanded(child: Text(fixed[1] ? '✅ Sink leak fixed' : '⚠ Kitchen sink drips', textAlign: TextAlign.right, style: TextStyle(color: fixed[1] ? const Color(0xFF86EFAC) : const Color(0xFFFCA5A5), fontSize: 11.5, fontWeight: FontWeight.w800))),
+        ]),
+      ]),
+    );
+  }
+}

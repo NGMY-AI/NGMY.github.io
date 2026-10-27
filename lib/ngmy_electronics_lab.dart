@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'ngmy_ai_inventor.dart';
+import 'ngmy_construction_lab.dart';
 import 'ngmy_electronics_board.dart';
 import 'ngmy_electronics_save.dart';
 import 'ngmy_electronics_screens.dart';
@@ -600,6 +601,8 @@ final List<_Challenge> _kChallenges = [
   _Challenge('Make toast', 'A heater turns electricity into heat. Make it glow bright orange.', (b) => b.parts.any((p) => p.kind == 'heater' && p.glow > 0.5)),
 ];
 
+const Color _amberHat = Color(0xFFFB923C);
+
 class NgmyElectronicsLab extends StatefulWidget {
   const NgmyElectronicsLab({super.key});
 
@@ -901,6 +904,7 @@ class _NgmyElectronicsLabState extends State<NgmyElectronicsLab> with WidgetsBin
           ),
           _AiOrb(onTap: _openAi),
           const SizedBox(width: 2),
+          _barButton(Icons.construction_rounded, 'Construction Lab: real 3D wiring, plumbing and a house', _amberHat, () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const NgmyConstructionLab()))),
           _barButton(Icons.flag_rounded, 'Challenges', const Color(0xFFFBBF24), _showChallenges, badge: _challengeBadge()),
           _barButton(Icons.help_outline_rounded, 'How to play', accent, () => showStudioHelp(context, 'ELECTRONICS LAB', help, accent)),
         ]),

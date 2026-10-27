@@ -38,6 +38,7 @@ const Map<String, String> kStudioSoundThemes = {
   'MEMORY MATCH': 'bubble',
   'LUCKY POCKET': 'click',
   'ELECTRONICS LAB': 'tech',
+  'CONSTRUCTION LAB': 'tech',
   'AI INVENTOR': 'tech',
   'MAGNET LAB': 'tech',
   'RADIO LAB': 'tech',
