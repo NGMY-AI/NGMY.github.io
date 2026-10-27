@@ -6,8 +6,8 @@ _.c=f
 _.d=g},Z:function Z(d,e,f){this.a=d
 this.b=e
 this.c=f},
-fKH(d,e){C.ch(null,C.X(209,D.w.l()>>>16&255,D.w.l()>>>8&255,D.w.l()&255),!0,null,new B.fvj(e),d,null,!0,!0,y.H)},
-fvj:function fvj(d){this.a=d},
+fKI(d,e){C.ch(null,C.X(209,D.w.l()>>>16&255,D.w.l()>>>8&255,D.w.l()&255),!0,null,new B.fvk(e),d,null,!0,!0,y.H)},
+fvk:function fvk(d){this.a=d},
 Yu:function Yu(d,e){this.c=d
 this.a=e},
 aAD:function aAD(d,e,f,g,h){var _=this
@@ -93,30 +93,30 @@ this.c=f},
 ZO:function ZO(d,e){this.a=d
 this.b=e},
 aII:function aII(){},
-fuU(d,e){var x=0,w=C.j(y.H),v,u
-var $async$fuU=C.e(function(f,g){if(f===1)return C.f(g,w)
+fuV(d,e){var x=0,w=C.j(y.H),v,u
+var $async$fuV=C.e(function(f,g){if(f===1)return C.f(g,w)
 for(;;)switch(x){case 0:u=C.q2(d,!0)
 u.toString
 v=C.dd()
-v.b=C.nW(new B.fuW(e,v),!1,!1)
+v.b=C.nX(new B.fuX(e,v),!1,!1)
 u.lm(0,v.b9())
 return C.h(null,w)}})
-return C.i($async$fuU,w)},
-fvf(d,e){var x=0,w=C.j(y.H),v,u
-var $async$fvf=C.e(function(f,g){if(f===1)return C.f(g,w)
+return C.i($async$fuV,w)},
+fvg(d,e){var x=0,w=C.j(y.H),v,u
+var $async$fvg=C.e(function(f,g){if(f===1)return C.f(g,w)
 for(;;)switch(x){case 0:u=C.q2(d,!0)
 u.toString
 v=C.dd()
-v.b=C.nW(new B.fvh(e,v),!1,!1)
+v.b=C.nX(new B.fvi(e,v),!1,!1)
 u.lm(0,v.b9())
 return C.h(null,w)}})
-return C.i($async$fvf,w)},
-fuW:function fuW(d,e){this.a=d
+return C.i($async$fvg,w)},
+fuX:function fuX(d,e){this.a=d
 this.b=e},
-fuV:function fuV(d){this.a=d},
-fvh:function fvh(d,e){this.a=d
+fuW:function fuW(d){this.a=d},
+fvi:function fvi(d,e){this.a=d
 this.b=e},
-fvg:function fvg(d){this.a=d},
+fvh:function fvh(d){this.a=d},
 WZ:function WZ(d,e,f){this.c=d
 this.d=e
 this.a=f},
@@ -138,41 +138,41 @@ d2n:function d2n(d,e){this.a=d
 this.b=e},
 aH9:function aH9(){},
 aHB:function aHB(){},
-fwE(d,e,f){var x=0,w=C.j(y.H),v,u
-var $async$fwE=C.e(function(g,h){if(g===1)return C.f(h,w)
+fwF(d,e,f){var x=0,w=C.j(y.H),v,u
+var $async$fwF=C.e(function(g,h){if(g===1)return C.f(h,w)
 for(;;)switch(x){case 0:u=C.q2(d,!0)
 u.toString
 v=C.dd()
-v.b=C.nW(new B.fwG(f,e,v),!1,!1)
+v.b=C.nX(new B.fwH(f,e,v),!1,!1)
 u.lm(0,v.b9())
 x=2
-return C.b(C.bN(D.um,null,y.H),$async$fwE)
+return C.b(C.bN(D.um,null,y.H),$async$fwF)
 case 2:J.lF(v.b9())
 return C.h(null,w)}})
-return C.i($async$fwE,w)},
-fwB(d,e,f,g){var x=0,w=C.j(y.H),v,u
-var $async$fwB=C.e(function(h,i){if(h===1)return C.f(i,w)
+return C.i($async$fwF,w)},
+fwC(d,e,f,g){var x=0,w=C.j(y.H),v,u
+var $async$fwC=C.e(function(h,i){if(h===1)return C.f(i,w)
 for(;;)switch(x){case 0:u=C.q2(d,!0)
 u.toString
 v=C.dd()
-v.b=C.nW(new B.fwD(g,e,f,D.bx,v),!1,!1)
+v.b=C.nX(new B.fwE(g,e,f,D.bx,v),!1,!1)
 u.lm(0,v.b9())
 x=2
-return C.b(C.bN(A.acq,null,y.H),$async$fwB)
+return C.b(C.bN(A.acq,null,y.H),$async$fwC)
 case 2:J.lF(v.b9())
 return C.h(null,w)}})
-return C.i($async$fwB,w)},
-fwG:function fwG(d,e,f){this.a=d
+return C.i($async$fwC,w)},
+fwH:function fwH(d,e,f){this.a=d
 this.b=e
 this.c=f},
-fwF:function fwF(d){this.a=d},
-fwD:function fwD(d,e,f,g,h){var _=this
+fwG:function fwG(d){this.a=d},
+fwE:function fwE(d,e,f,g,h){var _=this
 _.a=d
 _.b=e
 _.c=f
 _.d=g
 _.e=h},
-fwC:function fwC(d){this.a=d},
+fwD:function fwD(d){this.a=d},
 XY:function XY(d,e,f,g){var _=this
 _.c=d
 _.d=e
@@ -304,7 +304,7 @@ q=J.a8(r)
 p=C.eZ(q.h(r,f))
 if(p==null)p=0
 u=C.eZ(q.h(r,g))
-v=B.fSp(d,e,u==null?0:u,p,s)
+v=B.fSq(d,e,u==null?0:u,p,s)
 x=1
 break
 case 1:return C.h(v,w)}})
@@ -332,7 +332,7 @@ l=p
 k=q
 x=6
 return C.b(B.an4(),$async$LX)
-case 6:v=o.fSp(n,m,l,k,i)
+case 6:v=o.fSq(n,m,l,k,i)
 x=1
 break
 case 1:return C.h(v,w)}})
@@ -484,7 +484,7 @@ x=1
 break
 case 1:return C.h(v,w)}})
 return C.i($async$Tp,w)},
-hlc(d,e){var x,w,v,u,t=new C.f3()
+hld(d,e){var x,w,v,u,t=new C.f3()
 t.dU(e)
 x=J.e_(d,y.S)
 for(w=0;w<d;++w)x[w]=w
@@ -492,16 +492,16 @@ for(w=x.length-1;w>0;--w){v=t.aC(w+1)
 u=x[w]
 x[w]=x[v]
 x[v]=u}return x},
-hld(d,e,f){var x,w,v,u,t
+hle(d,e,f){var x,w,v,u,t
 for(x=new C.d0(d.toLowerCase()),w=y.E,v=w.k("bU<bT.E>"),x=new C.bU(x,x.gJ(0),v),w=w.k("bT.E"),u=17;x.C();){t=x.d
 if(t==null)t=w.a(t)
 u=37*u+t}for(x=new C.d0(e),v=new C.bU(x,x.gJ(0),v);v.C();){x=v.d
 if(x==null)x=w.a(x)
 u=37*u+x}return 37*u+f},
-fSp(d,e,f,g,h){var x
+fSq(d,e,f,g,h){var x
 if(e<=0)return 0
 x=D.o.F(g,e)
-return B.hlc(e,B.hld(h,d,f))[x]}},A,G
+return B.hld(e,B.hle(h,d,f))[x]}},A,G
 J=c[1]
 C=c[0]
 D=c[2]
@@ -590,7 +590,7 @@ C.bN(D.jj,new B.dN8(u),y.H)
 r=u.c
 r.toString
 x=3
-return C.b(B.fwE(r,s,t),$async$a6w)
+return C.b(B.fwF(r,s,t),$async$a6w)
 case 3:case 1:return C.h(v,w)}})
 return C.i($async$a6w,w)},
 bVm(d,e){var x,w,v=C.ae("\\s+",!0,!1,!1,!1),u=C.aJ((d+e).toLowerCase(),v,"")
@@ -611,9 +611,9 @@ break A}x=A.e5C
 break A}w=u.y
 if(w!=null&&x.a.length!==0){v=u.c
 v.toString
-B.fwB(v,x.b,w,x.a)}},
+B.fwC(v,x.b,w,x.a)}},
 B(d){var x=null,w=C.aH(d,x,y.w).w.a.a
-return C.ey(x,D.K,new C.ln(new B.dNE(this,C.fJc(d,w>520?420:w-28)),x),x,x,x,D.VI,D.cZ,x,x,x)},
+return C.ey(x,D.K,new C.ln(new B.dNE(this,C.fJd(d,w>520?420:w-28)),x),x,x,x,D.VI,D.cZ,x,x,x)},
 bzh(){return C.B(C.il(4,new B.dNb(this),!0,y.l),D.m,null,D.e,D.j,0,null,null)},
 bVp(){return C.B(C.il(4,new B.dNl(this),!0,y.l),D.m,null,D.e,D.j,0,null,null)},
 bVn(){var x,w,v,u,t,s,r,q,p,o,n,m=this,l=null
@@ -663,7 +663,7 @@ x=t!=null?5:7
 break
 case 5:s.toString
 x=8
-return C.b(B.fuU(s,t),$async$Ip)
+return C.b(B.fuV(s,t),$async$Ip)
 case 8:x=6
 break
 case 7:s.I(y.q).f.P(A.ey_)
@@ -683,7 +683,7 @@ C.bN(D.ws,new B.dNy(u),y.H)
 t=u.c
 t.toString
 x=11
-return C.b(B.fuU(t,q.c),$async$Ip)
+return C.b(B.fuV(t,q.c),$async$Ip)
 case 11:case 1:return C.h(v,w)}})
 return C.i($async$Ip,w)},
 aw5(){var x=0,w=C.j(y.H),v=this
@@ -719,7 +719,7 @@ t.toString
 s=u.dy
 s.toString
 x=5
-return C.b(B.fvf(t,s),$async$DI)
+return C.b(B.fvg(t,s),$async$DI)
 case 5:x=1
 break
 case 4:if(u.dx<=0){u.c.I(y.q).f.P(A.eA4)
@@ -745,7 +745,7 @@ C.bN(D.ws,new B.dNB(u),y.H)
 t=u.c
 t.toString
 x=13
-return C.b(B.fvf(t,q),$async$DI)
+return C.b(B.fvg(t,q),$async$DI)
 case 13:case 1:return C.h(v,w)}})
 return C.i($async$DI,w)},
 bBA(){var x,w,v,u,t,s,r,q,p,o,n=this,m=null,l=n.at/300,k=n.fy
@@ -920,7 +920,7 @@ aP(){this.aX()
 this.aV()
 this.bu()}}
 var z=a.updateTypes(["aw<~>()","Yu(Y)","~()","WZ(Y)","XA(Y)","XY(Y)","XX(Y)"])
-B.fvj.prototype={
+B.fvk.prototype={
 $1(d){return new B.Yu(this.a,null)},
 $S:z+1}
 B.dNf.prototype={
@@ -959,7 +959,7 @@ $0(){var x,w=this.a,v=w.z=w.id.aC(50)
 w.Q=!0
 x=this.b
 if(x===1)w.y=A.cap[D.o.F(v,50)]
-else if(x===2)w.y=A.cQK[D.o.F(v,51)]
+else if(x===2)w.y=A.cQL[D.o.F(v,51)]
 else if(x===3)w.y=A.cJi[D.o.F(v,50)]
 else w.y=null},
 $S:0}
@@ -1162,16 +1162,16 @@ x.fm(Math.sin(v*3.141592653589793*2)*0.35)
 x.jz(0.35)
 return C.fo(D.A,C.nl(this.b,null,this.c*0.85),null,x,!0)},
 $S:43}
-B.fuW.prototype={
-$1(d){return new B.WZ(this.a,new B.fuV(this.b),null)},
+B.fuX.prototype={
+$1(d){return new B.WZ(this.a,new B.fuW(this.b),null)},
 $S:z+3}
-B.fuV.prototype={
+B.fuW.prototype={
 $0(){return J.lF(this.a.b9())},
 $S:0}
-B.fvh.prototype={
-$1(d){return new B.XA(this.a,new B.fvg(this.b),null)},
+B.fvi.prototype={
+$1(d){return new B.XA(this.a,new B.fvh(this.b),null)},
 $S:z+4}
-B.fvg.prototype={
+B.fvh.prototype={
 $0(){return J.lF(this.a.b9())},
 $S:0}
 B.cT1.prototype={
@@ -1227,17 +1227,17 @@ t=C.d(k.a.c.d,l,l,l,l,l,l,C.l(l,l,t,l,l,l,l,l,l,l,l,14,l,l,D.u,l,l,!0,l,1.2,l,l,
 k=k.a.c
 return C.au(C.d8(C.e7(D.A,C.p(l,C.v(C.a([n,D.ab,t,D.T,C.d(k.a,l,l,l,l,l,l,A.eFV,D.L,l,l),D.ay,C.d("Lucky: "+D.d.aH(k.b," \xb7 "),l,l,l,l,l,l,C.l(l,l,D.c.j(0.75),l,l,l,l,l,l,l,l,12,l,l,D.O,l,l,!0,l,l,l,l,l,l,l,l),l,l,l),D.T,C.d("Tap to close",l,l,l,l,l,l,C.l(l,l,D.c.j(0.45),l,l,l,l,l,l,l,l,10,l,l,l,l,l,!0,l,l,l,l,l,l,l,l),l,l,l)],y.p),D.m,l,D.e,D.Q,0,D.p),D.f,l,l,new C.o(l,l,q,u,o,new C.a5(D.ax,D.aC,D.x,r,l,l),D.n),l,l,l,l,G.ae6,l,l,x),0.7+w*0.3,l,l),j),l,l,l)},
 $S:231}
-B.fwG.prototype={
-$1(d){return new B.XY(this.a,this.b,new B.fwF(this.c),null)},
+B.fwH.prototype={
+$1(d){return new B.XY(this.a,this.b,new B.fwG(this.c),null)},
 $S:z+5}
-B.fwF.prototype={
+B.fwG.prototype={
 $0(){return J.lF(this.a.b9())},
 $S:0}
-B.fwD.prototype={
+B.fwE.prototype={
 $1(d){var x=this
-return new B.XX(x.a,x.b,x.c,x.d,new B.fwC(x.e),null)},
+return new B.XX(x.a,x.b,x.c,x.d,new B.fwD(x.e),null)},
 $S:z+6}
-B.fwC.prototype={
+B.fwD.prototype={
 $0(){return J.lF(this.a.b9())},
 $S:0}
 B.dc0.prototype={
@@ -1285,7 +1285,7 @@ t=C.a([new C.ab(0,D.G,p.a.f.j(0.35),D.J,16)],y.V)
 s=p.a
 r=y.p
 return new C.bI(D.A,q,q,C.e7(D.A,C.d8(C.p(q,C.B(C.a([C.nl(s.d,q,22),D.aw,C.D(C.v(C.a([C.d(s.c,q,q,q,q,q,q,C.l(q,q,s.f,q,q,q,q,q,q,q,q,12,q,q,D.I,q,q,!0,q,q,q,q,q,q,q,q),q,q,q),D.ar,C.d(p.a.e,q,q,q,q,q,q,A.eGd,q,q,q)],r),D.F,q,D.e,D.Q,0,D.p),1)],r),D.F,q,D.e,D.j,0,q,q),D.f,q,new C.aW(0,this.b,0,1/0),new C.o(q,q,u,x,t,new C.a5(D.ax,D.aC,D.x,v,q,q),D.n),q,q,q,D.lv,D.iN,q,q,q),o),0.85+w*0.15,q,q),q)},
-$S:1779};(function aliases(){var x=B.aII.prototype
+$S:1780};(function aliases(){var x=B.aII.prototype
 x.bpO=x.q
 x=B.aH9.prototype
 x.bo9=x.q
@@ -1302,11 +1302,11 @@ x(w,"gchv","aw5",0)
 x(w,"gbXW","X_",0)
 x(w,"gchu","DI",0)})();(function inheritance(){var x=a.mixinHard,w=a.inheritMany,v=a.inherit
 w(C.aB,[B.cJ,B.Z,B.WV,B.ZO])
-w(C.i4,[B.fvj,B.dNE,B.dNb,B.dNl,B.dNp,B.fuW,B.fvh,B.fwG,B.fwD])
+w(C.i4,[B.fvk,B.dNE,B.dNb,B.dNl,B.dNp,B.fuX,B.fvi,B.fwH,B.fwE])
 w(C.af,[B.Yu,B.WZ,B.XA,B.XY,B.XX])
 w(C.ag,[B.aII,B.aH9,B.aHB,B.aI2,B.aI1])
 v(B.aAD,B.aII)
-w(C.jl,[B.dNf,B.dNe,B.dN7,B.dN8,B.dN6,B.dNu,B.dNv,B.dNt,B.dND,B.dNa,B.dN9,B.dNk,B.dNj,B.dNg,B.dNh,B.dNi,B.dNo,B.dNx,B.dNy,B.dNw,B.dNC,B.dNr,B.dNs,B.dNq,B.dNA,B.dNB,B.dNz,B.fuV,B.fvg,B.fwF,B.fwC,B.dc0,B.dbZ])
+w(C.jl,[B.dNf,B.dNe,B.dN7,B.dN8,B.dN6,B.dNu,B.dNv,B.dNt,B.dND,B.dNa,B.dN9,B.dNk,B.dNj,B.dNg,B.dNh,B.dNi,B.dNo,B.dNx,B.dNy,B.dNw,B.dNC,B.dNr,B.dNs,B.dNq,B.dNA,B.dNB,B.dNz,B.fuW,B.fvh,B.fwG,B.fwD,B.dc0,B.dbZ])
 w(C.kz,[B.dNn,B.dNc,B.dNd,B.dNm,B.cT1,B.d2n,B.dc_,B.dbY])
 v(B.b86,B.aH9)
 v(B.bbM,B.aHB)
@@ -1332,8 +1332,8 @@ A.bgS=new C.N(12,0,8,0)
 A.bkz=new C.N(24,30,24,26)
 A.d0M=x([D.aD,D.dK],y.O)
 A.bHE=new C.a5(D.ax,D.aC,D.x,A.d0M,null,null)
-A.cRh=x([D.jh,D.bx,D.D0],y.O)
-A.bIM=new C.a5(D.ax,D.aC,D.x,A.cRh,null,null)
+A.cRi=x([D.jh,D.bx,D.D0],y.O)
+A.bIM=new C.a5(D.ax,D.aC,D.x,A.cRi,null,null)
 A.aq7=x([D.aD,D.dK,D.D0],y.O)
 A.bIN=new C.a5(D.a3,D.a7,D.x,A.aq7,null,null)
 A.ar4=x([D.aK,D.aX,D.dn],y.O)
@@ -1573,7 +1573,7 @@ A.fhG=new B.WV("Fortune","\ud83d\udd2e",D.bL)
 A.ard=x([A.fhJ,A.fhH,A.fhI,A.fhG],C.az("O<WV>"))
 A.cJi=x(["Stargazing picnic with blankets, thermoses, and a constellation app.","Couples pottery or paint-and-sip night \u2014 laugh at the masterpieces.","Sunset kayak or paddleboat if you are both comfortable on water.","Dress up for dinner at a place with live acoustic music.","Home movie marathon: their pick, your pick, popcorn, dim lights.","Botanical garden walk with a camera and zero rush.","Rooftop or hilltop picnic at golden hour with sparkling juice.","Dance class intro: salsa, bachata, or swing \u2014 beginners welcome.","Visit a museum and choose one artwork that represents your mood.","Cook a new recipe together \u2014 assign roles: chef and sous-chef.","Ice skating or roller skating \u2014 hold on if balance needs help.","Book a couples massage or spa half-day for deep calm.","Drive to a small town you have never explored; caf\xe9 hop once there.","Build a blanket fort at home with fairy lights and playlists.","Volunteer together for a few hours \u2014 shared purpose bonds hearts.","Arcade date: playful competition, share tickets for a silly prize.","Wine-free vineyard tour or orchard visit in harvest season.","Photography walk: capture ten things that feel like \u201cus.\u201d","Attend a local theater play or improv show \u2014 shared laughter.","Plan a breakfast-in-bed surprise on a lazy weekend.","Take a scenic train or ferry ride with no destination pressure.","Visit an aquarium or planetarium \u2014 wonder feels romantic.","Host a fondue night: chocolate or cheese, choose your adventure.","Go thrifting and pick one outfit piece for each other.","Write wishes on paper lanterns or jars and read them aloud.","Plan a \u201cyes day\u201d with a small budget and big imagination.","Rent bikes and explore a trail ending at a lakeside bench.","Couples yoga or stretching session \u2014 gentle, grounding.","Attend a food festival and share every bite.","Set up a backyard fire pit with s\u2019mores and old stories.","Take a cooking class: pasta, sushi, or desserts.","Plan a surprise day trip to a waterfall or scenic overlook.","Visit a Christmas market or seasonal fair hand in hand.","Record a short video diary of your date \u2014 memory for later.","Book a cozy cabin or boutique hotel for one night away.","Go to a jazz lounge with mocktails if you prefer no alcohol.","Create a scavenger hunt with inside jokes as clues.","Plant something together \u2014 herbs, flowers, a tree if allowed.","Attend a poetry open mic and dedicate a line to them afterward.","Plan a themed dinner at home: Paris, Tokyo, or their dream city.","Watch the sunrise with hot drinks and silence first, words second.","Visit a cat caf\xe9 or animal shelter visit if you love gentle creatures.","Go bowling or mini-golf \u2014 playful rivalry, sweet truce.","Take a pottery mug home and use it on your next coffee date.","Plan a photo-book page of your favorite moments together.","Attend a lantern festival or night market with matching colors.","Write love letters and exchange them to open on a future date.","Plan a stargazing drive with their favorite snacks in the trunk.","Recreate your first meeting place with a small upgrade: better dessert.","End the night saying what you are grateful for about them \u2014 specific beats generic."],y.s)
 A.cNh=x([D.bL,D.iG,D.nZ],y.O)
-A.cQK=x(["Send a voice note saying one specific thing you appreciated about them today.","Plan a no-phone hour together \u2014 phones face down, eyes on each other.","Remember a small detail they mentioned and bring it up later; it shows you listen.","Compliment their character, not only their appearance \u2014 depth keeps hearts close.","Schedule a weekly check-in: \u201cHow are we feeling about us?\u201d","Share a playlist of songs that remind you of them \u2014 three tracks is enough.","Apologize quickly when you are wrong; pride is the enemy of closeness.","Celebrate their wins loudly, even the small ones \u2014 promotion, recipe, good day.","Ask \u201cWhat would make this week easier for you?\u201d and follow through once.","Leave a handwritten note in their bag, book, or on the mirror.","Plan surprise comfort: their favorite snack after a hard day.","Touch base mid-day with a kind text \u2014 not demanding, just warm.","Learn one thing they care about and ask a thoughtful question about it.","Defend them kindly in public; loyalty builds trust.","Create a shared inside joke \u2014 intimacy loves private language.","Book something to look forward to: concert, class, weekend trip.","Practice patience when they need space; trust is quiet confidence.","Cook or order their favorite meal without being asked.","Take photos together that are candid, not only posed perfection.","Say thank you for ordinary things: listening, driving, patience.","Introduce them proudly to friends \u2014 belonging matters.","Keep promises small and large; reliability is romance in action.","Flirt after you are comfortable \u2014 playfulness keeps sparks alive.","Ask about their family with genuine curiosity, not interrogation.","Share your feelings with calm words instead of guessing games.","Plan a tech-free walk and hold hands if you both want that.","Respect their boundaries without making them explain twice.","Send a meme or reel that made you think of them \u2014 light connection counts.","Celebrate anniversaries of small moments: first coffee, first laugh.","Offer help before they have to ask \u2014 dishes, errands, ride.","Speak their love language: time, words, gifts, acts, touch \u2014 learn which lands.","Do not weaponize the past in arguments; solve today\u2019s issue today.","Plan a double date with friends who bring good energy.","Write three things you love about them and read one aloud.","Protect their reputation online and offline.","Wake up early once to make breakfast \u2014 effort is attractive.","Listen without fixing unless they ask for advice.","Share goals and ask how you can support, not control.","Laugh at yourselves when plans fail \u2014 resilience is sexy.","Keep dating each other: dress up for no reason sometimes.","Remember important dates in your calendar with alerts.","Give them the last bite if they love it \u2014 generosity in small things.","Plan a cozy movie night with their favorite blanket rules.","Tell them when you are proud of how they handled something hard.","Be consistent with good morning and good night kindness.","Create a shared tradition: Sunday brunch, Friday playlist, monthly adventure.","Forgive fast when intent was good \u2014 hold grace like a gift.","Ask for what you need clearly instead of testing them.","Surprise them with flowers, a plant, or something living and hopeful.","Dream aloud about the future together \u2014 direction feels safe.","Choose them again today \u2014 love is a daily decision, not a one-time event."],y.s)
+A.cQL=x(["Send a voice note saying one specific thing you appreciated about them today.","Plan a no-phone hour together \u2014 phones face down, eyes on each other.","Remember a small detail they mentioned and bring it up later; it shows you listen.","Compliment their character, not only their appearance \u2014 depth keeps hearts close.","Schedule a weekly check-in: \u201cHow are we feeling about us?\u201d","Share a playlist of songs that remind you of them \u2014 three tracks is enough.","Apologize quickly when you are wrong; pride is the enemy of closeness.","Celebrate their wins loudly, even the small ones \u2014 promotion, recipe, good day.","Ask \u201cWhat would make this week easier for you?\u201d and follow through once.","Leave a handwritten note in their bag, book, or on the mirror.","Plan surprise comfort: their favorite snack after a hard day.","Touch base mid-day with a kind text \u2014 not demanding, just warm.","Learn one thing they care about and ask a thoughtful question about it.","Defend them kindly in public; loyalty builds trust.","Create a shared inside joke \u2014 intimacy loves private language.","Book something to look forward to: concert, class, weekend trip.","Practice patience when they need space; trust is quiet confidence.","Cook or order their favorite meal without being asked.","Take photos together that are candid, not only posed perfection.","Say thank you for ordinary things: listening, driving, patience.","Introduce them proudly to friends \u2014 belonging matters.","Keep promises small and large; reliability is romance in action.","Flirt after you are comfortable \u2014 playfulness keeps sparks alive.","Ask about their family with genuine curiosity, not interrogation.","Share your feelings with calm words instead of guessing games.","Plan a tech-free walk and hold hands if you both want that.","Respect their boundaries without making them explain twice.","Send a meme or reel that made you think of them \u2014 light connection counts.","Celebrate anniversaries of small moments: first coffee, first laugh.","Offer help before they have to ask \u2014 dishes, errands, ride.","Speak their love language: time, words, gifts, acts, touch \u2014 learn which lands.","Do not weaponize the past in arguments; solve today\u2019s issue today.","Plan a double date with friends who bring good energy.","Write three things you love about them and read one aloud.","Protect their reputation online and offline.","Wake up early once to make breakfast \u2014 effort is attractive.","Listen without fixing unless they ask for advice.","Share goals and ask how you can support, not control.","Laugh at yourselves when plans fail \u2014 resilience is sexy.","Keep dating each other: dress up for no reason sometimes.","Remember important dates in your calendar with alerts.","Give them the last bite if they love it \u2014 generosity in small things.","Plan a cozy movie night with their favorite blanket rules.","Tell them when you are proud of how they handled something hard.","Be consistent with good morning and good night kindness.","Create a shared tradition: Sunday brunch, Friday playlist, monthly adventure.","Forgive fast when intent was good \u2014 hold grace like a gift.","Ask for what you need clearly instead of testing them.","Surprise them with flowers, a plant, or something living and hopeful.","Dream aloud about the future together \u2014 direction feels safe.","Choose them again today \u2014 love is a daily decision, not a one-time event."],y.s)
 A.drG=new B.Z("love","I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
 A.dvo=new B.Z("love","Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
 A.dzT=new B.Z("love","Deep riddle #3 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
@@ -2615,4 +2615,4 @@ A.eH3=new C.F(!0,D.c,null,null,null,null,16,D.u,null,0.5,null,null,null,null,nul
 A.fac=new C.x("Daily Confidence Boost",null,A.eH3,null,null,null,null,null,null,null,null,null)
 A.eLW=new C.F(!0,D.c,null,null,null,null,14,D.I,null,0.8,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 A.fcU=new C.x("Love Match",null,A.eLW,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["F5LgxqspgpCyGjpw7jcKrKbxVC4="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["U/1RaiDb54ASME7dW5MRoTOmNzU="]=a.current})($__dart_deferred_initializers__);
