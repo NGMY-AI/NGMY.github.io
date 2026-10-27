@@ -1,19 +1,14 @@
-/// Official NGMY Growth Income investment tiers ($5 – $1,000).
+/// Official NGMY Growth Income investment tiers ($5 – $100). $100 is the most expensive plan.
 const List<double> kNgmyInvestmentPlanPrices = [
   5,
   20,
   30,
   50,
   100,
-  300,
-  400,
-  500,
-  600,
-  700,
-  800,
-  900,
-  1000,
 ];
+
+/// No plan above this price is ever offered, even if an old copy of the plan list still has one.
+const double kNgmyInvestmentPlanMaxPrice = 100;
 
 const double kNgmyInvestmentPlanRoi = 0.0286;
 

@@ -5363,7 +5363,7 @@ NgmyLoanConfigBridge ngmyLoanConfigBridge(AppConfig config) => NgmyLoanConfigBri
     );
 
 List<InvestmentPlan> _investmentPlansFromMaps(List<Map<String, dynamic>> maps) {
-  final plans = maps.map((e) => InvestmentPlan.fromJson(e)).toList();
+  final plans = maps.map((e) => InvestmentPlan.fromJson(e)).where((p) => p.price <= kNgmyInvestmentPlanMaxPrice).toList();
   for (final pl in plans) {
     pl.applyFixedRoi();
   }

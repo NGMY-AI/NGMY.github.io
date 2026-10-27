@@ -111,7 +111,7 @@ CIVIC REGISTRY (NGMY Hub): community ID, PIN gate, enrollment, registrars (AR), 
 
 VAULT GAMES (Home → Vault Channel): arcade games. Need an active Growth Income investment for full access; otherwise one free play total. Free trial does not unlock games.
 
-GROWTH INCOME / INVEST: purchase a plan, daily clock-in for ROI over work days; min withdraw typically \$10. Plan availability is admin-controlled.
+GROWTH INCOME / INVEST: purchase a plan, daily clock-in for ROI over work days; min withdraw typically \$10. Plans are \$5, \$20, \$30, \$50 and \$100 (the most expensive is \$100). Plan availability is admin-controlled.
 
 CREATOR TOOLS:
 - Doc Share — share docs; free individual creations then paid / org license.
