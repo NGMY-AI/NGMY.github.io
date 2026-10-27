@@ -59,6 +59,7 @@ void main() {
     expect(find.text('Apply for a Loan'), findsNothing);
   });
   adminPageTests();
+  calculatorTests();
 }
 
 void adminPageTests() {
@@ -87,6 +88,44 @@ void adminPageTests() {
     expect(find.text('Funeral / Burial'), findsOneWidget);
     expect(find.text('Buy a car'), findsOneWidget);
     expect(find.textContaining('Family or guarantor'), findsOneWidget);
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(seconds: 60));
+  });
+}
+
+void calculatorTests() {
+  testWidgets('only the admin has the loan calculator, and it shows the whole cost', (t) async {
+    SharedPreferences.setMockInitialValues({});
+    t.view.physicalSize = const Size(900, 3000);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    Future<void> open(bool calc) async {
+      await t.pumpWidget(MaterialApp(
+        home: NgmyLoanServicesScreen(userEmail: 'a@b.com', username: 'a', config: ngmyLoanConfigBridge(AppConfig()), onDataChanged: () {}, showCalculator: calc),
+      ));
+      await t.pump(const Duration(seconds: 1));
+    }
+
+    await open(false);
+    expect(find.text('Calculator'), findsNothing);
+    expect(find.text('How it works'), findsOneWidget);
+    expect(find.text('Step 5'), findsOneWidget);
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(seconds: 60));
+    await open(true);
+    expect(find.text('Calculator'), findsOneWidget);
+    await t.tap(find.text('Calculator'));
+    await t.pump(const Duration(seconds: 1));
+    expect(find.text('Loan calculator'), findsOneWidget);
+    expect(find.text('The member repays'), findsOneWidget);
+    expect(find.text('Payment by payment'), findsOneWidget);
+    await t.pump(const Duration(seconds: 1));
+    await t.scrollUntilVisible(find.text('Make these my loan terms'), 300, scrollable: find.descendant(of: find.byType(DraggableScrollableSheet), matching: find.byType(Scrollable)).first);
+    await t.pump(const Duration(milliseconds: 400));
+    expect(find.text('Make these my loan terms'), findsOneWidget);
+    await t.enterText(find.byType(TextField).first, '1000');
+    await t.pump(const Duration(milliseconds: 400));
+    expect(find.textContaining('weekly payments of'), findsOneWidget);
     await t.pumpWidget(const SizedBox());
     await t.pump(const Duration(seconds: 60));
   });

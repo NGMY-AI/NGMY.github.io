@@ -19252,8 +19252,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                           children: [
                             widget.homeLeadingOverride ??
                                 _roundGlassButton(
-                                  icon: widget.user.isAdmin == true ? Icons.attach_money_rounded : Icons.lock_rounded,
-                                  tooltip: widget.user.isAdmin == true ? 'Loan Service' : 'Loan Service is closed',
+                                  icon: Icons.attach_money_rounded,
+                                  tooltip: 'Loan Service',
                                   onTap: widget.user.isAdmin != true ? null : () => NgmyNavigator.push(
                                     context,
                                     LoanServiceScreen(user: widget.user, config: widget.config, onDataChanged: widget.onDataChanged),
@@ -19406,8 +19406,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             children: [
         widget.homeLeadingOverride ??
             _roundGlassButton(
-              icon: widget.user.isAdmin == true ? Icons.attach_money_rounded : Icons.lock_rounded,
-                                  tooltip: widget.user.isAdmin == true ? 'Loan Service' : 'Loan Service is closed',
+              icon: Icons.attach_money_rounded,
+                                  tooltip: 'Loan Service',
                                   onTap: widget.user.isAdmin != true ? null : () => NgmyNavigator.push(
                                     context,
                                     LoanServiceScreen(user: widget.user, config: widget.config, onDataChanged: widget.onDataChanged),
@@ -26730,6 +26730,7 @@ class LoanServiceScreen extends StatelessWidget {
       );
     }
     return NgmyLoanServicesScreen(
+      showCalculator: user.isAdmin == true,
       userEmail: user.email,
       username: user.username,
       config: ngmyLoanConfigBridge(config),
