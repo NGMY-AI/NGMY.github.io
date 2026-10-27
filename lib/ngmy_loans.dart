@@ -14,6 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'ngmy_db_relay.dart';
 import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_feature_sync_session.dart';
+import 'ngmy_loan_settings.dart';
 import 'ngmy_loan_phone.dart';
 import 'ngmy_network_resilience.dart';
 import 'ngmy_offline.dart';
@@ -571,6 +572,9 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
     _heroCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..forward();
     WidgetsBinding.instance.addObserver(this);
     unawaited(_refreshLoans());
+    unawaited(NgmyLoanSettings.load().then((_) {
+      if (mounted) setState(() {});
+    }));
   }
 
   @override
@@ -712,7 +716,7 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
               ],
               if (rejected.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const Text('Rejected — you may apply again', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.redAccent)),
+                const Text('Not approved this time — you are welcome to apply again', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.redAccent)),
                 ...rejected.map((a) => _loanTile(context, a, isDark)),
               ],
               const SizedBox(height: 24),
@@ -768,11 +772,16 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
               ],
             ),
             const SizedBox(height: 10),
+            Text(
+              'We help our community members when they need help — funerals, buying a car, or other important needs. Apply with collateral, repay on time, and your collateral is released back to you.',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.92), fontSize: 13, height: 1.45),
+            ),
+            const SizedBox(height: 10),
             RichText(
               text: TextSpan(
                 style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13, height: 1.4),
                 children: [
-                  const TextSpan(text: 'Call '),
+                  const TextSpan(text: 'Call us on '),
                   WidgetSpan(
                     alignment: PlaceholderAlignment.baseline,
                     baseline: TextBaseline.alphabetic,
@@ -790,7 +799,7 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
                       ),
                     ),
                   ),
-                  const TextSpan(text: ' or apply with collateral.'),
+                  const TextSpan(text: ' if you need a hand.'),
                 ],
               ),
             ),
@@ -806,7 +815,13 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
       );
 
   Widget _howItWorks(BuildContext context, bool isDark) {
-    final lines = widget.config.loanHowItWorks.split('\n').where((l) => l.trim().isNotEmpty).toList();
+    const lines = [
+      'Submit your loan application with your collateral details',
+      'Your application is reviewed within a few hours',
+      'If approved, the loan amount is credited to your account',
+      'Make your payments on schedule (the app shows your total repayment and each payment amount before you apply)',
+      'Upon full repayment, your collateral is released back to you',
+    ];
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
@@ -960,6 +975,15 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
                         const Text('Tap to track →', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600)),
                       ],
                     ),
+                    if (ngmyLoanReminderLine(app).isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(12)),
+                        child: Text(ngmyLoanReminderLine(app), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700, height: 1.35)),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1240,7 +1264,15 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
   final _ssnC = TextEditingController();
   final _receiveDetailC = TextEditingController();
   final _customCollateralC = TextEditingController();
+  final _purposeNoteC = TextEditingController();
+  final _collValueC = TextEditingController();
+  final _guarNameC = TextEditingController();
+  final _guarPhoneC = TextEditingController();
+  final _civicIdC = TextEditingController();
   final _picker = ImagePicker();
+  String? _purpose;
+  DateTime? _neededOn;
+  static const _purposes = ['Funeral / Burial', 'Buy a car', 'Car repair', 'Family emergency', 'Other need'];
 
   String? _paymentMethod;
   String? _collateralChoice;
@@ -1262,6 +1294,9 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
   void initState() {
     super.initState();
     _emailC.text = widget.userEmail;
+    unawaited(NgmyLoanSettings.load().then((_) {
+      if (mounted) setState(() {});
+    }));
     unawaited(_loadDraft().then((_) {
       if (!mounted) return;
       if (_phoneC.text.trim().isEmpty) {
@@ -1328,6 +1363,9 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
   @override
   void dispose() {
     _draftTimer?.cancel();
+    for (final c in [_purposeNoteC, _collValueC, _guarNameC, _guarPhoneC, _civicIdC]) {
+      c.dispose();
+    }
     _amountC.dispose();
     _fullNameC.dispose();
     _phoneC.dispose();
@@ -1606,7 +1644,9 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
       if (_titleFront == null) missing.add('Collateral photo — front');
       if (_titleBack == null) missing.add('Collateral photo — back');
     }
-    if (_amount > 2000 && _termMonths < 1) missing.add('Repayment term (choose months for loans over \$2,000)');
+    if (_amount > NgmyLoanSettings.current.maxAmount) missing.add('A loan amount of \$${ngmyLoanFormatCurrency(NgmyLoanSettings.current.maxAmount)} or less');
+    if (_purpose == null) missing.add('What you need help with');
+    if ((double.tryParse(_collValueC.text.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0) <= 0) missing.add('Estimated value of your collateral');
     return missing;
   }
 
@@ -1623,6 +1663,7 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(NgmyLoanLogic.loanLimitMessage(myLoans, newAmount: _amount))));
       return;
     }
+    if (!await _confirmAgreement()) return;
     setState(() => _submitting = true);
     try {
       final collateralType = _collateralChoice ?? 'custom';
@@ -1655,7 +1696,29 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
         'totalRepayment': double.parse(total.toStringAsFixed(2)),
         'scheduleSummary': term.summary,
         'termWeeks': term.weeks,
-        'termMonths': _amount > 2000 ? _termMonths : term.monthsLabel,
+        'termMonths': term.monthsLabel,
+        'repaymentMonths': NgmyLoanSettings.current.repaymentMonths,
+        'interestAmount': double.parse(interest.toStringAsFixed(2)),
+        'purpose': _purpose ?? '',
+        'purposeNote': _purposeNoteC.text.trim(),
+        'neededOn': _neededOn?.toUtc().toIso8601String() ?? '',
+        'collateralValue': double.tryParse(_collValueC.text.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0,
+        'guarantorName': _guarNameC.text.trim(),
+        'guarantorPhone': _guarPhoneC.text.trim(),
+        'civicRegistryId': _civicIdC.text.trim(),
+        'agreement': {
+          'acceptedAt': DateTime.now().toUtc().toIso8601String(),
+          'name': _fullNameC.text.trim(),
+          'civicRegistryId': _civicIdC.text.trim(),
+          'amount': _amount,
+          'interestAmount': double.parse(interest.toStringAsFixed(2)),
+          'totalRepayment': double.parse(total.toStringAsFixed(2)),
+          'payments': term.weeks,
+          'eachPayment': double.parse(weekly.toStringAsFixed(2)),
+          'period': term.monthsLabel,
+        },
+        'paidOut': false,
+        'collateralReleased': false,
         'collateralType': collateralType,
         'collateralCustomNote': _customCollateralC.text.trim(),
         'fullLegalName': _fullNameC.text.trim(),
@@ -1722,6 +1785,60 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
     };
   }
 
+  Widget _costRow(_LoanUi ui, String label, String value, {bool bold = false}) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(children: [
+          Expanded(child: Text(label, style: TextStyle(color: ui.textSecondary, fontSize: 13))),
+          Text(value, style: TextStyle(color: bold ? _loanGreen : ui.textPrimary, fontWeight: bold ? FontWeight.w900 : FontWeight.w700, fontSize: bold ? 15 : 13)),
+        ]),
+      );
+
+  /// What the loan will cost, in plain figures, before anything is submitted.
+  Widget _costCard(_LoanUi ui) {
+    final b = NgmyLoanLogic.breakdown(_amount);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: _loanGreen.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(14), border: Border.all(color: _loanGreen.withValues(alpha: 0.35))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('What you would repay', style: TextStyle(color: ui.textPrimary, fontWeight: FontWeight.w900, fontSize: 13)),
+        const SizedBox(height: 6),
+        _costRow(ui, 'Amount requested', '\$${ngmyLoanFormatCurrency(b.amount)}'),
+        _costRow(ui, 'Interest', '\$${ngmyLoanFormatCurrency(b.interest)}'),
+        _costRow(ui, 'Total to repay', '\$${ngmyLoanFormatCurrency(b.total)}', bold: true),
+        _costRow(ui, 'Number of payments', '${b.weeks} (one each week)'),
+        _costRow(ui, 'Each payment', '\$${ngmyLoanFormatCurrency(double.parse(b.weekly.toStringAsFixed(2)))}', bold: true),
+        _costRow(ui, 'Repayment period', b.period),
+      ]),
+    );
+  }
+
+  /// The member reads the exact figures and agrees before the application is sent.
+  Future<bool> _confirmAgreement() async {
+    final ui = _LoanUi(isDark);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ui.card,
+        title: Text('Please read and agree', style: TextStyle(color: ui.textPrimary, fontWeight: FontWeight.w900, fontSize: 17)),
+        content: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            _costCard(ui),
+            const SizedBox(height: 10),
+            Text(
+              'By tapping "I agree" I confirm these figures. I am offering my collateral, and it is released back to me when I have repaid in full.',
+              style: TextStyle(color: ui.textSecondary, fontSize: 12, height: 1.4),
+            ),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Go back')),
+          FilledButton(style: FilledButton.styleFrom(backgroundColor: _loanGreen), onPressed: () => Navigator.pop(ctx, true), child: const Text('I agree')),
+        ],
+      ),
+    );
+    return ok == true;
+  }
+
   String _collateralPhotoLabel(String side) {
     final type = _collateralChoice;
     final base = switch (type) {
@@ -1780,23 +1897,45 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
                 onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: 10),
-              if (term != null)
-                Text(term.summary, style: const TextStyle(color: _loanGreenDark, fontSize: 12, fontWeight: FontWeight.w600)),
-              if (_amount > 2000) ...[
+              const SizedBox(height: 4),
+              Text('You can ask for up to \$${ngmyLoanFormatCurrency(NgmyLoanSettings.current.maxAmount)}.', style: TextStyle(color: ui.textSecondary, fontSize: 11)),
+              if (_amount > 0 && term != null) ...[
                 const SizedBox(height: 10),
-                DropdownButtonFormField<int>(
-                  value: _termMonths,
-                  dropdownColor: ui.card,
-                  style: TextStyle(color: ui.textPrimary),
-                  decoration: _fieldDeco(ui, 'Repayment Period (Months)', required: true),
-                  items: const [3, 6, 9, 12].map((m) => DropdownMenuItem(value: m, child: Text('$m months'))).toList(),
-                  onChanged: (v) => setState(() => _termMonths = v ?? 12),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text('Loans over \$2,000 can be repaid in up to 12 months.', style: TextStyle(color: ui.textSecondary, fontSize: 11)),
-                ),
+                _costCard(ui),
               ],
+              const SizedBox(height: 18),
+              _sectionTitle(ui, 'What do you need help with?'),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final p in _purposes)
+                    ChoiceChip(
+                      label: Text(p),
+                      selected: _purpose == p,
+                      onSelected: (_) => setState(() => _purpose = p),
+                      selectedColor: _loanGreen.withValues(alpha: 0.25),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              TextField(controller: _purposeNoteC, style: TextStyle(color: ui.textPrimary), maxLines: 2, decoration: _fieldDeco(ui, 'A short note (optional)', hint: 'Tell us a little about what you need')),
+              const SizedBox(height: 10),
+              InkWell(
+                onTap: () async {
+                  final now = DateTime.now();
+                  final d = await showDatePicker(context: context, initialDate: _neededOn ?? now.add(const Duration(days: 3)), firstDate: now, lastDate: now.add(const Duration(days: 365)));
+                  if (d != null) setState(() => _neededOn = d);
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: InputDecorator(
+                  decoration: _fieldDeco(ui, 'Date you need it'),
+                  child: Text(
+                    _neededOn == null ? 'Tap to choose a date' : '${_neededOn!.month}/${_neededOn!.day}/${_neededOn!.year}',
+                    style: TextStyle(color: _neededOn == null ? ui.textSecondary : ui.textPrimary),
+                  ),
+                ),
+              ),
               const SizedBox(height: 18),
               _sectionTitle(ui, 'Personal Information'),
               TextField(controller: _fullNameC, style: TextStyle(color: ui.textPrimary), decoration: _fieldDeco(ui, 'Full Legal Name', hint: 'First Middle Last')),
@@ -1824,6 +1963,8 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
               TextField(controller: _emailC, style: TextStyle(color: ui.textPrimary), keyboardType: TextInputType.emailAddress, decoration: _fieldDeco(ui, 'Email Address', hint: 'you@email.com')),
               const SizedBox(height: 10),
               TextField(controller: _addressC, style: TextStyle(color: ui.textPrimary), maxLines: 2, decoration: _fieldDeco(ui, 'Home Address', hint: 'Street, City, State, ZIP')),
+              const SizedBox(height: 10),
+              TextField(controller: _civicIdC, style: TextStyle(color: ui.textPrimary), decoration: _fieldDeco(ui, 'Civic Registry ID', hint: 'Your NGMY Civic Registry ID, if you have one')),
               const SizedBox(height: 18),
               _sectionTitle(ui, 'Government-Issued ID'),
               DropdownButtonFormField<String>(
@@ -1919,6 +2060,22 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
                 _uploadBox(ui, label: _collateralPhotoLabel('front'), hint: 'Tap to add front photo', done: _titleFront != null, onTap: () async { final r = await _pickPhoto(_collateralPhotoLabel('front')); if (r != null) { setState(() => _titleFront = r); _scheduleDraftSave(); } }),
                 _uploadBox(ui, label: _collateralPhotoLabel('back'), hint: 'Tap to add back photo', done: _titleBack != null, onTap: () async { final r = await _pickPhoto(_collateralPhotoLabel('back')); if (r != null) { setState(() => _titleBack = r); _scheduleDraftSave(); } }),
               ],
+              if (_collateralChoice != null) ...[
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _collValueC,
+                  style: TextStyle(color: ui.textPrimary),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: _fieldDeco(ui, 'Estimated value of your collateral (\$)', hint: 'About how much it is worth', required: true),
+                ),
+              ],
+              const SizedBox(height: 18),
+              _sectionTitle(ui, 'Family or guarantor contact (optional)'),
+              Text('Someone who knows you and can be reached if we cannot reach you.', style: TextStyle(fontSize: 12, color: ui.textSecondary)),
+              const SizedBox(height: 8),
+              TextField(controller: _guarNameC, style: TextStyle(color: ui.textPrimary), decoration: _fieldDeco(ui, 'Their name')),
+              const SizedBox(height: 10),
+              TextField(controller: _guarPhoneC, style: TextStyle(color: ui.textPrimary), keyboardType: TextInputType.phone, decoration: _fieldDeco(ui, 'Their phone number')),
               const SizedBox(height: 20),
               Row(
                 children: [
@@ -2134,6 +2291,12 @@ class _NgmyLoanTrackingScreenState extends State<NgmyLoanTrackingScreen> with Wi
       payments[idx]['paidAt'] = DateTime.now().toUtc().toIso8601String();
       if (noteText.isNotEmpty) payments[idx]['adminNote'] = noteText;
       loan['payments'] = payments;
+      // When the last payment comes in, the loan is repaid and the collateral goes back to the member.
+      final due = (loan['totalRepayment'] as num?)?.toDouble() ?? 0;
+      if (due > 0 && ngmyLoanPaidTotal(payments) >= due - 0.005 && loan['collateralReleased'] != true) {
+        loan['collateralReleased'] = true;
+        loan['collateralReleasedAt'] = DateTime.now().toUtc().toIso8601String();
+      }
     });
   }
 
@@ -2597,7 +2760,7 @@ void showNgmyLoanCalculator(BuildContext context) {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('Loan Calculator', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-                          Text('36% interest · weekly payments', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                          Text('See what you would repay, week by week', style: TextStyle(color: Colors.white70, fontSize: 11)),
                         ],
                       ),
                     ),
@@ -2634,7 +2797,7 @@ void showNgmyLoanCalculator(BuildContext context) {
                       ),
                     ],
                     const SizedBox(height: 14),
-                    _calcCard('Interest (36%)', '\$${ngmyLoanFormatCurrency(interest)}', const Color(0xFFF59E0B), isDark),
+                    _calcCard('Interest', '\$${ngmyLoanFormatCurrency(interest)}', const Color(0xFFF59E0B), isDark),
                     const SizedBox(height: 8),
                     _calcCard('Total repayment', '\$${ngmyLoanFormatCurrency(total)}', const Color(0xFF3B82F6), isDark),
                     if (weekly > 0) ...[
@@ -2763,6 +2926,11 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
           Row(
             children: [
               const Expanded(child: Text('Loan Center', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
+              TextButton.icon(
+                onPressed: () => _editTerms(context),
+                icon: const Icon(Icons.tune_rounded, size: 18),
+                label: const Text('Loan terms'),
+              ),
               if (widget.onEditSettings != null)
                 TextButton.icon(
                   onPressed: () {
@@ -2781,6 +2949,46 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
         ],
       ),
     );
+  }
+
+  /// The admin chooses the interest rate, the biggest loan and the repayment period.
+  Future<void> _editTerms(BuildContext context) async {
+    final cur = NgmyLoanSettings.current;
+    final rate = TextEditingController(text: ngmyLoanFormatCurrency(cur.interestPercent));
+    final max = TextEditingController(text: ngmyLoanFormatCurrency(cur.maxAmount));
+    final months = TextEditingController(text: '${cur.repaymentMonths}');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Loan terms'),
+        content: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('These numbers are used everywhere in the loan service. Change them any time; loans already approved keep the figures the member agreed to.', style: TextStyle(fontSize: 12)),
+            const SizedBox(height: 12),
+            TextField(controller: rate, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Interest rate (%)', border: OutlineInputBorder())),
+            const SizedBox(height: 10),
+            TextField(controller: max, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Biggest loan (\$)', border: OutlineInputBorder())),
+            const SizedBox(height: 10),
+            TextField(controller: months, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Repayment period (months)', border: OutlineInputBorder())),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
+        ],
+      ),
+    );
+    final r = double.tryParse(rate.text.replaceAll(RegExp(r'[^0-9.]'), ''));
+    final mx = double.tryParse(max.text.replaceAll(RegExp(r'[^0-9.]'), ''));
+    final mo = int.tryParse(months.text.replaceAll(RegExp(r'[^0-9]'), ''));
+    rate.dispose();
+    max.dispose();
+    months.dispose();
+    if (ok != true || r == null || mx == null || mo == null) return;
+    final saved = await NgmyLoanSettings.save(NgmyLoanSettings(interestPercent: r.clamp(0, 200).toDouble(), maxAmount: mx.clamp(1, 1000000).toDouble(), repaymentMonths: mo.clamp(1, 24)));
+    if (!context.mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(saved ? 'Loan terms saved.' : 'Saved on this phone. It will sync when the connection is back.')));
   }
 
   Widget _adminCard(BuildContext context, Map<String, dynamic> app) {
@@ -2818,7 +3026,7 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20)),
-                  child: Text(status.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.w900)),
+                  child: Text(ngmyLoanStatusLabel(app).toUpperCase(), style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.w900)),
                 ),
               ],
             ),
@@ -2837,6 +3045,15 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
                         style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
                       ),
                       Text((app['userEmail'] ?? app['email'] ?? '').toString(), style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                      if ((app['purpose'] ?? '').toString().isNotEmpty) Text('Purpose: ${app['purpose']}', style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+                      if (status == 'approved') ...[
+                        Builder(builder: (_) {
+                          final tot = (app['totalRepayment'] as num?)?.toDouble() ?? 0;
+                          final paid = ngmyLoanPaidTotal((app['payments'] as List?) ?? const []);
+                          return Text('Paid \$${ngmyLoanFormatCurrency(paid)} · Balance \$${ngmyLoanFormatCurrency((tot - paid).clamp(0, tot).toDouble())}', style: const TextStyle(fontSize: 11.5, color: _loanGreenDark, fontWeight: FontWeight.w800));
+                        }),
+                        Text(app['collateralReleased'] == true ? 'Collateral: Released' : 'Collateral held', style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+                      ],
                       const SizedBox(height: 10),
                       const Row(
                         children: [
@@ -2855,12 +3072,31 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
                 ),
               ),
             ),
+            if (status == 'approved' && app['paidOut'] != true) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    final i = widget.config.loanApplications.indexWhere((a) => (a['id'] ?? '').toString() == id);
+                    if (i < 0) return;
+                    widget.config.loanApplications[i]['paidOut'] = true;
+                    widget.config.loanApplications[i]['paidOutAt'] = DateTime.now().toUtc().toIso8601String();
+                    widget.onDataChanged();
+                    await widget.onPersistNow?.call();
+                    if (mounted) setState(() {});
+                  },
+                  icon: const Icon(Icons.payments_rounded, size: 16),
+                  label: const Text('Mark as paid out'),
+                ),
+              ),
+            ],
             if (status == 'pending') ...[
               const SizedBox(height: 10),
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton(onPressed: () => _reject(context, id), child: const Text('Reject')),
+                    child: OutlinedButton(onPressed: () => _reject(context, id), child: const Text('Decline')),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -3387,8 +3623,52 @@ class _NgmyLoanAdminDetailScreen extends StatelessWidget {
   }
 }
 
+/// The status of a loan in plain words: Pending, Approved, Paid Out, In Repayment, Repaid, Overdue or Declined.
+String ngmyLoanStatusLabel(Map<String, dynamic> app) {
+  final s = (app['status'] ?? 'pending').toString();
+  if (s == 'rejected') return 'Declined';
+  if (s != 'approved') return 'Pending';
+  final total = (app['totalRepayment'] as num?)?.toDouble() ?? 0;
+  final pays = (app['payments'] as List?) ?? const [];
+  final paid = ngmyLoanPaidTotal(pays);
+  if (total > 0 && paid >= total - 0.005) return 'Repaid';
+  final now = DateTime.now().toUtc();
+  final overdue = pays.any((p) => p is Map && (p['status'] ?? '') != 'paid' && (DateTime.tryParse('${p['dueDate']}')?.isBefore(now) ?? false));
+  if (overdue) return 'Overdue';
+  if (paid > 0) return 'In Repayment';
+  return app['paidOut'] == true ? 'Paid Out' : 'Approved';
+}
+
+/// A friendly line about the next payment: coming up soon, late, or all done and the collateral released.
+String ngmyLoanReminderLine(Map<String, dynamic> app) {
+  if (app['collateralReleased'] == true) return '✅ Fully repaid. Your collateral has been released back to you.';
+  final pays = (app['payments'] as List?) ?? const [];
+  final now = DateTime.now().toUtc();
+  for (final p in pays) {
+    if (p is! Map || (p['status'] ?? '') == 'paid') continue;
+    final due = DateTime.tryParse('${p['dueDate']}');
+    if (due == null) continue;
+    final amt = ngmyLoanFormatCurrency((p['amount'] as num?)?.toDouble() ?? 0);
+    final date = '${due.toLocal().month}/${due.toLocal().day}/${due.toLocal().year}';
+    if (due.isBefore(now)) return '⏰ A payment of \$$amt was due on $date. Please pay when you can, or call us if you need more time.';
+    final days = due.difference(now).inDays;
+    if (days <= 2) return '🔔 Your next payment of \$$amt is due ${days <= 0 ? 'today' : 'in $days day${days == 1 ? '' : 's'}'} ($date).';
+    return 'Next payment: \$$amt on $date.';
+  }
+  return '';
+}
+
 class NgmyLoanLogic {
-  static const interestRate = 0.36;
+  /// The interest as a fraction (0.1 is 10%). The admin sets it in the loan settings.
+  static double get interestRate => NgmyLoanSettings.current.interestPercent / 100;
+
+  /// The whole cost of a loan, worked out from the admin's settings.
+  static ({double amount, double interest, double total, int weeks, double weekly, String period}) breakdown(double amount) {
+    final t = termForAmount(amount);
+    final interest = double.parse((amount * interestRate).toStringAsFixed(2));
+    final total = amount + interest;
+    return (amount: amount, interest: interest, total: total, weeks: t.weeks, weekly: t.weeks > 0 ? total / t.weeks : 0.0, period: t.monthsLabel);
+  }
 
   static List<Map<String, dynamic>> _activeLoans(List<Map<String, dynamic>> userLoans) => userLoans
       .where((a) {
@@ -3431,19 +3711,12 @@ class NgmyLoanLogic {
         _ => 'Collateral',
       };
 
+  /// Weekly payments over the repayment period the admin chose.
   static ({int weeks, String summary, String monthsLabel}) termForAmount(double amount, {int? userMonths}) {
-    if (amount <= 300) {
-      return (weeks: 4, summary: '4 weekly payments over 1 month', monthsLabel: '1 month');
-    }
-    if (amount <= 500) {
-      return (weeks: 6, summary: '6 weekly payments over 6 weeks (1½ months)', monthsLabel: '6 weeks');
-    }
-    if (amount <= 2000) {
-      return (weeks: 12, summary: '12 weekly payments over 3 months', monthsLabel: '3 months');
-    }
-    final months = (userMonths ?? 12).clamp(3, 12);
+    final months = NgmyLoanSettings.current.repaymentMonths;
     final weeks = months * 4;
-    return (weeks: weeks, summary: '$weeks weekly payments over $months months', monthsLabel: '$months months');
+    final label = months == 1 ? '1 month' : '$months months';
+    return (weeks: weeks, summary: '$weeks weekly payments over $label', monthsLabel: label);
   }
 
   static Future<void> openCashApp(String tag) async {

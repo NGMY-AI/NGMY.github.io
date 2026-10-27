@@ -19252,9 +19252,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                           children: [
                             widget.homeLeadingOverride ??
                                 _roundGlassButton(
-                                  icon: Icons.attach_money_rounded,
-                                  tooltip: 'Loan Service',
-                                  onTap: () => NgmyNavigator.push(
+                                  icon: widget.user.isAdmin == true ? Icons.attach_money_rounded : Icons.lock_rounded,
+                                  tooltip: widget.user.isAdmin == true ? 'Loan Service' : 'Loan Service is closed',
+                                  onTap: widget.user.isAdmin != true ? null : () => NgmyNavigator.push(
                                     context,
                                     LoanServiceScreen(user: widget.user, config: widget.config, onDataChanged: widget.onDataChanged),
                                     routeName: 'LoanServiceScreen',
@@ -19406,13 +19406,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             children: [
         widget.homeLeadingOverride ??
             _roundGlassButton(
-              icon: Icons.attach_money_rounded,
-              tooltip: 'Loan Service',
-              onTap: () => NgmyNavigator.push(
-                                context,
-                LoanServiceScreen(user: widget.user, config: widget.config, onDataChanged: widget.onDataChanged),
-                routeName: 'LoanServiceScreen',
-              ),
+              icon: widget.user.isAdmin == true ? Icons.attach_money_rounded : Icons.lock_rounded,
+                                  tooltip: widget.user.isAdmin == true ? 'Loan Service' : 'Loan Service is closed',
+                                  onTap: widget.user.isAdmin != true ? null : () => NgmyNavigator.push(
+                                    context,
+                                    LoanServiceScreen(user: widget.user, config: widget.config, onDataChanged: widget.onDataChanged),
+                                    routeName: 'LoanServiceScreen',
+                                  ),
             ),
         const SizedBox(width: 10),
                     Expanded(
@@ -26717,6 +26717,18 @@ class LoanServiceScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The loan service is closed to everyone except the admin.
+    if (user.isAdmin != true) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Loan Services')),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(28),
+            child: Text('Loan Services is closed for now.', textAlign: TextAlign.center, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          ),
+        ),
+      );
+    }
     return NgmyLoanServicesScreen(
       userEmail: user.email,
       username: user.username,
