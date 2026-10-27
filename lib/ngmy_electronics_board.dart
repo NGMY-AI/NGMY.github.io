@@ -29,6 +29,7 @@ const List<PartInfo> kPartInfos = [
   PartInfo('solar', 'Solar panel', '☀️', Color(0xFFFACC15), 'Makes electricity from light, with no battery. Use the light slider: more sunshine means more volts.', 'Slices of silicon. When light hits them it knocks electrons loose, and a layer on each side pushes them one way.'),
   PartInfo('crank', 'Hand crank', '🔄', Color(0xFFFB923C), 'A generator you turn by hand. Tap it again and again: the faster you spin it, the more volts it makes.', 'A magnet spins inside a coil of copper wire. A moving magnet pushes electrons along the wire. This is how an alternator or dynamo works.'),
   PartInfo('turbine', 'Wind turbine', '🌬️', Color(0xFF38BDF8), 'A generator turned by the wind. Change the wind strength to change the volts.', 'Blades catch the wind and turn a shaft joined to a generator, the same coil-and-magnet idea as a dynamo.'),
+  ...kPowerPartInfos,
   PartInfo('switch', 'Switch', '🎚️', Color(0xFFA78BFA), 'Opens or closes the loop. Electricity only flows round a closed loop. Tap it to flip it.', 'Two metal contacts. Flipping the lever makes them touch, or pulls them apart.'),
   PartInfo('fuse', 'Fuse', '🧯', Color(0xFFF87171), 'A safety part. If too much current flows, its thin wire melts and the loop breaks, which stops fires.', 'A very thin strip of metal inside a glass tube. It heats up and melts when the current is too high.'),
   PartInfo('pot', 'Dimmer knob', '🎛️', Color(0xFF2DD4BF), 'A resistor you can change. Turn it to let less or more current through, like a volume control.', 'A strip of resistive material with a sliding contact that touches it at different places.'),
@@ -62,6 +63,12 @@ class Part {
         ohms = 100;
       case 'pot':
         level = 0.5;
+      case 'ldr':
+        level = 0.5;
+      case 'buck':
+        volts = 5;
+      case 'regulator':
+        volts = 5;
     }
   }
 
@@ -81,6 +88,9 @@ class Part {
   int channel = 0; // the TV channel
   double onAge = 0; // seconds a gadget has been switched on
   String burnWhy = ''; // why it burnt out
+  double drop = 0; // a voltage reducer: how many volts it takes off right now
+  double vin = 0; // a voltage reducer: volts arriving
+  double vout = 0; // a voltage reducer: volts leaving
 
   // Results of the last solve.
   double v = 0; // volts across (a minus b)
@@ -221,6 +231,8 @@ class ElectronicsBoard {
         return p.ohms;
       case 'pot':
         return 1 + 99 * p.level;
+      case 'ldr':
+        return 20 + 980 * (1 - p.level);
       case 'voltmeter':
         return 1e6;
       case 'ammeter':
@@ -237,6 +249,13 @@ class ElectronicsBoard {
     _moveSparks(dt);
     _shortSignal = math.max(0, _shortSignal - dt);
     final h = math.min(dt * 6, 0.12); // the circuit runs a little faster than real life
+    // A fresh voltage reducer starts already regulating, so the gadget after it never sees the full battery volts.
+    for (final p in parts) {
+      if (isReducer(p) && !p.burnt && p.vin == 0 && p.vout == 0) {
+        final vmax = parts.where((q) => isSource(q) && !q.burnt).fold<double>(0, (m, q) => math.max(m, _sourceVolts(q)));
+        p.drop = math.max(0.0, vmax - reducerTarget(p));
+      }
+    }
     // Crank slows down; turbine stays at its wind setting.
     for (final p in parts) {
       if (p.kind == 'crank') p.level = math.max(0, p.level - dt * 0.25);
@@ -340,10 +359,14 @@ class ElectronicsBoard {
           gg = p.on ? 100 : 1e-9;
         } else if (p.kind == 'fuse') {
           gg = 1 / 0.05;
-        } else if (p.kind == 'led') {
+        } else if (p.kind == 'led' || p.kind == 'diode') {
           final on = _ledOn[p.id] ?? false;
-          gg = on ? 1 / 15 : 1e-9;
-          inj = on ? gg * 1.9 : 0;
+          final led = p.kind == 'led';
+          gg = on ? (led ? 1 / 15 : 1 / 0.8) : 1e-9;
+          inj = on ? gg * (led ? 1.9 : 0.7) : 0;
+        } else if (isReducer(p)) {
+          gg = 1 / 0.3;
+          inj = gg * p.drop;
         } else if (p.kind == 'capacitor') {
           gg = 0.3 / h;
           inj = gg * p.vc;
@@ -367,10 +390,11 @@ class ElectronicsBoard {
       if (!iterate) break;
       var changed = false;
       for (final p in parts) {
-        if (p.kind != 'led') continue;
+        if (p.kind != 'led' && p.kind != 'diode') continue;
         final vd = v[net(p, 0)] - v[net(p, 1)];
         final was = _ledOn[p.id] ?? false;
-        final now = was ? vd > 1.8 : vd > 1.95;
+        final led = p.kind == 'led';
+        final now = was ? vd > (led ? 1.8 : 0.65) : vd > (led ? 1.95 : 0.75);
         if (now != was) {
           _ledOn[p.id] = now;
           changed = true;
@@ -381,6 +405,10 @@ class ElectronicsBoard {
     for (final p in parts) {
       final a = net(p, 0), b = net(p, 1);
       p.v = v[a] - v[b];
+      if (isReducer(p)) {
+        p.vin = v[a] - v[ground];
+        p.vout = v[b] - v[ground];
+      }
       p.i = (gOf[p] ?? 0) * p.v - (injA[p] ?? 0);
       if (p.kind == 'capacitor' && !p.burnt) p.vc = p.v;
     }
@@ -449,6 +477,24 @@ class ElectronicsBoard {
       }
       final power = (p.v * p.i).abs();
       final cur = p.i.abs();
+      if (isReducer(p) && !p.burnt) {
+        // The converter keeps its output at the set volts: it takes off exactly what is too much.
+        final target = reducerTarget(p);
+        if (cur < 0.002) {
+          p.drop = (p.vin - target).clamp(0.0, 24.0);
+        } else {
+          p.drop = (p.drop + (p.vout - target) * 0.7).clamp(0.0, 24.0);
+        }
+        p.glow = (p.vin > target + 0.2 && (p.vout - target).abs() < 0.35) ? 1.0 : 0.0;
+        p.onAge = p.glow > 0 ? p.onAge + dt : 0;
+        if (p.vin > 26) _burn(p, 'The ${p.info.name} got ${p.vin.toStringAsFixed(1)} V going in, more than the 26 V it can take.');
+        if (cur > 1.5) _burn(p, 'More than 1.5 amps went through the ${p.info.name}. The gadget on its output takes too much power for it.');
+        if (p.kind == 'regulator' && p.drop * cur > 2.5) _burn(p, 'The regulator had to turn ${p.drop.toStringAsFixed(1)} V into heat while ${(cur * 1000).round()} mA flowed. That is ${(p.drop * cur).toStringAsFixed(1)} watts of heat, so it overheated. A step-down converter wastes far less.');
+      }
+      if (p.kind == 'diode' && !p.burnt) {
+        p.glow = (_ledOn[p.id] ?? false) ? 1.0 : 0.0;
+        if (cur > 1.5) _burn(p, 'More than 1.5 amps went through the diode, so it burnt out.');
+      }
       final spec = kDeviceSpecs[p.kind];
       if (spec != null) {
         final vv = spec.polar ? p.v : p.v.abs();
@@ -519,10 +565,15 @@ class ElectronicsBoard {
   static String _fmtV(double x) => x == x.roundToDouble() ? '${x.round()}' : '$x';
 
   /// Parts that do something only when they are powered.
-  bool needsPower(Part p) => const {'bulb', 'led', 'motor', 'buzzer', 'heater'}.contains(p.kind) || kDeviceSpecs.containsKey(p.kind);
+  bool isReducer(Part p) => p.kind == 'buck' || p.kind == 'regulator';
+
+  /// The volts a voltage reducer is set to give out.
+  double reducerTarget(Part p) => p.kind == 'regulator' ? 5.0 : p.volts;
+
+  bool needsPower(Part p) => const {'bulb', 'led', 'motor', 'buzzer', 'heater'}.contains(p.kind) || kDeviceSpecs.containsKey(p.kind) || isReducer(p);
 
   /// Has a left (+) dot that must go towards the battery +.
-  bool hasPolarity(Part p) => isSource(p) || p.kind == 'led' || (kDeviceSpecs[p.kind]?.polar ?? false);
+  bool hasPolarity(Part p) => isSource(p) || p.kind == 'led' || p.kind == 'diode' || isReducer(p) || (kDeviceSpecs[p.kind]?.polar ?? false);
 
   int wireCount(Part p, int t) => wires.where((w) => (w.a == p && w.ta == t) || (w.b == p && w.tb == t)).length;
 
@@ -545,6 +596,11 @@ class ElectronicsBoard {
     if (a == 0 || b == 0) return 'Only one end of the $name is wired. Electricity needs a full loop, so wire the ${a == 0 ? 'left (+)' : 'right'} dot as well, and bring it back to the battery.';
     final sources = parts.where(isSource).toList();
     if (sources.isEmpty) return 'There is no power. Add a battery, a solar panel, a hand crank or a wind turbine.';
+    if (isReducer(p)) {
+      final target = reducerTarget(p);
+      if (p.vin < -0.3) return 'The $name is wired backwards. Its left dot (+) is the INPUT and goes to the battery +. The right dot is the OUTPUT that goes on to your gadget.';
+      if (p.vin <= target + 0.2) return 'The $name can only bring volts DOWN. It makes ${_fmtV(target)} V, but only ${p.vin.toStringAsFixed(1)} V arrives. Use a bigger battery (more volts going in than coming out), or lower the output setting.';
+    }
     final spec = kDeviceSpecs[p.kind];
     final polar = p.kind == 'led' || (spec?.polar ?? false);
     if (polar && p.v < -0.3) return 'The $name is plugged in backwards. Its left dot is the + side and must go towards the + of the battery, and the right dot back to the −. Swap its two wires.';
@@ -1057,5 +1113,21 @@ const List<Recipe> kRecipes = [
     ('l', 'bulb', 0.85, 0.2, {}),
     ('v', 'voltmeter', 0.5, 0.6, {}),
   ], [('b', 0, 'a', 0), ('a', 1, 'l', 0), ('l', 1, 'b', 1), ('v', 0, 'l', 0), ('v', 1, 'l', 1)], keys: ['meter', 'measure', 'volt', 'amp', 'current', 'power', 'watt']),
+  Recipe('Phone and TV on one battery', 'The TV needs 9 volts, but a phone burns out above 7. A step-down converter takes the 9 V down to 5 V for the phone, so one battery runs both. The TV takes the 9 V straight from the battery.', [
+    ('b', 'battery', 0.15, 0.2, {'volts': 9}),
+    ('t', 'tv', 0.55, 0.2, {}),
+    ('c', 'buck', 0.4, 0.5, {'volts': 5}),
+    ('p', 'phone', 0.8, 0.5, {}),
+  ], [('b', 0, 't', 0), ('t', 1, 'b', 1), ('b', 0, 'c', 0), ('c', 1, 'p', 0), ('p', 1, 'b', 1)], keys: ['phone and tv', 'reduce', 'step down', 'converter', 'buck', 'one battery', 'tv and phone', 'lower voltage']),
+  Recipe('Safe phone charger', 'A 12 V battery would burn the phone. The step-down converter brings 12 V down to 5 V, which is what a phone wants.', [
+    ('b', 'battery', 0.2, 0.3, {'volts': 12}),
+    ('c', 'buck', 0.5, 0.3, {'volts': 5}),
+    ('p', 'phone', 0.8, 0.3, {}),
+  ], [('b', 0, 'c', 0), ('c', 1, 'p', 0), ('p', 1, 'b', 1)], keys: ['safe', 'charger', 'adapter', 'usb', 'lower', 'reduce']),
+  Recipe('Protect with a diode', 'A diode lets electricity go one way only, so a battery put in backwards cannot hurt the radio. It uses up about 0.7 V.', [
+    ('b', 'battery', 0.2, 0.3, {'volts': 9}),
+    ('d', 'diode', 0.5, 0.3, {}),
+    ('r', 'radio', 0.8, 0.3, {}),
+  ], [('b', 0, 'd', 0), ('d', 1, 'r', 0), ('r', 1, 'b', 1)], keys: ['diode', 'protect', 'backwards', 'one way']),
 ];
 

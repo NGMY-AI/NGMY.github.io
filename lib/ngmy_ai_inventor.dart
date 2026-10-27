@@ -206,7 +206,10 @@ String localAnswer(Design d, ElectronicsBoard b, String question) {
 
 class NgmyInventorStudio extends StatefulWidget {
 
-  const NgmyInventorStudio({super.key, this.ai});
+  const NgmyInventorStudio({super.key, this.ai, this.board});
+
+  /// Build on this board (the Electronics Lab passes its own) instead of a fresh one.
+  final ElectronicsBoard? board;
 
   /// Asks the AI. Pass a fake in tests.
   final InventorAi? ai;
@@ -216,7 +219,7 @@ class NgmyInventorStudio extends StatefulWidget {
 }
 
 class _NgmyInventorStudioState extends State<NgmyInventorStudio> {
-  final ElectronicsBoard _board = ElectronicsBoard();
+  late final ElectronicsBoard _board = widget.board ?? ElectronicsBoard();
   final Map<String, double> _pop = {};
   final TextEditingController _ctl = TextEditingController();
   final List<Timer> _timers = [];

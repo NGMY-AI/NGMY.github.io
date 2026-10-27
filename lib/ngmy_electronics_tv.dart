@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_electronics_screens.dart';
 import 'ngmy_studio_kit.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -22,15 +23,21 @@ const List<NgmyTvChannel> kNgmyTvChannels = [
   NgmyTvChannel('Ocean Friends', 'Fish, bubbles and a friendly whale'),
   NgmyTvChannel('Rainy Village', 'Storm clouds, then a rainbow'),
   NgmyTvChannel('Spark Adventure', 'Follow a spark round a circuit'),
+  NgmyTvChannel('Fireworks Night', 'Colour bursts over the city'),
+  NgmyTvChannel('Little Train', 'A train rolls past the hills'),
+  NgmyTvChannel('Robot Disco', 'A robot dances to the beat'),
+  NgmyTvChannel('Garden Time', 'Flowers grow and butterflies fly'),
 ];
 
 /// Paints one frame of the TV picture (the boot logo for the first seconds, then the channel).
 /// [age] is how many seconds the TV has been on; [t] is the running clock.
-void paintNgmyTv(Canvas c, Size s, int channel, double t, {double age = 99}) {
+void paintNgmyTv(Canvas c, Size s, int channel, double t, {double age = 99, int app = -1}) {
   c.save();
   c.clipRect(Offset.zero & s);
   if (age < 3.0) {
     _boot(c, s, age);
+  } else if (app >= 0) {
+    paintNgmyApp(c, s, app, t);
   } else {
     final k = ((age - 3.0) / 0.5).clamp(0.0, 1.0);
     final ch = channel % kNgmyTvChannels.length;
@@ -45,8 +52,16 @@ void paintNgmyTv(Canvas c, Size s, int channel, double t, {double age = 99}) {
         _ocean(c, s, t);
       case 4:
         _rain(c, s, t);
-      default:
+      case 5:
         _spark(c, s, t);
+      case 6:
+        _fireworks(c, s, t);
+      case 7:
+        _train(c, s, t);
+      case 8:
+        _robotDance(c, s, t);
+      default:
+        _garden(c, s, t);
     }
     _bug(c, s, channel, t);
     if (k < 1) c.drawRect(Offset.zero & s, Paint()..color = Colors.white.withValues(alpha: 0.6 * (1 - k)));
@@ -313,6 +328,140 @@ void _spark(Canvas c, Size s, double t) {
   _text(c, 'Electricity needs a full loop!', Offset(0, h * 0.74), h * 0.075, const Color(0xFF7DD3FC), align: TextAlign.center, width: w);
 }
 
+// 6 ── Fireworks over the NGMY tower.
+void _fireworks(Canvas c, Size s, double t) {
+  final w = s.width, h = s.height;
+  c.drawRect(Offset.zero & s, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF020617), Color(0xFF1E1B4B)]).createShader(Offset.zero & s));
+  c.drawRect(Rect.fromLTWH(0, h * 0.82, w, h * 0.18), Paint()..color = const Color(0xFF0B1220));
+  for (var k = 0; k < 7; k++) {
+    final bx = w * (0.05 + k * 0.15), bh = h * (0.1 + 0.07 * ((k * 5) % 4));
+    c.drawRect(Rect.fromLTWH(bx, h * 0.82 - bh, w * 0.1, bh), Paint()..color = const Color(0xFF111827));
+  }
+  const cols = [Color(0xFFF472B6), Color(0xFF38BDF8), Color(0xFFFDE047), Color(0xFF4ADE80), Color(0xFFFB923C)];
+  for (var f = 0; f < 4; f++) {
+    final cyc = (t * 0.55 + f * 0.27) % 1.0;
+    final seed = ((t * 0.55 + f * 0.27).floor() * 7 + f * 3);
+    final cx = w * (0.15 + 0.7 * ((seed * 0.37) % 1.0)), cy = h * (0.2 + 0.25 * ((seed * 0.53) % 1.0));
+    final col = cols[seed.abs() % cols.length];
+    if (cyc < 0.3) {
+      final k = cyc / 0.3;
+      c.drawCircle(Offset(cx, h * 0.82 - (h * 0.82 - cy) * k), 2.5, Paint()..color = Colors.white);
+    } else {
+      final k = (cyc - 0.3) / 0.7;
+      for (var i = 0; i < 28; i++) {
+        final a = i * math.pi * 2 / 28;
+        final r = h * 0.2 * Curves.easeOut.transform(k);
+        final p = Offset(cx + math.cos(a) * r, cy + math.sin(a) * r + k * k * h * 0.08);
+        c.drawCircle(p, 2.4 * (1 - k) + 0.4, Paint()..color = col.withValues(alpha: (1 - k).clamp(0.0, 1.0))..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.2));
+      }
+    }
+  }
+}
+
+// 7 ── A little train crosses the hills.
+void _train(Canvas c, Size s, double t) {
+  final w = s.width, h = s.height;
+  c.drawRect(Offset.zero & s, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF7DD3FC), Color(0xFFFEF3C7)]).createShader(Offset.zero & s));
+  for (var layer = 0; layer < 2; layer++) {
+    final path = Path()..moveTo(0, h);
+    for (var x = 0.0; x <= w; x += 6) {
+      final sx = x + t * (layer == 0 ? 8 : 20);
+      path.lineTo(x, h * (layer == 0 ? 0.55 : 0.68) + math.sin(sx / (layer == 0 ? 50 : 34)) * h * 0.06);
+    }
+    path.lineTo(w, h);
+    c.drawPath(path, Paint()..color = layer == 0 ? const Color(0xFF4D7C0F) : const Color(0xFF65A30D));
+  }
+  c.drawRect(Rect.fromLTWH(0, h * 0.8, w, h * 0.04), Paint()..color = const Color(0xFF475569));
+  for (var x = -((t * 80) % 24); x < w; x += 24) {
+    c.drawRect(Rect.fromLTWH(x, h * 0.84, 8, h * 0.03), Paint()..color = const Color(0xFF78350F));
+  }
+  final bob = math.sin(t * 14) * 1.2;
+  double cx = w * 0.12;
+  for (var k = 0; k < 4; k++) {
+    final isEngine = k == 0;
+    final body = Rect.fromLTWH(cx, h * 0.62 + bob, w * (isEngine ? 0.16 : 0.15), h * 0.18);
+    c.drawRRect(RRect.fromRectAndRadius(body, Radius.circular(h * 0.02)), Paint()..color = isEngine ? const Color(0xFFDC2626) : const [Color(0xFF2563EB), Color(0xFFF59E0B), Color(0xFF16A34A)][k - 1]);
+    for (var q = 0; q < 3; q++) {
+      c.drawRect(Rect.fromLTWH(body.left + body.width * (0.12 + q * 0.28), body.top + h * 0.03, body.width * 0.18, h * 0.06), Paint()..color = const Color(0xFFBAE6FD));
+    }
+    c.drawCircle(Offset(body.left + body.width * 0.25, h * 0.8 + bob), h * 0.025, Paint()..color = Colors.black87);
+    c.drawCircle(Offset(body.left + body.width * 0.75, h * 0.8 + bob), h * 0.025, Paint()..color = Colors.black87);
+    cx += body.width + w * 0.012;
+  }
+  for (var k = 0; k < 5; k++) {
+    final ph = (t * 0.8 + k * 0.2) % 1.0;
+    c.drawCircle(Offset(w * 0.2 - ph * w * 0.12, h * 0.6 - ph * h * 0.25), h * 0.02 + ph * h * 0.04, Paint()..color = Colors.white.withValues(alpha: 0.7 * (1 - ph)));
+  }
+}
+
+// 8 ── A friendly robot dances to the beat.
+void _robotDance(Canvas c, Size s, double t) {
+  final w = s.width, h = s.height;
+  c.drawRect(Offset.zero & s, Paint()..shader = LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color.lerp(const Color(0xFF4C1D95), const Color(0xFF0E7490), (math.sin(t * 2) + 1) / 2)!, const Color(0xFF111827)]).createShader(Offset.zero & s));
+  for (var k = 0; k < 8; k++) {
+    final on = (t * 2 + k) % 2 < 1;
+    c.drawRect(Rect.fromLTWH(w * k / 8, h * 0.86, w / 8 - 2, h * 0.14), Paint()..color = (on ? const Color(0xFFF472B6) : const Color(0xFF38BDF8)).withValues(alpha: 0.5));
+  }
+  final beat = math.sin(t * 6);
+  c.save();
+  c.translate(w * 0.5, h * 0.55 + beat.abs() * -h * 0.03);
+  c.rotate(beat * 0.06);
+  c.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: Offset.zero, width: h * 0.26, height: h * 0.3), Radius.circular(h * 0.04)), Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFE2E8F0), Color(0xFF64748B)]).createShader(Rect.fromCenter(center: Offset.zero, width: h * 0.26, height: h * 0.3)));
+  c.drawRect(Rect.fromCenter(center: Offset(0, h * 0.02), width: h * 0.14, height: h * 0.08), Paint()..color = const Color(0xFF22D3EE).withValues(alpha: 0.7));
+  c.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: Offset(0, -h * 0.25), width: h * 0.22, height: h * 0.17), Radius.circular(h * 0.04)), Paint()..color = const Color(0xFFCBD5E1));
+  final blink = (t * 1.3) % 1.0 > 0.08;
+  for (final x in const [-0.05, 0.05]) {
+    c.drawCircle(Offset(x * h, -h * 0.26), h * 0.025, Paint()..color = blink ? const Color(0xFF22D3EE) : const Color(0xFF0E7490));
+  }
+  c.drawLine(Offset(0, -h * 0.335), Offset(0, -h * 0.38), Paint()..color = Colors.white70..strokeWidth = 3);
+  c.drawCircle(Offset(0, -h * 0.39), h * 0.015, Paint()..color = const Color(0xFFEF4444));
+  for (final side in const [-1.0, 1.0]) {
+    c.save();
+    c.translate(side * h * 0.14, -h * 0.08);
+    c.rotate(side * (0.7 + math.sin(t * 6 + (side > 0 ? 0 : math.pi)) * 0.8));
+    c.drawLine(Offset.zero, Offset(side * h * 0.16, 0), Paint()..color = const Color(0xFF94A3B8)..strokeWidth = h * 0.035..strokeCap = StrokeCap.round);
+    c.restore();
+    c.drawLine(Offset(side * h * 0.06, h * 0.15), Offset(side * h * 0.08, h * 0.28 + (side > 0 ? beat : -beat) * h * 0.02), Paint()..color = const Color(0xFF94A3B8)..strokeWidth = h * 0.04..strokeCap = StrokeCap.round);
+  }
+  c.restore();
+  for (var k = 0; k < 4; k++) {
+    final ph = (t * 0.7 + k * 0.25) % 1.0;
+    _text(c, '♪', Offset(w * (0.2 + 0.18 * k) + math.sin(t * 2 + k) * 8, h * 0.7 - ph * h * 0.5), h * 0.08, Colors.white.withValues(alpha: 1 - ph));
+  }
+}
+
+// 9 ── A garden with butterflies and growing flowers.
+void _garden(Canvas c, Size s, double t) {
+  final w = s.width, h = s.height;
+  c.drawRect(Offset.zero & s, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF93C5FD), Color(0xFFFEF9C3)]).createShader(Offset.zero & s));
+  c.drawCircle(Offset(w * 0.12, h * 0.16), h * 0.07, Paint()..color = const Color(0xFFFDE047));
+  c.drawRect(Rect.fromLTWH(0, h * 0.72, w, h * 0.28), Paint()..color = const Color(0xFF4D7C0F));
+  const cols = [Color(0xFFF472B6), Color(0xFFFACC15), Color(0xFFEF4444), Color(0xFFA78BFA), Color(0xFFFB923C)];
+  for (var k = 0; k < 9; k++) {
+    final x = w * (0.07 + k * 0.105);
+    final grow = ((t * 0.25 - k * 0.12) % 3.0).clamp(0.0, 1.0);
+    final stemH = h * (0.12 + 0.05 * (k % 3)) * grow;
+    final top = Offset(x + math.sin(t + k) * 3, h * 0.78 - stemH);
+    c.drawLine(Offset(x, h * 0.78), top, Paint()..color = const Color(0xFF166534)..strokeWidth = 3);
+    if (grow > 0.7) {
+      for (var p = 0; p < 6; p++) {
+        final a = p * math.pi / 3 + t * 0.3;
+        c.drawCircle(top + Offset(math.cos(a), math.sin(a)) * h * 0.028, h * 0.022, Paint()..color = cols[k % cols.length]);
+      }
+      c.drawCircle(top, h * 0.016, Paint()..color = const Color(0xFFFDE047));
+    }
+  }
+  for (var k = 0; k < 3; k++) {
+    final x = w * (0.2 + 0.28 * k) + math.sin(t * 0.9 + k * 2) * w * 0.12;
+    final y = h * (0.3 + 0.1 * k) + math.cos(t * 1.3 + k) * h * 0.06;
+    final flap = math.sin(t * 18 + k).abs();
+    for (final side in const [-1.0, 1.0]) {
+      c.drawOval(Rect.fromCenter(center: Offset(x + side * h * 0.025 * flap, y), width: h * 0.05 * flap + 2, height: h * 0.06), Paint()..color = cols[(k + 2) % cols.length]);
+    }
+    c.drawLine(Offset(x, y - h * 0.03), Offset(x, y + h * 0.03), Paint()..color = Colors.black87..strokeWidth = 2);
+  }
+}
+
 // ─── The big screen ──────────────────────────────────────────────────────────
 
 /// Opens the TV full screen. It starts with the NGMY logo for 3 seconds, plays the chosen channel and
@@ -339,6 +488,8 @@ class NgmyTvScreen extends StatefulWidget {
 class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderStateMixin {
   late final AnimationController _clock = AnimationController(vsync: this, duration: const Duration(days: 1))..forward();
   late int _ch = widget.channel;
+  int _app = -1; // -1: watching a channel, otherwise the app that is open
+  bool _menu = false;
   Timer? _auto;
   double _channelSince = 0;
   bool _hud = true;
@@ -354,8 +505,8 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
 
   void _hideHudSoon() {
     _hudTimer?.cancel();
-    _hudTimer = Timer(const Duration(seconds: 4), () {
-      if (mounted) setState(() => _hud = false);
+    _hudTimer = Timer(const Duration(seconds: 6), () {
+      if (mounted && !_menu) setState(() => _hud = false);
     });
   }
 
@@ -363,15 +514,32 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
     if (mounted && Navigator.of(context).canPop()) Navigator.of(context).pop(_ch);
   }
 
+  /// Using the remote means the person is here and watching: the one-minute timer stops.
+  void _touched() {
+    _auto?.cancel();
+    _auto = null;
+    _hud = true;
+    _hideHudSoon();
+  }
+
   void _go(int d) {
     setState(() {
+      _app = -1;
       _ch = (_ch + d) % kNgmyTvChannels.length;
       if (_ch < 0) _ch += kNgmyTvChannels.length;
       _channelSince = _clock.lastElapsedDuration?.inMilliseconds.toDouble() ?? 0;
-      _hud = true;
+      _touched();
     });
     NgmyTone.play(900, ms: 40, wave: 'noise', volume: 0.3);
-    _hideHudSoon();
+  }
+
+  void _openApp(int a) {
+    setState(() {
+      _app = a;
+      _menu = false;
+      _touched();
+    });
+    NgmyTone.play(700, ms: 60, wave: 'tri', volume: 0.3);
   }
 
   @override
@@ -389,10 +557,7 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
       body: SafeArea(
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: () {
-            setState(() => _hud = true);
-            _hideHudSoon();
-          },
+          onTap: () => setState(_touched),
           child: Stack(fit: StackFit.expand, children: [
             Center(
               child: AspectRatio(
@@ -408,7 +573,7 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
                         final t = ms / 1000;
                         // The logo only shows when the TV first starts, not at every channel change.
                         final age = _channelSince == 0 && widget.showBoot ? t : 99.0;
-                        return CustomPaint(painter: _TvPainter(_ch, t, age), size: Size.infinite);
+                        return CustomPaint(painter: _TvPainter(_ch, t, age, _app), size: Size.infinite);
                       },
                     ),
                   ),
@@ -422,46 +587,111 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
                 ignoring: !_hud,
                 child: Column(children: [
                   Padding(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
                     child: Row(children: [
                       _round(Icons.close_rounded, 'Back to the board', _close),
                       const Spacer(),
-                      Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)), child: Text('NGMY TV · CH ${_ch + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12.5))),
+                      Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)), child: Text(_app >= 0 ? 'NGMY TV · ${kNgmyApps[_app].name}' : 'NGMY TV · CH ${_ch + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12.5))),
                     ]),
                   ),
+                  const SizedBox(height: 6),
+                  _remote(),
                   const Spacer(),
                   Container(
                     margin: const EdgeInsets.all(12),
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.65), borderRadius: BorderRadius.circular(18)),
-                    child: Row(children: [
-                      _round(Icons.skip_previous_rounded, 'Previous channel', () => _go(-1)),
-                      Expanded(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        Text(kNgmyTvChannels[_ch].title, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
-                        Text(kNgmyTvChannels[_ch].blurb, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white60, fontSize: 11.5)),
-                      ])),
-                      _round(Icons.skip_next_rounded, 'Next channel', () => _go(1)),
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      Text(_app >= 0 ? kNgmyApps[_app].name : kNgmyTvChannels[_ch].title, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+                      Text(_app >= 0 ? kNgmyApps[_app].blurb : kNgmyTvChannels[_ch].blurb, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white60, fontSize: 11.5)),
                     ]),
                   ),
                 ]),
               ),
             ),
+            if (_menu) Positioned.fill(child: _appsMenu()),
           ]),
         ),
       ),
     );
   }
 
+  /// The little remote control, at the top in the middle.
+  Widget _remote() {
+    Widget key(IconData icon, String label, VoidCallback f, {Color color = Colors.white, bool on = false}) => GestureDetector(
+          onTap: f,
+          child: Container(
+            width: 56,
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            margin: const EdgeInsets.symmetric(horizontal: 3),
+            decoration: BoxDecoration(color: on ? color.withValues(alpha: 0.28) : Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(14), border: Border.all(color: on ? color : Colors.white24)),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(height: 1),
+              Text(label, style: TextStyle(color: color, fontSize: 9.5, fontWeight: FontWeight.w800)),
+            ]),
+          ),
+        );
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+      decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.72), borderRadius: BorderRadius.circular(22), border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.5))),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        key(Icons.remove_rounded, 'CH −', () => _go(-1)),
+        key(Icons.add_rounded, 'CH +', () => _go(1)),
+        key(Icons.live_tv_rounded, 'TV', () => _go(0), color: const Color(0xFF38BDF8), on: _app < 0),
+        key(Icons.apps_rounded, 'APPS', () => setState(() {
+              _menu = !_menu;
+              _touched();
+            }), color: const Color(0xFFA78BFA), on: _menu),
+        key(Icons.campaign_rounded, 'ADS', () => _openApp(0), color: const Color(0xFFF472B6), on: _app == 0),
+      ]),
+    );
+  }
+
+  Widget _appsMenu() => GestureDetector(
+        onTap: () => setState(() => _menu = false),
+        child: Container(
+          color: Colors.black.withValues(alpha: 0.82),
+          padding: const EdgeInsets.fromLTRB(16, 120, 16, 16),
+          child: Column(children: [
+            const Text('NGMY Apps', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 1)),
+            const SizedBox(height: 12),
+            Expanded(
+              child: GridView.count(
+                crossAxisCount: 4,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 10,
+                childAspectRatio: 0.9,
+                children: [
+                  for (var k = 0; k < kNgmyApps.length; k++)
+                    GestureDetector(
+                      onTap: () => _openApp(k),
+                      child: Container(
+                        decoration: BoxDecoration(color: kNgmyApps[k].color.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(16), border: Border.all(color: kNgmyApps[k].color.withValues(alpha: 0.6))),
+                        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                          Text(kNgmyApps[k].emoji, style: const TextStyle(fontSize: 28)),
+                          const SizedBox(height: 4),
+                          Text(kNgmyApps[k].name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)),
+                        ]),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ]),
+        ),
+      );
+
   Widget _round(IconData i, String tip, VoidCallback f) => IconButton(onPressed: f, tooltip: tip, style: IconButton.styleFrom(backgroundColor: Colors.black54), icon: Icon(i, color: Colors.white));
 }
 
 class _TvPainter extends CustomPainter {
-  _TvPainter(this.ch, this.t, this.age);
-  final int ch;
+  _TvPainter(this.ch, this.t, this.age, this.app);
+  final int ch, app;
   final double t, age;
 
   @override
-  void paint(Canvas canvas, Size size) => paintNgmyTv(canvas, size, ch, t, age: age);
+  void paint(Canvas canvas, Size size) => paintNgmyTv(canvas, size, ch, t, age: age, app: app);
 
   @override
   bool shouldRepaint(covariant _TvPainter old) => true;

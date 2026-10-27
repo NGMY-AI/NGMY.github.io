@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_electronics_board.dart';
 import 'ngmy_electronics_extra_parts.dart';
+import 'ngmy_electronics_screens.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
 // More parts for the Electronics Lab: gadgets that need the right power, plus meters.
@@ -135,11 +136,16 @@ bool paintMorePart(Canvas c, Part p, double time, void Function(Canvas, String, 
       final screen = RRect.fromRectAndRadius(const Rect.fromLTWH(-12, -25, 24, 44), const Radius.circular(3));
       if (on) {
         c.drawRRect(screen, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1E3A8A), Color(0xFF0B1230)]).createShader(screen.outerRect));
+        // The phone plays NGMY ads while it charges.
+        c.save();
+        c.clipRRect(screen);
+        c.translate(-12, -25);
+        paintNgmyAd(c, const Size(24, 44), time);
+        c.restore();
         final level = (time * 0.12) % 1.0;
-        c.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(-7, -8, 14, 22), const Radius.circular(2)), Paint()..style = PaintingStyle.stroke..strokeWidth = 1.4..color = Colors.white);
-        c.drawRect(Rect.fromLTWH(-5.5, 12.5 - 19 * level, 11, 19 * level), Paint()..color = const Color(0xFF4ADE80));
-        text(c, '⚡', const Offset(-5, -4), Colors.white, 11);
-        text(c, '${(level * 100).round()}%', const Offset(-9, -22), Colors.white, 8);
+        c.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(-12, 12, 24, 7), const Radius.circular(2)), Paint()..color = Colors.black54);
+        c.drawRect(Rect.fromLTWH(-10, 14.5, 20 * level, 2.4), Paint()..color = const Color(0xFF4ADE80));
+        text(c, '⚡${(level * 100).round()}%', const Offset(-9, 12.2), Colors.white, 6);
       } else {
         c.drawRRect(screen, Paint()..color = const Color(0xFF05070A));
       }

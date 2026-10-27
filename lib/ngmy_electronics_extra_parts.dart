@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_electronics_board.dart';
 import 'ngmy_electronics_more_parts.dart';
+import 'ngmy_electronics_screens.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Even more parts for the Electronics Lab: appliances, toys and machines.
@@ -28,10 +29,16 @@ const Map<String, DeviceSpec> kExtraDeviceSpecs = {
   'discoball': DeviceSpec(16, 5.0, 13.5, polar: false),
   'robot': DeviceSpec(30, 4.0, 9.0),
   'toaster': DeviceSpec(5, 3.5, 13.0, polar: false),
+  'ledstrip': DeviceSpec(25, 3.0, 13.5),
+  'pump': DeviceSpec(14, 2.5, 9.0, polar: false),
+  'hairdryer': DeviceSpec(6, 6.0, 13.0, polar: false),
+  'headphones': DeviceSpec(30, 1.2, 5.0),
+  'smartwatch': DeviceSpec(35, 3.0, 4.5),
+  'tablet': DeviceSpec(20, 4.5, 7.5),
 };
 
 /// Machines whose blades or wheels turn faster with more volts.
-const Set<String> kSpinners = {'fan', 'toycar', 'blender', 'drone', 'drill', 'washer', 'discoball', 'lighthouse'};
+const Set<String> kSpinners = {'fan', 'toycar', 'blender', 'drone', 'drill', 'washer', 'discoball', 'lighthouse', 'pump', 'hairdryer'};
 
 const List<PartInfo> kExtraPartInfos = [
   PartInfo('fridge', 'Fridge', '🧊', Color(0xFF7DD3FC), 'Keeps food cold. Needs 4 to 13 volts. When it works the light inside comes on and frost appears. Works either way round.', 'A pump squeezes a special gas so it gets hot outside the fridge and very cold inside, carrying the warmth away.'),
@@ -51,6 +58,12 @@ const List<PartInfo> kExtraPartInfos = [
   PartInfo('discoball', 'Disco ball', '🪩', Color(0xFFE879F9), 'Spins and throws sparkles everywhere. Needs 5 to 13.5 volts. Works either way round.', 'Hundreds of tiny mirrors on a ball bounce a spotlight all around the room as it turns.'),
   PartInfo('robot', 'Robot', '🤖', Color(0xFF38BDF8), 'Its eyes light up and blink, and its arm waves. Needs 4 to 9 volts. The + dot goes to the battery +.', 'A tiny computer reads sensors and tells small motors in the arms and head what to do.'),
   PartInfo('toaster', 'Toaster', '🍞', Color(0xFFD97706), 'Glowing wires toast the bread, then it pops up. Needs 3.5 to 13 volts and a strong battery. Works either way round.', 'Thin wires get red hot as the current squeezes through them and toast the bread.'),
+  PartInfo('ledstrip', 'LED strip', '🌈', Color(0xFFF472B6), 'A strip of colour-changing lights. Needs 3 to 13.5 volts. The + dot goes to the battery +.', 'Many tiny LEDs in red, green and blue sit along a bendy strip. Mixing the three makes every colour.'),
+  PartInfo('pump', 'Water pump', '🚰', Color(0xFF38BDF8), 'Pushes water round a pipe. Needs 2.5 to 9 volts. Works either way round.', 'A small motor spins a paddle wheel inside a sealed case and flings water out of the pipe.'),
+  PartInfo('hairdryer', 'Hair dryer', '💨', Color(0xFFFB7185), 'Blows warm air. A hungry gadget: it needs 6 to 13 volts and a strong battery. Works either way round.', 'A fan blows air past a hot coil of wire, the same coil idea as a toaster.'),
+  PartInfo('headphones', 'Headphones', '🎧', Color(0xFFA78BFA), 'Play music into your ears. They are quiet and need only 1.2 to 5 volts, so 9 volts would burn them. Use a step-down converter! The + dot goes to the battery +.', 'Two tiny speakers, one for each ear, shake the air with a coil and a thin cone.'),
+  PartInfo('smartwatch', 'Smart watch', '⌚', Color(0xFF34D399), 'Shows the time and your heartbeat. It sips power: 3 to 4.5 volts only. Use a step-down converter on bigger batteries. The + dot goes to the battery +.', 'A tiny chip, a screen and a sensor that shines green light on your wrist to feel your pulse.'),
+  PartInfo('tablet', 'Tablet', '📲', Color(0xFF60A5FA), 'A big screen playing NGMY ads. Needs 4.5 to 7.5 volts, so a 9 volt battery needs a step-down converter. The + dot goes to the battery +.', 'A bright flat screen, a fast chip and a lithium battery in a thin case.'),
 ];
 
 /// Draws one of the extra appliances around the origin. Returns false for a kind that is not handled here.
@@ -314,6 +327,150 @@ bool paintExtraPart(Canvas c, Part p, double time, void Function(Canvas, String,
       }
       c.drawLine(const Offset(24, 2), const Offset(30, 2), line(const Color(0xFF111827), 3));
       return true;
+    case 'ledstrip':
+      c.drawRRect(rr(-34, -4, 68, 10, 4), fill(const Color(0xFF1F2937)));
+      for (var k = 0; k < 9; k++) {
+        final hue = (time * 90 + k * 40) % 360;
+        final col = on ? HSVColor.fromAHSV(1, hue, 0.8, 1).toColor() : const Color(0xFF374151);
+        if (on) c.drawCircle(Offset(-30 + k * 7.5, 1), 7, fill(col.withValues(alpha: 0.45))..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5));
+        c.drawCircle(Offset(-30 + k * 7.5, 1), 2.6, fill(col));
+      }
+      c.drawRRect(rr(-40, -2, 6, 6, 1), fill(const Color(0xFF9CA3AF)));
+      return true;
+    case 'pump':
+      c.drawRRect(rr(-16, -2, 32, 22, 6), grad(const Rect.fromLTWH(-16, -2, 32, 22), const Color(0xFF0EA5E9), const Color(0xFF075985)));
+      c.drawCircle(const Offset(-2, 9), 8, fill(const Color(0xFF082F49)));
+      c.save();
+      c.translate(-2, 9);
+      c.rotate(p.spin);
+      for (var k = 0; k < 3; k++) {
+        c.drawLine(Offset.zero, Offset(math.cos(k * 2.09) * 7, math.sin(k * 2.09) * 7), line(const Color(0xFFBAE6FD), 2.4));
+      }
+      c.restore();
+      c.drawPath(Path()..moveTo(16, 6)..lineTo(26, 6)..lineTo(26, -20)..lineTo(10, -20), line(const Color(0xFF94A3B8), 4));
+      if (on) {
+        for (var k = 0; k < 5; k++) {
+          final ph = (time * 0.9 + k * 0.2) % 1.0;
+          c.drawCircle(Offset(26, 6 - ph * 26), 2.2, fill(const Color(0xFF7DD3FC)));
+        }
+        c.drawCircle(const Offset(8, -14), 3.2, fill(const Color(0xFF7DD3FC).withValues(alpha: 0.7)));
+      }
+      return true;
+    case 'hairdryer':
+      c.save();
+      c.rotate(-0.15);
+      c.drawRRect(rr(-26, -14, 40, 22, 10), grad(const Rect.fromLTWH(-26, -14, 40, 22), const Color(0xFFFB7185), const Color(0xFFBE123C)));
+      c.drawRRect(rr(14, -10, 12, 14, 3), fill(const Color(0xFF1F2937)));
+      c.drawRRect(rr(-10, 6, 12, 22, 4), fill(const Color(0xFF374151)));
+      c.restore();
+      if (on) {
+        for (var k = 0; k < 4; k++) {
+          final ph = (time * 3 + k * 0.25) % 1.0;
+          c.drawLine(Offset(24 + ph * 18, -10 + k * 5.0), Offset(32 + ph * 18, -10 + k * 5.0), line(Colors.white.withValues(alpha: 1 - ph), 1.8));
+        }
+        c.drawCircle(const Offset(20, -3), 8, fill(const Color(0xFFFB923C).withValues(alpha: 0.4))..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5));
+      }
+      return true;
+    case 'headphones':
+      c.drawArc(Rect.fromCenter(center: const Offset(0, 2), width: 44, height: 44), math.pi, math.pi, false, line(const Color(0xFF475569), 4));
+      for (final x in const [-22.0, 22.0]) {
+        c.drawRRect(rr(x - 7, 0, 14, 20, 6), grad(Rect.fromLTWH(x - 7, 0, 14, 20), const Color(0xFFA78BFA), const Color(0xFF5B21B6)));
+        if (on) {
+          for (var k = 1; k <= 2; k++) {
+            c.drawArc(Rect.fromCircle(center: Offset(x, 10), radius: 10.0 + k * 5 + (time * 12) % 5), x < 0 ? 2.2 : -0.9, 1.6, false, line(const Color(0xFFC4B5FD).withValues(alpha: 0.9 - k * 0.3), 1.6));
+          }
+        }
+      }
+      if (on) text(c, '♪', Offset(-4, -8 - (time * 14) % 8), const Color(0xFFE9D5FF), 12);
+      return true;
+    case 'smartwatch':
+      c.drawRRect(rr(-8, -30, 16, 14, 3), fill(const Color(0xFF1F2937)));
+      c.drawRRect(rr(-8, 14, 16, 14, 3), fill(const Color(0xFF1F2937)));
+      c.drawRRect(rr(-14, -17, 28, 32, 8), grad(const Rect.fromLTWH(-14, -17, 28, 32), const Color(0xFF9CA3AF), const Color(0xFF374151)));
+      c.drawRRect(rr(-11, -14, 22, 26, 6), fill(const Color(0xFF020617)));
+      if (on) {
+        final now = DateTime.now();
+        text(c, '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}', const Offset(-9.5, -11), const Color(0xFF4ADE80), 9.5);
+        final beat = (math.sin(time * 9) + 1) / 2;
+        text(c, '♥', Offset(-8, 1), Color.lerp(const Color(0xFF9F1239), const Color(0xFFF43F5E), beat)!, 8 + beat * 2);
+        text(c, '${70 + (time * 2).floor() % 6}', const Offset(0, 2), Colors.white, 7);
+      }
+      return true;
+    case 'tablet':
+      c.drawRRect(rr(-30, -22, 60, 44, 6), fill(const Color(0xFF0B0F17)));
+      c.drawRRect(rr(-30, -22, 60, 44, 6), line(const Color(0xFF94A3B8), 1.6));
+      final scr = rr(-27, -19, 54, 38, 3);
+      if (on) {
+        c.save();
+        c.clipRRect(scr);
+        c.translate(-27, -19);
+        paintNgmyAd(c, const Size(54, 38), time);
+        c.restore();
+      } else {
+        c.drawRRect(scr, fill(const Color(0xFF05070A)));
+      }
+      return true;
+    case 'buck':
+      final board = rr(-26, -22, 52, 42, 5);
+      c.drawRRect(board, grad(board.outerRect, const Color(0xFF1D4ED8), const Color(0xFF1E3A8A)));
+      c.drawRRect(board, line(Colors.white24, 1.2));
+      // Coil (the inductor) and a small chip.
+      c.drawCircle(const Offset(-10, 4), 9, fill(const Color(0xFF111827)));
+      c.drawCircle(const Offset(-10, 4), 6, line(const Color(0xFFB45309), 2));
+      c.drawRRect(rr(4, -2, 14, 10, 2), fill(const Color(0xFF111827)));
+      // Display with live volts in and out.
+      c.drawRRect(rr(-22, -19, 44, 12, 2), fill(const Color(0xFF020617)));
+      text(c, '${p.vin.toStringAsFixed(1)}→${(on ? p.vout : p.volts).toStringAsFixed(1)}V', const Offset(-20.5, -17.6), on ? const Color(0xFF4ADE80) : const Color(0xFF64748B), 8.2);
+      c.drawCircle(const Offset(18, 14), 2.4, fill(on ? const Color(0xFF22C55E) : const Color(0xFF334155)));
+      text(c, 'IN', const Offset(-24, 11), Colors.white70, 6);
+      text(c, 'OUT', const Offset(6, 11), Colors.white70, 6);
+      return true;
+    case 'regulator':
+      final heat = on ? (p.drop * p.i.abs() / 2.5).clamp(0.0, 1.0) : 0.0;
+      c.drawRRect(rr(-14, -26, 28, 22, 3), fill(Color.lerp(const Color(0xFF94A3B8), const Color(0xFFEF4444), heat)!));
+      c.drawCircle(const Offset(0, -20), 3, fill(const Color(0xFF334155)));
+      c.drawRRect(rr(-12, -4, 24, 18, 3), grad(const Rect.fromLTWH(-12, -4, 24, 18), const Color(0xFF374151), const Color(0xFF030712)));
+      text(c, '7805', const Offset(-9, 0), Colors.white70, 8);
+      for (final x in const [-8.0, 0.0, 8.0]) {
+        c.drawRect(Rect.fromLTWH(x - 1, 14, 2, 8), fill(const Color(0xFFD1D5DB)));
+      }
+      if (heat > 0.2) {
+        for (var k = 0; k < 3; k++) {
+          final ph = (time * 0.9 + k * 0.33) % 1.0;
+          c.drawCircle(Offset(-6 + k * 6.0, -28 - ph * 12), 2 + ph * 2, fill(Colors.white.withValues(alpha: 0.5 * (1 - ph))));
+        }
+      }
+      text(c, '5V', const Offset(-7, -24), Colors.black87, 9);
+      return true;
+    case 'diode':
+      c.drawLine(const Offset(-34, 0), const Offset(34, 0), line(const Color(0xFFD1D5DB), 2.4));
+      c.drawRRect(rr(-14, -7, 28, 14, 6), fill(const Color(0xFFF59E0B).withValues(alpha: 0.85)));
+      c.drawRect(const Rect.fromLTWH(8, -7, 4, 14), fill(Colors.black87));
+      if (on) c.drawRRect(rr(-14, -7, 28, 14, 6), fill(const Color(0xFFFDE047).withValues(alpha: 0.4))..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6));
+      c.drawPath(Path()..moveTo(-8, -4)..lineTo(-8, 4)..lineTo(-1, 0)..close(), fill(Colors.black54));
+      text(c, 'one way', const Offset(-17, 10), Colors.white54, 8);
+      return true;
+    case 'ldr':
+      c.drawLine(const Offset(-34, 0), const Offset(-9, 0), line(const Color(0xFFD1D5DB), 2.4));
+      c.drawLine(const Offset(9, 0), const Offset(34, 0), line(const Color(0xFFD1D5DB), 2.4));
+      c.drawCircle(const Offset(0, 0), 12, fill(const Color(0xFFB45309)));
+      c.drawCircle(const Offset(0, 0), 12, line(const Color(0xFF451A03), 1.6));
+      final zig = Path()..moveTo(-8, -6);
+      for (var k = 0; k < 5; k++) {
+        zig.lineTo(k.isEven ? 8 : -8, -6 + k * 3.0);
+      }
+      c.drawPath(zig, line(const Color(0xFFFDE68A), 1.4));
+      text(c, '☀', Offset(-6, -26), Color.lerp(const Color(0xFF475569), const Color(0xFFFDE047), p.level)!, 14);
+      text(c, '${(20 + 980 * (1 - p.level)).round()}Ω', const Offset(-14, 13), Colors.white70, 8.5);
+      return true;
   }
   return false;
 }
+
+/// Parts that take volts down or protect a circuit.
+const List<PartInfo> kPowerPartInfos = [
+  PartInfo('buck', 'Step-down converter', '🔽', Color(0xFF2DD4BF), 'Brings the volts DOWN to the number you choose (3, 5, 6 or 9 V), so a gadget that needs few volts is safe on a big battery. The + (left) dot is the input from the battery. The right dot is the output to the gadget. More volts must go in than come out.', 'A fast switch chops the power into tiny pulses, and a coil and capacitor smooth them out to a lower voltage. Very little energy is wasted as heat.'),
+  PartInfo('regulator', '5 V regulator', '🧊', Color(0xFF94A3B8), 'Always gives out 5 volts, whatever bigger battery you use. The + (left) dot is the input. It turns the extra volts into HEAT, so it gets hot if the gadget takes a lot of current. Great for a phone, too hot for a big load.', 'A transistor acts like a tap that closes more when too many volts arrive, and a tiny circuit checks the output many times a second.'),
+  PartInfo('diode', 'Diode', '➡️', Color(0xFFFBBF24), 'Lets electricity go one way only (left to right). It uses up about 0.7 volts. Put it in a loop so a battery connected backwards cannot hurt a gadget.', 'A join between two kinds of crystal that electrons can cross in one direction but not the other.'),
+  PartInfo('ldr', 'Light sensor', '🌞', Color(0xFFFDE047), 'A resistor that changes with light: in the dark it holds the current back, in bright light it lets more through. Tap it and move the Light slider.', 'A flat disc of a special material (cadmium sulfide) that frees more electrons when light hits it.'),
+];

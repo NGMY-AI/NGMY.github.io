@@ -4,7 +4,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'ngmy_ai_inventor.dart';
 import 'ngmy_electronics_board.dart';
+import 'ngmy_electronics_screens.dart';
 import 'ngmy_electronics_tv.dart';
 import 'ngmy_studio_kit.dart';
 
@@ -79,10 +81,17 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
     if (l.length < 3) return;
     l.clear();
     if (b.works(p)) {
-      _openTv(p);
+      p.kind == 'tv' ? _openTv(p) : _openPhone(p);
     } else {
-      _say(b.diagnose(p) ?? 'The TV is off. Give it power first.');
+      _say(b.diagnose(p) ?? 'The ${p.info.name} is off. Give it power first.');
     }
+  }
+
+  Future<void> _openPhone(Part p) async {
+    if (_tvOpen || !mounted) return;
+    _tvOpen = true;
+    await showNgmyPhoneScreen(context, charge: ((b.time * 0.12) % 1.0 * 100).round());
+    _tvOpen = false;
   }
 
   ElectronicsBoard get b => widget.board;
@@ -90,6 +99,12 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
   @override
   void initState() {
     super.initState();
+    hook();
+    startFrames();
+  }
+
+  /// Listens for short circuits and burn-outs on the board (called again when we come back from another page).
+  void hook() {
     b.onEvent = (kind, p) {
       if (kind == 'short') {
         NgmyTone.play(1800, ms: 120, wave: 'noise', volume: 0.55);
@@ -103,7 +118,6 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
         NgmyTone.play(900, ms: 160, wave: 'square', sweep: 1.5, volume: 0.35);
       }
     };
-    startFrames();
   }
 
   @override
@@ -312,7 +326,7 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
                         NgmyTone.play(200, ms: 70, wave: 'saw', volume: 0.2);
                       }
                     });
-                    if (p.kind == 'tv') _tvTap(p);
+                    if (p.kind == 'tv' || p.kind == 'phone' || p.kind == 'tablet') _tvTap(p);
                     widget.onChanged?.call();
                     return;
                   }
@@ -445,6 +459,23 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
               Text(b.works(p) ? 'Showing: ${kNgmyTvChannels[p.channel % kNgmyTvChannels.length].title}. Tap the TV 3 times quickly to open the big screen.' : 'The TV is off. Give it power with the + dot towards the battery +.', style: const TextStyle(color: Colors.white54, fontSize: 12)),
               if (b.works(p)) StudioButton(icon: Icons.fullscreen_rounded, label: 'Open big screen', color: info.color, onTap: () => _openTv(p)),
             ],
+            if (p.kind == 'phone' || p.kind == 'tablet') ...[
+              const SizedBox(height: 6),
+              Text(b.works(p) ? 'Playing NGMY ads. Tap it 3 times quickly, or press the button, to open it and use its apps.' : 'It is off. Too few volts and it stays dark, too many and it burns out. Bring big battery volts down with a step-down converter.', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+              if (b.works(p)) StudioButton(icon: Icons.phone_android_rounded, label: 'Open ${p.kind == 'tablet' ? 'tablet' : 'phone'}', color: info.color, onTap: () => _openPhone(p)),
+            ],
+            if (b.isReducer(p)) ...[
+              const SizedBox(height: 6),
+              Text('Volts in: ${p.vin.toStringAsFixed(1)} V   →   Volts out: ${(b.works(p) ? p.vout : b.reducerTarget(p)).toStringAsFixed(1)} V', style: const TextStyle(color: Color(0xFF5EEAD4), fontWeight: FontWeight.w900, fontSize: 12.5)),
+              if (p.kind == 'buck') Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Wrap(spacing: 6, children: [for (final v in const [3.0, 4.5, 5.0, 6.0, 9.0]) StudioChip(label: '${v == v.roundToDouble() ? v.round() : v} V out', selected: p.volts == v, color: info.color, onTap: () {
+                  setState(() => p.volts = v);
+                  widget.onChanged?.call();
+                })]),
+              ),
+              if (p.kind == 'regulator') const Text('Always 5 V out. The extra volts turn into heat, so a hungry gadget will make it too hot.', style: TextStyle(color: Colors.white54, fontSize: 12)),
+            ],
             if (p.kind == 'battery' && p.volts == 1.5) Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Text('Charge: ${(p.charge * 100).round()}%${p.charge <= 0.02 ? '  (flat: charge it first with a solar panel, + to +, − to −)' : (p.charge >= 0.99 ? '  (full)' : '  (charging fills it up)')}', style: const TextStyle(color: Color(0xFF86EFAC), fontWeight: FontWeight.w800, fontSize: 12.5)),
@@ -465,6 +496,7 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
             if (p.kind == 'solar') slider('Sunlight', p.level, (x) => p.level = x),
             if (p.kind == 'turbine') slider('Wind', p.level, (x) => p.level = x),
             if (p.kind == 'pot') slider('Knob', p.level, (x) => p.level = x),
+            if (p.kind == 'ldr') slider('Light', p.level, (x) => p.level = x),
             if (p.kind == 'crank') const Text('Tap the crank on the board again and again to spin it faster.', style: TextStyle(color: Colors.white54, fontSize: 12)),
             if (p.kind == 'switch') Text(p.on ? 'Closed: the loop is joined up.' : 'Open: the loop is broken.', style: const TextStyle(color: Colors.white54, fontSize: 12)),
           ]),
@@ -492,6 +524,8 @@ final List<_Challenge> _kChallenges = [
   _Challenge('Play the radio', 'A radio needs about 3 volts or more. Try a 9 volt battery.', (b) => b.parts.any((p) => p.kind == 'radio' && p.glow > 0)),
   _Challenge('Watch TV', 'A TV needs 6 volts or more. Set a battery to 12 volts, and wire the TV\'s + (left) dot towards the battery +.', (b) => b.parts.any((p) => p.kind == 'tv' && p.glow > 0)),
   _Challenge('Charge a battery', 'A 1.5 V battery starts flat. Join it to a solar panel (+ to +, − to −) until its charge bar is full.', (b) => b.parts.any((p) => p.kind == 'battery' && p.volts == 1.5 && p.charge > 0.95)),
+  _Challenge('One battery, two gadgets', 'A TV needs 9 volts but a phone burns out. Use a step-down converter to give the phone 5 V from the same battery.', (b) => b.parts.any((p) => p.kind == 'tv' && p.glow > 0) && b.parts.any((p) => p.kind == 'phone' && p.glow > 0) && b.has('buck')),
+  _Challenge('Protect a radio', 'Put a diode in the loop with a radio. It only lets electricity go one way.', (b) => b.parts.any((p) => p.kind == 'diode' && p.glow > 0) && b.parts.any((p) => p.kind == 'radio' && p.glow > 0)),
   _Challenge('Make toast', 'A heater turns electricity into heat. Make it glow bright orange.', (b) => b.parts.any((p) => p.kind == 'heater' && p.glow > 0.5)),
 ];
 
@@ -588,6 +622,28 @@ class _NgmyElectronicsLabState extends State<NgmyElectronicsLab> {
         ),
       );
 
+  Widget _barChip(IconData icon, String label, Color col, VoidCallback onTap) => Expanded(
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            height: 32,
+            decoration: BoxDecoration(color: col.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(11), border: Border.all(color: col.withValues(alpha: 0.5))),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Icon(icon, color: col, size: 16),
+              const SizedBox(width: 5),
+              Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: col, fontWeight: FontWeight.w800, fontSize: 12.5))),
+            ]),
+          ),
+        ),
+      );
+
+  /// The AI Inventor builds what you ask for on this same board.
+  Future<void> _openAi() async {
+    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => NgmyInventorStudio(board: _board)));
+    _editor.currentState?.hook();
+    if (mounted) setState(() {});
+  }
+
   Widget _topBar(BuildContext context, String help) {
     const accent = Color(0xFF38BDF8);
     final c = _ch < _kChallenges.length ? _kChallenges[_ch] : null;
@@ -631,12 +687,34 @@ class _NgmyElectronicsLabState extends State<NgmyElectronicsLab> {
               ),
             ]),
           ),
-          _barButton(Icons.menu_book_rounded, 'Ready-made circuits', const Color(0xFFA78BFA), _recipes),
-          _barButton(Icons.build_rounded, 'Repair burnt parts', const Color(0xFFFBBF24), () => setState(_board.repairAll)),
-          _barButton(Icons.delete_sweep_rounded, 'Clear the board', const Color(0xFFF87171), () => setState(_board.clear)),
+          GestureDetector(
+            onTap: _openAi,
+            child: Tooltip(
+              message: 'AI Inventor: say what you want to make',
+              child: Container(
+                height: 34,
+                margin: const EdgeInsets.only(left: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 11),
+                decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFFA78BFA), Color(0xFFEC4899)]), borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: const Color(0xFFEC4899).withValues(alpha: 0.45), blurRadius: 10)]),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 16),
+                  SizedBox(width: 4),
+                  Text('AI', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13.5)),
+                ]),
+              ),
+            ),
+          ),
           _barButton(Icons.help_outline_rounded, 'How to play', accent, () => showStudioHelp(context, 'ELECTRONICS LAB', help, accent)),
         ]),
-        const SizedBox(height: 9),
+        const SizedBox(height: 8),
+        Row(children: [
+          _barChip(Icons.menu_book_rounded, 'Circuits', const Color(0xFFA78BFA), _recipes),
+          const SizedBox(width: 6),
+          _barChip(Icons.build_rounded, 'Repair', const Color(0xFFFBBF24), () => setState(_board.repairAll)),
+          const SizedBox(width: 6),
+          _barChip(Icons.delete_sweep_rounded, 'Clear', const Color(0xFFF87171), () => setState(_board.clear)),
+        ]),
+        const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
           decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.28), borderRadius: BorderRadius.circular(14), border: Border.all(color: tone.withValues(alpha: 0.45))),
@@ -667,7 +745,7 @@ class _NgmyElectronicsLabState extends State<NgmyElectronicsLab> {
     );
   }
 
-  static const String _help = 'Build real circuits.\n\n1. Tap a part in the tool rows at the top to put it on the board. Drag it around.\n2. Drag from a round dot on one part to a round dot on another to join them with a wire. A circuit only works when it makes a complete loop from the battery, through the parts, and back.\n3. Tap a part to read what it does and how it is made, and to change it (battery volts, sunlight, resistor size). Tap a switch to flip it, and a crank to spin it.\n\nThe maths is real: bulbs get brighter with more volts and burn out with too many, LEDs need a resistor, and moving dots on the wires show current flowing.\n\nLots of tools: two rows above the board (swipe sideways to see them all). Appliances, toys and machines each need the right volts. A TV needs 6+ volts and shows NGMY animations: tap it 3 times quickly for the big screen. A 1.5 V battery starts flat and must be charged with a solar panel first. If something does not work, tap it: it tells you why (backwards, burnt, flat battery, loop not finished...).\n\nTry the challenges at the top bar, or open Ready-made circuits to see how a flashlight, radio, TV or solar lamp is wired.';
+  static const String _help = 'Build real circuits.\n\n1. Tap a part in the tool rows at the top to put it on the board. Drag it around.\n2. Drag from a round dot on one part to a round dot on another to join them with a wire. A circuit only works when it makes a complete loop from the battery, through the parts, and back.\n3. Tap a part to read what it does and how it is made, and to change it (battery volts, sunlight, resistor size). Tap a switch to flip it, and a crank to spin it.\n\nThe maths is real: bulbs get brighter with more volts and burn out with too many, LEDs need a resistor, and moving dots on the wires show current flowing.\n\nThe AI button at the top is the AI Inventor: say what you want to make and watch it being built on your board.\n\nLots of tools: two rows above the board (swipe sideways to see them all). A phone burns out above 7 volts, so use a step-down converter (it brings big battery volts down) to run a phone and a TV from one battery. A diode lets electricity go one way only. Appliances, toys and machines each need the right volts. A TV needs 6+ volts and shows 10 NGMY channels, a remote and apps: tap it 3 times quickly for the big screen. A phone plays NGMY ads and has apps too. A 1.5 V battery starts flat and must be charged with a solar panel first. If something does not work, tap it: it tells you why (backwards, burnt, flat battery, loop not finished...).\n\nTry the challenges at the top bar, or open Ready-made circuits to see how a flashlight, radio, TV or solar lamp is wired.';
 
   @override
   Widget build(BuildContext context) {
