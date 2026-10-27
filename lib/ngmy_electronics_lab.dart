@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import 'ngmy_ai_inventor.dart';
 import 'ngmy_electronics_board.dart';
+import 'ngmy_electronics_save.dart';
 import 'ngmy_electronics_screens.dart';
 import 'ngmy_electronics_tv.dart';
 import 'ngmy_studio_kit.dart';
@@ -111,6 +112,10 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
         NgmyTone.play(200, ms: 160, wave: 'saw', sweep: 2.2, volume: 0.4);
         HapticFeedback.heavyImpact();
         if (mounted) _say('Short circuit! The power source was joined straight back to itself with nothing to use the power, so it is getting very hot. Put a bulb or another part between the + and the −, or add a fuse.');
+      }
+      if (kind == 'overload') {
+        NgmyTone.play(260, ms: 220, wave: 'saw', sweep: -0.6, volume: 0.35);
+        if (mounted) _say('⚠ Overloaded! The ${p.info.name} can only give about ${b.sourceMaxAmps(p).toStringAsFixed(2)} amps but your gadgets are asking for ${p.demand.toStringAsFixed(2)} amps. Its volts sag, so gadgets may switch off. Take some gadgets off, or use a bigger battery.');
       }
       if (kind == 'burn') {
         if (mounted) _say('Burnt out! ${p.burnWhy}');
@@ -476,6 +481,14 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
               ),
               if (p.kind == 'regulator') const Text('Always 5 V out. The extra volts turn into heat, so a hungry gadget will make it too hot.', style: TextStyle(color: Colors.white54, fontSize: 12)),
             ],
+            if (b.isSource(p) && !p.burnt) Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Supplying ${p.demand.toStringAsFixed(2)} A of the ${b.sourceMaxAmps(p).toStringAsFixed(2)} A it can give${b.overloaded(p) ? '   ⚠ OVERLOADED' : ''}', style: TextStyle(color: b.overloaded(p) ? const Color(0xFFF87171) : const Color(0xFF86EFAC), fontWeight: FontWeight.w800, fontSize: 12.5)),
+                const SizedBox(height: 3),
+                ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: (p.demand / b.sourceMaxAmps(p)).clamp(0.0, 1.0), minHeight: 5, backgroundColor: Colors.white12, valueColor: AlwaysStoppedAnimation(b.overloaded(p) ? const Color(0xFFEF4444) : const Color(0xFF4ADE80)))),
+              ]),
+            ),
             if (p.kind == 'battery' && p.volts == 1.5) Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Text('Charge: ${(p.charge * 100).round()}%${p.charge <= 0.02 ? '  (flat: charge it first with a solar panel, + to +, − to −)' : (p.charge >= 0.99 ? '  (full)' : '  (charging fills it up)')}', style: const TextStyle(color: Color(0xFF86EFAC), fontWeight: FontWeight.w800, fontSize: 12.5)),
@@ -536,7 +549,7 @@ class NgmyElectronicsLab extends StatefulWidget {
   State<NgmyElectronicsLab> createState() => _NgmyElectronicsLabState();
 }
 
-class _NgmyElectronicsLabState extends State<NgmyElectronicsLab> {
+class _NgmyElectronicsLabState extends State<NgmyElectronicsLab> with WidgetsBindingObserver {
   final ElectronicsBoard _board = ElectronicsBoard();
   final GlobalKey<BoardEditorState> _editor = GlobalKey();
   int _ch = 0;
@@ -544,24 +557,79 @@ class _NgmyElectronicsLabState extends State<NgmyElectronicsLab> {
   int _frame = 0;
   int _working = 0;
   int _broken = 0;
+  int _overloaded = 0;
+  String _saved = '';
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _restore();
+  }
+
+  /// Puts back the board and the challenges from the last visit.
+  Future<void> _restore() async {
+    final raw = await loadLabSave();
+    if (!mounted) return;
+    if (raw != null && _board.parts.isEmpty) {
+      final p = restoreLab(_board, raw);
+      if (p != null) {
+        setState(() {
+          _ch = p.challenge;
+          _done
+            ..clear()
+            ..addAll(p.done);
+        });
+        _saved = raw;
+      }
+    }
+    _loaded = true;
+  }
+
+  /// Saves the board and the challenges when anything has changed.
+  void _saveNow() {
+    if (!_loaded) return;
+    final raw = encodeLab(_board, _ch, _done);
+    if (raw == _saved) return;
+    _saved = raw;
+    storeLabSave(raw);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) _saveNow();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _saveNow();
+    super.dispose();
+  }
 
   void _tick() {
     _frame++;
     if (_frame % 15 == 0) {
       final w = _board.parts.where((p) => _board.needsPower(p) && _board.works(p)).length;
       final x = _board.parts.where((p) => p.burnt).length;
-      if (w != _working || x != _broken) {
+      final o = _board.parts.where(_board.overloaded).length;
+      if (w != _working || x != _broken || o != _overloaded) {
         setState(() {
           _working = w;
           _broken = x;
+          _overloaded = o;
         });
       }
     }
+    if (_frame % 45 == 0) _saveNow();
     if (_frame % 10 != 0 || _ch >= _kChallenges.length) return;
     if (!_done.contains(_ch) && _kChallenges[_ch].check(_board)) {
       _done.add(_ch);
       NgmyTone.chord('bell', [0, 4, 7, 12], ms: 700, volume: 0.45);
       setState(() {});
+      _saveNow();
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text('✅ Challenge done: ${_kChallenges[_ch].title}. Tap the flag for the next one.'), duration: const Duration(seconds: 3)));
     }
   }
 
@@ -608,16 +676,26 @@ class _NgmyElectronicsLabState extends State<NgmyElectronicsLab> {
     );
   }
 
-  Widget _barButton(IconData icon, String label, Color col, VoidCallback onTap) => GestureDetector(
+  Widget _barButton(IconData icon, String label, Color col, VoidCallback onTap, {Widget? badge}) => GestureDetector(
         onTap: onTap,
         child: Tooltip(
           message: label,
-          child: Container(
-            width: 34,
-            height: 34,
-            margin: const EdgeInsets.only(left: 4),
-            decoration: BoxDecoration(color: col.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(12), border: Border.all(color: col.withValues(alpha: 0.5))),
-            child: Icon(icon, color: col, size: 18),
+          child: SizedBox(
+            width: 40,
+            height: 38,
+            child: Stack(clipBehavior: Clip.none, children: [
+              Positioned(
+                left: 4,
+                top: 2,
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(color: col.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12), border: Border.all(color: col.withValues(alpha: 0.45))),
+                  child: Icon(icon, color: col, size: 18),
+                ),
+              ),
+              if (badge != null) Positioned(right: -1, top: -3, child: badge),
+            ]),
           ),
         ),
       );
@@ -626,12 +704,12 @@ class _NgmyElectronicsLabState extends State<NgmyElectronicsLab> {
         child: GestureDetector(
           onTap: onTap,
           child: Container(
-            height: 32,
-            decoration: BoxDecoration(color: col.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(11), border: Border.all(color: col.withValues(alpha: 0.5))),
+            height: 28,
+            decoration: BoxDecoration(color: col.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10), border: Border.all(color: col.withValues(alpha: 0.4))),
             child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Icon(icon, color: col, size: 16),
+              Icon(icon, color: col, size: 15),
               const SizedBox(width: 5),
-              Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: col, fontWeight: FontWeight.w800, fontSize: 12.5))),
+              Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: col, fontWeight: FontWeight.w800, fontSize: 12))),
             ]),
           ),
         ),
@@ -642,21 +720,97 @@ class _NgmyElectronicsLabState extends State<NgmyElectronicsLab> {
     await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => NgmyInventorStudio(board: _board)));
     _editor.currentState?.hook();
     if (mounted) setState(() {});
+    _saveNow();
+  }
+
+  /// A small round notification on the challenges button: how many are left, or a tick when one has just been done.
+  Widget? _challengeBadge() {
+    if (_ch >= _kChallenges.length) return null;
+    final done = _done.contains(_ch);
+    return Container(
+      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(color: done ? const Color(0xFF22C55E) : const Color(0xFFEF4444), borderRadius: BorderRadius.circular(9), border: Border.all(color: kStudioPanel, width: 1.5)),
+      child: Center(child: Text(done ? '✓' : '${_kChallenges.length - _done.length}', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900))),
+    );
+  }
+
+  Future<void> _showChallenges() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF17171C),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      builder: (ctx) => StatefulBuilder(builder: (ctx, set) {
+        final c = _ch < _kChallenges.length ? _kChallenges[_ch] : null;
+        final done = c != null && _done.contains(_ch);
+        final tone = done ? const Color(0xFF4ADE80) : const Color(0xFF38BDF8);
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.75),
+            child: ListView(shrinkWrap: true, padding: const EdgeInsets.fromLTRB(16, 14, 16, 16), children: [
+              Row(children: [
+                const Text('🎯 Challenges', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+                const Spacer(),
+                Text('${_done.length} of ${_kChallenges.length} done', style: TextStyle(color: tone, fontWeight: FontWeight.w800, fontSize: 12.5)),
+              ]),
+              const SizedBox(height: 8),
+              ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: _done.length / _kChallenges.length, minHeight: 5, backgroundColor: Colors.white12, valueColor: AlwaysStoppedAnimation(tone))),
+              const SizedBox(height: 12),
+              if (c == null)
+                const Text('🏆 All challenges done! Keep inventing.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800))
+              else
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: tone.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(14), border: Border.all(color: tone.withValues(alpha: 0.5))),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('${done ? '✅' : '🎯'} Now: ${c.title}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14.5)),
+                    const SizedBox(height: 4),
+                    Text(done ? 'Well done! You did it.' : c.hint, style: const TextStyle(color: Colors.white70, fontSize: 12.5, height: 1.35)),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () {
+                          setState(() => _ch = math.min(_kChallenges.length, _ch + 1));
+                          set(() {});
+                          _saveNow();
+                        },
+                        child: Text(done ? 'Next challenge ▶' : 'Skip this one', style: TextStyle(color: tone, fontWeight: FontWeight.w800)),
+                      ),
+                    ),
+                  ]),
+                ),
+              const SizedBox(height: 10),
+              for (var i = 0; i < _kChallenges.length; i++)
+                GestureDetector(
+                  onTap: () {
+                    setState(() => _ch = i);
+                    set(() {});
+                    _saveNow();
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                    decoration: BoxDecoration(color: i == _ch ? Colors.white.withValues(alpha: 0.09) : Colors.white.withValues(alpha: 0.04), borderRadius: BorderRadius.circular(12), border: Border.all(color: i == _ch ? tone.withValues(alpha: 0.6) : Colors.white10)),
+                    child: Row(children: [
+                      Text(_done.contains(i) ? '✅' : (i == _ch ? '🎯' : '⬜'), style: const TextStyle(fontSize: 14)),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(_kChallenges[i].title, style: TextStyle(color: _done.contains(i) ? Colors.white54 : Colors.white, fontWeight: FontWeight.w800, fontSize: 13))),
+                    ]),
+                  ),
+                ),
+            ]),
+          ),
+        );
+      }),
+    );
   }
 
   Widget _topBar(BuildContext context, String help) {
     const accent = Color(0xFF38BDF8);
-    final c = _ch < _kChallenges.length ? _kChallenges[_ch] : null;
-    final done = c != null && _done.contains(_ch);
-    final tone = done ? const Color(0xFF4ADE80) : accent;
     return Container(
-      padding: const EdgeInsets.fromLTRB(8, 8, 10, 10),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF0C4A6E), Color(0xFF111827), Color(0xFF1E1B4B)]),
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(22)),
-        border: Border(bottom: BorderSide(color: accent.withValues(alpha: 0.45), width: 1.4)),
-        boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.18), blurRadius: 14, offset: const Offset(0, 4))],
-      ),
+      padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+      decoration: BoxDecoration(color: kStudioPanel, border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08)))),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         Row(children: [
           GestureDetector(
@@ -664,88 +818,50 @@ class _NgmyElectronicsLabState extends State<NgmyElectronicsLab> {
             child: Container(
               width: 34,
               height: 34,
-              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), shape: BoxShape.circle),
+              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.07), shape: BoxShape.circle),
               child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 17),
             ),
           ),
           const SizedBox(width: 8),
           Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF38BDF8), Color(0xFF6366F1)]), borderRadius: BorderRadius.circular(13), boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.5), blurRadius: 10)]),
-            child: const Center(child: Text('⚡', style: TextStyle(fontSize: 21))),
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(11), border: Border.all(color: accent.withValues(alpha: 0.45))),
+            child: const Center(child: Text('⚡', style: TextStyle(fontSize: 19))),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Text('Electronics Lab', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 0.2)),
               Text(
-                _board.parts.isEmpty ? 'Pick a part to start' : '${_board.parts.length} parts · $_working working${_broken > 0 ? ' · $_broken burnt' : ''}',
+                _board.parts.isEmpty ? 'Pick a part to start' : '${_board.parts.length} parts · $_working working${_broken > 0 ? ' · $_broken burnt' : ''}${_overloaded > 0 ? ' · ⚠ overloaded' : ''}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: _broken > 0 ? const Color(0xFFFCA5A5) : const Color(0xFF7DD3FC), fontSize: 11.5, fontWeight: FontWeight.w700),
+                style: TextStyle(color: (_broken > 0 || _overloaded > 0) ? const Color(0xFFFCA5A5) : const Color(0xFF7DD3FC), fontSize: 11.5, fontWeight: FontWeight.w700),
               ),
             ]),
           ),
-          GestureDetector(
-            onTap: _openAi,
-            child: Tooltip(
-              message: 'AI Inventor: say what you want to make',
-              child: Container(
-                height: 34,
-                margin: const EdgeInsets.only(left: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 11),
-                decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFFA78BFA), Color(0xFFEC4899)]), borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: const Color(0xFFEC4899).withValues(alpha: 0.45), blurRadius: 10)]),
-                child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 16),
-                  SizedBox(width: 4),
-                  Text('AI', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13.5)),
-                ]),
-              ),
-            ),
-          ),
+          _AiOrb(onTap: _openAi),
+          const SizedBox(width: 2),
+          _barButton(Icons.flag_rounded, 'Challenges', const Color(0xFFFBBF24), _showChallenges, badge: _challengeBadge()),
           _barButton(Icons.help_outline_rounded, 'How to play', accent, () => showStudioHelp(context, 'ELECTRONICS LAB', help, accent)),
         ]),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Row(children: [
           _barChip(Icons.menu_book_rounded, 'Circuits', const Color(0xFFA78BFA), _recipes),
           const SizedBox(width: 6),
           _barChip(Icons.build_rounded, 'Repair', const Color(0xFFFBBF24), () => setState(_board.repairAll)),
           const SizedBox(width: 6),
-          _barChip(Icons.delete_sweep_rounded, 'Clear', const Color(0xFFF87171), () => setState(_board.clear)),
+          _barChip(Icons.delete_sweep_rounded, 'Clear', const Color(0xFFF87171), () {
+            setState(_board.clear);
+            _saveNow();
+          }),
         ]),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
-          decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.28), borderRadius: BorderRadius.circular(14), border: Border.all(color: tone.withValues(alpha: 0.45))),
-          child: c == null
-              ? const Text('🏆 All challenges done! Keep inventing.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800))
-              : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(children: [
-                    Expanded(child: Text('${done ? '✅' : '🎯'} ${c.title}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13.5))),
-                    Text('${_ch + 1}/${_kChallenges.length}', style: TextStyle(color: tone, fontWeight: FontWeight.w900, fontSize: 12)),
-                    SizedBox(
-                      height: 28,
-                      child: TextButton(
-                        style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10), minimumSize: Size.zero),
-                        onPressed: () => setState(() => _ch = math.min(_kChallenges.length, _ch + 1)),
-                        child: Text(done ? 'Next ▶' : 'Skip', style: TextStyle(color: tone, fontWeight: FontWeight.w800)),
-                      ),
-                    ),
-                  ]),
-                  Text(done ? 'Well done!' : c.hint, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, fontSize: 11.5, height: 1.25)),
-                  const SizedBox(height: 6),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(value: _done.length / _kChallenges.length, minHeight: 4, backgroundColor: Colors.white12, valueColor: AlwaysStoppedAnimation(tone)),
-                  ),
-                ]),
-        ),
       ]),
     );
   }
 
-  static const String _help = 'Build real circuits.\n\n1. Tap a part in the tool rows at the top to put it on the board. Drag it around.\n2. Drag from a round dot on one part to a round dot on another to join them with a wire. A circuit only works when it makes a complete loop from the battery, through the parts, and back.\n3. Tap a part to read what it does and how it is made, and to change it (battery volts, sunlight, resistor size). Tap a switch to flip it, and a crank to spin it.\n\nThe maths is real: bulbs get brighter with more volts and burn out with too many, LEDs need a resistor, and moving dots on the wires show current flowing.\n\nThe AI button at the top is the AI Inventor: say what you want to make and watch it being built on your board.\n\nLots of tools: two rows above the board (swipe sideways to see them all). A phone burns out above 7 volts, so use a step-down converter (it brings big battery volts down) to run a phone and a TV from one battery. A diode lets electricity go one way only. Appliances, toys and machines each need the right volts. A TV needs 6+ volts and shows 10 NGMY channels, a remote and apps: tap it 3 times quickly for the big screen. A phone plays NGMY ads and has apps too. A 1.5 V battery starts flat and must be charged with a solar panel first. If something does not work, tap it: it tells you why (backwards, burnt, flat battery, loop not finished...).\n\nTry the challenges at the top bar, or open Ready-made circuits to see how a flashlight, radio, TV or solar lamp is wired.';
+  static const String _help = 'Build real circuits.\n\n1. Tap a part in the tool rows at the top to put it on the board. Drag it around.\n2. Drag from a round dot on one part to a round dot on another to join them with a wire. A circuit only works when it makes a complete loop from the battery, through the parts, and back.\n3. Tap a part to read what it does and how it is made, and to change it (battery volts, sunlight, resistor size). Tap a switch to flip it, and a crank to spin it.\n\nThe maths is real: bulbs get brighter with more volts and burn out with too many, LEDs need a resistor, and moving dots on the wires show current flowing.\n\nEvery battery and solar panel can only give so many amps. Connect too many gadgets and a warning sign appears on it: the volts sag and gadgets switch off. Take some gadgets off, or use a bigger battery.\n\nYour board is saved by itself, so it is still there when you come back.\n\nThe AI button at the top is the AI Inventor: say what you want to make and watch it being built on your board. The flag button shows your challenges, with a number on it for how many are left.\n\nLots of tools: two rows above the board (swipe sideways to see them all). A phone burns out above 7 volts, so use a step-down converter (it brings big battery volts down) to run a phone and a TV from one battery. A diode lets electricity go one way only. Appliances, toys and machines each need the right volts. A TV needs 6+ volts and shows 10 NGMY channels, a remote and apps: tap it 3 times quickly for the big screen. A phone plays NGMY ads and has apps too. A 1.5 V battery starts flat and must be charged with a solar panel first. If something does not work, tap it: it tells you why (backwards, burnt, flat battery, overloaded, loop not finished...).\n\nOpen Ready-made circuits to see how a flashlight, radio, TV or solar lamp is wired.';
 
   @override
   Widget build(BuildContext context) {
@@ -760,4 +876,75 @@ class _NgmyElectronicsLabState extends State<NgmyElectronicsLab> {
       ),
     );
   }
+}
+
+/// The AI button: a dark glowing orb with a slowly turning ring and a twinkling spark.
+class _AiOrb extends StatefulWidget {
+  const _AiOrb({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  State<_AiOrb> createState() => _AiOrbState();
+}
+
+class _AiOrbState extends State<_AiOrb> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(seconds: 4))..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: Tooltip(
+        message: 'AI Inventor: say what you want to make',
+        child: SizedBox(
+          width: 42,
+          height: 42,
+          child: AnimatedBuilder(animation: _c, builder: (_, __) => CustomPaint(painter: _AiOrbPainter(_c.value))),
+        ),
+      ),
+    );
+  }
+}
+
+class _AiOrbPainter extends CustomPainter {
+  _AiOrbPainter(this.t);
+  final double t;
+
+  @override
+  void paint(Canvas c, Size s) {
+    final ctr = s.center(Offset.zero);
+    final r = s.width * 0.41;
+    final pulse = (math.sin(t * math.pi * 2) + 1) / 2;
+    c.drawCircle(ctr, r + 2 + pulse * 2, Paint()..color = const Color(0xFF8B5CF6).withValues(alpha: 0.25 + 0.15 * pulse)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5));
+    c.drawCircle(ctr, r, Paint()..shader = const RadialGradient(center: Alignment(-0.3, -0.4), colors: [Color(0xFF312E81), Color(0xFF0F0B1F)]).createShader(Rect.fromCircle(center: ctr, radius: r)));
+    final ring = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2
+      ..shader = SweepGradient(transform: GradientRotation(t * math.pi * 2), colors: const [Color(0xFFA78BFA), Color(0xFFEC4899), Color(0xFF22D3EE), Color(0xFFA78BFA)]).createShader(Rect.fromCircle(center: ctr, radius: r));
+    c.drawCircle(ctr, r, ring);
+    void star(Offset o, double sz, double alpha) {
+      final p = Path()
+        ..moveTo(o.dx, o.dy - sz)
+        ..quadraticBezierTo(o.dx, o.dy, o.dx + sz, o.dy)
+        ..quadraticBezierTo(o.dx, o.dy, o.dx, o.dy + sz)
+        ..quadraticBezierTo(o.dx, o.dy, o.dx - sz, o.dy)
+        ..quadraticBezierTo(o.dx, o.dy, o.dx, o.dy - sz)
+        ..close();
+      c.drawPath(p, Paint()..color = Colors.white.withValues(alpha: alpha));
+    }
+    star(ctr + const Offset(0, -4), 8 + pulse * 1.5, 1);
+    star(ctr + const Offset(8, -10), 3.2, 0.5 + 0.5 * math.sin(t * math.pi * 4));
+    star(ctr + const Offset(-9, 1), 2.6, 0.5 + 0.5 * math.cos(t * math.pi * 4));
+    final tp = TextPainter(text: const TextSpan(text: 'AI', style: TextStyle(color: Color(0xFFE9D5FF), fontSize: 9.5, fontWeight: FontWeight.w900, letterSpacing: 0.5)), textDirection: TextDirection.ltr)..layout();
+    tp.paint(c, ctr + Offset(-tp.width / 2, 5));
+  }
+
+  @override
+  bool shouldRepaint(covariant _AiOrbPainter old) => old.t != t;
 }

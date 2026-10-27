@@ -566,7 +566,8 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
                   decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFF1F2937), width: 6), boxShadow: [BoxShadow(color: const Color(0xFF38BDF8).withValues(alpha: 0.25), blurRadius: 40)]),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(4),
-                    child: AnimatedBuilder(
+                    child: Stack(fit: StackFit.expand, children: [
+                      AnimatedBuilder(
                       animation: _clock,
                       builder: (_, __) {
                         final ms = (_clock.lastElapsedDuration?.inMilliseconds ?? 0).toDouble();
@@ -576,6 +577,8 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
                         return CustomPaint(painter: _TvPainter(_ch, t, age, _app), size: Size.infinite);
                       },
                     ),
+                      if (_menu) _appsMenu(),
+                    ]),
                   ),
                 ),
               ),
@@ -609,7 +612,6 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
                 ]),
               ),
             ),
-            if (_menu) Positioned.fill(child: _appsMenu()),
           ]),
         ),
       ),
@@ -648,34 +650,30 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
     );
   }
 
+  /// The apps screen is drawn inside the TV, not over it.
   Widget _appsMenu() => GestureDetector(
         onTap: () => setState(() => _menu = false),
         child: Container(
-          color: Colors.black.withValues(alpha: 0.82),
-          padding: const EdgeInsets.fromLTRB(16, 120, 16, 16),
+          color: Colors.black.withValues(alpha: 0.9),
+          padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
           child: Column(children: [
-            const Text('NGMY Apps', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 1)),
-            const SizedBox(height: 12),
+            const Text('NGMY Apps', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 1)),
+            const SizedBox(height: 4),
             Expanded(
-              child: GridView.count(
-                crossAxisCount: 4,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 10,
-                childAspectRatio: 0.9,
-                children: [
-                  for (var k = 0; k < kNgmyApps.length; k++)
-                    GestureDetector(
-                      onTap: () => _openApp(k),
-                      child: Container(
-                        decoration: BoxDecoration(color: kNgmyApps[k].color.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(16), border: Border.all(color: kNgmyApps[k].color.withValues(alpha: 0.6))),
-                        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                          Text(kNgmyApps[k].emoji, style: const TextStyle(fontSize: 28)),
-                          const SizedBox(height: 4),
-                          Text(kNgmyApps[k].name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)),
-                        ]),
-                      ),
-                    ),
-                ],
+              child: GridView.builder(
+                padding: EdgeInsets.zero,
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 78, mainAxisExtent: 56, mainAxisSpacing: 6, crossAxisSpacing: 6),
+                itemCount: kNgmyApps.length,
+                itemBuilder: (_, k) => GestureDetector(
+                  onTap: () => _openApp(k),
+                  child: Container(
+                    decoration: BoxDecoration(color: kNgmyApps[k].color.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(12), border: Border.all(color: kNgmyApps[k].color.withValues(alpha: 0.6))),
+                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Text(kNgmyApps[k].emoji, style: const TextStyle(fontSize: 20)),
+                      Text(kNgmyApps[k].name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w800)),
+                    ]),
+                  ),
+                ),
               ),
             ),
           ]),

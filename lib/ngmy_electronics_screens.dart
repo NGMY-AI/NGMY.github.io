@@ -117,6 +117,12 @@ const List<NgmyApp> kNgmyApps = [
   NgmyApp('Arcade', '🕹️', Color(0xFFF87171), 'Pong plays itself'),
   NgmyApp('News', '📰', Color(0xFFE2E8F0), 'NGMY News today'),
   NgmyApp('School', '🎓', Color(0xFF4ADE80), 'Learn electricity'),
+  NgmyApp('Calculator', '🧮', Color(0xFFFB923C), 'Sums that type themselves'),
+  NgmyApp('Calendar', '📅', Color(0xFFEF4444), 'This month, today lit up'),
+  NgmyApp('Map', '🗺️', Color(0xFF3B82F6), 'NGMY Map'),
+  NgmyApp('Camera', '📷', Color(0xFF94A3B8), 'Point, focus, click'),
+  NgmyApp('Snake', '🐍', Color(0xFF22C55E), 'A snake eats apples'),
+  NgmyApp('Stopwatch', '⏱️', Color(0xFF22D3EE), 'Time and laps'),
 ];
 
 void paintNgmyApp(Canvas c, Size s, int app, double t) {
@@ -137,8 +143,20 @@ void paintNgmyApp(Canvas c, Size s, int app, double t) {
       _arcade(c, s, t);
     case 6:
       _news(c, s, t);
-    default:
+    case 7:
       _school(c, s, t);
+    case 8:
+      _calcApp(c, s, t);
+    case 9:
+      _calendarApp(c, s, t);
+    case 10:
+      _mapApp(c, s, t);
+    case 11:
+      _cameraApp(c, s, t);
+    case 12:
+      _snakeApp(c, s, t);
+    default:
+      _stopwatchApp(c, s, t);
   }
   c.restore();
 }
@@ -409,6 +427,153 @@ void _school(Canvas c, Size s, double t) {
   _label(c, '🔋', Offset(w * 0.2, h * 0.66), h * 0.07, Colors.white.withValues(alpha: a));
   _label(c, '💡', Offset(w * 0.8, h * 0.66), h * 0.07, Colors.white.withValues(alpha: a));
   _label(c, card.formula, Offset(w / 2, h * 0.87), h * 0.085, const Color(0xFF86EFAC).withValues(alpha: a), maxW: w * 0.86);
+}
+
+void _calcApp(Canvas c, Size s, double t) {
+  final w = s.width, h = s.height;
+  c.drawRect(Offset.zero & s, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF111827), Color(0xFF020617)]).createShader(Offset.zero & s));
+  const sums = ['12 × 8 = 96', '250 + 175 = 425', '9 × 9 = 81', '1000 − 365 = 635', '144 ÷ 12 = 12', '3.14 × 2 = 6.28'];
+  final i = (t / 4).floor() % sums.length;
+  final typed = ((t % 4) * 6).floor().clamp(0, sums[i].length);
+  final bw = math.min(w * 0.7, h * 0.95), bh = h * 0.92;
+  final body = Rect.fromCenter(center: Offset(w / 2, h / 2), width: bw, height: bh);
+  c.drawRRect(RRect.fromRectAndRadius(body, Radius.circular(bh * 0.06)), _fill(const Color(0xFF1F2937)));
+  final scr = Rect.fromLTWH(body.left + bw * 0.06, body.top + bh * 0.05, bw * 0.88, bh * 0.22);
+  c.drawRRect(RRect.fromRectAndRadius(scr, Radius.circular(bh * 0.02)), _fill(const Color(0xFFBEF264)));
+  _label(c, sums[i].substring(0, typed), scr.center, bh * 0.1, const Color(0xFF1A2E05), maxW: scr.width * 0.94);
+  const keys = ['7', '8', '9', '÷', '4', '5', '6', '×', '1', '2', '3', '−', '0', '.', '=', '+'];
+  final pressed = (t * 3).floor() % 16;
+  for (var k = 0; k < 16; k++) {
+    final r = k ~/ 4, q = k % 4;
+    final kw = bw * 0.2, kh = bh * 0.12;
+    final rect = Rect.fromLTWH(body.left + bw * 0.06 + q * (bw * 0.235), body.top + bh * 0.33 + r * (bh * 0.165), kw, kh);
+    final op = q == 3;
+    c.drawRRect(RRect.fromRectAndRadius(rect, Radius.circular(kh * 0.25)), _fill(k == pressed ? Colors.white : (op ? const Color(0xFFF97316) : const Color(0xFF374151))));
+    _label(c, keys[k], rect.center, kh * 0.55, k == pressed ? Colors.black : Colors.white, maxW: kw * 0.8);
+  }
+}
+
+void _calendarApp(Canvas c, Size s, double t) {
+  final w = s.width, h = s.height;
+  final now = DateTime.now();
+  c.drawRect(Offset.zero & s, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF0F172A), Color(0xFF1E293B)]).createShader(Offset.zero & s));
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  c.drawRect(Rect.fromLTWH(0, 0, w, h * 0.15), _fill(const Color(0xFFDC2626)));
+  _label(c, '${months[now.month - 1]} ${now.year}', Offset(w / 2, h * 0.075), h * 0.08, Colors.white, maxW: w * 0.9);
+  const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  final cw = w / 7;
+  for (var k = 0; k < 7; k++) {
+    _label(c, days[k], Offset(cw * (k + 0.5), h * 0.21), h * 0.05, Colors.white54);
+  }
+  final first = DateTime(now.year, now.month, 1);
+  final count = DateTime(now.year, now.month + 1, 0).day;
+  final offset = first.weekday - 1;
+  final rows = ((offset + count) / 7).ceil();
+  final ch = (h * 0.74) / rows;
+  for (var d = 1; d <= count; d++) {
+    final idx = offset + d - 1;
+    final ctr = Offset(cw * (idx % 7 + 0.5), h * 0.26 + ch * (idx ~/ 7 + 0.5));
+    if (d == now.day) {
+      c.drawCircle(ctr, math.min(cw, ch) * 0.42, _fill(const Color(0xFF38BDF8).withValues(alpha: 0.5 + 0.2 * math.sin(t * 3))));
+    }
+    _label(c, '$d', ctr, math.min(cw, ch) * 0.42, d == now.day ? Colors.white : Colors.white70);
+  }
+}
+
+void _mapApp(Canvas c, Size s, double t) {
+  final w = s.width, h = s.height;
+  c.drawRect(Offset.zero & s, _fill(const Color(0xFFE5E7EB)));
+  final r = math.Random(11);
+  for (var i = 0; i < 18; i++) {
+    c.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(r.nextDouble() * w, r.nextDouble() * h, w * (0.08 + r.nextDouble() * 0.1), h * (0.1 + r.nextDouble() * 0.15)), const Radius.circular(3)), _fill(i % 4 == 0 ? const Color(0xFFBBF7D0) : const Color(0xFFD1D5DB)));
+  }
+  final river = Path()..moveTo(0, h * 0.7);
+  for (var x = 0.0; x <= w; x += 8) {
+    river.lineTo(x, h * 0.7 + math.sin(x / (w * 0.12)) * h * 0.06);
+  }
+  c.drawPath(river, _stroke(const Color(0xFF7DD3FC), h * 0.06));
+  final roads = Path()..moveTo(0, h * 0.25)..lineTo(w * 0.4, h * 0.25)..lineTo(w * 0.4, h * 0.6)..lineTo(w * 0.8, h * 0.6)..lineTo(w * 0.8, h);
+  c.drawPath(roads, _stroke(Colors.white, h * 0.045));
+  c.drawPath(roads, _stroke(const Color(0xFFFBBF24), h * 0.012));
+  final m = roads.computeMetrics().first;
+  final pos = m.getTangentForOffset((t * m.length / 14) % m.length)!.position;
+  c.drawCircle(pos, h * 0.06 + math.sin(t * 5).abs() * h * 0.03, _fill(const Color(0xFF3B82F6).withValues(alpha: 0.3)));
+  c.drawCircle(pos, h * 0.028, _fill(const Color(0xFF2563EB)));
+  c.drawCircle(pos, h * 0.028, _stroke(Colors.white, 2));
+  c.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.05, h * 0.05, w * 0.55, h * 0.11), Radius.circular(h * 0.03)), _fill(Colors.black.withValues(alpha: 0.7)));
+  _label(c, '📍 NGMY Map: you are here', Offset(w * 0.325, h * 0.105), h * 0.05, Colors.white, maxW: w * 0.52);
+}
+
+void _cameraApp(Canvas c, Size s, double t) {
+  final w = s.width, h = s.height;
+  c.drawRect(Offset.zero & s, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF7DD3FC), Color(0xFFFDE68A), Color(0xFF65A30D)]).createShader(Offset.zero & s));
+  final bx = w * (0.5 + 0.28 * math.sin(t * 0.8));
+  final by = h * 0.58 + math.sin(t * 3).abs() * -h * 0.06;
+  c.drawCircle(Offset(bx, by), h * 0.14, _fill(const Color(0xFFFDE047)));
+  c.drawCircle(Offset(bx - h * 0.045, by - h * 0.02), h * 0.015, _fill(Colors.black87));
+  c.drawCircle(Offset(bx + h * 0.045, by - h * 0.02), h * 0.015, _fill(Colors.black87));
+  c.drawArc(Rect.fromCenter(center: Offset(bx, by + h * 0.02), width: h * 0.1, height: h * 0.08), 0.2, math.pi - 0.4, false, _stroke(Colors.black87, 2));
+  final fp = Rect.fromCenter(center: Offset(bx, by), width: h * 0.34, height: h * 0.34);
+  final ff = (math.sin(t * 6) + 1) / 2;
+  for (final corner in [fp.topLeft, fp.topRight, fp.bottomLeft, fp.bottomRight]) {
+    final sx = corner.dx < fp.center.dx ? 1.0 : -1.0, sy = corner.dy < fp.center.dy ? 1.0 : -1.0;
+    c.drawLine(corner, corner + Offset(sx * h * 0.05, 0), _stroke(Color.lerp(Colors.white, const Color(0xFFFACC15), ff)!, 3));
+    c.drawLine(corner, corner + Offset(0, sy * h * 0.05), _stroke(Color.lerp(Colors.white, const Color(0xFFFACC15), ff)!, 3));
+  }
+  for (final f in const [1 / 3, 2 / 3]) {
+    c.drawLine(Offset(w * f, 0), Offset(w * f, h), _stroke(Colors.white24, 1));
+    c.drawLine(Offset(0, h * f), Offset(w, h * f), _stroke(Colors.white24, 1));
+  }
+  c.drawCircle(Offset(w * 0.06, h * 0.07), h * 0.02, _fill((t * 1.5).floor().isEven ? const Color(0xFFEF4444) : const Color(0xFF7F1D1D)));
+  _label(c, 'REC', Offset(w * 0.13, h * 0.07), h * 0.045, Colors.white);
+  final shot = t % 6;
+  if (shot < 0.25) c.drawRect(Offset.zero & s, _fill(Colors.white.withValues(alpha: 1 - shot / 0.25)));
+  if (shot > 0.25 && shot < 2) _label(c, '📸 Photo saved', Offset(w / 2, h * 0.9), h * 0.06, Colors.white, maxW: w * 0.8);
+}
+
+void _snakeApp(Canvas c, Size s, double t) {
+  final w = s.width, h = s.height;
+  c.drawRect(Offset.zero & s, _fill(const Color(0xFF052E16)));
+  const cols = 20, rows = 11;
+  final cw = w / cols, ch = h / rows;
+  for (var x = 0; x < cols; x++) {
+    for (var y = 0; y < rows; y++) {
+      if ((x + y).isEven) c.drawRect(Rect.fromLTWH(x * cw, y * ch, cw, ch), _fill(const Color(0xFF064E3B).withValues(alpha: 0.5)));
+    }
+  }
+  Offset at(double u) => Offset(cols / 2 + (cols / 2 - 1.5) * math.sin(u * 0.55), rows / 2 + (rows / 2 - 1.5) * math.sin(u * 0.9 + 1.0));
+  final head = t * 4;
+  for (var k = 11; k >= 0; k--) {
+    final p = at(head - k * 0.42);
+    final rect = Rect.fromCenter(center: Offset(p.dx * cw, p.dy * ch), width: cw * 0.9, height: ch * 0.9);
+    c.drawRRect(RRect.fromRectAndRadius(rect, Radius.circular(cw * 0.3)), _fill(k == 0 ? const Color(0xFF86EFAC) : Color.lerp(const Color(0xFF22C55E), const Color(0xFF15803D), k / 11)!));
+  }
+  final hp = at(head);
+  c.drawCircle(Offset(hp.dx * cw - cw * 0.15, hp.dy * ch - ch * 0.15), cw * 0.09, _fill(Colors.black));
+  final food = at(head + 2.2);
+  c.drawCircle(Offset(food.dx * cw, food.dy * ch), cw * 0.35 + math.sin(t * 8).abs() * cw * 0.08, _fill(const Color(0xFFEF4444)));
+  _label(c, 'Score ${(t / 1.5).floor() * 10}', Offset(w * 0.15, h * 0.06), h * 0.06, Colors.white, maxW: w * 0.25);
+}
+
+void _stopwatchApp(Canvas c, Size s, double t) {
+  final w = s.width, h = s.height;
+  c.drawRect(Offset.zero & s, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF111827), Color(0xFF020617)]).createShader(Offset.zero & s));
+  final run = t % 60;
+  final centre = Offset(w * (w >= h ? 0.3 : 0.5), h * (w >= h ? 0.5 : 0.36));
+  final rad = math.min(w >= h ? w * 0.22 : w * 0.34, h * (w >= h ? 0.38 : 0.26));
+  c.drawCircle(centre, rad, _stroke(Colors.white12, rad * 0.12));
+  c.drawArc(Rect.fromCircle(center: centre, radius: rad), -math.pi / 2, run / 60 * math.pi * 2, false, _stroke(const Color(0xFF22D3EE), rad * 0.12));
+  final mm = (run ~/ 60).toString().padLeft(2, '0'), ss = run.floor().toString().padLeft(2, '0'), cs = ((run % 1) * 100).floor().toString().padLeft(2, '0');
+  _label(c, '$mm:$ss', centre, rad * 0.5, Colors.white, maxW: rad * 1.5);
+  _label(c, '.$cs', centre + Offset(0, rad * 0.45), rad * 0.3, const Color(0xFF22D3EE), maxW: rad);
+  final lx = w >= h ? w * 0.68 : w * 0.5;
+  final ly = w >= h ? h * 0.22 : h * 0.7;
+  _label(c, 'Laps', Offset(lx, ly), h * 0.06, Colors.white54);
+  for (var k = 1; k <= 4; k++) {
+    final lap = (run - (run % 10)) / 10 - (k - 1);
+    if (lap < 0) continue;
+    _label(c, 'Lap ${lap.floor() + 1}   0:${(10 + (lap * 3.7) % 4).toStringAsFixed(2)}', Offset(lx, ly + k * h * 0.09), h * 0.05, Colors.white70, maxW: w * 0.45, bold: false);
+  }
 }
 
 // ─── The big phone ───────────────────────────────────────────────────────────

@@ -88,6 +88,8 @@ class Part {
   int channel = 0; // the TV channel
   double onAge = 0; // seconds a gadget has been switched on
   String burnWhy = ''; // why it burnt out
+  double sag = 0; // an overloaded power source: how much its volts collapse
+  double demand = 0; // amps the circuit is asking a power source for
   double drop = 0; // a voltage reducer: how many volts it takes off right now
   double vin = 0; // a voltage reducer: volts arriving
   double vout = 0; // a voltage reducer: volts leaving
@@ -132,6 +134,7 @@ class ElectronicsBoard {
   final List<Spark> sparks = [];
   final math.Random _rnd = math.Random();
   double _shortSignal = 0;
+  double _overSignal = 0;
 
   /// Throws [n] sparks from near the part, a terminal side (-1 left, 1 right) or both (0).
   void emitSparks(Part p, int n, {int side = 0, double speed = 220}) {
@@ -198,7 +201,30 @@ class ElectronicsBoard {
     return 0;
   }
 
-  double _sourceR(Part p) {
+  /// The most current a power source can really give. Ask for more and its volts sag.
+  double sourceMaxAmps(Part p) {
+    switch (p.kind) {
+      case 'battery':
+        if (p.volts <= 1.5) return 0.5;
+        if (p.volts <= 3) return 0.8;
+        if (p.volts <= 4.5) return 1.0;
+        if (p.volts <= 9) return 1.2;
+        return 1.5;
+      case 'solar':
+        return 0.1 + 0.9 * p.level;
+      case 'crank':
+        return 0.6;
+      case 'turbine':
+        return 0.1 + 0.5 * p.level;
+    }
+    return 1.0;
+  }
+
+  bool overloaded(Part p) => isSource(p) && !p.burnt && p.demand > sourceMaxAmps(p) * 1.0;
+
+  double _sourceR(Part p) => _sourceR0(p) * (1 + p.sag);
+
+  double _sourceR0(Part p) {
     switch (p.kind) {
       case 'battery':
         return 0.4 + p.volts * 0.05;
@@ -248,6 +274,7 @@ class ElectronicsBoard {
     time += dt;
     _moveSparks(dt);
     _shortSignal = math.max(0, _shortSignal - dt);
+    _overSignal = math.max(0, _overSignal - dt);
     final h = math.min(dt * 6, 0.12); // the circuit runs a little faster than real life
     // A fresh voltage reducer starts already regulating, so the gadget after it never sees the full battery volts.
     for (final p in parts) {
@@ -301,8 +328,25 @@ class ElectronicsBoard {
     }
 
     // Each part is a conductance with an optional current push (a "Norton" model).
+    // First ask: what would the circuit take from healthy power sources?
+    for (final p in parts) {
+      p.sag = 0;
+    }
     final bool ledSettled = _solve(n, ground, h, true);
     if (!ledSettled) _solve(n, ground, h, false);
+    // A battery or solar panel can only give so many amps. Ask for more and its volts sag, like in real life.
+    var over = false;
+    for (final p in parts) {
+      if (!isSource(p) || p.burnt) {
+        p.demand = 0;
+        continue;
+      }
+      p.demand = math.max(0.0, -p.i);
+      final k = p.demand / sourceMaxAmps(p);
+      p.sag = k > 1.0 ? math.min(4.0, (k - 1) * 1.5) : 0;
+      if (p.sag > 0) over = true;
+    }
+    if (over) _solve(n, ground, h, true);
     _effects(dt);
   }
 
@@ -462,8 +506,12 @@ class ElectronicsBoard {
       }
       if (isSource(p) && !p.burnt) {
         // A big current from a power source means its wires are joined without anything to use the power: a short circuit.
-        final isc = _sourceVolts(p) / _sourceR(p);
-        if (isc > 0.3 && p.i.abs() > 0.4 && p.i.abs() > isc * 0.55 && !_chargingPair(p)) {
+        final isc = _sourceVolts(p) / _sourceR0(p);
+        if (overloaded(p) && _overSignal <= 0 && p.demand < isc * 0.55) {
+          _overSignal = 8;
+          onEvent?.call('overload', p);
+        }
+        if (isc > 0.3 && p.demand > 0.4 && p.demand > isc * 0.55 && !_chargingPair(p)) {
           p.hot += dt * 0.9;
           emitSparks(p, 3, speed: 260);
           if (_shortSignal <= 0) {
@@ -621,6 +669,9 @@ class ElectronicsBoard {
       if (s.kind == 'turbine' && s.level < 0.05) return 'The wind turbine has no wind. Turn the wind up.';
       if (s.kind == 'crank' && s.level < 0.05) return 'The hand crank has stopped. Tap it again and again to spin it.';
     }
+    for (final s in sources) {
+      if (overloaded(s)) return 'The ${s.info.name} is overloaded. Everything connected to it asks for ${s.demand.toStringAsFixed(2)} amps, but it can only give about ${sourceMaxAmps(s).toStringAsFixed(2)} amps, so its volts sag and the $name does not get enough. Take some gadgets off, or use a bigger battery.';
+    }
     if (spec != null && p.v.abs() < spec.minV && p.i.abs() > 0.0005) {
       final others = parts.any((q) => q != p && needsPower(q) && (q.i.abs() > 0.0005));
       return 'The $name needs at least ${_fmtV(spec.minV)} volts but only gets ${p.v.abs().toStringAsFixed(1)} V. Use a bigger battery${others ? ', or take out parts that share the voltage with it' : ''}.';
@@ -680,6 +731,13 @@ class BoardPainter extends CustomPainter {
       canvas.scale(Curves.elasticOut.transform(pop.clamp(0.0, 1.0)).clamp(0.01, 1.4));
       _part(canvas, p, identical(p, selected));
       canvas.restore();
+      if (board.overloaded(p)) {
+        final bp = c + const Offset(0, -40);
+        final flash = 0.65 + 0.35 * math.sin(board.time * 10);
+        canvas.drawPath(Path()..moveTo(bp.dx, bp.dy - 13)..lineTo(bp.dx + 13, bp.dy + 10)..lineTo(bp.dx - 13, bp.dy + 10)..close(), Paint()..color = const Color(0xFFEF4444).withValues(alpha: flash));
+        canvas.drawPath(Path()..moveTo(bp.dx, bp.dy - 13)..lineTo(bp.dx + 13, bp.dy + 10)..lineTo(bp.dx - 13, bp.dy + 10)..close(), Paint()..style = PaintingStyle.stroke..strokeWidth = 1.6..color = Colors.white);
+        _text(canvas, '!', bp + const Offset(-3, -8), Colors.white, 14);
+      }
       if (board.needsAttention(p)) {
         final bp = c + const Offset(0, -40);
         canvas.drawCircle(bp, 10, Paint()..color = const Color(0xFFF59E0B));

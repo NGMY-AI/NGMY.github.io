@@ -2,8 +2,10 @@ import 'dart:ui' show PictureRecorder;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ngmy/ngmy_electronics_board.dart';
 import 'package:ngmy/ngmy_electronics_lab.dart';
+import 'package:ngmy/ngmy_electronics_save.dart';
 import 'package:ngmy/ngmy_electronics_extra_parts.dart';
 import 'package:ngmy/ngmy_electronics_more_parts.dart';
 import 'package:ngmy/ngmy_electronics_screens.dart';
@@ -275,5 +277,106 @@ void reducerTests() {
     for (var ch = 0; ch < kNgmyTvChannels.length; ch++) {
       paintNgmyTv(Canvas(PictureRecorder()), const Size(320, 180), ch, 7.0);
     }
+  });
+}
+
+void realityTests() {
+  test('a battery that is asked for too much current shows overloaded and its volts sag', () {
+    final b = ElectronicsBoard();
+    final bat = b.add('battery', 0.1, 0.3)..volts = 9;
+    final kettle = b.add('kettle', 0.4, 0.3);
+    final heater = b.add('heater', 0.7, 0.3);
+    final light = b.add('bulb', 0.7, 0.6);
+    for (final d in [kettle, heater, light]) {
+      b.connect(bat, 0, d, 0);
+      b.connect(d, 1, bat, 1);
+    }
+    for (var i = 0; i < 60; i++) {
+      b.step(1 / 30);
+    }
+    expect(bat.demand, greaterThan(b.sourceMaxAmps(bat)));
+    expect(b.overloaded(bat), isTrue);
+    expect(bat.v, lessThan(8.0));
+    final events = <String>[];
+    b.onEvent = (k, p) => events.add(k);
+    for (var i = 0; i < 30; i++) {
+      b.step(1 / 30);
+    }
+    expect(events, contains('overload'));
+    final why = b.diagnose(light);
+    expect(why, anyOf(isNull, contains('overloaded')));
+    // Taking the hungry gadgets off clears the warning.
+    b.remove(kettle);
+    b.remove(heater);
+    for (var i = 0; i < 30; i++) {
+      b.step(1 / 30);
+    }
+    expect(b.overloaded(bat), isFalse);
+    expect(bat.v, closeTo(9.0, 0.8));
+  });
+
+  test('one bulb is fine, and a solar panel has a smaller limit than a big battery', () {
+    final b = loop('bulb', volts: 3);
+    expect(b.overloaded(b.of('battery').first), isFalse);
+    final s = ElectronicsBoard();
+    final panel = s.add('solar', 0.2, 0.3)..level = 0.3;
+    final heater = s.add('heater', 0.7, 0.3);
+    s.connect(panel, 0, heater, 0);
+    s.connect(heater, 1, panel, 1);
+    for (var i = 0; i < 30; i++) {
+      s.step(1 / 30);
+    }
+    expect(s.sourceMaxAmps(panel), lessThan(0.5));
+    expect(s.sourceMaxAmps(s.add('battery', 0.5, 0.5)..volts = 12), greaterThan(1.0));
+  });
+
+  test('the lab board is saved and comes back exactly, wires and settings included', () {
+    final b = ElectronicsBoard();
+    final bat = b.add('battery', 0.2, 0.3)..volts = 9;
+    final tv = b.add('tv', 0.6, 0.3)..channel = 4;
+    final buck = b.add('buck', 0.4, 0.6)..volts = 6;
+    b.connect(bat, 0, tv, 0);
+    b.connect(tv, 1, bat, 1);
+    b.connect(bat, 0, buck, 0);
+    final raw = encodeLab(b, 3, {0, 1, 2});
+    final back = ElectronicsBoard();
+    final progress = restoreLab(back, raw);
+    expect(progress, isNotNull);
+    expect(progress!.challenge, 3);
+    expect(progress.done, {0, 1, 2});
+    expect(back.parts.map((p) => p.kind).toList(), ['battery', 'tv', 'buck']);
+    expect(back.parts[0].volts, 9);
+    expect(back.parts[1].channel, 4);
+    expect(back.parts[2].volts, 6);
+    expect(back.wires.length, 3);
+    expect(restoreLab(ElectronicsBoard(), 'not json'), isNull);
+  });
+
+  testWidgets('what you build in the lab is still there when you come back, and the challenges sit behind a flag', (t) async {
+    SharedPreferences.setMockInitialValues({});
+    t.view.physicalSize = const Size(860, 1700);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(const MaterialApp(home: NgmyElectronicsLab()));
+    await t.pump(const Duration(milliseconds: 400));
+    expect(find.byTooltip('Challenges'), findsOneWidget);
+    expect(find.byTooltip('AI Inventor: say what you want to make'), findsOneWidget);
+    await t.tap(find.text('Light bulb').first);
+    await t.pump(const Duration(milliseconds: 400));
+    expect(find.textContaining('1 parts'), findsOneWidget);
+    await t.tap(find.byTooltip('Challenges'));
+    await t.pump(const Duration(milliseconds: 500));
+    expect(find.textContaining('Challenges'), findsWidgets);
+    expect(find.textContaining('Light the bulb'), findsWidgets);
+    await t.tapAt(const Offset(10, 10));
+    await t.pump(const Duration(milliseconds: 500));
+    // Leave the lab, then open it again.
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(milliseconds: 300));
+    await t.pumpWidget(const MaterialApp(home: NgmyElectronicsLab()));
+    await t.pump(const Duration(milliseconds: 600));
+    expect(find.textContaining('1 parts'), findsOneWidget);
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(milliseconds: 300));
   });
 }
