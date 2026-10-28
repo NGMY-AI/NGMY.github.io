@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'ngmy_electrical_ui.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -147,12 +148,18 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
         if (mounted) setState(() => flash = false);
       });
     }
-    if (a.fx == 'burn' || a.fx == 'trip') {
-      for (final s in p.burnt) {
-        fxUntil[s] = now + 3.5;
+    if (a.fx == 'burn' || a.fx == 'trip' || a.fx == 'arc') {
+      for (final s in p.fxKind.keys) {
+        fxUntil[s] = now + (p.fxKind[s] == 'fire' ? 7.0 : 4.5);
       }
       HapticFeedback.heavyImpact();
-      conBeep(150, ms: 300, wave: 'noise', volume: 0.5);
+      conBeep(a.fx == 'arc' ? 95 : 150, ms: a.fx == 'arc' ? 500 : 300, wave: a.fx == 'arc' ? 'saw' : 'noise', volume: 0.5);
+      if (a.fx == 'burn') {
+        setState(() => flash = true);
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) setState(() => flash = false);
+        });
+      }
     }
     _rebuild();
     _say(a.msg, ok: a.ok && !a.danger);
@@ -335,7 +342,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
         _apply(a);
         if (a.ok) {
           final d = p.devs[slot]!;
-          d.w.labels = !p.practice;
+          d.w.labels = !p.practice && !p.test;
           armed = '';
           _open(slot);
         }
@@ -773,7 +780,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
   }
 
   void _roomHint(String key) {
-    if (p.practice) return;
+    if (p.practice || p.test) return;
     final text = switch (key) {
       'wall' || 'ceiling' || 'fanbox' => 'Tap one of the glowing spots to mount the box there.',
       'drill' => 'Tap a stud to drill a hole through it.',
@@ -832,6 +839,31 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
                   },
                 ),
               ]),
+              Row(children: [
+                const Expanded(child: Text('Test mode (an inspection: nothing is explained until you submit)', style: TextStyle(color: Colors.white70, fontSize: 12.5, fontWeight: FontWeight.w700))),
+                Switch(
+                  value: p.test,
+                  onChanged: (v) {
+                    p.test = v;
+                    for (final dv in p.devs.values) {
+                      dv.w.test = v;
+                      if (v) dv.w.labels = false;
+                    }
+                    set(() {});
+                    setState(_rebuild);
+                  },
+                ),
+              ]),
+              const SizedBox(height: 6),
+              Row(children: [
+                Expanded(child: OutlinedButton(onPressed: () => showWireGuide(context), child: const Text('Wire guide'))),
+                const SizedBox(width: 8),
+                Expanded(child: FilledButton(onPressed: () async {
+                  Navigator.pop(ctx);
+                  await showTestFlow(context, title: p.roomName, attempts: p.testAttempts(), questions: p.testQuestions());
+                }, child: const Text('Submit for inspection'))),
+              ]),
+              const SizedBox(height: 6),
               const SizedBox(height: 6),
               Row(children: [
                 Expanded(child: OutlinedButton(onPressed: () {

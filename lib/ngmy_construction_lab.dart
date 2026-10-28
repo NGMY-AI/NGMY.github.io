@@ -1,6 +1,10 @@
 import 'dart:async';
+import 'ngmy_electrical_fx.dart';
+import 'ngmy_electrical_safety.dart';
+import 'ngmy_electrical_ui.dart';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'ngmy_3d.dart';
 import 'ngmy_construction_electrical.dart';
@@ -447,6 +451,23 @@ class _ElectricalPageState extends State<ElectricalLessonPage> {
   bool good = false;
   int mistakes = 0;
   Timer? _msgTimer;
+  final Stopwatch _clock = Stopwatch()..start();
+  double _fxStart = 0;
+  double get _now => _clock.elapsedMilliseconds / 1000;
+
+  /// Learn: a wrong wire is refused and explained. Practice: it is allowed, and the power-on shows what it does. Test: it is allowed in silence and judged when you submit.
+  void _setMode(String m) {
+    setState(() {
+      s.practice = m == 'practice';
+      s.test = m == 'test';
+      if (s.test) {
+        s.hints = false;
+        s.labels = false;
+      }
+      _rebuild();
+    });
+    _say(switch (m) { 'practice' => 'Practice: you can put a wire anywhere. The mistake shows when the power goes on.', 'test' => 'Test: put every wire where you think it goes. Nothing is marked until you submit.', _ => 'Learn: a wrong wire is refused and explained.' }, ok: true);
+  }
 
   @override
   void dispose() {
@@ -524,13 +545,24 @@ class _ElectricalPageState extends State<ElectricalLessonPage> {
         mistakes++;
         conBad();
         _say(err);
+      } else if (s.test) {
+        conBeep(520, ms: 60);
+        setState(() {
+          _rebuild();
+          hl = id;
+        });
+        _say(TestSession.neutralNote, ok: true);
+        chip = '';
       } else {
         conGood();
         setState(() {
           _rebuild();
           hl = id;
         });
-        if (wiringComplete(lesson, s)) {
+        if (s.practice) {
+          // Practice allows a wrong wire, so it does not say it is right: it says where it went.
+          _say('${hook.first.name}: fastened.', ok: true);
+        } else if (wiringComplete(lesson, s)) {
           _say('Every wire is on the right screw. Now push the device into the box.', ok: true);
         } else {
           _say('${hook.first.name}: fastened correctly.', ok: true);
@@ -563,6 +595,24 @@ class _ElectricalPageState extends State<ElectricalLessonPage> {
   }
 
   void _test() {
+    final v = evaluateWiring(lesson, s);
+    if (!v.ok) {
+      // The wiring is not correct and safe: show what the power-on does. A device that works is still not a pass.
+      setState(() {
+        s.power = true;
+        s.testing = false;
+        if (v.burns) s.burnt = true;
+        s.fx = v.effect;
+        _fxStart = _now;
+        _rebuild();
+      });
+      mistakes++;
+      conBad();
+      HapticFeedback.heavyImpact();
+      conBeep(v.effect == 'arc' ? 95 : 150, ms: 450, wave: v.effect == 'arc' ? 'saw' : 'noise', volume: 0.5);
+      _say(s.test ? (v.trips ? 'The breaker tripped.' : 'Power is on.') : '${v.message}\nHow to fix it: ${v.fix}');
+      return;
+    }
     setState(() {
       s.power = true;
       s.testing = true;
@@ -596,6 +646,14 @@ class _ElectricalPageState extends State<ElectricalLessonPage> {
         highlight: hl,
         onPick: _pick,
         onHome: _home,
+        dynamicPolys: (_) {
+          final b = MeshBuilder();
+          final active = s.fx.isNotEmpty && _now - _fxStart < (s.fx == 'fire' ? 7 : 4.5);
+          if (active || (s.burnt && s.fx.isNotEmpty)) {
+            faultEffect(b, active ? s.fx : 'smolder', (l) => V3(l.x * 0.32, -0.2 + l.y * 0.32, 0.8 + l.z * 0.32), 0.32, _now);
+          }
+          return b.polys;
+        },
         message: msg,
         good: good,
         info: hl != 0 ? scene.info[hl] : null,
@@ -614,16 +672,26 @@ class _ElectricalPageState extends State<ElectricalLessonPage> {
           ),
         ],
         topRight: [
-          conPill('Hints', on: s.hints, icon: Icons.lightbulb_rounded, onTap: () => setState(() {
-                s.hints = !s.hints;
-                _rebuild();
-              })),
+          conPill('Learn', on: !s.practice && !s.test, icon: Icons.school_rounded, color: const Color(0xFF4ADE80), onTap: () => _setMode('learn')),
           const SizedBox(height: 6),
-          conPill('Labels', on: s.labels, icon: Icons.label_rounded, color: const Color(0xFF38BDF8), onTap: () => setState(() {
-                s.labels = !s.labels;
-                _rebuild();
-              })),
+          conPill('Practice', on: s.practice, icon: Icons.build_rounded, color: const Color(0xFFF87171), onTap: () => _setMode('practice')),
           const SizedBox(height: 6),
+          conPill('Test', on: s.test, icon: Icons.fact_check_rounded, color: const Color(0xFFA78BFA), onTap: () => _setMode('test')),
+          const SizedBox(height: 6),
+          if (!s.test) ...[
+            conPill('Hints', on: s.hints, icon: Icons.lightbulb_rounded, onTap: () => setState(() {
+                  s.hints = !s.hints;
+                  _rebuild();
+                })),
+            const SizedBox(height: 6),
+            conPill('Labels', on: s.labels, icon: Icons.label_rounded, color: const Color(0xFF38BDF8), onTap: () => setState(() {
+                  s.labels = !s.labels;
+                  _rebuild();
+                })),
+            const SizedBox(height: 6),
+            conPill('Wire guide', on: false, icon: Icons.menu_book_rounded, color: const Color(0xFFFDBA74), onTap: () => showWireGuide(context)),
+            const SizedBox(height: 6),
+          ],
           conPill('Brass side', on: false, icon: Icons.rotate_left_rounded, color: const Color(0xFFCDA033), onTap: () => cam.glideTo(target: V3(0.6, 0, s.stage == 0 ? 4.2 : 0.4), dist: 10, yaw: -0.95, pitch: 0.2)),
           const SizedBox(height: 6),
           conPill('Silver side', on: false, icon: Icons.rotate_right_rounded, color: const Color(0xFFCBD0D6), onTap: () => cam.glideTo(target: V3(-0.6, 0, s.stage == 0 ? 4.2 : 0.4), dist: 10, yaw: 0.95, pitch: 0.2)),
@@ -659,6 +727,10 @@ class _ElectricalPageState extends State<ElectricalLessonPage> {
                   ),
                 ),
             ]),
+          if (s.test) ...[
+            Row(children: [conBigButton('Submit the test', Icons.fact_check_rounded, () => showTestFlow(context, title: lesson.title, attempts: [TestAttempt(lesson.title, rulesOf(lesson), connectionsOf(lesson, s), supported: s.supported)], questions: kLessonQuestions[lesson.id] ?? const []), color: const Color(0xFFA78BFA))]),
+            const SizedBox(height: 8),
+          ],
           const SizedBox(height: 8),
           Row(children: [
             conBigButton(canPush ? 'Push it into the box' : (s.power ? 'Turn the breaker OFF first' : 'Fasten every wire first'), Icons.move_down_rounded, canPush
@@ -700,6 +772,8 @@ class _ElectricalPageState extends State<ElectricalLessonPage> {
                 s.attached.clear();
                 s.power = true;
                 s.testing = false;
+                s.burnt = false;
+                s.fx = '';
                 mistakes = 0;
                 chip = '';
                 hl = 0;

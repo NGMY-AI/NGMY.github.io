@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_electrical_safety.dart';
+
 import 'ngmy_3d.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -62,6 +64,16 @@ class WiringState {
 
   /// The device burnt out from a mistake.
   bool burnt = false;
+
+  /// The fixture or fan hangs on a box that can carry it (false for a plain light box under a fan).
+  bool supported = true;
+
+  /// Test mode: wrong wires are allowed silently, and nothing is explained until the test is submitted.
+  bool test = false;
+
+  /// The effect the last power-on showed (arc, spark, smoke, fire) and when it started, for the animation.
+  String fx = '';
+  double fxStart = 0;
 }
 
 class WireChoice {
@@ -241,83 +253,79 @@ String? tryFasten(ElectricalLesson lesson, WiringState s, String chip, Hookup h,
     return 'STOP! The breaker is still ON, so these wires are live (120 volts). Turn the breaker OFF first. This can shock you badly.';
   }
   if (s.stage != 0) return 'The device is already in the box. Pull it out again to change the wires.';
-  if (!s.practice && !allowWrong && !h.accepts.contains(chip)) return lesson.wrongHint(chip, h);
+  if (!s.practice && !s.test && !allowWrong && !h.accepts.contains(chip)) return lesson.wrongHint(chip, h);
   if (s.attached[h.id] != null) return 'That place already has a wire. Tap the wire to take it off first.';
   if (s.attached.values.contains(chip)) return 'That wire is already fastened. Tap it to take it off if you want to move it.';
   s.attached[h.id] = chip;
   return null;
 }
 
-/// How a finished (or half finished) wiring job behaves when the power comes on.
+/// How a finished (or half finished) wiring job behaves when the power comes on. The judging is done by the safety engine
+/// ([evaluateConnections]); this keeps the names the lessons and jobs already use.
 class Verdict {
-  const Verdict(this.kind, this.message, {this.works = false, this.trips = false, this.burns = false});
-  final String kind; // ok, noGround, reversed, bonded, dead, openNeutral, short
+  const Verdict(this.kind, this.message, {this.works = false, this.trips = false, this.burns = false, this.report, this.effect = 'none', this.fix = ''});
+  final String kind; // ok, noGround, reversed, bonded, dead, openNeutral, short, groundWire, unverified
   final String message;
+
+  /// Does the device do its job? That never makes it safe: see [ok].
   final bool works;
   final bool trips;
   final bool burns;
+
+  /// What the engine found, and what to draw when the power goes on (none, arc, spark, smoke, fire).
+  final SafetyReport? report;
+  final String effect;
+  final String fix;
+
+  /// Correct and safe: the only result that counts as a finished job.
   bool get ok => kind == 'ok';
-  bool get dangerous => kind == 'reversed' || kind == 'openNeutral' || kind == 'noGround' || kind == 'bonded' || kind == 'short';
+  SafetyStatus get status => report?.status ?? (ok ? SafetyStatus.correct : SafetyStatus.incorrect);
+  bool get dangerous => report?.status == SafetyStatus.unsafe;
 }
 
-Verdict evaluateWiring(ElectricalLesson lesson, WiringState s) {
-  String roleOfHook(int id) => lesson.hookups.firstWhere((h) => h.id == id).role;
-  String roleOfChip(String key) => lesson.chips.firstWhere((c) => c.key == key).role;
-  var hotOnHot = 0, hotOnNeu = 0, hotOnGnd = 0, neuOnNeu = 0, neuOnHot = 0, neuOnGnd = 0, gndOnGnd = 0, gndOnHot = 0, gndOnNeu = 0, onLoad = 0;
+/// The engine's view of a lesson's wiring: which wire is on which terminal.
+List<Connection> connectionsOf(ElectricalLesson lesson, WiringState s) {
+  WireFunction fn(String role) => switch (role) { 'hot' => WireFunction.hot, 'neutral' => WireFunction.neutral, 'ground' => WireFunction.ground, _ => WireFunction.unknown };
+  TerminalRole tr(String role) => switch (role) { 'hot' => TerminalRole.hot, 'neutral' => TerminalRole.neutral, 'ground' => TerminalRole.ground, _ => TerminalRole.load };
+  final out = <Connection>[];
   for (final e in s.attached.entries) {
-    final hr = roleOfHook(e.key), cr = roleOfChip(e.value);
-    if (hr == 'load') {
-      onLoad++;
-      continue;
-    }
-    switch ((cr, hr)) {
-      case ('hot', 'hot'):
-        hotOnHot++;
-      case ('hot', 'neutral'):
-        hotOnNeu++;
-      case ('hot', 'ground'):
-        hotOnGnd++;
-      case ('neutral', 'neutral'):
-        neuOnNeu++;
-      case ('neutral', 'hot'):
-        neuOnHot++;
-      case ('neutral', 'ground'):
-        neuOnGnd++;
-      case ('ground', 'ground'):
-        gndOnGnd++;
-      case ('ground', 'hot'):
-        gndOnHot++;
-      case ('ground', 'neutral'):
-        gndOnNeu++;
-    }
+    final h = lesson.hookups.firstWhere((h) => h.id == e.key);
+    final c = lesson.chips.firstWhere((c) => c.key == e.value);
+    out.add(Connection(Wire(c.key, c.label, fn(c.role)), Terminal(h.id, h.name, tr(h.role))));
   }
-  final wantHot = lesson.chips.where((c) => c.role == 'hot').length;
-  final wantNeutral = lesson.chips.where((c) => c.role == 'neutral').length;
-  if (hotOnGnd > 0 || gndOnHot > 0) {
-    return const Verdict('short', 'A hot wire touched the ground. That is a short circuit: huge current, sparks and fire. The breaker slams off.', trips: true, burns: true);
-  }
-  if ((hotOnNeu > 0 && neuOnNeu > 0) || (neuOnHot > 0 && hotOnHot > 0)) {
-    return const Verdict('short', 'The hot and the neutral were joined together. That is a short circuit: a bang, sparks and a tripped breaker.', trips: true, burns: true);
-  }
-  if (hotOnNeu > 0 && neuOnHot > 0) {
-    return const Verdict('reversed', 'Hot and neutral are swapped (reversed polarity). Things still run, but the metal part of a lamp or appliance is live. That can shock someone. Black goes on brass, white on silver.', works: true);
-  }
-  if (neuOnGnd > 0 || gndOnNeu > 0) {
-    return const Verdict('bonded', 'The neutral and the ground were joined. A GFCI or the breaker may trip for no reason, and current can flow where it should not.', works: true, trips: true);
-  }
-  if (onLoad > 0 && hotOnHot < wantHot) {
-    return const Verdict('dead', 'The wires are on the taped LOAD screws, so no power reaches the outlet. Power comes in on LINE.');
-  }
-  if (hotOnHot < wantHot) {
-    return const Verdict('dead', 'The hot wire is not connected to the right place, so nothing gets power. The device is dead.');
-  }
-  if (wantNeutral > 0 && neuOnNeu < wantNeutral) {
-    return const Verdict('openNeutral', 'The neutral wire is not connected. Nothing runs, but the hot wire is still connected, so the slots can still be live. That is dangerous.');
-  }
-  if (gndOnGnd == 0) {
-    return const Verdict('noGround', 'It works, but there is no ground wire. Without a ground nothing protects you if an appliance fails.', works: true);
-  }
-  return const Verdict('ok', 'Wired correctly. Hot, neutral and ground are all in the right place.', works: true);
+  return out;
+}
+
+DeviceRules rulesOf(ElectricalLesson lesson) => DeviceRules(
+      name: lesson.title,
+      hotWires: lesson.chips.where((c) => c.role == 'hot').length,
+      neutralWires: lesson.chips.where((c) => c.role == 'neutral').length,
+    );
+
+Verdict evaluateWiring(ElectricalLesson lesson, WiringState s) {
+  final r = evaluateConnections(rulesOf(lesson), connectionsOf(lesson, s), supported: s.supported);
+  final c = r.consequence;
+  bool has(String code) => r.findings.any((f) => f.code == code);
+  final first = r.findings.isEmpty ? null : r.findings.reduce((a, b) => b.status.severity > a.status.severity ? b : a);
+  final kind = r.safe
+      ? 'ok'
+      : has('SHORT') || has('HOT_TO_GROUND')
+          ? 'short'
+          : has('REVERSED')
+              ? 'reversed'
+              : has('NEUTRAL_GROUND')
+                  ? 'bonded'
+                  : has('GROUND_AS_CURRENT')
+                      ? 'groundWire'
+                      : has('OPEN_NEUTRAL')
+                          ? 'openNeutral'
+                          : has('UNVERIFIED')
+                              ? 'unverified'
+                              : has('MISSING_GROUND')
+                                  ? 'noGround'
+                                  : 'dead';
+  final msg = r.safe ? 'Wired correctly. Hot, neutral and ground are all in the right place, and every safety check passes.' : '${first!.message} ${c.text}';
+  return Verdict(kind, msg, works: c.operates, trips: c.trips, burns: c.burns, report: r, effect: c.effect, fix: first?.fix ?? '');
 }
 
 // ─── Building the scene ──────────────────────────────────────────────────────

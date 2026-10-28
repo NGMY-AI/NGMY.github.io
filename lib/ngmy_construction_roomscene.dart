@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'ngmy_electrical_fx.dart';
 
 import 'package:flutter/material.dart';
 
@@ -442,24 +443,14 @@ List<Poly> roomDynamic(RoomProject p, double t, Map<int, double> fxUntil) {
         }
     }
   }
-  // Sparks and smoke from a mistake.
-  for (final e in fxUntil.entries) {
-    if (t > e.value) continue;
+  // What a fault looks like: arcs, sparks, smoke, flames. Each device shows its own kind; a burnt one keeps smoking.
+  for (final e in p.fxKind.entries) {
     final s = slotById(e.key);
-    final left = (e.value - t).clamp(0.0, 3.0);
-    b.id = 0;
-    for (var i = 0; i < 14; i++) {
-      final ph = ((t * 2.2 + i * 0.137) % 1.0);
-      final a = i * 2.4 + t * 7;
-      final at = slotPoint(s, V3(math.cos(a) * ph * 7, math.sin(a) * ph * 7 - ph * ph * 6, 3 + ph * 4));
-      b.ball(at, 0.35 * left.clamp(0.3, 1.0), Color.lerp(const Color(0xFFFF6A00), const Color(0xFFFFF3A0), 1 - ph)!, shine: 0, lat: 3, lon: 5);
-    }
-    b.alpha = 0.35;
-    for (var i = 0; i < 5; i++) {
-      final ph = ((t * 0.7 + i * 0.2) % 1.0);
-      b.ball(slotPoint(s, V3(math.sin(i * 1.7) * 2, ph * 10, 5 + ph * 3)), 1.2 + ph * 3, const Color(0xFF4B4B50), shine: 0, lat: 3, lon: 6);
-    }
-    b.alpha = 1;
+    final until = fxUntil[e.key] ?? 0;
+    final active = t <= until;
+    final burnt = p.burnt.contains(e.key);
+    if (!active && !burnt) continue;
+    faultEffect(b, active ? e.value : 'smolder', (l) => slotPoint(s, l), 1.0, t);
   }
   return b.polys;
 }

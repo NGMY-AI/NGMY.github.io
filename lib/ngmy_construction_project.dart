@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'ngmy_electrical_safety.dart';
 
 import 'ngmy_3d.dart';
 import 'ngmy_construction_electrical.dart';
@@ -119,6 +120,12 @@ class RoomProject {
   final Map<int, String> plugged = {}; // outlet slot -> appliance
   final Set<int> burnt = {};
   final List<String> log = [];
+
+  /// The effect each device shows right now (arc, spark, smoke, fire), drawn with the moving things.
+  final Map<int, String> fxKind = {};
+
+  /// Test mode (an inspection): wrong wires are taken without a word, and nothing is explained until the job is submitted.
+  bool test = false;
 
   void _plan(int? forced, String? name) {
     final r = math.Random(seed);
@@ -409,6 +416,9 @@ class RoomProject {
     }
     final d = Dev(kind);
     d.w.practice = practice;
+    d.w.test = test;
+    // A fan on a plain ceiling box is not supported: it is flagged unsafe by the engine.
+    d.w.supported = !(kind == 'fan' && boxes[slot] != 'fan');
     d.w.power = power;
     devs[slot] = d;
     return Act(true, '${kind == 'light' ? 'Light fixture' : kind == 'fan' ? 'Ceiling fan' : kind == 'gfci' ? 'GFCI outlet' : kind == 'switch' ? 'Switch' : 'Outlet'} is held up to ${s.name}. Turn the breaker OFF, then wire it.');
@@ -455,6 +465,7 @@ class RoomProject {
     final lesson = electricalLesson(d.kind);
     final h = lesson.hookups.firstWhere((x) => x.id == hookupId);
     final r = tryFasten(lesson, d.w, chip, h, allowWrong: true);
+    if (r == null && test) return const Act(true, TestSession.neutralNote);
     if (r == null) {
       // A wrong wire can be fastened, like for real. The trouble comes when the power goes on.
       if (!practice && !h.accepts.contains(chip)) {
@@ -513,6 +524,28 @@ class RoomProject {
     return const Act(true, 'Cover on. Now you can turn the breaker on and test.');
   }
 
+  /// What the learner built, for the inspection: one attempt for every device the job asked for (a missing one is an empty attempt).
+  List<TestAttempt> testAttempts() {
+    final out = <TestAttempt>[];
+    for (final o in orders) {
+      final d = devs[o.slot];
+      final lesson = electricalLesson(o.device);
+      final title = '${slotById(o.slot).name}: ${lesson.title}';
+      if (d == null || d.kind != o.device) {
+        out.add(TestAttempt(title, rulesOf(lesson), const []));
+        continue;
+      }
+      out.add(TestAttempt(title, rulesOf(lesson), connectionsOf(lesson, d.w), supported: d.w.supported));
+    }
+    return out;
+  }
+
+  /// The questions that go with this job's devices.
+  List<TestQuestion> testQuestions() {
+    final kinds = {for (final o in orders) o.device};
+    return [for (final k in kinds) ...(kLessonQuestions[k] ?? const <TestQuestion>[]).take(2)];
+  }
+
   Verdict verdict(int slot) => evaluateWiring(electricalLesson(devs[slot]!.kind), devs[slot]!.w);
 
   /// Switch the breaker on or off. Switching on tests every finished device, and a real mistake shows now.
@@ -533,24 +566,34 @@ class RoomProject {
     final msgs = <String>[];
     var tripNow = false;
     var burnNow = false;
+    var shows = false;
+    fxKind.clear();
     for (final e in devs.entries) {
       final d = e.value;
       if (d.w.stage == 0) continue;
       final v = verdict(e.key);
       d.w.testing = d.w.stage >= 2;
+      if (v.effect != 'none') {
+        fxKind[e.key] = v.effect;
+        d.w.fx = v.effect;
+        shows = true;
+      }
       if (v.trips) tripNow = true;
       if (v.burns) {
         burnNow = true;
         d.w.burnt = true;
         burnt.add(e.key);
       }
-      if (!v.ok) msgs.add('${slotById(e.key).name}: ${v.message}');
+      // In a test the power-on shows what happens, but explains nothing.
+      if (!v.ok && !test) msgs.add('${slotById(e.key).name}: ${v.message}');
     }
     if (tripNow) {
       tripped = true;
       syncPower();
-      return Act(false, '${burnNow ? 'BANG! Sparks and smoke. ' : ''}The breaker tripped. ${msgs.join(' ')} Fix it, then flip the breaker OFF and ON again.', danger: true, fx: burnNow ? 'burn' : 'trip');
+      final head = burnNow ? 'BANG! Sparks, smoke and flames. ' : 'Snap! ';
+      return Act(false, test ? 'The breaker tripped.' : '$head The breaker tripped. ${msgs.join(' ')} Fix it, then flip the breaker OFF and ON again.', danger: true, fx: burnNow ? 'burn' : 'trip');
     }
+    if (shows) return Act(false, test ? 'Power is on.' : 'Power is on, and something is wrong. ${msgs.join(' ')}', danger: true, fx: 'arc');
     if (msgs.isNotEmpty) return Act(true, 'Power is on. ${msgs.join(' ')}', danger: true);
     return const Act(true, 'Power is on.');
   }
@@ -594,16 +637,23 @@ class RoomProject {
     if (plugged.containsKey(slot)) return _mistake('Something is already plugged in.');
     plugged[slot] = appliance;
     if (d.w.burnt) return const Act(false, 'The outlet is burnt. Nothing works. Pull it out and put in a new one.', danger: true);
+    final v = verdict(slot);
     if (power && deviceOk(slot)) {
       d.tested = true;
-      final v = verdict(slot);
-      if (v.kind == 'reversed' || v.kind == 'noGround') {
-        return Act(true, 'It runs, but be careful: ${v.message}', danger: true);
+      if (!v.ok) {
+        // It runs, and that is exactly the trap: the wiring is still unsafe.
+        return Act(true, test ? '${_appName(appliance)} runs.' : '${_appName(appliance)} runs, but this outlet is NOT safe. ${v.message}', danger: !test);
       }
       return Act(true, '${_appName(appliance)} runs. The outlet works.');
     }
     if (!power) return const Act(true, 'Plugged in. Nothing happens because the breaker is off. Turn it on to test.');
-    return Act(false, 'Nothing happens. ${verdict(slot).message}', danger: true);
+    // Plugging into a faulty outlet with the power on shows the fault.
+    if (v.effect != 'none') {
+      fxKind[slot] = v.effect;
+      d.w.fx = v.effect;
+      return Act(false, test ? 'Nothing happens.' : '${_appName(appliance)} does not run. ${v.message}', danger: true, fx: v.effect == 'fire' ? 'burn' : 'arc');
+    }
+    return Act(false, test ? 'Nothing happens.' : 'Nothing happens. ${v.message}', danger: true);
   }
 
   Act unplug(int slot) {
