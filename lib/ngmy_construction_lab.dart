@@ -45,6 +45,7 @@ const List<_LessonInfo> _lessons = [
   _LessonInfo('outlet', '🔌', 'Wall outlet', 'Black to brass, white to silver', Color(0xFFF59E0B)),
   _LessonInfo('switch', '💡', 'Light switch', 'Two blacks and a wire nut', Color(0xFF38BDF8)),
   _LessonInfo('gfci', '🛡️', 'GFCI outlet', 'LINE and LOAD near water', Color(0xFF34D399)),
+  _LessonInfo('fan', '🌀', 'Ceiling fan', 'Black, white, green and a fan box', Color(0xFF22D3EE)),
   _LessonInfo('ptrap', '🪠', 'Sink drain (P-trap)', 'Build a drain with a water seal', Color(0xFF60A5FA)),
   _LessonInfo('faucet', '🚰', 'Faucet supply lines', 'Hot left, cold right', Color(0xFFF87171)),
   _LessonInfo('house', '🏗️', 'Build and fix a house', 'Stage by stage, then repair', Color(0xFFA78BFA)),
@@ -64,12 +65,8 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
 
   void _push(Widget page) => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
 
-  void _lesson(String id) => _push(switch (id) {
-        'ptrap' => const _PtrapPage(),
-        'faucet' => const _FaucetPage(),
-        'house' => const _HousePage(),
-        _ => _ElectricalPage(id: id),
-      });
+  /// Every lesson plays inside a furnished room, with a big TV on the wall showing the NGMY Jobs ad.
+  void _lesson(String id) => _push(id == 'house' ? const _HousePage() : NgmyHousePage(lesson: id));
 
   @override
   Widget build(BuildContext context) {
@@ -377,17 +374,19 @@ class LessonScaffold extends StatelessWidget {
 
 // ─── Electrical lessons ──────────────────────────────────────────────────────
 
-class _ElectricalPage extends StatefulWidget {
-  const _ElectricalPage({required this.id});
+/// The close-up wiring bench for one device. A room can hand it the state it is keeping, so the work carries on there.
+class ElectricalLessonPage extends StatefulWidget {
+  const ElectricalLessonPage({super.key, required this.id, this.state});
   final String id;
+  final WiringState? state;
 
   @override
-  State<_ElectricalPage> createState() => _ElectricalPageState();
+  State<ElectricalLessonPage> createState() => _ElectricalPageState();
 }
 
-class _ElectricalPageState extends State<_ElectricalPage> {
+class _ElectricalPageState extends State<ElectricalLessonPage> {
   late final ElectricalLesson lesson = electricalLesson(widget.id);
-  final WiringState s = WiringState();
+  late final WiringState s = widget.state ?? WiringState();
   late final Cam3 cam = Cam3(yaw: 0.42, pitch: 0.26, dist: 12, target: const V3(0, 0.2, 2.8));
   late Scene3D scene = buildElectricalScene(lesson, s);
   String chip = '';
@@ -582,7 +581,7 @@ class _ElectricalPageState extends State<_ElectricalPage> {
       panel: Column(mainAxisSize: MainAxisSize.min, children: [
         if (s.stage == 0) ...[
           Wrap(spacing: 8, runSpacing: 6, children: [
-              for (final c in lesson.chips)
+              for (final c in lesson.chips.where((c) => !s.attached.containsValue(c.key)))
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: GestureDetector(
@@ -667,15 +666,16 @@ class _ElectricalPageState extends State<_ElectricalPage> {
 
 // ─── Sink drain (P-trap) ─────────────────────────────────────────────────────
 
-class _PtrapPage extends StatefulWidget {
-  const _PtrapPage();
+class PtrapLessonPage extends StatefulWidget {
+  const PtrapLessonPage({super.key, this.state});
+  final PlumbState? state;
 
   @override
-  State<_PtrapPage> createState() => _PtrapPageState();
+  State<PtrapLessonPage> createState() => _PtrapPageState();
 }
 
-class _PtrapPageState extends State<_PtrapPage> {
-  final PlumbState s = PlumbState();
+class _PtrapPageState extends State<PtrapLessonPage> {
+  late final PlumbState s = widget.state ?? PlumbState();
   late final Cam3 cam = Cam3(yaw: -0.3, pitch: 0.18, dist: 40, target: const V3(7, 3, 0));
   late Scene3D scene = buildPtrapScene(s);
   String chip = '';
@@ -865,15 +865,16 @@ class _PtrapPageState extends State<_PtrapPage> {
 
 // ─── Faucet supply lines ─────────────────────────────────────────────────────
 
-class _FaucetPage extends StatefulWidget {
-  const _FaucetPage();
+class FaucetLessonPage extends StatefulWidget {
+  const FaucetLessonPage({super.key, this.state});
+  final PlumbState? state;
 
   @override
-  State<_FaucetPage> createState() => _FaucetPageState();
+  State<FaucetLessonPage> createState() => _FaucetPageState();
 }
 
-class _FaucetPageState extends State<_FaucetPage> {
-  final PlumbState s = PlumbState();
+class _FaucetPageState extends State<FaucetLessonPage> {
+  late final PlumbState s = widget.state ?? PlumbState();
   late final Cam3 cam = Cam3(yaw: -0.25, pitch: 0.2, dist: 36, target: const V3(0, 9, -3));
   late Scene3D scene = buildFaucetScene(s);
   String chip = '';
@@ -1128,9 +1129,9 @@ class _HousePageState extends State<_HousePage> {
 
   void _openLesson(String id) {
     final Widget page = switch (id) {
-      'ptrap' => const _PtrapPage(),
-      'faucet' => const _FaucetPage(),
-      _ => _ElectricalPage(id: id),
+      'ptrap' => const PtrapLessonPage(),
+      'faucet' => const FaucetLessonPage(),
+      _ => ElectricalLessonPage(id: id),
     };
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
   }

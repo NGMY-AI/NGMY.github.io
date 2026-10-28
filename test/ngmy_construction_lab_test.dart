@@ -185,9 +185,7 @@ void main() {
       t.view.physicalSize = const Size(900, 7000);
       t.view.devicePixelRatio = 2.0;
       addTearDown(t.view.reset);
-      await t.pumpWidget(const MaterialApp(home: NgmyConstructionLab()));
-      await t.pump(const Duration(milliseconds: 500));
-      await t.tap(find.text('Wall outlet'));
+      await t.pumpWidget(const MaterialApp(home: ElectricalLessonPage(id: 'outlet')));
       await t.pump(const Duration(milliseconds: 600));
       await t.pump(const Duration(milliseconds: 600));
       expect(find.text('Breaker ON (live)'), findsOneWidget);
@@ -226,9 +224,7 @@ void main() {
       t.view.physicalSize = const Size(900, 7000);
       t.view.devicePixelRatio = 2.0;
       addTearDown(t.view.reset);
-      await t.pumpWidget(const MaterialApp(home: NgmyConstructionLab()));
-      await t.pump(const Duration(milliseconds: 500));
-      await t.tap(find.text('Wall outlet'));
+      await t.pumpWidget(const MaterialApp(home: ElectricalLessonPage(id: 'outlet')));
       await t.pump(const Duration(milliseconds: 600));
       await t.pump(const Duration(milliseconds: 600));
       final view = find.byWidgetPredicate((w) => w is CustomPaint && w.painter is Scene3DPainter);

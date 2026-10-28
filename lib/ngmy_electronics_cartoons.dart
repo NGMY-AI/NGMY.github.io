@@ -112,7 +112,7 @@ void _confetti(Canvas c, Size s, double t, {int n = 18, double from = 0}) {
 }
 
 /// How many ad scenes there are.
-const int kCartoonScenes = 12;
+const int kCartoonScenes = 11;
 
 /// Draws scene [i] in the top part of [s]; [lt] is the seconds since the scene began (it repeats every 6 s).
 void cartoonScene(Canvas c, Size s, int i, double lt) {
@@ -122,22 +122,20 @@ void cartoonScene(Canvas c, Size s, int i, double lt) {
     case 1:
       _jobs(c, s, lt);
     case 2:
-      _growth(c, s, lt);
-    case 3:
       _store(c, s, lt);
-    case 4:
+    case 3:
       _swahili(c, s, lt);
-    case 5:
+    case 4:
       _scanner(c, s, lt);
-    case 6:
+    case 5:
       _invoice(c, s, lt);
-    case 7:
+    case 6:
       _book(c, s, lt);
-    case 8:
+    case 7:
       _wallet(c, s, lt);
-    case 9:
+    case 8:
       _games(c, s, lt);
-    case 10:
+    case 9:
       _lab(c, s, lt);
     default:
       _helper(c, s, lt);
@@ -226,48 +224,6 @@ void _jobs(Canvas c, Size s, double t) {
     final a = ((t - k * 0.5) / 0.5).clamp(0.0, 1.0);
     c.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(board.left + board.width * 0.08 + (1 - a) * w * 0.3, board.top + board.height * (0.08 + k * 0.3), board.width * 0.84, board.height * 0.24), const Radius.circular(3)), _f(Colors.white));
     c.drawRect(Rect.fromLTWH(board.left + board.width * 0.14 + (1 - a) * w * 0.3, board.top + board.height * (0.14 + k * 0.3), board.width * 0.5, board.height * 0.05), _f(const Color(0xFF94A3B8)));
-  }
-}
-
-// 2 ── Growth Income: a money tree grows coins.
-void _growth(Canvas c, Size s, double t) {
-  final w = s.width, h = s.height;
-  final ground = h * 0.94;
-  c.drawRect(Rect.fromLTWH(0, ground, w, h - ground), _f(const Color(0xFF14532D)));
-  final tx = w * 0.62;
-  final grow = (t / 2.5).clamp(0.0, 1.0);
-  c.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(tx - h * 0.03, ground - h * 0.4 * grow, h * 0.06, h * 0.4 * grow), const Radius.circular(4)), _f(const Color(0xFF78350F)));
-  final crown = Offset(tx, ground - h * 0.45 * grow);
-  c.drawCircle(crown, h * 0.3 * grow, _f(const Color(0xFF16A34A)));
-  c.drawCircle(crown + Offset(-h * 0.16 * grow, h * 0.07 * grow), h * 0.2 * grow, _f(const Color(0xFF22C55E)));
-  c.drawCircle(crown + Offset(h * 0.16 * grow, h * 0.07 * grow), h * 0.2 * grow, _f(const Color(0xFF15803D)));
-  if (grow >= 1) {
-    for (var k = 0; k < 7; k++) {
-      final a = k * 0.9 + 0.3;
-      final pop = ((t - 2.5 - k * 0.2) / 0.4).clamp(0.0, 1.0);
-      if (pop > 0) _coin(c, crown + Offset(math.cos(a) * h * 0.2, math.sin(a) * h * 0.17), h * 0.035 * Curves.elasticOut.transform(pop), t * 4 + k);
-    }
-  }
-  // A rising chart.
-  final chart = Rect.fromLTWH(w * 0.06, h * 0.08, w * 0.3, h * 0.3);
-  c.drawRRect(RRect.fromRectAndRadius(chart, Radius.circular(h * 0.02)), _f(Colors.black.withValues(alpha: 0.3)));
-  final path = Path()..moveTo(chart.left + 6, chart.bottom - 8);
-  final pts = [0.1, 0.25, 0.2, 0.45, 0.5, 0.75, 0.9];
-  final show = ((t / 3).clamp(0.0, 1.0) * (pts.length - 1)).floor();
-  for (var k = 0; k <= show; k++) {
-    path.lineTo(chart.left + 6 + (chart.width - 12) * k / (pts.length - 1), chart.bottom - 8 - (chart.height - 16) * pts[k]);
-  }
-  c.drawPath(path, _s(const Color(0xFF4ADE80), 3));
-  _t(c, '+\$', Offset(chart.right - h * 0.05, chart.top + h * 0.05), h * 0.06, const Color(0xFF4ADE80));
-  // The kid waters the tree.
-  final kx = w * 0.3;
-  cartoonKid(c, Offset(kx, ground), h * 0.62, t, armUp: false, wave: (math.sin(t * 3) + 1) / 2, bounce: math.sin(t * 3).abs() * h * 0.01, shirt: const Color(0xFFF59E0B));
-  final can = Offset(kx + h * 0.2, ground - h * 0.3);
-  c.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: can, width: h * 0.1, height: h * 0.08), const Radius.circular(4)), _f(const Color(0xFF3B82F6)));
-  c.drawLine(can + Offset(h * 0.04, -h * 0.01), can + Offset(h * 0.12, -h * 0.05), _s(const Color(0xFF3B82F6), 4));
-  for (var k = 0; k < 8; k++) {
-    final ph = (t * 1.4 + k * 0.125) % 1.0;
-    c.drawCircle(can + Offset(h * 0.13 + ph * h * 0.12, -h * 0.05 + ph * ph * h * 0.3), h * 0.008, _f(const Color(0xFF7DD3FC)));
   }
 }
 

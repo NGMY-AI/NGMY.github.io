@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_3d.dart';
 import 'ngmy_construction_home.dart';
+import 'ngmy_construction_tour.dart';
 import 'ngmy_electronics_screens.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -16,7 +17,9 @@ const int idHFurn = 100; // + furniture number (1 to 99)
 const int idHDoor = 600; // + door number
 const int idHWallBack = 300, idHWallLeft = 301, idHWallRight = 302, idHFloorObj = 310, idHCeilObj = 320;
 const int idHOutletA = 700, idHOutletB = 701, idHSwitch = 702, idHLight = 703;
-const int idHApp = 720; // + 0 or 1: what is plugged into each outlet
+const int idHApp = 720; // + 0 or 1 (or 2 and up for added outlets): what is plugged in
+const int idHWallTv = 730;
+const int idHExtra = 800; // + number: an outlet or switch the visitor added
 const int idHToiletF = 710, idHSinkF = 711, idHTubF = 712, idHKSink = 713;
 
 /// Edit modes: look, furniture, walls, floor, ceiling, doors.
@@ -135,9 +138,9 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
   final lightX = 0.0, lightZ = d * 0.5;
   final backDoorX = r.doors.where((e) => e.wall == 'back').map((e) => e.offset).fold<double>(-w / 2 + 30, (a, e) => e);
   final switchX = (backDoorX + 24).clamp(-w / 2 + 10, w / 2 - 10);
-  final wired = r.wired;
   final fan = r.ceilingFix == 'fan';
-  final lit = wired && r.lightOn;
+  final okL = r.okLight;
+  final lit = okL && r.okSwitch && r.lightOn;
   const okRing = Color(0xFF22D3EE), badRing = Color(0xFFEF4444);
   b.id = idHLight;
   if (fan) {
@@ -155,16 +158,26 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
     b.alpha = 1;
   }
   final fixName = fan ? 'Ceiling fan' : 'Ceiling light';
-  info[idHLight] = ObjInfo(fixName, !wired ? 'It has no power yet. The room still needs wiring: use the Wiring button.' : (r.lightOn ? 'It is on. Tap the wall switch (or tap this) to turn it off.' : 'It is off. Tap the wall switch (or tap this) to turn it on.'), V3(lightX, h - 8, lightZ), 80);
-  for (final (i, id, x) in [(0, idHOutletA, -w / 4), (1, idHOutletB, w / 4)]) {
+  final lightText = !okL ? 'It has no power yet. ${r.lesson.isNotEmpty ? 'Tap it to wire it.' : 'The room still needs wiring: use the Wiring button.'}' : (!r.okSwitch ? 'It is ready: wire the wall switch to turn it on.' : (r.lightOn ? 'It is on. Tap the wall switch (or tap this) to turn it off.' : 'It is off. Tap the wall switch (or tap this) to turn it on.'));
+  info[idHLight] = ObjInfo(fixName, lightText, V3(lightX, h - 8, lightZ), 80);
+
+  // Every outlet in the room: the two that belong to it and the ones that were added.
+  final bathKitchen = r.kind == 'bathroom' || r.kind == 'kitchen' || r.lesson == 'gfci';
+  final outlets = <(int, int, double, bool, String)>[
+    (0, idHOutletA, -w / 4, r.okOutA, bathKitchen ? 'GFCI outlet' : 'Wall outlet'),
+    (1, idHOutletB, w / 4, r.okOutB, bathKitchen ? 'GFCI outlet' : 'Wall outlet'),
+    for (var i = 0; i < r.extras.length; i++)
+      if (r.extras[i].kind != 'switch') (2 + i, idHExtra + i, r.extras[i].x, r.extras[i].done, r.extras[i].kind == 'gfci' ? 'Added GFCI outlet' : 'Added outlet'),
+  ];
+  for (final (i, id, x, ok, name) in outlets) {
     // A bright frame round the plate so a finished outlet can be found from far away.
     b.id = id;
     b.bias = 0.4;
     b.alpha = 0.55;
-    b.box(V3(x, 14, 0.25), const V3(15, 19, 0.5), wired ? okRing : badRing);
+    b.box(V3(x, 14, 0.25), const V3(15, 19, 0.5), ok ? okRing : badRing);
     b.alpha = 1;
     b.bias = 0;
-    b.box(V3(x, 14, 0.9), const V3(9.5, 13.5, 1.4), wired ? const Color(0xFFF7F2E6) : const Color(0xFF3F3F46), shine: 0.25);
+    b.box(V3(x, 14, 0.9), const V3(9.5, 13.5, 1.4), ok ? const Color(0xFFF7F2E6) : const Color(0xFF3F3F46), shine: 0.25);
     b.id = 0;
     for (final dz in const [-1.0, 1.0]) {
       for (final dx in const [-1.6, 1.6]) {
@@ -172,23 +185,33 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
       }
     }
     b.box(V3(x, 14, 1.7), const V3(1.2, 1.2, 0.3), const Color(0xFF9CA3AF));
-    info[id] = ObjInfo(r.kind == 'bathroom' || r.kind == 'kitchen' ? 'GFCI outlet' : 'Wall outlet', !wired ? 'This outlet is not wired yet. Use the Wiring button to wire it.' : (r.plugged[i] == null ? 'Tap it to plug something in.' : 'Tap it to plug something else in, or to unplug.'), V3(x, 14, 2), 60);
+    info[id] = ObjInfo(name, !ok ? 'This one is not wired yet. Tap it to wire it.' : (r.plugged[i] == null ? 'Tap it to plug something in.' : 'Tap it to plug something else in, or to unplug.'), V3(x, 14, 2), 60);
   }
-  b.id = idHSwitch;
-  b.bias = 0.4;
-  b.alpha = 0.55;
-  b.box(V3(switchX, 48, 0.25), const V3(10, 15, 0.5), wired ? okRing : badRing);
-  b.alpha = 1;
-  b.bias = 0;
-  b.box(V3(switchX, 48, 0.9), const V3(6, 10, 1.4), wired ? const Color(0xFFF7F2E6) : const Color(0xFF3F3F46), shine: 0.25);
-  b.box(V3(switchX, r.lightOn && wired ? 49.2 : 46.8, 1.9), const V3(1.8, 4, 1.0), const Color(0xFFD9D2C2));
-  info[idHSwitch] = ObjInfo('Light switch', !wired ? 'Not wired yet: the Wiring button opens the job.' : (r.lightOn ? 'On. Tap to turn the ${fan ? 'fan' : 'light'} off.' : 'Off. Tap to turn the ${fan ? 'fan' : 'light'} on.'), V3(switchX, 48, 2), 60);
-  if (!wired) labels.add(Label3D(V3(lightX, h - 26, lightZ), '⚡ No power: needs wiring', const Color(0xFFDC2626)));
+
+  // Every switch: the room's own and the ones that were added.
+  final switches = <(int, double, bool)>[
+    (idHSwitch, switchX, r.okSwitch),
+    for (var i = 0; i < r.extras.length; i++)
+      if (r.extras[i].kind == 'switch') (idHExtra + i, r.extras[i].x, r.extras[i].done),
+  ];
+  for (final (id, x, ok) in switches) {
+    b.id = id;
+    b.bias = 0.4;
+    b.alpha = 0.55;
+    b.box(V3(x, 48, 0.25), const V3(10, 15, 0.5), ok ? okRing : badRing);
+    b.alpha = 1;
+    b.bias = 0;
+    b.box(V3(x, 48, 0.9), const V3(6, 10, 1.4), ok ? const Color(0xFFF7F2E6) : const Color(0xFF3F3F46), shine: 0.25);
+    b.box(V3(x, r.lightOn && ok ? 49.2 : 46.8, 1.9), const V3(1.8, 4, 1.0), const Color(0xFFD9D2C2));
+    info[id] = ObjInfo('Light switch', !ok ? 'Not wired yet. Tap it to wire it.' : (r.lightOn ? 'On. Tap to turn the ${fan ? 'fan' : 'light'} off.' : 'Off. Tap to turn the ${fan ? 'fan' : 'light'} on.'), V3(x, 48, 2), 60);
+  }
+  if (!r.okLight && r.lesson.isEmpty) labels.add(Label3D(V3(lightX, h - 26, lightZ), '⚡ No power: needs wiring', const Color(0xFFDC2626)));
+  if (r.lesson.isNotEmpty && !r.lessonDone && !r.lessonIsPlumbing) labels.add(Label3D(V3(0, 40, 14), '👆 Tap the red one to wire it', const Color(0xFFDC2626)));
 
   // ── What is plugged in ──
-  for (final (i, x) in [(0, -w / 4), (1, w / 4)]) {
+  for (final (i, _, x, ok, _) in outlets) {
     final key = r.plugged[i];
-    if (key == null || !wired) continue;
+    if (key == null || !ok) continue;
     final a = applianceByKey(key);
     b.id = idHApp + i;
     b.tube([V3(x, 12, 1.8), V3(x, 6, 3), V3(x, 2, 11)], 0.3, const Color(0xFF1B1B1D), shine: 0.2, sides: 6, joints: false);
@@ -216,6 +239,35 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
       }
     }
     info[idHApp + i] = ObjInfo(a.name, a.isTv ? 'It is playing NGMY ads. Tap it to watch full screen with the remote.' : 'It is plugged in and running. Tap the outlet to unplug it or plug in something else.', V3(x, 16, 14), 90);
+  }
+
+  // ── The TV on the wall ──
+  final tvKey = r.wallTv;
+  if (tvKey != null) {
+    final a = applianceByKey(tvKey);
+    final hall = r.kind == 'hall';
+    final tw = a.tvWidth * (hall ? 0.5 : 0.9), th = tw * 0.56;
+    final sw = tw - 2.5, sh = th - 2.5;
+    b.id = idHWallTv;
+    if (hall) {
+      const y = 52.0, z = 50.0;
+      final x = w / 2;
+      b.box(V3(x - 1.4, y, z), V3(2.6, th + 3, tw + 3), const Color(0xFF1B1D22), shine: 0.5);
+      b.box(V3(x - 2.8, y, z), V3(0.2, th, tw), const Color(0xFF0B0F17), shine: 0.7);
+      if (r.tvOn) {
+        final xs = x - 2.95;
+        screens.add(ScreenQuad([V3(xs, y + sh / 2, z - sw / 2), V3(xs, y + sh / 2, z + sw / 2), V3(xs, y - sh / 2, z + sw / 2), V3(xs, y - sh / 2, z - sw / 2)], idHWallTv, (c, size, t) => paintNgmyApp(c, size, r.tvApp, t + r.id)));
+      }
+    } else {
+      final x = switch (r.kind) { 'living' => 44.0, 'kitchen' => 36.0, 'bathroom' => 10.0, _ => 34.0 };
+      final y = r.kind == 'bathroom' ? 66.0 : 58.0;
+      b.box(V3(x, y, 1.4), V3(tw + 3, th + 3, 2.6), const Color(0xFF1B1D22), shine: 0.5);
+      b.box(V3(x, y, 2.8), V3(tw, th, 0.2), const Color(0xFF0B0F17), shine: 0.7);
+      if (r.tvOn) {
+        screens.add(ScreenQuad([V3(x - sw / 2, y + sh / 2, 2.95), V3(x + sw / 2, y + sh / 2, 2.95), V3(x + sw / 2, y - sh / 2, 2.95), V3(x - sw / 2, y - sh / 2, 2.95)], idHWallTv, (c, size, t) => paintNgmyApp(c, size, r.tvApp, t + r.id)));
+      }
+    }
+    info[idHWallTv] = ObjInfo(a.name, r.tvOn ? 'It is on and playing ${kNgmyApps[r.tvApp].name}. Tap it to watch full screen with the remote.' : 'The TV is off. Tap it to turn it on.', V3(0, 56, 4), 110);
   }
 
   // ── The plumbing ──
@@ -352,13 +404,14 @@ Scene3D _outside(HRoom r, int problems) {
 }
 
 /// Things that move: the fan blades and the pictures on the TVs.
-List<Poly> homeDynamic(HRoom r, double t) {
+List<Poly> homeDynamic(HRoom r, double t, {PersonPose? person}) {
   final b = MeshBuilder();
   if (!r.indoor || r.kind == 'outside') return b.polys;
+  if (person != null && person.room == r.id) _person(b, person, t);
   final d = r.d;
   const h = HRoom.h;
   if (r.ceilingFix == 'fan') {
-    final spin = r.wired && r.lightOn;
+    final spin = r.okLight && r.okSwitch && r.lightOn;
     final base = spin ? t * 7.0 : 0.0;
     b.id = idHLight;
     for (var i = 0; i < 4; i++) {
@@ -368,6 +421,46 @@ List<Poly> homeDynamic(HRoom r, double t) {
     }
   }
   return b.polys;
+}
+
+
+/// The cartoon person of the house tour: big head, orange shirt, blue trousers. Feet on y = 0, facing +z until turned.
+void _person(MeshBuilder b, PersonPose p, double t) {
+  final pb = MeshBuilder();
+  pb.id = 0;
+  final swing = p.walking ? math.sin(t * 7.5) * 0.75 : 0.0;
+  final bob = p.walking ? (math.sin(t * 15).abs()) * 0.8 : 0.0;
+  final lift = p.sitting ? -9.0 : 0.0;
+  const skin = Color(0xFFF1C27D), shirt = Color(0xFFF59E0B), pants = Color(0xFF3B5BA5), hair = Color(0xFF3B2A1A);
+  // A leg or an arm that swings from the hip or the shoulder.
+  void limb(V3 pivot, double len, double thick, Color c, double rx) {
+    final lb = MeshBuilder();
+    lb.id = 0;
+    lb.box(V3(0, -len / 2, 0), V3(thick, len, thick), c, shine: 0.05);
+    pb.polys.addAll(transformPolys(lb.polys, rx: rx, t: pivot));
+  }
+
+  final legA = p.sitting ? -1.5 : swing, legB = p.sitting ? -1.5 : -swing;
+  limb(V3(-2.3, 13 + lift + bob, 0), 13, 3.4, pants, legA);
+  limb(V3(2.3, 13 + lift + bob, 0), 13, 3.4, pants, legB);
+  // The feet.
+  pb.box(V3(-2.3, 0.8 + (p.sitting ? 6 : 0), 1.6 + (p.sitting ? 12 : legA * 6)), const V3(3.6, 1.6, 5), const Color(0xFFFFFFFF));
+  pb.box(V3(2.3, 0.8 + (p.sitting ? 6 : 0), 1.6 + (p.sitting ? 12 : legB * 6)), const V3(3.6, 1.6, 5), const Color(0xFFFFFFFF));
+  // Body and head.
+  pb.box(V3(0, 20 + lift + bob, 0), const V3(9, 14, 5.5), shirt, shine: 0.05);
+  pb.ball(V3(0, 33.5 + lift + bob, 0), 5.4, skin, lat: 6, lon: 10);
+  pb.ball(V3(0, 35.2 + lift + bob, -1.4), 5.6, hair, lat: 5, lon: 9);
+  for (final x in const [-1.9, 1.9]) {
+    pb.ball(V3(x, 33.8 + lift + bob, 4.7), 0.8, const Color(0xFF111111), lat: 3, lon: 5);
+  }
+  pb.box(V3(0, 31.4 + lift + bob, 5.1), const V3(2.4, 0.5, 0.4), const Color(0xFF7F1D1D));
+  // Arms: they swing when walking, and one holds a cup after the fridge.
+  limb(V3(-5.6, 26 + lift + bob, 0), 12, 2.8, skin, p.holding ? -0.6 : -swing);
+  limb(V3(5.6, 26 + lift + bob, 0), 12, 2.8, skin, p.holding ? -1.35 : swing);
+  if (p.holding) {
+    pb.cyl(V3(5.6, 17.2 + lift + bob, 10.5), V3(5.6, 22 + lift + bob, 10.5), 1.7, const Color(0xFF38BDF8), shine: 0.5, sides: 8);
+  }
+  b.polys.addAll(transformPolys(pb.polys, ry: p.yaw, t: V3(p.x, 0, p.z)));
 }
 
 const Color kChromeC = Color(0xFFC9CED6);

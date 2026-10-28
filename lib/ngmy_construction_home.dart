@@ -2,8 +2,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_construction_electrical.dart';
+import 'ngmy_construction_plumbing.dart';
 import 'ngmy_construction_plumbjob.dart';
 import 'ngmy_construction_project.dart';
+import 'ngmy_electronics_screens.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
 // MY HOUSE: a finished house with five bedrooms, three bathrooms, a kitchen, a living room and a hall.
@@ -106,6 +109,18 @@ class HDoor {
   final int to;
 }
 
+/// An outlet, GFCI or switch the visitor added to a wall. It starts unwired: wiring it opens the wiring lesson.
+class HExtra {
+  HExtra(this.kind, this.x);
+  final String kind;
+
+  /// Where along the back wall it is.
+  final double x;
+  final WiringState state = WiringState();
+
+  bool get done => state.stage >= 2 && evaluateWiring(electricalLesson(kind), state).ok;
+}
+
 class HRoom {
   HRoom(this.id, this.name, this.kind, this.gx, this.gy, this.gw, this.gh, this.doors);
   final int id;
@@ -135,6 +150,33 @@ class HRoom {
   bool lightOn = false;
   String ceilingFix = 'light';
 
+  /// Outlets and switches the visitor added, a TV on the wall (any TV model, on or off) and the NGMY app it plays.
+  final List<HExtra> extras = [];
+  String? wallTv;
+  bool tvOn = false;
+  int tvApp = 0;
+
+  /// A lesson room: which lesson it teaches (outlet, switch, gfci, fan, ptrap or faucet) and the work done so far.
+  String lesson = '';
+  WiringState? lessonState;
+  PlumbState? lessonPlumb;
+  bool get lessonIsPlumbing => lesson == 'ptrap' || lesson == 'faucet';
+  bool get lessonDone {
+    if (lessonIsPlumbing) {
+      final p = lessonPlumb;
+      if (p == null) return false;
+      return lesson == 'ptrap' ? (p.placed.length == 3 && p.tight.values.every((t) => t) && p.running) : (faucetComplete(p) && p.valvesOpen);
+    }
+    final st = lessonState;
+    return st != null && st.stage >= 2 && evaluateWiring(electricalLesson(lesson), st).ok;
+  }
+
+  /// What works, fixture by fixture. In a lesson room only the thing being taught is pending.
+  bool get okLight => lesson.isEmpty ? wired : (lesson == 'fan' ? lessonDone : true);
+  bool get okSwitch => lesson.isEmpty ? wired : (lesson == 'switch' ? lessonDone : true);
+  bool get okOutA => lesson.isEmpty ? wired : ((lesson == 'outlet' || lesson == 'gfci') ? lessonDone : true);
+  bool get okOutB => lesson.isEmpty ? wired : true;
+
   double get w => switch (kind) { 'bathroom' => 110, 'kitchen' => 140, 'living' => 180, 'hall' => 240, 'outside' => 300, _ => 130 };
   double get d => switch (kind) { 'bathroom' => 100, 'kitchen' => 110, 'living' => 120, 'hall' => 64, 'outside' => 200, _ => 112 };
   bool get indoor => kind != 'outside';
@@ -142,8 +184,8 @@ class HRoom {
 
   bool get hasPlumbing => kind == 'bathroom' || kind == 'kitchen';
   // Once a job has been opened it decides: pull a device out of a finished room and the room is no longer wired.
-  bool get wired => !indoor || (wiring?.devicesDone ?? !wiringNeeded);
-  bool get plumbed => !hasPlumbing || (plumb?.done ?? !plumbNeeded);
+  bool get wired => !indoor || (lesson.isNotEmpty ? (lessonIsPlumbing || lessonDone) : (wiring?.devicesDone ?? !wiringNeeded));
+  bool get plumbed => !hasPlumbing || (lesson.isNotEmpty ? (!lessonIsPlumbing || lessonDone) : (plumb?.done ?? !plumbNeeded));
   bool get finished => wired && plumbed;
 
   Furn? furnById(int id) {
@@ -175,9 +217,45 @@ class HomeProject {
     _build();
   }
 
+  /// A single room that teaches one lesson: the ceiling light is already in, and the thing being taught is waiting.
+  HomeProject.lesson(String id) : seed = 7 {
+    lessonId = id;
+    final kind = switch (id) { 'gfci' || 'faucet' => 'bathroom', 'fan' => 'bedroom', 'ptrap' => 'kitchen', _ => 'living' };
+    final title = switch (id) { 'outlet' => 'Wall outlet', 'switch' => 'Light switch', 'gfci' => 'GFCI outlet', 'fan' => 'Ceiling fan', 'ptrap' => 'Sink drain', _ => 'Faucet' };
+    final r = HRoom(0, title, kind, 0, 0, 1, 1, []);
+    r.lesson = id;
+    r.ceilingFix = id == 'fan' ? 'fan' : 'light';
+    if (id == 'gfci') r.floor = 5;
+    r.wiringNeeded = false;
+    r.plumbNeeded = false;
+    r.floor = kind == 'bathroom' || kind == 'kitchen' ? 5 : 0;
+    _furnish(r);
+    // A big TV on the wall plays the NGMY Jobs ad, in every lesson room.
+    r.wallTv = 'bangtv';
+    r.tvOn = true;
+    r.tvApp = math.max(0, kNgmyApps.indexWhere((a) => a.name == 'Jobs'));
+    rooms = [r];
+  }
+
+  String lessonId = '';
+  bool get isLesson => lessonId.isNotEmpty;
+
+  /// Every room needs its wiring and its plumbing again, so the whole house can be done from the start.
+  void makeBare() {
+    for (final r in indoor) {
+      r.wiring = null;
+      r.plumb = null;
+      r.wiringNeeded = true;
+      r.plumbNeeded = r.hasPlumbing;
+      r.lightOn = false;
+      r.plugged.clear();
+      r.extras.clear();
+    }
+  }
+
   final int seed;
   bool practice = false;
-  late final List<HRoom> rooms;
+  late List<HRoom> rooms;
   int current = 0;
 
   /// The house you were in is kept while the app is open.

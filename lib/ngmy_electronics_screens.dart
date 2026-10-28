@@ -39,7 +39,6 @@ class _Ad {
 const List<_Ad> _kAds = [
   _Ad('NGMY Civic Registry', 'Enroll your family. Stay counted and helped together.', Color(0xFF1E3A8A), Color(0xFF38BDF8)),
   _Ad('NGMY Jobs', 'Find work. Get hired. Get paid.', Color(0xFFB45309), Color(0xFFFBBF24)),
-  _Ad('Growth Income', 'Make your money grow every work day.', Color(0xFF166534), Color(0xFF86EFAC)),
   _Ad('NGMY Store', 'African food and traditions. Support our Congolese and African community.', Color(0xFF9A3412), Color(0xFFFACC15)),
   _Ad('Kiswahili School', 'Learn Swahili and English, step by step.', Color(0xFF0F766E), Color(0xFF5EEAD4)),
   _Ad('Document Scanner', 'Scan, save and share your papers.', Color(0xFF4338CA), Color(0xFF818CF8)),
@@ -99,11 +98,10 @@ const List<NgmyApp> kNgmyApps = [
   NgmyApp('NGMY Ads', '📢', Color(0xFFF472B6), 'Every NGMY promotion, as cartoons', -1),
   NgmyApp('Civic Registry', '🪪', Color(0xFF3B82F6), 'Enroll your family in your community', 0),
   NgmyApp('Jobs', '💼', Color(0xFFF59E0B), 'Find work and get hired', 1),
-  NgmyApp('Growth Income', '📈', Color(0xFF22C55E), 'Make your money grow', 2),
-  NgmyApp('NGMY Store', '🛍️', Color(0xFFEA580C), 'African food and traditions', 3),
-  NgmyApp('Kiswahili', '🗣️', Color(0xFF14B8A6), 'Learn Swahili and English', 4),
-  NgmyApp('Doc Scanner', '📄', Color(0xFF6366F1), 'Scan, save and share', 5),
-  NgmyApp('Invoices', '🧾', Color(0xFFEC4899), 'Professional invoices', 6),
+  NgmyApp('NGMY Store', '🛍️', Color(0xFFEA580C), 'African food and traditions', 2),
+  NgmyApp('Kiswahili', '🗣️', Color(0xFF14B8A6), 'Learn Swahili and English', 3),
+  NgmyApp('Doc Scanner', '📄', Color(0xFF6366F1), 'Scan, save and share', 4),
+  NgmyApp('Invoices', '🧾', Color(0xFFEC4899), 'Professional invoices', 5),
   NgmyApp('Calendar', '📅', Color(0xFFEF4444), 'This month, today lit up', -2),
 ];
 

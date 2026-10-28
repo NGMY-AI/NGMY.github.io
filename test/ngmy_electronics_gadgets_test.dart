@@ -249,7 +249,7 @@ void reducerTests() {
     t.view.devicePixelRatio = 2.0;
     addTearDown(t.view.reset);
     expect(kNgmyTvChannels.length, 10);
-    expect(kNgmyApps.length, greaterThanOrEqualTo(9));
+    expect(kNgmyApps.length, greaterThanOrEqualTo(8));
     await t.pumpWidget(MaterialApp(home: NgmyTvScreen(channel: 8, stayFor: const Duration(seconds: 60), showBoot: false)));
     await t.pump(const Duration(seconds: 1));
     expect(find.text('APPS'), findsOneWidget);
