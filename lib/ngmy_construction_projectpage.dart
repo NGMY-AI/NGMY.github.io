@@ -44,6 +44,7 @@ const List<List<_Item>> _trays = [
   ],
   [
     _Item('look', 'Look', Icons.search_rounded),
+    _Item('tester', 'Voltage tester', Icons.flash_on_rounded),
     _Item('outlet', 'Outlet', Icons.power_rounded),
     _Item('gfci', 'GFCI', Icons.shield_rounded),
     _Item('switch', 'Switch', Icons.toggle_on_rounded),
@@ -53,7 +54,6 @@ const List<List<_Item>> _trays = [
     _Item('lamp', 'Lamp', Icons.light_rounded),
     _Item('toaster', 'Toaster', Icons.breakfast_dining_rounded),
     _Item('hairdryer', 'Hair dryer', Icons.dry_rounded),
-    _Item('tester', 'Tester', Icons.flash_on_rounded),
     _Item('flip', 'Flip switch', Icons.toggle_on_rounded),
     _Item('unplug', 'Unplug', Icons.power_off_rounded),
   ],

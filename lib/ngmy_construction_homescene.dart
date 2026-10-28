@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_3d.dart';
 import 'ngmy_construction_home.dart';
+import 'ngmy_electronics_screens.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
 // One room of the house drawn in 3D, with the front wall left off so you can look in.
@@ -24,6 +25,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
   final b = MeshBuilder();
   final info = <int, ObjInfo>{};
   final labels = <Label3D>[];
+  final screens = <ScreenQuad>[];
   final w = r.w, d = r.d;
   const h = HRoom.h;
   final wallCols = [for (final c in r.wallColor) kWallColors[c]];
@@ -195,6 +197,10 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
       b.box(V3(x, 2, 15), V3(tw * 0.45, 4, 14), const Color(0xFF2B2D33), shine: 0.3);
       b.box(V3(x, 8, 15), const V3(7, 8, 3), const Color(0xFF2B2D33), shine: 0.3);
       b.box(V3(x, 12 + th / 2, 15), V3(tw, th, 3), const Color(0xFF111418), shine: 0.5);
+      // The real NGMY ad plays on the glass, flat on the screen.
+      final sw = tw - 3.5, sh = th - 3.5, sy = 12 + th / 2;
+      final off = i * 7.0 + r.id;
+      screens.add(ScreenQuad([V3(x - sw / 2, sy + sh / 2, 16.6), V3(x + sw / 2, sy + sh / 2, 16.6), V3(x + sw / 2, sy - sh / 2, 16.6), V3(x - sw / 2, sy - sh / 2, 16.6)], idHApp + i, (c, size, t) => paintNgmyApp(c, size, 0, t + off)));
     } else if (a.key == 'lamp') {
       b.cyl(V3(x, 0, 14), V3(x, 1, 14), 6, const Color(0xFF8A6A47), shine: 0.4, sides: 14);
       b.cyl(V3(x, 1, 14), V3(x, 22, 14), 1, const Color(0xFFB08A5B), shine: 0.5, sides: 8);
@@ -290,7 +296,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
     }
   }
 
-  return Scene3D(b.polys, info: info, labels: labels);
+  return Scene3D(b.polys, info: info, labels: labels, screens: screens);
 }
 
 
@@ -349,7 +355,7 @@ Scene3D _outside(HRoom r, int problems) {
 List<Poly> homeDynamic(HRoom r, double t) {
   final b = MeshBuilder();
   if (!r.indoor || r.kind == 'outside') return b.polys;
-  final w = r.w, d = r.d;
+  final d = r.d;
   const h = HRoom.h;
   if (r.ceilingFix == 'fan') {
     final spin = r.wired && r.lightOn;
@@ -360,19 +366,6 @@ List<Poly> homeDynamic(HRoom r, double t) {
       final c = V3(math.cos(a) * 15, h - 15, d * 0.5 + math.sin(a) * 15);
       b.box(c, const V3(24, 0.8, 6.5), const Color(0xFF8B5E3C), shine: 0.1, yaw: -a);
     }
-  }
-  for (final (i, x) in [(0, -w / 4), (1, w / 4)]) {
-    final key = r.plugged[i];
-    if (key == null || !r.wired) continue;
-    final a = applianceByKey(key);
-    if (!a.isTv) continue;
-    final tw = a.tvWidth, th = tw * 0.56;
-    b.id = idHApp + i;
-    final hue = (t * 38 + i * 120) % 360;
-    b.box(V3(x, 12 + th / 2, 16.7), V3(tw - 3.5, th - 3.5, 0.4), HSVColor.fromAHSV(1, hue, 0.55, 0.95).toColor(), shine: 0.6);
-    final bx = x + math.sin(t * 1.3) * (tw * 0.25);
-    b.box(V3(bx, 12 + th * 0.28, 17.0), V3(tw * 0.34, th * 0.14, 0.3), Colors.white.withValues(alpha: 0.9));
-    b.box(V3(x - tw * 0.3, 12 + th * 0.78, 17.0), V3(tw * 0.18, th * 0.1, 0.3), const Color(0xFFF59E0B));
   }
   return b.polys;
 }

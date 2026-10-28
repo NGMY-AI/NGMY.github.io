@@ -79,8 +79,11 @@ void _extra() {
     await _frames(t, 30);
     expect(find.text('Back to the room'), findsNothing);
     // With a different item in hand, tap the outlet that is in the wall.
-    await t.ensureVisible(find.text('Switch'));
-    await t.tap(find.text('Switch'));
+    final other = o.device == 'gfci' ? 'Outlet' : 'GFCI';
+    await t.scrollUntilVisible(find.text(other), 80, scrollable: find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.right).first);
+    await t.ensureVisible(find.text(other));
+    await t.pump(const Duration(milliseconds: 300));
+    await t.tap(find.text(other));
     await _frames(t, 3);
     final painter = t.widget<CustomPaint>(_view()).painter! as Scene3DPainter;
     final box = t.getRect(_view());

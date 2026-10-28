@@ -158,7 +158,8 @@ void main() {
     r.plugged[0] = 'bangtv';
     final plain = buildHomeRoom(r).polys.length;
     expect(buildHomeRoom(r).polys.any((p) => p.id == idHApp), isTrue);
-    expect(homeDynamic(r, 1.0).any((p) => p.id == idHApp), isTrue, reason: 'the TV picture moves');
+    expect(buildHomeRoom(r).screens.where((q) => q.id == idHApp), isNotEmpty, reason: 'the NGMY ad plays on the glass');
+    expect(homeDynamic(r, 1.0).any((p) => p.id == idHApp), isFalse, reason: 'nothing floats in front of the screen');
     r.lightOn = true;
     expect(r.ceilingFix, 'fan');
     expect(homeDynamic(r, 1.0).where((p) => p.id == idHLight), isNotEmpty, reason: 'the fan blades turn');

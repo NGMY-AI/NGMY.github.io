@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'ngmy_3d.dart';
+import 'ngmy_electronics_screens.dart';
 import 'ngmy_construction_electrical.dart';
 import 'ngmy_construction_project.dart';
 
@@ -75,6 +76,7 @@ const Color _painted = Color(0xFFEFE9DC);
 
 Scene3D buildRoomScene(RoomProject p, RoomView v) {
   final b = MeshBuilder();
+  final screens = <ScreenQuad>[];
   final labels = <Label3D>[];
   final info = <int, ObjInfo>{};
 
@@ -332,6 +334,10 @@ Scene3D buildRoomScene(RoomProject p, RoomView v) {
       case 'tv':
         b.box(V3(x, -45, 24), const V3(54, 5, 18), const Color(0xFF3B2F26), shine: 0.2);
         b.box(V3(x, -19, 24), const V3(82, 46, 3), const Color(0xFF111418), shine: 0.4);
+        if (p.applianceRuns(e.key)) {
+          // The real NGMY ad plays on the glass.
+          screens.add(ScreenQuad([V3(x - 38.5, 1.5, 25.7), V3(x + 38.5, 1.5, 25.7), V3(x + 38.5, -39.5, 25.7), V3(x - 38.5, -39.5, 25.7)], idAppBase + e.key, (c, size, t) => paintNgmyApp(c, size, 0, t + e.key * 5.0)));
+        }
       case 'lamp':
         b.cyl(V3(x, -47.5, 24), V3(x, -46.5, 24), 6, const Color(0xFF8A6A47), shine: 0.4, sides: 14);
         b.cyl(V3(x, -46.5, 24), V3(x, -22, 24), 1, const Color(0xFFB08A5B), shine: 0.5, sides: 8);
@@ -351,7 +357,7 @@ Scene3D buildRoomScene(RoomProject p, RoomView v) {
   for (final s in kSlots) {
     info.putIfAbsent(idSlotBase + s.id, () => ObjInfo(s.name, s.ceiling ? 'A place in the ceiling for a ${s.role == 'fan' ? 'fan (needs a fan-rated box)' : 'light'}.' : 'A place on the wall at ${s.role == 'switch' ? 'switch height, about 48 inches from the floor' : 'outlet height, about 16 inches from the floor'}.', slotPoint(s, const V3(0, 0, 4)), 26));
   }
-  return Scene3D(b.polys, info: info, labels: labels);
+  return Scene3D(b.polys, info: info, labels: labels, screens: screens);
 }
 
 String _deviceName(String kind) => switch (kind) { 'gfci' => 'GFCI outlet', 'switch' => 'Light switch', 'light' => 'Ceiling light', 'fan' => 'Ceiling fan', _ => 'Outlet' };
@@ -399,12 +405,7 @@ List<Poly> roomDynamic(RoomProject p, double t, Map<int, double> fxUntil) {
     b.id = idAppBase + e.key;
     switch (e.value) {
       case 'tv':
-        b.bias = 0.8;
-        final hue = (t * 60) % 360;
-        b.box(V3(x, -19, 25.7), const V3(77, 41, 0.3), HSVColor.fromAHSV(1, hue, 0.5, 0.95).toColor());
-        b.box(V3(x - 20 + 40 * ((t * 0.6) % 1), -14 + 9 * math.sin(t * 3), 26), const V3(14, 14, 0.3), Colors.white);
-        b.box(V3(x - 24, -34, 26), const V3(24, 5, 0.3), const Color(0xFFF59E0B));
-        b.bias = 0;
+        break;
       case 'lamp':
         b.id = 0;
         b.alpha = 0.3 + 0.05 * math.sin(t * 6);

@@ -67,10 +67,23 @@ class Label3D {
 }
 
 class Scene3D {
-  const Scene3D(this.polys, {this.info = const {}, this.labels = const []});
+  const Scene3D(this.polys, {this.info = const {}, this.labels = const [], this.screens = const []});
   final List<Poly> polys;
   final Map<int, ObjInfo> info;
   final List<Label3D> labels;
+
+  /// Real pictures on screens (a TV playing an ad), drawn flat on a four cornered patch of the scene.
+  final List<ScreenQuad> screens;
+}
+
+/// A screen in the scene: where its four corners are (top left, top right, bottom right, bottom left, seen from the front)
+/// and how to paint what it shows, at [width] by [height], at a moment [t].
+class ScreenQuad {
+  const ScreenQuad(this.corners, this.id, this.paint, {this.width = 320, this.height = 180});
+  final List<V3> corners;
+  final int id;
+  final void Function(Canvas canvas, Size size, double t) paint;
+  final double width, height;
 }
 
 // ─── Building shapes ─────────────────────────────────────────────────────────
@@ -404,11 +417,26 @@ class Scene3DPainter extends CustomPainter {
       path.close();
       drawn.add(_Face(path, Color.fromRGBO(r, g, b, p.alpha), zs / cp3.length - p.bias, p.id, p.alpha < 0.99, p.id == highlight && highlight != 0));
     }
+    for (final sq in scene.screens) {
+      final q = [for (final v in sq.corners) toCam(v)];
+      if (q.any((v) => v.z < 1)) continue;
+      final mid = (q[0] + q[1] + q[2] + q[3]) * 0.25;
+      final n = rotN((sq.corners[3] - sq.corners[0]).cross(sq.corners[1] - sq.corners[0]));
+      if (n.dot(mid) > 0) continue;
+      final pts = [for (final v in q) Offset(cx + v.x * f / v.z, cy - v.y * f / v.z)];
+      final path = Path()..addPolygon(pts, true);
+      drawn.add(_Face(path, Colors.transparent, mid.z - 0.6, sq.id, false, false, (c) => _drawQuad(c, sq, pts, time)));
+    }
     drawn.sort((a, b) => b.z.compareTo(a.z));
     hits.list.clear();
     final fill = Paint()..style = PaintingStyle.fill;
     final edge = Paint()..style = PaintingStyle.stroke..strokeWidth = 0.8;
     for (final d in drawn) {
+      if (d.draw != null) {
+        d.draw!(canvas);
+        if (d.id != 0) hits.list.add((d.path, d.id));
+        continue;
+      }
       fill.color = d.color;
       canvas.drawPath(d.path, fill);
       if (!d.see) {
@@ -463,8 +491,40 @@ List<V3> _clipNear(List<V3> pts, {double near = 0.5}) {
   return out;
 }
 
+
+/// Paints [sq] flat onto the four screen points [p] (top left, top right, bottom right, bottom left).
+void _drawQuad(Canvas canvas, ScreenQuad sq, List<Offset> p, double t) {
+  final x0 = p[0].dx, y0 = p[0].dy, x1 = p[1].dx, y1 = p[1].dy, x2 = p[2].dx, y2 = p[2].dy, x3 = p[3].dx, y3 = p[3].dy;
+  final dx1 = x1 - x2, dx2 = x3 - x2, dx3 = x0 - x1 + x2 - x3;
+  final dy1 = y1 - y2, dy2 = y3 - y2, dy3 = y0 - y1 + y2 - y3;
+  double a, b, d, e, g = 0, h = 0;
+  if (dx3.abs() < 1e-9 && dy3.abs() < 1e-9) {
+    a = x1 - x0;
+    b = x3 - x0;
+    d = y1 - y0;
+    e = y3 - y0;
+  } else {
+    final den = dx1 * dy2 - dx2 * dy1;
+    if (den.abs() < 1e-9) return;
+    g = (dx3 * dy2 - dx2 * dy3) / den;
+    h = (dx1 * dy3 - dx3 * dy1) / den;
+    a = x1 - x0 + g * x1;
+    b = x3 - x0 + h * x3;
+    d = y1 - y0 + g * y1;
+    e = y3 - y0 + h * y3;
+  }
+  final w = sq.width, hh = sq.height;
+  final m = Matrix4(a / w, d / w, 0, g / w, b / hh, e / hh, 0, h / hh, 0, 0, 1, 0, x0, y0, 0, 1);
+  canvas.save();
+  canvas.transform(m.storage);
+  canvas.clipRect(Rect.fromLTWH(0, 0, w, hh));
+  sq.paint(canvas, Size(w, hh), t);
+  canvas.restore();
+}
+
 class _Face {
-  _Face(this.path, this.color, this.z, this.id, this.see, this.glow);
+  _Face(this.path, this.color, this.z, this.id, this.see, this.glow, [this.draw]);
+  final void Function(Canvas canvas)? draw;
   final Path path;
   final Color color;
   final double z;

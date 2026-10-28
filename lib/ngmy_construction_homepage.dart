@@ -38,6 +38,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   late Cam3 cam;
   late Scene3D scene;
   String mode = 'look';
+
+  /// The voltage tester is in your hand: tap an outlet, a switch or the light to check for power.
+  bool tester = false;
   int selFurn = 0;
   int selWall = -1;
   int hl = 0;
@@ -178,6 +181,12 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         setState(() => room.openDoors.remove(i));
         _go(to);
       });
+      return;
+    }
+    if (tester && (id == idHOutletA || id == idHOutletB || id == idHSwitch || id == idHLight || id == idHApp || id == idHApp + 1)) {
+      final live = room.wired;
+      conBeep(live ? 1400 : 500, ms: 160);
+      _say(live ? 'The tester glows and beeps: LIVE, 120 volts. Never touch a live wire. Switch the breaker off first.' : 'The tester stays dark: no power here. This room still needs wiring.', ok: !live);
       return;
     }
     if (id == idHOutletA || id == idHOutletB) {
@@ -496,6 +505,10 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
           _chip('🟫 Floor', mode == 'floor', () => _setMode('floor')),
           _chip('⬜ Ceiling', mode == 'ceiling', () => _setMode('ceiling')),
           _chip('🚪 Doors', mode == 'doors', () => _setMode('doors')),
+          _chip('🔦 Tester', tester, () => setState(() {
+            tester = !tester;
+            if (tester) _say('Voltage tester in your hand: tap an outlet, a switch or the light.');
+          }), color: const Color(0xFFFB923C)),
           _chip('⚡ Wiring', false, _openWiring, color: const Color(0xFFFACC15), dot: !r.wired),
           _chip('🚰 Plumbing', false, _openPlumbing, color: const Color(0xFF60A5FA), dot: r.hasPlumbing && !r.plumbed),
           _chip('📘 Learn', false, () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const NgmyConstructionLearnPage())), color: const Color(0xFFA78BFA)),
