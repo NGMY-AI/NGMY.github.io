@@ -309,7 +309,7 @@ class HRoom {
 
   bool get hasPlumbing => kind == 'bathroom' || kind == 'kitchen';
   // Once a job has been opened it decides: pull a device out of a finished room and the room is no longer wired.
-  bool get wired => !indoor || (lesson.isNotEmpty ? (lessonIsPlumbing || lessonDone) : (wiring?.devicesDone ?? !wiringNeeded));
+  bool get wired => !indoor || (lesson.isNotEmpty ? (lessonIsPlumbing || lessonDone) : (wiring?.wiringWorks ?? !wiringNeeded));
   bool get plumbed => !hasPlumbing || (lesson.isNotEmpty ? (!lessonIsPlumbing || lessonDone) : (plumb?.done ?? !plumbNeeded));
   bool get finished => wired && plumbed;
 

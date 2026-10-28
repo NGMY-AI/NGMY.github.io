@@ -68,6 +68,11 @@ const List<(double, double, double, int)> kHelis = [(0, 560, 240, 7), (0, 560, 3
   return turn(v.x0 + r, v.z0 + r, math.pi, s);
 }
 
+/// The buses and police cars are drawn big, so their billboards can be big: this is how much longer, taller and wider than the first drawing.
+const V3 kBusSize = V3(1.5, 1.7, 1.2), kPoliceSize = V3(1.45, 1.7, 1.15);
+
+List<Poly> _scaled(List<Poly> ps, V3 k) => [for (final p in ps) Poly([for (final v in p.pts) V3(v.x * k.x, v.y * k.y, v.z * k.z)], p.n, p.color, p.id, shine: p.shine, alpha: p.alpha, twoSided: p.twoSided, layer: p.layer, bias: p.bias, order: p.order, group: p.group)];
+
 double _heading(double ux, double uz) => math.atan2(ux, uz) - math.pi / 2;
 
 V3 _at(V3 l, double a, double x, double y, double z) => rotY(l, a) + V3(x, y, z);
@@ -119,7 +124,7 @@ List<Poly> trafficPolys(double t) {
     final v = kTraffic[i];
     final (x, z, ux, uz) = vehiclePose(v, t);
     final m = v.kind == 'bus' ? _bus() : _police(t, i);
-    out.addAll(transformPolys(m.polys, ry: _heading(ux, uz), t: V3(x, 0, z)));
+    out.addAll(transformPolys(_scaled(m.polys, v.kind == 'bus' ? kBusSize : kPoliceSize), ry: _heading(ux, uz), t: V3(x, 0, z)));
   }
   for (var i = 0; i < kHelis.length; i++) {
     final (cx, cz, alt, _) = kHelis[i];
@@ -156,19 +161,17 @@ List<Poly> trafficPolys(double t) {
 /// The billboards that move with the vehicles: one on each side of a bus or police car, one on each helicopter banner.
 List<ScreenQuad> trafficScreens(double t) {
   final out = <ScreenQuad>[];
-  ScreenQuad quad(V3 tl, V3 tr, V3 br, V3 bl, int ad, double w, double h, {bool two = false}) => ScreenQuad([tl, tr, br, bl], 0, (c, size, time) => paintCityAd(c, size, time, ad), width: w, height: h, bias: 6, order: 2, twoSided: two);
+  ScreenQuad quad(V3 tl, V3 tr, V3 br, V3 bl, int ad, double w, double h) => ScreenQuad([tl, tr, br, bl], 0, (c, size, time) => paintCityAd(c, size, time, ad), width: w, height: h, bias: 6, order: 2);
   for (var i = 0; i < kTraffic.length; i++) {
     final v = kTraffic[i];
     final (x, z, ux, uz) = vehiclePose(v, t);
     final a = _heading(ux, uz);
     V3 p(double lx, double ly, double lz) => _at(V3(lx, ly, lz), a, x, 0, z);
-    if (v.kind == 'bus') {
-      out.add(quad(p(-51, 24, 21.8), p(51, 24, 21.8), p(51, 7.5, 21.8), p(-51, 7.5, 21.8), v.ad, 900, 150));
-      out.add(quad(p(51, 24, -21.8), p(-51, 24, -21.8), p(-51, 7.5, -21.8), p(51, 7.5, -21.8), v.ad + 5, 900, 150));
-    } else {
-      out.add(quad(p(-38, 18.5, 18.2), p(38, 18.5, 18.2), p(38, 5.5, 18.2), p(-38, 5.5, 18.2), v.ad, 900, 150));
-      out.add(quad(p(38, 18.5, -18.2), p(-38, 18.5, -18.2), p(-38, 5.5, -18.2), p(38, 5.5, -18.2), v.ad + 4, 900, 150));
-    }
+    final k = v.kind == 'bus' ? kBusSize : kPoliceSize;
+    // One big billboard along each side, 94 percent of the length of the bus, each the right way up for someone standing on that side.
+    final hx = (v.kind == 'bus' ? 51.0 : 38.0) * k.x, y1 = (v.kind == 'bus' ? 25.0 : 19.0) * k.y, y0 = (v.kind == 'bus' ? 7.5 : 5.5) * k.y, hz = (v.kind == 'bus' ? 21.8 : 18.2) * k.z;
+    out.add(quad(p(-hx, y1, hz), p(hx, y1, hz), p(hx, y0, hz), p(-hx, y0, hz), v.ad, 1200, 220));
+    out.add(quad(p(hx, y1, -hz), p(-hx, y1, -hz), p(-hx, y0, -hz), p(hx, y0, -hz), v.ad + 5, 1200, 220));
   }
   for (var i = 0; i < kHelis.length; i++) {
     final (cx, cz, alt, ad) = kHelis[i];
@@ -178,7 +181,8 @@ List<ScreenQuad> trafficScreens(double t) {
     final a = _heading(-math.sin(th), math.cos(th));
     final y = alt + math.sin(t * 0.9 + i) * 5;
     V3 p(double lx, double ly) => _at(V3(lx, ly, 0), a, x, y, z);
-    out.add(quad(p(-42, -22), p(42, -22), p(42, -44), p(-42, -44), ad, 900, 230, two: true));
+    out.add(quad(p(-42, -22), p(42, -22), p(42, -44), p(-42, -44), ad, 900, 230));
+    out.add(quad(p(42, -22.3), p(-42, -22.3), p(-42, -44.3), p(42, -44.3), ad, 900, 230));
   }
   return out;
 }

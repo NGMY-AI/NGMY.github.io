@@ -749,7 +749,9 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
     V3 w(double x, double y, double z) => rotY(V3(x, y, z), rr) + V3(f.x, 0, f.z);
     final grp = furnGroup[f.id] ?? 0;
     if (f.kind == 'billboard') {
-      adScreens.add(ScreenQuad([w(-33, 62.5, 2), w(33, 62.5, 2), w(33, 31.5, 2), w(-33, 31.5, 2)], 0, (c, size, t) => paintCityAd(c, size, t, f.id), width: 960, height: 450, bias: 4, order: 2, twoSided: true, group: grp));
+      // One face on the front and one on the back, so it reads the right way up from both sides.
+      adScreens.add(ScreenQuad([w(-33, 62.5, 2), w(33, 62.5, 2), w(33, 31.5, 2), w(-33, 31.5, 2)], 0, (c, size, t) => paintCityAd(c, size, t, f.id), width: 960, height: 450, bias: 4, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(33, 62.5, -2), w(-33, 62.5, -2), w(-33, 31.5, -2), w(33, 31.5, -2)], 0, (c, size, t) => paintCityAd(c, size, t, f.id), width: 960, height: 450, bias: 4, order: 2, group: grp));
     } else {
       for (var k = 0; k < 2; k++) {
         final cx = k == 0 ? -40.0 : 40.0;
@@ -772,7 +774,9 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
   }
   b.box(const V3(0, 250, -118), const V3(250, 92, 6), const Color(0xFF111827), shine: 0.3);
   b.endGroup();
-  logos.add(ScreenQuad(const [V3(-125, 292, -114.5), V3(125, 292, -114.5), V3(125, 208, -114.5), V3(-125, 208, -114.5)], 0, (c, size, t) => paintNgmyPoster(c, size, t, 0), width: 1000, height: 336, bias: 4, order: 2, twoSided: true, group: gBoard));
+  logos.add(ScreenQuad(const [V3(-125, 292, -114.5), V3(125, 292, -114.5), V3(125, 208, -114.5), V3(-125, 208, -114.5)], 0, (c, size, t) => paintNgmyPoster(c, size, t, 0), width: 1000, height: 336, bias: 4, order: 2, group: gBoard));
+  // The same board seen from the back: its own face, turned round, so nothing is upside down or backwards from either side.
+  logos.add(ScreenQuad(const [V3(125, 292, -121.5), V3(-125, 292, -121.5), V3(-125, 208, -121.5), V3(125, 208, -121.5)], 0, (c, size, t) => paintNgmyPoster(c, size, t, 0), width: 1000, height: 336, bias: 4, order: 2, group: gBoard));
   return Scene3D(b.polys, info: info, labels: labels, screens: [...logos, ...adScreens]);
 }
 

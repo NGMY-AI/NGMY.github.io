@@ -257,7 +257,7 @@ void main() {
     expect(kTraffic.where((v) => v.kind == 'police'), isNotEmpty);
     expect(trafficPolys(3.0).length, greaterThan(300));
     final screens = trafficScreens(3.0);
-    expect(screens.length, kTraffic.length * 2 + kHelis.length, reason: 'a billboard on each side of every vehicle and on each helicopter');
+    expect(screens.length, kTraffic.length * 2 + kHelis.length * 2, reason: 'a billboard on each side of every vehicle and on each helicopter');
     // The helicopters are high in the sky.
     expect(trafficPolys(3.0).any((p) => p.pts.any((v) => v.y > 200)), isTrue);
   });

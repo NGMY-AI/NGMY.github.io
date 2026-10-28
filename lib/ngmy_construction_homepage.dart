@@ -192,6 +192,18 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         ..minPitch = 0.03
         ..maxPitch = 1.35
         ..setFree(true);
+    } else if (inside && full) {
+      // Full screen: you stand right inside the room, in the middle, like in a normal house, with the walls round you.
+      target = V3(0, 46, r.d * 0.1);
+      dist = r.d * 0.74;
+      pitch = 0.05;
+      yaw = 0;
+      cam
+        ..minDist = 6
+        ..maxDist = r.d * 0.78
+        ..minPitch = 0.02
+        ..maxPitch = 1.35
+        ..setFree(true);
     } else if (inside) {
       // Standing in the room, looking in: low, close, like a person in the doorway.
       target = V3(0, 40, r.d * 0.3);
@@ -504,6 +516,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   void _enterFull() {
     setState(() => full = true);
     if (!steer && !room.indoor) _startSteer();
+    if (room.indoor) _frame();
   }
 
   /// Just the game, turned on its side like a video, with only the walking controls and a way back.
@@ -531,7 +544,10 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
                   Positioned(top: 0, left: 0, child: GestureDetector(behavior: HitTestBehavior.translucent, onDoubleTap: () => setState(() => _fullHide = false), child: const SizedBox(width: 110, height: 64)))
                 else
                   Positioned(top: 10, left: 10, child: Row(children: [
-                    btn(Icons.fullscreen_exit_rounded, () => setState(() => full = false)),
+                    btn(Icons.fullscreen_exit_rounded, () {
+                      setState(() => full = false);
+                      if (room.indoor) _frame();
+                    }),
                     btn(Icons.screen_rotation_rounded, () => setState(() => _fullTurns = _fullTurns == 1 ? 3 : 1)),
                   ])),
               ]),
@@ -718,17 +734,15 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Row(children: [
-              CircleAvatar(radius: 18, backgroundColor: Color(0xFFF59E0B), child: Text('⚡')),
-              SizedBox(width: 10),
-              Text('Your neighbour', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
-              Spacer(),
-              Text('Messages', style: TextStyle(color: Colors.white38, fontSize: 12)),
+            Row(children: [
+              CircleAvatar(radius: 18, backgroundColor: const Color(0xFFF59E0B), child: Text(c.emoji)),
+              const SizedBox(width: 10),
+              Text(c.caller, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
+              const Spacer(),
+              const Text('Messages', style: TextStyle(color: Colors.white38, fontSize: 12)),
             ]),
             const Divider(color: Colors.white12),
-            bubble('Hello! All the lights went out in ${c.name}. The power is off in the whole house.'),
-            bubble('Could you check the breaker panel inside and fix the wiring? Switch the power off before you touch anything.'),
-            bubble('I will pay you 20 points. Thank you!'),
+            for (final line in c.lines) bubble(line),
             bubble('I am on my way.', mine: true),
             const SizedBox(height: 6),
             Wrap(spacing: 10, runSpacing: 8, children: [
@@ -736,7 +750,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
                 onPressed: () {
                   Navigator.pop(ctx);
                   if (!room.indoor) cam.glideTo(target: V3(f.x, 40, f.z), dist: 260);
-                  _say('The dark house with the red sign is the one. Walk to its front door and in.', ok: true);
+                  _say(c.kind == 'power' ? 'The dark house with the red sign is the one. Walk to its front door and in.' : (c.kind == 'sick' ? 'This is the hospital. Walk in and onto the desk to admit the sick person.' : 'The dark street light with the red sign is the one.'), ok: true);
                 },
                 icon: const Icon(Icons.place_rounded),
                 label: const Text('Show me the house'),
@@ -755,7 +769,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
                     cam.glideTo(target: V3(w.x, 30, w.z), dist: 170);
                     if (!steer) _startSteer();
                   }
-                  _say('You are at the house. Walk in through the door, then onto the red mat at the breaker panel.', ok: true);
+                  _say(c.kind == 'power' ? 'You are at the house. Walk in through the door, then onto the red mat at the breaker panel.' : (c.kind == 'sick' ? 'You are at the hospital. Walk in and onto the desk.' : 'You are at the street light. Tap it to fix it.'), ok: true);
                 },
                 icon: const Icon(Icons.directions_walk_rounded),
                 label: const Text('Take me there'),
@@ -967,60 +981,143 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   // ── The tour ──
 
   Future<void> _tourSheet() {
+    const pink = Color(0xFFF472B6), sky = Color(0xFF38BDF8);
     return showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF17171C),
+      backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
       builder: (ctx) => StatefulBuilder(builder: (ctx, set) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('House tour 🎬', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 4),
-              const Text('A little person walks through the whole house: the living room, the kitchen (a drink from the fridge), the hall, the bedrooms and the bathrooms. Every TV is switched on first. Choose how long it takes.', style: TextStyle(color: Colors.white60, fontSize: 12.5, height: 1.4)),
-              const SizedBox(height: 10),
-              const Text('Who walks the house?', style: TextStyle(color: Colors.white70, fontSize: 12.5, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 6),
-              Wrap(spacing: 8, runSpacing: 8, children: [
-                for (final e in kAvatarNames.entries)
-                  GestureDetector(
-                    onTap: () {
-                      set(() => ngmyPlayerAvatar = e.key);
-                      GlbAvatar.load(e.key);
-                      setState(() {});
-                    },
-                    child: Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), decoration: BoxDecoration(color: ngmyPlayerAvatar == e.key ? const Color(0xFF38BDF8).withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(12), border: Border.all(color: ngmyPlayerAvatar == e.key ? const Color(0xFF38BDF8) : Colors.white24, width: ngmyPlayerAvatar == e.key ? 2 : 1)), child: Text(e.value, style: TextStyle(color: ngmyPlayerAvatar == e.key ? const Color(0xFF38BDF8) : Colors.white, fontWeight: FontWeight.w900, fontSize: 13))),
+        Widget label(String t) => Padding(
+              padding: const EdgeInsets.only(top: 18, bottom: 8),
+              child: Text(t.toUpperCase(), style: const TextStyle(color: Colors.white54, fontSize: 11.5, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+            );
+        return Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1F2330), Color(0xFF0E1018)]),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+            border: Border(top: BorderSide(color: Color(0x33FFFFFF))),
+          ),
+          child: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 18),
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Center(child: Container(width: 42, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)))),
+                const SizedBox(height: 16),
+                Row(children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(gradient: const LinearGradient(colors: [pink, Color(0xFFA855F7)]), borderRadius: BorderRadius.circular(16)),
+                    child: const Icon(Icons.movie_creation_rounded, color: Colors.white, size: 28),
                   ),
-              ]),
-              const SizedBox(height: 12),
-              Wrap(spacing: 8, runSpacing: 8, children: [
-                for (final s in kTourLengths)
-                  GestureDetector(
-                    onTap: () => set(() => tourSecs = s),
-                    child: Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), decoration: BoxDecoration(color: tourSecs == s ? kConAmber.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(12), border: Border.all(color: tourSecs == s ? kConAmber : Colors.white24, width: tourSecs == s ? 2 : 1)), child: Text(tourLengthName(s), style: TextStyle(color: tourSecs == s ? kConAmber : Colors.white, fontWeight: FontWeight.w900, fontSize: 13))),
+                  const SizedBox(width: 14),
+                  const Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('House tour', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
+                      SizedBox(height: 2),
+                      Text('A film of your whole house, with every TV on.', style: TextStyle(color: Colors.white60, fontSize: 13)),
+                    ]),
                   ),
+                ]),
+                label('Who walks the house'),
+                SizedBox(
+                  height: 96,
+                  child: ListView(scrollDirection: Axis.horizontal, children: [
+                    for (final e in kAvatarNames.entries)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 10),
+                        child: GestureDetector(
+                          onTap: () {
+                            set(() => ngmyPlayerAvatar = e.key);
+                            GlbAvatar.load(e.key);
+                            setState(() {});
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 160),
+                            width: 92,
+                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+                            decoration: BoxDecoration(
+                              color: ngmyPlayerAvatar == e.key ? sky.withValues(alpha: 0.18) : Colors.white.withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: ngmyPlayerAvatar == e.key ? sky : Colors.white12, width: ngmyPlayerAvatar == e.key ? 2 : 1),
+                            ),
+                            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                              CircleAvatar(
+                                radius: 20,
+                                backgroundColor: ngmyPlayerAvatar == e.key ? sky : Colors.white24,
+                                child: Text(e.value.split(' ').first, style: const TextStyle(fontSize: 22)),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(e.value.split(' ').skip(1).join(' '), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: ngmyPlayerAvatar == e.key ? sky : Colors.white, fontWeight: FontWeight.w800, fontSize: 12.5)),
+                            ]),
+                          ),
+                        ),
+                      ),
+                  ]),
+                ),
+                label('How long'),
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(16)),
+                  child: Row(children: [
+                    for (final s in kTourLengths)
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => set(() => tourSecs = s),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 160),
+                            padding: const EdgeInsets.symmetric(vertical: 11),
+                            decoration: BoxDecoration(color: tourSecs == s ? kConAmber : Colors.transparent, borderRadius: BorderRadius.circular(12)),
+                            child: Center(child: Text(tourLengthName(s), textAlign: TextAlign.center, style: TextStyle(color: tourSecs == s ? Colors.black : Colors.white70, fontWeight: FontWeight.w900, fontSize: 12.5))),
+                          ),
+                        ),
+                      ),
+                  ]),
+                ),
+                const SizedBox(height: 22),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _startTour(tourSecs);
+                  },
+                  child: Container(
+                    height: 56,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFEF4444)]),
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: [BoxShadow(color: const Color(0xFFEF4444).withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 6))],
+                    ),
+                    child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Icon(Icons.play_arrow_rounded, color: Colors.white, size: 30),
+                      SizedBox(width: 6),
+                      Text('Play the tour', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
+                    ]),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _startTour(45, hallOnly: true);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white12)),
+                    child: const Row(children: [
+                      Icon(Icons.meeting_room_rounded, color: pink, size: 26),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text('Hallway tour', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+                          Text('Just the hall and its big TVs, 45 seconds', style: TextStyle(color: Colors.white54, fontSize: 12.5)),
+                        ]),
+                      ),
+                      Icon(Icons.chevron_right_rounded, color: Colors.white38),
+                    ]),
+                  ),
+                ),
               ]),
-              const SizedBox(height: 14),
-              FilledButton.icon(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _startTour(tourSecs);
-                },
-                icon: const Icon(Icons.play_arrow_rounded),
-                label: const Text('Play the tour'),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _startTour(45, hallOnly: true);
-                },
-                icon: const Icon(Icons.meeting_room_rounded),
-                label: const Text('Book a hallway tour (just the hall)'),
-              ),
-            ]),
+            ),
           ),
         );
       }),
@@ -1496,6 +1593,12 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (tour == null) cm.advance(1, home);
     if (++_beat % 8 == 0) cm.save(home);
     if (_beat % 45 == 20 && !isLesson) _neighbourEvents();
+    // In the city the phone rings at least once a minute with a job, so there is always somebody who needs you.
+    if (!isLesson && !room.indoor && _ringing == null && _nCall == null) {
+      if (++_quiet >= 45) _serviceCall();
+    } else if (room.indoor) {
+      _quiet = 0;
+    }
     for (final c in cm.calls) {
       if (_knownCalls.add(c.id)) _ring(c);
     }
@@ -1506,14 +1609,55 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   /// The phone rings: a two-note ring and a buzz, and a call banner to answer.
   void _ring(HelpCall c) {
+    _quiet = 0;
     _ringing = c;
     _nCall = null;
     _startRingTimer();
   }
 
-  void _ringNeighbour(Furn f) {
+  /// How many seconds have passed in the city without the phone ringing. It never gets to a minute.
+  int _quiet = 0;
+  int _calls = 0;
+
+  /// Rings with a job: a house with no power, a street light that is out, or somebody who is sick and needs the hospital.
+  void _serviceCall() {
+    final city = home.rooms.firstWhere((r) => !r.indoor);
+    final cm = comm;
+    final houses = [for (final f in city.furn) if ((f.kind == 'house2' || f.kind == 'bighouse') && !city.darkHouses.contains(f.id)) f];
+    final lamps = [for (final f in city.furn) if ((f.kind == 'pole' || f.kind == 'lamppost') && !city.brokenLamps.contains(f.id)) f];
+    final hospital = city.furn.where((f) => f.kind == 'hospital');
+    for (var tries = 0; tries < 3; tries++) {
+      final k = (_calls++) % 3;
+      if (k == 0 && houses.isNotEmpty && city.darkHouses.length < 3) {
+        final f = houses[(_beat * 7 + _calls) % houses.length];
+        city.darkHouses.add(f.id);
+        _ringNeighbour(f);
+        return;
+      }
+      if (k == 1 && cm != null && hospital.isNotEmpty) {
+        final well = cm.living.where((p) => !p.sick && p.inBed < 0).toList();
+        if (well.isNotEmpty) {
+          final p = well[(_beat + _calls) % well.length];
+          p.sick = true;
+          p.health = math.min(p.health, 70);
+          _ringNeighbour(hospital.first, kind: 'sick', who: p.name);
+          return;
+        }
+      }
+      if (k == 2 && lamps.isNotEmpty && city.brokenLamps.length < 4) {
+        final f = lamps[(_beat * 5 + _calls) % lamps.length];
+        city.brokenLamps.add(f.id);
+        _ringNeighbour(f, kind: 'light');
+        return;
+      }
+    }
+    _quiet = 0;
+  }
+
+  void _ringNeighbour(Furn f, {String kind = 'power', String who = ''}) {
+    _quiet = 0;
     _ringing = null;
-    _nCall = _NCall(f, f.kind == 'bighouse' ? 'the big house' : 'the house');
+    _nCall = _NCall(f, kind == 'power' ? (f.kind == 'bighouse' ? 'the big house' : 'the house') : kind == 'sick' ? 'the hospital' : 'the street', kind: kind, who: who);
     _startRingTimer();
   }
 
@@ -1570,12 +1714,12 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
             padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
             decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1F2937), Color(0xFF0B1220)]), borderRadius: BorderRadius.circular(30), border: Border.all(color: Colors.white24, width: 2), boxShadow: [BoxShadow(color: const Color(0xFFFACC15).withValues(alpha: 0.35), blurRadius: 24)]),
             child: Row(children: [
-              const CircleAvatar(radius: 26, backgroundColor: Color(0xFFF59E0B), child: Text('⚡', style: TextStyle(fontSize: 24))),
+              CircleAvatar(radius: 26, backgroundColor: const Color(0xFFF59E0B), child: Text(nc.emoji, style: const TextStyle(fontSize: 24))),
               const SizedBox(width: 12),
-              const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                Text('incoming call', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                Text('Your neighbour', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
-                Text('No power at a house', style: TextStyle(color: Colors.white38, fontSize: 11.5)),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                const Text('incoming call', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                Text(nc.caller, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
+                Text(nc.subtitle, style: const TextStyle(color: Colors.white38, fontSize: 11.5)),
               ])),
               GestureDetector(
                 onTapDown: (_) => _stopRing(),
@@ -2264,7 +2408,20 @@ class _StickState extends State<_Stick> {
 
 /// A neighbour who rang about a house with no power.
 class _NCall {
-  _NCall(this.furn, this.name);
+  _NCall(this.furn, this.name, {this.kind = 'power', this.who = ''});
   final Furn furn;
   final String name;
+
+  /// power (a house with no power), light (a street light is out) or sick (somebody needs the hospital).
+  final String kind;
+  final String who;
+
+  String get emoji => switch (kind) { 'sick' => '🤒', 'light' => '💡', _ => '⚡' };
+  String get caller => switch (kind) { 'sick' => who.isEmpty ? 'A neighbour' : who, 'light' => 'City lights office', _ => 'Your neighbour' };
+  String get subtitle => switch (kind) { 'sick' => 'Needs a doctor', 'light' => 'A street light is out', _ => 'No power at a house' };
+  List<String> get lines => switch (kind) {
+        'sick' => ['Hello! $caller is very sick and cannot get up.', 'Please take them to the hospital: walk into the hospital and onto the desk to admit them.', 'I will pay you 10 points. Thank you!'],
+        'light' => ['Hello! A street light is out and the street is dark.', 'It is the dark one with the red sign. Could you fix its wiring?', 'I will pay you 10 points. Thank you!'],
+        _ => ['Hello! All the lights went out in $name. The power is off in the whole house.', 'Could you check the breaker panel inside and fix the wiring? Switch the power off before you touch anything.', 'I will pay you 20 points. Thank you!'],
+      };
 }
