@@ -36,7 +36,7 @@ V3 rotY(V3 p, double a) {
 
 /// One flat face. [id] says which object it belongs to (0 means it cannot be tapped).
 class Poly {
-  const Poly(this.pts, this.n, this.color, this.id, {this.shine = 0, this.alpha = 1, this.twoSided = false, this.layer = 0, this.bias = 0});
+  const Poly(this.pts, this.n, this.color, this.id, {this.shine = 0, this.alpha = 1, this.twoSided = false, this.layer = 0, this.bias = 0, this.order = 2, this.group = 0});
   final List<V3> pts;
   final V3 n;
   final Color color;
@@ -48,6 +48,14 @@ class Poly {
 
   /// Draws this face as if it were a little nearer. Small parts that sit on a big face (screws, slots, plates) use it so the big face never covers them.
   final double bias;
+
+  /// The tier it is drawn in: 0 the shell of a room (floor, walls) first, 1 things fixed to it, 2 everything else, 3 see-through things last.
+  /// Inside a tier the faces are sorted far to near.
+  final int order;
+
+  /// Faces of one convex part (a limb, a ball, a box) share a group: the whole part is sorted as one, so its own faces can never
+  /// end up in front of a neighbour part they should be behind. 0 means each face is sorted by itself.
+  final int group;
 }
 
 /// What an object is called and what it does, and where the camera goes when it is tapped.
@@ -79,7 +87,7 @@ class Scene3D {
 /// A screen in the scene: where its four corners are (top left, top right, bottom right, bottom left, seen from the front)
 /// and how to paint what it shows, at [width] by [height], at a moment [t].
 class ScreenQuad {
-  const ScreenQuad(this.corners, this.id, this.paint, {this.width = 320, this.height = 180, this.bias = 0.6});
+  const ScreenQuad(this.corners, this.id, this.paint, {this.width = 320, this.height = 180, this.bias = 0.6, this.order = 1});
   final List<V3> corners;
   final int id;
   final void Function(Canvas canvas, Size size, double t) paint;
@@ -87,6 +95,9 @@ class ScreenQuad {
 
   /// How much nearer than the middle of the patch it counts as when the scene is sorted, so the wall behind never covers it.
   final double bias;
+
+  /// The drawing tier (see [Poly.order]).
+  final int order;
 }
 
 // ─── Building shapes ─────────────────────────────────────────────────────────
@@ -100,19 +111,30 @@ class MeshBuilder {
   double alpha = 1;
   double bias = 0;
 
+  /// The tier the next shapes are drawn in (see [Poly.order]), and whether each shape is one sorted group.
+  int order = 2;
+  bool grouped = false;
+  static int _groups = 0;
+  int _g = 0;
+
+  void _begin() {
+    _g = grouped ? ++_groups : 0;
+  }
+
   void quad(V3 a, V3 b, V3 c, V3 d, Color col, {V3? normal, double shine = 0, bool twoSided = false}) {
     final n = (normal ?? (b - a).cross(d - a)).unit;
-    polys.add(Poly([a, b, c, d], n, col, id, shine: shine, alpha: alpha, twoSided: twoSided, layer: layer, bias: bias));
+    polys.add(Poly([a, b, c, d], n, col, id, shine: shine, alpha: alpha, twoSided: twoSided, layer: layer, bias: bias, order: order, group: _g));
   }
 
   void tri(V3 a, V3 b, V3 c, Color col, {V3? normal, double shine = 0, bool twoSided = true}) {
     final n = (normal ?? (b - a).cross(c - a)).unit;
-    polys.add(Poly([a, b, c], n, col, id, shine: shine, alpha: alpha, twoSided: twoSided, layer: layer, bias: bias));
+    polys.add(Poly([a, b, c], n, col, id, shine: shine, alpha: alpha, twoSided: twoSided, layer: layer, bias: bias, order: order, group: _g));
   }
 
   /// A block centred on [c] with size [s]. Big faces can be cut into [split] x [split] tiles so they sort properly.
   /// With [ends] false the top and bottom faces are left out (for studs whose ends nobody sees).
   void box(V3 c, V3 s, Color col, {double shine = 0, int split = 1, double yaw = 0, bool ends = true}) {
+    _begin();
     final hx = s.x / 2, hy = s.y / 2, hz = s.z / 2;
     V3 r(V3 p) => (yaw == 0 ? p : rotY(p, yaw)) + c;
     V3 rn(V3 p) => yaw == 0 ? p : rotY(p, yaw);
@@ -123,7 +145,7 @@ class MeshBuilder {
           final b = a + u * (1 / split);
           final cc = b + v * (1 / split);
           final d = a + v * (1 / split);
-          polys.add(Poly([r(a), r(b), r(cc), r(d)], rn(n), col, id, shine: shine, alpha: alpha, layer: layer, bias: bias));
+          polys.add(Poly([r(a), r(b), r(cc), r(d)], rn(n), col, id, shine: shine, alpha: alpha, layer: layer, bias: bias, order: order, group: _g));
         }
       }
     }
@@ -139,6 +161,7 @@ class MeshBuilder {
 
   /// A round bar from [p0] to [p1].
   void cyl(V3 p0, V3 p1, double r, Color col, {double shine = 0, int sides = 14, bool caps = true, bool inner = false, double r1 = -1}) {
+    _begin();
     final axis = (p1 - p0).unit;
     final helper = axis.y.abs() < 0.9 ? const V3(0, 1, 0) : const V3(1, 0, 0);
     final u = axis.cross(helper).unit;
@@ -148,16 +171,17 @@ class MeshBuilder {
     for (var i = 0; i < sides; i++) {
       final d0 = dir(i), d1 = dir(i + 1);
       final n = (d0 + d1).unit;
-      polys.add(Poly([p0 + d0 * r, p0 + d1 * r, p1 + d1 * rEnd, p1 + d0 * rEnd], n, col, id, shine: shine, alpha: alpha, twoSided: inner, layer: layer, bias: bias));
+      polys.add(Poly([p0 + d0 * r, p0 + d1 * r, p1 + d1 * rEnd, p1 + d0 * rEnd], n, col, id, shine: shine, alpha: alpha, twoSided: inner, layer: layer, bias: bias, order: order, group: _g));
       if (caps) {
-        polys.add(Poly([p0, p0 + d1 * r, p0 + d0 * r], axis * -1, col, id, shine: shine, alpha: alpha, layer: layer, bias: bias));
-        polys.add(Poly([p1, p1 + d0 * rEnd, p1 + d1 * rEnd], axis, col, id, shine: shine, alpha: alpha, layer: layer, bias: bias));
+        polys.add(Poly([p0, p0 + d1 * r, p0 + d0 * r], axis * -1, col, id, shine: shine, alpha: alpha, layer: layer, bias: bias, order: order, group: _g));
+        polys.add(Poly([p1, p1 + d0 * rEnd, p1 + d1 * rEnd], axis, col, id, shine: shine, alpha: alpha, layer: layer, bias: bias, order: order, group: _g));
       }
     }
   }
 
   /// A ball (low detail) centred on [c].
   void ball(V3 c, double r, Color col, {double shine = 0.4, int lat = 6, int lon = 10}) {
+    _begin();
     V3 pt(int i, int j) {
       final th = math.pi * i / lat;
       final ph = 2 * math.pi * j / lon;
@@ -166,13 +190,14 @@ class MeshBuilder {
     for (var i = 0; i < lat; i++) {
       for (var j = 0; j < lon; j++) {
         final a = pt(i, j), b = pt(i, j + 1), cc = pt(i + 1, j + 1), d = pt(i + 1, j);
-        polys.add(Poly([c + a * r, c + b * r, c + cc * r, c + d * r], (a + b + cc + d).unit, col, id, shine: shine, alpha: alpha, layer: layer, bias: bias));
+        polys.add(Poly([c + a * r, c + b * r, c + cc * r, c + d * r], (a + b + cc + d).unit, col, id, shine: shine, alpha: alpha, layer: layer, bias: bias, order: order, group: _g));
       }
     }
   }
 
   /// A bendy tube (a wire, a pipe, a hose) through [pts].
   void tube(List<V3> pts, double r, Color col, {double shine = 0.25, int sides = 10, bool joints = true, bool endCaps = true, bool inner = false}) {
+    _begin();
     for (var i = 0; i + 1 < pts.length; i++) {
       if ((pts[i + 1] - pts[i]).len < 1e-6) continue;
       cyl(pts[i], pts[i + 1], r, col, shine: shine, sides: sides, caps: endCaps && (i == 0 || i == pts.length - 2), inner: inner);
@@ -186,6 +211,7 @@ class MeshBuilder {
 
   /// A flat ring (a washer, a nut face) around the axis from [p0] to [p1].
   void ring(V3 p0, V3 p1, double rOut, double rIn, Color col, {double shine = 0.4, int sides = 16}) {
+    _begin();
     cyl(p0, p1, rOut, col, shine: shine, sides: sides, caps: false);
     final axis = (p1 - p0).unit;
     final helper = axis.y.abs() < 0.9 ? const V3(0, 1, 0) : const V3(1, 0, 0);
@@ -194,7 +220,7 @@ class MeshBuilder {
     V3 dir(int i) => u * math.cos(i * 2 * math.pi / sides) + v * math.sin(i * 2 * math.pi / sides);
     for (final (pp, nn) in [(p0, axis * -1), (p1, axis)]) {
       for (var i = 0; i < sides; i++) {
-        polys.add(Poly([pp + dir(i) * rIn, pp + dir(i) * rOut, pp + dir(i + 1) * rOut, pp + dir(i + 1) * rIn], nn, col, id, shine: shine, alpha: alpha, layer: layer, bias: bias));
+        polys.add(Poly([pp + dir(i) * rIn, pp + dir(i) * rOut, pp + dir(i + 1) * rOut, pp + dir(i + 1) * rIn], nn, col, id, shine: shine, alpha: alpha, layer: layer, bias: bias, order: order, group: _g));
       }
     }
   }
@@ -207,7 +233,7 @@ List<Poly> transformPolys(List<Poly> ps, {double rx = 0, double ry = 0, V3 t = V
   V3 fix(V3 p) => ry == 0 ? p : rotY(p, ry);
   V3 pt(V3 p) => fix(rx == 0 ? p : rotX(p)) + t;
   V3 dir(V3 p) => fix(rx == 0 ? p : rotX(p));
-  return [for (final p in ps) Poly([for (final v in p.pts) pt(v)], dir(p.n), p.color, p.id, shine: p.shine, alpha: p.alpha, twoSided: p.twoSided, layer: p.layer, bias: p.bias)];
+  return [for (final p in ps) Poly([for (final v in p.pts) pt(v)], dir(p.n), p.color, p.id, shine: p.shine, alpha: p.alpha, twoSided: p.twoSided, layer: p.layer, bias: p.bias, order: p.order, group: p.group)];
 }
 
 /// Turns sharp corners of a path into smooth bends of about [radius].
@@ -418,7 +444,7 @@ class Scene3DPainter extends CustomPainter {
         i == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
       }
       path.close();
-      drawn.add(_Face(path, Color.fromRGBO(r, g, b, p.alpha), zs / cp3.length - p.bias, p.id, p.alpha < 0.99, p.id == highlight && highlight != 0));
+      drawn.add(_Face(path, Color.fromRGBO(r, g, b, p.alpha), zs / cp3.length - p.bias, p.id, p.alpha < 0.99, p.id == highlight && highlight != 0, null, p.order, p.group));
     }
     for (final sq in scene.screens) {
       final q = [for (final v in sq.corners) toCam(v)];
@@ -428,9 +454,21 @@ class Scene3DPainter extends CustomPainter {
       if (n.dot(mid) > 0) continue;
       final pts = [for (final v in q) Offset(cx + v.x * f / v.z, cy - v.y * f / v.z)];
       final path = Path()..addPolygon(pts, true);
-      drawn.add(_Face(path, Colors.transparent, mid.z - sq.bias, sq.id, false, false, (c) => _drawQuad(c, sq, pts, time)));
+      drawn.add(_Face(path, Colors.transparent, mid.z - sq.bias, sq.id, false, false, (c) => _drawQuad(c, sq, pts, time), sq.order));
     }
-    drawn.sort((a, b) => b.z.compareTo(a.z));
+    // Far to near inside each tier. A grouped part is sorted as one piece by the middle of the whole part.
+    final gz = <int, double>{}, gn = <int, int>{};
+    for (final f in drawn) {
+      if (f.group != 0) {
+        gz[f.group] = (gz[f.group] ?? 0) + f.z;
+        gn[f.group] = (gn[f.group] ?? 0) + 1;
+      }
+    }
+    double key(_Face f) => f.group != 0 ? gz[f.group]! / gn[f.group]! : f.z;
+    drawn.sort((a, b) {
+      final c = a.order.compareTo(b.order);
+      return c != 0 ? c : key(b).compareTo(key(a));
+    });
     hits.list.clear();
     final fill = Paint()..style = PaintingStyle.fill;
     final edge = Paint()..style = PaintingStyle.stroke..strokeWidth = 0.8;
@@ -526,7 +564,9 @@ void _drawQuad(Canvas canvas, ScreenQuad sq, List<Offset> p, double t) {
 }
 
 class _Face {
-  _Face(this.path, this.color, this.z, this.id, this.see, this.glow, [this.draw]);
+  _Face(this.path, this.color, this.z, this.id, this.see, this.glow, [this.draw, this.order = 2, this.group = 0]);
+  final int order;
+  final int group;
   final void Function(Canvas canvas)? draw;
   final Path path;
   final Color color;

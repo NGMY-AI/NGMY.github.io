@@ -171,6 +171,29 @@ void main() {
     expect(enters, greaterThan(10));
   });
 
+  test('the room is drawn in tiers so nothing is hidden or shown through the wrong thing: the shell first, then what is fixed to it, then the rest', () {
+    final h = HomeProject(seed: 3);
+    final r = h.rooms[10];
+    r.wallTv = 'bangtv';
+    r.tvOn = true;
+    r.doorAngle[0] = 1.2;
+    final s = buildHomeRoom(r, mode: 'walls');
+    for (final p in s.polys.where((p) => p.id >= idHWallBack && p.id <= idHWallRight)) {
+      expect(p.order, 0, reason: 'walls are the shell');
+    }
+    for (final p in s.polys.where((p) => p.id == idHWallTv)) {
+      expect(p.order, 1, reason: 'the TV frame is fixed to the wall');
+    }
+    expect(s.screens.firstWhere((q) => q.id == idHWallTv).order, 1);
+    // An open door leaf sticks out into the room, so it is sorted with the furniture.
+    expect(s.polys.where((p) => p.id == idHDoor && p.order == 2 && p.group != 0), isNotEmpty);
+    // A person is made of separately sorted parts, in the same tier as the furniture.
+    final person = homeDynamic(r, 1.0, person: const PersonPose(room: 10, x: 0, z: 50, yaw: 0, walking: true, phase: 3));
+    expect(person, isNotEmpty);
+    expect(person.every((p) => p.order == 2 && p.group != 0), isTrue);
+    expect({for (final p in person) p.group}.length, greaterThan(20));
+  });
+
   test('an added outlet or switch starts red and unwired and works once it is wired', () {
     final h = HomeProject(seed: 4);
     final r = h.rooms[0];
@@ -218,6 +241,29 @@ void main() {
     await t.pump(const Duration(milliseconds: 800));
     expect(find.text('Breaker ON (live)'), findsOneWidget);
     await t.pump(const Duration(seconds: 12));
+  });
+
+  testWidgets('Go outside and Go inside are buttons: the view never takes you out of the house by itself', (t) async {
+    t.view.physicalSize = const Size(900, 1600);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    HomeProject.session = HomeProject(seed: 5)..current = 10;
+    await t.pumpWidget(const MaterialApp(home: NgmyHousePage()));
+    await t.pump(const Duration(milliseconds: 600));
+    await _chip(t, '🌳 Go outside');
+    await t.pump(const Duration(milliseconds: 500));
+    expect(HomeProject.session!.current, 11);
+    await _chip(t, '🏠 Go inside');
+    await t.pump(const Duration(milliseconds: 500));
+    expect(HomeProject.session!.current, 10);
+    // Swiping the picture a long way sideways cannot turn the view round behind the room.
+    for (var i = 0; i < 6; i++) {
+      await t.dragFrom(const Offset(450, 900), const Offset(-380, 0));
+      await t.pump(const Duration(milliseconds: 100));
+    }
+    final painter = t.widget<CustomPaint>(_view()).painter! as Scene3DPainter;
+    expect(painter.cam.yaw.abs(), lessThan(0.7));
+    await t.pump(const Duration(seconds: 10));
   });
 
   testWidgets('the tour plays, shows what the person is doing, and stops; the map fits a narrow screen', (t) async {

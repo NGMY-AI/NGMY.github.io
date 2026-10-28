@@ -336,7 +336,7 @@ Scene3D buildRoomScene(RoomProject p, RoomView v) {
         b.box(V3(x, -19, 24), const V3(82, 46, 3), const Color(0xFF111418), shine: 0.4);
         if (p.applianceRuns(e.key)) {
           // The real NGMY ad plays on the glass.
-          screens.add(ScreenQuad([V3(x - 38.5, 1.5, 25.7), V3(x + 38.5, 1.5, 25.7), V3(x + 38.5, -39.5, 25.7), V3(x - 38.5, -39.5, 25.7)], idAppBase + e.key, (c, size, t) => paintNgmyApp(c, size, 0, t + e.key * 5.0), bias: 9));
+          screens.add(ScreenQuad([V3(x - 38.5, 1.5, 25.7), V3(x + 38.5, 1.5, 25.7), V3(x + 38.5, -39.5, 25.7), V3(x - 38.5, -39.5, 25.7)], idAppBase + e.key, (c, size, t) => paintNgmyApp(c, size, 0, t + e.key * 5.0), bias: 9, order: 2));
         }
       case 'lamp':
         b.cyl(V3(x, -47.5, 24), V3(x, -46.5, 24), 6, const Color(0xFF8A6A47), shine: 0.4, sides: 14);

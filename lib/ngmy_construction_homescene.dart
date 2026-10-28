@@ -37,6 +37,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
   int when(String m, int id) => mode == m ? id : 0;
 
   // ── Floor ──
+  b.order = 0;
   b.id = when('floor', idHFloorObj);
   b.box(V3(0, -0.6, d / 2), V3(w + 2.4, 1.2, d + 2), fl.color, shine: fl.kind == 'tile' ? 0.35 : (fl.kind == 'wood' ? 0.15 : 0), split: 3);
   info[idHFloorObj] = ObjInfo('Floor', 'The ${fl.name.toLowerCase()} floor.', V3(0, 0, d / 2), 140);
@@ -64,17 +65,20 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
   info[idHWallRight] = const ObjInfo('Right wall', 'Pick a paint colour above to change this wall.', V3(60, 40, 50), 140);
   b.id = 0;
   // Baseboards.
+  b.order = 1;
   const base = Color(0xFFF7F4EC);
   b.box(V3(0, 2.5, 0.4), V3(w, 5, 0.8), base, shine: 0.1);
   b.box(V3(-w / 2 + 0.4, 2.5, d / 2), V3(0.8, 5, d), base, shine: 0.1);
   b.box(V3(w / 2 - 0.4, 2.5, d / 2), V3(0.8, 5, d), base, shine: 0.1);
 
   // ── Ceiling (seen through) ──
+  b.order = 3;
   b.id = when('ceiling', idHCeilObj);
   b.alpha = mode == 'ceiling' ? 0.6 : 0.4;
   b.box(V3(0, h + 0.6, d / 2), V3(w + 2.4, 1.2, d + 2), kCeilColors[r.ceiling], split: 2);
   b.alpha = 1;
   // Crown moulding where the walls meet the ceiling.
+  b.order = 1;
   b.id = 0;
   const crown = Color(0xFFFFFFFF);
   b.box(V3(0, h - 2, 1.0), V3(w, 3, 1.4), crown, shine: 0.2);
@@ -87,6 +91,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
   final winWall = rightHasDoor ? 'left' : 'right';
   if (r.kind != 'hall') {
     final win = MeshBuilder();
+    win.order = 1;
     win.box(const V3(0, 56, 0.5), const V3(34, 30, 1), const Color(0xFFF4F1EA));
     win.box(const V3(0, 56, 0.9), const V3(30, 26, 0.6), const Color(0xFF9BD3F5), shine: 0.5);
     win.box(const V3(0, 56, 1.3), const V3(30, 1.4, 0.4), const Color(0xFFF4F1EA));
@@ -100,9 +105,16 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
     final dr = r.doors[i];
     final ang = r.doorAngle[i] ?? (r.openDoors.contains(i) ? 1.25 : 0.0);
     final open = ang > 0.04;
+    // The frame, the closed leaf and what shows through an open door are fixed to the wall (tier 1). An open leaf sticks out
+    // into the room, so it is sorted with the other things in the room (tier 2) and can hide a person who stands behind it.
     final db = MeshBuilder();
+    db.order = 1;
     db.id = idHDoor + i;
     db.box(const V3(0, 41, 0.45), const V3(31, 83, 0.9), const Color(0xFFF7F4EC));
+    final lf = MeshBuilder();
+    lf.order = 2;
+    lf.grouped = true;
+    lf.id = idHDoor + i;
     if (open) {
       db.id = 0;
       // What is behind the door: a glimpse of the next room, so an open door shows where it leads.
@@ -110,22 +122,23 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
       db.box(const V3(0, 40, 0.95), const V3(25, 79, 0.2), back);
       db.box(const V3(0, 5, 1.1), const V3(25, 10, 0.2), floor);
       db.box(const V3(0, 76, 1.1), const V3(25, 6, 0.2), Color.lerp(back, Colors.black, 0.25)!);
-      db.id = idHDoor + i;
       final th = -ang;
       final hinge = const V3(-12.5, 0, 1.2);
       final cen = hinge + rotY(const V3(12.5, 39, 0.6), th);
-      db.box(cen, const V3(25, 79, 1.4), const Color(0xFF8B5E34), shine: 0.15, yaw: th);
+      lf.box(cen, const V3(25, 79, 1.4), const Color(0xFF8B5E34), shine: 0.15, yaw: th);
     } else {
       db.box(const V3(0, 40, 1.4), const V3(25, 79, 1.2), const Color(0xFF8B5E34), shine: 0.15);
       db.box(const V3(7, 40, 2.4), const V3(2.2, 2.2, 1.8), const Color(0xFFE5C07B), shine: 0.8);
       db.box(const V3(0, 56, 2.1), const V3(17, 24, 0.3), const Color(0xFF7A4F28));
       db.box(const V3(0, 22, 2.1), const V3(17, 24, 0.3), const Color(0xFF7A4F28));
     }
-    b.polys.addAll(switch (dr.wall) {
-      'left' => transformPolys(db.polys, ry: math.pi / 2, t: V3(-w / 2, 0, dr.offset + d / 2 - 40)),
-      'right' => transformPolys(db.polys, ry: -math.pi / 2, t: V3(w / 2, 0, dr.offset + d / 2 - 40)),
-      _ => transformPolys(db.polys, t: V3(dr.offset, 0, 0)),
-    });
+    List<Poly> onWall(List<Poly> ps) => switch (dr.wall) {
+          'left' => transformPolys(ps, ry: math.pi / 2, t: V3(-w / 2, 0, dr.offset + d / 2 - 40)),
+          'right' => transformPolys(ps, ry: -math.pi / 2, t: V3(w / 2, 0, dr.offset + d / 2 - 40)),
+          _ => transformPolys(ps, t: V3(dr.offset, 0, 0)),
+        };
+    b.polys.addAll(onWall(db.polys));
+    b.polys.addAll(onWall(lf.polys));
     info[idHDoor + i] = ObjInfo('Door', 'Tap the door to go through it.', const V3(0, 40, 0), 90);
   }
 
@@ -133,6 +146,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
   for (final f in r.furn) {
     final k = kFurnKinds[f.kind]!;
     final fb = MeshBuilder();
+    fb.grouped = true;
     fb.id = when('furniture', idHFurn + f.id);
     _furniture(fb, f.kind, kFurnColors[f.color]);
     b.polys.addAll(transformPolys(fb.polys, ry: f.rot * math.pi / 2, t: V3(f.x, 0, f.z)));
@@ -140,6 +154,8 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
   }
 
   // ── The wiring ──
+  b.order = 2;
+  b.grouped = true;
   final lightX = 0.0, lightZ = d * 0.5;
   final backDoorX = r.doors.where((e) => e.wall == 'back').map((e) => e.offset).fold<double>(-w / 2 + 30, (a, e) => e);
   final switchX = (backDoorX + 24).clamp(-w / 2 + 10, w / 2 - 10);
@@ -158,9 +174,11 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
   }
   if (lit && !fan) {
     b.id = 0;
+    b.order = 3;
     b.alpha = 0.2;
     b.cyl(V3(lightX, h - 3, lightZ), V3(lightX, 0.5, lightZ), 36, const Color(0xFFFFF1A8), sides: 14, caps: false);
     b.alpha = 1;
+    b.order = 2;
   }
   final fixName = fan ? 'Ceiling fan' : 'Ceiling light';
   final lightText = !okL ? 'It has no power yet. ${r.lesson.isNotEmpty ? 'Tap it to wire it.' : 'The room still needs wiring: use the Wiring button.'}' : (!r.okSwitch ? 'It is ready: wire the wall switch to turn it on.' : (r.lightOn ? 'It is on. Tap the wall switch (or tap this) to turn it off.' : 'It is off. Tap the wall switch (or tap this) to turn it on.'));
@@ -174,6 +192,8 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
     for (var i = 0; i < r.extras.length; i++)
       if (r.extras[i].kind != 'switch') (2 + i, idHExtra + i, r.extras[i].x, r.extras[i].done, r.extras[i].kind == 'gfci' ? 'Added GFCI outlet' : 'Added outlet'),
   ];
+  b.order = 1;
+  b.grouped = false;
   for (final (i, id, x, ok, name) in outlets) {
     // A bright frame round the plate so a finished outlet can be found from far away.
     b.id = id;
@@ -214,6 +234,8 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
   if (r.lesson.isNotEmpty && !r.lessonDone && !r.lessonIsPlumbing) labels.add(Label3D(V3(0, 40, 14), '👆 Tap the red one to wire it', const Color(0xFFDC2626)));
 
   // ── What is plugged in ──
+  b.order = 2;
+  b.grouped = true;
   for (final (i, _, x, ok, _) in outlets) {
     final key = r.plugged[i];
     if (key == null || !ok) continue;
@@ -228,7 +250,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
       // The real NGMY ad plays on the glass, flat on the screen.
       final sw = tw - 3.5, sh = th - 3.5, sy = 12 + th / 2;
       final off = i * 7.0 + r.id;
-      screens.add(ScreenQuad([V3(x - sw / 2, sy + sh / 2, 16.6), V3(x + sw / 2, sy + sh / 2, 16.6), V3(x + sw / 2, sy - sh / 2, 16.6), V3(x - sw / 2, sy - sh / 2, 16.6)], idHApp + i, (c, size, t) => paintNgmyApp(c, size, 0, t + off), bias: 9));
+      screens.add(ScreenQuad([V3(x - sw / 2, sy + sh / 2, 16.6), V3(x + sw / 2, sy + sh / 2, 16.6), V3(x + sw / 2, sy - sh / 2, 16.6), V3(x - sw / 2, sy - sh / 2, 16.6)], idHApp + i, (c, size, t) => paintNgmyApp(c, size, 0, t + off), bias: 9, order: 2));
     } else if (a.key == 'lamp') {
       b.cyl(V3(x, 0, 14), V3(x, 1, 14), 6, const Color(0xFF8A6A47), shine: 0.4, sides: 14);
       b.cyl(V3(x, 1, 14), V3(x, 22, 14), 1, const Color(0xFFB08A5B), shine: 0.5, sides: 8);
@@ -247,6 +269,8 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
   }
 
   // ── The TV on the wall ──
+  b.order = 1;
+  b.grouped = false;
   final tvKey = r.wallTv;
   if (tvKey != null) {
     final a = applianceByKey(tvKey);
@@ -278,11 +302,18 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
   }
 
   // ── The plumbing ──
+  b.order = 2;
+  b.grouped = true;
   if (r.hasPlumbing) {
     final ok = r.plumbed;
     void stub(double x, double y) {
+      final o = b.order, g = b.grouped;
+      b.order = 1;
+      b.grouped = false;
       b.id = 0;
       b.cyl(V3(x, y, 0), V3(x, y, 2.2), 0.7, const Color(0xFFD08246), shine: 0.7, sides: 10);
+      b.order = o;
+      b.grouped = g;
     }
 
     if (r.kind == 'bathroom') {
@@ -297,8 +328,10 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
       } else {
         b.id = idHToiletF;
         b.alpha = 0.3;
+        b.order = 3;
         b.box(V3(tx, 14, 9), const V3(18, 28, 16), const Color(0xFF67E8F9));
         b.alpha = 1;
+        b.order = 2;
         stub(tx - 10, 8);
       }
       // Vanity and sink.
@@ -321,8 +354,10 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
         b.cyl(V3(tubX, 52, 3), V3(tubX, 52, 10), 0.7, kChromeC, shine: 0.9, sides: 8);
       } else {
         b.alpha = 0.3;
+        b.order = 3;
         b.box(V3(tubX, 8, 38), const V3(30, 16, 72), const Color(0xFF67E8F9));
         b.alpha = 1;
+        b.order = 2;
         stub(tubX - 4, 34);
         stub(tubX + 4, 34);
       }
@@ -362,6 +397,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
 /// The house seen from the garden. The front door leads inside.
 Scene3D _outside(HRoom r, int problems) {
   final b = MeshBuilder();
+  b.order = 0;
   final info = <int, ObjInfo>{};
   final labels = <Label3D>[];
   b.id = 0;
@@ -369,6 +405,8 @@ Scene3D _outside(HRoom r, int problems) {
   b.box(const V3(0, 0.05, 110), const V3(22, 0.2, 130), const Color(0xFFB8B2A7));
   b.box(const V3(-90, 0.05, 130), const V3(46, 0.2, 170), const Color(0xFF6B7380));
   // House body.
+  b.order = 2;
+  b.grouped = true;
   b.box(const V3(0, 50, -10), const V3(240, 100, 40), const Color(0xFFE8D9BC), split: 3);
   b.box(const V3(0, 3, 10.5), const V3(244, 6, 1.4), const Color(0xFF9C8E75));
   // Roof.
@@ -413,6 +451,7 @@ Scene3D _outside(HRoom r, int problems) {
 /// Things that move: the fan blades and the pictures on the TVs.
 List<Poly> homeDynamic(HRoom r, double t, {PersonPose? person}) {
   final b = MeshBuilder();
+  b.grouped = true;
   if (!r.indoor || r.kind == 'outside') return b.polys;
   if (person != null && person.room == r.id) _person(b, person, t);
   final d = r.d;
@@ -444,7 +483,7 @@ List<Poly> homeDynamic(HRoom r, double t, {PersonPose? person}) {
 /// The same faces, stretched or squashed about a point: a sphere becomes an egg, a tube becomes an oval.
 List<Poly> _stretch(List<Poly> ps, V3 s, V3 at) => [
       for (final p in ps)
-        Poly([for (final v in p.pts) V3(at.x + (v.x - at.x) * s.x, at.y + (v.y - at.y) * s.y, at.z + (v.z - at.z) * s.z)], V3(p.n.x / s.x, p.n.y / s.y, p.n.z / s.z).unit, p.color, p.id, shine: p.shine, alpha: p.alpha, twoSided: p.twoSided, layer: p.layer, bias: p.bias)
+        Poly([for (final v in p.pts) V3(at.x + (v.x - at.x) * s.x, at.y + (v.y - at.y) * s.y, at.z + (v.z - at.z) * s.z)], V3(p.n.x / s.x, p.n.y / s.y, p.n.z / s.z).unit, p.color, p.id, shine: p.shine, alpha: p.alpha, twoSided: p.twoSided, layer: p.layer, bias: p.bias, order: p.order, group: p.group)
     ];
 
 /// An adult person for the house tour, about 5 feet 8 inches tall, made of rounded parts (limbs with real joints, an
@@ -453,8 +492,8 @@ List<Poly> _stretch(List<Poly> ps, V3 s, V3 at) => [
 void _person(MeshBuilder b, PersonPose p, double t) {
   final pb = MeshBuilder();
   pb.id = 0;
-  // Drawn as if a little nearer than it is, so walls and floor pieces never hide parts of the person.
-  pb.bias = 6;
+  // Each part is one sorted piece, and the person is in the same tier as the furniture: depth decides what hides what.
+  pb.grouped = true;
   const skin = Color(0xFFE0A47C), skinShade = Color(0xFFCB8C64), hair = Color(0xFF2A1A10), shirt = Color(0xFF2F6FB5), pants = Color(0xFF2E3440), shoe = Color(0xFF1B1B1D);
   final stride = p.walking ? math.sin(p.phase * math.pi) : 0.0;
 
@@ -468,9 +507,9 @@ void _person(MeshBuilder b, PersonPose p, double t) {
   void part(void Function(MeshBuilder m) draw, V3 stretch, V3 at) {
     final m = MeshBuilder();
     m.id = 0;
-    m.bias = 6;
+    m.grouped = true;
     draw(m);
-    pb.polys.addAll([for (final q in _stretch(m.polys, stretch, V3.zero)) Poly([for (final v in q.pts) v + at], q.n, q.color, q.id, shine: q.shine, alpha: q.alpha, twoSided: q.twoSided, layer: q.layer, bias: q.bias)]);
+    pb.polys.addAll([for (final q in _stretch(m.polys, stretch, V3.zero)) Poly([for (final v in q.pts) v + at], q.n, q.color, q.id, shine: q.shine, alpha: q.alpha, twoSided: q.twoSided, layer: q.layer, bias: q.bias, order: q.order, group: q.group)]);
   }
 
   // A limb piece from [a] to [c], thicker at [a], with a round joint at [c].

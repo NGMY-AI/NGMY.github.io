@@ -133,19 +133,23 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       pitch = 0.22;
       yaw = -0.1;
       cam.yawRange = 0.9;
+      cam.maxDist = 560;
     } else if (inside) {
       // Standing in the room, looking in: low, close, like a person in the doorway.
       target = V3(0, 40, r.d * 0.3);
       dist = math.max(r.w * 0.8, r.d * 0.9) + 10;
       pitch = 0.1;
       yaw = -0.05;
-      cam.yawRange = 1.3;
+      // Inside the house the view stays inside: you can look about a little, not swing round behind the walls.
+      cam.yawRange = 0.5;
+      cam.maxDist = dist * 1.6;
     } else {
       target = V3(0, 30, r.d * 0.45);
       dist = (r.w * 1.2 > r.d * 1.4 ? r.w * 1.2 : r.d * 1.4) + 30;
       pitch = 0.5;
       yaw = -0.12;
       cam.yawRange = 0.9;
+      cam.maxDist = 560;
     }
     if (snap) {
       cam.target = target;
@@ -1024,6 +1028,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
           }, color: const Color(0xFF67E8F9)),
           if (!isLesson) _chip(tour != null ? '⏹ Stop tour' : '🎬 Tour', tour != null, () => tour != null ? _stopTour() : _tourSheet(), color: const Color(0xFFF472B6)),
           _chip('📺 TV', false, _tvSheet, color: const Color(0xFF60A5FA)),
+          if (!isLesson) _chip(room.indoor ? '🌳 Go outside' : '🏠 Go inside', false, () => _go(room.indoor ? 11 : 10), color: const Color(0xFF4ADE80)),
           if (!isLesson) _chip('➕ Add', false, _addSheet, color: const Color(0xFF4ADE80)),
           _chip('🔦 Tester', tester, () => setState(() {
             tester = !tester;
