@@ -91,7 +91,7 @@ class Scene3D {
 /// A screen in the scene: where its four corners are (top left, top right, bottom right, bottom left, seen from the front)
 /// and how to paint what it shows, at [width] by [height], at a moment [t].
 class ScreenQuad {
-  const ScreenQuad(this.corners, this.id, this.paint, {this.width = 320, this.height = 180, this.bias = 0.6, this.order = 1, this.group = 0});
+  const ScreenQuad(this.corners, this.id, this.paint, {this.width = 320, this.height = 180, this.bias = 0.6, this.order = 1, this.group = 0, this.twoSided = false});
   final List<V3> corners;
   final int id;
   final void Function(Canvas canvas, Size size, double t) paint;
@@ -105,6 +105,9 @@ class ScreenQuad {
 
   /// The group (see [Poly.group]) of the frame this screen sits in, so the frame and the picture are sorted as one piece and the frame can never cover the picture.
   final int group;
+
+  /// Also drawn when seen from behind (the picture then shows mirrored), so a TV never goes blank when you walk round it.
+  final bool twoSided;
 }
 
 // ─── Building shapes ─────────────────────────────────────────────────────────
@@ -509,10 +512,13 @@ class Scene3DPainter extends CustomPainter {
     }
 
     var outside = false;
+    var roomDepth = 0.0;
     final sh = scene.shell;
     if (sh != null) {
       final ex = cam.target.x - cam.dist * cp * syw, ez = cam.target.z + cam.dist * cp * cyw;
       outside = ex < sh.$1 - 1 || ex > sh.$2 + 1 || ez < sh.$3 - 1;
+      // Seen from outside, the walls nearer to you than the middle of the room are left out (a doll's house), so nothing inside is ever hidden.
+      if (outside) roomDepth = toCam(V3((sh.$1 + sh.$2) / 2, 40, (sh.$3 + sh.$4) / 2)).z;
     }
     final toLight = _toLight.unit;
     final half = (toLight + const V3(0, 0, -1)).unit;
@@ -529,6 +535,7 @@ class Scene3DPainter extends CustomPainter {
         mid = mid + v;
       }
       mid = mid * (1 / cp3.length);
+      if (outside && p.order == 0 && mid.z < roomDepth) continue;
       var n = rotN(p.n);
       final facing = n.dot(mid);
       if (facing > 0) {
@@ -554,13 +561,13 @@ class Scene3DPainter extends CustomPainter {
         i == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
       }
       path.close();
-      drawn.add(_Face(path, Color.fromRGBO(r, g, b, p.alpha), zs / cp3.length - p.bias, p.id, p.alpha < 0.99, p.id == highlight && highlight != 0, null, outside && p.order == 0 ? 3 : p.order, p.group));
+      drawn.add(_Face(path, Color.fromRGBO(r, g, b, p.alpha), zs / cp3.length - p.bias, p.id, p.alpha < 0.99, p.id == highlight && highlight != 0, null, p.order, p.group));
     }
     for (final sq in scene.screens) {
       final q = [for (final v in sq.corners) toCam(v)];
       final mid = (q[0] + q[1] + q[2] + q[3]) * 0.25;
       final n = rotN((sq.corners[3] - sq.corners[0]).cross(sq.corners[1] - sq.corners[0]));
-      if (n.dot(mid) > 0) continue;
+      if (n.dot(mid) > 0 && !sq.twoSided) continue;
       if (q.every((v) => v.z >= 1)) {
         final pts = [for (final v in q) Offset(cx + v.x * f / v.z, cy - v.y * f / v.z)];
         final path = Path()..addPolygon(pts, true);

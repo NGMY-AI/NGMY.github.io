@@ -70,7 +70,7 @@ PersonStyle get playerStyle => kAvatars[ngmyPlayerAvatar] ?? const PersonStyle()
 
 /// A resident standing in a room of the house: where, which way, what they look like and the words over their head.
 class ResidentFigure {
-  const ResidentFigure({required this.id, required this.room, required this.x, required this.z, required this.yaw, required this.style, required this.label, this.alert = false, this.calling = false, this.wander = 0});
+  const ResidentFigure({required this.id, required this.room, required this.x, required this.z, required this.yaw, required this.style, required this.label, this.alert = false, this.calling = false, this.wander = 0, this.activity = '', this.activityLabel = ''});
   final int id, room;
   final double x, z, yaw;
   final PersonStyle style;
@@ -84,6 +84,9 @@ class ResidentFigure {
 
   /// How far they stroll round their spot (0 to stand still), for the people who are out in the garden.
   final double wander;
+
+  /// What they are busy with in the city: feed, cook, wash, water, teach, rest or duty (empty when they are just standing), and its short name.
+  final String activity, activityLabel;
 }
 
 typedef Pt = (double, double);

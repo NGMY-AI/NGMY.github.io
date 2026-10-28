@@ -29,13 +29,13 @@ class ResidentInfo {
 }
 
 const List<ResidentInfo> kResidents = [
-  ResidentInfo(0, 'Ama', 0, 2, PersonStyle(avatar: 'michelle', skin: Color(0xFF8A5A3C), hair: Color(0xFF1B1210), shirt: Color(0xFFD9467E), pants: Color(0xFF3B3F5C)), 'A nurse who works nights.'),
+  ResidentInfo(0, 'Ama', 0, 2, PersonStyle(avatar: 'xbot', skin: Color(0xFF8A5A3C), hair: Color(0xFF1B1210), shirt: Color(0xFFD9467E), pants: Color(0xFF3B3F5C)), 'A nurse who works nights.'),
   ResidentInfo(1, 'Joseph', 1, 2, PersonStyle(avatar: 'soldier', skin: Color(0xFF6B4530), hair: Color(0xFF161010), shirt: Color(0xFF2E8F5B), pants: Color(0xFF2E3440)), 'A student who is always hungry.'),
   ResidentInfo(2, 'Grace', 3, 4, PersonStyle(avatar: 'xbot', skin: Color(0xFFA06B47), hair: Color(0xFF2A1A10), shirt: Color(0xFFF59E0B), pants: Color(0xFF4A3F6B)), 'A teacher who marks papers late.'),
   ResidentInfo(3, 'Daniel', 6, 8, PersonStyle(avatar: 'soldier', skin: Color(0xFFE0A47C), hair: Color(0xFF5B3A1E), shirt: Color(0xFF2F6FB5), pants: Color(0xFF2E3440)), 'A driver who sleeps in the day.'),
-  ResidentInfo(4, 'Fatima', 7, 8, PersonStyle(avatar: 'michelle', skin: Color(0xFFC98B5E), hair: Color(0xFF1B1210), shirt: Color(0xFF7C3AED), pants: Color(0xFF2B2D3A)), 'A baker who gets up at four.'),
+  ResidentInfo(4, 'Fatima', 7, 8, PersonStyle(avatar: 'xbot', skin: Color(0xFFC98B5E), hair: Color(0xFF1B1210), shirt: Color(0xFF7C3AED), pants: Color(0xFF2B2D3A)), 'A baker who gets up at four.'),
   ResidentInfo(5, 'Papa Moses', 10, -1, PersonStyle(avatar: 'soldier', skin: Color(0xFF7A4B30), hair: Color(0xFFD1D5DB), shirt: Color(0xFFB45309), pants: Color(0xFF3F3A33)), 'The oldest in the house. He watches TV all day.'),
-  ResidentInfo(6, 'Mama Rose', 9, -1, PersonStyle(avatar: 'michelle', skin: Color(0xFF8C5B3B), hair: Color(0xFF8A8F98), shirt: Color(0xFFEF4444), pants: Color(0xFF3B3F5C)), 'Cooks for everybody in the kitchen.'),
+  ResidentInfo(6, 'Mama Rose', 9, -1, PersonStyle(avatar: 'xbot', skin: Color(0xFF8C5B3B), hair: Color(0xFF8A8F98), shirt: Color(0xFFEF4444), pants: Color(0xFF3B3F5C)), 'Cooks for everybody in the kitchen.'),
 ];
 
 class Resident {
@@ -348,10 +348,47 @@ class Community {
     final out = <ResidentFigure>[];
     final room = home.rooms[roomId];
     if (room.indoor) return out;
+    Furn? one(String kind) {
+      for (final f in room.furn) {
+        if (f.kind == kind) return f;
+      }
+      return null;
+    }
+
+    // Each person has something to do, somewhere in the city: where they stand, what they face, and what they are busy with.
+    (double, double, double, String, String) job(Resident p, int k) {
+      double facing(double fx, double fz, double tx, double tz) => math.atan2(tx - fx, tz - fz);
+      switch (p.id) {
+        case 0:
+          final h = one('hospital');
+          if (h != null) return (h.x - 34, h.z + kFurnKinds['hospital']!.d / 2 + 26, math.pi, 'duty', '🩺 On duty at the hospital');
+        case 1:
+          final c = one('cow') ?? one('sheep') ?? one('horse');
+          if (c != null) return (c.x + 34, c.z + 22, facing(c.x + 34, c.z + 22, c.x, c.z), 'feed', '🌾 Feeding the animals');
+        case 2:
+          final s = one('school');
+          if (s != null) return (s.x - 24, s.z + kFurnKinds['school']!.d / 2 + 26, math.pi, 'teach', '📚 Teaching');
+        case 3:
+          final c = one('car');
+          if (c != null) return (c.x, c.z + 34, math.pi, 'wash', '🧽 Washing the car');
+        case 4:
+          final s = one('shop');
+          if (s != null) return (s.x + 62, s.z + 56, math.pi * 0.75, 'cook', '🍳 Cooking');
+        case 5:
+          final b = one('bench');
+          if (b != null) return (b.x, b.z + 26, math.pi, 'rest', '🪑 Resting');
+        case 6:
+          final f = one('flowers');
+          if (f != null) return (f.x + 30, f.z + 28, facing(f.x + 30, f.z + 28, f.x, f.z), 'water', '💧 Watering the flowers');
+      }
+      return (-270.0 + k * 90, 205.0, 0, '', '');
+    }
+
     var k = 0;
     for (final p in living.where(isOut)) {
       final calling = calls.any((c) => c.resident == p.id);
-      out.add(ResidentFigure(id: p.id, room: roomId, x: -270.0 + k * 90, z: 205.0 + (k.isOdd ? 22 : 0), yaw: 0, style: p.info.style, label: '${calling ? '📞 ' : ''}${p.name} ${p.badge}', alert: p.mood != 'fine' || calling, calling: calling, wander: calling ? 0 : 34));
+      final (x, z, yaw, act, name) = job(p, k);
+      out.add(ResidentFigure(id: p.id, room: roomId, x: x, z: z, yaw: calling ? 0.4 : yaw, style: p.info.style, label: '${calling ? '📞 ' : ''}${p.name} ${p.badge}', alert: p.mood != 'fine' || calling, calling: calling, wander: 0, activity: calling ? '' : act, activityLabel: calling ? '' : name));
       k++;
     }
     return out;

@@ -37,6 +37,7 @@ class CityInterior {
   late final WorldWalker walker;
   late final List<_Zone> _zones;
   late Scene3D scene;
+  Community? _cm;
   final Set<int> _inside = {};
 
   bool get isHospital => kind == 'hospital';
@@ -85,6 +86,7 @@ class CityInterior {
 
   /// The inside, drawn from scratch each time something changes.
   void build(Community? cm) {
+    _cm = cm;
     final b = MeshBuilder();
     final labels = <Label3D>[];
     const wallCol = Color(0xFFE9EFF2);
@@ -118,6 +120,7 @@ class CityInterior {
       b.cyl(const V3(-80, 0.2, 66), const V3(-80, 0.6, 66), 22, const Color(0xFF60A5FA), sides: 20);
       b.order = 2;
       labels.add(const Label3D(V3(-80, 52, 66), '🏥 Walk here to admit the sick', Color(0xFF0E7490)));
+      labels.add(const Label3D(V3(-80, 70, 40), '👩‍⚕️ Nurse', Color(0xFF0F766E)));
       for (var i = 0; i < 3; i++) {
         final z = 48.0 + i * 50;
         // A bed along the side wall: frame, mattress, pillow, and the patient under a blanket.
@@ -127,8 +130,8 @@ class CityInterior {
         final bed = (cm != null && i < cm.beds.length) ? cm.beds[i] : null;
         if (bed != null && bed.resident >= 0) {
           final p = cm!.residents[bed.resident];
-          b.box(V3(62, 19, z), const V3(50, 6, 28), bed.care > 70 ? const Color(0xFF4ADE80) : const Color(0xFFF87171));
-          b.ball(V3(96, 22, z), 7, p.info.style.skin, lat: 4, lon: 8);
+          // A short blanket over the legs (the patient lies on the bed, drawn with the moving things).
+          b.box(V3(48, 24, z), const V3(34, 4, 28), bed.care > 70 ? const Color(0xFF4ADE80) : const Color(0xFFF87171));
           labels.add(Label3D(V3(70, 40, z), '${p.name}  ${bed.care > 70 ? 'cared for' : 'needs treatment'}', bed.care > 70 ? const Color(0xFF15803D) : const Color(0xFFDC2626)));
         } else {
           labels.add(Label3D(V3(70, 30, z), 'Free bed ${i + 1}', const Color(0xFF475569)));
@@ -166,11 +169,27 @@ class CityInterior {
     scene = Scene3D(b.polys, labels: labels);
   }
 
-  /// The person you steer, and the shopkeeper.
+  /// The person you steer, the shopkeeper (or the doctor and the nurse), and the patients lying in their beds.
   List<Poly> dynamicPolys(double t, PersonStyle style) {
     final b = MeshBuilder();
     if (!isHospital) {
-      drawPerson(b, const PersonPose(room: 0, x: 0, z: 14, yaw: 0), t, kAvatars['michelle']!, id: 0, close: false);
+      drawPerson(b, const PersonPose(room: 0, x: 0, z: 14, yaw: 0), t, kAvatars['soldier']!, id: 0, close: false);
+    } else {
+      // A nurse at the desk and a doctor going from bed to bed.
+      drawPerson(b, const PersonPose(room: 0, x: -80, z: 50, yaw: 0), t, kAvatars['xbot']!, id: 0, close: false);
+      final len = 110.0, run = (t * 12) % (2 * len);
+      final z = 40 + (run < len ? run : 2 * len - run);
+      drawPerson(b, PersonPose(room: 0, x: 6, z: z, yaw: run < len ? 0 : math.pi, walking: true, phase: run / 12), t, kAvatars['soldier']!, id: 0, close: false);
+      final cm = _cm;
+      if (cm != null) {
+        for (var i = 0; i < cm.beds.length && i < 3; i++) {
+          final bed = cm.beds[i];
+          if (bed.resident < 0) continue;
+          final pb = MeshBuilder();
+          drawPerson(pb, const PersonPose(room: 0, x: 0, z: 0, yaw: 0), t, cm.residents[bed.resident].info.style, id: 0, close: false);
+          b.polys.addAll(transformPolys(pb.polys, rx: -math.pi / 2, ry: -math.pi / 2, t: V3(70 - 30, 27, 48.0 + i * 50)));
+        }
+      }
     }
     drawPerson(b, PersonPose(room: 0, x: walker.x, z: walker.z, yaw: walker.yaw, walking: walker.walking, phase: walker.phase, running: walker.running && walker.walking, lift: walker.lift), t, style, id: 0, close: true);
     return b.polys;

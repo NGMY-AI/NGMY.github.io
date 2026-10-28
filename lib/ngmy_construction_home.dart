@@ -468,6 +468,17 @@ class HomeProject {
         r.add('firestation', x: -340, z: 275);
         r.add('school', x: 360, z: 275);
         r.add('house2', x: -140, z: 150);
+        // A bigger town: more houses along the street, more trees and cars.
+        for (final (x, z) in const [(-260.0, 150.0), (-60.0, 150.0), (60.0, 150.0), (150.0, 150.0), (260.0, 150.0), (330.0, 150.0), (-330.0, 430.0), (-250.0, 430.0), (330.0, 430.0), (250.0, 430.0)]) {
+          r.add('house2', x: x, z: z);
+        }
+        for (final (x, z) in const [(-330.0, 100.0), (330.0, 90.0), (-110.0, 60.0), (110.0, 40.0), (-360.0, 380.0), (360.0, 380.0)]) {
+          r.add(x.abs() > 300 ? 'pine' : 'tree', x: x, z: z);
+        }
+        r.add('car', x: -250, z: 360);
+        r.add('car', x: 230, z: 360).rot = 2;
+        r.add('bench', x: -60, z: 195);
+        r.add('flowers', x: 90, z: 205);
         r.add('car', x: -120, z: 360);
         r.add('ambulance', x: 120, z: 360).rot = 2;
         r.add('firetruck', x: -340, z: 318);

@@ -107,11 +107,11 @@ void main() {
         }
       }
     }
-    final q = WorldWalker(w, x: 0, z: 40)..goTo(-90, 120);
+    final q = WorldWalker(w, x: 0, z: 40)..goTo(-90, 90);
     var steps = 0;
     while (q.advance(0.05) && steps++ < 600) {}
     expect((q.x + 90).abs(), lessThan(6));
-    expect((q.z - 120).abs(), lessThan(6));
+    expect((q.z - 90).abs(), lessThan(6));
     expect(q.target, isNull);
     final s = WorldWalker(w, x: 0, z: 120)..step(1, 0, 0.1);
     expect(s.yaw, closeTo(math.pi / 2, 0.01));

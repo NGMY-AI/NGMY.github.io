@@ -498,6 +498,109 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     );
   }
 
+  void _enterFull() {
+    setState(() => full = true);
+    if (!steer && !room.indoor) _startSteer();
+  }
+
+  /// Just the game, turned on its side like a video, with only the walking controls and a way back.
+  Widget _fullScreen(Widget stage) {
+    final mq = MediaQuery.of(context);
+    final land = Size(mq.size.height, mq.size.width);
+    Widget btn(IconData icon, VoidCallback onTap) => GestureDetector(
+          onTap: onTap,
+          child: Container(width: 40, height: 40, margin: const EdgeInsets.only(right: 8), decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.55), shape: BoxShape.circle, border: Border.all(color: Colors.white38)), child: Icon(icon, color: Colors.white, size: 20)),
+        );
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
+        child: RotatedBox(
+          quarterTurns: _fullTurns,
+          child: MediaQuery(
+            data: mq.copyWith(size: land, padding: EdgeInsets.zero, viewPadding: EdgeInsets.zero),
+            child: SizedBox(
+              width: land.width,
+              height: land.height,
+              child: Stack(children: [
+                Positioned.fill(child: stage),
+                Positioned(top: 10, left: 10, child: Row(children: [
+                  btn(Icons.fullscreen_exit_rounded, () => setState(() => full = false)),
+                  btn(Icons.screen_rotation_rounded, () => setState(() => _fullTurns = _fullTurns == 1 ? 3 : 1)),
+                ])),
+              ]),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The text message that follows a call: what the person needs, and how to get to them.
+  Future<void> _textSheet(HelpCall c) {
+    final info = kResidents[c.resident];
+    final roomId = c.kind == 'power' ? info.room : (info.bath >= 0 ? info.bath : info.room);
+    final roomName = roomId < home.rooms.length ? home.rooms[roomId].name : 'the house';
+    Widget bubble(String text, {bool mine = false}) => Align(
+          alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            constraints: const BoxConstraints(maxWidth: 290),
+            decoration: BoxDecoration(color: mine ? const Color(0xFF2563EB) : const Color(0xFF374151), borderRadius: BorderRadius.circular(18)),
+            child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.3)),
+          ),
+        );
+    return showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF111827),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              CircleAvatar(radius: 18, backgroundColor: info.style.shirt, child: Text(info.name[0], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900))),
+              const SizedBox(width: 10),
+              Text(info.name, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
+              const Spacer(),
+              const Text('Messages', style: TextStyle(color: Colors.white38, fontSize: 12)),
+            ]),
+            const Divider(color: Colors.white12),
+            bubble('Hi, it\'s ${info.name}. ${c.message}'),
+            bubble(c.kind == 'power' ? 'Please come to $roomName and fix the wiring. I can\'t stay in the dark.' : 'Please come to $roomName and fix the leak before it floods.'),
+            bubble('I\'ll pay ${c.reward} points. Thank you!'),
+            bubble('On my way!', mine: true),
+            const SizedBox(height: 6),
+            Wrap(spacing: 10, runSpacing: 8, children: [
+              FilledButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  final f = _figs.where((f) => f.id == c.resident).toList();
+                  if (f.isNotEmpty && !room.indoor) cam.glideTo(target: V3(f.first.x, 30, f.first.z), dist: 160);
+                  _say('${info.name} is the one with the phone sign.', ok: true);
+                },
+                icon: const Icon(Icons.place_rounded),
+                label: Text('Show me where ${info.name} is'),
+              ),
+              FilledButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  if (steer) _stopSteer();
+                  full = false;
+                  _go(roomId);
+                  _say('You are in $roomName. Fix the problem with the Wiring or Plumbing button.', ok: true);
+                },
+                icon: const Icon(Icons.build_rounded),
+                label: Text('Go and fix it ($roomName)'),
+              ),
+            ]),
+          ]),
+        ),
+      ),
+    );
+  }
+
   /// The city's own services (calls, people, the hospital, the shop), opened over the city.
   Future<void> _citySheet(String tab) async {
     await showModalBottomSheet<void>(
@@ -917,6 +1020,11 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   int _beat = 0;
   bool _madeSession = false;
 
+  /// Full screen: just the game, turned on its side like a video, with the walking controls.
+  bool full = false;
+  int _fullTurns = 1;
+  double _padW = 400;
+
   void _startSteer() {
     if (room.indoor) return;
     walker ??= WorldWalker(room, x: 0, z: 24);
@@ -1205,7 +1313,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     final controls = steer && !room.indoor;
     final call = _ringing;
     if (!controls && call == null) return null;
-    final screenW = MediaQuery.of(context).size.width;
+    final screenW = _padW;
     Widget btn(String label, VoidCallback onTap, {bool on = false, Color col = const Color(0xFF4ADE80)}) => GestureDetector(
           onTapDown: (_) => onTap(),
           child: Container(
@@ -1220,18 +1328,30 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         if (call != null)
           Container(
-            margin: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: const Color(0xFF14532D).withValues(alpha: 0.97), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFF4ADE80), width: 2)),
+            width: math.min(screenW - 28, 330),
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
+            decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1F2937), Color(0xFF0B1220)]), borderRadius: BorderRadius.circular(30), border: Border.all(color: Colors.white24, width: 2), boxShadow: [BoxShadow(color: const Color(0xFF4ADE80).withValues(alpha: 0.35), blurRadius: 24)]),
             child: Row(children: [
-              const Text('📞', style: TextStyle(fontSize: 30)),
-              const SizedBox(width: 10),
-              Expanded(child: Text('${kResidents[call.resident].name} is calling\n${call.message}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13.5, height: 1.3))),
-              btn('Answer', () {
-                _stopRing();
-                _citySheet('calls');
-              }),
-              btn('Later', _stopRing, col: Colors.white54),
+              CircleAvatar(radius: 26, backgroundColor: kResidents[call.resident].style.shirt, child: Text(kResidents[call.resident].name[0], style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900))),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                const Text('incoming call', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                Text(kResidents[call.resident].name, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+                const Text('NGMY City · mobile', style: TextStyle(color: Colors.white38, fontSize: 11.5)),
+              ])),
+              GestureDetector(
+                onTapDown: (_) => _stopRing(),
+                child: Container(width: 52, height: 52, decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle), child: const Icon(Icons.call_end_rounded, color: Colors.white)),
+              ),
+              const SizedBox(width: 14),
+              GestureDetector(
+                onTapDown: (_) {
+                  _stopRing();
+                  _textSheet(call);
+                },
+                child: Container(width: 52, height: 52, decoration: const BoxDecoration(color: Color(0xFF22C55E), shape: BoxShape.circle), child: const Icon(Icons.call_rounded, color: Colors.white)),
+              ),
             ]),
           ),
         if (controls)
@@ -1605,19 +1725,17 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         _chip('🏥 Hospital', false, () => _citySheet('hospital'), color: const Color(0xFFF87171)),
         _chip('🛒 Shop', false, () => _citySheet('shop'), color: const Color(0xFFFB923C)),
         _chip('👨‍👩‍👧 People', false, () => _citySheet('people'), color: const Color(0xFF60A5FA)),
+        _chip('⛶ Full screen', false, _enterFull, color: const Color(0xFF38BDF8)),
         _chip('🏠 Go inside', false, () => _go(10), color: const Color(0xFF4ADE80)),
         _chip('🗺 Map', showMap, () => setState(() => showMap = !showMap), color: const Color(0xFFA78BFA)),
       ];
 
   Widget _buildPage(BuildContext context) {
     final r = room;
-    final screenW = MediaQuery.of(context).size.width;
-    return LessonScaffold(
-      title: r.name,
-      color: kConAmber,
-      stepText: isLesson ? (r.lessonDone ? 'Done ✓' : 'To do') : '${home.finishedCount}/${home.indoor.length} done',
-      onSteps: () => isLesson ? _openLesson() : _problems(context),
-      stage: Stage3D(
+    final mq = MediaQuery.of(context);
+    final screenW = full ? mq.size.height : mq.size.width;
+    _padW = screenW;
+    final stage3d = Stage3D(
         sky: !room.indoor && inner == null,
         scene: scene,
         cam: cam,
@@ -1627,14 +1745,21 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         onDoubleTap: _doubleTap,
         message: msg,
         good: good,
-        messageTop: (showMap && !isLesson) ? 104 : 10,
+        messageTop: (showMap && !isLesson && !full) ? 104 : 10,
         layerOn: (l) => l <= 5,
         dynamicPolys: (_) => inner != null ? inner!.dynamicPolys(now, playerStyle) : homeDynamic(room, now, person: _pose(), personStyle: playerStyle, residents: _figs, mode: mode, drive: _driveNow()),
         bottom: _pad(),
         topLeft: [
-          if (showMap && !isLesson) _MiniMap(home: home, onTap: _go, maxWidth: math.min(138.0, screenW * 0.36)),
+          if (showMap && !isLesson && !full) _MiniMap(home: home, onTap: _go, maxWidth: math.min(138.0, screenW * 0.36)),
         ],
-      ),
+      );
+    if (full) return _fullScreen(stage3d);
+    return LessonScaffold(
+      title: r.name,
+      color: kConAmber,
+      stepText: isLesson ? (r.lessonDone ? 'Done ✓' : 'To do') : '${home.finishedCount}/${home.indoor.length} done',
+      onSteps: () => isLesson ? _openLesson() : _problems(context),
+      stage: stage3d,
       panel: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         _row(!room.indoor ? _cityChips() : [
           _chip(inside ? '🔭 See the whole room' : '🏠 Be inside', false, () {
