@@ -200,7 +200,7 @@ void main() {
     expect({for (final p in person) p.group}.length, greaterThan(20));
   });
 
-  test('TVs go up to 200 inches and a whole wall, clear of the doors, and the hall has two big ones on its end walls', () {
+  test('TVs go up to 200 inches and a whole wall, clear of the doors, and the hall has two big ones on its back wall', () {
     final h = HomeProject(seed: 3);
     final sizes = <String, double>{};
     for (final k in ['tv', 'tv100', 'tv150', 'tv200', 'wall']) {
@@ -226,15 +226,22 @@ void main() {
     expect(sizes['wall']!, greaterThan(70));
     // Only the floor TVs plug in.
     expect(kHomeAppliances.where((a) => a.isTv && !a.wallOnly).every((a) => a.tvWidth <= 70), isTrue);
-    // The hall: ten doors on the back wall, a TV on each end wall.
+    // The hall: three doors in the middle of the back wall, the other seven on the two short walls, and a video wall each side of the three.
     final hall = h.rooms[5];
     expect(hall.doors.length, 10);
-    expect(hall.doors.every((d) => d.wall == 'back'), isTrue);
+    expect(hall.doors.where((d) => d.wall == 'back').length, 3);
+    expect(hall.w, greaterThan(400));
+    expect(hall.d, greaterThan(150));
+    final left = wallTvBox(hall, applianceByKey('tv100'), sub: 0), right = wallTvBox(hall, applianceByKey('tv100'), sub: 1);
+    expect(left.w, greaterThan(120));
+    expect(left.cx, lessThan(-60));
+    expect(right.cx, greaterThan(60));
     hall.wallTv = 'tv100';
     hall.wallTv2 = 'tv100';
     hall.tvOn = true;
     final s = buildHomeRoom(hall);
-    expect(s.screens.map((q) => q.id).toSet(), {idHWallTv, idHWallTv + 1});
+    expect(s.screens.map((q) => q.id).where((i) => i != 0).toSet(), {idHWallTv, idHWallTv + 1});
+    expect(s.screens.any((q) => q.id == 0), isTrue, reason: 'the NGMY logo carpet');
   });
 
   test('the camera can never go under the floor, and a finger on the picture points at the floor under it', () {
@@ -340,13 +347,45 @@ void main() {
     await _chip(t, '🏠 Go inside');
     await t.pump(const Duration(milliseconds: 500));
     expect(HomeProject.session!.current, 10);
-    // Swiping the picture a long way sideways cannot turn the view round behind the room.
+    // Swiping the picture turns it all the way round, in every view, without any button; it still never goes under the floor.
     for (var i = 0; i < 6; i++) {
       await t.dragFrom(const Offset(450, 900), const Offset(-380, 0));
       await t.pump(const Duration(milliseconds: 100));
     }
     final painter = t.widget<CustomPaint>(_view()).painter! as Scene3DPainter;
-    expect(painter.cam.yaw.abs(), lessThan(0.7));
+    expect(painter.cam.free, isTrue);
+    expect(painter.cam.pitch, greaterThanOrEqualTo(0.03));
+    await t.pump(const Duration(seconds: 10));
+  });
+
+  testWidgets('tapping a door opens it, closes it, or goes through it', (t) async {
+    t.view.physicalSize = const Size(900, 1600);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    HomeProject.session = HomeProject(seed: 5)..current = 5;
+    await t.pumpWidget(const MaterialApp(home: NgmyHousePage()));
+    await t.pump(const Duration(milliseconds: 600));
+    final hall = HomeProject.session!.rooms[5];
+    final at = _find3d(t, idHDoor + 1);
+    expect(at, isNotNull);
+    await t.tapAt(at!);
+    await t.pump();
+    await t.pump(const Duration(seconds: 1));
+    await t.pump(const Duration(seconds: 1));
+    expect(find.text("Open the door"), findsOneWidget);
+    await t.tap(find.text('Open the door'));
+    await t.pump(const Duration(milliseconds: 600));
+    expect(hall.openDoors, contains(1));
+    final at2 = _find3d(t, idHDoor + 1);
+    expect(at2, isNotNull);
+    await t.tapAt(at2!);
+    await t.pump();
+    await t.pump(const Duration(seconds: 1));
+    await t.pump(const Duration(seconds: 1));
+    expect(find.text('Close the door'), findsOneWidget);
+    await t.tap(find.text('Close the door'));
+    await t.pump(const Duration(milliseconds: 600));
+    expect(hall.openDoors, isNot(contains(1)));
     await t.pump(const Duration(seconds: 10));
   });
 
@@ -374,6 +413,40 @@ void main() {
     expect(find.text('⏹ Stop the tour'), findsNothing);
     expect(t.takeException(), isNull);
     await t.pump(const Duration(seconds: 12));
+  });
+
+  test('things fixed to a wall (outlets, switches, doors with their handles, TV frames) are each one sorted piece, so no angle hides a part', () {
+    final h = HomeProject(seed: 3);
+    for (final r in h.indoor) {
+      r.wallTv = 'tv100';
+      r.tvOn = true;
+    }
+    for (final r in h.indoor) {
+      final sc = buildHomeRoom(r);
+      for (final id in [idHOutletA, idHOutletB, idHSwitch, idHWallTv]) {
+        final mine = sc.polys.where((p) => p.id == id).toList();
+        if (mine.isEmpty) continue;
+        expect({for (final p in mine) p.group}.length, 1, reason: '${r.name} object $id is one group');
+        expect(mine.first.group, isNot(0));
+      }
+      for (var i = 0; i < r.doors.length; i++) {
+        final mine = sc.polys.where((p) => p.id == idHDoor + i && p.order == 1).toList();
+        expect({for (final p in mine) p.group}.length, 1, reason: '${r.name} door $i is one group');
+      }
+      // The walls are in the tier below, and the floor under all of them.
+      expect(sc.polys.where((p) => p.order == -1), isNotEmpty);
+      expect(sc.shell, isNotNull);
+    }
+  });
+
+  test('a hallway-only tour stays in the hall and keeps to its time', () {
+    final h = HomeProject(seed: 3);
+    final t = HomeTour.hallOnly(h, 45);
+    expect(t.firstRoom, 5);
+    for (var s = 0.0; s < t.total; s += 0.5) {
+      expect(t.at(s).room, 5);
+    }
+    expect(t.total, closeTo(45, 3));
   });
 }
 

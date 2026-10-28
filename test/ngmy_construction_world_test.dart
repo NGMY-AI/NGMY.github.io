@@ -57,8 +57,9 @@ void main() {
       expect(mine.where((p) => p.pts.length == 4 && !p.twoSided).length, greaterThan(10), reason: '$k has windows and a door as flat patches');
     }
     // Nothing in the world reacts unless the edit button is on.
+    final open = {for (final f in w.furn) if (f.kind == 'hospital' || f.kind == 'shop') idHFurn + f.id};
     for (final p in buildHomeRoom(w).polys) {
-      expect(p.id == 0 || p.id >= idHDoor, isTrue, reason: 'object ${p.id} can be tapped without the Furniture button');
+      expect(p.id == 0 || p.id >= idHDoor || open.contains(p.id), isTrue, reason: 'object ${p.id} can be tapped without the Furniture button');
     }
   });
 
@@ -126,10 +127,10 @@ void main() {
     await t.pump(const Duration(milliseconds: 600));
     expect(find.byIcon(Icons.arrow_upward_rounded), findsNothing);
     final row = find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.right).first;
-    await t.scrollUntilVisible(find.text('🚶 Walk about'), 120, scrollable: row);
+    await t.scrollUntilVisible(find.text('🚶 Walk the city'), 120, scrollable: row);
     await t.drag(row, const Offset(-80, 0));
     await t.pump(const Duration(milliseconds: 300));
-    await t.tap(find.text('🚶 Walk about'));
+    await t.tap(find.text('🚶 Walk the city'));
     await t.pump(const Duration(milliseconds: 500));
     expect(find.byIcon(Icons.arrow_upward_rounded), findsOneWidget);
     expect(find.byIcon(Icons.arrow_downward_rounded), findsOneWidget);

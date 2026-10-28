@@ -159,13 +159,16 @@ class WallTvBox {
   final double w, h, cx, cy;
 }
 
-WallTvBox wallTvBox(HRoom r, HomeAppliance a) {
+WallTvBox wallTvBox(HRoom r, HomeAppliance a, {int sub = 0}) {
   double heightFor(double tw) => math.min(tw * 0.5625, tw > 60 ? 62.0 : 99.0);
   double centreY(double th) => th > 40 ? 30 + th / 2 : 58;
   if (r.kind == 'hall') {
-    final tw = a.fullWall ? r.d - 14 : math.min(a.tvWidth, r.d - 14);
-    final th = heightFor(tw);
-    return WallTvBox(tw, th, r.d / 2, centreY(th));
+    // A video wall: on each side of the three doors, a big TV that fills the whole stretch of wall from the skirting to the crown.
+    final doors = [for (final d in r.doors) if (d.wall == 'back') d.offset];
+    final lo = doors.isEmpty ? -40.0 : doors.reduce(math.min) - 19 - 8, hi = doors.isEmpty ? 40.0 : doors.reduce(math.max) + 19 + 8;
+    final edge = r.w / 2 - 8;
+    final tw = edge - hi;
+    return WallTvBox(tw, HRoom.h - 18, sub == 0 ? (-edge + lo) / 2 : (hi + edge) / 2, (HRoom.h - 18) / 2 + 6);
   }
   var lo = -r.w / 2 + 6, hi = r.w / 2 - 6;
   if (r.kind == 'bathroom') hi = 14;
@@ -271,8 +274,8 @@ class HRoom {
   bool get okOutA => lesson.isEmpty ? wired : ((lesson == 'outlet' || lesson == 'gfci') ? lessonDone : true);
   bool get okOutB => lesson.isEmpty ? wired : true;
 
-  double get w => switch (kind) { 'bathroom' => 110, 'kitchen' => 140, 'living' => 180, 'hall' => 300, 'outside' => 1200, _ => 130 };
-  double get d => switch (kind) { 'bathroom' => 100, 'kitchen' => 110, 'living' => 120, 'hall' => 90, 'outside' => 900, _ => 112 };
+  double get w => switch (kind) { 'bathroom' => 110, 'kitchen' => 140, 'living' => 180, 'hall' => 480, 'outside' => 1200, _ => 130 };
+  double get d => switch (kind) { 'bathroom' => 100, 'kitchen' => 110, 'living' => 120, 'hall' => 180, 'outside' => 900, _ => 112 };
   bool get indoor => kind != 'outside';
   static const double h = 96;
 
@@ -365,10 +368,14 @@ class HomeProject {
     final r = math.Random(seed);
     // The map is 9 cells wide and 5 tall. The hall runs along the middle.
     HDoor toHall(double off) => HDoor('back', off, 5);
-    // The hall's doors: all ten along the back wall (every room off the hall), so both end walls are free for big TVs.
-    const hallTargets = [0, 1, 2, 3, 4, 6, 7, 8, 9, 10];
+    // The hall's doors: three in the middle of the back wall (the living room, the kitchen and the first bedroom), with a big TV on
+    // each side of them. The other rooms have their door on a short wall (the offset is the way along the wall).
     final hallDoors = <HDoor>[
-      for (var i = 0; i < hallTargets.length; i++) HDoor('back', -126.0 + i * 28, hallTargets[i]),
+      const HDoor('back', -50, 10),
+      const HDoor('back', 0, 9),
+      const HDoor('back', 50, 0),
+      for (final (z, to) in const [(40.0, 1), (90.0, 2), (140.0, 3)]) HDoor('left', z - 50, to),
+      for (final (z, to) in const [(30.0, 4), (70.0, 6), (110.0, 7), (150.0, 8)]) HDoor('right', z - 50, to),
     ];
     final list = <HRoom>[
       HRoom(0, _bedNames[0], 'bedroom', 0, 0, 2, 2, [toHall(-48)]),
@@ -405,6 +412,11 @@ class HomeProject {
       room.ceiling = r.nextInt(kCeilColors.length);
       _furnish(room);
     }
+    // The hall always has its video wall: a big TV on each side of the three doors, showing the NGMY ads.
+    rooms[5]
+      ..wallTv = 'tv100'
+      ..wallTv2 = 'tv100'
+      ..tvOn = true;
     // At least one wiring job and one plumbing job, whatever the dice said.
     rooms[3].wiringNeeded = true;
     rooms[2].plumbNeeded = true;
@@ -473,9 +485,19 @@ class HomeProject {
         r.add('fence', x: -206, z: 480);
         r.add('fence', x: -142, z: 480);
       case 'hall':
-        r.add('rug', x: 0, z: 46);
-        r.add('plant', x: -60, z: 76);
-        r.add('plant', x: 60, z: 76);
+        // A lobby: a lounge in the middle of the carpet, plants, lamps, consoles and benches along the walls.
+        r.add('sofa', x: -140, z: 140);
+        r.add('sofa', x: 140, z: 140);
+        r.add('armchair', x: -80, z: 150).rot = 2;
+        r.add('armchair', x: 80, z: 150).rot = 2;
+        for (final x in [-w2 + 14, w2 - 14]) {
+          r.add('plant', x: x, z: 168);
+          r.add('lamp', x: x, z: 14);
+        }
+        r.add('plant', x: -180, z: 12);
+        r.add('plant', x: 180, z: 12);
+        r.add('console', x: -104, z: 10);
+        r.add('console', x: 104, z: 10);
       default:
     }
   }

@@ -726,7 +726,7 @@ class GlbAvatar {
     final lod = close ? _guide : _resident;
     final clip = clipFor(walking: walking);
     final len = clipLength(clip);
-    final clipTime = walking && walkedUnits != null ? walkedUnits / 50 * len : time * (_speed[key] ?? 1.0);
+    final clipTime = walking && walkedUnits != null && clip.toLowerCase().contains('walk') ? walkedUnits / 50 * len : time * (_speed[key] ?? 1.0);
     // Where the hips are at the start of the clip: the dancer is kept on her spot and is not carried around by the dance.
     var start = _hipsStart[clip];
     if (start == null) {

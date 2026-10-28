@@ -112,6 +112,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     }
     // The real characters are read from their files in the background; plain figures stand in until each is ready.
     GlbAvatar.preload(ngmyPlayerAvatar);
+    NgmyLogo.load();
     _refreshFigs();
     scene = buildHomeRoom(room, problems: problems, residents: _figs);
     _frame(snap: true);
@@ -318,6 +319,11 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       return;
     }
     if (id >= idHFurn && id < idHFurn + 100) {
+      final ff = room.furnById(id - idHFurn);
+      if (!room.indoor && mode != 'furniture' && ff != null && (ff.kind == 'hospital' || ff.kind == 'shop')) {
+        _citySheet(ff.kind);
+        return;
+      }
       if (mode != 'furniture') return;
       setState(() {
         selFurn = id - idHFurn;
@@ -348,18 +354,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         conBeep(room.openDoors.contains(i) ? 700 : 450, ms: 70);
         return;
       }
-      // Tap a door to open it and walk through, like in a game.
-      final to = room.doors[i].to;
-      setState(() {
-        room.openDoors.add(i);
-        _rebuild();
-      });
-      conBeep(700, ms: 70);
-      Future.delayed(const Duration(milliseconds: 450), () {
-        if (!mounted) return;
-        setState(() => room.openDoors.remove(i));
-        _go(to);
-      });
+      // Tap a door: open it or close it, or go through it.
+      _doorSheet(i);
       return;
     }
     // The voltage tester answers first.
@@ -436,6 +432,77 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   }
 
   /// A resident's card: how they are, and what you can do for them without leaving the room.
+  /// A door you tapped: open it, close it, or go through it.
+  Future<void> _doorSheet(int i) {
+    final to = room.doors[i].to;
+    final where = to < home.rooms.length ? home.rooms[to].name : 'the next room';
+    return showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF17171C),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Door to $where', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 4),
+            Text(room.openDoors.contains(i) ? 'The door is open.' : 'The door is closed.', style: const TextStyle(color: Colors.white54)),
+            const SizedBox(height: 12),
+            Wrap(spacing: 10, runSpacing: 10, children: [
+              FilledButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  setState(() {
+                    if (!room.openDoors.remove(i)) room.openDoors.add(i);
+                    _rebuild();
+                  });
+                  conBeep(room.openDoors.contains(i) ? 700 : 450, ms: 70);
+                },
+                icon: Icon(room.openDoors.contains(i) ? Icons.door_front_door_outlined : Icons.meeting_room_outlined),
+                label: Text(room.openDoors.contains(i) ? 'Close the door' : 'Open the door'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  setState(() {
+                    room.openDoors.add(i);
+                    _rebuild();
+                  });
+                  conBeep(700, ms: 70);
+                  Future.delayed(const Duration(milliseconds: 450), () {
+                    if (!mounted) return;
+                    setState(() => room.openDoors.remove(i));
+                    _go(to);
+                  });
+                },
+                icon: const Icon(Icons.arrow_forward_rounded),
+                label: const Text('Go through'),
+              ),
+            ]),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  /// The city's own services (calls, people, the hospital, the shop), opened over the city.
+  Future<void> _citySheet(String tab) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+        child: SizedBox(height: MediaQuery.of(ctx).size.height * 0.82, child: NgmyCommunityPage(initialTab: tab)),
+      ),
+    );
+    if (!mounted) return;
+    setState(() {
+      _refreshFigs();
+      _rebuild();
+    });
+  }
+
   Future<void> _residentSheet(int id) {
     final cm = comm;
     if (cm == null || id >= cm.residents.length) return Future.value();
@@ -635,6 +702,15 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
                 icon: const Icon(Icons.play_arrow_rounded),
                 label: const Text('Play the tour'),
               ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _startTour(45, hallOnly: true);
+                },
+                icon: const Icon(Icons.meeting_room_rounded),
+                label: const Text('Book a hallway tour (just the hall)'),
+              ),
             ]),
           ),
         );
@@ -642,7 +718,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     );
   }
 
-  void _startTour(int secs) {
+  void _startTour(int secs, {bool hallOnly = false}) {
     _tourTimer?.cancel();
     for (final r in home.indoor) {
       r.wallTv ??= 'tv100';
@@ -650,7 +726,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       r.tvOn = true;
     }
     walk = false;
-    tour = HomeTour(home, secs.toDouble());
+    tour = hallOnly ? HomeTour.hallOnly(home, secs.toDouble()) : HomeTour(home, secs.toDouble());
     _tourStart = now;
     inside = true;
     mode = 'look';
@@ -1235,6 +1311,18 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     ]);
   }
 
+  /// The buttons of the city (the garden): walking round it with the controls, building, and its hospital, shop, calls and people.
+  List<Widget> _cityChips() => [
+        _chip(steer ? '⏹ Stop walking' : '🚶 Walk the city', steer, steer ? _stopSteer : _startSteer, color: const Color(0xFF4ADE80)),
+        _chip('🏗 Build', false, _addSheet, color: const Color(0xFF4ADE80)),
+        _chip('📞 Calls', false, () => _citySheet('calls'), color: const Color(0xFFF472B6), dot: (comm?.calls.length ?? 0) > 0),
+        _chip('🏥 Hospital', false, () => _citySheet('hospital'), color: const Color(0xFFF87171)),
+        _chip('🛒 Shop', false, () => _citySheet('shop'), color: const Color(0xFFFB923C)),
+        _chip('👨‍👩‍👧 People', false, () => _citySheet('people'), color: const Color(0xFF60A5FA)),
+        _chip('🏠 Go inside', false, () => _go(10), color: const Color(0xFF4ADE80)),
+        _chip('🗺 Map', showMap, () => setState(() => showMap = !showMap), color: const Color(0xFFA78BFA)),
+      ];
+
   Widget _buildPage(BuildContext context) {
     final r = room;
     final screenW = MediaQuery.of(context).size.width;
@@ -1262,7 +1350,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         ],
       ),
       panel: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _row([
+        _row(!room.indoor ? _cityChips() : [
           _chip(inside ? '🔭 See the whole room' : '🏠 Be inside', false, () {
             setState(() => inside = !inside);
             _frame();
@@ -1281,9 +1369,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
           if (!isLesson) _chip(room.indoor ? '🌳 Go outside' : '🏠 Go inside', false, () => _go(room.indoor ? 11 : 10), color: const Color(0xFF4ADE80)),
           if (!room.indoor) _chip(steer ? '⏹ Stop walking' : '🚶 Walk about', steer, steer ? _stopSteer : _startSteer, color: const Color(0xFF4ADE80)),
           if (!isLesson) _chip('➕ Add', false, _addSheet, color: const Color(0xFF4ADE80)),
-          if (!isLesson) _chip('🏘 Community', false, () async {
-            await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const NgmyCommunityPage()));
-            if (mounted) setState(_rebuild);
+          if (!isLesson) _chip('🏘 Community', false, () {
+            if (room.indoor) _go(11);
+            _citySheet('calls');
           }, color: const Color(0xFFF472B6), dot: (comm?.calls.length ?? 0) > 0),
           _chip('🔦 Tester', tester, () => setState(() {
             tester = !tester;

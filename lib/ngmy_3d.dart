@@ -75,13 +75,16 @@ class Label3D {
 }
 
 class Scene3D {
-  const Scene3D(this.polys, {this.info = const {}, this.labels = const [], this.screens = const []});
+  const Scene3D(this.polys, {this.info = const {}, this.labels = const [], this.screens = const [], this.shell});
   final List<Poly> polys;
   final Map<int, ObjInfo> info;
   final List<Label3D> labels;
 
   /// Real pictures on screens (a TV playing an ad), drawn flat on a four cornered patch of the scene.
   final List<ScreenQuad> screens;
+
+  /// The room box (x from, x to, z from, z to) whose walls are tier 0. When the camera is outside it, those walls are drawn last, so they hide the room.
+  final (double, double, double, double)? shell;
 }
 
 /// A screen in the scene: where its four corners are (top left, top right, bottom right, bottom left, seen from the front)
@@ -123,7 +126,10 @@ class MeshBuilder {
 
   /// Everything built between [startGroup] and [endGroup] is sorted as one piece, in the order it was built. Use it for a wall and
   /// the windows and doors drawn on it, so the wall is always drawn first and the details are never hidden behind it.
-  void startGroup() => _sticky = ++_groups;
+  int startGroup() => _sticky = ++_groups;
+
+  /// Goes on building in a group that was started earlier (a wall, then later its skirting board).
+  void joinGroup(int g) => _sticky = g;
   void endGroup() => _sticky = 0;
 
   void _begin() {
@@ -498,6 +504,12 @@ class Scene3DPainter extends CustomPainter {
       return V3(r.x, r.y, r.z + cam.dist);
     }
 
+    var outside = false;
+    final sh = scene.shell;
+    if (sh != null) {
+      final ex = cam.target.x - cam.dist * cp * syw, ez = cam.target.z + cam.dist * cp * cyw;
+      outside = ex < sh.$1 - 1 || ex > sh.$2 + 1 || ez < sh.$3 - 1;
+    }
     final toLight = _toLight.unit;
     final half = (toLight + const V3(0, 0, -1)).unit;
     final drawn = <_Face>[];
@@ -538,7 +550,7 @@ class Scene3DPainter extends CustomPainter {
         i == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
       }
       path.close();
-      drawn.add(_Face(path, Color.fromRGBO(r, g, b, p.alpha), zs / cp3.length - p.bias, p.id, p.alpha < 0.99, p.id == highlight && highlight != 0, null, p.order, p.group));
+      drawn.add(_Face(path, Color.fromRGBO(r, g, b, p.alpha), zs / cp3.length - p.bias, p.id, p.alpha < 0.99, p.id == highlight && highlight != 0, null, outside && p.order == 0 ? 3 : p.order, p.group));
     }
     for (final sq in scene.screens) {
       final q = [for (final v in sq.corners) toCam(v)];

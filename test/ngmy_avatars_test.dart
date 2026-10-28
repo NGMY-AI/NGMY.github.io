@@ -14,24 +14,19 @@ void main() {
     expect(kAvatars.keys, containsAll(['xbot', 'michelle', 'soldier']));
   });
 
-  test('Residents call on the phone and some of them walk out into the garden and back', () {
+  test('Residents are out in the city, and those with a call for help are shown calling', () {
     final home = HomeProject(seed: 4);
     final c = Community(houseSeed: 4);
     expect(kResidents.where((r) => r.style.avatar != 'human'), isNotEmpty);
-    var out = 0, inside = 0;
-    for (var i = 0; i < 6; i++) {
-      c.clock = i * 40.0;
-      final garden = c.figuresIn(home, home.rooms.firstWhere((r) => !r.indoor).id);
-      out += garden.length;
-      for (final r in home.indoor) {
-        inside += c.figuresIn(home, r.id).length;
-      }
+    expect(c.figuresIn(home, 11).length, 7);
+    for (final r in home.indoor) {
+      expect(c.figuresIn(home, r.id), isEmpty);
     }
-    expect(out, greaterThan(0));
-    expect(inside, greaterThan(0));
     c.calls.add(HelpCall(99, 0, 'power', 'No power', 3));
-    c.clock = 0;
-    final all = [for (final r in home.rooms) ...c.figuresIn(home, r.id)];
-    expect(all.where((f) => f.calling && f.label.contains('📞')), isNotEmpty);
+    final all = c.figuresIn(home, 11);
+    final caller = all.firstWhere((f) => f.id == 0);
+    expect(caller.calling && caller.label.contains('📞'), isTrue);
+    expect(caller.wander, 0, reason: 'someone on the phone stands still');
+    expect(buildHomeRoom(home.rooms[11], residents: all).labels.any((l) => l.text.contains('Help')), isTrue);
   });
 }

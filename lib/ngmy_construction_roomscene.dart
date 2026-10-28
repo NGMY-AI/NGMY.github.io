@@ -36,9 +36,9 @@ class RoomView {
 V3 slotPoint(BoxSlot s, V3 local) => s.ceiling ? V3(s.pos.x + local.x, s.pos.y - local.z, s.pos.z + local.y) : V3(s.pos.x + local.x, s.pos.y + local.y, s.pos.z + local.z);
 
 /// Moves a scene made for a wall box (facing out of the wall) to this slot, and gives the objects new numbers.
-(List<Poly>, Map<int, ObjInfo>) _place(Scene3D sc, BoxSlot s, int Function(int id) mapId) {
+(List<Poly>, Map<int, ObjInfo>) _place(Scene3D sc, BoxSlot s, int Function(int id) mapId, int group) {
   final moved = s.ceiling ? transformPolys(sc.polys, rx: math.pi / 2, t: s.pos) : transformPolys(sc.polys, t: s.pos);
-  final polys = [for (final p in moved) Poly(p.pts, p.n, p.color, p.id == 0 ? 0 : mapId(p.id), shine: p.shine, alpha: p.alpha, twoSided: p.twoSided, layer: p.layer, bias: p.bias)];
+  final polys = [for (final p in moved) Poly(p.pts, p.n, p.color, p.id == 0 ? 0 : mapId(p.id), shine: p.shine, alpha: p.alpha, twoSided: p.twoSided, layer: p.layer, bias: p.bias, order: p.alpha < 0.99 ? 3 : 2, group: group)];
   final info = <int, ObjInfo>{for (final e in sc.info.entries) mapId(e.key): ObjInfo(e.value.name, e.value.about, slotPoint(s, e.value.focus), e.value.dist)};
   return (polys, info);
 }
@@ -81,8 +81,12 @@ Scene3D buildRoomScene(RoomProject p, RoomView v) {
   final info = <int, ObjInfo>{};
 
   // ── The room around the wall ──
+  // Everything fixed to the wall (framing, cable, drywall, boxes, devices, trim) is one group, built back to front, so no angle can hide a part of it.
+  final wg = MeshBuilder.newGroup();
+  b.order = -1;
   b.id = idRoomObj;
   b.box(const V3(0, -48.6, 55), const V3(160, 1.2, 120), const Color(0xFFB08A5B), shine: 0.15, split: 4);
+  b.order = 0;
   b.box(const V3(-72.8, 0, 55), const V3(1.2, 96, 112), const Color(0xFFD9D3C5), split: 3);
   // A window in the side wall.
   b.box(const V3(-72.0, 6, 55), const V3(0.4, 36, 34), const Color(0xFF9BD3F5), shine: 0.5);
@@ -95,9 +99,11 @@ Scene3D buildRoomScene(RoomProject p, RoomView v) {
   // While the house is still being built the ceiling is seen through, with the joists above it.
   // Once the drywall is done the ceiling is finished and painted: no bare wood.
   b.id = 0;
+  b.order = 3;
   b.alpha = p.drywallDone ? 0.42 : 0.1;
   b.box(const V3(0, 48.6, 55), const V3(150, 1.2, 112), p.drywallDone ? const Color(0xFFF7F4EC) : const Color(0xFFEDE8DC), split: 3);
   b.alpha = 1;
+  b.order = 2;
   b.id = idRoomObj;
   if (!p.drywallDone) {
     for (var i = 0; i < 10; i++) {
@@ -105,24 +111,30 @@ Scene3D buildRoomScene(RoomProject p, RoomView v) {
     }
   } else {
     const crown = Color(0xFFFFFFFF);
+    b.joinGroup(wg);
     b.box(const V3(0, 46.6, 0.8), const V3(147, 3, 1.4), crown, shine: 0.2);
     b.box(const V3(-71.2, 46.6, 55), const V3(1.4, 3, 112), crown, shine: 0.2);
     b.box(const V3(71.2, 46.6, 55), const V3(1.4, 3, 112), crown, shine: 0.2);
   }
   if (p.drywallDone) {
     // The baseboard goes on after the paint.
+    b.joinGroup(wg);
     b.box(const V3(0, -45.5, 0.5), const V3(144, 5, 0.7), const Color(0xFFF7F4EC), shine: 0.2);
   }
+  b.endGroup();
   // A sofa and a rug, so the room feels like a room.
   b.id = idRoomObj;
+  b.grouped = true;
   b.box(const V3(-8, -47.8, 70), const V3(80, 0.5, 60), const Color(0xFF8A4B4B), split: 2);
   b.box(const V3(-8, -39, 96), const V3(62, 18, 20), const Color(0xFF5E6E84), shine: 0.1);
   b.box(const V3(-8, -28, 104), const V3(62, 22, 6), const Color(0xFF55657B), shine: 0.1);
   b.box(const V3(-42, -34, 96), const V3(6, 14, 20), const Color(0xFF55657B), shine: 0.1);
   b.box(const V3(26, -34, 96), const V3(6, 14, 20), const Color(0xFF55657B), shine: 0.1);
+  b.grouped = false;
   info[idRoomObj] = const ObjInfo('The room', 'A room to build from bare studs to finished, working electrics. The walls hold the cable, the boxes and the devices.', V3(0, 0, 40), 190);
 
   // ── Framing ──
+  b.joinGroup(wg);
   b.id = idPlateObj;
   b.box(const V3(0, 47.25, -2.25), const V3(147, 1.5, 3.5), kWood, shine: 0.05, split: 3);
   b.box(const V3(0, -47.25, -2.25), const V3(147, 1.5, 3.5), kWood, shine: 0.05, split: 3);
@@ -222,35 +234,40 @@ Scene3D buildRoomScene(RoomProject p, RoomView v) {
     if (isActive) {
       final lesson = electricalLesson(d.kind);
       final bench = buildBench(lesson, d.w, withWall: false);
-      final (polys, inf) = _place(bench, s, (id) => benchId(s.id, id));
+      final (polys, inf) = _place(bench, s, (id) => benchId(s.id, id), wg);
       b.polys.addAll(polys);
       info.addAll(inf);
       if (d.w.labels && d.w.stage == 0) {
         labels.addAll([for (final l in bench.labels) Label3D(slotPoint(s, l.at), l.text, l.color)]);
       }
     } else if (d != null && d.w.stage >= 2) {
-      final (polys, _) = _place(buildFinished(d.kind, burnt: d.w.burnt), s, (id) => idDevBase + s.id);
+      final (polys, _) = _place(buildFinished(d.kind, burnt: d.w.burnt), s, (id) => idDevBase + s.id, wg);
       b.polys.addAll(polys);
       // A bright frame round a finished wall device, so it can be found and tapped from far away.
       if (!s.ceiling) {
+        b.order = 3;
         b.id = idDevBase + s.id;
         b.bias = 0.4;
         b.alpha = 0.55;
         b.box(V3(s.pos.x, s.pos.y, s.pos.z + 0.2), const V3(10, 14, 0.5), d.w.burnt ? const Color(0xFFEF4444) : const Color(0xFF22D3EE));
         b.alpha = 1;
+        b.order = 2;
         b.bias = 0;
       }
       info[idDevBase + s.id] = ObjInfo(_deviceName(d.kind), _deviceAbout(p, s.id), slotPoint(s, const V3(0, 0, 4)), 22);
     } else {
-      final (polys, _) = _place(buildBoxOnly(lessonKind, cabled: false), s, (id) => idSlotBase + s.id);
+      final (polys, _) = _place(buildBoxOnly(lessonKind, cabled: false), s, (id) => idSlotBase + s.id, wg);
       b.polys.addAll(polys);
       info[idSlotBase + s.id] = ObjInfo(s.ceiling ? 'Ceiling box' : 'Electrical box', p.cabled.contains(s.id) ? 'The box is mounted and the cable is in. A device can be wired here.' : 'The box is mounted. Pull the cable to it.', slotPoint(s, const V3(0, 0, 4)), 24);
     }
   }
 
+  b.endGroup();
+
   // ── Places you can tap, shown while a tool or item is in your hand ──
   final armed = v.armed;
   void marker(int id, V3 at, V3 size, {bool round = false, Color col = const Color(0xFF67E8F9)}) {
+    b.order = 3;
     b.id = id;
     b.alpha = 0.5;
     b.bias = 0.9;
@@ -261,6 +278,7 @@ Scene3D buildRoomScene(RoomProject p, RoomView v) {
     }
     b.bias = 0;
     b.alpha = 1;
+    b.order = 2;
   }
 
   if (armed == 'wall' || armed == 'ceiling' || armed == 'fanbox') {
@@ -324,6 +342,7 @@ Scene3D buildRoomScene(RoomProject p, RoomView v) {
   }
 
   // ── The things plugged in ──
+  b.grouped = true;
   for (final e in p.plugged.entries) {
     final s = slotById(e.key);
     b.id = idAppBase + e.key;
@@ -353,11 +372,12 @@ Scene3D buildRoomScene(RoomProject p, RoomView v) {
     info[idAppBase + e.key] = ObjInfo(_appNameFull(e.value), e.value == 'tv' ? 'Plugged into ${s.name}. Tap it to watch NGMY ads full screen. Use the Unplug tool to unplug it.' : 'Plugged into ${s.name}. Tap it to unplug.', V3(x, -35, 20), 60);
   }
 
+  b.grouped = false;
   // Info for the wall boxes/ceiling positions is added when they are boxes; give the markers a name too.
   for (final s in kSlots) {
     info.putIfAbsent(idSlotBase + s.id, () => ObjInfo(s.name, s.ceiling ? 'A place in the ceiling for a ${s.role == 'fan' ? 'fan (needs a fan-rated box)' : 'light'}.' : 'A place on the wall at ${s.role == 'switch' ? 'switch height, about 48 inches from the floor' : 'outlet height, about 16 inches from the floor'}.', slotPoint(s, const V3(0, 0, 4)), 26));
   }
-  return Scene3D(b.polys, info: info, labels: labels, screens: screens);
+  return Scene3D(b.polys, info: info, labels: labels, screens: screens, shell: (-73.0, 73.0, -3.0, 400.0));
 }
 
 String _deviceName(String kind) => switch (kind) { 'gfci' => 'GFCI outlet', 'switch' => 'Light switch', 'light' => 'Ceiling light', 'fan' => 'Ceiling fan', _ => 'Outlet' };

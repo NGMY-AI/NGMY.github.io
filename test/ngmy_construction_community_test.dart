@@ -193,33 +193,30 @@ void main() {
   test('the residents stand in their own rooms, clear of the furniture, drawn as people that can be tapped', () {
     final h = _goodHouse();
     final c = Community(houseSeed: h.seed, seed: 8);
+    // Nobody stands in the rooms any more: all seven are out in the city.
     for (final room in h.indoor) {
-      final figs = c.figuresIn(h, room.id);
-      for (final f in figs) {
-        expect(f.room, room.id);
-        expect(f.x.abs(), lessThan(room.w / 2));
-        expect(f.z, inInclusiveRange(0, room.d));
-        final r = kResidents[f.id];
-        expect(r.room, room.id);
-      }
+      expect(c.figuresIn(h, room.id), isEmpty, reason: room.name);
     }
-    final ama = kResidents[0];
-    final figs = c.figuresIn(h, ama.room);
+    final garden = h.rooms[11];
+    final figs = c.figuresIn(h, 11);
+    expect(figs.length, 7);
+    for (final f in figs) {
+      expect(f.room, 11);
+      expect(f.x.abs(), lessThan(garden.w / 2));
+    }
     expect(figs.map((f) => f.id), contains(0));
-    final room = h.rooms[ama.room];
-    final scene = buildHomeRoom(room, residents: figs);
+    final scene = buildHomeRoom(garden, residents: figs);
     expect(scene.labels.any((l) => l.text.contains('Ama')), isFalse, reason: 'names no longer float over the people');
-    expect(scene.info.containsKey(idHResident), isTrue);
-    final polys = homeDynamic(room, 1.0, residents: figs);
-    expect(polys.where((p) => p.id == idHResident), isNotEmpty);
-    expect(polys.every((p) => p.group != 0), isTrue, reason: 'each part sorted as one piece, like the tour person');
+    final polys = homeDynamic(garden, 1.0, residents: figs);
+    final mine = polys.where((p) => p.id >= idHResident && p.id < idHResident + 20).toList();
+    expect({for (final p in mine) p.id}.length, 7);
+    expect(mine.every((p) => p.group != 0), isTrue, reason: 'each part sorted as one piece, like the tour person');
     // Their clothes differ.
-    final b = c.figuresIn(h, kResidents[1].room);
-    expect(b.first.style.shirt == figs.first.style.shirt, isFalse);
-    // Someone in hospital is not in their room.
+    expect(figs[1].style.shirt == figs[0].style.shirt, isFalse);
+    // Someone in hospital is not in the street.
     c.residents[0].sick = true;
     c.admit(c.residents[0]);
-    expect(c.figuresIn(h, ama.room).map((f) => f.id), isNot(contains(0)));
+    expect(c.figuresIn(h, 11).map((f) => f.id), isNot(contains(0)));
   });
 
   testWidgets('the community page: calls, people, the hospital and the shop work, and Go and fix opens the house', (t) async {

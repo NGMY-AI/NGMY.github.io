@@ -14,7 +14,10 @@ import 'ngmy_studio_kit.dart';
 // ═════════════════════════════════════════════════════════════════════════════
 
 class NgmyCommunityPage extends StatefulWidget {
-  const NgmyCommunityPage({super.key});
+  const NgmyCommunityPage({super.key, this.initialTab = 'calls'});
+
+  /// The tab shown first: calls, people, hospital or shop (the city opens the one you tapped).
+  final String initialTab;
 
   @override
   State<NgmyCommunityPage> createState() => _NgmyCommunityPageState();
@@ -24,7 +27,7 @@ class _NgmyCommunityPageState extends State<NgmyCommunityPage> {
   Community? c;
   late HomeProject home;
   Timer? _tick;
-  String tab = 'calls';
+  late String tab = widget.initialTab;
   String? toast;
   Timer? _toastTimer;
   int _beat = 0;

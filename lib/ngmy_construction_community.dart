@@ -332,36 +332,19 @@ class Community {
 
   // ── Where the people stand in the house ──
 
-  /// Who is out in the garden just now: some of the residents stroll out for a while, then go back in.
-  bool isOut(Resident p) => (p.id == 1 || p.id == 4 || p.id == 3) && p.inBed < 0 && !calls.any((c) => c.resident == p.id) && ((clock / 40).floor() + p.id) % 3 == 0;
+  /// Everybody who lives here is out and about in the city. The rooms of the house are only for the tour.
+  bool isOut(Resident p) => p.inBed < 0;
 
-  /// The residents who are standing in room [roomId], with a free spot each.
+  /// The people standing in room [roomId]: all of them in the city (the garden), none inside the house.
   List<ResidentFigure> figuresIn(HomeProject home, int roomId) {
     final out = <ResidentFigure>[];
     final room = home.rooms[roomId];
-    ResidentFigure fig(Resident p, double x, double z, {double wander = 0}) {
+    if (room.indoor) return out;
+    var k = 0;
+    for (final p in living.where(isOut)) {
       final calling = calls.any((c) => c.resident == p.id);
-      return ResidentFigure(id: p.id, room: roomId, x: x, z: z, yaw: 0, style: p.info.style, label: '${calling ? '📞 ' : ''}${p.name} ${p.badge}', alert: p.mood != 'fine' || calling, calling: calling, wander: wander);
-    }
-
-    if (!room.indoor) {
-      var k = 0;
-      for (final p in living.where(isOut)) {
-        out.add(fig(p, -110.0 + k * 90, 215.0 + (k.isOdd ? 40 : 0), wander: 24));
-        k++;
-      }
-      return out;
-    }
-    final nav = RoomNav(room);
-    for (final p in living.where((p) => p.info.room == roomId && p.inBed < 0 && !isOut(p))) {
-      final want = switch (room.kind) {
-        'bedroom' => (-room.w * 0.18, room.d * 0.6),
-        'kitchen' => (-room.w * 0.15, 56.0),
-        _ => (-room.w * 0.25, 40.0),
-      };
-      final path = nav.route(want, want);
-      final spot = path.last;
-      out.add(fig(p, spot.$1, spot.$2));
+      out.add(ResidentFigure(id: p.id, room: roomId, x: -270.0 + k * 90, z: 205.0 + (k.isOdd ? 22 : 0), yaw: 0, style: p.info.style, label: '${calling ? '📞 ' : ''}${p.name} ${p.badge}', alert: p.mood != 'fine' || calling, calling: calling, wander: calling ? 0 : 34));
+      k++;
     }
     return out;
   }

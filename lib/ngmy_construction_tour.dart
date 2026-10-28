@@ -288,9 +288,16 @@ class _Seg {
 }
 
 class HomeTour {
-  HomeTour(this.home, this.seconds) {
+  HomeTour(this.home, this.seconds) : _hallOnly = false {
     _build();
   }
+
+  /// A tour of just the hallway: in from the living room, along the video wall, to the kitchen door.
+  HomeTour.hallOnly(this.home, this.seconds) : _hallOnly = true {
+    _build();
+  }
+
+  final bool _hallOnly;
 
   final HomeProject home;
   final double seconds;
@@ -327,6 +334,13 @@ class HomeTour {
       case 'bedroom':
         final (spot, yaw) = beside(44);
         return [_Goal(spot, yaw: yaw, secs: 3.4, note: 'Switching the ad on the TV', remote: true, pointing: true, event: 'ad')];
+      case 'hall':
+        if (!_hallOnly) return const [];
+        return [
+          _Goal((-r.w / 2 + 80, 90), yaw: math.pi, secs: 3.0, note: 'Looking at the left video wall', pointing: true),
+          _Goal((0, 120), yaw: 0, secs: 2.4, note: 'Looking over the lounge and the logo carpet'),
+          _Goal((r.w / 2 - 80, 90), yaw: math.pi, secs: 3.0, note: 'Looking at the right video wall', pointing: true),
+        ];
       default:
         return const [];
     }
@@ -365,6 +379,11 @@ class HomeTour {
   double _doorYaw(HRoom r, int di) => switch (r.doors[di].wall) { 'left' => -math.pi / 2, 'right' => math.pi / 2, _ => math.pi };
 
   void _build() {
+    if (_hallOnly) {
+      _leg(5, 10, 9, note: 'Walking into the hall');
+      _share();
+      return;
+    }
     // Through the front door into the living room, the kitchen, then the hall and every bedroom and bathroom.
     _leg(10, 11, 9, note: 'Coming in through the front door');
     _leg(9, 10, 5);
@@ -376,6 +395,10 @@ class HomeTour {
       _leg(k, 5, i == order.length - 1 ? null : 5);
       prev = k;
     }
+    _share();
+  }
+
+  void _share() {
     // Share the time: pauses keep their length (shortened for short tours), walking takes the rest.
     final pauseScale = math.min(1.0, seconds / 120);
     var fixed = 0.0, walkLen = 0.0;

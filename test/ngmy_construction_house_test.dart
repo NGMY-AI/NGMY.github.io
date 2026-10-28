@@ -58,7 +58,7 @@ void main() {
 
   test('only the wiring and plumbing can be tapped; everything else only while its edit button is on', () {
     final h = HomeProject(seed: 7);
-    const always = {0, idHOutletA, idHOutletB, idHSwitch, idHLight, idHToiletF, idHSinkF, idHTubF, idHKSink, idHApp, idHApp + 1};
+    const always = {0, idHOutletA, idHOutletB, idHSwitch, idHLight, idHToiletF, idHSinkF, idHTubF, idHKSink, idHApp, idHApp + 1, idHWallTv, idHWallTv + 1};
     for (final r in h.indoor) {
       final look = buildHomeRoom(r);
       expect(look.polys.length, lessThan(9000));
