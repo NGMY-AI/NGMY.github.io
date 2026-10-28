@@ -293,8 +293,8 @@ class HRoom {
   bool get okOutA => lesson.isEmpty ? wired : ((lesson == 'outlet' || lesson == 'gfci') ? lessonDone : true);
   bool get okOutB => lesson.isEmpty ? wired : true;
 
-  double get w => big ? 260 : switch (kind) { 'bathroom' => 110, 'kitchen' => 140, 'living' => 180, 'hall' => 480, 'outside' => 1200, _ => 130 };
-  double get d => big ? 180 : switch (kind) { 'bathroom' => 100, 'kitchen' => 110, 'living' => 120, 'hall' => 180, 'outside' => 900, _ => 112 };
+  double get w => big ? 260 : switch (kind) { 'bathroom' => 110, 'kitchen' => 140, 'living' => 180, 'hall' => 480, 'outside' => 1800, _ => 130 };
+  double get d => big ? 180 : switch (kind) { 'bathroom' => 100, 'kitchen' => 110, 'living' => 120, 'hall' => 180, 'outside' => 1400, _ => 112 };
   bool get indoor => kind != 'outside';
   static const double h = 130;
 
@@ -490,6 +490,21 @@ class HomeProject {
         r.add('car', x: 230, z: 360).rot = 2;
         r.add('bench', x: -60, z: 195);
         r.add('flowers', x: 90, z: 205);
+        // A whole town over nearly all the land: streets both ways, with houses along them.
+        for (var x = -600.0; x <= 600; x += kRoadGrid) {
+          if (x.abs() > 320) r.add('road', x: x, z: 360);
+          r.add(x.abs() < 1 ? 'roadcross' : 'road', x: x, z: 760);
+        }
+        for (var z = 400.0; z <= 720; z += kRoadGrid) {
+          r.add('road', x: 0, z: z).rot = 1;
+        }
+        bool clear(double x, double z) => !r.furn.any((f) => !kFlatKinds.contains(f.kind) && !kAnimalKinds.contains(f.kind) && (f.x - x).abs() < 100 && (f.z - z).abs() < 85);
+        for (final z in const [440.0, 690.0, 830.0, 1010.0, 1250.0]) {
+          for (var x = -780.0; x <= 780; x += 165) {
+            if (x.abs() < 60) continue;
+            if (clear(x, z)) r.add('house2', x: x, z: z);
+          }
+        }
         r.add('car', x: -120, z: 360);
         r.add('ambulance', x: 120, z: 360).rot = 2;
         r.add('firetruck', x: -340, z: 318);

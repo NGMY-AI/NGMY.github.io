@@ -47,8 +47,9 @@ void main() {
     addTearDown(t.view.reset);
     await t.pumpWidget(const MaterialApp(home: NgmyConstructionLab()));
     await t.pump(const Duration(milliseconds: 500));
-    expect(find.text('Learn mode'), findsOneWidget);
-    expect(find.text('Practice mode'), findsOneWidget);
+    expect(find.text('Learn mode'), findsNothing);
+    expect(find.text('Practice mode'), findsNothing);
+    expect(find.text('Community'), findsNothing);
     expect(find.text('My House'), findsOneWidget);
     expect(find.text('Fix a house'), findsOneWidget);
     expect(find.text('Plumb a room'), findsOneWidget);

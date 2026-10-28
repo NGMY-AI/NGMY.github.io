@@ -428,6 +428,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
   void _pickBench(int slot, int local) {
     final d = p.devs[slot];
     if (d == null) return;
+    if (const {idWall, idStud, idBox, idCable, idCableB}.contains(local)) return;
     final lesson = electricalLesson(d.kind);
     final hook = lesson.hookups.where((h) => h.id == local).toList();
     final key = wireKeyForId(d.kind, local);

@@ -186,7 +186,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       yaw = -0.25;
       cam
         ..minDist = 30
-        ..maxDist = 1100
+        ..maxDist = 2400
         ..minPitch = 0.03
         ..maxPitch = 1.35
         ..setFree(true);
@@ -1613,9 +1613,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         onTap: f,
         child: Stack(clipBehavior: Clip.none, children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(color: on ? color.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(14), border: Border.all(color: on ? color : Colors.white24, width: on ? 2 : 1)),
-            child: Text(label, style: TextStyle(color: on ? color : Colors.white, fontWeight: FontWeight.w800, fontSize: 12.5)),
+            child: Text(label, style: TextStyle(color: on ? color : Colors.white, fontWeight: FontWeight.w800, fontSize: 11)),
           ),
           if (dot) Positioned(right: -2, top: -3, child: Container(width: 11, height: 11, decoration: BoxDecoration(color: const Color(0xFFEF4444), shape: BoxShape.circle, border: Border.all(color: kConPanel, width: 2)))),
         ]),
@@ -1623,7 +1623,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     );
   }
 
-  Widget _row(List<Widget> kids) => SizedBox(height: 40, child: ListView(scrollDirection: Axis.horizontal, children: kids));
+  Widget _row(List<Widget> kids) => SizedBox(height: 30, child: ListView(scrollDirection: Axis.horizontal, children: kids));
 
   Widget _swatch(Color c, bool on, VoidCallback f, {String? label}) => Padding(
         padding: const EdgeInsets.only(right: 7),
@@ -1716,6 +1716,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       default:
         final seen = <int>{};
         return _row([
+          _chip('⛶ Full screen', false, _enterFull, color: const Color(0xFF38BDF8)),
           for (final d in room.doors)
             if (seen.add(d.to)) _chip('🚪 ${home.rooms[d.to].name}', false, () => _go(d.to), color: const Color(0xFF67E8F9), dot: !home.rooms[d.to].finished),
         ]);
@@ -1753,7 +1754,6 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         _chip('🏥 Hospital', false, () => _citySheet('hospital'), color: const Color(0xFFF87171)),
         _chip('🛒 Shop', false, () => _citySheet('shop'), color: const Color(0xFFFB923C)),
         _chip('👨‍👩‍👧 People', false, () => _citySheet('people'), color: const Color(0xFF60A5FA)),
-        _chip('⛶ Full screen', false, _enterFull, color: const Color(0xFF38BDF8)),
         _chip('🏠 Go inside', false, () => _go(10), color: const Color(0xFF4ADE80)),
         _chip('🗺 Map', showMap, () => setState(() => showMap = !showMap), color: const Color(0xFFA78BFA)),
       ];
@@ -1834,7 +1834,6 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
           _chip('⬜ Ceiling', mode == 'ceiling', () => _setMode('ceiling')),
           _chip('🚪 Doors', mode == 'doors', () => _setMode('doors')),
           _chip('📘 Learn', false, () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const NgmyConstructionLearnPage())), color: const Color(0xFFA78BFA)),
-          _chip(home.practice ? '🔥 Practice' : '🎓 Learn mode', home.practice, () => setState(() => home.practice = !home.practice), color: const Color(0xFFF87171)),
         ]),
         const SizedBox(height: 4),
         _context(),

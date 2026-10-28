@@ -420,6 +420,10 @@ Scene3D buildPlumbJobScene(PlumbJob j, {String armed = '', bool labels = true}) 
   nut('trap', tailBase + const V3(0, 3.7, 0), const V3(0, 1, 0), 0);
   nut('arm', tailBase + const V3(8.9, 2.6, 0), const V3(1, 0, 0), 1);
 
+  for (final id in j.leaking) {
+    final st = j.steps.firstWhere((s) => s.id == id);
+    lab.add(Label3D(plumbSpot(j, id) + const V3(0, 6, 4), '💧 LEAK: ${st.label}', const Color(0xFFDC2626)));
+  }
   return Scene3D(b.polys, info: info, labels: lab);
 }
 
@@ -436,30 +440,38 @@ void _valve(MeshBuilder b, int id, V3 at, bool placed, Color handle, {required v
 }
 
 /// Water that sprays from an open pipe or drips from a loose joint.
+/// Where on the job a joint is (for the water that comes out of it and for its "LEAK" label).
+V3 plumbSpot(PlumbJob j, String id) {
+  final bath = j.variant.id == 'bathroom';
+  final sx = bath ? 28.0 : 0.0;
+  const tx = -30.0;
+  return switch (id) {
+    'vhot' || 'hhot' => V3(sx - 8, 9, 2),
+    'vcold' || 'hcold' => V3(sx + 8, 9, 2),
+    'tvalve' || 'those' => V3(tx - 10, 9, 2),
+    'bolts' => V3(tx, 2, 17),
+    'faucet' => V3(sx, 30, 8),
+    'tail' => V3(sx, 22, 8),
+    'trap' => V3(sx, 24.7, 8),
+    _ => V3(sx + 8.9, 23.6, 8),
+  };
+}
+
 List<Poly> plumbJobWater(PlumbJob j, double t) {
   final b = MeshBuilder();
   if (j.leaking.isEmpty) return b.polys;
-  final bath = j.variant.id == 'bathroom';
-  
-  final sx = bath ? 28.0 : 0.0;
-  final tx = -30.0;
-  V3 where(String id) => switch (id) {
-        'vhot' || 'hhot' => V3(sx - 8, 9, 2),
-        'vcold' || 'hcold' => V3(sx + 8, 9, 2),
-        'tvalve' || 'those' => V3(tx - 10, 9, 2),
-        'bolts' => V3(tx, 2, 17),
-        'faucet' => V3(sx, 30, 8),
-        'tail' => V3(sx, 22, 8),
-        'trap' => V3(sx, 24.7, 8),
-        _ => V3(sx + 8.9, 23.6, 8),
-      };
   for (final id in j.leaking) {
-    final p = where(id);
+    final p = plumbSpot(j, id);
     final spray = j.steps.firstWhere((s) => s.id == id).item == 'valve' || !j.placed.contains(id);
-    for (var i = 0; i < (spray ? 10 : 5); i++) {
-      final ph = (t * (spray ? 1.8 : 1.2) + i / (spray ? 10 : 5)) % 1.0;
-      b.ball(p + V3(math.sin(i * 2.1) * ph * (spray ? 3 : 0.6), ph * (spray ? 4 : -0.5) - ph * ph * (spray ? 14 : 8), 1.5 + ph * (spray ? 6 : 0.8)), spray ? 0.5 : 0.35, const Color(0xFF5CB3FF), shine: 0.9, lat: 3, lon: 6);
+    // Big drops falling (or a spray), so a leak is easy to see.
+    for (var i = 0; i < (spray ? 14 : 8); i++) {
+      final ph = (t * (spray ? 1.8 : 1.2) + i / (spray ? 14 : 8)) % 1.0;
+      b.ball(p + V3(math.sin(i * 2.1) * ph * (spray ? 4 : 0.8), ph * (spray ? 5 : -0.5) - ph * ph * (spray ? 16 : 10), 1.5 + ph * (spray ? 7 : 1.0)), spray ? 1.1 : 0.9, const Color(0xFF3B9BFF), shine: 0.5, lat: 3, lon: 6);
     }
+    // A puddle on the floor that is there while it leaks.
+    b.alpha = 0.55;
+    b.cyl(V3(p.x, 0.3, 8 + 3), V3(p.x, 0.5, 8 + 3), 7 + 2 * math.sin(t * 2), const Color(0xFF3B9BFF), shine: 0.6, sides: 18);
+    b.alpha = 1;
   }
   return b.polys;
 }

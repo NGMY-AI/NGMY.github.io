@@ -82,4 +82,23 @@ void main() {
   test('scene polys class is used', () {
     expect(Scene3DPainter, isNotNull);
   });
+
+  testWidgets('the plumbing job tells you what to do next, shows only the parts it needs, and shows a leak and says where', (t) async {
+    t.view.physicalSize = const Size(900, 1600);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    final job = PlumbJob(seed: 2, variantId: 'kitchen');
+    await t.pumpWidget(MaterialApp(home: NgmyPlumbJobPage(job: job)));
+    await t.pump(const Duration(milliseconds: 500));
+    expect(find.textContaining('Next: pick'), findsOneWidget);
+    expect(find.text('Show me'), findsOneWidget);
+    // A kitchen has no toilet to fit.
+    expect(find.text('Toilet'), findsNothing);
+    // A leak is drawn and named.
+    job.leaking.add(job.steps.firstWhere((s) => s.item == 'trap').id);
+    final sc = buildPlumbJobScene(job);
+    expect(sc.labels.any((l) => l.text.contains('LEAK')), isTrue);
+    expect(plumbJobWater(job, 1.0), isNotEmpty);
+    await t.pump(const Duration(seconds: 10));
+  });
 }

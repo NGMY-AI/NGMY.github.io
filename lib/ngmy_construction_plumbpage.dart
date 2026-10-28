@@ -62,7 +62,7 @@ class _NgmyPlumbJobPageState extends State<NgmyPlumbJobPage> {
   }
 
   void _home() {
-    cam.glideTo(target: const V3(-4, 20, 8), dist: 175, yaw: -0.25, pitch: 0.4);
+    cam.glideTo(target: const V3(-4, 22, 8), dist: 135, yaw: -0.25, pitch: 0.4);
     setState(() => hl = 0);
   }
 
@@ -169,6 +169,51 @@ class _NgmyPlumbJobPageState extends State<NgmyPlumbJobPage> {
     _home();
   }
 
+  /// The parts this job needs, and nothing else (a kitchen has no toilet to fit).
+  List<String> get _tray => [for (final k in kPlumbItems) if (job.steps.any((s) => s.item == k)) k];
+
+  PStep? _nextStep() {
+    for (final s in job.steps) {
+      if (!job.placed.contains(s.id) && s.prereq.every(job.placed.contains)) return s;
+    }
+    return null;
+  }
+
+  /// What to do next, in plain words, as (what to say, the tool to pick up, the step to look at).
+  (String, String, String?) _guide() {
+    if (job.leaking.isNotEmpty) {
+      final loose = job.steps.where((s) => job.leaking.contains(s.id)).map((s) => s.label.toLowerCase()).join(', ');
+      if (job.waterOn) return ('💧 Water is leaking at: $loose. First turn the main water OFF: pick Hand and tap the main valve.', 'hand', 'main');
+      return ('💧 It leaked at: $loose. Pick the Wrench and tap it to tighten the joint. Then turn the water ON again to test.', 'wrench', job.leaking.first);
+    }
+    if (!job.allPlaced) {
+      final n = _nextStep();
+      if (n == null) return ('Fit the parts in the order of the job list.', '', null);
+      if (n.waterOff && job.waterOn) return ('The water must be OFF before you cut into the pipes: pick Hand and tap the main valve.', 'hand', 'main');
+      return ('Next: pick ${kPlumbItemNames[n.item] ?? n.item} from the tray, then tap ${n.label.toLowerCase()} (the glowing spot). ${n.why}', n.item, n.id);
+    }
+    final loose = job.steps.where((s) => job.looseJoints(s.id) > 0).toList();
+    if (loose.isNotEmpty) return ('Everything is fitted. Now tighten each joint: pick the Wrench and tap ${loose.first.label.toLowerCase()}.', 'wrench', loose.first.id);
+    if (!job.waterOn) return ('Turn the main water ON to test for leaks: pick Hand and tap the main valve.', 'hand', 'main');
+    return ('Looks good. Watch for leaks; if none, the job is done.', '', null);
+  }
+
+  /// "Show me": picks up the right tool and turns the view to where it goes.
+  void _showMe() {
+    final (text, tool, spot) = _guide();
+    setState(() {
+      armed = tool;
+      _rebuild();
+    });
+    if (spot != null) {
+      final id = spot == 'main' ? idPjMain : idPjBase + job.steps.indexWhere((s) => s.id == spot);
+      final info = scene.info[id];
+      if (info != null) cam.glideTo(target: info.focus, dist: 70, yaw: -0.2, pitch: 0.3);
+      setState(() => hl = id);
+    }
+    _say(text, ok: true);
+  }
+
   Widget _chip(String key, String label, IconData icon) {
     final on = armed == key;
     return Padding(
@@ -208,6 +253,18 @@ class _NgmyPlumbJobPageState extends State<NgmyPlumbJobPage> {
         dynamicPolys: (_) => plumbJobWater(job, clock.elapsedMilliseconds / 1000),
       ),
       panel: Column(mainAxisSize: MainAxisSize.min, children: [
+        if (!job.practice)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 6),
+            padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
+            decoration: BoxDecoration(color: const Color(0xFF38BDF8).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.6))),
+            child: Row(children: [
+              Expanded(child: Text('👉 ${_guide().$1}', maxLines: 4, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFFBAE6FD), fontSize: 12, height: 1.3, fontWeight: FontWeight.w700))),
+              const SizedBox(width: 6),
+              FilledButton(onPressed: _showMe, style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10), minimumSize: const Size(0, 36)), child: const Text('Show me', style: TextStyle(fontSize: 12))),
+            ]),
+          ),
         if (armed.isNotEmpty && _spots().isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
@@ -233,7 +290,7 @@ class _NgmyPlumbJobPageState extends State<NgmyPlumbJobPage> {
           child: ListView(scrollDirection: Axis.horizontal, children: [
             _chip('hand', 'Hand', Icons.back_hand_rounded),
             _chip('wrench', 'Wrench', Icons.build_rounded),
-            for (final k in kPlumbItems) _chip(k, kPlumbItemNames[k]!, Icons.plumbing_rounded),
+            for (final k in _tray) _chip(k, kPlumbItemNames[k]!, Icons.plumbing_rounded),
           ]),
         ),
       ]),

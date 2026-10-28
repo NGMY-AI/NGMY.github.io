@@ -99,12 +99,6 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
               ),
             ]),
             const SizedBox(height: 12),
-            Row(children: [
-              Expanded(child: _toggle('Learn mode', !practice, const Color(0xFF4ADE80), () => setState(() => practice = false))),
-              const SizedBox(width: 8),
-              Expanded(child: _toggle('Practice mode', practice, const Color(0xFFF87171), () => setState(() => practice = true))),
-            ]),
-            const SizedBox(height: 12),
             GestureDetector(
               onTap: () => _push(NgmyHousePage(practice: practice)),
               child: Container(
@@ -128,26 +122,6 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
                   const Text('5 bedrooms, 3 bathrooms and a garden. Walk in, look all round, fix what is wrong.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.35)),
                   const SizedBox(height: 14),
                   Container(padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10), decoration: BoxDecoration(color: kConAmber, borderRadius: BorderRadius.circular(20)), child: const Text('Go in', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 14))),
-                ]),
-              ),
-            ),
-            const SizedBox(height: 12),
-            GestureDetector(
-              onTap: () => _push(const NgmyCommunityPage()),
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF4A1D3A), Color(0xFF1F1A24)]),
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: const Color(0xFFF472B6), width: 1.5),
-                  boxShadow: [BoxShadow(color: const Color(0xFFF472B6).withValues(alpha: 0.22), blurRadius: 20, offset: const Offset(0, 6))],
-                ),
-                child: Column(children: const [
-                  Text('🏘', style: TextStyle(fontSize: 34)),
-                  SizedBox(height: 6),
-                  Text('Community', style: TextStyle(color: Color(0xFFF9A8D4), fontWeight: FontWeight.w900, fontSize: 19)),
-                  SizedBox(height: 3),
-                  Text('The people who live in the house get hungry and sick, and their wiring and plumbing break. Look after them and answer their calls for help.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 12.5, height: 1.35)),
                 ]),
               ),
             ),
@@ -539,6 +513,8 @@ class _ElectricalPageState extends State<ElectricalLessonPage> {
       _home();
       return;
     }
+    // The wall, the studs, the box and the cable are only the scenery: they cannot be tapped, so a tap on a wire never lands on them.
+    if (const {idWall, idStud, idBox, idCable, idCableB}.contains(id)) return;
     final hook = lesson.hookups.where((h) => h.id == id).toList();
     // A tap on a wire that is fastened takes it off the screw.
     final key = wireKeyForId(lesson.id, id);

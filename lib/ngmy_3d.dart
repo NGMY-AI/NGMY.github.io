@@ -520,6 +520,19 @@ class Scene3DPainter extends CustomPainter {
       // Seen from outside, the walls nearer to you than the middle of the room are left out (a doll's house), so nothing inside is ever hidden.
       if (outside) roomDepth = toCam(V3((sh.$1 + sh.$2) / 2, 40, (sh.$3 + sh.$4) / 2)).z;
     }
+    final wallSum = <int, double>{}, wallN = <int, int>{};
+    if (outside) {
+      for (final p in scene.polys) {
+        if (p.order != 0 || p.group == 0) continue;
+        var z = 0.0;
+        for (final v in p.pts) {
+          z += toCam(v).z;
+        }
+        wallSum[p.group] = (wallSum[p.group] ?? 0) + z / p.pts.length;
+        wallN[p.group] = (wallN[p.group] ?? 0) + 1;
+      }
+    }
+    final far = cam.dist * 2.4 + 450;
     final toLight = _toLight.unit;
     final half = (toLight + const V3(0, 0, -1)).unit;
     final drawn = <_Face>[];
@@ -535,7 +548,12 @@ class Scene3DPainter extends CustomPainter {
         mid = mid + v;
       }
       mid = mid * (1 / cp3.length);
-      if (outside && p.order == 0 && mid.z < roomDepth) continue;
+      if (outside && p.order == 0 && (p.group != 0 ? wallSum[p.group]! / wallN[p.group]! : mid.z) < roomDepth) continue;
+      var nearest = double.infinity;
+      for (final v in cp3) {
+        if (v.z < nearest) nearest = v.z;
+      }
+      if (nearest > far) continue;
       var n = rotN(p.n);
       final facing = n.dot(mid);
       if (facing > 0) {

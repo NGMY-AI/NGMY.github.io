@@ -38,14 +38,14 @@ void main() {
 
   test('the first town has roads, five kinds of building, vehicles, animals and trees; buildings draw from one sorted piece with flat windows', () {
     final w = HomeProject(seed: 2).rooms[11];
-    expect(w.w, 1200);
+    expect(w.w, 1800);
     for (final k in kBuildingKinds) {
       expect(w.furn.any((f) => f.kind == k), isTrue, reason: k);
     }
     expect(w.furn.where((f) => kRoadKinds.contains(f.kind)).length, greaterThan(15));
     expect(w.furn.where((f) => kAnimalKinds.contains(f.kind)).length, greaterThanOrEqualTo(6));
     expect(w.furn.any((f) => f.kind == 'firetruck') && w.furn.any((f) => f.kind == 'ambulance') && w.furn.any((f) => f.kind == 'car'), isTrue);
-    expect(buildHomeRoom(w, mode: 'furniture').polys.length, lessThan(20000));
+    expect(buildHomeRoom(w, mode: 'furniture').polys.length, lessThan(24000));
     for (final k in kBuildingKinds) {
       final t = HomeProject(seed: 1).rooms[11];
       t.furn.clear();
