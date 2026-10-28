@@ -5,6 +5,6 @@ C=c[2]
 B=c[115]
 var z=a.updateTypes([]);(function constants(){B.Vo=new A.w(1,1,0.8784313725490196,0.5411764705882353,C.t)
 B.acZ=new A.w(1,0.3607843137254902,0.22745098039215686,0.11764705882352941,C.t)
-B.Wv=new A.w(1,1,0.7019607843137254,0.2784313725490196,C.t)
-B.ag0=new A.Q(10,6,10,0)})()};
-(a=>{a["yM94+CqqJjCd6/2qMwyi0FrEtzM="]=a.current})($__dart_deferred_initializers__);
+B.Ww=new A.w(1,1,0.7019607843137254,0.2784313725490196,C.t)
+B.ag1=new A.Q(10,6,10,0)})()};
+(a=>{a["+Tv8phtAp7RuNN0NJzbAYG1xId8="]=a.current})($__dart_deferred_initializers__);
