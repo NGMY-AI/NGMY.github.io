@@ -89,6 +89,7 @@ flutter:
   assets:
     - assets/video_studio/
     - assets/sounds/
+    - assets/avatars/
     - assets/images/
     - assets/images/swahili/
     - assets/images/advisors/

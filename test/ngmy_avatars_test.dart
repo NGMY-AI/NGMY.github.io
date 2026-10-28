@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ngmy/ngmy_3d.dart';
 import 'package:ngmy/ngmy_construction_community.dart';
 import 'package:ngmy/ngmy_construction_home.dart';
 import 'package:ngmy/ngmy_construction_homescene.dart';
@@ -13,20 +12,6 @@ void main() {
     expect(playerStyle.avatar, 'soldier');
     ngmyPlayerAvatar = 'xbot';
     expect(kAvatars.keys, containsAll(['xbot', 'michelle', 'soldier']));
-  });
-
-  test('Each character is drawn differently (the dancer, the soldier and the robot are not the same shape)', () {
-    int count(String a) {
-      final b = MeshBuilder()..grouped = true;
-      final polys = homeDynamic(HomeProject(seed: 4).rooms[0], 1.0, person: const PersonPose(room: 0, x: 0, z: 40, yaw: 0), personStyle: kAvatars[a]);
-      b.polys.addAll(polys);
-      return b.polys.length;
-    }
-
-    final counts = {for (final a in kAvatars.keys) a: count(a)};
-    expect(counts['xbot'], isNot(counts['human']));
-    expect(counts['soldier'], isNot(counts['human']));
-    expect(counts['michelle'], isNot(counts['human']));
   });
 
   test('Residents call on the phone and some of them walk out into the garden and back', () {

@@ -31,11 +31,11 @@ class ResidentInfo {
 const List<ResidentInfo> kResidents = [
   ResidentInfo(0, 'Ama', 0, 2, PersonStyle(avatar: 'michelle', skin: Color(0xFF8A5A3C), hair: Color(0xFF1B1210), shirt: Color(0xFFD9467E), pants: Color(0xFF3B3F5C)), 'A nurse who works nights.'),
   ResidentInfo(1, 'Joseph', 1, 2, PersonStyle(avatar: 'soldier', skin: Color(0xFF6B4530), hair: Color(0xFF161010), shirt: Color(0xFF2E8F5B), pants: Color(0xFF2E3440)), 'A student who is always hungry.'),
-  ResidentInfo(2, 'Grace', 3, 4, PersonStyle(skin: Color(0xFFA06B47), hair: Color(0xFF2A1A10), shirt: Color(0xFFF59E0B), pants: Color(0xFF4A3F6B)), 'A teacher who marks papers late.'),
+  ResidentInfo(2, 'Grace', 3, 4, PersonStyle(avatar: 'xbot', skin: Color(0xFFA06B47), hair: Color(0xFF2A1A10), shirt: Color(0xFFF59E0B), pants: Color(0xFF4A3F6B)), 'A teacher who marks papers late.'),
   ResidentInfo(3, 'Daniel', 6, 8, PersonStyle(avatar: 'soldier', skin: Color(0xFFE0A47C), hair: Color(0xFF5B3A1E), shirt: Color(0xFF2F6FB5), pants: Color(0xFF2E3440)), 'A driver who sleeps in the day.'),
   ResidentInfo(4, 'Fatima', 7, 8, PersonStyle(avatar: 'michelle', skin: Color(0xFFC98B5E), hair: Color(0xFF1B1210), shirt: Color(0xFF7C3AED), pants: Color(0xFF2B2D3A)), 'A baker who gets up at four.'),
-  ResidentInfo(5, 'Papa Moses', 10, -1, PersonStyle(skin: Color(0xFF7A4B30), hair: Color(0xFFD1D5DB), shirt: Color(0xFFB45309), pants: Color(0xFF3F3A33)), 'The oldest in the house. He watches TV all day.'),
-  ResidentInfo(6, 'Mama Rose', 9, -1, PersonStyle(skin: Color(0xFF8C5B3B), hair: Color(0xFF8A8F98), shirt: Color(0xFFEF4444), pants: Color(0xFF3B3F5C)), 'Cooks for everybody in the kitchen.'),
+  ResidentInfo(5, 'Papa Moses', 10, -1, PersonStyle(avatar: 'soldier', skin: Color(0xFF7A4B30), hair: Color(0xFFD1D5DB), shirt: Color(0xFFB45309), pants: Color(0xFF3F3A33)), 'The oldest in the house. He watches TV all day.'),
+  ResidentInfo(6, 'Mama Rose', 9, -1, PersonStyle(avatar: 'michelle', skin: Color(0xFF8C5B3B), hair: Color(0xFF8A8F98), shirt: Color(0xFFEF4444), pants: Color(0xFF3B3F5C)), 'Cooks for everybody in the kitchen.'),
 ];
 
 class Resident {

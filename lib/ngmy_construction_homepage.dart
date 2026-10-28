@@ -19,6 +19,7 @@ import 'ngmy_construction_plumbpage.dart';
 import 'ngmy_construction_project.dart';
 import 'ngmy_construction_projectpage.dart';
 import 'ngmy_construction_tour.dart';
+import 'ngmy_avatar_glb.dart';
 import 'ngmy_construction_world.dart';
 import 'ngmy_electronics_screens.dart';
 import 'ngmy_electronics_tv.dart';
@@ -109,6 +110,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       final want = home.indoor.where((e) => switch (widget.focus) { 'wiring' => !e.wired, 'plumbing' => !e.plumbed, _ => !e.finished });
       if (want.isNotEmpty) home.current = want.first.id;
     }
+    // The real characters are read from their files in the background; plain figures stand in until each is ready.
+    GlbAvatar.preload(ngmyPlayerAvatar);
     _refreshFigs();
     scene = buildHomeRoom(room, problems: problems, residents: _figs);
     _frame(snap: true);
@@ -611,6 +614,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
                   GestureDetector(
                     onTap: () {
                       set(() => ngmyPlayerAvatar = e.key);
+                      GlbAvatar.load(e.key);
                       setState(() {});
                     },
                     child: Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), decoration: BoxDecoration(color: ngmyPlayerAvatar == e.key ? const Color(0xFF38BDF8).withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(12), border: Border.all(color: ngmyPlayerAvatar == e.key ? const Color(0xFF38BDF8) : Colors.white24, width: ngmyPlayerAvatar == e.key ? 2 : 1)), child: Text(e.value, style: TextStyle(color: ngmyPlayerAvatar == e.key ? const Color(0xFF38BDF8) : Colors.white, fontWeight: FontWeight.w900, fontSize: 13))),
