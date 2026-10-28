@@ -8,6 +8,7 @@ import 'ngmy_construction_house.dart';
 import 'ngmy_construction_plumbing.dart';
 import 'ngmy_construction_projectpage.dart';
 import 'ngmy_construction_servicepage.dart';
+import 'ngmy_construction_communitypage.dart';
 import 'ngmy_construction_homepage.dart';
 import 'ngmy_construction_learn.dart';
 import 'ngmy_studio_kit.dart';
@@ -125,6 +126,26 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
                 ]),
               ),
             ),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: () => _push(const NgmyCommunityPage()),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF4A1D3A), Color(0xFF1F1A24)]),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: const Color(0xFFF472B6), width: 1.5),
+                  boxShadow: [BoxShadow(color: const Color(0xFFF472B6).withValues(alpha: 0.22), blurRadius: 20, offset: const Offset(0, 6))],
+                ),
+                child: Column(children: const [
+                  Text('🏘', style: TextStyle(fontSize: 34)),
+                  SizedBox(height: 6),
+                  Text('Community', style: TextStyle(color: Color(0xFFF9A8D4), fontWeight: FontWeight.w900, fontSize: 19)),
+                  SizedBox(height: 3),
+                  Text('The people who live in the house get hungry and sick, and their wiring and plumbing break. Look after them and answer their calls for help.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 12.5, height: 1.35)),
+                ]),
+              ),
+            ),
             _section('JOBS'),
             _grid([
               _tile('🔌', 'Wire a room', 'Go to a room that needs wiring', const Color(0xFF22C55E), () => _push(NgmyHousePage(practice: practice, focus: 'wiring'))),
@@ -211,7 +232,7 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
 
 /// The 3D view with a message banner, an info card and zoom buttons on top of it.
 class Stage3D extends StatelessWidget {
-  const Stage3D({required this.scene, required this.cam, required this.onPick, required this.onHome, this.highlight = 0, this.dynamicPolys, this.layerOn, this.message, this.good = false, this.info, this.topLeft, this.topRight, this.infoAction, this.messageTop, this.onDoubleTap});
+  const Stage3D({required this.scene, required this.cam, required this.onPick, required this.onHome, this.highlight = 0, this.dynamicPolys, this.layerOn, this.message, this.good = false, this.info, this.topLeft, this.topRight, this.infoAction, this.messageTop, this.onDoubleTap, this.bottom});
   final Scene3D scene;
   final Cam3 cam;
   final void Function(int id) onPick;
@@ -232,6 +253,9 @@ class Stage3D extends StatelessWidget {
   /// A double tap on the picture: where, and how big the picture is.
   final void Function(Offset local, Size size)? onDoubleTap;
 
+  /// Something along the bottom of the picture, in the middle (the walking arrows).
+  final Widget? bottom;
+
   @override
   Widget build(BuildContext context) {
     return Stack(children: [
@@ -247,6 +271,7 @@ class Stage3D extends StatelessWidget {
           _round(Icons.center_focus_strong_rounded, 'Back to the whole view', onHome),
         ]),
       ),
+      if (bottom != null) Positioned(left: 0, right: 0, bottom: 14, child: Center(child: bottom!)),
       if (message != null)
         Positioned(
           left: 10,

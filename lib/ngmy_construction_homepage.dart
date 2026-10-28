@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import 'ngmy_3d.dart';
+import 'ngmy_construction_community.dart';
+import 'ngmy_construction_communitypage.dart';
 import 'ngmy_construction_electrical.dart';
 import 'ngmy_construction_home.dart';
 import 'ngmy_construction_homescene.dart';
@@ -17,6 +19,7 @@ import 'ngmy_construction_plumbpage.dart';
 import 'ngmy_construction_project.dart';
 import 'ngmy_construction_projectpage.dart';
 import 'ngmy_construction_tour.dart';
+import 'ngmy_construction_world.dart';
 import 'ngmy_electronics_screens.dart';
 import 'ngmy_electronics_tv.dart';
 
@@ -75,6 +78,16 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   String tourNote = '';
 
   HRoom get room => home.room;
+
+  /// The community that lives in this house, when it is running.
+  Community? get comm => Community.active != null && Community.active!.houseSeed == home.seed ? Community.active : null;
+  List<ResidentFigure> _figs = const [];
+  Timer? _commTimer;
+  String _lastNews = '';
+
+  void _refreshFigs() {
+    _figs = comm?.figuresIn(home, room.id) ?? const [];
+  }
   bool get isLesson => home.isLesson;
   int get problems => home.indoor.where((e) => !e.finished).length;
   double get now => clock.elapsedMilliseconds / 1000;
@@ -96,8 +109,19 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       final want = home.indoor.where((e) => switch (widget.focus) { 'wiring' => !e.wired, 'plumbing' => !e.plumbed, _ => !e.finished });
       if (want.isNotEmpty) home.current = want.first.id;
     }
-    scene = buildHomeRoom(room, problems: problems);
+    _refreshFigs();
+    scene = buildHomeRoom(room, problems: problems, residents: _figs);
     _frame(snap: true);
+    // While the community runs, the people and the news are kept up to date.
+    _commTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      final cm = comm;
+      if (cm == null || !mounted || tour != null) return;
+      setState(_rebuild);
+      if (cm.log.isNotEmpty && cm.log.first != _lastNews) {
+        _lastNews = cm.log.first;
+        _say(_lastNews);
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (isLesson) {
@@ -110,8 +134,10 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   @override
   void dispose() {
+    _walkTimer?.cancel();
     _t?.cancel();
     _tourTimer?.cancel();
+    _commTimer?.cancel();
     super.dispose();
   }
 
@@ -199,6 +225,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (walk) {
       final x = spot.x.clamp(-r.w / 2 + 10, r.w / 2 - 10), z = spot.z.clamp(10.0, r.d - 10);
       cam.glideTo(target: V3(x, 48, z));
+    } else if (!r.indoor && steer && walker != null) {
+      // Walk there: the person goes to the spot you tapped, round whatever is in the way.
+      walker!.goTo(spot.x.clamp(-r.w / 2 + 12, r.w / 2 - 12), spot.z.clamp(-290.0, r.d - 12));
     } else if (!r.indoor) {
       cam.glideTo(target: V3(spot.x, 30, spot.z), dist: math.max(60, cam.dist * 0.55));
     } else {
@@ -208,7 +237,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   }
 
   void _rebuild() {
-    scene = buildHomeRoom(room, mode: mode, selected: selFurn, problems: problems, closed: walk);
+    _refreshFigs();
+    scene = buildHomeRoom(room, mode: mode, selected: selFurn, problems: problems, closed: walk, residents: _figs);
   }
 
   void _say(String t, {bool ok = true}) {
@@ -235,6 +265,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   void _go(int id, {bool keepTour = false}) {
     if (id == home.current || id >= home.rooms.length) return;
+    if (steer && id != 11) _stopSteer();
     if (!keepTour && tour != null) _stopTour();
     setState(() {
       home.current = id;
@@ -244,6 +275,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       msg = null;
       _rebuild();
     });
+    if (!room.indoor) walker = WorldWalker(room, x: 0, z: 24);
     _frame();
     conBeep(520, ms: 60);
   }
@@ -280,6 +312,10 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   void _pick(int id) {
     if (id == 0) return;
+    if (id >= idHResident && id < idHResident + 20) {
+      _residentSheet(id - idHResident);
+      return;
+    }
     if (id >= idHFurn && id < idHFurn + 100) {
       if (mode != 'furniture') return;
       setState(() {
@@ -396,6 +432,47 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         if (i != null) _say('${i.name}: ${i.about}');
       }
     }
+  }
+
+  /// A resident's card: how they are, and what you can do for them without leaving the room.
+  Future<void> _residentSheet(int id) {
+    final cm = comm;
+    if (cm == null || id >= cm.residents.length) return Future.value();
+    final p = cm.residents[id];
+    return showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF17171C),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      builder: (ctx) => StatefulBuilder(builder: (ctx, set) {
+        Widget btn(String label, String Function() act, {Color col = kConAmber}) => GestureDetector(
+              onTap: () {
+                final t = act();
+                set(() {});
+                setState(_rebuild);
+                _say(t);
+              },
+              child: Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11), decoration: BoxDecoration(color: col.withValues(alpha: 0.22), borderRadius: BorderRadius.circular(12), border: Border.all(color: col)), child: Text(label, style: TextStyle(color: col, fontWeight: FontWeight.w900, fontSize: 13))),
+            );
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('${p.name} ${p.badge}', style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
+              Text(p.info.about, style: const TextStyle(color: Colors.white54, fontSize: 12.5)),
+              const SizedBox(height: 8),
+              Text('Now: ${p.mood}\nFood ${(100 - p.hunger).round()}%   Health ${p.health.round()}%   Home ${p.comfort.round()}%', style: const TextStyle(color: Colors.white70, fontSize: 13.5, height: 1.5)),
+              const SizedBox(height: 12),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                btn('🍞 Feed', () => cm.feed(p)),
+                if (p.sick) btn('💊 Medicine', () => cm.giveMedicine(p), col: const Color(0xFFA78BFA)),
+                if (p.sick || p.health < 60) btn('🏥 Hospital', () => cm.admit(p), col: const Color(0xFFF87171)),
+              ]),
+            ]),
+          ),
+        );
+      }),
+    );
   }
 
   // ── The plug-in sheet ──
@@ -703,8 +780,102 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   PersonPose? _pose() {
     final tr = tour;
-    if (tr == null) return null;
-    return tr.at(now - _tourStart);
+    if (tr != null) return tr.at(now - _tourStart);
+    // Outside, the person you steer is always standing in the world.
+    final w = walker;
+    if (w != null && !room.indoor) return PersonPose(room: room.id, x: w.x, z: w.z, yaw: w.yaw, walking: w.walking, phase: w.phase);
+    return null;
+  }
+
+  // ── Walking about the world ──
+
+  /// Walking about outside with the arrows: the person you steer, how it is going, and the arrows held (sideways, forward).
+  bool steer = false;
+  WorldWalker? walker;
+  Timer? _walkTimer;
+  double _inX = 0, _inZ = 0;
+  int _lastWalkMs = 0;
+
+  void _startSteer() {
+    if (room.indoor) return;
+    walker ??= WorldWalker(room, x: 0, z: 24);
+    walker!.refresh();
+    steer = true;
+    _lastWalkMs = DateTime.now().millisecondsSinceEpoch;
+    _walkTimer?.cancel();
+    _walkTimer = Timer.periodic(const Duration(milliseconds: 40), (_) => _walkTick());
+    setState(() {});
+    _say('Hold the arrows to walk. Double tap a spot to go there. Walk up to the front door to go inside.');
+  }
+
+  void _stopSteer() {
+    steer = false;
+    _inX = 0;
+    _inZ = 0;
+    _walkTimer?.cancel();
+    _walkTimer = null;
+    walker?.walking = false;
+    setState(() {});
+  }
+
+  /// One beat of walking: move on the arrows (relative to the camera: up is away from you) or towards the spot that was double
+  /// tapped, keep the camera on the person, and go into the house when they walk up to the front door.
+  void _walkTick() {
+    final w = walker;
+    if (w == null || !mounted || room.indoor) return;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final dt = ((nowMs - _lastWalkMs) / 1000).clamp(0.0, 0.1);
+    _lastWalkMs = nowMs;
+    w.refresh();
+    final sy = math.sin(cam.yaw), cy = math.cos(cam.yaw);
+    final dx = sy * _inZ + cy * _inX, dz = -cy * _inZ + sy * _inX;
+    var moved = false;
+    if (_inX != 0 || _inZ != 0) {
+      w.target = null;
+      moved = w.step(dx, dz, dt);
+    } else {
+      moved = w.advance(dt);
+    }
+    if (!moved) w.walking = false;
+    if (moved) {
+      cam.glideTo(target: V3(w.x, 30, w.z));
+      if (w.atDoor && (w.yaw.abs() > 2.2 || w.target != null && w.target!.$2 < 4)) {
+        // Walked up to the front door facing the house: in they go.
+        _stopSteer();
+        _go(10);
+        _say('You are inside the living room. Use Go outside to come back out.');
+      }
+    }
+  }
+
+  Widget? _pad() {
+    if (!steer || room.indoor) return null;
+    Widget key(IconData icon, double ix, double iz) => Listener(
+          onPointerDown: (_) {
+            _inX = ix;
+            _inZ = iz;
+          },
+          onPointerUp: (_) {
+            _inX = 0;
+            _inZ = 0;
+          },
+          onPointerCancel: (_) {
+            _inX = 0;
+            _inZ = 0;
+          },
+          child: Container(
+            width: 58,
+            height: 58,
+            margin: const EdgeInsets.all(3),
+            decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFF4ADE80), width: 1.6)),
+            child: Icon(icon, color: Colors.white, size: 28),
+          ),
+        );
+    return Column(mainAxisSize: MainAxisSize.min, children: [
+      key(Icons.arrow_upward_rounded, 0, 1),
+      Row(mainAxisSize: MainAxisSize.min, children: [key(Icons.arrow_back_rounded, -1, 0), const SizedBox(width: 58), key(Icons.arrow_forward_rounded, 1, 0)]),
+      key(Icons.arrow_downward_rounded, 0, -1),
+    ]);
   }
 
   // ── Jobs ──
@@ -1066,7 +1237,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         good: good,
         messageTop: (showMap && !isLesson) ? 104 : 10,
         layerOn: (l) => l <= 5,
-        dynamicPolys: (_) => homeDynamic(room, now, person: _pose()),
+        dynamicPolys: (_) => homeDynamic(room, now, person: _pose(), residents: _figs, mode: mode),
+        bottom: _pad(),
         topLeft: [
           if (showMap && !isLesson) _MiniMap(home: home, onTap: _go, maxWidth: math.min(138.0, screenW * 0.36)),
         ],
@@ -1089,7 +1261,12 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
           }, color: const Color(0xFFFB923C)),
           _chip('📺 TV', false, _tvSheet, color: const Color(0xFF60A5FA)),
           if (!isLesson) _chip(room.indoor ? '🌳 Go outside' : '🏠 Go inside', false, () => _go(room.indoor ? 11 : 10), color: const Color(0xFF4ADE80)),
+          if (!room.indoor) _chip(steer ? '⏹ Stop walking' : '🚶 Walk about', steer, steer ? _stopSteer : _startSteer, color: const Color(0xFF4ADE80)),
           if (!isLesson) _chip('➕ Add', false, _addSheet, color: const Color(0xFF4ADE80)),
+          if (!isLesson) _chip('🏘 Community', false, () async {
+            await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const NgmyCommunityPage()));
+            if (mounted) setState(_rebuild);
+          }, color: const Color(0xFFF472B6), dot: (comm?.calls.length ?? 0) > 0),
           _chip('🔦 Tester', tester, () => setState(() {
             tester = !tester;
             if (tester) _say('Voltage tester in your hand: tap an outlet, a switch or the light.');

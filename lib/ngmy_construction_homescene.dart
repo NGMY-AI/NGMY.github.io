@@ -431,7 +431,7 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected) {
   // The ground: a big lawn that goes on past the garden, and the path to the door.
   b.order = 0;
   b.id = when('floor', idHFloorObj);
-  b.box(V3(0, -0.6, d / 2 - 60), V3(w * 2.2, 1.2, d * 2.2), const Color(0xFF4C8B4A), split: 5);
+  b.box(V3(0, -0.6, d / 2 - 60), V3(w * 2.5, 1.2, d * 2.5), const Color(0xFF4C8B4A), split: 5);
   info[idHFloorObj] = const ObjInfo('Lawn', 'The grass. Walls, floors and the sky stay as they are, but you can add things to the garden with the Furniture button.', V3(0, 0, 150), 400);
   b.id = 0;
   b.order = 1;
@@ -506,10 +506,15 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected) {
   // The things in the garden.
   b.grouped = true;
   for (final f in r.furn) {
+    if (kAnimalKinds.contains(f.kind)) {
+      // Animals walk about, so they come from homeDynamic. Here they only get their name.
+      info[idHFurn + f.id] = ObjInfo(kFurnKinds[f.kind]!.name, 'It wanders about. Move it with the arrow buttons or take it out.', V3(f.x, 12, f.z), 140);
+      continue;
+    }
     final k = kFurnKinds[f.kind]!;
     final fb = MeshBuilder();
     fb.grouped = true;
-    fb.order = (f.kind == 'road' || f.kind == 'pond' || f.kind == 'rug') ? 1 : 2;
+    fb.order = kFlatKinds.contains(f.kind) ? 1 : 2;
     fb.id = when('furniture', idHFurn + f.id);
     _furniture(fb, f.kind, kFurnColors[f.color]);
     b.polys.addAll(transformPolys(fb.polys, ry: f.rot * math.pi / 2, t: V3(f.x, 0, f.z)));
@@ -520,10 +525,26 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected) {
 }
 
 /// Things that move: the fan blades and the pictures on the TVs.
-List<Poly> homeDynamic(HRoom r, double t, {PersonPose? person, List<ResidentFigure> residents = const []}) {
+List<Poly> homeDynamic(HRoom r, double t, {PersonPose? person, List<ResidentFigure> residents = const [], String mode = 'look'}) {
   final b = MeshBuilder();
   b.grouped = true;
-  if (!r.indoor || r.kind == 'outside') return b.polys;
+  if (r.kind == 'outside') {
+    if (person != null && person.room == r.id) _person(b, person, t);
+    for (final f in r.furn.where((f) => kAnimalKinds.contains(f.kind))) {
+      // Each animal wanders round a small circle, its legs swinging, facing the way it goes.
+      final a = t * (0.25 + (f.id % 5) * 0.04) + f.id * 1.7;
+      final px = f.x + math.cos(a) * 10, pz = f.z + math.sin(a) * 10;
+      final yaw = math.atan2(-math.sin(a), math.cos(a));
+      final ab = MeshBuilder()
+        ..grouped = true
+        ..order = 2
+        ..id = mode == 'furniture' ? idHFurn + f.id : 0;
+      _animal(ab, f.kind, kFurnColors[f.color], math.sin(t * 6 + f.id) * 0.5);
+      b.polys.addAll(transformPolys(ab.polys, ry: yaw, t: V3(px, 0, pz)));
+    }
+    return b.polys;
+  }
+  if (!r.indoor) return b.polys;
   if (person != null && person.room == r.id) _person(b, person, t);
   // The people who live here, standing in their rooms. Tapping one opens their card.
   for (final f in residents.where((f) => f.room == r.id)) {
@@ -554,6 +575,210 @@ List<Poly> homeDynamic(HRoom r, double t, {PersonPose? person, List<ResidentFigu
       2 || 4 || 8 => (const Color(0xFFD6E6EA), const Color(0xFFE4E7EA)),
       _ => (const Color(0xFFC3CFE6), const Color(0xFF8D9096)),
     };
+
+/// A row of windows on one face of a building. [n] panes spread over [span], at the heights [ys], flat on the wall.
+void _windows(MeshBuilder b, V3 face, V3 u, V3 n, double span, int n0, List<double> ys, {Color glass = const Color(0xFF9BD3F5), double w = 11, double h = 14}) {
+  for (var i = 0; i < n0; i++) {
+    final along = n0 == 1 ? 0.0 : -span / 2 + span * i / (n0 - 1);
+    for (final y in ys) {
+      final c = face + u * along + V3(0, y, 0);
+      _patch(b, c + n * 0.1, u, const V3(0, 1, 0), w + 3, h + 3, const Color(0xFFF7F4EC), n);
+      _patch(b, c + n * 0.2, u, const V3(0, 1, 0), w, h, glass, n, shine: 0.6);
+      _patch(b, c + n * 0.3, u, const V3(0, 1, 0), w, 0.9, const Color(0xFFF7F4EC), n);
+    }
+  }
+}
+
+/// A building you can place in the world: a house, a shop, a hospital, a fire station or a school. The walls, windows, doors and
+/// signs are one sorted piece (flat patches that cannot show through from behind), so it looks right from every side. The front
+/// (with the door) faces +z, and turning it turns the whole building.
+void _building(MeshBuilder b, String kind, Color accent) {
+  final (w, d, h, wall, roofCol) = switch (kind) {
+    'shop' => (84.0, 60.0, 40.0, const Color(0xFFF3E3A7), const Color(0xFF7A3B2E)),
+    'hospital' => (110.0, 70.0, 62.0, const Color(0xFFF1F5F9), const Color(0xFF64748B)),
+    'firestation' => (90.0, 64.0, 46.0, const Color(0xFFB45353), const Color(0xFF4B5563)),
+    'school' => (124.0, 70.0, 44.0, const Color(0xFFE4B07A), const Color(0xFF6B4A32)),
+    _ => (72.0, 60.0, 44.0, const Color(0xFFE8D9BC), const Color(0xFF7A3B2E)),
+  };
+  const trim = Color(0xFFF7F4EC), wood = Color(0xFF8B5E34);
+  final hd = d / 2, hw = w / 2;
+  const nF = V3(0, 0, 1), nB = V3(0, 0, -1), nR = V3(1, 0, 0), nL = V3(-1, 0, 0);
+  b.startGroup();
+  b.box(V3(0, h / 2, 0), V3(w, h, d), wall, split: 2);
+  b.box(V3(0, 2.5, 0), V3(w + 3, 5, d + 3), const Color(0xFF9C8E75));
+  final floors = kind == 'hospital' ? [14.0, 30.0, 46.0] : (kind == 'school' ? [14.0, 32.0] : (kind == 'house2' ? [26.0] : [22.0]));
+  final cols = (w / 24).floor().clamp(2, 5);
+  // The front: windows, the door and a sign.
+  final front = V3(0, 0, hd);
+  final windowRows = kind == 'firestation' ? [34.0] : floors;
+  _windows(b, front + const V3(0, 0, 0), const V3(1, 0, 0), nF, w - 30, cols, windowRows, glass: const Color(0xFF9BD3F5));
+  // A door in the middle (a wide garage door for the fire station).
+  if (kind == 'firestation') {
+    _patch(b, V3(-14, 17, hd + 0.4), const V3(1, 0, 0), const V3(0, 1, 0), 34, 34, const Color(0xFF4B5563), nF, shine: 0.2);
+    for (var i = 0; i < 6; i++) {
+      _patch(b, V3(-14, 4 + i * 6.0, hd + 0.5), const V3(1, 0, 0), const V3(0, 1, 0), 33, 0.8, const Color(0xFF9CA3AF), nF);
+    }
+    _patch(b, V3(24, 15, hd + 0.4), const V3(1, 0, 0), const V3(0, 1, 0), 14, 30, wood, nF);
+  } else {
+    _patch(b, V3(0, 14, hd + 0.3), const V3(1, 0, 0), const V3(0, 1, 0), 18, 28, trim, nF);
+    _patch(b, V3(0, 13, hd + 0.4), const V3(1, 0, 0), const V3(0, 1, 0), 14, 26, wood, nF, shine: 0.2);
+  }
+  // What the building is: a coloured sign, a red cross, an awning, a clock.
+  switch (kind) {
+    case 'hospital':
+      _patch(b, V3(0, h - 8, hd + 0.4), const V3(1, 0, 0), const V3(0, 1, 0), 30, 9, const Color(0xFFDC2626), nF);
+      _patch(b, V3(0, h - 8, hd + 0.5), const V3(1, 0, 0), const V3(0, 1, 0), 24, 2.6, Colors.white, nF);
+      _patch(b, V3(0, h - 8, hd + 0.5), const V3(1, 0, 0), const V3(0, 1, 0), 2.6, 7, Colors.white, nF);
+    case 'shop':
+      for (var i = 0; i < 6; i++) {
+        _patch(b, V3(-30 + i * 12.0, 33, hd + 3), const V3(1, 0, 0), const V3(0, 1, 0), 6, 6, i.isEven ? const Color(0xFFEF4444) : Colors.white, nF);
+      }
+      _patch(b, V3(0, h - 4, hd + 0.4), const V3(1, 0, 0), const V3(0, 1, 0), 36, 6, accent, nF);
+    case 'firestation':
+      _patch(b, V3(0, h - 5, hd + 0.4), const V3(1, 0, 0), const V3(0, 1, 0), 40, 7, const Color(0xFFFACC15), nF);
+    case 'school':
+      _patch(b, V3(0, h - 5, hd + 0.4), const V3(1, 0, 0), const V3(0, 1, 0), 40, 7, const Color(0xFF2563EB), nF);
+    default:
+  }
+  // The back and the two sides: windows too, and a back door.
+  _windows(b, V3(0, 0, -hd), const V3(-1, 0, 0), nB, w - 30, cols, windowRows);
+  _patch(b, V3(0, 13, -hd - 0.4), const V3(-1, 0, 0), const V3(0, 1, 0), 14, 26, wood, nB);
+  final sideN = (d / 24).floor().clamp(1, 3);
+  _windows(b, V3(hw, 0, 0), const V3(0, 0, -1), nR, d - 26, sideN, windowRows);
+  _windows(b, V3(-hw, 0, 0), const V3(0, 0, 1), nL, d - 26, sideN, windowRows);
+  b.endGroup();
+  // The roof.
+  final roof = MeshBuilder()
+    ..grouped = true
+    ..id = b.id
+    ..order = b.order;
+  if (kind == 'house2' || kind == 'school') {
+    final slab = MeshBuilder()
+      ..grouped = true
+      ..id = b.id
+      ..order = b.order;
+    slab.box(V3.zero, V3(w + 6, 2.5, d * 0.58), roofCol, shine: 0.1);
+    b.polys.addAll(transformPolys(slab.polys, rx: 0.42, t: V3(0, h + 5, d * 0.25)));
+    b.polys.addAll(transformPolys(slab.polys, rx: -0.42, t: V3(0, h + 5, -d * 0.25)));
+    b.tri(V3(hw + 0.2, h, hd), V3(hw + 0.2, h, -hd), V3(hw + 0.2, h + 12, 0), wall, normal: nR, twoSided: false);
+    b.tri(V3(-hw - 0.2, h, -hd), V3(-hw - 0.2, h, hd), V3(-hw - 0.2, h + 12, 0), wall, normal: nL, twoSided: false);
+    if (kind == 'school') {
+      roof.box(V3(0, h + 18, hd - 10), const V3(18, 20, 18), const Color(0xFFD9A066));
+      roof.box(V3(0, h + 30, hd - 10), const V3(22, 3, 22), roofCol);
+      roof.cyl(V3(0, h + 31, hd - 10), V3(0, h + 46, hd - 10), 0.6, const Color(0xFF9CA3AF), sides: 6);
+      roof.box(V3(5, h + 44, hd - 10), const V3(9, 5, 0.6), const Color(0xFFEF4444));
+    } else {
+      roof.box(V3(w * 0.28, h + 14, -d * 0.1), const V3(8, 18, 8), const Color(0xFF9C5A45));
+    }
+  } else {
+    roof.box(V3(0, h + 1.5, 0), V3(w + 2, 3, d + 2), roofCol, shine: 0.05);
+    roof.box(V3(0, h + 4, hd + 0.5), V3(w + 2, 4, 1.4), accent);
+    if (kind == 'hospital') {
+      roof.box(V3(w * 0.25, h + 5, -d * 0.15), const V3(26, 2, 26), const Color(0xFF475569));
+      roof.box(V3(w * 0.25, h + 6.2, -d * 0.15), const V3(16, 0.4, 16), Colors.white);
+    }
+    if (kind == 'firestation') {
+      roof.box(V3(hw - 10, h + 16, -d * 0.2), const V3(14, 30, 14), const Color(0xFFB45353));
+      roof.box(V3(hw - 10, h + 32, -d * 0.2), const V3(17, 3, 17), roofCol);
+    }
+  }
+  b.polys.addAll(roof.polys);
+}
+
+/// A road piece: 40 by 40, with its dashed line running to every edge it joins to. Straight joins left and right, a corner joins
+/// right and front, a T-junction left, right and front, and crossroads all four; turning it moves the joins. Because roads
+/// snap to the grid, neighbours always line up and the line carries on from one piece to the next.
+void _roadPiece(MeshBuilder b, String kind) {
+  b.box(const V3(0, 0.3, 0), const V3(40, 0.6, 40), const Color(0xFF3F4450));
+  b.box(const V3(0, 0.62, 19.2), const V3(40, 0.12, 1.2), const Color(0xFF6B7280));
+  b.box(const V3(0, 0.62, -19.2), const V3(40, 0.12, 1.2), const Color(0xFF6B7280));
+  final joins = switch (kind) {
+    'roadturn' => const [(1.0, 0.0), (0.0, 1.0)],
+    'roadtee' => const [(1.0, 0.0), (-1.0, 0.0), (0.0, 1.0)],
+    'roadcross' => const [(1.0, 0.0), (-1.0, 0.0), (0.0, 1.0), (0.0, -1.0)],
+    _ => const [(1.0, 0.0), (-1.0, 0.0)],
+  };
+  const line = Color(0xFFF3E7A1);
+  for (final (ex, ez) in joins) {
+    for (var i = 0; i < 2; i++) {
+      final at = 5.0 + i * 10.5;
+      b.box(V3(ex * at, 0.7, ez * at), V3(ex != 0 ? 6 : 1.6, 0.2, ez != 0 ? 6 : 1.6), line);
+    }
+  }
+  if (kind != 'road') b.box(const V3(0, 0.7, 0), const V3(3, 0.2, 3), line);
+  if (kind == 'roadcross') {
+    for (var i = -2; i <= 2; i++) {
+      b.box(V3(i * 4.0, 0.7, 15), const V3(2, 0.2, 6), Colors.white);
+    }
+  }
+}
+
+/// An animal, standing on y = 0, facing +z, with its legs swung by [swing] (0 for standing still).
+void _animal(MeshBuilder b, String kind, Color c, double swing) {
+  const dark = Color(0xFF2B2D33);
+  // Legs: a pivot on the body, a length, a thickness and the way each swings (the pairs swing against each other).
+  void legs(List<(double, double)> at, double hipY, double len, double th, Color col) {
+    var i = 0;
+    for (final (x, z) in at) {
+      final lb = MeshBuilder()
+        ..id = b.id
+        ..order = b.order
+        ..grouped = true;
+      lb.box(V3(0, -len / 2, 0), V3(th, len, th), col);
+      b.polys.addAll(transformPolys(lb.polys, rx: swing * (i.isEven ? 1 : -1) * (x > 0 ? 1 : -1), t: V3(x, hipY, z)));
+      i++;
+    }
+  }
+
+  switch (kind) {
+    case 'dog':
+      b.box(const V3(0, 8, 0), const V3(6.5, 6, 14), c, shine: 0.05);
+      b.ball(const V3(0, 11, 8.5), 3.4, c, lat: 4, lon: 8);
+      b.box(const V3(0, 9.6, 11.6), const V3(2.6, 2, 2.6), const Color(0xFF3B2A1A));
+      b.box(const V3(-2.4, 14, 8), const V3(1.4, 3, 1.6), dark);
+      b.box(const V3(2.4, 14, 8), const V3(1.4, 3, 1.6), dark);
+      b.cyl(const V3(0, 9.5, -7), const V3(0, 14, -9), 0.8, c, sides: 5);
+      legs(const [(-2.4, 5.0), (2.4, 5.0), (-2.4, -5.0), (2.4, -5.0)], 6, 6, 1.7, c);
+    case 'cat':
+      b.box(const V3(0, 6, 0), const V3(4.6, 4.2, 9.5), c, shine: 0.05);
+      b.ball(const V3(0, 8, 6), 2.7, c, lat: 4, lon: 8);
+      b.box(const V3(-1.6, 11, 6), const V3(1, 2, 1), c);
+      b.box(const V3(1.6, 11, 6), const V3(1, 2, 1), c);
+      b.cyl(const V3(0, 7, -5), const V3(0, 13, -8), 0.7, c, sides: 5);
+      legs(const [(-1.6, 3.5), (1.6, 3.5), (-1.6, -3.5), (1.6, -3.5)], 4, 4, 1.2, c);
+    case 'cow':
+      b.box(const V3(0, 17, 0), const V3(14, 13, 28), const Color(0xFFF1F5F9), shine: 0.05);
+      b.box(const V3(7.1, 18, -3), const V3(0.4, 7, 9), dark);
+      b.box(const V3(-7.1, 19, 4), const V3(0.4, 6, 8), dark);
+      b.box(const V3(0, 20, 16), const V3(8, 9, 9), const Color(0xFFF1F5F9));
+      b.box(const V3(0, 17, 21), const V3(5, 4.5, 3), const Color(0xFFF9A8D4));
+      b.box(const V3(-3.5, 26, 15), const V3(1, 3, 1), const Color(0xFFE5E7EB));
+      b.box(const V3(3.5, 26, 15), const V3(1, 3, 1), const Color(0xFFE5E7EB));
+      b.cyl(const V3(0, 20, -14), const V3(0, 8, -16), 0.7, dark, sides: 5);
+      legs(const [(-4.5, 10.0), (4.5, 10.0), (-4.5, -10.0), (4.5, -10.0)], 11, 11, 3.2, const Color(0xFFE5E7EB));
+    case 'sheep':
+      b.ball(const V3(0, 13, 0), 8.5, const Color(0xFFF5F5F4), lat: 4, lon: 8);
+      b.ball(const V3(0, 14, 5), 7, const Color(0xFFF5F5F4), lat: 4, lon: 8);
+      b.ball(const V3(0, 14, 11), 3.4, dark, lat: 4, lon: 8);
+      legs(const [(-3.5, 4.0), (3.5, 4.0), (-3.5, -4.0), (3.5, -4.0)], 8, 8, 1.8, dark);
+    case 'chicken':
+      b.ball(const V3(0, 6, 0), 4, c, lat: 4, lon: 8);
+      b.ball(const V3(0, 10, 3), 2.2, c, lat: 3, lon: 6);
+      b.box(const V3(0, 12, 3), const V3(0.8, 1.6, 1.4), const Color(0xFFDC2626));
+      b.box(const V3(0, 10, 5.2), const V3(0.8, 0.8, 1.6), const Color(0xFFF59E0B));
+      b.box(const V3(0, 8, -4), const V3(0.6, 4, 2.4), c);
+      legs(const [(-1.2, 0.0), (1.2, 0.0)], 3, 3, 0.8, const Color(0xFFF59E0B));
+    case 'horse':
+      b.box(const V3(0, 21, 0), const V3(11, 12, 30), c, shine: 0.1);
+      b.cyl(const V3(0, 24, 13), const V3(0, 36, 19), 4.2, c, r1: 3, sides: 8);
+      b.box(const V3(0, 37, 22), const V3(5, 6, 10), c);
+      b.box(const V3(0, 40, 17), const V3(1.6, 8, 5), dark);
+      b.cyl(const V3(0, 25, -15), const V3(0, 8, -19), 1.8, dark, sides: 6);
+      legs(const [(-3.5, 11.0), (3.5, 11.0), (-3.5, -11.0), (3.5, -11.0)], 16, 16, 2.6, c);
+    default:
+      b.box(const V3(0, 6, 0), const V3(8, 8, 12), c);
+  }
+}
 
 /// The same faces, stretched or squashed about a point: a sphere becomes an egg, a tube becomes an oval.
 List<Poly> _stretch(List<Poly> ps, V3 s, V3 at) => [
@@ -794,11 +1019,39 @@ void _furniture(MeshBuilder b, String kind, Color c) {
         b.cyl(V3(x, 5, -18), V3(x, 5, -21), 5.5, const Color(0xFF15171C), sides: 12);
         b.cyl(V3(x, 5, 18), V3(x, 5, 21), 5.5, const Color(0xFF15171C), sides: 12);
       }
-    case 'road':
-      b.box(const V3(0, 0.3, 0), const V3(120, 0.6, 44), const Color(0xFF3F4450));
-      for (final x in const [-48.0, -16.0, 16.0, 48.0]) {
-        b.box(V3(x, 0.7, 0), const V3(14, 0.2, 1.6), const Color(0xFFF3E7A1));
+    case 'road' || 'roadturn' || 'roadtee' || 'roadcross':
+      _roadPiece(b, kind);
+    case 'house2' || 'shop' || 'hospital' || 'firestation' || 'school':
+      _building(b, kind, c);
+    case 'firetruck':
+      b.box(const V3(0, 11, 0), const V3(96, 14, 38), const Color(0xFFDC2626), shine: 0.3);
+      b.box(const V3(36, 22, 0), const V3(22, 12, 34), const Color(0xFFDC2626), shine: 0.3);
+      b.box(const V3(37.5, 23, 0), const V3(20, 7, 34.4), const Color(0xFF9BD3F5), shine: 0.6);
+      b.box(const V3(-10, 22, 0), const V3(62, 2.4, 8), const Color(0xFF9CA3AF));
+      for (var i = 0; i < 6; i++) {
+        b.box(V3(-34 + i * 11.0, 24, 0), const V3(1.2, 4, 7), const Color(0xFF9CA3AF));
       }
+      b.box(const V3(36, 30, 0), const V3(8, 2, 16), const Color(0xFF3B82F6));
+      b.box(const V3(0, 11.5, 19.3), const V3(90, 2, 0.5), const Color(0xFFF3E7A1));
+      for (final x in const [-32.0, -8.0, 34.0]) {
+        b.cyl(V3(x, 6, -19), V3(x, 6, -22.5), 6, const Color(0xFF15171C), sides: 12);
+        b.cyl(V3(x, 6, 19), V3(x, 6, 22.5), 6, const Color(0xFF15171C), sides: 12);
+      }
+    case 'ambulance':
+      b.box(const V3(0, 14, 0), const V3(84, 18, 38), Colors.white, shine: 0.4);
+      b.box(const V3(30, 22, 0), const V3(24, 12, 34), Colors.white, shine: 0.4);
+      b.box(const V3(31.5, 23, 0), const V3(22, 7, 34.4), const Color(0xFF9BD3F5), shine: 0.6);
+      b.box(const V3(0, 14, 19.3), const V3(84, 3, 0.5), const Color(0xFFDC2626));
+      b.box(const V3(0, 14, -19.3), const V3(84, 3, 0.5), const Color(0xFFDC2626));
+      b.box(const V3(-12, 14, 19.4), const V3(11, 3, 0.5), const Color(0xFFDC2626));
+      b.box(const V3(-12, 14, 19.4), const V3(3, 11, 0.5), const Color(0xFFDC2626));
+      b.box(const V3(30, 29, 0), const V3(8, 2, 16), const Color(0xFFEF4444));
+      for (final x in const [-26.0, 26.0]) {
+        b.cyl(V3(x, 6, -19), V3(x, 6, -22.5), 6, const Color(0xFF15171C), sides: 12);
+        b.cyl(V3(x, 6, 19), V3(x, 6, 22.5), 6, const Color(0xFF15171C), sides: 12);
+      }
+    case 'dog' || 'cat' || 'cow' || 'sheep' || 'chicken' || 'horse':
+      _animal(b, kind, c, 0);
     case 'pond':
       final m = MeshBuilder()
         ..id = b.id

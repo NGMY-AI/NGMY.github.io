@@ -92,6 +92,9 @@ class Community {
     residents[4].hunger = 40;
   }
 
+  /// The community that is running now, so the house can show its people.
+  static Community? active;
+
   final int houseSeed;
   final math.Random _r;
   late List<Resident> residents;
@@ -121,7 +124,7 @@ class Community {
       final power = room.wired;
       final leak = p.info.bath >= 0 ? !home.rooms[p.info.bath].plumbed : (room.hasPlumbing && !room.plumbed);
       if (p.inBed < 0) {
-        p.hunger = math.min(100, p.hunger + 0.3 * dt);
+        p.hunger = math.min(100, p.hunger + 0.2 * dt);
         final target = 100.0 - (power ? 0 : 45) - (leak ? 35 : 0);
         p.comfort += (target - p.comfort).clamp(-0.6 * dt, 0.8 * dt);
         if (!p.sick && (p.comfort < 40 || p.hunger > 85) && _r.nextDouble() < 0.012 * dt) {
@@ -337,7 +340,7 @@ class Community {
     final nav = RoomNav(room);
     for (final p in living.where((p) => p.info.room == roomId && p.inBed < 0)) {
       final want = switch (room.kind) {
-        'bedroom' => (room.w * 0.30, room.d - 22.0),
+        'bedroom' => (-room.w * 0.18, room.d * 0.6),
         'kitchen' => (-room.w * 0.15, 56.0),
         _ => (-room.w * 0.25, 40.0),
       };
@@ -441,7 +444,7 @@ class Community {
   Future<void> save(HomeProject home) async {
     try {
       final p = await SharedPreferences.getInstance();
-      await p.setString(kCommunityKey, jsonEncode(toJson(home)));
+      await p.setString(kCommunityKey, jsonEncode({...toJson(home), 'at': DateTime.now().millisecondsSinceEpoch}));
     } catch (_) {}
   }
 
