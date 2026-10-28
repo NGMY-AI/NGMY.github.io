@@ -51,7 +51,7 @@
 
   <script>
     (function () {
-      var embedded = '20261028184322';
+      var embedded = '20261028193140';
       var base = window.__NGMY_BASE_PATH__ || '/';
       var KEY = 'ngmy_deploy_id';
       function forceRefreshForBuild(serverBuild, opts) {
@@ -637,9 +637,13 @@
 
       touch-action: manipulation;
 
-      -webkit-user-select: text;
+      -webkit-user-select: none;
 
-      user-select: text;
+      user-select: none;
+
+      -webkit-touch-callout: none;
+
+      -webkit-tap-highlight-color: transparent;
 
     }
 
@@ -834,7 +838,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20261028184322";
+      var CURRENT = "20261028193140";
 
       function showError(msg) {
 
@@ -983,7 +987,7 @@
 
   <script>
     (function () {
-      var deployId = '20261028184322';
+      var deployId = '20261028193140';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;
