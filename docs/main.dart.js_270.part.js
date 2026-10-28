@@ -1,23 +1,37 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
-$__dart_deferred_initializers__.current=function(a,b,c,$){var B,A,E,D={a6x:function a6x(d,e,f,g,h,i){var _=this
-_.c=d
-_.d=e
-_.e=f
-_.f=g
-_.r=h
-_.a=i}},C
-B=c[0]
+$__dart_deferred_initializers__.current=function(a,b,c,$){var D,A,E,C={
+h3q(d){switch(d.a){case 1:return B.dU3
+case 2:return B.dU5
+case 0:return B.dU4}},
+aqQ:function aqQ(d,e,f,g,h,i){var _=this
+_.a=d
+_.b=e
+_.c=f
+_.d=g
+_.e=h
+_.f=i}},B
+D=c[0]
 A=c[2]
-E=c[214]
-D=a.updateHolder(c[30],D)
-C=c[252]
-D.a6x.prototype={
-B(d){var x=this,w=null,v=B.N(d).ax.a===A.H,u=v?E.aee:C.beT,t=B.m(10),s=B.I(v?A.b5:C.b5e,A.r,1),r=y.a
-return B.p(w,B.v(B.a([B.A(B.a([B.D(B.d(x.c,w,w,w,w,w,w,A.eV,w,w,w),1),B.aH(w,w,w,w,C.bI3,w,w,w,x.r,w,w,w,w,"Full screen sign (landscape)",A.c7)],r),A.m,w,A.e,A.j,0,w,w),new B.aFS(x.d,x.e,120,A.cm,A.M,3.5,w),new B.bI(A.a7,w,w,B.bK(!1,A.CW,w,w,!0,w,w,x.f,w,w),w)],r),A.F,w,A.e,A.j,0,A.p),A.f,w,w,new B.o(u,w,s,t,w,w,A.n),w,w,w,w,A.bR,w,w,w)}}
+E=c[48]
+C=a.updateHolder(c[34],C)
+B=c[170]
+C.aqQ.prototype={}
 var z=a.updateTypes([]);(function inheritance(){var x=a.inherit
-x(D.a6x,B.au)})()
-B.jR(b.typeUniverse,JSON.parse('{"a6x":{"au":[],"r":[]}}'))
-var y={a:B.ax("P<r>")};(function constants(){C.b5e=new B.w(1,0.792156862745098,0.8392156862745098,0.9529411764705882,A.t)
-C.beT=new B.w(1,0.9529411764705882,0.9647058823529412,1,A.t)
-C.bI3=new B.ae(A.ak8,22,A.aU,null,null,null)})()};
-(a=>{a["lSuq9VUQSPrqpm+VxAt459SNFLk="]=a.current})($__dart_deferred_initializers__);
+x(C.aqQ,D.aC)})()
+var y={c:D.ax("P<w>")};(function constants(){var x=a.makeConstList
+B.aNy=new D.F(!0,A.c,null,null,null,null,9,A.u,null,2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+B.cK4=x([A.dv,A.jl,A.aE],y.c)
+B.dco=x([A.aE,A.ff],y.c)
+B.cRD=x([A.k5,A.p9,A.aE],y.c)
+B.dU3=new C.aqQ(B.cK4,B.dco,A.ff,A.iQ,"PREMIUM",B.cRD)
+B.d5q=x([A.cY,A.f6,A.bT],y.c)
+B.d1v=x([A.bT,A.aU],y.c)
+B.cQt=x([A.wW,A.bT,A.f6],y.c)
+B.dU4=new C.aqQ(B.d5q,B.d1v,A.bT,A.ju,"NGMY WALLET",B.cQt)
+B.d35=x([A.e8,A.dD,A.of],y.c)
+B.d6V=x([A.av,A.aM],y.c)
+B.cSj=x([A.A5,A.av,A.bV],y.c)
+B.dU5=new C.aqQ(B.d35,B.d6V,A.av,A.lF,"LUXURY",B.cSj)
+B.dU7=new E.aqP(1,"premium")
+B.dU8=new E.aqP(2,"luxury")})()};
+(a=>{a["yeh52fi/1iduy3gKmLSazrnXRrw="]=a.current})($__dart_deferred_initializers__);

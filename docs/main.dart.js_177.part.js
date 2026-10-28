@@ -1,7 +1,7 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var B,A={
 aVB(d,e){var y
-if(e!=null){y=new MediaRecorder(d,B.Cm(e))
+if(e!=null){y=new MediaRecorder(d,B.Ck(e))
 y.toString
 return y}y=new MediaRecorder(d)
 y.toString
@@ -12,4 +12,4 @@ return y}}
 B=c[0]
 A=a.updateHolder(c[53],A)
 var z=a.updateTypes([])};
-(a=>{a["pjNi0Lj5g7pN8f8/LNPO3acFFFM="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["m973z5eHSyuGiMataOgQkBdyGAs="]=a.current})($__dart_deferred_initializers__);
