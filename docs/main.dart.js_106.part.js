@@ -1,15 +1,15 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var B,A,D={
-bzj(d,e){var y="That reply glitched. Tap send again in a moment and we'll continue.",x=A.a.i(e==null?"":e)
-if(B.K9(x))return"NGMY AI can't reach the internet right now. Connect to Wi-Fi or mobile data and we'll be right back!"
+bzk(d,e){var y="That reply glitched. Tap send again in a moment and we'll continue.",x=A.a.i(e==null?"":e)
+if(B.Kb(x))return"NGMY AI can't reach the internet right now. Connect to Wi-Fi or mobile data and we'll be right back!"
 if(A.a.t(x,"proxy not deployed")||A.a.t(x,"404"))return"Your API key is saved, but the web AI proxy is not deployed in Supabase yet. Admin: deploy the bright-handler Edge Function, then try again."
 if(A.a.t(x.toLowerCase(),"not configured on the server")||A.a.t(x.toLowerCase(),"no api key"))return"NGMY Helper is not connected yet. An admin must save the AI API key in Management Menus \u2192 NGMY AI \u2192 Save AI Settings, then reload the app."
-if(x.length===0||B.hbx(x)||A.a.t(x.toLowerCase(),"http "))return y
+if(x.length===0||B.hbI(x)||A.a.t(x.toLowerCase(),"http "))return y
 return y}},C
 B=c[0]
 A=c[2]
-D=a.updateHolder(c[31],D)
+D=a.updateHolder(c[30],D)
 C=c[160]
-var z=a.updateTypes([]);(function constants(){C.akt=new B.ae(A.ez,16,A.ad,null,null,null)
-C.aLu=new B.hN(3,8,8,1,null)})()};
-(a=>{a["wL1h5ipGlCo9uEM8MIkR12K4HvY="]=a.current})($__dart_deferred_initializers__);
+var z=a.updateTypes([]);(function constants(){C.akv=new B.ae(A.ez,16,A.ad,null,null,null)
+C.aLv=new B.hH(3,8,8,1,null)})()};
+(a=>{a["PpWYR4jpzTI9AHOVouAoZ+NC/v4="]=a.current})($__dart_deferred_initializers__);
