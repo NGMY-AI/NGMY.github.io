@@ -1028,9 +1028,11 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   void _move(double dx, double dz) {
     final f = room.furnById(selFurn);
     if (f == null) return;
+    // Road pieces jump a whole piece at a time so they stay joined to their neighbours.
+    final road = kRoadKinds.contains(f.kind);
     setState(() {
-      f.x += dx;
-      f.z += dz;
+      f.x += road ? dx.sign * kRoadGrid : dx;
+      f.z += road ? dz.sign * kRoadGrid : dz;
       room.clamp(f);
       _rebuild();
     });
