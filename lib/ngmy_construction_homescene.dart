@@ -98,15 +98,20 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
   // ── Doors ──
   for (var i = 0; i < r.doors.length; i++) {
     final dr = r.doors[i];
-    final open = r.openDoors.contains(i);
+    final ang = r.doorAngle[i] ?? (r.openDoors.contains(i) ? 1.25 : 0.0);
+    final open = ang > 0.04;
     final db = MeshBuilder();
     db.id = idHDoor + i;
     db.box(const V3(0, 41, 0.45), const V3(31, 83, 0.9), const Color(0xFFF7F4EC));
     if (open) {
       db.id = 0;
-      db.box(const V3(0, 40, 0.95), const V3(25, 79, 0.2), const Color(0xFF1B1D22));
+      // What is behind the door: a glimpse of the next room, so an open door shows where it leads.
+      final (back, floor) = _glimpse(dr.to);
+      db.box(const V3(0, 40, 0.95), const V3(25, 79, 0.2), back);
+      db.box(const V3(0, 5, 1.1), const V3(25, 10, 0.2), floor);
+      db.box(const V3(0, 76, 1.1), const V3(25, 6, 0.2), Color.lerp(back, Colors.black, 0.25)!);
       db.id = idHDoor + i;
-      final th = -1.25;
+      final th = -ang;
       final hinge = const V3(-12.5, 0, 1.2);
       final cen = hinge + rotY(const V3(12.5, 39, 0.6), th);
       db.box(cen, const V3(25, 79, 1.4), const Color(0xFF8B5E34), shine: 0.15, yaw: th);
@@ -426,68 +431,91 @@ List<Poly> homeDynamic(HRoom r, double t, {PersonPose? person}) {
 }
 
 
-/// An adult person for the house tour, about 5 feet 8 inches tall: head with a neck, face, hair and ears, shoulders, a
-/// chest and a waist, arms with elbows and hands, legs with knees and shoes. Feet on y = 0, facing +z until turned.
-/// The arms and legs swing in a real stride, the knees bend, and the body bobs a little as they walk.
+/// The colours of the room seen through an open door that leads to room [to]: the wall at the back and the floor.
+(Color, Color) _glimpse(int to) => switch (to) {
+      5 => (const Color(0xFFF1E8D2), const Color(0xFFB08A5B)),
+      9 => (const Color(0xFFF3F0E8), const Color(0xFF7B8794)),
+      10 => (const Color(0xFFE9DEC2), const Color(0xFFB08A5B)),
+      11 => (const Color(0xFF9BD3F5), const Color(0xFF4C8B4A)),
+      2 || 4 || 8 => (const Color(0xFFD6E6EA), const Color(0xFFE4E7EA)),
+      _ => (const Color(0xFFC3CFE6), const Color(0xFF8D9096)),
+    };
+
+/// The same faces, stretched or squashed about a point: a sphere becomes an egg, a tube becomes an oval.
+List<Poly> _stretch(List<Poly> ps, V3 s, V3 at) => [
+      for (final p in ps)
+        Poly([for (final v in p.pts) V3(at.x + (v.x - at.x) * s.x, at.y + (v.y - at.y) * s.y, at.z + (v.z - at.z) * s.z)], V3(p.n.x / s.x, p.n.y / s.y, p.n.z / s.z).unit, p.color, p.id, shine: p.shine, alpha: p.alpha, twoSided: p.twoSided, layer: p.layer, bias: p.bias)
+    ];
+
+/// An adult person for the house tour, about 5 feet 8 inches tall, made of rounded parts (limbs with real joints, an
+/// oval body and head, shoulders, hands, shoes) rather than blocks. Feet on y = 0, facing +z until turned. The hips are
+/// worked out from the legs so the foot that is down always stands on the floor, and the knees bend as they walk.
 void _person(MeshBuilder b, PersonPose p, double t) {
   final pb = MeshBuilder();
   pb.id = 0;
   // Drawn as if a little nearer than it is, so walls and floor pieces never hide parts of the person.
   pb.bias = 6;
-  const skin = Color(0xFFE2A97E), hair = Color(0xFF2A1A10), shirt = Color(0xFF2F6FB5), pants = Color(0xFF2E3440), shoe = Color(0xFF1B1B1D);
-  final stride = p.walking ? math.sin(p.phase * math.pi * 2 * 0.5) : 0.0;
-  final bob = p.walking ? (math.cos(p.phase * math.pi * 2 * 0.5 * 2).abs() * 0.7) : 0.0;
-  const hipY = 33.0;
-  final hy = hipY + bob;
+  const skin = Color(0xFFE0A47C), skinShade = Color(0xFFCB8C64), hair = Color(0xFF2A1A10), shirt = Color(0xFF2F6FB5), pants = Color(0xFF2E3440), shoe = Color(0xFF1B1B1D);
+  final stride = p.walking ? math.sin(p.phase * math.pi) : 0.0;
 
-  // A limb segment hanging from [from], swung by [angle] about the sideways axis. Returns where its end is.
-  V3 seg(V3 from, double len, double angle, double thick, Color c, {double depth = -1}) {
-    final lb = MeshBuilder();
-    lb.id = 0;
-    lb.bias = 6;
-    lb.box(V3(0, -len / 2, 0), V3(thick, len, depth < 0 ? thick : depth), c, shine: 0.05);
-    pb.polys.addAll(transformPolys(lb.polys, rx: angle, t: from));
-    return from + V3(0, -len * math.cos(angle), -len * math.sin(angle));
+  // The legs first: their angles decide how high the hips are.
+  final swing = [for (final s in const [-1.0, 1.0]) stride * s * 0.6];
+  final knee = [for (final a in swing) p.walking ? math.max(0.0, -a) * 1.5 + 0.1 : 0.04];
+  final extent = [for (var i = 0; i < 2; i++) 16 * math.cos(swing[i]) + 15.5 * math.cos(swing[i] + knee[i])];
+  final hy = math.max(extent[0], extent[1]) + 3.3;
+
+  // A rounded part: built at the origin, stretched, then moved to [at].
+  void part(void Function(MeshBuilder m) draw, V3 stretch, V3 at) {
+    final m = MeshBuilder();
+    m.id = 0;
+    m.bias = 6;
+    draw(m);
+    pb.polys.addAll([for (final q in _stretch(m.polys, stretch, V3.zero)) Poly([for (final v in q.pts) v + at], q.n, q.color, q.id, shine: q.shine, alpha: q.alpha, twoSided: q.twoSided, layer: q.layer, bias: q.bias)]);
   }
 
-  // Legs: the thigh swings, the knee bends as the leg goes back, the foot stays flat.
-  for (final s in const [-1.0, 1.0]) {
-    final sw = stride * s * 0.55;
-    final knee = p.walking ? math.max(0.0, -sw) * 1.5 + 0.08 : 0.0;
+  // A limb piece from [a] to [c], thicker at [a], with a round joint at [c].
+  void cap(V3 a, V3 c, double ra, double rc, Color col) {
+    pb.cyl(a, c, ra, col, r1: rc, sides: 10, caps: false);
+    pb.ball(c, rc * 1.04, col, lat: 4, lon: 8);
+  }
+
+  for (var i = 0; i < 2; i++) {
+    final s = i == 0 ? -1.0 : 1.0;
     final hip = V3(s * 2.9, hy, 0);
-    final kneeAt = seg(hip, 16, sw, 5.2, pants);
-    final ankle = seg(kneeAt, 15.5, sw + knee, 4.3, pants);
-    pb.box(V3(s * 2.9, 1.3 + math.max(0.0, ankle.y - 2.4) * 0.0, ankle.z + 2.6), const V3(4.6, 2.6, 10), shoe, shine: 0.1);
-    pb.box(V3(s * 2.9, 0.7, ankle.z + 3.2), const V3(4.8, 0.6, 10.4), const Color(0xFF3A3A3F));
+    final kneeAt = hip + V3(0, -16 * math.cos(swing[i]), -16 * math.sin(swing[i]));
+    final a2 = swing[i] + knee[i];
+    final ankle = kneeAt + V3(0, -15.5 * math.cos(a2), -15.5 * math.sin(a2));
+    pb.ball(hip, 3.6, pants, lat: 4, lon: 8);
+    cap(hip, kneeAt, 3.5, 2.7, pants);
+    cap(kneeAt, ankle, 2.6, 1.9, pants);
+    // The shoe: a long rounded shape, toe forward, tipping with the shin.
+    part((m) => m.ball(V3.zero, 2.6, shoe, shine: 0.15, lat: 4, lon: 8), const V3(0.95, 0.62, 2.2), ankle + const V3(0, -1.6, 2.0));
+    part((m) => m.ball(V3.zero, 2.6, const Color(0xFFE5E7EB), lat: 3, lon: 8), const V3(0.97, 0.18, 2.25), ankle + const V3(0, -2.9, 2.0));
   }
-  // The body: hips, waist, chest, shoulders.
-  final lean = p.walking ? 0.05 : 0.0;
-  pb.box(V3(0, hy + 2, 0), const V3(11.6, 5.5, 6.6), pants, shine: 0.05);
-  pb.polys.addAll(transformPolys((MeshBuilder()
-        ..id = 0
-        ..bias = 6
-        ..box(const V3(0, 6.5, 0), const V3(11, 8.5, 6.4), shirt, shine: 0.05)
-        ..box(const V3(0, 14.5, 0), const V3(13.4, 9, 7.2), shirt, shine: 0.05)
-        ..box(const V3(0, 19.6, 0), const V3(15.6, 2.4, 6.8), shirt, shine: 0.05))
-      .polys, rx: -lean, t: V3(0, hy, 0)));
-  // Neck and head.
-  pb.cyl(V3(0, hy + 21, 0), V3(0, hy + 24, 0), 1.9, skin, sides: 8);
-  final head = V3(0, hy + 28.4, 0.4);
-  pb.ball(head, 4.5, skin, lat: 6, lon: 11);
-  pb.box(head + const V3(0, -2.2, 0.2), const V3(5.6, 4.2, 5.6), skin);
-  pb.ball(head + const V3(0, 1.3, -0.9), 4.8, hair, lat: 5, lon: 10);
-  pb.box(head + const V3(0, 3.1, 2.6), const V3(7.8, 1.6, 2.2), hair);
+  // The body: hips, a waist and chest like an oval, shoulders, neck.
+  part((m) => m.ball(V3.zero, 5.2, pants, lat: 4, lon: 10), const V3(1.12, 0.78, 0.76), V3(0, hy + 1.2, 0));
+  part((m) => m.cyl(const V3(0, 0, 0), const V3(0, 17, 0), 4.9, shirt, r1: 6.5, sides: 12, caps: false), const V3(1.0, 1.0, 0.62), V3(0, hy + 2.5, 0));
+  part((m) => m.cyl(const V3(0, 0, 0), const V3(0, 1.4, 0), 5.1, const Color(0xFF3A3A3F), sides: 12, caps: false), const V3(1.0, 1.0, 0.64), V3(0, hy + 2.4, 0));
+  part((m) => m.ball(V3.zero, 6.7, shirt, lat: 4, lon: 10), const V3(1.12, 0.5, 0.62), V3(0, hy + 19.6, 0));
+  pb.cyl(V3(0, hy + 20.5, 0.2), V3(0, hy + 24.2, 0.5), 2.0, skin, sides: 8);
+  // The head: an egg with a chin, hair, ears, eyes, brows, nose and mouth.
+  final head = V3(0, hy + 29, 0.6);
+  part((m) => m.ball(V3.zero, 4.7, skin, lat: 6, lon: 12), const V3(0.9, 1.08, 0.98), head);
+  part((m) => m.ball(V3.zero, 3.0, skin, lat: 4, lon: 8), const V3(1.0, 0.8, 0.95), head + const V3(0, -3.4, 1.0));
+  part((m) => m.ball(V3.zero, 5.0, hair, lat: 5, lon: 10), const V3(0.93, 0.92, 1.0), head + const V3(0, 1.5, -0.9));
+  part((m) => m.ball(V3.zero, 3.6, hair, lat: 3, lon: 8), const V3(1.1, 0.5, 0.7), head + const V3(0, 3.7, 2.6));
   for (final s in const [-1.0, 1.0]) {
-    pb.ball(head + V3(s * 1.8, 0.2, 3.9), 0.7, const Color(0xFF15171C), lat: 3, lon: 6);
-    pb.ball(head + V3(s * 4.4, -0.4, 0), 1.0, skin, lat: 3, lon: 6);
-    pb.box(head + V3(s * 1.8, 1.6, 4.2), const V3(2.0, 0.35, 0.4), hair);
+    pb.ball(head + V3(s * 4.2, -0.2, 0), 1.0, skin, lat: 3, lon: 6);
+    part((m) => m.ball(V3.zero, 1.0, Colors.white, lat: 3, lon: 6), const V3(1.1, 0.8, 0.6), head + V3(s * 1.8, 0.4, 4.15));
+    pb.ball(head + V3(s * 1.8, 0.4, 4.5), 0.5, const Color(0xFF15171C), lat: 3, lon: 6);
+    pb.box(head + V3(s * 1.8, 1.9, 4.2), const V3(2.1, 0.4, 0.5), hair);
   }
-  pb.box(head + const V3(0, -0.9, 4.4), const V3(0.9, 1.7, 1.2), const Color(0xFFD08F64));
-  pb.box(head + const V3(0, -2.9, 4.1), const V3(2.4, 0.4, 0.5), const Color(0xFF8A3B3B));
+  part((m) => m.ball(V3.zero, 1.0, skinShade, lat: 3, lon: 6), const V3(0.8, 1.1, 1.2), head + const V3(0, -1.2, 4.7));
+  pb.box(head + const V3(0, -3.3, 4.0), const V3(2.6, 0.45, 0.5), const Color(0xFF8A3B3B));
 
   // Arms: they swing against the legs; with the cup or the remote the right arm comes up.
   for (final s in const [-1.0, 1.0]) {
-    final sh = V3(s * 8.1, hy + 19.2, 0);
+    final sh = V3(s * 7.0, hy + 19.3, 0);
     var a1 = -stride * s * 0.5;
     var elbow = p.walking ? -0.45 : -0.12;
     if (s > 0 && p.holding) {
@@ -502,9 +530,12 @@ void _person(MeshBuilder b, PersonPose p, double t) {
       a1 = -1.55;
       elbow = -0.1;
     }
-    final elbowAt = seg(sh, 11.5, a1, 4.0, shirt);
-    final wrist = seg(elbowAt, 10.5, a1 + elbow, 3.2, skin);
-    pb.ball(wrist + const V3(0, -1.1, 0), 1.8, skin, lat: 4, lon: 7);
+    final elbowAt = sh + V3(0, -11.5 * math.cos(a1), -11.5 * math.sin(a1));
+    final a2 = a1 + elbow;
+    final wrist = elbowAt + V3(0, -10.5 * math.cos(a2), -10.5 * math.sin(a2));
+    cap(sh, elbowAt, 2.8, 2.3, shirt);
+    cap(elbowAt, wrist, 2.1, 1.6, skin);
+    part((m) => m.ball(V3.zero, 1.9, skin, lat: 4, lon: 8), const V3(0.85, 1.15, 0.9), wrist + const V3(0, -1.3, 0.2));
     if (s > 0 && p.holding) {
       pb.cyl(wrist + const V3(0, -2.6, 0), wrist + const V3(0, 2.6, 0), 1.7, const Color(0xFF38BDF8), shine: 0.5, sides: 8);
     }

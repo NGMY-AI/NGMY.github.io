@@ -12,7 +12,7 @@ import 'ngmy_construction_home.dart';
 
 /// Where the person is, and what they are doing, at one moment of the tour.
 class PersonPose {
-  const PersonPose({required this.room, required this.x, required this.z, required this.yaw, this.walking = false, this.holding = false, this.remote = false, this.pointing = false, this.note = '', this.event = '', this.openDoor = -1, this.phase = 0});
+  const PersonPose({required this.room, required this.x, required this.z, required this.yaw, this.walking = false, this.holding = false, this.remote = false, this.pointing = false, this.note = '', this.event = '', this.openDoor = -1, this.doorU = 0, this.enterDoor = -1, this.phase = 0});
   final int room;
   final double x, z;
 
@@ -26,6 +26,10 @@ class PersonPose {
 
   /// The number of the door (in the room's list) that the person is opening, or -1.
   final int openDoor;
+
+  /// How far through opening the door the person is (0 to 1), and the door they came in through (-1 for none).
+  final double doorU;
+  final int enterDoor;
 
   /// How far along the walk the legs are (for the stride).
   final double phase;
@@ -71,7 +75,7 @@ class RoomNav {
 
   final HRoom room;
   final List<NavRect> _obs;
-  static const double cell = 4, margin = 6;
+  static const double cell = 4, margin = 9;
   late final int nx, nz;
 
   double _x(int i) => -room.w / 2 + i * cell;
@@ -215,6 +219,7 @@ class _Seg {
   final List<double> lens = [];
   double len = 0;
   double t0 = 0;
+  int enterDoor = -1;
 }
 
 /// A point just inside the door of [r] that leads to room [to], and the way someone coming in through it faces.
@@ -226,12 +231,12 @@ class _Seg {
   switch (d.wall) {
     case 'left':
       final z = (d.offset + rd / 2 - 40).clamp(10.0, rd - 10);
-      return ((-w / 2 + 11, z), math.pi / 2, idx);
+      return ((-w / 2 + 18, z), math.pi / 2, idx);
     case 'right':
       final z = (d.offset + rd / 2 - 40).clamp(10.0, rd - 10);
-      return ((w / 2 - 11, z), -math.pi / 2, idx);
+      return ((w / 2 - 18, z), -math.pi / 2, idx);
     default:
-      return ((d.offset.clamp(-w / 2 + 10, w / 2 - 10), 11.0), 0.0, idx);
+      return ((d.offset.clamp(-w / 2 + 12, w / 2 - 12), 18.0), 0.0, idx);
   }
 }
 
@@ -271,7 +276,8 @@ class HomeTour {
   void _leg(int roomId, int? from, int? to, {String note = ''}) {
     final r = home.rooms[roomId];
     final nav = RoomNav(r);
-    final (inP, inYaw, _) = from == null ? ((0.0, 14.0), 0.0, 0) : _doorPoint(r, from);
+    final (inP, inYaw, enterIdx) = from == null ? ((0.0, 14.0), 0.0, -1) : _doorPoint(r, from);
+    final startAt = _segs.length;
     var cur = inP;
     // The person appears at the door they came through, facing into the room.
     _segs.add(_Seg(roomId, x: cur.$1, z: cur.$2, yaw: inYaw, secs: 0.5, note: note.isEmpty ? 'Walking in' : note));
@@ -288,7 +294,10 @@ class HomeTour {
       _segs.add(_Seg(roomId, path: path, note: 'Walking to the next room', holding: holding));
       cur = path.last;
       // They stop at the door and open it.
-      _segs.add(_Seg(roomId, x: cur.$1, z: cur.$2, yaw: _doorYaw(r, di), secs: 0.8, note: 'Opening the door', holding: holding, openDoor: di));
+      _segs.add(_Seg(roomId, x: cur.$1, z: cur.$2, yaw: _doorYaw(r, di), secs: 1.8, note: 'Opening the door', holding: holding, openDoor: di));
+    }
+    for (var k = startAt; k < _segs.length; k++) {
+      _segs[k].enterDoor = enterIdx;
     }
   }
 
@@ -346,7 +355,7 @@ class HomeTour {
     final u = s.secs <= 0 ? 0.0 : ((e - s.t0) / s.secs).clamp(0.0, 1.0);
     if (s.path == null) {
       final late = u > 0.5;
-      return PersonPose(room: s.room, x: s.x, z: s.z, yaw: s.yaw, holding: s.holding, remote: s.remote, pointing: s.pointing && late, note: s.note, event: late && s.event.isNotEmpty ? '${s.event}:${s.room}' : '', openDoor: s.openDoor);
+      return PersonPose(room: s.room, x: s.x, z: s.z, yaw: s.yaw, holding: s.holding, remote: s.remote, pointing: s.pointing && late, note: s.note, event: late && s.event.isNotEmpty ? '${s.event}:${s.room}' : '', openDoor: s.openDoor, doorU: s.openDoor >= 0 ? u : 0, enterDoor: s.enterDoor);
     }
     // Along the path at an even pace, facing the way of travel (a little ahead, so turns are smooth).
     Pt at(double dist) {
@@ -370,7 +379,7 @@ class HomeTour {
       dx = s.path!.last.$1 - s.path!.first.$1;
       dz = s.path!.last.$2 - s.path!.first.$2;
     }
-    return PersonPose(room: s.room, x: p.$1, z: p.$2, yaw: math.atan2(dx, dz), walking: true, holding: s.holding, note: s.note, phase: dist / 12);
+    return PersonPose(room: s.room, x: p.$1, z: p.$2, yaw: math.atan2(dx, dz), walking: true, holding: s.holding, note: s.note, enterDoor: s.enterDoor, phase: dist / 12);
   }
 }
 

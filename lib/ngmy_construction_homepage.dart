@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import 'ngmy_3d.dart';
 import 'ngmy_construction_electrical.dart';
@@ -522,9 +524,22 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   final Set<String> _fired = {};
   bool _switching = false;
-  bool _fade = false;
+  final GlobalKey _shotKey = GlobalKey();
 
-  /// One beat of the tour: open the door the person is at, change room with a fade, switch the TV ad, and let the camera follow.
+  /// The last picture of the room we just left. It fades out over the new room: a dissolve, like a cut in a film.
+  ui.Image? _shot;
+  int _shotId = 0;
+
+  V3 _doorWorld(HRoom r, int i) {
+    final d = r.doors[i];
+    return switch (d.wall) {
+      'left' => V3(-r.w / 2, 40, d.offset + r.d / 2 - 40),
+      'right' => V3(r.w / 2, 40, d.offset + r.d / 2 - 40),
+      _ => V3(d.offset, 40, 0),
+    };
+  }
+
+  /// One beat of the tour: swing the doors, switch the TV ad, and move the camera like a film camera.
   void _tourTick() {
     final tr = tour;
     if (tr == null || !mounted) return;
@@ -537,37 +552,83 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (_switching) return;
     final p = tr.at(e);
     if (p.room != home.current) {
-      // A short fade to black, like a cut in a film, while the next room is shown.
-      _switching = true;
-      setState(() => _fade = true);
-      Future.delayed(const Duration(milliseconds: 260), () {
-        if (!mounted) return;
-        room.openDoors.clear();
-        _go(p.room, keepTour: true);
-        setState(() => _fade = false);
-        _switching = false;
-      });
+      _tourCut(p);
       return;
     }
-    if (p.openDoor >= 0 && !room.openDoors.contains(p.openDoor)) {
-      setState(() {
-        room.openDoors.add(p.openDoor);
-        _rebuild();
-      });
-      conBeep(700, ms: 60);
+    final r = room;
+    var changed = false;
+    // The door the person came through stands open when they arrive and swings shut behind them.
+    if (p.enterDoor >= 0 && p.enterDoor < r.doors.length) {
+      final cur = r.doorAngle[p.enterDoor] ?? 0.0;
+      if (!p.walking && p.openDoor < 0) {
+        if (cur < 1.25) {
+          r.doorAngle[p.enterDoor] = 1.25;
+          changed = true;
+        }
+      } else if (p.walking && cur > 0) {
+        r.doorAngle[p.enterDoor] = math.max(0.0, cur - 0.3);
+        changed = true;
+      }
+    }
+    // The door ahead swings open while the person stands at it.
+    if (p.openDoor >= 0 && p.openDoor < r.doors.length) {
+      final a = 1.25 * Curves.easeOut.transform(p.doorU.clamp(0.0, 1.0));
+      if ((r.doorAngle[p.openDoor] ?? 0) != a) {
+        r.doorAngle[p.openDoor] = a;
+        changed = true;
+      }
     }
     if (p.event.startsWith('ad') && _fired.add(p.event)) {
       // The person presses the remote: the TV changes to the next ad.
-      setState(() {
-        room.tvApp = (room.tvApp + 1) % kNgmyApps.length;
-        _rebuild();
-      });
+      r.tvApp = (r.tvApp + 1) % kNgmyApps.length;
+      changed = true;
       conBeep(1000, ms: 50);
     }
-    // The camera follows the person, a little behind and to the side, and eases there.
-    final r = room;
-    cam.glideTo(target: V3(p.x * 0.7, 30, p.z * 0.6 + 8), dist: math.max(r.w * 0.95, r.d * 1.15) + 20, yaw: -0.05 - (p.x / (r.w / 2)) * 0.2, pitch: 0.24);
+    if (changed) setState(_rebuild);
+    // The camera: it follows the person from behind and to the side, and when a door opens it moves in towards the door,
+    // so the next room shows through the doorway before the cut.
+    final base = math.max(r.w * 0.95, r.d * 1.15) + 20;
+    if (p.openDoor >= 0 && p.openDoor < r.doors.length) {
+      final dp = _doorWorld(r, p.openDoor);
+      final u = Curves.easeInOut.transform(p.doorU.clamp(0.0, 1.0));
+      final wall = r.doors[p.openDoor].wall;
+      cam.glideTo(target: V3(dp.x * 0.9 + p.x * 0.1, 36, dp.z + (wall == 'back' ? 14 : 0)), dist: base + (70 - base) * u, yaw: wall == 'left' ? 0.55 * u : (wall == 'right' ? -0.55 * u : -0.03), pitch: 0.2 - 0.07 * u);
+    } else {
+      cam.glideTo(target: V3(p.x * 0.7, 30, p.z * 0.6 + 8), dist: base, yaw: -0.05 - (p.x / (r.w / 2)) * 0.2, pitch: 0.24);
+    }
     if (p.note != tourNote) setState(() => tourNote = p.note);
+  }
+
+  /// Go on to the next room with a dissolve: the picture of the old room fades away over the new one, where the
+  /// camera starts at the door the person comes out of.
+  Future<void> _tourCut(PersonPose p) async {
+    _switching = true;
+    ui.Image? shot;
+    try {
+      final b = _shotKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      shot = await b?.toImage(pixelRatio: 0.6).timeout(const Duration(milliseconds: 500));
+    } catch (_) {
+      shot = null;
+    }
+    if (!mounted || tour == null) {
+      _switching = false;
+      return;
+    }
+    room.doorAngle.clear();
+    _go(p.room, keepTour: true);
+    final r = room;
+    if (p.enterDoor >= 0 && p.enterDoor < r.doors.length) r.doorAngle[p.enterDoor] = 1.25;
+    setState(() {
+      _rebuild();
+      _shot = shot;
+      _shotId++;
+    });
+    // The camera begins close on the door they come out of.
+    cam.target = V3(p.x, 36, p.z + 4);
+    cam.dist = 70;
+    cam.yaw = -0.03;
+    cam.pitch = 0.15;
+    _switching = false;
   }
 
   void _stopTour() {
@@ -575,8 +636,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     _tourTimer = null;
     for (final r in home.rooms) {
       r.openDoors.clear();
+      r.doorAngle.clear();
     }
-    _fade = false;
+    _shot = null;
     _switching = false;
     setState(() {
       tour = null;
@@ -912,8 +974,22 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   Widget build(BuildContext context) {
     final page = _buildPage(context);
     return Stack(children: [
-      Positioned.fill(child: page),
-      Positioned.fill(child: IgnorePointer(child: AnimatedOpacity(opacity: _fade ? 1 : 0, duration: const Duration(milliseconds: 240), child: const ColoredBox(color: Colors.black)))),
+      Positioned.fill(child: RepaintBoundary(key: _shotKey, child: page)),
+      if (_shot != null)
+        Positioned.fill(
+          child: IgnorePointer(
+            child: TweenAnimationBuilder<double>(
+              key: ValueKey(_shotId),
+              tween: Tween(begin: 1.0, end: 0.0),
+              duration: const Duration(milliseconds: 900),
+              curve: Curves.easeInOut,
+              onEnd: () {
+                if (mounted) setState(() => _shot = null);
+              },
+              builder: (_, v, __) => Opacity(opacity: v, child: RawImage(image: _shot, fit: BoxFit.fill)),
+            ),
+          ),
+        ),
     ]);
   }
 

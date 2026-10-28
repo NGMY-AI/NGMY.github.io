@@ -140,6 +140,9 @@ class HRoom {
   int ceiling = 0;
   final Set<int> openDoors = {};
 
+  /// How far each door has swung open (0 shut, 1.25 wide open) while it is being opened or closed.
+  final Map<int, double> doorAngle = {};
+
   bool wiringNeeded = false;
   bool plumbNeeded = false;
   RoomProject? wiring;

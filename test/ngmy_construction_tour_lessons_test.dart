@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -122,7 +123,7 @@ void main() {
           if (p.walking) {
             walked = true;
             for (final o in blocks[p.room]!) {
-              expect(o.hit(p.x, p.z, 0), isFalse, reason: '${r.name} at $t: walking through furniture or a fixture at (${p.x}, ${p.z})');
+              expect(o.hit(p.x, p.z, 7), isFalse, reason: '${r.name} at $t: too close to furniture or a fixture at (${p.x}, ${p.z})');
             }
           }
           if (p.room == 9 && p.holding) drink = true;
@@ -138,6 +139,36 @@ void main() {
       }
     }
     expect(tourLengthName(60), '1 minute');
+  });
+
+  test('the person always stands on the floor, never in it, and never pokes out through a wall', () {
+    final h = HomeProject(seed: 3);
+    final tour = HomeTour(h, 60);
+    var lowest = 99.0, doors = 0, enters = 0;
+    for (var t = 0.0; t < tour.total; t += tour.total / 300) {
+      final p = tour.at(t);
+      final r = h.rooms[p.room];
+      final polys = homeDynamic(r, t, person: p).where((q) => q.id == 0 || true).toList();
+      var minY = 99.0;
+      for (final q in polys) {
+        for (final v in q.pts) {
+          if (v.y < minY) minY = v.y;
+          // Nothing of the person is outside the room (a little slack for the arms at a door).
+          expect(v.x.abs(), lessThan(r.w / 2 + 4), reason: '${r.name} at $t');
+          expect(v.z, greaterThan(-4), reason: '${r.name} at $t');
+        }
+      }
+      if (polys.isNotEmpty) {
+        lowest = math.min(lowest, minY);
+        expect(minY, greaterThan(-0.6), reason: 'a foot goes through the floor at $t');
+        expect(minY, lessThan(1.4), reason: 'the person floats at $t');
+      }
+      if (p.openDoor >= 0) doors++;
+      if (p.enterDoor >= 0) enters++;
+    }
+    expect(lowest, greaterThan(-0.6));
+    expect(doors, greaterThan(10));
+    expect(enters, greaterThan(10));
   });
 
   test('an added outlet or switch starts red and unwired and works once it is wired', () {
