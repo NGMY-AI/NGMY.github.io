@@ -507,37 +507,77 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     inside = true;
     mode = 'look';
     tester = false;
-    final first = tour!.at(0).room;
+    final first = tour!.firstRoom;
+    _fired.clear();
+    _switching = false;
     setState(() {
       home.current = first;
       msg = null;
       _rebuild();
     });
     _frame();
-    _tourTimer = Timer.periodic(const Duration(milliseconds: 150), (_) {
-      final tr = tour;
-      if (tr == null || !mounted) return;
-      final e = now - _tourStart;
-      if (e >= tr.total) {
-        _stopTour();
-        _say('The tour is over. Press Tour to walk the house again.');
-        return;
-      }
-      final p = tr.at(e);
-      if (p.room != home.current) {
-        _go(p.room, keepTour: true);
-      } else {
-        // The camera follows the person a little.
-        cam.glideTo(target: V3(p.x * 0.55, 38, math.max(20, p.z * 0.5 + 10)));
-      }
-      if (p.note != tourNote) setState(() => tourNote = p.note);
-    });
+    _tourTimer = Timer.periodic(const Duration(milliseconds: 120), (_) => _tourTick());
     setState(() {});
+  }
+
+  final Set<String> _fired = {};
+  bool _switching = false;
+  bool _fade = false;
+
+  /// One beat of the tour: open the door the person is at, change room with a fade, switch the TV ad, and let the camera follow.
+  void _tourTick() {
+    final tr = tour;
+    if (tr == null || !mounted) return;
+    final e = now - _tourStart;
+    if (e >= tr.total) {
+      _stopTour();
+      _say('The tour is over. Press Tour to walk the house again.');
+      return;
+    }
+    if (_switching) return;
+    final p = tr.at(e);
+    if (p.room != home.current) {
+      // A short fade to black, like a cut in a film, while the next room is shown.
+      _switching = true;
+      setState(() => _fade = true);
+      Future.delayed(const Duration(milliseconds: 260), () {
+        if (!mounted) return;
+        room.openDoors.clear();
+        _go(p.room, keepTour: true);
+        setState(() => _fade = false);
+        _switching = false;
+      });
+      return;
+    }
+    if (p.openDoor >= 0 && !room.openDoors.contains(p.openDoor)) {
+      setState(() {
+        room.openDoors.add(p.openDoor);
+        _rebuild();
+      });
+      conBeep(700, ms: 60);
+    }
+    if (p.event.startsWith('ad') && _fired.add(p.event)) {
+      // The person presses the remote: the TV changes to the next ad.
+      setState(() {
+        room.tvApp = (room.tvApp + 1) % kNgmyApps.length;
+        _rebuild();
+      });
+      conBeep(1000, ms: 50);
+    }
+    // The camera follows the person, a little behind and to the side, and eases there.
+    final r = room;
+    cam.glideTo(target: V3(p.x * 0.7, 30, p.z * 0.6 + 8), dist: math.max(r.w * 0.95, r.d * 1.15) + 20, yaw: -0.05 - (p.x / (r.w / 2)) * 0.2, pitch: 0.24);
+    if (p.note != tourNote) setState(() => tourNote = p.note);
   }
 
   void _stopTour() {
     _tourTimer?.cancel();
     _tourTimer = null;
+    for (final r in home.rooms) {
+      r.openDoors.clear();
+    }
+    _fade = false;
+    _switching = false;
     setState(() {
       tour = null;
       tourNote = '';
@@ -870,6 +910,14 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   @override
   Widget build(BuildContext context) {
+    final page = _buildPage(context);
+    return Stack(children: [
+      Positioned.fill(child: page),
+      Positioned.fill(child: IgnorePointer(child: AnimatedOpacity(opacity: _fade ? 1 : 0, duration: const Duration(milliseconds: 240), child: const ColoredBox(color: Colors.black)))),
+    ]);
+  }
+
+  Widget _buildPage(BuildContext context) {
     final r = room;
     final screenW = MediaQuery.of(context).size.width;
     return LessonScaffold(

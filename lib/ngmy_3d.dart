@@ -79,11 +79,14 @@ class Scene3D {
 /// A screen in the scene: where its four corners are (top left, top right, bottom right, bottom left, seen from the front)
 /// and how to paint what it shows, at [width] by [height], at a moment [t].
 class ScreenQuad {
-  const ScreenQuad(this.corners, this.id, this.paint, {this.width = 320, this.height = 180});
+  const ScreenQuad(this.corners, this.id, this.paint, {this.width = 320, this.height = 180, this.bias = 0.6});
   final List<V3> corners;
   final int id;
   final void Function(Canvas canvas, Size size, double t) paint;
   final double width, height;
+
+  /// How much nearer than the middle of the patch it counts as when the scene is sorted, so the wall behind never covers it.
+  final double bias;
 }
 
 // ─── Building shapes ─────────────────────────────────────────────────────────
@@ -425,7 +428,7 @@ class Scene3DPainter extends CustomPainter {
       if (n.dot(mid) > 0) continue;
       final pts = [for (final v in q) Offset(cx + v.x * f / v.z, cy - v.y * f / v.z)];
       final path = Path()..addPolygon(pts, true);
-      drawn.add(_Face(path, Colors.transparent, mid.z - 0.6, sq.id, false, false, (c) => _drawQuad(c, sq, pts, time)));
+      drawn.add(_Face(path, Colors.transparent, mid.z - sq.bias, sq.id, false, false, (c) => _drawQuad(c, sq, pts, time)));
     }
     drawn.sort((a, b) => b.z.compareTo(a.z));
     hits.list.clear();

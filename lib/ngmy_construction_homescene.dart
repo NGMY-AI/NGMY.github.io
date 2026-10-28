@@ -223,7 +223,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
       // The real NGMY ad plays on the glass, flat on the screen.
       final sw = tw - 3.5, sh = th - 3.5, sy = 12 + th / 2;
       final off = i * 7.0 + r.id;
-      screens.add(ScreenQuad([V3(x - sw / 2, sy + sh / 2, 16.6), V3(x + sw / 2, sy + sh / 2, 16.6), V3(x + sw / 2, sy - sh / 2, 16.6), V3(x - sw / 2, sy - sh / 2, 16.6)], idHApp + i, (c, size, t) => paintNgmyApp(c, size, 0, t + off)));
+      screens.add(ScreenQuad([V3(x - sw / 2, sy + sh / 2, 16.6), V3(x + sw / 2, sy + sh / 2, 16.6), V3(x + sw / 2, sy - sh / 2, 16.6), V3(x - sw / 2, sy - sh / 2, 16.6)], idHApp + i, (c, size, t) => paintNgmyApp(c, size, 0, t + off), bias: 9));
     } else if (a.key == 'lamp') {
       b.cyl(V3(x, 0, 14), V3(x, 1, 14), 6, const Color(0xFF8A6A47), shine: 0.4, sides: 14);
       b.cyl(V3(x, 1, 14), V3(x, 22, 14), 1, const Color(0xFFB08A5B), shine: 0.5, sides: 8);
@@ -249,6 +249,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
     final tw = a.tvWidth * (hall ? 0.5 : 0.9), th = tw * 0.56;
     final sw = tw - 2.5, sh = th - 2.5;
     b.id = idHWallTv;
+    b.bias = 5;
     if (hall) {
       const y = 52.0, z = 50.0;
       final x = w / 2;
@@ -256,17 +257,18 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
       b.box(V3(x - 2.8, y, z), V3(0.2, th, tw), const Color(0xFF0B0F17), shine: 0.7);
       if (r.tvOn) {
         final xs = x - 2.95;
-        screens.add(ScreenQuad([V3(xs, y + sh / 2, z - sw / 2), V3(xs, y + sh / 2, z + sw / 2), V3(xs, y - sh / 2, z + sw / 2), V3(xs, y - sh / 2, z - sw / 2)], idHWallTv, (c, size, t) => paintNgmyApp(c, size, r.tvApp, t + r.id)));
+        screens.add(ScreenQuad([V3(xs, y + sh / 2, z - sw / 2), V3(xs, y + sh / 2, z + sw / 2), V3(xs, y - sh / 2, z + sw / 2), V3(xs, y - sh / 2, z - sw / 2)], idHWallTv, (c, size, t) => paintNgmyApp(c, size, r.tvApp, t + r.id), bias: 9));
       }
     } else {
-      final x = switch (r.kind) { 'living' => 44.0, 'kitchen' => 36.0, 'bathroom' => 10.0, _ => 34.0 };
+      final x = switch (r.kind) { 'living' => -8.0, 'kitchen' => 36.0, 'bathroom' => 10.0, _ => 34.0 };
       final y = r.kind == 'bathroom' ? 66.0 : 58.0;
       b.box(V3(x, y, 1.4), V3(tw + 3, th + 3, 2.6), const Color(0xFF1B1D22), shine: 0.5);
       b.box(V3(x, y, 2.8), V3(tw, th, 0.2), const Color(0xFF0B0F17), shine: 0.7);
       if (r.tvOn) {
-        screens.add(ScreenQuad([V3(x - sw / 2, y + sh / 2, 2.95), V3(x + sw / 2, y + sh / 2, 2.95), V3(x + sw / 2, y - sh / 2, 2.95), V3(x - sw / 2, y - sh / 2, 2.95)], idHWallTv, (c, size, t) => paintNgmyApp(c, size, r.tvApp, t + r.id)));
+        screens.add(ScreenQuad([V3(x - sw / 2, y + sh / 2, 2.95), V3(x + sw / 2, y + sh / 2, 2.95), V3(x + sw / 2, y - sh / 2, 2.95), V3(x - sw / 2, y - sh / 2, 2.95)], idHWallTv, (c, size, t) => paintNgmyApp(c, size, r.tvApp, t + r.id), bias: 9));
       }
     }
+    b.bias = 0;
     info[idHWallTv] = ObjInfo(a.name, r.tvOn ? 'It is on and playing ${kNgmyApps[r.tvApp].name}. Tap it to watch full screen with the remote.' : 'The TV is off. Tap it to turn it on.', V3(0, 56, 4), 110);
   }
 
@@ -325,17 +327,17 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
       if (!ok) labels.add(Label3D(V3(0, 40, 14), '🚰 Needs plumbing', const Color(0xFF2563EB)));
     } else {
       // Kitchen: a run of counters along the back wall with the sink in the middle, a fridge and a stove.
-      const sx = 0.0;
+      const sx = 30.0;
       b.id = 0;
       b.box(V3(-w / 2 + 15, 36, 14), const V3(26, 72, 26), const Color(0xFFE8E8E8), shine: 0.6);
       b.box(V3(-w / 2 + 28.5, 36, 14.4), const V3(0.6, 70, 0.6), const Color(0xFF9CA3AF));
-      b.box(V3(w / 2 - 30, 15, 14), const V3(60, 30, 26), const Color(0xFF6B7380), shine: 0.1);
-      b.box(V3(w / 2 - 30, 31, 14), const V3(62, 2, 28), const Color(0xFF2B2D33), shine: 0.5);
-      b.box(V3(w / 2 - 44, 32.4, 14), const V3(12, 1, 12), const Color(0xFF111111), shine: 0.3);
-      b.box(V3(w / 2 - 16, 32.4, 14), const V3(12, 1, 12), const Color(0xFF111111), shine: 0.3);
+      b.box(V3(w / 2 - 10, 15, 14), const V3(20, 30, 26), const Color(0xFF6B7380), shine: 0.1);
+      b.box(V3(w / 2 - 10, 31, 14), const V3(22, 2, 28), const Color(0xFF2B2D33), shine: 0.5);
+      b.box(V3(w / 2 - 15, 32.4, 14), const V3(9, 1, 9), const Color(0xFF111111), shine: 0.3);
+      b.box(V3(w / 2 - 5, 32.4, 14), const V3(9, 1, 9), const Color(0xFF111111), shine: 0.3);
       b.id = idHKSink;
-      b.box(V3(sx, 15, 14), const V3(50, 30, 26), const Color(0xFF8B5E3C), shine: 0.1);
-      b.box(V3(sx, 31, 14), const V3(52, 2, 28), const Color(0xFF4A4C54), shine: 0.5);
+      b.box(V3(sx, 15, 14), const V3(40, 30, 26), const Color(0xFF8B5E3C), shine: 0.1);
+      b.box(V3(sx, 31, 14), const V3(42, 2, 28), const Color(0xFF4A4C54), shine: 0.5);
       if (ok) {
         b.cyl(V3(sx, 32.1, 14), V3(sx, 32.7, 14), 8, const Color(0xFFB6BCC4), shine: 0.8, sides: 18);
         b.tube([V3(sx, 32, 5), V3(sx, 42, 5), V3(sx, 44, 9), V3(sx, 44, 13)], 0.7, kChromeC, shine: 0.9, sides: 8);
@@ -344,7 +346,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
         stub(sx + 8, 18);
       }
       info[idHKSink] = ObjInfo('Kitchen sink', ok ? 'The faucet, the hoses and the drain are fitted.' : 'The kitchen sink is not plumbed yet. Use the Plumbing button.', V3(sx, 30, 14), 70);
-      if (!ok) labels.add(Label3D(V3(0, 48, 14), '🚰 Needs plumbing', const Color(0xFF2563EB)));
+      if (!ok) labels.add(Label3D(V3(sx, 48, 14), '🚰 Needs plumbing', const Color(0xFF2563EB)));
     }
   }
 
@@ -424,41 +426,92 @@ List<Poly> homeDynamic(HRoom r, double t, {PersonPose? person}) {
 }
 
 
-/// The cartoon person of the house tour: big head, orange shirt, blue trousers. Feet on y = 0, facing +z until turned.
+/// An adult person for the house tour, about 5 feet 8 inches tall: head with a neck, face, hair and ears, shoulders, a
+/// chest and a waist, arms with elbows and hands, legs with knees and shoes. Feet on y = 0, facing +z until turned.
+/// The arms and legs swing in a real stride, the knees bend, and the body bobs a little as they walk.
 void _person(MeshBuilder b, PersonPose p, double t) {
   final pb = MeshBuilder();
   pb.id = 0;
-  final swing = p.walking ? math.sin(t * 7.5) * 0.75 : 0.0;
-  final bob = p.walking ? (math.sin(t * 15).abs()) * 0.8 : 0.0;
-  final lift = p.sitting ? -9.0 : 0.0;
-  const skin = Color(0xFFF1C27D), shirt = Color(0xFFF59E0B), pants = Color(0xFF3B5BA5), hair = Color(0xFF3B2A1A);
-  // A leg or an arm that swings from the hip or the shoulder.
-  void limb(V3 pivot, double len, double thick, Color c, double rx) {
+  // Drawn as if a little nearer than it is, so walls and floor pieces never hide parts of the person.
+  pb.bias = 6;
+  const skin = Color(0xFFE2A97E), hair = Color(0xFF2A1A10), shirt = Color(0xFF2F6FB5), pants = Color(0xFF2E3440), shoe = Color(0xFF1B1B1D);
+  final stride = p.walking ? math.sin(p.phase * math.pi * 2 * 0.5) : 0.0;
+  final bob = p.walking ? (math.cos(p.phase * math.pi * 2 * 0.5 * 2).abs() * 0.7) : 0.0;
+  const hipY = 33.0;
+  final hy = hipY + bob;
+
+  // A limb segment hanging from [from], swung by [angle] about the sideways axis. Returns where its end is.
+  V3 seg(V3 from, double len, double angle, double thick, Color c, {double depth = -1}) {
     final lb = MeshBuilder();
     lb.id = 0;
-    lb.box(V3(0, -len / 2, 0), V3(thick, len, thick), c, shine: 0.05);
-    pb.polys.addAll(transformPolys(lb.polys, rx: rx, t: pivot));
+    lb.bias = 6;
+    lb.box(V3(0, -len / 2, 0), V3(thick, len, depth < 0 ? thick : depth), c, shine: 0.05);
+    pb.polys.addAll(transformPolys(lb.polys, rx: angle, t: from));
+    return from + V3(0, -len * math.cos(angle), -len * math.sin(angle));
   }
 
-  final legA = p.sitting ? -1.5 : swing, legB = p.sitting ? -1.5 : -swing;
-  limb(V3(-2.3, 13 + lift + bob, 0), 13, 3.4, pants, legA);
-  limb(V3(2.3, 13 + lift + bob, 0), 13, 3.4, pants, legB);
-  // The feet.
-  pb.box(V3(-2.3, 0.8 + (p.sitting ? 6 : 0), 1.6 + (p.sitting ? 12 : legA * 6)), const V3(3.6, 1.6, 5), const Color(0xFFFFFFFF));
-  pb.box(V3(2.3, 0.8 + (p.sitting ? 6 : 0), 1.6 + (p.sitting ? 12 : legB * 6)), const V3(3.6, 1.6, 5), const Color(0xFFFFFFFF));
-  // Body and head.
-  pb.box(V3(0, 20 + lift + bob, 0), const V3(9, 14, 5.5), shirt, shine: 0.05);
-  pb.ball(V3(0, 33.5 + lift + bob, 0), 5.4, skin, lat: 6, lon: 10);
-  pb.ball(V3(0, 35.2 + lift + bob, -1.4), 5.6, hair, lat: 5, lon: 9);
-  for (final x in const [-1.9, 1.9]) {
-    pb.ball(V3(x, 33.8 + lift + bob, 4.7), 0.8, const Color(0xFF111111), lat: 3, lon: 5);
+  // Legs: the thigh swings, the knee bends as the leg goes back, the foot stays flat.
+  for (final s in const [-1.0, 1.0]) {
+    final sw = stride * s * 0.55;
+    final knee = p.walking ? math.max(0.0, -sw) * 1.5 + 0.08 : 0.0;
+    final hip = V3(s * 2.9, hy, 0);
+    final kneeAt = seg(hip, 16, sw, 5.2, pants);
+    final ankle = seg(kneeAt, 15.5, sw + knee, 4.3, pants);
+    pb.box(V3(s * 2.9, 1.3 + math.max(0.0, ankle.y - 2.4) * 0.0, ankle.z + 2.6), const V3(4.6, 2.6, 10), shoe, shine: 0.1);
+    pb.box(V3(s * 2.9, 0.7, ankle.z + 3.2), const V3(4.8, 0.6, 10.4), const Color(0xFF3A3A3F));
   }
-  pb.box(V3(0, 31.4 + lift + bob, 5.1), const V3(2.4, 0.5, 0.4), const Color(0xFF7F1D1D));
-  // Arms: they swing when walking, and one holds a cup after the fridge.
-  limb(V3(-5.6, 26 + lift + bob, 0), 12, 2.8, skin, p.holding ? -0.6 : -swing);
-  limb(V3(5.6, 26 + lift + bob, 0), 12, 2.8, skin, p.holding ? -1.35 : swing);
-  if (p.holding) {
-    pb.cyl(V3(5.6, 17.2 + lift + bob, 10.5), V3(5.6, 22 + lift + bob, 10.5), 1.7, const Color(0xFF38BDF8), shine: 0.5, sides: 8);
+  // The body: hips, waist, chest, shoulders.
+  final lean = p.walking ? 0.05 : 0.0;
+  pb.box(V3(0, hy + 2, 0), const V3(11.6, 5.5, 6.6), pants, shine: 0.05);
+  pb.polys.addAll(transformPolys((MeshBuilder()
+        ..id = 0
+        ..bias = 6
+        ..box(const V3(0, 6.5, 0), const V3(11, 8.5, 6.4), shirt, shine: 0.05)
+        ..box(const V3(0, 14.5, 0), const V3(13.4, 9, 7.2), shirt, shine: 0.05)
+        ..box(const V3(0, 19.6, 0), const V3(15.6, 2.4, 6.8), shirt, shine: 0.05))
+      .polys, rx: -lean, t: V3(0, hy, 0)));
+  // Neck and head.
+  pb.cyl(V3(0, hy + 21, 0), V3(0, hy + 24, 0), 1.9, skin, sides: 8);
+  final head = V3(0, hy + 28.4, 0.4);
+  pb.ball(head, 4.5, skin, lat: 6, lon: 11);
+  pb.box(head + const V3(0, -2.2, 0.2), const V3(5.6, 4.2, 5.6), skin);
+  pb.ball(head + const V3(0, 1.3, -0.9), 4.8, hair, lat: 5, lon: 10);
+  pb.box(head + const V3(0, 3.1, 2.6), const V3(7.8, 1.6, 2.2), hair);
+  for (final s in const [-1.0, 1.0]) {
+    pb.ball(head + V3(s * 1.8, 0.2, 3.9), 0.7, const Color(0xFF15171C), lat: 3, lon: 6);
+    pb.ball(head + V3(s * 4.4, -0.4, 0), 1.0, skin, lat: 3, lon: 6);
+    pb.box(head + V3(s * 1.8, 1.6, 4.2), const V3(2.0, 0.35, 0.4), hair);
+  }
+  pb.box(head + const V3(0, -0.9, 4.4), const V3(0.9, 1.7, 1.2), const Color(0xFFD08F64));
+  pb.box(head + const V3(0, -2.9, 4.1), const V3(2.4, 0.4, 0.5), const Color(0xFF8A3B3B));
+
+  // Arms: they swing against the legs; with the cup or the remote the right arm comes up.
+  for (final s in const [-1.0, 1.0]) {
+    final sh = V3(s * 8.1, hy + 19.2, 0);
+    var a1 = -stride * s * 0.5;
+    var elbow = p.walking ? -0.45 : -0.12;
+    if (s > 0 && p.holding) {
+      a1 = -0.8;
+      elbow = -1.2;
+    }
+    if (s > 0 && p.remote) {
+      a1 = -1.0;
+      elbow = -0.6;
+    }
+    if (s > 0 && p.pointing) {
+      a1 = -1.55;
+      elbow = -0.1;
+    }
+    final elbowAt = seg(sh, 11.5, a1, 4.0, shirt);
+    final wrist = seg(elbowAt, 10.5, a1 + elbow, 3.2, skin);
+    pb.ball(wrist + const V3(0, -1.1, 0), 1.8, skin, lat: 4, lon: 7);
+    if (s > 0 && p.holding) {
+      pb.cyl(wrist + const V3(0, -2.6, 0), wrist + const V3(0, 2.6, 0), 1.7, const Color(0xFF38BDF8), shine: 0.5, sides: 8);
+    }
+    if (s > 0 && p.remote) {
+      pb.box(wrist + const V3(0, -0.4, 2.6), const V3(2.2, 1.1, 6.4), const Color(0xFF15171C), shine: 0.3);
+      pb.box(wrist + const V3(0, 0.2, 3.8), const V3(1.4, 0.3, 1.0), const Color(0xFFEF4444));
+    }
   }
   b.polys.addAll(transformPolys(pb.polys, ry: p.yaw, t: V3(p.x, 0, p.z)));
 }

@@ -103,25 +103,39 @@ void main() {
     expect(p.plumbed, isTrue);
   });
 
-  test('the house tour visits every room in turn, keeps to the time chosen and stays inside the rooms', () {
-    final h = HomeProject(seed: 3);
-    for (final secs in kTourLengths) {
-      final tour = HomeTour(h, secs.toDouble());
-      expect(tour.total, greaterThanOrEqualTo(secs - 0.01));
-      final seen = <int>[];
-      var drink = false, walked = false;
-      for (var t = 0.0; t < tour.total; t += tour.total / 400) {
-        final p = tour.at(t);
-        if (seen.isEmpty || seen.last != p.room) seen.add(p.room);
-        final r = h.rooms[p.room];
-        expect(p.x.abs(), lessThanOrEqualTo(r.w / 2 + 0.01), reason: '${r.name} at $t');
-        expect(p.z, inInclusiveRange(0, r.d + 0.01), reason: '${r.name} at $t');
-        if (p.room == 9 && p.holding) drink = true;
-        if (p.walking) walked = true;
+  test('the house tour walks round the furniture and the walls, visits every room, opens doors, switches the TV ad and keeps to the time chosen', () {
+    for (final seed in [3, 8]) {
+      final h = HomeProject(seed: seed);
+      final blocks = {for (final r in h.rooms) r.id: obstaclesOf(r)};
+      for (final secs in kTourLengths) {
+        final tour = HomeTour(h, secs.toDouble());
+        expect(tour.total, closeTo(secs, secs * 0.15 + 2), reason: '$secs seconds');
+        expect(tour.firstRoom, 10, reason: 'it starts at the front door, in the living room');
+        final seen = <int>{};
+        var drink = false, ad = false, door = false, walked = false, remote = false;
+        for (var t = 0.0; t < tour.total; t += tour.total / 900) {
+          final p = tour.at(t);
+          seen.add(p.room);
+          final r = h.rooms[p.room];
+          expect(p.x.abs(), lessThanOrEqualTo(r.w / 2 - 5), reason: '${r.name} at $t: inside the walls');
+          expect(p.z, inInclusiveRange(5, r.d - 5), reason: '${r.name} at $t: inside the walls');
+          if (p.walking) {
+            walked = true;
+            for (final o in blocks[p.room]!) {
+              expect(o.hit(p.x, p.z, 0), isFalse, reason: '${r.name} at $t: walking through furniture or a fixture at (${p.x}, ${p.z})');
+            }
+          }
+          if (p.room == 9 && p.holding) drink = true;
+          if (p.event.startsWith('ad')) ad = true;
+          if (p.openDoor >= 0) door = true;
+          if (p.remote) remote = true;
+        }
+        expect(seen.length, 11, reason: 'every room');
+        expect(drink, isTrue, reason: 'a drink from the kitchen fridge');
+        expect(ad && remote, isTrue, reason: 'the remote is used to switch the TV ad');
+        expect(door, isTrue, reason: 'the doors are opened');
+        expect(walked, isTrue);
       }
-      expect(seen, kTourRoute, reason: 'every room, in order');
-      expect(drink, isTrue, reason: 'a drink from the kitchen fridge');
-      expect(walked, isTrue);
     }
     expect(tourLengthName(60), '1 minute');
   });

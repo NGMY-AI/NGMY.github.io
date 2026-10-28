@@ -275,16 +275,16 @@ class HomeProject {
       const HDoor('right', 32, 10),
     ];
     final list = <HRoom>[
-      HRoom(0, _bedNames[0], 'bedroom', 0, 0, 2, 2, [toHall(-30)]),
-      HRoom(1, _bedNames[1], 'bedroom', 2, 0, 2, 2, [toHall(-30)]),
-      HRoom(2, 'Bathroom 1', 'bathroom', 4, 0, 1, 2, [toHall(-30)]),
-      HRoom(3, _bedNames[2], 'bedroom', 5, 0, 2, 2, [toHall(-30)]),
-      HRoom(4, 'Bathroom 2', 'bathroom', 7, 0, 2, 2, [toHall(-30)]),
+      HRoom(0, _bedNames[0], 'bedroom', 0, 0, 2, 2, [toHall(-48)]),
+      HRoom(1, _bedNames[1], 'bedroom', 2, 0, 2, 2, [toHall(-48)]),
+      HRoom(2, 'Bathroom 1', 'bathroom', 4, 0, 1, 2, [const HDoor('right', 50, 5)]),
+      HRoom(3, _bedNames[2], 'bedroom', 5, 0, 2, 2, [toHall(-48)]),
+      HRoom(4, 'Bathroom 2', 'bathroom', 7, 0, 2, 2, [const HDoor('right', 50, 5)]),
       HRoom(5, 'Hall', 'hall', 0, 2, 9, 1, hallDoors),
-      HRoom(6, _bedNames[3], 'bedroom', 0, 3, 2, 2, [toHall(-30)]),
-      HRoom(7, _bedNames[4], 'bedroom', 2, 3, 2, 2, [toHall(-30)]),
-      HRoom(8, 'Bathroom 3', 'bathroom', 4, 3, 1, 2, [toHall(-30)]),
-      HRoom(9, 'Kitchen', 'kitchen', 5, 3, 2, 2, [HDoor('back', -50, 5), const HDoor('right', 40, 10)]),
+      HRoom(6, _bedNames[3], 'bedroom', 0, 3, 2, 2, [toHall(-48)]),
+      HRoom(7, _bedNames[4], 'bedroom', 2, 3, 2, 2, [toHall(-48)]),
+      HRoom(8, 'Bathroom 3', 'bathroom', 4, 3, 1, 2, [const HDoor('right', 50, 5)]),
+      HRoom(9, 'Kitchen', 'kitchen', 5, 3, 2, 2, [HDoor('back', -26, 5), const HDoor('right', 40, 10)]),
       HRoom(10, 'Living room', 'living', 7, 3, 2, 2, [HDoor('back', -70, 5), const HDoor('left', 40, 9), const HDoor('back', 56, 11)]),
       HRoom(11, 'Garden', 'outside', 0, 5, 9, 1, [const HDoor('back', 0, 10)]),
     ];
@@ -316,17 +316,16 @@ class HomeProject {
     switch (r.kind) {
       case 'bedroom':
         r.add('rug', x: 0, z: r.d * 0.55);
-        r.add('bed', x: 0, z: 46);
-        r.add('nightstand', x: -42, z: 14);
-        r.add('nightstand', x: 42, z: 14);
-        r.add('wardrobe', x: -w2 + 12, z: 76).rot = 1;
-        r.add('desk', x: w2 - 14, z: 80).rot = 3;
+        r.add('bed', x: 24, z: 46);
+        r.add('nightstand', x: -8, z: 14);
+        r.add('wardrobe', x: -w2 + 12, z: 70).rot = 1;
+        r.add('desk', x: w2 - 14, z: 100).rot = 3;
       case 'living':
         r.add('rug', x: 0, z: 70);
         r.add('sofa', x: 0, z: 100);
         r.add('coffee', x: 0, z: 68);
         r.add('tvstand', x: 0, z: 14);
-        r.add('armchair', x: -60, z: 60);
+        r.add('armchair', x: 66, z: 70);
         r.add('plant', x: 76, z: 14);
         r.add('lamp', x: -76, z: 14);
       case 'kitchen':

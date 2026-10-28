@@ -3,112 +3,374 @@ import 'dart:math' as math;
 import 'ngmy_construction_home.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
-// THE HOUSE TOUR: a little cartoon person walks through the rooms of the house, one after another, and does
-// something in each (gets a drink in the kitchen, sits on the sofa, washes at the sink...). The person keeps to the
-// time the visitor chose, so a 30 second tour hurries and a 5 minute tour takes its time.
+// THE HOUSE TOUR: a person comes in through the front door and walks through the whole house like in a little movie.
+// The walk is planned round the furniture and the fixed things (the fridge, the counters, the bath), so nobody walks
+// through a wall, a chair or a table. In the living room the person picks up the remote and switches the ad on the
+// TV, in the kitchen they get a drink, in the bathrooms they wash their hands, and between rooms they open the door
+// and walk through it into the hall. The time chosen is shared out between walking and the things they do.
 // ═════════════════════════════════════════════════════════════════════════════
 
 /// Where the person is, and what they are doing, at one moment of the tour.
 class PersonPose {
-  const PersonPose({required this.room, required this.x, required this.z, required this.yaw, this.walking = false, this.sitting = false, this.holding = false, this.note = ''});
+  const PersonPose({required this.room, required this.x, required this.z, required this.yaw, this.walking = false, this.holding = false, this.remote = false, this.pointing = false, this.note = '', this.event = '', this.openDoor = -1, this.phase = 0});
   final int room;
   final double x, z;
 
-  /// The way the person faces (0 is towards the camera).
+  /// The way the person faces (0 is towards the camera, pi is towards the back wall).
   final double yaw;
-  final bool walking, sitting, holding;
-  final String note;
-}
-
-class _Leg {
-  const _Leg(this.pts, {this.faceBack = false, this.holdFrom = -1, this.note = '', this.noteAt = 0});
-  final List<(double, double)> pts;
-
-  /// At the end of the walk the person turns to face the back wall (the TV or the mirror) instead of the camera.
-  final bool faceBack;
-
-  /// The waypoint from which the person carries a drink (-1 for never).
-  final int holdFrom;
+  final bool walking, holding, remote, pointing;
   final String note;
 
-  /// The waypoint at which the note is shown.
-  final int noteAt;
+  /// Something to do once for this moment of the tour, for example switching the ad on the TV ("ad:10").
+  final String event;
+
+  /// The number of the door (in the room's list) that the person is opening, or -1.
+  final int openDoor;
+
+  /// How far along the walk the legs are (for the stride).
+  final double phase;
 }
 
-/// The order of the rooms on the tour: living room, kitchen, hall, then the bedrooms and bathrooms.
-const List<int> kTourRoute = [10, 9, 5, 0, 2, 1, 3, 4, 6, 7, 8];
+typedef Pt = (double, double);
+
+class NavRect {
+  const NavRect(this.x0, this.x1, this.z0, this.z1);
+  final double x0, x1, z0, z1;
+  bool hit(double x, double z, double m) => x > x0 - m && x < x1 + m && z > z0 - m && z < z1 + m;
+}
+
+/// Everything in the room that a person cannot walk through.
+List<NavRect> obstaclesOf(HRoom r) {
+  final w = r.w;
+  final o = <NavRect>[];
+  for (final f in r.furn) {
+    if (f.kind == 'rug') continue;
+    final k = kFurnKinds[f.kind]!;
+    final fw = f.rot.isOdd ? k.d : k.w, fd = f.rot.isOdd ? k.w : k.d;
+    o.add(NavRect(f.x - fw / 2, f.x + fw / 2, f.z - fd / 2, f.z + fd / 2));
+  }
+  switch (r.kind) {
+    case 'kitchen':
+      o.add(NavRect(-w / 2, -w / 2 + 28, 0, 28)); // the fridge
+      o.add(NavRect(10, w / 2, 0, 28)); // the sink counter and the stove
+    case 'bathroom':
+      o.add(const NavRect(-4, 16, 0, 24)); // the toilet
+      o.add(const NavRect(18, 50, 0, 20)); // the vanity
+      o.add(NavRect(-w / 2, -w / 2 + 33, 0, 75)); // the bath
+    default:
+  }
+  return o;
+}
+
+/// A path through a room round the obstacles: a grid search, then the corners are cut where the way is clear.
+class RoomNav {
+  RoomNav(this.room) : _obs = obstaclesOf(room) {
+    nx = (room.w / cell).ceil() + 1;
+    nz = (room.d / cell).ceil() + 1;
+  }
+
+  final HRoom room;
+  final List<NavRect> _obs;
+  static const double cell = 4, margin = 6;
+  late final int nx, nz;
+
+  double _x(int i) => -room.w / 2 + i * cell;
+  double _z(int j) => j * cell;
+
+  bool free(double x, double z) {
+    if (x < -room.w / 2 + 6 || x > room.w / 2 - 6 || z < 6 || z > room.d - 6) return false;
+    for (final r in _obs) {
+      if (r.hit(x, z, margin)) return false;
+    }
+    return true;
+  }
+
+  bool _clear(Pt a, Pt b) {
+    final len = math.sqrt(math.pow(b.$1 - a.$1, 2) + math.pow(b.$2 - a.$2, 2)).toDouble();
+    final n = math.max(1, (len / 2).ceil());
+    for (var i = 0; i <= n; i++) {
+      final t = i / n;
+      if (!free(a.$1 + (b.$1 - a.$1) * t, a.$2 + (b.$2 - a.$2) * t)) return false;
+    }
+    return true;
+  }
+
+  (int, int)? _nearestFree(Pt p) {
+    final ci = ((p.$1 + room.w / 2) / cell).round().clamp(0, nx - 1), cj = (p.$2 / cell).round().clamp(0, nz - 1);
+    for (var r = 0; r < 16; r++) {
+      (int, int)? best;
+      var bd = double.infinity;
+      for (var di = -r; di <= r; di++) {
+        for (var dj = -r; dj <= r; dj++) {
+          if (math.max(di.abs(), dj.abs()) != r) continue;
+          final i = ci + di, j = cj + dj;
+          if (i < 0 || j < 0 || i >= nx || j >= nz) continue;
+          if (!free(_x(i), _z(j))) continue;
+          final dd = math.pow(_x(i) - p.$1, 2) + math.pow(_z(j) - p.$2, 2).toDouble();
+          if (dd < bd) {
+            bd = dd.toDouble();
+            best = (i, j);
+          }
+        }
+      }
+      if (best != null) return best;
+    }
+    return null;
+  }
+
+  /// The way from [a] to [b]; the end is moved to the nearest free spot if [b] is inside something.
+  List<Pt> route(Pt a, Pt b) {
+    final s = _nearestFree(a), g = _nearestFree(b);
+    if (s == null || g == null) return [a, b];
+    final goal = (_x(g.$1), _z(g.$2));
+    if (_clear(a, goal)) return [a, goal];
+    // A* over the grid, eight ways.
+    final open = <int>{s.$1 * nz + s.$2};
+    final came = <int, int>{};
+    final gs = <int, double>{s.$1 * nz + s.$2: 0};
+    final fs = <int, double>{s.$1 * nz + s.$2: _h(s.$1, s.$2, g)};
+    final end = g.$1 * nz + g.$2;
+    var found = false;
+    var guard = 0;
+    while (open.isNotEmpty && guard++ < 6000) {
+      var cur = open.first;
+      for (final k in open) {
+        if ((fs[k] ?? 1e9) < (fs[cur] ?? 1e9)) cur = k;
+      }
+      if (cur == end) {
+        found = true;
+        break;
+      }
+      open.remove(cur);
+      final ci = cur ~/ nz, cj = cur % nz;
+      for (var di = -1; di <= 1; di++) {
+        for (var dj = -1; dj <= 1; dj++) {
+          if (di == 0 && dj == 0) continue;
+          final i = ci + di, j = cj + dj;
+          if (i < 0 || j < 0 || i >= nx || j >= nz || !free(_x(i), _z(j))) continue;
+          if (di != 0 && dj != 0 && (!free(_x(ci + di), _z(cj)) || !free(_x(ci), _z(cj + dj)))) continue;
+          final k = i * nz + j;
+          final tg = gs[cur]! + (di != 0 && dj != 0 ? 1.4142 : 1.0);
+          if (tg < (gs[k] ?? 1e9)) {
+            came[k] = cur;
+            gs[k] = tg;
+            fs[k] = tg + _h(i, j, g);
+            open.add(k);
+          }
+        }
+      }
+    }
+    if (!found) return [a, goal];
+    final cells = <int>[end];
+    while (came.containsKey(cells.last)) {
+      cells.add(came[cells.last]!);
+    }
+    final pts = <Pt>[a, for (final k in cells.reversed) (_x(k ~/ nz), _z(k % nz))];
+    // Cut the corners wherever the straight way is clear.
+    final out = <Pt>[pts.first];
+    var i = 0;
+    while (i < pts.length - 1) {
+      var j = pts.length - 1;
+      while (j > i + 1 && !_clear(pts[i], pts[j])) {
+        j--;
+      }
+      out.add(pts[j]);
+      i = j;
+    }
+    return out;
+  }
+
+  double _h(int i, int j, (int, int) g) => math.sqrt(math.pow(i - g.$1, 2) + math.pow(j - g.$2, 2)).toDouble();
+}
+
+class _Goal {
+  const _Goal(this.pos, {this.yaw = 0, this.secs = 0, this.note = '', this.holding = false, this.remote = false, this.pointing = false, this.event = ''});
+  final Pt pos;
+  final double yaw;
+  final double secs;
+  final String note;
+  final bool holding, remote, pointing;
+  final String event;
+}
+
+class _Seg {
+  _Seg(this.room, {this.path, this.x = 0, this.z = 0, this.yaw = 0, this.secs = 0, this.note = '', this.holding = false, this.remote = false, this.pointing = false, this.event = '', this.openDoor = -1}) {
+    if (path != null) {
+      for (var i = 1; i < path!.length; i++) {
+        final l = math.sqrt(math.pow(path![i].$1 - path![i - 1].$1, 2) + math.pow(path![i].$2 - path![i - 1].$2, 2)).toDouble();
+        lens.add(l);
+        len += l;
+      }
+    }
+  }
+
+  final int room;
+  final List<Pt>? path;
+  final double x, z, yaw;
+  double secs;
+  final String note;
+  final bool holding, remote, pointing;
+  final String event;
+  final int openDoor;
+  final List<double> lens = [];
+  double len = 0;
+  double t0 = 0;
+}
+
+/// A point just inside the door of [r] that leads to room [to], and the way someone coming in through it faces.
+(Pt, double, int) _doorPoint(HRoom r, int to) {
+  var idx = r.doors.indexWhere((d) => d.to == to);
+  if (idx < 0) idx = 0;
+  final d = r.doors[idx];
+  final w = r.w, rd = r.d;
+  switch (d.wall) {
+    case 'left':
+      final z = (d.offset + rd / 2 - 40).clamp(10.0, rd - 10);
+      return ((-w / 2 + 11, z), math.pi / 2, idx);
+    case 'right':
+      final z = (d.offset + rd / 2 - 40).clamp(10.0, rd - 10);
+      return ((w / 2 - 11, z), -math.pi / 2, idx);
+    default:
+      return ((d.offset.clamp(-w / 2 + 10, w / 2 - 10), 11.0), 0.0, idx);
+  }
+}
 
 class HomeTour {
   HomeTour(this.home, this.seconds) {
-    final rooms = [for (final id in kTourRoute) home.rooms[id]];
-    final each = math.max(3.0, seconds / rooms.length);
-    var t = 0.0;
-    for (final r in rooms) {
-      _segs.add((r, _legFor(r), t, t + each));
-      t += each;
-    }
-    total = t;
+    _build();
   }
 
   final HomeProject home;
   final double seconds;
-  final List<(HRoom, _Leg, double, double)> _segs = [];
+  final List<_Seg> _segs = [];
   late final double total;
 
-  _Leg _legFor(HRoom r) {
+  /// The goals for each kind of room: what the person does there.
+  List<_Goal> _goals(HRoom r) {
     final w = r.w, d = r.d;
     switch (r.kind) {
       case 'living':
-        return const _Leg([(-70, 10), (-20, 50), (0, 44)], faceBack: true, note: 'Watching the big TV', noteAt: 2);
+        return [
+          const _Goal((34, 62), yaw: math.pi, secs: 2.2, note: 'Picking up the remote', remote: true),
+          const _Goal((22, 44), yaw: math.pi, secs: 4.0, note: 'Switching the ad on the big TV', remote: true, pointing: true, event: 'ad'),
+        ];
       case 'kitchen':
-        return _Leg([(-50, 10), (-w / 2 + 24, 40), (0, d * 0.62)], holdFrom: 1, note: 'Getting a drink from the fridge', noteAt: 1);
-      case 'hall':
-        return _Leg([(-98, 12), (0, 22), (98, 12)], note: 'Walking down the hall', noteAt: 1);
+        return [
+          _Goal((-w / 2 + 40, 42), yaw: math.pi, secs: 2.8, note: 'Getting a drink from the fridge', holding: true),
+          _Goal((0, 46), secs: 2.4, note: 'Having the drink', holding: true),
+        ];
       case 'bathroom':
-        return _Leg([(-30, 10), (34, 40), (0, d * 0.6)], faceBack: true, note: 'Washing hands at the sink', noteAt: 1);
+        return const [_Goal((34, 40), yaw: math.pi, secs: 2.6, note: 'Washing hands at the sink')];
+      case 'bedroom':
+        return [_Goal((24, d - 16), yaw: math.pi, secs: 3.4, note: 'Switching the ad on the TV', remote: true, pointing: true, event: 'ad')];
       default:
-        return _Leg([(-30, 10), (0, d * 0.66), (-w / 2 + 14, 76)], faceBack: true, note: 'Watching TV in the bedroom', noteAt: 2);
+        return const [];
     }
   }
+
+  void _leg(int roomId, int? from, int? to, {String note = ''}) {
+    final r = home.rooms[roomId];
+    final nav = RoomNav(r);
+    final (inP, inYaw, _) = from == null ? ((0.0, 14.0), 0.0, 0) : _doorPoint(r, from);
+    var cur = inP;
+    // The person appears at the door they came through, facing into the room.
+    _segs.add(_Seg(roomId, x: cur.$1, z: cur.$2, yaw: inYaw, secs: 0.5, note: note.isEmpty ? 'Walking in' : note));
+    for (final g in _goals(r)) {
+      final path = nav.route(cur, g.pos);
+      _segs.add(_Seg(roomId, path: path, note: 'Walking', holding: _holdingBefore(g)));
+      cur = path.last;
+      _segs.add(_Seg(roomId, x: cur.$1, z: cur.$2, yaw: g.yaw, secs: g.secs, note: g.note, holding: g.holding, remote: g.remote, pointing: g.pointing, event: g.event));
+    }
+    if (to != null) {
+      final (outP, _, di) = _doorPoint(r, to);
+      final path = nav.route(cur, outP);
+      final holding = _goals(r).isNotEmpty && _goals(r).last.holding;
+      _segs.add(_Seg(roomId, path: path, note: 'Walking to the next room', holding: holding));
+      cur = path.last;
+      // They stop at the door and open it.
+      _segs.add(_Seg(roomId, x: cur.$1, z: cur.$2, yaw: _doorYaw(r, di), secs: 0.8, note: 'Opening the door', holding: holding, openDoor: di));
+    }
+  }
+
+  bool _holdingBefore(_Goal g) => g.holding && g.note.contains('Having');
+
+  double _doorYaw(HRoom r, int di) => switch (r.doors[di].wall) { 'left' => -math.pi / 2, 'right' => math.pi / 2, _ => math.pi };
+
+  void _build() {
+    // Through the front door into the living room, the kitchen, then the hall and every bedroom and bathroom.
+    _leg(10, 11, 9, note: 'Coming in through the front door');
+    _leg(9, 10, 5);
+    const order = [0, 2, 1, 3, 4, 6, 7, 8];
+    var prev = 9;
+    for (var i = 0; i < order.length; i++) {
+      final k = order[i];
+      _leg(5, prev, k, note: 'Walking down the hall');
+      _leg(k, 5, i == order.length - 1 ? null : 5);
+      prev = k;
+    }
+    // Share the time: pauses keep their length (shortened for short tours), walking takes the rest.
+    final pauseScale = math.min(1.0, seconds / 120);
+    var fixed = 0.0, walkLen = 0.0;
+    for (final s in _segs) {
+      if (s.path == null) {
+        s.secs = s.secs * pauseScale;
+        fixed += s.secs;
+      } else {
+        walkLen += s.len;
+      }
+    }
+    final walkTime = math.max(4.0, seconds - fixed);
+    final speed = walkLen / walkTime;
+    var t = 0.0;
+    for (final s in _segs) {
+      if (s.path != null) s.secs = speed <= 0 ? 0.1 : math.max(0.05, s.len / speed);
+      s.t0 = t;
+      t += s.secs;
+    }
+    total = t;
+  }
+
+  /// The room the tour starts in.
+  int get firstRoom => _segs.first.room;
 
   /// The person at [elapsed] seconds. After the end they stay where they stopped.
   PersonPose at(double elapsed) {
     final e = elapsed.clamp(0.0, total - 0.001);
-    for (final (r, leg, t0, t1) in _segs) {
-      if (e >= t0 && e < t1) return _pose(r, leg, (e - t0) / (t1 - t0));
+    var s = _segs.last;
+    for (final g in _segs) {
+      if (e >= g.t0 && e < g.t0 + g.secs) {
+        s = g;
+        break;
+      }
     }
-    final (r, leg, _, _) = _segs.last;
-    return _pose(r, leg, 1);
-  }
+    final u = s.secs <= 0 ? 0.0 : ((e - s.t0) / s.secs).clamp(0.0, 1.0);
+    if (s.path == null) {
+      final late = u > 0.5;
+      return PersonPose(room: s.room, x: s.x, z: s.z, yaw: s.yaw, holding: s.holding, remote: s.remote, pointing: s.pointing && late, note: s.note, event: late && s.event.isNotEmpty ? '${s.event}:${s.room}' : '', openDoor: s.openDoor);
+    }
+    // Along the path at an even pace, facing the way of travel (a little ahead, so turns are smooth).
+    Pt at(double dist) {
+      var acc = 0.0;
+      for (var i = 0; i < s.lens.length; i++) {
+        if (dist <= acc + s.lens[i] || i == s.lens.length - 1) {
+          final k = s.lens[i] == 0 ? 0.0 : ((dist - acc) / s.lens[i]).clamp(0.0, 1.0);
+          return (s.path![i].$1 + (s.path![i + 1].$1 - s.path![i].$1) * k, s.path![i].$2 + (s.path![i + 1].$2 - s.path![i].$2) * k);
+        }
+        acc += s.lens[i];
+      }
+      return s.path!.last;
+    }
 
-  PersonPose _pose(HRoom r, _Leg leg, double u) {
-    // 82% of the time is walking, the rest is the person doing the thing at the last stop.
-    const walkShare = 0.82;
-    final pts = leg.pts;
-    final lens = <double>[];
-    var sum = 0.0;
-    for (var i = 1; i < pts.length; i++) {
-      final l = math.sqrt(math.pow(pts[i].$1 - pts[i - 1].$1, 2) + math.pow(pts[i].$2 - pts[i - 1].$2, 2)).toDouble();
-      lens.add(l);
-      sum += l;
+    final dist = u * s.len;
+    final p = at(dist);
+    final ahead = at(math.min(s.len, dist + 7));
+    final back = at(math.max(0, dist - 7));
+    var dx = ahead.$1 - back.$1, dz = ahead.$2 - back.$2;
+    if (dx.abs() < 1e-6 && dz.abs() < 1e-6) {
+      dx = s.path!.last.$1 - s.path!.first.$1;
+      dz = s.path!.last.$2 - s.path!.first.$2;
     }
-    final walkU = (u / walkShare).clamp(0.0, 1.0);
-    final dist = walkU * sum;
-    var acc = 0.0;
-    var seg = 0;
-    while (seg < lens.length - 1 && acc + lens[seg] < dist) {
-      acc += lens[seg];
-      seg++;
-    }
-    final k = lens[seg] == 0 ? 0.0 : ((dist - acc) / lens[seg]).clamp(0.0, 1.0);
-    final a = pts[seg], b = pts[seg + 1];
-    final x = a.$1 + (b.$1 - a.$1) * k, z = a.$2 + (b.$2 - a.$2) * k;
-    final walking = u < walkShare;
-    final yaw = walking ? math.atan2(b.$1 - a.$1, b.$2 - a.$2) : (leg.faceBack ? math.pi : 0.0);
-    final atWaypoint = seg + (k > 0.99 ? 1 : 0);
-    final holding = leg.holdFrom >= 0 && (atWaypoint >= leg.holdFrom);
-    final noteOn = atWaypoint >= leg.noteAt;
-    return PersonPose(room: r.id, x: x, z: z, yaw: yaw, walking: walking, holding: holding, note: noteOn ? leg.note : 'Walking in');
+    return PersonPose(room: s.room, x: p.$1, z: p.$2, yaw: math.atan2(dx, dz), walking: true, holding: s.holding, note: s.note, phase: dist / 12);
   }
 }
 
