@@ -200,13 +200,17 @@ Scene3D buildPlumbJobScene(PlumbJob j, {String armed = '', bool labels = true}) 
   b.box(V3(sx, 0.6, 10), const V3(40, 1.2, 22), kWood, shine: 0.1);
   b.box(V3(sx, 29.4, 18.6), const V3(40, 7.2, 1.2), kWood, shine: 0.1);
   b.box(V3(sx - 19.4, 13.6, 10.5), const V3(1.2, 26.4, 20), kWood, shine: 0.1);
-  b.box(V3(sx, 33, 9), const V3(46, 2.4, 22), const Color(0xFF4A4C54), shine: 0.5, split: 2);
-  b.cyl(V3(sx, 34.2, 8), V3(sx, 34.4, 8), 7, const Color(0xFF2B2D33), sides: 18);
+  for (final (cx, cz, sw, sd) in <(double, double, double, double)>[(-15.6, 9.0, 14.8, 22.0), (15.6, 9.0, 14.8, 22.0), (0.0, -0.1, 16.4, 4.2), (0.0, 17.1, 16.4, 5.8)]) {
+    b.box(V3(sx + cx, 33, cz), V3(sw, 2.4, sd), const Color(0xFF4A4C54), shine: 0.5);
+  }
+  b.cyl(V3(sx, 27.0, 8), V3(sx, 34.3, 8), 8.0, const Color(0xFFF4F4F0), shine: 0.7, sides: 20, inner: true, caps: false);
+  b.cyl(V3(sx, 27.0, 8), V3(sx, 27.2, 8), 8.0, const Color(0xFFE6E6E0), shine: 0.5, sides: 20);
+  b.cyl(V3(sx, 27.1, 8), V3(sx, 27.3, 8), 1.4, const Color(0xFF2B2D33), sides: 12);
   b.cyl(V3(sx + 15, 23.6, 8), V3(sx + 19.4, 23.6, 8), 0.92, kPvc, shine: 0.3, sides: 12, inner: true, caps: false);
   info[idPjBase + 98] = const ObjInfo('Vanity and counter', 'The cabinet that holds the sink. The pipes live inside it.', V3(0, 20, 8), 70);
 
   // The main water valve on the wall.
-  final mainX = -62.0 * (j.mirror ? -1 : 1);
+  final mainX = -56.0;
   b.id = idPjMain;
   b.cyl(V3(mainX, 18, 0), V3(mainX, 18, 6), 1.5, kBrassValve, shine: 0.8, sides: 12);
   b.cyl(V3(mainX - 1, 18, 6), V3(mainX + 1, 18, 6.5), 4, j.waterOn ? kCold : const Color(0xFF6B7280), shine: 0.5, sides: 14);
@@ -270,7 +274,7 @@ Scene3D buildPlumbJobScene(PlumbJob j, {String armed = '', bool labels = true}) 
         if (placed) {
           b.id = oid;
           b.ring(c, c + const V3(0, 1.1, 0), 4.2, 2.4, const Color(0xFF8B6B3F), shine: 0.2, sides: 18);
-        } else if (j.placed.contains('flange')) {
+        } else {
           ghostBox(s.id, c + const V3(0, 0.5, 0), const V3(9, 1.2, 9));
         }
         slot(s, c, 'Wax ring spot');
@@ -281,7 +285,7 @@ Scene3D buildPlumbJobScene(PlumbJob j, {String armed = '', bool labels = true}) 
           b.cyl(V3(tx, 16, 14), V3(tx, 17, 14), 9.5, const Color(0xFFEFEFEA), shine: 0.8, sides: 20);
           b.box(V3(tx, 22, 4.5), const V3(20, 14, 7), const Color(0xFFF8F8F4), shine: 0.8);
           b.box(V3(tx, 29.2, 4.5), const V3(21, 1.4, 8), const Color(0xFFEFEFEA), shine: 0.8);
-        } else if (j.placed.contains('wax')) {
+        } else {
           b.id = oid;
           b.alpha = 0.32;
           b.cyl(V3(tx, 0.5, 14), V3(tx, 17, 14), 8.5, const Color(0xFF67E8F9), sides: 16);
@@ -297,7 +301,7 @@ Scene3D buildPlumbJobScene(PlumbJob j, {String armed = '', bool labels = true}) 
             b.cyl(V3(tx + dx, 3.4, 17), V3(tx + dx, 4.6, 17), 1.2, loose ? const Color(0xFFFB923C) : kStainless, shine: 0.8, sides: 6);
           }
           info[oid] = ObjInfo(s.label, loose ? 'The nuts are loose. Tighten them with the wrench, a little at a time so the porcelain does not crack.' : 'The toilet is bolted down.', V3(tx, 3, 17), 20);
-        } else if (j.placed.contains('toilet')) {
+        } else {
           for (final dx in const [-9.0, 9.0]) {
             b.id = oid;
             b.alpha = 0.4;
@@ -317,7 +321,7 @@ Scene3D buildPlumbJobScene(PlumbJob j, {String armed = '', bool labels = true}) 
           if (loose) {
             b.cyl(V3(tx - 10, 10, 1.6), V3(tx - 10, 11.2, 1.6), 0.9, const Color(0xFFFB923C), sides: 8);
           }
-        } else if (j.placed.contains('tvalve') && j.placed.contains('toilet')) {
+        } else {
           ghost(s.id, smoothPath([V3(tx - 10, 10, 1.6), V3(tx - 12, 14, 3.5), V3(tx - 6, 17, 3.6), V3(tx - 2, 21, 2.5)], per: 6), r: 0.9);
         }
         slot(s, V3(tx - 6, 15, 3), 'Toilet hose');
@@ -348,7 +352,6 @@ Scene3D buildPlumbJobScene(PlumbJob j, {String armed = '', bool labels = true}) 
         final hot = s.id == 'hhot';
         final side = hot ? -1.0 : 1.0;
         final path = smoothPath([V3(sx + side * 8, 10.5, 1.8), V3(sx + side * 9, 16, 3.5), V3(sx + side * 6, 22, 4.2), V3(sx + side * 3, 27.5, 6), V3(sx + side * 3, 28.6, 8)], per: 6);
-        final ready = j.placed.contains(hot ? 'vhot' : 'vcold') && j.placed.contains('faucet');
         if (placed) {
           b.id = oid;
           b.tube(path, 0.5, const Color(0xFFB9BEC6), shine: 0.7, sides: 8, joints: false);
@@ -358,7 +361,7 @@ Scene3D buildPlumbJobScene(PlumbJob j, {String armed = '', bool labels = true}) 
             b.cyl(path.first, path.first + const V3(0, 1.4, 0), 0.9, const Color(0xFFFB923C), sides: 8);
             b.cyl(path.last - const V3(0, 1.4, 0), path.last, 0.9, const Color(0xFFFB923C), sides: 8);
           }
-        } else if (ready) {
+        } else {
           ghost(s.id, path, r: 0.9);
         }
         slot(s, path[path.length ~/ 2], hot ? 'Hot hose' : 'Cold hose');
@@ -366,11 +369,10 @@ Scene3D buildPlumbJobScene(PlumbJob j, {String armed = '', bool labels = true}) 
       case 'trap':
       case 'arm':
         final p = shift(s.id == 'tail' ? ptrapTailPath() : (s.id == 'trap' ? ptrapTrapPath() : ptrapArmPath()));
-        final ready = s.prereq.every(j.placed.contains);
         if (placed) {
           b.id = oid;
           b.tube(p, 0.66, s.id == 'tail' ? kChrome : kPvc, shine: s.id == 'tail' ? 0.85 : 0.3, sides: 12, joints: true, endCaps: false, inner: true);
-        } else if (ready) {
+        } else {
           ghost(s.id, p, r: 0.78);
         }
         slot(s, p[p.length ~/ 2], s.id == 'tail' ? 'Tailpiece' : (s.id == 'trap' ? 'P-trap' : 'Trap arm'));

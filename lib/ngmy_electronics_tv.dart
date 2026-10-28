@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'ngmy_electronics_screens.dart';
+import 'ngmy_electronics_tv_brands.dart';
 import 'ngmy_studio_kit.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -466,18 +467,19 @@ void _garden(Canvas c, Size s, double t) {
 
 /// Opens the TV full screen. It starts with the NGMY logo for 3 seconds, plays the chosen channel and
 /// goes back to the board by itself after [stayFor] (or when the person taps the close button).
-Future<int?> showNgmyTvScreen(BuildContext context, {int channel = 0, Duration stayFor = const Duration(seconds: 60), bool showBoot = true, String title = 'NGMY TV'}) {
+Future<int?> showNgmyTvScreen(BuildContext context, {int channel = 0, Duration stayFor = const Duration(seconds: 60), bool showBoot = true, String title = 'NGMY TV', String kind = 'tv'}) {
   return Navigator.of(context).push<int>(PageRouteBuilder(
     opaque: true,
     transitionDuration: const Duration(milliseconds: 260),
-    pageBuilder: (_, __, ___) => NgmyTvScreen(channel: channel, stayFor: stayFor, showBoot: showBoot, title: title),
+    pageBuilder: (_, __, ___) => NgmyTvScreen(channel: channel, stayFor: stayFor, showBoot: showBoot, title: title, kind: kind),
     transitionsBuilder: (_, a, __, child) => FadeTransition(opacity: a, child: ScaleTransition(scale: Tween(begin: 0.85, end: 1.0).animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)), child: child)),
   ));
 }
 
 class NgmyTvScreen extends StatefulWidget {
-  const NgmyTvScreen({super.key, this.channel = 0, this.stayFor = const Duration(seconds: 60), this.showBoot = true, this.title = 'NGMY TV'});
+  const NgmyTvScreen({super.key, this.channel = 0, this.stayFor = const Duration(seconds: 60), this.showBoot = true, this.title = 'NGMY TV', this.kind = 'tv'});
   final String title;
+  final String kind;
   final int channel;
   final bool showBoot;
   final Duration stayFor;
@@ -564,7 +566,7 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
               child: AspectRatio(
                 aspectRatio: 16 / 9,
                 child: Container(
-                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFF1F2937), width: 6), boxShadow: [BoxShadow(color: const Color(0xFF38BDF8).withValues(alpha: 0.25), blurRadius: 40)]),
+                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), border: Border.all(color: _frame, width: 6), boxShadow: [BoxShadow(color: tvBrandAccent(widget.kind).withValues(alpha: 0.25), blurRadius: 40)]),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: Stack(fit: StackFit.expand, children: [
@@ -652,34 +654,9 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
   }
 
   /// The apps screen is drawn inside the TV, not over it.
-  Widget _appsMenu() => GestureDetector(
-        onTap: () => setState(() => _menu = false),
-        child: Container(
-          color: Colors.black.withValues(alpha: 0.9),
-          padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
-          child: Column(children: [
-            const Text('NGMY Apps', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 1)),
-            const SizedBox(height: 4),
-            Expanded(
-              child: GridView.builder(
-                padding: EdgeInsets.zero,
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 78, mainAxisExtent: 56, mainAxisSpacing: 6, crossAxisSpacing: 6),
-                itemCount: kNgmyApps.length,
-                itemBuilder: (_, k) => GestureDetector(
-                  onTap: () => _openApp(k),
-                  child: Container(
-                    decoration: BoxDecoration(color: kNgmyApps[k].color.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(12), border: Border.all(color: kNgmyApps[k].color.withValues(alpha: 0.6))),
-                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      Text(kNgmyApps[k].emoji, style: const TextStyle(fontSize: 20)),
-                      Text(kNgmyApps[k].name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w800)),
-                    ]),
-                  ),
-                ),
-              ),
-            ),
-          ]),
-        ),
-      );
+  Widget _appsMenu() => NgmyTvHome(kind: widget.kind, onOpen: _openApp, onClose: () => setState(() => _menu = false));
+
+  Color get _frame => switch (tvBrandOf(widget.kind)) { 'apple' => const Color(0xFF9CA3AF), 'bo' => const Color(0xFFB8B2A7), 'sony' => const Color(0xFF2A2A2D), 'lg' => const Color(0xFF0A0A0A), _ => const Color(0xFF1F2937) };
 
   Widget _round(IconData i, String tip, VoidCallback f) => IconButton(onPressed: f, tooltip: tip, style: IconButton.styleFrom(backgroundColor: Colors.black54), icon: Icon(i, color: Colors.white));
 }

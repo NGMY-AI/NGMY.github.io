@@ -54,8 +54,10 @@ const List<List<_Item>> _trays = [
 ];
 
 class NgmyRoomProjectPage extends StatefulWidget {
-  const NgmyRoomProjectPage({super.key, this.seed, this.practice = false});
+  const NgmyRoomProjectPage({super.key, this.seed, this.practice = false, this.quick = false});
   final int? seed;
+  /// Start with the boxes, cable and drywall already done, ready for the wiring.
+  final bool quick;
   final bool practice;
 
   @override
@@ -87,6 +89,10 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
   void initState() {
     super.initState();
     p = RoomProject(seed: seed, practice: widget.practice);
+    if (widget.quick) {
+      p.fastForward();
+      phase = 2;
+    }
     scene = buildRoomScene(p, _view());
     cam.yawCenter = 0;
     cam.yawRange = 1.1;
@@ -580,6 +586,20 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
             SizedBox(
               height: 52,
               child: ListView(scrollDirection: Axis.horizontal, children: [
+                if (phase < 2 && !p.drywallDone)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 7),
+                    child: GestureDetector(
+                      onTap: () => setState(() {
+                        p.fastForward();
+                        phase = 2;
+                        armed = '';
+                        _rebuild();
+                        _say('The boxes, the cable and the walls are done. Now the wiring: pick an Outlet or a Switch from the tray, then tap its box on the wall.', ok: true);
+                      }),
+                      child: Container(padding: const EdgeInsets.symmetric(horizontal: 12), decoration: BoxDecoration(color: const Color(0xFF1D4ED8), borderRadius: BorderRadius.circular(14)), child: const Center(child: Text('⏩ Skip to the wiring', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12.5)))),
+                    ),
+                  ),
                 for (final it in tray)
                   Padding(
                     padding: const EdgeInsets.only(right: 7),

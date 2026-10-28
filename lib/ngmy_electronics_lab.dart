@@ -70,7 +70,7 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
   Future<void> _openTv(Part p, {bool auto = false}) async {
     if (_tvOpen || !mounted) return;
     _tvOpen = true;
-    final ch = await showNgmyTvScreen(context, channel: p.channel, stayFor: auto ? const Duration(seconds: 60) : const Duration(hours: 1), showBoot: p.onAge < 3.2, title: p.info.name);
+    final ch = await showNgmyTvScreen(context, channel: p.channel, stayFor: auto ? const Duration(seconds: 60) : const Duration(hours: 1), showBoot: p.onAge < 3.2, title: p.info.name, kind: p.kind);
     _tvOpen = false;
     if (ch != null) p.channel = ch;
   }

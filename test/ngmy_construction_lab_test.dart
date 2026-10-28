@@ -162,7 +162,7 @@ void main() {
     const names = ['Wall outlet', 'Light switch', 'GFCI outlet', 'Sink drain (P-trap)', 'Faucet supply lines', 'Build and fix a house'];
 
     testWidgets('the lab lists every lesson and each one opens', (t) async {
-      t.view.physicalSize = const Size(900, 5200);
+      t.view.physicalSize = const Size(900, 7000);
       t.view.devicePixelRatio = 2.0;
       addTearDown(t.view.reset);
       await t.pumpWidget(const MaterialApp(home: NgmyConstructionLab()));
@@ -182,7 +182,7 @@ void main() {
     });
 
     testWidgets('in the outlet lesson the breaker, the wires and the steps work', (t) async {
-      t.view.physicalSize = const Size(900, 5200);
+      t.view.physicalSize = const Size(900, 7000);
       t.view.devicePixelRatio = 2.0;
       addTearDown(t.view.reset);
       await t.pumpWidget(const MaterialApp(home: NgmyConstructionLab()));
@@ -206,7 +206,7 @@ void main() {
     });
 
     testWidgets('the house page moves through the building stages', (t) async {
-      t.view.physicalSize = const Size(900, 5200);
+      t.view.physicalSize = const Size(900, 7000);
       t.view.devicePixelRatio = 2.0;
       addTearDown(t.view.reset);
       await t.pumpWidget(const MaterialApp(home: NgmyConstructionLab()));
@@ -223,7 +223,7 @@ void main() {
     });
 
     testWidgets('a real tap on a screw in the 3D view fastens the wire, and a wrong screw is explained', (t) async {
-      t.view.physicalSize = const Size(900, 5200);
+      t.view.physicalSize = const Size(900, 7000);
       t.view.devicePixelRatio = 2.0;
       addTearDown(t.view.reset);
       await t.pumpWidget(const MaterialApp(home: NgmyConstructionLab()));

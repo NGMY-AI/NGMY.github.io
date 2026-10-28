@@ -23,7 +23,7 @@ class NgmyPlumbJobPage extends StatefulWidget {
 class _NgmyPlumbJobPageState extends State<NgmyPlumbJobPage> {
   late int seed = widget.seed ?? DateTime.now().millisecondsSinceEpoch % 100000;
   late PlumbJob job;
-  final Cam3 cam = Cam3(yaw: -0.25, pitch: 0.4, dist: 175, target: const V3(0, 20, 8))..maxDist = 200;
+  final Cam3 cam = Cam3(yaw: -0.25, pitch: 0.4, dist: 175, target: const V3(-4, 20, 8))..maxDist = 200;
   late Scene3D scene;
   final Stopwatch clock = Stopwatch()..start();
   String armed = '';
@@ -60,7 +60,7 @@ class _NgmyPlumbJobPageState extends State<NgmyPlumbJobPage> {
   }
 
   void _home() {
-    cam.glideTo(target: const V3(0, 20, 8), dist: 175, yaw: -0.25, pitch: 0.4);
+    cam.glideTo(target: const V3(-4, 20, 8), dist: 175, yaw: -0.25, pitch: 0.4);
     setState(() => hl = 0);
   }
 

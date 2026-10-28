@@ -153,6 +153,39 @@ class RoomProject {
     return Act(false, msg);
   }
 
+  /// Does the rough-in and the drywall in one go, so a person can start straight at the wiring.
+  void fastForward() {
+    for (final o in orders) {
+      final s = slotById(o.slot);
+      boxes[o.slot] = s.role == 'fan' ? 'fan' : (s.ceiling ? 'ceiling' : 'wall');
+    }
+    holes.addAll([for (var i = 0; i < kStudX.length; i++) i]);
+    cabled.addAll(needed);
+    for (final e in kGoodSheetEdges) {
+      final sh = SheetState()
+        ..placed = true
+        ..painted = true
+        ..sanded = true;
+      for (final st in studsUnder(e)) {
+        for (var r = 0; r < screwRows; r++) {
+          sh.screws.add(st * 10 + r);
+        }
+      }
+      for (final slot in needed) {
+        final s = slotById(slot);
+        if (!s.ceiling && s.pos.x >= e && s.pos.x <= e + 48) sh.cutouts.add(slot);
+      }
+      sheets[e] = sh;
+    }
+    for (final sm in seams) {
+      sm
+        ..taped = true
+        ..coats = 3
+        ..dry = true
+        ..sanded = true;
+    }
+  }
+
   // ───────────────────────── Phase 1: rough-in ─────────────────────────
 
   /// Studs the cable has to pass through to get from the panel to [slot].

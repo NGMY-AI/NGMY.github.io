@@ -86,6 +86,10 @@ Scene3D buildRoomScene(RoomProject p, RoomView v) {
   b.box(const V3(-72.0, 6, 55), const V3(0.4, 36, 34), const Color(0xFF9BD3F5), shine: 0.5);
   b.box(const V3(-71.7, 6, 55), const V3(0.3, 38, 2), const Color(0xFFF4F1EA));
   b.box(const V3(-71.7, 6, 55), const V3(0.3, 2, 36), const Color(0xFFF4F1EA));
+  // The wall on the other side, with a door.
+  b.box(const V3(72.8, 0, 55), const V3(1.2, 96, 112), const Color(0xFFD9D3C5), split: 3);
+  b.box(const V3(72.0, -17, 70), const V3(0.5, 62, 30), const Color(0xFF8B5E34), shine: 0.15);
+  b.box(const V3(71.6, -22, 62), const V3(0.4, 3, 3), const Color(0xFFE5C07B), shine: 0.8);
   // The ceiling is seen through, with the joists above it.
   b.id = 0;
   b.alpha = 0.1;
