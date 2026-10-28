@@ -627,6 +627,164 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     _say('Looking up at the ceiling from the floor. Drag to look round.', ok: true);
   }
 
+  // ── Jobs round the neighbourhood: houses and street lights that break, goods to carry, houses to sell ──
+
+  /// The wiring job for a house with no power: the same wiring bench as the jobs, in that house.
+  Future<void> _houseJob(CityInterior inn) async {
+    final f = inn.door;
+    final p = RoomProject(seed: f.id * 13 + 5, kind: 0)..fastForward();
+    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => NgmyRoomProjectPage(project: p)));
+    if (!mounted) return;
+    if (p.devicesDone) {
+      room.darkHouses.remove(f.id);
+      inn.dark = false;
+      comm?.points += 20;
+      inn.build(comm);
+      setState(_rebuild);
+      _say('The power is back in the house: you fixed the wiring the right way. +20 points.', ok: true);
+    } else {
+      _say('The wiring is not finished yet. Walk back onto the red mat at the panel to try again.', ok: false);
+    }
+  }
+
+  /// A street light that went out: the lamp wiring lesson, then the light comes back.
+  Future<void> _fixLamp(Furn f) async {
+    final st = WiringState();
+    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ElectricalLessonPage(id: 'light', state: st)));
+    if (!mounted) return;
+    if (st.stage >= 2 && evaluateWiring(electricalLesson('light'), st).ok) {
+      room.brokenLamps.remove(f.id);
+      comm?.points += 8;
+      setState(_rebuild);
+      _say('The street light is on again. You wired it correctly: black to black, white to white, ground to ground. +8 points.', ok: true);
+    } else {
+      _say('The light is still out: finish the wiring and fit the cover, then it comes on.', ok: false);
+    }
+  }
+
+  void _pickUp(Furn f) {
+    room.furn.remove(f);
+    _carrying = 'crate';
+    setState(_rebuild);
+    _say('You picked up a crate. Carry it to the shop and walk onto the green mat by the counter to sell it at the market.', ok: true);
+    conBeep(700, ms: 60);
+  }
+
+  void _drop() {
+    final w = walker;
+    if (w == null) return;
+    room.add('crate', x: w.x + math.sin(w.yaw) * 34, z: w.z + math.cos(w.yaw) * 34);
+    _carrying = null;
+    setState(_rebuild);
+    _say('You put the crate down.', ok: true);
+  }
+
+  /// The town's things break from time to time, and the neighbours ring.
+  void _neighbourEvents() {
+    final city = home.rooms.firstWhere((r) => !r.indoor);
+    final houses = [for (final f in city.furn) if ((f.kind == 'house2' || f.kind == 'bighouse') && !city.darkHouses.contains(f.id)) f];
+    if (city.darkHouses.length < 2 && houses.isNotEmpty) {
+      final f = houses[(_beat * 7 + 3) % houses.length];
+      city.darkHouses.add(f.id);
+      _ringNeighbour(f);
+    }
+    final lamps = [for (final f in city.furn) if ((f.kind == 'pole' || f.kind == 'lamppost') && !city.brokenLamps.contains(f.id)) f];
+    if (city.brokenLamps.length < 3 && lamps.isNotEmpty && _beat % 90 == 0) {
+      city.brokenLamps.add(lamps[(_beat * 5) % lamps.length].id);
+      _say('⚡ A street light went out in the town. Find it (it is dark, with a red sign) and fix it.', ok: false);
+    }
+    if (!room.indoor && inner == null) setState(_rebuild);
+  }
+
+  Future<void> _neighbourText(_NCall c) {
+    final f = c.furn;
+    Widget bubble(String text, {bool mine = false}) => Align(
+          alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            constraints: const BoxConstraints(maxWidth: 290),
+            decoration: BoxDecoration(color: mine ? const Color(0xFF2563EB) : const Color(0xFF374151), borderRadius: BorderRadius.circular(18)),
+            child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.3)),
+          ),
+        );
+    return showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF111827),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Row(children: [
+              CircleAvatar(radius: 18, backgroundColor: Color(0xFFF59E0B), child: Text('⚡')),
+              SizedBox(width: 10),
+              Text('Your neighbour', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
+              Spacer(),
+              Text('Messages', style: TextStyle(color: Colors.white38, fontSize: 12)),
+            ]),
+            const Divider(color: Colors.white12),
+            bubble('Hello! All the lights went out in ${c.name}. The power is off in the whole house.'),
+            bubble('Could you check the breaker panel inside and fix the wiring? Switch the power off before you touch anything.'),
+            bubble('I will pay you 20 points. Thank you!'),
+            bubble('I am on my way.', mine: true),
+            const SizedBox(height: 6),
+            Wrap(spacing: 10, runSpacing: 8, children: [
+              FilledButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  if (!room.indoor) cam.glideTo(target: V3(f.x, 40, f.z), dist: 260);
+                  _say('The dark house with the red sign is the one. Walk to its front door and in.', ok: true);
+                },
+                icon: const Icon(Icons.place_rounded),
+                label: const Text('Show me the house'),
+              ),
+              FilledButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  final w = walker;
+                  if (w != null && !room.indoor) {
+                    final k = kFurnKinds[f.kind]!;
+                    final out = rotY(V3(0, 0, k.d / 2 + 60), f.rot * math.pi / 2);
+                    w
+                      ..x = f.x + out.x
+                      ..z = f.z + out.z
+                      ..target = null;
+                    cam.glideTo(target: V3(w.x, 30, w.z), dist: 170);
+                    if (!steer) _startSteer();
+                  }
+                  _say('You are at the house. Walk in through the door, then onto the red mat at the breaker panel.', ok: true);
+                },
+                icon: const Icon(Icons.directions_walk_rounded),
+                label: const Text('Take me there'),
+              ),
+            ]),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  /// Sell a building, a billboard or a crate you put in the town, for points.
+  void _sell() {
+    final f = room.furnById(selFurn);
+    if (f == null) return;
+    const prices = {'house2': 40, 'bighouse': 80, 'shop': 70, 'billboard': 15, 'crate': 4, 'car': 25, 'tree': 5, 'bench': 4};
+    final p = prices[f.kind];
+    if (p == null) {
+      _say('This cannot be sold.', ok: false);
+      return;
+    }
+    room.furn.remove(f);
+    room.darkHouses.remove(f.id);
+    room.brokenLamps.remove(f.id);
+    selFurn = 0;
+    comm?.points += p;
+    setState(_rebuild);
+    _say('Sold for $p points.', ok: true);
+  }
+
   /// The city's own services (calls, people, the hospital, the shop), opened over the city.
   Future<void> _citySheet(String tab) async {
     await showModalBottomSheet<void>(
@@ -1060,6 +1218,10 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   double _padW = 400;
   bool _fullHide = false;
 
+  /// What the person carries (a crate to sell at the market), and the neighbour who is calling about a house with no power.
+  String? _carrying;
+  _NCall? _nCall;
+
   void _startSteer() {
     if (room.indoor) return;
     walker ??= WorldWalker(room, x: 0, z: 24);
@@ -1107,10 +1269,16 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (!moved) w.walking = false;
     if (moved || w.lift > 0) cam.glideTo(target: V3(w.x, 30, w.z));
     if (inn != null) {
+      inn.carrying = _carrying;
       final said = inn.update(comm);
+      _carrying = inn.carrying;
       if (said != null) {
         _say(said);
         setState(_rebuild);
+      }
+      if (inn.jobRequested) {
+        inn.jobRequested = false;
+        _houseJob(inn);
       }
       if (inn.leaving) _leaveBuilding();
       return;
@@ -1123,9 +1291,10 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         _say('You are inside the living room. Use Go outside to come back out.');
         return;
       }
-      for (final f in room.furn.where((f) => f.kind == 'hospital' || f.kind == 'shop')) {
+      for (final f in room.furn.where((f) => kEnterable.contains(f.kind))) {
         final k = kFurnKinds[f.kind]!;
-        if ((w.x - f.x).abs() < 20 && (w.z - (f.z + k.d / 2 + 10)).abs() < 12 && w.yaw.abs() > 2.0) {
+        final dv = rotY(V3(0, 0, k.d / 2 + 10), f.rot * math.pi / 2);
+        if ((w.x - (f.x + dv.x)).abs() < 22 && (w.z - (f.z + dv.z)).abs() < 16) {
           _enterBuilding(f);
           return;
         }
@@ -1137,7 +1306,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   void _enterBuilding(Furn f) {
     _inX = 0;
     _inZ = 0;
-    final inn = CityInterior(f.kind, f)..build(comm);
+    final inn = CityInterior(f.kind, f, dark: room.darkHouses.contains(f.id))
+      ..carrying = _carrying
+      ..build(comm);
     inner = inn;
     _act = null;
     cam
@@ -1158,12 +1329,14 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (inn == null || w == null) return;
     final f = inn.door;
     final k = kFurnKinds[f.kind]!;
+    _carrying = inn.carrying;
     inner = null;
     _inX = 0;
     _inZ = 0;
+    final out = rotY(V3(0, 0, k.d / 2 + 30), f.rot * math.pi / 2);
     w
-      ..x = f.x
-      ..z = f.z + k.d / 2 + 28
+      ..x = f.x + out.x
+      ..z = f.z + out.z
       ..yaw = 0
       ..target = null
       ..refresh();
@@ -1180,9 +1353,21 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (drv != null) {
       act = (label: '🚪 Get out', go: _getOut);
     } else {
+      if (_carrying != null) {
+        act = (label: '⬇ Put the crate down', go: _drop);
+      }
       for (final f in room.furn) {
         final d = math.sqrt(math.pow(w.x - f.x, 2) + math.pow(w.z - f.z, 2));
         final name = kFurnKinds[f.kind]!.name.toLowerCase();
+        if (act != null) break;
+        if (f.kind == 'crate' && d < 46) {
+          act = (label: '📦 Pick up the crate', go: () => _pickUp(f));
+          break;
+        }
+        if ((f.kind == 'pole' || f.kind == 'lamppost') && room.brokenLamps.contains(f.id) && d < 60) {
+          act = (label: '🔧 Fix the street light', go: () => _fixLamp(f));
+          break;
+        }
         if (kAnimalKinds.contains(f.kind) && d < 36) {
           act = (label: '🍎 Feed the $name', go: () => _feed(f));
           break;
@@ -1309,6 +1494,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (cm == null || !mounted) return;
     if (tour == null) cm.advance(1, home);
     if (++_beat % 8 == 0) cm.save(home);
+    if (_beat % 45 == 20 && !isLesson) _neighbourEvents();
     for (final c in cm.calls) {
       if (_knownCalls.add(c.id)) _ring(c);
     }
@@ -1320,6 +1506,17 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   /// The phone rings: a two-note ring and a buzz, and a call banner to answer.
   void _ring(HelpCall c) {
     _ringing = c;
+    _nCall = null;
+    _startRingTimer();
+  }
+
+  void _ringNeighbour(Furn f) {
+    _ringing = null;
+    _nCall = _NCall(f, f.kind == 'bighouse' ? 'the big house' : 'the house');
+    _startRingTimer();
+  }
+
+  void _startRingTimer() {
     _ringTicks = 0;
     _ringTimer?.cancel();
     _ringTimer = Timer.periodic(const Duration(milliseconds: 380), (_) {
@@ -1341,13 +1538,17 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     _ringTimer?.cancel();
     _ringTimer = null;
     if (!mounted) return;
-    setState(() => _ringing = null);
+    setState(() {
+      _ringing = null;
+      _nCall = null;
+    });
   }
 
   Widget? _pad() {
     final controls = steer && !room.indoor;
     final call = _ringing;
-    if (!controls && call == null) return null;
+    final nc = _nCall;
+    if (!controls && call == null && nc == null) return null;
     final screenW = _padW;
     Widget btn(String label, VoidCallback onTap, {bool on = false, Color col = const Color(0xFF4ADE80)}) => GestureDetector(
           onTapDown: (_) => onTap(),
@@ -1361,6 +1562,35 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     return SizedBox(
       width: screenW,
       child: Column(mainAxisSize: MainAxisSize.min, children: [
+        if (nc != null)
+          Container(
+            width: math.min(screenW - 28, 330),
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
+            decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1F2937), Color(0xFF0B1220)]), borderRadius: BorderRadius.circular(30), border: Border.all(color: Colors.white24, width: 2), boxShadow: [BoxShadow(color: const Color(0xFFFACC15).withValues(alpha: 0.35), blurRadius: 24)]),
+            child: Row(children: [
+              const CircleAvatar(radius: 26, backgroundColor: Color(0xFFF59E0B), child: Text('⚡', style: TextStyle(fontSize: 24))),
+              const SizedBox(width: 12),
+              const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                Text('incoming call', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                Text('Your neighbour', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
+                Text('No power at a house', style: TextStyle(color: Colors.white38, fontSize: 11.5)),
+              ])),
+              GestureDetector(
+                onTapDown: (_) => _stopRing(),
+                child: Container(width: 52, height: 52, decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle), child: const Icon(Icons.call_end_rounded, color: Colors.white)),
+              ),
+              const SizedBox(width: 14),
+              GestureDetector(
+                onTapDown: (_) {
+                  final c = nc;
+                  _stopRing();
+                  _neighbourText(c);
+                },
+                child: Container(width: 52, height: 52, decoration: const BoxDecoration(color: Color(0xFF22C55E), shape: BoxShape.circle), child: const Icon(Icons.call_rounded, color: Colors.white)),
+              ),
+            ]),
+          ),
         if (call != null)
           Container(
             width: math.min(screenW - 28, 330),
@@ -1673,6 +1903,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
               _arrow(Icons.arrow_downward_rounded, () => _move(0, 6)),
               _arrow(Icons.rotate_90_degrees_cw_rounded, _turn),
               _arrow(Icons.palette_rounded, _recolor),
+              if (!room.indoor) _arrow(Icons.sell_rounded, _sell),
               _arrow(Icons.delete_outline_rounded, _remove),
             ])
           else
@@ -1782,7 +2013,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         good: good,
         messageTop: (showMap && !isLesson && !full) ? 104 : 10,
         layerOn: (l) => l <= 5,
-        dynamicPolys: (_) => inner != null ? inner!.dynamicPolys(now, playerStyle) : [...homeDynamic(room, now, person: _pose(), personStyle: playerStyle, residents: _figs, mode: mode, drive: _driveNow()), if (!room.indoor) ...trafficPolys(now)],
+        dynamicPolys: (_) => inner != null ? inner!.dynamicPolys(now, playerStyle) : [...homeDynamic(room, now, person: _pose(), personStyle: playerStyle, residents: _figs, mode: mode, drive: _driveNow(), carrying: _carrying != null), if (!room.indoor) ...trafficPolys(now)],
         dynamicScreens: (_) => (inner == null && !room.indoor) ? trafficScreens(now) : const [],
         bottom: _pad(),
         topLeft: [
@@ -2028,4 +2259,11 @@ class _StickState extends State<_Stick> {
       ),
     );
   }
+}
+
+/// A neighbour who rang about a house with no power.
+class _NCall {
+  _NCall(this.furn, this.name);
+  final Furn furn;
+  final String name;
 }

@@ -701,6 +701,47 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
     b.polys.addAll(transformPolys(fb.polys, ry: f.rot * math.pi / 2, t: V3(f.x, 0, f.z)));
     info[idHFurn + f.id] = ObjInfo(k.name, f.kind == 'hospital' ? 'The hospital: tap it to see the beds and treat the patients.' : (f.kind == 'shop' ? 'The shop: tap it to buy food and medicine.' : 'Move it with the arrow buttons, turn it, change its colour or take it out.'), V3(f.x, 12, f.z), 140);
   }
+  // The street lights: bright when they work, dark and with a warning when they are broken. And the wires between the poles.
+  final poles = <Furn>[];
+  for (final f in r.furn.where((f) => f.kind == 'pole' || f.kind == 'lamppost')) {
+    final broken = r.brokenLamps.contains(f.id);
+    final top = f.kind == 'pole' ? V3(f.x + 20, 86, f.z) : V3(f.x, 55, f.z);
+    final lb = MeshBuilder()
+      ..id = 0
+      ..order = 2;
+    lb.ball(top, f.kind == 'pole' ? 4.6 : 4.2, broken ? const Color(0xFF374151) : const Color(0xFFFFF1A8), shine: broken ? 0.1 : 0.0, lat: 3, lon: 6);
+    if (!broken) {
+      lb.alpha = 0.2;
+      lb.ball(top, 10, const Color(0xFFFFF1A8), shine: 0, lat: 2, lon: 6);
+      lb.alpha = 1;
+    }
+    b.polys.addAll(lb.polys);
+    if (broken) labels.add(Label3D(top + const V3(0, 14, 0), '⚡ Light out: fix it', const Color(0xFFDC2626)));
+    if (f.kind == 'pole') poles.add(f);
+  }
+  poles.sort((a, b) => a.x.compareTo(b.x));
+  for (var i = 0; i + 1 < poles.length; i++) {
+    final p = poles[i], q = poles[i + 1];
+    if ((p.z - q.z).abs() > 1 || (q.x - p.x).abs() > 170) continue;
+    final wb = MeshBuilder()
+      ..id = 0
+      ..order = 2;
+    for (final dz in const [-20.0, 0.0, 20.0]) {
+      wb.tube([V3(p.x + dz, 121, p.z), V3((p.x + q.x) / 2 + dz, 117, p.z), V3(q.x + dz, 121, p.z)], 0.35, const Color(0xFF111827), shine: 0, sides: 4, joints: false);
+    }
+    b.polys.addAll(wb.polys);
+  }
+  for (final f in r.furn.where((f) => r.darkHouses.contains(f.id))) {
+    final k = kFurnKinds[f.kind]!;
+    labels.add(Label3D(V3(f.x, f.kind == 'bighouse' ? 120 : 82, f.z), '⚡ No power: fix the wiring', const Color(0xFFDC2626)));
+    final dark = MeshBuilder()
+      ..id = 0
+      ..order = 2;
+    dark.alpha = 0.45;
+    dark.box(V3(f.x, k.d > 0 ? 30 : 30, f.z), V3(k.w + 2, 60, k.d + 2), const Color(0xFF0B1220));
+    dark.alpha = 1;
+    b.polys.addAll(dark.polys);
+  }
   // The ads: on every billboard, and on two big TVs in the front of every big house.
   final adScreens = <ScreenQuad>[];
   for (final f in r.furn.where((f) => f.kind == 'billboard' || f.kind == 'bighouse')) {
@@ -711,8 +752,8 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
       adScreens.add(ScreenQuad([w(-33, 62.5, 2), w(33, 62.5, 2), w(33, 31.5, 2), w(-33, 31.5, 2)], 0, (c, size, t) => paintCityAd(c, size, t, f.id), width: 960, height: 450, bias: 4, order: 2, twoSided: true, group: grp));
     } else {
       for (var k = 0; k < 2; k++) {
-        final cx = k == 0 ? -27.0 : 27.0;
-        adScreens.add(ScreenQuad([w(cx - 18, 66, 42.6), w(cx + 18, 66, 42.6), w(cx + 18, 40, 42.6), w(cx - 18, 40, 42.6)], 0, (c, size, t) => paintCityAd(c, size, t, f.id * 2 + k + 1), width: 720, height: 520, bias: 9, order: 2, group: grp));
+        final cx = k == 0 ? -40.0 : 40.0;
+        adScreens.add(ScreenQuad([w(cx - 26, 70, 60.7), w(cx + 26, 70, 60.7), w(cx + 26, 40, 60.7), w(cx - 26, 40, 60.7)], 0, (c, size, t) => paintCityAd(c, size, t, f.id * 2 + k + 1), width: 720, height: 520, bias: 9, order: 2, group: grp));
       }
     }
   }
@@ -736,11 +777,17 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
 }
 
 /// Things that move: the fan blades and the pictures on the TVs.
-List<Poly> homeDynamic(HRoom r, double t, {PersonPose? person, PersonStyle? personStyle, List<ResidentFigure> residents = const [], String mode = 'look', (String, double, double, double, int)? drive}) {
+List<Poly> homeDynamic(HRoom r, double t, {PersonPose? person, PersonStyle? personStyle, List<ResidentFigure> residents = const [], String mode = 'look', (String, double, double, double, int)? drive, bool carrying = false}) {
   final b = MeshBuilder();
   b.grouped = true;
   if (r.kind == 'outside') {
     if (person != null && person.room == r.id) _figure(b, person, t, personStyle ?? playerStyle, close: true);
+    if (carrying && person != null && person.room == r.id) {
+      // A crate carried in front of the person.
+      final cb = MeshBuilder()..id = 0;
+      cb.box(V3(person.x + math.sin(person.yaw) * 9, 46 + person.lift, person.z + math.cos(person.yaw) * 9), const V3(14, 11, 14), const Color(0xFFC49A62));
+      b.polys.addAll(cb.polys);
+    }
     if (drive != null) {
       // The vehicle you are driving: (kind, x, z, the way it faces, colour). Its front is its +x end.
       final cb = MeshBuilder()
@@ -763,7 +810,7 @@ List<Poly> homeDynamic(HRoom r, double t, {PersonPose? person, PersonStyle? pers
       b.polys.addAll(transformPolys(ab.polys, ry: yaw, t: V3(px, 0, pz)));
     }
     for (final f in residents.where((f) => f.room == r.id)) {
-      _figure(b, PersonPose(room: r.id, x: f.x, z: f.z, yaw: f.yaw), t, f.style, id: idHResident + f.id, tint: true);
+      _figure(b, PersonPose(room: r.id, x: f.x, z: f.z, yaw: f.yaw), t, f.style, id: idHResident + f.id, tint: f.style.shirt);
       _activityProps(b, f, t);
     }
     return b.polys;
@@ -915,8 +962,10 @@ void _building(MeshBuilder b, String kind, Color accent) {
 /// snap to the grid, neighbours always line up and the line carries on from one piece to the next.
 void _roadPiece(MeshBuilder b, String kind) {
   b.box(const V3(0, 0.3, 0), const V3(40, 0.6, 40), const Color(0xFF3F4450));
-  b.box(const V3(0, 0.62, 19.2), const V3(40, 0.12, 1.2), const Color(0xFF6B7280));
-  b.box(const V3(0, 0.62, -19.2), const V3(40, 0.12, 1.2), const Color(0xFF6B7280));
+  if (kind != 'road') {
+    b.box(const V3(0, 0.62, 19.2), const V3(40, 0.12, 1.2), const Color(0xFF6B7280));
+    b.box(const V3(0, 0.62, -19.2), const V3(40, 0.12, 1.2), const Color(0xFF6B7280));
+  }
   final joins = switch (kind) {
     'roadturn' => const [(1.0, 0.0), (0.0, 1.0)],
     'roadtee' => const [(1.0, 0.0), (-1.0, 0.0), (0.0, 1.0)],
@@ -924,6 +973,10 @@ void _roadPiece(MeshBuilder b, String kind) {
     _ => const [(1.0, 0.0), (-1.0, 0.0)],
   };
   const line = Color(0xFFF3E7A1);
+  if (kind == 'road') {
+    b.box(const V3(0, 0.7, 0), const V3(14, 0.2, 1.6), line);
+    return;
+  }
   for (final (ex, ez) in joins) {
     for (var i = 0; i < 2; i++) {
       final at = 5.0 + i * 10.5;
@@ -1056,17 +1109,17 @@ void _activityProps(MeshBuilder b, ResidentFigure f, double t) {
 }
 
 /// Draws a person (the real character when it has been read) for scenes made in other files.
-void drawPerson(MeshBuilder b, PersonPose p, double t, PersonStyle style, {int id = 0, bool close = false}) => _figure(b, p, t, style, id: id, close: close);
+void drawPerson(MeshBuilder b, PersonPose p, double t, PersonStyle style, {int id = 0, bool close = false, Color? tint}) => _figure(b, p, t, style, id: id, close: close, tint: tint);
 
 /// A person of the house: the real character from its .glb file when that has been read, else a plain figure meanwhile.
-void _figure(MeshBuilder b, PersonPose p, double t, PersonStyle style, {int id = 0, bool close = false, bool tint = false}) {
+void _figure(MeshBuilder b, PersonPose p, double t, PersonStyle style, {int id = 0, bool close = false, Color? tint}) {
   final av = GlbAvatar.ready(style.avatar);
   if (av == null) {
     final plain = style.avatar == 'xbot' ? const PersonStyle() : PersonStyle(skin: style.skin, hair: style.hair, shirt: style.shirt, pants: style.pants);
     _person(b, p, t, style: plain, id: id);
     return;
   }
-  b.polys.addAll(av.polys(time: t, x: p.x, z: p.z, yaw: p.yaw, walking: p.walking, running: p.running, lift: p.lift, walkedUnits: p.walking && !p.running && p.phase > 0 ? p.phase * 12 : null, id: id, close: close, tint: tint ? style.shirt : null));
+  b.polys.addAll(av.polys(time: t, x: p.x, z: p.z, yaw: p.yaw, walking: p.walking, running: p.running, lift: p.lift, walkedUnits: p.walking && !p.running && p.phase > 0 ? p.phase * 12 : null, id: id, close: close, tint: tint));
 }
 
 /// An adult person for the house tour, about 5 feet 8 inches tall, made of rounded parts (limbs with real joints, an
@@ -1284,9 +1337,8 @@ void _furniture(MeshBuilder b, String kind, Color c) {
       b.box(const V3(0, 6, 0), const V3(64, 2, 1.2), dark);
       b.box(const V3(0, 13, 0), const V3(64, 2, 1.2), dark);
     case 'lamppost':
-      b.cyl(const V3(0, 0, 0), const V3(0, 52, 0), 1.3, const Color(0xFF2B2D33), sides: 8);
-      b.cyl(const V3(0, 0, 0), const V3(0, 3, 0), 3.5, const Color(0xFF2B2D33), sides: 8);
-      b.ball(const V3(0, 55, 0), 4, const Color(0xFFFFF1A8), lat: 4, lon: 8);
+      b.cyl(const V3(0, 0, 0), const V3(0, 52, 0), 1.3, const Color(0xFF2B2D33), sides: 5);
+      b.cyl(const V3(0, 0, 0), const V3(0, 3, 0), 3.5, const Color(0xFF2B2D33), sides: 6);
     case 'bench':
       b.box(const V3(0, 12, 0), const V3(44, 2, 14), c, shine: 0.1);
       b.box(const V3(0, 20, -6), const V3(44, 10, 2), c, shine: 0.1);
@@ -1305,7 +1357,13 @@ void _furniture(MeshBuilder b, String kind, Color c) {
     case 'road' || 'roadturn' || 'roadtee' || 'roadcross':
       _roadPiece(b, kind);
     case 'house2' || 'shop' || 'hospital' || 'firestation' || 'school':
-      _building(b, kind, c);
+      // Every building is half as big again as it was drawn, so there is room for the people to walk round it.
+      final m0 = MeshBuilder()
+        ..id = b.id
+        ..grouped = true
+        ..order = b.order;
+      _building(m0, kind, c);
+      b.polys.addAll(_stretch(m0.polys, const V3(1.5, 1.35, 1.5), V3.zero));
     case 'bighouse':
       // The same house, bigger: wider, taller and deeper. Its TVs are added with the moving screens.
       final m = MeshBuilder()
@@ -1313,7 +1371,21 @@ void _furniture(MeshBuilder b, String kind, Color c) {
         ..grouped = true
         ..order = b.order;
       _building(m, 'house2', c);
-      b.polys.addAll(_stretch(m.polys, const V3(1.6, 1.5, 1.4), V3.zero));
+      b.polys.addAll(_stretch(m.polys, const V3(2.2, 1.8, 2.0), V3.zero));
+    case 'pole':
+      // A wooden electric pole with a cross arm, a transformer and a street light on an arm (the light itself is added with the scene).
+      b.cyl(const V3(0, 0, 0), const V3(0, 124, 0), 2.6, const Color(0xFF6B4A32), r1: 2.0, sides: 5);
+      b.box(const V3(0, 116, 0), const V3(46, 3, 3), const Color(0xFF5E4630));
+      for (final x in const [-20.0, 0.0, 20.0]) {
+        b.cyl(V3(x, 116, 0), V3(x, 121, 0), 1.1, const Color(0xFFF1F5F9), sides: 4);
+      }
+      b.cyl(const V3(4, 96, 0), const V3(4, 108, 0), 5.5, const Color(0xFF6B7280), sides: 6);
+      b.box(const V3(12, 86, 0), const V3(20, 2, 2), const Color(0xFF3F3F46));
+    case 'crate':
+      b.box(const V3(0, 7, 0), const V3(26, 14, 26), const Color(0xFFC49A62), shine: 0.05);
+      b.box(const V3(0, 14.4, 0), const V3(27, 1.4, 27), const Color(0xFF8B5E34));
+      b.ball(const V3(-5, 17, 0), 3.4, const Color(0xFFEF4444), shine: 0.3, lat: 3, lon: 5);
+      b.ball(const V3(5, 17, 2), 3.4, const Color(0xFFF59E0B), shine: 0.3, lat: 3, lon: 5);
     case 'billboard':
       {
         b.startGroup();

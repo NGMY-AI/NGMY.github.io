@@ -261,4 +261,111 @@ void main() {
     expect(polys, isNotEmpty);
     GlbAvatar.enabled = true;
   });
+
+  test('every building can be entered; the school, the fire station and the houses have their own jobs; the market buys what you carry', () {
+    expect(kEnterable, containsAll(['hospital', 'shop', 'school', 'firestation', 'house2', 'bighouse']));
+    final home = HomeProject(seed: 3);
+    final cm = Community(houseSeed: 3, seed: 3);
+    final city = home.rooms[11];
+    Furn of(String k) => city.furn.firstWhere((f) => f.kind == k);
+    // The school: walk onto the mat and teach.
+    final school = CityInterior('school', of('school'))..build(cm);
+    final p0 = cm.points;
+    school.walker
+      ..x = 0
+      ..z = 80;
+    expect(school.update(cm), contains('taught'));
+    expect(cm.points, p0 + 3);
+    // The fire station.
+    final fire = CityInterior('firestation', of('firestation'))..build(cm);
+    fire.walker
+      ..x = -60
+      ..z = 130;
+    expect(fire.update(cm), contains('equipment'));
+    // A house with no power asks for the wiring job at its panel; one with power does not.
+    final dark = CityInterior('house2', of('house2'), dark: true)..build(cm);
+    dark.walker
+      ..x = -100
+      ..z = 100;
+    expect(dark.update(cm), isNotNull);
+    expect(dark.jobRequested, isTrue);
+    final fine = CityInterior('house2', of('house2'))..build(cm);
+    fine.walker
+      ..x = -100
+      ..z = 100;
+    expect(fine.update(cm), contains('every breaker is on'));
+    expect(fine.jobRequested, isFalse);
+    // The market stall buys a crate you carry, and only then.
+    final shop = CityInterior('shop', of('shop'))..build(cm);
+    shop.walker
+      ..x = 0
+      ..z = 84;
+    expect(shop.update(cm), contains('Bring goods'));
+    shop.walker
+      ..x = 0
+      ..z = 200;
+    shop.update(cm);
+    shop.carrying = 'crate';
+    final before = cm.points;
+    shop.walker
+      ..x = 0
+      ..z = 84;
+    expect(shop.update(cm), contains('sold'));
+    expect(cm.points, before + 6);
+    expect(shop.carrying, isNull);
+  });
+
+  test('the town is bigger and more spread out: big buildings, houses well back from the streets, poles and lights, crates to carry', () {
+    final city = HomeProject(seed: 4).rooms[11];
+    expect(kFurnKinds['hospital']!.w, greaterThanOrEqualTo(160));
+    expect(kFurnKinds['house2']!.w, greaterThanOrEqualTo(100));
+    final roads = city.furn.where((f) => kRoadKinds.contains(f.kind)).toList();
+    for (final f in city.furn.where((f) => kBuildingKinds.contains(f.kind) || f.kind == 'bighouse')) {
+      final k = kFurnKinds[f.kind]!;
+      for (final r in roads) {
+        final gapX = (f.x - r.x).abs() - k.w / 2 - 20, gapZ = (f.z - r.z).abs() - k.d / 2 - 20;
+        expect(gapX > 60 || gapZ > 60, isTrue, reason: '${f.kind} at (${f.x}, ${f.z}) is too close to the road at (${r.x}, ${r.z})');
+      }
+    }
+    expect(city.furn.where((f) => f.kind == 'house2' || f.kind == 'bighouse').length, greaterThanOrEqualTo(14));
+    expect(city.furn.where((f) => f.kind == 'pole').length, greaterThanOrEqualTo(10));
+    expect(city.furn.where((f) => f.kind == 'lamppost').length, greaterThanOrEqualTo(8));
+    expect(city.furn.where((f) => f.kind == 'crate').length, greaterThanOrEqualTo(4));
+    // A broken street light and a house with no power are marked in the scene.
+    city.brokenLamps.add(city.furn.firstWhere((f) => f.kind == 'pole').id);
+    city.darkHouses.add(city.furn.firstWhere((f) => f.kind == 'house2').id);
+    final sc = buildHomeRoom(city);
+    expect(sc.labels.any((l) => l.text.contains('Light out')), isTrue);
+    expect(sc.labels.any((l) => l.text.contains('No power')), isTrue);
+  });
+
+  testWidgets('in full screen, double tapping the buttons hides them, and double tapping where they were brings them back', (t) async {
+    t.view.physicalSize = const Size(900, 1600);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    HomeProject.session = HomeProject(seed: 33)..current = 11;
+    await t.pumpWidget(const MaterialApp(home: NgmyHousePage()));
+    await t.pump(const Duration(milliseconds: 600));
+    final row = find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.right).first;
+    await t.scrollUntilVisible(find.text('⛶ Full screen'), 120, scrollable: row);
+    await t.drag(row, const Offset(-120, 0));
+    await t.pump(const Duration(milliseconds: 300));
+    await t.tap(find.text('⛶ Full screen'));
+    await t.pump(const Duration(milliseconds: 500));
+    final exit = find.byIcon(Icons.fullscreen_exit_rounded);
+    expect(exit, findsOneWidget);
+    final at = t.getCenter(exit);
+    await t.tapAt(at);
+    await t.pump(const Duration(milliseconds: 60));
+    await t.tapAt(at);
+    await t.pump(const Duration(milliseconds: 600));
+    expect(find.byIcon(Icons.fullscreen_exit_rounded), findsNothing, reason: 'two quick taps hide the buttons');
+    expect(find.byWidgetPredicate((w) => w.runtimeType.toString() == '_Stick'), findsOneWidget, reason: 'the game and its controls stay');
+    await t.tapAt(at);
+    await t.pump(const Duration(milliseconds: 60));
+    await t.tapAt(at);
+    await t.pump(const Duration(milliseconds: 600));
+    expect(find.byIcon(Icons.fullscreen_exit_rounded), findsOneWidget, reason: 'two quick taps where they were bring them back');
+    await t.pump(const Duration(seconds: 10));
+  });
 }

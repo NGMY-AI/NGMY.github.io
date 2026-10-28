@@ -61,13 +61,15 @@ const Map<String, FurnKind> kFurnKinds = {
   'roadturn': FurnKind('Road corner', '↪️', 40, 40),
   'roadtee': FurnKind('Road T-junction', '⊤', 40, 40),
   'roadcross': FurnKind('Crossroads', '✚', 40, 40),
-  'house2': FurnKind('House', '🏠', 72, 60),
-  'bighouse': FurnKind('Big house', '🏢', 115, 84),
+  'house2': FurnKind('House', '🏠', 108, 90),
+  'bighouse': FurnKind('Big house', '🏢', 158, 120),
+  'pole': FurnKind('Electric pole', '🔌', 10, 10),
+  'crate': FurnKind('Crate', '📦', 28, 28),
   'billboard': FurnKind('Billboard', '🪧', 72, 10),
-  'shop': FurnKind('Shop', '🏪', 84, 60),
-  'hospital': FurnKind('Hospital', '🏥', 110, 70),
-  'firestation': FurnKind('Fire station', '🚒', 90, 64),
-  'school': FurnKind('School', '🏫', 124, 70),
+  'shop': FurnKind('Shop', '🏪', 126, 90),
+  'hospital': FurnKind('Hospital', '🏥', 165, 105),
+  'firestation': FurnKind('Fire station', '🚒', 135, 96),
+  'school': FurnKind('School', '🏫', 186, 105),
   'firetruck': FurnKind('Fire truck', '🚒', 96, 40),
   'ambulance': FurnKind('Ambulance', '🚑', 84, 40),
   'dog': FurnKind('Dog', '🐕', 22, 10),
@@ -267,6 +269,10 @@ class HRoom {
 
   /// The hall has a second TV, on the other end wall.
   String? wallTv2;
+
+  /// The city's street lights and houses that are broken just now (the number of the lamp post or house in the list of things), for the jobs round the neighbourhood.
+  final Set<int> brokenLamps = {};
+  final Set<int> darkHouses = {};
 
   /// A lesson room is big and nearly empty, so the outlets and switches are in the open and any TV fits. Which wall the TV hangs on there: back, left or right.
   bool big = false;
@@ -469,76 +475,76 @@ class HomeProject {
         r.add('rug', x: 0, z: 62).rot = 0;
         r.add('plant', x: r.w / 2 - 12, z: r.d - 12);
       case 'outside':
-        // The house is at the back (z 0 and less); the lane runs from the crossroads up to the front path.
-        for (var x = -320.0; x <= 320; x += kRoadGrid) {
-          r.add(x == 0 ? 'roadcross' : 'road', x: x, z: 360);
+        // The house is at the back (z 0 and less). Two streets run right across the town and a lane joins them to the house.
+        // Everything stands well back from the streets (more than a hundred units), so there is room to walk beside the road.
+        const z1 = 420.0, z2 = 860.0;
+        for (var x = -780.0; x <= 780; x += kRoadGrid) {
+          r.add(x.abs() < 1 ? 'roadcross' : 'road', x: x, z: z1);
+          r.add(x.abs() < 1 ? 'roadcross' : 'road', x: x, z: z2);
         }
-        for (var z = 320.0; z >= 160; z -= kRoadGrid) {
+        for (var z = 200.0; z <= 820; z += kRoadGrid) {
+          if ((z - z1).abs() < 1 || (z - z2).abs() < 1) continue;
           r.add('road', x: 0, z: z).rot = 1;
         }
-        r.add('shop', x: -200, z: 270);
-        r.add('hospital', x: 210, z: 275);
-        r.add('firestation', x: -340, z: 275);
-        r.add('school', x: 360, z: 275);
-        r.add('house2', x: -140, z: 150);
-        // A bigger town: more houses along the street, more trees and cars.
-        for (final (x, z) in const [(-260.0, 150.0), (-60.0, 150.0), (60.0, 150.0), (150.0, 150.0), (260.0, 150.0), (330.0, 150.0), (-330.0, 430.0), (-250.0, 430.0), (330.0, 430.0), (250.0, 430.0)]) {
-          r.add('house2', x: x, z: z);
+        bool clear(double x, double z, [double rx = 135, double rz = 115]) => !r.furn.any((f) => !kFlatKinds.contains(f.kind) && !kAnimalKinds.contains(f.kind) && (f.x - x).abs() < rx && (f.z - z).abs() < rz);
+        // The town centre, on the first street.
+        r.add('shop', x: -250, z: 225);
+        r.add('hospital', x: 250, z: 215);
+        r.add('firestation', x: -480, z: 225);
+        r.add('school', x: 520, z: 210);
+        // Big billboards, each with its own ad.
+        for (final (x, z) in const [(-660.0, 340.0), (-330.0, 340.0), (330.0, 340.0), (660.0, 340.0), (-660.0, 500.0), (-330.0, 500.0), (330.0, 500.0), (660.0, 500.0), (-660.0, 780.0), (-330.0, 780.0), (330.0, 780.0), (660.0, 780.0), (-500.0, 940.0), (500.0, 940.0)]) {
+          if (clear(x, z, 60, 40)) r.add('billboard', x: x, z: z);
         }
-        for (final (x, z) in const [(-330.0, 100.0), (330.0, 90.0), (-110.0, 60.0), (110.0, 40.0), (-360.0, 380.0), (360.0, 380.0)]) {
-          r.add(x.abs() > 300 ? 'pine' : 'tree', x: x, z: z);
+        // Houses over the whole land, well apart.
+        for (final (x, z) in const [(-700.0, 225.0), (-120.0, 160.0), (120.0, 160.0), (720.0, 225.0)]) {
+          if (clear(x, z)) r.add('house2', x: x, z: z);
         }
-        r.add('car', x: -250, z: 360);
-        r.add('car', x: 230, z: 360).rot = 2;
-        r.add('bench', x: -60, z: 195);
-        r.add('flowers', x: 90, z: 205);
-        // A whole town over nearly all the land: streets both ways, with houses along them.
-        for (var x = -600.0; x <= 600; x += kRoadGrid) {
-          if (x.abs() > 320) r.add('road', x: x, z: 360);
-          r.add(x.abs() < 1 ? 'roadcross' : 'road', x: x, z: 760);
-        }
-        for (var z = 400.0; z <= 720; z += kRoadGrid) {
-          r.add('road', x: 0, z: z).rot = 1;
-        }
-        bool clear(double x, double z) => !r.furn.any((f) => !kFlatKinds.contains(f.kind) && !kAnimalKinds.contains(f.kind) && (f.x - x).abs() < 100 && (f.z - z).abs() < 85);
-        // Billboards along the streets, each playing a different NGMY ad, and a few big houses.
-        for (final (x, z) in const [(-480.0, 318.0), (-120.0, 322.0), (120.0, 322.0), (480.0, 318.0), (-480.0, 410.0), (-250.0, 410.0), (250.0, 410.0), (480.0, 410.0), (-480.0, 718.0), (-200.0, 718.0), (200.0, 718.0), (480.0, 718.0), (-300.0, 806.0), (300.0, 806.0)]) {
-          if (clear(x, z)) r.add('billboard', x: x, z: z);
-        }
-        for (final (x, z) in const [(-480.0, 150.0), (480.0, 150.0), (-330.0, 470.0)]) {
-          if (clear(x, z)) r.add('bighouse', x: x, z: z);
-        }
-        for (final z in const [440.0, 690.0, 830.0, 1010.0, 1250.0]) {
-          for (var x = -780.0; x <= 780; x += 165) {
-            if (x.abs() < 60) continue;
-            if (clear(x, z)) r.add((x ~/ 165) % 3 == 0 ? 'bighouse' : 'house2', x: x, z: z);
+        for (final (z, step, big) in const [(600.0, 250.0, true), (730.0, 250.0, false), (1030.0, 250.0, true), (1210.0, 330.0, true)]) {
+          for (var x = -750.0; x <= 750; x += step) {
+            if (x.abs() < 100) continue;
+            if (clear(x, z)) r.add(big && (x ~/ step) % 2 == 0 ? 'bighouse' : 'house2', x: x, z: z);
           }
         }
-        r.add('car', x: -120, z: 360);
-        r.add('ambulance', x: 120, z: 360).rot = 2;
-        r.add('firetruck', x: -340, z: 318);
-        r.add('tree', x: -190, z: 60);
-        r.add('tree', x: 190, z: 90);
-        r.add('pine', x: 250, z: 40);
-        r.add('pine', x: -260, z: 30);
+        // Electric poles along the streets (the street lights hang on them) and street lamps between them.
+        for (var x = -720.0; x <= 720; x += 240) {
+          for (final z in const [z1 - 40, z2 - 40]) {
+            r.add('pole', x: x, z: z);
+          }
+          for (final z in const [z1 + 40, z2 + 40]) {
+            if (x.abs() > 30) r.add('lamppost', x: x + 120, z: z);
+          }
+        }
+        // Vehicles on the streets, trees, flowers and benches, and goods to carry to the market.
+        r.add('car', x: -120, z: z1);
+        r.add('ambulance', x: 120, z: z1).rot = 2;
+        r.add('firetruck', x: -480, z: z1 + 4);
+        r.add('car', x: 260, z: z2).rot = 2;
+        for (final (x, z) in const [(-210.0, 60.0), (210.0, 90.0), (-330.0, 120.0), (330.0, 60.0), (-110.0, 330.0), (110.0, 330.0), (-600.0, 380.0), (600.0, 380.0), (-560.0, 640.0), (560.0, 640.0), (-420.0, 1100.0), (420.0, 1100.0)]) {
+          r.add((x.abs() > 400 || z > 1000) ? 'pine' : 'tree', x: x, z: z);
+        }
         r.add('bush', x: -70, z: 20);
         r.add('bush', x: 70, z: 20);
         r.add('flowers', x: -30, z: 24);
         r.add('flowers', x: 30, z: 24);
-        r.add('lamppost', x: 40, z: 330);
-        r.add('lamppost', x: -80, z: 330);
-        r.add('bench', x: 120, z: 190);
-        r.add('pond', x: 160, z: 470);
+        r.add('flowers', x: 90, z: 205);
+        r.add('bench', x: -60, z: 195);
+        r.add('bench', x: 150, z: 300);
+        r.add('pond', x: -160, z: 1340);
         r.add('dog', x: 60, z: 60);
         r.add('cat', x: -50, z: 80);
-        r.add('cow', x: -300, z: 520);
-        r.add('cow', x: -240, z: 560);
-        r.add('sheep', x: -180, z: 540);
-        r.add('horse', x: 260, z: 560);
-        r.add('chicken', x: -100, z: 500);
-        r.add('fence', x: -270, z: 480);
-        r.add('fence', x: -206, z: 480);
-        r.add('fence', x: -142, z: 480);
+        // The farm, in the far corner.
+        r.add('cow', x: -640, z: 1280);
+        r.add('cow', x: -570, z: 1330);
+        r.add('sheep', x: -500, z: 1300);
+        r.add('horse', x: 560, z: 1330);
+        r.add('chicken', x: -440, z: 1340);
+        for (var i = 0; i < 4; i++) {
+          r.add('fence', x: -680 + i * 64.0, z: 1220);
+        }
+        for (final (x, z) in const [(-600.0, 1250.0), (-520.0, 1260.0), (-460.0, 1250.0), (520.0, 1280.0), (600.0, 1270.0), (-300.0, 1300.0)]) {
+          r.add('crate', x: x, z: z);
+        }
       case 'hall':
         // Nothing stands in the hall: the carpet with the logo and the TV walls are what you see.
       default:
