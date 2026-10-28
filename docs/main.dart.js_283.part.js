@@ -2,5 +2,5 @@
 $__dart_deferred_initializers__.current=function(a,b,c,$){var A,B
 A=c[0]
 B=c[169]
-var z=a.updateTypes([]);(function constants(){B.akp=new A.a_(62818,"MaterialIcons",!1)})()};
-(a=>{a["nYLarNk7dH/qy05xnAsHKRtZhKM="]=a.current})($__dart_deferred_initializers__);
+var z=a.updateTypes([]);(function constants(){B.aks=new A.a_(62818,"MaterialIcons",!1)})()};
+(a=>{a["ezlLAvfOOvRg6fL8UBgIAA3JCRM="]=a.current})($__dart_deferred_initializers__);
