@@ -110,6 +110,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     }
     home.practice = widget.practice || home.practice;
     cam = Cam3(yaw: -0.05, pitch: 0.1, dist: 120, target: const V3(0, 40, 40))..maxDist = 560;
+    if (widget.focus == 'city') home.current = 11;
     if (widget.focus.isNotEmpty) {
       final want = home.indoor.where((e) => switch (widget.focus) { 'wiring' => !e.wired, 'plumbing' => !e.plumbed, _ => !e.finished });
       if (want.isNotEmpty) home.current = want.first.id;
@@ -510,6 +511,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     final land = Size(mq.size.height, mq.size.width);
     Widget btn(IconData icon, VoidCallback onTap) => GestureDetector(
           onTap: onTap,
+          onDoubleTap: () => setState(() => _fullHide = true),
           child: Container(width: 40, height: 40, margin: const EdgeInsets.only(right: 8), decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.55), shape: BoxShape.circle, border: Border.all(color: Colors.white38)), child: Icon(icon, color: Colors.white, size: 20)),
         );
     return Scaffold(
@@ -524,10 +526,13 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
               height: land.height,
               child: Stack(children: [
                 Positioned.fill(child: stage),
-                Positioned(top: 10, left: 10, child: Row(children: [
-                  btn(Icons.fullscreen_exit_rounded, () => setState(() => full = false)),
-                  btn(Icons.screen_rotation_rounded, () => setState(() => _fullTurns = _fullTurns == 1 ? 3 : 1)),
-                ])),
+                if (_fullHide)
+                  Positioned(top: 0, left: 0, child: GestureDetector(behavior: HitTestBehavior.translucent, onDoubleTap: () => setState(() => _fullHide = false), child: const SizedBox(width: 110, height: 64)))
+                else
+                  Positioned(top: 10, left: 10, child: Row(children: [
+                    btn(Icons.fullscreen_exit_rounded, () => setState(() => full = false)),
+                    btn(Icons.screen_rotation_rounded, () => setState(() => _fullTurns = _fullTurns == 1 ? 3 : 1)),
+                  ])),
               ]),
             ),
           ),
@@ -1053,6 +1058,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   bool full = false;
   int _fullTurns = 1;
   double _padW = 400;
+  bool _fullHide = false;
 
   void _startSteer() {
     if (room.indoor) return;
@@ -1346,8 +1352,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     Widget btn(String label, VoidCallback onTap, {bool on = false, Color col = const Color(0xFF4ADE80)}) => GestureDetector(
           onTapDown: (_) => onTap(),
           child: Container(
-            margin: const EdgeInsets.only(left: 6, top: 6),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            margin: const EdgeInsets.only(left: 4, top: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 12),
             decoration: BoxDecoration(color: on ? col.withValues(alpha: 0.45) : Colors.black.withValues(alpha: 0.62), borderRadius: BorderRadius.circular(18), border: Border.all(color: col, width: 1.8)),
             child: Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
           ),
@@ -1385,7 +1391,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
           ),
         if (controls)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
+            padding: const EdgeInsets.fromLTRB(22, 0, 22, 44),
             child: Row(crossAxisAlignment: CrossAxisAlignment.end, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               _Stick(onMove: (x, y) {
                 _inX = x;

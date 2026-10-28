@@ -129,16 +129,17 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
             _grid([
               _tile('🔌', 'Wire a room', 'Go to a room that needs wiring', const Color(0xFF22C55E), () => _push(NgmyHousePage(practice: practice, focus: 'wiring'))),
               _tile('🚽', 'Plumb a room', 'Go to a bathroom or kitchen', const Color(0xFF38BDF8), () => _push(NgmyHousePage(practice: practice, focus: 'plumbing'))),
-              _tile('🧠', 'Diagram lessons', 'Three-way switch, fan with light', const Color(0xFFA78BFA), () => _push(const NgmyElectricalDiagramPage())),
               _tile('🔧', 'Fix a house', 'Walk the house and fix every sign', const Color(0xFFF59E0B), () => _push(NgmyHousePage(practice: practice, focus: 'fix'))),
               _tile('🧱', 'Build a room', 'Frame, drywall, then wire', const Color(0xFF4ADE80), () => _push(NgmyRoomProjectPage(practice: practice))),
               _tile('⚡', 'Wiring bench', 'Just the wiring, one room', const Color(0xFFFACC15), () => _push(NgmyRoomProjectPage(quick: true, practice: practice))),
               _tile('🧪', 'Safety inspection', 'A test job: marked when you submit', const Color(0xFFA78BFA), () => _push(const NgmyRoomProjectPage(quick: true, test: true))),
               _tile('📞', 'Service calls', 'A customer rings with problems', const Color(0xFFFB7185), () => _push(NgmyServiceCallPage(practice: practice))),
+              _tile('🏘', 'Neighbourhood jobs', 'Fix lights and wiring around the city', const Color(0xFF38BDF8), () => _push(const NgmyHousePage(focus: 'city'))),
             ]),
             _section('LESSONS'),
             _grid([
               for (final l in _lessons) _tile(l.emoji, l.title, l.blurb, l.color, () => _lesson(l.id)),
+              _tile('🧠', 'Diagram lessons', 'Three-way switch, fan with light', const Color(0xFFA78BFA), () => _push(const NgmyElectricalDiagramPage())),
               _tile('📘', 'Learn the trades', 'Short cards for beginners', const Color(0xFFA78BFA), () => _push(const NgmyConstructionLearnPage())),
             ]),
           ],
@@ -252,6 +253,16 @@ class Stage3D extends StatelessWidget {
           _round(Icons.add_rounded, 'Zoom in', () => cam.zoomBy(0.8)),
           _round(Icons.remove_rounded, 'Zoom out', () => cam.zoomBy(1.25)),
           _round(Icons.center_focus_strong_rounded, 'Back to the whole view', onHome),
+          _round(Icons.swap_vert_rounded, 'Flip up and down swiping', () {
+            Cam3.invertY = !Cam3.invertY;
+            Cam3.savePrefs();
+            conBeep(Cam3.invertY ? 520 : 420, ms: 60);
+          }),
+          _round(Icons.swap_horiz_rounded, 'Flip left and right swiping', () {
+            Cam3.invertX = !Cam3.invertX;
+            Cam3.savePrefs();
+            conBeep(Cam3.invertX ? 520 : 420, ms: 60);
+          }),
         ]),
       ),
       if (bottom != null) Positioned(left: 0, right: 0, bottom: 14, child: Center(child: bottom!)),

@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -296,6 +297,26 @@ List<V3> smoothPath(List<V3> pts, {int per = 6}) {
 // ─── Camera ──────────────────────────────────────────────────────────────────
 
 class Cam3 extends ChangeNotifier {
+  /// Which way a swipe turns the view. The two small buttons next to the zoom buttons flip them, and the choice is remembered.
+  static bool invertX = false, invertY = false;
+  static bool _prefsRead = false;
+
+  static void loadPrefs() {
+    if (_prefsRead) return;
+    _prefsRead = true;
+    SharedPreferences.getInstance().then((p) {
+      invertX = p.getBool('ngmy_swipe_invert_x') ?? false;
+      invertY = p.getBool('ngmy_swipe_invert_y') ?? false;
+    }).catchError((_) {});
+  }
+
+  static void savePrefs() {
+    SharedPreferences.getInstance().then((p) {
+      p.setBool('ngmy_swipe_invert_x', invertX);
+      p.setBool('ngmy_swipe_invert_y', invertY);
+    }).catchError((_) {});
+  }
+
   Cam3({this.yaw = 0.5, this.pitch = 0.3, this.dist = 40, this.target = V3.zero});
   double yaw, pitch, dist;
   V3 target;
@@ -799,6 +820,7 @@ class _Scene3DViewState extends State<Scene3DView> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
+    Cam3.loadPrefs();
     _ticker = createTicker((d) {
       final dt = (d - _last).inMicroseconds / 1e6;
       _last = d;
@@ -827,7 +849,7 @@ class _Scene3DViewState extends State<Scene3DView> with SingleTickerProviderStat
           if (d.pointerCount >= 2) {
             widget.cam.zoomBy(_startDist / d.scale / widget.cam.dist);
           } else {
-            widget.cam.orbit(d.focalPointDelta.dx * 0.009, -d.focalPointDelta.dy * 0.009);
+            widget.cam.orbit(d.focalPointDelta.dx * 0.009 * (Cam3.invertX ? -1 : 1), -d.focalPointDelta.dy * 0.009 * (Cam3.invertY ? -1 : 1));
           }
         },
         onTapUp: (d) => widget.onPick?.call(_hits.pick(d.localPosition)),
