@@ -19184,6 +19184,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _openLocalGrowthFromHome() async {
+    // Growth Income is closed for members; only the admin opens it.
+    if (widget.user.isAdmin != true) return;
     if (widget.disableLocalGrowthIncomeEntry) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('You are already in Local Growth — use the back arrow to return to the main app.')),
@@ -19264,7 +19266,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             _roundGlassButton(
                               icon: Icons.wifi_rounded,
                               tooltip: 'Growth Income',
-                              onTap: _openLocalGrowthFromHome,
+                              onTap: widget.user.isAdmin != true ? null : _openLocalGrowthFromHome,
                             ),
                           ],
                         ),
@@ -19446,7 +19448,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         _roundGlassButton(
           icon: Icons.wifi_rounded,
           tooltip: 'Growth Income',
-          onTap: _openLocalGrowthFromHome,
+          onTap: widget.user.isAdmin != true ? null : _openLocalGrowthFromHome,
         ),
       ],
     );

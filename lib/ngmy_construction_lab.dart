@@ -9,6 +9,8 @@ import 'ngmy_construction_plumbing.dart';
 import 'ngmy_construction_projectpage.dart';
 import 'ngmy_construction_servicepage.dart';
 import 'ngmy_construction_plumbpage.dart';
+import 'ngmy_construction_homepage.dart';
+import 'ngmy_construction_learn.dart';
 import 'ngmy_studio_kit.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -34,43 +36,44 @@ void conGood() {
 void conBad() => conBeep(180, ms: 220, wave: 'square', volume: 0.25);
 
 class _LessonInfo {
-  const _LessonInfo(this.id, this.group, this.title, this.blurb, this.icon, this.color);
-  final String id, group, title, blurb;
-  final IconData icon;
+  const _LessonInfo(this.id, this.emoji, this.title, this.blurb, this.color);
+  final String id, emoji, title, blurb;
   final Color color;
 }
 
 const List<_LessonInfo> _lessons = [
-  _LessonInfo('outlet', 'Electrical wiring', 'Wall outlet', 'Wire a 120 volt receptacle. Black to brass, white to silver, bare copper to green.', Icons.electrical_services_rounded, Color(0xFFF59E0B)),
-  _LessonInfo('switch', 'Electrical wiring', 'Light switch', 'Two cables, two black wires and a wire nut. Learn what a switch really cuts.', Icons.toggle_on_rounded, Color(0xFF38BDF8)),
-  _LessonInfo('gfci', 'Electrical wiring', 'GFCI outlet', 'LINE and LOAD: the outlet that protects you near water.', Icons.shield_rounded, Color(0xFF34D399)),
-  _LessonInfo('ptrap', 'Plumbing', 'Sink drain (P-trap)', 'Build the drain under a sink and stop sewer gas with a water seal.', Icons.plumbing_rounded, Color(0xFF60A5FA)),
-  _LessonInfo('faucet', 'Plumbing', 'Faucet supply lines', 'Hot on the left, cold on the right: connect the hoses and open the valves.', Icons.water_drop_rounded, Color(0xFFF87171)),
-  _LessonInfo('house', 'The whole house', 'Build and fix a house', 'Build it stage by stage, look inside the walls and fix a tripped breaker and a leak.', Icons.home_work_rounded, Color(0xFFA78BFA)),
+  _LessonInfo('outlet', '🔌', 'Wall outlet', 'Black to brass, white to silver', Color(0xFFF59E0B)),
+  _LessonInfo('switch', '💡', 'Light switch', 'Two blacks and a wire nut', Color(0xFF38BDF8)),
+  _LessonInfo('gfci', '🛡️', 'GFCI outlet', 'LINE and LOAD near water', Color(0xFF34D399)),
+  _LessonInfo('ptrap', '🪠', 'Sink drain (P-trap)', 'Build a drain with a water seal', Color(0xFF60A5FA)),
+  _LessonInfo('faucet', '🚰', 'Faucet supply lines', 'Hot left, cold right', Color(0xFFF87171)),
+  _LessonInfo('house', '🏗️', 'Build and fix a house', 'Stage by stage, then repair', Color(0xFFA78BFA)),
 ];
 
 // ─── The landing page ────────────────────────────────────────────────────────
 
-class NgmyConstructionLab extends StatelessWidget {
+class NgmyConstructionLab extends StatefulWidget {
   const NgmyConstructionLab({super.key});
 
-  void _open(BuildContext context, String id) {
-    final Widget page = switch (id) {
-      'ptrap' => const _PtrapPage(),
-      'faucet' => const _FaucetPage(),
-      'house' => const _HousePage(),
-      _ => _ElectricalPage(id: id),
-    };
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
-  }
+  @override
+  State<NgmyConstructionLab> createState() => _NgmyConstructionLabState();
+}
+
+class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
+  bool practice = false;
+
+  void _push(Widget page) => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
+
+  void _lesson(String id) => _push(switch (id) {
+        'ptrap' => const _PtrapPage(),
+        'faucet' => const _FaucetPage(),
+        'house' => const _HousePage(),
+        _ => _ElectricalPage(id: id),
+      });
 
   @override
   Widget build(BuildContext context) {
     NgmyTone.theme = kStudioSoundThemes['CONSTRUCTION LAB'] ?? 'tech';
-    final groups = <String>[];
-    for (final l in _lessons) {
-      if (!groups.contains(l.group)) groups.add(l.group);
-    }
     return Scaffold(
       backgroundColor: kStudioBg,
       body: SafeArea(
@@ -89,156 +92,104 @@ class NgmyConstructionLab extends StatelessWidget {
               const Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('Construction Lab', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 19)),
-                  Text('Learn the trades on real looking 3D models', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                  Text('Wire it. Plumb it. Fix a house.', style: TextStyle(color: Colors.white54, fontSize: 12)),
                 ]),
               ),
             ]),
             const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(color: kConPanel, borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white12)),
-              child: const Text(
-                'Turn every model with your finger, pinch to zoom, and tap any part to zoom in and learn what it is. Pick a wire, then tap the screw it belongs on. Wires have their real colours, and every mistake is explained.',
-                style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.45),
+            Row(children: [
+              Expanded(child: _toggle('Learn mode', !practice, const Color(0xFF4ADE80), () => setState(() => practice = false))),
+              const SizedBox(width: 8),
+              Expanded(child: _toggle('Practice mode', practice, const Color(0xFFF87171), () => setState(() => practice = true))),
+            ]),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: () => _push(NgmyHousePage(practice: practice)),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF3B2A12), Color(0xFF1F1A12)]), borderRadius: BorderRadius.circular(20), border: Border.all(color: kConAmber, width: 1.6)),
+                child: Row(children: [
+                  const Text('🏠', style: TextStyle(fontSize: 40)),
+                  const SizedBox(width: 14),
+                  const Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('My House', style: TextStyle(color: kConAmber, fontWeight: FontWeight.w900, fontSize: 18)),
+                      SizedBox(height: 2),
+                      Text('5 bedrooms, 3 bathrooms. Walk in and fix what is wrong.', style: TextStyle(color: Colors.white70, fontSize: 12.5, height: 1.3)),
+                    ]),
+                  ),
+                  const Icon(Icons.chevron_right_rounded, color: kConAmber),
+                ]),
               ),
             ),
-            const Padding(padding: EdgeInsets.fromLTRB(4, 18, 4, 8), child: Text('BUILD A WHOLE ROOM', style: TextStyle(color: kConAmber, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.2))),
-            _projectCard(context, practice: false),
-            _projectCard(context, practice: true),
-            _modeCard(context, '🔌', 'Wire a room (quick start)', 'Skip the framing and the drywall: the room is ready, so you go straight to the wiring. Pick an outlet, a switch, a light or a fan, hold it to its box, turn the breaker off, fasten every wire to the right coloured screw, push it in, cover it and test it with the tester, a TV or the switch.', const Color(0xFF22C55E), () => const NgmyRoomProjectPage(quick: true)),
-            const Padding(padding: EdgeInsets.fromLTRB(4, 18, 4, 8), child: Text('SERVICE CALLS', style: TextStyle(color: kConAmber, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.2))),
-            _modeCard(context, '🔧', 'Fix a house (learn)', 'A customer rings with a list of problems: a tripped breaker, a leaking nut, a dead outlet, a running toilet, a hole in the wall and more. A different list every time. Look and test, pick the right tool, and I explain every wrong move.', const Color(0xFF38BDF8), () => const NgmyServiceCallPage()),
-            _modeCard(context, '⚡', 'Fix a house (practice)', 'The same, but with no explanations. Touch a live wire and you get shocked. Three shocks and the call is over.', const Color(0xFFF87171), () => const NgmyServiceCallPage(practice: true)),
-            const Padding(padding: EdgeInsets.fromLTRB(4, 18, 4, 8), child: Text('PLUMBING JOBS', style: TextStyle(color: kConAmber, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.2))),
-            _modeCard(context, '🚽', 'Plumb a room (learn)', 'A bathroom or a kitchen, a different one each time. Fit the flange, wax ring, toilet, valves, hoses, faucet and drain piece by piece. Put something in the wrong order and I tell you why. Then turn the water on and find the leaks.', const Color(0xFF38BDF8), () => const NgmyPlumbJobPage()),
-            _modeCard(context, '💧', 'Plumb a room (practice)', 'The same job with no hints and no labels. Cut a pipe with the water on and the room floods.', const Color(0xFFF87171), () => const NgmyPlumbJobPage(practice: true)),
-            for (final g in groups) ...[
-              Padding(padding: const EdgeInsets.fromLTRB(4, 18, 4, 8), child: Text(g.toUpperCase(), style: const TextStyle(color: kConAmber, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.2))),
-              for (final l in _lessons.where((e) => e.group == g)) _card(context, l),
-            ],
+            _section('JOBS'),
+            _grid([
+              _tile('🔌', 'Wire a room', 'Outlets, switches, lights, fans', const Color(0xFF22C55E), () => _push(NgmyRoomProjectPage(quick: true, practice: practice))),
+              _tile('🧱', 'Build a room', 'Frame, drywall, then wire', const Color(0xFF4ADE80), () => _push(NgmyRoomProjectPage(practice: practice))),
+              _tile('🚽', 'Plumb a room', 'A bathroom or a kitchen', const Color(0xFF38BDF8), () => _push(NgmyPlumbJobPage(practice: practice))),
+              _tile('🔧', 'Fix a house', 'A customer rings with problems', const Color(0xFFF59E0B), () => _push(NgmyServiceCallPage(practice: practice))),
+            ]),
+            _section('LESSONS'),
+            _grid([
+              for (final l in _lessons) _tile(l.emoji, l.title, l.blurb, l.color, () => _lesson(l.id)),
+              _tile('📘', 'Learn the trades', 'Short cards for beginners', const Color(0xFFA78BFA), () => _push(const NgmyConstructionLearnPage())),
+            ]),
           ],
         ),
       ),
     );
   }
 
-  Widget _modeCard(BuildContext context, String emoji, String title, String blurb, Color c, Widget Function() page) {
-    return GestureDetector(
-      onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page())),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: kConPanel, borderRadius: BorderRadius.circular(18), border: Border.all(color: c.withValues(alpha: 0.6), width: 1.5)),
-        child: Row(children: [
-          Container(width: 52, height: 52, decoration: BoxDecoration(color: c.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(16)), child: Center(child: Text(emoji, style: const TextStyle(fontSize: 28)))),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(title, style: TextStyle(color: c, fontWeight: FontWeight.w900, fontSize: 15)),
-              const SizedBox(height: 3),
-              Text(blurb, style: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.35)),
-            ]),
-          ),
-          Icon(Icons.chevron_right_rounded, color: c),
-        ]),
-      ),
-    );
-  }
+  Widget _section(String t) => Padding(padding: const EdgeInsets.fromLTRB(4, 18, 4, 8), child: Text(t, style: const TextStyle(color: kConAmber, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.2)));
 
-  Widget _projectCard(BuildContext context, {required bool practice}) {
-    final c = practice ? const Color(0xFFF87171) : const Color(0xFF4ADE80);
-    return GestureDetector(
-      onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => NgmyRoomProjectPage(practice: practice))),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: kConPanel, borderRadius: BorderRadius.circular(18), border: Border.all(color: c.withValues(alpha: 0.6), width: 1.5)),
-        child: Row(children: [
-          Container(width: 52, height: 52, decoration: BoxDecoration(color: c.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(16)), child: Center(child: Text(practice ? '🔥' : '🏗️', style: const TextStyle(fontSize: 28)))),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(practice ? 'Practice mode' : 'Learn mode', style: TextStyle(color: c, fontWeight: FontWeight.w900, fontSize: 15)),
-              const SizedBox(height: 3),
-              Text(
-                practice
-                    ? 'A new room job every time. No hints: I only speak up when you get something wrong. Touch a live wire and you get shocked. Wire it wrong and it burns.'
-                    : 'A new room job every time: mount the boxes, pull the cable, hang the drywall, then wire outlets, switches, a light or fan and plug in a TV to test. I tell you what to do next and why a move is wrong.',
-                style: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.35),
-              ),
-            ]),
-          ),
-          Icon(Icons.chevron_right_rounded, color: c),
-        ]),
-      ),
-    );
-  }
+  Widget _toggle(String label, bool on, Color c, VoidCallback f) => GestureDetector(
+        onTap: f,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(color: on ? c.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(14), border: Border.all(color: on ? c : Colors.white24, width: on ? 2 : 1)),
+          child: Center(child: Text(label, style: TextStyle(color: on ? c : Colors.white70, fontWeight: FontWeight.w900, fontSize: 13))),
+        ),
+      );
 
-  Widget _card(BuildContext context, _LessonInfo l) {
-    return GestureDetector(
-      onTap: () => _open(context, l.id),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(color: kConPanel, borderRadius: BorderRadius.circular(18), border: Border.all(color: l.color.withValues(alpha: 0.45))),
-        child: Row(children: [
-          ClipRRect(borderRadius: BorderRadius.circular(14), child: SizedBox(width: 116, height: 92, child: _Thumb(l.id))),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Icon(l.icon, color: l.color, size: 18),
-                const SizedBox(width: 6),
-                Expanded(child: Text(l.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15))),
-              ]),
-              const SizedBox(height: 4),
-              Text(l.blurb, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.35)),
-            ]),
-          ),
-          Icon(Icons.chevron_right_rounded, color: l.color),
-        ]),
-      ),
-    );
-  }
-}
-
-/// A small still picture of a lesson's 3D model.
-class _Thumb extends StatelessWidget {
-  const _Thumb(this.id);
-  final String id;
-
-  @override
-  Widget build(BuildContext context) {
-    final Scene3D scene;
-    final Cam3 cam;
-    switch (id) {
-      case 'ptrap':
-        scene = buildPtrapScene(PlumbState()..placed.addAll({'tail', 'trap', 'arm'})..tight.updateAll((k, v) => true));
-        cam = Cam3(yaw: -0.4, pitch: 0.2, dist: 40, target: const V3(8, 3, 0));
-      case 'faucet':
-        scene = buildFaucetScene(PlumbState()..attached.addAll({idValveHot: 'hot', idInletHot: 'hot', idValveCold: 'cold', idInletCold: 'cold'}));
-        cam = Cam3(yaw: -0.3, pitch: 0.22, dist: 42, target: const V3(0, 9, -3));
-      case 'house':
-        scene = buildHouseScene(HouseState()..stage = 6);
-        cam = Cam3(yaw: -0.3, pitch: 0.5, dist: 50, target: const V3(0, 4.5, -2));
-      default:
-        scene = buildElectricalScene(electricalLesson(id), WiringState()..power = false..attached.addAll(id == 'gfci' ? const {idGreen: 'ground'} : const {idGreen: 'ground', idSilverTop: 'white'}));
-        cam = Cam3(yaw: 0.45, pitch: 0.25, dist: 12.5, target: const V3(0, -0.2, 3.2));
+  /// Tiles two to a row.
+  Widget _grid(List<Widget> tiles) {
+    final rows = <Widget>[];
+    for (var i = 0; i < tiles.length; i += 2) {
+      rows.add(Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: IntrinsicHeight(
+          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Expanded(child: tiles[i]),
+            const SizedBox(width: 8),
+            Expanded(child: i + 1 < tiles.length ? tiles[i + 1] : const SizedBox.shrink()),
+          ]),
+        ),
+      ));
     }
-    return RepaintBoundary(
-      child: CustomPaint(
-        painter: Scene3DPainter(scene: scene, cam: cam, hits: HitCache(), layerOn: id == 'house' ? (_) => true : null),
-        size: Size.infinite,
-      ),
-    );
+    return Column(children: rows);
   }
+
+  Widget _tile(String emoji, String title, String line, Color c, VoidCallback f) => GestureDetector(
+        onTap: f,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: kConPanel, borderRadius: BorderRadius.circular(16), border: Border.all(color: c.withValues(alpha: 0.5))),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(emoji, style: const TextStyle(fontSize: 24)),
+            const SizedBox(height: 6),
+            Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13.5)),
+            const SizedBox(height: 2),
+            Text(line, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white54, fontSize: 11.5, height: 1.3)),
+          ]),
+        ),
+      );
 }
 
 // ─── Shared pieces ───────────────────────────────────────────────────────────
 
 /// The 3D view with a message banner, an info card and zoom buttons on top of it.
 class Stage3D extends StatelessWidget {
-  const Stage3D({required this.scene, required this.cam, required this.onPick, required this.onHome, this.highlight = 0, this.dynamicPolys, this.layerOn, this.message, this.good = false, this.info, this.topLeft, this.topRight, this.infoAction});
+  const Stage3D({required this.scene, required this.cam, required this.onPick, required this.onHome, this.highlight = 0, this.dynamicPolys, this.layerOn, this.message, this.good = false, this.info, this.topLeft, this.topRight, this.infoAction, this.messageTop});
   final Scene3D scene;
   final Cam3 cam;
   final void Function(int id) onPick;
@@ -252,6 +203,9 @@ class Stage3D extends StatelessWidget {
   final List<Widget>? topLeft;
   final List<Widget>? topRight;
   final Widget? infoAction;
+
+  /// How far down the message banner sits (it clears the corner widgets).
+  final double? messageTop;
 
   @override
   Widget build(BuildContext context) {
@@ -272,7 +226,7 @@ class Stage3D extends StatelessWidget {
         Positioned(
           left: 10,
           right: 62,
-          top: topLeft != null ? 60 : 10,
+          top: messageTop ?? (topLeft != null ? 60 : 10),
           child: Container(
             padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
             decoration: BoxDecoration(color: (good ? const Color(0xFF14532D) : const Color(0xFF7F1D1D)).withValues(alpha: 0.95), borderRadius: BorderRadius.circular(14), border: Border.all(color: good ? const Color(0xFF4ADE80) : const Color(0xFFF87171))),
@@ -373,7 +327,7 @@ Future<void> showConSteps(BuildContext context, String title, List<String> steps
   );
 }
 
-/// A lesson page: a header with the title, then the 3D area and a bottom panel.
+/// A lesson page: a header with the title, the menu under it, then the 3D area.
 class LessonScaffold extends StatelessWidget {
   const LessonScaffold({required this.title, required this.color, required this.stage, required this.panel, required this.onSteps, required this.stepText});
   final String title;
@@ -404,13 +358,15 @@ class LessonScaffold extends StatelessWidget {
               ),
             ]),
           ),
-          Expanded(child: ClipRRect(borderRadius: const BorderRadius.vertical(top: Radius.circular(20)), child: stage)),
+          // The menu sits at the top, like in the Electronics Lab, and never takes more than a third of the screen.
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-            decoration: const BoxDecoration(color: kConPanel, border: Border(top: BorderSide(color: Colors.white12))),
-            child: panel,
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.34),
+            padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
+            decoration: const BoxDecoration(color: kConPanel, border: Border(bottom: BorderSide(color: Colors.white12))),
+            child: SingleChildScrollView(child: panel),
           ),
+          Expanded(child: ClipRRect(borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)), child: stage)),
         ]),
       ),
     );

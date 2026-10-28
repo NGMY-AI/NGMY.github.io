@@ -24,6 +24,7 @@ class _Item {
 
 const List<List<_Item>> _trays = [
   [
+    _Item('look', 'Look', Icons.search_rounded),
     _Item('wall', 'Wall box', Icons.crop_portrait_rounded),
     _Item('ceiling', 'Ceiling box', Icons.circle_outlined),
     _Item('fanbox', 'Fan box', Icons.air_rounded),
@@ -31,6 +32,7 @@ const List<List<_Item>> _trays = [
     _Item('cable', 'Cable roll', Icons.cable_rounded),
   ],
   [
+    _Item('look', 'Look', Icons.search_rounded),
     _Item('sheet', 'Drywall sheet', Icons.view_agenda_rounded),
     _Item('knife', 'Drywall saw', Icons.content_cut_rounded),
     _Item('screw', 'Screw gun', Icons.hardware_rounded),
@@ -40,6 +42,7 @@ const List<List<_Item>> _trays = [
     _Item('paint', 'Roller', Icons.roller_shades_rounded),
   ],
   [
+    _Item('look', 'Look', Icons.search_rounded),
     _Item('outlet', 'Outlet', Icons.power_rounded),
     _Item('gfci', 'GFCI', Icons.shield_rounded),
     _Item('switch', 'Switch', Icons.toggle_on_rounded),
@@ -50,12 +53,15 @@ const List<List<_Item>> _trays = [
     _Item('toaster', 'Toaster', Icons.breakfast_dining_rounded),
     _Item('hairdryer', 'Hair dryer', Icons.dry_rounded),
     _Item('tester', 'Tester', Icons.flash_on_rounded),
+    _Item('flip', 'Flip switch', Icons.toggle_on_rounded),
   ],
 ];
 
 class NgmyRoomProjectPage extends StatefulWidget {
-  const NgmyRoomProjectPage({super.key, this.seed, this.practice = false, this.quick = false});
+  const NgmyRoomProjectPage({super.key, this.seed, this.practice = false, this.quick = false, this.project});
   final int? seed;
+  /// A job that is already under way (the one for a room of the house).
+  final RoomProject? project;
   /// Start with the boxes, cable and drywall already done, ready for the wiring.
   final bool quick;
   final bool practice;
@@ -88,7 +94,8 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
   @override
   void initState() {
     super.initState();
-    p = RoomProject(seed: seed, practice: widget.practice);
+    p = widget.project ?? RoomProject(seed: seed, practice: widget.practice);
+    if (widget.project != null && p.drywallDone) phase = 2;
     if (widget.quick) {
       p.fastForward();
       phase = 2;
@@ -210,7 +217,18 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
     if (active >= 0 && !(id >= idBenchBase && id < idBenchBase + 700)) return;
     // Parts of the device you are working on.
     if (id >= idBenchBase && id < idBenchBase + 700) {
-      _pickBench((id - idBenchBase) ~/ 100, (id - idBenchBase) % 100);
+      final slot = (id - idBenchBase) ~/ 100;
+      // Tapping a device you already put in, from the room, opens it again.
+      if (active != slot) {
+        if (armed == 'tester') {
+          _tester(slot);
+        } else {
+          setState(() => armed = '');
+          _open(slot);
+        }
+        return;
+      }
+      _pickBench(slot, (id - idBenchBase) % 100);
       return;
     }
     if (id >= idStudBase && id < idStudBase + 10) {
@@ -268,14 +286,22 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
       _apply(p.unplug(id - idAppBase));
       return;
     }
-    final info = scene.info[id];
-    if (info != null) {
-      setState(() => hl = id);
-      _say('${info.name}: ${info.about}', ok: true);
+    // The room itself (floor, walls, studs, sofa) does nothing, unless the Look tool is in your hand.
+    if (armed == 'look') {
+      final info = scene.info[id];
+      if (info != null) {
+        setState(() => hl = id);
+        _say('${info.name}: ${info.about}', ok: true);
+      }
     }
   }
 
   void _pickSlot(int slot) {
+    if (p.devs.containsKey(slot) && armed != 'tester' && armed != 'look' && !kAppliances.contains(armed)) {
+      setState(() => armed = '');
+      _open(slot);
+      return;
+    }
     switch (armed) {
       case 'wall':
       case 'ceiling':
@@ -334,14 +360,17 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
       _tester(slot);
       return;
     }
-    if (d.kind == 'switch' && d.w.stage >= 2) {
-      _apply(p.flipSwitch(slot));
-      setState(() => hl = 0);
+    if (armed == 'flip') {
+      if (d.kind == 'switch' && d.w.stage >= 2) {
+        _apply(p.flipSwitch(slot));
+      } else {
+        _say('Only a finished switch can be flipped.');
+      }
       return;
     }
-    setState(() => hl = idDevBase + slot);
-    final info = scene.info[idDevBase + slot];
-    if (info != null) _say('${info.name}: ${info.about}', ok: true);
+    // Any device you already put in can be opened again to change it or pull it out.
+    setState(() => armed = '');
+    _open(slot);
   }
 
   void _pickBench(int slot, int local) {
@@ -618,7 +647,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(color: const Color(0xFF38BDF8).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.4))),
-                child: Text('👉 ${_next()}', maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFFBAE6FD), fontSize: 12, height: 1.3, fontWeight: FontWeight.w700)),
+                child: Text('👉 ${_next()}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFFBAE6FD), fontSize: 11.5, height: 1.25, fontWeight: FontWeight.w700)),
               )
             else
               const Text('Practice mode: no hints. You will only hear from me when something is wrong.', style: TextStyle(color: Colors.white38, fontSize: 11.5)),
@@ -742,6 +771,8 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
       'screw' => 'Tap the glowing dots on the studs. The lighter dots between studs are a trap.',
       'tape' || 'mud' || 'sand' => 'Tap a seam between two sheets.',
       'paint' => 'Tap a sheet to paint it.',
+      'look' => 'Tap anything to read what it is.',
+      'flip' => 'Tap a finished switch to turn the light or the fan on and off.',
       'tester' => 'Tap a box or a device to test it for power.',
       'tv' || 'lamp' || 'toaster' || 'hairdryer' => 'Tap a finished outlet to plug it in.',
       _ => 'Tap a glowing box to put it there.',

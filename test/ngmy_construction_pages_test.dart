@@ -49,8 +49,9 @@ void main() {
     await t.pump(const Duration(milliseconds: 500));
     expect(find.text('Learn mode'), findsOneWidget);
     expect(find.text('Practice mode'), findsOneWidget);
-    expect(find.text('Fix a house (learn)'), findsOneWidget);
-    expect(find.text('Fix a house (practice)'), findsOneWidget);
+    expect(find.text('My House'), findsOneWidget);
+    expect(find.text('Fix a house'), findsOneWidget);
+    expect(find.text('Plumb a room'), findsOneWidget);
     expect(find.text('Wall outlet'), findsOneWidget);
   });
 
@@ -64,6 +65,8 @@ void main() {
     await t.pump(const Duration(milliseconds: 700));
     expect(find.textContaining('Mount a box at'), findsOneWidget);
     expect(find.text('Behind the wall'), findsOneWidget);
+    await t.ensureVisible(find.text('Wall box'));
+    await t.pump(const Duration(milliseconds: 300));
     await t.tap(find.text('Wall box'));
     await t.pump(const Duration(milliseconds: 500));
     final at = _find3d(t, idSlotBase + first);

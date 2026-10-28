@@ -12,8 +12,10 @@ import 'ngmy_construction_project.dart' show Act;
 // ═════════════════════════════════════════════════════════════════════════════
 
 class NgmyPlumbJobPage extends StatefulWidget {
-  const NgmyPlumbJobPage({super.key, this.seed, this.practice = false});
+  const NgmyPlumbJobPage({super.key, this.seed, this.practice = false, this.job});
   final int? seed;
+  /// A job that is already under way (the one for a room of the house).
+  final PlumbJob? job;
   final bool practice;
 
   @override
@@ -36,7 +38,7 @@ class _NgmyPlumbJobPageState extends State<NgmyPlumbJobPage> {
   @override
   void initState() {
     super.initState();
-    job = PlumbJob(seed: seed, practice: widget.practice);
+    job = widget.job ?? PlumbJob(seed: seed, practice: widget.practice);
     scene = buildPlumbJobScene(job, armed: armed, labels: !job.practice);
   }
 

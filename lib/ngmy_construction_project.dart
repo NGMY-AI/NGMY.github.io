@@ -89,8 +89,8 @@ const List<String> kPhaseNames = ['1 Rough-in', '2 Drywall', '3 Devices'];
 const List<String> kAppliances = ['tv', 'lamp', 'toaster', 'hairdryer'];
 
 class RoomProject {
-  RoomProject({this.seed = 1, this.practice = false}) {
-    _plan();
+  RoomProject({this.seed = 1, this.practice = false, int? kind, String? name}) {
+    _plan(kind, name);
   }
 
   final int seed;
@@ -120,20 +120,20 @@ class RoomProject {
   final Set<int> burnt = {};
   final List<String> log = [];
 
-  void _plan() {
+  void _plan(int? forced, String? name) {
     final r = math.Random(seed);
-    final kind = r.nextInt(3);
+    final kind = forced ?? r.nextInt(3);
     final outlets = [0, 1, 2]..shuffle(r);
     final sw = 3 + r.nextInt(2);
     switch (kind) {
       case 0:
-        roomName = 'Living room';
+        roomName = name ?? 'Living room';
         orders = [Order(outlets[0], 'outlet'), Order(outlets[1], 'outlet'), Order(5, 'light', controlledBy: sw), Order(sw, 'switch')];
       case 1:
-        roomName = 'Bedroom';
+        roomName = name ?? 'Bedroom';
         orders = [Order(outlets[0], 'outlet'), Order(outlets[1], 'outlet'), Order(6, 'fan', controlledBy: sw), Order(sw, 'switch')];
       default:
-        roomName = 'Kitchen';
+        roomName = name ?? 'Kitchen';
         orders = [Order(outlets[0], 'gfci'), Order(outlets[1], 'gfci'), Order(5, 'light', controlledBy: sw), Order(sw, 'switch')];
     }
   }

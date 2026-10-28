@@ -79,8 +79,8 @@ const Map<String, String> kPlumbItemNames = {
 };
 
 class PlumbJob {
-  PlumbJob({this.seed = 1, this.practice = false}) {
-    variant = kPlumbVariants[math.Random(seed).nextInt(kPlumbVariants.length)];
+  PlumbJob({this.seed = 1, this.practice = false, String? variantId}) {
+    variant = variantId != null ? kPlumbVariants.firstWhere((v) => v.id == variantId) : kPlumbVariants[math.Random(seed).nextInt(kPlumbVariants.length)];
     mirror = math.Random(seed + 7).nextBool();
   }
 
