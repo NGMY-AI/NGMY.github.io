@@ -16,6 +16,9 @@ import 'ngmy_construction_world.dart';
 // ═════════════════════════════════════════════════════════════════════════════
 
 /// A place on the floor that does something when you walk into it.
+/// The labels inside a house that you can tap to be shown the thing they are about.
+const int idCinPanel = 1300, idCinOutlet = 1301;
+
 class _Zone {
   const _Zone(this.id, this.x, this.z, this.r);
   final int id;
@@ -336,8 +339,27 @@ class CityInterior {
     }
     _mat(b, -100, 100, 22, dark ? const Color(0xFFEF4444) : const Color(0xFF22C55E));
     _mat(b, 90, 100, 22, const Color(0xFF60A5FA));
-    labels.add(Label3D(const V3(-100, 54, 100), dark ? '⚡ Breaker panel: walk here to fix the wiring' : '⚡ Breaker panel: all fine', dark ? const Color(0xFFDC2626) : const Color(0xFF15803D)));
-    labels.add(Label3D(const V3(90, 44, 100), dark ? '🔌 Outlet: dead' : '🔌 Outlet: works', dark ? const Color(0xFFDC2626) : const Color(0xFF15803D)));
+    // The faults you can see: a red frame behind the breaker panel, the outlet and the switch on the wall (green when the house works).
+    final frame = dark ? const Color(0xFFEF4444) : const Color(0xFF22C55E);
+    b.order = 1;
+    b.alpha = 0.6;
+    b.box(const V3(-w / 2 + 2.4, 54, 45), const V3(1.2, 44, 34), frame);
+    b.box(const V3(95, 26, 1.0), const V3(1.0, 30, 0.8), frame);
+    b.box(const V3(95, 26, 1.0), const V3(24, 1.0, 0.8), frame);
+    b.box(const V3(-60, 50, 1.0), const V3(18, 26, 0.8), frame);
+    b.alpha = 1;
+    b.box(const V3(95, 26, 1.8), const V3(14, 20, 1.2), const Color(0xFFF7F2E6), shine: 0.25);
+    for (final dz in const [-1.0, 1.0]) {
+      for (final dx in const [-1.6, 1.6]) {
+        b.box(V3(95 + dx, 26 + dz * 3.4, 2.6), const V3(0.8, 2.6, 0.3), const Color(0xFF22252B));
+      }
+    }
+    b.box(const V3(-60, 50, 1.8), const V3(8, 14, 1.2), const Color(0xFFF7F2E6), shine: 0.25);
+    b.box(V3(-60, dark ? 48 : 52, 2.8), const V3(2, 5, 1.0), const Color(0xFFD9D2C2));
+    b.order = 2;
+    labels.add(Label3D(const V3(-w / 2 + 6, 82, 45), dark ? '⚡ Breaker panel: tap, then walk onto the red mat' : '⚡ Breaker panel: all fine', dark ? const Color(0xFFDC2626) : const Color(0xFF15803D), id: idCinPanel));
+    labels.add(Label3D(const V3(95, 50, 6), dark ? '🔌 Outlet: dead, tap to see it' : '🔌 Outlet: works', dark ? const Color(0xFFDC2626) : const Color(0xFF15803D), id: idCinOutlet));
+    labels.add(Label3D(const V3(-60, 70, 6), dark ? '💡 Switch: no power' : '💡 Switch: works', dark ? const Color(0xFFDC2626) : const Color(0xFF15803D), id: idCinOutlet));
     if (dark) labels.add(const Label3D(V3(0, 100, 20), 'No power in this house', Color(0xFFDC2626)));
   }
 

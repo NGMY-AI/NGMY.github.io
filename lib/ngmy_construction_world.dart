@@ -75,6 +75,25 @@ class WorldWalker {
     if (r != null) _obstacles = obstaclesOfWorld(r, skip: skipFurn);
   }
 
+  /// If the person is standing inside something (they got out of a car and are in the middle of it), move them to the nearest free spot.
+  bool unstick() {
+    if (!blocked(x, z)) return false;
+    for (var r = 6.0; r <= 320; r += 6) {
+      final n = math.max(8, (r / 6).round() * 3);
+      for (var i = 0; i < n; i++) {
+        final a = i * 2 * math.pi / n;
+        final nx = x + math.cos(a) * r, nz = z + math.sin(a) * r;
+        if (!blocked(nx, nz)) {
+          x = nx;
+          z = nz;
+          target = null;
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   bool blocked(double px, double pz) {
     if (px < _minX || px > _maxX || pz < _minZ || pz > _maxZ) return true;
     for (final o in _obstacles) {

@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_3d.dart';
 import 'ngmy_construction_community.dart';
@@ -123,10 +124,21 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     scene = buildHomeRoom(room, problems: problems, residents: _figs);
     _frame(snap: true);
     // While the community runs, the people and the news are kept up to date.
+    _loadLock();
     _commTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       final cm = comm;
-      if (cm == null || !mounted || tour != null) return;
-      setState(_rebuild);
+      if (_locked) {
+        if (mounted) setState(() {});
+        return;
+      }
+      if (cm == null || !mounted || tour != null || _pages > 0) return;
+      // Only draw the scene again when somebody has moved or changed, not every two seconds for nothing.
+      final figs = cm.figuresIn(home, room.id);
+      final sig = [for (final f in figs) '${f.id}:${f.x.round()}:${f.z.round()}:${f.calling}:${f.activityLabel}'].join('|');
+      if (inner == null && sig != _figSig) {
+        _figSig = sig;
+        setState(_rebuild);
+      }
       if (cm.log.isNotEmpty && cm.log.first != _lastNews) {
         _lastNews = cm.log.first;
         _say(_lastNews);
@@ -342,6 +354,19 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   void _pick(int id) {
     if (id == 0) return;
+    if (id >= idHTag && id < idHTag + 400) {
+      final f = room.furnById(id - idHTag);
+      if (f != null) _goToTag(f);
+      return;
+    }
+    if (id == idCinPanel || id == idCinOutlet) {
+      final inn = inner;
+      if (inn != null) {
+        cam.glideTo(target: id == idCinPanel ? const V3(-140, 54, 45) : const V3(95, 28, 4), dist: 110, pitch: 0.2);
+        _say(id == idCinPanel ? 'This is the breaker panel. Walk onto the red mat in front of it to fix the wiring.' : 'This is the dead outlet, with the red frame behind it. Fix the wiring at the panel to bring it back.', ok: true);
+      }
+      return;
+    }
     if (id >= idHResident && id < idHResident + 20) {
       _residentSheet(id - idHResident);
       return;
@@ -549,6 +574,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
                       if (room.indoor) _frame();
                     }),
                     btn(Icons.screen_rotation_rounded, () => setState(() => _fullTurns = _fullTurns == 1 ? 3 : 1)),
+                    btn(_hideTags ? Icons.label_off_rounded : Icons.label_rounded, () => setState(() => _hideTags = !_hideTags)),
                   ])),
               ]),
             ),
@@ -650,9 +676,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   Future<void> _houseJob(CityInterior inn) async {
     final f = inn.door;
     final p = RoomProject(seed: f.id * 13 + 5, kind: 0)..fastForward();
-    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => NgmyRoomProjectPage(project: p)));
+    await _pushPage(MaterialPageRoute<void>(builder: (_) => NgmyRoomProjectPage(project: p)));
     if (!mounted) return;
-    if (p.devicesDone) {
+    if (p.wiringWorks) {
       room.darkHouses.remove(f.id);
       inn.dark = false;
       comm?.points += 20;
@@ -667,7 +693,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   /// A street light that went out: the lamp wiring lesson, then the light comes back.
   Future<void> _fixLamp(Furn f) async {
     final st = WiringState();
-    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ElectricalLessonPage(id: 'light', state: st)));
+    await _pushPage(MaterialPageRoute<void>(builder: (_) => ElectricalLessonPage(id: 'light', state: st)));
     if (!mounted) return;
     if (st.stage >= 2 && evaluateWiring(electricalLesson('light'), st).ok) {
       room.brokenLamps.remove(f.id);
@@ -699,11 +725,13 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   /// The town's things break from time to time, and the neighbours ring.
   void _neighbourEvents() {
     final city = home.rooms.firstWhere((r) => !r.indoor);
-    final houses = [for (final f in city.furn) if ((f.kind == 'house2' || f.kind == 'bighouse') && !city.darkHouses.contains(f.id)) f];
-    if (city.darkHouses.length < 2 && houses.isNotEmpty) {
-      final f = houses[(_beat * 7 + 3) % houses.length];
+    if (_isBusy) return;
+    final houses = [for (final f in city.furn) if ((f.kind == 'house2' || f.kind == 'bighouse') && !city.darkHouses.contains(f.id) && f.id != _lastHouse) f];
+    if (city.darkHouses.length < 2 && houses.isNotEmpty && _ringing == null && _nCall == null) {
+      final f = houses[_rnd.nextInt(houses.length)];
       city.darkHouses.add(f.id);
-      _ringNeighbour(f);
+      _lastHouse = f.id;
+      _ringCall(_NCall(f, f.kind == 'bighouse' ? 'the big house' : 'the house'));
     }
     final lamps = [for (final f in city.furn) if ((f.kind == 'pole' || f.kind == 'lamppost') && !city.brokenLamps.contains(f.id)) f];
     if (city.brokenLamps.length < 3 && lamps.isNotEmpty && _beat % 90 == 0) {
@@ -1354,6 +1382,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     _lastWalkMs = nowMs;
     w.refresh();
     w.running = _run && _driving == null;
+    if (_driving == null) w.unstick();
     w.fall(dt);
     final sy = math.sin(cam.yaw), cy = math.cos(cam.yaw);
     final dx = sy * _inZ + cy * _inX, dz = -cy * _inZ + sy * _inX;
@@ -1537,6 +1566,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         break;
       }
     }
+    w.unstick();
     setState(_rebuild);
     _say('You got out.');
   }
@@ -1548,6 +1578,204 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   }
 
   // ── Life in the city: time passes, people call ──
+
+  // ── The work you are given: one job at a time, a waiting list, and the office ──
+
+  /// How many job pages (the wiring bench, a lesson) are open on top of the city. Nothing happens in the city meanwhile.
+  int _pages = 0;
+  String _figSig = '';
+
+  Future<void> _pushPage(Route<void> r) async {
+    _pages++;
+    try {
+      await Navigator.of(context).push(r);
+    } finally {
+      _pages--;
+    }
+  }
+
+  /// The job being done, the jobs waiting ("Later"), how many calls in a row were missed, and seconds spent on the job.
+  _NCall? _job;
+  final List<_NCall> _waiting = [];
+  int _strikes = 0;
+  int _jobSecs = 0;
+  int _lastHouse = -1;
+  final math.Random _rnd = math.Random();
+  bool _hideTags = false;
+
+  static const String _lockKey = 'ngmy_city_locked_until';
+  int _lockedUntil = 0;
+  bool get _locked => DateTime.now().millisecondsSinceEpoch < _lockedUntil;
+
+  Future<void> _loadLock() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      final until = p.getInt(_lockKey) ?? 0;
+      if (!mounted) return;
+      if (until > DateTime.now().millisecondsSinceEpoch) setState(() => _lockedUntil = until);
+    } catch (_) {}
+  }
+
+  /// Three missed jobs in a row: the game closes for five hours.
+  void _lockOut() {
+    _lockedUntil = DateTime.now().add(const Duration(hours: 5)).millisecondsSinceEpoch;
+    _strikes = 0;
+    _job = null;
+    _waiting.clear();
+    _stopRing();
+    SharedPreferences.getInstance().then((p) => p.setInt(_lockKey, _lockedUntil)).catchError((_) => false);
+    if (mounted) setState(() {});
+  }
+
+  void _strike(String why) {
+    _strikes++;
+    if (_strikes >= 3) {
+      _lockOut();
+    } else if (_strikes == 2) {
+      _say('$why. That is two in a row.', ok: false);
+      _officeCall();
+    } else {
+      _say('$why. Answer the phone and finish the job, or you lose your place.', ok: false);
+    }
+  }
+
+  /// The office rings to say the phone must be answered.
+  Future<void> _officeCall() {
+    conBeep(1046, ms: 160, wave: 'sine', volume: 0.3);
+    Widget bubble(String text) => Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            constraints: const BoxConstraints(maxWidth: 290),
+            decoration: BoxDecoration(color: const Color(0xFF374151), borderRadius: BorderRadius.circular(18)),
+            child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.3)),
+          ),
+        );
+    return showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF111827),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Row(children: [
+              CircleAvatar(radius: 18, backgroundColor: Color(0xFFEF4444), child: Text('☎')),
+              SizedBox(width: 10),
+              Text('City office', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
+            ]),
+            const Divider(color: Colors.white12),
+            bubble('Hello, this is the City office. You have missed 2 calls in a row.'),
+            bubble('Please answer the phone, so you can keep working.'),
+            bubble('If you miss one more, the game closes for 5 hours.'),
+            const SizedBox(height: 6),
+            FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK, I will answer')),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  /// Is something happening that should stop new work from coming in?
+  bool get _isBusy => _pages > 0 || _job != null || _locked;
+
+  /// A fresh job at a house that is chosen by chance, never the same one twice running. Marks the fault in the city.
+  _NCall? _newJob() {
+    final city = home.rooms.firstWhere((r) => !r.indoor);
+    final cm = comm;
+    final houses = [for (final f in city.furn) if ((f.kind == 'house2' || f.kind == 'bighouse') && !city.darkHouses.contains(f.id) && f.id != _lastHouse) f];
+    final lamps = [for (final f in city.furn) if ((f.kind == 'pole' || f.kind == 'lamppost') && !city.brokenLamps.contains(f.id)) f];
+    final hospital = city.furn.where((f) => f.kind == 'hospital');
+    final order = [0, 1, 2]..shuffle(_rnd);
+    for (final k in order) {
+      if (k == 0 && houses.isNotEmpty && city.darkHouses.length < 4) {
+        final f = houses[_rnd.nextInt(houses.length)];
+        city.darkHouses.add(f.id);
+        _lastHouse = f.id;
+        return _NCall(f, f.kind == 'bighouse' ? 'the big house' : 'the house');
+      }
+      if (k == 1 && cm != null && hospital.isNotEmpty) {
+        final well = cm.living.where((p) => !p.sick && p.inBed < 0).toList();
+        if (well.isNotEmpty) {
+          final p = well[_rnd.nextInt(well.length)];
+          p.sick = true;
+          p.health = math.min(p.health, 70);
+          return _NCall(hospital.first, 'the hospital', kind: 'sick', who: p.name);
+        }
+      }
+      if (k == 2 && lamps.isNotEmpty && city.brokenLamps.length < 4) {
+        final f = lamps[_rnd.nextInt(lamps.length)];
+        city.brokenLamps.add(f.id);
+        return _NCall(f, 'the street', kind: 'light');
+      }
+    }
+    return null;
+  }
+
+  /// Is the thing this job is about put right?
+  bool _jobDone(_NCall c) {
+    final city = home.rooms.firstWhere((r) => !r.indoor);
+    switch (c.kind) {
+      case 'power':
+        return !city.darkHouses.contains(c.furn.id);
+      case 'light':
+        return !city.brokenLamps.contains(c.furn.id);
+      default:
+        final cm = comm;
+        if (cm == null) return false;
+        final p = cm.residents.where((r) => r.name == c.who);
+        if (p.isEmpty) return true;
+        return p.first.inBed >= 0 || !p.first.sick || !p.first.alive;
+    }
+  }
+
+  void _finishJob(_NCall c) {
+    _strikes = 0;
+    _job = null;
+    _jobSecs = 0;
+    if (c.kind == 'sick') {
+      comm?.points += 10;
+      _say('The sick person is at the hospital. +10 points. Well done.', ok: true);
+    }
+    if (mounted) setState(_rebuild);
+  }
+
+  /// Put the person in front of whatever the job is about.
+  void _teleportTo(Furn f) {
+    final w = walker;
+    if (w == null || room.indoor) return;
+    if (inner != null) _leaveBuilding();
+    final k = kFurnKinds[f.kind]!;
+    final out = rotY(V3(0, 0, k.d / 2 + 60), f.rot * math.pi / 2);
+    w
+      ..x = f.x + out.x
+      ..z = f.z + out.z
+      ..target = null
+      ..refresh();
+    w.unstick();
+    cam.glideTo(target: V3(w.x, 30, w.z), dist: 170);
+    if (!steer) _startSteer();
+  }
+
+  void _startJob(_NCall c) {
+    _job = c;
+    _jobSecs = 0;
+    _teleportTo(c.furn);
+    _say(switch (c.kind) { 'sick' => 'New job: ${c.who} is sick. Go into the hospital and onto the desk.', 'light' => 'New job: a street light is out. Tap the dark light to fix it.', _ => 'New job: a house has no power. Walk in and fix it at the panel.' }, ok: true);
+    setState(() {});
+  }
+
+  /// A red tag over a dark house or a street light: go there, and into the house.
+  void _goToTag(Furn f) {
+    if (room.indoor) return;
+    _teleportTo(f);
+    if (f.kind == 'house2' || f.kind == 'bighouse') {
+      _enterBuilding(f);
+    } else {
+      _say('You are at the street light. Press Fix the street light.', ok: true);
+    }
+  }
 
   Future<void> _startLife() async {
     if (isLesson) return;
@@ -1592,14 +1820,32 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (cm == null || !mounted) return;
     if (tour == null) cm.advance(1, home);
     if (++_beat % 8 == 0) cm.save(home);
+    if (_locked || _pages > 0) return;
     if (_beat % 45 == 20 && !isLesson) _neighbourEvents();
     // In the city the phone rings at least once a minute with a job, so there is always somebody who needs you.
-    if (!isLesson && !room.indoor && _ringing == null && _nCall == null) {
-      if (++_quiet >= 45) _serviceCall();
+    if (!isLesson && !room.indoor) {
+      final j = _job;
+      if (j != null) {
+        _jobSecs++;
+        if (_jobDone(j)) {
+          _finishJob(j);
+        } else if (_jobSecs >= 240) {
+          _job = null;
+          _jobSecs = 0;
+          _strike('The job was not finished in time');
+        }
+      } else if (_waiting.isNotEmpty && inner == null && _ringing == null && _nCall == null) {
+        // The first job is done and you are out of the house: on to the next one.
+        final next = _waiting.removeAt(0);
+        if (!_jobDone(next)) _startJob(next);
+      } else if (_ringing == null && _nCall == null && ++_quiet >= 45) {
+        _serviceCall();
+      }
     } else if (room.indoor) {
       _quiet = 0;
     }
     for (final c in cm.calls) {
+      if (_isBusy && !_knownCalls.contains(c.id)) continue;
       if (_knownCalls.add(c.id)) _ring(c);
     }
     _knownCalls.removeWhere((id) => !cm.calls.any((c) => c.id == id));
@@ -1617,47 +1863,24 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   /// How many seconds have passed in the city without the phone ringing. It never gets to a minute.
   int _quiet = 0;
-  int _calls = 0;
 
   /// Rings with a job: a house with no power, a street light that is out, or somebody who is sick and needs the hospital.
   void _serviceCall() {
-    final city = home.rooms.firstWhere((r) => !r.indoor);
-    final cm = comm;
-    final houses = [for (final f in city.furn) if ((f.kind == 'house2' || f.kind == 'bighouse') && !city.darkHouses.contains(f.id)) f];
-    final lamps = [for (final f in city.furn) if ((f.kind == 'pole' || f.kind == 'lamppost') && !city.brokenLamps.contains(f.id)) f];
-    final hospital = city.furn.where((f) => f.kind == 'hospital');
-    for (var tries = 0; tries < 3; tries++) {
-      final k = (_calls++) % 3;
-      if (k == 0 && houses.isNotEmpty && city.darkHouses.length < 3) {
-        final f = houses[(_beat * 7 + _calls) % houses.length];
-        city.darkHouses.add(f.id);
-        _ringNeighbour(f);
-        return;
-      }
-      if (k == 1 && cm != null && hospital.isNotEmpty) {
-        final well = cm.living.where((p) => !p.sick && p.inBed < 0).toList();
-        if (well.isNotEmpty) {
-          final p = well[(_beat + _calls) % well.length];
-          p.sick = true;
-          p.health = math.min(p.health, 70);
-          _ringNeighbour(hospital.first, kind: 'sick', who: p.name);
-          return;
-        }
-      }
-      if (k == 2 && lamps.isNotEmpty && city.brokenLamps.length < 4) {
-        final f = lamps[(_beat * 5 + _calls) % lamps.length];
-        city.brokenLamps.add(f.id);
-        _ringNeighbour(f, kind: 'light');
-        return;
-      }
-    }
     _quiet = 0;
+    final c = _newJob();
+    if (c == null) return;
+    if (_isBusy) {
+      // Somebody is working: no phone call, the job waits on the list.
+      if (_waiting.length < 3) _waiting.add(c);
+      return;
+    }
+    _ringCall(c);
   }
 
-  void _ringNeighbour(Furn f, {String kind = 'power', String who = ''}) {
+  void _ringCall(_NCall c) {
     _quiet = 0;
     _ringing = null;
-    _nCall = _NCall(f, kind == 'power' ? (f.kind == 'bighouse' ? 'the big house' : 'the house') : kind == 'sick' ? 'the hospital' : 'the street', kind: kind, who: who);
+    _nCall = c;
     _startRingTimer();
   }
 
@@ -1668,7 +1891,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       if (!mounted) return;
       _ringTicks++;
       if (_ringTicks > 36) {
+        final missed = _nCall;
         _stopRing();
+        if (missed != null) _strike('Nobody answered the phone');
         return;
       }
       if (_ringTicks % 8 < 4) {
@@ -1722,14 +1947,29 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
                 Text(nc.subtitle, style: const TextStyle(color: Colors.white38, fontSize: 11.5)),
               ])),
               GestureDetector(
-                onTapDown: (_) => _stopRing(),
-                child: Container(width: 52, height: 52, decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle), child: const Icon(Icons.call_end_rounded, color: Colors.white)),
+                onTapDown: (_) {
+                  _stopRing();
+                  _strike('You turned the call down');
+                },
+                child: Container(width: 46, height: 46, decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle), child: const Icon(Icons.call_end_rounded, color: Colors.white)),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 8),
               GestureDetector(
                 onTapDown: (_) {
                   final c = nc;
                   _stopRing();
+                  _waiting.add(c);
+                  _say('Saved on your waiting list. You will be taken there when you are free.', ok: true);
+                },
+                child: Container(width: 46, height: 46, decoration: const BoxDecoration(color: Color(0xFFF59E0B), shape: BoxShape.circle), child: const Icon(Icons.schedule_rounded, color: Colors.white)),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTapDown: (_) {
+                  final c = nc;
+                  _stopRing();
+                  _job = c;
+                  _jobSecs = 0;
                   _neighbourText(c);
                 },
                 child: Container(width: 52, height: 52, decoration: const BoxDecoration(color: Color(0xFF22C55E), shape: BoxShape.circle), child: const Icon(Icons.call_rounded, color: Colors.white)),
@@ -1812,10 +2052,10 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     }
     if (r.lessonIsPlumbing) {
       r.lessonPlumb ??= PlumbState();
-      await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => r.lesson == 'ptrap' ? PtrapLessonPage(state: r.lessonPlumb) : FaucetLessonPage(state: r.lessonPlumb)));
+      await _pushPage(MaterialPageRoute<void>(builder: (_) => r.lesson == 'ptrap' ? PtrapLessonPage(state: r.lessonPlumb) : FaucetLessonPage(state: r.lessonPlumb)));
     } else {
       r.lessonState ??= WiringState();
-      await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ElectricalLessonPage(id: r.lesson, state: r.lessonState)));
+      await _pushPage(MaterialPageRoute<void>(builder: (_) => ElectricalLessonPage(id: r.lesson, state: r.lessonState)));
     }
     if (!mounted) return;
     setState(_rebuild);
@@ -1831,7 +2071,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   Future<void> _wireExtra(int i) async {
     final e = room.extras[i];
-    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ElectricalLessonPage(id: e.kind, state: e.state)));
+    await _pushPage(MaterialPageRoute<void>(builder: (_) => ElectricalLessonPage(id: e.kind, state: e.state)));
     if (!mounted) return;
     setState(_rebuild);
     if (e.done) _say('Wired! ${e.kind == 'switch' ? 'Tap it to turn the light on and off.' : 'Tap it to plug something in.'}');
@@ -1847,7 +2087,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       r.wiring = np;
     }
     r.wiring!.practice = home.practice;
-    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => NgmyRoomProjectPage(project: r.wiring)));
+    await _pushPage(MaterialPageRoute<void>(builder: (_) => NgmyRoomProjectPage(project: r.wiring)));
     if (!mounted) return;
     setState(_rebuild);
     if (r.wired) _say('${r.name}: the wiring is finished. The light has power.');
@@ -1862,7 +2102,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     r.plumb ??= PlumbJob(seed: home.seed * 41 + r.id, variantId: r.kind == 'kitchen' ? 'kitchen' : 'bathroom');
     if (!r.plumbNeeded && !r.plumb!.allPlaced) r.plumb!.completeAll();
     r.plumb!.practice = home.practice;
-    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => NgmyPlumbJobPage(job: r.plumb)));
+    await _pushPage(MaterialPageRoute<void>(builder: (_) => NgmyPlumbJobPage(job: r.plumb)));
     if (!mounted) return;
     setState(_rebuild);
     if (r.plumbed) _say('${r.name}: the plumbing is finished and nothing leaks.');
@@ -2108,6 +2348,30 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_locked) {
+      final left = Duration(milliseconds: _lockedUntil - DateTime.now().millisecondsSinceEpoch);
+      return Scaffold(
+        backgroundColor: const Color(0xFF0B0F17),
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const Text('🔒', style: TextStyle(fontSize: 54)),
+                const SizedBox(height: 12),
+                const Text('The game is closed for now', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900), textAlign: TextAlign.center),
+                const SizedBox(height: 10),
+                const Text('You missed 3 jobs in a row. The City office needs people who answer the phone and finish the job.', style: TextStyle(color: Colors.white70, fontSize: 14.5, height: 1.4), textAlign: TextAlign.center),
+                const SizedBox(height: 14),
+                Text('It opens again in ${left.inHours}h ${left.inMinutes % 60}m', style: const TextStyle(color: Color(0xFFFACC15), fontSize: 18, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 22),
+                FilledButton(onPressed: () => Navigator.of(context).maybePop(), child: const Text('Go back')),
+              ]),
+            ),
+          ),
+        ),
+      );
+    }
     final page = _buildPage(context);
     return Stack(children: [
       Positioned.fill(child: RepaintBoundary(key: _shotKey, child: page)),
@@ -2138,8 +2402,21 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         _chip('🛒 Shop', false, () => _citySheet('shop'), color: const Color(0xFFFB923C)),
         _chip('👨‍👩‍👧 People', false, () => _citySheet('people'), color: const Color(0xFF60A5FA)),
         _chip('🏠 Go inside', false, () => _go(10), color: const Color(0xFF4ADE80)),
+        if (_job != null) _chip('📋 Go to my job', false, () => _startJob(_job!), color: const Color(0xFFFACC15)),
+        if (_waiting.isNotEmpty) _chip('⏳ Waiting: ${_waiting.length}', false, () => _say('${_waiting.length} job${_waiting.length == 1 ? '' : 's'} waiting. You are taken to the next one when you finish this one.', ok: true), color: const Color(0xFFF59E0B)),
+        _chip(_hideTags ? '🏷 Show tags' : '🏷 Hide tags', _hideTags, () => setState(() => _hideTags = !_hideTags), color: const Color(0xFFF87171)),
         _chip('🗺 Map', showMap, () => setState(() => showMap = !showMap), color: const Color(0xFFA78BFA)),
       ];
+
+  Scene3D? _tagSrc, _tagOut;
+
+  /// The scene, without the red tags when they are switched off.
+  Scene3D get _shownScene {
+    if (!_hideTags) return scene;
+    if (identical(_tagSrc, scene) && _tagOut != null) return _tagOut!;
+    _tagSrc = scene;
+    return _tagOut = Scene3D(scene.polys, info: scene.info, labels: [for (final l in scene.labels) if (l.id == 0 && l.color != const Color(0xFFDC2626)) l], screens: scene.screens, shell: scene.shell);
+  }
 
   Widget _buildPage(BuildContext context) {
     final r = room;
@@ -2148,7 +2425,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     _padW = screenW;
     final stage3d = Stage3D(
         sky: !room.indoor && inner == null,
-        scene: scene,
+        scene: _shownScene,
         cam: cam,
         highlight: hl,
         onPick: _pick,

@@ -25,6 +25,7 @@ const int idHOutletA = 700, idHOutletB = 701, idHSwitch = 702, idHLight = 703;
 const int idHResident = 900; // + the resident's number: a person who lives in the house
 const int idHApp = 720; // + 0 or 1 (or 2 and up for added outlets): what is plugged in
 const int idHWallTv = 730;
+const int idHTag = 1100; // + a furniture number: the red tag over a dark house or a street light that is out
 const int idHExtra = 800; // + number: an outlet or switch the visitor added
 const int idHToiletF = 710, idHSinkF = 711, idHTubF = 712, idHKSink = 713;
 
@@ -716,7 +717,7 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
       lb.alpha = 1;
     }
     b.polys.addAll(lb.polys);
-    if (broken) labels.add(Label3D(top + const V3(0, 14, 0), '⚡ Light out: fix it', const Color(0xFFDC2626)));
+    if (broken) labels.add(Label3D(top + const V3(0, 14, 0), '⚡ Light out: tap to go and fix it', const Color(0xFFDC2626), id: idHTag + f.id));
     if (f.kind == 'pole') poles.add(f);
   }
   poles.sort((a, b) => a.x.compareTo(b.x));
@@ -733,7 +734,7 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
   }
   for (final f in r.furn.where((f) => r.darkHouses.contains(f.id))) {
     final k = kFurnKinds[f.kind]!;
-    labels.add(Label3D(V3(f.x, f.kind == 'bighouse' ? 120 : 82, f.z), '⚡ No power: fix the wiring', const Color(0xFFDC2626)));
+    labels.add(Label3D(V3(f.x, f.kind == 'bighouse' ? 120 : 82, f.z), '⚡ No power: tap to go in and fix it', const Color(0xFFDC2626), id: idHTag + f.id));
     final dark = MeshBuilder()
       ..id = 0
       ..order = 2;

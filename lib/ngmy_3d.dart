@@ -70,10 +70,13 @@ class ObjInfo {
 }
 
 class Label3D {
-  const Label3D(this.at, this.text, this.color);
+  const Label3D(this.at, this.text, this.color, {this.id = 0});
   final V3 at;
   final String text;
   final Color color;
+
+  /// Not 0: tapping the label reports this id, so a label can take you to the thing it is about.
+  final int id;
 }
 
 class Scene3D {
@@ -707,6 +710,7 @@ class Scene3DPainter extends CustomPainter {
       canvas.drawRRect(r, Paint()..color = l.color.withValues(alpha: 0.92));
       canvas.drawRRect(r, Paint()..style = PaintingStyle.stroke..strokeWidth = 1..color = Colors.white70);
       tp.paint(canvas, p - Offset(tp.width / 2, tp.height / 2));
+      if (l.id != 0) hits.list.add((Path()..addRRect(r), l.id));
     }
   }
 

@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_3d.dart';
+import 'package:ngmy/ngmy_construction_cityin.dart';
+import 'package:ngmy/ngmy_construction_tour.dart';
+import 'package:ngmy/ngmy_construction_world.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ngmy/ngmy_city_traffic.dart';
 import 'package:ngmy/ngmy_construction_home.dart';
 import 'package:ngmy/ngmy_construction_homepage.dart';
@@ -91,5 +95,31 @@ void main() {
     await t.pump(const Duration(seconds: 1));
     await t.pump(const Duration(seconds: 1));
     await t.pump(const Duration(seconds: 30));
+  });
+
+  test('a person who ends up inside something is moved out to free ground', () {
+    final w = WorldWalker.indoors(w: 300, d: 210, obstacles: const [NavRect(-40, 40, 80, 130)], x: 0, z: 100);
+    expect(w.blocked(w.x, w.z), isTrue);
+    expect(w.unstick(), isTrue);
+    expect(w.blocked(w.x, w.z), isFalse);
+    expect(w.unstick(), isFalse, reason: 'nothing to do when already free');
+  });
+
+  test('a dark house shows its breaker panel, outlet and switch with red frames, and the labels can be tapped', () {
+    final f = HomeProject(seed: 4).rooms[11].furn.firstWhere((f) => f.kind == 'house2');
+    final dark = CityInterior('house2', f, dark: true)..build(null);
+    expect(dark.scene.labels.where((l) => l.id == idCinPanel || l.id == idCinOutlet).length, 3);
+    expect(dark.scene.polys.any((p) => p.color == const Color(0xFFEF4444) && p.alpha < 1), isTrue, reason: 'a red frame behind it');
+  });
+
+  testWidgets('after three missed jobs the game is closed with a countdown', (t) async {
+    SharedPreferences.setMockInitialValues({'ngmy_city_locked_until': DateTime.now().add(const Duration(hours: 4, minutes: 30)).millisecondsSinceEpoch});
+    HomeProject.session = HomeProject(seed: 31)..current = 11;
+    await t.pumpWidget(const MaterialApp(home: NgmyHousePage()));
+    await t.pump(const Duration(milliseconds: 600));
+    await t.pump(const Duration(seconds: 3));
+    expect(find.text('The game is closed for now'), findsOneWidget);
+    expect(find.textContaining('It opens again in 4h'), findsOneWidget);
+    await t.pump(const Duration(seconds: 3));
   });
 }
