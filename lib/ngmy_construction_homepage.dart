@@ -161,13 +161,13 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     double dist, pitch, yaw;
     if (walk) {
       // Standing in the middle of the room: the camera is the head, and turning it goes all the way round.
-      target = V3(0, 48, r.d * 0.55);
-      dist = 3;
-      pitch = 0.0;
+      target = V3(0, 40, r.d * 0.5);
+      dist = math.max(r.w, r.d) * 0.6;
+      pitch = 0.12;
       yaw = -0.05;
       cam
-        ..minDist = 2
-        ..maxDist = 12
+        ..minDist = 20
+        ..maxDist = 260
         ..minPitch = -1.2
         ..maxPitch = 1.2
         ..setFree(true);
@@ -195,8 +195,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         ..maxDist = dist * 1.6
         ..minPitch = 0.03
         ..maxPitch = 1.35
-        ..yawRange = 0.5
-        ..setFree(false);
+        ..setFree(true);
     } else {
       target = V3(0, 30, r.d * 0.45);
       dist = (r.w * 1.2 > r.d * 1.4 ? r.w * 1.2 : r.d * 1.4) + 30;
@@ -207,8 +206,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         ..maxDist = 560
         ..minPitch = 0.1
         ..maxPitch = 1.35
-        ..yawRange = 0.9
-        ..setFree(false);
+        ..setFree(true);
     }
     if (snap) {
       cam.target = target;
@@ -1246,6 +1244,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       stepText: isLesson ? (r.lessonDone ? 'Done ✓' : 'To do') : '${home.finishedCount}/${home.indoor.length} done',
       onSteps: () => isLesson ? _openLesson() : _problems(context),
       stage: Stage3D(
+        sky: !room.indoor,
         scene: scene,
         cam: cam,
         highlight: hl,

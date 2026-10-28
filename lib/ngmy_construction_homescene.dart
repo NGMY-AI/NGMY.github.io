@@ -408,7 +408,6 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
   }
 
   for (final f in residents.where((f) => f.room == r.id)) {
-    labels.add(Label3D(V3(f.x, 74, f.z), f.label, f.alert ? const Color(0xFFDC2626) : const Color(0xFF15803D)));
     info[idHResident + f.id] = ObjInfo(f.label, 'Tap to see how they are, feed them or give medicine.', V3(f.x, 36, f.z), 90);
   }
   return Scene3D(b.polys, info: info, labels: labels, screens: screens);

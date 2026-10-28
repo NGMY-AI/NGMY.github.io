@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image/image.dart' as pic;
 
 import 'ngmy_3d.dart';
 
@@ -59,6 +59,9 @@ class _Lod {
   final Uint8List vskin;
   final Int32List tris;
   final Int32List colors;
+
+  /// Which part of the body each point belongs to (head, arms, legs, trunk): every part is sorted as one piece.
+  late Uint8List region;
   int get vertices => rest.length ~/ 3;
   int get faces => tris.length ~/ 3;
 }
@@ -109,6 +112,9 @@ class GlbAvatar {
   // ── What is in the file ──
 
   late List<int> _parent;
+  late List<String> _names;
+  int _hips = -1;
+  final Map<String, (double, double)> _hipsStart = {};
   late List<List<int>> _children;
   late List<int> _roots;
   late Float64List _restT, _restR, _restS;
@@ -139,6 +145,8 @@ class GlbAvatar {
     final nodes = (json['nodes'] as List).cast<Map<String, dynamic>>();
     final n = nodes.length;
     _parent = List.filled(n, -1);
+    _names = [for (final nd in nodes) ((nd['name'] as String?) ?? '').toLowerCase()];
+    _hips = _names.indexWhere((e) => e.contains('hips'));
     _children = [for (final nd in nodes) [for (final c in (nd['children'] as List? ?? const [])) (c as num).toInt()]];
     for (var i = 0; i < n; i++) {
       for (final c in _children[i]) {
@@ -211,12 +219,11 @@ class GlbAvatar {
       final bytes = g.imageBytes(i);
       if (bytes == null) continue;
       try {
-        final codec = await ui.instantiateImageCodec(bytes);
-        final frame = await codec.getNextFrame();
-        final bd = await frame.image.toByteData(format: ui.ImageByteFormat.rawRgba);
-        if (bd != null) images[i] = _Img(frame.image.width, frame.image.height, bd.buffer.asUint8List(bd.offsetInBytes, bd.lengthInBytes));
-        frame.image.dispose();
-        codec.dispose();
+        final decoded = pic.decodeImage(bytes);
+        if (decoded != null) {
+          final rgba = decoded.convert(format: pic.Format.uint8, numChannels: 4);
+          images[i] = _Img(rgba.width, rgba.height, Uint8List.fromList(rgba.getBytes(order: pic.ChannelOrder.rgba)));
+        }
       } catch (e) {
         debugPrint('Could not read a picture of $key: $e');
       }
@@ -229,6 +236,8 @@ class GlbAvatar {
     _guide = _thin(mesh, kAvatarFacesGuide);
     await Future<void>.delayed(Duration.zero);
     _resident = _thin(mesh, kAvatarFacesResident);
+    _guide.region = _regionsOf(_guide);
+    _resident.region = _regionsOf(_resident);
 
     // Feet on the floor: the lowest point of the standing pose is y = 0.
     final rest = _poseMatrices(null, 0);
@@ -238,6 +247,40 @@ class GlbAvatar {
       low = math.min(low, pts[i]);
     }
     _floor = low.isFinite ? low : 0;
+  }
+
+  /// 0 head, 1 left arm, 2 right arm, 3 left leg, 4 right leg, 5 trunk: found by following the bone up to the first named part.
+  int _regionOfNode(int node) {
+    var i = node;
+    while (i >= 0) {
+      final n = _names[i];
+      if (n.contains('head') || n.contains('neck')) return 0;
+      if (n.contains('leftshoulder') || n.contains('leftarm')) return 1;
+      if (n.contains('rightshoulder') || n.contains('rightarm')) return 2;
+      if (n.contains('leftupleg') || n.contains('leftleg') || n.contains('leftfoot')) return 3;
+      if (n.contains('rightupleg') || n.contains('rightleg') || n.contains('rightfoot')) return 4;
+      i = _parent[i];
+    }
+    return 5;
+  }
+
+  Uint8List _regionsOf(_Lod lod) {
+    final out = Uint8List(lod.vertices);
+    for (var v = 0; v < lod.vertices; v++) {
+      final sk = lod.vskin[v];
+      if (sk == 255 || sk >= _skinJoints.length) {
+        out[v] = 5;
+        continue;
+      }
+      var best = 0;
+      for (var k = 1; k < 4; k++) {
+        if (lod.wgt[v * 4 + k] > lod.wgt[v * 4 + best]) best = k;
+      }
+      final j = lod.jidx[v * 4 + best];
+      final joints = _skinJoints[sk];
+      out[v] = j < joints.length ? _regionOfNode(joints[j]) : 5;
+    }
+    return out;
   }
 
   static Float64List _identities(int n) {
@@ -673,26 +716,44 @@ class GlbAvatar {
 
   double clipLength(String clip) => clips[clip]?.duration ?? 1;
 
+  /// The way each character faces in its file, and how fast its clips should play.
+  static const Map<String, double> _faceFix = {'soldier': math.pi};
+  static const Map<String, double> _speed = {'michelle': 0.55};
+
   /// The character as faces of the game: feet on y = 0, facing +z (turned by [yaw]), standing at [x], [z].
   /// [walkedUnits] is how far the person has walked (it keeps the feet in step with the ground); null means just use [time].
   List<Poly> polys({required double time, required double x, required double z, required double yaw, bool walking = false, double? walkedUnits, int id = 0, bool close = true}) {
     final lod = close ? _guide : _resident;
     final clip = clipFor(walking: walking);
     final len = clipLength(clip);
-    final clipTime = walking && walkedUnits != null ? walkedUnits / 50 * len : time;
+    final clipTime = walking && walkedUnits != null ? walkedUnits / 50 * len : time * (_speed[key] ?? 1.0);
+    // Where the hips are at the start of the clip: the dancer is kept on her spot and is not carried around by the dance.
+    var start = _hipsStart[clip];
+    if (start == null) {
+      _poseMatrices(clip, 0);
+      start = _hips >= 0 ? (_scratch['world']![_hips * 16 + 12], _scratch['world']![_hips * 16 + 14]) : (0.0, 0.0);
+      _hipsStart[clip] = start;
+    }
     final mats = _poseMatrices(clip, clipTime);
+    var ox = 0.0, oz = 0.0;
+    if (_hips >= 0) {
+      ox = _scratch['world']![_hips * 16 + 12] - start.$1;
+      oz = _scratch['world']![_hips * 16 + 14] - start.$2;
+    }
     final p = _skin(lod, mats);
     final s = kAvatarUnitsPerMetre;
-    final c = math.cos(yaw), sn = math.sin(yaw);
+    final a = yaw + (_faceFix[key] ?? 0);
+    final c = math.cos(a), sn = math.sin(a);
     final pts = List<V3>.generate(lod.vertices, (i) {
-      final px = p[i * 3] * s, py = (p[i * 3 + 1] - _floor) * s, pz = p[i * 3 + 2] * s;
+      final px = (p[i * 3] - ox) * s, py = (p[i * 3 + 1] - _floor) * s, pz = (p[i * 3 + 2] - oz) * s;
       return V3(px * c + pz * sn + x, py, -px * sn + pz * c + z);
     });
+    final groups = [for (var i = 0; i < 6; i++) MeshBuilder.newGroup()];
     final out = <Poly>[];
     for (var t = 0; t < lod.tris.length; t += 3) {
-      final a = pts[lod.tris[t]], b = pts[lod.tris[t + 1]], d = pts[lod.tris[t + 2]];
-      final n = (b - a).cross(d - a).unit;
-      out.add(Poly([a, b, d], n, Color(lod.colors[t ~/ 3]), id, shine: 0.08));
+      final va = pts[lod.tris[t]], vb = pts[lod.tris[t + 1]], vd = pts[lod.tris[t + 2]];
+      final n = (vb - va).cross(vd - va).unit;
+      out.add(Poly([va, vb, vd], n, Color(lod.colors[t ~/ 3]), id, shine: 0.08, group: groups[lod.region[lod.tris[t]]]));
     }
     return out;
   }

@@ -115,6 +115,9 @@ class MeshBuilder {
   int order = 2;
   bool grouped = false;
   static int _groups = 0;
+
+  /// A fresh group number, for faces made somewhere else that must be sorted together as one part.
+  static int newGroup() => ++_groups;
   int _g = 0;
   int _sticky = 0;
 
@@ -402,7 +405,7 @@ class HitCache {
 }
 
 class Scene3DPainter extends CustomPainter {
-  Scene3DPainter({required this.scene, required this.cam, required this.hits, this.highlight = 0, this.layerOn, this.clock, this.dynamicPolys, Listenable? repaint, this.background = const Color(0xFF0E1218)}) : super(repaint: repaint);
+  Scene3DPainter({required this.scene, required this.cam, required this.hits, this.highlight = 0, this.layerOn, this.clock, this.dynamicPolys, Listenable? repaint, this.background = const Color(0xFF0E1218), this.sky = false}) : super(repaint: repaint);
   final Scene3D scene;
   final Cam3 cam;
   final HitCache hits;
@@ -414,13 +417,71 @@ class Scene3DPainter extends CustomPainter {
   final List<Poly> Function(double t)? dynamicPolys;
   final Color background;
 
+  /// Draw space behind the scene (stars, a galaxy, the Earth) instead of a plain dark colour.
+  final bool sky;
+
   double get time => clock?.value ?? 0;
 
   static const _toLight = V3(-0.28, 0.55, -0.8);
 
+  void _paintSky(Canvas canvas, Size size) {
+    final w = size.width, h = size.height;
+    final rect = Offset.zero & size;
+    canvas.drawRect(rect, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF02030A), Color(0xFF0A0F2E), Color(0xFF241552)]).createShader(rect));
+    final drift = cam.yaw * 90;
+    // The galaxy: a soft slanted band of light.
+    canvas.save();
+    canvas.translate(w * 0.45 - drift, h * 0.3);
+    canvas.rotate(-0.45);
+    for (var i = 0; i < 3; i++) {
+      final bw = w * (1.9 - i * 0.4), bh = h * (0.2 - i * 0.05);
+      final r = Rect.fromCenter(center: Offset.zero, width: bw, height: bh);
+      final col = [const Color(0xFF6D4AFF), const Color(0xFF38BDF8), const Color(0xFFF0ABFC)][i];
+      canvas.drawOval(r, Paint()..shader = RadialGradient(colors: [col.withValues(alpha: 0.30 - i * 0.07), col.withValues(alpha: 0)]).createShader(r));
+    }
+    canvas.restore();
+    // The stars, always in the same places, some twinkling.
+    final rnd = math.Random(11);
+    final star = Paint();
+    for (var i = 0; i < 170; i++) {
+      final x = ((rnd.nextDouble() * w * 1.5 - drift * (0.4 + rnd.nextDouble() * 0.6)) % w + w) % w;
+      final y = rnd.nextDouble() * h * 0.85;
+      final big = rnd.nextDouble();
+      final tw = 0.55 + 0.45 * math.sin(time * (1 + big * 2) + i);
+      star.color = Colors.white.withValues(alpha: (0.35 + 0.65 * big) * tw);
+      canvas.drawCircle(Offset(x, y), 0.5 + big * 1.4, star);
+    }
+    // The Earth, with its blue seas, green land, clouds and a shadow on one side.
+    final c = Offset(w * 0.8 - drift * 0.3, h * 0.17);
+    final rad = math.min(w, h) * 0.12;
+    canvas.drawCircle(c, rad * 1.5, Paint()..shader = RadialGradient(colors: [const Color(0xFF38BDF8).withValues(alpha: 0.28), const Color(0x0038BDF8)]).createShader(Rect.fromCircle(center: c, radius: rad * 1.5)));
+    canvas.save();
+    canvas.clipPath(Path()..addOval(Rect.fromCircle(center: c, radius: rad)));
+    canvas.drawCircle(c, rad, Paint()..shader = const RadialGradient(center: Alignment(-0.4, -0.4), colors: [Color(0xFF4FB3F6), Color(0xFF1D5FC4), Color(0xFF0B2A6B)]).createShader(Rect.fromCircle(center: c, radius: rad)));
+    final land = Paint()..color = const Color(0xFF3FA55B);
+    for (final (dx, dy, rx, ry) in const [(-0.35, -0.2, 0.42, 0.3), (0.3, 0.25, 0.32, 0.38), (0.05, -0.55, 0.22, 0.14), (-0.5, 0.45, 0.2, 0.16)]) {
+      canvas.drawOval(Rect.fromCenter(center: c + Offset(dx * rad + math.sin(time * 0.05) * rad * 0.08, dy * rad), width: rx * rad * 2, height: ry * rad * 2), land);
+    }
+    final cloud = Paint()..color = Colors.white.withValues(alpha: 0.55);
+    for (final (dx, dy, rx) in const [(-0.1, 0.0, 0.5), (0.35, -0.4, 0.3), (-0.4, 0.55, 0.35)]) {
+      canvas.drawOval(Rect.fromCenter(center: c + Offset(dx * rad, dy * rad), width: rx * rad * 2, height: rad * 0.16), cloud);
+    }
+    canvas.drawCircle(c + Offset(rad * 0.45, rad * 0.35), rad, Paint()..color = Colors.black.withValues(alpha: 0.38));
+    canvas.restore();
+    // A small moon.
+    final m = Offset(w * 0.18 - drift * 0.2, h * 0.12);
+    canvas.drawCircle(m, rad * 0.28, Paint()..color = const Color(0xFFD7D9E0));
+    canvas.drawCircle(m + Offset(rad * 0.08, rad * 0.05), rad * 0.07, Paint()..color = const Color(0xFFAEB1BC));
+    canvas.drawCircle(m + Offset(-rad * 0.1, -rad * 0.09), rad * 0.05, Paint()..color = const Color(0xFFAEB1BC));
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.drawRect(Offset.zero & size, Paint()..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color.lerp(background, Colors.white, 0.06)!, background]).createShader(Offset.zero & size));
+    if (sky) {
+      _paintSky(canvas, size);
+    } else {
+      canvas.drawRect(Offset.zero & size, Paint()..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color.lerp(background, Colors.white, 0.06)!, background]).createShader(Offset.zero & size));
+    }
     final w = size.width, h = size.height;
     final f = math.min(w, h) * 1.15;
     final cx = w / 2, cy = h / 2;
@@ -618,7 +679,7 @@ class _Face {
 // ─── The view: turn with a finger, pinch or scroll to zoom, tap to pick ───────
 
 class Scene3DView extends StatefulWidget {
-  const Scene3DView({super.key, required this.scene, required this.cam, this.highlight = 0, this.onPick, this.layerOn, this.dynamicPolys, this.background = const Color(0xFF0E1218), this.overlay, this.onDoubleTap});
+  const Scene3DView({super.key, required this.scene, required this.cam, this.highlight = 0, this.onPick, this.layerOn, this.dynamicPolys, this.background = const Color(0xFF0E1218), this.overlay, this.onDoubleTap, this.sky = false});
   final Scene3D scene;
   final Cam3 cam;
   final int highlight;
@@ -627,6 +688,7 @@ class Scene3DView extends StatefulWidget {
   final List<Poly> Function(double t)? dynamicPolys;
   final Color background;
   final Widget? overlay;
+  final bool sky;
 
   /// A double tap: where on the view (and how big the view is), for "go to where I tapped".
   final void Function(Offset local, Size size)? onDoubleTap;
@@ -684,7 +746,7 @@ class _Scene3DViewState extends State<Scene3DView> with SingleTickerProviderStat
           ClipRect(
             child: RepaintBoundary(
               child: CustomPaint(
-                painter: Scene3DPainter(scene: widget.scene, cam: widget.cam, hits: _hits, highlight: widget.highlight, layerOn: widget.layerOn, clock: _time, dynamicPolys: widget.dynamicPolys, repaint: Listenable.merge([widget.cam, _time]), background: widget.background),
+                painter: Scene3DPainter(scene: widget.scene, cam: widget.cam, hits: _hits, highlight: widget.highlight, layerOn: widget.layerOn, clock: _time, dynamicPolys: widget.dynamicPolys, repaint: Listenable.merge([widget.cam, _time]), background: widget.background, sky: widget.sky),
                 size: Size.infinite,
               ),
             ),

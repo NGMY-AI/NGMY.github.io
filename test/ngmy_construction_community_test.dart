@@ -208,7 +208,7 @@ void main() {
     expect(figs.map((f) => f.id), contains(0));
     final room = h.rooms[ama.room];
     final scene = buildHomeRoom(room, residents: figs);
-    expect(scene.labels.any((l) => l.text.contains('Ama')), isTrue);
+    expect(scene.labels.any((l) => l.text.contains('Ama')), isFalse, reason: 'names no longer float over the people');
     expect(scene.info.containsKey(idHResident), isTrue);
     final polys = homeDynamic(room, 1.0, residents: figs);
     expect(polys.where((p) => p.id == idHResident), isNotEmpty);
