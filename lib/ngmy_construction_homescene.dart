@@ -17,14 +17,15 @@ const int idHFurn = 100; // + furniture number (1 to 99)
 const int idHDoor = 600; // + door number
 const int idHWallBack = 300, idHWallLeft = 301, idHWallRight = 302, idHFloorObj = 310, idHCeilObj = 320;
 const int idHOutletA = 700, idHOutletB = 701, idHSwitch = 702, idHLight = 703;
+const int idHResident = 900; // + the resident's number: a person who lives in the house
 const int idHApp = 720; // + 0 or 1 (or 2 and up for added outlets): what is plugged in
 const int idHWallTv = 730;
 const int idHExtra = 800; // + number: an outlet or switch the visitor added
 const int idHToiletF = 710, idHSinkF = 711, idHTubF = 712, idHKSink = 713;
 
 /// Edit modes: look, furniture, walls, floor, ceiling, doors.
-Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int problems = 0}) {
-  if (r.kind == 'outside') return _outside(r, problems);
+Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int problems = 0, bool closed = false, List<ResidentFigure> residents = const []}) {
+  if (r.kind == 'outside') return _outside(r, problems, mode, selected);
   final b = MeshBuilder();
   final info = <int, ObjInfo>{};
   final labels = <Label3D>[];
@@ -63,6 +64,11 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
   info[idHWallBack] = const ObjInfo('Back wall', 'Pick a paint colour above to change this wall.', V3(0, 40, 0), 140);
   info[idHWallLeft] = const ObjInfo('Left wall', 'Pick a paint colour above to change this wall.', V3(-60, 40, 50), 140);
   info[idHWallRight] = const ObjInfo('Right wall', 'Pick a paint colour above to change this wall.', V3(60, 40, 50), 140);
+  if (closed) {
+    // The fourth wall, so the room is a whole room that can be looked round in every direction.
+    b.id = 0;
+    b.box(V3(0, h / 2, d + 0.6), V3(w + 2.4, h, 1.2), wallCols[0], split: 3);
+  }
   b.id = 0;
   // Baseboards.
   b.order = 1;
@@ -71,10 +77,10 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
   b.box(V3(-w / 2 + 0.4, 2.5, d / 2), V3(0.8, 5, d), base, shine: 0.1);
   b.box(V3(w / 2 - 0.4, 2.5, d / 2), V3(0.8, 5, d), base, shine: 0.1);
 
-  // ── Ceiling (seen through) ──
-  b.order = 3;
+  // ── Ceiling (seen through from outside, solid when you are inside) ──
+  b.order = closed ? 0 : 3;
   b.id = when('ceiling', idHCeilObj);
-  b.alpha = mode == 'ceiling' ? 0.6 : 0.4;
+  b.alpha = closed ? 1.0 : (mode == 'ceiling' ? 0.6 : 0.4);
   b.box(V3(0, h + 0.6, d / 2), V3(w + 2.4, 1.2, d + 2), kCeilColors[r.ceiling], split: 2);
   b.alpha = 1;
   // Crown moulding where the walls meet the ceiling.
@@ -97,6 +103,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
     win.box(const V3(0, 56, 1.3), const V3(30, 1.4, 0.4), const Color(0xFFF4F1EA));
     win.box(const V3(0, 56, 1.3), const V3(1.4, 26, 0.4), const Color(0xFFF4F1EA));
     final z = d * 0.55;
+    if (closed) b.polys.addAll(transformPolys(win.polys, ry: math.pi, t: V3(0, 0, d + 0.2)));
     b.polys.addAll(winWall == 'right' ? transformPolys(win.polys, ry: -math.pi / 2, t: V3(w / 2, 0, z)) : transformPolys(win.polys, ry: math.pi / 2, t: V3(-w / 2, 0, z)));
   }
 
@@ -147,6 +154,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
     final k = kFurnKinds[f.kind]!;
     final fb = MeshBuilder();
     fb.grouped = true;
+    fb.order = f.kind == 'rug' ? 1 : 2;
     fb.id = when('furniture', idHFurn + f.id);
     _furniture(fb, f.kind, kFurnColors[f.color]);
     b.polys.addAll(transformPolys(fb.polys, ry: f.rot * math.pi / 2, t: V3(f.x, 0, f.z)));
@@ -268,38 +276,46 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
     info[idHApp + i] = ObjInfo(a.name, a.isTv ? 'It is playing NGMY ads. Tap it to watch full screen with the remote.' : 'It is plugged in and running. Tap the outlet to unplug it or plug in something else.', V3(x, 16, 14), 90);
   }
 
-  // ── The TV on the wall ──
+  // ── The TVs on the wall ──
   b.order = 1;
   b.grouped = false;
-  final tvKey = r.wallTv;
-  if (tvKey != null) {
+  void hangTv(String? tvKey, int sub) {
+    if (tvKey == null) return;
     final a = applianceByKey(tvKey);
-    final hall = r.kind == 'hall';
-    final tw = a.tvWidth * (hall ? 0.5 : 0.9), th = tw * 0.56;
+    final box = wallTvBox(r, a);
+    final tw = box.w, th = box.h, y = box.cy;
     final sw = tw - 2.5, sh = th - 2.5;
-    b.id = idHWallTv;
+    final id = idHWallTv + sub;
+    const frame = Color(0xFF1B1D22), glass = Color(0xFF0B0F17);
+    b.id = id;
     b.bias = 5;
-    if (hall) {
-      const y = 52.0, z = 50.0;
-      final x = w / 2;
-      b.box(V3(x - 1.4, y, z), V3(2.6, th + 3, tw + 3), const Color(0xFF1B1D22), shine: 0.5);
-      b.box(V3(x - 2.8, y, z), V3(0.2, th, tw), const Color(0xFF0B0F17), shine: 0.7);
+    if (r.kind == 'hall') {
+      // On an end wall, facing into the hall.
+      final left = sub == 1;
+      final x = left ? -w / 2 : w / 2;
+      final dir = left ? 1.0 : -1.0;
+      final z = box.cx;
+      b.box(V3(x + dir * 1.4, y, z), V3(2.6, th + 3, tw + 3), frame, shine: 0.5);
+      b.box(V3(x + dir * 2.8, y, z), V3(0.2, th, tw), glass, shine: 0.7);
       if (r.tvOn) {
-        final xs = x - 2.95;
-        screens.add(ScreenQuad([V3(xs, y + sh / 2, z - sw / 2), V3(xs, y + sh / 2, z + sw / 2), V3(xs, y - sh / 2, z + sw / 2), V3(xs, y - sh / 2, z - sw / 2)], idHWallTv, (c, size, t) => paintNgmyApp(c, size, r.tvApp, t + r.id), bias: 9));
+        final xs = x + dir * 2.95;
+        final zl = left ? z + sw / 2 : z - sw / 2, zr = left ? z - sw / 2 : z + sw / 2;
+        screens.add(ScreenQuad([V3(xs, y + sh / 2, zl), V3(xs, y + sh / 2, zr), V3(xs, y - sh / 2, zr), V3(xs, y - sh / 2, zl)], id, (c, size, t) => paintNgmyApp(c, size, r.tvApp, t + r.id + sub * 3), height: 320 * sh / sw, bias: 9));
       }
     } else {
-      final x = switch (r.kind) { 'living' => -8.0, 'kitchen' => 36.0, 'bathroom' => 10.0, _ => 34.0 };
-      final y = r.kind == 'bathroom' ? 66.0 : 58.0;
-      b.box(V3(x, y, 1.4), V3(tw + 3, th + 3, 2.6), const Color(0xFF1B1D22), shine: 0.5);
-      b.box(V3(x, y, 2.8), V3(tw, th, 0.2), const Color(0xFF0B0F17), shine: 0.7);
+      final x = box.cx;
+      b.box(V3(x, y, 1.4), V3(tw + 3, th + 3, 2.6), frame, shine: 0.5);
+      b.box(V3(x, y, 2.8), V3(tw, th, 0.2), glass, shine: 0.7);
       if (r.tvOn) {
-        screens.add(ScreenQuad([V3(x - sw / 2, y + sh / 2, 2.95), V3(x + sw / 2, y + sh / 2, 2.95), V3(x + sw / 2, y - sh / 2, 2.95), V3(x - sw / 2, y - sh / 2, 2.95)], idHWallTv, (c, size, t) => paintNgmyApp(c, size, r.tvApp, t + r.id), bias: 9));
+        screens.add(ScreenQuad([V3(x - sw / 2, y + sh / 2, 2.95), V3(x + sw / 2, y + sh / 2, 2.95), V3(x + sw / 2, y - sh / 2, 2.95), V3(x - sw / 2, y - sh / 2, 2.95)], id, (c, size, t) => paintNgmyApp(c, size, r.tvApp, t + r.id), height: 320 * sh / sw, bias: 9));
       }
     }
     b.bias = 0;
-    info[idHWallTv] = ObjInfo(a.name, r.tvOn ? 'It is on and playing ${kNgmyApps[r.tvApp].name}. Tap it to watch full screen with the remote.' : 'The TV is off. Tap it to turn it on.', V3(0, 56, 4), 110);
+    info[id] = ObjInfo(a.name, r.tvOn ? 'It is on and playing ${kNgmyApps[r.tvApp].name}. Tap it to watch full screen with the remote.' : 'The TV is off. Tap it to turn it on.', V3(0, y, 4), 110);
   }
+
+  hangTv(r.wallTv, 0);
+  if (r.kind == 'hall') hangTv(r.wallTv2, 1);
 
   // ── The plumbing ──
   b.order = 2;
@@ -390,70 +406,129 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
     }
   }
 
+  for (final f in residents.where((f) => f.room == r.id)) {
+    labels.add(Label3D(V3(f.x, 74, f.z), f.label, f.alert ? const Color(0xFFDC2626) : const Color(0xFF15803D)));
+    info[idHResident + f.id] = ObjInfo(f.label, 'Tap to see how they are, feed them or give medicine.', V3(f.x, 36, f.z), 90);
+  }
   return Scene3D(b.polys, info: info, labels: labels, screens: screens);
 }
 
 
-/// The house seen from the garden. The front door leads inside.
-Scene3D _outside(HRoom r, int problems) {
+/// A flat, single-sided patch on a wall (a window pane, a door): it can only be seen from outside, so it never shows through the house.
+void _patch(MeshBuilder b, V3 c, V3 u, V3 v, double w, double h, Color col, V3 n, {double shine = 0}) {
+  final a = c + u * (-w / 2) + v * (h / 2), bb = c + u * (w / 2) + v * (h / 2), cc = c + u * (w / 2) + v * (-h / 2), d = c + u * (-w / 2) + v * (-h / 2);
+  b.quad(a, bb, cc, d, col, normal: n, shine: shine);
+}
+
+/// The garden and the house seen from outside, from any side. The house is drawn so that every wall keeps its windows and doors
+/// whichever way you look at it. Everything in the garden can be moved, turned, recoloured and added to.
+Scene3D _outside(HRoom r, int problems, String mode, int selected) {
   final b = MeshBuilder();
-  b.order = 0;
   final info = <int, ObjInfo>{};
   final labels = <Label3D>[];
+  final w = r.w, d = r.d;
+  int when(String m, int id) => mode == m ? id : 0;
+  // The ground: a big lawn that goes on past the garden, and the path to the door.
+  b.order = 0;
+  b.id = when('floor', idHFloorObj);
+  b.box(V3(0, -0.6, d / 2 - 60), V3(w * 2.2, 1.2, d * 2.2), const Color(0xFF4C8B4A), split: 5);
+  info[idHFloorObj] = const ObjInfo('Lawn', 'The grass. Walls, floors and the sky stay as they are, but you can add things to the garden with the Furniture button.', V3(0, 0, 150), 400);
   b.id = 0;
-  b.box(const V3(0, -0.6, 100), const V3(420, 1.2, 320), const Color(0xFF4C8B4A), split: 4);
-  b.box(const V3(0, 0.05, 110), const V3(22, 0.2, 130), const Color(0xFFB8B2A7));
-  b.box(const V3(-90, 0.05, 130), const V3(46, 0.2, 170), const Color(0xFF6B7380));
-  // House body.
+  b.order = 1;
+  b.box(V3(0, 0.15, 60), const V3(26, 0.3, 130), const Color(0xFFB8B2A7));
+  for (var i = 0; i < 6; i++) {
+    b.box(V3(0, 0.35, 8 + i * 22.0), const V3(22, 0.2, 0.8), const Color(0xFF9C968B));
+  }
+
+  // The house: one piece, so that its walls, windows and doors are always drawn in the right order.
+  const cream = Color(0xFFE8D9BC), trim = Color(0xFFF7F4EC), glass = Color(0xFF9BD3F5), wood = Color(0xFF8B5E34);
   b.order = 2;
-  b.grouped = true;
-  b.box(const V3(0, 50, -10), const V3(240, 100, 40), const Color(0xFFE8D9BC), split: 3);
-  b.box(const V3(0, 3, 10.5), const V3(244, 6, 1.4), const Color(0xFF9C8E75));
-  // Roof.
+  b.startGroup();
+  b.box(const V3(0, 50, -30), const V3(240, 100, 60), cream, split: 3);
+  b.box(const V3(0, 3, -30), const V3(244, 6, 64), const Color(0xFF9C8E75));
+  // A window: a white frame, the glass and two bars, flat on the wall.
+  void window(V3 face, V3 u, V3 n, double along, double y) {
+    final c = face + u * along + V3(0, y, 0);
+    _patch(b, c + n * 0.1, u, const V3(0, 1, 0), 26, 30, trim, n);
+    _patch(b, c + n * 0.2, u, const V3(0, 1, 0), 22, 26, glass, n, shine: 0.6);
+    _patch(b, c + n * 0.3, u, const V3(0, 1, 0), 22, 1.2, trim, n);
+    _patch(b, c + n * 0.3, u, const V3(0, 1, 0), 1.2, 26, trim, n);
+  }
+
+  void door(V3 face, V3 u, V3 n, double along, int id) {
+    final c = face + u * along;
+    final saved = b.id;
+    _patch(b, c + V3(0, 42, 0) + n * 0.1, u, const V3(0, 1, 0), 34, 84, trim, n);
+    b.id = id;
+    _patch(b, c + V3(0, 41, 0) + n * 0.2, u, const V3(0, 1, 0), 28, 80, wood, n, shine: 0.2);
+    b.id = 0;
+    _patch(b, c + V3(0, 58, 0) + n * 0.3, u, const V3(0, 1, 0), 20, 26, const Color(0xFF7A4F28), n);
+    _patch(b, c + V3(0, 22, 0) + n * 0.3, u, const V3(0, 1, 0), 20, 26, const Color(0xFF7A4F28), n);
+    b.box(c + u * 9 + V3(0, 40, 0) + n * 1.0, V3(2.6, 2.6, 2.6), const Color(0xFFE5C07B), shine: 0.8);
+    b.id = saved;
+  }
+
+  const front = V3(0, 0, 0), back = V3(0, 0, -60), rightF = V3(120, 0, -30), leftF = V3(-120, 0, -30);
+  const uf = V3(1, 0, 0), ub = V3(-1, 0, 0), ur = V3(0, 0, -1), ul = V3(0, 0, 1);
+  for (final x in const [-90.0, -52.0, 52.0, 90.0]) {
+    window(front, uf, const V3(0, 0, 1), x, 62);
+  }
+  door(front, uf, const V3(0, 0, 1), 0, idHDoor);
+  for (final x in const [-80.0, 80.0]) {
+    window(back, ub, const V3(0, 0, -1), x, 62);
+  }
+  door(back, ub, const V3(0, 0, -1), 0, 0);
+  for (final z in const [-14.0, 14.0]) {
+    window(rightF, ur, const V3(1, 0, 0), z, 62);
+    window(leftF, ul, const V3(-1, 0, 0), -z, 62);
+  }
+  // The roof: two slopes, the two end triangles and a chimney.
+  const roofCol = Color(0xFF7A3B2E);
   final roof = MeshBuilder();
-  roof.box(const V3(0, 0, 0), const V3(260, 3, 56), const Color(0xFF7A3B2E), shine: 0.1, split: 2);
-  b.polys.addAll(transformPolys(roof.polys, rx: 0.5, t: const V3(0, 114, 8)));
-  b.polys.addAll(transformPolys(roof.polys, rx: -0.5, t: const V3(0, 114, -34)));
-  b.box(const V3(0, 127, -13), const V3(262, 3, 5), const Color(0xFF5E2D23));
-  // The end walls under the roof.
-  b.box(const V3(-120.5, 108, -10), const V3(1.5, 16, 40), const Color(0xFFE8D9BC));
-  b.box(const V3(120.5, 108, -10), const V3(1.5, 16, 40), const Color(0xFFE8D9BC));
-  // Windows.
-  for (final x in const [-90.0, -50.0, 50.0, 90.0]) {
-    b.box(V3(x, 62, 10.5), const V3(24, 28, 1.2), const Color(0xFFF7F4EC));
-    b.box(V3(x, 62, 11.2), const V3(20, 24, 0.6), const Color(0xFF9BD3F5), shine: 0.6);
-    b.box(V3(x, 62, 11.6), const V3(20, 1.2, 0.4), const Color(0xFFF7F4EC));
-    b.box(V3(x, 62, 11.6), const V3(1.2, 24, 0.4), const Color(0xFFF7F4EC));
+  roof.box(const V3(0, 0, 0), const V3(262, 3, 56), roofCol, shine: 0.1, split: 2);
+  // The end walls under the roof (triangles), part of the same piece as the walls.
+  b.tri(const V3(120.1, 100, 0), const V3(120.1, 100, -60), const V3(120.1, 124, -30), cream, normal: const V3(1, 0, 0), twoSided: false);
+  b.tri(const V3(-120.1, 100, -60), const V3(-120.1, 100, 0), const V3(-120.1, 124, -30), cream, normal: const V3(-1, 0, 0), twoSided: false);
+  b.endGroup();
+  b.grouped = true;
+  b.polys.addAll(transformPolys(roof.polys, rx: 0.5, t: const V3(0, 115, 3)));
+  b.polys.addAll(transformPolys(roof.polys, rx: -0.5, t: const V3(0, 115, -63)));
+  b.box(const V3(0, 128, -30), const V3(262, 3, 5), const Color(0xFF5E2D23));
+  b.box(const V3(70, 125, -45), const V3(14, 36, 14), const Color(0xFF9C5A45));
+  b.box(const V3(70, 144, -45), const V3(17, 3, 17), const Color(0xFF6B4A32));
+  // The porch over the front door.
+  b.box(const V3(0, 2, 14), const V3(50, 4, 28), const Color(0xFFB8B2A7));
+  b.cyl(const V3(-20, 4, 26), const V3(-20, 92, 26), 2.2, trim, sides: 8);
+  b.cyl(const V3(20, 4, 26), const V3(20, 92, 26), 2.2, trim, sides: 8);
+  b.box(const V3(0, 94, 13), const V3(56, 3, 32), roofCol, shine: 0.1);
+  info[idHDoor] = const ObjInfo('Front door', 'Tap the door to go inside the house.', V3(0, 40, 12), 260);
+
+  // The things in the garden.
+  b.grouped = true;
+  for (final f in r.furn) {
+    final k = kFurnKinds[f.kind]!;
+    final fb = MeshBuilder();
+    fb.grouped = true;
+    fb.order = (f.kind == 'road' || f.kind == 'pond' || f.kind == 'rug') ? 1 : 2;
+    fb.id = when('furniture', idHFurn + f.id);
+    _furniture(fb, f.kind, kFurnColors[f.color]);
+    b.polys.addAll(transformPolys(fb.polys, ry: f.rot * math.pi / 2, t: V3(f.x, 0, f.z)));
+    info[idHFurn + f.id] = ObjInfo(k.name, 'Move it with the arrow buttons, turn it, change its colour or take it out.', V3(f.x, 12, f.z), 140);
   }
-  // The front door and the step.
-  b.box(const V3(0, 2, 18), const V3(44, 4, 14), const Color(0xFFB8B2A7));
-  b.box(const V3(0, 42, 10.6), const V3(34, 84, 1.2), const Color(0xFFF7F4EC));
-  b.id = idHDoor;
-  b.box(const V3(0, 41, 11.6), const V3(28, 80, 1.4), const Color(0xFF8B5E34), shine: 0.2);
-  b.box(const V3(8, 40, 12.6), const V3(2.6, 2.6, 1.8), const Color(0xFFE5C07B), shine: 0.8);
-  b.box(const V3(0, 58, 12.4), const V3(20, 26, 0.3), const Color(0xFF7A4F28));
-  b.box(const V3(0, 22, 12.4), const V3(20, 26, 0.3), const Color(0xFF7A4F28));
-  info[idHDoor] = const ObjInfo('Front door', 'Tap the door to go inside the house.', V3(0, 40, 12), 220);
-  b.id = 0;
-  // A tree, bushes and a mailbox.
-  b.cyl(const V3(120, 0, 70), const V3(120, 40, 70), 5, const Color(0xFF6B4A32), sides: 8);
-  b.ball(const V3(120, 62, 70), 28, const Color(0xFF3F8F4F), lat: 6, lon: 10);
-  b.ball(const V3(100, 52, 74), 18, const Color(0xFF4FA860), lat: 5, lon: 8);
-  for (final x in const [-30.0, 30.0, -70.0, 70.0]) {
-    b.ball(V3(x, 6, 24), 7, const Color(0xFF3A7D44), lat: 4, lon: 8);
-  }
-  b.cyl(const V3(34, 0, 150), const V3(34, 30, 150), 1.4, const Color(0xFF6B4A32), sides: 6);
-  b.box(const V3(34, 33, 150), const V3(12, 9, 18), const Color(0xFF2B4C7E), shine: 0.3);
-  labels.add(Label3D(const V3(0, 100, 30), problems == 0 ? '✅ The house is finished' : '🏠 $problems rooms still need work', problems == 0 ? const Color(0xFF16A34A) : const Color(0xFFD97706)));
+  labels.add(Label3D(const V3(0, 150, 8), problems == 0 ? '✅ The house is finished' : '🏠 $problems rooms still need work', problems == 0 ? const Color(0xFF16A34A) : const Color(0xFFD97706)));
   return Scene3D(b.polys, info: info, labels: labels);
 }
 
 /// Things that move: the fan blades and the pictures on the TVs.
-List<Poly> homeDynamic(HRoom r, double t, {PersonPose? person}) {
+List<Poly> homeDynamic(HRoom r, double t, {PersonPose? person, List<ResidentFigure> residents = const []}) {
   final b = MeshBuilder();
   b.grouped = true;
   if (!r.indoor || r.kind == 'outside') return b.polys;
   if (person != null && person.room == r.id) _person(b, person, t);
+  // The people who live here, standing in their rooms. Tapping one opens their card.
+  for (final f in residents.where((f) => f.room == r.id)) {
+    _person(b, PersonPose(room: r.id, x: f.x, z: f.z, yaw: f.yaw), t, style: f.style, id: idHResident + f.id);
+  }
   final d = r.d;
   const h = HRoom.h;
   if (r.ceilingFix == 'fan') {
@@ -489,12 +564,13 @@ List<Poly> _stretch(List<Poly> ps, V3 s, V3 at) => [
 /// An adult person for the house tour, about 5 feet 8 inches tall, made of rounded parts (limbs with real joints, an
 /// oval body and head, shoulders, hands, shoes) rather than blocks. Feet on y = 0, facing +z until turned. The hips are
 /// worked out from the legs so the foot that is down always stands on the floor, and the knees bend as they walk.
-void _person(MeshBuilder b, PersonPose p, double t) {
+void _person(MeshBuilder b, PersonPose p, double t, {PersonStyle style = const PersonStyle(), int id = 0}) {
   final pb = MeshBuilder();
-  pb.id = 0;
+  pb.id = id;
   // Each part is one sorted piece, and the person is in the same tier as the furniture: depth decides what hides what.
   pb.grouped = true;
-  const skin = Color(0xFFE0A47C), skinShade = Color(0xFFCB8C64), hair = Color(0xFF2A1A10), shirt = Color(0xFF2F6FB5), pants = Color(0xFF2E3440), shoe = Color(0xFF1B1B1D);
+  final skin = style.skin, skinShade = Color.lerp(style.skin, Colors.black, 0.16)!, hair = style.hair, shirt = style.shirt, pants = style.pants;
+  const shoe = Color(0xFF1B1B1D);
   final stride = p.walking ? math.sin(p.phase * math.pi) : 0.0;
 
   // The legs first: their angles decide how high the hips are.
@@ -506,7 +582,7 @@ void _person(MeshBuilder b, PersonPose p, double t) {
   // A rounded part: built at the origin, stretched, then moved to [at].
   void part(void Function(MeshBuilder m) draw, V3 stretch, V3 at) {
     final m = MeshBuilder();
-    m.id = 0;
+    m.id = id;
     m.grouped = true;
     draw(m);
     pb.polys.addAll([for (final q in _stretch(m.polys, stretch, V3.zero)) Poly([for (final v in q.pts) v + at], q.n, q.color, q.id, shine: q.shine, alpha: q.alpha, twoSided: q.twoSided, layer: q.layer, bias: q.bias, order: q.order, group: q.group)]);
@@ -675,6 +751,82 @@ void _furniture(MeshBuilder b, String kind, Color c) {
         b.box(V3(-8 + (i % 2) * 6.0, 10 + i * 15.0, 2), const V3(5, 9, 8), [const Color(0xFFB91C1C), const Color(0xFF1D4ED8), const Color(0xFF15803D), const Color(0xFFD97706)][i]);
         b.box(V3(4 + (i % 2) * 4.0, 10 + i * 15.0, 2), const V3(8, 9, 8), [const Color(0xFFD97706), const Color(0xFF15803D), const Color(0xFFB91C1C), const Color(0xFF1D4ED8)][i]);
       }
+    case 'tree':
+      b.cyl(const V3(0, 0, 0), const V3(0, 34, 0), 4.2, const Color(0xFF6B4A32), r1: 3.0, sides: 8);
+      b.ball(const V3(0, 48, 0), 17, const Color(0xFF3F8F4F), lat: 5, lon: 9);
+      b.ball(const V3(9, 40, 4), 11, const Color(0xFF4FA860), lat: 4, lon: 8);
+      b.ball(const V3(-8, 42, -5), 12, const Color(0xFF357A44), lat: 4, lon: 8);
+    case 'pine':
+      b.cyl(const V3(0, 0, 0), const V3(0, 10, 0), 3, const Color(0xFF6B4A32), sides: 8);
+      for (var i = 0; i < 3; i++) {
+        b.cyl(V3(0, 8 + i * 14.0, 0), V3(0, 26 + i * 14.0, 0), 14 - i * 3.5, const Color(0xFF2F6B3C), r1: 1.5, sides: 10);
+      }
+    case 'bush':
+      b.ball(const V3(0, 8, 0), 9, const Color(0xFF3A7D44), lat: 4, lon: 8);
+      b.ball(const V3(5, 6, 3), 6.5, const Color(0xFF4FA860), lat: 4, lon: 8);
+    case 'flowers':
+      for (final (x, z, col) in const [(-6.0, -4.0, Color(0xFFF472B6)), (5.0, -5.0, Color(0xFFFACC15)), (0.0, 1.0, Color(0xFFEF4444)), (-5.0, 5.0, Color(0xFFA78BFA)), (6.0, 4.0, Color(0xFFFFFFFF))]) {
+        b.cyl(V3(x, 0, z), V3(x, 7, z), 0.4, const Color(0xFF2F6B3C), sides: 5);
+        b.ball(V3(x, 8, z), 2.2, col, lat: 3, lon: 6);
+      }
+    case 'fence':
+      for (final x in const [-30.0, -10.0, 10.0, 30.0]) {
+        b.box(V3(x, 9, 0), const V3(2.2, 18, 2.2), c, shine: 0.05);
+      }
+      b.box(const V3(0, 6, 0), const V3(64, 2, 1.2), dark);
+      b.box(const V3(0, 13, 0), const V3(64, 2, 1.2), dark);
+    case 'lamppost':
+      b.cyl(const V3(0, 0, 0), const V3(0, 52, 0), 1.3, const Color(0xFF2B2D33), sides: 8);
+      b.cyl(const V3(0, 0, 0), const V3(0, 3, 0), 3.5, const Color(0xFF2B2D33), sides: 8);
+      b.ball(const V3(0, 55, 0), 4, const Color(0xFFFFF1A8), lat: 4, lon: 8);
+    case 'bench':
+      b.box(const V3(0, 12, 0), const V3(44, 2, 14), c, shine: 0.1);
+      b.box(const V3(0, 20, -6), const V3(44, 10, 2), c, shine: 0.1);
+      b.box(const V3(-18, 6, 0), const V3(3, 12, 12), const Color(0xFF2B2D33));
+      b.box(const V3(18, 6, 0), const V3(3, 12, 12), const Color(0xFF2B2D33));
+    case 'car':
+      b.box(const V3(0, 10, 0), const V3(84, 10, 38), c, shine: 0.4);
+      b.box(const V3(-4, 20, 0), const V3(46, 10, 34), c, shine: 0.4);
+      b.box(const V3(-4, 20.4, 0), const V3(47, 7, 34.4), const Color(0xFF9BD3F5), shine: 0.6);
+      b.box(const V3(41.5, 11, -12), const V3(1, 3, 6), const Color(0xFFFFF1A8));
+      b.box(const V3(41.5, 11, 12), const V3(1, 3, 6), const Color(0xFFFFF1A8));
+      for (final x in const [-26.0, 26.0]) {
+        b.cyl(V3(x, 5, -18), V3(x, 5, -21), 5.5, const Color(0xFF15171C), sides: 12);
+        b.cyl(V3(x, 5, 18), V3(x, 5, 21), 5.5, const Color(0xFF15171C), sides: 12);
+      }
+    case 'road':
+      b.box(const V3(0, 0.3, 0), const V3(120, 0.6, 44), const Color(0xFF3F4450));
+      for (final x in const [-48.0, -16.0, 16.0, 48.0]) {
+        b.box(V3(x, 0.7, 0), const V3(14, 0.2, 1.6), const Color(0xFFF3E7A1));
+      }
+    case 'pond':
+      final m = MeshBuilder()
+        ..id = b.id
+        ..order = b.order
+        ..grouped = true;
+      m.cyl(const V3(0, 0, 0), const V3(0, 0.6, 0), 28, const Color(0xFF5CB3E8), shine: 0.8, sides: 22);
+      b.polys.addAll(_stretch(m.polys, const V3(1.4, 1, 1), V3.zero));
+      for (final (x, z) in const [(-34.0, -6.0), (30.0, 10.0), (-10.0, 24.0)]) {
+        b.ball(V3(x, 1.2, z), 2.6, const Color(0xFF8A8F98), lat: 3, lon: 6);
+      }
+    case 'swing':
+      b.cyl(const V3(-24, 38, 0), const V3(24, 38, 0), 1.6, const Color(0xFFB45309), sides: 8);
+      for (final x in const [-24.0, 24.0]) {
+        b.cyl(V3(x, 38, 0), V3(x, 0, 14), 1.4, const Color(0xFFB45309), sides: 6);
+        b.cyl(V3(x, 38, 0), V3(x, 0, -14), 1.4, const Color(0xFFB45309), sides: 6);
+      }
+      for (final x in const [-5.0, 5.0]) {
+        b.cyl(V3(x, 38, 0), V3(x, 15, 0), 0.3, const Color(0xFF2B2D33), sides: 4);
+      }
+      b.box(const V3(0, 14, 0), const V3(14, 1.5, 5), c);
+    case 'shed':
+      b.box(const V3(0, 14, 0), const V3(50, 28, 42), c, shine: 0.05);
+      b.box(const V3(0, 30, 0), const V3(56, 3, 48), const Color(0xFF5E2D23));
+      b.box(const V3(0, 11, 21.2), const V3(16, 22, 0.6), dark);
+    case 'doghouse':
+      b.box(const V3(0, 7, 0), const V3(24, 14, 22), c, shine: 0.05);
+      b.box(const V3(0, 15.5, 0), const V3(28, 2.5, 26), const Color(0xFF5E2D23));
+      b.box(const V3(0, 5, 11.2), const V3(9, 10, 0.6), const Color(0xFF1B1D22));
     default:
       b.box(const V3(0, 6, 0), const V3(10, 12, 10), c);
   }

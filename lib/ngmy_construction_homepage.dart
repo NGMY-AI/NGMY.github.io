@@ -56,6 +56,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   /// Looking from inside the room (the default) or from above at the whole cut-away room.
   bool inside = true;
   bool showMap = true;
+
+  /// Looking all the way round from the middle of the room (a closed room, 360 degrees), by dragging.
+  bool walk = false;
   int selFurn = 0;
   int selWall = -1;
   int hl = 0;
@@ -127,29 +130,56 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     final r = room;
     V3 target;
     double dist, pitch, yaw;
-    if (!r.indoor) {
-      target = const V3(0, 50, 40);
-      dist = 380;
-      pitch = 0.22;
-      yaw = -0.1;
-      cam.yawRange = 0.9;
-      cam.maxDist = 560;
+    if (walk) {
+      // Standing in the middle of the room: the camera is the head, and turning it goes all the way round.
+      target = V3(0, 48, r.d * 0.55);
+      dist = 3;
+      pitch = 0.0;
+      yaw = -0.05;
+      cam
+        ..minDist = 2
+        ..maxDist = 12
+        ..minPitch = -1.2
+        ..maxPitch = 1.2
+        ..setFree(true);
+    } else if (!r.indoor) {
+      // The garden: walk right round the house, from above, never from under the ground.
+      target = const V3(0, 40, 150);
+      dist = 540;
+      pitch = 0.35;
+      yaw = -0.25;
+      cam
+        ..minDist = 30
+        ..maxDist = 1100
+        ..minPitch = 0.03
+        ..maxPitch = 1.35
+        ..setFree(true);
     } else if (inside) {
       // Standing in the room, looking in: low, close, like a person in the doorway.
       target = V3(0, 40, r.d * 0.3);
       dist = math.max(r.w * 0.8, r.d * 0.9) + 10;
       pitch = 0.1;
       yaw = -0.05;
-      // Inside the house the view stays inside: you can look about a little, not swing round behind the walls.
-      cam.yawRange = 0.5;
-      cam.maxDist = dist * 1.6;
+      // Inside the house the view stays inside: you can look about a little, not swing round behind the walls or go under the floor.
+      cam
+        ..minDist = 6
+        ..maxDist = dist * 1.6
+        ..minPitch = 0.03
+        ..maxPitch = 1.35
+        ..yawRange = 0.5
+        ..setFree(false);
     } else {
       target = V3(0, 30, r.d * 0.45);
       dist = (r.w * 1.2 > r.d * 1.4 ? r.w * 1.2 : r.d * 1.4) + 30;
       pitch = 0.5;
       yaw = -0.12;
-      cam.yawRange = 0.9;
-      cam.maxDist = 560;
+      cam
+        ..minDist = 6
+        ..maxDist = 560
+        ..minPitch = 0.1
+        ..maxPitch = 1.35
+        ..yawRange = 0.9
+        ..setFree(false);
     }
     if (snap) {
       cam.target = target;
@@ -161,8 +191,24 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     }
   }
 
+  /// Double tap: go to where you tapped. Standing in a room that walks you there; from above or outside it takes you closer.
+  void _doubleTap(Offset p, Size size) {
+    final spot = cam.floorPoint(p, size);
+    if (spot == null) return;
+    final r = room;
+    if (walk) {
+      final x = spot.x.clamp(-r.w / 2 + 10, r.w / 2 - 10), z = spot.z.clamp(10.0, r.d - 10);
+      cam.glideTo(target: V3(x, 48, z));
+    } else if (!r.indoor) {
+      cam.glideTo(target: V3(spot.x, 30, spot.z), dist: math.max(60, cam.dist * 0.55));
+    } else {
+      cam.glideTo(target: V3(spot.x.clamp(-r.w / 2, r.w / 2), 36, spot.z.clamp(0.0, r.d)), dist: math.max(40, cam.dist * 0.6));
+    }
+    conBeep(560, ms: 50);
+  }
+
   void _rebuild() {
-    scene = buildHomeRoom(room, mode: mode, selected: selFurn, problems: problems);
+    scene = buildHomeRoom(room, mode: mode, selected: selFurn, problems: problems, closed: walk);
   }
 
   void _say(String t, {bool ok = true}) {
@@ -316,8 +362,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       }
       return;
     }
-    if (id == idHWallTv) {
-      final key = room.wallTv;
+    if (id == idHWallTv || id == idHWallTv + 1) {
+      final key = id == idHWallTv ? room.wallTv : room.wallTv2;
       if (key == null) return;
       if (!room.tvOn) {
         setState(() {
@@ -367,7 +413,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
             const Text('Plug in', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
             const SizedBox(height: 10),
             Wrap(spacing: 8, runSpacing: 8, children: [
-              for (final a in kHomeAppliances)
+              for (final a in kHomeAppliances.where((a) => !a.wallOnly))
                 GestureDetector(
                   onTap: () {
                     Navigator.pop(ctx);
@@ -430,6 +476,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
                 for (final a in kHomeAppliances.where((a) => a.isTv))
                   big(a.name, () {
                     room.wallTv = a.key;
+                    if (room.kind == 'hall') room.wallTv2 = a.key;
                     room.tvOn = true;
                   }, color: room.wallTv == a.key ? kConAmber : const Color(0xFF0E7490)),
               ]),
@@ -444,7 +491,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
                 if (!isLesson)
                   big('📺 A TV in every room, all on', () {
                     for (final r in home.indoor) {
-                      r.wallTv ??= 'bangtv';
+                      r.wallTv ??= 'tv100';
+                      if (r.kind == 'hall') r.wallTv2 ??= 'tv100';
                       r.tvOn = true;
                     }
                   }, color: const Color(0xFF16A34A)),
@@ -505,9 +553,11 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   void _startTour(int secs) {
     _tourTimer?.cancel();
     for (final r in home.indoor) {
-      r.wallTv ??= 'bangtv';
+      r.wallTv ??= 'tv100';
+      if (r.kind == 'hall') r.wallTv2 ??= 'tv100';
       r.tvOn = true;
     }
+    walk = false;
     tour = HomeTour(home, secs.toDouble());
     _tourStart = now;
     inside = true;
@@ -922,7 +972,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
             ])
           else
             const Align(alignment: Alignment.centerLeft, child: Padding(padding: EdgeInsets.only(bottom: 4), child: Text('Tap a piece of furniture, or add one:', style: TextStyle(color: Colors.white60, fontSize: 12)))),
-          _row([for (final e in kFurnKinds.entries) _chip('${e.value.emoji} ${e.value.name}', false, () => _addFurn(e.key), color: const Color(0xFF67E8F9))]),
+          _row([for (final e in kFurnKinds.entries) if (kOutdoorFurn.contains(e.key) == !room.indoor) _chip('${e.value.emoji} ${e.value.name}', false, () => _addFurn(e.key), color: const Color(0xFF67E8F9))]),
         ]);
       case 'walls':
         return _row([
@@ -1011,6 +1061,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         highlight: hl,
         onPick: _pick,
         onHome: () => _frame(),
+        onDoubleTap: _doubleTap,
         message: msg,
         good: good,
         messageTop: (showMap && !isLesson) ? 104 : 10,
@@ -1027,6 +1078,15 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
             _frame();
           }, color: const Color(0xFF67E8F9)),
           if (!isLesson) _chip(tour != null ? '⏹ Stop tour' : '🎬 Tour', tour != null, () => tour != null ? _stopTour() : _tourSheet(), color: const Color(0xFFF472B6)),
+          _chip(walk ? '🚶 Stop looking round' : '🔄 Look all round (360)', walk, () {
+            setState(() {
+              walk = !walk;
+              if (walk && tour != null) _stopTour();
+              _rebuild();
+            });
+            _frame();
+            if (walk) _say('Drag to turn all the way round. Double tap a spot on the floor to walk there.');
+          }, color: const Color(0xFFFB923C)),
           _chip('📺 TV', false, _tvSheet, color: const Color(0xFF60A5FA)),
           if (!isLesson) _chip(room.indoor ? '🌳 Go outside' : '🏠 Go inside', false, () => _go(room.indoor ? 11 : 10), color: const Color(0xFF4ADE80)),
           if (!isLesson) _chip('➕ Add', false, _addSheet, color: const Color(0xFF4ADE80)),

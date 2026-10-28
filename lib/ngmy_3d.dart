@@ -116,9 +116,15 @@ class MeshBuilder {
   bool grouped = false;
   static int _groups = 0;
   int _g = 0;
+  int _sticky = 0;
+
+  /// Everything built between [startGroup] and [endGroup] is sorted as one piece, in the order it was built. Use it for a wall and
+  /// the windows and doors drawn on it, so the wall is always drawn first and the details are never hidden behind it.
+  void startGroup() => _sticky = ++_groups;
+  void endGroup() => _sticky = 0;
 
   void _begin() {
-    _g = grouped ? ++_groups : 0;
+    _g = _sticky != 0 ? _sticky : (grouped ? ++_groups : 0);
   }
 
   void quad(V3 a, V3 b, V3 c, V3 d, Color col, {V3? normal, double shine = 0, bool twoSided = false}) {
@@ -279,6 +285,9 @@ class Cam3 extends ChangeNotifier {
   V3 target;
   double minDist = 6, maxDist = 160;
 
+  /// How far the camera may look up and down. A room view keeps [minPitch] above the floor, so you can never go under it.
+  double minPitch = -1.25, maxPitch = 1.35;
+
   /// Turning is kept to the front of the scene unless [free] is on (the "look behind the wall" button), so a swipe never throws you round the back by accident.
   double yawCenter = 0, yawRange = 1.25;
   bool free = false;
@@ -343,8 +352,32 @@ class Cam3 extends ChangeNotifier {
     _toPitch = null;
     yaw += dYaw;
     if (!free) yaw = yaw.clamp(yawCenter - yawRange, yawCenter + yawRange);
-    pitch = (pitch + dPitch).clamp(-1.25, 1.35);
+    pitch = (pitch + dPitch).clamp(minPitch, maxPitch);
     notifyListeners();
+  }
+
+
+  /// The spot of the plane at height [y] (the floor, by default) that is under the point [p] of a view of size [size], or null
+  /// when that point of the screen looks at the sky. This is what makes "double tap where you want to go" possible.
+  V3? floorPoint(Offset p, Size size, {double y = 0}) {
+    final f = math.min(size.width, size.height) * 1.15;
+    final dx = (p.dx - size.width / 2) / f, dy = -(p.dy - size.height / 2) / f;
+    final cy = math.cos(yaw), sy = math.sin(yaw), cp = math.cos(pitch), sp = math.sin(pitch);
+    // Camera-space offset (without the distance) back to a world offset.
+    V3 unrot(V3 r) {
+      final t = -r.z;
+      final qy = r.y * cp + t * sp;
+      final z1 = t * cp - r.y * sp;
+      return V3(r.x * cy - z1 * sy, qy, r.x * sy + z1 * cy);
+    }
+
+    V3 at(double t) => target + unrot(V3(dx * t, dy * t, t - dist));
+    final a = at(0), b = at(1);
+    final dyw = b.y - a.y;
+    if (dyw.abs() < 1e-9) return null;
+    final t = (y - a.y) / dyw;
+    if (t <= 0) return null;
+    return at(t);
   }
 
   void zoomBy(double factor) {
@@ -465,9 +498,14 @@ class Scene3DPainter extends CustomPainter {
       }
     }
     double key(_Face f) => f.group != 0 ? gz[f.group]! / gn[f.group]! : f.z;
+    for (var i = 0; i < drawn.length; i++) {
+      drawn[i].seq = i;
+    }
     drawn.sort((a, b) {
       final c = a.order.compareTo(b.order);
-      return c != 0 ? c : key(b).compareTo(key(a));
+      if (c != 0) return c;
+      final k = key(b).compareTo(key(a));
+      return k != 0 ? k : a.seq.compareTo(b.seq);
     });
     hits.list.clear();
     final fill = Paint()..style = PaintingStyle.fill;
@@ -567,6 +605,7 @@ class _Face {
   _Face(this.path, this.color, this.z, this.id, this.see, this.glow, [this.draw, this.order = 2, this.group = 0]);
   final int order;
   final int group;
+  int seq = 0;
   final void Function(Canvas canvas)? draw;
   final Path path;
   final Color color;
@@ -579,7 +618,7 @@ class _Face {
 // ─── The view: turn with a finger, pinch or scroll to zoom, tap to pick ───────
 
 class Scene3DView extends StatefulWidget {
-  const Scene3DView({super.key, required this.scene, required this.cam, this.highlight = 0, this.onPick, this.layerOn, this.dynamicPolys, this.background = const Color(0xFF0E1218), this.overlay});
+  const Scene3DView({super.key, required this.scene, required this.cam, this.highlight = 0, this.onPick, this.layerOn, this.dynamicPolys, this.background = const Color(0xFF0E1218), this.overlay, this.onDoubleTap});
   final Scene3D scene;
   final Cam3 cam;
   final int highlight;
@@ -588,6 +627,9 @@ class Scene3DView extends StatefulWidget {
   final List<Poly> Function(double t)? dynamicPolys;
   final Color background;
   final Widget? overlay;
+
+  /// A double tap: where on the view (and how big the view is), for "go to where I tapped".
+  final void Function(Offset local, Size size)? onDoubleTap;
 
   @override
   State<Scene3DView> createState() => _Scene3DViewState();
@@ -599,6 +641,7 @@ class _Scene3DViewState extends State<Scene3DView> with SingleTickerProviderStat
   final ValueNotifier<double> _time = ValueNotifier(0);
   Duration _last = Duration.zero;
   double _startDist = 40;
+  Offset _lastDouble = Offset.zero;
 
   @override
   void initState() {
@@ -635,6 +678,8 @@ class _Scene3DViewState extends State<Scene3DView> with SingleTickerProviderStat
           }
         },
         onTapUp: (d) => widget.onPick?.call(_hits.pick(d.localPosition)),
+        onDoubleTapDown: widget.onDoubleTap == null ? null : (d) => _lastDouble = d.localPosition,
+        onDoubleTap: widget.onDoubleTap == null ? null : () => widget.onDoubleTap!(_lastDouble, context.size ?? Size.zero),
         child: Stack(fit: StackFit.expand, children: [
           ClipRect(
             child: RepaintBoundary(

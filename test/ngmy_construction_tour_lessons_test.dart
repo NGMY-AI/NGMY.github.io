@@ -19,7 +19,13 @@ Finder _view() => find.byWidgetPredicate((w) => w is CustomPaint && w.painter is
 /// Brings a chip of the top menu into view (the rows scroll sideways) and taps it.
 Future<void> _chip(WidgetTester t, String label, {int row = 0}) async {
   final rows = find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.right);
-  await t.scrollUntilVisible(find.text(label), 60, scrollable: rows.at(row));
+  if (find.text(label).evaluate().isEmpty) {
+    try {
+      await t.scrollUntilVisible(find.text(label), -60, scrollable: rows.at(row), maxScrolls: 30);
+    } catch (_) {
+      await t.scrollUntilVisible(find.text(label), 60, scrollable: rows.at(row), maxScrolls: 60);
+    }
+  }
   await t.ensureVisible(find.text(label));
   await t.pump(const Duration(milliseconds: 200));
   await t.tap(find.text(label));
@@ -194,6 +200,84 @@ void main() {
     expect({for (final p in person) p.group}.length, greaterThan(20));
   });
 
+  test('TVs go up to 200 inches and a whole wall, clear of the doors, and the hall has two big ones on its end walls', () {
+    final h = HomeProject(seed: 3);
+    final sizes = <String, double>{};
+    for (final k in ['tv', 'tv100', 'tv150', 'tv200', 'wall']) {
+      final a = applianceByKey(k);
+      expect(a.isTv, isTrue);
+      var best = 0.0;
+      for (final r in h.indoor.where((r) => r.kind != 'hall')) {
+        final box = wallTvBox(r, a);
+        best = math.max(best, box.w);
+        // On the wall, inside it, and not over a door.
+        expect(box.cx - box.w / 2, greaterThanOrEqualTo(-r.w / 2), reason: '${r.name} $k');
+        expect(box.cx + box.w / 2, lessThanOrEqualTo(r.w / 2), reason: '${r.name} $k');
+        for (final d in r.doors.where((d) => d.wall == 'back')) {
+          final overlap = (box.cx - box.w / 2 < d.offset + 15.5) && (box.cx + box.w / 2 > d.offset - 15.5);
+          expect(overlap, isFalse, reason: '${r.name}: a $k TV covers a door');
+        }
+        expect(box.cy + box.h / 2, lessThanOrEqualTo(HRoom.h - 2));
+      }
+      sizes[k] = best;
+    }
+    expect(sizes['tv100']!, greaterThan(sizes['tv']!));
+    expect(sizes['wall']!, greaterThanOrEqualTo(sizes['tv200']!));
+    expect(sizes['wall']!, greaterThan(70));
+    // Only the floor TVs plug in.
+    expect(kHomeAppliances.where((a) => a.isTv && !a.wallOnly).every((a) => a.tvWidth <= 70), isTrue);
+    // The hall: ten doors on the back wall, a TV on each end wall.
+    final hall = h.rooms[5];
+    expect(hall.doors.length, 10);
+    expect(hall.doors.every((d) => d.wall == 'back'), isTrue);
+    hall.wallTv = 'tv100';
+    hall.wallTv2 = 'tv100';
+    hall.tvOn = true;
+    final s = buildHomeRoom(hall);
+    expect(s.screens.map((q) => q.id).toSet(), {idHWallTv, idHWallTv + 1});
+  });
+
+  test('the camera can never go under the floor, and a finger on the picture points at the floor under it', () {
+    final cam = Cam3(yaw: 0, pitch: 0.5, dist: 100, target: V3.zero)..minPitch = 0.03;
+    cam.orbit(0, -5);
+    expect(cam.pitch, 0.03);
+    // The middle of the picture looks at the target, which is on the floor.
+    final mid = cam.floorPoint(const Offset(200, 300), const Size(400, 600))!;
+    expect(mid.x.abs(), lessThan(0.01));
+    expect(mid.z.abs(), lessThan(0.01));
+    // A point lower on the screen is nearer the camera; one to the right is to the right.
+    final low = cam.floorPoint(const Offset(200, 500), const Size(400, 600))!;
+    expect(low.z, greaterThan(5));
+    final right = cam.floorPoint(const Offset(380, 300), const Size(400, 600))!;
+    expect(right.x, greaterThan(5));
+    // Looking at the sky gives nothing.
+    expect(cam.floorPoint(const Offset(200, 0), const Size(400, 600)), isNull, reason: 'the top of the picture looks at the sky');
+    final up = Cam3(yaw: 0, pitch: 0.0, dist: 100, target: const V3(0, 40, 0));
+    expect(up.floorPoint(const Offset(200, 10), const Size(400, 600)), isNull);
+  });
+
+  test('the garden has big space and things to put in it, and the house is drawn so its walls keep their windows from every side', () {
+    final h = HomeProject(seed: 3);
+    final g = h.rooms[11];
+    expect(g.w, greaterThan(400));
+    expect(g.furn.where((f) => kOutdoorFurn.contains(f.kind)).length, greaterThan(8));
+    final s = buildHomeRoom(g, mode: 'furniture');
+    expect(s.polys.length, lessThan(12000));
+    expect(s.polys.any((p) => p.id == idHDoor), isTrue);
+    // Every window pane is one flat, single-sided patch: it cannot show through the house from behind.
+    final panes = s.polys.where((p) => p.pts.length == 4 && p.id == 0 && p.group != 0 && (p.color.b > 0.9 && p.color.r < 0.7));
+    expect(panes.length, greaterThan(8));
+    // Garden things can be added, and are drawn in their own pieces.
+    final f = g.add('car');
+    expect(buildHomeRoom(g, mode: 'furniture').info.containsKey(idHFurn + f.id), isTrue);
+    for (final k in kOutdoorFurn) {
+      final t = HomeProject(seed: 1).rooms[11];
+      t.furn.clear();
+      t.add(k);
+      expect(buildHomeRoom(t).polys, isNotEmpty, reason: k);
+    }
+  });
+
   test('an added outlet or switch starts red and unwired and works once it is wired', () {
     final h = HomeProject(seed: 4);
     final r = h.rooms[0];
@@ -230,7 +314,7 @@ void main() {
     await t.scrollUntilVisible(find.text('🔧 Do the lesson'), 60, scrollable: find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.right).first);
     expect(find.text('🔧 Do the lesson'), findsOneWidget);
     // Look from above so the whole wall is in the picture.
-    await t.tap(find.text('🔭 See the whole room'));
+    await _chip(t, '🔭 See the whole room');
     for (var i = 0; i < 30; i++) {
       await t.pump(const Duration(milliseconds: 100));
     }

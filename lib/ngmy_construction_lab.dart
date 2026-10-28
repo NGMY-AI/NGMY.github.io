@@ -8,7 +8,6 @@ import 'ngmy_construction_house.dart';
 import 'ngmy_construction_plumbing.dart';
 import 'ngmy_construction_projectpage.dart';
 import 'ngmy_construction_servicepage.dart';
-import 'ngmy_construction_plumbpage.dart';
 import 'ngmy_construction_homepage.dart';
 import 'ngmy_construction_learn.dart';
 import 'ngmy_studio_kit.dart';
@@ -103,19 +102,26 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
             GestureDetector(
               onTap: () => _push(NgmyHousePage(practice: practice)),
               child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF3B2A12), Color(0xFF1F1A12)]), borderRadius: BorderRadius.circular(20), border: Border.all(color: kConAmber, width: 1.6)),
-                child: Row(children: [
-                  const Text('🏠', style: TextStyle(fontSize: 40)),
-                  const SizedBox(width: 14),
-                  const Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('My House', style: TextStyle(color: kConAmber, fontWeight: FontWeight.w900, fontSize: 18)),
-                      SizedBox(height: 2),
-                      Text('5 bedrooms, 3 bathrooms. Walk in and fix what is wrong.', style: TextStyle(color: Colors.white70, fontSize: 12.5, height: 1.3)),
-                    ]),
+                padding: const EdgeInsets.fromLTRB(18, 22, 18, 20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF4A3414), Color(0xFF1F1A12), Color(0xFF2A1F12)]),
+                  borderRadius: BorderRadius.circular(26),
+                  border: Border.all(color: kConAmber, width: 1.8),
+                  boxShadow: [BoxShadow(color: kConAmber.withValues(alpha: 0.28), blurRadius: 26, offset: const Offset(0, 8))],
+                ),
+                child: Column(children: [
+                  Container(
+                    width: 78,
+                    height: 78,
+                    decoration: BoxDecoration(shape: BoxShape.circle, color: kConAmber.withValues(alpha: 0.2), border: Border.all(color: kConAmber, width: 2), boxShadow: [BoxShadow(color: kConAmber.withValues(alpha: 0.5), blurRadius: 22)]),
+                    child: const Center(child: Text('🏠', style: TextStyle(fontSize: 42))),
                   ),
-                  const Icon(Icons.chevron_right_rounded, color: kConAmber),
+                  const SizedBox(height: 12),
+                  const Text('My House', textAlign: TextAlign.center, style: TextStyle(color: kConAmber, fontWeight: FontWeight.w900, fontSize: 22)),
+                  const SizedBox(height: 4),
+                  const Text('5 bedrooms, 3 bathrooms and a garden. Walk in, look all round, fix what is wrong.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.35)),
+                  const SizedBox(height: 14),
+                  Container(padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10), decoration: BoxDecoration(color: kConAmber, borderRadius: BorderRadius.circular(20)), child: const Text('Go in', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 14))),
                 ]),
               ),
             ),
@@ -139,13 +145,20 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
     );
   }
 
-  Widget _section(String t) => Padding(padding: const EdgeInsets.fromLTRB(4, 18, 4, 8), child: Text(t, style: const TextStyle(color: kConAmber, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.2)));
+  Widget _section(String t) => Padding(
+        padding: const EdgeInsets.fromLTRB(4, 22, 4, 12),
+        child: Row(children: [
+          Expanded(child: Container(height: 1, color: kConAmber.withValues(alpha: 0.35))),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Text(t, style: const TextStyle(color: kConAmber, fontWeight: FontWeight.w900, fontSize: 12.5, letterSpacing: 2))),
+          Expanded(child: Container(height: 1, color: kConAmber.withValues(alpha: 0.35))),
+        ]),
+      );
 
   Widget _toggle(String label, bool on, Color c, VoidCallback f) => GestureDetector(
         onTap: f,
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(color: on ? c.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(14), border: Border.all(color: on ? c : Colors.white24, width: on ? 2 : 1)),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(color: on ? c.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(18), border: Border.all(color: on ? c : Colors.white24, width: on ? 2 : 1)),
           child: Center(child: Text(label, style: TextStyle(color: on ? c : Colors.white70, fontWeight: FontWeight.w900, fontSize: 13))),
         ),
       );
@@ -171,14 +184,24 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
   Widget _tile(String emoji, String title, String line, Color c, VoidCallback f) => GestureDetector(
         onTap: f,
         child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: kConPanel, borderRadius: BorderRadius.circular(16), border: Border.all(color: c.withValues(alpha: 0.5))),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(emoji, style: const TextStyle(fontSize: 24)),
-            const SizedBox(height: 6),
-            Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13.5)),
-            const SizedBox(height: 2),
-            Text(line, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white54, fontSize: 11.5, height: 1.3)),
+          padding: const EdgeInsets.fromLTRB(10, 16, 10, 14),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [c.withValues(alpha: 0.2), kConPanel]),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: c.withValues(alpha: 0.55), width: 1.4),
+            boxShadow: [BoxShadow(color: c.withValues(alpha: 0.18), blurRadius: 16, offset: const Offset(0, 6))],
+          ),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.center, children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: c.withValues(alpha: 0.22), border: Border.all(color: c.withValues(alpha: 0.7), width: 1.5), boxShadow: [BoxShadow(color: c.withValues(alpha: 0.35), blurRadius: 14)]),
+              child: Center(child: Text(emoji, style: const TextStyle(fontSize: 28))),
+            ),
+            const SizedBox(height: 10),
+            Text(title, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
+            const SizedBox(height: 3),
+            Text(line, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, fontSize: 11.5, height: 1.3)),
           ]),
         ),
       );
@@ -188,7 +211,7 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
 
 /// The 3D view with a message banner, an info card and zoom buttons on top of it.
 class Stage3D extends StatelessWidget {
-  const Stage3D({required this.scene, required this.cam, required this.onPick, required this.onHome, this.highlight = 0, this.dynamicPolys, this.layerOn, this.message, this.good = false, this.info, this.topLeft, this.topRight, this.infoAction, this.messageTop});
+  const Stage3D({required this.scene, required this.cam, required this.onPick, required this.onHome, this.highlight = 0, this.dynamicPolys, this.layerOn, this.message, this.good = false, this.info, this.topLeft, this.topRight, this.infoAction, this.messageTop, this.onDoubleTap});
   final Scene3D scene;
   final Cam3 cam;
   final void Function(int id) onPick;
@@ -206,10 +229,13 @@ class Stage3D extends StatelessWidget {
   /// How far down the message banner sits (it clears the corner widgets).
   final double? messageTop;
 
+  /// A double tap on the picture: where, and how big the picture is.
+  final void Function(Offset local, Size size)? onDoubleTap;
+
   @override
   Widget build(BuildContext context) {
     return Stack(children: [
-      Positioned.fill(child: Scene3DView(scene: scene, cam: cam, highlight: highlight, onPick: onPick, dynamicPolys: dynamicPolys, layerOn: layerOn, background: kConBg)),
+      Positioned.fill(child: Scene3DView(scene: scene, cam: cam, highlight: highlight, onPick: onPick, dynamicPolys: dynamicPolys, layerOn: layerOn, background: kConBg, onDoubleTap: onDoubleTap)),
       if (topLeft != null) Positioned(left: 8, top: 8, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: topLeft!)),
       Positioned(
         right: 8,

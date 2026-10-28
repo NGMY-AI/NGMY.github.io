@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'package:flutter/material.dart';
+
 import 'ngmy_construction_home.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -33,6 +35,24 @@ class PersonPose {
 
   /// How far along the walk the legs are (for the stride).
   final double phase;
+}
+
+/// The colours of a person: skin, hair, shirt and trousers. The tour person and every resident are built the same way.
+class PersonStyle {
+  const PersonStyle({this.skin = const Color(0xFFE0A47C), this.hair = const Color(0xFF2A1A10), this.shirt = const Color(0xFF2F6FB5), this.pants = const Color(0xFF2E3440)});
+  final Color skin, hair, shirt, pants;
+}
+
+/// A resident standing in a room of the house: where, which way, what they look like and the words over their head.
+class ResidentFigure {
+  const ResidentFigure({required this.id, required this.room, required this.x, required this.z, required this.yaw, required this.style, required this.label, this.alert = false});
+  final int id, room;
+  final double x, z, yaw;
+  final PersonStyle style;
+  final String label;
+
+  /// Something is wrong with them (hungry, sick...), so the label is drawn in red.
+  final bool alert;
 }
 
 typedef Pt = (double, double);
@@ -250,24 +270,36 @@ class HomeTour {
   final List<_Seg> _segs = [];
   late final double total;
 
-  /// The goals for each kind of room: what the person does there.
+  /// The goals for each kind of room: what the person does there. Nobody stands in front of a TV: they stand beside it.
   List<_Goal> _goals(HRoom r) {
-    final w = r.w, d = r.d;
+    final w = r.w;
+    // A spot beside the wall TV (left of it if there is room, else right), and the way to face the TV from there.
+    (Pt, double) beside(double z) {
+      final a = applianceByKey(r.wallTv ?? 'tv100');
+      final box = wallTvBox(r, a);
+      var x = box.cx - box.w / 2 - 18;
+      if (x < -w / 2 + 14) x = box.cx + box.w / 2 + 18;
+      x = x.clamp(-w / 2 + 14, w / 2 - 14);
+      return ((x, z), math.atan2(box.cx - x, -z));
+    }
+
     switch (r.kind) {
       case 'living':
+        final (spot, yaw) = beside(46);
         return [
           const _Goal((34, 62), yaw: math.pi, secs: 2.2, note: 'Picking up the remote', remote: true),
-          const _Goal((22, 44), yaw: math.pi, secs: 4.0, note: 'Switching the ad on the big TV', remote: true, pointing: true, event: 'ad'),
+          _Goal(spot, yaw: yaw, secs: 4.0, note: 'Switching the ad on the big TV', remote: true, pointing: true, event: 'ad'),
         ];
       case 'kitchen':
         return [
           _Goal((-w / 2 + 40, 42), yaw: math.pi, secs: 2.8, note: 'Getting a drink from the fridge', holding: true),
-          _Goal((0, 46), secs: 2.4, note: 'Having the drink', holding: true),
+          const _Goal((-20, 46), secs: 2.4, note: 'Having the drink', holding: true),
         ];
       case 'bathroom':
         return const [_Goal((34, 40), yaw: math.pi, secs: 2.6, note: 'Washing hands at the sink')];
       case 'bedroom':
-        return [_Goal((24, d - 16), yaw: math.pi, secs: 3.4, note: 'Switching the ad on the TV', remote: true, pointing: true, event: 'ad')];
+        final (spot, yaw) = beside(44);
+        return [_Goal(spot, yaw: yaw, secs: 3.4, note: 'Switching the ad on the TV', remote: true, pointing: true, event: 'ad')];
       default:
         return const [];
     }

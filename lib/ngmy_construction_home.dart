@@ -49,7 +49,48 @@ const Map<String, FurnKind> kFurnKinds = {
   'lamp': FurnKind('Floor lamp', '💡', 10, 10),
   'console': FurnKind('Console table', '🗄️', 44, 14),
   'shelf': FurnKind('Bookshelf', '📚', 36, 12),
+  'tree': FurnKind('Tree', '🌳', 36, 36),
+  'pine': FurnKind('Pine tree', '🌲', 30, 30),
+  'bush': FurnKind('Bush', '🌿', 18, 18),
+  'flowers': FurnKind('Flowers', '🌷', 22, 22),
+  'fence': FurnKind('Fence', '🚧', 64, 6),
+  'lamppost': FurnKind('Street lamp', '🏮', 8, 8),
+  'bench': FurnKind('Bench', '🪑', 44, 16),
+  'car': FurnKind('Car', '🚗', 84, 40),
+  'road': FurnKind('Road', '🛣️', 40, 40),
+  'roadturn': FurnKind('Road corner', '↪️', 40, 40),
+  'roadtee': FurnKind('Road T-junction', '⊤', 40, 40),
+  'roadcross': FurnKind('Crossroads', '✚', 40, 40),
+  'house2': FurnKind('House', '🏠', 72, 60),
+  'shop': FurnKind('Shop', '🏪', 84, 60),
+  'hospital': FurnKind('Hospital', '🏥', 110, 70),
+  'firestation': FurnKind('Fire station', '🚒', 90, 64),
+  'school': FurnKind('School', '🏫', 124, 70),
+  'firetruck': FurnKind('Fire truck', '🚒', 96, 40),
+  'ambulance': FurnKind('Ambulance', '🚑', 84, 40),
+  'dog': FurnKind('Dog', '🐕', 22, 10),
+  'cat': FurnKind('Cat', '🐈', 16, 8),
+  'cow': FurnKind('Cow', '🐄', 38, 16),
+  'sheep': FurnKind('Sheep', '🐑', 26, 14),
+  'chicken': FurnKind('Chicken', '🐔', 12, 8),
+  'horse': FurnKind('Horse', '🐎', 46, 16),
+  'pond': FurnKind('Pond', '💧', 80, 56),
+  'swing': FurnKind('Swing set', '🎠', 56, 40),
+  'shed': FurnKind('Shed', '🛖', 50, 42),
+  'doghouse': FurnKind('Dog house', '🐕', 24, 22),
 };
+
+/// What can be put in the garden, and what goes inside the rooms.
+const List<String> kOutdoorFurn = ['road', 'roadturn', 'roadtee', 'roadcross', 'house2', 'shop', 'hospital', 'firestation', 'school', 'car', 'firetruck', 'ambulance', 'dog', 'cat', 'cow', 'sheep', 'chicken', 'horse', 'tree', 'pine', 'bush', 'flowers', 'fence', 'lamppost', 'bench', 'pond', 'swing', 'shed', 'doghouse'];
+
+/// Road pieces snap to a grid of this size, so neighbours always line up.
+const double kRoadGrid = 40;
+const List<String> kRoadKinds = ['road', 'roadturn', 'roadtee', 'roadcross'];
+const List<String> kBuildingKinds = ['house2', 'shop', 'hospital', 'firestation', 'school'];
+const List<String> kAnimalKinds = ['dog', 'cat', 'cow', 'sheep', 'chicken', 'horse'];
+
+/// Flat things lie on the ground (you walk over them and cars drive over them): they are drawn before everything that stands on them.
+const List<String> kFlatKinds = ['rug', 'road', 'roadturn', 'roadtee', 'roadcross', 'pond', 'flowers'];
 
 const List<Color> kFurnColors = [Color(0xFF8B5E3C), Color(0xFF5E6E84), Color(0xFF9A4F4F), Color(0xFF4F7A5E), Color(0xFFD9C9A8), Color(0xFF3F3F46)];
 const List<String> kFurnColorNames = ['Walnut', 'Blue grey', 'Brick red', 'Sage green', 'Sand', 'Charcoal'];
@@ -80,15 +121,25 @@ const List<Color> kCeilColors = [Color(0xFFF4F1EA), Color(0xFFEAF2F7), Color(0xF
 
 /// Something that can be plugged into a wall outlet in the house.
 class HomeAppliance {
-  const HomeAppliance(this.key, this.name, this.emoji, {this.tvWidth = 0});
+  const HomeAppliance(this.key, this.name, this.emoji, {this.tvWidth = 0, this.fullWall = false});
   final String key, name, emoji;
 
   /// For a TV: how wide the screen is, in the house's inches.
   final double tvWidth;
-  bool get isTv => tvWidth > 0;
+
+  /// A TV that takes the whole free stretch of the wall.
+  final bool fullWall;
+  bool get isTv => tvWidth > 0 || fullWall;
+
+  /// Too big to stand on the floor: it hangs on the wall.
+  bool get wallOnly => tvWidth > 70 || fullWall;
 }
 
 const List<HomeAppliance> kHomeAppliances = [
+  HomeAppliance('wall', 'Whole-wall TV', '🎬', fullWall: true),
+  HomeAppliance('tv200', 'Cinema 200"', '🎬', tvWidth: 175),
+  HomeAppliance('tv150', 'Cinema 150"', '🎬', tvWidth: 130),
+  HomeAppliance('tv100', 'Giant 100"', '📺', tvWidth: 89),
   HomeAppliance('bangtv', 'Beovision TV 77"', '📺', tvWidth: 66),
   HomeAppliance('sonytv', 'Sony Bravia 75"', '📺', tvWidth: 64),
   HomeAppliance('lgtv', 'LG OLED 65"', '📺', tvWidth: 56),
@@ -100,6 +151,43 @@ const List<HomeAppliance> kHomeAppliances = [
 ];
 
 HomeAppliance applianceByKey(String k) => kHomeAppliances.firstWhere((a) => a.key == k, orElse: () => kHomeAppliances[3]);
+
+/// Where a wall TV is and how big it is: width, height, centre along the wall and centre height. It is as big as the free stretch
+/// of wall allows (between the doors, clear of the vanity in a bathroom), and in the hall it hangs on an end wall.
+class WallTvBox {
+  const WallTvBox(this.w, this.h, this.cx, this.cy);
+  final double w, h, cx, cy;
+}
+
+WallTvBox wallTvBox(HRoom r, HomeAppliance a) {
+  double heightFor(double tw) => math.min(tw * 0.5625, tw > 60 ? 62.0 : 99.0);
+  double centreY(double th) => th > 40 ? 30 + th / 2 : 58;
+  if (r.kind == 'hall') {
+    final tw = a.fullWall ? r.d - 14 : math.min(a.tvWidth, r.d - 14);
+    final th = heightFor(tw);
+    return WallTvBox(tw, th, r.d / 2, centreY(th));
+  }
+  var lo = -r.w / 2 + 6, hi = r.w / 2 - 6;
+  if (r.kind == 'bathroom') hi = 14;
+  final spans = [for (final d in r.doors) if (d.wall == 'back') (d.offset - 19, d.offset + 19)]..sort((x, y) => x.$1.compareTo(y.$1));
+  var bestA = lo, bestB = lo, cursor = lo;
+  void consider(double a0, double b0) {
+    if (b0 - a0 > bestB - bestA) {
+      bestA = a0;
+      bestB = b0;
+    }
+  }
+
+  for (final (s0, s1) in spans) {
+    if (s0 > cursor) consider(cursor, math.min(s0, hi));
+    cursor = math.max(cursor, s1);
+  }
+  if (cursor < hi) consider(cursor, hi);
+  final free = math.max(30.0, bestB - bestA - 4);
+  final tw = a.fullWall ? free : math.min(a.tvWidth, free);
+  final th = heightFor(tw);
+  return WallTvBox(tw, th, (bestA + bestB) / 2, centreY(th));
+}
 
 /// A door in a wall: which wall, how far along it, and which room it leads to.
 class HDoor {
@@ -156,6 +244,9 @@ class HRoom {
   /// Outlets and switches the visitor added, a TV on the wall (any TV model, on or off) and the NGMY app it plays.
   final List<HExtra> extras = [];
   String? wallTv;
+
+  /// The hall has a second TV, on the other end wall.
+  String? wallTv2;
   bool tvOn = false;
   int tvApp = 0;
 
@@ -180,8 +271,8 @@ class HRoom {
   bool get okOutA => lesson.isEmpty ? wired : ((lesson == 'outlet' || lesson == 'gfci') ? lessonDone : true);
   bool get okOutB => lesson.isEmpty ? wired : true;
 
-  double get w => switch (kind) { 'bathroom' => 110, 'kitchen' => 140, 'living' => 180, 'hall' => 240, 'outside' => 300, _ => 130 };
-  double get d => switch (kind) { 'bathroom' => 100, 'kitchen' => 110, 'living' => 120, 'hall' => 64, 'outside' => 200, _ => 112 };
+  double get w => switch (kind) { 'bathroom' => 110, 'kitchen' => 140, 'living' => 180, 'hall' => 300, 'outside' => 1200, _ => 130 };
+  double get d => switch (kind) { 'bathroom' => 100, 'kitchen' => 110, 'living' => 120, 'hall' => 90, 'outside' => 900, _ => 112 };
   bool get indoor => kind != 'outside';
   static const double h = 96;
 
@@ -212,6 +303,10 @@ class HRoom {
     final fw = turned ? k.d : k.w, fd = turned ? k.w : k.d;
     f.x = f.x.clamp(-w / 2 + fw / 2 + 1, w / 2 - fw / 2 - 1);
     f.z = f.z.clamp(fd / 2 + 1, d - fd / 2 - 1);
+    if (kRoadKinds.contains(f.kind)) {
+      f.x = (f.x / kRoadGrid).round() * kRoadGrid;
+      f.z = (f.z / kRoadGrid).round() * kRoadGrid;
+    }
   }
 }
 
@@ -270,12 +365,10 @@ class HomeProject {
     final r = math.Random(seed);
     // The map is 9 cells wide and 5 tall. The hall runs along the middle.
     HDoor toHall(double off) => HDoor('back', off, 5);
-    // The hall's doors: eight along the back wall (the rooms above and below it) and one at each end.
-    const hallTargets = [0, 1, 2, 3, 4, 6, 7, 8];
+    // The hall's doors: all ten along the back wall (every room off the hall), so both end walls are free for big TVs.
+    const hallTargets = [0, 1, 2, 3, 4, 6, 7, 8, 9, 10];
     final hallDoors = <HDoor>[
-      for (var i = 0; i < hallTargets.length; i++) HDoor('back', -98.0 + i * 28, hallTargets[i]),
-      const HDoor('left', 32, 9),
-      const HDoor('right', 32, 10),
+      for (var i = 0; i < hallTargets.length; i++) HDoor('back', -126.0 + i * 28, hallTargets[i]),
     ];
     final list = <HRoom>[
       HRoom(0, _bedNames[0], 'bedroom', 0, 0, 2, 2, [toHall(-48)]),
@@ -294,7 +387,10 @@ class HomeProject {
     rooms = list;
     // What is wrong in this house: a different mix every time.
     for (final room in rooms) {
-      if (!room.indoor) continue;
+      if (!room.indoor) {
+        _furnish(room);
+        continue;
+      }
       room.ceilingFix = room.kind == 'bedroom' ? 'fan' : 'light';
       room.wiringNeeded = r.nextDouble() < 0.6;
       room.plumbNeeded = room.hasPlumbing && r.nextDouble() < 0.7;
@@ -327,7 +423,6 @@ class HomeProject {
         r.add('rug', x: 0, z: 70);
         r.add('sofa', x: 0, z: 100);
         r.add('coffee', x: 0, z: 68);
-        r.add('tvstand', x: 0, z: 14);
         r.add('armchair', x: 66, z: 70);
         r.add('plant', x: 76, z: 14);
         r.add('lamp', x: -76, z: 14);
@@ -339,9 +434,48 @@ class HomeProject {
       case 'bathroom':
         r.add('rug', x: 0, z: 62).rot = 0;
         r.add('plant', x: r.w / 2 - 12, z: r.d - 12);
+      case 'outside':
+        // The house is at the back (z 0 and less); the lane runs from the crossroads up to the front path.
+        for (var x = -320.0; x <= 320; x += kRoadGrid) {
+          r.add(x == 0 ? 'roadcross' : 'road', x: x, z: 360);
+        }
+        for (var z = 320.0; z >= 160; z -= kRoadGrid) {
+          r.add('road', x: 0, z: z).rot = 1;
+        }
+        r.add('shop', x: -200, z: 270);
+        r.add('hospital', x: 210, z: 275);
+        r.add('firestation', x: -340, z: 275);
+        r.add('school', x: 360, z: 275);
+        r.add('house2', x: -140, z: 150);
+        r.add('car', x: -120, z: 360);
+        r.add('ambulance', x: 120, z: 360).rot = 2;
+        r.add('firetruck', x: -340, z: 318);
+        r.add('tree', x: -190, z: 60);
+        r.add('tree', x: 190, z: 90);
+        r.add('pine', x: 250, z: 40);
+        r.add('pine', x: -260, z: 30);
+        r.add('bush', x: -70, z: 20);
+        r.add('bush', x: 70, z: 20);
+        r.add('flowers', x: -30, z: 24);
+        r.add('flowers', x: 30, z: 24);
+        r.add('lamppost', x: 40, z: 330);
+        r.add('lamppost', x: -80, z: 330);
+        r.add('bench', x: 120, z: 190);
+        r.add('pond', x: 160, z: 470);
+        r.add('dog', x: 60, z: 60);
+        r.add('cat', x: -50, z: 80);
+        r.add('cow', x: -300, z: 520);
+        r.add('cow', x: -240, z: 560);
+        r.add('sheep', x: -180, z: 540);
+        r.add('horse', x: 260, z: 560);
+        r.add('chicken', x: -100, z: 500);
+        r.add('fence', x: -270, z: 480);
+        r.add('fence', x: -206, z: 480);
+        r.add('fence', x: -142, z: 480);
       case 'hall':
-        r.add('rug', x: 0, z: 36);
-        r.add('plant', x: 108, z: 50);
+        r.add('rug', x: 0, z: 46);
+        r.add('plant', x: -60, z: 76);
+        r.add('plant', x: 60, z: 76);
       default:
     }
   }
