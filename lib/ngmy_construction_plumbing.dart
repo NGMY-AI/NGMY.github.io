@@ -65,9 +65,9 @@ String? tryHose(PlumbState s, String hose, PlumbHook h) {
 
 const double _pr = 0.66;
 
-List<V3> _tailPath() => const [V3(0, 8.3, 0), V3(0, 3.9, 0)];
+List<V3> ptrapTailPath() => const [V3(0, 8.3, 0), V3(0, 3.9, 0)];
 
-List<V3> _trapPath() {
+List<V3> ptrapTrapPath() {
   final pts = <V3>[const V3(0, 3.9, 0), const V3(0, 0.2, 0)];
   for (var i = 1; i <= 12; i++) {
     final a = math.pi + math.pi * i / 12;
@@ -77,7 +77,7 @@ List<V3> _trapPath() {
   return pts;
 }
 
-List<V3> _armPath() => const [V3(8.6, 2.6, 0), V3(15.0, 2.6, 0)];
+List<V3> ptrapArmPath() => const [V3(8.6, 2.6, 0), V3(15.0, 2.6, 0)];
 
 Scene3D buildPtrapScene(PlumbState s) {
   final b = MeshBuilder();
@@ -109,9 +109,9 @@ Scene3D buildPtrapScene(PlumbState s) {
     }
   }
 
-  piece(idTail, _tailPath(), kChrome, 0.85, 'tail');
-  piece(idTrap, _trapPath(), kPvc, 0.3, 'trap');
-  piece(idArm, _armPath(), kPvc, 0.3, 'arm');
+  piece(idTail, ptrapTailPath(), kChrome, 0.85, 'tail');
+  piece(idTrap, ptrapTrapPath(), kPvc, 0.3, 'trap');
+  piece(idArm, ptrapArmPath(), kPvc, 0.3, 'arm');
 
   // The slip nuts and their washers: loose until they are hand tightened.
   void nut(int id, String key, V3 joint, V3 axis, V3 looseShift, bool needs) {
@@ -136,7 +136,7 @@ Scene3D buildPtrapScene(PlumbState s) {
     b.id = 0;
     b.alpha = 0.55;
     b.bias = 0.4;
-    final pts = _trapPath();
+    final pts = ptrapTrapPath();
     final low = pts.where((p) => p.y < -0.6).toList();
     if (low.length > 1) b.tube(low, _pr * 0.62, const Color(0xFF3B9BFF), shine: 0.6, sides: 8, joints: true, endCaps: false);
     b.alpha = 1;
@@ -167,7 +167,7 @@ List<Poly> ptrapWater(PlumbState s, double t) {
       b.ball(at + V3(0, -ph * 6.0 * ph - ph * 1.5, 0), 0.22 * (1 - ph * 0.3), const Color(0xFF5CB3FF), shine: 0.9, lat: 3, lon: 6);
     }
   } else if (s.running) {
-    final path = [..._tailPath(), ..._trapPath().skip(1), ..._armPath().skip(1)];
+    final path = [...ptrapTailPath(), ...ptrapTrapPath().skip(1), ...ptrapArmPath().skip(1)];
     for (var i = 0; i < 18; i++) {
       final ph = (t * 0.45 + i / 18) % 1.0;
       final idx = (ph * (path.length - 1)).floor().clamp(0, path.length - 2);

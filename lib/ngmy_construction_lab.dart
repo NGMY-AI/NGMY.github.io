@@ -6,6 +6,9 @@ import 'ngmy_3d.dart';
 import 'ngmy_construction_electrical.dart';
 import 'ngmy_construction_house.dart';
 import 'ngmy_construction_plumbing.dart';
+import 'ngmy_construction_projectpage.dart';
+import 'ngmy_construction_servicepage.dart';
+import 'ngmy_construction_plumbpage.dart';
 import 'ngmy_studio_kit.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -13,22 +16,22 @@ import 'ngmy_studio_kit.dart';
 // build a sink drain, connect a faucet, and walk through a whole house stage by stage.
 // ═════════════════════════════════════════════════════════════════════════════
 
-const Color _bg = Color(0xFF0E1218);
-const Color _panel = Color(0xFF161B24);
-const Color _amber = Color(0xFFF59E0B);
+const Color kConBg = Color(0xFF0E1218);
+const Color kConPanel = Color(0xFF161B24);
+const Color kConAmber = Color(0xFFF59E0B);
 
-void _beep(double f, {int ms = 90, String wave = 'tri', double volume = 0.25}) {
+void conBeep(double f, {int ms = 90, String wave = 'tri', double volume = 0.25}) {
   try {
     NgmyTone.play(f, ms: ms, wave: wave, volume: volume);
   } catch (_) {}
 }
 
-void _good() {
-  _beep(880, ms: 80);
-  Future.delayed(const Duration(milliseconds: 90), () => _beep(1320, ms: 120));
+void conGood() {
+  conBeep(880, ms: 80);
+  Future.delayed(const Duration(milliseconds: 90), () => conBeep(1320, ms: 120));
 }
 
-void _bad() => _beep(180, ms: 220, wave: 'square', volume: 0.25);
+void conBad() => conBeep(180, ms: 220, wave: 'square', volume: 0.25);
 
 class _LessonInfo {
   const _LessonInfo(this.id, this.group, this.title, this.blurb, this.icon, this.color);
@@ -79,7 +82,7 @@ class NgmyConstructionLab extends StatelessWidget {
               Container(
                 width: 40,
                 height: 40,
-                decoration: BoxDecoration(color: _amber.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(13), border: Border.all(color: _amber.withValues(alpha: 0.6))),
+                decoration: BoxDecoration(color: kConAmber.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(13), border: Border.all(color: kConAmber.withValues(alpha: 0.6))),
                 child: const Center(child: Text('🏗️', style: TextStyle(fontSize: 22))),
               ),
               const SizedBox(width: 10),
@@ -93,18 +96,79 @@ class NgmyConstructionLab extends StatelessWidget {
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(color: _panel, borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white12)),
+              decoration: BoxDecoration(color: kConPanel, borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white12)),
               child: const Text(
                 'Turn every model with your finger, pinch to zoom, and tap any part to zoom in and learn what it is. Pick a wire, then tap the screw it belongs on. Wires have their real colours, and every mistake is explained.',
                 style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.45),
               ),
             ),
+            const Padding(padding: EdgeInsets.fromLTRB(4, 18, 4, 8), child: Text('BUILD A WHOLE ROOM', style: TextStyle(color: kConAmber, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.2))),
+            _projectCard(context, practice: false),
+            _projectCard(context, practice: true),
+            const Padding(padding: EdgeInsets.fromLTRB(4, 18, 4, 8), child: Text('SERVICE CALLS', style: TextStyle(color: kConAmber, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.2))),
+            _modeCard(context, '🔧', 'Fix a house (learn)', 'A customer rings with a list of problems: a tripped breaker, a leaking nut, a dead outlet, a running toilet, a hole in the wall and more. A different list every time. Look and test, pick the right tool, and I explain every wrong move.', const Color(0xFF38BDF8), () => const NgmyServiceCallPage()),
+            _modeCard(context, '⚡', 'Fix a house (practice)', 'The same, but with no explanations. Touch a live wire and you get shocked. Three shocks and the call is over.', const Color(0xFFF87171), () => const NgmyServiceCallPage(practice: true)),
+            const Padding(padding: EdgeInsets.fromLTRB(4, 18, 4, 8), child: Text('PLUMBING JOBS', style: TextStyle(color: kConAmber, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.2))),
+            _modeCard(context, '🚽', 'Plumb a room (learn)', 'A bathroom or a kitchen, a different one each time. Fit the flange, wax ring, toilet, valves, hoses, faucet and drain piece by piece. Put something in the wrong order and I tell you why. Then turn the water on and find the leaks.', const Color(0xFF38BDF8), () => const NgmyPlumbJobPage()),
+            _modeCard(context, '💧', 'Plumb a room (practice)', 'The same job with no hints and no labels. Cut a pipe with the water on and the room floods.', const Color(0xFFF87171), () => const NgmyPlumbJobPage(practice: true)),
             for (final g in groups) ...[
-              Padding(padding: const EdgeInsets.fromLTRB(4, 18, 4, 8), child: Text(g.toUpperCase(), style: const TextStyle(color: _amber, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.2))),
+              Padding(padding: const EdgeInsets.fromLTRB(4, 18, 4, 8), child: Text(g.toUpperCase(), style: const TextStyle(color: kConAmber, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.2))),
               for (final l in _lessons.where((e) => e.group == g)) _card(context, l),
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _modeCard(BuildContext context, String emoji, String title, String blurb, Color c, Widget Function() page) {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page())),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: kConPanel, borderRadius: BorderRadius.circular(18), border: Border.all(color: c.withValues(alpha: 0.6), width: 1.5)),
+        child: Row(children: [
+          Container(width: 52, height: 52, decoration: BoxDecoration(color: c.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(16)), child: Center(child: Text(emoji, style: const TextStyle(fontSize: 28)))),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: TextStyle(color: c, fontWeight: FontWeight.w900, fontSize: 15)),
+              const SizedBox(height: 3),
+              Text(blurb, style: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.35)),
+            ]),
+          ),
+          Icon(Icons.chevron_right_rounded, color: c),
+        ]),
+      ),
+    );
+  }
+
+  Widget _projectCard(BuildContext context, {required bool practice}) {
+    final c = practice ? const Color(0xFFF87171) : const Color(0xFF4ADE80);
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => NgmyRoomProjectPage(practice: practice))),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: kConPanel, borderRadius: BorderRadius.circular(18), border: Border.all(color: c.withValues(alpha: 0.6), width: 1.5)),
+        child: Row(children: [
+          Container(width: 52, height: 52, decoration: BoxDecoration(color: c.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(16)), child: Center(child: Text(practice ? '🔥' : '🏗️', style: const TextStyle(fontSize: 28)))),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(practice ? 'Practice mode' : 'Learn mode', style: TextStyle(color: c, fontWeight: FontWeight.w900, fontSize: 15)),
+              const SizedBox(height: 3),
+              Text(
+                practice
+                    ? 'A new room job every time. No hints: I only speak up when you get something wrong. Touch a live wire and you get shocked. Wire it wrong and it burns.'
+                    : 'A new room job every time: mount the boxes, pull the cable, hang the drywall, then wire outlets, switches, a light or fan and plug in a TV to test. I tell you what to do next and why a move is wrong.',
+                style: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.35),
+              ),
+            ]),
+          ),
+          Icon(Icons.chevron_right_rounded, color: c),
+        ]),
       ),
     );
   }
@@ -115,7 +179,7 @@ class NgmyConstructionLab extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(color: _panel, borderRadius: BorderRadius.circular(18), border: Border.all(color: l.color.withValues(alpha: 0.45))),
+        decoration: BoxDecoration(color: kConPanel, borderRadius: BorderRadius.circular(18), border: Border.all(color: l.color.withValues(alpha: 0.45))),
         child: Row(children: [
           ClipRRect(borderRadius: BorderRadius.circular(14), child: SizedBox(width: 116, height: 92, child: _Thumb(l.id))),
           const SizedBox(width: 12),
@@ -172,8 +236,8 @@ class _Thumb extends StatelessWidget {
 // ─── Shared pieces ───────────────────────────────────────────────────────────
 
 /// The 3D view with a message banner, an info card and zoom buttons on top of it.
-class _Stage3D extends StatelessWidget {
-  const _Stage3D({required this.scene, required this.cam, required this.onPick, required this.onHome, this.highlight = 0, this.dynamicPolys, this.layerOn, this.message, this.good = false, this.info, this.topLeft, this.topRight, this.infoAction});
+class Stage3D extends StatelessWidget {
+  const Stage3D({required this.scene, required this.cam, required this.onPick, required this.onHome, this.highlight = 0, this.dynamicPolys, this.layerOn, this.message, this.good = false, this.info, this.topLeft, this.topRight, this.infoAction});
   final Scene3D scene;
   final Cam3 cam;
   final void Function(int id) onPick;
@@ -191,7 +255,7 @@ class _Stage3D extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Stack(children: [
-      Positioned.fill(child: Scene3DView(scene: scene, cam: cam, highlight: highlight, onPick: onPick, dynamicPolys: dynamicPolys, layerOn: layerOn, background: _bg)),
+      Positioned.fill(child: Scene3DView(scene: scene, cam: cam, highlight: highlight, onPick: onPick, dynamicPolys: dynamicPolys, layerOn: layerOn, background: kConBg)),
       if (topLeft != null) Positioned(left: 8, top: 8, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: topLeft!)),
       Positioned(
         right: 8,
@@ -250,7 +314,7 @@ class _Stage3D extends StatelessWidget {
       );
 }
 
-Widget _pill(String label, {required bool on, required VoidCallback onTap, Color color = _amber, IconData? icon}) => GestureDetector(
+Widget conPill(String label, {required bool on, required VoidCallback onTap, Color color = kConAmber, IconData? icon}) => GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -262,7 +326,7 @@ Widget _pill(String label, {required bool on, required VoidCallback onTap, Color
       ),
     );
 
-Widget _bigButton(String label, IconData icon, VoidCallback? onTap, {Color color = _amber}) => Expanded(
+Widget conBigButton(String label, IconData icon, VoidCallback? onTap, {Color color = kConAmber}) => Expanded(
       child: GestureDetector(
         onTap: onTap,
         child: Container(
@@ -277,7 +341,7 @@ Widget _bigButton(String label, IconData icon, VoidCallback? onTap, {Color color
       ),
     );
 
-Future<void> _showSteps(BuildContext context, String title, List<String> steps, List<bool> done) {
+Future<void> showConSteps(BuildContext context, String title, List<String> steps, List<bool> done) {
   return showModalBottomSheet<void>(
     context: context,
     backgroundColor: const Color(0xFF17171C),
@@ -289,7 +353,7 @@ Future<void> _showSteps(BuildContext context, String title, List<String> steps, 
         child: ListView(shrinkWrap: true, padding: const EdgeInsets.fromLTRB(16, 16, 16, 16), children: [
           Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
           const SizedBox(height: 4),
-          Text('${done.where((d) => d).length} of ${steps.length} steps done', style: const TextStyle(color: _amber, fontWeight: FontWeight.w800, fontSize: 12.5)),
+          Text('${done.where((d) => d).length} of ${steps.length} steps done', style: const TextStyle(color: kConAmber, fontWeight: FontWeight.w800, fontSize: 12.5)),
           const SizedBox(height: 10),
           for (var i = 0; i < steps.length; i++)
             Container(
@@ -297,7 +361,7 @@ Future<void> _showSteps(BuildContext context, String title, List<String> steps, 
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(14), border: Border.all(color: done[i] ? const Color(0xFF4ADE80).withValues(alpha: 0.6) : Colors.white12)),
               child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(done[i] ? '✅' : '${i + 1}.', style: TextStyle(color: done[i] ? Colors.white : _amber, fontWeight: FontWeight.w900, fontSize: 14)),
+                Text(done[i] ? '✅' : '${i + 1}.', style: TextStyle(color: done[i] ? Colors.white : kConAmber, fontWeight: FontWeight.w900, fontSize: 14)),
                 const SizedBox(width: 10),
                 Expanded(child: Text(steps[i], style: TextStyle(color: done[i] ? Colors.white54 : Colors.white, fontSize: 13, height: 1.4))),
               ]),
@@ -309,8 +373,8 @@ Future<void> _showSteps(BuildContext context, String title, List<String> steps, 
 }
 
 /// A lesson page: a header with the title, then the 3D area and a bottom panel.
-class _LessonScaffold extends StatelessWidget {
-  const _LessonScaffold({required this.title, required this.color, required this.stage, required this.panel, required this.onSteps, required this.stepText});
+class LessonScaffold extends StatelessWidget {
+  const LessonScaffold({required this.title, required this.color, required this.stage, required this.panel, required this.onSteps, required this.stepText});
   final String title;
   final Color color;
   final Widget stage;
@@ -343,7 +407,7 @@ class _LessonScaffold extends StatelessWidget {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-            decoration: const BoxDecoration(color: _panel, border: Border(top: BorderSide(color: Colors.white12))),
+            decoration: const BoxDecoration(color: kConPanel, border: Border(top: BorderSide(color: Colors.white12))),
             child: panel,
           ),
         ]),
@@ -435,7 +499,7 @@ class _ElectricalPageState extends State<_ElectricalPage> {
     final key = wireKeyForId(lesson.id, id);
     if (key != null && s.stage == 0 && s.attached.containsValue(key)) {
       if (s.power) {
-        _bad();
+        conBad();
         _say('STOP! The power is still on. Turn the breaker OFF before you touch any wire.');
         return;
       }
@@ -448,10 +512,10 @@ class _ElectricalPageState extends State<_ElectricalPage> {
       final err = tryFasten(lesson, s, chip, hook.first);
       if (err != null) {
         mistakes++;
-        _bad();
+        conBad();
         _say(err);
       } else {
-        _good();
+        conGood();
         setState(() {
           _rebuild();
           hl = id;
@@ -480,10 +544,10 @@ class _ElectricalPageState extends State<_ElectricalPage> {
       _rebuild();
     });
     if (s.power) {
-      _beep(120, ms: 200, wave: 'saw');
+      conBeep(120, ms: 200, wave: 'saw');
       if (s.stage == 0) _say('The breaker is ON. The wires are LIVE at 120 volts. Turn it OFF before you touch anything.');
     } else {
-      _beep(600, ms: 100);
+      conBeep(600, ms: 100);
       _say('Breaker OFF. It is safe to work on the wires. (In real life, always test them with a tester first.)', ok: true);
     }
   }
@@ -494,7 +558,7 @@ class _ElectricalPageState extends State<_ElectricalPage> {
       s.testing = true;
       _rebuild();
     });
-    _good();
+    conGood();
     _say(
       switch (lesson.id) {
         'switch' => 'Power on. Flip the switch and the light turns on: both black wires are on brass screws, so the switch opens and closes the hot wire. The lesson is complete! Mistakes: $mistakes.',
@@ -511,12 +575,12 @@ class _ElectricalPageState extends State<_ElectricalPage> {
     final next = done.indexWhere((d) => !d);
     final stepText = next < 0 ? 'All done' : 'Step ${next + 1}/${lesson.steps.length}';
     final canPush = wiringComplete(lesson, s) && !s.power;
-    return _LessonScaffold(
+    return LessonScaffold(
       title: lesson.title,
-      color: _amber,
+      color: kConAmber,
       stepText: stepText,
-      onSteps: () => _showSteps(context, lesson.title, lesson.steps, done),
-      stage: _Stage3D(
+      onSteps: () => showConSteps(context, lesson.title, lesson.steps, done),
+      stage: Stage3D(
         scene: scene,
         cam: cam,
         highlight: hl,
@@ -540,19 +604,19 @@ class _ElectricalPageState extends State<_ElectricalPage> {
           ),
         ],
         topRight: [
-          _pill('Hints', on: s.hints, icon: Icons.lightbulb_rounded, onTap: () => setState(() {
+          conPill('Hints', on: s.hints, icon: Icons.lightbulb_rounded, onTap: () => setState(() {
                 s.hints = !s.hints;
                 _rebuild();
               })),
           const SizedBox(height: 6),
-          _pill('Labels', on: s.labels, icon: Icons.label_rounded, color: const Color(0xFF38BDF8), onTap: () => setState(() {
+          conPill('Labels', on: s.labels, icon: Icons.label_rounded, color: const Color(0xFF38BDF8), onTap: () => setState(() {
                 s.labels = !s.labels;
                 _rebuild();
               })),
           const SizedBox(height: 6),
-          _pill('Brass side', on: false, icon: Icons.rotate_left_rounded, color: const Color(0xFFCDA033), onTap: () => cam.glideTo(target: V3(0.6, 0, s.stage == 0 ? 4.2 : 0.4), dist: 10, yaw: -0.95, pitch: 0.2)),
+          conPill('Brass side', on: false, icon: Icons.rotate_left_rounded, color: const Color(0xFFCDA033), onTap: () => cam.glideTo(target: V3(0.6, 0, s.stage == 0 ? 4.2 : 0.4), dist: 10, yaw: -0.95, pitch: 0.2)),
           const SizedBox(height: 6),
-          _pill('Silver side', on: false, icon: Icons.rotate_right_rounded, color: const Color(0xFFCBD0D6), onTap: () => cam.glideTo(target: V3(-0.6, 0, s.stage == 0 ? 4.2 : 0.4), dist: 10, yaw: 0.95, pitch: 0.2)),
+          conPill('Silver side', on: false, icon: Icons.rotate_right_rounded, color: const Color(0xFFCBD0D6), onTap: () => cam.glideTo(target: V3(-0.6, 0, s.stage == 0 ? 4.2 : 0.4), dist: 10, yaw: 0.95, pitch: 0.2)),
           const SizedBox(height: 8),
         ],
       ),
@@ -587,13 +651,13 @@ class _ElectricalPageState extends State<_ElectricalPage> {
             ]),
           const SizedBox(height: 8),
           Row(children: [
-            _bigButton(canPush ? 'Push it into the box' : (s.power ? 'Turn the breaker OFF first' : 'Fasten every wire first'), Icons.move_down_rounded, canPush
+            conBigButton(canPush ? 'Push it into the box' : (s.power ? 'Turn the breaker OFF first' : 'Fasten every wire first'), Icons.move_down_rounded, canPush
                 ? () {
                     setState(() {
                       s.stage = 1;
                       _rebuild();
                     });
-                    _good();
+                    conGood();
                     _say('The wires are folded back and the device is pushed into the box. Now put the cover plate on.', ok: true);
                     _home();
                   }
@@ -601,7 +665,7 @@ class _ElectricalPageState extends State<_ElectricalPage> {
           ]),
         ] else if (s.stage == 1) ...[
           Row(children: [
-            _bigButton('Pull it back out', Icons.undo_rounded, () {
+            conBigButton('Pull it back out', Icons.undo_rounded, () {
               setState(() {
                 s.stage = 0;
                 _rebuild();
@@ -609,18 +673,18 @@ class _ElectricalPageState extends State<_ElectricalPage> {
               _home();
             }, color: Colors.white70),
             const SizedBox(width: 8),
-            _bigButton('Put the cover plate on', Icons.crop_square_rounded, () {
+            conBigButton('Put the cover plate on', Icons.crop_square_rounded, () {
               setState(() {
                 s.stage = 2;
                 _rebuild();
               });
-              _good();
+              conGood();
               _say('Cover plate on. Now turn the power on and test.', ok: true);
             }),
           ]),
         ] else ...[
           Row(children: [
-            _bigButton('Start over', Icons.restart_alt_rounded, () {
+            conBigButton('Start over', Icons.restart_alt_rounded, () {
               setState(() {
                 s.stage = 0;
                 s.attached.clear();
@@ -634,7 +698,7 @@ class _ElectricalPageState extends State<_ElectricalPage> {
               _home();
             }, color: Colors.white70),
             const SizedBox(width: 8),
-            _bigButton(s.testing ? 'Tested ✓' : 'Power on and test', Icons.bolt_rounded, s.testing ? null : _test),
+            conBigButton(s.testing ? 'Tested ✓' : 'Power on and test', Icons.bolt_rounded, s.testing ? null : _test),
           ]),
         ],
       ]),
@@ -713,7 +777,7 @@ class _PtrapPageState extends State<_PtrapPage> {
         return;
       }
       if (chip != key) {
-        _bad();
+        conBad();
         _say(switch (chip) {
           'tail' => 'The tailpiece is the straight pipe that hangs from the sink. It goes at the very top, under the drain.',
           'trap' => 'The P-trap is the U-shaped bend. It goes right under the tailpiece, in the middle.',
@@ -722,12 +786,12 @@ class _PtrapPageState extends State<_PtrapPage> {
         return;
       }
       if (key == 'trap' && !s.placed.contains('tail')) {
-        _bad();
+        conBad();
         _say('Start from the top: put the tailpiece on first, then the trap under it.');
         return;
       }
       if (key == 'arm' && !s.placed.contains('trap')) {
-        _bad();
+        conBad();
         _say('The trap arm joins the trap. Put the P-trap on first.');
         return;
       }
@@ -738,7 +802,7 @@ class _PtrapPageState extends State<_PtrapPage> {
         _rebuild();
         chip = '';
       });
-      _good();
+      conGood();
       _say('Piece in place. ${s.placed.length == 3 ? 'Now tighten the two slip nuts: tap each nut.' : 'Pick the next piece.'}', ok: true);
       return;
     }
@@ -750,7 +814,7 @@ class _PtrapPageState extends State<_PtrapPage> {
           s.leakAt = '';
           _rebuild();
         });
-        _good();
+        conGood();
         _say('Slip nut hand tightened. In real life give it a quarter turn more with pliers, but never over-tighten plastic.', ok: true);
         return;
       }
@@ -770,10 +834,10 @@ class _PtrapPageState extends State<_PtrapPage> {
       _rebuild();
     });
     if (loose.isNotEmpty) {
-      _bad();
+      conBad();
       _say('It is dripping from a loose slip nut! Tap the nut and tighten it, then run the water again.');
     } else {
-      _good();
+      conGood();
       _say('No leaks. The water flows through the trap and into the wall. The little pool in the U-bend stays there and blocks sewer gas. The lesson is complete!', ok: true);
     }
   }
@@ -784,12 +848,12 @@ class _PtrapPageState extends State<_PtrapPage> {
     final next = done.indexWhere((d) => !d);
     final allPlaced = s.placed.length == 3;
     const names = {'tail': 'Tailpiece', 'trap': 'P-trap', 'arm': 'Trap arm'};
-    return _LessonScaffold(
+    return LessonScaffold(
       title: 'Sink drain (P-trap)',
       color: const Color(0xFF60A5FA),
       stepText: next < 0 ? 'All done' : 'Step ${next + 1}/${steps.length}',
-      onSteps: () => _showSteps(context, 'Sink drain (P-trap)', steps, done),
-      stage: _Stage3D(
+      onSteps: () => showConSteps(context, 'Sink drain (P-trap)', steps, done),
+      stage: Stage3D(
         scene: scene,
         cam: cam,
         highlight: hl,
@@ -820,7 +884,7 @@ class _PtrapPageState extends State<_PtrapPage> {
           ]),
         const SizedBox(height: 8),
         Row(children: [
-          _bigButton('Start over', Icons.restart_alt_rounded, () {
+          conBigButton('Start over', Icons.restart_alt_rounded, () {
             setState(() {
               s.placed.clear();
               s.tight.updateAll((k, v) => false);
@@ -833,7 +897,7 @@ class _PtrapPageState extends State<_PtrapPage> {
             _home();
           }, color: Colors.white70),
           const SizedBox(width: 8),
-          _bigButton(allPlaced ? 'Run the water' : 'Build the drain first', Icons.water_drop_rounded, allPlaced ? _run : null, color: const Color(0xFF60A5FA)),
+          conBigButton(allPlaced ? 'Run the water' : 'Build the drain first', Icons.water_drop_rounded, allPlaced ? _run : null, color: const Color(0xFF60A5FA)),
         ]),
       ]),
     );
@@ -905,10 +969,10 @@ class _FaucetPageState extends State<_FaucetPage> {
     if (hooks.isNotEmpty && chip.isNotEmpty) {
       final err = tryHose(s, chip, hooks.first);
       if (err != null) {
-        _bad();
+        conBad();
         _say(err);
       } else {
-        _good();
+        conGood();
         setState(() {
           s.valvesOpen = false;
           _rebuild();
@@ -949,10 +1013,10 @@ class _FaucetPageState extends State<_FaucetPage> {
       return;
     }
     if (faucetComplete(s)) {
-      _good();
+      conGood();
       _say('Hot and cold flow through the hoses and out of the faucet. No leaks. The lesson is complete!', ok: true);
     } else {
-      _bad();
+      conBad();
       _say('Water is spraying out of a valve that has no hose! Close the valves and finish connecting the hoses first.');
     }
   }
@@ -961,12 +1025,12 @@ class _FaucetPageState extends State<_FaucetPage> {
   Widget build(BuildContext context) {
     final done = _done();
     final next = done.indexWhere((d) => !d);
-    return _LessonScaffold(
+    return LessonScaffold(
       title: 'Faucet supply lines',
       color: const Color(0xFFF87171),
       stepText: next < 0 ? 'All done' : 'Step ${next + 1}/${steps.length}',
-      onSteps: () => _showSteps(context, 'Faucet supply lines', steps, done),
-      stage: _Stage3D(
+      onSteps: () => showConSteps(context, 'Faucet supply lines', steps, done),
+      stage: Stage3D(
         scene: scene,
         cam: cam,
         highlight: hl,
@@ -977,7 +1041,7 @@ class _FaucetPageState extends State<_FaucetPage> {
         info: hl != 0 ? scene.info[hl] : null,
         dynamicPolys: (t) => faucetWater(s, t),
         topRight: [
-          _pill('Hints', on: s.hints, icon: Icons.lightbulb_rounded, onTap: () => setState(() {
+          conPill('Hints', on: s.hints, icon: Icons.lightbulb_rounded, onTap: () => setState(() {
                 s.hints = !s.hints;
                 _rebuild();
               })),
@@ -1004,7 +1068,7 @@ class _FaucetPageState extends State<_FaucetPage> {
           ]),
         const SizedBox(height: 8),
         Row(children: [
-          _bigButton('Start over', Icons.restart_alt_rounded, () {
+          conBigButton('Start over', Icons.restart_alt_rounded, () {
             setState(() {
               s.attached.clear();
               s.valvesOpen = false;
@@ -1015,7 +1079,7 @@ class _FaucetPageState extends State<_FaucetPage> {
             _home();
           }, color: Colors.white70),
           const SizedBox(width: 8),
-          _bigButton(s.valvesOpen ? 'Close the valves' : 'Open the valves', Icons.water_drop_rounded, _open, color: const Color(0xFFF87171)),
+          conBigButton(s.valvesOpen ? 'Close the valves' : 'Open the valves', Icons.water_drop_rounded, _open, color: const Color(0xFFF87171)),
         ]),
       ]),
     );
@@ -1076,7 +1140,7 @@ class _HousePageState extends State<_HousePage> {
         _rebuild();
         hl = id;
       });
-      _good();
+      conGood();
       _say('You flipped the breaker fully OFF and then ON. The living room light is back on. A breaker trips when a circuit is overloaded: find out why before it trips again.', ok: true);
       cam.glideTo(target: const V3(-6.5, 5, -3), dist: 22);
       return;
@@ -1089,11 +1153,11 @@ class _HousePageState extends State<_HousePage> {
           _rebuild();
           hl = id;
         });
-        _good();
+        conGood();
         _say('You tightened the slip nut with the wrench. The drip has stopped.', ok: true);
         return;
       }
-      _bad();
+      conBad();
       _say(id == idHNut ? 'Hand tightening is not enough here. Pick the wrench first, then tap the nut.' : 'The water is dripping from the slip nut on the trap. Pick the wrench, then tap the nut.');
     }
     final info = scene.info[id];
@@ -1117,12 +1181,12 @@ class _HousePageState extends State<_HousePage> {
     final stage = kHouseStages[s.stage];
     final lesson = hl == 0 ? null : houseLessonFor(hl);
     final fixed = [!s.breakerTripped, !s.leaking || s.nutFixed];
-    return _LessonScaffold(
+    return LessonScaffold(
       title: 'Build and fix a house',
       color: const Color(0xFFA78BFA),
       stepText: 'Stage ${s.stage + 1}/${kHouseStages.length}',
-      onSteps: () => _showSteps(context, 'Fix the house', const ['The living room has no power: find the tripped breaker in the panel and reset it.', 'The kitchen sink drips: pick the wrench and tighten the slip nut under the sink. (Build the house up to Fixtures to see the problems.)'], fixed),
-      stage: _Stage3D(
+      onSteps: () => showConSteps(context, 'Fix the house', const ['The living room has no power: find the tripped breaker in the panel and reset it.', 'The kitchen sink drips: pick the wrench and tighten the slip nut under the sink. (Build the house up to Fixtures to see the problems.)'], fixed),
+      stage: Stage3D(
         scene: scene,
         cam: cam,
         highlight: hl,
@@ -1135,7 +1199,7 @@ class _HousePageState extends State<_HousePage> {
             ? null
             : GestureDetector(
                 onTap: () => _openLesson(lesson),
-                child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7), decoration: BoxDecoration(color: _amber, borderRadius: BorderRadius.circular(12)), child: const Text('Open the 3D lesson', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 12))),
+                child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7), decoration: BoxDecoration(color: kConAmber, borderRadius: BorderRadius.circular(12)), child: const Text('Open the 3D lesson', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 12))),
               ),
         layerOn: (l) => l <= s.stage,
         dynamicPolys: (t) => houseWater(s, t),
@@ -1143,7 +1207,7 @@ class _HousePageState extends State<_HousePage> {
       panel: Column(mainAxisSize: MainAxisSize.min, children: [
         Row(children: [
           Expanded(child: Text('${s.stage + 1}. ${stage.$1}', style: const TextStyle(color: Color(0xFFC4B5FD), fontWeight: FontWeight.w900, fontSize: 14))),
-          _pill('Wrench', on: tool == 'wrench', icon: Icons.build_rounded, color: const Color(0xFF38BDF8), onTap: () => setState(() => tool = tool == 'wrench' ? '' : 'wrench')),
+          conPill('Wrench', on: tool == 'wrench', icon: Icons.build_rounded, color: const Color(0xFF38BDF8), onTap: () => setState(() => tool = tool == 'wrench' ? '' : 'wrench')),
         ]),
         const SizedBox(height: 2),
         Text(stage.$2, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.35)),

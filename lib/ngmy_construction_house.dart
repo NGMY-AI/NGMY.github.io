@@ -26,13 +26,34 @@ const List<(String, String)> kHouseStages = [
 // Object numbers.
 const int idSlab = 70, idPanel = 71, idBreakerLiving = 72, idBreaker2 = 73, idBreaker3 = 74, idBreaker4 = 75, idBreaker5 = 76;
 const int idHOutlet = 81, idHSwitch = 82, idHLight = 83, idHGfci = 84, idHFaucet = 85, idHTrap = 86, idHNut = 87, idHToilet = 88, idHHeater = 89, idHSofa = 90;
-const int idHStuds = 91, idHPipes = 92, idHCables = 93, idHCounter = 94;
+const int idHStuds = 91, idHPipes = 92, idHCables = 93, idHCounter = 94, idHHole = 95, idHJoint = 96;
+
+/// Where a hole in the wall can be (x, y on the back wall).
+const List<(double, double)> kHoleSpots = [(-9.5, 4.6), (-5.9, 2.3), (8.8, 4.4)];
 
 class HouseState {
   int stage = 5;
-  bool breakerTripped = true;
   bool leaking = true;
   bool nutFixed = false;
+
+  /// Breakers that have tripped (the middle, orange position).
+  final Set<int> trippedBreakers = {idBreakerLiving};
+
+  /// Breakers a person has switched OFF on purpose (to work safely).
+  final Set<int> offBreakers = {};
+  bool get breakerTripped => trippedBreakers.contains(idBreakerLiving);
+  set breakerTripped(bool v) => v ? trippedBreakers.add(idBreakerLiving) : trippedBreakers.remove(idBreakerLiving);
+
+  // The things that can go wrong in a service call.
+  final Set<int> holes = {}; // spots in kHoleSpots that have a hole
+  final Set<int> patched = {};
+  bool pexLeak = false;
+  bool burntOutlet = false;
+  bool gfciTripped = false;
+  bool flicker = false;
+  bool toiletRunning = false;
+  bool faucetDrip = false;
+  bool clogged = false;
 }
 
 /// Which lesson a tapped fixture opens (or null when it has no lesson).
@@ -128,11 +149,12 @@ Scene3D buildHouseScene(HouseState s) {
   for (var i = 0; i < breakers.length; i++) {
     final col = i % 2;
     final row = i ~/ 2;
-    final tripped = i == 0 && s.breakerTripped;
+    final tripped = s.trippedBreakers.contains(breakers[i]);
+    final off = s.offBreakers.contains(breakers[i]);
     b.id = breakers[i];
     final c = V3(9.55 + col * 0.5, 5.7 - row * 0.5, -7.5);
     b.box(c, const V3(0.4, 0.38, 0.12), const Color(0xFF22262C), shine: 0.3);
-    b.box(c + V3(0, tripped ? 0 : 0.07, 0.08), const V3(0.18, 0.12, 0.08), tripped ? const Color(0xFFF97316) : const Color(0xFFE5E7EB), shine: 0.4);
+    b.box(c + V3(0, tripped ? 0 : (off ? -0.07 : 0.07), 0.08), const V3(0.18, 0.12, 0.08), tripped ? const Color(0xFFF97316) : (off ? const Color(0xFF6B7280) : const Color(0xFFE5E7EB)), shine: 0.4);
   }
   // Living room: sofa, outlet, switch and ceiling light.
   b.id = idHSofa;
@@ -145,7 +167,7 @@ Scene3D buildHouseScene(HouseState s) {
     b.box(c, V3(w, h, 0.06), col, shine: 0.3);
   }
 
-  plate(idHOutlet, const V3(-3.2, 1.3, -7.82), kIvory);
+  plate(idHOutlet, const V3(-3.2, 1.3, -7.82), s.burntOutlet ? const Color(0xFF2A2523) : kIvory);
   b.id = idHOutlet;
   b.box(const V3(-3.2, 1.45, -7.78), const V3(0.05, 0.12, 0.03), const Color(0xFF17181B));
   b.box(const V3(-3.2, 1.15, -7.78), const V3(0.05, 0.12, 0.03), const Color(0xFF17181B));
@@ -173,9 +195,9 @@ Scene3D buildHouseScene(HouseState s) {
   b.tube(roundedPath(const [V3(3.0, 3.2, -7.85), V3(3.0, 4.0, -7.85), V3(3.0, 4.2, -7.4), V3(3.0, 3.95, -7.0)], 0.2), 0.055, kChrome, shine: 0.9, sides: 8, joints: false);
   b.id = idHGfci;
   b.box(const V3(5.2, 3.9, -7.82), const V3(0.45, 0.72, 0.06), kIvory, shine: 0.3);
-  b.box(const V3(5.2, 3.9, -7.76), const V3(0.12, 0.1, 0.03), const Color(0xFFD72A2A));
+  b.box(const V3(5.2, 3.9, -7.76), const V3(0.12, 0.1, 0.03), s.gfciTripped ? const Color(0xFFFF5A1F) : const Color(0xFFD72A2A));
   b.id = idHTrap;
-  b.tube(roundedPath(const [V3(3.0, 3.1, -7.1), V3(3.0, 1.7, -7.1), V3(3.0, 1.0, -7.1), V3(3.65, 0.5, -7.1), V3(4.3, 1.0, -7.1), V3(4.3, 1.8, -7.1), V3(5.0, 1.8, -7.1), V3(5.0, 1.8, -7.85)], 0.35), 0.11, kPvc, shine: 0.3, sides: 10, joints: true);
+  b.tube(roundedPath(const [V3(3.0, 3.1, -7.1), V3(3.0, 1.7, -7.1), V3(3.0, 1.0, -7.1), V3(3.65, 0.5, -7.1), V3(4.3, 1.0, -7.1), V3(4.3, 1.8, -7.1), V3(5.0, 1.8, -7.1), V3(5.0, 1.8, -7.85)], 0.35, steps: 3), 0.11, kPvc, shine: 0.3, sides: 8, joints: false);
   b.id = idHNut;
   b.cyl(const V3(3.0, 1.55, -7.1), const V3(3.0, 1.85, -7.1), 0.19, s.nutFixed ? const Color(0xFFE5E5DD) : const Color(0xFFD9C9A0), shine: 0.3, sides: 8);
   // Bathroom: toilet and water heater.
@@ -188,6 +210,22 @@ Scene3D buildHouseScene(HouseState s) {
   b.cyl(const V3(11.2, 4.5, -6.0), const V3(11.2, 4.7, -6.0), 0.5, const Color(0xFF7B828B), shine: 0.5, sides: 12);
   b.box(const V3(11.2, 2.4, -5.18), const V3(0.5, 0.5, 0.04), const Color(0xFFD05A3A));
 
+  // Holes in the wall (and patches over them), and a leaky pipe joint.
+  b.id = idHHole;
+  for (var i = 0; i < kHoleSpots.length; i++) {
+    final sp = kHoleSpots[i];
+    if (s.patched.contains(i)) {
+      b.box(V3(sp.$1, sp.$2, -7.82), const V3(1.5, 1.5, 0.05), const Color(0xFFEDEAE0));
+      b.box(V3(sp.$1, sp.$2, -7.79), const V3(1.1, 1.1, 0.03), const Color(0xFFE2DFD2));
+    } else if (s.holes.contains(i)) {
+      b.box(V3(sp.$1, sp.$2, -7.82), const V3(1.0, 0.9, 0.06), const Color(0xFF1B1209));
+      b.box(V3(sp.$1, sp.$2, -7.8), const V3(1.4, 1.3, 0.02), const Color(0xFFCFC9B8));
+    }
+  }
+  if (s.pexLeak) {
+    b.id = idHJoint;
+    b.cyl(const V3(3.4, 3.55, -7.85), const V3(3.4, 3.25, -7.85), 0.1, const Color(0xFFB45309), shine: 0.7, sides: 8);
+  }
   // ── Roof ──
   b.bias = 0;
   b.layer = hLayerRoof;
@@ -222,6 +260,8 @@ Scene3D buildHouseScene(HouseState s) {
     idHHeater: const ObjInfo('Water heater', 'Heats the water. The cold line goes in at the top and the hot line comes out at the top.', V3(11.2, 2.3, -6), 9),
     idHSofa: const ObjInfo('Sofa', 'Just furniture, to show the size of the room.', V3(-8.4, 1.2, -6.4), 10),
     idHCounter: const ObjInfo('Kitchen counter and cabinet', 'The cabinet under the sink is where the drain and the shut-off valves live.', V3(3.5, 2, -7.2), 9),
+    idHHole: const ObjInfo('Wall', 'The drywall of the back wall.', V3(0, 4, -7.8), 16),
+    idHJoint: const ObjInfo('Pipe joint', 'A crimped joint in the hot water line.', V3(3.4, 3.4, -7.85), 4),
   };
   return Scene3D(b.polys, info: info);
 }
@@ -231,6 +271,39 @@ List<Poly> houseWater(HouseState s, double t) {
   final b = MeshBuilder();
   b.layer = hLayerFix;
   b.bias = 0.8;
+  if (s.pexLeak) {
+    for (var i = 0; i < 6; i++) {
+      final ph = (t * 1.5 + i / 6) % 1.0;
+      b.ball(V3(3.4 + math.sin(i * 2.0) * 0.12, 3.3 - ph * ph * 2.8, -7.7), 0.05, const Color(0xFFFF8A80), shine: 0.9, lat: 3, lon: 6);
+    }
+  }
+  if (s.faucetDrip) {
+    final ph = (t * 1.1) % 1.0;
+    b.ball(V3(3.0, 3.9 - ph * ph * 0.7, -6.95), 0.05, const Color(0xFF8DC8FF), shine: 0.9, lat: 3, lon: 6);
+  }
+  if (s.toiletRunning) {
+    for (var i = 0; i < 6; i++) {
+      final ph = (t * 1.6 + i / 6) % 1.0;
+      b.ball(V3(8.2 + math.sin(i * 1.7) * 0.15, 2.2 - ph * 1.5, -7.2), 0.05, const Color(0xFF8DC8FF), shine: 0.9, lat: 3, lon: 6);
+    }
+  }
+  if (s.clogged) {
+    b.alpha = 0.55;
+    b.box(const V3(3.0, 3.28, -7.2), const V3(1.7, 0.08, 1.2), const Color(0xFF6FB6FF), shine: 0.8);
+    b.alpha = 1;
+  }
+  if (s.burntOutlet) {
+    for (var i = 0; i < 8; i++) {
+      final ph = (t * 2.0 + i * 0.13) % 1.0;
+      b.ball(V3(-3.2 + math.cos(i * 2.4 + t * 6) * ph * 0.7, 1.3 + math.sin(i * 2.4 + t * 6) * ph * 0.7, -7.6 + ph * 0.3), 0.05, Color.lerp(const Color(0xFFFF6A00), const Color(0xFFFFF3A0), 1 - ph)!, shine: 0, lat: 3, lon: 5);
+    }
+  }
+  if (s.flicker && !s.breakerTripped) {
+    b.id = 0;
+    b.alpha = ((math.sin(t * 17) + math.sin(t * 29) + 2) / 4 * 0.5).clamp(0.0, 0.6);
+    b.ball(const V3(-6.5, 6.9, -3.0), 1.5, const Color(0xFFFFE680), shine: 0, lat: 4, lon: 10);
+    b.alpha = 1;
+  }
   if (s.leaking && !s.nutFixed) {
     for (var i = 0; i < 5; i++) {
       final ph = (t * 1.3 + i * 0.2) % 1.0;

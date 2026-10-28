@@ -184,6 +184,16 @@ class MeshBuilder {
   }
 }
 
+/// Moves and turns a group of faces: turn about the x axis by [rx], then about the y axis by [ry], then slide by [t].
+List<Poly> transformPolys(List<Poly> ps, {double rx = 0, double ry = 0, V3 t = V3.zero}) {
+  final cx = math.cos(rx), sx = math.sin(rx);
+  V3 rotX(V3 p) => V3(p.x, p.y * cx - p.z * sx, p.y * sx + p.z * cx);
+  V3 fix(V3 p) => ry == 0 ? p : rotY(p, ry);
+  V3 pt(V3 p) => fix(rx == 0 ? p : rotX(p)) + t;
+  V3 dir(V3 p) => fix(rx == 0 ? p : rotX(p));
+  return [for (final p in ps) Poly([for (final v in p.pts) pt(v)], dir(p.n), p.color, p.id, shine: p.shine, alpha: p.alpha, twoSided: p.twoSided, layer: p.layer, bias: p.bias)];
+}
+
 /// Turns sharp corners of a path into smooth bends of about [radius].
 List<V3> roundedPath(List<V3> pts, double radius, {int steps = 6}) {
   if (pts.length < 3) return pts;
@@ -226,6 +236,16 @@ class Cam3 extends ChangeNotifier {
   double yaw, pitch, dist;
   V3 target;
   double minDist = 6, maxDist = 160;
+
+  /// Turning is kept to the front of the scene unless [free] is on (the "look behind the wall" button), so a swipe never throws you round the back by accident.
+  double yawCenter = 0, yawRange = 1.25;
+  bool free = false;
+
+  void setFree(bool v) {
+    free = v;
+    if (!v) yaw = yaw.clamp(yawCenter - yawRange, yawCenter + yawRange);
+    notifyListeners();
+  }
 
   // A glide to a new view.
   V3? _toTarget;
@@ -280,6 +300,7 @@ class Cam3 extends ChangeNotifier {
     _toYaw = null;
     _toPitch = null;
     yaw += dYaw;
+    if (!free) yaw = yaw.clamp(yawCenter - yawRange, yawCenter + yawRange);
     pitch = (pitch + dPitch).clamp(-1.25, 1.35);
     notifyListeners();
   }
@@ -394,7 +415,7 @@ class Scene3DPainter extends CustomPainter {
         edge.color = d.color;
         canvas.drawPath(d.path, edge);
       }
-      if (d.id != 0 && !d.see) hits.list.add((d.path, d.id));
+      if (d.id != 0) hits.list.add((d.path, d.id));
     }
     // A bright outline around the object that is selected.
     if (highlight != 0) {

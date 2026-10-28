@@ -162,7 +162,7 @@ void main() {
     const names = ['Wall outlet', 'Light switch', 'GFCI outlet', 'Sink drain (P-trap)', 'Faucet supply lines', 'Build and fix a house'];
 
     testWidgets('the lab lists every lesson and each one opens', (t) async {
-      t.view.physicalSize = const Size(900, 3200);
+      t.view.physicalSize = const Size(900, 5200);
       t.view.devicePixelRatio = 2.0;
       addTearDown(t.view.reset);
       await t.pumpWidget(const MaterialApp(home: NgmyConstructionLab()));
@@ -182,7 +182,7 @@ void main() {
     });
 
     testWidgets('in the outlet lesson the breaker, the wires and the steps work', (t) async {
-      t.view.physicalSize = const Size(900, 2000);
+      t.view.physicalSize = const Size(900, 5200);
       t.view.devicePixelRatio = 2.0;
       addTearDown(t.view.reset);
       await t.pumpWidget(const MaterialApp(home: NgmyConstructionLab()));
@@ -206,7 +206,7 @@ void main() {
     });
 
     testWidgets('the house page moves through the building stages', (t) async {
-      t.view.physicalSize = const Size(900, 3200);
+      t.view.physicalSize = const Size(900, 5200);
       t.view.devicePixelRatio = 2.0;
       addTearDown(t.view.reset);
       await t.pumpWidget(const MaterialApp(home: NgmyConstructionLab()));
@@ -223,7 +223,7 @@ void main() {
     });
 
     testWidgets('a real tap on a screw in the 3D view fastens the wire, and a wrong screw is explained', (t) async {
-      t.view.physicalSize = const Size(900, 2000);
+      t.view.physicalSize = const Size(900, 5200);
       t.view.devicePixelRatio = 2.0;
       addTearDown(t.view.reset);
       await t.pumpWidget(const MaterialApp(home: NgmyConstructionLab()));
@@ -255,7 +255,7 @@ void main() {
       await t.pump(const Duration(milliseconds: 400));
       await t.tapAt(find3d(idGreen)!);
       await t.pump(const Duration(milliseconds: 700));
-      expect(find.textContaining('Green ground screw: fastened correctly'), findsOneWidget);
+      expect(find.textContaining('Green screw: GROUND: fastened correctly'), findsOneWidget);
       // The white wire on a brass screw is explained, then it goes on a silver screw.
       await t.pump(const Duration(milliseconds: 1200));
       await t.tap(find.text('White · neutral'));
