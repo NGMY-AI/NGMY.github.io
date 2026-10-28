@@ -78,11 +78,7 @@ class _NgmyServiceCallPageState extends State<NgmyServiceCallPage> {
   }
 
   void _pick(int id) {
-    if (id == 0) {
-      _home();
-      return;
-    }
-    final info = scene.info[id];
+    if (id == 0) return;
     final a = call.use(tool, id);
     if (a.ok) {
       conGood();
@@ -101,7 +97,6 @@ class _NgmyServiceCallPageState extends State<NgmyServiceCallPage> {
       hl = id;
     });
     _say(a.msg, ok: a.ok && !a.danger);
-    if (info != null) cam.glideTo(target: info.focus, dist: info.dist);
     if (call.failed) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _over());
     } else if (call.allFixed && !doneShown) {

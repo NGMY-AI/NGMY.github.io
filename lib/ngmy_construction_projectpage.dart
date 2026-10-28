@@ -202,15 +202,12 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
   // ── Picking ──
 
   void _pick(int id) {
+    // The view never jumps because of a tap that missed: only the buttons move it.
     if (id == 0) {
-      if (active >= 0) {
-        _leave();
-      } else {
-        setState(() => hl = 0);
-        _roomView();
-      }
+      if (active < 0) setState(() => hl = 0);
       return;
     }
+    if (active >= 0 && !(id >= idBenchBase && id < idBenchBase + 700)) return;
     // Parts of the device you are working on.
     if (id >= idBenchBase && id < idBenchBase + 700) {
       _pickBench((id - idBenchBase) ~/ 100, (id - idBenchBase) % 100);
@@ -274,7 +271,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
     final info = scene.info[id];
     if (info != null) {
       setState(() => hl = id);
-      cam.glideTo(target: info.focus, dist: info.dist);
+      _say('${info.name}: ${info.about}', ok: true);
     }
   }
 
@@ -316,7 +313,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
     final info = scene.info[idSlotBase + slot];
     if (info != null) {
       setState(() => hl = idSlotBase + slot);
-      cam.glideTo(target: info.focus, dist: info.dist);
+      _say('${info.name}: ${info.about}', ok: true);
     }
   }
 
@@ -344,7 +341,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
     }
     setState(() => hl = idDevBase + slot);
     final info = scene.info[idDevBase + slot];
-    if (info != null) cam.glideTo(target: info.focus, dist: info.dist);
+    if (info != null) _say('${info.name}: ${info.about}', ok: true);
   }
 
   void _pickBench(int slot, int local) {
@@ -360,11 +357,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
     if (hook.isNotEmpty && d.w.stage == 0) {
       if (chip.isEmpty) {
         _say('Pick a wire below first, then tap ${hook.first.name}.');
-        final info = scene.info[benchId(slot, local)];
-        if (info != null) {
-          setState(() => hl = benchId(slot, local));
-          cam.glideTo(target: info.focus, dist: info.dist);
-        }
+        setState(() => hl = benchId(slot, local));
         return;
       }
       final a = p.fasten(slot, chip, local);
@@ -380,8 +373,55 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
     final info = scene.info[benchId(slot, local)];
     if (info != null) {
       setState(() => hl = benchId(slot, local));
-      cam.glideTo(target: info.focus, dist: info.dist);
+      _say('${info.name}: ${info.about}', ok: true);
     }
+  }
+
+
+  /// The places the thing in your hand can go, as buttons, so nobody has to hit a tiny glowing marker.
+  List<(int, String)> _spots() {
+    final out = <(int, String)>[];
+    for (final s in kSlots) {
+      final has = p.devs.containsKey(s.id);
+      final ok = switch (armed) {
+        'wall' => !s.ceiling && !p.boxes.containsKey(s.id),
+        'ceiling' || 'fanbox' => s.ceiling && !p.boxes.containsKey(s.id),
+        'cable' => p.boxes.containsKey(s.id) && !p.cabled.contains(s.id),
+        'knife' => !s.ceiling && p.boxes.containsKey(s.id),
+        'outlet' || 'gfci' || 'switch' => !s.ceiling && p.boxes.containsKey(s.id) && !has,
+        'light' || 'fan' => s.ceiling && p.boxes.containsKey(s.id) && !has,
+        'tv' || 'lamp' || 'toaster' || 'hairdryer' => has && (p.devs[s.id]!.kind == 'outlet' || p.devs[s.id]!.kind == 'gfci'),
+        'tester' => p.boxes.containsKey(s.id),
+        _ => false,
+      };
+      if (ok) out.add((s.id, s.name));
+    }
+    return out;
+  }
+
+  Widget _spotButtons() {
+    final spots = _spots();
+    if (spots.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Wrap(spacing: 6, runSpacing: 6, children: [
+        for (final (id, name) in spots)
+          GestureDetector(
+            onTap: () {
+              if (kAppliances.contains(armed)) {
+                _pickDevice(id);
+              } else {
+                _pickSlot(id);
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+              decoration: BoxDecoration(color: const Color(0xFF0E7490).withValues(alpha: 0.35), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFF67E8F9))),
+              child: Text('📍 $name',style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+            ),
+          ),
+      ]),
+    );
   }
 
   // ── The end of a job ──
@@ -627,6 +667,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
                   ),
               ]),
             ),
+            if (armed.isNotEmpty) _spotButtons(),
           ] else ...[
             Wrap(spacing: 8, runSpacing: 6, children: [
               if (d.w.stage == 0)
@@ -639,8 +680,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
                       }
                       chip = chip == c.key ? '' : c.key;
                       if (chip.isNotEmpty) {
-                        cam.glideTo(dist: 9, yaw: c.role == 'neutral' ? 0.85 : (c.role == 'hot' ? -0.85 : 0.1));
-                        _say('${c.label}: now tap the place it belongs on.', ok: true);
+                        _say('${c.label}: now tap the screw it belongs on, or press the matching button below.', ok: true);
                       }
                     }),
                     child: Container(
@@ -653,6 +693,21 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
                     ),
                   ),
             ]),
+            if (d.w.stage == 0 && chip.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Wrap(spacing: 6, runSpacing: 6, children: [
+                  for (final hk in lesson!.hookups)
+                    GestureDetector(
+                      onTap: () => _pickBench(active, hk.id),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+                        decoration: BoxDecoration(color: const Color(0xFF0E7490).withValues(alpha: 0.35), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFF67E8F9))),
+                        child: Text('➜ ${hk.name}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+                      ),
+                    ),
+                ]),
+              ),
             const SizedBox(height: 8),
             Row(children: [
               conBigButton('Back to the room', Icons.arrow_back_rounded, _leave, color: Colors.white70),

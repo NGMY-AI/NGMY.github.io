@@ -65,6 +65,20 @@ void main() {
     await t.pump(const Duration(seconds: 1));
   });
 
+  testWidgets('a part picked from the tray offers its spot as a button', (t) async {
+    t.view.physicalSize = const Size(900, 2000);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(const MaterialApp(home: NgmyPlumbJobPage(seed: 1)));
+    await t.pump(const Duration(milliseconds: 700));
+    await t.tap(find.text('Flange'));
+    await t.pump(const Duration(milliseconds: 300));
+    await t.tap(find.text('📍 Toilet flange'));
+    await t.pump(const Duration(milliseconds: 300));
+    expect(find.textContaining('1/'), findsWidgets);
+    await t.pump(const Duration(seconds: 12));
+  });
+
   test('scene polys class is used', () {
     expect(Scene3DPainter, isNotNull);
   });

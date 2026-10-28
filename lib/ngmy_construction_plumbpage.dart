@@ -82,17 +82,30 @@ class _NgmyPlumbJobPageState extends State<NgmyPlumbJobPage> {
     return Act(false, m);
   }
 
-  void _pick(int id) {
-    if (id == 0) {
-      _home();
-      return;
-    }
+  void _pick(int id) => _act(id);
+
+  void _spot(String what) {
+    final id = switch (what) {
+      'main' => idPjMain,
+      _ => idPjBase + job.steps.indexWhere((s) => s.id == what),
+    };
+    _act(id);
+  }
+
+  List<(String, String)> _spots() {
+    if (armed == 'hand') return [('main', 'Main water valve')];
+    if (armed == 'wrench') return [for (final s in job.steps) if (job.placed.contains(s.id) && job.looseJoints(s.id) > 0) (s.id, s.label)];
+    return [for (final s in job.steps) if (s.item == armed && !job.placed.contains(s.id)) (s.id, s.label)];
+  }
+
+  void _act(int id) {
+    // A tap that missed never moves the view; only the buttons do.
+    if (id == 0) return;
     final info = scene.info[id];
     if (armed.isEmpty) {
       setState(() => hl = id);
       if (info != null) {
         _say('${info.name}: ${info.about}', ok: true);
-        cam.glideTo(target: info.focus, dist: info.dist);
       }
       return;
     }
@@ -117,7 +130,6 @@ class _NgmyPlumbJobPageState extends State<NgmyPlumbJobPage> {
       hl = id;
     });
     _say(a.msg, ok: a.ok && !a.danger);
-    if (info != null) cam.glideTo(target: info.focus, dist: info.dist.clamp(30, 90));
     if (job.done && !doneShown) {
       doneShown = true;
       WidgetsBinding.instance.addPostFrameCallback((_) => _done());
@@ -194,6 +206,21 @@ class _NgmyPlumbJobPageState extends State<NgmyPlumbJobPage> {
         dynamicPolys: (_) => plumbJobWater(job, clock.elapsedMilliseconds / 1000),
       ),
       panel: Column(mainAxisSize: MainAxisSize.min, children: [
+        if (armed.isNotEmpty && _spots().isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Wrap(spacing: 6, runSpacing: 6, children: [
+              for (final (id, name) in _spots())
+                GestureDetector(
+                  onTap: () => _spot(id),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+                    decoration: BoxDecoration(color: const Color(0xFF0E7490).withValues(alpha: 0.35), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFF67E8F9))),
+                    child: Text('📍 $name', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+                  ),
+                ),
+            ]),
+          ),
         Align(
           alignment: Alignment.centerLeft,
           child: Text(job.practice ? 'Practice mode: no hints. Build it in the right order.' : (job.allPlaced ? 'Everything is fitted. Tighten every joint, then turn the main water on to test.' : 'Job: ${job.variant.blurb}'), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.3, fontWeight: FontWeight.w700)),
