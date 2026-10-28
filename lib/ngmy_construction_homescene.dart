@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'ngmy_city_ads.dart';
 import 'dart:ui' as ui;
 
 import 'package:flutter/services.dart';
@@ -681,6 +682,7 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
 
   // The things in the garden.
   b.grouped = true;
+  final furnGroup = <int, int>{};
   for (final f in r.furn) {
     if (hideFurn.contains(idHFurn + f.id)) continue;
     if (kAnimalKinds.contains(f.kind)) {
@@ -695,8 +697,24 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
     // The hospital and the shop can always be tapped: they open the city's hospital and shop.
     fb.id = (f.kind == 'hospital' || f.kind == 'shop') ? idHFurn + f.id : when('furniture', idHFurn + f.id);
     _furniture(fb, f.kind, kFurnColors[f.color]);
+    if (fb.polys.isNotEmpty) furnGroup[f.id] = fb.polys.first.group;
     b.polys.addAll(transformPolys(fb.polys, ry: f.rot * math.pi / 2, t: V3(f.x, 0, f.z)));
     info[idHFurn + f.id] = ObjInfo(k.name, f.kind == 'hospital' ? 'The hospital: tap it to see the beds and treat the patients.' : (f.kind == 'shop' ? 'The shop: tap it to buy food and medicine.' : 'Move it with the arrow buttons, turn it, change its colour or take it out.'), V3(f.x, 12, f.z), 140);
+  }
+  // The ads: on every billboard, and on two big TVs in the front of every big house.
+  final adScreens = <ScreenQuad>[];
+  for (final f in r.furn.where((f) => f.kind == 'billboard' || f.kind == 'bighouse')) {
+    final rr = f.rot * math.pi / 2;
+    V3 w(double x, double y, double z) => rotY(V3(x, y, z), rr) + V3(f.x, 0, f.z);
+    final grp = furnGroup[f.id] ?? 0;
+    if (f.kind == 'billboard') {
+      adScreens.add(ScreenQuad([w(-33, 62.5, 2), w(33, 62.5, 2), w(33, 31.5, 2), w(-33, 31.5, 2)], 0, (c, size, t) => paintCityAd(c, size, t, f.id), width: 960, height: 450, bias: 4, order: 2, twoSided: true, group: grp));
+    } else {
+      for (var k = 0; k < 2; k++) {
+        final cx = k == 0 ? -27.0 : 27.0;
+        adScreens.add(ScreenQuad([w(cx - 18, 66, 42.6), w(cx + 18, 66, 42.6), w(cx + 18, 40, 42.6), w(cx - 18, 40, 42.6)], 0, (c, size, t) => paintCityAd(c, size, t, f.id * 2 + k + 1), width: 720, height: 520, bias: 9, order: 2, group: grp));
+      }
+    }
   }
   for (final f in residents.where((f) => f.room == r.id && !f.calling && f.activityLabel.isNotEmpty)) {
     labels.add(Label3D(V3(f.x, 82, f.z), f.activityLabel, const Color(0xFF0F766E)));
@@ -705,8 +723,16 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
   for (final f in residents.where((f) => f.room == r.id && f.calling)) {
     labels.add(Label3D(V3(f.x, 80, f.z), '📞 Help!', const Color(0xFFDC2626)));
   }
-  labels.add(Label3D(const V3(0, 150, 8), problems == 0 ? '✅ The house is finished' : '🏠 $problems rooms still need work', problems == 0 ? const Color(0xFF16A34A) : const Color(0xFFD97706)));
-  return Scene3D(b.polys, info: info, labels: labels, screens: logos);
+  labels.add(Label3D(const V3(0, 216, -30), problems == 0 ? '✅ The house is finished' : '🏠 $problems rooms still need work', problems == 0 ? const Color(0xFF16A34A) : const Color(0xFFD97706)));
+  // The big billboard behind the house: the NGMY logo with New Global Movement for Youth.
+  final gBoard = b.startGroup();
+  for (final x in const [-80.0, 80.0]) {
+    b.cyl(V3(x, 0, -118), V3(x, 215, -118), 3, const Color(0xFF3F3F46), sides: 8);
+  }
+  b.box(const V3(0, 250, -118), const V3(250, 92, 6), const Color(0xFF111827), shine: 0.3);
+  b.endGroup();
+  logos.add(ScreenQuad(const [V3(125, 292, -114.5), V3(-125, 292, -114.5), V3(-125, 208, -114.5), V3(125, 208, -114.5)], 0, (c, size, t) => paintNgmyPoster(c, size, t, 0), width: 1000, height: 336, bias: 4, order: 2, twoSided: true, group: gBoard));
+  return Scene3D(b.polys, info: info, labels: labels, screens: [...logos, ...adScreens]);
 }
 
 /// Things that move: the fan blades and the pictures on the TVs.
@@ -737,7 +763,7 @@ List<Poly> homeDynamic(HRoom r, double t, {PersonPose? person, PersonStyle? pers
       b.polys.addAll(transformPolys(ab.polys, ry: yaw, t: V3(px, 0, pz)));
     }
     for (final f in residents.where((f) => f.room == r.id)) {
-      _figure(b, PersonPose(room: r.id, x: f.x, z: f.z, yaw: f.yaw), t, f.style, id: idHResident + f.id);
+      _figure(b, PersonPose(room: r.id, x: f.x, z: f.z, yaw: f.yaw), t, f.style, id: idHResident + f.id, tint: true);
       _activityProps(b, f, t);
     }
     return b.polys;
@@ -1033,14 +1059,14 @@ void _activityProps(MeshBuilder b, ResidentFigure f, double t) {
 void drawPerson(MeshBuilder b, PersonPose p, double t, PersonStyle style, {int id = 0, bool close = false}) => _figure(b, p, t, style, id: id, close: close);
 
 /// A person of the house: the real character from its .glb file when that has been read, else a plain figure meanwhile.
-void _figure(MeshBuilder b, PersonPose p, double t, PersonStyle style, {int id = 0, bool close = false}) {
+void _figure(MeshBuilder b, PersonPose p, double t, PersonStyle style, {int id = 0, bool close = false, bool tint = false}) {
   final av = GlbAvatar.ready(style.avatar);
   if (av == null) {
     final plain = style.avatar == 'xbot' ? const PersonStyle() : PersonStyle(skin: style.skin, hair: style.hair, shirt: style.shirt, pants: style.pants);
     _person(b, p, t, style: plain, id: id);
     return;
   }
-  b.polys.addAll(av.polys(time: t, x: p.x, z: p.z, yaw: p.yaw, walking: p.walking, running: p.running, lift: p.lift, walkedUnits: p.walking && !p.running && p.phase > 0 ? p.phase * 12 : null, id: id, close: close));
+  b.polys.addAll(av.polys(time: t, x: p.x, z: p.z, yaw: p.yaw, walking: p.walking, running: p.running, lift: p.lift, walkedUnits: p.walking && !p.running && p.phase > 0 ? p.phase * 12 : null, id: id, close: close, tint: tint ? style.shirt : null));
 }
 
 /// An adult person for the house tour, about 5 feet 8 inches tall, made of rounded parts (limbs with real joints, an
@@ -1280,6 +1306,23 @@ void _furniture(MeshBuilder b, String kind, Color c) {
       _roadPiece(b, kind);
     case 'house2' || 'shop' || 'hospital' || 'firestation' || 'school':
       _building(b, kind, c);
+    case 'bighouse':
+      // The same house, bigger: wider, taller and deeper. Its TVs are added with the moving screens.
+      final m = MeshBuilder()
+        ..id = b.id
+        ..grouped = true
+        ..order = b.order;
+      _building(m, 'house2', c);
+      b.polys.addAll(_stretch(m.polys, const V3(1.6, 1.5, 1.4), V3.zero));
+    case 'billboard':
+      {
+        b.startGroup();
+        for (final x in const [-26.0, 26.0]) {
+          b.cyl(V3(x, 0, -1), V3(x, 40, -1), 1.6, const Color(0xFF3F3F46), sides: 8);
+        }
+        b.box(const V3(0, 47, 0), const V3(72, 32, 3), const Color(0xFF1F2937), shine: 0.3);
+        b.endGroup();
+      }
     case 'firetruck':
       b.box(const V3(0, 11, 0), const V3(96, 14, 38), const Color(0xFFDC2626), shine: 0.3);
       b.box(const V3(36, 22, 0), const V3(22, 12, 34), const Color(0xFFDC2626), shine: 0.3);

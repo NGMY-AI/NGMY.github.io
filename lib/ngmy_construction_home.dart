@@ -62,6 +62,8 @@ const Map<String, FurnKind> kFurnKinds = {
   'roadtee': FurnKind('Road T-junction', '⊤', 40, 40),
   'roadcross': FurnKind('Crossroads', '✚', 40, 40),
   'house2': FurnKind('House', '🏠', 72, 60),
+  'bighouse': FurnKind('Big house', '🏢', 115, 84),
+  'billboard': FurnKind('Billboard', '🪧', 72, 10),
   'shop': FurnKind('Shop', '🏪', 84, 60),
   'hospital': FurnKind('Hospital', '🏥', 110, 70),
   'firestation': FurnKind('Fire station', '🚒', 90, 64),
@@ -81,7 +83,7 @@ const Map<String, FurnKind> kFurnKinds = {
 };
 
 /// What can be put in the garden, and what goes inside the rooms.
-const List<String> kOutdoorFurn = ['road', 'roadturn', 'roadtee', 'roadcross', 'house2', 'shop', 'hospital', 'firestation', 'school', 'car', 'firetruck', 'ambulance', 'dog', 'cat', 'cow', 'sheep', 'chicken', 'horse', 'tree', 'pine', 'bush', 'flowers', 'fence', 'lamppost', 'bench', 'pond', 'swing', 'shed', 'doghouse'];
+const List<String> kOutdoorFurn = ['road', 'roadturn', 'roadtee', 'roadcross', 'house2', 'bighouse', 'billboard', 'shop', 'hospital', 'firestation', 'school', 'car', 'firetruck', 'ambulance', 'dog', 'cat', 'cow', 'sheep', 'chicken', 'horse', 'tree', 'pine', 'bush', 'flowers', 'fence', 'lamppost', 'bench', 'pond', 'swing', 'shed', 'doghouse'];
 
 /// Road pieces snap to a grid of this size, so neighbours always line up.
 const double kRoadGrid = 40;
@@ -499,10 +501,17 @@ class HomeProject {
           r.add('road', x: 0, z: z).rot = 1;
         }
         bool clear(double x, double z) => !r.furn.any((f) => !kFlatKinds.contains(f.kind) && !kAnimalKinds.contains(f.kind) && (f.x - x).abs() < 100 && (f.z - z).abs() < 85);
+        // Billboards along the streets, each playing a different NGMY ad, and a few big houses.
+        for (final (x, z) in const [(-480.0, 318.0), (-120.0, 322.0), (120.0, 322.0), (480.0, 318.0), (-480.0, 410.0), (-250.0, 410.0), (250.0, 410.0), (480.0, 410.0), (-480.0, 718.0), (-200.0, 718.0), (200.0, 718.0), (480.0, 718.0), (-300.0, 806.0), (300.0, 806.0)]) {
+          if (clear(x, z)) r.add('billboard', x: x, z: z);
+        }
+        for (final (x, z) in const [(-480.0, 150.0), (480.0, 150.0), (-330.0, 470.0)]) {
+          if (clear(x, z)) r.add('bighouse', x: x, z: z);
+        }
         for (final z in const [440.0, 690.0, 830.0, 1010.0, 1250.0]) {
           for (var x = -780.0; x <= 780; x += 165) {
             if (x.abs() < 60) continue;
-            if (clear(x, z)) r.add('house2', x: x, z: z);
+            if (clear(x, z)) r.add((x ~/ 165) % 3 == 0 ? 'bighouse' : 'house2', x: x, z: z);
           }
         }
         r.add('car', x: -120, z: 360);

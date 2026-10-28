@@ -3,6 +3,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_3d.dart';
+import 'package:ngmy/ngmy_avatar_glb.dart';
+import 'package:ngmy/ngmy_city_ads.dart';
+import 'package:ngmy/ngmy_city_traffic.dart';
 import 'package:ngmy/ngmy_construction_cityin.dart';
 import 'package:ngmy/ngmy_construction_community.dart';
 import 'package:ngmy/ngmy_construction_home.dart';
@@ -218,5 +221,44 @@ void main() {
     await t.pump(const Duration(milliseconds: 500));
     expect(find.byIcon(Icons.fullscreen_exit_rounded), findsNothing);
     await t.pump(const Duration(seconds: 10));
+  });
+
+  test('the city has billboards, big houses with TV windows, self-driving buses and police cars, and helicopters, all playing different NGMY ads', () {
+    final city = HomeProject(seed: 4).rooms[11];
+    expect(city.furn.where((f) => f.kind == 'billboard').length, greaterThanOrEqualTo(8));
+    expect(city.furn.where((f) => f.kind == 'bighouse').length, greaterThanOrEqualTo(3));
+    final sc = buildHomeRoom(city, problems: 5);
+    final bill = city.furn.where((f) => f.kind == 'billboard').length;
+    final big = city.furn.where((f) => f.kind == 'bighouse').length;
+    // One screen per billboard, two TVs per big house, and the posters on the house, one of them the big billboard behind it.
+    expect(sc.screens.length, greaterThanOrEqualTo(bill + big * 2 + 5));
+    expect(kCityAdCount, greaterThanOrEqualTo(15), reason: 'many different ads');
+    // The sign that says how many rooms need work is at the top of the house, above the roof.
+    final label = sc.labels.firstWhere((l) => l.text.contains('rooms still need work'));
+    expect(label.at.y, greaterThan(200));
+    // Vehicles drive by themselves: a moment later they are somewhere else, and they keep to their street.
+    for (final v in kTraffic) {
+      final a = vehiclePose(v, 1.0), b = vehiclePose(v, 11.0);
+      expect((a.$1 - b.$1).abs() + (a.$2 - b.$2).abs(), greaterThan(50), reason: v.kind);
+      expect(v.alongX ? a.$2 : a.$1, v.fixed);
+    }
+    expect(kTraffic.where((v) => v.kind == 'bus'), isNotEmpty);
+    expect(kTraffic.where((v) => v.kind == 'police'), isNotEmpty);
+    expect(trafficPolys(3.0).length, greaterThan(300));
+    final screens = trafficScreens(3.0);
+    expect(screens.length, kTraffic.length * 2 + kHelis.length, reason: 'a billboard on each side of every vehicle and on each helicopter');
+    // The helicopters are high in the sky.
+    expect(trafficPolys(3.0).any((p) => p.pts.any((v) => v.y > 200)), isTrue);
+  });
+
+  test('every person in the city is a different colour', () {
+    final home = HomeProject(seed: 4);
+    final figs = Community(houseSeed: 4).figuresIn(home, 11);
+    expect({for (final f in figs) f.style.shirt.toARGB32()}.length, figs.length, reason: 'no two the same');
+    final city = home.rooms[11];
+    final polys = homeDynamic(city, 1.0, residents: figs);
+    GlbAvatar.enabled = false;
+    expect(polys, isNotEmpty);
+    GlbAvatar.enabled = true;
   });
 }

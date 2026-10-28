@@ -25,7 +25,7 @@ const double kAvatarUnitsPerMetre = 36.0;
 
 /// How many faces the body keeps: the one on the tour (close up) and the people who live in the house.
 const int kAvatarFacesGuide = 5000;
-const int kAvatarFacesResident = 2000;
+const int kAvatarFacesResident = 1100;
 
 class _Chan {
   _Chan(this.node, this.path, this.times, this.values, this.step);
@@ -722,7 +722,7 @@ class GlbAvatar {
 
   /// The character as faces of the game: feet on y = 0, facing +z (turned by [yaw]), standing at [x], [z].
   /// [walkedUnits] is how far the person has walked (it keeps the feet in step with the ground); null means just use [time].
-  List<Poly> polys({required double time, required double x, required double z, required double yaw, bool walking = false, bool running = false, double lift = 0, double? walkedUnits, int id = 0, bool close = true}) {
+  List<Poly> polys({required double time, required double x, required double z, required double yaw, bool walking = false, bool running = false, double lift = 0, double? walkedUnits, int id = 0, bool close = true, Color? tint}) {
     final lod = close ? _guide : _resident;
     final clip = clipFor(walking: walking, running: running);
     final len = clipLength(clip);
@@ -753,10 +753,19 @@ class GlbAvatar {
     for (var t = 0; t < lod.tris.length; t += 3) {
       final va = pts[lod.tris[t]], vb = pts[lod.tris[t + 1]], vd = pts[lod.tris[t + 2]];
       final n = (vb - va).cross(vd - va).unit;
-      out.add(Poly([va, vb, vd], n, Color(lod.colors[t ~/ 3]), id, shine: 0.08, group: groups[lod.region[lod.tris[t]]]));
+      out.add(Poly([va, vb, vd], n, tint == null ? Color(lod.colors[t ~/ 3]) : _tinted(lod.colors[t ~/ 3], tint), id, shine: 0.08, group: groups[lod.region[lod.tris[t]]]));
     }
     return out;
   }
+}
+
+/// A character's colours turned towards [tint], keeping the light and dark of the original, so each person in the city looks different.
+Color _tinted(int base, Color tint) {
+  final r = (base >> 16) & 255, g = (base >> 8) & 255, b = base & 255;
+  final l = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  final k = 0.35 + l * 1.0;
+  int mix(int from, double to) => (from + (to.clamp(0.0, 255.0) - from) * 0.8).round();
+  return Color.fromARGB(255, mix(r, tint.r * 255 * k), mix(g, tint.g * 255 * k), mix(b, tint.b * 255 * k));
 }
 
 class _Mesh {

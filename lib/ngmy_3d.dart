@@ -418,7 +418,7 @@ class HitCache {
 }
 
 class Scene3DPainter extends CustomPainter {
-  Scene3DPainter({required this.scene, required this.cam, required this.hits, this.highlight = 0, this.layerOn, this.clock, this.dynamicPolys, Listenable? repaint, this.background = const Color(0xFF0E1218), this.sky = false}) : super(repaint: repaint);
+  Scene3DPainter({required this.scene, required this.cam, required this.hits, this.highlight = 0, this.layerOn, this.clock, this.dynamicPolys, this.dynamicScreens, Listenable? repaint, this.background = const Color(0xFF0E1218), this.sky = false}) : super(repaint: repaint);
   final Scene3D scene;
   final Cam3 cam;
   final HitCache hits;
@@ -428,6 +428,9 @@ class Scene3DPainter extends CustomPainter {
 
   /// Shapes that move (water, sparks), made fresh for each moment.
   final List<Poly> Function(double t)? dynamicPolys;
+
+  /// Moving screens (a billboard on a bus), made fresh for each moment.
+  final List<ScreenQuad> Function(double t)? dynamicScreens;
   final Color background;
 
   /// Draw space behind the scene (stars, a galaxy, the Earth) instead of a plain dark colour.
@@ -581,11 +584,13 @@ class Scene3DPainter extends CustomPainter {
       path.close();
       drawn.add(_Face(path, Color.fromRGBO(r, g, b, p.alpha), zs / cp3.length - p.bias, p.id, p.alpha < 0.99, p.id == highlight && highlight != 0, null, p.order, p.group));
     }
-    for (final sq in scene.screens) {
+    final allScreens = dynamicScreens == null ? scene.screens : [...scene.screens, ...dynamicScreens!(time)];
+    for (final sq in allScreens) {
       final q = [for (final v in sq.corners) toCam(v)];
       final mid = (q[0] + q[1] + q[2] + q[3]) * 0.25;
       final n = rotN((sq.corners[3] - sq.corners[0]).cross(sq.corners[1] - sq.corners[0]));
       if (n.dot(mid) > 0 && !sq.twoSided) continue;
+      if (mid.z > far) continue;
       if (q.every((v) => v.z >= 1)) {
         final pts = [for (final v in q) Offset(cx + v.x * f / v.z, cy - v.y * f / v.z)];
         final path = Path()..addPolygon(pts, true);
@@ -764,13 +769,14 @@ class _Face {
 // ─── The view: turn with a finger, pinch or scroll to zoom, tap to pick ───────
 
 class Scene3DView extends StatefulWidget {
-  const Scene3DView({super.key, required this.scene, required this.cam, this.highlight = 0, this.onPick, this.layerOn, this.dynamicPolys, this.background = const Color(0xFF0E1218), this.overlay, this.onDoubleTap, this.sky = false});
+  const Scene3DView({super.key, required this.scene, required this.cam, this.highlight = 0, this.onPick, this.layerOn, this.dynamicPolys, this.dynamicScreens, this.background = const Color(0xFF0E1218), this.overlay, this.onDoubleTap, this.sky = false});
   final Scene3D scene;
   final Cam3 cam;
   final int highlight;
   final void Function(int id)? onPick;
   final bool Function(int layer)? layerOn;
   final List<Poly> Function(double t)? dynamicPolys;
+  final List<ScreenQuad> Function(double t)? dynamicScreens;
   final Color background;
   final Widget? overlay;
   final bool sky;
@@ -831,7 +837,7 @@ class _Scene3DViewState extends State<Scene3DView> with SingleTickerProviderStat
           ClipRect(
             child: RepaintBoundary(
               child: CustomPaint(
-                painter: Scene3DPainter(scene: widget.scene, cam: widget.cam, hits: _hits, highlight: widget.highlight, layerOn: widget.layerOn, clock: _time, dynamicPolys: widget.dynamicPolys, repaint: Listenable.merge([widget.cam, _time]), background: widget.background, sky: widget.sky),
+                painter: Scene3DPainter(scene: widget.scene, cam: widget.cam, hits: _hits, highlight: widget.highlight, layerOn: widget.layerOn, clock: _time, dynamicPolys: widget.dynamicPolys, dynamicScreens: widget.dynamicScreens, repaint: Listenable.merge([widget.cam, _time]), background: widget.background, sky: widget.sky),
                 size: Size.infinite,
               ),
             ),
