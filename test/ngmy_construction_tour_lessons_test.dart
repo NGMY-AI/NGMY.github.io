@@ -65,12 +65,13 @@ void main() {
     expect(names[1], 'NGMY Jobs');
   });
 
-  test('every lesson plays in a furnished room with a big TV showing the NGMY Jobs ad, and only the lesson is waiting', () {
+  test('every lesson plays in a big bare room with a big TV showing the NGMY Jobs ad, and only the lesson is waiting', () {
     for (final id in ['outlet', 'switch', 'gfci', 'fan', 'ptrap', 'faucet']) {
       final h = HomeProject.lesson(id);
       final r = h.room;
       expect(h.isLesson, isTrue);
-      expect(r.furn, isNotEmpty, reason: id);
+      expect(r.furn, isEmpty, reason: '$id is bare so nothing hides the outlets or the TV');
+      expect(r.big, isTrue);
       expect(r.wallTv, isNotNull);
       expect(r.tvOn, isTrue);
       expect(kNgmyApps[r.tvApp].name, 'Jobs');

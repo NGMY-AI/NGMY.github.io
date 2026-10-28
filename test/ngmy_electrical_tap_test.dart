@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_3d.dart';
 import 'package:ngmy/ngmy_construction_electrical.dart';
+import 'package:ngmy/ngmy_construction_home.dart';
+import 'package:ngmy/ngmy_construction_homescene.dart';
 import 'package:ngmy/ngmy_construction_lab.dart';
 
 Offset? _find(WidgetTester t, int id) {
@@ -57,5 +59,24 @@ void main() {
     final p0 = cam.pitch;
     await t.dragFrom(c, const Offset(0, -100));
     expect(cam.pitch, greaterThan(p0));
+  });
+
+  test('a lesson room is big and bare, the outlets are in the open, and the TV can go on any wall', () {
+    for (final id in ['outlet', 'switch', 'gfci', 'fan']) {
+      final h = HomeProject.lesson(id);
+      final r = h.rooms[0];
+      expect(r.w, greaterThanOrEqualTo(240), reason: id);
+      expect(r.furn, isEmpty, reason: '$id has nothing standing in front of the outlets');
+      final box = wallTvBox(r, applianceByKey(r.wallTv!));
+      expect(box.w, greaterThan(100), reason: 'a big default TV');
+      expect(box.cx - box.w / 2, greaterThanOrEqualTo(-r.w / 2));
+      expect(box.cx + box.w / 2, lessThanOrEqualTo(r.w / 2));
+    }
+    final r = HomeProject.lesson('outlet').rooms[0];
+    final back = buildHomeRoom(r).screens.where((q) => q.id == idHWallTv).first.corners.first;
+    r.tvWall = 'left';
+    final left = buildHomeRoom(r).screens.where((q) => q.id == idHWallTv).first.corners.first;
+    expect(left.x, closeTo(-r.w / 2 + 2.95, 0.5), reason: 'now on the left wall');
+    expect(back.x, isNot(closeTo(left.x, 1)));
   });
 }

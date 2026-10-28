@@ -162,6 +162,12 @@ class WallTvBox {
 WallTvBox wallTvBox(HRoom r, HomeAppliance a, {int sub = 0}) {
   double heightFor(double tw) => math.min(tw * 0.5625, tw > 60 ? 62.0 : 99.0);
   double centreY(double th) => th > 40 ? 30 + th / 2 : 58;
+  if (r.kind != 'hall' && r.tvWall != 'back') {
+    // A lesson room's TV on a side wall: as big as the wall allows.
+    final tw = a.fullWall ? r.d - 14 : math.min(a.tvWidth, r.d - 14);
+    final th = heightFor(tw);
+    return WallTvBox(tw, th, r.d / 2, centreY(th));
+  }
   if (r.kind == 'hall' && sub < 2) {
     // On an end wall, facing into the hall.
     final tw = a.fullWall ? r.d - 14 : math.min(a.tvWidth, r.d - 14);
@@ -177,7 +183,7 @@ WallTvBox wallTvBox(HRoom r, HomeAppliance a, {int sub = 0}) {
     return WallTvBox(tw, HRoom.h - 24, sub == 2 ? (-edge + lo) / 2 : (hi + edge) / 2, (HRoom.h - 24) / 2 + 8);
   }
   var lo = -r.w / 2 + 6, hi = r.w / 2 - 6;
-  if (r.kind == 'bathroom') hi = 14;
+  if (r.kind == 'bathroom' && !r.big) hi = 14;
   final spans = [for (final d in r.doors) if (d.wall == 'back' && !d.hidden) (d.offset - 19, d.offset + 19)]..sort((x, y) => x.$1.compareTo(y.$1));
   var bestA = lo, bestB = lo, cursor = lo;
   void consider(double a0, double b0) {
@@ -259,6 +265,10 @@ class HRoom {
 
   /// The hall has a second TV, on the other end wall.
   String? wallTv2;
+
+  /// A lesson room is big and nearly empty, so the outlets and switches are in the open and any TV fits. Which wall the TV hangs on there: back, left or right.
+  bool big = false;
+  String tvWall = 'back';
   bool tvOn = false;
   int tvApp = 0;
 
@@ -283,8 +293,8 @@ class HRoom {
   bool get okOutA => lesson.isEmpty ? wired : ((lesson == 'outlet' || lesson == 'gfci') ? lessonDone : true);
   bool get okOutB => lesson.isEmpty ? wired : true;
 
-  double get w => switch (kind) { 'bathroom' => 110, 'kitchen' => 140, 'living' => 180, 'hall' => 480, 'outside' => 1200, _ => 130 };
-  double get d => switch (kind) { 'bathroom' => 100, 'kitchen' => 110, 'living' => 120, 'hall' => 180, 'outside' => 900, _ => 112 };
+  double get w => big ? 260 : switch (kind) { 'bathroom' => 110, 'kitchen' => 140, 'living' => 180, 'hall' => 480, 'outside' => 1200, _ => 130 };
+  double get d => big ? 180 : switch (kind) { 'bathroom' => 100, 'kitchen' => 110, 'living' => 120, 'hall' => 180, 'outside' => 900, _ => 112 };
   bool get indoor => kind != 'outside';
   static const double h = 130;
 
@@ -339,9 +349,10 @@ class HomeProject {
     r.wiringNeeded = false;
     r.plumbNeeded = false;
     r.floor = kind == 'bathroom' || kind == 'kitchen' ? 5 : 0;
-    _furnish(r);
+    // A lesson room is big and bare: nothing stands in front of the outlets, the switch or the TV.
+    r.big = true;
     // A big TV on the wall plays the NGMY Jobs ad, in every lesson room.
-    r.wallTv = 'bangtv';
+    r.wallTv = 'tv150';
     r.tvOn = true;
     r.tvApp = math.max(0, kNgmyApps.indexWhere((a) => a.name == 'Jobs'));
     rooms = [r];

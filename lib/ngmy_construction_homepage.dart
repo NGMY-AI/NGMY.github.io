@@ -761,6 +761,14 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
                     room.tvOn = true;
                   }, color: room.wallTv == a.key ? kConAmber : const Color(0xFF0E7490)),
               ]),
+              if (isLesson) ...[
+                const Text('Which wall?', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w800, fontSize: 13)),
+                const SizedBox(height: 6),
+                Wrap(spacing: 8, runSpacing: 8, children: [
+                  for (final (key, name) in const [('back', 'Back wall'), ('left', 'Left wall'), ('right', 'Right wall')])
+                    big(name, () => room.tvWall = key, color: room.tvWall == key ? kConAmber : const Color(0xFF0E7490)),
+                ]),
+              ],
               const SizedBox(height: 10),
               Wrap(spacing: 8, runSpacing: 8, children: [
                 if (room.wallTv != null) big(room.tvOn ? '⏻ Turn this TV off' : '⏻ Turn this TV on', () => room.tvOn = !room.tvOn),

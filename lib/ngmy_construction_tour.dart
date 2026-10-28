@@ -316,6 +316,7 @@ class HomeTour {
     final w = r.w;
     // A spot beside the wall TV (left of it if there is room, else right), and the way to face the TV from there.
     (Pt, double) beside(double z) {
+      if (r.tvWall != 'back') return ((0.0, z), r.tvWall == 'left' ? -math.pi / 2 : math.pi / 2);
       final a = applianceByKey(r.wallTv ?? 'tv100');
       final box = wallTvBox(r, a);
       var x = box.cx - box.w / 2 - 18;

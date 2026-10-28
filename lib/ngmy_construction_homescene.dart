@@ -451,9 +451,9 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
     b.id = id;
     final g = b.startGroup();
     b.bias = 5;
-    if (r.kind == 'hall' && sub < 2) {
-      // On an end wall, facing into the hall.
-      final left = sub == 1;
+    if ((r.kind == 'hall' && sub < 2) || (r.kind != 'hall' && r.tvWall != 'back')) {
+      // On a side wall, facing into the room.
+      final left = r.kind == 'hall' ? sub == 1 : r.tvWall == 'left';
       final x = left ? -w / 2 : w / 2;
       final dir = left ? 1.0 : -1.0;
       final z = box.cx;
@@ -487,7 +487,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
   // ── The plumbing ──
   b.order = 2;
   b.grouped = true;
-  if (r.hasPlumbing) {
+  if (r.hasPlumbing && (r.lesson.isEmpty || r.lessonIsPlumbing)) {
     final ok = r.plumbed;
     void stub(double x, double y) {
       final o = b.order, g = b.grouped;
