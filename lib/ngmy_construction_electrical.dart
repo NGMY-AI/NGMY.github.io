@@ -654,7 +654,11 @@ void _fixture(MeshBuilder b, String kind, WiringState s) {
     (kWhiteWire, const V3(0, 0, 0)),
     (const Color(0xFF2FA24F), const V3(1.5, 0, 0)),
   ];
+  const pigtailIds = [idNutBlack, idNutWhite, idNutGround];
+  var pi = 0;
   for (final (col, off) in pigtail) {
+    b.id = s.stage == 0 ? pigtailIds[pi] : idFixture;
+    pi++;
     final nz = s.stage == 0 ? z - 3.2 : z;
     b.tube([V3(off.x, -0.3, z - 0.3), V3(off.x, -0.3, nz + 0.4)], 0.07, col, shine: 0.3, sides: 6, joints: false);
   }

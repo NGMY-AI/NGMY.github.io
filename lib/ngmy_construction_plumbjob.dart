@@ -217,10 +217,15 @@ Scene3D buildPlumbJobScene(PlumbJob j, {String armed = '', bool labels = true}) 
   b.box(V3(sx, 29.4, 18.6), const V3(40, 7.2, 1.2), kWood, shine: 0.1);
   b.box(V3(sx - 19.4, 13.6, 10.5), const V3(1.2, 26.4, 20), kWood, shine: 0.1);
   for (final (cx, cz, sw, sd) in <(double, double, double, double)>[(-15.6, 9.0, 14.8, 22.0), (15.6, 9.0, 14.8, 22.0), (0.0, -0.1, 16.4, 4.2), (0.0, 17.1, 16.4, 5.8)]) {
-    b.box(V3(sx + cx, 33, cz), V3(sw, 2.4, sd), const Color(0xFF4A4C54), shine: 0.5);
+    b.box(V3(sx + cx, 33, cz), V3(sw, 2.4, sd), const Color(0xFFEDEDEA), shine: 0.6);
   }
-  b.cyl(V3(sx, 27.0, 8), V3(sx, 34.3, 8), 8.0, const Color(0xFFF4F4F0), shine: 0.7, sides: 20, inner: true, caps: false);
-  b.cyl(V3(sx, 27.0, 8), V3(sx, 27.2, 8), 8.0, const Color(0xFFE6E6E0), shine: 0.5, sides: 20);
+  b.cyl(V3(sx, 27.0, 8), V3(sx, 34.3, 8), 10.5, const Color(0xFFF4F4F0), shine: 0.7, sides: 24, inner: true, caps: false);
+  b.cyl(V3(sx, 27.0, 8), V3(sx, 27.2, 8), 10.5, const Color(0xFFE6E6E0), shine: 0.5, sides: 24);
+  if (bath) {
+    // A mirror over the sink, so it reads as a bathroom.
+    b.box(V3(sx, 46, 0.6), const V3(30, 22, 0.8), const Color(0xFFE5E7EB), shine: 0.3);
+    b.box(V3(sx, 46, 1.1), const V3(27, 19, 0.4), const Color(0xFF9BD3F5), shine: 0.9);
+  }
   b.cyl(V3(sx, 27.1, 8), V3(sx, 27.3, 8), 1.4, const Color(0xFF2B2D33), sides: 12);
   b.cyl(V3(sx + 15, 23.6, 8), V3(sx + 19.4, 23.6, 8), 0.92, kPvc, shine: 0.3, sides: 12, inner: true, caps: false);
   info[idPjBase + 98] = const ObjInfo('Vanity and counter', 'The cabinet that holds the sink. The pipes live inside it.', V3(0, 20, 8), 70);

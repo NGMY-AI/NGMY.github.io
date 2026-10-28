@@ -159,6 +159,7 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
               _tile('🔧', 'Fix a house', 'Walk the house and fix every sign', const Color(0xFFF59E0B), () => _push(NgmyHousePage(practice: practice, focus: 'fix'))),
               _tile('🧱', 'Build a room', 'Frame, drywall, then wire', const Color(0xFF4ADE80), () => _push(NgmyRoomProjectPage(practice: practice))),
               _tile('⚡', 'Wiring bench', 'Just the wiring, one room', const Color(0xFFFACC15), () => _push(NgmyRoomProjectPage(quick: true, practice: practice))),
+              _tile('🧪', 'Safety inspection', 'A test job: marked when you submit', const Color(0xFFA78BFA), () => _push(const NgmyRoomProjectPage(quick: true, test: true))),
               _tile('📞', 'Service calls', 'A customer rings with problems', const Color(0xFFFB7185), () => _push(NgmyServiceCallPage(practice: practice))),
             ]),
             _section('LESSONS'),
@@ -445,7 +446,9 @@ class ElectricalLessonPage extends StatefulWidget {
 class _ElectricalPageState extends State<ElectricalLessonPage> {
   late final ElectricalLesson lesson = electricalLesson(widget.id);
   late final WiringState s = widget.state ?? WiringState();
-  late final Cam3 cam = Cam3(yaw: 0.42, pitch: 0.26, dist: 12, target: const V3(0, 0.2, 2.8));
+  // A ceiling light or fan is seen from the side, where the house wires, the fixture wires and the nuts between them are all in view.
+  bool get _ceilingLesson => lesson.id == 'light' || lesson.id == 'fan';
+  late final Cam3 cam = _ceilingLesson ? Cam3(yaw: 1.15, pitch: 0.12, dist: 11, target: const V3(0, -0.3, 3.2)) : Cam3(yaw: 0.42, pitch: 0.26, dist: 12, target: const V3(0, 0.2, 2.8));
   late Scene3D scene = buildElectricalScene(lesson, s);
   String chip = '';
   int hl = 0;
@@ -494,12 +497,21 @@ class _ElectricalPageState extends State<ElectricalLessonPage> {
   }
 
   void _home() {
+    if (_ceilingLesson && s.stage == 0) {
+      cam.glideTo(target: const V3(0, -0.3, 3.2), dist: 11, yaw: 1.15, pitch: 0.12);
+      setState(() => hl = 0);
+      return;
+    }
     cam.glideTo(target: V3(0, 0.1, s.stage == 0 ? 2.8 : 0.4), dist: s.stage == 0 ? 12 : 10, yaw: 0.42, pitch: 0.26);
     setState(() => hl = 0);
   }
 
   /// Turns the device so the screws that wire belongs on are in view: brass on the right, silver on the left, green at the bottom.
   void _lookFor(String key) {
+    if (_ceilingLesson) {
+      cam.glideTo(target: const V3(0, -0.3, 3.2), dist: 9, yaw: 1.15, pitch: 0.12);
+      return;
+    }
     if (key == 'ground') {
       cam.glideTo(target: const V3(0, -1.2, 5.0), dist: 8, yaw: 0.15, pitch: 0.55);
     } else if (key == 'white') {
@@ -539,6 +551,33 @@ class _ElectricalPageState extends State<ElectricalLessonPage> {
       s.attached.removeWhere((_, v) => v == key);
       setState(_rebuild);
       _say('Wire taken off the screw.', ok: true);
+      return;
+    }
+    // Tapping a screw or nut that already has a wire takes the wire off it.
+    if (hook.isNotEmpty && s.stage == 0 && s.attached.containsKey(id) && (chip.isEmpty || s.attached[id] == chip)) {
+      if (s.power) {
+        conBad();
+        _say('STOP! The power is still on. Turn the breaker OFF before you touch any wire.');
+        return;
+      }
+      s.attached.remove(id);
+      setState(() {
+        chip = '';
+        _rebuild();
+      });
+      _say(s.test ? TestSession.neutralNote : 'Wire taken off.', ok: true);
+      return;
+    }
+    // Tapping a house wire in the picture picks it up, like choosing it in the tray: then tap where it goes.
+    if (key != null && s.stage == 0 && !s.attached.containsValue(key) && lesson.chips.any((c) => c.key == key)) {
+      setState(() {
+        chip = chip == key ? '' : key;
+        hl = chip.isEmpty ? 0 : id;
+      });
+      if (chip.isNotEmpty) {
+        _lookFor(key);
+        _say('${lesson.chips.firstWhere((c) => c.key == key).label}: picked up. Now tap the screw, nut or wire it joins.', ok: true);
+      }
       return;
     }
     if (hook.isNotEmpty && chip.isNotEmpty && s.stage == 0) {

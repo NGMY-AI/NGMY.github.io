@@ -803,7 +803,7 @@ class _Scene3DViewState extends State<Scene3DView> with SingleTickerProviderStat
           if (d.pointerCount >= 2) {
             widget.cam.zoomBy(_startDist / d.scale / widget.cam.dist);
           } else {
-            widget.cam.orbit(-d.focalPointDelta.dx * 0.009, d.focalPointDelta.dy * 0.009);
+            widget.cam.orbit(d.focalPointDelta.dx * 0.009, -d.focalPointDelta.dy * 0.009);
           }
         },
         onTapUp: (d) => widget.onPick?.call(_hits.pick(d.localPosition)),

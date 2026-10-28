@@ -601,6 +601,26 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     );
   }
 
+  /// From the floor, looking up at the ceiling (and the lights and fan on it).
+  void _lookUpHere() {
+    final r = room;
+    if (!r.indoor) return;
+    setState(() {
+      inside = true;
+      walk = false;
+      mode = 'ceiling';
+      _rebuild();
+    });
+    cam
+      ..minDist = 20
+      ..maxDist = 300
+      ..minPitch = -0.95
+      ..maxPitch = 1.35
+      ..setFree(true);
+    cam.glideTo(target: V3(0, HRoom.h - 12, r.d * 0.5), dist: math.max(r.w, r.d) * 0.75, yaw: -0.05, pitch: -0.5);
+    _say('Looking up at the ceiling from the floor. Drag to look round.', ok: true);
+  }
+
   /// The city's own services (calls, people, the hospital, the shop), opened over the city.
   Future<void> _citySheet(String tab) async {
     await showModalBottomSheet<void>(
@@ -1767,6 +1787,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
             _frame();
           }, color: const Color(0xFF67E8F9)),
           if (!isLesson) _chip(tour != null ? '⏹ Stop tour' : '🎬 Tour', tour != null, () => tour != null ? _stopTour() : _tourSheet(), color: const Color(0xFFF472B6)),
+          _chip('⬆ Look up at the ceiling', false, _lookUpHere, color: const Color(0xFF67E8F9)),
           _chip(walk ? '🚶 Stop looking round' : '🔄 Look all round (360)', walk, () {
             setState(() {
               walk = !walk;

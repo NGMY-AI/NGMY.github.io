@@ -45,7 +45,6 @@ const List<List<_Item>> _trays = [
   ],
   [
     _Item('look', 'Look', Icons.search_rounded),
-    _Item('tester', 'Voltage tester', Icons.flash_on_rounded),
     _Item('outlet', 'Outlet', Icons.power_rounded),
     _Item('gfci', 'GFCI', Icons.shield_rounded),
     _Item('switch', 'Switch', Icons.toggle_on_rounded),
@@ -56,12 +55,15 @@ const List<List<_Item>> _trays = [
     _Item('toaster', 'Toaster', Icons.breakfast_dining_rounded),
     _Item('hairdryer', 'Hair dryer', Icons.dry_rounded),
     _Item('flip', 'Flip switch', Icons.toggle_on_rounded),
-    _Item('unplug', 'Unplug', Icons.power_off_rounded),
+    _Item('tester', 'Voltage tester', Icons.flash_on_rounded),
   ],
 ];
 
 class NgmyRoomProjectPage extends StatefulWidget {
-  const NgmyRoomProjectPage({super.key, this.seed, this.practice = false, this.quick = false, this.project});
+  const NgmyRoomProjectPage({super.key, this.seed, this.practice = false, this.quick = false, this.project, this.test = false});
+
+  /// Start in test mode (an inspection).
+  final bool test;
   final int? seed;
   /// A job that is already under way (the one for a room of the house).
   final RoomProject? project;
@@ -102,6 +104,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
   void initState() {
     super.initState();
     p = widget.project ?? RoomProject(seed: seed, practice: widget.practice);
+    if (widget.test) p.test = true;
     if (widget.project != null && p.drywallDone) phase = 2;
     if (widget.quick) {
       p.fastForward();
@@ -180,11 +183,45 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
 
   void _front() {
     behind = false;
+    cam
+      ..minPitch = 0.05
+      ..yawRange = 0.7;
     cam.setFree(false);
     cam.yawCenter = 0;
     setState(() => active = -1);
     _rebuild();
     cam.glideTo(target: const V3(0, -4, 28), dist: 205, yaw: -0.12, pitch: 0.4);
+  }
+
+  /// From the floor, looking up at the ceiling: easy to see the lights, the fan and their wires.
+  void _lookUp() {
+    behind = false;
+    cam.setFree(false);
+    cam.minPitch = -0.95;
+    cam.yawCenter = 0;
+    cam.yawRange = 1.0;
+    setState(() => active = -1);
+    _rebuild();
+    cam.glideTo(target: const V3(0, 44, 55), dist: 82, yaw: -0.12, pitch: -0.55);
+  }
+
+  /// Round the side of the TV, close to the wall, to see the plug and the outlet behind it.
+  void _behindTv() {
+    final tv = p.plugged.entries.where((e) => e.value == 'tv').toList();
+    if (tv.isEmpty) {
+      _say('Plug a TV into an outlet first. Then you can look behind it.');
+      return;
+    }
+    final x = slotById(tv.first.key).pos.x;
+    behind = false;
+    cam.setFree(false);
+    cam.minPitch = 0.02;
+    cam.yawCenter = 0;
+    cam.yawRange = 1.7;
+    setState(() => active = -1);
+    _rebuild();
+    cam.glideTo(target: V3(x, -30, 14), dist: 60, yaw: x < 0 ? -1.4 : 1.4, pitch: 0.12);
+    _say('This is the back of the TV. Tap the TV or its plug to pull the plug.', ok: true);
   }
 
   void _behind() {
@@ -207,7 +244,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
     });
     _rebuild();
     final at = slotPoint(s, const V3(0, 0, 3));
-    cam.glideTo(target: at, dist: s.ceiling ? 22 : 15, yaw: 0.3, pitch: s.ceiling ? -0.8 : 0.26);
+    cam.glideTo(target: at, dist: s.ceiling ? 20 : 15, yaw: s.ceiling ? 1.2 : 0.3, pitch: s.ceiling ? -0.12 : 0.26);
   }
 
   void _leave() {
@@ -297,11 +334,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
     }
     if (id >= idAppBase && id < idAppBase + 7) {
       final slot = id - idAppBase;
-      // A TV opens full screen with the NGMY ads; the Unplug tool pulls any plug.
-      if (p.plugged[slot] == 'tv' && armed != 'unplug') {
-        showNgmyTvScreen(context, kind: 'tv', title: 'Samsung Neo QLED 8K', stayFor: const Duration(hours: 1), showBoot: true);
-        return;
-      }
+      // Tapping what is plugged in pulls the plug (a TV does not open full screen: it only plays when the outlet has power).
       _apply(p.unplug(slot));
       return;
     }
@@ -400,6 +433,21 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
     final key = wireKeyForId(d.kind, local);
     if (key != null && d.w.attached.containsValue(key) && d.w.stage == 0) {
       _apply(p.unfasten(slot, key));
+      return;
+    }
+    // Tapping a screw or nut that has a wire takes that wire off.
+    if (hook.isNotEmpty && d.w.stage == 0 && d.w.attached[local] != null && (chip.isEmpty || d.w.attached[local] == chip)) {
+      _apply(p.unfasten(slot, d.w.attached[local]!));
+      setState(() => chip = '');
+      return;
+    }
+    // Tapping a house wire picks it up: then tap the screw, nut or fixture wire it joins.
+    if (key != null && d.w.stage == 0 && !d.w.attached.containsValue(key) && lesson.chips.any((c) => c.key == key)) {
+      setState(() {
+        chip = chip == key ? '' : key;
+        hl = chip.isEmpty ? 0 : benchId(slot, local);
+      });
+      if (chip.isNotEmpty) _say('${lesson.chips.firstWhere((c) => c.key == key).label}: picked up. Now tap where it joins.', ok: true);
       return;
     }
     if (hook.isNotEmpty && d.w.stage == 0) {
@@ -625,6 +673,10 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
           ],
           topRight: [
             conPill(behind ? 'In front' : 'Behind the wall', on: behind, icon: behind ? Icons.flip_to_front_rounded : Icons.flip_to_back_rounded, color: const Color(0xFFA78BFA), onTap: behind ? _front : _behind),
+            const SizedBox(height: 6),
+            conPill('Look up', on: false, icon: Icons.vertical_align_top_rounded, color: const Color(0xFF67E8F9), onTap: _lookUp),
+            const SizedBox(height: 6),
+            conPill('Behind the TV', on: false, icon: Icons.tv_rounded, color: const Color(0xFFFB923C), onTap: _behindTv),
             const SizedBox(height: 6),
             if (d != null) ...[
               conPill('Labels', on: d.w.labels, icon: Icons.label_rounded, color: const Color(0xFF38BDF8), onTap: () => setState(() {

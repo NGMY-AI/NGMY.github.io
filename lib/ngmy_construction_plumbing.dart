@@ -214,7 +214,12 @@ Scene3D buildFaucetScene(PlumbState s) {
   b.box(const V3(0, 3, -6.5), const V3(36, 30, 1), kDrywall, split: 3);
   b.id = idDeck;
   b.box(const V3(0, 14.5, -1.5), const V3(36, 1.6, 12), kGranite, shine: 0.5, split: 3);
-  b.cyl(const V3(0, 13.6, -1.5), const V3(0, 14.6, -1.5), 5.5, const Color(0xFF111418), sides: 16);
+  // The sink: a white basin sunk into the counter, with a chrome drain, and the cabinet walls under it.
+  b.cyl(const V3(0, 9.4, -1.5), const V3(0, 14.7, -1.5), 7.6, const Color(0xFFF4F4F0), shine: 0.7, sides: 28, inner: true, caps: false);
+  b.cyl(const V3(0, 9.4, -1.5), const V3(0, 9.6, -1.5), 7.6, const Color(0xFFE6E6E0), shine: 0.5, sides: 28);
+  b.cyl(const V3(0, 9.5, -1.5), const V3(0, 9.8, -1.5), 1.2, kChrome, shine: 0.9, sides: 14);
+  b.box(const V3(-11.5, 4, -1.5), const V3(1, 22, 11), const Color(0xFFC49A62), shine: 0.1);
+  b.box(const V3(11.5, 4, -1.5), const V3(1, 22, 11), const Color(0xFFC49A62), shine: 0.1);
   // The faucet on top of the counter.
   b.id = idFaucet;
   b.cyl(const V3(0, 15.3, _vz), const V3(0, 15.5, _vz), 3.4, kChrome, shine: 0.9, sides: 20);
@@ -234,10 +239,10 @@ Scene3D buildFaucetScene(PlumbState s) {
   for (final (id, x, handle) in [(idValveHot, -4.6, kHot), (idValveCold, 4.6, kCold)]) {
     b.id = id;
     b.cyl(V3(x, -1.5, -6.0), V3(x, -1.5, _vz), 0.4, kCopperPipe, shine: 0.7, sides: 12);
-    b.cyl(V3(x, -1.5, _vz - 0.8), V3(x, 0.7, _vz - 0.8), 0.78, kBrassValve, shine: 0.8, sides: 12);
-    b.cyl(V3(x, 0.7, _vz - 0.8), V3(x, 1.5, _vz), 0.38, kBrassValve, shine: 0.8, sides: 10);
+    b.cyl(V3(x, -1.5, _vz - 0.8), V3(x, 0.7, _vz - 0.8), 1.0, kChrome, shine: 0.9, sides: 14);
+    b.cyl(V3(x, 0.7, _vz - 0.8), V3(x, 1.5, _vz), 0.45, kChrome, shine: 0.9, sides: 10);
     b.cyl(V3(x, -0.2, _vz - 0.8), V3(x, -0.2, _vz + 0.5), 0.2, const Color(0xFFA7ADB5), shine: 0.7, sides: 8);
-    b.cyl(V3(x, -0.2, _vz + 0.5), V3(x, -0.2, _vz + 0.8), 0.95, handle, shine: 0.5, sides: 12);
+    b.cyl(V3(x, -0.2, _vz + 0.5), V3(x, -0.2, _vz + 1.2), 1.45, handle, shine: 0.5, sides: 14);
     b.ring(V3(x, 1.2, _vz), V3(x, 1.9, _vz), 0.78, 0.4, kBrassValve, shine: 0.8, sides: 8);
   }
   // The hoses (braided steel with a coloured band) once both ends are fastened; otherwise a free end.
