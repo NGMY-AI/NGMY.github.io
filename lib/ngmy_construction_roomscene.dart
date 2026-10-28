@@ -377,7 +377,7 @@ Scene3D buildRoomScene(RoomProject p, RoomView v) {
   for (final s in kSlots) {
     info.putIfAbsent(idSlotBase + s.id, () => ObjInfo(s.name, s.ceiling ? 'A place in the ceiling for a ${s.role == 'fan' ? 'fan (needs a fan-rated box)' : 'light'}.' : 'A place on the wall at ${s.role == 'switch' ? 'switch height, about 48 inches from the floor' : 'outlet height, about 16 inches from the floor'}.', slotPoint(s, const V3(0, 0, 4)), 26));
   }
-  return Scene3D(b.polys, info: info, labels: labels, screens: screens, shell: (-73.0, 73.0, -3.0, 400.0));
+  return Scene3D(b.polys, info: info, labels: labels, screens: screens);
 }
 
 String _deviceName(String kind) => switch (kind) { 'gfci' => 'GFCI outlet', 'switch' => 'Light switch', 'light' => 'Ceiling light', 'fan' => 'Ceiling fan', _ => 'Outlet' };

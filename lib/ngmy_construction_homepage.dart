@@ -4,9 +4,11 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 
 import 'ngmy_3d.dart';
 import 'ngmy_construction_community.dart';
+import 'ngmy_construction_cityin.dart';
 import 'ngmy_construction_communitypage.dart';
 import 'ngmy_construction_electrical.dart';
 import 'ngmy_construction_home.dart';
@@ -101,6 +103,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     } else {
       if (widget.fresh || widget.seed != null || HomeProject.session == null) {
         HomeProject.session = HomeProject(seed: widget.seed ?? DateTime.now().millisecondsSinceEpoch % 100000);
+        _madeSession = true;
       }
       home = HomeProject.session!;
     }
@@ -113,6 +116,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     // The real characters are read from their files in the background; plain figures stand in until each is ready.
     GlbAvatar.preload(ngmyPlayerAvatar);
     NgmyLogo.load();
+    _startLife();
     _refreshFigs();
     scene = buildHomeRoom(room, problems: problems, residents: _figs);
     _frame(snap: true);
@@ -142,6 +146,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     _t?.cancel();
     _tourTimer?.cancel();
     _commTimer?.cancel();
+    _lifeTimer?.cancel();
+    _ringTimer?.cancel();
     super.dispose();
   }
 
@@ -224,7 +230,10 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     final spot = cam.floorPoint(p, size);
     if (spot == null) return;
     final r = room;
-    if (walk) {
+    final inn = inner;
+    if (inn != null) {
+      inn.walker.goTo(spot.x.clamp(-CityInterior.w / 2 + 12, CityInterior.w / 2 - 12), spot.z.clamp(12.0, CityInterior.d - 4));
+    } else if (walk) {
       final x = spot.x.clamp(-r.w / 2 + 10, r.w / 2 - 10), z = spot.z.clamp(10.0, r.d - 10);
       cam.glideTo(target: V3(x, 48, z));
     } else if (!r.indoor && steer && walker != null) {
@@ -240,7 +249,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   void _rebuild() {
     _refreshFigs();
-    scene = buildHomeRoom(room, mode: mode, selected: selFurn, problems: problems, closed: walk, residents: _figs);
+    final inn = inner;
+    scene = inn != null ? inn.scene : buildHomeRoom(room, mode: mode, selected: selFurn, problems: problems, closed: walk, residents: _figs, hideFurn: _driving != null ? {idHFurn + _driving!.id} : const {});
   }
 
   void _say(String t, {bool ok = true}) {
@@ -268,6 +278,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   void _go(int id, {bool keepTour = false}) {
     if (id == home.current || id >= home.rooms.length) return;
     if (steer && id != 11) _stopSteer();
+    inner = null;
+    _driving = null;
+    _act = null;
     if (!keepTour && tour != null) _stopTour();
     setState(() {
       home.current = id;
@@ -395,8 +408,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       }
       return;
     }
-    if (id == idHWallTv || id == idHWallTv + 1) {
-      final key = id == idHWallTv ? room.wallTv : room.wallTv2;
+    if (id >= idHWallTv && id <= idHWallTv + 3) {
+      final key = (id == idHWallTv || id == idHWallTv + 2) ? room.wallTv : (room.wallTv2 ?? room.wallTv);
       if (key == null) return;
       if (!room.tvOn) {
         setState(() {
@@ -874,7 +887,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (tr != null) return tr.at(now - _tourStart);
     // Outside, the person you steer is always standing in the world.
     final w = walker;
-    if (w != null && !room.indoor) return PersonPose(room: room.id, x: w.x, z: w.z, yaw: w.yaw, walking: w.walking, phase: w.phase);
+    if (_driving != null) return null;
+    if (w != null && !room.indoor) return PersonPose(room: room.id, x: w.x, z: w.z, yaw: w.yaw, walking: w.walking, phase: w.phase, running: w.running && w.walking, lift: w.lift);
     return null;
   }
 
@@ -887,6 +901,22 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   double _inX = 0, _inZ = 0;
   int _lastWalkMs = 0;
 
+  /// The building you are walking about in (the hospital or the shop), running, the vehicle you drive, and what you can do where you stand.
+  CityInterior? inner;
+  bool _run = false;
+  Furn? _driving;
+  ({String label, VoidCallback go})? _act;
+  final Map<int, double> _fedAt = {};
+
+  /// The phone: who is calling, how long it has rung, and the calls that were already there.
+  HelpCall? _ringing;
+  Timer? _ringTimer;
+  int _ringTicks = 0;
+  final Set<int> _knownCalls = {};
+  Timer? _lifeTimer;
+  int _beat = 0;
+  bool _madeSession = false;
+
   void _startSteer() {
     if (room.indoor) return;
     walker ??= WorldWalker(room, x: 0, z: 24);
@@ -896,28 +926,32 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     _walkTimer?.cancel();
     _walkTimer = Timer.periodic(const Duration(milliseconds: 40), (_) => _walkTick());
     setState(() {});
-    _say('Hold the arrows to walk. Double tap a spot to go there. Walk up to the front door to go inside.');
+    _say('Slide the round stick to walk. Walk up to a door to go in: the house, the hospital or the shop. Double tap a spot to go there.');
   }
 
   void _stopSteer() {
     steer = false;
     _inX = 0;
     _inZ = 0;
+    _run = false;
     _walkTimer?.cancel();
     _walkTimer = null;
     walker?.walking = false;
     setState(() {});
   }
 
-  /// One beat of walking: move on the arrows (relative to the camera: up is away from you) or towards the spot that was double
-  /// tapped, keep the camera on the person, and go into the house when they walk up to the front door.
+  /// One beat of walking: move with the stick (up is away from you) or towards the spot that was double tapped, keep the
+  /// camera on the person, and go through the door they walk up to (the house, the hospital, the shop).
   void _walkTick() {
-    final w = walker;
-    if (w == null || !mounted || room.indoor) return;
+    final inn = inner;
+    final w = inn?.walker ?? walker;
+    if (w == null || !mounted || (inn == null && room.indoor)) return;
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     final dt = ((nowMs - _lastWalkMs) / 1000).clamp(0.0, 0.1);
     _lastWalkMs = nowMs;
     w.refresh();
+    w.running = _run && _driving == null;
+    w.fall(dt);
     final sy = math.sin(cam.yaw), cy = math.cos(cam.yaw);
     final dx = sy * _inZ + cy * _inX, dz = -cy * _inZ + sy * _inX;
     var moved = false;
@@ -928,45 +962,297 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       moved = w.advance(dt);
     }
     if (!moved) w.walking = false;
-    if (moved) {
-      cam.glideTo(target: V3(w.x, 30, w.z));
+    if (moved || w.lift > 0) cam.glideTo(target: V3(w.x, 30, w.z));
+    if (inn != null) {
+      final said = inn.update(comm);
+      if (said != null) {
+        _say(said);
+        setState(_rebuild);
+      }
+      if (inn.leaving) _leaveBuilding();
+      return;
+    }
+    if (moved && _driving == null) {
       if (w.atDoor && (w.yaw.abs() > 2.2 || w.target != null && w.target!.$2 < 4)) {
         // Walked up to the front door facing the house: in they go.
         _stopSteer();
         _go(10);
         _say('You are inside the living room. Use Go outside to come back out.');
+        return;
       }
+      for (final f in room.furn.where((f) => f.kind == 'hospital' || f.kind == 'shop')) {
+        final k = kFurnKinds[f.kind]!;
+        if ((w.x - f.x).abs() < 20 && (w.z - (f.z + k.d / 2 + 10)).abs() < 12 && w.yaw.abs() > 2.0) {
+          _enterBuilding(f);
+          return;
+        }
+      }
+    }
+    _updateAct(w);
+  }
+
+  void _enterBuilding(Furn f) {
+    _inX = 0;
+    _inZ = 0;
+    final inn = CityInterior(f.kind, f)..build(comm);
+    inner = inn;
+    _act = null;
+    cam
+      ..minDist = 60
+      ..maxDist = 420
+      ..minPitch = 0.15
+      ..maxPitch = 1.35
+      ..setFree(true);
+    cam.glideTo(target: V3(0, 30, 110), dist: 260, yaw: 0.0, pitch: 0.55);
+    setState(_rebuild);
+    _say(f.kind == 'hospital' ? 'The hospital. Walk onto the blue mat to admit the sick, and up to a bed to treat the patient. Walk to the green mat to go out.' : 'The shop. Walk onto the yellow mat for food and the purple mat for medicine. Walk to the green mat to go out.');
+    conBeep(660, ms: 80);
+  }
+
+  void _leaveBuilding() {
+    final inn = inner;
+    final w = walker;
+    if (inn == null || w == null) return;
+    final f = inn.door;
+    final k = kFurnKinds[f.kind]!;
+    inner = null;
+    _inX = 0;
+    _inZ = 0;
+    w
+      ..x = f.x
+      ..z = f.z + k.d / 2 + 28
+      ..yaw = 0
+      ..target = null
+      ..refresh();
+    setState(_rebuild);
+    _frame();
+    cam.glideTo(target: V3(w.x, 30, w.z));
+    _say('You are back in the city.');
+  }
+
+  /// What can be done where the person stands: feed an animal, get in or out of a vehicle.
+  void _updateAct(WorldWalker w) {
+    ({String label, VoidCallback go})? act;
+    final drv = _driving;
+    if (drv != null) {
+      act = (label: '🚪 Get out', go: _getOut);
+    } else {
+      for (final f in room.furn) {
+        final d = math.sqrt(math.pow(w.x - f.x, 2) + math.pow(w.z - f.z, 2));
+        final name = kFurnKinds[f.kind]!.name.toLowerCase();
+        if (kAnimalKinds.contains(f.kind) && d < 36) {
+          act = (label: '🍎 Feed the $name', go: () => _feed(f));
+          break;
+        }
+        if (const ['car', 'ambulance', 'firetruck'].contains(f.kind) && d < 60) {
+          act = (label: '🚗 Get in the $name', go: () => _getIn(f));
+          break;
+        }
+      }
+    }
+    if (act?.label != _act?.label) setState(() => _act = act);
+  }
+
+  void _feed(Furn f) {
+    final last = _fedAt[f.id];
+    final name = kFurnKinds[f.kind]!.name;
+    if (last != null && now - last < 30) {
+      _say('The ${name.toLowerCase()} has just eaten. Come back in a little while.', ok: false);
+      return;
+    }
+    _fedAt[f.id] = now;
+    final t = comm?.feedAnimal(name) ?? 'You fed the ${name.toLowerCase()}.';
+    conBeep(880, ms: 90);
+    setState(() {});
+    _say(t);
+  }
+
+  void _getIn(Furn f) {
+    final w = walker;
+    if (w == null) return;
+    _driving = f;
+    w
+      ..skipFurn = f.id
+      ..body = 22
+      ..speedScale = 2.4
+      ..x = f.x
+      ..z = f.z
+      ..yaw = math.atan2(math.cos(f.rot * math.pi / 2), -math.sin(f.rot * math.pi / 2))
+      ..target = null
+      ..refresh();
+    setState(_rebuild);
+    _say('You are driving the ${kFurnKinds[f.kind]!.name.toLowerCase()}. Slide the stick to drive. Press Get out to stop.');
+    conBeep(300, ms: 120);
+  }
+
+  void _getOut() {
+    final f = _driving;
+    final w = walker;
+    if (f == null || w == null) return;
+    // The vehicle stays where it was left, and you stand beside it.
+    f
+      ..x = w.x
+      ..z = w.z
+      ..rot = ((w.yaw - math.pi / 2) / (math.pi / 2)).round() % 4;
+    final side = w.yaw + math.pi / 2;
+    _driving = null;
+    w
+      ..skipFurn = null
+      ..body = 7
+      ..speedScale = 1
+      ..running = false
+      ..refresh();
+    for (final r in [46.0, 62.0, 80.0]) {
+      final nx = w.x + math.sin(side) * r, nz = w.z + math.cos(side) * r;
+      if (!w.blocked(nx, nz)) {
+        w
+          ..x = nx
+          ..z = nz;
+        break;
+      }
+    }
+    setState(_rebuild);
+    _say('You got out.');
+  }
+
+  (String, double, double, double, int)? _driveNow() {
+    final f = _driving, w = walker;
+    if (f == null || w == null) return null;
+    return (f.kind, w.x, w.z, w.yaw, f.color);
+  }
+
+  // ── Life in the city: time passes, people call ──
+
+  Future<void> _startLife() async {
+    if (isLesson) return;
+    Map<String, dynamic>? saved;
+    final already = Community.active;
+    if (already == null || already.houseSeed != home.seed) {
+      try {
+        saved = await Community.loadJson();
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    {
+      Community made;
+      final active = Community.active;
+      if (active != null && active.houseSeed == home.seed) {
+        made = active;
+      } else if (saved != null && ((saved['seed'] as num?)?.toInt() ?? -1) == home.seed) {
+        made = Community.fromJson(saved);
+      } else if (saved != null && _madeSession) {
+        // The house you left is the one that comes back, with its repairs.
+        final seed = (saved['seed'] as num?)?.toInt() ?? home.seed;
+        home = HomeProject.session = HomeProject(seed: seed);
+        Community.applyHouse(home, saved);
+        made = Community.fromJson(saved);
+      } else {
+        made = Community(houseSeed: home.seed, seed: home.seed)..syncCalls(home);
+      }
+      Community.active = made;
+      for (final c in made.calls) {
+        _knownCalls.add(c.id);
+      }
+      setState(() {
+        _rebuild();
+        _frame(snap: true);
+      });
+      _lifeTimer = Timer.periodic(const Duration(seconds: 1), (_) => _life());
     }
   }
 
+  void _life() {
+    final cm = comm;
+    if (cm == null || !mounted) return;
+    if (tour == null) cm.advance(1, home);
+    if (++_beat % 8 == 0) cm.save(home);
+    for (final c in cm.calls) {
+      if (_knownCalls.add(c.id)) _ring(c);
+    }
+    _knownCalls.removeWhere((id) => !cm.calls.any((c) => c.id == id));
+    final r = _ringing;
+    if (r != null && !cm.calls.any((c) => c.id == r.id)) _stopRing();
+  }
+
+  /// The phone rings: a two-note ring and a buzz, and a call banner to answer.
+  void _ring(HelpCall c) {
+    _ringing = c;
+    _ringTicks = 0;
+    _ringTimer?.cancel();
+    _ringTimer = Timer.periodic(const Duration(milliseconds: 380), (_) {
+      if (!mounted) return;
+      _ringTicks++;
+      if (_ringTicks > 36) {
+        _stopRing();
+        return;
+      }
+      if (_ringTicks % 8 < 4) {
+        conBeep(_ringTicks.isEven ? 1046 : 1318, ms: 160, wave: 'sine', volume: 0.3);
+        if (_ringTicks % 8 == 0) HapticFeedback.vibrate();
+      }
+    });
+    setState(() {});
+  }
+
+  void _stopRing() {
+    _ringTimer?.cancel();
+    _ringTimer = null;
+    if (!mounted) return;
+    setState(() => _ringing = null);
+  }
+
   Widget? _pad() {
-    if (!steer || room.indoor) return null;
-    Widget key(IconData icon, double ix, double iz) => Listener(
-          onPointerDown: (_) {
-            _inX = ix;
-            _inZ = iz;
-          },
-          onPointerUp: (_) {
-            _inX = 0;
-            _inZ = 0;
-          },
-          onPointerCancel: (_) {
-            _inX = 0;
-            _inZ = 0;
-          },
+    final controls = steer && !room.indoor;
+    final call = _ringing;
+    if (!controls && call == null) return null;
+    final screenW = MediaQuery.of(context).size.width;
+    Widget btn(String label, VoidCallback onTap, {bool on = false, Color col = const Color(0xFF4ADE80)}) => GestureDetector(
+          onTapDown: (_) => onTap(),
           child: Container(
-            width: 58,
-            height: 58,
-            margin: const EdgeInsets.all(3),
-            decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFF4ADE80), width: 1.6)),
-            child: Icon(icon, color: Colors.white, size: 28),
+            margin: const EdgeInsets.only(left: 6, top: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            decoration: BoxDecoration(color: on ? col.withValues(alpha: 0.45) : Colors.black.withValues(alpha: 0.62), borderRadius: BorderRadius.circular(18), border: Border.all(color: col, width: 1.8)),
+            child: Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
           ),
         );
-    return Column(mainAxisSize: MainAxisSize.min, children: [
-      key(Icons.arrow_upward_rounded, 0, 1),
-      Row(mainAxisSize: MainAxisSize.min, children: [key(Icons.arrow_back_rounded, -1, 0), const SizedBox(width: 58), key(Icons.arrow_forward_rounded, 1, 0)]),
-      key(Icons.arrow_downward_rounded, 0, -1),
-    ]);
+    return SizedBox(
+      width: screenW,
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        if (call != null)
+          Container(
+            margin: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: const Color(0xFF14532D).withValues(alpha: 0.97), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFF4ADE80), width: 2)),
+            child: Row(children: [
+              const Text('📞', style: TextStyle(fontSize: 30)),
+              const SizedBox(width: 10),
+              Expanded(child: Text('${kResidents[call.resident].name} is calling\n${call.message}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13.5, height: 1.3))),
+              btn('Answer', () {
+                _stopRing();
+                _citySheet('calls');
+              }),
+              btn('Later', _stopRing, col: Colors.white54),
+            ]),
+          ),
+        if (controls)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.end, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              _Stick(onMove: (x, y) {
+                _inX = x;
+                _inZ = y;
+              }),
+              Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.end, children: [
+                if (_act != null) btn('✋ ${_act!.label}', _act!.go, col: const Color(0xFFFACC15)),
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  if (_driving == null) btn(_run ? '🏃 Run: on' : '🏃 Run', () => setState(() => _run = !_run), on: _run),
+                  if (_driving == null) btn('⬆ Jump', () => (inner?.walker ?? walker)?.jump(), col: const Color(0xFF60A5FA)),
+                ]),
+              ]),
+            ]),
+          ),
+      ]),
+    );
   }
 
   // ── Jobs ──
@@ -1332,7 +1618,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       stepText: isLesson ? (r.lessonDone ? 'Done ✓' : 'To do') : '${home.finishedCount}/${home.indoor.length} done',
       onSteps: () => isLesson ? _openLesson() : _problems(context),
       stage: Stage3D(
-        sky: !room.indoor,
+        sky: !room.indoor && inner == null,
         scene: scene,
         cam: cam,
         highlight: hl,
@@ -1343,7 +1629,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         good: good,
         messageTop: (showMap && !isLesson) ? 104 : 10,
         layerOn: (l) => l <= 5,
-        dynamicPolys: (_) => homeDynamic(room, now, person: _pose(), personStyle: playerStyle, residents: _figs, mode: mode),
+        dynamicPolys: (_) => inner != null ? inner!.dynamicPolys(now, playerStyle) : homeDynamic(room, now, person: _pose(), personStyle: playerStyle, residents: _figs, mode: mode, drive: _driveNow()),
         bottom: _pad(),
         topLeft: [
           if (showMap && !isLesson) _MiniMap(home: home, onTap: _go, maxWidth: math.min(138.0, screenW * 0.36)),
@@ -1529,4 +1815,56 @@ class _MapPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _MapPainter old) => true;
+}
+
+/// The round walking stick: put a finger on it and slide in the direction to go. The further from the middle, the faster.
+class _Stick extends StatefulWidget {
+  const _Stick({required this.onMove});
+  final void Function(double x, double y) onMove;
+
+  @override
+  State<_Stick> createState() => _StickState();
+}
+
+class _StickState extends State<_Stick> {
+  static const double _size = 132, _reach = 46;
+  Offset? _knob;
+
+  void _set(Offset local) {
+    var d = local - const Offset(_size / 2, _size / 2);
+    if (d.distance > _reach) d = d / d.distance * _reach;
+    final x = d.dx / _reach, y = -d.dy / _reach;
+    final mag = math.sqrt(x * x + y * y);
+    widget.onMove(mag < 0.15 ? 0 : x, mag < 0.15 ? 0 : y);
+    setState(() => _knob = d);
+  }
+
+  void _end() {
+    widget.onMove(0, 0);
+    setState(() => _knob = null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const green = Color(0xFF4ADE80);
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: (e) => _set(e.localPosition),
+      onPointerMove: (e) => _set(e.localPosition),
+      onPointerUp: (_) => _end(),
+      onPointerCancel: (_) => _end(),
+      child: SizedBox(
+        width: _size,
+        height: _size,
+        child: Stack(alignment: Alignment.center, children: [
+          Container(width: _size, height: _size, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.black.withValues(alpha: 0.42), border: Border.all(color: green.withValues(alpha: 0.9), width: 2.4))),
+          Container(width: _size * 0.5, height: _size * 0.5, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: green.withValues(alpha: 0.25), width: 1.5))),
+          Transform.translate(
+            offset: _knob ?? Offset.zero,
+            child: Container(width: 56, height: 56, decoration: BoxDecoration(shape: BoxShape.circle, color: green.withValues(alpha: _knob == null ? 0.55 : 0.9), border: Border.all(color: Colors.white, width: 2))),
+          ),
+        ]),
+      ),
+    );
+  }
 }

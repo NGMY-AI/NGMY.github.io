@@ -228,11 +228,12 @@ void main() {
     expect(kHomeAppliances.where((a) => a.isTv && !a.wallOnly).every((a) => a.tvWidth <= 70), isTrue);
     // The hall: three doors in the middle of the back wall, the other seven on the two short walls, and a video wall each side of the three.
     final hall = h.rooms[5];
-    expect(hall.doors.length, 10);
-    expect(hall.doors.where((d) => d.wall == 'back').length, 3);
+    expect(hall.doors.length, 10, reason: 'every room is still joined to the hall in the plan');
+    expect(hall.doors.where((d) => !d.hidden).length, 3, reason: 'but the hall shows only three doors');
+    expect(buildHomeRoom(hall).polys.where((p) => p.id >= idHDoor && p.id < idHDoor + 20 && p.order == 1).map((p) => p.id).toSet().length, 3);
     expect(hall.w, greaterThan(400));
     expect(hall.d, greaterThan(150));
-    final left = wallTvBox(hall, applianceByKey('tv100'), sub: 0), right = wallTvBox(hall, applianceByKey('tv100'), sub: 1);
+    final left = wallTvBox(hall, applianceByKey("tv100"), sub: 2), right = wallTvBox(hall, applianceByKey("tv100"), sub: 3);
     expect(left.w, greaterThan(120));
     expect(left.cx, lessThan(-60));
     expect(right.cx, greaterThan(60));
@@ -240,7 +241,7 @@ void main() {
     hall.wallTv2 = 'tv100';
     hall.tvOn = true;
     final s = buildHomeRoom(hall);
-    expect(s.screens.map((q) => q.id).where((i) => i != 0).toSet(), {idHWallTv, idHWallTv + 1});
+    expect(s.screens.map((q) => q.id).where((i) => i != 0).toSet(), {idHWallTv, idHWallTv + 1, idHWallTv + 2, idHWallTv + 3}, reason: 'four TVs: one on each end wall, one each side of the doors');
     expect(s.screens.any((q) => q.id == 0), isTrue, reason: 'the NGMY logo carpet');
   });
 
@@ -431,12 +432,23 @@ void main() {
       }
       for (var i = 0; i < r.doors.length; i++) {
         final mine = sc.polys.where((p) => p.id == idHDoor + i && p.order == 1).toList();
+        if (mine.isEmpty) continue;
         expect({for (final p in mine) p.group}.length, 1, reason: '${r.name} door $i is one group');
       }
       // The walls are in the tier below, and the floor under all of them.
       expect(sc.polys.where((p) => p.order == -1), isNotEmpty);
       expect(sc.shell, isNotNull);
     }
+  });
+
+  testWidgets('a big screen close to the camera stays on: the part in front is still drawn', (t) async {
+    // A screen 600 wide with the camera right in front of it, so two of its corners are behind the camera.
+    final quad = ScreenQuad(const [V3(-300, 100, 0), V3(300, 100, 0), V3(300, 0, 0), V3(-300, 0, 0)], 77, (c, size, time) => c.drawRect(Offset.zero & size, Paint()..color = Colors.red), bias: 0);
+    await t.binding.setSurfaceSize(const Size(400, 400));
+    await t.pumpWidget(MaterialApp(home: Scene3DView(scene: Scene3D(const [], screens: [quad]), cam: Cam3(yaw: 0, pitch: 0.0, dist: 20, target: const V3(0, 50, 0)))));
+    await t.pump(const Duration(milliseconds: 200));
+    final painter = t.widget<CustomPaint>(find.byWidgetPredicate((w) => w is CustomPaint && w.painter is Scene3DPainter).first).painter! as Scene3DPainter;
+    expect(painter.hits.list.any((h) => h.$2 == 77), isTrue, reason: 'the screen is drawn from close by');
   });
 
   test('a hallway-only tour stays in the hall and keeps to its time', () {

@@ -13,9 +13,10 @@ const NavRect kHouseFootprint = NavRect(-126, 126, -66, 5);
 
 /// What a person cannot walk through in the world: the house, the buildings, the vehicles, the trees, the fences and the benches.
 /// Flat things (roads, ponds, flowers) and animals are walked over or past.
-List<NavRect> obstaclesOfWorld(HRoom r) {
+List<NavRect> obstaclesOfWorld(HRoom r, {int? skip}) {
   final o = <NavRect>[kHouseFootprint];
   for (final f in r.furn) {
+    if (f.id == skip) continue;
     if (kFlatKinds.contains(f.kind) || kAnimalKinds.contains(f.kind) || f.kind == 'bush') continue;
     final k = kFurnKinds[f.kind]!;
     var fw = f.rot.isOdd ? k.d : k.w, fd = f.rot.isOdd ? k.w : k.d;
@@ -30,28 +31,54 @@ List<NavRect> obstaclesOfWorld(HRoom r) {
 }
 
 class WorldWalker {
-  WorldWalker(this.room, {this.x = 0, this.z = 22, this.yaw = 0}) {
+  WorldWalker(HRoom this.room, {this.x = 0, this.z = 22, this.yaw = 0})
+      : _minX = -room.w / 2 + 10,
+        _maxX = room.w / 2 - 10,
+        _minZ = -300,
+        _maxZ = room.d - 10 {
     refresh();
   }
 
-  final HRoom room;
+  /// Somebody walking about inside a building: a floor of [w] by [d] and the things that are in the way.
+  WorldWalker.indoors({required double w, required double d, required List<NavRect> obstacles, this.x = 0, this.z = 22, this.yaw = 0})
+      : room = null,
+        _minX = -w / 2 + 12,
+        _maxX = w / 2 - 12,
+        _minZ = 12,
+        _maxZ = d - 4,
+        _obstacles = obstacles;
+
+  final HRoom? room;
+  final double _minX, _maxX, _minZ, _maxZ;
   double x, z, yaw;
 
   /// Walking right now (for the stride), how far along the stride they are, and where a double tap sent them.
   bool walking = false;
   double phase = 0;
+
+  /// Running (faster), and how high off the ground a jump has taken the person.
+  bool running = false;
+  double lift = 0;
+  double _vy = 0;
   (double, double)? target;
   List<NavRect> _obstacles = const [];
 
-  static const double speed = 70, radius = 7;
+  static const double speed = 70;
+
+  /// How wide the person is (a car is wider), how much faster than walking they go, and the furniture they are sitting in (a car).
+  double body = 7, speedScale = 1;
+  int? skipFurn;
 
   /// Pick up the furniture as it is now (it can be moved between steps).
-  void refresh() => _obstacles = obstaclesOfWorld(room);
+  void refresh() {
+    final r = room;
+    if (r != null) _obstacles = obstaclesOfWorld(r, skip: skipFurn);
+  }
 
   bool blocked(double px, double pz) {
-    if (px < -room.w / 2 + 10 || px > room.w / 2 - 10 || pz < -300 || pz > room.d - 10) return true;
+    if (px < _minX || px > _maxX || pz < _minZ || pz > _maxZ) return true;
     for (final o in _obstacles) {
-      if (o.hit(px, pz, radius)) return true;
+      if (o.hit(px, pz, body)) return true;
     }
     return false;
   }
@@ -68,7 +95,8 @@ class WorldWalker {
       return false;
     }
     final ux = dx / len, uz = dz / len;
-    final d = speed * dt;
+    // A stick pushed halfway walks at half speed; running is nearly twice as fast.
+    final d = speed * speedScale * (running ? 1.9 : 1.0) * math.min(1.0, len) * dt;
     var nx = x + ux * d, nz = z + uz * d;
     var moved = true;
     if (blocked(nx, nz)) {
@@ -88,6 +116,22 @@ class WorldWalker {
     }
     walking = moved;
     return moved;
+  }
+
+  /// Jump (only from the ground).
+  void jump() {
+    if (lift <= 0.01) _vy = 160;
+  }
+
+  /// The jump goes on in the air: up, then down again.
+  void fall(double dt) {
+    if (lift <= 0 && _vy <= 0) return;
+    lift += _vy * dt;
+    _vy -= 560 * dt;
+    if (lift <= 0) {
+      lift = 0;
+      _vy = 0;
+    }
   }
 
   /// Send the person to a spot (a double tap). They walk there in a straight line, sliding round whatever is in the way.

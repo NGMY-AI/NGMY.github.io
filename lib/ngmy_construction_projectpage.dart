@@ -75,7 +75,11 @@ class NgmyRoomProjectPage extends StatefulWidget {
 class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
   late RoomProject p;
   late int seed = widget.seed ?? DateTime.now().millisecondsSinceEpoch % 100000;
-  final Cam3 cam = Cam3(yaw: -0.12, pitch: 0.4, dist: 205, target: const V3(0, -4, 28))..maxDist = 300;
+  final Cam3 cam = Cam3(yaw: -0.12, pitch: 0.4, dist: 205, target: const V3(0, -4, 28))
+    ..maxDist = 300
+    // Fixing a wall: you can look a little to each side and up and down, but never round behind the room or under the floor.
+    ..yawRange = 0.7
+    ..minPitch = 0.05;
   late Scene3D scene;
   final Stopwatch clock = Stopwatch()..start();
   final Map<int, double> fxUntil = {};

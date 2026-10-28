@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -90,7 +91,7 @@ class Scene3D {
 /// A screen in the scene: where its four corners are (top left, top right, bottom right, bottom left, seen from the front)
 /// and how to paint what it shows, at [width] by [height], at a moment [t].
 class ScreenQuad {
-  const ScreenQuad(this.corners, this.id, this.paint, {this.width = 320, this.height = 180, this.bias = 0.6, this.order = 1});
+  const ScreenQuad(this.corners, this.id, this.paint, {this.width = 320, this.height = 180, this.bias = 0.6, this.order = 1, this.group = 0});
   final List<V3> corners;
   final int id;
   final void Function(Canvas canvas, Size size, double t) paint;
@@ -101,6 +102,9 @@ class ScreenQuad {
 
   /// The drawing tier (see [Poly.order]).
   final int order;
+
+  /// The group (see [Poly.group]) of the frame this screen sits in, so the frame and the picture are sorted as one piece and the frame can never cover the picture.
+  final int group;
 }
 
 // ─── Building shapes ─────────────────────────────────────────────────────────
@@ -554,13 +558,31 @@ class Scene3DPainter extends CustomPainter {
     }
     for (final sq in scene.screens) {
       final q = [for (final v in sq.corners) toCam(v)];
-      if (q.any((v) => v.z < 1)) continue;
       final mid = (q[0] + q[1] + q[2] + q[3]) * 0.25;
       final n = rotN((sq.corners[3] - sq.corners[0]).cross(sq.corners[1] - sq.corners[0]));
       if (n.dot(mid) > 0) continue;
-      final pts = [for (final v in q) Offset(cx + v.x * f / v.z, cy - v.y * f / v.z)];
-      final path = Path()..addPolygon(pts, true);
-      drawn.add(_Face(path, Colors.transparent, mid.z - sq.bias, sq.id, false, false, (c) => _drawQuad(c, sq, pts, time), sq.order));
+      if (q.every((v) => v.z >= 1)) {
+        final pts = [for (final v in q) Offset(cx + v.x * f / v.z, cy - v.y * f / v.z)];
+        final path = Path()..addPolygon(pts, true);
+        drawn.add(_Face(path, Colors.transparent, mid.z - sq.bias, sq.id, false, false, (c) => _drawQuad(c, sq, pts, time), sq.order, sq.group));
+        continue;
+      }
+      // A corner is behind the camera (a big screen seen from close by): cut the screen into little patches and draw the ones in front, so it never switches off.
+      const nx = 8, ny = 6;
+      V3 at(double u, double v) => V3.lerp(V3.lerp(q[0], q[1], u), V3.lerp(q[3], q[2], u), v);
+      final cells = <(int, int, List<Offset>)>[];
+      final path = Path();
+      for (var j = 0; j < ny; j++) {
+        for (var i = 0; i < nx; i++) {
+          final cs = [at(i / nx, j / ny), at((i + 1) / nx, j / ny), at((i + 1) / nx, (j + 1) / ny), at(i / nx, (j + 1) / ny)];
+          if (cs.any((v) => v.z < 1)) continue;
+          final pts = [for (final v in cs) Offset(cx + v.x * f / v.z, cy - v.y * f / v.z)];
+          cells.add((i, j, pts));
+          path.addPolygon(pts, true);
+        }
+      }
+      if (cells.isEmpty) continue;
+      drawn.add(_Face(path, Colors.transparent, mid.z - sq.bias, sq.id, false, false, (c) => _drawQuadCells(c, sq, cells, nx, ny, time), sq.order, sq.group));
     }
     // Far to near inside each tier. A grouped part is sorted as one piece by the middle of the whole part.
     final gz = <int, double>{}, gn = <int, int>{};
@@ -645,11 +667,12 @@ List<V3> _clipNear(List<V3> pts, {double near = 0.5}) {
 
 
 /// Paints [sq] flat onto the four screen points [p] (top left, top right, bottom right, bottom left).
-void _drawQuad(Canvas canvas, ScreenQuad sq, List<Offset> p, double t) {
+/// The matrix that lays a picture of [w] by [h] on the four screen points [p] (top left, top right, bottom right, bottom left).
+Matrix4? _quadMatrix(List<Offset> p, double w, double h) {
   final x0 = p[0].dx, y0 = p[0].dy, x1 = p[1].dx, y1 = p[1].dy, x2 = p[2].dx, y2 = p[2].dy, x3 = p[3].dx, y3 = p[3].dy;
   final dx1 = x1 - x2, dx2 = x3 - x2, dx3 = x0 - x1 + x2 - x3;
   final dy1 = y1 - y2, dy2 = y3 - y2, dy3 = y0 - y1 + y2 - y3;
-  double a, b, d, e, g = 0, h = 0;
+  double a, b, d, e, g = 0, hh = 0;
   if (dx3.abs() < 1e-9 && dy3.abs() < 1e-9) {
     a = x1 - x0;
     b = x3 - x0;
@@ -657,21 +680,46 @@ void _drawQuad(Canvas canvas, ScreenQuad sq, List<Offset> p, double t) {
     e = y3 - y0;
   } else {
     final den = dx1 * dy2 - dx2 * dy1;
-    if (den.abs() < 1e-9) return;
+    if (den.abs() < 1e-9) return null;
     g = (dx3 * dy2 - dx2 * dy3) / den;
-    h = (dx1 * dy3 - dx3 * dy1) / den;
+    hh = (dx1 * dy3 - dx3 * dy1) / den;
     a = x1 - x0 + g * x1;
-    b = x3 - x0 + h * x3;
+    b = x3 - x0 + hh * x3;
     d = y1 - y0 + g * y1;
-    e = y3 - y0 + h * y3;
+    e = y3 - y0 + hh * y3;
   }
+  return Matrix4(a / w, d / w, 0, g / w, b / h, e / h, 0, hh / h, 0, 0, 1, 0, x0, y0, 0, 1);
+}
+
+void _drawQuad(Canvas canvas, ScreenQuad sq, List<Offset> p, double t) {
   final w = sq.width, hh = sq.height;
-  final m = Matrix4(a / w, d / w, 0, g / w, b / hh, e / hh, 0, h / hh, 0, 0, 1, 0, x0, y0, 0, 1);
+  final m = _quadMatrix(p, w, hh);
+  if (m == null) return;
   canvas.save();
   canvas.transform(m.storage);
   canvas.clipRect(Rect.fromLTWH(0, 0, w, hh));
   sq.paint(canvas, Size(w, hh), t);
   canvas.restore();
+}
+
+/// A screen cut into [nx] by [ny] patches: the picture is recorded once and each patch shows its own part of it.
+void _drawQuadCells(Canvas canvas, ScreenQuad sq, List<(int, int, List<Offset>)> cells, int nx, int ny, double t) {
+  final w = sq.width, hh = sq.height;
+  final rec = ui.PictureRecorder();
+  sq.paint(Canvas(rec), Size(w, hh), t);
+  final pic = rec.endRecording();
+  final cw = w / nx, ch = hh / ny;
+  for (final (i, j, pts) in cells) {
+    final m = _quadMatrix(pts, cw, ch);
+    if (m == null) continue;
+    canvas.save();
+    canvas.transform(m.storage);
+    canvas.clipRect(Rect.fromLTWH(0, 0, cw, ch));
+    canvas.translate(-i * cw, -j * ch);
+    canvas.drawPicture(pic);
+    canvas.restore();
+  }
+  pic.dispose();
 }
 
 class _Face {

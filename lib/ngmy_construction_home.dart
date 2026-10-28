@@ -162,17 +162,23 @@ class WallTvBox {
 WallTvBox wallTvBox(HRoom r, HomeAppliance a, {int sub = 0}) {
   double heightFor(double tw) => math.min(tw * 0.5625, tw > 60 ? 62.0 : 99.0);
   double centreY(double th) => th > 40 ? 30 + th / 2 : 58;
+  if (r.kind == 'hall' && sub < 2) {
+    // On an end wall, facing into the hall.
+    final tw = a.fullWall ? r.d - 14 : math.min(a.tvWidth, r.d - 14);
+    final th = heightFor(tw);
+    return WallTvBox(tw, th, r.d / 2, centreY(th));
+  }
   if (r.kind == 'hall') {
     // A video wall: on each side of the three doors, a big TV that fills the whole stretch of wall from the skirting to the crown.
-    final doors = [for (final d in r.doors) if (d.wall == 'back') d.offset];
+    final doors = [for (final d in r.doors) if (d.wall == 'back' && !d.hidden) d.offset];
     final lo = doors.isEmpty ? -40.0 : doors.reduce(math.min) - 19 - 8, hi = doors.isEmpty ? 40.0 : doors.reduce(math.max) + 19 + 8;
     final edge = r.w / 2 - 8;
     final tw = edge - hi;
-    return WallTvBox(tw, HRoom.h - 18, sub == 0 ? (-edge + lo) / 2 : (hi + edge) / 2, (HRoom.h - 18) / 2 + 6);
+    return WallTvBox(tw, HRoom.h - 24, sub == 2 ? (-edge + lo) / 2 : (hi + edge) / 2, (HRoom.h - 24) / 2 + 8);
   }
   var lo = -r.w / 2 + 6, hi = r.w / 2 - 6;
   if (r.kind == 'bathroom') hi = 14;
-  final spans = [for (final d in r.doors) if (d.wall == 'back') (d.offset - 19, d.offset + 19)]..sort((x, y) => x.$1.compareTo(y.$1));
+  final spans = [for (final d in r.doors) if (d.wall == 'back' && !d.hidden) (d.offset - 19, d.offset + 19)]..sort((x, y) => x.$1.compareTo(y.$1));
   var bestA = lo, bestB = lo, cursor = lo;
   void consider(double a0, double b0) {
     if (b0 - a0 > bestB - bestA) {
@@ -194,7 +200,10 @@ WallTvBox wallTvBox(HRoom r, HomeAppliance a, {int sub = 0}) {
 
 /// A door in a wall: which wall, how far along it, and which room it leads to.
 class HDoor {
-  const HDoor(this.wall, this.offset, this.to);
+  const HDoor(this.wall, this.offset, this.to, {this.hidden = false});
+
+  /// A door that is only there for the map and the tour (the hall shows just three doors): it is not drawn and cannot be tapped.
+  final bool hidden;
   final String wall; // back, left or right
   final double offset;
   final int to;
@@ -277,7 +286,7 @@ class HRoom {
   double get w => switch (kind) { 'bathroom' => 110, 'kitchen' => 140, 'living' => 180, 'hall' => 480, 'outside' => 1200, _ => 130 };
   double get d => switch (kind) { 'bathroom' => 100, 'kitchen' => 110, 'living' => 120, 'hall' => 180, 'outside' => 900, _ => 112 };
   bool get indoor => kind != 'outside';
-  static const double h = 96;
+  static const double h = 130;
 
   bool get hasPlumbing => kind == 'bathroom' || kind == 'kitchen';
   // Once a job has been opened it decides: pull a device out of a finished room and the room is no longer wired.
@@ -368,14 +377,14 @@ class HomeProject {
     final r = math.Random(seed);
     // The map is 9 cells wide and 5 tall. The hall runs along the middle.
     HDoor toHall(double off) => HDoor('back', off, 5);
-    // The hall's doors: three in the middle of the back wall (the living room, the kitchen and the first bedroom), with a big TV on
-    // each side of them. The other rooms have their door on a short wall (the offset is the way along the wall).
+    // The hall's doors: only three, in the middle of the back wall (the living room, the kitchen and the first bedroom), with a big TV
+    // on each side of them and one on each end wall. The other rooms are reached from the map, or through their own door to the hall.
     final hallDoors = <HDoor>[
       const HDoor('back', -50, 10),
       const HDoor('back', 0, 9),
       const HDoor('back', 50, 0),
-      for (final (z, to) in const [(40.0, 1), (90.0, 2), (140.0, 3)]) HDoor('left', z - 50, to),
-      for (final (z, to) in const [(30.0, 4), (70.0, 6), (110.0, 7), (150.0, 8)]) HDoor('right', z - 50, to),
+      // The other rooms keep their doors in the plan (so the map and the tour reach them) but the hall does not show them.
+      for (final (i, to) in const [(0, 1), (1, 2), (2, 3), (3, 4), (4, 6), (5, 7), (6, 8)]) HDoor('back', -150.0 + i * 50, to, hidden: true),
     ];
     final list = <HRoom>[
       HRoom(0, _bedNames[0], 'bedroom', 0, 0, 2, 2, [toHall(-48)]),
@@ -485,19 +494,7 @@ class HomeProject {
         r.add('fence', x: -206, z: 480);
         r.add('fence', x: -142, z: 480);
       case 'hall':
-        // A lobby: a lounge in the middle of the carpet, plants, lamps, consoles and benches along the walls.
-        r.add('sofa', x: -140, z: 140);
-        r.add('sofa', x: 140, z: 140);
-        r.add('armchair', x: -80, z: 150).rot = 2;
-        r.add('armchair', x: 80, z: 150).rot = 2;
-        for (final x in [-w2 + 14, w2 - 14]) {
-          r.add('plant', x: x, z: 168);
-          r.add('lamp', x: x, z: 14);
-        }
-        r.add('plant', x: -180, z: 12);
-        r.add('plant', x: 180, z: 12);
-        r.add('console', x: -104, z: 10);
-        r.add('console', x: 104, z: 10);
+        // Nothing stands in the hall: the carpet with the logo and the TV walls are what you see.
       default:
     }
   }

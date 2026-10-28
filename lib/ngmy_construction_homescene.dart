@@ -43,7 +43,7 @@ class NgmyLogo {
       }();
 }
 
-/// The hall's carpet: deep blue with a gold border and the NGMY logo in the middle.
+/// The hall's carpet: deep blue with a gold border and the NGMY logo in a round gold frame in the middle.
 void paintNgmyCarpet(Canvas c, Size s, double t) {
   final r = Offset.zero & s;
   c.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(18)), Paint()..shader = const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF0B1F4B), Color(0xFF123A7A)]).createShader(r));
@@ -53,23 +53,53 @@ void paintNgmyCarpet(Canvas c, Size s, double t) {
     ..strokeWidth = s.height * 0.025;
   c.drawRRect(RRect.fromRectAndRadius(r.deflate(s.height * 0.05), Radius.circular(s.height * 0.08)), gold);
   c.drawRRect(RRect.fromRectAndRadius(r.deflate(s.height * 0.1), Radius.circular(s.height * 0.05)), gold..strokeWidth = s.height * 0.01);
+  // The round frame: a gold ring round a white disc, with the logo inside it.
+  final mid = Offset(s.width / 2, s.height / 2);
+  final rad = s.height * 0.36;
+  c.drawCircle(mid, rad * 1.1, Paint()..color = const Color(0x55000000));
+  c.drawCircle(mid, rad, Paint()..color = const Color(0xFFF5C14B));
+  c.drawCircle(mid, rad * 0.9, Paint()..color = const Color(0xFFFDFCF7));
+  c.drawCircle(mid, rad * 0.95, Paint()
+    ..style = PaintingStyle.stroke
+    ..color = const Color(0xFF0B1F4B)
+    ..strokeWidth = rad * 0.04);
   final img = NgmyLogo.image;
-  final box = Rect.fromCenter(center: Offset(s.width / 2, s.height * 0.44), width: s.width * 0.55, height: s.height * 0.5);
+  final box = Rect.fromCenter(center: mid, width: rad * 1.5, height: rad * 1.2);
   if (img != null) {
     final k = math.min(box.width / img.width, box.height / img.height);
     final dst = Rect.fromCenter(center: box.center, width: img.width * k, height: img.height * k);
     c.drawImageRect(img, Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()), dst, Paint()..filterQuality = FilterQuality.medium);
   } else {
-    final tp = TextPainter(text: TextSpan(text: 'NGMY', style: TextStyle(color: Colors.white, fontSize: s.height * 0.32, fontWeight: FontWeight.w900, letterSpacing: s.height * 0.02)), textDirection: TextDirection.ltr)..layout();
-    tp.paint(c, box.center - Offset(tp.width / 2, tp.height / 2));
+    final tp = TextPainter(text: TextSpan(text: 'NGMY', style: TextStyle(color: const Color(0xFF0B1F4B), fontSize: rad * 0.6, fontWeight: FontWeight.w900)), textDirection: TextDirection.ltr)..layout();
+    tp.paint(c, mid - Offset(tp.width / 2, tp.height / 2));
   }
-  final line = TextPainter(text: TextSpan(text: 'NEW GLOBAL MOVEMENT FOR YOUTH', style: TextStyle(color: const Color(0xFFF5C14B), fontSize: s.height * 0.075, fontWeight: FontWeight.w900, letterSpacing: s.height * 0.012)), textDirection: TextDirection.ltr)..layout();
-  line.paint(c, Offset((s.width - line.width) / 2, s.height * 0.76));
+}
+
+/// The NGMY logo in a round gold frame, for the walls of the house.
+void paintNgmyMedallion(Canvas c, Size s, double t) {
+  final mid = s.center(Offset.zero);
+  final rad = s.shortestSide / 2;
+  c.drawCircle(mid, rad, Paint()..color = const Color(0xFFF5C14B));
+  c.drawCircle(mid, rad * 0.9, Paint()..color = const Color(0xFFFDFCF7));
+  c.drawCircle(mid, rad * 0.93, Paint()
+    ..style = PaintingStyle.stroke
+    ..color = const Color(0xFF0B1F4B)
+    ..strokeWidth = rad * 0.04);
+  final img = NgmyLogo.image;
+  final box = Rect.fromCenter(center: mid, width: rad * 1.5, height: rad * 1.2);
+  if (img != null) {
+    final k = math.min(box.width / img.width, box.height / img.height);
+    final dst = Rect.fromCenter(center: box.center, width: img.width * k, height: img.height * k);
+    c.drawImageRect(img, Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()), dst, Paint()..filterQuality = FilterQuality.medium);
+  } else {
+    final tp = TextPainter(text: TextSpan(text: 'NGMY', style: TextStyle(color: const Color(0xFF0B1F4B), fontSize: rad * 0.6, fontWeight: FontWeight.w900)), textDirection: TextDirection.ltr)..layout();
+    tp.paint(c, mid - Offset(tp.width / 2, tp.height / 2));
+  }
 }
 
 /// Edit modes: look, furniture, walls, floor, ceiling, doors.
-Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int problems = 0, bool closed = false, List<ResidentFigure> residents = const []}) {
-  if (r.kind == 'outside') return _outside(r, problems, mode, selected, residents);
+Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int problems = 0, bool closed = false, List<ResidentFigure> residents = const [], Set<int> hideFurn = const {}}) {
+  if (r.kind == 'outside') return _outside(r, problems, mode, selected, residents, hideFurn);
   final b = MeshBuilder();
   final info = <int, ObjInfo>{};
   final labels = <Label3D>[];
@@ -100,7 +130,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
 
   if (r.kind == 'hall') {
     // A big carpet with the NGMY logo, flat on the floor in the middle of the hall.
-    final cw = w * 0.72, z0 = 24.0, z1 = d - 20;
+    final cw = math.min(w * 0.5, d * 1.5), z0 = 14.0, z1 = d - 14;
     screens.add(ScreenQuad([V3(-cw / 2, 0.5, z0), V3(cw / 2, 0.5, z0), V3(cw / 2, 0.5, z1), V3(-cw / 2, 0.5, z1)], 0, paintNgmyCarpet, width: 900, height: 900 * (z1 - z0) / cw, bias: 60, order: -1));
   }
   // ── Walls ──
@@ -179,6 +209,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
   // ── Doors ──
   for (var i = 0; i < r.doors.length; i++) {
     final dr = r.doors[i];
+    if (dr.hidden) continue;
     final ang = r.doorAngle[i] ?? (r.openDoors.contains(i) ? 1.25 : 0.0);
     final open = ang > 0.04;
     // The frame, the closed leaf and what shows through an open door are fixed to the wall (tier 1). An open leaf sticks out
@@ -326,13 +357,15 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
     b.tube([V3(x, 12, 1.8), V3(x, 6, 3), V3(x, 2, 11)], 0.3, const Color(0xFF1B1B1D), shine: 0.2, sides: 6, joints: false);
     if (a.isTv) {
       final tw = a.tvWidth, th = tw * 0.56;
+      final tg = b.startGroup();
       b.box(V3(x, 2, 15), V3(tw * 0.45, 4, 14), const Color(0xFF2B2D33), shine: 0.3);
       b.box(V3(x, 8, 15), const V3(7, 8, 3), const Color(0xFF2B2D33), shine: 0.3);
       b.box(V3(x, 12 + th / 2, 15), V3(tw, th, 3), const Color(0xFF111418), shine: 0.5);
       // The real NGMY ad plays on the glass, flat on the screen.
       final sw = tw - 3.5, sh = th - 3.5, sy = 12 + th / 2;
       final off = i * 7.0 + r.id;
-      screens.add(ScreenQuad([V3(x - sw / 2, sy + sh / 2, 16.6), V3(x + sw / 2, sy + sh / 2, 16.6), V3(x + sw / 2, sy - sh / 2, 16.6), V3(x - sw / 2, sy - sh / 2, 16.6)], idHApp + i, (c, size, t) => paintNgmyApp(c, size, 0, t + off), bias: 9, order: 2));
+      screens.add(ScreenQuad([V3(x - sw / 2, sy + sh / 2, 16.6), V3(x + sw / 2, sy + sh / 2, 16.6), V3(x + sw / 2, sy - sh / 2, 16.6), V3(x - sw / 2, sy - sh / 2, 16.6)], idHApp + i, (c, size, t) => paintNgmyApp(c, size, 0, t + off), bias: 9, order: 2, group: tg));
+      b.endGroup();
     } else if (a.key == 'lamp') {
       b.cyl(V3(x, 0, 14), V3(x, 1, 14), 6, const Color(0xFF8A6A47), shine: 0.4, sides: 14);
       b.cyl(V3(x, 1, 14), V3(x, 22, 14), 1, const Color(0xFFB08A5B), shine: 0.5, sides: 8);
@@ -361,24 +394,43 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
     final sw = tw - 2.5, sh = th - 2.5;
     final id = idHWallTv + sub;
     const frame = Color(0xFF1B1D22), glass = Color(0xFF0B0F17);
+    // Every TV plays a different NGMY ad.
+    final app = r.tvApp + sub * 2;
     b.id = id;
-    b.startGroup();
+    final g = b.startGroup();
     b.bias = 5;
-    {
+    if (r.kind == 'hall' && sub < 2) {
+      // On an end wall, facing into the hall.
+      final left = sub == 1;
+      final x = left ? -w / 2 : w / 2;
+      final dir = left ? 1.0 : -1.0;
+      final z = box.cx;
+      b.box(V3(x + dir * 1.4, y, z), V3(2.6, th + 3, tw + 3), frame, shine: 0.5);
+      b.box(V3(x + dir * 2.8, y, z), V3(0.2, th, tw), glass, shine: 0.7);
+      if (r.tvOn) {
+        final xs = x + dir * 2.95;
+        final zl = left ? z + sw / 2 : z - sw / 2, zr = left ? z - sw / 2 : z + sw / 2;
+        screens.add(ScreenQuad([V3(xs, y + sh / 2, zl), V3(xs, y + sh / 2, zr), V3(xs, y - sh / 2, zr), V3(xs, y - sh / 2, zl)], id, (c, size, t) => paintNgmyApp(c, size, app, t + r.id + sub * 3), height: 320 * sh / sw, bias: 9, group: g));
+      }
+    } else {
       final x = box.cx;
       b.box(V3(x, y, 1.4), V3(tw + 3, th + 3, 2.6), frame, shine: 0.5);
       b.box(V3(x, y, 2.8), V3(tw, th, 0.2), glass, shine: 0.7);
       if (r.tvOn) {
-        screens.add(ScreenQuad([V3(x - sw / 2, y + sh / 2, 2.95), V3(x + sw / 2, y + sh / 2, 2.95), V3(x + sw / 2, y - sh / 2, 2.95), V3(x - sw / 2, y - sh / 2, 2.95)], id, (c, size, t) => paintNgmyApp(c, size, r.tvApp, t + r.id), height: 320 * sh / sw, bias: 9));
+        screens.add(ScreenQuad([V3(x - sw / 2, y + sh / 2, 2.95), V3(x + sw / 2, y + sh / 2, 2.95), V3(x + sw / 2, y - sh / 2, 2.95), V3(x - sw / 2, y - sh / 2, 2.95)], id, (c, size, t) => paintNgmyApp(c, size, app, t + r.id + sub * 3), height: 320 * sh / sw, bias: 9, group: g));
       }
     }
     b.endGroup();
     b.bias = 0;
-    info[id] = ObjInfo(a.name, r.tvOn ? 'It is on and playing ${kNgmyApps[r.tvApp].name}. Tap it to watch full screen with the remote.' : 'The TV is off. Tap it to turn it on.', V3(0, y, 4), 110);
+    info[id] = ObjInfo(a.name, r.tvOn ? 'It is on and playing ${kNgmyApps[app % kNgmyApps.length].name}. Tap it to watch full screen with the remote.' : 'The TV is off. Tap it to turn it on.', V3(0, y, 4), 110);
   }
 
   hangTv(r.wallTv, 0);
-  if (r.kind == 'hall') hangTv(r.wallTv2, 1);
+  if (r.kind == 'hall') {
+    hangTv(r.wallTv2, 1);
+    hangTv(r.wallTv, 2);
+    hangTv(r.wallTv2 ?? r.wallTv, 3);
+  }
 
   // ── The plumbing ──
   b.order = 2;
@@ -484,7 +536,7 @@ void _patch(MeshBuilder b, V3 c, V3 u, V3 v, double w, double h, Color col, V3 n
 
 /// The garden and the house seen from outside, from any side. The house is drawn so that every wall keeps its windows and doors
 /// whichever way you look at it. Everything in the garden can be moved, turned, recoloured and added to.
-Scene3D _outside(HRoom r, int problems, String mode, int selected, List<ResidentFigure> residents) {
+Scene3D _outside(HRoom r, int problems, String mode, int selected, List<ResidentFigure> residents, Set<int> hideFurn) {
   final b = MeshBuilder();
   final info = <int, ObjInfo>{};
   final labels = <Label3D>[];
@@ -505,8 +557,8 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
   // The house: one piece, so that its walls, windows and doors are always drawn in the right order.
   const cream = Color(0xFFE8D9BC), trim = Color(0xFFF7F4EC), glass = Color(0xFF9BD3F5), wood = Color(0xFF8B5E34);
   b.order = 2;
-  b.startGroup();
-  b.box(const V3(0, 50, -30), const V3(240, 100, 60), cream, split: 3);
+  final houseGroup = b.startGroup();
+  b.box(const V3(0, 75, -30), const V3(240, 150, 60), cream, split: 3);
   b.box(const V3(0, 3, -30), const V3(244, 6, 64), const Color(0xFF9C8E75));
   // A window: a white frame, the glass and two bars, flat on the wall.
   void window(V3 face, V3 u, V3 n, double along, double y) {
@@ -534,10 +586,12 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
   const uf = V3(1, 0, 0), ub = V3(-1, 0, 0), ur = V3(0, 0, -1), ul = V3(0, 0, 1);
   for (final x in const [-90.0, -52.0, 52.0, 90.0]) {
     window(front, uf, const V3(0, 0, 1), x, 62);
+    window(front, uf, const V3(0, 0, 1), x, 122);
   }
   door(front, uf, const V3(0, 0, 1), 0, idHDoor);
   for (final x in const [-80.0, 80.0]) {
     window(back, ub, const V3(0, 0, -1), x, 62);
+    window(back, ub, const V3(0, 0, -1), x, 122);
   }
   door(back, ub, const V3(0, 0, -1), 0, 0);
   for (final z in const [-14.0, 14.0]) {
@@ -549,25 +603,33 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
   final roof = MeshBuilder();
   roof.box(const V3(0, 0, 0), const V3(262, 3, 56), roofCol, shine: 0.1, split: 2);
   // The end walls under the roof (triangles), part of the same piece as the walls.
-  b.tri(const V3(120.1, 100, 0), const V3(120.1, 100, -60), const V3(120.1, 124, -30), cream, normal: const V3(1, 0, 0), twoSided: false);
-  b.tri(const V3(-120.1, 100, -60), const V3(-120.1, 100, 0), const V3(-120.1, 124, -30), cream, normal: const V3(-1, 0, 0), twoSided: false);
+  b.tri(const V3(120.1, 150, 0), const V3(120.1, 150, -60), const V3(120.1, 174, -30), cream, normal: const V3(1, 0, 0), twoSided: false);
+  b.tri(const V3(-120.1, 150, -60), const V3(-120.1, 150, 0), const V3(-120.1, 174, -30), cream, normal: const V3(-1, 0, 0), twoSided: false);
   b.endGroup();
   b.grouped = true;
-  b.polys.addAll(transformPolys(roof.polys, rx: 0.5, t: const V3(0, 115, 3)));
-  b.polys.addAll(transformPolys(roof.polys, rx: -0.5, t: const V3(0, 115, -63)));
-  b.box(const V3(0, 128, -30), const V3(262, 3, 5), const Color(0xFF5E2D23));
-  b.box(const V3(70, 125, -45), const V3(14, 36, 14), const Color(0xFF9C5A45));
-  b.box(const V3(70, 144, -45), const V3(17, 3, 17), const Color(0xFF6B4A32));
+  b.polys.addAll(transformPolys(roof.polys, rx: 0.5, t: const V3(0, 165, 3)));
+  b.polys.addAll(transformPolys(roof.polys, rx: -0.5, t: const V3(0, 165, -63)));
+  b.box(const V3(0, 178, -30), const V3(262, 3, 5), const Color(0xFF5E2D23));
+  b.box(const V3(70, 175, -45), const V3(14, 36, 14), const Color(0xFF9C5A45));
+  b.box(const V3(70, 194, -45), const V3(17, 3, 17), const Color(0xFF6B4A32));
   // The porch over the front door.
   b.box(const V3(0, 2, 14), const V3(50, 4, 28), const Color(0xFFB8B2A7));
   b.cyl(const V3(-20, 4, 26), const V3(-20, 92, 26), 2.2, trim, sides: 8);
   b.cyl(const V3(20, 4, 26), const V3(20, 92, 26), 2.2, trim, sides: 8);
   b.box(const V3(0, 94, 13), const V3(56, 3, 32), roofCol, shine: 0.1);
   info[idHDoor] = const ObjInfo('Front door', 'Tap the door to go inside the house.', V3(0, 40, 12), 260);
+  // The NGMY logo in a round gold frame on every wall, like the one on the hall carpet.
+  final logos = <ScreenQuad>[];
+  void logo(V3 tl, V3 tr, V3 br, V3 bl) => logos.add(ScreenQuad([tl, tr, br, bl], 0, paintNgmyMedallion, width: 256, height: 256, bias: 1, order: 2, group: houseGroup));
+  logo(const V3(-26, 146, 0.6), const V3(26, 146, 0.6), const V3(26, 94, 0.6), const V3(-26, 94, 0.6));
+  logo(const V3(120.6, 140, -8), const V3(120.6, 140, -52), const V3(120.6, 96, -52), const V3(120.6, 96, -8));
+  logo(const V3(-120.6, 140, -52), const V3(-120.6, 140, -8), const V3(-120.6, 96, -8), const V3(-120.6, 96, -52));
+  logo(const V3(26, 146, -60.6), const V3(-26, 146, -60.6), const V3(-26, 94, -60.6), const V3(26, 94, -60.6));
 
   // The things in the garden.
   b.grouped = true;
   for (final f in r.furn) {
+    if (hideFurn.contains(idHFurn + f.id)) continue;
     if (kAnimalKinds.contains(f.kind)) {
       // Animals walk about, so they come from homeDynamic. Here they only get their name.
       info[idHFurn + f.id] = ObjInfo(kFurnKinds[f.kind]!.name, 'It wanders about. Move it with the arrow buttons or take it out.', V3(f.x, 12, f.z), 140);
@@ -588,15 +650,24 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
     labels.add(Label3D(V3(f.x, 80, f.z), '📞 Help!', const Color(0xFFDC2626)));
   }
   labels.add(Label3D(const V3(0, 150, 8), problems == 0 ? '✅ The house is finished' : '🏠 $problems rooms still need work', problems == 0 ? const Color(0xFF16A34A) : const Color(0xFFD97706)));
-  return Scene3D(b.polys, info: info, labels: labels);
+  return Scene3D(b.polys, info: info, labels: labels, screens: logos);
 }
 
 /// Things that move: the fan blades and the pictures on the TVs.
-List<Poly> homeDynamic(HRoom r, double t, {PersonPose? person, PersonStyle? personStyle, List<ResidentFigure> residents = const [], String mode = 'look'}) {
+List<Poly> homeDynamic(HRoom r, double t, {PersonPose? person, PersonStyle? personStyle, List<ResidentFigure> residents = const [], String mode = 'look', (String, double, double, double, int)? drive}) {
   final b = MeshBuilder();
   b.grouped = true;
   if (r.kind == 'outside') {
     if (person != null && person.room == r.id) _figure(b, person, t, personStyle ?? playerStyle, close: true);
+    if (drive != null) {
+      // The vehicle you are driving: (kind, x, z, the way it faces, colour). Its front is its +x end.
+      final cb = MeshBuilder()
+        ..grouped = true
+        ..order = 2
+        ..id = 0;
+      _furniture(cb, drive.$1, kFurnColors[drive.$5]);
+      b.polys.addAll(transformPolys(cb.polys, ry: drive.$4 - math.pi / 2, t: V3(drive.$2, 0, drive.$3)));
+    }
     for (final f in r.furn.where((f) => kAnimalKinds.contains(f.kind))) {
       // Each animal wanders round a small circle, its legs swinging, facing the way it goes.
       final a = t * (0.25 + (f.id % 5) * 0.04) + f.id * 1.7;
@@ -858,6 +929,9 @@ List<Poly> _stretch(List<Poly> ps, V3 s, V3 at) => [
         Poly([for (final v in p.pts) V3(at.x + (v.x - at.x) * s.x, at.y + (v.y - at.y) * s.y, at.z + (v.z - at.z) * s.z)], V3(p.n.x / s.x, p.n.y / s.y, p.n.z / s.z).unit, p.color, p.id, shine: p.shine, alpha: p.alpha, twoSided: p.twoSided, layer: p.layer, bias: p.bias, order: p.order, group: p.group)
     ];
 
+/// Draws a person (the real character when it has been read) for scenes made in other files.
+void drawPerson(MeshBuilder b, PersonPose p, double t, PersonStyle style, {int id = 0, bool close = false}) => _figure(b, p, t, style, id: id, close: close);
+
 /// A person of the house: the real character from its .glb file when that has been read, else a plain figure meanwhile.
 void _figure(MeshBuilder b, PersonPose p, double t, PersonStyle style, {int id = 0, bool close = false}) {
   final av = GlbAvatar.ready(style.avatar);
@@ -866,7 +940,7 @@ void _figure(MeshBuilder b, PersonPose p, double t, PersonStyle style, {int id =
     _person(b, p, t, style: plain, id: id);
     return;
   }
-  b.polys.addAll(av.polys(time: t, x: p.x, z: p.z, yaw: p.yaw, walking: p.walking, walkedUnits: p.walking && p.phase > 0 ? p.phase * 12 : null, id: id, close: close));
+  b.polys.addAll(av.polys(time: t, x: p.x, z: p.z, yaw: p.yaw, walking: p.walking, running: p.running, lift: p.lift, walkedUnits: p.walking && !p.running && p.phase > 0 ? p.phase * 12 : null, id: id, close: close));
 }
 
 /// An adult person for the house tour, about 5 feet 8 inches tall, made of rounded parts (limbs with real joints, an
@@ -967,7 +1041,7 @@ void _person(MeshBuilder b, PersonPose p, double t, {PersonStyle style = const P
       pb.box(wrist + const V3(0, 0.2, 3.8), const V3(1.4, 0.3, 1.0), const Color(0xFFEF4444));
     }
   }
-  b.polys.addAll(transformPolys(pb.polys, ry: p.yaw, t: V3(p.x, 0, p.z)));
+  b.polys.addAll(transformPolys(pb.polys, ry: p.yaw, t: V3(p.x, p.lift, p.z)));
 }
 
 const Color kChromeC = Color(0xFFC9CED6);

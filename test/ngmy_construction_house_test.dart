@@ -58,7 +58,7 @@ void main() {
 
   test('only the wiring and plumbing can be tapped; everything else only while its edit button is on', () {
     final h = HomeProject(seed: 7);
-    const always = {0, idHOutletA, idHOutletB, idHSwitch, idHLight, idHToiletF, idHSinkF, idHTubF, idHKSink, idHApp, idHApp + 1, idHWallTv, idHWallTv + 1};
+    const always = {0, idHOutletA, idHOutletB, idHSwitch, idHLight, idHToiletF, idHSinkF, idHTubF, idHKSink, idHApp, idHApp + 1, idHWallTv, idHWallTv + 1, idHWallTv + 2, idHWallTv + 3};
     for (final r in h.indoor) {
       final look = buildHomeRoom(r);
       expect(look.polys.length, lessThan(9000));
@@ -73,6 +73,7 @@ void main() {
         ('doors', (id) => id >= idHDoor && id < idHDoor + 20),
       ]) {
         final s = buildHomeRoom(r, mode: mode);
+        if (mode == 'furniture' && r.furn.isEmpty) continue;
         expect(s.polys.any((p) => test(p.id)), isTrue, reason: '${r.name} $mode');
       }
     }

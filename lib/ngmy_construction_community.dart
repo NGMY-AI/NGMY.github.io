@@ -315,6 +315,14 @@ class Community {
     return t;
   }
 
+  /// Somebody feeds an animal in the city: a small reward.
+  String feedAnimal(String name) {
+    points += 1;
+    final t = 'You fed the ${name.toLowerCase()}. +1 point.';
+    _say(t);
+    return t;
+  }
+
   String buy(String what) {
     switch (what) {
       case 'food':

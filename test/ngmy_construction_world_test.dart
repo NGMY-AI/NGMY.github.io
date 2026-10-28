@@ -118,25 +118,40 @@ void main() {
     expect(s.phase, greaterThan(0));
   });
 
-  testWidgets('in the garden Walk about shows the arrows and Stop walking hides them', (t) async {
+  testWidgets('in the garden Walk the city shows the round stick, run and jump, and Stop walking hides them', (t) async {
     t.view.physicalSize = const Size(900, 1600);
     t.view.devicePixelRatio = 2.0;
     addTearDown(t.view.reset);
     HomeProject.session = HomeProject(seed: 5)..current = 11;
     await t.pumpWidget(const MaterialApp(home: NgmyHousePage()));
     await t.pump(const Duration(milliseconds: 600));
-    expect(find.byIcon(Icons.arrow_upward_rounded), findsNothing);
-    final row = find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.right).first;
-    await t.scrollUntilVisible(find.text('🚶 Walk the city'), 120, scrollable: row);
-    await t.drag(row, const Offset(-80, 0));
-    await t.pump(const Duration(milliseconds: 300));
+    final stick = find.byWidgetPredicate((w) => w.runtimeType.toString() == '_Stick');
+    expect(stick, findsNothing);
+    // The city's own buttons come first in the row.
     await t.tap(find.text('🚶 Walk the city'));
     await t.pump(const Duration(milliseconds: 500));
-    expect(find.byIcon(Icons.arrow_upward_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.arrow_downward_rounded), findsOneWidget);
+    expect(stick, findsOneWidget);
+    expect(find.text('🏃 Run'), findsOneWidget);
+    expect(find.text('⬆ Jump'), findsOneWidget);
+    // Sliding the stick sideways walks the person across the lawn, and the camera follows.
+    final painter = t.widget<CustomPaint>(find.byWidgetPredicate((w) => w is CustomPaint && w.painter is Scene3DPainter).first).painter! as Scene3DPainter;
+    final before = painter.cam.target.x;
+    final g = await t.startGesture(t.getCenter(stick));
+    await g.moveBy(const Offset(80, 0));
+    for (var i = 0; i < 20; i++) {
+      await t.pump(const Duration(milliseconds: 100));
+    }
+    await g.up();
+    expect((painter.cam.target.x - before).abs(), greaterThan(5), reason: "the person walked and the camera followed");
+    // Run and jump are buttons you press, not menus.
+    await t.tap(find.text('🏃 Run'));
+    await t.pump(const Duration(milliseconds: 100));
+    expect(find.text('🏃 Run: on'), findsOneWidget);
+    await t.tap(find.text('⬆ Jump'));
+    await t.pump(const Duration(milliseconds: 100));
     await t.tap(find.text('⏹ Stop walking'));
     await t.pump(const Duration(milliseconds: 300));
-    expect(find.byIcon(Icons.arrow_upward_rounded), findsNothing);
+    expect(stick, findsNothing);
     await t.pump(const Duration(seconds: 10));
   });
 }

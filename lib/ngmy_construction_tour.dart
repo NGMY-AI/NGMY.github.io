@@ -14,7 +14,7 @@ import 'ngmy_construction_home.dart';
 
 /// Where the person is, and what they are doing, at one moment of the tour.
 class PersonPose {
-  const PersonPose({required this.room, required this.x, required this.z, required this.yaw, this.walking = false, this.holding = false, this.remote = false, this.pointing = false, this.note = '', this.event = '', this.openDoor = -1, this.doorU = 0, this.enterDoor = -1, this.phase = 0, this.phone = false});
+  const PersonPose({required this.room, required this.x, required this.z, required this.yaw, this.walking = false, this.holding = false, this.remote = false, this.pointing = false, this.note = '', this.event = '', this.openDoor = -1, this.doorU = 0, this.enterDoor = -1, this.phase = 0, this.phone = false, this.lift = 0, this.running = false});
   final int room;
   final double x, z;
 
@@ -24,6 +24,10 @@ class PersonPose {
 
   /// On the phone: the right hand is held up in front of the face.
   final bool phone;
+
+  /// How far off the ground a jump has lifted the person, and whether they are running.
+  final double lift;
+  final bool running;
   final String note;
 
   /// Something to do once for this moment of the tour, for example switching the ad on the TV ("ad:10").
@@ -387,13 +391,11 @@ class HomeTour {
     // Through the front door into the living room, the kitchen, then the hall and every bedroom and bathroom.
     _leg(10, 11, 9, note: 'Coming in through the front door');
     _leg(9, 10, 5);
+    // The hall has only three doors: down the hall to the first bedroom, then every other room is entered through its own door to the hall.
+    _leg(5, 9, 0, note: 'Walking down the hall');
     const order = [0, 2, 1, 3, 4, 6, 7, 8];
-    var prev = 9;
     for (var i = 0; i < order.length; i++) {
-      final k = order[i];
-      _leg(5, prev, k, note: 'Walking down the hall');
-      _leg(k, 5, i == order.length - 1 ? null : 5);
-      prev = k;
+      _leg(order[i], 5, i == order.length - 1 ? null : 5);
     }
     _share();
   }

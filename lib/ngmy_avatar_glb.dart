@@ -701,7 +701,7 @@ class GlbAvatar {
   }
 
   /// The name of the clip that suits what the person is doing.
-  String clipFor({bool walking = false}) {
+  String clipFor({bool walking = false, bool running = false}) {
     String? find(String part) {
       for (final k in clips.keys) {
         if (k.toLowerCase().contains(part)) return k;
@@ -709,7 +709,7 @@ class GlbAvatar {
       return null;
     }
 
-    final want = walking ? find('walk') : (find('idle') ?? find('samba'));
+    final want = running ? (find('run') ?? find('walk')) : (walking ? find('walk') : (find('idle') ?? find('samba')));
     if (want != null) return want;
     return find('samba') ?? clips.keys.firstWhere((k) => !k.toLowerCase().contains('pose'), orElse: () => clips.keys.first);
   }
@@ -722,11 +722,11 @@ class GlbAvatar {
 
   /// The character as faces of the game: feet on y = 0, facing +z (turned by [yaw]), standing at [x], [z].
   /// [walkedUnits] is how far the person has walked (it keeps the feet in step with the ground); null means just use [time].
-  List<Poly> polys({required double time, required double x, required double z, required double yaw, bool walking = false, double? walkedUnits, int id = 0, bool close = true}) {
+  List<Poly> polys({required double time, required double x, required double z, required double yaw, bool walking = false, bool running = false, double lift = 0, double? walkedUnits, int id = 0, bool close = true}) {
     final lod = close ? _guide : _resident;
-    final clip = clipFor(walking: walking);
+    final clip = clipFor(walking: walking, running: running);
     final len = clipLength(clip);
-    final clipTime = walking && walkedUnits != null && clip.toLowerCase().contains('walk') ? walkedUnits / 50 * len : time * (_speed[key] ?? 1.0);
+    final clipTime = walking && walkedUnits != null && clip.toLowerCase().contains('walk') ? walkedUnits / 50 * len : time * (_speed[key] ?? 1.0) * (running ? 1.0 : 1.0);
     // Where the hips are at the start of the clip: the dancer is kept on her spot and is not carried around by the dance.
     var start = _hipsStart[clip];
     if (start == null) {
@@ -745,7 +745,7 @@ class GlbAvatar {
     final a = yaw + (_faceFix[key] ?? 0);
     final c = math.cos(a), sn = math.sin(a);
     final pts = List<V3>.generate(lod.vertices, (i) {
-      final px = (p[i * 3] - ox) * s, py = (p[i * 3 + 1] - _floor) * s, pz = (p[i * 3 + 2] - oz) * s;
+      final px = (p[i * 3] - ox) * s, py = (p[i * 3 + 1] - _floor) * s + lift, pz = (p[i * 3 + 2] - oz) * s;
       return V3(px * c + pz * sn + x, py, -px * sn + pz * c + z);
     });
     final groups = [for (var i = 0; i < 6; i++) MeshBuilder.newGroup()];
