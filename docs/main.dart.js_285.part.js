@@ -3,5 +3,5 @@ $__dart_deferred_initializers__.current=function(a,b,c,$){var A,B,C
 A=c[0]
 B=c[2]
 C=c[116]
-var z=a.updateTypes([]);(function constants(){C.WK=new A.w(1,1,0.9529411764705882,0.6901960784313725,B.t)})()};
-(a=>{a["6okQkf3hNb2YBNlaLYwP1M96+/I="]=a.current})($__dart_deferred_initializers__);
+var z=a.updateTypes([]);(function constants(){C.WM=new A.w(1,1,0.9529411764705882,0.6901960784313725,B.t)})()};
+(a=>{a["dHqHoa6VtcCpG7En+H5BF/AADgI="]=a.current})($__dart_deferred_initializers__);
