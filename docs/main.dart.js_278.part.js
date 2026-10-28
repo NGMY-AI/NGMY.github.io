@@ -1,23 +1,37 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
-$__dart_deferred_initializers__.current=function(a,b,c,$){var B,A,E,D={a77:function a77(d,e,f,g,h,i){var _=this
-_.c=d
-_.d=e
-_.e=f
-_.f=g
-_.r=h
-_.a=i}},C
-B=c[0]
+$__dart_deferred_initializers__.current=function(a,b,c,$){var D,A,E,C={
+h9M(d){switch(d.a){case 1:return B.e_k
+case 2:return B.e_m
+case 0:return B.e_l}},
+arI:function arI(d,e,f,g,h,i){var _=this
+_.a=d
+_.b=e
+_.c=f
+_.d=g
+_.e=h
+_.f=i}},B
+D=c[0]
 A=c[2]
-E=c[220]
-D=a.updateHolder(c[30],D)
-C=c[257]
-D.a77.prototype={
-B(d){var x=this,w=null,v=B.P(d).ax.a===A.I,u=v?E.afv:C.bhF,t=B.m(10),s=B.I(v?A.b3:C.b7z,A.q,1),r=y.a
-return B.p(w,B.v(B.a([B.B(B.a([B.E(B.d(x.c,w,w,w,w,w,w,A.eW,w,w,w),1),B.aH(w,w,w,w,C.bM5,w,w,w,x.r,w,w,w,w,"Full screen sign (landscape)",A.cc)],r),A.m,w,A.e,A.j,0,w,w),new B.aGK(x.d,x.e,120,A.cr,A.M,3.5,w),new B.bI(A.a7,w,w,B.bK(!1,A.Dn,w,w,!0,w,w,x.f,w,w),w)],r),A.F,w,A.e,A.j,0,A.p),A.f,w,w,new B.o(u,w,s,t,w,w,A.n),w,w,w,w,A.bU,w,w,w)}}
+E=c[48]
+C=a.updateHolder(c[34],C)
+B=c[176]
+C.arI.prototype={}
 var z=a.updateTypes([]);(function inheritance(){var x=a.inherit
-x(D.a77,B.au)})()
-B.jY(b.typeUniverse,JSON.parse('{"a77":{"au":[],"r":[]}}'))
-var y={a:B.ax("O<r>")};(function constants(){C.b7z=new B.w(1,0.792156862745098,0.8392156862745098,0.9529411764705882,A.t)
-C.bhF=new B.w(1,0.9529411764705882,0.9647058823529412,1,A.t)
-C.bM5=new B.ae(A.a05,22,A.aV,null,null,null)})()};
-(a=>{a["RBNUo3ZYl3QA5aoVxUh/tAUu2Oc="]=a.current})($__dart_deferred_initializers__);
+x(C.arI,D.aC)})()
+var y={c:D.ax("O<w>")};(function constants(){var x=a.makeConstList
+B.aPf=new D.G(!0,A.c,null,null,null,null,9,A.u,null,2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+B.cOU=x([A.dx,A.j7,A.aE],y.c)
+B.dif=x([A.aE,A.fj],y.c)
+B.cWG=x([A.ke,A.pt,A.aE],y.c)
+B.e_k=new C.arI(B.cOU,B.dif,A.fj,A.iY,"PREMIUM",B.cWG)
+B.db7=x([A.cY,A.fb,A.bS],y.c)
+B.d6T=x([A.bS,A.aV],y.c)
+B.cVt=x([A.vd,A.bS,A.fb],y.c)
+B.e_l=new C.arI(B.db7,B.d6T,A.bS,A.jC,"NGMY WALLET",B.cVt)
+B.d8A=x([A.ea,A.dH,A.oz],y.c)
+B.dcG=x([A.aw,A.aM],y.c)
+B.cXr=x([A.Au,A.aw,A.bZ],y.c)
+B.e_m=new C.arI(B.d8A,B.dcG,A.aw,A.lS,"LUXURY",B.cXr)
+B.e_o=new E.arH(1,"premium")
+B.e_p=new E.arH(2,"luxury")})()};
+(a=>{a["fyv4lDAjTirLzYp9nQbb4HVgkBM="]=a.current})($__dart_deferred_initializers__);
