@@ -155,7 +155,8 @@ void main() {
     expect(p.installDevice(out.slot, 'outlet').ok, isTrue);
     // The power is on: wires are refused, and wrong wires are explained.
     p.breaker = true;
-    expect(p.fasten(out.slot, 'black', idBrassTop).msg, contains('STOP'));
+    expect(p.fasten(out.slot, 'black', idBrassTop).fx, 'shock');
+    expect(p.lives, 3, reason: 'a shock in Learn mode costs no life');
     p.breaker = false;
     expect(p.fasten(out.slot, 'black', idSilverTop).msg, contains('BRASS'));
     expect(p.pushIn(out.slot).msg, contains('Every wire'));

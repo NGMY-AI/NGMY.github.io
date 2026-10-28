@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'ngmy_ai_inventor.dart';
-import 'ngmy_construction_lab.dart';
+import 'ngmy_construction_lab.dart' deferred as construction;
 import 'ngmy_electronics_board.dart';
 import 'ngmy_electronics_save.dart';
 import 'ngmy_electronics_screens.dart';
@@ -904,7 +904,12 @@ class _NgmyElectronicsLabState extends State<NgmyElectronicsLab> with WidgetsBin
           ),
           _AiOrb(onTap: _openAi),
           const SizedBox(width: 2),
-          _barButton(Icons.construction_rounded, 'Construction Lab: real 3D wiring, plumbing and a house', _amberHat, () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const NgmyConstructionLab()))),
+          _barButton(Icons.construction_rounded, 'Construction Lab: real 3D wiring, plumbing and a house', _amberHat, () async {
+            // The Construction Lab is its own download, so opening the Core Protocol stays quick.
+            await construction.loadLibrary();
+            if (!mounted) return;
+            await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => construction.NgmyConstructionLab()));
+          }),
           _barButton(Icons.flag_rounded, 'Challenges', const Color(0xFFFBBF24), _showChallenges, badge: _challengeBadge()),
           _barButton(Icons.help_outline_rounded, 'How to play', accent, () => showStudioHelp(context, 'ELECTRONICS LAB', help, accent)),
         ]),

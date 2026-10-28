@@ -58,12 +58,12 @@ void main() {
 
   test('only the wiring and plumbing can be tapped; everything else only while its edit button is on', () {
     final h = HomeProject(seed: 7);
-    const always = {0, idHOutletA, idHOutletB, idHSwitch, idHLight, idHToiletF, idHSinkF, idHTubF, idHKSink};
-    for (final r in h.rooms) {
+    const always = {0, idHOutletA, idHOutletB, idHSwitch, idHLight, idHToiletF, idHSinkF, idHTubF, idHKSink, idHApp, idHApp + 1};
+    for (final r in h.indoor) {
       final look = buildHomeRoom(r);
       expect(look.polys.length, lessThan(9000));
       for (final p in look.polys) {
-        expect(always.contains(p.id), isTrue, reason: '${r.name} object ${p.id} is tappable in Look mode');
+        expect(always.contains(p.id) || (p.id >= idHDoor && p.id < idHDoor + 20), isTrue, reason: '${r.name} object ${p.id} is tappable in Look mode');
       }
       for (final (mode, test) in <(String, bool Function(int))>[
         ('furniture', (id) => id >= idHFurn && id < idHFurn + 100),
@@ -115,6 +115,56 @@ void main() {
     expect(r.plumbed, isTrue);
     expect(r.finished, isTrue);
     expect(buildHomeRoom(r).labels, isEmpty);
+  });
+
+  test('a finished room can be opened and worked on, and pulling a device out makes it need wiring again', () {
+    final h = HomeProject(seed: 7);
+    final r = h.rooms[0];
+    r.wiringNeeded = false;
+    expect(r.wired, isTrue);
+    r.wiring = RoomProject(seed: 9, kind: wiringKindFor(r), name: r.name)
+      ..fastForward()
+      ..completeWiring();
+    expect(r.wired, isTrue);
+    final p = r.wiring!;
+    final sw = p.orders.firstWhere((o) => o.device == 'switch').slot;
+    p.breaker = false;
+    p.syncPower();
+    expect(p.removeDevice(sw).ok, isTrue);
+    expect(r.wired, isFalse);
+    final bath = h.rooms[2];
+    bath.plumbNeeded = false;
+    expect(bath.plumbed, isTrue);
+    bath.plumb = PlumbJob(seed: 2, variantId: 'bathroom')..completeAll();
+    expect(bath.plumbed, isTrue);
+  });
+
+  test('the garden is joined to the living room by the front door and builds fine', () {
+    final h = HomeProject(seed: 7);
+    final out = h.rooms.firstWhere((r) => r.kind == 'outside');
+    expect(h.rooms[10].doors.any((d) => d.to == out.id), isTrue);
+    expect(out.doors.single.to, 10);
+    final s = buildHomeRoom(out, problems: 3);
+    expect(s.polys.length, lessThan(9000));
+    expect(s.polys.any((p) => p.id == idHDoor), isTrue);
+    expect(s.labels.single.text, contains('3 rooms'));
+    expect(h.indoor.length, 11);
+  });
+
+  test('plugging in, the switch and the fan show up in the scene', () {
+    final h = HomeProject(seed: 7);
+    final r = h.rooms[0];
+    r.wiringNeeded = false;
+    r.plugged[0] = 'bangtv';
+    final plain = buildHomeRoom(r).polys.length;
+    expect(buildHomeRoom(r).polys.any((p) => p.id == idHApp), isTrue);
+    expect(homeDynamic(r, 1.0).any((p) => p.id == idHApp), isTrue, reason: 'the TV picture moves');
+    r.lightOn = true;
+    expect(r.ceilingFix, 'fan');
+    expect(homeDynamic(r, 1.0).where((p) => p.id == idHLight), isNotEmpty, reason: 'the fan blades turn');
+    expect(plain, greaterThan(500));
+    r.wiringNeeded = true;
+    expect(buildHomeRoom(r).polys.any((p) => p.id == idHApp), isFalse, reason: 'nothing runs without power');
   });
 
   test('furniture stays inside the room', () {

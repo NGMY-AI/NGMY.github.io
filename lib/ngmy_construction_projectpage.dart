@@ -9,6 +9,7 @@ import 'ngmy_construction_electrical.dart';
 import 'ngmy_construction_lab.dart';
 import 'ngmy_construction_project.dart';
 import 'ngmy_construction_roomscene.dart';
+import 'ngmy_electronics_tv.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
 // THE ROOM PROJECT PAGE. Pick up a tool or an item, then tap the place in the 3D room where it goes.
@@ -54,6 +55,7 @@ const List<List<_Item>> _trays = [
     _Item('hairdryer', 'Hair dryer', Icons.dry_rounded),
     _Item('tester', 'Tester', Icons.flash_on_rounded),
     _Item('flip', 'Flip switch', Icons.toggle_on_rounded),
+    _Item('unplug', 'Unplug', Icons.power_off_rounded),
   ],
 ];
 
@@ -283,7 +285,13 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
       return;
     }
     if (id >= idAppBase && id < idAppBase + 7) {
-      _apply(p.unplug(id - idAppBase));
+      final slot = id - idAppBase;
+      // A TV opens full screen with the NGMY ads; the Unplug tool pulls any plug.
+      if (p.plugged[slot] == 'tv' && armed != 'unplug') {
+        showNgmyTvScreen(context, kind: 'tv', title: 'Samsung Neo QLED 8K', stayFor: const Duration(hours: 1), showBoot: true);
+        return;
+      }
+      _apply(p.unplug(slot));
       return;
     }
     // The room itself (floor, walls, studs, sofa) does nothing, unless the Look tool is in your hand.
@@ -700,7 +708,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
           ] else ...[
             Wrap(spacing: 8, runSpacing: 6, children: [
               if (d.w.stage == 0)
-                for (final c in lesson!.chips)
+                for (final c in lesson!.chips.where((c) => !d.w.attached.containsValue(c.key)))
                   GestureDetector(
                     onTap: () => setState(() {
                       if (d.w.attached.containsValue(c.key)) {
@@ -726,7 +734,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Wrap(spacing: 6, runSpacing: 6, children: [
-                  for (final hk in lesson!.hookups)
+                  for (final hk in lesson!.hookups.where((hk) => !d.w.attached.containsKey(hk.id)))
                     GestureDetector(
                       onTap: () => _pickBench(active, hk.id),
                       child: Container(
@@ -773,6 +781,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
       'paint' => 'Tap a sheet to paint it.',
       'look' => 'Tap anything to read what it is.',
       'flip' => 'Tap a finished switch to turn the light or the fan on and off.',
+      'unplug' => 'Tap whatever is plugged in to pull the plug.',
       'tester' => 'Tap a box or a device to test it for power.',
       'tv' || 'lamp' || 'toaster' || 'hairdryer' => 'Tap a finished outlet to plug it in.',
       _ => 'Tap a glowing box to put it there.',

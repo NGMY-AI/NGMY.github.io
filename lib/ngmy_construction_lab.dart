@@ -124,10 +124,12 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
             ),
             _section('JOBS'),
             _grid([
-              _tile('🔌', 'Wire a room', 'Outlets, switches, lights, fans', const Color(0xFF22C55E), () => _push(NgmyRoomProjectPage(quick: true, practice: practice))),
+              _tile('🔌', 'Wire a room', 'Go to a room that needs wiring', const Color(0xFF22C55E), () => _push(NgmyHousePage(practice: practice, focus: 'wiring'))),
+              _tile('🚽', 'Plumb a room', 'Go to a bathroom or kitchen', const Color(0xFF38BDF8), () => _push(NgmyHousePage(practice: practice, focus: 'plumbing'))),
+              _tile('🔧', 'Fix a house', 'Walk the house and fix every sign', const Color(0xFFF59E0B), () => _push(NgmyHousePage(practice: practice, focus: 'fix'))),
               _tile('🧱', 'Build a room', 'Frame, drywall, then wire', const Color(0xFF4ADE80), () => _push(NgmyRoomProjectPage(practice: practice))),
-              _tile('🚽', 'Plumb a room', 'A bathroom or a kitchen', const Color(0xFF38BDF8), () => _push(NgmyPlumbJobPage(practice: practice))),
-              _tile('🔧', 'Fix a house', 'A customer rings with problems', const Color(0xFFF59E0B), () => _push(NgmyServiceCallPage(practice: practice))),
+              _tile('⚡', 'Wiring bench', 'Just the wiring, one room', const Color(0xFFFACC15), () => _push(NgmyRoomProjectPage(quick: true, practice: practice))),
+              _tile('📞', 'Service calls', 'A customer rings with problems', const Color(0xFFFB7185), () => _push(NgmyServiceCallPage(practice: practice))),
             ]),
             _section('LESSONS'),
             _grid([

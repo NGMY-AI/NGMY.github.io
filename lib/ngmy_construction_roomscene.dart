@@ -90,14 +90,22 @@ Scene3D buildRoomScene(RoomProject p, RoomView v) {
   b.box(const V3(72.8, 0, 55), const V3(1.2, 96, 112), const Color(0xFFD9D3C5), split: 3);
   b.box(const V3(72.0, -17, 70), const V3(0.5, 62, 30), const Color(0xFF8B5E34), shine: 0.15);
   b.box(const V3(71.6, -22, 62), const V3(0.4, 3, 3), const Color(0xFFE5C07B), shine: 0.8);
-  // The ceiling is seen through, with the joists above it.
+  // While the house is still being built the ceiling is seen through, with the joists above it.
+  // Once the drywall is done the ceiling is finished and painted: no bare wood.
   b.id = 0;
-  b.alpha = 0.1;
-  b.box(const V3(0, 48.6, 55), const V3(150, 1.2, 112), const Color(0xFFEDE8DC), split: 3);
+  b.alpha = p.drywallDone ? 0.42 : 0.1;
+  b.box(const V3(0, 48.6, 55), const V3(150, 1.2, 112), p.drywallDone ? const Color(0xFFF7F4EC) : const Color(0xFFEDE8DC), split: 3);
   b.alpha = 1;
   b.id = idRoomObj;
-  for (var i = 0; i < 10; i++) {
-    b.box(V3(-72.0 + i * 16, 51.3, 55), const V3(1.5, 3.5, 112), kWood, shine: 0.05, ends: false);
+  if (!p.drywallDone) {
+    for (var i = 0; i < 10; i++) {
+      b.box(V3(-72.0 + i * 16, 51.3, 55), const V3(1.5, 3.5, 112), kWood, shine: 0.05, ends: false);
+    }
+  } else {
+    const crown = Color(0xFFFFFFFF);
+    b.box(const V3(0, 46.6, 0.8), const V3(147, 3, 1.4), crown, shine: 0.2);
+    b.box(const V3(-71.2, 46.6, 55), const V3(1.4, 3, 112), crown, shine: 0.2);
+    b.box(const V3(71.2, 46.6, 55), const V3(1.4, 3, 112), crown, shine: 0.2);
   }
   if (p.drywallDone) {
     // The baseboard goes on after the paint.
@@ -221,6 +229,15 @@ Scene3D buildRoomScene(RoomProject p, RoomView v) {
     } else if (d != null && d.w.stage >= 2) {
       final (polys, _) = _place(buildFinished(d.kind, burnt: d.w.burnt), s, (id) => idDevBase + s.id);
       b.polys.addAll(polys);
+      // A bright frame round a finished wall device, so it can be found and tapped from far away.
+      if (!s.ceiling) {
+        b.id = idDevBase + s.id;
+        b.bias = 0.4;
+        b.alpha = 0.55;
+        b.box(V3(s.pos.x, s.pos.y, s.pos.z + 0.2), const V3(10, 14, 0.5), d.w.burnt ? const Color(0xFFEF4444) : const Color(0xFF22D3EE));
+        b.alpha = 1;
+        b.bias = 0;
+      }
       info[idDevBase + s.id] = ObjInfo(_deviceName(d.kind), _deviceAbout(p, s.id), slotPoint(s, const V3(0, 0, 4)), 22);
     } else {
       final (polys, _) = _place(buildBoxOnly(lessonKind, cabled: false), s, (id) => idSlotBase + s.id);
@@ -313,8 +330,8 @@ Scene3D buildRoomScene(RoomProject p, RoomView v) {
     b.box(V3(x, s.pos.y, 1.6), const V3(2.8, 3.4, 2.4), const Color(0xFF222326), shine: 0.3);
     switch (e.value) {
       case 'tv':
-        b.box(V3(x, -45, 24), const V3(36, 5, 16), const Color(0xFF3B2F26), shine: 0.2);
-        b.box(V3(x, -30, 24), const V3(46, 28, 3), const Color(0xFF111418), shine: 0.4);
+        b.box(V3(x, -45, 24), const V3(54, 5, 18), const Color(0xFF3B2F26), shine: 0.2);
+        b.box(V3(x, -19, 24), const V3(82, 46, 3), const Color(0xFF111418), shine: 0.4);
       case 'lamp':
         b.cyl(V3(x, -47.5, 24), V3(x, -46.5, 24), 6, const Color(0xFF8A6A47), shine: 0.4, sides: 14);
         b.cyl(V3(x, -46.5, 24), V3(x, -22, 24), 1, const Color(0xFFB08A5B), shine: 0.5, sides: 8);
@@ -327,7 +344,7 @@ Scene3D buildRoomScene(RoomProject p, RoomView v) {
         b.cyl(V3(x - 6, -38, 24), V3(x + 8, -38, 24), 3.4, const Color(0xFFE2455A), shine: 0.6, sides: 12, r1: 3);
         b.box(V3(x - 8, -43, 24), const V3(4, 10, 3.5), const Color(0xFFE2455A), shine: 0.6, yaw: 0.0);
     }
-    info[idAppBase + e.key] = ObjInfo(_appNameFull(e.value), 'Plugged into ${s.name}. Tap it to unplug.', V3(x, -35, 20), 60);
+    info[idAppBase + e.key] = ObjInfo(_appNameFull(e.value), e.value == 'tv' ? 'Plugged into ${s.name}. Tap it to watch NGMY ads full screen. Use the Unplug tool to unplug it.' : 'Plugged into ${s.name}. Tap it to unplug.', V3(x, -35, 20), 60);
   }
 
   // Info for the wall boxes/ceiling positions is added when they are boxes; give the markers a name too.
@@ -384,8 +401,9 @@ List<Poly> roomDynamic(RoomProject p, double t, Map<int, double> fxUntil) {
       case 'tv':
         b.bias = 0.8;
         final hue = (t * 60) % 360;
-        b.box(V3(x, -30, 25.7), const V3(41, 23, 0.3), HSVColor.fromAHSV(1, hue, 0.5, 0.95).toColor());
-        b.box(V3(x - 10 + 20 * ((t * 0.6) % 1), -26 + 6 * math.sin(t * 3), 26), const V3(8, 8, 0.3), Colors.white);
+        b.box(V3(x, -19, 25.7), const V3(77, 41, 0.3), HSVColor.fromAHSV(1, hue, 0.5, 0.95).toColor());
+        b.box(V3(x - 20 + 40 * ((t * 0.6) % 1), -14 + 9 * math.sin(t * 3), 26), const V3(14, 14, 0.3), Colors.white);
+        b.box(V3(x - 24, -34, 26), const V3(24, 5, 0.3), const Color(0xFFF59E0B));
         b.bias = 0;
       case 'lamp':
         b.id = 0;

@@ -166,6 +166,22 @@ class PlumbJob {
 
   bool _needsWater(PStep s) => s.item == 'valve' || s.item.startsWith('hose');
 
+  /// Fits every piece, tightens every joint and tests the water, so a finished room can be opened and worked on.
+  void completeAll() {
+    waterOn = true;
+    toggleWater();
+    for (final s in steps) {
+      place(s.item, s.id);
+    }
+    for (final s in steps) {
+      for (var i = 0; i < s.tighten; i++) {
+        tighten(s.id);
+      }
+    }
+    toggleWater();
+    mistakes = 0;
+  }
+
   bool get allPlaced => steps.every((s) => placed.contains(s.id));
   bool get allTight => steps.every((s) => looseJoints(s.id) <= 0 || !placed.contains(s.id));
   bool get done => allPlaced && allTight && waterOn && tested && leaking.isEmpty;

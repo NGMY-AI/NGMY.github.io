@@ -186,6 +186,39 @@ class RoomProject {
     }
   }
 
+  /// Wires every device the right way and tests it, so a finished room can be opened and worked on.
+  void completeWiring() {
+    for (final o in orders) {
+      installDevice(o.slot, o.device);
+    }
+    for (final o in orders) {
+      final d = devs[o.slot];
+      if (d == null) continue;
+      final plan = switch (d.kind) {
+        'outlet' => {idGreen: 'ground', idSilverTop: 'white', idBrassTop: 'black'},
+        'gfci' => {idGreen: 'ground', idSilverBottom: 'white', idBrassBottom: 'black'},
+        'switch' => {idGreen: 'ground', idBrassTop: 'blackLine', idBrassBottom: 'blackLoad'},
+        _ => {idNutGround: 'ground', idNutWhite: 'white', idNutBlack: 'black'},
+      };
+      for (final e in plan.entries) {
+        fasten(o.slot, e.value, e.key);
+      }
+      pushIn(o.slot);
+      coverOn(o.slot);
+    }
+    if (!breaker) toggleBreaker();
+    for (final o in orders) {
+      if (o.device == 'outlet' || o.device == 'gfci') {
+        plug(o.slot, 'lamp');
+        unplug(o.slot);
+      }
+    }
+    for (final o in orders.where((o) => o.device == 'switch')) {
+      flipSwitch(o.slot);
+      flipSwitch(o.slot);
+    }
+  }
+
   // ───────────────────────── Phase 1: rough-in ─────────────────────────
 
   /// Studs the cable has to pass through to get from the panel to [slot].
@@ -386,13 +419,20 @@ class RoomProject {
     if (d == null) return const Act(false, 'There is nothing there.');
     if (power && !d.w.burnt) {
       if (practice) return _shock();
-      return _mistake('STOP! The breaker is ON. Turn it OFF before you take a device out.');
+      return _softShock();
     }
     devs.remove(slot);
     plugged.remove(slot);
     burnt.remove(slot);
     switchOn.remove(slot);
     return const Act(true, 'Device taken out. You can put it somewhere else, or put in a new one.');
+  }
+
+  /// In Learn mode a shock still happens and is felt, but it costs no life.
+  Act _softShock() {
+    shocks++;
+    mistakes++;
+    return const Act(false, 'ZAP! You touched a live wire. In Learn mode you are not hurt, but in real life this can kill. Switch the breaker OFF and test the wires first.', danger: true, fx: 'shock');
   }
 
   Act _shock() {
@@ -414,11 +454,19 @@ class RoomProject {
     syncPower();
     final lesson = electricalLesson(d.kind);
     final h = lesson.hookups.firstWhere((x) => x.id == hookupId);
-    final r = tryFasten(lesson, d.w, chip, h);
-    if (r == null) return Act(true, '${h.name}: wire fastened.');
+    final r = tryFasten(lesson, d.w, chip, h, allowWrong: true);
+    if (r == null) {
+      // A wrong wire can be fastened, like for real. The trouble comes when the power goes on.
+      if (!practice && !h.accepts.contains(chip)) {
+        mistakes++;
+        return Act(true, '${h.name}: fastened. Careful: ${lesson.wrongHint(chip, h)} It will burn or trip the breaker when the power comes on.', danger: true);
+      }
+      return Act(true, '${h.name}: wire fastened.');
+    }
     if (r.startsWith('SHOCK')) return _shock();
+    if (r.startsWith('STOP')) return _softShock();
     mistakes++;
-    return Act(false, r, danger: r.startsWith('STOP'));
+    return Act(false, r);
   }
 
   Act unfasten(int slot, String chipKey) {
@@ -427,7 +475,7 @@ class RoomProject {
     syncPower();
     if (d.w.power && d.w.stage == 0) {
       if (practice) return _shock();
-      return _mistake('STOP! The power is still on. Turn the breaker OFF before you touch any wire.');
+      return _softShock();
     }
     d.w.attached.removeWhere((_, v) => v == chipKey);
     return const Act(true, 'Wire taken off.');
@@ -440,7 +488,7 @@ class RoomProject {
     if (!wiringComplete(lesson, d.w)) return _mistake('Every wire must be fastened first.');
     if (power) {
       if (practice) return _shock();
-      return _mistake('Turn the breaker OFF before you push the device into the box.');
+      return _softShock();
     }
     d.w.stage = 1;
     return const Act(true, 'The wires are folded back and the device is in the box. Now put the cover on.');
@@ -451,7 +499,7 @@ class RoomProject {
     if (d == null) return const Act(false, '');
     if (power) {
       if (practice) return _shock();
-      return _mistake('Turn the breaker OFF before you pull the device out.');
+      return _softShock();
     }
     d.w.stage = 0;
     d.w.testing = false;

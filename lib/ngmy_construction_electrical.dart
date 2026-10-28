@@ -235,13 +235,13 @@ bool wiringComplete(ElectricalLesson lesson, WiringState s) {
 
 /// Tries to fasten [chip] on [h]. Returns null when it worked, or a plain-words reason when it did not.
 /// In practice mode a wrong wire is allowed, and touching live wires returns a message that starts with SHOCK.
-String? tryFasten(ElectricalLesson lesson, WiringState s, String chip, Hookup h) {
+String? tryFasten(ElectricalLesson lesson, WiringState s, String chip, Hookup h, {bool allowWrong = false}) {
   if (s.power && s.stage == 0) {
     if (s.practice) return 'SHOCK! The breaker was still ON and you touched a live wire. Always turn the power OFF and test the wires first.';
     return 'STOP! The breaker is still ON, so these wires are live (120 volts). Turn the breaker OFF first. This can shock you badly.';
   }
   if (s.stage != 0) return 'The device is already in the box. Pull it out again to change the wires.';
-  if (!s.practice && !h.accepts.contains(chip)) return lesson.wrongHint(chip, h);
+  if (!s.practice && !allowWrong && !h.accepts.contains(chip)) return lesson.wrongHint(chip, h);
   if (s.attached[h.id] != null) return 'That place already has a wire. Tap the wire to take it off first.';
   if (s.attached.values.contains(chip)) return 'That wire is already fastened. Tap it to take it off if you want to move it.';
   s.attached[h.id] = chip;
@@ -479,7 +479,9 @@ Scene3D buildBench(ElectricalLesson lesson, WiringState s, {bool withWall = true
         _ => ('LOAD (taped)', const Color(0xFFB45309)),
       };
       final t = ceilingKind ? switch (h.role) { 'hot' => 'BLACK NUT · HOT', 'neutral' => 'WHITE NUT · NEUTRAL', _ => 'GROUND' } : text;
-      final off = ceilingKind ? const V3(0, -1.6, 0.8) : V3(p.x > 0.4 ? 1.9 : (p.x < -0.4 ? -2.1 : 0), p.x.abs() < 0.4 ? -1.5 : 0.1, 0.4);
+      final off = ceilingKind
+          ? switch (h.role) { 'hot' => const V3(-4.6, -2.0, 1.2), 'neutral' => const V3(0, -3.4, 1.2), _ => const V3(4.6, -2.0, 1.2) }
+          : V3(p.x > 0.4 ? 3.8 : (p.x < -0.4 ? -4.2 : 0), p.x.abs() < 0.4 ? -3.0 : -0.4, 1.0);
       labels.add(Label3D(p + off, t, col));
     }
   }

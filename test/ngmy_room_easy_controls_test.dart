@@ -55,6 +55,8 @@ void main() {
       await _frames(t, 2);
     }
     expect(find.text('Push it into the box'), findsOneWidget);
+    // Wires that are on are gone from the list, and so are the screws that are taken.
+    expect(find.textContaining('➜ '), findsNothing);
     await t.pump(const Duration(seconds: 12));
   });
 }

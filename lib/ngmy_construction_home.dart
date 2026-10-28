@@ -75,6 +75,29 @@ const List<FloorStyle> kFloorStyles = [
 
 const List<Color> kCeilColors = [Color(0xFFF4F1EA), Color(0xFFEAF2F7), Color(0xFFF6E8E8), Color(0xFFF3EBC8)];
 
+/// Something that can be plugged into a wall outlet in the house.
+class HomeAppliance {
+  const HomeAppliance(this.key, this.name, this.emoji, {this.tvWidth = 0});
+  final String key, name, emoji;
+
+  /// For a TV: how wide the screen is, in the house's inches.
+  final double tvWidth;
+  bool get isTv => tvWidth > 0;
+}
+
+const List<HomeAppliance> kHomeAppliances = [
+  HomeAppliance('bangtv', 'Beovision TV 77"', '📺', tvWidth: 66),
+  HomeAppliance('sonytv', 'Sony Bravia 75"', '📺', tvWidth: 64),
+  HomeAppliance('lgtv', 'LG OLED 65"', '📺', tvWidth: 56),
+  HomeAppliance('tv', 'Samsung Neo QLED 55"', '📺', tvWidth: 48),
+  HomeAppliance('appletv', 'Apple TV 4K 50"', '📺', tvWidth: 44),
+  HomeAppliance('lamp', 'Table lamp', '💡'),
+  HomeAppliance('toaster', 'Toaster', '🍞'),
+  HomeAppliance('hairdryer', 'Hair dryer', '💇'),
+];
+
+HomeAppliance applianceByKey(String k) => kHomeAppliances.firstWhere((a) => a.key == k, orElse: () => kHomeAppliances[3]);
+
 /// A door in a wall: which wall, how far along it, and which room it leads to.
 class HDoor {
   const HDoor(this.wall, this.offset, this.to);
@@ -107,13 +130,20 @@ class HRoom {
   RoomProject? wiring;
   PlumbJob? plumb;
 
-  double get w => switch (kind) { 'bathroom' => 110, 'kitchen' => 140, 'living' => 180, 'hall' => 240, _ => 130 };
-  double get d => switch (kind) { 'bathroom' => 100, 'kitchen' => 110, 'living' => 120, 'hall' => 64, _ => 112 };
+  /// What is plugged into the two wall outlets (0 and 1), whether the ceiling light or fan is on, and which one hangs there.
+  final Map<int, String> plugged = {};
+  bool lightOn = false;
+  String ceilingFix = 'light';
+
+  double get w => switch (kind) { 'bathroom' => 110, 'kitchen' => 140, 'living' => 180, 'hall' => 240, 'outside' => 300, _ => 130 };
+  double get d => switch (kind) { 'bathroom' => 100, 'kitchen' => 110, 'living' => 120, 'hall' => 64, 'outside' => 200, _ => 112 };
+  bool get indoor => kind != 'outside';
   static const double h = 96;
 
   bool get hasPlumbing => kind == 'bathroom' || kind == 'kitchen';
-  bool get wired => !wiringNeeded || (wiring?.devicesDone ?? false);
-  bool get plumbed => !hasPlumbing || !plumbNeeded || (plumb?.done ?? false);
+  // Once a job has been opened it decides: pull a device out of a finished room and the room is no longer wired.
+  bool get wired => !indoor || (wiring?.devicesDone ?? !wiringNeeded);
+  bool get plumbed => !hasPlumbing || (plumb?.done ?? !plumbNeeded);
   bool get finished => wired && plumbed;
 
   Furn? furnById(int id) {
@@ -177,11 +207,14 @@ class HomeProject {
       HRoom(7, _bedNames[4], 'bedroom', 2, 3, 2, 2, [toHall(-30)]),
       HRoom(8, 'Bathroom 3', 'bathroom', 4, 3, 1, 2, [toHall(-30)]),
       HRoom(9, 'Kitchen', 'kitchen', 5, 3, 2, 2, [HDoor('back', -50, 5), const HDoor('right', 40, 10)]),
-      HRoom(10, 'Living room', 'living', 7, 3, 2, 2, [HDoor('back', -70, 5), const HDoor('left', 40, 9)]),
+      HRoom(10, 'Living room', 'living', 7, 3, 2, 2, [HDoor('back', -70, 5), const HDoor('left', 40, 9), const HDoor('back', 56, 11)]),
+      HRoom(11, 'Garden', 'outside', 0, 5, 9, 1, [const HDoor('back', 0, 10)]),
     ];
     rooms = list;
     // What is wrong in this house: a different mix every time.
     for (final room in rooms) {
+      if (!room.indoor) continue;
+      room.ceilingFix = room.kind == 'bedroom' ? 'fan' : 'light';
       room.wiringNeeded = r.nextDouble() < 0.6;
       room.plumbNeeded = room.hasPlumbing && r.nextDouble() < 0.7;
       room.wallColor.fillRange(0, 3, r.nextInt(kWallColors.length));
@@ -235,10 +268,11 @@ class HomeProject {
 
   HRoom get room => rooms[current];
 
-  int get wiredCount => rooms.where((e) => e.wired).length;
+  List<HRoom> get indoor => [for (final e in rooms) if (e.indoor) e];
+  int get wiredCount => indoor.where((e) => e.wired).length;
   int get plumbedCount => rooms.where((e) => e.hasPlumbing && e.plumbed).length;
   int get plumbTotal => rooms.where((e) => e.hasPlumbing).length;
-  int get finishedCount => rooms.where((e) => e.finished).length;
+  int get finishedCount => indoor.where((e) => e.finished).length;
 }
 
 /// Which wiring job a room gets: bedrooms a fan, the kitchen and bathrooms water-safe GFCI outlets.

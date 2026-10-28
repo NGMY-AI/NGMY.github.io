@@ -10,6 +10,7 @@ import 'ngmy_construction_learn.dart';
 import 'ngmy_construction_plumbjob.dart';
 import 'ngmy_construction_plumbpage.dart';
 import 'ngmy_construction_project.dart';
+import 'ngmy_electronics_tv.dart';
 import 'ngmy_construction_projectpage.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -18,8 +19,11 @@ import 'ngmy_construction_projectpage.dart';
 // ═════════════════════════════════════════════════════════════════════════════
 
 class NgmyHousePage extends StatefulWidget {
-  const NgmyHousePage({super.key, this.seed, this.practice = false, this.fresh = false});
+  const NgmyHousePage({super.key, this.seed, this.practice = false, this.fresh = false, this.focus = ''});
   final int? seed;
+
+  /// Start in a room that needs this: wiring, plumbing or anything (fix).
+  final String focus;
   final bool practice;
 
   /// Start a new house even if one is already open.
@@ -40,8 +44,10 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   String? msg;
   bool good = true;
   Timer? _t;
+  final Stopwatch clock = Stopwatch()..start();
 
   HRoom get room => home.room;
+  int get problems => home.indoor.where((e) => !e.finished).length;
 
   @override
   void initState() {
@@ -52,11 +58,18 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     home = HomeProject.session!;
     home.practice = widget.practice || home.practice;
     cam = Cam3(yaw: -0.12, pitch: 0.5, dist: 200, target: const V3(0, 30, 60))
-      ..maxDist = 420
+      ..maxDist = 520
       ..yawCenter = 0
       ..yawRange = 0.9;
-    scene = buildHomeRoom(room);
+    if (widget.focus.isNotEmpty) {
+      final want = home.indoor.where((e) => switch (widget.focus) { 'wiring' => !e.wired, 'plumbing' => !e.plumbed, _ => !e.finished });
+      if (want.isNotEmpty) home.current = want.first.id;
+    }
+    scene = buildHomeRoom(room, problems: problems);
     _frame(snap: true);
+    if (widget.focus.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _say(switch (widget.focus) { 'wiring' => 'This room needs wiring: press the Wiring button, or tap the outlet or the light.', 'plumbing' => 'This room needs plumbing: press the Plumbing button, or tap the toilet or the sink.', _ => 'Walk through the house and fix what the signs say is wrong.' }));
+    }
   }
 
   @override
@@ -79,7 +92,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   }
 
   void _rebuild() {
-    scene = buildHomeRoom(room, mode: mode, selected: selFurn);
+    scene = buildHomeRoom(room, mode: mode, selected: selFurn, problems: problems);
   }
 
   void _say(String t, {bool ok = true}) {
@@ -143,21 +156,60 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       return;
     }
     if (id >= idHDoor && id < idHDoor + 20) {
-      if (mode != 'doors') return;
       final i = id - idHDoor;
+      if (i >= room.doors.length) return;
+      if (mode == 'doors') {
+        setState(() {
+          if (!room.openDoors.remove(i)) room.openDoors.add(i);
+          _rebuild();
+        });
+        conBeep(room.openDoors.contains(i) ? 700 : 450, ms: 70);
+        return;
+      }
+      // Tap a door to open it and walk through, like in a game.
+      final to = room.doors[i].to;
       setState(() {
-        if (!room.openDoors.remove(i)) room.openDoors.add(i);
+        room.openDoors.add(i);
         _rebuild();
       });
-      conBeep(room.openDoors.contains(i) ? 700 : 450, ms: 70);
+      conBeep(700, ms: 70);
+      Future.delayed(const Duration(milliseconds: 450), () {
+        if (!mounted) return;
+        setState(() => room.openDoors.remove(i));
+        _go(to);
+      });
       return;
     }
-    if (id == idHOutletA || id == idHOutletB || id == idHSwitch || id == idHLight) {
+    if (id == idHOutletA || id == idHOutletB) {
       if (!room.wired) {
         _openWiring();
       } else {
-        final i = scene.info[id];
-        if (i != null) _say('${i.name}: ${i.about}');
+        _plugSheet(id == idHOutletA ? 0 : 1);
+      }
+      return;
+    }
+    if (id == idHSwitch || id == idHLight) {
+      if (!room.wired) {
+        _openWiring();
+      } else {
+        setState(() {
+          room.lightOn = !room.lightOn;
+          _rebuild();
+        });
+        final fan = room.ceilingFix == 'fan';
+        _say(room.lightOn ? (fan ? 'The fan spins.' : 'The light is on.') : (fan ? 'The fan stops.' : 'The light is off.'));
+        conBeep(room.lightOn ? 900 : 500, ms: 60);
+      }
+      return;
+    }
+    if (id == idHApp || id == idHApp + 1) {
+      final key = room.plugged[id - idHApp];
+      if (key == null) return;
+      final a = applianceByKey(key);
+      if (a.isTv) {
+        showNgmyTvScreen(context, kind: a.key, title: a.name, stayFor: const Duration(hours: 1), showBoot: true);
+      } else {
+        _plugSheet(id - idHApp);
       }
       return;
     }
@@ -171,16 +223,66 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     }
   }
 
+  /// Choose what to plug into an outlet, or unplug it.
+  Future<void> _plugSheet(int outlet) {
+    return showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF17171C),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Plug in', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 10),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              for (final a in kHomeAppliances)
+                GestureDetector(
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    setState(() {
+                      room.plugged[outlet] = a.key;
+                      _rebuild();
+                    });
+                    _say(a.isTv ? '${a.name} is on and playing NGMY ads. Tap it to watch full screen.' : '${a.name} is plugged in and running.');
+                    conBeep(820, ms: 70);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12), border: Border.all(color: room.plugged[outlet] == a.key ? kConAmber : Colors.white24)),
+                    child: Text('${a.emoji} ${a.name}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12.5)),
+                  ),
+                ),
+              if (room.plugged[outlet] != null)
+                GestureDetector(
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    setState(() {
+                      room.plugged.remove(outlet);
+                      _rebuild();
+                    });
+                    _say('Unplugged.');
+                  },
+                  child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), decoration: BoxDecoration(color: const Color(0xFF7F1D1D), borderRadius: BorderRadius.circular(12)), child: const Text('⏏ Unplug', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12.5))),
+                ),
+            ]),
+          ]),
+        ),
+      ),
+    );
+  }
+
   // ── Jobs ──
 
   Future<void> _openWiring() async {
     final r = room;
-    if (r.wired && !r.wiringNeeded) {
-      _say('The wiring in this room is already finished. Everything works.');
-      return;
+    if (!r.indoor) return;
+    // A finished room opens finished: you can pull a device out, change it, or wire it again.
+    if (r.wiring == null) {
+      final np = RoomProject(seed: home.seed * 37 + r.id, kind: wiringKindFor(r), name: r.name)..fastForward();
+      if (!r.wiringNeeded) np.completeWiring();
+      r.wiring = np;
     }
-    r.wiringNeeded = true;
-    r.wiring ??= RoomProject(seed: home.seed * 37 + r.id, kind: wiringKindFor(r), name: r.name)..fastForward();
     r.wiring!.practice = home.practice;
     await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => NgmyRoomProjectPage(project: r.wiring)));
     if (!mounted) return;
@@ -194,12 +296,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       _say('This room has no plumbing. Bathrooms and the kitchen do.', ok: false);
       return;
     }
-    if (r.plumbed && !r.plumbNeeded) {
-      _say('The plumbing in this room is already finished. Nothing leaks.');
-      return;
-    }
-    r.plumbNeeded = true;
     r.plumb ??= PlumbJob(seed: home.seed * 41 + r.id, variantId: r.kind == 'kitchen' ? 'kitchen' : 'bathroom');
+    if (!r.plumbNeeded && !r.plumb!.allPlaced) r.plumb!.completeAll();
     r.plumb!.practice = home.practice;
     await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => NgmyPlumbJobPage(job: r.plumb)));
     if (!mounted) return;
@@ -373,7 +471,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     return LessonScaffold(
       title: r.name,
       color: kConAmber,
-      stepText: '${home.finishedCount}/${home.rooms.length} done',
+      stepText: '${home.finishedCount}/${home.indoor.length} done',
       onSteps: () => _problems(context),
       stage: Stage3D(
         scene: scene,
@@ -385,6 +483,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         good: good,
         messageTop: 104,
         layerOn: (l) => l <= 5,
+        dynamicPolys: (_) => homeDynamic(room, clock.elapsedMilliseconds / 1000),
         topLeft: [
           _MiniMap(home: home, onTap: _go),
         ],
@@ -420,9 +519,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
           child: ListView(shrinkWrap: true, padding: const EdgeInsets.all(16), children: [
             const Text('What the house needs', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
             const SizedBox(height: 4),
-            Text('Wiring ${home.wiredCount}/${home.rooms.length} · Plumbing ${home.plumbedCount}/${home.plumbTotal}', style: const TextStyle(color: kConAmber, fontWeight: FontWeight.w800, fontSize: 12.5)),
+            Text('Wiring ${home.wiredCount}/${home.indoor.length} · Plumbing ${home.plumbedCount}/${home.plumbTotal}', style: const TextStyle(color: kConAmber, fontWeight: FontWeight.w800, fontSize: 12.5)),
             const SizedBox(height: 10),
-            for (final e in home.rooms)
+            for (final e in home.indoor)
               GestureDetector(
                 onTap: () {
                   Navigator.pop(ctx);
