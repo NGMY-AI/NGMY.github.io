@@ -1,6 +1,7 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
-$__dart_deferred_initializers__.current=function(a,b,c,$){var A,B
+$__dart_deferred_initializers__.current=function(a,b,c,$){var A,B,C
 A=c[0]
-B=c[181]
-var z=a.updateTypes([]);(function constants(){B.aOE=new A.x("Download QR",null,null,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["FD0ZievHuCrQgnoMKeOQkT3UWF0="]=a.current})($__dart_deferred_initializers__);
+B=c[2]
+C=c[85]
+var z=a.updateTypes([]);(function constants(){C.Bh=new A.ae(B.fJ,18,null,null,null,null)})()};
+(a=>{a["/vZUvPwRXIrNR1Cc5nRSx332pL4="]=a.current})($__dart_deferred_initializers__);
