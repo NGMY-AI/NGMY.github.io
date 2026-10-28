@@ -23,5 +23,5 @@ var z=a.updateTypes([]);(function inheritance(){var y=a.inherit
 y(C.mJ,B.aC)})();(function constants(){D.KP=new B.w(1,0.0196078431372549,0.027450980392156862,0.047058823529411764,A.t)
 D.X9=new B.md(null,null,null,null,null,A.bF,null)
 D.alc=new B.a0(983930,"MaterialIcons",!1)
-D.aOe=new B.G(!0,A.c,null,null,null,null,10.5,A.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["dYOC3gWZIj+dCH0BbMSBLUfsVoI="]=a.current})($__dart_deferred_initializers__);
+D.aOf=new B.G(!0,A.c,null,null,null,null,10.5,A.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)})()};
+(a=>{a["KrHKG3uQM8znS8de3J5kQEP2HP8="]=a.current})($__dart_deferred_initializers__);
