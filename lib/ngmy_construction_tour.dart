@@ -14,13 +14,16 @@ import 'ngmy_construction_home.dart';
 
 /// Where the person is, and what they are doing, at one moment of the tour.
 class PersonPose {
-  const PersonPose({required this.room, required this.x, required this.z, required this.yaw, this.walking = false, this.holding = false, this.remote = false, this.pointing = false, this.note = '', this.event = '', this.openDoor = -1, this.doorU = 0, this.enterDoor = -1, this.phase = 0});
+  const PersonPose({required this.room, required this.x, required this.z, required this.yaw, this.walking = false, this.holding = false, this.remote = false, this.pointing = false, this.note = '', this.event = '', this.openDoor = -1, this.doorU = 0, this.enterDoor = -1, this.phase = 0, this.phone = false});
   final int room;
   final double x, z;
 
   /// The way the person faces (0 is towards the camera, pi is towards the back wall).
   final double yaw;
   final bool walking, holding, remote, pointing;
+
+  /// On the phone: the right hand is held up in front of the face.
+  final bool phone;
   final String note;
 
   /// Something to do once for this moment of the tour, for example switching the ad on the TV ("ad:10").
@@ -39,13 +42,31 @@ class PersonPose {
 
 /// The colours of a person: skin, hair, shirt and trousers. The tour person and every resident are built the same way.
 class PersonStyle {
-  const PersonStyle({this.skin = const Color(0xFFE0A47C), this.hair = const Color(0xFF2A1A10), this.shirt = const Color(0xFF2F6FB5), this.pants = const Color(0xFF2E3440)});
+  const PersonStyle({this.skin = const Color(0xFFE0A47C), this.hair = const Color(0xFF2A1A10), this.shirt = const Color(0xFF2F6FB5), this.pants = const Color(0xFF2E3440), this.avatar = 'human'});
   final Color skin, hair, shirt, pants;
+
+  /// Which character it is: human, xbot (a white robot), michelle (the dancer) or soldier.
+  final String avatar;
 }
+
+/// The characters of the city: the X Bot, the Dancer, the Soldier and an ordinary person.
+const Map<String, PersonStyle> kAvatars = {
+  'xbot': PersonStyle(avatar: 'xbot', skin: Color(0xFFE9EBEF), hair: Color(0xFF2B2F36), shirt: Color(0xFFE9EBEF), pants: Color(0xFFDADDE3)),
+  'michelle': PersonStyle(avatar: 'michelle', skin: Color(0xFF7A4B30), hair: Color(0xFF140C08), shirt: Color(0xFF1F2937), pants: Color(0xFF111827)),
+  'soldier': PersonStyle(avatar: 'soldier', skin: Color(0xFFD9A57C), hair: Color(0xFF3B2A1A), shirt: Color(0xFF5B6B3A), pants: Color(0xFF8A7B55)),
+  'human': PersonStyle(),
+};
+
+const Map<String, String> kAvatarNames = {'xbot': '🤖 X Bot', 'michelle': '💃 Dancer', 'soldier': '🪖 Soldier', 'human': '🙂 Person'};
+
+/// The character that does the house tour and that you steer outside. The X Bot to begin with; the tour sheet changes it.
+String ngmyPlayerAvatar = 'xbot';
+
+PersonStyle get playerStyle => kAvatars[ngmyPlayerAvatar] ?? const PersonStyle();
 
 /// A resident standing in a room of the house: where, which way, what they look like and the words over their head.
 class ResidentFigure {
-  const ResidentFigure({required this.id, required this.room, required this.x, required this.z, required this.yaw, required this.style, required this.label, this.alert = false});
+  const ResidentFigure({required this.id, required this.room, required this.x, required this.z, required this.yaw, required this.style, required this.label, this.alert = false, this.calling = false, this.wander = 0});
   final int id, room;
   final double x, z, yaw;
   final PersonStyle style;
@@ -53,6 +74,12 @@ class ResidentFigure {
 
   /// Something is wrong with them (hungry, sick...), so the label is drawn in red.
   final bool alert;
+
+  /// They are on the phone, calling for help.
+  final bool calling;
+
+  /// How far they stroll round their spot (0 to stand still), for the people who are out in the garden.
+  final double wander;
 }
 
 typedef Pt = (double, double);

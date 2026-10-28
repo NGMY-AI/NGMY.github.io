@@ -603,6 +603,19 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
               const Text('House tour 🎬', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
               const SizedBox(height: 4),
               const Text('A little person walks through the whole house: the living room, the kitchen (a drink from the fridge), the hall, the bedrooms and the bathrooms. Every TV is switched on first. Choose how long it takes.', style: TextStyle(color: Colors.white60, fontSize: 12.5, height: 1.4)),
+              const SizedBox(height: 10),
+              const Text('Who walks the house?', style: TextStyle(color: Colors.white70, fontSize: 12.5, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 6),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                for (final e in kAvatarNames.entries)
+                  GestureDetector(
+                    onTap: () {
+                      set(() => ngmyPlayerAvatar = e.key);
+                      setState(() {});
+                    },
+                    child: Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), decoration: BoxDecoration(color: ngmyPlayerAvatar == e.key ? const Color(0xFF38BDF8).withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(12), border: Border.all(color: ngmyPlayerAvatar == e.key ? const Color(0xFF38BDF8) : Colors.white24, width: ngmyPlayerAvatar == e.key ? 2 : 1)), child: Text(e.value, style: TextStyle(color: ngmyPlayerAvatar == e.key ? const Color(0xFF38BDF8) : Colors.white, fontWeight: FontWeight.w900, fontSize: 13))),
+                  ),
+              ]),
               const SizedBox(height: 12),
               Wrap(spacing: 8, runSpacing: 8, children: [
                 for (final s in kTourLengths)
@@ -1239,7 +1252,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         good: good,
         messageTop: (showMap && !isLesson) ? 104 : 10,
         layerOn: (l) => l <= 5,
-        dynamicPolys: (_) => homeDynamic(room, now, person: _pose(), residents: _figs, mode: mode),
+        dynamicPolys: (_) => homeDynamic(room, now, person: _pose(), personStyle: playerStyle, residents: _figs, mode: mode),
         bottom: _pad(),
         topLeft: [
           if (showMap && !isLesson) _MiniMap(home: home, onTap: _go, maxWidth: math.min(138.0, screenW * 0.36)),

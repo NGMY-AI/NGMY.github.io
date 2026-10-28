@@ -29,11 +29,11 @@ class ResidentInfo {
 }
 
 const List<ResidentInfo> kResidents = [
-  ResidentInfo(0, 'Ama', 0, 2, PersonStyle(skin: Color(0xFF8A5A3C), hair: Color(0xFF1B1210), shirt: Color(0xFFD9467E), pants: Color(0xFF3B3F5C)), 'A nurse who works nights.'),
-  ResidentInfo(1, 'Joseph', 1, 2, PersonStyle(skin: Color(0xFF6B4530), hair: Color(0xFF161010), shirt: Color(0xFF2E8F5B), pants: Color(0xFF2E3440)), 'A student who is always hungry.'),
+  ResidentInfo(0, 'Ama', 0, 2, PersonStyle(avatar: 'michelle', skin: Color(0xFF8A5A3C), hair: Color(0xFF1B1210), shirt: Color(0xFFD9467E), pants: Color(0xFF3B3F5C)), 'A nurse who works nights.'),
+  ResidentInfo(1, 'Joseph', 1, 2, PersonStyle(avatar: 'soldier', skin: Color(0xFF6B4530), hair: Color(0xFF161010), shirt: Color(0xFF2E8F5B), pants: Color(0xFF2E3440)), 'A student who is always hungry.'),
   ResidentInfo(2, 'Grace', 3, 4, PersonStyle(skin: Color(0xFFA06B47), hair: Color(0xFF2A1A10), shirt: Color(0xFFF59E0B), pants: Color(0xFF4A3F6B)), 'A teacher who marks papers late.'),
-  ResidentInfo(3, 'Daniel', 6, 8, PersonStyle(skin: Color(0xFFE0A47C), hair: Color(0xFF5B3A1E), shirt: Color(0xFF2F6FB5), pants: Color(0xFF2E3440)), 'A driver who sleeps in the day.'),
-  ResidentInfo(4, 'Fatima', 7, 8, PersonStyle(skin: Color(0xFFC98B5E), hair: Color(0xFF1B1210), shirt: Color(0xFF7C3AED), pants: Color(0xFF2B2D3A)), 'A baker who gets up at four.'),
+  ResidentInfo(3, 'Daniel', 6, 8, PersonStyle(avatar: 'soldier', skin: Color(0xFFE0A47C), hair: Color(0xFF5B3A1E), shirt: Color(0xFF2F6FB5), pants: Color(0xFF2E3440)), 'A driver who sleeps in the day.'),
+  ResidentInfo(4, 'Fatima', 7, 8, PersonStyle(avatar: 'michelle', skin: Color(0xFFC98B5E), hair: Color(0xFF1B1210), shirt: Color(0xFF7C3AED), pants: Color(0xFF2B2D3A)), 'A baker who gets up at four.'),
   ResidentInfo(5, 'Papa Moses', 10, -1, PersonStyle(skin: Color(0xFF7A4B30), hair: Color(0xFFD1D5DB), shirt: Color(0xFFB45309), pants: Color(0xFF3F3A33)), 'The oldest in the house. He watches TV all day.'),
   ResidentInfo(6, 'Mama Rose', 9, -1, PersonStyle(skin: Color(0xFF8C5B3B), hair: Color(0xFF8A8F98), shirt: Color(0xFFEF4444), pants: Color(0xFF3B3F5C)), 'Cooks for everybody in the kitchen.'),
 ];
@@ -332,13 +332,28 @@ class Community {
 
   // ── Where the people stand in the house ──
 
+  /// Who is out in the garden just now: some of the residents stroll out for a while, then go back in.
+  bool isOut(Resident p) => (p.id == 1 || p.id == 4 || p.id == 3) && p.inBed < 0 && !calls.any((c) => c.resident == p.id) && ((clock / 40).floor() + p.id) % 3 == 0;
+
   /// The residents who are standing in room [roomId], with a free spot each.
   List<ResidentFigure> figuresIn(HomeProject home, int roomId) {
     final out = <ResidentFigure>[];
     final room = home.rooms[roomId];
-    if (!room.indoor) return out;
+    ResidentFigure fig(Resident p, double x, double z, {double wander = 0}) {
+      final calling = calls.any((c) => c.resident == p.id);
+      return ResidentFigure(id: p.id, room: roomId, x: x, z: z, yaw: 0, style: p.info.style, label: '${calling ? '📞 ' : ''}${p.name} ${p.badge}', alert: p.mood != 'fine' || calling, calling: calling, wander: wander);
+    }
+
+    if (!room.indoor) {
+      var k = 0;
+      for (final p in living.where(isOut)) {
+        out.add(fig(p, -110.0 + k * 90, 215.0 + (k.isOdd ? 40 : 0), wander: 24));
+        k++;
+      }
+      return out;
+    }
     final nav = RoomNav(room);
-    for (final p in living.where((p) => p.info.room == roomId && p.inBed < 0)) {
+    for (final p in living.where((p) => p.info.room == roomId && p.inBed < 0 && !isOut(p))) {
       final want = switch (room.kind) {
         'bedroom' => (-room.w * 0.18, room.d * 0.6),
         'kitchen' => (-room.w * 0.15, 56.0),
@@ -346,7 +361,7 @@ class Community {
       };
       final path = nav.route(want, want);
       final spot = path.last;
-      out.add(ResidentFigure(id: p.id, room: roomId, x: spot.$1, z: spot.$2, yaw: 0, style: p.info.style, label: '${p.name} ${p.badge}', alert: p.mood != 'fine'));
+      out.add(fig(p, spot.$1, spot.$2));
     }
     return out;
   }

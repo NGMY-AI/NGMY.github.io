@@ -525,11 +525,11 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected) {
 }
 
 /// Things that move: the fan blades and the pictures on the TVs.
-List<Poly> homeDynamic(HRoom r, double t, {PersonPose? person, List<ResidentFigure> residents = const [], String mode = 'look'}) {
+List<Poly> homeDynamic(HRoom r, double t, {PersonPose? person, PersonStyle? personStyle, List<ResidentFigure> residents = const [], String mode = 'look'}) {
   final b = MeshBuilder();
   b.grouped = true;
   if (r.kind == 'outside') {
-    if (person != null && person.room == r.id) _person(b, person, t);
+    if (person != null && person.room == r.id) _person(b, person, t, style: personStyle ?? playerStyle);
     for (final f in r.furn.where((f) => kAnimalKinds.contains(f.kind))) {
       // Each animal wanders round a small circle, its legs swinging, facing the way it goes.
       final a = t * (0.25 + (f.id % 5) * 0.04) + f.id * 1.7;
@@ -542,13 +542,18 @@ List<Poly> homeDynamic(HRoom r, double t, {PersonPose? person, List<ResidentFigu
       _animal(ab, f.kind, kFurnColors[f.color], math.sin(t * 6 + f.id) * 0.5);
       b.polys.addAll(transformPolys(ab.polys, ry: yaw, t: V3(px, 0, pz)));
     }
+    for (final f in residents.where((f) => f.room == r.id)) {
+      final sway = math.sin(t * 0.5 + f.id) * f.wander;
+      _person(b, PersonPose(room: r.id, x: f.x + sway, z: f.z, yaw: math.cos(t * 0.5 + f.id) >= 0 ? math.pi / 2 : -math.pi / 2, walking: true), t, style: f.style, id: idHResident + f.id);
+    }
     return b.polys;
   }
   if (!r.indoor) return b.polys;
-  if (person != null && person.room == r.id) _person(b, person, t);
+  if (person != null && person.room == r.id) _person(b, person, t, style: personStyle ?? playerStyle);
   // The people who live here, standing in their rooms. Tapping one opens their card.
   for (final f in residents.where((f) => f.room == r.id)) {
-    _person(b, PersonPose(room: r.id, x: f.x, z: f.z, yaw: f.yaw), t, style: f.style, id: idHResident + f.id);
+    final sway = f.wander > 0 ? math.sin(t * 0.5 + f.id) * f.wander : 0.0;
+    _person(b, PersonPose(room: r.id, x: f.x + sway, z: f.z, yaw: f.wander > 0 ? (math.cos(t * 0.5 + f.id) >= 0 ? math.pi / 2 : -math.pi / 2) : (f.calling ? 0.5 : f.yaw), walking: f.wander > 0, phone: f.calling), t, style: f.style, id: idHResident + f.id);
   }
   final d = r.d;
   const h = HRoom.h;
@@ -795,7 +800,10 @@ void _person(MeshBuilder b, PersonPose p, double t, {PersonStyle style = const P
   // Each part is one sorted piece, and the person is in the same tier as the furniture: depth decides what hides what.
   pb.grouped = true;
   final skin = style.skin, skinShade = Color.lerp(style.skin, Colors.black, 0.16)!, hair = style.hair, shirt = style.shirt, pants = style.pants;
-  const shoe = Color(0xFF1B1B1D);
+  final avatar = style.avatar;
+  final robot = avatar == 'xbot', dancer = avatar == 'michelle', soldier = avatar == 'soldier';
+  const dark = Color(0xFF2B2F36);
+  final shoe = robot ? dark : (soldier ? const Color(0xFF2B2418) : const Color(0xFF1B1B1D));
   final stride = p.walking ? math.sin(p.phase * math.pi) : 0.0;
 
   // The legs first: their angles decide how high the hips are.
@@ -816,7 +824,7 @@ void _person(MeshBuilder b, PersonPose p, double t, {PersonStyle style = const P
   // A limb piece from [a] to [c], thicker at [a], with a round joint at [c].
   void cap(V3 a, V3 c, double ra, double rc, Color col) {
     pb.cyl(a, c, ra, col, r1: rc, sides: 10, caps: false);
-    pb.ball(c, rc * 1.04, col, lat: 4, lon: 8);
+    pb.ball(c, rc * 1.04, robot ? dark : col, lat: 4, lon: 8);
   }
 
   for (var i = 0; i < 2; i++) {
@@ -834,28 +842,60 @@ void _person(MeshBuilder b, PersonPose p, double t, {PersonStyle style = const P
   }
   // The body: hips, a waist and chest like an oval, shoulders, neck.
   part((m) => m.ball(V3.zero, 5.2, pants, lat: 4, lon: 10), const V3(1.12, 0.78, 0.76), V3(0, hy + 1.2, 0));
-  part((m) => m.cyl(const V3(0, 0, 0), const V3(0, 17, 0), 4.9, shirt, r1: 6.5, sides: 12, caps: false), const V3(1.0, 1.0, 0.62), V3(0, hy + 2.5, 0));
+  part((m) => m.cyl(const V3(0, 0, 0), const V3(0, 17, 0), 4.9, shirt, r1: 6.5, sides: 12, caps: false), V3(dancer ? 0.86 : 1.0, 1.0, 0.62), V3(0, hy + 2.5, 0));
+  if (robot) {
+    pb.box(V3(0, hy + 13, 4.1), const V3(5.5, 4.5, 0.6), dark, shine: 0.4);
+    pb.box(V3(0, hy + 8, 3.5), const V3(1.4, 7, 0.5), dark);
+  }
+  if (soldier) {
+    // A vest over the shirt and a pack on the back.
+    const vest = Color(0xFF3F4A26);
+    part((m) => m.cyl(const V3(0, 0, 0), const V3(0, 11, 0), 5.6, vest, r1: 6.8, sides: 12, caps: false), const V3(1.02, 1.0, 0.7), V3(0, hy + 8, 0));
+    pb.box(V3(0, hy + 14, -5.6), const V3(10, 13, 4.2), const Color(0xFF4B5A2E));
+    pb.box(V3(0, hy + 10, 4.6), const V3(8, 3.5, 1.0), const Color(0xFF2B2F1A));
+  }
   part((m) => m.cyl(const V3(0, 0, 0), const V3(0, 1.4, 0), 5.1, const Color(0xFF3A3A3F), sides: 12, caps: false), const V3(1.0, 1.0, 0.64), V3(0, hy + 2.4, 0));
-  part((m) => m.ball(V3.zero, 6.7, shirt, lat: 4, lon: 10), const V3(1.12, 0.5, 0.62), V3(0, hy + 19.6, 0));
+  part((m) => m.ball(V3.zero, 6.7, shirt, lat: 4, lon: 10), V3(dancer ? 0.98 : 1.12, 0.5, 0.62), V3(0, hy + 19.6, 0));
   pb.cyl(V3(0, hy + 20.5, 0.2), V3(0, hy + 24.2, 0.5), 2.0, skin, sides: 8);
   // The head: an egg with a chin, hair, ears, eyes, brows, nose and mouth.
   final head = V3(0, hy + 29, 0.6);
   part((m) => m.ball(V3.zero, 4.7, skin, lat: 6, lon: 12), const V3(0.9, 1.08, 0.98), head);
   part((m) => m.ball(V3.zero, 3.0, skin, lat: 4, lon: 8), const V3(1.0, 0.8, 0.95), head + const V3(0, -3.4, 1.0));
-  part((m) => m.ball(V3.zero, 5.0, hair, lat: 5, lon: 10), const V3(0.93, 0.92, 1.0), head + const V3(0, 1.5, -0.9));
-  part((m) => m.ball(V3.zero, 3.6, hair, lat: 3, lon: 8), const V3(1.1, 0.5, 0.7), head + const V3(0, 3.7, 2.6));
-  for (final s in const [-1.0, 1.0]) {
-    pb.ball(head + V3(s * 4.2, -0.2, 0), 1.0, skin, lat: 3, lon: 6);
-    part((m) => m.ball(V3.zero, 1.0, Colors.white, lat: 3, lon: 6), const V3(1.1, 0.8, 0.6), head + V3(s * 1.8, 0.4, 4.15));
-    pb.ball(head + V3(s * 1.8, 0.4, 4.5), 0.5, const Color(0xFF15171C), lat: 3, lon: 6);
-    pb.box(head + V3(s * 1.8, 1.9, 4.2), const V3(2.1, 0.4, 0.5), hair);
+  if (robot) {
+    // A smooth white head with a dark glass face, two glowing eyes and a little aerial.
+    part((m) => m.ball(V3.zero, 4.1, dark, shine: 0.6, lat: 5, lon: 10), const V3(0.95, 0.72, 0.55), head + const V3(0, 0.4, 3.2));
+    for (final s in const [-1.0, 1.0]) {
+      pb.ball(head + V3(s * 1.7, 0.6, 5.3), 0.6, const Color(0xFF38BDF8), lat: 3, lon: 6);
+    }
+    pb.cyl(head + const V3(0, 4.5, 0), head + const V3(0, 8, 0), 0.35, dark, sides: 5);
+    pb.ball(head + const V3(0, 8.4, 0), 0.9, const Color(0xFF38BDF8), lat: 3, lon: 6);
+  } else {
+    part((m) => m.ball(V3.zero, 5.0, hair, lat: 5, lon: 10), const V3(0.93, 0.92, 1.0), head + const V3(0, 1.5, -0.9));
+    part((m) => m.ball(V3.zero, 3.6, hair, lat: 3, lon: 8), const V3(1.1, 0.5, 0.7), head + const V3(0, 3.7, 2.6));
+    for (final s in const [-1.0, 1.0]) {
+      pb.ball(head + V3(s * 4.2, -0.2, 0), 1.0, skin, lat: 3, lon: 6);
+      part((m) => m.ball(V3.zero, 1.0, Colors.white, lat: 3, lon: 6), const V3(1.1, 0.8, 0.6), head + V3(s * 1.8, 0.4, 4.15));
+      pb.ball(head + V3(s * 1.8, 0.4, 4.5), 0.5, const Color(0xFF15171C), lat: 3, lon: 6);
+      pb.box(head + V3(s * 1.8, 1.9, 4.2), const V3(2.1, 0.4, 0.5), hair);
+    }
+    part((m) => m.ball(V3.zero, 1.0, skinShade, lat: 3, lon: 6), const V3(0.8, 1.1, 1.2), head + const V3(0, -1.2, 4.7));
+    pb.box(head + const V3(0, -3.3, 4.0), const V3(2.6, 0.45, 0.5), dancer ? const Color(0xFFB91C4A) : const Color(0xFF8A3B3B));
   }
-  part((m) => m.ball(V3.zero, 1.0, skinShade, lat: 3, lon: 6), const V3(0.8, 1.1, 1.2), head + const V3(0, -1.2, 4.7));
-  pb.box(head + const V3(0, -3.3, 4.0), const V3(2.6, 0.45, 0.5), const Color(0xFF8A3B3B));
+  if (dancer) {
+    // Long hair down the back and a bun on top.
+    pb.cyl(head + const V3(0, 2, -3.4), V3(0, hy + 13, -4.4), 3.7, hair, r1: 2.0, sides: 8, caps: false);
+    pb.ball(V3(0, hy + 13, -4.4), 2.1, hair, lat: 3, lon: 7);
+    pb.ball(head + const V3(0, 6.4, -1.4), 2.4, hair, lat: 3, lon: 7);
+  }
+  if (soldier) {
+    // A helmet with a brim.
+    part((m) => m.ball(V3.zero, 5.4, const Color(0xFF4B5A2E), shine: 0.2, lat: 5, lon: 10), const V3(1.0, 0.8, 1.1), head + const V3(0, 3.0, 0.2));
+    pb.box(head + const V3(0, 1.6, 4.7), const V3(9, 0.7, 3.2), const Color(0xFF3B4723));
+  }
 
   // Arms: they swing against the legs; with the cup or the remote the right arm comes up.
   for (final s in const [-1.0, 1.0]) {
-    final sh = V3(s * 7.0, hy + 19.3, 0);
+    final sh = V3(s * (dancer ? 6.2 : 7.0), hy + 19.3, 0);
     var a1 = -stride * s * 0.5;
     var elbow = p.walking ? -0.45 : -0.12;
     if (s > 0 && p.holding) {
@@ -870,6 +910,10 @@ void _person(MeshBuilder b, PersonPose p, double t, {PersonStyle style = const P
       a1 = -1.55;
       elbow = -0.1;
     }
+    if (s > 0 && p.phone) {
+      a1 = -1.45;
+      elbow = -1.65;
+    }
     final elbowAt = sh + V3(0, -11.5 * math.cos(a1), -11.5 * math.sin(a1));
     final a2 = a1 + elbow;
     final wrist = elbowAt + V3(0, -10.5 * math.cos(a2), -10.5 * math.sin(a2));
@@ -878,6 +922,10 @@ void _person(MeshBuilder b, PersonPose p, double t, {PersonStyle style = const P
     part((m) => m.ball(V3.zero, 1.9, skin, lat: 4, lon: 8), const V3(0.85, 1.15, 0.9), wrist + const V3(0, -1.3, 0.2));
     if (s > 0 && p.holding) {
       pb.cyl(wrist + const V3(0, -2.6, 0), wrist + const V3(0, 2.6, 0), 1.7, const Color(0xFF38BDF8), shine: 0.5, sides: 8);
+    }
+    if (s > 0 && p.phone) {
+      pb.box(wrist + const V3(0, 1.5, 0.8), const V3(2.8, 5.2, 0.9), const Color(0xFF15171C), shine: 0.3);
+      pb.box(wrist + const V3(0, 1.5, 1.3), const V3(2.2, 4.4, 0.2), const Color(0xFF38BDF8), shine: 0.6);
     }
     if (s > 0 && p.remote) {
       pb.box(wrist + const V3(0, -0.4, 2.6), const V3(2.2, 1.1, 6.4), const Color(0xFF15171C), shine: 0.3);
