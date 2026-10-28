@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'ngmy_electrical_diagram_page.dart';
 import 'ngmy_electrical_fx.dart';
 import 'ngmy_electrical_safety.dart';
 import 'ngmy_electrical_ui.dart';
@@ -154,6 +155,7 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
             _grid([
               _tile('🔌', 'Wire a room', 'Go to a room that needs wiring', const Color(0xFF22C55E), () => _push(NgmyHousePage(practice: practice, focus: 'wiring'))),
               _tile('🚽', 'Plumb a room', 'Go to a bathroom or kitchen', const Color(0xFF38BDF8), () => _push(NgmyHousePage(practice: practice, focus: 'plumbing'))),
+              _tile('🧠', 'Diagram lessons', 'Three-way switch, fan with light', const Color(0xFFA78BFA), () => _push(const NgmyElectricalDiagramPage())),
               _tile('🔧', 'Fix a house', 'Walk the house and fix every sign', const Color(0xFFF59E0B), () => _push(NgmyHousePage(practice: practice, focus: 'fix'))),
               _tile('🧱', 'Build a room', 'Frame, drywall, then wire', const Color(0xFF4ADE80), () => _push(NgmyRoomProjectPage(practice: practice))),
               _tile('⚡', 'Wiring bench', 'Just the wiring, one room', const Color(0xFFFACC15), () => _push(NgmyRoomProjectPage(quick: true, practice: practice))),
