@@ -12,7 +12,7 @@ s=new A.S(Date.now(),0,!1)
 r=J.nW(y.i.a(C.R.aH(0,k,null)),y.b)
 p=r
 o=A.h5(p).k("a2<bX.E>")
-n=A.B(new A.a2(p,new B.fmn(s),o),o.k("J.E"))
+n=A.B(new A.a2(p,new B.fmx(s),o),o.k("J.E"))
 q=n
 x=8
 return A.b(l.ar("String","saved_invoices_v1",C.R.ao(q,null)),$async$aNs)
@@ -44,10 +44,10 @@ if(!y.i.b(t)){s=A.a([],y.k)
 v=s
 x=1
 break}s=J.d8(t,y.B)
-s=A.cD(s,new B.fpQ(),s.$ti.k("J.E"),y.y)
+s=A.cD(s,new B.fq0(),s.$ti.k("J.E"),y.y)
 r=A.a4(s).k("a2<J.E>")
-s=A.B(new A.a2(s,new B.fpR(),r),r.k("J.E"))
-C.d.b_(s,new B.fpS())
+s=A.B(new A.a2(s,new B.fq1(),r),r.k("J.E"))
+C.d.b_(s,new B.fq2())
 v=s
 x=1
 break}catch(n){s=A.a([],y.k)
@@ -78,22 +78,22 @@ var $async$aNx=A.e(function(e,f){if(e===1)return A.f(f,w)
 for(;;)switch(x){case 0:x=2
 return A.b(B.Kf(),$async$aNx)
 case 2:v=f
-J.nj(v,new B.fn0(d))
+J.nj(v,new B.fna(d))
 x=3
 return A.b(B.aOS(v),$async$aNx)
 case 3:return A.h(null,w)}})
 return A.i($async$aNx,w)},
-fmn:function fmn(d){this.a=d},
-fpQ:function fpQ(){},
-fpR:function fpR(){},
-fpS:function fpS(){},
-fn0:function fn0(d){this.a=d}}
+fmx:function fmx(d){this.a=d},
+fq0:function fq0(){},
+fq1:function fq1(){},
+fq2:function fq2(){},
+fna:function fna(d){this.a=d}}
 J=c[1]
 A=c[0]
 C=c[2]
 B=a.updateHolder(c[25],B)
 var z=a.updateTypes([])
-B.fmn.prototype={
+B.fmx.prototype={
 $1(d){var x,w,v
 if(!y.B.b(d))return!1
 v=J.q(d,"paidAt")
@@ -103,25 +103,25 @@ w=A.bi(x)
 if(w==null)return!0
 return this.a.cY(w.bP(432e9))},
 $S:48}
-B.fpQ.prototype={
+B.fq0.prototype={
 $1(d){return A.a1(d,y.w,y.b)},
 $S:26}
-B.fpR.prototype={
+B.fq1.prototype={
 $1(d){var x=J.q(d,"id")
 return J.k(x==null?"":x).length!==0},
 $S:4}
-B.fpS.prototype={
+B.fq2.prototype={
 $2(d,e){var x,w,v="createdAt",u=J.q(d,v),t=A.bi(J.k(u==null?"":u)),s=t==null?new A.S(A.fQ(0,0,!1),0,!1):t
 u=J.q(e,v)
 w=A.bi(J.k(u==null?"":u))
 x=w==null?new A.S(A.fQ(0,0,!1),0,!1):w
-return J.CC(x,s)},
+return J.CD(x,s)},
 $S:44}
-B.fn0.prototype={
+B.fna.prototype={
 $1(d){var x=J.q(d,"id")
 return J.k(x==null?"":x)===this.a},
 $S:4};(function inheritance(){var x=a.inheritMany,w=a.inherit
-x(A.hT,[B.fmn,B.fpQ,B.fpR,B.fn0])
-w(B.fpS,A.ke)})()
+x(A.hT,[B.fmx,B.fq0,B.fq1,B.fna])
+w(B.fq2,A.ke)})()
 var y={k:A.ax("P<a3<n,@>>"),E:A.ax("ai<a3<n,@>>"),i:A.ax("ai<@>"),y:A.ax("a3<n,@>"),B:A.ax("a3<@,@>"),w:A.ax("n"),b:A.ax("@"),v:A.ax("~")}};
-(a=>{a["3AP9+KuxYHrjE+CycO4nys138v8="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["Ype9+hjGOaGYJCb/pjmaXkWEUXg="]=a.current})($__dart_deferred_initializers__);
