@@ -11,41 +11,61 @@ import 'ngmy_city_ads.dart';
 // ═════════════════════════════════════════════════════════════════════════════
 
 class CityVehicle {
-  const CityVehicle(this.kind, this.alongX, this.fixed, this.lo, this.hi, this.speed, this.phase, this.ad);
+  const CityVehicle(this.kind, this.x0, this.z0, this.x1, this.z1, this.speed, this.phase, this.ad);
 
   /// bus or police.
   final String kind;
 
-  /// Driving along x (on a street that runs left to right) or along z.
-  final bool alongX;
+  /// The loop it drives round: a rectangle of road with rounded corners (it goes round the roundabouts and never turns back).
+  final double x0, z0, x1, z1;
 
-  /// The street: the z (or x) it stays on, and the stretch it drives, in both directions, and how fast.
-  final double fixed, lo, hi, speed, phase;
-
-  /// Which ad its billboard plays.
+  /// How fast, where on the loop it starts, and which ad its billboard plays.
+  final double speed, phase;
   final int ad;
 }
 
+/// The corners of a loop are quarter turns of this radius, round the roundabouts.
+const double kLoopTurn = 30;
+
+/// Four vehicles, two on each loop of road (the loops share the middle road, each driving on its own side of it).
 const List<CityVehicle> kTraffic = [
-  CityVehicle('bus', true, 374, -540, 540, 36, 0, 1),
-  CityVehicle('bus', true, 774, -540, 540, 30, 420, 3),
-  CityVehicle('police', true, 346, -540, 540, 48, 700, 5),
-  CityVehicle('police', true, 746, -540, 540, 42, 200, 6),
-  CityVehicle('bus', false, 14, 175, 735, 28, 100, 2),
-  CityVehicle('police', false, -14, 175, 735, 34, 50, 4),
+  CityVehicle('bus', -591, 429, -9, 851, 36, 0, 1),
+  CityVehicle('police', -591, 429, -9, 851, 44, 1000, 5),
+  CityVehicle('bus', 9, 429, 591, 851, 32, 0, 3),
+  CityVehicle('police', 9, 429, 591, 851, 40, 1000, 6),
 ];
+
 
 /// The two helicopters: where they circle, how high, and their ads.
 const List<(double, double, double, int)> kHelis = [(0, 560, 240, 7), (0, 560, 300, 9)];
 
-/// Where a vehicle is at time [t] and which way it faces (the x and z of its direction).
+/// Where a vehicle is at time [t] and which way it faces (the x and z of its direction). It drives round its loop one way.
 (double, double, double, double) vehiclePose(CityVehicle v, double t) {
-  final len = v.hi - v.lo;
-  final s = (t * v.speed + v.phase) % (2 * len);
-  final fwd = s < len;
-  final p = v.lo + (fwd ? s : 2 * len - s);
-  final dir = fwd ? 1.0 : -1.0;
-  return v.alongX ? (p, v.fixed, dir, 0) : (v.fixed, p, 0, dir);
+  const r = kLoopTurn;
+  final sx = v.x1 - v.x0 - 2 * r, sz = v.z1 - v.z0 - 2 * r;
+  const arc = math.pi * r / 2;
+  final per = 2 * sx + 2 * sz + 4 * arc;
+  var s = (t * v.speed + v.phase) % per;
+  (double, double, double, double) turn(double cx, double cz, double a0, double d) {
+    final a = a0 + d / r;
+    return (cx + r * math.cos(a), cz + r * math.sin(a), -math.sin(a), math.cos(a));
+  }
+
+  if (s < sx) return (v.x0 + r + s, v.z0, 1, 0);
+  s -= sx;
+  if (s < arc) return turn(v.x1 - r, v.z0 + r, -math.pi / 2, s);
+  s -= arc;
+  if (s < sz) return (v.x1, v.z0 + r + s, 0, 1);
+  s -= sz;
+  if (s < arc) return turn(v.x1 - r, v.z1 - r, 0, s);
+  s -= arc;
+  if (s < sx) return (v.x1 - r - s, v.z1, -1, 0);
+  s -= sx;
+  if (s < arc) return turn(v.x0 + r, v.z1 - r, math.pi / 2, s);
+  s -= arc;
+  if (s < sz) return (v.x0, v.z1 - r - s, 0, -1);
+  s -= sz;
+  return turn(v.x0 + r, v.z0 + r, math.pi, s);
 }
 
 double _heading(double ux, double uz) => math.atan2(ux, uz) - math.pi / 2;

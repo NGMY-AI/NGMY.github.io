@@ -17,6 +17,9 @@ const int idStudBase = 1000, idSlotBase = 2000, idDevBase = 3000, idBenchBase = 
 const int idEdgeBase = 6000, idSheetBase = 6100, idSeamBase = 6200, idScrewBase = 7000, idBetweenBase = 7500;
 const int idPanelObj = 8000, idRoomObj = 8001, idPlateObj = 8002, idCableObj = 8003, idAppBase = 8100;
 
+/// The plug and cord of what is plugged in (+ the outlet number): the thing you tap to pull the plug. The TV itself is not a button.
+const int idPlugBase = 8200;
+
 double screwRowY(int row) => -40.0 + row * 16;
 
 int benchId(int slot, int local) => idBenchBase + slot * 100 + local;
@@ -346,10 +349,12 @@ Scene3D buildRoomScene(RoomProject p, RoomView v) {
   b.grouped = true;
   for (final e in p.plugged.entries) {
     final s = slotById(e.key);
-    b.id = idAppBase + e.key;
     final x = s.pos.x;
-    b.tube(roundedPath([V3(x, s.pos.y, 2.5), V3(x, -46, 3.5), V3(x, -46, 22)], 4), 0.28, const Color(0xFF1B1B1D), shine: 0.2, sides: 6, joints: false);
-    b.box(V3(x, s.pos.y, 1.6), const V3(2.8, 3.4, 2.4), const Color(0xFF222326), shine: 0.3);
+    // The cord and the plug are what you pull; the appliance is only the appliance.
+    b.id = idPlugBase + e.key;
+    b.tube(roundedPath([V3(x, s.pos.y, 2.5), V3(x, -46, 3.5), V3(x, -46, 22)], 4), 0.55, const Color(0xFF1B1B1D), shine: 0.2, sides: 6, joints: false);
+    b.box(V3(x, s.pos.y, 1.8), const V3(4.6, 5.4, 3.2), const Color(0xFF3A3C42), shine: 0.3);
+    b.id = idAppBase + e.key;
     switch (e.value) {
       case 'tv':
         b.box(V3(x, -45, 24), const V3(54, 5, 18), const Color(0xFF3B2F26), shine: 0.2);
@@ -370,7 +375,7 @@ Scene3D buildRoomScene(RoomProject p, RoomView v) {
         b.cyl(V3(x - 6, -38, 24), V3(x + 8, -38, 24), 3.4, const Color(0xFFE2455A), shine: 0.6, sides: 12, r1: 3);
         b.box(V3(x - 8, -43, 24), const V3(4, 10, 3.5), const Color(0xFFE2455A), shine: 0.6, yaw: 0.0);
     }
-    info[idAppBase + e.key] = ObjInfo(_appNameFull(e.value), e.value == 'tv' ? 'Plugged into ${s.name}. Tap it to watch NGMY ads full screen. Use the Unplug tool to unplug it.' : 'Plugged into ${s.name}. Tap it to unplug.', V3(x, -35, 20), 60);
+    info[idAppBase + e.key] = ObjInfo(_appNameFull(e.value), e.value == 'tv' ? 'Plugged into ${s.name}. To unplug it, go behind it (the Behind the TV button) and tap the plug on the wall.' : 'Plugged into ${s.name}. Tap it to unplug.', V3(x, -35, 20), 60);
   }
 
   b.grouped = false;

@@ -772,7 +772,7 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
   }
   b.box(const V3(0, 250, -118), const V3(250, 92, 6), const Color(0xFF111827), shine: 0.3);
   b.endGroup();
-  logos.add(ScreenQuad(const [V3(125, 292, -114.5), V3(-125, 292, -114.5), V3(-125, 208, -114.5), V3(125, 208, -114.5)], 0, (c, size, t) => paintNgmyPoster(c, size, t, 0), width: 1000, height: 336, bias: 4, order: 2, twoSided: true, group: gBoard));
+  logos.add(ScreenQuad(const [V3(-125, 292, -114.5), V3(125, 292, -114.5), V3(125, 208, -114.5), V3(-125, 208, -114.5)], 0, (c, size, t) => paintNgmyPoster(c, size, t, 0), width: 1000, height: 336, bias: 4, order: 2, twoSided: true, group: gBoard));
   return Scene3D(b.polys, info: info, labels: labels, screens: [...logos, ...adScreens]);
 }
 
@@ -1356,6 +1356,13 @@ void _furniture(MeshBuilder b, String kind, Color c) {
       }
     case 'road' || 'roadturn' || 'roadtee' || 'roadcross':
       _roadPiece(b, kind);
+    case 'roundabout':
+      // A round road with a grass island in the middle; cars turn round it.
+      b.cyl(const V3(0, 0, 0), const V3(0, 0.9, 0), 38, const Color(0xFF3F4450), sides: 12);
+      b.cyl(const V3(0, 1.1, 0), const V3(0, 2.4, 0), 12, const Color(0xFF6B7280), sides: 8);
+      b.cyl(const V3(0, 2.4, 0), const V3(0, 2.8, 0), 10.5, const Color(0xFF4F9D5B), sides: 8);
+      b.ball(const V3(0, 8, 0), 5, const Color(0xFF3F8F4D), lat: 3, lon: 6);
+      b.cyl(const V3(0, 2.8, 0), const V3(0, 6, 0), 0.8, const Color(0xFF6B4A32), sides: 5);
     case 'house2' || 'shop' || 'hospital' || 'firestation' || 'school':
       // Every building is half as big again as it was drawn, so there is room for the people to walk round it.
       final m0 = MeshBuilder()

@@ -242,9 +242,10 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       // Walk there: the person goes to the spot you tapped, round whatever is in the way.
       walker!.goTo(spot.x.clamp(-r.w / 2 + 12, r.w / 2 - 12), spot.z.clamp(-290.0, r.d - 12));
     } else if (!r.indoor) {
-      cam.glideTo(target: V3(spot.x, 30, spot.z), dist: math.max(60, cam.dist * 0.55));
+      cam.glideTo(target: V3(spot.x, 30, spot.z), dist: math.max(70, cam.dist * 0.4), pitch: 0.32);
     } else {
-      cam.glideTo(target: V3(spot.x.clamp(-r.w / 2, r.w / 2), 36, spot.z.clamp(0.0, r.d)), dist: math.max(40, cam.dist * 0.6));
+      // Like a map: you are taken to the spot you tapped, close to it and low, so you can look round the room from there.
+      cam.glideTo(target: V3(spot.x.clamp(-r.w / 2 + 8, r.w / 2 - 8), 40, spot.z.clamp(8.0, r.d - 8)), dist: math.max(36, cam.dist * 0.35), pitch: 0.2);
     }
     conBeep(560, ms: 50);
   }

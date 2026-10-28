@@ -237,10 +237,21 @@ void main() {
     final label = sc.labels.firstWhere((l) => l.text.contains('rooms still need work'));
     expect(label.at.y, greaterThan(200));
     // Vehicles drive by themselves: a moment later they are somewhere else, and they keep to their street.
+    expect(kTraffic.length, lessThanOrEqualTo(4), reason: 'not too many cars');
     for (final v in kTraffic) {
       final a = vehiclePose(v, 1.0), b = vehiclePose(v, 11.0);
       expect((a.$1 - b.$1).abs() + (a.$2 - b.$2).abs(), greaterThan(50), reason: v.kind);
-      expect(v.alongX ? a.$2 : a.$1, v.fixed);
+      // It drives round its loop and never turns back: it keeps going the same way round, and stays on the loop.
+      var turned = 0.0;
+      var last = vehiclePose(v, 0);
+      for (var t = 1.0; t < 200; t += 1) {
+        final p = vehiclePose(v, t);
+        expect(p.$1, inInclusiveRange(v.x0 - 1, v.x1 + 1));
+        expect(p.$2, inInclusiveRange(v.z0 - 1, v.z1 + 1));
+        turned += last.$3 * p.$4 - last.$4 * p.$3;
+        last = p;
+      }
+      expect(turned, greaterThan(0), reason: 'always turns the same way round');
     }
     expect(kTraffic.where((v) => v.kind == 'bus'), isNotEmpty);
     expect(kTraffic.where((v) => v.kind == 'police'), isNotEmpty);

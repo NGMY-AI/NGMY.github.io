@@ -10,7 +10,6 @@ import 'ngmy_construction_electrical.dart';
 import 'ngmy_construction_lab.dart';
 import 'ngmy_construction_project.dart';
 import 'ngmy_construction_roomscene.dart';
-import 'ngmy_electronics_tv.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
 // THE ROOM PROJECT PAGE. Pick up a tool or an item, then tap the place in the 3D room where it goes.
@@ -181,6 +180,17 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
     cam.glideTo(target: const V3(0, -4, 28), dist: 205, yaw: behind ? math.pi : -0.12, pitch: 0.4);
   }
 
+  /// Double tap: go to that place, like on a map. The view moves to where you tapped on the wall (or the floor) and comes close, so you can look at it from there.
+  void _doubleTap(Offset local, Size size) {
+    if (active >= 0) return;
+    var at = cam.wallPoint(local, size);
+    if (at == null || at.x.abs() > 78 || at.y.abs() > 52) at = cam.floorPoint(local, size, y: -47);
+    if (at == null) return;
+    final x = at.x.clamp(-70.0, 70.0), y = at.y.clamp(-46.0, 48.0), z = at.z.clamp(-6.0, 100.0);
+    cam.glideTo(target: V3(x, y, z), dist: math.max(34, cam.dist * 0.45));
+    conBeep(560, ms: 50);
+  }
+
   void _front() {
     behind = false;
     cam
@@ -332,10 +342,16 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
       _apply(p.toggleBreaker());
       return;
     }
+    if (id >= idPlugBase && id < idPlugBase + 7) {
+      // Tapping the plug on the wall pulls it out.
+      _apply(p.unplug(id - idPlugBase));
+      return;
+    }
     if (id >= idAppBase && id < idAppBase + 7) {
+      // The TV or lamp itself is not a button: it only tells you how to unplug it.
       final slot = id - idAppBase;
-      // Tapping what is plugged in pulls the plug (a TV does not open full screen: it only plays when the outlet has power).
-      _apply(p.unplug(slot));
+      final name = switch (p.plugged[slot]) { 'tv' => 'The TV', 'lamp' => 'The lamp', 'toaster' => 'The toaster', _ => 'The hair dryer' };
+      _say('$name is plugged in. To pull the plug, go behind it (the Behind the TV button) and tap the plug on the wall.', ok: true);
       return;
     }
     // The room itself (floor, walls, studs, sofa) does nothing, unless the Look tool is in your hand.
@@ -646,6 +662,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
           cam: cam,
           highlight: hl,
           onPick: _pick,
+          onDoubleTap: _doubleTap,
           onHome: () {
             if (active >= 0) {
               _leave();
@@ -819,11 +836,15 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
                 const SizedBox(width: 8),
                 conBigButton('Cover on', Icons.crop_square_rounded, () => _apply(p.coverOn(active))),
               ],
-              if (d.w.stage >= 2) conBigButton(d.w.burnt ? 'Take out the burnt one' : 'Pull it out again', Icons.eject_rounded, () {
-                    final a = p.removeDevice(active);
-                    _apply(a);
-                    if (a.ok) _leave();
-                  }, color: d.w.burnt ? const Color(0xFFF87171) : Colors.white70),
+              if (d.w.stage >= 2 && d.w.burnt)
+                conBigButton('Take out the burnt one', Icons.eject_rounded, () {
+                  final a = p.removeDevice(active);
+                  _apply(a);
+                  if (a.ok) _leave();
+                }, color: const Color(0xFFF87171))
+              else if (d.w.stage >= 2)
+                // It comes out of the wall but stays: only a burnt one is thrown away.
+                conBigButton('Pull it out of the wall', Icons.eject_rounded, () => _apply(p.pullOut(active)), color: Colors.white70),
             ]),
           ],
         ]),

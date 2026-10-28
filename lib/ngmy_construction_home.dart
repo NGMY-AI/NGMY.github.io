@@ -58,6 +58,7 @@ const Map<String, FurnKind> kFurnKinds = {
   'bench': FurnKind('Bench', '🪑', 44, 16),
   'car': FurnKind('Car', '🚗', 84, 40),
   'road': FurnKind('Road', '🛣️', 40, 40),
+  'roundabout': FurnKind('Roundabout', '🔄', 80, 80),
   'roadturn': FurnKind('Road corner', '↪️', 40, 40),
   'roadtee': FurnKind('Road T-junction', '⊤', 40, 40),
   'roadcross': FurnKind('Crossroads', '✚', 40, 40),
@@ -85,7 +86,7 @@ const Map<String, FurnKind> kFurnKinds = {
 };
 
 /// What can be put in the garden, and what goes inside the rooms.
-const List<String> kOutdoorFurn = ['road', 'roadturn', 'roadtee', 'roadcross', 'house2', 'bighouse', 'billboard', 'shop', 'hospital', 'firestation', 'school', 'car', 'firetruck', 'ambulance', 'dog', 'cat', 'cow', 'sheep', 'chicken', 'horse', 'tree', 'pine', 'bush', 'flowers', 'fence', 'lamppost', 'bench', 'pond', 'swing', 'shed', 'doghouse'];
+const List<String> kOutdoorFurn = ['road', 'roundabout', 'roadturn', 'roadtee', 'roadcross', 'house2', 'bighouse', 'billboard', 'shop', 'hospital', 'firestation', 'school', 'car', 'firetruck', 'ambulance', 'dog', 'cat', 'cow', 'sheep', 'chicken', 'horse', 'tree', 'pine', 'bush', 'flowers', 'fence', 'lamppost', 'bench', 'pond', 'swing', 'shed', 'doghouse'];
 
 /// Road pieces snap to a grid of this size, so neighbours always line up.
 const double kRoadGrid = 40;
@@ -94,7 +95,7 @@ const List<String> kBuildingKinds = ['house2', 'shop', 'hospital', 'firestation'
 const List<String> kAnimalKinds = ['dog', 'cat', 'cow', 'sheep', 'chicken', 'horse'];
 
 /// Flat things lie on the ground (you walk over them and cars drive over them): they are drawn before everything that stands on them.
-const List<String> kFlatKinds = ['rug', 'road', 'roadturn', 'roadtee', 'roadcross', 'pond', 'flowers'];
+const List<String> kFlatKinds = ['rug', 'road', 'roundabout', 'roadturn', 'roadtee', 'roadcross', 'pond', 'flowers'];
 
 const List<Color> kFurnColors = [Color(0xFF8B5E3C), Color(0xFF5E6E84), Color(0xFF9A4F4F), Color(0xFF4F7A5E), Color(0xFFD9C9A8), Color(0xFF3F3F46)];
 const List<String> kFurnColorNames = ['Walnut', 'Blue grey', 'Brick red', 'Sage green', 'Sand', 'Charcoal'];
@@ -486,6 +487,16 @@ class HomeProject {
           if ((z - z1).abs() < 1 || (z - z2).abs() < 1) continue;
           r.add('road', x: 0, z: z).rot = 1;
         }
+        // Two more roads join the streets, so the cars have loops to drive round; every junction is a roundabout.
+        for (final rx in const [-600.0, 600.0]) {
+          for (var z = z1 + kRoadGrid; z < z2 - 1; z += kRoadGrid) {
+            r.add('road', x: rx, z: z).rot = 1;
+          }
+        }
+        for (final rx in const [-600.0, 0.0, 600.0]) {
+          r.add('roundabout', x: rx, z: z1);
+          r.add('roundabout', x: rx, z: z2);
+        }
         bool clear(double x, double z, [double rx = 135, double rz = 115]) => !r.furn.any((f) => !kFlatKinds.contains(f.kind) && !kAnimalKinds.contains(f.kind) && (f.x - x).abs() < rx && (f.z - z).abs() < rz);
         // The town centre, on the first street.
         r.add('shop', x: -250, z: 225);
@@ -500,11 +511,16 @@ class HomeProject {
         for (final (x, z) in const [(-700.0, 225.0), (-120.0, 160.0), (120.0, 160.0), (720.0, 225.0)]) {
           if (clear(x, z)) r.add('house2', x: x, z: z);
         }
-        for (final (z, step, big) in const [(600.0, 250.0, true), (730.0, 250.0, false), (1030.0, 250.0, true), (1210.0, 330.0, true)]) {
+        for (final (z, step, big) in const [(600.0, 250.0, true), (730.0, 250.0, false), (1030.0, 250.0, true), (1210.0, 330.0, true), (1340.0, 250.0, false)]) {
           for (var x = -750.0; x <= 750; x += step) {
             if (x.abs() < 100) continue;
+            // Between the two streets the loop roads at x = 600 run through, so the houses keep well back from them.
+            if (z < 900 && x.abs() > 400) continue;
             if (clear(x, z)) r.add(big && (x ~/ step) % 2 == 0 ? 'bighouse' : 'house2', x: x, z: z);
           }
+        }
+        for (final (x, z) in const [(-820.0, 640.0), (820.0, 640.0)]) {
+          if (clear(x, z)) r.add('bighouse', x: x, z: z);
         }
         // Electric poles along the streets (the street lights hang on them) and street lamps between them.
         for (var x = -720.0; x <= 720; x += 240) {
@@ -516,11 +532,11 @@ class HomeProject {
           }
         }
         // Vehicles on the streets, trees, flowers and benches, and goods to carry to the market.
-        r.add('car', x: -120, z: z1);
-        r.add('ambulance', x: 120, z: z1).rot = 2;
-        r.add('firetruck', x: -480, z: z1 + 4);
-        r.add('car', x: 260, z: z2).rot = 2;
-        for (final (x, z) in const [(-210.0, 60.0), (210.0, 90.0), (-330.0, 120.0), (330.0, 60.0), (-110.0, 330.0), (110.0, 330.0), (-600.0, 380.0), (600.0, 380.0), (-560.0, 640.0), (560.0, 640.0), (-420.0, 1100.0), (420.0, 1100.0)]) {
+        // Only a few vehicles stand about, off the roads (the buses and police cars drive round by themselves).
+        r.add('car', x: -300, z: z1 + 70).rot = 2;
+        r.add('ambulance', x: 180, z: 300);
+        r.add('firetruck', x: -440, z: 300);
+        for (final (x, z) in const [(-210.0, 60.0), (210.0, 90.0), (-330.0, 120.0), (330.0, 60.0), (-110.0, 330.0), (110.0, 330.0), (-560.0, 640.0), (560.0, 640.0), (-420.0, 1100.0), (420.0, 1100.0)]) {
           r.add((x.abs() > 400 || z > 1000) ? 'pine' : 'tree', x: x, z: z);
         }
         r.add('bush', x: -70, z: 20);

@@ -396,6 +396,27 @@ class Cam3 extends ChangeNotifier {
 
   /// The spot of the plane at height [y] (the floor, by default) that is under the point [p] of a view of size [size], or null
   /// when that point of the screen looks at the sky. This is what makes "double tap where you want to go" possible.
+  /// Where the finger on [p] touches the vertical plane z = [z] (a wall), or null when it points away from it.
+  V3? wallPoint(Offset p, Size size, {double z = 0}) {
+    final f = math.min(size.width, size.height) * 1.15;
+    final dx = (p.dx - size.width / 2) / f, dy = -(p.dy - size.height / 2) / f;
+    final cy = math.cos(yaw), sy = math.sin(yaw), cp = math.cos(pitch), sp = math.sin(pitch);
+    V3 unrot(V3 r) {
+      final t = -r.z;
+      final qy = r.y * cp + t * sp;
+      final z1 = t * cp - r.y * sp;
+      return V3(r.x * cy - z1 * sy, qy, r.x * sy + z1 * cy);
+    }
+
+    V3 at(double t) => target + unrot(V3(dx * t, dy * t, t - dist));
+    final a = at(0), b = at(1);
+    final dzw = b.z - a.z;
+    if (dzw.abs() < 1e-9) return null;
+    final t = (z - a.z) / dzw;
+    if (t <= 0) return null;
+    return at(t);
+  }
+
   V3? floorPoint(Offset p, Size size, {double y = 0}) {
     final f = math.min(size.width, size.height) * 1.15;
     final dx = (p.dx - size.width / 2) / f, dy = -(p.dy - size.height / 2) / f;
