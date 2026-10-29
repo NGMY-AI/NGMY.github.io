@@ -19,6 +19,27 @@ import 'ngmy_construction_world.dart';
 /// The labels inside a house that you can tap to be shown the thing they are about.
 const int idCinPanel = 19500, idCinOutlet = 19501, idCinElevator = 19502;
 
+/// The display above the elevator doors: the level, big, and an arrow for the way it is going.
+void paintCabinDisplay(Canvas c, Size s, double t, int n, bool up) {
+  final r = Offset.zero & s;
+  c.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(18)), Paint()..color = const Color(0xFF020617));
+  c.drawRRect(RRect.fromRectAndRadius(r.deflate(6), const Radius.circular(14)), Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 5
+    ..color = const Color(0xFF22D3EE));
+  final blink = (t * 3).floor().isEven;
+  final arrow = Path();
+  final ax = s.width * 0.2, ay = s.height * 0.5, h = s.height * 0.3;
+  if (up) {
+    arrow..moveTo(ax, ay - h)..lineTo(ax + h, ay + h * 0.7)..lineTo(ax - h, ay + h * 0.7)..close();
+  } else {
+    arrow..moveTo(ax, ay + h)..lineTo(ax + h, ay - h * 0.7)..lineTo(ax - h, ay - h * 0.7)..close();
+  }
+  c.drawPath(arrow, Paint()..color = blink ? const Color(0xFF22D3EE) : const Color(0xFF0E7490));
+  final tp = TextPainter(text: TextSpan(text: n == 1 ? 'L' : '$n', style: TextStyle(color: const Color(0xFFFACC15), fontSize: s.height * 0.78, fontWeight: FontWeight.w900)), textDirection: TextDirection.ltr)..layout();
+  tp.paint(c, Offset(s.width * 0.62 - tp.width / 2, s.height / 2 - tp.height / 2));
+}
+
 class _Zone {
   const _Zone(this.id, this.x, this.z, this.r);
   final int id;
@@ -66,6 +87,13 @@ class CityInterior {
   bool elevatorRequested = false;
   bool onBalcony = false;
   bool get isTower => kind == 'tower';
+  bool get isCabin => kind == 'cabin';
+
+  /// How far the elevator doors are open (0 shut, 1 open), and what the display in the car shows (the level, and which way it is going).
+  double doorOpen = 0;
+  int shownLevel = 1;
+  bool goingUp = true;
+  final List<ScreenQuad> _screens = [];
 
   /// The elevator takes you to [n]; [darkHere] is whether the office on that level has no power.
   void goToLevel(int n, {required bool darkHere}) {
@@ -205,6 +233,10 @@ class CityInterior {
   /// The inside, drawn from scratch each time something changes.
   void build(Community? cm) {
     _cm = cm;
+    if (isCabin) {
+      _buildCabin();
+      return;
+    }
     final b = MeshBuilder();
     final labels = <Label3D>[];
     final (wallCol, floorCol) = switch (kind) {
@@ -395,12 +427,8 @@ class CityInterior {
     b.box(const V3(-47, 48, 3.5), const V3(7, 96, 7), const Color(0xFF475569), shine: 0.5);
     b.box(const V3(47, 48, 3.5), const V3(7, 96, 7), const Color(0xFF475569), shine: 0.5);
     b.box(const V3(0, 93, 3.5), const V3(100, 7, 7), const Color(0xFF475569), shine: 0.5);
-    // The doors and the buttons sit on the frame: they are drawn after it from every side.
+    // The doors slide, so they are drawn live (see dynamicPolys); the display and the buttons sit on the frame.
     b.bias = 6;
-    for (final x in const [-24.0, 24.0]) {
-      b.box(V3(x, 42, 6.6), const V3(42, 84, 1.2), const Color(0xFFF8FAFC), shine: 0.7);
-    }
-    b.box(const V3(0, 42, 7.4), const V3(1.4, 84, 0.6), const Color(0xFF0F172A));
     b.box(const V3(0, 98, 8.0), const V3(34, 6, 0.6), const Color(0xFF22D3EE), shine: 0.4);
     b.box(const V3(0, 98, 6.6), const V3(40, 12, 2), const Color(0xFF111827));
     b.box(const V3(64, 50, 6.6), const V3(10, 26, 2), const Color(0xFF374151));
@@ -445,6 +473,42 @@ class CityInterior {
     labels.add(const Label3D(V3(0, 62, 12), '🛗 Elevator: walk onto the blue mat or tap', Color(0xFF0369A1), id: idCinElevator));
     labels.add(const Label3D(V3(105, 52, 100), '🌆 Balcony: step here to see the city', Color(0xFF15803D)));
     _wiring(b, labels);
+  }
+
+  /// The inside of the elevator car: steel walls, a handrail, a display above the doors that shows the level, and the doors in front
+  /// (they slide, drawn live). The camera looks at the back of the person over their shoulder, so you see the doors and the display.
+  void _buildCabin() {
+    final b = MeshBuilder();
+    const steel = Color(0xFFB8C0CC), dark = Color(0xFF334155);
+    b.order = -1;
+    b.box(const V3(0, -0.6, 38), const V3(74, 1.2, 90), const Color(0xFF475569), shine: 0.3);
+    b.order = 0;
+    b.startGroup();
+    b.box(const V3(-37, 50, 38), const V3(2, 100, 90), steel, shine: 0.4);
+    b.endGroup();
+    b.startGroup();
+    b.box(const V3(37, 50, 38), const V3(2, 100, 90), steel, shine: 0.4);
+    b.endGroup();
+    b.order = 1;
+    b.box(const V3(0, 101, 38), const V3(76, 2, 90), const Color(0xFFE2E8F0));
+    b.order = 2;
+    b.grouped = true;
+    // The handrails and a bright light strip in the ceiling.
+    for (final x in const [-34.0, 34.0]) {
+      b.box(V3(x, 40, 38), const V3(2.4, 2.4, 70), const Color(0xFF94A3B8), shine: 0.7);
+    }
+    b.box(const V3(0, 99, 38), const V3(40, 1.4, 60), const Color(0xFFFFF7D6), shine: 0.2);
+    // The front: two pillars, a header with the display, and a mirror-like panel on each side wall.
+    for (final x in const [-27.0, 27.0]) {
+      b.box(V3(x, 45, 80), const V3(18, 90, 5), dark, shine: 0.3);
+    }
+    b.box(const V3(0, 91, 80), const V3(74, 20, 5), dark, shine: 0.3);
+    b.box(const V3(0, 48, 82), const V3(36, 4, 3), const Color(0xFF64748B));
+    // The display above the doors, seen from inside: top left is on the viewer's left (the viewer looks towards +z, so that is +x).
+    _screens
+      ..clear()
+      ..add(ScreenQuad([const V3(17, 98, 77.2), const V3(-17, 98, 77.2), const V3(-17, 83, 77.2), const V3(17, 83, 77.2)], 0, (c, size, t) => paintCabinDisplay(c, size, t, shownLevel, goingUp), width: 520, height: 230, bias: 6, order: 2));
+    scene = Scene3D(b.polys, screens: List<ScreenQuad>.of(_screens));
   }
 
   void _house(MeshBuilder b, List<Label3D> labels) {
@@ -504,6 +568,24 @@ class CityInterior {
   /// The person you steer, the people who work here, the patients lying in their beds, and the crate you carry.
   List<Poly> dynamicPolys(double t, PersonStyle style) {
     final b = MeshBuilder();
+    if (isTower || isCabin) {
+      // The elevator doors: two panels that slide apart (the lobby) or together (the car).
+      final db = MeshBuilder()
+        ..order = 2
+        ..id = 0;
+      if (isTower) {
+        db.bias = 6;
+        for (final s in const [-1.0, 1.0]) {
+          db.box(V3(s * (24 + 21 * doorOpen), 42, 6.6), const V3(42, 84, 1.2), const Color(0xFFF8FAFC), shine: 0.7);
+        }
+      } else {
+        db.bias = 6;
+        for (final s in const [-1.0, 1.0]) {
+          db.box(V3(s * (9 + 18 * doorOpen), 40, 78.6), const V3(18, 80, 2), const Color(0xFFE2E8F0), shine: 0.7);
+        }
+      }
+      b.polys.addAll(db.polys);
+    }
     switch (kind) {
       case 'shop':
         drawPerson(b, const PersonPose(room: 0, x: 0, z: 18, yaw: 0), t, kAvatars['soldier']!, id: 0, close: false, tint: const Color(0xFF8B5CF6));

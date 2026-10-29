@@ -9,6 +9,8 @@ import 'package:ngmy/ngmy_construction_cityin.dart';
 import 'package:ngmy/ngmy_construction_tour.dart';
 import 'package:ngmy/ngmy_construction_world.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ngmy/ngmy_city_ads.dart';
+import 'package:ngmy/ngmy_city_delivery.dart';
 import 'package:ngmy/ngmy_city_traffic.dart';
 import 'package:ngmy/ngmy_construction_home.dart';
 import 'package:ngmy/ngmy_construction_homepage.dart';
@@ -237,7 +239,7 @@ void main() {
       expect(mine.any((q) => q.corners.every((c) => c.z > f.z)), isTrue, reason: '${f.kind} at (${f.x}, ${f.z}) has a south billboard');
       expect(mine.any((q) => q.corners.every((c) => c.z < f.z)), isTrue, reason: '${f.kind} at (${f.x}, ${f.z}) has a north billboard');
       for (final q in mine) {
-        expect(_facing(q).z.abs(), greaterThan(0), reason: 'a flat picture');
+        expect(_facing(q).x.abs() + _facing(q).z.abs(), greaterThan(0), reason: 'a flat picture');
         expect(q.corners[0].y, greaterThan(q.corners[3].y), reason: 'upright');
       }
     }
@@ -337,6 +339,105 @@ void main() {
 
   test('the game is quick: people walk fast in the big town, and a screen off the edge costs nothing', () {
     expect(WorldWalker.speed, greaterThanOrEqualTo(100));
+  });
+
+  test('the NGMY ad billboards: big boards round the edge of the land and on the big buildings, playing one ad after another', () {
+    final city = HomeProject(seed: 4).rooms[11];
+    final boards = city.furn.where((f) => f.kind == 'adboard').toList();
+    expect(boards.length, greaterThanOrEqualTo(12), reason: 'more billboards at the ends of the city');
+    expect(boards.any((f) => f.z > 1900) && boards.any((f) => f.z < -600) && boards.any((f) => f.x < -1200) && boards.any((f) => f.x > 1200), isTrue, reason: 'on every side');
+    final sc = buildHomeRoom(city);
+    for (final f in boards) {
+      final faces = sc.screens.where((q) => q.width == 1280 && q.corners.every((c) => (c.x - f.x).abs() < 170 && (c.z - f.z).abs() < 170 && c.y > 80 && c.y < 200)).toList();
+      expect(faces.length, greaterThanOrEqualTo(2), reason: 'the board at (${f.x}, ${f.z}) has a picture on both sides');
+    }
+    // The picture changes: at different moments a board shows different ads (it is the next ad every 7 seconds).
+    final seen = <int>{};
+    for (var t = 0.0; t < 100; t += 7) {
+      seen.add((t / 7).floor() % kCityAdCount);
+    }
+    expect(seen.length, greaterThan(8), reason: 'many different ads in a row');
+    for (var t = 0.0; t < 40; t += 7) {
+      final rec = PictureRecorder();
+      paintCityAdLoop(Canvas(rec), const Size(640, 210), t, 3);
+      rec.endRecording();
+    }
+    // The towers have boards on the roof and on every side, all playing ads.
+    final tower = city.furn.firstWhere((f) => f.kind == 'tower');
+    final mine = sc.screens.where((q) => q.corners.every((c) => (c.x - tower.x).abs() < 90 && (c.z - tower.z).abs() < 60 && c.y > 40)).toList();
+    expect(mine.length, greaterThanOrEqualTo(6), reason: 'front, back, two sides and two roof faces');
+    // Walking between the masts of a board is possible: the board does not block the whole width.
+    final w = WorldWalker(city, x: 0, z: 400);
+    final b0 = boards.first;
+    w.x = b0.x;
+    w.z = b0.z + 30;
+    expect(w.blocked(w.x, w.z), isFalse, reason: 'you can walk under the board between its masts');
+  });
+
+  testWidgets('deliveries: the Orders button opens the board with orders and the race, and taking an order shows it on screen', (t) async {
+    t.view.physicalSize = const Size(900, 1600);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    SharedPreferences.setMockInitialValues({});
+    HomeProject.session = HomeProject(seed: 31)..current = 11;
+    await t.pumpWidget(const MaterialApp(home: NgmyHousePage()));
+    await t.pump(const Duration(milliseconds: 600));
+    final row = find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.right).first;
+    await t.scrollUntilVisible(find.text('🛵 Orders'), 120, scrollable: row);
+    await t.ensureVisible(find.text('🛵 Orders'));
+    await t.pump(const Duration(milliseconds: 300));
+    await t.tap(find.text('🛵 Orders'));
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 300));
+    expect(find.text('Deliveries'), findsOneWidget);
+    expect(find.text('OPEN ORDERS'), findsOneWidget);
+    expect(find.text('THE RACE'), findsOneWidget);
+    expect(find.text('Take'), findsWidgets);
+    expect(find.text('Maya'), findsOneWidget, reason: 'the rival couriers are in the race');
+    await t.tap(find.text('Take').first);
+    await t.pump(const Duration(milliseconds: 300));
+    expect(find.text('Deliveries'), findsNothing, reason: 'the card closes after you take an order');
+    await t.pump(const Duration(seconds: 2));
+    await t.pump(const Duration(seconds: 12));
+  });
+
+  test('the rival couriers are drawn in the town, walking with their orders', () {
+    final city = HomeProject(seed: 4).rooms[11];
+    final board = DeliveryBoard(city)..advance(1);
+    final plain = homeDynamic(city, 3.0).length;
+    final withCouriers = homeDynamic(city, 3.0, couriers: board.figures(6)).length;
+    expect(withCouriers, greaterThan(plain), reason: 'five couriers are added to the picture');
+  });
+
+  test('the elevator car and the ride: the car has a display showing the level, doors that slide, and the person inside', () {
+    final city = HomeProject(seed: 4).rooms[11];
+    final tower = city.furn.firstWhere((f) => f.kind == 'tower');
+    final cab = CityInterior('cabin', tower)
+      ..shownLevel = 6
+      ..goingUp = true;
+    cab.walker
+      ..x = 0
+      ..z = 44;
+    cab.build(null);
+    expect(cab.isCabin, isTrue);
+    expect(cab.scene.screens.length, 1, reason: 'the display above the doors');
+    cab.doorOpen = 0;
+    final shut = cab.dynamicPolys(1.0, const PersonStyle());
+    cab.doorOpen = 1;
+    final open = cab.dynamicPolys(1.0, const PersonStyle());
+    expect(shut.length, open.length);
+    double doorX(List<Poly> ps) => ps.where((p) => p.color == const Color(0xFFE2E8F0)).expand((p) => p.pts).map((v) => v.x.abs()).reduce(math.max);
+    expect(doorX(open), greaterThan(doorX(shut)), reason: 'the doors slide apart');
+    for (var n = 1; n <= 12; n += 5) {
+      final rec = PictureRecorder();
+      paintCabinDisplay(Canvas(rec), const Size(520, 230), 0.4, n, n.isEven);
+      rec.endRecording();
+    }
+    // The lobby doors slide too, drawn live.
+    final lobby = CityInterior('tower', tower)..build(null);
+    lobby.doorOpen = 0;
+    final a = lobby.dynamicPolys(1.0, const PersonStyle()).length;
+    expect(a, greaterThan(0));
   });
 
   testWidgets('missing calls never closes the game: an old lock is cleared and the game opens as normal', (t) async {

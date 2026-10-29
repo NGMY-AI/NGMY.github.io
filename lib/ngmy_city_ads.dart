@@ -39,6 +39,9 @@ TextPainter _tp(String text, TextStyle style, double maxWidth, {int lines = 1}) 
 const int kCityAdCount = 1 + 7 + 9;
 
 /// City ad number [n]: the NGMY poster with the logo and the words, seven new ads, then the NGMY app ads.
+/// An ad that keeps changing: every 7 seconds the next NGMY ad plays on the billboard, starting from a different one for each billboard.
+void paintCityAdLoop(Canvas c, Size s, double t, int seed) => paintCityAd(c, s, t, seed + (t / 7).floor());
+
 void paintCityAd(Canvas c, Size s, double t, int n) {
   final k = n % kCityAdCount;
   if (k == 0) {

@@ -19,9 +19,12 @@ List<NavRect> obstaclesOfWorld(HRoom r, {int? skip}) {
     if (f.id == skip) continue;
     if (kFlatKinds.contains(f.kind) || kAnimalKinds.contains(f.kind) || f.kind == 'bush') continue;
     // The big town sign stands on two masts over the road: you walk between them and under the board.
-    if (f.kind == 'townsign') {
-      for (final dx in const [-178.0, 178.0]) {
-        o.add(NavRect(f.x + dx - 8, f.x + dx + 8, f.z - 8, f.z + 8));
+    if (f.kind == 'townsign' || f.kind == 'adboard') {
+      final span = f.kind == 'townsign' ? 178.0 : 150.0;
+      for (final dx in [-span, span]) {
+        final a = f.rot * math.pi / 2;
+        final vx = dx * math.cos(a), vz = -dx * math.sin(a);
+        o.add(NavRect(f.x + vx - 8, f.x + vx + 8, f.z + vz - 8, f.z + vz + 8));
       }
       continue;
     }

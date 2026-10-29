@@ -73,6 +73,7 @@ const Map<String, FurnKind> kFurnKinds = {
   'gasstation': FurnKind('NGMY gas station', '⛽', 150, 90),
   'townsign': FurnKind('NGMY Town sign', '🪧', 380, 14),
   'cornersign': FurnKind('NGMY Town billboard', '🪧', 150, 10),
+  'adboard': FurnKind('NGMY ad billboard', '📺', 330, 14),
   'shop': FurnKind('Shop', '🏪', 126, 90),
   'hospital': FurnKind('Hospital', '🏥', 165, 105),
   'firestation': FurnKind('Fire station', '🚒', 135, 96),
@@ -92,7 +93,7 @@ const Map<String, FurnKind> kFurnKinds = {
 };
 
 /// What can be put in the garden, and what goes inside the rooms.
-const List<String> kOutdoorFurn = ['road', 'roundabout', 'roadturn', 'roadtee', 'roadcross', 'house2', 'bighouse', 'billboard', 'tower', 'hq', 'store', 'gasstation', 'townsign', 'cornersign', 'shop', 'hospital', 'firestation', 'school', 'car', 'firetruck', 'ambulance', 'dog', 'cat', 'cow', 'sheep', 'chicken', 'horse', 'tree', 'pine', 'bush', 'flowers', 'fence', 'lamppost', 'bench', 'pond', 'swing', 'shed', 'doghouse'];
+const List<String> kOutdoorFurn = ['road', 'roundabout', 'roadturn', 'roadtee', 'roadcross', 'house2', 'bighouse', 'billboard', 'tower', 'hq', 'store', 'gasstation', 'townsign', 'cornersign', 'adboard', 'shop', 'hospital', 'firestation', 'school', 'car', 'firetruck', 'ambulance', 'dog', 'cat', 'cow', 'sheep', 'chicken', 'horse', 'tree', 'pine', 'bush', 'flowers', 'fence', 'lamppost', 'bench', 'pond', 'swing', 'shed', 'doghouse'];
 
 /// Road pieces snap to a grid of this size, so neighbours always line up.
 const double kRoadGrid = 40;
@@ -272,6 +273,9 @@ class HRoom {
 
   /// The wiring lesson of each street light being fixed, kept so the work is still there when you come back.
   final Map<int, WiringState> lampWork = {};
+
+  /// The delivery orders and the rival couriers of the town (a DeliveryBoard), kept so the race goes on while you are away.
+  Object? deliveryBoard;
 
   /// Fixture 0 to 3 (outlet, outlet, ceiling light or fan, switch): 0 not started, 1 started, 2 finished.
   int fixtureState(int i) => !indoor || lesson.isNotEmpty ? 2 : (wiring != null ? wiring!.orderProgress(i) : (wiringNeeded ? 0 : 2));
@@ -642,6 +646,22 @@ class HomeProject {
         r.add('townsign', x: 0, z: 640);
         for (final (x, z) in const [(-1150.0, 80.0), (1150.0, 80.0), (-1150.0, 1990.0), (1150.0, 1990.0)]) {
           r.add('cornersign', x: x, z: z);
+        }
+        // Big NGMY ad billboards round the edge of the land, each playing the NGMY ads one after the other.
+        for (final x in const [-1000.0, -500.0, 0.0, 500.0, 1000.0]) {
+          r.add('adboard', x: x, z: 2045);
+        }
+        for (final x in const [-900.0, -300.0, 300.0, 900.0]) {
+          r.add('adboard', x: x, z: -690);
+        }
+        for (final z in const [300.0, 800.0, 1300.0, 1800.0]) {
+          // Turned to face along the edge, then put right at the edge (the turn changes how wide it is).
+          final west = r.add('adboard', x: -1245, z: z)..rot = 1;
+          west.x = -1245;
+          r.clamp(west);
+          final east = r.add('adboard', x: 1245, z: z)..rot = 3;
+          east.x = 1245;
+          r.clamp(east);
         }
         // Electric poles along the streets (the street lights hang on them) and street lamps between them.
         for (var x = -1200.0; x <= 1200; x += 480) {

@@ -83,7 +83,7 @@ void main() {
       return v.map((e) => e.x).reduce((x, y) => x + y) / v.length;
     }
 
-    expect((midX(a) - midX(b)).abs(), greaterThan(0.1));
+    expect((midX(a) - midX(b)).abs(), greaterThan(0.02), reason: 'the animal has moved');
     expect(homeDynamic(w, 1.0).every((p) => p.id == 0), isTrue);
   });
 

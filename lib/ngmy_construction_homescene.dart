@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'ngmy_city_ads.dart';
+import 'ngmy_city_delivery.dart';
 import 'dart:ui' as ui;
 
 import 'package:flutter/services.dart';
@@ -815,14 +816,14 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
   }
   // The ads: on every billboard, and on two big TVs in the front of every big house.
   final adScreens = <ScreenQuad>[];
-  for (final f in r.furn.where((f) => const {'billboard', 'bighouse', 'townsign', 'cornersign', 'tower', 'hq', 'store', 'gasstation'}.contains(f.kind))) {
+  for (final f in r.furn.where((f) => const {'billboard', 'bighouse', 'townsign', 'cornersign', 'adboard', 'tower', 'hq', 'store', 'gasstation'}.contains(f.kind))) {
     final rr = f.rot * math.pi / 2;
     V3 w(double x, double y, double z) => rotY(V3(x, y, z), rr) + V3(f.x, 0, f.z);
     final grp = furnGroup[f.id] ?? 0;
     if (f.kind == 'billboard') {
       // One face on the front and one on the back, so it reads the right way up from both sides.
-      adScreens.add(ScreenQuad([w(-33, 62.5, 2), w(33, 62.5, 2), w(33, 31.5, 2), w(-33, 31.5, 2)], 0, (c, size, t) => paintCityAd(c, size, t, f.id), width: 960, height: 450, bias: 4, order: 2, group: grp));
-      adScreens.add(ScreenQuad([w(33, 62.5, -2), w(-33, 62.5, -2), w(-33, 31.5, -2), w(33, 31.5, -2)], 0, (c, size, t) => paintCityAd(c, size, t, f.id), width: 960, height: 450, bias: 4, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(-33, 62.5, 2), w(33, 62.5, 2), w(33, 31.5, 2), w(-33, 31.5, 2)], 0, (c, size, t) => paintCityAdLoop(c, size, t, f.id), width: 960, height: 450, bias: 4, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(33, 62.5, -2), w(-33, 62.5, -2), w(-33, 31.5, -2), w(33, 31.5, -2)], 0, (c, size, t) => paintCityAdLoop(c, size, t, f.id), width: 960, height: 450, bias: 4, order: 2, group: grp));
     } else if (f.kind == 'townsign' || f.kind == 'cornersign') {
       // Both faces, each one the right way up: the biggest billboard in the city and the one at each corner.
       final big = f.kind == 'townsign';
@@ -831,15 +832,27 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
       final px = big ? 1400.0 : 700.0, py = big ? 450.0 : 300.0;
       adScreens.add(ScreenQuad([w(-hw, cy + hh, zz), w(hw, cy + hh, zz), w(hw, cy - hh, zz), w(-hw, cy - hh, zz)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY TOWN', l2), width: px, height: py, bias: 4, order: 2, group: grp));
       adScreens.add(ScreenQuad([w(hw, cy + hh, -zz), w(-hw, cy + hh, -zz), w(-hw, cy - hh, -zz), w(hw, cy - hh, -zz)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY TOWN', l2), width: px, height: py, bias: 4, order: 2, group: grp));
+    } else if (f.kind == 'adboard') {
+      adScreens.add(ScreenQuad([w(-158, 195, 3.6), w(158, 195, 3.6), w(158, 90, 3.6), w(-158, 90, 3.6)], 0, (c, size, t) => paintCityAdLoop(c, size, t, f.id), width: 1280, height: 424, bias: 4, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(158, 195, -3.6), w(-158, 195, -3.6), w(-158, 90, -3.6), w(158, 90, -3.6)], 0, (c, size, t) => paintCityAdLoop(c, size, t, f.id + 4), width: 1280, height: 424, bias: 4, order: 2, group: grp));
     } else if (f.kind == 'tower') {
       final hgt = _towerHeight(kFurnColors[f.color]);
-      adScreens.add(ScreenQuad([w(-40, hgt - 8, 35.9), w(40, hgt - 8, 35.9), w(40, hgt - 54, 35.9), w(-40, hgt - 54, 35.9)], 0, (c, size, t) => paintCityAd(c, size, t, f.id), width: 800, height: 460, bias: 8, order: 2, group: grp));
-      adScreens.add(ScreenQuad([w(40, hgt - 8, -35.9), w(-40, hgt - 8, -35.9), w(-40, hgt - 54, -35.9), w(40, hgt - 54, -35.9)], 0, (c, size, t) => paintCityAd(c, size, t, f.id + 7), width: 800, height: 460, bias: 8, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(-40, hgt - 8, 35.9), w(40, hgt - 8, 35.9), w(40, hgt - 54, 35.9), w(-40, hgt - 54, 35.9)], 0, (c, size, t) => paintCityAdLoop(c, size, t, f.id), width: 800, height: 460, bias: 8, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(40, hgt - 8, -35.9), w(-40, hgt - 8, -35.9), w(-40, hgt - 54, -35.9), w(40, hgt - 54, -35.9)], 0, (c, size, t) => paintCityAdLoop(c, size, t, f.id + 7), width: 800, height: 460, bias: 8, order: 2, group: grp));
+      // The two sides of the tower, and the big board on the roof (a face to the south and one to the north).
+      adScreens.add(ScreenQuad([w(50.9, hgt - 8, 28), w(50.9, hgt - 8, -28), w(50.9, hgt - 54, -28), w(50.9, hgt - 54, 28)], 0, (c, size, t) => paintCityAdLoop(c, size, t, f.id + 3), width: 640, height: 460, bias: 8, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(-50.9, hgt - 8, -28), w(-50.9, hgt - 8, 28), w(-50.9, hgt - 54, 28), w(-50.9, hgt - 54, -28)], 0, (c, size, t) => paintCityAdLoop(c, size, t, f.id + 5), width: 640, height: 460, bias: 8, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(-40, hgt + 58, 1.7), w(40, hgt + 58, 1.7), w(40, hgt + 22, 1.7), w(-40, hgt + 22, 1.7)], 0, (c, size, t) => paintCityAdLoop(c, size, t, f.id + 1), width: 960, height: 400, bias: 8, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(40, hgt + 58, -1.7), w(-40, hgt + 58, -1.7), w(-40, hgt + 22, -1.7), w(40, hgt + 22, -1.7)], 0, (c, size, t) => paintCityAdLoop(c, size, t, f.id + 2), width: 960, height: 400, bias: 8, order: 2, group: grp));
     } else if (f.kind == 'hq') {
       adScreens.add(ScreenQuad([w(-70, 108, 45.9), w(70, 108, 45.9), w(70, 52, 45.9), w(-70, 52, 45.9)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY COMPANY', 'Building the movement'), width: 1000, height: 400, bias: 8, order: 2, group: grp));
       adScreens.add(ScreenQuad([w(-48, 215, 30.2), w(48, 215, 30.2), w(48, 175, 30.2), w(-48, 175, 30.2)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY', 'New Global Movement for Youth'), width: 900, height: 380, bias: 8, order: 2, group: grp));
       adScreens.add(ScreenQuad([w(70, 108, -45.9), w(-70, 108, -45.9), w(-70, 52, -45.9), w(70, 52, -45.9)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY COMPANY', 'Building the movement'), width: 1000, height: 400, bias: 8, order: 2, group: grp));
       adScreens.add(ScreenQuad([w(48, 215, -30.2), w(-48, 215, -30.2), w(-48, 175, -30.2), w(48, 175, -30.2)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY', 'New Global Movement for Youth'), width: 900, height: 380, bias: 8, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(-54, 276 + 52, 1.7), w(54, 276 + 52, 1.7), w(54, 276 + 18, 1.7), w(-54, 276 + 18, 1.7)], 0, (c, size, t) => paintCityAdLoop(c, size, t, f.id + 4), width: 1000, height: 360, bias: 8, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(54, 276 + 52, -1.7), w(-54, 276 + 52, -1.7), w(-54, 276 + 18, -1.7), w(54, 276 + 18, -1.7)], 0, (c, size, t) => paintCityAdLoop(c, size, t, f.id + 6), width: 1000, height: 360, bias: 8, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(85.9, 118, 36), w(85.9, 118, -36), w(85.9, 62, -36), w(85.9, 62, 36)], 0, (c, size, t) => paintCityAdLoop(c, size, t, f.id + 2), width: 720, height: 560, bias: 8, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(-85.9, 118, -36), w(-85.9, 118, 36), w(-85.9, 62, 36), w(-85.9, 62, -36)], 0, (c, size, t) => paintCityAdLoop(c, size, t, f.id + 3), width: 720, height: 560, bias: 8, order: 2, group: grp));
     } else if (f.kind == 'store') {
       adScreens.add(ScreenQuad([w(-54, 85, 37.7), w(54, 85, 37.7), w(54, 67, 37.7), w(-54, 67, 37.7)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY STORE', 'Everything you need'), width: 900, height: 150, bias: 6, order: 2, group: grp));
     } else if (f.kind == 'gasstation') {
@@ -873,7 +886,7 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
 }
 
 /// Things that move: the fan blades and the pictures on the TVs.
-List<Poly> homeDynamic(HRoom r, double t, {PersonPose? person, PersonStyle? personStyle, List<ResidentFigure> residents = const [], String mode = 'look', (String, double, double, double, int)? drive, bool carrying = false}) {
+List<Poly> homeDynamic(HRoom r, double t, {PersonPose? person, PersonStyle? personStyle, List<ResidentFigure> residents = const [], String mode = 'look', (String, double, double, double, int)? drive, bool carrying = false, List<CourierFigure> couriers = const []}) {
   final b = MeshBuilder();
   b.grouped = true;
   if (r.kind == 'outside') {
@@ -908,6 +921,15 @@ List<Poly> homeDynamic(HRoom r, double t, {PersonPose? person, PersonStyle? pers
     for (final f in residents.where((f) => f.room == r.id)) {
       _figure(b, PersonPose(room: r.id, x: f.x, z: f.z, yaw: f.yaw), t, f.style, id: idHResident + f.id, tint: f.style.shirt);
       _activityProps(b, f, t);
+    }
+    // The other couriers, walking between the shops and the houses with their orders.
+    for (final c in couriers) {
+      _figure(b, PersonPose(room: r.id, x: c.x, z: c.z, yaw: c.yaw, walking: c.walking, phase: c.phase), t, c.style, tint: c.color);
+      if (c.carrying) {
+        final cb = MeshBuilder()..id = 0;
+        cb.box(V3(c.x + math.sin(c.yaw) * 9, 46, c.z + math.cos(c.yaw) * 9), const V3(13, 12, 13), const Color(0xFFF5C14B));
+        b.polys.addAll(cb.polys);
+      }
     }
     return b.polys;
   }
@@ -1535,6 +1557,12 @@ void _furniture(MeshBuilder b, String kind, Color c) {
           b.box(V3(0, hgt + 3, 0), V3(bw + 4, 6, bd + 4), const Color(0xFF1F2937));
           b.box(V3(bw * 0.2, hgt + 12, 0), V3(bw * 0.3, 12, bd * 0.3), const Color(0xFF9CA3AF));
         }
+        // A big board on the roof, playing the ads.
+        final roof = big ? hgt + 128.0 : hgt + 6.0;
+        for (final x in [-(bw * 0.3), bw * 0.3]) {
+          b.box(V3(x, roof + 8, 0), const V3(3, 16, 3), const Color(0xFF3F3F46));
+        }
+        b.box(V3(0, roof + 34, 0), V3(big ? 112 : 84, 38, 3), const Color(0xFF0B1F4B), shine: 0.3);
         // The entrance: glass doors with a yellow canopy, so the building can be walked into.
         _patch(b, V3(0, 17, bd / 2 + 0.6), const V3(1, 0, 0), const V3(0, 1, 0), 34, 34, const Color(0xFF1F2937), const V3(0, 0, 1), shine: 0.5);
         _patch(b, V3(0, 17, bd / 2 + 0.7), const V3(0, 1, 0).cross(const V3(0, 0, 1)), const V3(0, 1, 0), 1.2, 34, const Color(0xFF9BD3F5), const V3(0, 0, 1), shine: 0.6);
@@ -1574,6 +1602,15 @@ void _furniture(MeshBuilder b, String kind, Color c) {
       b.box(const V3(0, 252, 0), const V3(366, 124, 6), const Color(0xFF0B1F4B), shine: 0.3);
       b.box(const V3(0, 316, 0), const V3(366, 6, 10), const Color(0xFFF5C14B));
       b.box(const V3(0, 188, 0), const V3(366, 6, 10), const Color(0xFFF5C14B));
+      b.endGroup();
+    case 'adboard':
+      b.startGroup();
+      for (final x in const [-150.0, 150.0]) {
+        b.cyl(V3(x, 0, 0), V3(x, 205, 0), 4.5, const Color(0xFF3F3F46), sides: 6);
+      }
+      b.box(const V3(0, 142, 0), const V3(324, 114, 6), const Color(0xFF0B1F4B), shine: 0.3);
+      b.box(const V3(0, 202, 0), const V3(324, 6, 10), const Color(0xFFF5C14B));
+      b.box(const V3(0, 82, 0), const V3(324, 6, 10), const Color(0xFFF5C14B));
       b.endGroup();
     case 'cornersign':
       b.startGroup();

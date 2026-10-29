@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'ngmy_city_traffic.dart';
+import 'ngmy_city_delivery.dart';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -156,6 +157,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   @override
   void dispose() {
+    _rideTimer?.cancel();
     _droneTimer?.cancel();
     _walkTimer?.cancel();
     _t?.cancel();
@@ -698,29 +700,315 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     conBeep(700, ms: 70);
   }
 
+  // ── Deliveries: orders to take, rival couriers and the race ──
+
+  bool _cardOrders = false;
+
+  /// The delivery board of the town (null in a lesson room, which has no town).
+  DeliveryBoard? get _boardMaybe {
+    final out = home.rooms.where((r) => !r.indoor);
+    if (out.isEmpty) return null;
+    final city = out.first;
+    return (city.deliveryBoard ??= DeliveryBoard(city)) as DeliveryBoard;
+  }
+
+  DeliveryBoard get _board => _boardMaybe!;
+
+  void _deliveryEvent(DeliveryEvent? e) {
+    if (e == null) return;
+    if (e.points > 0) comm?.points += e.points;
+    conBeep(e.kind == 'pickup' ? 700 : 940, ms: 120);
+    _say(e.text, ok: e.kind != 'expired');
+    setState(_rebuild);
+  }
+
+  Widget _ordersCard() {
+    final b = _board;
+    final w = walker;
+    final px = w?.x ?? 0, pz = w?.z ?? 300;
+    final act = b.active;
+    Widget pill(String t, Color c) => Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: c.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(10)), child: Text(t, style: TextStyle(color: c, fontWeight: FontWeight.w900, fontSize: 11.5)));
+    String where(Furn f) => kFurnKinds[f.kind]!.name;
+    Widget orderRow(DeliveryOrder o) {
+      final a = doorSpot(o.from);
+      final toShop = (math.sqrt(math.pow(a.$1 - px, 2) + math.pow(a.$2 - pz, 2)) / 10).round();
+      return Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white12)),
+        child: Row(children: [
+          Text(o.info.emoji, style: const TextStyle(fontSize: 26)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('${o.info.name}: ${where(o.from)} → a house', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13.5)),
+              const SizedBox(height: 3),
+              Wrap(spacing: 6, children: [pill('${o.pay} points', const Color(0xFFFACC15)), pill('$toShop m to the shop', const Color(0xFF38BDF8)), pill('${(o.distance / 10).round()} m trip', const Color(0xFF4ADE80))]),
+            ]),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: act != null
+                ? null
+                : () {
+                    if (b.take(o, now)) {
+                      setState(() => _cardOrders = false);
+                      if (!steer) _startSteer();
+                      _say('${o.info.emoji} Order taken: go to the ${where(o.from).toLowerCase()} (follow the yellow line), then to the house.', ok: true);
+                    }
+                  },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(color: act != null ? Colors.white12 : const Color(0xFFFACC15), borderRadius: BorderRadius.circular(14)),
+              child: Text('Take', style: TextStyle(color: act != null ? Colors.white38 : Colors.black, fontWeight: FontWeight.w900)),
+            ),
+          ),
+        ]),
+      );
+    }
+
+    final rows = b.table();
+    final medals = ['🥇', '🥈', '🥉', '4', '5', '6'];
+    return Container(
+      color: Colors.black.withValues(alpha: 0.55),
+      alignment: Alignment.center,
+      child: SingleChildScrollView(
+        child: Container(
+          width: 340,
+          margin: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1F2937), Color(0xFF0B1220)]), borderRadius: BorderRadius.circular(28), border: Border.all(color: Colors.white24)),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              const Text('🛵', style: TextStyle(fontSize: 28)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Deliveries', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+                  Text('Race ${b.round}: first to $kRaceGoal wins +$kRaceBonus', style: const TextStyle(color: Colors.white60, fontSize: 12.5)),
+                ]),
+              ),
+              GestureDetector(onTap: () => setState(() => _cardOrders = false), child: const Icon(Icons.close_rounded, color: Colors.white54)),
+            ]),
+            const SizedBox(height: 12),
+            if (act != null)
+              Container(
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 10),
+                decoration: BoxDecoration(color: const Color(0xFFFACC15).withValues(alpha: 0.14), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFFACC15))),
+                child: Row(children: [
+                  Text(act.info.emoji, style: const TextStyle(fontSize: 24)),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(act.pickedUp ? 'You have the ${act.info.name.toLowerCase()}. Take it to the house (follow the yellow line).' : 'Go to the ${where(act.from).toLowerCase()} to pick up the ${act.info.name.toLowerCase()}.', style: const TextStyle(color: Colors.white, fontSize: 13))),
+                  GestureDetector(
+                    onTap: () => setState(() {
+                      b.cancel();
+                      _say('Order given back.', ok: true);
+                    }),
+                    child: const Text('Give back', style: TextStyle(color: Color(0xFFF87171), fontWeight: FontWeight.w900, fontSize: 12.5)),
+                  ),
+                ]),
+              )
+            else ...[
+              const Text('OPEN ORDERS', style: TextStyle(color: Colors.white54, fontSize: 11.5, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+              const SizedBox(height: 8),
+              for (final o in b.open(px, pz).take(6)) orderRow(o),
+            ],
+            const SizedBox(height: 6),
+            const Text('THE RACE', style: TextStyle(color: Colors.white54, fontSize: 11.5, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+            const SizedBox(height: 8),
+            for (var i = 0; i < rows.length; i++)
+              Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(color: rows[i].$1 == 'You' ? const Color(0xFF38BDF8).withValues(alpha: 0.18) : Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(12), border: Border.all(color: rows[i].$1 == 'You' ? const Color(0xFF38BDF8) : Colors.white10)),
+                child: Row(children: [
+                  SizedBox(width: 26, child: Text(medals[i], style: const TextStyle(fontSize: 16, color: Colors.white70))),
+                  Expanded(child: Text(rows[i].$1, style: TextStyle(color: Colors.white, fontWeight: rows[i].$1 == 'You' ? FontWeight.w900 : FontWeight.w700))),
+                  Text('${rows[i].$2}/$kRaceGoal', style: const TextStyle(color: Color(0xFF4ADE80), fontWeight: FontWeight.w900)),
+                  const SizedBox(width: 10),
+                  Text('${rows[i].$3} pts', style: const TextStyle(color: Color(0xFFFACC15), fontWeight: FontWeight.w800, fontSize: 12)),
+                ]),
+              ),
+          ]),
+        ),
+      ),
+    );
+  }
+
   // ── The elevator of an office tower ──
 
   bool _cardElevator = false;
   bool _onBalcony = false;
 
-  /// Take the elevator to [n]: the office on that level may have no power.
+  // ── The ride in the elevator: walk in, the doors close, the numbers climb, the doors open and you walk out ──
+
+  _Ride? _ride;
+  Timer? _rideTimer;
+  CityInterior? _lobby;
+  final ValueNotifier<String> _rideLabel = ValueNotifier('');
+
+  /// Take the elevator to [n]: the camera follows the person to the doors, into the car (where the display counts the levels), and out.
   void _goLevel(int n) {
     final inn = inner;
-    if (inn == null || !inn.isTower) return;
-    final id = inn.door.id;
-    final dark = room.darkOffices[id] == n;
-    final p = _houseProjects[id * 100 + n];
-    inn.goToLevel(n, darkHere: dark);
-    inn.fixtures = p == null ? const [false, false, false, false] : _fixturesOf(p);
-    inn.build(comm);
-    setState(() {
-      _cardElevator = false;
-      _rebuild();
-    });
-    cam.glideTo(target: const V3(0, 30, 110), dist: 260, yaw: 0.0, pitch: 0.55);
-    conBeep(660, ms: 90);
-    conBeep(880, ms: 90);
-    _say(dark ? 'Level $n. This office has no power: walk onto the red mat at the breaker panel, or tap the red frames.' : 'Level $n of ${inn.levels}.', ok: true);
+    if (inn == null || !inn.isTower || _ride != null) return;
+    if (n == inn.level) {
+      setState(() => _cardElevator = false);
+      return;
+    }
+    _lobby = inn;
+    _ride = _Ride(inn.level, n, DateTime.now().millisecondsSinceEpoch)
+      ..sx = inn.walker.x
+      ..sz = inn.walker.z;
+    _inX = 0;
+    _inZ = 0;
+    inn.doorOpen = 0;
+    setState(() => _cardElevator = false);
+    cam.glideTo(target: const V3(0, 40, 45), dist: 175, yaw: 0.0, pitch: 0.28);
+    _say('Going to level $n: walking to the elevator.', ok: true);
+    _rideTimer?.cancel();
+    _rideTimer = Timer.periodic(const Duration(milliseconds: 33), (_) => _rideTick());
+  }
+
+  double _ease(double k) {
+    final x = k.clamp(0.0, 1.0);
+    return x * x * (3 - 2 * x);
+  }
+
+  void _rideTick() {
+    final r = _ride, lobby = _lobby;
+    if (r == null || lobby == null || !mounted) {
+      _rideTimer?.cancel();
+      return;
+    }
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final el = (nowMs - r.t0) / 1000;
+    final up = r.to > r.from;
+    switch (r.stage) {
+      case 0:
+        // Walk to the doors, wait while they open, step in.
+        final w = lobby.walker;
+        if (el < 1.0) {
+          final k = _ease(el / 1.0);
+          w
+            ..x = r.sx * (1 - k)
+            ..z = r.sz + (62 - r.sz) * k
+            ..yaw = math.atan2(-r.sx, 62 - r.sz)
+            ..walking = true;
+        } else if (el < 1.8) {
+          w
+            ..x = 0
+            ..z = 62
+            ..yaw = math.pi
+            ..walking = false;
+        } else if (el < 2.5) {
+          final k = _ease((el - 1.8) / 0.7);
+          w
+            ..z = 62 - 44 * k
+            ..yaw = math.pi
+            ..walking = true;
+        } else {
+          w.walking = false;
+        }
+        w.phase += 0.3;
+        lobby.doorOpen = _ease((el - 0.8) / 0.8);
+        if (el >= 2.6) {
+          // Into the car.
+          r.stage = 1;
+          r.t0 = nowMs;
+          r.total = (1.4 + (r.to - r.from).abs() * 0.45).clamp(2.6, 6.4).toDouble();
+          r.shown = r.from;
+          final cab = CityInterior('cabin', lobby.door)
+            ..shownLevel = r.from
+            ..goingUp = up
+            ..doorOpen = 1;
+          cab.walker
+            ..x = 0
+            ..z = 44
+            ..yaw = 0
+            ..walking = false;
+          cab.build(null);
+          inner = cab;
+          _rideLabel.value = '${up ? '▲' : '▼'}  ${r.from == 1 ? 'L' : r.from}';
+          setState(_rebuild);
+          cam.setView(target: const V3(0, 52, 40), dist: 66, yaw: math.pi, pitch: 0.1);
+          conBeep(520, ms: 70, volume: 0.25);
+        }
+      case 1:
+        // The doors shut, the car goes up (or down) with the number counting, a little shake, and the doors open with a chime.
+        final cab = inner;
+        if (cab == null || !cab.isCabin) return;
+        final t = r.total;
+        cab.doorOpen = el < 0.9 ? 1 - _ease(el / 0.9) : (el > t - 0.9 ? _ease((el - (t - 0.9)) / 0.9) : 0);
+        final moving = el > 0.9 && el < t - 0.9;
+        if (moving) {
+          final k = _ease((el - 0.9) / (t - 1.8));
+          final lv = (r.from + ((r.to - r.from) * k).round()).clamp(1, cab.levels);
+          if (lv != r.shown) {
+            r.shown = lv;
+            cab.shownLevel = lv;
+            _rideLabel.value = '${up ? '▲' : '▼'}  ${lv == 1 ? 'L' : lv}';
+            conBeep(500 + lv * 22, ms: 45, volume: 0.2);
+          }
+        }
+        final shake = moving ? 1.0 : 0.25;
+        cam.setView(
+          target: V3(0, 52 + math.sin(el * 5.3) * 0.5 * shake, 40),
+          dist: 66 + math.sin(el * 2.1) * 1.2,
+          yaw: math.pi + math.sin(el * 8) * 0.010 * shake,
+          pitch: 0.1 + math.sin(el * 6.1) * 0.007 * shake,
+        );
+        if (el > t - 0.9 && !r.chimed) {
+          r.chimed = true;
+          cab.shownLevel = r.to;
+          _rideLabel.value = '${r.to == 1 ? 'L' : r.to}';
+          conBeep(880, ms: 140, volume: 0.3);
+          Future<void>.delayed(const Duration(milliseconds: 150), () => conBeep(1175, ms: 220, volume: 0.3));
+        }
+        if (el >= t) {
+          // The car stops: the lobby of the new level, with the doors open and the person in the doorway.
+          r.stage = 2;
+          r.t0 = nowMs;
+          final id = lobby.door.id;
+          final dark = room.darkOffices[id] == r.to;
+          final p = _houseProjects[id * 100 + r.to];
+          lobby.goToLevel(r.to, darkHere: dark);
+          lobby.fixtures = p == null ? const [false, false, false, false] : _fixturesOf(p);
+          lobby.build(comm);
+          lobby.walker
+            ..x = 0
+            ..z = 16
+            ..yaw = 0
+            ..walking = false;
+          lobby.doorOpen = 1;
+          inner = lobby;
+          setState(_rebuild);
+          cam.setView(target: const V3(0, 40, 50), dist: 175, yaw: 0.0, pitch: 0.28);
+        }
+      default:
+        // Walk out of the doors into the lobby; the doors close behind.
+        final w = lobby.walker;
+        final k = _ease(el / 1.6);
+        w
+          ..x = 0
+          ..z = 16 + 96 * k
+          ..yaw = 0
+          ..walking = el < 1.6
+          ..phase += 0.3;
+        lobby.doorOpen = 1 - _ease((el - 1.3) / 0.8);
+        cam.glideTo(target: V3(0, 40, w.z * 0.7 + 14));
+        if (el >= 2.2) {
+          final dark = lobby.dark;
+          _rideTimer?.cancel();
+          _ride = null;
+          w.walking = false;
+          lobby.doorOpen = 0;
+          setState(_rebuild);
+          cam.glideTo(target: const V3(0, 30, 110), dist: 260, yaw: 0.0, pitch: 0.55);
+          conBeep(660, ms: 80);
+          _say(dark ? 'Level ${lobby.level}. This office has no power: walk onto the red mat at the breaker panel, or tap the red frames.' : 'Level ${lobby.level} of ${lobby.levels}.', ok: true);
+        }
+    }
   }
 
   Widget _elevatorCard() {
@@ -1088,8 +1376,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   /// The GPS: a line of yellow dashes on the ground from the person to the job, and a tall yellow beam over the place.
   List<Poly> _routePolys() {
-    final w = walker, s = _jobSpot();
-    if (_job == null || w == null || s == null || room.indoor || inner != null) return const [];
+    final w = walker, s = _boardMaybe?.target ?? _jobSpot();
+    if ((_job == null && _boardMaybe?.active == null) || w == null || s == null || room.indoor || inner != null) return const [];
     final b = MeshBuilder()
       ..grouped = false
       ..order = 1;
@@ -1787,6 +2075,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   void _walkTick() {
     final inn = inner;
     final w = inn?.walker ?? walker;
+    if (_ride != null) return;
     if (w == null || !mounted || (inn == null && room.indoor)) return;
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     final dt = ((nowMs - _lastWalkMs) / 1000).clamp(0.0, 0.1);
@@ -1834,6 +2123,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       if (inn.leaving) _leaveBuilding();
       return;
     }
+    if (inn == null && _driving == null && _boardMaybe?.active != null) _deliveryEvent(_boardMaybe!.updatePlayer(w.x, w.z, now));
     if (moved && _driving == null) {
       if (w.atDoor && (w.yaw.abs() > 2.2 || w.target != null && w.target!.$2 < 4)) {
         // Walked up to the front door facing the house: in they go.
@@ -2266,6 +2556,10 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (_beat % 45 == 20 && !isLesson) _neighbourEvents();
     // In the city the phone rings at least once a minute with a job, so there is always somebody who needs you.
     if (!isLesson && !room.indoor) {
+      final raceMsg = _boardMaybe?.advance(now);
+      if (raceMsg != null) _say('🏁 $raceMsg', ok: true);
+      final w0 = walker;
+      if (w0 != null && _boardMaybe?.active != null && inner == null) _deliveryEvent(_boardMaybe!.updatePlayer(w0.x, w0.z, now));
       final j = _job;
       if (j != null) {
         _jobSecs++;
@@ -2357,6 +2651,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   }
 
   Widget? _pad() {
+    if (_ride != null) return null;
     final controls = steer && !room.indoor;
     final call = _ringing;
     final nc = _nCall;
@@ -2847,6 +3142,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         if (inner?.isTower == true) _chip('🏢 Level ${inner!.level} of ${inner!.levels}', false, () => setState(() => _cardElevator = true), color: const Color(0xFF60A5FA)),
         if (_job != null) _chip('📋 My job${_jobMeters() == null ? '' : ' · ${_jobMeters()} m'}', false, () => setState(() => _cardCall = _job), color: const Color(0xFFFACC15)),
         if (_waiting.isNotEmpty) _chip('⏳ Waiting: ${_waiting.length}', false, () => _say('${_waiting.length} job${_waiting.length == 1 ? '' : 's'} waiting. You are taken to the next one when you finish this one.', ok: true), color: const Color(0xFFF59E0B)),
+        _chip('🛵 Orders', _board.active != null, () => setState(() => _cardOrders = true), color: const Color(0xFFFACC15), dot: _board.active == null),
         _chip(_droneOn ? '⏹ Stop drone' : '🚁 Drone', _droneOn, () => _droneOn ? _stopDrone() : setState(() => _cardDrone = true), color: const Color(0xFF38BDF8)),
         _chip(_hideTags ? '🏷 Show tags' : '🏷 Hide tags', _hideTags, () => setState(() => _hideTags = !_hideTags), color: const Color(0xFFF87171)),
         _chip('🗺 Map', showMap, () => setState(() => showMap = !showMap), color: const Color(0xFFA78BFA)),
@@ -2879,14 +3175,39 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         good: good,
         messageTop: full ? 62 : ((showMap && !isLesson) ? 104 : 10),
         layerOn: (l) => l <= 5,
-        dynamicPolys: (_) => inner != null ? inner!.dynamicPolys(now, playerStyle) : [...homeDynamic(room, now, person: _pose(), personStyle: playerStyle, residents: _figs, mode: mode, drive: _driveNow(), carrying: _carrying != null), if (!room.indoor) ...trafficPolys(now), ...(_job != null ? _routePolys() : const <Poly>[])],
+        dynamicPolys: (_) => inner != null ? inner!.dynamicPolys(now, playerStyle) : [...homeDynamic(room, now, person: _pose(), personStyle: playerStyle, residents: _figs, mode: mode, drive: _driveNow(), carrying: _carrying != null || (_boardMaybe?.carrying ?? false), couriers: room.indoor ? const [] : (_boardMaybe?.figures(now) ?? const [])), if (!room.indoor) ...trafficPolys(now), ...((_job != null || _boardMaybe?.active != null) ? _routePolys() : const <Poly>[])],
         dynamicScreens: (_) => (inner == null && !room.indoor) ? trafficScreens(now) : const [],
         bottom: _pad(),
         topLeft: [
           if (showMap && !isLesson && !full) _MiniMap(home: home, onTap: _go, maxWidth: math.min(138.0, screenW * 0.36)),
         ],
       );
-    final stage = (_cardCall != null || _cardOffice || _cardDrone || _cardElevator) ? Stack(fit: StackFit.expand, children: [stage3d, Positioned.fill(child: _cardElevator ? _elevatorCard() : (_cardDrone ? _droneCard() : _cardOverlay()))]) : stage3d;
+    final anyCard = _cardCall != null || _cardOffice || _cardDrone || _cardElevator || _cardOrders;
+    final carDisplay = _ride?.stage == 1;
+    final stage = (anyCard || carDisplay)
+        ? Stack(fit: StackFit.expand, children: [
+            stage3d,
+            if (anyCard) Positioned.fill(child: _cardOrders ? _ordersCard() : (_cardElevator ? _elevatorCard() : (_cardDrone ? _droneCard() : _cardOverlay()))),
+            if (carDisplay)
+              Positioned(
+                top: 74,
+                left: 0,
+                right: 0,
+                child: IgnorePointer(
+                  child: Center(
+                    child: ValueListenableBuilder<String>(
+                      valueListenable: _rideLabel,
+                      builder: (_, v, __) => Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 8),
+                        decoration: BoxDecoration(color: const Color(0xFF020617).withValues(alpha: 0.82), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFF22D3EE), width: 2)),
+                        child: Text(v, style: const TextStyle(color: Color(0xFFFACC15), fontSize: 44, fontWeight: FontWeight.w900, letterSpacing: 2)),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ])
+        : stage3d;
     if (full) return _fullScreen(stage);
     return LessonScaffold(
       title: r.name,
@@ -3129,6 +3450,18 @@ class _StickState extends State<_Stick> {
 }
 
 /// A neighbour who rang about a house with no power.
+/// A ride in the elevator: from which level to which, where the person started, when the part began, and what the display shows.
+class _Ride {
+  _Ride(this.from, this.to, this.t0);
+  final int from, to;
+  int t0;
+  int stage = 0;
+  int shown = 1;
+  double total = 3;
+  double sx = 0, sz = 112;
+  bool chimed = false;
+}
+
 /// One leg of a drone film: a smooth curve through the eye points (looking at the look points) at [speed] units a second, optionally into or
 /// out of a building, or following a vehicle for [secs] seconds.
 class DroneLeg {
@@ -3215,8 +3548,8 @@ List<DroneLeg> buildDroneLegs(HRoom city, String what) {
     for (var s = 0.0; s <= 1.0; s += 0.02) {
       final p = V3.lerp(a, b, s);
       for (final f in city.furn) {
-        if (f.kind != 'billboard' && f.kind != 'cornersign' && f.kind != 'townsign') continue;
-        final (hx, hz, hy) = switch (f.kind) { 'townsign' => (215.0, 40.0, 345.0), 'cornersign' => (95.0, 40.0, 185.0), _ => (60.0, 60.0, 90.0) };
+        if (f.kind != 'billboard' && f.kind != 'cornersign' && f.kind != 'townsign' && f.kind != 'adboard') continue;
+        final (hx, hz, hy) = switch (f.kind) { 'townsign' => (215.0, 40.0, 345.0), 'cornersign' => (95.0, 40.0, 185.0), 'adboard' => (180.0, 40.0, 215.0), _ => (60.0, 60.0, 90.0) };
         if ((p.x - f.x).abs() < hx && (p.z - f.z).abs() < hz && p.y < hy) return true;
       }
     }
@@ -3229,6 +3562,8 @@ List<DroneLeg> buildDroneLegs(HRoom city, String what) {
         pass(f, 255, 250, 430, 520, 60, note: 'The biggest billboard in the city: NGMY Town');
       case 'cornersign':
         pass(f, 115, 120, 210, 260, 50, note: 'A corner billboard: NGMY Town');
+      case 'adboard':
+        pass(f, 160, 142, 330, 410, 55, note: 'A big NGMY ad billboard');
       default:
         pass(f, 75, 48, 130, 175, 45, note: 'An NGMY billboard');
     }
@@ -3255,7 +3590,7 @@ List<DroneLeg> buildDroneLegs(HRoom city, String what) {
   }
 
   final all = !const ['city', 'billboards', 'houses', 'hospital', 'traffic'].contains(what);
-  final boards = [for (final f in city.furn) if (f.kind == 'billboard' || f.kind == 'cornersign') f];
+  final boards = [for (final f in city.furn) if (f.kind == 'billboard' || f.kind == 'cornersign' || f.kind == 'adboard') f];
   final towns = city.furn.where((f) => f.kind == 'townsign');
   final houses = [for (final f in city.furn) if (f.kind == 'house2' || f.kind == 'bighouse') f];
 

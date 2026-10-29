@@ -169,7 +169,7 @@ List<Poly> trafficPolys(double t) {
 /// The billboards that move with the vehicles: one on each side of a bus or police car, one on each helicopter banner.
 List<ScreenQuad> trafficScreens(double t) {
   final out = <ScreenQuad>[];
-  ScreenQuad quad(V3 tl, V3 tr, V3 br, V3 bl, int ad, double w, double h) => ScreenQuad([tl, tr, br, bl], 0, (c, size, time) => paintCityAd(c, size, time, ad), width: w, height: h, bias: 6, order: 2);
+  ScreenQuad quad(V3 tl, V3 tr, V3 br, V3 bl, int ad, double w, double h) => ScreenQuad([tl, tr, br, bl], 0, (c, size, time) => paintCityAdLoop(c, size, time, ad), width: w, height: h, bias: 6, order: 2);
   for (var i = 0; i < kTraffic.length; i++) {
     final v = kTraffic[i];
     final (x, z, ux, uz) = vehiclePose(v, t);
