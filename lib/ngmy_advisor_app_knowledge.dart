@@ -105,7 +105,7 @@ BUSINESS CARD: Tool Hub → create/edit/download. Paid unlock for edit+download 
 
 SLIDES: Slides tab. Free blank + some class templates/designs. Slides Pro unlocks more. Marriage documents are a separate short session unlock.
 
-ADVISORS: 30 free minutes, then Advisors subscription for unlimited chat (admins unlimited).
+ADVISORS: 10 free minutes, then Advisors subscription for unlimited chat (admins unlimited).
 
 CIVIC REGISTRY (NGMY Hub): community ID, PIN gate, enrollment, registrars (AR), civic registrar roles. Guest enroll can use ?civic=enroll. Georgia stays free. Every other state gets a 2-month free Civic Registry trial for Authorized Registrars, then \$50/mo State Registrar sponsorship starting month 3.
 

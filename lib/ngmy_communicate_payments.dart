@@ -24,7 +24,10 @@ class NgmyCommunicatePassOption {
 
 class NgmyCommunicatePayments {
   static const double defaultFeeAmount = 1.0;
-  static const int defaultMinutesPerPayment = 30;
+  static const int defaultMinutesPerPayment = 10;
+
+  /// The old free allowance. A saved setting that still says 30 is the old default, not a choice, so it counts as the new 10.
+  static const int _oldDefaultMinutes = 30;
 
   static double feeAmountFromConfig(dynamic config) {
     final v = (config as dynamic).communicateFeeAmount;
@@ -34,7 +37,7 @@ class NgmyCommunicatePayments {
 
   static int minutesPerPaymentFromConfig(dynamic config) {
     final v = (config as dynamic).communicateMinutesPerPayment;
-    if (v is num && v > 0) return v.toInt();
+    if (v is num && v > 0 && v.toInt() != _oldDefaultMinutes) return v.toInt();
     return defaultMinutesPerPayment;
   }
 

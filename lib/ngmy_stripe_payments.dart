@@ -81,7 +81,7 @@ class NgmyStripePayments {
   /// Invoices a free user may create before the paywall. Counted per invoice,
   /// not per day, so someone who only invoices occasionally still gets all three.
   static const int invoiceFreeCount = 3;
-  static const int advisorFreeMinutes = 30;
+  static const int advisorFreeMinutes = 10;
   static const int dayTrialHours = 24;
   static const int marriageSessionHours = 4;
   static const int phoneUnlockAccessDays = 10;
