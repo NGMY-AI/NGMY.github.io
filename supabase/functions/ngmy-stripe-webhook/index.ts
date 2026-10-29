@@ -41,6 +41,7 @@ const PRODUCT_SLUGS = new Set([
   "device_transfer",
   "state_registrar",
   "house_insurance",
+  "advisor_browser",
 ]);
 
 const STATE_REGISTRAR_SETTINGS_KEY = "civic_state_registrar_subscriptions";
@@ -100,6 +101,8 @@ const ACCESS_HOURS_MARRIAGE = 4;
 const ACCESS_DAYS_BUSINESS_CARD = 2;
 const ACCESS_DAYS_BIO_PHOTO_PACK = 1;
 const ACCESS_DAYS_QR_GENERATOR = 14;
+// The advisors' live browser: 2 hours of browsing, kept for a week.
+const ACCESS_DAYS_ADVISOR_BROWSER = 7;
 const ACCESS_DAYS_SWAHILI_LEVEL = 36500;
 const SIGNATURE_TOLERANCE_SEC = 300;
 
@@ -180,6 +183,9 @@ function accessUntilForProduct(product: string, existingUntil: Date | null): str
   }
   if (product === "qr_generator") {
     return new Date(now.getTime() + ACCESS_DAYS_QR_GENERATOR * 86_400_000).toISOString();
+  }
+  if (product === "advisor_browser") {
+    return new Date(now.getTime() + ACCESS_DAYS_ADVISOR_BROWSER * 86_400_000).toISOString();
   }
   if (product.startsWith("business_card:")) {
     return new Date(now.getTime() + ACCESS_DAYS_BUSINESS_CARD * 86_400_000).toISOString();

@@ -1679,7 +1679,7 @@ class _AdminCareSheetState extends State<_AdminCareSheet> {
   }
 
   Future<void> _load() async {
-    final results = await Future.wait([NgmyHouseWorkersApi.adminCare(), NgmyHouseWorkersApi.adminCarePayments()]);
+    final results = await Future.wait([NgmyHouseWorkersApi.adminCare(), NgmyHouseWorkersApi.adminCarePayments(), NgmyHouseWorkersApi.adminBrowserPayments()]);
     if (!mounted) return;
     setState(() {
       _loading = false;
@@ -1689,17 +1689,23 @@ class _AdminCareSheetState extends State<_AdminCareSheet> {
       } else {
         _error = (results[0]['error'] ?? 'Could not load.').toString();
       }
-      if (results[1]['ok'] == true) _payments = _maps(results[1]['payments']);
+      _payments = [
+        if (results[1]['ok'] == true) ..._maps(results[1]['payments']),
+        if (results[2]['ok'] == true) ..._maps(results[2]['payments']),
+      ]..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
     });
   }
 
   int get _pendingPayments => _payments.where((p) => p['status'] == 'pending').length;
 
   Future<void> _decide(Map<String, dynamic> p, bool approve) async {
-    final res = await NgmyHouseWorkersApi.adminCarePaymentDecide((p['id'] ?? '').toString(), approve);
+    final browser = p['kind'] == 'browser';
+    final res = browser
+        ? await NgmyHouseWorkersApi.adminBrowserPaymentDecide((p['id'] ?? '').toString(), approve)
+        : await NgmyHouseWorkersApi.adminCarePaymentDecide((p['id'] ?? '').toString(), approve);
     if (!mounted) return;
     if (res['ok'] == true) {
-      _snack(context, approve ? 'Payment approved. House Care is active.' : 'Payment rejected.');
+      _snack(context, approve ? (browser ? 'Payment approved. The 2 hours of browser time are on their way.' : 'Payment approved. House Care is active.') : 'Payment rejected.');
       _load();
     } else {
       _snack(context, (res['error'] ?? 'Could not update.').toString(), error: true);
@@ -1741,7 +1747,7 @@ class _AdminCareSheetState extends State<_AdminCareSheet> {
   Widget _paymentCard(Map<String, dynamic> p, _HwColors c) {
     final status = (p['status'] ?? '').toString();
     final color = status == 'approved' ? _kHwGreen : (status == 'rejected' ? const Color(0xFFEF4444) : const Color(0xFFF59E0B));
-    final what = p['term'] == true ? 'Full agreement' : (p['plan'] == 'premium' ? 'Premium month' : 'Monthly');
+    final what = p['kind'] == 'browser' ? 'Advisor browser · 2 hours' : (p['term'] == true ? 'Full agreement' : (p['plan'] == 'premium' ? 'Premium month' : 'Monthly'));
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
@@ -1757,7 +1763,7 @@ class _AdminCareSheetState extends State<_AdminCareSheet> {
           ),
           const SizedBox(width: 8),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text('\$${((p['amount'] as num?) ?? 0).toStringAsFixed(0)}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: c.ink)),
+            Text('\$${((p['amount'] as num?) ?? 0) == ((p['amount'] as num?) ?? 0).roundToDouble() ? ((p['amount'] as num?) ?? 0).toStringAsFixed(0) : ((p['amount'] as num?) ?? 0).toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: c.ink)),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(999)),
@@ -1960,6 +1966,8 @@ Future<Map<String, dynamic>?> showNgmyCareCashAppSheet(
   required String cashAppUrl,
   required String cashAppTag,
   required bool fullTerm,
+  /// Sends the payment somewhere else than House Care (the code, the screenshot as base64 and its type). It returns the server's answer.
+  Future<Map<String, dynamic>> Function(String code, String proofBase64, String proofMime)? onSubmit,
 }) {
   return showGeneralDialog<Map<String, dynamic>>(
     context: context,
@@ -1967,7 +1975,7 @@ Future<Map<String, dynamic>?> showNgmyCareCashAppSheet(
     barrierLabel: 'Close',
     barrierColor: Colors.black.withOpacity(0.62),
     transitionDuration: const Duration(milliseconds: 380),
-    pageBuilder: (_, __, ___) => _CareCashAppSheet(amount: amount, label: label, cashAppUrl: cashAppUrl, cashAppTag: cashAppTag, fullTerm: fullTerm),
+    pageBuilder: (_, __, ___) => _CareCashAppSheet(amount: amount, label: label, cashAppUrl: cashAppUrl, cashAppTag: cashAppTag, fullTerm: fullTerm, onSubmit: onSubmit),
     transitionBuilder: (_, anim, __, child) {
       final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutBack, reverseCurve: Curves.easeInCubic);
       return FadeTransition(
@@ -1979,7 +1987,9 @@ Future<Map<String, dynamic>?> showNgmyCareCashAppSheet(
 }
 
 class _CareCashAppSheet extends StatefulWidget {
-  const _CareCashAppSheet({required this.amount, required this.label, required this.cashAppUrl, required this.cashAppTag, required this.fullTerm});
+  const _CareCashAppSheet({required this.amount, required this.label, required this.cashAppUrl, required this.cashAppTag, required this.fullTerm, this.onSubmit});
+
+  final Future<Map<String, dynamic>> Function(String code, String proofBase64, String proofMime)? onSubmit;
 
   final double amount;
   final String label;
@@ -2002,7 +2012,7 @@ class _CareCashAppSheetState extends State<_CareCashAppSheet> with SingleTickerP
   Uint8List? _shot;
   String _shotMime = 'image/jpeg';
 
-  String get _amountText => widget.amount.toStringAsFixed(0);
+  String get _amountText => widget.amount == widget.amount.roundToDouble() ? widget.amount.toStringAsFixed(0) : widget.amount.toStringAsFixed(2);
 
   @override
   void dispose() {
@@ -2049,13 +2059,16 @@ class _CareCashAppSheetState extends State<_CareCashAppSheet> with SingleTickerP
   Future<void> _submit() async {
     if (_shot == null || _busy) return;
     setState(() => _busy = true);
-    final res = await NgmyHouseWorkersApi.planCashApp(
-      'basic',
-      term: widget.fullTerm,
-      code: _code,
-      proofBase64: base64Encode(_shot!),
-      proofMime: _shotMime,
-    );
+    final custom = widget.onSubmit;
+    final res = custom != null
+        ? await custom(_code, base64Encode(_shot!), _shotMime)
+        : await NgmyHouseWorkersApi.planCashApp(
+            'basic',
+            term: widget.fullTerm,
+            code: _code,
+            proofBase64: base64Encode(_shot!),
+            proofMime: _shotMime,
+          );
     if (!mounted) return;
     setState(() => _busy = false);
     if (res['ok'] == true) {
@@ -2188,7 +2201,7 @@ class _CareCashAppSheetState extends State<_CareCashAppSheet> with SingleTickerP
                           tween: Tween(begin: 0, end: widget.amount),
                           duration: const Duration(milliseconds: 1100),
                           curve: Curves.easeOutCubic,
-                          builder: (_, v, __) => Text('\$${v.toStringAsFixed(0)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 46, height: 1.15)),
+                          builder: (_, v, __) => Text('\$${widget.amount == widget.amount.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 46, height: 1.15)),
                         ),
                         if (tag.isNotEmpty) Text('to $tag', style: const TextStyle(color: _green, fontWeight: FontWeight.w800, fontSize: 14)),
                       ]),

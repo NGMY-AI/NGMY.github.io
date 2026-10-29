@@ -208,7 +208,7 @@ bool ngmyUserNamesLiveBrowser(String text) =>
 
 // ── Run controller ─────────────────────────────────────────────────────────
 
-enum NgmyAgentStartResult { started, notConfigured, failed }
+enum NgmyAgentStartResult { started, notConfigured, failed, paymentNeeded }
 
 class NgmyAdvisorAgentStep {
   final int id;
@@ -333,6 +333,9 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
     return ok;
   }
 
+  /// Asked before a browser run starts: true to go on, false when the time is over (it has already shown the payment pop-up).
+  Future<bool> Function()? gate;
+
   Future<NgmyAgentStartResult> start({
     required String task,
     String? startUrl,
@@ -344,6 +347,9 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
     bool direct = false,
     bool isRetry = false,
   }) async {
+    // The person's browser time is checked first: when it is over the payment pop-up is shown and nothing starts.
+    final check = gate;
+    if (!isRetry && check != null && !await check()) return NgmyAgentStartResult.paymentNeeded;
     if (running) await stop();
     if (!isRetry) _retriedDirect = false;
     _lastStartUrl = startUrl;

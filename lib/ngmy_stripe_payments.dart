@@ -32,6 +32,7 @@ enum NgmyStripeProduct {
   civicUserGroupExtra,
   civicUserGroupMembers,
   houseInsurance,
+  advisorBrowser,
 }
 
 class NgmyStripePayments {
@@ -77,6 +78,10 @@ class NgmyStripePayments {
   /// Live Payment Link for House Insurance ($125 / 30 days). Empty until the
   /// Stripe Dashboard link is pasted here — Cash App still collects the fee.
   static const String houseInsuranceUrl = 'https://buy.stripe.com/cNi3cveo13tv2ZR1hXb7y0m';
+
+  /// Payment Link for the advisors' live browser: $5.99 = 2 hours of browser time, kept for a week.
+  /// Create it in the Stripe Dashboard (a one-time $5.99 price) and paste the buy.stripe.com link here.
+  static const String advisorBrowserUrl = '';
 
   /// Invoices a free user may create before the paywall. Counted per invoice,
   /// not per day, so someone who only invoices occasionally still gets all three.
@@ -158,6 +163,8 @@ class NgmyStripePayments {
         return 'civic_user_group_members';
       case NgmyStripeProduct.houseInsurance:
         return 'house_insurance';
+      case NgmyStripeProduct.advisorBrowser:
+        return 'advisor_browser';
     }
   }
 
@@ -203,6 +210,8 @@ class NgmyStripePayments {
         return NgmyStripeProduct.civicUserGroupMembers;
       case 'house_insurance':
         return NgmyStripeProduct.houseInsurance;
+      case 'advisor_browser':
+        return NgmyStripeProduct.advisorBrowser;
       default:
         return null;
     }
@@ -250,6 +259,8 @@ class NgmyStripePayments {
         return civicUserGroupMembersUrl;
       case NgmyStripeProduct.houseInsurance:
         return houseInsuranceUrl;
+      case NgmyStripeProduct.advisorBrowser:
+        return advisorBrowserUrl;
     }
   }
 
@@ -349,6 +360,8 @@ class NgmyStripePayments {
         return 299;
       case NgmyStripeProduct.houseInsurance:
         return 12500;
+      case NgmyStripeProduct.advisorBrowser:
+        return 599;
     }
   }
 
@@ -424,6 +437,8 @@ class NgmyStripePayments {
         return const [Color(0xFFA5F3FC), Color(0xFF155E75)]; // bolt ice
       case NgmyStripeProduct.houseInsurance:
         return const [Color(0xFF5EEAD4), Color(0xFF0F766E)]; // house teal
+      case NgmyStripeProduct.advisorBrowser:
+        return const [Color(0xFFFDE68A), Color(0xFFB45309)]; // browser amber
     }
   }
 
@@ -470,6 +485,8 @@ class NgmyStripePayments {
         return const Color(0xFFCFFAFE);
       case NgmyStripeProduct.houseInsurance:
         return const Color(0xFFCCFBF1);
+      case NgmyStripeProduct.advisorBrowser:
+        return const Color(0xFFFEF3C7);
     }
   }
 
@@ -529,6 +546,8 @@ class NgmyStripePayments {
         return 'Group 100+ Members';
       case NgmyStripeProduct.houseInsurance:
         return 'House Insurance';
+      case NgmyStripeProduct.advisorBrowser:
+        return 'Advisor Browser';
     }
   }
 
@@ -574,6 +593,8 @@ class NgmyStripePayments {
         return Icons.groups_rounded;
       case NgmyStripeProduct.houseInsurance:
         return Icons.home_repair_service_rounded;
+      case NgmyStripeProduct.advisorBrowser:
+        return Icons.travel_explore_rounded;
     }
   }
 
@@ -619,10 +640,13 @@ class NgmyStripePayments {
         return 'Unlock more than 100 members in your lightning Civic Group (30 days).';
       case NgmyStripeProduct.houseInsurance:
         return '\$125 for 30 days of the home-fix coverages you choose.';
+      case NgmyStripeProduct.advisorBrowser:
+        return '2 hours of my live browser for \$5.99, kept for a week.';
     }
   }
 
   static bool isOneTimePayProduct(NgmyStripeProduct product) =>
+      product == NgmyStripeProduct.advisorBrowser ||
       product == NgmyStripeProduct.marriageDocument ||
       product == NgmyStripeProduct.phoneUnlock ||
       product == NgmyStripeProduct.businessCard ||
@@ -1121,6 +1145,8 @@ class NgmyStripePayments {
     bool checkDayTrial = false,
     String? title,
     String? message,
+    String? extraLabel,
+    Future<void> Function()? onExtra,
   }) async {
     if (isAdmin) return true;
     await processPaymentReturnFromUrl();
@@ -1148,6 +1174,8 @@ class NgmyStripePayments {
       email: email,
       title: title,
       message: message,
+      extraLabel: extraLabel,
+      onExtra: onExtra,
     );
     if (opened != true) return false;
 
@@ -1219,6 +1247,8 @@ class NgmyStripePayments {
     String checkoutScope = '',
     String? title,
     String? message,
+    String? extraLabel,
+    Future<void> Function()? onExtra,
   }) {
     return showDialog<bool>(
       context: context,
@@ -1230,6 +1260,8 @@ class NgmyStripePayments {
         checkoutScope: checkoutScope,
         title: title ?? productTitle(product),
         message: message ?? productSubtitle(product),
+        extraLabel: extraLabel,
+        onExtra: onExtra,
       ),
     ).then((v) => v == true);
   }
@@ -1242,7 +1274,13 @@ class _NgmyPaymentDialog extends StatefulWidget {
     this.checkoutScope = '',
     required this.title,
     required this.message,
+    this.extraLabel,
+    this.onExtra,
   });
+
+  /// A second way to pay under the card button (Cash App): its label, and what to do when it is tapped.
+  final String? extraLabel;
+  final Future<void> Function()? onExtra;
 
   final NgmyStripeProduct product;
   final String email;
@@ -1666,6 +1704,10 @@ class _NgmyPaymentDialogState extends State<_NgmyPaymentDialog>
                                 colors: [mid, deep],
                                 shine: shine,
                                 onPressed: () async {
+                                  if (!NgmyStripePayments.hasCheckoutLink(widget.product)) {
+                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Card checkout is not linked yet. Use Cash App.')));
+                                    return;
+                                  }
                                   await NgmyStripePayments.startCheckout(
                                     widget.email,
                                     widget.product,
@@ -1677,6 +1719,29 @@ class _NgmyPaymentDialogState extends State<_NgmyPaymentDialog>
                                 },
                               ),
                             ),
+                            if (widget.extraLabel != null && widget.onExtra != null) ...[
+                              const SizedBox(height: 10),
+                              _stagger(
+                                9,
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 50,
+                                  child: OutlinedButton.icon(
+                                    onPressed: () async {
+                                      await widget.onExtra!();
+                                      if (context.mounted) Navigator.pop(context, false);
+                                    },
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: Colors.white,
+                                      side: BorderSide(color: mid.withValues(alpha: 0.6), width: 1.4),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                                    ),
+                                    icon: const Icon(Icons.attach_money_rounded, size: 20),
+                                    label: Text(widget.extraLabel!, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                                  ),
+                                ),
+                              ),
+                            ],
                             if (widget.email.trim().isNotEmpty) ...[
                               const SizedBox(height: 13),
                               _stagger(

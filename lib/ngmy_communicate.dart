@@ -32,6 +32,7 @@ import 'ngmy_ai_memory.dart';
 import 'ngmy_bottom_nav_frame.dart';
 import 'ngmy_communicate_chat_images.dart';
 import 'ngmy_communicate_debater.dart';
+import 'ngmy_browser_time.dart';
 import 'ngmy_communicate_payments.dart';
 import 'ngmy_stripe_payments.dart';
 import 'ngmy_communicate_storage.dart';
@@ -3759,6 +3760,48 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   double _browserLift = 0;
   /// Real cloud browser the advisor drives live (Browser Use Cloud).
   final _agentRun = NgmyAdvisorAgentRun();
+
+  bool get _isAdminUser {
+    try {
+      return (widget.user as dynamic).isAdmin == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// The browser time of this account: asked before a browser run starts (10 free minutes, then $5.99 for 2 hours).
+  Future<bool> _browserGate() => NgmyBrowserTime.ensureAvailable(context: context, email: _email, config: widget.config, isAdmin: _isAdminUser);
+
+  /// When the live browser was last counted, and when payments were last looked up.
+  DateTime? _browserCountedAt;
+  DateTime? _browserPaySyncAt;
+  bool _browserPaywallOpen = false;
+
+  /// Every few seconds: while the live browser is open (and the chat is in front) its time is taken off in the background. When
+  /// the time runs out the browser stops and the payment pop-up comes up. The person never sees any counting.
+  Future<void> _countBrowserTime() async {
+    if (_isAdminUser || _email.isEmpty) return;
+    final now = DateTime.now();
+    final last = _browserCountedAt;
+    _browserCountedAt = now;
+    final lastSync = _browserPaySyncAt;
+    if (lastSync == null || now.difference(lastSync) > const Duration(seconds: 60)) {
+      _browserPaySyncAt = now;
+      unawaited(NgmyBrowserTime.syncPayments(_email));
+    }
+    if (last == null || !_liveBrowserOn || !_shouldCountTime) return;
+    final secs = now.difference(last).inSeconds.clamp(0, 30);
+    if (secs <= 0) return;
+    await NgmyBrowserTime.use(_email, secs);
+    if (await NgmyBrowserTime.hasTime(_email) || _browserPaywallOpen || !mounted) return;
+    _browserPaywallOpen = true;
+    try {
+      if (_agentRun.running) await _agentRun.stop();
+      if (mounted) await NgmyBrowserTime.showPaywall(context, email: _email, config: widget.config);
+    } finally {
+      _browserPaywallOpen = false;
+    }
+  }
   /// Outbound texts waiting for an AI reply (never drop while busy).
   final List<Map<String, String>> _outboundQueue = [];
   DateTime? _sessionStart;
@@ -3861,6 +3904,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       recentUserMessages: recentUser.length > 4 ? recentUser.sublist(recentUser.length - 4) : recentUser,
       applicantDetails: _applicantDetails,
     );
+    // Out of browser time: the payment pop-up was shown, so no message is sent.
+    if (started == NgmyAgentStartResult.paymentNeeded) return true;
     if (started == NgmyAgentStartResult.started) {
       unawaited(_savePendingAgentRun());
       if (_browserSession.visible) unawaited(_browserSession.hide());
@@ -4110,6 +4155,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       ..onOpened = ((url) => unawaited(SharedPreferences.getInstance().then((p) => p.remove(_browserClosedKey))))
       ..addListener(_onBrowserSessionChanged);
     _agentRun
+      ..gate = _browserGate
       ..addListener(_onBrowserSessionChanged)
       ..onFinished = (run) => unawaited(_onAgentFinished(run));
     _load();
@@ -4235,6 +4281,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       if (!mounted) return false;
       await _syncTimeCounting();
       await _flushSessionTime();
+      unawaited(_countBrowserTime());
       final used = await NgmyCommunicateTimeTracker.getUsedSeconds(_email);
       if (mounted) {
         setState(() {
@@ -5246,6 +5293,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       recentUserMessages: tail,
       applicantDetails: _applicantDetails,
     );
+    if (started == NgmyAgentStartResult.paymentNeeded) return true;
     if (started != NgmyAgentStartResult.started) return false;
     unawaited(_savePendingAgentRun());
     if (_browserSession.visible) unawaited(_browserSession.hide());
@@ -5841,6 +5889,11 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                 ? (answeringForm ? 'Got it — continuing the application with that.' : 'Got it — picking up where we left off. Watch the Browser 👀')
                 : 'On it! I\'m doing that now in my browser — watch me live below. I\'ll tell you what I find.',
           );
+          return;
+        }
+        // Out of browser time: the payment pop-up was shown, so there is no text message about it.
+        if (started == NgmyAgentStartResult.paymentNeeded) {
+          deliveredOk = true;
           return;
         }
         if (started == NgmyAgentStartResult.failed) {

@@ -62,6 +62,10 @@ class NgmyHouseWorkersApi {
   static Future<Map<String, dynamic>> planCashApp(String plan, {bool term = false, String? code, String? proofBase64, String? proofMime}) =>
       _call('hwPlanCashApp', {'plan': plan, if (term) 'term': true, if (code != null) 'code': code, if (proofBase64 != null) 'proofBase64': proofBase64, if (proofMime != null) 'proofMime': proofMime});
   static Future<Map<String, dynamic>> adminCarePayments() => _call('hwAdminCarePayments');
+  // Cash App payments for the advisors' live browser ($5.99 = 2 hours): the admin checks the money and approves.
+  static Future<Map<String, dynamic>> adminBrowserPayments() => _call('bwAdminPayments');
+  static Future<Map<String, dynamic>> adminBrowserPaymentDecide(String id, bool approve) =>
+      _call('bwAdminPaymentDecide', {'paymentId': id, 'decision': approve ? 'approve' : 'reject'});
   static Future<Map<String, dynamic>> adminCarePaymentDecide(String id, bool approve) =>
       _call('hwAdminCarePaymentDecide', {'paymentId': id, 'decision': approve ? 'approve' : 'reject'});
   static Future<Map<String, dynamic>> adminWorkerStats(String email) => _call('hwAdminWorkerStats', {'workerEmail': email});

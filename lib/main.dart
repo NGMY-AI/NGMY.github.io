@@ -13158,6 +13158,16 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           }
         }
       } catch (_) {/* the alert is skipped this time */}
+      try {
+        final res = await NgmyHouseWorkersApi.adminBrowserPayments();
+        if (res['ok'] == true && res['payments'] is List) {
+          for (final p in res['payments'] as List) {
+            if (p is Map && p['status'] == 'pending') {
+              careItems.add(NgmyAdminAlertItem('browserpay:${p['id']}', '\$${p['amount']} · browser · ${p['name']}'));
+            }
+          }
+        }
+      } catch (_) {/* the alert is skipped this time */}
     }
     final cats = <NgmyAdminAlertCategory>[
       if (isAdmin) ...[

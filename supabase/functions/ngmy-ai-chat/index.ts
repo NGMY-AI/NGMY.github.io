@@ -554,7 +554,7 @@ async function handleAgentStart(req: Request, body: any): Promise<Response> {
   const payload: Record<string, unknown> = {
     task: fullTask,
     // The most one browser task may spend. 0.75 was too small: tasks stopped at the very start with "Task cost limit reached".
-    maxCostUsd: Math.max(0.75, Number(Deno.env.get("BROWSER_USE_MAX_COST_USD") ?? "3") || 3),
+    maxCostUsd: Math.max(0.75, Number(Deno.env.get("BROWSER_USE_MAX_COST_USD") ?? "2") || 2),
     browserSettings: freshBrowser(),
   };
   if (/^[0-9a-f-]{36}$/i.test(sessionId) && !direct) {
@@ -1639,6 +1639,7 @@ const HW_ACTIONS = new Set([
   "hwList", "hwMe", "hwApply", "hwRequest", "hwRespond", "hwDone", "hwRate", "hwCancel",
   "hwAdminList", "hwAdminDecide", "hwPostJob", "hwJobs", "hwPickJob", "hwPlanCashApp", "hwBusy",
   "hwCare", "hwCareSign", "hwAdminCare", "hwAdminPayList", "hwAdminPay", "hwAdminCareRevoke", "hwAdminCareRestore", "hwAdminCarePayments", "hwAdminCarePaymentDecide", "hwAdminWorkerStats",
+  "bwCashApp", "bwPassGet", "bwAdminPayments", "bwAdminPaymentDecide",
 ]);
 const HW_MAX_PHOTO_BYTES = 900 * 1024;
 
@@ -2399,6 +2400,43 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
     return jsonOk({ ok: true, pending: true, care: await hwCare(db, email), plans: await hwPlans(db, email) });
   }
 
+  // ── The advisors' live browser: $5.99 for 2 hours, paid by Cash App with a code and a screenshot, checked by an admin ──
+  if (action === "bwCashApp") {
+    const limited = await enforceRateLimit(req, "bw_pay", email, 6, 86400);
+    if (limited) return limited;
+    const { data: waiting } = await db.from("browser_payments").select("id").eq("email", email).eq("status", "pending").limit(1);
+    if (waiting && waiting.length > 0) {
+      return jsonOk({ ok: false, error: "Your last payment is still being confirmed." }, 409);
+    }
+    const code = String(body?.code ?? "").replace(/\D/g, "").slice(0, 8);
+    const proofB64 = String(body?.proofBase64 ?? "");
+    if (code.length < 4) return jsonOk({ ok: false, error: "Your payment code is missing. Open the payment again." }, 400);
+    if (!proofB64) return jsonOk({ ok: false, error: "Attach the screenshot of your Cash App payment." }, 400);
+    let proofUrl = "";
+    try {
+      proofUrl = await hwUploadCareImage(db, email, "pay", proofB64, String(body?.proofMime ?? ""));
+    } catch (e) {
+      return jsonOk({ ok: false, error: String((e as Error).message ?? e) }, 400);
+    }
+    const { error } = await db.from("browser_payments").insert({ email, amount: 5.99, status: "pending", code, proof_url: proofUrl });
+    if (error) {
+      await hwRemoveCareImage(db, proofUrl);
+      const missing = /browser_payments|relation|does not exist/i.test(error.message);
+      return jsonOk({ ok: false, error: missing ? "Browser payments are not switched on yet. Please tell the admin to finish the setup." : error.message }, 500);
+    }
+    return jsonOk({ ok: true, pending: true });
+  }
+
+  if (action === "bwPassGet") {
+    // The phone asks: did an admin approve my payment? Each approval is handed over once (claimed).
+    const { data: ready, error } = await db.from("browser_payments").select("id").eq("email", email).eq("status", "approved").eq("claimed", false).limit(10);
+    if (error) return jsonOk({ ok: true, grants: 0, pending: false });
+    const ids = (ready ?? []).map((r: any) => r.id);
+    if (ids.length > 0) await db.from("browser_payments").update({ claimed: true }).in("id", ids);
+    const { data: waiting } = await db.from("browser_payments").select("id").eq("email", email).eq("status", "pending").limit(1);
+    return jsonOk({ ok: true, grants: ids.length, pending: (waiting ?? []).length > 0 });
+  }
+
   if (action === "hwBusy") {
     // The times a worker is already booked on a day, so the app can show them as busy.
     const workerId = hwText(body?.workerId, 60);
@@ -2787,6 +2825,29 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
     }
     const { error } = await db.from("house_subscriptions")
       .update({ status: "pending", updated_at: now }).eq("email", target);
+    if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    return jsonOk({ ok: true });
+  }
+  if (action === "bwAdminPayments") {
+    // Cash App payments for the live browser that members say they sent, waiting for an admin to check the money.
+    const { data, error } = await db.from("browser_payments").select("*").order("created_at", { ascending: false }).limit(200);
+    if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    const payments = (data ?? []).map((r: any) => ({
+      id: r.id, email: r.email, name: String(r.email), plan: "browser", term: false, kind: "browser",
+      amount: Number(r.amount ?? 0), status: r.status, createdAt: r.created_at, decidedAt: r.decided_at,
+      code: r.code ?? "", proofUrl: r.proof_url ?? "",
+    }));
+    return jsonOk({ ok: true, payments, pending: payments.filter((p: any) => p.status === "pending").length });
+  }
+  if (action === "bwAdminPaymentDecide") {
+    const id = hwText(body?.paymentId, 60);
+    const decision = body?.decision === "approve" ? "approved" : body?.decision === "reject" ? "rejected" : "";
+    if (!id || !decision) return jsonOk({ ok: false, error: "Pick a payment." }, 400);
+    const { data: pay } = await db.from("browser_payments").select("*").eq("id", id).maybeSingle();
+    if (!pay) return jsonOk({ ok: false, error: "That payment was not found." }, 404);
+    if (pay.status !== "pending") return jsonOk({ ok: false, error: `That payment was already ${pay.status}.` }, 409);
+    const { error } = await db.from("browser_payments")
+      .update({ status: decision, decided_at: now, decided_by: email }).eq("id", id).eq("status", "pending");
     if (error) return jsonOk({ ok: false, error: error.message }, 500);
     return jsonOk({ ok: true });
   }
@@ -10605,6 +10666,10 @@ serve(async (req) => {
       hn: "hwAdminCarePayments",
       ho: "hwAdminCarePaymentDecide",
       hp: "hwAdminWorkerStats",
+      hq: "bwCashApp",
+      hr: "bwPassGet",
+      hs: "bwAdminPayments",
+      ht: "bwAdminPaymentDecide",
       s1: "storeGrant",
       s2: "storeRevoke",
       s3: "storeList",
