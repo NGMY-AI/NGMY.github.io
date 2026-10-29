@@ -95,6 +95,16 @@ if (-not $pl) {
 } else {
     Write-Ok "Reusing $($pl.url)"
 }
+# The NGMY name and logo on the Stripe checkout page, like the other products.
+$items = Invoke-Stripe -Method GET -Path "payment_links/$($pl.id)/line_items?limit=1"
+$prodId = $items.data[0].price.product
+if ($prodId -is [string]) {
+    $null = Invoke-Stripe -Method POST -Path "products/$prodId" -Fields @(
+        "name=NGMY Browser (2 hours)",
+        "images[0]=$($SiteUrl)icons/Icon-512.png"
+    )
+    Write-Ok "Product named NGMY Browser, with the NGMY logo"
+}
 $redirect = $SiteUrl + "?ngmy_pay_ok=1" + [char]38 + "ngmy_pay=" + $Slug
 $null = Invoke-Stripe -Method POST -Path "payment_links/$($pl.id)" -Fields @(
     "after_completion[type]=redirect",

@@ -2043,7 +2043,7 @@ class _CareCashAppSheetState extends State<_CareCashAppSheet> with SingleTickerP
 
   Future<void> _pickShot() async {
     try {
-      final file = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1200, imageQuality: 70);
+      final file = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1000, imageQuality: 60);
       if (file == null) return;
       final bytes = await file.readAsBytes();
       if (!mounted) return;

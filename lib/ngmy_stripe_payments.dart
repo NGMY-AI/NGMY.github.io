@@ -388,6 +388,8 @@ class NgmyStripePayments {
         return '2 weeks';
       case NgmyStripeProduct.swahiliLevel:
         return 'lifetime';
+      case NgmyStripeProduct.advisorBrowser:
+        return '2 hours';
       default:
         return '30 days';
     }
@@ -547,7 +549,7 @@ class NgmyStripePayments {
       case NgmyStripeProduct.houseInsurance:
         return 'House Insurance';
       case NgmyStripeProduct.advisorBrowser:
-        return 'Advisor Browser';
+        return 'NGMY Browser';
     }
   }
 
@@ -1675,7 +1677,7 @@ class _NgmyPaymentDialogState extends State<_NgmyPaymentDialog>
                                   ),
                                 ),
                                 child: Text(
-                                  '$duration of access',
+                                  widget.product == NgmyStripeProduct.advisorBrowser ? '2 hours of browser time' : '$duration of access',
                                   style: TextStyle(
                                     color: metalText,
                                     fontSize: 11.5,

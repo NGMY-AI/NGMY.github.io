@@ -2446,7 +2446,9 @@ const HW_CARE_VERSION = "v1";
 async function hwUploadCareImage(db: any, email: string, kind: string, b64: string, mime: string): Promise<string> {
   const clean = b64.includes(",") ? b64.slice(b64.indexOf(",") + 1) : b64;
   const bytes = Uint8Array.from(atob(clean), (ch) => ch.charCodeAt(0));
-  if (bytes.length === 0 || bytes.length > HW_MAX_PHOTO_BYTES) throw new Error(`The ${kind} is too big. Try again.`);
+  // A screenshot of a Cash App payment is a phone screenshot, which is bigger than a profile photo.
+  const maxBytes = kind === "pay" ? 4 * 1024 * 1024 : HW_MAX_PHOTO_BYTES;
+  if (bytes.length === 0 || bytes.length > maxBytes) throw new Error(kind === "pay" ? "That screenshot is too big. Try a smaller one." : `The ${kind} is too big. Try again.`);
   const type = /png/i.test(mime) ? "image/png" : "image/jpeg";
   const ext = type === "image/png" ? "png" : "jpg";
   const key = await sha256Hex(`hwcare:${email}`);

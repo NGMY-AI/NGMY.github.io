@@ -148,7 +148,7 @@ class NgmyBrowserTime {
       context: context,
       product: NgmyStripeProduct.advisorBrowser,
       email: email,
-      title: 'Keep using my browser',
+      title: 'NGMY Browser',
       message: waiting
           ? 'Your Cash App payment is being checked. Your 2 hours start as soon as an admin approves it.'
           : 'Your browser time is up. \$${price.toStringAsFixed(2)} gives you 2 more hours: use them within a week, and what is left stays here when you close the browser.',
@@ -177,7 +177,7 @@ class NgmyBrowserTime {
     final res = await showNgmyCareCashAppSheet(
       context,
       amount: price,
-      label: 'Advisor browser · 2 hours',
+      label: 'NGMY Browser · 2 hours',
       cashAppUrl: url,
       cashAppTag: cfg.cashAppDisplayTag(),
       fullTerm: false,
