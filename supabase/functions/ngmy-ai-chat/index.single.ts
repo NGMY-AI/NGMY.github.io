@@ -1,0 +1,11558 @@
+// NGMY AI proxy — run on Supabase so phone/web PWA avoids browser CORS blocks.
+// Deploy: supabase functions deploy ngmy-ai-chat --project-ref gvufllqqxjnpicmkxzcg
+// Or link project in Supabase Dashboard → Edge Functions.
+
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+// ── The AI limits (the whole of ai_gate.ts, built in so this one file can be pasted alone) ──
+// NGMY AI gate — everything that decides whether an AI request may go to the AI provider.
+//
+// Pure logic with no Deno or Supabase imports, so it can be tested with `deno test` and a fake store.
+// The Edge Function (index.ts) plugs in a Postgres-backed store (`ngmy_ai_gate` SQL function), so the
+// counters are durable and shared by every function instance.
+//
+// Order of checks, all BEFORE the provider is called:
+//   1. who is it?  (a signed-in user, or only an IP address)
+//   2. is the AI provider cooling down after a 429?  (then nobody calls it)
+//   3. per-user minute / hour / day limits, per-IP limit, and the global daily cap — all counted in ONE
+//      all-or-nothing step, so a blocked request never uses up quota.
+
+export type AiClass = "normal" | "expensive";
+
+export interface WindowLimits {
+  perMinute: number;
+  perHour: number;
+  perDay: number;
+}
+
+export interface GateLimits {
+  /** Normal AI chat / advisor. */
+  normal: WindowLimits;
+  /** Expensive actions: job applications, documents, App Builder, pictures, voice, live browser. */
+  expensive: WindowLimits;
+  /** Unauthenticated AI is off unless this is true. */
+  allowAnon: boolean;
+  /** Per IP per minute for anyone who is not signed in. */
+  anonPerMinute: number;
+  /** Per IP per minute for signed-in users too (stops many accounts from one address). */
+  ipPerMinute: number;
+  /** Requests per day for the whole app on the shared key (the circuit breaker). */
+  globalPerDay: number;
+  /** Cost controls. */
+  maxPromptChars: number;
+  maxPromptCharsExpensive: number;
+  maxImages: number;
+  maxImageChars: number;
+  maxOutputTokens: number;
+  maxOutputTokensExpensive: number;
+  timeoutMs: number;
+  /** How many different models one request may try (a failure is never retried on the same model). */
+  maxModelAttempts: number;
+  /** After the provider says 429, nobody calls it for this long. */
+  providerCooldownSeconds: number;
+  /** This many blocked requests from one user in ten minutes is logged as a spike. */
+  spikeThreshold: number;
+}
+
+export const DEFAULT_LIMITS: GateLimits = {
+  normal: { perMinute: 20, perHour: 100, perDay: 300 },
+  expensive: { perMinute: 5, perHour: 20, perDay: 50 },
+  allowAnon: false,
+  anonPerMinute: 5,
+  ipPerMinute: 60,
+  globalPerDay: 5000,
+  maxPromptChars: 24000,
+  maxPromptCharsExpensive: 120000,
+  maxImages: 4,
+  maxImageChars: 6_000_000,
+  maxOutputTokens: 2048,
+  maxOutputTokensExpensive: 8192,
+  timeoutMs: 30000,
+  maxModelAttempts: 2,
+  providerCooldownSeconds: 60,
+  spikeThreshold: 10,
+};
+
+/** The names that can be set as environment variables or in the admin settings table (ngmy_ai_settings). */
+export const LIMIT_KEYS: Record<string, string> = {
+  AI_LIMIT_NORMAL_PER_MIN: "normal.perMinute",
+  AI_LIMIT_NORMAL_PER_HOUR: "normal.perHour",
+  AI_LIMIT_NORMAL_PER_DAY: "normal.perDay",
+  AI_LIMIT_EXPENSIVE_PER_MIN: "expensive.perMinute",
+  AI_LIMIT_EXPENSIVE_PER_HOUR: "expensive.perHour",
+  AI_LIMIT_EXPENSIVE_PER_DAY: "expensive.perDay",
+  AI_ALLOW_ANON: "allowAnon",
+  AI_LIMIT_ANON_PER_MIN: "anonPerMinute",
+  AI_LIMIT_IP_PER_MIN: "ipPerMinute",
+  AI_GLOBAL_PER_DAY: "globalPerDay",
+  AI_MAX_PROMPT_CHARS: "maxPromptChars",
+  AI_MAX_PROMPT_CHARS_EXPENSIVE: "maxPromptCharsExpensive",
+  AI_MAX_IMAGES: "maxImages",
+  AI_MAX_IMAGE_CHARS: "maxImageChars",
+  AI_MAX_OUTPUT_TOKENS: "maxOutputTokens",
+  AI_MAX_OUTPUT_TOKENS_EXPENSIVE: "maxOutputTokensExpensive",
+  AI_TIMEOUT_MS: "timeoutMs",
+  AI_MAX_MODEL_ATTEMPTS: "maxModelAttempts",
+  AI_PROVIDER_COOLDOWN_SECONDS: "providerCooldownSeconds",
+  AI_SPIKE_THRESHOLD: "spikeThreshold",
+};
+
+/**
+ * Starts from the defaults, then environment variables, then the admin settings table (which wins).
+ * Anything that is not a sensible number is ignored, so a typo can never switch the limits off.
+ */
+export function buildLimits(
+  env: (name: string) => string | undefined,
+  overrides: Record<string, string> = {},
+): GateLimits {
+  const out: GateLimits = JSON.parse(JSON.stringify(DEFAULT_LIMITS));
+  for (const [name, path] of Object.entries(LIMIT_KEYS)) {
+    const raw = (overrides[name] ?? env(name) ?? "").toString().trim();
+    if (!raw) continue;
+    const [a, b] = path.split(".");
+    if (path === "allowAnon") {
+      out.allowAnon = /^(1|true|yes|on)$/i.test(raw);
+      continue;
+    }
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 1) continue;
+    if (b) (out as any)[a][b] = Math.floor(n);
+    else (out as any)[a] = Math.floor(n);
+  }
+  return out;
+}
+
+/** What one counted limit looks like. */
+export interface Entry {
+  bucket: string;
+  key: string;
+  windowSeconds: number;
+  max: number;
+}
+
+export type ConsumeResult = { ok: true } | { ok: false; failed: Entry; retryAfter: number };
+
+export interface GateStore {
+  /** Counts every entry in one step, or counts none of them when any one is full. */
+  consumeAll(entries: Entry[]): Promise<ConsumeResult>;
+  /** Seconds left in the provider cooldown (0 when the provider may be called). */
+  cooldownLeft(): Promise<number>;
+  startCooldown(seconds: number): Promise<void>;
+}
+
+export interface Who {
+  /** The signed-in user (auth user id), or null for somebody who is not signed in. */
+  userId: string | null;
+  ip: string;
+}
+
+export const MSG_TOO_FAST = "You are using AI too fast. Please wait a little and try again.";
+export const MSG_LOGIN = "Please sign in to use AI.";
+export const MSG_BUSY = "The AI is busy right now. Please try again in a minute.";
+export const MSG_RESTING = "The AI is resting for now. Please try again later.";
+
+export type GateDecision =
+  | { ok: true }
+  | {
+    ok: false;
+    status: 401 | 429 | 503;
+    code: "ai_login_required" | "ai_rate_limited" | "ai_busy" | "ai_unavailable";
+    message: string;
+    retryAfter: number;
+    logKind: string;
+    logDetail: string;
+  };
+
+function secondsToUtcMidnight(now: Date): number {
+  const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+  return Math.max(1, Math.ceil((next - now.getTime()) / 1000));
+}
+
+export async function gateAiRequest(
+  store: GateStore,
+  limits: GateLimits,
+  who: Who,
+  endpoint: string,
+  cls: AiClass,
+  now: Date = new Date(),
+): Promise<GateDecision> {
+  const signedIn = !!who.userId;
+  const ip = (who.ip || "unknown").slice(0, 80);
+
+  if (!signedIn && !limits.allowAnon) {
+    return {
+      ok: false,
+      status: 401,
+      code: "ai_login_required",
+      message: MSG_LOGIN,
+      retryAfter: 0,
+      logKind: "ai_blocked_anon",
+      logDetail: `user=none endpoint=${endpoint} class=${cls} ip=${ip}`,
+    };
+  }
+
+  const cool = await store.cooldownLeft();
+  if (cool > 0) {
+    return {
+      ok: false,
+      status: 503,
+      code: "ai_busy",
+      message: MSG_BUSY,
+      retryAfter: cool,
+      logKind: "ai_provider_cooldown",
+      logDetail: `user=${who.userId ?? "none"} endpoint=${endpoint} class=${cls} left=${cool}s`,
+    };
+  }
+
+  const entries: Entry[] = [];
+  if (signedIn) {
+    const w = limits[cls];
+    entries.push({ bucket: `ai_${cls}_min`, key: who.userId!, windowSeconds: 60, max: w.perMinute });
+    entries.push({ bucket: `ai_${cls}_hour`, key: who.userId!, windowSeconds: 3600, max: w.perHour });
+    entries.push({ bucket: `ai_${cls}_day`, key: who.userId!, windowSeconds: 86400, max: w.perDay });
+    entries.push({ bucket: "ai_ip_min", key: ip, windowSeconds: 60, max: limits.ipPerMinute });
+  } else {
+    entries.push({ bucket: "ai_anon_ip_min", key: ip, windowSeconds: 60, max: limits.anonPerMinute });
+  }
+  entries.push({ bucket: "ai_global_day", key: "all", windowSeconds: 86400, max: limits.globalPerDay });
+
+  const r = await store.consumeAll(entries);
+  if (r.ok) return { ok: true };
+
+  const who2 = `user=${who.userId ?? "none"} endpoint=${endpoint} class=${cls} ip=${ip}`;
+  if (r.failed.bucket === "ai_global_day") {
+    return {
+      ok: false,
+      status: 503,
+      code: "ai_unavailable",
+      message: MSG_RESTING,
+      retryAfter: Math.min(r.retryAfter || 3600, secondsToUtcMidnight(now)),
+      logKind: "ai_global_cap",
+      logDetail: `${who2} cap=${limits.globalPerDay}/day`,
+    };
+  }
+  return {
+    ok: false,
+    status: 429,
+    code: "ai_rate_limited",
+    message: MSG_TOO_FAST,
+    retryAfter: Math.max(1, r.retryAfter || 60),
+    logKind: "ai_rate_limit",
+    logDetail: `${who2} window=${r.failed.bucket}`,
+  };
+}
+
+/** What kind of request is it? Decided on the server from the request, never from a flag the browser sends. */
+const EXPENSIVE_KINDS = new Set([
+  "jobApplication",
+  "coverLetter",
+  "resume",
+  "document",
+  "documentGeneration",
+  "appBuilder",
+  "slides",
+  "book",
+  "news",
+  "translate",
+]);
+
+export function classifyAiRequest(body: Record<string, unknown>): AiClass {
+  const mode = String(body?.mode ?? "");
+  const kind = String(body?.kind ?? "");
+  if (mode === "appBuilder" || EXPENSIVE_KINDS.has(kind) || EXPENSIVE_KINDS.has(mode)) return "expensive";
+  const images = Array.isArray(body?.images) ? body.images.length : 0;
+  if (images > 0) return "expensive";
+  return "normal";
+}
+
+/** Null when the input is fine, otherwise the plain message to send back (HTTP 400/413). */
+export function checkAiInput(limits: GateLimits, body: Record<string, unknown>, cls: AiClass): string | null {
+  const prompt = String(body?.prompt ?? "");
+  const maxChars = cls === "expensive" ? limits.maxPromptCharsExpensive : limits.maxPromptChars;
+  if (prompt.length > maxChars) return "That message is too long. Please make it shorter.";
+  if (Array.isArray(body?.images)) {
+    const imgs = body.images as Array<Record<string, unknown>>;
+    if (imgs.length > limits.maxImages) return "Too many pictures in one request.";
+    let total = 0;
+    for (const im of imgs) total += String(im?.data ?? "").length;
+    if (total > limits.maxImageChars) return "Those pictures are too big. Please use smaller ones.";
+  }
+  return null;
+}
+
+/** The AI provider said 429 (or its quota is gone). The caller stops at once and shows a busy message. */
+export class ProviderBusyError extends Error {
+  constructor(public retryAfter = 0) {
+    super("AI provider is busy");
+    this.name = "ProviderBusyError";
+  }
+}
+
+/** The provider rejected the key or the request in a way that retrying cannot fix. */
+export class ProviderStopError extends Error {
+  constructor(public status: number) {
+    super(`AI provider refused the request (HTTP ${status})`);
+    this.name = "ProviderStopError";
+  }
+}
+
+/**
+ * One call to the provider with a timeout. A 429 stops everything (ProviderBusyError); a 401/403 stops too.
+ * Nothing here retries: at most [maxModelAttempts] different models are tried by the caller, one call each.
+ */
+export async function providerFetch(
+  fetchImpl: typeof fetch,
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  const res = await fetchImpl(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+  if (res.status === 429) {
+    const ra = Number(res.headers.get("retry-after") ?? "");
+    throw new ProviderBusyError(Number.isFinite(ra) && ra > 0 ? Math.min(ra, 600) : 0);
+  }
+  if (res.status === 401 || res.status === 403) throw new ProviderStopError(res.status);
+  return res;
+}
+
+/** Takes anything that looks like a key or a key in a URL out of text that is about to go to the browser or the logs. */
+export function scrubSecrets(text: string): string {
+  return String(text)
+    .replace(/([?&](?:key|api_key|apikey|token)=)[^&\s"')]+/gi, "$1[hidden]")
+    .replace(/AIza[0-9A-Za-z_-]{20,}/g, "[hidden]")
+    .replace(/sk-ant-[0-9A-Za-z_-]{16,}/g, "[hidden]")
+    .replace(/sk-[0-9A-Za-z_-]{20,}/g, "[hidden]")
+    .replace(/(Bearer\s+)[0-9A-Za-z._-]{16,}/gi, "$1[hidden]");
+}
+
+/** A store that lives in memory: used by the tests, and as the strict fallback when the database cannot be reached. */
+export class MemoryGateStore implements GateStore {
+  private counts = new Map<string, number>();
+  private until = 0;
+  constructor(private clock: () => number = () => Date.now()) {}
+
+  async consumeAll(entries: Entry[]): Promise<ConsumeResult> {
+    const now = this.clock();
+    const slots = entries.map((e) => {
+      const win = Math.floor(now / 1000 / e.windowSeconds);
+      return { e, id: `${e.bucket}|${e.key}|${win}`, endsAt: (win + 1) * e.windowSeconds * 1000 };
+    });
+    for (const s of slots) {
+      if ((this.counts.get(s.id) ?? 0) >= s.e.max) {
+        return { ok: false, failed: s.e, retryAfter: Math.max(1, Math.ceil((s.endsAt - now) / 1000)) };
+      }
+    }
+    for (const s of slots) this.counts.set(s.id, (this.counts.get(s.id) ?? 0) + 1);
+    if (this.counts.size > 50000) this.counts.clear();
+    return { ok: true };
+  }
+
+  async cooldownLeft(): Promise<number> {
+    return Math.max(0, Math.ceil((this.until - this.clock()) / 1000));
+  }
+
+  async startCooldown(seconds: number): Promise<void> {
+    this.until = Math.max(this.until, this.clock() + seconds * 1000);
+  }
+
+  /** For tests: ends the cooldown now. */
+  resetCooldown(): void {
+    this.until = 0;
+  }
+}
+
+// ── end of the AI limits ──
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+type Provider = "gemini" | "openai" | "anthropic" | "openaiCompatible";
+
+type GeminiImagePart = { mimeType?: string; data?: string };
+
+async function geminiVirtualOutfit(
+  apiKey: string,
+  prompt: string,
+  images: GeminiImagePart[],
+  personOnly = false,
+): Promise<string> {
+  const models = [
+    "gemini-2.5-flash-image",
+    "gemini-2.5-flash-image-preview",
+    "gemini-2.0-flash-preview-image-generation",
+  ];
+  const parts: unknown[] = [{ text: prompt }];
+  const imgs = personOnly ? images.slice(0, 1) : images;
+  for (const img of imgs) {
+    const data = String(img?.data ?? "").trim();
+    if (!data) continue;
+    parts.push({
+      inline_data: {
+        mime_type: String(img?.mimeType ?? "image/jpeg").trim() || "image/jpeg",
+        data,
+      },
+    });
+  }
+
+  let lastErr = "Gemini image generation failed";
+  for (const model of models.slice(0, Math.max(1, AI_RUNTIME.maxModelAttempts))) {
+    // The key goes in a header, never in the web address (an address can end up in an error message).
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    const res = await providerFetch(fetch, url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: {
+          responseModalities: ["TEXT", "IMAGE"],
+          temperature: 0.35,
+        },
+      }),
+    }, AI_RUNTIME.timeoutMs);
+    if (!res.ok) {
+      lastErr = scrubSecrets((await res.text()).slice(0, 200));
+      continue;
+    }
+    const data = await res.json();
+    const candidates = data?.candidates;
+    if (!Array.isArray(candidates) || candidates.length === 0) continue;
+    const respParts = candidates[0]?.content?.parts;
+    if (!Array.isArray(respParts)) continue;
+    for (const part of respParts) {
+      const inline = part?.inlineData ?? part?.inline_data;
+      const b64 = inline?.data;
+      if (b64 && String(b64).trim()) return String(b64).trim();
+    }
+    lastErr = "No image in Gemini response";
+  }
+  throw new Error(lastErr);
+}
+
+// The chat models this key can use right now. Google retires and renames models, so ask it
+// which ones exist instead of trusting a fixed list (a stale list is what made every advisor
+// reply fail).
+let geminiModelCache: { at: number; list: string[] } | null = null;
+async function geminiChatModels(apiKey: string): Promise<string[]> {
+  const fallback = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.0-flash"];
+  if (geminiModelCache && Date.now() - geminiModelCache.at < 30 * 60 * 1000 && geminiModelCache.list.length) {
+    return geminiModelCache.list;
+  }
+  try {
+    const res = await providerFetch(
+      fetch,
+      "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200",
+      { headers: { "x-goog-api-key": apiKey } },
+      10000,
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const found: { name: string; v: number }[] = [];
+      for (const m of (data?.models ?? []) as any[]) {
+        const methods: string[] = m?.supportedGenerationMethods ?? [];
+        const name = String(m?.name ?? "").replace(/^models\//, "");
+        if (!methods.includes("generateContent")) continue;
+        if (!/flash/.test(name)) continue;
+        if (/image|tts|live|audio|embedding|thinking|exp|preview|vision|robotics|computer|native|8b|lite/.test(name)) continue;
+        const v = parseFloat((name.match(/gemini-(\d+(?:\.\d+)?)/) ?? [])[1] ?? "0");
+        found.push({ name, v });
+      }
+      found.sort((a, b) => b.v - a.v);
+      const list = ["gemini-flash-latest", ...found.slice(0, 3).map((f) => f.name), ...fallback].filter((n, i, a) => a.indexOf(n) === i);
+      geminiModelCache = { at: Date.now(), list };
+      return list;
+    }
+  } catch (e) {
+    if (e instanceof ProviderBusyError || e instanceof ProviderStopError) throw e;
+    // fall through to the built-in list
+  }
+  return fallback;
+}
+
+async function geminiChat(
+  apiKey: string,
+  prompt: string,
+  images: GeminiImagePart[] = [],
+  appBuilder = false,
+): Promise<string> {
+  const models = (await geminiChatModels(apiKey)).slice(0, Math.max(1, AI_RUNTIME.maxModelAttempts));
+  const geminiParts: unknown[] = [];
+  for (const img of images) {
+    const data = String(img?.data ?? "").trim();
+    if (!data) continue;
+    geminiParts.push({
+      inline_data: {
+        mime_type: String(img?.mimeType ?? "image/jpeg").trim() || "image/jpeg",
+        data,
+      },
+    });
+  }
+  geminiParts.push({ text: prompt });
+
+  const errors: string[] = [];
+  for (const model of models) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    const res = await providerFetch(fetch, url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify({
+        contents: [{ parts: geminiParts }],
+        // Every reply has a ceiling; App Builder replies (a whole app as JSON) get the bigger one.
+        generationConfig: { maxOutputTokens: appBuilder ? AI_RUNTIME.maxOutputTokensExpensive : AI_RUNTIME.maxOutputTokens },
+      }),
+    }, AI_RUNTIME.timeoutMs);
+    if (res.ok) {
+      const data = await res.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text && String(text).trim()) return String(text).trim();
+    } else {
+      const body = scrubSecrets((await res.text()).replace(/\s+/g, " ").slice(0, 160));
+      errors.push(`${model}: HTTP ${res.status} ${body}`);
+      // A model that no longer exists is dropped from the list for next time.
+      if (res.status === 404 && geminiModelCache) geminiModelCache.list = geminiModelCache.list.filter((m) => m !== model);
+    }
+  }
+  throw new Error(errors.length ? errors.join(" | ") : "Gemini request failed");
+}
+
+// ── Advisor Browser ─────────────────────────────────────────────────────────
+// Read-only: looks at public pages / web search. Never logs in, clicks, or submits.
+
+type AdvisorBrowseResult = {
+  ok: boolean;
+  summary: string;
+  url: string;
+  title: string;
+  sources: { url: string; title: string }[];
+  screenshotBase64?: string;
+  error?: string;
+};
+
+/** Public http(s) only — blocks localhost / private network targets. */
+function advisorBrowseSafeUrl(raw: string): URL | null {
+  let s = raw.trim();
+  if (!s) return null;
+  if (!/^https?:\/\//i.test(s)) s = `https://${s}`;
+  let u: URL;
+  try {
+    u = new URL(s);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+  const h = u.hostname.toLowerCase();
+  if (
+    h === "localhost" || h.endsWith(".localhost") || h.endsWith(".local") ||
+    h.endsWith(".internal") || h === "0.0.0.0" || h.startsWith("127.") ||
+    h.startsWith("10.") || h.startsWith("192.168.") || h.startsWith("169.254.") ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(h) || h.includes(":") || !h.includes(".")
+  ) {
+    return null;
+  }
+  return u;
+}
+
+/** Google grounding links are redirects — resolve to the real page URL. */
+async function advisorResolveRedirect(link: string): Promise<string> {
+  if (!link.includes("vertexaisearch.cloud.google.com")) return link;
+  try {
+    const res = await fetch(link, { method: "GET", redirect: "manual" });
+    const loc = res.headers.get("location");
+    try {
+      await res.body?.cancel();
+    } catch { /* ignore */ }
+    return loc && /^https?:\/\//i.test(loc) ? loc : link;
+  } catch {
+    return link;
+  }
+}
+
+function advisorHtmlToText(html: string): { title: string; text: string } {
+  const title = (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "").replace(/\s+/g, " ").trim();
+  const text = html
+    .replace(/<(script|style|noscript|svg|head)[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, " ")
+    .trim();
+  return { title, text };
+}
+
+async function advisorFetchPageText(u: URL): Promise<{ title: string; text: string } | null> {
+  try {
+    const res = await fetch(u.toString(), {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; NGMY-Advisor/1.0)",
+        "Accept": "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5",
+      },
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!res.ok) return null;
+    const type = res.headers.get("content-type") ?? "";
+    if (!/text|html|xml|json/i.test(type)) return null;
+    const raw = (await res.text()).slice(0, 600000);
+    const out = advisorHtmlToText(raw);
+    return { title: out.title, text: out.text.slice(0, 14000) };
+  } catch {
+    return null;
+  }
+}
+
+async function advisorScreenshot(u: URL): Promise<string | undefined> {
+  try {
+    const shotUrl = `https://image.thum.io/get/width/1100/crop/760/noanimate/${u.toString()}`;
+    const res = await fetch(shotUrl, { signal: AbortSignal.timeout(15000) });
+    if (!res.ok) return undefined;
+    const type = res.headers.get("content-type") ?? "";
+    if (!type.startsWith("image/")) return undefined;
+    const buf = new Uint8Array(await res.arrayBuffer());
+    if (buf.length < 4096 || buf.length > 3_500_000) return undefined;
+    return bytesToBase64(buf);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Gemini with Google Search + URL Context tools — the model actually reads the web. */
+async function advisorGeminiBrowse(
+  apiKey: string,
+  task: string,
+  url: string,
+): Promise<{ text: string; sources: { url: string; title: string }[] } | null> {
+  const prompt =
+    "You are the web-browsing hands of a chat advisor. Use your tools to actually look at the web.\n" +
+    (url ? `Open and read this page: ${url}\n` : "Search the web for what the user needs.\n") +
+    `User request: ${task || "Tell me what is on this page."}\n\n` +
+    "Report what you actually saw: the key facts, numbers, prices, dates, names and anything the user asked about. " +
+    "Plain text, no markdown, at most 170 words. If the page needs a login or you could not load it, say so plainly. " +
+    "Never invent content you did not see.\n" +
+    "On the very last line write: TITLE: <page or best source title>";
+  for (const model of ["gemini-2.5-flash", "gemini-2.0-flash"]) {
+    try {
+      const res = await providerFetch(
+        fetch,
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            tools: url ? [{ url_context: {} }, { google_search: {} }] : [{ google_search: {} }],
+            generationConfig: { temperature: 0.2, maxOutputTokens: 900 },
+          }),
+        },
+        28000,
+      );
+      if (!res.ok) continue;
+      const data = await res.json();
+      const cand = data?.candidates?.[0];
+      const parts = Array.isArray(cand?.content?.parts) ? cand.content.parts : [];
+      const text = parts.map((p: { text?: string }) => p?.text ?? "").join("").trim();
+      if (!text) continue;
+      const chunks = Array.isArray(cand?.groundingMetadata?.groundingChunks)
+        ? cand.groundingMetadata.groundingChunks
+        : [];
+      const sources: { url: string; title: string }[] = [];
+      for (const c of chunks) {
+        const uri = String(c?.web?.uri ?? "").trim();
+        if (!uri || sources.some((s) => s.url === uri)) continue;
+        sources.push({ url: uri, title: String(c?.web?.title ?? "").trim() });
+        if (sources.length >= 5) break;
+      }
+      return { text, sources };
+    } catch (e) {
+      if (e instanceof ProviderBusyError || e instanceof ProviderStopError) throw e;
+      // try next model
+    }
+  }
+  return null;
+}
+
+async function advisorBrowse(apiKey: string, task: string, rawUrl: string): Promise<AdvisorBrowseResult> {
+  const target = rawUrl ? advisorBrowseSafeUrl(rawUrl) : null;
+  if (rawUrl && !target) {
+    return { ok: false, summary: "", url: "", title: "", sources: [], error: "That link can't be opened." };
+  }
+
+  let summary = "";
+  let title = "";
+  let sources: { url: string; title: string }[] = [];
+
+  const isGeminiKey = !!apiKey && !/^(sk-|pk-|openai:|anthropic:|claude:|compat:)/i.test(apiKey.trim());
+  const geminiKey = apiKey.trim().replace(/^(gemini:|google:)/i, "");
+  const browsed = isGeminiKey ? await advisorGeminiBrowse(geminiKey, task, target?.toString() ?? "") : null;
+  if (browsed) {
+    const lines = browsed.text.split("\n");
+    const titleIdx = lines.findIndex((l) => /^\s*TITLE:/i.test(l));
+    if (titleIdx >= 0) {
+      title = lines[titleIdx].replace(/^\s*TITLE:\s*/i, "").trim();
+      lines.splice(titleIdx, 1);
+    }
+    summary = lines.join("\n").trim();
+    sources = browsed.sources;
+  }
+
+  // Fallback: fetch the page ourselves so the advisor still sees real text.
+  if (!summary && target) {
+    const page = await advisorFetchPageText(target);
+    if (page && page.text) {
+      title = title || page.title;
+      summary = `PAGE TEXT (excerpt): ${page.text.slice(0, 5000)}`;
+    }
+  }
+
+  // Pick the page to show: the user's link, else the top search source.
+  let shown = target?.toString() ?? "";
+  if (!shown && sources.length > 0) {
+    shown = await advisorResolveRedirect(sources[0].url);
+    if (!title) title = sources[0].title;
+  }
+  const resolvedSources = await Promise.all(
+    sources.slice(0, 3).map(async (s) => ({ url: await advisorResolveRedirect(s.url), title: s.title })),
+  );
+  const shownSafe = shown ? advisorBrowseSafeUrl(shown) : null;
+  const screenshotBase64 = shownSafe ? await advisorScreenshot(shownSafe) : undefined;
+
+  if (!summary) {
+    return {
+      ok: false,
+      summary: "",
+      url: shownSafe?.toString() ?? "",
+      title,
+      sources: resolvedSources,
+      screenshotBase64,
+      error: "Could not read the page.",
+    };
+  }
+  return {
+    ok: true,
+    summary: summary.slice(0, 6000),
+    url: shownSafe?.toString() ?? "",
+    title: title.slice(0, 160),
+    sources: resolvedSources,
+    screenshotBase64,
+  };
+}
+
+// ── Advisor Live Agent ──────────────────────────────────────────────────────
+// A real cloud browser (Browser Use Cloud) that the advisor drives while the user watches
+// a live view inside the chat. Key: BROWSER_USE_API_KEY (Supabase secret).
+
+const BROWSER_USE_API = "https://api.browser-use.com/api/v4";
+
+const ADVISOR_AGENT_RULES =
+  "\n\nRULES (from the NGMY app — always follow):\n" +
+  "- The user is watching this browser live and can tap into it at any time. Work quickly and finish the job.\n" +
+  "- SPEED: take the shortest path. Go straight to the right URL when you can (e.g. a site's search-results URL " +
+  "with the query in it) instead of clicking through menus. Don't re-check things you already saw. Read the page " +
+  "content you need in one go, then finish — no extra browsing once you have the answer. On forms, fill several fields " +
+  "in one step when you can, skip optional fields nobody gave you, and don't scroll just to look around.\n" +
+  "- DO EXACTLY WHAT WAS ASKED. If the user named a website (e.g. Zillow), use THAT site — search it with its own " +
+  "search box. If it blocks you (CAPTCHA, 'press and hold', access denied), say so plainly instead of silently " +
+  "switching; you may then add what you found on another reputable site, labeled as such. If no site was named, " +
+  "use the best-known site for the job.\n" +
+  "- The user types fast: read past typos (e.g. 'texs' = taxes) and use the recent chat context given above.\n" +
+  "- Close cookie banners / pop-ups and accept read-only terms needed to view public information.\n" +
+  "- PAGE WON'T LOAD ('This site can't be reached', ERR_TUNNEL_CONNECTION_FAILED, ERR_PROXY..., ERR_CONNECTION...): " +
+  "reload once. If it still fails, STOP right away and finish with the word NETWORK_BLOCKED in your notes — the app " +
+  "will reopen the browser on another connection and try again. Don't wander to other sites first.\n" +
+  "- CAR VIN (17 characters): decode it on the official free NHTSA decoder " +
+  "(https://vpic.nhtsa.dot.gov/decoder/) for year, make, model, trim, engine and plant; check " +
+  "https://www.nhtsa.gov/recalls for open recalls; look for odometer/mileage readings on free history sites. " +
+  "If full mileage history is only in a paid report (Carfax / AutoCheck), say so instead of guessing.\n" +
+  "- Answer every part of the request (e.g. for a home: tax amounts by year, assessed value, sale history with dates " +
+  "and prices) and say which parts the site didn't show.\n" +
+  "- SIGN-UPS: Use the details the user gave (email, name…). If they asked you to make the password, create a " +
+  "strong one (14+ chars: upper, lower, number, symbol) and put it in your final summary so they can save it. " +
+  "Accept normal terms of service when the user asked you to sign up.\n" +
+  "- LOGINS: Never guess an existing password. If you need to log in, stop and say: " +
+  "'Please log in in the browser window, then tell me to continue.'\n" +
+  "- EMAIL / SMS CODES and CAPTCHAs: stop and ask the user to enter the code or solve it in the browser window.\n" +
+  "- FINDING WHAT'S AVAILABLE (e.g. 'find the open positions at KFC in Macon GA'): search the company's own careers " +
+  "site (or a major job site if it has none) for that place, collect the real open job titles (with pay/hours if shown), " +
+  "and finish with them in \"options\" so the user can pick one. Do NOT start an application in that case.\n" +
+  "  VERIFY BEFORE YOU LIST: only list a job/item as available if you actually OPENED its own page and it is live; put " +
+  "that page's exact URL for each one in \"sources\" (name = the job title + location). If a search page shows a listing " +
+  "but its own page won't open, list it under notes as 'listed but could not be opened' — never as available.\n" +
+  "- FOLLOW-UPS: if 'What you found last time' gives a link for what the user picked, open that link directly.\n" +
+  "- NONE NEARBY: if there is no match in the place asked, look in the nearest towns and report the closest real one " +
+  "(with its link and roughly how far), and add an option like 'Check other job boards'.\n" +
+  "- YOU ARE THE GO-BETWEEN WHILE FILLING A FORM — AND BE FAST: every stop makes the user wait, so stop as rarely as possible. " +
+  "Answer every question you can from the user's details. Skip optional fields nobody gave you. Use the obvious answer for " +
+  "low-stakes fields instead of stopping: 'How did you hear about us' → 'Online job search'; 'Preferred name' → their first name; " +
+  "'Desired pay' → 'Open' / 'Negotiable' (or leave blank if allowed); 'Can you start' → 'Immediately' unless the task says otherwise. " +
+  "For things only the user can answer (work eligibility, criminal history, previous employer, a personal yes/no…): FIRST fill " +
+  "everything else on the page, THEN collect ALL such questions on this page and stop ONCE, putting them all in \"question\" one per " +
+  "line (e.g. '1. Are you eligible to work in the United States?\\n2. Have you ever been convicted of a felony?'). Never guess those. " +
+  "If there is just one, give its choices in \"options\" " +
+  "(e.g. question 'Are you eligible to work in the United States?', options ['Yes', 'No']). Give options ONLY when the form " +
+  "shows real choices (a dropdown, radio buttons, a yes/no question) — for a typed field (name, phone, email, address…) give []. " +
+  "Name, email, phone, address, age and availability written in the task ARE the user's answers — type them in, never stop to ask " +
+  "for them again. The user answers and you continue in this same browser from the same page.\n" +
+  "- FORMS / APPLICATIONS (government, Medicaid, insurance, jobs, banks): fill every field from the user's info. " +
+  "If something required is missing, stop and list exactly what you need. Stop BEFORE the final Submit and " +
+  "list what you filled; submit only when the user's message says to submit.\n" +
+  "- MONEY: Never complete a payment, purchase, transfer, withdrawal, deposit, or real-money trade/bet — even if asked. " +
+  "Get everything ready up to the final button, stop, and tell the user to tap it themselves in the browser window.\n" +
+  "- Do not change account settings or delete anything unless asked.\n" +
+  "- TRADING / BETTING SITES: you may open them, read charts, prices and balances, and explain what you see — " +
+  "but never place, open or close a trade or bet (demo or real). Tell the user what to tap themselves.\n" +
+  "- FINAL ANSWER FORMAT: your final result must be ONLY a JSON object (no markdown, no extra text):\n" +
+  '{"title": "short title", "summary": "1-2 plain sentences", ' +
+  '"sections": [{"heading": "e.g. Property taxes", "rows": [{"label": "2025", "value": "$1,234"}]}], ' +
+  '"notes": ["anything missing, blocked or that needs the user"], "sources": [{"name": "site name", "url": "https://..."}], ' +
+  '"options": ["when the user has to choose next — e.g. each open job title you found — one short choice per item, else []"], "question": "if you stopped because the form asked something you were not told, that exact question; else empty"}\n' +
+  "  Group facts into clear sections (e.g. Overview, Estimates, Property taxes by year, Sale history, Details). " +
+  "Copy numbers, dates, names and balances exactly as shown on the page. Use an empty list when a part doesn't apply.";
+
+function browserUseKey(): string {
+  return String(Deno.env.get("BROWSER_USE_API_KEY") ?? "").trim();
+}
+
+async function browserUseFetch(path: string, init: RequestInit = {}): Promise<{ status: number; data: any }> {
+  const res = await fetch(`${BROWSER_USE_API}${path}`, {
+    ...init,
+    headers: {
+      "X-Browser-Use-API-Key": browserUseKey(),
+      "Content-Type": "application/json",
+      ...(init.headers ?? {}),
+    },
+    signal: AbortSignal.timeout(20000),
+  });
+  let data: any = null;
+  try {
+    data = await res.json();
+  } catch { /* empty body */ }
+  return { status: res.status, data };
+}
+
+function browserUseError(status: number, data: any): string {
+  if (status === 402) return "The live browser is out of credits. Top up Browser Use Cloud to keep going.";
+  if (status === 409) return "The browser is still busy with the last task.";
+  if (status === 429) return "Too many live browsers at once — try again in a moment.";
+  const d = data?.detail;
+  const msg = typeof d === "string" ? d : (d?.message ?? data?.message ?? "");
+  return msg ? String(msg).slice(0, 200) : `Live browser error (HTTP ${status}).`;
+}
+
+/** Short human line for one agent event (step / thought / action). */
+function agentEventText(ev: any): string {
+  const d = ev?.data ?? {};
+  for (const k of ["summary", "next_goal", "nextGoal", "goal", "message", "text", "description", "action", "title"]) {
+    const v = d?.[k];
+    if (typeof v === "string" && v.trim()) return v.trim().slice(0, 220);
+  }
+  return "";
+}
+
+async function handleAgentStart(req: Request, body: any): Promise<Response> {
+  if (!browserUseKey()) {
+    return jsonOk({ ok: false, code: "not_configured", error: "Live browser is not set up yet." });
+  }
+  const email = (await requireJwtEmail(req)).trim().toLowerCase();
+  if (!email) return jsonOk({ ok: false, error: "Please sign in to use the live browser." }, 401);
+  const limited = await enforceRateLimit(req, "agent_run", email, 20, 3600);
+  if (limited) return limited;
+  const aiGuard = await guardAi(req, "agent", "expensive");
+  if (aiGuard) return aiGuard;
+
+  const task = String(body?.task ?? "").trim().slice(0, 3000);
+  if (!task) return jsonOk({ ok: false, error: "task is required" }, 400);
+  const startUrl = String(body?.startUrl ?? "").trim();
+  const safeStart = startUrl ? advisorBrowseSafeUrl(startUrl) : null;
+  const sessionId = String(body?.sessionId ?? "").trim();
+  const prevTask = String(body?.prevTask ?? "").trim().slice(0, 1500);
+  const prevResult = String(body?.prevResult ?? "").trim().slice(0, 2500);
+  // Their saved details (name, email, phone, address, age) — every form uses them, never asks again.
+  const applicant = String(body?.applicantDetails ?? "").trim().slice(0, 800);
+  // Recent things the user said in this chat (e.g. "open Zillow" two messages ago).
+  const recent = (Array.isArray(body?.recentUserMessages) ? body.recentUserMessages : [])
+    .map((m: unknown) => String(m ?? "").trim().slice(0, 400)).filter((m: string) => m).slice(-4);
+
+  const fullTask = (safeStart ? `Start at ${safeStart.toString()}\n` : "") +
+    (recent.length ? `Recent chat from the user (oldest first), for context:\n- ${recent.join("\n- ")}\n` : "") +
+    (prevTask ? `Context — the previous task in this same browser was: "${prevTask}".\n` : "") +
+    (prevResult ? `What you found last time in this browser (go straight to these pages and links — do NOT search from scratch again):\n${prevResult}\n` : "") +
+    (applicant ? `THE USER'S DETAILS — type these into any form or application exactly as given and never stop to ask for them (use an account email/phone only if the task says they confirmed it): ${applicant}\n` : "") +
+    `THE USER'S REQUEST NOW: ${task}` + ADVISOR_AGENT_RULES;
+  // Visible mouse pointer in the live view (NGMY Agent Cursor extension, if uploaded).
+  const cursorExt = await ensureCursorExtensionId();
+  // "direct" = no managed proxy. The default US proxy sometimes can't reach a site at all
+  // (ERR_TUNNEL_CONNECTION_FAILED) — then the app retries the task on a direct connection.
+  const direct = String(body?.network ?? "") === "direct";
+  const freshBrowser = () => ({
+    // 1024 wide keeps sites in their desktop layout while streaming lighter/smoother to a phone.
+    screenWidth: 1024,
+    screenHeight: 720,
+    ...(direct ? { proxyCountryCode: null } : {}),
+    ...(/^[0-9a-f-]{36}$/i.test(cursorExt) ? { extensionIds: [cursorExt] } : {}),
+  });
+  const payload: Record<string, unknown> = {
+    task: fullTask,
+    maxCostUsd: 0.75,
+    browserSettings: freshBrowser(),
+  };
+  if (/^[0-9a-f-]{36}$/i.test(sessionId) && !direct) {
+    payload.sessionId = sessionId;
+    delete payload.browserSettings; // continuing an existing browser
+  }
+  // Fastest model this account accepts (rejected ones are skipped for good — every failed try
+  // used to look like a dead browser and opened a NEW paid browser each time).
+  const useModel = (i: number) => {
+    const m = AGENT_MODELS[Math.min(i, AGENT_MODELS.length - 1)];
+    payload.model = m.model;
+    if (m.modelParams) payload.modelParams = m.modelParams;
+    else delete payload.modelParams;
+  };
+  useModel(agentModelIdx);
+  const post = () => browserUseFetch("/runs", { method: "POST", body: JSON.stringify(payload) });
+  const ok = (s: number) => s === 200 || s === 201;
+  const sessionGone = (res: { status: number; data: any }) => {
+    if (res.status === 404 || res.status === 410) return true;
+    const msg = JSON.stringify(res.data ?? "").toLowerCase();
+    return /session|browser/.test(msg) && /(not found|ended|stopped|expired|closed|terminated|no longer)/.test(msg);
+  };
+  let r = await post();
+  // 1) Model settings rejected → change the model only; keep the same browser session.
+  // Only a complaint about the model moves on to the next one (not e.g. an extension error).
+  const modelRefused = (res: { status: number; data: any }) =>
+    (res.status === 403 || /model|reasoning|thinking|preset|early.?access|not (available|allowed|enabled)|unsupported/i
+      .test(JSON.stringify(res.data ?? "")));
+  while (!ok(r.status) && (r.status === 400 || r.status === 403 || r.status === 422) && !sessionGone(r) &&
+    modelRefused(r) && agentModelIdx < AGENT_MODELS.length - 1) {
+    console.log("[agent] model refused", payload.model, r.status);
+    agentModelIdx++;
+    useModel(agentModelIdx);
+    r = await post();
+  }
+  if (!ok(r.status) && (r.status === 400 || r.status === 422) && payload.model && !sessionGone(r)) {
+    delete payload.model;
+    delete payload.modelParams;
+    r = await post();
+  }
+  // 2) The same browser is still finishing the last task → wait for it, don't open another.
+  for (let i = 0; i < 5 && r.status === 409 && payload.sessionId; i++) {
+    await new Promise((res) => setTimeout(res, 1500));
+    r = await post();
+  }
+  // 3) Only if that browser has really ended do we open a new one.
+  if (!ok(r.status) && payload.sessionId && sessionGone(r)) {
+    console.log("[agent] session ended", r.status, "— starting a new browser");
+    delete payload.sessionId;
+    payload.browserSettings = freshBrowser();
+    r = await post();
+  }
+  if (r.status === 400 && payload.browserSettings && cursorExt) {
+    // Never let the cursor extension block a task — retry without it.
+    payload.browserSettings = { screenWidth: 1024, screenHeight: 720, ...(direct ? { proxyCountryCode: null } : {}) };
+    r = await browserUseFetch("/runs", { method: "POST", body: JSON.stringify(payload) });
+  }
+  if (r.status !== 200 && r.status !== 201) {
+    return jsonOk({ ok: false, error: browserUseError(r.status, r.data) });
+  }
+  return jsonOk({ ok: true, runId: r.data?.id, sessionId: r.data?.sessionId, status: r.data?.status });
+}
+
+/** Parse the agent's JSON answer into a safe, size-limited card shape (or null). */
+function agentStructuredResult(raw: unknown): Record<string, unknown> | null {
+  let obj: any = raw;
+  if (typeof raw === "string") {
+    const s = raw.trim();
+    const start = s.indexOf("{"), end = s.lastIndexOf("}");
+    if (start < 0 || end <= start) return null;
+    try {
+      obj = JSON.parse(s.slice(start, end + 1));
+    } catch {
+      return null;
+    }
+  }
+  if (!obj || typeof obj !== "object") return null;
+  const str = (v: unknown, n: number) => String(v ?? "").trim().slice(0, n);
+  const sections = (Array.isArray(obj.sections) ? obj.sections : []).slice(0, 12).map((sec: any) => ({
+    heading: str(sec?.heading, 80),
+    rows: (Array.isArray(sec?.rows) ? sec.rows : []).slice(0, 30).map((r: any) => ({
+      label: str(r?.label, 80),
+      value: str(r?.value, 300),
+    })).filter((r: any) => r.label || r.value),
+  })).filter((sec: any) => sec.heading || sec.rows.length);
+  const sources = (Array.isArray(obj.sources) ? obj.sources : []).slice(0, 6).map((x: any) => ({
+    name: str(x?.name, 80),
+    url: /^https?:\/\//.test(String(x?.url ?? "")) ? str(x.url, 500) : "",
+  })).filter((x: any) => x.name || x.url);
+  const out = {
+    title: str(obj.title, 120),
+    summary: str(obj.summary, 600),
+    sections,
+    notes: (Array.isArray(obj.notes) ? obj.notes : []).slice(0, 8).map((n: unknown) => str(n, 300)).filter(Boolean),
+    sources,
+    // Choices for the user's next step (e.g. the open job titles found) — shown as buttons.
+    options: (Array.isArray(obj.options) ? obj.options : []).map((o: unknown) => str(o, 48)).filter(Boolean).slice(0, 8),
+    question: str(obj.question, 300),
+  };
+  return out.title || out.summary || sections.length || out.question ? out : null;
+}
+
+async function handleAgentPoll(req: Request, body: any): Promise<Response> {
+  if (!browserUseKey()) return jsonOk({ ok: false, code: "not_configured" });
+  const runId = String(body?.runId ?? "").trim();
+  if (!/^[0-9a-f-]{36}$/i.test(runId)) return jsonOk({ ok: false, error: "runId is required" }, 400);
+  const after = Math.max(0, Number(body?.after ?? 0) || 0);
+
+  const [run, evs] = await Promise.all([
+    browserUseFetch(`/runs/${runId}`),
+    browserUseFetch(`/runs/${runId}/events?after=${after}&limit=100&include_output=false`),
+  ]);
+  if (run.status !== 200) return jsonOk({ ok: false, error: browserUseError(run.status, run.data) });
+
+  let liveUrl = "";
+  let pageUrl = "";
+  const steps: { id: number; type: string; text: string }[] = [];
+  let maxId = after;
+  for (const ev of Array.isArray(evs.data?.events) ? evs.data.events : []) {
+    const id = Number(ev?.id ?? 0);
+    if (id > maxId) maxId = id;
+    const d = ev?.data ?? {};
+    const lv = d?.live_view_url ?? d?.liveViewUrl ?? d?.liveUrl;
+    if (typeof lv === "string" && lv.startsWith("https://")) liveUrl = lv;
+    const u = d?.url ?? d?.page_url ?? d?.pageUrl;
+    if (typeof u === "string" && /^https?:\/\//.test(u)) pageUrl = u;
+    const text = agentEventText(ev);
+    if (text) steps.push({ id, type: String(ev?.type ?? ""), text });
+  }
+  return jsonOk({
+    ok: true,
+    status: run.data?.status,
+    result: run.data?.result ?? (typeof run.data?.output === "string" ? run.data.output : null),
+    structured: agentStructuredResult(run.data?.result ?? run.data?.output),
+    error: run.data?.error ?? null,
+    costUsd: run.data?.totalCostUsd ?? null,
+    sessionId: run.data?.sessionId ?? null,
+    liveUrl,
+    pageUrl,
+    steps,
+    nextAfter: evs.data?.nextAfter ?? maxId,
+  });
+}
+
+// NGMY Agent Cursor extension (tools/agent-cursor-extension) — zipped + base64.
+// Bump the config key below whenever the extension changes so it is re-uploaded.
+const NGMY_CURSOR_EXTENSION_KEY = "cursor_extension_id_v1";
+const NGMY_CURSOR_EXTENSION_ZIP_B64 = "UEsDBBQAAAAIAONiSV0fw0Ml8gAAAH4BAAANAAAAbWFuaWZlc3QuanNvbkWQQUvEQAyF7/0VYc6lrHgTEcSDJ714ElnK7DTdjk6Tkky7yLL/3XSq7iWQfI/kvZwrADd6ij1qbhcUjUzuDm7rFZAf0Rr3+vzyDo9HpAxPsyiLK/gqdzfNrtlt0w41SJzyL3kb+KTgYYkaDwlh5FkRJo6UUWoIKYYvMP2U0GTUQf6eIh1hMIGCMkzIxiB4gp5T4hPkAaFY8p1tZYFIZZbignAQu4fSbGYC2xnK7WZJzdCHjQHOpZbsOQxYgLv3KbWzJH1w+/pP8LmxUHI31l2RzNT6vIbsOMxjuZO9ZPevWBf2Yl9cl/Q+KRZysbqvLtUPUEsDBBQAAAAIAONiSV0lQg4SAgYAAGUOAAAJAAAAY3Vyc29yLmpzlVdbcts2FP33Km6UNKImFPW0bJOWp4nrtJ2xnU6iziQ/TSASlFBTIAuAkhhZM1lE19CFZSW9AEmJsmW79UMCAVzgnPs4AFstuP756hO8nlCu4DwVMhbw/dvfEAiykEAgiRlXVICaEgVhHEUxdqspBaIt6hL8iPk3Elo46Kf6W2UJ4xP7oNUCGZupqcQFFkT5UxwwPRGbU5gzugCfcJCUwkKvb9YN5kyDYBIC3HviHFhWA4ZnsDoAYCFYC8aDeOF8/swnsyxH3ABBVSq4h1P2DMMQlEipd4DDEVUwjaWyS2Y2KDKxYYmT+m0bsuIbO0dsRrVt2xiGKfcViznM4pQrhKTx5Ij0enB7C88CdMEM3eKUjYuI6q8qPjDb47Kbyb6gRNFiqlUP2Lze2M50pMoi6vhSjuhS29WTWDKNxA3ZkgYe45Iqt+0VfJp0jstIl8ecel+b6A26dLud/lH/uDfoH3n1fGk/5ohCxLFe0uxDlCL+9MOUoPusFdIMqAt1P4olDeqwLiBpC4dxTsUvo6tLtP1iugFODc6z4gnASVZ3gEY01DhVnODnggVq6nYHydKbUjaZqrytBOEyjMXMNa0IHWP128nS1h8FhOLHTMjX31iB0zvElEzHzG+O6VdGheV0befYxs9OwwtZhB5yAxEnTZkTbUM3WUIP/8VkTKy2rX+d/mGj4a23XMRdLjn8Xn8L37RnREwYd5udI1ywjb+m5Y1jEWBkBAlYKt3D9g87RPJRV2OQccQCeN4bH3fDgUc4mxGzqQBnIIESSZtxqutQLIgIZAXijzc0CwWZUQliFYp4ttq6UvokopbTa3hxQnymMrezVvG9CR1nsJ3RXlfoq0dDmZAgwEI1BI7vsT05OdF9xL+ZCKycwC3Z+XEUC/d5GIY73ghjrtxBuw0dHRiZSUVnzZTZEsE2UUhYuMXoVXKg6ASnK234rwlRcjxt7WTvqZxPUNiIlMNaUjNC9SZeDms6ot0+/tXOThOiphAMa1c96EZHziF0TqDr9JtHzuCy29bPna81wIyLhjVNsgZSifiG4lOn0ymfmiaRhjX0/aYrYpz+icU8rBmH1VpnCG8+2YBDgSjBqdpZLrffv/1z2sKBsy+5M0vZHuYF+1dKRfaBRtRXsbDqTlIqDMrcQ3PUjgp9/lxohf7K+62Ngo3jINMC+KD+OSRJKA/OpywKjFyapdd3dHVOLb60gWeluBZS622U9lnJS6vtdTobU+Ew+ZZxprRtY39/1tgVYK31fOkZrefZjsMKtd3mDwrcVolerJbQhN4a9ejFKsNmF5uNLxtXPm39CjrHpXnRzu13fSFYkmBFCvSGeMQbxpM71ApZ/2/Hi3BMGl2jauhzRdTL7pyGLnIdcI26nizvjGLt68FsZ7CSKjshF8WOeFLpUxU1rDjUhSOoCXzDhsFhe09a+FTH5V1o0ah65j6jkQk2jZwJVW90oWAZnEcMp7/HFC7dAjyNoqpvxoj6IaMd544dU5vw8iVgO1f5PasWHStYujDOffYKrlAcnBnjVrdvQ7lQC7rIMtPTtPNeQbmqHoH1feomJ9+illu0Sp1iao9EisIYaHD47BsGH7VDyodPm5zPoW0mGQSbWfm2GxZbZzsKjzJaqVMU+Qt9s7hkuDEe/1Yd81Ga4NVt0Aj1Ha0AuBdQXuEVINshD9a2uaOZ/R7YCo9rXt0qj6fOwqqjPAMhQYfl+yUOFlHiZDhQVFWlZ/3EvuZyW9mzEoP9FItaBLz8YtlFYICXd2QSYR8q5ZTwIMLgjTPYEKtkqGa0PxDwv7jpyD3KztzYGb/LL0ehS7/cvFIV+UW39Yf16/Vvv49uRxcfR6/fX7y+/XBxeXE+arxoOYpKZSm0nGhhaZj6wSujPMeDXR8JAVNkHNF9urXD/A7lO4TvkCswm7MQF7EqdO7LJkJ7cveNfBKsxXkpn09Bqp4C5YUElbVTXrojSkQpgOUbxtawfOG4p5Kr/cu266ZuTtqFbu6PMuNJqjDGxXvZYwmBd8iiyO5N3vrjntVP766K2F7GJMCXBTv3OdqtG9rx/wJQSwECFAAUAAAACADjYkldH8NDJfIAAAB+AQAADQAAAAAAAAAAAAAAAAAAAAAAbWFuaWZlc3QuanNvblBLAQIUABQAAAAIAONiSV0lQg4SAgYAAGUOAAAJAAAAAAAAAAAAAAAAAB0BAABjdXJzb3IuanNQSwUGAAAAAAIAAgByAAAARgcAAAAA";
+
+let cursorExtensionCache: string | null = null;
+
+/** Extension id for the visible mouse pointer — uploaded once with the server key, id kept
+ * in the server-only ngmy_agent_config table. Returns "" if anything fails (never blocks a task). */
+async function ensureCursorExtensionId(): Promise<string> {
+  if (cursorExtensionCache !== null) return cursorExtensionCache;
+  const envId = String(Deno.env.get("BROWSER_USE_CURSOR_EXTENSION_ID") ?? "").trim();
+  if (/^[0-9a-f-]{36}$/i.test(envId)) return (cursorExtensionCache = envId);
+  const db = adminClient();
+  try {
+    if (db) {
+      const { data } = await db.from("ngmy_agent_config").select("value").eq("key", NGMY_CURSOR_EXTENSION_KEY).maybeSingle();
+      const v = String(data?.value ?? "");
+      if (/^[0-9a-f-]{36}$/i.test(v)) return (cursorExtensionCache = v);
+    }
+    const bytes = Uint8Array.from(atob(NGMY_CURSOR_EXTENSION_ZIP_B64), (ch) => ch.charCodeAt(0));
+    const form = new FormData();
+    form.append("file", new Blob([bytes], { type: "application/zip" }), "ngmy-agent-cursor.zip");
+    const res = await fetch(`${BROWSER_USE_API}/extensions`, {
+      method: "POST",
+      headers: { "X-Browser-Use-API-Key": browserUseKey() },
+      body: form,
+      signal: AbortSignal.timeout(30000),
+    });
+    const data: any = await res.json().catch(() => null);
+    const id = String(data?.id ?? "");
+    if ((res.status === 200 || res.status === 201) && /^[0-9a-f-]{36}$/i.test(id)) {
+      if (db) await db.from("ngmy_agent_config").upsert({ key: NGMY_CURSOR_EXTENSION_KEY, value: id, updated_at: new Date().toISOString() });
+      return (cursorExtensionCache = id);
+    }
+    console.log("[agent] cursor extension upload failed", res.status, browserUseError(res.status, data));
+  } catch (e) {
+    console.log("[agent] cursor extension error", String(e));
+  }
+  cursorExtensionCache = "";
+  return "";
+}
+
+// ── Live snapshots of the advisor's cloud browser (for iPhone, where the live video
+// stream crashes the web app): one small JPEG of the current screen per request. ──
+const agentCdpCache = new Map<string, { ws: string; at: number }>();
+const agentShotHits = new Map<string, { start: number; n: number }>();
+// Fastest first. bu-fast is early-access (rejected on this account); Gemini 3.6 Flash with low
+// thinking is the quick everyday driver; GPT-6 Luna (low effort) is the careful fallback.
+// The first one Browser Use accepts is remembered so later tasks don't retry rejected ones.
+const AGENT_MODELS: { model: string; modelParams?: Record<string, unknown> }[] = [
+  { model: "bu-fast" },
+  // Minimal thinking = quickest clicks (each step was ~5 s of thinking at "low").
+  { model: "gemini-3.6-flash", modelParams: { thinkingConfig: { thinkingLevel: "minimal" } } },
+  { model: "gemini-3.6-flash", modelParams: { thinkingConfig: { thinkingLevel: "low" } } },
+  { model: "gemini-3.6-flash" },
+  { model: "gpt-6-luna", modelParams: { reasoning: { effort: "low" } } },
+];
+let agentModelIdx = 0;
+
+async function agentCdpWsUrl(sessionId: string): Promise<string> {
+  const hit = agentCdpCache.get(sessionId);
+  if (hit && Date.now() - hit.at < 5 * 60_000) return hit.ws;
+  const r = await browserUseFetch(`/browsers?agentSessionId=${sessionId}&filterBy=active&pageSize=5`);
+  const item = (Array.isArray(r.data?.items) ? r.data.items : []).find((b: any) => b?.status === "active" && b?.cdpUrl);
+  let url = String(item?.cdpUrl ?? "");
+  if (!url) return "";
+  if (/^https?:/i.test(url)) {
+    const v: any = await fetch(url.replace(/\/$/, "") + "/json/version", { signal: AbortSignal.timeout(5000) })
+      .then((x) => x.json()).catch(() => null);
+    url = String(v?.webSocketDebuggerUrl ?? "");
+  }
+  if (url) agentCdpCache.set(sessionId, { ws: url, at: Date.now() });
+  return url;
+}
+
+/** Screenshot of the page the agent is on (JPEG base64), or null. Read-only — never clicks. */
+function cdpScreenshot(wsUrl: string, timeoutMs = 7000): Promise<string | null> {
+  return new Promise((resolve) => {
+    let done = false;
+    let nextId = 0;
+    const pending = new Map<number, (m: any) => void>();
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(wsUrl);
+    } catch {
+      resolve(null);
+      return;
+    }
+    const finish = (v: string | null) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      try { ws.close(); } catch { /* closed */ }
+      resolve(v);
+    };
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    const send = (method: string, params: Record<string, unknown> = {}, sessionId?: string) =>
+      new Promise<any>((res) => {
+        const id = ++nextId;
+        pending.set(id, res);
+        ws.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
+      });
+    ws.onmessage = (ev) => {
+      try {
+        const m = JSON.parse(String(ev.data));
+        const cb = m?.id ? pending.get(m.id) : undefined;
+        if (cb) {
+          pending.delete(m.id);
+          cb(m);
+        }
+      } catch { /* ignore */ }
+    };
+    ws.onerror = () => finish(null);
+    ws.onclose = () => finish(null);
+    ws.onopen = async () => {
+      try {
+        const t = await send("Target.getTargets");
+        const pages = (t?.result?.targetInfos ?? []).filter((x: any) =>
+          x?.type === "page" && /^(https?:|about:blank)/.test(String(x?.url ?? ""))
+        );
+        // The agent's tab: the last real web page (not a blank tab).
+        const page = [...pages].reverse().find((x: any) => /^https?:/.test(String(x.url))) ?? pages[pages.length - 1];
+        if (!page) return finish(null);
+        const a = await send("Target.attachToTarget", { targetId: page.targetId, flatten: true });
+        const sid = a?.result?.sessionId;
+        if (!sid) return finish(null);
+        const shot = await send("Page.captureScreenshot", { format: "jpeg", quality: 55, optimizeForSpeed: true }, sid);
+        finish(typeof shot?.result?.data === "string" ? shot.result.data : null);
+      } catch {
+        finish(null);
+      }
+    };
+  });
+}
+
+/** Latest screenshot found in the run's recent events (URL or base64), as JPEG/PNG base64. */
+async function agentStepScreenshot(runId: string, latest: number): Promise<string | null> {
+  const total = Math.max(0, latest);
+  const r = await browserUseFetch(`/runs/${runId}/events?after=${Math.max(0, total - 12)}&limit=12&include_output=true`);
+  const evs = Array.isArray(r.data?.events) ? r.data.events : [];
+  const found: string[] = [];
+  const walk = (v: any, key = "") => {
+    if (found.length || v == null) return;
+    if (typeof v === "string") {
+      if (/screenshot|image|frame/i.test(key) && (v.startsWith("http") || v.length > 2000)) found.push(v);
+      return;
+    }
+    if (Array.isArray(v)) {
+      for (const x of v) walk(x, key);
+      return;
+    }
+    if (typeof v === "object") for (const [k, x] of Object.entries(v)) walk(x, k);
+  };
+  for (const ev of [...evs].reverse()) {
+    walk(ev?.data);
+    if (found.length) break;
+  }
+  const v = found[0];
+  if (!v) return null;
+  if (!v.startsWith("http")) return v.replace(/^data:image\/\w+;base64,/, "");
+  try {
+    const img = await fetch(v, { signal: AbortSignal.timeout(6000) });
+    if (!img.ok) return null;
+    const bytes = new Uint8Array(await img.arrayBuffer());
+    let bin = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  } catch {
+    return null;
+  }
+}
+
+async function handleAgentShot(req: Request, body: any): Promise<Response> {
+  if (!browserUseKey()) return jsonOk({ ok: false, code: "not_configured" });
+  const sessionId = String(body?.sessionId ?? "").trim();
+  if (!/^[0-9a-f-]{36}$/i.test(sessionId)) return jsonOk({ ok: false, error: "sessionId is required" }, 400);
+  const ws = await agentCdpWsUrl(sessionId);
+  let shot: string | null = ws ? await cdpScreenshot(ws) : null;
+  if (!shot && ws) {
+    // The connection address may have changed (new browser) — look it up again once.
+    agentCdpCache.delete(sessionId);
+    const again = await agentCdpWsUrl(sessionId);
+    if (again) shot = await cdpScreenshot(again);
+  }
+  if (!shot) {
+    // Second way: the newest screenshot the agent recorded in its own steps.
+    const runId = String(body?.runId ?? "").trim();
+    if (/^[0-9a-f-]{36}$/i.test(runId)) shot = await agentStepScreenshot(runId, Number(body?.after ?? 0) || 0);
+  }
+  if (!shot) console.log("[agent-shot] no picture", { cdp: !!ws, session: sessionId.slice(0, 8) });
+  return jsonOk(shot ? { ok: true, jpegBase64: shot } : { ok: false, error: "No picture yet." });
+}
+
+async function handleAgentStop(body: any): Promise<Response> {
+  if (!browserUseKey()) return jsonOk({ ok: false, code: "not_configured" });
+  const runId = String(body?.runId ?? "").trim();
+  if (!/^[0-9a-f-]{36}$/i.test(runId)) return jsonOk({ ok: false, error: "runId is required" }, 400);
+  const r = await browserUseFetch(`/runs/${runId}/cancel`, { method: "POST" });
+  return jsonOk({ ok: r.status === 200, status: r.data?.status ?? null });
+}
+
+// ── NGMY Trading Lab (Stage 1) ──────────────────────────────────────────────
+// Real data (Coinbase public candles) → validation → indicators → a model that is
+// trained AND tested chronologically on each request → independent risk engine →
+// PAPER trading only (simulated money, server-side ledger). No broker / live orders.
+
+const TL_SYMBOLS = new Set(["BTC-USD", "ETH-USD", "SOL-USD", "XRP-USD", "DOGE-USD", "LTC-USD", "ADA-USD"]);
+const TL_TIMEFRAMES = new Set([60, 300, 900, 3600]);
+const TL_FEE_RATE = 0.001; // 0.10% per side (simulated taker fee)
+const TL_SLIPPAGE = 0.0005; // 0.05% per fill (simulated)
+const TL_MODEL_VERSION = "lr2-v1"; // two logistic models (up / down), chronological split
+
+type Candle = { t: number; o: number; h: number; l: number; c: number; v: number };
+
+const TL_DEFAULT_RISK = {
+  riskPerTradePct: 1, // % of equity lost if the stop is hit
+  maxPositionPct: 20, // max notional as % of equity
+  maxDailyLossPct: 3,
+  maxDrawdownPct: 10,
+  maxOpenPositions: 2,
+  maxConsecutiveLosses: 3,
+  minSecondsBetweenOrders: 300,
+  minExpectedReturnPct: 0.05, // after costs, per trade
+  minEdgeBrierImprovementPct: 1, // model must beat the base rate on unseen data
+  maxDataAgeBars: 2,
+};
+
+async function tlFetchCandles(symbol: string, gran: number, want = 1200): Promise<Candle[]> {
+  const out = new Map<number, Candle>();
+  let end = Math.floor(Date.now() / 1000);
+  const pages = Math.min(6, Math.ceil(want / 290));
+  for (let p = 0; p < pages; p++) {
+    const start = end - 290 * gran;
+    const url = `https://api.exchange.coinbase.com/products/${symbol}/candles?granularity=${gran}` +
+      `&start=${new Date(start * 1000).toISOString()}&end=${new Date(end * 1000).toISOString()}`;
+    const res = await fetch(url, { headers: { "User-Agent": "NGMY-TradingLab/1.0" }, signal: AbortSignal.timeout(12000) });
+    if (!res.ok) break;
+    const rows = await res.json();
+    if (!Array.isArray(rows) || rows.length === 0) break;
+    for (const r of rows) {
+      // Coinbase row: [time, low, high, open, close, volume]
+      const k: Candle = { t: Number(r[0]), l: Number(r[1]), h: Number(r[2]), o: Number(r[3]), c: Number(r[4]), v: Number(r[5]) };
+      if ([k.t, k.l, k.h, k.o, k.c].every(Number.isFinite)) out.set(k.t, k);
+    }
+    end = start - gran;
+  }
+  return [...out.values()].sort((a, b) => a.t - b.t);
+}
+
+function tlValidate(c: Candle[], gran: number) {
+  const issues: string[] = [];
+  let bad = 0;
+  let gaps = 0;
+  for (let i = 0; i < c.length; i++) {
+    const k = c[i];
+    if (!(k.l > 0) || k.h < Math.max(k.o, k.c) || k.l > Math.min(k.o, k.c)) bad++;
+    if (i > 0 && k.t - c[i - 1].t > gran) gaps += Math.round((k.t - c[i - 1].t) / gran) - 1;
+  }
+  const last = c.length ? c[c.length - 1].t : 0;
+  const ageBars = last ? (Date.now() / 1000 - last) / gran : Infinity;
+  if (bad) issues.push(`${bad} malformed candles`);
+  if (gaps) issues.push(`${gaps} missing intervals (no trades or feed gaps)`);
+  if (ageBars > 2) issues.push(`latest candle is ${ageBars.toFixed(1)} bars old`);
+  return { count: c.length, malformed: bad, gaps, lastCandleAt: last ? new Date(last * 1000).toISOString() : null, ageBars, issues };
+}
+
+function tlEma(v: number[], n: number): number[] {
+  const k = 2 / (n + 1);
+  const out: number[] = [];
+  v.forEach((x, i) => out.push(i === 0 ? x : x * k + out[i - 1] * (1 - k)));
+  return out;
+}
+
+function tlIndicators(c: Candle[]) {
+  const close = c.map((k) => k.c);
+  const ema20 = tlEma(close, 20), ema50 = tlEma(close, 50);
+  const ema12 = tlEma(close, 12), ema26 = tlEma(close, 26);
+  const macd = ema12.map((x, i) => x - ema26[i]);
+  const signal = tlEma(macd, 9);
+  const hist = macd.map((x, i) => x - signal[i]);
+  // RSI(14), Wilder smoothing
+  const rsi: number[] = new Array(c.length).fill(50);
+  let ag = 0, al = 0;
+  for (let i = 1; i < c.length; i++) {
+    const d = close[i] - close[i - 1];
+    const g = Math.max(d, 0), l = Math.max(-d, 0);
+    if (i <= 14) {
+      ag += g / 14; al += l / 14;
+    } else {
+      ag = (ag * 13 + g) / 14; al = (al * 13 + l) / 14;
+    }
+    rsi[i] = al === 0 ? 100 : 100 - 100 / (1 + ag / al);
+  }
+  // ATR(14)
+  const atr: number[] = new Array(c.length).fill(0);
+  for (let i = 0; i < c.length; i++) {
+    const tr = i === 0 ? c[i].h - c[i].l : Math.max(c[i].h - c[i].l, Math.abs(c[i].h - close[i - 1]), Math.abs(c[i].l - close[i - 1]));
+    atr[i] = i === 0 ? tr : (atr[i - 1] * 13 + tr) / 14;
+  }
+  // Bollinger(20, 2)
+  const bbU: number[] = [], bbL: number[] = [], bbM: number[] = [];
+  for (let i = 0; i < c.length; i++) {
+    const s = close.slice(Math.max(0, i - 19), i + 1);
+    const m = s.reduce((a, b) => a + b, 0) / s.length;
+    const sd = Math.sqrt(s.reduce((a, b) => a + (b - m) ** 2, 0) / s.length);
+    bbM.push(m); bbU.push(m + 2 * sd); bbL.push(m - 2 * sd);
+  }
+  return { close, ema20, ema50, macd, signal, hist, rsi, atr, bbU, bbL, bbM };
+}
+
+/** Features at bar i use ONLY data up to and including bar i (no look-ahead). */
+function tlFeatures(c: Candle[], ind: ReturnType<typeof tlIndicators>, i: number): number[] {
+  const cl = ind.close;
+  const width = ind.bbU[i] - ind.bbL[i];
+  return [
+    Math.log(cl[i] / cl[i - 1]) * 100,
+    Math.log(cl[i] / cl[i - 5]) * 100,
+    (ind.rsi[i] - 50) / 50,
+    (ind.hist[i] / cl[i]) * 1000,
+    (ind.ema20[i] / ind.ema20[i - 5] - 1) * 100,
+    width > 0 ? (cl[i] - ind.bbL[i]) / width - 0.5 : 0,
+    (ind.atr[i] / cl[i]) * 100,
+    (cl[i] / ind.ema50[i] - 1) * 100,
+  ];
+}
+const TL_FEATURE_NAMES = ["ret_1", "ret_5", "rsi_14", "macd_hist", "ema20_slope", "bollinger_pos", "atr_pct", "dist_ema50"];
+
+function tlSigmoid(z: number) {
+  return 1 / (1 + Math.exp(-Math.max(-30, Math.min(30, z))));
+}
+
+function tlTrainLogistic(X: number[][], y: number[], lambda: number): number[] {
+  const d = X[0].length;
+  const w = new Array(d + 1).fill(0);
+  const lr = 0.1;
+  for (let it = 0; it < 300; it++) {
+    const g = new Array(d + 1).fill(0);
+    for (let n = 0; n < X.length; n++) {
+      let z = w[d];
+      for (let j = 0; j < d; j++) z += w[j] * X[n][j];
+      const e = tlSigmoid(z) - y[n];
+      for (let j = 0; j < d; j++) g[j] += e * X[n][j];
+      g[d] += e;
+    }
+    for (let j = 0; j < d; j++) w[j] -= lr * (g[j] / X.length + lambda * w[j]);
+    w[d] -= lr * (g[d] / X.length);
+  }
+  return w;
+}
+
+function tlPredict(w: number[], x: number[]) {
+  let z = w[x.length];
+  for (let j = 0; j < x.length; j++) z += w[j] * x[j];
+  return tlSigmoid(z);
+}
+
+function tlBrier(p: number[], y: number[]) {
+  return p.reduce((a, pi, i) => a + (pi - y[i]) ** 2, 0) / Math.max(1, p.length);
+}
+
+function tlCalibration(p: number[], y: number[]) {
+  const bins = [0, 0.2, 0.4, 0.6, 0.8, 1.0001];
+  const out: { from: number; to: number; n: number; predicted: number; observed: number }[] = [];
+  for (let b = 0; b < bins.length - 1; b++) {
+    const idx = p.map((v, i) => (v >= bins[b] && v < bins[b + 1] ? i : -1)).filter((i) => i >= 0);
+    if (!idx.length) continue;
+    out.push({
+      from: bins[b], to: Math.min(1, bins[b + 1]), n: idx.length,
+      predicted: idx.reduce((a, i) => a + p[i], 0) / idx.length,
+      observed: idx.reduce((a, i) => a + y[i], 0) / idx.length,
+    });
+  }
+  return out;
+}
+
+/** Full analysis: validate data, train on the past, test on unseen later data, forecast now. */
+async function tlAnalyze(symbol: string, gran: number, horizon: number, risk: typeof TL_DEFAULT_RISK) {
+  const candles = await tlFetchCandles(symbol, gran, 1500);
+  const quality = tlValidate(candles, gran);
+  if (candles.length < 300) {
+    return { ok: false, error: "Not enough market data from the provider right now.", quality };
+  }
+  const ind = tlIndicators(candles);
+  const cost = 2 * (TL_FEE_RATE + TL_SLIPPAGE); // round trip
+  const start = 60;
+  const rows: { i: number; x: number[]; ret: number }[] = [];
+  for (let i = start; i < candles.length - horizon; i++) {
+    rows.push({ i, x: tlFeatures(candles, ind, i), ret: ind.close[i + horizon] / ind.close[i] - 1 });
+  }
+  // Chronological split — never mix future into training.
+  const nTrain = Math.floor(rows.length * 0.7), nVal = Math.floor(rows.length * 0.15);
+  const train = rows.slice(0, nTrain), val = rows.slice(nTrain, nTrain + nVal), test = rows.slice(nTrain + nVal);
+  const d = TL_FEATURE_NAMES.length;
+  const mean = new Array(d).fill(0), std = new Array(d).fill(0);
+  for (const r of train) r.x.forEach((v, j) => (mean[j] += v / train.length));
+  for (const r of train) r.x.forEach((v, j) => (std[j] += (v - mean[j]) ** 2 / train.length));
+  for (let j = 0; j < d; j++) std[j] = Math.sqrt(std[j]) || 1;
+  const z = (x: number[]) => x.map((v, j) => (v - mean[j]) / std[j]);
+  const yUp = (r: { ret: number }) => (r.ret > cost ? 1 : 0);
+  const yDown = (r: { ret: number }) => (r.ret < -cost ? 1 : 0);
+
+  function fit(label: (r: { ret: number }) => number) {
+    let best = { lambda: 0.1, w: [] as number[], vb: Infinity };
+    for (const lambda of [0.001, 0.01, 0.1, 1]) {
+      const w = tlTrainLogistic(train.map((r) => z(r.x)), train.map(label), lambda);
+      const vb = tlBrier(val.map((r) => tlPredict(w, z(r.x))), val.map(label));
+      if (vb < best.vb) best = { lambda, w, vb };
+    }
+    // Refit on train+val with the chosen regularization, then evaluate ONLY on unseen test data.
+    const tv = [...train, ...val];
+    const w = tlTrainLogistic(tv.map((r) => z(r.x)), tv.map(label), best.lambda);
+    const baseRate = tv.reduce((a, r) => a + label(r), 0) / tv.length;
+    const p = test.map((r) => tlPredict(w, z(r.x)));
+    const y = test.map(label);
+    const brier = tlBrier(p, y);
+    const baseBrier = tlBrier(test.map(() => baseRate), y);
+    return { w, lambda: best.lambda, baseRate, brier, baseBrier, improvementPct: (1 - brier / baseBrier) * 100, calibration: tlCalibration(p, y), p };
+  }
+  const up = fit(yUp), down = fit(yDown);
+
+  // Backtest on the unseen test window: non-overlapping trades, entry next open, exit at horizon close
+  // (or ATR stop / target hit first, stop assumed first when both touch), costs included.
+  const minEdge = 0.1;
+  let equity = 0, peak = 0, maxDd = 0, wins = 0, losses = 0, grossW = 0, grossL = 0;
+  const trades: number[] = [];
+  for (let k = 0; k < test.length; k++) {
+    const r = test[k];
+    const pu = up.p[k], pd = down.p[k];
+    const side = pu - pd > minEdge ? 1 : pd - pu > minEdge ? -1 : 0;
+    if (!side || r.i + 1 + horizon >= candles.length) continue;
+    const entry = candles[r.i + 1].o;
+    const stopDist = 1.5 * ind.atr[r.i], tgtDist = 2 * ind.atr[r.i];
+    let exit = candles[r.i + horizon].c;
+    for (let j = r.i + 1; j <= r.i + horizon; j++) {
+      const hitStop = side > 0 ? candles[j].l <= entry - stopDist : candles[j].h >= entry + stopDist;
+      const hitTgt = side > 0 ? candles[j].h >= entry + tgtDist : candles[j].l <= entry - tgtDist;
+      if (hitStop) { exit = side > 0 ? entry - stopDist : entry + stopDist; break; }
+      if (hitTgt) { exit = side > 0 ? entry + tgtDist : entry - tgtDist; break; }
+    }
+    const ret = side * (exit / entry - 1) - cost;
+    trades.push(ret);
+    equity += ret; peak = Math.max(peak, equity); maxDd = Math.max(maxDd, peak - equity);
+    if (ret > 0) { wins++; grossW += ret; } else { losses++; grossL -= ret; }
+    k += horizon; // no overlapping positions
+  }
+  const n = trades.length;
+  const testFrom = new Date(candles[test[0].i].t * 1000).toISOString();
+  const testTo = new Date(candles[test[test.length - 1].i].t * 1000).toISOString();
+  const backtest = {
+    period: { from: testFrom, to: testTo }, trades: n, wins, losses,
+    winRate: n ? wins / n : null,
+    avgWinPct: wins ? (grossW / wins) * 100 : null, avgLossPct: losses ? (grossL / losses) * 100 : null,
+    profitFactor: grossL > 0 ? grossW / grossL : null,
+    netReturnPct: equity * 100, maxDrawdownPct: maxDd * 100,
+    expectedValuePct: n ? (equity / n) * 100 : null,
+    costPerTradePct: cost * 100,
+    note: n < 30 ? "Small sample — results are not statistically reliable." : "Simulated on past data; not a guarantee.",
+  };
+
+  // Forecast for the latest closed bar.
+  const last = candles.length - 1;
+  const xNow = tlFeatures(candles, ind, last);
+  let pUp = tlPredict(up.w, z(xNow)), pDown = tlPredict(down.w, z(xNow));
+  const s = pUp + pDown;
+  if (s > 0.98) { pUp = (pUp / s) * 0.98; pDown = (pDown / s) * 0.98; }
+  const pRange = Math.max(0, 1 - pUp - pDown);
+  const avg = (f: (r: { ret: number }) => boolean) => {
+    const sel = [...train, ...val].filter(f);
+    return sel.length ? sel.reduce((a, r) => a + r.ret, 0) / sel.length : 0;
+  };
+  const eUp = avg((r) => r.ret > cost), eDown = avg((r) => r.ret < -cost), eRange = avg((r) => Math.abs(r.ret) <= cost);
+  const expRet = pUp * eUp + pDown * eDown + pRange * eRange;
+  const longEv = (expRet - cost) * 100, shortEv = (-expRet - cost) * 100;
+
+  const reasons: string[] = [], against: string[] = [];
+  const price = ind.close[last];
+  const trend = ind.ema20[last] > ind.ema50[last] ? "up" : "down";
+  const bbWidthPct = ((ind.bbU[last] - ind.bbL[last]) / price) * 100;
+  const regime = Math.abs(ind.ema20[last] / ind.ema50[last] - 1) * 100 > bbWidthPct * 0.15 ? `trending ${trend}` : "ranging";
+  if (ind.rsi[last] > 70) against.push(`RSI ${ind.rsi[last].toFixed(0)} — overbought`);
+  if (ind.rsi[last] < 30) against.push(`RSI ${ind.rsi[last].toFixed(0)} — oversold`);
+  reasons.push(`EMA20 ${trend === "up" ? "above" : "below"} EMA50 (${regime})`);
+  reasons.push(`MACD histogram ${ind.hist[last] >= 0 ? "positive" : "negative"}`);
+
+  let decision = "NO_TRADE";
+  const noTrade: string[] = [];
+  const edgeUp = up.improvementPct >= risk.minEdgeBrierImprovementPct;
+  const edgeDown = down.improvementPct >= risk.minEdgeBrierImprovementPct;
+  if (quality.ageBars > risk.maxDataAgeBars) noTrade.push("market data is stale");
+  if (pUp - pDown > minEdge && edgeUp && longEv >= risk.minExpectedReturnPct) decision = "LONG";
+  else if (pDown - pUp > minEdge && edgeDown && shortEv >= risk.minExpectedReturnPct) decision = "SHORT";
+  else {
+    if (Math.abs(pUp - pDown) <= minEdge) noTrade.push("up and down probabilities too close");
+    if (!edgeUp && !edgeDown) noTrade.push("model did not beat a simple base rate on unseen data");
+    if (Math.max(longEv, shortEv) < risk.minExpectedReturnPct) noTrade.push("expected return after costs is too small");
+  }
+  if (decision !== "NO_TRADE" && noTrade.length) decision = "NO_TRADE";
+  if (decision !== "NO_TRADE" && (backtest.expectedValuePct ?? -1) <= 0) {
+    decision = "NO_TRADE";
+    noTrade.push("this model lost money in the out-of-sample backtest");
+  }
+
+  const atr = ind.atr[last];
+  return {
+    ok: true,
+    symbol, timeframeSec: gran, horizonBars: horizon,
+    dataSource: "Coinbase Exchange public candles",
+    quality,
+    price, priceAt: new Date(candles[last].t * 1000).toISOString(),
+    candles: candles.slice(-120).map((k) => [k.t, k.o, k.h, k.l, k.c]),
+    indicators: {
+      rsi14: ind.rsi[last], macdHist: ind.hist[last], ema20: ind.ema20[last], ema50: ind.ema50[last],
+      atr14: atr, bollingerUpper: ind.bbU[last], bollingerLower: ind.bbL[last],
+      support: Math.min(...candles.slice(-50).map((k) => k.l)), resistance: Math.max(...candles.slice(-50).map((k) => k.h)),
+      regime,
+    },
+    forecast: {
+      pUp, pDown, pRange, expectedReturnPct: expRet * 100, longEvPct: longEv, shortEvPct: shortEv,
+      costRoundTripPct: cost * 100, horizonMinutes: (horizon * gran) / 60,
+      label: "Estimate, not a guarantee",
+    },
+    decision, reasons, against, noTradeReasons: noTrade,
+    plan: decision === "NO_TRADE" ? null : {
+      side: decision === "LONG" ? "long" : "short",
+      stopLoss: decision === "LONG" ? price - 1.5 * atr : price + 1.5 * atr,
+      takeProfit: decision === "LONG" ? price + 2 * atr : price - 2 * atr,
+      invalidation: `Close ${decision === "LONG" ? "below" : "above"} ${(decision === "LONG" ? price - 1.5 * atr : price + 1.5 * atr).toFixed(4)}`,
+    },
+    model: {
+      version: TL_MODEL_VERSION,
+      features: TL_FEATURE_NAMES,
+      trainedOn: { bars: train.length + val.length, from: new Date(candles[train[0].i].t * 1000).toISOString() },
+      testedOn: { bars: test.length, from: testFrom, to: testTo },
+      up: { brier: up.brier, baseBrier: up.baseBrier, improvementPct: up.improvementPct, lambda: up.lambda, calibration: up.calibration },
+      down: { brier: down.brier, baseBrier: down.baseBrier, improvementPct: down.improvementPct, lambda: down.lambda, calibration: down.calibration },
+    },
+    backtest,
+    news: { available: false, note: "News analysis is not connected yet (Stage 2)." },
+    _features: xNow,
+  };
+}
+
+// ── Paper ledger, risk engine, actions ──
+
+async function tlAudit(db: any, email: string, action: string, detail: Record<string, unknown>) {
+  try {
+    await db.from("trading_audit_log").insert({ user_email: email, action, detail });
+  } catch { /* never block on audit */ }
+}
+
+async function tlRisk(db: any, email: string) {
+  const { data } = await db.from("trading_risk_settings").select("settings").eq("user_email", email).maybeSingle();
+  return { ...TL_DEFAULT_RISK, ...(data?.settings ?? {}) };
+}
+
+async function tlAccount(db: any, email: string) {
+  let { data: acct } = await db.from("trading_paper_accounts").select("*").eq("user_email", email).maybeSingle();
+  if (!acct) {
+    await db.from("trading_paper_accounts").insert({ user_email: email });
+    ({ data: acct } = await db.from("trading_paper_accounts").select("*").eq("user_email", email).maybeSingle());
+  }
+  return acct;
+}
+
+/** Close paper trades whose stop / target / time stop was reached, using real candles. */
+async function tlSettleOpen(db: any, email: string) {
+  const { data: open } = await db.from("trading_paper_trades").select("*").eq("user_email", email).eq("status", "open");
+  const marks: Record<string, number> = {};
+  for (const t of open ?? []) {
+    const candles = await tlFetchCandles(t.symbol, 60, 300);
+    if (!candles.length) continue;
+    const entryT = Date.parse(t.entry_at) / 1000;
+    const stopT = Date.parse(t.time_stop_at) / 1000;
+    let exit: number | null = null, reason = "", at = 0;
+    for (const k of candles) {
+      if (k.t < entryT) continue;
+      const long = t.side === "long";
+      if (long ? k.l <= t.stop_loss : k.h >= t.stop_loss) { exit = Number(t.stop_loss); reason = "stop loss"; at = k.t; break; }
+      if (long ? k.h >= t.take_profit : k.l <= t.take_profit) { exit = Number(t.take_profit); reason = "take profit"; at = k.t; break; }
+      if (k.t >= stopT) { exit = k.c; reason = "time stop"; at = k.t; break; }
+    }
+    const lastPx = candles[candles.length - 1].c;
+    marks[t.id] = lastPx;
+    if (exit === null) continue;
+    const fill = t.side === "long" ? exit * (1 - TL_SLIPPAGE) : exit * (1 + TL_SLIPPAGE);
+    const fee = fill * Number(t.qty) * TL_FEE_RATE;
+    const gross = (t.side === "long" ? fill - t.entry_price : t.entry_price - fill) * Number(t.qty);
+    const pnl = gross - fee - Number(t.fees);
+    const { data: upd } = await db.from("trading_paper_trades")
+      .update({ status: "closed", exit_price: fill, exit_at: new Date(at * 1000).toISOString(), exit_reason: reason, fees: Number(t.fees) + fee, pnl })
+      .eq("id", t.id).eq("status", "open").select("id");
+    if (upd?.length) {
+      const acct = await tlAccount(db, email);
+      await db.from("trading_paper_accounts").update({
+        balance: Number(acct.balance) + gross - fee,
+        realized_pnl: Number(acct.realized_pnl) + pnl,
+        fees_paid: Number(acct.fees_paid) + fee,
+        updated_at: new Date().toISOString(),
+      }).eq("user_email", email);
+      await tlAudit(db, email, "paper_close", { tradeId: t.id, reason, fill, pnl });
+    }
+  }
+  return marks;
+}
+
+/** Score past predictions against what the market actually did. */
+async function tlResolvePredictions(db: any, email: string) {
+  const { data: due } = await db.from("trading_predictions").select("*").eq("user_email", email)
+    .is("resolved_at", null).lte("resolve_after", new Date().toISOString()).limit(20);
+  for (const p of due ?? []) {
+    const candles = await tlFetchCandles(p.symbol, p.timeframe_sec, 300);
+    const target = Date.parse(p.resolve_after) / 1000;
+    const k = candles.find((c) => c.t >= target - p.timeframe_sec) ?? null;
+    if (!k) continue;
+    const ret = k.c / Number(p.price_at) - 1;
+    const cost = 2 * (TL_FEE_RATE + TL_SLIPPAGE);
+    const outcome = ret > cost ? "up" : ret < -cost ? "down" : "range";
+    await db.from("trading_predictions").update({ resolved_at: new Date().toISOString(), outcome, actual_return: ret })
+      .eq("id", p.id);
+  }
+}
+
+async function tlSummary(db: any, email: string) {
+  const marks = await tlSettleOpen(db, email);
+  await tlResolvePredictions(db, email);
+  const acct = await tlAccount(db, email);
+  const { data: trades } = await db.from("trading_paper_trades").select("*").eq("user_email", email)
+    .order("entry_at", { ascending: false }).limit(200);
+  const open = (trades ?? []).filter((t: any) => t.status === "open");
+  const closed = (trades ?? []).filter((t: any) => t.status === "closed");
+  const unrealized = open.reduce((a: number, t: any) => {
+    const px = marks[t.id] ?? Number(t.entry_price);
+    return a + (t.side === "long" ? px - t.entry_price : t.entry_price - px) * Number(t.qty);
+  }, 0);
+  const equity = Number(acct.balance) + unrealized;
+  if (equity > Number(acct.peak_equity)) {
+    await db.from("trading_paper_accounts").update({ peak_equity: equity }).eq("user_email", email);
+    acct.peak_equity = equity;
+  }
+  const pnls = closed.map((t: any) => Number(t.pnl ?? 0));
+  const wins = pnls.filter((x: number) => x > 0), losses = pnls.filter((x: number) => x <= 0);
+  const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
+  const { data: preds } = await db.from("trading_predictions").select("p_up,outcome,decision").eq("user_email", email)
+    .not("resolved_at", "is", null).order("created_at", { ascending: false }).limit(500);
+  const res = preds ?? [];
+  const brier = res.length ? res.reduce((a: number, p: any) => a + (Number(p.p_up) - (p.outcome === "up" ? 1 : 0)) ** 2, 0) / res.length : null;
+  const today = new Date(); today.setUTCHours(0, 0, 0, 0);
+  const todayPnl = sum(closed.filter((t: any) => Date.parse(t.exit_at) >= today.getTime()).map((t: any) => Number(t.pnl ?? 0)));
+  return {
+    ok: true,
+    mode: "PAPER (simulated money)",
+    account: {
+      startingBalance: Number(acct.starting_balance), balance: Number(acct.balance), equity,
+      realizedPnl: Number(acct.realized_pnl), unrealizedPnl: unrealized, feesPaid: Number(acct.fees_paid),
+      netChange: equity - Number(acct.starting_balance), deposits: 0, withdrawals: 0,
+      drawdownPct: Number(acct.peak_equity) > 0 ? (1 - equity / Number(acct.peak_equity)) * 100 : 0,
+      todayPnl, halted: acct.halted, haltedReason: acct.halted_reason,
+    },
+    openTrades: open.map((t: any) => ({ ...t, markPrice: marks[t.id] ?? null })),
+    closedTrades: closed.slice(0, 50),
+    performance: {
+      trades: closed.length, winRate: closed.length ? wins.length / closed.length : null,
+      avgWin: wins.length ? sum(wins) / wins.length : null, avgLoss: losses.length ? sum(losses) / losses.length : null,
+      profitFactor: losses.length && sum(losses) < 0 ? sum(wins) / -sum(losses) : null,
+      expectedValue: closed.length ? sum(pnls) / closed.length : null, netPnl: sum(pnls),
+      sampleNote: closed.length < 30 ? `Only ${closed.length} closed trades — too few to judge.` : null,
+    },
+    predictions: { resolved: res.length, brierUp: brier },
+    risk: await tlRisk(db, email),
+  };
+}
+
+/** Independent risk check — can veto any trade the model suggests. */
+async function tlRiskCheck(db: any, email: string, analysis: any, risk: typeof TL_DEFAULT_RISK) {
+  const reasons: string[] = [];
+  const sum = await tlSummary(db, email);
+  const a = sum.account;
+  if (a.halted) reasons.push(`trading halted: ${a.haltedReason ?? "emergency stop"}`);
+  if (analysis.decision === "NO_TRADE") reasons.push("model says NO TRADE");
+  if (analysis.quality.ageBars > risk.maxDataAgeBars) reasons.push("market data is stale");
+  if (sum.openTrades.length >= risk.maxOpenPositions) reasons.push(`max open positions (${risk.maxOpenPositions}) reached`);
+  if (sum.openTrades.some((t: any) => t.symbol === analysis.symbol)) reasons.push(`already have an open ${analysis.symbol} position`);
+  if (a.todayPnl <= -(risk.maxDailyLossPct / 100) * a.startingBalance) reasons.push("daily loss limit reached");
+  if (a.drawdownPct >= risk.maxDrawdownPct) reasons.push("max drawdown reached");
+  const recent = sum.closedTrades.slice(0, risk.maxConsecutiveLosses);
+  if (recent.length === risk.maxConsecutiveLosses && recent.every((t: any) => Number(t.pnl) <= 0)) {
+    reasons.push(`${risk.maxConsecutiveLosses} losses in a row — cooling off`);
+  }
+  const lastOpen = (sum.openTrades[0] ?? sum.closedTrades[0])?.entry_at;
+  if (lastOpen && (Date.now() - Date.parse(lastOpen)) / 1000 < risk.minSecondsBetweenOrders) reasons.push("order frequency limit");
+  return { approved: reasons.length === 0, reasons, summary: sum };
+}
+
+async function handleTrading(req: Request, action: string, body: any): Promise<Response> {
+  const symbol = String(body?.symbol ?? "BTC-USD").toUpperCase();
+  const gran = Number(body?.timeframeSec ?? 300);
+  const horizon = Math.min(Math.max(Math.round(Number(body?.horizonBars ?? 6)), 2), 48);
+  if (!TL_SYMBOLS.has(symbol)) return jsonOk({ ok: false, error: "Unsupported symbol." }, 400);
+  if (!TL_TIMEFRAMES.has(gran)) return jsonOk({ ok: false, error: "Unsupported timeframe." }, 400);
+
+  const email = (await requireJwtEmail(req)).trim().toLowerCase();
+  const db = adminClient();
+
+  if (action === "tradeAnalyze") {
+    if (!email) return jsonOk({ ok: false, error: "Please sign in to use the Trading Lab." }, 401);
+    const limited = await enforceRateLimit(req, "trade_analyze", email, 60, 3600);
+    if (limited) return limited;
+    const risk = email && db ? await tlRisk(db, email) : TL_DEFAULT_RISK;
+    const a: any = await tlAnalyze(symbol, gran, horizon, risk);
+    if (a.ok && email && db) {
+      const { data: row } = await db.from("trading_predictions").insert({
+        user_email: email, symbol, timeframe_sec: gran, horizon_bars: horizon, price_at: a.price,
+        p_up: a.forecast.pUp, p_down: a.forecast.pDown, p_range: a.forecast.pRange,
+        expected_return: a.forecast.expectedReturnPct / 100, decision: a.decision, model_version: TL_MODEL_VERSION,
+        features: Object.fromEntries(TL_FEATURE_NAMES.map((n, j) => [n, a._features[j]])),
+        test_metrics: { up: a.model.up.improvementPct, down: a.model.down.improvementPct, backtest: a.backtest },
+        resolve_after: new Date(Date.parse(a.priceAt) + (horizon + 1) * gran * 1000).toISOString(),
+      }).select("id").maybeSingle();
+      a.predictionId = row?.id ?? null;
+    }
+    delete a._features;
+    return jsonOk(a);
+  }
+
+  if (!email) return jsonOk({ ok: false, error: "Please sign in to use paper trading." }, 401);
+  if (!db) return jsonOk({ ok: false, error: "Server database unavailable." }, 500);
+  const limited = await enforceRateLimit(req, "trade_ops", email, 240, 3600);
+  if (limited) return limited;
+
+  if (action === "tradeSummary") return jsonOk(await tlSummary(db, email));
+
+  if (action === "tradePaperOpen") {
+    const key = String(body?.idempotencyKey ?? "").slice(0, 80);
+    if (key.length < 8) return jsonOk({ ok: false, error: "idempotencyKey required" }, 400);
+    const { data: dup } = await db.from("trading_paper_trades").select("id").eq("idempotency_key", key).maybeSingle();
+    if (dup) return jsonOk({ ok: true, duplicate: true, tradeId: dup.id });
+    // Re-analyze on the server — the client can't feed in its own numbers.
+    const risk = await tlRisk(db, email);
+    const a: any = await tlAnalyze(symbol, gran, horizon, risk);
+    if (!a.ok) return jsonOk({ ok: false, error: a.error });
+    const check = await tlRiskCheck(db, email, a, risk);
+    if (!check.approved) {
+      await tlAudit(db, email, "paper_rejected", { symbol, reasons: check.reasons });
+      return jsonOk({ ok: false, rejected: true, reasons: check.reasons, analysis: { decision: a.decision, noTradeReasons: a.noTradeReasons } });
+    }
+    const equity = check.summary.account.equity;
+    const side = a.plan.side;
+    const fill = side === "long" ? a.price * (1 + TL_SLIPPAGE) : a.price * (1 - TL_SLIPPAGE);
+    const stopDist = Math.abs(fill - a.plan.stopLoss);
+    let qty = ((risk.riskPerTradePct / 100) * equity) / stopDist;
+    qty = Math.min(qty, ((risk.maxPositionPct / 100) * equity) / fill);
+    if (!(qty > 0)) return jsonOk({ ok: false, error: "Position size came out as zero." });
+    const fee = fill * qty * TL_FEE_RATE;
+    const { data: t, error } = await db.from("trading_paper_trades").insert({
+      user_email: email, symbol, side, qty, entry_price: fill, stop_loss: a.plan.stopLoss, take_profit: a.plan.takeProfit,
+      time_stop_at: new Date(Date.now() + 3 * horizon * gran * 1000).toISOString(), fees: fee,
+      model_version: TL_MODEL_VERSION, reason: [...a.reasons, ...a.against.map((s: string) => `against: ${s}`)].join("; "),
+      idempotency_key: key,
+    }).select("*").maybeSingle();
+    if (error) return jsonOk({ ok: false, error: "Could not record the paper trade." }, 500);
+    const acct = await tlAccount(db, email);
+    await db.from("trading_paper_accounts").update({ balance: Number(acct.balance) - fee, fees_paid: Number(acct.fees_paid) + fee })
+      .eq("user_email", email);
+    await tlAudit(db, email, "paper_open", { tradeId: t.id, symbol, side, qty, fill });
+    return jsonOk({ ok: true, trade: t, simulated: true });
+  }
+
+  if (action === "tradePaperClose") {
+    const id = String(body?.tradeId ?? "");
+    const { data: t } = await db.from("trading_paper_trades").select("*").eq("id", id).eq("user_email", email).eq("status", "open").maybeSingle();
+    if (!t) return jsonOk({ ok: false, error: "Open trade not found." }, 404);
+    const candles = await tlFetchCandles(t.symbol, 60, 30);
+    if (!candles.length) return jsonOk({ ok: false, error: "No price available — try again." });
+    const px = candles[candles.length - 1].c;
+    const fill = t.side === "long" ? px * (1 - TL_SLIPPAGE) : px * (1 + TL_SLIPPAGE);
+    const fee = fill * Number(t.qty) * TL_FEE_RATE;
+    const gross = (t.side === "long" ? fill - t.entry_price : t.entry_price - fill) * Number(t.qty);
+    const pnl = gross - fee - Number(t.fees);
+    const { data: upd } = await db.from("trading_paper_trades").update({
+      status: "closed", exit_price: fill, exit_at: new Date().toISOString(), exit_reason: "closed by user",
+      fees: Number(t.fees) + fee, pnl,
+    }).eq("id", t.id).eq("status", "open").select("id");
+    if (upd?.length) {
+      const acct = await tlAccount(db, email);
+      await db.from("trading_paper_accounts").update({
+        balance: Number(acct.balance) + gross - fee, realized_pnl: Number(acct.realized_pnl) + pnl, fees_paid: Number(acct.fees_paid) + fee,
+      }).eq("user_email", email);
+      await tlAudit(db, email, "paper_close", { tradeId: t.id, reason: "user", fill, pnl });
+    }
+    return jsonOk({ ok: true, pnl });
+  }
+
+  if (action === "tradeHalt") {
+    const halted = body?.halted === true;
+    await tlAccount(db, email);
+    await db.from("trading_paper_accounts").update({ halted, halted_reason: halted ? "emergency stop by user" : null })
+      .eq("user_email", email);
+    await tlAudit(db, email, halted ? "halt" : "resume", {});
+    return jsonOk({ ok: true, halted });
+  }
+
+  if (action === "tradeRiskSet") {
+    if (body?.confirm !== true) return jsonOk({ ok: false, error: "Confirmation required to change risk limits." }, 400);
+    const s = body?.settings ?? {};
+    const clamp = (v: unknown, lo: number, hi: number, d: number) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? Math.min(Math.max(n, lo), hi) : d;
+    };
+    const next = {
+      riskPerTradePct: clamp(s.riskPerTradePct, 0.1, 5, TL_DEFAULT_RISK.riskPerTradePct),
+      maxPositionPct: clamp(s.maxPositionPct, 1, 50, TL_DEFAULT_RISK.maxPositionPct),
+      maxDailyLossPct: clamp(s.maxDailyLossPct, 0.5, 20, TL_DEFAULT_RISK.maxDailyLossPct),
+      maxDrawdownPct: clamp(s.maxDrawdownPct, 1, 50, TL_DEFAULT_RISK.maxDrawdownPct),
+      maxOpenPositions: Math.round(clamp(s.maxOpenPositions, 1, 10, TL_DEFAULT_RISK.maxOpenPositions)),
+      maxConsecutiveLosses: Math.round(clamp(s.maxConsecutiveLosses, 1, 10, TL_DEFAULT_RISK.maxConsecutiveLosses)),
+      minSecondsBetweenOrders: Math.round(clamp(s.minSecondsBetweenOrders, 30, 86400, TL_DEFAULT_RISK.minSecondsBetweenOrders)),
+      minExpectedReturnPct: clamp(s.minExpectedReturnPct, 0, 5, TL_DEFAULT_RISK.minExpectedReturnPct),
+      minEdgeBrierImprovementPct: clamp(s.minEdgeBrierImprovementPct, 0, 20, TL_DEFAULT_RISK.minEdgeBrierImprovementPct),
+      maxDataAgeBars: clamp(s.maxDataAgeBars, 1, 5, TL_DEFAULT_RISK.maxDataAgeBars),
+    };
+    await db.from("trading_risk_settings").upsert({ user_email: email, settings: next, updated_at: new Date().toISOString() });
+    await tlAudit(db, email, "risk_settings", next);
+    return jsonOk({ ok: true, settings: next });
+  }
+
+  if (action === "tradeReset") {
+    if (body?.confirm !== true) return jsonOk({ ok: false, error: "Confirmation required." }, 400);
+    await db.from("trading_paper_trades").delete().eq("user_email", email).eq("mode", "paper");
+    await db.from("trading_paper_accounts").delete().eq("user_email", email);
+    await tlAccount(db, email);
+    await tlAudit(db, email, "paper_reset", {});
+    return jsonOk({ ok: true });
+  }
+
+  return jsonOk({ ok: false, error: "Unknown trading action." }, 400);
+}
+
+// ── Advisor dating rules (server is the single source of truth) ─────────────
+const REL_INACTIVE_MS = 30 * 24 * 3600 * 1000; // no message from the partner for 30 days → breakup
+const REL_COOLDOWN_MS = 365 * 24 * 3600 * 1000; // after a breakup: wait 1 year
+const REL_MAX_CHANCES = 2; // first chance + one second chance
+// Not easy to get: they only say yes after real conversation.
+const REL_MIN_MESSAGES = 30;
+const REL_MIN_DAYS = 2;
+
+async function relRapport(db: any, advisorId: string, email: string, bump: boolean) {
+  const { data } = await db.from("advisor_rapport").select("messages,first_at")
+    .eq("advisor_id", advisorId).eq("user_email", email).maybeSingle();
+  if (!bump) return { messages: Number(data?.messages ?? 0), firstAt: data?.first_at ?? null };
+  const next = Number(data?.messages ?? 0) + 1;
+  await db.from("advisor_rapport").upsert({
+    advisor_id: advisorId, user_email: email, messages: next,
+    first_at: data?.first_at ?? new Date().toISOString(), last_at: new Date().toISOString(),
+  });
+  return { messages: next, firstAt: data?.first_at ?? new Date().toISOString() };
+}
+
+/** Ends relationships whose partner hasn't written in 30 days. */
+async function relExpireInactive(db: any, advisorId: string) {
+  const cutoff = new Date(Date.now() - REL_INACTIVE_MS).toISOString();
+  await db.from("advisor_relationships")
+    .update({ status: "ended", ended_at: new Date().toISOString(), ended_reason: "no message for 30 days" })
+    .eq("advisor_id", advisorId).eq("status", "dating").lt("last_user_msg_at", cutoff);
+}
+
+/** What this user may do with this advisor right now. */
+async function relStatusFor(db: any, advisorId: string, email: string) {
+  await relExpireInactive(db, advisorId);
+  const { data: active } = await db.from("advisor_relationships").select("user_email,started_at,chance")
+    .eq("advisor_id", advisorId).eq("status", "dating").maybeSingle();
+  if (active && active.user_email === email) {
+    return { state: "dating_you", since: active.started_at, chance: active.chance };
+  }
+  const { data: history } = await db.from("advisor_relationships").select("chance,ended_at")
+    .eq("advisor_id", advisorId).eq("user_email", email).eq("status", "ended").order("ended_at", { ascending: false });
+  const past = history ?? [];
+  if (past.length >= REL_MAX_CHANCES) return { state: "no_more_chances", relationships: past.length };
+  const lastEnd = past.length ? Date.parse(String(past[0].ended_at ?? "")) : 0;
+  if (lastEnd && Date.now() - lastEnd < REL_COOLDOWN_MS) {
+    return { state: "cooldown", availableAt: new Date(lastEnd + REL_COOLDOWN_MS).toISOString(), relationships: past.length };
+  }
+  // Never reveal who the partner is.
+  if (active) return { state: "taken" };
+  return { state: "single", nextChance: past.length + 1 };
+}
+
+async function handleAdvisorRelationship(req: Request, action: string, body: any): Promise<Response> {
+  const email = (await requireJwtEmail(req)).trim().toLowerCase();
+  if (!email) return jsonOk({ ok: false, error: "Please sign in." }, 401);
+  const db = adminClient();
+  if (!db) return jsonOk({ ok: false, error: "Server database unavailable." }, 500);
+  const limited = await enforceRateLimit(req, "advisor_rel", email, 600, 3600);
+  if (limited) return limited;
+  const advisorId = String(body?.advisorId ?? "").trim().slice(0, 120);
+  if (!advisorId) return jsonOk({ ok: false, error: "advisorId required" }, 400);
+
+  if (action === "relTouch") {
+    // The partner wrote — keeps the relationship alive. Every message also builds rapport.
+    await db.from("advisor_relationships").update({ last_user_msg_at: new Date().toISOString() })
+      .eq("advisor_id", advisorId).eq("user_email", email).eq("status", "dating");
+    const rapport = await relRapport(db, advisorId, email, true);
+    return jsonOk({ ok: true, rapport: rapport.messages, ...(await relStatusFor(db, advisorId, email)) });
+  }
+  if (action === "relStart") {
+    const st: any = await relStatusFor(db, advisorId, email);
+    if (st.state !== "single") return jsonOk({ ok: true, started: false, ...st });
+    // One advisor per user.
+    const { data: mine } = await db.from("advisor_relationships").select("advisor_id")
+      .eq("user_email", email).eq("status", "dating").maybeSingle();
+    if (mine) return jsonOk({ ok: true, started: false, state: "you_are_taken" });
+    // Not easy to get — they need to have really talked first.
+    const rapport = await relRapport(db, advisorId, email, false);
+    const days = rapport.firstAt ? (Date.now() - Date.parse(rapport.firstAt)) / 86400000 : 0;
+    if (rapport.messages < REL_MIN_MESSAGES || days < REL_MIN_DAYS) {
+      return jsonOk({ ok: true, started: false, state: "too_soon", rapport: rapport.messages });
+    }
+    const { error } = await db.from("advisor_relationships").insert({
+      advisor_id: advisorId, user_email: email, status: "dating", chance: st.nextChance,
+    });
+    if (error) return jsonOk({ ok: true, started: false, state: "taken" }); // someone else got there first
+    return jsonOk({ ok: true, started: true, state: "dating_you", chance: st.nextChance });
+  }
+  if (action === "relEnd") {
+    await db.from("advisor_relationships")
+      .update({ status: "ended", ended_at: new Date().toISOString(), ended_reason: "breakup" })
+      .eq("advisor_id", advisorId).eq("user_email", email).eq("status", "dating");
+    return jsonOk({ ok: true, ...(await relStatusFor(db, advisorId, email)) });
+  }
+  return jsonOk({ ok: true, ...(await relStatusFor(db, advisorId, email)) });
+}
+
+// ── House & Insurance workers (apply, list by state, work requests, ratings) ──
+// Phones never read these tables directly. A worker's phone number is only
+// returned to a client after that worker accepted the client's job, and a
+// client's phone only to the worker they sent the job to.
+const HW_ACTIONS = new Set([
+  "hwList", "hwMe", "hwApply", "hwRequest", "hwRespond", "hwDone", "hwRate", "hwCancel",
+  "hwAdminList", "hwAdminDecide", "hwPostJob", "hwJobs", "hwPickJob", "hwPlanCashApp", "hwBusy",
+  "hwCare", "hwCareSign", "hwAdminCare", "hwAdminPayList", "hwAdminPay", "hwAdminCareRevoke", "hwAdminCareRestore", "hwAdminCarePayments", "hwAdminCarePaymentDecide", "hwAdminWorkerStats",
+]);
+const HW_MAX_PHOTO_BYTES = 900 * 1024;
+
+// A booking is one worker, one day, one time slot. A day is YYYY-MM-DD; a slot is HH:MM.
+function hwDate(v: unknown): string {
+  const s = String(v ?? "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "";
+}
+function hwSlot(v: unknown): string {
+  const s = String(v ?? "").trim();
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(s) ? s : "";
+}
+
+function hwText(v: unknown, max: number): string {
+  return String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+}
+
+function hwLongText(v: unknown, max: number): string {
+  return String(v ?? "").replace(/\r/g, "").trim().slice(0, max);
+}
+
+function hwPhone(v: unknown): string {
+  const digits = String(v ?? "").replace(/[^\d+]/g, "");
+  return digits.slice(0, 20);
+}
+
+function hwPublicWorker(w: any) {
+  const count = Number(w.rating_count ?? 0);
+  return {
+    id: w.id,
+    name: w.name,
+    state: w.state,
+    city: w.city,
+    skills: Array.isArray(w.skills) ? w.skills : [],
+    bio: w.bio,
+    photoUrl: w.photo_url,
+    rating: count > 0 ? Math.round((Number(w.rating_sum ?? 0) / count) * 10) / 10 : 0,
+    ratingCount: count,
+    jobsDone: Number(w.jobs_done ?? 0),
+  };
+}
+
+async function hwUploadPhoto(db: any, email: string, b64: string, mime: string): Promise<string> {
+  const clean = b64.includes(",") ? b64.slice(b64.indexOf(",") + 1) : b64;
+  const bytes = Uint8Array.from(atob(clean), (ch) => ch.charCodeAt(0));
+  if (bytes.length === 0 || bytes.length > HW_MAX_PHOTO_BYTES) throw new Error("Photo is too big. Pick a smaller picture.");
+  const type = /png/i.test(mime) ? "image/png" : "image/jpeg";
+  const ext = type === "image/png" ? "png" : "jpg";
+  const key = await sha256Hex(`hw:${email}`);
+  const path = `house-workers/${key.slice(0, 24)}-${Date.now()}.${ext}`;
+  const { error } = await db.storage.from("media").upload(path, bytes, { contentType: type, upsert: true });
+  if (error) throw new Error("Photo upload failed. Try again.");
+  const base = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
+  return `${base}/storage/v1/object/public/media/${path}`;
+}
+
+// Who may work fixing houses: a Civic Registry member (has a Registry ID)
+// with at least one published bio page (Menu Studio → Bio Studio). A worker
+// with more than 5 missed or more than 3 claims in Civic Registry is
+// deactivated: hidden from clients and unable to take work.
+const HW_MAX_MISSED = 5;
+const HW_MAX_CLAIMS = 3;
+type HwElig = {
+  /** The state on the person's Civic Registry record ("" when it has none). */
+  state: string;
+  /** The person's name and phone on their Civic Registry record. */
+  name: string;
+  phone: string;
+  hasRegistryId: boolean;
+  hasBio: boolean;
+  missed: number;
+  claims: number;
+  deactivated: boolean;
+  eligible: boolean;
+};
+
+async function hwEligibility(db: any, emails: string[]): Promise<Map<string, HwElig>> {
+  const keys = [...new Set(emails.map((e) => emailKey(e)).filter(Boolean))];
+  const out = new Map<string, HwElig>();
+  if (keys.length === 0) return out;
+  const payload = await loadCivicPayload(db);
+  const live = filterTombstonedMembers(
+    asMemberList(payload.members),
+    asMemberList(payload.removed),
+    asMemberList(payload.deceased),
+  );
+  // A person is found by email first, then by phone number (the account's
+  // phone, and the WhatsApp number on their worker profile).
+  const phonesFor = new Map<string, Set<string>>();
+  const addPhone = (e: string, raw: unknown) => {
+    const p = hwPhoneKey(raw);
+    if (!p) return;
+    if (!phonesFor.has(e)) phonesFor.set(e, new Set());
+    phonesFor.get(e)!.add(p);
+  };
+  const { data: userRows } = await db.from("users").select("email,phone").in("email", keys);
+  for (const u of userRows ?? []) addPhone(emailKey(String(u.email ?? "")), u.phone);
+  const { data: workerRows } = await db.from("house_workers").select("email,phone").in("email", keys);
+  for (const w of workerRows ?? []) addPhone(emailKey(String(w.email ?? "")), w.phone);
+  const memberFor = new Map<string, Record<string, unknown>>();
+  for (const m of live) {
+    if (!String(m.registryId ?? "").trim()) continue;
+    for (const raw of [m.email, m.linkedAppEmail]) {
+      const e = emailKey(String(raw ?? ""));
+      if (e && keys.includes(e) && !memberFor.has(e)) memberFor.set(e, m);
+    }
+  }
+  for (const e of keys) {
+    if (memberFor.has(e)) continue;
+    const mine = phonesFor.get(e);
+    if (!mine || mine.size === 0) continue;
+    const hit = live.find((m) => String(m.registryId ?? "").trim() && mine.has(hwPhoneKey(m.phone)));
+    if (hit) memberFor.set(e, hit);
+  }
+  const claims = new Map<string, number>();
+  const { data: claimRows } = await db.from("transactions").select("userEmail").eq("type", 6).in("userEmail", keys);
+  for (const r of claimRows ?? []) {
+    const e = emailKey(String(r.userEmail ?? ""));
+    claims.set(e, (claims.get(e) ?? 0) + 1);
+  }
+  const bioOwners = new Set<string>();
+  for (const key of ["ngmy_bio_publish_registry", "ngmy_local_bio_publish_registry"]) {
+    const value = await loadSettingsObject(db, key);
+    for (const group of [value.bios, value.entries]) {
+      if (!group || typeof group !== "object") continue;
+      for (const entry of Object.values(group as Record<string, unknown>)) {
+        if (!entry || typeof entry !== "object") continue;
+        const e = emailKey(String((entry as Record<string, unknown>).createdByEmail ?? ""));
+        if (e) bioOwners.add(e);
+      }
+    }
+  }
+  for (const e of keys) {
+    const m = memberFor.get(e);
+    const missed = Number(m?.missed ?? 0) || 0;
+    const c = claims.get(e) ?? 0;
+    const hasRegistryId = !!m;
+    const hasBio = bioOwners.has(e);
+    const deactivated = missed > HW_MAX_MISSED || c > HW_MAX_CLAIMS;
+    out.set(e, {
+      state: hwText(m?.state ?? m?.stateName ?? "", 60),
+      name: hwText(m?.fullName ?? m?.name ?? m?.legalName ?? "", 80),
+      phone: hwPhone(m?.phone ?? ""),
+      hasRegistryId,
+      hasBio,
+      missed,
+      claims: c,
+      deactivated,
+      eligible: hasRegistryId && hasBio && !deactivated,
+    });
+  }
+  return out;
+}
+
+/** Last 10 digits of a phone number, so +1 706-…, (706) … and 706… all match. */
+function hwPhoneKey(raw: unknown): string {
+  const digits = String(raw ?? "").replace(/\D/g, "");
+  return digits.length >= 10 ? digits.slice(-10) : "";
+}
+
+/** An approved worker can only be seen and sent work while still in good standing.
+ *  NGMY admins are never paused: they run the program, not a Civic Registry seat. */
+function hwCanWork(e: HwElig | undefined, email = ""): boolean {
+  if (email && isNgmyAdminEmail(email)) return true;
+  return !!e && e.hasRegistryId && !e.deactivated;
+}
+
+// ── NGMY Store accounts granted by an admin ─────────────────────────────────
+// The admin types an email or a phone number; the matching account gets NGMY
+// Store access (users."canSellOnStore") and a store profile: store name and a
+// short description that helper gift cards show, so the store is recognised
+// when it scans the gift QR.
+const STORE_ACTIONS = new Set(["storeGrant", "storeRevoke", "storeList", "storeMine", "storeSaveProfile", "storeDirectory"]);
+
+async function storeFindAccount(db: any, target: string): Promise<{ email: string; phone: string; name: string } | null> {
+  const t = target.trim();
+  if (!t) return null;
+  if (t.includes("@")) {
+    const { data } = await db.from("users").select("email,phone,username").ilike("email", t).maybeSingle();
+    return data ? { email: emailKey(data.email), phone: String(data.phone ?? ""), name: String(data.username ?? "") } : null;
+  }
+  const want = hwPhoneKey(t);
+  if (!want) return null;
+  const { data } = await db.from("users").select("email,phone,username").ilike("phone", `%${want.slice(-4)}%`).limit(200);
+  const hit = (data ?? []).find((u: any) => hwPhoneKey(u.phone) === want);
+  return hit ? { email: emailKey(hit.email), phone: String(hit.phone ?? ""), name: String(hit.username ?? "") } : null;
+}
+
+async function storeUploadPhoto(db: any, email: string, b64: string, mime: string): Promise<string> {
+  const clean = b64.includes(",") ? b64.slice(b64.indexOf(",") + 1) : b64;
+  const bytes = Uint8Array.from(atob(clean), (ch) => ch.charCodeAt(0));
+  if (bytes.length === 0 || bytes.length > HW_MAX_PHOTO_BYTES) throw new Error("Picture is too big. Pick a smaller one.");
+  const type = /png/i.test(mime) ? "image/png" : "image/jpeg";
+  const key = await sha256Hex(`store:${email}`);
+  const path = `stores/${key.slice(0, 24)}-${Date.now()}.${type === "image/png" ? "png" : "jpg"}`;
+  const { error } = await db.storage.from("media").upload(path, bytes, { contentType: type, upsert: true });
+  if (error) throw new Error("Picture upload failed. Try again.");
+  const base = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
+  return `${base}/storage/v1/object/public/media/${path}`;
+}
+
+async function storeRemovePhoto(db: any, url: string): Promise<void> {
+  const marker = "/storage/v1/object/public/media/";
+  const at = url.indexOf(marker);
+  if (at < 0) return;
+  const path = decodeURIComponent(url.slice(at + marker.length).split("?")[0]);
+  if (!path.startsWith("stores/")) return;
+  try {
+    await db.storage.from("media").remove([path]);
+  } catch (_) { /* harmless leftover */ }
+}
+
+function storePublic(s: any) {
+  return {
+    email: s.email,
+    storeName: s.store_name,
+    description: s.description,
+    phone: s.phone,
+    grantedAt: s.granted_at,
+    address: s.address ?? "",
+    city: s.city ?? "",
+    state: s.state ?? "",
+    photoUrl: s.photo_url ?? "",
+    profileDone: s.profile_done === true,
+  };
+}
+
+async function handleStoreAccess(req: Request, action: string, body: any): Promise<Response> {
+  const email = (await requireJwtEmail(req)).trim().toLowerCase();
+  if (!email) return jsonOk({ ok: false, error: "Please sign in first." }, 401);
+  const db = adminClient();
+  if (!db) return jsonOk({ ok: false, error: "Server database unavailable." }, 500);
+  const isAdmin = isNgmyAdminEmail(email);
+  const now = new Date().toISOString();
+
+  if (action === "storeMine") {
+    const { data } = await db.from("ngmy_stores").select("*").eq("email", email).eq("active", true).maybeSingle();
+    return jsonOk({ ok: true, store: data ? storePublic(data) : null });
+  }
+
+  if (action === "storeDirectory") {
+    // Every signed-in member can browse stores (no phone numbers here).
+    const { data } = await db.from("ngmy_stores").select("*").eq("active", true).order("store_name").limit(500);
+    const stores = (data ?? []).map((s: any) => {
+      const p = storePublic(s);
+      return { ...p, phone: "" };
+    });
+    return jsonOk({ ok: true, stores });
+  }
+
+  if (action === "storeSaveProfile") {
+    const limited = await enforceRateLimit(req, "store_profile", email, 20, 3600);
+    if (limited) return limited;
+    const { data: mine } = await db.from("ngmy_stores").select("*").eq("email", email).eq("active", true).maybeSingle();
+    if (!mine) return jsonOk({ ok: false, error: "This account does not have NGMY Store access." }, 403);
+    const storeName = hwText(body?.storeName, 80);
+    const address = hwText(body?.address, 200);
+    const city = hwText(body?.city, 60);
+    const state = hwText(body?.state, 60);
+    const description = hwLongText(body?.description, 240);
+    if (!storeName || !address || !state) {
+      return jsonOk({ ok: false, error: "Enter the store name, address, and state." }, 400);
+    }
+    let photoUrl = String(mine.photo_url ?? "");
+    let uploaded = "";
+    if (typeof body?.photoBase64 === "string" && body.photoBase64.length > 0) {
+      try {
+        uploaded = await storeUploadPhoto(db, email, body.photoBase64, String(body?.photoMime ?? ""));
+        photoUrl = uploaded;
+      } catch (e) {
+        return jsonOk({ ok: false, error: String((e as Error).message ?? e) }, 400);
+      }
+    }
+    if (!photoUrl) return jsonOk({ ok: false, error: "Add a store profile picture." }, 400);
+    const { error } = await db.from("ngmy_stores").update({
+      store_name: storeName, address, city, state, description, photo_url: photoUrl,
+      profile_done: true, updated_at: now,
+    }).eq("email", email);
+    if (error) {
+      if (uploaded) await storeRemovePhoto(db, uploaded);
+      return jsonOk({ ok: false, error: error.message }, 500);
+    }
+    // New picture saved: delete the old file so only the current one is kept.
+    const oldUrl = String(mine.photo_url ?? "");
+    if (uploaded && oldUrl && oldUrl !== uploaded) await storeRemovePhoto(db, oldUrl);
+    const { data: saved } = await db.from("ngmy_stores").select("*").eq("email", email).maybeSingle();
+    return jsonOk({ ok: true, store: saved ? storePublic(saved) : null });
+  }
+
+  if (!isAdmin) return jsonOk({ ok: false, error: "Admin only." }, 403);
+
+  if (action === "storeList") {
+    const { data } = await db.from("ngmy_stores").select("*").eq("active", true).order("store_name").limit(500);
+    return jsonOk({ ok: true, stores: (data ?? []).map(storePublic) });
+  }
+  if (action === "storeGrant") {
+    // Store name and description are optional here: the owner fills in the
+    // store profile (name, address, picture) in the pop-up they receive.
+    const storeName = hwText(body?.storeName, 80);
+    const description = hwLongText(body?.description, 240);
+    const acct = await storeFindAccount(db, String(body?.target ?? ""));
+    if (!acct || !acct.email) {
+      return jsonOk({ ok: false, error: "No NGMY account has that email or phone number." }, 404);
+    }
+    const { data: existing } = await db.from("ngmy_stores").select("email").eq("email", acct.email).maybeSingle();
+    const patch: Record<string, unknown> = { phone: acct.phone, active: true, granted_by: email, updated_at: now };
+    if (storeName) patch.store_name = storeName;
+    if (description) patch.description = description;
+    const { error } = existing
+      ? await db.from("ngmy_stores").update(patch).eq("email", acct.email)
+      : await db.from("ngmy_stores").insert({ email: acct.email, store_name: storeName, description, ...patch });
+    if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    await db.from("users").update({ canSellOnStore: true }).ilike("email", acct.email);
+    return jsonOk({ ok: true, store: { email: acct.email, storeName, description, phone: acct.phone }, accountName: acct.name });
+  }
+  // storeRevoke — removes the store completely: store profile and picture,
+  // every listing it posted (and their photos), and the account's Sell access.
+  // Orders and helper gift cards already given stay: they are buyers' records.
+  const target = emailKey(String(body?.storeEmail ?? ""));
+  if (!target) return jsonOk({ ok: false, error: "Store not found." }, 400);
+  const { data: storeRow } = await db.from("ngmy_stores").select("photo_url").eq("email", target).maybeSingle();
+  if (storeRow?.photo_url) await storeRemovePhoto(db, String(storeRow.photo_url));
+  await db.from("ngmy_stores").delete().eq("email", target);
+  await db.from("users").update({ canSellOnStore: false }).ilike("email", target);
+
+  // Listings live in store_listings (id, data jsonb).
+  const mediaPaths = new Set<string>();
+  const collectMedia = (v: unknown) => {
+    if (typeof v === "string") {
+      const s = v.trim();
+      if (s.startsWith("supabase://media/")) mediaPaths.add(s.slice("supabase://media/".length).split("?")[0]);
+      const marker = "/storage/v1/object/public/media/";
+      const at = s.indexOf(marker);
+      if (at >= 0) mediaPaths.add(decodeURIComponent(s.slice(at + marker.length).split("?")[0]));
+    } else if (Array.isArray(v)) {
+      for (const x of v) collectMedia(x);
+    } else if (v && typeof v === "object") {
+      for (const x of Object.values(v as Record<string, unknown>)) collectMedia(x);
+    }
+  };
+  let removedListings = 0;
+  const { data: listingRows } = await db.from("store_listings").select("id,data").limit(5000);
+  const mine = (listingRows ?? []).filter((r: any) =>
+    emailKey(String(r?.data?.sellerEmail ?? "")) === target
+  );
+  for (const r of mine) collectMedia(r.data);
+  if (mine.length > 0) {
+    await db.from("store_listings").delete().in("id", mine.map((r: any) => r.id));
+    removedListings = mine.length;
+  }
+  // Older copy of the listings kept on the config row.
+  try {
+    const { data: cfg } = await db.from("config").select("id,storelistings").limit(5);
+    for (const row of cfg ?? []) {
+      const list = Array.isArray(row.storelistings) ? row.storelistings : [];
+      const keep = list.filter((l: any) => emailKey(String(l?.sellerEmail ?? "")) !== target);
+      if (keep.length !== list.length) {
+        for (const l of list) if (emailKey(String(l?.sellerEmail ?? "")) === target) collectMedia(l);
+        await db.from("config").update({ storelistings: keep }).eq("id", row.id);
+      }
+    }
+  } catch (_) { /* no config copy */ }
+  const paths = [...mediaPaths].filter((p) => p && !p.includes(".."));
+  for (let i = 0; i < paths.length; i += 100) {
+    try {
+      await db.storage.from("media").remove(paths.slice(i, i + 100));
+    } catch (_) { /* leftover files are harmless */ }
+  }
+  return jsonOk({ ok: true, removedListings, removedFiles: paths.length });
+}
+
+// Plans: basic ($50/mo, card or Cash App) lets a member post jobs to the
+// board; premium ($65/mo, Cash App) also lets them send work straight to a
+// worker they choose. Card payments for basic land in ngmy_stripe_access.
+const HW_BASIC_PRICE = 125;
+const HW_PREMIUM_PRICE = 65;
+const HW_PLAN_DAYS = 30;
+// A paid member can pay again only in the last days of the time they paid for.
+const HW_RENEW_WINDOW_DAYS = 3;
+// Off until the job board and plan screens ship in the app: until then a
+// client can still send work straight to a worker without Premium.
+const HW_PLANS_ENFORCED = false;
+
+async function hwPlans(db: any, email: string) {
+  const nowMs = Date.now();
+  const { data: rows } = await db.from("house_plans").select("plan,access_until").eq("email", email);
+  let basicUntil = 0;
+  let premiumUntil = 0;
+  for (const r of rows ?? []) {
+    const t = Date.parse(String(r.access_until ?? "")) || 0;
+    if (r.plan === "basic") basicUntil = Math.max(basicUntil, t);
+    if (r.plan === "premium") premiumUntil = Math.max(premiumUntil, t);
+  }
+  try {
+    const { data: card } = await db.from("ngmy_stripe_access").select("access_until")
+      .eq("email", email).eq("product", "house_insurance");
+    for (const r of card ?? []) basicUntil = Math.max(basicUntil, Date.parse(String(r.access_until ?? "")) || 0);
+  } catch (_) { /* card table missing: Cash App plans still count */ }
+  const premium = premiumUntil > nowMs;
+  return {
+    basicUntil: basicUntil > 0 ? new Date(basicUntil).toISOString() : null,
+    premiumUntil: premiumUntil > 0 ? new Date(premiumUntil).toISOString() : null,
+    canPost: premium || basicUntil > nowMs,
+    premium,
+    basicPrice: HW_BASIC_PRICE,
+    premiumPrice: HW_PREMIUM_PRICE,
+  };
+}
+
+/** When a plan's access would run until if its next payment were approved now, and what that payment costs. */
+async function hwPlanUntil(db: any, email: string, plan: string, term: boolean):
+  Promise<{ until: string; amount: number } | { error: string; status: number }> {
+  const { data: prev } = await db.from("house_plans").select("access_until").eq("email", email).eq("plan", plan).maybeSingle();
+  const prevMs = Date.parse(String(prev?.access_until ?? "")) || 0;
+  const base = Math.max(Date.now(), prevMs);
+  const price = plan === "premium" ? HW_PREMIUM_PRICE : HW_BASIC_PRICE;
+  // Paid ahead (a whole term, or many months): nothing more to pay until that time is nearly over.
+  if (plan === "basic" && prevMs > Date.now() + HW_RENEW_WINDOW_DAYS * 86400000) {
+    return { error: `You are already paid until ${new Date(prevMs).toISOString().slice(0, 10)}. You can pay again in the last 3 days before it ends.`, status: 409 };
+  }
+  if (term && plan === "basic") {
+    // The whole agreement at once: the monthly price for every month of the term the member signed.
+    let years = 0;
+    try {
+      const { data: sub } = await db.from("house_subscriptions").select("term_years").eq("email", email).maybeSingle();
+      years = Number(sub?.term_years ?? 0);
+    } catch (_) { /* no agreement yet */ }
+    if (!(years >= 1 && years <= 4)) {
+      return { error: "Sign the House Care agreement first, then you can pay the whole term.", status: 400 };
+    }
+    const d = new Date(base);
+    d.setFullYear(d.getFullYear() + years);
+    return { until: d.toISOString(), amount: price * 12 * years };
+  }
+  return { until: new Date(base + HW_PLAN_DAYS * 86400000).toISOString(), amount: price };
+}
+
+const HW_NEEDS_SUB = "Join House Care and pay for it before you send work.";
+
+/** Work can only be sent by a member whose House Care is paid (Cash App or card) and not ended. */
+async function hwSubscribed(db: any, email: string): Promise<boolean> {
+  const plans = await hwPlans(db, email);
+  if (!plans.canPost) return false;
+  try {
+    const { data } = await db.from("house_subscriptions").select("status").eq("email", email).maybeSingle();
+    if (data?.status === "cancelled") return false;
+  } catch (_) { /* no agreement row: the paid plan still counts */ }
+  return true;
+}
+
+// ── House Care membership ───────────────────────────────────────────────────
+// A member signs the NGMY agreement (a chosen term, a signature and a selfie) and pays the monthly
+// plan. While the plan is paid, their posted work carries no labor charge: they only pay for
+// materials. Everyone else can still post work, and is charged like normal work.
+const HW_CARE_TERMS = [1, 2, 3, 4];
+const HW_CARE_VERSION = "v1";
+
+async function hwUploadCareImage(db: any, email: string, kind: string, b64: string, mime: string): Promise<string> {
+  const clean = b64.includes(",") ? b64.slice(b64.indexOf(",") + 1) : b64;
+  const bytes = Uint8Array.from(atob(clean), (ch) => ch.charCodeAt(0));
+  if (bytes.length === 0 || bytes.length > HW_MAX_PHOTO_BYTES) throw new Error(`The ${kind} is too big. Try again.`);
+  const type = /png/i.test(mime) ? "image/png" : "image/jpeg";
+  const ext = type === "image/png" ? "png" : "jpg";
+  const key = await sha256Hex(`hwcare:${email}`);
+  const path = `house-care/${key.slice(0, 24)}-${kind}-${Date.now()}.${ext}`;
+  const { error } = await db.storage.from("media").upload(path, bytes, { contentType: type, upsert: true });
+  if (error) throw new Error(`The ${kind} upload failed. Try again.`);
+  const base = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
+  return `${base}/storage/v1/object/public/media/${path}`;
+}
+
+async function hwRemoveCareImage(db: any, url: string): Promise<void> {
+  const marker = "/storage/v1/object/public/media/";
+  const at = url.indexOf(marker);
+  if (at < 0) return;
+  const path = decodeURIComponent(url.slice(at + marker.length).split("?")[0]);
+  if (!path.startsWith("house-care/")) return;
+  try {
+    await db.storage.from("media").remove([path]);
+  } catch (_) { /* a leftover file is harmless */ }
+}
+
+async function hwCare(db: any, email: string) {
+  const plans = await hwPlans(db, email);
+  let pendingPayment: any = null;
+  try {
+    const { data: pend } = await db.from("house_care_payments").select("amount,term,created_at")
+      .eq("email", email).eq("plan", "basic").eq("status", "pending").order("created_at", { ascending: false }).limit(1);
+    if (pend && pend.length > 0) pendingPayment = { amount: Number(pend[0].amount ?? 0), term: pend[0].term === true, createdAt: pend[0].created_at };
+  } catch (_) { /* payments table not created yet */ }
+  let row: any = null;
+  try {
+    const { data } = await db.from("house_subscriptions").select("*").eq("email", email).maybeSingle();
+    row = data;
+  } catch (_) { /* table not created yet: no membership */ }
+  if (!row) {
+    return { signed: false, active: false, termYears: 0, status: "none", nextDue: plans.basicUntil, price: HW_BASIC_PRICE, pendingPayment, subscribed: plans.canPost, daysLeft: 0 };
+  }
+  const paidUntil: string | null = plans.basicUntil;
+  const paidMs = paidUntil ? Date.parse(paidUntil) : 0;
+  const active = row.status !== "cancelled" && paidMs > Date.now();
+  const status = row.status === "cancelled" ? "cancelled" : active ? "active" : row.started_at ? "lapsed" : "pending";
+  const startedAt: string | null = row.started_at ?? (active ? new Date().toISOString() : null);
+  const storedDue = row.next_payment_due ? Date.parse(String(row.next_payment_due)) : 0;
+  if (status !== row.status || startedAt !== row.started_at || (paidMs && Math.abs(storedDue - paidMs) > 60000)) {
+    try {
+      await db.from("house_subscriptions").update({
+        status, started_at: startedAt, next_payment_due: paidUntil, updated_at: new Date().toISOString(),
+      }).eq("email", email);
+    } catch (_) { /* the state is recomputed on the next call */ }
+  }
+  const termEnds = startedAt
+    ? new Date(new Date(startedAt).setFullYear(new Date(startedAt).getFullYear() + Number(row.term_years ?? 1))).toISOString()
+    : null;
+  return {
+    signed: true, active, status, termYears: Number(row.term_years ?? 1), fullName: row.full_name ?? "",
+    agreedAt: row.agreed_at, startedAt, termEnds, nextDue: paidUntil, price: HW_BASIC_PRICE,
+    // Paid ahead for a long time (the whole term): no payment is due until it runs down.
+    prepaid: active && paidMs > Date.now() + HW_RENEW_WINDOW_DAYS * 86400000,
+    subscribed: status !== "cancelled" && plans.canPost,
+    daysLeft: paidMs > Date.now() ? Math.ceil((paidMs - Date.now()) / 86400000) : 0,
+    termPrice: HW_BASIC_PRICE * 12 * Number(row.term_years ?? 1),
+    pendingPayment,
+  };
+}
+
+/** A worker's record: jobs finished and money earned, by month and in total. */
+async function hwWorkerStats(db: any, email: string) {
+  let rows: any[] = [];
+  const first = await db.from("house_work_requests")
+    .select("done_at,labor_cost,materials_cost,worker_pay,labor_free")
+    .eq("worker_email", email).eq("status", "done").order("done_at", { ascending: false }).limit(2000);
+  if (first.error) {
+    // The pay columns are not in the database yet: count jobs only.
+    const second = await db.from("house_work_requests").select("done_at")
+      .eq("worker_email", email).eq("status", "done").order("done_at", { ascending: false }).limit(2000);
+    rows = second.data ?? [];
+  } else {
+    rows = first.data ?? [];
+  }
+  const byMonth = new Map<string, { month: string; done: number; earned: number; materials: number }>();
+  let totalDone = 0;
+  let totalEarned = 0;
+  for (const r of rows) {
+    const month = String(r.done_at ?? "").slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(month)) continue;
+    const earned = (Number(r.labor_cost ?? 0) || 0) + (Number(r.worker_pay ?? 0) || 0);
+    const entry = byMonth.get(month) ?? { month, done: 0, earned: 0, materials: 0 };
+    entry.done += 1;
+    entry.earned += earned;
+    entry.materials += Number(r.materials_cost ?? 0) || 0;
+    byMonth.set(month, entry);
+    totalDone += 1;
+    totalEarned += earned;
+  }
+  const months = [...byMonth.values()].sort((a, b) => b.month.localeCompare(a.month));
+  const nowMonth = new Date().toISOString().slice(0, 7);
+  return {
+    months,
+    totalDone,
+    totalEarned,
+    thisMonth: byMonth.get(nowMonth) ?? { month: nowMonth, done: 0, earned: 0, materials: 0 },
+  };
+}
+
+/** Deletes one worker photo from storage. Only touches house-workers/ files. */
+async function hwRemovePhoto(db: any, url: string): Promise<void> {
+  const marker = "/storage/v1/object/public/media/";
+  const at = url.indexOf(marker);
+  if (at < 0) return;
+  const path = decodeURIComponent(url.slice(at + marker.length).split("?")[0]);
+  if (!path.startsWith("house-workers/")) return;
+  try {
+    await db.storage.from("media").remove([path]);
+  } catch (_) { /* a leftover file is harmless; never block the save */ }
+}
+
+async function handleHouseWorkers(req: Request, action: string, body: any): Promise<Response> {
+  const email = (await requireJwtEmail(req)).trim().toLowerCase();
+  if (!email) return jsonOk({ ok: false, error: "Please sign in first." }, 401);
+  const db = adminClient();
+  if (!db) return jsonOk({ ok: false, error: "Server database unavailable." }, 500);
+  const now = new Date().toISOString();
+  const isAdmin = isNgmyAdminEmail(email);
+
+  if (action === "hwList") {
+    // A person only sees the workers of the state they are registered in (Civic Registry).
+    // The state is read from their registry record, never from what the phone sends. Admins may look at any state.
+    const myElig = (await hwEligibility(db, [email])).get(email);
+    if (!isAdmin && !myElig?.hasRegistryId) return jsonOk({ ok: true, workers: [], needsRegistry: true });
+    const state = isAdmin ? (hwText(body?.state, 60) || myElig?.state || "") : (myElig?.state ?? "");
+    if (!state) return jsonOk({ ok: true, workers: [], registryState: "" });
+    const { data: rows, error } = await db.from("house_workers").select("*")
+      .eq("status", "approved").limit(500);
+    if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    const data = (rows ?? []).filter((w: any) => statesMatch(String(w.state ?? ""), state));
+    const elig = await hwEligibility(db, (data ?? []).map((w: any) => w.email));
+    const workers = (data ?? []).filter((w: any) => hwCanWork(elig.get(emailKey(w.email)), w.email)).map((w: any) => isAdmin ? { ...hwPublicWorker(w), email: w.email, phone: w.phone } : hwPublicWorker(w))
+      .sort((a: any, b: any) => (b.rating - a.rating) || (b.jobsDone - a.jobsDone));
+    return jsonOk({ ok: true, workers });
+  }
+
+  if (action === "hwMe") {
+    const { data: me } = await db.from("house_workers").select("*").eq("email", email).maybeSingle();
+    const { data: sent } = await db.from("house_work_requests").select("*")
+      .eq("client_email", email).order("created_at", { ascending: false }).limit(50);
+    const workerEmails = [...new Set((sent ?? []).map((r: any) => r.worker_email).filter(Boolean))];
+    const { data: sentWorkers } = workerEmails.length
+      ? await db.from("house_workers").select("*").in("email", workerEmails)
+      : { data: [] as any[] };
+    const byEmail = new Map((sentWorkers ?? []).map((w: any) => [w.email, w]));
+    const mine = (sent ?? []).map((r: any) => {
+      const w: any = byEmail.get(r.worker_email) ?? {};
+      const shared = r.status === "accepted" || r.status === "done";
+      return {
+        id: r.id, status: r.status, details: r.details, address: r.address, city: r.city,
+        category: r.category, bestTime: r.best_time, createdAt: r.created_at,
+        acceptedAt: r.accepted_at, doneAt: r.done_at, rating: r.rating, review: r.review,
+        laborFree: r.labor_free === true, materialsCost: r.materials_cost ?? null, laborCost: r.labor_cost ?? null,
+        worker: { ...hwPublicWorker(w), phone: shared ? (w.phone ?? "") : "" },
+      };
+    });
+    let inbox: any[] = [];
+    if (me && me.status === "approved") {
+      const { data: incoming } = await db.from("house_work_requests").select("*")
+        .eq("worker_email", email).order("created_at", { ascending: false }).limit(80);
+      inbox = (incoming ?? []).map((r: any) => ({
+        id: r.id, status: r.status, details: r.details, address: r.address, city: r.city,
+        state: r.state, category: r.category, bestTime: r.best_time, createdAt: r.created_at,
+        acceptedAt: r.accepted_at, doneAt: r.done_at, rating: r.rating, review: r.review,
+        clientName: r.client_name,
+        laborFree: r.labor_free === true, materialsCost: r.materials_cost ?? null, laborCost: r.labor_cost ?? null,
+        clientPhone: (r.status === "accepted" || r.status === "done") ? r.client_phone : "",
+      }));
+    }
+    const myElig = (await hwEligibility(db, [email])).get(email);
+    return jsonOk({
+      ok: true,
+      worker: me
+        ? {
+          ...hwPublicWorker(me),
+          status: me.status === "approved" && !hwCanWork(myElig, email) ? "deactivated" : me.status,
+          phone: me.phone,
+        }
+        : null,
+      requests: mine,
+      inbox,
+      isAdmin,
+      eligibility: myElig ?? null,
+      registryState: myElig?.state ?? "",
+      registryName: myElig?.name ?? "",
+      registryPhone: myElig?.phone ?? "",
+      stats: me ? await hwWorkerStats(db, email) : null,
+      plans: await hwPlans(db, email),
+      care: await hwCare(db, email),
+    });
+  }
+
+  if (action === "hwCare") {
+    return jsonOk({ ok: true, care: await hwCare(db, email), eligibility: (await hwEligibility(db, [email])).get(email) ?? null });
+  }
+
+  if (action === "hwCareSign") {
+    const limited = await enforceRateLimit(req, "hw_care", email, 6, 86400);
+    if (limited) return limited;
+    const elig = (await hwEligibility(db, [email])).get(email);
+    if (!isAdmin && !elig?.hasRegistryId) {
+      return jsonOk({ ok: false, needsRegistry: true, error: "You need to be registered in Civic Registry to join House Care." }, 403);
+    }
+    const termYears = Math.round(Number(body?.termYears ?? 0));
+    if (!HW_CARE_TERMS.includes(termYears)) return jsonOk({ ok: false, error: "Choose how long you want to stay." }, 400);
+    const fullName = hwText(body?.fullName, 80);
+    if (fullName.length < 3) return jsonOk({ ok: false, error: "Type your full name." }, 400);
+    if (body?.accepted !== true) return jsonOk({ ok: false, error: "Accept the agreement first." }, 400);
+    if (typeof body?.signatureBase64 !== "string" || body.signatureBase64.length < 50) {
+      return jsonOk({ ok: false, error: "Sign the agreement first." }, 400);
+    }
+    if (typeof body?.selfieBase64 !== "string" || body.selfieBase64.length < 50) {
+      return jsonOk({ ok: false, error: "Take a selfie of yourself and upload it." }, 400);
+    }
+    let prev: any = null;
+    try {
+      const { data } = await db.from("house_subscriptions").select("*").eq("email", email).maybeSingle();
+      prev = data;
+    } catch (_) { /* first membership */ }
+    if (prev && prev.status === "active") {
+      return jsonOk({ ok: false, error: "You already have an active agreement." }, 409);
+    }
+    let signatureUrl = "";
+    let selfieUrl = "";
+    try {
+      signatureUrl = await hwUploadCareImage(db, email, "signature", body.signatureBase64, "image/png");
+      selfieUrl = await hwUploadCareImage(db, email, "selfie", body.selfieBase64, String(body?.selfieMime ?? ""));
+    } catch (e) {
+      if (signatureUrl) await hwRemoveCareImage(db, signatureUrl);
+      return jsonOk({ ok: false, error: String((e as Error).message ?? e) }, 400);
+    }
+    const { error } = await db.from("house_subscriptions").upsert({
+      email, full_name: fullName, term_years: termYears, state: elig?.state || hwText(body?.state, 60),
+      signature_url: signatureUrl, selfie_url: selfieUrl, agreement_version: HW_CARE_VERSION,
+      agreed_at: now, status: "pending", started_at: null, next_payment_due: null, updated_at: now,
+    });
+    if (error) {
+      await hwRemoveCareImage(db, signatureUrl);
+      await hwRemoveCareImage(db, selfieUrl);
+      return jsonOk({ ok: false, error: error.message }, 500);
+    }
+    if (prev?.signature_url) await hwRemoveCareImage(db, String(prev.signature_url));
+    if (prev?.selfie_url) await hwRemoveCareImage(db, String(prev.selfie_url));
+    return jsonOk({ ok: true, care: await hwCare(db, email) });
+  }
+
+  if (action === "hwPlanCashApp") {
+    // Cash App is confirmed by the member (like every NGMY Cash App plan);
+    // admins see each plan with its method in Worker applications.
+    const limited = await enforceRateLimit(req, "hw_plan", email, 6, 86400);
+    if (limited) return limited;
+    const plan = body?.plan === "premium" ? "premium" : body?.plan === "basic" ? "basic" : "";
+    if (!plan) return jsonOk({ ok: false, error: "Pick a plan." }, 400);
+    // Paying for House & Insurance needs a Civic Registry record.
+    if (!isAdmin && !(await hwEligibility(db, [email])).get(email)?.hasRegistryId) {
+      return jsonOk({ ok: false, needsRegistry: true, error: "You need to be registered in Civic Registry to pay for House & Insurance." }, 403);
+    }
+    const unpaid = await hwPlanUntil(db, email, plan, body?.term === true);
+    if ("error" in unpaid) return jsonOk({ ok: false, error: unpaid.error }, unpaid.status);
+    // An admin's own payment counts straight away; everyone else's waits for an admin to approve it.
+    if (isAdmin) {
+      const { error } = await db.from("house_plans").upsert({
+        email, plan, method: "cashapp", access_until: unpaid.until, updated_at: now,
+      });
+      if (error) return jsonOk({ ok: false, error: error.message }, 500);
+      return jsonOk({ ok: true, plans: await hwPlans(db, email) });
+    }
+    const { data: waiting } = await db.from("house_care_payments").select("id").eq("email", email).eq("plan", plan).eq("status", "pending").limit(1);
+    if (waiting && waiting.length > 0) {
+      return jsonOk({ ok: false, error: "Your last payment is still being confirmed." }, 409);
+    }
+    // Like a Growth Income deposit: the payment carries its code and the screenshot of the Cash App payment.
+    const code = String(body?.code ?? "").replace(/\D/g, "").slice(0, 8);
+    const proofB64 = String(body?.proofBase64 ?? "");
+    if (code.length < 4) return jsonOk({ ok: false, error: "Your payment code is missing. Open the payment again." }, 400);
+    if (!proofB64) return jsonOk({ ok: false, error: "Attach the screenshot of your Cash App payment." }, 400);
+    let proofUrl = "";
+    try {
+      proofUrl = await hwUploadCareImage(db, email, "pay", proofB64, String(body?.proofMime ?? ""));
+    } catch (e) {
+      return jsonOk({ ok: false, error: String((e as Error).message ?? e) }, 400);
+    }
+    const { error } = await db.from("house_care_payments").insert({
+      email, plan, term: body?.term === true && plan === "basic", amount: unpaid.amount, status: "pending",
+      code, proof_url: proofUrl,
+    });
+    if (error) {
+      await hwRemoveCareImage(db, proofUrl);
+      const missing = /house_care_payments|proof_url|code/i.test(error.message);
+      return jsonOk({ ok: false, error: missing ? "Payments are not switched on yet. Please tell the admin to finish the House Care setup." : error.message }, 500);
+    }
+    return jsonOk({ ok: true, pending: true, care: await hwCare(db, email), plans: await hwPlans(db, email) });
+  }
+
+  if (action === "hwBusy") {
+    // The times a worker is already booked on a day, so the app can show them as busy.
+    const workerId = hwText(body?.workerId, 60);
+    const day = hwDate(body?.date);
+    if (!workerId || !day) return jsonOk({ ok: false, error: "Choose a day first." }, 400);
+    const { data: w } = await db.from("house_workers").select("email").eq("id", workerId).maybeSingle();
+    if (!w) return jsonOk({ ok: false, error: "This worker is not available." }, 404);
+    const { data: rows } = await db.from("house_work_requests").select("booking_time")
+      .eq("worker_email", w.email).eq("booking_date", day).in("status", ["pending", "accepted"]);
+    const busyTimes = (rows ?? []).map((r: any) => String(r.booking_time ?? "")).filter((t: string) => t);
+    return jsonOk({ ok: true, busyTimes });
+  }
+
+  if (action === "hwPostJob") {
+    const limited = await enforceRateLimit(req, "hw_post", email, 10, 3600);
+    if (limited) return limited;
+    // Anyone registered in Civic Registry can post work, in the state they are registered in.
+    // A House Care member pays for materials only; everyone else is charged like normal work.
+    const postElig = (await hwEligibility(db, [email])).get(email);
+    if (!isAdmin && !postElig?.hasRegistryId) {
+      return jsonOk({ ok: false, needsRegistry: true, error: "You need to be registered in Civic Registry to submit work." }, 403);
+    }
+    if (!isAdmin && !(await hwSubscribed(db, email))) return jsonOk({ ok: false, needsSubscription: true, error: HW_NEEDS_SUB }, 402);
+    // The work goes to the state on their Civic Registry record, nowhere else.
+    const state = isAdmin ? (postElig?.state || hwText(body?.state, 60)) : (postElig?.state ?? "");
+    if (!state) {
+      return jsonOk({ ok: false, error: "Your Civic Registry record has no state, so we cannot send your work to workers yet." }, 400);
+    }
+    const laborFree = (await hwCare(db, email)).active;
+    const details = hwLongText(body?.details, 1500);
+    const clientName = hwText(body?.clientName, 80);
+    const clientPhone = hwPhone(body?.clientPhone);
+    if (!state || details.length < 5 || !clientName || clientPhone.replace(/\D/g, "").length < 10) {
+      return jsonOk({ ok: false, error: "Enter your state, name, WhatsApp number, and what is wrong." }, 400);
+    }
+    const { count } = await db.from("house_work_requests").select("id", { count: "exact", head: true })
+      .eq("client_email", email).in("status", ["open", "pending"]);
+    if ((count ?? 0) >= 5) {
+      return jsonOk({ ok: false, error: "You already have 5 jobs waiting. Wait for a worker to pick one up first." }, 429);
+    }
+    const jobRow: Record<string, unknown> = {
+      client_email: email, client_name: clientName, client_phone: clientPhone,
+      worker_email: null, status: "open", state, city: hwText(body?.city, 60),
+      address: hwText(body?.address, 200), category: hwText(body?.category, 60),
+      details, best_time: hwText(body?.bestTime, 80), labor_free: laborFree,
+    };
+    let ins = await db.from("house_work_requests").insert(jobRow).select("id").single();
+    if (ins.error && /labor_free/i.test(ins.error.message ?? "")) {
+      // The House Care columns are not in the database yet: post the job without the flag.
+      delete jobRow.labor_free;
+      ins = await db.from("house_work_requests").insert(jobRow).select("id").single();
+    }
+    if (ins.error) return jsonOk({ ok: false, error: ins.error.message }, 500);
+    return jsonOk({ ok: true, id: ins.data?.id, laborFree });
+  }
+
+  if (action === "hwJobs" || action === "hwPickJob") {
+    const { data: me } = await db.from("house_workers").select("*").eq("email", email).maybeSingle();
+    const canWork = me?.status === "approved" && hwCanWork((await hwEligibility(db, [email])).get(email), email);
+    if (!canWork) return jsonOk({ ok: false, error: "Only approved workers in good standing can pick up jobs." }, 403);
+    if (action === "hwJobs") {
+      // A worker only sees work posted in their own state.
+      const { data: openRows } = await db.from("house_work_requests").select("*")
+        .eq("status", "open").neq("client_email", email)
+        .order("created_at", { ascending: false }).limit(300);
+      const data = (openRows ?? []).filter((r: any) => statesMatch(String(r.state ?? ""), String(me.state ?? ""))).slice(0, 60);
+      const jobs = (data ?? []).map((r: any) => ({
+        id: r.id, details: r.details, city: r.city, state: r.state, category: r.category,
+        bestTime: r.best_time, createdAt: r.created_at, clientName: hwText(r.client_name, 80), address: hwText(r.address, 200),
+        laborFree: r.labor_free === true,
+      }));
+      return jsonOk({ ok: true, jobs, state: me.state });
+    }
+    const id = hwText(body?.requestId, 60);
+    // Only work from the worker's own state can be picked up.
+    const { data: target } = await db.from("house_work_requests").select("state").eq("id", id).maybeSingle();
+    if (!target || !statesMatch(String(target.state ?? ""), String(me.state ?? ""))) {
+      return jsonOk({ ok: false, error: "This job is not in your state." }, 403);
+    }
+    // First worker to tap wins: the update only matches while the job is still open.
+    const { data: picked } = await db.from("house_work_requests").update({
+      worker_email: email, status: "accepted", accepted_at: now,
+    }).eq("id", id).eq("status", "open").is("worker_email", null).neq("client_email", email).select("*");
+    if (!picked || picked.length === 0) {
+      return jsonOk({ ok: false, error: "Another worker already picked up this job." }, 409);
+    }
+    return jsonOk({
+      ok: true, clientPhone: picked[0].client_phone, clientName: picked[0].client_name,
+      address: picked[0].address, laborFree: picked[0].labor_free === true,
+    });
+  }
+
+  if (action === "hwApply") {
+    const limited = await enforceRateLimit(req, "hw_apply", email, 10, 3600);
+    if (limited) return limited;
+    const name = hwText(body?.name, 80);
+    const phone = hwPhone(body?.phone);
+    const state = hwText(body?.state, 60);
+    const city = hwText(body?.city, 60);
+    const bio = hwLongText(body?.bio, 500);
+    const skills = (Array.isArray(body?.skills) ? body.skills : [])
+      .map((s: unknown) => hwText(s, 40)).filter(Boolean).slice(0, 12);
+    if (!name || phone.replace(/\D/g, "").length < 10 || !state || skills.length === 0) {
+      return jsonOk({ ok: false, error: "Enter your name, WhatsApp number, state, and at least one skill." }, 400);
+    }
+    const elig = (await hwEligibility(db, [email])).get(email);
+    if (!isAdmin && !elig?.eligible) {
+      return jsonOk({
+        ok: false,
+        error: !elig?.hasRegistryId
+          ? "You need a Civic Registry ID to be a worker."
+          : elig.deactivated
+          ? "You cannot work right now: more than 5 missed or more than 3 claims in Civic Registry."
+          : "You need at least one bio page (Menu Studio → Bio Studio) to be a worker.",
+      }, 403);
+    }
+    // A worker works in the state they are registered in, and only there.
+    if (!isAdmin && elig?.state && !statesMatch(elig.state, state)) {
+      return jsonOk({ ok: false, error: `You are registered in ${displayStateName(elig.state)}, so you can only work in ${displayStateName(elig.state)}.` }, 403);
+    }
+    const { data: prev } = await db.from("house_workers").select("*").eq("email", email).maybeSingle();
+    if (prev?.status === "removed") {
+      return jsonOk({ ok: false, error: "This account cannot apply as a worker. Contact NGMY." }, 403);
+    }
+    let photoUrl = prev?.photo_url ?? "";
+    if (typeof body?.photoBase64 === "string" && body.photoBase64.length > 0) {
+      try {
+        photoUrl = await hwUploadPhoto(db, email, body.photoBase64, String(body?.photoMime ?? ""));
+      } catch (e) {
+        return jsonOk({ ok: false, error: String((e as Error).message ?? e) }, 400);
+      }
+    }
+    if (!photoUrl) return jsonOk({ ok: false, error: "Add a profile photo so clients can see you." }, 400);
+    // An approved worker who edits keeps approval; a rejected one goes back to review.
+    const status = prev?.status === "approved" ? "approved" : "pending";
+    const { error } = await db.from("house_workers").upsert({
+      email, name, phone, state, city, bio, skills, photo_url: photoUrl, status, updated_at: now,
+    });
+    if (error) {
+      // The new file is not used; remove it so it does not linger.
+      if (photoUrl !== (prev?.photo_url ?? "")) await hwRemovePhoto(db, photoUrl);
+      return jsonOk({ ok: false, error: error.message }, 500);
+    }
+    // Saved with the new photo: delete the old file so storage only holds the current one.
+    const oldUrl = String(prev?.photo_url ?? "");
+    if (oldUrl && oldUrl !== photoUrl) await hwRemovePhoto(db, oldUrl);
+    return jsonOk({ ok: true, status });
+  }
+
+  if (action === "hwRequest") {
+    const limited = await enforceRateLimit(req, "hw_request", email, 20, 3600);
+    if (limited) return limited;
+    if (!isAdmin && !(await hwSubscribed(db, email))) return jsonOk({ ok: false, needsSubscription: true, error: HW_NEEDS_SUB }, 402);
+    // Choosing a specific worker is a Premium feature; posting to the job board is not.
+    if (HW_PLANS_ENFORCED && !isAdmin && !(await hwPlans(db, email)).premium) {
+      return jsonOk({
+        ok: false,
+        needsPlan: "premium",
+        error: `Sending work straight to a worker needs Premium ($${HW_PREMIUM_PRICE}/month).`,
+      }, 402);
+    }
+    const workerId = hwText(body?.workerId, 60);
+    const details = hwLongText(body?.details, 1500);
+    const clientName = hwText(body?.clientName, 80);
+    const clientPhone = hwPhone(body?.clientPhone);
+    if (!workerId || details.length < 5 || !clientName || clientPhone.replace(/\D/g, "").length < 10) {
+      return jsonOk({ ok: false, error: "Enter your name, WhatsApp number, and what is wrong." }, 400);
+    }
+    const { data: w } = await db.from("house_workers").select("*").eq("id", workerId).maybeSingle();
+    if (!w || w.status !== "approved" || !hwCanWork((await hwEligibility(db, [w.email])).get(emailKey(w.email)), w.email)) {
+      return jsonOk({ ok: false, error: "This worker is not available." }, 404);
+    }
+    if (w.email === email) return jsonOk({ ok: false, error: "You cannot send work to yourself." }, 400);
+    // Only someone registered in Civic Registry can send work, and only to a worker of their own state.
+    const reqElig = (await hwEligibility(db, [email])).get(email);
+    if (!isAdmin && !reqElig?.hasRegistryId) {
+      return jsonOk({ ok: false, needsRegistry: true, error: "You need to be registered in Civic Registry to send work." }, 403);
+    }
+    if (!isAdmin && !statesMatch(reqElig?.state ?? "", String(w.state ?? ""))) {
+      return jsonOk({ ok: false, error: "You can only send work to workers in your own state." }, 403);
+    }
+    // A booking is a worker, a day, and a time. Only one open booking per slot.
+    const bookingDate = hwDate(body?.bookingDate);
+    const bookingTime = hwSlot(body?.bookingTime);
+    if (!bookingDate || !bookingTime) {
+      return jsonOk({ ok: false, error: "Choose the day and the time for the work." }, 400);
+    }
+    const { data: clash } = await db.from("house_work_requests").select("id")
+      .eq("worker_email", w.email).eq("booking_date", bookingDate).eq("booking_time", bookingTime)
+      .in("status", ["pending", "accepted"]).limit(1);
+    if (clash && clash.length > 0) {
+      return jsonOk({ ok: false, error: "This worker is already booked at that time. Please pick another time." }, 409);
+    }
+    const { count } = await db.from("house_work_requests").select("id", { count: "exact", head: true })
+      .eq("client_email", email).eq("status", "pending");
+    if ((count ?? 0) >= 5) {
+      return jsonOk({ ok: false, error: "You already have 5 requests waiting. Wait for a worker to answer first." }, 429);
+    }
+    const { data, error } = await db.from("house_work_requests").insert({
+      client_email: email, client_name: clientName, client_phone: clientPhone,
+      worker_email: w.email, state: w.state, city: hwText(body?.city, 60),
+      address: hwText(body?.address, 200), category: hwText(body?.category, 60),
+      details, best_time: hwText(body?.bestTime, 80),
+      booking_date: bookingDate, booking_time: bookingTime,
+    }).select("id").single();
+    // The unique slot rule catches two bookings that land at the same moment.
+    if (error && /duplicate|unique/i.test(error.message ?? "")) {
+      return jsonOk({ ok: false, error: "This worker is already booked at that time. Please pick another time." }, 409);
+    }
+    if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    return jsonOk({ ok: true, id: data?.id });
+  }
+
+  // The remaining actions all act on one request.
+  if (["hwRespond", "hwDone", "hwRate", "hwCancel"].includes(action)) {
+    const id = hwText(body?.requestId, 60);
+    const { data: r } = await db.from("house_work_requests").select("*").eq("id", id).maybeSingle();
+    if (!r) return jsonOk({ ok: false, error: "Request not found." }, 404);
+    const isWorker = r.worker_email === email;
+    const isClient = r.client_email === email;
+
+    if (action === "hwRespond") {
+      if (!isWorker) return jsonOk({ ok: false, error: "Only the worker can answer this." }, 403);
+      if (r.status !== "pending") return jsonOk({ ok: false, error: "This request was already answered." }, 409);
+      const accept = body?.decision === "accept";
+      if (accept && !hwCanWork((await hwEligibility(db, [email])).get(email), email)) {
+        return jsonOk({
+          ok: false,
+          error: "Your worker account is deactivated (more than 5 missed or more than 3 claims in Civic Registry).",
+        }, 403);
+      }
+      await db.from("house_work_requests").update({
+        status: accept ? "accepted" : "declined",
+        accepted_at: accept ? now : null,
+      }).eq("id", id).eq("status", "pending");
+      return jsonOk({ ok: true, status: accept ? "accepted" : "declined", clientPhone: accept ? r.client_phone : "" });
+    }
+    if (action === "hwDone") {
+      if (!isWorker && !isClient) return jsonOk({ ok: false, error: "Not your request." }, 403);
+      if (r.status !== "accepted") return jsonOk({ ok: false, error: "Only accepted work can be marked done." }, 409);
+      // The worker can record what the work cost: materials, and labor. A House Care member's
+      // work has no labor charge, so labor is always 0 on those jobs.
+      const patch: Record<string, unknown> = { status: "done", done_at: now };
+      if (isWorker) {
+        patch.materials_cost = Math.max(0, Math.min(100000, Number(body?.materialsCost ?? 0) || 0));
+        patch.labor_cost = r.labor_free === true ? 0 : Math.max(0, Math.min(100000, Number(body?.laborCost ?? 0) || 0));
+      }
+      let doneRes = await db.from("house_work_requests").update(patch)
+        .eq("id", id).eq("status", "accepted").select("id");
+      if (doneRes.error && /materials_cost|labor_cost/i.test(doneRes.error.message ?? "")) {
+        doneRes = await db.from("house_work_requests").update({ status: "done", done_at: now })
+          .eq("id", id).eq("status", "accepted").select("id");
+      }
+      const upd = doneRes.data;
+      if (upd && upd.length) {
+        const { data: w } = await db.from("house_workers").select("jobs_done").eq("email", r.worker_email).maybeSingle();
+        await db.from("house_workers").update({ jobs_done: Number(w?.jobs_done ?? 0) + 1 }).eq("email", r.worker_email);
+      }
+      return jsonOk({ ok: true, status: "done" });
+    }
+    if (action === "hwRate") {
+      if (!isClient) return jsonOk({ ok: false, error: "Only the client can rate this work." }, 403);
+      if (r.status !== "done") return jsonOk({ ok: false, error: "Rate the worker after the work is done." }, 409);
+      if (r.rating) return jsonOk({ ok: false, error: "You already rated this work." }, 409);
+      const rating = Math.round(Number(body?.rating ?? 0));
+      if (!(rating >= 1 && rating <= 5)) return jsonOk({ ok: false, error: "Pick 1 to 5 stars." }, 400);
+      const { data: upd } = await db.from("house_work_requests").update({
+        rating, review: hwLongText(body?.review, 500), rated_at: now,
+      }).eq("id", id).is("rating", null).select("id");
+      if (upd && upd.length) {
+        const { data: w } = await db.from("house_workers").select("rating_sum,rating_count").eq("email", r.worker_email).maybeSingle();
+        await db.from("house_workers").update({
+          rating_sum: Number(w?.rating_sum ?? 0) + rating,
+          rating_count: Number(w?.rating_count ?? 0) + 1,
+        }).eq("email", r.worker_email);
+      }
+      return jsonOk({ ok: true });
+    }
+    // hwCancel
+    if (!isClient) return jsonOk({ ok: false, error: "Only the client can cancel." }, 403);
+    if (r.status !== "pending" && r.status !== "open") {
+      return jsonOk({ ok: false, error: "Only waiting requests can be cancelled." }, 409);
+    }
+    await db.from("house_work_requests").update({ status: "cancelled" }).eq("id", id).in("status", ["pending", "open"]);
+    return jsonOk({ ok: true, status: "cancelled" });
+  }
+
+  if (!isAdmin) return jsonOk({ ok: false, error: "Admin only." }, 403);
+  if (action === "hwAdminPayList") {
+    // Finished House Care jobs (no labor charge to the member) that have not been paid to the worker yet.
+    const { data, error } = await db.from("house_work_requests").select("*")
+      .eq("status", "done").eq("labor_free", true).is("worker_pay", null)
+      .order("done_at", { ascending: false }).limit(100);
+    if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    const emails = [...new Set((data ?? []).map((r: any) => r.worker_email).filter(Boolean))];
+    const { data: ws } = emails.length ? await db.from("house_workers").select("email,name").in("email", emails) : { data: [] as any[] };
+    const names = new Map((ws ?? []).map((w: any) => [w.email, w.name]));
+    return jsonOk({
+      ok: true,
+      jobs: (data ?? []).map((r: any) => ({
+        id: r.id, workerEmail: r.worker_email, workerName: names.get(r.worker_email) ?? r.worker_email,
+        category: r.category, city: r.city, details: hwText(r.details, 200), doneAt: r.done_at,
+        materialsCost: r.materials_cost ?? null,
+      })),
+    });
+  }
+  if (action === "hwAdminPay") {
+    const id = hwText(body?.requestId, 60);
+    const amount = Math.round((Number(body?.amount ?? 0) || 0) * 100) / 100;
+    if (!id || amount < 0 || amount > 100000) return jsonOk({ ok: false, error: "Enter the amount paid." }, 400);
+    const { data, error } = await db.from("house_work_requests").update({ worker_pay: amount })
+      .eq("id", id).eq("status", "done").select("id");
+    if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    if (!data || data.length === 0) return jsonOk({ ok: false, error: "That job is not finished." }, 409);
+    return jsonOk({ ok: true });
+  }
+  if (action === "hwAdminWorkerStats") {
+    // Everything an admin needs to know about one worker: profile, work done by week / month / ever, ratings and reviews.
+    const target = emailKey(String(body?.workerEmail ?? ""));
+    if (!target) return jsonOk({ ok: false, error: "Pick a worker." }, 400);
+    const { data: w } = await db.from("house_workers").select("*").eq("email", target).maybeSingle();
+    if (!w) return jsonOk({ ok: false, error: "That worker was not found." }, 404);
+    const { data: rows } = await db.from("house_work_requests").select("*")
+      .eq("worker_email", target).order("created_at", { ascending: false }).limit(1000);
+    const nowMs = Date.now();
+    const monthKey = new Date().toISOString().slice(0, 7);
+    let done = 0, week = 0, month = 0, last30 = 0, inProgress = 0, cancelled = 0;
+    let earned = 0, earnedMonth = 0, hoursSum = 0, hoursCount = 0, lastDone = "";
+    const dist: Record<string, number> = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
+    const reviews: any[] = [];
+    let ratingSum = 0, ratingCount = 0;
+    for (const r of rows ?? []) {
+      if (r.status === "accepted") inProgress++;
+      if (r.status === "cancelled") cancelled++;
+      if (r.status === "done") {
+        done++;
+        const dMs = Date.parse(String(r.done_at ?? "")) || 0;
+        if (dMs > nowMs - 7 * 86400000) week++;
+        if (dMs > nowMs - 30 * 86400000) last30++;
+        const pay = (Number(r.labor_cost ?? 0) || 0) + (Number(r.worker_pay ?? 0) || 0);
+        earned += pay;
+        if (String(r.done_at ?? "").slice(0, 7) === monthKey) { month++; earnedMonth += pay; }
+        if (!lastDone || String(r.done_at) > lastDone) lastDone = String(r.done_at ?? "");
+        const aMs = Date.parse(String(r.accepted_at ?? "")) || 0;
+        if (aMs && dMs > aMs) { hoursSum += (dMs - aMs) / 3600000; hoursCount++; }
+      }
+      const rating = Number(r.rating ?? 0);
+      if (rating >= 1 && rating <= 5) {
+        ratingSum += rating; ratingCount++; dist[String(rating)]++;
+        if (reviews.length < 20) {
+          reviews.push({
+            rating, review: String(r.review ?? ""), at: r.rated_at, category: r.category ?? "",
+            client: hwText(r.client_name, 80).split(" ")[0],
+          });
+        }
+      }
+    }
+    return jsonOk({
+      ok: true,
+      worker: {
+        name: w.name, email: w.email, phone: w.phone, state: w.state, city: w.city, status: w.status,
+        bio: w.bio, photoUrl: w.photo_url, skills: Array.isArray(w.skills) ? w.skills : [], createdAt: w.created_at,
+      },
+      stats: {
+        done, week, month, last30, inProgress, cancelled, earned, earnedMonth, lastDone,
+        avgHours: hoursCount > 0 ? Math.round((hoursSum / hoursCount) * 10) / 10 : 0,
+        rating: ratingCount > 0 ? Math.round((ratingSum / ratingCount) * 10) / 10 : 0,
+        ratingCount, distribution: dist,
+      },
+      reviews,
+    });
+  }
+  if (action === "hwAdminCareRevoke" || action === "hwAdminCareRestore") {
+    // The admin ends (or brings back) a member's House Care. Ending it stops the free labor and
+    // removes the House Care card from the member's home screen.
+    const target = emailKey(String(body?.memberEmail ?? ""));
+    if (!target) return jsonOk({ ok: false, error: "Pick a member." }, 400);
+    if (action === "hwAdminCareRevoke") {
+      const { data, error } = await db.from("house_subscriptions")
+        .update({ status: "cancelled", updated_at: now }).eq("email", target).select("email");
+      if (error) return jsonOk({ ok: false, error: error.message }, 500);
+      if (!data || data.length === 0) return jsonOk({ ok: false, error: "That member has no House Care." }, 404);
+      // Stop the paid time too, so labor is charged again straight away.
+      await db.from("house_plans").update({ access_until: now, updated_at: now }).eq("email", target).eq("plan", "basic");
+      return jsonOk({ ok: true });
+    }
+    const { error } = await db.from("house_subscriptions")
+      .update({ status: "pending", updated_at: now }).eq("email", target);
+    if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    return jsonOk({ ok: true });
+  }
+  if (action === "hwAdminCarePayments") {
+    // Cash App payments members say they sent, waiting for an admin to check the money and approve.
+    const { data, error } = await db.from("house_care_payments").select("*")
+      .order("created_at", { ascending: false }).limit(200);
+    if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    const emails = [...new Set((data ?? []).map((r: any) => String(r.email)))];
+    const names: Record<string, string> = {};
+    if (emails.length > 0) {
+      const { data: subs } = await db.from("house_subscriptions").select("email,full_name").in("email", emails);
+      for (const s of subs ?? []) names[String(s.email)] = String(s.full_name ?? "");
+    }
+    const payments = (data ?? []).map((r: any) => ({
+      id: r.id, email: r.email, name: names[String(r.email)] || String(r.email), plan: r.plan, term: r.term === true,
+      amount: Number(r.amount ?? 0), status: r.status, createdAt: r.created_at, decidedAt: r.decided_at,
+      code: r.code ?? "", proofUrl: r.proof_url ?? "",
+    }));
+    return jsonOk({ ok: true, payments, pending: payments.filter((p: any) => p.status === "pending").length });
+  }
+  if (action === "hwAdminCarePaymentDecide") {
+    const id = hwText(body?.paymentId, 60);
+    const decision = body?.decision === "approve" ? "approved" : body?.decision === "reject" ? "rejected" : "";
+    if (!id || !decision) return jsonOk({ ok: false, error: "Pick a payment." }, 400);
+    const { data: pay } = await db.from("house_care_payments").select("*").eq("id", id).maybeSingle();
+    if (!pay) return jsonOk({ ok: false, error: "That payment was not found." }, 404);
+    if (pay.status !== "pending") return jsonOk({ ok: false, error: `That payment was already ${pay.status}.` }, 409);
+    if (decision === "approved") {
+      const grant = await hwPlanUntil(db, String(pay.email), String(pay.plan), pay.term === true);
+      if ("error" in grant) return jsonOk({ ok: false, error: grant.error }, grant.status);
+      const { error: planErr } = await db.from("house_plans").upsert({
+        email: pay.email, plan: pay.plan, method: "cashapp", access_until: grant.until, updated_at: now,
+      });
+      if (planErr) return jsonOk({ ok: false, error: planErr.message }, 500);
+    }
+    const { error } = await db.from("house_care_payments")
+      .update({ status: decision, decided_at: now, decided_by: email }).eq("id", id).eq("status", "pending");
+    if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    return jsonOk({ ok: true });
+  }
+  if (action === "hwAdminCare") {
+    // Every House Care agreement: who signed, the signature, the selfie, the term and when the next payment is due.
+    const { data, error } = await db.from("house_subscriptions").select("*")
+      .order("agreed_at", { ascending: false }).limit(200);
+    if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    const members = [];
+    for (const row of data ?? []) {
+      const care: any = await hwCare(db, String(row.email));
+      members.push({
+        email: row.email, fullName: row.full_name, state: row.state, termYears: row.term_years,
+        signatureUrl: row.signature_url, selfieUrl: row.selfie_url, agreedAt: row.agreed_at,
+        status: care.status, startedAt: care.startedAt, nextDue: care.nextDue, termEnds: care.termEnds,
+        agreementVersion: row.agreement_version,
+      });
+    }
+    return jsonOk({ ok: true, members });
+  }
+  if (action === "hwAdminList") {
+    const { data } = await db.from("house_workers").select("*").order("created_at", { ascending: false }).limit(500);
+    const rank: Record<string, number> = { pending: 0, approved: 1, rejected: 2, removed: 3 };
+    const elig = await hwEligibility(db, (data ?? []).map((w: any) => w.email));
+    const workers = (data ?? []).map((w: any) => {
+      const e = elig.get(emailKey(w.email));
+      return {
+        ...hwPublicWorker(w), email: w.email, phone: w.phone, status: w.status, createdAt: w.created_at,
+        hasRegistryId: e?.hasRegistryId ?? false,
+        hasBio: e?.hasBio ?? false,
+        missed: e?.missed ?? 0,
+        claims: e?.claims ?? 0,
+        deactivated: !hwCanWork(e, w.email),
+      };
+    }).sort((a: any, b: any) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9));
+    const { data: planRows } = await db.from("house_plans").select("*").order("updated_at", { ascending: false }).limit(100);
+    const plans = (planRows ?? []).map((p: any) => ({
+      email: p.email, plan: p.plan, method: p.method, until: p.access_until, at: p.updated_at,
+    }));
+    return jsonOk({ ok: true, workers, plans });
+  }
+  // hwAdminDecide
+  const target = hwText(body?.workerEmail ?? body?.email, 200).toLowerCase();
+  const decision = String(body?.decision ?? "");
+  const status = decision === "approve" ? "approved" : decision === "reject" ? "rejected" : decision === "remove" ? "removed" : "";
+  if (!target) return jsonOk({ ok: false, error: "Worker not found. Refresh and try again." }, 400);
+  if (!status) return jsonOk({ ok: false, error: "Pick approve, reject, or remove." }, 400);
+  const { error } = await db.from("house_workers").update({ status, reviewed_at: now, updated_at: now }).eq("email", target);
+  if (error) return jsonOk({ ok: false, error: error.message }, 500);
+  return jsonOk({ ok: true, status });
+}
+
+// ── Free advisor minutes per account (never resets) ─────────────────────────
+async function handleFreeTime(req: Request, action: string, body: any): Promise<Response> {
+  const email = (await requireJwtEmail(req)).trim().toLowerCase();
+  if (!email) return jsonOk({ ok: false, error: "Please sign in." }, 401);
+  const db = adminClient();
+  if (!db) return jsonOk({ ok: false, error: "Server database unavailable." }, 500);
+  const { data: row } = await db.from("advisor_free_time").select("used_seconds,updated_at").eq("user_email", email).maybeSingle();
+  let used = Number(row?.used_seconds ?? 0);
+  if (action === "freeTimeAdd") {
+    const limited = await enforceRateLimit(req, "free_time", email, 400, 3600);
+    if (limited) return limited;
+    const asked = Math.max(0, Math.floor(Number(body?.seconds ?? 0) || 0));
+    // Only real time can be added: no more than the time since the last update (+ small slack).
+    const sinceLast = row?.updated_at ? (Date.now() - Date.parse(row.updated_at)) / 1000 : 60;
+    const add = Math.min(asked, 120, Math.max(5, Math.ceil(sinceLast) + 5));
+    // A phone that was offline may report a higher total — take the higher number, never lower.
+    const deviceTotal = Math.max(0, Math.floor(Number(body?.deviceTotal ?? 0) || 0));
+    used = Math.max(used + add, Math.min(deviceTotal, 24 * 3600));
+    await db.from("advisor_free_time").upsert({ user_email: email, used_seconds: used, updated_at: new Date().toISOString() });
+  }
+  return jsonOk({ ok: true, usedSeconds: used });
+}
+
+// ── Storage / database housekeeping (approved by the owner 2026-10-09) ──────
+// Runs at most every 6 h, in the background of normal requests:
+//  • Doc Share "My Code" cloud transfers nobody collected within 14 days (files + inbox entry)
+//  • temporary QR transfer stashes not touched for 14 days
+//  • security-event log rows older than 30 days, rate-limit counters older than 2 days
+const NGMY_MAINT_KEY = "maintenance_last_run_v1";
+const NGMY_TRANSFER_TTL_MS = 14 * 24 * 3600 * 1000;
+let ngmyMaintRunning = false;
+
+async function ngmyMaybeRunMaintenance(): Promise<void> {
+  if (ngmyMaintRunning) return;
+  const db = adminClient();
+  if (!db) return;
+  try {
+    const { data } = await db.from("ngmy_agent_config").select("value").eq("key", NGMY_MAINT_KEY).maybeSingle();
+    const last = Date.parse(String(data?.value ?? "")) || 0;
+    if (Date.now() - last < 6 * 3600 * 1000) return;
+    ngmyMaintRunning = true;
+    const finished = await ngmyRunMaintenance(db);
+    if (finished) {
+      await db.from("ngmy_agent_config").upsert({ key: NGMY_MAINT_KEY, value: new Date().toISOString(), updated_at: new Date().toISOString() });
+    }
+  } catch (e) {
+    console.log("[maintenance] error", String(e));
+  } finally {
+    ngmyMaintRunning = false;
+  }
+}
+
+/** Returns true when everything was cleaned (false = ran out of time, continue next request). */
+async function ngmyRunMaintenance(db: any): Promise<boolean> {
+  const started = Date.now();
+  const outOfTime = () => Date.now() - started > 90_000;
+  const cutoff = Date.now() - NGMY_TRANSFER_TTL_MS;
+  const bucket = db.storage.from("media");
+  let removedFiles = 0;
+
+  // 1) Uncollected My Code transfer files: my-code-inbox/<email>/<session>/<file>.partNNNNN
+  const list = async (path: string) => {
+    const out: any[] = [];
+    for (let offset = 0; offset < 20000; offset += 1000) {
+      const { data, error } = await bucket.list(path, { limit: 1000, offset, sortBy: { column: "name", order: "asc" } });
+      if (error || !Array.isArray(data) || data.length === 0) break;
+      out.push(...data);
+      if (data.length < 1000) break;
+    }
+    return out;
+  };
+  for (const who of await list("my-code-inbox")) {
+    if (outOfTime()) return false;
+    for (const session of await list(`my-code-inbox/${who.name}`)) {
+      if (outOfTime()) return false;
+      const base = `my-code-inbox/${who.name}/${session.name}`;
+      const old = (await list(base))
+        .filter((f) => f.id && Date.parse(String(f.created_at ?? f.updated_at ?? "")) < cutoff)
+        .map((f) => `${base}/${f.name}`);
+      for (let i = 0; i < old.length; i += 500) {
+        if (outOfTime()) return false;
+        const { error } = await bucket.remove(old.slice(i, i + 500));
+        if (!error) removedFiles += Math.min(500, old.length - i);
+      }
+    }
+  }
+
+  // 2) Their inbox entries (pending storage deliveries older than 14 days).
+  const { data: inboxes } = await db.from("ngmy_settings").select("key,value").like("key", "ngmy_doc_share_inbox_v1_%");
+  for (const row of inboxes ?? []) {
+    const list = Array.isArray(row?.value?.deliveries) ? row.value.deliveries : null;
+    if (!list) continue;
+    const keep = list.filter((d: any) => {
+      const created = Date.parse(String(d?.createdAt ?? "")) || Date.now();
+      const expired = d?.type === "storage" && d?.status !== "done" && created < cutoff;
+      return !expired;
+    });
+    if (keep.length !== list.length) {
+      await db.from("ngmy_settings").update({ value: { ...row.value, deliveries: keep }, updated_at: new Date().toISOString() })
+        .eq("key", row.key);
+    }
+  }
+
+  // 3) Temporary QR transfer stashes.
+  const stashCutoff = new Date(cutoff).toISOString();
+  const { data: s1 } = await db.from("ngmy_settings").delete().like("key", "ngmy_doc_share_stash_v2_%").lt("updated_at", stashCutoff).select("key");
+  const { data: s2 } = await db.from("ngmy_settings").delete().like("key", "%_qr_stashes_v1").lt("updated_at", stashCutoff).select("key");
+
+  // 4) Overdue gives in Civic Registry: file the automatic claims.
+  try {
+    const giveItems = await giveLoad(db);
+    if (await giveSweep(db, giveItems, await giveLiveMembers(db))) await giveSave(db, giveItems);
+  } catch (e) {
+    console.log("[maintenance] civic gives", String(e));
+  }
+
+  // 5) Logs.
+  await db.from("ngmy_security_events").delete().lt("at", new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString());
+  await db.from("ngmy_rate_limits").delete().lt("window_start", new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString());
+
+  console.log(`[maintenance] removed ${removedFiles} transfer files, ${(s1?.length ?? 0) + (s2?.length ?? 0)} stashes`);
+  return true;
+}
+
+async function openAiChat(
+  apiKey: string,
+  prompt: string,
+  baseUrl = "https://api.openai.com/v1",
+  appBuilder = false,
+): Promise<string> {
+  const res = await providerFetch(fetch, `${baseUrl.replace(/\/$/, "")}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: appBuilder ? "gpt-4o" : "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: appBuilder ? AI_RUNTIME.maxOutputTokensExpensive : AI_RUNTIME.maxOutputTokens,
+    }),
+  }, AI_RUNTIME.timeoutMs);
+  if (!res.ok) throw new Error(scrubSecrets((await res.text()).slice(0, 200)));
+  const data = await res.json();
+  const text = data?.choices?.[0]?.message?.content;
+  if (!text) throw new Error("Empty OpenAI response");
+  return String(text).trim();
+}
+
+async function anthropicChat(
+  apiKey: string,
+  prompt: string,
+  appBuilder = false,
+): Promise<string> {
+  // App Builder needs a stronger model; every reply has a token ceiling and a timeout.
+  const models = (appBuilder
+    ? ["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"]
+    : ["claude-3-5-haiku-latest"]).slice(0, Math.max(1, AI_RUNTIME.maxModelAttempts));
+  const maxTokens = appBuilder ? AI_RUNTIME.maxOutputTokensExpensive : AI_RUNTIME.maxOutputTokens;
+  let lastErr = "Anthropic request failed";
+  for (const model of models) {
+    const res = await providerFetch(fetch, "https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    }, AI_RUNTIME.timeoutMs);
+    if (res.ok) {
+      const data = await res.json();
+      const text = data?.content?.[0]?.text;
+      if (text && String(text).trim()) return String(text).trim();
+    } else {
+      lastErr = scrubSecrets((await res.text()).slice(0, 200));
+    }
+  }
+  throw new Error(lastErr);
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+async function elevenLabsTts(
+  apiKey: string,
+  text: string,
+  voiceId: string,
+  modelId: string,
+): Promise<string> {
+  const models = modelId
+    ? [modelId, "eleven_turbo_v2_5", "eleven_flash_v2_5", "eleven_multilingual_v2"]
+    : ["eleven_turbo_v2_5", "eleven_flash_v2_5", "eleven_multilingual_v2"];
+  const tried = new Set<string>();
+  let lastErr = "ElevenLabs request failed";
+
+  for (const model of models.slice(0, 2)) {
+    if (tried.has(model)) continue;
+    tried.add(model);
+    const url =
+      `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}`;
+    const res = await providerFetch(fetch, url, {
+      method: "POST",
+      headers: {
+        accept: "audio/mpeg",
+        "content-type": "application/json",
+        "xi-api-key": apiKey,
+      },
+      body: JSON.stringify({ text, model_id: model }),
+    }, AI_RUNTIME.timeoutMs);
+    if (res.ok) {
+      const audio = new Uint8Array(await res.arrayBuffer());
+      if (audio.length > 0) return bytesToBase64(audio);
+    } else {
+      lastErr = scrubSecrets((await res.text()).slice(0, 200));
+    }
+  }
+  throw new Error(lastErr);
+}
+
+async function resendSendEmail(
+  apiKey: string,
+  from: string,
+  to: string,
+  subject: string,
+  html: string,
+): Promise<{ id?: string }> {
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to: [to],
+      subject,
+      html,
+    }),
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(errText || `Resend HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  return { id: data?.id ? String(data.id) : undefined };
+}
+
+const NGMY_ADMIN_EMAILS = new Set([
+  "kbpabloqr@gmail.com",
+  "ngumoyaking@gmail.com",
+  "appbusiness321@gmail.com",
+  "appbusiness84@gmail.com",
+]);
+
+async function sha256Hex(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function adminClient() {
+  const url = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (!url || !serviceKey) return null;
+  return createClient(url, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+function clientIp(req: Request): string {
+  const xf = (req.headers.get("x-forwarded-for") ?? "").split(",")[0]?.trim();
+  return (
+    xf ||
+    req.headers.get("cf-connecting-ip")?.trim() ||
+    req.headers.get("x-real-ip")?.trim() ||
+    "unknown"
+  );
+}
+
+function rateLimitedResponse(): Response {
+  return new Response(
+    JSON.stringify({ error: "Too many requests. Try again shortly.", code: "rate_limited" }),
+    {
+      status: 429,
+      headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" },
+    },
+  );
+}
+
+async function logSecurityEvent(
+  admin: ReturnType<typeof createClient> | null,
+  kind: string,
+  detail: string,
+  ip: string,
+): Promise<void> {
+  if (!admin) return;
+  try {
+    await admin.from("ngmy_security_events").insert({
+      kind: kind.slice(0, 80),
+      detail: detail.slice(0, 500),
+      ip: ip.slice(0, 80),
+    });
+  } catch (e) {
+    console.error("[security-event]", kind, e);
+  }
+}
+
+/** Fail-open if the SQL migration has not been run yet — login/features keep working. */
+async function consumeRateLimit(
+  admin: ReturnType<typeof createClient> | null,
+  bucket: string,
+  key: string,
+  max: number,
+  windowSeconds: number,
+): Promise<boolean> {
+  if (!admin) return true;
+  try {
+    const { data, error } = await admin.rpc("ngmy_consume_rate_limit", {
+      p_bucket: bucket,
+      p_key: key.slice(0, 200),
+      p_max: max,
+      p_window_seconds: windowSeconds,
+    });
+    if (error) {
+      console.error("[rate-limit-rpc]", bucket, error.message);
+      return true;
+    }
+    return data === true;
+  } catch (e) {
+    console.error("[rate-limit-rpc]", bucket, e);
+    return true;
+  }
+}
+
+async function enforceRateLimit(
+  req: Request,
+  bucket: string,
+  key: string,
+  max: number,
+  windowSeconds: number,
+  /** What the blocked request was for (logged only when blocked — finds noisy writers). */
+  note = "",
+): Promise<Response | null> {
+  const admin = adminClient();
+  const ok = await consumeRateLimit(admin, bucket, key, max, windowSeconds);
+  if (ok) return null;
+  const ip = clientIp(req);
+  console.error("[rate-limit]", bucket, key.slice(0, 80), ip);
+  await logSecurityEvent(admin, "rate_limit", `${bucket}:${key}${note ? " " + note : ""}`.slice(0, 300), ip);
+  return rateLimitedResponse();
+}
+
+// ── AI gate: login, limits and the circuit breaker, all decided BEFORE the AI provider is called ──
+// The logic lives in ai_gate.ts (and is tested in ai_gate_test.ts); this part connects it to the database.
+let AI_RUNTIME: GateLimits = buildLimits((n) => Deno.env.get(n));
+let aiLimitsAt = 0;
+const memoryGateFallback = new MemoryGateStore();
+
+/** The limits now in force: defaults, then environment variables, then the admin table ngmy_ai_settings. */
+async function loadAiLimits(admin: any): Promise<GateLimits> {
+  if (Date.now() - aiLimitsAt < 60_000) return AI_RUNTIME;
+  const overrides: Record<string, string> = {};
+  if (admin) {
+    try {
+      const { data } = await admin.from("ngmy_ai_settings").select("key,value");
+      for (const r of (data ?? []) as Array<{ key: unknown; value: unknown }>) overrides[String(r.key)] = String(r.value);
+    } catch (_) {
+      // The table is not there yet: the environment values and the defaults apply.
+    }
+  }
+  AI_RUNTIME = buildLimits((n) => Deno.env.get(n), overrides);
+  aiLimitsAt = Date.now();
+  return AI_RUNTIME;
+}
+
+/** Counters in Postgres (shared by every function instance, kept across restarts). If the database cannot be reached, strict in-memory counters are used instead — never "no limit". */
+class DbGateStore implements GateStore {
+  constructor(private admin: any) {}
+
+  async consumeAll(entries: Entry[]): Promise<ConsumeResult> {
+    if (!this.admin) return memoryGateFallback.consumeAll(entries);
+    try {
+      const { data, error } = await this.admin.rpc("ngmy_ai_gate", {
+        p_entries: entries.map((e) => ({ bucket: e.bucket, key: e.key, window: e.windowSeconds, max: e.max })),
+      });
+      if (error) throw new Error(error.message);
+      if ((data as { ok?: boolean } | null)?.ok === true) return { ok: true };
+      const d = (data ?? {}) as { bucket?: string; key?: string; retry_after?: number };
+      const failed = entries.find((e) => e.bucket === d.bucket && e.key.slice(0, 200) === d.key) ?? entries[0];
+      return { ok: false, failed, retryAfter: Number(d.retry_after ?? 60) };
+    } catch (e) {
+      console.error("[ai-gate] database counters unavailable, using strict in-memory counters:", scrubSecrets(String(e)));
+      return memoryGateFallback.consumeAll(entries);
+    }
+  }
+
+  async cooldownLeft(): Promise<number> {
+    const local = await memoryGateFallback.cooldownLeft();
+    if (!this.admin) return local;
+    try {
+      const { data, error } = await this.admin.rpc("ngmy_ai_cooldown_left");
+      if (!error) return Math.max(local, Number(data ?? 0));
+    } catch (_) {
+      // use the in-memory value
+    }
+    return local;
+  }
+
+  async startCooldown(seconds: number): Promise<void> {
+    await memoryGateFallback.startCooldown(seconds);
+    if (!this.admin) return;
+    try {
+      await this.admin.rpc("ngmy_ai_cooldown_start", { p_seconds: seconds });
+    } catch (e) {
+      console.error("[ai-gate] could not save the cooldown:", scrubSecrets(String(e)));
+    }
+  }
+}
+
+/** Who is asking: a real signed-in user (not an anonymous guest session), or only an IP address. */
+async function resolveAiWho(req: Request, admin: any): Promise<Who> {
+  const ip = clientIp(req);
+  const m = (req.headers.get("Authorization") ?? "").match(/^Bearer\s+(.+)$/i);
+  const token = (m?.[1] ?? "").trim();
+  if (!token || !admin || token === Deno.env.get("SUPABASE_ANON_KEY")) return { userId: null, ip };
+  try {
+    const { data, error } = await admin.auth.getUser(token);
+    const u = data?.user as { id?: string; email?: string; is_anonymous?: boolean } | null | undefined;
+    if (error || !u || u.is_anonymous || !u.email || !u.id) return { userId: null, ip };
+    return { userId: String(u.id), ip };
+  } catch (_) {
+    return { userId: null, ip };
+  }
+}
+
+const aiLogSeen = new Map<string, number>();
+const aiBlocks = new Map<string, { n: number; start: number }>();
+let aiAlertAt = 0;
+
+/** Optional: set AI_ALERT_WEBHOOK_URL (Slack, Discord, any URL that takes JSON) to be told at once about a spike or the daily cap. At most one message an hour. */
+async function aiAlert(text: string): Promise<void> {
+  const url = String(Deno.env.get("AI_ALERT_WEBHOOK_URL") ?? "").trim();
+  if (!url || Date.now() - aiAlertAt < 3_600_000) return;
+  aiAlertAt = Date.now();
+  try {
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: `NGMY AI: ${text}`, content: `NGMY AI: ${text}` }),
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch (_) {
+    // an alert must never break a request
+  }
+}
+
+/** Writes who/what/when to ngmy_security_events (at most once a minute for the same user and endpoint), and notices spikes. */
+async function logAiEvent(
+  admin: any,
+  kind: string,
+  detail: string,
+  who: Who,
+): Promise<void> {
+  const now = Date.now();
+  const subject = who.userId ?? who.ip;
+  const logKey = `${kind}|${subject}|${(detail.match(/endpoint=(\S+)/) ?? [])[1] ?? ""}`;
+  if (aiLogSeen.size > 5000) aiLogSeen.clear();
+  if (now - (aiLogSeen.get(logKey) ?? 0) > 60_000) {
+    aiLogSeen.set(logKey, now);
+    console.error("[ai-gate]", kind, detail);
+    await logSecurityEvent(admin, kind, detail, who.ip);
+  }
+  if (kind === "ai_rate_limit" || kind === "ai_blocked_anon") {
+    if (aiBlocks.size > 5000) aiBlocks.clear();
+    const b = aiBlocks.get(subject);
+    if (!b || now - b.start > 600_000) {
+      aiBlocks.set(subject, { n: 1, start: now });
+    } else if (++b.n === AI_RUNTIME.spikeThreshold) {
+      const msg = `spike: ${b.n} blocked AI requests in 10 minutes from ${who.userId ? "user " + who.userId : "ip " + who.ip}`;
+      console.error("[ai-gate]", msg);
+      await logSecurityEvent(admin, "ai_spike", `${msg} ${detail}`.slice(0, 300), who.ip);
+      void aiAlert(msg);
+    }
+  }
+  if (kind === "ai_global_cap") void aiAlert("the daily AI cap for the whole app was reached");
+}
+
+function aiJson(body: Record<string, unknown>, status: number, retryAfter = 0): Response {
+  const headers: Record<string, string> = { ...corsHeaders, "Content-Type": "application/json" };
+  if (retryAfter > 0) headers["Retry-After"] = String(Math.ceil(retryAfter));
+  return new Response(JSON.stringify(body), { status, headers });
+}
+
+/** Login + per-user limits + IP limits + global cap. Returns null when the request may go on to the AI provider. */
+async function guardAi(req: Request, endpoint: string, cls: AiClass): Promise<Response | null> {
+  const admin = adminClient();
+  const limits = await loadAiLimits(admin);
+  const who = await resolveAiWho(req, admin);
+  const r = await gateAiRequest(new DbGateStore(admin), limits, who, endpoint, cls);
+  if (r.ok) return null;
+  await logAiEvent(admin, r.logKind, r.logDetail, who);
+  return aiJson({ error: r.message, code: r.code, retryAfter: r.retryAfter }, r.status, r.retryAfter);
+}
+
+/** The provider said 429: nobody calls it for a short while, and the user sees a busy message (no retry). */
+async function aiProviderBusy(req: Request, e: ProviderBusyError, endpoint: string): Promise<Response> {
+  const admin = adminClient();
+  const limits = await loadAiLimits(admin);
+  const secs = Math.max(limits.providerCooldownSeconds, e.retryAfter);
+  await new DbGateStore(admin).startCooldown(secs);
+  const who = await resolveAiWho(req, admin);
+  await logAiEvent(admin, "ai_provider_429", `user=${who.userId ?? "none"} endpoint=${endpoint} cooldown=${secs}s ip=${who.ip}`, who);
+  return aiJson({ error: MSG_BUSY, code: "ai_busy", retryAfter: secs }, 503, secs);
+}
+
+/** The server decides which AI company and which key to use. The browser can neither pick the provider nor a web address to send the key to. */
+function parseServerAiCreds(raw: string): { provider: Provider; key: string; baseUrl?: string } {
+  const key = raw.trim();
+  const lower = key.toLowerCase();
+  if (lower.startsWith("compat:")) {
+    const rest = key.slice(7).trim();
+    const pipe = rest.indexOf("|");
+    if (pipe > 0) {
+      const base = rest.slice(0, pipe).trim();
+      if (/^https:\/\//i.test(base)) return { provider: "openaiCompatible", key: rest.slice(pipe + 1).trim(), baseUrl: base };
+    }
+    return { provider: "openai", key: rest };
+  }
+  for (const [prefix, provider] of [["gemini:", "gemini"], ["google:", "gemini"], ["openai:", "openai"], ["anthropic:", "anthropic"], ["claude:", "anthropic"]] as const) {
+    if (lower.startsWith(prefix)) return { provider, key: key.slice(prefix.length).trim() };
+  }
+  if (key.startsWith("sk-ant-")) return { provider: "anthropic", key };
+  if (key.startsWith("sk-") || key.startsWith("pk-")) return { provider: "openai", key };
+  return { provider: "gemini", key };
+}
+
+/** Admin only: see the limits in force, today's usage and the newest abuse events; or change a limit. */
+async function handleAiAdmin(req: Request, action: string, body: any): Promise<Response> {
+  const email = await resolveJwtEmail(req);
+  if (!email || !NGMY_ADMIN_EMAILS.has(email)) return jsonOk({ ok: false, error: "Admins only." }, 403);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ ok: false, error: "The database cannot be reached." }, 500);
+  if (action === "aiLimitsSave") {
+    const settings = (body?.settings ?? {}) as Record<string, unknown>;
+    const rows: { key: string; value: string; updated_by: string }[] = [];
+    for (const [k, v] of Object.entries(settings)) {
+      if (!(k in LIMIT_KEYS)) return jsonOk({ ok: false, error: `Unknown setting ${k}.` }, 400);
+      rows.push({ key: k, value: String(v).slice(0, 20), updated_by: email });
+    }
+    if (rows.length) {
+      const { error } = await admin.from("ngmy_ai_settings").upsert(rows, { onConflict: "key" });
+      if (error) return jsonOk({ ok: false, error: "Could not save: run supabase/ai_gate.sql first." }, 500);
+    }
+    aiLimitsAt = 0;
+    await loadAiLimits(admin);
+    return jsonOk({ ok: true, limits: AI_RUNTIME });
+  }
+  const limits = await loadAiLimits(admin);
+  const day = new Date();
+  day.setUTCHours(0, 0, 0, 0);
+  const events = await admin.from("ngmy_security_events").select("at,kind,detail,ip").like("kind", "ai_%").order("at", { ascending: false }).limit(100);
+  const usage = await admin.from("ngmy_rate_limits").select("bucket,k,hits").like("bucket", "ai_%").gte("window_start", day.toISOString()).order("hits", { ascending: false }).limit(60);
+  return jsonOk({ ok: true, limits, events: events.data ?? [], usageToday: usage.data ?? [] });
+}
+
+function keyFromConfigRow(row: Record<string, unknown> | null): string {
+  if (!row) return "";
+  for (const field of ["aiApiKey", "ai_api_key", "geminiApiKey", "gemini_api_key"]) {
+    const v = String(row[field] ?? "").trim();
+    if (v) return v;
+  }
+  return "";
+}
+
+/** Server-only AI key: Edge secrets first, then private table, then service-role config. Never trust client body. */
+async function resolveServerAiApiKey(): Promise<string> {
+  for (const envName of ["NGMY_AI_API_KEY", "GEMINI_API_KEY", "AI_API_KEY"]) {
+    const v = String(Deno.env.get(envName) ?? "").trim();
+    if (v) return v;
+  }
+  const admin = adminClient();
+  if (!admin) return "";
+
+  try {
+    const { data: secretRow } = await admin
+      .from("ngmy_server_secrets")
+      .select("ai_api_key")
+      .eq("id", "1")
+      .maybeSingle();
+    const fromPrivate = String(secretRow?.ai_api_key ?? "").trim();
+    if (fromPrivate) return fromPrivate;
+  } catch (_) {
+    // table may not exist yet
+  }
+
+  for (const id of ["1", 1]) {
+    const { data } = await admin
+      .from("config")
+      .select("aiApiKey,ai_api_key,geminiApiKey,gemini_api_key")
+      .eq("id", id)
+      .maybeSingle();
+    const k = keyFromConfigRow(data as Record<string, unknown> | null);
+    if (k) return k;
+  }
+  const { data } = await admin
+    .from("config")
+    .select("aiApiKey,ai_api_key,geminiApiKey,gemini_api_key")
+    .limit(1)
+    .maybeSingle();
+  return keyFromConfigRow(data as Record<string, unknown> | null);
+}
+
+async function resolveServerElevenLabsKey(): Promise<string> {
+  const env = String(Deno.env.get("ELEVENLABS_API_KEY") ?? "").trim();
+  if (env) return env;
+  const admin = adminClient();
+  if (!admin) return "";
+  const { data } = await admin
+    .from("config")
+    .select("elevenLabsApiKey,elevenlabs_api_key")
+    .eq("id", "1")
+    .maybeSingle();
+  if (!data) return "";
+  return String(data.elevenLabsApiKey ?? data.elevenlabs_api_key ?? "").trim();
+}
+
+function jsonOk(payload: Record<string, unknown>, status = 200): Response {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+/** Fetches HTML for the advisor mini-browser (sites that block iframes). */
+async function handleAdvisorBrowserFrame(rawUrl: string): Promise<Response> {
+  // Public sites only — never let the relay reach localhost / private network / cloud metadata.
+  const safe = advisorBrowseSafeUrl(String(rawUrl ?? ""));
+  if (!safe) {
+    return jsonOk({ ok: false, error: "That link can't be opened." }, 400);
+  }
+  const parsed: URL = safe;
+  const host = parsed.hostname.toLowerCase();
+  if (host === "ngmy.org" || host.endsWith(".ngmy.org")) {
+    return jsonOk({ ok: false, error: "Cannot embed NGMY inside the advisor browser." }, 400);
+  }
+
+  try {
+    const res = await fetch(parsed.toString(), {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; NGMYAdvisorBrowser/1.0)",
+        Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+      },
+      redirect: "follow",
+      signal: AbortSignal.timeout(15000),
+    });
+    // A redirect could land on a private address — re-check where we ended up.
+    if (res.url && !advisorBrowseSafeUrl(res.url)) {
+      return jsonOk({ ok: false, error: "That link can't be opened." }, 400);
+    }
+    const ct = (res.headers.get("content-type") ?? "").toLowerCase();
+    if (!res.ok) {
+      return jsonOk({ ok: false, error: `Site returned HTTP ${res.status}` }, 502);
+    }
+    if (!ct.includes("html") && !ct.includes("text/plain")) {
+      return jsonOk({ ok: false, error: "This link is not an HTML page." }, 400);
+    }
+    let html = await res.text();
+    if (html.length > 1_200_000) {
+      html = html.substring(0, 1_200_000);
+    }
+    // Base on the FINAL page URL so relative links on deep pages resolve correctly.
+    const baseHref = (res.url || parsed.toString()).replace(/"/g, "%22");
+    // Bridge: link taps go back to the app (re-loaded through this relay) and the advisor
+    // can tap buttons by their text. The page runs sandboxed with no access to NGMY.
+    const bridge = `(function(){
+var P=window.parent;function abs(h){try{return new URL(h,document.baseURI).href}catch(e){return ''}}
+document.addEventListener('click',function(e){var a=e.target&&e.target.closest?e.target.closest('a[href]'):null;if(!a)return;
+var h=a.getAttribute('href')||'';if(!h||h.charAt(0)==='#'||/^javascript:/i.test(h))return;var u=abs(h);if(!/^https?:/i.test(u))return;
+e.preventDefault();P.postMessage({ngmyBrowser:'navigate',url:u},'*');},true);
+document.addEventListener('submit',function(e){var f=e.target;if(f&&f.querySelector&&f.querySelector('input[type=password]')){e.preventDefault();
+P.postMessage({ngmyBrowser:'needsRealBrowser',url:abs(f.getAttribute('action')||location.href)},'*');}},true);
+function vis(el){var r=el.getBoundingClientRect();return r.width>0&&r.height>0;}
+function byText(t){t=String(t||'').trim().toLowerCase();if(!t)return null;var els=document.querySelectorAll('a,button,[role=button],input[type=submit],input[type=button],label,summary,li,span,div');var best=null;
+for(var i=0;i<els.length;i++){var el=els[i];if(!vis(el))continue;var s=(el.innerText||el.value||el.getAttribute('aria-label')||'').trim().toLowerCase();if(!s)continue;
+if(s===t)return el;if(!best&&s.length<=t.length+40&&s.indexOf(t)>=0)best=el;}return best;}
+window.addEventListener('message',function(e){if(e.source!==P)return;var d=e.data||{};var el=null;
+if(d.ngmyBrowserCmd==='click_text')el=byText(d.text);else if(d.ngmyBrowserCmd==='click_selector'){try{el=document.querySelector(d.selector)}catch(x){}}
+if(el){el.scrollIntoView({block:'center'});el.click();}P.postMessage({ngmyBrowser:'clicked',ok:!!el},'*');});
+P.postMessage({ngmyBrowser:'loaded',title:document.title||''},'*');})();`;
+    const inject =
+      `<base href="${baseHref}" target="_self" />` +
+      `<meta name="referrer" content="no-referrer" />` +
+      `<meta name="viewport" content="width=device-width, initial-scale=1" />` +
+      `<script>document.addEventListener('DOMContentLoaded',function(){${bridge}});</script>`;
+    if (/<head[^>]*>/i.test(html)) {
+      html = html.replace(/<head[^>]*>/i, (m) => `${m}${inject}`);
+    } else if (/<html[^>]*>/i.test(html)) {
+      html = html.replace(/<html[^>]*>/i, (m) => `${m}<head>${inject}</head>`);
+    } else {
+      html = `<!DOCTYPE html><html><head>${inject}</head><body>${html}</body></html>`;
+    }
+    // Modern JS apps (React/Vite shells like beebots.tech) can't run re-hosted — their own
+    // security rules block it. Tell the app so it shows a real rendered picture instead.
+    const visibleText = advisorHtmlToText(html).text;
+    const appShell = visibleText.length < 160 &&
+      (/<script[^>]+type=["']?module/i.test(html) ||
+        /id=["'](root|app|__next|__nuxt)["']/i.test(html));
+    return jsonOk({ ok: true, html, appShell, finalUrl: res.url || parsed.toString() });
+  } catch (e) {
+    return jsonOk({ ok: false, error: String(e) }, 502);
+  }
+}
+
+function isNgmyAdminEmail(email: string): boolean {
+  return NGMY_ADMIN_EMAILS.has(email.trim().toLowerCase());
+}
+
+async function handleSaveAiApiKey(requesterEmail: string, apiKey: string): Promise<Response> {
+  if (!isNgmyAdminEmail(requesterEmail)) {
+    return jsonOk({ error: "Admin access required" }, 403);
+  }
+  const k = apiKey.trim();
+  if (!k) return jsonOk({ error: "apiKey is required" }, 400);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+
+  // Store in private table; keep public config key columns empty.
+  const { error: privateErr } = await admin.from("ngmy_server_secrets").upsert({
+    id: "1",
+    ai_api_key: k,
+    updated_at: new Date().toISOString(),
+  });
+  if (privateErr) {
+    // Fall back to config only if private table missing; still blank client-readable risk until wipe SQL runs.
+    const { error } = await admin.from("config").upsert({
+      id: "1",
+      geminiApiKey: k,
+      gemini_api_key: k,
+      aiApiKey: k,
+      ai_api_key: k,
+    });
+    if (error) return jsonOk({ error: error.message }, 500);
+  } else {
+    await admin.from("config").upsert({
+      id: "1",
+      geminiApiKey: "",
+      gemini_api_key: "",
+      aiApiKey: "",
+      ai_api_key: "",
+    });
+  }
+  return jsonOk({ ok: true, configured: true });
+}
+
+async function handleAiKeyConfigured(): Promise<Response> {
+  const key = await resolveServerAiApiKey();
+  return jsonOk({ configured: key.length > 0 });
+}
+
+async function ensureAuthUser(admin: ReturnType<typeof createClient>, email: string): Promise<void> {
+  const { error } = await admin.auth.admin.createUser({
+    email,
+    email_confirm: true,
+    // Random password — NGMY uses custom passwordHash; session is issued via magic link.
+    password: `${crypto.randomUUID()}Aa1!`,
+    user_metadata: { ngmy_app: true },
+  });
+  if (!error) return;
+  const msg = String(error.message ?? "").toLowerCase();
+  if (msg.includes("already") || msg.includes("registered") || msg.includes("exists")) return;
+  // Soft-fail: generateLink may still work if the user already exists.
+  console.error("[ngmy-auth] createUser:", error.message);
+}
+
+type MintedSession = { access_token: string; refresh_token: string };
+
+/** One magic-link mint. Returns the session or the reason it failed. */
+async function mintSessionViaLink(
+  admin: ReturnType<typeof createClient>,
+  email: string,
+  type: "magiclink" | "recovery",
+): Promise<{ session: MintedSession | null; error: string }> {
+  const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+    type,
+    email,
+  });
+  const hashed = String(linkData?.properties?.hashed_token ?? "").trim();
+  if (linkErr || !hashed) {
+    const reason = `generateLink(${type}): ${linkErr?.message ?? "no token"}`;
+    console.error("[ngmy-auth]", reason);
+    return { session: null, error: reason };
+  }
+  const { data: verified, error: verifyErr } = await admin.auth.verifyOtp({
+    token_hash: hashed,
+    type: type === "recovery" ? "recovery" : "email",
+  });
+  const access = String(verified?.session?.access_token ?? "").trim();
+  const refresh = String(verified?.session?.refresh_token ?? "").trim();
+  if (verifyErr || !access || !refresh) {
+    const reason = `verifyOtp(${type}): ${verifyErr?.message ?? "no session"}`;
+    console.error("[ngmy-auth]", reason);
+    return { session: null, error: reason };
+  }
+  return { session: { access_token: access, refresh_token: refresh }, error: "" };
+}
+
+/**
+ * Issue a real Supabase Auth session for this email (JWT includes email for
+ * RLS). The failure reason travels back to the app: a password that matches
+ * but no session is exactly the state where Help Mode looks signed in yet
+ * every registrar write is refused, and the app could not say why.
+ */
+async function issueAuthSessionForEmail(
+  admin: ReturnType<typeof createClient>,
+  email: string,
+): Promise<{ session: MintedSession | null; error: string }> {
+  await ensureAuthUser(admin, email);
+  const first = await mintSessionViaLink(admin, email, "magiclink");
+  if (first.session) return first;
+  // Second path through a different OTP type — a stale magiclink token or a
+  // one-type rate limit should not strand the account without a session.
+  const second = await mintSessionViaLink(admin, email, "recovery");
+  if (second.session) return second;
+  return { session: null, error: `${first.error}; ${second.error}` };
+}
+
+async function handleVerifyPasswordLogin(email: string, passwordHash: string): Promise<Response> {
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const key = email.trim().toLowerCase();
+  const hash = passwordHash.trim();
+  if (!key || !hash) return jsonOk({ ok: false, error: "Email and password required" }, 400);
+
+  let row: Record<string, unknown> | null = null;
+  const exact = await admin
+    .from("users")
+    .select("email,passwordHash,username,phone,isAdmin,status,forceLogout,accountBalance,canSellOnStore")
+    .eq("email", key)
+    .maybeSingle();
+  if (exact.data) row = exact.data as Record<string, unknown>;
+  if (!row) {
+    const fuzzy = await admin
+      .from("users")
+      .select("email,passwordHash,username,phone,isAdmin,status,forceLogout,accountBalance,canSellOnStore")
+      .ilike("email", key)
+      .maybeSingle();
+    if (fuzzy.data) row = fuzzy.data as Record<string, unknown>;
+  }
+  if (!row) {
+    await logSecurityEvent(admin, "login_failed", `unknown:${key}`, "edge");
+    return jsonOk({ ok: false, error: "Invalid email or password" }, 401);
+  }
+
+  const dbHash = String(row.passwordHash ?? row.password_hash ?? "").trim();
+  if (!dbHash || dbHash !== hash) {
+    await logSecurityEvent(admin, "login_failed", `bad_password:${key}`, "edge");
+    return jsonOk({ ok: false, error: "Invalid email or password" }, 401);
+  }
+
+  const minted = await issueAuthSessionForEmail(admin, String(row.email ?? key));
+
+  // Never return passwordHash to the client.
+  return jsonOk({
+    ok: true,
+    user: {
+      email: String(row.email ?? key),
+      username: String(row.username ?? ""),
+      phone: String(row.phone ?? ""),
+      isAdmin: Boolean(row.isAdmin) || isNgmyAdminEmail(String(row.email ?? key)),
+      status: String(row.status ?? "active"),
+      forceLogout: Boolean(row.forceLogout),
+      accountBalance: Number(row.accountBalance ?? 0),
+      canSellOnStore: Boolean(row.canSellOnStore),
+    },
+    session: minted.session,
+    ...(minted.session ? {} : { sessionError: minted.error }),
+  });
+}
+
+async function handleRegisterAppUser(body: Record<string, unknown>): Promise<Response> {
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const email = String(body.email ?? "").trim().toLowerCase();
+  const passwordHash = String(body.passwordHash ?? "").trim();
+  const username = String(body.username ?? "").trim() || email.split("@")[0] || "User";
+  const phone = String(body.phone ?? "").trim();
+  if (!email.includes("@") || passwordHash.length < 8) {
+    return jsonOk({ error: "Valid email and password required" }, 400);
+  }
+
+  const exists = await userAccountExists(admin, email);
+  if (exists) return jsonOk({ error: "Account already exists. Please log in." }, 409);
+
+  const isAdmin = isNgmyAdminEmail(email);
+  const { error: upsertErr } = await admin.from("users").upsert({
+    email,
+    passwordHash,
+    username,
+    phone,
+    isAdmin,
+    status: "active",
+    accountBalance: 0,
+  }, { onConflict: "email" });
+  if (upsertErr) return jsonOk({ error: upsertErr.message }, 500);
+
+  const minted = await issueAuthSessionForEmail(admin, email);
+  return jsonOk({
+    ok: true,
+    user: {
+      email,
+      username,
+      phone,
+      isAdmin,
+      status: "active",
+      forceLogout: false,
+      accountBalance: 0,
+      canSellOnStore: false,
+    },
+    session: minted.session,
+    ...(minted.session ? {} : { sessionError: minted.error }),
+  });
+}
+
+async function userAccountExists(admin: ReturnType<typeof createClient>, email: string): Promise<boolean> {
+  const { data } = await admin.from("users").select("email").ilike("email", email).maybeSingle();
+  return data != null;
+}
+
+async function passwordResetSendResendCode(
+  admin: ReturnType<typeof createClient>,
+  email: string,
+): Promise<Response> {
+  const resendKey = String(Deno.env.get("RESEND_API_KEY") ?? "").trim();
+  const from = String(Deno.env.get("RESEND_FROM_EMAIL") ?? "NGMY <noreply@ngmy.org>").trim();
+  if (!resendKey) {
+    return new Response(JSON.stringify({ error: "Email service not configured. Try again later." }), {
+      status: 503,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const pepper = Deno.env.get("PW_RESET_PEPPER") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "ngmy";
+  const codeHash = await sha256Hex(`${code}:${email}:${pepper}`);
+  const expiresAt = new Date(Date.now() + AUTH_CODE_TTL_MS).toISOString();
+
+  const { error: upsertErr } = await admin.from("ngmy_password_reset_otp").upsert(
+    { email, code_hash: codeHash, expires_at: expiresAt, attempts: 0 },
+    { onConflict: "email" },
+  );
+  if (upsertErr) {
+    return new Response(JSON.stringify({ error: "Could not store verification code." }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const html =
+    `<p>Your NGMY password reset code is:</p><p style="font-size:28px;font-weight:bold;letter-spacing:4px">${code}</p>` +
+    `<p>This code expires in 1 day. If you did not request this, ignore this email.</p>`;
+  await resendSendEmail(resendKey, from, email, "Your NGMY password reset code", html);
+
+  return new Response(JSON.stringify({ ok: true, method: "resend" }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+const CIVIC_RECOVERY_KEY = "civic_recovery_emails";
+const CIVIC_RECOVERY_INBOX_KEY = "civic_recovery_inbox";
+const MAX_RECOVERY_EMAILS = 3;
+const AUTH_CODE_TTL_MS = 24 * 60 * 60 * 1000;
+
+function asRecoveryEmails(raw: unknown): string[] {
+  const out: string[] = [];
+  const push = (v: unknown) => {
+    const e = emailKey(String(v ?? ""));
+    if (e.includes("@") && !out.includes(e)) out.push(e);
+  };
+  if (Array.isArray(raw)) {
+    for (const v of raw) push(v);
+  } else if (raw && typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    if (Array.isArray(o.emails)) {
+      for (const v of o.emails) push(v);
+    } else {
+      push(o.email);
+    }
+  } else {
+    push(raw);
+  }
+  return out.slice(0, MAX_RECOVERY_EMAILS);
+}
+
+function recoveryOwnerHasRecord(map: Record<string, unknown>, accountEmail: string): boolean {
+  const key = emailKey(accountEmail);
+  if (!key) return false;
+  if (map[key] !== undefined && map[key] !== null) return true;
+  return Object.keys(map).some((k) => k !== "savedAt" && emailKey(k) === key);
+}
+
+async function loadRecoveryEmails(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  accountEmail: string,
+): Promise<string[]> {
+  const map = await loadSettingsObject(admin, CIVIC_RECOVERY_KEY);
+  const want = emailKey(accountEmail);
+  const direct = asRecoveryEmails(map[want]);
+  if (direct.length > 0) return direct;
+  for (const [k, raw] of Object.entries(map)) {
+    if (k === "savedAt") continue;
+    if (emailKey(k) === want) {
+      const parsed = asRecoveryEmails(raw);
+      if (parsed.length > 0) return parsed;
+    }
+  }
+  return [];
+}
+
+type InboxItem = { purpose: string; code: string; at: string; expiresAt: string };
+
+function inboxItemsFrom(raw: unknown): InboxItem[] {
+  if (!Array.isArray(raw)) return [];
+  const now = Date.now();
+  const items: InboxItem[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== "object") continue;
+    const r = row as Record<string, unknown>;
+    const expiresAt = String(r.expiresAt ?? "");
+    const exp = new Date(expiresAt).getTime();
+    if (!exp || now > exp) continue;
+    const code = String(r.code ?? "").trim();
+    if (code.length < 6) continue;
+    items.push({
+      purpose: String(r.purpose ?? "verify"),
+      code,
+      at: String(r.at ?? new Date().toISOString()),
+      expiresAt,
+    });
+  }
+  return items.slice(-8);
+}
+
+async function saveRecoveryEmails(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  accountEmail: string,
+  emails: string[],
+): Promise<{ ok: boolean; error?: string }> {
+  const map = await loadSettingsObject(admin, CIVIC_RECOVERY_KEY);
+  map[emailKey(accountEmail)] = { emails: emails.slice(0, MAX_RECOVERY_EMAILS) };
+  return await saveSettingsObject(admin, CIVIC_RECOVERY_KEY, map);
+}
+
+function recoveryCircleRecipients(owner: string, emails: string[]): string[] {
+  const out: string[] = [];
+  const push = (v: string) => {
+    const e = emailKey(v);
+    if (e.includes("@") && !out.includes(e)) out.push(e);
+  };
+  push(owner);
+  for (const email of emails) push(email);
+  return out;
+}
+
+async function findRecoveryCircle(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  typedEmail: string,
+): Promise<{ owner: string; emails: string[]; resetEmail: string } | null> {
+  const want = emailKey(typedEmail);
+  if (!want.includes("@")) return null;
+  const map = await loadSettingsObject(admin, CIVIC_RECOVERY_KEY);
+  const own = asRecoveryEmails(map[want]);
+  if (own.length > 0) {
+    return { owner: want, emails: own, resetEmail: want };
+  }
+  for (const [ownerRaw, raw] of Object.entries(map)) {
+    if (ownerRaw === "savedAt") continue;
+    const owner = emailKey(ownerRaw);
+    if (!owner.includes("@")) continue;
+    const emails = asRecoveryEmails(raw);
+    if (emails.includes(want) || owner === want) {
+      const resetEmail = (await userAccountExists(admin, want)) ? want : owner;
+      return { owner, emails, resetEmail };
+    }
+  }
+  return null;
+}
+
+async function pushInboxCodeToMany(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  recipients: string[],
+  purpose: string,
+  code: string,
+): Promise<void> {
+  const map = await loadSettingsObject(admin, CIVIC_RECOVERY_INBOX_KEY);
+  const now = new Date();
+  const item: InboxItem = {
+    purpose,
+    code,
+    at: now.toISOString(),
+    expiresAt: new Date(now.getTime() + AUTH_CODE_TTL_MS).toISOString(),
+  };
+  for (const recipient of recoveryCircleRecipients("", recipients)) {
+    const prev = map[recipient];
+    const current = prev && typeof prev === "object" && !Array.isArray(prev)
+      ? prev as Record<string, unknown>
+      : {};
+    const items = inboxItemsFrom(current.items);
+    items.push(item);
+    map[recipient] = { items: items.slice(-8) };
+  }
+  await saveSettingsObject(admin, CIVIC_RECOVERY_INBOX_KEY, map);
+}
+
+async function handleCivicRecoveryStatus(req: Request): Promise<Response> {
+  const jwtEmail = await requireJwtEmail(req);
+  if (!jwtEmail) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const stored = await loadSettingsObject(admin, CIVIC_RECOVERY_KEY);
+  let emails = await loadRecoveryEmails(admin, jwtEmail);
+  if (emails.length === 0 && !recoveryOwnerHasRecord(stored, jwtEmail) && await userAccountExists(admin, jwtEmail)) {
+    emails = [emailKey(jwtEmail)];
+    await saveRecoveryEmails(admin, jwtEmail, emails);
+  }
+  const inbox = await loadSettingsObject(admin, CIVIC_RECOVERY_INBOX_KEY);
+  const box = inbox[emailKey(jwtEmail)];
+  const rawItems = box && typeof box === "object" && !Array.isArray(box)
+    ? (box as Record<string, unknown>).items
+    : [];
+  return jsonOk({
+    ok: true,
+    email: emails[0] ?? "",
+    emails,
+    codes: inboxItemsFrom(rawItems),
+  });
+}
+
+async function handleCivicRecoveryLink(req: Request, body: Record<string, unknown>): Promise<Response> {
+  const jwtEmail = await requireJwtEmail(req);
+  if (!jwtEmail) return jsonOk({ error: "Authentication required" }, 401);
+  const loginEmail = emailKey(String(body.email ?? body.civicEmail ?? ""));
+  if (!loginEmail || !loginEmail.includes("@")) {
+    return jsonOk({ error: "Enter an email that was used to log in." }, 400);
+  }
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  if (!(await userAccountExists(admin, loginEmail))) {
+    return jsonOk({ error: "That email has not been used to log in." }, 400);
+  }
+  const emails = await loadRecoveryEmails(admin, jwtEmail);
+  if (emails.includes(loginEmail)) return jsonOk({ ok: true, emails, email: loginEmail });
+  if (emails.length >= MAX_RECOVERY_EMAILS) {
+    return jsonOk({ error: "You can save a maximum of 3 emails." }, 400);
+  }
+  emails.push(loginEmail);
+  const saved = await saveRecoveryEmails(admin, jwtEmail, emails);
+  if (!saved.ok) return jsonOk({ error: saved.error ?? "Could not save." }, 500);
+  return jsonOk({ ok: true, emails, email: loginEmail });
+}
+
+async function handleCivicRecoveryRemove(req: Request, body: Record<string, unknown>): Promise<Response> {
+  const jwtEmail = await requireJwtEmail(req);
+  if (!jwtEmail) return jsonOk({ error: "Authentication required" }, 401);
+  const civicEmail = emailKey(String(body.civicEmail ?? body.email ?? ""));
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const emails = (await loadRecoveryEmails(admin, jwtEmail)).filter((e) => e !== civicEmail);
+  const saved = await saveRecoveryEmails(admin, jwtEmail, emails);
+  if (!saved.ok) return jsonOk({ error: saved.error ?? "Could not save." }, 500);
+  return jsonOk({ ok: true, emails });
+}
+
+async function issueCivicAuthCode(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  accountEmail: string,
+  purpose: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const circle = await findRecoveryCircle(admin, accountEmail);
+  const emails = circle?.emails ?? await loadRecoveryEmails(admin, accountEmail);
+  if (emails.length === 0) {
+    return { ok: false, error: "Add a login email on Profile first." };
+  }
+  const resetEmail = emailKey(circle?.resetEmail ?? accountEmail);
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const pepper = Deno.env.get("PW_RESET_PEPPER") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "ngmy";
+  const codeHash = await sha256Hex(`${code}:${resetEmail}:${pepper}`);
+  const expiresAt = new Date(Date.now() + AUTH_CODE_TTL_MS).toISOString();
+  if (purpose === "password_reset") {
+    await admin.from("ngmy_password_reset_otp").upsert(
+      { email: resetEmail, code_hash: codeHash, expires_at: expiresAt, attempts: 0 },
+      { onConflict: "email" },
+    );
+  }
+  const owner = circle?.owner ?? emailKey(accountEmail);
+  await pushInboxCodeToMany(admin, recoveryCircleRecipients(owner, emails), purpose, code);
+  return { ok: true };
+}
+
+async function handleCivicRecoveryIssue(req: Request, body: Record<string, unknown>): Promise<Response> {
+  const jwtEmail = await requireJwtEmail(req);
+  if (!jwtEmail) return jsonOk({ error: "Authentication required" }, 401);
+  const purpose = String(body.purpose ?? "verify").trim() || "verify";
+  if (!["verify", "change_email", "password_reset"].includes(purpose)) {
+    return jsonOk({ error: "Unknown code type." }, 400);
+  }
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  if (purpose === "password_reset") {
+    const allowed = await consumeRateLimit(admin, "pw_reset_week", jwtEmail, 1, 604800);
+    if (!allowed) {
+      return jsonOk({ error: "You can only send 1 password reset code every 7 days." }, 429);
+    }
+  } else if (!isNgmyAdminEmail(jwtEmail)) {
+    const allowed = await consumeRateLimit(admin, "civic_code_week", jwtEmail, 3, 604800);
+    if (!allowed) {
+      return jsonOk({ error: "You can only receive 3 codes every 7 days." }, 429);
+    }
+  }
+  const issued = await issueCivicAuthCode(admin, jwtEmail, purpose);
+  if (!issued.ok) return jsonOk({ error: issued.error ?? "Could not create code." }, 400);
+  return jsonOk({ ok: true });
+}
+
+async function handlePasswordResetSendOtp(email: string, req: Request): Promise<Response> {
+  const admin = adminClient();
+  if (!admin) {
+    return new Response(JSON.stringify({ error: "Server misconfigured" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const circle = await findRecoveryCircle(admin, email);
+  if (!circle) {
+    if (await userAccountExists(admin, email)) {
+      return jsonOk({
+        error: "Add a login email on Profile first. Password reset codes appear there.",
+      }, 400);
+    }
+    return new Response(JSON.stringify({ ok: true, method: "civic" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const allowed = await consumeRateLimit(admin, "pw_reset_week", circle.resetEmail, 1, 604800);
+  if (!allowed) {
+    return jsonOk({
+      error: "You can only send 1 password reset code every 7 days.",
+    }, 429);
+  }
+
+  const issued = await issueCivicAuthCode(admin, circle.resetEmail, "password_reset");
+  if (!issued.ok) return jsonOk({ error: issued.error ?? "Could not create code." }, 400);
+
+  return new Response(JSON.stringify({ ok: true, method: "civic" }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+async function inboxHasLiveCode(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  accountEmail: string,
+  purpose: string,
+  code: string,
+): Promise<boolean> {
+  const inbox = await loadSettingsObject(admin, CIVIC_RECOVERY_INBOX_KEY);
+  const box = inbox[emailKey(accountEmail)];
+  const rawItems = box && typeof box === "object" && !Array.isArray(box)
+    ? (box as Record<string, unknown>).items
+    : [];
+  const want = code.trim();
+  return inboxItemsFrom(rawItems).some((i) => i.purpose === purpose && i.code === want);
+}
+
+async function consumeInboxCodeEverywhere(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  purpose: string,
+  code: string,
+): Promise<void> {
+  const want = code.trim();
+  if (!want) return;
+  const map = await loadSettingsObject(admin, CIVIC_RECOVERY_INBOX_KEY);
+  let changed = false;
+  for (const [k, raw] of Object.entries(map)) {
+    if (k === "savedAt") continue;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+    const current = raw as Record<string, unknown>;
+    const items = inboxItemsFrom(current.items);
+    const next = items.filter((i) => !(i.purpose === purpose && i.code === want));
+    if (next.length !== items.length) {
+      current.items = next;
+      map[k] = current;
+      changed = true;
+    }
+  }
+  if (changed) await saveSettingsObject(admin, CIVIC_RECOVERY_INBOX_KEY, map);
+}
+
+async function handlePasswordResetVerifyOtp(email: string, code: string): Promise<Response> {
+  const admin = adminClient();
+  if (!admin) {
+    return new Response(JSON.stringify({ error: "Server misconfigured" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const account = emailKey(email);
+  const { data: row, error } = await admin
+    .from("ngmy_password_reset_otp")
+    .select("code_hash,expires_at,attempts")
+    .eq("email", account)
+    .maybeSingle();
+  if (error || !row) {
+    if (await inboxHasLiveCode(admin, account, "password_reset", code)) {
+      const pepper = Deno.env.get("PW_RESET_PEPPER") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "ngmy";
+      const resetToken = crypto.randomUUID();
+      const resetTokenHash = await sha256Hex(`${resetToken}:${account}:${pepper}`);
+      const resetTokenExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+      await consumeInboxCodeEverywhere(admin, "password_reset", code);
+      await admin.from("ngmy_password_reset_otp").upsert(
+        {
+          email: account,
+          code_hash: "",
+          reset_token_hash: resetTokenHash,
+          reset_token_expires_at: resetTokenExpiresAt,
+          attempts: 0,
+        },
+        { onConflict: "email" },
+      );
+      return new Response(JSON.stringify({ ok: true, resetToken }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify({ error: "Incorrect or expired code." }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const attempts = Number(row.attempts ?? 0);
+  if (attempts >= 8) {
+    return new Response(JSON.stringify({ error: "Too many attempts. Request a new code." }), {
+      status: 429,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const expiresAt = new Date(String(row.expires_at ?? 0)).getTime();
+  if (!expiresAt || Date.now() > expiresAt) {
+    await admin.from("ngmy_password_reset_otp").delete().eq("email", account);
+    return new Response(JSON.stringify({ error: "Code expired. Request a new one." }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const pepper = Deno.env.get("PW_RESET_PEPPER") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "ngmy";
+  const codeHash = await sha256Hex(`${code.trim()}:${account}:${pepper}`);
+  if (codeHash !== row.code_hash && !(await inboxHasLiveCode(admin, account, "password_reset", code))) {
+    await admin.from("ngmy_password_reset_otp").update({ attempts: attempts + 1 }).eq("email", account);
+    return new Response(JSON.stringify({ error: "Incorrect code." }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // Code confirmed — issue a short-lived reset token instead of deleting the row.
+  // The client has no Supabase Auth session on this path (unlike the verifyOTP
+  // path), so it can't authenticate the password write via JWT; this token lets
+  // passwordResetComplete authorize it server-side instead.
+  await consumeInboxCodeEverywhere(admin, "password_reset", code);
+  const resetToken = crypto.randomUUID();
+  const resetTokenHash = await sha256Hex(`${resetToken}:${account}:${pepper}`);
+  const resetTokenExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  await admin
+    .from("ngmy_password_reset_otp")
+    .update({
+      code_hash: "",
+      reset_token_hash: resetTokenHash,
+      reset_token_expires_at: resetTokenExpiresAt,
+    })
+    .eq("email", account);
+
+  return new Response(JSON.stringify({ ok: true, resetToken }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+async function handlePasswordResetComplete(
+  jwtEmail: string,
+  email: string,
+  newHash: string,
+  resetToken: string,
+): Promise<Response> {
+  const admin = adminClient();
+  if (!admin) {
+    return new Response(JSON.stringify({ error: "Server misconfigured" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // Authorized either by a real Supabase Auth session for this email (verifyOTP
+  // path already established one) or by the short-lived reset token from the
+  // resend/OTP-code path above.
+  let authorized = jwtEmail !== "" && jwtEmail.toLowerCase().trim() === email;
+
+  if (!authorized && resetToken) {
+    const { data: row } = await admin
+      .from("ngmy_password_reset_otp")
+      .select("reset_token_hash,reset_token_expires_at")
+      .eq("email", email)
+      .maybeSingle();
+    if (row?.reset_token_hash) {
+      const pepper = Deno.env.get("PW_RESET_PEPPER") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "ngmy";
+      const tokenHash = await sha256Hex(`${resetToken}:${email}:${pepper}`);
+      const expiresAt = new Date(String(row.reset_token_expires_at ?? 0)).getTime();
+      authorized = tokenHash === row.reset_token_hash && !!expiresAt && Date.now() <= expiresAt;
+    }
+  }
+
+  if (!authorized) {
+    return new Response(JSON.stringify({ error: "Reset session expired. Request a new code." }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  let result = await admin.from("users").update({ passwordHash: newHash }).eq("email", email).select();
+  if (!result.data || result.data.length === 0) {
+    result = await admin.from("users").update({ passwordHash: newHash }).ilike("email", email).select();
+  }
+  if (!result.data || result.data.length === 0) {
+    await admin.from("users").upsert(
+      { email, passwordHash: newHash, username: email.split("@")[0] },
+      { onConflict: "email" },
+    );
+  }
+
+  await admin.from("ngmy_password_reset_otp").delete().eq("email", email);
+
+  return new Response(JSON.stringify({ ok: true }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+// ─── Generic DB relay — disguises table/settings-key names from DevTools ───
+// Transport-only proxy: forwards the caller's own Authorization header (their
+// real session JWT, or the anon key if logged out) to a fresh client, so
+// Postgres RLS governs the result exactly as if the caller had queried the
+// table directly. This function does NOT re-implement authorization — RLS
+// already does that correctly for every table below.
+
+const RELAY_TABLE_CODES: Record<string, string> = {
+  s: "ngmy_settings",
+  c: "config",
+  f: "family_trees",
+  h: "home_cards",
+  x: "ngmy_stripe_access",
+  u: "users",
+  t: "transactions",
+};
+
+// One code per static ngmy_settings key. Add new keys here (and in
+// lib/ngmy_db_relay.dart's mirror map) rather than reading the table directly.
+const RELAY_SETTINGS_KEY_CODES: Record<string, string> = {
+  k1: "ngmy_loan_status_map_v1",
+  k2: "ngmy_loan_payments_map_v1",
+  k3: "wallet_txn_decisions",
+  k4: "app_studio_access_settings",
+  k5: "ngmy_app_studio_cloud_slot",
+  k6: "ngmy_app_studio_published_registry",
+  k7: "ngmy_bio_publish_registry",
+  k8: "ngmy_menu_publish_registry",
+  k9: "ngmy_invoice_publish_registry",
+  k10: "civic_user_groups_v1",
+  k11: "civic_state_registrar_subscriptions",
+  k12: "civic_voting_settings",
+  k13: "civic_hati_kiapo_uongozi",
+  k14: "home_vote_ad_campaign",
+  k15: "ngmy_helper_kb",
+  k16: "ngmy_communicate_backup_codes_v1",
+  k17: "ngmy_family_tree_backup_codes_v1",
+  k18: "ngmy_family_tree_qr_stashes_v1",
+  k19: "ngmy_slides_transfer_qr_stashes_v1",
+  k20: "ngmy_worksheet_project_qr_stashes_v1",
+  k21: "ngmy_doc_share_school_accounts_v1",
+  k22: "ngmy_doc_share_video_relay_v1",
+  k23: "ngmy_doc_share_webrtc_signal_v1",
+  k24: "ngmy_user_saved_sync_qrs_v1",
+  k25: "terms_and_conditions",
+  k26: "privacy_policy",
+  k27: "investment_plans",
+  k28: "ngmy_popups",
+  k29: "ngmy_chat_closed",
+  k30: "management_operational_lists",
+  k31: "store_sell_access_emails",
+  k32: "deleted_media_ids",
+  k33: "family_tree_payment_settings",
+  k34: "invoice_payment_settings",
+  k35: "music_studio_payment_settings",
+  k36: "app_studio_payment_settings",
+  k37: "communicate_settings",
+  k38: "communicate_payment_settings",
+  k39: "wallet_payment_settings",
+  k40: "repair_estimate_payment_settings",
+  k41: "translate_message_payment_settings",
+  k42: "document_scan_payment_settings",
+  k43: "doc_share_payment_settings",
+  k44: "civic_self_enrollment_settings",
+  k45: "ngmy_helper_ai_settings",
+  k46: "ngmy_app_branding",
+  k47: "civic_help_mode_settings",
+  k48: "help_center_hub_settings",
+  k49: "platform_live_stats",
+  k50: "civic_contribution_receipt_removed",
+  k51: "civic_deleted_contribution_ids",
+  k52: "civic_help_campaign_spendings",
+  k53: "civic_helper_gift_pending_v1",
+  k54: "civic_helper_gift_inbox_v1",
+  k55: "game_center_timers",
+  k56: "ngmy_dice_live_v1",
+};
+
+// Dynamic key PREFIXES — the suffix (a share code/token/base64 email) travels
+// as its own field ("sfx"); only the feature-identifying prefix is coded.
+const RELAY_SETTINGS_PREFIX_CODES: Record<string, string> = {
+  d1: "ngmy_bio_pub_",
+  d2: "ngmy_menu_pub_",
+  d3: "ngmy_doc_share_stash_v2_",
+  d4: "ngmy_doc_share_code_v2_",
+  d5: "ngmy_essentials_code_v1_",
+  d6: "ngmy_bio_lib_v1_",
+  d7: "ngmy_menu_lib_v1_",
+  d8: "ngmy_studio_entitlement_v1_",
+  d9: "ngmy_doc_share_inbox_v1_",
+  d10: "ngmy_game_receipts_",
+  d11: "ngmy_local_growth_income_stash_v1_",
+  d12: "ngmy_local_growth_income_code_v1_",
+  d13: "ngmy_local_deposit_qr_v1_",
+  d14: "ngmy_local_deposit_code_v1_",
+  d15: "ngmy_local_deposit_inbox_v1_",
+  d16: "ngmy_refcode_",
+  d17: "ngmy_transfer_relay_v1_",
+  d18: "ngmy_transfer_v1_",
+  d19: "ngmy_transfer_signal_v1_",
+  d20: "ngmy_doc_share_my_code_lookup_v1_",
+  d21: "ngmy_doc_share_my_code_user_v1_",
+  d22: "ngmy_gi_account_wallet_v1_",
+  d23: "ngmy_helper_gift_qr_v1_",
+};
+
+function resolveRelaySettingsKey(skCode: string, suffix: string): string | null {
+  const direct = RELAY_SETTINGS_KEY_CODES[skCode];
+  if (direct) return direct;
+  const prefix = RELAY_SETTINGS_PREFIX_CODES[skCode];
+  if (prefix) return `${prefix}${suffix}`;
+  return null;
+}
+
+// Fields that must never leave the server for these settings keys, even
+// though the app itself wrote them (audit-only metadata like who published
+// something — the client never reads it back, so it should not be on the wire).
+const RELAY_SETTINGS_STRIP_FIELDS: Record<string, string[]> = {
+  home_vote_ad_campaign: ["publishedBy"],
+};
+
+const DICE_LIVE_KEY = "ngmy_dice_live_v1";
+
+function diceRecords(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value)
+    ? value.filter((r): r is Record<string, unknown> => !!r && typeof r === "object" && !Array.isArray(r))
+    : [];
+}
+
+// Growth Income plays as "you@x.com+local.ngmy": the same person as "you@x.com".
+function diceEmailKey(raw: string): string {
+  const k = emailKey(raw);
+  return k.endsWith("+local.ngmy") ? k.slice(0, -"+local.ngmy".length) : k;
+}
+
+function diceNum(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+// A player sees the shared dice rules but only their own personal rows.
+function diceFilterForPlayer(value: Record<string, unknown>, email: string): Record<string, unknown> {
+  const mine = (r: Record<string, unknown>) => diceEmailKey(String(r.email ?? "")) === diceEmailKey(email);
+  return {
+    ...value,
+    diceServer: 1,
+    userGrants: diceRecords(value.userGrants).filter(mine),
+    userFaceRules: diceRecords(value.userFaceRules).filter(mine),
+    userOutcomeRules: diceRecords(value.userOutcomeRules).filter(mine),
+    playerState: diceRecords(value.playerState).filter(mine),
+  };
+}
+
+// A player's write may only count their own rules down and update their own play counters.
+function diceMergePlayerWrite(
+  current: Record<string, unknown>,
+  incomingRaw: unknown,
+  email: string,
+): Record<string, unknown> {
+  const incoming = incomingRaw && typeof incomingRaw === "object" && !Array.isArray(incomingRaw)
+    ? (incomingRaw as Record<string, unknown>)
+    : {};
+  const mine = (r: Record<string, unknown>) => diceEmailKey(String(r.email ?? "")) === diceEmailKey(email);
+  const countDown = (
+    currentRows: unknown,
+    incomingRows: unknown,
+    sameRule: (a: Record<string, unknown>, b: Record<string, unknown>) => boolean,
+    downFields: string[],
+    upFields: string[],
+  ) =>
+    diceRecords(currentRows).map((row) => {
+      if (!mine(row)) return row;
+      const match = diceRecords(incomingRows).find((r) => mine(r) && sameRule(row, r));
+      if (!match || String(match.updatedAt ?? "") !== String(row.updatedAt ?? "")) return row;
+      const next = { ...row };
+      for (const f of downFields) next[f] = Math.min(diceNum(row[f]), diceNum(match[f]));
+      for (const f of upFields) next[f] = Math.max(diceNum(row[f]), diceNum(match[f]));
+      return next;
+    });
+
+  const playerState = diceRecords(current.playerState).filter((r) => !mine(r));
+  const ownState = diceRecords(incoming.playerState).find(mine);
+  if (ownState) {
+    const prev = diceRecords(current.playerState).find(mine);
+    const prevStamp = String(prev?.crowdStamp ?? "");
+    const nextStamp = String(ownState.crowdStamp ?? "");
+    const merged = { ...ownState };
+    if (prev && prevStamp === nextStamp) {
+      merged.crowdWinsUsed = Math.max(diceNum(prev.crowdWinsUsed), diceNum(ownState.crowdWinsUsed));
+      merged.crowdLosesUsed = Math.max(diceNum(prev.crowdLosesUsed), diceNum(ownState.crowdLosesUsed));
+    } else if (prev && prevStamp > nextStamp) {
+      Object.assign(merged, {
+        crowdStamp: prev.crowdStamp,
+        crowdWinsUsed: prev.crowdWinsUsed,
+        crowdLosesUsed: prev.crowdLosesUsed,
+      });
+    }
+    playerState.push(merged);
+  } else {
+    const prev = diceRecords(current.playerState).find(mine);
+    if (prev) playerState.push(prev);
+  }
+
+  return {
+    ...current,
+    userFaceRules: countDown(
+      current.userFaceRules,
+      incoming.userFaceRules,
+      (a, b) => diceNum(a.outcome) === diceNum(b.outcome),
+      ["nextLeft"],
+      ["dayUsed", "weekUsed"],
+    ),
+    userOutcomeRules: countDown(current.userOutcomeRules, incoming.userOutcomeRules, () => true, ["winsLeft", "losesLeft", "plus3Left"], []),
+    playerState,
+  };
+}
+
+function redactSettingsRow(realKey: string | null, row: unknown): unknown {
+  if (!realKey || !row || typeof row !== "object") return row;
+  const strip = RELAY_SETTINGS_STRIP_FIELDS[realKey];
+  if (!strip || strip.length === 0) return row;
+  const r = row as Record<string, unknown>;
+  if (r.value && typeof r.value === "object" && !Array.isArray(r.value)) {
+    const v = { ...(r.value as Record<string, unknown>) };
+    for (const f of strip) delete v[f];
+    return { ...r, value: v };
+  }
+  return row;
+}
+
+/** Share/claim vaults — never listed via public REST. Single-key relay uses service role. */
+function isClaimSettingsKey(key: string): boolean {
+  const k = key.trim();
+  if (!k) return false;
+  const exact = new Set([
+    "ngmy_slides_transfer_qr_stashes_v1",
+    "ngmy_family_tree_qr_stashes_v1",
+    "ngmy_worksheet_project_qr_stashes_v1",
+    "ngmy_family_tree_backup_codes_v1",
+    "ngmy_communicate_backup_codes_v1",
+  ]);
+  if (exact.has(k)) return true;
+  const prefixes = [
+    "ngmy_doc_share_stash_v2_",
+    "ngmy_doc_share_code_v2_",
+    "ngmy_essentials_code_v1_",
+    "ngmy_local_growth_income_stash_v1_",
+    "ngmy_local_growth_income_code_v1_",
+    "ngmy_local_deposit_qr_v1_",
+    "ngmy_local_deposit_code_v1_",
+    "ngmy_local_deposit_inbox_v1_",
+    "ngmy_refcode_",
+    "ngmy_transfer_relay_v1_",
+    "ngmy_transfer_v1_",
+    "ngmy_transfer_signal_v1_",
+  ];
+  return prefixes.some((p) => k.startsWith(p));
+}
+
+const CIVIC_HELP_MODE_SAFE_BYTES = 120000;
+
+/** Drop a receipt mirror that is large enough to make the campaign save fail. */
+function slimCivicHelpModeDocument(value: Record<string, unknown>): Record<string, unknown> {
+  const copy: Record<string, unknown> = { ...value };
+  delete copy.helpCampaignSpendings;
+  const receipts = copy.contributionReceipts;
+  if (!Array.isArray(receipts) || receipts.length === 0) return copy;
+  try {
+    if (JSON.stringify(copy).length <= CIVIC_HELP_MODE_SAFE_BYTES) return copy;
+  } catch {
+    // Fall through and keep the campaign without the mirror.
+  }
+  delete copy.contributionReceipts;
+  return copy;
+}
+
+function mergeCivicHelpModeSave(
+  current: Record<string, unknown>,
+  incoming: Record<string, unknown>,
+): Record<string, unknown> {
+  const cleaned: Record<string, unknown> = { ...incoming };
+  delete cleaned.helpCampaignSpendings;
+  delete cleaned.contributionReceipts;
+  const incomingByState =
+    cleaned.helpModeByState && typeof cleaned.helpModeByState === "object"
+      ? (cleaned.helpModeByState as Record<string, unknown>)
+      : {};
+  const existingByState =
+    current.helpModeByState && typeof current.helpModeByState === "object"
+      ? (current.helpModeByState as Record<string, unknown>)
+      : {};
+  const mergedByState: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(existingByState)) {
+    const ck = canonicalStateKey(k) || k.trim().toLowerCase();
+    if (ck) mergedByState[ck] = v;
+  }
+  for (const [k, v] of Object.entries(incomingByState)) {
+    const ck = canonicalStateKey(k) || k.trim().toLowerCase();
+    if (ck) mergedByState[ck] = v;
+  }
+  cleaned.helpModeByState = mergedByState;
+  if (Array.isArray(cleaned.helpCampaignClosures) && Array.isArray(current.helpCampaignClosures)) {
+    const seen = new Set<string>();
+    const closures: unknown[] = [];
+    for (const row of [
+      ...(current.helpCampaignClosures as unknown[]),
+      ...(cleaned.helpCampaignClosures as unknown[]),
+    ]) {
+      if (!row || typeof row !== "object") continue;
+      const id = String((row as Record<string, unknown>).campaignId ?? "").trim();
+      const key = id || JSON.stringify(row);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      closures.push(row);
+    }
+    cleaned.helpCampaignClosures = closures;
+  }
+  const existingReceipts = Array.isArray(current.contributionReceipts)
+    ? current.contributionReceipts
+    : [];
+  if (existingReceipts.length === 0) return cleaned;
+  return slimCivicHelpModeDocument({ ...cleaned, contributionReceipts: existingReceipts });
+}
+
+function slimCivicHelpModeRow(row: unknown): unknown {
+  if (!row || typeof row !== "object" || Array.isArray(row)) return row;
+  const record = row as Record<string, unknown>;
+  if (!record.value || typeof record.value !== "object" || Array.isArray(record.value)) {
+    return row;
+  }
+  return {
+    ...record,
+    value: slimCivicHelpModeDocument(record.value as Record<string, unknown>),
+  };
+}
+
+function relayClientFor(req: Request) {
+  const url = Deno.env.get("SUPABASE_URL") ?? "";
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  const authHeader = req.headers.get("Authorization") ?? `Bearer ${anonKey}`;
+  if (!url || !anonKey) return null;
+  return createClient(url, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+async function handleDbRelay(req: Request, body: Record<string, unknown>): Promise<Response> {
+  const caller = relayClientFor(req);
+  if (!caller) return jsonOk({ error: "Server misconfigured" }, 500);
+
+  const tableCode = String(body.t ?? "");
+  const table = RELAY_TABLE_CODES[tableCode];
+  if (!table) return jsonOk({ error: "Unknown table" }, 400);
+
+  const eq: Record<string, unknown> = { ...(body.eq as Record<string, unknown> | undefined ?? {}) };
+  let settingsRealKey: string | null = null;
+  if (table === "ngmy_settings") {
+    settingsRealKey = resolveRelaySettingsKey(String(body.sk ?? ""), String(body.sfx ?? ""));
+    if (!settingsRealKey) return jsonOk({ error: "Unknown settings key" }, 400);
+    eq["key"] = settingsRealKey;
+  }
+
+  // Claim tokens / transfer vaults are locked from public REST listing. The
+  // caller already named one key, so service role can fetch that row only.
+  let client =
+    table === "ngmy_settings" && settingsRealKey && isClaimSettingsKey(settingsRealKey)
+      ? (adminClient() ?? caller)
+      : caller;
+
+  const op = String(body.op ?? "s");
+
+  // Help mode on/off must be readable by every member and writable by the
+  // registrar even when ngmy_settings RLS hides civic_help_mode_settings.
+  // An anonymous storage JWT has no email, so the user-scoped client sees
+  // zero rows and Activate/Deactivate looks like a failed cloud sync.
+  if (table === "ngmy_settings" && settingsRealKey === "civic_help_mode_settings") {
+    const admin = adminClient();
+    if (op === "s") {
+      if (admin) client = admin;
+    } else if (op === "up" || op === "i" || op === "u") {
+      const email = await requireJwtEmail(req);
+      if (!email || !admin) return jsonOk({ error: "Authentication required" }, 401);
+      const role = await resolveCivicRole(admin, email);
+      if (!role.isAdmin && !role.isRegistrar) {
+        const detail = await registrarRefusalDetail(admin, email);
+        return jsonOk({ error: `Not allowed: ${maskEmailNetwork(email)} (${detail})` }, 403);
+      }
+      client = admin;
+    }
+  }
+
+  // Game Center timers: every player reads them; only an admin can change them.
+  if (table === "ngmy_settings" && settingsRealKey === "game_center_timers") {
+    const admin = adminClient();
+    if (op === "s") {
+      if (admin) client = admin;
+    } else {
+      const email = await requireJwtEmail(req);
+      if (!email || !admin) return jsonOk({ error: "Authentication required" }, 401);
+      const role = await resolveCivicRole(admin, email);
+      if (!role.isAdmin) return jsonOk({ error: "Admin only" }, 403);
+      client = admin;
+    }
+  }
+
+  // Dice control: admins write everything; players read their own rows and only count down.
+  let diceViewerEmail: string | null = null;
+  if (table === "ngmy_settings" && settingsRealKey === DICE_LIVE_KEY) {
+    const admin = adminClient();
+    if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+    const email = (await requireJwtEmail(req)).trim().toLowerCase();
+    const isAdmin = email ? (await resolveCivicRole(admin, email)).isAdmin : false;
+    if (op === "s") {
+      client = admin;
+      diceViewerEmail = isAdmin ? null : email;
+    } else if (op === "up" || op === "i") {
+      if (!email) return jsonOk({ error: "Authentication required" }, 401);
+      if (!isAdmin) {
+        const current = await loadSettingsObject(admin, DICE_LIVE_KEY);
+        const incomingRows = Array.isArray(body.rows) ? (body.rows as Record<string, unknown>[]) : [];
+        for (const r of incomingRows) r["value"] = diceMergePlayerWrite(current, r["value"], email);
+      }
+      client = admin;
+    } else {
+      if (!isAdmin) return jsonOk({ error: "Admin only" }, 403);
+      client = admin;
+    }
+  }
+
+  const helperGiftRelayKey =
+    settingsRealKey === CIVIC_HELPER_GIFT_PENDING_KEY ||
+    settingsRealKey === CIVIC_HELPER_GIFT_INBOX_KEY ||
+    (settingsRealKey?.startsWith(CIVIC_HELPER_GIFT_STASH_PREFIX) ?? false);
+  if (table === "ngmy_settings" && helperGiftRelayKey) {
+    const admin = adminClient();
+    const email = await requireJwtEmail(req);
+    if (!email || !admin) return jsonOk({ error: "Authentication required" }, 401);
+    const role = await resolveCivicRole(admin, email);
+    if (op === "s") {
+      if (settingsRealKey === CIVIC_HELPER_GIFT_INBOX_KEY) {
+        const inbox = helperGiftItems(await loadSettingsObject(admin, CIVIC_HELPER_GIFT_INBOX_KEY));
+        const filtered = role.isAdmin
+          ? inbox
+          : inbox.filter((g) => emailKey(String(g.email ?? "")) === email);
+        return jsonOk({ ok: true, data: { key: settingsRealKey, value: { items: filtered } } });
+      }
+      if (!role.isAdmin && !role.isRegistrar) {
+        return jsonOk({ ok: true, data: null });
+      }
+      client = admin;
+    } else if (op === "up" || op === "i" || op === "u") {
+      if (settingsRealKey === CIVIC_HELPER_GIFT_PENDING_KEY) {
+        if (!role.isAdmin && !role.isRegistrar) {
+          return jsonOk({ error: "Authorized Registrar or admin required" }, 403);
+        }
+      } else if (!role.isAdmin) {
+        const gift = settingsRealKey
+          ? await loadSettingsObject(admin, settingsRealKey)
+          : {};
+        const lockedStore = emailKey(String(gift.storeSellerEmail ?? ""));
+        if (lockedStore !== email) {
+          return jsonOk({ error: "Admin or assigned store required" }, 403);
+        }
+      }
+      client = admin;
+    }
+  }
+
+  const inFilter = body.in as Record<string, unknown[]> | undefined;
+  const DB_RELAY_DEFAULT_LIMIT = 200;
+  const DB_RELAY_MAX_LIMIT = 500;
+  const DB_RELAY_MAX_ROWS = 50;
+
+  if (op === "s") {
+    const readLimited = relayRateLimit(req, "db_read", 120,
+      `${table}${settingsRealKey ? ":" + settingsRealKey : ""}`);
+    if (readLimited) return readLimited;
+    let q = client.from(table).select(String(body.cols ?? "*"));
+    for (const [k, v] of Object.entries(eq)) q = q.eq(k, v as never);
+    const contains = body.contains as Record<string, unknown> | undefined;
+    if (contains) {
+      for (const [k, v] of Object.entries(contains)) q = q.contains(k, v as never);
+    }
+    if (inFilter) {
+      for (const [k, v] of Object.entries(inFilter)) q = q.in(k, (v as unknown[]) ?? []);
+    }
+    const ilike = body.ilike as Record<string, unknown> | undefined;
+    if (ilike) {
+      for (const [k, v] of Object.entries(ilike)) q = q.ilike(k, String(v));
+    }
+    const order = body.order as { col?: string; ascending?: boolean } | undefined;
+    if (order?.col) q = q.order(order.col, { ascending: order.ascending !== false });
+    const range = body.range as [number, number] | undefined;
+    const hasRange = Array.isArray(range) && range.length === 2;
+    if (typeof body.limit === "number" && Number.isFinite(body.limit)) {
+      q = q.limit(Math.min(Math.max(1, Math.floor(body.limit)), DB_RELAY_MAX_LIMIT));
+    } else if (!body.single && !hasRange) {
+      q = q.limit(DB_RELAY_DEFAULT_LIMIT);
+    }
+    if (hasRange) {
+      const from = Math.max(0, Math.floor(Number(range[0]) || 0));
+      const toRaw = Math.floor(Number(range[1]) || from);
+      const to = Math.min(Math.max(from, toRaw), from + DB_RELAY_MAX_LIMIT - 1);
+      q = q.range(from, to);
+    }
+    const result = body.single ? await q.maybeSingle() : await q;
+    if (result.error) return jsonOk({ error: result.error.message }, 400);
+    const redact = (row: unknown) => {
+      if (settingsRealKey === DICE_LIVE_KEY) {
+        // diceServer tells the app this server version applies the dice rules.
+        const r = row && typeof row === "object" ? (row as Record<string, unknown>) : { key: DICE_LIVE_KEY };
+        const value = r.value && typeof r.value === "object" && !Array.isArray(r.value)
+          ? (r.value as Record<string, unknown>)
+          : {};
+        const shown = diceViewerEmail !== null ? diceFilterForPlayer(value, diceViewerEmail) : { ...value, diceServer: 1 };
+        return { ...r, value: shown };
+      }
+      const redacted = redactSettingsRow(settingsRealKey, row);
+      if (settingsRealKey !== "civic_help_mode_settings") return redacted;
+      return slimCivicHelpModeRow(redacted);
+    };
+    const data = Array.isArray(result.data)
+      ? result.data.map((r) => redact(r))
+      : redact(result.data);
+    return jsonOk({ ok: true, data });
+  }
+
+  // 240/min: a registrar entering several contributions within seconds used to hit 60 and the
+  // last one silently never reached the database (one phone showed $40, the rest $30).
+  const writeLimited = relayRateLimit(req, "db_write", 240,
+    `${table}${settingsRealKey ? ":" + settingsRealKey : ""} ${op}`);
+  if (writeLimited) return writeLimited;
+
+  if (op === "up" || op === "i") {
+    const rows = Array.isArray(body.rows) ? (body.rows as Record<string, unknown>[]) : [];
+    if (rows.length === 0) return jsonOk({ error: "No rows" }, 400);
+    if (rows.length > DB_RELAY_MAX_ROWS) {
+      return jsonOk({ error: `At most ${DB_RELAY_MAX_ROWS} rows per write` }, 400);
+    }
+    if (table === "ngmy_settings" && eq["key"]) {
+      for (const r of rows) r["key"] = eq["key"];
+    }
+    if (settingsRealKey === "civic_help_mode_settings") {
+      const admin = adminClient();
+      if (admin) {
+        const current = await loadSettingsObject(admin, "civic_help_mode_settings");
+        for (const r of rows) {
+          const incoming = r["value"];
+          const doc = incoming && typeof incoming === "object" && !Array.isArray(incoming)
+            ? (incoming as Record<string, unknown>)
+            : {};
+          r["value"] = mergeCivicHelpModeSave(current, doc);
+        }
+      }
+    }
+    const onConflict = body.onConflict ? String(body.onConflict) : undefined;
+    const { error } =
+      op === "up"
+        ? await client.from(table).upsert(rows, onConflict ? { onConflict } : undefined)
+        : await client.from(table).insert(rows);
+    if (error) return jsonOk({ error: error.message }, 400);
+    return jsonOk({ ok: true });
+  }
+
+  if (op === "u") {
+    if (Object.keys(eq).length === 0) return jsonOk({ error: "Refusing unscoped update" }, 400);
+    const patch = (body.patch as Record<string, unknown>) ?? {};
+    if (Object.keys(patch).length === 0) return jsonOk({ error: "No patch fields" }, 400);
+    let q = client.from(table).update(patch);
+    for (const [k, v] of Object.entries(eq)) q = q.eq(k, v as never);
+    const { error } = await q;
+    if (error) return jsonOk({ error: error.message }, 400);
+    return jsonOk({ ok: true });
+  }
+
+  if (op === "d") {
+    if (Object.keys(eq).length === 0 && !inFilter) return jsonOk({ error: "Refusing unscoped delete" }, 400);
+    let q = client.from(table).delete();
+    for (const [k, v] of Object.entries(eq)) q = q.eq(k, v as never);
+    if (inFilter) {
+      for (const [k, v] of Object.entries(inFilter)) q = q.in(k, (v as unknown[]) ?? []);
+    }
+    const { error } = await q;
+    if (error) return jsonOk({ error: error.message }, 400);
+    return jsonOk({ ok: true });
+  }
+
+  return jsonOk({ error: "Unsupported op" }, 400);
+}
+
+// ─── Civic Registry (role-filtered; service role only touches the blob) ───
+
+const CIVIC_MEMBERS_KEY = "civic_registry_members";
+const CIVIC_PINS_KEY = "civic_registry_pins";
+const CIVIC_REGISTRAR_APPS_KEY = "civic_registrar_applications";
+
+type CivicRegistrarAppsStore = {
+  applications: Record<string, unknown>[];
+  deleted: { id: string; email: string; deletedAt: string }[];
+};
+
+type CivicRole = {
+  email: string;
+  isAdmin: boolean;
+  isRegistrar: boolean;
+  registrarState: string;
+};
+
+function emailKey(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+function stateKey(state: string): string {
+  return state.trim().toLowerCase();
+}
+
+const US_STATE_PREFIX: Record<string, string> = {
+  alabama: "AL",
+  alaska: "AK",
+  arizona: "AZ",
+  arkansas: "AR",
+  california: "CA",
+  colorado: "CO",
+  connecticut: "CT",
+  delaware: "DE",
+  florida: "FL",
+  georgia: "GA",
+  hawaii: "HI",
+  idaho: "ID",
+  illinois: "IL",
+  indiana: "IN",
+  iowa: "IA",
+  kansas: "KS",
+  kentucky: "KY",
+  louisiana: "LA",
+  maine: "ME",
+  maryland: "MD",
+  massachusetts: "MA",
+  michigan: "MI",
+  minnesota: "MN",
+  mississippi: "MS",
+  missouri: "MO",
+  montana: "MT",
+  nebraska: "NE",
+  nevada: "NV",
+  "new hampshire": "NH",
+  "new jersey": "NJ",
+  "new mexico": "NM",
+  "new york": "NY",
+  "north carolina": "NC",
+  "north dakota": "ND",
+  ohio: "OH",
+  oklahoma: "OK",
+  oregon: "OR",
+  pennsylvania: "PA",
+  "rhode island": "RI",
+  "south carolina": "SC",
+  "south dakota": "SD",
+  tennessee: "TN",
+  texas: "TX",
+  utah: "UT",
+  vermont: "VT",
+  virginia: "VA",
+  washington: "WA",
+  "west virginia": "WV",
+  wisconsin: "WI",
+  wyoming: "WY",
+  "district of columbia": "DC",
+};
+
+/** Match "Georgia", "georgia", "GA", "ga" as the same state. */
+function canonicalStateKey(state: string): string {
+  const raw = stateKey(state);
+  if (!raw) return "";
+  if (US_STATE_PREFIX[raw]) return raw;
+  for (const [full, code] of Object.entries(US_STATE_PREFIX)) {
+    if (raw === code.toLowerCase()) return full;
+  }
+  return raw;
+}
+
+function displayStateName(state: string): string {
+  const canon = canonicalStateKey(state);
+  if (!canon) return state.trim();
+  return canon
+    .split(" ")
+    .map((w) => (w.isEmpty ? w : w.charAt(0).toUpperCase() + w.slice(1)))
+    .join(" ");
+}
+
+async function resolveJwtEmail(req: Request): Promise<string> {
+  const auth = req.headers.get("Authorization") ?? "";
+  const m = auth.match(/^Bearer\s+(.+)$/i);
+  const token = (m?.[1] ?? "").trim();
+  if (!token || token === Deno.env.get("SUPABASE_ANON_KEY")) return "";
+  const admin = adminClient();
+  if (!admin) return "";
+  try {
+    const { data, error } = await admin.auth.getUser(token);
+    if (error || !data?.user) return "";
+    return emailKey(String(data.user.email ?? ""));
+  } catch (_) {
+    return "";
+  }
+}
+
+/** Privileged actions must use a real session JWT — never trust body.email alone. */
+async function requireJwtEmail(req: Request): Promise<string> {
+  return await resolveJwtEmail(req);
+}
+
+const NETWORK_STRIP_KEYS = new Set([
+  "passwordHash",
+  "password_hash",
+  "governmentID",
+  "GovernmentID",
+  "dateOfBirth",
+  "homeAddress",
+  "IDExpiration",
+  "ssn",
+  "socialSecurity",
+]);
+
+function maskEmailValue(raw: string, viewer: string): string {
+  const e = emailKey(raw);
+  const v = emailKey(viewer);
+  if (!e) return "";
+  if (e === v) return raw;
+  const at = e.indexOf("@");
+  if (at <= 0) return "***";
+  return `${e.slice(0, 1)}***${e.slice(at)}`;
+}
+
+/** Every bright-handler response masks emails — including the signed-in viewer. */
+function maskEmailNetwork(raw: string): string {
+  const e = emailKey(raw);
+  if (!e) return "";
+  const at = e.indexOf("@");
+  if (at <= 0) return "***";
+  return `${e.slice(0, 1)}***${e.slice(at)}`;
+}
+
+function maskEmailFieldsNetwork(
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  const out = { ...row };
+  for (const f of [
+    "userEmail",
+    "email",
+    "fromEmail",
+    "toEmail",
+    "player1Email",
+    "player2Email",
+    "buyerEmail",
+    "sellerEmail",
+    "ownerEmail",
+    "applicantEmail",
+    "reviewedBy",
+    "revokedBy",
+    "recordedByEmail",
+  ]) {
+    if (typeof row[f] === "string") {
+      out[f] = maskEmailNetwork(String(row[f]));
+    }
+  }
+  return out;
+}
+
+function registrarAppNetworkSummary(
+  a: Record<string, unknown>,
+): Record<string, unknown> {
+  return maskEmailFieldsNetwork({
+    id: a.id,
+    status: a.status,
+    state: a.state,
+    createdAt: a.createdAt,
+    reviewedAt: a.reviewedAt,
+    revokedAt: a.revokedAt,
+    updatedAt: a.updatedAt,
+    userEmail: a.userEmail ?? a.email ?? "",
+    reviewedBy: a.reviewedBy,
+    revokedBy: a.revokedBy,
+  });
+}
+
+function registrarAppForViewer(
+  a: Record<string, unknown>,
+  viewer: string,
+): Record<string, unknown> {
+  const summary = registrarAppNetworkSummary(a);
+  const own = emailKey(String(a.userEmail ?? a.email ?? ""));
+  if (own && own === viewer) {
+    summary.userEmail = own;
+  }
+  return summary;
+}
+
+function statesMatch(a: string, b: string): boolean {
+  const ka = canonicalStateKey(a);
+  const kb = canonicalStateKey(b);
+  return !!ka && !!kb && ka === kb;
+}
+
+/** Reviewers must see who applied — masked emails made Approve grant nobody. */
+function sanitizeRegistrarAppReviewer(a: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: a.id,
+    userEmail: String(a.userEmail ?? a.email ?? ""),
+    email: String(a.userEmail ?? a.email ?? ""),
+    fullName: String(a.fullName ?? a.applicantName ?? ""),
+    applicantName: String(a.applicantName ?? a.fullName ?? ""),
+    username: String(a.username ?? ""),
+    phone: String(a.phone ?? ""),
+    state: String(a.state ?? ""),
+    status: String(a.status ?? ""),
+    reason: String(a.reason ?? ""),
+    experience: String(a.experience ?? ""),
+    createdAt: a.createdAt,
+    reviewedAt: a.reviewedAt,
+    revokedAt: a.revokedAt,
+    updatedAt: a.updatedAt,
+    reviewedBy: a.reviewedBy,
+    revokedBy: a.revokedBy,
+    revokeVotes: Array.isArray(a.revokeVotes) ? a.revokeVotes : [],
+    revokeRequestedBy: a.revokeRequestedBy,
+    revokeRequestedAt: a.revokeRequestedAt,
+  };
+}
+
+function normalizeRevokeVotes(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    const e = emailKey(String(item ?? ""));
+    if (!e || isRedactedCivicValue(e) || seen.has(e)) continue;
+    seen.add(e);
+    out.push(e);
+  }
+  return out;
+}
+
+function protectDualRevokeOnPersist(
+  current: Record<string, unknown>[],
+  incoming: Record<string, unknown>[],
+  actorIsAdmin: boolean,
+): Record<string, unknown>[] {
+  if (actorIsAdmin) return incoming;
+  return incoming.map((row) => {
+    const id = String(row.id ?? "").trim();
+    const prev = current.find((a) => String(a.id ?? "").trim() === id);
+    if (!prev) return row;
+    const wasApproved = String(prev.status ?? "").toLowerCase() === "approved";
+    const nowRevoked = String(row.status ?? "").toLowerCase() === "revoked";
+    if (!wasApproved || !nowRevoked) return row;
+    const count = countApprovedRegistrarsInState(current, String(prev.state ?? row.state ?? ""));
+    if (count < 2) return row;
+    const votes = normalizeRevokeVotes(row.revokeVotes ?? prev.revokeVotes);
+    if (votes.length >= 2) return row;
+    return {
+      ...row,
+      status: "approved",
+      revokeVotes: votes,
+      revokeRequestedBy: row.revokeRequestedBy ?? prev.revokeRequestedBy,
+      revokeRequestedAt: row.revokeRequestedAt ?? prev.revokeRequestedAt,
+      revokedAt: prev.revokedAt,
+      revokedBy: prev.revokedBy,
+    };
+  });
+}
+
+function registrarAppDecisionMs(row: Record<string, unknown>): number {
+  const raw = String(row.updatedAt ?? row.revokedAt ?? row.reviewedAt ?? row.createdAt ?? "").trim();
+  if (!raw) return 0;
+  const t = Date.parse(raw);
+  return Number.isFinite(t) ? t : 0;
+}
+
+/**
+ * Never let a stale device persist flip a newer revoke/reject back to approved,
+ * and never resurrect tombstoned application ids/emails.
+ */
+function protectRegistrarStatusRegression(
+  current: Record<string, unknown>[],
+  incoming: Record<string, unknown>[],
+  deleted: { id: string; email: string; deletedAt: string }[],
+): Record<string, unknown>[] {
+  const deletedIds = new Set(deleted.map((d) => d.id).filter(Boolean));
+  const deletedEmails = new Set(deleted.map((d) => emailKey(d.email)).filter(Boolean));
+  const out: Record<string, unknown>[] = [];
+  for (const row of incoming) {
+    const id = String(row.id ?? "").trim();
+    const em = emailKey(String(row.userEmail ?? row.email ?? ""));
+    if ((id && deletedIds.has(id)) || (em && deletedEmails.has(em))) {
+      // Allow a brand-new pending re-application after delete (new id, pending).
+      const st = String(row.status ?? "").toLowerCase();
+      if (!(st === "pending" && id && !deletedIds.has(id))) continue;
+    }
+    const prev = current.find((a) => {
+      const pid = String(a.id ?? "").trim();
+      if (id && pid === id) return true;
+      if (em && emailKey(String(a.userEmail ?? a.email ?? "")) === em) return true;
+      return false;
+    });
+    if (!prev) {
+      out.push(row);
+      continue;
+    }
+    const prevStatus = String(prev.status ?? "").toLowerCase();
+    const nextStatus = String(row.status ?? "").toLowerCase();
+    const prevMs = registrarAppDecisionMs(prev);
+    const nextMs = registrarAppDecisionMs(row);
+    // Stale approved must not overwrite a newer/equal revoke or reject.
+    if (
+      (prevStatus === "revoked" || prevStatus === "rejected") &&
+      nextStatus === "approved" &&
+      nextMs <= prevMs
+    ) {
+      out.push({ ...prev });
+      continue;
+    }
+    out.push(row);
+  }
+  return out;
+}
+
+function normalizeRegistrarDeleted(raw: unknown): { id: string; email: string; deletedAt: string }[] {
+  if (!Array.isArray(raw)) return [];
+  const out: { id: string; email: string; deletedAt: string }[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    const id = String(row.id ?? "").trim();
+    const email = emailKey(String(row.email ?? row.userEmail ?? ""));
+    const deletedAt = String(row.deletedAt ?? "").trim() || new Date().toISOString();
+    const key = id || (email ? `em:${email}` : "");
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ id, email, deletedAt });
+  }
+  return out.slice(-200);
+}
+
+function preserveApplicantIdentityOnIncoming(
+  incoming: Record<string, unknown>,
+  existing: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  const copy = { ...incoming };
+  if (!existing) return copy;
+  const incomingEmail = String(copy.userEmail ?? copy.email ?? "");
+  const existingEmail = String(existing.userEmail ?? existing.email ?? "");
+  if (isRedactedCivicValue(incomingEmail) && existingEmail && !isRedactedCivicValue(existingEmail)) {
+    copy.userEmail = existingEmail;
+    if (typeof copy.email === "string") copy.email = existingEmail;
+  }
+  for (const f of ["fullName", "applicantName", "phone", "reason", "experience", "username"]) {
+    const inc = String(copy[f] ?? "").trim();
+    const ex = String(existing[f] ?? "").trim();
+    if (isRedactedCivicValue(inc) && ex) copy[f] = existing[f];
+  }
+  return { ...existing, ...copy };
+}
+
+function overlayRegistrarAppsOnCurrent(
+  current: Record<string, unknown>[],
+  incoming: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const currentById = new Map<string, Record<string, unknown>>();
+  for (const row of current) {
+    const id = String(row.id ?? "").trim();
+    if (id) currentById.set(id, row);
+  }
+  return incoming.map((row) => {
+    const id = String(row.id ?? "").trim();
+    return preserveApplicantIdentityOnIncoming(row, id ? currentById.get(id) : undefined);
+  });
+}
+
+const MAX_AUTHORIZED_REGISTRARS_PER_STATE = 5;
+
+function registrarSlotKey(a: Record<string, unknown>): string {
+  const email = emailKey(String(a.userEmail ?? a.email ?? ""));
+  if (email && !isRedactedCivicValue(email)) return `em:${email}`;
+  const id = String(a.id ?? "").trim();
+  if (id) return `id:${id}`;
+  if (email) return `em:${email}`;
+  return "";
+}
+
+function countApprovedRegistrarsInState(
+  apps: Record<string, unknown>[],
+  state: string,
+): number {
+  const seen = new Set<string>();
+  const seenIds = new Set<string>();
+  for (const a of apps) {
+    if (String(a.status ?? "").toLowerCase() !== "approved") continue;
+    if (!statesMatch(String(a.state ?? ""), state)) continue;
+    const id = String(a.id ?? "").trim();
+    if (id && seenIds.has(id)) continue;
+    const key = registrarSlotKey(a);
+    if (!key) continue;
+    if (id) seenIds.add(id);
+    seen.add(key);
+  }
+  return seen.size;
+}
+
+function applicationWasApproved(
+  current: Record<string, unknown>[],
+  row: Record<string, unknown>,
+): boolean {
+  const id = String(row.id ?? "").trim();
+  const email = emailKey(String(row.userEmail ?? row.email ?? ""));
+  for (const a of current) {
+    const sameId = id && String(a.id ?? "").trim() === id;
+    const sameEmail = email && emailKey(String(a.userEmail ?? a.email ?? "")) === email;
+    if (!sameId && !sameEmail) continue;
+    if (String(a.status ?? "").toLowerCase() === "approved") return true;
+  }
+  return false;
+}
+
+/** Keep existing approvals; block any new approval that would go past 5. */
+function limitNewRegistrarApprovals(
+  current: Record<string, unknown>[],
+  incoming: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const approvedKeysByState = new Map<string, Set<string>>();
+  const take = (state: string, key: string, force: boolean): boolean => {
+    const st = canonicalStateKey(state);
+    if (!st || !key) return false;
+    let set = approvedKeysByState.get(st);
+    if (!set) {
+      set = new Set();
+      approvedKeysByState.set(st, set);
+    }
+    if (set.has(key)) return true;
+    if (!force && set.size >= MAX_AUTHORIZED_REGISTRARS_PER_STATE) return false;
+    set.add(key);
+    return true;
+  };
+
+  const next = incoming.map((row) => ({ ...row }));
+  for (const row of next) {
+    if (String(row.status ?? "").toLowerCase() !== "approved") continue;
+    if (!applicationWasApproved(current, row)) continue;
+    take(String(row.state ?? ""), registrarSlotKey(row), true);
+  }
+  for (const row of next) {
+    if (String(row.status ?? "").toLowerCase() !== "approved") continue;
+    if (applicationWasApproved(current, row)) continue;
+    const key = registrarSlotKey(row);
+    if (!take(String(row.state ?? ""), key, false)) {
+      const id = String(row.id ?? "").trim();
+      const prev = current.find((a) => String(a.id ?? "").trim() === id);
+      row.status = String(prev?.status ?? "pending");
+    }
+  }
+  return next;
+}
+
+function loanAppNetworkSummary(
+  a: Record<string, unknown>,
+): Record<string, unknown> {
+  return maskEmailFieldsNetwork({
+    id: a.id,
+    status: a.status,
+    amount: a.amount,
+    dueDate: a.dueDate,
+    createdAt: a.createdAt,
+    reviewedAt: a.reviewedAt,
+    userEmail: a.userEmail ?? "",
+    reviewedBy: a.reviewedBy,
+  });
+}
+
+function jobAppNetworkSummary(
+  a: Record<string, unknown>,
+): Record<string, unknown> {
+  return maskEmailFieldsNetwork({
+    id: a.id,
+    status: a.status,
+    state: a.state,
+    createdAt: a.createdAt,
+    reviewedAt: a.reviewedAt,
+    userEmail: a.userEmail ?? "",
+    reviewedBy: a.reviewedBy,
+  });
+}
+
+function userRowNetworkSummary(
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  return maskEmailFieldsNetwork({
+    email: row.email ?? "",
+    username: "***",
+    status: row.status,
+    isAdmin: row.isAdmin,
+    isAuthorizedRegistrar: row.isAuthorizedRegistrar,
+    isApprovedWorker: row.isApprovedWorker,
+    isApprovedHelper: row.isApprovedHelper,
+    isEnrolledInRegistry: row.isEnrolledInRegistry,
+    forceLogout: row.forceLogout,
+    canSellOnStore: row.canSellOnStore,
+    profilePicturePath: row.profilePicturePath,
+  });
+}
+
+function managementNetworkPayload(
+  mgmt: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (Array.isArray(mgmt.loanApplications)) {
+    out.loanApplications = asMemberList(mgmt.loanApplications).map(loanAppNetworkSummary);
+  }
+  if (Array.isArray(mgmt.jobWorkerApplications)) {
+    out.jobWorkerApplications = asMemberList(mgmt.jobWorkerApplications).map(jobAppNetworkSummary);
+  }
+  if (Array.isArray(mgmt.jobPosts)) {
+    out.jobPosts = asMemberList(mgmt.jobPosts).map((r) => maskEmailFieldsNetwork(r));
+  }
+  for (const f of ["helpHelperApplications", "helpRequests", "helpBusinesses"] as const) {
+    if (Array.isArray(mgmt[f])) {
+      out[f] = asMemberList(mgmt[f]).map((r) => maskEmailFieldsNetwork(r));
+    }
+  }
+  return out;
+}
+
+function redactEmailFields(
+  row: Record<string, unknown>,
+  viewer: string,
+): Record<string, unknown> {
+  const ownerEmail = emailKey(
+    String(row.userEmail ?? row.email ?? row.applicantEmail ?? ""),
+  );
+  const isOther = ownerEmail !== "" && ownerEmail !== emailKey(viewer);
+  const out = { ...row };
+  for (const k of NETWORK_STRIP_KEYS) delete out[k];
+  const emailFields = [
+    "userEmail",
+    "email",
+    "fromEmail",
+    "toEmail",
+    "player1Email",
+    "player2Email",
+    "buyerEmail",
+    "sellerEmail",
+    "ownerEmail",
+    "applicantEmail",
+    "reviewedBy",
+    "recordedByEmail",
+  ];
+  for (const f of emailFields) {
+    if (typeof row[f] === "string") {
+      out[f] = maskEmailValue(String(row[f]), viewer);
+    }
+  }
+  if (isOther) {
+    for (const f of [
+      "phone",
+      "accountBalance",
+      "totalProfit",
+      "points",
+      "referralCount",
+    ]) {
+      if (out[f] != null) out[f] = "***";
+    }
+    for (const f of [
+      "state",
+      "city",
+      "fullName",
+      "username",
+      "applicantName",
+      "experience",
+      "skills",
+      "availability",
+      "bio",
+      "notes",
+      "reason",
+    ]) {
+      if (typeof out[f] === "string" && String(out[f]).trim()) out[f] = "***";
+    }
+    if (typeof out.fullLegalName === "string") {
+      const parts = String(out.fullLegalName).trim().split(/\s+/);
+      out.fullLegalName = parts.length > 0 ? `${parts[0]} ***` : "***";
+    }
+  }
+  return out;
+}
+
+function redactTransaction(
+  row: Record<string, unknown>,
+  _viewer: string,
+): Record<string, unknown> {
+  return {
+    id: row.id,
+    status: row.status,
+    type: row.type,
+    amount: row.amount,
+    timestamp: row.timestamp,
+  };
+}
+
+/** Fetch handlers return no PII — only ack + counts; app uses local cache for display. */
+function networkFetchOk(extras: Record<string, unknown> = {}): Response {
+  return jsonOk({ ok: true, networkEmpty: true, ...extras });
+}
+
+function redactEmailKeyedMap(
+  map: unknown,
+  _viewer: string,
+): Record<string, unknown> {
+  if (!map || typeof map !== "object" || Array.isArray(map)) return {};
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(map as Record<string, unknown>)) {
+    out[maskEmailNetwork(k)] = v;
+  }
+  return out;
+}
+
+function redactList(
+  list: Record<string, unknown>[],
+  viewer: string,
+): Record<string, unknown>[] {
+  return list.map((r) => redactEmailFields(r, viewer));
+}
+
+function redactManagement(
+  mgmt: Record<string, unknown>,
+  viewer: string,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...mgmt };
+  for (const f of [
+    "loanApplications",
+    "jobWorkerApplications",
+    "jobPosts",
+    "helpHelperApplications",
+    "helpRequests",
+    "helpBusinesses",
+  ]) {
+    if (Array.isArray(out[f])) {
+      out[f] = redactList(asMemberList(out[f]), viewer);
+    }
+  }
+  delete out.adminDeletedUserEmails;
+  delete out.adminUserAccountStatusByEmail;
+  delete out.adminUserCrownBadgeByEmail;
+  return out;
+}
+
+async function loadCivicPayload(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+): Promise<Record<string, unknown>> {
+  const { data } = await admin
+    .from("ngmy_settings")
+    .select("value")
+    .eq("key", CIVIC_MEMBERS_KEY)
+    .maybeSingle();
+  const value = data?.value;
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return { members: [], removed: [], deceased: [] };
+}
+
+async function saveCivicPayload(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  payload: Record<string, unknown>,
+): Promise<{ ok: boolean; error?: string }> {
+  const current = await loadCivicPayload(admin);
+  // Every writer loads the roster, changes it, then saves the whole list.
+  // When two saves overlap (an enroll and a phone's full sync), the later
+  // one used to write a list that never had the other's new member, and
+  // that member silently vanished. Keep anyone in the latest saved roster
+  // that this save does not know about, unless this save deleted them.
+  if (Array.isArray(payload.members)) {
+    const next = asMemberList(payload.members);
+    const known = new Set<string>();
+    for (const m of next) for (const k of identityKeys(m)) known.add(k);
+    const lost = asMemberList(current.members).filter((m) => {
+      const keys = identityKeys(m);
+      return keys.length > 0 && !keys.some((k) => known.has(k));
+    });
+    if (lost.length > 0) {
+      const removed = asMemberList(payload.removed ?? current.removed);
+      const deceased = asMemberList(payload.deceased ?? current.deceased);
+      const keep = filterTombstonedMembers(lost, removed, deceased).filter((m) => !isGhostMemberRow(m));
+      if (keep.length > 0) payload = { ...payload, members: [...next, ...keep] };
+    }
+  }
+  const row = {
+    key: CIVIC_MEMBERS_KEY,
+    value: { ...current, ...payload, savedAt: new Date().toISOString() },
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await admin.from("ngmy_settings").upsert(row, { onConflict: "key" });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+function asMemberList(raw: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((e) => e && typeof e === "object" && !Array.isArray(e))
+    .map((e) => ({ ...(e as Record<string, unknown>) }));
+}
+
+function isRedactedCivicValue(v: unknown): boolean {
+  const s = String(v ?? "").trim();
+  if (!s) return true;
+  if (s === "***") return true;
+  if (s.includes("***")) return true;
+  return false;
+}
+
+function memberRowKey(m: Record<string, unknown>): string {
+  const id = String(m.registryId ?? "").trim().toUpperCase();
+  if (id) return `id:${id}`;
+  const em = emailKey(String(m.email ?? ""));
+  if (em && !isRedactedCivicValue(em)) return `em:${em}`;
+  return "";
+}
+
+function memberDetailScore(m: Record<string, unknown>): number {
+  let s = 0;
+  if (!isRedactedCivicValue(m.phone)) s += 2;
+  if (!isRedactedCivicValue(m.homeAddress)) s += 2;
+  if (!isRedactedCivicValue(m.dob)) s += 2;
+  if (!isRedactedCivicValue(m.fullName)) s += 1;
+  if (!isRedactedCivicValue(m.state)) s += 3;
+  if (!isRedactedCivicValue(m.email)) s += 2;
+  return s;
+}
+
+function preferMemberRow(
+  a: Record<string, unknown>,
+  b: Record<string, unknown>,
+): Record<string, unknown> {
+  const ta = Date.parse(String(a.updatedAt ?? a.enrolledAt ?? "")) || 0;
+  const tb = Date.parse(String(b.updatedAt ?? b.enrolledAt ?? "")) || 0;
+  let preferred = ta !== tb
+    ? (tb > ta ? b : a)
+    : (memberDetailScore(b) > memberDetailScore(a) ? b : a);
+  const other = preferred === a ? b : a;
+  preferred = { ...preferred };
+  for (const key of [
+    "registryId",
+    "state",
+    "email",
+    "phone",
+    "homeAddress",
+    "fullName",
+    "dob",
+    "city",
+    "room",
+  ]) {
+    if (isRedactedCivicValue(preferred[key]) && !isRedactedCivicValue(other[key])) {
+      preferred[key] = other[key];
+    }
+  }
+  // helps/missed follow activityAt, their own mutation stamp. A row can be
+  // newer overall (contact edit, dedupe pass) while carrying a stale help
+  // count, and taking it wholesale is what made "remove help" come back.
+  const aa = Date.parse(String(a.activityAt ?? "")) || 0;
+  const ba = Date.parse(String(b.activityAt ?? "")) || 0;
+  if (aa || ba) {
+    const counters = ba > aa ? b : a;
+    preferred.helps = counters.helps ?? 0;
+    preferred.missed = counters.missed ?? 0;
+    if (counters.activityAt) preferred.activityAt = counters.activityAt;
+  }
+  const accessA = Date.parse(String(a.accessControlAt ?? "")) || 0;
+  const accessB = Date.parse(String(b.accessControlAt ?? "")) || 0;
+  if (accessA || accessB) {
+    const access = accessB > accessA ? b : a;
+    preferred.accessControlAt = access.accessControlAt;
+    preferred.accessSessionEpoch = access.accessSessionEpoch;
+    preferred.accessLockedUntil = access.accessLockedUntil;
+    preferred.accessLockedBy = access.accessLockedBy;
+    preferred.accessLockHours = access.accessLockHours;
+    preferred.accessLockLiftedAt = access.accessLockLiftedAt;
+  }
+  return preferred;
+}
+
+/** Union roster rows — never drop cloud-only members when a device pushes stale local data. */
+function mergeMemberLists(
+  base: Record<string, unknown>[],
+  incoming: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const byKey = new Map<string, Record<string, unknown>>();
+  for (const m of base) {
+    const k = memberRowKey(m);
+    if (k) byKey.set(k, m);
+  }
+  for (const m of incoming) {
+    const k = memberRowKey(m);
+    if (!k) continue;
+    const prev = byKey.get(k);
+    byKey.set(k, prev ? preferMemberRow(prev, m) : m);
+  }
+  return [...byKey.values()];
+}
+
+/** Email, registry id, and digit key so a ranking row without an email still matches a delete. */
+function identityKeys(row: Record<string, unknown>): string[] {
+  const keys: string[] = [];
+  const add = (k: string) => {
+    if (k && keys.indexOf(k) < 0) keys.push(k);
+  };
+  const visit = (src: Record<string, unknown>) => {
+    const em = emailKey(String(src.email ?? ""));
+    if (em && !isRedactedCivicValue(em)) add(`em:${em}`);
+    const linked = emailKey(String(src.linkedAppEmail ?? ""));
+    if (linked && !isRedactedCivicValue(linked)) add(`em:${linked}`);
+    for (const field of ["registryId", "previousRegistryId"]) {
+      const rid = String(src[field] ?? "").trim();
+      if (!rid) continue;
+      add(`id:${rid.toUpperCase()}`);
+      const person = rankingPersonKey({ registryId: rid, email: em });
+      if (person) add(`rk:${person}`);
+    }
+  };
+  visit(row);
+  const snap = row.snapshot;
+  if (snap && typeof snap === "object" && !Array.isArray(snap)) {
+    visit(snap as Record<string, unknown>);
+  }
+  return keys;
+}
+
+/** Keep live roster rows that are not superseded by delete/deceased tombstones. */
+function filterTombstonedMembers(
+  members: Record<string, unknown>[],
+  removed: Record<string, unknown>[],
+  deceased: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const removedAtByKey = new Map<string, number>();
+  for (const r of removed) {
+    const at = Date.parse(String(r.removedAt ?? "")) || 0;
+    for (const key of identityKeys(r)) {
+      const prev = removedAtByKey.get(key) ?? 0;
+      if (at >= prev) removedAtByKey.set(key, at);
+    }
+  }
+
+  const deceasedKeys = new Set<string>();
+  for (const d of deceased) {
+    for (const key of identityKeys(d)) deceasedKeys.add(key);
+  }
+
+  return members.filter((m) => {
+    const keys = identityKeys(m);
+    if (keys.length === 0) return true;
+    if (keys.some((k) => deceasedKeys.has(k))) return false;
+
+    let removedAt = 0;
+    let hit = false;
+    for (const key of keys) {
+      const at = removedAtByKey.get(key);
+      if (at == null) continue;
+      hit = true;
+      if (at > removedAt) removedAt = at;
+    }
+    if (!hit) return true;
+
+    const restoredAt = Date.parse(String(m.restoredAt ?? "")) || 0;
+
+    // Only an explicit restore / re-enroll brings a deleted member back.
+    // updatedAt must not count: every roster merge refreshes it, which let
+    // deleted members and duplicates reappear on the next sync.
+    return restoredAt > 0 && restoredAt >= removedAt;
+  });
+}
+
+/// Auto-created roster ghosts: no registry id, or no name and nothing else to
+/// identify a person. These are what surfaced in the app as "Member" rows.
+function isGhostMemberRow(m: Record<string, unknown>): boolean {
+  if (!String(m.registryId ?? "").trim()) return true;
+  if (!isRedactedCivicValue(m.fullName)) return false;
+  return isRedactedCivicValue(m.username) &&
+    isRedactedCivicValue(m.phone) &&
+    isRedactedCivicValue(m.homeAddress) &&
+    isRedactedCivicValue(m.dob);
+}
+
+function isKnownUsState(state: string): boolean {
+  const raw = stateKey(state);
+  if (!raw) return false;
+  if (Object.prototype.hasOwnProperty.call(US_STATE_PREFIX, raw)) return true;
+  return Object.values(US_STATE_PREFIX).some((code) => code.toLowerCase() === raw);
+}
+
+function familySizeOf(m: Record<string, unknown>): number {
+  const n = Number(m.familyMembers ?? 1);
+  return Number.isFinite(n) && n >= 1 ? Math.trunc(n) : 1;
+}
+
+function nationwidePersonKey(m: Record<string, unknown>): string {
+  const rid = String(m.registryId ?? "").trim().toUpperCase();
+  if (rid) return `id:${rid}`;
+  const em = emailKey(String(m.email ?? ""));
+  if (em && !isRedactedCivicValue(em)) return `em:${em}`;
+  return "";
+}
+
+/** Enrolled Civic Registry members in US states — Members list nationwide. */
+function countableRegisteredMembers(
+  members: Record<string, unknown>[],
+  removed: Record<string, unknown>[],
+  deceased: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const live = filterTombstonedMembers(members, removed, deceased);
+  const seen = new Set<string>();
+  const out: Record<string, unknown>[] = [];
+  for (const m of live) {
+    const rid = String(m.registryId ?? "").trim();
+    if (!rid) continue;
+    if (isGhostMemberRow(m)) continue;
+    if (!isKnownUsState(String(m.state ?? ""))) continue;
+    const name = String(m.fullName ?? m.username ?? "").trim();
+    if (isRedactedCivicValue(name) || name.toLowerCase() === "member") continue;
+    const key = nationwidePersonKey(m);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(m);
+  }
+  return out;
+}
+
+function sanitizeDirectoryMember(m: Record<string, unknown>): Record<string, unknown> {
+  const nicknames = Array.isArray(m.nicknames) ? m.nicknames : [];
+  return {
+    email: maskEmailNetwork(String(m.email ?? "")),
+    username: String(m.username ?? ""),
+    fullName: String(m.fullName ?? ""),
+    city: String(m.city ?? ""),
+    room: String(m.room ?? ""),
+    state: String(m.state ?? ""),
+    registryId: String(m.registryId ?? ""),
+    familyMembers: m.familyMembers ?? 1,
+    familyMales: m.familyMales,
+    familyFemales: m.familyFemales,
+    nicknames,
+    showNicknames: m.showNicknames === true,
+    helps: m.helps ?? 0,
+    missed: m.missed ?? 0,
+    // Ships with the counters it belongs to. Dropping it here would leave the
+    // receiving device unable to tell a fresh count from a stale one, and its
+    // merge would fall back to keeping whichever number is larger.
+    activityAt: m.activityAt,
+    firstHelpAt: m.firstHelpAt,
+    contributionCount: m.contributionCount,
+    enrolledAt: m.enrolledAt,
+    updatedAt: m.updatedAt,
+    enrollmentSource: m.enrollmentSource,
+    accessControlAt: m.accessControlAt,
+    accessSessionEpoch: m.accessSessionEpoch,
+    accessLockedUntil: m.accessLockedUntil,
+    accessLockHours: m.accessLockHours,
+    accessLockLiftedAt: m.accessLockLiftedAt,
+    // Public directory only — no address/phone/dob/idPhoto/idType
+  };
+}
+
+function sanitizeDirectoryDeceased(row: Record<string, unknown>): Record<string, unknown> {
+  const snap = row.snapshot && typeof row.snapshot === "object"
+    ? sanitizeDirectoryMember(row.snapshot as Record<string, unknown>)
+    : {};
+  return {
+    email: maskEmailNetwork(String(row.email ?? snap.email ?? "")),
+    registryId: String(row.registryId ?? snap.registryId ?? ""),
+    deceasedAt: row.deceasedAt,
+    state: String(row.state ?? snap.state ?? ""),
+    snapshot: snap,
+  };
+}
+
+function filterMembersByState(
+  members: Record<string, unknown>[],
+  state: string,
+): Record<string, unknown>[] {
+  const sk = canonicalStateKey(state);
+  if (!sk) return [];
+  return members.filter((m) => canonicalStateKey(String(m.state ?? "")) === sk);
+}
+
+async function resolveCivicRole(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  email: string,
+): Promise<CivicRole> {
+  const key = emailKey(email);
+  const role: CivicRole = {
+    email: key,
+    isAdmin: isNgmyAdminEmail(key),
+    isRegistrar: false,
+    registrarState: "",
+  };
+  if (!key) return role;
+
+  try {
+    const { data: userRow } = await admin
+      .from("users")
+      .select(
+        "email,isAdmin,isCivicRegistryAdmin,isCivicRegistryKing,isAuthorizedRegistrar,state",
+      )
+      .eq("email", key)
+      .maybeSingle();
+    if (userRow) {
+      if (
+        userRow.isAdmin === true ||
+        userRow.isCivicRegistryAdmin === true ||
+        userRow.isCivicRegistryKing === true
+      ) {
+        role.isAdmin = true;
+      }
+    }
+  } catch (_) {
+    // columns may vary — try a narrower select
+    try {
+      const { data: userRow } = await admin
+        .from("users")
+        .select("email,isAdmin,state")
+        .eq("email", key)
+        .maybeSingle();
+      if (userRow?.isAdmin === true) role.isAdmin = true;
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  try {
+    const store = await loadRegistrarApplicationsStore(admin);
+    let bestApproved: Record<string, unknown> | null = null;
+    let terminalDenied = false;
+    for (const a of store.applications) {
+      if (emailKey(String(a.userEmail ?? a.email ?? "")) !== key) continue;
+      const st = String(a.status ?? "").toLowerCase();
+      if (st === "revoked" || st === "rejected") {
+        terminalDenied = true;
+        continue;
+      }
+      if (st === "approved") bestApproved = a;
+    }
+    if (bestApproved) {
+      role.isRegistrar = true;
+      const st = String(bestApproved.state ?? "").trim();
+      if (st) role.registrarState = displayStateName(st);
+    } else if (terminalDenied) {
+      role.isRegistrar = false;
+      // Keep the users table in sync so phones stop treating them as registrar.
+      await applyRegistrarFlagToUser(admin, key, false);
+    } else {
+      // No application row: trust user flag only when not tombstoned.
+      const tombstoned = store.deleted.some((d) => emailKey(d.email) === key);
+      if (!tombstoned) {
+        try {
+          const { data: userRow } = await admin
+            .from("users")
+            .select("isAuthorizedRegistrar,state")
+            .eq("email", key)
+            .maybeSingle();
+          if (userRow?.isAuthorizedRegistrar === true) {
+            role.isRegistrar = true;
+            const st = String(userRow.state ?? "").trim();
+            if (st) role.registrarState = displayStateName(st);
+          }
+        } catch (_) {
+          // ignore
+        }
+      } else {
+        await applyRegistrarFlagToUser(admin, key, false);
+      }
+    }
+  } catch (_) {
+    // ignore
+  }
+
+  return role;
+}
+
+async function loadRegistrarApplicationsStore(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+): Promise<CivicRegistrarAppsStore> {
+  try {
+    const { data: settingsRow } = await admin
+      .from("ngmy_settings")
+      .select("value")
+      .eq("key", CIVIC_REGISTRAR_APPS_KEY)
+      .maybeSingle();
+    const value = settingsRow?.value;
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      const raw = (value as Record<string, unknown>).applications;
+      const deleted = normalizeRegistrarDeleted((value as Record<string, unknown>).deleted);
+      if (Array.isArray(raw)) {
+        return {
+          applications: raw
+            .filter((e) => e && typeof e === "object" && !Array.isArray(e))
+            .map((e) => ({ ...(e as Record<string, unknown>) })),
+          deleted,
+        };
+      }
+      return { applications: [], deleted };
+    }
+  } catch (_) {
+    // fall through
+  }
+  try {
+    const { data: cfg } = await admin
+      .from("config")
+      .select("civicRegistrarApplications")
+      .eq("id", "1")
+      .maybeSingle();
+    const apps = cfg?.civicRegistrarApplications;
+    if (Array.isArray(apps)) {
+      return {
+        applications: apps
+          .filter((e) => e && typeof e === "object" && !Array.isArray(e))
+          .map((e) => ({ ...(e as Record<string, unknown>) })),
+        deleted: [],
+      };
+    }
+  } catch (_) {
+    // ignore
+  }
+  return { applications: [], deleted: [] };
+}
+
+async function loadRegistrarApplications(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+): Promise<Record<string, unknown>[]> {
+  const store = await loadRegistrarApplicationsStore(admin);
+  return store.applications;
+}
+
+async function saveRegistrarApplications(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  applications: Record<string, unknown>[],
+  deleted: { id: string; email: string; deletedAt: string }[] = [],
+): Promise<{ ok: boolean; error?: string }> {
+  const prev = await loadRegistrarApplicationsStore(admin);
+  const mergedDeleted = normalizeRegistrarDeleted([...prev.deleted, ...deleted]);
+  // Drop tombstones for emails that now have a live pending/approved row (re-apply).
+  const liveEmails = new Set(
+    applications
+      .map((a) => emailKey(String(a.userEmail ?? a.email ?? "")))
+      .filter(Boolean),
+  );
+  const liveIds = new Set(applications.map((a) => String(a.id ?? "").trim()).filter(Boolean));
+  const keptDeleted = mergedDeleted.filter((d) => {
+    if (d.id && liveIds.has(d.id)) return false;
+    if (d.email && liveEmails.has(d.email)) return false;
+    return true;
+  });
+  const { error } = await admin.from("ngmy_settings").upsert(
+    {
+      key: CIVIC_REGISTRAR_APPS_KEY,
+      value: {
+        applications,
+        deleted: keptDeleted,
+        savedAt: new Date().toISOString(),
+      },
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "key" },
+  );
+  if (error) return { ok: false, error: error.message };
+  // Keep public config empty — devices must use edge fetch, not config union.
+  await admin.from("config").upsert({
+    id: "1",
+    civicRegistrarApplications: [],
+  });
+  return { ok: true };
+}
+
+function sanitizeRegistrarAppPublic(a: Record<string, unknown>): Record<string, unknown> {
+  return {
+    state: String(a.state ?? ""),
+    status: String(a.status ?? ""),
+  };
+}
+
+function sanitizeRegistrarAppOwn(a: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: a.id,
+    userEmail: String(a.userEmail ?? ""),
+    fullName: String(a.fullName ?? a.applicantName ?? ""),
+    state: String(a.state ?? ""),
+    status: String(a.status ?? ""),
+    createdAt: a.createdAt,
+    reviewedAt: a.reviewedAt,
+    revokedAt: a.revokedAt,
+    updatedAt: a.updatedAt,
+    // no phone / address of other people — own row only
+    phone: String(a.phone ?? ""),
+  };
+}
+
+async function handleCivicFetchRegistrarApplications(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  const apps = await loadRegistrarApplications(admin);
+
+  const approvedStates = [
+    ...new Set(
+      apps
+        .filter((a) => String(a.status ?? "").toLowerCase() === "approved")
+        .map((a) => String(a.state ?? "").trim())
+        .filter(Boolean),
+    ),
+  ];
+
+  const mine = apps.filter((a) => emailKey(String(a.userEmail ?? a.email ?? "")) === email);
+  const payloadBase = {
+    ok: true,
+    isRegistrar: role.isRegistrar || role.isAdmin,
+    isAdmin: role.isAdmin,
+    registrarState: role.registrarState || "",
+    myApplications: mine.map(sanitizeRegistrarAppOwn),
+    approvedStates,
+  };
+
+  if (role.isAdmin) {
+    return jsonOk({
+      ...payloadBase,
+      view: "admin",
+      applications: apps.map((a) => sanitizeRegistrarAppReviewer(a)),
+    });
+  }
+
+  if (role.isRegistrar) {
+    return jsonOk({
+      ...payloadBase,
+      view: "registrar",
+      applications: apps.map((a) => sanitizeRegistrarAppReviewer(a)),
+    });
+  }
+
+  return jsonOk({
+    ...payloadBase,
+    view: "member",
+    applications: mine.map(sanitizeRegistrarAppOwn),
+  });
+}
+
+const REGISTRAR_DECISION_FIELDS = [
+  "reviewedAt",
+  "reviewedBy",
+  "revokedAt",
+  "revokedBy",
+  "revokeVotes",
+  "revokeRequestedBy",
+  "revokeRequestedAt",
+  "rejectionReason",
+];
+
+/** A member's own row: pending when new, otherwise the status the server already holds. */
+function memberOwnedRegistrarRow(
+  incoming: Record<string, unknown>,
+  current: Record<string, unknown>[],
+): Record<string, unknown> {
+  const id = String(incoming.id ?? "").trim();
+  const prev = id ? current.find((a) => String(a.id ?? "").trim() === id) : undefined;
+  const row: Record<string, unknown> = { ...incoming };
+  for (const f of REGISTRAR_DECISION_FIELDS) delete row[f];
+  if (prev) {
+    for (const f of REGISTRAR_DECISION_FIELDS) {
+      if (prev[f] !== undefined) row[f] = prev[f];
+    }
+    row.status = String(prev.status ?? "pending");
+    if (prev.updatedAt !== undefined) row.updatedAt = prev.updatedAt;
+    return row;
+  }
+  row.status = "pending";
+  delete row.updatedAt;
+  return row;
+}
+
+/** What the server holds for this account, for a 403 that names the fix. */
+async function registrarRefusalDetail(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  email: string,
+): Promise<string> {
+  try {
+    const store = await loadRegistrarApplicationsStore(admin);
+    const mine = store.applications.filter((a) =>
+      emailKey(String(a.userEmail ?? a.email ?? "")) === email
+    );
+    if (mine.length === 0) {
+      const tombstoned = store.deleted.some((d) => emailKey(d.email) === email);
+      return tombstoned
+        ? "its registrar application was deleted on the server; a new request must be approved"
+        : "no registrar application exists for it on the server";
+    }
+    let best = mine[0];
+    for (const a of mine) {
+      if (registrarAppDecisionMs(a) >= registrarAppDecisionMs(best)) best = a;
+    }
+    const st = String(best.status ?? "pending").toLowerCase();
+    const state = displayStateName(String(best.state ?? "")) || "its state";
+    if (st === "pending") return `its ${state} registrar request is still pending approval`;
+    if (st === "revoked" || st === "rejected") return `its ${state} registrar access is ${st}`;
+    return `its ${state} registrar application is ${st}`;
+  } catch (_) {
+    return "no approved registrar application was found for it";
+  }
+}
+
+async function handleCivicPersistRegistrarApplications(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  const incoming = asMemberList(body.applications); // reuse list helper
+  const store = await loadRegistrarApplicationsStore(admin);
+  const current = store.applications;
+  const extraDeleted: { id: string; email: string; deletedAt: string }[] = [];
+  const now = new Date().toISOString();
+
+  let next = current;
+  if (role.isAdmin) {
+    // Incoming list is source of truth for which rows exist, but never
+    // let a masked reviewer copy overwrite the applicant's real email.
+    if (Array.isArray(body.applications)) {
+      const incomingIds = new Set(
+        incoming.map((a) => String(a.id ?? "").trim()).filter(Boolean),
+      );
+      for (const row of current) {
+        const id = String(row.id ?? "").trim();
+        if (!id || incomingIds.has(id)) continue;
+        extraDeleted.push({
+          id,
+          email: emailKey(String(row.userEmail ?? row.email ?? "")),
+          deletedAt: now,
+        });
+      }
+      next = overlayRegistrarAppsOnCurrent(current, incoming);
+    }
+  } else if (role.isRegistrar && role.registrarState) {
+    // Merge: keep other states unchanged; replace home-state rows from incoming home-state
+    const home = canonicalStateKey(role.registrarState);
+    const kept = current.filter((a) => canonicalStateKey(String(a.state ?? "")) !== home);
+    const currentHome = current.filter((a) => canonicalStateKey(String(a.state ?? "")) === home);
+    const homeIncoming = incoming.filter((a) => canonicalStateKey(String(a.state ?? "")) === home);
+    const homeIncomingIds = new Set(
+      homeIncoming.map((a) => String(a.id ?? "").trim()).filter(Boolean),
+    );
+    for (const row of currentHome) {
+      const id = String(row.id ?? "").trim();
+      if (!id || homeIncomingIds.has(id)) continue;
+      extraDeleted.push({
+        id,
+        email: emailKey(String(row.userEmail ?? row.email ?? "")),
+        deletedAt: now,
+      });
+    }
+    next = [...kept, ...overlayRegistrarAppsOnCurrent(currentHome, homeIncoming)];
+  } else {
+    // Member may only upsert their own pending application row(s). The
+    // status is never theirs to set: a phone that still holds an old
+    // "approved" copy must not be able to re-approve itself, and a row the
+    // server already decided keeps that decision.
+    const mineIncoming = incoming
+      .filter((a) => emailKey(String(a.userEmail ?? "")) === email)
+      .map((a) => memberOwnedRegistrarRow(a, current));
+    if (mineIncoming.length === 0) {
+      return jsonOk({ error: "Forbidden" }, 403);
+    }
+    const others = current.filter((a) => emailKey(String(a.userEmail ?? "")) !== email);
+    next = [...others, ...mineIncoming];
+  }
+
+  next = limitNewRegistrarApprovals(current, next);
+  next = protectDualRevokeOnPersist(current, next, role.isAdmin);
+  next = protectRegistrarStatusRegression(current, next, [
+    ...store.deleted,
+    ...extraDeleted,
+  ]);
+
+  const saved = await saveRegistrarApplications(admin, next, extraDeleted);
+  if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+  return jsonOk({ ok: true, count: next.length });
+}
+
+async function handleCivicDeleteRegistrarApplication(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  if (!role.isAdmin && !role.isRegistrar) {
+    return jsonOk({ error: "Forbidden" }, 403);
+  }
+
+  const targetEmail = emailKey(String(body.userEmail ?? body.email ?? ""));
+  const targetId = String(body.id ?? "").trim();
+  if (!targetEmail && !targetId) {
+    return jsonOk({ error: "userEmail or id required" }, 400);
+  }
+
+  const store = await loadRegistrarApplicationsStore(admin);
+  const removing = store.applications.filter((a) => {
+    const id = String(a.id ?? "").trim();
+    const em = emailKey(String(a.userEmail ?? a.email ?? ""));
+    if (targetId && id === targetId) return true;
+    if (targetEmail && em === targetEmail) return true;
+    return false;
+  });
+  if (removing.length === 0) {
+    return jsonOk({ ok: true, deleted: 0 });
+  }
+
+  if (!role.isAdmin) {
+    for (const row of removing) {
+      if (!statesMatch(role.registrarState, String(row.state ?? ""))) {
+        return jsonOk({ error: "Forbidden" }, 403);
+      }
+    }
+  }
+
+  const now = new Date().toISOString();
+  const deleted = removing.map((row) => ({
+    id: String(row.id ?? "").trim(),
+    email: emailKey(String(row.userEmail ?? row.email ?? "")),
+    deletedAt: now,
+  }));
+  const removeIds = new Set(deleted.map((d) => d.id).filter(Boolean));
+  const removeEmails = new Set(deleted.map((d) => d.email).filter(Boolean));
+  const next = store.applications.filter((a) => {
+    const id = String(a.id ?? "").trim();
+    const em = emailKey(String(a.userEmail ?? a.email ?? ""));
+    if (id && removeIds.has(id)) return false;
+    if (em && removeEmails.has(em)) return false;
+    return true;
+  });
+
+  const saved = await saveRegistrarApplications(admin, next, deleted);
+  if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+
+  for (const em of removeEmails) {
+    await applyRegistrarFlagToUser(admin, em, false);
+  }
+
+  return jsonOk({ ok: true, deleted: removing.length });
+}
+
+async function applyRegistrarFlagToUser(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  applicantEmail: string,
+  approved: boolean,
+  state = "",
+): Promise<void> {
+  const key = emailKey(applicantEmail);
+  if (!key || isRedactedCivicValue(key)) return;
+  const patch: Record<string, unknown> = { isAuthorizedRegistrar: approved };
+  if (approved && state.trim()) patch.state = state.trim();
+  try {
+    await admin.from("users").update(patch).eq("email", key);
+  } catch (_) {
+    // user row may not exist yet — application status is the source of truth
+  }
+}
+
+async function handleCivicDecideRegistrarApplication(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  if (!role.isAdmin && !role.isRegistrar) {
+    return jsonOk({ error: "Forbidden" }, 403);
+  }
+
+  const id = String(body.id ?? "").trim();
+  const status = String(body.status ?? "").toLowerCase().trim();
+  if (!id) return jsonOk({ error: "Application id required" }, 400);
+  if (!["approved", "rejected", "revoked", "cancelrevoke"].includes(status)) {
+    return jsonOk({ error: "Invalid status" }, 400);
+  }
+
+  const apps = await loadRegistrarApplications(admin);
+  const idx = apps.findIndex((a) => String(a.id ?? "").trim() === id);
+  if (idx < 0) return jsonOk({ error: "Application not found" }, 404);
+
+  const row = { ...apps[idx] };
+  const appState = String(row.state ?? "");
+  if (!role.isAdmin) {
+    if (!statesMatch(role.registrarState, appState)) {
+      return jsonOk({ error: "Forbidden" }, 403);
+    }
+  }
+
+  const applicantEmail = emailKey(String(row.userEmail ?? row.email ?? ""));
+  const now = new Date().toISOString();
+  let canSoloRevoke = role.isAdmin && isNgmyAdminEmail(email);
+  try {
+    const { data: actorRow } = await admin
+      .from("users")
+      .select("isAdmin,isCivicRegistryAdmin")
+      .eq("email", email)
+      .maybeSingle();
+    if (actorRow?.isAdmin === true || actorRow?.isCivicRegistryAdmin === true || isNgmyAdminEmail(email)) {
+      canSoloRevoke = true;
+    }
+  } catch (_) {
+    if (isNgmyAdminEmail(email)) canSoloRevoke = true;
+  }
+
+  if (status === "cancelrevoke") {
+    if (String(row.status ?? "").toLowerCase() !== "approved") {
+      return jsonOk({ error: "No pending revoke to cancel" });
+    }
+    const votes = normalizeRevokeVotes(row.revokeVotes);
+    if (!canSoloRevoke && !votes.includes(email)) {
+      return jsonOk({ error: "Forbidden" }, 403);
+    }
+    delete row.revokeVotes;
+    delete row.revokeRequestedBy;
+    delete row.revokeRequestedAt;
+    row.updatedAt = now;
+    apps[idx] = row;
+    const savedCancel = await saveRegistrarApplications(admin, apps);
+    if (!savedCancel.ok) return jsonOk({ error: savedCancel.error ?? "Save failed" }, 500);
+    return jsonOk({
+      ok: true,
+      pendingRevoke: false,
+      application: sanitizeRegistrarAppReviewer(row),
+    });
+  }
+
+  const alreadyApproved = String(row.status ?? "").toLowerCase() === "approved";
+  if (status === "approved" && !alreadyApproved) {
+    const used = countApprovedRegistrarsInState(apps, appState);
+    if (used >= MAX_AUTHORIZED_REGISTRARS_PER_STATE) {
+      const label = displayStateName(appState) || "This state";
+      return jsonOk({
+        ok: false,
+        capped: true,
+        error: `${label} already has ${MAX_AUTHORIZED_REGISTRARS_PER_STATE} authorized registrars.`,
+      });
+    }
+  }
+
+  if (status === "revoked" && alreadyApproved && !canSoloRevoke) {
+    const used = countApprovedRegistrarsInState(apps, appState);
+    if (used >= 2) {
+      if (email && email === applicantEmail) {
+        return jsonOk({ error: "Another Authorized Registrar must confirm this revoke." });
+      }
+      const votes = normalizeRevokeVotes(row.revokeVotes);
+      if (email && !votes.includes(email)) votes.push(email);
+      const otherVotes = votes.filter((v) => v !== applicantEmail);
+      if (otherVotes.length < 2) {
+        row.revokeVotes = otherVotes;
+        row.revokeRequestedBy = otherVotes[0] ?? email;
+        row.revokeRequestedAt = String(row.revokeRequestedAt ?? now);
+        row.updatedAt = now;
+        apps[idx] = row;
+        const savedVote = await saveRegistrarApplications(admin, apps);
+        if (!savedVote.ok) return jsonOk({ error: savedVote.error ?? "Save failed" }, 500);
+        return jsonOk({
+          ok: true,
+          pendingRevoke: true,
+          application: sanitizeRegistrarAppReviewer(row),
+        });
+      }
+    }
+  }
+
+  row.status = status;
+  row.updatedAt = now;
+  delete row.revokeVotes;
+  delete row.revokeRequestedBy;
+  delete row.revokeRequestedAt;
+  if (status === "revoked") {
+    row.revokedAt = now;
+    row.revokedBy = email;
+  } else {
+    row.reviewedAt = now;
+    row.reviewedBy = email;
+  }
+  apps[idx] = row;
+
+  const saved = await saveRegistrarApplications(admin, apps);
+  if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+
+  await applyRegistrarFlagToUser(admin, applicantEmail, status === "approved", appState);
+
+  return jsonOk({
+    ok: true,
+    pendingRevoke: false,
+    application: sanitizeRegistrarAppReviewer(row),
+  });
+}
+
+async function loadRegistryPins(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+): Promise<{ global: string; byState: Record<string, string> }> {
+  // Prefer locked ngmy_settings row (not readable by anon after pin lock SQL).
+  try {
+    const { data: settingsRow } = await admin
+      .from("ngmy_settings")
+      .select("value")
+      .eq("key", CIVIC_PINS_KEY)
+      .maybeSingle();
+    const value = settingsRow?.value;
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      const v = value as Record<string, unknown>;
+      const global = String(v.global ?? "").trim();
+      const byState: Record<string, string> = {};
+      const raw = v.byState;
+      if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+        for (const [k, val] of Object.entries(raw as Record<string, unknown>)) {
+          const pin = String(val ?? "").trim();
+          if (k.trim() && pin) byState[k.trim()] = pin;
+        }
+      }
+      if (global || Object.keys(byState).length > 0) {
+        return { global, byState };
+      }
+    }
+  } catch (_) {
+    // fall through to legacy config
+  }
+
+  const { data } = await admin
+    .from("config")
+    .select("civicRegistryPin,civicRegistryPinsByState")
+    .eq("id", "1")
+    .maybeSingle();
+  const global = String(data?.civicRegistryPin ?? "").trim();
+  const byState: Record<string, string> = {};
+  const raw = data?.civicRegistryPinsByState;
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      const pin = String(v ?? "").trim();
+      if (k.trim() && pin) byState[k.trim()] = pin;
+    }
+  }
+  return { global, byState };
+}
+
+async function saveRegistryPins(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  pins: { global: string; byState: Record<string, string> },
+): Promise<{ ok: boolean; error?: string }> {
+  const payload = {
+    global: pins.global,
+    byState: pins.byState,
+    savedAt: new Date().toISOString(),
+  };
+  const { error: settingsErr } = await admin.from("ngmy_settings").upsert(
+    {
+      key: CIVIC_PINS_KEY,
+      value: payload,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "key" },
+  );
+  if (settingsErr) return { ok: false, error: settingsErr.message };
+
+  // Keep config columns empty so public selects cannot leak PINs.
+  await admin.from("config").upsert({
+    id: "1",
+    civicRegistryPin: "",
+    civicRegistryPinsByState: {},
+  });
+  return { ok: true };
+}
+
+function effectivePinForState(
+  pins: { global: string; byState: Record<string, string> },
+  state: string,
+): string {
+  const sk = canonicalStateKey(state);
+  if (!sk) return pins.global.trim();
+  const per = (pins.byState[state.trim()] ?? pins.byState[sk] ?? "").trim();
+  if (per) return per;
+  for (const [k, v] of Object.entries(pins.byState)) {
+    if (canonicalStateKey(k) === sk && String(v).trim()) return String(v).trim();
+  }
+  return pins.global.trim();
+}
+
+async function pinSigFor(state: string, pin: string): Promise<string> {
+  const h = await sha256Hex(`${canonicalStateKey(state)}|${pin.trim()}`);
+  return `v1:${h}`;
+}
+
+function phoneDigits(phone: string): string {
+  let d = phone.replace(/\D/g, "");
+  if (d.length === 11 && d.startsWith("1")) d = d.slice(1);
+  return d.length >= 10 ? d.slice(-10) : d;
+}
+
+function normName(s: string): string {
+  return s.trim().toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ");
+}
+
+function namesCompatible(registered: string, entered: string): boolean {
+  if (registered === entered) return true;
+  const a = registered.split(" ").filter(Boolean);
+  const b = entered.split(" ").filter(Boolean);
+  if (a.length < 2 || b.length < 2) return false;
+  if (a[0] !== b[0] || a[a.length - 1] !== b[b.length - 1]) return false;
+  if (a.length <= b.length) return b.every((part) => a.includes(part));
+  return a.every((part) => b.includes(part) || part.length === 1);
+}
+
+function normCivicId(s: string): string {
+  let t = s.trim().toUpperCase();
+  if (t.startsWith("NGMY-CIVIC:")) t = t.slice("NGMY-CIVIC:".length).trim();
+  return t.replace(/[^A-Z0-9]/g, "");
+}
+
+function civicIdsMatch(a: string, b: string): boolean {
+  const x = normCivicId(a);
+  const y = normCivicId(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  const dx = x.replace(/^[A-Z]+/, "");
+  const dy = y.replace(/^[A-Z]+/, "");
+  return dx.length >= 6 && dx === dy;
+}
+
+function isPlaceholderRegistryId(id: string): boolean {
+  const s = String(id ?? "").trim();
+  if (!s) return true;
+  if (s.includes("***")) return true;
+  return /^\*+\d/.test(s);
+}
+
+function isCanonicalRegistryId(id: string): boolean {
+  return /^[A-Z]{2}\d{6,}$/i.test(String(id ?? "").trim());
+}
+
+/** GA6250732 and **6250732 must count as one member. */
+function rankingPersonKey(m: Record<string, unknown>): string {
+  const rid = String(m.registryId ?? "");
+  if (isPlaceholderRegistryId(rid)) {
+    const digits = rid.replace(/\D/g, "");
+    return digits.length >= 6 ? `d:${digits}` : "";
+  }
+  const n = normCivicId(rid);
+  const digits = n.replace(/^[A-Z]+/, "");
+  if (digits.length >= 6) return `d:${digits}`;
+  if (n) return `id:${n}`;
+  const em = emailKey(String(m.email ?? ""));
+  if (em && !isRedactedCivicValue(em)) return `em:${em}`;
+  return "";
+}
+
+function preferCanonicalRankingRow(
+  a: Record<string, unknown>,
+  b: Record<string, unknown>,
+): Record<string, unknown> {
+  const aCanon = isCanonicalRegistryId(String(a.registryId ?? ""));
+  const bCanon = isCanonicalRegistryId(String(b.registryId ?? ""));
+  if (aCanon !== bCanon) return aCanon ? a : b;
+  const aName = String(a.fullName ?? a.username ?? "").trim();
+  const bName = String(b.fullName ?? b.username ?? "").trim();
+  const aOk = aName.length > 0 && !isRedactedCivicValue(aName) && aName.toLowerCase() !== "member";
+  const bOk = bName.length > 0 && !isRedactedCivicValue(bName) && bName.toLowerCase() !== "member";
+  if (aOk !== bOk) return aOk ? a : b;
+  return aCanon ? a : b;
+}
+
+function rankingSnapshotFrom(
+  members: Record<string, unknown>[],
+  state: string,
+): Record<string, unknown>[] {
+  const want = canonicalStateKey(state);
+  const seen = new Map<string, Record<string, unknown>>();
+  for (const m of members) {
+    if (want && canonicalStateKey(String(m.state ?? "")) !== want) continue;
+    if (isGhostMemberRow(m)) continue;
+    const rid = String(m.registryId ?? "").trim();
+    if (!rid || isPlaceholderRegistryId(rid)) continue;
+    const key = rankingPersonKey(m);
+    if (!key) continue;
+    const prev = seen.get(key);
+    seen.set(key, prev ? preferCanonicalRankingRow(prev, m) : m);
+  }
+  return [...seen.values()].map((m) => ({
+    // Married couples rank as one household, shown under the husband.
+    fullName: String(m.householdHeadName ?? "").trim() || String(m.fullName ?? ""),
+    username: String(m.username ?? ""),
+    registryId: String(m.registryId ?? "").trim(),
+    state: displayStateName(String(m.state ?? state)),
+    helps: Number(m.helps ?? 0) || 0,
+    missed: Number(m.missed ?? 0) || 0,
+    activityAt: m.activityAt ?? null,
+    firstHelpAt: m.firstHelpAt ?? null,
+    enrolledAt: m.enrolledAt ?? null,
+  }));
+}
+
+/** Copy helps/missed from the saved board onto live roster rows — never add people from the board alone. */
+function overlayRankingStatsFromBoard(
+  live: Record<string, unknown>[],
+  board: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  if (!board.length) return live;
+  const byKey = new Map<string, Record<string, unknown>>();
+  for (const b of board) {
+    const k = memberRowKey(b);
+    if (k) byKey.set(k, b);
+  }
+  return live.map((m) => {
+    const k = memberRowKey(m);
+    if (!k) return m;
+    const b = byKey.get(k);
+    if (!b) return m;
+    return {
+      ...m,
+      helps: b.helps ?? m.helps,
+      missed: b.missed ?? m.missed,
+      activityAt: b.activityAt ?? m.activityAt,
+      firstHelpAt: b.firstHelpAt ?? m.firstHelpAt,
+      enrolledAt: b.enrolledAt ?? m.enrolledAt,
+    };
+  });
+}
+
+function rankingBoardFromPayload(
+  payload: Record<string, unknown>,
+  state: string,
+): Record<string, unknown>[] | null {
+  const raw = payload.rankingByState;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const map = raw as Record<string, unknown>;
+  const want = canonicalStateKey(state);
+  const hit = map[want] ?? map[state] ?? map[displayStateName(state)];
+  if (!Array.isArray(hit) || hit.length === 0) return null;
+  return asMemberList(hit);
+}
+
+function civicAccessLoginError(
+  member: Record<string, unknown> | undefined,
+  removed: boolean,
+): string | null {
+  if (removed) {
+    return "You were removed from Civic Registry and cannot log in.";
+  }
+  if (!member) return null;
+  const until = Date.parse(String(member.accessLockedUntil ?? ""));
+  if (Number.isFinite(until) && Date.now() < until) {
+    const when = new Date(until).toLocaleString();
+    return `You are blocked from Civic Registry until ${when}.`;
+  }
+  return null;
+}
+
+function memberMatchesNameOrKeys(
+  row: Record<string, unknown>,
+  fullName: string,
+  memberEmail = "",
+  registryId = "",
+): boolean {
+  const want = normName(fullName);
+  const rn = normName(String(row.fullName ?? ""));
+  if (want && rn && want === rn) return true;
+  const em = emailKey(String(row.email ?? ""));
+  if (memberEmail && em && em === memberEmail) return true;
+  const rid = String(row.registryId ?? "");
+  const prev = String(row.previousRegistryId ?? "");
+  if (registryId && (civicIdsMatch(rid, registryId) || civicIdsMatch(prev, registryId))) return true;
+  return false;
+}
+
+function normAddress(s: string): string {
+  return s.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function findDuplicateMember(
+  members: Record<string, unknown>[],
+  fullName: string,
+  homeAddress: string,
+  phone: string,
+): Record<string, unknown> | null {
+  const name = normName(fullName);
+  const addr = normAddress(homeAddress);
+  const ph = phoneDigits(phone);
+  for (const m of members) {
+    const mn = normName(String(m.fullName ?? ""));
+    const ma = normAddress(String(m.homeAddress ?? ""));
+    const mp = phoneDigits(String(m.phone ?? ""));
+    // Phone match alone is enough (same person).
+    if (ph.length >= 7 && mp.length >= 7 && ph === mp) return m;
+    // Same name + same address (not name-only — that blocked real enrollments).
+    if (name && mn && name === mn && addr && ma && addr.length >= 8 && addr === ma) return m;
+  }
+  return null;
+}
+
+/** First + last name must match (middle names optional). */
+function firstLastNameMatch(entered: string, registered: string): boolean {
+  const a = normName(entered).split(" ").filter(Boolean);
+  const b = normName(registered).split(" ").filter(Boolean);
+  if (a.length < 2 || b.length < 2) return false;
+  return a[0] === b[0] && a[a.length - 1] === b[b.length - 1];
+}
+
+function nameMatchesForSelfUpdate(entered: string, registered: string): boolean {
+  if (firstLastNameMatch(entered, registered)) return true;
+  const a = normName(entered);
+  const b = normName(registered);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  return namesCompatible(b, a) || namesCompatible(a, b);
+}
+
+/** Softer address compare — ignore punctuation / St vs Street / extra city-zip. */
+function softNormAddress(s: string): string {
+  return s
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(
+      /\b(street|st|avenue|ave|road|rd|boulevard|blvd|drive|dr|lane|ln|court|ct|circle|cir|apartment|apt|suite|ste|unit|north|south|east|west|n|s|e|w)\b/g,
+      " ",
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function addressesCompatible(a: string, b: string): boolean {
+  const x = softNormAddress(a);
+  const y = softNormAddress(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  if (x.length >= 8 && y.length >= 8 && (x.includes(y) || y.includes(x))) return true;
+  const xt = x.split(" ").filter(Boolean).slice(0, 4).join(" ");
+  const yt = y.split(" ").filter(Boolean).slice(0, 4).join(" ");
+  return xt.length >= 5 && xt === yt;
+}
+
+function profileSelfUpdatesThisYear(m: Record<string, unknown>): number {
+  const raw = m.profileSelfUpdates;
+  if (!Array.isArray(raw)) return 0;
+  const year = new Date().getUTCFullYear();
+  let n = 0;
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const at = String((entry as Record<string, unknown>).at ?? "").trim();
+    if (!at) continue;
+    const d = new Date(at);
+    if (!Number.isNaN(d.getTime()) && d.getUTCFullYear() === year) n += 1;
+  }
+  return n;
+}
+
+function appendProfileSelfUpdate(
+  m: Record<string, unknown>,
+  fields: string[],
+): void {
+  const prev = Array.isArray(m.profileSelfUpdates)
+    ? [...(m.profileSelfUpdates as unknown[])]
+    : [];
+  prev.push({ at: new Date().toISOString(), fields });
+  // Keep the list small — only need recent years for the twice/year check.
+  m.profileSelfUpdates = prev.slice(-12);
+}
+
+/**
+ * Family-size self-update match: first+last name + phone are required.
+ * Address is optional — when it also matches, prefer that row; never
+ * require address, and never match on address alone.
+ */
+function findMemberByFirstLastAddressPhone(
+  members: Record<string, unknown>[],
+  fullName: string,
+  homeAddress: string,
+  phone: string,
+): Record<string, unknown> | null {
+  const ph = phoneDigits(phone);
+  if (ph.length < 7) return null;
+
+  let byNamePhoneAddr: Record<string, unknown> | null = null;
+  let byNamePhone: Record<string, unknown> | null = null;
+
+  for (const m of members) {
+    if (!nameMatchesForSelfUpdate(fullName, String(m.fullName ?? ""))) continue;
+    const mp = phoneDigits(String(m.phone ?? ""));
+    const phoneOk = mp.length >= 7 && mp === ph;
+    if (!phoneOk) continue;
+    const addrOk =
+      softNormAddress(homeAddress).length >= 8 &&
+      addressesCompatible(homeAddress, String(m.homeAddress ?? ""));
+    if (addrOk) {
+      byNamePhoneAddr = m;
+      break;
+    }
+    if (!byNamePhone) byNamePhone = m;
+  }
+
+  return byNamePhoneAddr ?? byNamePhone;
+}
+
+function stateCodePrefix(state: string): string {
+  return US_STATE_PREFIX[canonicalStateKey(state)] ?? "XX";
+}
+
+function generateRegistryId(state: string, existing: Set<string>): string {
+  const prefix = stateCodePrefix(state);
+  for (let i = 0; i < 5000; i++) {
+    const n = Math.floor(Math.random() * 8999999) + 1000000;
+    const candidate = `${prefix}${n}`;
+    if (!existing.has(candidate.toUpperCase())) return candidate;
+  }
+  return `${prefix}${Date.now()}`;
+}
+
+async function handleCivicCheckAccess(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const state = String(body.state ?? "").trim();
+  const memberEmail = emailKey(String(body.memberEmail ?? ""));
+  const registryId = String(body.registryId ?? "").trim();
+  const fullName = String(body.fullName ?? "").trim();
+  if (!memberEmail && !registryId && !fullName) {
+    return jsonOk({ ok: true, allowed: true });
+  }
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  if (role.isAdmin || role.isRegistrar) {
+    return jsonOk({
+      ok: true,
+      allowed: true,
+      bypass: "registrar",
+      isRegistrar: role.isRegistrar || role.isAdmin,
+      registrarState: role.registrarState || "",
+    });
+  }
+  const payload = await loadCivicPayload(admin);
+  const inState = (m: Record<string, unknown>) =>
+    !state || canonicalStateKey(String(m.state ?? "")) === canonicalStateKey(state);
+  const members = asMemberList(payload.members).filter(inState);
+  const removed = asMemberList(payload.removed).filter(inState);
+  const deceased = asMemberList(payload.deceased).filter((d) => {
+    const snap = d.snapshot && typeof d.snapshot === "object"
+      ? (d.snapshot as Record<string, unknown>)
+      : d;
+    return inState({ state: d.state ?? snap.state });
+  });
+  const matchAccess = (row: Record<string, unknown>) =>
+    registryId
+      ? memberMatchesNameOrKeys(row, "", "", registryId)
+      : memberMatchesNameOrKeys(row, fullName, memberEmail, registryId);
+  // A current member always wins over an old tombstone — re-enrolled people
+  // were getting bounced back to Verify your membership.
+  const match = members.find(matchAccess);
+  if (!match) {
+    if (removed.some(matchAccess)) {
+      return jsonOk({
+        ok: true,
+        allowed: false,
+        blocked: "removed",
+        error: "You were removed from Civic Registry and cannot log in.",
+      });
+    }
+    if (deceased.some((d) => {
+      const snap = d.snapshot && typeof d.snapshot === "object"
+        ? (d.snapshot as Record<string, unknown>)
+        : d;
+      return matchAccess(snap);
+    })) {
+      return jsonOk({
+        ok: true,
+        allowed: false,
+        blocked: "deceased",
+        error: "This Civic Registry record is closed and cannot be used to log in.",
+      });
+    }
+  }
+  const accessErr = civicAccessLoginError(match, false);
+  if (accessErr) {
+    return jsonOk({
+      ok: true,
+      allowed: false,
+      blocked: "locked",
+      lockedUntil: match?.accessLockedUntil ?? null,
+      error: accessErr,
+    });
+  }
+  const unlockAt = Date.parse(String(body.unlockAt ?? ""));
+  const epoch = Date.parse(String(match?.accessSessionEpoch ?? ""));
+  if (
+    match &&
+    Number.isFinite(epoch) &&
+    Number.isFinite(unlockAt) &&
+    unlockAt < epoch
+  ) {
+    return jsonOk({
+      ok: true,
+      allowed: false,
+      blocked: "loggedOut",
+      error: "You were logged out of Civic Registry. Enter your PIN, name, date of birth, and Registry ID again.",
+    });
+  }
+  const pinSig = String(body.pinSig ?? "").trim();
+  // Only server-issued v1 hashes prove the state code changed. Local leftover
+  // signatures must not bounce a member back to Verify your membership.
+  if (state && pinSig.startsWith("v1:") && pinSig !== "v1:local") {
+    const pins = await loadRegistryPins(admin);
+    const expected = effectivePinForState(pins, state);
+    if (expected && (await pinSigFor(state, expected)) !== pinSig) {
+      return jsonOk({
+        ok: true,
+        allowed: false,
+        blocked: "pin",
+        error: "State code changed. Verify your membership again.",
+      });
+    }
+  }
+  return jsonOk({ ok: true, allowed: true });
+}
+
+async function handleCivicVerifyStatePin(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  // The PIN itself is the secret (rate-limited above). No login is needed to check it, so
+  // members without a Supabase session can still pass the state gate.
+  const state = String(body.state ?? "").trim();
+  const pin = String(body.pin ?? "").trim();
+  if (!state || !pin) return jsonOk({ error: "state and pin required" }, 400);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const pins = await loadRegistryPins(admin);
+  const expected = effectivePinForState(pins, state);
+  if (!expected) return jsonOk({ error: "Registry PIN not set yet for this state." }, 400);
+  if (pin !== expected) return jsonOk({ error: "Incorrect PIN", ok: false }, 403);
+  const pinSig = await pinSigFor(state, expected);
+  return jsonOk({ ok: true, pinSig, state });
+}
+
+async function handleCivicGateMatchName(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  // The state PIN proof (pinSig) is the gate here; no login is needed.
+  const email = emailKey(String(body.email ?? ""));
+  const state = String(body.state ?? "").trim();
+  const fullName = String(body.fullName ?? "").trim();
+  const pinSig = String(body.pinSig ?? "").trim();
+  if (!state || !fullName || !pinSig) {
+    return jsonOk({ error: "state, fullName, and pinSig required" }, 400);
+  }
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const pins = await loadRegistryPins(admin);
+  const expected = effectivePinForState(pins, state);
+  if (!expected || (await pinSigFor(state, expected)) !== pinSig) {
+    return jsonOk({ error: "PIN session invalid" }, 403);
+  }
+  const payload = await loadCivicPayload(admin);
+  const members = filterMembersByState(asMemberList(payload.members), state);
+  const removed = filterMembersByState(asMemberList(payload.removed), state);
+  const deceased = asMemberList(payload.deceased).filter((d) => {
+    const snap = d.snapshot && typeof d.snapshot === "object"
+      ? (d.snapshot as Record<string, unknown>)
+      : d;
+    return canonicalStateKey(String(d.state ?? snap.state ?? "")) === canonicalStateKey(state);
+  });
+  const want = normName(fullName);
+  if (removed.some((r) => memberMatchesNameOrKeys(r, fullName))) {
+    return jsonOk({
+      ok: false,
+      error: "You were removed from Civic Registry and cannot log in.",
+    }, 403);
+  }
+  if (deceased.some((d) => {
+    const snap = d.snapshot && typeof d.snapshot === "object"
+      ? (d.snapshot as Record<string, unknown>)
+      : d;
+    return memberMatchesNameOrKeys(snap, fullName);
+  })) {
+    return jsonOk({
+      ok: false,
+      error: "This Civic Registry record is closed and cannot be used to log in.",
+    }, 403);
+  }
+  let match = members.find((m) => normName(String(m.fullName ?? "")) === want);
+  if (!match) {
+    match = members.find((m) => namesCompatible(normName(String(m.fullName ?? "")), want));
+  }
+  if (!match) return jsonOk({ error: "That name is not registered in this state." }, 404);
+  const accessErr = civicAccessLoginError(match, false);
+  if (accessErr) return jsonOk({ ok: false, error: accessErr }, 403);
+  const matchToken = await sha256Hex(
+    `${email}|${stateKey(state)}|${emailKey(String(match.email ?? ""))}|${String(match.registryId ?? "")}|${pinSig}`,
+  );
+  // Stash match context in a short-lived settings row? Keep stateless: encode email+rid in token verify later by re-finding.
+  return jsonOk({
+    ok: true,
+    matchToken,
+    memberEmail: emailKey(String(match.email ?? "")),
+    registryIdHint: String(match.registryId ?? ""),
+  });
+}
+
+async function handleCivicGateVerifyIdentity(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  // The state PIN proof (pinSig) is the gate here; no login is needed.
+  const email = emailKey(String(body.email ?? ""));
+  const state = String(body.state ?? "").trim();
+  const pinSig = String(body.pinSig ?? "").trim();
+  const memberEmail = emailKey(String(body.memberEmail ?? ""));
+  const dob = String(body.dob ?? "").trim();
+  const registryId = String(body.registryId ?? "").trim();
+  const step = String(body.step ?? "dob").trim(); // dob | id | both
+  if (!state || !pinSig || (!memberEmail && !registryId)) {
+    return jsonOk({ error: "state, pinSig, and memberEmail or registryId required" }, 400);
+  }
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const pins = await loadRegistryPins(admin);
+  const expected = effectivePinForState(pins, state);
+  if (!expected || (await pinSigFor(state, expected)) !== pinSig) {
+    return jsonOk({ error: "PIN session invalid" }, 403);
+  }
+  const payload = await loadCivicPayload(admin);
+  const members = filterMembersByState(asMemberList(payload.members), state);
+  const removed = filterMembersByState(asMemberList(payload.removed), state);
+  if (removed.some((r) => memberMatchesNameOrKeys(r, "", memberEmail, registryId))) {
+    return jsonOk({
+      ok: false,
+      error: "You were removed from Civic Registry and cannot log in.",
+    }, 403);
+  }
+  const idMatchesRow = (m: Record<string, unknown>) =>
+    civicIdsMatch(String(m.registryId ?? ""), registryId) ||
+    civicIdsMatch(String(m.previousRegistryId ?? ""), registryId);
+  const stateAllowsRow = (m: Record<string, unknown>) => {
+    const ms = canonicalStateKey(String(m.state ?? ""));
+    const wantState = canonicalStateKey(state);
+    if (ms === wantState) return true;
+    if (!ms && registryId) {
+      const prefix = (US_STATE_PREFIX[wantState] ?? "").toUpperCase();
+      const rid = normCivicId(String(m.registryId ?? ""));
+      return Boolean(prefix && rid.startsWith(prefix));
+    }
+    return false;
+  };
+  let match = memberEmail
+    ? members.find((m) => emailKey(String(m.email ?? "")) === memberEmail)
+    : undefined;
+  if (registryId) {
+    const byId = members.find(idMatchesRow) ??
+      asMemberList(payload.members).filter(stateAllowsRow).find(idMatchesRow);
+    // At the ID step the typed registry ID is the source of truth (same-name collisions).
+    if (byId && (step === "id" || step === "both" || !match)) match = byId;
+  }
+  if (!match) return jsonOk({ error: "Member not found" }, 404);
+  const accessErr = civicAccessLoginError(match, false);
+  if (accessErr) return jsonOk({ ok: false, error: accessErr }, 403);
+
+  const normDob = (s: string) => s.replace(/[^\d]/g, "");
+  if (step === "dob" || step === "both") {
+    if (!dob) return jsonOk({ error: "dob required" }, 400);
+    const got = normDob(String(match.dob ?? ""));
+    const want = normDob(dob);
+    if (got && want && got !== want) {
+      return jsonOk({ error: "Date of birth does not match that registered name.", ok: false }, 403);
+    }
+    // Self-enrollment rows may have no DOB on file — registry ID step verifies them.
+    if (step === "dob") return jsonOk({ ok: true });
+  }
+  if (step === "id" || step === "both") {
+    if (!registryId) return jsonOk({ error: "registryId required" }, 400);
+    const got = String(match.registryId ?? "");
+    const prev = String(match.previousRegistryId ?? "");
+    if (!civicIdsMatch(got, registryId) && !civicIdsMatch(prev, registryId)) {
+      return jsonOk({ error: "Registry ID does not match that member.", ok: false }, 403);
+    }
+  }
+  return jsonOk({
+    ok: true,
+    pinSig,
+    registryId: String(match.registryId ?? ""),
+    state,
+  });
+}
+
+function stripSecretsFromCivicRow(
+  m: Record<string, unknown>,
+): Record<string, unknown> {
+  const out = { ...m };
+  // Keep homeAddress/dob for registrar roster tools — only strip true secrets.
+  for (const k of ["passwordHash", "password_hash", "governmentID", "GovernmentID", "ssn", "socialSecurity"]) {
+    delete out[k];
+  }
+  delete out.idPhoto;
+  delete out.idPhotoData;
+  delete out.idPhotoBase64;
+  return out;
+}
+
+function civicRosterRowsForPrivileged(
+  list: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  return list.map(stripSecretsFromCivicRow);
+}
+
+async function handleCivicFetchRoster(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  const state = String(body.state ?? "").trim();
+  const pinSig = String(body.pinSig ?? "").trim();
+  const payload = await loadCivicPayload(admin);
+  const allMembers = asMemberList(payload.members);
+  const allRemoved = asMemberList(payload.removed);
+  const allDeceased = asMemberList(payload.deceased);
+
+  if (role.isAdmin) {
+    return jsonOk({
+      ok: true,
+      view: "admin",
+      members: civicRosterRowsForPrivileged(allMembers),
+      removed: civicRosterRowsForPrivileged(allRemoved),
+      deceased: civicRosterRowsForPrivileged(allDeceased),
+      savedAt: payload.savedAt ?? null,
+    });
+  }
+
+  if (role.isRegistrar && role.registrarState) {
+    const st = role.registrarState;
+    const homeMembers = filterMembersByState(allMembers, st);
+    const homeRemoved = filterMembersByState(allRemoved, st);
+    const homeDeceased = allDeceased.filter((d) => {
+      const snap = d.snapshot && typeof d.snapshot === "object"
+        ? (d.snapshot as Record<string, unknown>)
+        : d;
+      return canonicalStateKey(String(d.state ?? snap.state ?? "")) === canonicalStateKey(st);
+    });
+
+    let extraDir: Record<string, unknown>[] = [];
+    let extraDec: Record<string, unknown>[] = [];
+    if (state && canonicalStateKey(state) !== canonicalStateKey(st) && pinSig) {
+      const pins = await loadRegistryPins(admin);
+      const expected = effectivePinForState(pins, state);
+      if (expected && (await pinSigFor(state, expected)) === pinSig) {
+        extraDir = filterMembersByState(allMembers, state).map(sanitizeDirectoryMember);
+        extraDec = allDeceased
+          .filter((d) => {
+            const snap = d.snapshot && typeof d.snapshot === "object"
+              ? (d.snapshot as Record<string, unknown>)
+              : d;
+            return canonicalStateKey(String(d.state ?? snap.state ?? "")) === canonicalStateKey(state);
+          })
+          .map(sanitizeDirectoryDeceased);
+      }
+    }
+
+    const members = [
+      ...civicRosterRowsForPrivileged(homeMembers),
+      ...extraDir.filter(
+        (m) =>
+          !homeMembers.some(
+            (h) => emailKey(String(h.email ?? "")) === emailKey(String(m.email ?? "")),
+          ),
+      ),
+    ];
+    return jsonOk({
+      ok: true,
+      view: "registrar",
+      registrarState: st,
+      members,
+      removed: civicRosterRowsForPrivileged(homeRemoved),
+      deceased: [
+        ...civicRosterRowsForPrivileged(homeDeceased),
+        ...extraDec,
+      ],
+      savedAt: payload.savedAt ?? null,
+    });
+  }
+
+  // Normal member: requires state + valid pinSig; directory only
+  if (!state || !pinSig) {
+    return jsonOk({
+      ok: true,
+      view: "member",
+      members: [],
+      removed: [],
+      deceased: [],
+      needsUnlock: true,
+    });
+  }
+  const pins = await loadRegistryPins(admin);
+  const expected = effectivePinForState(pins, state);
+  if (!expected || (await pinSigFor(state, expected)) !== pinSig) {
+    return jsonOk({ error: "State unlock required", ok: false }, 403);
+  }
+  const dir = filterMembersByState(allMembers, state).map(sanitizeDirectoryMember);
+  const dec = allDeceased
+    .filter((d) => {
+      const snap = d.snapshot && typeof d.snapshot === "object"
+        ? (d.snapshot as Record<string, unknown>)
+        : d;
+      return canonicalStateKey(String(d.state ?? snap.state ?? "")) === canonicalStateKey(state);
+    })
+    .map(sanitizeDirectoryDeceased);
+  return jsonOk({
+    ok: true,
+    view: "member",
+    members: dir,
+    removed: [],
+    deceased: dec,
+    savedAt: payload.savedAt ?? null,
+  });
+}
+
+/** Same live counters for every unlocked viewer — Rankings must not use a device-local roster. */
+async function handleCivicFetchRankings(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const state = String(body.state ?? "").trim();
+  const pinSig = String(body.pinSig ?? "").trim();
+  if (!state) return jsonOk({ error: "state required" }, 400);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  const want = canonicalStateKey(state);
+  let allowed = role.isAdmin;
+  if (
+    !allowed &&
+    role.isRegistrar &&
+    role.registrarState &&
+    canonicalStateKey(role.registrarState) === want
+  ) {
+    allowed = true;
+  }
+  const payload = await loadCivicPayload(admin);
+  const inState = (m: Record<string, unknown>) =>
+    canonicalStateKey(String(m.state ?? "")) === want;
+  const live = filterTombstonedMembers(
+    asMemberList(payload.members).filter(inState),
+    asMemberList(payload.removed).filter(inState),
+    asMemberList(payload.deceased).filter((d) => {
+      const snap = d.snapshot && typeof d.snapshot === "object"
+        ? (d.snapshot as Record<string, unknown>)
+        : d;
+      return inState({ state: d.state ?? snap.state, registryId: d.registryId ?? snap.registryId });
+    }),
+  );
+  if (!allowed) {
+    const enrolledHere = live.some((m) => {
+      if (emailKey(String(m.email ?? "")) === email) return true;
+      return emailKey(String(m.linkedAppEmail ?? "")) === email;
+    });
+    if (enrolledHere) allowed = true;
+  }
+  if (!allowed) {
+    const pins = await loadRegistryPins(admin);
+    const expected = effectivePinForState(pins, state);
+    if (
+      !expected ||
+      !pinSig.startsWith("v1:") ||
+      pinSig === "v1:local" ||
+      (await pinSigFor(state, expected)) !== pinSig
+    ) {
+      return jsonOk({ error: "State unlock required", ok: false }, 403);
+    }
+  }
+  const board = rankingBoardFromPayload(payload, state) ?? [];
+  const withStats = overlayRankingStatsFromBoard(live, board);
+  const members = rankingSnapshotFrom(
+    filterTombstonedMembers(
+      withStats,
+      asMemberList(payload.removed),
+      asMemberList(payload.deceased),
+    ),
+    state,
+  );
+  return jsonOk({
+    ok: true,
+    state: displayStateName(state),
+    savedAt: payload.savedAt ?? null,
+    members,
+  });
+}
+
+async function handleCivicNationwideStats(req: Request): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+
+  const roster = await loadCivicPayload(admin);
+  const members = countableRegisteredMembers(
+    asMemberList(roster.members),
+    asMemberList(roster.removed),
+    asMemberList(roster.deceased),
+  );
+  const deceased = asMemberList(roster.deceased);
+  const deceasedEmails = new Set<string>();
+  const deceasedIds = new Set<string>();
+  for (const raw of deceased) {
+    const snap = raw.snapshot && typeof raw.snapshot === "object"
+      ? raw.snapshot as Record<string, unknown>
+      : raw;
+    const memberEmail = emailKey(String(raw.email ?? snap.email ?? ""));
+    const registryId = String(raw.registryId ?? snap.registryId ?? "").trim().toUpperCase();
+    if (memberEmail) deceasedEmails.add(memberEmail);
+    if (registryId) deceasedIds.add(registryId);
+  }
+
+  const contributions: Record<string, unknown>[] = [];
+  const pageSize = 1000;
+  for (let from = 0;; from += pageSize) {
+    const { data, error } = await admin
+      .from("transactions")
+      .select("id,userEmail,amount,timestamp,sourceDetails")
+      .eq("type", 5)
+      .eq("status", 1)
+      .order("timestamp", { ascending: false })
+      .range(from, from + pageSize - 1);
+    if (error) return jsonOk({ error: error.message }, 500);
+    const page = (data ?? []) as Record<string, unknown>[];
+    contributions.push(...page);
+    if (page.length < pageSize) break;
+  }
+
+  const spendingsWrap = await loadSettingsObject(admin, HELP_SPENDINGS_KEY);
+  const spendings = asItems(spendingsWrap);
+  const now = Date.now();
+  const resets = new Map<string, Record<string, unknown>>();
+  for (const row of spendings) {
+    if (row.walletSoftReset !== true) continue;
+    const state = canonicalStateKey(String(row.state ?? ""));
+    if (!state) continue;
+    const purgeAt = Date.parse(String(row.purgeAt ?? ""));
+    if (row.permanent !== true && Number.isFinite(purgeAt) && purgeAt <= now) continue;
+    const at = Date.parse(String(row.recordedAt ?? ""));
+    const prior = resets.get(state);
+    const priorAt = Date.parse(String(prior?.recordedAt ?? ""));
+    if (!prior || (!Number.isNaN(at) && (Number.isNaN(priorAt) || at > priorAt))) {
+      resets.set(state, row);
+    }
+  }
+
+  const collected = new Map<string, number>();
+  const campaignKeys = new Set<string>();
+  for (const row of contributions) {
+    let meta: Record<string, unknown> = {};
+    try {
+      const decoded = JSON.parse(String(row.sourceDetails ?? "{}"));
+      if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
+        meta = decoded as Record<string, unknown>;
+      }
+    } catch (_) {}
+    const memberEmail = emailKey(String(meta.memberEmail ?? row.userEmail ?? ""));
+    const registryId = String(meta.registryId ?? "").trim().toUpperCase();
+    if ((memberEmail && deceasedEmails.has(memberEmail)) ||
+        (registryId && deceasedIds.has(registryId))) continue;
+    const state = canonicalStateKey(String(meta.state ?? meta.civicState ?? ""));
+    if (!state) continue;
+    const txAt = Date.parse(String(row.timestamp ?? ""));
+    const reset = resets.get(state);
+    const resetAt = Date.parse(String(reset?.recordedAt ?? ""));
+    if (reset?.hideBudget === true && Number.isFinite(resetAt) &&
+        (!Number.isFinite(txAt) || txAt <= resetAt)) continue;
+    const amount = Number(row.amount ?? 0);
+    if (Number.isFinite(amount)) {
+      collected.set(state, (collected.get(state) ?? 0) + amount);
+    }
+    const campaignId = String(meta.campaignId ?? "").trim();
+    const fallback = [
+      String(meta.purpose ?? "Contribution").trim(),
+      String(meta.scopeType ?? "all"),
+      String(meta.scopeValue ?? ""),
+      state,
+    ].join("|");
+    campaignKeys.add(campaignId || fallback);
+  }
+
+  const spent = new Map<string, number>();
+  const credits = new Map<string, number>();
+  const silentCuts = new Map<string, number>();
+  for (const row of spendings) {
+    if (row.walletSoftReset === true) continue;
+    const state = canonicalStateKey(String(row.state ?? ""));
+    if (!state) continue;
+    const pendingDeleteAt = Date.parse(String(row.pendingDeleteAt ?? ""));
+    if (Number.isFinite(pendingDeleteAt) && pendingDeleteAt <= now) continue;
+    const amount = Number(row.amount ?? 0);
+    if (!Number.isFinite(amount)) continue;
+    const rowAt = Date.parse(String(row.requestedAt ?? row.recordedAt ?? ""));
+    const reset = resets.get(state);
+    const resetAt = Date.parse(String(reset?.recordedAt ?? ""));
+    const existedAtReset = Number.isFinite(resetAt) &&
+      (!Number.isFinite(rowAt) || rowAt <= resetAt);
+    const kind = String(row.kind ?? "").trim();
+    const id = String(row.id ?? "");
+    const description = String(row.description ?? "").trim();
+    const hideBudget = reset?.hideBudget === true && existedAtReset;
+    const hideSpendings = reset?.hideSpendings === true && existedAtReset;
+    if (row.silentAdminRemoval === true ||
+        description === "Admin available balance adjustment") {
+      if (!hideBudget && !hideSpendings) {
+        silentCuts.set(state, (silentCuts.get(state) ?? 0) + amount);
+      }
+      continue;
+    }
+    if (kind === "fund_transfer_pending" || id.startsWith("xfer_pending_")) continue;
+    if (kind === "transfer_from_trust" || row.contributionTransferCredit === true) {
+      if (!hideBudget) credits.set(state, (credits.get(state) ?? 0) + amount);
+      continue;
+    }
+    const trustDeposit = row.walletTrustDeposit === true ||
+      kind === "state_trust_deposit" ||
+      kind === "transfer_from_contribution" ||
+      id.startsWith("trust_deposit_") ||
+      id.startsWith("xfer_in_trust_");
+    if (trustDeposit || hideSpendings) continue;
+    const fund = String(row.fund ?? "contribution").trim().toLowerCase();
+    if (fund !== "trust") spent.set(state, (spent.get(state) ?? 0) + amount);
+  }
+
+  const states = new Set<string>([
+    ...collected.keys(),
+    ...spent.keys(),
+    ...credits.keys(),
+    ...silentCuts.keys(),
+  ]);
+  let contributionsKept = 0;
+  for (const state of states) {
+    const available = (collected.get(state) ?? 0) -
+      (silentCuts.get(state) ?? 0) -
+      (spent.get(state) ?? 0) +
+      (credits.get(state) ?? 0);
+    contributionsKept += Math.max(0, available);
+  }
+
+  let totalFamilyMembers = 0;
+  for (const member of members) {
+    const n = Number(member.familyMembers ?? 1);
+    totalFamilyMembers += Number.isFinite(n) && n >= 1 ? Math.trunc(n) : 1;
+  }
+  return jsonOk({
+    ok: true,
+    registeredMembers: members.length,
+    totalFamilyMembers,
+    deceasedMembers: deceased.length,
+    contributionsKept,
+    totalContributions: campaignKeys.size,
+    generatedAt: new Date().toISOString(),
+  });
+}
+
+async function handleCivicPersistRoster(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ ok: false, error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ ok: false, error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  if (!role.isAdmin && !role.isRegistrar) {
+    return jsonOk({ ok: false, error: "Registrar or admin required" }, 403);
+  }
+
+  const incomingMembers = asMemberList(body.members);
+  const incomingRemoved = asMemberList(body.removed);
+  const incomingDeceased = asMemberList(body.deceased);
+  const scopeState = role.isAdmin
+    ? String(body.state ?? "").trim()
+    : role.registrarState.trim();
+
+  const current = await loadCivicPayload(admin);
+  let members = asMemberList(current.members);
+  let removed = asMemberList(current.removed);
+  let deceased = asMemberList(current.deceased);
+
+  if (role.isAdmin && !scopeState) {
+    // Union with existing cloud roster — never let a stale device wipe members.
+    members = mergeMemberLists(members, incomingMembers);
+    removed = mergeMemberLists(removed, incomingRemoved);
+    if (incomingDeceased.length > 0) {
+      deceased = mergeMemberLists(deceased, incomingDeceased);
+    }
+  } else {
+    const sk = canonicalStateKey(scopeState);
+    if (!sk) return jsonOk({ ok: false, error: "No registrar state" }, 403);
+    const mergeStateSlice = (
+      allMembers: Record<string, unknown>[],
+      incoming: Record<string, unknown>[],
+      stateKey: string,
+    ) => {
+      const other = allMembers.filter(
+        (m) => canonicalStateKey(String(m.state ?? "")) !== stateKey,
+      );
+      const existingHome = allMembers.filter(
+        (m) => canonicalStateKey(String(m.state ?? "")) === stateKey,
+      );
+      const inc = incoming.filter(
+        (m) => canonicalStateKey(String(m.state ?? "")) === stateKey,
+      );
+      // Union this device with the cloud. A phone with a partial roster must
+      // never replace the state's members and make them disappear.
+      if (inc.length === 0) return allMembers;
+      return [...other, ...mergeMemberLists(existingHome, inc)];
+    };
+
+    members = mergeStateSlice(members, incomingMembers, sk);
+
+    // Registrar may enroll in another state they are viewing (body.state).
+    const bodyState = String(body.state ?? "").trim();
+    const bodySk = canonicalStateKey(bodyState);
+    if (bodySk && bodySk !== sk) {
+      members = mergeStateSlice(members, incomingMembers, bodySk);
+    }
+
+    // Deletes with no state on record belong to whoever is syncing — dropping
+    // them meant the member was handed straight back on the next merge.
+    const ownsRemoved = (m: Record<string, unknown>) => {
+      const k = canonicalStateKey(String(m.state ?? ""));
+      return !k || k === sk;
+    };
+    const otherRemoved = removed.filter((m) => !ownsRemoved(m));
+    const homeRemovedExisting = removed.filter(ownsRemoved);
+    const homeRemovedIncoming = incomingRemoved.filter(ownsRemoved);
+    removed = [...otherRemoved, ...mergeMemberLists(homeRemovedExisting, homeRemovedIncoming)];
+
+    const otherDeceased = deceased.filter((d) => {
+      const snap = d.snapshot && typeof d.snapshot === "object"
+        ? (d.snapshot as Record<string, unknown>)
+        : d;
+      return canonicalStateKey(String(d.state ?? snap.state ?? "")) !== sk;
+    });
+    const homeDeceasedExisting = deceased.filter((d) => {
+      const snap = d.snapshot && typeof d.snapshot === "object"
+        ? (d.snapshot as Record<string, unknown>)
+        : d;
+      return canonicalStateKey(String(d.state ?? snap.state ?? "")) === sk;
+    });
+    const homeDeceasedIncoming = incomingDeceased.filter((d) => {
+      const snap = d.snapshot && typeof d.snapshot === "object"
+        ? (d.snapshot as Record<string, unknown>)
+        : d;
+      return canonicalStateKey(String(d.state ?? snap.state ?? "")) === sk;
+    });
+    deceased = [
+      ...otherDeceased,
+      ...mergeMemberLists(homeDeceasedExisting, homeDeceasedIncoming),
+    ];
+  }
+
+  members = filterTombstonedMembers(members, removed, deceased);
+  members = members.filter((m) => !isGhostMemberRow(m));
+
+  const rankingByState: Record<string, unknown> = {
+    ...(current.rankingByState &&
+    typeof current.rankingByState === "object" &&
+    !Array.isArray(current.rankingByState)
+      ? (current.rankingByState as Record<string, unknown>)
+      : {}),
+  };
+  const snapRaw = body.rankingSnapshot;
+  const snapState = String(body.state ?? "").trim() || scopeState;
+  const snapKey = canonicalStateKey(snapState);
+  const snapMembers = Array.isArray(snapRaw) && snapRaw.length > 0
+    ? asMemberList(snapRaw)
+    : incomingMembers.filter((m) =>
+      !snapKey || canonicalStateKey(String(m.state ?? "")) === snapKey
+    );
+  if (snapKey) {
+    const incomingRows = rankingSnapshotFrom(snapMembers, snapState);
+    const existingBoard = rankingBoardFromPayload(current, snapState) ?? [];
+    const liveHome = members.filter(
+      (m) => canonicalStateKey(String(m.state ?? "")) === snapKey,
+    );
+    const union = filterTombstonedMembers(
+      mergeMemberLists(mergeMemberLists(existingBoard, liveHome), incomingRows),
+      removed,
+      deceased,
+    );
+    rankingByState[snapKey] = rankingSnapshotFrom(union, snapState);
+  }
+
+  const saved = await saveCivicPayload(admin, { members, removed, deceased, rankingByState });
+  if (!saved.ok) return jsonOk({ ok: false, error: saved.error ?? "Save failed" }, 500);
+  return jsonOk({ ok: true, memberCount: members.length });
+}
+
+/** Upsert one member into the cloud roster — used for immediate enroll (no full-roster payload). */
+// ── Civic Registry families ───────────────────────────────────────────────
+// A member row is a household. Its spouse and unmarried children live inside
+// it as `relatives` — they never appear in public search, are never ranked and
+// never contribute on their own (a married couple counts as one household).
+// A child marked married, or a spouse marked divorced / separated, is split
+// into their own member row (their own household) and stays linked to the
+// family they came from.
+
+type CivicRel = Record<string, unknown>;
+
+const CIVIC_MAX_RELATIVES = 40;
+
+function civicRelList(v: unknown, max = CIVIC_MAX_RELATIVES): CivicRel[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .filter((x) => x && typeof x === "object" && !Array.isArray(x))
+    .slice(0, max)
+    .map((x) => ({ ...(x as CivicRel) }));
+}
+
+function civicGender(v: unknown): string {
+  const g = String(v ?? "").trim().toLowerCase();
+  return g === "male" || g === "female" ? g : "";
+}
+
+/** Clean one relative coming from a phone. */
+function civicCleanRel(r: CivicRel, depth = 0): CivicRel | null {
+  const relation = String(r.relation ?? "").trim().toLowerCase() === "spouse" ? "spouse" : "child";
+  const fullName = String(r.fullName ?? "").trim().slice(0, 80);
+  if (!fullName) return null;
+  const out: CivicRel = {
+    id: String(r.id ?? "").trim().slice(0, 40) || `rel_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
+    relation,
+    fullName,
+    gender: civicGender(r.gender),
+    dob: String(r.dob ?? "").trim().slice(0, 10),
+    age: Number(r.age ?? 0) > 0 && Number(r.age) < 130 ? Math.floor(Number(r.age)) : null,
+    phone: String(r.phone ?? "").replace(/\D/g, "").slice(0, 15),
+    idType: String(r.idType ?? "").trim().slice(0, 40),
+    address: String(r.address ?? "").replace(/\s+/g, " ").trim().slice(0, 200),
+    email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(r.email ?? "").trim()) ? String(r.email).trim().toLowerCase().slice(0, 120) : "",
+    status: "",
+  };
+  if (relation === "spouse") {
+    const s = String(r.status ?? "married").trim().toLowerCase();
+    out.status = s === "divorced" || s === "separated" ? s : "married";
+  } else {
+    out.status = String(r.status ?? "single").trim().toLowerCase() === "married" ? "married" : "single";
+    // A married child brings their own spouse / children (one level deep).
+    if (out.status === "married" && depth === 0) {
+      out.relatives = civicRelList(r.relatives, 20)
+        .map((x) => civicCleanRel(x, depth + 1))
+        .filter((x): x is CivicRel => x !== null);
+    }
+  }
+  const own = String(r.ownRegistryId ?? "").trim();
+  if (own) out.ownRegistryId = own;
+  return out;
+}
+
+/** Same child in two records = same name + birthday/age. */
+function civicChildKey(r: CivicRel): string {
+  const n = String(r.fullName ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  if (!n) return "";
+  const d = String(r.dob ?? "").trim() || (r.age ? `age${r.age}` : "");
+  return `${n}|${d}`;
+}
+
+/** Who still lives in this household (spun-off people have their own). */
+function civicHouseholdRels(rels: CivicRel[]): CivicRel[] {
+  return rels.filter((r) => {
+    if (String(r.ownRegistryId ?? "").trim()) return false;
+    if (r.relation === "spouse") return r.status === "married";
+    return r.status !== "married";
+  });
+}
+
+function civicFamilyCounts(
+  selfGender: string,
+  rels: CivicRel[],
+): { total: number; males: number; females: number; allKnown: boolean } {
+  const inHouse = civicHouseholdRels(rels);
+  const genders = [selfGender, ...inHouse.map((r) => civicGender(r.gender))];
+  return {
+    total: 1 + inHouse.length,
+    males: genders.filter((g) => g === "male").length,
+    females: genders.filter((g) => g === "female").length,
+    allKnown: genders.every((g) => g !== ""),
+  };
+}
+
+/** A married couple's household is shown under the husband. */
+function civicHouseholdHeadName(member: CivicRel): string {
+  const self = String(member.fullName ?? "").trim();
+  if (civicGender(member.gender) !== "female") return self;
+  const husband = civicRelList(member.relatives).find((r) =>
+    r.relation === "spouse" && r.status === "married" && civicGender(r.gender) === "male" &&
+    !String(r.ownRegistryId ?? "").trim()
+  );
+  return husband ? String(husband.fullName ?? "").trim() || self : self;
+}
+
+function civicApplyCounts(member: CivicRel): void {
+  const rels = civicRelList(member.relatives);
+  if (!rels.length && !civicGender(member.gender)) return;
+  const c = civicFamilyCounts(civicGender(member.gender), rels);
+  if (rels.length) {
+    member.familyMembers = c.total;
+    if (c.allKnown) {
+      member.familyMales = c.males;
+      member.familyFemales = c.females;
+    }
+  }
+  member.householdHeadName = civicHouseholdHeadName(member);
+}
+
+/**
+ * Cleans [member]'s family, enforces "a child belongs to at most two parents",
+ * and splits married children / divorced spouses into their own member rows.
+ * [others] = every other member row (not this one).
+ */
+function applyCivicFamily(
+  member: CivicRel,
+  others: CivicRel[],
+  existingIds: Set<string>,
+): { error?: string; spawned: CivicRel[] } {
+  const spawned: CivicRel[] = [];
+  member.gender = civicGender(member.gender);
+  const ms = String(member.maritalStatus ?? "").trim().toLowerCase();
+  member.maritalStatus = ["single", "married", "divorced", "separated", "widowed"].includes(ms) ? ms : "";
+  const rels = civicRelList(member.relatives)
+    .map((r) => civicCleanRel(r))
+    .filter((x): x is CivicRel => x !== null);
+
+  // A child can only be listed under their mother and father.
+  for (const r of rels) {
+    if (r.relation !== "child" || String(r.ownRegistryId ?? "").trim()) continue;
+    const key = civicChildKey(r);
+    if (!key) continue;
+    let parents = 0;
+    for (const o of others) {
+      if (civicRelList(o.relatives).some((x) =>
+        x.relation === "child" && !String(x.ownRegistryId ?? "").trim() && civicChildKey(x) === key
+      )) parents++;
+    }
+    if (parents >= 2) {
+      return {
+        error: `${r.fullName} is already listed as a child in two families (their mother and father). A child can only be added under two parents.`,
+        spawned,
+      };
+    }
+  }
+
+  const state = String(member.state ?? "").trim();
+  const now = new Date().toISOString();
+  const headRidKey = String(member.registryId ?? "").trim().toUpperCase();
+  // Already has their own household? (enrolled before, or split off earlier from this family)
+  const findExisting = (r: CivicRel): CivicRel | undefined => {
+    const n = String(r.fullName ?? "").trim().toLowerCase();
+    const d = String(r.dob ?? "").trim();
+    if (!n) return undefined;
+    return others.find((o) => {
+      if (String(o.fullName ?? "").trim().toLowerCase() !== n) return false;
+      if (canonicalStateKey(String(o.state ?? "")) !== canonicalStateKey(state)) return false;
+      const od = String(o.dob ?? "").trim();
+      if (d && od) return d === od;
+      const parents = Array.isArray(o.parentRegistryIds) ? o.parentRegistryIds.map((x) => String(x).trim().toUpperCase()) : [];
+      return parents.includes(headRidKey) || String(o.formerSpouseRegistryId ?? "").trim().toUpperCase() === headRidKey;
+    });
+  };
+  const spawn = (r: CivicRel, extra: CivicRel): string => {
+    const already = findExisting(r);
+    if (already && String(already.registryId ?? "").trim()) return String(already.registryId).trim();
+    const rid = generateRegistryId(state, existingIds);
+    existingIds.add(rid.toUpperCase());
+    const row: CivicRel = {
+      email: String(r.email ?? "").trim() || `civic.${rid.toLowerCase()}@guest.ngmy`,
+      fullName: r.fullName,
+      gender: civicGender(r.gender),
+      dob: r.dob ?? "",
+      phone: r.phone ?? "",
+      homeAddress: String(r.address ?? "").trim() || String(member.homeAddress ?? ""),
+      city: String(member.city ?? ""),
+      room: String(member.room ?? ""),
+      state,
+      idType: String(r.idType ?? ""),
+      registryId: rid,
+      familyMembers: 1,
+      familyMales: 0,
+      familyFemales: 0,
+      enrollmentSource: "family_split",
+      registeredByToken: member.registeredByToken ?? "",
+      enrolledAt: now,
+      updatedAt: now,
+      restoredAt: now,
+      ...extra,
+    };
+    civicApplyCounts(row);
+    spawned.push(row);
+    return rid;
+  };
+
+  const headRid = String(member.registryId ?? "").trim();
+  for (const r of rels) {
+    if (String(r.ownRegistryId ?? "").trim()) continue;
+    if (r.relation === "child" && r.status === "married") {
+      // Married child → their own household, with their own spouse / kids.
+      r.ownRegistryId = spawn(r, {
+        maritalStatus: "married",
+        relatives: civicRelList(r.relatives),
+        parentRegistryIds: headRid ? [headRid] : [],
+      });
+    } else if (r.relation === "spouse" && (r.status === "divorced" || r.status === "separated")) {
+      // Divorced / separated → counted on their own from now on.
+      r.ownRegistryId = spawn(r, {
+        maritalStatus: r.status,
+        relatives: [],
+        formerSpouseRegistryId: headRid,
+        fromRelId: String(r.id ?? ""),
+      });
+    }
+  }
+  member.relatives = rels;
+  civicApplyCounts(member);
+  return { spawned };
+}
+
+
+// ── Civic Registry: Give & Lend ─────────────────────────────────────────────
+// A member gives (or lends) money, an item or a service to another member.
+// Both sides unlock it with their own Registry ID + date of birth. The
+// receiver accepts and signs; the giver gets a receipt. If it is not paid
+// back / returned within 3 days after the due date, an AI-written claim is
+// filed on the receiver's Civic Registry record automatically.
+
+const CIVIC_GIVES_KEY = "civic_gives_v1";
+const CIVIC_GIVE_ACTIONS = new Set([
+  "civicGiveUnlock", "civicGiveList", "civicGiveCreate", "civicGiveRespond", "civicGiveUpdate", "civicGiveInbox",
+]);
+const CIVIC_GIVE_GRACE_MS = 3 * 24 * 3600 * 1000;
+const CIVIC_GIVE_MAX_SIGNATURE = 260 * 1024;
+
+type CivicGive = Record<string, any>;
+
+function giveText(v: unknown, max: number): string {
+  return String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+}
+
+/** Digits of a birthday as MMDDYYYY (accepts MM/DD/YYYY and YYYY-MM-DD). */
+function giveDobKey(v: unknown): string {
+  const s = String(v ?? "").trim();
+  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) return `${iso[2].padStart(2, "0")}${iso[3].padStart(2, "0")}${iso[1]}`;
+  const us = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+  if (us) return `${us[1].padStart(2, "0")}${us[2].padStart(2, "0")}${us[3]}`;
+  return s.replace(/\D/g, "");
+}
+
+function giveIsGuestEmail(e: string): boolean {
+  return !e || e.endsWith("@guest.ngmy") || e.startsWith("civic.");
+}
+
+async function giveLiveMembers(db: any): Promise<Record<string, unknown>[]> {
+  const payload = await loadCivicPayload(db);
+  return filterTombstonedMembers(
+    asMemberList(payload.members),
+    asMemberList(payload.removed),
+    asMemberList(payload.deceased),
+  );
+}
+
+function giveMemberByRid(live: Record<string, unknown>[], rid: string): Record<string, unknown> | undefined {
+  const want = rid.trim().toUpperCase();
+  if (!want) return undefined;
+  return live.find((m) => String(m.registryId ?? "").trim().toUpperCase() === want);
+}
+
+function giveMemberName(m: Record<string, unknown>): string {
+  return giveText(m.fullName ?? m.username ?? "Member", 80) || "Member";
+}
+
+/** The caller's own account's Registry ID (users row), if any. */
+async function giveAccountRid(db: any, email: string): Promise<string> {
+  try {
+    const { data } = await db.from("users").select("*").eq("email", email).maybeSingle();
+    return String(data?.registryId ?? data?.registry_id ?? "").trim().toUpperCase();
+  } catch {
+    return "";
+  }
+}
+
+/** Checks Registry ID + birthday, and that this Registry ID is not someone else's account. */
+async function giveVerify(db: any, live: Record<string, unknown>[], caller: string, rid: unknown, dob: unknown):
+  Promise<{ ok: true; member: Record<string, unknown>; rid: string } | { ok: false; error: string }> {
+  const id = String(rid ?? "").trim().toUpperCase();
+  const m = giveMemberByRid(live, id);
+  const wantDob = giveDobKey(dob);
+  if (!m || !wantDob || giveDobKey(m.dob) !== wantDob) {
+    return { ok: false, error: "That Registry ID and date of birth don't match a member." };
+  }
+  const linked = [emailKey(String(m.email ?? "")), emailKey(String(m.linkedAppEmail ?? ""))].filter((e) => !giveIsGuestEmail(e));
+  if (linked.length > 0 && !linked.includes(caller)) {
+    const accountRid = await giveAccountRid(db, caller);
+    if (accountRid !== id) return { ok: false, error: "This Registry ID belongs to another account." };
+  }
+  return { ok: true, member: m, rid: id };
+}
+
+/** Every Registry ID that belongs to this signed-in account (for notifications). */
+async function giveRidsForAccount(db: any, live: Record<string, unknown>[], caller: string): Promise<Set<string>> {
+  const out = new Set<string>();
+  for (const m of live) {
+    const id = String(m.registryId ?? "").trim().toUpperCase();
+    if (!id) continue;
+    if (emailKey(String(m.email ?? "")) === caller || emailKey(String(m.linkedAppEmail ?? "")) === caller) out.add(id);
+  }
+  const accountRid = await giveAccountRid(db, caller);
+  if (accountRid) out.add(accountRid);
+  return out;
+}
+
+async function giveLoad(db: any): Promise<CivicGive[]> {
+  const value = await loadSettingsObject(db, CIVIC_GIVES_KEY);
+  return Array.isArray(value.items) ? (value.items as CivicGive[]).filter((x) => x && typeof x === "object") : [];
+}
+
+async function giveSave(db: any, items: CivicGive[]): Promise<boolean> {
+  // Keep the newest 5000 (finished ones older than 2 years drop off first).
+  const cutoff = Date.now() - 2 * 365 * 24 * 3600 * 1000;
+  const kept = items
+    .filter((g) => ["pending", "accepted"].includes(g.status) || Date.parse(String(g.updatedAt ?? "")) > cutoff)
+    .slice(-5000);
+  return (await saveSettingsObject(db, CIVIC_GIVES_KEY, { items: kept })).ok;
+}
+
+function giveWhat(g: CivicGive): string {
+  if (g.kind === "money") return `$${Number(g.amount ?? 0).toFixed(2)}`;
+  return giveText(g.title, 80) || "an item";
+}
+
+function giveFallbackClaim(g: CivicGive): string {
+  const due = String(g.dueAt ?? "").slice(0, 10);
+  const verb = g.kind === "money" ? "pay back" : "return";
+  return `Unpaid ${g.kind === "money" ? "loan" : "give"}: ${g.recipient?.name} received ${giveWhat(g)} from ${g.giver?.name} ` +
+    `on ${String(g.givenAt ?? "").slice(0, 10)} and agreed to ${verb} it by ${due}. ` +
+    `It was not ${g.kind === "money" ? "paid back" : "returned"} within 3 days after that date. Receipt ${g.receiptNo}.`;
+}
+
+/** AI writes the claim from everything collected when it was given. */
+async function giveWriteClaim(g: CivicGive): Promise<string> {
+  const fallback = giveFallbackClaim(g);
+  try {
+    const key = await resolveServerAiApiKey();
+    if (!key) return fallback;
+    const qa = (Array.isArray(g.qa) ? g.qa : []).map((x: any) => `Q: ${x.q}\nA: ${x.a}`).join("\n");
+    const prompt = `You write short, factual claim records for a community registry.
+Something was given and not paid back / returned on time. Write the claim (max 90 words, plain sentences, no markdown, no headings).
+Say who gave what to whom, the dates, what was agreed, and that it was not ${g.kind === "money" ? "paid back" : "returned"} within the 3-day grace period. Only use the facts below; never invent anything.
+
+Kind: ${g.kind}
+What: ${giveWhat(g)}${g.kind !== "money" && g.description ? ` — ${g.description}` : ""}${g.itemValue ? ` (value about $${g.itemValue})` : ""}
+Giver: ${g.giver?.name} (Registry ID ${g.giver?.rid})
+Receiver: ${g.recipient?.name} (Registry ID ${g.recipient?.rid})
+Given on: ${String(g.givenAt ?? "").slice(0, 10)}
+Due back: ${String(g.dueAt ?? "").slice(0, 10)}
+Receiver signed as: ${g.signature?.name ?? ""} on ${String(g.signature?.at ?? "").slice(0, 10)}
+Receipt: ${g.receiptNo}
+Details given at the time:
+${qa || "(none)"}
+${g.note ? `Note: ${g.note}` : ""}`;
+    const text = (await geminiChat(key, prompt)).replace(/[*#`]/g, "").trim();
+    return text.length > 20 ? text.slice(0, 900) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/** Files the automatic claims that are due. Returns true when something changed. */
+async function giveSweep(db: any, items: CivicGive[], live: Record<string, unknown>[]): Promise<boolean> {
+  let changed = false;
+  const now = Date.now();
+  for (const g of items) {
+    if (g.status !== "accepted" || g.claimId) continue;
+    const due = Date.parse(String(g.dueAt ?? ""));
+    if (!Number.isFinite(due) || now < due + 24 * 3600 * 1000 + CIVIC_GIVE_GRACE_MS) continue;
+    const text = await giveWriteClaim(g);
+    const member = giveMemberByRid(live, String(g.recipient?.rid ?? ""));
+    const who = emailKey(String(member?.email ?? g.recipient?.email ?? "")) ||
+      `civic.${String(g.recipient?.rid ?? "").toLowerCase()}@guest.ngmy`;
+    const claimId = `claim_give_${g.id}`;
+    const { error } = await db.from("transactions").upsert({
+      id: claimId,
+      userEmail: who,
+      amount: 0,
+      type: 6,
+      method: 2,
+      sourceDetails: text,
+      status: 0,
+      timestamp: new Date().toISOString(),
+    }, { onConflict: "id" });
+    if (error) {
+      console.log("[civic-give] claim insert failed", error.message);
+      continue;
+    }
+    g.status = "claimed";
+    g.claimId = claimId;
+    g.claimAt = new Date().toISOString();
+    g.claimText = text;
+    g.updatedAt = g.claimAt;
+    changed = true;
+  }
+  return changed;
+}
+
+function givePublic(g: CivicGive, myRids: Set<string>): CivicGive {
+  const out = { ...g };
+  out.role = myRids.has(String(g.giver?.rid ?? "")) ? "giver" : "receiver";
+  if (out.giver) out.giver = { rid: out.giver.rid, name: out.giver.name, state: out.giver.state };
+  if (out.recipient) out.recipient = { rid: out.recipient.rid, name: out.recipient.name, state: out.recipient.state };
+  return out;
+}
+
+function giveDateIso(v: unknown): string {
+  const s = String(v ?? "").trim();
+  const t = Date.parse(s);
+  return Number.isFinite(t) ? new Date(t).toISOString() : "";
+}
+
+async function handleCivicGive(req: Request, action: string, body: any): Promise<Response> {
+  const caller = await requireJwtEmail(req);
+  if (!caller) return jsonOk({ ok: false, error: "Please sign in first." }, 401);
+  const db = adminClient();
+  if (!db) return jsonOk({ ok: false, error: "Server misconfigured" }, 500);
+  let items = await giveLoad(db);
+
+  // Light inbox for notifications: one small read, matched by account email.
+  // (No roster load and no claim sweep here — those run on real actions and
+  // in the 6-hourly housekeeping, so idle phones cost almost nothing.)
+  if (action === "civicGiveInbox") {
+    const isGiver = (g: CivicGive) => g.giver?.account === caller || g.giver?.email === caller;
+    const isReceiver = (g: CivicGive) => g.recipient?.email === caller || g.recipient?.account === caller;
+    const rows = items
+      .filter((g) => isGiver(g) || isReceiver(g))
+      .slice(-60)
+      .map((g) => ({
+        id: g.id,
+        status: g.status,
+        role: isGiver(g) ? "giver" : "receiver",
+        kind: g.kind,
+        what: giveWhat(g),
+        other: isGiver(g) ? g.recipient?.name : g.giver?.name,
+        updatedAt: g.updatedAt,
+      }));
+    return jsonOk({ ok: true, items: rows });
+  }
+
+  const live = await giveLiveMembers(db);
+  const swept = await giveSweep(db, items, live);
+  if (swept) await giveSave(db, items);
+
+  const v = await giveVerify(db, live, caller, body?.rid, body?.dob);
+  if (!v.ok) return jsonOk({ ok: false, error: v.error }, 403);
+  const me = v.rid;
+  const myName = giveMemberName(v.member);
+  const mine = new Set([me]);
+
+  if (action === "civicGiveUnlock") {
+    return jsonOk({ ok: true, me: { rid: me, name: myName, state: String(v.member.state ?? "") } });
+  }
+
+  if (action === "civicGiveList") {
+    const rows = items
+      .filter((g) => g.giver?.rid === me || g.recipient?.rid === me)
+      .sort((a, b) => String(b.updatedAt ?? "").localeCompare(String(a.updatedAt ?? "")))
+      .slice(0, 200)
+      .map((g) => givePublic(g, mine));
+    return jsonOk({ ok: true, me: { rid: me, name: myName }, items: rows });
+  }
+
+  if (action === "civicGiveCreate") {
+    const to = giveMemberByRid(live, String(body?.to ?? ""));
+    if (!to) return jsonOk({ ok: false, error: "That member was not found." }, 404);
+    const toRid = String(to.registryId ?? "").trim().toUpperCase();
+    if (toRid === me) return jsonOk({ ok: false, error: "You can't give to yourself." }, 400);
+    const kind = ["money", "item", "service", "other"].includes(String(body?.kind)) ? String(body.kind) : "money";
+    const amount = Math.round(Number(body?.amount ?? 0) * 100) / 100;
+    if (kind === "money" && !(amount > 0 && amount <= 1_000_000)) {
+      return jsonOk({ ok: false, error: "Enter the amount of money." }, 400);
+    }
+    const title = giveText(body?.title, 80);
+    if (kind !== "money" && !title) return jsonOk({ ok: false, error: "Say what you're giving." }, 400);
+    const givenAt = giveDateIso(body?.givenAt) || new Date().toISOString();
+    const dueAt = giveDateIso(body?.dueAt);
+    if (!dueAt) return jsonOk({ ok: false, error: "Pick the date it must be paid back / returned." }, 400);
+    if (Date.parse(dueAt) < Date.parse(givenAt)) return jsonOk({ ok: false, error: "The return date must be after the date it's given." }, 400);
+    const qa = (Array.isArray(body?.qa) ? body.qa : []).slice(0, 10)
+      .map((x: any) => ({ q: giveText(x?.q, 200), a: giveText(x?.a, 500) }))
+      .filter((x: any) => x.q && x.a);
+    const pendingSame = items.filter((g) => g.giver?.rid === me && g.status === "pending").length;
+    if (pendingSame >= 20) return jsonOk({ ok: false, error: "You have too many requests waiting. Wait for answers first." }, 429);
+    const now = new Date().toISOString();
+    const g: CivicGive = {
+      id: `give_${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 8)}`,
+      createdAt: now,
+      updatedAt: now,
+      status: "pending",
+      kind,
+      amount: kind === "money" ? amount : 0,
+      title: kind === "money" ? (title || "Money") : title,
+      description: giveText(body?.description, 400),
+      itemValue: kind === "money" ? 0 : Math.max(0, Math.round(Number(body?.itemValue ?? 0) * 100) / 100),
+      givenAt,
+      dueAt,
+      qa,
+      note: giveText(body?.note, 300),
+      giver: { rid: me, name: myName, state: String(v.member.state ?? ""), email: emailKey(String(v.member.email ?? "")) || caller, account: caller },
+      recipient: {
+        rid: toRid,
+        name: giveMemberName(to),
+        state: String(to.state ?? ""),
+        email: emailKey(String(to.linkedAppEmail ?? "")) || emailKey(String(to.email ?? "")),
+      },
+    };
+    items.push(g);
+    if (!(await giveSave(db, items))) return jsonOk({ ok: false, error: "Could not save. Try again." }, 500);
+    return jsonOk({ ok: true, item: givePublic(g, mine) });
+  }
+
+  const g = items.find((x) => x.id === String(body?.id ?? ""));
+  if (!g) return jsonOk({ ok: false, error: "That request was not found." }, 404);
+  const now = new Date().toISOString();
+
+  if (action === "civicGiveRespond") {
+    if (g.recipient?.rid !== me) return jsonOk({ ok: false, error: "Only the receiver can answer this." }, 403);
+    if (g.recipient) g.recipient.account = caller;
+    if (g.status !== "pending") return jsonOk({ ok: false, error: "This request was already answered." }, 409);
+    if (body?.accept === true) {
+      const signName = giveText(body?.signName, 80);
+      const signImage = String(body?.signImage ?? "");
+      if (signName.length < 3) return jsonOk({ ok: false, error: "Type your full name to sign." }, 400);
+      if (!signImage.startsWith("data:image/png;base64,") || signImage.length > CIVIC_GIVE_MAX_SIGNATURE) {
+        return jsonOk({ ok: false, error: "Please sign in the box." }, 400);
+      }
+      g.status = "accepted";
+      g.signature = { name: signName, image: signImage, at: now };
+      g.receiptNo = `NGMY-${Date.now().toString(36).toUpperCase().slice(-6)}-${g.id.slice(-4).toUpperCase()}`;
+      g.acceptedAt = now;
+    } else {
+      g.status = "declined";
+      g.declinedAt = now;
+    }
+    g.updatedAt = now;
+    if (!(await giveSave(db, items))) return jsonOk({ ok: false, error: "Could not save. Try again." }, 500);
+    return jsonOk({ ok: true, item: givePublic(g, mine) });
+  }
+
+  if (action === "civicGiveUpdate") {
+    if (g.giver?.rid !== me) return jsonOk({ ok: false, error: "Only the giver can change this." }, 403);
+    const op = String(body?.op ?? "");
+    if (op === "cancel") {
+      if (g.status !== "pending") return jsonOk({ ok: false, error: "Only a waiting request can be cancelled." }, 409);
+      g.status = "cancelled";
+    } else if (op === "returned") {
+      if (g.status !== "accepted" && g.status !== "claimed") {
+        return jsonOk({ ok: false, error: "Only an accepted give can be marked paid back." }, 409);
+      }
+      g.status = "returned";
+      g.returnedAt = now;
+      // Paid after a claim was filed: the claim is closed (resolved).
+      if (g.claimId) await db.from("transactions").update({ status: 1 }).eq("id", g.claimId);
+    } else {
+      return jsonOk({ ok: false, error: "Unknown change." }, 400);
+    }
+    g.updatedAt = now;
+    if (!(await giveSave(db, items))) return jsonOk({ ok: false, error: "Could not save. Try again." }, 500);
+    return jsonOk({ ok: true, item: givePublic(g, mine) });
+  }
+
+  return jsonOk({ ok: false, error: "Unknown action." }, 400);
+}
+
+/**
+ * A married couple is one household (shown under the husband). When they
+ * separate, everything the household built up is divided 50 / 50: the
+ * contribution count, the missed count, and the money on each contribution
+ * record — half stays with the household, half goes to the spouse's new row.
+ */
+async function civicSplitSpouseContributions(
+  db: any,
+  head: Record<string, unknown>,
+  spawned: Record<string, unknown>[],
+): Promise<void> {
+  const headEmail = emailKey(String(head.email ?? ""));
+  for (const row of spawned) {
+    if (!row.formerSpouseRegistryId) continue;
+    const toEmail = emailKey(String(row.email ?? ""));
+    const relId = String(row.fromRelId ?? "").trim() || String(row.registryId ?? "");
+
+    // Counts: half each (an odd one stays with the household).
+    const helps = Number(head.helps ?? 0) || 0;
+    const missed = Number(head.missed ?? 0) || 0;
+    const helpsHalf = Math.floor(helps / 2);
+    const missedHalf = Math.floor(missed / 2);
+    head.helps = helps - helpsHalf;
+    head.missed = missed - missedHalf;
+    row.helps = (Number(row.helps ?? 0) || 0) + helpsHalf;
+    row.missed = (Number(row.missed ?? 0) || 0) + missedHalf;
+    // Fresh stamps so these counts win over older copies on other phones.
+    head.activityAt = new Date().toISOString();
+    row.activityAt = head.activityAt;
+
+    // Money on each contribution record: half each.
+    if (!headEmail || !toEmail) continue;
+    const { data, error } = await db.from("transactions")
+      .select("id,amount,sourceDetails,timestamp")
+      .eq("type", 5)
+      .eq("status", 1)
+      .ilike("userEmail", headEmail)
+      .limit(1000);
+    if (error || !Array.isArray(data)) continue;
+    for (const tx of data) {
+      const total = Number(tx.amount ?? 0);
+      if (!(total > 0)) continue;
+      let meta: Record<string, unknown> = {};
+      try {
+        meta = JSON.parse(String(tx.sourceDetails ?? "{}"));
+      } catch {
+        meta = { note: String(tx.sourceDetails ?? "") };
+      }
+      const half = Math.round((total / 2) * 100) / 100;
+      await db.from("transactions").update({ amount: Math.round((total - half) * 100) / 100 }).eq("id", tx.id);
+      await db.from("transactions").upsert({
+        id: `${tx.id}_sp_${relId}`.slice(0, 180),
+        userEmail: toEmail,
+        amount: half,
+        type: 5,
+        method: 2,
+        sourceDetails: JSON.stringify({
+          ...meta,
+          memberEmail: toEmail,
+          memberName: String(row.fullName ?? ""),
+          registryId: String(row.registryId ?? ""),
+          splitFrom: tx.id,
+          splitShare: "50/50 at separation",
+        }),
+        status: 1,
+        timestamp: tx.timestamp,
+      }, { onConflict: "id" });
+    }
+  }
+}
+
+async function handleCivicUpsertMember(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ ok: false, error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ ok: false, error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  if (!role.isAdmin && !role.isRegistrar) {
+    return jsonOk({ ok: false, error: "Registrar or admin required" }, 403);
+  }
+
+  const raw = body.member;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return jsonOk({ ok: false, error: "member object required" }, 400);
+  }
+  const member = { ...(raw as Record<string, unknown>) };
+  const fullName = String(member.fullName ?? "").trim();
+  const state = displayStateName(String(member.state ?? body.state ?? "").trim());
+  let registryId = String(member.registryId ?? "").trim();
+  if (!fullName || !state) {
+    return jsonOk({ ok: false, error: "fullName and state are required" }, 400);
+  }
+
+  // Registrars may only write to their home state (or admin anywhere).
+  if (!role.isAdmin) {
+    const home = canonicalStateKey(role.registrarState);
+    if (home && canonicalStateKey(state) !== home) {
+      // Allow if body explicitly scopes to home and member.state was wrong — normalize to home.
+      member.state = displayStateName(role.registrarState);
+    } else {
+      member.state = state;
+    }
+  } else {
+    member.state = state;
+  }
+
+  member.fullName = fullName;
+  member.email = emailKey(String(member.email ?? ""));
+  member.updatedAt = new Date().toISOString();
+  if (!member.enrolledAt) member.enrolledAt = member.updatedAt;
+  // Never store huge inline photo blobs in ngmy_settings.
+  delete member.idPhoto;
+  delete member.idPhotoData;
+  delete member.idPhotoBase64;
+
+  const current = await loadCivicPayload(admin);
+  const members = asMemberList(current.members);
+  const removed = asMemberList(current.removed);
+  const deceased = asMemberList(current.deceased);
+
+  if (body.heal === true) {
+    // A phone re-sending a member the server lost. Never bring back someone
+    // who was deleted or marked deceased.
+    if (!registryId || filterTombstonedMembers([member], removed, deceased).length === 0) {
+      return jsonOk({ ok: false, skipped: true, error: "Member was deleted." });
+    }
+    const exists = members.some((m) =>
+      String(m.registryId ?? "").trim().toUpperCase() === registryId.toUpperCase()
+    );
+    if (exists) return jsonOk({ ok: true, registryId, skipped: true });
+  } else {
+    // An explicit enroll: wins over an older delete of the same person, even
+    // when a phone later syncs that old delete again.
+    member.restoredAt = new Date().toISOString();
+  }
+
+  if (!registryId) {
+    const existingIds = new Set(
+      members.map((m) => String(m.registryId ?? "").trim().toUpperCase()).filter(Boolean),
+    );
+    registryId = generateRegistryId(String(member.state ?? state), existingIds);
+  }
+  member.registryId = registryId;
+
+  // Spouse / children / married-child splits (see applyCivicFamily).
+  const famIds = new Set(
+    members.map((m) => String(m.registryId ?? "").trim().toUpperCase()).filter(Boolean),
+  );
+  famIds.add(registryId.toUpperCase());
+  const fam = applyCivicFamily(
+    member,
+    members.filter((m) => String(m.registryId ?? "").trim().toUpperCase() !== registryId.toUpperCase()),
+    famIds,
+  );
+  if (fam.error) return jsonOk({ ok: false, error: fam.error }, 400);
+  // A spouse who separated takes the contributions they gave with them.
+  await civicSplitSpouseContributions(admin, member, fam.spawned);
+
+  const nextMembers = mergeMemberLists(members, [member, ...fam.spawned]);
+  const memberEmail = emailKey(String(member.email ?? ""));
+  const memberRid = String(member.registryId ?? "").trim().toUpperCase();
+  const nextRemoved = removed.filter((r) => {
+    const re = emailKey(String(r.email ?? ""));
+    const rid = String(r.registryId ?? "").trim().toUpperCase();
+    if (memberEmail && re === memberEmail) return false;
+    if (memberRid && rid === memberRid) return false;
+    return true;
+  });
+
+  const saved = await saveCivicPayload(admin, {
+    members: nextMembers,
+    removed: nextRemoved,
+    deceased,
+    source: "civicUpsertMember",
+  });
+  if (!saved.ok) return jsonOk({ ok: false, error: saved.error ?? "Save failed" }, 500);
+  return jsonOk({
+    ok: true,
+    registryId,
+    memberCount: nextMembers.length,
+    // New households split off from this family (married children, divorced spouses).
+    spawned: fam.spawned.map((s) => ({ registryId: s.registryId, fullName: s.fullName })),
+    relatives: member.relatives ?? [],
+  });
+}
+
+async function handleCivicGuestEnroll(body: Record<string, unknown>): Promise<Response> {
+  const fullName = String(body.fullName ?? "").trim();
+  const phone = String(body.phone ?? "").trim();
+  const homeAddress = String(body.homeAddress ?? body.address ?? "").trim();
+  const state = displayStateName(String(body.state ?? "").trim());
+  const familyMembers = Number(body.familyMembers ?? 1) || 1;
+  const familyMales = Number(body.familyMales ?? 0) || 0;
+  const familyFemales = Number(body.familyFemales ?? 0) || 0;
+  const registrarToken = String(body.registeredByToken ?? body.registrarToken ?? "").trim();
+  const guestRelatives = civicRelList(body.relatives);
+
+  if (!fullName || !phone || !homeAddress || !state) {
+    return jsonOk({ error: "fullName, phone, homeAddress, and state are required" }, 400);
+  }
+  // With family members listed, the counts are worked out from them.
+  if (!guestRelatives.length && familyMales + familyFemales !== familyMembers) {
+    return jsonOk({ error: "familyMales + familyFemales must equal familyMembers" }, 400);
+  }
+
+  const admin = adminClient();
+  if (!admin) return jsonOk({ ok: false, error: "Server misconfigured" }, 500);
+
+  const linkToken = String(body.linkToken ?? body.t ?? "").trim();
+  const linkVersion = Number(body.k ?? body.linkVersion ?? 0) || 0;
+  const linkOk = await validateStateEnrollmentLink(admin, state, linkToken, linkVersion);
+  if (!linkOk) {
+    return jsonOk({
+      ok: false,
+      error: "This enrollment link is no longer valid. Ask your Authorized Registrar for the current link.",
+    }, 403);
+  }
+
+  // Honor admin self-enrollment toggle unless this is a registrar-attributed link.
+  if (!registrarToken) {
+    const se = await loadSettingsObject(admin, CIVIC_SELF_ENROLL_SETTINGS_KEY);
+    let selfEnroll =
+      se.civicSelfEnrollmentEnabled === true ||
+      String(se.civicSelfEnrollmentEnabled ?? "").toLowerCase() === "true";
+    if (!selfEnroll) {
+      try {
+        const { data: cfg } = await admin
+          .from("config")
+          .select("civicSelfEnrollmentEnabled")
+          .eq("id", "1")
+          .maybeSingle();
+        selfEnroll = cfg?.civicSelfEnrollmentEnabled === true;
+      } catch (_) {
+        // ignore
+      }
+    }
+    if (!selfEnroll) {
+      return jsonOk({ ok: false, error: "Self-enrollment is closed right now." }, 403);
+    }
+  }
+
+  const payload = await loadCivicPayload(admin);
+  const members = asMemberList(payload.members);
+
+  const digits = phoneDigits(phone);
+  const guestEmail =
+    digits.length >= 7 ? `civic.${digits}@guest.ngmy` : `civic.${Date.now()}@guest.ngmy`;
+
+  const dup = findDuplicateMember(members, fullName, homeAddress, phone);
+  if (dup) {
+    const updatesThisYear = profileSelfUpdatesThisYear(dup);
+    return jsonOk({
+      error: "Already enrolled",
+      duplicate: {
+        fullName: String(dup.fullName ?? ""),
+        registryId: String(dup.registryId ?? ""),
+        updatesThisYear,
+        // Family self-update from this link is allowed at most twice per year.
+        canSelfUpdate: updatesThisYear < 2,
+      },
+      ok: false,
+    }, 409);
+  }
+
+  const existingIds = new Set(
+    members.map((m) => String(m.registryId ?? "").trim().toUpperCase()).filter(Boolean),
+  );
+  const registryId = generateRegistryId(state, existingIds);
+  const now = new Date().toISOString();
+  const member: Record<string, unknown> = {
+    email: guestEmail,
+    fullName,
+    phone: digits.length >= 7 ? digits : phone,
+    homeAddress,
+    state,
+    city: "",
+    room: "",
+    dob: "",
+    idType: "",
+    registryId,
+    familyMembers,
+    familyMales,
+    familyFemales,
+    enrollmentSource: "guest_self_enrollment",
+    registeredByToken: registrarToken,
+    enrolledAt: now,
+    updatedAt: now,
+    gender: civicGender(body.gender),
+    maritalStatus: String(body.maritalStatus ?? "").trim().toLowerCase(),
+    relatives: guestRelatives,
+  };
+
+  // Re-load right before write so concurrent self-enrolls are not overwritten.
+  const latest = await loadCivicPayload(admin);
+  const latestMembers = asMemberList(latest.members);
+  const latestRemoved = asMemberList(latest.removed);
+  const latestDeceased = asMemberList(latest.deceased);
+  const dup2 = findDuplicateMember(latestMembers, fullName, homeAddress, phone);
+  if (dup2) {
+    const updatesThisYear = profileSelfUpdatesThisYear(dup2);
+    return jsonOk({
+      error: "Already enrolled",
+      duplicate: {
+        fullName: String(dup2.fullName ?? ""),
+        registryId: String(dup2.registryId ?? ""),
+        updatesThisYear,
+        canSelfUpdate: updatesThisYear < 2,
+      },
+      ok: false,
+    }, 409);
+  }
+  const guestIds = new Set(
+    latestMembers.map((m) => String(m.registryId ?? "").trim().toUpperCase()).filter(Boolean),
+  );
+  guestIds.add(registryId.toUpperCase());
+  const guestFam = applyCivicFamily(member, latestMembers, guestIds);
+  if (guestFam.error) return jsonOk({ ok: false, error: guestFam.error }, 400);
+  const nextMembers = mergeMemberLists(latestMembers, [member, ...guestFam.spawned]);
+  const nextRemoved = latestRemoved.filter(
+    (r) => emailKey(String(r.email ?? "")) !== emailKey(guestEmail),
+  );
+
+  const saved = await saveCivicPayload(admin, {
+    members: nextMembers,
+    removed: nextRemoved,
+    deceased: latestDeceased,
+    source: "guest_self_enrollment",
+  });
+  if (!saved.ok) return jsonOk({ ok: false, error: saved.error ?? "Save failed" }, 500);
+
+  // Verify the row actually landed — never tell the guest "enrolled" on a failed write.
+  const verify = await loadCivicPayload(admin);
+  const verifyMembers = asMemberList(verify.members);
+  const savedRow = verifyMembers.find(
+    (m) => String(m.registryId ?? "").trim().toUpperCase() === registryId.toUpperCase(),
+  );
+  if (!savedRow) {
+    return jsonOk({ ok: false, error: "Enrollment could not be verified. Please try again." }, 500);
+  }
+
+  return jsonOk({
+    ok: true,
+    registryId,
+    email: guestEmail,
+    state,
+    memberCount: verifyMembers.length,
+  });
+}
+
+/**
+ * Existing members only — never creates a new enrollment.
+ * - mode "family": match first+last name + phone → update family size only
+ *   (address is optional and never required; when it also matches it prefers that row)
+ * - mode "profile": require Civic Registry ID (+ name must match that ID) → update
+ *   address / phone / dob / family size (never the registered name). Max 2 updates / calendar year.
+ */
+async function handleCivicGuestSelfUpdate(body: Record<string, unknown>): Promise<Response> {
+  const mode = String(body.mode ?? "family").trim().toLowerCase() === "profile"
+    ? "profile"
+    : "family";
+  const fullName = String(body.fullName ?? "").trim();
+  const phone = String(body.phone ?? "").trim();
+  const homeAddress = String(body.homeAddress ?? body.address ?? "").trim();
+  const registryId = String(body.registryId ?? "").trim();
+  const dob = String(body.dob ?? "").trim();
+  const familyRaw = body.familyMembers;
+  const hasFamily = familyRaw !== undefined && familyRaw !== null && String(familyRaw).trim() !== "";
+  const familyMembers = hasFamily ? (Number(familyRaw) || 0) : 0;
+  const malesRaw = body.familyMales;
+  const femalesRaw = body.familyFemales;
+  const hasMales = malesRaw !== undefined && malesRaw !== null && String(malesRaw).trim() !== "";
+  const hasFemales = femalesRaw !== undefined && femalesRaw !== null && String(femalesRaw).trim() !== "";
+  const familyMales = hasMales ? (Number(malesRaw) || 0) : 0;
+  const familyFemales = hasFemales ? (Number(femalesRaw) || 0) : 0;
+
+  if (!fullName || !RegExp(/^\S+\s+\S+/).test(fullName)) {
+    return jsonOk({ ok: false, error: "First and last name are required." }, 400);
+  }
+
+  if (mode === "family") {
+    if (!phone) {
+      return jsonOk({ ok: false, error: "Name and phone are required to update family size." }, 400);
+    }
+    if (!hasFamily || familyMembers < 1 || familyMembers > 99) {
+      return jsonOk({ ok: false, error: "Family size must be 1–99." }, 400);
+    }
+    if (!hasMales || !hasFemales) {
+      return jsonOk({ ok: false, error: "Male and female counts are required." }, 400);
+    }
+    if (familyMales + familyFemales !== familyMembers) {
+      return jsonOk({ ok: false, error: "familyMales + familyFemales must equal familyMembers" }, 400);
+    }
+  } else {
+    if (!registryId) {
+      return jsonOk({
+        ok: false,
+        error: "Civic Registry ID is required to update address, phone, or birthday.",
+      }, 400);
+    }
+    if (hasFamily) {
+      if (familyMembers < 1 || familyMembers > 99) {
+        return jsonOk({ ok: false, error: "Family size must be 1–99." }, 400);
+      }
+      if (hasMales && hasFemales && familyMales + familyFemales !== familyMembers) {
+        return jsonOk({ ok: false, error: "familyMales + familyFemales must equal familyMembers" }, 400);
+      }
+    }
+    if (dob && !/^\d{2}\/\d{2}\/\d{4}$/.test(dob)) {
+      return jsonOk({ ok: false, error: "Birthday must be MM/DD/YYYY." }, 400);
+    }
+    if (!homeAddress && !phone && !dob && !hasFamily) {
+      return jsonOk({ ok: false, error: "Nothing to update." }, 400);
+    }
+  }
+
+  const admin = adminClient();
+  if (!admin) return jsonOk({ ok: false, error: "Server misconfigured" }, 500);
+
+  const latest = await loadCivicPayload(admin);
+  const members = asMemberList(latest.members);
+  const removed = asMemberList(latest.removed);
+  const deceased = asMemberList(latest.deceased);
+
+  let target: Record<string, unknown> | null = null;
+  if (mode === "profile") {
+    target = members.find((m) => civicIdsMatch(String(m.registryId ?? ""), registryId)) ?? null;
+    if (!target) {
+      return jsonOk({ ok: false, error: "No Civic Registry member found for that ID." }, 404);
+    }
+    if (!nameMatchesForSelfUpdate(fullName, String(target.fullName ?? ""))) {
+      return jsonOk({
+        ok: false,
+        error: "Name does not match that Civic Registry ID.",
+      }, 403);
+    }
+  } else {
+    // Prefer Registry ID when the enroll step already identified the person
+    // (duplicate-by-phone). Confirm with phone and/or name so we never update
+    // the wrong row if a bad ID is posted.
+    if (registryId) {
+      const byId = members.find((m) => civicIdsMatch(String(m.registryId ?? ""), registryId)) ?? null;
+      if (byId) {
+        const wantPh = phoneDigits(phone);
+        const gotPh = phoneDigits(String(byId.phone ?? ""));
+        const phoneOk = wantPh.length >= 7 && gotPh.length >= 7 && wantPh === gotPh;
+        const nameOk = nameMatchesForSelfUpdate(fullName, String(byId.fullName ?? ""));
+        if (phoneOk || nameOk) target = byId;
+      }
+    }
+    if (!target) {
+      target = findMemberByFirstLastAddressPhone(members, fullName, homeAddress, phone);
+    }
+    if (!target) {
+      return jsonOk({
+        ok: false,
+        error:
+          "No matching member found. First and last name and phone must match your existing Civic Registry record.",
+      }, 404);
+    }
+  }
+
+  if (profileSelfUpdatesThisYear(target) >= 2) {
+    return jsonOk({
+      ok: false,
+      error: "You can only update your Civic Registry info twice per year.",
+      limitReached: true,
+      updatesThisYear: 2,
+    }, 429);
+  }
+
+  const fieldsChanged: string[] = [];
+  if (mode === "family") {
+    target.familyMembers = familyMembers;
+    target.familyMales = familyMales;
+    target.familyFemales = familyFemales;
+    fieldsChanged.push("familyMembers", "familyMales", "familyFemales");
+  } else {
+    if (homeAddress) {
+      target.homeAddress = homeAddress;
+      fieldsChanged.push("homeAddress");
+    }
+    if (phone) {
+      const digits = phoneDigits(phone);
+      if (digits.length < 7) {
+        return jsonOk({ ok: false, error: "Phone must be 7–15 digits." }, 400);
+      }
+      target.phone = digits;
+      fieldsChanged.push("phone");
+    }
+    if (dob) {
+      target.dob = dob;
+      fieldsChanged.push("dob");
+    }
+    if (hasFamily) {
+      target.familyMembers = familyMembers;
+      fieldsChanged.push("familyMembers");
+      if (hasMales) {
+        target.familyMales = familyMales;
+        fieldsChanged.push("familyMales");
+      }
+      if (hasFemales) {
+        target.familyFemales = familyFemales;
+        fieldsChanged.push("familyFemales");
+      }
+    }
+  }
+
+  // Never rewrite the registered name on self-update.
+  target.updatedAt = new Date().toISOString();
+  appendProfileSelfUpdate(target, fieldsChanged);
+
+  const rid = String(target.registryId ?? "").trim().toUpperCase();
+  const nextMembers = members.map((m) =>
+    civicIdsMatch(String(m.registryId ?? ""), rid) ? target! : m,
+  );
+
+  const saved = await saveCivicPayload(admin, {
+    members: nextMembers,
+    removed,
+    deceased,
+    source: "guest_self_update",
+  });
+  if (!saved.ok) return jsonOk({ ok: false, error: saved.error ?? "Save failed" }, 500);
+
+  return jsonOk({
+    ok: true,
+    updated: true,
+    mode,
+    registryId: String(target.registryId ?? ""),
+    fields: fieldsChanged,
+    updatesThisYear: profileSelfUpdatesThisYear(target),
+  });
+}
+
+async function handleCivicFetchRegistryPins(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  if (!role.isAdmin && !role.isRegistrar) {
+    return jsonOk({ error: "Forbidden" }, 403);
+  }
+  const pins = await loadRegistryPins(admin);
+  if (role.isAdmin) {
+    return jsonOk({ ok: true, global: pins.global, byState: pins.byState });
+  }
+  // Registrar: only their home-state PIN
+  const st = role.registrarState;
+  const pin = effectivePinForState(pins, st);
+  const byState: Record<string, string> = {};
+  if (st && pin) byState[st] = pin;
+  return jsonOk({ ok: true, global: "", byState });
+}
+
+async function handleCivicSaveRegistryPins(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  if (!role.isAdmin && !role.isRegistrar) {
+    return jsonOk({ error: "Forbidden" }, 403);
+  }
+
+  const current = await loadRegistryPins(admin);
+  let nextGlobal = current.global;
+  const nextByState: Record<string, string> = { ...current.byState };
+
+  const state = String(body.state ?? "").trim();
+  const pin = String(body.pin ?? "").trim();
+  const globalPinRaw = body.globalPin;
+  const globalPin = globalPinRaw == null ? null : String(globalPinRaw).trim();
+
+  if (role.isAdmin) {
+    if (globalPin != null && globalPin.length > 0) nextGlobal = globalPin;
+    if (state && pin) nextByState[state] = pin;
+    // Admin may replace full map when provided
+    const map = body.byState;
+    if (map && typeof map === "object" && !Array.isArray(map)) {
+      for (const [k, v] of Object.entries(map as Record<string, unknown>)) {
+        const sk = String(k ?? "").trim();
+        const pv = String(v ?? "").trim();
+        if (sk && pv) nextByState[sk] = pv;
+      }
+    }
+  } else {
+    // Registrar: only home state PIN
+    const home = role.registrarState.trim();
+    if (!home) return jsonOk({ error: "No registrar state" }, 403);
+    if (state && stateKey(state) !== stateKey(home)) {
+      return jsonOk({ error: "Registrars can only set PIN for their home state" }, 403);
+    }
+    if (!pin) return jsonOk({ error: "pin required" }, 400);
+    nextByState[home] = pin;
+  }
+
+  const saved = await saveRegistryPins(admin, {
+    global: nextGlobal,
+    byState: nextByState,
+  });
+  if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+  return jsonOk({
+    ok: true,
+    global: role.isAdmin ? nextGlobal : "",
+    byState: role.isAdmin
+      ? nextByState
+      : { [role.registrarState]: nextByState[role.registrarState] ?? pin },
+  });
+}
+
+// ─── Private config lists (loans, games, help, jobs, store) ───
+
+const MGMT_LISTS_KEY = "management_operational_lists";
+const GAME_INVITES_KEY = "game_invites";
+const STORE_INQUIRIES_KEY = "store_inquiries";
+const STORE_ORDERS_KEY = "store_orders";
+const MEDIA_VIRTUAL_KEY = "media_virtual_profiles";
+const FAMILY_PHOTO_ACCESS_KEY = "family_tree_photo_access";
+const HELP_SPENDINGS_KEY = "civic_help_campaign_spendings";
+const CIVIC_CITIES_ROOMS_KEY = "civic_cities_rooms";
+const CIVIC_DELETED_CONTRIB_KEY = "civic_deleted_contribution_ids";
+const CIVIC_RECEIPT_REMOVED_KEY = "civic_contribution_receipt_removed";
+const CIVIC_HELP_MODE_KEY = "civic_help_mode_settings";
+const STORE_SELL_ACCESS_KEY = "store_sell_access_emails";
+const CIVIC_SELF_ENROLL_SETTINGS_KEY = "civic_self_enrollment_settings";
+
+function stateEnrollSlug(state: string): string {
+  const sk = canonicalStateKey(state);
+  if (!sk) return "";
+  return sk.replace(/\s+/g, "-");
+}
+
+function buildEnrollmentShareUrl(
+  state: string,
+  registrarToken: string,
+  version: number,
+): string {
+  const slug = stateEnrollSlug(state);
+  if (!slug) return "https://ngmy.org/";
+  const base = `https://ngmy.org/enroll/${encodeURIComponent(slug)}`;
+  const params: string[] = [];
+  if (registrarToken) params.push(`r=${registrarToken}`);
+  if (version > 1) params.push(`k=${version}`);
+  return params.length ? `${base}?${params.join("&")}` : base;
+}
+
+function stateEnrollmentLinksMap(
+  se: Record<string, unknown>,
+): Record<string, Record<string, unknown>> {
+  const raw = se.stateEnrollmentLinks;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Record<string, Record<string, unknown>> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      out[k] = v as Record<string, unknown>;
+    }
+  }
+  return out;
+}
+
+async function validateStateEnrollmentLink(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  state: string,
+  token: string,
+  version = 0,
+): Promise<boolean> {
+  const sk = canonicalStateKey(state);
+  const t = token.trim().toLowerCase();
+  if (!sk) return false;
+  const se = await loadSettingsObject(admin, CIVIC_SELF_ENROLL_SETTINGS_KEY);
+  const links = stateEnrollmentLinksMap(se);
+  const entry = links[sk];
+  if (!entry) return true;
+
+  let expectedVersion = Number(entry.version ?? 0) || 0;
+  const legacyToken = String(entry.token ?? "").trim().toLowerCase();
+  if (!expectedVersion && legacyToken) expectedVersion = 1;
+
+  if (expectedVersion > 1) {
+    const gotVersion = version > 0 ? version : 1;
+    return gotVersion === expectedVersion;
+  }
+
+  if (legacyToken && t) return t === legacyToken;
+
+  if (expectedVersion === 1) {
+    const gotVersion = version > 0 ? version : 1;
+    return gotVersion === 1;
+  }
+
+  return true;
+}
+
+async function ensureStateEnrollmentLink(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  state: string,
+  { rotate = false } = {},
+): Promise<number> {
+  const sk = canonicalStateKey(state);
+  if (!sk) return 1;
+  const se = await loadSettingsObject(admin, CIVIC_SELF_ENROLL_SETTINGS_KEY);
+  const links = stateEnrollmentLinksMap(se);
+  const prev = links[sk];
+  let current = Number(prev?.version ?? 0) || 0;
+  if (!current && String(prev?.token ?? "").trim()) current = 1;
+
+  if (!rotate) return current > 0 ? current : 1;
+
+  const next = (current > 0 ? current : 1) + 1;
+  links[sk] = { version: next, issuedAt: new Date().toISOString() };
+  await saveSettingsObject(admin, CIVIC_SELF_ENROLL_SETTINGS_KEY, {
+    ...se,
+    stateEnrollmentLinks: links,
+  });
+  return next;
+}
+
+async function handleCivicFetchEnrollmentLink(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ ok: false, error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ ok: false, error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  if (!role.isAdmin && !role.isRegistrar) {
+    return jsonOk({ ok: false, error: "Registrar or admin required" }, 403);
+  }
+  const state = displayStateName(
+    String(body.state ?? (role.isRegistrar ? role.registrarState : "")).trim(),
+  );
+  if (!state) return jsonOk({ ok: false, error: "State required" }, 400);
+  if (role.isRegistrar && !role.isAdmin) {
+    const home = canonicalStateKey(role.registrarState);
+    const want = canonicalStateKey(state);
+    if (home && want && home !== want) {
+      return jsonOk({ ok: false, error: "Not authorized for that state" }, 403);
+    }
+  }
+  const version = await ensureStateEnrollmentLink(admin, state, { rotate: false });
+  const registrarToken = role.isRegistrar
+    ? String(body.registrarToken ?? "").trim()
+    : "";
+  const rTok = registrarToken || (role.isRegistrar ? registrarLinkTokenFromEmail(email) : "");
+  return jsonOk({
+    ok: true,
+    state,
+    linkVersion: version,
+    linkToken: "",
+    url: buildEnrollmentShareUrl(state, rTok, version),
+  });
+}
+
+function registrarLinkTokenFromEmail(email: string): string {
+  const bytes = new TextEncoder().encode(emailKey(email));
+  let hash = 0x811c9dc5;
+  for (const b of bytes) {
+    hash ^= b;
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function stateCodeFromName(state: string): string {
+  const sk = canonicalStateKey(state);
+  const codes: Record<string, string> = {
+    alabama: "AL", alaska: "AK", arizona: "AZ", arkansas: "AR", california: "CA",
+    colorado: "CO", connecticut: "CT", delaware: "DE", florida: "FL", georgia: "GA",
+    hawaii: "HI", idaho: "ID", illinois: "IL", indiana: "IN", iowa: "IA",
+    kansas: "KS", kentucky: "KY", louisiana: "LA", maine: "ME", maryland: "MD",
+    massachusetts: "MA", michigan: "MI", minnesota: "MN", mississippi: "MS",
+    missouri: "MO", montana: "MT", nebraska: "NE", nevada: "NV",
+    "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM", "new york": "NY",
+    "north carolina": "NC", "north dakota": "ND", ohio: "OH", oklahoma: "OK",
+    oregon: "OR", pennsylvania: "PA", "rhode island": "RI", "south carolina": "SC",
+    "south dakota": "SD", tennessee: "TN", texas: "TX", utah: "UT", vermont: "VT",
+    virginia: "VA", washington: "WA", "west virginia": "WV", wisconsin: "WI",
+    wyoming: "WY",
+  };
+  return codes[sk] ?? state.slice(0, 2).toUpperCase();
+}
+
+async function handleCivicRegenerateEnrollmentLink(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ ok: false, error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ ok: false, error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  if (!role.isAdmin && !role.isRegistrar) {
+    return jsonOk({ ok: false, error: "Registrar or admin required" }, 403);
+  }
+  const state = displayStateName(
+    String(body.state ?? (role.isRegistrar ? role.registrarState : "")).trim(),
+  );
+  if (!state) return jsonOk({ ok: false, error: "State required" }, 400);
+  if (role.isRegistrar && !role.isAdmin) {
+    const home = canonicalStateKey(role.registrarState);
+    const want = canonicalStateKey(state);
+    if (home && want && home !== want) {
+      return jsonOk({ ok: false, error: "Not authorized for that state" }, 403);
+    }
+  }
+  const version = await ensureStateEnrollmentLink(admin, state, { rotate: true });
+  const rTok = role.isRegistrar ? registrarLinkTokenFromEmail(email) : "";
+  return jsonOk({
+    ok: true,
+    state,
+    linkVersion: version,
+    linkToken: "",
+    url: buildEnrollmentShareUrl(state, rTok, version),
+    rotated: true,
+  });
+}
+
+async function loadSettingsObject(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  key: string,
+): Promise<Record<string, unknown>> {
+  const { data } = await admin.from("ngmy_settings").select("value").eq("key", key).maybeSingle();
+  const value = data?.value;
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return {};
+}
+
+async function saveSettingsObject(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  key: string,
+  value: Record<string, unknown>,
+): Promise<{ ok: boolean; error?: string }> {
+  const { error } = await admin.from("ngmy_settings").upsert(
+    {
+      key,
+      value: { ...value, savedAt: new Date().toISOString() },
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "key" },
+  );
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+// ── Multiplayer game invites ──────────────────────────────────────────────────
+// All invites live in one server-only row. A player only ever sees and changes invites they
+// are part of. When both players save at once, each player's own flags (joined, ready,
+// progress — maps keyed by email) are kept from that player, so neither wipes the other.
+const GAME_INVITES_KEY_V2 = "game_invites_v2";
+
+function gameBaseEmail(e: string): string {
+  const k = emailKey(e);
+  return k.endsWith("+local.ngmy") ? k.slice(0, -"+local.ngmy".length) : k;
+}
+
+function inviteTime(i: Record<string, any>): number {
+  for (const k of ["sessionUpdatedAt", "respondedAt", "createdAt"]) {
+    const t = Date.parse(String(i?.[k] ?? ""));
+    if (Number.isFinite(t)) return t;
+  }
+  return 0;
+}
+
+function isPlainObj(v: unknown): v is Record<string, any> {
+  return !!v && typeof v === "object" && !Array.isArray(v);
+}
+
+function mergeInviteForCaller(stored: Record<string, any> | undefined, incoming: Record<string, any>, caller: string): Record<string, any> {
+  if (!stored) return incoming;
+  // A new game in the series (or a decision like accept/decline) → take the incoming copy whole.
+  const played = (x: any) => Number(x?.matchesPlayed ?? 0) || 0;
+  if (played(incoming) > played(stored)) return incoming;
+  if (played(incoming) < played(stored)) return stored;
+  const newer = inviteTime(incoming) >= inviteTime(stored) ? incoming : stored;
+  const out: Record<string, any> = { ...stored, ...newer };
+  // A decided status never goes back to pending.
+  if (stored.status && stored.status !== "pending" && incoming.status === "pending") out.status = stored.status;
+  const ss = isPlainObj(stored.sessionState) ? stored.sessionState : {};
+  const is = isPlainObj(incoming.sessionState) ? incoming.sessionState : {};
+  const session: Record<string, any> = { ...ss, ...(newer === incoming ? is : {}) };
+  for (const k of new Set([...Object.keys(ss), ...Object.keys(is)])) {
+    const a = ss[k], b = is[k];
+    if (isPlainObj(a) || isPlainObj(b)) {
+      const am = isPlainObj(a) ? a : {}, bm = isPlainObj(b) ? b : {};
+      const keysAreEmails = [...Object.keys(am), ...Object.keys(bm)].some((x) => x.includes("@"));
+      if (keysAreEmails) {
+        // Each player owns their own entry.
+        const m: Record<string, any> = { ...am };
+        for (const [ek, ev] of Object.entries(bm)) {
+          if (gameBaseEmail(ek) === caller || !(ek in m)) m[ek] = ev;
+        }
+        session[k] = m;
+      } else {
+        session[k] = { ...am, ...bm };
+      }
+    } else if (Array.isArray(a) && Array.isArray(b)) {
+      session[k] = [...new Set([...a, ...b])]; // e.g. matched memory cards
+    } else if ((k === "startAt" || k.endsWith("Seed")) && a != null && a !== "") {
+      session[k] = a; // the first start time / board seed wins, so both play the same game
+    }
+  }
+  out.sessionState = session;
+  out.sessionUpdatedAt = new Date(Math.max(inviteTime(stored), inviteTime(incoming))).toISOString();
+  return out;
+}
+
+async function handleGameInvitesSync(req: Request, body: Record<string, unknown>): Promise<Response> {
+  const caller = await requireJwtEmail(req);
+  const admin = adminClient();
+  if (!caller || !admin) return jsonOk({ ok: false, error: "Please sign in again." }, 401);
+  const me = emailKey(caller);
+  // Growth Income plays as "you@x.com+local.ngmy" — the same person.
+  const mine = (i: Record<string, any>) => gameBaseEmail(String(i?.fromEmail ?? "")) === me || gameBaseEmail(String(i?.toEmail ?? "")) === me;
+  const incoming = (Array.isArray(body?.invites) ? body.invites : []).filter(isPlainObj).slice(0, 60) as Record<string, any>[];
+  const doc = await loadSettingsObject(admin, GAME_INVITES_KEY_V2);
+  const list = (Array.isArray(doc.items) ? doc.items : []).filter(isPlainObj) as Record<string, any>[];
+  const byId = new Map<string, Record<string, any>>();
+  for (const i of list) if (i.id) byId.set(String(i.id), i);
+  let changed = false;
+  for (const raw of incoming) {
+    const id = String(raw.id ?? "").trim();
+    if (!id || !mine(raw)) continue;
+    const stored = byId.get(id);
+    if (stored && !mine(stored)) continue; // never touch someone else's invite
+    if (!stored && gameBaseEmail(String(raw.fromEmail ?? "")) !== me) continue; // only the sender creates one
+    const merged = mergeInviteForCaller(stored, raw, me);
+    if (JSON.stringify(merged) !== JSON.stringify(stored)) {
+      byId.set(id, merged);
+      changed = true;
+    }
+  }
+  // Drop old ones: unanswered after 14 days, anything else after 30.
+  const now = Date.now();
+  const kept = [...byId.values()].filter((i) => {
+    const age = now - inviteTime(i);
+    return (String(i.status ?? "pending") === "pending" ? age < 14 * 864e5 : age < 30 * 864e5);
+  });
+  if (kept.length !== byId.size) changed = true;
+  if (changed) {
+    const saved = await saveSettingsObject(admin, GAME_INVITES_KEY_V2, { items: kept.slice(-1500) });
+    if (!saved.ok) return jsonOk({ ok: false, error: saved.error });
+  }
+  const onlyId = String(body?.id ?? "").trim();
+  const result = kept.filter((i) => mine(i) && (!onlyId || String(i.id) === onlyId));
+  return jsonOk({ ok: true, invites: result });
+}
+
+const CIVIC_HELPER_GIFT_PENDING_KEY = "civic_helper_gift_pending_v1";
+const CIVIC_HELPER_GIFT_INBOX_KEY = "civic_helper_gift_inbox_v1";
+const CIVIC_HELPER_GIFT_STASH_PREFIX = "ngmy_helper_gift_qr_v1_";
+
+function helperGiftItems(value: Record<string, unknown>): Record<string, unknown>[] {
+  return Array.isArray(value.items)
+    ? value.items
+      .filter((e) => e && typeof e === "object" && !Array.isArray(e))
+      .map((e) => ({ ...(e as Record<string, unknown>) }))
+    : [];
+}
+
+async function handleCivicHelperGifts(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const op = String(body.op ?? "fetch").trim().toLowerCase();
+  const role = await resolveCivicRole(admin, email);
+
+  if (op === "fetch") {
+    const pending = helperGiftItems(await loadSettingsObject(admin, CIVIC_HELPER_GIFT_PENDING_KEY));
+    const inbox = helperGiftItems(await loadSettingsObject(admin, CIVIC_HELPER_GIFT_INBOX_KEY));
+    if (role.isAdmin) {
+      return jsonOk({ ok: true, pending, inbox });
+    }
+    return jsonOk({
+      ok: true,
+      pending: [],
+      inbox: inbox.filter((g) => emailKey(String(g.email ?? "")) === email),
+    });
+  }
+
+  if (op === "pending") {
+    if (!role.isAdmin && !role.isRegistrar) {
+      return jsonOk({ error: "Authorized Registrar or admin required" }, 403);
+    }
+    const raw = body.pending;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      return jsonOk({ error: "Pending helper gift required" }, 400);
+    }
+    const pending = { ...(raw as Record<string, unknown>) };
+    const id = String(pending.id ?? "").trim();
+    const recipient = emailKey(String(pending.email ?? ""));
+    const state = String(pending.state ?? "").trim();
+    const streak = Number(pending.streak ?? 0);
+    if (!id || !recipient || !state || !Number.isFinite(streak) || streak < 3) {
+      return jsonOk({ error: "Invalid helper gift alert" }, 400);
+    }
+    if (!role.isAdmin && !statesMatch(role.registrarState, state)) {
+      return jsonOk({ error: "A registrar may report helper streaks only for their home state" }, 403);
+    }
+    pending.email = recipient;
+    pending.granted = false;
+    const current = helperGiftItems(await loadSettingsObject(admin, CIVIC_HELPER_GIFT_PENDING_KEY));
+    const index = current.findIndex((p) => String(p.id ?? "") === id);
+    if (index >= 0) current[index] = { ...current[index], ...pending };
+    else if (!current.some((p) => p.granted !== true && emailKey(String(p.email ?? "")) === recipient)) {
+      current.unshift(pending);
+    }
+    const saved = await saveSettingsObject(admin, CIVIC_HELPER_GIFT_PENDING_KEY, { items: current });
+    if (!saved.ok) return jsonOk({ error: saved.error ?? "Could not notify admin" }, 500);
+    return jsonOk({ ok: true });
+  }
+
+  const token = String(
+    body.token ??
+      ((body.gift && typeof body.gift === "object" && !Array.isArray(body.gift))
+        ? (body.gift as Record<string, unknown>).token
+        : "") ??
+      "",
+  ).trim();
+  if (!token.startsWith("HG") || token.length < 8) {
+    return jsonOk({ error: "Invalid helper gift token" }, 400);
+  }
+  const stashKey = `${CIVIC_HELPER_GIFT_STASH_PREFIX}${token}`;
+
+  if (op === "grant") {
+    if (!role.isAdmin) return jsonOk({ error: "Admin required" }, 403);
+    const pendingId = String(body.pendingId ?? "").trim();
+    const rawGift = body.gift;
+    if (!pendingId || !rawGift || typeof rawGift !== "object" || Array.isArray(rawGift)) {
+      return jsonOk({ error: "Pending alert and gift are required" }, 400);
+    }
+    let pending = helperGiftItems(await loadSettingsObject(admin, CIVIC_HELPER_GIFT_PENDING_KEY));
+    const giftRecipientHint = emailKey(String((rawGift as Record<string, unknown>).email ?? ""));
+
+    const findOpenPendingIndex = (): number => {
+      let idx = pending.findIndex((p) => String(p.id ?? "") === pendingId && p.granted !== true);
+      if (idx >= 0) return idx;
+      if (giftRecipientHint) {
+        idx = pending.findIndex(
+          (p) => p.granted !== true && emailKey(String(p.email ?? "")) === giftRecipientHint,
+        );
+      }
+      return idx;
+    };
+
+    let pendingIndex = findOpenPendingIndex();
+    if (pendingIndex < 0) {
+      const rawPending = body.pending;
+      if (rawPending && typeof rawPending === "object" && !Array.isArray(rawPending)) {
+        const snap = { ...(rawPending as Record<string, unknown>) };
+        const id = String(snap.id ?? pendingId).trim();
+        const recipient = emailKey(String(snap.email ?? giftRecipientHint));
+        const streak = Number(snap.streak ?? 0);
+        if (id && recipient && Number.isFinite(streak) && streak >= 3) {
+          snap.id = id;
+          snap.email = recipient;
+          snap.granted = false;
+          const existingIdx = pending.findIndex((p) => String(p.id ?? "") === id);
+          if (existingIdx >= 0) pending[existingIdx] = { ...pending[existingIdx], ...snap };
+          else if (
+            !pending.some((p) => p.granted !== true && emailKey(String(p.email ?? "")) === recipient)
+          ) {
+            pending.unshift(snap);
+          }
+          const pendingSaved = await saveSettingsObject(admin, CIVIC_HELPER_GIFT_PENDING_KEY, {
+            items: pending,
+          });
+          if (pendingSaved.ok) {
+            pending = helperGiftItems(await loadSettingsObject(admin, CIVIC_HELPER_GIFT_PENDING_KEY));
+            pendingIndex = findOpenPendingIndex();
+          }
+        }
+      }
+    }
+    if (pendingIndex < 0) return jsonOk({ error: "This helper reward is no longer pending" }, 409);
+    const gift = { ...(rawGift as Record<string, unknown>) };
+    const recipient = emailKey(String(pending[pendingIndex].email ?? ""));
+    const amount = Number(gift.amount ?? 0);
+    const storeEmail = emailKey(String(gift.storeSellerEmail ?? ""));
+    if (
+      !recipient ||
+      !Number.isFinite(amount) ||
+      amount <= 0 ||
+      amount > 10000 ||
+      !storeEmail ||
+      String(gift.giftName ?? "").trim().length === 0
+    ) {
+      return jsonOk({ error: "Invalid money card" }, 400);
+    }
+    gift.email = recipient;
+    gift.token = token;
+    gift.qrPayload = `NGMYHELPERGIFT1|${token}`;
+    gift.storeSellerEmail = storeEmail;
+    gift.grantedBy = email;
+    gift.redeemed = false;
+    const stashSaved = await saveSettingsObject(admin, stashKey, gift);
+    if (!stashSaved.ok) return jsonOk({ error: stashSaved.error ?? "Could not create gift QR" }, 500);
+
+    const inbox = helperGiftItems(await loadSettingsObject(admin, CIVIC_HELPER_GIFT_INBOX_KEY));
+    const giftId = String(gift.id ?? "").trim();
+    const existing = inbox.findIndex((g) =>
+      String(g.token ?? "") === token || (giftId && String(g.id ?? "") === giftId)
+    );
+    if (existing >= 0) inbox[existing] = gift;
+    else inbox.unshift(gift);
+    const inboxSaved = await saveSettingsObject(admin, CIVIC_HELPER_GIFT_INBOX_KEY, { items: inbox });
+    if (!inboxSaved.ok) return jsonOk({ error: inboxSaved.error ?? "Could not deliver gift" }, 500);
+
+    pending[pendingIndex] = { ...pending[pendingIndex], granted: true, notified: true };
+    const pendingSaved = await saveSettingsObject(admin, CIVIC_HELPER_GIFT_PENDING_KEY, { items: pending });
+    if (!pendingSaved.ok) return jsonOk({ error: pendingSaved.error ?? "Could not close reward alert" }, 500);
+    return jsonOk({ ok: true, gift });
+  }
+
+  const gift = await loadSettingsObject(admin, stashKey);
+  if (!gift.token) return jsonOk({ error: "Gift not found" }, 404);
+  const lockedStore = emailKey(String(gift.storeSellerEmail ?? ""));
+  if (!role.isAdmin && lockedStore !== email) {
+    return jsonOk({ error: "This money card belongs to another NGMY store" }, 403);
+  }
+  if (op === "lookup") return jsonOk({ ok: true, gift });
+
+  if (op === "redeem") {
+    if (gift.redeemed === true) return jsonOk({ error: "This gift was already redeemed", gift }, 409);
+    // Money cards are valid for 1 week after they are sent.
+    const sentAt = Date.parse(String(gift.createdAt ?? ""));
+    if (sentAt && Date.now() - sentAt > 7 * 24 * 3600 * 1000) {
+      return jsonOk({ error: "This money card expired (cards are valid for 1 week after they are sent).", gift }, 410);
+    }
+    const updated = {
+      ...gift,
+      redeemed: true,
+      redeemedAt: new Date().toISOString(),
+      redeemedByStore: email,
+    };
+    const stashSaved = await saveSettingsObject(admin, stashKey, updated);
+    if (!stashSaved.ok) return jsonOk({ error: stashSaved.error ?? "Could not redeem gift" }, 500);
+    const inbox = helperGiftItems(await loadSettingsObject(admin, CIVIC_HELPER_GIFT_INBOX_KEY));
+    const index = inbox.findIndex((g) =>
+      String(g.token ?? "") === token || String(g.id ?? "") === String(gift.id ?? "")
+    );
+    if (index >= 0) inbox[index] = updated;
+    else inbox.unshift(updated);
+    const inboxSaved = await saveSettingsObject(admin, CIVIC_HELPER_GIFT_INBOX_KEY, { items: inbox });
+    if (!inboxSaved.ok) return jsonOk({ error: inboxSaved.error ?? "Could not update gift inbox" }, 500);
+    return jsonOk({ ok: true, gift: updated });
+  }
+
+  return jsonOk({ error: "Unknown helper gift operation" }, 400);
+}
+
+function rowTouchesEmail(row: Record<string, unknown>, email: string): boolean {
+  const want = emailKey(email);
+  if (!want) return false;
+  const fields = [
+    "userEmail",
+    "email",
+    "fromEmail",
+    "toEmail",
+    "player1Email",
+    "player2Email",
+    "buyerEmail",
+    "sellerEmail",
+    "ownerEmail",
+    "applicantEmail",
+    "reviewedBy",
+  ];
+  for (const f of fields) {
+    if (emailKey(String(row[f] ?? "")) === want) return true;
+  }
+  // nested maps keyed by email
+  for (const v of Object.values(row)) {
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      for (const k of Object.keys(v as Record<string, unknown>)) {
+        if (emailKey(k) === want) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function filterListForEmail(
+  list: Record<string, unknown>[],
+  email: string,
+): Record<string, unknown>[] {
+  return list.filter((row) => rowTouchesEmail(row, email));
+}
+
+function asItems(value: Record<string, unknown>, wrapKey = "items"): Record<string, unknown>[] {
+  const raw = value[wrapKey] ?? value.applications ?? value.loanApplications;
+  return asMemberList(raw);
+}
+
+async function handlePrivateListsFetch(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+
+  const mgmt = await loadSettingsObject(admin, MGMT_LISTS_KEY);
+  const invitesWrap = await loadSettingsObject(admin, GAME_INVITES_KEY);
+  const inquiriesWrap = await loadSettingsObject(admin, STORE_INQUIRIES_KEY);
+  const ordersWrap = await loadSettingsObject(admin, STORE_ORDERS_KEY);
+  const mediaWrap = await loadSettingsObject(admin, MEDIA_VIRTUAL_KEY);
+  const familyWrap = await loadSettingsObject(admin, FAMILY_PHOTO_ACCESS_KEY);
+  const spendingsWrap = await loadSettingsObject(admin, HELP_SPENDINGS_KEY);
+
+  const listFields = [
+    "loanApplications",
+    "jobWorkerApplications",
+    "jobPosts",
+    "helpHelperApplications",
+    "helpRequests",
+    "helpBusinesses",
+  ] as const;
+
+  if (role.isAdmin) {
+    return networkFetchOk({ view: "admin" });
+  }
+
+  const filteredMgmt: Record<string, unknown> = { ...mgmt };
+  for (const f of listFields) {
+    const list = asMemberList(mgmt[f]);
+    if (f === "jobPosts") {
+      filteredMgmt[f] = list;
+    } else {
+      filteredMgmt[f] = filterListForEmail(list, email);
+    }
+  }
+  delete filteredMgmt.adminDeletedUserEmails;
+  delete filteredMgmt.adminUserAccountStatusByEmail;
+  delete filteredMgmt.adminUserCrownBadgeByEmail;
+
+  const familyMap = (familyWrap.byEmail && typeof familyWrap.byEmail === "object")
+    ? (familyWrap.byEmail as Record<string, unknown>)
+    : familyWrap;
+  const ownFamily: Record<string, unknown> = {};
+  if (familyMap && typeof familyMap === "object") {
+    for (const [k, v] of Object.entries(familyMap)) {
+      if (emailKey(k) === email) ownFamily[k] = v;
+    }
+  }
+
+  return networkFetchOk({
+    view: role.isRegistrar ? "registrar" : "member",
+  });
+}
+
+async function handlePrivateListsPersist(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  const kind = String(body.kind ?? "management").trim(); // management | gameInvites | storeInquiries | storeOrders | familyPhotoAccess | mediaVirtualProfiles
+
+  if (kind === "management") {
+    const incoming = (body.management && typeof body.management === "object")
+      ? (body.management as Record<string, unknown>)
+      : {};
+    const current = await loadSettingsObject(admin, MGMT_LISTS_KEY);
+    if (role.isAdmin) {
+      const saved = await saveSettingsObject(admin, MGMT_LISTS_KEY, { ...current, ...incoming });
+      if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+      // Keep config columns empty
+      await admin.from("config").upsert({
+        id: "1",
+        loanApplications: [],
+        jobWorkerApplications: [],
+        jobPosts: incoming.jobPosts ?? current.jobPosts ?? [],
+        helpHelperApplications: [],
+        helpRequests: [],
+        helpBusinesses: [],
+      });
+      return jsonOk({ ok: true });
+    }
+    // Member: merge only own rows into each list
+    const next = { ...current };
+    for (const f of [
+      "loanApplications",
+      "jobWorkerApplications",
+      "helpHelperApplications",
+      "helpRequests",
+      "helpBusinesses",
+    ]) {
+      const cur = asMemberList(current[f]);
+      const others = cur.filter((r) => !rowTouchesEmail(r, email));
+      const mineIn = asMemberList(incoming[f]).filter((r) => rowTouchesEmail(r, email));
+      // Prefer incoming own rows; if empty keep existing own
+      const mineCur = cur.filter((r) => rowTouchesEmail(r, email));
+      next[f] = [...others, ...(mineIn.length > 0 ? mineIn : mineCur)];
+    }
+    if (Array.isArray(incoming.jobPosts)) next.jobPosts = incoming.jobPosts;
+    const saved = await saveSettingsObject(admin, MGMT_LISTS_KEY, next);
+    if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+    await admin.from("config").upsert({
+      id: "1",
+      loanApplications: [],
+      jobWorkerApplications: [],
+      helpHelperApplications: [],
+      helpRequests: [],
+      helpBusinesses: [],
+    });
+    return jsonOk({ ok: true });
+  }
+
+  const keyByKind: Record<string, string> = {
+    gameInvites: GAME_INVITES_KEY,
+    storeInquiries: STORE_INQUIRIES_KEY,
+    storeOrders: STORE_ORDERS_KEY,
+    mediaVirtualProfiles: MEDIA_VIRTUAL_KEY,
+    familyPhotoAccess: FAMILY_PHOTO_ACCESS_KEY,
+    helpCampaignSpendings: HELP_SPENDINGS_KEY,
+  };
+  const settingsKey = keyByKind[kind];
+  if (!settingsKey) return jsonOk({ error: "Unknown kind" }, 400);
+
+  if (kind === "familyPhotoAccess") {
+    const map = (body.byEmail && typeof body.byEmail === "object")
+      ? (body.byEmail as Record<string, unknown>)
+      : {};
+    const current = await loadSettingsObject(admin, FAMILY_PHOTO_ACCESS_KEY);
+    const curMap = (current.byEmail && typeof current.byEmail === "object")
+      ? { ...(current.byEmail as Record<string, unknown>) }
+      : {};
+    if (role.isAdmin) {
+      const saved = await saveSettingsObject(admin, FAMILY_PHOTO_ACCESS_KEY, { byEmail: map });
+      if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+    } else {
+      // member may only set own key
+      if (map[email] != null) curMap[email] = map[email];
+      const saved = await saveSettingsObject(admin, FAMILY_PHOTO_ACCESS_KEY, { byEmail: curMap });
+      if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+    }
+    await admin.from("config").upsert({ id: "1", familyTreePhotoAccessUntilByEmail: {} });
+    return jsonOk({ ok: true });
+  }
+
+  const items = asMemberList(body.items ?? body.list);
+  const current = await loadSettingsObject(admin, settingsKey);
+  const curItems = asItems(current);
+  let nextItems = curItems;
+  if (kind === "helpCampaignSpendings") {
+    if (!role.isAdmin && !role.isRegistrar) {
+      return jsonOk({ error: "Not allowed" }, 403);
+    }
+    nextItems = items;
+  } else if (role.isAdmin) {
+    nextItems = items;
+  } else {
+    const others = curItems.filter((r) => !rowTouchesEmail(r, email));
+    const mineIn = items.filter((r) => rowTouchesEmail(r, email));
+    const mineCur = curItems.filter((r) => rowTouchesEmail(r, email));
+    nextItems = [...others, ...(mineIn.length > 0 ? mineIn : mineCur)];
+  }
+  const saved = await saveSettingsObject(admin, settingsKey, { items: nextItems });
+  if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+
+  const wipe: Record<string, unknown> = { id: "1" };
+  if (kind === "gameInvites") wipe.gameInvites = [];
+  if (kind === "storeInquiries") wipe.storeInquiries = [];
+  if (kind === "storeOrders") wipe.storeOrders = [];
+  if (kind === "mediaVirtualProfiles") wipe.mediaVirtualProfiles = [];
+  if (kind === "helpCampaignSpendings") wipe.helpCampaignSpendings = [];
+  await admin.from("config").upsert(wipe);
+  return jsonOk({ ok: true, count: nextItems.length });
+}
+
+async function handleCivicFetchCitiesRooms(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  const wrap = await loadSettingsObject(admin, CIVIC_CITIES_ROOMS_KEY);
+  const fullByState = (wrap.civicCitiesByState && typeof wrap.civicCitiesByState === "object")
+    ? (wrap.civicCitiesByState as Record<string, unknown>)
+    : {};
+  const fullCities = Array.isArray(wrap.cities) ? wrap.cities : [];
+  const fullRooms = Array.isArray(wrap.rooms) ? wrap.rooms : [];
+
+  if (role.isAdmin || role.isRegistrar) {
+    return jsonOk({
+      ok: true,
+      civicCitiesByState: fullByState,
+      cities: fullCities,
+      rooms: fullRooms,
+    });
+  }
+
+  // Members: only their enrolled/anchor state slice (no full US map in Network).
+  let userState = "";
+  try {
+    const { data: userRow } = await admin.from("users").select("state").eq("email", email).maybeSingle();
+    userState = String(userRow?.state ?? "").trim();
+  } catch (_) {
+    // ignore
+  }
+  const sk = canonicalStateKey(userState);
+  const slice: Record<string, unknown> = {};
+  if (sk) {
+    for (const [k, v] of Object.entries(fullByState)) {
+      if (canonicalStateKey(k) === sk) slice[k] = v;
+    }
+  }
+  return jsonOk({
+    ok: true,
+    civicCitiesByState: slice,
+    cities: fullCities,
+    rooms: fullRooms,
+  });
+}
+
+/** Guest self-enrollment page — cities/rooms for one state + flag (no roster PII). */
+async function handleCivicPublicCatalog(body: Record<string, unknown>): Promise<Response> {
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const citiesWrap = await loadSettingsObject(admin, CIVIC_CITIES_ROOMS_KEY);
+  const se = await loadSettingsObject(admin, CIVIC_SELF_ENROLL_SETTINGS_KEY);
+  let selfEnroll =
+    se.civicSelfEnrollmentEnabled === true ||
+    String(se.civicSelfEnrollmentEnabled ?? "").toLowerCase() === "true";
+  if (!selfEnroll) {
+    try {
+      const { data: cfg } = await admin
+        .from("config")
+        .select("civicSelfEnrollmentEnabled")
+        .eq("id", "1")
+        .maybeSingle();
+      selfEnroll = cfg?.civicSelfEnrollmentEnabled === true;
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  const fullByState = (citiesWrap.civicCitiesByState && typeof citiesWrap.civicCitiesByState === "object")
+    ? (citiesWrap.civicCitiesByState as Record<string, unknown>)
+    : {};
+  const fullRooms = Array.isArray(citiesWrap.rooms) ? citiesWrap.rooms : [];
+  const wantState = String(body.state ?? "").trim();
+  const sk = canonicalStateKey(wantState);
+  const linkToken = String(body.linkToken ?? body.t ?? "").trim();
+  const linkVersion = Number(body.k ?? body.linkVersion ?? 0) || 0;
+  const linkValid = wantState
+    ? await validateStateEnrollmentLink(admin, wantState, linkToken, linkVersion)
+    : true;
+
+  // Only one state's cities on the wire — never the full US map in Network.
+  const slice: Record<string, unknown> = {};
+  let citiesForState: unknown[] = [];
+  if (sk) {
+    for (const [k, v] of Object.entries(fullByState)) {
+      if (canonicalStateKey(k) === sk) {
+        slice[k] = v;
+        if (Array.isArray(v)) citiesForState = v;
+      }
+    }
+  }
+
+  return jsonOk({
+    ok: true,
+    civicCitiesByState: slice,
+    cities: citiesForState,
+    rooms: fullRooms,
+    civicSelfEnrollmentEnabled: selfEnroll && linkValid,
+    enrollmentLinkValid: linkValid,
+  });
+}
+
+async function handleCivicAdminSettingsFetch(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  if (!role.isAdmin && !role.isRegistrar) {
+    return jsonOk({ error: "Not allowed" }, 403);
+  }
+
+  const help = await loadSettingsObject(admin, CIVIC_HELP_MODE_KEY);
+  const deleted = await loadSettingsObject(admin, CIVIC_DELETED_CONTRIB_KEY);
+  const removed = await loadSettingsObject(admin, CIVIC_RECEIPT_REMOVED_KEY);
+  const rawByState = (help.helpModeByState && typeof help.helpModeByState === "object")
+    ? (help.helpModeByState as Record<string, unknown>)
+    : {};
+  const safeByState: Record<string, unknown> = {};
+  for (const [state, raw] of Object.entries(rawByState)) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+    const campaign = raw as Record<string, unknown>;
+    safeByState[state] = {
+      active: campaign.active === true,
+      purpose: String(campaign.purpose ?? ""),
+      scopeType: String(campaign.scopeType ?? "all"),
+      scopeValue: String(campaign.scopeValue ?? ""),
+      campaignId: String(campaign.campaignId ?? ""),
+      campaignStartedAt: String(campaign.campaignStartedAt ?? ""),
+      updatedAt: String(campaign.updatedAt ?? ""),
+    };
+  }
+
+  const helperGiftPending = role.isAdmin
+    ? helperGiftItems(await loadSettingsObject(admin, CIVIC_HELPER_GIFT_PENDING_KEY))
+    : [];
+  const helperGiftInbox = role.isAdmin
+    ? helperGiftItems(await loadSettingsObject(admin, CIVIC_HELPER_GIFT_INBOX_KEY))
+    : [];
+
+  // Return only shared synchronization state. Payment handles, phone numbers,
+  // member emails, and unrelated settings never cross this endpoint.
+  return jsonOk({
+    ok: true,
+    view: role.isAdmin ? "admin" : "registrar",
+    civicHelperGiftPending: helperGiftPending,
+    civicHelperGiftInbox: helperGiftInbox,
+    civicHelpModeSettings: {
+      helpModeByState: safeByState,
+      helpCampaignClosures: Array.isArray(help.helpCampaignClosures)
+        ? help.helpCampaignClosures
+        : [],
+      savedAt: String(help.savedAt ?? ""),
+    },
+    civicDeletedContributionIds: Array.isArray(deleted.ids) ? deleted.ids : [],
+    civicContributionReceiptRemoved: {
+      ids: Array.isArray(removed.ids) ? removed.ids : [],
+      updatedAt: String(removed.updatedAt ?? removed.savedAt ?? ""),
+    },
+  });
+}
+
+async function handleCivicAdminSettingsPersist(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  if (!role.isAdmin && !role.isRegistrar) {
+    // Say which account was checked. "Not allowed" alone could not tell a
+    // registrar that the phone is signed in to a different email than the
+    // one that was approved.
+    const detail = await registrarRefusalDetail(admin, email);
+    return jsonOk({
+      error: `Not allowed: ${maskEmailNetwork(email)} has no approved registrar or admin role on the server (${detail})`,
+    }, 403);
+  }
+
+  const kind = String(body.kind ?? "").trim();
+  if (kind === "civicDeletedContributionIds") {
+    const ids = body.ids ?? body.keys ?? [];
+    const saved = await saveSettingsObject(admin, CIVIC_DELETED_CONTRIB_KEY, {
+      ids: Array.isArray(ids) ? ids : [],
+    });
+    if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+    return jsonOk({ ok: true });
+  }
+  if (kind === "civicContributionReceiptRemoved") {
+    const payload = (body.payload && typeof body.payload === "object")
+      ? (body.payload as Record<string, unknown>)
+      : {};
+    const saved = await saveSettingsObject(admin, CIVIC_RECEIPT_REMOVED_KEY, payload);
+    if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+    return jsonOk({ ok: true });
+  }
+  if (kind === "civicHelpModeSettings") {
+    const payload = (body.payload && typeof body.payload === "object")
+      ? (body.payload as Record<string, unknown>)
+      : {};
+    const current = await loadSettingsObject(admin, CIVIC_HELP_MODE_KEY);
+    const merged = mergeCivicHelpModeSave(current, payload);
+    let saved = await saveSettingsObject(admin, CIVIC_HELP_MODE_KEY, merged);
+    if (!saved.ok && merged.contributionReceipts) {
+      const withoutReceipts = { ...merged };
+      delete withoutReceipts.contributionReceipts;
+      saved = await saveSettingsObject(admin, CIVIC_HELP_MODE_KEY, withoutReceipts);
+    }
+    if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+    return jsonOk({ ok: true });
+  }
+  if (kind === "civicHelperGiftPending") {
+    if (!role.isAdmin && !role.isRegistrar) {
+      return jsonOk({ error: "Authorized Registrar or admin required" }, 403);
+    }
+    const raw = body.payload;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      return jsonOk({ error: "Pending helper gift required" }, 400);
+    }
+    const pending = { ...(raw as Record<string, unknown>) };
+    const id = String(pending.id ?? "").trim();
+    const recipient = emailKey(String(pending.email ?? ""));
+    const state = String(pending.state ?? "").trim();
+    const streak = Number(pending.streak ?? 0);
+    if (!id || !recipient || !state || !Number.isFinite(streak) || streak < 3) {
+      return jsonOk({ error: "Invalid helper gift alert" }, 400);
+    }
+    if (!role.isAdmin && !statesMatch(role.registrarState, state)) {
+      return jsonOk({ error: "A registrar may report helper streaks only for their home state" }, 403);
+    }
+    pending.email = recipient;
+    pending.granted = false;
+    const current = helperGiftItems(await loadSettingsObject(admin, CIVIC_HELPER_GIFT_PENDING_KEY));
+    const index = current.findIndex((p) => String(p.id ?? "") === id);
+    if (index >= 0) current[index] = { ...current[index], ...pending };
+    else if (!current.some((p) => p.granted !== true && emailKey(String(p.email ?? "")) === recipient)) {
+      current.unshift(pending);
+    }
+    const saved = await saveSettingsObject(admin, CIVIC_HELPER_GIFT_PENDING_KEY, { items: current });
+    if (!saved.ok) return jsonOk({ error: saved.error ?? "Could not notify admin" }, 500);
+    return jsonOk({ ok: true });
+  }
+  if (kind === "civicHelperGiftInbox" && role.isAdmin) {
+    const raw = body.payload;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      return jsonOk({ error: "Gift inbox payload required" }, 400);
+    }
+    const items = helperGiftItems(raw);
+    const saved = await saveSettingsObject(admin, CIVIC_HELPER_GIFT_INBOX_KEY, { items });
+    if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+    return jsonOk({ ok: true });
+  }
+  if (kind === "storeSellAccessEmails" && role.isAdmin) {
+    const emails = body.emails ?? body.items ?? [];
+    const saved = await saveSettingsObject(admin, STORE_SELL_ACCESS_KEY, {
+      emails: Array.isArray(emails) ? emails : [],
+    });
+    if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+    return jsonOk({ ok: true });
+  }
+  if (kind === "civicCitiesRooms" && (role.isAdmin || role.isRegistrar)) {
+    const existing = await loadSettingsObject(admin, CIVIC_CITIES_ROOMS_KEY);
+    const existingByState =
+      existing.civicCitiesByState && typeof existing.civicCitiesByState === "object"
+        ? { ...(existing.civicCitiesByState as Record<string, unknown>) }
+        : {};
+    const incomingByState =
+      body.civicCitiesByState && typeof body.civicCitiesByState === "object"
+        ? (body.civicCitiesByState as Record<string, unknown>)
+        : {};
+    const mergedByState: Record<string, unknown> = { ...existingByState };
+    for (const [k, v] of Object.entries(incomingByState)) {
+      mergedByState[k] = v;
+    }
+    const existingRooms = Array.isArray(existing.rooms)
+      ? existing.rooms.map((e) => String(e))
+      : [];
+    const incomingRooms = Array.isArray(body.rooms)
+      ? body.rooms.map((e) => String(e))
+      : [];
+    const roomsExact = body.roomsExact === true;
+    let rooms: string[];
+    if (roomsExact) {
+      rooms = incomingRooms;
+    } else if (incomingRooms.length === 0) {
+      rooms = existingRooms;
+    } else {
+      const seen = new Set<string>();
+      rooms = [];
+      for (const r of [...existingRooms, ...incomingRooms]) {
+        const t = r.trim();
+        if (!t || seen.has(t.toLowerCase())) continue;
+        seen.add(t.toLowerCase());
+        rooms.push(t);
+      }
+    }
+    const cities = Array.from(
+      new Set(
+        Object.values(mergedByState)
+          .flatMap((v) => (Array.isArray(v) ? v.map((e) => String(e).trim()) : []))
+          .filter((s) => s.length > 0),
+      ),
+    );
+    const saved = await saveSettingsObject(admin, CIVIC_CITIES_ROOMS_KEY, {
+      civicCitiesByState: mergedByState,
+      cities,
+      rooms,
+    });
+    if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+    await admin.from("config").upsert({
+      id: "1",
+      civicCitiesByState: {},
+      cities: [],
+      rooms: [],
+    });
+    return jsonOk({ ok: true });
+  }
+
+  return jsonOk({ error: "Unknown kind" }, 400);
+}
+
+async function handleTransactionsFetch(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  const pendingWallet = body.pendingWallet === true;
+  const rawLimit = Number(body.limit ?? 0);
+  const limit = role.isAdmin
+    ? Math.min(Math.max(rawLimit > 0 ? rawLimit : 2000, 1), 5000)
+    : Math.min(Math.max(rawLimit > 0 ? rawLimit : 1000, 1), 2000);
+
+  let query = admin
+    .from("transactions")
+    .select("*")
+    .order("timestamp", { ascending: false })
+    .limit(limit);
+
+  if (!role.isAdmin) {
+    query = query.ilike("userEmail", email);
+  } else if (pendingWallet) {
+    query = query.eq("status", 0).in("type", [0, 1]);
+  }
+
+  const { data, error } = await query;
+  if (error) return jsonOk({ error: error.message }, 500);
+  const count = ((data ?? []) as unknown[]).length;
+  return networkFetchOk({ count, pendingWallet: pendingWallet || undefined });
+}
+
+async function handleAdminUsersList(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email || !isNgmyAdminEmail(email)) {
+    return jsonOk({ error: "Admin only" }, 403);
+  }
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+
+  const columns =
+    "email,username,phone,isAdmin,status,forceLogout,accountBalance,totalProfit," +
+    "canSellOnStore,freeTrialActive,freeTrialDailyAmount,profilePicturePath,referredByCode,referralCount," +
+    "points,mediaBio,isEnrolledInRegistry,fullName,state,isAuthorizedRegistrar,isApprovedWorker,isApprovedHelper,created_at";
+
+  let rows: Record<string, unknown>[] = [];
+  try {
+    const { data, error } = await admin.from("users").select(columns).order("created_at", { ascending: false }).limit(5000);
+    if (error) {
+      const { data: fallback, error: err2 } = await admin
+        .from("users")
+        .select("email,username,phone,accountBalance,status,isAdmin")
+        .order("email")
+        .limit(5000);
+      if (err2) return jsonOk({ error: err2.message }, 500);
+      rows = (fallback ?? []) as Record<string, unknown>[];
+    } else {
+      rows = (data ?? []) as Record<string, unknown>[];
+    }
+  } catch (e) {
+    return jsonOk({ error: String(e) }, 500);
+  }
+
+  return jsonOk({ ok: true, users: rows });
+}
+
+const CIVIC_USER_GROUPS_KEY = "civic_user_groups_v1";
+
+function civicGroupOwnerEmail(g: Record<string, unknown>): string {
+  return emailKey(String(g.ownerEmail ?? ""));
+}
+
+function civicGroupHasMember(g: Record<string, unknown>, email: string): boolean {
+  const want = emailKey(email);
+  if (!want) return false;
+  if (civicGroupOwnerEmail(g) === want) return true;
+  const members = Array.isArray(g.members) ? g.members : [];
+  return members.some((m) => {
+    if (!m || typeof m !== "object") return false;
+    return emailKey(String((m as Record<string, unknown>).email ?? "")) === want;
+  });
+}
+
+/** True when [email] is the owner or an APPROVED member (a person waiting for approval is not in yet). */
+function civicGroupHasApprovedMember(g: Record<string, unknown>, email: string): boolean {
+  const want = emailKey(email);
+  if (!want) return false;
+  if (civicGroupOwnerEmail(g) === want) return true;
+  const members = Array.isArray(g.members) ? g.members : [];
+  return members.some((m) => {
+    if (!m || typeof m !== "object") return false;
+    const r = m as Record<string, unknown>;
+    return emailKey(String(r.email ?? "")) === want && String(r.status ?? "") !== "pending";
+  });
+}
+
+/** What a person who is only WAITING for approval may see: their own request, nothing about the group's money or people. */
+function civicGroupRedactedForPending(g: Record<string, unknown>, email: string): Record<string, unknown> {
+  const want = emailKey(email);
+  const members = (Array.isArray(g.members) ? g.members : []).filter((m) => civicGroupMemberEmail(m) === want);
+  return {
+    id: g.id,
+    name: g.name,
+    ownerEmail: g.ownerEmail,
+    ownerName: g.ownerName,
+    inviteCode: g.inviteCode,
+    createdAt: g.createdAt,
+    members,
+    notes: [],
+    ledger: [],
+  };
+}
+
+function civicGroupMemberEmail(m: unknown): string {
+  if (!m || typeof m !== "object") return "";
+  return emailKey(String((m as Record<string, unknown>).email ?? ""));
+}
+
+function civicGroupInviteCode(g: Record<string, unknown>): string {
+  return String(g.inviteCode ?? "").trim().toUpperCase();
+}
+
+function civicGroupMemberCount(g: Record<string, unknown>): number {
+  const emails = new Set<string>();
+  const owner = civicGroupOwnerEmail(g);
+  if (owner) emails.add(owner);
+  const members = Array.isArray(g.members) ? g.members : [];
+  for (const m of members) {
+    const e = civicGroupMemberEmail(m);
+    if (e) emails.add(e);
+  }
+  return emails.size;
+}
+
+function filterCivicUserGroupsForCaller(
+  value: Record<string, unknown>,
+  email: string,
+  isAdmin: boolean,
+): Record<string, unknown> {
+  const groups =
+    value.groups && typeof value.groups === "object" && !Array.isArray(value.groups)
+      ? (value.groups as Record<string, unknown>)
+      : {};
+  if (isAdmin) return { ...value, groups };
+  const mine: Record<string, unknown> = {};
+  const callerE = emailKey(email);
+  for (const [id, raw] of Object.entries(groups)) {
+    if (!raw || typeof raw !== "object") continue;
+    const g = raw as Record<string, unknown>;
+    if (civicGroupOwnerEmail(g) === callerE || civicGroupHasApprovedMember(g, callerE)) {
+      mine[id] = g;
+    } else if (civicGroupHasMember(g, callerE)) {
+      mine[id] = civicGroupRedactedForPending(g, callerE);
+    }
+  }
+  return { ...value, groups: mine };
+}
+
+function mergeCivicGroupMembersPreserveJoiners(
+  prev: Record<string, unknown>,
+  incoming: Record<string, unknown>,
+): unknown[] {
+  const incomingMembers = Array.isArray(incoming.members) ? incoming.members : [];
+  const prevMembers = Array.isArray(prev.members) ? prev.members : [];
+  const prevRemovalIds = new Set<string>();
+  const prevLedger = Array.isArray(prev.ledger) ? prev.ledger : [];
+  for (const row of prevLedger) {
+    if (!row || typeof row !== "object") continue;
+    const e = row as Record<string, unknown>;
+    const kind = String(e.kind ?? "").toLowerCase();
+    if (kind === "member_removed" || kind === "removed") {
+      prevRemovalIds.add(String(e.id ?? ""));
+    }
+  }
+  const removedKeys = new Set<string>();
+  const incomingLedger = Array.isArray(incoming.ledger) ? incoming.ledger : [];
+  for (const row of incomingLedger) {
+    if (!row || typeof row !== "object") continue;
+    const e = row as Record<string, unknown>;
+    const kind = String(e.kind ?? "").toLowerCase();
+    if (kind !== "member_removed" && kind !== "removed") continue;
+    if (prevRemovalIds.has(String(e.id ?? ""))) continue;
+    const label = String(e.label ?? "").trim().toLowerCase();
+    const memberEmail = emailKey(String(e.memberEmail ?? ""));
+    if (label) removedKeys.add(label);
+    if (memberEmail) removedKeys.add(memberEmail);
+  }
+  const byEmail = new Map<string, unknown>();
+  for (const m of incomingMembers) {
+    const e = civicGroupMemberEmail(m);
+    if (e) byEmail.set(e, m);
+  }
+  for (const m of prevMembers) {
+    const e = civicGroupMemberEmail(m);
+    if (!e || byEmail.has(e)) continue;
+    const name = String((m as Record<string, unknown>).name ?? "").trim().toLowerCase();
+    if (removedKeys.has(e) || (name && removedKeys.has(name))) continue;
+    byEmail.set(e, m);
+  }
+  return [...byEmail.values()];
+}
+
+function mergeCivicUserGroupsBlob(
+  existing: Record<string, unknown>,
+  incoming: Record<string, unknown>,
+  caller: string,
+  isAdmin: boolean,
+): Record<string, unknown> {
+  const existingMap =
+    existing.groups && typeof existing.groups === "object" && !Array.isArray(existing.groups)
+      ? { ...(existing.groups as Record<string, unknown>) }
+      : {};
+  const incomingMap =
+    incoming.groups && typeof incoming.groups === "object" && !Array.isArray(incoming.groups)
+      ? (incoming.groups as Record<string, unknown>)
+      : {};
+  const merged: Record<string, unknown> = { ...existingMap };
+  const callerE = emailKey(caller);
+
+  for (const [id, raw] of Object.entries(incomingMap)) {
+    if (!id || !raw || typeof raw !== "object") continue;
+    const g = raw as Record<string, unknown>;
+    const prevRaw = existingMap[id];
+    const prev = prevRaw && typeof prevRaw === "object" ? prevRaw as Record<string, unknown> : null;
+    if (!prev) {
+      if (isAdmin || civicGroupOwnerEmail(g) === callerE) merged[id] = g;
+      continue;
+    }
+    if (isAdmin || civicGroupOwnerEmail(prev) === callerE) {
+      merged[id] = { ...g, members: mergeCivicGroupMembersPreserveJoiners(prev, g) };
+      continue;
+    }
+    if (civicGroupHasMember(g, callerE) && !civicGroupHasMember(prev, callerE)) {
+      const prevMembers = Array.isArray(prev.members) ? [...prev.members] : [];
+      const incomingMembers = Array.isArray(g.members) ? g.members : [];
+      const extra = incomingMembers.filter((m) => {
+        if (!m || typeof m !== "object") return false;
+        return emailKey(String((m as Record<string, unknown>).email ?? "")) === callerE;
+      });
+      merged[id] = { ...prev, members: [...prevMembers, ...extra] };
+    }
+  }
+
+  for (const id of Object.keys(existingMap)) {
+    if (id in incomingMap) continue;
+    const prev = existingMap[id];
+    if (!prev || typeof prev !== "object") continue;
+    if (isAdmin || civicGroupOwnerEmail(prev as Record<string, unknown>) === callerE) {
+      delete merged[id];
+    }
+  }
+
+  return { groups: merged, updatedAt: new Date().toISOString() };
+}
+
+async function handleCivicUserGroupsFetch(req: Request): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  const value = await loadSettingsObject(admin, CIVIC_USER_GROUPS_KEY);
+  const filtered = filterCivicUserGroupsForCaller(value, email, role.isAdmin) as Record<string, unknown>;
+  // An Authorized Registrar also gets the (approved) Lightning users who live in their state.
+  if ((role.isRegistrar && role.registrarState) || role.isAdmin) {
+    const want = role.isAdmin ? "" : canonicalStateKey(role.registrarState);
+    const users: Record<string, unknown>[] = [];
+    const groups = value.groups && typeof value.groups === "object" && !Array.isArray(value.groups)
+      ? (value.groups as Record<string, unknown>)
+      : {};
+    for (const raw of Object.values(groups)) {
+      if (!raw || typeof raw !== "object") continue;
+      const g = raw as Record<string, unknown>;
+      const members = Array.isArray(g.members) ? g.members : [];
+      for (const m of members) {
+        if (!m || typeof m !== "object") continue;
+        const r = m as Record<string, unknown>;
+        if (String(r.status ?? "") === "pending") continue;
+        if (want && canonicalStateKey(String(r.state ?? "")) !== want) continue;
+        if (!String(r.state ?? "").trim()) continue;
+        users.push({
+          email: emailKey(String(r.email ?? "")),
+          name: String(r.name ?? ""),
+          phone: String(r.phone ?? ""),
+          state: String(r.state ?? ""),
+          address: String(r.address ?? ""),
+          family: Array.isArray(r.family) ? r.family : [],
+          groupCode: String(g.inviteCode ?? ""),
+          groupName: String(g.name ?? ""),
+        });
+      }
+    }
+    filtered.registrarLightningUsers = users;
+  }
+  return jsonOk({ ok: true, value: filtered });
+
+}
+
+async function handleCivicUserGroupsFind(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const code = String(body.code ?? "").trim().toUpperCase();
+  if (!/^[A-Z]{3}[0-9]{1,5}$/.test(code) && !/^GRP-[A-Z0-9]{5,10}$/.test(code)) {
+    return jsonOk({ ok: false, error: "Invalid group code" }, 400);
+  }
+  const value = await loadSettingsObject(admin, CIVIC_USER_GROUPS_KEY);
+  const groups =
+    value.groups && typeof value.groups === "object" && !Array.isArray(value.groups)
+      ? (value.groups as Record<string, unknown>)
+      : {};
+  for (const raw of Object.values(groups)) {
+    if (!raw || typeof raw !== "object") continue;
+    const g = raw as Record<string, unknown>;
+    if (civicGroupInviteCode(g) !== code) continue;
+    return jsonOk({ ok: true, group: g, alreadyMember: civicGroupHasMember(g, email) });
+  }
+  return jsonOk({ ok: true, group: null, alreadyMember: false });
+}
+
+async function handleCivicUserGroupsJoin(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const code = String(body.code ?? "").trim().toUpperCase();
+  if (!/^[A-Z]{3}[0-9]{1,5}$/.test(code) && !/^GRP-[A-Z0-9]{5,10}$/.test(code)) {
+    return jsonOk({ ok: false, error: "Invalid group code" }, 400);
+  }
+  const displayName = String(body.name ?? "").trim() || email.split("@")[0] || "Member";
+  const existing = await loadSettingsObject(admin, CIVIC_USER_GROUPS_KEY);
+  const groups =
+    existing.groups && typeof existing.groups === "object" && !Array.isArray(existing.groups)
+      ? { ...(existing.groups as Record<string, unknown>) }
+      : {};
+  let foundId = "";
+  let found: Record<string, unknown> | null = null;
+  for (const [id, raw] of Object.entries(groups)) {
+    if (!raw || typeof raw !== "object") continue;
+    const g = raw as Record<string, unknown>;
+    if (civicGroupInviteCode(g) === code) {
+      foundId = id;
+      found = g;
+      break;
+    }
+  }
+  if (!found || !foundId) return jsonOk({ ok: false, error: "No group found for that code." });
+  if (civicGroupHasApprovedMember(found, email)) {
+    return jsonOk({ ok: true, group: found, alreadyMember: true });
+  }
+  if (civicGroupHasMember(found, email)) {
+    return jsonOk({ ok: true, group: civicGroupRedactedForPending(found, email), alreadyMember: false, pending: true });
+  }
+  if (civicGroupMemberCount(found) >= 500) {
+    return jsonOk({ ok: false, error: "This group is full." }, 400);
+  }
+  const members = Array.isArray(found.members) ? [...found.members] : [];
+  // Having the code is not enough: the person is added as PENDING and the group owner has to approve them.
+  members.push({
+    email: emailKey(email),
+    name: displayName,
+    joinedAt: new Date().toISOString(),
+    missed: 0,
+    status: "pending",
+    phone: String(body.phone ?? "").replace(/\D/g, "").slice(0, 15),
+    state: String(body.state ?? "").trim().slice(0, 40),
+    address: String(body.address ?? "").trim().slice(0, 200),
+    family: Array.isArray(body.family) ? (body.family as unknown[]).slice(0, 12) : [],
+    requestedAt: new Date().toISOString(),
+  });
+  const next = { ...found, members };
+  groups[foundId] = next;
+  const saved = await saveSettingsObject(admin, CIVIC_USER_GROUPS_KEY, {
+    groups,
+    updatedAt: new Date().toISOString(),
+  });
+  if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+  return jsonOk({ ok: true, group: civicGroupRedactedForPending(next, email), alreadyMember: false, pending: true });
+}
+
+async function handleCivicUserGroupsPersist(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  const incoming =
+    body.value && typeof body.value === "object" && !Array.isArray(body.value)
+      ? (body.value as Record<string, unknown>)
+      : {};
+  const existing = await loadSettingsObject(admin, CIVIC_USER_GROUPS_KEY);
+  const existingGroups =
+    existing.groups && typeof existing.groups === "object" && !Array.isArray(existing.groups)
+      ? (existing.groups as Record<string, unknown>)
+      : {};
+  const incomingGroups =
+    incoming.groups && typeof incoming.groups === "object" && !Array.isArray(incoming.groups)
+      ? (incoming.groups as Record<string, unknown>)
+      : {};
+  for (const [id, raw] of Object.entries(incomingGroups)) {
+    if (!raw || typeof raw !== "object" || existingGroups[id]) continue;
+    const code = civicGroupInviteCode(raw as Record<string, unknown>);
+    if (!code) continue;
+    const clash = Object.entries(existingGroups).some(([eid, eraw]) => {
+      if (eid === id || !eraw || typeof eraw !== "object") return false;
+      return civicGroupInviteCode(eraw as Record<string, unknown>) === code;
+    });
+    if (clash) {
+      return jsonOk({ ok: false, error: "That group code is already taken. Try another." }, 409);
+    }
+  }
+  const merged = mergeCivicUserGroupsBlob(existing, incoming, email, role.isAdmin);
+  const saved = await saveSettingsObject(admin, CIVIC_USER_GROUPS_KEY, merged);
+  if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+  return jsonOk({
+    ok: true,
+    value: filterCivicUserGroupsForCaller(merged, email, role.isAdmin),
+  });
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "POST only" }), {
+      status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // Housekeeping in the background (at most every 6 h) — never delays the request.
+  try {
+    const job = ngmyMaybeRunMaintenance();
+    const rt = (globalThis as any).EdgeRuntime;
+    if (rt?.waitUntil) rt.waitUntil(job);
+  } catch { /* ignore */ }
+
+  try {
+    const body = await req.json();
+    const wireCode = String(body?.a ?? "").trim();
+    const WIRE_TO_ACTION: Record<string, string> = {
+      u1: "adminUsersList",
+      p1: "privateListsFetch",
+      p2: "privateListsPersist",
+      t1: "transactionsFetch",
+      c1: "civicVerifyStatePin",
+      c2: "civicGateMatchName",
+      c3: "civicGateVerifyIdentity",
+      c4: "civicFetchRoster",
+      c5: "civicUpsertMember",
+      c6: "civicRemoveMember",
+      c7: "civicMarkDeceased",
+      c8: "civicPersistRoster",
+      c9: "civicGuestEnroll",
+      ca: "civicPublicCatalog",
+      cb: "civicFetchRegistryPins",
+      cc: "civicSaveRegistryPins",
+      cd: "civicFetchRegistrarApplications",
+      ce: "civicPersistRegistrarApplications",
+      cf: "civicFetchCitiesRooms",
+      cg: "civicAdminSettingsFetch",
+      ch: "civicAdminSettingsPersist",
+      ci: "civicFetchEnrollmentLink",
+      cj: "civicRegenerateEnrollmentLink",
+      ck: "civicNationwideStats",
+      cl: "civicCheckAccess",
+      cm: "civicRecoveryStatus",
+      cn: "civicRecoveryLink",
+      co: "civicRecoveryRemove",
+      cp: "civicRecoveryIssue",
+      cq: "civicFetchRankings",
+      cr: "civicHelperGifts",
+      cs: "civicDecideRegistrarApplication",
+      ct: "civicUserGroupsFetch",
+      cu: "civicUserGroupsPersist",
+      cv: "civicUserGroupsFind",
+      cw: "civicUserGroupsJoin",
+      cx: "civicGuestSelfUpdate",
+      cy: "civicDeleteRegistrarApplication",
+      k1: "civicGiveUnlock",
+      k2: "civicGiveList",
+      k3: "civicGiveCreate",
+      k4: "civicGiveRespond",
+      k5: "civicGiveUpdate",
+      k6: "civicGiveInbox",
+      a1: "aiKeyConfigured",
+      a2: "saveAiApiKey",
+      a3: "verifyPasswordLogin",
+      a4: "registerAppUser",
+      a5: "passwordResetSendOtp",
+      a6: "passwordResetVerifyOtp",
+      a7: "passwordResetComplete",
+      r1: "dbRelay",
+      v1: "elevenlabsTts",
+      m1: "resendEmail",
+      i1: "geminiVirtualOutfit",
+      i2: "pollinationsImage",
+      b1: "advisorBrowserFrame",
+      w1: "advisorBrowse",
+      w2: "advisorBrowserShot",
+      g1: "agentStart",
+      g2: "agentPoll",
+      g3: "agentStop",
+      g4: "agentStatus",
+      g5: "agentShot",
+      m9: "gameInvitesSync",
+      f1: "freeTimeGet",
+      f2: "freeTimeAdd",
+      h1: "hwList",
+      h2: "hwMe",
+      h3: "hwApply",
+      h4: "hwRequest",
+      h5: "hwRespond",
+      h6: "hwDone",
+      h7: "hwRate",
+      h8: "hwCancel",
+      h9: "hwAdminList",
+      ha: "hwAdminDecide",
+      hb: "hwPostJob",
+      hc: "hwJobs",
+      hd: "hwPickJob",
+      he: "hwPlanCashApp",
+      hf: "hwBusy",
+      hg: "hwCare",
+      hh: "hwCareSign",
+      hi: "hwAdminCare",
+      hj: "hwAdminPayList",
+      hk: "hwAdminPay",
+      hl: "hwAdminCareRevoke",
+      hm: "hwAdminCareRestore",
+      hn: "hwAdminCarePayments",
+      ho: "hwAdminCarePaymentDecide",
+      hp: "hwAdminWorkerStats",
+      s1: "storeGrant",
+      s2: "storeRevoke",
+      s3: "storeList",
+      s4: "storeMine",
+      s5: "storeSaveProfile",
+      s6: "storeDirectory",
+      d1: "relStatus",
+      d2: "relTouch",
+      d3: "relStart",
+      d4: "relEnd",
+      x1: "tradeAnalyze",
+      x2: "tradeSummary",
+      x3: "tradePaperOpen",
+      x4: "tradePaperClose",
+      x5: "tradeHalt",
+      x6: "tradeRiskSet",
+      x7: "tradeReset",
+      z0: "chat",
+    };
+    const action = WIRE_TO_ACTION[wireCode] ?? String(body?.action ?? "chat").trim();
+    // Client-supplied apiKey is ignored for AI calls (security). Admin save/login use explicit fields.
+    const clientApiKeyIgnored = String(body?.apiKey ?? "").trim();
+
+    if (action === "passwordResetSendOtp") {
+      const email = String(body?.email ?? "").trim().toLowerCase();
+      if (!email || !email.includes("@")) {
+        return new Response(JSON.stringify({ error: "Invalid email" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const limitedIp = await enforceRateLimit(req, "pw_reset_ip", clientIp(req), 8, 3600);
+      if (limitedIp) return limitedIp;
+      return await handlePasswordResetSendOtp(email, req);
+    }
+
+    if (action === "passwordResetVerifyOtp") {
+      const email = String(body?.email ?? "").trim().toLowerCase();
+      const code = String(body?.code ?? "").trim();
+      if (!email || code.length < 6) {
+        return new Response(JSON.stringify({ error: "Email and 6-digit code required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const limited = await enforceRateLimit(req, "pw_reset_verify", email, 12, 900);
+      if (limited) return limited;
+      return await handlePasswordResetVerifyOtp(email, code);
+    }
+
+    if (action === "passwordResetComplete") {
+      const jwtEmailForReset = (await requireJwtEmail(req)).toLowerCase().trim();
+      const email = (String(body?.email ?? "").trim().toLowerCase()) || jwtEmailForReset;
+      const newHash = String(body?.newPasswordHash ?? "").trim();
+      const resetToken = String(body?.resetToken ?? "").trim();
+      if (!email || !newHash) {
+        return new Response(JSON.stringify({ error: "Email and new password required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const limited = await enforceRateLimit(req, "pw_reset_complete", email || clientIp(req), 8, 900);
+      if (limited) return limited;
+      return await handlePasswordResetComplete(jwtEmailForReset, email, newHash, resetToken);
+    }
+
+    if (action === "dbRelay") {
+      return await handleDbRelay(req, body ?? {});
+    }
+
+    if (action === "saveAiApiKey") {
+      const requesterEmail = (await requireJwtEmail(req)).trim().toLowerCase();
+      const apiKey = String(body?.apiKey ?? "").trim();
+      return await handleSaveAiApiKey(requesterEmail, apiKey);
+    }
+
+    if (action === "aiKeyConfigured") {
+      return await handleAiKeyConfigured();
+    }
+
+    if (action === "verifyPasswordLogin") {
+      const email = String(body?.email ?? "").trim().toLowerCase();
+      const passwordHash = String(body?.passwordHash ?? "").trim();
+      const ip = clientIp(req);
+      const limitedEmail = await enforceRateLimit(req, "login_email", `${ip}:${email}`, 10, 900);
+      if (limitedEmail) return limitedEmail;
+      const limitedIp = await enforceRateLimit(req, "login_ip", ip, 40, 900);
+      if (limitedIp) return limitedIp;
+      return await handleVerifyPasswordLogin(email, passwordHash);
+    }
+
+    if (action === "registerAppUser") {
+      const limited = await enforceRateLimit(req, "register_ip", clientIp(req), 5, 3600);
+      if (limited) return limited;
+      return await handleRegisterAppUser(body as Record<string, unknown>);
+    }
+
+    if (action === "civicVerifyStatePin") {
+      const limited = await enforceRateLimit(req, "civic_pin", clientIp(req), 15, 900);
+      if (limited) return limited;
+      return await handleCivicVerifyStatePin(req, body as Record<string, unknown>);
+    }
+    if (action === "civicGateMatchName") {
+      const limited = await enforceRateLimit(req, "civic_gate", clientIp(req), 20, 900);
+      if (limited) return limited;
+      return await handleCivicGateMatchName(req, body as Record<string, unknown>);
+    }
+    if (action === "civicGateVerifyIdentity") {
+      const limited = await enforceRateLimit(req, "civic_gate", clientIp(req), 20, 900);
+      if (limited) return limited;
+      return await handleCivicGateVerifyIdentity(req, body as Record<string, unknown>);
+    }
+    if (action === "civicFetchDirectory" || action === "civicFetchRoster" ||
+      action === "civicFetchRegistrarRoster" || action === "civicFetchAdminRoster") {
+      return await handleCivicFetchRoster(req, body as Record<string, unknown>);
+    }
+    if (action === "civicFetchRankings") {
+      return await handleCivicFetchRankings(req, body as Record<string, unknown>);
+    }
+    if (action === "civicHelperGifts") {
+      return await handleCivicHelperGifts(req, body as Record<string, unknown>);
+    }
+    if (action === "civicNationwideStats") {
+      return await handleCivicNationwideStats(req);
+    }
+    if (action === "civicCheckAccess") {
+      return await handleCivicCheckAccess(req, body as Record<string, unknown>);
+    }
+    if (action === "civicRecoveryStatus") {
+      return await handleCivicRecoveryStatus(req);
+    }
+    if (action === "civicRecoveryLink") {
+      return await handleCivicRecoveryLink(req, body as Record<string, unknown>);
+    }
+    if (action === "civicRecoveryRemove") {
+      return await handleCivicRecoveryRemove(req, body as Record<string, unknown>);
+    }
+    if (action === "civicRecoveryIssue") {
+      return await handleCivicRecoveryIssue(req, body as Record<string, unknown>);
+    }
+    if (action === "civicUpsertMember") {
+      const limited = await enforceRateLimit(req, "civic_write", clientIp(req), 40, 60);
+      if (limited) return limited;
+      return await handleCivicUpsertMember(req, body as Record<string, unknown>);
+    }
+    if (action === "civicRemoveMember" ||
+      action === "civicMarkDeceased" || action === "civicPersistRoster") {
+      const limited = await enforceRateLimit(req, "civic_write", clientIp(req), 40, 60);
+      if (limited) return limited;
+      return await handleCivicPersistRoster(req, body as Record<string, unknown>);
+    }
+    if (action === "civicGuestEnroll") {
+      const limited = await enforceRateLimit(req, "civic_enroll", clientIp(req), 8, 3600);
+      if (limited) return limited;
+      return await handleCivicGuestEnroll(body as Record<string, unknown>);
+    }
+    if (action === "civicGuestSelfUpdate") {
+      const limited = await enforceRateLimit(req, "civic_self_update", clientIp(req), 12, 3600);
+      if (limited) return limited;
+      return await handleCivicGuestSelfUpdate(body as Record<string, unknown>);
+    }
+    if (action === "civicPublicCatalog") {
+      const limited = await enforceRateLimit(req, "civic_catalog", clientIp(req), 60, 60);
+      if (limited) return limited;
+      return await handleCivicPublicCatalog(body as Record<string, unknown>);
+    }
+    if (action === "civicFetchEnrollmentLink") {
+      return await handleCivicFetchEnrollmentLink(req, body as Record<string, unknown>);
+    }
+    if (action === "civicRegenerateEnrollmentLink") {
+      return await handleCivicRegenerateEnrollmentLink(req, body as Record<string, unknown>);
+    }
+    if (action === "civicFetchRegistryPins") {
+      return await handleCivicFetchRegistryPins(req, body as Record<string, unknown>);
+    }
+    if (action === "civicSaveRegistryPins") {
+      return await handleCivicSaveRegistryPins(req, body as Record<string, unknown>);
+    }
+    if (action === "civicFetchRegistrarApplications") {
+      return await handleCivicFetchRegistrarApplications(req, body as Record<string, unknown>);
+    }
+    if (action === "civicPersistRegistrarApplications") {
+      return await handleCivicPersistRegistrarApplications(req, body as Record<string, unknown>);
+    }
+    if (action === "civicDecideRegistrarApplication") {
+      return await handleCivicDecideRegistrarApplication(req, body as Record<string, unknown>);
+    }
+    if (action === "civicDeleteRegistrarApplication") {
+      return await handleCivicDeleteRegistrarApplication(req, body as Record<string, unknown>);
+    }
+    if (action === "privateListsFetch") {
+      return await handlePrivateListsFetch(req, body as Record<string, unknown>);
+    }
+    if (action === "privateListsPersist") {
+      const limited = await enforceRateLimit(req, "private_lists", clientIp(req), 40, 60);
+      if (limited) return limited;
+      return await handlePrivateListsPersist(req, body as Record<string, unknown>);
+    }
+    if (action === "adminUsersList") {
+      return await handleAdminUsersList(req, body as Record<string, unknown>);
+    }
+    if (action === "transactionsFetch") {
+      const limited = await enforceRateLimit(req, "txn_fetch", clientIp(req), 30, 60);
+      if (limited) return limited;
+      return await handleTransactionsFetch(req, body as Record<string, unknown>);
+    }
+    if (action === "civicFetchCitiesRooms") {
+      return await handleCivicFetchCitiesRooms(req, body as Record<string, unknown>);
+    }
+    if (action === "civicAdminSettingsFetch") {
+      return await handleCivicAdminSettingsFetch(req, body as Record<string, unknown>);
+    }
+    if (action === "civicAdminSettingsPersist") {
+      return await handleCivicAdminSettingsPersist(req, body as Record<string, unknown>);
+    }
+    if (action === "civicUserGroupsFetch") {
+      const limited = await enforceRateLimit(req, "civic_groups", clientIp(req), 40, 60);
+      if (limited) return limited;
+      return await handleCivicUserGroupsFetch(req);
+    }
+    if (action === "civicUserGroupsPersist") {
+      const limited = await enforceRateLimit(req, "civic_groups_write", clientIp(req), 40, 60);
+      if (limited) return limited;
+      return await handleCivicUserGroupsPersist(req, body as Record<string, unknown>);
+    }
+    if (action === "civicUserGroupsFind") {
+      const limited = await enforceRateLimit(req, "civic_groups", clientIp(req), 40, 60);
+      if (limited) return limited;
+      return await handleCivicUserGroupsFind(req, body as Record<string, unknown>);
+    }
+    if (action === "civicUserGroupsJoin") {
+      const limited = await enforceRateLimit(req, "civic_groups_write", clientIp(req), 40, 60);
+      if (limited) return limited;
+      return await handleCivicUserGroupsJoin(req, body as Record<string, unknown>);
+    }
+
+    // Advisor "eyes" — read a page / search the web so the advisor answers from what is really there.
+    // Advisor web tools cost money / fetch other sites — signed-in NGMY users only, so the
+    // server can't be used as a free open proxy or to run up AI costs.
+    if (["advisorBrowse", "advisorBrowserShot", "advisorBrowserFrame"].includes(action)) {
+      const who = (await requireJwtEmail(req)).trim();
+      if (!who) return jsonOk({ ok: false, error: "Please sign in to use the advisor browser." }, 401);
+    }
+
+    if (action === "advisorBrowse") {
+      const aiGuard = await guardAi(req, "browse", "expensive");
+      if (aiGuard) return aiGuard;
+      const task = String(body?.task ?? "").trim().slice(0, 2000);
+      const rawUrl = String(body?.url ?? "").trim();
+      if (!task && !rawUrl) {
+        return jsonOk({ ok: false, error: "task or url is required" }, 400);
+      }
+      const apiKey = await resolveServerAiApiKey();
+      return jsonOk(await advisorBrowse(apiKey ?? "", task, rawUrl));
+    }
+
+    // Trading Lab — analysis, risk engine, paper trading (simulated money only).
+    if (action.startsWith("trade") &&
+      ["tradeAnalyze", "tradeSummary", "tradePaperOpen", "tradePaperClose", "tradeHalt", "tradeRiskSet", "tradeReset"]
+        .includes(action)) {
+      return await handleTrading(req, action, body);
+    }
+
+    if (action === "freeTimeGet" || action === "freeTimeAdd") return await handleFreeTime(req, action, body);
+    if (HW_ACTIONS.has(action)) return await handleHouseWorkers(req, action, body);
+    if (CIVIC_GIVE_ACTIONS.has(action)) {
+      const limited = await enforceRateLimit(req, action === "civicGiveInbox" ? "civic_give_inbox" : "civic_give", clientIp(req), action === "civicGiveInbox" ? 120 : 40, 3600);
+      if (limited) return limited;
+      return await handleCivicGive(req, action, body);
+    }
+    if (STORE_ACTIONS.has(action)) return await handleStoreAccess(req, action, body);
+
+    if (["relStatus", "relTouch", "relStart", "relEnd"].includes(action)) {
+      return await handleAdvisorRelationship(req, action, body);
+    }
+
+    // Live agent: advisor drives a real cloud browser; user watches the live view in chat.
+    if (action === "agentStart") return await handleAgentStart(req, body);
+    if (action === "agentPoll") {
+      const limited = await enforceRateLimit(req, "agent_poll", clientIp(req), 900, 3600);
+      if (limited) return limited;
+      return await handleAgentPoll(req, body);
+    }
+    if (action === "agentStop") return await handleAgentStop(body);
+    if (action === "gameInvitesSync") {
+      // In-memory limit (no database write per check) — the match gate checks every ~2 s.
+      const ip = clientIp(req);
+      const now = Date.now();
+      const slot = agentShotHits.get(`gi:${ip}`);
+      if (!slot || now - slot.start > 60_000) agentShotHits.set(`gi:${ip}`, { start: now, n: 1 });
+      else if (++slot.n > 120) return rateLimitedResponse();
+      return await handleGameInvitesSync(req, body);
+    }
+    if (action === "agentShot") {
+      // ~1 per second while a task runs and the chat is open. In-memory limit (no database
+      // write per picture, so this costs nothing extra in the database).
+      const ip = clientIp(req);
+      const now = Date.now();
+      const slot = agentShotHits.get(ip);
+      if (!slot || now - slot.start > 60_000) {
+        agentShotHits.set(ip, { start: now, n: 1 });
+      } else if (++slot.n > 120) {
+        return rateLimitedResponse();
+      }
+      if (agentShotHits.size > 5000) agentShotHits.clear();
+      return await handleAgentShot(req, body);
+    }
+    if (action === "agentStatus") {
+      const configured = !!browserUseKey();
+      if (!configured || !body?.verify) return jsonOk({ ok: true, configured });
+      const limited = await enforceRateLimit(req, "agent_verify", clientIp(req), 10, 600);
+      if (limited) return limited;
+      // Cheap authenticated call — confirms the key is accepted (never returns the key).
+      const r = await browserUseFetch("/runs?limit=1");
+      const cursorReady = r.status === 200 ? !!(await ensureCursorExtensionId()) : false;
+      // Counts only (no task text): how many recent tasks and how many separate browsers they used.
+      const recent = await browserUseFetch("/runs?limit=30");
+      const list = Array.isArray(recent.data?.items) ? recent.data.items : (Array.isArray(recent.data?.runs) ? recent.data.runs : (Array.isArray(recent.data) ? recent.data : []));
+      const sessions = new Set(list.map((x: any) => String(x?.sessionId ?? x?.session_id ?? "")).filter((s: string) => s));
+      const models = [...new Set(list.map((x: any) => String(x?.model ?? "")).filter((s: string) => s))];
+      // Timing only (no task text, no pages): how long recent tasks took and seconds per step.
+      let timings: unknown[] = [];
+      if (body?.timings) {
+        const t = (v: unknown) => { const n = Date.parse(String(v ?? "")); return Number.isFinite(n) ? n : 0; };
+        timings = await Promise.all(list.slice(0, 6).map(async (x: any) => {
+          const id = String(x?.id ?? "");
+          const ev = id ? await browserUseFetch(`/runs/${id}/events?limit=200`) : { status: 0, data: null };
+          const items: any[] = Array.isArray(ev.data?.items) ? ev.data.items : (Array.isArray(ev.data?.events) ? ev.data.events : (Array.isArray(ev.data) ? ev.data : []));
+          const at = (e: any) => t(e?.createdAt ?? e?.timestamp ?? e?.created_at ?? e?.ts ?? e?.time ?? e?.occurredAt);
+          const stamps = items.map(at).filter((n) => n > 0).sort((a, b) => a - b);
+          // Time the AI took to think each step (request → response), and time spent acting between steps.
+          const think: number[] = [], act: number[] = [];
+          let lastReq = 0, lastResp = 0;
+          for (const e of items) {
+            const ty = String(e?.type ?? ""), n = at(e);
+            if (!n) continue;
+            if (ty === "llm.request") { if (lastResp) act.push((n - lastResp) / 1000); lastReq = n; }
+            if (ty === "llm.response" && lastReq) { think.push((n - lastReq) / 1000); lastResp = n; }
+          }
+          const avg = (a: number[]) => a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length * 10) / 10 : null;
+          const gaps = stamps.slice(1).map((n, i) => (n - stamps[i]) / 1000);
+          const start = t(x?.createdAt ?? x?.startedAt), end = t(x?.finishedAt ?? x?.completedAt ?? x?.updatedAt);
+          return {
+            model: x?.model, status: x?.status, events: items.length,
+            totalSec: start && end ? Math.round((end - start) / 1000) : null,
+            avgGapSec: gaps.length ? Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length) : null,
+            maxGapSec: gaps.length ? Math.round(Math.max(...gaps)) : null,
+            steps: think.length, thinkAvgSec: avg(think), thinkMaxSec: think.length ? Math.round(Math.max(...think)) : null,
+            actAvgSec: avg(act), actMaxSec: act.length ? Math.round(Math.max(...act)) : null,
+            inTokens: x?.totalInputTokens, outTokens: x?.totalOutputTokens, cost: x?.totalCostUsd,
+            eventKeys: Object.keys(items[0] ?? {}).slice(0, 12),
+            error: String(x?.error ?? "").slice(0, 160), flags: x?.flags, contextLimit: x?.contextLimit,
+            cursor: ev.data?.nextCursor ?? ev.data?.next ?? ev.data?.hasMore ?? null,
+          };
+        }));
+      }
+      return jsonOk({ ok: true, configured, keyValid: r.status === 200, keyStatus: r.status, cursorReady, recentRuns: list.length, recentBrowsers: sessions.size, models, modelIdx: agentModelIdx, timings });
+    }
+
+    // Rendered picture of a page for the mini browser (sites that can't be re-hosted).
+    if (action === "advisorBrowserShot") {
+      const limited = await enforceRateLimit(req, "advisor_shot", clientIp(req), 90, 3600);
+      if (limited) return limited;
+      const safe = advisorBrowseSafeUrl(String(body?.url ?? ""));
+      if (!safe) return jsonOk({ ok: false, error: "That link can't be opened." }, 400);
+      const shot = await advisorScreenshot(safe);
+      return jsonOk(shot ? { ok: true, screenshotBase64: shot } : { ok: false, error: "No picture yet." });
+    }
+
+    if (action === "advisorBrowserFrame") {
+      const limited = await enforceRateLimit(req, "advisor_browser", clientIp(req), 40, 3600);
+      if (limited) return limited;
+      const url = String(body?.url ?? "").trim();
+      if (!url) {
+        return jsonOk({ ok: false, error: "url is required" }, 400);
+      }
+      return await handleAdvisorBrowserFrame(url);
+    }
+
+    if (action === "elevenlabsTts") {
+      const aiGuard = await guardAi(req, "tts", "expensive");
+      if (aiGuard) return aiGuard;
+      const text = String(body?.text ?? "").trim().slice(0, 2500);
+      const voiceId = String(body?.voiceId ?? "21m00Tcm4TlvDq8ikWAM").trim();
+      const modelId = String(body?.modelId ?? "eleven_turbo_v2_5").trim();
+      const apiKey = (await resolveServerElevenLabsKey()) || clientApiKeyIgnored;
+      if (!apiKey || !text) {
+        return new Response(
+          JSON.stringify({ error: "Voice API key not configured on server, and text is required" }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+      const audioBase64 = await elevenLabsTts(apiKey, text, voiceId, modelId);
+      return new Response(JSON.stringify({ audioBase64 }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "resendEmail") {
+      const limited = await enforceRateLimit(req, "resend", clientIp(req), 20, 3600);
+      if (limited) return limited;
+      const requesterEmail = (await requireJwtEmail(req)).trim().toLowerCase();
+      if (!requesterEmail || !NGMY_ADMIN_EMAILS.has(requesterEmail)) {
+        return new Response(JSON.stringify({ error: "Admin access required for email send" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const resendKey = String(Deno.env.get("RESEND_API_KEY") ?? "").trim();
+      const to = String(body?.to ?? "").trim();
+      const subject = String(body?.subject ?? "Message from NGMY").trim();
+      const html = String(body?.html ?? body?.body ?? "").trim();
+      const from = String(
+        body?.from ?? Deno.env.get("RESEND_FROM_EMAIL") ?? "NGMY <noreply@ngmy.org>",
+      ).trim();
+      if (!resendKey || !to || !html) {
+        return new Response(
+          JSON.stringify({ error: "Resend API key (server secret), to, and html/body are required" }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+      const sent = await resendSendEmail(resendKey, from, to, subject, html);
+      return new Response(JSON.stringify({ ok: true, id: sent.id ?? null }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "geminiVirtualOutfit") {
+      const aiGuard = await guardAi(req, "outfit", "expensive");
+      if (aiGuard) return aiGuard;
+      const outfitBad = checkAiInput(AI_RUNTIME, { prompt: body?.prompt, images: body?.images }, "expensive");
+      if (outfitBad) return aiJson({ error: outfitBad, code: "ai_input_too_big" }, 413);
+      const outfitPrompt = String(body?.prompt ?? "").trim();
+      const images: GeminiImagePart[] = Array.isArray(body?.images)
+        ? body.images
+        : [];
+      const personOnly = Boolean(body?.personOnly);
+      const apiKey = await resolveServerAiApiKey();
+      if (!apiKey || !outfitPrompt || images.length < 1) {
+        return new Response(
+          JSON.stringify({
+            error: "Server AI key, prompt, and at least one image (person) are required",
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+      const imageBase64 = await geminiVirtualOutfit(
+        apiKey,
+        outfitPrompt,
+        images,
+        personOnly,
+      );
+      return new Response(JSON.stringify({ imageBase64 }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Partner chat selfies — fetch image server-side so phone browsers skip CORS.
+    if (action === "pollinationsImage") {
+      const aiGuard = await guardAi(req, "image", "normal");
+      if (aiGuard) return aiGuard;
+      const imgPrompt = String(body?.prompt ?? "").trim();
+      const allowAdult = Boolean(body?.allowAdult);
+      if (!imgPrompt) {
+        return new Response(JSON.stringify({ error: "prompt is required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const clipped = imgPrompt.length > 480 ? `${imgPrompt.slice(0, 477)}...` : imgPrompt;
+      const seed = Date.now();
+      const url =
+        `https://image.pollinations.ai/prompt/${encodeURIComponent(clipped)}` +
+        `?width=768&height=768&nologo=true&enhance=true&seed=${seed}` +
+        (allowAdult ? `&safe=false` : "");
+      const imgRes = await fetch(url);
+      if (!imgRes.ok) {
+        return new Response(
+          JSON.stringify({ error: `Image service HTTP ${imgRes.status}` }),
+          {
+            status: 502,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+      const buf = new Uint8Array(await imgRes.arrayBuffer());
+      if (buf.length < 2048) {
+        return new Response(JSON.stringify({ error: "Image service returned empty body" }), {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ imageBase64: bytesToBase64(buf) }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "aiGateStatus" || action === "aiLimitsSave") return await handleAiAdmin(req, action, body);
+    // Login, per-user limits, IP limits and the global cap are checked here, before anything reaches the AI provider.
+    const aiCls = classifyAiRequest(body);
+    const chatGuard = await guardAi(req, "chat", aiCls);
+    if (chatGuard) return chatGuard;
+    const prompt = String(body?.prompt ?? "").trim();
+    const inputBad = checkAiInput(AI_RUNTIME, body, aiCls);
+    if (inputBad) return aiJson({ error: inputBad, code: "ai_input_too_big" }, 413);
+    const images: GeminiImagePart[] = Array.isArray(body?.images)
+      ? (body.images as GeminiImagePart[]).slice(0, AI_RUNTIME.maxImages)
+      : [];
+    // App Builder sends a full multi-screen app as JSON, which needs a much
+    // bigger output budget (and a stronger model) than a short chat reply.
+    const appBuilder = String(body?.mode ?? "") === "appBuilder";
+
+    const serverKey = await resolveServerAiApiKey();
+    const creds = parseServerAiCreds(serverKey);
+    const apiKey = creds.key;
+    const provider = creds.provider;
+    const openAiBaseUrl = creds.baseUrl;
+    if (!apiKey || !prompt) {
+      return new Response(
+        JSON.stringify({
+          error: !apiKey
+            ? "AI is not set up yet. Admin: set the NGMY_AI_API_KEY secret."
+            : "prompt is required",
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    let text = "";
+    switch (provider) {
+      case "openai":
+        text = await openAiChat(apiKey, prompt, "https://api.openai.com/v1", appBuilder);
+        break;
+      case "anthropic":
+        text = await anthropicChat(apiKey, prompt, appBuilder);
+        break;
+      case "openaiCompatible":
+        text = await openAiChat(
+          apiKey,
+          prompt,
+          openAiBaseUrl ?? "https://api.openai.com/v1",
+          appBuilder,
+        );
+        break;
+      case "gemini":
+      default:
+        text = await geminiChat(apiKey, prompt, images, appBuilder);
+        break;
+    }
+
+    return new Response(JSON.stringify({ text }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    if (e instanceof ProviderBusyError) return await aiProviderBusy(req, e, "provider");
+    if (e instanceof ProviderStopError) {
+      console.error("[ai-gate] provider refused the request:", e.status);
+      return aiJson({ error: "The AI is not available right now. Please try again later.", code: "ai_unavailable" }, 502, 120);
+    }
+    const msg = scrubSecrets(e instanceof Error ? e.message : String(e));
+    return new Response(JSON.stringify({ error: msg }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
+
+// ── Relay rate limit, kept in memory ──────────────────────────────────────────
+// Every database read/write through the relay used to be counted with a database write
+// (and every blocked one wrote a security-log row + an error log line) — that doubled the
+// database traffic and filled the logs. Same limits, counted in memory; a block is logged
+// at most once a minute per connection.
+const relayHits = new Map<string, { start: number; n: number }>();
+const relayBlockLogged = new Map<string, number>();
+
+function relayRateLimit(req: Request, bucket: string, max: number, note: string): Response | null {
+  const ip = clientIp(req);
+  const key = `${bucket}|${ip}`;
+  const now = Date.now();
+  const slot = relayHits.get(key);
+  if (!slot || now - slot.start > 60_000) {
+    relayHits.set(key, { start: now, n: 1 });
+    if (relayHits.size > 20000) relayHits.clear();
+    return null;
+  }
+  if (++slot.n <= max) return null;
+  const last = relayBlockLogged.get(key) ?? 0;
+  if (now - last > 60_000) {
+    relayBlockLogged.set(key, now);
+    if (relayBlockLogged.size > 5000) relayBlockLogged.clear();
+    console.error("[rate-limit]", bucket, ip, note.slice(0, 120));
+    const admin = adminClient();
+    if (admin) void logSecurityEvent(admin, "rate_limit", `${bucket}:${ip} ${note}`.slice(0, 300), ip);
+  }
+  return rateLimitedResponse();
+}
