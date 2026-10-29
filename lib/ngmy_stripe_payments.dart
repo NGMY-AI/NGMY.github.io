@@ -81,7 +81,7 @@ class NgmyStripePayments {
 
   /// Payment Link for the advisors' live browser: $5.99 = 2 hours of browser time, kept for a week.
   /// Create it in the Stripe Dashboard (a one-time $5.99 price) and paste the buy.stripe.com link here.
-  static const String advisorBrowserUrl = '';
+  static const String advisorBrowserUrl = 'https://buy.stripe.com/aFa28r5Rv0hj57Zf8Nb7y0n';
 
   /// Invoices a free user may create before the paywall. Counted per invoice,
   /// not per day, so someone who only invoices occasionally still gets all three.
