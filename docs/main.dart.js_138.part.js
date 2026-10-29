@@ -1520,7 +1520,7 @@ i.push(A.am)
 i.push(new C.fCG(r).$1("NIMETOWE"))
 i.push(A.fF)
 v=J.e4(3,x.l)
-for(u=0;u<3;++u)v[u]=new B.D(A.Mh,new B.cl(A.aP,A.e,A.j,A.m,t,A.p,t,0,B.a([B.p(t,t,A.f,t,t,new B.o(r,t,t,t,t,t,A.a5),t,7,t,t,t,t,t,7),A.db,new B.bB(1,A.bh,p.$1$h(4),t)],j),t),t)
+for(u=0;u<3;++u)v[u]=new B.D(A.Mi,new B.cl(A.aP,A.e,A.j,A.m,t,A.p,t,0,B.a([B.p(t,t,A.f,t,t,new B.o(r,t,t,t,t,t,A.a5),t,7,t,t,t,t,t,7),A.db,new B.bB(1,A.bh,p.$1$h(4),t)],j),t),t)
 A.d.v(i,v)
 i.push(A.b7)
 i.push(B.d(d.b,t,t,t,t,t,t,B.l(t,t,s.j(0.85),t,t,t,t,t,t,t,t,8,t,t,A.H,t,t,!0,t,t,t,t,t,t,t,t),A.L,t,t))
@@ -1555,7 +1555,7 @@ p=B.C(new B.a_(i,new C.fwA(),q),q.k("J.E"))
 w=!g&&p.length!==0?3:4
 break
 case 3:w=5
-return B.b(B.bS(D.Lu,null,new C.fwB(p),d,!0,!0,!1,A.lx,!1,!1,x.N),$async$ags)
+return B.b(B.bS(D.Lv,null,new C.fwB(p),d,!0,!0,!1,A.lx,!1,!1,x.N),$async$ags)
 case 5:t=k
 if(t==="continue"){f.$1(A.d.gI(p).hH())
 w=1
@@ -1585,7 +1585,7 @@ p=B.C(new B.a_(i,new C.fwE(),q),q.k("J.E"))
 w=!g&&p.length!==0?3:4
 break
 case 3:w=5
-return B.b(B.bS(D.Lu,null,new C.fwF(p),d,!0,!0,!1,A.lx,!1,!1,x.N),$async$agt)
+return B.b(B.bS(D.Lv,null,new C.fwF(p),d,!0,!0,!1,A.lx,!1,!1,x.N),$async$agt)
 case 5:t=k
 if(t==="continue"){f.$1(A.d.gI(p).hH())
 w=1
@@ -1615,14 +1615,14 @@ m=B.C(new B.a_(i,new C.fwI(),n),n.k("J.E"))
 w=!g&&m.length!==0?3:4
 break
 case 3:w=5
-return B.b(B.bS(D.Lu,null,new C.fwJ(m),d,!0,!0,!1,A.lx,!1,!1,x.N),$async$agu)
+return B.b(B.bS(D.Lv,null,new C.fwJ(m),d,!0,!0,!1,A.lx,!1,!1,x.N),$async$agu)
 case 5:t=k
 if(t==="continue"){f.$1(A.d.gI(m).hH())
 w=1
 break}if(t!=="new"){w=1
 break}case 4:if(d.e==null){w=1
 break}w=6
-return B.b(C.bDl(d,"Malipo ya Awamu ya Mahari",D.QI),$async$agu)
+return B.b(C.bDl(d,"Malipo ya Awamu ya Mahari",D.QJ),$async$agu)
 case 6:s=k
 if(s==null||d.e==null){w=1
 break}w=A.a.i(h==null?"":h).length!==0?7:9
@@ -1635,8 +1635,8 @@ case 9:w=10
 return B.b(B.L8(d,"Tafuta jimbo\u2026","",A.k7,"Chagua jimbo"),$async$agu)
 case 10:r=k
 case 8:if(r==null||d.e==null){w=1
-break}q=C.agS(s,D.QI)
-if(q==null)q=A.d.gI(D.QI)
+break}q=C.agS(s,D.QJ)
+if(q==null)q=A.d.gI(D.QJ)
 n=C.cB()
 p=C.rw(q.e,null,0,0,C.fZw(q,0.21,"Mimi [Jina la Baba wa Mume], nikiwa kama baba na mkuu wa familia ya upande wa mume kutoka jamii ya [Jina la Jamii ya Mume], nyumba ya [Jina la Nyumba ya Mume], ninafanya makubaliano haya rasmi na familia ya [Jina la Baba wa Binti], wa jamii ya [Jina la Jamii ya Binti], nyumba ya [Jina la Nyumba ya Binti]. Kwa kuwa malipo kamili ya mahari ya mke wa mwanangu hayajakamilika kwa sasa, tumefikia makubaliano ya kulipa kwa awamu. Kiasi kilichosalia cha mahari kitakamilishwa kikamilifu na familia yetu ifikapo tarehe [Tarehe ya Kurudi Kulipa Mahari]. Siku hiyo, pande zote mbili zitakutana tena kwa ajili ya kukamilisha taratibu zote zilizosalia, kupokea baraka kamili za ndoa, na kukabidhiwa Cheti cha Ndoa ya Kimila. Makubaliano haya yanafanyika kwa hiari, kwa ridhaa ya familia zote mbili, na kwa kufuata misingi ya heshima, mila, desturi na maelewano mema kati ya familia zetu.",D.d0t,"MALIPO YALIYOSALIA",!1,"Mambo ya Cash na Mali (Yaliyosalia / Yatakayokamilishwa):",18,r,"HATI YA MAKUBALIANO YA MALIPO YA AWAMU YA MAHARI",24,0.85,0.048,2),n,D.qk,"","","Hati ya Makubaliano ya Malipo ya Awamu",D.de)
 n=C.cB()
@@ -1703,13 +1703,13 @@ return B.a([C.CJ(h,0.028,D.bg,h,0,"chv_"+d,g,e,f),C.CJ(w,0.024,D.l6,w,0,"chv_l_"
 bzz(d,e,f,g,h){var w=e+0.12,v=g-0.12
 return B.a([C.Ky("Sahihi:",A.bi,h,10,A.P,0.02,"is_"+d,0.12,e,f),C.er(A.bi,!1,4279310375,A.aD,"marriage_sign_"+d,0,24,A.bo,A.a6,"",0.032,C.cB(),null,"","",0,!1,"",0,D.bg,0,2,"",0,0,"",D.cn,D.f4,v,w,f-0.006),C.hjN(w,f+0.016,v)],x.u)},
 h2r(d){var w,v
-for(w=0;w<19;++w){v=D.QX[w]
+for(w=0;w<19;++w){v=D.QY[w]
 if(v.a===d)return v}return null},
 i7w(d){var w,v,u,t,s,r,q,p,o,n,m,l=null,k=d.c
 if(A.a.a0(k,"hati_kuhowa_")){w=C.agS(A.a.b5(k,12),l)
 v=w==null?l:w.d}else if(A.a.a0(k,"hati_kuhoweya_")){w=C.agS(A.a.b5(k,14),l)
 v=w==null?l:w.d}else if(A.a.a0(k,"hati_malipo_awamu_")){u=A.a.b5(k,18)
-w=C.agS(u,D.QI)
+w=C.agS(u,D.QJ)
 v=w==null?l:w.d
 if(v==null){w=C.agS(u,l)
 v=w==null?l:w.d}}else if(A.a.a0(k,"marriage_")){w=C.h2r(A.a.b5(k,9))
@@ -3114,8 +3114,8 @@ break
 default:w=null}return w},
 hUV(d){var w,v,u,t=A.a.i(d).toLowerCase()
 if(t.length===0)return null
-for(w=0;w<109;++w){v=D.Q6[w]
-if(v.toLowerCase()===t)return v}for(w=0;w<109;++w){v=D.Q6[w]
+for(w=0;w<109;++w){v=D.Q7[w]
+if(v.toLowerCase()===t)return v}for(w=0;w<109;++w){v=D.Q7[w]
 if(!B.cS(v.toLowerCase(),t,0))u=B.cS(t,v.toLowerCase(),0)
 else u=!0
 if(u)return v}return null},
@@ -3133,12 +3133,12 @@ q.n(0,"image_query",r.w)
 p=r.x
 if(p>0)q.n(0,"picture",p)
 o.push(q)}return A.S.ao(B.F(["title",d.a,"style",d.b,"logo_frame",d.d,"logo_ring",d.e,"photo_frame",d.f,"photo_ring",d.r,"slides",o],u,t),null)},
-i7X(d,e,f,g,h){var w=new B.M(D.wb,new C.fHl(),x.eC).aH(0,", "),v=""+d,u=C.hoC(h),t=F.fB5(h),s=C.hkN(g),r=e.t(0,D.I4)?'- New slides get an "emoji".\n':"",q=e.t(0,D.I5)?'- New slides get an "icon3d" from: '+A.d.aH(D.Q6,", ")+".\n":"",p=e.t(0,D.CU)?'- New content slides get an "image_query" (2-3 English words).\n':""
+i7X(d,e,f,g,h){var w=new B.M(D.wb,new C.fHl(),x.eC).aH(0,", "),v=""+d,u=C.hoC(h),t=F.fB5(h),s=C.hkN(g),r=e.t(0,D.I4)?'- New slides get an "emoji".\n':"",q=e.t(0,D.I5)?'- New slides get an "icon3d" from: '+A.d.aH(D.Q7,", ")+".\n":"",p=e.t(0,D.CU)?'- New content slides get an "image_query" (2-3 English words).\n':""
 return"You edit an existing presentation. Here it is as JSON:\n"+f+"\n\nThe presenter is looking at slide "+v+'.\n\nWHAT THEY WANT CHANGED (may be informal):\n"""'+h+'"""\n\nRules:\n- Do exactly what they ask: add, remove, move, shorten, lengthen or rewrite slides, change the tone, the language or the style ('+w+'). "This slide" / "here" means slide '+v+". New slides go where they say (or right after slide "+v+').\n- Keep every slide they did not ask about exactly as it is.\n- Same limits as before: titles max 7 words, 3 to 5 bullets of max 12 words, never invent prices, dates or statistics.\n- LANGUAGE: keep the presentation\'s current language unless they ask for another one; if they do, translate EVERY slide. JSON keys and the "kind", "style", "icon3d" and "image_query" values stay in English.\n- TRANSLATING OR REWORDING: change only the words. Keep "style", "kind", "emoji", "icon3d", "image_query", "picture" and the frame/ring values exactly as they are, with the same number of slides and bullets.\n- VOICE: write the way a real, friendly person talks and writes to someone they respect. Short plain sentences. Everyday words that people really use today. No corporate or robotic phrasing ("leverage", "synergy", "empower the ecosystem", "in today\'s dynamic landscape"), no made-up or rare words, no stacked jargon, no lecture tone. Explain the Civic registry, the AI, and any other topic the way you would explain it to a neighbour. If the language is Swahili, use the Swahili people speak and write every day in Kenya and Tanzania: real common words, natural word order, and never an English word forced into Swahili grammar or an invented Swahili word. Check that each word is one an ordinary speaker would understand.\n'+u+"\n"+t+'\n- Keep "logo_frame", "logo_ring", "photo_frame" and "photo_ring" unless they ask to change how the logo or pictures look.\n- PICTURE LOOK: "logo_frame" and "photo_frame" are one of: circle, rounded, triangle, hexagon, diamond, arch, or "" (as is). "logo_ring" and "photo_ring" are one of: gold, platinum, glow, rainbow, double, neon, framed, rosegold, jewels, aurora, or "" (none). Follow what the request says (e.g. "my picture in a circle with a gold ring"); if it says nothing, choose what suits the look (luxury \u2192 gold, neon/night \u2192 neon, clean \u2192 rounded with no ring).\n- BIO LINK: if they ask to put their bio link / link page / socials / "my links" in the presentation, add ONE slide with kind "bio" (title like "Connect with me", a one-line inviting subtitle) \u2014 usually just before the closing slide, or where they say. Their real Bio page (with clickable links) is shown on a phone on that slide.\n'+s+"\n"+r+q+p+'- Reply with the WHOLE presentation as JSON only, no markdown, same shape:\n{"title":"...","style":"...","logo_frame":"","logo_ring":"","photo_frame":"","photo_ring":"","slides":[{"kind":"...","title":"...","subtitle":"...","bullets":[],"notes":"...","emoji":"","icon3d":"","image_query":""}]}\n'},
 i7Y(d,e,f,g,h,i){var w,v,u,t,s='- "emoji": ONE emoji that fits the slide (e.g. \ud83c\udf89 \ud83d\ude80 \ud83c\udf3f \ud83d\udca1).\n',r=f?"- A document is attached (read it all). Rewrite its content as the slides in the same language: keep its facts, names, numbers, dates and the order of its sections, and never invent facts it does not contain.\n":"",q=new B.M(D.wb,new C.fHo(),x.eC).aH(0,", "),p=new B.ff("")
 if(e.t(0,D.I4)){p.a=s
 w=s}else w=""
-if(e.t(0,D.I5))w=p.a=w+('- "icon3d": ONE name copied exactly from this list that fits the slide: '+A.d.aH(D.Q6,", ")+".\n")
+if(e.t(0,D.I5))w=p.a=w+('- "icon3d": ONE name copied exactly from this list that fits the slide: '+A.d.aH(D.Q7,", ")+".\n")
 if(e.t(0,D.CU))p.a=w+'- "image_query": 2-3 simple English words for a real photo that fits the slide (e.g. "city skyline", "students classroom").\n'
 w=C.hoC(d)
 v=F.fB5(d)
@@ -3203,7 +3203,7 @@ s=new C.nL("luxe",u.a,A.lV,t,u.e,u.f,B.a([s,u.d,s],x.t),D.de)
 w=s}if(w==null)w=C.i80(f9.b)
 r=g2.t(0,D.a5r)||f6
 q=g2.t(0,D.I4)
-p=g2.t(0,D.S6)
+p=g2.t(0,D.S7)
 o=new C.fzL()
 n=B.a([],x.g)
 m=new C.fzO(o,w,r)
@@ -3246,7 +3246,7 @@ c1.push(k.$9$anim$delay$fx$key(d0,0.42,0.04,0.16,0.28,c0,500,d1?f2:"",b4))}else 
 c1.push(l.$8$fx$key(D.bg,0.4,0.66,0.2,0.012,b5,f4,f3))
 c1.push(m.$10$align$anim$key$weight(b2.b,0.08,0.33,0.84,0.3,54,A.L,b9,e5,A.u))
 c1.push(m.$10$align$color$delay$key(b2.c,0.12,0.7,0.76,0.14,24,A.L,a2,300,f5))
-d3=D.S3
+d3=D.S4
 break A}if("section"===d2){c1.push(l.$8$fx$key(D.eN,0.64,0.46,0.42,0.75,(A.o.D(42,0,255)<<24|b5&16777215)>>>0,e7,e6))
 if(d0!=null){b4=!c3&&!d1?f1:f0
 c1.push(k.$8$anim$fx$key(d0,0.7,0.2,0.24,0.44,c0,d1?f2:"",b4))}else c1.push(l.$9$fx$key$rotation(D.l6,0.78,0.1,0.18,0.32,(A.o.D(64,0,255)<<24|b7&16777215)>>>0,e7,e8,0.3))
@@ -3284,7 +3284,7 @@ c1.push(k.$9$anim$delay$fx$key(d0,0.42,0.05,0.16,0.28,c0,450,d1?f2:"",b4))}else 
 c1.push(l.$8$fx$key(D.bg,0.42,0.61,0.16,0.012,b5,f4,f3))
 c1.push(m.$10$align$anim$key$weight(b2.b,0.1,0.34,0.8,0.26,52,A.L,b9,e5,A.u))
 c1.push(m.$10$align$color$delay$key(b2.c,0.14,0.65,0.72,0.16,24,A.L,a2,300,f5))
-d3=D.S3
+d3=D.S4
 break A}d4=b2.d
 if(d4.length===0&&b2.c.length!==0)d4=B.a([b2.c],a9)
 d5=c9!=null
@@ -3439,7 +3439,7 @@ l.cx=t
 t=B.a3(e).k("jR<co.E,m>")
 t=B.C(new B.jR(e,new C.ffS(),t),t.k("J.E"))
 l.cy=t
-l.ay=e.t(0,D.S6)
+l.ay=e.t(0,D.S7)
 u=l
 w=1
 break
@@ -3563,7 +3563,7 @@ p.cx=o
 o=w.$ti.k("jR<co.E,m>")
 o=B.C(new B.jR(w,new C.fHr(),o),o.k("J.E"))
 p.cy=o
-p.ay=w.t(0,D.S6)
+p.ay=w.t(0,D.S7)
 return p},
 ibP(d,e,f){return B.bS(A.K,null,new C.fPC(f,e),d,!0,!0,!0,null,!1,!1,x.I)},
 hOG(){var w,v,u,t=1000*Date.now()&2147483647,s=new B.eE()
@@ -3989,7 +3989,7 @@ if(o==null){w=d.db
 if(w.length===0)w="Image"
 p=B.x2(B.fc(w,l,l,l,B.h9(l,A.rH,l,l,l,l,l,l,l,A.dt,l,l,10,l,l,l,!0,l,l,l,l),l))}else p=new B.HP(o,n?A.abA:A.VK,l,l)
 break
-case 3:w=new B.nv(A.Il,1,A.kM)
+case 3:w=new B.nv(A.Im,1,A.kM)
 u=B.vu(6)
 t=d.db
 if(t.length===0)t="PDF document"
@@ -4004,7 +4004,7 @@ if(w!==0)p=B.hfb(-w,p)
 w=i===D.cQ
 if(w){m=A.o.aC(d.Q,24)&255
 if(m<255)p=new B.aso(m/255,p)}if(w)return new F.w7(k,l,j,l,new B.S5(new B.kC(g,g,f,1/0),p))
-if(i===D.l5){i=new B.nv(A.Il,1,A.kM)
+if(i===D.l5){i=new B.nv(A.Im,1,A.kM)
 i=B.lw(A.v2,p,l,new B.kD(A.pb,new B.pD(i,i,i,i),B.vu(4),A.hI,l),l,l,D.bx8,l)}else i=p
 return new F.w7(k,l,j,l,new B.fS(g,f,i))},
 hWz(d,e,f,g){var w,v=null,u=C.bA6(d.e),t=d.f
@@ -4016,7 +4016,7 @@ h2U(d){var w=0,v=B.j(x.E),u,t,s,r,q,p,o,n
 var $async$h2U=B.e(function(e,f){if(e===1)return B.f(f,v)
 for(;;)switch(w){case 0:n=B.a4c(null,"NGMY Slides",d.b)
 for(t=d.r,s=t.length,r=n.c,q=0;q<t.length;t.length===s||(0,B.K)(t),++q){p=t[q]
-o=new B.Ws(A.wn,A.Ii,D.byf,null,null,null,!1,null)
+o=new B.Ws(A.wn,A.Ij,D.byf,null,null,null,!1,null)
 o=new B.BO(o,new C.fHD(607,787,p,d))
 o.MB(n,null)
 r.push(o)}u=n.kc(0)
@@ -4043,7 +4043,7 @@ n=A.a.i(r.b)
 u.push(new B.nM(D.brp,new C.awC(new C.ai9(q),B.lw(m,B.fc(n.length===0?A.a.i(r.c):n,m,m,m,D.fbJ,A.ny),m,new B.kD(p,m,new B.aiA(o,o,o,o),A.hI,m),m,m,D.bxy,m))))}k=k?m:l.as
 if(A.a.i(k==null?"":k).length!==0){k=A.a.i(l.as)
 t=B.x2(B.fc(k,m,m,m,D.faY,m))
-u.push(new C.awC(C.hw8(k),t))}return B.lw(m,B.yO(u,A.LZ,A.lu),m,new B.kD(j,new B.pD(v,v,v,v),w,A.hI,m),m,m,D.bsf,m)},
+u.push(new C.awC(C.hw8(k),t))}return B.lw(m,B.yO(u,A.M_,A.lu),m,new B.kD(j,new B.pD(v,v,v,v),w,A.hI,m),m,m,D.bsf,m)},
 fml:function fml(){},
 fmk:function fmk(d,e){this.a=d
 this.b=e},
@@ -4321,7 +4321,7 @@ return B.b(B.L8(d,"Search states\u2026","",A.k7,"Choose state"),$async$agv)
 case 10:case 8:q=a6
 if(q==null||d.e==null){w=1
 break}p=C.h2r(s)
-if(p==null)p=A.d.gI(D.QX)
+if(p==null)p=A.d.gI(D.QY)
 f=C.cB()
 o=A.a.i(q)
 if(o.length===0)o=null
@@ -4385,7 +4385,7 @@ case"lineThrough":return A.zJ
 default:return A.aD}},
 er(d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0){return new C.eM(o,a7,a9,b0,a8,n,a2,j,l,k,g,f,d,p,w,i,a0,a1,v,e,h,s,a6,a3,r,q,m,u,a5,t,a4)},
 hlT(d){var w,v,u=J.k(d==null?"fade":d)
-for(w=0;w<22;++w){v=D.QH[w]
+for(w=0;w<22;++w){v=D.QI[w]
 if(v.b===u)return v}return D.de},
 hSm(d){var w,v,u=J.k(d==null?"text":d)
 for(w=0;w<6;++w){v=D.cSX[w]
@@ -6509,7 +6509,7 @@ break}w=4
 return B.b(C.VX(),$async$a8_)
 case 4:s=a6
 r=C.yA(a2==null?"":a2)
-if(r==null)r=a3!=null?C.hpt(a3,null,A.IL):null
+if(r==null)r=a3!=null?C.hpt(a3,null,A.IM):null
 q=x.N
 p=B.aX(q)
 for(o=J.dl(s),n=J.aV(o.gib(s)),m=x.f;n.C();){l=n.gR(n)
@@ -8082,7 +8082,7 @@ if(e.aN()!==67324752)return
 e.aW()
 o.b=e.aW()
 w=D.aE5.h(0,e.aW())
-o.c=w==null?D.LT:w
+o.c=w==null?D.LU:w
 o.d=e.aW()
 o.e=e.aW()
 o.f=e.aN()
@@ -8117,7 +8117,7 @@ q=s.aW()
 o.at=D.aV6
 o.ax=new C.cxj(r,q)
 w=D.aE5.h(0,q)
-o.c=w==null?D.LT:w}}}if((o.b&8)!==0){p=e.aN()
+o.c=w==null?D.LU:w}}}if((o.b&8)!==0){p=e.aN()
 if(p===134695760)o.f=e.aN()
 else o.f=p
 o.r=e.aN()
@@ -8238,7 +8238,7 @@ p-=8}if(p>=8&&n.w===4294967295){n.w=o.t1()
 p-=8}if(p>=8&&n.as===4294967295){n.as=o.t1()
 p-=8}if(p>=4&&n.y===65535)n.y=o.aN()}}}}if(u>0)e.anq(u)
 f.c=n.as
-t=new C.cxm(D.LT,n,D.DK,B.a([C.JF(0),C.JF(0),C.JF(0)],x.f3))
+t=new C.cxm(D.LU,n,D.DK,B.a([C.JF(0),C.JF(0),C.JF(0)],x.f3))
 n.ch=t
 t.aHy(0,f,g)},
 u(d){return this.at}}
@@ -9016,13 +9016,13 @@ cDF(d){var w=B.bi(d),v=w==null?null:w.bV()
 if(v==null)return""
 return A.im[B.bH(v)-1]+" "+B.bR(v)},
 aQs(d,e){var w=null,v=B.n(e*0.3)
-return B.p(w,B.X(d,A.c,w,w,w,e*0.5),A.f,w,w,new B.o(w,w,w,v,w,D.Oq,A.n),w,e,w,w,w,w,w,e)},
+return B.p(w,B.X(d,A.c,w,w,w,e*0.5),A.f,w,w,new B.o(w,w,w,v,w,D.Or,A.n),w,e,w,w,w,w,w,e)},
 aQr(d){return this.aQs(d,44)},
-b6Q(d,e,f,g){var w,v,u=null,t=this.w===d,s=t?D.Oq:u,r=B.n(14),q=B.X(e,t?A.c:A.aA,u,u,u,17),p=x.p
-q=B.a([q,M.J_,B.d(f,u,u,u,u,u,u,B.l(u,u,t?A.c:A.aA,u,u,u,u,u,u,u,u,13.5,u,u,A.H,u,u,!0,u,u,u,u,u,u,u,u),u,u,u)],p)
+b6Q(d,e,f,g){var w,v,u=null,t=this.w===d,s=t?D.Or:u,r=B.n(14),q=B.X(e,t?A.c:A.aA,u,u,u,17),p=x.p
+q=B.a([q,M.J0,B.d(f,u,u,u,u,u,u,B.l(u,u,t?A.c:A.aA,u,u,u,u,u,u,u,u,13.5,u,u,A.H,u,u,!0,u,u,u,u,u,u,u,u),u,u,u)],p)
 if(g>0){w=A.c.j(t?0.25:0.1)
 v=B.n(10)
-A.d.v(q,B.a([M.J_,B.p(u,B.d(""+g,u,u,u,u,u,u,B.l(u,u,t?A.c:A.aS,u,u,u,u,u,u,u,u,11,u,u,A.u,u,u,!0,u,u,u,u,u,u,u,u),u,u,u),A.f,u,u,new B.o(w,u,u,v,u,u,A.n),u,u,u,u,D.byh,u,u,u)],p))}return B.E(B.aC(A.c7,B.df(u,B.B(q,A.m,u,A.b9,A.j,0,u,u),u,u,A.bc,new B.o(u,u,u,r,u,s,A.n),A.hz,u,u,u,A.tN,u,u,u),A.y,!1,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,new C.f7K(this,d),u,u,u,u,u,u,!1,A.a7),1)},
+A.d.v(q,B.a([M.J0,B.p(u,B.d(""+g,u,u,u,u,u,u,B.l(u,u,t?A.c:A.aS,u,u,u,u,u,u,u,u,11,u,u,A.u,u,u,!0,u,u,u,u,u,u,u,u),u,u,u),A.f,u,u,new B.o(w,u,u,v,u,u,A.n),u,u,u,u,D.byh,u,u,u)],p))}return B.E(B.aC(A.c7,B.df(u,B.B(q,A.m,u,A.b9,A.j,0,u,u),u,u,A.bc,new B.o(u,u,u,r,u,s,A.n),A.hz,u,u,u,A.tN,u,u,u),A.y,!1,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,new C.f7K(this,d),u,u,u,u,u,u,!1,A.a7),1)},
 ciR(d){var w,v,u,t,s,r,q=null,p=this.d.t(0,d.a),o=p?A.d_.j(0.14):D.XO,n=B.n(18),m=p?A.d_:A.dm
 m=B.I(m,A.q,p?1.8:1)
 w=this.aQr(A.q7)
@@ -9031,14 +9031,14 @@ u=d.r.length
 t=u===1?"":"s"
 s=x.p
 t=B.E(B.x(B.a([v,A.cV,B.d(""+u+" slide"+t,q,q,q,q,q,q,D.aRt,q,q,q)],s),A.F,q,A.e,A.j,0,A.p),1)
-v=p?D.Oq:q
+v=p?D.Or:q
 u=p?q:B.I(A.b_,A.q,1.6)
 r=p?D.bOR:q
 return B.aC(q,B.df(q,B.B(B.a([w,A.be,t,B.df(q,r,q,q,A.bc,new B.o(q,q,u,q,q,v,A.a5),A.fB,q,26,q,q,q,q,26)],s),A.m,q,A.e,A.j,0,q,q),q,q,A.bc,new B.o(o,q,m,n,q,q,A.n),A.fB,q,q,A.da,A.bl,q,q,q),A.y,!1,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,new C.f7z(this,p,d),q,q,q,q,q,q,!1,A.a7)},
 cqG(d){var w,v,u,t,s,r=this,q=null,p=J.a4(d),o=p.h(d,"savedAt"),n=r.cDF(J.k(o==null?"":o))
 o=B.n(18)
 w=B.I(A.dm,A.q,1)
-v=r.aQr(A.NC)
+v=r.aQr(A.ND)
 u=p.h(d,"name")
 u=B.d(J.k(u==null?"Presentation":u),q,1,A.a2,q,q,q,D.aRr,q,q,q)
 p=p.h(d,"slides")
@@ -9067,12 +9067,12 @@ r=A.c.j(0.05)
 q=B.n(18)
 p=B.I(A.dm,A.q,1)
 o=J.a4(h)
-q=B.a([A.R,u,new B.D(D.bvl,s,i),B.p(i,B.B(B.a([j.b6Q(0,A.yd,"Save",j.a.c.length),j.b6Q(1,A.NQ,"Saved",o.gM(h))],t),A.m,i,A.e,A.j,0,i,i),A.f,i,i,new B.o(r,i,p,q,i,i,A.n),i,i,i,D.bup,A.ek,i,i,i)],t)
+q=B.a([A.R,u,new B.D(D.bvl,s,i),B.p(i,B.B(B.a([j.b6Q(0,A.yd,"Save",j.a.c.length),j.b6Q(1,A.NR,"Saved",o.gM(h))],t),A.m,i,A.e,A.j,0,i,i),A.f,i,i,new B.o(r,i,p,q,i,i,A.n),i,i,i,D.bup,A.ek,i,i,i)],t)
 if(j.x!=null){u=(j.y?A.c9:A.bv).j(0.12)
 s=B.n(14)
 r=B.I((j.y?A.c9:A.bv).j(0.4),A.q,1)
 p=j.y
-n=p?A.ND:A.eh
+n=p?A.NE:A.eh
 n=B.X(n,p?A.c9:A.bv,i,i,i,18)
 m=j.x
 m.toString
@@ -9092,7 +9092,7 @@ A.d.v(u,s)}q.push(new B.dq(1,A.co,B.cw(u,i,X.ait,i,i,A.ah,!0),i))
 if(j.w===0){u=j.d
 s=u.a===0
 r=s||j.r?i:j.gc3T()
-p=s?i:D.Oq
+p=s?i:D.Or
 s=s?A.c.j(0.07):i
 o=B.n(18)
 n=u.a===0?i:B.a([new B.ac(0,A.G,A.b6.j(0.4),A.cB,18)],x.V)
@@ -9466,7 +9466,7 @@ w.m(new C.eaS(w))}},
 B(d){var w,v,u,t,s,r,q,p=this,o=null,n=p.a,m=n.c
 if(A.a.i(m==null?"":m).length===0){if(!n.e)return A.bI
 n=B.n(8*n.d)
-m=B.a([D.jf.j(0.92),D.KU.j(0.95)],x.O)
+m=B.a([D.jf.j(0.92),D.KV.j(0.95)],x.O)
 w=B.I(A.c0.j(0.55),A.q,1)
 v=p.a
 u=v.d
@@ -9491,7 +9491,7 @@ C.jo.prototype={}
 C.ade.prototype={
 B(d){return B.oT(new C.dYQ(this,B.P(d).ax.a===A.I,d),!0,0.72,0.9,0.5,!1,null)}}
 C.acD.prototype={
-B(d){var w,v,u=null,t=B.P(d).ax.a===A.I,s=B.n(18),r=B.n(18),q=B.I(D.jf.j(t?0.35:0.4),A.q,1),p=t?D.Lu:A.c,o=x.V,n=B.a([new B.ac(0,A.G,A.w.j(t?0.3:0.08),A.cB,14)],o),m=B.n(10),l=B.I(A.c0.j(0.5),A.q,1)
+B(d){var w,v,u=null,t=B.P(d).ax.a===A.I,s=B.n(18),r=B.n(18),q=B.I(D.jf.j(t?0.35:0.4),A.q,1),p=t?D.Lv:A.c,o=x.V,n=B.a([new B.ac(0,A.G,A.w.j(t?0.3:0.08),A.cB,14)],o),m=B.n(10),l=B.I(A.c0.j(0.5),A.q,1)
 o=B.a([new B.ac(0,A.G,A.w.j(0.14),A.dE,6)],o)
 w=this.c
 o=B.E(B.p(u,new B.fK(0.5625,C.i5f(w),u),A.aq,u,u,new B.o(u,u,l,m,o,u,A.n),u,u,u,D.ajk,u,u,u,u),1)
@@ -9517,13 +9517,13 @@ B(d){var w,v,u,t,s,r=null,q=B.P(d).ax.a===A.I,p=B.n(18),o=B.n(18),n=B.I(A.ay.j(q
 l=B.a([new B.ac(0,A.G,A.w.j(0.14),A.dE,6)],l)
 w=this.c
 v=C.h2r(w.a)
-if(v==null)v=A.d.gI(D.QX)
+if(v==null)v=A.d.gI(D.QY)
 u=B.b0(v.f)
 t=B.b0(v.r)
 s=x.p
 l=B.E(B.p(r,new B.fK(0.5625,new B.an(A.W,r,A.b1,A.r,B.a([B.bZ(0,B.fP(C.h2q(v.d),A.A,r,r,A.ci,A.bV,!0,r,!1,r,r),0,0,0),new B.D(A.aik,new C.bj4(v,u,t,r),r)],s),r),r),A.aq,r,r,new B.o(r,r,i,j,l,r,A.n),r,r,r,D.ajk,r,r,r,r),1)
 j=A.ay.j(q?0.18:0.16)
-i=B.d(w.b,r,r,r,r,r,r,B.l(r,r,q?A.c:Z.Lv,r,r,r,r,r,r,r,r,12.5,r,r,A.u,r,r,!0,r,0.1,r,r,r,r,r,r),r,r,r)
+i=B.d(w.b,r,r,r,r,r,r,B.l(r,r,q?A.c:Z.Lw,r,r,r,r,r,r,r,r,12.5,r,r,A.u,r,r,!0,r,0.1,r,r,r,r,r,r),r,r,r)
 return B.aF(!1,A.a1,!0,r,B.aL(!1,p,!0,B.p(r,B.x(B.a([l,B.p(r,B.x(B.a([i,A.cV,B.d(w.c,r,2,A.a2,r,r,r,B.l(r,r,q?A.aA:D.b9o,r,r,r,r,r,r,r,r,9.5,r,r,r,r,1.32,!0,r,r,r,r,r,r,r,r),r,r,r)],s),A.F,r,A.e,A.j,0,A.p),A.f,r,r,new B.o(r,r,new B.bO(new B.az(j,1,A.q,-1),A.Y,A.Y,A.Y),r,r,r,A.n),r,r,r,r,D.ahD,r,r,r)],s),A.ai,r,A.e,A.j,0,A.p),A.f,r,r,new B.o(m,r,n,o,k,r,A.n),r,r,r,r,r,r,r,r),r,!0,r,r,r,r,r,r,r,r,r,r,r,this.d,r,r,r,r,r,r,r),A.f,A.K,0,r,r,r,r,r,A.ag)}}
 C.kU.prototype={
 a5(){return"NgmyMarriagePaperStyle."+this.b}}
@@ -9766,21 +9766,21 @@ d=new B.az(A.bE,1,A.q,-1)
 u.push(new B.bI(r,a2,a2,B.p(a2,new B.y(f.b,a2,D.feE,a2,a2,a2,a2,a2,a2,a2,a2,a2),A.f,a2,A7.VG,new B.o(q,a2,new B.bO(d,d,d,d),new B.bp(p,p,p,p),a2,a2,A.n),a2,a2,a2,A.cw,A.ik,a2,a2,a2),a2))}u.push(A.am)
 t=B.a([],w)
 for(o=0;o<4;++o){a0=D.cZk[o]
-t.push(B.mK(a2,D.tt,new B.y(a0,a2,A.Jd,a2,a2,a2,a2,a2,a2,a2,a2,a2),A.hG,new C.eji(a1,a0),a2,a2,P.v4,a2))}u.push(B.bV(A.bA,t,A.br,6,8))
+t.push(B.mK(a2,D.tt,new B.y(a0,a2,A.Je,a2,a2,a2,a2,a2,a2,a2,a2,a2),A.hG,new C.eji(a1,a0),a2,a2,P.v4,a2))}u.push(B.bV(A.bA,t,A.br,6,8))
 u.push(A.R)
 t=B.E(B.aM(a2,A.U,!1,a2,!0,A.r,a2,B.aN(),a1.f,a2,a2,a2,a2,a2,2,a1.aSj("Ask for a change, or ask a question\u2026"),A.y,!0,a2,!0,a2,!1,a2,A.aj,a2,a2,a2,a2,a2,a2,a2,a2,a2,4,1,a2,!1,"\u2022",a2,a2,a2,new C.ejj(a1),a2,!1,a2,a2,!1,a2,!0,a2,A.a9,a2,a2,a2,a2,a2,a2,a2,a2,a2,a2,a2,A.dp,!0,A.a4,a2,A.an,a2,a2,a2,a2),1)
 s=a1.as?a2:a1.gc84()
 u.push(B.B(B.a([t,A.ab,B.HJ(A.yH,s,B.nB(a2,A.b6,a2,a2,a2,a2,a2,a2,a2,a2,a2,a2,a2,a2,a2,a2,a2),a2)],w),A.m,a2,A.e,A.j,0,a2,a2))
 u.push(A.aB)
 t=a1.as?a2:a1.gaZq()
-u.push(B.dn(A.p1,D.fzv,t,B.bn(A.cS,a2,a2,a2,a2,A.IY,a2,a2,new B.b7(B.n(16),A.Y),a2,a2,a2)))
+u.push(B.dn(A.p1,D.fzv,t,B.bn(A.cS,a2,a2,a2,a2,A.IZ,a2,a2,new B.b7(B.n(16),A.Y),a2,a2,a2)))
 A.d.v(v,u)}v=B.a([B.cw(v,a1.r,A.ai6,a2,a2,A.ah,!1)],w)
 if(a1.as){u=A.w.j(0.55)
 t=B.n(20)
 s=B.I(E.jX.j(0.5),A.q,1)
 v.push(B.bZ(0,B.en(B.av(B.p(a2,B.B(B.a([E.a7v,A.eo,B.d(a1.at,a2,a2,a2,a2,a2,a2,A.iP,a2,a2,a2)],w),A.m,a2,A.e,A.N,0,a2,a2),A.f,a2,a2,new B.o(E.AR,a2,s,t,a2,a2,A.n),a2,a2,a2,a2,D.bvN,a2,a2,a2),a2,a2,a2),u,!0),0,0,0))}return B.c8(a3,A.AZ,new B.an(A.W,a2,A.aa,A.r,v,a2),a2,!1,!1,a2,a2)},
 aSj(d){var w=null
-return B.bs(w,new B.b4(4,B.n(14),A.Y),w,A.eR,w,w,w,w,!0,w,w,w,w,w,w,D.tt,!0,w,w,w,w,w,w,w,w,w,w,w,w,w,A0.J8,d,w,w,w,w,w,w,w,w,w,!0,!0,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w)},
+return B.bs(w,new B.b4(4,B.n(14),A.Y),w,A.eR,w,w,w,w,!0,w,w,w,w,w,w,D.tt,!0,w,w,w,w,w,w,w,w,w,w,w,w,w,A0.J9,d,w,w,w,w,w,w,w,w,w,!0,!0,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w)},
 aQN(d){var w,v,u,t=null,s=d.a===this.y.a,r=B.n(12),q=B.b0(d.f),p=s?A.bD:A.bE
 p=B.I(p,A.q,s?2.4:1)
 w=B.a([B.p(t,t,A.f,B.b0(d.x),t,t,t,5,t,A.kW,t,t,t,t),A.fF],x.p)
@@ -9980,7 +9980,7 @@ return B.p(k,l.tB(d-20,e-20),A.f,k,k,new B.o(A.c,k,k,k,j,k,A.n),k,e,k,k,A.bR,k,k
 case 10:return new B.a7(d,e,B.nw(l.tB(d,e),A.aq,D.h8L),k)
 case 0:j=B.I(B.b0(j.w),A.q,2.4)
 return B.p(k,l.tB(d-14,e-14),A.f,k,k,new B.o(k,k,j,k,k,k,A.n),k,e,k,k,A.ek,k,k,d)}},
-aOk(d,e){return this.d.e===D.RA?A.bI:this.bER(d,e)},
+aOk(d,e){return this.d.e===D.RB?A.bI:this.bER(d,e)},
 Wa(d){return this.aOk(d,A.L)},
 gaA_(){var w=this.c
 return A.a.i(w.y).length!==0||A.a.i(w.w).length!==0},
@@ -10014,7 +10014,7 @@ b9v(d,e,f,g){return B.cq(new C.cd0(this,e,d,g,!0,f))},
 cf2(){var w,v,u,t,s,r,q,p,o,n,m,l,k=this,j=null,i="Roboto",h=k.d
 switch(h.d.a){case 0:return B.x(B.a([k.acz(824),A.aB,k.aV1(824),k.b6v(824),A.O,k.Nt(),A.ac,B.av(k.qo(824,360),j,j,j),k.Wa(824),A.ac,B.E(k.a97(3),1)],x.p),A.ai,j,A.e,A.j,0,A.p)
 case 1:w=x.p
-return B.x(B.a([k.acz(824),A.aR,new B.a7(j,350,B.B(B.a([new B.a7(440,j,B.x(B.a([k.abr(440,A.bi,3,62,26),k.aAG(440,A.bi,2,20),A.b7,k.aqB(B.b0(h.x),!1)],w),A.F,j,A.e,A.j,0,A.p),j),A.IZ,B.x(B.a([k.qo(362,310),k.Wa(362)],w),A.m,j,A.e,A.j,0,A.p)],w),A.F,j,A.e,A.j,0,j,j),j),A.R,k.az9(2),A.ac,B.E(k.a97(3),1)],w),A.ai,j,A.e,A.j,0,A.p)
+return B.x(B.a([k.acz(824),A.aR,new B.a7(j,350,B.B(B.a([new B.a7(440,j,B.x(B.a([k.abr(440,A.bi,3,62,26),k.aAG(440,A.bi,2,20),A.b7,k.aqB(B.b0(h.x),!1)],w),A.F,j,A.e,A.j,0,A.p),j),A.J_,B.x(B.a([k.qo(362,310),k.Wa(362)],w),A.m,j,A.e,A.j,0,A.p)],w),A.F,j,A.e,A.j,0,j,j),j),A.R,k.az9(2),A.ac,B.E(k.a97(3),1)],w),A.ai,j,A.e,A.j,0,A.p)
 case 2:w=k.vu(824,!0)
 v=B.b0(h.x)
 u=h.ch
@@ -10025,7 +10025,7 @@ if(A.a.i(r.d).length!==0)s.push(k.cxn(788,u?B.b0(h.f):A.c,22))
 v=B.p(j,B.x(s,A.m,j,A.e,A.j,0,A.p),A.f,v,j,j,j,j,j,j,A.Bk,j,j,j)
 u=B.a([B.av(k.qo(824,390),j,j,j)],t)
 s=A.a.i(r.f)
-if(s.length!==0&&h.e!==D.RA){h=A.w.j(0.65)
+if(s.length!==0&&h.e!==D.RB){h=A.w.j(0.65)
 u.push(B.ao(0,B.p(j,B.d(s,j,2,A.a2,j,j,j,k.ax1(i,14,A.c,1.15,A.P),j,j,j),A.f,h,j,j,j,j,j,j,A.lQ,j,j,j),j,j,0,0,j,j))}return B.x(B.a([w,A.ac,v,A.ac,new B.an(A.W,j,A.aa,A.r,u,j),A.O,k.Nt(),A.R,B.E(k.Wl(2,21),1)],t),A.ai,j,A.e,A.j,0,A.p)
 case 3:h=k.vu(824,!0)
 w=k.qo(824,560)
@@ -10037,7 +10037,7 @@ return B.x(B.a([k.acz(824),A.aB,k.aV1(824),k.b6v(824),A.O,k.Nt(),A.ac,B.E(k.b9v(
 case 5:w=k.vu(824,!0)
 v=x.p
 u=B.x(B.a([k.abr(440,A.bi,3,62,26),k.aAG(440,A.bi,2,20),A.b7,k.aqA(!1)],v),A.F,j,A.e,A.j,0,A.p)
-return B.x(B.a([w,A.by,new B.a7(j,400,B.B(B.a([new B.a7(440,j,u,j),A.aON,new B.D(A.i4,k.qo(364,h.e===D.RA?400:330),j)],v),A.F,j,A.e,A.j,0,j,j),j),A.aB,B.E(k.Wl(2,21),1)],v),A.ai,j,A.e,A.j,0,A.p)
+return B.x(B.a([w,A.by,new B.a7(j,400,B.B(B.a([new B.a7(440,j,u,j),A.aON,new B.D(A.i4,k.qo(364,h.e===D.RB?400:330),j)],v),A.F,j,A.e,A.j,0,j,j),j),A.aB,B.E(k.Wl(2,21),1)],v),A.ai,j,A.e,A.j,0,A.p)
 case 6:return B.x(B.a([k.acz(824),A.ac,k.bXS(824,2,70),k.cxl(824,21),A.O,k.Nt(),A.ac,B.E(k.b9v(3,340,B.av(k.qo(340,340),j,j,j),350),1)],x.p),A.ai,j,A.e,A.j,0,A.p)
 case 7:w=k.vu(824,!0)
 v=B.b0(h.x)
@@ -10155,7 +10155,7 @@ s.drawCircle(q*u,p*t,0.4+o*1.4,n)
 n.delete()}for(v=x.O,r=0;r<5;++r){q=k.aj()*u
 p=k.aj()*t
 m=50+k.aj()*90
-w.sar(new B.bT(A.A,0.5,A.x,l,0,B.a([A.KV.j(0.13),A.K],v),l,l).av(0,B.bU(new B.v(q,p),m)))
+w.sar(new B.bT(A.A,0.5,A.x,l,0,B.a([A.KW.j(0.13),A.K],v),l,l).av(0,B.bU(new B.v(q,p),m)))
 n=w.H()
 s.drawCircle(q,p,m,n)
 n.delete()}w.sar(l)},
@@ -10550,7 +10550,7 @@ r=B.a([],s)
 for(q=0;q<6;++q){p=D.cQT[q]
 r.push(new B.D(A.ij,o.afT(p,o.x===p,new C.eSD(o,p)),n))}return B.x(B.a([v,A.R,u,t,B.cd(B.B(r,A.m,n,A.e,A.j,0,n,n),A.r,n,A.y,n,n,n,n,A.aP),A.ac,new B.a7(n,118,B.hN(n,new C.eSE(o,w),w.length,n,n,A.aP,new C.eSF(),!1),n),A.O,o.aZA(B.x(B.a([B.iI(A.b6,n,n,A.af,!0,new C.eSG(o),n,D.fqw,n,D.fmR,o.k3),B.iI(A.b6,n,n,A.af,!0,new C.eSH(o),n,n,n,D.fk6,o.k2)],s),A.m,n,A.e,A.j,0,A.p),A.ai5)],s),A.F,n,A.e,A.j,0,A.p)},
 cDV(){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5=this,a6=null,a7=a5.aAP()
-if(a7.length===0)return a5.vB(B.d("Type your quote on the Design tab. Every word will show up here so you can make it bigger, normal or smaller.",a6,a6,a6,a6,a6,a6,D.Jm,a6,a6,a6))
+if(a7.length===0)return a5.vB(B.d("Type your quote on the Design tab. Every word will show up here so you can make it bigger, normal or smaller.",a6,a6,a6,a6,a6,a6,D.Jn,a6,a6,a6))
 w=a5.d.a.a
 v=B.a([],x.t)
 for(u=a7.length,t=0,s=0;s<a7.length;a7.length===u||(0,B.K)(a7),++s){r=a7[s]
@@ -10566,7 +10566,7 @@ A.d.fq(m)
 l=m.length!==0&&A.d.d6(m,new C.eTY(a5,m))?a5.db[A.d.gI(m)]:a6
 k=new C.eU4(a5)
 j=new C.eU6()
-q=B.d("Tap the words you want to change, then choose a size. One sentence can have big, normal and small words.",a6,a6,a6,a6,a6,a6,D.Jm,a6,a6,a6)
+q=B.d("Tap the words you want to change, then choose a size. One sentence can have big, normal and small words.",a6,a6,a6,a6,a6,a6,D.Jn,a6,a6,a6)
 p=x.p
 o=B.a([],p)
 for(i=a5.db,h=0;h<a7.length;++h){g=new B.aT(11,11)
@@ -10580,7 +10580,7 @@ a0=B.af("[*~^]",!0,!1,!1,!1)
 e=B.aK(e,a0,"")
 a0=j.$1(i[h])
 a1=i[h]>0?A.u:A.a6
-o.push(B.aC(a6,B.p(a6,new B.y(e,a6,new B.H(!0,A.c,a6,a6,a6,a6,a0,a1,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6),a6,a6,a6,a6,a6,a6,a6,a6,a6),A.f,a6,a6,new B.o(f,a6,new B.bO(d,d,d,d),new B.bp(g,g,g,g),a6,a6,A.n),a6,a6,a6,a6,A.MN,a6,a6,a6),A.y,!1,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,new C.eTZ(a5,h),a6,a6,a6,a6,a6,a6,!1,A.a7))}o=a5.vB(B.bV(A.bA,o,A.t2,6,6))
+o.push(B.aC(a6,B.p(a6,new B.y(e,a6,new B.H(!0,A.c,a6,a6,a6,a6,a0,a1,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6),a6,a6,a6,a6,a6,a6,a6,a6,a6),A.f,a6,a6,new B.o(f,a6,new B.bO(d,d,d,d),new B.bp(g,g,g,g),a6,a6,A.n),a6,a6,a6,a6,A.MO,a6,a6,a6),A.y,!1,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,a6,new C.eTZ(a5,h),a6,a6,a6,a6,a6,a6,!1,A.a7))}o=a5.vB(B.bV(A.bA,o,A.t2,6,6))
 i=B.a([a5.oa("All words",L.aml,!1,new C.eU_(a5,a7))],p)
 if(n>1){a2=0
 for(;;){if(!(a2<n&&a2<8))break
@@ -10601,7 +10601,7 @@ cz2(){var w,v,u,t,s,r,q=this,p=null,o=x.p,n=B.B(B.a([D.bz6,B.d(A.d.h7(D.ax4,new 
 k=q.aik(k,new C.eTJ(q),D.d0p)
 w=q.p1
 v=w?A.c:A.b_
-n=B.a([n,A.R,m,l,B.bV(A.bA,B.a([k,B.aC(p,B.p(p,D.bLx,A.f,p,p,new B.o(p,p,B.I(v,A.q,w?3:1),p,p,D.f1r,A.a5),p,34,p,p,p,p,p,34),A.y,!1,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,new C.eTM(q),p,p,p,p,p,p,!1,A.a7)],o),A.t2,10,10),A.am,B.d("Add a coloured band behind the words, with any word design. The first circle turns it off.",p,p,p,p,p,p,D.Jm,p,p,p)],o)
+n=B.a([n,A.R,m,l,B.bV(A.bA,B.a([k,B.aC(p,B.p(p,D.bLx,A.f,p,p,new B.o(p,p,B.I(v,A.q,w?3:1),p,p,D.f1r,A.a5),p,34,p,p,p,p,p,34),A.y,!1,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,new C.eTM(q),p,p,p,p,p,p,!1,A.a7)],o),A.t2,10,10),A.am,B.d("Add a coloured band behind the words, with any word design. The first circle turns it off.",p,p,p,p,p,p,D.Jn,p,p,p)],o)
 if(q.gaV9()!==0){m=B.a([],o)
 if(q.p1){l=q.p2
 l=q.ahU("Colour",l,0,360,new C.eTN(q),""+A.k.V(l)+"\xb0")
@@ -10624,7 +10624,7 @@ m.push(B.aC(p,B.p(p,B.X(k.b,A.c,p,p,p,20),A.f,p,p,new B.o(w,p,new B.bO(r,r,r,r),
 n.push(q.xQ("COLOUR",A.nm))
 n.push(q.aik(q.fx,new C.eTT(q),D.dbB))
 n.push(A.am)
-n.push(B.d("The first circle keeps the colour that comes with the design.",p,p,p,p,p,p,D.Jm,p,p,p))
+n.push(B.d("The first circle keeps the colour that comes with the design.",p,p,p,p,p,p,D.Jn,p,p,p))
 n.push(q.xQ("SIZE AND PLACE",A.Gs))
 m=q.fr
 m=q.km("Text size",m,0.5,1.6,new C.eTK(q),1,""+A.k.V(m*100)+"%")
@@ -10676,7 +10676,7 @@ v=s.km("Tint",v,-1,1,new C.eSf(s),0,""+A.k.V(v*100))
 u=s.x2
 t=x.p
 u=s.vB(B.x(B.a([q,w,v,s.km("Shift colours",u,-180,180,new C.eSg(s),0,""+A.k.V(u)+"\xb0"),new B.bI(A.a3,r,r,s.oa("Negative",D.bGv,s.y1,new C.eSh(s)),r)],t),A.m,r,A.e,A.j,0,A.p))
-v=s.xQ("COLOUR WASH",A.NL)
+v=s.xQ("COLOUR WASH",A.NM)
 w=s.b1
 q=B.a([null],x.Z)
 A.d.v(q,D.avN)
@@ -10709,7 +10709,7 @@ t=x.p
 return B.x(B.a([s.vB(B.x(B.a([r,w,v,s.km("Turn",u,-180,180,new C.eSq(s),0,""+A.k.V(u)+"\xb0")],t),A.m,null,A.e,A.j,0,A.p)),A.R,B.bV(A.bA,B.a([s.oa("Turn 90\xb0",H.amS,!1,new C.eSr(s)),s.oa("Flip sideways",A.Ge,s.c6,new C.eSs(s)),s.oa("Flip upside down",A.Ge,s.cI,new C.eSt(s))],t),A.br,8,8)],t),A.F,null,A.e,A.j,0,A.p)},
 c3w(){var w=null,v=B.n(22),u=B.I(A.bE,A.q,1)
 return B.p(w,B.x(B.a([D.eQk,A.R,D.fpy,A.aB,B.aC(w,B.p(A.A,D.eQx,A.f,w,w,new B.o(w,w,w,B.n(16),w,G.uf,A.n),w,52,w,w,w,w,w,w),A.y,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,new C.eTg(this),w,w,w,w,w,w,!1,A.a7)],x.p),A.F,w,A.e,A.j,0,A.p),A.f,w,w,new B.o(D.tt,w,u,v,w,w,A.n),w,w,w,w,A.bQ,w,w,w)},
-c0E(){var w,v,u,t,s,r,q,p=this,o=null,n=new C.eT8(p),m=x.p,l=B.B(B.a([D.bzc,p.oa("Reset",A.lp,!1,new C.eT4(p))],m),A.m,o,A.e,A.j,0,o,o),k=B.d("Drag it on the quote to move it. It stays on every quote.",o,o,o,o,o,o,D.Jm,o,o,o),j=p.xQ("SHAPE",A.amO),i=B.a([],m)
+c0E(){var w,v,u,t,s,r,q,p=this,o=null,n=new C.eT8(p),m=x.p,l=B.B(B.a([D.bzc,p.oa("Reset",A.lp,!1,new C.eT4(p))],m),A.m,o,A.e,A.j,0,o,o),k=B.d("Drag it on the quote to move it. It stays on every quote.",o,o,o,o,o,o,D.Jn,o,o,o),j=p.xQ("SHAPE",A.amO),i=B.a([],m)
 for(w=0;w<7;++w){v={}
 u=D.Cg[w]
 v.a=null
@@ -10864,7 +10864,7 @@ return w}catch(v){}return D.boP},
 c0K(d,e,f,g){var w=e.length===0&&f.length===0?"rounded":e
 return B.cqW(C.fCq(w,this.b3E(d),f),g)},
 ack(d,e,f,g,h){var w=null,v=new C.f_j(f,e),u=new C.f_k(f,e),t=A.c.j(0.05),s=B.n(12),r=B.n(12),q=B.n(12),p=h==null,o=B.I(p?A.bE:A.b6.j(0.6),A.q,1)
-if(p)p=new B.a7(34,30,new B.an(A.W,w,A.aa,A.f,B.a([B.av(B.X(f?A.BU:A.NB,A.bX,w,w,w,26),w,w,w),D.ehT],x.p),w),w)
+if(p)p=new B.a7(34,30,new B.an(A.W,w,A.aa,A.f,B.a([B.av(B.X(f?A.BU:A.NC,A.bX,w,w,w,26),w,w,w),D.ehT],x.p),w),w)
 else p=this.c0K(g,v.$1(h),u.$1(h),34)
 return B.aF(!1,A.a1,!0,s,B.aL(!1,r,!0,B.p(w,B.B(B.a([B.E(B.av(p,w,w,w),1),D.bKj],x.p),A.m,w,A.e,A.j,0,w,w),A.f,w,w,new B.o(w,w,o,q,w,w,A.n),w,44,w,w,A.mu,w,w,w),w,!0,w,w,w,w,w,w,w,w,w,w,w,new C.f_i(this,f,h,g,v,u,d),w,w,w,w,w,w,w),A.f,t,0,w,w,w,w,w,A.ag)},
 aWU(d,e,f,g,h){var w,v,u,t,s,r,q,p=null,o=null,n=h==null
@@ -10875,7 +10875,7 @@ s=B.n(14)
 r=B.I(n?A.bE:A.bd.j(0.6),A.q,1)
 q=o
 n=q==null?B.X(d,A.es,p,p,p,20):q
-n=B.a([n,A.ab,B.E(B.d(e,p,1,A.a2,p,p,p,A.Jr,p,p,p),1)],x.p)
+n=B.a([n,A.ab,B.E(B.d(e,p,1,A.a2,p,p,p,A.Js,p,p,p),1)],x.p)
 if(f!=null)n.push(B.aC(p,D.a1m,A.y,!1,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,f,p,p,p,p,p,p,!1,A.a7))
 return B.aF(!1,A.a1,!0,u,B.aL(!1,t,!0,B.p(p,B.B(n,A.m,p,A.e,A.j,0,p,p),A.f,p,p,new B.o(p,p,r,s,p,p,A.n),p,50,p,p,A.kW,p,p,p),p,!0,p,p,p,p,p,p,p,p,p,p,p,g,p,p,p,p,p,p,p),A.f,v,0,p,p,p,p,p,A.ag)},
 a8s(){var w=0,v=B.j(x.H),u,t=2,s=[],r=this,q,p,o,n
@@ -10965,7 +10965,7 @@ v=B.a([new B.ac(0,A.G,A.b6.j(0.45),A.J,10)],v)
 s.push(B.hx(B.aF(!1,A.a1,!0,h,B.aL(!1,h,!0,B.p(h,B.X(i.e==null?A.vQ:A.ho,A.c,h,h,h,20),A.f,h,h,new B.o(h,h,h,h,v,E.w5,A.a5),h,40,h,h,h,h,h,40),A.cL,!0,h,h,h,h,h,h,h,h,h,h,h,q,h,h,h,h,h,h,h),A.f,A.K,0,h,h,A.cL,h,h,A.ag),h,r,h,h))
 v=B.B(s,A.m,h,A.e,A.N,0,h,h)
 s=A.c.j(0.05)
-v=B.aM(h,A.U,!1,h,!0,A.r,h,B.aN(),i.d,h,h,h,h,h,2,B.bs(h,h,h,h,h,h,h,h,!0,new B.b4(4,B.n(16),new B.az(A.c.j(0.1),1,A.q,-1)),h,h,h,h,h,s,!0,h,h,h,h,new B.b4(4,B.n(16),D.aZc),h,h,h,h,h,h,h,h,A0.J8,"Type your idea here\u2026",h,h,h,h,h,h,h,h,h,!0,!0,!1,h,h,h,h,h,h,h,h,new B.D(A.ij,v,h),h,h,h,h,h),A.y,!0,h,!0,h,!1,i.f,A.aj,h,h,h,h,h,h,h,h,h,6,3,h,!1,"\u2022",h,h,h,h,h,!1,h,h,!1,h,!0,h,A.a9,h,h,h,h,h,h,h,h,h,h,h,D.aQP,!0,A.a4,h,A.an,h,h,h,h)
+v=B.aM(h,A.U,!1,h,!0,A.r,h,B.aN(),i.d,h,h,h,h,h,2,B.bs(h,h,h,h,h,h,h,h,!0,new B.b4(4,B.n(16),new B.az(A.c.j(0.1),1,A.q,-1)),h,h,h,h,h,s,!0,h,h,h,h,new B.b4(4,B.n(16),D.aZc),h,h,h,h,h,h,h,h,A0.J9,"Type your idea here\u2026",h,h,h,h,h,h,h,h,h,!0,!0,!1,h,h,h,h,h,h,h,h,new B.D(A.ij,v,h),h,h,h,h,h),A.y,!0,h,!0,h,!1,i.f,A.aj,h,h,h,h,h,h,h,h,h,6,3,h,!1,"\u2022",h,h,h,h,h,!1,h,h,!1,h,!0,h,A.a9,h,h,h,h,h,h,h,h,h,h,h,D.aQP,!0,A.a4,h,A.an,h,h,h,h)
 s=i.x
 r=s==null
 q=r?"Add your logo":"Logo added"
@@ -11016,7 +11016,7 @@ o.push(B.cq(new C.f_K(i)))
 o.push(A.by)
 o.push(D.fs4)
 o.push(A.O)
-w=B.a([i.b6t("auto","Let AI choose",A.dX,A.Ql)],t)
+w=B.a([i.b6t("auto","Let AI choose",A.dX,A.Qm)],t)
 for(v=x.O,m=0;m<11;++m){j=D.wb[m]
 u=j.d
 w.push(i.b6t(j.a,j.b,j.c,B.a([B.b0(A.d.gI(u).a),B.b0(A.d.gI(u).b)],v)))}o.push(B.bV(A.bA,w,A.br,8,8))
@@ -11046,7 +11046,7 @@ return B.aC(q,B.df(q,B.x(B.a([s,A.au,B.eQ(A.A,B.d(r,q,q,q,q,q,q,B.l(q,q,A.c,q,q,
 b6t(d,e,f,g){var w,v=null,u=this.CW===d,t=B.n(99),s=u?A.c.j(0.12):A.c.j(0.04),r=u?A.ad:A.bE
 r=B.I(r,A.q,u?1.6:1)
 w=B.p(v,B.X(f,A.c,v,v,v,14),A.f,v,v,new B.o(v,v,v,v,v,new B.a8(A.a3,A.a8,A.x,g,v,v),A.a5),v,26,v,v,v,v,v,26)
-return B.aC(v,B.df(v,B.B(B.a([w,M.J_,B.d(e,v,v,v,v,v,v,B.l(v,v,A.c,v,v,v,v,v,v,v,v,12.5,v,v,u?A.u:A.a6,v,v,!0,v,v,v,v,v,v,v,v),v,v,v)],x.p),A.m,v,A.e,A.N,0,v,v),v,v,A.bc,new B.o(s,v,r,t,v,v,A.n),A.eH,v,v,v,M.ajb,v,v,v),A.y,!1,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,new C.f_o(this,d),v,v,v,v,v,v,!1,A.a7)}}
+return B.aC(v,B.df(v,B.B(B.a([w,M.J0,B.d(e,v,v,v,v,v,v,B.l(v,v,A.c,v,v,v,v,v,v,v,v,12.5,v,v,u?A.u:A.a6,v,v,!0,v,v,v,v,v,v,v,v),v,v,v)],x.p),A.m,v,A.e,A.N,0,v,v),v,v,A.bc,new B.o(s,v,r,t,v,v,A.n),A.eH,v,v,v,M.ajb,v,v,v),A.y,!1,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,new C.f_o(this,d),v,v,v,v,v,v,!1,A.a7)}}
 C.a0j.prototype={
 T(){return new C.aHe(new B.as(A.as,$.aw()))}}
 C.aHe.prototype={
@@ -11122,7 +11122,7 @@ v=x.p
 u=B.B(B.a([B.p(j,D.an6,A.f,j,j,D.b0p,j,34,j,j,j,j,j,34),A.at,D.bzO],v),A.m,j,A.e,A.j,0,j,j)
 t=B.d("You're on slide "+k.a.d+". Ask for new slides, changes to any slide, a different style or another language.",j,j,j,j,j,j,Aq.a8b,j,j,j)
 s=A.c.j(0.05)
-s=B.aM(j,A.U,!0,j,!0,A.r,j,B.aN(),k.d,j,j,j,j,j,2,B.bs(j,j,j,j,j,j,j,j,!0,new B.b4(4,B.n(16),new B.az(A.c.j(0.1),1,A.q,-1)),j,j,j,j,j,s,!0,j,j,j,j,new B.b4(4,B.n(16),Ar.aaX),j,j,j,j,j,j,j,j,A0.J8,"e.g. Add a slide after this one about how to sign up, and make the title slide more exciting.",j,j,j,j,j,j,j,j,j,!0,!0,!1,j,j,j,j,j,j,j,j,j,j,j,j,j,j),A.y,!0,j,!0,j,!1,j,A.aj,j,j,j,j,j,j,j,j,j,5,2,j,!1,"\u2022",j,j,j,j,j,!1,j,j,!1,j,!0,j,A.a9,j,j,j,j,j,j,j,j,j,j,j,D.aQP,!0,A.a4,j,A.an,j,j,j,j)
+s=B.aM(j,A.U,!0,j,!0,A.r,j,B.aN(),k.d,j,j,j,j,j,2,B.bs(j,j,j,j,j,j,j,j,!0,new B.b4(4,B.n(16),new B.az(A.c.j(0.1),1,A.q,-1)),j,j,j,j,j,s,!0,j,j,j,j,new B.b4(4,B.n(16),Ar.aaX),j,j,j,j,j,j,j,j,A0.J9,"e.g. Add a slide after this one about how to sign up, and make the title slide more exciting.",j,j,j,j,j,j,j,j,j,!0,!0,!1,j,j,j,j,j,j,j,j,j,j,j,j,j,j),A.y,!0,j,!0,j,!1,j,A.aj,j,j,j,j,j,j,j,j,j,5,2,j,!1,"\u2022",j,j,j,j,j,!1,j,j,!1,j,!0,j,A.a9,j,j,j,j,j,j,j,j,j,j,j,D.aQP,!0,A.a4,j,A.an,j,j,j,j)
 r=B.a([],v)
 for(q=0;q<6;++q){p=D.cZL[q]
 o=A.c.j(0.06)
@@ -11518,7 +11518,7 @@ s=C.cY(u,3)
 r=Math.sin(a3*(0.8+C.cY(u,4))+u)
 q=h*(0.012+0.012*C.cY(u,5))
 p=Math.cos(a3*(2+3*C.cY(u,6))+u)
-o=D.PN[A.o.D(A.k.bm(C.cY(u,7)*5),0,4)]
+o=D.PO[A.o.D(A.k.bm(C.cY(u,7)*5),0,4)]
 J.by(f.save())
 f.translate(s*j+r*h*0.04,t-i)
 f.rotate((a3*(0.6+C.cY(u,8)*2)+u)*180/3.141592653589793,0,0)
@@ -11701,7 +11701,7 @@ u.e=null}d=$.W()
 a0=new B.at(A.X,A.V,A.a_,A.a0,A.Z)
 a0.b=A.ae
 a0.c=h
-a0.r=D.PN[A.o.E(w,4)].j(0.7).gp(0)
+a0.r=D.PO[A.o.E(w,4)].j(0.7).gp(0)
 p=a0.H()
 a0=u.e
 g.drawPath((a0==null?u.e=new B.cC(u.gbK().a.snapshot()):a0).a,p)
@@ -11807,7 +11807,7 @@ m.delete()}j=A.k.bm(a0/2.4)
 k=A.k.E(a0,2.4)/2.4
 for(w=Math.max(4,A.k.V(70*this.d)),v=j+1,u=(1-k)*1.2,t=0;t<w;++t){s=C.cY(t,j)*3.141592653589793*2
 i=f*(0.1+0.55*D.boi.aA(0,k)*(0.5+0.5*C.cY(t,v)))
-this.rC(d,new B.v(h+Math.cos(s)*i,g+Math.sin(s)*i),f*(0.01+0.012*C.cY(t,3)),D.PN[A.o.D(A.k.bm(C.cY(t,4)*5),0,4)],u)}},
+this.rC(d,new B.v(h+Math.cos(s)*i,g+Math.sin(s)*i),f*(0.01+0.012*C.cY(t,3)),D.PO[A.o.D(A.k.bm(C.cY(t,4)*5),0,4)],u)}},
 bC4(a7,a8,a9){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3=null,a4=a8.a,a5=a8.b,a6=Math.min(a4,a5)
 for(w=this.d,v=Math.max(4,A.k.V(22*w)),u=a7.a,t=x.O,s=x.v,r=a9*2,q=a9*a6,p=a9*0.9,o=0;o<v;++o){n=a6*(0.045+0.035*C.cY(o,1))
 m=a5+n*6
@@ -12472,7 +12472,7 @@ u.rotate((t+p)*180/3.141592653589793,0,0)
 o=B.ch(A.J,r*A.k.D(Math.abs(Math.cos(q+p)),0.2,1),s)
 $.W()
 n=new B.at(A.X,A.V,A.a_,A.a0,A.Z)
-n.r=D.PN[A.o.E(p,5)].gp(0)
+n.r=D.PO[A.o.E(p,5)].gp(0)
 m=n.H()
 u.drawRect(B.c0(o),m)
 m.delete()
@@ -12830,7 +12830,7 @@ w=this.b
 v=w/6.283185307179586
 $.W()
 u=B.N()
-u.z=A.Rq
+u.z=A.Rr
 t=B.N()
 for(s=a3.a,r=this.d,q=w*2,p=a4.a,o=a4.b,n=0;n<46;++n){m=a2.aj()
 l=a2.aj()
@@ -13374,7 +13374,7 @@ break
 case"fire":v=o.d
 e=B.a([new B.cR(A.cs,A.J,8*v),new B.cR(A.av,new B.v(0,-3*v),18*v)],x.r)
 k=A.u
-w=W.KT
+w=W.KU
 break
 case"ice":v=o.d
 e=B.a([new B.cR(A.aN,A.J,10*v),new B.cR(A.cA,A.J,22*v)],x.r)
@@ -13399,7 +13399,7 @@ case"gold":$.W()
 f=B.N()
 v=o.d
 f.sar(D.bWJ.av(0,new B.a9(0,0,0+900*v,0+m.w*v*1.6)))
-e=B.a([new B.cR(A.KI,new B.v(0,3*v),5*v)],x.r)
+e=B.a([new B.cR(A.KJ,new B.v(0,3*v),5*v)],x.r)
 w=l
 k=A.u
 break
@@ -13606,7 +13606,7 @@ C.azn.prototype={
 T(){return new C.bdN()}}
 C.bdN.prototype={
 Z(){this.a1()
-if(this.a.c!==D.cn)B.bN(A.M9,new C.d5j(this),x.a)},
+if(this.a.c!==D.cn)B.bN(A.Ma,new C.d5j(this),x.a)},
 B(d){var w,v,u,t,s,r,q=this,p=null,o=4280172719,n=q.a.c
 if(n===D.cn)n=B.av(B.d("No animation on elements",p,p,p,p,p,p,B.l(p,p,A.c.j(0.75),p,p,p,p,p,p,p,p,16,p,p,A.P,p,p,!0,p,p,p,p,p,p,p,p),p,p,p),p,p,p)
 else{n=n.u(0)
@@ -15264,12 +15264,12 @@ if(o)if(e)q=f
 else q=g?A.ad:A.ak
 else q=p
 n=B.a([B.p(p,B.d(t,p,p,p,p,p,p,B.l(p,p,q,p,p,p,p,p,p,p,p,s,p,p,r,p,p,!0,p,p,p,p,p,p,p,p),p,p,p),A.f,p,p,new B.o(w,p,u,v,p,p,A.n),p,p,p,p,new B.Q(n,8,n,8),p,p,p)],x.p)
-if(i)n.push(B.ao(p,B.p(p,D.Ob,A.f,p,p,D.E8,p,12,p,p,p,p,p,12),p,p,p,-2,-2,p))
+if(i)n.push(B.ao(p,B.p(p,D.Oc,A.f,p,p,D.E8,p,12,p,p,p,p,p,12),p,p,p,-2,-2,p))
 return new B.D(A.fC,B.aC(p,new B.an(A.W,p,A.aa,A.f,n,p),A.y,!1,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,h,p,p,p,p,p,p,!1,A.a7),p)},
 bNe(d){var w,v=null,u=this.jW()
 if(u==null)return A.bI
 w=B.a([A.ab,B.d("Anim:",v,v,v,v,v,v,B.l(v,v,d?A.aA:A.ak,v,v,v,v,v,v,v,v,10,v,v,A.H,v,v,!0,v,v,v,v,v,v,v,v),v,v,v),A.bp],x.p)
-A.d.v(w,new B.M(D.QH,new C.etS(this,u,d),x.bR))
+A.d.v(w,new B.M(D.QI,new C.etS(this,u,d),x.bR))
 return B.B(w,A.m,v,A.e,A.j,0,v,v)},
 va(d){return this.bzC(d)},
 bzC(d){var w=0,v=B.j(x.H),u,t=this,s
@@ -15461,7 +15461,7 @@ bJw(d,e,f){var w,v=d.w
 if(v==="hati_kuhowa")w=D.dfE
 else if(v==="hati_kuhoweya")w=D.d1e
 else{if(v==="hati_kiapo_uongozi")v=D.cOW
-else v=C.kx(v)?D.cW5:A.Qh
+else v=C.kx(v)?D.cW5:A.Qi
 w=v}v=this.fy
 v===$&&B.c()
 return B.c6(v,new C.etr(this,f,d,e,w),null)},
@@ -15483,7 +15483,7 @@ r=B.E(new B.D(A.h8,B.c_(new B.D(A.eR,B.aM(j,A.U,!0,j,!0,A.r,j,B.aN(),w,A.bj,j,j,
 q=B.n(16)
 p=d?A.bn:A.c
 o=B.I(d?A.aJ:A.aL,A.q,1)
-n=B.E(B.cd(B.B(B.a([k.tY(G.Na,j,new C.euU(k,i),d),k.tY(G.a_J,j,new C.euV(k,i),d),k.tY(K.alQ,j,new C.euW(k,i),d),k.tY(K.a0o,j,new C.euX(k,i),d),k.tY(k.bAl(i.as),j,new C.euY(k,i),d),k.tY(D.amX,j,new C.euZ(k,i),d),k.tY(D.amW,j,new C.ev_(k,i),d)],t),A.m,j,A.e,A.j,0,j,j),A.r,j,A.y,j,j,j,j,A.aP),1)
+n=B.E(B.cd(B.B(B.a([k.tY(G.Nb,j,new C.euU(k,i),d),k.tY(G.a_J,j,new C.euV(k,i),d),k.tY(K.alQ,j,new C.euW(k,i),d),k.tY(K.a0o,j,new C.euX(k,i),d),k.tY(k.bAl(i.as),j,new C.euY(k,i),d),k.tY(D.amX,j,new C.euZ(k,i),d),k.tY(D.amW,j,new C.ev_(k,i),d)],t),A.m,j,A.e,A.j,0,j,j),A.r,j,A.y,j,j,j,j,A.aP),1)
 m=A.k.N(i.w)
 return B.bZ(0,B.aF(!1,A.a1,!0,j,B.x(B.a([s,r,new B.D(H.ahF,B.p(j,B.B(B.a([n,A.ab,B.d(""+m+" pt",j,j,j,j,j,j,B.l(j,j,d?A.aA:A.ak,j,j,j,j,j,j,j,j,11,j,j,A.H,j,j,!0,j,j,j,j,j,j,j,j),j,j,j),A.db],t),A.m,j,A.e,A.j,0,j,j),A.f,j,j,new B.o(p,j,o,q,j,j,A.n),j,j,j,j,A.ll,j,j,j),j)],t),A.m,j,A.e,A.j,0,A.p),A.f,u,0,j,j,j,j,j,A.ag),0,0,0)},
 c2E(d){var w,v,u,t,s,r,q,p,o=this,n=null,m=o.jW()
@@ -15500,7 +15500,7 @@ p=B.a([],q)
 if(v)p.push(o.b4e(A.jr,"Edit",new C.euD(o,m),d,!0))
 if(w===D.lw)p.push(o.b4e(A.Gv,"Shape & ring",new C.euE(o),d,!0))
 p.push(o.tY(A.C0,"Format",new C.euF(o),d))
-if(v)A.d.v(p,B.a([o.tY(G.Na,n,new C.euG(o,m),d),o.tY(D.amX,n,new C.euH(o,m),d),o.tY(D.amW,n,new C.euI(o,m),d)],q))
+if(v)A.d.v(p,B.a([o.tY(G.Nb,n,new C.euG(o,m),d),o.tY(D.amX,n,new C.euH(o,m),d),o.tY(D.amW,n,new C.euI(o,m),d)],q))
 p.push(A.b7)
 p.push(o.crN(A.e7,n,o.gaQG(),d,!0))
 p.push(o.tY(A.ho,"Done",new C.euJ(o),d))
@@ -15580,16 +15580,16 @@ w.push(e.lK(e.crb(s),t.a,new C.ewr(u,e),a3,D.aNW.t(0,s)))}w.push(e.iP(A.l_,"Note
 w.push(e.lK(A.Gu,"Quiz",new C.ewt(e),a3,!0))
 w.push(e.lK(M.G4,"Worksheet",new C.ewE(e),a3,!0))
 w.push(e.lK(V.Gx,"Flashcard",new C.ewP(e),a3,!0))
-w.push(e.lK(A.O0,"Lab Report",new C.ex_(e),a3,!0))
+w.push(e.lK(A.O1,"Lab Report",new C.ex_(e),a3,!0))
 w.push(e.lK(A.u1,"Rubric",new C.ex6(e),a3,!0))
 w.push(e.lK(A.oV,"Minutes",new C.ex7(e),a3,!0))
 w.push(e.lK(A.o5,"Syllabus",new C.ex8(e),a3,!0))
-w.push(e.lK(A.O6,"Timeline",new C.ex9(e),a3,!0))
+w.push(e.lK(A.O7,"Timeline",new C.ex9(e),a3,!0))
 return B.B(w,A.m,d,A.e,A.j,0,d,d)
 case"Tools":w=B.a([],x.p)
 for(v=0;v<74;++v){r=D.daw[v]
 w.push(e.lK(r.b,r.c,new C.exa(e,r),a3,!D.aO1.t(0,A.a.i(r.a))))}return B.B(w,A.m,d,A.e,A.j,0,d,d)
-case"Insert":return B.B(B.a([e.iP(A.yv,a0,e.gaMk(),a3),e.iP(A.u4,"Picture",new C.ewu(e),a3),e.iP(A.yp,"Bio link",new C.ewv(e),a3),e.iP(A.a0R,"Table",new C.eww(e),a3),e.iP(A.O4,"Sticky",new C.ewx(e),a3),e.iP(A.u3,"Divider",new C.ewy(e),a3),e.iP(A.C1,"Header",new C.ewz(e),a3),e.lK(A3.vP,"Rectangle",new C.ewA(e),a3,!0),e.lK(A.re,"Circle",new C.ewB(e),a3,!0),e.lK(A.a0e,"Triangle",new C.ewC(e),a3,!0),e.lK(A.j1,"Arrow",new C.ewD(e),a3,!0),e.lK(D.bFL,"Parallelogram",new C.ewF(e),a3,!0),e.lK(D.bIg,"Hexagon",new C.ewG(e),a3,!0),e.lK(A.u3,"Line",new C.ewH(e),a3,!0),e.lK(A.ya,"PDF",new C.ewI(e),a3,!0),e.lK(O.a1_,"Signature",new C.ewJ(e),a3,!0),e.iP(A2.BQ,"Quote",new C.ewK(e),a3),e.iP(D.a_R,a1,new C.ewL(e),a3)],x.p),A.m,d,A.e,A.j,0,d,d)
+case"Insert":return B.B(B.a([e.iP(A.yv,a0,e.gaMk(),a3),e.iP(A.u4,"Picture",new C.ewu(e),a3),e.iP(A.yp,"Bio link",new C.ewv(e),a3),e.iP(A.a0R,"Table",new C.eww(e),a3),e.iP(A.O5,"Sticky",new C.ewx(e),a3),e.iP(A.u3,"Divider",new C.ewy(e),a3),e.iP(A.C1,"Header",new C.ewz(e),a3),e.lK(A3.vP,"Rectangle",new C.ewA(e),a3,!0),e.lK(A.re,"Circle",new C.ewB(e),a3,!0),e.lK(A.a0e,"Triangle",new C.ewC(e),a3,!0),e.lK(A.j1,"Arrow",new C.ewD(e),a3,!0),e.lK(D.bFL,"Parallelogram",new C.ewF(e),a3,!0),e.lK(D.bIg,"Hexagon",new C.ewG(e),a3,!0),e.lK(A.u3,"Line",new C.ewH(e),a3,!0),e.lK(A.ya,"PDF",new C.ewI(e),a3,!0),e.lK(O.a1_,"Signature",new C.ewJ(e),a3,!0),e.iP(A2.BQ,"Quote",new C.ewK(e),a3),e.iP(D.a_R,a1,new C.ewL(e),a3)],x.p),A.m,d,A.e,A.j,0,d,d)
 case"Design":w=e.c
 w.toString
 w=B.aI(w,A.bW,x.w).w
@@ -15622,10 +15622,10 @@ t=new C.exb(e,a3)
 q=x.p
 p=B.a([],q)
 if(f!=null){o=B.d("ELEMENT ANIMATION",d,d,d,d,d,d,B.l(d,d,a3?A.aA:A.ak,d,d,d,d,d,d,d,d,10,d,d,A.H,d,d,!0,d,1,d,d,d,d,d,d),d,d,d)
-n=t.$4(D.QH,f.dy,new C.ewT(e,u,f),A.aZ)
+n=t.$4(D.QI,f.dy,new C.ewT(e,u,f),A.aZ)
 A.d.v(p,B.a([o,A.au,n,A.O,B.d("SLIDE TRANSITION",d,d,d,d,d,d,B.l(d,d,a3?A.aA:A.ak,d,d,d,d,d,d,d,d,10,d,d,A.H,d,d,!0,d,1,d,d,d,d,d,d),d,d,d),A.au],q))}q=e.gdu()
 q=q==null?d:q.r
-p.push(t.$4(D.QH,q,new C.ewU(e,u),A.bj))
+p.push(t.$4(D.QI,q,new C.ewU(e,u),A.bj))
 return new B.a7(w.a.a-20,d,B.x(p,A.F,d,A.e,A.N,0,A.p),d)
 case"View":w=e.y?"Hide Notes":"Show Notes"
 return B.B(B.a([e.iP(A.l_,w,new C.ewV(e),a3),e.iP(A.u7,"Print deck",new C.ewW(e),a3),e.lK(D.akT,"Export JSON",new C.ewX(e),a3,!0),e.iP(A.fP,"Duplicate Slide",e.gaRz(),a3),e.iP(A.e7,a2,e.gaQH(),a3),e.cvj(a3)],x.p),A.m,d,A.e,A.j,0,d,d)
@@ -15636,7 +15636,7 @@ t=e.e
 if(t!=null){t=t.w
 t=t==="hati_kuhowa"||t==="hati_kuhoweya"}else t=!1
 if(t)u.push(e.iP(A.kw,"Transfer",new C.ex1(e),a3))
-if(f!=null){w=B.a([A.ab,e.iP(G.Na,"Bold",new C.ex2(e,f),a3),e.iP(G.a_J,"Italic",new C.ex3(e,f),a3),e.iP(G.aku,"Underline",new C.ex4(e,f),a3),e.iP(Ad.Nb,"Bullets",new C.ex5(e,f),a3),e.bPy(f,a3)],w)
+if(f!=null){w=B.a([A.ab,e.iP(G.Nb,"Bold",new C.ex2(e,f),a3),e.iP(G.a_J,"Italic",new C.ex3(e,f),a3),e.iP(G.aku,"Underline",new C.ex4(e,f),a3),e.iP(Ad.Nc,"Bullets",new C.ex5(e,f),a3),e.bPy(f,a3)],w)
 if(!A.a.a0(f.db,"__design__"))w.push(e.bNe(a3))
 w.push(e.iP(D.bEo,"Delete",e.gaQG(),a3))
 A.d.v(u,w)}return B.B(u,A.m,d,A.e,A.j,0,d,d)}},
@@ -15667,7 +15667,7 @@ return B.p(w,B.B(B.a([t,B.d(""+s,w,w,w,w,w,w,B.l(w,w,e?A.c:A.bk,w,w,w,w,w,w,w,w,
 c_v(d){var w=null
 return B.BW(B.Dk(B.X(A5.a_U,d?A.ad:A.bq,w,w,w,16),w,w,D.fxf,w,w,w),w,w,new C.euv(),A.J,this.gbB2(),A.cp,"Slide layout",x.fO)},
 lK(d,e,f,g,h){var w=null,v=B.n(14),u=B.n(14),t=g?A.c.j(0.06):A.bL,s=B.I(g?A.dm:A.aL,A.q,1),r=x.p,q=B.a([B.X(d,g?A.ds:A.bj,w,w,w,18)],r)
-if(h)q.push(B.ao(w,B.p(w,D.Ob,A.f,w,w,D.E8,w,12,w,w,w,w,w,12),w,w,w,-6,-4,w))
+if(h)q.push(B.ao(w,B.p(w,D.Oc,A.f,w,w,D.E8,w,12,w,w,w,w,w,12),w,w,w,-6,-4,w))
 return new B.D(A.fC,B.aF(!1,A.a1,!0,w,B.aL(!1,v,!0,B.eH(new B.D(A.h8,B.x(B.a([new B.an(A.W,w,A.aa,A.f,q,w),A.cV,B.d(e,w,w,w,w,w,w,B.l(w,w,g?A.aS:A.bq,w,w,w,w,w,w,w,w,9,w,w,A.H,w,w,!0,w,w,w,w,w,w,w,w),w,w,w)],r),A.m,w,A.e,A.N,0,A.p),w),w,new B.o(t,w,s,u,w,w,A.n),w,w,w),w,!0,w,w,w,w,w,w,w,w,w,w,w,f,w,w,w,w,w,w,w),A.f,A.K,0,w,w,w,w,w,A.ag),w)},
 iP(d,e,f,g){return this.lK(d,e,f,g,!1)},
 b5B(d,e){var w,v,u=this,t=null,s=u.e
@@ -15751,7 +15751,7 @@ if(e)t=A.bj
 else t=f?A.aA:A.ak
 s=x.p
 t=B.a([B.d(d,r,r,r,r,r,r,B.l(r,r,t,r,r,r,r,r,r,r,r,10,r,r,A.H,r,r,!0,r,r,r,r,r,r,r,r),r,r,r)],s)
-if(h)A.d.v(t,B.a([A.db,B.p(r,D.Ob,A.f,r,r,D.E8,r,12,r,r,r,r,r,12)],s))
+if(h)A.d.v(t,B.a([A.db,B.p(r,D.Oc,A.f,r,r,D.E8,r,12,r,r,r,r,r,12)],s))
 return B.aC(r,B.p(r,B.B(t,A.m,r,A.e,A.N,0,r,r),A.f,r,r,new B.o(w,r,u,v,r,r,A.n),r,r,r,r,A.h7,r,r,r),A.y,!1,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,g,r,r,r,r,r,r,!1,A.a7)},
 bGP(d,e,f,g){return this.aPl(d,e,f,g,!1)},
 c9t(d,e,f){var w,v,u,t,s,r,q,p,o,n,m=this,l=null,k=d.a
@@ -15795,7 +15795,7 @@ n=a2.b
 m=n===D.cQ
 if(m)o.push(B.B(B.a([D.fm1,B.E(B.l0(a1,a1,a1,96,10,new C.eue(w,a2),A.k.D(a2.w,10,96)),1)],p),A.m,a1,A.e,A.j,0,a1,a1))
 l=n===D.lw
-if(l||n===D.l5||n===D.S2)A.d.v(o,B.a([B.d("Crop / position",a1,a1,a1,a1,a1,a1,B.l(a1,a1,a3?A.aA:A.ak,a1,a1,a1,a1,a1,a1,a1,a1,11,a1,a1,a1,a1,a1,!0,a1,a1,a1,a1,a1,a1,a1,a1),a1,a1,a1),B.B(B.a([D.fxZ,B.E(B.l0(a1,a1,a1,s,0,new C.euf(w,a2),A.k.D(a2.c,0,s)),1)],p),A.m,a1,A.e,A.j,0,a1,a1),B.B(B.a([D.fFO,B.E(B.l0(a1,a1,a1,r,0,new C.eug(w,a2),A.k.D(a2.d,0,r)),1)],p),A.m,a1,A.e,A.j,0,a1,a1)],p))
+if(l||n===D.l5||n===D.S3)A.d.v(o,B.a([B.d("Crop / position",a1,a1,a1,a1,a1,a1,B.l(a1,a1,a3?A.aA:A.ak,a1,a1,a1,a1,a1,a1,a1,a1,11,a1,a1,a1,a1,a1,!0,a1,a1,a1,a1,a1,a1,a1,a1),a1,a1,a1),B.B(B.a([D.fxZ,B.E(B.l0(a1,a1,a1,s,0,new C.euf(w,a2),A.k.D(a2.c,0,s)),1)],p),A.m,a1,A.e,A.j,0,a1,a1),B.B(B.a([D.fFO,B.E(B.l0(a1,a1,a1,r,0,new C.eug(w,a2),A.k.D(a2.d,0,r)),1)],p),A.m,a1,A.e,A.j,0,a1,a1)],p))
 if(l){l=B.d("Shape (frame)",a1,a1,a1,a1,a1,a1,B.l(a1,a1,a3?A.aA:A.ak,a1,a1,a1,a1,a1,a1,a1,a1,11,a1,a1,a1,a1,a1,!0,a1,a1,a1,a1,a1,a1,a1,a1),a1,a1,a1)
 k=B.a([],p)
 for(j=0;j<7;++j){i={}
@@ -16302,7 +16302,7 @@ s=B.X(A.lo,A.bj.j(0.9),n,n,n,18)
 r=o.gaO_()
 q=o.gb5A()
 p=o.gb5A()===1?"":"s"
-A.d.v(w,B.a([A.by,B.p(n,B.B(B.a([s,A.at,B.E(B.d("Ready to share "+r+" \xb7 "+q+" slide"+p,n,n,n,n,n,n,B.l(n,n,m?A.ad:A.bq,n,n,n,n,n,n,n,n,12,n,n,A.a6,n,n,!0,n,n,n,n,n,n,n,n),n,n,n),1)],h),A.m,n,A.e,A.j,0,n,n),A.f,n,n,new B.o(v,n,t,u,n,n,A.n),n,n,n,n,A.bB,n,n,n)],h))}j=B.a([j,B.bm(!0,B.x(B.a([new B.D(Af.MM,i,n),B.E(B.cw(w,n,D.bv3,n,n,A.ah,!1),1)],h),A.m,n,A.e,A.j,0,A.p),!0,!1,A.af,!0,!0)],h)
+A.d.v(w,B.a([A.by,B.p(n,B.B(B.a([s,A.at,B.E(B.d("Ready to share "+r+" \xb7 "+q+" slide"+p,n,n,n,n,n,n,B.l(n,n,m?A.ad:A.bq,n,n,n,n,n,n,n,n,12,n,n,A.a6,n,n,!0,n,n,n,n,n,n,n,n),n,n,n),1)],h),A.m,n,A.e,A.j,0,n,n),A.f,n,n,new B.o(v,n,t,u,n,n,A.n),n,n,n,n,A.bB,n,n,n)],h))}j=B.a([j,B.bm(!0,B.x(B.a([new B.D(Af.MN,i,n),B.E(B.cw(w,n,D.bv3,n,n,A.ah,!1),1)],h),A.m,n,A.e,A.j,0,A.p),!0,!1,A.af,!0,!0)],h)
 if(o.f)j.push(B.p(n,T.VZ,A.f,A.dB,n,n,n,n,n,n,n,n,n,n))
 return B.c8(n,l,new B.an(A.W,n,A.aa,A.r,j,n),n,!1,!1,n,n)},
 afn(){var w=0,v=B.j(x.H),u=this,t,s
@@ -16425,7 +16425,7 @@ l.toString
 p.push(B.p(j,B.pT(j,j,!1,l,j,!0,!0,j,!1,D.bmg),A.f,j,j,new B.o(o,j,m,n,j,j,A.n),j,j,j,j,A.cp,j,j,j))
 A.d.v(r,p)}r.push(A.aB)
 r.push(B.d(g===!0?"Cloud QR \u2014 scan on another phone with NGMY Slides open.":"Offline QR \u2014 keep both devices on the same network if scan fails.",j,j,j,j,j,j,A.hg,A.L,j,j))
-return B.c8(j,h,B.bm(!0,B.x(B.a([new B.D(Af.MM,v,j),B.E(B.cd(B.x(B.a([t,A.aR,B.p(j,B.x(r,A.m,j,A.e,A.j,0,A.p),A.f,j,j,new B.o(j,j,s,q,j,D.bYt,A.n),j,j,j,j,A.tS,j,j,1/0)],u),A.m,j,A.e,A.j,0,A.p),A.r,j,A.y,j,E.aiP,j,j,A.ah),1)],u),A.m,j,A.e,A.j,0,A.p),!0,!1,A.af,!0,!0),j,!1,!1,j,j)}}
+return B.c8(j,h,B.bm(!0,B.x(B.a([new B.D(Af.MN,v,j),B.E(B.cd(B.x(B.a([t,A.aR,B.p(j,B.x(r,A.m,j,A.e,A.j,0,A.p),A.f,j,j,new B.o(j,j,s,q,j,D.bYt,A.n),j,j,j,j,A.tS,j,j,1/0)],u),A.m,j,A.e,A.j,0,A.p),A.r,j,A.y,j,E.aiP,j,j,A.ah),1)],u),A.m,j,A.e,A.j,0,A.p),!0,!1,A.af,!0,!0),j,!1,!1,j,j)}}
 C.aEb.prototype={
 T(){return new C.aEc(new B.as(A.as,$.aw()),B.jS(!0,null,!0,!0,null,null,!1))}}
 C.aEc.prototype={
@@ -16459,15 +16459,15 @@ else n=r?A.bj.j(0.55):A.aJ
 m=new B.az(n,q?2:1.2,A.q,-1)
 n=q?B.a([new B.ac(0,A.G,A.bj.j(0.28),A.J,12)],g):k
 t.push(new B.bB(1,A.bh,B.df(A.A,new B.y(p,k,D.f79,k,k,k,k,k,k,k,k,k),k,k,A.bc,new B.o(s,k,new B.bO(m,m,m,m),new B.bp(o,o,o,o),n,k,A.n),A.hz,k,56,k,k,k,k,k),k))
-if(u!==4&&u!==1)t.push(M.J_)
+if(u!==4&&u!==1)t.push(M.J0)
 A.d.v(d,t)}g=B.a([B.B(d,A.m,k,A.e,A.j,0,k,k),B.bZ(0,B.de(B.aM(k,A.U,!0,k,!0,A.r,k,B.aN(),w,k,k,k,k,k,2,D.bUt,A.y,!0,k,!0,k,!1,v,A.aj,k,k,B.a([new B.ul(B.af("[A-Za-z0-9]",!0,!1,!1,!1),!0,""),new B.Br(5,k),new C.buG()],x.aS),k,k,A.aPV,k,5,k,1,k,k,!1,"\u2022",k,new C.erP(l),k,new C.erQ(l),k,!1,k,k,!1,k,!0,k,A.a9,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a4,k,A.m5,k,k,k,k),0),0,0,0)],a1)
 d=C.yA(w.a.a.toUpperCase())==null?k:l.gc8O()
-return B.av(new B.D(new B.Q(24,24,24,24+j.f.d),B.aF(!1,A.a1,!0,k,new B.cT(Ac.Ks,B.p(k,B.bw(e,B.x(B.a([a0,new B.D(D.bvy,B.x(B.a([new B.an(A.W,k,A.aa,A.r,g,k),A.R,D.fmr,A.by,new B.a7(1/0,50,B.bG(D.fD_,d,B.bn(A.bj,A.bn,A.ak,k,A.c,k,k,k,new B.b7(B.n(16),A.Y),k,k,k)),k),A.am,B.bK(!1,A.nE,k,k,!0,k,k,new C.erR(a2),k,B.fy(k,k,k,k,k,k,k,k,k,k,k,A.bK,k,k,k,k,k,k,k,k,k,k,k,k,k,k))],a1),A.m,k,A.e,A.j,0,A.p),k)],a1),A.m,k,A.e,A.N,0,A.p),A.aq),A.f,k,k,new B.o(A.d9,k,h,i,f,k,A.n),k,k,k,k,k,k,k,k),k),A.f,A.K,0,k,k,k,k,k,A.ag),k),k,k,k)}}
+return B.av(new B.D(new B.Q(24,24,24,24+j.f.d),B.aF(!1,A.a1,!0,k,new B.cT(Ac.Kt,B.p(k,B.bw(e,B.x(B.a([a0,new B.D(D.bvy,B.x(B.a([new B.an(A.W,k,A.aa,A.r,g,k),A.R,D.fmr,A.by,new B.a7(1/0,50,B.bG(D.fD_,d,B.bn(A.bj,A.bn,A.ak,k,A.c,k,k,k,new B.b7(B.n(16),A.Y),k,k,k)),k),A.am,B.bK(!1,A.nE,k,k,!0,k,k,new C.erR(a2),k,B.fy(k,k,k,k,k,k,k,k,k,k,k,A.bK,k,k,k,k,k,k,k,k,k,k,k,k,k,k))],a1),A.m,k,A.e,A.j,0,A.p),k)],a1),A.m,k,A.e,A.N,0,A.p),A.aq),A.f,k,k,new B.o(A.d9,k,h,i,f,k,A.n),k,k,k,k,k,k,k,k),k),A.f,A.K,0,k,k,k,k,k,A.ag),k),k,k,k)}}
 C.buG.prototype={
 oz(d,e){var w=e.a.toUpperCase()
 return e.cJ_(B.hg(A.bw,w.length),w)}}
 C.ar9.prototype={
-T(){return new C.aEf(B.ze(A.M3,A.nL,A.ui))}}
+T(){return new C.aEf(B.ze(A.M4,A.nL,A.ui))}}
 C.aEf.prototype={
 q(){this.d.q()
 this.a2()},
@@ -16495,7 +16495,7 @@ for(w=d.a,v=w.length,u=0;u<w.length;w.length===v||(0,B.K)(w),++u){t=C.i8d(w[u])
 if(t!=null){this.aZK(t)
 return}}},
 B(d){var w,v,u,t=this,s=null,r=B.aH(s,s,s,s,A.w2,s,s,s,t.gbNK(),s,s,s,s,"Enter document code",s),q=t.f,p=q?"Flash off":"Flash on",o=x.p
-p=B.eF(B.a([r,B.aH(s,s,s,s,B.X(q?A.rh:Ak.NI,s,s,s,s,s),s,s,s,new C.eyu(t),s,s,s,s,p,s)],o),s,s,!0,!0,A.d9,s,1,s,s,s,!1,s,!1,A.c,s,s,s,!0,s,s,s,s,s,D.fEd,s,s,s,1,s,!0)
+p=B.eF(B.a([r,B.aH(s,s,s,s,B.X(q?A.rh:Ak.NJ,s,s,s,s,s),s,s,s,new C.eyu(t),s,s,s,s,p,s)],o),s,s,!0,!0,A.d9,s,1,s,s,s,!1,s,!1,A.c,s,s,s,!0,s,s,s,s,s,D.fEd,s,s,s,1,s,!0)
 r=B.zd(t.d,A.bV,t.gc8L())
 w=B.n(28)
 w=B.av(B.p(s,s,A.f,s,s,new B.o(s,s,B.I(A.bj,A.q,3),w,B.a([new B.ac(2,A.G,A.bj.j(0.35),A.J,24)],x.V),s,A.n),s,260,s,s,s,s,s,260),s,s,s)
@@ -16504,7 +16504,7 @@ u=B.n(16)
 return B.c8(p,A.w,new B.an(A.W,s,A.b1,A.r,B.a([r,w,B.ao(32,B.p(s,D.fs0,A.f,s,s,new B.o(v,s,B.I(A.bj.j(0.45),A.q,1),u,s,s,A.n),s,s,s,s,A.jo,s,s,s),s,s,20,20,s,s)],o),s),s,!1,!1,s,s)}}
 C.buS.prototype={
 B(d){var w=null,v=B.n(24),u=B.I(A.aJ,A.q,1)
-return B.aF(!1,A.a1,!0,w,B.p(w,B.x(B.a([B.p(w,H.anj,A.f,w,w,D.b17,w,56,w,w,w,w,w,56),A.aR,D.fDU,A.am,new B.jM(this.c,new C.f97(),w,w,x.cI),A.aR,new B.jM(this.d,new C.f98(),w,w,x.cl),A.ac,D.fDR],x.p),A.m,w,A.e,A.N,0,A.p),A.f,w,Ac.Ks,new B.o(A.ax,w,u,v,w,w,A.n),w,w,w,L.Zt,D.bwb,w,w,w),A.f,A.K,0,w,w,w,w,w,A.ag)}}
+return B.aF(!1,A.a1,!0,w,B.p(w,B.x(B.a([B.p(w,H.anj,A.f,w,w,D.b17,w,56,w,w,w,w,w,56),A.aR,D.fDU,A.am,new B.jM(this.c,new C.f97(),w,w,x.cI),A.aR,new B.jM(this.d,new C.f98(),w,w,x.cl),A.ac,D.fDR],x.p),A.m,w,A.e,A.N,0,A.p),A.f,w,Ac.Kt,new B.o(A.ax,w,u,v,w,w,A.n),w,w,w,L.Zt,D.bwb,w,w,w),A.f,A.K,0,w,w,w,w,w,A.ag)}}
 C.a7G.prototype={
 T(){return new C.bk2(A.bx)},
 gde(){return this.c}}
@@ -17107,7 +17107,7 @@ C.fOh.prototype={
 $1(d){return new C.ade(this.a,this.b,null)},
 $S:z+108}
 C.dYQ.prototype={
-$2(d,e){var w,v,u,t=null,s=this.b,r=s?D.bmM:A.Ly,q=B.I(D.jf.j(0.25),A.q,1),p=B.av(B.p(t,t,A.f,t,t,new B.o(A.c0.j(0.45),t,t,B.n(2),t,t,A.n),t,4,t,t,t,t,t,40),t,t,t),o=B.n(15)
+$2(d,e){var w,v,u,t=null,s=this.b,r=s?D.bmM:A.Lz,q=B.I(D.jf.j(0.25),A.q,1),p=B.av(B.p(t,t,A.f,t,t,new B.o(A.c0.j(0.45),t,t,B.n(2),t,t,A.n),t,4,t,t,t,t,t,40),t,t,t),o=B.n(15)
 o=B.p(t,D.anE,A.f,t,t,new B.o(t,t,B.I(A.c.j(0.5),A.q,1.2),o,B.a([new B.ac(0,A.G,D.jf.j(0.35),A.em,10)],x.V),D.bZ4,A.n),t,t,t,t,A.xJ,t,t,t)
 w=this.a
 v=w.d.length
@@ -17171,13 +17171,13 @@ C.fPK.prototype={
 $1(d){return D.h5o},
 $S:z+74}
 C.eg4.prototype={
-$2(d,e){var w,v=null,u=this.a,t=u?D.bet:A.Ly,s=B.I(A.ay.j(0.25),A.q,1),r=B.av(B.p(v,v,A.f,v,v,new B.o(A.ay.j(0.45),v,v,B.n(2),v,v,A.n),v,4,v,v,v,v,v,40),v,v,v),q=B.n(15)
+$2(d,e){var w,v=null,u=this.a,t=u?D.bet:A.Lz,s=B.I(A.ay.j(0.25),A.q,1),r=B.av(B.p(v,v,A.f,v,v,new B.o(A.ay.j(0.45),v,v,B.n(2),v,v,A.n),v,4,v,v,v,v,v,40),v,v,v),q=B.n(15)
 q=B.p(v,D.bRF,A.f,v,v,new B.o(v,v,B.I(A.c.j(0.5),A.q,1.2),q,B.a([new B.ac(0,A.G,A.c0.j(0.35),A.em,10)],x.V),D.aoZ,A.n),v,v,v,v,A.xJ,v,v,v)
 w=x.p
-return B.p(v,B.x(B.a([new B.D(I.Zi,B.x(B.a([r,A.aB,B.B(B.a([q,A.be,B.E(B.x(B.a([B.d("Chagua muundo wa hati",v,v,v,v,v,v,B.l(v,v,u?A.c:Z.Lv,v,v,v,v,v,v,v,v,17,v,v,A.u,v,v,!0,v,v,v,v,v,v,v,v),v,v,v),A.bC,B.d("Hati ya Ndoa \xb7 19 miundo",v,v,v,v,v,v,D.faw,v,v,v)],w),A.F,v,A.e,A.j,0,A.p),1)],w),A.m,v,A.e,A.j,0,v,v)],w),A.m,v,A.e,A.j,0,A.p),v),B.E(B.im(!0,v,e,A.y,D.aOX,new C.eg3(this.b),19,D.air,v,A.ah,!1),1)],w),A.m,v,A.e,A.j,0,A.p),A.f,v,v,new B.o(t,v,s,A.mc,v,v,A.n),v,v,v,v,v,v,v,v)},
+return B.p(v,B.x(B.a([new B.D(I.Zi,B.x(B.a([r,A.aB,B.B(B.a([q,A.be,B.E(B.x(B.a([B.d("Chagua muundo wa hati",v,v,v,v,v,v,B.l(v,v,u?A.c:Z.Lw,v,v,v,v,v,v,v,v,17,v,v,A.u,v,v,!0,v,v,v,v,v,v,v,v),v,v,v),A.bC,B.d("Hati ya Ndoa \xb7 19 miundo",v,v,v,v,v,v,D.faw,v,v,v)],w),A.F,v,A.e,A.j,0,A.p),1)],w),A.m,v,A.e,A.j,0,v,v)],w),A.m,v,A.e,A.j,0,A.p),v),B.E(B.im(!0,v,e,A.y,D.aOX,new C.eg3(this.b),19,D.air,v,A.ah,!1),1)],w),A.m,v,A.e,A.j,0,A.p),A.f,v,v,new B.o(t,v,s,A.mc,v,v,A.n),v,v,v,v,v,v,v,v)},
 $S:115}
 C.eg3.prototype={
-$2(d,e){var w=D.QX[e]
+$2(d,e){var w=D.QY[e]
 return new C.aeY(w,new C.eg2(this.a,w),null)},
 $S:z+75}
 C.eg2.prototype={
@@ -17446,7 +17446,7 @@ l=C.h26(f,new B.H(!0,e,a5,i,a5,a5,h,A.cN,A.bo,0,a5,a5,1.28,a5,a5,a5,a5,a5,a5,a5,
 if(C.fZW(g.length===0?B.a([a6],n):g,l))break}a1=o.ae3(i,h,1.28)
 a2=new C.cd1(a1)
 n=x.p
-v=B.B(B.a([a2.$2(l[0],u),A.IZ,new B.a7(v,a5,a4.f,a5),A.IZ,a2.$2(l[1],u)],n),A.F,a5,A.e,A.j,0,a5,a5)
+v=B.B(B.a([a2.$2(l[0],u),A.J_,new B.a7(v,a5,a4.f,a5),A.J_,a2.$2(l[1],u)],n),A.F,a5,A.e,A.j,0,a5,a5)
 k=B.a([],n)
 for(i=m>0,j=j.w,g=m-12,a3=0;a3<t;++a3){f=B.a([],n)
 if(a3>0)f.push(new B.D(D.byg,B.p(a5,a5,A.f,B.b0(j).j(0.5),a5,a5,a5,a5,a5,a5,a5,a5,a5,1),a5))
@@ -18857,7 +18857,7 @@ this.a.d.sp(0,w)
 return w},
 $S:8}
 C.dUz.prototype={
-$2(d,e){var w=null,v=Math.min(e.b,e.d),u=this.b,t=B.c_(w,new B.o(w,w,w,w,w,new B.bT(A.K7,1.2,A.x,w,0,u.d,w,w),A.n),A.bf),s=this.a,r=s.d,q=s.a.d?0.45:1
+$2(d,e){var w=null,v=Math.min(e.b,e.d),u=this.b,t=B.c_(w,new B.o(w,w,w,w,w,new B.bT(A.K8,1.2,A.x,w,0,u.d,w,w),A.n),A.bf),s=this.a,r=s.d,q=s.a.d?0.45:1
 return B.jA(new B.an(A.W,w,A.b1,A.r,B.a([t,new B.ex(B.b3(w,w,w,new C.beq(u.a,r,q,r),A.aw),w),B.av(new B.jM(r,new C.dUy(s,v,this.c,u),w,w,x.cl),w,w,w)],x.p),w),A.r,w)},
 $S:358}
 C.dUy.prototype={
@@ -18966,7 +18966,7 @@ return new B.e2(new C.fO_(w),null)},
 $S:21}
 C.fO_.prototype={
 $2(d,e){var w=null,v=this.a
-return B.p(w,B.bm(!0,new B.cT(new B.aY(0,1/0,0,B.aI(d,A.bW,x.w).w.a.b*0.85),B.cd(B.x(B.a([B.av(B.p(w,w,A.f,w,w,new B.o(A.b_,w,w,B.n(9),w,w,A.n),w,4,w,w,w,w,w,40),w,w,w),A.aB,D.fzZ,A.au,D.fAe,A.aB,new C.aZU(v.a,new C.fNZ(v,e,d),!0,w)],x.p),A.F,w,A.e,A.N,0,A.p),A.r,w,A.y,w,w,w,w,A.ah),w),!0,!1,A.af,!0,!1),A.f,w,w,D.b1p,w,w,w,w,A.Mx,w,w,w)},
+return B.p(w,B.bm(!0,new B.cT(new B.aY(0,1/0,0,B.aI(d,A.bW,x.w).w.a.b*0.85),B.cd(B.x(B.a([B.av(B.p(w,w,A.f,w,w,new B.o(A.b_,w,w,B.n(9),w,w,A.n),w,4,w,w,w,w,w,40),w,w,w),A.aB,D.fzZ,A.au,D.fAe,A.aB,new C.aZU(v.a,new C.fNZ(v,e,d),!0,w)],x.p),A.F,w,A.e,A.N,0,A.p),A.r,w,A.y,w,w,w,w,A.ah),w),!0,!1,A.af,!0,!1),A.f,w,w,D.b1p,w,w,w,w,A.My,w,w,w)},
 $S:161}
 C.fNZ.prototype={
 $1(d){this.b.$1(new C.fNY(this.a,d))
@@ -20239,7 +20239,7 @@ $0(){B.a6(this.a,!1).O("split")
 return null},
 $S:0}
 C.es9.prototype={
-$0(){var w=this.b,v=w.c,u=C.er(A.bi,!1,4279310375,A.aD,v,4280640491,24,A.bo,A.a6,"",0.84,C.cB(),w.b,"","",0,!1,"",0,D.bg,4280172719,2,v,0,0,"",D.cn,D.S2,0.88,0.06,0.08)
+$0(){var w=this.b,v=w.c,u=C.er(A.bi,!1,4279310375,A.aD,v,4280640491,24,A.bo,A.a6,"",0.84,C.cB(),w.b,"","",0,!1,"",0,D.bg,4280172719,2,v,0,0,"",D.cn,D.S3,0.88,0.06,0.08)
 v=this.a
 A.d.L(v.gdu().z,u)
 v.r=u.a},
@@ -20254,7 +20254,7 @@ m=B.a([],s)
 l=Date.now()
 k=$.j2
 $.j2=k+1
-m.push(new C.eM(""+1000*l+"_"+k,D.S2,0.04,0.06,0.92,0.88,v,24,A.a6,A.bo,A.aD,4279310375,A.bi,u,D.bg,4280640491,4280172719,2,0,!1,n+" / "+t,q,D.cn,0,"","","","","",!1,0))
+m.push(new C.eM(""+1000*l+"_"+k,D.S3,0.04,0.06,0.92,0.88,v,24,A.a6,A.bo,A.aD,4279310375,A.bi,u,D.bg,4280640491,4280172719,2,0,!1,n+" / "+t,q,D.cn,0,"","","","","",!1,0))
 A.d.cj(j.e.r,i+q-1,new C.lH(""+1000*p+"_"+o,r+n,"",D.qk,4294967295,null,D.de,0,"",0,m))}j.f=i
 j.r=null},
 $S:0}
@@ -20443,7 +20443,7 @@ A.d.L(v.gdu().z,C.CW(4294967295,0.36,C.cB(),D.bg,w,2,0.24,0.38,0.28))
 A.d.L(v.gdu().z,C.iY(A.L,!1,w,A.aD,14,A.bo,A.a6,0.12,C.cB(),"[ QR CODE ]",0,D.de,0.24,0.38,0.4))},
 $S:0}
 C.esz.prototype={
-$0(){return C.ceA(this.b,D.S3,this.a.gql())},
+$0(){return C.ceA(this.b,D.S4,this.a.gql())},
 $S:0}
 C.etS.prototype={
 $1(d){var w=this.b,v=w.dy,u=!D.a73.t(0,d),t=this.a
@@ -20638,7 +20638,7 @@ else if(n==="hati_kiapo_uongozi"){n=v.x
 if(A.a.i(n==null?"":n).length===0)n="Civic Registry"
 n="Kiapo cha Uongozi \u2022 "+B.u(n)+" \u2022 Updated "+k.PM(v.f)}else n=""+v.r.length+" slides \u2022 Updated "+k.PM(v.f)
 r=k.bJu(n,A.d.gI(r),t)
-return B.p(l,B.bw(j,new B.a7Q(B.aF(!1,A.a1,!0,l,B.aL(!1,l,!0,B.p(l,B.dN(!1,A.Mu,l,l,!0,l,l,l,!0,l,q,l,l,l,l,l,!1,l,l,l,l,l,r,l,o,l,B.aH(l,l,l,l,B.X(A.o6,t?A.aA:A.bK,l,l,l,l),l,l,l,new C.etp(k,v,t),l,l,l,l,"Project options",l),l),A.f,l,l,new B.o(l,l,p,u,l,new B.a8(A.az,A.aC,A.x,s,l,l),A.n),l,l,l,l,l,l,l,l),l,!0,l,l,l,l,l,l,l,l,l,l,l,new C.etq(k,v),l,l,l,l,l,l,l),A.f,A.K,0,l,l,l,l,l,A.ag),l),A.aq),A.f,l,l,l,l,l,l,A.da,l,l,l,l)},
+return B.p(l,B.bw(j,new B.a7Q(B.aF(!1,A.a1,!0,l,B.aL(!1,l,!0,B.p(l,B.dN(!1,A.Mv,l,l,!0,l,l,l,!0,l,q,l,l,l,l,l,!1,l,l,l,l,l,r,l,o,l,B.aH(l,l,l,l,B.X(A.o6,t?A.aA:A.bK,l,l,l,l),l,l,l,new C.etp(k,v,t),l,l,l,l,"Project options",l),l),A.f,l,l,new B.o(l,l,p,u,l,new B.a8(A.az,A.aC,A.x,s,l,l),A.n),l,l,l,l,l,l,l,l),l,!0,l,l,l,l,l,l,l,l,l,l,l,new C.etq(k,v),l,l,l,l,l,l,l),A.f,A.K,0,l,l,l,l,l,A.ag),l),A.aq),A.f,l,l,l,l,l,l,A.da,l,l,l,l)},
 $S:94}
 C.etq.prototype={
 $0(){return this.a.aeS(this.b)},
@@ -21036,7 +21036,7 @@ if(u==null)u=d.c
 u=B.a([d.f,u],x.O)
 t=v?d.c:A.b_
 u=B.a([B.p(s,s,A.f,s,s,new B.o(s,s,B.I(t,A.q,v?2.5:1),s,s,new B.a8(A.a3,A.a8,A.x,u,s,s),A.a5),s,26,s,s,s,s,s,26)],x.p)
-if(D.a74.t(0,q))u.push(B.ao(s,B.p(s,D.Ob,A.f,s,s,D.E8,s,12,s,s,s,s,s,12),s,s,s,-2,-2,s))
+if(D.a74.t(0,q))u.push(B.ao(s,B.p(s,D.Oc,A.f,s,s,D.E8,s,12,s,s,s,s,s,12),s,s,s,-2,-2,s))
 return new B.D(A.fC,B.aC(s,B.hx(new B.an(A.W,s,A.aa,A.f,u,s),s,w,s,s),A.y,!1,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,new C.ewo(r,d),s,s,s,s,s,s,!1,A.a7),s)},
 $S:z+89}
 C.ewo.prototype={
@@ -22263,7 +22263,7 @@ D.b0I=new B.o(null,null,null,null,null,D.ej8,A.a5)
 D.X7=new B.w(1,0.054901960784313725,0.08235294117647059,0.14901960784313725,A.t)
 D.b_a=new B.bO(P.v4,A.Y,A.Y,A.Y)
 D.b0K=new B.o(D.X7,null,D.b_a,null,null,null,A.n)
-D.c_2=new B.a8(A.a3,A.a8,A.x,A.Ql,null,null)
+D.c_2=new B.a8(A.a3,A.a8,A.x,A.Qm,null,null)
 D.b0R=new B.o(null,null,null,null,null,D.c_2,A.a5)
 D.ad1=new B.w(1,0.058823529411764705,0.058823529411764705,0.0784313725490196,A.t)
 D.b0U=new B.o(D.ad1,null,null,A.qI,null,null,A.n)
@@ -22295,7 +22295,7 @@ D.bIV=new B.ae(A.dX,28,A.c,null,null,null)
 D.b5P=new B.cp(A.A,null,null,D.bIV,null)
 D.b7j=new B.fk(2,null,null,null,null,A.c0,null,null,null,null)
 D.b6a=new B.cp(A.A,null,null,D.b7j,null)
-D.bJf=new B.ae(L.NX,40,A.bz,null,null,null)
+D.bJf=new B.ae(L.NY,40,A.bz,null,null,null)
 D.b6b=new B.cp(A.A,null,null,D.bJf,null)
 D.b8c=new B.w(1,1,0.9019607843137255,0.6549019607843137,A.t)
 D.b8p=new B.w(1,0.10588235294117647,0.13333333333333333,0.19607843137254902,A.t)
@@ -22304,7 +22304,7 @@ D.b8U=new B.w(1,0.10980392156862745,0.07450980392156863,0.054901960784313725,A.t
 D.b9o=new B.w(1,0.47843137254901963,0.41568627450980394,0.27058823529411763,A.t)
 D.b9E=new B.w(0.8,1,0.9450980392156862,0.9490196078431372,A.t)
 D.b9F=new B.w(0.0784313725490196,0.788235294117647,0.6352941176470588,0.15294117647058825,A.t)
-D.KU=new B.w(1,0.0392156862745098,0.08235294117647059,0.14901960784313725,A.t)
+D.KV=new B.w(1,0.0392156862745098,0.08235294117647059,0.14901960784313725,A.t)
 D.ba4=new B.w(0.2,0.9607843137254902,0.6196078431372549,0.043137254901960784,A.t)
 D.baa=new B.w(0.13333333333333333,0.9607843137254902,0.7686274509803922,0.3176470588235294,A.t)
 D.adj=new B.w(1,0.1411764705882353,0.09411764705882353,0.07058823529411765,A.t)
@@ -22330,7 +22330,7 @@ D.bh2=new B.w(0.4,0.9607843137254902,0.7686274509803922,0.3176470588235294,A.t)
 D.aff=new B.w(1,0.47843137254901963,0.23137254901960785,0.2901960784313726,A.t)
 D.Xh=new B.w(0,0.9607843137254902,0.7686274509803922,0.3176470588235294,A.t)
 D.AT=new B.w(1,0.5411764705882353,0.39215686274509803,0.09019607843137255,A.t)
-D.Lu=new B.w(1,0.0784313725490196,0.09803921568627451,0.16470588235294117,A.t)
+D.Lv=new B.w(1,0.0784313725490196,0.09803921568627451,0.16470588235294117,A.t)
 D.jf=new B.w(1,0.07058823529411765,0.12941176470588237,0.23921568627450981,A.t)
 D.afD=new B.w(0,1,0.9686274509803922,0.8392156862745098,A.t)
 D.Xt=new B.w(1,0.2901960784313726,0.17254901960784313,0.10588235294117647,A.t)
@@ -22346,7 +22346,7 @@ D.ffl=new B.H(!0,A.aA,null,null,null,null,22,null,null,null,null,null,null,null,
 D.fFk=new B.y("Bio link",null,D.ffl,null,null,null,null,null,null,null,null,null)
 D.b64=new B.cp(A.A,null,null,D.fFk,null)
 D.bnl=new B.hL(A.We,!0,D.b64,null)
-D.LT=new C.a3K(0,"none")
+D.LU=new C.a3K(0,"none")
 D.agG=new C.a3K(1,"deflate")
 D.agH=new C.a3K(2,"bzip2")
 D.boi=new B.ko(0.165,0.84,0.44,1)
@@ -22494,7 +22494,7 @@ D.bN1=new B.ae(A.p0,22,A.c,null,null,null)
 D.bN5=new B.ae(A.cD,13,A.c,null,null,null)
 D.bNb=new B.ae(A.e7,26,A.av,null,null,null)
 D.bNe=new B.ae(A.rl,26,A.c,null,null,null)
-D.Ob=new B.ae(A.js,8,A.c,null,null,null)
+D.Oc=new B.ae(A.js,8,A.c,null,null,null)
 D.bNx=new B.ae(A.q6,40,A.c,null,null,null)
 D.bNy=new B.ae(A.bDl,null,null,null,null,null)
 D.bNC=new B.ae(A.u7,20,null,null,null,null)
@@ -22565,7 +22565,7 @@ D.diB=w([D.bds,D.xv,A.c0],x.O)
 D.bXi=new B.a8(A.a3,A.a8,A.x,D.diB,null,null)
 D.cYk=w([A.b2,A.cS,A.eB],x.O)
 D.bXj=new B.a8(A.az,A.aC,A.x,D.cYk,null,null)
-D.Oq=new B.a8(A.a3,A.a8,A.x,A.Hp,null,null)
+D.Or=new B.a8(A.a3,A.a8,A.x,A.Hp,null,null)
 D.blu=new B.w(1,0.9019607843137255,0.7568627450980392,0.3607843137254902,A.t)
 D.cAy=w([D.blu,A.c0,A.jh],x.O)
 D.aoZ=new B.a8(A.az,A.aC,A.x,D.cAy,null,null)
@@ -22584,7 +22584,7 @@ D.bYx=new B.a8(A.b0,A.b4,A.x,D.cVw,null,null)
 D.dc0=w([A.aE,A.dR],x.O)
 D.bYD=new B.a8(A.a3,A.a8,A.x,D.dc0,null,null)
 D.afp=new B.w(1,0.1803921568627451,0.25882352941176473,0.4392156862745098,A.t)
-D.awX=w([D.afp,D.jf,D.KU],x.O)
+D.awX=w([D.afp,D.jf,D.KV],x.O)
 D.bZ4=new B.a8(A.az,A.aC,A.x,D.awX,null,null)
 D.cAq=w([A.dx,A.dI],x.O)
 D.bZf=new B.a8(A.b0,A.b4,A.x,D.cAq,null,null)
@@ -22620,12 +22620,12 @@ D.beS=new B.w(1,1,0.9686274509803922,0.9647058823529412,A.t)
 D.hbX=w([D.beS,A.adb,A.i2],x.O)
 D.a51=new C.jo("kuhowa_elegant_burgundy","Kuhowa \u2014 Mvinyo","Mpaka mwembamba wa dhahabu \xb7 vichwa vya rangi ya mvinyo.",D.dFK,4294965238,4283043359,4291404327,D.jO)
 D.dFD=new C.kU(19,"goldFiligree")
-D.LB=new B.w(1,1,0.984313725490196,0.9529411764705882,A.t)
-D.hbL=w([D.LB,A.ay,A.jh],x.O)
+D.LC=new B.w(1,1,0.984313725490196,0.9529411764705882,A.t)
+D.hbL=w([D.LC,A.ay,A.jh],x.O)
 D.a5_=new C.jo("kuhowa_gold_filigree","Dhahabu ya Filigree","Mpaka wa dhahabu mara tatu \xb7 pembe za mapambo.",D.dFD,4294966259,4279378237,4292128567,D.jO)
 D.dFE=new C.kU(20,"goldLaurel")
 D.blk=new B.w(1,0.47843137254901963,0.3607843137254902,0.0784313725490196,A.t)
-D.hbY=w([A.KM,A.i2,D.blk],x.O)
+D.hbY=w([A.KN,A.i2,D.blk],x.O)
 D.a50=new C.jo("kuhowa_gold_laurel","Taji ya Dhahabu","Majani ya dhahabu kando \xb7 almasi kwenye pembe.",D.dFE,4294966776,4282000405,4291404327,D.jO)
 D.dFF=new C.kU(21,"goldCrest")
 D.ad4=new B.w(1,1,0.9725490196078431,0.9254901960784314,A.t)
@@ -22638,7 +22638,7 @@ D.hbR=w([D.bmF,A.ay,D.jf],x.O)
 D.a52=new C.jo("kuhowa_gold_star","Nyota ya Dhahabu","Nyota za dhahabu kwenye pembe \xb7 mstari wa bluu ndani.",D.dFI,4294966518,4279378237,4292128567,D.jO)
 D.GQ=w([D.a55,D.a53,D.a4X,D.a4Y,D.a4Z,D.a51,D.a5_,D.a50,D.a54,D.a52],x.h)
 D.qk=new C.mx(0,"blank")
-D.S3=new C.mx(1,"title")
+D.S4=new C.mx(1,"title")
 D.mJ=new C.mx(2,"titleContent")
 D.e_j=new C.mx(3,"twoColumn")
 D.CS=new C.mx(4,"section")
@@ -22646,7 +22646,7 @@ D.e_k=new C.mx(5,"comparison")
 D.I_=new C.mx(6,"flashcard")
 D.I0=new C.mx(7,"quiz")
 D.I1=new C.mx(8,"worksheet")
-D.apm=w([D.qk,D.S3,D.mJ,D.e_j,D.CS,D.e_k,D.I_,D.I0,D.I1],B.ax("O<mx>"))
+D.apm=w([D.qk,D.S4,D.mJ,D.e_j,D.CS,D.e_k,D.I_,D.I0,D.I1],B.ax("O<mx>"))
 D.axZ=w([An.WD,A.dI],x.O)
 D.ky=w([A.c0,A.bM,A.i1,A.hK,D.AT],x.O)
 D.dBz=new C.j1("fireworks","Royal Fireworks","Thank you for celebrating with us",D.axZ,D.ky)
@@ -22671,8 +22671,8 @@ D.deq=w([D.b9_,D.be0],x.O)
 D.dBg=new C.j1("starburst","Golden Starburst","Thank you!",D.deq,D.ky)
 D.c_p=w([A.fc,A.xp],x.O)
 D.acR=new B.w(1,0.615686274509804,0.3058823529411765,0.3607843137254902,A.t)
-D.PZ=w([A.oK,A.iy,A.vq,A.nN,D.acR],x.O)
-D.dBK=new C.j1("balloons","Luxury Balloons","Let's celebrate",D.c_p,D.PZ)
+D.Q_=w([A.oK,A.iy,A.vq,A.nN,D.acR],x.O)
+D.dBK=new C.j1("balloons","Luxury Balloons","Let's celebrate",D.c_p,D.Q_)
 D.cSa=w([A.Wr,A.w],x.O)
 D.dBy=new C.j1("galaxy","Galaxy Spiral","The sky is not the limit",D.cSa,D.uh)
 D.bjG=new B.w(1,0.047058823529411764,0.00392156862745098,0.00392156862745098,A.t)
@@ -22686,11 +22686,11 @@ D.dh3=w([A.dx,A.hJ],x.O)
 D.dBo=new C.j1("lanterns","Sky Lanterns","Lighting the way together",D.dh3,D.ky)
 D.bcx=new B.w(1,0.0784313725490196,0.00784313725490196,0.0392156862745098,A.t)
 D.cQ8=w([A.xr,D.bcx],x.O)
-D.dBk=new C.j1("hearts","Floating Hearts","Made with love",D.cQ8,D.PZ)
+D.dBk=new C.j1("hearts","Floating Hearts","Made with love",D.cQ8,D.Q_)
 D.b9x=new B.w(1,0.23137254901960785,0.0392156862745098,0.10980392156862745,A.t)
 D.bam=new B.w(1,0.058823529411764705,0.00784313725490196,0.027450980392156862,A.t)
 D.diz=w([D.b9x,D.bam],x.O)
-D.dBJ=new C.j1("petals","Rose Petals","Thank you, from our hearts",D.diz,D.PZ)
+D.dBJ=new C.j1("petals","Rose Petals","Thank you, from our hearts",D.diz,D.Q_)
 D.bkE=new B.w(1,0.00784313725490196,0.06274509803921569,0.0392156862745098,A.t)
 D.deK=w([A.lh,D.bkE],x.O)
 D.dBf=new C.j1("butterflies","Golden Butterflies","New beginnings",D.deK,D.ky)
@@ -22698,7 +22698,7 @@ D.bgP=new B.w(1,0.0392156862745098,0.0392156862745098,0.12156862745098039,A.t)
 D.cR6=w([D.bgP,A.w],x.O)
 D.dBB=new C.j1("neon","Neon Night","Let's go!",D.cR6,D.uh)
 D.bdH=new B.w(1,0.0196078431372549,0.00392156862745098,0.050980392156862744,A.t)
-D.dcb=w([A.Lb,D.bdH],x.O)
+D.dcb=w([A.Lc,D.bdH],x.O)
 D.dBE=new C.j1("disco","Disco Ball","Party time",D.dcb,D.uh)
 D.bhm=new B.w(1,0.11764705882352941,0.0392156862745098,0.1803921568627451,A.t)
 D.dbJ=w([A.hl,D.bhm],x.O)
@@ -22723,7 +22723,7 @@ D.bi3=new B.w(1,0.1411764705882353,0.10196078431372549,0.0196078431372549,A.t)
 D.bkY=new B.w(1,0.027450980392156862,0.0196078431372549,0.00392156862745098,A.t)
 D.d0k=w([D.bi3,D.bkY],x.O)
 D.dBp=new C.j1("trophy","Trophy Shine","Winners together",D.d0k,D.ky)
-D.dbF=w([Ao.L_,A.w],x.O)
+D.dbF=w([Ao.L0,A.w],x.O)
 D.dBh=new C.j1("shooting","Shooting Stars","Make a wish",D.dbF,D.uh)
 D.b8s=new B.w(1,0.10980392156862745,0.07058823529411765,0.023529411764705882,A.t)
 D.agb=new B.w(1,0.0196078431372549,0.011764705882352941,0.00784313725490196,A.t)
@@ -22734,7 +22734,7 @@ D.d6w=w([D.b8P,A.w],x.O)
 D.dBn=new C.j1("orbits","Golden Orbits","Always moving forward",D.d6w,D.ky)
 D.bkF=new B.w(1,0.0392156862745098,0.011764705882352941,0.047058823529411764,A.t)
 D.d34=w([A.adU,D.bkF],x.O)
-D.dBs=new C.j1("flowers","Blooming Garden","Growing together",D.d34,D.PZ)
+D.dBs=new C.j1("flowers","Blooming Garden","Growing together",D.d34,D.Q_)
 D.b8B=new B.w(1,0.07450980392156863,0.027450980392156862,0.1803921568627451,A.t)
 D.b9c=new B.w(1,0.00784313725490196,0.00392156862745098,0.03137254901960784,A.t)
 D.dgy=w([D.b8B,D.b9c],x.O)
@@ -22768,8 +22768,8 @@ D.b3r=new B.vv(A.dN,D.bMH,null,x.U)
 D.cq2=w([D.b3q,D.b3o,D.b3r],B.ax("O<vv<q4>>"))
 D.cxI=w([A.AW,A.hi],x.O)
 D.cxJ=w([A.b2,A.bd,A.eB],x.O)
-D.PN=w([A.bM,A.hK,A.i1,A.ay,A.nN],x.O)
-D.cAt=w([A.c0,D.jf,D.KU],x.O)
+D.PO=w([A.bM,A.hK,A.i1,A.ay,A.nN],x.O)
+D.cAt=w([A.c0,D.jf,D.KV],x.O)
 D.cB0=w([1,2,4,8,16,32,64,128,27,54,108,216,171,77,154,47,94,188,99,198,151,53,106,212,179,125,250,239,197,145],x.t)
 D.emc=new B.z(4278913286,4280030216)
 D.emu=new B.z(4279373061,4278518787)
@@ -22867,7 +22867,7 @@ D.bhq=new B.w(1,0.10196078431372549,0.0392156862745098,0.058823529411764705,A.t)
 D.dAP=new C.ld("rose_gold_elite","Rose Gold Elite","Luxury",A.hi,D.bhq,A.XA,A.iy,A.nN)
 D.dAS=new C.ld("platinum_night","Platinum Night","Luxury",A.cr,A.dI,A.bn,A.aQ,A.aL)
 D.dAW=new C.ld("emerald_prestige","Emerald Prestige","Luxury",A.aV,A.pH,A.f1,A.pO,A.jC)
-D.dAD=new C.ld("royal_purple","Royal Purple","Luxury",A.n1,A.WJ,A.jd,A.km,A.KL)
+D.dAD=new C.ld("royal_purple","Royal Purple","Luxury",A.n1,A.WJ,A.jd,A.km,A.KM)
 D.dAN=new C.ld("neon_pitch","Neon Pitch","Bold",A.b8,A.dI,A.M,A.b3,A.aL)
 D.dAK=new C.ld("crimson_impact","Crimson Impact","Bold",A.bz,A.kr,A.er,A.tC,A.f0)
 D.dAJ=new C.ld("sunset_gallery","Sunset Gallery","Bold",A.fl,A.tj,A.k_,A.qP,A.mk)
@@ -22886,7 +22886,7 @@ D.eyd=new B.z("Symbols",D.d_f)
 D.cP1=w([D.exV,D.ekW,D.eB1,D.eus,D.eyd],B.ax("O<+(m,ai<m>)>"))
 D.b8G=new B.w(1,0.22745098039215686,0.15294117647058825,0.03137254901960784,A.t)
 D.cPn=w([A.c0,D.adY,D.b8G],x.O)
-D.b2M=new B.ac(0,A.G,A.KI,A.aH1,40)
+D.b2M=new B.ac(0,A.G,A.KJ,A.aH1,40)
 D.b2s=new B.ac(0,A.G,A.nP,A.em,8)
 D.cPA=w([D.b2M,D.b2s],x.V)
 D.cQ3=w([4280171146,4280640491,4279080072,4278556265],x.t)
@@ -22895,7 +22895,7 @@ D.a2y=w([A.hK,A.eB,A.bz,A.ax,A.cc],x.O)
 D.cQT=w(["All","Robotic","Nature","Warm","Bold","Clean"],x.s)
 D.aed=new B.w(1,0.043137254901960784,0.0392156862745098,0.03137254901960784,A.t)
 D.cR3=w([A.Xp,D.aed,A.Xp],x.O)
-D.cR9=w([A.i2,D.jf,D.KU],x.O)
+D.cR9=w([A.i2,D.jf,D.KV],x.O)
 D.euf=new B.z(A.bi,D.a0m)
 D.evB=new B.z(A.L,D.a0l)
 D.epz=new B.z(A.dN,D.a0n)
@@ -22903,16 +22903,16 @@ D.cS4=w([D.euf,D.evB,D.epz],B.ax("O<+(q4,a0)>"))
 D.cQ=new C.IJ(0,"text")
 D.lw=new C.IJ(1,"image")
 D.f4=new C.IJ(2,"shape")
-D.S2=new C.IJ(3,"pdf")
+D.S3=new C.IJ(3,"pdf")
 D.l5=new C.IJ(4,"signature")
 D.a5p=new C.IJ(5,"bio")
-D.cSX=w([D.cQ,D.lw,D.f4,D.S2,D.l5,D.a5p],B.ax("O<IJ>"))
+D.cSX=w([D.cQ,D.lw,D.f4,D.S3,D.l5,D.a5p],B.ax("O<IJ>"))
 D.cSY=w([A.bo,A.cF],B.ax("O<HE>"))
 D.cTy=w(["School","Documents","Sign & present"],x.s)
 D.b2R=new B.ac(0,A.G,A.ag1,A.uA,28)
 D.cTT=w([D.b2R],x.V)
 D.cUb=w([4292128567,4279983648,4290190364,4279898632,4293436183,4279060385],x.t)
-D.Q6=w(["Rocket","Trophy","Party popper","Confetti ball","Balloon","Wrapped gift","Birthday cake","Sparkles","Star","Glowing star","Fire","Light bulb","Gem stone","Crown","Money bag","Dollar banknote","Chart increasing","Bar chart","Bullseye","Globe showing americas","Globe showing europe-africa","Sun","Rainbow","Cloud","High voltage","Red heart","Handshake","Graduation cap","Books","Open book","Pencil","Laptop","Mobile phone","Microphone","Musical notes","Camera","Video camera","Megaphone","Bell","Calendar","Alarm clock","Hourglass done","Key","Locked","Shield","Gear","Hammer and wrench","Magnifying glass tilted left","Package","Shopping cart","House","Office building","Hospital","Ballot box with ballot","Automobile","Airplane","Seedling","Deciduous tree","Evergreen tree","Palm tree","Sunflower","Cherry blossom","Herb","Four leaf clover","Water wave","Mountain","Lion","Tiger face","Dog face","Cat face","Elephant","Unicorn","Butterfly","Honeybee","Owl","Eagle","Dolphin","Turtle","Panda","Fox","Rabbit face","Monkey face","Penguin","Horse","Bird","Peacock","Parrot","Red apple","Pizza","Hot beverage","Soccer ball","Basketball","Artist palette","Clapper board","Robot","Brain","Check mark button","Red question mark","Speech balloon","Compass","Crystal ball","Puzzle piece","1st place medal","Smiling face with sunglasses","Grinning face with big eyes","Star-struck","Partying face","Thinking face","Hundred points"],x.s)
+D.Q7=w(["Rocket","Trophy","Party popper","Confetti ball","Balloon","Wrapped gift","Birthday cake","Sparkles","Star","Glowing star","Fire","Light bulb","Gem stone","Crown","Money bag","Dollar banknote","Chart increasing","Bar chart","Bullseye","Globe showing americas","Globe showing europe-africa","Sun","Rainbow","Cloud","High voltage","Red heart","Handshake","Graduation cap","Books","Open book","Pencil","Laptop","Mobile phone","Microphone","Musical notes","Camera","Video camera","Megaphone","Bell","Calendar","Alarm clock","Hourglass done","Key","Locked","Shield","Gear","Hammer and wrench","Magnifying glass tilted left","Package","Shopping cart","House","Office building","Hospital","Ballot box with ballot","Automobile","Airplane","Seedling","Deciduous tree","Evergreen tree","Palm tree","Sunflower","Cherry blossom","Herb","Four leaf clover","Water wave","Mountain","Lion","Tiger face","Dog face","Cat face","Elephant","Unicorn","Butterfly","Honeybee","Owl","Eagle","Dolphin","Turtle","Panda","Fox","Rabbit face","Monkey face","Penguin","Horse","Bird","Peacock","Parrot","Red apple","Pizza","Hot beverage","Soccer ball","Basketball","Artist palette","Clapper board","Robot","Brain","Check mark button","Red question mark","Speech balloon","Compass","Crystal ball","Puzzle piece","1st place medal","Smiling face with sunglasses","Grinning face with big eyes","Star-struck","Partying face","Thinking face","Hundred points"],x.s)
 D.awb=w([A.hK,A.F5,A.aL,A.c,A.oK,A.ay],x.O)
 D.eHo=new B.z(0.1,0.08)
 D.eB_=new B.z(0.3,0.05)
@@ -22946,7 +22946,7 @@ D.e12=new C.jH("coral","Coral",A.cc,A.k_,A.tj,A.iA,A.mk)
 D.e0S=new C.jH("forest","Forest",A.hk,A.e_,A.ct,A.lL,A.es)
 D.e0T=new C.jH("berry","Berry",A.f_,G.XM,A.F6,D.afv,A.km)
 D.e1_=new C.jH("sand","Sand",A.dU,A.ie,A.nR,A.i1,A.bM)
-D.e14=new C.jH("ice","Ice",A.n0,A.Lc,A.aJ,A.mY,A.f9)
+D.e14=new C.jH("ice","Ice",A.n0,A.Ld,A.aJ,A.mY,A.f9)
 D.e0V=new C.jH("charcoal","Charcoal",A.ak,A.aQ,A.cr,A.bn,A.M)
 D.e0O=new C.jH("mint","Mint",A.aV,A.fy,A.h6,A.lL,A.pO)
 D.e13=new C.jH("crimson","Crimson",A.bz,A.n4,A.kr,A.F3,A.tC)
@@ -22957,12 +22957,12 @@ D.e0U=new C.jH("plum","Plum",A.n1,A.xp,A.F6,A.EI,A.qY)
 D.e17=new C.jH("steel","Steel",A.d_,A.dc,A.bn,A.ks,A.lf)
 D.a2O=w([D.e0W,D.e16,D.e0X,D.e0Y,D.e18,D.e15,D.e0R,D.e0Q,D.e0P,D.e10,D.e12,D.e0S,D.e0T,D.e1_,D.e14,D.e0V,D.e0O,D.e13,D.e0Z,D.e11,D.e0U,D.e17],B.ax("O<jH>"))
 D.cW5=w([A.c0,A.jh],x.O)
-D.S4=new C.hF(10,"rotate3d")
+D.S5=new C.hF(10,"rotate3d")
 D.I3=new C.hF(8,"flip")
 D.aGv=new C.hF(19,"spiral")
 D.ql=new C.hF(16,"bounce")
 D.aGy=new C.hF(9,"flipVertical")
-D.cW6=w([D.S4,D.I3,D.aGv,D.ql,D.aGy],x.i)
+D.cW6=w([D.S5,D.I3,D.aGv,D.ql,D.aGy],x.i)
 D.e8=w([1353184337,1399144830,3282310938,2522752826,3412831035,4047871263,2874735276,2466505547,1442459680,4134368941,2440481928,625738485,4242007375,3620416197,2151953702,2409849525,1230680542,1729870373,2551114309,3787521629,41234371,317738113,2744600205,3338261355,3881799427,2510066197,3950669247,3663286933,763608788,3542185048,694804553,1154009486,1787413109,2021232372,1799248025,3715217703,3058688446,397248752,1722556617,3023752829,407560035,2184256229,1613975959,1165972322,3765920945,2226023355,480281086,2485848313,1483229296,436028815,2272059028,3086515026,601060267,3791801202,1468997603,715871590,120122290,63092015,2591802758,2768779219,4068943920,2997206819,3127509762,1552029421,723308426,2461301159,4042393587,2715969870,3455375973,3586000134,526529745,2331944644,2639474228,2689987490,853641733,1978398372,971801355,2867814464,111112542,1360031421,4186579262,1023860118,2919579357,1186850381,3045938321,90031217,1876166148,4279586912,620468249,2548678102,3426959497,2006899047,3175278768,2290845959,945494503,3689859193,1191869601,3910091388,3374220536,0,2206629897,1223502642,2893025566,1316117100,4227796733,1446544655,517320253,658058550,1691946762,564550760,3511966619,976107044,2976320012,266819475,3533106868,2660342555,1338359936,2720062561,1766553434,370807324,179999714,3844776128,1138762300,488053522,185403662,2915535858,3114841645,3366526484,2233069911,1275557295,3151862254,4250959779,2670068215,3170202204,3309004356,880737115,1982415755,3703972811,1761406390,1676797112,3403428311,277177154,1076008723,538035844,2099530373,4164795346,288553390,1839278535,1261411869,4080055004,3964831245,3504587127,1813426987,2579067049,4199060497,577038663,3297574056,440397984,3626794326,4019204898,3343796615,3251714265,4272081548,906744984,3481400742,685669029,646887386,2764025151,3835509292,227702864,2613862250,1648787028,3256061430,3904428176,1593260334,4121936770,3196083615,2090061929,2838353263,3004310991,999926984,2809993232,1852021992,2075868123,158869197,4095236462,28809964,2828685187,1701746150,2129067946,147831841,3873969647,3650873274,3459673930,3557400554,3598495785,2947720241,824393514,815048134,3227951669,935087732,2798289660,2966458592,366520115,1251476721,4158319681,240176511,804688151,2379631990,1303441219,1414376140,3741619940,3820343710,461924940,3089050817,2136040774,82468509,1563790337,1937016826,776014843,1511876531,1389550482,861278441,323475053,2355222426,2047648055,2383738969,2302415851,3995576782,902390199,3991215329,1018251130,1507840668,1064563285,2043548696,3208103795,3939366739,1537932639,342834655,2262516856,2180231114,1053059257,741614648,1598071746,1925389590,203809468,2336832552,1100287487,1895934009,3736275976,2632234200,2428589668,1636092795,1890988757,1952214088,1113045200],x.t)
 D.cW9=w(["HOME: the first tab. It has the NGMY brand, the Helper AI, loans, and the tech frames: Neural Link, Signal Grid, Core Protocol and the Vault Channel arcade.","TOOL HUB: the second tab. It holds the Business Card Creator, Menu Studio (restaurant menus and Bio link pages) and Business Essentials (invoices, receipts, flyers and other business papers).","SLIDES: the third tab. Presentations with many designs, an AI that makes decks, and Marriage documents.","NGMY HUB: the centre tab. Civic Registry, NGMY Store, Help Center and Insurance, Document Scanner, and the App Builder when it is switched on.","ADVISORS: the fifth tab. AI advisors you can chat with like real people. They help with jobs, applications, benefits and everyday questions, and they can answer in Swahili when you write Swahili.","CREATOR HUB: the sixth tab. Doc Share, Quote Calc, QR Generator, Play Zone, Kiswahili School, Recorder Studio, Video Studio and Phone Unlock.","PROFILE: the seventh tab. Theme, logout, legal pages and Worksheets (Projects, Cashier IOUs and receipts, and the Family Tree).","GROWTH INCOME: For now the Growth Income button (the wifi icon, top right of Home) works only for the admin: everyone else sees the same icon but it does not open. members buy an investment plan and earn daily by clocking in, on work days only (Monday to Friday, there is no clock-in on Saturday and Sunday). The wallet shows the balance, deposits, withdrawals and a history of the last two months, with the balance before and after each move. Missing 3 work days in a month removes the investment plan (a new plan must be bought), and the count starts again each month; a warning shows after the 2nd missed day. Clocking in 30 minutes late or more takes 30 percent off the earnings for that day. The investment plans are $5, $20, $30, $50 and $100; $100 is the most expensive plan and nothing above it is offered.","KING AND QUEEN CROWN: a crown badge for special members. A King or Queen receives a daily crown reward of one dollar, and the receipt shows in the wallet history.","WALLET: one balance everywhere in the app. The server keeps the balance so every phone shows the same number.","LOANS: Loan Services is a community help service: it helps members when they need help, for example funerals, buying a car, car repairs or family emergencies. For now the Loan Service button (top left of Home) works only for the admin: everyone else sees the same icon but it cannot be opened. The loan calculator (amount, interest rate and repayment period to try, the whole cost and every payment, and a button to make the tried terms the real loan terms) is for the admin only. The How it works frame is a five-step timeline (Apply, Review, Funds, Repay, Released). A loan is applied for with collateral, repaid in weekly payments, and the collateral is released back to the member when the loan is fully repaid. The admin sets the interest rate, the biggest loan and the repayment period in Loan Center, Loan terms; nothing is written into the screens. Before applying, the member sees the full cost (amount, interest, total to repay, number of payments, each payment, repayment period) and must tap I agree; the agreement is saved with the application. The application asks what the member needs help with (Funeral or Burial, Buy a car, Car repair, Family emergency, Other need), the date needed, the collateral with its estimated value and photos, and an optional family or guarantor contact. A loan shows as Pending, Approved, Paid Out, In Repayment, Repaid, Overdue or Declined, and the member sees a gentle reminder about the next payment.","NGMY STORE: buy and sell items inside the app. Approved members can open a store.","CIVIC REGISTRY: the community system for the M'MBONDO community. It registers members with a Registry ID card, counts members by state, records contributions with receipts, and lets Authorized Registrars enroll families. Registrars can print the community roster as a PDF.","CIVIC BIRTHDAYS AND FAMILY: the registry records children and their ages, shows a birthday reminder two days before, and congratulates a child on turning 18. Members can have a nickname that others search for, while registrars see the real name.","CIVIC VOTING AND STATE WALLET: the community votes on decisions inside the app, and each state has a wallet showing its funds, spending and trust deposits so the money is visible to everyone.","LIGHTNING GROUPS: groups inside the Civic Registry where people give together. A person asks to join with a name, phone number, state and address, and the group owner approves. The group shows named contribution rounds, receipts, who gave, who missed and how many times.","JOBS AND HELP: help finding jobs, house repairs and house workers, a Help Center with insurance, and the Helper AI for support.","CORE PROTOCOL: a collection of studios for curious minds: Universe, Electronics Lab (the AI Inventor now lives inside it as the AI button at the top), Construction Lab (real 3D wiring, plumbing and a house), Discovery Lab (Body Explorer, a real 3D human you can turn and look inside), Toolbox, Molecule Maker, DNA Lab, Ecosystem Lab, Balance Lab, Gear Lab, Laser Maze, Light Mixer, Cipher Lab, Reaction Lab, Spark Painter, Rocket Lander, Orbit Studio, Swarm Studio, Chain Burst, Title Animator, Circuit Lab, Marble Music and Orbit Sequencer.","CITY AVATARS: the people of My House are the real characters from the NGMY 3D viewer files (Xbot.glb the X Bot, Michelle.glb the Dancer, Soldier.glb the Soldier), kept in the app (assets/avatars) and drawn with their own skeletons and animations (the X Bot and Soldier stand and walk, the Dancer dances). Their skin pictures are painted onto the body faces, and the body is thinned to a few thousand faces so the game stays quick, so they look a little more faceted than in the viewer. The X Bot is the one who goes through the rooms on the house tour and that you steer outside; in the tour sheet (Play) a Who walks the house? choice switches the tour guide to the Dancer, the Soldier or a plain person. The residents are the three characters too: they stay in the house, some stroll out into the garden for a while and go back in, and a resident with an open call for help shows a phone icon in the name. In every view of My House you can turn the camera all the way round (360) by dragging, with no button needed; Look all round (360) only moves you to the middle of the room at a normal distance. Names no longer float over the people in the rooms: tap a person to see their card. Outside, in the garden and town, the sky behind is space with stars, a galaxy, the Earth and the Moon. The Dancer is played slowly and kept on her spot, and the Soldier now faces the way he walks.","MY HOUSE, THE HALL AND THE CITY: the hall is a wide lobby: three doors in the middle of the back wall (the living room, the kitchen, the first bedroom) with a big video-wall TV on each side showing NGMY ads, the other seven doors on the two short walls, a blue carpet with the NGMY logo, sofas, armchairs, plants, lamps and consoles. In the Tour sheet, Book a hallway tour plays a tour of just the hall. Tapping a door asks whether to open it, close it or go through it. Outlets, switches, doors with their handles, TV frames, wall trim and the wiring job room are drawn so they never disappear when the camera turns, and from outside the house its walls hide the room. The residents live in the city (the Garden is the whole city): they walk about the streets, those with a call for help stand with a phone and a Help sign, and tapping the hospital or the shop building (or the Calls, Hospital, Shop and People buttons, or Community) opens those services over the city. In the city a Walk the city button gives you the walking controls, and Build adds roads, buildings and other things. Nobody is placed in the rooms during the house tour.","WALKING THE CITY: in the Garden (the whole city) press Walk the city and a round stick appears: slide a finger on it to walk, further from the middle is faster, and the Run and Jump buttons make the person run and jump. Walk up to the front door of the house, the hospital or the shop and the person goes in; inside the hospital walk onto the blue mat to admit the sick and up to a bed to treat the patient, inside the shop walk onto the yellow mat for food and the purple mat for medicine, and walk onto the green mat to go out. Near an animal an Act button feeds it for a point, and near a car, ambulance or fire truck it lets you get in and drive it with the stick and park it. When somebody calls for help the phone rings with a call banner: Answer opens the calls. Phone, hospital, shop, animals and cars are all in the city, and the hall of the house shows only three doors: the other rooms are reached from the map or from their own door.","ELECTRICAL SAFETY SCHOOL: every wiring lesson and job is judged by one safety engine. A job is CORRECT only if the connections are on the right terminals, complete and safe; a device that works (a TV that plays, a fan that spins) is never proof of safe wiring. Swapped hot and neutral, a missing neutral or ground, neutral used as ground, hot touching ground, loose or bare wires and a fan on a plain box are all UNSAFE and can never pass. Results are CORRECT, INCORRECT, UNSAFE, INCOMPLETE or REQUIRES VERIFICATION. The lessons have Learn (a wrong wire is refused and explained), Practice (anything is allowed and power-on shows the consequence with arcs, sparks, smoke or flames) and Test (silent, graded on submit with score, explanations and violations). The wiring job has a Test mode switch and Submit for inspection in its settings. A Wire guide lists U.S. wire colors, exceptions and the rule to verify. Diagram lessons (three-way switch, fan with a light kit) are in the Construction Lab menu.","CITY LIFE AND THE HALL, UPDATE: seen from outside the house, the walls on your side are left out (like a doll house) so the TVs and the logo carpet are never hidden at any angle, and the TV pictures also show when seen from behind. The house outside has a big wide NGMY poster on the back wall and different framed posters on the sides. In the city every resident is busy with a real job (the nurse on duty at the hospital, feeding the animals, teaching at the school, washing the car, cooking, resting on the bench, watering the flowers), with props such as steam, grain and water, and a small name for the activity. The city has many more houses. Inside the hospital there are a nurse, a doctor and patients lying in their beds, and you treat them by walking to them. A Full screen button in the city turns the game on its side like a video and keeps only the stick, Run, Jump and Act buttons. When somebody calls, a phone-call screen with a green Answer and a red hang-up button appears; answering opens a text message with what the person needs, a button that shows where they are and a button that takes you to fix it.","WIRING CONTROLS, UPDATE: in a wiring lesson or job, tap a house wire to pick it up (it glows), then tap the screw, wire nut or fixture wire it joins and they connect; tap a joined wire, nut or screw again to take it off. Ceiling lights and fans are shown from the side so the house wires, fixture wires and nuts are all in view. Swiping up looks up and swiping right turns right in every 3D view. The wiring job has Look up (from the floor to the ceiling) and Behind the TV buttons, the Voltage tester sits at the end of the tray where Unplug was, and tapping something plugged in pulls the plug (a TV no longer opens full screen). The house has a Look up at the ceiling button. The Construction Lab menu has a new Safety inspection job (a test job marked on submit). The plumbing sink, basin, mirror and shut-off valves are bigger and look more like a real bathroom sink.","LESSON ROOMS, UPDATE: every lesson room is now big and bare (no furniture, no bathroom fixtures in the electrical lessons), so the outlets and the switch are in the open and nothing hides them or the TV. The wall TV is big by default (Cinema 150) and the TV button lets you choose the wall it hangs on: back, left or right.","CITY AND PLUMBING, UPDATE: the city is now a big town (1800 by 1400) with streets both ways and houses spread over nearly all the land; far-away houses are not drawn while you walk close by, to keep it quick. The Full screen button sits in the row with the door buttons next to Living room. The top buttons are smaller. The Construction Lab menu no longer has the Learn mode and Practice mode buttons or the Community card (the community lives in the city). Seen from outside the house, a whole wall is left out or kept, never half a wall. In the lessons and the wiring job the wall, studs, box and cable cannot be tapped, only the wires and screws. The plumbing job now shows a blue Next box that says exactly what to do, with a Show me button that picks the tool and turns the view to the spot; it shows only the parts the job needs; and a leak shows big drops, a puddle and a red LEAK label that names the joint, with the instruction to turn the water off and tighten it with the wrench.","CITY ADS AND TRAFFIC: the city has about a dozen billboards along the streets, each playing a different NGMY ad (new ads for NGMY Jobs, Loans, Kiswahili School, Civic Registry, Core Protocol, Build and Fix and Create, plus the NGMY app ads), big houses with two big TVs on the front that play ads too, and a huge billboard behind the main house with the NGMY logo and New Global Movement for Youth. Big buses and big police cars with flashing lights drive themselves up and down the streets, each with a billboard on both sides playing an ad, and two helicopters circle in the sky pulling banners that play ads. The sign that says how many rooms still need work is at the top of the house, above the roof. Every person in the city is a different colour.","NEIGHBOURHOOD WORK AND TRADE: every building in the city can be walked into (hospital, shop, school, fire station, every house and big house), and each has its own job done by walking onto a mat: teach the class at the school, check the equipment at the fire station, sell what you carry at the market stall in the shop. The buildings are about half as big again, and the houses stand well back from the streets so there is room to walk beside the road. Electric poles carry wires along the streets with street lights on them, and street lamps stand between the poles. From time to time a street light goes out (it is dark with a red sign) and a neighbour rings because a house has no power. A street light is fixed with the real ceiling-light wiring lesson (black to black, white to white, ground to ground, then the cover); a house is fixed by walking in and onto the red mat at its breaker panel, which opens the wiring job. Fixing earns points. Crates of goods lie about the farm: pick one up with the action button, carry it to the shop and sell it at the market stall, then come back for more. In Build mode a house, big house, shop, billboard, car, tree, bench or crate can be sold for points. Full screen: double tap the two buttons to hide them, double tap where they were to bring them back. The controls are raised from the edges of the phone. The small buttons beside the zoom buttons flip the up-down and left-right swipe, and the choice is remembered. The Construction Lab menu has the jobs first (with a new Neighbourhood jobs tile) and the lessons and reading last. Double tap anywhere in the house, a room or the city and the camera takes you to that spot, like a map. The city has fewer cars: two buses and two police cars drive round two loops of road and never turn back, and every junction on the loops is a roundabout. In the wiring job a plugged-in TV is not a button: go behind it and tap the plug on the wall to pull it out. Pulling a switch or outlet out of the wall keeps it there (only a burnt one is thrown away so a new one can go in). Every billboard has a picture on each side, so nothing is upside down or backwards from behind. The buses and police cars are bigger, with big billboards. In the city the phone rings at least once a minute: a house with no power, a street light out, or somebody sick who must be taken to the hospital desk. A room whose wiring is right has no red boxes left, even if the final test was not run. Swiping left and right turns the view the way your finger goes. The house tour sheet has a new design. Full screen inside a room puts you inside it, like a normal house. Getting out of a car puts you beside it, never inside it, and a person who ends up stuck is moved out. A dark house shows its breaker panel, outlet and switch with red frames, and tapping a red tag (No power, Light out) takes you to that house or street light. The city no longer redraws itself every two seconds, and nothing happens in the city while a job page is open. Work comes one job at a time from houses chosen by chance: while you work no new call rings, a job you put off with the Later button waits on a list and starts when you leave the house you fixed. Turning calls down or not answering counts as a miss; two misses in a row bring a call from the City office, three close the game for 5 hours. The Hide tags button (next to Full screen and Rotate) hides the red tags and the rooms-still-need-work sign. Every outlet, switch and ceiling light or fan in a room is marked fixed on its own as soon as it is wired right, so only the ones still to do keep a red frame, and the sign over the room names what is still to wire. A call opens as a card in the middle of the screen (it turns with the full screen game) with Show me the way (a yellow dashed line on the ground and a tall yellow beam lead to the place), Take me there and Later. A Drone button gives a film of the city from the air: choose the whole city, billboards and the NGMY logos, houses (and inside a big one), the hospital, shop and school inside, or the traffic. The hall has a camera in each corner: tap one to look from there. The Kiswahili School ad has a long conversation, three exchanges a play and new phrases each time. In a house with no power in the city, tap the breaker panel, the outlet or the switch (or their red frames) to start the wiring job straight away. The drone is one smooth flight with no cuts: it starts high, comes down and passes in front of each billboard and round its side, never going into it, and the houses and the buildings are flown past the same way before it goes inside. Indoor furniture is smaller, a TV never stands on a cabinet or the floor (TVs hang on the wall), and a wardrobe, shelf, lamp or console is moved aside so it never hides the TV on the wall. The city land is much bigger (2600 by 2100) with houses behind my house, down both sides and over every green stretch, each with room in front of its door so you can always walk up to it, and a longer street system. Downtown, at the south end, has NGMY office towers, the NGMY company building, NGMY stores, NGMY gas stations and a second NGMY hospital; the stores and gas stations can be walked into like a shop. The biggest billboard, NGMY Town, stands over the middle road, and a NGMY Town billboard stands at each corner of the land; every sign has a picture on both sides. The drone passes each billboard slowly in an arc of about three seconds, goes round all the signs and follows the helicopters to show their banners. Swiping now turns the view the way the finger goes: swipe right looks right, swipe up looks up (the choice is saved under a new name so old choices do not interfere). The message at the top is placed under the buttons in full screen. Nothing in the city is switched off because it is far away: the houses, the billboards and the signs stay on, seen from the drone or from the ground. Every tower and the NGMY company building has billboards on the south face and on the north face (the side the town looks at), and the big NGMY Town sign shows a picture on both of its faces. In the hall the camera is only the camera (no label), and the wall TVs read the right way round from outside the wall too. In a house with no power each fixture turns green on its own when it is fixed, the work you did is kept when you leave and come back, and the panel turns green when the whole house has power; in your own rooms a fixed outlet, switch or light has a green frame, an amber frame while it is started, and a red one while it is not. The work you do on a house, an office level or a street light is kept in the town. Take me there puts you a few steps in front of the door (or beside the street light). People walk fast in the big town and the drawing skips what is off the screen. Missing calls never closes the game; after a few the office only rings to remind you. Every office tower and the NGMY company building can be walked into: the lobby has an elevator (walk onto the blue mat or tap it) with buttons for every level, the level number is always shown, there is a balcony with a glass railing (step on the green mat to look over the town), and you can get a job from an office with no power on any level, take the elevator to that level and fix its breaker panel. The elevator ride is shown: the person walks to the doors, they slide open, the person steps in, the doors close, the camera is inside the car with a display above the doors and a big number that counts up or down level by level with a little shake, a chime and the doors open at the new level where the person walks out. The Orders button opens the delivery board: orders for food, groceries, medicine, packages and letters are picked up at a shop, a store, the hospital, a tower or the company building and carried to a house (follow the yellow line); they pay points. Five other couriers, Maya, Kofi, Amara, Tunde and Zawadi, walk the town doing the same: an order they take is gone, and the first to deliver 8 orders wins the round and a bonus. The race table shows everybody. There are many more big NGMY ad billboards round the edge of the land (north, south, east and west) and on the roofs and sides of the towers and the company building; every one plays the NGMY ads one after the other, a new one every 7 seconds. NEW IN THE CITY: the drone has a special request for the edge billboards only (the big boards round the edge of the land), the billboards request now includes the edge boards, the tower boards and every other billboard, and every drone film always starts at the big sign that welcomes everybody to NGMY Town. The rival couriers now walk round the buildings (never through walls) and go in and out of the doors, out of sight for a moment inside. When all the fixtures of a dark house or office are connected, a green Complete work button appears (in the chips row, and next to the drone button in full screen): press it to check the wiring, bring the power back and get paid. Energy: about five minutes of walking use it all up, then you must rest for three minutes (then you are back at half energy) or eat; a long battery bar next to the page title shows it, and under the Run and Jump buttons in full screen, with no numbers. Food from the shops (apple, juice, sandwich, burger meal) gives energy back and costs points. The shops are now real: shelves with tins, boxes, bottles and loaves, drinks fridges, fresh fruit, a till and a cashier, and walking up to a shelf or the counter (or the Buy things chip) opens the shopping list: food, food for the town and medicine, all paid with the points you earned. Cars only have about two minutes of gas; a gas bar shows beside the energy bar while you drive, and there are many gas stations round the town where you press Buy gas (or buy a gas can in the gas shop). The licence office sells the Uber licence for 40 points. Uber stations (a yellow and black shelter with a car beside it) have people waiting: drive up with the licence and they get in, take them to their house (follow the yellow line) and the fare is paid when you arrive. MORE SWITCHES, OUTLETS AND LIFE: the Construction Lab has ten more wiring lessons (double-pole, three-way, four-way, smart or motion or timer, and combination switches; split half-switched, 4-wire 240 V, 3-wire 240 V, 240 V only and isolated-ground outlets), and every house or office job now asks for a different outlet and a different switch, so people learn them all by fixing them. Calls and jobs only come in the NGMY City map (the garden with the billboards), never in the rooms of the house. Houses stand much further apart. The incoming call screen shows who is calling on top and the Decline, Later and Answer buttons in a row below. Energy lasts about two minutes of walking, then the person crawls on the ground for 20 seconds: if they have not bought food in a shop by then they lose 5 stars, rest for three minutes and come back at half energy. Thirst (buy water or juice) and feeling unwell (buy pain pills) make walking tire faster, so everything the shops sell is needed at some time. The stars balance is shown next to the zoom in button all the time. Thirst also lasts two minutes. Nothing counts against the person while they are working on a job or away from the city map. When all the wiring of a house is connected the work is handed in by itself. Wires and screws are easy to tap: a tap near one picks it. The shop screen is laid out in columns to fit a phone on its side with nothing to scroll, and every pop-up shrinks to fit the screen. Every elevator car and every level of a tower has big TVs playing the NGMY ads, a ride takes at least 3 seconds and longer for every level it climbs, and inside a building the view is close in so you feel you are inside. ADVISOR BROWSER: the live browser of the advisors (the computer an advisor uses to look things up and fill forms) is free for the first 10 minutes of use. After that a payment pop-up appears (never a text message) asking $5.99 for 2 more hours, by card with Stripe or with Cash App (a code, a screenshot of the payment, and an admin approves it). The hours must be used within a week; they are counted quietly in the background only while the browser is open, and what is left is still there when the person comes back. Hours not used within the week are lost, and the next time the person gets only 5 minutes before the pop-up asks again. One browser task may spend at most 2 dollars. Inside a building the camera never leaves the walls, so turning round never shows a wall from behind or a TV switching off, and the rooms are deeper and taller. In a tower the way out is only on the ground floor; the other levels use the elevator down. Walking, the drone and the elevator ride move in step with every frame and the camera sticks to the person, so it is smooth. Finishing the wiring or plumbing of a room, a lesson or an added outlet pays stars at once.","AI FAIR USE: all NGMY AI runs on the server and needs a signed-in account. To keep the shared AI key safe, each person can use AI only so fast: if you go too fast you see You are using AI too fast, please wait a little and try again, and you can use it again after a short wait. Big jobs (job applications, documents, books, slides, news, translations, pictures, voice) have tighter limits than normal chat. If the AI company is busy you see that the AI is busy and to try again in a minute, and the app does not keep asking. There is also a daily cap for the whole app. Admins can see the limits, the heaviest users and the newest abuse, and change the limits without a new version of the app.",'CONSTRUCTION LAB: a trade school in real looking 3D, MY HOUSE (top card of the Construction Lab): a finished furnished house with 5 bedrooms, 3 bathrooms, a kitchen, a living room and a hall, each drawn as a cut-away 3D room. A little map in the corner shows where you are, tap a room to go there, or use the door buttons; red marks a room whose wiring needs work and blue one whose plumbing does. Signals in the room (a red No power sign, a blue Needs plumbing sign, bare pipe stubs) show what is wrong; the Wiring and Plumbing buttons, or a tap on the outlet, light, toilet or sink, open the same hands-on jobs and the room is finished when the job is. Furniture, walls, floor, ceiling and doors only react while their own edit button is on: Furniture (add, move with arrows, turn, change colour, remove), Walls (paint one wall or all), Floor (wood, carpet or tile), Ceiling, Doors (open and close). A Learn button opens short beginner cards on safety, wiring, plumbing, framing and tools. In My House you are inside the room by default (a low view, like standing in the doorway) and a button switches to a view of the whole room from above. A \ud83c\udfac Tour button plays a life-like person (an adult with a face, hair, arms, legs and a real stride) who comes in through the front door and walks through the whole house like a film, in the time you choose (30 seconds, 1, 2, 3 or 5 minutes), after every TV is switched on. The walk is planned round the furniture and fixtures, so the person never goes through a wall, a chair or a table; in the living room and the bedrooms the person picks up the remote and switches the ad on the TV, in the kitchen they take a drink from the fridge, in the bathrooms they wash their hands, and between rooms they open the door and walk through into the hall. The doors really swing open and show the next room behind them; when the person opens a door the camera moves in towards it, then the picture dissolves into the next room (the hall, a bedroom, a bathroom) where the camera starts on the door they come out of, and the door closes behind them as they walk on. TVs on the wall go from 100 inches to 150, 200 and a whole-wall TV: each is as big as the free stretch of wall allows, never over a door, with nothing in front of it, and the person on the tour stands beside the TV and not in front of it. The hall is wider and deeper, has all ten doors on its back wall and a big TV on each end wall. A \ud83d\udd04 Look all round (360) button puts you in the middle of a closed room (solid ceiling and four walls) to turn all the way round by dragging; a double tap on the floor walks you to that spot, and from above or in the garden a double tap takes the view closer to where you tapped. The view can never go under the floor. The garden is a big lawn you can walk all the way round, and the house outside has windows and doors on all four sides, a porch, a chimney and a roof; with the Furniture button you can add and move trees, pines, bushes, flowers, fences, street lamps, benches, cars, roads, ponds, swings, sheds and dog houses. The cards on the Construction Lab home screen are centred, with a glowing round icon and a soft colour. COMMUNITY (a card on the Construction Lab home screen and a Community button in My House): the seven people who live in the house (Ama, Joseph, Grace, Daniel, Fatima, Papa Moses and Mama Rose, each with their own look) get hungry over time, can fall sick, and become unhappy when their room has no power or their sink leaks; they stand in their rooms in the house as people you can tap, with a word over their head showing how they are. The player feeds them (food), gives medicine, sends the sick to the hospital (three beds: each patient needs treating before their care runs out and goes home better), and buys food and medicine in the shop with points. People who are starving, sick or unhappy for too long lose health and can die. Calls for help arrive in plain words ("My outlet is dead and it is dark in here", "The sink leaks"): Go and fix it opens the house on that room, the real wiring or plumbing job is done, and when it works the call finishes and earns 15 points; wiring and plumbing also break by themselves from time to time so there is always something to do. Hospital discharges, feeding and medicine earn points too. Everything is saved (the people, supplies, calls and which rooms are fixed or broken) and time passes only gently while the app is closed. Inside a room the view stays inside the house: you can look about a little but you cannot swing round behind the walls, and a Go outside button (and Go inside in the garden) is the only way out. Everything in a room is drawn in layers (the floor and walls first, then what is fixed to them like the TV, the plates, the frames and the doors, then the furniture and the person), so the edges of a TV or a door never disappear when you turn to the side and the person never shows through a door, a wall or their own body. The person is built from rounded parts with real joints (a head with a face and hair, shoulders, elbows, knees, hands and shoes), the foot that is down always stands on the floor, and the walk keeps a body-width away from furniture and walls. A TV button puts a wall TV (five models, the big ones up to 77 inches) in a room, or in every room, and turns TVs on and off. An Add button adds outlets, GFCI outlets and light switches to a room that you wire yourself with the wiring bench, a Map button shows or hides the little map (which shrinks to fit the screen), and the Start from a bare house button makes every room need its wiring and plumbing so you can wire the whole house first. The ceiling of a room can hold a light or a fan. All the lessons on the lab home screen (Wall outlet, Light switch, GFCI outlet, Ceiling fan, Sink drain, Faucet supply lines, Build and fix a house, Learn the trades: eight tiles, four on each side) play inside a furnished room with a big TV on the wall showing the NGMY Jobs ad; the ceiling light is already in and only the thing being taught is waiting (red), and once it is done you can use it: flip the switch, plug in a lamp, TV or hair dryer, watch the fan spin. The house also has a Garden (a view of the house from outside with a tree, a path and a mailbox): the front door of the living room leads out to it and the front door there leads back in. Tap a door in a room to open it and walk through it into the next room or the hall, like in a game. Every room can be fixed, even the ones shown as finished: a finished room opens finished and you can pull devices out and wire them again. In a wired room tap an outlet to plug something in (five big TVs from Beovision to Apple TV that play NGMY ads, a lamp, a toaster or a hair dryer) or unplug it, tap the wall switch (or the light) to turn the light or the ceiling fan on and off, and tap a TV to watch it full screen with its own brand home screen. Bedrooms have ceiling fans. Wire a room, Plumb a room and Fix a house on the lab home screen all open My House at a room that needs that job. In the wiring jobs a wrong wire can be fastened just like for real and it burns or trips the breaker when the power goes on, touching a live wire shocks (in Learn mode it hurts nothing but the shock still happens, in Practice mode it costs a life), the wire buttons that are already fastened disappear, the screw labels are kept away from the wires, finished devices have a bright frame so they are easy to find from far, finished rooms have a painted ceiling with crown moulding and no bare beams, and a TV in the room job opens full screen when tapped. The Construction Lab downloads on its own when its button is pressed, so the Core Protocol opens quickly. A TV that is plugged in and on plays the real NGMY ads right on its screen, flat on the glass like a normal TV, without opening it (tap it to watch full screen). There is a Voltage tester: in My House pick the Tester button and tap an outlet, the switch or the light (it glows and beeps when there is power and stays dark when there is none), and in the wiring jobs it is the Voltage tester right after Look in the devices tray. The Construction Lab menus are now at the top like in the Electronics Lab, the home screen of the lab is a short list of tiles with a Learn mode and Practice mode switch, a device already put in can be tapped again to open it or pull it out, and a tap that misses never moves the view. opened from the construction helmet button next to the AI button at the top of the Electronics Lab, and also as a tile in the Core Protocol. Every model can be turned with a finger, zoomed by pinching or with the zoom buttons, and any part can be tapped to zoom in and read what it is. Lessons: Wall outlet (black hot wire to the brass screw, white neutral to the silver screw, bare copper ground to the green screw), Light switch (two black wires on the two brass screws, white wires joined with a wire nut), GFCI outlet (power in on the LINE screws, the LOAD screws are covered with yellow tape, press RESET then TEST), Sink drain (build the tailpiece, P-trap and trap arm, tighten the slip nuts, run the water and see the water seal that blocks sewer gas), Faucet supply lines (hot red hose on the left, cold blue hose on the right, then open the shut-off valves) and a whole house cut open at the front that can be built stage by stage (slab, framing, plumbing rough-in, electrical rough-in, drywall, fixtures, roof), where a tripped breaker and a leaking slip nut can be fixed and each fixture opens its own lesson. The electrical lessons start with the breaker ON and refuse any wire until it is turned OFF, and every wrong connection is explained in plain words. BUILD A WHOLE ROOM (also WIRE A ROOM quick start, and a Skip to the wiring button in the tray, which do the framing, cable and drywall for you so you start straight at wiring the outlets, switches, light and fan with coloured labelled screws, the tester, the TV and the switch test; the room has a window wall, a door wall and the working wall): a project with three phases (rough-in, drywall, devices). Rough-in: mount wall boxes, ceiling boxes and a fan box on the studs with the drill, and unroll the cable through the studs and ceiling (a wrong route gives an error). Drywall: hang the sheets, cut holes with the drywall saw, screw them to the studs, then tape, mud, sand and paint. Devices: wire outlets, several switches, a ceiling light and a ceiling fan, each with a switch to test, then plug in a TV and other appliances. The screw terminals have different colours (brass gold hot, silver neutral, green ground) and show a label when tapped. A Behind the wall / In front button lets you choose which side of the wall you look from instead of the camera turning by itself. Learn mode tells you what to do next and explains every wrong move; Practice mode only speaks up when something is done wrong, and real wiring mistakes shock (three lives) or burn. SERVICE CALLS (Fix a house, learn and practice): a customer rings with four problems chosen from twelve kinds (tripped breaker, no hot water, leaking slip nut, leaking crimped joint, dead outlet, flickering light, burnt outlet, tripped GFCI, running toilet, dripping faucet, hole in the wall, clogged sink), a different mix every time; use Look and test, then the right tool from the toolbox (hand, screwdriver, pliers, wrench, crimp tool, plunger, new flapper, new outlet, drywall patch); wires must have their breaker switched off first. PLUMBING JOBS (learn and practice): fit out a bathroom (flange, wax ring, toilet, bolts, shut-off valve, supply hose, then the sink) or a kitchen sink piece by piece, with the order checked (the app says why a piece cannot go there yet), the main water valve turned off before cutting into pipes, joints tightened with the wrench, and finally the water turned on to find leaks.',"MY HOUSE, THE WORLD OUTSIDE: go outside from the living room (Go outside, or the front door) into a big garden town you can walk and decorate. It starts with a main street, a lane up to the house, a crossroads, a shop, a hospital with a red cross, a fire station with a fire truck, a school, a second house, an ambulance and a car, trees, a pond, lampposts, a bench and fenced animals. In Furniture mode the Add tray offers road pieces (straight, corner, T-junction, crossroads) that snap to a grid and jump a whole piece with the arrow buttons so they always join up, buildings (house, shop, hospital, fire station, school), cars, a fire truck, an ambulance, animals (dog, cat, cow, sheep, chicken, horse) that wander about, trees, bushes, flowers, fences, a bench, a swing, a shed and a doghouse. Everything can be moved, turned, recoloured and removed with the buttons, and nothing reacts to a tap unless the Furniture button is on. Walk about puts a person in the world: hold the arrows to walk (up is away from you), or double tap a spot to send them there; they walk round buildings, vehicles, trees and fences, and walking up to the front door takes them back into the living room. The camera never goes under the ground.","ELECTRONICS LAB: build real circuits with 56 parts in two tool rows, both at the top above the board (swipe sideways), under a redesigned top bar with the lab name, a live count of working and burnt parts, buttons for ready-made circuits, repair, clear and help, and a challenge card with a progress bar: batteries, solar panel, hand crank, wind turbine, switch, fuse, bulb, LED, motor, radio, TV, fan, speaker, clock, calculator, phone charger, WiFi router, siren, toy car, kettle, desk lamp, party lights, voltmeter and ammeter, step-down converter (brings big battery volts down to 3 to 9 V so a phone, tablet, headphones or smart watch is safe), 5 V regulator (gets hot), diode (one way, 0.7 V drop), light sensor, LED strip, water pump, hair dryer, headphones, smart watch, tablet, fridge, washing machine, blender, drone, power drill, torch, neon sign, microwave, doorbell, security camera, game console, heart monitor, aquarium, lighthouse, disco ball, robot and toaster. Each gadget needs the right volts and the right way round: the lab explains why something is not working (not connected, only one end wired, plugged in backwards, flat battery, switch open, too few volts, burnt out and why). A 1.5 volt battery starts flat and must be charged by a solar panel first. The TV shows NGMY animation channels: it opens on the big screen by itself for a minute when it first switches on, and tapping it 3 times quickly opens the big screen. Each TV brand shows its apps in its own design: Samsung with a Smart Hub bar along the bottom, LG with webOS wide launcher cards, Sony with Google TV rows and a picture card, Apple TV with big rounded icons that rise when selected, and Bang and Olufsen with a quiet warm text menu. The TV has 10 NGMY animation channels, a remote control at the top middle of the big screen (CH minus, CH plus, TV, Apps, Ads) and 8 apps inside the TV screen (there is no Growth Income ad or app on the TVs): NGMY Ads (every promotion as cartoons), Civic Registry, Jobs, NGMY Store (African and traditional food, supporting the Congolese and African community), Kiswahili, Doc Scanner, Invoices and Calendar. Each ad is a little cartoon with a kid character. Premium devices with screens play the NGMY cartoon ads on their own screens: TVs (Samsung Neo QLED 8K, LG OLED evo G5, Sony Bravia 9, Apple TV 4K, Bang and Olufsen Beovision), phones (iPhone 18 Pro Max with a Dynamic Island, iPhone Fold, Galaxy S26 Ultra, Galaxy Z Fold7, Pixel 10 Pro XL, Xiaomi 16 Ultra, Huawei Mate 80 Pro Max, OPPO Find X9 Ultra, Honor Magic V5, vivo X300 Pro), tablets and readers (iPad Pro, Kindle Scribe), computers (MacBook Pro, iMac, Pro Display XDR monitor, Sony laser projector, luxury car touchscreen, Apple Vision Pro). Tapping a screen 3 times opens its big screen (a phone opens like an iPhone, a computer shows a desktop with a dock and app windows). Tapping it 4 times opens a size sheet so the screen can be made bigger (never smaller than normal). Sample circuit: Phone and TV on one battery, using a step-down converter. The AI button at the top of the lab opens the AI Inventor, which builds what you describe on the lab board.  Every battery and solar panel can only give so many amps: when the gadgets connected ask for more, a red warning triangle appears on the power source, its volts sag, gadgets switch off and the lab explains why. The lab saves your board and your challenges by itself, so nothing disappears when you leave. The challenges sit behind a flag button in the top bar (with a number on it for how many are left), next to the dark glowing AI button and the help button.","BODY EXPLORER: a real 3D human body built from medical anatomy data. You can turn it, zoom in, switch layers (skin, muscles, organs, skeleton, blood vessels), tap any part to learn about it, hear the heart beat, and take a quiz.","KISWAHILI SCHOOL: learn English and Swahili with pictures and the teacher Mwalimu Amina.","FAMILY TREE AND FAMILY BOOK: build a family tree, then keep a Family Book library of up to six books. The AI can write a whole new book from the tree, in English or Swahili, and the cover can be designed. The look of the top of each book can be chosen from eight header designs (classic leather, ornate gold, parchment, clean paper, midnight, emerald, rose vintage, modern) with the Header button, and the book title also shows as a small running title on every page.","NOTES: business notes with search, photos and cards.","NGMY QUOTES: make a picture quote with many designs, word sizes, text styles, your own photo and the NGMY logo. It also makes NEWS: a newspaper page with a headline, article and your picture, written by an AI that knows NGMY.","BIO STUDIO: link-in-bio pages with designs such as Neural Core, Quantum Grid and Mech Terminal, and visitors can react to a page.","MENU STUDIO: restaurant menus published as a link.","BUSINESS CARD CREATOR: design and download business cards.","INVOICES AND QUOTE CALC: invoices, receipts and estimates with NGMY watermarks.","DOC SHARE, QR GENERATOR, RECORDER STUDIO, VIDEO STUDIO, PLAY ZONE AND PHONE UNLOCK: tools in the Creator Hub.","APP BUILDER: describe an app and the AI builds it, including real web apps you can publish.","DOCUMENT SCANNER: scan papers with the phone camera.","GAME CENTER AND VAULT ARCADE: arcade games you can play. Game bets and wins have their own receipts and do not appear in the wallet history. Games played offline are saved on the phone and counted on the balance, then applied to the account in order as soon as the phone is online again, and every device updates."],x.s)
 D.cWs=w([0.62,1],x.x)
@@ -22970,7 +22970,7 @@ D.cX1=w([0,0.32,0.68,1],x.x)
 D.mK=new C.hF(6,"zoom")
 D.uu=new C.hF(4,"slideUp")
 D.ut=new C.hF(2,"slideLeft")
-D.cXa=w([D.mK,D.I3,D.uu,D.S4,D.ut],x.i)
+D.cXa=w([D.mK,D.I3,D.uu,D.S5,D.ut],x.i)
 D.cXG=w([A.bY,A.hi,A.iy,A.hK,A.c],x.O)
 D.b2H=new B.ac(0,A.G,D.aer,A.uA,30)
 D.cYp=w([D.b2H],x.V)
@@ -23054,8 +23054,8 @@ D.dIO=new C.lg("gold","Golden Press",D.dso,D.a4C,4279505162,4278847748,429489863
 D.dIP=new C.lg("minimal","Paper White",D.aF2,D.a4C,4294967295,4294638330,4279769115,4279769115,"split","NgmyOldStandard","NgmyOldStandard","NgmyOldStandard","a quiet, elegant long-read: thoughtful, simple and beautifully written",!1,"none",!1,!1)
 D.dIA=new C.lg("gazette","Fresh Gazette",D.aEY,D.aEV,4294373341,4293582786,4280949518,4288295954,"centered","NgmyOldStandard","NgmyOldStandard","NgmyOldStandard","a refined town gazette: formal, dignified and warm, with a strong headline",!1,"none",!1,!0)
 D.dIK=new C.lg("times","Classic Times",D.aEZ,D.aEU,4294637810,4293913565,4279636750,4280171146,"centered","NgmyOldStandard","NgmyOldStandard","NgmyOldStandard","a serious classic broadsheet: calm, factual, authoritative, with a strong headline and a clear subhead",!1,"bw",!1,!1)
-D.RA=new C.Bu(2,"polaroid")
-D.dIJ=new C.lg("scrapbook","Memory Scrapbook",D.aF0,D.RA,4294437835,4293580710,4282001946,4290007817,"split","NgmyOldStandard","NgmyOldStandard","NgmyOldStandard","a warm scrapbook clipping: personal, nostalgic and heartfelt",!1,"sepia",!1,!1)
+D.RB=new C.Bu(2,"polaroid")
+D.dIJ=new C.lg("scrapbook","Memory Scrapbook",D.aF0,D.RB,4294437835,4293580710,4282001946,4290007817,"split","NgmyOldStandard","NgmyOldStandard","NgmyOldStandard","a warm scrapbook clipping: personal, nostalgic and heartfelt",!1,"sepia",!1,!1)
 D.a32=w([D.dIC,D.dIy,D.dIL,D.dIE,D.dII,D.dIx,D.dIz,D.dIN,D.dIM,D.dIw,D.dIH,D.dID,D.dIF,D.dIG,D.dIB,D.dIO,D.dIP,D.dIA,D.dIK,D.dIJ],B.ax("O<lg>"))
 D.d44=w([0.45,1],x.x)
 D.Hh=w([619,720,127,481,931,816,813,233,566,247,985,724,205,454,863,491,741,242,949,214,733,859,335,708,621,574,73,654,730,472,419,436,278,496,867,210,399,680,480,51,878,465,811,169,869,675,611,697,867,561,862,687,507,283,482,129,807,591,733,623,150,238,59,379,684,877,625,169,643,105,170,607,520,932,727,476,693,425,174,647,73,122,335,530,442,853,695,249,445,515,909,545,703,919,874,474,882,500,594,612,641,801,220,162,819,984,589,513,495,799,161,604,958,533,221,400,386,867,600,782,382,596,414,171,516,375,682,485,911,276,98,553,163,354,666,933,424,341,533,870,227,730,475,186,263,647,537,686,600,224,469,68,770,919,190,373,294,822,808,206,184,943,795,384,383,461,404,758,839,887,715,67,618,276,204,918,873,777,604,560,951,160,578,722,79,804,96,409,713,940,652,934,970,447,318,353,859,672,112,785,645,863,803,350,139,93,354,99,820,908,609,772,154,274,580,184,79,626,630,742,653,282,762,623,680,81,927,626,789,125,411,521,938,300,821,78,343,175,128,250,170,774,972,275,999,639,495,78,352,126,857,956,358,619,580,124,737,594,701,612,669,112,134,694,363,992,809,743,168,974,944,375,748,52,600,747,642,182,862,81,344,805,988,739,511,655,814,334,249,515,897,955,664,981,649,113,974,459,893,228,433,837,553,268,926,240,102,654,459,51,686,754,806,760,493,403,415,394,687,700,946,670,656,610,738,392,760,799,887,653,978,321,576,617,626,502,894,679,243,440,680,879,194,572,640,724,926,56,204,700,707,151,457,449,797,195,791,558,945,679,297,59,87,824,713,663,412,693,342,606,134,108,571,364,631,212,174,643,304,329,343,97,430,751,497,314,983,374,822,928,140,206,73,263,980,736,876,478,430,305,170,514,364,692,829,82,855,953,676,246,369,970,294,750,807,827,150,790,288,923,804,378,215,828,592,281,565,555,710,82,896,831,547,261,524,462,293,465,502,56,661,821,976,991,658,869,905,758,745,193,768,550,608,933,378,286,215,979,792,961,61,688,793,644,986,403,106,366,905,644,372,567,466,434,645,210,389,550,919,135,780,773,635,389,707,100,626,958,165,504,920,176,193,713,857,265,203,50,668,108,645,990,626,197,510,357,358,850,858,364,936,638],x.t)
@@ -23120,7 +23120,7 @@ D.b9w=new B.w(1,0.7686274509803922,0.3607843137254902,0.24313725490196078,A.t)
 D.hbH=w([D.bdi,D.bc6,D.b9w],x.O)
 D.dDY=new C.jo("kuhowa_shweshwe_ivory","Shweshwe","Nguo ya shweshwe \xb7 kadi ya pembe ndani.",D.aG9,4294505710,4279970378,4291058750,D.jO)
 D.rC=new C.kU(15,"certIvoryNavy")
-D.hbF=w([D.LB,D.jf,A.i2],x.O)
+D.hbF=w([D.LC,D.jf,A.i2],x.O)
 D.aFB=new C.xx(1,"ringsNdoa")
 D.dDV=new C.jo("kuhowa_rings_ndoa","Hati ya Ndoa","Pete mbili \xb7 vichwa vya kidonge \xb7 hati rasmi.",D.rC,4294966259,4279378237,4291404327,D.aFB)
 D.a57=new C.xx(2,"coupleCards")
@@ -23131,18 +23131,18 @@ D.hbT=w([D.ad3,D.jf,A.i2],x.O)
 D.aFC=new C.xx(3,"kuhoweshaForm")
 D.dDO=new C.jo("kuhowa_barua","Barua ya Kuhowesha","Barua rasmi \xb7 pete \xb7 orodha ya vitu.",D.CN,4294966519,4279378237,4291404327,D.aFC)
 D.aep=new B.w(1,0.10196078431372549,0.15294117647058825,0.26666666666666666,A.t)
-D.hcc=w([D.LB,D.aep,A.i2],x.O)
+D.hcc=w([D.LC,D.aep,A.i2],x.O)
 D.a58=new C.xx(4,"mahariPande")
 D.dDR=new C.jo("kuhowa_mahari_pande","Mahari ya Pande","Masharti ya mahari \xb7 pande mbili.",D.rC,4294966259,4279904068,4291404327,D.a58)
 D.aGa=new C.kU(16,"certIvoryGreen")
 D.bcH=new B.w(1,0.12156862745098039,0.30196078431372547,0.22745098039215686,A.t)
-D.hbJ=w([A.KM,D.bcH,A.i2],x.O)
+D.hbJ=w([A.KN,D.bcH,A.i2],x.O)
 D.aFD=new C.xx(5,"familiaMti")
 D.dDX=new C.jo("kuhowa_sheria_familia","Sheria za Familia","Mti wa familia \xb7 sheria za pamoja.",D.aGa,4294966776,4280241466,4291404327,D.aFD)
 D.a59=new C.xx(6,"ndoaSafi")
 D.dDP=new C.jo("kuhowa_ndoa_pamoja","Ndoa ya Pamoja","Safu mbili \xb7 mume na mke.",D.CN,4294966519,4279378237,4291404327,D.a59)
 D.bgO=new B.w(1,0.22745098039215686,0.16470588235294117,0.06274509803921569,A.t)
-D.hbM=w([D.LB,A.i2,D.bgO],x.O)
+D.hbM=w([D.LC,A.i2,D.bgO],x.O)
 D.a5a=new C.xx(7,"peteWide")
 D.dDU=new C.jo("kuhowa_pete_pana","Pete Pana","Pete kubwa za dhahabu \xb7 nafasi wazi.",D.rC,4294966259,4282001936,4291404327,D.a5a)
 D.dE3=new C.xx(8,"muhuriCrest")
@@ -23161,9 +23161,9 @@ D.I4=new C.w1(0,"emojis")
 D.CU=new C.w1(1,"pictures")
 D.I5=new C.w1(2,"icons3d")
 D.a5r=new C.w1(3,"animations")
-D.S6=new C.w1(4,"videoMotion")
+D.S7=new C.w1(4,"videoMotion")
 D.CV=new C.w1(5,"luxe")
-D.a3a=w([D.I4,D.CU,D.I5,D.a5r,D.S6,D.CV],B.ax("O<w1>"))
+D.a3a=w([D.I4,D.CU,D.I5,D.a5r,D.S7,D.CV],B.ax("O<w1>"))
 D.eEH=new B.z(A.dX,"Looks")
 D.et8=new B.z(A.yB,"Light")
 D.et5=new B.z(A.nm,"Colour")
@@ -23209,12 +23209,12 @@ D.e_l=new C.hF(12,"blur")
 D.aGu=new C.hF(13,"dissolve")
 D.e_m=new C.hF(14,"wipeLeft")
 D.e_n=new C.hF(15,"wipeRight")
-D.S5=new C.hF(17,"push")
+D.S6=new C.hF(17,"push")
 D.e_o=new C.hF(18,"flash")
 D.aGw=new C.hF(20,"swing")
 D.e_p=new C.hF(21,"curtain")
-D.QH=w([D.cn,D.de,D.ut,D.I2,D.uu,D.aGx,D.mK,D.e_q,D.I3,D.aGy,D.S4,D.a5q,D.e_l,D.aGu,D.e_m,D.e_n,D.ql,D.S5,D.e_o,D.aGv,D.aGw,D.e_p],x.i)
-D.QI=w([D.a55,D.a53,D.a4X,D.a4Y,D.a4Z,D.a51,D.a5_,D.a50,D.a54,D.a52,D.aFz,D.aFA,D.aFy,D.aFx],x.h)
+D.QI=w([D.cn,D.de,D.ut,D.I2,D.uu,D.aGx,D.mK,D.e_q,D.I3,D.aGy,D.S5,D.a5q,D.e_l,D.aGu,D.e_m,D.e_n,D.ql,D.S6,D.e_o,D.aGv,D.aGw,D.e_p],x.i)
+D.QJ=w([D.a55,D.a53,D.a4X,D.a4Y,D.a4Z,D.a51,D.a5_,D.a50,D.a54,D.a52,D.aFz,D.aFA,D.aFy,D.aFx],x.h)
 D.d9U=w([y.L,"Mbuzi Mbili","Ngyoka","Mmoko"],x.s)
 D.d9Y=w([A.xl,A.hK,A.c0],x.O)
 D.est=new B.z(A.u0,"Design")
@@ -23226,19 +23226,19 @@ D.enp=new B.z(A.lr,"Logo")
 D.eHm=new B.z(A.GC,"News")
 D.da2=w([D.est,D.eGb,D.eBT,D.eBX,D.enp,D.eHm],x.f2)
 D.da3=w(["golddust","sparkle","sheen"],x.s)
-D.e0N=new C.ew("upload_pdf",L.NX,"Upload PDF")
+D.e0N=new C.ew("upload_pdf",L.NY,"Upload PDF")
 D.e_X=new C.ew("sign_paper",A.Gz,"Sign Paper")
 D.bGo=new B.a0(63438,"MaterialIcons",!1)
 D.e0J=new C.ew("hd_photo",D.bGo,"HD Photo")
 D.e_P=new C.ew("sharpen",E.a08,"Sharpen")
-D.e_Z=new C.ew("print",L.NX,"Download PDF")
+D.e_Z=new C.ew("print",L.NY,"Download PDF")
 D.e0q=new C.ew("rotate",D.alx,"Rotate")
 D.e07=new C.ew("text_box",A.C_,"Text Box")
 D.e09=new C.ew("picture",A.u4,"Picture")
 D.e05=new C.ew("title",A.yv,"Title")
 D.e01=new C.ew("subtitle",T.amn,"Subtitle")
 D.e0z=new C.ew("bullets",K.a0o,"Bullet List")
-D.e02=new C.ew("numbered",A.NM,"Numbered")
+D.e02=new C.ew("numbered",A.NN,"Numbered")
 D.e0C=new C.ew("quote",A2.BQ,"Quote")
 D.e0e=new C.ew("citation",A.o5,"Citation")
 D.e0F=new C.ew("date_stamp",Ag.a0d,"Date Stamp")
@@ -23262,12 +23262,12 @@ D.e_H=new C.ew("initial_line",A.jr,"Initials")
 D.e_K=new C.ew("approved",A.lr,"APPROVED")
 D.e0o=new C.ew("draft",A.p0,"DRAFT")
 D.e0u=new C.ew("confidential",A.js,"Confidential")
-D.e0x=new C.ew("sticky",A.O4,"Sticky Note")
+D.e0x=new C.ew("sticky",A.O5,"Sticky Note")
 D.e0G=new C.ew("progress",A.am_,"Progress")
 D.bHC=new B.a0(983507,"MaterialIcons",!1)
 D.e_V=new C.ew("stars",D.bHC,"Star Rating")
 D.e_F=new C.ew("equation",A.alR,"Equation")
-D.e_Q=new C.ew("timeline",A.O6,"Timeline")
+D.e_Q=new C.ew("timeline",A.O7,"Timeline")
 D.e0d=new C.ew("two_col",A.a0U,"Two Columns")
 D.e_S=new C.ew("compare",A1.a0g,"Compare")
 D.e_D=new C.ew("duplicate_el",A.fP,"Duplicate")
@@ -23297,12 +23297,12 @@ D.e0v=new C.ew("cover_page",A.q1,"Cover Page")
 D.e_G=new C.ew("invoice",A.ha,"Invoice")
 D.e_R=new C.ew("resume",A.mv,"Resume")
 D.e04=new C.ew("minutes",A.oV,"Minutes")
-D.e_L=new C.ew("lab_report",A.O0,"Lab Report")
+D.e_L=new C.ew("lab_report",A.O1,"Lab Report")
 D.e_M=new C.ew("rubric",A.u1,"Rubric")
 D.e0g=new C.ew("flashcard_tool",V.Gx,"Flashcard")
 D.e0D=new C.ew("quiz_tool",A.Gu,"Quiz Block")
 D.e0k=new C.ew("worksheet_tool",M.G4,"Worksheet")
-D.e0p=new C.ew("outline_share",A.O2,"Share Outline")
+D.e0p=new C.ew("outline_share",A.O3,"Share Outline")
 D.e0E=new C.ew("export_json",D.akT,"Export JSON")
 D.e_E=new C.ew("new_slide",D.a_R,"New Slide")
 D.e0b=new C.ew("present",A.q7,"Present")
@@ -23342,7 +23342,7 @@ D.emf=new B.z(4278916151,4280172719)
 D.emo=new B.z(4279179050,4281549141)
 D.cPg=w([D.emn,D.emr,D.emf,D.emo],x.n)
 D.ctr=w([4281908728,4294626325,4287931320],x.t)
-D.e_x=new C.nL("professional","Professional",A.BJ,D.cPg,4294967295,3872118241,D.ctr,D.S5)
+D.e_x=new C.nL("professional","Professional",A.BJ,D.cPg,4294967295,3872118241,D.ctr,D.S6)
 D.emj=new B.z(4278995566,4278413729)
 D.emb=new B.z(4278727492,4279137424)
 D.emH=new B.z(4280171146,4278751666)
@@ -23356,7 +23356,7 @@ D.emS=new B.z(4283178389,4294197086)
 D.emZ=new B.z(4288295954,4294688548)
 D.cLv=w([D.emW,D.emY,D.emS,D.emZ],x.n)
 D.ctQ=w([4294829706,4294967295,4294747557],x.t)
-D.e_A=new C.nL("sunset","Sunset",A.O8,D.cLv,4294967295,4009749973,D.ctQ,D.de)
+D.e_A=new C.nL("sunset","Sunset",A.O9,D.cLv,4294967295,4009749973,D.ctQ,D.de)
 D.en8=new B.z(4294967295,4294047225)
 D.en3=new B.z(4294507260,4294967295)
 D.en7=new B.z(4294967295,4293060848)
@@ -23496,7 +23496,7 @@ D.hcz=new C.xA(9,"fomuWazi")
 D.dFY=new C.nH("fomu_wazi","Fomu ya Ndoa","Fomu yenye mistari \xb7 namba \xb7 sehemu wazi za kujaza.",D.CN,4294966519,4279904068,4291404327)
 D.hcr=new C.xA(10,"upendoOrnate")
 D.dG1=new C.nH("upendo_dhahabu","Upendo wa Dhahabu","Mapambo ya dhahabu \xb7 picha za wanandoa \xb7 rangi ya waridi.",D.aGb,4294965493,4286200650,4291404327)
-D.QX=w([D.dFR,D.dG2,D.dFS,D.dG4,D.dG6,D.dFP,D.dFU,D.dFZ,D.dG0,D.dFT,D.dG3,D.dG_,D.dFQ,D.dG5,D.dFX,D.dFW,D.dFV,D.dFY,D.dG1],B.ax("O<nH>"))
+D.QY=w([D.dFR,D.dG2,D.dFS,D.dG4,D.dG6,D.dFP,D.dFU,D.dFZ,D.dG0,D.dFT,D.dG3,D.dG_,D.dFQ,D.dG5,D.dFX,D.dFW,D.dFV,D.dFY,D.dG1],B.ax("O<nH>"))
 D.CR=new C.ar4(0,"landscape169")
 D.of=new C.ar4(1,"portrait916")
 D.diD=w([D.CR,D.of],B.ax("O<ar4>"))
@@ -23519,7 +23519,7 @@ D.dji=w([D.ekb,D.ep7,D.enD,D.elU,D.ekc,D.ep8,D.enE,D.elV,D.eki,D.epj,D.enV,D.eno
 D.eLP=new B.cA(["open",A.jr,"Open & write","Keep writing this book"])
 D.eMf=new B.cA(["print",A.u7,"Print as a book","Fold and staple it"])
 D.djs=w([D.eLP,D.eMf],B.ax("O<+(m,a0,m,m)>"))
-D.dk9=w([D.a5q,D.mK,D.I3,D.S5,D.de,D.S4],x.i)
+D.dk9=w([D.a5q,D.mK,D.I3,D.S6,D.de,D.S5],x.i)
 D.eCq=new B.z(-1,"Small")
 D.ejX=new B.z(0,"Normal")
 D.ekJ=new B.z(1,"Big")
@@ -23527,8 +23527,8 @@ D.elj=new B.z(2,"Huge")
 D.dkH=w([D.eCq,D.ejX,D.ekJ,D.elj],x.ek)
 D.dl7=w([49,65,89,38,83,89],x.t)
 D.dle=w([A.vf,A.hK,A.c0],x.O)
-D.dlG=w([D.de,D.mK,D.ut,D.a5q,D.I3,D.S5],x.i)
-D.aE5=new B.dt([0,D.LT,8,D.agG,12,D.agH],B.ax("dt<G,a3K>"))
+D.dlG=w([D.de,D.mK,D.ut,D.a5q,D.I3,D.S6],x.i)
+D.aE5=new B.dt([0,D.LU,8,D.agG,12,D.agH],B.ax("dt<G,a3K>"))
 D.e5B={gold:0,platinum:1,glow:2,rainbow:3,double:4,neon:5,framed:6,rosegold:7,jewels:8,aurora:9}
 D.bjM=new B.w(1,0.8313725490196079,0.6274509803921569,0.09019607843137255,A.t)
 D.cPr=w([A.bM,D.bjM],x.O)
@@ -23666,9 +23666,9 @@ D.aO1=new B.dD(D.e4R,30,x.M)
 D.e6_={circle:0,triangle:1,hexagon:2,diamond:3}
 D.eSL=new B.dD(D.e6_,4,x.M)
 D.eVa=new B.ar(390,844)
-D.eVX=new B.a7(20,20,A.KF,null)
+D.eVX=new B.a7(20,20,A.KG,null)
 D.aOP=new B.a7(null,2.5,null,null)
-D.eW6=new B.a7(18,18,A.KF,null)
+D.eW6=new B.a7(18,18,A.KG,null)
 D.bQy=new B.ae(A.j3,19,A.c,null,null,null)
 D.eWh=new B.a7(38,38,D.bQy,null)
 D.bOO=new B.ae(A.yC,22,A.c,null,null,null)
@@ -23764,7 +23764,7 @@ D.f7j=new B.H(!0,A.bX,null,null,null,null,12.5,null,null,null,null,null,null,nul
 D.f7E=new B.H(!0,A.eC,null,null,null,null,12,A.H,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.f92=new B.H(!0,A.bK,null,null,null,null,13.5,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.f9b=new B.H(!0,A.jj,null,null,null,null,11,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.f9p=new B.rH(!0,A.Il,null,null,null,null,A.dt,8,null,null,null,null,null,null,null,null,null,null,null,null)
+D.f9p=new B.rH(!0,A.Im,null,null,null,null,A.dt,8,null,null,null,null,null,null,null,null,null,null,null,null)
 D.f9T=new B.H(!0,A.c,null,null,null,null,8,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.faw=new B.H(!0,A.jh,null,null,null,null,11.5,A.P,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.faU=new B.H(!0,A.aA,null,null,null,null,12.5,A.P,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
@@ -23779,7 +23779,7 @@ D.fbJ=new B.rH(!0,A.pb,null,null,null,null,A.dt,9,null,null,null,null,null,null,
 D.fc0=new B.H(!0,null,null,null,null,null,20,A.u,null,0.8,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fcx=new B.H(!0,A.c,null,null,null,null,16,A.H,null,null,null,null,1.2,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fcz=new B.H(!0,D.aeT,null,null,null,null,14,null,null,null,null,null,1.45,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.Jm=new B.H(!0,A.aA,null,null,null,null,12.5,null,null,null,null,null,1.35,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.Jn=new B.H(!0,A.aA,null,null,null,null,12.5,null,null,null,null,null,1.35,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fd1=new B.H(!0,A.c0,null,null,null,null,11.5,A.P,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fda=new B.H(!0,A.bK,null,null,null,null,14,A.a6,null,null,null,null,1.45,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fdd=new B.H(!0,A.bM,null,null,null,null,12,A.H,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
@@ -23869,7 +23869,7 @@ D.fx9=new B.y("Anza upya (hati mpya)",null,null,null,null,null,null,null,null,nu
 D.fxf=new B.y("Layout",null,A.U7,null,null,null,null,null,null,null,null,null)
 D.fxT=new B.y("Print",null,A.cC,null,null,null,null,null,null,null,null,null)
 D.fxZ=new B.y("X",null,A.rU,null,null,null,null,null,null,null,null,null)
-D.fyz=new B.y("Your logo goes on every slide and your pictures replace stock photos. The ring button also has the ending celebrations.",null,A9.Jh,null,null,null,null,null,null,null,null,null)
+D.fyz=new B.y("Your logo goes on every slide and your pictures replace stock photos. The ring button also has the ending celebrations.",null,A9.Ji,null,null,null,null,null,null,null,null,null)
 D.fz8=new B.y("Use the whole picture",null,null,null,null,null,null,null,null,null,null,null)
 D.fzl=new B.y("Hati ya Kuhowa",null,A.ft,null,null,null,null,null,null,null,null,null)
 D.fzn=new B.y("Choose a class template",null,A.ft,null,null,null,null,null,null,null,null,null)
@@ -23889,7 +23889,7 @@ D.fC1=new B.y("Done",null,A.lb,null,null,null,null,null,null,null,null,null)
 D.ffZ=new B.H(!0,A.c,null,null,null,null,18,A.H,null,null,null,null,1.25,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fC6=new B.y("Delete presentation?",null,D.ffZ,null,A.L,null,null,null,null,null,null,null)
 D.fCp=new B.y("After the last slide it starts again from the first",null,A.hg,null,null,null,null,null,null,null,null,null)
-D.fCB=new B.y("\ud83c\udf33",null,A.Jf,null,A.L,null,null,null,null,null,null,null)
+D.fCB=new B.y("\ud83c\udf33",null,A.Jg,null,A.L,null,null,null,null,null,null,null)
 D.fCT=new B.y("Plays big after your last slide. Tap one to watch it, change the words or add your logo.",null,A.hg,null,null,null,null,null,null,null,null,null)
 D.fD_=new B.y("Transfer document",null,A.or,null,null,null,null,null,null,null,null,null)
 D.fDa=new B.y("Add to the slides",null,A.hu,null,null,null,null,null,null,null,null,null)
@@ -23911,7 +23911,7 @@ D.fFr=new B.y("Hati iliyopo ya jimbo hili itabadilishwa.",null,null,null,null,nu
 D.fFs=new B.y("Each page becomes its own slide you can present",null,A.hg,null,null,null,null,null,null,null,null,null)
 D.fFO=new B.y("Y",null,A.rU,null,null,null,null,null,null,null,null,null)
 D.fFZ=new B.y("Crop the picture",null,A.lb,null,null,null,null,null,null,null,null,null)
-D.fG5=new B.y("Edit text",null,A.Jg,null,null,null,null,null,null,null,null,null)
+D.fG5=new B.y("Edit text",null,A.Jh,null,null,null,null,null,null,null,null,null)
 D.fIk=B.dU("a8n")
 D.DK=new C.ax_(0,"none")
 D.aV5=new C.ax_(1,"zipCrypto")
@@ -23969,4 +23969,4 @@ t.n(0,u.b,u.a)}return t})
 w($,"im5","bDZ",()=>{var v="Corporate",u=4280171146,t=4294967295,s=4280640491,r=4279080072,q="Modern",p="Bold",o=4278190080,n=4280472558,m=4279179050,l=4284773515,k=4287874557,j=4293548044,i=4279548070,h=x.O
 return B.a([C.mW(new C.fGX(),v,"biz_plan_blue","Business Plan",B.a([B.b0(u),B.b0(t)],h)),C.mW(new C.fGY(),v,"exec_summary","Executive",B.a([B.b0(s),B.b0(t)],h)),C.mW(new C.fGZ(),v,"teal_corporate","Teal Corp",B.a([B.b0(r),B.b0(4279310375)],h)),C.mW(new C.fH9(),q,"geometric_overlap","Geometric",B.a([B.b0(4279203438),B.b0(u)],h)),C.mW(new C.fHe(),p,"midnight_cyan","Midnight Cyan",B.a([B.b0(o),B.b0(n)],h)),C.mW(new C.fHf(),q,"diagonal_hero","Diagonal Hero",B.a([B.b0(m),B.b0(l)],h)),C.mW(new C.fHg(),v,"swot_grid","SWOT Grid",B.a([B.b0(u),B.b0(4278556265)],h)),C.mW(new C.fHh(),v,"layered_chevrons","Chevrons",B.a([B.b0(4280172719),B.b0(k)],h)),C.mW(new C.fHi(),q,"split_triangle","Split Panel",B.a([B.b0(s),B.b0(t)],h)),C.mW(new C.fHj(),v,"corporate_navy","Navy Pro",B.a([B.b0(4278982953),B.b0(4282090230)],h)),C.mW(new C.fHk(),p,"cyan_slash","Cyan Slash",B.a([B.b0(o),B.b0(4278630100)],h)),C.mW(new C.fH_(),p,"crimson_impact","Crimson",B.a([B.b0(4282714634),B.b0(4292617766)],h)),C.mW(new C.fH0(),q,"ocean_waves","Ocean Waves",B.a([B.b0(4278413729),B.b0(4286436348)],h)),C.mW(new C.fH1(),p,"mono_geometric","Mono Geo",B.a([B.b0(o),B.b0(n)],h)),C.mW(new C.fH2(),"Luxury","luxury_gold","Gold Luxe",B.a([B.b0(4280031511),B.b0(4293571336)],h)),C.mW(new C.fH3(),q,"hex_infographic","Hex Stack",B.a([B.b0(r),B.b0(4284410580)],h)),C.mW(new C.fH4(),q,"photo_banner","Photo Banner",B.a([B.b0(m),B.b0(4281908728)],h)),C.mW(new C.fH5(),v,"process_steps","Process",B.a([B.b0(s),B.b0(k)],h)),C.mW(new C.fH6(),"Minimal","grid_modern","Grid Modern",B.a([B.b0(l),B.b0(t)],h)),C.mW(new C.fH7(),"Luxury","platinum_frame","Platinum",B.a([B.b0(4282865001),B.b0(4293060848)],h)),C.mW(new C.fH8(),v,"agenda_cards","Agenda Cards",B.a([B.b0(u),B.b0(4292602622)],h)),C.mW(new C.fHa(),q,"headline_orange","Headline Orange",B.a([B.b0(j),B.b0(i)],h)),C.mW(new C.fHb(),q,"infographic_teal","Infographic",B.a([B.b0(r),B.b0(j)],h)),C.mW(new C.fHc(),q,"content_year","Year Feature",B.a([B.b0(j),B.b0(t)],h)),C.mW(new C.fHd(),q,"photo_cta","Photo CTA",B.a([B.b0(m),B.b0(i)],h))],B.ax("O<EF>"))})
 w($,"ilI","hv8",()=>B.af("^[A-Z]{2}\\d{3}$",!0,!1,!1,!1))})()};
-(a=>{a["nJIngtsBbm+k0FA9Hdw1QANRhLE="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["mzwyw0dSzpWkDLFwz3hH5tvldUg="]=a.current})($__dart_deferred_initializers__);

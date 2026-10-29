@@ -971,7 +971,7 @@ B.dVv.prototype={
 $0(){return this.a.Q=!1},
 $S:0}
 B.dVG.prototype={
-$4(d,a0,a1,a2){var x,w,v,u,t,s,r,q=null,p=C.aI(d,q,y.w).w,o=C.EK(E.Q1,!1,"\ud83c\udfae",q,new B.dVF(d),q,a2,a0,"Entertainment Hub \xb7 live","Play Zone",q),n=this.a,m=C.jI(n.bF4(),E.Q1,q,a2,D.cp,0.1,a0,a1),l=A.awl[n.d],k=l.c,j=C.Z(15,k.l()>>>16&255,k.l()>>>8&255,k.l()&255),i=C.n(12),h=C.I(C.Z(140,k.l()>>>16&255,k.l()>>>8&255,k.l()&255),D.q,1.2),g=C.nK(l.b,q,20),f=n.d===0?"Your Love Journey":l.a+" Zone",e=y.p
+$4(d,a0,a1,a2){var x,w,v,u,t,s,r,q=null,p=C.aI(d,q,y.w).w,o=C.EK(E.Q2,!1,"\ud83c\udfae",q,new B.dVF(d),q,a2,a0,"Entertainment Hub \xb7 live","Play Zone",q),n=this.a,m=C.jI(n.bF4(),E.Q2,q,a2,D.cp,0.1,a0,a1),l=A.awl[n.d],k=l.c,j=C.Z(15,k.l()>>>16&255,k.l()>>>8&255,k.l()&255),i=C.n(12),h=C.I(C.Z(140,k.l()>>>16&255,k.l()>>>8&255,k.l()&255),D.q,1.2),g=C.nK(l.b,q,20),f=n.d===0?"Your Love Journey":l.a+" Zone",e=y.p
 i=C.a([m,D.aB,C.jI(C.p(q,C.B(C.a([g,D.ab,C.d(f,q,q,q,q,q,q,C.l(q,q,k,q,q,q,q,q,q,q,q,14,q,q,D.H,q,q,!0,q,q,q,q,q,q,q,q),q,q,q)],e),D.m,q,D.b9,D.j,0,q,q),D.f,q,q,new C.o(j,q,h,i,q,q,D.n),q,q,q,q,D.jG,q,q,1/0),A.dgg,q,a2,D.bl,0.24,a0,a1),D.ac],e)
 m=n.d
 if(m===0)D.d.v(i,C.a([n.c0Z(),D.aR,n.c0X()],e))
@@ -1002,7 +1002,7 @@ D.d.v(k,C.a([D.aB,C.p(q,C.x(C.a([A.foo,D.am,C.d(x.c,q,q,q,q,q,q,D.nD,q,q,q)],e),
 if(!n.cy)m.push(n.a7Z(D.a27,D.b6,"Reveal Answer",n.gcpo()))
 else m.push(n.a7Z(D.a27,D.b6,"Next Riddle \u2192",n.gc3z()))
 i.push(new C.an(D.W,q,D.aa,D.f,C.a([j,C.p(q,C.x(m,D.m,q,D.e,D.j,0,D.p),D.f,q,q,new C.o(D.iW,q,g,h,f,q,D.n),q,q,q,q,D.vD,q,q,1/0)],e),q))}else i.push(n.bPT())
-return C.b1C(22,C.x(C.a([o,new C.dq(1,D.co,C.cd(C.x(i,D.m,q,D.e,D.j,0,D.p),D.r,q,D.y,q,D.aia,q,q,D.ah),q)],e),D.m,q,D.e,D.N,0,D.p),E.Q1,p.a.b*0.88,a2,a0,a1,this.b)},
+return C.b1C(22,C.x(C.a([o,new C.dq(1,D.co,C.cd(C.x(i,D.m,q,D.e,D.j,0,D.p),D.r,q,D.y,q,D.aia,q,q,D.ah),q)],e),D.m,q,D.e,D.N,0,D.p),E.Q2,p.a.b*0.88,a2,a0,a1,this.b)},
 $C:"$4",
 $R:4,
 $S:321}
@@ -2615,4 +2615,4 @@ A.f7w=new C.H(!0,D.c,null,null,null,null,16,D.u,null,0.5,null,null,null,null,nul
 A.fDK=new C.y("Daily Confidence Boost",null,A.f7w,null,null,null,null,null,null,null,null,null)
 A.fcH=new C.H(!0,D.c,null,null,null,null,14,D.H,null,0.8,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 A.fGE=new C.y("Love Match",null,A.fcH,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["yu9vJHhYneNFjBRpY62GQcizy/E="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["WYpeZDIabGWpKbFHXjpzY2W9JIs="]=a.current})($__dart_deferred_initializers__);

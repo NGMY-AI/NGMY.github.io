@@ -20,7 +20,7 @@ return B.bt(y.a,y.b,y.c,y.d,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,
 u(d){var y=this
 return"HSVColor("+B.u(y.a)+", "+B.u(y.b)+", "+B.u(y.c)+", "+B.u(y.d)+")"}}
 var z=a.updateTypes([]);(function inheritance(){var y=a.inherit
-y(C.mS,B.aD)})();(function constants(){D.LH=new B.w(1,0.0196078431372549,0.027450980392156862,0.047058823529411764,A.t)
+y(C.mS,B.aD)})();(function constants(){D.LI=new B.w(1,0.0196078431372549,0.027450980392156862,0.047058823529411764,A.t)
 D.amT=new B.a0(983930,"MaterialIcons",!1)
 D.aQp=new B.H(!0,A.c,null,null,null,null,10.5,A.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["Cv+GiZn5YL54xqyCDeSELenL03c="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["GzW3yBMOCwbzdi9R9H//nlWPBC0="]=a.current})($__dart_deferred_initializers__);

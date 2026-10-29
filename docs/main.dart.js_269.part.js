@@ -447,7 +447,7 @@ D=c[200]
 H=c[203]
 I=c[205]
 C.aqO.prototype={
-T(){var x=A.ze(B.M3,B.nL,B.ayw),w=A.a([],y.k),v=$.aw()
+T(){var x=A.ze(B.M4,B.nL,B.ayw),w=A.a([],y.k),v=$.aw()
 return new C.aE0(x,w,new A.as(B.as,v),new A.as(B.as,v),new A.as(B.as,v),new A.as(B.as,v),new A.as(B.as,v),new A.as(new A.bb("1",B.b5,B.aO),v),new A.as(B.as,v),new A.cs(null,y.A),null,null)}}
 C.aE0.prototype={
 Z(){var x,w=this
@@ -841,7 +841,7 @@ v=t.z
 v=v!=null?"Detected "+v+" \u2014 hold steady":"Scan any barcode or QR code"
 v=A.ao(10,A.d(v,s,s,s,s,s,s,A.l(s,s,A.Z(235,B.c.l()>>>16&255,B.c.l()>>>8&255,B.c.l()&255),s,s,s,s,s,s,s,s,12,s,s,B.a6,s,s,!0,s,s,s,s,s,s,s,s),B.L,s,s),s,s,0,0,s,s)
 u=A.nB(s,B.dB,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s)
-q.push(A.E(new A.an(B.W,s,B.b1,B.r,A.a([x,w,v,A.ao(s,A.B(A.a([A.aH(s,s,s,s,A.X(t.r?B.aks:B.akr,B.c,s,s,s,s),s,s,s,new C.elW(t),s,s,s,u,s,s),A.aH(s,s,s,s,D.bQ4,s,s,s,t.gaS_(),s,s,s,A.nB(s,B.dB,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s),s,s)],r),B.m,s,B.e,B.j,0,s,s),s,s,s,8,8,s)],r),s),5))}else q.push(A.E(new A.D(B.a9,A.x(A.a([D.bN7,B.ac,D.fGe,B.aR,A.dn(B.Oh,D.fD7,t.gaS_(),A.bn(B.aE,s,s,s,s,s,s,s,s,s,s,s))],r),B.m,s,B.b9,B.j,0,B.p),s),3))
+q.push(A.E(new A.an(B.W,s,B.b1,B.r,A.a([x,w,v,A.ao(s,A.B(A.a([A.aH(s,s,s,s,A.X(t.r?B.aks:B.akr,B.c,s,s,s,s),s,s,s,new C.elW(t),s,s,s,u,s,s),A.aH(s,s,s,s,D.bQ4,s,s,s,t.gaS_(),s,s,s,A.nB(s,B.dB,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s),s,s)],r),B.m,s,B.e,B.j,0,s,s),s,s,s,8,8,s)],r),s),5))}else q.push(A.E(new A.D(B.a9,A.x(A.a([D.bN7,B.ac,D.fGe,B.aR,A.dn(B.Oi,D.fD7,t.gaS_(),A.bn(B.aE,s,s,s,s,s,s,s,s,s,s,s))],r),B.m,s,B.b9,B.j,0,B.p),s),3))
 q.push(A.E(t.bDQ(d),5))
 return A.x(q,B.m,s,B.e,B.j,0,B.p)},
 bDQ(d){var x,w,v,u,t,s,r,q,p,o,n,m,l=this,k=null
@@ -905,13 +905,13 @@ return A.cw(w,k,B.bQ,k,k,B.ah,!1)},
 abB(d,e){var x=null
 return new A.D(B.eI,A.B(A.a([new A.a7(72,x,A.d(d,x,x,x,x,x,x,A.l(x,x,A.Z(115,B.c.l()>>>16&255,B.c.l()>>>8&255,B.c.l()&255),x,x,x,x,x,x,x,x,12,x,x,B.P,x,x,!0,x,x,x,x,x,x,x,x),x,x,x),x),A.E(A.d(e,x,x,x,x,x,x,B.a8h,x,x,x),1)],y.p),B.F,x,B.e,B.j,0,x,x),x)},
 bD2(d){var x=this,w=null,v=x.gaye(),u=A.d("Create & QR designer",w,w,w,w,w,w,A.l(w,w,A.Z(140,B.c.l()>>>16&255,B.c.l()>>>8&255,B.c.l()&255),w,w,w,w,w,w,w,w,11,w,w,B.H,w,w,!0,w,1.2,w,w,w,w,w,w),w,w,w),t=x.ax6("Product name",x.ch,new C.elG(x)),s=y.p,r=A.B(A.a([A.E(x.ax6("Barcode / UPC",x.CW,new C.elH(x)),1),B.ab,A.HJ(D.bR1,new C.elI(x),A.nB(w,B.aE,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w),w)],s),B.m,w,B.e,B.j,0,w,w),q=A.B(A.a([A.E(x.c8j("Product type",x.cx,"e.g. Grocery, Electronics",new C.elK(x)),1),B.ab,A.E(x.c8k("Price ($)",x.db,B.dO,new C.elL(x)),1)],s),B.m,w,B.e,B.j,0,w,w),p=A.B(A.a([A.E(x.c8m("Stock qty",x.dx,"How many in store",B.dO,new C.elM(x)),1),B.ab,A.E(x.ax6("Brand (optional)",x.cy,new C.elN(x)),1)],s),B.m,w,B.e,B.j,0,w,w),o=x.c8l("Notes",x.dy,2,new C.elO(x))
-u=A.a([u,B.O,t,B.O,r,B.O,q,B.O,p,B.O,o,B.ac,A.dn(B.Og,A.d(x.fr==null?"Save to device":"Update on device",w,w,w,w,w,w,w,w,w,w),x.gcqs(),A.bn(B.aV,w,w,w,w,B.ly,w,w,w,w,w,w))],s)
+u=A.a([u,B.O,t,B.O,r,B.O,q,B.O,p,B.O,o,B.ac,A.dn(B.Oh,A.d(x.fr==null?"Save to device":"Update on device",w,w,w,w,w,w,w,w,w,w),x.gcqs(),A.bn(B.aV,w,w,w,w,B.ly,w,w,w,w,w,w))],s)
 if(v!=null){t=A.d("Price in center \xb7 NGMY logo \xb7 gold corner rings",w,w,w,w,w,w,A.l(w,w,A.Z(115,B.c.l()>>>16&255,B.c.l()>>>8&255,B.c.l()&255),w,w,w,w,w,w,w,w,11,w,w,w,w,w,!0,w,w,w,w,w,w,w,w),B.L,w,w)
 r=A.av(new A.ex(new C.arf(v.gani(),v.f,!0,w),x.fx),w,w,w)
 q=x.fy
 p=q?w:new C.elP(x,v)
 q=q?B.Tp:B.yI
-p=A.E(A.eA(q,B.Jz,p,A.dg(w,w,w,w,w,w,w,w,w,B.aV,w,w,w,w,w,new A.az(A.Z(140,B.aV.l()>>>16&255,B.aV.l()>>>8&255,B.aV.l()&255),1,B.q,-1),w,w,w,w)),1)
+p=A.E(A.eA(q,B.JA,p,A.dg(w,w,w,w,w,w,w,w,w,B.aV,w,w,w,w,w,new A.az(A.Z(140,B.aV.l()>>>16&255,B.aV.l()>>>8&255,B.aV.l()&255),1,B.q,-1),w,w,w,w)),1)
 q=x.fy?w:new C.elQ(x,v)
 q=A.E(A.dn(B.ao5,B.pn,q,A.bn(B.aV,w,w,w,w,w,w,w,w,w,w,w)),1)
 o=x.fy?w:new C.elR(x,v)
@@ -1347,4 +1347,4 @@ D.fA5=new A.y("Product Scanner",null,B.cC,null,null,null,null,null,null,null,nul
 D.fD7=new A.y("Enter barcode",null,null,null,null,null,null,null,null,null,null,null)
 D.fFy=new A.y("Store QR code",null,B.nD,null,null,null,null,null,null,null,null,null)
 D.fGe=new A.y("Camera scan works on the NGMY phone app.\nOn desktop web, enter the barcode below.",null,B.aR9,null,B.L,null,null,null,null,null,null,null)})()};
-(a=>{a["telLTh806WB3dmcrmnLvw1PkQO4="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["212xycjZj5WcGl5PkkvIoPuLQ9w="]=a.current})($__dart_deferred_initializers__);
