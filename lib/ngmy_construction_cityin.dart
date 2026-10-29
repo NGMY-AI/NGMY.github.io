@@ -109,7 +109,7 @@ class CityInterior {
     build(_cm);
   }
 
-  static const double w = 300, d = 210, h = 120;
+  static const double w = 300, d = 320, h = 140;
   late final WorldWalker walker;
   late final List<_Zone> _zones;
   late Scene3D scene;
@@ -156,7 +156,7 @@ class CityInterior {
       };
 
   /// You walked to the front edge, onto the door mat.
-  bool get leaving => walker.z > d - 12 && walker.x.abs() < 36;
+  bool get leaving => walker.z > d - 12 && walker.x.abs() < 36 && !(isTower && level > 1);
 
   /// Does what the place under the person's feet asks for. Returns what happened, or null.
   String? update(Community? cm) {
@@ -332,8 +332,13 @@ class CityInterior {
     }
     // The way out.
     b.order = 1;
-    b.box(const V3(0, 0.3, d - 6), const V3(60, 0.4, 12), const Color(0xFF16A34A));
-    labels.add(const Label3D(V3(0, 26, d - 8), '⬇ Walk here to go out', Color(0xFF15803D)));
+    // The way out is on the ground floor only: from the other levels you go down in the elevator.
+    if (isTower && level > 1) {
+      labels.add(const Label3D(V3(0, 26, d - 8), '🛗 Take the elevator down to go out', Color(0xFF0369A1)));
+    } else {
+      b.box(const V3(0, 0.3, d - 6), const V3(60, 0.4, 12), const Color(0xFF16A34A));
+      labels.add(const Label3D(V3(0, 26, d - 8), '⬇ Walk here to go out', Color(0xFF15803D)));
+    }
     if (cm != null) labels.add(Label3D(const V3(0, h - 14, 4), '⭐ ${cm.points}   🍞 ${cm.food}   💊 ${cm.medicine}${carrying != null ? '   📦 carrying' : ''}', const Color(0xFF0F172A)));
     final tv = <ScreenQuad>[];
     if (isTower) {

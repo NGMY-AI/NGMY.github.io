@@ -172,4 +172,21 @@ void main() {
     expect(hits.pick(const Offset(112, 130)), 11, reason: 'a finger width beside the wire');
     expect(hits.pick(const Offset(300, 300)), 1, reason: 'far from it the wall is picked');
   });
+  test('the way out of a tower is on the ground floor only: the upper levels have no exit mat', () {
+    final city = HomeProject(seed: 4).rooms[11];
+    final tower = city.furn.firstWhere((f) => f.kind == 'tower');
+    final inn = CityInterior('tower', tower)..build(null);
+    inn.walker
+      ..x = 0
+      ..z = CityInterior.d - 6;
+    expect(inn.leaving, isTrue, reason: 'the lobby has the way out');
+    expect(inn.scene.labels.any((l) => l.text.contains('go out')), isTrue);
+    inn.goToLevel(4, darkHere: false);
+    inn.walker
+      ..x = 0
+      ..z = CityInterior.d - 6;
+    expect(inn.leaving, isFalse, reason: 'no way out from level 4');
+    expect(inn.scene.labels.any((l) => l.text.contains('Walk here to go out')), isFalse);
+    expect(inn.scene.labels.any((l) => l.text.contains('elevator down')), isTrue);
+  });
 }

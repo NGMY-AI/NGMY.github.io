@@ -2,6 +2,7 @@ import 'dart:async';
 import 'ngmy_city_traffic.dart';
 import 'ngmy_city_delivery.dart';
 import 'ngmy_city_needs.dart';
+import 'ngmy_frame_loop.dart';
 import 'ngmy_city_uber.dart';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -1132,7 +1133,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   // ── The ride in the elevator: walk in, the doors close, the numbers climb, the doors open and you walk out ──
 
   _Ride? _ride;
-  Timer? _rideTimer;
+  FrameLoop? _rideTimer;
   CityInterior? _lobby;
   final ValueNotifier<String> _rideLabel = ValueNotifier('');
 
@@ -1155,7 +1156,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     cam.glideTo(target: const V3(0, 40, 45), dist: 175, yaw: 0.0, pitch: 0.28);
     _say('Going to level $n: walking to the elevator.', ok: true);
     _rideTimer?.cancel();
-    _rideTimer = Timer.periodic(const Duration(milliseconds: 33), (_) => _rideTick());
+    _rideTimer = FrameLoop(_rideTick)..start();
   }
 
   double _ease(double k) {
@@ -1360,7 +1361,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   bool _droneOn = false;
   bool _cardDrone = false;
-  Timer? _droneTimer;
+  FrameLoop? _droneTimer;
   List<DroneLeg> _legs = const [];
   int _legIx = 0;
   int _legStartMs = 0;
@@ -1402,7 +1403,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       ..setFree(true);
     _nextLeg();
     _droneTimer?.cancel();
-    _droneTimer = Timer.periodic(const Duration(milliseconds: 33), (_) => _droneTick());
+    _droneTimer = FrameLoop(_droneTick)..start();
   }
 
   void _nextLeg() {
@@ -2338,7 +2339,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   /// Walking about outside with the arrows: the person you steer, how it is going, and the arrows held (sideways, forward).
   bool steer = false;
   WorldWalker? walker;
-  Timer? _walkTimer;
+  FrameLoop? _walkTimer;
   double _inX = 0, _inZ = 0;
   int _lastWalkMs = 0;
 
@@ -2389,7 +2390,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     steer = true;
     _lastWalkMs = DateTime.now().millisecondsSinceEpoch;
     _walkTimer?.cancel();
-    _walkTimer = Timer.periodic(const Duration(milliseconds: 40), (_) => _walkTick());
+    _walkTimer = FrameLoop(_walkTick, testEvery: const Duration(milliseconds: 40))..start();
     setState(() {});
     _say('Slide the round stick to walk. Walk up to a door to go in: the house, the hospital or the shop. Double tap a spot to go there.');
   }
@@ -2443,7 +2444,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     final tiredMsg = counting ? needs.tick(dt, walking: moved && _driving == null, driving: moved && _driving != null) : null;
     if (tiredMsg != null) _say(tiredMsg, ok: false);
     _takePenalty();
-    if (moved || w.lift > 0) cam.glideTo(target: V3(w.x, 30, w.z));
+    if (moved || w.lift > 0) cam.follow(V3(w.x, 30, w.z));
     if (inn != null) {
       inn.carrying = _carrying;
       final said = inn.update(comm);
@@ -2478,6 +2479,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         }
       }
       if (inn.leaving) _leaveBuilding();
+      if (!_onBalcony && _ride == null) _keepCamInside();
       return;
     }
     if (inn == null && _driving == null && _boardMaybe?.active != null) _deliveryEvent(_boardMaybe!.updatePlayer(w.x, w.z, now));
@@ -2500,6 +2502,22 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       }
     }
     _updateAct(w);
+  }
+
+  /// Inside a building the camera stays inside the walls, so turning round never shows a wall from behind (black) or the outside.
+  void _keepCamInside() {
+    final hw = CityInterior.w / 2 - 10, z0 = 12.0, z1 = CityInterior.d - 10, top = CityInterior.h - 8;
+    final before = cam.dist;
+    for (var i = 0; i < 40; i++) {
+      final cp = math.cos(cam.pitch), sp = math.sin(cam.pitch);
+      final ex = cam.target.x - cam.dist * cp * math.sin(cam.yaw);
+      final ez = cam.target.z + cam.dist * cp * math.cos(cam.yaw);
+      final ey = cam.target.y + cam.dist * sp;
+      if (ex.abs() <= hw && ez >= z0 && ez <= z1 && ey <= top) break;
+      if (cam.dist <= cam.minDist) break;
+      cam.dist = math.max(cam.minDist, cam.dist * 0.93);
+    }
+    if (cam.dist != before) cam.glideTo(dist: cam.dist);
   }
 
   void _enterBuilding(Furn f) {
@@ -3180,6 +3198,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (!mounted) return;
     setState(_rebuild);
     if (r.lessonDone) {
+      comm?.points += 10;
       _say(switch (r.lesson) {
         'switch' => 'Done! Tap the switch on the wall: the light comes on.',
         'fan' => 'Done! Tap the wall switch and the fan spins.',
@@ -3193,10 +3212,12 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   Future<void> _wireExtra(int i) async {
     final e = room.extras[i];
+    final was = e.done;
     await _pushPage(MaterialPageRoute<void>(builder: (_) => ElectricalLessonPage(id: e.kind, state: e.state)));
     if (!mounted) return;
     setState(_rebuild);
-    if (e.done) _say('Wired! ${e.kind == 'switch' ? 'Tap it to turn the light on and off.' : 'Tap it to plug something in.'}');
+    if (e.done && !was) comm?.points += 8;
+    if (e.done) _say('Wired! ${was ? '' : 'You are paid 8 stars. '}${e.kind == 'switch' ? 'Tap it to turn the light on and off.' : 'Tap it to plug something in.'}');
   }
 
   Future<void> _openWiring() async {
@@ -3209,10 +3230,16 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       r.wiring = np;
     }
     r.wiring!.practice = home.practice;
+    final wasWired = r.wired;
     await _pushPage(MaterialPageRoute<void>(builder: (_) => NgmyRoomProjectPage(project: r.wiring)));
     if (!mounted) return;
     setState(_rebuild);
-    if (r.wired) _say('${r.name}: the wiring is finished. The light has power.');
+    if (r.wired && !wasWired) {
+      comm?.points += 20;
+      _say('${r.name}: the wiring is finished and the light has power. You are paid 20 stars!', ok: true);
+    } else if (r.wired) {
+      _say('${r.name}: the wiring is finished. The light has power.');
+    }
   }
 
   Future<void> _openPlumbing() async {
@@ -3224,10 +3251,16 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     r.plumb ??= PlumbJob(seed: home.seed * 41 + r.id, variantId: r.kind == 'kitchen' ? 'kitchen' : 'bathroom');
     if (!r.plumbNeeded && !r.plumb!.allPlaced) r.plumb!.completeAll();
     r.plumb!.practice = home.practice;
+    final wasPlumbed = r.plumbed;
     await _pushPage(MaterialPageRoute<void>(builder: (_) => NgmyPlumbJobPage(job: r.plumb)));
     if (!mounted) return;
     setState(_rebuild);
-    if (r.plumbed) _say('${r.name}: the plumbing is finished and nothing leaks.');
+    if (r.plumbed && !wasPlumbed) {
+      comm?.points += 20;
+      _say('${r.name}: the plumbing is finished and nothing leaks. You are paid 20 stars!', ok: true);
+    } else if (r.plumbed) {
+      _say('${r.name}: the plumbing is finished and nothing leaks.');
+    }
   }
 
   // ── Adding things ──

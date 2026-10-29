@@ -354,6 +354,13 @@ class Cam3 extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The camera sticks to [t] (a person who walks): no chasing, so the person never wobbles against the picture.
+  void follow(V3 t) {
+    _toTarget = null;
+    target = t;
+    notifyListeners();
+  }
+
   /// Sets the view straight away (a drone flight moves it a little every frame).
   void setView({required V3 target, required double dist, required double yaw, required double pitch}) {
     _toTarget = null;
