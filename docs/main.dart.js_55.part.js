@@ -1,6 +1,6 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var J,A,C,B={
-h7l(d){var x,w,v
+h7r(d){var x,w,v
 if(C.a.i(d).length===0)return A.a([],y.e)
 try{x=C.S.aI(0,d,null)
 if(!y.i.b(x)){w=A.a([],y.e)
@@ -17,19 +17,19 @@ return A.b(A.az(),$async$CF)
 case 3:u=f
 t=C.a.i(d)
 t=A.aU(J.q(u.a,"ngmy_bios_v1_"+t.toLowerCase()))
-v=B.h7l(t==null?"":t)
+v=B.h7r(t==null?"":t)
 x=1
 break
 case 1:return A.h(v,w)}})
 return A.i($async$CF,w)},
-agv(d,e){return B.i2s(d,e)},
-i2s(d,e){var x=0,w=A.j(y.t),v,u=2,t=[],s,r,q,p
-var $async$agv=A.e(function(f,g){if(f===1){t.push(g)
+agy(d,e){return B.i2y(d,e)},
+i2y(d,e){var x=0,w=A.j(y.t),v,u=2,t=[],s,r,q,p
+var $async$agy=A.e(function(f,g){if(f===1){t.push(g)
 x=u}for(;;)switch(x){case 0:u=4
 x=7
-return A.b(A.f5(d,null,!1,e),$async$agv)
+return A.b(A.f5(d,null,!1,e),$async$agy)
 case 7:s=g
-v=new A.aF9(!0,s)
+v=new A.aFb(!0,s)
 x=1
 break
 u=2
@@ -39,7 +39,7 @@ case 4:u=3
 p=t.pop()
 r=A.aa(p)
 $.am.$1("[ngmy_settings] relay status GET "+d+": "+A.t(r))
-v=D.eAB
+v=D.eAC
 x=1
 break
 x=6
@@ -48,15 +48,15 @@ case 3:x=2
 break
 case 6:case 1:return A.h(v,w)
 case 2:return A.f(t.at(-1),w)}})
-return A.i($async$agv,w)},
-aON(d){var x=0,w=A.j(y.C),v,u=2,t=[],s,r,q,p,o
-var $async$aON=A.e(function(e,f){if(e===1){t.push(f)
+return A.i($async$agy,w)},
+aOP(d){var x=0,w=A.j(y.C),v,u=2,t=[],s,r,q,p,o
+var $async$aOP=A.e(function(e,f){if(e===1){t.push(f)
 x=u}for(;;)switch(x){case 0:p=C.a.i(d)
 if(J.ad(p)===0){v=!1
 x=1
 break}u=4
 x=7
-return A.b(E.bBk(p,C.cH),$async$aON)
+return A.b(E.bBl(p,C.cH),$async$aOP)
 case 7:r=f
 v=r
 x=1
@@ -77,7 +77,7 @@ case 3:x=2
 break
 case 6:case 1:return A.h(v,w)
 case 2:return A.f(t.at(-1),w)}})
-return A.i($async$aON,w)}},D,E
+return A.i($async$aOP,w)}},D,E
 J=c[1]
 A=c[0]
 C=c[2]
@@ -88,10 +88,10 @@ var z=a.updateTypes([])
 B.bZT.prototype={
 $1(d){return A.vM(A.a2(d,y.w,y.b))},
 $S:1914};(function inheritance(){var x=a.inherit
-x(B.bZT,A.hU)})()
-var y={e:A.ax("O<iw>"),s:A.ax("ai<iw>"),i:A.ax("ai<@>"),B:A.ax("a5<@,@>"),k:A.ax("iw"),t:A.ax("+reachable,value(R,a5<n,@>?)"),w:A.ax("n"),C:A.ax("R"),b:A.ax("@")};(function constants(){D.abM=new A.fj(null,null,null,null,null,C.bj,null,null,null,null)
+x(B.bZT,A.hV)})()
+var y={e:A.ax("O<iw>"),s:A.ax("ai<iw>"),i:A.ax("ai<@>"),B:A.ax("a5<@,@>"),k:A.ax("iw"),t:A.ax("+reachable,value(R,a5<n,@>?)"),w:A.ax("n"),C:A.ax("R"),b:A.ax("@")};(function constants(){D.abM=new A.fj(null,null,null,null,null,C.bk,null,null,null,null)
 D.VG=new A.cp(C.A,null,null,D.abM,null)
 D.YZ=new A.Q(4,4,12,0)
 D.alI=new A.a0(983410,"MaterialIcons",!0)
-D.eAB=new A.aF9(!1,null)})()};
-(a=>{a["hrw5oPC7GufhzALGfrmfy6dmeto="]=a.current})($__dart_deferred_initializers__);
+D.eAC=new A.aFb(!1,null)})()};
+(a=>{a["/P4YrQB9FgP2VUT6/+Nfisg/iV8="]=a.current})($__dart_deferred_initializers__);
