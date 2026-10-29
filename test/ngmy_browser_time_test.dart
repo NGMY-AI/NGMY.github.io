@@ -15,7 +15,7 @@ void main() {
   });
   tearDown(() {
     NgmyBrowserTime.clock = DateTime.now;
-    NgmyBrowserTime.paywallTest = true;
+    NgmyBrowserTime.paywallTest = false;
   });
 
   test('10 free minutes of browser time, counted quietly, and then the payment is needed', () async {

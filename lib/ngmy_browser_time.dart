@@ -30,7 +30,7 @@ class NgmyBrowserTime {
 
   /// TEST SWITCH. While it is true nobody gets free browser time and admins are asked to pay too, so the payment pop-up
   /// can be tried straight away. Set it to false to bring back the 10 free minutes (and no limit for admins).
-  static bool paywallTest = true;
+  static bool paywallTest = false;
 
   /// Admins are never asked to pay (except while [paywallTest] is on).
   static bool adminExempt(bool isAdmin) => isAdmin && !paywallTest;
@@ -150,7 +150,7 @@ class NgmyBrowserTime {
       email: email,
       title: 'NGMY Browser',
       message: waiting
-          ? 'Your Cash App payment is being checked. Your 2 hours start as soon as an admin approves it.'
+          ? 'Your payment was received. Your 2 hours of browser time will be ready in a moment.'
           : 'Your browser time is up. \$${price.toStringAsFixed(2)} gives you 2 more hours: use them within a week, and what is left stays here when you close the browser.',
       extraLabel: 'Pay with Cash App',
       onExtra: () => _payCashApp(root, email, config),
@@ -191,7 +191,7 @@ class NgmyBrowserTime {
       },
     );
     if (res != null && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment sent. An admin will check it, and your 2 hours start as soon as it is approved.')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Your payment was sent. Thank you!')));
     }
   }
 }
