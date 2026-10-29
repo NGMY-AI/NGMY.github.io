@@ -301,22 +301,22 @@ List<V3> smoothPath(List<V3> pts, {int per = 6}) {
 
 class Cam3 extends ChangeNotifier {
   /// Which way a swipe turns the view. The two small buttons next to the zoom buttons flip them, and the choice is remembered.
-  static bool invertX = true, invertY = false;
+  static bool invertX = false, invertY = true;
   static bool _prefsRead = false;
 
   static void loadPrefs() {
     if (_prefsRead) return;
     _prefsRead = true;
     SharedPreferences.getInstance().then((p) {
-      invertX = p.getBool('ngmy_swipe_invert_x2') ?? true;
-      invertY = p.getBool('ngmy_swipe_invert_y') ?? false;
+      invertX = p.getBool('ngmy_swipe_x3') ?? false;
+      invertY = p.getBool('ngmy_swipe_y3') ?? true;
     }).catchError((_) {});
   }
 
   static void savePrefs() {
     SharedPreferences.getInstance().then((p) {
-      p.setBool('ngmy_swipe_invert_x2', invertX);
-      p.setBool('ngmy_swipe_invert_y', invertY);
+      p.setBool('ngmy_swipe_x3', invertX);
+      p.setBool('ngmy_swipe_y3', invertY);
     }).catchError((_) {});
   }
 

@@ -25,8 +25,8 @@ const int idHOutletA = 700, idHOutletB = 701, idHSwitch = 702, idHLight = 703;
 const int idHResident = 900; // + the resident's number: a person who lives in the house
 const int idHApp = 720; // + 0 or 1 (or 2 and up for added outlets): what is plugged in
 const int idHWallTv = 730;
-const int idHCam = 1500; // + 0 to 3: the cameras in the corners of the hall
-const int idHTag = 1100; // + a furniture number: the red tag over a dark house or a street light that is out
+const int idHCam = 19000; // + 0 to 3: the cameras in the corners of the hall
+const int idHTag = 20000; // + a furniture number: the red tag over a dark house or a street light that is out
 const int idHExtra = 800; // + number: an outlet or switch the visitor added
 const int idHToiletF = 710, idHSinkF = 711, idHTubF = 712, idHKSink = 713;
 
@@ -99,6 +99,44 @@ void paintNgmyMedallion(Canvas c, Size s, double t) {
     tp.paint(c, mid - Offset(tp.width / 2, tp.height / 2));
   }
 }
+
+/// A big NGMY sign: the logo on a gold disc on the left, the first line in white and the second in gold. For the town signs, the company and the stores.
+void paintNgmySign(Canvas c, Size s, double t, String line1, String line2) {
+  final r = Offset.zero & s;
+  const gold = Color(0xFFF5C14B);
+  c.drawRRect(RRect.fromRectAndRadius(r, Radius.circular(s.shortestSide * 0.08)), Paint()..shader = const LinearGradient(begin: Alignment.centerLeft, end: Alignment.centerRight, colors: [Color(0xFF0B1F4B), Color(0xFF1E4FA3), Color(0xFF0B1F4B)]).createShader(r));
+  c.drawRRect(RRect.fromRectAndRadius(r.deflate(s.shortestSide * 0.045), Radius.circular(s.shortestSide * 0.06)), Paint()
+    ..style = PaintingStyle.stroke
+    ..color = gold
+    ..strokeWidth = s.shortestSide * 0.035);
+  final rad = s.height * 0.33;
+  final mid = Offset(s.height * 0.6, s.height * 0.5);
+  c.drawCircle(mid, rad, Paint()..color = gold);
+  c.drawCircle(mid, rad * 0.88, Paint()..color = const Color(0xFFFDFCF7));
+  final img = NgmyLogo.image;
+  final box = Rect.fromCenter(center: mid, width: rad * 1.4, height: rad * 1.15);
+  if (img != null) {
+    final k = math.min(box.width / img.width, box.height / img.height);
+    c.drawImageRect(img, Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()), Rect.fromCenter(center: box.center, width: img.width * k, height: img.height * k), Paint()..filterQuality = FilterQuality.medium);
+  } else {
+    final tp = TextPainter(text: TextSpan(text: 'NGMY', style: TextStyle(color: const Color(0xFF0B1F4B), fontSize: rad * 0.55, fontWeight: FontWeight.w900)), textDirection: TextDirection.ltr)..layout();
+    tp.paint(c, mid - Offset(tp.width / 2, tp.height / 2));
+  }
+  final left = s.height * 1.08, maxW = s.width - left - s.height * 0.2;
+  void line(String text, double size, Color col, double y) {
+    var tp = TextPainter(text: TextSpan(text: text, style: TextStyle(color: col, fontSize: size, fontWeight: FontWeight.w900, letterSpacing: size * 0.05)), textDirection: TextDirection.ltr, maxLines: 1)..layout();
+    if (tp.width > maxW) {
+      tp = TextPainter(text: TextSpan(text: text, style: TextStyle(color: col, fontSize: size * maxW / tp.width, fontWeight: FontWeight.w900, letterSpacing: size * 0.05)), textDirection: TextDirection.ltr, maxLines: 1)..layout();
+    }
+    tp.paint(c, Offset(left + maxW / 2 - tp.width / 2, y));
+  }
+
+  line(line1, s.height * 0.36, Colors.white, s.height * 0.16);
+  line(line2, s.height * 0.14, gold, s.height * 0.62);
+}
+
+/// How tall a downtown tower is (they differ by their colour).
+double _towerHeight(Color c) => 210.0 + (c.toARGB32() % 5) * 24.0;
 
 /// A framed NGMY poster for the outside walls of the house. [variant] 0 is the wide one for the back wall, 1 and 2 are for the sides.
 void paintNgmyPoster(Canvas c, Size s, double t, int variant) {
@@ -770,7 +808,7 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
   }
   // The ads: on every billboard, and on two big TVs in the front of every big house.
   final adScreens = <ScreenQuad>[];
-  for (final f in r.furn.where((f) => f.kind == 'billboard' || f.kind == 'bighouse')) {
+  for (final f in r.furn.where((f) => const {'billboard', 'bighouse', 'townsign', 'cornersign', 'tower', 'hq', 'store', 'gasstation'}.contains(f.kind))) {
     final rr = f.rot * math.pi / 2;
     V3 w(double x, double y, double z) => rotY(V3(x, y, z), rr) + V3(f.x, 0, f.z);
     final grp = furnGroup[f.id] ?? 0;
@@ -778,6 +816,24 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
       // One face on the front and one on the back, so it reads the right way up from both sides.
       adScreens.add(ScreenQuad([w(-33, 62.5, 2), w(33, 62.5, 2), w(33, 31.5, 2), w(-33, 31.5, 2)], 0, (c, size, t) => paintCityAd(c, size, t, f.id), width: 960, height: 450, bias: 4, order: 2, group: grp));
       adScreens.add(ScreenQuad([w(33, 62.5, -2), w(-33, 62.5, -2), w(-33, 31.5, -2), w(33, 31.5, -2)], 0, (c, size, t) => paintCityAd(c, size, t, f.id), width: 960, height: 450, bias: 4, order: 2, group: grp));
+    } else if (f.kind == 'townsign' || f.kind == 'cornersign') {
+      // Both faces, each one the right way up: the biggest billboard in the city and the one at each corner.
+      final big = f.kind == 'townsign';
+      final hw = big ? 178.0 : 71.0, hh = big ? 57.0 : 31.0, cy = big ? 252.0 : 122.0, zz = big ? 3.6 : 3.0;
+      final l2 = big ? 'Welcome to NGMY City · New Global Movement for Youth' : 'Welcome to NGMY City';
+      final px = big ? 1400.0 : 700.0, py = big ? 450.0 : 300.0;
+      adScreens.add(ScreenQuad([w(-hw, cy + hh, zz), w(hw, cy + hh, zz), w(hw, cy - hh, zz), w(-hw, cy - hh, zz)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY TOWN', l2), width: px, height: py, bias: 4, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(hw, cy + hh, -zz), w(-hw, cy + hh, -zz), w(-hw, cy - hh, -zz), w(hw, cy - hh, -zz)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY TOWN', l2), width: px, height: py, bias: 4, order: 2, group: grp));
+    } else if (f.kind == 'tower') {
+      final hgt = _towerHeight(kFurnColors[f.color]);
+      adScreens.add(ScreenQuad([w(-38, hgt - 10, 35.9), w(38, hgt - 10, 35.9), w(38, hgt - 44, 35.9), w(-38, hgt - 44, 35.9)], 0, (c, size, t) => paintCityAd(c, size, t, f.id), width: 760, height: 340, bias: 8, order: 2, group: grp));
+    } else if (f.kind == 'hq') {
+      adScreens.add(ScreenQuad([w(-70, 108, 45.9), w(70, 108, 45.9), w(70, 52, 45.9), w(-70, 52, 45.9)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY COMPANY', 'Building the movement'), width: 1000, height: 400, bias: 8, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(-48, 215, 30.2), w(48, 215, 30.2), w(48, 175, 30.2), w(-48, 175, 30.2)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY', 'New Global Movement for Youth'), width: 900, height: 380, bias: 8, order: 2, group: grp));
+    } else if (f.kind == 'store') {
+      adScreens.add(ScreenQuad([w(-54, 85, 37.7), w(54, 85, 37.7), w(54, 67, 37.7), w(-54, 67, 37.7)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY STORE', 'Everything you need'), width: 900, height: 150, bias: 6, order: 2, group: grp));
+    } else if (f.kind == 'gasstation') {
+      adScreens.add(ScreenQuad([w(-86, 107, 35.7), w(-54, 107, 35.7), w(-54, 85, 35.7), w(-86, 85, 35.7)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY GAS', 'Open 24 hours'), width: 480, height: 330, bias: 6, order: 2, group: grp));
     } else {
       for (var k = 0; k < 2; k++) {
         final cx = k == 0 ? -40.0 : 40.0;
@@ -991,6 +1047,13 @@ void _building(MeshBuilder b, String kind, Color accent) {
 /// right and front, a T-junction left, right and front, and crossroads all four; turning it moves the joins. Because roads
 /// snap to the grid, neighbours always line up and the line carries on from one piece to the next.
 void _roadPiece(MeshBuilder b, String kind) {
+  // A plain straight piece is two flat faces (the road and its line): there are hundreds of them.
+  if (kind == 'road') {
+    const up = V3(0, 1, 0);
+    b.quad(const V3(-20, 0.6, -20), const V3(20, 0.6, -20), const V3(20, 0.6, 20), const V3(-20, 0.6, 20), const Color(0xFF3F4450), normal: up);
+    b.quad(const V3(-7, 0.8, -0.8), const V3(7, 0.8, -0.8), const V3(7, 0.8, 0.8), const V3(-7, 0.8, 0.8), const Color(0xFFF3E7A1), normal: up);
+    return;
+  }
   b.box(const V3(0, 0.3, 0), const V3(40, 0.6, 40), const Color(0xFF3F4450));
   if (kind != 'road') {
     b.box(const V3(0, 0.62, 19.2), const V3(40, 0.12, 1.2), const Color(0xFF6B7280));
@@ -1434,6 +1497,68 @@ void _furniture(MeshBuilder b, String kind, Color c) {
         b.box(const V3(0, 47, 0), const V3(72, 32, 3), const Color(0xFF1F2937), shine: 0.3);
         b.endGroup();
       }
+    case 'tower' || 'hq':
+      {
+        final big = kind == 'hq';
+        final bw = big ? 170.0 : 100.0, bd = big ? 90.0 : 70.0;
+        final hgt = big ? 150.0 : _towerHeight(c);
+        const bodies = [Color(0xFF3B5B7A), Color(0xFF475569), Color(0xFF2F4F4F), Color(0xFF5B6B8C), Color(0xFF6B7280), Color(0xFF334155)];
+        final body = big ? const Color(0xFFE5E7EB) : bodies[(c.toARGB32() >> 4) % bodies.length];
+        const glass = Color(0xFF9BD3F5);
+        void bands(double bwid, double bdep, double y0, double y1) {
+          for (var y = y0; y < y1; y += 22) {
+            _patch(b, V3(0, y, bdep / 2 + 0.2), const V3(1, 0, 0), const V3(0, 1, 0), bwid - 8, 9, glass, const V3(0, 0, 1), shine: 0.6);
+            _patch(b, V3(0, y, -bdep / 2 - 0.2), const V3(-1, 0, 0), const V3(0, 1, 0), bwid - 8, 9, glass, const V3(0, 0, -1), shine: 0.6);
+            _patch(b, V3(bwid / 2 + 0.2, y, 0), const V3(0, 0, -1), const V3(0, 1, 0), bdep - 8, 9, glass, const V3(1, 0, 0), shine: 0.6);
+            _patch(b, V3(-bwid / 2 - 0.2, y, 0), const V3(0, 0, 1), const V3(0, 1, 0), bdep - 8, 9, glass, const V3(-1, 0, 0), shine: 0.6);
+          }
+        }
+
+        b.box(V3(0, hgt / 2, 0), V3(bw, hgt, bd), body, shine: 0.25);
+        bands(bw, bd, 20, hgt - 8);
+        if (big) {
+          b.box(V3(0, hgt + 60, 0), V3(bw * 0.66, 120, bd * 0.66), const Color(0xFFF1F5F9), shine: 0.25);
+          bands(bw * 0.66, bd * 0.66, hgt + 16, hgt + 112);
+          b.box(V3(0, hgt + 124, 0), V3(bw * 0.7, 8, bd * 0.7), const Color(0xFFF5C14B), shine: 0.4);
+        } else {
+          b.box(V3(0, hgt + 3, 0), V3(bw + 4, 6, bd + 4), const Color(0xFF1F2937));
+          b.box(V3(bw * 0.2, hgt + 12, 0), V3(bw * 0.3, 12, bd * 0.3), const Color(0xFF9CA3AF));
+        }
+      }
+    case 'store':
+      b.box(const V3(0, 28, 0), const V3(130, 56, 80), c, shine: 0.2);
+      b.box(const V3(0, 58, 0), const V3(134, 4, 84), const Color(0xFF1F2937));
+      _patch(b, const V3(0, 24, 40.2), const V3(1, 0, 0), const V3(0, 1, 0), 112, 30, const Color(0xFF9BD3F5), const V3(0, 0, 1), shine: 0.6);
+      b.box(const V3(0, 44, 46), const V3(130, 4, 14), const Color(0xFFDC2626));
+      b.box(const V3(0, 76, 36), const V3(112, 22, 3), const Color(0xFF111827));
+    case 'gasstation':
+      for (final x in const [-55.0, 55.0]) {
+        for (final z in const [5.0, 35.0]) {
+          b.cyl(V3(x, 0, z), V3(x, 46, z), 2.4, const Color(0xFFE5E7EB), sides: 6);
+        }
+      }
+      b.box(const V3(0, 48, 20), const V3(130, 5, 50), const Color(0xFFDC2626), shine: 0.3);
+      b.box(const V3(0, 51.5, 20), const V3(132, 2, 52), const Color(0xFFF5C14B));
+      for (final x in const [-22.0, 22.0]) {
+        b.box(V3(x, 9, 20), const V3(7, 18, 10), const Color(0xFFF3F4F6), shine: 0.3);
+        b.box(V3(x, 15, 20.2), const V3(7.4, 6, 10.4), const Color(0xFFDC2626));
+      }
+      b.box(const V3(0, 19, -30), const V3(80, 38, 26), c, shine: 0.2);
+      b.cyl(const V3(-70, 0, 34), const V3(-70, 95, 34), 2.2, const Color(0xFF3F3F46), sides: 6);
+      b.box(const V3(-70, 96, 34), const V3(34, 22, 3), const Color(0xFF111827));
+    case 'townsign':
+      for (final x in const [-178.0, 178.0]) {
+        b.cyl(V3(x, 0, 0), V3(x, 316, 0), 5.5, const Color(0xFF3F3F46), sides: 6);
+      }
+      b.box(const V3(0, 252, 0), const V3(366, 124, 6), const Color(0xFF0B1F4B), shine: 0.3);
+      b.box(const V3(0, 316, 0), const V3(366, 6, 10), const Color(0xFFF5C14B));
+      b.box(const V3(0, 188, 0), const V3(366, 6, 10), const Color(0xFFF5C14B));
+    case 'cornersign':
+      for (final x in const [-55.0, 55.0]) {
+        b.cyl(V3(x, 0, 0), V3(x, 125, 0), 3, const Color(0xFF3F3F46), sides: 6);
+      }
+      b.box(const V3(0, 122, 0), const V3(150, 70, 5), const Color(0xFF0B1F4B), shine: 0.3);
+      b.box(const V3(0, 159, 0), const V3(152, 4, 7), const Color(0xFFF5C14B));
     case 'firetruck':
       b.box(const V3(0, 11, 0), const V3(96, 14, 38), const Color(0xFFDC2626), shine: 0.3);
       b.box(const V3(36, 22, 0), const V3(22, 12, 34), const Color(0xFFDC2626), shine: 0.3);

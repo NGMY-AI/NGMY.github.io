@@ -146,7 +146,7 @@ void main() {
     expect(h.rooms[10].doors.any((d) => d.to == out.id), isTrue);
     expect(out.doors.single.to, 10);
     final s = buildHomeRoom(out, problems: 3);
-    expect(s.polys.length, lessThan(12000));
+    expect(s.polys.length, lessThan(22000));
     expect(s.polys.any((p) => p.id == idHDoor), isTrue);
     expect(s.labels.single.text, contains('3 rooms'));
     expect(h.indoor.length, 11);

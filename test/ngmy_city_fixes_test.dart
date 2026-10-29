@@ -68,7 +68,8 @@ void main() {
   });
 
   test('swiping right turns the view right and swiping left turns it left by default', () {
-    expect(Cam3.invertX, isTrue);
+    expect(Cam3.invertX, isFalse);
+    expect(Cam3.invertY, isTrue);
   });
 
   test('a loop of road never turns a car back', () {
@@ -177,28 +178,32 @@ void main() {
     await t.pump(const Duration(seconds: 10));
   });
 
-  test('the billboard drone film is one smooth flight: it starts high, never cuts and never goes into a billboard', () {
+  test('the billboard drone film is one smooth flight with slow passes, then the helicopters: it starts high, never cuts and never goes into a sign', () {
     final city = HomeProject(seed: 4).rooms[11];
     final legs = buildDroneLegs(city, 'billboards');
-    expect(legs.length, 1, reason: 'one flight, no cuts');
     expect(legs.first.enter, isNull);
     expect(legs.first.exit, isFalse);
+    expect(legs.skip(1).every((l) => l.heli != null), isTrue, reason: 'after the billboards it follows the helicopters');
+    expect(legs.where((l) => l.heli != null).length, kHelis.length);
     expect(legs.first.eyes.first.y, greaterThan(500), reason: 'it starts high up');
-    final boards = city.furn.where((f) => f.kind == 'billboard').toList();
-    expect(boards, isNotEmpty);
+    final signs = city.furn.where((f) => f.kind == 'billboard' || f.kind == 'cornersign' || f.kind == 'townsign').toList();
+    expect(signs.where((f) => f.kind == 'townsign').length, 1);
+    expect(signs.where((f) => f.kind == 'cornersign').length, 4);
     final eyes = legs.first.eyes;
     for (var i = 0; i + 1 < eyes.length; i++) {
       for (var s = 0.0; s <= 1.0; s += 0.01) {
         final p = V3.lerp(eyes[i], eyes[i + 1], s);
-        for (final f in boards) {
-          final near = (p.x - f.x).abs() < 50 && (p.z - f.z).abs() < 50 && p.y < 75;
-          expect(near, isFalse, reason: 'the drone is inside the billboard at (${f.x}, ${f.z})');
+        for (final f in signs) {
+          final (hx, hz, hy) = switch (f.kind) { 'townsign' => (200.0, 30.0, 330.0), 'cornersign' => (85.0, 30.0, 170.0), _ => (50.0, 50.0, 75.0) };
+          final inside = (p.x - f.x).abs() < hx && (p.z - f.z).abs() < hz && p.y < hy;
+          expect(inside, isFalse, reason: 'the drone is inside the ${f.kind} at (${f.x}, ${f.z})');
         }
       }
     }
-    // It comes close to every billboard: a point in front of each one, 130 units away.
-    for (final f in boards) {
-      expect(eyes.any((e) => math.sqrt(math.pow(e.x - f.x, 2) + math.pow(e.z - f.z, 2)) < 140 && e.y < 100), isTrue, reason: 'billboard at (${f.x}, ${f.z}) is visited');
+    // It comes close to every sign and swings slowly round it: the path near each is at least a few seconds long at the film speed.
+    for (final f in signs) {
+      final near = [for (final e in eyes) if (math.sqrt(math.pow(e.x - f.x, 2) + math.pow(e.z - f.z, 2)) < (f.kind == 'townsign' ? 560 : f.kind == 'cornersign' ? 290 : 190)) e];
+      expect(near.length, greaterThanOrEqualTo(5), reason: '${f.kind} at (${f.x}, ${f.z}) is visited with a slow arc');
     }
   });
 

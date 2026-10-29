@@ -359,7 +359,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       _eyeAt(id - idHCam);
       return;
     }
-    if (id >= idHTag && id < idHTag + 400) {
+    if (id >= idHTag && id < idHTag + 3000) {
       final f = room.furnById(id - idHTag);
       if (f != null) _goToTag(f);
       return;
@@ -752,14 +752,14 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     final l = _legs[_legIx];
     _legStartMs = DateTime.now().millisecondsSinceEpoch;
     if (l.enter != null) {
-      inner = CityInterior(l.enter!.kind, l.enter!, dark: room.darkHouses.contains(l.enter!.id))..build(comm);
+      inner = CityInterior(interiorKindOf(l.enter!.kind), l.enter!, dark: room.darkHouses.contains(l.enter!.id))..build(comm);
       setState(_rebuild);
     }
     if (l.exit && inner != null) {
       inner = null;
       setState(_rebuild);
     }
-    if (l.follow == null) {
+    if (l.follow == null && l.heli == null) {
       // Carry on from where the camera is, so there is no jump (only going into or out of a building cuts).
       final cut = l.enter != null || l.exit;
       final (e0, l0) = _eyeNow();
@@ -778,7 +778,22 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     final l = _legs[_legIx];
     final el = (DateTime.now().millisecondsSinceEpoch - _legStartMs) / 1000;
     V3 eye, look;
-    if (l.follow != null) {
+    if (l.heli != null) {
+      final p = heliPose(l.heli!, now);
+      look = V3(p.$1, p.$2 - 33, p.$3);
+      final side = l.heli! .isEven ? 1.0 : -1.0;
+      eye = V3(look.x + p.$5 * 165 * side, look.y + 30, look.z - p.$4 * 165 * side);
+      if (el < 3) {
+        final k = el / 3, e = k * k * (3 - 2 * k);
+        final (e0, l0) = _eyeNow();
+        eye = V3.lerp(e0, eye, e);
+        look = V3.lerp(l0, look, e);
+      }
+      if (el >= l.secs) {
+        _nextLeg();
+        return;
+      }
+    } else if (l.follow != null) {
       final p = vehiclePose(kTraffic[l.follow!], now);
       look = V3(p.$1, 26, p.$2);
       final a = el * 0.35 + 0.8;
@@ -1107,7 +1122,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   void _sell() {
     final f = room.furnById(selFurn);
     if (f == null) return;
-    const prices = {'house2': 40, 'bighouse': 80, 'shop': 70, 'billboard': 15, 'crate': 4, 'car': 25, 'tree': 5, 'bench': 4};
+    const prices = {'house2': 40, 'bighouse': 80, 'shop': 70, 'billboard': 15, 'crate': 4, 'car': 25, 'tree': 5, 'bench': 4, 'tower': 120, 'hq': 200, 'store': 90, 'gasstation': 90, 'cornersign': 30};
     final p = prices[f.kind];
     if (p == null) {
       _say('This cannot be sold.', ok: false);
@@ -1727,7 +1742,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   void _enterBuilding(Furn f) {
     _inX = 0;
     _inZ = 0;
-    final inn = CityInterior(f.kind, f, dark: room.darkHouses.contains(f.id))
+    final inn = CityInterior(interiorKindOf(f.kind), f, dark: room.darkHouses.contains(f.id))
       ..carrying = _carrying
       ..build(comm);
     inner = inn;
@@ -2699,7 +2714,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         onDoubleTap: _doubleTap,
         message: msg,
         good: good,
-        messageTop: (showMap && !isLesson && !full) ? 104 : 10,
+        messageTop: full ? 62 : ((showMap && !isLesson) ? 104 : 10),
         layerOn: (l) => l <= 5,
         dynamicPolys: (_) => inner != null ? inner!.dynamicPolys(now, playerStyle) : [...homeDynamic(room, now, person: _pose(), personStyle: playerStyle, residents: _figs, mode: mode, drive: _driveNow(), carrying: _carrying != null), if (!room.indoor) ...trafficPolys(now), ...(_job != null ? _routePolys() : const <Poly>[])],
         dynamicScreens: (_) => (inner == null && !room.indoor) ? trafficScreens(now) : const [],
@@ -2954,13 +2969,16 @@ class _StickState extends State<_Stick> {
 /// One leg of a drone film: a smooth curve through the eye points (looking at the look points) at [speed] units a second, optionally into or
 /// out of a building, or following a vehicle for [secs] seconds.
 class DroneLeg {
-  DroneLeg(this.eyes, this.looks, {this.speed = 130, this.note, this.enter, this.exit = false, this.follow, this.secs = 8});
+  DroneLeg(this.eyes, this.looks, {this.speed = 130, this.note, this.enter, this.exit = false, this.follow, this.heli, this.secs = 8});
   final List<V3> eyes, looks;
   final double speed, secs;
   final String? note;
   final Furn? enter;
   final bool exit;
   final int? follow;
+
+  /// Follow helicopter number [heli], to show the billboard it flies with.
+  final int? heli;
 }
 
 class _NCall {
@@ -3011,13 +3029,56 @@ List<DroneLeg> buildDroneLegs(HRoom city, String what) {
     if (note != null) notes.add(note);
   }
 
-  /// Fly past the face of something: in front and a little above, then up and round the side.
+  /// Fly past the face of something slowly: come down in front of it, then swing round its side in an arc, always looking at it and
+  /// never nearer than [near]. It takes about three seconds.
   void pass(Furn f, double height, double look, double near, double far, double lift, {String? note}) {
     final (fx, fz) = droneFacing(f);
     final c = V3(f.x, look, f.z);
-    pt(V3(f.x + fx * near, height, f.z + fz * near), c, note: note);
-    final a = math.atan2(fx, fz) + 0.95;
-    pt(V3(f.x + math.sin(a) * far, height + lift, f.z + math.cos(a) * far), c);
+    final base = math.atan2(fx, fz);
+    for (var i = 0; i < 6; i++) {
+      final a = base - 0.55 + i * 0.38;
+      final r = near + (far - near) * i / 5;
+      pt(V3(f.x + math.sin(a) * r, height + lift * i / 5 + (i == 0 ? 40 : 0), f.z + math.cos(a) * r), c, note: i == 0 ? note : null);
+    }
+  }
+
+  /// A billboard, a corner sign or the big town sign, passed the way that suits its size.
+  /// Does the straight line from [a] to [b] go through any sign (its mast and board)?
+  bool hitsSigns(V3 a, V3 b) {
+    for (var s = 0.0; s <= 1.0; s += 0.02) {
+      final p = V3.lerp(a, b, s);
+      for (final f in city.furn) {
+        if (f.kind != 'billboard' && f.kind != 'cornersign' && f.kind != 'townsign') continue;
+        final (hx, hz, hy) = switch (f.kind) { 'townsign' => (215.0, 40.0, 345.0), 'cornersign' => (95.0, 40.0, 185.0), _ => (60.0, 60.0, 90.0) };
+        if ((p.x - f.x).abs() < hx && (p.z - f.z).abs() < hz && p.y < hy) return true;
+      }
+    }
+    return false;
+  }
+
+  void passSignPoints(Furn f) {
+    switch (f.kind) {
+      case 'townsign':
+        pass(f, 255, 250, 430, 520, 60, note: 'The biggest billboard in the city: NGMY Town');
+      case 'cornersign':
+        pass(f, 115, 120, 210, 260, 50, note: 'A corner billboard: NGMY Town');
+      default:
+        pass(f, 75, 48, 130, 175, 45, note: 'An NGMY billboard');
+    }
+  }
+
+  void passSign(Furn f) {
+    final before = eyes.length;
+    passSignPoints(f);
+    if (before > 0 && before < eyes.length) {
+      final a = eyes[before - 1], b = eyes[before];
+      if (hitsSigns(a, b)) {
+        // Going from one sign to the next would cut through one: climb above them and come down onto the next.
+        final la = looks[before - 1], lb = looks[before];
+        eyes.insertAll(before, [V3(a.x, 420, a.z), V3(b.x, 420, b.z)]);
+        looks.insertAll(before, [la, lb]);
+      }
+    }
   }
 
   void interior(Furn f) {
@@ -3027,7 +3088,8 @@ List<DroneLeg> buildDroneLegs(HRoom city, String what) {
   }
 
   final all = !const ['city', 'billboards', 'houses', 'hospital', 'traffic'].contains(what);
-  final boards = [for (final f in city.furn) if (f.kind == 'billboard') f]..sort((a, b) => a.x.compareTo(b.x));
+  final boards = [for (final f in city.furn) if (f.kind == 'billboard' || f.kind == 'cornersign') f];
+  final towns = city.furn.where((f) => f.kind == 'townsign');
   final houses = [for (final f in city.furn) if (f.kind == 'house2' || f.kind == 'bighouse') f];
 
   // It always starts high over the city and comes down.
@@ -3051,11 +3113,24 @@ List<DroneLeg> buildDroneLegs(HRoom city, String what) {
     pt(const V3(-120, 300, -320), const V3(0, 250, -118));
     pt(const V3(-260, 330, -80), const V3(0, 250, -118));
     pt(const V3(-100, 400, 350), const V3(-200, 100, 480));
-    final step = all ? math.max(1, boards.length ~/ 4) : 1;
-    for (var i = 0; i < boards.length && (all ? i < boards.length : true); i += step) {
-      pass(boards[i], 88, 48, 130, 175, 62, note: 'An NGMY billboard');
+    for (final f in towns) {
+      passSign(f);
     }
-    flush(speed: 125);
+    // Then every billboard, always the nearest one next, so the drone goes round the city without crossing it.
+    var from = towns.isEmpty ? const V3(0, 0, 640) : V3(towns.first.x, 0, towns.first.z);
+    final left = List<Furn>.of(boards);
+    var shown = 0;
+    while (left.isNotEmpty && shown < (all ? 8 : 40)) {
+      left.sort((a, b) => (math.pow(a.x - from.x, 2) + math.pow(a.z - from.z, 2)).compareTo(math.pow(b.x - from.x, 2) + math.pow(b.z - from.z, 2)));
+      final f = left.removeAt(0);
+      passSign(f);
+      from = V3(f.x, 0, f.z);
+      shown++;
+    }
+    flush(speed: 105);
+    for (var i = 0; i < kHelis.length; i++) {
+      legs.add(DroneLeg(const [], const [], heli: i, secs: 10, note: 'A helicopter with its billboard'));
+    }
   }
   if (what == 'houses' || all) {
     for (var i = 0; i < houses.length && i < (all ? 2 : 5); i++) {
@@ -3080,6 +3155,11 @@ List<DroneLeg> buildDroneLegs(HRoom city, String what) {
   }
   flush();
   if (what == 'traffic' || all) {
+    if (!all) {
+      for (var i = 0; i < kHelis.length; i++) {
+        legs.add(DroneLeg(const [], const [], heli: i, secs: 10, note: 'A helicopter with its billboard'));
+      }
+    }
     for (var i = 0; i < kTraffic.length && i < (all ? 2 : 4); i++) {
       legs.add(DroneLeg(const [], const [], follow: i, secs: 9, note: kTraffic[i].kind == 'bus' ? 'A self-driving bus with its billboards' : 'A self-driving police car'));
     }

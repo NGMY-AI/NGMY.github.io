@@ -18,6 +18,13 @@ List<NavRect> obstaclesOfWorld(HRoom r, {int? skip}) {
   for (final f in r.furn) {
     if (f.id == skip) continue;
     if (kFlatKinds.contains(f.kind) || kAnimalKinds.contains(f.kind) || f.kind == 'bush') continue;
+    // The big town sign stands on two masts over the road: you walk between them and under the board.
+    if (f.kind == 'townsign') {
+      for (final dx in const [-178.0, 178.0]) {
+        o.add(NavRect(f.x + dx - 8, f.x + dx + 8, f.z - 8, f.z + 8));
+      }
+      continue;
+    }
     final k = kFurnKinds[f.kind]!;
     var fw = f.rot.isOdd ? k.d : k.w, fd = f.rot.isOdd ? k.w : k.d;
     // A tree is a trunk, not the whole width of its leaves.
@@ -34,7 +41,7 @@ class WorldWalker {
   WorldWalker(HRoom this.room, {this.x = 0, this.z = 22, this.yaw = 0})
       : _minX = -room.w / 2 + 10,
         _maxX = room.w / 2 - 10,
-        _minZ = -300,
+        _minZ = -760,
         _maxZ = room.d - 10 {
     refresh();
   }

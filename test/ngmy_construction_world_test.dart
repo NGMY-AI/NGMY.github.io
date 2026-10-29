@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_3d.dart';
+import 'package:ngmy/ngmy_construction_cityin.dart';
 import 'package:ngmy/ngmy_construction_home.dart';
 import 'package:ngmy/ngmy_construction_homepage.dart';
 import 'package:ngmy/ngmy_construction_homescene.dart';
@@ -38,14 +39,14 @@ void main() {
 
   test('the first town has roads, five kinds of building, vehicles, animals and trees; buildings draw from one sorted piece with flat windows', () {
     final w = HomeProject(seed: 2).rooms[11];
-    expect(w.w, 1800);
+    expect(w.w, 2600);
     for (final k in kBuildingKinds) {
       expect(w.furn.any((f) => f.kind == k), isTrue, reason: k);
     }
     expect(w.furn.where((f) => kRoadKinds.contains(f.kind)).length, greaterThan(15));
     expect(w.furn.where((f) => kAnimalKinds.contains(f.kind)).length, greaterThanOrEqualTo(6));
     expect(w.furn.any((f) => f.kind == 'firetruck') && w.furn.any((f) => f.kind == 'ambulance') && w.furn.any((f) => f.kind == 'car'), isTrue);
-    expect(buildHomeRoom(w, mode: 'furniture').polys.length, lessThan(24000));
+    expect(buildHomeRoom(w, mode: 'furniture').polys.length, lessThan(30000));
     for (final k in kBuildingKinds) {
       final t = HomeProject(seed: 1).rooms[11];
       t.furn.clear();
@@ -153,5 +154,25 @@ void main() {
     await t.pump(const Duration(milliseconds: 300));
     expect(stick, findsNothing);
     await t.pump(const Duration(seconds: 10));
+  });
+
+  test("every building you can go into can be reached: the spot in front of its door is free and inside the land", () {
+    final w = HomeProject(seed: 2).rooms[11];
+    final walker = WorldWalker(w, x: 0, z: 400);
+    var checked = 0;
+    for (final f in w.furn.where((f) => kEnterable.contains(f.kind))) {
+      final k = kFurnKinds[f.kind]!;
+      final dv = rotY(const V3(0, 0, 1), f.rot * 1.5707963267948966);
+      final x = f.x + dv.x * (k.d / 2 + 10), z = f.z + dv.z * (k.d / 2 + 10);
+      walker.x = x;
+      walker.z = z;
+      expect(walker.blocked(x, z), isFalse, reason: "the door of the ${f.kind} at (${f.x}, ${f.z}) cannot be reached");
+      checked++;
+    }
+    expect(checked, greaterThan(40), reason: "a town full of buildings you can enter");
+    expect(w.furn.where((f) => f.kind == "house2" || f.kind == "bighouse").any((f) => f.z < -200), isTrue, reason: "houses behind my house");
+    expect(w.furn.where((f) => f.kind == "tower").length, greaterThan(8));
+    expect(w.furn.where((f) => f.kind == "townsign").length, 1);
+    expect(w.furn.where((f) => f.kind == "cornersign").length, 4);
   });
 }

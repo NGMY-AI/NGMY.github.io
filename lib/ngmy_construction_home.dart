@@ -67,6 +67,12 @@ const Map<String, FurnKind> kFurnKinds = {
   'pole': FurnKind('Electric pole', '🔌', 10, 10),
   'crate': FurnKind('Crate', '📦', 28, 28),
   'billboard': FurnKind('Billboard', '🪧', 72, 10),
+  'tower': FurnKind('Office tower', '🏢', 100, 70),
+  'hq': FurnKind('NGMY company', '🏛️', 170, 90),
+  'store': FurnKind('NGMY store', '🏬', 130, 80),
+  'gasstation': FurnKind('NGMY gas station', '⛽', 150, 90),
+  'townsign': FurnKind('NGMY Town sign', '🪧', 380, 14),
+  'cornersign': FurnKind('NGMY Town billboard', '🪧', 150, 10),
   'shop': FurnKind('Shop', '🏪', 126, 90),
   'hospital': FurnKind('Hospital', '🏥', 165, 105),
   'firestation': FurnKind('Fire station', '🚒', 135, 96),
@@ -86,7 +92,7 @@ const Map<String, FurnKind> kFurnKinds = {
 };
 
 /// What can be put in the garden, and what goes inside the rooms.
-const List<String> kOutdoorFurn = ['road', 'roundabout', 'roadturn', 'roadtee', 'roadcross', 'house2', 'bighouse', 'billboard', 'shop', 'hospital', 'firestation', 'school', 'car', 'firetruck', 'ambulance', 'dog', 'cat', 'cow', 'sheep', 'chicken', 'horse', 'tree', 'pine', 'bush', 'flowers', 'fence', 'lamppost', 'bench', 'pond', 'swing', 'shed', 'doghouse'];
+const List<String> kOutdoorFurn = ['road', 'roundabout', 'roadturn', 'roadtee', 'roadcross', 'house2', 'bighouse', 'billboard', 'tower', 'hq', 'store', 'gasstation', 'townsign', 'cornersign', 'shop', 'hospital', 'firestation', 'school', 'car', 'firetruck', 'ambulance', 'dog', 'cat', 'cow', 'sheep', 'chicken', 'horse', 'tree', 'pine', 'bush', 'flowers', 'fence', 'lamppost', 'bench', 'pond', 'swing', 'shed', 'doghouse'];
 
 /// Road pieces snap to a grid of this size, so neighbours always line up.
 const double kRoadGrid = 40;
@@ -307,8 +313,8 @@ class HRoom {
   /// What is still to be done in this room, in words.
   List<String> get missing => lesson.isNotEmpty || !indoor || wired ? const [] : [if (!okOutA) 'outlet 1', if (!okOutB) 'outlet 2', if (!okLight) (ceilingFix == 'fan' ? 'ceiling fan' : 'ceiling light'), if (!okSwitch) 'switch'];
 
-  double get w => big ? 260 : switch (kind) { 'bathroom' => 110, 'kitchen' => 140, 'living' => 180, 'hall' => 480, 'outside' => 1800, _ => 130 };
-  double get d => big ? 180 : switch (kind) { 'bathroom' => 100, 'kitchen' => 110, 'living' => 120, 'hall' => 180, 'outside' => 1400, _ => 112 };
+  double get w => big ? 260 : switch (kind) { 'bathroom' => 110, 'kitchen' => 140, 'living' => 180, 'hall' => 480, 'outside' => 2600, _ => 130 };
+  double get d => big ? 180 : switch (kind) { 'bathroom' => 100, 'kitchen' => 110, 'living' => 120, 'hall' => 180, 'outside' => 2100, _ => 112 };
   bool get indoor => kind != 'outside';
   static const double h = 130;
 
@@ -380,7 +386,8 @@ class HRoom {
     final turned = f.rot.isOdd;
     final fw = turned ? k.d : k.w, fd = turned ? k.w : k.d;
     f.x = f.x.clamp(-w / 2 + fw / 2 + 1, w / 2 - fw / 2 - 1);
-    f.z = f.z.clamp(fd / 2 + 1, d - fd / 2 - 1);
+    // Outside, the land goes on behind the house too.
+    f.z = f.z.clamp(kind == 'outside' ? -760 + fd / 2 : fd / 2 + 1, d - fd / 2 - 1);
     if (kRoadKinds.contains(f.kind)) {
       f.x = (f.x / kRoadGrid).round() * kRoadGrid;
       f.z = (f.z / kRoadGrid).round() * kRoadGrid;
@@ -558,7 +565,7 @@ class HomeProject {
         for (final (x, z) in const [(-700.0, 225.0), (-120.0, 160.0), (120.0, 160.0), (720.0, 225.0)]) {
           if (clear(x, z)) r.add('house2', x: x, z: z);
         }
-        for (final (z, step, big) in const [(600.0, 250.0, true), (730.0, 250.0, false), (1030.0, 250.0, true), (1210.0, 330.0, true), (1340.0, 250.0, false)]) {
+        for (final (z, step, big) in const [(600.0, 250.0, true), (730.0, 250.0, false), (1030.0, 250.0, true), (1210.0, 330.0, true)]) {
           for (var x = -750.0; x <= 750; x += step) {
             if (x.abs() < 100) continue;
             // Between the two streets the loop roads at x = 600 run through, so the houses keep well back from them.
@@ -569,20 +576,75 @@ class HomeProject {
         for (final (x, z) in const [(-820.0, 640.0), (820.0, 640.0)]) {
           if (clear(x, z)) r.add('bighouse', x: x, z: z);
         }
+        // ── The bigger town: longer streets, more houses, downtown with the NGMY companies, and the big signs ──
+        const z3 = 1460.0, z4 = 1700.0;
+        for (var x = -1220.0; x <= 1220; x += kRoadGrid) {
+          if (x.abs() > 780) {
+            r.add('road', x: x, z: z1);
+            r.add('road', x: x, z: z2);
+          }
+          r.add('road', x: x, z: z3);
+          r.add('road', x: x, z: z4);
+        }
+        for (var z = z2 + kRoadGrid; z < z3 - 1; z += kRoadGrid) {
+          r.add('road', x: 0, z: z).rot = 1;
+        }
+        final roads = [for (final f in r.furn) if (kRoadKinds.contains(f.kind) || f.kind == 'roundabout') f];
+        // Is there room for a building of [fw] by [fd] here, with the road and the other buildings well away from its door side (z up)?
+        bool free(double x, double z, double fw, double fd) {
+          for (final q in roads) {
+            if ((q.x - x).abs() < fw / 2 + 50 && (q.z - z).abs() < fd / 2 + 20 + (q.z > z ? 70 : 30)) return false;
+          }
+          for (final f in r.furn) {
+            if (kRoadKinds.contains(f.kind) || f.kind == 'roundabout' || f.kind == 'rug' || f.kind == 'flowers') continue;
+            final k = kFurnKinds[f.kind]!;
+            if ((f.x - x).abs() < (fw + k.w) / 2 + 50 && (f.z - z).abs() < (fd + k.d) / 2 + (f.z > z ? 90 : 50)) return false;
+          }
+          return true;
+        }
+
+        // More houses: behind my house, down both sides and over every green stretch, each with room in front of its door.
+        var added = 0;
+        for (var zi = 0; zi < 14 && added < 90; zi++) {
+          final z = -560.0 + zi * 150;
+          for (var xi = 0; xi <= 10 && added < 90; xi++) {
+            final x = -1150.0 + xi * 230;
+            if (x.abs() < 170 && z < 100) continue;
+            final kind = (xi * 7 + zi * 3) % 5 == 0 ? 'bighouse' : 'house2';
+            final k = kFurnKinds[kind]!;
+            if (free(x, z, k.w, k.d)) {
+              r.add(kind, x: x, z: z);
+              added++;
+            }
+          }
+        }
+        // Downtown, south of the houses: towers, the NGMY company, stores, gas stations and hospitals.
+        var di = 0;
+        for (final (x, kind) in const [(-1050.0, 'store'), (-840.0, 'tower'), (-630.0, 'tower'), (-420.0, 'gasstation'), (-210.0, 'tower'), (0.0, 'hq'), (210.0, 'tower'), (420.0, 'store'), (630.0, 'tower'), (840.0, 'tower'), (1050.0, 'gasstation')]) {
+          r.add(kind, x: x, z: 1560).color = di++ % 6;
+        }
+        for (final (x, kind) in const [(-1050.0, 'hospital'), (-840.0, 'tower'), (-630.0, 'store'), (-420.0, 'tower'), (-210.0, 'tower'), (0.0, 'tower'), (210.0, 'tower'), (420.0, 'tower'), (630.0, 'store'), (840.0, 'tower'), (1050.0, 'hospital')]) {
+          r.add(kind, x: x, z: 1860).color = di++ % 6;
+        }
+        // The biggest billboard, over the middle road: NGMY Town. And one at each corner of the land.
+        r.add('townsign', x: 0, z: 640);
+        for (final (x, z) in const [(-1150.0, 80.0), (1150.0, 80.0), (-1150.0, 1990.0), (1150.0, 1990.0)]) {
+          r.add('cornersign', x: x, z: z);
+        }
         // Electric poles along the streets (the street lights hang on them) and street lamps between them.
-        for (var x = -720.0; x <= 720; x += 240) {
-          for (final z in const [z1 - 40, z2 - 40]) {
+        for (var x = -1200.0; x <= 1200; x += 480) {
+          for (final z in const [z1 - 40, z2 - 40, z3 - 40, z4 - 40]) {
             r.add('pole', x: x, z: z);
           }
-          for (final z in const [z1 + 40, z2 + 40]) {
-            if (x.abs() > 30) r.add('lamppost', x: x + 120, z: z);
+          for (final z in const [z1 + 40, z2 + 40, z3 + 40, z4 + 40]) {
+            if (x.abs() < 1100) r.add('lamppost', x: x + 240, z: z);
           }
         }
         // Vehicles on the streets, trees, flowers and benches, and goods to carry to the market.
         // Only a few vehicles stand about, off the roads (the buses and police cars drive round by themselves).
         r.add('car', x: -300, z: z1 + 70).rot = 2;
-        r.add('ambulance', x: 180, z: 300);
-        r.add('firetruck', x: -440, z: 300);
+        r.add('ambulance', x: 110, z: 345);
+        r.add('firetruck', x: -385, z: 345);
         for (final (x, z) in const [(-210.0, 60.0), (210.0, 90.0), (-330.0, 120.0), (330.0, 60.0), (-110.0, 330.0), (110.0, 330.0), (-560.0, 640.0), (560.0, 640.0), (-420.0, 1100.0), (420.0, 1100.0)]) {
           r.add((x.abs() > 400 || z > 1000) ? 'pine' : 'tree', x: x, z: z);
         }

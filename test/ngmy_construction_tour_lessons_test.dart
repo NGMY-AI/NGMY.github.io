@@ -271,7 +271,7 @@ void main() {
     expect(g.w, greaterThan(400));
     expect(g.furn.where((f) => kOutdoorFurn.contains(f.kind)).length, greaterThan(8));
     final s = buildHomeRoom(g, mode: 'furniture');
-    expect(s.polys.length, lessThan(12000));
+    expect(s.polys.length, lessThan(22000));
     expect(s.polys.any((p) => p.id == idHDoor), isTrue);
     // Every window pane is one flat, single-sided patch: it cannot show through the house from behind.
     final panes = s.polys.where((p) => p.pts.length == 4 && p.id == 0 && p.group != 0 && (p.color.b > 0.9 && p.color.r < 0.7));

@@ -17,7 +17,7 @@ import 'ngmy_construction_world.dart';
 
 /// A place on the floor that does something when you walk into it.
 /// The labels inside a house that you can tap to be shown the thing they are about.
-const int idCinPanel = 1300, idCinOutlet = 1301;
+const int idCinPanel = 19500, idCinOutlet = 19501;
 
 class _Zone {
   const _Zone(this.id, this.x, this.z, this.r);
@@ -26,7 +26,10 @@ class _Zone {
 }
 
 /// The buildings you can walk into.
-const Set<String> kEnterable = {'hospital', 'shop', 'school', 'firestation', 'house2', 'bighouse'};
+const Set<String> kEnterable = {'hospital', 'shop', 'school', 'firestation', 'house2', 'bighouse', 'store', 'gasstation'};
+
+/// The inside a building has: an NGMY store or gas station is a shop inside.
+String interiorKindOf(String kind) => (kind == 'store' || kind == 'gasstation') ? 'shop' : kind;
 
 const List<String> _safetyTips = [
   'Always switch the breaker OFF and test the wires with a tester before you touch them.',

@@ -49,16 +49,16 @@ void main() {
     await t.pump(const Duration(seconds: 10));
   });
 
-  testWidgets('swiping up looks up, and swiping right turns the view the way the finger goes (the left-right choice was flipped again)', (t) async {
+  testWidgets('swiping right looks right and swiping up looks up (checked from the camera: yaw up turns right, pitch down looks up)', (t) async {
     final cam = Cam3(yaw: 0, pitch: 0.3, dist: 100, target: V3.zero)..setFree(true);
     await t.pumpWidget(MaterialApp(home: Scene3DView(scene: const Scene3D([]), cam: cam)));
     await t.pump(const Duration(milliseconds: 100));
     final c = t.getCenter(find.byType(Scene3DView));
     await t.dragFrom(c, const Offset(100, 0));
-    expect(cam.yaw, lessThan(-0.3));
+    expect(cam.yaw, greaterThan(0.3));
     final p0 = cam.pitch;
     await t.dragFrom(c, const Offset(0, -100));
-    expect(cam.pitch, greaterThan(p0));
+    expect(cam.pitch, lessThan(p0));
   });
 
   test('a lesson room is big and bare, the outlets are in the open, and the TV can go on any wall', () {

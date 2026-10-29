@@ -39,6 +39,14 @@ const List<CityVehicle> kTraffic = [
 /// The two helicopters: where they circle, how high, and their ads.
 const List<(double, double, double, int)> kHelis = [(0, 560, 240, 7), (0, 560, 300, 9)];
 
+/// Where helicopter [i] is at time [t] (x, height, z) and the way it flies (x, z of its direction).
+(double, double, double, double, double) heliPose(int i, double t) {
+  final (cx, cz, alt, _) = kHelis[i];
+  final th = t * 0.09 + i * math.pi;
+  const radius = 520.0;
+  return (cx + radius * math.cos(th), alt + math.sin(t * 0.9 + i) * 5, cz + radius * math.sin(th), -math.sin(th), math.cos(th));
+}
+
 /// Where a vehicle is at time [t] and which way it faces (the x and z of its direction). It drives round its loop one way.
 (double, double, double, double) vehiclePose(CityVehicle v, double t) {
   const r = kLoopTurn;
