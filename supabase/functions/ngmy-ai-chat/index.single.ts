@@ -897,7 +897,8 @@ async function handleAgentStart(req: Request, body: any): Promise<Response> {
   });
   const payload: Record<string, unknown> = {
     task: fullTask,
-    maxCostUsd: 0.75,
+    // The most one browser task may spend. 0.75 was too small: tasks stopped at the very start with "Task cost limit reached".
+    maxCostUsd: Math.max(0.75, Number(Deno.env.get("BROWSER_USE_MAX_COST_USD") ?? "3") || 3),
     browserSettings: freshBrowser(),
   };
   if (/^[0-9a-f-]{36}$/i.test(sessionId) && !direct) {

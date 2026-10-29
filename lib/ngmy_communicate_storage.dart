@@ -613,10 +613,26 @@ class NgmyCommunicateTimeTracker {
   // The free minutes are per ACCOUNT and kept on the server too, so logging out, clearing the
   // browser, reinstalling or another phone can never give them back. The meter only goes up.
 
-  static Future<int> getUsedSeconds(String email) async {
-    if (email.trim().isEmpty) return 0;
+  /// The free allowance was cut from 30 to 10 minutes and everybody started again at zero: whatever was already used when this
+  /// account first opened the advisors after that is taken off (the real meter keeps going up; only the part after the reset counts).
+  static String _baseKey(String email) => 'ngmy_communicate_free_base_v2_${email.toLowerCase().trim()}';
+
+  static Future<int> _rawUsed(String email) async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getInt(_key(email)) ?? 0;
+  }
+
+  static Future<int> _base(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_baseKey(email)) ?? -1;
+  }
+
+  static Future<int> getUsedSeconds(String email) async {
+    if (email.trim().isEmpty) return 0;
+    final raw = await _rawUsed(email);
+    final base = await _base(email);
+    if (base < 0) return raw;
+    return raw > base ? raw - base : 0;
   }
 
   static Future<void> _raiseLocal(String email, int total) async {
@@ -634,6 +650,11 @@ class NgmyCommunicateTimeTracker {
       if (server != null) await _raiseLocal(email, server);
     } catch (e) {
       debugPrint('[communicate] free time sync: $e');
+    }
+    // First time since the reset (30 to 10 minutes): whatever is used now is forgiven, so everybody starts again with 10 free minutes.
+    if (await _base(email) < 0) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_baseKey(email), await _rawUsed(email));
     }
     return getUsedSeconds(email);
   }
