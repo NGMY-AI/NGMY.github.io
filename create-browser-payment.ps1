@@ -58,17 +58,19 @@ if ($useMode -eq "live" -and -not $isLive) { throw "Mode is live but the key is 
 if ($useMode -eq "test" -and $isLive) { throw "Mode is test but the key is sk_live_" }
 $script:StripeKey = $stripeKey
 $sbToken = $secrets["SUPABASE_ACCESS_TOKEN"]
-if (-not $sbToken) { throw "SUPABASE_ACCESS_TOKEN is empty in .ngmy_secrets.local" }
+if (-not $sbToken) { Write-Host "No SUPABASE_ACCESS_TOKEN in .ngmy_secrets.local: the table and the functions are skipped (do them by hand), only Stripe is done." -ForegroundColor Yellow }
 
 Write-Host "Stripe mode: $(if ($isLive) { 'LIVE (real money)' } else { 'TEST' })" -ForegroundColor Cyan
 
 # 1. the table
 Write-Step 1 "Creating the browser_payments table ..."
+if ($sbToken) {
 $sql = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot "supabase\browser_payments.sql"))
 $sqlBody = @{ query = [string]$sql } | ConvertTo-Json -Compress -Depth 3
 $null = Invoke-RestMethod -Method Post -Uri "https://api.supabase.com/v1/projects/$ProjectRef/database/query" `
     -Headers @{ Authorization = "Bearer $sbToken" } -ContentType "application/json" -Body $sqlBody
 Write-Ok "Table ready"
+}
 
 # 2. the Stripe payment link
 Write-Step 2 "Creating the Stripe Payment Link (USD 5.99) ..."
@@ -111,6 +113,7 @@ $text = [regex]::Replace($text, $pattern, "static const String advisorBrowserUrl
 Write-Ok "advisorBrowserUrl = $($pl.url)"
 
 # 4. the functions
+if ($sbToken) {
 Write-Step 4 "Deploying the Stripe webhook ..."
 $fnDir = Join-Path $PSScriptRoot "supabase\functions\ngmy-stripe-webhook"
 $raw = & curl.exe -s -X POST "https://api.supabase.com/v1/projects/$ProjectRef/functions/deploy?slug=ngmy-stripe-webhook" `
@@ -123,6 +126,7 @@ Write-Ok "Webhook deployed (version $($obj.version))"
 
 Write-Step 5 "Deploying the advisor function (bright-handler) ..."
 & (Join-Path $PSScriptRoot "deploy-bright-handler.ps1")
+}
 
 Write-Host ""
 Write-Host "Done. Now tell Claude 'the link is in', so the app with the link is committed and pushed." -ForegroundColor Green
