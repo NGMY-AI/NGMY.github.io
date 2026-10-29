@@ -28,6 +28,13 @@ class NgmyBrowserTime {
 
   static DateTime Function() clock = DateTime.now;
 
+  /// TEST SWITCH. While it is true nobody gets free browser time and admins are asked to pay too, so the payment pop-up
+  /// can be tried straight away. Set it to false to bring back the 10 free minutes (and no limit for admins).
+  static bool paywallTest = true;
+
+  /// Admins are never asked to pay (except while [paywallTest] is on).
+  static bool adminExempt(bool isAdmin) => isAdmin && !paywallTest;
+
   /// The stored numbers for [email]: the free seconds left (the first time: the 10 minutes), the paid seconds left, when the paid
   /// time ends, and the end of the last Stripe payment that was already turned into hours.
   static Future<({int free, int pack, int until, int credited})> _read(SharedPreferences p, String email) async {
@@ -59,7 +66,8 @@ class NgmyBrowserTime {
     final p = await SharedPreferences.getInstance();
     await _expire(p, email);
     final s = await _read(p, email);
-    return s.pack > 0 ? s.pack : s.free;
+    if (s.pack > 0) return s.pack;
+    return paywallTest ? 0 : s.free;
   }
 
   static Future<bool> hasTime(String email) async => (await secondsLeft(email)) > 0;
@@ -119,7 +127,7 @@ class NgmyBrowserTime {
     required dynamic config,
     bool isAdmin = false,
   }) async {
-    if (isAdmin) return true;
+    if (adminExempt(isAdmin)) return true;
     final waiting = await syncPayments(email);
     if (await hasTime(email)) return true;
     if (!context.mounted) return false;

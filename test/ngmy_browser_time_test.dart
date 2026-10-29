@@ -11,8 +11,12 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     now = DateTime(2026, 11, 2, 9);
     NgmyBrowserTime.clock = () => now;
+    NgmyBrowserTime.paywallTest = false;
   });
-  tearDown(() => NgmyBrowserTime.clock = DateTime.now);
+  tearDown(() {
+    NgmyBrowserTime.clock = DateTime.now;
+    NgmyBrowserTime.paywallTest = true;
+  });
 
   test('10 free minutes of browser time, counted quietly, and then the payment is needed', () async {
     expect(await NgmyBrowserTime.secondsLeft(mail), 600);
@@ -56,5 +60,15 @@ void main() {
     expect(NgmyStripePayments.productSlug(NgmyStripeProduct.advisorBrowser), NgmyBrowserTime.stripeSlug);
     expect(NgmyStripePayments.productFromSlug('advisor_browser'), NgmyStripeProduct.advisorBrowser);
     expect(NgmyStripePayments.isOneTimePayProduct(NgmyStripeProduct.advisorBrowser), isTrue);
+  });
+  test('test switch: no free time and admins are asked too, until the switch is turned off', () async {
+    NgmyBrowserTime.paywallTest = true;
+    expect(await NgmyBrowserTime.secondsLeft(mail), 0);
+    expect(NgmyBrowserTime.adminExempt(true), isFalse);
+    await NgmyBrowserTime.creditPack(mail);
+    expect(await NgmyBrowserTime.secondsLeft(mail), 7200, reason: 'a payment still gives its 2 hours');
+    NgmyBrowserTime.paywallTest = false;
+    expect(NgmyBrowserTime.adminExempt(true), isTrue);
+    expect(NgmyBrowserTime.adminExempt(false), isFalse);
   });
 }

@@ -3780,7 +3780,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   /// Every few seconds: while the live browser is open (and the chat is in front) its time is taken off in the background. When
   /// the time runs out the browser stops and the payment pop-up comes up. The person never sees any counting.
   Future<void> _countBrowserTime() async {
-    if (_isAdminUser || _email.isEmpty) return;
+    if (NgmyBrowserTime.adminExempt(_isAdminUser) || _email.isEmpty) return;
     final now = DateTime.now();
     final last = _browserCountedAt;
     _browserCountedAt = now;
