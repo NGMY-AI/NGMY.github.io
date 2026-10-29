@@ -403,7 +403,8 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
     b.id = id;
     b.bias = 0.4;
     b.alpha = 0.55;
-    b.box(V3(x, 14, 0.25), const V3(15, 19, 0.5), ok ? okRing : badRing);
+    final st = ok ? 2 : (i < 2 ? r.fixtureState(i) : 0);
+    b.box(V3(x, 14, 0.25), const V3(15, 19, 0.5), ok ? okRing : (st == 1 ? const Color(0xFFF59E0B) : badRing));
     b.alpha = 1;
     b.bias = 0;
     b.box(V3(x, 14, 0.9), const V3(9.5, 13.5, 1.4), ok ? const Color(0xFFF7F2E6) : const Color(0xFF3F3F46), shine: 0.25);
@@ -429,7 +430,8 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
     b.id = id;
     b.bias = 0.4;
     b.alpha = 0.55;
-    b.box(V3(x, 48, 0.25), const V3(10, 15, 0.5), ok ? okRing : badRing);
+    final sst = ok ? 2 : (id == idHSwitch ? r.fixtureState(3) : 0);
+    b.box(V3(x, 48, 0.25), const V3(10, 15, 0.5), ok ? okRing : (sst == 1 ? const Color(0xFFF59E0B) : badRing));
     b.alpha = 1;
     b.bias = 0;
     b.box(V3(x, 48, 0.9), const V3(6, 10, 1.4), ok ? const Color(0xFFF7F2E6) : const Color(0xFF3F3F46), shine: 0.25);
@@ -796,6 +798,9 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
       wb.tube([V3(p.x + dz, 121, p.z), V3((p.x + q.x) / 2 + dz, 117, p.z), V3(q.x + dz, 121, p.z)], 0.35, const Color(0xFF111827), shine: 0, sides: 4, joints: false);
     }
     b.polys.addAll(wb.polys);
+  }
+  for (final f in r.furn.where((f) => r.darkOffices.containsKey(f.id))) {
+    labels.add(Label3D(V3(f.x, f.kind == 'hq' ? 190 : 130, f.z + 40), '⚡ Level ${r.darkOffices[f.id]} has no power: tap to go and fix it', const Color(0xFFDC2626), id: idHTag + f.id));
   }
   for (final f in r.furn.where((f) => r.darkHouses.contains(f.id))) {
     final k = kFurnKinds[f.kind]!;
@@ -1530,6 +1535,10 @@ void _furniture(MeshBuilder b, String kind, Color c) {
           b.box(V3(0, hgt + 3, 0), V3(bw + 4, 6, bd + 4), const Color(0xFF1F2937));
           b.box(V3(bw * 0.2, hgt + 12, 0), V3(bw * 0.3, 12, bd * 0.3), const Color(0xFF9CA3AF));
         }
+        // The entrance: glass doors with a yellow canopy, so the building can be walked into.
+        _patch(b, V3(0, 17, bd / 2 + 0.6), const V3(1, 0, 0), const V3(0, 1, 0), 34, 34, const Color(0xFF1F2937), const V3(0, 0, 1), shine: 0.5);
+        _patch(b, V3(0, 17, bd / 2 + 0.7), const V3(0, 1, 0).cross(const V3(0, 0, 1)), const V3(0, 1, 0), 1.2, 34, const Color(0xFF9BD3F5), const V3(0, 0, 1), shine: 0.6);
+        b.box(V3(0, 38, bd / 2 + 5), const V3(46, 3, 10), const Color(0xFFF5C14B), shine: 0.3);
         b.endGroup();
       }
     case 'store':

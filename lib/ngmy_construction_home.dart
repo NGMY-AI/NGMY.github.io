@@ -263,6 +263,18 @@ class HRoom {
   bool wiringNeeded = false;
   bool plumbNeeded = false;
   RoomProject? wiring;
+
+  /// The wiring jobs of the houses and offices in the town (outside only), kept so work already done is still there when you come back.
+  final Map<int, RoomProject> houseWork = {};
+
+  /// Which office in a tower has no power: the building's number and the level.
+  final Map<int, int> darkOffices = {};
+
+  /// The wiring lesson of each street light being fixed, kept so the work is still there when you come back.
+  final Map<int, WiringState> lampWork = {};
+
+  /// Fixture 0 to 3 (outlet, outlet, ceiling light or fan, switch): 0 not started, 1 started, 2 finished.
+  int fixtureState(int i) => !indoor || lesson.isNotEmpty ? 2 : (wiring != null ? wiring!.orderProgress(i) : (wiringNeeded ? 0 : 2));
   PlumbJob? plumb;
 
   /// What is plugged into the two wall outlets (0 and 1), whether the ceiling light or fan is on, and which one hangs there.

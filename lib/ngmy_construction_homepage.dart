@@ -364,6 +364,10 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       if (f != null) _goToTag(f);
       return;
     }
+    if (id == idCinElevator) {
+      if (inner?.isTower == true) setState(() => _cardElevator = true);
+      return;
+    }
     if (id == idCinPanel || id == idCinOutlet) {
       final inn = inner;
       if (inn != null) {
@@ -694,6 +698,87 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     conBeep(700, ms: 70);
   }
 
+  // ── The elevator of an office tower ──
+
+  bool _cardElevator = false;
+  bool _onBalcony = false;
+
+  /// Take the elevator to [n]: the office on that level may have no power.
+  void _goLevel(int n) {
+    final inn = inner;
+    if (inn == null || !inn.isTower) return;
+    final id = inn.door.id;
+    final dark = room.darkOffices[id] == n;
+    final p = _houseProjects[id * 100 + n];
+    inn.goToLevel(n, darkHere: dark);
+    inn.fixtures = p == null ? const [false, false, false, false] : _fixturesOf(p);
+    inn.build(comm);
+    setState(() {
+      _cardElevator = false;
+      _rebuild();
+    });
+    cam.glideTo(target: const V3(0, 30, 110), dist: 260, yaw: 0.0, pitch: 0.55);
+    conBeep(660, ms: 90);
+    conBeep(880, ms: 90);
+    _say(dark ? 'Level $n. This office has no power: walk onto the red mat at the breaker panel, or tap the red frames.' : 'Level $n of ${inn.levels}.', ok: true);
+  }
+
+  Widget _elevatorCard() {
+    final inn = inner;
+    if (inn == null || !inn.isTower) return const SizedBox.shrink();
+    final jobLevel = room.darkOffices[inn.door.id];
+    return Container(
+      color: Colors.black.withValues(alpha: 0.55),
+      alignment: Alignment.center,
+      child: SingleChildScrollView(
+        child: Container(
+          width: 330,
+          margin: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1F2937), Color(0xFF0B1220)]), borderRadius: BorderRadius.circular(28), border: Border.all(color: Colors.white24)),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              const Text('🛗', style: TextStyle(fontSize: 28)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Elevator', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+                  Text('You are on level ${inn.level} of ${inn.levels}', style: const TextStyle(color: Colors.white60, fontSize: 12.5)),
+                ]),
+              ),
+              GestureDetector(onTap: () => setState(() => _cardElevator = false), child: const Icon(Icons.close_rounded, color: Colors.white54)),
+            ]),
+            const SizedBox(height: 12),
+            const Text('Choose a level. A red one has an office with no power.', style: TextStyle(color: Colors.white70, fontSize: 13)),
+            const SizedBox(height: 10),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              for (var n = inn.levels; n >= 1; n--)
+                GestureDetector(
+                  onTap: () => _goLevel(n),
+                  child: Container(
+                    width: 58,
+                    height: 52,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: n == inn.level ? const Color(0xFF38BDF8) : (n == jobLevel ? const Color(0xFFDC2626).withValues(alpha: 0.35) : Colors.white.withValues(alpha: 0.08)),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: n == jobLevel ? const Color(0xFFEF4444) : (n == inn.level ? Colors.white : Colors.white24), width: n == inn.level || n == jobLevel ? 2 : 1),
+                    ),
+                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Text(n == 1 ? 'L' : '$n', style: TextStyle(color: n == inn.level ? Colors.black : Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
+                      if (n == jobLevel) const Text('⚡', style: TextStyle(fontSize: 11)),
+                    ]),
+                  ),
+                ),
+            ]),
+            const SizedBox(height: 6),
+            const Text('L is the lobby. On every level there is a balcony with a view of the town.', style: TextStyle(color: Colors.white38, fontSize: 11.5)),
+          ]),
+        ),
+      ),
+    );
+  }
+
   // ── The drone: one smooth flight over the city ──
 
   bool _droneOn = false;
@@ -894,24 +979,29 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   /// The wiring job for a house with no power: the same wiring bench as the jobs, in that house.
   /// The wiring job of each dark house, kept so the work you did is still there when you come back.
-  final Map<int, RoomProject> _houseProjects = {};
+  Map<int, RoomProject> get _houseProjects => home.rooms.firstWhere((r) => !r.indoor).houseWork;
 
   List<bool> _fixturesOf(RoomProject p) => [for (var i = 0; i < 4; i++) p.orderOk(i)];
 
   Future<void> _houseJob(CityInterior inn) async {
     final f = inn.door;
-    final p = _houseProjects.putIfAbsent(f.id, () => RoomProject(seed: f.id * 13 + 5, kind: 0)..fastForward());
+    final key = inn.isTower ? f.id * 100 + inn.level : f.id;
+    final p = _houseProjects.putIfAbsent(key, () => RoomProject(seed: f.id * 13 + 5 + inn.level, kind: 0)..fastForward());
     await _pushPage(MaterialPageRoute<void>(builder: (_) => NgmyRoomProjectPage(project: p)));
     if (!mounted) return;
     inn.fixtures = _fixturesOf(p);
     if (p.wiringWorks) {
-      _houseProjects.remove(f.id);
-      room.darkHouses.remove(f.id);
+      _houseProjects.remove(key);
+      if (inn.isTower) {
+        room.darkOffices.remove(f.id);
+      } else {
+        room.darkHouses.remove(f.id);
+      }
       inn.dark = false;
       comm?.points += 20;
       inn.build(comm);
       setState(_rebuild);
-      _say('The power is back in the house: you fixed the wiring the right way. +20 points.', ok: true);
+      _say(inn.isTower ? 'The power is back on level ${inn.level}: you fixed the wiring the right way. +20 points.' : 'The power is back in the house: you fixed the wiring the right way. +20 points.', ok: true);
     } else {
       inn.build(comm);
       setState(_rebuild);
@@ -923,10 +1013,11 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   /// A street light that went out: the lamp wiring lesson, then the light comes back.
   Future<void> _fixLamp(Furn f) async {
-    final st = WiringState();
+    final st = room.lampWork.putIfAbsent(f.id, () => WiringState());
     await _pushPage(MaterialPageRoute<void>(builder: (_) => ElectricalLessonPage(id: 'light', state: st)));
     if (!mounted) return;
     if (st.stage >= 2 && evaluateWiring(electricalLesson('light'), st).ok) {
+      room.lampWork.remove(f.id);
       room.brokenLamps.remove(f.id);
       comm?.points += 8;
       setState(_rebuild);
@@ -1103,9 +1194,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
           Text('City office', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
         ]),
         const SizedBox(height: 12),
-        bubble('Hello, this is the City office. You have missed 2 calls in a row.'),
+        bubble('Hello, this is the City office. A few calls were missed.'),
         bubble('Please answer the phone, so you can keep working.'),
-        bubble('If you miss one more, the game closes for 5 hours.'),
+        bubble('Every call is a person who needs help. Thank you for answering!'),
         action(Icons.check_rounded, 'OK, I will answer', const Color(0xFF4ADE80), () => setState(() => _cardOffice = false), primary: true),
       ]);
     }
@@ -1727,6 +1818,19 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         inn.jobRequested = false;
         _houseJob(inn);
       }
+      if (inn.elevatorRequested) {
+        inn.elevatorRequested = false;
+        if (!_cardElevator) setState(() => _cardElevator = true);
+      }
+      if (inn.onBalcony != _onBalcony) {
+        _onBalcony = inn.onBalcony;
+        // Out on the balcony the view turns to look over the town, and comes back when you step in.
+        if (_onBalcony) {
+          cam.glideTo(target: const V3(230, -40, 100), dist: 330, yaw: 1.35, pitch: 0.35);
+        } else {
+          cam.glideTo(target: V3(0, 30, 110), dist: 260, yaw: 0.0, pitch: 0.55);
+        }
+      }
       if (inn.leaving) _leaveBuilding();
       return;
     }
@@ -1759,6 +1863,12 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       ..build(comm);
     inner = inn;
     _act = null;
+    if (inn.isTower) {
+      final jl = room.darkOffices[f.id];
+      if (_job != null && _job!.kind == 'office' && jl != null) {
+        _cardElevator = true;
+      }
+    }
     cam
       ..minDist = 60
       ..maxDist = 420
@@ -1767,7 +1877,14 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       ..setFree(true);
     cam.glideTo(target: V3(0, 30, 110), dist: 260, yaw: 0.0, pitch: 0.55);
     setState(_rebuild);
-    _say(f.kind == 'hospital' ? 'The hospital. Walk onto the blue mat to admit the sick, and up to a bed to treat the patient. Walk to the green mat to go out.' : 'The shop. Walk onto the yellow mat for food and the purple mat for medicine. Walk to the green mat to go out.');
+    _say(switch (inn.kind) {
+      'hospital' => 'The hospital. Walk onto the blue mat to admit the sick, and up to a bed to treat the patient. Walk to the green mat to go out.',
+      'tower' => 'The lobby of an office tower. Walk onto the blue mat (or tap the elevator) to choose a level. Walk to the green mat to go out.',
+      'house2' || 'bighouse' => 'The house. Walk onto the red or green mat at the breaker panel. Walk to the green mat to go out.',
+      'school' => 'The school. Walk onto the mats to teach the class or read in the library. Walk to the green mat to go out.',
+      'firestation' => 'The fire station. Walk onto the mats to check the equipment. Walk to the green mat to go out.',
+      _ => 'The shop. Walk onto the yellow mat for food and the purple mat for medicine. Walk to the green mat to go out.',
+    });
     conBeep(660, ms: 80);
   }
 
@@ -1931,21 +2048,16 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   Future<void> _loadLock() async {
     try {
       final p = await SharedPreferences.getInstance();
-      final until = p.getInt(_lockKey) ?? 0;
-      if (!mounted) return;
-      if (until > DateTime.now().millisecondsSinceEpoch) setState(() => _lockedUntil = until);
+      // The game is never closed for missing calls: an old lock saved on this phone is cleared.
+      if (p.getInt(_lockKey) != null) await p.remove(_lockKey);
     } catch (_) {}
   }
 
-  /// Three missed jobs in a row: the game closes for five hours.
+  /// Missing calls never closes the game. After three in a row the office calls again, and the count starts over.
   void _lockOut() {
-    _lockedUntil = DateTime.now().add(const Duration(hours: 5)).millisecondsSinceEpoch;
     _strikes = 0;
-    _job = null;
-    _waiting.clear();
     _stopRing();
-    SharedPreferences.getInstance().then((p) => p.setInt(_lockKey, _lockedUntil)).catchError((_) => false);
-    if (mounted) setState(() {});
+    _officeCall();
   }
 
   void _strike(String why) {
@@ -1979,7 +2091,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     final houses = [for (final f in city.furn) if ((f.kind == 'house2' || f.kind == 'bighouse') && !city.darkHouses.contains(f.id) && f.id != _lastHouse) f];
     final lamps = [for (final f in city.furn) if ((f.kind == 'pole' || f.kind == 'lamppost') && !city.brokenLamps.contains(f.id)) f];
     final hospital = city.furn.where((f) => f.kind == 'hospital');
-    final order = [0, 1, 2]..shuffle(_rnd);
+    final order = [0, 1, 2, 3]..shuffle(_rnd);
+    final towers = [for (final f in city.furn) if ((f.kind == 'tower' || f.kind == 'hq') && !city.darkOffices.containsKey(f.id)) f];
     for (final k in order) {
       if (k == 0 && houses.isNotEmpty && city.darkHouses.length < 4) {
         final f = houses[_rnd.nextInt(houses.length)];
@@ -1995,6 +2108,12 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
           p.health = math.min(p.health, 70);
           return _NCall(hospital.first, 'the hospital', kind: 'sick', who: p.name);
         }
+      }
+      if (k == 3 && towers.isNotEmpty && city.darkOffices.length < 3) {
+        final f = towers[_rnd.nextInt(towers.length)];
+        final lv = 2 + _rnd.nextInt(towerLevels(f) - 1);
+        city.darkOffices[f.id] = lv;
+        return _NCall(f, f.kind == 'hq' ? 'the NGMY company building' : 'the office tower', kind: 'office', level: lv);
       }
       if (k == 2 && lamps.isNotEmpty && city.brokenLamps.length < 4) {
         final f = lamps[_rnd.nextInt(lamps.length)];
@@ -2013,6 +2132,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         return !city.darkHouses.contains(c.furn.id);
       case 'light':
         return !city.brokenLamps.contains(c.furn.id);
+      case 'office':
+        return !city.darkOffices.containsKey(c.furn.id);
       default:
         final cm = comm;
         if (cm == null) return false;
@@ -2038,16 +2159,42 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     final w = walker;
     if (w == null || room.indoor) return;
     if (inner != null) _leaveBuilding();
-    final k = kFurnKinds[f.kind]!;
-    final out = rotY(V3(0, 0, k.d / 2 + 60), f.rot * math.pi / 2);
     w
-      ..x = f.x + out.x
-      ..z = f.z + out.z
       ..target = null
       ..refresh();
+    final spot = _frontSpot(f, w);
+    w
+      ..x = spot.$1
+      ..z = spot.$2;
     w.unstick();
     cam.glideTo(target: V3(w.x, 30, w.z), dist: 170);
     if (!steer) _startSteer();
+  }
+
+  /// A free place right in front of the door of a building (a few steps from it), or beside a pole or a street light.
+  (double, double) _frontSpot(Furn f, WorldWalker w) {
+    final k = kFurnKinds[f.kind]!;
+    final building = kEnterable.contains(f.kind);
+    final dist = building ? k.d / 2 + 32 : 34.0;
+    final front = rotY(V3(0, 0, 1), f.rot * math.pi / 2);
+    final side = V3(front.z, 0, -front.x);
+    final tries = <(double, double)>[];
+    if (building) {
+      for (final dd in const [0.0, 10.0, 22.0, 36.0, 52.0]) {
+        for (final ss in const [0.0, 24.0, -24.0, 48.0, -48.0]) {
+          tries.add((f.x + front.x * (dist + dd) + side.x * ss, f.z + front.z * (dist + dd) + side.z * ss));
+        }
+      }
+    } else {
+      for (var i = 0; i < 12; i++) {
+        final a = i * math.pi / 6;
+        tries.add((f.x + math.cos(a) * dist, f.z + math.sin(a) * dist));
+      }
+    }
+    for (final t in tries) {
+      if (!w.blocked(t.$1, t.$2)) return t;
+    }
+    return tries.first;
   }
 
   void _startJob(_NCall c) {
@@ -2064,6 +2211,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     _teleportTo(f);
     if (f.kind == 'house2' || f.kind == 'bighouse') {
       _enterBuilding(f);
+    } else if (f.kind == 'tower' || f.kind == 'hq') {
+      _enterBuilding(f);
+      setState(() => _cardElevator = true);
     } else {
       _say('You are at the street light. Press Fix the street light.', ok: true);
     }
@@ -2694,6 +2844,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         _chip('🛒 Shop', false, () => _citySheet('shop'), color: const Color(0xFFFB923C)),
         _chip('👨‍👩‍👧 People', false, () => _citySheet('people'), color: const Color(0xFF60A5FA)),
         _chip('🏠 Go inside', false, () => _go(10), color: const Color(0xFF4ADE80)),
+        if (inner?.isTower == true) _chip('🏢 Level ${inner!.level} of ${inner!.levels}', false, () => setState(() => _cardElevator = true), color: const Color(0xFF60A5FA)),
         if (_job != null) _chip('📋 My job${_jobMeters() == null ? '' : ' · ${_jobMeters()} m'}', false, () => setState(() => _cardCall = _job), color: const Color(0xFFFACC15)),
         if (_waiting.isNotEmpty) _chip('⏳ Waiting: ${_waiting.length}', false, () => _say('${_waiting.length} job${_waiting.length == 1 ? '' : 's'} waiting. You are taken to the next one when you finish this one.', ok: true), color: const Color(0xFFF59E0B)),
         _chip(_droneOn ? '⏹ Stop drone' : '🚁 Drone', _droneOn, () => _droneOn ? _stopDrone() : setState(() => _cardDrone = true), color: const Color(0xFF38BDF8)),
@@ -2735,7 +2886,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
           if (showMap && !isLesson && !full) _MiniMap(home: home, onTap: _go, maxWidth: math.min(138.0, screenW * 0.36)),
         ],
       );
-    final stage = (_cardCall != null || _cardOffice || _cardDrone) ? Stack(fit: StackFit.expand, children: [stage3d, Positioned.fill(child: _cardDrone ? _droneCard() : _cardOverlay())]) : stage3d;
+    final stage = (_cardCall != null || _cardOffice || _cardDrone || _cardElevator) ? Stack(fit: StackFit.expand, children: [stage3d, Positioned.fill(child: _cardElevator ? _elevatorCard() : (_cardDrone ? _droneCard() : _cardOverlay()))]) : stage3d;
     if (full) return _fullScreen(stage);
     return LessonScaffold(
       title: r.name,
@@ -2994,7 +3145,7 @@ class DroneLeg {
 }
 
 class _NCall {
-  _NCall(this.furn, this.name, {this.kind = 'power', this.who = ''});
+  _NCall(this.furn, this.name, {this.kind = 'power', this.who = '', this.level = 0});
   final Furn furn;
   final String name;
 
@@ -3002,11 +3153,15 @@ class _NCall {
   final String kind;
   final String who;
 
-  String get emoji => switch (kind) { 'sick' => '🤒', 'light' => '💡', _ => '⚡' };
-  String get caller => switch (kind) { 'sick' => who.isEmpty ? 'A neighbour' : who, 'light' => 'City lights office', _ => 'Your neighbour' };
-  String get subtitle => switch (kind) { 'sick' => 'Needs a doctor', 'light' => 'A street light is out', _ => 'No power at a house' };
+  /// For an office call: the level of the tower that has no power.
+  final int level;
+
+  String get emoji => switch (kind) { 'sick' => '🤒', 'light' => '💡', 'office' => '🏢', _ => '⚡' };
+  String get caller => switch (kind) { 'sick' => who.isEmpty ? 'A neighbour' : who, 'light' => 'City lights office', 'office' => 'Office manager', _ => 'Your neighbour' };
+  String get subtitle => switch (kind) { 'sick' => 'Needs a doctor', 'light' => 'A street light is out', 'office' => 'No power in an office', _ => 'No power at a house' };
   List<String> get lines => switch (kind) {
         'sick' => ['Hello! $caller is very sick and cannot get up.', 'Please take them to the hospital: walk into the hospital and onto the desk to admit them.', 'I will pay you 10 points. Thank you!'],
+        'office' => ['Hello! The office on level $level of $name has no power.', 'Take the elevator up to level $level, then fix the breaker panel there.', 'I will pay you 20 points. Thank you!'],
         'light' => ['Hello! A street light is out and the street is dark.', 'It is the dark one with the red sign. Could you fix its wiring?', 'I will pay you 10 points. Thank you!'],
         _ => ['Hello! All the lights went out in $name. The power is off in the whole house.', 'Could you check the breaker panel inside and fix the wiring? Switch the power off before you touch anything.', 'I will pay you 20 points. Thank you!'],
       };

@@ -90,8 +90,8 @@ void main() {
   test('the person you steer walks round buildings and trees, never through the house, and reaches a spot you send them to', () {
     final w = HomeProject(seed: 2).rooms[11];
     final p = WorldWalker(w, x: 0, z: 40);
-    for (var i = 0; i < 80; i++) {
-      p.step(0, -1, 0.05);
+    for (var i = 0; i < 400; i++) {
+      p.step(0, -1, 0.01);
     }
     expect(p.z, greaterThan(kHouseFootprint.z1));
     expect(p.atDoor, isTrue);

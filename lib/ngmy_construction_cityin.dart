@@ -17,7 +17,7 @@ import 'ngmy_construction_world.dart';
 
 /// A place on the floor that does something when you walk into it.
 /// The labels inside a house that you can tap to be shown the thing they are about.
-const int idCinPanel = 19500, idCinOutlet = 19501;
+const int idCinPanel = 19500, idCinOutlet = 19501, idCinElevator = 19502;
 
 class _Zone {
   const _Zone(this.id, this.x, this.z, this.r);
@@ -26,10 +26,13 @@ class _Zone {
 }
 
 /// The buildings you can walk into.
-const Set<String> kEnterable = {'hospital', 'shop', 'school', 'firestation', 'house2', 'bighouse', 'store', 'gasstation'};
+const Set<String> kEnterable = {'hospital', 'shop', 'school', 'firestation', 'house2', 'bighouse', 'store', 'gasstation', 'tower', 'hq'};
 
 /// The inside a building has: an NGMY store or gas station is a shop inside.
-String interiorKindOf(String kind) => (kind == 'store' || kind == 'gasstation') ? 'shop' : kind;
+String interiorKindOf(String kind) => (kind == 'store' || kind == 'gasstation') ? 'shop' : (kind == 'hq' ? 'tower' : kind);
+
+/// How many levels an office tower has (the tall ones more, the company building twelve).
+int towerLevels(Furn f) => f.kind == 'hq' ? 12 : ((210.0 + (kFurnColors[f.color].toARGB32() % 5) * 24) / 22).floor().clamp(8, 14);
 
 const List<String> _safetyTips = [
   'Always switch the breaker OFF and test the wires with a tester before you touch them.',
@@ -57,6 +60,26 @@ class CityInterior {
   /// What has been fixed so far in a dark house: outlet 1, outlet 2, ceiling light, switch.
   List<bool> fixtures = const [false, false, false, false];
 
+  /// In an office tower: the level you are on, how many there are, and what the elevator or the balcony mat asks the page to do.
+  int level = 1;
+  late final int levels = towerLevels(door);
+  bool elevatorRequested = false;
+  bool onBalcony = false;
+  bool get isTower => kind == 'tower';
+
+  /// The elevator takes you to [n]; [darkHere] is whether the office on that level has no power.
+  void goToLevel(int n, {required bool darkHere}) {
+    level = n.clamp(1, levels);
+    dark = darkHere;
+    walker
+      ..x = 0
+      ..z = 112
+      ..yaw = math.pi;
+    onBalcony = false;
+    _inside.clear();
+    build(_cm);
+  }
+
   static const double w = 300, d = 210, h = 120;
   late final WorldWalker walker;
   late final List<_Zone> _zones;
@@ -82,6 +105,7 @@ class CityInterior {
         'shop' => const [NavRect(-60, 60, 28, 50), NavRect(-134, -80, 70, 170), NavRect(80, 134, 70, 170)],
         'school' => const [NavRect(-70, 70, 20, 44), NavRect(-110, -50, 80, 100), NavRect(50, 110, 80, 100), NavRect(-110, -50, 130, 150), NavRect(50, 110, 130, 150)],
         'firestation' => const [NavRect(-100, 100, 24, 90), NavRect(-134, -110, 100, 190), NavRect(110, 134, 100, 190)],
+        'tower' => const [NavRect(-62, 62, 6, 46), NavRect(-117, -73, 149, 171), NavRect(-57, -13, 164, 186), NavRect(73, 117, 159, 181), NavRect(120, 144, 140, 160), NavRect(108, 142, 48, 60)],
         _ => const [NavRect(-90, 10, 130, 160), NavRect(-50, 50, 70, 100), NavRect(-134, -110, 20, 70)],
       };
 
@@ -90,6 +114,7 @@ class CityInterior {
         'shop' => const [_Zone(0, -64, 120, 26), _Zone(1, 64, 120, 26), _Zone(2, 0, 84, 24)],
         'school' => const [_Zone(0, 0, 80, 26), _Zone(1, 90, 56, 22)],
         'firestation' => const [_Zone(0, -60, 130, 26), _Zone(1, 80, 56, 22)],
+        'tower' => const [_Zone(0, 0, 70, 26), _Zone(1, -100, 110, 24), _Zone(2, 105, 100, 26)],
         _ => const [_Zone(0, -100, 100, 24), _Zone(1, 90, 100, 24)],
       };
 
@@ -102,6 +127,7 @@ class CityInterior {
     for (final z in _zones) {
       final near = math.sqrt(math.pow(walker.x - z.x, 2) + math.pow(walker.z - z.z, 2)) < z.r;
       if (!near) {
+        if (isTower && z.id == 2) onBalcony = false;
         _inside.remove(z.id);
         continue;
       }
@@ -150,6 +176,20 @@ class CityInterior {
           return 'You checked the equipment with the firefighters. +2 points. Keep the extinguishers charged.';
         }
         return 'Fire drill: ${_safetyTips[((cm?.points ?? 0) + 1) % _safetyTips.length]}';
+      case 'tower':
+        if (zone == 0) {
+          elevatorRequested = true;
+          return 'The elevator: choose your level (you are on level $level of $levels).';
+        }
+        if (zone == 2) {
+          onBalcony = true;
+          return 'The balcony on level $level: the whole town is below you.';
+        }
+        if (dark) {
+          jobRequested = true;
+          return 'The breaker panel on level $level. This office has no power. Let us find the wiring fault.';
+        }
+        return 'The breaker panel on level $level: every breaker is on and the office has power.';
       default:
         if (zone == 0) {
           if (dark) {
@@ -172,6 +212,7 @@ class CityInterior {
       'shop' => (const Color(0xFFF1E3C6), const Color(0xFFD8C4A0)),
       'school' => (const Color(0xFFF3E6C8), const Color(0xFFC9B58C)),
       'firestation' => (const Color(0xFFE7D2D0), const Color(0xFFB4B7BD)),
+      'tower' => (dark ? const Color(0xFF9AA0A8) : const Color(0xFFEDEFF3), const Color(0xFFB8BEC8)),
       _ => (dark ? const Color(0xFF9AA0A8) : const Color(0xFFF1E6D0), const Color(0xFFC49A62)),
     };
     // Floor, then the three walls with windows (the front is open, so you see right in).
@@ -184,9 +225,18 @@ class CityInterior {
     b.startGroup();
     b.box(const V3(-w / 2 - 0.6, h / 2, d / 2), const V3(1.2, h, d), wallCol, split: 3);
     b.endGroup();
-    b.startGroup();
-    b.box(const V3(w / 2 + 0.6, h / 2, d / 2), const V3(1.2, h, d), wallCol, split: 3);
-    b.endGroup();
+    if (isTower) {
+      // The right side of a tower is glass, so the balcony looks out over the town.
+      b.order = 3;
+      b.alpha = 0.18;
+      b.box(const V3(w / 2 + 0.6, h / 2, d / 2), const V3(1.2, h, d), const Color(0xFFBFE3F7));
+      b.alpha = 1;
+      b.order = 0;
+    } else {
+      b.startGroup();
+      b.box(const V3(w / 2 + 0.6, h / 2, d / 2), const V3(1.2, h, d), wallCol, split: 3);
+      b.endGroup();
+    }
     b.order = 1;
     // Windows with a frame and the sky outside.
     const sky = Color(0xFF9BD3F5);
@@ -197,8 +247,10 @@ class CityInterior {
     for (final z in const [50.0, 130.0]) {
       b.box(V3(-w / 2 + 0.4, 78, z), const V3(0.6, 32, 34), const Color(0xFFF7F4EC));
       b.box(V3(-w / 2 + 0.8, 78, z), const V3(0.4, 29, 31), sky, shine: 0.6);
-      b.box(V3(w / 2 - 0.4, 78, z), const V3(0.6, 32, 34), const Color(0xFFF7F4EC));
-      b.box(V3(w / 2 - 0.8, 78, z), const V3(0.4, 29, 31), sky, shine: 0.6);
+      if (!isTower) {
+        b.box(V3(w / 2 - 0.4, 78, z), const V3(0.6, 32, 34), const Color(0xFFF7F4EC));
+        b.box(V3(w / 2 - 0.8, 78, z), const V3(0.4, 29, 31), sky, shine: 0.6);
+      }
     }
     // A skirting board and a beam along the ceiling, so it reads as the inside of a building.
     b.box(const V3(0, 3, 1.2), const V3(w, 6, 1.6), const Color(0xFFF7F4EC));
@@ -209,7 +261,7 @@ class CityInterior {
     for (final x in const [-90.0, 0.0, 90.0]) {
       for (final z in const [50.0, 140.0]) {
         b.cyl(V3(x, h - 2, z), V3(x, h - 18, z), 0.5, const Color(0xFF3F3F46), sides: 4);
-        b.ball(V3(x, h - 20, z), 5, (isHouse && dark) ? const Color(0xFF4B5563) : const Color(0xFFFFF1A8), lat: 3, lon: 6);
+        b.ball(V3(x, h - 20, z), 5, ((isHouse || isTower) && dark) ? const Color(0xFF4B5563) : const Color(0xFFFFF1A8), lat: 3, lon: 6);
       }
     }
     switch (kind) {
@@ -221,6 +273,8 @@ class CityInterior {
         _school(b, labels);
       case 'firestation':
         _station(b, labels);
+      case 'tower':
+        _tower(b, labels);
       default:
         _house(b, labels);
     }
@@ -327,6 +381,72 @@ class CityInterior {
     labels.add(const Label3D(V3(80, 40, 56), '🔥 Fire drill', Color(0xFFDC2626)));
   }
 
+  /// The inside of an office tower: a lobby with the elevator on the back wall (its display shows the level), desks, a balcony on the
+  /// right with a glass railing, and the breaker panel of the level. Outside the glass: the sky and the town far below.
+  void _tower(MeshBuilder b, List<Label3D> labels) {
+    const carpets = [Color(0xFF3B5B7A), Color(0xFF7C3A3A), Color(0xFF3F6B4F), Color(0xFF6B4F7C), Color(0xFF7A6A3B)];
+    b.order = 1;
+    b.box(const V3(-10, 0.5, 150), const V3(190, 0.6, 90), carpets[level % 5]);
+    b.order = 2;
+    // The elevator: a steel frame, two doors, a display with the level and a button panel.
+    b.id = idCinElevator;
+    // The shaft is thin and flat on the wall, so nothing of it can hide the doors; the frame is three bars round it.
+    b.box(const V3(0, 42, 1.5), const V3(88, 84, 3), const Color(0xFF0F172A));
+    b.box(const V3(-47, 48, 3.5), const V3(7, 96, 7), const Color(0xFF475569), shine: 0.5);
+    b.box(const V3(47, 48, 3.5), const V3(7, 96, 7), const Color(0xFF475569), shine: 0.5);
+    b.box(const V3(0, 93, 3.5), const V3(100, 7, 7), const Color(0xFF475569), shine: 0.5);
+    // The doors and the buttons sit on the frame: they are drawn after it from every side.
+    b.bias = 6;
+    for (final x in const [-24.0, 24.0]) {
+      b.box(V3(x, 42, 6.6), const V3(42, 84, 1.2), const Color(0xFFF8FAFC), shine: 0.7);
+    }
+    b.box(const V3(0, 42, 7.4), const V3(1.4, 84, 0.6), const Color(0xFF0F172A));
+    b.box(const V3(0, 98, 8.0), const V3(34, 6, 0.6), const Color(0xFF22D3EE), shine: 0.4);
+    b.box(const V3(0, 98, 6.6), const V3(40, 12, 2), const Color(0xFF111827));
+    b.box(const V3(64, 50, 6.6), const V3(10, 26, 2), const Color(0xFF374151));
+    b.ball(const V3(64, 57, 8.4), 2, const Color(0xFFFACC15), lat: 3, lon: 5);
+    b.ball(const V3(64, 49, 8.4), 2, const Color(0xFF22C55E), lat: 3, lon: 5);
+    b.bias = 0;
+    b.id = 0;
+    _mat(b, 0, 70, 26, const Color(0xFF38BDF8));
+    // Desks with chairs.
+    for (final (x, z) in const [(-95.0, 160.0), (-35.0, 175.0), (95.0, 170.0)]) {
+      b.box(V3(x, 15, z), const V3(44, 3, 22), const Color(0xFF8B5E3C), shine: 0.2);
+      b.box(V3(x - 19, 7, z), const V3(3, 14, 18), const Color(0xFF3F3F46));
+      b.box(V3(x + 19, 7, z), const V3(3, 14, 18), const Color(0xFF3F3F46));
+      b.box(V3(x, 24, z - 4), const V3(14, 10, 2), const Color(0xFF111418), shine: 0.5);
+      b.box(V3(x, 9, z + 18), const V3(14, 3, 14), const Color(0xFF1F2937));
+      b.box(V3(x, 16, z + 25), const V3(14, 14, 3), const Color(0xFF1F2937));
+    }
+    // The balcony on the right: a glass railing, a plant and a bench, and the green mat to step on.
+    _mat(b, 105, 100, 26, const Color(0xFF22C55E));
+    b.alpha = 0.3;
+    b.order = 3;
+    b.box(V3(w / 2 - 6, 14, 100), const V3(1.5, 28, 120), const Color(0xFFBFE3F7));
+    b.alpha = 1;
+    b.order = 2;
+    for (final z in const [40.0, 70.0, 100.0, 130.0, 160.0]) {
+      b.box(V3(w / 2 - 6, 14, z), const V3(2.5, 30, 2.5), const Color(0xFF9CA3AF), shine: 0.5);
+    }
+    b.ball(const V3(132, 14, 150), 10, const Color(0xFF3F8F4F), lat: 3, lon: 6);
+    b.box(const V3(125, 8, 54), const V3(30, 6, 12), const Color(0xFF8B5E3C));
+    // Outside the glass: the sky, and the ground and the other buildings of the town, far below on a high level.
+    final base = -(level * 22.0);
+    b.order = -1;
+    b.box(V3(520, base - 1, 105), const V3(900, 2, 700), const Color(0xFF4C8B4A));
+    b.box(const V3(720, 100, 105), const V3(2, 700, 900), const Color(0xFF9BD3F5));
+    b.order = 1;
+    for (var i = 0; i < 15; i++) {
+      final hgt = 30.0 + ((door.id * 7 + i * 13) % 90);
+      final col = const [Color(0xFF64748B), Color(0xFF3B5B7A), Color(0xFF94A3B8), Color(0xFF475569)][(door.id + i) % 4];
+      b.box(V3(215 + (i % 5) * 80.0, base + hgt / 2, -60 + (i ~/ 5) * 135.0), V3(38, hgt, 38), col);
+    }
+    labels.add(Label3D(const V3(0, 110, 10), '🏢 LEVEL $level of $levels', const Color(0xFF1D4ED8), id: idCinElevator));
+    labels.add(const Label3D(V3(0, 62, 12), '🛗 Elevator: walk onto the blue mat or tap', Color(0xFF0369A1), id: idCinElevator));
+    labels.add(const Label3D(V3(105, 52, 100), '🌆 Balcony: step here to see the city', Color(0xFF15803D)));
+    _wiring(b, labels);
+  }
+
   void _house(MeshBuilder b, List<Label3D> labels) {
     // A living room: a sofa, a coffee table, a TV on the wall, a shelf, a plant, a rug, and the breaker panel on the wall.
     b.order = 1;
@@ -338,6 +458,11 @@ class CityInterior {
     b.box(const V3(20, 66, 1.4), const V3(100, 52, 2.4), const Color(0xFF111418), shine: 0.4);
     b.box(const V3(120, 40, 100), const V3(16, 80, 60), const Color(0xFF9A6B3F));
     b.ball(const V3(-125, 16, 30), 10, const Color(0xFF3F8F4F), lat: 3, lon: 6);
+    _wiring(b, labels);
+  }
+
+  /// The breaker panel, the outlet and the switch on the walls (red until fixed, green when fixed), with their tappable labels.
+  void _wiring(MeshBuilder b, List<Label3D> labels) {
     // The breaker panel on the left wall.
     b.id = idCinPanel;
     b.box(const V3(-w / 2 + 3, 54, 45), const V3(5, 34, 24), const Color(0xFF8E959E), shine: 0.5);

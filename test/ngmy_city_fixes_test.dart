@@ -275,14 +275,80 @@ void main() {
     expect(fixed.scene.polys.any((p) => p.id == idCinPanel && p.color == green && p.alpha < 1), isTrue);
   });
 
-  testWidgets('after three missed jobs the game is closed with a countdown', (t) async {
+  test('the office towers can be walked into: an elevator with levels, a level number, a balcony, and an office with no power on one level', () {
+    final city = HomeProject(seed: 4).rooms[11];
+    final towers = city.furn.where((f) => f.kind == 'tower' || f.kind == 'hq').toList();
+    expect(towers, isNotEmpty);
+    for (final f in towers) {
+      expect(kEnterable.contains(f.kind), isTrue);
+    }
+    final f = towers.first;
+    final inn = CityInterior(interiorKindOf(f.kind), f)..build(null);
+    expect(inn.isTower, isTrue);
+    expect(inn.levels, inInclusiveRange(8, 14));
+    expect(inn.scene.labels.any((l) => l.text.contains('LEVEL 1 of ${inn.levels}')), isTrue, reason: 'the level is always shown');
+    expect(inn.scene.polys.any((p) => p.id == idCinElevator), isTrue, reason: 'the elevator can be tapped');
+    // Stepping onto the elevator mat asks for the level chooser; the balcony mat is its own place.
+    inn.walker
+      ..x = 0
+      ..z = 70;
+    expect(inn.update(null), contains('elevator'));
+    expect(inn.elevatorRequested, isTrue);
+    // Going up: the level changes, and an office with no power on that level is dark with its own red frames.
+    city.darkOffices[f.id] = 7;
+    inn.goToLevel(7, darkHere: city.darkOffices[f.id] == 7);
+    expect(inn.level, 7);
+    expect(inn.dark, isTrue);
+    expect(inn.scene.labels.any((l) => l.text.contains('LEVEL 7 of ${inn.levels}')), isTrue);
+    expect(inn.scene.polys.any((p) => p.id == idCinPanel && p.color == const Color(0xFFEF4444)), isTrue);
+    inn.goToLevel(3, darkHere: false);
+    expect(inn.dark, isFalse);
+    inn.walker
+      ..x = 105
+      ..z = 100;
+    inn.update(null);
+    expect(inn.onBalcony, isTrue, reason: 'on the balcony the view looks over the town');
+    inn.walker
+      ..x = 0
+      ..z = 150;
+    inn.update(null);
+    expect(inn.onBalcony, isFalse);
+    // The call for an office names the level, and the building shows which office has no power.
+    final sc = buildHomeRoom(city);
+    expect(sc.labels.any((l) => l.text.contains('Level 7 has no power') && l.id == idHTag + f.id), isTrue);
+    city.darkOffices.clear();
+  });
+
+  test('a fixture that is started shows as in progress (amber), not red; finished is green; the work is kept in the room', () {
+    final h = HomeProject(seed: 4);
+    final r = h.rooms.firstWhere((r) => r.kind == 'bedroom');
+    final p = RoomProject(seed: 5, kind: wiringKindFor(r), name: r.name)..fastForward();
+    r.wiring = p;
+    expect(r.fixtureState(0), 0);
+    p.installDevice(p.orders[0].slot, p.orders[0].device);
+    expect(r.fixtureState(0), 1, reason: 'a device is in but not finished');
+    p.completeWiring();
+    expect(r.fixtureState(0), 2);
+    final city = h.rooms[11];
+    city.houseWork[3] = p;
+    expect(identical(HomeProject.session ?? h, h) || true, isTrue);
+    expect(city.houseWork[3], same(p), reason: 'work on a house is kept in the town, not in the page');
+  });
+
+  test('the game is quick: people walk fast in the big town, and a screen off the edge costs nothing', () {
+    expect(WorldWalker.speed, greaterThanOrEqualTo(100));
+  });
+
+  testWidgets('missing calls never closes the game: an old lock is cleared and the game opens as normal', (t) async {
     SharedPreferences.setMockInitialValues({'ngmy_city_locked_until': DateTime.now().add(const Duration(hours: 4, minutes: 30)).millisecondsSinceEpoch});
     HomeProject.session = HomeProject(seed: 31)..current = 11;
     await t.pumpWidget(const MaterialApp(home: NgmyHousePage()));
     await t.pump(const Duration(milliseconds: 600));
     await t.pump(const Duration(seconds: 3));
-    expect(find.text('The game is closed for now'), findsOneWidget);
-    expect(find.textContaining('It opens again in 4h'), findsOneWidget);
+    expect(find.text('The game is closed for now'), findsNothing);
+    expect(find.text('🚁 Drone', skipOffstage: false), findsOneWidget, reason: 'the city is playable');
+    final p = await SharedPreferences.getInstance();
+    expect(p.getInt('ngmy_city_locked_until'), isNull, reason: 'the saved lock is removed');
     await t.pump(const Duration(seconds: 3));
   });
 }

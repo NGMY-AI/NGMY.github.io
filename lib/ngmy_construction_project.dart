@@ -665,6 +665,14 @@ class RoomProject {
 
   static String _appName(String a) => switch (a) { 'tv' => 'The TV', 'lamp' => 'The lamp', 'toaster' => 'The toaster', _ => 'The hair dryer' };
 
+  /// How far this fixture is: 0 nothing yet, 1 started (a device is in but not finished), 2 finished and right.
+  int orderProgress(int i) {
+    if (i < 0 || i >= orders.length) return 2;
+    if (orderOk(i)) return 2;
+    final d = devs[orders[i].slot];
+    return d == null ? 0 : 1;
+  }
+
   /// Is this one fixture finished: the device is in, wired right (the number is its place in [orders]: outlet, outlet, light or fan, switch).
   bool orderOk(int i) {
     if (i < 0 || i >= orders.length) return true;

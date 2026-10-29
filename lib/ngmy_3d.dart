@@ -596,7 +596,10 @@ class Scene3DPainter extends CustomPainter {
         wallN[p.group] = (wallN[p.group] ?? 0) + 1;
       }
     }
-    final far = math.max(cam.dist * 2.4 + 450, scene.farMin);
+    final reach = scene.farMin <= 0 ? 0.0 : 1800 + (scene.farMin - 1800) * ((cam.dist - 200) / 600).clamp(0.0, 1.0);
+    final far = math.max(cam.dist * 2.4 + 450, reach);
+    // What is off the screen is not drawn, but it still counts for the sorting of the piece it belongs to.
+    final offZ = <int, double>{}, offN = <int, int>{};
     final toLight = _toLight.unit;
     final half = (toLight + const V3(0, 0, -1)).unit;
     final drawn = <_Face>[];
@@ -623,6 +626,21 @@ class Scene3DPainter extends CustomPainter {
       if (facing > 0) {
         if (!p.twoSided) continue;
         n = n * -1;
+      }
+      var pxMin = double.infinity, pxMax = -double.infinity, pyMin = double.infinity, pyMax = -double.infinity;
+      for (final v in cp3) {
+        final x = cx + v.x * f / v.z, y = cy - v.y * f / v.z;
+        if (x < pxMin) pxMin = x;
+        if (x > pxMax) pxMax = x;
+        if (y < pyMin) pyMin = y;
+        if (y > pyMax) pyMax = y;
+      }
+      if (pxMax < -8 || pxMin > w + 8 || pyMax < -8 || pyMin > h + 8) {
+        if (p.group != 0) {
+          offZ[p.group] = (offZ[p.group] ?? 0) + zs / cp3.length - p.bias;
+          offN[p.group] = (offN[p.group] ?? 0) + 1;
+        }
+        continue;
       }
       final lam = math.max(0.0, n.dot(toLight));
       var shade = 0.56 + 0.58 * lam;
@@ -654,6 +672,20 @@ class Scene3DPainter extends CustomPainter {
       if (mid.z > far) continue;
       if (q.every((v) => v.z >= 1)) {
         final pts = [for (final v in q) Offset(cx + v.x * f / v.z, cy - v.y * f / v.z)];
+        var qx0 = double.infinity, qx1 = -double.infinity, qy0 = double.infinity, qy1 = -double.infinity;
+        for (final o in pts) {
+          if (o.dx < qx0) qx0 = o.dx;
+          if (o.dx > qx1) qx1 = o.dx;
+          if (o.dy < qy0) qy0 = o.dy;
+          if (o.dy > qy1) qy1 = o.dy;
+        }
+        if (qx1 < -8 || qx0 > w + 8 || qy1 < -8 || qy0 > h + 8) {
+          if (sq.group != 0) {
+            offZ[sq.group] = (offZ[sq.group] ?? 0) + mid.z - sq.bias;
+            offN[sq.group] = (offN[sq.group] ?? 0) + 1;
+          }
+          continue;
+        }
         final path = Path()..addPolygon(pts, true);
         final qb = path.getBounds();
         drawn.add(_Face(path, Colors.transparent, mid.z - sq.bias, sq.id, false, false, (c) {
@@ -683,7 +715,7 @@ class Scene3DPainter extends CustomPainter {
       drawn.add(_Face(path, Colors.transparent, mid.z - sq.bias, sq.id, false, false, (c) => _drawQuadCells(c, sq, cells, nx, ny, time), sq.order, sq.group));
     }
     // Far to near inside each tier. A grouped part is sorted as one piece by the middle of the whole part.
-    final gz = <int, double>{}, gn = <int, int>{};
+    final gz = Map<int, double>.of(offZ), gn = Map<int, int>.of(offN);
     for (final f in drawn) {
       if (f.group != 0) {
         gz[f.group] = (gz[f.group] ?? 0) + f.z;

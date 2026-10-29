@@ -70,7 +70,8 @@ class WorldWalker {
   (double, double)? target;
   List<NavRect> _obstacles = const [];
 
-  static const double speed = 70;
+  /// How fast a person walks (the town is big, so this is quick; running is almost twice as fast).
+  static const double speed = 115;
 
   /// How wide the person is (a car is wider), how much faster than walking they go, and the furniture they are sitting in (a car).
   double body = 7, speedScale = 1;
