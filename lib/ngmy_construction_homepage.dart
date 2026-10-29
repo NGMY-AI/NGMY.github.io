@@ -893,12 +893,19 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   // ── Jobs round the neighbourhood: houses and street lights that break, goods to carry, houses to sell ──
 
   /// The wiring job for a house with no power: the same wiring bench as the jobs, in that house.
+  /// The wiring job of each dark house, kept so the work you did is still there when you come back.
+  final Map<int, RoomProject> _houseProjects = {};
+
+  List<bool> _fixturesOf(RoomProject p) => [for (var i = 0; i < 4; i++) p.orderOk(i)];
+
   Future<void> _houseJob(CityInterior inn) async {
     final f = inn.door;
-    final p = RoomProject(seed: f.id * 13 + 5, kind: 0)..fastForward();
+    final p = _houseProjects.putIfAbsent(f.id, () => RoomProject(seed: f.id * 13 + 5, kind: 0)..fastForward());
     await _pushPage(MaterialPageRoute<void>(builder: (_) => NgmyRoomProjectPage(project: p)));
     if (!mounted) return;
+    inn.fixtures = _fixturesOf(p);
     if (p.wiringWorks) {
+      _houseProjects.remove(f.id);
       room.darkHouses.remove(f.id);
       inn.dark = false;
       comm?.points += 20;
@@ -906,7 +913,11 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       setState(_rebuild);
       _say('The power is back in the house: you fixed the wiring the right way. +20 points.', ok: true);
     } else {
-      _say('The wiring is not finished yet. Walk back onto the red mat at the panel to try again.', ok: false);
+      inn.build(comm);
+      setState(_rebuild);
+      final done = [if (p.orderOk(0)) 'outlet 1', if (p.orderOk(1)) 'outlet 2', if (p.orderOk(2)) 'the ceiling light', if (p.orderOk(3)) 'the switch'];
+      final todo = [if (!p.orderOk(0)) 'outlet 1', if (!p.orderOk(1)) 'outlet 2', if (!p.orderOk(2)) 'the ceiling light', if (!p.orderOk(3)) 'the switch'];
+      _say('${done.isEmpty ? 'Nothing is fixed yet' : 'Fixed so far: ${done.join(', ')}'}. Still to do: ${todo.join(', ')}. Tap the red frames to carry on.', ok: false);
     }
   }
 
@@ -1744,6 +1755,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     _inZ = 0;
     final inn = CityInterior(interiorKindOf(f.kind), f, dark: room.darkHouses.contains(f.id))
       ..carrying = _carrying
+      ..fixtures = _houseProjects[f.id] == null ? const [false, false, false, false] : _fixturesOf(_houseProjects[f.id]!)
       ..build(comm);
     inner = inn;
     _act = null;

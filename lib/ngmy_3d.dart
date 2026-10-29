@@ -80,7 +80,7 @@ class Label3D {
 }
 
 class Scene3D {
-  const Scene3D(this.polys, {this.info = const {}, this.labels = const [], this.screens = const [], this.shell});
+  const Scene3D(this.polys, {this.info = const {}, this.labels = const [], this.screens = const [], this.shell, this.farMin = 0});
   final List<Poly> polys;
   final Map<int, ObjInfo> info;
   final List<Label3D> labels;
@@ -90,6 +90,9 @@ class Scene3D {
 
   /// The room box (x from, x to, z from, z to) whose walls are tier 0. When the camera is outside it, those walls are drawn last, so they hide the room.
   final (double, double, double, double)? shell;
+
+  /// Nothing nearer than this is left out because it is far away (a whole town is seen from the air, so nothing may switch off).
+  final double farMin;
 }
 
 /// A screen in the scene: where its four corners are (top left, top right, bottom right, bottom left, seen from the front)
@@ -593,7 +596,7 @@ class Scene3DPainter extends CustomPainter {
         wallN[p.group] = (wallN[p.group] ?? 0) + 1;
       }
     }
-    final far = cam.dist * 2.4 + 450;
+    final far = math.max(cam.dist * 2.4 + 450, scene.farMin);
     final toLight = _toLight.unit;
     final half = (toLight + const V3(0, 0, -1)).unit;
     final drawn = <_Face>[];
@@ -652,7 +655,14 @@ class Scene3DPainter extends CustomPainter {
       if (q.every((v) => v.z >= 1)) {
         final pts = [for (final v in q) Offset(cx + v.x * f / v.z, cy - v.y * f / v.z)];
         final path = Path()..addPolygon(pts, true);
-        drawn.add(_Face(path, Colors.transparent, mid.z - sq.bias, sq.id, false, false, (c) => _drawQuad(c, sq, pts, time), sq.order, sq.group));
+        final qb = path.getBounds();
+        drawn.add(_Face(path, Colors.transparent, mid.z - sq.bias, sq.id, false, false, (c) {
+          if (qb.width < 7 && qb.height < 7) {
+            c.drawPath(path, Paint()..color = const Color(0xFF38BDF8));
+          } else {
+            _drawQuad(c, sq, pts, time);
+          }
+        }, sq.order, sq.group));
         continue;
       }
       // A corner is behind the camera (a big screen seen from close by): cut the screen into little patches and draw the ones in front, so it never switches off.

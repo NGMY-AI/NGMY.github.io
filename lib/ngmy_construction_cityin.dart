@@ -54,6 +54,9 @@ class CityInterior {
   /// A house with no power (its panel has to be fixed).
   bool dark;
 
+  /// What has been fixed so far in a dark house: outlet 1, outlet 2, ceiling light, switch.
+  List<bool> fixtures = const [false, false, false, false];
+
   static const double w = 300, d = 210, h = 120;
   late final WorldWalker walker;
   late final List<_Zone> _zones;
@@ -345,14 +348,17 @@ class CityInterior {
     _mat(b, -100, 100, 22, dark ? const Color(0xFFEF4444) : const Color(0xFF22C55E));
     _mat(b, 90, 100, 22, const Color(0xFF60A5FA));
     // The faults you can see: a red frame behind the breaker panel, the outlet and the switch on the wall (green when the house works).
-    final frame = dark ? const Color(0xFFEF4444) : const Color(0xFF22C55E);
+    const green = Color(0xFF22C55E), red = Color(0xFFEF4444);
+    // Each one turns green on its own as soon as it is fixed; the panel is green when the whole house has power.
+    final outOk = !dark || (fixtures[0] && fixtures[1]);
+    final swOk = !dark || fixtures[3];
     b.order = 1;
     b.alpha = 0.6;
     b.id = idCinPanel;
-    b.box(const V3(-w / 2 + 2.4, 54, 45), const V3(1.2, 44, 34), frame);
+    b.box(const V3(-w / 2 + 2.4, 54, 45), const V3(1.2, 44, 34), dark ? red : green);
     b.id = idCinOutlet;
-    b.box(const V3(95, 26, 1.0), const V3(30, 36, 0.8), frame);
-    b.box(const V3(-60, 50, 1.0), const V3(24, 32, 0.8), frame);
+    b.box(const V3(95, 26, 1.0), const V3(30, 36, 0.8), outOk ? green : red);
+    b.box(const V3(-60, 50, 1.0), const V3(24, 32, 0.8), swOk ? green : red);
     b.alpha = 1;
     b.box(const V3(95, 26, 1.8), const V3(14, 20, 1.2), const Color(0xFFF7F2E6), shine: 0.25);
     for (final dz in const [-1.0, 1.0]) {
@@ -361,12 +367,12 @@ class CityInterior {
       }
     }
     b.box(const V3(-60, 50, 1.8), const V3(8, 14, 1.2), const Color(0xFFF7F2E6), shine: 0.25);
-    b.box(V3(-60, dark ? 48 : 52, 2.8), const V3(2, 5, 1.0), const Color(0xFFD9D2C2));
+    b.box(V3(-60, swOk ? 52 : 48, 2.8), const V3(2, 5, 1.0), const Color(0xFFD9D2C2));
     b.id = 0;
     b.order = 2;
     labels.add(Label3D(const V3(-w / 2 + 6, 82, 45), dark ? '⚡ Breaker panel: tap, then walk onto the red mat' : '⚡ Breaker panel: all fine', dark ? const Color(0xFFDC2626) : const Color(0xFF15803D), id: idCinPanel));
-    labels.add(Label3D(const V3(95, 50, 6), dark ? '🔌 Outlet: dead, tap to see it' : '🔌 Outlet: works', dark ? const Color(0xFFDC2626) : const Color(0xFF15803D), id: idCinOutlet));
-    labels.add(Label3D(const V3(-60, 70, 6), dark ? '💡 Switch: no power' : '💡 Switch: works', dark ? const Color(0xFFDC2626) : const Color(0xFF15803D), id: idCinOutlet));
+    labels.add(Label3D(const V3(95, 50, 6), outOk ? '🔌 Outlets: fixed' : '🔌 Outlet: dead, tap to fix it', outOk ? const Color(0xFF15803D) : const Color(0xFFDC2626), id: idCinOutlet));
+    labels.add(Label3D(const V3(-60, 70, 6), swOk ? '💡 Switch: fixed' : '💡 Switch: no power, tap to fix it', swOk ? const Color(0xFF15803D) : const Color(0xFFDC2626), id: idCinOutlet));
     if (dark) labels.add(const Label3D(V3(0, 100, 20), 'No power in this house', Color(0xFFDC2626)));
   }
 

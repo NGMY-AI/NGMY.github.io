@@ -139,7 +139,7 @@ void main() {
     final sc = buildHomeRoom(hall);
     for (var i = 0; i < 4; i++) {
       expect(sc.polys.any((p) => p.id == idHCam + i), isTrue, reason: 'camera $i');
-      expect(sc.labels.any((l) => l.id == idHCam + i), isTrue);
+      expect(sc.labels.any((l) => l.id == idHCam + i), isFalse, reason: 'just the camera, no label');
     }
     for (var k = 0; k < 8; k++) {
       final rec = PictureRecorder();
@@ -224,6 +224,55 @@ void main() {
     final withStand = buildHomeRoom(r);
     final stand = withStand.polys.where((p) => p.id >= idHFurn && p.id < idHFurn + 100 && p.color == const Color(0xFF111418));
     expect(stand, isEmpty, reason: 'no TV screen on a cabinet');
+  });
+
+  test('every tower and the company building has billboards on the south face and on the north face the town looks at; nothing is switched off far away', () {
+    final city = HomeProject(seed: 4).rooms[11];
+    final sc = buildHomeRoom(city);
+    expect(sc.farMin, greaterThanOrEqualTo(4000), reason: 'houses and billboards stay on when the camera is far away');
+    final towers = city.furn.where((f) => f.kind == 'tower' || f.kind == 'hq').toList();
+    expect(towers.length, greaterThan(8));
+    for (final f in towers) {
+      final mine = sc.screens.where((q) => q.corners.every((c) => (c.x - f.x).abs() < 80 && (c.z - f.z).abs() < 50 && c.y > 40)).toList();
+      expect(mine.any((q) => q.corners.every((c) => c.z > f.z)), isTrue, reason: '${f.kind} at (${f.x}, ${f.z}) has a south billboard');
+      expect(mine.any((q) => q.corners.every((c) => c.z < f.z)), isTrue, reason: '${f.kind} at (${f.x}, ${f.z}) has a north billboard');
+      for (final q in mine) {
+        expect(_facing(q).z.abs(), greaterThan(0), reason: 'a flat picture');
+        expect(q.corners[0].y, greaterThan(q.corners[3].y), reason: 'upright');
+      }
+    }
+    // The big NGMY Town sign: a picture on both faces.
+    final town = city.furn.firstWhere((f) => f.kind == 'townsign');
+    final faces = sc.screens.where((q) => q.corners.every((c) => (c.z - town.z).abs() < 5 && c.y > 190)).toList();
+    expect(faces.length, 2);
+    expect(faces.map((q) => _facing(q).z > 0).toSet().length, 2, reason: 'one face looks south, the other north');
+  });
+
+  test('the TVs in the hall read the right way round from outside the wall too', () {
+    final hall = HomeProject(seed: 4).rooms.firstWhere((r) => r.kind == 'hall');
+    hall.tvOn = true;
+    final sc = buildHomeRoom(hall);
+    expect(sc.screens.where((q) => q.twoSided), isEmpty, reason: 'a two sided picture looks mirrored from behind');
+    for (final id in [idHWallTv, idHWallTv + 1]) {
+      final faces = sc.screens.where((q) => q.id == id).toList();
+      expect(faces.length, 2, reason: 'TV $id has a face on each side');
+      final a = _facing(faces[0]), b = _facing(faces[1]);
+      expect(a.x * b.x + a.y * b.y + a.z * b.z, lessThan(0), reason: 'the two faces look opposite ways');
+    }
+  });
+
+  test('a fixed fixture in a dark house turns green on its own, the panel only when the whole house has power', () {
+    final f = HomeProject(seed: 4).rooms[11].furn.firstWhere((f) => f.kind == 'house2');
+    final inn = CityInterior('house2', f, dark: true)
+      ..fixtures = const [true, true, false, true]
+      ..build(null);
+    const green = Color(0xFF22C55E), red = Color(0xFFEF4444);
+    bool has(int id, Color c) => inn.scene.polys.any((p) => p.id == id && p.color == c && p.alpha < 1);
+    expect(has(idCinOutlet, green), isTrue, reason: 'outlets and switch are fixed');
+    expect(has(idCinOutlet, red), isFalse);
+    expect(has(idCinPanel, red), isTrue, reason: 'the ceiling light is still to do, so the house is still dark');
+    final fixed = CityInterior('house2', f)..build(null);
+    expect(fixed.scene.polys.any((p) => p.id == idCinPanel && p.color == green && p.alpha < 1), isTrue);
   });
 
   testWidgets('after three missed jobs the game is closed with a countdown', (t) async {

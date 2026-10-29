@@ -365,7 +365,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
   final fan = r.ceilingFix == 'fan';
   final okL = r.okLight;
   final lit = okL && r.okSwitch && r.lightOn;
-  const okRing = Color(0xFF22D3EE), badRing = Color(0xFFEF4444);
+  const okRing = Color(0xFF22C55E), badRing = Color(0xFFEF4444);
   b.id = idHLight;
   if (fan) {
     // The motor of a ceiling fan on a short rod. The blades come from homeDynamic, so they can spin.
@@ -507,14 +507,17 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
       if (r.tvOn) {
         final xs = x + dir * 2.95;
         final zl = left ? z + sw / 2 : z - sw / 2, zr = left ? z - sw / 2 : z + sw / 2;
-        screens.add(ScreenQuad([V3(xs, y + sh / 2, zl), V3(xs, y + sh / 2, zr), V3(xs, y - sh / 2, zr), V3(xs, y - sh / 2, zl)], id, (c, size, t) => paintNgmyApp(c, size, app, t + r.id + sub * 3), height: 320 * sh / sw, bias: 9, group: g, twoSided: true));
+        screens.add(ScreenQuad([V3(xs, y + sh / 2, zl), V3(xs, y + sh / 2, zr), V3(xs, y - sh / 2, zr), V3(xs, y - sh / 2, zl)], id, (c, size, t) => paintNgmyApp(c, size, app, t + r.id + sub * 3), height: 320 * sh / sw, bias: 9, group: g));
+        final xb = x + dir * 0.05;
+        screens.add(ScreenQuad([V3(xb, y + sh / 2, zr), V3(xb, y + sh / 2, zl), V3(xb, y - sh / 2, zl), V3(xb, y - sh / 2, zr)], id, (c, size, t) => paintNgmyApp(c, size, app, t + r.id + sub * 3), height: 320 * sh / sw, bias: 9, group: g));
       }
     } else {
       final x = box.cx;
       b.box(V3(x, y, 1.4), V3(tw + 3, th + 3, 2.6), frame, shine: 0.5);
       b.box(V3(x, y, 2.8), V3(tw, th, 0.2), glass, shine: 0.7);
       if (r.tvOn) {
-        screens.add(ScreenQuad([V3(x - sw / 2, y + sh / 2, 2.95), V3(x + sw / 2, y + sh / 2, 2.95), V3(x + sw / 2, y - sh / 2, 2.95), V3(x - sw / 2, y - sh / 2, 2.95)], id, (c, size, t) => paintNgmyApp(c, size, app, t + r.id + sub * 3), height: 320 * sh / sw, bias: 9, group: g, twoSided: true));
+        screens.add(ScreenQuad([V3(x - sw / 2, y + sh / 2, 2.95), V3(x + sw / 2, y + sh / 2, 2.95), V3(x + sw / 2, y - sh / 2, 2.95), V3(x - sw / 2, y - sh / 2, 2.95)], id, (c, size, t) => paintNgmyApp(c, size, app, t + r.id + sub * 3), height: 320 * sh / sw, bias: 9, group: g));
+        screens.add(ScreenQuad([V3(x + sw / 2, y + sh / 2, 0.05), V3(x - sw / 2, y + sh / 2, 0.05), V3(x - sw / 2, y - sh / 2, 0.05), V3(x + sw / 2, y - sh / 2, 0.05)], id, (c, size, t) => paintNgmyApp(c, size, app, t + r.id + sub * 3), height: 320 * sh / sw, bias: 9, group: g));
       }
     }
     b.endGroup();
@@ -544,7 +547,6 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
       b.ball(V3(cx - math.sin(yaw) * 5 + math.cos(yaw) * 3, HRoom.h - 8, cz - math.cos(yaw) * 5 - math.sin(yaw) * 3), 1.4, const Color(0xFFEF4444), lat: 3, lon: 5);
       b.endGroup();
       b.id = 0;
-      labels.add(Label3D(V3(cx, HRoom.h - 26, cz), '📷 See from here', const Color(0xFF0369A1), id: idHCam + i));
       info[idHCam + i] = ObjInfo('Hall camera', 'Tap it and you look from here, like your eyes.', V3(cx, HRoom.h - 12, cz), 60);
     }
   }
@@ -826,10 +828,13 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
       adScreens.add(ScreenQuad([w(hw, cy + hh, -zz), w(-hw, cy + hh, -zz), w(-hw, cy - hh, -zz), w(hw, cy - hh, -zz)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY TOWN', l2), width: px, height: py, bias: 4, order: 2, group: grp));
     } else if (f.kind == 'tower') {
       final hgt = _towerHeight(kFurnColors[f.color]);
-      adScreens.add(ScreenQuad([w(-38, hgt - 10, 35.9), w(38, hgt - 10, 35.9), w(38, hgt - 44, 35.9), w(-38, hgt - 44, 35.9)], 0, (c, size, t) => paintCityAd(c, size, t, f.id), width: 760, height: 340, bias: 8, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(-40, hgt - 8, 35.9), w(40, hgt - 8, 35.9), w(40, hgt - 54, 35.9), w(-40, hgt - 54, 35.9)], 0, (c, size, t) => paintCityAd(c, size, t, f.id), width: 800, height: 460, bias: 8, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(40, hgt - 8, -35.9), w(-40, hgt - 8, -35.9), w(-40, hgt - 54, -35.9), w(40, hgt - 54, -35.9)], 0, (c, size, t) => paintCityAd(c, size, t, f.id + 7), width: 800, height: 460, bias: 8, order: 2, group: grp));
     } else if (f.kind == 'hq') {
       adScreens.add(ScreenQuad([w(-70, 108, 45.9), w(70, 108, 45.9), w(70, 52, 45.9), w(-70, 52, 45.9)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY COMPANY', 'Building the movement'), width: 1000, height: 400, bias: 8, order: 2, group: grp));
       adScreens.add(ScreenQuad([w(-48, 215, 30.2), w(48, 215, 30.2), w(48, 175, 30.2), w(-48, 175, 30.2)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY', 'New Global Movement for Youth'), width: 900, height: 380, bias: 8, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(70, 108, -45.9), w(-70, 108, -45.9), w(-70, 52, -45.9), w(70, 52, -45.9)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY COMPANY', 'Building the movement'), width: 1000, height: 400, bias: 8, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(48, 215, -30.2), w(-48, 215, -30.2), w(-48, 175, -30.2), w(48, 175, -30.2)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY', 'New Global Movement for Youth'), width: 900, height: 380, bias: 8, order: 2, group: grp));
     } else if (f.kind == 'store') {
       adScreens.add(ScreenQuad([w(-54, 85, 37.7), w(54, 85, 37.7), w(54, 67, 37.7), w(-54, 67, 37.7)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY STORE', 'Everything you need'), width: 900, height: 150, bias: 6, order: 2, group: grp));
     } else if (f.kind == 'gasstation') {
@@ -859,7 +864,7 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
   logos.add(ScreenQuad(const [V3(-125, 292, -114.5), V3(125, 292, -114.5), V3(125, 208, -114.5), V3(-125, 208, -114.5)], 0, (c, size, t) => paintNgmyPoster(c, size, t, 0), width: 1000, height: 336, bias: 4, order: 2, group: gBoard));
   // The same board seen from the back: its own face, turned round, so nothing is upside down or backwards from either side.
   logos.add(ScreenQuad(const [V3(125, 292, -121.5), V3(-125, 292, -121.5), V3(-125, 208, -121.5), V3(125, 208, -121.5)], 0, (c, size, t) => paintNgmyPoster(c, size, t, 0), width: 1000, height: 336, bias: 4, order: 2, group: gBoard));
-  return Scene3D(b.polys, info: info, labels: labels, screens: [...logos, ...adScreens]);
+  return Scene3D(b.polys, info: info, labels: labels, screens: [...logos, ...adScreens], farMin: 4000);
 }
 
 /// Things that move: the fan blades and the pictures on the TVs.
@@ -1499,6 +1504,7 @@ void _furniture(MeshBuilder b, String kind, Color c) {
       }
     case 'tower' || 'hq':
       {
+        b.startGroup();
         final big = kind == 'hq';
         final bw = big ? 170.0 : 100.0, bd = big ? 90.0 : 70.0;
         final hgt = big ? 150.0 : _towerHeight(c);
@@ -1524,14 +1530,18 @@ void _furniture(MeshBuilder b, String kind, Color c) {
           b.box(V3(0, hgt + 3, 0), V3(bw + 4, 6, bd + 4), const Color(0xFF1F2937));
           b.box(V3(bw * 0.2, hgt + 12, 0), V3(bw * 0.3, 12, bd * 0.3), const Color(0xFF9CA3AF));
         }
+        b.endGroup();
       }
     case 'store':
+      b.startGroup();
       b.box(const V3(0, 28, 0), const V3(130, 56, 80), c, shine: 0.2);
       b.box(const V3(0, 58, 0), const V3(134, 4, 84), const Color(0xFF1F2937));
       _patch(b, const V3(0, 24, 40.2), const V3(1, 0, 0), const V3(0, 1, 0), 112, 30, const Color(0xFF9BD3F5), const V3(0, 0, 1), shine: 0.6);
       b.box(const V3(0, 44, 46), const V3(130, 4, 14), const Color(0xFFDC2626));
       b.box(const V3(0, 76, 36), const V3(112, 22, 3), const Color(0xFF111827));
+      b.endGroup();
     case 'gasstation':
+      b.startGroup();
       for (final x in const [-55.0, 55.0]) {
         for (final z in const [5.0, 35.0]) {
           b.cyl(V3(x, 0, z), V3(x, 46, z), 2.4, const Color(0xFFE5E7EB), sides: 6);
@@ -1546,19 +1556,24 @@ void _furniture(MeshBuilder b, String kind, Color c) {
       b.box(const V3(0, 19, -30), const V3(80, 38, 26), c, shine: 0.2);
       b.cyl(const V3(-70, 0, 34), const V3(-70, 95, 34), 2.2, const Color(0xFF3F3F46), sides: 6);
       b.box(const V3(-70, 96, 34), const V3(34, 22, 3), const Color(0xFF111827));
+      b.endGroup();
     case 'townsign':
+      b.startGroup();
       for (final x in const [-178.0, 178.0]) {
         b.cyl(V3(x, 0, 0), V3(x, 316, 0), 5.5, const Color(0xFF3F3F46), sides: 6);
       }
       b.box(const V3(0, 252, 0), const V3(366, 124, 6), const Color(0xFF0B1F4B), shine: 0.3);
       b.box(const V3(0, 316, 0), const V3(366, 6, 10), const Color(0xFFF5C14B));
       b.box(const V3(0, 188, 0), const V3(366, 6, 10), const Color(0xFFF5C14B));
+      b.endGroup();
     case 'cornersign':
+      b.startGroup();
       for (final x in const [-55.0, 55.0]) {
         b.cyl(V3(x, 0, 0), V3(x, 125, 0), 3, const Color(0xFF3F3F46), sides: 6);
       }
       b.box(const V3(0, 122, 0), const V3(150, 70, 5), const Color(0xFF0B1F4B), shine: 0.3);
       b.box(const V3(0, 159, 0), const V3(152, 4, 7), const Color(0xFFF5C14B));
+      b.endGroup();
     case 'firetruck':
       b.box(const V3(0, 11, 0), const V3(96, 14, 38), const Color(0xFFDC2626), shine: 0.3);
       b.box(const V3(36, 22, 0), const V3(22, 12, 34), const Color(0xFFDC2626), shine: 0.3);
