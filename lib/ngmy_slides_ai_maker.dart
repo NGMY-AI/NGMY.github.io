@@ -814,7 +814,7 @@ Future<NgmySlidesAiOutline> _askForOutline(String prompt, {required String fallb
   final creds = ngmyParseAiCredentials(key);
   String? lastError;
   for (var attempt = 0; attempt < 2; attempt++) {
-    final r = await ngmyAiGenerateWithCredentials(creds, prompt, images: sources);
+    final r = await ngmyAiGenerateWithCredentials(creds, prompt, images: sources, kind: 'slides');
     if (r.text != null) {
       final outline = ngmyParseSlidesAiOutline(r.text!, fallbackStyle: fallbackStyle);
       if (outline != null) return outline;

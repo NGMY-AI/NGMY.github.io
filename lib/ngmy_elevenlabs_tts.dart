@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_ai_client.dart';
@@ -178,27 +177,8 @@ class NgmyElevenLabsTts {
     required String text,
     required String modelId,
   }) async {
-    try {
-      final url = Uri.parse('https://api.elevenlabs.io/v1/text-to-speech/$_voiceId');
-      final res = await http
-          .post(
-            url,
-            headers: {
-              'accept': 'audio/mpeg',
-              'content-type': 'application/json',
-              'xi-api-key': apiKey,
-            },
-            body: jsonEncode({'text': text, 'model_id': modelId}),
-          )
-          .timeout(const Duration(seconds: 45));
-      if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) return (bytes: res.bodyBytes, error: null);
-      final err = _parseElevenLabsError(res.body, res.statusCode);
-      debugPrint('[elevenlabs] direct $modelId: $err');
-      return (bytes: null, error: err);
-    } catch (e) {
-      debugPrint('[elevenlabs] direct $modelId: $e');
-      return (bytes: null, error: e.toString());
-    }
+    // The voice key lives on the NGMY server only; the browser never calls ElevenLabs.
+    return (bytes: null, error: 'Voice runs on the NGMY server only.');
   }
 
   static Future<({Uint8List? bytes, String? error})> _fetchViaSupabaseFunction({

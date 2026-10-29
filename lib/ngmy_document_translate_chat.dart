@@ -219,7 +219,7 @@ class _NgmyDocumentTranslatePageState extends State<_NgmyDocumentTranslatePage> 
     final from = _replyMode ? _myLang : _theirLang;
     final to = _replyMode ? _theirLang : _myLang;
     final creds = ngmyParseAiCredentials(apiKey);
-    final result = await ngmyAiGenerateWithCredentials(creds, _translatePrompt(text: text, fromCode: from, toCode: to));
+    final result = await ngmyAiGenerateWithCredentials(creds, _translatePrompt(text: text, fromCode: from, toCode: to), kind: 'translate');
 
     if (!mounted) return;
     if (result.text != null && result.text!.trim().isNotEmpty) {

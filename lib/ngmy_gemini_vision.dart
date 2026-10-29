@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 
 import 'ngmy_ai_client.dart';
 import 'ngmy_ai_memory.dart';
@@ -30,76 +29,13 @@ String _visionApiError(Object? err, {String? body}) {
   return text.isEmpty ? 'Unknown AI error' : text;
 }
 
-const _geminiVisionModels = [
-  'gemini-2.5-flash',
-  'gemini-2.0-flash',
-  'gemini-2.0-flash-lite',
-  'gemini-1.5-flash-latest',
-  'gemini-1.5-flash',
-];
-
-String? _extractGeminiText(Map<String, dynamic> data) {
-  final candidates = data['candidates'];
-  if (candidates is! List || candidates.isEmpty) return null;
-  final parts = candidates[0]['content']?['parts'];
-  if (parts is! List || parts.isEmpty) return null;
-  final text = parts[0]['text']?.toString();
-  if (text == null || text.trim().isEmpty) return null;
-  return NgmyAiMemoryStore.sanitizeHelperReply(text.trim());
-}
-
 Future<({String? text, String? error})> _callGeminiVisionDirect({
   required String apiKey,
   required String prompt,
   required List<({Uint8List bytes, String mimeType})> images,
 }) async {
-  final key = apiKey.trim();
-  if (key.isEmpty) return (text: null, error: 'No API key configured.');
-
-  final parts = <Map<String, dynamic>>[];
-  for (final img in images) {
-    parts.add({
-      'inline_data': {
-        'mime_type': img.mimeType.trim().isEmpty ? 'image/jpeg' : img.mimeType,
-        'data': base64Encode(img.bytes),
-      },
-    });
-  }
-  parts.add({'text': prompt});
-
-  Object? lastError;
-  String? lastBody;
-
-  for (final model in _geminiVisionModels) {
-    try {
-      final url = Uri.parse(
-        'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=${Uri.encodeQueryComponent(key)}',
-      );
-      final response = await http
-          .post(
-            url,
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'contents': [
-                {'parts': parts},
-              ],
-            }),
-          )
-          .timeout(const Duration(seconds: 120));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final text = _extractGeminiText(data);
-        if (text != null) return (text: text, error: null);
-        lastError = 'Empty AI response';
-      } else {
-        lastBody = response.body;
-        lastError = 'HTTP ${response.statusCode}';
-      }
-    } catch (e) {
-      lastError = e;
-    }
-  }
-  return (text: null, error: _visionApiError(lastError, body: lastBody));
+  // Switched off: pictures are read on the NGMY server (sign-in and limits apply), never straight from an AI company.
+  return (text: null, error: 'AI runs on the NGMY server only. Please try again.');
 }
 
 /// Same disguised relay as every other AI call (`/api/sync` on web) — never
@@ -120,8 +56,8 @@ Future<({String? text, String? error})> _callGeminiVisionViaProxy({
         .toList();
     final body = <String, dynamic>{
       'action': 'chat',
-      'provider': 'gemini',
       'prompt': prompt,
+      'kind': 'vision',
       'images': imagePayload,
     };
 

@@ -61,7 +61,7 @@ Future<String> _ask(String prompt, Uint8List? photo) async {
   final images = photo == null ? const <NgmyAiImagePart>[] : [(mimeType: _mime(photo), data: base64Encode(photo))];
   String? error;
   for (var attempt = 0; attempt < 2; attempt++) {
-    final r = await ngmyAiGenerateWithCredentials(creds, prompt, images: images, timeout: const Duration(seconds: 150));
+    final r = await ngmyAiGenerateWithCredentials(creds, prompt, images: images, kind: 'news', timeout: const Duration(seconds: 150));
     if (r.text != null && r.text!.trim().isNotEmpty) return r.text!;
     error = r.error;
   }

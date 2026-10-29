@@ -4,6 +4,20 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import {
+  buildLimits,
+  checkAiInput,
+  classifyAiRequest,
+  gateAiRequest,
+  LIMIT_KEYS,
+  MemoryGateStore,
+  MSG_BUSY,
+  ProviderBusyError,
+  providerFetch,
+  ProviderStopError,
+  scrubSecrets,
+} from "./ai_gate.ts";
+import type { AiClass, ConsumeResult, Entry, GateLimits, GateStore, Who } from "./ai_gate.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -41,12 +55,12 @@ async function geminiVirtualOutfit(
   }
 
   let lastErr = "Gemini image generation failed";
-  for (const model of models) {
-    const url =
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-    const res = await fetch(url, {
+  for (const model of models.slice(0, Math.max(1, AI_RUNTIME.maxModelAttempts))) {
+    // The key goes in a header, never in the web address (an address can end up in an error message).
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    const res = await providerFetch(fetch, url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
         contents: [{ parts }],
         generationConfig: {
@@ -54,9 +68,9 @@ async function geminiVirtualOutfit(
           temperature: 0.35,
         },
       }),
-    });
+    }, AI_RUNTIME.timeoutMs);
     if (!res.ok) {
-      lastErr = await res.text();
+      lastErr = scrubSecrets((await res.text()).slice(0, 200));
       continue;
     }
     const data = await res.json();
@@ -84,8 +98,11 @@ async function geminiChatModels(apiKey: string): Promise<string[]> {
     return geminiModelCache.list;
   }
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=${encodeURIComponent(apiKey)}`,
+    const res = await providerFetch(
+      fetch,
+      "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200",
+      { headers: { "x-goog-api-key": apiKey } },
+      10000,
     );
     if (res.ok) {
       const data = await res.json();
@@ -104,7 +121,8 @@ async function geminiChatModels(apiKey: string): Promise<string[]> {
       geminiModelCache = { at: Date.now(), list };
       return list;
     }
-  } catch (_) {
+  } catch (e) {
+    if (e instanceof ProviderBusyError || e instanceof ProviderStopError) throw e;
     // fall through to the built-in list
   }
   return fallback;
@@ -116,7 +134,7 @@ async function geminiChat(
   images: GeminiImagePart[] = [],
   appBuilder = false,
 ): Promise<string> {
-  const models = await geminiChatModels(apiKey);
+  const models = (await geminiChatModels(apiKey)).slice(0, Math.max(1, AI_RUNTIME.maxModelAttempts));
   const geminiParts: unknown[] = [];
   for (const img of images) {
     const data = String(img?.data ?? "").trim();
@@ -132,26 +150,22 @@ async function geminiChat(
 
   const errors: string[] = [];
   for (const model of models) {
-    const url =
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-    const res = await fetch(url, {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    const res = await providerFetch(fetch, url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
         contents: [{ parts: geminiParts }],
-        // App Builder replies are a full multi-screen app as JSON — needs a
-        // much larger output budget than a short chat reply.
-        ...(appBuilder
-          ? { generationConfig: { maxOutputTokens: 16384 } }
-          : {}),
+        // Every reply has a ceiling; App Builder replies (a whole app as JSON) get the bigger one.
+        generationConfig: { maxOutputTokens: appBuilder ? AI_RUNTIME.maxOutputTokensExpensive : AI_RUNTIME.maxOutputTokens },
       }),
-    });
+    }, AI_RUNTIME.timeoutMs);
     if (res.ok) {
       const data = await res.json();
       const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (text && String(text).trim()) return String(text).trim();
     } else {
-      const body = (await res.text()).replace(/\s+/g, " ").slice(0, 160);
+      const body = scrubSecrets((await res.text()).replace(/\s+/g, " ").slice(0, 160));
       errors.push(`${model}: HTTP ${res.status} ${body}`);
       // A model that no longer exists is dropped from the list for next time.
       if (res.status === 404 && geminiModelCache) geminiModelCache.list = geminiModelCache.list.filter((m) => m !== model);
@@ -279,18 +293,19 @@ async function advisorGeminiBrowse(
     "On the very last line write: TITLE: <page or best source title>";
   for (const model of ["gemini-2.5-flash", "gemini-2.0-flash"]) {
     try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
+      const res = await providerFetch(
+        fetch,
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
             tools: url ? [{ url_context: {} }, { google_search: {} }] : [{ google_search: {} }],
             generationConfig: { temperature: 0.2, maxOutputTokens: 900 },
           }),
-          signal: AbortSignal.timeout(28000),
         },
+        28000,
       );
       if (!res.ok) continue;
       const data = await res.json();
@@ -309,7 +324,8 @@ async function advisorGeminiBrowse(
         if (sources.length >= 5) break;
       }
       return { text, sources };
-    } catch {
+    } catch (e) {
+      if (e instanceof ProviderBusyError || e instanceof ProviderStopError) throw e;
       // try next model
     }
   }
@@ -501,6 +517,8 @@ async function handleAgentStart(req: Request, body: any): Promise<Response> {
   if (!email) return jsonOk({ ok: false, error: "Please sign in to use the live browser." }, 401);
   const limited = await enforceRateLimit(req, "agent_run", email, 20, 3600);
   if (limited) return limited;
+  const aiGuard = await guardAi(req, "agent", "expensive");
+  if (aiGuard) return aiGuard;
 
   const task = String(body?.task ?? "").trim().slice(0, 3000);
   if (!task) return jsonOk({ ok: false, error: "task is required" }, 400);
@@ -2988,7 +3006,7 @@ async function openAiChat(
   baseUrl = "https://api.openai.com/v1",
   appBuilder = false,
 ): Promise<string> {
-  const res = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
+  const res = await providerFetch(fetch, `${baseUrl.replace(/\/$/, "")}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -2997,10 +3015,10 @@ async function openAiChat(
     body: JSON.stringify({
       model: appBuilder ? "gpt-4o" : "gpt-4o-mini",
       messages: [{ role: "user", content: prompt }],
-      max_tokens: appBuilder ? 8000 : 2048,
+      max_tokens: appBuilder ? AI_RUNTIME.maxOutputTokensExpensive : AI_RUNTIME.maxOutputTokens,
     }),
-  });
-  if (!res.ok) throw new Error(await res.text());
+  }, AI_RUNTIME.timeoutMs);
+  if (!res.ok) throw new Error(scrubSecrets((await res.text()).slice(0, 200)));
   const data = await res.json();
   const text = data?.choices?.[0]?.message?.content;
   if (!text) throw new Error("Empty OpenAI response");
@@ -3012,17 +3030,14 @@ async function anthropicChat(
   prompt: string,
   appBuilder = false,
 ): Promise<string> {
-  // App Builder needs a stronger model and a much larger token budget — a
-  // full multi-screen app as JSON does not fit in the 2048-token budget
-  // used for short chat replies, so it gets cut off mid-structure and fails
-  // to parse, leaving only the chat preamble (looks like "nothing changed").
-  const models = appBuilder
+  // App Builder needs a stronger model; every reply has a token ceiling and a timeout.
+  const models = (appBuilder
     ? ["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"]
-    : ["claude-3-5-haiku-latest"];
-  const maxTokens = appBuilder ? 8000 : 2048;
+    : ["claude-3-5-haiku-latest"]).slice(0, Math.max(1, AI_RUNTIME.maxModelAttempts));
+  const maxTokens = appBuilder ? AI_RUNTIME.maxOutputTokensExpensive : AI_RUNTIME.maxOutputTokens;
   let lastErr = "Anthropic request failed";
   for (const model of models) {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await providerFetch(fetch, "https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -3034,13 +3049,13 @@ async function anthropicChat(
         max_tokens: maxTokens,
         messages: [{ role: "user", content: prompt }],
       }),
-    });
+    }, AI_RUNTIME.timeoutMs);
     if (res.ok) {
       const data = await res.json();
       const text = data?.content?.[0]?.text;
       if (text && String(text).trim()) return String(text).trim();
     } else {
-      lastErr = await res.text();
+      lastErr = scrubSecrets((await res.text()).slice(0, 200));
     }
   }
   throw new Error(lastErr);
@@ -3064,12 +3079,12 @@ async function elevenLabsTts(
   const tried = new Set<string>();
   let lastErr = "ElevenLabs request failed";
 
-  for (const model of models) {
+  for (const model of models.slice(0, 2)) {
     if (tried.has(model)) continue;
     tried.add(model);
     const url =
       `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}`;
-    const res = await fetch(url, {
+    const res = await providerFetch(fetch, url, {
       method: "POST",
       headers: {
         accept: "audio/mpeg",
@@ -3077,12 +3092,12 @@ async function elevenLabsTts(
         "xi-api-key": apiKey,
       },
       body: JSON.stringify({ text, model_id: model }),
-    });
+    }, AI_RUNTIME.timeoutMs);
     if (res.ok) {
       const audio = new Uint8Array(await res.arrayBuffer());
       if (audio.length > 0) return bytesToBase64(audio);
     } else {
-      lastErr = await res.text();
+      lastErr = scrubSecrets((await res.text()).slice(0, 200));
     }
   }
   throw new Error(lastErr);
@@ -3221,6 +3236,219 @@ async function enforceRateLimit(
   console.error("[rate-limit]", bucket, key.slice(0, 80), ip);
   await logSecurityEvent(admin, "rate_limit", `${bucket}:${key}${note ? " " + note : ""}`.slice(0, 300), ip);
   return rateLimitedResponse();
+}
+
+// ── AI gate: login, limits and the circuit breaker, all decided BEFORE the AI provider is called ──
+// The logic lives in ai_gate.ts (and is tested in ai_gate_test.ts); this part connects it to the database.
+let AI_RUNTIME: GateLimits = buildLimits((n) => Deno.env.get(n));
+let aiLimitsAt = 0;
+const memoryGateFallback = new MemoryGateStore();
+
+/** The limits now in force: defaults, then environment variables, then the admin table ngmy_ai_settings. */
+async function loadAiLimits(admin: any): Promise<GateLimits> {
+  if (Date.now() - aiLimitsAt < 60_000) return AI_RUNTIME;
+  const overrides: Record<string, string> = {};
+  if (admin) {
+    try {
+      const { data } = await admin.from("ngmy_ai_settings").select("key,value");
+      for (const r of (data ?? []) as Array<{ key: unknown; value: unknown }>) overrides[String(r.key)] = String(r.value);
+    } catch (_) {
+      // The table is not there yet: the environment values and the defaults apply.
+    }
+  }
+  AI_RUNTIME = buildLimits((n) => Deno.env.get(n), overrides);
+  aiLimitsAt = Date.now();
+  return AI_RUNTIME;
+}
+
+/** Counters in Postgres (shared by every function instance, kept across restarts). If the database cannot be reached, strict in-memory counters are used instead — never "no limit". */
+class DbGateStore implements GateStore {
+  constructor(private admin: any) {}
+
+  async consumeAll(entries: Entry[]): Promise<ConsumeResult> {
+    if (!this.admin) return memoryGateFallback.consumeAll(entries);
+    try {
+      const { data, error } = await this.admin.rpc("ngmy_ai_gate", {
+        p_entries: entries.map((e) => ({ bucket: e.bucket, key: e.key, window: e.windowSeconds, max: e.max })),
+      });
+      if (error) throw new Error(error.message);
+      if ((data as { ok?: boolean } | null)?.ok === true) return { ok: true };
+      const d = (data ?? {}) as { bucket?: string; key?: string; retry_after?: number };
+      const failed = entries.find((e) => e.bucket === d.bucket && e.key.slice(0, 200) === d.key) ?? entries[0];
+      return { ok: false, failed, retryAfter: Number(d.retry_after ?? 60) };
+    } catch (e) {
+      console.error("[ai-gate] database counters unavailable, using strict in-memory counters:", scrubSecrets(String(e)));
+      return memoryGateFallback.consumeAll(entries);
+    }
+  }
+
+  async cooldownLeft(): Promise<number> {
+    const local = await memoryGateFallback.cooldownLeft();
+    if (!this.admin) return local;
+    try {
+      const { data, error } = await this.admin.rpc("ngmy_ai_cooldown_left");
+      if (!error) return Math.max(local, Number(data ?? 0));
+    } catch (_) {
+      // use the in-memory value
+    }
+    return local;
+  }
+
+  async startCooldown(seconds: number): Promise<void> {
+    await memoryGateFallback.startCooldown(seconds);
+    if (!this.admin) return;
+    try {
+      await this.admin.rpc("ngmy_ai_cooldown_start", { p_seconds: seconds });
+    } catch (e) {
+      console.error("[ai-gate] could not save the cooldown:", scrubSecrets(String(e)));
+    }
+  }
+}
+
+/** Who is asking: a real signed-in user (not an anonymous guest session), or only an IP address. */
+async function resolveAiWho(req: Request, admin: any): Promise<Who> {
+  const ip = clientIp(req);
+  const m = (req.headers.get("Authorization") ?? "").match(/^Bearer\s+(.+)$/i);
+  const token = (m?.[1] ?? "").trim();
+  if (!token || !admin || token === Deno.env.get("SUPABASE_ANON_KEY")) return { userId: null, ip };
+  try {
+    const { data, error } = await admin.auth.getUser(token);
+    const u = data?.user as { id?: string; email?: string; is_anonymous?: boolean } | null | undefined;
+    if (error || !u || u.is_anonymous || !u.email || !u.id) return { userId: null, ip };
+    return { userId: String(u.id), ip };
+  } catch (_) {
+    return { userId: null, ip };
+  }
+}
+
+const aiLogSeen = new Map<string, number>();
+const aiBlocks = new Map<string, { n: number; start: number }>();
+let aiAlertAt = 0;
+
+/** Optional: set AI_ALERT_WEBHOOK_URL (Slack, Discord, any URL that takes JSON) to be told at once about a spike or the daily cap. At most one message an hour. */
+async function aiAlert(text: string): Promise<void> {
+  const url = String(Deno.env.get("AI_ALERT_WEBHOOK_URL") ?? "").trim();
+  if (!url || Date.now() - aiAlertAt < 3_600_000) return;
+  aiAlertAt = Date.now();
+  try {
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: `NGMY AI: ${text}`, content: `NGMY AI: ${text}` }),
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch (_) {
+    // an alert must never break a request
+  }
+}
+
+/** Writes who/what/when to ngmy_security_events (at most once a minute for the same user and endpoint), and notices spikes. */
+async function logAiEvent(
+  admin: any,
+  kind: string,
+  detail: string,
+  who: Who,
+): Promise<void> {
+  const now = Date.now();
+  const subject = who.userId ?? who.ip;
+  const logKey = `${kind}|${subject}|${(detail.match(/endpoint=(\S+)/) ?? [])[1] ?? ""}`;
+  if (aiLogSeen.size > 5000) aiLogSeen.clear();
+  if (now - (aiLogSeen.get(logKey) ?? 0) > 60_000) {
+    aiLogSeen.set(logKey, now);
+    console.error("[ai-gate]", kind, detail);
+    await logSecurityEvent(admin, kind, detail, who.ip);
+  }
+  if (kind === "ai_rate_limit" || kind === "ai_blocked_anon") {
+    if (aiBlocks.size > 5000) aiBlocks.clear();
+    const b = aiBlocks.get(subject);
+    if (!b || now - b.start > 600_000) {
+      aiBlocks.set(subject, { n: 1, start: now });
+    } else if (++b.n === AI_RUNTIME.spikeThreshold) {
+      const msg = `spike: ${b.n} blocked AI requests in 10 minutes from ${who.userId ? "user " + who.userId : "ip " + who.ip}`;
+      console.error("[ai-gate]", msg);
+      await logSecurityEvent(admin, "ai_spike", `${msg} ${detail}`.slice(0, 300), who.ip);
+      void aiAlert(msg);
+    }
+  }
+  if (kind === "ai_global_cap") void aiAlert("the daily AI cap for the whole app was reached");
+}
+
+function aiJson(body: Record<string, unknown>, status: number, retryAfter = 0): Response {
+  const headers: Record<string, string> = { ...corsHeaders, "Content-Type": "application/json" };
+  if (retryAfter > 0) headers["Retry-After"] = String(Math.ceil(retryAfter));
+  return new Response(JSON.stringify(body), { status, headers });
+}
+
+/** Login + per-user limits + IP limits + global cap. Returns null when the request may go on to the AI provider. */
+async function guardAi(req: Request, endpoint: string, cls: AiClass): Promise<Response | null> {
+  const admin = adminClient();
+  const limits = await loadAiLimits(admin);
+  const who = await resolveAiWho(req, admin);
+  const r = await gateAiRequest(new DbGateStore(admin), limits, who, endpoint, cls);
+  if (r.ok) return null;
+  await logAiEvent(admin, r.logKind, r.logDetail, who);
+  return aiJson({ error: r.message, code: r.code, retryAfter: r.retryAfter }, r.status, r.retryAfter);
+}
+
+/** The provider said 429: nobody calls it for a short while, and the user sees a busy message (no retry). */
+async function aiProviderBusy(req: Request, e: ProviderBusyError, endpoint: string): Promise<Response> {
+  const admin = adminClient();
+  const limits = await loadAiLimits(admin);
+  const secs = Math.max(limits.providerCooldownSeconds, e.retryAfter);
+  await new DbGateStore(admin).startCooldown(secs);
+  const who = await resolveAiWho(req, admin);
+  await logAiEvent(admin, "ai_provider_429", `user=${who.userId ?? "none"} endpoint=${endpoint} cooldown=${secs}s ip=${who.ip}`, who);
+  return aiJson({ error: MSG_BUSY, code: "ai_busy", retryAfter: secs }, 503, secs);
+}
+
+/** The server decides which AI company and which key to use. The browser can neither pick the provider nor a web address to send the key to. */
+function parseServerAiCreds(raw: string): { provider: Provider; key: string; baseUrl?: string } {
+  const key = raw.trim();
+  const lower = key.toLowerCase();
+  if (lower.startsWith("compat:")) {
+    const rest = key.slice(7).trim();
+    const pipe = rest.indexOf("|");
+    if (pipe > 0) {
+      const base = rest.slice(0, pipe).trim();
+      if (/^https:\/\//i.test(base)) return { provider: "openaiCompatible", key: rest.slice(pipe + 1).trim(), baseUrl: base };
+    }
+    return { provider: "openai", key: rest };
+  }
+  for (const [prefix, provider] of [["gemini:", "gemini"], ["google:", "gemini"], ["openai:", "openai"], ["anthropic:", "anthropic"], ["claude:", "anthropic"]] as const) {
+    if (lower.startsWith(prefix)) return { provider, key: key.slice(prefix.length).trim() };
+  }
+  if (key.startsWith("sk-ant-")) return { provider: "anthropic", key };
+  if (key.startsWith("sk-") || key.startsWith("pk-")) return { provider: "openai", key };
+  return { provider: "gemini", key };
+}
+
+/** Admin only: see the limits in force, today's usage and the newest abuse events; or change a limit. */
+async function handleAiAdmin(req: Request, action: string, body: any): Promise<Response> {
+  const email = await resolveJwtEmail(req);
+  if (!email || !NGMY_ADMIN_EMAILS.has(email)) return jsonOk({ ok: false, error: "Admins only." }, 403);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ ok: false, error: "The database cannot be reached." }, 500);
+  if (action === "aiLimitsSave") {
+    const settings = (body?.settings ?? {}) as Record<string, unknown>;
+    const rows: { key: string; value: string; updated_by: string }[] = [];
+    for (const [k, v] of Object.entries(settings)) {
+      if (!(k in LIMIT_KEYS)) return jsonOk({ ok: false, error: `Unknown setting ${k}.` }, 400);
+      rows.push({ key: k, value: String(v).slice(0, 20), updated_by: email });
+    }
+    if (rows.length) {
+      const { error } = await admin.from("ngmy_ai_settings").upsert(rows, { onConflict: "key" });
+      if (error) return jsonOk({ ok: false, error: "Could not save: run supabase/ai_gate.sql first." }, 500);
+    }
+    aiLimitsAt = 0;
+    await loadAiLimits(admin);
+    return jsonOk({ ok: true, limits: AI_RUNTIME });
+  }
+  const limits = await loadAiLimits(admin);
+  const day = new Date();
+  day.setUTCHours(0, 0, 0, 0);
+  const events = await admin.from("ngmy_security_events").select("at,kind,detail,ip").like("kind", "ai_%").order("at", { ascending: false }).limit(100);
+  const usage = await admin.from("ngmy_rate_limits").select("bucket,k,hits").like("bucket", "ai_%").gte("window_start", day.toISOString()).order("hits", { ascending: false }).limit(60);
+  return jsonOk({ ok: true, limits, events: events.data ?? [], usageToday: usage.data ?? [] });
 }
 
 function keyFromConfigRow(row: Record<string, unknown> | null): string {
@@ -10621,8 +10849,8 @@ serve(async (req) => {
     }
 
     if (action === "advisorBrowse") {
-      const limited = await enforceRateLimit(req, "ai_browse", clientIp(req), 12, 600);
-      if (limited) return limited;
+      const aiGuard = await guardAi(req, "browse", "expensive");
+      if (aiGuard) return aiGuard;
       const task = String(body?.task ?? "").trim().slice(0, 2000);
       const rawUrl = String(body?.url ?? "").trim();
       if (!task && !rawUrl) {
@@ -10756,8 +10984,8 @@ serve(async (req) => {
     }
 
     if (action === "elevenlabsTts") {
-      const limited = await enforceRateLimit(req, "tts", clientIp(req), 20, 600);
-      if (limited) return limited;
+      const aiGuard = await guardAi(req, "tts", "expensive");
+      if (aiGuard) return aiGuard;
       const text = String(body?.text ?? "").trim().slice(0, 2500);
       const voiceId = String(body?.voiceId ?? "21m00Tcm4TlvDq8ikWAM").trim();
       const modelId = String(body?.modelId ?? "eleven_turbo_v2_5").trim();
@@ -10810,8 +11038,10 @@ serve(async (req) => {
     }
 
     if (action === "geminiVirtualOutfit") {
-      const limited = await enforceRateLimit(req, "ai_outfit", clientIp(req), 15, 600);
-      if (limited) return limited;
+      const aiGuard = await guardAi(req, "outfit", "expensive");
+      if (aiGuard) return aiGuard;
+      const outfitBad = checkAiInput(AI_RUNTIME, { prompt: body?.prompt, images: body?.images }, "expensive");
+      if (outfitBad) return aiJson({ error: outfitBad, code: "ai_input_too_big" }, 413);
       const outfitPrompt = String(body?.prompt ?? "").trim();
       const images: GeminiImagePart[] = Array.isArray(body?.images)
         ? body.images
@@ -10842,8 +11072,8 @@ serve(async (req) => {
 
     // Partner chat selfies — fetch image server-side so phone browsers skip CORS.
     if (action === "pollinationsImage") {
-      const limited = await enforceRateLimit(req, "ai_image", clientIp(req), 15, 600);
-      if (limited) return limited;
+      const aiGuard = await guardAi(req, "image", "normal");
+      if (aiGuard) return aiGuard;
       const imgPrompt = String(body?.prompt ?? "").trim();
       const allowAdult = Boolean(body?.allowAdult);
       if (!imgPrompt) {
@@ -10880,34 +11110,31 @@ serve(async (req) => {
       });
     }
 
-    const chatLimited = await enforceRateLimit(req, "ai_chat", clientIp(req), 30, 600);
-    if (chatLimited) return chatLimited;
+    if (action === "aiGateStatus" || action === "aiLimitsSave") return await handleAiAdmin(req, action, body);
+    // Login, per-user limits, IP limits and the global cap are checked here, before anything reaches the AI provider.
+    const aiCls = classifyAiRequest(body);
+    const chatGuard = await guardAi(req, "chat", aiCls);
+    if (chatGuard) return chatGuard;
     const prompt = String(body?.prompt ?? "").trim();
-    const appBuilderEarly = String(body?.mode ?? "") === "appBuilder";
-    const maxPrompt = appBuilderEarly ? 200000 : 120000;
-    if (prompt.length > maxPrompt) {
-      return new Response(JSON.stringify({ error: "Prompt is too long." }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    const provider = String(body?.provider ?? "gemini") as Provider;
-    const openAiBaseUrl = body?.openAiBaseUrl
-      ? String(body.openAiBaseUrl).trim()
-      : undefined;
+    const inputBad = checkAiInput(AI_RUNTIME, body, aiCls);
+    if (inputBad) return aiJson({ error: inputBad, code: "ai_input_too_big" }, 413);
     const images: GeminiImagePart[] = Array.isArray(body?.images)
-      ? (body.images as GeminiImagePart[]).slice(0, 6)
+      ? (body.images as GeminiImagePart[]).slice(0, AI_RUNTIME.maxImages)
       : [];
     // App Builder sends a full multi-screen app as JSON, which needs a much
     // bigger output budget (and a stronger model) than a short chat reply.
     const appBuilder = String(body?.mode ?? "") === "appBuilder";
 
-    const apiKey = await resolveServerAiApiKey();
+    const serverKey = await resolveServerAiApiKey();
+    const creds = parseServerAiCreds(serverKey);
+    const apiKey = creds.key;
+    const provider = creds.provider;
+    const openAiBaseUrl = creds.baseUrl;
     if (!apiKey || !prompt) {
       return new Response(
         JSON.stringify({
           error: !apiKey
-            ? "AI API key is not configured on the server. Admin: set NGMY_AI_API_KEY secret or Save AI Settings."
+            ? "AI is not set up yet. Admin: set the NGMY_AI_API_KEY secret."
             : "prompt is required",
         }),
         {
@@ -10943,7 +11170,12 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+    if (e instanceof ProviderBusyError) return await aiProviderBusy(req, e, "provider");
+    if (e instanceof ProviderStopError) {
+      console.error("[ai-gate] provider refused the request:", e.status);
+      return aiJson({ error: "The AI is not available right now. Please try again later.", code: "ai_unavailable" }, 502, 120);
+    }
+    const msg = scrubSecrets(e instanceof Error ? e.message : String(e));
     return new Response(JSON.stringify({ error: msg }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

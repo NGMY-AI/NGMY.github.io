@@ -139,59 +139,16 @@ List<Map<String, dynamic>> _geminiPartsFor(String prompt, List<NgmyAiImagePart> 
   return parts;
 }
 
+/// The browser and the app never call an AI company directly (a key in the browser could be copied). All AI goes through the NGMY server,
+/// which needs a login and has limits. These old direct calls are switched off.
+const String kNgmyDirectAiOff = 'AI runs on the NGMY server only. Please try again.';
+
 Future<({String? text, String? error})> _callGeminiDirect(
   String apiKey,
   String prompt, {
   List<NgmyAiImagePart> images = const [],
 }) async {
-  const models = [
-    'gemini-2.5-flash',
-    'gemini-2.0-flash',
-    'gemini-2.0-flash-lite',
-    'gemini-1.5-flash-latest',
-    'gemini-1.5-flash',
-    'gemini-1.5-flash-8b',
-  ];
-  final geminiParts = _geminiPartsFor(prompt, images);
-  Object? lastError;
-  String? lastBody;
-  for (final model in models) {
-    try {
-      final url = Uri.parse(
-        'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=${Uri.encodeQueryComponent(apiKey)}',
-      );
-      final response = await http
-          .post(
-            url,
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'contents': [
-                {'parts': geminiParts},
-              ],
-            }),
-          )
-          .timeout(const Duration(seconds: 90));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final candidates = data['candidates'];
-        if (candidates is List && candidates.isNotEmpty) {
-          final parts = candidates[0]['content']?['parts'];
-          if (parts is List && parts.isNotEmpty) {
-            final text = parts[0]['text']?.toString();
-            if (text != null && text.trim().isNotEmpty) {
-              return (text: NgmyAiMemoryStore.sanitizeHelperReply(text.trim()), error: null);
-            }
-          }
-        }
-      } else {
-        lastBody = response.body;
-        lastError = 'HTTP ${response.statusCode}';
-      }
-    } catch (e) {
-      lastError = e;
-    }
-  }
-  return (text: null, error: _extractApiErrorMessage(lastError, body: lastBody));
+  return (text: null, error: kNgmyDirectAiOff);
 }
 
 /// One fast Gemini model for advisor chat — avoids trying 6 models sequentially.
@@ -202,43 +159,7 @@ Future<({String? text, String? error})> _callGeminiDirectCommunicate(
   Duration timeout = const Duration(seconds: 26),
   int maxOutputTokens = 1400,
 }) async {
-  const model = 'gemini-2.0-flash';
-  try {
-    final url = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=${Uri.encodeQueryComponent(apiKey)}',
-    );
-    final response = await http
-        .post(
-          url,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'contents': [
-              {'parts': _geminiPartsFor(prompt, images)},
-            ],
-            'generationConfig': {
-              'maxOutputTokens': maxOutputTokens,
-              'temperature': 0.92,
-            },
-          }),
-        )
-        .timeout(timeout);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final candidates = data['candidates'];
-      if (candidates is List && candidates.isNotEmpty) {
-        final parts = candidates[0]['content']?['parts'];
-        if (parts is List && parts.isNotEmpty) {
-          final text = parts[0]['text']?.toString();
-          if (text != null && text.trim().isNotEmpty) {
-            return (text: NgmyAiMemoryStore.sanitizeHelperReply(text.trim()), error: null);
-          }
-        }
-      }
-    }
-    return (text: null, error: _extractApiErrorMessage('HTTP ${response.statusCode}', body: response.body));
-  } catch (e) {
-    return (text: null, error: _extractApiErrorMessage(e));
-  }
+  return (text: null, error: kNgmyDirectAiOff);
 }
 
 /// Fast advisor reply — hard time budget so typing never hangs for minutes.
@@ -253,7 +174,6 @@ Future<({String? text, String? error})> ngmyAiGenerateCommunicateFast(
       final proxied = await _callAiViaSupabaseProxy(
         prompt: prompt,
         provider: creds.provider,
-        openAiBaseUrl: creds.openAiBaseUrl,
         images: images,
       );
       if (proxied.text != null && proxied.text!.trim().isNotEmpty) return proxied;
@@ -278,59 +198,6 @@ Future<({String? text, String? error})> ngmyAiGenerateCommunicateFast(
 }
 
 /// Stronger Gemini call for App Builder — larger JSON apps, longer timeout.
-Future<({String? text, String? error})> _callGeminiDirectAppBuilder(String apiKey, String prompt) async {
-  const models = [
-    'gemini-2.5-pro',
-    'gemini-2.5-flash',
-    'gemini-2.0-flash',
-    'gemini-1.5-pro-latest',
-    'gemini-1.5-flash-latest',
-  ];
-  Object? lastError;
-  String? lastBody;
-  for (final model in models) {
-    try {
-      final url = Uri.parse(
-        'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=${Uri.encodeQueryComponent(apiKey)}',
-      );
-      final response = await http
-          .post(
-            url,
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'contents': [
-                {'parts': [{'text': prompt}]},
-              ],
-              'generationConfig': {
-                'maxOutputTokens': 16384,
-                'temperature': 0.35,
-              },
-            }),
-          )
-          .timeout(const Duration(seconds: 180));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final candidates = data['candidates'];
-        if (candidates is List && candidates.isNotEmpty) {
-          final parts = candidates[0]['content']?['parts'];
-          if (parts is List && parts.isNotEmpty) {
-            final text = parts[0]['text']?.toString();
-            if (text != null && text.trim().isNotEmpty) {
-              return (text: NgmyAiMemoryStore.sanitizeHelperReply(text.trim()), error: null);
-            }
-          }
-        }
-      } else {
-        lastBody = response.body;
-        lastError = 'HTTP ${response.statusCode}';
-      }
-    } catch (e) {
-      lastError = e;
-    }
-  }
-  return (text: null, error: _extractApiErrorMessage(lastError, body: lastBody));
-}
-
 /// App Builder AI — uses stronger models and longer output for full app JSON.
 Future<({String? text, String? error})> ngmyAiGenerateForAppBuilder(
   NgmyAiCredentials creds,
@@ -341,146 +208,16 @@ Future<({String? text, String? error})> ngmyAiGenerateForAppBuilder(
   // mid-structure. Small text-only edits fit and succeed; full rebuilds get
   // truncated, fail to parse, and only the chat preamble survives — which
   // looks exactly like "the AI only changes text". Use a much larger budget
-  // and a stronger model here.
-  const appBuilderMaxTokens = 8000;
-
-  Future<({String? text, String? error})> runDirect() async {
-    if (ngmyIsServerManagedAiKey(creds.apiKey)) {
-      return (text: null, error: 'Direct AI disabled — server key only.');
-    }
-    switch (creds.provider) {
-      case NgmyAiProviderKind.gemini:
-        final strong = await _callGeminiDirectAppBuilder(creds.apiKey, prompt);
-        if (strong.text != null) return strong;
-        return _callGeminiDirect(creds.apiKey, prompt);
-      case NgmyAiProviderKind.openai:
-        return _callOpenAiDirect(creds.apiKey, prompt, model: 'gpt-4o', maxTokens: appBuilderMaxTokens);
-      case NgmyAiProviderKind.anthropic:
-        return _callAnthropicDirect(creds.apiKey, prompt, maxTokens: appBuilderMaxTokens, preferStrong: true);
-      case NgmyAiProviderKind.openaiCompatible:
-        return _callOpenAiDirect(
-          creds.apiKey,
-          prompt,
-          baseUrl: creds.openAiBaseUrl ?? 'https://api.openai.com/v1',
-          model: 'gpt-4o',
-          maxTokens: appBuilderMaxTokens,
-        );
-    }
-  }
-
+  // and a stronger model here: the server picks both (and caps them).
   final proxied = await _callAiViaSupabaseProxy(
     prompt: prompt,
     provider: creds.provider,
-    openAiBaseUrl: creds.openAiBaseUrl,
     mode: 'appBuilder',
     // Writing a whole app takes much longer than a chat reply (the usual wait is 20 seconds).
     timeout: const Duration(seconds: 170),
   );
   if (proxied.text != null) return proxied;
-  if (ngmyIsServerManagedAiKey(creds.apiKey)) {
-    return (text: null, error: proxied.error ?? 'AI request failed.');
-  }
-  final direct = await runDirect();
-  if (direct.text != null) return direct;
-  return (text: null, error: proxied.error ?? direct.error ?? 'AI request failed.');
-}
-
-Future<({String? text, String? error})> _callOpenAiDirect(
-  String apiKey,
-  String prompt, {
-  String baseUrl = 'https://api.openai.com/v1',
-  String model = 'gpt-4o-mini',
-  int maxTokens = 2048,
-}) async {
-  Object? lastError;
-  String? lastBody;
-  for (final m in [model, 'gpt-4o-mini', 'gpt-3.5-turbo']) {
-    try {
-      final url = Uri.parse('$baseUrl/chat/completions');
-      final response = await http
-          .post(
-            url,
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $apiKey',
-            },
-            body: jsonEncode({
-              'model': m,
-              'messages': [
-                {'role': 'user', 'content': prompt},
-              ],
-              'max_tokens': maxTokens,
-            }),
-          )
-          .timeout(const Duration(seconds: 90));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final choices = data['choices'];
-        if (choices is List && choices.isNotEmpty) {
-          final text = choices[0]['message']?['content']?.toString();
-          if (text != null && text.trim().isNotEmpty) {
-            return (text: NgmyAiMemoryStore.sanitizeHelperReply(text.trim()), error: null);
-          }
-        }
-      } else {
-        lastBody = response.body;
-        lastError = 'HTTP ${response.statusCode}';
-      }
-    } catch (e) {
-      lastError = e;
-    }
-  }
-  return (text: null, error: _extractApiErrorMessage(lastError, body: lastBody));
-}
-
-Future<({String? text, String? error})> _callAnthropicDirect(
-  String apiKey,
-  String prompt, {
-  int maxTokens = 2048,
-  bool preferStrong = false,
-}) async {
-  Object? lastError;
-  String? lastBody;
-  final models = preferStrong
-      ? ['claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest', 'claude-3-haiku-20240307']
-      : ['claude-3-5-haiku-latest', 'claude-3-5-sonnet-latest', 'claude-3-haiku-20240307'];
-  for (final model in models) {
-    try {
-      final response = await http
-          .post(
-            Uri.parse('https://api.anthropic.com/v1/messages'),
-            headers: {
-              'Content-Type': 'application/json',
-              'x-api-key': apiKey,
-              'anthropic-version': '2023-06-01',
-            },
-            body: jsonEncode({
-              'model': model,
-              'max_tokens': maxTokens,
-              'messages': [
-                {'role': 'user', 'content': prompt},
-              ],
-            }),
-          )
-          .timeout(const Duration(seconds: 90));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final content = data['content'];
-        if (content is List && content.isNotEmpty) {
-          final text = content[0]['text']?.toString();
-          if (text != null && text.trim().isNotEmpty) {
-            return (text: NgmyAiMemoryStore.sanitizeHelperReply(text.trim()), error: null);
-          }
-        }
-      } else {
-        lastBody = response.body;
-        lastError = 'HTTP ${response.statusCode}';
-      }
-    } catch (e) {
-      lastError = e;
-    }
-  }
-  return (text: null, error: _extractApiErrorMessage(lastError, body: lastBody));
+  return (text: null, error: proxied.error ?? 'AI request failed.');
 }
 
 /// Supabase Edge Function proxy (fixes browser CORS for PWA / phone web).
@@ -491,15 +228,15 @@ Future<({String? text, String? error})> _callAiViaSupabaseProxy({
   String? openAiBaseUrl,
   List<NgmyAiImagePart> images = const [],
   String? mode,
+  String? kind,
   Duration? timeout,
 }) async {
   try {
     final body = <String, dynamic>{
       'action': 'chat',
-      'provider': images.isNotEmpty ? NgmyAiProviderKind.gemini.name : provider.name,
       'prompt': prompt,
       if (mode != null && mode.isNotEmpty) 'mode': mode,
-      if (openAiBaseUrl != null && openAiBaseUrl.isNotEmpty) 'openAiBaseUrl': openAiBaseUrl,
+      if (kind != null && kind.isNotEmpty) 'kind': kind,
       if (images.isNotEmpty)
         'images': images
             .where((img) => img.data.trim().isNotEmpty)
@@ -530,49 +267,18 @@ Future<({String? text, String? error})> ngmyAiGenerateWithCredentials(
   String prompt, {
   List<NgmyAiImagePart> images = const [],
   Duration? timeout,
+  String? kind,
 }) async {
-  Future<({String? text, String? error})> runDirect() async {
-    if (ngmyIsServerManagedAiKey(creds.apiKey)) {
-      return (text: null, error: 'Direct AI disabled — server key only.');
-    }
-    if (images.isNotEmpty) {
-      return _callGeminiDirect(creds.apiKey, prompt, images: images);
-    }
-    switch (creds.provider) {
-      case NgmyAiProviderKind.gemini:
-        return _callGeminiDirect(creds.apiKey, prompt);
-      case NgmyAiProviderKind.openai:
-        return _callOpenAiDirect(creds.apiKey, prompt);
-      case NgmyAiProviderKind.anthropic:
-        return _callAnthropicDirect(creds.apiKey, prompt);
-      case NgmyAiProviderKind.openaiCompatible:
-        return _callOpenAiDirect(
-          creds.apiKey,
-          prompt,
-          baseUrl: creds.openAiBaseUrl ?? 'https://api.openai.com/v1',
-        );
-    }
-  }
-
   // Always prefer the server proxy so the real API key never leaves Supabase.
   final proxied = await _callAiViaSupabaseProxy(
     prompt: prompt,
     provider: creds.provider,
-    openAiBaseUrl: creds.openAiBaseUrl,
     images: images,
+    kind: kind,
     timeout: timeout,
   );
-  if (proxied.text != null) return proxied;
-  if (ngmyIsServerManagedAiKey(creds.apiKey) || kIsWeb) {
-    return (
-      text: null,
-      error: proxied.error ?? 'AI request failed.',
-    );
-  }
-
-  final direct = await runDirect();
-  if (direct.text != null) return direct;
-  return (text: null, error: proxied.error ?? direct.error);
+  // Whatever the answer, it is the server's answer: no second try straight at an AI company.
+  return (text: proxied.text, error: proxied.text != null ? null : (proxied.error ?? 'AI request failed.'));
 }
 
 /// NGMY Helper + any feature that used Gemini-only chat.
@@ -593,6 +299,7 @@ Future<String?> ngmyAiGenerateReply(
 
   final result = await ngmyAiGenerateWithCredentials(creds, prompt);
   if (result.text != null) return result.text;
+  if (ngmyIsAiLimitMessage(result.error)) return result.error;
   if (result.error != null) {
     debugPrint('[ngmy-ai] ${ngmyAiProviderLabel(creds.provider)} failed: ${result.error}');
   }
@@ -625,8 +332,15 @@ const String kNgmySoftAiRetryMessage =
 const String kNgmySoftHelperRetryMessage =
     "That reply glitched. Tap send again in a moment and we'll continue.";
 
+/// True for the server's own "too fast", "busy", "resting" and "sign in" answers. They are never retried: asking again only makes it worse.
+bool ngmyIsAiLimitMessage(String? err) {
+  final e = (err ?? '').toLowerCase();
+  return e.contains('using ai too fast') || e.contains('ai is busy') || e.contains('ai is resting') || e.contains('sign in to use ai') || e.contains('too long');
+}
+
 bool ngmyIsTransientAiHttpError(String err) {
   final e = err.toLowerCase();
+  if (ngmyIsAiLimitMessage(err)) return false;
   return RegExp(r'\b(429|500|502|503|504)\b').hasMatch(e) ||
       e.contains('unavailable') ||
       e.contains('internal error') ||
@@ -692,6 +406,7 @@ Future<({String? text, String? error})> ngmyAiGenerateWithRetry(
     result = await ngmyAiGenerateWithCredentials(creds, prompt, images: images);
     if (result.text != null && result.text!.trim().isNotEmpty) return result;
     final err = (result.error ?? '').toLowerCase();
+    if (ngmyIsAiLimitMessage(result.error)) break;
     final retryable = ngmyIsOfflineOrNetworkError(err) ||
         ngmyIsTransientAiHttpError(err) ||
         err.contains('socket') ||
@@ -1447,99 +1162,9 @@ Future<({Uint8List? bytes, String? error})> ngmyAiGenerateImage(
   String prompt,
 ) async {
   final p = prompt.trim();
-  if (creds.apiKey.isEmpty) return (bytes: null, error: 'No API key configured.');
   if (p.isEmpty) return (bytes: null, error: 'Enter an image description.');
-
-  Future<({Uint8List? bytes, String? error})> openAiImage({String? baseUrl}) async {
-    final root = (baseUrl ?? 'https://api.openai.com/v1').replaceAll(RegExp(r'/+$'), '');
-    try {
-      final response = await http
-          .post(
-            Uri.parse('$root/images/generations'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer ${creds.apiKey}',
-            },
-            body: jsonEncode({
-              'model': 'dall-e-3',
-              'prompt': p,
-              'n': 1,
-              'size': '1024x1024',
-              'response_format': 'b64_json',
-            }),
-          )
-          .timeout(const Duration(seconds: 120));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final items = data['data'];
-        if (items is List && items.isNotEmpty) {
-          final b64 = items[0]['b64_json']?.toString();
-          if (b64 != null && b64.isNotEmpty) {
-            return (bytes: base64Decode(b64), error: null);
-          }
-        }
-      }
-      return (bytes: null, error: _extractApiErrorMessage('HTTP ${response.statusCode}', body: response.body));
-    } catch (e) {
-      return (bytes: null, error: _extractApiErrorMessage(e));
-    }
-  }
-
-  Future<({Uint8List? bytes, String? error})> geminiImage() async {
-    const models = ['imagen-3.0-generate-002', 'imagen-3.0-fast-generate-001'];
-    for (final model in models) {
-      try {
-        final url = Uri.parse(
-          'https://generativelanguage.googleapis.com/v1beta/models/$model:predict?key=${Uri.encodeQueryComponent(creds.apiKey)}',
-        );
-        final response = await http
-            .post(
-              url,
-              headers: {'Content-Type': 'application/json'},
-              body: jsonEncode({
-                'instances': [
-                  {'prompt': p},
-                ],
-                'parameters': {'sampleCount': 1},
-              }),
-            )
-            .timeout(const Duration(seconds: 120));
-        if (response.statusCode != 200) continue;
-        final data = jsonDecode(response.body);
-        final preds = data['predictions'];
-        if (preds is List && preds.isNotEmpty) {
-          final b64 = preds[0]['bytesBase64Encoded']?.toString() ?? preds[0]['b64_json']?.toString();
-          if (b64 != null && b64.isNotEmpty) {
-            return (bytes: base64Decode(b64), error: null);
-          }
-        }
-      } catch (_) {}
-    }
-    return (bytes: null, error: 'Gemini image models unavailable for this key.');
-  }
-
-  ({Uint8List? bytes, String? error}) primary;
-  switch (creds.provider) {
-    case NgmyAiProviderKind.openai:
-      primary = await openAiImage();
-      break;
-    case NgmyAiProviderKind.openaiCompatible:
-      primary = await openAiImage(baseUrl: creds.openAiBaseUrl);
-      break;
-    case NgmyAiProviderKind.gemini:
-      primary = await geminiImage();
-      if (primary.bytes == null) primary = await openAiImage();
-      break;
-    case NgmyAiProviderKind.anthropic:
-      primary = await openAiImage();
-      if (primary.bytes == null) primary = await geminiImage();
-      break;
-  }
-  if (primary.bytes != null) return primary;
-
-  final fallback = await ngmyPollinationsImage(p);
-  if (fallback.bytes != null) return fallback;
-  return (bytes: null, error: primary.error ?? fallback.error ?? 'Could not generate image.');
+  // The picture is made on the NGMY server (sign-in and limits apply), never straight from an AI company.
+  return ngmyPollinationsImage(p);
 }
 
 const _kNgmyOutfitVisionBriefPrompt = '''
@@ -1650,60 +1275,7 @@ Future<({Uint8List? bytes, String? error})> _callGeminiOutfitDirect({
   required String personMime,
   required String prompt,
 }) async {
-  const models = [
-    'gemini-2.5-flash-image',
-    'gemini-2.5-flash-image-preview',
-    'gemini-2.0-flash-preview-image-generation',
-  ];
-  // Person photo only — outfit is described in text to avoid paste/overlay artifacts.
-  final parts = <Map<String, dynamic>>[
-    {'text': prompt},
-    {
-      'inline_data': {
-        'mime_type': personMime.trim().isEmpty ? 'image/jpeg' : personMime,
-        'data': base64Encode(personBytes),
-      },
-    },
-  ];
-
-  Object? lastError;
-  String? lastBody;
-  for (final model in models) {
-    try {
-      final url = Uri.parse(
-        'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=${Uri.encodeQueryComponent(apiKey)}',
-      );
-      final response = await http
-          .post(
-            url,
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'contents': [
-                {'parts': parts},
-              ],
-              'generationConfig': {
-                'responseModalities': ['TEXT', 'IMAGE'],
-                'temperature': 0.35,
-              },
-            }),
-          )
-          .timeout(const Duration(seconds: 180));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final bytes = _extractGeminiImageFromResponse(data);
-        if (bytes != null && bytes.length > 2048) {
-          return (bytes: bytes, error: null);
-        }
-        lastError = 'No image in AI response';
-      } else {
-        lastBody = response.body;
-        lastError = 'HTTP ${response.statusCode}';
-      }
-    } catch (e) {
-      lastError = e;
-    }
-  }
-  return (bytes: null, error: _extractApiErrorMessage(lastError, body: lastBody));
+  return (bytes: null, error: kNgmyDirectAiOff);
 }
 
 Future<({Uint8List? bytes, String? error})> _callGeminiOutfitViaProxy({

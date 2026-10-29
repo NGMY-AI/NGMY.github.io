@@ -232,7 +232,7 @@ Pages: ${jsonEncode([for (final p in part) {'title': p.$1, 'body': p.$2}])}
 Reply with JSON only, with exactly ${part.length} pages in the same order: {"pages":[{"title":"...","body":"..."}]}
 ''';
       for (var attempt = 0; attempt < 2; attempt++) {
-        final r = await ngmyAiGenerateWithCredentials(creds, prompt, timeout: const Duration(seconds: 150));
+        final r = await ngmyAiGenerateWithCredentials(creds, prompt, kind: 'book', timeout: const Duration(seconds: 150));
         final text = r.text;
         if (text == null) continue;
         final obj = _jsonObject(text);
@@ -278,7 +278,7 @@ ${jsonEncode([for (final p in part) {'title': p.$1, 'body': p.$2}])}
 ''';
     List? got;
     for (var attempt = 0; attempt < 2 && got == null; attempt++) {
-      final r = await ngmyAiGenerateWithCredentials(creds, prompt, timeout: const Duration(seconds: 150));
+      final r = await ngmyAiGenerateWithCredentials(creds, prompt, kind: 'book', timeout: const Duration(seconds: 150));
       lastError = r.error;
       final text = r.text;
       if (text == null) continue;
@@ -340,7 +340,7 @@ Future<NgmyBookEditResult> ngmyEditBookWithAi({
   Future<String?> ask(String prompt) async {
     String? error;
     for (var attempt = 0; attempt < 2; attempt++) {
-      final r = await ngmyAiGenerateWithCredentials(creds, prompt, timeout: const Duration(seconds: 150));
+      final r = await ngmyAiGenerateWithCredentials(creds, prompt, kind: 'book', timeout: const Duration(seconds: 150));
       if (r.text != null && r.text!.trim().isNotEmpty) return r.text;
       error = r.error;
     }
@@ -449,7 +449,7 @@ Future<NgmyBookDoc> _ngmyWriteBookRaw({
   Future<String?> ask(String prompt) async {
     for (var attempt = 0; attempt < 2; attempt++) {
       // A page of writing takes a while: give the AI up to two and a half minutes, not the usual 18 seconds.
-      final r = await ngmyAiGenerateWithCredentials(creds, prompt, timeout: const Duration(seconds: 150));
+      final r = await ngmyAiGenerateWithCredentials(creds, prompt, kind: 'book', timeout: const Duration(seconds: 150));
       if (r.text != null && r.text!.trim().isNotEmpty) return r.text;
       lastError = r.error;
     }
