@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'ngmy_3d.dart';
+import 'ngmy_city_ads.dart';
 import 'ngmy_construction_community.dart';
 import 'ngmy_construction_home.dart';
 import 'ngmy_construction_homescene.dart';
@@ -334,7 +335,19 @@ class CityInterior {
     b.box(const V3(0, 0.3, d - 6), const V3(60, 0.4, 12), const Color(0xFF16A34A));
     labels.add(const Label3D(V3(0, 26, d - 8), '⬇ Walk here to go out', Color(0xFF15803D)));
     if (cm != null) labels.add(Label3D(const V3(0, h - 14, 4), '⭐ ${cm.points}   🍞 ${cm.food}   💊 ${cm.medicine}${carrying != null ? '   📦 carrying' : ''}', const Color(0xFF0F172A)));
-    scene = Scene3D(b.polys, labels: labels);
+    final tv = <ScreenQuad>[];
+    if (isTower) {
+      // Big TVs on the walls of every level, playing the NGMY ads.
+      b.order = 2;
+      b.bias = 0;
+      b.box(const V3(-100, 38, 1.2), const V3(86, 52, 2.4), const Color(0xFF111827), shine: 0.3);
+      b.box(const V3(100, 38, 1.2), const V3(86, 52, 2.4), const Color(0xFF111827), shine: 0.3);
+      b.box(const V3(-w / 2 + 1.2, 38, 128), const V3(2.4, 52, 96), const Color(0xFF111827), shine: 0.3);
+      tv.add(ScreenQuad([const V3(-140, 62, 2.6), const V3(-60, 62, 2.6), const V3(-60, 15, 2.6), const V3(-140, 15, 2.6)], 0, (c, size, t) => paintCityAdLoop(c, size, t, door.id + level), width: 960, height: 560, bias: 5, order: 2));
+      tv.add(ScreenQuad([const V3(60, 62, 2.6), const V3(140, 62, 2.6), const V3(140, 15, 2.6), const V3(60, 15, 2.6)], 0, (c, size, t) => paintCityAdLoop(c, size, t, door.id + level + 3), width: 960, height: 560, bias: 5, order: 2));
+      tv.add(ScreenQuad([const V3(-w / 2 + 2.6, 62, 172), const V3(-w / 2 + 2.6, 62, 84), const V3(-w / 2 + 2.6, 15, 84), const V3(-w / 2 + 2.6, 15, 172)], 0, (c, size, t) => paintCityAdLoop(c, size, t, door.id + level + 7), width: 960, height: 560, bias: 5, order: 2));
+    }
+    scene = Scene3D(b.polys, labels: labels, screens: tv);
   }
 
   void _mat(MeshBuilder b, double x, double z, double r, Color col) {
@@ -687,10 +700,16 @@ class CityInterior {
     }
     b.box(const V3(0, 91, 80), const V3(74, 20, 5), dark, shine: 0.3);
     b.box(const V3(0, 48, 82), const V3(36, 4, 3), const Color(0xFF64748B));
+    // A big TV on each side wall, playing the NGMY ads.
+    b.box(const V3(-36.2, 60, 38), const V3(1.6, 58, 66), const Color(0xFF111827), shine: 0.3);
+    b.box(const V3(36.2, 60, 38), const V3(1.6, 58, 66), const Color(0xFF111827), shine: 0.3);
     // The display above the doors, seen from inside: top left is on the viewer's left (the viewer looks towards +z, so that is +x).
     _screens
       ..clear()
       ..add(ScreenQuad([const V3(17, 98, 77.2), const V3(-17, 98, 77.2), const V3(-17, 83, 77.2), const V3(17, 83, 77.2)], 0, (c, size, t) => paintCabinDisplay(c, size, t, shownLevel, goingUp), width: 520, height: 230, bias: 6, order: 2));
+    _screens
+      ..add(ScreenQuad([const V3(-34.6, 86, 69), const V3(-34.6, 86, 7), const V3(-34.6, 34, 7), const V3(-34.6, 34, 69)], 0, (c, size, t) => paintCityAdLoop(c, size, t, 1), width: 720, height: 600, bias: 30, order: 2))
+      ..add(ScreenQuad([const V3(34.6, 86, 7), const V3(34.6, 86, 69), const V3(34.6, 34, 69), const V3(34.6, 34, 7)], 0, (c, size, t) => paintCityAdLoop(c, size, t, 4), width: 720, height: 600, bias: 30, order: 2));
     scene = Scene3D(b.polys, screens: List<ScreenQuad>.of(_screens));
   }
 

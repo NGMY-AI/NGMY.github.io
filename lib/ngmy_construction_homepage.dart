@@ -915,63 +915,94 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   Widget _shopCard() {
     final cm = comm;
     final gas = inner?.isGasShop ?? false;
-    Widget row(ShopItem it) {
+    final size = MediaQuery.of(context).size;
+    // Sideways (a phone on its side, or full screen): three columns of big tiles that fit the screen, nothing to scroll.
+    final wide = size.width > size.height * 1.15;
+
+    Widget tile(ShopItem it) {
       final price = it.id == 'tank' ? fillPrice(needs.fuel) : it.price;
       final can = (cm?.points ?? 0) >= price;
-      return Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white12)),
-        child: Row(children: [
-          Text(it.emoji, style: const TextStyle(fontSize: 26)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(it.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
-              Text(it.note, style: const TextStyle(color: Colors.white54, fontSize: 11.5)),
-            ]),
-          ),
-          GestureDetector(
-            onTap: () => _buyItem(it),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-              decoration: BoxDecoration(color: can ? const Color(0xFFFACC15) : Colors.white12, borderRadius: BorderRadius.circular(14)),
-              child: Text('$price ⭐', style: TextStyle(color: can ? Colors.black : Colors.white38, fontWeight: FontWeight.w900)),
-            ),
-          ),
-        ]),
+      return GestureDetector(
+        onTap: () => _buyItem(it),
+        child: Container(
+          width: wide ? 112 : double.infinity,
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: EdgeInsets.symmetric(horizontal: wide ? 8 : 12, vertical: wide ? 8 : 10),
+          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(16), border: Border.all(color: can ? const Color(0xFFFACC15).withValues(alpha: 0.5) : Colors.white12)),
+          child: wide
+              ? Column(mainAxisSize: MainAxisSize.min, children: [
+                  Text(it.emoji, style: const TextStyle(fontSize: 28)),
+                  const SizedBox(height: 2),
+                  Text(it.name, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12.5)),
+                  Text(it.note, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white54, fontSize: 9.5, height: 1.15)),
+                  const SizedBox(height: 5),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                    decoration: BoxDecoration(color: can ? const Color(0xFFFACC15) : Colors.white12, borderRadius: BorderRadius.circular(12)),
+                    child: Text('$price ⭐', style: TextStyle(color: can ? Colors.black : Colors.white38, fontWeight: FontWeight.w900, fontSize: 13)),
+                  ),
+                ])
+              : Row(children: [
+                  Text(it.emoji, style: const TextStyle(fontSize: 26)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(it.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
+                      Text(it.note, style: const TextStyle(color: Colors.white54, fontSize: 11.5)),
+                    ]),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                    decoration: BoxDecoration(color: can ? const Color(0xFFFACC15) : Colors.white12, borderRadius: BorderRadius.circular(14)),
+                    child: Text('$price ⭐', style: TextStyle(color: can ? Colors.black : Colors.white38, fontWeight: FontWeight.w900)),
+                  ),
+                ]),
+        ),
       );
     }
 
-    Widget head(String t) => Padding(padding: const EdgeInsets.only(top: 4, bottom: 8), child: Text(t, style: const TextStyle(color: Colors.white54, fontSize: 11.5, fontWeight: FontWeight.w900, letterSpacing: 1.2)));
+    Widget section(String title, List<ShopItem> items) => Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+          Padding(padding: const EdgeInsets.only(top: 2, bottom: 6), child: Text(title, style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.2))),
+          if (wide) Wrap(spacing: 8, children: [for (final it in items) tile(it)]) else for (final it in items) tile(it),
+        ]);
+
+    final header = Row(children: [
+      Text(gas ? '⛽' : '🛒', style: const TextStyle(fontSize: 28)),
+      const SizedBox(width: 10),
+      Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(gas ? 'NGMY Gas shop' : 'NGMY Mart', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+          Text('You have ${cm?.points ?? 0} ⭐', style: const TextStyle(color: Color(0xFFFACC15), fontSize: 13, fontWeight: FontWeight.w800)),
+        ]),
+      ),
+      if (wide) SizedBox(width: 190, child: NeedsBars(needs: needs, driving: gas, height: 14)),
+      const SizedBox(width: 12),
+      GestureDetector(onTap: () => setState(() => _cardShop = false), child: const Icon(Icons.close_rounded, color: Colors.white54, size: 26)),
+    ]);
+
+    final food = section('FOOD AND DRINKS (energy)', kShopFood);
+    final more = section(gas ? 'GAS' : 'HEALTH AND THE TOWN', gas ? kShopGas : kShopTown);
     return Container(
       color: Colors.black.withValues(alpha: 0.55),
       alignment: Alignment.center,
-      child: SingleChildScrollView(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
         child: Container(
-          width: 340,
-          margin: const EdgeInsets.all(14),
+          width: wide ? math.min(size.width - 24, 820) : 340,
+          margin: const EdgeInsets.all(12),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1F2937), Color(0xFF0B1220)]), borderRadius: BorderRadius.circular(28), border: Border.all(color: Colors.white24)),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Row(children: [
-              Text(gas ? '⛽' : '🛒', style: const TextStyle(fontSize: 28)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(gas ? 'NGMY Gas shop' : 'NGMY Mart', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
-                  Text('You have ${cm?.points ?? 0} ⭐', style: const TextStyle(color: Color(0xFFFACC15), fontSize: 13, fontWeight: FontWeight.w800)),
-                ]),
-              ),
-              GestureDetector(onTap: () => setState(() => _cardShop = false), child: const Icon(Icons.close_rounded, color: Colors.white54)),
-            ]),
+            header,
             const SizedBox(height: 10),
-            NeedsBars(needs: needs, driving: gas, height: 14),
-            const SizedBox(height: 8),
-            if (gas) ...[head('GAS'), for (final it in kShopGas) row(it)],
-            head('FOOD AND DRINKS (energy)'),
-            for (final it in kShopFood) row(it),
-            if (!gas) ...[head('HEALTH AND THE TOWN'), for (final it in kShopTown) row(it)],
+            if (!wide) ...[NeedsBars(needs: needs, driving: gas, height: 14), const SizedBox(height: 8)],
+            if (wide)
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(flex: 5, child: food),
+                const SizedBox(width: 14),
+                Expanded(flex: 3, child: more),
+              ])
+            else ...[food, more],
           ]),
         ),
       ),
@@ -1028,7 +1059,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     return Container(
       color: Colors.black.withValues(alpha: 0.55),
       alignment: Alignment.center,
-      child: SingleChildScrollView(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
         child: Container(
           width: 340,
           margin: const EdgeInsets.all(14),
@@ -1172,7 +1204,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
           // Into the car.
           r.stage = 1;
           r.t0 = nowMs;
-          r.total = (1.4 + (r.to - r.from).abs() * 0.45).clamp(2.6, 6.4).toDouble();
+          r.total = 3.0 + ((r.to - r.from).abs() - 1).clamp(0, 99) * 1.1;
           r.shown = r.from;
           final cab = CityInterior('cabin', lobby.door)
             ..shownLevel = r.from
@@ -1211,7 +1243,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         cam.setView(
           target: V3(0, 52 + math.sin(el * 5.3) * 0.5 * shake, 40),
           dist: 66 + math.sin(el * 2.1) * 1.2,
-          yaw: math.pi + math.sin(el * 8) * 0.010 * shake,
+          yaw: math.pi + math.sin(el * 0.9) * 0.5 + math.sin(el * 8) * 0.010 * shake,
           pitch: 0.1 + math.sin(el * 6.1) * 0.007 * shake,
         );
         if (el > t - 0.9 && !r.chimed) {
@@ -1260,7 +1292,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
           w.walking = false;
           lobby.doorOpen = 0;
           setState(_rebuild);
-          cam.glideTo(target: const V3(0, 30, 110), dist: 260, yaw: 0.0, pitch: 0.55);
+          cam.glideTo(target: const V3(0, 30, 110), dist: 170, yaw: 0.0, pitch: 0.4);
           conBeep(660, ms: 80);
           _say(dark ? 'Level ${lobby.level}. This office has no power: walk onto the red mat at the breaker panel, or tap the red frames.' : 'Level ${lobby.level} of ${lobby.levels}.', ok: true);
         }
@@ -1274,7 +1306,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     return Container(
       color: Colors.black.withValues(alpha: 0.55),
       alignment: Alignment.center,
-      child: SingleChildScrollView(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
         child: Container(
           width: 330,
           margin: const EdgeInsets.all(14),
@@ -1493,7 +1526,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     return Container(
       color: Colors.black.withValues(alpha: 0.55),
       alignment: Alignment.center,
-      child: SingleChildScrollView(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
         child: Container(
           width: 330,
           margin: const EdgeInsets.all(14),
@@ -1574,9 +1608,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (!mounted) return;
     inn.fixtures = _fixturesOf(p);
     if (_workReady) {
-      inn.build(comm);
-      setState(_rebuild);
-      _say('Everything is connected. Press the green Complete work button to hand the job in.', ok: true);
+      // Everything is connected: the work is handed in by itself (the green button is there too, if it has to be done by hand).
+      _completeWork();
     } else {
       inn.build(comm);
       setState(_rebuild);
@@ -1778,7 +1811,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     return Container(
       color: Colors.black.withValues(alpha: 0.55),
       alignment: Alignment.center,
-      child: SingleChildScrollView(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
         child: Container(
           width: 330,
           margin: const EdgeInsets.all(14),
@@ -2404,7 +2438,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       moved = w.advance(dt);
     }
     if (!moved) w.walking = false;
-    final tiredMsg = needs.tick(dt, walking: moved && _driving == null, driving: moved && _driving != null);
+    // Nothing counts against the person while they are working (a job page is open) or away from the city map.
+    final counting = _pages == 0 && !room.indoor;
+    final tiredMsg = counting ? needs.tick(dt, walking: moved && _driving == null, driving: moved && _driving != null) : null;
     if (tiredMsg != null) _say(tiredMsg, ok: false);
     _takePenalty();
     if (moved || w.lift > 0) cam.glideTo(target: V3(w.x, 30, w.z));
@@ -2438,7 +2474,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         if (_onBalcony) {
           cam.glideTo(target: const V3(230, -40, 100), dist: 330, yaw: 1.35, pitch: 0.35);
         } else {
-          cam.glideTo(target: V3(0, 30, 110), dist: 260, yaw: 0.0, pitch: 0.55);
+          cam.glideTo(target: V3(0, 30, 110), dist: 170, yaw: 0.0, pitch: 0.4);
         }
       }
       if (inn.leaving) _leaveBuilding();
@@ -2487,7 +2523,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       ..minPitch = 0.15
       ..maxPitch = 1.35
       ..setFree(true);
-    cam.glideTo(target: V3(0, 30, 110), dist: 260, yaw: 0.0, pitch: 0.55);
+    cam.glideTo(target: V3(0, 30, 110), dist: 170, yaw: 0.0, pitch: 0.4);
     setState(_rebuild);
     _say(switch (inn.kind) {
       'hospital' => 'The hospital. Walk onto the blue mat to admit the sick, and up to a bed to treat the patient. Walk to the green mat to go out.',
@@ -2879,7 +2915,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (cm == null || !mounted) return;
     if (tour == null) cm.advance(1, home);
     if (++_beat % 8 == 0) cm.save(home);
-    if (!steer && (needs.resting || needs.crawling)) {
+    if (inner != null && _workReady) _completeWork();
+    if (!steer && _pages == 0 && !room.indoor && (needs.resting || needs.crawling)) {
       final m = needs.tick(1);
       if (m != null) _say(m, ok: false);
       _takePenalty();
@@ -3847,7 +3884,7 @@ class _NCall {
   String get subtitle => switch (kind) { 'sick' => 'Needs a doctor', 'light' => 'A street light is out', 'office' => 'No power in an office', _ => 'No power at a house' };
   List<String> get lines => switch (kind) {
         'sick' => ['Hello! $caller is very sick and cannot get up.', 'Please take them to the hospital: walk into the hospital and onto the desk to admit them.', 'I will pay you 10 points. Thank you!'],
-        'office' => ['Hello! The office on level $level of $name has no power.', 'Take the elevator up to level $level, then fix the breaker panel there.', 'I will pay you 20 points. Thank you!'],
+        'office' => ['Hello, this is the office manager. The office on level $level of $name has lost its power and nobody can work.', 'Please take the elevator up to level $level, and fix the wiring at the breaker panel there.', 'I will pay you 20 points. Thank you so much!'],
         'light' => ['Hello! A street light is out and the street is dark.', 'It is the dark one with the red sign. Could you fix its wiring?', 'I will pay you 10 points. Thank you!'],
         _ => ['Hello! All the lights went out in $name. The power is off in the whole house.', 'Could you check the breaker panel inside and fix the wiring? Switch the power off before you touch anything.', 'I will pay you 20 points. Thank you!'],
       };

@@ -462,7 +462,7 @@ void main() {
       ..z = 44;
     cab.build(null);
     expect(cab.isCabin, isTrue);
-    expect(cab.scene.screens.length, 1, reason: 'the display above the doors');
+    expect(cab.scene.screens.length, 3, reason: 'the display above the doors and a big TV on each side wall');
     cab.doorOpen = 0;
     final shut = cab.dynamicPolys(1.0, const PersonStyle());
     cab.doorOpen = 1;

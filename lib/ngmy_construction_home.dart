@@ -585,7 +585,7 @@ class HomeProject {
         for (final (x, z) in const [(-700.0, 225.0), (-120.0, 160.0), (120.0, 160.0), (720.0, 225.0)]) {
           if (clear(x, z)) r.add('house2', x: x, z: z);
         }
-        for (final (z, step, big) in const [(600.0, 400.0, true), (730.0, 400.0, false), (1030.0, 400.0, true), (1210.0, 400.0, true)]) {
+        for (final (z, step, big) in const [(600.0, 400.0, true), (1030.0, 400.0, true), (1210.0, 400.0, true)]) {
           for (var x = -800.0; x <= 800; x += step) {
             if (x.abs() < 100) continue;
             // Between the two streets the loop roads at x = 600 run through, so the houses keep well back from them.
@@ -618,7 +618,7 @@ class HomeProject {
           for (final f in r.furn) {
             if (kRoadKinds.contains(f.kind) || f.kind == 'roundabout' || f.kind == 'rug' || f.kind == 'flowers') continue;
             final k = kFurnKinds[f.kind]!;
-            if ((f.x - x).abs() < (fw + k.w) / 2 + 50 && (f.z - z).abs() < (fd + k.d) / 2 + (f.z > z ? 90 : 50)) return false;
+            if ((f.x - x).abs() < (fw + k.w) / 2 + 130 && (f.z - z).abs() < (fd + k.d) / 2 + (f.z > z ? 150 : 110)) return false;
           }
           return true;
         }
@@ -670,10 +670,10 @@ class HomeProject {
 
         // More houses: behind my house, down both sides and over every green stretch, each with room in front of its door.
         var added = 0;
-        for (var zi = 0; zi < 9 && added < 90; zi++) {
-          final z = -560.0 + zi * 235;
-          for (var xi = 0; xi <= 7 && added < 90; xi++) {
-            final x = -1150.0 + xi * 330;
+        for (var zi = 0; zi < 7 && added < 90; zi++) {
+          final z = -560.0 + zi * 300;
+          for (var xi = 0; xi <= 5 && added < 90; xi++) {
+            final x = -1150.0 + xi * 420;
             if (x.abs() < 170 && z < 100) continue;
             final kind = (xi * 7 + zi * 3) % 5 == 0 ? 'bighouse' : 'house2';
             final k = kFurnKinds[kind]!;

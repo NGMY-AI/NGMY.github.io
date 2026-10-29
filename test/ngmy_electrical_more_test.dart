@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:ngmy/ngmy_3d.dart';
+import 'package:ngmy/ngmy_construction_cityin.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_construction_community.dart';
 import 'package:ngmy/ngmy_construction_electrical.dart';
@@ -148,5 +150,26 @@ void main() {
     expect(find.text('INCOMING CALL'), findsNothing, reason: 'no call while you are inside the house');
     Community.active = null;
     await t.pump(const Duration(seconds: 10));
+  });
+  test('big TVs playing the NGMY ads in the elevator car and on the walls of every level of a tower', () {
+    final city = HomeProject(seed: 4).rooms[11];
+    final tower = city.furn.firstWhere((f) => f.kind == 'tower');
+    final lobby = CityInterior('tower', tower)..build(null);
+    expect(lobby.scene.screens.length, 3);
+    lobby.goToLevel(5, darkHere: false);
+    expect(lobby.scene.screens.length, 3, reason: 'every level has its TVs');
+    expect((CityInterior('cabin', tower)..build(null)).scene.screens.length, 3);
+  });
+
+  test('wires and screws are easy to hit: a tap near a thin thing picks it', () {
+    final hits = HitCache();
+    final thin = Path()..addRect(const Rect.fromLTWH(100, 100, 4, 60));
+    final wall = Path()..addRect(const Rect.fromLTWH(0, 0, 400, 400));
+    hits.list
+      ..add((wall, 1))
+      ..add((thin, 11));
+    expect(hits.pick(const Offset(102, 130)), 11, reason: 'right on the wire');
+    expect(hits.pick(const Offset(112, 130)), 11, reason: 'a finger width beside the wire');
+    expect(hits.pick(const Offset(300, 300)), 1, reason: 'far from it the wall is picked');
   });
 }

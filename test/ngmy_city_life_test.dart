@@ -20,7 +20,7 @@ void main() {
       ..uberLicence = false;
   }
 
-  test('energy: a minute and a half of walking uses it all, then 20 seconds of crawling to a shop, then stars are lost and a rest; food helps', () {
+  test('energy: two minutes of walking uses it all, then 20 seconds of crawling to a shop, then stars are lost and a rest; food helps', () {
     resetNeeds();
     final n = CityNeeds.session;
     final said = <String>[];
@@ -32,7 +32,7 @@ void main() {
       if (m != null) said.add(m);
       t++;
     }
-    expect(t, inInclusiveRange(88, 92), reason: 'a minute and a half of straight walking');
+    expect(t, inInclusiveRange(118, 122), reason: 'two minutes of straight walking');
     expect(n.crawling, isTrue, reason: 'worn out: crawling on the ground');
     expect(said.any((m) => m.contains('tired')), isTrue, reason: 'it warns when low');
     // Eating in time saves the day: no stars lost.
@@ -86,15 +86,15 @@ void main() {
     expect(kShopTown.any((i) => i.cure), isTrue, reason: 'pills are for sale');
   });
 
-  test('gas: about a minute of driving empties the tank, buying gas fills it', () {
+  test('gas: about two minutes of driving empties the tank, buying gas fills it', () {
     resetNeeds();
     final n = CityNeeds.session;
     var t = 0;
-    while (!n.outOfGas && t < 200) {
+    while (!n.outOfGas && t < 400) {
       n.tick(1, driving: true);
       t++;
     }
-    expect(t, inInclusiveRange(59, 61));
+    expect(t, inInclusiveRange(119, 121));
     expect(n.outOfGas, isTrue);
     expect(fillPrice(0), 12);
     expect(fillPrice(1), 0);
@@ -186,33 +186,27 @@ void main() {
     st.setState(() {});
     await t.pump(const Duration(milliseconds: 200));
     expect(find.text('✅ Complete work'), findsNothing);
-    // All connected: the button is there, in the chips and next to the drone button in full screen.
+    // All connected: the button shows (in the chips, and next to the drone button in full screen) and the work is also handed in by itself.
     var all = half;
     for (var seed = 1; seed < 40; seed++) {
       all = RoomProject(seed: seed, kind: 0)..fastForward()..completeWiring();
       if (all.orders.isNotEmpty) break;
     }
+    final before = (st.comm as Community).points;
     city.houseWork[house.id] = all;
     st.setState(() {});
-    await t.pump(const Duration(milliseconds: 200));
-    final row = find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.right).first;
-    await t.scrollUntilVisible(find.text('✅ Complete work'), -120, scrollable: row);
-    expect(find.text('✅ Complete work'), findsOneWidget);
+    await t.pump();
+    expect(find.text('✅ Complete work', skipOffstage: false), findsOneWidget);
     st.full = true;
     st.setState(() {});
-    await t.pump(const Duration(milliseconds: 200));
+    await t.pump();
     expect(find.byIcon(Icons.task_alt_rounded), findsOneWidget, reason: 'next to the drone button in full screen');
     st.full = false;
     st.setState(() {});
-    await t.pump(const Duration(milliseconds: 200));
-    final before = (st.comm as Community).points;
-    await t.scrollUntilVisible(find.text('✅ Complete work'), -120, scrollable: row);
-    await t.ensureVisible(find.text('✅ Complete work'));
-    await t.tap(find.text('✅ Complete work'));
-    await t.pump(const Duration(milliseconds: 300));
-    expect(city.darkHouses.contains(house.id), isFalse, reason: 'the power is back');
+    await t.pump(const Duration(seconds: 2));
+    expect(city.darkHouses.contains(house.id), isFalse, reason: 'the power is back without pressing anything');
     expect((st.comm as Community).points, before + 20);
-    expect(find.text('✅ Complete work'), findsNothing);
+    expect(find.text('✅ Complete work', skipOffstage: false), findsNothing);
     await t.pump(const Duration(seconds: 15));
   });
 

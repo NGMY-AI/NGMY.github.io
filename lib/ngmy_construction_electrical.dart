@@ -423,7 +423,7 @@ Scene3D buildBench(ElectricalLesson lesson, WiringState s, {bool withWall = true
   }
   final cableEnds = _boxAndCable(b, lesson.legacy ? kind : 'outlet', true);
   // ── Wires ──
-  const double wr = 0.085;
+  const double wr = 0.12;
   void wire(int id, V3 start, V3 free, String key, Color insul) {
     b.id = id;
     final attachedTo = s.attached.entries.where((e) => e.value == key).toList();

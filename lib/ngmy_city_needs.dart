@@ -6,16 +6,16 @@ class CityNeeds extends ChangeNotifier {
   /// The city keeps one set of needs for the whole session, so leaving and coming back does not refill anybody.
   static final CityNeeds session = CityNeeds();
 
-  /// About a minute and a half of straight walking uses all the energy. Then the person crawls on the ground for [crawlSeconds]: if
+  /// About two minutes of straight walking use all the energy. Then the person crawls on the ground for [crawlSeconds]: if
   /// they have not found a shop and eaten by then they lose [crawlPenalty] stars, rest three minutes and come back at half.
-  static const double walkSeconds = 90, crawlSeconds = 20, restSeconds = 180, restEnergy = 0.5;
+  static const double walkSeconds = 120, crawlSeconds = 20, restSeconds = 180, restEnergy = 0.5;
   static const int crawlPenalty = 5;
 
-  /// Water lasts about two and a half minutes of walking; without it the energy drains much faster.
-  static const double thirstSeconds = 150;
+  /// Water lasts about two minutes of walking; without it the energy drains much faster.
+  static const double thirstSeconds = 120;
 
-  /// About one minute of driving uses a whole tank.
-  static const double driveSeconds = 60;
+  /// About two minutes of driving use a whole tank.
+  static const double driveSeconds = 120;
 
   double energy = 1.0;
   double fuel = 1.0;

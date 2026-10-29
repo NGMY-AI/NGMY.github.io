@@ -471,10 +471,31 @@ class HitCache {
 
   /// The object under [p], nearest first.
   int pick(Offset p) {
+    var exact = 0;
+    Rect? exactBounds;
     for (var i = list.length - 1; i >= 0; i--) {
-      if (list[i].$1.contains(p)) return list[i].$2;
+      if (list[i].$1.contains(p)) {
+        exact = list[i].$2;
+        exactBounds = list[i].$1.getBounds();
+        break;
+      }
     }
-    return 0;
+    if (exact != 0 && exactBounds!.shortestSide < 16) return exact;
+    // Thin things (a wire, a screw, a pole) are hard to hit with a finger: a tap close to one picks it, unless the tap landed on another thin thing.
+    const slop = 18.0;
+    var best = 0;
+    var bestD = double.infinity;
+    for (final e in list) {
+      final b = e.$1.getBounds();
+      if (b.shortestSide > 22 || b.longestSide > 150) continue;
+      final dx = math.max(math.max(b.left - p.dx, p.dx - b.right), 0.0), dy = math.max(math.max(b.top - p.dy, p.dy - b.bottom), 0.0);
+      final d = math.sqrt(dx * dx + dy * dy);
+      if (d <= slop && d < bestD) {
+        bestD = d;
+        best = e.$2;
+      }
+    }
+    return best != 0 ? best : exact;
   }
 }
 
