@@ -53,7 +53,7 @@ $useMode = if ($Mode) { $Mode } elseif ($secrets["STRIPE_MODE"]) { $secrets["STR
 $stripeKey = if ($useMode -eq "live") { $secrets["STRIPE_SECRET_KEY_LIVE"] } else { $secrets["STRIPE_SECRET_KEY_TEST"] }
 if (-not $stripeKey) { $stripeKey = $secrets["STRIPE_SECRET_KEY"] }
 if (-not $stripeKey) { throw "No Stripe secret key found for mode '$useMode' in .ngmy_secrets.local" }
-$isLive = $stripeKey.StartsWith("sk_live_")
+$isLive = ($stripeKey.StartsWith("sk_live_") -or $stripeKey.StartsWith("rk_live_"))
 if ($useMode -eq "live" -and -not $isLive) { throw "Mode is live but the key is not sk_live_" }
 if ($useMode -eq "test" -and $isLive) { throw "Mode is test but the key is sk_live_" }
 $script:StripeKey = $stripeKey
