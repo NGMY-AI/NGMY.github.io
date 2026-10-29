@@ -1,9 +1,9 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var J,A,C,B={
-aOr(){var x=0,w=A.j(y.v),v,u=2,t=[],s,r,q,p,o,n,m,l,k,j
-var $async$aOr=A.e(function(d,e){if(d===1){t.push(e)
+aOs(){var x=0,w=A.j(y.v),v,u=2,t=[],s,r,q,p,o,n,m,l,k,j
+var $async$aOs=A.e(function(d,e){if(d===1){t.push(e)
 x=u}for(;;)switch(x){case 0:x=3
-return A.b(A.az(),$async$aOr)
+return A.b(A.az(),$async$aOs)
 case 3:l=e
 k=A.aU(J.q(l.a,"saved_invoices_v1"))
 if(k==null||k.length===0){x=1
@@ -15,7 +15,7 @@ o=A.hc(p).k("a_<bW.E>")
 n=A.C(new A.a_(p,new B.fte(s),o),o.k("J.E"))
 q=n
 x=8
-return A.b(l.ar("String","saved_invoices_v1",C.S.ao(q,null)),$async$aOr)
+return A.b(l.ar("String","saved_invoices_v1",C.S.ao(q,null)),$async$aOs)
 case 8:u=2
 x=7
 break
@@ -27,11 +27,11 @@ case 4:x=2
 break
 case 7:case 1:return A.h(v,w)
 case 2:return A.f(t.at(-1),w)}})
-return A.i($async$aOr,w)},
+return A.i($async$aOs,w)},
 KK(){var x=0,w=A.j(y.E),v,u,t,s,r,q,p,o
 var $async$KK=A.e(function(d,e){if(d===1)return A.f(e,w)
 for(;;)switch(x){case 0:x=3
-return A.b(B.aOr(),$async$KK)
+return A.b(B.aOs(),$async$KK)
 case 3:p=A
 o=J
 x=4
@@ -55,34 +55,34 @@ v=s
 x=1
 break}case 1:return A.h(v,w)}})
 return A.i($async$KK,w)},
-aPR(d){var x=0,w=A.j(y.v)
-var $async$aPR=A.e(function(e,f){if(e===1)return A.f(f,w)
+aPS(d){var x=0,w=A.j(y.v)
+var $async$aPS=A.e(function(e,f){if(e===1)return A.f(f,w)
 for(;;)switch(x){case 0:x=3
-return A.b(A.az(),$async$aPR)
+return A.b(A.az(),$async$aPS)
 case 3:x=2
-return A.b(f.ar("String","saved_invoices_v1",C.S.ao(d,null)),$async$aPR)
+return A.b(f.ar("String","saved_invoices_v1",C.S.ao(d,null)),$async$aPS)
 case 2:return A.h(null,w)}})
-return A.i($async$aPR,w)},
-aOm(d){var x=0,w=A.j(y.v),v
-var $async$aOm=A.e(function(e,f){if(e===1)return A.f(f,w)
+return A.i($async$aPS,w)},
+aOn(d){var x=0,w=A.j(y.v),v
+var $async$aOn=A.e(function(e,f){if(e===1)return A.f(f,w)
 for(;;)switch(x){case 0:x=2
-return A.b(B.KK(),$async$aOm)
+return A.b(B.KK(),$async$aOn)
 case 2:v=f
 J.pC(v,0,d)
 x=3
-return A.b(B.aPR(v),$async$aOm)
+return A.b(B.aPS(v),$async$aOn)
 case 3:return A.h(null,w)}})
-return A.i($async$aOm,w)},
-aOw(d){var x=0,w=A.j(y.v),v
-var $async$aOw=A.e(function(e,f){if(e===1)return A.f(f,w)
+return A.i($async$aOn,w)},
+aOx(d){var x=0,w=A.j(y.v),v
+var $async$aOx=A.e(function(e,f){if(e===1)return A.f(f,w)
 for(;;)switch(x){case 0:x=2
-return A.b(B.KK(),$async$aOw)
+return A.b(B.KK(),$async$aOx)
 case 2:v=f
 J.nt(v,new B.ftW(d))
 x=3
-return A.b(B.aPR(v),$async$aOw)
+return A.b(B.aPS(v),$async$aOx)
 case 3:return A.h(null,w)}})
-return A.i($async$aOw,w)},
+return A.i($async$aOx,w)},
 fte:function fte(d){this.a=d},
 fx5:function fx5(){},
 fx6:function fx6(){},
@@ -124,4 +124,4 @@ $S:4};(function inheritance(){var x=a.inheritMany,w=a.inherit
 x(A.hZ,[B.fte,B.fx5,B.fx6,B.ftW])
 w(B.fx7,A.km)})()
 var y={k:A.ax("O<a5<m,@>>"),E:A.ax("ai<a5<m,@>>"),i:A.ax("ai<@>"),y:A.ax("a5<m,@>"),B:A.ax("a5<@,@>"),w:A.ax("m"),b:A.ax("@"),v:A.ax("~")}};
-(a=>{a["bLLz7RfLGxTDtE3k1WfObMwsUDU="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["g+iVlx4RQfcqgO/2ESzUUyRpllA="]=a.current})($__dart_deferred_initializers__);
