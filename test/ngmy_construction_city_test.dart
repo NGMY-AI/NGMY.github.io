@@ -131,7 +131,7 @@ void main() {
     var rang = false;
     for (var i = 0; i < 150 && !rang; i++) {
       await t.pump(const Duration(seconds: 1));
-      rang = find.text('incoming call').evaluate().isNotEmpty;
+      rang = find.text('INCOMING CALL').evaluate().isNotEmpty;
     }
     expect(rang, isTrue, reason: 'the phone rings when a call comes in');
     // A phone-call screen with a green answer and a red hang-up button.

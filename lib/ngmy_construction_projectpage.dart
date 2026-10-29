@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 
 import 'ngmy_3d.dart';
 import 'ngmy_construction_electrical.dart';
+import 'ngmy_construction_electrical_more.dart';
 import 'ngmy_construction_lab.dart';
 import 'ngmy_construction_project.dart';
 import 'ngmy_construction_roomscene.dart';
@@ -47,6 +48,16 @@ const List<List<_Item>> _trays = [
     _Item('outlet', 'Outlet', Icons.power_rounded),
     _Item('gfci', 'GFCI', Icons.shield_rounded),
     _Item('switch', 'Switch', Icons.toggle_on_rounded),
+    _Item('split', 'Split outlet', Icons.power_rounded),
+    _Item('v240four', '240 V 4-wire', Icons.electrical_services_rounded),
+    _Item('v240three', '240 V 3-wire', Icons.electrical_services_rounded),
+    _Item('v240only', '240 V only', Icons.electrical_services_rounded),
+    _Item('isolated', 'Isolated ground', Icons.power_rounded),
+    _Item('switch2p', 'Double-pole', Icons.toggle_on_rounded),
+    _Item('switch3', '3-way switch', Icons.toggle_on_rounded),
+    _Item('switch4', '4-way switch', Icons.toggle_on_rounded),
+    _Item('switchsmart', 'Smart switch', Icons.toggle_on_rounded),
+    _Item('switchcombo', 'Double switch', Icons.toggle_on_rounded),
     _Item('light', 'Light', Icons.lightbulb_rounded),
     _Item('fan', 'Fan', Icons.mode_fan_off_rounded),
     _Item('tv', 'TV', Icons.tv_rounded),
@@ -102,7 +113,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
   @override
   void initState() {
     super.initState();
-    p = widget.project ?? RoomProject(seed: seed, practice: widget.practice);
+    p = widget.project ?? RoomProject(seed: seed, practice: widget.practice, variants: true);
     if (widget.test) p.test = true;
     if (widget.project != null && p.drywallDone) phase = 2;
     if (widget.quick) {
@@ -385,6 +396,16 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
       case 'outlet':
       case 'gfci':
       case 'switch':
+      case 'split':
+      case 'v240four':
+      case 'v240three':
+      case 'v240only':
+      case 'isolated':
+      case 'switch2p':
+      case 'switch3':
+      case 'switch4':
+      case 'switchsmart':
+      case 'switchcombo':
       case 'light':
       case 'fan':
         final a = p.installDevice(slot, armed);
@@ -429,7 +450,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
       return;
     }
     if (armed == 'flip') {
-      if (d.kind == 'switch' && d.w.stage >= 2) {
+      if (isSwitchKind(d.kind) && d.w.stage >= 2) {
         _apply(p.flipSwitch(slot));
       } else {
         _say('Only a finished switch can be flipped.');
@@ -501,9 +522,9 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
         'ceiling' || 'fanbox' => s.ceiling && !p.boxes.containsKey(s.id),
         'cable' => p.boxes.containsKey(s.id) && !p.cabled.contains(s.id),
         'knife' => !s.ceiling && p.boxes.containsKey(s.id),
-        'outlet' || 'gfci' || 'switch' => !s.ceiling && p.boxes.containsKey(s.id) && !has,
+        _ when isOutletKind(armed) || isSwitchKind(armed) => !s.ceiling && p.boxes.containsKey(s.id) && !has,
         'light' || 'fan' => s.ceiling && p.boxes.containsKey(s.id) && !has,
-        'tv' || 'lamp' || 'toaster' || 'hairdryer' => has && (p.devs[s.id]!.kind == 'outlet' || p.devs[s.id]!.kind == 'gfci'),
+        'tv' || 'lamp' || 'toaster' || 'hairdryer' => has && isOutletKind(p.devs[s.id]!.kind),
         'tester' => p.boxes.containsKey(s.id),
         _ => false,
       };
@@ -585,7 +606,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
   void _newJob({bool sameSeed = false}) {
     setState(() {
       if (!sameSeed) seed = DateTime.now().millisecondsSinceEpoch % 100000;
-      p = RoomProject(seed: seed, practice: p.practice);
+      p = RoomProject(seed: seed, practice: p.practice, variants: true);
       phase = 0;
       armed = '';
       active = -1;
@@ -610,7 +631,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
         if (noBox.isNotEmpty) {
           final o = noBox.first;
           final s = slotById(o.slot);
-          return 'Mount a box at ${s.name} (${o.device == 'gfci' ? 'a GFCI' : o.device} goes here): pick a ${s.ceiling ? (s.role == 'fan' ? 'fan box' : 'ceiling box') : 'wall box'}, then tap the glowing spot.';
+          return 'Mount a box at ${s.name} (${deviceKindName(o.device).toLowerCase()} goes here): pick a ${s.ceiling ? (s.role == 'fan' ? 'fan box' : 'ceiling box') : 'wall box'}, then tap the glowing spot.';
         }
         final noCable = p.orders.where((o) => !p.cabled.contains(o.slot)).toList();
         if (noCable.isNotEmpty) {
@@ -634,12 +655,12 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
         final todo = p.orders.where((o) => p.devs[o.slot]?.kind != o.device).toList();
         if (todo.isNotEmpty) {
           final o = todo.first;
-          return 'Pick the ${o.device == 'gfci' ? 'GFCI' : o.device} and tap ${slotById(o.slot).name}. (${names(todo.map((e) => e.slot))} still need a device.)';
+          return 'Pick the ${deviceKindName(o.device).toLowerCase()} and tap ${slotById(o.slot).name}. (${names(todo.map((e) => e.slot))} still need a device.)';
         }
         final unfinished = p.orders.where((o) => (p.devs[o.slot]?.w.stage ?? 0) < 2).toList();
         if (unfinished.isNotEmpty) return 'Tap ${slotById(unfinished.first.slot).name} to work on it: breaker OFF, wires, push in, cover on.';
         if (!p.breaker) return 'Turn the breaker ON (tap the panel or the breaker button) and test.';
-        final out = p.orders.where((o) => (o.device == 'outlet' || o.device == 'gfci') && p.devs[o.slot]?.tested != true).toList();
+        final out = p.orders.where((o) => isOutletKind(o.device) && p.devs[o.slot]?.tested != true).toList();
         if (out.isNotEmpty) return 'Pick the TV or the lamp and plug it into ${slotById(out.first.slot).name} to test it.';
         return 'Flip the wall switch to test the ${p.orders.any((o) => o.device == 'fan') ? 'fan' : 'light'}.';
     }
@@ -896,7 +917,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
                   margin: const EdgeInsets.only(bottom: 6),
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white12)),
-                  child: Text('${p.devs[o.slot]?.w.stage == 2 ? '✅' : '⬜'} ${o.device == 'gfci' ? 'A GFCI outlet' : (o.device == 'outlet' ? 'An outlet' : (o.device == 'switch' ? 'A light switch' : (o.device == 'light' ? 'A ceiling light' : 'A ceiling fan')))} at ${slotById(o.slot).name}${o.controlledBy != null ? ', turned on by ${slotById(o.controlledBy!).name}' : ''}', style: const TextStyle(color: Colors.white, fontSize: 13)),
+                  child: Text('${p.devs[o.slot]?.w.stage == 2 ? '✅' : '⬜'} ${o.device == 'gfci' ? 'A GFCI outlet' : (o.device == 'outlet' ? 'An outlet' : (o.device == 'switch' ? 'A light switch' : (o.device == 'light' ? 'A ceiling light' : (o.device == 'fan' ? 'A ceiling fan' : 'A ${deviceKindName(o.device).toLowerCase()}'))))} at ${slotById(o.slot).name}${o.controlledBy != null ? ', turned on by ${slotById(o.controlledBy!).name}' : ''}', style: const TextStyle(color: Colors.white, fontSize: 13)),
                 ),
               const SizedBox(height: 10),
               Row(children: [

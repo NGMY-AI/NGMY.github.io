@@ -16,6 +16,7 @@ import 'ngmy_construction_community.dart';
 import 'ngmy_construction_cityin.dart';
 import 'ngmy_construction_communitypage.dart';
 import 'ngmy_construction_electrical.dart';
+import 'ngmy_construction_electrical_more.dart';
 import 'ngmy_construction_home.dart';
 import 'ngmy_construction_homescene.dart';
 import 'ngmy_construction_lab.dart';
@@ -877,16 +878,33 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         needs.fill(it.fuel);
         say = it.id == 'tank' ? 'You filled the tank for $price points.' : 'You put gas in the car. -$price points.';
       }
-    } else if (needs.energy >= 0.98 && !needs.resting) {
-      say = 'You are not hungry: your energy is full.';
-      ok = false;
-    } else if (cm.points < it.price) {
-      say = 'You need ${it.price} points for the ${it.name.toLowerCase()}.';
-      ok = false;
+    } else if (it.cure) {
+      if (!needs.sick) {
+        say = 'You feel fine: you do not need pills.';
+        ok = false;
+      } else if (cm.points < it.price) {
+        say = 'You need ${it.price} points for the ${it.name.toLowerCase()}.';
+        ok = false;
+      } else {
+        cm.points -= it.price;
+        needs.cure();
+        say = 'You took the pills. You feel well again.';
+      }
     } else {
-      cm.points -= it.price;
-      needs.eat(it.energy);
-      say = 'You ate the ${it.name.toLowerCase()}. ${needs.resting ? 'Still resting.' : 'You feel stronger.'}';
+      final wantsEnergy = it.energy > 0 && (needs.energy < 0.98 || needs.resting || needs.crawling);
+      final wantsDrink = it.thirst > 0 && needs.thirst < 0.97;
+      if (!wantsEnergy && !wantsDrink) {
+        say = it.energy > 0 ? 'You are not hungry: your energy is full.' : 'You are not thirsty.';
+        ok = false;
+      } else if (cm.points < it.price) {
+        say = 'You need ${it.price} points for the ${it.name.toLowerCase()}.';
+        ok = false;
+      } else {
+        cm.points -= it.price;
+        if (it.energy > 0) needs.eat(it.energy);
+        if (it.thirst > 0) needs.drink(it.thirst);
+        say = 'You had the ${it.name.toLowerCase()}. ${needs.crawling || needs.resting ? 'Still too tired: eat more.' : 'You feel stronger.'}';
+      }
     }
     conBeep(ok ? 880 : 300, ms: 90);
     _say(say, ok: ok);
@@ -953,7 +971,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
             if (gas) ...[head('GAS'), for (final it in kShopGas) row(it)],
             head('FOOD AND DRINKS (energy)'),
             for (final it in kShopFood) row(it),
-            if (!gas) ...[head('FOR THE TOWN'), for (final it in kShopTown) row(it)],
+            if (!gas) ...[head('HEALTH AND THE TOWN'), for (final it in kShopTown) row(it)],
           ]),
         ),
       ),
@@ -1551,7 +1569,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   Future<void> _houseJob(CityInterior inn) async {
     final f = inn.door;
     final key = inn.isTower ? f.id * 100 + inn.level : f.id;
-    final p = _houseProjects.putIfAbsent(key, () => RoomProject(seed: f.id * 13 + 5 + inn.level, kind: 0)..fastForward());
+    final p = _houseProjects.putIfAbsent(key, () => RoomProject(seed: f.id * 13 + 5 + inn.level, kind: 0, variants: true)..fastForward());
     await _pushPage(MaterialPageRoute<void>(builder: (_) => NgmyRoomProjectPage(project: p)));
     if (!mounted) return;
     inn.fixtures = _fixturesOf(p);
@@ -2277,7 +2295,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     // Outside, the person you steer is always standing in the world.
     final w = walker;
     if (_driving != null) return null;
-    if (w != null && !room.indoor) return PersonPose(room: room.id, x: w.x, z: w.z, yaw: w.yaw, walking: w.walking, phase: w.phase, running: w.running && w.walking, lift: w.lift);
+    if (w != null && !room.indoor) return PersonPose(room: room.id, x: w.x, z: w.z, yaw: w.yaw, walking: w.walking, phase: w.phase, running: w.running && w.walking, lift: w.lift, crawl: needs.crawling);
     return null;
   }
 
@@ -2295,6 +2313,16 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   bool _run = false;
   Furn? _driving;
   int _tiredSayMs = 0;
+
+  /// The stars lost because the crawl to a shop ran out.
+  void _takePenalty() {
+    final p = needs.penaltyDue;
+    if (p <= 0) return;
+    needs.penaltyDue = 0;
+    final cm = comm;
+    if (cm != null) cm.points = math.max(0, cm.points - p);
+    if (mounted) setState(() {});
+  }
 
   /// Energy and gas of the person in the city.
   final CityNeeds needs = CityNeeds.session;
@@ -2362,6 +2390,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     var moved = false;
     // Worn out (or no gas): the person cannot move until the rest is over, or they eat (or fill up).
     final stuck = _driving == null ? needs.resting : needs.outOfGas;
+    if (_driving == null) w.speedScale = needs.crawling ? 0.28 : 1;
     if (stuck) {
       if ((_inX != 0 || _inZ != 0 || w.target != null) && nowMs - _tiredSayMs > 6000) {
         _tiredSayMs = nowMs;
@@ -2377,6 +2406,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (!moved) w.walking = false;
     final tiredMsg = needs.tick(dt, walking: moved && _driving == null, driving: moved && _driving != null);
     if (tiredMsg != null) _say(tiredMsg, ok: false);
+    _takePenalty();
     if (moved || w.lift > 0) cam.glideTo(target: V3(w.x, 30, w.z));
     if (inn != null) {
       inn.carrying = _carrying;
@@ -2849,9 +2879,18 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (cm == null || !mounted) return;
     if (tour == null) cm.advance(1, home);
     if (++_beat % 8 == 0) cm.save(home);
-    if (!steer && needs.resting) needs.tick(1);
+    if (!steer && (needs.resting || needs.crawling)) {
+      final m = needs.tick(1);
+      if (m != null) _say(m, ok: false);
+      _takePenalty();
+    }
+    // Now and then somebody feels unwell: medicine from the shop sets it right.
+    if (steer && !room.indoor && !needs.sick && _rnd.nextInt(240) == 0) {
+      needs.fallSick();
+      _say('You feel unwell: a headache. You tire faster until you take pills from a shop.', ok: false);
+    }
     if (_locked || _pages > 0) return;
-    if (_beat % 45 == 20 && !isLesson) _neighbourEvents();
+    if (_beat % 45 == 20 && !isLesson && !room.indoor) _neighbourEvents();
     // In the city the phone rings at least once a minute with a job, so there is always somebody who needs you.
     if (!isLesson && !room.indoor) {
       final raceMsg = _boardMaybe?.advance(now);
@@ -2879,6 +2918,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       _quiet = 0;
     }
     for (final c in cm.calls) {
+      if (room.indoor) continue; // calls and jobs only come while you are in the city map (the garden with the billboards)
       if (_isBusy && !_knownCalls.contains(c.id)) continue;
       if (_knownCalls.add(c.id)) _ring(c);
     }
@@ -2964,80 +3004,86 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
             child: Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
           ),
         );
+    // The incoming call: the person on top (picture, small "incoming call", the name big, what it is about), and under it the
+    // buttons in a row, each with its word, so nothing is squeezed or on top of anything else.
+    Widget incoming({required Widget avatar, required String who, required String about, required Color glow, required VoidCallback onDecline, VoidCallback? onLater, required VoidCallback onAnswer}) {
+      Widget action(IconData icon, String label, Color col, VoidCallback onTap, {bool big = false}) => Expanded(
+            child: GestureDetector(
+              onTapDown: (_) => onTap(),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Container(width: big ? 58 : 50, height: big ? 58 : 50, decoration: BoxDecoration(color: col, shape: BoxShape.circle), child: Icon(icon, color: Colors.white, size: big ? 30 : 26)),
+                const SizedBox(height: 5),
+                Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w800)),
+              ]),
+            ),
+          );
+      return Container(
+        width: math.min(screenW - 28, 340),
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+        decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1F2937), Color(0xFF0B1220)]), borderRadius: BorderRadius.circular(30), border: Border.all(color: Colors.white24, width: 2), boxShadow: [BoxShadow(color: glow.withValues(alpha: 0.35), blurRadius: 24)]),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+            avatar,
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                const Text('INCOMING CALL', style: TextStyle(color: Colors.white54, fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: 1.1)),
+                const SizedBox(height: 2),
+                Text(who, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 2),
+                Text(about, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white54, fontSize: 13)),
+              ]),
+            ),
+          ]),
+          const SizedBox(height: 14),
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            action(Icons.call_end_rounded, 'Decline', const Color(0xFFEF4444), onDecline),
+            if (onLater != null) action(Icons.schedule_rounded, 'Later', const Color(0xFFF59E0B), onLater),
+            action(Icons.call_rounded, 'Answer', const Color(0xFF22C55E), onAnswer, big: true),
+          ]),
+        ]),
+      );
+    }
+
     return SizedBox(
       width: screenW,
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         if (nc != null)
-          Container(
-            width: math.min(screenW - 28, 330),
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
-            decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1F2937), Color(0xFF0B1220)]), borderRadius: BorderRadius.circular(30), border: Border.all(color: Colors.white24, width: 2), boxShadow: [BoxShadow(color: const Color(0xFFFACC15).withValues(alpha: 0.35), blurRadius: 24)]),
-            child: Row(children: [
-              CircleAvatar(radius: 26, backgroundColor: const Color(0xFFF59E0B), child: Text(nc.emoji, style: const TextStyle(fontSize: 24))),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                const Text('incoming call', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                Text(nc.caller, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
-                Text(nc.subtitle, style: const TextStyle(color: Colors.white38, fontSize: 11.5)),
-              ])),
-              GestureDetector(
-                onTapDown: (_) {
-                  _stopRing();
-                  _strike('You turned the call down');
-                },
-                child: Container(width: 46, height: 46, decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle), child: const Icon(Icons.call_end_rounded, color: Colors.white)),
-              ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTapDown: (_) {
-                  final c = nc;
-                  _stopRing();
-                  _waiting.add(c);
-                  _say('Saved on your waiting list. You will be taken there when you are free.', ok: true);
-                },
-                child: Container(width: 46, height: 46, decoration: const BoxDecoration(color: Color(0xFFF59E0B), shape: BoxShape.circle), child: const Icon(Icons.schedule_rounded, color: Colors.white)),
-              ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTapDown: (_) {
-                  final c = nc;
-                  _stopRing();
-                  _job = c;
-                  _jobSecs = 0;
-                  _neighbourText(c);
-                },
-                child: Container(width: 52, height: 52, decoration: const BoxDecoration(color: Color(0xFF22C55E), shape: BoxShape.circle), child: const Icon(Icons.call_rounded, color: Colors.white)),
-              ),
-            ]),
+          incoming(
+            avatar: CircleAvatar(radius: 28, backgroundColor: const Color(0xFFF59E0B), child: Text(nc.emoji, style: const TextStyle(fontSize: 26))),
+            who: nc.caller,
+            about: nc.subtitle,
+            glow: const Color(0xFFFACC15),
+            onDecline: () {
+              _stopRing();
+              _strike('You turned the call down');
+            },
+            onLater: () {
+              final c = nc;
+              _stopRing();
+              _waiting.add(c);
+              _say('Saved on your waiting list. You will be taken there when you are free.', ok: true);
+            },
+            onAnswer: () {
+              final c = nc;
+              _stopRing();
+              _job = c;
+              _jobSecs = 0;
+              _neighbourText(c);
+            },
           ),
         if (call != null)
-          Container(
-            width: math.min(screenW - 28, 330),
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
-            decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1F2937), Color(0xFF0B1220)]), borderRadius: BorderRadius.circular(30), border: Border.all(color: Colors.white24, width: 2), boxShadow: [BoxShadow(color: const Color(0xFF4ADE80).withValues(alpha: 0.35), blurRadius: 24)]),
-            child: Row(children: [
-              CircleAvatar(radius: 26, backgroundColor: kResidents[call.resident].style.shirt, child: Text(kResidents[call.resident].name[0], style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900))),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                const Text('incoming call', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                Text(kResidents[call.resident].name, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
-                const Text('NGMY City · mobile', style: TextStyle(color: Colors.white38, fontSize: 11.5)),
-              ])),
-              GestureDetector(
-                onTapDown: (_) => _stopRing(),
-                child: Container(width: 52, height: 52, decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle), child: const Icon(Icons.call_end_rounded, color: Colors.white)),
-              ),
-              const SizedBox(width: 14),
-              GestureDetector(
-                onTapDown: (_) {
-                  _stopRing();
-                  _textSheet(call);
-                },
-                child: Container(width: 52, height: 52, decoration: const BoxDecoration(color: Color(0xFF22C55E), shape: BoxShape.circle), child: const Icon(Icons.call_rounded, color: Colors.white)),
-              ),
-            ]),
+          incoming(
+            avatar: CircleAvatar(radius: 28, backgroundColor: kResidents[call.resident].style.shirt, child: Text(kResidents[call.resident].name[0], style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900))),
+            who: kResidents[call.resident].name,
+            about: 'NGMY City · mobile',
+            glow: const Color(0xFF4ADE80),
+            onDecline: _stopRing,
+            onAnswer: () {
+              _stopRing();
+              _textSheet(call);
+            },
           ),
         if (controls)
           Padding(
@@ -3101,6 +3147,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         'switch' => 'Done! Tap the switch on the wall: the light comes on.',
         'fan' => 'Done! Tap the wall switch and the fan spins.',
         'outlet' || 'gfci' => 'Done! Tap the outlet and plug something in.',
+        _ when isSwitchKind(r.lesson) => 'Done! Tap the switch on the wall: it works.',
+        _ when isOutletKind(r.lesson) => 'Done! Tap the outlet and plug something in.',
         _ => 'Done! The sink works.',
       });
     }
@@ -3468,6 +3516,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     _padW = screenW;
     final stage3d = Stage3D(
         sky: !room.indoor && inner == null,
+        stars: isLesson ? null : () => comm?.points ?? 0,
         scene: _shownScene,
         cam: cam,
         highlight: hl,

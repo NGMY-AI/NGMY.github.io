@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_construction_electrical_more.dart';
 import 'ngmy_electrical_safety.dart';
 
 import 'ngmy_3d.dart';
@@ -86,7 +87,7 @@ class WireChoice {
 }
 
 class ElectricalLesson {
-  const ElectricalLesson({required this.id, required this.title, required this.blurb, required this.steps, required this.chips, required this.hookups, required this.wrongHint});
+  const ElectricalLesson({required this.id, required this.title, required this.blurb, required this.steps, required this.chips, required this.hookups, required this.wrongHint, this.look = '', this.strict = false, this.needsGround = true, this.solution = const {}});
   final String id;
   final String title;
   final String blurb;
@@ -94,6 +95,21 @@ class ElectricalLesson {
   final List<WireChoice> chips;
   final List<Hookup> hookups;
   final String Function(String chip, Hookup h) wrongHint;
+
+  /// How the device looks and how its box is drawn: switch or outlet. Empty for the five lessons the lab began with.
+  final String look;
+
+  /// Every wire has to be on the terminal that belongs to it (a traveler is not a common), even in practice and test mode.
+  final bool strict;
+
+  /// False for the old 3-wire 240 volt outlets, which have no separate ground.
+  final bool needsGround;
+
+  /// The right wiring: terminal number to wire key.
+  final Map<int, String> solution;
+
+  /// One of the five lessons the lab began with: they keep their own drawn wires.
+  bool get legacy => look.isEmpty;
 }
 
 const List<WireChoice> _outletChips = [
@@ -234,6 +250,7 @@ final List<ElectricalLesson> kElectricalLessons = [
       _ => 'The bare copper ground wire joins the fan GREEN ground wire only.',
     },
   ),
+  ...kMoreLessons,
 ];
 
 ElectricalLesson electricalLesson(String id) => kElectricalLessons.firstWhere((l) => l.id == id);
@@ -300,6 +317,7 @@ DeviceRules rulesOf(ElectricalLesson lesson) => DeviceRules(
       name: lesson.title,
       hotWires: lesson.chips.where((c) => c.role == 'hot').length,
       neutralWires: lesson.chips.where((c) => c.role == 'neutral').length,
+      needsGround: lesson.needsGround,
     );
 
 Verdict evaluateWiring(ElectricalLesson lesson, WiringState s) {
@@ -324,6 +342,15 @@ Verdict evaluateWiring(ElectricalLesson lesson, WiringState s) {
                               : has('MISSING_GROUND')
                                   ? 'noGround'
                                   : 'dead';
+  // A wire on the wrong kind of terminal (a traveler on the common, a load on the line) is not a wired switch, even if every hot is on a hot.
+  if (lesson.strict && !s.test) {
+    for (final e in s.attached.entries) {
+      final hk = lesson.hookups.firstWhere((x) => x.id == e.key);
+      if (!hk.accepts.contains(e.value)) {
+        return Verdict('dead', 'The ' + lesson.chips.firstWhere((c) => c.key == e.value).label + ' is on the wrong terminal (' + hk.name + '). ' + hk.hint, works: false, report: r, effect: 'none', fix: hk.hint);
+      }
+    }
+  }
   final msg = r.safe ? 'Wired correctly. Hot, neutral and ground are all in the right place, and every safety check passes.' : '${first!.message} ${c.text}';
   return Verdict(kind, msg, works: c.operates, trips: c.trips, burns: c.burns, report: r, effect: c.effect, fix: first?.fix ?? '');
 }
@@ -333,6 +360,17 @@ Verdict evaluateWiring(ElectricalLesson lesson, WiringState s) {
 const double _cx = 0, _cy = -0.2;
 
 bool _ceiling(String lesson) => lesson == 'light' || lesson == 'fan';
+
+/// How a device is drawn: the five lessons the lab began with look like themselves, the others like a switch or an outlet.
+String lookOf(String lesson) {
+  for (final l in kMoreLessons) {
+    if (l.id == lesson) return l.look;
+  }
+  return lesson;
+}
+
+/// The wires of a lesson that is not one of the first five: one object number each (wire 0, wire 1, ...).
+const int idWireN = 60;
 
 /// Where the device sits: out in front of the box while wiring, in the box after.
 double _deviceZ(String lesson, WiringState s) => _ceiling(lesson) ? (s.stage == 0 ? 6.4 : 0.6) : (s.stage == 0 ? 4.7 : -0.25);
@@ -370,7 +408,7 @@ Scene3D buildElectricalScene(ElectricalLesson lesson, WiringState s) => buildBen
 /// The box, the cable, the wires and the device. With [withWall] it also draws a piece of wall around the box.
 Scene3D buildBench(ElectricalLesson lesson, WiringState s, {bool withWall = true}) {
   final b = MeshBuilder();
-  final kind = lesson.id;
+  final kind = lookOf(lesson.id);
   final ceilingKind = _ceiling(kind);
   if (withWall) {
     b.id = idWall;
@@ -383,7 +421,7 @@ Scene3D buildBench(ElectricalLesson lesson, WiringState s, {bool withWall = true
     b.box(const V3(11.25, 0, -2.25), const V3(1.5, 18, 3.5), kWood, shine: 0.05, split: 3);
     b.box(const V3(5.0, 8.6, -2.25), const V3(14, 1.5, 3.5), kWood, shine: 0.05, split: 2);
   }
-  final cableEnds = _boxAndCable(b, kind, true);
+  final cableEnds = _boxAndCable(b, lesson.legacy ? kind : 'outlet', true);
   // ── Wires ──
   const double wr = 0.085;
   void wire(int id, V3 start, V3 free, String key, Color insul) {
@@ -413,7 +451,16 @@ Scene3D buildBench(ElectricalLesson lesson, WiringState s, {bool withWall = true
   }
 
   final e0 = cableEnds.first;
-  if (kind == 'switch') {
+  if (!lesson.legacy) {
+    // A device with its own wires: one wire for each choice, side by side out of the cable.
+    final n = lesson.chips.length;
+    for (var i = 0; i < n; i++) {
+      final c = lesson.chips[i];
+      final t = n == 1 ? 0.0 : (i / (n - 1) - 0.5);
+      final isG = c.role == 'ground';
+      wire(idWireN + i, e0 + V3(t * 0.5, 0, 0.04 * i), V3(t * 3.6, -1.7 - 0.12 * (i % 2), 2.3 + 0.15 * i), c.key, isG ? kCopper : (c.color == const Color(0xFFF1F1EA) ? kWhiteWire : c.color));
+    }
+  } else if (kind == 'switch') {
     final eb = cableEnds.last;
     wire(idBlack, e0 + const V3(-0.1, 0, 0), const V3(-1.2, -1.6, 2.2), 'blackLine', kBlack);
     wire(idBlack2, eb + const V3(0.1, 0, 0), const V3(1.2, -1.7, 2.3), 'blackLoad', kBlack);
@@ -432,7 +479,7 @@ Scene3D buildBench(ElectricalLesson lesson, WiringState s, {bool withWall = true
   if (ceilingKind) {
     _fixture(b, kind, s);
   } else {
-    _device(b, kind, _deviceZ(kind, s), s.burnt);
+    _device(b, kind, _deviceZ(kind, s), s.burnt, fourScrews: !lesson.legacy);
   }
   if (s.hints && s.stage == 0) {
     b.id = 0;
@@ -476,6 +523,16 @@ Scene3D buildBench(ElectricalLesson lesson, WiringState s, {bool withWall = true
     idCanopy: const ObjInfo('Canopy', 'The round cover that hides the box and the wire connections against the ceiling.', V3(0, 0, 0.6), 8),
   };
 
+  if (!lesson.legacy) {
+    info[idDevice] = ObjInfo(lesson.title, lesson.blurb, V3(0, -0.2, _deviceZ(kind, s)), 9);
+    for (var i = 0; i < lesson.chips.length; i++) {
+      final c = lesson.chips[i];
+      info[idWireN + i] = ObjInfo(c.label, 'Pick this wire up, then tap the screw it belongs on. Tap it again on the screw to take it off.', V3(-0.8 + i * 0.5, -0.8, 1.2), 7);
+    }
+    for (final hk in lesson.hookups) {
+      info[hk.id] = ObjInfo(hk.name, hk.hint, hookupPoint(kind, hk.id, s), 5);
+    }
+  }
   final labels = <Label3D>[];
   if (s.labels && s.stage == 0) {
     for (final h in lesson.hookups) {
@@ -486,7 +543,7 @@ Scene3D buildBench(ElectricalLesson lesson, WiringState s, {bool withWall = true
         'ground' => ('GREEN · GROUND', const Color(0xFF1F7A3A)),
         _ => ('LOAD (taped)', const Color(0xFFB45309)),
       };
-      final t = ceilingKind ? switch (h.role) { 'hot' => 'BLACK NUT · HOT', 'neutral' => 'WHITE NUT · NEUTRAL', _ => 'GROUND' } : text;
+      final t = ceilingKind ? switch (h.role) { 'hot' => 'BLACK NUT · HOT', 'neutral' => 'WHITE NUT · NEUTRAL', _ => 'GROUND' } : (lesson.legacy ? text : h.name);
       final off = ceilingKind
           ? switch (h.role) { 'hot' => const V3(-4.6, -2.0, 1.2), 'neutral' => const V3(0, -3.4, 1.2), _ => const V3(4.6, -2.0, 1.2) }
           : V3(p.x > 0.4 ? 3.8 : (p.x < -0.4 ? -4.2 : 0), p.x.abs() < 0.4 ? -3.0 : -0.4, 1.0);
@@ -530,7 +587,7 @@ List<V3> _boxAndCable(MeshBuilder b, String kind, bool showCable) {
 /// Just the box and its cable (nothing wired yet), as it sits in the wall or the ceiling.
 Scene3D buildBoxOnly(String kind, {bool cabled = true}) {
   final b = MeshBuilder();
-  _boxAndCable(b, kind, cabled);
+  _boxAndCable(b, lookOf(kind) == kind ? kind : 'outlet', cabled);
   return Scene3D(b.polys, info: const {idBox: ObjInfo('Electrical box', 'The box is ready. Pull a cable to it, then wire a device.', V3(0, 0, -1.2), 9)});
 }
 
@@ -543,14 +600,23 @@ Scene3D buildFinished(String kind, {bool burnt = false}) {
   if (_ceiling(kind)) {
     _fixture(b, kind, s);
   } else {
-    _device(b, kind, -0.25, burnt, faceOnly: true);
+    _device(b, lookOf(kind), -0.25, burnt, faceOnly: true);
     _plate(b, burnt);
   }
   return Scene3D(b.polys);
 }
 
 /// Which wire an object number stands for (so a tap on a wire can take it off the screw).
-String? wireKeyForId(String lesson, int id) => switch (id) {
+String? wireKeyForId(String lesson, int id) {
+  final more = kMoreLessons.where((l) => l.id == lesson);
+  if (more.isNotEmpty) {
+    final i = id - idWireN;
+    return i >= 0 && i < more.first.chips.length ? more.first.chips[i].key : null;
+  }
+  return _legacyWireKey(lesson, id);
+}
+
+String? _legacyWireKey(String lesson, int id) => switch (id) {
       idBlack => lesson == 'switch' ? 'blackLine' : 'black',
       idBlack2 => 'blackLoad',
       idWhite => 'white',
@@ -560,7 +626,7 @@ String? wireKeyForId(String lesson, int id) => switch (id) {
 
 // ─── The device itself ───────────────────────────────────────────────────────
 
-void _device(MeshBuilder b, String kind, double z, bool burnt, {bool faceOnly = false}) {
+void _device(MeshBuilder b, String kind, double z, bool burnt, {bool faceOnly = false, bool fourScrews = false}) {
   final c = V3(_cx, _cy, z);
   final isSwitch = kind == 'switch';
   final isGfci = kind == 'gfci';
@@ -616,7 +682,7 @@ void _device(MeshBuilder b, String kind, double z, bool burnt, {bool faceOnly = 
       b.box(V3(x + side * 0.05, c.y + y, c.z - 0.45), const V3(0.34, 0.66, 0.9), const Color(0xFFFACC15), shine: 0.2);
     }
   }
-  if (!isSwitch) {
+  if (!isSwitch || fourScrews) {
     screw(idSilverTop, -1, topY, kNickel, kNickelPlate, taped: isGfci);
     screw(idSilverBottom, -1, botY, kNickel, kNickelPlate);
   }

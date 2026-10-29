@@ -1241,6 +1241,13 @@ void drawPerson(MeshBuilder b, PersonPose p, double t, PersonStyle style, {int i
 
 /// A person of the house: the real character from its .glb file when that has been read, else a plain figure meanwhile.
 void _figure(MeshBuilder b, PersonPose p, double t, PersonStyle style, {int id = 0, bool close = false, Color? tint}) {
+  if (p.crawl) {
+    // Worn out: the person lies face down on the ground and crawls, drawn upright and then turned over onto the ground.
+    final up = MeshBuilder();
+    _figure(up, PersonPose(room: p.room, x: 0, z: 0, yaw: 0, walking: p.walking, phase: p.phase * 0.5), t, style, id: id, close: close, tint: tint);
+    b.polys.addAll(transformPolys(up.polys, rx: math.pi / 2, ry: p.yaw, t: V3(p.x, 9, p.z)));
+    return;
+  }
   final av = GlbAvatar.ready(style.avatar);
   if (av == null) {
     final plain = style.avatar == 'xbot' ? const PersonStyle() : PersonStyle(skin: style.skin, hair: style.hair, shirt: style.shirt, pants: style.pants);

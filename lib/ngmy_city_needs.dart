@@ -6,8 +6,13 @@ class CityNeeds extends ChangeNotifier {
   /// The city keeps one set of needs for the whole session, so leaving and coming back does not refill anybody.
   static final CityNeeds session = CityNeeds();
 
-  /// About five minutes of straight walking use all the energy; then there is a three minute rest and back up to half.
-  static const double walkSeconds = 300, restSeconds = 180, restEnergy = 0.5;
+  /// About a minute and a half of straight walking uses all the energy. Then the person crawls on the ground for [crawlSeconds]: if
+  /// they have not found a shop and eaten by then they lose [crawlPenalty] stars, rest three minutes and come back at half.
+  static const double walkSeconds = 90, crawlSeconds = 20, restSeconds = 180, restEnergy = 0.5;
+  static const int crawlPenalty = 5;
+
+  /// Water lasts about two and a half minutes of walking; without it the energy drains much faster.
+  static const double thirstSeconds = 150;
 
   /// About one minute of driving uses a whole tank.
   static const double driveSeconds = 60;
@@ -16,10 +21,19 @@ class CityNeeds extends ChangeNotifier {
   double fuel = 1.0;
   double restLeft = 0;
 
+  /// How long the person has left to crawl to a shop, how much water is left, whether they are unwell (medicine cures it), and the
+  /// stars to take off because the crawl ran out (the page takes them and clears this).
+  double crawlLeft = 0;
+  double thirst = 1.0;
+  bool sick = false;
+  int penaltyDue = 0;
+
   /// The Uber licence, bought at the licence office.
   bool uberLicence = false;
 
   bool get resting => restLeft > 0;
+  bool get crawling => crawlLeft > 0;
+  bool get thirsty => thirst < 0.3;
   bool get outOfGas => fuel <= 0;
   bool get lowEnergy => energy < 0.25 && !resting;
   bool get lowFuel => fuel < 0.25;
@@ -27,6 +41,17 @@ class CityNeeds extends ChangeNotifier {
   /// Time passes: [walking] on foot or [driving] in the car, for [dt] seconds. Returns a message when something just ran out.
   String? tick(double dt, {bool walking = false, bool driving = false}) {
     String? said;
+    if (crawling) {
+      crawlLeft -= dt;
+      if (crawlLeft <= 0) {
+        crawlLeft = 0;
+        restLeft = restSeconds;
+        penaltyDue += crawlPenalty;
+        said = 'You did not reach a shop in time: you lost $crawlPenalty stars. You must rest for three minutes, or eat something.';
+      }
+      notifyListeners();
+      return said;
+    }
     if (resting) {
       restLeft -= dt;
       if (restLeft <= 0) {
@@ -39,12 +64,17 @@ class CityNeeds extends ChangeNotifier {
     }
     if (walking) {
       final before = energy;
-      energy = (energy - dt / walkSeconds).clamp(0.0, 1.0);
+      final beforeThirst = thirst;
+      thirst = (thirst - dt / thirstSeconds).clamp(0.0, 1.0);
+      final drain = (thirst <= 0 ? 1.8 : 1.0) * (sick ? 1.5 : 1.0);
+      energy = (energy - dt * drain / walkSeconds).clamp(0.0, 1.0);
       if (energy <= 0) {
-        restLeft = restSeconds;
-        said = 'You are worn out. You must rest for three minutes, or eat something in a shop.';
+        crawlLeft = crawlSeconds;
+        said = 'You have no energy left: you crawl on the ground. Get to a shop and buy food within 20 seconds, or you lose $crawlPenalty stars.';
       } else if (before >= 0.25 && energy < 0.25) {
         said = 'You are getting tired. Find a shop and buy some food.';
+      } else if (beforeThirst >= 0.3 && thirst < 0.3) {
+        said = 'You are thirsty. Buy some water or juice at a shop, or you will tire much faster.';
       }
       notifyListeners();
     }
@@ -64,7 +94,26 @@ class CityNeeds extends ChangeNotifier {
   /// Food: gives energy back, and ends a rest once there is enough to carry on.
   void eat(double amount) {
     energy = (energy + amount).clamp(0.0, 1.0);
-    if (resting && energy >= 0.3) restLeft = 0;
+    if (energy >= 0.3) {
+      restLeft = 0;
+      crawlLeft = 0;
+    }
+    notifyListeners();
+  }
+
+  void drink(double amount) {
+    thirst = (thirst + amount).clamp(0.0, 1.0);
+    notifyListeners();
+  }
+
+  /// A headache or a cold: walking costs more energy until the person takes medicine.
+  void fallSick() {
+    sick = true;
+    notifyListeners();
+  }
+
+  void cure() {
+    sick = false;
     notifyListeners();
   }
 
@@ -121,7 +170,11 @@ class NeedsBars extends StatelessWidget {
     return ListenableBuilder(
       listenable: needs,
       builder: (_, __) => Column(mainAxisSize: MainAxisSize.min, children: [
-        NeedBar(value: needs.resting ? needs.restProgress : needs.energy, height: height, icon: needs.resting ? '😴' : '⚡'),
+        NeedBar(value: needs.crawling ? 0 : (needs.resting ? needs.restProgress : needs.energy), height: height, icon: needs.crawling ? '🐛' : (needs.resting ? '😴' : '⚡')),
+        if (needs.thirsty || needs.sick) ...[
+          SizedBox(height: height / 4),
+          NeedBar(value: needs.sick ? 0.2 : needs.thirst, height: height * 0.7, icon: needs.sick ? '🤒' : '💧'),
+        ],
         if (driving) ...[
           SizedBox(height: height / 3),
           NeedBar(value: needs.fuel, height: height, icon: '⛽'),
@@ -138,20 +191,25 @@ extension on CityNeeds {
 
 /// One thing for sale in a shop: food gives energy back, gas fills the tank, the rest goes into the town's stores.
 class ShopItem {
-  const ShopItem(this.id, this.emoji, this.name, this.price, this.note, {this.energy = 0, this.fuel = 0});
+  const ShopItem(this.id, this.emoji, this.name, this.price, this.note, {this.energy = 0, this.fuel = 0, this.thirst = 0, this.cure = false});
   final String id, emoji, name, note;
   final int price;
-  final double energy, fuel;
+  final double energy, fuel, thirst;
+
+  /// Medicine for yourself: cures being unwell.
+  final bool cure;
 }
 
 const List<ShopItem> kShopFood = [
-  ShopItem('apple', '🍎', 'Apple', 3, 'A little energy', energy: 0.12),
-  ShopItem('juice', '🥤', 'Juice', 4, 'Some energy', energy: 0.18),
+  ShopItem('apple', '🍎', 'Apple', 3, 'A little energy', energy: 0.12, thirst: 0.1),
+  ShopItem('water', '💧', 'Water', 2, 'Quenches your thirst', thirst: 0.8),
+  ShopItem('juice', '🥤', 'Juice', 4, 'Some energy and a drink', energy: 0.18, thirst: 0.5),
   ShopItem('sandwich', '🥪', 'Sandwich', 6, 'A good bit of energy', energy: 0.30),
   ShopItem('meal', '🍔', 'Burger meal', 10, 'Lots of energy', energy: 0.55),
 ];
 
 const List<ShopItem> kShopTown = [
+  ShopItem('pills', '🩹', 'Pain pills', 8, 'Cures a headache or a cold: you walk normally again', cure: true),
   ShopItem('bread', '🍞', 'Food for the town', 10, '5 portions for the people who live here'),
   ShopItem('medicine', '💊', 'Medicine', 12, '3 doses for the sick'),
 ];

@@ -14,7 +14,7 @@ import 'ngmy_construction_home.dart';
 
 /// Where the person is, and what they are doing, at one moment of the tour.
 class PersonPose {
-  const PersonPose({required this.room, required this.x, required this.z, required this.yaw, this.walking = false, this.holding = false, this.remote = false, this.pointing = false, this.note = '', this.event = '', this.openDoor = -1, this.doorU = 0, this.enterDoor = -1, this.phase = 0, this.phone = false, this.lift = 0, this.running = false});
+  const PersonPose({required this.room, required this.x, required this.z, required this.yaw, this.walking = false, this.holding = false, this.remote = false, this.pointing = false, this.note = '', this.event = '', this.openDoor = -1, this.doorU = 0, this.enterDoor = -1, this.phase = 0, this.phone = false, this.lift = 0, this.running = false, this.crawl = false});
   final int room;
   final double x, z;
 
@@ -28,6 +28,9 @@ class PersonPose {
   /// How far off the ground a jump has lifted the person, and whether they are running.
   final double lift;
   final bool running;
+
+  /// Crawling on the ground, worn out.
+  final bool crawl;
   final String note;
 
   /// Something to do once for this moment of the tour, for example switching the ad on the TV ("ad:10").

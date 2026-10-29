@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'ngmy_construction_electrical_more.dart';
 import 'ngmy_electrical_diagram_page.dart';
 import 'ngmy_electrical_fx.dart';
 import 'ngmy_electrical_safety.dart';
@@ -51,6 +52,16 @@ const List<_LessonInfo> _lessons = [
   _LessonInfo('switch', '💡', 'Light switch', 'Two blacks and a wire nut', Color(0xFF38BDF8)),
   _LessonInfo('gfci', '🛡️', 'GFCI outlet', 'LINE and LOAD near water', Color(0xFF34D399)),
   _LessonInfo('fan', '🌀', 'Ceiling fan', 'Black, white, green and a fan box', Color(0xFF22D3EE)),
+  _LessonInfo('switch2p', '🔥', 'Double-pole switch', '240 V: breaks both hot legs', Color(0xFFFB7185)),
+  _LessonInfo('switch3', '🔀', 'Three-way switch', 'Common and two travelers', Color(0xFF38BDF8)),
+  _LessonInfo('switch4', '🔁', 'Four-way switch', 'Between two three-ways', Color(0xFF60A5FA)),
+  _LessonInfo('switchsmart', '📶', 'Smart, motion or timer switch', 'Needs the neutral wire', Color(0xFFA78BFA)),
+  _LessonInfo('switchcombo', '🎚️', 'Combination switch', 'Two switches, one feed', Color(0xFF2DD4BF)),
+  _LessonInfo('split', '🌗', 'Split (half-switched) outlet', 'Break the tab: switched and always-on', Color(0xFFFBBF24)),
+  _LessonInfo('v240four', '🧺', '4-wire 240 V outlet', 'Dryer, range and EV: two hots, neutral, ground', Color(0xFFF87171)),
+  _LessonInfo('v240three', '🕰️', '3-wire 240 V outlet', 'Old dryer or range: no separate ground', Color(0xFFFB923C)),
+  _LessonInfo('v240only', '❄️', '240 V only outlet', 'Window AC, welder: two hots and ground', Color(0xFF22D3EE)),
+  _LessonInfo('isolated', '🏭', 'Isolated-ground outlet', 'Its own ground wire to the panel', Color(0xFF34D399)),
   _LessonInfo('ptrap', '🪠', 'Sink drain (P-trap)', 'Build a drain with a water seal', Color(0xFF60A5FA)),
   _LessonInfo('faucet', '🚰', 'Faucet supply lines', 'Hot left, cold right', Color(0xFFF87171)),
   _LessonInfo('house', '🏗️', 'Build and fix a house', 'Stage by stage, then repair', Color(0xFFA78BFA)),
@@ -212,10 +223,48 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
 
 // ─── Shared pieces ───────────────────────────────────────────────────────────
 
+/// The stars balance: a little pill with a star and the number, always up to date.
+class StarsBadge extends StatefulWidget {
+  const StarsBadge({super.key, required this.stars});
+  final int Function() stars;
+
+  @override
+  State<StarsBadge> createState() => _StarsBadgeState();
+}
+
+class _StarsBadgeState extends State<StarsBadge> {
+  Timer? _t;
+
+  @override
+  void initState() {
+    super.initState();
+    _t = Timer.periodic(const Duration(milliseconds: 400), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFFACC15), width: 1.5)),
+        child: Text('⭐ ${widget.stars()}', style: const TextStyle(color: Color(0xFFFACC15), fontWeight: FontWeight.w900, fontSize: 15)),
+      );
+}
+
 /// The 3D view with a message banner, an info card and zoom buttons on top of it.
 class Stage3D extends StatelessWidget {
-  const Stage3D({required this.scene, required this.cam, required this.onPick, required this.onHome, this.highlight = 0, this.dynamicPolys, this.dynamicScreens, this.layerOn, this.message, this.good = false, this.info, this.topLeft, this.topRight, this.infoAction, this.messageTop, this.onDoubleTap, this.bottom, this.sky = false});
+  const Stage3D({required this.scene, required this.cam, required this.onPick, required this.onHome, this.highlight = 0, this.dynamicPolys, this.dynamicScreens, this.layerOn, this.message, this.good = false, this.info, this.topLeft, this.topRight, this.infoAction, this.messageTop, this.onDoubleTap, this.bottom, this.sky = false, this.stars});
   final bool sky;
+
+  /// The stars (points) the person has, shown right beside the zoom in button all the time.
+  final int Function()? stars;
   final Scene3D scene;
   final Cam3 cam;
   final void Function(int id) onPick;
@@ -248,9 +297,12 @@ class Stage3D extends StatelessWidget {
       Positioned(
         right: 8,
         top: 8,
-        child: Column(children: [
+        child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           ...?topRight,
-          _round(Icons.add_rounded, 'Zoom in', () => cam.zoomBy(0.8)),
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            if (stars != null) StarsBadge(stars: stars!),
+            _round(Icons.add_rounded, 'Zoom in', () => cam.zoomBy(0.8)),
+          ]),
           _round(Icons.remove_rounded, 'Zoom out', () => cam.zoomBy(1.25)),
           _round(Icons.center_focus_strong_rounded, 'Back to the whole view', onHome),
           _round(Icons.swap_vert_rounded, 'Flip up and down swiping', () {
@@ -525,8 +577,13 @@ class _ElectricalPageState extends State<ElectricalLessonPage> {
         return [off, off, off, has('ground'), has('blackLine'), has('blackLoad'), s.stage >= 2 && s.testing];
       case 'gfci':
         return [off, off, has('ground'), has('white'), has('black'), s.stage >= 2, s.stage >= 2 && s.testing];
-      default:
+      case 'outlet':
+      case 'light':
+      case 'fan':
         return [off, off, has('ground'), has('white'), has('black'), s.stage >= 1, s.stage >= 2 && s.testing];
+      default:
+        // The other switches and outlets: the two first steps, one step for each wire, then in the box and tested.
+        return [off, off, for (final c in lesson.chips) has(c.key), s.stage >= 1, s.stage >= 2 && s.testing];
     }
   }
 
@@ -662,6 +719,9 @@ class _ElectricalPageState extends State<ElectricalLessonPage> {
       switch (lesson.id) {
         'switch' => 'Power on. Flip the switch and the light turns on: both black wires are on brass screws, so the switch opens and closes the hot wire. The lesson is complete! Mistakes: $mistakes.',
         'gfci' => 'Power on. Press RESET (it clicks), then TEST: it must shut the outlet off. Wired on LINE, it protects the whole circuit. The lesson is complete! Mistakes: $mistakes.',
+        'outlet' => 'The tester glows: this outlet has 120 volts and is wired correctly. The lesson is complete! Mistakes: $mistakes.',
+        _ when isSwitchKind(lesson.id) => 'Power on. ' + lesson.title + ' is wired correctly: every wire is on the terminal that belongs to it. The lesson is complete! Mistakes: $mistakes.',
+        _ when lesson.id != 'light' && lesson.id != 'fan' => 'Power on. The ' + lesson.title.toLowerCase() + ' is wired correctly: every wire is on the terminal that belongs to it. The lesson is complete! Mistakes: $mistakes.',
         _ => 'The tester glows: this outlet has 120 volts and is wired correctly. The lesson is complete! Mistakes: $mistakes.',
       },
       ok: true,

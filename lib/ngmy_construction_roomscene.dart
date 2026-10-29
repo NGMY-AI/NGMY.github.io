@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'ngmy_3d.dart';
 import 'ngmy_electronics_screens.dart';
 import 'ngmy_construction_electrical.dart';
+import 'ngmy_construction_electrical_more.dart';
 import 'ngmy_construction_project.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -326,11 +327,11 @@ Scene3D buildRoomScene(RoomProject p, RoomView v) {
       }
     }
   }
-  if (!{'wall', 'ceiling', 'fanbox', 'cable', 'knife', 'sheet', 'screw', ''}.contains(armed) && (kAppliances.contains(armed) || {'outlet', 'gfci', 'switch', 'light', 'fan'}.contains(armed))) {
+  if (!{'wall', 'ceiling', 'fanbox', 'cable', 'knife', 'sheet', 'screw', ''}.contains(armed) && (kAppliances.contains(armed) || {'outlet', 'gfci', 'switch', 'light', 'fan'}.contains(armed) || isOutletKind(armed) || isSwitchKind(armed))) {
     for (final s in kSlots) {
       if (kAppliances.contains(armed)) {
         final d = p.devs[s.id];
-        if (d != null && (d.kind == 'outlet' || d.kind == 'gfci') && d.w.stage >= 2 && !p.plugged.containsKey(s.id)) {
+        if (d != null && isOutletKind(d.kind) && d.w.stage >= 2 && !p.plugged.containsKey(s.id)) {
           marker(idDevBase + s.id, V3(s.pos.x, s.pos.y, 1.2), const V3(5, 8, 0.5), col: const Color(0xFF4ADE80));
         }
       } else if (p.boxes.containsKey(s.id) && p.cabled.contains(s.id) && !p.devs.containsKey(s.id)) {
@@ -341,7 +342,7 @@ Scene3D buildRoomScene(RoomProject p, RoomView v) {
   if (v.hints) {
     for (final o in p.orders) {
       final s = slotById(o.slot);
-      labels.add(Label3D(s.ceiling ? V3(s.pos.x, s.pos.y - 14, s.pos.z) : V3(s.pos.x, s.pos.y - 8, 4), '${o.device == 'gfci' ? 'GFCI' : o.device} here', const Color(0xFF7C3AED)));
+      labels.add(Label3D(s.ceiling ? V3(s.pos.x, s.pos.y - 14, s.pos.z) : V3(s.pos.x, s.pos.y - 8, 4), '${o.device == 'gfci' ? 'GFCI' : (kLegacyKinds.contains(o.device) ? o.device : deviceKindName(o.device))} here', const Color(0xFF7C3AED)));
     }
   }
 
@@ -386,7 +387,7 @@ Scene3D buildRoomScene(RoomProject p, RoomView v) {
   return Scene3D(b.polys, info: info, labels: labels, screens: screens);
 }
 
-String _deviceName(String kind) => switch (kind) { 'gfci' => 'GFCI outlet', 'switch' => 'Light switch', 'light' => 'Ceiling light', 'fan' => 'Ceiling fan', _ => 'Outlet' };
+String _deviceName(String kind) => switch (kind) { 'gfci' => 'GFCI outlet', 'switch' => 'Light switch', 'light' => 'Ceiling light', 'fan' => 'Ceiling fan', 'outlet' => 'Outlet', _ => deviceKindName(kind) };
 
 String _appNameFull(String a) => switch (a) { 'tv' => 'TV', 'lamp' => 'Lamp', 'toaster' => 'Toaster', _ => 'Hair dryer' };
 
@@ -394,7 +395,7 @@ String _deviceAbout(RoomProject p, int slot) {
   final d = p.devs[slot];
   if (d == null) return '';
   if (d.w.burnt) return 'BURNT. It was wired wrong and it burnt out. Pull it out and put in a new one.';
-  if (d.kind == 'switch') return p.switchOn.contains(slot) ? 'The switch is ON. Tap to turn it off.' : 'The switch is OFF. Tap to flip it on.';
+  if (isSwitchKind(d.kind)) return p.switchOn.contains(slot) ? 'The switch is ON. Tap to turn it off.' : 'The switch is OFF. Tap to flip it on.';
   if (d.kind == 'light' || d.kind == 'fan') return p.loadRuns(slot) ? 'It is running.' : 'It is off. Flip its switch (breaker on).';
   return 'Tap with a TV, lamp, toaster or hair dryer in your hand to plug it in. Plugged: ${p.plugged[slot] ?? 'nothing'}.';
 }

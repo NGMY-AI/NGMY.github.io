@@ -6,6 +6,7 @@ import 'package:ngmy/ngmy_city_uber.dart';
 import 'package:ngmy/ngmy_construction_cityin.dart';
 import 'package:ngmy/ngmy_construction_community.dart';
 import 'package:ngmy/ngmy_construction_home.dart';
+import 'package:ngmy/ngmy_construction_lab.dart';
 import 'package:ngmy/ngmy_construction_homepage.dart';
 import 'package:ngmy/ngmy_construction_project.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -19,21 +20,35 @@ void main() {
       ..uberLicence = false;
   }
 
-  test('energy: about five minutes of walking use it all, then three minutes of rest, then back at half; food helps', () {
+  test('energy: a minute and a half of walking uses it all, then 20 seconds of crawling to a shop, then stars are lost and a rest; food helps', () {
     resetNeeds();
     final n = CityNeeds.session;
     final said = <String>[];
     var t = 0.0;
-    while (!n.resting && t < 400) {
+    n.thirst = 1;
+    while (!n.crawling && t < 400) {
+      n.thirst = 1;
       final m = n.tick(1, walking: true);
       if (m != null) said.add(m);
       t++;
     }
-    expect(t, inInclusiveRange(295, 305), reason: 'five minutes of straight walking');
-    expect(n.resting, isTrue);
+    expect(t, inInclusiveRange(88, 92), reason: 'a minute and a half of straight walking');
+    expect(n.crawling, isTrue, reason: 'worn out: crawling on the ground');
     expect(said.any((m) => m.contains('tired')), isTrue, reason: 'it warns when low');
-    expect(said.any((m) => m.contains('rest')), isTrue);
-    // While resting, walking changes nothing and the time runs down.
+    // Eating in time saves the day: no stars lost.
+    final saved = CityNeeds()..energy = 0..crawlLeft = 12;
+    saved.eat(0.55);
+    expect(saved.crawling, isFalse);
+    expect(saved.penaltyDue, 0);
+    // Not in time: after 20 seconds five stars go, and then a three minute rest, back at half.
+    var crawl = 0;
+    while (n.crawling && crawl < 100) {
+      n.tick(1, walking: true);
+      crawl++;
+    }
+    expect(crawl, inInclusiveRange(19, 21), reason: 'twenty seconds to get to a shop');
+    expect(n.penaltyDue, 5, reason: 'five stars lost');
+    expect(n.resting, isTrue);
     var rest = 0;
     while (n.resting && rest < 400) {
       n.tick(1, walking: true);
@@ -41,15 +56,34 @@ void main() {
     }
     expect(rest, inInclusiveRange(178, 182), reason: 'three minutes');
     expect(n.energy, closeTo(0.5, 1e-9), reason: 'back at half');
-    // Food gives energy back, and ends a rest early.
+    // An apple is not enough to get going from a rest; a sandwich is.
     n.energy = 0;
     n.restLeft = 100;
     n.eat(0.12);
-    expect(n.resting, isTrue, reason: 'an apple is not enough to get going');
+    expect(n.resting, isTrue);
     n.eat(0.3);
     expect(n.resting, isFalse);
     expect(n.energy, closeTo(0.42, 1e-9));
     resetNeeds();
+  });
+
+  test('thirst and being unwell make walking cost more energy until water or pills', () {
+    final a = CityNeeds(), b = CityNeeds()..thirst = 0, c = CityNeeds()..fallSick();
+    for (var i = 0; i < 30; i++) {
+      a.thirst = 1;
+      a.tick(1, walking: true);
+      b.tick(1, walking: true);
+      c.thirst = 1;
+      c.tick(1, walking: true);
+    }
+    expect(b.energy, lessThan(a.energy - 0.1), reason: 'thirsty: tires much faster');
+    expect(c.energy, lessThan(a.energy - 0.05), reason: 'unwell: tires faster');
+    b.drink(0.8);
+    expect(b.thirsty, isFalse);
+    c.cure();
+    expect(c.sick, isFalse);
+    expect(kShopFood.any((i) => i.thirst > 0 && i.energy == 0), isTrue, reason: 'water is for sale');
+    expect(kShopTown.any((i) => i.cure), isTrue, reason: 'pills are for sale');
   });
 
   test('gas: about a minute of driving empties the tank, buying gas fills it', () {
@@ -192,6 +226,7 @@ void main() {
     await t.pumpWidget(const MaterialApp(home: NgmyHousePage()));
     await t.pump(const Duration(milliseconds: 600));
     expect(find.byType(NeedBar), findsWidgets, reason: 'the battery bar next to the page title');
+    expect(find.byType(StarsBadge), findsOneWidget, reason: 'the stars balance beside the zoom in button');
     final city = HomeProject.session!.rooms[11];
     final st = t.state(find.byType(NgmyHousePage)) as dynamic;
     st.inner = CityInterior('shop', city.furn.firstWhere((f) => f.kind == 'store'))..build(null);

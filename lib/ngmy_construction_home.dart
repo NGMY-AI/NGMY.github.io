@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'ngmy_construction_electrical.dart';
+import 'ngmy_construction_electrical_more.dart';
 import 'ngmy_construction_plumbing.dart';
 import 'ngmy_construction_plumbjob.dart';
 import 'ngmy_construction_project.dart';
@@ -325,8 +326,8 @@ class HRoom {
   /// Each fixture is marked fixed on its own as soon as it is: only the ones still to do keep their red frame.
   bool _fixture(int i) => !indoor || (wiring != null ? wiring!.orderOk(i) : !wiringNeeded);
   bool get okLight => lesson.isEmpty ? _fixture(2) : (lesson == 'fan' ? lessonDone : true);
-  bool get okSwitch => lesson.isEmpty ? _fixture(3) : (lesson == 'switch' ? lessonDone : true);
-  bool get okOutA => lesson.isEmpty ? _fixture(0) : ((lesson == 'outlet' || lesson == 'gfci') ? lessonDone : true);
+  bool get okSwitch => lesson.isEmpty ? _fixture(3) : (isSwitchKind(lesson) ? lessonDone : true);
+  bool get okOutA => lesson.isEmpty ? _fixture(0) : (isOutletKind(lesson) ? lessonDone : true);
   bool get okOutB => lesson.isEmpty ? _fixture(1) : true;
 
   /// What is still to be done in this room, in words.
@@ -584,8 +585,8 @@ class HomeProject {
         for (final (x, z) in const [(-700.0, 225.0), (-120.0, 160.0), (120.0, 160.0), (720.0, 225.0)]) {
           if (clear(x, z)) r.add('house2', x: x, z: z);
         }
-        for (final (z, step, big) in const [(600.0, 250.0, true), (730.0, 250.0, false), (1030.0, 250.0, true), (1210.0, 330.0, true)]) {
-          for (var x = -750.0; x <= 750; x += step) {
+        for (final (z, step, big) in const [(600.0, 400.0, true), (730.0, 400.0, false), (1030.0, 400.0, true), (1210.0, 400.0, true)]) {
+          for (var x = -800.0; x <= 800; x += step) {
             if (x.abs() < 100) continue;
             // Between the two streets the loop roads at x = 600 run through, so the houses keep well back from them.
             if (z < 900 && x.abs() > 400) continue;
@@ -612,7 +613,7 @@ class HomeProject {
         // Is there room for a building of [fw] by [fd] here, with the road and the other buildings well away from its door side (z up)?
         bool free(double x, double z, double fw, double fd) {
           for (final q in roads) {
-            if ((q.x - x).abs() < fw / 2 + 50 && (q.z - z).abs() < fd / 2 + 20 + (q.z > z ? 70 : 30)) return false;
+            if ((q.x - x).abs() < fw / 2 + 90 && (q.z - z).abs() < fd / 2 + 20 + (q.z > z ? 70 : 30)) return false;
           }
           for (final f in r.furn) {
             if (kRoadKinds.contains(f.kind) || f.kind == 'roundabout' || f.kind == 'rug' || f.kind == 'flowers') continue;
@@ -630,6 +631,12 @@ class HomeProject {
             final q = kFurnKinds[f.kind]!;
             final qw = f.rot.isOdd ? q.d : q.w, qd = f.rot.isOdd ? q.w : q.d;
             if ((f.x - x).abs() < (fw + qw) / 2 + 34 && (f.z - z).abs() < (fd + qd) / 2 + 34) return false;
+            // Never build in front of the door of a building that is already there.
+            if (const {'house2', 'bighouse', 'shop', 'hospital', 'school', 'firestation', 'store', 'gasstation', 'tower', 'hq', 'dmv'}.contains(f.kind)) {
+              final a = f.rot * math.pi / 2;
+              final dx = f.x + math.sin(a) * (q.d / 2 + 30), dz = f.z + math.cos(a) * (q.d / 2 + 30);
+              if ((dx - x).abs() < fw / 2 + 40 && (dz - z).abs() < fd / 2 + 40) return false;
+            }
           }
           return true;
         }
@@ -663,10 +670,10 @@ class HomeProject {
 
         // More houses: behind my house, down both sides and over every green stretch, each with room in front of its door.
         var added = 0;
-        for (var zi = 0; zi < 14 && added < 90; zi++) {
-          final z = -560.0 + zi * 150;
-          for (var xi = 0; xi <= 10 && added < 90; xi++) {
-            final x = -1150.0 + xi * 230;
+        for (var zi = 0; zi < 9 && added < 90; zi++) {
+          final z = -560.0 + zi * 235;
+          for (var xi = 0; xi <= 7 && added < 90; xi++) {
+            final x = -1150.0 + xi * 330;
             if (x.abs() < 170 && z < 100) continue;
             final kind = (xi * 7 + zi * 3) % 5 == 0 ? 'bighouse' : 'house2';
             final k = kFurnKinds[kind]!;

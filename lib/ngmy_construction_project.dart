@@ -3,6 +3,7 @@ import 'ngmy_electrical_safety.dart';
 
 import 'ngmy_3d.dart';
 import 'ngmy_construction_electrical.dart';
+import 'ngmy_construction_electrical_more.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
 // THE ROOM PROJECT: a whole room to build with your own hands.
@@ -90,8 +91,8 @@ const List<String> kPhaseNames = ['1 Rough-in', '2 Drywall', '3 Devices'];
 const List<String> kAppliances = ['tv', 'lamp', 'toaster', 'hairdryer'];
 
 class RoomProject {
-  RoomProject({this.seed = 1, this.practice = false, int? kind, String? name}) {
-    _plan(kind, name);
+  RoomProject({this.seed = 1, this.practice = false, int? kind, String? name, bool variants = false}) {
+    _plan(kind, name, variants);
   }
 
   final int seed;
@@ -127,7 +128,7 @@ class RoomProject {
   /// Test mode (an inspection): wrong wires are taken without a word, and nothing is explained until the job is submitted.
   bool test = false;
 
-  void _plan(int? forced, String? name) {
+  void _plan(int? forced, String? name, bool variants) {
     final r = math.Random(seed);
     final kind = forced ?? r.nextInt(3);
     final outlets = [0, 1, 2]..shuffle(r);
@@ -142,6 +143,11 @@ class RoomProject {
       default:
         roomName = name ?? 'Kitchen';
         orders = [Order(outlets[0], 'gfci'), Order(outlets[1], 'gfci'), Order(5, 'light', controlledBy: sw), Order(sw, 'switch')];
+    }
+    if (variants) {
+      // Every job teaches a different outlet and a different switch: the second outlet and the wall switch can be any of the other types.
+      orders[1] = Order(orders[1].slot, kOutletVariants[r.nextInt(kOutletVariants.length)]);
+      orders[3] = Order(orders[3].slot, kSwitchVariants[r.nextInt(kSwitchVariants.length)]);
     }
   }
 
@@ -201,7 +207,8 @@ class RoomProject {
     for (final o in orders) {
       final d = devs[o.slot];
       if (d == null) continue;
-      final plan = switch (d.kind) {
+      final more = electricalLesson(d.kind);
+      final plan = !more.legacy ? more.solution : switch (d.kind) {
         'outlet' => {idGreen: 'ground', idSilverTop: 'white', idBrassTop: 'black'},
         'gfci' => {idGreen: 'ground', idSilverBottom: 'white', idBrassBottom: 'black'},
         'switch' => {idGreen: 'ground', idBrassTop: 'blackLine', idBrassBottom: 'blackLoad'},
@@ -215,12 +222,12 @@ class RoomProject {
     }
     if (!breaker) toggleBreaker();
     for (final o in orders) {
-      if (o.device == 'outlet' || o.device == 'gfci') {
+      if (isOutletKind(o.device)) {
         plug(o.slot, 'lamp');
         unplug(o.slot);
       }
     }
-    for (final o in orders.where((o) => o.device == 'switch')) {
+    for (final o in orders.where((o) => isSwitchKind(o.device))) {
       flipSwitch(o.slot);
       flipSwitch(o.slot);
     }
@@ -394,7 +401,7 @@ class RoomProject {
 
   String _kindOkFor(BoxSlot s, String kind) {
     if (s.ceiling) return (kind == 'light' || kind == 'fan') ? '' : 'A ceiling box holds a light or a fan, not an outlet or a switch.';
-    return (kind == 'outlet' || kind == 'gfci' || kind == 'switch') ? '' : 'A light or a fan hangs from the ceiling. A wall box holds an outlet, a GFCI or a switch.';
+    return (isOutletKind(kind) || isSwitchKind(kind)) ? '' : 'A light or a fan hangs from the ceiling. A wall box holds an outlet, a GFCI or a switch.';
   }
 
   Act installDevice(int slot, String kind) {
@@ -404,9 +411,9 @@ class RoomProject {
     if (devs.containsKey(slot)) return _mistake('There is already a device there. Pull it out first if you want to move it.');
     final bad = _kindOkFor(s, kind);
     if (bad.isNotEmpty) return _mistake(bad);
-    if ((kind == 'switch' && s.role == 'low') || (kind != 'switch' && !s.ceiling && s.role == 'switch')) {
+    if ((isSwitchKind(kind) && s.role == 'low') || (!isSwitchKind(kind) && !s.ceiling && s.role == 'switch')) {
       if (!practice) {
-        return _mistake(kind == 'switch' ? 'A switch goes about 48 inches from the floor, where a hand falls naturally. This box is down at outlet height.' : 'Outlets go low, about 16 inches from the floor. This box is up at switch height.');
+        return _mistake(isSwitchKind(kind) ? 'A switch goes about 48 inches from the floor, where a hand falls naturally. This box is down at outlet height.' : 'Outlets go low, about 16 inches from the floor. This box is up at switch height.');
       }
       mistakes++;
       log.add('Wrong height at ${s.name}.');
@@ -421,7 +428,7 @@ class RoomProject {
     d.w.supported = !(kind == 'fan' && boxes[slot] != 'fan');
     d.w.power = power;
     devs[slot] = d;
-    return Act(true, '${kind == 'light' ? 'Light fixture' : kind == 'fan' ? 'Ceiling fan' : kind == 'gfci' ? 'GFCI outlet' : kind == 'switch' ? 'Switch' : 'Outlet'} is held up to ${s.name}. Turn the breaker OFF, then wire it.');
+    return Act(true, '${kind == 'light' ? 'Light fixture' : kind == 'fan' ? 'Ceiling fan' : kind == 'gfci' ? 'GFCI outlet' : kind == 'switch' ? 'Switch' : deviceKindName(kind)} is held up to ${s.name}. Turn the breaker OFF, then wire it.');
   }
 
   Act removeDevice(int slot) {
@@ -600,7 +607,7 @@ class RoomProject {
 
   Act flipSwitch(int slot) {
     final d = devs[slot];
-    if (d == null || d.kind != 'switch' || d.w.stage < 2) return const Act(false, 'Nothing to flip yet.');
+    if (d == null || !isSwitchKind(d.kind) || d.w.stage < 2) return const Act(false, 'Nothing to flip yet.');
     if (switchOn.contains(slot)) {
       switchOn.remove(slot);
     } else {
@@ -633,7 +640,7 @@ class RoomProject {
 
   Act plug(int slot, String appliance) {
     final d = devs[slot];
-    if (d == null || (d.kind != 'outlet' && d.kind != 'gfci') || d.w.stage < 2) return _mistake('There is no finished outlet there to plug into.');
+    if (d == null || !isOutletKind(d.kind) || d.w.stage < 2) return _mistake('There is no finished outlet there to plug into.');
     if (plugged.containsKey(slot)) return _mistake('Something is already plugged in.');
     plugged[slot] = appliance;
     if (d.w.burnt) return const Act(false, 'The outlet is burnt. Nothing works. Pull it out and put in a new one.', danger: true);
@@ -698,9 +705,9 @@ class RoomProject {
       final d = devs[o.slot];
       if (d == null || d.kind != o.device || d.w.stage < 2) return false;
       if (!verdict(o.slot).ok) return false;
-      if (o.device == 'outlet' || o.device == 'gfci') {
+      if (isOutletKind(o.device)) {
         if (!d.tested) return false;
-      } else if (o.device != 'switch' && !d.tested) {
+      } else if (!isSwitchKind(o.device) && !d.tested) {
         return false;
       }
     }
