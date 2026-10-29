@@ -1,5 +1,7 @@
 import 'dart:math' as math;
+import 'dart:ui' show PictureRecorder;
 import 'package:flutter/material.dart';
+import 'package:ngmy/ngmy_electronics_cartoons.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_3d.dart';
@@ -110,6 +112,67 @@ void main() {
     final dark = CityInterior('house2', f, dark: true)..build(null);
     expect(dark.scene.labels.where((l) => l.id == idCinPanel || l.id == idCinOutlet).length, 3);
     expect(dark.scene.polys.any((p) => p.color == const Color(0xFFEF4444) && p.alpha < 1), isTrue, reason: 'a red frame behind it');
+  });
+
+  test('each fixture is marked fixed on its own: only the one still to do keeps its red frame', () {
+    final h = HomeProject(seed: 4);
+    final r = h.rooms.firstWhere((r) => r.kind == 'bedroom');
+    final p = RoomProject(seed: 5, kind: wiringKindFor(r), name: r.name)..fastForward()..completeWiring();
+    r.wiring = p;
+    expect(r.wired, isTrue);
+    expect(r.missing, isEmpty);
+    p.devs.remove(p.orders[2].slot);
+    expect(r.okOutA && r.okOutB && r.okSwitch, isTrue, reason: 'what was fixed stays marked fixed');
+    expect(r.okLight, isFalse);
+    expect(r.wired, isFalse);
+    expect(r.missing.length, 1);
+    expect(r.missing.first, anyOf('ceiling fan', 'ceiling light'));
+    final sc = buildHomeRoom(r);
+    expect(sc.labels.any((l) => l.text.contains('Still to wire')), isTrue);
+  });
+
+  test('the hall has a camera in each corner that can be tapped, and the Swahili ad has a long conversation', () {
+    final hall = HomeProject(seed: 4).rooms.firstWhere((r) => r.kind == 'hall');
+    final sc = buildHomeRoom(hall);
+    for (var i = 0; i < 4; i++) {
+      expect(sc.polys.any((p) => p.id == idHCam + i), isTrue, reason: 'camera $i');
+      expect(sc.labels.any((l) => l.id == idHCam + i), isTrue);
+    }
+    for (var k = 0; k < 8; k++) {
+      final rec = PictureRecorder();
+      cartoonScene(Canvas(rec), const Size(640, 360), 3, k * 0.75);
+      rec.endRecording();
+    }
+  });
+
+  testWidgets('the drone chooser opens in the middle of the city screen, flies, and stops', (t) async {
+    t.view.physicalSize = const Size(900, 1600);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    SharedPreferences.setMockInitialValues({});
+    HomeProject.session = HomeProject(seed: 31)..current = 11;
+    await t.pumpWidget(const MaterialApp(home: NgmyHousePage()));
+    await t.pump(const Duration(milliseconds: 600));
+    final row = find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.right).first;
+    await t.scrollUntilVisible(find.text('🚁 Drone'), 120, scrollable: row);
+    await t.drag(row, const Offset(-150, 0));
+    await t.pump(const Duration(milliseconds: 300));
+    await t.tap(find.text('🚁 Drone'));
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 300));
+    expect(find.text('Drone film'), findsOneWidget);
+    expect(find.text('Billboards and NGMY logos'), findsOneWidget);
+    await t.tap(find.text('The whole city'));
+    await t.pump(const Duration(milliseconds: 300));
+    await t.pump(const Duration(seconds: 2));
+    expect(find.text('Drone film'), findsNothing);
+    await t.scrollUntilVisible(find.text('⏹ Stop drone'), 120, scrollable: row);
+    await t.drag(row, const Offset(-150, 0));
+    await t.pump(const Duration(milliseconds: 300));
+    await t.tap(find.text('⏹ Stop drone'));
+    await t.pump(const Duration(milliseconds: 500));
+    expect(find.text('⏹ Stop drone'), findsNothing);
+    await t.pump(const Duration(seconds: 10));
   });
 
   testWidgets('after three missed jobs the game is closed with a countdown', (t) async {

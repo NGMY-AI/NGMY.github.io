@@ -156,6 +156,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   @override
   void dispose() {
+    _droneTimer?.cancel();
     _walkTimer?.cancel();
     _t?.cancel();
     _tourTimer?.cancel();
@@ -354,6 +355,10 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   void _pick(int id) {
     if (id == 0) return;
+    if (id >= idHCam && id < idHCam + 4) {
+      _eyeAt(id - idHCam);
+      return;
+    }
     if (id >= idHTag && id < idHTag + 400) {
       final f = room.furnById(id - idHTag);
       if (f != null) _goToTag(f);
@@ -575,6 +580,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
                     }),
                     btn(Icons.screen_rotation_rounded, () => setState(() => _fullTurns = _fullTurns == 1 ? 3 : 1)),
                     btn(_hideTags ? Icons.label_off_rounded : Icons.label_rounded, () => setState(() => _hideTags = !_hideTags)),
+                    if (!room.indoor) btn(_droneOn ? Icons.stop_rounded : Icons.flight_rounded, () => _droneOn ? _stopDrone() : setState(() => _cardDrone = true)),
                   ])),
               ]),
             ),
@@ -670,6 +676,215 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     _say('Looking up at the ceiling from the floor. Drag to look round.', ok: true);
   }
 
+  /// Look from a camera in a corner of the hall: the view is put right there, looking across the room.
+  void _eyeAt(int i) {
+    final r = room;
+    final ex = (i % 2 == 0 ? -1.0 : 1.0) * (r.w / 2 - 14), ez = i < 2 ? 14.0 : r.d - 14, ey = HRoom.h - 24;
+    final vx = -ex, vz = r.d / 2 - ez;
+    final yaw = math.atan2(vx, -vz), pitch = 0.12;
+    const d = 26.0;
+    final target = V3(ex + d * math.cos(pitch) * math.sin(yaw), ey - d * math.sin(pitch), ez - d * math.cos(pitch) * math.cos(yaw));
+    cam.minDist = 6;
+    cam.glideTo(target: target, dist: d, yaw: yaw, pitch: pitch);
+    _say('You are looking from the camera in the corner. Drag to look round, or tap a camera for another corner.', ok: true);
+    conBeep(700, ms: 70);
+  }
+
+  // ── The drone: a film of the city ──
+
+  bool _droneOn = false;
+  bool _cardDrone = false;
+  Timer? _droneTimer;
+  List<_Shot> _shots = const [];
+  int _shotIx = 0;
+  int _shotStartMs = 0;
+  ({V3 target, double dist, double yaw, double pitch}) _shotFrom = (target: V3.zero, dist: 100, yaw: 0, pitch: 0.3);
+
+  /// The shots of a drone film. [what] is city, billboards, houses, hospital or traffic; anything else is all of them.
+  List<_Shot> _makeShots(String what) {
+    final city = home.rooms.firstWhere((r) => !r.indoor);
+    final out = <_Shot>[];
+    void fly(V3 t, double dist, double yaw, double pitch, double secs, {String? note}) => out.add(_Shot(t, dist, yaw, pitch, secs, note: note));
+    void interior(Furn f, double secs) {
+      out.add(_Shot(const V3(0, 40, 110), 250, -0.7, 0.45, 0.1, enter: f));
+      out.add(_Shot(const V3(0, 40, 110), 220, 0.7, 0.4, secs));
+      out.add(_Shot(const V3(0, 40, 110), 200, 0.0, 0.5, 0.1, exit: true));
+    }
+
+    final wantAll = !const ['city', 'billboards', 'houses', 'hospital', 'traffic'].contains(what);
+    if (what == 'city' || wantAll) {
+      fly(const V3(0, 40, 700), 1500, 0.0, 0.85, 4, note: 'The whole city from high up');
+      fly(const V3(-600, 40, 300), 700, -0.6, 0.5, 6, note: 'Over the north streets');
+      fly(const V3(600, 40, 300), 700, 0.6, 0.5, 6);
+      fly(const V3(600, 40, 900), 700, 2.4, 0.5, 6, note: 'Over the south');
+      fly(const V3(-600, 40, 900), 700, -2.4, 0.5, 6);
+    }
+    if (what == 'billboards' || wantAll) {
+      fly(const V3(0, 250, -118), 360, 0.0, 0.12, 6, note: 'The big NGMY logo board: New Global Movement for Youth');
+      fly(const V3(0, 250, -118), 330, 3.1, 0.12, 5, note: 'And from behind it');
+      final boards = [for (final f in city.furn) if (f.kind == 'billboard') f]..sort((a, b) => a.x.compareTo(b.x));
+      for (var i = 0; i < boards.length && i < (wantAll ? 4 : 8); i += wantAll ? math.max(1, boards.length ~/ 4) : 1) {
+        final f = boards[i];
+        fly(V3(f.x, 48, f.z), 120, 0.0, 0.1, 5, note: 'An NGMY billboard');
+      }
+    }
+    if (what == 'houses' || wantAll) {
+      final houses = [for (final f in city.furn) if (f.kind == 'house2' || f.kind == 'bighouse') f];
+      for (var i = 0; i < houses.length && i < (wantAll ? 2 : 5); i++) {
+        final f = houses[(i * 5 + 1) % houses.length];
+        fly(V3(f.x, 55, f.z), 230, 0.5 - i * 0.4, 0.28, 5, note: f.kind == 'bighouse' ? 'A big house with TV windows' : 'A house');
+      }
+      final bh = houses.where((f) => f.kind == 'bighouse');
+      if (bh.isNotEmpty) {
+        fly(V3(bh.first.x, 45, bh.first.z), 160, 0.0, 0.15, 3);
+        interior(bh.first, 6);
+      }
+    }
+    if (what == 'hospital' || wantAll) {
+      for (final kind in const ['hospital', 'shop', 'school']) {
+        final f = city.furn.where((f) => f.kind == kind);
+        if (f.isEmpty) continue;
+        fly(V3(f.first.x, 50, f.first.z), 300, 0.4, 0.3, 4, note: 'The $kind');
+        interior(f.first, 6);
+      }
+    }
+    if (what == 'traffic' || wantAll) {
+      for (var i = 0; i < kTraffic.length && i < 3; i++) {
+        out.add(_Shot(V3.zero, 190, 0.8 + i, 0.3, 6, follow: i, note: kTraffic[i].kind == 'bus' ? 'A self-driving bus with its billboards' : 'A self-driving police car'));
+      }
+    }
+    return out;
+  }
+
+  void _startDrone(String what) {
+    _stopRing();
+    _stopTour();
+    if (steer) _stopSteer();
+    inner = null;
+    final shots = _makeShots(what);
+    if (shots.isEmpty) return;
+    setState(() {
+      _cardDrone = false;
+      _cardCall = null;
+      _droneOn = true;
+      _shots = shots;
+      _shotIx = -1;
+    });
+    cam
+      ..minDist = 6
+      ..maxDist = 2600
+      ..minPitch = -1.2
+      ..maxPitch = 1.4
+      ..setFree(true);
+    _nextShot();
+    _droneTimer?.cancel();
+    _droneTimer = Timer.periodic(const Duration(milliseconds: 33), (_) => _droneTick());
+  }
+
+  void _nextShot() {
+    _shotIx++;
+    if (_shotIx >= _shots.length) {
+      _stopDrone();
+      return;
+    }
+    final s = _shots[_shotIx];
+    _shotFrom = (target: cam.target, dist: cam.dist, yaw: cam.yaw, pitch: cam.pitch);
+    _shotStartMs = DateTime.now().millisecondsSinceEpoch;
+    if (s.enter != null) {
+      inner = CityInterior(s.enter!.kind, s.enter!, dark: room.darkHouses.contains(s.enter!.id))..build(comm);
+      setState(_rebuild);
+    }
+    if (s.exit) {
+      inner = null;
+      setState(_rebuild);
+    }
+    if (s.note != null) _say('🚁 ${s.note}', ok: true);
+  }
+
+  void _droneTick() {
+    if (!_droneOn || !mounted) return;
+    final s = _shots[_shotIx];
+    final el = (DateTime.now().millisecondsSinceEpoch - _shotStartMs) / 1000;
+    final k = (el / s.secs).clamp(0.0, 1.0);
+    final e = k * k * (3 - 2 * k);
+    var tt = s.target;
+    if (s.follow != null) {
+      final p = vehiclePose(kTraffic[s.follow!], now);
+      tt = V3(p.$1, 24, p.$2);
+    }
+    // A drone drifts: a little slow turn while it looks.
+    final yaw = _shotFrom.yaw + (s.yaw - _shotFrom.yaw) * e + math.sin(now * 0.4) * 0.03;
+    cam.setView(
+      target: V3.lerp(_shotFrom.target, tt, s.follow != null ? 1 : e),
+      dist: _shotFrom.dist + (s.dist - _shotFrom.dist) * e,
+      yaw: yaw,
+      pitch: _shotFrom.pitch + (s.pitch - _shotFrom.pitch) * e,
+    );
+    if (k >= 1) _nextShot();
+  }
+
+  void _stopDrone() {
+    _droneTimer?.cancel();
+    _droneTimer = null;
+    if (!mounted) return;
+    setState(() {
+      _droneOn = false;
+      inner = null;
+      _rebuild();
+    });
+    _frame();
+    _say('The drone has landed.', ok: true);
+  }
+
+  Widget _droneCard() {
+    Widget opt(String emoji, String title, String sub, String what) => GestureDetector(
+          onTap: () => _startDrone(what),
+          child: Container(
+            margin: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white12)),
+            child: Row(children: [
+              Text(emoji, style: const TextStyle(fontSize: 26)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+                  Text(sub, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                ]),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: Colors.white38),
+            ]),
+          ),
+        );
+    return Container(
+      color: Colors.black.withValues(alpha: 0.55),
+      alignment: Alignment.center,
+      child: SingleChildScrollView(
+        child: Container(
+          width: 330,
+          margin: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1F2937), Color(0xFF0B1220)]), borderRadius: BorderRadius.circular(28), border: Border.all(color: Colors.white24)),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              const Text('🚁', style: TextStyle(fontSize: 28)),
+              const SizedBox(width: 10),
+              const Expanded(child: Text('Drone film', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900))),
+              GestureDetector(onTap: () => setState(() => _cardDrone = false), child: const Icon(Icons.close_rounded, color: Colors.white54)),
+            ]),
+            const Text('What should the drone show you?', style: TextStyle(color: Colors.white60, fontSize: 13)),
+            opt('🌆', 'The whole city', 'High flights over every street', 'city'),
+            opt('🪧', 'Billboards and NGMY logos', 'Close to every ad, and the big logo board', 'billboards'),
+            opt('🏠', 'Houses', 'Fly by the houses, then go inside a big one', 'houses'),
+            opt('🏥', 'Hospital, shop and school', 'Fly in and look round inside each', 'hospital'),
+            opt('🚌', 'Traffic', 'Follow the self-driving buses and police cars', 'traffic'),
+            opt('🎬', 'Everything', 'A little of all of it', 'all'),
+          ]),
+        ),
+      ),
+    );
+  }
+
   // ── Jobs round the neighbourhood: houses and street lights that break, goods to carry, houses to sell ──
 
   /// The wiring job for a house with no power: the same wiring bench as the jobs, in that house.
@@ -741,69 +956,158 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (!room.indoor && inner == null) setState(_rebuild);
   }
 
-  Future<void> _neighbourText(_NCall c) {
-    final f = c.furn;
-    Widget bubble(String text, {bool mine = false}) => Align(
-          alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+  /// The call that is open in the middle of the screen (and turns with a full screen game), and the office message.
+  _NCall? _cardCall;
+  bool _cardOffice = false;
+
+  Future<void> _neighbourText(_NCall c) async {
+    setState(() => _cardCall = c);
+  }
+
+  /// Where in front of the job's building the person is sent.
+  (double, double)? _jobSpot() {
+    final f = _job?.furn;
+    if (f == null) return null;
+    final k = kFurnKinds[f.kind]!;
+    final out = rotY(V3(0, 0, k.d / 2 + 60), f.rot * math.pi / 2);
+    return (f.x + out.x, f.z + out.z);
+  }
+
+  int? _jobMeters() {
+    final w = walker, s = _jobSpot();
+    if (w == null || s == null) return null;
+    return (math.sqrt(math.pow(s.$1 - w.x, 2) + math.pow(s.$2 - w.z, 2)) / 10).round();
+  }
+
+  /// The GPS: a line of yellow dashes on the ground from the person to the job, and a tall yellow beam over the place.
+  List<Poly> _routePolys() {
+    final w = walker, s = _jobSpot();
+    if (_job == null || w == null || s == null || room.indoor || inner != null) return const [];
+    final b = MeshBuilder()
+      ..grouped = false
+      ..order = 1;
+    final dx = s.$1 - w.x, dz = s.$2 - w.z;
+    final len = math.sqrt(dx * dx + dz * dz);
+    if (len > 60) {
+      final yaw = math.atan2(dx, dz);
+      var n = 0;
+      for (var d = 46.0; d < len - 30 && n < 70; d += 26, n++) {
+        b.box(V3(w.x + dx / len * d, 1.4, w.z + dz / len * d), const V3(9, 0.7, 15), const Color(0xFFFACC15), yaw: yaw);
+      }
+    }
+    b.order = 3;
+    b.alpha = 0.4;
+    b.cyl(V3(s.$1, 0, s.$2), V3(s.$1, 170, s.$2), 4, const Color(0xFFFACC15), sides: 8);
+    b.cyl(V3(s.$1, 0, s.$2), V3(s.$1, 1.6, s.$2), 24, const Color(0xFFFACC15), sides: 14);
+    return b.polys;
+  }
+
+  Widget _cardOverlay() {
+    final c = _cardCall;
+    Widget bubble(String t) => Align(
+          alignment: Alignment.centerLeft,
           child: Container(
             margin: const EdgeInsets.only(bottom: 8),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             constraints: const BoxConstraints(maxWidth: 290),
-            decoration: BoxDecoration(color: mine ? const Color(0xFF2563EB) : const Color(0xFF374151), borderRadius: BorderRadius.circular(18)),
-            child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.3)),
+            decoration: const BoxDecoration(color: Color(0xFF334155), borderRadius: BorderRadius.only(topLeft: Radius.circular(5), topRight: Radius.circular(18), bottomLeft: Radius.circular(18), bottomRight: Radius.circular(18))),
+            child: Text(t, style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.3)),
           ),
         );
-    return showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: const Color(0xFF111827),
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              CircleAvatar(radius: 18, backgroundColor: const Color(0xFFF59E0B), child: Text(c.emoji)),
-              const SizedBox(width: 10),
-              Text(c.caller, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
-              const Spacer(),
-              const Text('Messages', style: TextStyle(color: Colors.white38, fontSize: 12)),
+    Widget action(IconData icon, String label, Color col, VoidCallback onTap, {bool primary = false}) => GestureDetector(
+          onTap: onTap,
+          child: Container(
+            height: 48,
+            margin: const EdgeInsets.only(top: 8),
+            decoration: BoxDecoration(color: primary ? col : col.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(16), border: Border.all(color: col)),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Icon(icon, color: primary ? Colors.black : col, size: 21),
+              const SizedBox(width: 8),
+              Text(label, style: TextStyle(color: primary ? Colors.black : Colors.white, fontWeight: FontWeight.w900, fontSize: 14.5)),
             ]),
-            const Divider(color: Colors.white12),
-            for (final line in c.lines) bubble(line),
-            bubble('I am on my way.', mine: true),
-            const SizedBox(height: 6),
-            Wrap(spacing: 10, runSpacing: 8, children: [
-              FilledButton.icon(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  if (!room.indoor) cam.glideTo(target: V3(f.x, 40, f.z), dist: 260);
-                  _say(c.kind == 'power' ? 'The dark house with the red sign is the one. Walk to its front door and in.' : (c.kind == 'sick' ? 'This is the hospital. Walk in and onto the desk to admit the sick person.' : 'The dark street light with the red sign is the one.'), ok: true);
-                },
-                icon: const Icon(Icons.place_rounded),
-                label: const Text('Show me the house'),
-              ),
-              FilledButton.icon(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  final w = walker;
-                  if (w != null && !room.indoor) {
-                    final k = kFurnKinds[f.kind]!;
-                    final out = rotY(V3(0, 0, k.d / 2 + 60), f.rot * math.pi / 2);
-                    w
-                      ..x = f.x + out.x
-                      ..z = f.z + out.z
-                      ..target = null;
-                    cam.glideTo(target: V3(w.x, 30, w.z), dist: 170);
-                    if (!steer) _startSteer();
-                  }
-                  _say(c.kind == 'power' ? 'You are at the house. Walk in through the door, then onto the red mat at the breaker panel.' : (c.kind == 'sick' ? 'You are at the hospital. Walk in and onto the desk.' : 'You are at the street light. Tap it to fix it.'), ok: true);
-                },
-                icon: const Icon(Icons.directions_walk_rounded),
-                label: const Text('Take me there'),
-              ),
+          ),
+        );
+    final Widget body;
+    if (c != null) {
+      final m = _jobMeters();
+      body = Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          CircleAvatar(radius: 24, backgroundColor: const Color(0xFFF59E0B), child: Text(c.emoji, style: const TextStyle(fontSize: 22))),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(c.caller, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+              const Text('Message · now', style: TextStyle(color: Colors.white38, fontSize: 12)),
             ]),
+          ),
+          GestureDetector(onTap: () => setState(() => _cardCall = null), child: const Icon(Icons.close_rounded, color: Colors.white54)),
+        ]),
+        const SizedBox(height: 12),
+        for (final line in c.lines) bubble(line),
+        Container(
+          margin: const EdgeInsets.only(top: 4),
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: const Color(0xFFFACC15).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFFACC15).withValues(alpha: 0.5))),
+          child: Row(children: [
+            const Icon(Icons.navigation_rounded, color: Color(0xFFFACC15)),
+            const SizedBox(width: 10),
+            Expanded(child: Text(m == null ? 'A yellow line on the ground will show you the way.' : 'Follow the yellow line on the ground. It is about $m metres away.', style: const TextStyle(color: Colors.white, fontSize: 13))),
           ]),
+        ),
+        action(Icons.navigation_rounded, 'Show me the way', const Color(0xFFFACC15), () {
+          setState(() => _cardCall = null);
+          if (!steer) _startSteer();
+          final w = walker;
+          if (w != null) cam.glideTo(target: V3(w.x, 30, w.z), dist: 220, pitch: 0.5);
+          _say('Follow the yellow line on the ground to get there.', ok: true);
+        }, primary: true),
+        action(Icons.directions_walk_rounded, 'Take me there', const Color(0xFF4ADE80), () {
+          setState(() => _cardCall = null);
+          if (_job == null) {
+            _job = c;
+            _jobSecs = 0;
+          }
+          _teleportTo(c.furn);
+          _say(c.kind == 'power' ? 'You are at the house. Walk in and onto the red mat at the breaker panel.' : (c.kind == 'sick' ? 'You are at the hospital. Walk in and onto the desk.' : 'You are at the street light. Press Fix the street light.'), ok: true);
+        }),
+        action(Icons.schedule_rounded, 'Later', const Color(0xFFF59E0B), () {
+          setState(() {
+            _cardCall = null;
+            if (identical(_job, c)) _job = null;
+            if (!_waiting.contains(c)) _waiting.add(c);
+          });
+          _say('Saved on your waiting list.', ok: true);
+        }),
+      ]);
+    } else {
+      body = Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Row(children: [
+          CircleAvatar(radius: 24, backgroundColor: Color(0xFFEF4444), child: Text('☎', style: TextStyle(fontSize: 22))),
+          SizedBox(width: 12),
+          Text('City office', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+        ]),
+        const SizedBox(height: 12),
+        bubble('Hello, this is the City office. You have missed 2 calls in a row.'),
+        bubble('Please answer the phone, so you can keep working.'),
+        bubble('If you miss one more, the game closes for 5 hours.'),
+        action(Icons.check_rounded, 'OK, I will answer', const Color(0xFF4ADE80), () => setState(() => _cardOffice = false), primary: true),
+      ]);
+    }
+    return Container(
+      color: Colors.black.withValues(alpha: 0.55),
+      alignment: Alignment.center,
+      child: SingleChildScrollView(
+        child: Container(
+          width: 330,
+          margin: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1F2937), Color(0xFF0B1220)]),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: Colors.white24),
+            boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 24)],
+          ),
+          child: body,
         ),
       ),
     );
@@ -1640,45 +1944,16 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   }
 
   /// The office rings to say the phone must be answered.
-  Future<void> _officeCall() {
+  void _officeCall() {
     conBeep(1046, ms: 160, wave: 'sine', volume: 0.3);
-    Widget bubble(String text) => Align(
-          alignment: Alignment.centerLeft,
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            constraints: const BoxConstraints(maxWidth: 290),
-            decoration: BoxDecoration(color: const Color(0xFF374151), borderRadius: BorderRadius.circular(18)),
-            child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.3)),
-          ),
-        );
-    return showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: const Color(0xFF111827),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Row(children: [
-              CircleAvatar(radius: 18, backgroundColor: Color(0xFFEF4444), child: Text('☎')),
-              SizedBox(width: 10),
-              Text('City office', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
-            ]),
-            const Divider(color: Colors.white12),
-            bubble('Hello, this is the City office. You have missed 2 calls in a row.'),
-            bubble('Please answer the phone, so you can keep working.'),
-            bubble('If you miss one more, the game closes for 5 hours.'),
-            const SizedBox(height: 6),
-            FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK, I will answer')),
-          ]),
-        ),
-      ),
-    );
+    setState(() {
+      _cardCall = null;
+      _cardOffice = true;
+    });
   }
 
   /// Is something happening that should stop new work from coming in?
-  bool get _isBusy => _pages > 0 || _job != null || _locked;
+  bool get _isBusy => _pages > 0 || _job != null || _locked || _droneOn;
 
   /// A fresh job at a house that is chosen by chance, never the same one twice running. Marks the fault in the city.
   _NCall? _newJob() {
@@ -2402,8 +2677,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         _chip('🛒 Shop', false, () => _citySheet('shop'), color: const Color(0xFFFB923C)),
         _chip('👨‍👩‍👧 People', false, () => _citySheet('people'), color: const Color(0xFF60A5FA)),
         _chip('🏠 Go inside', false, () => _go(10), color: const Color(0xFF4ADE80)),
-        if (_job != null) _chip('📋 Go to my job', false, () => _startJob(_job!), color: const Color(0xFFFACC15)),
+        if (_job != null) _chip('📋 My job${_jobMeters() == null ? '' : ' · ${_jobMeters()} m'}', false, () => setState(() => _cardCall = _job), color: const Color(0xFFFACC15)),
         if (_waiting.isNotEmpty) _chip('⏳ Waiting: ${_waiting.length}', false, () => _say('${_waiting.length} job${_waiting.length == 1 ? '' : 's'} waiting. You are taken to the next one when you finish this one.', ok: true), color: const Color(0xFFF59E0B)),
+        _chip(_droneOn ? '⏹ Stop drone' : '🚁 Drone', _droneOn, () => _droneOn ? _stopDrone() : setState(() => _cardDrone = true), color: const Color(0xFF38BDF8)),
         _chip(_hideTags ? '🏷 Show tags' : '🏷 Hide tags', _hideTags, () => setState(() => _hideTags = !_hideTags), color: const Color(0xFFF87171)),
         _chip('🗺 Map', showMap, () => setState(() => showMap = !showMap), color: const Color(0xFFA78BFA)),
       ];
@@ -2415,7 +2691,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (!_hideTags) return scene;
     if (identical(_tagSrc, scene) && _tagOut != null) return _tagOut!;
     _tagSrc = scene;
-    return _tagOut = Scene3D(scene.polys, info: scene.info, labels: [for (final l in scene.labels) if (l.id == 0 && l.color != const Color(0xFFDC2626)) l], screens: scene.screens, shell: scene.shell);
+    return _tagOut = Scene3D(scene.polys, info: scene.info, labels: [for (final l in scene.labels) if (l.id == 0 && l.color != const Color(0xFFDC2626) && !l.text.contains('rooms still need work') && !l.text.contains('house is finished')) l], screens: scene.screens, shell: scene.shell);
   }
 
   Widget _buildPage(BuildContext context) {
@@ -2435,20 +2711,21 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         good: good,
         messageTop: (showMap && !isLesson && !full) ? 104 : 10,
         layerOn: (l) => l <= 5,
-        dynamicPolys: (_) => inner != null ? inner!.dynamicPolys(now, playerStyle) : [...homeDynamic(room, now, person: _pose(), personStyle: playerStyle, residents: _figs, mode: mode, drive: _driveNow(), carrying: _carrying != null), if (!room.indoor) ...trafficPolys(now)],
+        dynamicPolys: (_) => inner != null ? inner!.dynamicPolys(now, playerStyle) : [...homeDynamic(room, now, person: _pose(), personStyle: playerStyle, residents: _figs, mode: mode, drive: _driveNow(), carrying: _carrying != null), if (!room.indoor) ...trafficPolys(now), ...(_job != null ? _routePolys() : const <Poly>[])],
         dynamicScreens: (_) => (inner == null && !room.indoor) ? trafficScreens(now) : const [],
         bottom: _pad(),
         topLeft: [
           if (showMap && !isLesson && !full) _MiniMap(home: home, onTap: _go, maxWidth: math.min(138.0, screenW * 0.36)),
         ],
       );
-    if (full) return _fullScreen(stage3d);
+    final stage = (_cardCall != null || _cardOffice || _cardDrone) ? Stack(fit: StackFit.expand, children: [stage3d, Positioned.fill(child: _cardDrone ? _droneCard() : _cardOverlay())]) : stage3d;
+    if (full) return _fullScreen(stage);
     return LessonScaffold(
       title: r.name,
       color: kConAmber,
       stepText: isLesson ? (r.lessonDone ? 'Done ✓' : 'To do') : '${home.finishedCount}/${home.indoor.length} done',
       onSteps: () => isLesson ? _openLesson() : _problems(context),
-      stage: stage3d,
+      stage: stage,
       panel: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         _row(!room.indoor ? _cityChips() : [
           _chip(inside ? '🔭 See the whole room' : '🏠 Be inside', false, () {
@@ -2684,6 +2961,17 @@ class _StickState extends State<_Stick> {
 }
 
 /// A neighbour who rang about a house with no power.
+/// One shot of a drone film: where the camera ends up, how long it takes, and optionally a building to go into (or leave), or a vehicle to follow.
+class _Shot {
+  _Shot(this.target, this.dist, this.yaw, this.pitch, this.secs, {this.note, this.enter, this.exit = false, this.follow});
+  final V3 target;
+  final double dist, yaw, pitch, secs;
+  final String? note;
+  final Furn? enter;
+  final bool exit;
+  final int? follow;
+}
+
 class _NCall {
   _NCall(this.furn, this.name, {this.kind = 'power', this.who = ''});
   final Furn furn;

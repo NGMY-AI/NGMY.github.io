@@ -277,16 +277,35 @@ void _swahili(Canvas c, Size s, double t) {
   final w = s.width, h = s.height;
   final ground = h * 0.94;
   c.drawRect(Rect.fromLTWH(0, ground, w, h - ground), _f(Colors.black.withValues(alpha: 0.2)));
-  const pairs = [('Jambo!', 'Hello!'), ('Asante', 'Thank you'), ('Karibu', 'Welcome'), ('Rafiki', 'Friend')];
-  final idx = (t / 1.5).floor() % pairs.length;
-  final lt = t % 1.5;
-  final left = lt < 0.75;
+  // A real little conversation: the first child says it in Swahili, the other answers or says what it means. Three exchanges in each play,
+  // and each play starts further along the list, so every phrase comes round.
+  const pairs = [
+    ('Jambo! Habari yako?', 'Nzuri, asante!'),
+    ('Jina lako nani?', 'Jina langu ni Amina.'),
+    ('Karibu nyumbani!', 'Asante sana!'),
+    ('Naenda shule leo.', 'I am going to school.'),
+    ('Ninapenda kujifunza!', 'I love to learn!'),
+    ('Maji, tafadhali.', 'Water, please.'),
+    ('Rafiki yangu mpendwa', 'My dear friend'),
+    ('Tuonane kesho!', 'See you tomorrow!'),
+    ('Pole sana, rafiki.', 'I am so sorry, friend.'),
+    ('Hongera! Umefaulu!', 'Congratulations! You passed!'),
+    ('Mimi ni mwanafunzi.', 'I am a student.'),
+    ('Chakula kitamu sana!', 'The food is so delicious!'),
+    ('Safari njema!', 'Have a good trip!'),
+    ('Unaongea Kiswahili vizuri!', 'You speak Swahili well!'),
+  ];
+  final base = (DateTime.now().millisecondsSinceEpoch ~/ 6000) * 3;
+  final idx = (base + (t / 2).floor().clamp(0, 2)) % pairs.length;
+  final lt = t % 2.0;
+  final left = lt < 1.0;
   cartoonKid(c, Offset(w * 0.25, ground), h * 0.68, t, shirt: const Color(0xFF16A34A), wave: left ? (math.sin(t * 8) + 1) / 2 : 0, talk: left, skin: const Color(0xFF8D5524), hairStyle: 2, bounce: left ? math.sin(t * 8).abs() * h * 0.01 : 0);
   cartoonKid(c, Offset(w * 0.75, ground), h * 0.68, t, shirt: const Color(0xFF2563EB), wave: left ? 0 : (math.sin(t * 8) + 1) / 2, talk: !left, skin: const Color(0xFFE0AC69), hairStyle: 0, bounce: left ? 0 : math.sin(t * 8).abs() * h * 0.01);
+  double fit(String text) => math.min(h * 0.085, w * 0.44 / (text.length * 0.62));
   if (left) {
-    _speech(c, Offset(w * 0.26, h * 0.15), pairs[idx].$1, h * 0.085, lt / 0.25, fill: const Color(0xFFFEF9C3));
+    _speech(c, Offset(w * 0.27, h * 0.15), pairs[idx].$1, fit(pairs[idx].$1), lt / 0.25, fill: const Color(0xFFFEF9C3));
   } else {
-    _speech(c, Offset(w * 0.74, h * 0.15), pairs[idx].$2, h * 0.085, (lt - 0.75) / 0.25, fill: const Color(0xFFE0F2FE));
+    _speech(c, Offset(w * 0.73, h * 0.15), pairs[idx].$2, fit(pairs[idx].$2), (lt - 1.0) / 0.25, fill: const Color(0xFFE0F2FE));
   }
   for (var k = 0; k < 3; k++) {
     _t(c, '→', Offset(w * 0.5, h * (0.35 + k * 0.1)), h * 0.07, Colors.white.withValues(alpha: 0.3 + 0.5 * ((t * 2 + k) % 1)));

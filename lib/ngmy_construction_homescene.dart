@@ -25,6 +25,7 @@ const int idHOutletA = 700, idHOutletB = 701, idHSwitch = 702, idHLight = 703;
 const int idHResident = 900; // + the resident's number: a person who lives in the house
 const int idHApp = 720; // + 0 or 1 (or 2 and up for added outlets): what is plugged in
 const int idHWallTv = 730;
+const int idHCam = 1500; // + 0 to 3: the cameras in the corners of the hall
 const int idHTag = 1100; // + a furniture number: the red tag over a dark house or a street light that is out
 const int idHExtra = 800; // + number: an outlet or switch the visitor added
 const int idHToiletF = 710, idHSinkF = 711, idHTubF = 712, idHKSink = 713;
@@ -397,7 +398,10 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
     b.endGroup();
     info[id] = ObjInfo('Light switch', !ok ? 'Not wired yet. Tap it to wire it.' : (r.lightOn ? 'On. Tap to turn the ${fan ? 'fan' : 'light'} off.' : 'Off. Tap to turn the ${fan ? 'fan' : 'light'} on.'), V3(x, 48, 2), 60);
   }
-  if (!r.okLight && r.lesson.isEmpty) labels.add(Label3D(V3(lightX, h - 26, lightZ), '⚡ No power: needs wiring', const Color(0xFFDC2626)));
+  if (r.lesson.isEmpty && !r.wired) {
+    final todo = r.missing;
+    labels.add(Label3D(V3(lightX, h - 26, lightZ), todo.isEmpty ? '⚡ No power: needs wiring' : '⚡ Still to wire: ${todo.join(', ')}', const Color(0xFFDC2626)));
+  }
   if (r.lesson.isNotEmpty && !r.lessonDone && !r.lessonIsPlumbing) labels.add(Label3D(V3(0, 40, 14), '👆 Tap the red one to wire it', const Color(0xFFDC2626)));
 
   // ── What is plugged in ──
@@ -484,6 +488,26 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
     hangTv(r.wallTv2, 1);
     hangTv(r.wallTv, 2);
     hangTv(r.wallTv2 ?? r.wallTv, 3);
+  }
+
+  // A camera in each corner of the hall: tap one and you are looking from there, as if it were your eyes.
+  if (r.kind == 'hall') {
+    for (var i = 0; i < 4; i++) {
+      final cx = (i % 2 == 0 ? -1.0 : 1.0) * (w / 2 - 14), cz = i < 2 ? 14.0 : d - 14;
+      final yaw = math.atan2(-cx, -(d / 2 - cz) * -1);
+      b.order = 2;
+      b.grouped = false;
+      b.startGroup();
+      b.id = idHCam + i;
+      b.box(V3(cx, HRoom.h - 5, cz), const V3(5, 10, 5), const Color(0xFF3F3F46));
+      b.box(V3(cx, HRoom.h - 12, cz), const V3(10, 8, 15), const Color(0xFFE5E7EB), shine: 0.4, yaw: yaw);
+      b.box(V3(cx + math.sin(yaw) * 8.5, HRoom.h - 12, cz + math.cos(yaw) * 8.5), const V3(7, 6, 3), const Color(0xFF111827), shine: 0.6, yaw: yaw);
+      b.ball(V3(cx - math.sin(yaw) * 5 + math.cos(yaw) * 3, HRoom.h - 8, cz - math.cos(yaw) * 5 - math.sin(yaw) * 3), 1.4, const Color(0xFFEF4444), lat: 3, lon: 5);
+      b.endGroup();
+      b.id = 0;
+      labels.add(Label3D(V3(cx, HRoom.h - 26, cz), '📷 See from here', const Color(0xFF0369A1), id: idHCam + i));
+      info[idHCam + i] = ObjInfo('Hall camera', 'Tap it and you look from here, like your eyes.', V3(cx, HRoom.h - 12, cz), 60);
+    }
   }
 
   // ── The plumbing ──

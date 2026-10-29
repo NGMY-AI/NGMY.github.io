@@ -63,7 +63,7 @@ void main() {
       final look = buildHomeRoom(r);
       expect(look.polys.length, lessThan(9000));
       for (final p in look.polys) {
-        expect(always.contains(p.id) || (p.id >= idHDoor && p.id < idHDoor + 20), isTrue, reason: '${r.name} object ${p.id} is tappable in Look mode');
+        expect(always.contains(p.id) || (p.id >= idHDoor && p.id < idHDoor + 20) || (p.id >= idHCam && p.id < idHCam + 4), isTrue, reason: '${r.name} object ${p.id} is tappable in Look mode');
       }
       for (final (mode, test) in <(String, bool Function(int))>[
         ('furniture', (id) => id >= idHFurn && id < idHFurn + 100),

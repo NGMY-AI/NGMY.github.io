@@ -665,6 +665,15 @@ class RoomProject {
 
   static String _appName(String a) => switch (a) { 'tv' => 'The TV', 'lamp' => 'The lamp', 'toaster' => 'The toaster', _ => 'The hair dryer' };
 
+  /// Is this one fixture finished: the device is in, wired right (the number is its place in [orders]: outlet, outlet, light or fan, switch).
+  bool orderOk(int i) {
+    if (i < 0 || i >= orders.length) return true;
+    final o = orders[i];
+    final d = devs[o.slot];
+    if (d == null || d.kind != o.device || d.w.stage < 2) return false;
+    return verdict(o.slot).ok;
+  }
+
   /// Does the wiring work: every device in and wired right? This is what makes the house lights and outlets live, even if the final test was never run.
   bool get wiringWorks {
     for (final o in orders) {

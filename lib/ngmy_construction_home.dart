@@ -297,10 +297,15 @@ class HRoom {
   }
 
   /// What works, fixture by fixture. In a lesson room only the thing being taught is pending.
-  bool get okLight => lesson.isEmpty ? wired : (lesson == 'fan' ? lessonDone : true);
-  bool get okSwitch => lesson.isEmpty ? wired : (lesson == 'switch' ? lessonDone : true);
-  bool get okOutA => lesson.isEmpty ? wired : ((lesson == 'outlet' || lesson == 'gfci') ? lessonDone : true);
-  bool get okOutB => lesson.isEmpty ? wired : true;
+  /// Each fixture is marked fixed on its own as soon as it is: only the ones still to do keep their red frame.
+  bool _fixture(int i) => !indoor || (wiring != null ? wiring!.orderOk(i) : !wiringNeeded);
+  bool get okLight => lesson.isEmpty ? _fixture(2) : (lesson == 'fan' ? lessonDone : true);
+  bool get okSwitch => lesson.isEmpty ? _fixture(3) : (lesson == 'switch' ? lessonDone : true);
+  bool get okOutA => lesson.isEmpty ? _fixture(0) : ((lesson == 'outlet' || lesson == 'gfci') ? lessonDone : true);
+  bool get okOutB => lesson.isEmpty ? _fixture(1) : true;
+
+  /// What is still to be done in this room, in words.
+  List<String> get missing => lesson.isNotEmpty || !indoor || wired ? const [] : [if (!okOutA) 'outlet 1', if (!okOutB) 'outlet 2', if (!okLight) (ceilingFix == 'fan' ? 'ceiling fan' : 'ceiling light'), if (!okSwitch) 'switch'];
 
   double get w => big ? 260 : switch (kind) { 'bathroom' => 110, 'kitchen' => 140, 'living' => 180, 'hall' => 480, 'outside' => 1800, _ => 130 };
   double get d => big ? 180 : switch (kind) { 'bathroom' => 100, 'kitchen' => 110, 'living' => 120, 'hall' => 180, 'outside' => 1400, _ => 112 };

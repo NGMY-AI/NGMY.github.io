@@ -351,6 +351,19 @@ class Cam3 extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Sets the view straight away (a drone flight moves it a little every frame).
+  void setView({required V3 target, required double dist, required double yaw, required double pitch}) {
+    _toTarget = null;
+    _toDist = null;
+    _toYaw = null;
+    _toPitch = null;
+    this.target = target;
+    this.dist = dist;
+    this.yaw = yaw;
+    this.pitch = pitch;
+    notifyListeners();
+  }
+
   bool get gliding => _toTarget != null || _toDist != null || _toYaw != null || _toPitch != null;
 
   void tick(double dt) {
