@@ -139,6 +139,9 @@ void paintNgmySign(Canvas c, Size s, double t, String line1, String line2) {
 /// How tall a downtown tower is (they differ by their colour).
 double _towerHeight(Color c) => 210.0 + (c.toARGB32() % 5) * 24.0;
 
+/// How tall a tower or the company building is, up to the top of its roof board.
+double towerHeightFor(Furn f) => f.kind == 'hq' ? 278.0 : _towerHeight(kFurnColors[f.color]);
+
 /// A framed NGMY poster for the outside walls of the house. [variant] 0 is the wide one for the back wall, 1 and 2 are for the sides.
 void paintNgmyPoster(Canvas c, Size s, double t, int variant) {
   final r = Offset.zero & s;
@@ -1576,6 +1579,33 @@ void _furniture(MeshBuilder b, String kind, Color c) {
       _patch(b, const V3(0, 24, 40.2), const V3(1, 0, 0), const V3(0, 1, 0), 112, 30, const Color(0xFF9BD3F5), const V3(0, 0, 1), shine: 0.6);
       b.box(const V3(0, 44, 46), const V3(130, 4, 14), const Color(0xFFDC2626));
       b.box(const V3(0, 76, 36), const V3(112, 22, 3), const Color(0xFF111827));
+      b.endGroup();
+    case 'dmv':
+      b.startGroup();
+      b.box(const V3(0, 28, 0), const V3(130, 56, 80), const Color(0xFFE2E8F0), shine: 0.2);
+      b.box(const V3(0, 58, 0), const V3(134, 4, 84), const Color(0xFF1E3A8A));
+      _patch(b, const V3(0, 24, 40.2), const V3(1, 0, 0), const V3(0, 1, 0), 112, 30, const Color(0xFF9BD3F5), const V3(0, 0, 1), shine: 0.6);
+      b.box(const V3(0, 44, 46), const V3(130, 4, 14), const Color(0xFF2563EB));
+      b.box(const V3(0, 76, 36), const V3(112, 22, 3), const Color(0xFF1E3A8A));
+      b.box(const V3(0, 76, 37.8), const V3(100, 14, 0.6), const Color(0xFFFACC15));
+      b.box(const V3(-28, 76, 38.3), const V3(14, 9, 0.5), const Color(0xFF1E3A8A));
+      b.endGroup();
+    case 'ubstation':
+      b.startGroup();
+      for (final x in const [-52.0, 52.0]) {
+        for (final z in const [-22.0, 22.0]) {
+          b.cyl(V3(x, 0, z), V3(x, 50, z), 2.2, const Color(0xFF334155), sides: 6);
+        }
+      }
+      b.box(const V3(0, 52, 0), const V3(124, 4, 60), const Color(0xFF111827), shine: 0.3);
+      b.box(const V3(0, 55, 0), const V3(126, 2, 62), const Color(0xFFFACC15));
+      b.box(const V3(0, 26, -24), const V3(112, 46, 2), const Color(0xFF93C5FD), shine: 0.6);
+      b.box(const V3(0, 11, -15), const V3(80, 4, 14), const Color(0xFF475569));
+      b.box(const V3(0, 6, -15), const V3(76, 8, 3), const Color(0xFF334155));
+      b.cyl(const V3(58, 0, 30), const V3(58, 92, 30), 2, const Color(0xFF3F3F46), sides: 6);
+      b.box(const V3(58, 96, 30), const V3(38, 20, 3), const Color(0xFF111827));
+      b.box(const V3(58, 96, 31.7), const V3(32, 6, 0.5), const Color(0xFFFACC15));
+      b.box(const V3(58, 104, 31.7), const V3(32, 3, 0.5), const Color(0xFFFFFFFF));
       b.endGroup();
     case 'gasstation':
       b.startGroup();

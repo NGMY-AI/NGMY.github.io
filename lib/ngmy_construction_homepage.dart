@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'ngmy_city_traffic.dart';
 import 'ngmy_city_delivery.dart';
+import 'ngmy_city_needs.dart';
+import 'ngmy_city_uber.dart';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -591,6 +593,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
                     btn(Icons.screen_rotation_rounded, () => setState(() => _fullTurns = _fullTurns == 1 ? 3 : 1)),
                     btn(_hideTags ? Icons.label_off_rounded : Icons.label_rounded, () => setState(() => _hideTags = !_hideTags)),
                     if (!room.indoor) btn(_droneOn ? Icons.stop_rounded : Icons.flight_rounded, () => _droneOn ? _stopDrone() : setState(() => _cardDrone = true)),
+                    if (_workReady) GestureDetector(onTap: _completeWork, child: Container(width: 40, height: 40, margin: const EdgeInsets.only(right: 8), decoration: BoxDecoration(color: const Color(0xFF16A34A), shape: BoxShape.circle, border: Border.all(color: Colors.white)), child: const Icon(Icons.task_alt_rounded, color: Colors.white, size: 22))),
                   ])),
               ]),
             ),
@@ -720,6 +723,241 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     conBeep(e.kind == 'pickup' ? 700 : 940, ms: 120);
     _say(e.text, ok: e.kind != 'expired');
     setState(_rebuild);
+  }
+
+  // ── The Uber licence and the Uber stations: drive people home and earn the fare ──
+
+  bool _cardLicence = false;
+  int _uberSayMs = 0;
+
+  /// The Uber board of the town (null in a lesson room).
+  UberBoard? get _uberMaybe {
+    final out = home.rooms.where((r) => !r.indoor);
+    if (out.isEmpty) return null;
+    final city = out.first;
+    return (city.uberBoard ??= UberBoard(city)) as UberBoard;
+  }
+
+  void _buyLicence() {
+    final cm = comm;
+    if (cm == null) return;
+    if (needs.uberLicence) {
+      _say('You already have your Uber licence.', ok: true);
+    } else if (cm.points < kUberLicencePrice) {
+      _say('The licence costs $kUberLicencePrice points. You have ${cm.points}. Earn more with jobs and deliveries.', ok: false);
+    } else {
+      cm.points -= kUberLicencePrice;
+      needs.uberLicence = true;
+      conBeep(880, ms: 140);
+      _say('You passed! Here is your Uber licence. Drive a car to an Uber station and the people waiting will get in.', ok: true);
+    }
+    setState(() {});
+    inner?.build(comm);
+  }
+
+  Widget _licenceCard() {
+    final cm = comm;
+    final has = needs.uberLicence;
+    return Container(
+      color: Colors.black.withValues(alpha: 0.55),
+      alignment: Alignment.center,
+      child: Container(
+        width: 330,
+        margin: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1F2937), Color(0xFF0B1220)]), borderRadius: BorderRadius.circular(28), border: Border.all(color: Colors.white24)),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            const Text('🪪', style: TextStyle(fontSize: 30)),
+            const SizedBox(width: 10),
+            const Expanded(child: Text('Uber licence', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900))),
+            GestureDetector(onTap: () => setState(() => _cardLicence = false), child: const Icon(Icons.close_rounded, color: Colors.white54)),
+          ]),
+          const SizedBox(height: 10),
+          Text(has ? 'You are a licensed Uber driver. Drive a car to an Uber station (the yellow and black shelter): the people waiting get in, and you take them to their house. The fare is paid when you get there.' : 'With the Uber licence you can take the people waiting at the Uber stations home and be paid for every ride. The car needs gas, so watch the gas bar.', style: const TextStyle(color: Colors.white70, fontSize: 13.5, height: 1.35)),
+          const SizedBox(height: 10),
+          Text('You have ${cm?.points ?? 0} ⭐', style: const TextStyle(color: Color(0xFFFACC15), fontWeight: FontWeight.w800)),
+          const SizedBox(height: 10),
+          GestureDetector(
+            onTap: has ? () => setState(() => _cardLicence = false) : _buyLicence,
+            child: Container(
+              height: 50,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: has ? const Color(0xFF22C55E) : ((cm?.points ?? 0) >= kUberLicencePrice ? const Color(0xFFFACC15) : Colors.white12), borderRadius: BorderRadius.circular(16)),
+              child: Text(has ? '✓ Licensed' : 'Get the licence · $kUberLicencePrice ⭐', style: TextStyle(color: has || (cm?.points ?? 0) >= kUberLicencePrice ? Colors.black : Colors.white38, fontWeight: FontWeight.w900, fontSize: 16)),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  /// While you drive: a person at the station gets in, and at their house they get out and pay.
+  void _uberTick(WorldWalker w) {
+    final u = _uberMaybe;
+    if (u == null || u.stations.isEmpty) return;
+    final fare = u.drop(w.x, w.z, now);
+    if (fare > 0) {
+      comm?.points += fare;
+      conBeep(940, ms: 140);
+      _say('🚖 You dropped the passenger at the house. Fare: +$fare points. Thank you!', ok: true);
+      setState(_rebuild);
+      return;
+    }
+    if (u.active == null && u.stationNear(w.x, w.z) != null && u.waiting.any((p) => p.station == u.stationNear(w.x, w.z))) {
+      if (!needs.uberLicence) {
+        if (DateTime.now().millisecondsSinceEpoch - _uberSayMs > 20000) {
+          _uberSayMs = DateTime.now().millisecondsSinceEpoch;
+          _say('People are waiting for a ride, but you need an Uber licence first. Get it at the licence office.', ok: false);
+        }
+        return;
+      }
+      if (needs.outOfGas) return;
+      final p = u.pickUp(w.x, w.z);
+      if (p != null) {
+        conBeep(700, ms: 100);
+        _say('🚖 ${p.name} got in. Take them to their house (follow the yellow line): ${p.fare} points.', ok: true);
+        setState(_rebuild);
+      }
+    }
+  }
+
+  /// The Uber chip: where to get the licence, where the stations are, and who is in the car.
+  void _uberChip() {
+    final u = _uberMaybe;
+    if (u == null) return;
+    final p = u.active;
+    if (p != null) {
+      _say('🚖 ${p.name} is in the car and wants to go home: ${p.fare} points. Follow the yellow line to the house.', ok: true);
+      return;
+    }
+    if (!needs.uberLicence) {
+      final dmv = [for (final f in room.furn) if (f.kind == 'dmv') f];
+      if (dmv.isEmpty) {
+        _say('There is no licence office in this town yet.', ok: false);
+        return;
+      }
+      _teleportTo(dmv.first);
+      _say('You are at the licence office. Walk in through the door and onto the blue mat to get your Uber licence.', ok: true);
+      return;
+    }
+    if (u.stations.isEmpty) {
+      _say('There is no Uber station in this town yet.', ok: false);
+      return;
+    }
+    final w = walker;
+    final st = [...u.stations]..sort((a, b) => ((a.x - (w?.x ?? 0)) * (a.x - (w?.x ?? 0)) + (a.z - (w?.z ?? 0)) * (a.z - (w?.z ?? 0))).compareTo((b.x - (w?.x ?? 0)) * (b.x - (w?.x ?? 0)) + (b.z - (w?.z ?? 0)) * (b.z - (w?.z ?? 0))));
+    _teleportTo(st.first);
+    _say('You are at an Uber station. Get in the car parked next to it and drive up to the people waiting. They get in by themselves.', ok: true);
+  }
+
+  // ── Buying: food for energy, gas for the car, goods for the town, all paid for with points ──
+
+  bool _cardShop = false;
+
+  /// Buy [it] with points: food gives energy back, gas fills the tank, the town items go into the stores.
+  void _buyItem(ShopItem it) {
+    final cm = comm;
+    if (cm == null) return;
+    String say;
+    var ok = true;
+    if (it.id == 'bread' || it.id == 'medicine') {
+      say = cm.buy(it.id == 'bread' ? 'food' : 'medicine');
+      ok = !say.startsWith('You need');
+    } else if (it.fuel > 0) {
+      final price = it.id == 'tank' ? fillPrice(needs.fuel) : it.price;
+      if (needs.fuel >= 0.99) {
+        say = 'The tank is already full.';
+        ok = false;
+      } else if (cm.points < price) {
+        say = 'You need $price points for that. Earn more with jobs and deliveries.';
+        ok = false;
+      } else {
+        cm.points -= price;
+        needs.fill(it.fuel);
+        say = it.id == 'tank' ? 'You filled the tank for $price points.' : 'You put gas in the car. -$price points.';
+      }
+    } else if (needs.energy >= 0.98 && !needs.resting) {
+      say = 'You are not hungry: your energy is full.';
+      ok = false;
+    } else if (cm.points < it.price) {
+      say = 'You need ${it.price} points for the ${it.name.toLowerCase()}.';
+      ok = false;
+    } else {
+      cm.points -= it.price;
+      needs.eat(it.energy);
+      say = 'You ate the ${it.name.toLowerCase()}. ${needs.resting ? 'Still resting.' : 'You feel stronger.'}';
+    }
+    conBeep(ok ? 880 : 300, ms: 90);
+    _say(say, ok: ok);
+    inner?.build(comm);
+    setState(_rebuild);
+  }
+
+  Widget _shopCard() {
+    final cm = comm;
+    final gas = inner?.isGasShop ?? false;
+    Widget row(ShopItem it) {
+      final price = it.id == 'tank' ? fillPrice(needs.fuel) : it.price;
+      final can = (cm?.points ?? 0) >= price;
+      return Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white12)),
+        child: Row(children: [
+          Text(it.emoji, style: const TextStyle(fontSize: 26)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(it.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
+              Text(it.note, style: const TextStyle(color: Colors.white54, fontSize: 11.5)),
+            ]),
+          ),
+          GestureDetector(
+            onTap: () => _buyItem(it),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              decoration: BoxDecoration(color: can ? const Color(0xFFFACC15) : Colors.white12, borderRadius: BorderRadius.circular(14)),
+              child: Text('$price ⭐', style: TextStyle(color: can ? Colors.black : Colors.white38, fontWeight: FontWeight.w900)),
+            ),
+          ),
+        ]),
+      );
+    }
+
+    Widget head(String t) => Padding(padding: const EdgeInsets.only(top: 4, bottom: 8), child: Text(t, style: const TextStyle(color: Colors.white54, fontSize: 11.5, fontWeight: FontWeight.w900, letterSpacing: 1.2)));
+    return Container(
+      color: Colors.black.withValues(alpha: 0.55),
+      alignment: Alignment.center,
+      child: SingleChildScrollView(
+        child: Container(
+          width: 340,
+          margin: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1F2937), Color(0xFF0B1220)]), borderRadius: BorderRadius.circular(28), border: Border.all(color: Colors.white24)),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              Text(gas ? '⛽' : '🛒', style: const TextStyle(fontSize: 28)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(gas ? 'NGMY Gas shop' : 'NGMY Mart', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+                  Text('You have ${cm?.points ?? 0} ⭐', style: const TextStyle(color: Color(0xFFFACC15), fontSize: 13, fontWeight: FontWeight.w800)),
+                ]),
+              ),
+              GestureDetector(onTap: () => setState(() => _cardShop = false), child: const Icon(Icons.close_rounded, color: Colors.white54)),
+            ]),
+            const SizedBox(height: 10),
+            NeedsBars(needs: needs, driving: gas, height: 14),
+            const SizedBox(height: 8),
+            if (gas) ...[head('GAS'), for (final it in kShopGas) row(it)],
+            head('FOOD AND DRINKS (energy)'),
+            for (final it in kShopFood) row(it),
+            if (!gas) ...[head('FOR THE TOWN'), for (final it in kShopTown) row(it)],
+          ]),
+        ),
+      ),
+    );
   }
 
   Widget _ordersCard() {
@@ -1253,6 +1491,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
             const Text('What should the drone show you?', style: TextStyle(color: Colors.white60, fontSize: 13)),
             opt('🌆', 'The whole city', 'High flights over every street', 'city'),
             opt('🪧', 'Billboards and NGMY logos', 'Close to every ad, and the big logo board', 'billboards'),
+            opt('🏁', 'Edge billboards only', 'A tour round the big boards at the edges of the city', 'edges'),
             opt('🏠', 'Houses', 'Fly by the houses, then go inside a big one', 'houses'),
             opt('🏥', 'Hospital, shop and school', 'Fly in and look round inside each', 'hospital'),
             opt('🚌', 'Traffic', 'Follow the self-driving buses and police cars', 'traffic'),
@@ -1271,6 +1510,44 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   List<bool> _fixturesOf(RoomProject p) => [for (var i = 0; i < 4; i++) p.orderOk(i)];
 
+  /// The key of the wiring job of the building the person is in (a house, or one level of an office tower).
+  int? get _workKey {
+    final inn = inner;
+    if (inn == null || !inn.dark) return null;
+    return inn.isTower ? inn.door.id * 100 + inn.level : inn.door.id;
+  }
+
+  /// Is the wiring of the dark house or office you are in all connected? Then the Complete work button shows.
+  bool get _workReady {
+    final k = _workKey;
+    final p = k == null ? null : _houseProjects[k];
+    return p != null && (p.wiringWorks || _fixturesOf(p).every((o) => o));
+  }
+
+  /// The Complete work button: check the wiring, bring the power back, pay the points.
+  void _completeWork() {
+    final inn = inner, k = _workKey;
+    final p = k == null ? null : _houseProjects[k];
+    if (inn == null || k == null || p == null) return;
+    if (!p.wiringWorks) {
+      _say('Not quite done: the wiring is not right yet. Open the wiring bench again (tap the panel) and check every wire.', ok: false);
+      return;
+    }
+    final f = inn.door;
+    _houseProjects.remove(k);
+    if (inn.isTower) {
+      room.darkOffices.remove(f.id);
+    } else {
+      room.darkHouses.remove(f.id);
+    }
+    inn.dark = false;
+    comm?.points += 20;
+    inn.build(comm);
+    setState(_rebuild);
+    conBeep(880, ms: 120, volume: 0.3);
+    _say(inn.isTower ? 'Work complete! The power is back on level ${inn.level}. +20 points.' : 'Work complete! The power is back in the house. +20 points.', ok: true);
+  }
+
   Future<void> _houseJob(CityInterior inn) async {
     final f = inn.door;
     final key = inn.isTower ? f.id * 100 + inn.level : f.id;
@@ -1278,18 +1555,10 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     await _pushPage(MaterialPageRoute<void>(builder: (_) => NgmyRoomProjectPage(project: p)));
     if (!mounted) return;
     inn.fixtures = _fixturesOf(p);
-    if (p.wiringWorks) {
-      _houseProjects.remove(key);
-      if (inn.isTower) {
-        room.darkOffices.remove(f.id);
-      } else {
-        room.darkHouses.remove(f.id);
-      }
-      inn.dark = false;
-      comm?.points += 20;
+    if (_workReady) {
       inn.build(comm);
       setState(_rebuild);
-      _say(inn.isTower ? 'The power is back on level ${inn.level}: you fixed the wiring the right way. +20 points.' : 'The power is back in the house: you fixed the wiring the right way. +20 points.', ok: true);
+      _say('Everything is connected. Press the green Complete work button to hand the job in.', ok: true);
     } else {
       inn.build(comm);
       setState(_rebuild);
@@ -1376,8 +1645,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   /// The GPS: a line of yellow dashes on the ground from the person to the job, and a tall yellow beam over the place.
   List<Poly> _routePolys() {
-    final w = walker, s = _boardMaybe?.target ?? _jobSpot();
-    if ((_job == null && _boardMaybe?.active == null) || w == null || s == null || room.indoor || inner != null) return const [];
+    final w = walker, s = _uberMaybe?.target ?? _boardMaybe?.target ?? _jobSpot();
+    if ((_job == null && _boardMaybe?.active == null && _uberMaybe?.active == null) || w == null || s == null || room.indoor || inner != null) return const [];
     final b = MeshBuilder()
       ..grouped = false
       ..order = 1;
@@ -2025,6 +2294,10 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   CityInterior? inner;
   bool _run = false;
   Furn? _driving;
+  int _tiredSayMs = 0;
+
+  /// Energy and gas of the person in the city.
+  final CityNeeds needs = CityNeeds.session;
   ({String label, VoidCallback go})? _act;
   final Map<int, double> _fedAt = {};
 
@@ -2087,13 +2360,23 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     final sy = math.sin(cam.yaw), cy = math.cos(cam.yaw);
     final dx = sy * _inZ + cy * _inX, dz = -cy * _inZ + sy * _inX;
     var moved = false;
-    if (_inX != 0 || _inZ != 0) {
+    // Worn out (or no gas): the person cannot move until the rest is over, or they eat (or fill up).
+    final stuck = _driving == null ? needs.resting : needs.outOfGas;
+    if (stuck) {
+      if ((_inX != 0 || _inZ != 0 || w.target != null) && nowMs - _tiredSayMs > 6000) {
+        _tiredSayMs = nowMs;
+        _say(_driving == null ? 'You are too tired to walk. Rest a little, or buy some food in a shop.' : 'The car has no gas. Get out, walk to a gas station and buy gas.', ok: false);
+      }
+      w.target = null;
+    } else if (_inX != 0 || _inZ != 0) {
       w.target = null;
       moved = w.step(dx, dz, dt);
     } else {
       moved = w.advance(dt);
     }
     if (!moved) w.walking = false;
+    final tiredMsg = needs.tick(dt, walking: moved && _driving == null, driving: moved && _driving != null);
+    if (tiredMsg != null) _say(tiredMsg, ok: false);
     if (moved || w.lift > 0) cam.glideTo(target: V3(w.x, 30, w.z));
     if (inn != null) {
       inn.carrying = _carrying;
@@ -2106,6 +2389,14 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       if (inn.jobRequested) {
         inn.jobRequested = false;
         _houseJob(inn);
+      }
+      if (inn.licenceRequested) {
+        inn.licenceRequested = false;
+        if (!_cardLicence) setState(() => _cardLicence = true);
+      }
+      if (inn.shopRequested) {
+        inn.shopRequested = false;
+        if (!_cardShop) setState(() => _cardShop = true);
       }
       if (inn.elevatorRequested) {
         inn.elevatorRequested = false;
@@ -2124,6 +2415,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       return;
     }
     if (inn == null && _driving == null && _boardMaybe?.active != null) _deliveryEvent(_boardMaybe!.updatePlayer(w.x, w.z, now));
+    if (inn == null && _driving != null) _uberTick(w);
     if (moved && _driving == null) {
       if (w.atDoor && (w.yaw.abs() > 2.2 || w.target != null && w.target!.$2 < 4)) {
         // Walked up to the front door facing the house: in they go.
@@ -2169,6 +2461,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     setState(_rebuild);
     _say(switch (inn.kind) {
       'hospital' => 'The hospital. Walk onto the blue mat to admit the sick, and up to a bed to treat the patient. Walk to the green mat to go out.',
+      'dmv' => 'The licence office. Walk onto the blue mat at the desk to get your Uber licence. Walk to the green mat to go out.',
       'tower' => 'The lobby of an office tower. Walk onto the blue mat (or tap the elevator) to choose a level. Walk to the green mat to go out.',
       'house2' || 'bighouse' => 'The house. Walk onto the red or green mat at the breaker panel. Walk to the green mat to go out.',
       'school' => 'The school. Walk onto the mats to teach the class or read in the library. Walk to the green mat to go out.',
@@ -2205,7 +2498,11 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   void _updateAct(WorldWalker w) {
     ({String label, VoidCallback go})? act;
     final drv = _driving;
-    if (drv != null) {
+    // Close to a gas station with a thirsty tank: buy gas right here.
+    final pump = (drv != null || _carrying == null) && needs.fuel < (drv != null ? 0.7 : 0.99) && room.furn.any((f) => f.kind == 'gasstation' && math.sqrt(math.pow(w.x - f.x, 2) + math.pow(w.z - f.z, 2)) < 135);
+    if (pump) {
+      act = (label: '⛽ Buy gas (${fillPrice(needs.fuel)} ⭐)', go: () => _buyItem(kShopGas[1]));
+    } else if (drv != null) {
       act = (label: '🚪 Get out', go: _getOut);
     } else {
       if (_carrying != null) {
@@ -2552,6 +2849,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (cm == null || !mounted) return;
     if (tour == null) cm.advance(1, home);
     if (++_beat % 8 == 0) cm.save(home);
+    if (!steer && needs.resting) needs.tick(1);
     if (_locked || _pages > 0) return;
     if (_beat % 45 == 20 && !isLesson) _neighbourEvents();
     // In the city the phone rings at least once a minute with a job, so there is always somebody who needs you.
@@ -2755,6 +3053,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
                   if (_driving == null) btn(_run ? '🏃 Run: on' : '🏃 Run', () => setState(() => _run = !_run), on: _run),
                   if (_driving == null) btn('⬆ Jump', () => (inner?.walker ?? walker)?.jump(), col: const Color(0xFF60A5FA)),
                 ]),
+                // The energy (and the gas in a car) as a long battery as wide as the two buttons together.
+                Padding(padding: const EdgeInsets.only(left: 4, top: 6), child: SizedBox(width: _driving == null ? 206 : 140, child: NeedsBars(needs: needs, driving: _driving != null, height: 12))),
               ]),
             ]),
           ),
@@ -3132,6 +3432,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   /// The buttons of the city (the garden): walking round it with the controls, building, and its hospital, shop, calls and people.
   List<Widget> _cityChips() => [
+        if (_workReady) _chip('✅ Complete work', true, _completeWork, color: const Color(0xFF22C55E)),
         _chip(steer ? '⏹ Stop walking' : '🚶 Walk the city', steer, steer ? _stopSteer : _startSteer, color: const Color(0xFF4ADE80)),
         _chip('🏗 Build', false, _addSheet, color: const Color(0xFF4ADE80)),
         _chip('📞 Calls', false, () => _citySheet('calls'), color: const Color(0xFFF472B6), dot: (comm?.calls.length ?? 0) > 0),
@@ -3139,12 +3440,14 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         _chip('🛒 Shop', false, () => _citySheet('shop'), color: const Color(0xFFFB923C)),
         _chip('👨‍👩‍👧 People', false, () => _citySheet('people'), color: const Color(0xFF60A5FA)),
         _chip('🏠 Go inside', false, () => _go(10), color: const Color(0xFF4ADE80)),
+        if (inner?.isShop == true) _chip('🛒 Buy things', _cardShop, () => setState(() => _cardShop = true), color: const Color(0xFFFACC15)),
         if (inner?.isTower == true) _chip('🏢 Level ${inner!.level} of ${inner!.levels}', false, () => setState(() => _cardElevator = true), color: const Color(0xFF60A5FA)),
         if (_job != null) _chip('📋 My job${_jobMeters() == null ? '' : ' · ${_jobMeters()} m'}', false, () => setState(() => _cardCall = _job), color: const Color(0xFFFACC15)),
         if (_waiting.isNotEmpty) _chip('⏳ Waiting: ${_waiting.length}', false, () => _say('${_waiting.length} job${_waiting.length == 1 ? '' : 's'} waiting. You are taken to the next one when you finish this one.', ok: true), color: const Color(0xFFF59E0B)),
         _chip('🛵 Orders', _board.active != null, () => setState(() => _cardOrders = true), color: const Color(0xFFFACC15), dot: _board.active == null),
         _chip(_droneOn ? '⏹ Stop drone' : '🚁 Drone', _droneOn, () => _droneOn ? _stopDrone() : setState(() => _cardDrone = true), color: const Color(0xFF38BDF8)),
         _chip(_hideTags ? '🏷 Show tags' : '🏷 Hide tags', _hideTags, () => setState(() => _hideTags = !_hideTags), color: const Color(0xFFF87171)),
+        _chip('🚖 Uber', _uberMaybe?.active != null, _uberChip, color: const Color(0xFFFACC15)),
         _chip('🗺 Map', showMap, () => setState(() => showMap = !showMap), color: const Color(0xFFA78BFA)),
       ];
 
@@ -3175,19 +3478,19 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         good: good,
         messageTop: full ? 62 : ((showMap && !isLesson) ? 104 : 10),
         layerOn: (l) => l <= 5,
-        dynamicPolys: (_) => inner != null ? inner!.dynamicPolys(now, playerStyle) : [...homeDynamic(room, now, person: _pose(), personStyle: playerStyle, residents: _figs, mode: mode, drive: _driveNow(), carrying: _carrying != null || (_boardMaybe?.carrying ?? false), couriers: room.indoor ? const [] : (_boardMaybe?.figures(now) ?? const [])), if (!room.indoor) ...trafficPolys(now), ...((_job != null || _boardMaybe?.active != null) ? _routePolys() : const <Poly>[])],
+        dynamicPolys: (_) => inner != null ? inner!.dynamicPolys(now, playerStyle) : [...homeDynamic(room, now, person: _pose(), personStyle: playerStyle, residents: _figs, mode: mode, drive: _driveNow(), carrying: _carrying != null || (_boardMaybe?.carrying ?? false), couriers: room.indoor ? const [] : [...(_boardMaybe?.figures(now) ?? const <CourierFigure>[]), ...(_uberMaybe?.figures(now) ?? const <CourierFigure>[])]), if (!room.indoor) ...trafficPolys(now), ...((_job != null || _boardMaybe?.active != null || _uberMaybe?.active != null) ? _routePolys() : const <Poly>[])],
         dynamicScreens: (_) => (inner == null && !room.indoor) ? trafficScreens(now) : const [],
         bottom: _pad(),
         topLeft: [
           if (showMap && !isLesson && !full) _MiniMap(home: home, onTap: _go, maxWidth: math.min(138.0, screenW * 0.36)),
         ],
       );
-    final anyCard = _cardCall != null || _cardOffice || _cardDrone || _cardElevator || _cardOrders;
+    final anyCard = _cardCall != null || _cardOffice || _cardDrone || _cardElevator || _cardOrders || _cardShop || _cardLicence;
     final carDisplay = _ride?.stage == 1;
     final stage = (anyCard || carDisplay)
         ? Stack(fit: StackFit.expand, children: [
             stage3d,
-            if (anyCard) Positioned.fill(child: _cardOrders ? _ordersCard() : (_cardElevator ? _elevatorCard() : (_cardDrone ? _droneCard() : _cardOverlay()))),
+            if (anyCard) Positioned.fill(child: _cardLicence ? _licenceCard() : _cardShop ? _shopCard() : _cardOrders ? _ordersCard() : (_cardElevator ? _elevatorCard() : (_cardDrone ? _droneCard() : _cardOverlay()))),
             if (carDisplay)
               Positioned(
                 top: 74,
@@ -3214,6 +3517,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       color: kConAmber,
       stepText: isLesson ? (r.lessonDone ? 'Done ✓' : 'To do') : '${home.finishedCount}/${home.indoor.length} done',
       onSteps: () => isLesson ? _openLesson() : _problems(context),
+      titleExtra: room.indoor ? null : NeedsBars(needs: needs, driving: _driving != null, height: 12),
       stage: stage,
       panel: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         _row(!room.indoor ? _cityChips() : [
@@ -3531,14 +3835,44 @@ List<DroneLeg> buildDroneLegs(HRoom city, String what) {
 
   /// Fly past the face of something slowly: come down in front of it, then swing round its side in an arc, always looking at it and
   /// never nearer than [near]. It takes about three seconds.
+  bool insideSign(V3 p) {
+    for (final f in city.furn) {
+      if (f.kind != 'billboard' && f.kind != 'cornersign' && f.kind != 'townsign' && f.kind != 'adboard') continue;
+      final (hx, hz, hy) = switch (f.kind) { 'townsign' => (215.0, 40.0, 345.0), 'cornersign' => (95.0, 40.0, 185.0), 'adboard' => (180.0, 40.0, 215.0), _ => (60.0, 60.0, 90.0) };
+      final turned = f.rot.isOdd;
+      if ((p.x - f.x).abs() < (turned ? hz : hx) && (p.z - f.z).abs() < (turned ? hx : hz) && p.y < hy) return true;
+    }
+    return false;
+  }
+
   void pass(Furn f, double height, double look, double near, double far, double lift, {String? note}) {
     final (fx, fz) = droneFacing(f);
     final c = V3(f.x, look, f.z);
     final base = math.atan2(fx, fz);
+    String? pending;
     for (var i = 0; i < 6; i++) {
       final a = base - 0.55 + i * 0.38;
       final r = near + (far - near) * i / 5;
-      pt(V3(f.x + math.sin(a) * r, height + lift * i / 5 + (i == 0 ? 40 : 0), f.z + math.cos(a) * r), c, note: i == 0 ? note : null);
+      final at = V3(f.x + math.sin(a) * r, height + lift * i / 5 + (i == 0 ? 40 : 0), f.z + math.cos(a) * r);
+      // A point that would sit inside another sign (boards stand close together at the edges) is left out.
+      if (insideSign(at)) {
+        if (i == 0) pending = note;
+        continue;
+      }
+      if (eyes.isNotEmpty && i > 0) {
+        final prev = eyes.last;
+        var cuts = false;
+        for (var s = 0.0; s <= 1.0 && !cuts; s += 0.02) {
+          cuts = insideSign(V3.lerp(prev, at, s));
+        }
+        // The straight line to the next point would cut through a board (they stand close together): climb over it.
+        if (cuts) {
+          pt(V3(prev.x, 420, prev.z), looks.last);
+          pt(V3(at.x, 420, at.z), c);
+        }
+      }
+      pt(at, c, note: i == 0 ? note : pending);
+      pending = null;
     }
   }
 
@@ -3550,7 +3884,8 @@ List<DroneLeg> buildDroneLegs(HRoom city, String what) {
       for (final f in city.furn) {
         if (f.kind != 'billboard' && f.kind != 'cornersign' && f.kind != 'townsign' && f.kind != 'adboard') continue;
         final (hx, hz, hy) = switch (f.kind) { 'townsign' => (215.0, 40.0, 345.0), 'cornersign' => (95.0, 40.0, 185.0), 'adboard' => (180.0, 40.0, 215.0), _ => (60.0, 60.0, 90.0) };
-        if ((p.x - f.x).abs() < hx && (p.z - f.z).abs() < hz && p.y < hy) return true;
+        final turned = f.rot.isOdd;
+        if ((p.x - f.x).abs() < (turned ? hz : hx) && (p.z - f.z).abs() < (turned ? hx : hz) && p.y < hy) return true;
       }
     }
     return false;
@@ -3564,6 +3899,10 @@ List<DroneLeg> buildDroneLegs(HRoom city, String what) {
         pass(f, 115, 120, 210, 260, 50, note: 'A corner billboard: NGMY Town');
       case 'adboard':
         pass(f, 160, 142, 330, 410, 55, note: 'A big NGMY ad billboard');
+      case 'tower':
+        pass(f, 430, towerHeightFor(f) + 40, 150, 210, 20, note: 'A tower with NGMY ad boards');
+      case 'hq':
+        pass(f, 440, 312, 190, 250, 20, note: 'The NGMY company building');
       default:
         pass(f, 75, 48, 130, 175, 45, note: 'An NGMY billboard');
     }
@@ -3589,13 +3928,15 @@ List<DroneLeg> buildDroneLegs(HRoom city, String what) {
     startsInside = true;
   }
 
-  final all = !const ['city', 'billboards', 'houses', 'hospital', 'traffic'].contains(what);
-  final boards = [for (final f in city.furn) if (f.kind == 'billboard' || f.kind == 'cornersign' || f.kind == 'adboard') f];
+  final all = !const ['city', 'billboards', 'edges', 'houses', 'hospital', 'traffic'].contains(what);
+  // Every billboard in the town: the street ones, the corner ones, the big ones at the edges, and the towers with their boards.
+  final boards = [for (final f in city.furn) if (f.kind == 'billboard' || f.kind == 'cornersign' || f.kind == 'adboard' || f.kind == 'tower' || f.kind == 'hq') f];
   final towns = city.furn.where((f) => f.kind == 'townsign');
   final houses = [for (final f in city.furn) if (f.kind == 'house2' || f.kind == 'bighouse') f];
 
-  // It always starts high over the city and comes down.
-  pt(const V3(0, 950, 1750), const V3(0, 0, 700), note: 'The whole city from high up');
+  // The film always starts at the big sign that welcomes everybody to NGMY Town: from high up, down and round it.
+  pt(const V3(0, 900, 1600), const V3(0, 250, 640), note: 'Welcome to NGMY Town');
+  if (towns.isNotEmpty) passSign(towns.first);
   if (what == 'city' || all) {
     pt(const V3(-700, 430, 1150), const V3(-200, 0, 900));
     pt(const V3(-720, 360, 320), const V3(-200, 0, 500));
@@ -3615,14 +3956,11 @@ List<DroneLeg> buildDroneLegs(HRoom city, String what) {
     pt(const V3(-120, 300, -320), const V3(0, 250, -118));
     pt(const V3(-260, 330, -80), const V3(0, 250, -118));
     pt(const V3(-100, 400, 350), const V3(-200, 100, 480));
-    for (final f in towns) {
-      passSign(f);
-    }
     // Then every billboard, always the nearest one next, so the drone goes round the city without crossing it.
     var from = towns.isEmpty ? const V3(0, 0, 640) : V3(towns.first.x, 0, towns.first.z);
     final left = List<Furn>.of(boards);
     var shown = 0;
-    while (left.isNotEmpty && shown < (all ? 8 : 40)) {
+    while (left.isNotEmpty && shown < (all ? 8 : 80)) {
       left.sort((a, b) => (math.pow(a.x - from.x, 2) + math.pow(a.z - from.z, 2)).compareTo(math.pow(b.x - from.x, 2) + math.pow(b.z - from.z, 2)));
       final f = left.removeAt(0);
       passSign(f);
@@ -3633,6 +3971,20 @@ List<DroneLeg> buildDroneLegs(HRoom city, String what) {
     for (var i = 0; i < kHelis.length; i++) {
       legs.add(DroneLeg(const [], const [], heli: i, secs: 10, note: 'A helicopter with its billboard'));
     }
+  }
+  if (what == 'edges') {
+    // Only the big boards at the edges of the town, all the way round (clockwise), with a high sweep between them.
+    final edge = [for (final f in city.furn) if (f.kind == 'adboard' || f.kind == 'cornersign') f];
+    double ang(Furn f) => math.atan2(f.z - 1000, f.x);
+    edge.sort((a, b) => ang(a).compareTo(ang(b)));
+    for (final f in edge) {
+      if (eyes.length > 1) {
+        final last = eyes.last;
+        pt(V3((last.x + f.x) / 2, 430, (last.z + f.z) / 2), V3(f.x, 100, f.z));
+      }
+      passSign(f);
+    }
+    flush(speed: 150);
   }
   if (what == 'houses' || all) {
     for (var i = 0; i < houses.length && i < (all ? 2 : 5); i++) {

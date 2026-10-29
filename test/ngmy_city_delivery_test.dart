@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_city_delivery.dart';
+import 'package:ngmy/ngmy_construction_cityin.dart';
 import 'package:ngmy/ngmy_construction_home.dart';
 
 void main() {
@@ -101,5 +102,27 @@ void main() {
     expect(bonus, isTrue);
     expect(b.round, 2);
     expect(b.roundDeliveries, 0);
+  });
+
+  test('the couriers walk round the buildings (never through a wall) and go in and out of the doors', () {
+    final city = HomeProject(seed: 4).rooms[11];
+    final b = DeliveryBoard(city);
+    final blocks = [for (final f in city.furn) if (kEnterable.contains(f.kind) || f.kind == 'tower' || f.kind == 'hq') f];
+    var sawInside = false, seen = 0;
+    for (var t = 0.0; t < 420; t += 0.25) {
+      b.advance(t);
+      if (b.couriers.any((c) => c.inside)) sawInside = true;
+      for (final c in b.figures(t)) {
+        seen++;
+        for (final f in blocks) {
+          final k = kFurnKinds[f.kind]!;
+          final fw = f.rot.isOdd ? k.d : k.w, fd = f.rot.isOdd ? k.w : k.d;
+          final inWall = (c.x - f.x).abs() < fw / 2 - 5 && (c.z - f.z).abs() < fd / 2 - 5;
+          expect(inWall, isFalse, reason: '${c.name} is inside the ${f.kind} at (${f.x}, ${f.z}) at t=$t: (${c.x.round()}, ${c.z.round()})');
+        }
+      }
+    }
+    expect(seen, greaterThan(100));
+    expect(sawInside, isTrue, reason: 'a courier goes in through a door and is out of sight for a moment');
   });
 }

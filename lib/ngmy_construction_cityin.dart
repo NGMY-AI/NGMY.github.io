@@ -47,7 +47,7 @@ class _Zone {
 }
 
 /// The buildings you can walk into.
-const Set<String> kEnterable = {'hospital', 'shop', 'school', 'firestation', 'house2', 'bighouse', 'store', 'gasstation', 'tower', 'hq'};
+const Set<String> kEnterable = {'hospital', 'shop', 'school', 'firestation', 'house2', 'bighouse', 'store', 'gasstation', 'dmv', 'tower', 'hq'};
 
 /// The inside a building has: an NGMY store or gas station is a shop inside.
 String interiorKindOf(String kind) => (kind == 'store' || kind == 'gasstation') ? 'shop' : (kind == 'hq' ? 'tower' : kind);
@@ -121,6 +121,12 @@ class CityInterior {
   /// They walked onto the panel of a house with no power: the page opens the wiring job.
   bool jobRequested = false;
 
+  /// They walked up to a shelf or the counter of a shop: the page opens the shopping list.
+  bool shopRequested = false;
+
+  /// They walked up to the licence desk: the page opens the licence card.
+  bool licenceRequested = false;
+
   /// How many points the last sale or task gave (for the page's message).
   int earned = 0;
 
@@ -130,7 +136,8 @@ class CityInterior {
 
   List<NavRect> _obstacles() => switch (kind) {
         'hospital' => const [NavRect(-134, -36, 16, 44), NavRect(34, 118, 30, 66), NavRect(34, 118, 80, 116), NavRect(34, 118, 130, 166), NavRect(-134, -76, 140, 160)],
-        'shop' => const [NavRect(-60, 60, 28, 50), NavRect(-134, -80, 70, 170), NavRect(80, 134, 70, 170)],
+        'dmv' => const [NavRect(-70, 70, 28, 52), NavRect(-134, -96, 100, 170), NavRect(96, 134, 100, 170)],
+      'shop' => const [NavRect(-60, 60, 28, 50), NavRect(-150, -100, 70, 170), NavRect(100, 150, 70, 170), NavRect(-60, -20, 156, 186), NavRect(20, 60, 156, 186)],
         'school' => const [NavRect(-70, 70, 20, 44), NavRect(-110, -50, 80, 100), NavRect(50, 110, 80, 100), NavRect(-110, -50, 130, 150), NavRect(50, 110, 130, 150)],
         'firestation' => const [NavRect(-100, 100, 24, 90), NavRect(-134, -110, 100, 190), NavRect(110, 134, 100, 190)],
         'tower' => const [NavRect(-62, 62, 6, 46), NavRect(-117, -73, 149, 171), NavRect(-57, -13, 164, 186), NavRect(73, 117, 159, 181), NavRect(120, 144, 140, 160), NavRect(108, 142, 48, 60)],
@@ -139,6 +146,7 @@ class CityInterior {
 
   List<_Zone> _zonesOf() => switch (kind) {
         'hospital' => const [_Zone(0, -80, 66, 24), _Zone(1, 20, 48, 20), _Zone(2, 20, 98, 20), _Zone(3, 20, 148, 20)],
+        'dmv' => const [_Zone(0, 0, 78, 26)],
         'shop' => const [_Zone(0, -64, 120, 26), _Zone(1, 64, 120, 26), _Zone(2, 0, 84, 24)],
         'school' => const [_Zone(0, 0, 80, 26), _Zone(1, 90, 56, 22)],
         'firestation' => const [_Zone(0, -60, 130, 26), _Zone(1, 80, 56, 22)],
@@ -181,15 +189,23 @@ class CityInterior {
         return cm.treat(bed);
       case 'shop':
         if (cm == null) return 'The city is still loading.';
-        if (zone == 0) return cm.buy('food');
-        if (zone == 1) return cm.buy('medicine');
-        // The market stall: what you carry is sold here.
-        if (carrying == null) return 'The market stall. Bring goods to sell: pick up crates in the city and carry them here.';
+        // The shelves and the counter open the shopping list; the counter also buys what you carry.
+        if (zone != 2) {
+          shopRequested = true;
+          return zone == 0 ? 'The food shelves: have a look and choose what to buy.' : (isGasShop ? 'The shelf for the car: have a look.' : 'The medicine shelf: have a look and choose.');
+        }
+        if (carrying == null) {
+          shopRequested = true;
+          return 'The counter. Bring goods to sell: pick up crates in the city and carry them here. Or choose what to buy.';
+        }
         final price = carrying == 'crate' ? 6 : 4;
         cm.points += price;
         earned = price;
         carrying = null;
         return 'You sold your goods at the market. +$price points. Go and fetch more.';
+      case 'dmv':
+        licenceRequested = true;
+        return 'The licence desk: you can get your Uber licence here.';
       case 'school':
         if (zone == 0) {
           if (cm != null) cm.points += 3;
@@ -242,6 +258,7 @@ class CityInterior {
     final (wallCol, floorCol) = switch (kind) {
       'hospital' => (const Color(0xFFE9EFF2), const Color(0xFFD9E4E8)),
       'shop' => (const Color(0xFFF1E3C6), const Color(0xFFD8C4A0)),
+      'dmv' => (const Color(0xFFE3ECF5), const Color(0xFFBCC8D6)),
       'school' => (const Color(0xFFF3E6C8), const Color(0xFFC9B58C)),
       'firestation' => (const Color(0xFFE7D2D0), const Color(0xFFB4B7BD)),
       'tower' => (dark ? const Color(0xFF9AA0A8) : const Color(0xFFEDEFF3), const Color(0xFFB8BEC8)),
@@ -301,6 +318,8 @@ class CityInterior {
         _hospital(b, labels, cm);
       case 'shop':
         _shop(b, labels);
+      case 'dmv':
+        _dmv(b, labels);
       case 'school':
         _school(b, labels);
       case 'firestation':
@@ -358,24 +377,188 @@ class CityInterior {
     }
   }
 
-  void _shop(MeshBuilder b, List<Label3D> labels) {
-    b.box(const V3(0, 14, 40), const V3(120, 28, 22), const Color(0xFF8B5E3C), shine: 0.15);
-    b.box(const V3(0, 29, 40), const V3(124, 2, 26), const Color(0xFFF1F5F9), shine: 0.3);
-    for (final (x, food) in const [(-112.0, true), (112.0, false)]) {
-      b.box(V3(x, 40, 120), const V3(28, 80, 100), const Color(0xFF9A6B3F), shine: 0.05);
-      for (var row = 0; row < 4; row++) {
-        for (var k = 0; k < 5; k++) {
-          final c = food ? [const Color(0xFFF59E0B), const Color(0xFFEF4444), const Color(0xFFEAB308), const Color(0xFF84CC16)][(row + k) % 4] : (k.isEven ? Colors.white : const Color(0xFF93C5FD));
-          b.box(V3(x + (x < 0 ? 15 : -15), 12 + row * 18, 78 + k * 20.0), const V3(4, 10, 14), c);
+  /// The licence office: a long desk with a clerk and a computer, a board of road signs, a row of chairs and a certificate on the wall.
+  void _dmv(MeshBuilder b, List<Label3D> labels) {
+    b.order = 2;
+    b.grouped = true;
+    b.startGroup();
+    b.box(const V3(0, 14, 40), const V3(140, 28, 22), const Color(0xFF475569), shine: 0.15);
+    b.box(const V3(0, 29, 40), const V3(144, 2, 26), const Color(0xFFF1F5F9), shine: 0.3);
+    b.box(const V3(-34, 40, 38), const V3(22, 14, 3), const Color(0xFF111827), shine: 0.3);
+    b.box(const V3(-34, 40, 36.4), const V3(18, 10, 0.6), const Color(0xFF22D3EE), shine: 0.5);
+    b.box(const V3(-34, 34, 38), const V3(6, 6, 6), const Color(0xFF334155));
+    b.box(const V3(30, 34, 40), const V3(16, 3, 11), const Color(0xFFFACC15));
+    b.endGroup();
+    b.startGroup();
+    b.box(const V3(34, 8, 18), const V3(11, 16, 7), const Color(0xFF1F2937));
+    b.box(const V3(34, 25, 18), const V3(13, 18, 8), const Color(0xFF2563EB));
+    b.ball(const V3(34, 39, 18), 5.5, const Color(0xFFF2C79C), lat: 5, lon: 8);
+    b.ball(const V3(34, 42, 18), 5.7, const Color(0xFF111827), lat: 3, lon: 8);
+    b.endGroup();
+    // The board of road signs on the left wall and the licence on the right wall.
+    b.startGroup();
+    b.box(const V3(-148, 56, 120), const V3(3, 46, 90), const Color(0xFFF8FAFC));
+    for (var i = 0; i < 3; i++) {
+      final z = 90 + i * 30.0;
+      b.box(V3(-146, 62, z), const V3(1, 18, 18), [const Color(0xFFDC2626), const Color(0xFFFACC15), const Color(0xFF2563EB)][i], yaw: 0);
+      b.box(V3(-145.6, 62, z), const V3(0.6, 9, 9), Colors.white);
+    }
+    b.box(const V3(148, 60, 120), const V3(3, 42, 70), const Color(0xFFFEF3C7));
+    b.box(const V3(146.4, 62, 120), const V3(0.6, 28, 52), Colors.white);
+    b.box(const V3(146.2, 52, 120), const V3(0.6, 6, 14), const Color(0xFFDC2626));
+    b.endGroup();
+    // A row of chairs for people waiting.
+    for (final x in const [-110.0, -80.0, 80.0, 110.0]) {
+      b.startGroup();
+      b.box(V3(x, 9, 150), const V3(22, 4, 20), const Color(0xFF2563EB));
+      b.box(V3(x, 17, 160), const V3(22, 16, 3), const Color(0xFF2563EB));
+      b.box(V3(x - 8, 4, 150), const V3(2, 8, 2), const Color(0xFF334155));
+      b.box(V3(x + 8, 4, 150), const V3(2, 8, 2), const Color(0xFF334155));
+      b.endGroup();
+    }
+    // A little car on a plinth, to show what the licence is for.
+    b.startGroup();
+    b.box(const V3(0, 3, 150), const V3(70, 6, 36), const Color(0xFF94A3B8));
+    b.box(const V3(0, 14, 150), const V3(52, 10, 22), const Color(0xFFEF4444), shine: 0.4);
+    b.box(const V3(-4, 22, 150), const V3(26, 8, 18), const Color(0xFF93C5FD), shine: 0.5);
+    for (final x in const [-16.0, 16.0]) {
+      for (final z in const [139.0, 161.0]) {
+        b.cyl(V3(x, 9, z - 1.5), V3(x, 9, z + 1.5), 5, const Color(0xFF111827), sides: 8);
+      }
+    }
+    b.endGroup();
+    _mat(b, 0, 78, 24, const Color(0xFF38BDF8));
+    labels.add(const Label3D(V3(0, 100, 36), '🪪 NGMY Licence office', Color(0xFF0F172A)));
+    labels.add(const Label3D(V3(0, 52, 78), '🪪 Walk here to get your Uber licence', Color(0xFF0369A1)));
+    labels.add(const Label3D(V3(34, 56, 18), '🧑‍💼 Clerk', Color(0xFF0F766E)));
+  }
+
+  bool get isGasShop => door.kind == 'gasstation';
+
+  /// One shelf unit against a side wall: uprights, four boards, and real-looking goods (tins, boxes, bottles, loaves) facing the aisle.
+  /// [side] is -1 for the left wall and 1 for the right; [style] is 0 for food, 1 for medicine and health, 2 for things for the car.
+  void _gondola(MeshBuilder b, double side, int style) {
+    const wood = Color(0xFF6B4A2B), board = Color(0xFFD9BE92);
+    final cx = side * 128.0;
+    const food = [Color(0xFFEF4444), Color(0xFFF59E0B), Color(0xFF22C55E), Color(0xFFEAB308), Color(0xFF3B82F6), Color(0xFFF97316), Color(0xFFA855F7)];
+    const health = [Color(0xFFFFFFFF), Color(0xFF93C5FD), Color(0xFF86EFAC), Color(0xFFFCA5A5), Color(0xFFF1F5F9), Color(0xFFFDE68A)];
+    const car = [Color(0xFF1E293B), Color(0xFFFACC15), Color(0xFFEF4444), Color(0xFF38BDF8), Color(0xFF475569)];
+    final pal = switch (style) { 1 => health, 2 => car, _ => food };
+    b.startGroup();
+    b.box(V3(side * 148, 40, 120), const V3(4, 80, 104), wood);
+    for (final z in const [68.0, 172.0]) {
+      b.box(V3(cx, 40, z), const V3(40, 80, 3), wood);
+    }
+    b.box(V3(cx, 4, 120), const V3(40, 8, 104), const Color(0xFF4B3621));
+    for (var lv = 0; lv < 4; lv++) {
+      b.box(V3(cx, 11 + lv * 18, 120), const V3(40, 2, 104), board, shine: 0.1);
+    }
+    for (var lv = 0; lv < 4; lv++) {
+      final y0 = 12 + lv * 18.0;
+      for (var i = 0; i < 9; i++) {
+        final z = 76 + i * 11.0;
+        for (var row = 0; row < 2; row++) {
+          final x = side * (114 + row * 14.0);
+          final c = pal[(lv * 7 + i * 3 + row * 5 + style) % pal.length];
+          final kind = (lv + i + style + row) % 4;
+          final front = x - side * 2.7;
+          switch (kind) {
+            case 0:
+              b.cyl(V3(x, y0, z), V3(x, y0 + 8, z), 3.2, c, sides: 8, shine: 0.3);
+              b.cyl(V3(x, y0 + 2.5, z), V3(x, y0 + 5.5, z), 3.3, Colors.white, sides: 8, caps: false);
+            case 1:
+              b.box(V3(x, y0 + 7, z), const V3(5, 14, 8.5), c, shine: 0.1);
+              b.box(V3(front, y0 + 8, z), const V3(0.5, 8, 6), Colors.white);
+            case 2:
+              b.cyl(V3(x, y0, z), V3(x, y0 + 10, z), 2.4, c, sides: 8, shine: 0.45);
+              b.cyl(V3(x, y0 + 10, z), V3(x, y0 + 12.5, z), 1.2, Colors.white, sides: 6);
+            default:
+              b.box(V3(x, y0 + 3.2, z), const V3(6.5, 6.4, 13), style == 0 ? const Color(0xFFB7791F) : c, shine: 0.05);
+              b.box(V3(x, y0 + 6.6, z), const V3(5.5, 1.4, 12), style == 0 ? const Color(0xFFE9B949) : Colors.white);
+          }
         }
       }
     }
+    b.endGroup();
+  }
+
+  /// A drinks fridge against the back wall: glass doors, and bottles on the shelves inside.
+  void _fridge(MeshBuilder b, double x) {
+    b.startGroup();
+    b.box(V3(x, 32, 11), const V3(58, 64, 22), const Color(0xFFE5E7EB), shine: 0.3);
+    b.box(V3(x, 33, 22.4), const V3(52, 56, 1), const Color(0xFF1E293B));
+    const cols = [Color(0xFFEF4444), Color(0xFF22C55E), Color(0xFFF59E0B), Color(0xFF3B82F6), Color(0xFFE5E7EB), Color(0xFFA855F7)];
+    for (var lv = 0; lv < 3; lv++) {
+      b.box(V3(x, 15 + lv * 17.0, 21), const V3(50, 1, 2), const Color(0xFF94A3B8));
+      for (var i = 0; i < 7; i++) {
+        final bx = x - 21 + i * 7.0;
+        b.cyl(V3(bx, 16 + lv * 17.0, 21.6), V3(bx, 27 + lv * 17.0, 21.6), 2.2, cols[(i + lv * 2) % cols.length], sides: 6, shine: 0.5);
+      }
+    }
+    b.endGroup();
+    final o = b.order;
+    b.order = 3;
+    b.alpha = 0.2;
+    b.box(V3(x, 33, 23.2), const V3(52, 58, 0.6), const Color(0xFFBFE3F7));
+    b.alpha = 1;
+    b.order = o;
+  }
+
+  void _shop(MeshBuilder b, List<Label3D> labels) {
+    final gas = isGasShop;
+    b.order = 2;
+    b.grouped = true;
+    // The counter with a till, a card machine, sweets and the person who serves.
+    b.startGroup();
+    b.box(const V3(0, 14, 40), const V3(120, 28, 22), const Color(0xFF8B5E3C), shine: 0.15);
+    b.box(const V3(0, 29, 40), const V3(124, 2, 26), const Color(0xFFF1F5F9), shine: 0.3);
+    b.box(const V3(0, 14, 51.2), const V3(110, 18, 0.6), const Color(0xFFC08A5A));
+    b.box(const V3(-30, 36, 38), const V3(20, 12, 14), const Color(0xFF374151), shine: 0.3);
+    b.box(const V3(-30, 44, 33), const V3(16, 9, 2), const Color(0xFF22D3EE), shine: 0.5);
+    b.box(const V3(0, 31, 46), const V3(10, 3, 7), const Color(0xFF111827));
+    for (var i = 0; i < 6; i++) {
+      b.box(V3(14.0 + i * 7.5, 33, 47), const V3(5, 5, 5), const [Color(0xFFEF4444), Color(0xFFFACC15), Color(0xFF22C55E), Color(0xFF3B82F6)][i % 4]);
+    }
+    b.endGroup();
+    b.startGroup();
+    b.box(const V3(34, 8, 18), const V3(11, 16, 7), const Color(0xFF1F2937));
+    b.box(const V3(34, 25, 18), const V3(13, 18, 8), const Color(0xFF16A34A));
+    b.box(const V3(34, 25, 21.6), const V3(9, 12, 0.6), const Color(0xFFDCFCE7));
+    b.ball(const V3(34, 39, 18), 5.5, const Color(0xFFF2C79C), lat: 5, lon: 8);
+    b.ball(const V3(34, 42, 18), 5.7, const Color(0xFF3F2A1C), lat: 3, lon: 8);
+    b.endGroup();
+    // Shelves of goods on both walls, and drinks fridges at the back.
+    _gondola(b, -1, 0);
+    _gondola(b, 1, gas ? 2 : 1);
+    _fridge(b, -104);
+    _fridge(b, 104);
+    // Fresh fruit on two stands near the door.
+    for (final (x, cols) in [(-40.0, const [Color(0xFFEF4444), Color(0xFFF97316), Color(0xFFEF4444)]), (40.0, const [Color(0xFF84CC16), Color(0xFFFACC15), Color(0xFF22C55E)])]) {
+      b.startGroup();
+      b.box(V3(x, 5, 170), const V3(38, 10, 24), const Color(0xFF9A6B3F));
+      b.box(V3(x, 11, 160), const V3(38, 2, 6), const Color(0xFF7C5230));
+      for (var i = 0; i < 4; i++) {
+        for (var j = 0; j < 3; j++) {
+          b.ball(V3(x - 13.5 + i * 9.0, 12.5, 163 + j * 7.5), 4.2, cols[(i + j) % 3], lat: 4, lon: 6);
+        }
+      }
+      b.endGroup();
+    }
+    // Signs hanging over the aisles.
+    b.startGroup();
+    b.box(const V3(0, 100, 36), const V3(110, 14, 2), gas ? const Color(0xFFDC2626) : const Color(0xFF16A34A));
+    b.box(const V3(-110, 96, 120), const V3(2, 12, 60), const Color(0xFFF59E0B));
+    b.box(const V3(110, 96, 120), const V3(2, 12, 60), gas ? const Color(0xFF1E293B) : const Color(0xFF38BDF8));
+    b.endGroup();
     _mat(b, -64, 120, 24, const Color(0xFFFACC15));
     _mat(b, 64, 120, 24, const Color(0xFFA78BFA));
     _mat(b, 0, 84, 22, const Color(0xFF22C55E));
-    labels.add(const Label3D(V3(-64, 62, 120), '🍞 Food: walk here, 10 ⭐ for 5', Color(0xFFB45309)));
-    labels.add(const Label3D(V3(64, 62, 120), '💊 Medicine: walk here, 12 ⭐ for 3', Color(0xFF6D28D9)));
-    labels.add(const Label3D(V3(0, 48, 84), '💰 Market stall: walk here to sell what you carry', Color(0xFF15803D)));
+    labels.add(Label3D(const V3(0, 112, 36), gas ? '⛽ NGMY Gas shop' : '🛒 NGMY Mart', const Color(0xFF0F172A)));
+    labels.add(const Label3D(V3(-84, 84, 120), '🍞 Food and drinks', Color(0xFFB45309)));
+    labels.add(Label3D(const V3(84, 84, 120), gas ? '🛢 For the car' : '💊 Medicine and health', const Color(0xFF6D28D9)));
+    labels.add(const Label3D(V3(0, 50, 84), '💰 Counter: walk here to pay or sell', Color(0xFF15803D)));
+    labels.add(const Label3D(V3(0, 40, 176), '🍎 Fresh fruit', Color(0xFFB91C1C)));
+    labels.add(const Label3D(V3(34, 56, 18), '🧑‍💼 Cashier', Color(0xFF0F766E)));
   }
 
   void _school(MeshBuilder b, List<Label3D> labels) {

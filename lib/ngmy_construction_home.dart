@@ -71,6 +71,8 @@ const Map<String, FurnKind> kFurnKinds = {
   'hq': FurnKind('NGMY company', '🏛️', 170, 90),
   'store': FurnKind('NGMY store', '🏬', 130, 80),
   'gasstation': FurnKind('NGMY gas station', '⛽', 150, 90),
+  'dmv': FurnKind('NGMY licence office', '🪪', 130, 80),
+  'ubstation': FurnKind('NGMY Uber station', '🚖', 120, 60),
   'townsign': FurnKind('NGMY Town sign', '🪧', 380, 14),
   'cornersign': FurnKind('NGMY Town billboard', '🪧', 150, 10),
   'adboard': FurnKind('NGMY ad billboard', '📺', 330, 14),
@@ -93,7 +95,7 @@ const Map<String, FurnKind> kFurnKinds = {
 };
 
 /// What can be put in the garden, and what goes inside the rooms.
-const List<String> kOutdoorFurn = ['road', 'roundabout', 'roadturn', 'roadtee', 'roadcross', 'house2', 'bighouse', 'billboard', 'tower', 'hq', 'store', 'gasstation', 'townsign', 'cornersign', 'adboard', 'shop', 'hospital', 'firestation', 'school', 'car', 'firetruck', 'ambulance', 'dog', 'cat', 'cow', 'sheep', 'chicken', 'horse', 'tree', 'pine', 'bush', 'flowers', 'fence', 'lamppost', 'bench', 'pond', 'swing', 'shed', 'doghouse'];
+const List<String> kOutdoorFurn = ['road', 'roundabout', 'roadturn', 'roadtee', 'roadcross', 'house2', 'bighouse', 'billboard', 'tower', 'hq', 'store', 'gasstation', 'dmv', 'ubstation', 'townsign', 'cornersign', 'adboard', 'shop', 'hospital', 'firestation', 'school', 'car', 'firetruck', 'ambulance', 'dog', 'cat', 'cow', 'sheep', 'chicken', 'horse', 'tree', 'pine', 'bush', 'flowers', 'fence', 'lamppost', 'bench', 'pond', 'swing', 'shed', 'doghouse'];
 
 /// Road pieces snap to a grid of this size, so neighbours always line up.
 const double kRoadGrid = 40;
@@ -276,6 +278,7 @@ class HRoom {
 
   /// The delivery orders and the rival couriers of the town (a DeliveryBoard), kept so the race goes on while you are away.
   Object? deliveryBoard;
+  Object? uberBoard;
 
   /// Fixture 0 to 3 (outlet, outlet, ceiling light or fan, switch): 0 not started, 1 started, 2 finished.
   int fixtureState(int i) => !indoor || lesson.isNotEmpty ? 2 : (wiring != null ? wiring!.orderProgress(i) : (wiringNeeded ? 0 : 2));
@@ -618,6 +621,45 @@ class HomeProject {
           }
           return true;
         }
+
+        // The driving licence office (where the Uber licence is bought) and the Uber stations where people wait for a ride home.
+        bool roomFor(double x, double z, double fw, double fd) {
+          if (x.abs() > 1150 || z < -600 || z > 1450) return false;
+          for (final f in r.furn) {
+            if (f.kind == 'rug' || f.kind == 'flowers' || f.kind == 'pond') continue;
+            final q = kFurnKinds[f.kind]!;
+            final qw = f.rot.isOdd ? q.d : q.w, qd = f.rot.isOdd ? q.w : q.d;
+            if ((f.x - x).abs() < (fw + qw) / 2 + 34 && (f.z - z).abs() < (fd + qd) / 2 + 34) return false;
+          }
+          return true;
+        }
+
+        void place(String kind, int want, List<(double, double)> spots) {
+          final k = kFurnKinds[kind]!;
+          var n = 0;
+          void put(double x, double z) {
+            r.add(kind, x: x, z: z);
+            if (kind == 'ubstation') r.add('car', x: x + 96, z: z + 6);
+            n++;
+          }
+
+          for (final (x, z) in spots) {
+            if (n >= want) return;
+            if (roomFor(x, z, k.w, k.d)) put(x, z);
+          }
+          // No luck at the usual places: look over the land for free spots, not close to one of the same kind.
+          for (var z = -500.0; z < 1400 && n < want; z += 100) {
+            for (var x = -1100.0; x <= 1100 && n < want; x += 110) {
+              if (r.furn.any((f) => f.kind == kind && (f.x - x).abs() < 420 && (f.z - z).abs() < 420)) continue;
+              if (roomFor(x, z, k.w, k.d)) put(x, z);
+            }
+          }
+        }
+
+        // More gas stations, spread over the town so a car is never far from one (the tank only lasts about a minute).
+        place('gasstation', 6, const [(-900.0, 400.0), (900.0, 400.0), (-900.0, 1000.0), (900.0, 1000.0), (-300.0, 1260.0), (300.0, 1260.0), (-1000.0, 700.0), (1000.0, 700.0), (-640.0, 90.0), (640.0, 90.0), (-900.0, 1400.0), (900.0, 1400.0)]);
+        place('dmv', 1, const [(-760.0, 330.0), (760.0, 330.0), (-450.0, 1080.0), (450.0, 1080.0)]);
+        place('ubstation', 3, const [(0.0, 330.0), (-120.0, 1080.0), (120.0, 1080.0), (-300.0, 1000.0), (300.0, 1000.0), (-700.0, 800.0), (700.0, 800.0)]);
 
         // More houses: behind my house, down both sides and over every green stretch, each with room in front of its door.
         var added = 0;

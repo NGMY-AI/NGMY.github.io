@@ -84,11 +84,16 @@ void main() {
       ..x = -64
       ..z = 120;
     expect(inn.update(cm), contains('food'));
+    expect(inn.shopRequested, isTrue, reason: 'the shopping list opens');
+    expect(cm.buy('food'), contains('food'));
     expect(cm.food, food + 5);
+    inn.shopRequested = false;
     inn.walker
       ..x = 64
       ..z = 120;
     expect(inn.update(cm), contains('medicine'));
+    expect(inn.shopRequested, isTrue);
+    expect(cm.buy('medicine'), contains('medicine'));
     expect(cm.medicine, med + 3);
     expect(cm.points, 40 - 10 - 12);
     // The shopkeeper is drawn with the moving things, and so is the person.

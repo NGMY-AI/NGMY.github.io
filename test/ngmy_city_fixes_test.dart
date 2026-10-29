@@ -188,7 +188,7 @@ void main() {
     expect(legs.skip(1).every((l) => l.heli != null), isTrue, reason: 'after the billboards it follows the helicopters');
     expect(legs.where((l) => l.heli != null).length, kHelis.length);
     expect(legs.first.eyes.first.y, greaterThan(500), reason: 'it starts high up');
-    final signs = city.furn.where((f) => f.kind == 'billboard' || f.kind == 'cornersign' || f.kind == 'townsign').toList();
+    final signs = city.furn.where((f) => f.kind == 'billboard' || f.kind == 'cornersign' || f.kind == 'townsign' || f.kind == 'adboard').toList();
     expect(signs.where((f) => f.kind == 'townsign').length, 1);
     expect(signs.where((f) => f.kind == 'cornersign').length, 4);
     final eyes = legs.first.eyes;
@@ -196,17 +196,59 @@ void main() {
       for (var s = 0.0; s <= 1.0; s += 0.01) {
         final p = V3.lerp(eyes[i], eyes[i + 1], s);
         for (final f in signs) {
-          final (hx, hz, hy) = switch (f.kind) { 'townsign' => (200.0, 30.0, 330.0), 'cornersign' => (85.0, 30.0, 170.0), _ => (50.0, 50.0, 75.0) };
-          final inside = (p.x - f.x).abs() < hx && (p.z - f.z).abs() < hz && p.y < hy;
+          final (hx, hz, hy) = switch (f.kind) { 'townsign' => (200.0, 30.0, 330.0), 'cornersign' => (85.0, 30.0, 170.0), 'adboard' => (170.0, 30.0, 210.0), _ => (50.0, 50.0, 75.0) };
+          final turned = f.rot.isOdd;
+          final inside = (p.x - f.x).abs() < (turned ? hz : hx) && (p.z - f.z).abs() < (turned ? hx : hz) && p.y < hy;
           expect(inside, isFalse, reason: 'the drone is inside the ${f.kind} at (${f.x}, ${f.z})');
         }
       }
     }
     // It comes close to every sign and swings slowly round it: the path near each is at least a few seconds long at the film speed.
     for (final f in signs) {
-      final near = [for (final e in eyes) if (math.sqrt(math.pow(e.x - f.x, 2) + math.pow(e.z - f.z, 2)) < (f.kind == 'townsign' ? 560 : f.kind == 'cornersign' ? 290 : 190)) e];
+      final near = [for (final e in eyes) if (math.sqrt(math.pow(e.x - f.x, 2) + math.pow(e.z - f.z, 2)) < (f.kind == 'townsign' ? 560 : f.kind == 'adboard' ? 450 : f.kind == 'cornersign' ? 290 : 190)) e];
       expect(near.length, greaterThanOrEqualTo(5), reason: '${f.kind} at (${f.x}, ${f.z}) is visited with a slow arc');
     }
+  });
+
+  test('the drone: every film starts at the welcome sign; the edge billboards have their own request, and the billboards request has them too', () {
+    final city = HomeProject(seed: 4).rooms[11];
+    final town = city.furn.firstWhere((f) => f.kind == 'townsign');
+    final edge = city.furn.where((f) => f.kind == 'adboard' || f.kind == 'cornersign').toList();
+    for (final what in ['city', 'billboards', 'edges', 'houses', 'all']) {
+      final legs = buildDroneLegs(city, what);
+      final first = legs.first;
+      expect(first.eyes.first.y, greaterThan(800), reason: '$what starts high');
+      expect(first.looks.first.x, closeTo(town.x, 5), reason: '$what starts looking at the welcome sign');
+      expect(first.looks.first.z, closeTo(town.z, 5));
+      expect(first.eyes.where((e) => math.sqrt(math.pow(e.x - town.x, 2) + math.pow(e.z - town.z, 2)) < 560).length, greaterThanOrEqualTo(5), reason: '$what swings round the welcome sign first');
+    }
+    bool visits(DroneLeg leg, Furn f) => leg.eyes.where((e) => math.sqrt(math.pow(e.x - f.x, 2) + math.pow(e.z - f.z, 2)) < 450 && e.y < 260).length >= 5;
+    final edges = buildDroneLegs(city, 'edges');
+    expect(edges.length, 1, reason: 'one smooth flight round the edges');
+    for (final f in edge) {
+      expect(visits(edges.first, f), isTrue, reason: 'the edge sign at (${f.x}, ${f.z}) is in the edges film');
+    }
+    // It goes round the edge: the boards are visited in order round the town (the angle only grows).
+    final order = <Furn>[];
+    for (final e in edges.first.eyes) {
+      for (final f in edge) {
+        if (!order.contains(f) && math.sqrt(math.pow(e.x - f.x, 2) + math.pow(e.z - f.z, 2)) < 440 && e.y < 260) order.add(f);
+      }
+    }
+    expect(order.length, edge.length);
+    final angs = [for (final f in order) math.atan2(f.z - 1000, f.x)];
+    var wraps = 0;
+    for (var i = 1; i < angs.length; i++) {
+      if (angs[i] < angs[i - 1]) wraps++;
+    }
+    expect(wraps, lessThanOrEqualTo(1), reason: 'one lap round the town');
+    // The ordinary billboards request has every edge billboard in it too, and the towers' boards.
+    final all = buildDroneLegs(city, 'billboards');
+    for (final f in edge.where((f) => f.kind == 'adboard')) {
+      expect(visits(all.first, f), isTrue, reason: 'the billboards film also shows the edge board at (${f.x}, ${f.z})');
+    }
+    final towerOk = city.furn.where((f) => f.kind == 'tower').every((f) => all.first.eyes.any((e) => math.sqrt(math.pow(e.x - f.x, 2) + math.pow(e.z - f.z, 2)) < 260 && e.y > 400));
+    expect(towerOk, isTrue, reason: 'it passes above every tower with its roof boards');
   });
 
   test('a cabinet is moved out of the stretch of wall in front of the TV, furniture is smaller, and no TV stands on the floor', () {

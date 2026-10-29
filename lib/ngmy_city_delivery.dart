@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'ngmy_construction_home.dart';
+import 'ngmy_city_nav.dart';
 import 'ngmy_construction_tour.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -46,6 +47,14 @@ DeliveryKind deliveryKindOf(String key) => kDeliveryKinds.firstWhere((k) => k.ke
   return (f.x + math.sin(a) * d, f.z + math.cos(a) * d);
 }
 
+/// The door of a building itself (the front face), where people go in and come out.
+(double, double) doorFace(Furn f) {
+  final k = kFurnKinds[f.kind]!;
+  final a = f.rot * math.pi / 2;
+  final d = k.d / 2 - 2;
+  return (f.x + math.sin(a) * d, f.z + math.cos(a) * d);
+}
+
 /// One order: what, where from, where to, how much it pays, and who has it (null nobody, -1 you, 0 and up one of the couriers).
 class DeliveryOrder {
   DeliveryOrder(this.id, this.kind, this.from, this.to, this.pay);
@@ -85,6 +94,12 @@ class Courier {
   double legStart = 0, legEnd = 0, fromX = 0, fromZ = 0, toX = 0, toZ = 0;
   int leg = 0; // 0 resting, 1 to the pick-up, 2 to the house
   double restUntil = 0;
+
+  /// The way being walked (round the buildings, to the door), and whether the courier is inside the building just now.
+  List<(double, double)> path = const [];
+  double pathLen = 0;
+  bool inside = false;
+  double insideEnd = 0;
 }
 
 /// A courier as it is drawn right now.
@@ -134,6 +149,7 @@ class DeliveryBoard {
   final List<DeliveryOrder> orders = [];
   final List<Courier> couriers = [];
   int _nextId = 1;
+  late final CityNav nav = CityNav(city);
 
   /// You: the order you carry, how many you delivered this round and in all, and your points from deliveries.
   DeliveryOrder? active;
@@ -248,13 +264,21 @@ class DeliveryBoard {
         final o = free[math.min(free.length - 1, _rnd.nextInt(3))];
         o.holder = couriers.indexOf(c);
         c.job = o;
-        _startLeg(c, now, 1, doorSpot(o.from));
+        _startLeg(c, now, 1, o.from);
       } else if (now >= c.legEnd) {
-        c.x = c.toX;
-        c.z = c.toZ;
+        if (!c.inside) {
+          // At the door: in they go, and they are out of sight for a moment.
+          c.x = c.toX;
+          c.z = c.toZ;
+          c.inside = true;
+          c.insideEnd = now + (c.leg == 1 ? 1.6 : 1.3);
+          continue;
+        }
+        if (now < c.insideEnd) continue;
+        c.inside = false;
         final o = c.job!;
         if (c.leg == 1) {
-          _startLeg(c, now + 1.2, 2, doorSpot(o.to));
+          _startLeg(c, now, 2, o.to);
         } else {
           orders.remove(o);
           c.job = null;
@@ -277,14 +301,18 @@ class DeliveryBoard {
 
   double _dist(Courier c, (double, double) p) => math.sqrt(math.pow(p.$1 - c.x, 2) + math.pow(p.$2 - c.z, 2));
 
-  void _startLeg(Courier c, double start, int leg, (double, double) to) {
+  /// Sends the courier to the door of [building]: round the other buildings, up to its door.
+  void _startLeg(Courier c, double start, int leg, Furn building) {
+    final spot = doorSpot(building), door = doorFace(building);
     c.leg = leg;
     c.fromX = c.x;
     c.fromZ = c.z;
-    c.toX = to.$1;
-    c.toZ = to.$2;
+    c.toX = door.$1;
+    c.toZ = door.$2;
+    c.path = [...nav.route((c.x, c.z), spot), door];
+    c.pathLen = pathLength(c.path);
     c.legStart = start;
-    c.legEnd = start + math.max(1.0, _dist(c, to) / c.speed);
+    c.legEnd = start + math.max(1.0, c.pathLen / c.speed);
   }
 
   /// Where each courier is at [now] and what it is doing, for drawing.
@@ -293,11 +321,14 @@ class DeliveryBoard {
     for (final c in couriers) {
       var x = c.x, z = c.z, yaw = 0.0;
       var walking = false;
-      if (c.leg != 0 && now >= c.legStart) {
+      // Inside a building (handing over, picking up): not on the street.
+      if (c.inside) continue;
+      if (c.leg != 0 && now >= c.legStart && c.path.length > 1) {
         final k = ((now - c.legStart) / math.max(0.01, c.legEnd - c.legStart)).clamp(0.0, 1.0);
-        x = c.fromX + (c.toX - c.fromX) * k;
-        z = c.fromZ + (c.toZ - c.fromZ) * k;
-        yaw = math.atan2(c.toX - c.fromX, c.toZ - c.fromZ);
+        final p = pointAlong(c.path, c.pathLen * k);
+        x = p.$1;
+        z = p.$2;
+        yaw = p.$3;
         walking = k < 1;
       }
       out.add(CourierFigure(c.name, x, z, yaw, now * 2.2 + c.speed, walking, c.style, c.color, c.leg == 2));

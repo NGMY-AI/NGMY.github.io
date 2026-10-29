@@ -373,13 +373,16 @@ Future<void> showConSteps(BuildContext context, String title, List<String> steps
 
 /// A lesson page: a header with the title, the menu under it, then the 3D area.
 class LessonScaffold extends StatelessWidget {
-  const LessonScaffold({required this.title, required this.color, required this.stage, required this.panel, required this.onSteps, required this.stepText});
+  const LessonScaffold({required this.title, required this.color, required this.stage, required this.panel, required this.onSteps, required this.stepText, this.titleExtra});
   final String title;
   final Color color;
   final Widget stage;
   final Widget panel;
   final VoidCallback onSteps;
   final String stepText;
+
+  /// Something shown right after the title, as wide as the room allows (the energy bar in the city).
+  final Widget? titleExtra;
 
   @override
   Widget build(BuildContext context) {
@@ -391,7 +394,14 @@ class LessonScaffold extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(4, 4, 8, 4),
             child: Row(children: [
               IconButton(onPressed: () => Navigator.of(context).maybePop(), icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20)),
-              Expanded(child: Text(title, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 16))),
+              if (titleExtra == null)
+                Expanded(child: Text(title, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 16)))
+              else ...[
+                Text(title, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 16)),
+                const SizedBox(width: 10),
+                Expanded(child: titleExtra!),
+                const SizedBox(width: 10),
+              ],
               GestureDetector(
                 onTap: onSteps,
                 child: Container(
