@@ -22,8 +22,8 @@ If the database cannot be reached the server falls back to strict in-memory coun
 | `AI_LIMIT_ANON_PER_MIN` | If anonymous AI is on: per IP per minute | 5 |
 | `AI_LIMIT_IP_PER_MIN` | Per IP per minute for signed-in users too (stops many accounts from one address) | 60 |
 | `AI_GLOBAL_PER_DAY` | All AI requests of the whole app per day (circuit breaker) | 5000 |
-| `AI_MAX_PROMPT_CHARS` | Longest message for normal AI | 24000 |
-| `AI_MAX_PROMPT_CHARS_EXPENSIVE` | Longest message for expensive actions | 120000 |
+| `AI_MAX_PROMPT_CHARS` | Longest message for normal AI (advisor chats send their persona and memory, so this is generous) | 100000 |
+| `AI_MAX_PROMPT_CHARS_EXPENSIVE` | Longest message for expensive actions | 200000 |
 | `AI_MAX_IMAGES` / `AI_MAX_IMAGE_CHARS` | Pictures per request / total picture size | 4 / 6,000,000 |
 | `AI_MAX_OUTPUT_TOKENS` / `AI_MAX_OUTPUT_TOKENS_EXPENSIVE` | Longest AI answer | 2048 / 8192 |
 | `AI_TIMEOUT_MS` | Timeout of every provider call | 30000 |

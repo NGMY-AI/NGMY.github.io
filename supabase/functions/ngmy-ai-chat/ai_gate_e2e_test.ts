@@ -154,7 +154,7 @@ Deno.test("expensive actions (App Builder / pictures) have their own, tighter li
 
 Deno.test("a message that is too long is refused (413) without calling the provider", async () => {
   const before = providerCalls;
-  const r = await ask("user-erin", chat("x".repeat(25000)), "198.51.100.10");
+  const r = await ask("user-erin", chat("x".repeat(110000)), "198.51.100.10");
   eq(r.status, 413);
   eq(providerCalls, before);
 });
