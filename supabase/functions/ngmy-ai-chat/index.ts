@@ -553,10 +553,12 @@ async function handleAgentStart(req: Request, body: any): Promise<Response> {
   });
   const payload: Record<string, unknown> = {
     task: fullTask,
-    // The most one browser task may spend. 0.75 was too small: tasks stopped at the very start with "Task cost limit reached".
-    maxCostUsd: Math.max(0.75, Number(Deno.env.get("BROWSER_USE_MAX_COST_USD") ?? "2") || 2),
+    // The most one browser task may spend: 1 dollar for everybody except admins (set BROWSER_USE_MAX_COST_USD to change it).
+    maxCostUsd: Math.max(0.5, Number(Deno.env.get("BROWSER_USE_MAX_COST_USD") ?? "1") || 1),
     browserSettings: freshBrowser(),
   };
+  // Admins have no spending limit on a browser task.
+  if (isNgmyAdminEmail(email)) delete payload.maxCostUsd;
   if (/^[0-9a-f-]{36}$/i.test(sessionId) && !direct) {
     payload.sessionId = sessionId;
     delete payload.browserSettings; // continuing an existing browser
