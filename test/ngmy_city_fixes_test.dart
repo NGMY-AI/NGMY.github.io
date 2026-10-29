@@ -112,6 +112,8 @@ void main() {
     final dark = CityInterior('house2', f, dark: true)..build(null);
     expect(dark.scene.labels.where((l) => l.id == idCinPanel || l.id == idCinOutlet).length, 3);
     expect(dark.scene.polys.any((p) => p.color == const Color(0xFFEF4444) && p.alpha < 1), isTrue, reason: 'a red frame behind it');
+    expect(dark.scene.polys.any((p) => p.id == idCinOutlet), isTrue, reason: 'the outlet and switch themselves can be tapped');
+    expect(dark.scene.polys.any((p) => p.id == idCinPanel), isTrue, reason: 'and so can the panel');
   });
 
   test('each fixture is marked fixed on its own: only the one still to do keeps its red frame', () {
@@ -173,6 +175,50 @@ void main() {
     await t.pump(const Duration(milliseconds: 500));
     expect(find.text('⏹ Stop drone'), findsNothing);
     await t.pump(const Duration(seconds: 10));
+  });
+
+  test('the billboard drone film is one smooth flight: it starts high, never cuts and never goes into a billboard', () {
+    final city = HomeProject(seed: 4).rooms[11];
+    final legs = buildDroneLegs(city, 'billboards');
+    expect(legs.length, 1, reason: 'one flight, no cuts');
+    expect(legs.first.enter, isNull);
+    expect(legs.first.exit, isFalse);
+    expect(legs.first.eyes.first.y, greaterThan(500), reason: 'it starts high up');
+    final boards = city.furn.where((f) => f.kind == 'billboard').toList();
+    expect(boards, isNotEmpty);
+    final eyes = legs.first.eyes;
+    for (var i = 0; i + 1 < eyes.length; i++) {
+      for (var s = 0.0; s <= 1.0; s += 0.01) {
+        final p = V3.lerp(eyes[i], eyes[i + 1], s);
+        for (final f in boards) {
+          final near = (p.x - f.x).abs() < 50 && (p.z - f.z).abs() < 50 && p.y < 75;
+          expect(near, isFalse, reason: 'the drone is inside the billboard at (${f.x}, ${f.z})');
+        }
+      }
+    }
+    // It comes close to every billboard: a point in front of each one, 130 units away.
+    for (final f in boards) {
+      expect(eyes.any((e) => math.sqrt(math.pow(e.x - f.x, 2) + math.pow(e.z - f.z, 2)) < 140 && e.y < 100), isTrue, reason: 'billboard at (${f.x}, ${f.z}) is visited');
+    }
+  });
+
+  test('a cabinet is moved out of the stretch of wall in front of the TV, furniture is smaller, and no TV stands on the floor', () {
+    expect(kFurnKinds['bed']!.w, lessThanOrEqualTo(50));
+    expect(kFurnKinds['sofa']!.w, lessThanOrEqualTo(66));
+    final r = HomeProject(seed: 4).rooms.firstWhere((r) => r.kind == 'living');
+    r.wallTv = 'tv';
+    r.tvWall = 'back';
+    r.furn.clear();
+    final cab = r.add('wardrobe', x: 0, z: 10);
+    final box = wallTvBox(r, applianceByKey('tv'));
+    buildHomeRoom(r);
+    final k = kFurnKinds['wardrobe']!;
+    final clear = cab.x + k.w / 2 <= box.cx - box.w / 2 || cab.x - k.w / 2 >= box.cx + box.w / 2 || cab.z - k.d / 2 >= 52;
+    expect(clear, isTrue, reason: 'the wardrobe no longer hides the TV');
+    r.add('tvstand', x: 30, z: 20);
+    final withStand = buildHomeRoom(r);
+    final stand = withStand.polys.where((p) => p.id >= idHFurn && p.id < idHFurn + 100 && p.color == const Color(0xFF111418));
+    expect(stand, isEmpty, reason: 'no TV screen on a cabinet');
   });
 
   testWidgets('after three missed jobs the game is closed with a countdown', (t) async {

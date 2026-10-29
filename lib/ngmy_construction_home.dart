@@ -34,21 +34,21 @@ class FurnKind {
 }
 
 const Map<String, FurnKind> kFurnKinds = {
-  'bed': FurnKind('Bed', '🛏️', 60, 80),
-  'nightstand': FurnKind('Night table', '🪑', 16, 16),
-  'wardrobe': FurnKind('Wardrobe', '🚪', 44, 20),
-  'desk': FurnKind('Desk', '🖥️', 48, 24),
-  'rug': FurnKind('Rug', '🟥', 70, 50),
-  'sofa': FurnKind('Sofa', '🛋️', 80, 32),
-  'armchair': FurnKind('Armchair', '💺', 30, 30),
-  'coffee': FurnKind('Coffee table', '☕', 40, 24),
-  'tvstand': FurnKind('TV stand', '📺', 56, 18),
-  'dining': FurnKind('Dining table', '🍽️', 56, 36),
-  'chair': FurnKind('Chair', '🪑', 18, 18),
+  'bed': FurnKind('Bed', '🛏️', 48, 64),
+  'nightstand': FurnKind('Night table', '🪑', 13, 13),
+  'wardrobe': FurnKind('Wardrobe', '🚪', 35, 16),
+  'desk': FurnKind('Desk', '🖥️', 38, 19),
+  'rug': FurnKind('Rug', '🟥', 56, 40),
+  'sofa': FurnKind('Sofa', '🛋️', 64, 26),
+  'armchair': FurnKind('Armchair', '💺', 24, 24),
+  'coffee': FurnKind('Coffee table', '☕', 32, 19),
+  'tvstand': FurnKind('Media cabinet', '🗄️', 45, 14),
+  'dining': FurnKind('Dining table', '🍽️', 45, 29),
+  'chair': FurnKind('Chair', '🪑', 14, 14),
   'plant': FurnKind('Plant', '🪴', 14, 14),
   'lamp': FurnKind('Floor lamp', '💡', 10, 10),
-  'console': FurnKind('Console table', '🗄️', 44, 14),
-  'shelf': FurnKind('Bookshelf', '📚', 36, 12),
+  'console': FurnKind('Console table', '🗄️', 35, 11),
+  'shelf': FurnKind('Bookshelf', '📚', 29, 10),
   'tree': FurnKind('Tree', '🌳', 36, 36),
   'pine': FurnKind('Pine tree', '🌲', 30, 30),
   'bush': FurnKind('Bush', '🌿', 18, 18),
@@ -330,6 +330,48 @@ class HRoom {
     furn.add(f);
     clamp(f);
     return f;
+  }
+
+  /// Tall things (cabinets) that must never stand in front of a TV on the wall.
+  static const Set<String> tallKinds = {'wardrobe', 'shelf', 'lamp', 'console'};
+
+  /// Moves every tall piece of furniture out of the stretch of wall in front of the TV, so the TV can always be seen.
+  void clearTv() {
+    final key = wallTv;
+    if (key == null || !indoor || kind == 'hall') return;
+    final box = wallTvBox(this, applianceByKey(key));
+    final lo = box.cx - box.w / 2 - 6, hi = box.cx + box.w / 2 + 6;
+    const depth = 52.0;
+    for (final f in furn.where((f) => tallKinds.contains(f.kind))) {
+      final k = kFurnKinds[f.kind]!;
+      final turned = f.rot.isOdd;
+      final fw = turned ? k.d : k.w, fd = turned ? k.w : k.d;
+      if (tvWall == 'back') {
+        if (f.z - fd / 2 >= depth || f.x + fw / 2 <= lo || f.x - fw / 2 >= hi) continue;
+        final right = hi + fw / 2 + 1, left = lo - fw / 2 - 1;
+        final room = w / 2 - fw / 2 - 1;
+        if (right <= room && (f.x - right).abs() <= (f.x - left).abs() || left < -room && right <= room) {
+          f.x = right;
+        } else if (left >= -room) {
+          f.x = left;
+        } else {
+          f.z = depth + fd / 2 + 1;
+        }
+      } else {
+        final wallX = tvWall == 'left' ? -w / 2 : w / 2;
+        final near = tvWall == 'left' ? f.x - fw / 2 < wallX + depth : f.x + fw / 2 > wallX - depth;
+        if (!near || f.z + fd / 2 <= lo || f.z - fd / 2 >= hi) continue;
+        final down = hi + fd / 2 + 1, up = lo - fd / 2 - 1;
+        final room = d - fd / 2 - 1;
+        if (down <= room) {
+          f.z = down;
+        } else if (up >= fd / 2 + 1) {
+          f.z = up;
+        } else {
+          f.x = tvWall == 'left' ? wallX + depth + fw / 2 + 1 : wallX - depth - fw / 2 - 1;
+        }
+      }
+    }
   }
 
   /// Keeps a piece of furniture inside the room.

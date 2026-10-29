@@ -333,20 +333,23 @@ class CityInterior {
     b.box(const V3(120, 40, 100), const V3(16, 80, 60), const Color(0xFF9A6B3F));
     b.ball(const V3(-125, 16, 30), 10, const Color(0xFF3F8F4F), lat: 3, lon: 6);
     // The breaker panel on the left wall.
+    b.id = idCinPanel;
     b.box(const V3(-w / 2 + 3, 54, 45), const V3(5, 34, 24), const Color(0xFF8E959E), shine: 0.5);
     for (var i = 0; i < 4; i++) {
       b.box(V3(-w / 2 + 5.8, 62 - i * 6.0, 45), const V3(1.2, 3.6, 18), dark && i == 0 ? const Color(0xFFF97316) : const Color(0xFF22262C));
     }
+    b.id = 0;
     _mat(b, -100, 100, 22, dark ? const Color(0xFFEF4444) : const Color(0xFF22C55E));
     _mat(b, 90, 100, 22, const Color(0xFF60A5FA));
     // The faults you can see: a red frame behind the breaker panel, the outlet and the switch on the wall (green when the house works).
     final frame = dark ? const Color(0xFFEF4444) : const Color(0xFF22C55E);
     b.order = 1;
     b.alpha = 0.6;
+    b.id = idCinPanel;
     b.box(const V3(-w / 2 + 2.4, 54, 45), const V3(1.2, 44, 34), frame);
-    b.box(const V3(95, 26, 1.0), const V3(1.0, 30, 0.8), frame);
-    b.box(const V3(95, 26, 1.0), const V3(24, 1.0, 0.8), frame);
-    b.box(const V3(-60, 50, 1.0), const V3(18, 26, 0.8), frame);
+    b.id = idCinOutlet;
+    b.box(const V3(95, 26, 1.0), const V3(30, 36, 0.8), frame);
+    b.box(const V3(-60, 50, 1.0), const V3(24, 32, 0.8), frame);
     b.alpha = 1;
     b.box(const V3(95, 26, 1.8), const V3(14, 20, 1.2), const Color(0xFFF7F2E6), shine: 0.25);
     for (final dz in const [-1.0, 1.0]) {
@@ -356,6 +359,7 @@ class CityInterior {
     }
     b.box(const V3(-60, 50, 1.8), const V3(8, 14, 1.2), const Color(0xFFF7F2E6), shine: 0.25);
     b.box(V3(-60, dark ? 48 : 52, 2.8), const V3(2, 5, 1.0), const Color(0xFFD9D2C2));
+    b.id = 0;
     b.order = 2;
     labels.add(Label3D(const V3(-w / 2 + 6, 82, 45), dark ? '⚡ Breaker panel: tap, then walk onto the red mat' : '⚡ Breaker panel: all fine', dark ? const Color(0xFFDC2626) : const Color(0xFF15803D), id: idCinPanel));
     labels.add(Label3D(const V3(95, 50, 6), dark ? '🔌 Outlet: dead, tap to see it' : '🔌 Outlet: works', dark ? const Color(0xFFDC2626) : const Color(0xFF15803D), id: idCinOutlet));

@@ -152,6 +152,7 @@ void paintNgmyPoster(Canvas c, Size s, double t, int variant) {
 /// Edit modes: look, furniture, walls, floor, ceiling, doors.
 Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int problems = 0, bool closed = false, List<ResidentFigure> residents = const [], Set<int> hideFurn = const {}}) {
   if (r.kind == 'outside') return _outside(r, problems, mode, selected, residents, hideFurn);
+  r.clearTv();
   final b = MeshBuilder();
   final info = <int, ObjInfo>{};
   final labels = <Label3D>[];
@@ -313,7 +314,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
     fb.order = f.kind == 'rug' ? 1 : 2;
     fb.id = when('furniture', idHFurn + f.id);
     _furniture(fb, f.kind, kFurnColors[f.color]);
-    b.polys.addAll(transformPolys(fb.polys, ry: f.rot * math.pi / 2, t: V3(f.x, 0, f.z)));
+    b.polys.addAll(transformPolys(_shrink(fb.polys, 0.8), ry: f.rot * math.pi / 2, t: V3(f.x, 0, f.z)));
     info[idHFurn + f.id] = ObjInfo(k.name, 'Move it with the arrow buttons, turn it, change its colour or take it out.', V3(f.x, 12, f.z), 90);
   }
 
@@ -1257,6 +1258,9 @@ const Color kChromeC = Color(0xFFC9CED6);
 Color _shade(Color c, double t) => Color.lerp(c, t < 0 ? Colors.black : Colors.white, t.abs())!;
 
 /// Builds a piece of furniture centred on the origin, standing on y = 0, front towards +z.
+/// The same pieces, smaller (indoor furniture is 80 percent of its first drawing so rooms are not crowded).
+List<Poly> _shrink(List<Poly> ps, double k) => [for (final p in ps) Poly([for (final v in p.pts) V3(v.x * k, v.y * k, v.z * k)], p.n, p.color, p.id, shine: p.shine, alpha: p.alpha, twoSided: p.twoSided, layer: p.layer, bias: p.bias, order: p.order, group: p.group)];
+
 void _furniture(MeshBuilder b, String kind, Color c) {
   final dark = _shade(c, -0.25), light = _shade(c, 0.2);
   switch (kind) {
@@ -1305,11 +1309,10 @@ void _furniture(MeshBuilder b, String kind, Color c) {
       }
       b.box(const V3(4, 16.2, 0), const V3(8, 2, 6), const Color(0xFFE5E7EB), shine: 0.5);
     case 'tvstand':
+      // A low media cabinet. The TV is never on it: TVs hang on the wall.
       b.box(const V3(0, 9, 0), const V3(56, 18, 18), c, shine: 0.1);
       b.box(const V3(0, 11, 9.2), const V3(52, 8, 0.4), dark);
-      b.box(const V3(0, 34, 0), const V3(46, 26, 2), const Color(0xFF111418), shine: 0.7);
-      b.box(const V3(0, 34, 1.1), const V3(43, 23, 0.3), const Color(0xFF1E3A5F), shine: 0.9);
-      b.box(const V3(0, 20, 0), const V3(8, 4, 4), const Color(0xFF2B2D33));
+      b.box(const V3(0, 19, 0), const V3(20, 2, 8), const Color(0xFF2B2D33));
     case 'dining':
       b.box(const V3(0, 28, 0), const V3(56, 2, 36), c, shine: 0.2);
       for (final (x, z) in const [(-25.0, -15.0), (25.0, -15.0), (-25.0, 15.0), (25.0, 15.0)]) {
