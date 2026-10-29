@@ -7655,8 +7655,8 @@ return{f:x("ep<@>"),V:x("O<ac>"),O:x("O<w>"),q:x("O<ai<G>>"),g:x("O<v>"),v:x("O<
 D.fvh=new A.y("Tap to drop \xb7 line it up!",null,null,null,null,null,null,null,null,null,null,null)
 D.aY6=new B.ji(D.fvh,null)
 D.aXh=new A.bI(C.b0,null,null,D.aY6,null)
-D.fyh=new A.y("Swipe through fruit \xb7 avoid \ud83d\udca3",null,null,null,null,null,null,null,null,null,null,null)
-D.aY1=new B.ji(D.fyh,null)
+D.fyg=new A.y("Swipe through fruit \xb7 avoid \ud83d\udca3",null,null,null,null,null,null,null,null,null,null,null)
+D.aY1=new B.ji(D.fyg,null)
 D.aXi=new A.bI(C.b0,null,null,D.aY1,null)
 D.fAm=new A.y("Swipe to merge \u2014 reach 256",null,null,null,null,null,null,null,null,null,null,null)
 D.aY4=new B.ji(D.fAm,null)
@@ -8750,4 +8750,4 @@ D.h8w=new B.a0s(2,"fall")
 D.h8x=new B.a0s(3,"walk")
 D.aWd=new B.a0s(4,"drop")})();(function staticFields(){$.cdJ=null
 $.fWK=A.U(y.N,A.ax("+order,pos(ai<G>,G)"))})()};
-(a=>{a["JJr77VWhgEQnVutjd1Dz68ngkRQ="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["ZaNeiaobxP1ZgiSiq6tnME7pkDg="]=a.current})($__dart_deferred_initializers__);

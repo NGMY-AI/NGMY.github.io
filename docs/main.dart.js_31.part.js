@@ -2065,7 +2065,7 @@ case 24:case 21:w=18
 break
 case 19:if(B.a.i(o.b)!==q&&J.ad(q)!==0){l=r.c
 if(l==null){w=1
-break}l.J(x.q).f.S(D.eXT)
+break}l.J(x.q).f.S(D.eXS)
 w=1
 break}case 18:l=r.d
 k=B.a.i(o.b).length!==0?o.b:q
@@ -3514,7 +3514,7 @@ t=p.z
 s=t.length!==0
 t=s?r.c0F(t):A.X(B.y8,B.ay,q,q,q,28)
 u=A.aC(q,A.p(q,t,B.aq,q,q,new A.o(v,q,u,q,q,q,B.a5),q,72,q,q,q,q,q,72),B.y,!1,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,w,q,q,q,q,q,q,!1,B.a7)
-w=A.a([A.dn(D.bRD,D.fyD,w,A.bn(B.ay,q,q,q,B.w,q,q,q,q,q,q,q))],o)
+w=A.a([A.dn(D.bRD,D.fyC,w,A.bn(B.ay,q,q,q,B.w,q,q,q,q,q,q,q))],o)
 if(s)w.push(A.bK(!1,D.fkc,q,q,!0,q,q,r.gco0(),q,q))
 n.push(r.Ay(d,A.x(A.a([A.B(A.a([u,B.eo,A.E(A.x(w,B.ai,q,B.e,B.j,0,B.p),1)],o),B.m,q,B.e,B.j,0,q,q),B.ac,r.a8O(d,r.CW,B.iI,"Phone","555-123-4567",new C.ei2(e)),r.a8O(d,r.cx,B.BG,"Address","123 Main St, City",new C.ei3(e)),r.a8O(d,r.cy,B.jK,"Hours","Mon\u2013Sat 11am\u201310pm",new C.ei4(e)),r.a8O(d,r.db,B.hp,"Website","yourrestaurant.com",new C.ei5(e))],o),B.ai,q,B.e,B.j,0,B.p),"Card info (optional)"))}if(m)n.push(B.aB)
 m=d.a
@@ -4872,11 +4872,11 @@ D.aP_=new A.hQ(4,8,8,0.88,null)
 D.flg=new A.y("Bio deleted \u2014 public link cleared",null,null,null,null,null,null,null,null,null,null,null)
 D.eXk=new A.b1(D.flg,null,null,null,null,null,null,null,B.iu,null,null,null,null,B.T,!1,null,null,null,B.r,null)
 D.fit=new A.y("Could not save display name. Try a smaller photo, then Save again.",null,null,null,null,null,null,null,null,null,null,null)
-D.eXT=new A.b1(D.fit,B.dJ,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
+D.eXS=new A.b1(D.fit,B.dJ,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
 D.fGx=new A.y("Link copied to clipboard!",null,null,null,null,null,null,null,null,null,null,null)
 D.eZn=new A.b1(D.fGx,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
-D.fzh=new A.y("Publish first to get a QR link",null,null,null,null,null,null,null,null,null,null,null)
-D.eZB=new A.b1(D.fzh,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
+D.fzg=new A.y("Publish first to get a QR link",null,null,null,null,null,null,null,null,null,null,null)
+D.eZB=new A.b1(D.fzg,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
 D.fGC=new A.y("Menu deleted \u2014 public link cleared",null,null,null,null,null,null,null,null,null,null,null)
 D.eZI=new A.b1(D.fGC,null,null,null,null,null,null,null,B.iu,null,null,null,null,B.T,!1,null,null,null,B.r,null)
 D.fDX=new A.y("Add a restaurant name first",null,null,null,null,null,null,null,null,null,null,null)
@@ -4905,9 +4905,9 @@ D.fs_=new A.y("Back to editing",null,null,null,null,null,null,null,null,null,nul
 D.ftB=new A.y("Add menu",null,null,null,null,null,null,null,null,null,null,null)
 D.fv0=new A.y("Add item",null,null,null,null,null,null,null,null,null,null,null)
 D.fw0=new A.y("Publish",null,B.cC,null,null,null,null,null,null,null,null,null)
-D.fyD=new A.y("Restaurant logo",null,null,null,null,null,null,null,null,null,null,null)
+D.fyC=new A.y("Restaurant logo",null,null,null,null,null,null,null,null,null,null,null)
 D.fA0=new A.y("Add section",null,null,null,null,null,null,null,null,null,null,null)
 D.fBj=new A.y("Use banner",null,null,null,null,null,null,null,null,null,null,null)
 D.fC8=new A.y("Create new Bio",null,B.fS,null,null,null,null,null,null,null,null,null)
 D.h4F=new C.acO(!0,0,"")})();(function staticFields(){$.hhM=null})()};
-(a=>{a["Bvs+0ZEmdu35nSxGmS1vUFtv41A="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["ckllg3bCxbtgWuZ0jmCc5AgjGjY="]=a.current})($__dart_deferred_initializers__);

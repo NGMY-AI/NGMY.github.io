@@ -4864,7 +4864,7 @@ return A.i($async$ahD,v)},
 Oe(){var w=0,v=A.j(x.H),u,t=2,s=[],r=[],q=this,p,o,n,m,l,k,j,i,h
 var $async$Oe=A.e(function(d,e){if(d===1){s.push(e)
 w=t}for(;;)switch(w){case 0:i=q.ax
-if(!new A.bc(i,A.a3(i).k("bc<2>")).b6(0,new C.eJL())){q.c.J(x.q).f.S(D.eY0)
+if(!new A.bc(i,A.a3(i).k("bc<2>")).b6(0,new C.eJL())){q.c.J(x.q).f.S(D.eY_)
 w=1
 break}p=q.bOg()
 q.m(new C.eJM(q))
@@ -5420,7 +5420,7 @@ $0(){return this.a.dx=!0},
 $S:0}
 C.eJn.prototype={
 $1(d){var w=null
-return A.em(A.a([A.bK(!1,D.fww,w,w,!0,w,w,new C.eJl(d),w,w),A.bG(D.fys,new C.eJm(d),A.bn(B.mZ,w,w,w,w,w,w,w,w,w,w,w))],x.p),w,w,B.mX,D.ftO,w,w,w,w,D.fvQ,w)},
+return A.em(A.a([A.bK(!1,D.fww,w,w,!0,w,w,new C.eJl(d),w,w),A.bG(D.fyr,new C.eJm(d),A.bn(B.mZ,w,w,w,w,w,w,w,w,w,w,w))],x.p),w,w,B.mX,D.ftO,w,w,w,w,D.fvQ,w)},
 $S:20}
 C.eJl.prototype={
 $0(){A.a6(this.a,!1).O(!1)
@@ -6306,7 +6306,7 @@ D.eOo=new A.e8(["GILDED HERALD LIVE","NGMY HERALD","NGMY Herald","NGMYHerald",!0
 D.eOp=new A.e8(["STATE OF THE NATION","NGMY PRESIDENT","NGMY Office","NGMYState",!1])
 D.eWP=new A.hQ(2,8,8,1.2,null)
 D.fjp=new A.y("Upload a video into at least one screen frame.",null,null,null,null,null,null,null,null,null,null,null)
-D.eY0=new A.b1(D.fjp,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
+D.eY_=new A.b1(D.fjp,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
 D.fG3=new A.y("Loading video\u2026",null,null,null,null,null,null,null,null,null,null,null)
 D.eZX=new A.b1(D.fG3,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
 D.fpN=new A.y("Logo added \u2014 it will animate like a news pop-up.",null,null,null,null,null,null,null,null,null,null,null)
@@ -6322,7 +6322,7 @@ D.fmp=new A.y("Save your video",null,B.hu,null,null,null,null,null,null,null,nul
 D.ftO=new A.y("Template recording is in progress. Cancel and go back?",null,B.hG,null,null,null,null,null,null,null,null,null)
 D.fvQ=new A.y("Cancel export?",null,B.dp,null,null,null,null,null,null,null,null,null)
 D.fww=new A.y("Keep recording",null,null,null,null,null,null,null,null,null,null,null)
-D.fys=new A.y("Cancel export",null,null,null,null,null,null,null,null,null,null,null)
+D.fyr=new A.y("Cancel export",null,null,null,null,null,null,null,null,null,null,null)
 D.fB5=new A.y("Show brand logo",null,N.TM,null,null,null,null,null,null,null,null,null)
 D.fDv=new A.y("Save to Photos / Files",null,null,null,null,null,null,null,null,null,null,null)
 D.h5r=new C.a_t(null)})();(function staticFields(){$.Gf=null
@@ -6338,4 +6338,4 @@ w($,"iid","h4q",()=>A.nx(B.jE))
 w($,"iie","htc",()=>A.nx(B.dV))
 w($,"iif","htd",()=>A.mZ(0,0.5,x.W))
 w($,"ilK","h5_",()=>A.fUU(C.i0g(),!0,A.ax("Wg")))})()};
-(a=>{a["mONOfX9it9eLt+JMkt8/40M+2XA="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["f+ITU2LHdqi1wTmRS8Lj5bAw8bg="]=a.current})($__dart_deferred_initializers__);

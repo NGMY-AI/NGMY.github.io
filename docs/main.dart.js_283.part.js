@@ -6099,7 +6099,7 @@ j=A.B(A.a([f.aqP("INVESTED","$"+A.dC(k),!0),f.aqP("DAILY ROI",B.k.aa(j*100,2)+"%
 k=A.dC(u.e)
 u=u.f
 g=261-u>0?"ACTIVE":"ENDED"
-B.d.v(v,A.a([D.fz0,B.uN,A.p(e,new A.an(B.W,e,B.aa,B.r,A.a([m,A.x(A.a([o,B.O,D.fqZ,B.bC,l,B.au,i,B.au,h,B.O,r,B.am,s,B.am,j,B.au,A.Dq("Earned $"+k+" \u2022 Clocked "+u+"/261 \u2022 "+g,1,B.a2,D.fcf)],w),B.F,e,B.e,B.N,0,B.p)],w),e),B.f,e,e,new A.o(e,e,p,q,n,D.bYA,B.n),e,e,e,e,B.bB,e,e,1/0),B.a7y],w))}v.push(D.fj_)
+B.d.v(v,A.a([D.fz_,B.uN,A.p(e,new A.an(B.W,e,B.aa,B.r,A.a([m,A.x(A.a([o,B.O,D.fqZ,B.bC,l,B.au,i,B.au,h,B.O,r,B.am,s,B.am,j,B.au,A.Dq("Earned $"+k+" \u2022 Clocked "+u+"/261 \u2022 "+g,1,B.a2,D.fcf)],w),B.F,e,B.e,B.N,0,B.p)],w),e),B.f,e,e,new A.o(e,e,p,q,n,D.bYA,B.n),e,e,e,e,B.bB,e,e,1/0),B.a7y],w))}v.push(D.fj_)
 v.push(B.uN)
 B.d.v(v,new A.M(a1,new C.dfX(f,a2),A.T(a1).k("M<1,t>")))
 return A.c8(e,B.K,A.bm(!1,A.cd(A.x(v,B.F,e,B.e,B.j,0,B.p),B.r,e,B.y,e,new A.Q(20,10,20,124+d.r.d),e,e,B.ah),!0,!1,B.af,!0,!0),e,!1,!1,e,e)},
@@ -8039,7 +8039,7 @@ if(n)n=B.Tp
 else n=A.X(B.yd,t?B.aQ:B.M,u,u,u,u)
 w=x.p
 o=A.eF(A.a([A.hn(n,A.d("Save",u,u,u,u,u,u,A.l(u,u,t?B.aQ:B.M,u,u,u,u,u,u,u,u,u,u,u,u,u,u,!0,u,u,u,u,u,u,u,u),u,u,u),m,u)],w),u,u,!0,!0,q,u,1,u,u,u,!1,u,!1,p,u,u,u,!0,u,u,u,u,u,o,u,u,u,1,u,!0)
-p=R.aUn(B.aK,u,O.VS,B.o8,D.fyL,v.gbz9())
+p=R.aUn(B.aK,u,O.VS,B.o8,D.fyK,v.gbz9())
 q=v.bCR(s)
 n=A.d("Drag categories to reorder. Tap a category to edit questions.",u,u,u,u,u,u,A.l(u,u,t?B.bK:B.ak,u,u,u,u,u,u,u,u,12,u,u,u,u,u,!0,u,u,u,u,u,u,u,u),u,u,u)
 m=v.d
@@ -9925,7 +9925,7 @@ p=A.n(18)
 v=A.a([new A.ac(0,B.G,B.bD.j(0.4),B.cB,18)],v)
 n=g.e
 j=n===1?"":"s"
-return new A.D(new A.Q(0,0,0,d.f.d+e.r.d),A.p(f,A.x(A.a([w,B.aR,t,B.by,q,B.by,D.fyq,B.am,o,B.aR,D.fCL,B.O,s,B.aB,r,B.aR,new A.a7(f,54,A.c_(A.hn(D.an9,A.d("Send invite \xb7 "+n+" game"+j,f,f,f,f,f,f,B.fS,f,f,f),g.gc81(),f),new A.o(f,f,f,p,v,D.bYY,B.n),B.bf),f)],u),B.ai,f,B.e,B.N,0,B.p),B.f,f,f,D.b0J,f,f,f,f,D.bvf,f,f,f),f)},
+return new A.D(new A.Q(0,0,0,d.f.d+e.r.d),A.p(f,A.x(A.a([w,B.aR,t,B.by,q,B.by,D.fyp,B.am,o,B.aR,D.fCL,B.O,s,B.aB,r,B.aR,new A.a7(f,54,A.c_(A.hn(D.an9,A.d("Send invite \xb7 "+n+" game"+j,f,f,f,f,f,f,B.fS,f,f,f),g.gc81(),f),new A.o(f,f,f,p,v,D.bYY,B.n),B.bf),f)],u),B.ai,f,B.e,B.N,0,B.p),B.f,f,f,D.b0J,f,f,f,f,D.bvf,f,f,f),f)},
 b5o(d,e,f){var w=null,v=f.j(0.1),u=A.n(16),t=A.I(f.j(0.45),B.q,1)
 return A.E(A.p(w,A.x(A.a([A.X(d,f,w,w,w,24),B.au,A.d(e,w,w,w,w,w,w,B.Js,w,w,w)],x.p),B.m,w,B.e,B.j,0,B.p),B.f,w,w,new A.o(v,w,t,u,w,w,B.n),w,w,w,w,B.fa,w,w,w),1)}}
 C.p7.prototype={}
@@ -11676,7 +11676,7 @@ return A.i($async$$0,v)},
 $S:1}
 C.dwq.prototype={
 $1(d){var w=null,v=new A.as(B.as,$.aw()),u=A.P(d).ax.a===B.I,t=u?B.id:B.c,s=x.p,r=A.x(A.a([A.d("Enter the verification code shown on your local deposit request. It must match what admin used for this QR.",w,w,w,w,w,w,A.l(w,w,u?B.ad:B.ak,w,w,w,w,w,w,w,w,13,w,w,w,w,1.4,!0,w,w,w,w,w,w,w,w),w,w,w),B.aB,A.aM(w,B.U,!0,w,!0,B.r,w,A.aN(),v,w,w,w,w,w,2,A.bs(w,new A.b4(4,A.n(14),B.dh),w,w,w,w,w,w,!0,w,w,w,w,w,w,w,!0,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,"Verification code",!0,!0,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w),B.y,!0,w,!0,w,!1,w,B.aj,w,w,w,w,w,B.dO,w,w,w,1,w,w,!1,"\u2022",w,w,w,w,w,!1,w,w,!1,w,!0,w,B.a9,w,w,w,w,w,w,w,w,w,w,w,w,!0,B.L,w,B.an,w,w,w,w)],s),B.F,w,B.e,B.N,0,B.p)
-return A.em(A.a([A.bK(!1,B.df,w,w,!0,w,w,new C.dwo(d),w,w),A.bG(D.fkh,new C.dwp(d,v),A.bn(B.aV,w,w,w,w,w,w,w,w,w,w,w))],s),w,w,t,r,w,w,w,w,D.fyK,w)},
+return A.em(A.a([A.bK(!1,B.df,w,w,!0,w,w,new C.dwo(d),w,w),A.bG(D.fkh,new C.dwp(d,v),A.bn(B.aV,w,w,w,w,w,w,w,w,w,w,w))],s),w,w,t,r,w,w,w,w,D.fyJ,w)},
 $S:20}
 C.dwo.prototype={
 $0(){A.a6(this.a,!1).O(null)
@@ -14341,10 +14341,10 @@ D.f3B=new A.H(!0,B.c,null,null,null,null,22,B.u,null,0.3,null,null,null,null,nul
 D.fwm=new A.y("Investment Required",null,D.f3B,null,B.L,null,null,null,null,null,null,null)
 D.f37=new A.H(!0,B.c,null,null,null,null,16.5,B.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fxR=new A.y("Network Status",null,D.f37,null,null,null,null,null,null,null,null,null)
-D.fyq=new A.y("Their account email",null,G.a7Z,null,null,null,null,null,null,null,null,null)
-D.fyK=new A.y("Verification code",null,B.cC,null,null,null,null,null,null,null,null,null)
-D.fyL=new A.y("Category",null,null,null,null,null,null,null,null,null,null,null)
-D.fz0=new A.y("ACTIVE ASSET",null,D.aQM,null,null,null,null,null,null,null,null,null)
+D.fyp=new A.y("Their account email",null,G.a7Z,null,null,null,null,null,null,null,null,null)
+D.fyJ=new A.y("Verification code",null,B.cC,null,null,null,null,null,null,null,null,null)
+D.fyK=new A.y("Category",null,null,null,null,null,null,null,null,null,null,null)
+D.fz_=new A.y("ACTIVE ASSET",null,D.aQM,null,null,null,null,null,null,null,null,null)
 D.fzm=new A.y("Scan QR",null,B.cC,null,null,null,null,null,null,null,null,null)
 D.fzr=new A.y("Check word",null,B.cC,null,null,null,null,null,null,null,null,null)
 D.fzR=new A.y("YOUR HAND",null,D.aRj,null,null,null,null,null,null,null,null,null)
@@ -14381,4 +14381,4 @@ w($,"iij","bDO",()=>C.i0f())
 w($,"ii5","ht7",()=>{var v=null,u=A.h3(v,v,v,v,D.f2C,B.a4,B.c6,v,B.dP,B.c5)
 u.en()
 return u})})()};
-(a=>{a["c0ywrHEOoWZKo3ghj7kfdWxNkW4="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["H1JQNiy+rBLJ/lnyho6nkcBU2Ws="]=a.current})($__dart_deferred_initializers__);

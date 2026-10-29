@@ -3905,7 +3905,7 @@ r===$&&A.c()
 w=11
 return A.b(A.fN(new A.fE(q+"\n\n"+C.aNW(r.c,r.ax))),$async$JY)
 case 11:q=t.c
-if(q!=null)q.J(x.q).f.S(D.eYu)
+if(q!=null)q.J(x.q).f.S(D.eYt)
 w=9
 break
 case 10:w=s==="pin"?12:14
@@ -4999,7 +4999,7 @@ t=k.Q
 s=B.bD.j(0.45)
 r=k.Q?"Blocking popup when it is time to take this medicine":"Reminders off for this medicine"
 q=x.p
-t=A.a([f,w,v,B.O,new C.Ez(D.cTg,""+u,B.bD,new C.dna(k),j),B.au,A.iI(j,j,s,B.af,j,new C.dnb(k),j,A.d(r,j,j,j,j,j,j,A.l(j,j,B.c.j(0.45),j,j,j,j,j,j,j,j,12,j,j,j,j,j,!0,j,j,j,j,j,j,j,j),j,j,j),new A.cN(new C.dnc(),x.bc),D.fyi,t)],q)
+t=A.a([f,w,v,B.O,new C.Ez(D.cTg,""+u,B.bD,new C.dna(k),j),B.au,A.iI(j,j,s,B.af,j,new C.dnb(k),j,A.d(r,j,j,j,j,j,j,A.l(j,j,B.c.j(0.45),j,j,j,j,j,j,j,j,12,j,j,j,j,j,!0,j,j,j,j,j,j,j,j),j,j,j),new A.cN(new C.dnc(),x.bc),D.fyh,t)],q)
 if(k.Q){f=A.a([A.d("REMINDER TIMES",j,j,j,j,j,j,A.l(j,j,B.c.j(0.45),j,j,j,j,j,j,j,j,10,j,j,B.H,j,j,!0,j,1.1,j,j,j,j,j,j),j,j,j),B.O],q)
 p=k.as.length
 o=J.e4(p,x.l)
@@ -8093,7 +8093,7 @@ D.eX4=new A.hQ(2,10,10,0.82,null)
 D.fjN=new A.y("Pick a time at least 1 minute from now.",null,null,null,null,null,null,null,null,null,null,null)
 D.eXz=new A.b1(D.fjN,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
 D.fkH=new A.y("Note copied \u2014 paste to share",null,null,null,null,null,null,null,null,null,null,null)
-D.eYu=new A.b1(D.fkH,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
+D.eYt=new A.b1(D.fkH,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
 D.fn2=new A.y("Enter a task title",null,null,null,null,null,null,null,null,null,null,null)
 D.eZ7=new A.b1(D.fn2,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
 D.fnb=new A.y("Photo could not be saved. Try a smaller picture.",null,null,null,null,null,null,null,null,null,null,null)
@@ -8142,7 +8142,7 @@ D.fv1=new A.y("Pick any color",null,B.dj,null,null,null,null,null,null,null,null
 D.fwe=new A.y("Remind me in\u2026",null,B.j8,null,null,null,null,null,null,null,null,null)
 D.fwz=new A.y("Cover icon",null,B.rX,null,null,null,null,null,null,null,null,null)
 D.fxq=new A.y("Insert emoji",null,B.rX,null,null,null,null,null,null,null,null,null)
-D.fyi=new A.y("Reminder alerts",null,B.a8l,null,null,null,null,null,null,null,null,null)
+D.fyh=new A.y("Reminder alerts",null,B.a8l,null,null,null,null,null,null,null,null,null)
 D.fzx=new A.y("Highlight text first to animate only that part. Pick None to remove animation. ( ) only shows while you edit right next to the word \u2014 never in Preview or note list.",null,B.hg,null,null,null,null,null,null,null,null,null)
 D.fBt=new A.y("Text color",null,B.dj,null,null,null,null,null,null,null,null,null)
 D.fBX=new A.y("Edit",null,B.pj,null,null,null,null,null,null,null,null,null)
@@ -8175,4 +8175,4 @@ v($,"ilq","h4X",()=>C.hfj("initializeDateFormatting(<locale>)",D.dpN))
 w($,"iej","hrj",()=>A.a([A.af("^'(?:[^']|'')*'",!0,!1,!1,!1),A.af("^(?:G+|y+|M+|k+|S+|E+|a+|h+|K+|H+|c+|L+|Q+|d+|D+|m+|s+|v+|z+|Z+)",!0,!1,!1,!1),A.af("^[^'GyMkSEahKHcLQdDmsvzZ]+",!0,!1,!1,!1)],A.ax("O<fXP>")))
 w($,"iic","htb",()=>A.af("''",!0,!1,!1,!1))
 w($,"igk","hsj",()=>C.hxA("MMM d, yyyy"))})()};
-(a=>{a["cii2+OzxP+Xvp8MmaVzuvaEEEUU="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["mgovrTH8bIB/Hj6vBN6DbVcaI+0="]=a.current})($__dart_deferred_initializers__);

@@ -1643,7 +1643,7 @@ if(o&&!r.d.y){r.c.J(x.q).f.S(D.eYR)
 w=1
 break}if(o){n=r.d
 n=n.y&&B.a.i(n.ax).length===0}else n=!1
-if(n){r.c.J(x.q).f.S(D.eYk)
+if(n){r.c.J(x.q).f.S(D.eYj)
 w=1
 break}n=r.d
 m=n.d
@@ -3051,7 +3051,7 @@ if(t!=null&&B.a.i(t).length!==0)u.push(C.h0F("Help for",B.a.i(t)))
 u.push(B.R)
 u.push(D.fvT)
 u.push(B.by)
-u.push(A.B(A.a([A.E(A.bK(!1,D.fyI,w,w,!0,w,w,new C.foZ(d),w,w),1),B.ab,A.E(A.bG(D.fEL,new C.fp_(d),A.bn(B.b3,w,w,w,B.c_,w,B.cm,w,new A.b7(A.n(14),B.Y),w,w,w)),2)],v),B.m,w,B.e,B.j,0,w,w))
+u.push(A.B(A.a([A.E(A.bK(!1,D.fyH,w,w,!0,w,w,new C.foZ(d),w,w),1),B.ab,A.E(A.bG(D.fEL,new C.fp_(d),A.bn(B.b3,w,w,w,B.c_,w,B.cm,w,new A.b7(A.n(14),B.Y),w,w,w)),2)],v),B.m,w,B.e,B.j,0,w,w))
 return new A.D(F.xK,new C.ox(A.x(u,B.ai,w,B.e,B.N,0,B.p),!0,w),w)},
 $S:61}
 C.foZ.prototype={
@@ -3407,10 +3407,10 @@ D.eil=new A.C0(null,B.dI)
 D.ejW=new A.z(0,"Ledger")
 D.ekL=new A.z(1,"People")
 D.elk=new A.z(2,"Invite")
-D.fyG=new A.y("Your request is already waiting. The group owner has to approve you.",null,null,null,null,null,null,null,null,null,null,null)
-D.eXy=new A.b1(D.fyG,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
+D.fyF=new A.y("Your request is already waiting. The group owner has to approve you.",null,null,null,null,null,null,null,null,null,null,null)
+D.eXy=new A.b1(D.fyF,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
 D.fxc=new A.y("Help mode is active but missing a campaign.",null,null,null,null,null,null,null,null,null,null,null)
-D.eYk=new A.b1(D.fxc,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
+D.eYj=new A.b1(D.fxc,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
 D.flQ=new A.y("Activate help mode before recording a contribution.",null,null,null,null,null,null,null,null,null,null,null)
 D.eYR=new A.b1(D.flQ,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
 D.fDc=new A.y("Add what you are collecting for, then activate help mode.",null,null,null,null,null,null,null,null,null,null,null)
@@ -3481,7 +3481,7 @@ D.fvW=new A.y("Remove member?",null,B.dj,null,B.L,null,null,null,null,null,null,
 D.fwi=new A.y("Keep member",null,B.kH,null,null,null,null,null,null,null,null,null)
 D.fwB=new A.y("Are your mother, father, spouse, children or brothers and sisters already here? Choose them.",null,D.U0,null,null,null,null,null,null,null,null,null)
 D.fwI=new A.y("Request sent",null,B.kf,null,null,null,null,null,null,null,null,null)
-D.fyI=new A.y("Go back",null,B.kH,null,null,null,null,null,null,null,null,null)
+D.fyH=new A.y("Go back",null,B.kH,null,null,null,null,null,null,null,null,null)
 D.fzC=new A.y("Scan group QR",null,null,null,null,null,null,null,null,null,null,null)
 D.fA1=new A.y("Tap who put money in \u2014 people who joined this group.",null,B.hg,null,B.L,null,null,null,null,null,null,null)
 D.fAX=new A.y("Record contribution",null,B.fS,null,B.L,null,null,null,null,null,null,null)
@@ -3498,4 +3498,4 @@ D.a9L=new C.Cu(0,"all")
 D.aVR=new C.Cu(1,"contributions")
 D.aVS=new C.Cu(2,"missed")
 D.h5h=new C.aCE(null)})()};
-(a=>{a["dKfe8oPkEpUplwA2WEFFuADQNVU="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["38yWvz7DWZxvMh+MUuHmdJ0Zi+0="]=a.current})($__dart_deferred_initializers__);

@@ -4588,7 +4588,7 @@ return A.b(B.a6N(o.e,r,s,q),$async$J4)
 case 4:p=e
 o=u.c
 if(o==null){x=1
-break}if(!p){o.J(y.q).f.S(D.eXL)
+break}if(!p){o.J(y.q).f.S(D.eXK)
 x=1
 break}x=5
 return A.b(B.a6J(u.a.c,"member"),$async$J4)
@@ -4628,7 +4628,7 @@ return A.b(B.a6L(s,t,o,q.c),$async$xU)
 case 9:p=e
 o=u.c
 if(o==null){x=1
-break}if(!p){o.J(y.q).f.S(D.eXI)
+break}if(!p){o.J(y.q).f.S(D.eXH)
 x=1
 break}x=10
 return A.b(B.ap1(u.a.c),$async$xU)
@@ -4893,7 +4893,7 @@ u=l.f?k:l.gctg()
 t=i[3]
 s=i[1]
 q=A.n(16)
-s=A.eA(M.a19,D.fyp,u,A.dg(k,k,i[2].j(0.75),k,k,k,k,k,k,t,k,k,C.cm,k,new A.b7(q,C.Y),new A.az(s,1,C.q,-1),k,k,k,k))
+s=A.eA(M.a19,D.fyo,u,A.dg(k,k,i[2].j(0.75),k,k,k,k,k,k,t,k,k,C.cm,k,new A.b7(q,C.Y),new A.az(s,1,C.q,-1),k,k,k,k))
 i=A.d("Device share sheet when available. Or send in-app with their code below.",k,k,k,k,k,k,A.l(k,k,i[4],k,k,k,k,k,k,k,k,11,k,k,k,k,1.35,!0,k,k,k,k,k,k,k,k),C.L,k,k)
 u=l.f?k:l.gc6G()
 t=A.bn(C.aE,k,k,0,C.c,k,C.ng,k,new A.b7(A.n(16),C.Y),k,k,k)
@@ -5678,7 +5678,7 @@ return A.b(B.rr(t.c,t.d),$async$a1w)
 case 5:q=e
 case 4:if(q==null||q.length===0){t=u.c
 if(t==null){x=1
-break}t.J(y.q).f.S(D.eYh)
+break}t.J(y.q).f.S(D.eYg)
 x=1
 break}t=u.a.d
 s=t.b
@@ -6101,7 +6101,7 @@ s=B.a6O(p?"":t)
 if(s==null){r=u.c
 if(r!=null){q=C.a.i(p?"":t).length!==0
 p=q}else p=!1
-if(p)r.J(y.q).f.S(D.eXS)
+if(p)r.J(y.q).f.S(D.eXR)
 x=1
 break}p=u.c
 if(p!=null)A.a6(p,!1).O(s)
@@ -7355,8 +7355,8 @@ D.adQ=new A.w(1,0.1411764705882353,0.18823529411764706,0.2549019607843137,C.t)
 D.aeN=new A.w(1,0.03137254901960784,0.06274509803921569,0.09411764705882353,C.t)
 D.age=new A.w(1,0.07058823529411765,0.10196078431372549,0.14901960784313725,C.t)
 D.fkI=new A.y("Your team portal",null,C.dj,null,null,null,null,null,null,null,null,null)
-D.fyY=new A.y("Share the access code and member password with your team. They only sign in once.",null,G.Dy,null,null,null,null,null,null,null,null,null)
-D.d6h=x([D.fkI,C.am,D.fyY],y.p)
+D.fyX=new A.y("Share the access code and member password with your team. They only sign in once.",null,G.Dy,null,null,null,null,null,null,null,null,null)
+D.d6h=x([D.fkI,C.am,D.fyX],y.p)
 D.bnv=new A.fm(C.ah,C.e,C.j,C.F,null,C.p,null,0,D.d6h,null)
 D.fDh=new A.y("Create your organization",null,C.ft,null,null,null,null,null,null,null,null,null)
 D.fp_=new A.y("Set an access code and member password. Share them with your team \u2014 they sign in once.",null,G.Dy,null,null,null,null,null,null,null,null,null)
@@ -7408,8 +7408,8 @@ D.RM=new B.Ng(1,"cloudStash")
 D.dB9=new B.Ng(2,"inlineInstant")
 D.RN=new B.Ng(3,"webrtcLink")
 D.zk=new B.Ng(4,"videoCloud")
-D.fyX=new A.y("Receive file",null,C.nD,null,null,null,null,null,null,null,null,null)
-D.cxb=x([E.anC,C.ab,D.fyX],y.p)
+D.fyW=new A.y("Receive file",null,C.nD,null,null,null,null,null,null,null,null,null)
+D.cxb=x([E.anC,C.ab,D.fyW],y.p)
 D.eQh=new A.cl(C.aP,C.b9,C.j,C.m,null,C.p,null,0,D.cxb,null)
 D.eck=new A.D(C.cm,D.eQh,null)
 D.fbQ=new A.H(!0,C.c,null,null,null,null,null,C.P,null,null,null,null,null,null,null,null,null,null,null,null,null,null,V.a2X,null,null,null)
@@ -7447,13 +7447,13 @@ D.eUM=new A.ar(160,48)
 D.b7k=new A.fk(2,null,null,null,null,C.aE,null,null,null,null)
 D.eWg=new A.a7(16,16,D.b7k,null)
 D.fon=new A.y("Could not create portal. Access code may already be in use.",null,null,null,null,null,null,null,null,null,null,null)
-D.eXI=new A.b1(D.fon,null,null,null,null,null,null,null,null,null,null,null,null,C.T,!1,null,null,null,C.r,null)
+D.eXH=new A.b1(D.fon,null,null,null,null,null,null,null,null,null,null,null,null,C.T,!1,null,null,null,C.r,null)
 D.fvL=new A.y("Access code or password incorrect, or organization subscription expired.",null,null,null,null,null,null,null,null,null,null,null)
-D.eXL=new A.b1(D.fvL,null,null,null,null,null,null,null,null,null,null,null,null,C.T,!1,null,null,null,C.r,null)
+D.eXK=new A.b1(D.fvL,null,null,null,null,null,null,null,null,null,null,null,null,C.T,!1,null,null,null,C.r,null)
 D.fEl=new A.y("Enter a valid 5\u20136 character code.",null,null,null,null,null,null,null,null,null,null,null)
-D.eXS=new A.b1(D.fEl,null,null,null,null,null,null,null,null,null,null,null,null,C.T,!1,null,null,null,C.r,null)
+D.eXR=new A.b1(D.fEl,null,null,null,null,null,null,null,null,null,null,null,null,C.T,!1,null,null,null,C.r,null)
 D.fnY=new A.y("Could not read this image to share.",null,null,null,null,null,null,null,null,null,null,null)
-D.eYh=new A.b1(D.fnY,null,null,null,null,null,null,null,null,null,null,null,null,C.T,!1,null,null,null,C.r,null)
+D.eYg=new A.b1(D.fnY,null,null,null,null,null,null,null,null,null,null,null,null,C.T,!1,null,null,null,C.r,null)
 D.fzJ=new A.y("Connected \u2014 sending files now\u2026",null,null,null,null,null,null,null,null,null,null,null)
 D.aPb=new A.b1(D.fzJ,null,null,null,null,null,null,null,null,null,null,null,null,C.T,!1,null,null,null,C.r,null)
 D.fB6=new A.y("Share code copied",null,null,null,null,null,null,null,null,null,null,null)
@@ -7489,7 +7489,7 @@ D.fx4=new A.y("Scan receiver answer QR",null,null,null,null,null,null,null,null,
 D.fxn=new A.y("Share code & instructions",null,null,null,null,null,null,null,null,null,null,null)
 D.fxW=new A.y("Scan Doc Share QR",null,null,null,null,null,null,null,null,null,null,null)
 D.fy1=new A.y("Create portal",null,C.ck,null,null,null,null,null,null,null,null,null)
-D.fyp=new A.y("Share via AirDrop / Bluetooth / Nearby",null,C.eX,null,null,null,null,null,null,null,null,null)
+D.fyo=new A.y("Share via AirDrop / Bluetooth / Nearby",null,C.eX,null,null,null,null,null,null,null,null,null)
 D.fBB=new A.y("Share files & videos\nwith a scan.",null,C.aQw,null,null,null,null,null,null,null,null,null)
 D.fBU=new A.y("Add files",null,C.ck,null,null,null,null,null,null,null,null,null)
 D.h2z=new B.YT(null)
@@ -7510,4 +7510,4 @@ $.hQg=null
 $.h07=null})();(function lazyInitializers(){var x=a.lazyFinal
 x($,"igG","hsr",()=>new B.cjo())
 x($,"ieB","h3T",()=>C.a.t(A.bu(A.bu(A.bu(A.GM(),"window"),"navigator"),"userAgent"),"Firefox"))})()};
-(a=>{a["V/xW7cCEY1ygSxXZolb3MhjLc1A="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["ISdcZCgyCVCLZQtxH5jNUYenSII="]=a.current})($__dart_deferred_initializers__);

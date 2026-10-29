@@ -6837,7 +6837,7 @@ return B.b(B.hY(D.WS,!0,"Dismiss",d,new C.fQr(),new C.fQs(),A.Fm,!0,x.N),$async$
 case 3:t=f
 if(t==null){u=null
 w=1
-break}if(t.length===0){if(d.e!=null)d.J(x.q).f.S(D.eYA)
+break}if(t.length===0){if(d.e!=null)d.J(x.q).f.S(D.eYz)
 u=null
 w=1
 break}u=t
@@ -10245,7 +10245,7 @@ if(r==null)p=A.lH
 else{w=B.E(new B.D(A.bQ,B.av(new B.fK(t.gaN8(),B.cq(new C.ekt(t,r)),s),s,s,s),s),1)
 v=B.a([],p)
 for(u=0;u<6;++u)v.push(new B.D(A.ij,B.j9(s,s,s,new B.y(D.avm[u].a,s,E.aQB,s,s,s,s,s,s,s,s,s),s,new C.eku(t,u),t.e===u,s,s,s,s),s))
-p=B.x(B.a([w,B.p(s,B.bm(!0,B.x(B.a([new B.a7(s,40,B.cw(v,s,s,s,s,A.aP,!1),s),B.B(B.a([D.bPw,B.E(B.l0(s,s,s,6,1,new C.ekv(t),t.f),1),D.bP8],p),A.m,s,A.e,A.j,0,s,s),D.fzp,A.am,B.bK(!1,D.fz8,s,s,!0,s,s,new C.ekw(t,d),s,s)],p),A.m,s,A.e,A.N,0,A.p),!0,!1,A.af,!0,!1),A.f,D.X7,s,s,s,s,s,s,D.btM,s,s,s)],p),A.m,s,A.e,A.j,0,A.p)}return B.c8(q,A.AZ,p,s,!1,!1,s,s)}}
+p=B.x(B.a([w,B.p(s,B.bm(!0,B.x(B.a([new B.a7(s,40,B.cw(v,s,s,s,s,A.aP,!1),s),B.B(B.a([D.bPw,B.E(B.l0(s,s,s,6,1,new C.ekv(t),t.f),1),D.bP8],p),A.m,s,A.e,A.j,0,s,s),D.fzp,A.am,B.bK(!1,D.fz7,s,s,!0,s,s,new C.ekw(t,d),s,s)],p),A.m,s,A.e,A.N,0,A.p),!0,!1,A.af,!0,!1),A.f,D.X7,s,s,s,s,s,s,D.btM,s,s,s)],p),A.m,s,A.e,A.j,0,A.p)}return B.c8(q,A.AZ,p,s,!1,!1,s,s)}}
 C.bbM.prototype={
 a4(d,e){var w
 $.W()
@@ -10993,7 +10993,7 @@ o=i.at
 r=i.as
 n=i.y
 n=n.length===0?h:A.d.gI(n)
-o=B.a([w,A.aB,D.ftX,A.au,D.fwO,A.by,u,A.O,D.fvd,A.aB,v,A.by,B.B(B.a([q,A.at,B.E(B.x(B.a([s,A.am,B.B(B.a([p,A.bp,B.E(i.ack(new C.f_H(i),r,!0,n,o),1)],t),A.m,h,A.e,A.j,0,h,h)],t),A.m,h,A.e,A.j,0,A.p),1)],t),A.F,h,A.e,A.j,0,h,h),A.am,D.fyz],t)
+o=B.a([w,A.aB,D.ftX,A.au,D.fwO,A.by,u,A.O,D.fvd,A.aB,v,A.by,B.B(B.a([q,A.at,B.E(B.x(B.a([s,A.am,B.B(B.a([p,A.bp,B.E(i.ack(new C.f_H(i),r,!0,n,o),1)],t),A.m,h,A.e,A.j,0,h,h)],t),A.m,h,A.e,A.j,0,A.p),1)],t),A.F,h,A.e,A.j,0,h,h),A.am,D.fyy],t)
 w=i.w.a
 if(w.length!==0){v=B.n(999)
 u=B.I(D.bh2,A.q,1)
@@ -14176,7 +14176,7 @@ break}w=4
 return B.b(r.aq("Bool","ngmy_marriage_hint_seen",!0),$async$Yz)
 case 4:s=t.c
 if(s==null){w=1
-break}s.J(x.q).f.S(D.eXU)
+break}s.J(x.q).f.S(D.eXT)
 case 1:return B.h(u,v)}})
 return B.i($async$Yz,v)},
 JE(d,e){return this.cok(d,e)},
@@ -14213,7 +14213,7 @@ break
 case 4:case 1:return B.h(u,v)}})
 return B.i($async$JE,v)},
 c_o(){var w,v,u,t,s=this
-if(!s.gabl()){s.c.J(x.q).f.S(D.eY6)
+if(!s.gabl()){s.c.J(x.q).f.S(D.eY5)
 return}w=s.gOH()
 v=s.a
 u=v.d
@@ -16210,7 +16210,7 @@ t.m(new C.eyd(t))
 o=J.a4(r)
 if(o.gam(r)){o=t.c
 if(o==null){w=1
-break}o.J(x.q).f.S(D.eYp)
+break}o.J(x.q).f.S(D.eYo)
 w=1
 break}w=5
 return B.b(t.a.bgB(r),$async$R7)
@@ -23639,8 +23639,8 @@ D.bAY=new B.dq(1,A.co,D.bAN,null)
 D.d9J=w([L.anC,A.ab,D.bAY],x.p)
 D.eQI=new B.cl(A.aP,A.b9,A.j,A.m,null,A.p,null,0,D.d9J,null)
 D.bLZ=new B.ae(A.GC,22,A.bH,null,null,null)
-D.fyS=new B.y("NGMY NEWS",null,I.a80,null,null,null,null,null,null,null,null,null)
-D.cQW=w([D.bLZ,A.ab,D.fyS],x.p)
+D.fyR=new B.y("NGMY NEWS",null,I.a80,null,null,null,null,null,null,null,null,null)
+D.cQW=w([D.bLZ,A.ab,D.fyR],x.p)
 D.eQR=new B.cl(A.aP,A.e,A.N,A.m,null,A.p,null,0,D.cQW,null)
 D.eR2=new B.pc(!1,!1,null,T.VZ,null,A.c_,null,null,null)
 D.a73=new B.jk([D.cn,D.de,D.ut,D.I2,D.uu,D.aGx],B.ax("jk<hF>"))
@@ -23689,16 +23689,16 @@ D.fvP=new B.y("Chagua jimbo la Civic Registry kwanza.",null,null,null,null,null,
 D.eXu=new B.b1(D.fvP,null,null,null,null,null,null,null,null,null,null,null,null,A.T,!1,null,null,null,A.r,null)
 D.ftW=new B.y("Done \u2014 only the text size was changed. Undo brings back the old size.",null,null,null,null,null,null,null,null,null,null,null)
 D.eXv=new B.b1(D.ftW,null,null,null,null,null,null,null,null,null,null,null,null,A.T,!1,null,null,null,A.r,null)
-D.fyW=new B.y("This slide has no text boxes.",null,null,null,null,null,null,null,null,null,null,null)
-D.eXE=new B.b1(D.fyW,null,null,null,null,null,null,null,null,null,null,null,null,A.T,!1,null,null,null,A.r,null)
+D.fyV=new B.y("This slide has no text boxes.",null,null,null,null,null,null,null,null,null,null,null)
+D.eXE=new B.b1(D.fyV,null,null,null,null,null,null,null,null,null,null,null,null,A.T,!1,null,null,null,A.r,null)
 D.fzt=new B.y("Tap fields to edit names. Tap signature boxes to sign or re-sign. Print from the View tab.",null,null,null,null,null,null,null,null,null,null,null)
-D.eXU=new B.b1(D.fzt,null,null,null,null,null,null,null,null,null,null,null,null,A.T,!1,null,null,null,A.r,null)
+D.eXT=new B.b1(D.fzt,null,null,null,null,null,null,null,null,null,null,null,null,A.T,!1,null,null,null,A.r,null)
 D.fsC=new B.y("Sign in to Civic Registry to view Hati ya Kiapo cha Uongozi.",null,null,null,null,null,null,null,null,null,null,null)
-D.eY6=new B.b1(D.fsC,null,null,null,null,null,null,null,null,null,null,null,null,A.T,!1,null,null,null,A.r,null)
+D.eY5=new B.b1(D.fsC,null,null,null,null,null,null,null,null,null,null,null,null,A.T,!1,null,null,null,A.r,null)
 D.fGy=new B.y("Could not read that presentation QR or document code.",null,null,null,null,null,null,null,null,null,null,null)
-D.eYp=new B.b1(D.fGy,null,null,null,null,null,null,null,null,null,null,null,null,A.T,!1,null,null,null,A.r,null)
+D.eYo=new B.b1(D.fGy,null,null,null,null,null,null,null,null,null,null,null,null,A.T,!1,null,null,null,A.r,null)
 D.fDG=new B.y("Use the 5-character code on the document QR, like GA847.",null,null,null,null,null,null,null,null,null,null,null)
-D.eYA=new B.b1(D.fDG,null,null,null,null,null,null,null,null,null,null,null,null,A.T,!1,null,null,null,A.r,null)
+D.eYz=new B.b1(D.fDG,null,null,null,null,null,null,null,null,null,null,null,null,A.T,!1,null,null,null,A.r,null)
 D.fzB=new B.y("Sign in to Civic Registry to view this document.",null,null,null,null,null,null,null,null,null,null,null)
 D.eZg=new B.b1(D.fzB,null,null,null,null,null,null,null,null,null,null,null,null,A.T,!1,null,null,null,A.r,null)
 D.fnu=new B.y("Buttons hidden. Double-tap the top-right corner to show them again.",null,null,null,null,null,null,null,null,null,null,null)
@@ -23869,8 +23869,8 @@ D.fx9=new B.y("Anza upya (hati mpya)",null,null,null,null,null,null,null,null,nu
 D.fxf=new B.y("Layout",null,A.U7,null,null,null,null,null,null,null,null,null)
 D.fxT=new B.y("Print",null,A.cC,null,null,null,null,null,null,null,null,null)
 D.fxZ=new B.y("X",null,A.rU,null,null,null,null,null,null,null,null,null)
-D.fyz=new B.y("Your logo goes on every slide and your pictures replace stock photos. The ring button also has the ending celebrations.",null,A9.Ji,null,null,null,null,null,null,null,null,null)
-D.fz8=new B.y("Use the whole picture",null,null,null,null,null,null,null,null,null,null,null)
+D.fyy=new B.y("Your logo goes on every slide and your pictures replace stock photos. The ring button also has the ending celebrations.",null,A9.Ji,null,null,null,null,null,null,null,null,null)
+D.fz7=new B.y("Use the whole picture",null,null,null,null,null,null,null,null,null,null,null)
 D.fzl=new B.y("Hati ya Kuhowa",null,A.ft,null,null,null,null,null,null,null,null,null)
 D.fzn=new B.y("Choose a class template",null,A.ft,null,null,null,null,null,null,null,null,null)
 D.fzp=new B.y("Drag the picture to move it. Pinch or use the slider to zoom.",null,A.hg,null,null,null,null,null,null,null,null,null)
@@ -23969,4 +23969,4 @@ t.n(0,u.b,u.a)}return t})
 w($,"im5","bDZ",()=>{var v="Corporate",u=4280171146,t=4294967295,s=4280640491,r=4279080072,q="Modern",p="Bold",o=4278190080,n=4280472558,m=4279179050,l=4284773515,k=4287874557,j=4293548044,i=4279548070,h=x.O
 return B.a([C.mW(new C.fGX(),v,"biz_plan_blue","Business Plan",B.a([B.b0(u),B.b0(t)],h)),C.mW(new C.fGY(),v,"exec_summary","Executive",B.a([B.b0(s),B.b0(t)],h)),C.mW(new C.fGZ(),v,"teal_corporate","Teal Corp",B.a([B.b0(r),B.b0(4279310375)],h)),C.mW(new C.fH9(),q,"geometric_overlap","Geometric",B.a([B.b0(4279203438),B.b0(u)],h)),C.mW(new C.fHe(),p,"midnight_cyan","Midnight Cyan",B.a([B.b0(o),B.b0(n)],h)),C.mW(new C.fHf(),q,"diagonal_hero","Diagonal Hero",B.a([B.b0(m),B.b0(l)],h)),C.mW(new C.fHg(),v,"swot_grid","SWOT Grid",B.a([B.b0(u),B.b0(4278556265)],h)),C.mW(new C.fHh(),v,"layered_chevrons","Chevrons",B.a([B.b0(4280172719),B.b0(k)],h)),C.mW(new C.fHi(),q,"split_triangle","Split Panel",B.a([B.b0(s),B.b0(t)],h)),C.mW(new C.fHj(),v,"corporate_navy","Navy Pro",B.a([B.b0(4278982953),B.b0(4282090230)],h)),C.mW(new C.fHk(),p,"cyan_slash","Cyan Slash",B.a([B.b0(o),B.b0(4278630100)],h)),C.mW(new C.fH_(),p,"crimson_impact","Crimson",B.a([B.b0(4282714634),B.b0(4292617766)],h)),C.mW(new C.fH0(),q,"ocean_waves","Ocean Waves",B.a([B.b0(4278413729),B.b0(4286436348)],h)),C.mW(new C.fH1(),p,"mono_geometric","Mono Geo",B.a([B.b0(o),B.b0(n)],h)),C.mW(new C.fH2(),"Luxury","luxury_gold","Gold Luxe",B.a([B.b0(4280031511),B.b0(4293571336)],h)),C.mW(new C.fH3(),q,"hex_infographic","Hex Stack",B.a([B.b0(r),B.b0(4284410580)],h)),C.mW(new C.fH4(),q,"photo_banner","Photo Banner",B.a([B.b0(m),B.b0(4281908728)],h)),C.mW(new C.fH5(),v,"process_steps","Process",B.a([B.b0(s),B.b0(k)],h)),C.mW(new C.fH6(),"Minimal","grid_modern","Grid Modern",B.a([B.b0(l),B.b0(t)],h)),C.mW(new C.fH7(),"Luxury","platinum_frame","Platinum",B.a([B.b0(4282865001),B.b0(4293060848)],h)),C.mW(new C.fH8(),v,"agenda_cards","Agenda Cards",B.a([B.b0(u),B.b0(4292602622)],h)),C.mW(new C.fHa(),q,"headline_orange","Headline Orange",B.a([B.b0(j),B.b0(i)],h)),C.mW(new C.fHb(),q,"infographic_teal","Infographic",B.a([B.b0(r),B.b0(j)],h)),C.mW(new C.fHc(),q,"content_year","Year Feature",B.a([B.b0(j),B.b0(t)],h)),C.mW(new C.fHd(),q,"photo_cta","Photo CTA",B.a([B.b0(m),B.b0(i)],h))],B.ax("O<EF>"))})
 w($,"ilI","hv8",()=>B.af("^[A-Z]{2}\\d{3}$",!0,!1,!1,!1))})()};
-(a=>{a["mzwyw0dSzpWkDLFwz3hH5tvldUg="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["zjHtuB2RRUEPaIm55nN88T8TN/Q="]=a.current})($__dart_deferred_initializers__);

@@ -644,7 +644,7 @@ s=new A.S(Date.now(),0,!1).a6().ac()
 r=A.c7(B.a.i(q.dx.a.a),p)
 return new C.oj(x,n,o,w,v,u,t,p,s,r==null?1:r,p)},
 bBn(){var x,w=this,v=w.gae5(),u=w.gNZ(),t=w.gO_()
-if(u<=0&&v.length===0){w.c.J(y.q).f.S(D.eYn)
+if(u<=0&&v.length===0){w.c.J(y.q).f.S(D.eYm)
 return}w.a.c.$3(v,u,t)
 x=w.c
 x.toString
@@ -691,7 +691,7 @@ g=A.d6(B.a.i(u.db.a.a))
 if(g==null)g=0
 t=A.c7(B.a.i(u.dx.a.a),null)
 s=B.o.D(t==null?1:t,1,9999)
-if(j.length===0){u.c.J(y.q).f.S(D.eYt)
+if(j.length===0){u.c.J(y.q).f.S(D.eYs)
 x=1
 break}if(i.length===0){u.c.J(y.q).f.S(D.f0y)
 x=1
@@ -900,7 +900,7 @@ x=l.gNZ()
 if(x>0)w.push(A.dn(D.bRK,D.fjJ,l.gbBm(),A.bn(B.aV,k,k,k,k,B.ly,k,k,k,k,k,k)))
 w.push(B.O)
 w.push(A.eA(D.bMZ,D.fjr,new C.elU(l),A.dg(k,k,k,k,k,k,k,k,k,B.aV,k,B.ly,k,k,k,k,k,k,k,k)))
-w.push(A.hn(B.w1,D.fyd,l.gbGs(),k))
+w.push(A.hn(B.w1,D.fyc,l.gbGs(),k))
 return A.cw(w,k,B.bQ,k,k,B.ah,!1)},
 abB(d,e){var x=null
 return new A.D(B.eI,A.B(A.a([new A.a7(72,x,A.d(d,x,x,x,x,x,x,A.l(x,x,A.Z(115,B.c.l()>>>16&255,B.c.l()>>>8&255,B.c.l()&255),x,x,x,x,x,x,x,x,12,x,x,B.P,x,x,!0,x,x,x,x,x,x,x,x),x,x,x),x),A.E(A.d(e,x,x,x,x,x,x,B.a8h,x,x,x),1)],y.p),B.F,x,B.e,B.j,0,x,x),x)},
@@ -1326,9 +1326,9 @@ D.ehE=new A.jq("share",48,D.fAy,null,y._)
 D.ehJ=new A.jq("delete",48,B.wD,null,y._)
 D.d3J=x([D.ehG,D.ehy,D.ehD,D.ehE,D.ehJ],A.ax("O<pb<m>>"))
 D.fxj=new A.y("Save a price in My Catalog first, or enroll this product.",null,null,null,null,null,null,null,null,null,null,null)
-D.eYn=new A.b1(D.fxj,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
+D.eYm=new A.b1(D.fxj,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
 D.fkl=new A.y("Enter a product name.",null,null,null,null,null,null,null,null,null,null,null)
-D.eYt=new A.b1(D.fkl,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
+D.eYs=new A.b1(D.fkl,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
 D.fEX=new A.y("Switch to Scan tab \u2014 scan fills barcode here.",null,null,null,null,null,null,null,null,null,null,null)
 D.eYL=new A.b1(D.fEX,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
 D.fDC=new A.y("Saved on this device only.",null,null,null,null,null,null,null,null,null,null,null)
@@ -1342,9 +1342,9 @@ D.fjr=new A.y("Edit / enroll in catalog",null,null,null,null,null,null,null,null
 D.fjJ=new A.y("Use price in calculator",null,null,null,null,null,null,null,null,null,null,null)
 D.fkL=new A.y("Enroll in My Catalog",null,null,null,null,null,null,null,null,null,null,null)
 D.fss=new A.y("Enter barcode or scan data",null,null,null,null,null,null,null,null,null,null,null)
-D.fyd=new A.y("Scan another",null,null,null,null,null,null,null,null,null,null,null)
+D.fyc=new A.y("Scan another",null,null,null,null,null,null,null,null,null,null,null)
 D.fA5=new A.y("Product Scanner",null,B.cC,null,null,null,null,null,null,null,null,null)
 D.fD7=new A.y("Enter barcode",null,null,null,null,null,null,null,null,null,null,null)
 D.fFy=new A.y("Store QR code",null,B.nD,null,null,null,null,null,null,null,null,null)
 D.fGe=new A.y("Camera scan works on the NGMY phone app.\nOn desktop web, enter the barcode below.",null,B.aR9,null,B.L,null,null,null,null,null,null,null)})()};
-(a=>{a["212xycjZj5WcGl5PkkvIoPuLQ9w="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["OUutNvS5Rp6w9/lBa7XMpZNzZBk="]=a.current})($__dart_deferred_initializers__);

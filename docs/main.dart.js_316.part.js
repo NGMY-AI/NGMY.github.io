@@ -5214,7 +5214,7 @@ k=B.c.j(0.07)
 k=A.aM(q,B.U,!1,q,!0,B.r,q,A.aN(),r.d,q,q,q,q,q,2,A.bs(q,new A.b4(4,A.n(16),B.Y),q,q,q,q,q,q,!0,q,q,q,q,q,q,k,!0,q,q,q,q,q,q,q,q,q,q,q,q,q,B.kI,"Say it in your own words\u2026",q,q,q,q,q,q,q,q,q,!0,!0,!1,q,q,q,q,q,q,q,q,q,q,q,q,q,q),B.y,!0,q,!0,q,!1,q,B.aj,q,q,q,q,q,q,q,q,q,6,3,q,!1,"\u2022",q,q,q,q,q,!1,q,q,!1,q,!0,q,B.a9,q,q,q,q,q,q,q,q,q,q,q,B.dp,!0,B.a4,q,B.an,q,q,q,q)
 w=A.a([],n)
 for(v=r.gbNX(),u=v.length,t=0;t<u;++t){s=v[t]
-w.push(A.mK(q,B.c.j(0.08),new A.y(s,q,B.Je,q,q,q,q,q,q,q,q,q),B.hG,new C.d8K(r,s),q,q,q,q))}return A.eL(q,E.AR,A.cd(A.x(A.a([m,B.R,D.fDz,B.am,l,B.ac,k,B.O,A.bV(B.bA,w,B.br,6,6),B.aB,A.dn(D.bJQ,D.fEm,new C.d8L(r,d),A.bn(B.b6,q,q,q,q,B.ok,q,q,new A.b7(A.n(16),B.Y),q,q,q)),B.au,D.fyC],n),B.F,q,B.e,B.N,0,B.p),B.r,q,B.y,q,B.fD,q,q,B.ah),q,q,q,D.aiI,B.d1,q,new A.b7(p,new A.az(o,1.4,B.q,-1)),q)}}
+w.push(A.mK(q,B.c.j(0.08),new A.y(s,q,B.Je,q,q,q,q,q,q,q,q,q),B.hG,new C.d8K(r,s),q,q,q,q))}return A.eL(q,E.AR,A.cd(A.x(A.a([m,B.R,D.fDz,B.am,l,B.ac,k,B.O,A.bV(B.bA,w,B.br,6,6),B.aB,A.dn(D.bJQ,D.fEm,new C.d8L(r,d),A.bn(B.b6,q,q,q,q,B.ok,q,q,new A.b7(A.n(16),B.Y),q,q,q)),B.au,D.fyB],n),B.F,q,B.e,B.N,0,B.p),B.r,q,B.y,q,B.fD,q,q,B.ah),q,q,q,D.aiI,B.d1,q,new A.b7(p,new A.az(o,1.4,B.q,-1)),q)}}
 C.Zd.prototype={
 T(){return new C.azA(A.a([],x.Y))},
 ge1(){return this.c}}
@@ -5529,7 +5529,7 @@ h=g?B.c:B.aA
 m.push(A.aC(e,A.x(A.a([j,B.bC,new A.y(i,e,new A.H(!0,h,e,e,e,e,10,B.P,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e),e,e,e,e,e,e,e,e,e)],w),B.m,e,B.e,B.N,0,B.p),B.y,!1,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,new C.cZG(f,k),e,e,e,e,e,e,!1,B.a7))}m=A.bV(B.bA,m,B.br,8,10)
 l=A.d("TITLE SIZE",e,e,e,e,e,e,H.mQ,e,e,e)
 k=f.go4()
-return new A.D(new A.Q(0,0,0,a3.f.d),A.bm(!0,new A.cT(new A.aY(0,1/0,0,a1.a.b*0.92),A.cw(A.a([D.fy4,B.ac,d,B.aR,a0,B.R,a2,B.aB,D.fE8,B.O,v,B.aB,D.fye,B.O,q,B.aB,a4,B.aB,p,B.O,m,B.aB,l,A.l0(e,9,""+B.k.V(f.go4().f),36,18,new C.cZH(f),k.f),A.d("WHERE THE WORDS SIT",e,e,e,e,e,e,H.mQ,e,e,e),B.am,f.ar0(D.a3O,f.go4().r,new C.cZI(f),D.doq),B.ac,A.d("BORDER",e,e,e,e,e,e,H.mQ,e,e,e),B.am,f.ar0(D.a3b,f.go4().w,new C.cZJ(f),D.dov),B.ac,A.d("COVER MATERIAL",e,e,e,e,e,e,H.mQ,e,e,e),B.am,f.ar0(D.a36,f.go4().x,new C.cZL(f),D.dq2),B.am,A.iI(e,B.b6,e,B.af,e,new C.cZM(f),e,e,e,D.fsv,f.go4().z),B.by,A.bG(D.fwT,new C.cZN(f,a6),A.bn(B.b6,e,e,e,e,B.ok,e,e,new A.b7(A.n(16),B.Y),e,e,e))],w),e,R.aiy,e,e,B.ah,!0),e),!0,!1,B.af,!0,!0),e)}}
+return new A.D(new A.Q(0,0,0,a3.f.d),A.bm(!0,new A.cT(new A.aY(0,1/0,0,a1.a.b*0.92),A.cw(A.a([D.fy4,B.ac,d,B.aR,a0,B.R,a2,B.aB,D.fE8,B.O,v,B.aB,D.fyd,B.O,q,B.aB,a4,B.aB,p,B.O,m,B.aB,l,A.l0(e,9,""+B.k.V(f.go4().f),36,18,new C.cZH(f),k.f),A.d("WHERE THE WORDS SIT",e,e,e,e,e,e,H.mQ,e,e,e),B.am,f.ar0(D.a3O,f.go4().r,new C.cZI(f),D.doq),B.ac,A.d("BORDER",e,e,e,e,e,e,H.mQ,e,e,e),B.am,f.ar0(D.a3b,f.go4().w,new C.cZJ(f),D.dov),B.ac,A.d("COVER MATERIAL",e,e,e,e,e,e,H.mQ,e,e,e),B.am,f.ar0(D.a36,f.go4().x,new C.cZL(f),D.dq2),B.am,A.iI(e,B.b6,e,B.af,e,new C.cZM(f),e,e,e,D.fsv,f.go4().z),B.by,A.bG(D.fwT,new C.cZN(f,a6),A.bn(B.b6,e,e,e,e,B.ok,e,e,new A.b7(A.n(16),B.Y),e,e,e))],w),e,R.aiy,e,e,B.ah,!0),e),!0,!1,B.af,!0,!0),e)}}
 C.aGz.prototype={
 a4(d,e){var w,v,u,t=new A.aO($.W().r,B.ao,null,null,A.a([],x.v))
 t.F(new A.b5(0,0))
@@ -5719,7 +5719,7 @@ var $async$Oo=A.e(function(d,e){if(d===1)return A.f(e,v)
 for(;;)switch(w){case 0:o=t.c
 if(o==null){w=1
 break}s=x.q
-o.J(s).f.S(D.eYs)
+o.J(s).f.S(D.eYr)
 w=3
 return A.b(C.Gv(t.a.c),$async$Oo)
 case 3:r=e
@@ -7448,7 +7448,7 @@ this.a2()},
 K3(){var w,v=this.d
 v===$&&A.c()
 w=B.a.i(v.a.a)
-if(w.length===0){this.c.J(x.q).f.S(D.eXN)
+if(w.length===0){this.c.J(x.q).f.S(D.eXM)
 return}v=this.c
 v.toString
 A.a6(v,!1).O(new C.aSU(w))},
@@ -8120,7 +8120,7 @@ w=5
 return A.b(t.vE(),$async$HQ)
 case 5:n=t.c
 if(n==null){w=1
-break}if(!o){n.J(x.q).f.S(D.eYg)
+break}if(!o){n.J(x.q).f.S(D.eYf)
 w=1
 break}n=J.aV(t.e)
 for(;;){if(!n.C()){m=p
@@ -8212,7 +8212,7 @@ case 6:w=7
 return A.b(t.vE(),$async$NG)
 case 7:s=t.c
 if(s==null){w=1
-break}s.J(x.q).f.S(D.eYl)
+break}s.J(x.q).f.S(D.eYk)
 case 4:case 1:return A.h(u,v)}})
 return A.i($async$NG,v)},
 cel(d){var w=this.c
@@ -8577,7 +8577,7 @@ return A.p(w,A.d(C.wO(d,!1),w,w,w,w,w,w,D.fbP,w,w,w),B.f,w,w,new A.o(v,w,t,u,w,w
 $S:1926}
 C.fLi.prototype={
 $1(d){var w=null,v=A.aI(d,B.bW,x.w).w,u=A.n(26),t=A.aH(w,w,w,w,D.bQ2,w,w,w,new C.fLf(d),w,w,w,w,w,B.ce),s=this.a,r=this.b,q=B.c.j(0.28),p=x.p
-return A.eL(w,B.K,new A.cT(new A.aY(0,380,0,v.a.b*0.9),A.aF(!1,B.a1,!0,u,new A.D(B.YR,A.x(A.a([new A.bI(B.a8,w,w,t,w),new A.dq(1,B.co,A.cd(A.x(A.a([new A.ex(new C.aYn(r,w),s),B.R,A.B(A.a([A.E(A.eA(B.yI,D.fCC,new C.fLg(s,r,d),A.dg(w,w,w,w,w,w,w,w,w,B.c,w,w,B.fa,w,new A.b7(A.n(14),B.Y),new A.az(q,1,B.q,-1),w,w,w,w)),1),B.ab,A.E(A.dn(B.a18,D.fz9,new C.fLh(r,d),A.bn(B.aZ,w,w,w,B.c,w,B.fa,w,new A.b7(A.n(14),B.Y),w,w,w)),1)],p),B.m,w,B.e,B.j,0,w,w)],p),B.m,w,B.e,B.N,0,B.p),B.r,w,B.y,w,w,w,w,B.ah),w)],p),B.m,w,B.e,B.N,0,B.p),w),B.f,B.ax,0,w,w,w,w,w,B.ag),w),w,w,0,Aj.Zf,B.d1,w,w,w)},
+return A.eL(w,B.K,new A.cT(new A.aY(0,380,0,v.a.b*0.9),A.aF(!1,B.a1,!0,u,new A.D(B.YR,A.x(A.a([new A.bI(B.a8,w,w,t,w),new A.dq(1,B.co,A.cd(A.x(A.a([new A.ex(new C.aYn(r,w),s),B.R,A.B(A.a([A.E(A.eA(B.yI,D.fCC,new C.fLg(s,r,d),A.dg(w,w,w,w,w,w,w,w,w,B.c,w,w,B.fa,w,new A.b7(A.n(14),B.Y),new A.az(q,1,B.q,-1),w,w,w,w)),1),B.ab,A.E(A.dn(B.a18,D.fz8,new C.fLh(r,d),A.bn(B.aZ,w,w,w,B.c,w,B.fa,w,new A.b7(A.n(14),B.Y),w,w,w)),1)],p),B.m,w,B.e,B.j,0,w,w)],p),B.m,w,B.e,B.N,0,B.p),B.r,w,B.y,w,w,w,w,B.ah),w)],p),B.m,w,B.e,B.N,0,B.p),w),B.f,B.ax,0,w,w,w,w,w,B.ag),w),w,w,0,Aj.Zf,B.d1,w,w,w)},
 $S:48}
 C.fLf.prototype={
 $0(){A.a6(this.a,!1).O(null)
@@ -8946,7 +8946,7 @@ q=q.a.d.a
 w=q?B.bs:B.bm
 t=(q?B.bs:B.bm).j(0.28)
 s=x.p
-return new A.d_(e,!1,A.av(A.aF(!1,B.a1,!0,r,A.p(r,A.x(A.a([p,B.O,v,u,B.aB,A.B(A.a([A.E(A.dV(B.nE,new C.dGt(d),A.dg(r,r,r,r,r,r,r,r,r,w,r,r,B.jG,r,new A.b7(A.n(10),B.Y),new A.az(t,1,B.q,-1),r,r,r,r)),1),B.ab,A.E(A.bG(D.fyA,new C.dGu(d),A.bn(B.cT,r,r,r,B.c,r,B.jG,r,new A.b7(A.n(10),B.Y),r,r,r)),1)],s),B.m,r,B.e,B.j,0,r,r)],s),B.ai,r,B.e,B.N,0,B.p),B.f,r,r,new A.o(o,r,m,n,r,r,B.n),r,r,r,B.Bn,E.Z6,r,r,300),B.f,B.K,0,r,r,r,r,r,B.ag),r,r,r),r)},
+return new A.d_(e,!1,A.av(A.aF(!1,B.a1,!0,r,A.p(r,A.x(A.a([p,B.O,v,u,B.aB,A.B(A.a([A.E(A.dV(B.nE,new C.dGt(d),A.dg(r,r,r,r,r,r,r,r,r,w,r,r,B.jG,r,new A.b7(A.n(10),B.Y),new A.az(t,1,B.q,-1),r,r,r,r)),1),B.ab,A.E(A.bG(D.fyz,new C.dGu(d),A.bn(B.cT,r,r,r,B.c,r,B.jG,r,new A.b7(A.n(10),B.Y),r,r,r)),1)],s),B.m,r,B.e,B.j,0,r,r)],s),B.ai,r,B.e,B.N,0,B.p),B.f,r,r,new A.o(o,r,m,n,r,r,B.n),r,r,r,B.Bn,E.Z6,r,r,300),B.f,B.K,0,r,r,r,r,r,B.ag),r,r,r),r)},
 $S:31}
 C.dGt.prototype={
 $0(){A.a6(this.a,!1).O(!1)
@@ -11471,15 +11471,15 @@ D.eV0=new A.ar(280,88)
 D.eVM=new A.a7(30,null,null,null)
 D.eX3=new A.hQ(2,12,12,1.05,null)
 D.fnl=new A.y("Please enter a family tree name.",null,null,null,null,null,null,null,null,null,null,null)
-D.eXN=new A.b1(D.fnl,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
+D.eXM=new A.b1(D.fnl,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
 D.fnA=new A.y("Your shelf is full: six books is the most. Remove one to write another.",null,null,null,null,null,null,null,null,null,null,null)
 D.aP8=new A.b1(D.fnA,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
 D.fvI=new A.y("Could not save project on this device. Please try again.",null,null,null,null,null,null,null,null,null,null,null)
-D.eYg=new A.b1(D.fvI,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
+D.eYf=new A.b1(D.fvI,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
 D.fG4=new A.y("All projects cleared",null,null,null,null,null,null,null,null,null,null,null)
-D.eYl=new A.b1(D.fG4,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
+D.eYk=new A.b1(D.fG4,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
 D.fpD=new A.y("Syncing family trees with the database\u2026",null,null,null,null,null,null,null,null,null,null,null)
-D.eYs=new A.b1(D.fpD,null,null,null,null,null,null,null,null,null,null,null,null,B.fM,!1,null,null,null,B.r,null)
+D.eYr=new A.b1(D.fpD,null,null,null,null,null,null,null,null,null,null,null,null,B.fM,!1,null,null,null,B.r,null)
 D.fDq=new A.y("Your new book is on the shelf.",null,null,null,null,null,null,null,null,null,null,null)
 D.aPc=new A.b1(D.fDq,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
 D.fkv=new A.y("Choose male or female.",null,null,null,null,null,null,null,null,null,null,null)
@@ -11560,10 +11560,10 @@ D.fxi=new A.y("Your photos",null,B.pg,null,null,null,null,null,null,null,null,nu
 D.fxx=new A.y("Create Project",null,B.ck,null,null,null,null,null,null,null,null,null)
 D.fy4=new A.y("Design your cover",null,U.rT,null,null,null,null,null,null,null,null,null)
 D.fya=new A.y("Gallery",null,null,null,null,null,null,null,null,null,null,null)
-D.fye=new A.y("PICTURE",null,H.mQ,null,null,null,null,null,null,null,null,null)
-D.fyA=new A.y("Paid",null,B.ck,null,null,null,null,null,null,null,null,null)
-D.fyC=new A.y("You can undo it right after.",null,T.Ji,null,null,null,null,null,null,null,null,null)
-D.fz9=new A.y("Print",null,B.uQ,null,null,null,null,null,null,null,null,null)
+D.fyd=new A.y("PICTURE",null,H.mQ,null,null,null,null,null,null,null,null,null)
+D.fyz=new A.y("Paid",null,B.ck,null,null,null,null,null,null,null,null,null)
+D.fyB=new A.y("You can undo it right after.",null,T.Ji,null,null,null,null,null,null,null,null,null)
+D.fz8=new A.y("Print",null,B.uQ,null,null,null,null,null,null,null,null,null)
 D.fzw=new A.y("Amount owed",null,D.aRk,null,null,null,null,null,null,null,null,null)
 D.fzL=new A.y("Got it",null,B.ck,null,null,null,null,null,null,null,null,null)
 D.fAl=new A.y("The whole book",null,null,null,null,null,null,null,null,null,null,null)
@@ -11599,4 +11599,4 @@ D.h5i=new C.a_a(null)
 D.aad=new C.aJm(0,"projects")
 D.aWz=new C.aJm(1,"cashier")
 D.hax=new C.aJm(2,"familyTree")})()};
-(a=>{a["R+eq773pA5HJ7Im9bgKR73ik8E0="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["pOIYWnUPG6uSwttpqbCVqGMwwwI="]=a.current})($__dart_deferred_initializers__);

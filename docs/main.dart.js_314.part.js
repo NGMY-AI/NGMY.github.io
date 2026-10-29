@@ -2807,7 +2807,7 @@ case 5:w=11
 return A.b(B.aPU(p,t.gmW(),d),$async$ye)
 case 11:p=t.c
 if(p==null){w=1
-break}p.J(x.q).f.S(D.eYx)
+break}p.J(x.q).f.S(D.eYw)
 case 4:w=12
 return A.b(t.pd(),$async$ye)
 case 12:case 1:return A.h(u,v)}})
@@ -2923,7 +2923,7 @@ m.P$=0
 w=3
 return A.b(B.wQ(u.gmW(),s.b),$async$a1E)
 case 3:if(u.c!=null){u.m(new B.dA0(s,u))
-u.c.J(x.q).f.S(D.eXY)}return A.h(null,v)}})
+u.c.J(x.q).f.S(D.eXX)}return A.h(null,v)}})
 return A.i($async$a1E,v)},
 B(d){var w,v,u,t,s,r,q,p,o,n=this
 A.P(d)
@@ -3870,7 +3870,7 @@ w.aGN(u,C.o.D(v.y,0,u.f.length-1))},
 NJ(){var w=0,v=A.j(x.H),u,t=this,s
 var $async$NJ=A.e(function(d,e){if(d===1)return A.f(e,v)
 for(;;)switch(w){case 0:s=t.a.x
-if(s==null){t.c.J(x.q).f.S(D.eYG)
+if(s==null){t.c.J(x.q).f.S(D.eYF)
 w=1
 break}w=3
 return A.b(t.Wn(s),$async$NJ)
@@ -4256,7 +4256,7 @@ return A.em(A.a([A.bK(!1,T.Ug,v,v,!0,v,v,new B.fl1(t,w.c),v,v),A.bG(D.frk,new B.
 $S:20}
 B.fl1.prototype={
 $0(){A.fN(new A.fE(this.a))
-this.b.J(x.q).f.S(D.eYa)},
+this.b.J(x.q).f.S(D.eY9)},
 $S:0}
 B.fl2.prototype={
 $0(){A.a6(this.a,!1).O(null)
@@ -5891,8 +5891,8 @@ D.dq1=new A.bk(D.rF,["feed","Feed","feed"],x.w)
 D.dpY=new A.bk(D.rF,["create","Post","create"],x.w)
 D.aEk=new A.bk(D.rF,["profile","Profile","profile"],x.w)
 D.d9b=w([D.dq1,D.dpY,D.aEk],x.m)
-D.fz3=new A.y("Text",null,null,null,null,null,null,null,null,null,null,null)
-D.bqj=new A.eG("text",D.fz3,C.eZ,null,x.r)
+D.fz2=new A.y("Text",null,null,null,null,null,null,null,null,null,null,null)
+D.bqj=new A.eG("text",D.fz2,C.eZ,null,x.r)
 D.fjG=new A.y("Number",null,null,null,null,null,null,null,null,null,null,null)
 D.bqo=new A.eG("number",D.fjG,C.eZ,null,x.r)
 D.fm4=new A.y("Email",null,null,null,null,null,null,null,null,null,null,null)
@@ -6018,16 +6018,16 @@ D.ft3=new A.y("Use Exit in the menu to leave App Builder.",null,null,null,null,n
 D.eXn=new A.b1(D.ft3,null,null,null,null,null,null,null,null,null,null,null,null,C.T,!1,null,null,null,C.r,null)
 D.fp9=new A.y("Copied JSON",null,null,null,null,null,null,null,null,null,null,null)
 D.eXs=new A.b1(D.fp9,null,null,null,null,null,null,null,null,null,null,null,null,C.T,!1,null,null,null,C.r,null)
-D.fza=new A.y("Link copied.",null,null,null,null,null,null,null,null,null,null,null)
-D.aP7=new A.b1(D.fza,null,null,null,null,null,null,null,null,null,null,null,null,C.T,!1,null,null,null,C.r,null)
+D.fz9=new A.y("Link copied.",null,null,null,null,null,null,null,null,null,null,null)
+D.aP7=new A.b1(D.fz9,null,null,null,null,null,null,null,null,null,null,null,null,C.T,!1,null,null,null,C.r,null)
 D.fum=new A.y("Integrations saved.",null,null,null,null,null,null,null,null,null,null,null)
-D.eXY=new A.b1(D.fum,null,null,null,null,null,null,null,null,null,null,null,null,C.T,!1,null,null,null,C.r,null)
+D.eXX=new A.b1(D.fum,null,null,null,null,null,null,null,null,null,null,null,null,C.T,!1,null,null,null,C.r,null)
 D.fBc=new A.y("Link copied!",null,null,null,null,null,null,null,null,null,null,null)
-D.eYa=new A.b1(D.fBc,null,null,null,null,null,null,null,null,null,null,null,null,C.T,!1,null,null,null,C.r,null)
+D.eY9=new A.b1(D.fBc,null,null,null,null,null,null,null,null,null,null,null,null,C.T,!1,null,null,null,C.r,null)
 D.fEN=new A.y("Saved on this device. Admin can review on this device.",null,null,null,null,null,null,null,null,null,null,null)
-D.eYx=new A.b1(D.fEN,null,null,null,null,null,null,null,null,null,null,null,null,C.T,!1,null,null,null,C.r,null)
+D.eYw=new A.b1(D.fEN,null,null,null,null,null,null,null,null,null,null,null,null,C.T,!1,null,null,null,C.r,null)
 D.fjw=new A.y("Open a project to publish.",null,null,null,null,null,null,null,null,null,null,null)
-D.eYG=new A.b1(D.fjw,null,null,null,null,null,null,null,null,null,null,null,null,C.T,!1,null,null,null,C.r,null)
+D.eYF=new A.b1(D.fjw,null,null,null,null,null,null,null,null,null,null,null,null,C.T,!1,null,null,null,C.r,null)
 D.fpc=new A.y("Open or create a project first (My Projects or Templates).",null,null,null,null,null,null,null,null,null,null,null)
 D.eZE=new A.b1(D.fpc,null,null,null,null,null,null,null,null,null,null,null,null,C.T,!1,null,null,null,C.r,null)
 D.fuJ=new A.y("Open a project first \u2014 then connect Supabase or other backends.",null,null,null,null,null,null,null,null,null,null,null)
@@ -6075,4 +6075,4 @@ D.fDO=new A.y("My Projects",null,null,null,null,null,null,null,null,null,null,nu
 D.fF4=new A.y("Invoice published",null,C.kf,null,null,null,null,null,null,null,null,null)})();(function lazyInitializers(){var w=a.lazyFinal
 w($,"ilE","hv5",()=>{var v=4279150057,u=4284704497
 return A.a([B.ms("Featured",new B.fvV(),"Map, saved trips & destinations.","\u2708\ufe0f","qr_studio","Travel Explorer",v),B.ms("",new B.fvW(),"Product feed, cart & checkout.","\ud83d\udecd\ufe0f","luxe_store","Luxe Store",4293675161),B.ms("",new B.fvX(),"Posts, profiles & engagement.","\ud83d\udcac","creator_hub","Social Pulse",4287323382),B.ms("",new B.fw7(),"Workouts, check-ins & nutrition.","\ud83d\udcaa","pulse_fitness","Pulse Fitness",4279286145),B.ms("",new B.fwd(),"Clients, invoices & pipeline.","\ud83d\udcca","invoice_pro","CRM Dashboard",u),B.ms("",new B.fwe(),"Showcase work & contact.","\ud83c\udf10","video_hub","Portfolio Hub",v),B.ms("",new B.fwf(),"Live QR for websites & text.","\ud83d\udcf1","qr_code_studio","QR Code Studio",4278630100),B.ms("New",new B.fwg(),"Sell, track sales & get paid.","\ud83d\udcb5","side_hustle","Side Hustle Marketplace",4279673674),B.ms("",new B.fwh(),"Services, bookings & client earnings.","\ud83d\udcc5","booking_pro","Booking & Services",4286331629),B.ms("",new B.fwi(),"Daily checklist, streaks & progress.","\ud83d\udd25","habit_tracker","Habit Tracker",4279548070),B.ms("",new B.fwj(),"Income, spending & budget at a glance.","\ud83d\udcb0","finance_dash","Money Tracker",4282090230),B.ms("",new B.fvY(),"Post roles, track applicants.","\ud83d\udcbc","job_board","Job Board",4281549141),B.ms("",new B.fvZ(),"Discussion feed, posts & replies.","\ud83d\udde3\ufe0f","community_forum","Community Forum",4288814255),B.ms("",new B.fw_(),"Episodes, categories & playback links.","\ud83c\udf99\ufe0f","podcast_hub","Podcast Hub",4280232247),B.ms("",new B.fw0(),"Events, RSVPs & shareable QR codes.","\ud83c\udfab","event_tickets","Event Ticketing",4294286859),B.ms("New",new B.fw1(),"Raise funds, track donors, share a link.","\u2764\ufe0f","donate_nonprofit","Giving Campaign",4292943176),B.ms("",new B.fw2(),"Sessions, bookings & client roster.","\ud83e\uddd8","coaching_booking","Coaching Studio",4286456526),B.ms("",new B.fw3(),"Showcase galleries & booking requests.","\ud83d\udcf7","photo_portfolio","Photo Portfolio",4279310375),B.ms("",new B.fw4(),"Save recipes, ingredients & steps.","\ud83c\udf73","recipe_box","Recipe Box",4293548044),B.ms("",new B.fw5(),"Daily care, vet visits & reminders.","\ud83d\udc3e","pet_care","Pet Care Tracker",4284850957),B.ms("",new B.fw6(),"Create invoices, track clients & income.","\ud83e\uddfe","freelance_invoicing","Freelancer Invoicing",4280171146),B.ms("",new B.fw8(),"Log rounds, track scores & leaderboard.","\ud83c\udfc6","trivia_game","Trivia Night Scorekeeper",4292552567),B.ms("New",new B.fw9(),"Map of properties, inquiries & saves.","\ud83c\udfe0","real_estate","Real Estate Listings",4278995566),B.ms("",new B.fwa(),"Menu by category, tap to add to order.","\ud83c\udf7d\ufe0f","restaurant_menu","Restaurant Menu & Orders",4290321436),B.ms("",new B.fwb(),"Members, renewals & revenue.","\ud83e\udeaa","membership_manager","Membership Manager",4278483031),B.ms("",new B.fwc(),"Start fresh \u2014 describe any app to NGMY AI.","\ud83d\ude80","blank","Blank Canvas",u)],A.ax("O<a6_>"))})})()};
-(a=>{a["QnDdGFp4E8vx1H13gB7K1Tg0Ig0="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["JbP8wzvFLdycWDlwmKe1BQsLB1g="]=a.current})($__dart_deferred_initializers__);

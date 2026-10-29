@@ -15499,7 +15499,7 @@ B.dSE.prototype={
 $0(){},
 $S:0}
 B.dSr.prototype={
-$1(d){var w,v,u,t,s,r,q=null,p=C.n(22),o=x.p,n=C.a([D.fzg,A.au,D.fk4,A.R],o)
+$1(d){var w,v,u,t,s,r,q=null,p=C.n(22),o=x.p,n=C.a([D.fzf,A.au,D.fk4,A.R],o)
 for(w=this.a,v=0;v<19;++v){u=D.Qf[v]
 t=A.c.j(0.06)
 s=new C.aT(14,14)
@@ -18666,8 +18666,8 @@ D.bwZ=new C.Q(4,0,4,14)
 D.fhr=new C.H(!0,A.aA,null,null,null,null,14,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fmV=new C.y("Games and little helpers for a spare minute.",null,D.fhr,null,null,null,null,null,null,null,null,null)
 D.ec0=new C.D(D.bwZ,D.fmV,null)
-D.fyV=new C.y("Tap to throw in a star",null,A.kI,null,null,null,null,null,null,null,null,null)
-D.b6_=new C.cp(A.A,null,null,D.fyV,null)
+D.fyU=new C.y("Tap to throw in a star",null,A.kI,null,null,null,null,null,null,null,null,null)
+D.b6_=new C.cp(A.A,null,null,D.fyU,null)
 D.ehV=new C.cL(0,null,0,14,null,null,D.b6_,null)
 D.d9Z=w([A.iB,A.bm],x.O)
 D.aMp=new C.bT(A.A,0.5,A.x,null,0,D.d9Z,null,null)
@@ -18920,7 +18920,7 @@ D.fxV=new C.y("Electronics Lab",null,D.f4Q,null,null,null,null,A.a2,null,1,null,
 D.fxY=new C.y("?",null,M.aRw,null,null,null,null,null,null,null,null,null)
 D.fbq=new C.H(!0,A.aN,null,null,null,null,null,A.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fy2=new C.y("Planet Earth",null,D.fbq,null,null,null,null,null,null,null,null,null)
-D.fzg=new C.y("Ready-made circuits",null,A.dj,null,null,null,null,null,null,null,null,null)
+D.fzf=new C.y("Ready-made circuits",null,A.dj,null,null,null,null,null,null,null,null,null)
 D.fzS=new C.y("Always 5 V out. The extra volts turn into heat, so a hungry gadget will make it too hot.",null,A.hg,null,null,null,null,null,null,null,null,null)
 D.fAa=new C.y("UNIVERSE EXPLORER",null,I.a80,null,null,null,null,null,null,null,null,null)
 D.fCI=new C.y("SECRET VERSION",null,Q.mQ,null,null,null,null,null,null,null,null,null)
@@ -18948,4 +18948,4 @@ t.n(0,u.a,u)}return t})
 w($,"ijP","ahJ",()=>C.a([B.FA("Light the bulb","You need a battery and a bulb joined in a loop. Wire the + of the battery to the bulb, and the bulb back to the battery.",new B.fhp()),B.FA("Make a flashlight","Add a switch into the loop, so you can turn the bulb on and off.",new B.fhq()),B.FA("Spin the motor","A battery and a motor in a loop will make it spin.",new B.fhr()),B.FA("Light an LED safely","An LED burns out on its own. Put a resistor in the loop with it. Mind the + side of the LED!",new B.fhs()),B.FA("Light a bulb with no battery","Use a solar panel, a hand crank or a wind turbine instead of a battery.",new B.fht()),B.FA("Play the radio","A radio needs about 3 volts or more. Try a 9 volt battery.",new B.fhg()),B.FA("Watch TV","A TV needs 6 volts or more. Set a battery to 12 volts, and wire the TV's + (left) dot towards the battery +.",new B.fhh()),B.FA("Charge a battery","A 1.5 V battery starts flat. Join it to a solar panel (+ to +, \u2212 to \u2212) until its charge bar is full.",new B.fhi()),B.FA("One battery, two gadgets","A TV needs 9 volts but a phone burns out. Use a step-down converter to give the phone 5 V from the same battery.",new B.fhj()),B.FA("Protect a radio","Put a diode in the loop with a radio. It only lets electricity go one way.",new B.fhk()),B.FA("Make toast","A heater turns electricity into heat. Make it glow bright orange.",new B.fhl())],C.ax("O<baB>")))
 w($,"ikh","huo",()=>C.a([B.a0H("Spin the Wheel","Let luck decide","\ud83c\udfa1",A.aM,A.cc,new B.fi6()),B.a0H("Focus Timer","Work, then rest","\u23f1\ufe0f",A.c9,A.bz,new B.fi7()),B.a0H("Breathe","Calm down in a minute","\ud83e\udee7",A.hm,A.cA,new B.fi8()),B.a0H("Draw Pad","Sketch and share","\ud83c\udfa8",A.bD,A.b6,new B.fi9()),B.a0H("Memory Match","Find the pairs","\ud83c\udccf",A.aN,A.cb,new B.fia()),B.a0H("Simon Sounds","Copy the tune","\ud83c\udfb5",A.bH,A.bd,new B.fib()),B.a0H("Tip & Split","Share the bill","\ud83e\uddfe",A.b2,A.aZ,new B.fic()),B.a0H("Lucky Pocket","Dice, coin, number","\ud83c\udfb2",A.bu,A.aE,new B.fid())],C.ax("O<btM>")))
 w($,"ikg","hun",()=>C.a([B.af3("EARTH GLOBE","Turn it, tap a country",A.mz,A.aN,new B.fi_()),B.af3("SOLAR SYSTEM","The Sun and its worlds",D.bFo,A.aM,new B.fi0()),B.af3("GRAVITY LAB","Drop, weigh, orbit",D.amr,A.cs,new B.fi1()),B.af3("BLACK HOLE","Throw in a star",A.FW,A.bu,new B.fi2()),B.af3("GALAXY","Build, tilt, collide",A.yc,A.h4,new B.fi3()),B.af3("SIZE COMPARE","Earth next to a star",D.bFH,A.bY,new B.fi4()),B.af3("SEASONS & MOON","Why it is summer",A.vL,A.bv,new B.fi5())],C.ax("O<btH>")))})()};
-(a=>{a["mi/fM91WJGL67cl4y8S1MB0CV5E="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["/ER5/ExgXVa8YlfKml6uK4fDk6A="]=a.current})($__dart_deferred_initializers__);

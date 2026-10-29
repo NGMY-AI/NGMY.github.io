@@ -11592,7 +11592,7 @@ r=s.gkE()&&s.gkA()
 w.push(k.Ap("\ud83d\udeaa "+s.b,!1,new A.e4d(k,l),D.b3,!r))}}return new C.a7(j,30,C.cw(w,j,j,j,j,D.aP,!1),j)}},
 B(d){var w,v=this,u=null
 if(Date.now()<0){w=C.dE(0,0,0,0-Date.now(),0,0).a
-return C.c8(u,I.ml,C.bm(!0,C.av(new C.D(D.rb,C.x(C.a([B.fyT,D.ac,B.fz_,D.R,B.fzc,D.aB,C.d("It opens again in "+D.o.an(w,36e8)+"h "+D.o.E(D.o.an(w,6e7),60)+"m",u,u,u,u,u,u,B.fbT,u,u,u),D.dY,C.bG(D.aRH,new A.e79(d),u)],x.p),D.m,u,D.e,D.N,0,D.p),u),u,u,u),!0,!1,D.af,!0,!0),u,!1,!1,u,u)}w=C.a([C.bZ(0,new C.ex(v.bDI(d),v.a_),0,0,0)],x.p)
+return C.c8(u,I.ml,C.bm(!0,C.av(new C.D(D.rb,C.x(C.a([B.fyS,D.ac,B.fyZ,D.R,B.fzb,D.aB,C.d("It opens again in "+D.o.an(w,36e8)+"h "+D.o.E(D.o.an(w,6e7),60)+"m",u,u,u,u,u,u,B.fbT,u,u,u),D.dY,C.bG(D.aRH,new A.e79(d),u)],x.p),D.m,u,D.e,D.N,0,D.p),u),u,u,u),!0,!1,D.af,!0,!0),u,!1,!1,u,u)}w=C.a([C.bZ(0,new C.ex(v.bDI(d),v.a_),0,0,0)],x.p)
 if(v.az!=null)w.push(C.bZ(0,C.e_(C.mF(new A.e7a(v),u,D.dC,D.ii,new C.cx(v.aF,x.ac),new A.e7b(v),new C.bq(1,0,x.g6),x.i),!0,u),0,0,0))
 return new C.an(D.W,u,D.aa,D.r,w,u)},
 bG2(){var w,v,u=this,t=null,s=C.a([],x.p)
@@ -11829,7 +11829,7 @@ v=C.n(26)
 w=C.I(D.aF,D.q,1.8)
 s=x.V
 r=C.a([new C.ac(0,D.G,D.aF.j(0.28),D.dn,26)],s)
-r=C.aC(m,C.p(m,C.x(C.a([C.p(m,B.b6z,D.f,m,m,new C.o(D.aF.j(0.2),m,C.I(D.aF,D.q,2),m,C.a([new C.ac(0,D.G,D.aF.j(0.5),D.J,22)],s),m,D.a5),m,78,m,m,m,m,m,78),D.ac,B.fs6,D.au,B.fyH,D.aB,C.p(m,B.fs2,D.f,m,m,new C.o(D.aF,m,m,C.n(20),m,m,D.n),m,m,m,m,M.aiQ,m,m,m)],t),D.m,m,D.e,D.j,0,D.p),D.f,m,m,new C.o(m,m,w,v,r,B.bXv,D.n),m,m,m,m,D.vD,m,m,m),D.y,!1,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,new A.dNe(n),m,m,m,m,m,m,!1,D.a7)
+r=C.aC(m,C.p(m,C.x(C.a([C.p(m,B.b6z,D.f,m,m,new C.o(D.aF.j(0.2),m,C.I(D.aF,D.q,2),m,C.a([new C.ac(0,D.G,D.aF.j(0.5),D.J,22)],s),m,D.a5),m,78,m,m,m,m,m,78),D.ac,B.fs6,D.au,B.fyG,D.aB,C.p(m,B.fs2,D.f,m,m,new C.o(D.aF,m,m,C.n(20),m,m,D.n),m,m,m,m,M.aiQ,m,m,m)],t),D.m,m,D.e,D.j,0,D.p),D.f,m,m,new C.o(m,m,w,v,r,B.bXv,D.n),m,m,m,m,D.vD,m,m,m),D.y,!1,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,new A.dNe(n),m,m,m,m,m,m,!1,D.a7)
 v=n.aYG("JOBS")
 w=n.aYF(C.a([n.vx("\ud83d\udd0c","Wire a room","Go to a room that needs wiring",D.bd,new A.dNf(n)),n.vx("\ud83d\udebd","Plumb a room","Go to a bathroom or kitchen",D.aN,new A.dNi(n)),n.vx("\ud83d\udd27","Fix a house","Walk the house and fix every sign",D.aF,new A.dNj(n)),n.vx("\ud83e\uddf1","Build a room","Frame, drywall, then wire",D.b2,new A.dNk(n)),n.vx("\u26a1","Wiring bench","Just the wiring, one room",D.bH,new A.dNl(n)),n.vx("\ud83e\uddea","Safety inspection","A test job: marked when you submit",D.bu,new A.dNm(n)),n.vx("\ud83d\udcde","Service calls","A customer rings with problems",D.iU,new A.dNn(n)),n.vx("\ud83c\udfd8","Neighbourhood jobs","Fix lights and wiring around the city",D.aN,new A.dNo(n))],t))
 s=n.aYG("LESSONS")
@@ -16697,7 +16697,7 @@ k.push(C.aC(m,C.p(m,new C.y(s.c+" "+s.b,m,D.Js,m,m,m,m,m,m,m,m,m),D.f,m,m,new C.
 w===$&&C.c()
 v=w.d
 v===$&&C.c()
-if(v[w.e].fx.h(0,t)!=null)k.push(C.aC(m,C.p(m,B.fyU,D.f,m,m,new C.o(D.er,m,m,C.n(12),m,m,D.n),m,m,m,m,D.ej,m,m,m),D.y,!1,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,new A.e5I(u,d,t),m,m,m,m,m,m,!1,D.a7))
+if(v[w.e].fx.h(0,t)!=null)k.push(C.aC(m,C.p(m,B.fyT,D.f,m,m,new C.o(D.er,m,m,C.n(12),m,m,D.n),m,m,m,m,D.ej,m,m,m),D.y,!1,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,new A.e5I(u,d,t),m,m,m,m,m,m,!1,D.a7))
 return C.bm(!0,new C.D(D.bQ,C.x(C.a([B.fv3,D.R,C.bV(D.bA,k,D.br,8,8)],l),D.F,m,D.e,D.N,0,D.p),m),!0,!1,D.af,!0,!0)},
 $S:26}
 A.e5G.prototype={
@@ -19639,7 +19639,7 @@ $1(d){return this.a.c6b()},
 $S:8}
 A.ere.prototype={
 $1(d){var w=null
-return C.em(C.a([C.bG(B.ftr,new A.erd(this.a,d),w)],x.p),w,w,E.n8,B.fsA,w,w,w,w,B.fyM,w)},
+return C.em(C.a([C.bG(B.ftr,new A.erd(this.a,d),w)],x.p),w,w,E.n8,B.fsA,w,w,w,w,B.fyL,w)},
 $S:20}
 A.erd.prototype={
 $0(){C.a6(this.b,!1).O(null)
@@ -19719,7 +19719,7 @@ j.push(C.p(l,new C.y(o+" "+n,l,new C.H(!0,m,l,l,l,l,13.5,l,l,l,l,l,l,l,l,l,l,l,l
 j.push(B.fwc)
 j.push(D.O)
 j.push(C.B(C.a([B.byD,C.aas(l,l,l,l,!1,D.y,l,l,l,l,l,l,new A.erp(k,e),l,l,l,l,l,l,l,l,k.d.b)],w),D.m,l,D.e,D.j,0,l,l))
-j.push(C.bG(B.fze,new A.erq(k,d),l))
+j.push(C.bG(B.fzd,new A.erq(k,d),l))
 return C.bm(!0,C.cw(j,l,D.bQ,l,l,D.ah,!0),!0,!1,D.af,!0,!0)},
 $S:88}
 A.erp.prototype={
@@ -21875,14 +21875,14 @@ B.fwA=new C.y("Elevator",null,D.ft,null,null,null,null,null,null,null,null,null)
 B.fxy=new C.y("Deliveries",null,D.ft,null,null,null,null,null,null,null,null,null)
 B.fxM=new C.y("Every connection is on the right terminal and every safety check passes.",null,D.rV,null,null,null,null,null,null,null,null,null)
 B.fxU=new C.y("Message \xb7 now",null,D.wx,null,null,null,null,null,null,null,null,null)
-B.fyH=new C.y("5 bedrooms, 3 bathrooms and a garden. Walk in, look all round, fix what is wrong.",null,A2.TJ,null,D.L,null,null,null,null,null,null,null)
-B.fyM=new C.y("Call over",null,B.aQI,null,null,null,null,null,null,null,null,null)
-B.fyT=new C.y("\ud83d\udd12",null,M.TX,null,null,null,null,null,null,null,null,null)
-B.fyU=new C.y("\u23cf Unplug",null,I.zM,null,null,null,null,null,null,null,null,null)
-B.fz_=new C.y("The game is closed for now",null,D.nA,null,D.L,null,null,null,null,null,null,null)
+B.fyG=new C.y("5 bedrooms, 3 bathrooms and a garden. Walk in, look all round, fix what is wrong.",null,A2.TJ,null,D.L,null,null,null,null,null,null,null)
+B.fyL=new C.y("Call over",null,B.aQI,null,null,null,null,null,null,null,null,null)
+B.fyS=new C.y("\ud83d\udd12",null,M.TX,null,null,null,null,null,null,null,null,null)
+B.fyT=new C.y("\u23cf Unplug",null,I.zM,null,null,null,null,null,null,null,null,null)
+B.fyZ=new C.y("The game is closed for now",null,D.nA,null,D.L,null,null,null,null,null,null,null)
 B.f50=new C.H(!0,D.ad,null,null,null,null,14.5,null,null,null,null,null,1.4,null,null,null,null,null,null,null,null,null,null,null,null,null)
-B.fzc=new C.y("You missed 3 jobs in a row. The City office needs people who answer the phone and finish the job.",null,B.f50,null,D.L,null,null,null,null,null,null,null)
-B.fze=new C.y("A different call",null,null,null,null,null,null,null,null,null,null,null)
+B.fzb=new C.y("You missed 3 jobs in a row. The City office needs people who answer the phone and finish the job.",null,B.f50,null,D.L,null,null,null,null,null,null,null)
+B.fzd=new C.y("A different call",null,null,null,null,null,null,null,null,null,null,null)
 B.fzF=new C.y("\ud83d\udecf\ufe0f",null,D.oq,null,null,null,null,null,null,null,null,null)
 B.fA4=new C.y("Job complete! \ud83c\udf89",null,L.Jm,null,null,null,null,null,null,null,null,null)
 B.fAh=new C.y("OPEN ORDERS",null,F.zQ,null,null,null,null,null,null,null,null,null)
@@ -22988,4 +22988,4 @@ return C.a([A.vC("Breaks BOTH hot legs of a 240 volt circuit at once: water heat
 w($,"ilO","GR",()=>{var v,u=C.a([],x.n)
 for(v=0;v<10;++v)u.push(-72+16*v)
 return u})})()};
-(a=>{a["YssYSI1R5Gx4/Vk5JDfOXJKiPwY="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["XEFa8N7ak8OwNa6aC/ynSwthrkA="]=a.current})($__dart_deferred_initializers__);
