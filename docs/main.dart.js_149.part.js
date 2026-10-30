@@ -1425,7 +1425,7 @@ else t=v===w?"\nmiddle":""
 s=v*2
 n.push(new A.D(B.eI,new A.cl(B.aP,B.e,B.j,B.m,r,B.p,r,0,A.a([new A.a7(66,r,new A.y("Sheet "+u+t,r,D.f68,r,r,r,r,r,r,r,r,r),r),p.$2("front",q[s]),p.$2("back",q[s+1])],o),r),r))}return A.x(n,B.m,r,B.e,B.j,0,B.p)},
 B(d){var x,w,v,u,t,s,r,q,p,o=this,n=null,m=o.r,l=o.w!=null,k=A.aI(d,n,y.w).w,j=A.n(22),i=A.av(A.p(n,n,B.f,n,n,new A.o(B.fe,n,n,A.n(9),n,n,B.n),n,4,n,n,n,n,n,40),n,n,n),h=A.a([new A.ac(0,B.G,B.w.j(0.2),B.cJ,10)],y.V),g=y.p
-h=A.B(A.a([A.p(n,new A.a7(96,148.36363636363637,A.eQ(B.A,new A.ex(C.ao2(o.gpb()),o.z),B.f,B.dv),n),B.f,n,n,new A.o(n,n,n,n,h,n,B.n),n,n,n,n,n,n,n,n),B.ep,A.E(A.x(A.a([D.h8Q,B.R,A.eA(D.anu,D.aSi,o.gawn(),A.dg(n,n,n,n,n,n,n,n,n,F.lj,n,n,n,n,new A.b7(A.n(12),B.Y),D.ab5,n,n,n,n))],g),B.F,n,B.e,B.j,0,B.p),1)],g),B.m,n,B.e,B.j,0,n,n)
+h=A.B(A.a([A.p(n,new A.a7(96,148.36363636363637,A.eQ(B.A,new A.ex(C.ao2(o.gpb()),o.z),B.f,B.dv),n),B.f,n,n,new A.o(n,n,n,n,h,n,B.n),n,n,n,n,n,n,n,n),B.ep,A.E(A.x(A.a([D.h8T,B.R,A.eA(D.anu,D.aSi,o.gawn(),A.dg(n,n,n,n,n,n,n,n,n,F.lj,n,n,n,n,new A.b7(A.n(12),B.Y),D.ab5,n,n,n,n))],g),B.F,n,B.e,B.j,0,B.p),1)],g),B.m,n,B.e,B.j,0,n,n)
 x=A.B(A.a([o.ar7("Fold & staple",o.e,new C.cGq(o),B.q2),B.ab,o.ar7("Single pages",!o.e,new C.cGr(o),B.BE)],g),B.m,n,B.e,B.j,0,n,n)
 w=A.a([],g)
 for(v=0;v<2;++v){u=D.awL[v]
@@ -2110,7 +2110,7 @@ p.xe()
 x=p.cy
 w=x.p1
 v=p.c.a
-v.n(0,"/FontName",new A.hf("/"+w.goy()))
+v.n(0,"/FontName",new A.hg("/"+w.goy()))
 u=p.cx
 v.n(0,"/FontFile2",new A.jf(u.a,u.b))
 u=w.a
@@ -2153,7 +2153,7 @@ w=x.a
 t.cx.dO(J.eX(B.dD.gaP(w)))
 u.k4.c.a.n(0,"/Length1",new A.h2(w.byteLength))
 w=d.a
-w.n(0,"/BaseFont",new A.hf("/"+x.goy()))
+w.n(0,"/BaseFont",new A.hg("/"+x.goy()))
 x=u.k3
 x===$&&A.c()
 w.n(0,"/FontDescriptor",new A.jf(x.a,x.b))
@@ -2179,9 +2179,9 @@ u=o.ok
 u===$&&A.c()
 t=y.C
 s=y.N
-r=A.pZ(A.F(["/Type",B.a61,"/BaseFont",new A.hf("/"+m),"/FontFile2",new A.jf(w.a,w.b),"/FontDescriptor",new A.jf(v.a,v.b),"/W",A.O7(A.a([B.D8,new A.jf(u.a,u.b)],y.R),t),"/CIDToGIDMap",D.eg6,"/DW",D.ega,"/Subtype",D.eg1,"/CIDSystemInfo",A.pZ(A.F(["/Supplement",B.D8,"/Registry",new A.ry(A.Wv("Adobe"),B.uF,!0),"/Ordering",new A.ry(A.Wv("Identity-H"),B.uF,!0)],s,t),t)],s,t),t)
+r=A.pZ(A.F(["/Type",B.a61,"/BaseFont",new A.hg("/"+m),"/FontFile2",new A.jf(w.a,w.b),"/FontDescriptor",new A.jf(v.a,v.b),"/W",A.O7(A.a([B.D8,new A.jf(u.a,u.b)],y.R),t),"/CIDToGIDMap",D.eg6,"/DW",D.ega,"/Subtype",D.eg1,"/CIDSystemInfo",A.pZ(A.F(["/Supplement",B.D8,"/Registry",new A.ry(A.Wv("Adobe"),B.uF,!0),"/Ordering",new A.ry(A.Wv("Identity-H"),B.uF,!0)],s,t),t)],s,t),t)
 t=d.a
-t.n(0,"/BaseFont",new A.hf("/"+n.goy()))
+t.n(0,"/BaseFont",new A.hg("/"+n.goy()))
 t.n(0,"/Encoding",D.efQ)
 t.n(0,"/DescendantFonts",A.O7(A.a([r],y.W),y.l))
 n=o.k2
@@ -2373,7 +2373,7 @@ if((x.a.a&30)===0)x.fV(0)
 x=this.a.a
 x.toString
 this.c.a3(0,x)
-A.hl(new A.ei(d,e,"image resource service",A.dM("image failed to precache"),null,!0))},
+A.hm(new A.ei(d,e,"image resource service",A.dM("image failed to precache"),null,!0))},
 $S:253}
 C.fHi.prototype={
 $1(d){var x=A.af(d,!0,!1,!1,!1)
@@ -3138,12 +3138,12 @@ D.dyp=new C.rn(D.Qz,D.QA,null,D.HR,null)
 D.dyq=new C.rn(D.Qz,D.QA,null,D.aFw,null)
 D.dyr=new C.rn(D.Qz,D.QA,null,D.a4J,null)
 D.e8m=new A.v(26,26)
-D.hd4=new C.cgN(1,"clip")
+D.hd7=new C.cgN(1,"clip")
 D.ahC=new A.Q(0,48,0,48)
 D.aI7=new A.iS(1,0.9607843137254902,0.9607843137254902,0.9607843137254902)
-D.efQ=new A.hf("/Identity-H")
-D.eg1=new A.hf("/CIDFontType2")
-D.eg6=new A.hf("/Identity")
+D.efQ=new A.hg("/Identity-H")
+D.eg1=new A.hg("/CIDFontType2")
+D.eg6=new A.hg("/Identity")
 D.eg9=new A.h2(10)
 D.ega=new A.h2(1000)
 D.egc=new A.h2(79)
@@ -3172,7 +3172,7 @@ D.fAU=new A.y("Printing could not open here \u2014 the PDF was saved. Open it an
 D.eYI=new A.b1(D.fAU,null,null,null,null,null,null,null,null,null,null,null,null,B.T,!1,null,null,null,B.r,null)
 D.fF_=new A.y("Your book is open \u2014 tap the Share button (square with the arrow), then Print. Choose both sides.",null,null,null,null,null,null,null,null,null,null,null)
 D.f0i=new A.b1(D.fF_,null,null,null,null,null,null,null,null,null,null,null,null,B.eg,!1,null,null,null,B.r,null)
-D.hde=new C.crL(0,"loose")
+D.hdh=new C.crL(0,"loose")
 D.f3E=new A.H(!0,B.Ex,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.f4Z=new A.H(!0,B.c,null,null,null,null,null,null,null,null,null,null,1.4,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.aQf=new A.H(!0,E.iD,null,null,null,null,12,B.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
@@ -3197,6 +3197,6 @@ D.fDc=new A.y("Save PDF",null,B.ck,null,null,null,null,null,null,null,null,null)
 D.aSi=new A.y("Design cover",null,B.ck,null,null,null,null,null,null,null,null,null)
 D.fF6=new A.y("Design the cover",null,B.cD,null,null,null,null,null,null,null,null,null)
 D.fI4=new C.cvh(6,"postScriptName")
-D.h8Q=new C.br2(null)})();(function staticFields(){$.hju=null
+D.h8T=new C.br2(null)})();(function staticFields(){$.hju=null
 $.hls=A.U(y.N,A.ax("aA<m?>"))})()};
-(a=>{a["UdZsERTYroIeNrNsatApy8R9lMo="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["jZbZZRjck11GJi3kyOU5ff3Nabk="]=a.current})($__dart_deferred_initializers__);

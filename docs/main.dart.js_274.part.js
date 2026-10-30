@@ -2151,7 +2151,7 @@ w=B.a([d.f,v],x.O)
 return new C.adB(w,d.w?A.M:A.c,v,A.lW)}if(v==="Premium"){v=d.f
 w=B.aq(v,d.r,0.55)
 w.toString
-return new C.adB(B.a([v,w],x.O),A.c,v,A.j5)}if(d.w)return D.h72
+return new C.adB(B.a([v,w],x.O),A.c,v,A.j5)}if(d.w)return D.h75
 v=d.f
 return new C.adB(B.a([v,d.r],x.O),A.c,v,A.ls)},
 b5s(d,e,f,g,h){var w=null,v=B.n(10),u=B.d(d,w,w,w,w,w,w,B.l(w,w,g,w,w,w,w,w,w,w,w,9,w,w,A.P,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),t=f.w?A.c:B.Z(245,A.c.l()>>>16&255,A.c.l()>>>8&255,A.c.l()&255),s=B.n(6),r=f.f
@@ -2927,7 +2927,7 @@ $R:3,
 $S:z+6}
 C.fRU.prototype={
 $4(d,e,f,g){var w=x.t
-return new B.d_(e,!1,B.is(A.A,g,null,new B.bf(B.cH(A.ex,e,null),new B.bq(0.88,1,w),w.k("bf<bJ.T>"))),null)},
+return new B.d_(e,!1,B.is(A.A,g,null,new B.bf(B.cH(A.ey,e,null),new B.bq(0.88,1,w),w.k("bf<bJ.T>"))),null)},
 $S:32}
 C.cg_.prototype={
 $0(){var w=this.a.c
@@ -3029,8 +3029,8 @@ D.dFj=new C.fW("executive","Executive","Premium",D.aFO,L.Qb,A.bK,A.w,!1,!1)
 D.dEI=new C.jW(18,"goldFoil")
 D.dFh=new C.fW("gold_foil","Gold Foil","Premium",D.dEI,E.axp,A.aM,A.w,!1,!1)
 D.aFR=new C.jW(19,"marble")
-D.cWl=w([A.pJ,A.vh],x.O)
-D.dFs=new C.fW("marble","Marble","Premium",D.aFR,D.cWl,A.ic,A.w,!0,!1)
+D.cWm=w([A.pJ,A.vh],x.O)
+D.dFs=new C.fW("marble","Marble","Premium",D.aFR,D.cWm,A.ic,A.w,!0,!1)
 D.dEO=new C.jW(7,"midnightRoyale")
 D.dF5=new C.fW("midnight_royale","Midnight Royale","Premium",D.dEO,E.awY,A.ay,A.bm,!1,!1)
 D.aG4=new C.jW(8,"obsidianChevron")
@@ -3203,5 +3203,5 @@ D.fB1=new B.y("INVOICE",null,D.faW,null,null,null,null,null,null,null,null,null)
 D.fBS=new B.y("Delete invoice?",null,null,null,null,null,null,null,null,null,null,null)
 D.fCN=new B.y("Paid invoices auto-delete from local saves after 5 days.",null,null,null,null,null,null,null,null,null,null,null)
 D.fEN=new B.y("Save Invoice",null,null,null,null,null,null,null,null,null,null,null)
-D.h72=new C.adB(A.a3_,A.c,A.fy,A.eh)})()};
-(a=>{a["TLmI3h+xvRboTv37I6pwTjlO33s="]=a.current})($__dart_deferred_initializers__);
+D.h75=new C.adB(A.a3_,A.c,A.fy,A.eh)})()};
+(a=>{a["M88unxB9Lx4BSTnFoc+kGDuPjgo="]=a.current})($__dart_deferred_initializers__);

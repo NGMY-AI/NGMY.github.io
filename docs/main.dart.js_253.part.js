@@ -1325,7 +1325,7 @@ C.ZS.prototype={
 T(){return new C.aBG(D.aVV)}}
 C.aBG.prototype={
 B(d){var w,v,u=this,t=null,s=A.aI(d,B.bX,x.w).w,r=A.n(28),q=A.I(B.bT.j(0.35),B.q,1),p=x.p
-p=A.a([A.av(A.p(t,t,B.f,t,t,new A.o(B.b_,t,t,A.n(99),t,t,B.n),t,4,t,t,t,t,t,40),t,t,t),B.aB,D.eQG,B.am,D.fw0,B.aR,A.bV(B.bA,A.a([u.ash("iPhone",B.yq,D.aVV),u.ash("Android",D.bFf,D.h5h),u.ash("Computer",K.alx,D.h5i)],p),B.br,8,8),B.by],p)
+p=A.a([A.av(A.p(t,t,B.f,t,t,new A.o(B.b_,t,t,A.n(99),t,t,B.n),t,4,t,t,t,t,t,40),t,t,t),B.aB,D.eQG,B.am,D.fw0,B.aR,A.bV(B.bA,A.a([u.ash("iPhone",B.yq,D.aVV),u.ash("Android",D.bFf,D.h5k),u.ash("Computer",K.alx,D.h5l)],p),B.br,8,8),B.by],p)
 w=u.cwT(u.d)
 B.d.v(p,new A.M(w,u.gcwR(),A.T(w).k("M<1,t>")))
 p.push(B.aB)
@@ -3126,7 +3126,7 @@ A.a6(w,!1).O(null)
 return null},
 $S:0}
 C.dNZ.prototype={
-$1(d){return D.h5j},
+$1(d){return D.h5m},
 $S:z+8}
 C.dO6.prototype={
 $2(d,e){var w,v,u,t,s,r,q,p,o,n,m=null,l=this.a,k=l.d
@@ -3525,7 +3525,7 @@ D.ddf=w(["1. Open ngmy.org in Chrome (recommended).",y.k,"3. When Android asks, 
 D.di1=w(["1. Open ngmy.org in Safari (Add to Home Screen works too).",y.k,"3. Tap Allow when ngmy.org asks \u2014 this works with Safari set to Ask or Allow.","4. Recommended: Settings \u2192 Safari \u2192 Microphone \u2192 Ask, then Allow inside ngmy.org when recording.","5. If no prompt appears: tap the AA icon in the address bar \u2192 Website Settings \u2192 Microphone \u2192 Allow.","6. Also check: Settings \u2192 Privacy & Security \u2192 Microphone \u2192 Safari ON.","7. Close Safari completely, reopen ngmy.org, tap Start Video, then Allow."],x.s)
 D.b7I=new A.fk(null,null,null,null,null,B.bT,null,null,null,null)
 D.b6e=new A.cp(B.A,null,null,D.b7I,null)
-D.ec8=new A.D(B.ey,D.b6e,null)
+D.ec8=new A.D(B.ez,D.b6e,null)
 D.ekq=new A.z(1080,1080)
 D.ekr=new A.z(1080,1920)
 D.ekF=new A.z(1920,1080)
@@ -3569,8 +3569,8 @@ D.fER=new A.y("Rename",null,B.ck,null,null,null,null,null,null,null,null,null)
 D.fGy=new A.y("Loading video\u2026",null,B.hg,null,null,null,null,null,null,null,null,null)
 D.fJE=new A.v6(B.Ai,P.ab2)
 D.aVV=new C.aBF(0,"iphone")
-D.h5h=new C.aBF(1,"android")
-D.h5i=new C.aBF(2,"computer")
-D.h5j=new C.ZS(null)})();(function staticFields(){$.fX_=null})();(function lazyInitializers(){var w=a.lazyFinal
+D.h5k=new C.aBF(1,"android")
+D.h5l=new C.aBF(2,"computer")
+D.h5m=new C.ZS(null)})();(function staticFields(){$.fX_=null})();(function lazyInitializers(){var w=a.lazyFinal
 w($,"imQ","o4",()=>new C.b_W(new C.b_U(A.a([],A.ax("O<na>"))),B.bx,$.aw()))})()};
-(a=>{a["grQ6X22srRmvxhZ6TkiqPxm4o0A="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["dnkfbrb14u9G/swVMrUhXemvGYA="]=a.current})($__dart_deferred_initializers__);
