@@ -1573,7 +1573,7 @@ r.cx=f
 w=3
 return A.b(r.w4(),$async$nU)
 case 3:w=4
-return A.b(r.y5(),$async$nU)
+return A.b(r.y6(),$async$nU)
 case 4:w=5
 return A.b(r.EP(),$async$nU)
 case 5:r.y=r.at=!0
@@ -1603,7 +1603,7 @@ w=!q?16:17
 break
 case 16:r.a="Allow microphone access so your videos record with sound."
 w=18
-return A.b(r.y5(),$async$nU)
+return A.b(r.y6(),$async$nU)
 case 18:r.at=!1
 u=!1
 w=1
@@ -1617,7 +1617,7 @@ w=!p?20:21
 break
 case 20:r.a="Camera is not ready. Allow camera access for ngmy.org."
 w=22
-return A.b(r.y5(),$async$nU)
+return A.b(r.y6(),$async$nU)
 case 22:r.at=!1
 u=!1
 w=1
@@ -1639,7 +1639,7 @@ o=A.ab(l)
 r.a=r.asf(o)
 r.at=!1
 w=26
-return A.b(r.y5(),$async$nU)
+return A.b(r.y6(),$async$nU)
 case 26:u=!1
 w=1
 break
@@ -1658,7 +1658,7 @@ break}t.CW=t.at=!1
 w=3
 return A.b(t.EP(),$async$a3g)
 case 3:w=4
-return A.b(t.y5(),$async$a3g)
+return A.b(t.y6(),$async$a3g)
 case 4:case 1:return A.h(u,v)}})
 return A.i($async$a3g,v)},
 CZ(d,e){return this.bxm(d,e)},
@@ -2774,7 +2774,7 @@ $.am.$1("[live_capture] MediaRecorder mime "+e+" failed: "+A.u(v))}try{p=F.aX6(d
 return p}catch(t){u=A.ab(t)
 $.am.$1("[live_capture] MediaRecorder default failed: "+A.u(u))
 return null}},
-asf(d){switch(x.v.b(d)?B.bqh.gwK(d):""){case"NotAllowedError":return"Microphone/camera access was blocked. Allow it for ngmy.org in your browser or phone Settings, then try again."
+asf(d){switch(x.v.b(d)?B.bqh.gwL(d):""){case"NotAllowedError":return"Microphone/camera access was blocked. Allow it for ngmy.org in your browser or phone Settings, then try again."
 case"NotFoundError":return"No microphone or camera was found on this device."
 case"NotReadableError":return"Your camera or microphone is already being used by another app. Close it and try again."
 case"OverconstrainedError":return"This device could not meet the recording settings. Try another size (YouTube/TikTok) or switch cameras."
@@ -2872,7 +2872,7 @@ break
 case 26:w=29
 return A.b(r.EP(),$async$bT)
 case 29:w=30
-return A.b(r.y5(),$async$bT)
+return A.b(r.y6(),$async$bT)
 case 30:r.c=null
 w=27
 break
@@ -2957,11 +2957,11 @@ case 10:s.w=s.r=null
 return A.h(null,v)
 case 1:return A.f(t.at(-1),v)}})
 return A.i($async$Ny,v)},
-y5(){var w=0,v=A.j(x.H),u=this,t,s
-var $async$y5=A.e(function(d,e){if(d===1)return A.f(e,v)
+y6(){var w=0,v=A.j(x.H),u=this,t,s
+var $async$y6=A.e(function(d,e){if(d===1)return A.f(e,v)
 for(;;)switch(w){case 0:u.ayS()
 w=2
-return A.b(u.aB_(!1),$async$y5)
+return A.b(u.aB_(!1),$async$y6)
 case 2:try{t=u.dx
 if(t!=null)t.stop()}catch(r){}u.dx=null
 try{t=u.b
@@ -2973,7 +2973,7 @@ if(t!=null){t=t.getTracks()
 t.toString
 J.iw(t,new C.cb9())}}catch(r){}u.c=null
 return A.h(null,v)}})
-return A.i($async$y5,v)},
+return A.i($async$y6,v)},
 q(){var w=0,v=A.j(x.H),u=this
 var $async$q=A.e(function(d,e){if(d===1)return A.f(e,v)
 for(;;)switch(w){case 0:u.CW=u.at=!1
@@ -2983,7 +2983,7 @@ case 2:u.aix()
 w=3
 return A.b(u.EP(),$async$q)
 case 3:w=4
-return A.b(u.y5(),$async$q)
+return A.b(u.y6(),$async$q)
 case 4:return A.h(null,v)}})
 return A.i($async$q,v)}}
 C.aHB.prototype={
@@ -3573,4 +3573,4 @@ D.h5j=new C.aBF(1,"android")
 D.h5k=new C.aBF(2,"computer")
 D.h5l=new C.ZS(null)})();(function staticFields(){$.fX2=null})();(function lazyInitializers(){var w=a.lazyFinal
 w($,"imU","o4",()=>new C.b_W(new C.b_U(A.a([],A.ax("O<na>"))),B.bx,$.aw()))})()};
-(a=>{a["xim11MkpjqNOUwAu1JLNiO0ZYqk="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["yW76FEyVJIBNzczEwNzQhUBwSRM="]=a.current})($__dart_deferred_initializers__);

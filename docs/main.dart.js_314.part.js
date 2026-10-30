@@ -2776,42 +2776,42 @@ case 3:return A.h(null,v)}})
 return A.i($async$WL,v)},
 cbp(d){this.m(new B.dzZ(this,d))
 this.pf()},
-yf(d){return this.cxE(d)},
+yg(d){return this.cxE(d)},
 cxE(d){var w=0,v=A.j(x.H),u,t=this,s,r,q,p,o
-var $async$yf=A.e(function(e,f){if(e===1)return A.f(f,v)
+var $async$yg=A.e(function(e,f){if(e===1)return A.f(f,v)
 for(;;)switch(w){case 0:p=t.a
 o=p.c.w
 p=p.d
 w=o?3:5
 break
 case 3:w=6
-return A.b(B.GG(p,t.gmW(),d),$async$yf)
+return A.b(B.GG(p,t.gmW(),d),$async$yg)
 case 6:s=f
 r=A.Rk(s.b)
 w=7
-return A.b(B.wQ(t.gmW(),r),$async$yf)
+return A.b(B.wQ(t.gmW(),r),$async$yg)
 case 7:w=8
-return A.b(A.a1V(r),$async$yf)
+return A.b(A.a1V(r),$async$yg)
 case 8:w=9
-return A.b(t.Xh(r),$async$yf)
+return A.b(t.Xh(r),$async$yg)
 case 9:p=t.c
 if(p==null){w=1
 break}w=10
-return A.b(B.fly(p,r),$async$yf)
+return A.b(B.fly(p,r),$async$yg)
 case 10:p=s.a
 q=p==null?"Your link works on any phone or browser.":p+" Link may not open on other devices until publish succeeds online."
 t.c.J(x.q).f.S(A.b2(null,null,null,null,null,C.r,null,A.d("Published. "+q+" Backup .ngmy.json downloaded.",null,null,null,null,null,null,null,null,null,null),null,C.T,null,null,null,null,null,null,null,null,null,null))
 w=4
 break
 case 5:w=11
-return A.b(B.aPV(p,t.gmW(),d),$async$yf)
+return A.b(B.aPV(p,t.gmW(),d),$async$yg)
 case 11:p=t.c
 if(p==null){w=1
 break}p.J(x.q).f.S(D.eYJ)
 case 4:w=12
-return A.b(t.pf(),$async$yf)
+return A.b(t.pf(),$async$yg)
 case 12:case 1:return A.h(u,v)}})
-return A.i($async$yf,v)},
+return A.i($async$yg,v)},
 Xh(d){return this.bOl(d)},
 bOl(d){var w=0,v=A.j(x.H),u,t=2,s=[],r=this,q,p,o,n,m
 var $async$Xh=A.e(function(e,f){if(e===1){s.push(f)
@@ -4349,7 +4349,7 @@ B.dAh.prototype={
 $1(d){return B.fFU(d)},
 $S:1838}
 B.dAi.prototype={
-$1(d){return this.a.yf(d)},
+$1(d){return this.a.yg(d)},
 $S:305}
 B.dAj.prototype={
 $0(){this.a.af9()
@@ -6075,4 +6075,4 @@ D.fE0=new A.y("My Projects",null,null,null,null,null,null,null,null,null,null,nu
 D.fFh=new A.y("Invoice published",null,C.kg,null,null,null,null,null,null,null,null,null)})();(function lazyInitializers(){var w=a.lazyFinal
 w($,"imu","hvQ",()=>{var v=4279150057,u=4284704497
 return A.a([B.mt("Featured",new B.fwB(),"Map, saved trips & destinations.","\u2708\ufe0f","qr_studio","Travel Explorer",v),B.mt("",new B.fwC(),"Product feed, cart & checkout.","\ud83d\udecd\ufe0f","luxe_store","Luxe Store",4293675161),B.mt("",new B.fwD(),"Posts, profiles & engagement.","\ud83d\udcac","creator_hub","Social Pulse",4287323382),B.mt("",new B.fwO(),"Workouts, check-ins & nutrition.","\ud83d\udcaa","pulse_fitness","Pulse Fitness",4279286145),B.mt("",new B.fwU(),"Clients, invoices & pipeline.","\ud83d\udcca","invoice_pro","CRM Dashboard",u),B.mt("",new B.fwV(),"Showcase work & contact.","\ud83c\udf10","video_hub","Portfolio Hub",v),B.mt("",new B.fwW(),"Live QR for websites & text.","\ud83d\udcf1","qr_code_studio","QR Code Studio",4278630100),B.mt("New",new B.fwX(),"Sell, track sales & get paid.","\ud83d\udcb5","side_hustle","Side Hustle Marketplace",4279673674),B.mt("",new B.fwY(),"Services, bookings & client earnings.","\ud83d\udcc5","booking_pro","Booking & Services",4286331629),B.mt("",new B.fwZ(),"Daily checklist, streaks & progress.","\ud83d\udd25","habit_tracker","Habit Tracker",4279548070),B.mt("",new B.fx_(),"Income, spending & budget at a glance.","\ud83d\udcb0","finance_dash","Money Tracker",4282090230),B.mt("",new B.fwE(),"Post roles, track applicants.","\ud83d\udcbc","job_board","Job Board",4281549141),B.mt("",new B.fwF(),"Discussion feed, posts & replies.","\ud83d\udde3\ufe0f","community_forum","Community Forum",4288814255),B.mt("",new B.fwG(),"Episodes, categories & playback links.","\ud83c\udf99\ufe0f","podcast_hub","Podcast Hub",4280232247),B.mt("",new B.fwH(),"Events, RSVPs & shareable QR codes.","\ud83c\udfab","event_tickets","Event Ticketing",4294286859),B.mt("New",new B.fwI(),"Raise funds, track donors, share a link.","\u2764\ufe0f","donate_nonprofit","Giving Campaign",4292943176),B.mt("",new B.fwJ(),"Sessions, bookings & client roster.","\ud83e\uddd8","coaching_booking","Coaching Studio",4286456526),B.mt("",new B.fwK(),"Showcase galleries & booking requests.","\ud83d\udcf7","photo_portfolio","Photo Portfolio",4279310375),B.mt("",new B.fwL(),"Save recipes, ingredients & steps.","\ud83c\udf73","recipe_box","Recipe Box",4293548044),B.mt("",new B.fwM(),"Daily care, vet visits & reminders.","\ud83d\udc3e","pet_care","Pet Care Tracker",4284850957),B.mt("",new B.fwN(),"Create invoices, track clients & income.","\ud83e\uddfe","freelance_invoicing","Freelancer Invoicing",4280171146),B.mt("",new B.fwP(),"Log rounds, track scores & leaderboard.","\ud83c\udfc6","trivia_game","Trivia Night Scorekeeper",4292552567),B.mt("New",new B.fwQ(),"Map of properties, inquiries & saves.","\ud83c\udfe0","real_estate","Real Estate Listings",4278995566),B.mt("",new B.fwR(),"Menu by category, tap to add to order.","\ud83c\udf7d\ufe0f","restaurant_menu","Restaurant Menu & Orders",4290321436),B.mt("",new B.fwS(),"Members, renewals & revenue.","\ud83e\udeaa","membership_manager","Membership Manager",4278483031),B.mt("",new B.fwT(),"Start fresh \u2014 describe any app to NGMY AI.","\ud83d\ude80","blank","Blank Canvas",u)],A.ax("O<a60>"))})})()};
-(a=>{a["+eKMEbfZiMVaod+aKmOiifym91w="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["BLcJDinHBDzRPLtizgfMpVUpfKY="]=a.current})($__dart_deferred_initializers__);

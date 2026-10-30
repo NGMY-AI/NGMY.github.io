@@ -4456,7 +4456,7 @@ case 1:return C.f(t.at(-1),v)}})
 return C.i($async$bDC,v)},
 cqO(d,e){var w=0,v=C.j(x.g7),u
 var $async$cqO=C.e(function(f,g){if(f===1)return C.f(g,v)
-for(;;)switch(w){case 0:u=$.h4S().xb(d,null,null,null,e)
+for(;;)switch(w){case 0:u=$.h4S().xc(d,null,null,null,e)
 w=1
 break
 case 1:return C.h(u,v)}})
@@ -9154,7 +9154,7 @@ b7=C.N()
 b7.r=D.b9L.j(0.05+0.09*b3*(0.5+0.5*Math.sin(r.d*22))).gp(0)
 c0.b0(new C.a9(0,0,b8,b9),b7)
 a9=C.h4(b5,b5,b5,b5,D.f2Q,A.a4,A.c6,b5,A.dP,A.c5)
-a9.wF(b6-24)
+a9.wG(b6-24)
 a9.a4(c0,new C.v(12,10))}},
 qm(d,e,f,g,h){var w=null,v=C.h4(w,w,w,w,C.d3(w,w,w,w,w,w,w,w,w,C.l(w,w,g,w,w,w,w,w,w,w,w,h,w,w,A.u,w,w,!0,w,w,w,w,w,w,w,w),e),A.a4,A.c6,w,A.dP,A.c5)
 v.en()
@@ -18948,4 +18948,4 @@ t.n(0,u.a,u)}return t})
 w($,"ikD","ahK",()=>C.a([B.FA("Light the bulb","You need a battery and a bulb joined in a loop. Wire the + of the battery to the bulb, and the bulb back to the battery.",new B.fhW()),B.FA("Make a flashlight","Add a switch into the loop, so you can turn the bulb on and off.",new B.fhX()),B.FA("Spin the motor","A battery and a motor in a loop will make it spin.",new B.fhY()),B.FA("Light an LED safely","An LED burns out on its own. Put a resistor in the loop with it. Mind the + side of the LED!",new B.fhZ()),B.FA("Light a bulb with no battery","Use a solar panel, a hand crank or a wind turbine instead of a battery.",new B.fi_()),B.FA("Play the radio","A radio needs about 3 volts or more. Try a 9 volt battery.",new B.fhN()),B.FA("Watch TV","A TV needs 6 volts or more. Set a battery to 12 volts, and wire the TV's + (left) dot towards the battery +.",new B.fhO()),B.FA("Charge a battery","A 1.5 V battery starts flat. Join it to a solar panel (+ to +, \u2212 to \u2212) until its charge bar is full.",new B.fhP()),B.FA("One battery, two gadgets","A TV needs 9 volts but a phone burns out. Use a step-down converter to give the phone 5 V from the same battery.",new B.fhQ()),B.FA("Protect a radio","Put a diode in the loop with a radio. It only lets electricity go one way.",new B.fhR()),B.FA("Make toast","A heater turns electricity into heat. Make it glow bright orange.",new B.fhS())],C.ax("O<baE>")))
 w($,"il5","hv8",()=>C.a([B.a0J("Spin the Wheel","Let luck decide","\ud83c\udfa1",A.aM,A.cc,new B.fiD()),B.a0J("Focus Timer","Work, then rest","\u23f1\ufe0f",A.c9,A.bz,new B.fiE()),B.a0J("Breathe","Calm down in a minute","\ud83e\udee7",A.hm,A.cA,new B.fiF()),B.a0J("Draw Pad","Sketch and share","\ud83c\udfa8",A.bD,A.b6,new B.fiG()),B.a0J("Memory Match","Find the pairs","\ud83c\udccf",A.aN,A.cb,new B.fiH()),B.a0J("Simon Sounds","Copy the tune","\ud83c\udfb5",A.bH,A.bc,new B.fiI()),B.a0J("Tip & Split","Share the bill","\ud83e\uddfe",A.b2,A.aZ,new B.fiJ()),B.a0J("Lucky Pocket","Dice, coin, number","\ud83c\udfb2",A.bu,A.aE,new B.fiK())],C.ax("O<btQ>")))
 w($,"il4","hv7",()=>C.a([B.af4("EARTH GLOBE","Turn it, tap a country",A.mA,A.aN,new B.fiw()),B.af4("SOLAR SYSTEM","The Sun and its worlds",D.bFv,A.aM,new B.fix()),B.af4("GRAVITY LAB","Drop, weigh, orbit",D.amz,A.cs,new B.fiy()),B.af4("BLACK HOLE","Throw in a star",A.G_,A.bu,new B.fiz()),B.af4("GALAXY","Build, tilt, collide",A.yd,A.h4,new B.fiA()),B.af4("SIZE COMPARE","Earth next to a star",D.bFO,A.bY,new B.fiB()),B.af4("SEASONS & MOON","Why it is summer",A.vM,A.bv,new B.fiC())],C.ax("O<btL>")))})()};
-(a=>{a["gSmO1ZSTu5X3LTtCi+/jWCsDBro="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["RHbmg2pF6zaM6Rgt+x0Br8k6SMQ="]=a.current})($__dart_deferred_initializers__);
