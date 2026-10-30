@@ -287,6 +287,28 @@ class CityInterior {
       b.box(const V3(w / 2 + 0.6, h / 2, d / 2), const V3(1.2, h, d), wallCol, split: 3);
       b.endGroup();
     }
+    // The front wall, with a doorway where the way out is (none on the upper levels of a tower), so turning round never shows the outside.
+    b.order = 0;
+    if (isTower && level > 1) {
+      b.startGroup();
+      b.box(const V3(0, h / 2, d + 0.6), const V3(w + 2.4, h, 1.2), wallCol, split: 3);
+      b.endGroup();
+    } else {
+      const doorHalf = 38.0;
+      b.startGroup();
+      b.box(V3(-(w / 2 + doorHalf) / 2, h / 2, d + 0.6), V3(w / 2 - doorHalf + 1.2, h, 1.2), wallCol, split: 2);
+      b.endGroup();
+      b.startGroup();
+      b.box(V3((w / 2 + doorHalf) / 2, h / 2, d + 0.6), V3(w / 2 - doorHalf + 1.2, h, 1.2), wallCol, split: 2);
+      b.endGroup();
+      b.startGroup();
+      b.box(V3(0, (h + 64) / 2, d + 0.6), V3(doorHalf * 2, h - 64, 1.2), wallCol);
+      b.endGroup();
+      // Daylight in the doorway (glass doors), so it is never a black hole.
+      b.startGroup();
+      b.box(const V3(0, 32, d + 0.9), const V3(doorHalf * 2, 64, 0.6), const Color(0xFFD6EEFB), shine: 0.5);
+      b.endGroup();
+    }
     b.order = 1;
     // Windows with a frame and the sky outside.
     const sky = Color(0xFF9BD3F5);
@@ -345,12 +367,16 @@ class CityInterior {
       // Big TVs on the walls of every level, playing the NGMY ads.
       b.order = 2;
       b.bias = 0;
-      b.box(const V3(-100, 38, 1.2), const V3(86, 52, 2.4), const Color(0xFF111827), shine: 0.3);
-      b.box(const V3(100, 38, 1.2), const V3(86, 52, 2.4), const Color(0xFF111827), shine: 0.3);
-      b.box(const V3(-w / 2 + 1.2, 38, 128), const V3(2.4, 52, 96), const Color(0xFF111827), shine: 0.3);
-      tv.add(ScreenQuad([const V3(-140, 62, 2.6), const V3(-60, 62, 2.6), const V3(-60, 15, 2.6), const V3(-140, 15, 2.6)], 0, (c, size, t) => paintCityAdLoop(c, size, t, door.id + level), width: 960, height: 560, bias: 5, order: 2));
-      tv.add(ScreenQuad([const V3(60, 62, 2.6), const V3(140, 62, 2.6), const V3(140, 15, 2.6), const V3(60, 15, 2.6)], 0, (c, size, t) => paintCityAdLoop(c, size, t, door.id + level + 3), width: 960, height: 560, bias: 5, order: 2));
-      tv.add(ScreenQuad([const V3(-w / 2 + 2.6, 62, 172), const V3(-w / 2 + 2.6, 62, 84), const V3(-w / 2 + 2.6, 15, 84), const V3(-w / 2 + 2.6, 15, 172)], 0, (c, size, t) => paintCityAdLoop(c, size, t, door.id + level + 7), width: 960, height: 560, bias: 5, order: 2));
+      b.box(const V3(-100, 38, 0.7), const V3(86, 52, 1.4), const Color(0xFF111827), shine: 0.3);
+      b.box(const V3(100, 38, 0.7), const V3(86, 52, 1.4), const Color(0xFF111827), shine: 0.3);
+      b.box(const V3(-w / 2 + 0.7, 38, 128), const V3(1.4, 52, 96), const Color(0xFF111827), shine: 0.3);
+      tv.add(ScreenQuad([const V3(-140, 62, 3.6), const V3(-60, 62, 3.6), const V3(-60, 15, 3.6), const V3(-140, 15, 3.6)], 0, (c, size, t) => paintCityAdLoop(c, size, t, door.id + level), width: 960, height: 560, bias: 60, order: 2));
+      tv.add(ScreenQuad([const V3(60, 62, 3.6), const V3(140, 62, 3.6), const V3(140, 15, 3.6), const V3(60, 15, 3.6)], 0, (c, size, t) => paintCityAdLoop(c, size, t, door.id + level + 3), width: 960, height: 560, bias: 60, order: 2));
+      tv.add(ScreenQuad([const V3(-w / 2 + 3.6, 62, 172), const V3(-w / 2 + 3.6, 62, 84), const V3(-w / 2 + 3.6, 15, 84), const V3(-w / 2 + 3.6, 15, 172)], 0, (c, size, t) => paintCityAdLoop(c, size, t, door.id + level + 7), width: 960, height: 560, bias: 60, order: 2));
+    }
+    if (isHouse && !dark) {
+      // The TV in the living room plays the NGMY ads while the house has power.
+      tv.add(ScreenQuad([const V3(-26, 89, 3.8), const V3(66, 89, 3.8), const V3(66, 43, 3.8), const V3(-26, 43, 3.8)], 0, (c, size, t) => paintCityAdLoop(c, size, t, door.id + 2), width: 960, height: 480, bias: 60, order: 2));
     }
     scene = Scene3D(b.polys, labels: labels, screens: tv);
   }
@@ -629,7 +655,7 @@ class CityInterior {
     b.box(const V3(47, 48, 3.5), const V3(7, 96, 7), const Color(0xFF475569), shine: 0.5);
     b.box(const V3(0, 93, 3.5), const V3(100, 7, 7), const Color(0xFF475569), shine: 0.5);
     // The doors slide, so they are drawn live (see dynamicPolys); the display and the buttons sit on the frame.
-    b.bias = 6;
+    b.bias = 60;
     b.box(const V3(0, 98, 8.0), const V3(34, 6, 0.6), const Color(0xFF22D3EE), shine: 0.4);
     b.box(const V3(0, 98, 6.6), const V3(40, 12, 2), const Color(0xFF111827));
     b.box(const V3(64, 50, 6.6), const V3(10, 26, 2), const Color(0xFF374151));
@@ -781,12 +807,12 @@ class CityInterior {
         ..order = 2
         ..id = 0;
       if (isTower) {
-        db.bias = 6;
+        db.bias = 60;
         for (final s in const [-1.0, 1.0]) {
           db.box(V3(s * (24 + 21 * doorOpen), 42, 6.6), const V3(42, 84, 1.2), const Color(0xFFF8FAFC), shine: 0.7);
         }
       } else {
-        db.bias = 6;
+        db.bias = 60;
         for (final s in const [-1.0, 1.0]) {
           db.box(V3(s * (9 + 18 * doorOpen), 40, 78.6), const V3(18, 80, 2), const Color(0xFFE2E8F0), shine: 0.7);
         }

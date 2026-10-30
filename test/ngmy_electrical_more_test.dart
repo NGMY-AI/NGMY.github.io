@@ -8,6 +8,7 @@ import 'package:ngmy/ngmy_construction_electrical_more.dart';
 import 'package:ngmy/ngmy_construction_home.dart';
 import 'package:ngmy/ngmy_construction_homepage.dart';
 import 'package:ngmy/ngmy_construction_project.dart';
+import 'package:ngmy/ngmy_construction_tour.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -188,5 +189,20 @@ void main() {
     expect(inn.leaving, isFalse, reason: 'no way out from level 4');
     expect(inn.scene.labels.any((l) => l.text.contains('Walk here to go out')), isFalse);
     expect(inn.scene.labels.any((l) => l.text.contains('elevator down')), isTrue);
+  });
+  test('the TVs never switch off: the pictures are far in front of their frames, the elevator doors are drawn over the shaft, and the house TV plays ads while it has power', () {
+    final city = HomeProject(seed: 4).rooms[11];
+    final tower = city.furn.firstWhere((f) => f.kind == 'tower');
+    final lobby = CityInterior('tower', tower)..build(null);
+    for (final q in lobby.scene.screens) {
+      expect(q.bias, greaterThanOrEqualTo(30), reason: 'a picture must always be drawn after its frame, from every side');
+    }
+    final doors = lobby.dynamicPolys(1.0, const PersonStyle()).where((p) => p.color == const Color(0xFFF8FAFC));
+    expect(doors, isNotEmpty);
+    expect(doors.every((p) => p.bias >= 30), isTrue, reason: 'doors are drawn over the shaft from every side');
+    final house = city.furn.firstWhere((f) => f.kind == 'house2');
+    expect(CityInterior('house2', house)..build(null), isA<CityInterior>());
+    expect((CityInterior('house2', house)..build(null)).scene.screens.length, 1, reason: 'a house with power: the TV plays ads');
+    expect((CityInterior('house2', house, dark: true)..build(null)).scene.screens, isEmpty, reason: 'no power, no picture');
   });
 }
