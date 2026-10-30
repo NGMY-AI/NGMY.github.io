@@ -296,8 +296,19 @@ void main() {
     final sim = CityTrafficSim.instance..reset();
     var passedRed = 0;
     final lastAlong = <String, double>{};
-    for (var t = 0.0; t < 700; t += 0.25) {
+    final driven = List<double>.filled(kTraffic.length, 0.0);
+    for (var t = 0.0; t < 3000; t += 0.25) {
       sim.advance(t);
+      for (var i = 0; i < kTraffic.length; i++) {
+        driven[i] += sim.speedOf(i) * 0.25;
+      }
+      // Nobody gets stuck: every vehicle keeps getting on, minute after minute.
+      if (t % 120 == 0 && t > 0) {
+        for (var i = 0; i < kTraffic.length; i++) {
+          expect(driven[i], greaterThan(1200), reason: 'vehicle $i is stuck at t=$t');
+          driven[i] = 0;
+        }
+      }
       final poses = [for (final v in kTraffic) vehiclePose(v, t)];
       for (var i = 0; i < kTraffic.length; i++) {
         for (var j = i + 1; j < kTraffic.length; j++) {

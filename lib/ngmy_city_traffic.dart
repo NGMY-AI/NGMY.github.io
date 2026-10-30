@@ -132,6 +132,51 @@ bool walkSignal(CityLight l, double t) {
 
 // ── The traffic itself ──
 
+/// A place where the two loops come close (the corners at the two ends of the middle street). Long vehicles swing wide in a
+/// corner, so only one at a time may be in it. [entry] is, for each vehicle, how far along its loop it is when its body first
+/// touches the zone, and [len] how much further it drives before it is out again.
+class _Zone {
+  _Zone(this.x0, this.x1, this.z0, this.z1) {
+    for (final v in kTraffic) {
+      final per = _loopShape(v).per;
+      bool inZone(double s) {
+        final (px, pz, ux, uz) = loopPoint(v, s);
+        for (final fa in const [-0.5, -0.25, 0.0, 0.25, 0.5]) {
+          for (final fs in const [-0.5, 0.0, 0.5]) {
+            final x = px + ux * fa * v.length - uz * fs * v.width, z = pz + uz * fa * v.length + ux * fs * v.width;
+            if (x > x0 && x < x1 && z > z0 && z < z1) return true;
+          }
+        }
+        return false;
+      }
+
+      // Start the count somewhere outside the zone, so a vehicle that is in it at the start of the loop is counted whole.
+      var from = 0.0;
+      while (inZone(from) && from < per) {
+        from += 1;
+      }
+      var first = -1.0, run = 0.0;
+      for (var k = 0.0; k < per; k += 1) {
+        final s = (from + k) % per;
+        if (inZone(s)) {
+          if (first < 0) first = s;
+          run += 1;
+        } else if (first >= 0) {
+          break;
+        }
+      }
+      entry.add(first);
+      len.add(run);
+    }
+  }
+
+  final double x0, x1, z0, z1;
+  final List<double> entry = [], len = [];
+  int owner = -1;
+}
+
+final List<_Zone> _zones = [_Zone(-80, 80, 400, 565), _Zone(-80, 80, 715, 885)];
+
 /// The cars drive by themselves: each keeps its distance from the one in front, waits for a person on foot in its way, and stops at a
 /// red light. It is worked out a little at a time (so a car can wait and then go again) and the same every run.
 class CityTrafficSim {
@@ -141,7 +186,7 @@ class CityTrafficSim {
   static const double _step = 0.05, _accel = 40, _brake = 110;
 
   final List<double> _s = [for (final v in kTraffic) v.phase];
-  final List<double> _speed = [for (final v in kTraffic) 0.0];
+  final List<double> _speed = List<double>.filled(kTraffic.length, 0.0);
   double _t = 0;
 
   /// The people on foot the cars must look out for (the couriers in the street): their x and z.
@@ -154,6 +199,9 @@ class CityTrafficSim {
       _speed[i] = 0;
     }
     _t = 0;
+    for (final z in _zones) {
+      z.owner = -1;
+    }
   }
 
   /// How fast vehicle [i] goes now.
@@ -172,6 +220,15 @@ class CityTrafficSim {
   }
 
   void _stepOnce(double dt) {
+    for (final z in _zones) {
+      final o = z.owner;
+      if (o < 0) continue;
+      final per = _loopShape(kTraffic[o]).per;
+      var into = (_s[o] - z.entry[o]) % per;
+      if (into < 0) into += per;
+      // It has driven through and out the other side: the zone is free for the next one.
+      if (into >= z.len[o] && into < per / 2) z.owner = -1;
+    }
     for (var i = 0; i < kTraffic.length; i++) {
       final v = kTraffic[i];
       final per = _loopShape(v).per;
@@ -196,23 +253,32 @@ class CityTrafficSim {
         if (d > per - 30) continue;
         if (d < 260 && !(st == 1 && d < _speed[i] * 1.2)) target = math.min(target, room(d - 4));
       }
-      // Any other vehicle in front of it, even from the other loop (a long vehicle swings wide at a corner): do not drive into its body.
-      final (cx0, cz0, cux, cuz) = loopPoint(v, _s[i]);
-      for (var j = 0; j < kTraffic.length; j++) {
-        if (j == i) continue;
-        final pj = loopPoint(kTraffic[j], _s[j]);
-        final dx = pj.$1 - cx0, dz = pj.$2 - cz0;
-        if (dx * dx + dz * dz > 640000) continue;
-        // If they already touch, the one with the lower number carries on so the two never wait for each other for ever.
-        if (i < j && _overlap(loopPoint(v, _s[i]), v, pj, kTraffic[j])) continue;
-        for (final look in const [8.0, 20.0, 35.0, 55.0, 80.0, 110.0]) {
-          // Where the other will be by the time this one has driven [look] further.
-          final tau = look / math.max(_speed[i], 8.0);
-          if (_overlap(loopPoint(v, _s[i] + look), v, loopPoint(kTraffic[j], _s[j] + _speed[j] * tau), kTraffic[j])) {
-            target = math.min(target, room(look - 16));
-            break;
-          }
+      // The crossing zones at the two ends of the middle street: only one vehicle at a time may be inside one, the others wait at its edge.
+      for (final z in _zones) {
+        final a = z.entry[i];
+        if (a < 0) continue;
+        var d = (a - _s[i]) % per;
+        if (d < 0) d += per;
+        final inside = (_s[i] - a) % per < z.len[i];
+        if (inside) {
+          if (z.owner < 0) z.owner = i;
+          continue;
         }
+        if (z.owner == i) continue;
+        final nearEnough = d < 40 + _speed[i] * _speed[i] / (2 * _brake) + 20;
+        // A red light between the vehicle and the zone: it is held there by the light and does not take the zone for itself yet.
+        var lightFirst = false;
+        for (final l in kLights) {
+          if (l.loop != i ~/ 2 || lightState(l, _t) == 0) continue;
+          var dl = (l.stopAt - (_s[i] + half)) % per;
+          if (dl < 0) dl += per;
+          if (dl < d) lightFirst = true;
+        }
+        if (z.owner < 0 && nearEnough && !lightFirst) {
+          z.owner = i;
+          continue;
+        }
+        if (d < 400) target = math.min(target, room(d - 10));
       }
       // A person on foot in front of it.
       final (px, pz, ux, uz) = loopPoint(v, _s[i]);
@@ -230,22 +296,6 @@ class CityTrafficSim {
   }
 
   bool _sameLoop(int a, int b) => a ~/ 2 == b ~/ 2;
-
-  /// Does any point of the body of [b] (at its place [pb]) lie inside the body of [a] (at [pa])?
-  static bool _overlap((double, double, double, double) pa, CityVehicle a, (double, double, double, double) pb, CityVehicle b) => _inside(pa, a, pb, b) || _inside(pb, b, pa, a);
-
-  static bool _inside((double, double, double, double) pa, CityVehicle a, (double, double, double, double) pb, CityVehicle b) {
-    for (final fa in const [-0.5, -0.25, 0.0, 0.25, 0.5]) {
-      for (final fs in const [-0.5, 0.0, 0.5]) {
-        final px = pb.$1 + pb.$3 * fa * b.length - pb.$4 * fs * b.width;
-        final pz = pb.$2 + pb.$4 * fa * b.length + pb.$3 * fs * b.width;
-        final dx = px - pa.$1, dz = pz - pa.$2;
-        final along = (dx * pa.$3 + dz * pa.$4).abs(), across = (-dx * pa.$4 + dz * pa.$3).abs();
-        if (along < a.length / 2 + 6 && across < a.width / 2 + 6) return true;
-      }
-    }
-    return false;
-  }
 
   /// Where vehicle [i] is at time [t] and which way it faces.
   (double, double, double, double) pose(int i, double t) {
