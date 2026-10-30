@@ -774,6 +774,8 @@ class CityInterior {
     // Each one turns green on its own as soon as it is fixed; the panel is green when the whole house has power.
     final outOk = !dark || (fixtures[0] && fixtures[1]);
     final swOk = !dark || fixtures[3];
+    final lightOk = !dark || fixtures[2];
+    final todo = [if (!(fixtures[0] && fixtures[1]) && dark) 'outlets', if (!lightOk) 'ceiling light', if (!swOk) 'switch'];
     b.order = 1;
     b.alpha = 0.6;
     b.id = idCinPanel;
@@ -781,6 +783,8 @@ class CityInterior {
     b.id = idCinOutlet;
     b.box(const V3(95, 26, 1.0), const V3(30, 36, 0.8), outOk ? green : red);
     b.box(const V3(-60, 50, 1.0), const V3(24, 32, 0.8), swOk ? green : red);
+    // The ceiling light has its own frame in the middle of the ceiling.
+    b.box(const V3(0, h - 1.2, 95), const V3(46, 0.8, 46), lightOk ? green : red);
     b.alpha = 1;
     b.box(const V3(95, 26, 1.8), const V3(14, 20, 1.2), const Color(0xFFF7F2E6), shine: 0.25);
     for (final dz in const [-1.0, 1.0]) {
@@ -792,9 +796,10 @@ class CityInterior {
     b.box(V3(-60, swOk ? 52 : 48, 2.8), const V3(2, 5, 1.0), const Color(0xFFD9D2C2));
     b.id = 0;
     b.order = 2;
-    labels.add(Label3D(const V3(-w / 2 + 6, 82, 45), dark ? '⚡ Breaker panel: tap, then walk onto the red mat' : '⚡ Breaker panel: all fine', dark ? const Color(0xFFDC2626) : const Color(0xFF15803D), id: idCinPanel));
+    labels.add(Label3D(const V3(-w / 2 + 6, 82, 45), dark ? (todo.isEmpty ? '⚡ Breaker panel: tap to switch the power on' : '⚡ Breaker panel: still to fix: ${todo.join(', ')}') : '⚡ Breaker panel: all fine', dark ? const Color(0xFFDC2626) : const Color(0xFF15803D), id: idCinPanel));
     labels.add(Label3D(const V3(95, 50, 6), outOk ? '🔌 Outlets: fixed' : '🔌 Outlet: dead, tap to fix it', outOk ? const Color(0xFF15803D) : const Color(0xFFDC2626), id: idCinOutlet));
     labels.add(Label3D(const V3(-60, 70, 6), swOk ? '💡 Switch: fixed' : '💡 Switch: no power, tap to fix it', swOk ? const Color(0xFF15803D) : const Color(0xFFDC2626), id: idCinOutlet));
+    labels.add(Label3D(const V3(0, h - 30, 95), lightOk ? '💡 Ceiling light: fixed' : '💡 Ceiling light: dead, tap to fix it', lightOk ? const Color(0xFF15803D) : const Color(0xFFDC2626), id: idCinOutlet));
     if (dark) labels.add(const Label3D(V3(0, 100, 20), 'No power in this house', Color(0xFFDC2626)));
   }
 

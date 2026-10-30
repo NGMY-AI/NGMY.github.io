@@ -114,7 +114,7 @@ void main() {
   test('a dark house shows its breaker panel, outlet and switch with red frames, and the labels can be tapped', () {
     final f = HomeProject(seed: 4).rooms[11].furn.firstWhere((f) => f.kind == 'house2');
     final dark = CityInterior('house2', f, dark: true)..build(null);
-    expect(dark.scene.labels.where((l) => l.id == idCinPanel || l.id == idCinOutlet).length, 3);
+    expect(dark.scene.labels.where((l) => l.id == idCinPanel || l.id == idCinOutlet).length, 4);
     expect(dark.scene.polys.any((p) => p.color == const Color(0xFFEF4444) && p.alpha < 1), isTrue, reason: 'a red frame behind it');
     expect(dark.scene.polys.any((p) => p.id == idCinOutlet), isTrue, reason: 'the outlet and switch themselves can be tapped');
     expect(dark.scene.polys.any((p) => p.id == idCinPanel), isTrue, reason: 'and so can the panel');
@@ -317,7 +317,7 @@ void main() {
     const green = Color(0xFF22C55E), red = Color(0xFFEF4444);
     bool has(int id, Color c) => inn.scene.polys.any((p) => p.id == id && p.color == c && p.alpha < 1);
     expect(has(idCinOutlet, green), isTrue, reason: 'outlets and switch are fixed');
-    expect(has(idCinOutlet, red), isFalse);
+    expect(has(idCinOutlet, red), isTrue, reason: 'the ceiling light still has its own red frame, so the person can see what is left');
     expect(has(idCinPanel, red), isTrue, reason: 'the ceiling light is still to do, so the house is still dark');
     final fixed = CityInterior('house2', f)..build(null);
     expect(fixed.scene.polys.any((p) => p.id == idCinPanel && p.color == green && p.alpha < 1), isTrue);
