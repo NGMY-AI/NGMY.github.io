@@ -205,7 +205,7 @@ void main() {
     st.setState(() {});
     await t.pump(const Duration(seconds: 2));
     expect(city.darkHouses.contains(house.id), isFalse, reason: 'the power is back without pressing anything');
-    expect((st.comm as Community).points, before + 20);
+    expect((st.comm as Community).points - before, inInclusiveRange(10, 35), reason: "a finished job pays 10 to 35 stars");
     expect(find.text('✅ Complete work', skipOffstage: false), findsNothing);
     await t.pump(const Duration(seconds: 15));
   });

@@ -73,7 +73,7 @@ const Map<String, FurnKind> kFurnKinds = {
   'store': FurnKind('NGMY store', '🏬', 130, 80),
   'gasstation': FurnKind('NGMY gas station', '⛽', 150, 90),
   'dmv': FurnKind('NGMY licence office', '🪪', 130, 80),
-  'ubstation': FurnKind('NGMY Uber station', '🚖', 120, 60),
+  'ubstation': FurnKind('NGMY Uber', '🚖', 120, 60),
   'townsign': FurnKind('NGMY Town sign', '🪧', 380, 14),
   'cornersign': FurnKind('NGMY Town billboard', '🪧', 150, 10),
   'adboard': FurnKind('NGMY ad billboard', '📺', 330, 14),

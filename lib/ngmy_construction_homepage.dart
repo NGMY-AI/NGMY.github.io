@@ -1213,14 +1213,14 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
             ..doorOpen = 1;
           cab.walker
             ..x = 0
-            ..z = 44
+            ..z = 58
             ..yaw = 0
             ..walking = false;
           cab.build(null);
           inner = cab;
           _rideLabel.value = '${up ? '▲' : '▼'}  ${r.from == 1 ? 'L' : r.from}';
           setState(_rebuild);
-          cam.setView(target: const V3(0, 52, 40), dist: 66, yaw: math.pi, pitch: 0.1);
+          cam.setView(target: const V3(0, 52, 52), dist: 54, yaw: math.pi, pitch: 0.1);
           conBeep(520, ms: 70, volume: 0.25);
         }
       case 1:
@@ -1242,8 +1242,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         }
         final shake = moving ? 1.0 : 0.25;
         cam.setView(
-          target: V3(0, 52 + math.sin(el * 5.3) * 0.5 * shake, 40),
-          dist: 66 + math.sin(el * 2.1) * 1.2,
+          target: V3(0, 52 + math.sin(el * 5.3) * 0.5 * shake, 52),
+          dist: 54 + math.sin(el * 2.1) * 1.2,
           yaw: math.pi + math.sin(el * 0.9) * 0.5 + math.sin(el * 8) * 0.010 * shake,
           pitch: 0.1 + math.sin(el * 6.1) * 0.007 * shake,
         );
@@ -1396,6 +1396,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       _legIx = -1;
     });
     cam
+      ..farExtra = 4800
       ..minDist = 6
       ..maxDist = 2600
       ..minPitch = -1.2
@@ -1492,6 +1493,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   }
 
   void _stopDrone() {
+    cam.farExtra = 0;
     _droneTimer?.cancel();
     _droneTimer = null;
     if (!mounted) return;
@@ -1577,6 +1579,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     return p != null && (p.wiringWorks || _fixturesOf(p).every((o) => o));
   }
 
+  /// What a finished job pays: a different number of stars each time, from 10 to 35.
+  int _jobPay() => 10 + _rnd.nextInt(26);
+
   /// The Complete work button: check the wiring, bring the power back, pay the points.
   void _completeWork() {
     final inn = inner, k = _workKey;
@@ -1594,11 +1599,12 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       room.darkHouses.remove(f.id);
     }
     inn.dark = false;
-    comm?.points += 20;
+    final pay = _jobPay();
+    comm?.points += pay;
     inn.build(comm);
     setState(_rebuild);
     conBeep(880, ms: 120, volume: 0.3);
-    _say(inn.isTower ? 'Work complete! The power is back on level ${inn.level}. +20 points.' : 'Work complete! The power is back in the house. +20 points.', ok: true);
+    _say(inn.isTower ? 'Work complete! The power is back on level ${inn.level}. +$pay stars.' : 'Work complete! The power is back in the house. +$pay stars.', ok: true);
   }
 
   Future<void> _houseJob(CityInterior inn) async {
@@ -1628,9 +1634,10 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (st.stage >= 2 && evaluateWiring(electricalLesson('light'), st).ok) {
       room.lampWork.remove(f.id);
       room.brokenLamps.remove(f.id);
-      comm?.points += 8;
+      final pay = _jobPay();
+      comm?.points += pay;
       setState(_rebuild);
-      _say('The street light is on again. You wired it correctly: black to black, white to white, ground to ground. +8 points.', ok: true);
+      _say('The street light is on again. You wired it correctly: black to black, white to white, ground to ground. +$pay stars.', ok: true);
     } else {
       _say('The light is still out: finish the wiring and fit the cover, then it comes on.', ok: false);
     }
@@ -2819,8 +2826,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     _job = null;
     _jobSecs = 0;
     if (c.kind == 'sick') {
-      comm?.points += 10;
-      _say('The sick person is at the hospital. +10 points. Well done.', ok: true);
+      final pay = _jobPay();
+      comm?.points += pay;
+      _say('The sick person is at the hospital. +$pay stars. Well done.', ok: true);
     }
     if (mounted) setState(_rebuild);
   }
@@ -3235,8 +3243,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (!mounted) return;
     setState(_rebuild);
     if (r.wired && !wasWired) {
-      comm?.points += 20;
-      _say('${r.name}: the wiring is finished and the light has power. You are paid 20 stars!', ok: true);
+      final pay = _jobPay();
+      comm?.points += pay;
+      _say('${r.name}: the wiring is finished and the light has power. You are paid $pay stars!', ok: true);
     } else if (r.wired) {
       _say('${r.name}: the wiring is finished. The light has power.');
     }
@@ -3256,8 +3265,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (!mounted) return;
     setState(_rebuild);
     if (r.plumbed && !wasPlumbed) {
-      comm?.points += 20;
-      _say('${r.name}: the plumbing is finished and nothing leaks. You are paid 20 stars!', ok: true);
+      final pay = _jobPay();
+      comm?.points += pay;
+      _say('${r.name}: the plumbing is finished and nothing leaks. You are paid $pay stars!', ok: true);
     } else if (r.plumbed) {
       _say('${r.name}: the plumbing is finished and nothing leaks.');
     }
@@ -3916,10 +3926,10 @@ class _NCall {
   String get caller => switch (kind) { 'sick' => who.isEmpty ? 'A neighbour' : who, 'light' => 'City lights office', 'office' => 'Office manager', _ => 'Your neighbour' };
   String get subtitle => switch (kind) { 'sick' => 'Needs a doctor', 'light' => 'A street light is out', 'office' => 'No power in an office', _ => 'No power at a house' };
   List<String> get lines => switch (kind) {
-        'sick' => ['Hello! $caller is very sick and cannot get up.', 'Please take them to the hospital: walk into the hospital and onto the desk to admit them.', 'I will pay you 10 points. Thank you!'],
-        'office' => ['Hello, this is the office manager. The office on level $level of $name has lost its power and nobody can work.', 'Please take the elevator up to level $level, and fix the wiring at the breaker panel there.', 'I will pay you 20 points. Thank you so much!'],
-        'light' => ['Hello! A street light is out and the street is dark.', 'It is the dark one with the red sign. Could you fix its wiring?', 'I will pay you 10 points. Thank you!'],
-        _ => ['Hello! All the lights went out in $name. The power is off in the whole house.', 'Could you check the breaker panel inside and fix the wiring? Switch the power off before you touch anything.', 'I will pay you 20 points. Thank you!'],
+        'sick' => ['Hello! $caller is very sick and cannot get up.', 'Please take them to the hospital: walk into the hospital and onto the desk to admit them.', 'I will pay you between 10 and 35 stars. Thank you!'],
+        'office' => ['Hello, this is the office manager. The office on level $level of $name has lost its power and nobody can work.', 'Please take the elevator up to level $level, and fix the wiring at the breaker panel there.', 'I will pay you between 10 and 35 stars. Thank you!'],
+        'light' => ['Hello! A street light is out and the street is dark.', 'It is the dark one with the red sign. Could you fix its wiring?', 'I will pay you between 10 and 35 stars. Thank you!'],
+        _ => ['Hello! All the lights went out in $name. The power is off in the whole house.', 'Could you check the breaker panel inside and fix the wiring? Switch the power off before you touch anything.', 'I will pay you between 10 and 35 stars. Thank you!'],
       };
 }
 

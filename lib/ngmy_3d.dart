@@ -328,6 +328,9 @@ class Cam3 extends ChangeNotifier {
   V3 target;
   double minDist = 6, maxDist = 160;
 
+  /// When above zero nothing nearer than this is left out because it is far away (the drone flies over the whole town).
+  double farExtra = 0;
+
   /// How far the camera may look up and down. A room view keeps [minPitch] above the floor, so you can never go under it.
   double minPitch = -1.25, maxPitch = 1.35;
 
@@ -625,7 +628,7 @@ class Scene3DPainter extends CustomPainter {
       }
     }
     final reach = scene.farMin <= 0 ? 0.0 : 1800 + (scene.farMin - 1800) * ((cam.dist - 200) / 600).clamp(0.0, 1.0);
-    final far = math.max(cam.dist * 2.4 + 450, reach);
+    final far = math.max(math.max(cam.dist * 2.4 + 450, reach), cam.farExtra);
     // What is off the screen is not drawn, but it still counts for the sorting of the piece it belongs to.
     final offZ = <int, double>{}, offN = <int, int>{};
     final toLight = _toLight.unit;
@@ -634,6 +637,11 @@ class Scene3DPainter extends CustomPainter {
     final all = dynamicPolys == null ? scene.polys : [...scene.polys, ...dynamicPolys!(time)];
     for (final p in all) {
       if (layerOn != null && !layerOn!(p.layer)) continue;
+      // A face that looks away is dropped before anything else is worked out (it is about half of them).
+      var n = rotN(p.n);
+      final away = n.dot(toCam(p.pts[0])) > 0;
+      if (away && !p.twoSided) continue;
+      if (away) n = n * -1;
       final cp3 = _clipNear([for (final v in p.pts) toCam(v)]);
       if (cp3.length < 3) continue;
       var zs = 0.0;
@@ -649,12 +657,6 @@ class Scene3DPainter extends CustomPainter {
         if (v.z < nearest) nearest = v.z;
       }
       if (nearest > far) continue;
-      var n = rotN(p.n);
-      final facing = n.dot(mid);
-      if (facing > 0) {
-        if (!p.twoSided) continue;
-        n = n * -1;
-      }
       var pxMin = double.infinity, pxMax = -double.infinity, pyMin = double.infinity, pyMax = -double.infinity;
       for (final v in cp3) {
         final x = cx + v.x * f / v.z, y = cy - v.y * f / v.z;
@@ -663,6 +665,8 @@ class Scene3DPainter extends CustomPainter {
         if (y < pyMin) pyMin = y;
         if (y > pyMax) pyMax = y;
       }
+      // A face smaller than a pixel cannot be seen: it costs nothing to leave it out.
+      if (pxMax - pxMin < 0.6 && pyMax - pyMin < 0.6) continue;
       if (pxMax < -8 || pxMin > w + 8 || pyMax < -8 || pyMin > h + 8) {
         if (p.group != 0) {
           offZ[p.group] = (offZ[p.group] ?? 0) + zs / cp3.length - p.bias;
@@ -692,6 +696,9 @@ class Scene3DPainter extends CustomPainter {
       drawn.add(_Face(path, Color.fromRGBO(r, g, b, p.alpha), zs / cp3.length - p.bias, p.id, p.alpha < 0.99, p.id == highlight && highlight != 0, null, p.order, p.group));
     }
     final allScreens = dynamicScreens == null ? scene.screens : [...scene.screens, ...dynamicScreens!(time)];
+    // Painting a picture (an ad) is the dearest thing in a frame, so only the biggest few are painted in full and the small, far ones are a flat colour.
+    final areas = <double>[];
+    final fullAt = <double>[0.0];
     for (final sq in allScreens) {
       final q = [for (final v in sq.corners) toCam(v)];
       final mid = (q[0] + q[1] + q[2] + q[3]) * 0.25;
@@ -716,9 +723,13 @@ class Scene3DPainter extends CustomPainter {
         }
         final path = Path()..addPolygon(pts, true);
         final qb = path.getBounds();
+        final area = qb.width * qb.height;
+        areas.add(area);
         drawn.add(_Face(path, Colors.transparent, mid.z - sq.bias, sq.id, false, false, (c) {
           if (qb.width < 7 && qb.height < 7) {
             c.drawPath(path, Paint()..color = const Color(0xFF38BDF8));
+          } else if (area < fullAt[0] || (qb.width < 44 && qb.height < 44)) {
+            c.drawPath(path, Paint()..color = const Color(0xFF1D4ED8));
           } else {
             _drawQuad(c, sq, pts, time);
           }
@@ -742,6 +753,8 @@ class Scene3DPainter extends CustomPainter {
       if (cells.isEmpty) continue;
       drawn.add(_Face(path, Colors.transparent, mid.z - sq.bias, sq.id, false, false, (c) => _drawQuadCells(c, sq, cells, nx, ny, time), sq.order, sq.group));
     }
+    areas.sort((a, b) => b.compareTo(a));
+    fullAt[0] = areas.length > 10 ? areas[9] : 0.0;
     // Far to near inside each tier. A grouped part is sorted as one piece by the middle of the whole part.
     final gz = Map<int, double>.of(offZ), gn = Map<int, int>.of(offN);
     for (final f in drawn) {

@@ -199,7 +199,7 @@ void main() {
     }
     final doors = lobby.dynamicPolys(1.0, const PersonStyle()).where((p) => p.color == const Color(0xFFF8FAFC));
     expect(doors, isNotEmpty);
-    expect(doors.every((p) => p.bias >= 30), isTrue, reason: 'doors are drawn over the shaft from every side');
+    expect(doors.every((p) => p.bias >= 12 && p.bias <= 30), isTrue, reason: 'doors are drawn over the shaft from every side, but a person standing in front of them is still in front');
     final house = city.furn.firstWhere((f) => f.kind == 'house2');
     expect(CityInterior('house2', house)..build(null), isA<CityInterior>());
     expect((CityInterior('house2', house)..build(null)).scene.screens.length, 1, reason: 'a house with power: the TV plays ads');

@@ -819,7 +819,7 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
   }
   // The ads: on every billboard, and on two big TVs in the front of every big house.
   final adScreens = <ScreenQuad>[];
-  for (final f in r.furn.where((f) => const {'billboard', 'bighouse', 'townsign', 'cornersign', 'adboard', 'tower', 'hq', 'store', 'gasstation'}.contains(f.kind))) {
+  for (final f in r.furn.where((f) => const {'billboard', 'bighouse', 'townsign', 'cornersign', 'adboard', 'tower', 'hq', 'store', 'gasstation', 'ubstation', 'dmv'}.contains(f.kind))) {
     final rr = f.rot * math.pi / 2;
     V3 w(double x, double y, double z) => rotY(V3(x, y, z), rr) + V3(f.x, 0, f.z);
     final grp = furnGroup[f.id] ?? 0;
@@ -858,6 +858,12 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
       adScreens.add(ScreenQuad([w(-85.9, 118, -36), w(-85.9, 118, 36), w(-85.9, 62, 36), w(-85.9, 62, -36)], 0, (c, size, t) => paintCityAdLoop(c, size, t, f.id + 3), width: 720, height: 560, bias: 8, order: 2, group: grp));
     } else if (f.kind == 'store') {
       adScreens.add(ScreenQuad([w(-54, 85, 37.7), w(54, 85, 37.7), w(54, 67, 37.7), w(-54, 67, 37.7)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY STORE', 'Everything you need'), width: 900, height: 150, bias: 6, order: 2, group: grp));
+    } else if (f.kind == 'ubstation') {
+      // The sign on the pole says NGMY Uber.
+      adScreens.add(ScreenQuad([w(40, 106, 31.9), w(76, 106, 31.9), w(76, 86, 31.9), w(40, 86, 31.9)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY UBER', 'Rides home'), width: 480, height: 270, bias: 8, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(76, 106, 28.1), w(40, 106, 28.1), w(40, 86, 28.1), w(76, 86, 28.1)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY UBER', 'Rides home'), width: 480, height: 270, bias: 8, order: 2, group: grp));
+    } else if (f.kind == 'dmv') {
+      adScreens.add(ScreenQuad([w(-50, 85, 38.6), w(50, 85, 38.6), w(50, 67, 38.6), w(-50, 67, 38.6)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY LICENCE', 'Get your Uber licence'), width: 900, height: 160, bias: 8, order: 2, group: grp));
     } else if (f.kind == 'gasstation') {
       adScreens.add(ScreenQuad([w(-86, 107, 35.7), w(-54, 107, 35.7), w(-54, 85, 35.7), w(-86, 85, 35.7)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY GAS', 'Open 24 hours'), width: 480, height: 330, bias: 6, order: 2, group: grp));
     } else {
