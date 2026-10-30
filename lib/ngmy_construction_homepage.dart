@@ -126,7 +126,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     NgmyLogo.load();
     _startLife();
     _refreshFigs();
-    scene = buildHomeRoom(room, problems: problems, residents: _figs);
+    scene = buildHomeRoom(room, problems: problems, closed: room.indoor, residents: _figs);
     _frame(snap: true);
     // While the community runs, the people and the news are kept up to date.
     _loadLock();
@@ -211,8 +211,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         ..minPitch = 0.03
         ..maxPitch = 1.35
         ..setFree(true);
-    } else if (inside && full) {
-      // Full screen: you stand right inside the room, in the middle, like in a normal house, with the walls round you.
+    } else if (inside) {
+      // You stand right inside the room, in the middle, like in a normal house, with the four walls and the ceiling round you.
       target = V3(0, 46, r.d * 0.1);
       dist = r.d * 0.74;
       pitch = 0.05;
@@ -221,19 +221,6 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         ..minDist = 6
         ..maxDist = r.d * 0.78
         ..minPitch = 0.02
-        ..maxPitch = 1.35
-        ..setFree(true);
-    } else if (inside) {
-      // Standing in the room, looking in: low, close, like a person in the doorway.
-      target = V3(0, 40, r.d * 0.3);
-      dist = math.max(r.w * 0.8, r.d * 0.9) + 10;
-      pitch = 0.1;
-      yaw = -0.05;
-      // Inside the house the view stays inside: you can look about a little, not swing round behind the walls or go under the floor.
-      cam
-        ..minDist = 6
-        ..maxDist = dist * 1.6
-        ..minPitch = 0.03
         ..maxPitch = 1.35
         ..setFree(true);
     } else {
@@ -284,7 +271,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   void _rebuild() {
     _refreshFigs();
     final inn = inner;
-    scene = inn != null ? inn.scene : buildHomeRoom(room, mode: mode, selected: selFurn, problems: problems, closed: walk, residents: _figs, hideFurn: _driving != null ? {idHFurn + _driving!.id} : const {});
+    scene = inn != null ? inn.scene : buildHomeRoom(room, mode: mode, selected: selFurn, problems: problems, closed: walk || (inside && room.indoor && tour == null), residents: _figs, hideFurn: _driving != null ? {idHFurn + _driving!.id} : const {});
   }
 
   void _say(String t, {bool ok = true}) {
@@ -1500,7 +1487,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     final l = _legs[_legIx];
     _legStartMs = DateTime.now().millisecondsSinceEpoch;
     if (l.enter != null) {
-      inner = CityInterior(interiorKindOf(l.enter!.kind), l.enter!, dark: room.darkHouses.contains(l.enter!.id))..build(comm);
+      inner = CityInterior(interiorKindOf(l.enter!.kind), l.enter!, dark: room.darkHouses.contains(l.enter!.id))
+        ..fixtures = _houseProjects[l.enter!.id] == null ? const [false, false, false, false] : _fixturesOf(_houseProjects[l.enter!.id]!)
+        ..build(comm);
       setState(_rebuild);
     }
     if (l.exit && inner != null) {
@@ -3380,9 +3369,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (r.wired && !wasWired) {
       final pay = _jobPay();
       comm?.points += pay;
-      _say('${r.name}: the wiring is finished and the light has power. You are paid $pay stars!', ok: true);
+      _say('${r.name}: the wiring is finished and the light has power. You are paid $pay stars!${r.plumbed ? '' : ' The room still needs its plumbing, so it stays red until the pipes are done too.'}', ok: true);
     } else if (r.wired) {
-      _say('${r.name}: the wiring is finished. The light has power.');
+      _say('${r.name}: the wiring is finished. The light has power.${r.plumbed ? '' : ' The room still needs its plumbing.'}');
     }
   }
 
@@ -3791,7 +3780,10 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       panel: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         _row(!room.indoor ? _cityChips() : [
           _chip(inside ? '🔭 See the whole room' : '🏠 Be inside', false, () {
-            setState(() => inside = !inside);
+            setState(() {
+              inside = !inside;
+              _rebuild();
+            });
             _frame();
           }, color: const Color(0xFF67E8F9)),
           if (!isLesson) _chip(tour != null ? '⏹ Stop tour' : '🎬 Tour', tour != null, () => tour != null ? _stopTour() : _tourSheet(), color: const Color(0xFFF472B6)),
