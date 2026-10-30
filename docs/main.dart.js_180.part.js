@@ -6,10 +6,10 @@ y.toString
 return y}y=new MediaRecorder(d)
 y.toString
 return y},
-bXc(d){var y=MediaRecorder.isTypeSupported(d)
+bXd(d){var y=MediaRecorder.isTypeSupported(d)
 y.toString
 return y}}
 B=c[0]
 A=a.updateHolder(c[53],A)
 var z=a.updateTypes([])};
-(a=>{a["SIy4/YvpXQryFm5YTEaRXde2Afg="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["UfSBXxqhoJmSuerexs612csl9PM="]=a.current})($__dart_deferred_initializers__);
