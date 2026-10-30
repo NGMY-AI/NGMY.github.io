@@ -381,6 +381,15 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
       _open(slot);
       return;
     }
+    // Tapping an empty spot that needs a device (and nothing is in your hand) puts in the device that belongs there.
+    if (!p.devs.containsKey(slot) && p.drywallDone && (armed.isEmpty || armed == 'look')) {
+      for (final o in p.orders) {
+        if (o.slot == slot) {
+          armed = o.device;
+          break;
+        }
+      }
+    }
     switch (armed) {
       case 'wall':
       case 'ceiling':
@@ -655,7 +664,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
         final todo = p.orders.where((o) => p.devs[o.slot]?.kind != o.device).toList();
         if (todo.isNotEmpty) {
           final o = todo.first;
-          return 'Pick the ${deviceKindName(o.device).toLowerCase()} and tap ${slotById(o.slot).name}. (${names(todo.map((e) => e.slot))} still need a device.)';
+          return 'The breaker being on is not the end: the job is done only when every device is in and wired. Tap the blue square at ${slotById(o.slot).name} to put in the ${deviceKindName(o.device).toLowerCase()}. (${names(todo.map((e) => e.slot))} still need a device.)';
         }
         final unfinished = p.orders.where((o) => (p.devs[o.slot]?.w.stage ?? 0) < 2).toList();
         if (unfinished.isNotEmpty) return 'Tap ${slotById(unfinished.first.slot).name} to work on it: breaker OFF, wires, push in, cover on.';
