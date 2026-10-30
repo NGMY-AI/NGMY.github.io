@@ -563,6 +563,51 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (room.indoor) _frame();
   }
 
+  /// The phone view: the whole screen of a phone standing up, like a phone video (a TikTok), with the drone ready to fly.
+  void _enterPhone() {
+    setState(() {
+      _phone = true;
+      _fullHide = false;
+      _cardDrone = !_droneOn;
+    });
+    _say('Phone view: the city fills your phone standing up. Pick a drone film and start filming.', ok: true);
+  }
+
+  void _exitPhone() {
+    if (_droneOn) _stopDrone();
+    setState(() {
+      _phone = false;
+      _cardDrone = false;
+    });
+  }
+
+  Widget _phoneScreen(Widget stage) {
+    final mq = MediaQuery.of(context);
+    Widget btn(IconData icon, VoidCallback onTap) => GestureDetector(
+          onTap: onTap,
+          onDoubleTap: () => setState(() => _fullHide = true),
+          child: Container(width: 44, height: 44, margin: const EdgeInsets.only(right: 10), decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.55), shape: BoxShape.circle, border: Border.all(color: Colors.white38)), child: Icon(icon, color: Colors.white, size: 22)),
+        );
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(children: [
+        Positioned.fill(child: stage),
+        if (_fullHide)
+          Positioned(top: mq.padding.top, left: 0, child: GestureDetector(behavior: HitTestBehavior.translucent, onDoubleTap: () => setState(() => _fullHide = false), child: const SizedBox(width: 120, height: 70)))
+        else
+          Positioned(
+            top: mq.padding.top + 8,
+            left: 10,
+            child: Row(children: [
+              btn(Icons.close_rounded, _exitPhone),
+              btn(_droneOn ? Icons.stop_rounded : Icons.flight_rounded, () => _droneOn ? _stopDrone() : setState(() => _cardDrone = true)),
+              btn(_hideTags ? Icons.label_off_rounded : Icons.label_rounded, () => setState(() => _hideTags = !_hideTags)),
+            ]),
+          ),
+      ]),
+    );
+  }
+
   /// Just the game, turned on its side like a video, with only the walking controls and a way back.
   Widget _fullScreen(Widget stage) {
     final mq = MediaQuery.of(context);
@@ -1445,8 +1490,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (l.heli != null) {
       final p = heliPose(l.heli!, now);
       look = V3(p.$1, p.$2 - 33, p.$3);
-      final side = l.heli! .isEven ? 1.0 : -1.0;
-      eye = V3(look.x + p.$5 * 165 * side, look.y + 30, look.z - p.$4 * 165 * side);
+      final a = (l.heli!.isEven ? 0.6 : 2.4) + el * 0.5;
+      eye = V3(look.x + math.cos(a) * 175, look.y + 35, look.z + math.sin(a) * 175);
       if (el < 3) {
         final k = el / 3, e = k * k * (3 - 2 * k);
         final (e0, l0) = _eyeNow();
@@ -1460,7 +1505,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     } else if (l.follow != null) {
       final p = vehiclePose(kTraffic[l.follow!], now);
       look = V3(p.$1, 26, p.$2);
-      final a = el * 0.35 + 0.8;
+      final a = el * 0.6 + 0.8;
       eye = V3(p.$1 + math.sin(a) * 190, 85, p.$2 + math.cos(a) * 190);
       if (el < 2.5) {
         final k = el / 2.5, e = k * k * (3 - 2 * k);
@@ -2382,6 +2427,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   /// Full screen: just the game, turned on its side like a video, with the walking controls.
   bool full = false;
+
+  /// The phone view: the city fills the whole phone standing up (not turned on its side), for flying the drone and filming it.
+  bool _phone = false;
   int _fullTurns = 1;
   double _padW = 400;
   bool _fullHide = false;
@@ -3505,6 +3553,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         final seen = <int>{};
         return _row([
           _chip('⛶ Full screen', false, _enterFull, color: const Color(0xFF38BDF8)),
+          if (!room.indoor) _chip('📱 Phone', false, _enterPhone, color: const Color(0xFFF472B6)),
           for (final d in room.doors)
             if (seen.add(d.to)) _chip('🚪 ${home.rooms[d.to].name}', false, () => _go(d.to), color: const Color(0xFF67E8F9), dot: !home.rooms[d.to].finished),
         ]);
@@ -3605,7 +3654,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         onDoubleTap: _doubleTap,
         message: msg,
         good: good,
-        messageTop: full ? 62 : ((showMap && !isLesson) ? 104 : 10),
+        messageTop: full ? 62 : (_phone ? MediaQuery.of(context).padding.top + 66 : ((showMap && !isLesson) ? 104 : 10)),
         layerOn: (l) => l <= 5,
         dynamicPolys: (_) => inner != null ? inner!.dynamicPolys(now, playerStyle) : [...homeDynamic(room, now, person: _pose(), personStyle: playerStyle, residents: _figs, mode: mode, drive: _driveNow(), carrying: _carrying != null || (_boardMaybe?.carrying ?? false), couriers: room.indoor ? const [] : [...(_boardMaybe?.figures(now) ?? const <CourierFigure>[]), ...(_uberMaybe?.figures(now) ?? const <CourierFigure>[])]), if (!room.indoor) ...trafficPolys(now), ...((_job != null || _boardMaybe?.active != null || _uberMaybe?.active != null) ? _routePolys() : const <Poly>[])],
         dynamicScreens: (_) => (inner == null && !room.indoor) ? trafficScreens(now) : const [],
@@ -3641,6 +3690,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
           ])
         : stage3d;
     if (full) return _fullScreen(stage);
+    if (_phone) return _phoneScreen(stage);
     return LessonScaffold(
       title: r.name,
       color: kConAmber,
@@ -3974,6 +4024,50 @@ List<DroneLeg> buildDroneLegs(HRoom city, String what) {
     return false;
   }
 
+  Furn? signHit(V3 a, V3 b) {
+    for (var s = 0.0; s <= 1.0; s += 0.02) {
+      final p = V3.lerp(a, b, s);
+      for (final f in city.furn) {
+        if (f.kind != 'billboard' && f.kind != 'cornersign' && f.kind != 'townsign' && f.kind != 'adboard') continue;
+        final (hx, hz, hy) = switch (f.kind) { 'townsign' => (215.0, 40.0, 345.0), 'cornersign' => (95.0, 40.0, 185.0), 'adboard' => (180.0, 40.0, 215.0), _ => (60.0, 60.0, 90.0) };
+        final turned = f.rot.isOdd;
+        if ((p.x - f.x).abs() < (turned ? hz : hx) && (p.z - f.z).abs() < (turned ? hx : hz) && p.y < hy) return f;
+      }
+    }
+    return null;
+  }
+
+  bool hitsSigns(V3 a, V3 b) => signHit(a, b) != null;
+
+  /// A point to fly round the sign that is in the way: out to the side at the same height, so the drone sweeps past it in one
+  /// smooth curve instead of climbing and dropping back in the same place. Null when nothing is in the way.
+  V3? detour(V3 a, V3 b) {
+    final f = signHit(a, b);
+    if (f == null) return null;
+    final (hx, hz, _) = switch (f.kind) { 'townsign' => (215.0, 40.0, 345.0), 'cornersign' => (95.0, 40.0, 185.0), 'adboard' => (180.0, 40.0, 215.0), _ => (60.0, 60.0, 90.0) };
+    final rad = math.max(hx, hz) + 170.0;
+    final dx = b.x - a.x, dz = b.z - a.z;
+    final len = math.sqrt(dx * dx + dz * dz);
+    if (len < 1) return null;
+    final nx = -dz / len, nz = dx / len;
+    final y = math.max(a.y, b.y);
+    final p1 = V3(f.x + nx * rad, y, f.z + nz * rad), p2 = V3(f.x - nx * rad, y, f.z - nz * rad);
+    double cost(V3 p) => (p - a).len + (b - p).len;
+    final free1 = !insideSign(p1), free2 = !insideSign(p2);
+    if (free1 && free2) return cost(p1) <= cost(p2) ? p1 : p2;
+    return free1 ? p1 : (free2 ? p2 : null);
+  }
+
+  /// The points that take the drone from [a] to [b] round every sign in the way, all sideways at the same height; only when that
+  /// is not possible does it go over the top.
+  List<V3> around(V3 a, V3 b, [int depth = 0]) {
+    if (!hitsSigns(a, b)) return const [];
+    final d = depth >= 3 ? null : detour(a, b);
+    // No way round: rise in one long diagonal over the middle (never straight up and down on the same spot).
+    if (d == null) return [V3((a.x + b.x) / 2, 430, (a.z + b.z) / 2)];
+    return [...around(a, d, depth + 1), d, ...around(d, b, depth + 1)];
+  }
+
   void pass(Furn f, double height, double look, double near, double far, double lift, {String? note}) {
     final (fx, fz) = droneFacing(f);
     final c = V3(f.x, look, f.z);
@@ -3994,10 +4088,11 @@ List<DroneLeg> buildDroneLegs(HRoom city, String what) {
         for (var s = 0.0; s <= 1.0 && !cuts; s += 0.02) {
           cuts = insideSign(V3.lerp(prev, at, s));
         }
-        // The straight line to the next point would cut through a board (they stand close together): climb over it.
+        // The straight line to the next point would cut through a board (they stand close together): swing round it.
         if (cuts) {
-          pt(V3(prev.x, 420, prev.z), looks.last);
-          pt(V3(at.x, 420, at.z), c);
+          for (final d in around(prev, at)) {
+            pt(d, looks.last);
+          }
         }
       }
       pt(at, c, note: i == 0 ? note : pending);
@@ -4007,18 +4102,6 @@ List<DroneLeg> buildDroneLegs(HRoom city, String what) {
 
   /// A billboard, a corner sign or the big town sign, passed the way that suits its size.
   /// Does the straight line from [a] to [b] go through any sign (its mast and board)?
-  bool hitsSigns(V3 a, V3 b) {
-    for (var s = 0.0; s <= 1.0; s += 0.02) {
-      final p = V3.lerp(a, b, s);
-      for (final f in city.furn) {
-        if (f.kind != 'billboard' && f.kind != 'cornersign' && f.kind != 'townsign' && f.kind != 'adboard') continue;
-        final (hx, hz, hy) = switch (f.kind) { 'townsign' => (215.0, 40.0, 345.0), 'cornersign' => (95.0, 40.0, 185.0), 'adboard' => (180.0, 40.0, 215.0), _ => (60.0, 60.0, 90.0) };
-        final turned = f.rot.isOdd;
-        if ((p.x - f.x).abs() < (turned ? hz : hx) && (p.z - f.z).abs() < (turned ? hx : hz) && p.y < hy) return true;
-      }
-    }
-    return false;
-  }
 
   void passSignPoints(Furn f) {
     switch (f.kind) {
@@ -4042,11 +4125,14 @@ List<DroneLeg> buildDroneLegs(HRoom city, String what) {
     passSignPoints(f);
     if (before > 0 && before < eyes.length) {
       final a = eyes[before - 1], b = eyes[before];
-      if (hitsSigns(a, b)) {
-        // Going from one sign to the next would cut through one: climb above them and come down onto the next.
+      final route = around(a, b);
+      if (route.isNotEmpty) {
+        // Going from one sign to the next would cut through one: swing out round it (sideways, at the same height).
         final la = looks[before - 1], lb = looks[before];
-        eyes.insertAll(before, [V3(a.x, 420, a.z), V3(b.x, 420, b.z)]);
-        looks.insertAll(before, [la, lb]);
+        for (var k = 0; k < route.length; k++) {
+          eyes.insert(before + k, route[k]);
+          looks.insert(before + k, V3.lerp(la, lb, (k + 1) / (route.length + 1)));
+        }
       }
     }
   }
@@ -4098,7 +4184,7 @@ List<DroneLeg> buildDroneLegs(HRoom city, String what) {
     }
     flush(speed: 105);
     for (var i = 0; i < kHelis.length; i++) {
-      legs.add(DroneLeg(const [], const [], heli: i, secs: 10, note: 'A helicopter with its billboard'));
+      legs.add(DroneLeg(const [], const [], heli: i, secs: 6, note: 'A helicopter with its billboard'));
     }
   }
   if (what == 'edges') {
@@ -4140,11 +4226,11 @@ List<DroneLeg> buildDroneLegs(HRoom city, String what) {
   if (what == 'traffic' || all) {
     if (!all) {
       for (var i = 0; i < kHelis.length; i++) {
-        legs.add(DroneLeg(const [], const [], heli: i, secs: 10, note: 'A helicopter with its billboard'));
+        legs.add(DroneLeg(const [], const [], heli: i, secs: 6, note: 'A helicopter with its billboard'));
       }
     }
     for (var i = 0; i < kTraffic.length && i < (all ? 2 : 4); i++) {
-      legs.add(DroneLeg(const [], const [], follow: i, secs: 9, note: kTraffic[i].kind == 'bus' ? 'A self-driving bus with its billboards' : 'A self-driving police car'));
+      legs.add(DroneLeg(const [], const [], follow: i, secs: 6, note: kTraffic[i].kind == 'bus' ? 'A self-driving bus with its billboards' : 'A self-driving police car'));
     }
   }
   return legs;

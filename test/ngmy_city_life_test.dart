@@ -251,4 +251,43 @@ void main() {
     resetNeeds();
     await t.pump(const Duration(seconds: 15));
   });
+  testWidgets('the phone view: a phone icon between Full screen and the living room opens the city across the whole standing phone, with the drone chooser', (t) async {
+    t.view.physicalSize = const Size(900, 1600);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    SharedPreferences.setMockInitialValues({});
+    HomeProject.session = HomeProject(seed: 31)..current = 11;
+    await t.pumpWidget(const MaterialApp(home: NgmyHousePage()));
+    await t.pump(const Duration(milliseconds: 600));
+    final phone = find.text('📱 Phone', skipOffstage: false);
+    expect(phone, findsOneWidget);
+    // It sits between the Full screen chip and the door chips.
+    final fullX = t.getTopLeft(find.text('⛶ Full screen', skipOffstage: false)).dx;
+    final phoneX = t.getTopLeft(phone).dx;
+    expect(phoneX, greaterThan(fullX));
+    await t.ensureVisible(phone);
+    await t.pump(const Duration(milliseconds: 200));
+    await t.tap(phone);
+    await t.pump(const Duration(milliseconds: 400));
+    expect(find.text('Drone film'), findsOneWidget, reason: 'the drone chooser opens straight away');
+    expect(find.byType(RotatedBox), findsNothing, reason: 'the phone stays standing: nothing is turned on its side');
+    expect(find.byIcon(Icons.close_rounded), findsWidgets);
+    await t.tap(find.byIcon(Icons.close_rounded).first);
+    await t.pump(const Duration(milliseconds: 300));
+    await t.pump(const Duration(seconds: 12));
+  });
+  test('the drone never hangs in one place: no climbing and dropping on the same spot, and no leg that stays long', () {
+    final city = HomeProject(seed: 4).rooms[11];
+    for (final what in const ['billboards', 'edges', 'city', 'houses', 'traffic', 'all']) {
+      final legs = buildDroneLegs(city, what);
+      for (final l in legs) {
+        for (var i = 1; i < l.eyes.length; i++) {
+          final a = l.eyes[i - 1], b = l.eyes[i];
+          final flat = (a.x - b.x).abs() + (a.z - b.z).abs();
+          expect(flat < 10 && (a.y - b.y).abs() > 100, isFalse, reason: '$what: a climb or drop on the same spot at (${a.x.round()}, ${a.z.round()})');
+        }
+        if (l.heli != null || l.follow != null) expect(l.secs, lessThanOrEqualTo(6), reason: '$what: a helicopter or vehicle leg is short and sweeping');
+      }
+    }
+  });
 }
