@@ -111,25 +111,25 @@ x=A.bj(null,B.pS,null,1,null,w)
 x.fg(0,!0)
 w.d!==$&&A.aP()
 w.d=x
-w.Zv()},
+w.Zw()},
 q(){var x=this.d
 x===$&&A.c()
 x.q()
 this.bvp()},
-Zv(){var x=0,w=A.j(y.n),v,u=this,t,s
-var $async$Zv=A.e(function(d,e){if(d===1)return A.f(e,w)
+Zw(){var x=0,w=A.j(y.n),v,u=this,t,s
+var $async$Zw=A.e(function(d,e){if(d===1)return A.f(e,w)
 for(;;)switch(x){case 0:u.m(new C.e24(u))
 t=y.S
 x=3
-return A.b(A.iP(A.a([E.aP5(u.a.c),E.aPN(u.a.c),E.aPG(u.a.c),E.aPv(u.a.c),E.aP8(u.a.c),E.aP9(u.a.c),E.aPp(u.a.c),A.a7d(u.a.c).bC(new C.e25(),t),C.fET(u.a.c),C.fER(u.a.c)],y.K),t),$async$Zv)
+return A.b(A.iP(A.a([E.aP5(u.a.c),E.aPN(u.a.c),E.aPG(u.a.c),E.aPv(u.a.c),E.aP8(u.a.c),E.aP9(u.a.c),E.aPp(u.a.c),A.a7d(u.a.c).bC(new C.e25(),t),C.fET(u.a.c),C.fER(u.a.c)],y.K),t),$async$Zw)
 case 3:s=e
 if(u.c==null){x=1
 break}u.m(new C.e26(u,s))
 case 1:return A.h(v,w)}})
-return A.i($async$Zv,w)},
-rm(d){return this.cde(d)},
+return A.i($async$Zw,w)},
+rl(d){return this.cde(d)},
 cde(d){var x=0,w=A.j(y.n),v=this,u
-var $async$rm=A.e(function(e,f){if(e===1)return A.f(f,w)
+var $async$rl=A.e(function(e,f){if(e===1)return A.f(f,w)
 for(;;)switch(x){case 0:case 2:switch(d.a){case"contacts":x=4
 break
 case"sitemap":x=5
@@ -153,55 +153,55 @@ break}break
 case 4:u=v.c
 u.toString
 x=14
-return A.b(E.hr8(u,v.a.c),$async$rm)
+return A.b(E.hr8(u,v.a.c),$async$rl)
 case 14:x=3
 break
 case 5:u=v.c
 u.toString
 x=15
-return A.b(E.hrp(u,v.a.c),$async$rm)
+return A.b(E.hrp(u,v.a.c),$async$rl)
 case 15:x=3
 break
 case 6:u=v.c
 u.toString
 x=16
-return A.b(E.hro(u,v.a.c),$async$rm)
+return A.b(E.hro(u,v.a.c),$async$rl)
 case 16:x=3
 break
 case 7:u=v.c
 u.toString
 x=17
-return A.b(E.hrl(u,v.a.c),$async$rm)
+return A.b(E.hrl(u,v.a.c),$async$rl)
 case 17:x=3
 break
 case 8:u=v.c
 u.toString
 x=18
-return A.b(E.hra(u,v.a.c),$async$rm)
+return A.b(E.hra(u,v.a.c),$async$rl)
 case 18:x=3
 break
 case 9:u=v.c
 u.toString
 x=19
-return A.b(E.hrb(u,v.a.c),$async$rm)
+return A.b(E.hrb(u,v.a.c),$async$rl)
 case 19:x=3
 break
 case 10:u=v.c
 u.toString
 x=20
-return A.b(E.hrk(u,v.a.c),$async$rm)
+return A.b(E.hrk(u,v.a.c),$async$rl)
 case 20:x=3
 break
 case 11:u=v.c
 u.toString
 x=21
-return A.b(F.fQu(u,H.eU,H.e1o,!1,v.a.c),$async$rm)
+return A.b(F.fQu(u,H.eU,H.e1o,!1,v.a.c),$async$rl)
 case 21:x=3
 break
 case 12:u=v.c
 u.toString
 x=22
-return A.b(F.fQu(u,H.eU,H.aGJ,!1,v.a.c),$async$rm)
+return A.b(F.fQu(u,H.eU,H.aGJ,!1,v.a.c),$async$rl)
 case 22:x=3
 break
 case 13:x=3
@@ -209,12 +209,12 @@ break
 case 3:x=v.c!=null?23:24
 break
 case 23:x=25
-return A.b(v.Zv(),$async$rm)
+return A.b(v.Zw(),$async$rl)
 case 25:case 24:return A.h(null,w)}})
-return A.i($async$rm,w)},
-rg(d){return this.c0y(d)},
+return A.i($async$rl,w)},
+rf(d){return this.c0y(d)},
 c0y(d){var x=0,w=A.j(y.t),v,u=this,t,s
-var $async$rg=A.e(function(e,f){if(e===1)return A.f(f,w)
+var $async$rf=A.e(function(e,f){if(e===1)return A.f(f,w)
 for(;;)switch(x){case 0:case 3:switch(d){case"contacts":x=5
 break
 case"sitemap":x=6
@@ -239,7 +239,7 @@ default:x=15
 break}break
 case 5:s=J
 x=16
-return A.b(E.a17(u.a.c),$async$rg)
+return A.b(E.a17(u.a.c),$async$rf)
 case 16:t=s.b6(f,new C.e1M(),y.H)
 t=A.C(t,t.$ti.k("ak.E"))
 v=t
@@ -247,7 +247,7 @@ x=1
 break
 case 6:s=J
 x=17
-return A.b(E.a18(u.a.c),$async$rg)
+return A.b(E.a18(u.a.c),$async$rf)
 case 17:t=s.b6(f,new C.e1N(),y.H)
 t=A.C(t,t.$ti.k("ak.E"))
 v=t
@@ -255,7 +255,7 @@ x=1
 break
 case 7:s=J
 x=18
-return A.b(E.a19(u.a.c),$async$rg)
+return A.b(E.a19(u.a.c),$async$rf)
 case 18:t=s.b6(f,new C.e1O(),y.H)
 t=A.C(t,t.$ti.k("ak.E"))
 v=t
@@ -263,7 +263,7 @@ x=1
 break
 case 8:s=J
 x=19
-return A.b(A.CI(u.a.c),$async$rg)
+return A.b(A.CI(u.a.c),$async$rf)
 case 19:t=s.b6(f,new C.e1P(),y.H)
 t=A.C(t,t.$ti.k("ak.E"))
 v=t
@@ -271,7 +271,7 @@ x=1
 break
 case 9:s=J
 x=20
-return A.b(E.bC4(u.a.c),$async$rg)
+return A.b(E.bC4(u.a.c),$async$rf)
 case 20:t=s.b6(f,new C.e1Q(),y.H)
 t=A.C(t,t.$ti.k("ak.E"))
 v=t
@@ -279,7 +279,7 @@ x=1
 break
 case 10:s=J
 x=21
-return A.b(E.CJ(u.a.c),$async$rg)
+return A.b(E.CJ(u.a.c),$async$rf)
 case 21:t=s.b6(f,new C.e1R(),y.H)
 t=A.C(t,t.$ti.k("ak.E"))
 v=t
@@ -287,7 +287,7 @@ x=1
 break
 case 11:s=J
 x=22
-return A.b(A.QT(u.a.c),$async$rg)
+return A.b(A.QT(u.a.c),$async$rf)
 case 22:t=s.b6(f,new C.e1S(),y.H)
 t=A.C(t,t.$ti.k("ak.E"))
 v=t
@@ -295,7 +295,7 @@ x=1
 break
 case 12:s=J
 x=23
-return A.b(A.a7d(u.a.c),$async$rg)
+return A.b(A.a7d(u.a.c),$async$rf)
 case 23:t=s.b6(f,new C.e1T(),y.H)
 t=A.C(t,t.$ti.k("ak.E"))
 v=t
@@ -303,7 +303,7 @@ x=1
 break
 case 13:s=J
 x=24
-return A.b(F.a1Q(u.a.c),$async$rg)
+return A.b(F.a1Q(u.a.c),$async$rf)
 case 24:t=s.b6(f,new C.e1U(),y.H)
 t=A.C(t,t.$ti.k("ak.E"))
 v=t
@@ -311,7 +311,7 @@ x=1
 break
 case 14:s=J
 x=25
-return A.b(F.QU(u.a.c),$async$rg)
+return A.b(F.QU(u.a.c),$async$rf)
 case 25:t=s.b6(f,new C.e1V(),y.H)
 t=A.C(t,t.$ti.k("ak.E"))
 v=t
@@ -321,21 +321,21 @@ case 15:v=D.d8L
 x=1
 break
 case 4:case 1:return A.h(v,w)}})
-return A.i($async$rg,w)},
-Zu(d){return this.ccS(d)},
+return A.i($async$rf,w)},
+Zv(d){return this.ccS(d)},
 ccS(d){var x=0,w=A.j(y.n),v,u=this,t,s
-var $async$Zu=A.e(function(e,f){if(e===1)return A.f(f,w)
+var $async$Zv=A.e(function(e,f){if(e===1)return A.f(f,w)
 for(;;)switch(x){case 0:u.m(new C.e20(u,d))
 x=3
-return A.b(u.rg(d.a),$async$Zu)
+return A.b(u.rf(d.a),$async$Zv)
 case 3:t=f
 s=u.c
 if(s==null){x=1
 break}x=4
-return A.b(A.hY(B.w.j(0.55),!0,d.b,s,new C.e21(),new C.e22(u,d,t),B.kU,!0,y.n),$async$Zu)
+return A.b(A.hY(B.w.j(0.55),!0,d.b,s,new C.e21(),new C.e22(u,d,t),B.kU,!0,y.n),$async$Zv)
 case 4:if(u.c!=null)u.m(new C.e23(u))
 case 1:return A.h(v,w)}})
-return A.i($async$Zu,w)},
+return A.i($async$Zv,w)},
 B(d){var x=null,w=A.aI(d,B.bX,y.w).w,v=this.d
 v===$&&A.c()
 return A.av(new A.D(B.MF,A.aF(!1,B.a1,!0,x,A.c7(v,new C.e2a(this,w.a),x),B.f,B.K,0,x,x,x,x,x,B.ag),x),x,x,x)}}
@@ -480,7 +480,7 @@ s=this.a
 q=A.B(A.a([A.E(A.eA(D.bPO,D.fG2,new C.e1Y(s,d,w),A.dg(n,n,n,n,n,n,n,n,n,B.c,n,D.eUJ,n,n,n,new A.az(B.c.j(0.28),1,B.q,-1),n,n,n,n)),1)],r),B.m,n,B.e,B.j,0,n,n)
 p=this.c
 o=J.a4(p)
-w=o.gan(p)?new A.D(B.ey,A.d("Nothing saved yet \u2014 tap Open / add to create items in Essentials.",n,n,n,n,n,n,A.l(n,n,B.c.j(0.6),n,n,n,n,n,n,n,n,n,n,n,B.a6,n,n,!0,n,n,n,n,n,n,n,n),B.L,n,n),n):A.hN(n,new C.e1Z(s,p,d,w),o.gM(p),B.YZ,n,B.ah,new C.e2_(),!0)
+w=o.gan(p)?new A.D(B.ey,A.d("Nothing saved yet \u2014 tap Open / add to create items in Essentials.",n,n,n,n,n,n,A.l(n,n,B.c.j(0.6),n,n,n,n,n,n,n,n,n,n,n,B.a6,n,n,!0,n,n,n,n,n,n,n,n),B.L,n,n),n):A.hN(n,new C.e1Z(s,p,d,w),o.gM(p),B.Z_,n,B.ah,new C.e2_(),!0)
 return new A.d_(e,!1,A.av(A.aF(!1,B.a1,!0,n,A.p(n,A.x(A.a([new A.D(B.Bk,v,n),new A.D(B.xN,q,n),new A.dq(1,B.co,w,n)],r),B.m,n,B.e,B.N,0,B.p),B.f,n,new A.aY(0,1/0,0,m.a.b*0.78),new A.o(n,n,u,x,t,B.aph,B.n),n,n,n,B.fO,n,n,n,l),B.f,B.K,0,n,n,n,n,n,B.ag),n,n,n),n)},
 $S:32}
 C.e1X.prototype={
@@ -492,7 +492,7 @@ $0(){var x=0,w=A.j(y.n),v=this
 var $async$$0=A.e(function(d,e){if(d===1)return A.f(e,w)
 for(;;)switch(x){case 0:A.a6(v.b,!1).O(null)
 x=2
-return A.b(v.a.rm(v.c),$async$$0)
+return A.b(v.a.rl(v.c),$async$$0)
 case 2:return A.h(null,w)}})
 return A.i($async$$0,w)},
 $S:1}
@@ -570,7 +570,7 @@ m=A.n(99)
 B.d.v(t,A.a([B.fF,A.p(l,A.d(""+h,l,l,l,l,l,l,A.l(l,l,r,l,l,l,l,l,l,l,l,10,l,l,B.H,l,l,!0,l,l,l,l,l,l,l,l),l,l,l),B.f,l,l,new A.o(p,l,l,m,l,l,B.n),l,l,l,l,B.xX,l,l,l)],n))}return A.aF(!1,B.a1,!0,l,A.aL(!1,i,!0,A.df(l,A.x(t,B.m,l,B.b9,B.j,0,B.p),l,l,B.bd,new A.o(l,l,q,v,o,new A.a8(new A.dc(-1+u,-0.5),new A.dc(1-u,0.7),B.x,s,l,l),B.n),B.eH,l,l,l,B.bl,l,l,l),l,!0,l,l,l,l,l,l,l,l,l,l,l,new C.e27(j,k),l,l,l,l,l,l,l),B.f,B.K,0,l,l,l,l,l,B.ag)},
 $S:75}
 C.e27.prototype={
-$0(){return this.a.Zu(this.b)},
+$0(){return this.a.Zv(this.b)},
 $S:0};(function aliases(){var x=C.aLy.prototype
 x.bvp=x.q})();(function inheritance(){var x=a.mixinHard,w=a.inheritMany,v=a.inherit
 w(A.aD,[C.Vi,C.y9,C.jw])
@@ -596,12 +596,12 @@ D.h3T=new C.y9("contacts","Contacts",B.oW,B.aN,G.axw)
 D.h3U=new C.y9("sitemap","Site Map",B.l_,B.bv,G.az5)
 D.h3R=new C.y9("hotlines","Hotlines",B.vY,B.aM,G.atU)
 D.h3O=new C.y9("medicines","Medicines",B.yE,B.bD,G.avN)
-D.h3X=new C.y9("notes","Notes",I.a0D,B.bu,G.axX)
+D.h3X=new C.y9("notes","Notes",I.a0E,B.bu,G.axX)
 D.h3V=new C.y9("tasks","Quick Tasks",B.C1,B.bv,B.a3o)
 D.dlB=x([B.aE,B.bu],y.O)
 D.h3W=new C.y9("where","Where I Put It",B.mz,B.bu,D.dlB)
-D.cWg=x([B.fl,B.aM],y.O)
-D.h3Q=new C.y9("alarms","Alarms",B.a04,B.cc,D.cWg)
+D.cWf=x([B.fl,B.aM],y.O)
+D.h3Q=new C.y9("alarms","Alarms",B.a05,B.cc,D.cWf)
 D.dc3=x([B.n0,B.cA],y.O)
 D.h3P=new C.y9("menu","Local Menu",B.vZ,B.cA,D.dc3)
 D.dem=x([B.jZ,B.cb],y.O)
@@ -612,4 +612,4 @@ D.eUJ=new A.ar(0,42)
 D.eX0=new A.hQ(2,10,10,1.28,null)
 D.fg2=new A.H(!0,B.c,null,null,null,null,12,B.u,null,null,null,null,1.15,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fG2=new A.y("Open / add",null,B.ck,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["2tJsWDwOUVSdThx0Ffu/5lL6THc="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["7XavIBjZb4LlVwUGxl3QhtorUI8="]=a.current})($__dart_deferred_initializers__);
