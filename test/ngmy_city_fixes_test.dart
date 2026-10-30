@@ -22,6 +22,7 @@ V3 _facing(ScreenQuad q) => (q.corners[3] - q.corners[0]).cross(q.corners[1] - q
 
 void main() {
   hideAllTest();
+  unsafeLabelTest();
   test('every billboard has a picture on each side, each one the right way up for the person looking at it', () {
     final city = HomeProject(seed: 4).rooms[11];
     final sc = buildHomeRoom(city, problems: 5);
@@ -520,5 +521,16 @@ void hideAllTest() {
     await t.tapAt(const Offset(40, 30));
     await t.pump(const Duration(milliseconds: 300));
     expect(find.byIcon(Icons.add_rounded), findsOneWidget);
+  });
+}
+
+void unsafeLabelTest() {
+  test('a fixture that works but is not wired safely says so on its red label', () {
+    final f = HomeProject(seed: 4).rooms[11].furn.firstWhere((f) => f.kind == 'house2');
+    final inn = CityInterior('house2', f, dark: true)
+      ..fixtures = const [false, false, true, true]
+      ..state = const [2, 0, 0, 0]
+      ..build(null);
+    expect(inn.scene.labels.any((l) => l.text.contains('NOT wired safely')), isTrue);
   });
 }

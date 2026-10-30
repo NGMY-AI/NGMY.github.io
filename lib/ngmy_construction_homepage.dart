@@ -1333,7 +1333,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
           final dark = room.darkOffices[id] == r.to;
           final p = _houseProjects[id * 100 + r.to];
           lobby.goToLevel(r.to, darkHere: dark);
-          lobby.fixtures = p == null ? const [false, false, false, false] : _fixturesOf(p);
+          _syncFixtures(lobby, p);
           lobby.build(comm);
           lobby.walker
             ..x = 0
@@ -1488,8 +1488,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     _legStartMs = DateTime.now().millisecondsSinceEpoch;
     if (l.enter != null) {
       inner = CityInterior(interiorKindOf(l.enter!.kind), l.enter!, dark: room.darkHouses.contains(l.enter!.id))
-        ..fixtures = _houseProjects[l.enter!.id] == null ? const [false, false, false, false] : _fixturesOf(_houseProjects[l.enter!.id]!)
         ..build(comm);
+      _syncFixtures(inner!, _houseProjects[l.enter!.id]);
+      inner!.build(comm);
       setState(_rebuild);
     }
     if (l.exit && inner != null) {
@@ -1638,6 +1639,35 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   List<bool> _fixturesOf(RoomProject p) => [for (var i = 0; i < 4; i++) p.orderOk(i)];
 
+  /// For each fixture: 0 fixed or nothing put in yet, 1 started but not finished, 2 in and working but not wired safely.
+  List<int> _stateOf(RoomProject p) => [
+        for (var i = 0; i < 4; i++)
+          p.orderOk(i) || i >= p.orders.length
+              ? 0
+              : () {
+                  final o = p.orders[i];
+                  final d = p.devs[o.slot];
+                  if (d == null || d.kind != o.device) return 0;
+                  return d.w.stage < 2 ? 1 : 2;
+                }(),
+      ];
+
+  /// What is wrong with a fixture that is not fixed, in words (what the person needs to do).
+  String _whyNot(RoomProject p, int i) {
+    if (i >= p.orders.length) return '';
+    final o = p.orders[i];
+    final d = p.devs[o.slot];
+    final name = deviceKindName(o.device).toLowerCase();
+    if (d == null || d.kind != o.device) return 'no $name put in yet at ${slotById(o.slot).name}';
+    if (d.w.stage < 2) return 'the $name at ${slotById(o.slot).name} is not finished: fasten every wire and close it';
+    return 'the $name at ${slotById(o.slot).name} works but is NOT wired safely: ${p.verdict(o.slot).message}';
+  }
+
+  void _syncFixtures(CityInterior inn, RoomProject? p) {
+    inn.fixtures = p == null ? const [false, false, false, false] : _fixturesOf(p);
+    inn.state = p == null ? const [0, 0, 0, 0] : _stateOf(p);
+  }
+
   /// The key of the wiring job of the building the person is in (a house, or one level of an office tower).
   int? get _workKey {
     final inn = inner;
@@ -1686,7 +1716,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     final p = _houseProjects.putIfAbsent(key, () => RoomProject(seed: f.id * 13 + 5 + inn.level, kind: 0, variants: true)..fastForward());
     await _pushPage(MaterialPageRoute<void>(builder: (_) => NgmyRoomProjectPage(project: p)));
     if (!mounted) return;
-    inn.fixtures = _fixturesOf(p);
+    _syncFixtures(inn, p);
     if (_workReady) {
       // Everything is connected: the work is handed in by itself (the green button is there too, if it has to be done by hand).
       _completeWork();
@@ -1695,7 +1725,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       setState(_rebuild);
       final done = [if (p.orderOk(0)) 'outlet 1', if (p.orderOk(1)) 'outlet 2', if (p.orderOk(2)) 'the ceiling light', if (p.orderOk(3)) 'the switch'];
       final todo = [if (!p.orderOk(0)) 'outlet 1', if (!p.orderOk(1)) 'outlet 2', if (!p.orderOk(2)) 'the ceiling light', if (!p.orderOk(3)) 'the switch'];
-      _say('${done.isEmpty ? 'Nothing is fixed yet' : 'Fixed so far: ${done.join(', ')}'}. Still to do: ${todo.join(', ')}. Tap the red frames to carry on.', ok: false);
+      final whys = [for (var i = 0; i < 4; i++) if (!p.orderOk(i)) _whyNot(p, i)].where((e) => e.isNotEmpty).toList();
+      _say('${done.isEmpty ? 'Nothing is fixed yet' : 'Fixed so far: ${done.join(', ')}'}. Still to do: ${todo.join(', ')}. ${whys.isEmpty ? '' : 'Why: ${whys.take(2).join('; ')}. '}Tap the red frames to carry on.', ok: false);
     }
   }
 
@@ -2617,8 +2648,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     _inZ = 0;
     final inn = CityInterior(interiorKindOf(f.kind), f, dark: room.darkHouses.contains(f.id))
       ..carrying = _carrying
-      ..fixtures = _houseProjects[f.id] == null ? const [false, false, false, false] : _fixturesOf(_houseProjects[f.id]!)
       ..build(comm);
+    _syncFixtures(inn, _houseProjects[f.id]);
+    inn.build(comm);
     inner = inn;
     _act = null;
     if (inn.isTower) {

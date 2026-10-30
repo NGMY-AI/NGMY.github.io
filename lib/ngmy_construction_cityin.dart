@@ -82,6 +82,9 @@ class CityInterior {
   /// What has been fixed so far in a dark house: outlet 1, outlet 2, ceiling light, switch.
   List<bool> fixtures = const [false, false, false, false];
 
+  /// For each of them that is not fixed: 0 nothing put in yet, 1 started but not finished, 2 in and working but NOT wired safely.
+  List<int> state = const [0, 0, 0, 0];
+
   /// In an office tower: the level you are on, how many there are, and what the elevator or the balcony mat asks the page to do.
   int level = 1;
   late final int levels = towerLevels(door);
@@ -797,9 +800,14 @@ class CityInterior {
     b.id = 0;
     b.order = 2;
     labels.add(Label3D(const V3(-w / 2 + 6, 82, 45), dark ? (todo.isEmpty ? '⚡ Breaker panel: tap to switch the power on' : '⚡ Breaker panel: still to fix: ${todo.join(', ')}') : '⚡ Breaker panel: all fine', dark ? const Color(0xFFDC2626) : const Color(0xFF15803D), id: idCinPanel));
-    labels.add(Label3D(const V3(95, 50, 6), outOk ? '🔌 Outlets: fixed' : '🔌 Outlet: dead, tap to fix it', outOk ? const Color(0xFF15803D) : const Color(0xFFDC2626), id: idCinOutlet));
-    labels.add(Label3D(const V3(-60, 70, 6), swOk ? '💡 Switch: fixed' : '💡 Switch: no power, tap to fix it', swOk ? const Color(0xFF15803D) : const Color(0xFFDC2626), id: idCinOutlet));
-    labels.add(Label3D(const V3(0, h - 30, 95), lightOk ? '💡 Ceiling light: fixed' : '💡 Ceiling light: dead, tap to fix it', lightOk ? const Color(0xFF15803D) : const Color(0xFFDC2626), id: idCinOutlet));
+    String why(List<int> ix, String none) {
+      final worst = ix.where((i) => !fixtures[i]).map((i) => state[i]).fold(0, math.max);
+      return worst == 2 ? 'works but is NOT wired safely: open it and check every wire' : (worst == 1 ? 'started: finish the wiring' : none);
+    }
+
+    labels.add(Label3D(const V3(95, 50, 6), outOk ? '🔌 Outlets: fixed' : '🔌 Outlet: ${why(const [0, 1], 'dead, tap to fix it')}', outOk ? const Color(0xFF15803D) : const Color(0xFFDC2626), id: idCinOutlet));
+    labels.add(Label3D(const V3(-60, 70, 6), swOk ? '💡 Switch: fixed' : '💡 Switch: ${why(const [3], 'no power, tap to fix it')}', swOk ? const Color(0xFF15803D) : const Color(0xFFDC2626), id: idCinOutlet));
+    labels.add(Label3D(const V3(0, h - 30, 95), lightOk ? '💡 Ceiling light: fixed' : '💡 Ceiling light: ${why(const [2], 'dead, tap to fix it')}', lightOk ? const Color(0xFF15803D) : const Color(0xFFDC2626), id: idCinOutlet));
     if (dark) labels.add(const Label3D(V3(0, 100, 20), 'No power in this house', Color(0xFFDC2626)));
   }
 
