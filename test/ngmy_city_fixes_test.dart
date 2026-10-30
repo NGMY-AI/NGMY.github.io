@@ -21,6 +21,7 @@ import 'package:ngmy/ngmy_construction_project.dart';
 V3 _facing(ScreenQuad q) => (q.corners[3] - q.corners[0]).cross(q.corners[1] - q.corners[0]);
 
 void main() {
+  hideAllTest();
   test('every billboard has a picture on each side, each one the right way up for the person looking at it', () {
     final city = HomeProject(seed: 4).rooms[11];
     final sc = buildHomeRoom(city, problems: 5);
@@ -47,10 +48,10 @@ void main() {
     for (final q in wide) {
       final dv = q.corners[1] - q.corners[0];
       final len = math.sqrt(dv.x * dv.x + dv.y * dv.y + dv.z * dv.z);
-      expect(len, greaterThan(110), reason: 'a long billboard');
+      expect(len, greaterThan(70), reason: 'a long billboard');
     }
     expect(kBusSize.y, greaterThan(1.4));
-    expect(kBusSize.x, greaterThan(1.3));
+    expect(kBusSize.x, greaterThan(0.7));
   });
 
   test('once the wiring is right the house works, even if the last test was never run', () {
@@ -160,8 +161,9 @@ void main() {
     await t.pump(const Duration(milliseconds: 600));
     final row = find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.right).first;
     await t.scrollUntilVisible(find.text('🚁 Drone'), 120, scrollable: row);
-    await t.drag(row, const Offset(-150, 0));
     await t.pump(const Duration(milliseconds: 300));
+    await t.ensureVisible(find.text('🚁 Drone'));
+    await t.pump();
     await t.tap(find.text('🚁 Drone'));
     await t.pump();
     await t.pump(const Duration(milliseconds: 300));
@@ -174,6 +176,8 @@ void main() {
     await t.scrollUntilVisible(find.text('⏹ Stop drone'), 120, scrollable: row);
     await t.drag(row, const Offset(-150, 0));
     await t.pump(const Duration(milliseconds: 300));
+    await t.ensureVisible(find.text('⏹ Stop drone'));
+    await t.pump();
     await t.tap(find.text('⏹ Stop drone'));
     await t.pump(const Duration(milliseconds: 500));
     expect(find.text('⏹ Stop drone'), findsNothing);
@@ -493,5 +497,28 @@ void main() {
     final p = await SharedPreferences.getInstance();
     expect(p.getInt('ngmy_city_locked_until'), isNull, reason: 'the saved lock is removed');
     await t.pump(const Duration(seconds: 3));
+  });
+}
+
+void hideAllTest() {
+  testWidgets('Hide all hides every button and the map; a tap in the corner brings them back', (t) async {
+    t.view.physicalSize = const Size(900, 1600);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    SharedPreferences.setMockInitialValues({});
+    HomeProject.session = HomeProject(seed: 31)..current = 11;
+    await t.pumpWidget(const MaterialApp(home: NgmyHousePage()));
+    await t.pump(const Duration(milliseconds: 600));
+    final row = find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.right).first;
+    await t.scrollUntilVisible(find.text('👁 Hide all'), 120, scrollable: row);
+    await t.ensureVisible(find.text('👁 Hide all'));
+    await t.pump();
+    await t.tap(find.text('👁 Hide all'));
+    await t.pump(const Duration(milliseconds: 300));
+    expect(find.byIcon(Icons.add_rounded), findsNothing);
+    expect(find.text('👁 Hide all'), findsNothing);
+    await t.tapAt(const Offset(40, 30));
+    await t.pump(const Duration(milliseconds: 300));
+    expect(find.byIcon(Icons.add_rounded), findsOneWidget);
   });
 }

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'ngmy_city_ads.dart';
+import 'ngmy_city_traffic.dart';
 import 'ngmy_city_delivery.dart';
 import 'dart:ui' as ui;
 
@@ -817,6 +818,8 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
     dark.alpha = 1;
     b.polys.addAll(dark.polys);
   }
+  // The zebra crossings and stop lines at the traffic lights.
+  if (!r.indoor) b.polys.addAll(crosswalkPolys());
   // The ads: on every billboard, and on two big TVs in the front of every big house.
   final adScreens = <ScreenQuad>[];
   for (final f in r.furn.where((f) => const {'billboard', 'bighouse', 'townsign', 'cornersign', 'adboard', 'tower', 'hq', 'store', 'gasstation', 'ubstation', 'dmv'}.contains(f.kind))) {
@@ -1084,45 +1087,47 @@ void _building(MeshBuilder b, String kind, Color accent) {
   b.polys.addAll(roof.polys);
 }
 
-/// A road piece: 40 by 40, with its dashed line running to every edge it joins to. Straight joins left and right, a corner joins
-/// right and front, a T-junction left, right and front, and crossroads all four; turning it moves the joins. Because roads
-/// snap to the grid, neighbours always line up and the line carries on from one piece to the next.
+/// A road piece. The streets are 100 wide (two lanes of 50), so a piece is drawn 100 across and 40 along: two lanes with a double
+/// yellow line down the middle and a white line along each edge. Junctions and corners are 100 by 100, and the roundabouts are big.
+/// The tarmac is drawn first and the lines over it, so where two pieces overlap nothing flickers. Because roads snap to the grid,
+/// neighbours always line up and the lines carry on from one piece to the next.
 void _roadPiece(MeshBuilder b, String kind) {
-  // A plain straight piece is two flat faces (the road and its line): there are hundreds of them.
+  const up = V3(0, 1, 0);
+  const tar = Color(0xFF3F4450), yellow = Color(0xFFF3C94A), white = Color(0xFFE5E7EB);
+  final tier = b.order, biasWas = b.bias;
+  b.order = 1;
+  b.bias = 0;
   if (kind == 'road') {
-    const up = V3(0, 1, 0);
-    b.quad(const V3(-20, 0.6, -20), const V3(20, 0.6, -20), const V3(20, 0.6, 20), const V3(-20, 0.6, 20), const Color(0xFF3F4450), normal: up);
-    b.quad(const V3(-7, 0.8, -0.8), const V3(7, 0.8, -0.8), const V3(7, 0.8, 0.8), const V3(-7, 0.8, 0.8), const Color(0xFFF3E7A1), normal: up);
+    b.quad(const V3(-20, 0.6, -50), const V3(20, 0.6, -50), const V3(20, 0.6, 50), const V3(-20, 0.6, 50), tar, normal: up);
+    b.bias = 90;
+    // The double yellow line, and a white line along each edge (all as long as the piece, so they run on into the next one).
+    for (final z in const [-1.6, 1.6]) {
+      b.quad(V3(-20, 0.9, z - 0.7), V3(20, 0.9, z - 0.7), V3(20, 0.9, z + 0.7), V3(-20, 0.9, z + 0.7), yellow, normal: up);
+    }
+    for (final z in const [-47.0, 47.0]) {
+      b.quad(V3(-20, 0.9, z - 0.8), V3(20, 0.9, z - 0.8), V3(20, 0.9, z + 0.8), V3(-20, 0.9, z + 0.8), white, normal: up);
+    }
+    b.order = tier;
+    b.bias = biasWas;
     return;
   }
-  b.box(const V3(0, 0.3, 0), const V3(40, 0.6, 40), const Color(0xFF3F4450));
-  if (kind != 'road') {
-    b.box(const V3(0, 0.62, 19.2), const V3(40, 0.12, 1.2), const Color(0xFF6B7280));
-    b.box(const V3(0, 0.62, -19.2), const V3(40, 0.12, 1.2), const Color(0xFF6B7280));
-  }
+  // Corners, T-junctions and crossroads: one big square of tarmac.
+  b.quad(const V3(-50, 0.6, -50), const V3(50, 0.6, -50), const V3(50, 0.6, 50), const V3(-50, 0.6, 50), tar, normal: up);
+  b.bias = 90;
   final joins = switch (kind) {
     'roadturn' => const [(1.0, 0.0), (0.0, 1.0)],
     'roadtee' => const [(1.0, 0.0), (-1.0, 0.0), (0.0, 1.0)],
-    'roadcross' => const [(1.0, 0.0), (-1.0, 0.0), (0.0, 1.0), (0.0, -1.0)],
-    _ => const [(1.0, 0.0), (-1.0, 0.0)],
+    _ => const [(1.0, 0.0), (-1.0, 0.0), (0.0, 1.0), (0.0, -1.0)],
   };
-  const line = Color(0xFFF3E7A1);
-  if (kind == 'road') {
-    b.box(const V3(0, 0.7, 0), const V3(14, 0.2, 1.6), line);
-    return;
-  }
   for (final (ex, ez) in joins) {
-    for (var i = 0; i < 2; i++) {
-      final at = 5.0 + i * 10.5;
-      b.box(V3(ex * at, 0.7, ez * at), V3(ex != 0 ? 6 : 1.6, 0.2, ez != 0 ? 6 : 1.6), line);
+    // A short double yellow line running out to every road that joins here.
+    for (final d in const [-1.6, 1.6]) {
+      final x0 = ex != 0 ? 30 * ex : d, z0 = ez != 0 ? 30 * ez : d;
+      b.box(V3(x0, 0.95, z0), V3(ex != 0 ? 36 : 1.4, 0.1, ez != 0 ? 36 : 1.4), yellow);
     }
   }
-  if (kind != 'road') b.box(const V3(0, 0.7, 0), const V3(3, 0.2, 3), line);
-  if (kind == 'roadcross') {
-    for (var i = -2; i <= 2; i++) {
-      b.box(V3(i * 4.0, 0.7, 15), const V3(2, 0.2, 6), Colors.white);
-    }
-  }
+  b.order = tier;
+  b.bias = biasWas;
 }
 
 /// An animal, standing on y = 0, facing +z, with its legs swung by [swing] (0 for standing still).
@@ -1501,11 +1506,11 @@ void _furniture(MeshBuilder b, String kind, Color c) {
       _roadPiece(b, kind);
     case 'roundabout':
       // A round road with a grass island in the middle; cars turn round it.
-      b.cyl(const V3(0, 0, 0), const V3(0, 0.9, 0), 38, const Color(0xFF3F4450), sides: 12);
-      b.cyl(const V3(0, 1.1, 0), const V3(0, 2.4, 0), 12, const Color(0xFF6B7280), sides: 8);
-      b.cyl(const V3(0, 2.4, 0), const V3(0, 2.8, 0), 10.5, const Color(0xFF4F9D5B), sides: 8);
-      b.ball(const V3(0, 8, 0), 5, const Color(0xFF3F8F4D), lat: 3, lon: 6);
-      b.cyl(const V3(0, 2.8, 0), const V3(0, 6, 0), 0.8, const Color(0xFF6B4A32), sides: 5);
+      b.cyl(const V3(0, 0, 0), const V3(0, 0.9, 0), 72, const Color(0xFF3F4450), sides: 16);
+      b.cyl(const V3(0, 1.1, 0), const V3(0, 2.4, 0), 17, const Color(0xFF6B7280), sides: 10);
+      b.cyl(const V3(0, 2.4, 0), const V3(0, 2.8, 0), 15, const Color(0xFF4F9D5B), sides: 10);
+      b.ball(const V3(0, 9, 0), 6, const Color(0xFF3F8F4D), lat: 3, lon: 6);
+      b.cyl(const V3(0, 2.8, 0), const V3(0, 7, 0), 0.9, const Color(0xFF6B4A32), sides: 5);
     case 'house2' || 'shop' || 'hospital' || 'firestation' || 'school':
       // Every building is half as big again as it was drawn, so there is room for the people to walk round it.
       final m0 = MeshBuilder()

@@ -602,8 +602,46 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
               btn(Icons.close_rounded, _exitPhone),
               btn(_droneOn ? Icons.stop_rounded : Icons.flight_rounded, () => _droneOn ? _stopDrone() : setState(() => _cardDrone = true)),
               btn(_hideTags ? Icons.label_off_rounded : Icons.label_rounded, () => setState(() => _hideTags = !_hideTags)),
+              btn(Icons.visibility_off_rounded, () => setState(() => _clean = true)),
             ]),
           ),
+      ]),
+    );
+  }
+
+  /// Only the city fills the screen, in whichever way it was being shown (turned on its side in full screen). A tap in the top
+  /// left corner, where the buttons were, brings everything back.
+  Widget _cleanScreen(Widget stage) {
+    final mq = MediaQuery.of(context);
+    void back() => setState(() => _clean = false);
+    if (full) {
+      final land = Size(mq.size.height, mq.size.width);
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: RotatedBox(
+            quarterTurns: _fullTurns,
+            child: MediaQuery(
+              data: mq.copyWith(size: land, padding: EdgeInsets.zero, viewPadding: EdgeInsets.zero),
+              child: SizedBox(
+                width: land.width,
+                height: land.height,
+                child: Stack(children: [
+                  Positioned.fill(child: stage),
+                  Positioned(top: 0, left: 0, child: GestureDetector(behavior: HitTestBehavior.translucent, onTap: back, child: const SizedBox(width: 270, height: 64))),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    final top = _phone ? mq.padding.top : 0.0;
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(children: [
+        Positioned.fill(child: stage),
+        Positioned(top: top, left: 0, child: GestureDetector(behavior: HitTestBehavior.translucent, onTap: back, child: const SizedBox(width: 270, height: 70))),
       ]),
     );
   }
@@ -639,6 +677,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
                     }),
                     btn(Icons.screen_rotation_rounded, () => setState(() => _fullTurns = _fullTurns == 1 ? 3 : 1)),
                     btn(_hideTags ? Icons.label_off_rounded : Icons.label_rounded, () => setState(() => _hideTags = !_hideTags)),
+                    btn(Icons.visibility_off_rounded, () => setState(() => _clean = true)),
                     if (!room.indoor) btn(_droneOn ? Icons.stop_rounded : Icons.flight_rounded, () => _droneOn ? _stopDrone() : setState(() => _cardDrone = true)),
                     if (_workReady) GestureDetector(onTap: _completeWork, child: Container(width: 40, height: 40, margin: const EdgeInsets.only(right: 8), decoration: BoxDecoration(color: const Color(0xFF16A34A), shape: BoxShape.circle, border: Border.all(color: Colors.white)), child: const Icon(Icons.task_alt_rounded, color: Colors.white, size: 22))),
                   ])),
@@ -1074,7 +1113,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
           const SizedBox(width: 10),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('${o.info.name}: ${where(o.from)} → a house', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13.5)),
+              Text(o.emergency ? '🚑 ${o.info.name}: ${where(o.from)} → ${where(o.to)} (somebody was run over)' : '${o.info.name}: ${where(o.from)} → a house', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13.5)),
               const SizedBox(height: 3),
               Wrap(spacing: 6, children: [pill('${o.pay} points', const Color(0xFFFACC15)), pill('$toShop m to the shop', const Color(0xFF38BDF8)), pill('${(o.distance / 10).round()} m trip', const Color(0xFF4ADE80))]),
             ]),
@@ -2434,6 +2473,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   double _padW = 400;
   bool _fullHide = false;
 
+  /// Everything hidden but the city: no buttons, map, banners or cards. A tap where the button was brings them back.
+  bool _clean = false;
+
   /// What the person carries (a crate to sell at the market), and the neighbour who is calling about a house with no power.
   String? _carrying;
   _NCall? _nCall;
@@ -2538,6 +2580,12 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       return;
     }
     if (inn == null && _driving == null && _boardMaybe?.active != null) _deliveryEvent(_boardMaybe!.updatePlayer(w.x, w.z, now));
+    // A person on foot in the way of a car is run over.
+    if (inn == null && _driving == null && !room.indoor && _ride == null && _pages == 0) {
+      CityTrafficSim.instance.advance(now);
+      final hit = CityTrafficSim.instance.hit(w.x, w.z);
+      if (hit >= 0) _roadAccident(hit);
+    }
     if (inn == null && _driving != null) _uberTick(w);
     if (moved && _driving == null) {
       if (w.atDoor && (w.yaw.abs() > 2.2 || w.target != null && w.target!.$2 < 4)) {
@@ -2944,6 +2992,45 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     } else {
       _say('You are at the street light. Press Fix the street light.', ok: true);
     }
+  }
+
+  /// The cars of the town: told where the people on foot are (the couriers) so they wait for them, and brought up to this moment.
+  List<Poly> _trafficPolysNow() {
+    final sim = CityTrafficSim.instance;
+    sim.pedestrians = [for (final c in _boardMaybe?.figures(now) ?? const <CourierFigure>[]) (c.x, c.z)];
+    return trafficPolys(now);
+  }
+
+  int _lastHitMs = -100000;
+
+  /// The person was run over by vehicle [vi]: an ambulance takes them to the hospital, they are weak, and medicine and food are
+  /// wanted there: those are orders on the board (other people deliver them, and so can you).
+  void _roadAccident(int vi) {
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    if (nowMs - _lastHitMs < 10000) return;
+    _lastHitMs = nowMs;
+    final w = walker;
+    if (w == null) return;
+    conBeep(110, ms: 600, wave: 'noise', volume: 0.5);
+    HapticFeedback.heavyImpact();
+    _inX = 0;
+    _inZ = 0;
+    w.target = null;
+    needs
+      ..energy = math.min(needs.energy, 0.2)
+      ..crawlLeft = 0
+      ..restLeft = 0;
+    final car = kTraffic[vi].kind == 'bus' ? 'bus' : 'police car';
+    final hospitals = room.furn.where((f) => f.kind == 'hospital').toList();
+    if (hospitals.isEmpty) {
+      _say('A $car ran you over! Always cross at the zebra crossing when the green walking person shows.', ok: false);
+      return;
+    }
+    _boardMaybe?.postEmergency(hospitals.first);
+    _teleportTo(hospitals.first);
+    _enterBuilding(hospitals.first);
+    _say('🚑 A $car ran you over! An ambulance brought you to the hospital. Medicine and food are being ordered for you: they are on the Orders board. Cross at the zebra crossing when the green walking person shows.', ok: false);
+    setState(() => _cardOrders = false);
   }
 
   Future<void> _startLife() async {
@@ -3624,6 +3711,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         _chip('🛵 Orders', _board.active != null, () => setState(() => _cardOrders = true), color: const Color(0xFFFACC15), dot: _board.active == null),
         _chip(_droneOn ? '⏹ Stop drone' : '🚁 Drone', _droneOn, () => _droneOn ? _stopDrone() : setState(() => _cardDrone = true), color: const Color(0xFF38BDF8)),
         _chip(_hideTags ? '🏷 Show tags' : '🏷 Hide tags', _hideTags, () => setState(() => _hideTags = !_hideTags), color: const Color(0xFFF87171)),
+        _chip('👁 Hide all', false, () => setState(() => _clean = true), color: const Color(0xFF94A3B8)),
         _chip('🚖 Uber', _uberMaybe?.active != null, _uberChip, color: const Color(0xFFFACC15)),
         _chip('🗺 Map', showMap, () => setState(() => showMap = !showMap), color: const Color(0xFFA78BFA)),
       ];
@@ -3654,9 +3742,10 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         onDoubleTap: _doubleTap,
         message: msg,
         good: good,
+        bare: _clean,
         messageTop: full ? 62 : (_phone ? MediaQuery.of(context).padding.top + 66 : ((showMap && !isLesson) ? 104 : 10)),
         layerOn: (l) => l <= 5,
-        dynamicPolys: (_) => inner != null ? inner!.dynamicPolys(now, playerStyle) : [...homeDynamic(room, now, person: _pose(), personStyle: playerStyle, residents: _figs, mode: mode, drive: _driveNow(), carrying: _carrying != null || (_boardMaybe?.carrying ?? false), couriers: room.indoor ? const [] : [...(_boardMaybe?.figures(now) ?? const <CourierFigure>[]), ...(_uberMaybe?.figures(now) ?? const <CourierFigure>[])]), if (!room.indoor) ...trafficPolys(now), ...((_job != null || _boardMaybe?.active != null || _uberMaybe?.active != null) ? _routePolys() : const <Poly>[])],
+        dynamicPolys: (_) => inner != null ? inner!.dynamicPolys(now, playerStyle) : [...homeDynamic(room, now, person: _pose(), personStyle: playerStyle, residents: _figs, mode: mode, drive: _driveNow(), carrying: _carrying != null || (_boardMaybe?.carrying ?? false), couriers: room.indoor ? const [] : [...(_boardMaybe?.figures(now) ?? const <CourierFigure>[]), ...(_uberMaybe?.figures(now) ?? const <CourierFigure>[])]), if (!room.indoor) ..._trafficPolysNow(), ...((_job != null || _boardMaybe?.active != null || _uberMaybe?.active != null) ? _routePolys() : const <Poly>[])],
         dynamicScreens: (_) => (inner == null && !room.indoor) ? trafficScreens(now) : const [],
         bottom: _pad(),
         topLeft: [
@@ -3665,7 +3754,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       );
     final anyCard = _cardCall != null || _cardOffice || _cardDrone || _cardElevator || _cardOrders || _cardShop || _cardLicence;
     final carDisplay = _ride?.stage == 1;
-    final stage = (anyCard || carDisplay)
+    final stage = ((anyCard || carDisplay) && !_clean)
         ? Stack(fit: StackFit.expand, children: [
             stage3d,
             if (anyCard) Positioned.fill(child: _cardLicence ? _licenceCard() : _cardShop ? _shopCard() : _cardOrders ? _ordersCard() : (_cardElevator ? _elevatorCard() : (_cardDrone ? _droneCard() : _cardOverlay()))),
@@ -3689,6 +3778,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
               ),
           ])
         : stage3d;
+    if (_clean) return _cleanScreen(stage);
     if (full) return _fullScreen(stage);
     if (_phone) return _phoneScreen(stage);
     return LessonScaffold(

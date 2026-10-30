@@ -260,8 +260,11 @@ class _StarsBadgeState extends State<StarsBadge> {
 
 /// The 3D view with a message banner, an info card and zoom buttons on top of it.
 class Stage3D extends StatelessWidget {
-  const Stage3D({required this.scene, required this.cam, required this.onPick, required this.onHome, this.highlight = 0, this.dynamicPolys, this.dynamicScreens, this.layerOn, this.message, this.good = false, this.info, this.topLeft, this.topRight, this.infoAction, this.messageTop, this.onDoubleTap, this.bottom, this.sky = false, this.stars});
+  const Stage3D({required this.scene, required this.cam, required this.onPick, required this.onHome, this.highlight = 0, this.dynamicPolys, this.dynamicScreens, this.layerOn, this.message, this.good = false, this.info, this.topLeft, this.topRight, this.infoAction, this.messageTop, this.onDoubleTap, this.bottom, this.sky = false, this.stars, this.bare = false});
   final bool sky;
+
+  /// Only the picture: no buttons, banners, cards or map on top of it.
+  final bool bare;
 
   /// The stars (points) the person has, shown right beside the zoom in button all the time.
   final int Function()? stars;
@@ -291,6 +294,7 @@ class Stage3D extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (bare) return Scene3DView(scene: scene, cam: cam, highlight: highlight, onPick: onPick, dynamicPolys: dynamicPolys, dynamicScreens: dynamicScreens, layerOn: layerOn, background: kConBg, onDoubleTap: onDoubleTap, sky: sky);
     return Stack(children: [
       Positioned.fill(child: Scene3DView(scene: scene, cam: cam, highlight: highlight, onPick: onPick, dynamicPolys: dynamicPolys, dynamicScreens: dynamicScreens, layerOn: layerOn, background: kConBg, onDoubleTap: onDoubleTap, sky: sky)),
       if (topLeft != null) Positioned(left: 8, top: 8, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: topLeft!)),

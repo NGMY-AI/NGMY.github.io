@@ -65,6 +65,9 @@ class DeliveryOrder {
   int? holder;
   bool pickedUp = false;
 
+  /// Wanted at the hospital for somebody who was run over: it comes first on the board and pays well.
+  bool emergency = false;
+
   /// When you took it (seconds on the town clock), so an order you leave for six minutes goes back on the board.
   double takenAt = 0;
 
@@ -163,6 +166,19 @@ class DeliveryBoard {
     return doorSpot(_places[_rnd.nextInt(_places.length)]);
   }
 
+  /// Somebody was run over and is in the [hospital]: medicine and food are wanted there from the nearest stores. They go to the top of the board.
+  void postEmergency(Furn hospital) {
+    final stores = [for (final f in _places) if (f.kind == 'store' || f.kind == 'shop' || f.kind == 'gasstation') f];
+    if (stores.isEmpty) return;
+    stores.sort((a, b) => _d(a.x, a.z, (hospital.x, hospital.z)).compareTo(_d(b.x, b.z, (hospital.x, hospital.z))));
+    var i = 0;
+    for (final kind in const ['medicine', 'food']) {
+      final from = stores[i % stores.length];
+      i++;
+      orders.insert(0, DeliveryOrder(_nextId++, kind, from, hospital, kind == 'medicine' ? 30 : 24)..emergency = true);
+    }
+  }
+
   /// Keeps at least [min] open orders on the board.
   void refill(double now, {int min = 7}) {
     var guard = 0;
@@ -219,7 +235,7 @@ class DeliveryBoard {
     if (d > kDeliveryReach) return null;
     if (!o.pickedUp) {
       o.pickedUp = true;
-      return DeliveryEvent('pickup', '${o.info.emoji} You picked up the ${o.info.name.toLowerCase()} at the ${kFurnKinds[o.from.kind]!.name.toLowerCase()}. Now take it to the house.');
+      return DeliveryEvent('pickup', '${o.info.emoji} You picked up the ${o.info.name.toLowerCase()} at the ${kFurnKinds[o.from.kind]!.name.toLowerCase()}. Now take it to the ${o.emergency ? 'hospital' : 'house'}.');
     }
     orders.remove(o);
     active = null;
@@ -257,6 +273,7 @@ class DeliveryBoard {
         final free = [for (final o in orders) if (o.holder == null) o];
         if (free.isEmpty) continue;
         free.sort((a, b) {
+          if (a.emergency != b.emergency) return a.emergency ? -1 : 1;
           final da = _dist(c, doorSpot(a.from)), db = _dist(c, doorSpot(b.from));
           return da.compareTo(db);
         });
@@ -350,6 +367,7 @@ class DeliveryBoard {
   List<DeliveryOrder> open(double px, double pz) {
     final list = [for (final o in orders) if (o.holder == null) o];
     list.sort((a, b) {
+      if (a.emergency != b.emergency) return a.emergency ? -1 : 1;
       final da = _d(px, pz, doorSpot(a.from)), db = _d(px, pz, doorSpot(b.from));
       return da.compareTo(db);
     });

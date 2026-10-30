@@ -1,7 +1,9 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_city_delivery.dart';
 import 'package:ngmy/ngmy_city_needs.dart';
+import 'package:ngmy/ngmy_city_traffic.dart';
 import 'package:ngmy/ngmy_city_uber.dart';
 import 'package:ngmy/ngmy_construction_cityin.dart';
 import 'package:ngmy/ngmy_construction_community.dart';
@@ -289,5 +291,96 @@ void main() {
         if (l.heli != null || l.follow != null) expect(l.secs, lessThanOrEqualTo(6), reason: '$what: a helicopter or vehicle leg is short and sweeping');
       }
     }
+  });
+  test('traffic: every car keeps its lane and its distance, stops at a red light, and never goes through another car', () {
+    final sim = CityTrafficSim.instance..reset();
+    var passedRed = 0;
+    final lastAlong = <String, double>{};
+    for (var t = 0.0; t < 700; t += 0.25) {
+      sim.advance(t);
+      final poses = [for (final v in kTraffic) vehiclePose(v, t)];
+      for (var i = 0; i < kTraffic.length; i++) {
+        for (var j = i + 1; j < kTraffic.length; j++) {
+          // Two cars overlap when any point of the body of one is inside the body of the other (a long car swings out at a corner).
+          bool inside(int a, int b) {
+            for (final fa in const [-0.5, -0.25, 0.0, 0.25, 0.5]) {
+              for (final fs in const [-0.5, 0.0, 0.5]) {
+                final px = poses[b].$1 + poses[b].$3 * fa * kTraffic[b].length - poses[b].$4 * fs * kTraffic[b].width;
+                final pz = poses[b].$2 + poses[b].$4 * fa * kTraffic[b].length + poses[b].$3 * fs * kTraffic[b].width;
+                final dx = px - poses[a].$1, dz = pz - poses[a].$2;
+                final along = (dx * poses[a].$3 + dz * poses[a].$4).abs(), across = (-dx * poses[a].$4 + dz * poses[a].$3).abs();
+                if (along < kTraffic[a].length / 2 && across < kTraffic[a].width / 2) return true;
+              }
+            }
+            return false;
+          }
+
+          expect(inside(i, j) || inside(j, i), isFalse, reason: 'vehicle $i and $j drive through each other at t=$t');
+        }
+      }
+      for (final l in kLights) {
+        for (var k = 0; k < 2; k++) {
+          final vi = l.loop * 2 + k;
+          final sp = loopPoint(kTraffic[l.loop * 2], l.stopAt);
+          final p = poses[vi];
+          final frontX = p.$1 + p.$3 * kTraffic[vi].length / 2, frontZ = p.$2 + p.$4 * kTraffic[vi].length / 2;
+          final along = (frontX - sp.$1) * sp.$3 + (frontZ - sp.$2) * sp.$4;
+          final near = (frontX - sp.$1).abs() + (frontZ - sp.$2).abs() < 120;
+          final key = '${l.loop}-${l.stopAt}-$vi';
+          final before = lastAlong[key];
+          if (near && before != null && before < -1 && along >= -1) {
+            final c = (t + l.offset) % kLightCycle;
+            if (lightState(l, t) == 2 && c - kGreen - kAmber > 1.5) passedRed++;
+          }
+          lastAlong[key] = near ? along : -9999;
+        }
+      }
+    }
+    expect(passedRed, 0, reason: 'no car goes through a red light');
+    // The cars do stop: some moment in the run has a car standing still at a light.
+    var stopped = false;
+    sim.reset();
+    for (var t = 0.0; t < 200 && !stopped; t += 0.5) {
+      sim.advance(t);
+      stopped = [for (var i = 0; i < kTraffic.length; i++) sim.speedOf(i)].any((s) => s < 0.5);
+    }
+    expect(stopped, isTrue, reason: 'a red light stops a car');
+  });
+
+  test('people on foot: a green walking person only while the cars are stopped, and a car that is moving runs a person over', () {
+    for (final l in kLights) {
+      for (var t = 0.0; t < 120; t += 0.5) {
+        if (lightState(l, t) != 2) expect(walkSignal(l, t), isFalse, reason: 'no walking while the cars can go');
+      }
+      expect([for (var t = 0.0; t < kLightCycle; t += 0.5) walkSignal(l, t)].any((w) => w), isTrue);
+    }
+    final sim = CityTrafficSim.instance..reset();
+    var hitSomeone = false, safeWhenStopped = false;
+    for (var t = 0.0; t < 300; t += 0.5) {
+      sim.advance(t);
+      for (var i = 0; i < kTraffic.length; i++) {
+        final p = vehiclePose(kTraffic[i], t);
+        final h = sim.hit(p.$1, p.$2);
+        if (sim.speedOf(i) > 6) {
+          if (h >= 0) hitSomeone = true;
+          expect(sim.hit(9999, 9999), -1);
+        } else if (sim.speedOf(i) < 1) {
+          if (sim.hit(p.$1, p.$2) != i) safeWhenStopped = true;
+        }
+      }
+    }
+    expect(hitSomeone, isTrue, reason: 'somebody in front of a moving car is hit');
+    expect(safeWhenStopped, isTrue, reason: 'a car that stands still at the light does not hit anybody');
+  });
+
+  test('somebody run over: medicine and food are ordered to the hospital from the stores, first on the board', () {
+    final city = HomeProject(seed: 4).rooms[11];
+    final board = DeliveryBoard(city);
+    final hospital = city.furn.firstWhere((f) => f.kind == 'hospital');
+    board.postEmergency(hospital);
+    final open = board.open(0, 300);
+    expect(open.take(2).every((o) => o.emergency && o.to == hospital), isTrue);
+    expect(open.take(2).map((o) => o.kind).toSet(), {'medicine', 'food'});
+    expect(open.first.pay, greaterThanOrEqualTo(24));
   });
 }
