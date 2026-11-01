@@ -25,41 +25,78 @@ const double kBillboardShotSecs = 30;
 /// The space between two signs on the same billboard.
 const double kBbGap = 16;
 
-/// The most signs one billboard can hold.
-const int kBbMaxSigns = 4;
+/// The most signs one billboard layout can hold.
+const int kBbMaxSigns = 6;
 
-/// A kind of billboard: how big each sign is, how many there are in a row and in a column, and how high the bottom stands.
+/// Where one separate board stands: sideways (x), forwards (z), and which way its picture faces (yaw: 0 faces the front, pi the back, +-pi/2 the sides).
+class BbPlace {
+  const BbPlace(this.x, this.z, this.yaw);
+  final double x, z, yaw;
+}
+
+/// A kind of billboard: how big each sign is, and how they are laid out. Either the signs are joined on one board (in [cols] across and [rows] down),
+/// or each sign is a board of its own standing at its own [places]. [poleH] is how high the bottom edge of a board is above the ground.
 class BbTemplate {
-  const BbTemplate(this.id, this.emoji, this.name, this.blurb, this.w, this.h, this.poleH, {this.cols = 1, this.rows = 1});
+  const BbTemplate(this.id, this.emoji, this.name, this.blurb, this.w, this.h, this.poleH, {this.cols = 1, this.rows = 1, this.places = const [], this.reach = 0, this.shot = 1});
   final String id, emoji, name, blurb;
 
   /// The size of one sign and how high the bottom edge of the board is above the ground.
   final double w, h, poleH;
 
-  /// How many signs across and how many down.
+  /// How many signs across and how many down, when they are joined on one board.
   final int cols, rows;
 
-  int get signs => cols * rows;
+  /// For separate boards: where each one stands. Empty means one joined board.
+  final List<BbPlace> places;
 
-  /// The size of the whole board, all signs together.
-  double get tw => cols * w + (cols - 1) * kBbGap;
-  double get th => rows * h + (rows - 1) * kBbGap;
+  /// How far the drone must stay from the middle at least (for a board with a big building round it), and how wide the drone's circles are as a share of the layout.
+  final double reach, shot;
 
-  /// How far the drone stays from the board: it grows with the biggest side.
-  double get span => math.max(tw, th * 1.3);
+  int get signs => places.isEmpty ? cols * rows : places.length;
+
+  /// The edges of everything the board stands on, as left, right, back, front.
+  (double, double, double, double) get _bounds {
+    if (places.isEmpty) return (-tw / 2, tw / 2, -12, 0);
+    var x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+    for (final p in places) {
+      for (final sx in [-w / 2, w / 2]) {
+        for (final sz in [-12.0, 0.0]) {
+          final q = rotY(V3(sx, 0, sz), p.yaw);
+          x0 = math.min(x0, q.x + p.x);
+          x1 = math.max(x1, q.x + p.x);
+          z0 = math.min(z0, q.z + p.z);
+          z1 = math.max(z1, q.z + p.z);
+        }
+      }
+    }
+    return (x0, x1, z0, z1);
+  }
+
+  /// The size of the whole layout, all signs together, and its middle.
+  double get tw => places.isEmpty ? cols * w + (cols - 1) * kBbGap : _bounds.$2 - _bounds.$1;
+  double get th => places.isEmpty ? rows * h + (rows - 1) * kBbGap : h;
+  double get depth => places.isEmpty ? 12 : _bounds.$4 - _bounds.$3;
+  double get cx => places.isEmpty ? 0 : (_bounds.$1 + _bounds.$2) / 2;
+  double get cz => places.isEmpty ? 0 : (_bounds.$3 + _bounds.$4) / 2;
+
+  /// How far the drone stays from the middle: it grows with the biggest side.
+  double get span => math.max(math.max(tw, depth), math.max(th * 1.3, reach)) * shot;
 }
 
 const List<BbTemplate> kBbTemplates = [
   BbTemplate('highway', '🛣️', 'Highway board', 'Huge and wide, on two thick poles, with a walkway under it', 420, 170, 150),
   BbTemplate('tower', '🗼', 'Tall tower sign', 'A big sign high up on one very thick pole', 400, 210, 270),
   BbTemplate('neon', '🌃', 'Neon board', 'A big black board with a glowing neon edge', 380, 190, 120),
-  BbTemplate('roof', '🏠', 'Rooftop board', 'A big house with a huge board standing on its roof', 460, 180, 208),
+  BbTemplate('roof', '🏠', 'Rooftop board', 'A big house with big TVs, the NGMY carpet on its back, and a huge board on its roof', 460, 180, 208, reach: 760),
   BbTemplate('screen', '📺', 'Big screen', 'A giant TV screen on a stand', 440, 250, 60),
   BbTemplate('gate', '🚪', 'Town gate', 'A huge arch with the board across it', 600, 200, 200),
-  BbTemplate('duo', '🪧', 'Two signs side by side', 'Two big signs on one board: you choose what each says', 320, 160, 150, cols: 2),
-  BbTemplate('trio', '🎞️', 'Three in a row', 'Three signs in a row on one long board', 300, 150, 160, cols: 3),
-  BbTemplate('stack', '🏗️', 'Tower of three', 'Three signs stacked up one pole like a tower', 320, 140, 230, rows: 3),
-  BbTemplate('quad', '🔲', 'Four-sign wall', 'Four signs, two on top and two below, on a giant frame', 300, 150, 170, cols: 2, rows: 2),
+  BbTemplate('duo', '🪧', 'Two signs on one board', 'Two big signs joined on one board: you choose what each says', 320, 160, 150, cols: 2),
+  BbTemplate('long3', '🎞️', 'Three signs on one long board', 'Three big signs joined on one long board', 300, 150, 160, cols: 3),
+  BbTemplate('line3', '↔️', 'Three in a row', 'Three separate boards standing in one straight line', 300, 150, 150, places: [BbPlace(-460, 0, 0), BbPlace(0, 0, 0), BbPlace(460, 0, 0)], shot: 0.6),
+  BbTemplate('lines6', '🛤️', 'Two lines of three', 'Six separate boards: one straight line of three facing front, another line of three behind it facing back', 280, 140, 140,
+      places: [BbPlace(-440, 160, 0), BbPlace(0, 160, 0), BbPlace(440, 160, 0), BbPlace(-440, -380, math.pi), BbPlace(0, -380, math.pi), BbPlace(440, -380, math.pi)], shot: 0.6),
+  BbTemplate('scatter', '🌐', 'Billboard park', 'Four separate boards: one at the front, one at the back and one on each side, all facing out', 320, 160, 150,
+      places: [BbPlace(0, 300, 0), BbPlace(0, -300, math.pi), BbPlace(-560, 0, -math.pi / 2), BbPlace(560, 0, math.pi / 2)], shot: 0.6),
 ];
 
 /// The colours a custom sign can have: the two background colours and the colour of the words.
@@ -228,15 +265,48 @@ void paintBillboard(Canvas c, Size s, double t, BbSign b, [int index = 0]) {
   c.restore();
 }
 
-/// Where sign [i] is on the board of [tp]: its left and right edges and its top and bottom edges.
+/// Where sign [i] is on its own board: its left and right edges and its top and bottom edges. On a joined board the signs sit in a grid;
+/// on a board of its own the sign fills the board.
 (double x0, double x1, double yTop, double yBot) billboardSignRect(BbTemplate tp, int i) {
+  if (tp.places.isNotEmpty) return (-tp.w / 2, tp.w / 2, tp.poleH + tp.h, tp.poleH);
   final r = i ~/ tp.cols, c = i % tp.cols;
   final x0 = -tp.tw / 2 + c * (tp.w + kBbGap);
   final yTop = tp.poleH + tp.th - r * (tp.h + kBbGap);
   return (x0, x0 + tp.w, yTop, yTop - tp.h);
 }
 
-/// The scene: the ground, a road, trees and lamps, and the billboard of the chosen kind with its signs on both sides.
+/// A big TV for the walls of the house: the NGMY logo on blue, or an NGMY ad.
+void _paintTv(Canvas c, Size s, double t, int k) {
+  final r = Offset.zero & s;
+  c.drawRect(r, Paint()..color = const Color(0xFF05070D));
+  final inner = r.deflate(s.shortestSide * 0.06);
+  c.save();
+  c.clipRect(inner);
+  c.translate(inner.left, inner.top);
+  final sz = inner.size;
+  if (k.isEven) {
+    c.drawRect(Offset.zero & sz, Paint()..shader = const LinearGradient(colors: [Color(0xFF0B1F4B), Color(0xFF1E4FA3)]).createShader(Offset.zero & sz));
+    final m = sz.height * 0.82;
+    c.save();
+    c.translate((sz.width - m) / 2, (sz.height - m) / 2);
+    paintNgmyMedallion(c, Size(m, m), t);
+    c.restore();
+  } else {
+    paintCityAd(c, sz, t, k);
+  }
+  c.restore();
+}
+
+void _paintDoor(Canvas c, Size s, double t) {
+  final r = Offset.zero & s;
+  c.drawRect(r, Paint()..color = const Color(0xFF7C4A2D));
+  final panel = Paint()..color = const Color(0xFF5E3920);
+  c.drawRect(Rect.fromLTWH(s.width * 0.12, s.height * 0.07, s.width * 0.76, s.height * 0.38), panel);
+  c.drawRect(Rect.fromLTWH(s.width * 0.12, s.height * 0.52, s.width * 0.76, s.height * 0.4), panel);
+  c.drawCircle(Offset(s.width * 0.82, s.height * 0.5), s.width * 0.05, Paint()..color = const Color(0xFFF5C14B));
+}
+
+/// The scene: the ground, a road, trees and lamps, and the billboard layout of the chosen kind, with the signs on both sides of every board.
 /// The poles and braces always stop below or behind the board, so nothing ever pokes through a sign.
 Scene3D buildBillboardScene(BbTemplate tp, BbContent content) {
   final b = MeshBuilder();
@@ -244,15 +314,17 @@ Scene3D buildBillboardScene(BbTemplate tp, BbContent content) {
   const up = V3(0, 1, 0);
   b.order = 0;
   b.quad(const V3(-3000, 0, -3000), const V3(3000, 0, -3000), const V3(3000, 0, 3000), const V3(-3000, 0, 3000), grass, normal: up);
-  // A road in front of the billboard, and a dashed line down it.
+  // A road in front of the billboards, and a dashed line down it.
   b.order = 1;
   b.quad(const V3(-2200, 0.4, 560), const V3(2200, 0.4, 560), const V3(2200, 0.4, 720), const V3(-2200, 0.4, 720), road, normal: up);
   for (var x = -2100.0; x < 2100; x += 90) {
     b.quad(V3(x, 0.8, 637), V3(x + 45, 0.8, 637), V3(x + 45, 0.8, 643), V3(x, 0.8, 643), line, normal: up);
   }
   b.order = 2;
-  final w = tp.w, h = tp.h, y0 = tp.poleH, tw = tp.tw, th = tp.th;
-  // The board itself: a thick back, and a frame round each sign.
+  final w = tp.w, h = tp.h, y0 = tp.poleH;
+  final sep = tp.places.isNotEmpty;
+  // The size of one board (all the joined signs, or the one sign of a board of its own).
+  final tw = sep ? w : tp.tw, th = sep ? h : tp.th;
   Color frame = const Color(0xFFF5C14B);
   var thick = 12.0;
   switch (tp.id) {
@@ -269,77 +341,119 @@ Scene3D buildBillboardScene(BbTemplate tp, BbContent content) {
       frame = const Color(0xFF1E3A8A);
     case 'duo':
       frame = const Color(0xFF22D3EE);
-    case 'trio':
+    case 'long3':
       frame = const Color(0xFFF472B6);
-    case 'stack':
+    case 'line3':
       frame = const Color(0xFF4ADE80);
-    case 'quad':
+    case 'lines6':
       frame = const Color(0xFFF8FAFC);
+    case 'scatter':
+      frame = const Color(0xFF22D3EE);
   }
-  final body = MeshBuilder()..order = 2;
-  // One backing per sign (not one huge slab), so the order things are drawn in never lets a backing cover a sign beside it.
-  for (var i = 0; i < tp.signs; i++) {
-    final (x0, x1, yt, yb) = billboardSignRect(tp, i);
-    body.box(V3((x0 + x1) / 2, (yt + yb) / 2, -thick / 2 - 0.2), V3(w + 16, h + 16, thick), tp.id == 'neon' || tp.id == 'screen' ? dark : const Color(0xFF1F2937), shine: 0.2);
+  final pw = tp.signs > 1 ? 720.0 : 900.0, ph = pw * h / w;
+  final screens = <ScreenQuad>[];
+  final boards = sep ? tp.places.length : 1;
+  for (var bi = 0; bi < boards; bi++) {
+    final pl = sep ? tp.places[bi] : const BbPlace(0, 0, 0);
+    final ids = sep ? [bi] : [for (var i = 0; i < tp.signs; i++) i];
+    V3 place(V3 p) => rotY(p, pl.yaw) + V3(pl.x, 0, pl.z);
+    final body = MeshBuilder()..order = 2;
+    final fb = MeshBuilder()..order = 2;
+    // One backing and one frame per sign (not one huge slab), so the order things are drawn in never lets a backing cover a sign beside it.
+    for (final i in ids) {
+      final (x0, x1, yt, yb) = billboardSignRect(tp, i);
+      final cx = (x0 + x1) / 2, cy = (yt + yb) / 2;
+      body.box(place(V3(cx, cy, -thick / 2 - 0.2)), V3(w + 16, h + 16, thick), tp.id == 'neon' || tp.id == 'screen' ? dark : const Color(0xFF1F2937), shine: 0.2, yaw: pl.yaw);
+      const ft = 7.0;
+      fb.box(place(V3(cx, yt + 3, 3)), V3(w + 14, ft, 8), frame, shine: 0.4, yaw: pl.yaw);
+      fb.box(place(V3(cx, yb - 3, 3)), V3(w + 14, ft, 8), frame, shine: 0.4, yaw: pl.yaw);
+      fb.box(place(V3(x0 - 3, cy, 3)), V3(ft, h + 14, 8), frame, shine: 0.4, yaw: pl.yaw);
+      fb.box(place(V3(x1 + 3, cy, 3)), V3(ft, h + 14, 8), frame, shine: 0.4, yaw: pl.yaw);
+    }
+    b.polys.addAll(body.polys);
+    b.polys.addAll(fb.polys);
+    // The supports. Every pole ends at the bottom of the board and sits in line with its back, so none can come out through a sign.
+    final sb = MeshBuilder()..order = 2;
+    final poleR = math.max(6.0, tw * 0.018);
+    final zp = -thick / 2;
+    // A flat picture on a wall of the house, facing [yaw].
+    void wall(V3 c, double yaw, double ww, double hh, void Function(Canvas, Size, double) paint, {double px = 260}) {
+      V3 q(double x, double y) => rotY(V3(x, y, 0), yaw) + c;
+      screens.add(ScreenQuad([q(-ww / 2, hh / 2), q(ww / 2, hh / 2), q(ww / 2, -hh / 2), q(-ww / 2, -hh / 2)], 0, paint, width: px, height: px * hh / ww, bias: 30, order: 2));
+    }
+
+    switch (sep ? 'sep' : tp.id) {
+      case 'tower':
+        sb.cyl(V3(0, 0, zp), V3(0, y0 - 7, zp), poleR * 1.9, steel, sides: 12);
+        sb.cyl(V3(0, 0, zp), V3(0, 14, zp), poleR * 2.8, dark, sides: 12);
+      case 'screen':
+        sb.box(V3(0, 7, -10), V3(tw * 0.6, 14, 70), dark);
+        sb.box(V3(0, (14 + y0 - 7) / 2, zp), V3(60, y0 - 21, 14), steel);
+      case 'roof':
+        // A big house: the board stands on its flat roof. Its walls carry big TVs and NGMY logos (flat pictures, so they never vanish from any side),
+        // and the back wall has the NGMY hall carpet.
+        const wall0 = Color(0xFFE7D8BE), trim = Color(0xFF9CA3AF);
+        const hz = -150.0, hd = 270.0, hh = 200.0;
+        const fz = hz + hd / 2, bz = hz - hd / 2;
+        sb.box(const V3(0, hh / 2, hz), const V3(620, hh, hd), wall0, shine: 0.1, split: 3);
+        sb.box(const V3(0, hh + 4, hz), const V3(640, 8, hd + 20), trim, shine: 0.15, split: 3);
+        sb.box(const V3(-390, 70, hz + 30), const V3(200, 140, 200), const Color(0xFFD9C5A3), shine: 0.1, split: 2);
+        sb.box(const V3(-390, 144, hz + 30), const V3(216, 8, 216), trim, split: 2);
+        sb.box(const V3(230, hh + 30, hz - 60), const V3(40, 60, 40), const Color(0xFF8B5E3C));
+        sb.box(const V3(0, 90, fz + 10), const V3(90, 6, 26), const Color(0xFFB91C1C));
+        // The front: four big TVs up top, four below, and the door.
+        var k = 0;
+        for (final x in const [-230.0, -80.0, 80.0, 230.0]) {
+          final n = k++;
+          wall(V3(x, 140, fz + 0.8), 0, 120, 72, (c, s, t) => _paintTv(c, s, t, n), px: 300);
+        }
+        for (final x in const [-250.0, -130.0, 130.0, 250.0]) {
+          final n = k++;
+          wall(V3(x, 45, fz + 0.8), 0, 100, 60, (c, s, t) => _paintTv(c, s, t, n), px: 260);
+        }
+        wall(const V3(0, 40, fz + 0.8), 0, 56, 80, _paintDoor, px: 120);
+        wall(const V3(-400, 80, hz + 130 + 0.8), 0, 130, 80, (c, s, t) => _paintTv(c, s, t, 8), px: 300);
+        // The right side: three TVs and three NGMY logos.
+        for (var j = 0; j < 3; j++) {
+          final z = hz + 90 - j * 90;
+          wall(V3(310.8, 140, z), math.pi / 2, 80, 64, (c, s, t) => _paintTv(c, s, t, 9 + j), px: 240);
+          wall(V3(310.8, 55, z), math.pi / 2, 60, 60, paintNgmyMedallion, px: 200);
+        }
+        // The left side, on the low wing.
+        for (var j = 0; j < 2; j++) {
+          final z = hz + 30 + 55 - j * 110;
+          wall(V3(-490.8, 95, z), -math.pi / 2, 90, 60, (c, s, t) => _paintTv(c, s, t, 12 + j), px: 240);
+          wall(V3(-490.8, 40, z), -math.pi / 2, 50, 50, paintNgmyMedallion, px: 180);
+        }
+        // The back: the NGMY hall carpet.
+        wall(V3(0, 100, bz - 0.8), math.pi, 580, 170, paintNgmyCarpet, px: 900);
+      case 'gate':
+        for (final x in const [-1.0, 1.0]) {
+          sb.cyl(V3(x * (tw / 2 + 25), 0, zp), V3(x * (tw / 2 + 25), y0 + th + 26, zp), poleR * 1.6, steel, sides: 12);
+        }
+        sb.box(V3(0, y0 + th + 17, zp), V3(tw + 80, 18, 22), steel, shine: 0.2);
+      default:
+        final px = (!sep && tp.signs > 2) ? 0.36 : 0.3;
+        for (final x in const [-1.0, 1.0]) {
+          sb.cyl(place(V3(x * tw * px, 0, zp)), place(V3(x * tw * px, y0 - 7, zp)), poleR, steel, sides: 10);
+        }
+        if (tp.id == 'highway') {
+          sb.box(V3(0, y0 - 16, 14), V3(tw + 14, 3, 24), steel);
+        }
+    }
+    b.polys.addAll(sb.polys);
+    // The signs, on both sides: from behind the signs are in the same left to right order.
+    for (final i in ids) {
+      final (x0, x1, yt, yb) = billboardSignRect(tp, i);
+      final signFront = content.signs[i];
+      screens.add(ScreenQuad([place(V3(x0, yt, 0.8)), place(V3(x1, yt, 0.8)), place(V3(x1, yb, 0.8)), place(V3(x0, yb, 0.8))], 0, (c, size, t) => paintBillboard(c, size, t, signFront, i), width: pw, height: ph, bias: 60, order: 2));
+      final j = sep ? i : (i ~/ tp.cols) * tp.cols + (tp.cols - 1 - i % tp.cols);
+      final signBack = content.signs[j];
+      screens.add(ScreenQuad([place(V3(x1, yt, -thick - 0.8)), place(V3(x0, yt, -thick - 0.8)), place(V3(x0, yb, -thick - 0.8)), place(V3(x1, yb, -thick - 0.8))], 0, (c, size, t) => paintBillboard(c, size, t, signBack, j), width: pw, height: ph, bias: 60, order: 2));
+    }
   }
-  b.polys.addAll(body.polys);
-  final fb = MeshBuilder()..order = 2;
-  const ft = 7.0;
-  for (var i = 0; i < tp.signs; i++) {
-    final (x0, x1, yt, yb) = billboardSignRect(tp, i);
-    final cx = (x0 + x1) / 2, cy = (yt + yb) / 2;
-    fb.box(V3(cx, yt + 3, 3), V3(w + 14, ft, 8), frame, shine: 0.4);
-    fb.box(V3(cx, yb - 3, 3), V3(w + 14, ft, 8), frame, shine: 0.4);
-    fb.box(V3(x0 - 3, cy, 3), V3(ft, h + 14, 8), frame, shine: 0.4);
-    fb.box(V3(x1 + 3, cy, 3), V3(ft, h + 14, 8), frame, shine: 0.4);
-  }
-  b.polys.addAll(fb.polys);
-  // The supports. Every pole ends at the bottom of the board and sits in line with its back, so none can come out through a sign.
-  final sb = MeshBuilder()..order = 2;
-  final poleR = math.max(6.0, tw * 0.018);
-  final zp = -thick / 2;
-  switch (tp.id) {
-    case 'tower':
-    case 'stack':
-      sb.cyl(V3(0, 0, zp), V3(0, y0 - 7, zp), poleR * 1.9, steel, sides: 12);
-      sb.cyl(V3(0, 0, zp), V3(0, 14, zp), poleR * 2.8, dark, sides: 12);
-    case 'screen':
-      sb.box(V3(0, 7, -10), V3(tw * 0.6, 14, 70), dark);
-      sb.box(V3(0, (14 + y0 - 7) / 2, zp), V3(60, y0 - 21, 14), steel);
-    case 'roof':
-      // A big house: the board stands on its flat roof and is held by posts behind it.
-      const wall = Color(0xFFE7D8BE), trim = Color(0xFF9CA3AF), glass = Color(0xFF93C5FD), wood = Color(0xFF7C4A2D);
-      const hz = -150.0, hd = 270.0, hh = 200.0;
-      sb.box(const V3(0, hh / 2, hz), const V3(620, hh, hd), wall, shine: 0.1);
-      sb.box(const V3(0, hh + 4, hz), const V3(640, 8, hd + 20), trim, shine: 0.15);
-      sb.box(const V3(-390, 70, hz + 30), const V3(200, 140, 200), const Color(0xFFD9C5A3), shine: 0.1);
-      sb.box(const V3(-390, 144, hz + 30), const V3(216, 8, 216), trim);
-      sb.box(const V3(230, hh + 30, hz - 60), const V3(40, 60, 40), const Color(0xFF8B5E3C));
-      for (final wx in const [-250.0, -150.0, -50.0, 50.0, 150.0, 250.0]) {
-        sb.box(V3(wx, 140, hz + hd / 2 + 1), const V3(46, 52, 3), glass, shine: 0.5);
-        if (wx.abs() > 60) sb.box(V3(wx, 60, hz + hd / 2 + 1), const V3(46, 52, 3), glass, shine: 0.5);
-      }
-      sb.box(V3(0, 40, hz + hd / 2 + 1), const V3(56, 80, 4), wood);
-      sb.box(V3(0, 90, hz + hd / 2 + 10), const V3(90, 6, 26), const Color(0xFFB91C1C));
-      sb.box(V3(-390, 60, hz + 30 + 101), const V3(60, 70, 3), glass, shine: 0.5);
-      // No posts behind the board: it stands straight on the roof, so nothing can show through its picture.
-    case 'gate':
-      for (final x in const [-1.0, 1.0]) {
-        sb.cyl(V3(x * (tw / 2 + 25), 0, zp), V3(x * (tw / 2 + 25), y0 + th + 26, zp), poleR * 1.6, steel, sides: 12);
-      }
-      sb.box(V3(0, y0 + th + 17, zp), V3(tw + 80, 18, 22), steel, shine: 0.2);
-    default:
-      final px = tp.signs > 2 ? 0.36 : 0.3;
-      for (final x in const [-1.0, 1.0]) {
-        sb.cyl(V3(x * tw * px, 0, zp), V3(x * tw * px, y0 - 7, zp), poleR, steel, sides: 10);
-      }
-      if (tp.id == 'highway') {
-        sb.box(V3(0, y0 - 16, 14), V3(tw + 14, 3, 24), steel);
-      }
-  }
-  b.polys.addAll(sb.polys);
   // A few trees and lamp posts, so there is something to fly past.
-  const spots = [(-700.0, 330.0), (700.0, 380.0), (-500.0, -420.0), (580.0, -480.0), (-950.0, 100.0), (950.0, 30.0), (0.0, -800.0), (-1200.0, -300.0), (1250.0, -200.0)];
+  const spots = [(-700.0, 330.0), (700.0, 380.0), (-1100.0, -420.0), (1100.0, -480.0), (-1300.0, 100.0), (1350.0, 30.0), (0.0, -900.0), (-1500.0, -300.0), (1550.0, -200.0)];
   final tb = MeshBuilder()..order = 2;
   for (final (x, z) in spots) {
     tb.cyl(V3(x, 0, z), V3(x, 55, z), 7, const Color(0xFF6B4A32), sides: 6);
@@ -350,17 +464,6 @@ Scene3D buildBillboardScene(BbTemplate tp, BbContent content) {
     tb.ball(V3(x, 95, 580), 8, const Color(0xFFFFF1A8), lat: 3, lon: 6);
   }
   b.polys.addAll(tb.polys);
-  // The signs, on both sides: from behind the signs are in the same left to right order.
-  final pw = tp.signs > 1 ? 720.0 : 900.0, ph = pw * h / w;
-  final screens = <ScreenQuad>[];
-  for (var i = 0; i < tp.signs; i++) {
-    final (x0, x1, yt, yb) = billboardSignRect(tp, i);
-    final signFront = content.signs[i];
-    screens.add(ScreenQuad([V3(x0, yt, 0.8), V3(x1, yt, 0.8), V3(x1, yb, 0.8), V3(x0, yb, 0.8)], 0, (c, size, t) => paintBillboard(c, size, t, signFront, i), width: pw, height: ph, bias: 60, order: 2));
-    final j = (i ~/ tp.cols) * tp.cols + (tp.cols - 1 - i % tp.cols);
-    final signBack = content.signs[j];
-    screens.add(ScreenQuad([V3(x1, yt, -thick - 0.8), V3(x0, yt, -thick - 0.8), V3(x0, yb, -thick - 0.8), V3(x1, yb, -thick - 0.8)], 0, (c, size, t) => paintBillboard(c, size, t, signBack, j), width: pw, height: ph, bias: 60, order: 2));
-  }
   return Scene3D(b.polys, screens: screens, farMin: 6000);
 }
 
@@ -392,7 +495,7 @@ V3 _cr(V3 p0, V3 p1, V3 p2, V3 p3, double u) {
 
 /// Where the drone is (the eye) and what it looks at, [secs] into the shot, round a board of [tp].
 (V3 eye, V3 look) billboardShot(BbTemplate tp, double secs) {
-  final centre = V3(0, tp.poleH + tp.th / 2, 0);
+  final centre = V3(tp.cx, tp.poleH + tp.th / 2, tp.cz);
   V3 at(_Key k) => centre + V3(math.sin(k.a) * k.r * tp.span + k.ex * tp.tw, k.h * tp.th, math.cos(k.a) * k.r * tp.span);
   V3 gaze(_Key k) => centre + V3(k.lx * tp.tw, k.ly * tp.th, 0);
   final s = secs.clamp(0.0, kBillboardShotSecs);
@@ -469,7 +572,7 @@ class NgmyBillboardStudioState extends State<NgmyBillboardStudioPage> {
 
   void _frameBoard() {
     final t = tpl;
-    cam.setView(target: V3(0, t.poleH + t.th / 2, 0), dist: t.span * 1.9, yaw: 0.45, pitch: 0.22);
+    cam.setView(target: V3(t.cx, t.poleH + t.th / 2, t.cz), dist: t.span * 1.9, yaw: 0.45, pitch: 0.22);
   }
 
   Future<void> _load() async {

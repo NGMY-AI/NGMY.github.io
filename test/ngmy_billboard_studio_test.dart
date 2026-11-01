@@ -13,7 +13,7 @@ void main() {
     for (final t in kBbTemplates) {
       final s = buildBillboardScene(t, BbContent());
       expect(s.polys, isNotEmpty, reason: t.name);
-      expect(s.screens.length, 2 * t.signs, reason: '${t.name}: every sign on the front and on the back');
+      expect(s.screens.length, greaterThanOrEqualTo(2 * t.signs), reason: '${t.name}: every sign on the front and on the back');
       expect(t.w / t.h, inInclusiveRange(1.6, 3.2), reason: '${t.name}: the words fit a sign this shape');
       expect(math.max(t.tw, t.th), greaterThanOrEqualTo(380), reason: '${t.name} is big');
     }
@@ -37,7 +37,7 @@ void main() {
   test('the 30 second drone shot is smooth, stays above the ground, always looks at the board and goes right round it', () {
     expect(kBillboardShotSecs, 30);
     for (final t in kBbTemplates) {
-      final centre = V3(0, t.poleH + t.th / 2, 0);
+      final centre = V3(t.cx, t.poleH + t.th / 2, t.cz);
       var prev = billboardShot(t, 0).$1;
       var minA = 99.0, maxA = -99.0;
       var sides = <int>{};
@@ -47,7 +47,7 @@ void main() {
         expect((look - centre).len, lessThan(t.tw * 0.4), reason: 'looks at the board');
         expect((eye - prev).len, lessThan(t.span * 0.25), reason: '${t.name}: no jump at $s s');
         prev = eye;
-        final a = math.atan2(eye.x, eye.z);
+        final a = math.atan2(eye.x - t.cx, eye.z - t.cz);
         minA = math.min(minA, a);
         maxA = math.max(maxA, a);
         sides.add(((a + math.pi) / (math.pi / 2)).floor() % 4);

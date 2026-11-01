@@ -182,9 +182,14 @@ void paintNgmyPoster(Canvas c, Size s, double t, int variant) {
     c.drawCircle(mid, s.height * 0.34, Paint()..color = gold);
     c.drawCircle(mid, s.height * 0.3, Paint()..color = const Color(0xFFFDFCF7));
     logoAt(Rect.fromCenter(center: mid, width: s.height * 0.5, height: s.height * 0.4));
-    line('NEW GLOBAL', Offset(s.width * 0.62, s.height * 0.2), s.height * 0.16);
-    line('MOVEMENT', Offset(s.width * 0.62, s.height * 0.4), s.height * 0.16);
-    line('FOR YOUTH', Offset(s.width * 0.62, s.height * 0.6), s.height * 0.16);
+    // The words sit in the space to the right of the logo disc and shrink to fit it, so they can never run over the logo.
+    final wl = s.height * 1.04, wr = s.width - s.height * 0.12;
+    double natural(String text) => (TextPainter(text: TextSpan(text: text, style: TextStyle(fontSize: s.height * 0.16, fontWeight: FontWeight.w900, letterSpacing: s.height * 0.16 * 0.08)), textDirection: TextDirection.ltr)..layout()).width;
+    final fit = math.min(1.0, (wr - wl) / math.max(natural('NEW GLOBAL'), math.max(natural('MOVEMENT'), natural('FOR YOUTH'))));
+    final cx = (wl + wr) / 2;
+    line('NEW GLOBAL', Offset(cx, s.height * 0.2), s.height * 0.16 * fit);
+    line('MOVEMENT', Offset(cx, s.height * 0.4), s.height * 0.16 * fit);
+    line('FOR YOUTH', Offset(cx, s.height * 0.6), s.height * 0.16 * fit);
   } else {
     logoAt(Rect.fromCenter(center: Offset(s.width / 2, s.height * 0.42), width: s.width * 0.6, height: s.height * 0.4));
     line('NGMY', Offset(s.width / 2, s.height * 0.68), s.height * 0.12);
