@@ -13,38 +13,39 @@ void main() {
     for (final t in kBbTemplates) {
       final s = buildBillboardScene(t, BbContent());
       expect(s.polys, isNotEmpty, reason: t.name);
-      expect(s.screens.length, 2, reason: '${t.name}: a picture on the front and on the back');
+      expect(s.screens.length, 2 * t.signs, reason: '${t.name}: every sign on the front and on the back');
+      expect(t.w / t.h, inInclusiveRange(1.6, 3.2), reason: '${t.name}: the words fit a sign this shape');
+      expect(math.max(t.tw, t.th), greaterThanOrEqualTo(380), reason: '${t.name} is big');
     }
   });
 
   test('the board plays the NGMY default until something is changed, and can go back to it', () {
     final c = BbContent();
-    expect(c.useDefault, isTrue);
-    expect(c.headline, BbContent.defHeadline);
-    c.useDefault = false;
-    c.headline = 'MY SHOP';
-    c.logoBytes = null;
-    final j = c.toJson();
-    final d = BbContent()..fromJson(j);
-    expect(d.useDefault, isFalse);
-    expect(d.headline, 'MY SHOP');
-    d.resetToNgmy();
-    expect(d.useDefault, isTrue);
-    expect(d.headline, BbContent.defHeadline);
+    expect(c.signs[0].useDefault, isTrue);
+    expect(c.signs[0].headline, BbSign.defHeadline);
+    c.signs[1].useDefault = false;
+    c.signs[1].headline = 'MY SHOP';
+    final d = BbContent()..fromJson(c.toJson());
+    expect(d.signs[0].useDefault, isTrue);
+    expect(d.signs[1].useDefault, isFalse);
+    expect(d.signs[1].headline, 'MY SHOP');
+    d.resetAll();
+    expect(d.signs[1].useDefault, isTrue);
+    expect(d.signs[1].headline, BbSign.defHeadline);
   });
 
   test('the 30 second drone shot is smooth, stays above the ground, always looks at the board and goes right round it', () {
     expect(kBillboardShotSecs, 30);
     for (final t in kBbTemplates) {
-      final centre = V3(0, t.poleH + t.h / 2, 0);
+      final centre = V3(0, t.poleH + t.th / 2, 0);
       var prev = billboardShot(t, 0).$1;
       var minA = 99.0, maxA = -99.0;
       var sides = <int>{};
       for (var s = 0.1; s <= 30.0001; s += 0.1) {
         final (eye, look) = billboardShot(t, s);
         expect(eye.y, greaterThanOrEqualTo(17.9), reason: '${t.name} at $s s is not under the ground');
-        expect((look - centre).len, lessThan(1), reason: 'looks at the board');
-        expect((eye - prev).len, lessThan(t.w * 0.25), reason: '${t.name}: no jump at $s s');
+        expect((look - centre).len, lessThan(t.tw * 0.4), reason: 'looks at the board');
+        expect((eye - prev).len, lessThan(t.span * 0.25), reason: '${t.name}: no jump at $s s');
         prev = eye;
         final a = math.atan2(eye.x, eye.z);
         minA = math.min(minA, a);
@@ -82,13 +83,21 @@ void main() {
     await t.enterText(find.byType(TextField).first, 'MY SHOP');
     await t.pump();
     final st = t.state(find.byType(NgmyBillboardStudioPage)) as dynamic;
-    expect(st.content.useDefault, isFalse);
-    expect(st.content.headline, 'MY SHOP');
+    expect(st.content.signs[0].useDefault, isFalse);
+    expect(st.content.signs[0].headline, 'MY SHOP');
     await t.tap(find.text('Done'));
     await t.pump(const Duration(milliseconds: 100));
     await t.pump(const Duration(milliseconds: 500));
     await t.tap(find.text('🎬 30 second drone shot'));
     await t.pump(const Duration(milliseconds: 200));
+    expect(find.text('⏹ Stop the drone'), findsOneWidget);
+    expect(find.text('Crane shot'), findsNothing, reason: 'no shot name or bar on screen while flying');
+    await t.tap(find.text('👁 Hide everything'));
+    await t.pump(const Duration(milliseconds: 100));
+    expect(find.text('⏹ Stop the drone'), findsNothing);
+    expect(find.text('👁 Hide everything'), findsNothing);
+    await t.tapAt(const Offset(225, 400));
+    await t.pump(const Duration(milliseconds: 100));
     expect(find.text('⏹ Stop the drone'), findsOneWidget);
     await t.tap(find.text('⏹ Stop the drone'));
     await t.pump(const Duration(milliseconds: 200));
