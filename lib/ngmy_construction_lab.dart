@@ -15,6 +15,7 @@ import 'ngmy_construction_plumbing.dart';
 import 'ngmy_construction_projectpage.dart';
 import 'ngmy_construction_servicepage.dart';
 import 'ngmy_construction_communitypage.dart';
+import 'ngmy_billboard_studio.dart';
 import 'ngmy_construction_homepage.dart';
 import 'ngmy_construction_learn.dart';
 import 'ngmy_studio_kit.dart';
@@ -110,6 +111,7 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
               ),
             ]),
             const SizedBox(height: 12),
+            Stack(children: [
             GestureDetector(
               onTap: () => _push(NgmyHousePage(practice: practice)),
               child: Container(
@@ -136,6 +138,19 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
                 ]),
               ),
             ),
+            Positioned(
+              top: 10,
+              right: 10,
+              child: GestureDetector(
+                onTap: () => _push(const NgmyBillboardStudioPage()),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                  decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFF5C14B), width: 1.4)),
+                  child: const Text('🪧 Billboards', style: TextStyle(color: Color(0xFFF5C14B), fontWeight: FontWeight.w900, fontSize: 12)),
+                ),
+              ),
+            ),
+            ]),
             _section('JOBS'),
             _grid([
               _tile('🔌', 'Wire a room', 'Go to a room that needs wiring', const Color(0xFF22C55E), () => _push(NgmyHousePage(practice: practice, focus: 'wiring'))),
