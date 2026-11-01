@@ -699,7 +699,11 @@ class Scene3DPainter extends CustomPainter {
     // Painting a picture (an ad) is the dearest thing in a frame, so only the biggest few are painted in full and the small, far ones are a flat colour.
     final areas = <double>[];
     final fullAt = <double>[0.0];
-    for (final sq in allScreens) {
+    var newPics = 0, stalePics = 0;
+    final nStatic = scene.screens.length;
+    for (var si = 0; si < allScreens.length; si++) {
+      final sq = allScreens[si];
+      final isStatic = si < nStatic;
       final q = [for (final v in sq.corners) toCam(v)];
       final mid = (q[0] + q[1] + q[2] + q[3]) * 0.25;
       final n = rotN((sq.corners[3] - sq.corners[0]).cross(sq.corners[1] - sq.corners[0]));
@@ -726,10 +730,33 @@ class Scene3DPainter extends CustomPainter {
         final area = qb.width * qb.height;
         areas.add(area);
         drawn.add(_Face(path, Colors.transparent, mid.z - sq.bias, sq.id, false, false, (c) {
-          if (area < fullAt[0] || (qb.width < 30 && qb.height < 30)) {
-            _drawFarAd(c, pts, sq.id);
-          } else {
+          if (!isStatic || area >= fullAt[0]) {
+            // The biggest few (and the moving ones) are painted live, so they play smoothly.
             _drawQuad(c, sq, pts, time);
+          } else {
+            // The rest show the real ad too, from a picture of it that is made again a few times a second: far away it is the same ad, not a plain colour.
+            final cached = _adCache[sq];
+            final bucket = (time * 5).floor();
+            if (cached == null ? newPics < 10 : (cached.bucket != bucket && stalePics < 3)) {
+              final rec = ui.PictureRecorder();
+              sq.paint(Canvas(rec), Size(sq.width, sq.height), time);
+              cached?.pic.dispose();
+              _adCache[sq] = _AdPic(bucket, rec.endRecording());
+              cached == null ? newPics++ : stalePics++;
+            }
+            final pic = _adCache[sq]?.pic;
+            if (pic != null) {
+              final m = _quadMatrix(pts, sq.width, sq.height);
+              if (m != null) {
+                c.save();
+                c.transform(m.storage);
+                c.clipRect(Rect.fromLTWH(0, 0, sq.width, sq.height));
+                c.drawPicture(pic);
+                c.restore();
+              }
+            } else {
+              c.drawPath(path, Paint()..color = const Color(0xFF1F2937));
+            }
           }
         }, sq.order, sq.group));
         continue;
@@ -752,7 +779,7 @@ class Scene3DPainter extends CustomPainter {
       drawn.add(_Face(path, Colors.transparent, mid.z - sq.bias, sq.id, false, false, (c) => _drawQuadCells(c, sq, cells, nx, ny, time), sq.order, sq.group));
     }
     areas.sort((a, b) => b.compareTo(a));
-    fullAt[0] = areas.length > 24 ? areas[23] : 0.0;
+    fullAt[0] = areas.length > 6 ? areas[5] : 0.0;
     // Far to near inside each tier. A grouped part is sorted as one piece by the middle of the whole part.
     final gz = Map<int, double>.of(offZ), gn = Map<int, int>.of(offN);
     for (final f in drawn) {
@@ -861,16 +888,14 @@ Matrix4? _quadMatrix(List<Offset> p, double w, double h) {
   return Matrix4(a / w, d / w, 0, g / w, b / h, e / h, 0, hh / h, 0, 0, 1, 0, x0, y0, 0, 1);
 }
 
-/// A far or small picture, cheap to draw: a panel in one of the ad colours with a bar of text and a line, so from far away it
-/// still reads as an ad and never as a blank blue board.
-void _drawFarAd(Canvas c, List<Offset> pts, int id) {
-  const bases = [Color(0xFF6D28D9), Color(0xFFBE185D), Color(0xFF0F766E), Color(0xFFC2410C), Color(0xFF1F2937), Color(0xFF9D174D)];
-  c.drawPath(Path()..addPolygon(pts, true), Paint()..color = bases[id.abs() % bases.length]);
-  Offset at(double u, double v) => Offset.lerp(Offset.lerp(pts[0], pts[1], u)!, Offset.lerp(pts[3], pts[2], u)!, v)!;
-  Path bar(double u0, double v0, double u1, double v1) => Path()..addPolygon([at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1)], true);
-  c.drawPath(bar(0.1, 0.28, 0.9, 0.5), Paint()..color = Colors.white.withValues(alpha: 0.85));
-  c.drawPath(bar(0.1, 0.62, 0.65, 0.72), Paint()..color = Colors.white.withValues(alpha: 0.5));
+/// A picture of an ad made a moment ago, kept so a screen that is not one of the biggest does not have to be painted from nothing every frame.
+class _AdPic {
+  _AdPic(this.bucket, this.pic);
+  final int bucket;
+  final ui.Picture pic;
 }
+
+final Expando<_AdPic> _adCache = Expando<_AdPic>();
 
 void _drawQuad(Canvas canvas, ScreenQuad sq, List<Offset> p, double t) {
   final w = sq.width, hh = sq.height;
