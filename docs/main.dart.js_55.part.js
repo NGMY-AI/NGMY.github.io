@@ -10,10 +10,10 @@ w=A.C(w,A.a3(w).k("J.E"))
 return w}catch(v){w=A.a([],y.e)
 return w}},
 c_X:function c_X(){},
-CR(d){var x=0,w=A.j(y.s),v,u,t
-var $async$CR=A.e(function(e,f){if(e===1)return A.f(f,w)
+CS(d){var x=0,w=A.j(y.s),v,u,t
+var $async$CS=A.e(function(e,f){if(e===1)return A.f(f,w)
 for(;;)switch(x){case 0:x=3
-return A.b(A.ay(),$async$CR)
+return A.b(A.ay(),$async$CS)
 case 3:u=f
 t=C.a.i(d)
 t=A.aU(J.q(u.a,"ngmy_bios_v1_"+t.toLowerCase()))
@@ -21,9 +21,9 @@ v=B.haA(t==null?"":t)
 x=1
 break
 case 1:return A.h(v,w)}})
-return A.i($async$CR,w)},
-agR(d,e){return B.i5T(d,e)},
-i5T(d,e){var x=0,w=A.j(y.t),v,u=2,t=[],s,r,q,p
+return A.i($async$CS,w)},
+agR(d,e){return B.i5S(d,e)},
+i5S(d,e){var x=0,w=A.j(y.t),v,u=2,t=[],s,r,q,p
 var $async$agR=A.e(function(f,g){if(f===1){t.push(g)
 x=u}for(;;)switch(x){case 0:u=4
 x=7
@@ -39,7 +39,7 @@ case 4:u=3
 p=t.pop()
 r=A.ab(p)
 $.am.$1("[ngmy_settings] relay status GET "+d+": "+A.u(r))
-v=D.eFf
+v=D.eFe
 x=1
 break
 x=6
@@ -87,11 +87,11 @@ E=c[55]
 var z=a.updateTypes([])
 B.c_X.prototype={
 $1(d){return A.vU(A.a2(d,y.w,y.b))},
-$S:1927};(function inheritance(){var x=a.inherit
+$S:1926};(function inheritance(){var x=a.inherit
 x(B.c_X,A.i_)})()
 var y={e:A.ax("O<iA>"),s:A.ax("ai<iA>"),i:A.ax("ai<@>"),B:A.ax("a5<@,@>"),k:A.ax("iA"),t:A.ax("+reachable,value(R,a5<m,@>?)"),w:A.ax("m"),C:A.ax("R"),b:A.ax("@")};(function constants(){D.acw=new A.fk(null,null,null,null,null,C.bj,null,null,null,null)
 D.VZ=new A.cp(C.A,null,null,D.acw,null)
 D.Zv=new A.Q(4,4,12,0)
 D.amv=new A.a0(983410,"MaterialIcons",!0)
-D.eFf=new A.aFC(!1,null)})()};
-(a=>{a["6eor9tZ8tbkT0wuBhPb6C/87Qlc="]=a.current})($__dart_deferred_initializers__);
+D.eFe=new A.aFC(!1,null)})()};
+(a=>{a["hFK9E7ckNbe3cMKqzjRDSRh7JlI="]=a.current})($__dart_deferred_initializers__);
