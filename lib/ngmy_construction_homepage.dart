@@ -1704,10 +1704,15 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     inn.dark = false;
     final pay = _jobPay();
     comm?.points += pay;
+    _jobCompleteMs = DateTime.now().millisecondsSinceEpoch;
+    _quiet = 0;
+    inn.fixtures = const [true, true, true, true];
+    inn.state = const [0, 0, 0, 0];
     inn.build(comm);
     setState(_rebuild);
     conBeep(880, ms: 120, volume: 0.3);
-    _say(inn.isTower ? 'Work complete! The power is back on level ${inn.level}. +$pay stars.' : 'Work complete! The power is back in the house. +$pay stars.', ok: true);
+    final others = room.darkHouses.length + room.darkOffices.length;
+    _say('✅ JOB COMPLETE! ${inn.isTower ? 'The power is back on level ${inn.level}.' : 'The power is back in the house.'} +$pay stars.${others > 0 ? ' The other red tags in the city are different places that still have no power.' : ''}', ok: true);
   }
 
   Future<void> _houseJob(CityInterior inn) async {
@@ -2938,8 +2943,13 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     }
   }
 
+  /// When the last job was finished: the next one only starts a few seconds later, so "Work complete" stays on the screen.
+  int _jobCompleteMs = -100000;
+
   void _finishJob(_NCall c) {
     _strikes = 0;
+    _jobCompleteMs = DateTime.now().millisecondsSinceEpoch;
+    _quiet = 0;
     _job = null;
     _jobSecs = 0;
     if (c.kind == 'sick') {
@@ -3126,7 +3136,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
           _jobSecs = 0;
           _strike('The job was not finished in time');
         }
-      } else if (_waiting.isNotEmpty && inner == null && _ringing == null && _nCall == null) {
+      } else if (_waiting.isNotEmpty && inner == null && _ringing == null && _nCall == null && DateTime.now().millisecondsSinceEpoch - _jobCompleteMs > 10000) {
         // The first job is done and you are out of the house: on to the next one.
         final next = _waiting.removeAt(0);
         if (!_jobDone(next)) _startJob(next);

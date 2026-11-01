@@ -726,10 +726,8 @@ class Scene3DPainter extends CustomPainter {
         final area = qb.width * qb.height;
         areas.add(area);
         drawn.add(_Face(path, Colors.transparent, mid.z - sq.bias, sq.id, false, false, (c) {
-          if (qb.width < 7 && qb.height < 7) {
-            c.drawPath(path, Paint()..color = const Color(0xFF38BDF8));
-          } else if (area < fullAt[0] || (qb.width < 44 && qb.height < 44)) {
-            c.drawPath(path, Paint()..color = const Color(0xFF1D4ED8));
+          if (area < fullAt[0] || (qb.width < 30 && qb.height < 30)) {
+            _drawFarAd(c, pts, sq.id);
           } else {
             _drawQuad(c, sq, pts, time);
           }
@@ -754,7 +752,7 @@ class Scene3DPainter extends CustomPainter {
       drawn.add(_Face(path, Colors.transparent, mid.z - sq.bias, sq.id, false, false, (c) => _drawQuadCells(c, sq, cells, nx, ny, time), sq.order, sq.group));
     }
     areas.sort((a, b) => b.compareTo(a));
-    fullAt[0] = areas.length > 10 ? areas[9] : 0.0;
+    fullAt[0] = areas.length > 24 ? areas[23] : 0.0;
     // Far to near inside each tier. A grouped part is sorted as one piece by the middle of the whole part.
     final gz = Map<int, double>.of(offZ), gn = Map<int, int>.of(offN);
     for (final f in drawn) {
@@ -861,6 +859,17 @@ Matrix4? _quadMatrix(List<Offset> p, double w, double h) {
     e = y3 - y0 + hh * y3;
   }
   return Matrix4(a / w, d / w, 0, g / w, b / h, e / h, 0, hh / h, 0, 0, 1, 0, x0, y0, 0, 1);
+}
+
+/// A far or small picture, cheap to draw: a panel in one of the ad colours with a bar of text and a line, so from far away it
+/// still reads as an ad and never as a blank blue board.
+void _drawFarAd(Canvas c, List<Offset> pts, int id) {
+  const bases = [Color(0xFF6D28D9), Color(0xFFBE185D), Color(0xFF0F766E), Color(0xFFC2410C), Color(0xFF1F2937), Color(0xFF9D174D)];
+  c.drawPath(Path()..addPolygon(pts, true), Paint()..color = bases[id.abs() % bases.length]);
+  Offset at(double u, double v) => Offset.lerp(Offset.lerp(pts[0], pts[1], u)!, Offset.lerp(pts[3], pts[2], u)!, v)!;
+  Path bar(double u0, double v0, double u1, double v1) => Path()..addPolygon([at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1)], true);
+  c.drawPath(bar(0.1, 0.28, 0.9, 0.5), Paint()..color = Colors.white.withValues(alpha: 0.85));
+  c.drawPath(bar(0.1, 0.62, 0.65, 0.72), Paint()..color = Colors.white.withValues(alpha: 0.5));
 }
 
 void _drawQuad(Canvas canvas, ScreenQuad sq, List<Offset> p, double t) {
