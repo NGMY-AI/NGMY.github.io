@@ -681,11 +681,16 @@ class RoomProject {
   }
 
   /// Is this one fixture finished: the device is in, wired right (the number is its place in [orders]: outlet, outlet, light or fan, switch).
+  /// Is [kind] a fair choice for what the job asked for? The person chooses what goes in: any outlet is fine for an outlet, any switch for a switch,
+  /// a light or a fan for the ceiling. What matters is that it is wired right.
+  static bool kindFits(String wanted, String kind) =>
+      wanted == kind || (isOutletKind(wanted) && isOutletKind(kind)) || (isSwitchKind(wanted) && isSwitchKind(kind)) || ((wanted == 'light' || wanted == 'fan') && (kind == 'light' || kind == 'fan'));
+
   bool orderOk(int i) {
     if (i < 0 || i >= orders.length) return true;
     final o = orders[i];
     final d = devs[o.slot];
-    if (d == null || d.kind != o.device || d.w.stage < 2) return false;
+    if (d == null || !kindFits(o.device, d.kind) || d.w.stage < 2) return false;
     return verdict(o.slot).ok;
   }
 
@@ -693,7 +698,7 @@ class RoomProject {
   bool get wiringWorks {
     for (final o in orders) {
       final d = devs[o.slot];
-      if (d == null || d.kind != o.device || d.w.stage < 2) return false;
+      if (d == null || !kindFits(o.device, d.kind) || d.w.stage < 2) return false;
       if (!verdict(o.slot).ok) return false;
     }
     return true;
@@ -703,7 +708,7 @@ class RoomProject {
   bool get devicesDone {
     for (final o in orders) {
       final d = devs[o.slot];
-      if (d == null || d.kind != o.device || d.w.stage < 2) return false;
+      if (d == null || !kindFits(o.device, d.kind) || d.w.stage < 2) return false;
       if (!verdict(o.slot).ok) return false;
       if (isOutletKind(o.device)) {
         if (!d.tested) return false;

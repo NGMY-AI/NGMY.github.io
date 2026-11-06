@@ -969,7 +969,8 @@ class _Scene3DViewState extends State<Scene3DView> with SingleTickerProviderStat
   final HitCache _hits = HitCache();
   final ValueNotifier<double> _time = ValueNotifier(0);
   Duration _last = Duration.zero;
-  double _startDist = 40;
+  double _lastScale = 1;
+  int _lastFingers = 0;
   Offset _lastDouble = Offset.zero;
 
   @override
@@ -999,10 +1000,20 @@ class _Scene3DViewState extends State<Scene3DView> with SingleTickerProviderStat
       },
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onScaleStart: (d) => _startDist = widget.cam.dist,
+        onScaleStart: (d) {
+          _lastScale = 1;
+          _lastFingers = d.pointerCount;
+        },
         onScaleUpdate: (d) {
+          // The pinch is measured from the last step, not from where the gesture began, so putting a finger down or lifting one never throws the zoom back.
+          if (d.pointerCount != _lastFingers) {
+            _lastFingers = d.pointerCount;
+            _lastScale = d.scale;
+          }
           if (d.pointerCount >= 2) {
-            widget.cam.zoomBy(_startDist / d.scale / widget.cam.dist);
+            final f = _lastScale / d.scale;
+            _lastScale = d.scale;
+            if (f.isFinite && f > 0) widget.cam.zoomBy(f);
           } else {
             widget.cam.orbit(d.focalPointDelta.dx * 0.009 * (Cam3.invertX ? -1 : 1), -d.focalPointDelta.dy * 0.009 * (Cam3.invertY ? -1 : 1));
           }

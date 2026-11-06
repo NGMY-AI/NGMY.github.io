@@ -381,15 +381,6 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
       _open(slot);
       return;
     }
-    // Tapping an empty spot that needs a device (and nothing is in your hand) puts in the device that belongs there.
-    if (!p.devs.containsKey(slot) && p.drywallDone && (armed.isEmpty || armed == 'look')) {
-      for (final o in p.orders) {
-        if (o.slot == slot) {
-          armed = o.device;
-          break;
-        }
-      }
-    }
     switch (armed) {
       case 'wall':
       case 'ceiling':
@@ -432,6 +423,11 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
     }
     if (p.devs.containsKey(slot)) {
       _open(slot);
+      return;
+    }
+    // An empty box is never filled for you: you choose what goes in from the tray.
+    if (p.drywallDone && p.boxes.containsKey(slot) && !p.devs.containsKey(slot)) {
+      _say('This box is empty. Pick what you want to put in (an outlet, a switch, a light or a fan) from the tray, then tap the box.', ok: true);
       return;
     }
     final info = scene.info[idSlotBase + slot];

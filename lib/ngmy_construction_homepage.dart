@@ -1647,7 +1647,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
               : () {
                   final o = p.orders[i];
                   final d = p.devs[o.slot];
-                  if (d == null || d.kind != o.device) return 0;
+                  if (d == null || !RoomProject.kindFits(o.device, d.kind)) return 0;
                   return d.w.stage < 2 ? 1 : 2;
                 }(),
       ];
@@ -1657,8 +1657,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (i >= p.orders.length) return '';
     final o = p.orders[i];
     final d = p.devs[o.slot];
-    final name = deviceKindName(o.device).toLowerCase();
-    if (d == null || d.kind != o.device) return 'no $name put in yet at ${slotById(o.slot).name}';
+    final name = deviceKindName(d?.kind ?? o.device).toLowerCase();
+    if (d == null || !RoomProject.kindFits(o.device, d.kind)) return 'nothing put in yet at ${slotById(o.slot).name}';
     if (d.w.stage < 2) return 'the $name at ${slotById(o.slot).name} is not finished: fasten every wire and close it';
     return 'the $name at ${slotById(o.slot).name} works but is NOT wired safely: ${p.verdict(o.slot).message}';
   }
@@ -1690,7 +1690,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     final inn = inner, k = _workKey;
     final p = k == null ? null : _houseProjects[k];
     if (inn == null || k == null || p == null) return;
-    if (!p.wiringWorks) {
+    if (!_fixturesOf(p).every((o) => o)) {
       _say('Not quite done: the wiring is not right yet. Open the wiring bench again (tap the panel) and check every wire.', ok: false);
       return;
     }

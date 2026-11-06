@@ -320,9 +320,9 @@ class Stage3D extends StatelessWidget {
           ...?topRight,
           Row(mainAxisSize: MainAxisSize.min, children: [
             if (stars != null) StarsBadge(stars: stars!),
-            _round(Icons.add_rounded, 'Zoom in', () => cam.zoomBy(0.8)),
+            _ZoomButton(icon: Icons.add_rounded, tip: 'Zoom in', cam: cam, out: false),
           ]),
-          _round(Icons.remove_rounded, 'Zoom out', () => cam.zoomBy(1.25)),
+          _ZoomButton(icon: Icons.remove_rounded, tip: 'Zoom out', cam: cam, out: true),
           _round(Icons.center_focus_strong_rounded, 'Back to the whole view', onHome),
           _round(Icons.swap_vert_rounded, 'Flip up and down swiping', () {
             Cam3.invertY = !Cam3.invertY;
@@ -1435,4 +1435,62 @@ class _HousePageState extends State<_HousePage> {
       ]),
     );
   }
+}
+
+/// A zoom button that answers the moment a finger lands (one big step), and keeps zooming while it is held down.
+class _ZoomButton extends StatefulWidget {
+  const _ZoomButton({required this.icon, required this.tip, required this.cam, required this.out});
+  final IconData icon;
+  final String tip;
+  final Cam3 cam;
+  final bool out;
+
+  @override
+  State<_ZoomButton> createState() => _ZoomButtonState();
+}
+
+class _ZoomButtonState extends State<_ZoomButton> {
+  Timer? _hold;
+  bool _down = false;
+
+  void _stop() {
+    _hold?.cancel();
+    _hold = null;
+    if (_down && mounted) setState(() => _down = false);
+  }
+
+  void _start() {
+    setState(() => _down = true);
+    widget.cam.zoomBy(widget.out ? 1.45 : 0.69);
+    _hold?.cancel();
+    _hold = Timer(const Duration(milliseconds: 280), () {
+      _hold = Timer.periodic(const Duration(milliseconds: 55), (_) => widget.cam.zoomBy(widget.out ? 1.06 : 0.94));
+    });
+  }
+
+  @override
+  void dispose() {
+    _hold?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Tooltip(
+          message: widget.tip,
+          child: Listener(
+            behavior: HitTestBehavior.opaque,
+            onPointerDown: (_) => _start(),
+            onPointerUp: (_) => _stop(),
+            onPointerCancel: (_) => _stop(),
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(color: Colors.black.withValues(alpha: _down ? 0.8 : 0.55), shape: BoxShape.circle, border: Border.all(color: _down ? const Color(0xFFFACC15) : Colors.white24, width: _down ? 2 : 1)),
+              child: Icon(widget.icon, color: Colors.white, size: 22),
+            ),
+          ),
+        ),
+      );
 }
