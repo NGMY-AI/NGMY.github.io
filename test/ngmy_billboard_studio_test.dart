@@ -44,7 +44,7 @@ void main() {
       for (var s = 0.1; s <= 30.0001; s += 0.1) {
         final (eye, look) = billboardShot(t, s);
         expect(eye.y, greaterThanOrEqualTo(17.9), reason: '${t.name} at $s s is not under the ground');
-        expect((look - centre).len, lessThan(t.tw * 0.4), reason: 'looks at the board');
+        expect((look - centre).len, lessThan(t.tw * (t.id == 'scatter' ? 0.6 : 0.4)), reason: 'looks at the board');
         expect((eye - prev).len, lessThan(t.span * 0.25), reason: '${t.name}: no jump at $s s');
         prev = eye;
         final a = math.atan2(eye.x - t.cx, eye.z - t.cz);

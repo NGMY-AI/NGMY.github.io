@@ -493,8 +493,44 @@ V3 _cr(V3 p0, V3 p1, V3 p2, V3 p3, double u) {
   return V3(f(p0.x, p1.x, p2.x, p3.x), f(p0.y, p1.y, p2.y, p3.y), f(p0.z, p1.z, p2.z, p3.z));
 }
 
+/// The Billboard park shot, planned like a film: every two seconds the drone is at one of these places looking at one of these points.
+/// High wide shot, a crane down and a push in to the front board, a sweeping arc round to the right board, a long curve behind to the back board,
+/// round to the left board, then up and away for the wide finish. The path is smoothed, so the drone glides and never jerks.
+const List<(V3, V3)> _parkKeys = [
+  (V3(900, 700, 1300), V3(0, 200, 0)),
+  (V3(600, 540, 1250), V3(0, 220, 100)),
+  (V3(250, 360, 1150), V3(0, 230, 300)),
+  (V3(60, 260, 950), V3(0, 230, 300)),
+  (V3(-70, 235, 800), V3(-30, 230, 300)),
+  (V3(420, 280, 950), V3(220, 230, 230)),
+  (V3(900, 270, 640), V3(500, 230, 110)),
+  (V3(1100, 240, 60), V3(560, 230, 0)),
+  (V3(1050, 310, -380), V3(400, 230, -200)),
+  (V3(700, 360, -860), V3(120, 230, -300)),
+  (V3(60, 245, -860), V3(0, 230, -300)),
+  (V3(-640, 300, -760), V3(-300, 230, -150)),
+  (V3(-1040, 270, -300), V3(-560, 230, -100)),
+  (V3(-1100, 240, 0), V3(-560, 230, 0)),
+  (V3(-850, 480, 800), V3(-150, 230, 100)),
+  (V3(-1000, 820, 1500), V3(0, 200, 0)),
+];
+
+(V3 eye, V3 look) _parkShot(double secs) {
+  final s = secs.clamp(0.0, kBillboardShotSecs);
+  final seg = kBillboardShotSecs / (_parkKeys.length - 1);
+  final i = math.min((s / seg).floor(), _parkKeys.length - 2);
+  final u = (s / seg - i).clamp(0.0, 1.0);
+  (V3, V3) k(int n) => _parkKeys[n.clamp(0, _parkKeys.length - 1)];
+  final eye = _cr(k(i - 1).$1, k(i).$1, k(i + 1).$1, k(i + 2).$1, u);
+  final look = _cr(k(i - 1).$2, k(i).$2, k(i + 1).$2, k(i + 2).$2, u);
+  // A slow float, like a real drone in the air.
+  final sway = V3(math.sin(s * 1.3) * 3, math.sin(s * 1.9) * 2.5, math.cos(s * 1.1) * 3);
+  return (V3(eye.x + sway.x, math.max(eye.y + sway.y, 18), eye.z + sway.z), look);
+}
+
 /// Where the drone is (the eye) and what it looks at, [secs] into the shot, round a board of [tp].
 (V3 eye, V3 look) billboardShot(BbTemplate tp, double secs) {
+  if (tp.id == 'scatter') return _parkShot(secs);
   final centre = V3(tp.cx, tp.poleH + tp.th / 2, tp.cz);
   V3 at(_Key k) => centre + V3(math.sin(k.a) * k.r * tp.span + k.ex * tp.tw, k.h * tp.th, math.cos(k.a) * k.r * tp.span);
   V3 gaze(_Key k) => centre + V3(k.lx * tp.tw, k.ly * tp.th, 0);

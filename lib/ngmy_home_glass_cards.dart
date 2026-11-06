@@ -2918,7 +2918,8 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
                   showDateTab: revealDates && !isVoteAd,
                   welcomeName: isFront && !isCivic && !isVoteAd ? name : null,
                   onDelete: isFront && !isCivic && !isVoteAd ? () => _deleteSpending(entry.id) : null,
-                  onAdd: isFront && !isCivic ? _openAddSheet : null,
+                  // The Civic Registry ID card has no plus of its own, but when it is the only card on home the plus is shown so other cards can be added.
+                  onAdd: isFront && (!isCivic || _spending.every((e) => e.hasCivicId)) ? _openAddSheet : null,
                   onManageCloud: isFront && !isVoteAd ? _openCloudCardsManager : null,
                   footer: isFront && !entry.hideModePill ? _modePillFor(entry) : null,
                   fillBleed: showNoteFace ||
