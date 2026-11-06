@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_arcade_a.dart';
-import 'package:ngmy/ngmy_arcade_b.dart';
 import 'package:ngmy/ngmy_arcade_c.dart';
 import 'package:ngmy/ngmy_edu_b.dart';
 import 'package:ngmy/ngmy_fun_a.dart';
@@ -20,7 +19,6 @@ void main() {
     'RADIO LAB': () => const NgmyRadioStudio(),
     'PIXEL TV': () => const NgmyPixelScreenStudio(),
     'ATOM BUILDER': () => const NgmyAtomStudio(),
-    'CIPHER LAB': () => const NgmyCipherStudio(),
     'MAGNET LAB': () => const NgmyMagnetCraneStudio(),
   };
 
@@ -40,9 +38,6 @@ void main() {
   }
 
   test('science rules behind the new labs', () {
-    expect(caesar('ABC XYZ', 3), 'DEF ABC');
-    expect(caesar(caesar('HELLO', 7), -7), 'HELLO');
-    expect(vigenere(vigenere('ATTACKATDAWN', 'LEMON'), 'LEMON', decode: true), 'ATTACKATDAWN');
     expect(lensImageDistance(120, 60), closeTo(120, 1e-9));
     expect(lensImageDistance(60, 60), isNull);
     expect(electronShells(11), [2, 8, 1]);

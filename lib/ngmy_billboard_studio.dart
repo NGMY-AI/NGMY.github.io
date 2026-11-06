@@ -29,37 +29,35 @@ const double kBbGap = 16;
 const int kBbMaxSigns = 6;
 
 /// Where one separate board stands: sideways (x), forwards (z), and which way its picture faces (yaw: 0 faces the front, pi the back, +-pi/2 the sides).
+/// [lift] raises it on taller poles and [scale] makes the whole board bigger (or smaller), so boards in one layout can be different heights and sizes.
 class BbPlace {
-  const BbPlace(this.x, this.z, this.yaw);
-  final double x, z, yaw;
+  const BbPlace(this.x, this.z, this.yaw, {this.lift = 0, this.scale = 1});
+  final double x, z, yaw, lift, scale;
 }
 
-/// A kind of billboard: how big each sign is, and how they are laid out. Either the signs are joined on one board (in [cols] across and [rows] down),
-/// or each sign is a board of its own standing at its own [places]. [poleH] is how high the bottom edge of a board is above the ground.
+/// A kind of billboard: how big each sign is, and where the boards stand. No board is ever joined to another: every sign is a board of its own,
+/// standing at its own [places]. A layout with no places is one single board. [poleH] is how high the bottom edge of a board is above the ground.
 class BbTemplate {
-  const BbTemplate(this.id, this.emoji, this.name, this.blurb, this.w, this.h, this.poleH, {this.cols = 1, this.rows = 1, this.places = const [], this.reach = 0, this.shot = 1});
+  const BbTemplate(this.id, this.emoji, this.name, this.blurb, this.w, this.h, this.poleH, {this.places = const [], this.reach = 0, this.shot = 1});
   final String id, emoji, name, blurb;
 
   /// The size of one sign and how high the bottom edge of the board is above the ground.
   final double w, h, poleH;
 
-  /// How many signs across and how many down, when they are joined on one board.
-  final int cols, rows;
-
-  /// For separate boards: where each one stands. Empty means one joined board.
+  /// For a layout of several boards: where each one stands. Empty means one single board.
   final List<BbPlace> places;
 
   /// How far the drone must stay from the middle at least (for a board with a big building round it), and how wide the drone's circles are as a share of the layout.
   final double reach, shot;
 
-  int get signs => places.isEmpty ? cols * rows : places.length;
+  int get signs => places.isEmpty ? 1 : places.length;
 
-  /// The edges of everything the board stands on, as left, right, back, front.
+  /// The edges of everything the boards stand on, as left, right, back, front.
   (double, double, double, double) get _bounds {
-    if (places.isEmpty) return (-tw / 2, tw / 2, -12, 0);
+    if (places.isEmpty) return (-w / 2, w / 2, -12, 0);
     var x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
     for (final p in places) {
-      for (final sx in [-w / 2, w / 2]) {
+      for (final sx in [-w * p.scale / 2, w * p.scale / 2]) {
         for (final sz in [-12.0, 0.0]) {
           final q = rotY(V3(sx, 0, sz), p.yaw);
           x0 = math.min(x0, q.x + p.x);
@@ -72,10 +70,10 @@ class BbTemplate {
     return (x0, x1, z0, z1);
   }
 
-  /// The size of the whole layout, all signs together, and its middle.
-  double get tw => places.isEmpty ? cols * w + (cols - 1) * kBbGap : _bounds.$2 - _bounds.$1;
-  double get th => places.isEmpty ? rows * h + (rows - 1) * kBbGap : h;
-  double get depth => places.isEmpty ? 12 : _bounds.$4 - _bounds.$3;
+  /// The size of the whole layout, and its middle.
+  double get tw => _bounds.$2 - _bounds.$1;
+  double get th => places.isEmpty ? h : places.map((p) => p.lift + h * p.scale).reduce(math.max);
+  double get depth => _bounds.$4 - _bounds.$3;
   double get cx => places.isEmpty ? 0 : (_bounds.$1 + _bounds.$2) / 2;
   double get cz => places.isEmpty ? 0 : (_bounds.$3 + _bounds.$4) / 2;
 
@@ -87,14 +85,18 @@ const List<BbTemplate> kBbTemplates = [
   BbTemplate('highway', '🛣️', 'Highway board', 'Huge and wide, on two thick poles, with a walkway under it', 420, 170, 150),
   BbTemplate('tower', '🗼', 'Tall tower sign', 'A big sign high up on one very thick pole', 400, 210, 270),
   BbTemplate('neon', '🌃', 'Neon board', 'A big black board with a glowing neon edge', 380, 190, 120),
-  BbTemplate('roof', '🏠', 'Rooftop board', 'A big house with big TVs, the NGMY carpet on its back, and a huge board on its roof', 460, 180, 208, reach: 760),
+  BbTemplate('roof', '🏠', 'Rooftop board', 'A tall house with two big TVs, the NGMY carpet on its back, and a huge board on its roof', 460, 180, 308, reach: 800),
   BbTemplate('screen', '📺', 'Big screen', 'A giant TV screen on a stand', 440, 250, 60),
   BbTemplate('gate', '🚪', 'Town gate', 'A huge arch with the board across it', 600, 200, 200),
-  BbTemplate('duo', '🪧', 'Two signs on one board', 'Two big signs joined on one board: you choose what each says', 320, 160, 150, cols: 2),
-  BbTemplate('long3', '🎞️', 'Three signs on one long board', 'Three big signs joined on one long board', 300, 150, 160, cols: 3),
+  BbTemplate('duo', '🪧', 'Two far apart', 'Two separate boards: a near one and a taller one far behind it', 320, 160, 140,
+      places: [BbPlace(-420, 140, 0.35), BbPlace(460, -420, -0.3, lift: 160, scale: 1.35)], shot: 0.7),
   BbTemplate('line3', '↔️', 'Three in a row', 'Three separate boards standing in one straight line', 300, 150, 150, places: [BbPlace(-460, 0, 0), BbPlace(0, 0, 0), BbPlace(460, 0, 0)], shot: 0.6),
-  BbTemplate('lines6', '🛤️', 'Two lines of three', 'Six separate boards: one straight line of three facing front, another line of three behind it facing back', 280, 140, 140,
-      places: [BbPlace(-440, 160, 0), BbPlace(0, 160, 0), BbPlace(440, 160, 0), BbPlace(-440, -380, math.pi), BbPlace(0, -380, math.pi), BbPlace(440, -380, math.pi)], shot: 0.6),
+  BbTemplate('far3', '🛰️', 'Three scattered far', 'Three separate boards far from each other, one of them tall and far behind', 320, 160, 140,
+      places: [BbPlace(-950, 250, 0.5), BbPlace(150, -700, -0.2, lift: 220, scale: 1.55), BbPlace(1000, 60, -0.55, scale: 0.9)], shot: 0.6),
+  BbTemplate('skyline', '🌆', 'Skyline', 'Four separate boards, the taller ones standing behind the shorter ones', 300, 150, 130,
+      places: [BbPlace(-360, 300, 0.15), BbPlace(360, 300, -0.15), BbPlace(0, -120, 0, lift: 100, scale: 1.25), BbPlace(-160, -640, 0.1, lift: 260, scale: 1.6)], shot: 0.6),
+  BbTemplate('lines6', '🛤️', 'Two lines of three', 'Six separate boards: a straight line of three facing front, and a taller line of three behind it facing back', 280, 140, 140,
+      places: [BbPlace(-440, 160, 0), BbPlace(0, 160, 0), BbPlace(440, 160, 0), BbPlace(-440, -420, math.pi, lift: 130, scale: 1.2), BbPlace(0, -420, math.pi, lift: 130, scale: 1.2), BbPlace(440, -420, math.pi, lift: 130, scale: 1.2)], shot: 0.6),
   BbTemplate('scatter', '🌐', 'Billboard park', 'Four separate boards: one at the front, one at the back and one on each side, all facing out', 320, 160, 150,
       places: [BbPlace(0, 300, 0), BbPlace(0, -300, math.pi), BbPlace(-560, 0, -math.pi / 2), BbPlace(560, 0, math.pi / 2)], shot: 0.6),
 ];
@@ -265,14 +267,12 @@ void paintBillboard(Canvas c, Size s, double t, BbSign b, [int index = 0]) {
   c.restore();
 }
 
-/// Where sign [i] is on its own board: its left and right edges and its top and bottom edges. On a joined board the signs sit in a grid;
-/// on a board of its own the sign fills the board.
+/// Where sign [i] is on its own board: its left and right edges and its top and bottom edges. Every sign fills a board of its own.
 (double x0, double x1, double yTop, double yBot) billboardSignRect(BbTemplate tp, int i) {
-  if (tp.places.isNotEmpty) return (-tp.w / 2, tp.w / 2, tp.poleH + tp.h, tp.poleH);
-  final r = i ~/ tp.cols, c = i % tp.cols;
-  final x0 = -tp.tw / 2 + c * (tp.w + kBbGap);
-  final yTop = tp.poleH + tp.th - r * (tp.h + kBbGap);
-  return (x0, x0 + tp.w, yTop, yTop - tp.h);
+  if (tp.places.isEmpty) return (-tp.w / 2, tp.w / 2, tp.poleH + tp.h, tp.poleH);
+  final p = tp.places[i];
+  final ww = tp.w * p.scale, hh = tp.h * p.scale, y0 = tp.poleH + p.lift;
+  return (-ww / 2, ww / 2, y0 + hh, y0);
 }
 
 /// A big TV for the walls of the house: the NGMY logo on blue, or an NGMY ad.
@@ -323,8 +323,6 @@ Scene3D buildBillboardScene(BbTemplate tp, BbContent content) {
   b.order = 2;
   final w = tp.w, h = tp.h, y0 = tp.poleH;
   final sep = tp.places.isNotEmpty;
-  // The size of one board (all the joined signs, or the one sign of a board of its own).
-  final tw = sep ? w : tp.tw, th = sep ? h : tp.th;
   Color frame = const Color(0xFFF5C14B);
   var thick = 12.0;
   switch (tp.id) {
@@ -341,35 +339,39 @@ Scene3D buildBillboardScene(BbTemplate tp, BbContent content) {
       frame = const Color(0xFF1E3A8A);
     case 'duo':
       frame = const Color(0xFF22D3EE);
-    case 'long3':
-      frame = const Color(0xFFF472B6);
     case 'line3':
       frame = const Color(0xFF4ADE80);
+    case 'far3':
+      frame = const Color(0xFFF59E0B);
+    case 'skyline':
+      frame = const Color(0xFFA78BFA);
     case 'lines6':
       frame = const Color(0xFFF8FAFC);
     case 'scatter':
       frame = const Color(0xFF22D3EE);
   }
-  final pw = tp.signs > 1 ? 720.0 : 900.0, ph = pw * h / w;
+  // The rooftop board is drawn in a later tier than the house, so the house can never cover its frame, logo or screens at any angle.
+  final bo = tp.id == 'roof' ? 3 : 2;
+  final pw = sep ? 720.0 : 900.0, ph = pw * h / w;
   final screens = <ScreenQuad>[];
   final boards = sep ? tp.places.length : 1;
   for (var bi = 0; bi < boards; bi++) {
     final pl = sep ? tp.places[bi] : const BbPlace(0, 0, 0);
-    final ids = sep ? [bi] : [for (var i = 0; i < tp.signs; i++) i];
+    // This board's own size and height (boards in a layout can be different).
+    final sc = pl.scale;
+    final bw = w * sc, bh = h * sc, yb0 = y0 + pl.lift;
+    final tw = bw, th = bh;
     V3 place(V3 p) => rotY(p, pl.yaw) + V3(pl.x, 0, pl.z);
-    final body = MeshBuilder()..order = 2;
-    final fb = MeshBuilder()..order = 2;
-    // One backing and one frame per sign (not one huge slab), so the order things are drawn in never lets a backing cover a sign beside it.
-    for (final i in ids) {
-      final (x0, x1, yt, yb) = billboardSignRect(tp, i);
-      final cx = (x0 + x1) / 2, cy = (yt + yb) / 2;
-      body.box(place(V3(cx, cy, -thick / 2 - 0.2)), V3(w + 16, h + 16, thick), tp.id == 'neon' || tp.id == 'screen' ? dark : const Color(0xFF1F2937), shine: 0.2, yaw: pl.yaw);
-      const ft = 7.0;
-      fb.box(place(V3(cx, yt + 3, 3)), V3(w + 14, ft, 8), frame, shine: 0.4, yaw: pl.yaw);
-      fb.box(place(V3(cx, yb - 3, 3)), V3(w + 14, ft, 8), frame, shine: 0.4, yaw: pl.yaw);
-      fb.box(place(V3(x0 - 3, cy, 3)), V3(ft, h + 14, 8), frame, shine: 0.4, yaw: pl.yaw);
-      fb.box(place(V3(x1 + 3, cy, 3)), V3(ft, h + 14, 8), frame, shine: 0.4, yaw: pl.yaw);
-    }
+    final body = MeshBuilder()..order = bo;
+    final fb = MeshBuilder()..order = bo;
+    final (x0, x1, yt, yb) = billboardSignRect(tp, bi);
+    final cx = (x0 + x1) / 2, cy = (yt + yb) / 2;
+    body.box(place(V3(cx, cy, -thick / 2 - 0.2)), V3(bw + 16, bh + 16, thick), tp.id == 'neon' || tp.id == 'screen' ? dark : const Color(0xFF1F2937), shine: 0.2, yaw: pl.yaw);
+    final ft = 7.0 * math.max(1.0, sc * 0.8);
+    fb.box(place(V3(cx, yt + 3, 3)), V3(bw + 14, ft, 8), frame, shine: 0.4, yaw: pl.yaw);
+    fb.box(place(V3(cx, yb - 3, 3)), V3(bw + 14, ft, 8), frame, shine: 0.4, yaw: pl.yaw);
+    fb.box(place(V3(x0 - 3, cy, 3)), V3(ft, bh + 14, 8), frame, shine: 0.4, yaw: pl.yaw);
+    fb.box(place(V3(x1 + 3, cy, 3)), V3(ft, bh + 14, 8), frame, shine: 0.4, yaw: pl.yaw);
     b.polys.addAll(body.polys);
     b.polys.addAll(fb.polys);
     // The supports. Every pole ends at the bottom of the board and sits in line with its back, so none can come out through a sign.
@@ -379,7 +381,7 @@ Scene3D buildBillboardScene(BbTemplate tp, BbContent content) {
     // A flat picture on a wall of the house, facing [yaw].
     void wall(V3 c, double yaw, double ww, double hh, void Function(Canvas, Size, double) paint, {double px = 260}) {
       V3 q(double x, double y) => rotY(V3(x, y, 0), yaw) + c;
-      screens.add(ScreenQuad([q(-ww / 2, hh / 2), q(ww / 2, hh / 2), q(ww / 2, -hh / 2), q(-ww / 2, -hh / 2)], 0, paint, width: px, height: px * hh / ww, bias: 30, order: 2));
+      screens.add(ScreenQuad([q(-ww / 2, hh / 2), q(ww / 2, hh / 2), q(ww / 2, -hh / 2), q(-ww / 2, -hh / 2)], 0, paint, width: px, height: px * hh / ww, bias: 30, order: bo));
     }
 
     switch (sep ? 'sep' : tp.id) {
@@ -390,28 +392,22 @@ Scene3D buildBillboardScene(BbTemplate tp, BbContent content) {
         sb.box(V3(0, 7, -10), V3(tw * 0.6, 14, 70), dark);
         sb.box(V3(0, (14 + y0 - 7) / 2, zp), V3(60, y0 - 21, 14), steel);
       case 'roof':
-        // A big house: the board stands on its flat roof. Its walls carry big TVs and NGMY logos (flat pictures, so they never vanish from any side),
-        // and the back wall has the NGMY hall carpet.
+        // A tall house: the board stands on its flat roof. The front has one big TV on each side of the door, the right side and the low wing
+        // keep their TVs and NGMY logos, and the back wall has the NGMY hall carpet. All are flat pictures drawn after the house, so none vanish.
         const wall0 = Color(0xFFE7D8BE), trim = Color(0xFF9CA3AF);
-        const hz = -150.0, hd = 270.0, hh = 200.0;
+        const hz = -150.0, hd = 270.0, hh = 300.0;
         const fz = hz + hd / 2, bz = hz - hd / 2;
-        sb.box(const V3(0, hh / 2, hz), const V3(620, hh, hd), wall0, shine: 0.1, split: 3);
-        sb.box(const V3(0, hh + 4, hz), const V3(640, 8, hd + 20), trim, shine: 0.15, split: 3);
+        sb.box(const V3(0, hh / 2, hz), const V3(620, hh, hd), wall0, shine: 0.1, split: 4);
+        sb.box(const V3(0, hh + 4, hz), const V3(640, 8, hd + 20), trim, shine: 0.15, split: 4);
+        sb.box(const V3(0, 210, hz), const V3(632, 10, hd + 12), trim, split: 4);
         sb.box(const V3(-390, 70, hz + 30), const V3(200, 140, 200), const Color(0xFFD9C5A3), shine: 0.1, split: 2);
         sb.box(const V3(-390, 144, hz + 30), const V3(216, 8, 216), trim, split: 2);
         sb.box(const V3(230, hh + 30, hz - 60), const V3(40, 60, 40), const Color(0xFF8B5E3C));
-        sb.box(const V3(0, 90, fz + 10), const V3(90, 6, 26), const Color(0xFFB91C1C));
-        // The front: four big TVs up top, four below, and the door.
-        var k = 0;
-        for (final x in const [-230.0, -80.0, 80.0, 230.0]) {
-          final n = k++;
-          wall(V3(x, 140, fz + 0.8), 0, 120, 72, (c, s, t) => _paintTv(c, s, t, n), px: 300);
-        }
-        for (final x in const [-250.0, -130.0, 130.0, 250.0]) {
-          final n = k++;
-          wall(V3(x, 45, fz + 0.8), 0, 100, 60, (c, s, t) => _paintTv(c, s, t, n), px: 260);
-        }
-        wall(const V3(0, 40, fz + 0.8), 0, 56, 80, _paintDoor, px: 120);
+        sb.box(const V3(0, 130, fz + 12), const V3(110, 8, 34), const Color(0xFFB91C1C));
+        // The front: one big TV on each side of the door.
+        wall(const V3(-190, 160, fz + 0.8), 0, 210, 126, (c, s, t) => _paintTv(c, s, t, 0), px: 360);
+        wall(const V3(190, 160, fz + 0.8), 0, 210, 126, (c, s, t) => _paintTv(c, s, t, 3), px: 360);
+        wall(const V3(0, 58, fz + 0.8), 0, 72, 116, _paintDoor, px: 140);
         wall(const V3(-400, 80, hz + 130 + 0.8), 0, 130, 80, (c, s, t) => _paintTv(c, s, t, 8), px: 300);
         // The right side: three TVs and three NGMY logos.
         for (var j = 0; j < 3; j++) {
@@ -433,29 +429,24 @@ Scene3D buildBillboardScene(BbTemplate tp, BbContent content) {
         }
         sb.box(V3(0, y0 + th + 17, zp), V3(tw + 80, 18, 22), steel, shine: 0.2);
       default:
-        final px = (!sep && tp.signs > 2) ? 0.36 : 0.3;
         for (final x in const [-1.0, 1.0]) {
-          sb.cyl(place(V3(x * tw * px, 0, zp)), place(V3(x * tw * px, y0 - 7, zp)), poleR, steel, sides: 10);
+          sb.cyl(place(V3(x * tw * 0.3, 0, zp)), place(V3(x * tw * 0.3, yb0 - 7, zp)), poleR, steel, sides: 10);
         }
         if (tp.id == 'highway') {
           sb.box(V3(0, y0 - 16, 14), V3(tw + 14, 3, 24), steel);
         }
     }
     b.polys.addAll(sb.polys);
-    // The signs, on both sides: from behind the signs are in the same left to right order.
-    for (final i in ids) {
-      final (x0, x1, yt, yb) = billboardSignRect(tp, i);
-      final signFront = content.signs[i];
-      screens.add(ScreenQuad([place(V3(x0, yt, 0.8)), place(V3(x1, yt, 0.8)), place(V3(x1, yb, 0.8)), place(V3(x0, yb, 0.8))], 0, (c, size, t) => paintBillboard(c, size, t, signFront, i), width: pw, height: ph, bias: 60, order: 2));
-      final j = sep ? i : (i ~/ tp.cols) * tp.cols + (tp.cols - 1 - i % tp.cols);
-      final signBack = content.signs[j];
-      screens.add(ScreenQuad([place(V3(x1, yt, -thick - 0.8)), place(V3(x0, yt, -thick - 0.8)), place(V3(x0, yb, -thick - 0.8)), place(V3(x1, yb, -thick - 0.8))], 0, (c, size, t) => paintBillboard(c, size, t, signBack, j), width: pw, height: ph, bias: 60, order: 2));
-    }
+    // The sign, on both sides.
+    final signFront = content.signs[bi];
+    screens.add(ScreenQuad([place(V3(x0, yt, 0.8)), place(V3(x1, yt, 0.8)), place(V3(x1, yb, 0.8)), place(V3(x0, yb, 0.8))], 0, (c, size, t) => paintBillboard(c, size, t, signFront, bi), width: pw, height: ph, bias: 60, order: bo));
+    screens.add(ScreenQuad([place(V3(x1, yt, -thick - 0.8)), place(V3(x0, yt, -thick - 0.8)), place(V3(x0, yb, -thick - 0.8)), place(V3(x1, yb, -thick - 0.8))], 0, (c, size, t) => paintBillboard(c, size, t, signFront, bi), width: pw, height: ph, bias: 60, order: bo));
   }
   // A few trees and lamp posts, so there is something to fly past.
   const spots = [(-700.0, 330.0), (700.0, 380.0), (-1100.0, -420.0), (1100.0, -480.0), (-1300.0, 100.0), (1350.0, 30.0), (0.0, -900.0), (-1500.0, -300.0), (1550.0, -200.0)];
   final tb = MeshBuilder()..order = 2;
   for (final (x, z) in spots) {
+    if (tp.id == 'roof' && z > 200) continue;
     tb.cyl(V3(x, 0, z), V3(x, 55, z), 7, const Color(0xFF6B4A32), sides: 6);
     tb.ball(V3(x, 98, z), 46, const Color(0xFF3F8F4D), lat: 3, lon: 6);
   }
@@ -467,29 +458,79 @@ Scene3D buildBillboardScene(BbTemplate tp, BbContent content) {
   return Scene3D(b.polys, screens: screens, farMin: 6000);
 }
 
-/// A point of the drone shot: the angle round the board (0 is straight in front), how far away, how high above the middle of the board,
+/// A point of a drone shot round one board: the angle round the board (0 is straight in front), how far away, how high above the middle of the board,
 /// how far it has slid sideways, and what it looks at (sideways and up, as a share of the board).
 class _Key {
   const _Key(this.t, this.a, this.r, this.h, {this.ex = 0, this.lx = 0, this.ly = 0});
   final double t, a, r, h, ex, lx, ly;
 }
 
-/// The 30 second shot, cut like a film: each move starts slowly, whips across and settles. A bird's-eye shot dives down to a low hero angle,
-/// a low slide across the face, a whip round to the left, a swoop up high, a dive down behind the board, a crane up, a low whip back to the front,
-/// a push in, and a fast pull away into the sky.
-const List<_Key> _keys = [
-  _Key(0, 0.7, 2.2, 2.0),
-  _Key(3, 0.1, 0.95, -0.42, ex: -0.3, lx: -0.2, ly: 0.05),
-  _Key(6.5, 0.0, 0.9, -0.38, ex: 0.3, lx: 0.2, ly: 0.05),
-  _Key(9.5, -0.9, 1.15, 0.1),
-  _Key(12.5, -1.7, 1.45, 1.6),
-  _Key(15.5, -2.8, 1.0, -0.35),
-  _Key(18.5, -3.6, 0.9, 0.05),
-  _Key(21.5, -4.6, 1.5, 1.5),
-  _Key(24.5, -5.4, 0.9, -0.4),
-  _Key(27.5, -6.28, 0.75, 0.05),
-  _Key(30, -6.0, 2.4, 1.7),
+/// Four different 30 second shots for a single board. Each move starts slowly, whips across and settles.
+const List<List<_Key>> _keySets = [
+  // 0 · Dive and orbit: a high bird-eye shot dives to a low hero angle, slides low across the face, whips round, swoops up, dives behind, cranes up, pulls away.
+  [
+    _Key(0, 0.7, 2.2, 2.0),
+    _Key(3, 0.1, 0.95, -0.42, ex: -0.3, lx: -0.2, ly: 0.05),
+    _Key(6.5, 0.0, 0.9, -0.38, ex: 0.3, lx: 0.2, ly: 0.05),
+    _Key(9.5, -0.9, 1.15, 0.1),
+    _Key(12.5, -1.7, 1.45, 1.6),
+    _Key(15.5, -2.8, 1.0, -0.35),
+    _Key(18.5, -3.6, 0.9, 0.05),
+    _Key(21.5, -4.6, 1.5, 1.5),
+    _Key(24.5, -5.4, 0.9, -0.4),
+    _Key(27.5, -6.28, 0.75, 0.05),
+    _Key(30, -6.0, 2.4, 1.7),
+  ],
+  // 1 · Spiral up: starts low behind the board and spirals round and up, then swoops down to the front and slides across it.
+  [
+    _Key(0, -3.14, 1.2, -0.3),
+    _Key(4, -2.2, 1.1, 0.0),
+    _Key(8, -1.2, 1.0, 0.4),
+    _Key(12, -0.4, 1.0, 0.9),
+    _Key(15, 0.1, 0.85, 1.7),
+    _Key(18, 0.3, 0.8, 0.0),
+    _Key(21, 0.0, 0.9, -0.2, ex: 0.35, lx: 0.25),
+    _Key(24, 0.6, 1.4, 0.1, ex: -0.2),
+    _Key(27, 1.4, 1.2, 0.8),
+    _Key(30, 2.4, 2.3, 1.5),
+  ],
+  // 2 · Push and pull: a wide front shot, a fast push in, a slow drift, then pull back and whip round the left, behind, and the right to a wide front shot.
+  [
+    _Key(0, 0.3, 2.6, 0.5),
+    _Key(3, 0.1, 1.0, 0.0),
+    _Key(6, 0.0, 0.95, 0.05, ex: 0.2, lx: 0.15),
+    _Key(9, -0.8, 1.6, 0.3),
+    _Key(12, -1.57, 1.0, -0.2),
+    _Key(15, -2.4, 1.5, 0.9),
+    _Key(18, -3.14, 1.0, 0.1),
+    _Key(21, -3.9, 1.5, 0.6),
+    _Key(24, -4.71, 1.0, -0.3),
+    _Key(27, -5.5, 1.3, 0.5),
+    _Key(30, -6.28, 2.6, 0.9),
+  ],
+  // 3 · Top reveal: straight down from above, a fast drop to the front, then a slide round the right, a high whip behind, a low dive, and a pull away.
+  [
+    _Key(0, 0.0, 0.5, 3.5),
+    _Key(4, 0.2, 1.0, -0.3),
+    _Key(8, 1.0, 1.0, 0.0),
+    _Key(12, 1.57, 1.2, 0.3),
+    _Key(16, 3.14, 1.4, 1.2),
+    _Key(20, 3.5, 0.9, -0.35),
+    _Key(24, 4.7, 1.1, 0.0),
+    _Key(28, 6.0, 1.0, 0.3),
+    _Key(30, 6.3, 2.2, 1.4),
+  ],
 ];
+
+/// Which shot each single board gets, and whether it goes round the other way.
+const Map<String, (int, bool)> _shotFor = {
+  'highway': (0, false),
+  'tower': (1, false),
+  'neon': (3, false),
+  'roof': (2, true),
+  'screen': (1, true),
+  'gate': (3, true),
+};
 
 /// Slow start, fast middle, soft stop: what makes a camera move look planned.
 double _ease(double u) => u * u * (3 - 2 * u);
@@ -499,9 +540,8 @@ V3 _cr(V3 p0, V3 p1, V3 p2, V3 p3, double u) {
   return V3(f(p0.x, p1.x, p2.x, p3.x), f(p0.y, p1.y, p2.y, p3.y), f(p0.z, p1.z, p2.z, p3.z));
 }
 
-/// The Billboard park shot, planned like a film: every two seconds the drone is at one of these places looking at one of these points, and it dives low to each board, then swoops up high.
-/// High wide shot, a crane down and a push in to the front board, a sweeping arc round to the right board, a long curve behind to the back board,
-/// round to the left board, then up and away for the wide finish. The path is smoothed, so the drone glides and never jerks.
+/// The Billboard park shot, planned by hand: every two seconds the drone is at one of these places looking at one of these points,
+/// and it dives low to each board, then swoops up high.
 const List<(V3, V3)> _parkKeys = [
   (V3(1000, 900, 1500), V3(0, 200, 0)),
   (V3(300, 70, 1000), V3(0, 250, 300)),
@@ -521,12 +561,17 @@ const List<(V3, V3)> _parkKeys = [
   (V3(1000, 900, 1500), V3(0, 200, 0)),
 ];
 
-(V3 eye, V3 look) _parkShot(double secs) {
+/// Where a drone is and what it looks at, [secs] into a shot made of keys spread evenly over the 30 seconds.
+(V3 eye, V3 look) _keyShot(List<(V3, V3)> keys, double secs, [List<double>? times]) {
   final s = secs.clamp(0.0, kBillboardShotSecs);
-  final seg = kBillboardShotSecs / (_parkKeys.length - 1);
-  final i = math.min((s / seg).floor(), _parkKeys.length - 2);
-  final u = _ease((s / seg - i).clamp(0.0, 1.0));
-  (V3, V3) k(int n) => _parkKeys[n.clamp(0, _parkKeys.length - 1)];
+  // Evenly spaced keys, or keys at the given times (longer flights get more time).
+  final ts = times ?? [for (var n = 0; n < keys.length; n++) kBillboardShotSecs * n / (keys.length - 1)];
+  var i = 0;
+  while (i + 2 < keys.length && ts[i + 1] <= s) {
+    i++;
+  }
+  final u = _ease(((s - ts[i]) / (ts[i + 1] - ts[i])).clamp(0.0, 1.0));
+  (V3, V3) k(int n) => keys[n.clamp(0, keys.length - 1)];
   final eye = _cr(k(i - 1).$1, k(i).$1, k(i + 1).$1, k(i + 2).$1, u);
   final look = _cr(k(i - 1).$2, k(i).$2, k(i + 1).$2, k(i + 2).$2, u);
   // A slow float, like a real drone in the air.
@@ -534,19 +579,88 @@ const List<(V3, V3)> _parkKeys = [
   return (V3(eye.x + sway.x, math.max(eye.y + sway.y, 18), eye.z + sway.z), look);
 }
 
-/// Where the drone is (the eye) and what it looks at, [secs] into the shot, round a board of [tp].
+/// The order the drone visits the boards of a layout, and which kind of move it starts with. Each layout is different.
+const Map<String, (List<int>, int)> _tourPlan = {
+  'duo': ([0, 1], 0),
+  'line3': ([0, 1, 2], 1),
+  'far3': ([2, 0, 1], 2),
+  'skyline': ([0, 1, 2, 3], 0),
+  'lines6': ([0, 1, 2, 5, 4, 3], 1),
+};
+
+final Map<String, List<(V3, V3)>> _tours = {};
+final Map<String, List<double>> _tourTimeCache = {};
+
+/// When the drone reaches each key of a tour: a long flight gets more time than a short one, so no flight is a blur.
+List<double> _tourTimes(BbTemplate tp) => _tourTimeCache.putIfAbsent(tp.id, () {
+      final keys = _tourKeys(tp);
+      final w = [for (var i = 0; i < keys.length - 1; i++) math.pow(math.max((keys[i + 1].$1 - keys[i].$1).len, 250), 0.75).toDouble()];
+      final total = w.reduce((a, b) => a + b);
+      final out = <double>[0];
+      for (final x in w) {
+        out.add(out.last + kBillboardShotSecs * x / total);
+      }
+      return out;
+    });
+
+/// A planned tour of a layout: a high wide shot, then to every board in turn (a dive to a low angle, a whip past it, or a rise up beside it, a different
+/// one for each board), flying up and over when the next board faces the other way, and a last high wide shot from behind.
+List<(V3, V3)> _tourKeys(BbTemplate tp) => _tours.putIfAbsent(tp.id, () {
+      final plan = _tourPlan[tp.id] ?? ([for (var i = 0; i < tp.signs; i++) i], 0);
+      final big = math.max(math.max(tp.tw, tp.depth), tp.th * 1.3);
+      final centre = V3(tp.cx, tp.poleH + tp.th / 2, tp.cz);
+      final top = tp.poleH + tp.th;
+      final keys = <(V3, V3)>[(V3(tp.cx + big * 0.55, top + big * 0.5, tp.cz + big * 1.15), centre)];
+      V3? lastFacing;
+      for (var j = 0; j < plan.$1.length; j++) {
+        final p = tp.places[plan.$1[j]];
+        final bw = tp.w * p.scale, bh = tp.h * p.scale;
+        final c = V3(p.x, tp.poleH + p.lift + bh / 2, p.z);
+        final f = V3(math.sin(p.yaw), 0, math.cos(p.yaw)), r = V3(math.cos(p.yaw), 0, -math.sin(p.yaw));
+        final d = bw * 1.5;
+        V3 at(double ff, double rr, double up) => c + f * (d * ff) + r * (bw * rr) + V3(0, bh * up, 0);
+        final style = (plan.$2 + j) % 3;
+        final moves = switch (style) {
+          0 => [at(1.8, 0, 1.1), at(1.0, -0.22, -0.35), at(0.9, 0.3, -0.2)],
+          1 => [at(0.9, 1.5, -0.25), at(1.05, 0, 0.05), at(0.85, -1.3, 0.15)],
+          _ => [at(1.3, 0.2, -0.45), at(1.1, 0, 0.45), at(1.7, -0.3, 1.3)],
+        };
+        if (lastFacing != null && lastFacing.x * f.x + lastFacing.z * f.z < 0.3) {
+          // The next board faces another way: fly up and round over the top, so the drone never cuts through a board.
+          final mid = (keys.last.$1 + moves.first) * 0.5;
+          keys.add((V3(mid.x + lastFacing.z * big * 0.5, top + big * 0.55, mid.z - lastFacing.x * big * 0.5), centre));
+        }
+        for (final m in moves) {
+          keys.add((m, c));
+        }
+        lastFacing = f;
+      }
+      final end = V3(tp.cx - big * 0.7, top + big * 0.6, tp.cz - big * 1.0);
+      if (lastFacing != null) {
+        final mid = (keys.last.$1 + end) * 0.5;
+        keys.add((V3(mid.x + lastFacing.z * big * 0.5, top + big * 0.55, mid.z - lastFacing.x * big * 0.5), centre));
+      }
+      keys.add((end, centre));
+      return keys;
+    });
+
+/// Where the drone is (the eye) and what it looks at, [secs] into the shot, for the board or boards of [tp].
 (V3 eye, V3 look) billboardShot(BbTemplate tp, double secs) {
-  if (tp.id == 'scatter') return _parkShot(secs);
+  if (tp.id == 'scatter') return _keyShot(_parkKeys, secs);
+  if (tp.places.isNotEmpty) return _keyShot(_tourKeys(tp), secs, _tourTimes(tp));
+  final (setIx, mirror) = _shotFor[tp.id] ?? (0, false);
+  final keys = _keySets[setIx];
+  final m = mirror ? -1.0 : 1.0;
   final centre = V3(tp.cx, tp.poleH + tp.th / 2, tp.cz);
-  V3 at(_Key k) => centre + V3(math.sin(k.a) * k.r * tp.span + k.ex * tp.tw, k.h * tp.th, math.cos(k.a) * k.r * tp.span);
-  V3 gaze(_Key k) => centre + V3(k.lx * tp.tw, k.ly * tp.th, 0);
+  V3 at(_Key k) => centre + V3(math.sin(m * k.a) * k.r * tp.span + m * k.ex * tp.tw, k.h * tp.th, math.cos(m * k.a) * k.r * tp.span);
+  V3 gaze(_Key k) => centre + V3(m * k.lx * tp.tw, k.ly * tp.th, 0);
   final s = secs.clamp(0.0, kBillboardShotSecs);
   var i = 0;
-  while (i + 2 < _keys.length && _keys[i + 1].t <= s) {
+  while (i + 2 < keys.length && keys[i + 1].t <= s) {
     i++;
   }
-  final u = _ease(((s - _keys[i].t) / (_keys[i + 1].t - _keys[i].t)).clamp(0.0, 1.0));
-  _Key kk(int k) => _keys[k.clamp(0, _keys.length - 1)];
+  final u = _ease(((s - keys[i].t) / (keys[i + 1].t - keys[i].t)).clamp(0.0, 1.0));
+  _Key kk(int k) => keys[k.clamp(0, keys.length - 1)];
   final eye = _cr(at(kk(i - 1)), at(kk(i)), at(kk(i + 1)), at(kk(i + 2)), u);
   final look = _cr(gaze(kk(i - 1)), gaze(kk(i)), gaze(kk(i + 1)), gaze(kk(i + 2)), u);
   // Never lower than a person's height off the ground.
@@ -726,42 +840,56 @@ class NgmyBillboardStudioState extends State<NgmyBillboardStudioPage> {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
       builder: (ctx) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(14, 16, 14, 10),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text('Choose a billboard', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 10),
+            const SizedBox(height: 4),
+            const Text('One board on its own, or several boards standing apart.', style: TextStyle(color: Colors.white60, fontSize: 12.5)),
+            const SizedBox(height: 12),
             ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.62),
-              child: ListView(shrinkWrap: true, children: [
-                for (final t in kBbTemplates)
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _setTemplate(t.id);
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: content.template == t.id ? const Color(0xFF1E3A8A) : const Color(0xFF1F2937),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: content.template == t.id ? const Color(0xFFF5C14B) : Colors.white12),
-                      ),
-                      child: Row(children: [
-                        Text(t.emoji, style: const TextStyle(fontSize: 28)),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(t.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
-                            Text(t.blurb, style: const TextStyle(color: Colors.white60, fontSize: 12.5)),
-                          ]),
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.66),
+              // Two boards in every row.
+              child: GridView.count(
+                shrinkWrap: true,
+                crossAxisCount: 2,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 1.05,
+                children: [
+                  for (final t in kBbTemplates)
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _setTemplate(t.id);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+                        decoration: BoxDecoration(
+                          color: content.template == t.id ? const Color(0xFF1E3A8A) : const Color(0xFF1F2937),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: content.template == t.id ? const Color(0xFFF5C14B) : Colors.white12, width: content.template == t.id ? 2 : 1),
                         ),
-                        if (t.signs > 1) Text('${t.signs} signs', style: const TextStyle(color: Color(0xFF4ADE80), fontWeight: FontWeight.w800, fontSize: 12)),
-                        if (content.template == t.id) const Padding(padding: EdgeInsets.only(left: 6), child: Icon(Icons.check_circle_rounded, color: Color(0xFFF5C14B))),
-                      ]),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Row(children: [
+                            Text(t.emoji, style: const TextStyle(fontSize: 26)),
+                            const Spacer(),
+                            if (t.signs > 1)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(color: const Color(0xFF14532D), borderRadius: BorderRadius.circular(10)),
+                                child: Text('${t.signs} boards', style: const TextStyle(color: Color(0xFF4ADE80), fontWeight: FontWeight.w800, fontSize: 11)),
+                              ),
+                            if (content.template == t.id) const Padding(padding: EdgeInsets.only(left: 4), child: Icon(Icons.check_circle_rounded, color: Color(0xFFF5C14B), size: 20)),
+                          ]),
+                          const SizedBox(height: 6),
+                          Text(t.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
+                          const SizedBox(height: 3),
+                          Expanded(child: Text(t.blurb, overflow: TextOverflow.fade, style: const TextStyle(color: Colors.white60, fontSize: 11.5, height: 1.25))),
+                        ]),
+                      ),
                     ),
-                  ),
-              ]),
+                ],
+              ),
             ),
           ]),
         ),

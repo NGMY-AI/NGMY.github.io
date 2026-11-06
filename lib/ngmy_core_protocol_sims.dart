@@ -175,7 +175,6 @@ final List<_StudioDef> _kStudios = [
   _StudioDef('ELECTRONICS LAB', 'Batteries, wires, real circuits', Icons.electrical_services_rounded, const Color(0xFF38BDF8), () => const NgmyElectronicsLab()),
   _StudioDef('DISCOVERY LAB', 'Body Explorer: a real 3D human', Icons.biotech_rounded, const Color(0xFF4ADE80), () => const NgmyBodyExplorer()),
   _StudioDef('TOOLBOX', 'Converter, clock, games', Icons.build_circle_rounded, const Color(0xFFFB923C), () => const NgmyToolboxHub()),
-  _StudioDef('CIPHER LAB', 'Make and crack secret codes', Icons.vpn_key_rounded, const Color(0xFF38BDF8), () => const NgmyCipherStudio()),
   _StudioDef('REACTION LAB', 'Wire parts together', Icons.hub_rounded, const Color(0xFF34D399), () => const NgmyReactionLabScreen()),
   _StudioDef('SPARK PAINTER', 'Paint with light', Icons.brush_rounded, const Color(0xFFF472B6), () => const NgmySparkPainterStudio()),
   _StudioDef('ROCKET LANDER', 'Land softly on the pad', Icons.rocket_launch_rounded, const Color(0xFF38BDF8), () => const NgmyRocketLanderStudio()),

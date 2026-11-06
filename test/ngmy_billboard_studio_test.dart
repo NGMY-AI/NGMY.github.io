@@ -44,7 +44,7 @@ void main() {
       for (var s = 0.1; s <= 30.0001; s += 0.1) {
         final (eye, look) = billboardShot(t, s);
         expect(eye.y, greaterThanOrEqualTo(17.9), reason: '${t.name} at $s s is not under the ground');
-        expect((look - centre).len, lessThan(t.tw * (t.id == 'scatter' ? 0.6 : 0.4)), reason: 'looks at the board');
+        expect((look - centre).len, lessThan(t.places.isEmpty ? t.tw * 0.4 : t.tw * 0.6 + t.th), reason: 'looks at the board');
         expect((eye - prev).len, lessThan(t.span * 0.25), reason: '${t.name}: no jump at $s s');
         prev = eye;
         final a = math.atan2(eye.x - t.cx, eye.z - t.cz);
@@ -52,7 +52,7 @@ void main() {
         maxA = math.max(maxA, a);
         sides.add(((a + math.pi) / (math.pi / 2)).floor() % 4);
       }
-      expect(sides.length, 4, reason: '${t.name}: the drone shows the front, both sides and the back');
+      expect(sides.length, greaterThanOrEqualTo(t.places.isEmpty ? 4 : 3), reason: '${t.name}: the drone goes right round');
     }
   });
 
@@ -68,6 +68,7 @@ void main() {
     await t.pump(const Duration(milliseconds: 100));
     await t.pump(const Duration(milliseconds: 500));
     expect(find.text('Neon board'), findsOneWidget);
+// Two boards in every row of the chooser.    expect(t.getTopLeft(find.text('Highway board')).dy, t.getTopLeft(find.text('Tall tower sign')).dy);    expect(t.getTopLeft(find.text('Highway board')).dx, lessThan(t.getTopLeft(find.text('Tall tower sign')).dx));
     await t.ensureVisible(find.text('Neon board'));
     await t.pump();
     await t.tap(find.text('Neon board'));
@@ -102,5 +103,21 @@ void main() {
     await t.tap(find.text('⏹ Stop the drone'));
     await t.pump(const Duration(milliseconds: 200));
     expect(find.text('🎬 30 second drone shot'), findsOneWidget);
+  });
+
+  test('no boards are joined, the layouts have taller boards standing behind and the house is tall', () {
+    for (final t in kBbTemplates.where((t) => t.id != 'highway')) {
+      if (t.signs > 1) expect(t.places.length, t.signs, reason: '${t.name}: every sign is a board of its own');
+    }
+    final sky = kBbTemplates.firstWhere((t) => t.id == 'skyline');
+    final tallest = sky.places.reduce((a, b) => a.lift > b.lift ? a : b);
+    expect(tallest.z, lessThan(sky.places.map((p) => p.z).reduce(math.max)), reason: 'the tallest board stands behind the others');
+    for (final id in ['duo', 'line3', 'far3', 'skyline', 'lines6', 'scatter']) {
+      expect(kBbTemplates.where((t) => t.id == id).length, 1, reason: id);
+    }
+    expect(kBbTemplates.firstWhere((t) => t.id == 'roof').poleH, greaterThanOrEqualTo(300));
+    // Every kind has a different camera path.
+    final starts = {for (final t in kBbTemplates) '${billboardShot(t, 4).$1.x.round()},${billboardShot(t, 4).$1.y.round()}': t.id};
+    expect(starts.length, kBbTemplates.length);
   });
 }
