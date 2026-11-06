@@ -876,6 +876,20 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
                 // It comes out of the wall but stays: only a burnt one is thrown away.
                 conBigButton('Pull it out of the wall', Icons.eject_rounded, () => _apply(p.pullOut(active)), color: Colors.white70),
             ]),
+            if (!d.w.burnt) ...[
+              const SizedBox(height: 8),
+              // Take the device away and leave the empty box, to put in a different outlet or switch (or a different kind of either).
+              Row(children: [
+                conBigButton('Take it out and put in a different ${isSwitchKind(d.kind) ? 'switch' : 'one'}', Icons.swap_horiz_rounded, () {
+                  final a = p.removeDevice(active);
+                  _apply(a);
+                  if (a.ok) {
+                    _leave();
+                    _say('The ${deviceKindName(d.kind)} is out and the box is empty. Pick the kind you want from the tray (a different outlet or switch is fine), then tap the box.', ok: true);
+                  }
+                }, color: const Color(0xFF38BDF8)),
+              ]),
+            ],
           ],
         ]),
       ),

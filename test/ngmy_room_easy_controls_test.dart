@@ -17,6 +17,7 @@ Future<void> _frames(WidgetTester t, [int n = 25]) async {
 
 void main() {
   _extra();
+  _swap();
   setUp(() => NgmyTone.enabled = false);
 
   testWidgets('place and wire a device with buttons only, and a missed tap never moves the view', (t) async {
@@ -101,6 +102,30 @@ void _extra() {
     await t.tapAt(at!);
     await _frames(t, 20);
     expect(find.text('Back to the room'), findsOneWidget);
+    await t.pump(const Duration(seconds: 12));
+  });
+}
+
+void _swap() {
+  testWidgets('a device that is in can be taken out with a button, leaving the empty box for a different outlet or switch', (t) async {
+    t.view.physicalSize = const Size(900, 1800);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    final plan = RoomProject(seed: 3);
+    final o = plan.orders.firstWhere((o) => o.device == 'outlet' || o.device == 'gfci');
+    await t.pumpWidget(const MaterialApp(home: NgmyRoomProjectPage(seed: 3, quick: true)));
+    await _frames(t, 8);
+    await t.tap(find.text(o.device == 'gfci' ? 'GFCI' : 'Outlet'));
+    await _frames(t, 3);
+    await t.tap(find.text('📍 ${slotById(o.slot).name}'));
+    await _frames(t);
+    final swap = find.textContaining('Take it out and put in a different');
+    expect(swap, findsOneWidget);
+    await t.ensureVisible(swap);
+    await t.tap(swap);
+    await _frames(t, 30);
+    expect(find.text('Back to the room'), findsNothing);
+    expect(find.textContaining('the box is empty'), findsWidgets);
     await t.pump(const Duration(seconds: 12));
   });
 }

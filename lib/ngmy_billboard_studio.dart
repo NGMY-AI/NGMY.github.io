@@ -474,52 +474,58 @@ class _Key {
   final double t, a, r, h, ex, lx, ly;
 }
 
-/// The 30 second shot, like a film crew's: a crane shot coming down, a push in, a slow slide along the face (looking at each sign
-/// in turn), a swing round the left side, behind the board, round the right side, then up and away for the last wide shot.
+/// The 30 second shot, cut like a film: each move starts slowly, whips across and settles. A bird's-eye shot dives down to a low hero angle,
+/// a low slide across the face, a whip round to the left, a swoop up high, a dive down behind the board, a crane up, a low whip back to the front,
+/// a push in, and a fast pull away into the sky.
 const List<_Key> _keys = [
-  _Key(0, 0.8, 2.4, 1.1),
-  _Key(4, 0.4, 1.5, 0.4, ly: 0.05),
-  _Key(7.5, 0.0, 0.95, 0.05, ex: -0.36, lx: -0.3),
-  _Key(11.5, 0.0, 0.95, 0.05, ex: 0.36, lx: 0.3),
-  _Key(15, -1.3, 1.3, 0.3),
-  _Key(19, -2.6, 1.1, 0.1),
-  _Key(22, -3.3, 1.15, 0.15),
-  _Key(26, -4.8, 1.3, 0.2),
-  _Key(30, -6.1, 2.5, 1.2),
+  _Key(0, 0.7, 2.2, 2.0),
+  _Key(3, 0.1, 0.95, -0.42, ex: -0.3, lx: -0.2, ly: 0.05),
+  _Key(6.5, 0.0, 0.9, -0.38, ex: 0.3, lx: 0.2, ly: 0.05),
+  _Key(9.5, -0.9, 1.15, 0.1),
+  _Key(12.5, -1.7, 1.45, 1.6),
+  _Key(15.5, -2.8, 1.0, -0.35),
+  _Key(18.5, -3.6, 0.9, 0.05),
+  _Key(21.5, -4.6, 1.5, 1.5),
+  _Key(24.5, -5.4, 0.9, -0.4),
+  _Key(27.5, -6.28, 0.75, 0.05),
+  _Key(30, -6.0, 2.4, 1.7),
 ];
+
+/// Slow start, fast middle, soft stop: what makes a camera move look planned.
+double _ease(double u) => u * u * (3 - 2 * u);
 
 V3 _cr(V3 p0, V3 p1, V3 p2, V3 p3, double u) {
   double f(double a, double b, double c, double d) => 0.5 * ((2 * b) + (-a + c) * u + (2 * a - 5 * b + 4 * c - d) * u * u + (-a + 3 * b - 3 * c + d) * u * u * u);
   return V3(f(p0.x, p1.x, p2.x, p3.x), f(p0.y, p1.y, p2.y, p3.y), f(p0.z, p1.z, p2.z, p3.z));
 }
 
-/// The Billboard park shot, planned like a film: every two seconds the drone is at one of these places looking at one of these points.
+/// The Billboard park shot, planned like a film: every two seconds the drone is at one of these places looking at one of these points, and it dives low to each board, then swoops up high.
 /// High wide shot, a crane down and a push in to the front board, a sweeping arc round to the right board, a long curve behind to the back board,
 /// round to the left board, then up and away for the wide finish. The path is smoothed, so the drone glides and never jerks.
 const List<(V3, V3)> _parkKeys = [
-  (V3(900, 700, 1300), V3(0, 200, 0)),
-  (V3(600, 540, 1250), V3(0, 220, 100)),
-  (V3(250, 360, 1150), V3(0, 230, 300)),
-  (V3(60, 260, 950), V3(0, 230, 300)),
-  (V3(-70, 235, 800), V3(-30, 230, 300)),
-  (V3(420, 280, 950), V3(220, 230, 230)),
-  (V3(900, 270, 640), V3(500, 230, 110)),
-  (V3(1100, 240, 60), V3(560, 230, 0)),
-  (V3(1050, 310, -380), V3(400, 230, -200)),
-  (V3(700, 360, -860), V3(120, 230, -300)),
-  (V3(60, 245, -860), V3(0, 230, -300)),
-  (V3(-640, 300, -760), V3(-300, 230, -150)),
-  (V3(-1040, 270, -300), V3(-560, 230, -100)),
-  (V3(-1100, 240, 0), V3(-560, 230, 0)),
-  (V3(-850, 480, 800), V3(-150, 230, 100)),
-  (V3(-1000, 820, 1500), V3(0, 200, 0)),
+  (V3(1000, 900, 1500), V3(0, 200, 0)),
+  (V3(300, 70, 1000), V3(0, 250, 300)),
+  (V3(-200, 90, 780), V3(0, 240, 300)),
+  (V3(-420, 520, 1000), V3(0, 230, 300)),
+  (V3(700, 330, 900), V3(300, 230, 200)),
+  (V3(1100, 80, 300), V3(560, 250, 0)),
+  (V3(1080, 100, -250), V3(560, 240, -100)),
+  (V3(1000, 700, -700), V3(200, 230, -300)),
+  (V3(200, 90, -860), V3(0, 250, -300)),
+  (V3(-300, 110, -820), V3(0, 240, -300)),
+  (V3(-900, 600, -600), V3(-300, 230, -100)),
+  (V3(-1100, 90, -200), V3(-560, 250, 0)),
+  (V3(-1100, 120, 250), V3(-560, 240, 0)),
+  (V3(-700, 520, 1000), V3(-100, 230, 100)),
+  (V3(200, 170, 1300), V3(0, 230, 150)),
+  (V3(1000, 900, 1500), V3(0, 200, 0)),
 ];
 
 (V3 eye, V3 look) _parkShot(double secs) {
   final s = secs.clamp(0.0, kBillboardShotSecs);
   final seg = kBillboardShotSecs / (_parkKeys.length - 1);
   final i = math.min((s / seg).floor(), _parkKeys.length - 2);
-  final u = (s / seg - i).clamp(0.0, 1.0);
+  final u = _ease((s / seg - i).clamp(0.0, 1.0));
   (V3, V3) k(int n) => _parkKeys[n.clamp(0, _parkKeys.length - 1)];
   final eye = _cr(k(i - 1).$1, k(i).$1, k(i + 1).$1, k(i + 2).$1, u);
   final look = _cr(k(i - 1).$2, k(i).$2, k(i + 1).$2, k(i + 2).$2, u);
@@ -539,7 +545,7 @@ const List<(V3, V3)> _parkKeys = [
   while (i + 2 < _keys.length && _keys[i + 1].t <= s) {
     i++;
   }
-  final u = ((s - _keys[i].t) / (_keys[i + 1].t - _keys[i].t)).clamp(0.0, 1.0);
+  final u = _ease(((s - _keys[i].t) / (_keys[i + 1].t - _keys[i].t)).clamp(0.0, 1.0));
   _Key kk(int k) => _keys[k.clamp(0, _keys.length - 1)];
   final eye = _cr(at(kk(i - 1)), at(kk(i)), at(kk(i + 1)), at(kk(i + 2)), u);
   final look = _cr(gaze(kk(i - 1)), gaze(kk(i)), gaze(kk(i + 1)), gaze(kk(i + 2)), u);
