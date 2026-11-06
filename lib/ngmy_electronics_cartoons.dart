@@ -380,31 +380,167 @@ void _invoice(Canvas c, Size s, double t) {
   cartoonKid(c, Offset(w * 0.2, ground), h * 0.66, t, shirt: const Color(0xFFEC4899), armUp: true, wave: t > 2.8 ? (math.sin(t * 6) + 1) / 2 : 0, talk: t > 2.8, hairStyle: 1, skin: const Color(0xFF6B4423));
 }
 
-// 7 ── Family Book and Family Tree.
+/// A round family portrait: a head and shoulders in a gold ring. [kind]: 0 grandma, 1 grandpa, 2 mother, 3 father, 4 girl, 5 boy.
+/// [glow] (0 to 1) adds a warm light round it.
+void paintFamilyPortrait(Canvas c, Offset at, double r, int kind, double t, {double glow = 0}) {
+  const skins = [Color(0xFF8D5524), Color(0xFF6B4423), Color(0xFFA9703A), Color(0xFF5C3A21), Color(0xFF8D5524), Color(0xFF7A4A28)];
+  const bgs = [Color(0xFFFBCFE8), Color(0xFFBFDBFE), Color(0xFFFDE68A), Color(0xFFBBF7D0), Color(0xFFDDD6FE), Color(0xFFFED7AA)];
+  const shirts = [Color(0xFFDB2777), Color(0xFF1D4ED8), Color(0xFF7C3AED), Color(0xFF0F766E), Color(0xFFF59E0B), Color(0xFFDC2626)];
+  final k = kind % 6;
+  final skin = skins[k];
+  final hair = k < 2 ? const Color(0xFFE5E7EB) : const Color(0xFF1F1209);
+  c.save();
+  c.translate(at.dx, at.dy);
+  if (glow > 0) {
+    c.drawCircle(Offset.zero, r * 1.5, Paint()..shader = RadialGradient(colors: [const Color(0xFFFDE047).withValues(alpha: 0.55 * glow), Colors.transparent]).createShader(Rect.fromCircle(center: Offset.zero, radius: r * 1.5)));
+  }
+  c.drawCircle(Offset(0, r * 0.06), r * 1.1, _f(Colors.black.withValues(alpha: 0.25)));
+  c.drawCircle(Offset.zero, r * 1.08, _f(const Color(0xFFF5C14B)));
+  c.save();
+  c.clipPath(Path()..addOval(Rect.fromCircle(center: Offset.zero, radius: r)));
+  c.drawRect(Rect.fromCircle(center: Offset.zero, radius: r), _f(bgs[k]));
+  // Shoulders and neck.
+  c.drawOval(Rect.fromCenter(center: Offset(0, r * 1.0), width: r * 1.8, height: r * 1.05), _f(shirts[k]));
+  c.drawRect(Rect.fromCenter(center: Offset(0, r * 0.42), width: r * 0.3, height: r * 0.34), _f(Color.lerp(skin, Colors.black, 0.15)!));
+  final head = Offset(0, -r * 0.08);
+  // Hair behind the head.
+  if (k == 0) c.drawCircle(Offset(0, -r * 0.7), r * 0.22, _f(hair));
+  if (k == 4) {
+    for (final x in const [-1.0, 1.0]) {
+      c.drawCircle(Offset(x * r * 0.42, -r * 0.42), r * 0.21, _f(hair));
+    }
+  }
+  if (k == 2 || k == 5 || k == 3) c.drawCircle(head + Offset(0, -r * 0.03), r * 0.46, _f(hair));
+  c.drawCircle(head, r * 0.42, _f(skin));
+  // Hair in front.
+  if (k == 0 || k == 4) c.drawArc(Rect.fromCircle(center: head, radius: r * 0.43), math.pi * 1.05, math.pi * 0.9, true, _f(hair));
+  if (k == 3 || k == 5) c.drawArc(Rect.fromCircle(center: head, radius: r * 0.44), math.pi * 1.0, math.pi, true, _f(hair));
+  if (k == 1) {
+    for (final x in const [-1.0, 1.0]) {
+      c.drawCircle(head + Offset(x * r * 0.4, -r * 0.02), r * 0.1, _f(hair));
+    }
+  }
+  if (k == 2) {
+    // A bright head wrap.
+    final wrap = Path()..moveTo(-r * 0.46, head.dy - r * 0.05)..quadraticBezierTo(0, head.dy - r * 0.78, r * 0.46, head.dy - r * 0.05)..quadraticBezierTo(0, head.dy - r * 0.28, -r * 0.46, head.dy - r * 0.05)..close();
+    c.drawPath(wrap, _f(const Color(0xFFF59E0B)));
+    for (var d = 0; d < 4; d++) {
+      c.drawCircle(Offset(-r * 0.22 + d * r * 0.15, head.dy - r * 0.3 - (d == 1 || d == 2 ? r * 0.06 : 0)), r * 0.035, _f(const Color(0xFFB91C1C)));
+    }
+  }
+  // Face.
+  final blink = (t * 0.8 + k) % 3 > 2.85;
+  for (final x in const [-1.0, 1.0]) {
+    final e = head + Offset(x * r * 0.17, -r * 0.03);
+    if (blink) {
+      c.drawLine(e + Offset(-r * 0.05, 0), e + Offset(r * 0.05, 0), _s(Colors.black87, r * 0.03));
+    } else {
+      c.drawCircle(e, r * 0.055, _f(Colors.black87));
+      c.drawCircle(e + Offset(r * 0.015, -r * 0.015), r * 0.016, _f(Colors.white));
+    }
+    c.drawCircle(head + Offset(x * r * 0.27, r * 0.12), r * 0.06, _f(const Color(0xFFFB7185).withValues(alpha: 0.5)));
+  }
+  c.drawArc(Rect.fromCenter(center: head + Offset(0, r * 0.1), width: r * 0.3, height: r * 0.2), 0.2, math.pi - 0.4, false, _s(const Color(0xFF3F1D0B), r * 0.035));
+  if (k < 2) {
+    // Round glasses.
+    for (final x in const [-1.0, 1.0]) {
+      c.drawCircle(head + Offset(x * r * 0.17, -r * 0.03), r * 0.115, _s(const Color(0xFF374151), r * 0.03));
+    }
+    c.drawLine(head + Offset(-r * 0.055, -r * 0.03), head + Offset(r * 0.055, -r * 0.03), _s(const Color(0xFF374151), r * 0.025));
+  }
+  c.restore();
+  c.drawCircle(Offset.zero, r * 1.04, _s(const Color(0xFFFFE08A), r * 0.07));
+  c.restore();
+}
+
+/// A name tag under a portrait.
+void paintFamilyTag(Canvas c, Offset at, double r, String name) {
+  final rect = Rect.fromCenter(center: at, width: r * 2.5, height: r * 0.62);
+  c.drawRRect(RRect.fromRectAndRadius(rect, Radius.circular(r * 0.31)), _f(Colors.white));
+  c.drawRRect(RRect.fromRectAndRadius(rect, Radius.circular(r * 0.31)), _s(const Color(0xFFEC4899), r * 0.05));
+  _t(c, '♥ $name', at, r * 0.4, const Color(0xFF9D174D), maxW: r * 2.2);
+}
+
+/// A branch that grows from [a] to [b] bending towards [ctrl], thick at [wa] and thin at [wb]; [prog] (0 to 1) is how much has grown.
+void paintFamilyLimb(Canvas c, Offset a, Offset ctrl, Offset b, double wa, double wb, double prog, {Color bark = const Color(0xFF6B4423)}) {
+  if (prog <= 0) return;
+  const n = 22;
+  Offset pt(double u) => Offset.lerp(Offset.lerp(a, ctrl, u)!, Offset.lerp(ctrl, b, u)!, u)!;
+  final steps = (n * prog.clamp(0.0, 1.0)).ceil();
+  var prev = a;
+  for (var i = 1; i <= steps; i++) {
+    final u = math.min(i / n, prog.clamp(0.0, 1.0));
+    final p = pt(u);
+    final wd = wa + (wb - wa) * u;
+    c.drawLine(prev, p, _s(bark, wd));
+    c.drawLine(prev + Offset(-wd * 0.18, 0), p + Offset(-wd * 0.18, 0), _s(Color.lerp(bark, Colors.white, 0.18)!, wd * 0.28));
+    prev = p;
+  }
+}
+
+/// Little hearts that float up from [from].
+void paintFamilyHearts(Canvas c, Offset from, double h, double t, {int n = 7}) {
+  for (var i = 0; i < n; i++) {
+    final ph = (t * 0.45 + i / n) % 1.0;
+    final x = from.dx + math.sin(i * 2.3 + t * 2) * h * 0.12 + (i - n / 2) * h * 0.03;
+    _t(c, '♥', Offset(x, from.dy - ph * h * 0.45), h * (0.04 + 0.02 * (i % 3)), Color.lerp(const Color(0xFFEC4899), const Color(0xFFFB7185), (i % 2).toDouble())!.withValues(alpha: (1 - ph) * 0.9));
+  }
+}
+
+// 6 ── Family Book and Family Tree: a book opens and a family tree grows out of it, with a face on every branch.
 void _book(Canvas c, Size s, double t) {
   final w = s.width, h = s.height;
   final ground = h * 0.94;
   c.drawRect(Rect.fromLTWH(0, ground, w, h - ground), _f(const Color(0xFF14532D).withValues(alpha: 0.7)));
-  final bc = Offset(w * 0.6, h * 0.62);
-  final bw = math.min(w * 0.3, h * 0.6);
-  c.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: bc, width: bw * 2.1, height: bw * 1.3), const Radius.circular(6)), _f(const Color(0xFF7C2D12)));
-  c.drawRect(Rect.fromCenter(center: bc - Offset(bw * 0.5, 0), width: bw, height: bw * 1.2), _f(const Color(0xFFFEF3C7)));
-  c.drawRect(Rect.fromCenter(center: bc + Offset(bw * 0.5, 0), width: bw, height: bw * 1.2), _f(const Color(0xFFFEF3C7)));
-  final flip = (t % 2.0) / 2.0;
-  c.save();
-  c.translate(bc.dx, bc.dy);
-  c.scale(math.cos(flip * math.pi), 1);
-  c.drawRect(Rect.fromLTWH(0, -bw * 0.6, bw, bw * 1.2), _f(const Color(0xFFFDE68A)));
-  c.restore();
-  // A tiny tree grows from the book.
-  final grow = (t / 3).clamp(0.0, 1.0);
-  c.drawLine(Offset(bc.dx, bc.dy - bw * 0.6), Offset(bc.dx, bc.dy - bw * 0.6 - h * 0.28 * grow), _s(const Color(0xFF78350F), h * 0.025));
-  for (var k = 0; k < 5; k++) {
-    final a = (grow - 0.4 - k * 0.1).clamp(0.0, 1.0);
-    c.drawCircle(Offset(bc.dx + math.cos(k * 1.3) * h * 0.14 * a, bc.dy - bw * 0.6 - h * 0.28 * grow + math.sin(k * 1.3) * h * 0.08 * a), h * 0.05 * a, _f(const Color(0xFF22C55E)));
-    if (a > 0.6) _t(c, '♥', Offset(bc.dx + math.cos(k * 1.3) * h * 0.14, bc.dy - bw * 0.6 - h * 0.28 * grow + math.sin(k * 1.3) * h * 0.08), h * 0.04, const Color(0xFFEC4899));
+  double prog(double a, double d) => ((t - a) / d).clamp(0.0, 1.0);
+  double ease(double x) => Curves.easeInOut.transform(x);
+  final bw = math.min(w * 0.34, h * 0.62);
+  final bc = Offset(w * 0.64, ground - bw * 0.2);
+  // The open book.
+  c.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: bc, width: bw * 2.15, height: bw * 0.5), Radius.circular(bw * 0.08)), _f(const Color(0xFF7C2D12)));
+  final left = Path()..moveTo(bc.dx, bc.dy - bw * 0.2)..quadraticBezierTo(bc.dx - bw * 0.5, bc.dy - bw * 0.3, bc.dx - bw * 1.0, bc.dy - bw * 0.16)..lineTo(bc.dx - bw * 1.0, bc.dy + bw * 0.14)..quadraticBezierTo(bc.dx - bw * 0.5, bc.dy + bw * 0.02, bc.dx, bc.dy + bw * 0.16)..close();
+  c.drawPath(left, _f(const Color(0xFFFEF3C7)));
+  final right = Path()..moveTo(bc.dx, bc.dy - bw * 0.2)..quadraticBezierTo(bc.dx + bw * 0.5, bc.dy - bw * 0.3, bc.dx + bw * 1.0, bc.dy - bw * 0.16)..lineTo(bc.dx + bw * 1.0, bc.dy + bw * 0.14)..quadraticBezierTo(bc.dx + bw * 0.5, bc.dy + bw * 0.02, bc.dx, bc.dy + bw * 0.16)..close();
+  c.drawPath(right, _f(const Color(0xFFFFFBEB)));
+  for (var l = 0; l < 3; l++) {
+    c.drawLine(Offset(bc.dx - bw * 0.85, bc.dy - bw * 0.06 + l * bw * 0.06), Offset(bc.dx - bw * 0.2, bc.dy - bw * 0.1 + l * bw * 0.06), _s(const Color(0xFFD6B98C), 1.4));
+    c.drawLine(Offset(bc.dx + bw * 0.2, bc.dy - bw * 0.1 + l * bw * 0.06), Offset(bc.dx + bw * 0.85, bc.dy - bw * 0.06 + l * bw * 0.06), _s(const Color(0xFFD6B98C), 1.4));
   }
-  cartoonKid(c, Offset(w * 0.2, ground), h * 0.66, t, shirt: const Color(0xFF7C3AED), wave: (math.sin(t * 4) + 1) / 2, hairStyle: 2, bounce: math.sin(t * 4).abs() * h * 0.01);
+  // A glowing light rises out of the book.
+  final light = ease(prog(0.2, 1.0));
+  c.drawCircle(bc - Offset(0, bw * 0.3), bw * (0.5 + 0.1 * math.sin(t * 4)) * light, Paint()..shader = RadialGradient(colors: [const Color(0xFFFDE047).withValues(alpha: 0.6 * light), Colors.transparent]).createShader(Rect.fromCircle(center: bc - Offset(0, bw * 0.3), radius: bw * 0.7)));
+  // The tree.
+  final base = bc - Offset(0, bw * 0.12);
+  Offset p(double dx, double dy) => Offset(bc.dx + dx * h, base.dy - dy * h);
+  final grow = ease(prog(0.5, 1.1));
+  final bloom = ease(prog(1.3, 1.2));
+  for (final (dx, dy, rr) in const [(-0.2, 0.46, 0.12), (0.2, 0.46, 0.12), (0.0, 0.52, 0.15), (0.0, 0.7, 0.1)]) {
+    c.drawCircle(p(dx, dy), h * rr * bloom + math.sin(t * 2 + dx * 9) * 1.2, _f(const Color(0xFF16A34A).withValues(alpha: 0.9)));
+  }
+  paintFamilyLimb(c, base, base + Offset(0, -h * 0.08), p(0, 0.22), h * 0.05, h * 0.035, grow);
+  final b2 = ease(prog(1.2, 0.8));
+  paintFamilyLimb(c, p(0, 0.22), p(-0.06, 0.28), p(-0.2, 0.36), h * 0.032, h * 0.02, b2);
+  paintFamilyLimb(c, p(0, 0.22), p(0.06, 0.28), p(0.2, 0.36), h * 0.032, h * 0.02, b2);
+  final b3 = ease(prog(2.4, 0.7));
+  paintFamilyLimb(c, p(0, 0.22), p(0, 0.4), p(0, 0.57), h * 0.03, h * 0.016, b3);
+  // The faces pop open one after another.
+  void face(int kind, String name, Offset at, double r, double start) {
+    final k = prog(start, 0.5);
+    if (k <= 0) return;
+    c.save();
+    c.translate(at.dx, at.dy);
+    c.scale(Curves.elasticOut.transform(k).clamp(0.01, 1.3));
+    paintFamilyPortrait(c, Offset.zero, r, kind, t, glow: t > 4.5 ? 0.6 : 0);
+    paintFamilyTag(c, Offset(0, r * 1.42), r, name);
+    c.restore();
+  }
+
+  face(2, 'Mama', p(-0.2, 0.36), h * 0.088, 1.9);
+  face(3, 'Baba', p(0.2, 0.36), h * 0.088, 2.4);
+  face(4, 'Dada', p(0, 0.57), h * 0.08, 3.0);
+  if (t > 3.6) paintFamilyHearts(c, p(0, 0.36), h, t - 3.6);
+  cartoonKid(c, Offset(w * 0.2, ground), h * 0.66, t, shirt: const Color(0xFF7C3AED), wave: (math.sin(t * 4) + 1) / 2, talk: t > 3.0, hairStyle: 2, bounce: math.sin(t * 4).abs() * h * 0.01);
+  _speech(c, Offset(w * 0.2, h * 0.1), 'My tree!', h * 0.06, prog(3.0, 0.4), fill: Colors.white);
 }
 
 // 8 ── Wallet: coins stack up while the kid saves.

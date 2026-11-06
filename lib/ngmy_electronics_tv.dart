@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_electronics_cartoons.dart';
 import 'ngmy_electronics_screens.dart';
 import 'ngmy_electronics_tv_brands.dart';
 import 'ngmy_studio_kit.dart';
@@ -108,47 +109,140 @@ void _bug(Canvas c, Size s, int ch, double t) {
   _text(c, 'CH ${ch + 1}  ·  ${kNgmyTvChannels[ch % kNgmyTvChannels.length].title}', Offset(h * 0.04, h * 0.885), h * 0.075, Colors.white, width: s.width - h * 0.08);
 }
 
-// 0 ── A family tree grows and name bubbles pop open.
+/// Text that shrinks to fit its box and sits in the middle of it.
+void _fit(Canvas c, String text, Rect box, double size, Color col, {bool bold = true, double spacing = 0}) {
+  TextPainter make(double v) => TextPainter(text: TextSpan(text: text, style: TextStyle(color: col, fontSize: v, fontWeight: bold ? FontWeight.w900 : FontWeight.w700, letterSpacing: spacing)), textDirection: TextDirection.ltr, maxLines: 1)..layout();
+  var tp = make(size);
+  if (tp.width > box.width && tp.width > 0) tp = make(size * box.width / tp.width);
+  tp.paint(c, box.center - Offset(tp.width / 2, tp.height / 2));
+}
+
+// 0 ── The NGMY Family Tree: a tree grows from the grandparents (the roots) up through the parents to the children, with a face on every branch.
 void _treeStory(Canvas c, Size s, double t) {
   final w = s.width, h = s.height;
-  final cycle = t % 14.0;
-  c.drawRect(Offset.zero & s, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF7DD3FC), Color(0xFFFEF3C7)]).createShader(Offset.zero & s));
-  c.drawCircle(Offset(w * 0.85, h * 0.18), h * 0.08, Paint()..color = const Color(0xFFFDE047));
-  c.drawRect(Rect.fromLTWH(0, h * 0.78, w, h * 0.22), Paint()..color = const Color(0xFF65A30D));
-  final grow = (cycle / 5).clamp(0.0, 1.0);
-  final base = Offset(w * 0.5, h * 0.8);
-  void branch(Offset from, double ang, double len, int depth, double prog) {
-    if (depth == 0 || prog <= 0) return;
-    final l = len * prog.clamp(0.0, 1.0);
-    final to = from + Offset(math.cos(ang) * l, -math.sin(ang) * l);
-    c.drawLine(from, to, Paint()..color = const Color(0xFF78350F)..strokeWidth = depth * 2.2..strokeCap = StrokeCap.round);
-    if (prog > 0.95) {
-      final sway = math.sin(t * 1.6 + depth) * 0.04;
-      branch(to, ang + 0.5 + sway, len * 0.72, depth - 1, prog * 1.6 - 0.9 - (5 - depth) * 0.0);
-      branch(to, ang - 0.5 + sway, len * 0.72, depth - 1, prog * 1.6 - 0.9);
-    }
-    if (depth == 1 && prog > 0.5) {
-      c.drawCircle(to, h * 0.035, Paint()..color = Color.lerp(const Color(0xFF16A34A), const Color(0xFF4ADE80), (math.sin(t * 2 + to.dx) + 1) / 2)!);
-    }
+  final cy = t % 14.0;
+  double prog(double a, double d) => ((cy - a) / d).clamp(0.0, 1.0);
+  double ease(double x) => Curves.easeInOut.transform(x);
+  const gold = Color(0xFFF5C14B), navy = Color(0xFF0B1F4B);
+  // Evening sky from navy to gold, with a sun glow behind the tree and a few stars.
+  c.drawRect(Offset.zero & s, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF0B1F4B), Color(0xFF1E4FA3), Color(0xFFF59E0B), Color(0xFFFDE68A)], stops: [0.0, 0.42, 0.8, 1.0]).createShader(Offset.zero & s));
+  final tx = w * 0.34;
+  Offset p(double dx, double y) => Offset(tx + dx * h, y * h);
+  final sun = p(0, 0.5);
+  c.drawCircle(sun, h * 0.75, Paint()..shader = RadialGradient(colors: [const Color(0xFFFDE68A).withValues(alpha: 0.55), Colors.transparent]).createShader(Rect.fromCircle(center: sun, radius: h * 0.75)));
+  final rnd = math.Random(11);
+  for (var i = 0; i < 26; i++) {
+    c.drawCircle(Offset(rnd.nextDouble() * w, rnd.nextDouble() * h * 0.45), 0.6 + rnd.nextDouble() * 1.1, Paint()..color = Colors.white.withValues(alpha: 0.35 + 0.4 * math.sin(t * 2 + i)));
   }
-  branch(base, math.pi / 2, h * 0.24, 5, grow * 1.4);
-  // Names pop open on the branches.
-  const names = ['Mama', 'Baba', 'Bibi', 'Babu', 'Dada', 'Kaka'];
-  for (var i = 0; i < names.length; i++) {
-    final start = 5.0 + i * 1.3;
-    final k = ((cycle - start) / 0.5).clamp(0.0, 1.0);
-    if (k <= 0) continue;
-    final pos = Offset(w * (0.2 + 0.12 * i + (i.isOdd ? 0.04 : 0)), h * (0.16 + 0.14 * (i % 3)));
-    final sc = Curves.elasticOut.transform(k);
+  // Rolling green hills.
+  for (var l = 0; l < 2; l++) {
+    final path = Path()..moveTo(0, h);
+    for (var x = 0.0; x <= w; x += 6) {
+      path.lineTo(x, h * (l == 0 ? 0.78 : 0.82) + math.sin(x / (l == 0 ? 70 : 50) + l * 2) * h * 0.02);
+    }
+    path.lineTo(w, h);
+    c.drawPath(path, Paint()..color = l == 0 ? const Color(0xFF3F8F4D) : const Color(0xFF2F6F3B));
+  }
+  final base = p(0, 0.81);
+  final trunk = ease(prog(0.2, 1.6));
+  final bloom = ease(prog(2.4, 2.6));
+  // The leafy crown, behind the branches.
+  final crown = const [(-0.30, 0.32, 0.2), (-0.08, 0.17, 0.22), (0.14, 0.14, 0.2), (0.34, 0.3, 0.2), (0.0, 0.32, 0.26), (-0.42, 0.46, 0.15), (0.42, 0.46, 0.15), (0.0, 0.07, 0.15)];
+  for (final (dx, y, r) in crown) {
+    final sway = math.sin(t * 1.4 + dx * 7) * h * 0.006;
+    c.drawCircle(p(dx, y) + Offset(sway, 0), h * r * bloom, Paint()..color = const Color(0xFF166534));
+    c.drawCircle(p(dx, y - 0.015) + Offset(sway, 0), h * r * 0.82 * bloom, Paint()..color = const Color(0xFF15803D));
+  }
+  // The trunk, roots and branches.
+  for (final x in const [-1.0, 1.0]) {
+    paintFamilyLimb(c, base, base + Offset(x * h * 0.04, h * 0.01), base + Offset(x * h * 0.12, h * 0.015), h * 0.04, h * 0.01, trunk);
+  }
+  paintFamilyLimb(c, base, p(0.02, 0.7), p(0, 0.6), h * 0.085, h * 0.055, trunk);
+  final b1 = ease(prog(1.8, 1.6));
+  paintFamilyLimb(c, p(0, 0.6), p(-0.1, 0.55), p(-0.34, 0.44), h * 0.05, h * 0.026, b1);
+  paintFamilyLimb(c, p(0, 0.6), p(0.1, 0.55), p(0.34, 0.44), h * 0.05, h * 0.026, b1);
+  final b2 = ease(prog(3.2, 1.3));
+  paintFamilyLimb(c, p(-0.34, 0.44), p(-0.17, 0.33), p(0, 0.39), h * 0.024, h * 0.018, b2);
+  paintFamilyLimb(c, p(0.34, 0.44), p(0.17, 0.33), p(0, 0.39), h * 0.024, h * 0.018, b2);
+  final b3 = ease(prog(4.4, 1.3));
+  paintFamilyLimb(c, p(0, 0.39), p(-0.1, 0.3), p(-0.17, 0.2), h * 0.02, h * 0.012, b3);
+  paintFamilyLimb(c, p(0, 0.39), p(0.1, 0.3), p(0.17, 0.2), h * 0.02, h * 0.012, b3);
+  paintFamilyLimb(c, p(-0.27, 0.72), p(-0.14, 0.78), p(0, 0.7), h * 0.016, h * 0.012, ease(prog(3.6, 1.0)));
+  paintFamilyLimb(c, p(0.27, 0.72), p(0.14, 0.78), p(0, 0.7), h * 0.016, h * 0.012, ease(prog(3.6, 1.0)));
+  // Leaves along the crown, shining and swaying.
+  final lr = math.Random(5);
+  for (var i = 0; i < 110; i++) {
+    final (dx, y, r) = crown[i % crown.length];
+    final a = lr.nextDouble() * math.pi * 2, d = math.sqrt(lr.nextDouble()) * r * 0.95;
+    final pos = p(dx + math.cos(a) * d, y + math.sin(a) * d) + Offset(math.sin(t * 1.6 + i) * h * 0.006, 0);
     c.save();
     c.translate(pos.dx, pos.dy);
-    c.scale(sc);
-    c.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: Offset.zero, width: h * 0.26, height: h * 0.11), Radius.circular(h * 0.05)), Paint()..color = Colors.white);
-    c.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: Offset.zero, width: h * 0.26, height: h * 0.11), Radius.circular(h * 0.05)), Paint()..style = PaintingStyle.stroke..strokeWidth = 2..color = const Color(0xFFEC4899));
-    _text(c, '♥ ${names[i]}', Offset(-h * 0.1, -h * 0.04), h * 0.065, const Color(0xFF9D174D));
+    c.rotate(a + math.sin(t * 1.3 + i) * 0.2);
+    final sc = (bloom * 1.4 - (i % 10) * 0.05).clamp(0.0, 1.0);
+    c.drawOval(Rect.fromCenter(center: Offset.zero, width: h * 0.03 * sc, height: h * 0.015 * sc), Paint()..color = Color.lerp(const Color(0xFF22C55E), const Color(0xFF86EFAC), (math.sin(t * 2 + i) + 1) / 2)!);
     c.restore();
   }
-  if (cycle > 11.5) _text(c, 'Family is everything', Offset(0, h * 0.62), h * 0.09, const Color(0xFF7C2D12), align: TextAlign.center, width: w);
+  // The faces pop open: the grandparents at the roots, the parents on the big branches, the children at the top.
+  void face(int kind, String name, Offset at, double r, double start) {
+    final k = prog(start, 0.6);
+    if (k <= 0) return;
+    c.save();
+    c.translate(at.dx, at.dy);
+    c.scale(Curves.elasticOut.transform(k).clamp(0.01, 1.3));
+    paintFamilyPortrait(c, Offset.zero, r, kind, t, glow: cy > 9.5 ? 0.5 + 0.3 * math.sin(t * 3 + kind) : 0);
+    paintFamilyTag(c, Offset(0, r * 1.42), r, name);
+    c.restore();
+  }
+
+  face(0, 'Bibi', p(-0.27, 0.72), h * 0.075, 5.0);
+  face(1, 'Babu', p(0.27, 0.72), h * 0.075, 5.6);
+  face(2, 'Mama', p(-0.34, 0.44), h * 0.085, 6.4);
+  face(3, 'Baba', p(0.34, 0.44), h * 0.085, 7.0);
+  face(4, 'Dada', p(-0.17, 0.2), h * 0.075, 8.0);
+  face(5, 'Kaka', p(0.17, 0.2), h * 0.075, 8.6);
+  // Hearts that join the couples.
+  void heart(Offset at, double r, double start) {
+    final k = prog(start, 0.5);
+    if (k <= 0) return;
+    final sc = Curves.elasticOut.transform(k).clamp(0.01, 1.3) * (1 + 0.07 * math.sin(t * 6));
+    c.drawCircle(at, r * sc, Paint()..color = const Color(0xFFEC4899));
+    c.drawCircle(at, r * sc, Paint()..style = PaintingStyle.stroke..strokeWidth = 2..color = Colors.white);
+    _text(c, '♥', at - Offset(r * 0.5 * sc, r * 0.62 * sc), r * 1.3 * sc, Colors.white);
+  }
+
+  heart(p(0, 0.7), h * 0.028, 5.9);
+  heart(p(0, 0.39), h * 0.035, 7.4);
+  if (cy > 9.3) {
+    for (var i = 0; i < 7; i++) {
+      final ph = ((cy - 9.3) * 0.4 + i / 7) % 1.0;
+      _text(c, '♥', p(math.sin(i * 2.3 + t * 2) * 0.3, 0.38 - ph * 0.3), h * (0.04 + 0.02 * (i % 3)), const Color(0xFFFB7185).withValues(alpha: (1 - ph) * 0.85));
+    }
+  }
+  // The title card on the right.
+  final slide = (1 - ease(prog(1.0, 0.9))) * w * 0.4;
+  final card = Rect.fromLTWH(w * 0.655 + slide, h * 0.1, w * 0.315, h * 0.64);
+  c.drawRRect(RRect.fromRectAndRadius(card, Radius.circular(h * 0.05)), Paint()..color = navy.withValues(alpha: 0.88));
+  c.drawRRect(RRect.fromRectAndRadius(card, Radius.circular(h * 0.05)), Paint()..style = PaintingStyle.stroke..strokeWidth = h * 0.012..color = gold);
+  Rect row(double y, double hh) => Rect.fromLTWH(card.left + card.width * 0.08, h * y, card.width * 0.84, h * hh);
+  _fit(c, 'NGMY', row(0.13, 0.06), h * 0.06, gold, spacing: h * 0.012);
+  _fit(c, 'Family', row(0.2, 0.1), h * 0.1, Colors.white);
+  _fit(c, 'Tree', row(0.3, 0.1), h * 0.1, Colors.white);
+  const lines = ['Add every person', 'Link mums, dads, kids', 'Keep it for ever'];
+  for (var i = 0; i < lines.length; i++) {
+    final k = prog(5.5 + i * 1.5, 0.5);
+    if (k <= 0) continue;
+    _fit(c, '♥ ${lines[i]}', row(0.43 + i * 0.075, 0.06).shift(Offset((1 - k) * 30, 0)), h * 0.05, const Color(0xFFFBCFE8).withValues(alpha: k), bold: false);
+  }
+  final bk = prog(11.0, 0.5);
+  if (bk > 0) {
+    final pill = Rect.fromCenter(center: Offset(card.center.dx, h * 0.67), width: card.width * 0.6 * Curves.easeOutBack.transform(bk), height: h * 0.075);
+    c.drawRRect(RRect.fromRectAndRadius(pill, Radius.circular(h * 0.04)), Paint()..color = gold);
+    if (bk > 0.8) _fit(c, 'ngmy.org', pill.deflate(h * 0.01), h * 0.05, navy);
+  }
+  if (cy > 11.6) _fit(c, 'Family is everything', Rect.fromLTWH(0, h * 0.82, tx * 2, h * 0.05), h * 0.05, Colors.white.withValues(alpha: ((cy - 11.6) / 0.5).clamp(0.0, 1.0)));
+  // A soft fade between one run and the next.
+  final fade = cy < 0.4 ? 1 - cy / 0.4 : (cy > 13.5 ? (cy - 13.5) / 0.5 : 0.0);
+  if (fade > 0) c.drawRect(Offset.zero & s, Paint()..color = Colors.black.withValues(alpha: fade));
 }
 
 // 1 ── A coin hops over hills collecting stars.
