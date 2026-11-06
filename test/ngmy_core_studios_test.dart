@@ -72,10 +72,7 @@ void main() {
   testWidgets('Title Animator', (t) => _play(t, const NgmyTitleStudio(), 'title'));
   testWidgets('Palette Lab', (t) => _play(t, const NgmyPaletteStudio(), 'palette'));
   testWidgets('Gravity Toy', (t) => _play(t, const NgmyGravityStudio(), 'gravity'));
-  testWidgets('Orbit Studio', (t) => _play(t, const NgmyOrbitStudio(), 'orbit'));
-  testWidgets('Swarm Studio', (t) => _play(t, const NgmySwarmStudio(), 'swarm'));
   testWidgets('Firework Designer', (t) => _play(t, const NgmyFireworkStudio(), 'fireworks'));
-  testWidgets('Chain Burst', (t) => _play(t, const NgmyChainBurstStudio(), 'chain'));
   testWidgets('Beat Maker', (t) => _play(t, const NgmyBeatStudio(), 'beat'));
   testWidgets('Reaction Lab', (t) => _play(t, const NgmyReactionLabScreen(), 'lab'));
 
@@ -85,8 +82,6 @@ void main() {
   testWidgets('Name Melody', (t) => _play(t, const NgmyNameMelodyStudio(), 'name'));
   testWidgets('Circuit Lab', (t) => _play(t, const NgmyCircuitStudio(), 'circuit'));
   testWidgets('Note Lab', (t) => _play(t, const NgmyNoteLabScreen(), 'note lab'));
-  testWidgets('Marble Music', (t) => _play(t, const NgmyMarbleStudio(), 'marble'));
-  testWidgets('Orbit Sequencer', (t) => _play(t, const NgmyOrbitSequencerStudio(), 'orbit seq'));
   testWidgets('Life Melody', (t) => _play(t, const NgmyLifeMelodyStudio(), 'life'));
   testWidgets('Pendulum Waves', (t) => _play(t, const NgmyPendulumStudio(), 'pendulum'));
 

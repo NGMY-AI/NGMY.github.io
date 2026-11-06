@@ -14,7 +14,6 @@ import 'ngmy_electronics_lab.dart';
 import 'ngmy_body_explorer.dart';
 import 'ngmy_play_hub.dart';
 import 'ngmy_arcade_a.dart';
-import 'ngmy_edu_a.dart';
 import 'ngmy_edu_b.dart';
 import 'ngmy_fun_a.dart';
 import 'ngmy_universe_hub.dart';
@@ -176,24 +175,12 @@ final List<_StudioDef> _kStudios = [
   _StudioDef('ELECTRONICS LAB', 'Batteries, wires, real circuits', Icons.electrical_services_rounded, const Color(0xFF38BDF8), () => const NgmyElectronicsLab()),
   _StudioDef('DISCOVERY LAB', 'Body Explorer: a real 3D human', Icons.biotech_rounded, const Color(0xFF4ADE80), () => const NgmyBodyExplorer()),
   _StudioDef('TOOLBOX', 'Converter, clock, games', Icons.build_circle_rounded, const Color(0xFFFB923C), () => const NgmyToolboxHub()),
-  _StudioDef('MOLECULE MAKER', 'Join atoms into real molecules', Icons.bubble_chart_rounded, const Color(0xFF2DD4BF), () => const NgmyMoleculeStudio()),
-  _StudioDef('DNA LAB', 'Copy DNA, build a protein', Icons.biotech_rounded, const Color(0xFFF472B6), () => const NgmyDnaStudio()),
-  _StudioDef('ECOSYSTEM LAB', 'Grass, rabbits and foxes', Icons.pets_rounded, const Color(0xFF4ADE80), () => const NgmyEcosystemStudio()),
-  _StudioDef('BALANCE LAB', 'Levers, weight and torque', Icons.balance_rounded, const Color(0xFFFBBF24), () => const NgmyBalanceStudio()),
-  _StudioDef('GEAR LAB', 'Teeth, speed and force', Icons.settings_rounded, const Color(0xFFFB923C), () => const NgmyGearStudio()),
-  _StudioDef('LASER MAZE', 'Bend the beam with mirrors', Icons.flare_rounded, const Color(0xFFEF4444), () => const NgmyLaserMazeStudio()),
-  _StudioDef('LIGHT MIXER', 'Match colours with light', Icons.color_lens_rounded, const Color(0xFF22D3EE), () => const NgmyLightMixerStudio()),
   _StudioDef('CIPHER LAB', 'Make and crack secret codes', Icons.vpn_key_rounded, const Color(0xFF38BDF8), () => const NgmyCipherStudio()),
   _StudioDef('REACTION LAB', 'Wire parts together', Icons.hub_rounded, const Color(0xFF34D399), () => const NgmyReactionLabScreen()),
   _StudioDef('SPARK PAINTER', 'Paint with light', Icons.brush_rounded, const Color(0xFFF472B6), () => const NgmySparkPainterStudio()),
   _StudioDef('ROCKET LANDER', 'Land softly on the pad', Icons.rocket_launch_rounded, const Color(0xFF38BDF8), () => const NgmyRocketLanderStudio()),
-  _StudioDef('ORBIT STUDIO', 'Slingshot planets', Icons.public_rounded, const Color(0xFFFB923C), () => const NgmyOrbitStudio()),
-  _StudioDef('SWARM STUDIO', 'A living school of fish', Icons.bubble_chart_rounded, const Color(0xFF4ADE80), () => const NgmySwarmStudio()),
-  _StudioDef('CHAIN BURST', 'One tap, a whole chain', Icons.bolt_rounded, const Color(0xFFF472B6), () => const NgmyChainBurstStudio()),
   _StudioDef('TITLE ANIMATOR', 'Make a moving title', Icons.title_rounded, const Color(0xFFFACC15), () => const NgmyTitleStudio()),
   _StudioDef('CIRCUIT LAB', 'Connect logic, learn it', Icons.memory_rounded, const Color(0xFF60A5FA), () => const NgmyCircuitStudio()),
-  _StudioDef('MARBLE MUSIC', 'Marbles ring the notes', Icons.blur_circular_rounded, const Color(0xFF22D3EE), () => const NgmyMarbleStudio()),
-  _StudioDef('ORBIT SEQUENCER', 'Planets play the tune', Icons.track_changes_rounded, const Color(0xFFA78BFA), () => const NgmyOrbitSequencerStudio()),
 ];
 
 class _SequencePicker extends StatelessWidget {
