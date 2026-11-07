@@ -463,6 +463,8 @@ class FamilyTree {
   final String ownerEmail;
   /// Local permission for this device (viewer = QR/file recipient, read-only).
   final FamilyTreeAccessRole localRole;
+  /// Games the person who made the tree wrote by hand (two at most): raw data, read by the family games.
+  final List<Map<String, dynamic>> games;
 
   const FamilyTree({
     required this.id,
@@ -475,6 +477,7 @@ class FamilyTree {
     this.visibleChildrenPerParent = 0,
     this.ownerEmail = '',
     this.localRole = FamilyTreeAccessRole.owner,
+    this.games = const [],
   });
 
   bool get isViewOnly => localRole == FamilyTreeAccessRole.viewer;
@@ -492,6 +495,7 @@ class FamilyTree {
         'visibleChildrenPerParent': visibleChildrenPerParent,
         'ownerEmail': ownerEmail,
         'localRole': familyTreeAccessRoleToString(localRole),
+        'games': games,
       };
 
   factory FamilyTree.fromJson(Map<String, dynamic> json) {
@@ -520,6 +524,10 @@ class FamilyTree {
       visibleChildrenPerParent: (json['visibleChildrenPerParent'] as num?)?.toInt() ?? 0,
       ownerEmail: (json['ownerEmail'] ?? '').toString(),
       localRole: familyTreeAccessRoleFromString(json['localRole']?.toString()),
+      games: [
+        for (final g in (json['games'] is List ? json['games'] as List : const []))
+          if (g is Map) Map<String, dynamic>.from(g),
+      ],
     );
   }
 
@@ -532,6 +540,7 @@ class FamilyTree {
     int? visibleChildrenPerParent,
     String? ownerEmail,
     FamilyTreeAccessRole? localRole,
+    List<Map<String, dynamic>>? games,
   }) {
     return FamilyTree(
       id: id,
@@ -544,6 +553,7 @@ class FamilyTree {
       visibleChildrenPerParent: visibleChildrenPerParent ?? this.visibleChildrenPerParent,
       ownerEmail: ownerEmail ?? this.ownerEmail,
       localRole: localRole ?? this.localRole,
+      games: games ?? this.games,
     );
   }
 }

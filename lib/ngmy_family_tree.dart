@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_family_book_ui.dart';
+import 'ngmy_family_games_ui.dart';
 import 'ngmy_family_tree_payments.dart';
 import 'ngmy_family_tree_sync.dart';
 import 'ngmy_family_tree_sync_ui.dart';
@@ -556,6 +557,22 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
     await _persist();
   }
 
+  void _openGames() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => NgmyFamilyGamesPage(
+        tree: _tree,
+        userEmail: widget.userEmail,
+        isOwner: familyTreeIsOwner(_tree, widget.userEmail),
+        onSaveGames: (games) async {
+          if (!mounted) return;
+          setState(() => _tree = _tree.copyWith(games: games));
+          await _persist();
+        },
+      ),
+    ));
+  }
+
+  /// The tree display settings: how many children show under each parent, hidden people, and the way into the family games.
   Future<void> _openTreeSettings() async {
     if (!_canEdit) {
       _toast('View only — display settings are locked.');
@@ -563,60 +580,122 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
     }
     final p = WorksheetPalette.of(context);
     var limit = _tree.visibleChildrenPerParent;
-    final ok = await showDialog<bool>(
+    final hiddenCount = _tree.members.where((m) => m.hidden).length;
+    final choices = {0, 2, 3, 4, 5, 6, 8, limit}.toList()..sort();
+    final result = await showModalBottomSheet<({int limit, bool games})>(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) => AlertDialog(
-          backgroundColor: p.cardBg,
-          title: Text('Tree display settings', style: TextStyle(color: p.primaryText, fontWeight: FontWeight.w800)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'How many children to show per parent before a "+ more" dropdown (0 = show all).',
-                style: TextStyle(color: p.secondaryText, height: 1.35, fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  IconButton(
-                    onPressed: limit > 0 ? () => setLocal(() => limit -= 1) : null,
-                    icon: const Icon(Icons.remove_circle_outline),
-                  ),
-                  Expanded(
-                    child: Text(
-                      limit == 0 ? 'Show all children' : 'Show $limit children, then dropdown',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontWeight: FontWeight.w800, color: p.primaryText),
+        builder: (ctx, setLocal) => SafeArea(
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+            decoration: BoxDecoration(color: p.cardBg, borderRadius: BorderRadius.circular(26), border: Border.all(color: WorksheetPalette.teal.withValues(alpha: 0.5), width: 1.5)),
+            clipBehavior: Clip.antiAlias,
+            child: SingleChildScrollView(
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const KenteBand(height: 12),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 14, 12, 4),
+                  child: Row(children: [
+                    Container(width: 42, height: 42, decoration: BoxDecoration(color: WorksheetPalette.teal.withValues(alpha: 0.18), shape: BoxShape.circle), child: const Icon(Icons.account_tree_rounded, color: WorksheetPalette.teal)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text('Tree display settings', style: TextStyle(color: p.primaryText, fontWeight: FontWeight.w900, fontSize: 18)),
+                        Text(_tree.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.secondaryText, fontSize: 12.5, fontWeight: FontWeight.w700)),
+                      ]),
                     ),
+                    IconButton(onPressed: () => Navigator.pop(ctx), icon: Icon(Icons.close_rounded, color: p.secondaryText)),
+                  ]),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 10, 18, 4),
+                  child: Text('CHILDREN SHOWN UNDER EACH PARENT', style: TextStyle(color: p.secondaryText, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1)),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  child: Wrap(spacing: 8, runSpacing: 8, children: [
+                    for (final c in choices)
+                      GestureDetector(
+                        onTap: () => setLocal(() => limit = c),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 160),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(color: limit == c ? WorksheetPalette.teal : WorksheetPalette.teal.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: WorksheetPalette.teal, width: limit == c ? 2 : 1)),
+                          child: Text(c == 0 ? 'Show all' : '$c', style: TextStyle(color: limit == c ? Colors.white : WorksheetPalette.teal, fontWeight: FontWeight.w900, fontSize: 14)),
+                        ),
+                      ),
+                  ]),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
+                  child: Text(limit == 0 ? 'Every child shows in the tree.' : 'Only $limit children show under a parent. The rest wait in a "+ more" dropdown.', style: TextStyle(color: p.secondaryText, height: 1.35, fontSize: 12.5)),
+                ),
+                if (hiddenCount > 0)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+                    child: Row(children: [
+                      Icon(Icons.visibility_off_outlined, color: p.secondaryText, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text('$hiddenCount hidden ${hiddenCount == 1 ? 'person' : 'people'}', style: TextStyle(color: p.primaryText, fontWeight: FontWeight.w800))),
+                      Switch(value: _showHidden, activeThumbColor: WorksheetPalette.teal, onChanged: (v) {
+                        setState(() => _showHidden = v);
+                        setLocal(() {});
+                      }),
+                    ]),
                   ),
-                  IconButton(
-                    onPressed: () => setLocal(() => limit += 1),
-                    icon: const Icon(Icons.add_circle_outline),
+                const SizedBox(height: 14),
+                // The way into the games.
+                GestureDetector(
+                  onTap: () => Navigator.pop(ctx, (limit: limit, games: true)),
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 14),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF7C3AED), Color(0xFFB4532A)]), borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: const Color(0xFF7C3AED).withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 5))]),
+                    child: Row(children: [
+                      const Text('🎮', style: TextStyle(fontSize: 38)),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text('Family Games', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
+                          Text('Quizzes, stories by the fire and tests made from the people in this tree. Win Family Stars.', style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.3)),
+                        ]),
+                      ),
+                      const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 18),
+                    ]),
                   ),
-                ],
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.teal),
-              child: const Text('Save'),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+                  child: Row(children: [
+                    Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel'))),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => Navigator.pop(ctx, (limit: limit, games: false)),
+                        style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.teal, padding: const EdgeInsets.symmetric(vertical: 14)),
+                        child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w900)),
+                      ),
+                    ),
+                  ]),
+                ),
+              ]),
             ),
-          ],
+          ),
         ),
       ),
     );
-    if (ok != true || !mounted) return;
-    _pushUndo();
-    setState(() {
-      _tree = _tree.copyWith(visibleChildrenPerParent: limit);
-      _expandedChildGroups.clear();
-    });
-    await _persist();
+    if (result == null || !mounted) return;
+    if (result.limit != _tree.visibleChildrenPerParent) {
+      _pushUndo();
+      setState(() {
+        _tree = _tree.copyWith(visibleChildrenPerParent: result.limit);
+        _expandedChildGroups.clear();
+      });
+      await _persist();
+    }
+    if (result.games && mounted) _openGames();
   }
 
   Future<void> _addMember({String? parentId}) async {
@@ -999,6 +1078,13 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
                     onPressed: _openFamilyBook,
                     p: p,
                     tint: Colors.orange.shade700,
+                  ),
+                  _FamilyTreeMiniTool(
+                    tooltip: 'Family games',
+                    icon: Icons.sports_esports_rounded,
+                    onPressed: _openGames,
+                    p: p,
+                    tint: const Color(0xFF7C3AED),
                   ),
                   if (_canEdit)
                     _FamilyTreeMiniTool(
