@@ -1,8 +1,11 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:ngmy/ngmy_family_fireside.dart';
+import 'package:ngmy/ngmy_family_fireside_art.dart';
 import 'package:ngmy/ngmy_family_games_engine.dart';
 import 'package:ngmy/ngmy_family_games_ui.dart';
 import 'package:ngmy/ngmy_worksheets_storage.dart';
@@ -330,7 +333,13 @@ void main() {
       await t.pump(const Duration(milliseconds: 300));
       final st = t.state(find.byType(FamilyFiresidePage)) as FamilyFiresidePageState;
       expect(st.elderName, 'Babu Juma');
+      // The elder talks: the words come out a few at a time and the mouth moves while they do.
+      expect(st.look.elderTalking, isTrue);
+      expect(st.shown, lessThan(st.elderSays.length));
+      await t.pump(const Duration(seconds: 3));
+      expect(st.look.elderTalking, isFalse);
       expect(find.textContaining('Babu Juma'), findsWidgets);
+      expect(st.look.elderIsWoman, isFalse);
       final fire0 = st.fire;
       await t.tap(find.text('Sit down by the fire'));
       await t.pump(const Duration(milliseconds: 200));
@@ -350,9 +359,35 @@ void main() {
       expect(await FamilyStars.total('f@x.y'), greaterThan(30));
     });
 
-    test('the village scene builds: huts, a baobab, stars and the people round the fire', () {
-      final s = buildVillageScene();
-      expect(s.polys.length, greaterThan(400));
+    test('the painted village draws in every moment of the story without a problem, on a tall phone and a wide screen', () {
+      final clock = ValueNotifier<double>(0);
+      final state = FiresideState();
+      final backdrop = FiresideBackdrop();
+      for (final size in const [Size(450, 900), Size(900, 600), Size(360, 640)]) {
+        for (var step = 0; step <= 4; step++) {
+          for (final woman in [false, true]) {
+            state
+              ..step = step
+              ..elderIsWoman = woman
+              ..elderTalking = step.isEven
+              ..correct = step == 3
+              ..cheerUntil = step == 3 ? 99 : -1
+              ..gaspUntil = step == 2 ? 99 : -1
+              ..answerText = 'I say: 3'
+              ..answerUntil = 99
+              ..reaction = 'Wow...'
+              ..reactionUntil = 99
+              ..fire = step / 4;
+            for (final tm in [0.0, 1.7, 6.3, 21.0]) {
+              clock.value = tm;
+              final rec = ui.PictureRecorder();
+              FiresideArt(clock: clock, state: state, backdrop: backdrop).paint(Canvas(rec), size);
+              rec.endRecording().dispose();
+            }
+          }
+        }
+      }
+      backdrop.dispose();
     });
   });
 }
