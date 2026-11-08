@@ -449,3 +449,95 @@ List<CreatorGame> creatorGamesOf(FamilyTree tree) => [for (final g in tree.games
 bool canMakeCreatorGame(FamilyTree tree, {required bool isOwner}) => isOwner && tree.games.length < kMaxCreatorGames;
 
 String encodeCreatorGames(List<CreatorGame> games) => jsonEncode([for (final g in games) g.toJson()]);
+
+// ─── Who am I: clues about one person, one at a time ─────────────────────────
+
+class WhoRound {
+  const WhoRound(this.id, this.name, this.kind, this.clues, this.options);
+  final String id, name;
+
+  /// Which portrait to draw: 0 grandma, 1 grandpa, 2 mother, 3 father, 4 girl, 5 boy.
+  final int kind;
+
+  /// What the person says about themselves, from the easy-to-miss to the giveaway.
+  final List<String> clues;
+
+  /// The names to pick from (the right one is among them).
+  final List<String> options;
+}
+
+/// The portrait that fits a person: the elders, the parents, and the children.
+int portraitKindOf(FamilyGameData d, FamilyMember m) {
+  final female = m.gender == FamilyGender.female;
+  if (d.depthOf(m) == 0 && d.childrenOf(m).isNotEmpty) return female ? 0 : 1;
+  if (d.childrenOf(m).isNotEmpty || d.spouseOf(m) != null) return female ? 2 : 3;
+  return female ? 4 : 5;
+}
+
+List<WhoRound> whoAmIRounds(FamilyTree tree, {int rounds = 5, int seed = 1}) {
+  final d = FamilyGameData(tree);
+  final r = math.Random(seed);
+  final out = <WhoRound>[];
+  final members = [...d.members]..shuffle(r);
+  final names = [for (final m in d.members) d.nameOf(m)];
+  for (final m in members) {
+    final clues = <String>[];
+    final p = d.parentOf(m);
+    final kids = d.childrenOf(m);
+    final s = d.spouseOf(m);
+    final sibs = d.siblingsOf(m);
+    if (m.birthPlace.trim().isNotEmpty) clues.add('I was born in ${m.birthPlace.trim()}.');
+    if (m.occupation.trim().isNotEmpty) clues.add('I work as ${m.occupation.trim()}.');
+    final y = _year(m.birthDate);
+    if (y != null) clues.add('I was born in the year $y.');
+    if (sibs.isNotEmpty) clues.add('I have ${sibs.length} ${sibs.length == 1 ? 'brother or sister' : 'brothers and sisters'}.');
+    if (kids.isNotEmpty) clues.add('I have ${kids.length} ${kids.length == 1 ? 'child' : 'children'}.');
+    if (s != null) clues.add('I am married to ${d.nameOf(s)}.');
+    if (kids.isNotEmpty) clues.add('I am the ${d.parentWord(m)} of ${d.nameOf(kids.first)}.');
+    if (p != null) clues.add('My ${d.parentWord(p)} is ${d.nameOf(p)}.');
+    if (clues.length < 3) continue;
+    clues.shuffle(r);
+    // The giveaway (a name of a relative) goes last.
+    clues.sort((a, b) => _giveaway(a).compareTo(_giveaway(b)));
+    final name = d.nameOf(m);
+    final wrong = names.where((n) => n != name).toList()..shuffle(r);
+    final options = [name, ...wrong.take(3)]..shuffle(r);
+    out.add(WhoRound(m.id, name, portraitKindOf(d, m), clues.take(4).toList(), options));
+    if (out.length >= rounds) break;
+  }
+  return out;
+}
+
+int _giveaway(String clue) => clue.contains('married to') || clue.contains(' of ') || clue.startsWith('My ') ? 1 : 0;
+
+// ─── Plant the tree: put the children under their parent ─────────────────────
+
+class PlantRound {
+  const PlantRound(this.parent, this.parentKind, this.children, this.childKinds, this.others, this.otherKinds);
+  final String parent;
+  final int parentKind;
+
+  /// The people who really are the parent's children, and the portraits to draw for them.
+  final List<String> children;
+  final List<int> childKinds;
+
+  /// People who are not (to tempt a wrong move).
+  final List<String> others;
+  final List<int> otherKinds;
+}
+
+List<PlantRound> plantRounds(FamilyTree tree, {int rounds = 3, int seed = 1}) {
+  final d = FamilyGameData(tree);
+  final r = math.Random(seed);
+  final out = <PlantRound>[];
+  final parents = [for (final m in d.members) if (d.childrenOf(m).length >= 2) m]..shuffle(r);
+  for (final p in parents) {
+    final kids = d.childrenOf(p).take(4).toList();
+    final others = [for (final m in d.members) if (m.id != p.id && !kids.any((k) => k.id == m.id) && m.parentId != p.id) m]..shuffle(r);
+    if (others.isEmpty) continue;
+    final extra = others.take(math.min(2, others.length)).toList();
+    out.add(PlantRound(d.nameOf(p), portraitKindOf(d, p), [for (final k in kids) d.nameOf(k)], [for (final k in kids) portraitKindOf(d, k)], [for (final o in extra) d.nameOf(o)], [for (final o in extra) portraitKindOf(d, o)]));
+    if (out.length >= rounds) break;
+  }
+  return out;
+}

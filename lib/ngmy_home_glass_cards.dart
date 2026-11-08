@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ngmy_business_card_models.dart';
 import 'ngmy_business_card_renderer.dart';
 import 'ngmy_business_card_storage.dart';
+import 'ngmy_card_share.dart';
 import 'ngmy_civic_id_photo.dart';
 import 'ngmy_civic_registry_id_card.dart';
 import 'ngmy_civic_registry_members.dart';
@@ -261,16 +262,55 @@ class NgmyHomeLocalStore {
   static String _spendingKey(String email) => 'ngmy_home_spending_v1_${email.toLowerCase().trim()}';
   static String _notesKey(String email) => 'ngmy_home_notes_v1_${email.toLowerCase().trim()}';
 
-  static Future<List<NgmySpendingEntry>> loadSpending(String email) async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_spendingKey(email));
-    if (raw == null || raw.isEmpty) return [];
+  /// A second copy of the cards, kept beside the first, so a copy that is cut short or damaged never loses them.
+  static String _backupKey(String email) => 'ngmy_home_spending_backup_v1_${email.toLowerCase().trim()}';
+
+  static List<NgmySpendingEntry>? _decode(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
     try {
       final list = jsonDecode(raw) as List<dynamic>;
       return list.whereType<Map>().map((e) => NgmySpendingEntry.fromJson(Map<String, dynamic>.from(e))).toList();
     } catch (_) {
-      return [];
+      return null;
     }
+  }
+
+  static Future<List<NgmySpendingEntry>> loadSpending(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    final main = _decode(prefs.getString(_spendingKey(email)));
+    final backup = _decode(prefs.getString(_backupKey(email)));
+    if (main != null && (main.isNotEmpty || backup == null || backup.isEmpty)) return main;
+    // The main copy is missing or damaged: bring the cards back from the backup copy.
+    if (backup != null && backup.isNotEmpty) {
+      try {
+        await prefs.setString(_spendingKey(email), prefs.getString(_backupKey(email))!);
+      } catch (_) {}
+      return backup;
+    }
+    return main ?? [];
+  }
+
+  /// Changes some cards and leaves all the others exactly as they are now in storage. Background work (the cloud, the civic ID,
+  /// the business card snapshots) uses this, so it can never write back an old list over a card added a moment ago.
+  static Future<List<NgmySpendingEntry>> patchSpending(String email, {Map<String, NgmySpendingEntry> upsert = const {}, Set<String> remove = const {}, bool syncCloud = true}) async {
+    final cur = await loadSpending(email);
+    final next = <NgmySpendingEntry>[];
+    final used = <String>{};
+    for (final e in cur) {
+      if (remove.contains(e.id)) continue;
+      final u = upsert[e.id];
+      if (u != null) {
+        next.add(u);
+        used.add(e.id);
+      } else {
+        next.add(e);
+      }
+    }
+    for (final u in upsert.values) {
+      if (!used.contains(u.id) && !remove.contains(u.id)) next.insert(0, u);
+    }
+    await saveSpending(email, next, syncCloud: syncCloud);
+    return next;
   }
 
   static String _cloudIdsKey(String email) => 'ngmy_home_cloud_ids_v1_${email.toLowerCase().trim()}';
@@ -322,16 +362,26 @@ class NgmyHomeLocalStore {
       } catch (_) {}
       return e;
     }).toList();
-    final payload = jsonEncode(lean.map((e) => e.toJson()).toList());
-    try {
-      await prefs.setString(_spendingKey(email), payload);
-    } catch (err) {
-      // Last-resort: drop photo/image payloads and retry so cards still persist.
-      final stripped = lean
-          .map((e) => e.copyWith(imageBase64: e.imageBase64.length > 200000 ? '' : e.imageBase64))
-          .toList();
-      await prefs.setString(_spendingKey(email), jsonEncode(stripped.map((e) => e.toJson()).toList()));
+    // Write the cards, and a second copy beside them. If the phone is short of room, the biggest pictures are left out a step at a time
+    // until it fits: the cards themselves are always kept.
+    var wrote = false;
+    for (final limit in const [1 << 30, 200000, 60000, 0]) {
+      final part = limit == 1 << 30 ? lean : lean.map((e) => e.copyWith(imageBase64: e.imageBase64.length > limit ? '' : e.imageBase64)).toList();
+      final payload = jsonEncode(part.map((e) => e.toJson()).toList());
+      try {
+        await prefs.setString(_spendingKey(email), payload);
+        wrote = true;
+        try {
+          await prefs.setString(_backupKey(email), payload);
+        } catch (_) {
+          // No room for the second copy: the first one is what counts.
+        }
+        break;
+      } catch (_) {
+        // Try again with smaller pictures.
+      }
     }
+    if (!wrote) debugPrint('[home cards] the cards could not be written to this phone');
     if (syncCloud) {
       // Refresh payloads for already-saved cloud cards only — never auto-add new ones.
       unawaited(pushSavedHomeCardsToCloud(email, lean));
@@ -351,7 +401,8 @@ class NgmyHomeLocalStore {
     await saveCloudCardIds(email, remote.map((e) => e.id).toList());
     final merged = mergeHomeCardsCloudIntoLocal(local: local, remote: remote);
     if (!_spendingListsEqual(local, merged)) {
-      await saveSpending(email, merged, syncCloud: false);
+      // Patch, not overwrite: a card added while the cloud was answering must stay.
+      await patchSpending(email, upsert: {for (final e in merged) e.id: e}, syncCloud: false);
     }
     return merged;
   }
@@ -2086,7 +2137,12 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
         next.add(e);
       }
     }
-    if (changed) await NgmyHomeLocalStore.saveSpending(widget.userEmail, next, syncCloud: false);
+    if (changed) {
+      // Only the cards that changed are written; every other card stays as it is in storage now.
+      final fresh = {for (final e in next) if (e.hasBusinessCard) e.id: e};
+      final before = {for (final e in spending) e.id: e.businessCardJson};
+      await NgmyHomeLocalStore.patchSpending(widget.userEmail, upsert: {for (final en in fresh.entries) if (before[en.key] != en.value.businessCardJson) en.key: en.value}, syncCloud: false);
+    }
     return next;
   }
 
@@ -2164,7 +2220,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
           return e;
         }
       }).toList();
-      await NgmyHomeLocalStore.saveSpending(widget.userEmail, leanForSave, syncCloud: false);
+      await NgmyHomeLocalStore.patchSpending(widget.userEmail, upsert: {for (final e in leanForSave) if (e.hasCivicId) e.id: e}, syncCloud: false);
     }
     return next;
   }
@@ -2274,7 +2330,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
       if (care['signed'] != true || care['status'] == 'cancelled') {
         if (existing.isEmpty) return cards;
         final next = cards.where((e) => !e.hasHouseCare).toList();
-        await NgmyHomeLocalStore.saveSpending(widget.userEmail, next);
+        await NgmyHomeLocalStore.patchSpending(widget.userEmail, remove: {for (final e in existing) e.id});
         return next;
       }
       final snapshot = ngmyHouseCareSnapshot(care, widget.displayName ?? '');
@@ -2288,7 +2344,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
         houseCareJson: snapshot,
       );
       final next = [entry, ...cards.where((e) => !e.hasHouseCare)];
-      await NgmyHomeLocalStore.saveSpending(widget.userEmail, next);
+      await NgmyHomeLocalStore.patchSpending(widget.userEmail, upsert: {entry.id: entry});
       return next;
     } catch (e) {
       debugPrint('[home cards] house care: $e');
@@ -2344,6 +2400,8 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
   double get _totalSpent => _spending.where((e) => !e.hasImage && !e.isPassword).fold(0.0, (sum, e) => sum + e.amount);
 
   Future<void> _addSpendingEntry(NgmySpendingEntry entry) async {
+    // A card was added: any background refresh that began before now is out of date and must not touch the list.
+    _loadGen++;
     final base = [entry, ..._spending.where((e) => e.id != entry.id && e.id != kNgmyHomeVoteAdCardId)];
     final next = _mergeHomeVoteAd(base, NgmyHomeVoteAdStore.current);
     setState(() => _spending = next);
@@ -2354,10 +2412,25 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
     await _setDeckPrefs(frontSpendingId: entry.id);
   }
 
+  /// Keeps a business card that was just put on Home on the account as well, if one of the 5 places is free.
+  /// If all 5 are used the card stays on this phone only, and the person can free a place in the cloud cards list.
+  Future<void> _keepBusinessCardOnAccount(String json) async {
+    try {
+      final card = _spending.where((e) => e.hasBusinessCard && e.businessCardJson == json).firstOrNull;
+      if (card == null || widget.userEmail.trim().isEmpty) return;
+      final ids = await NgmyHomeLocalStore.loadCloudCardIds(widget.userEmail);
+      if (ids.length >= kNgmyHomeCloudCardSlots) return;
+      await saveHomeCardToCloud(userEmail: widget.userEmail, card: card, allLocal: _spending.where((e) => e.id != kNgmyHomeVoteAdCardId).toList());
+    } catch (e) {
+      debugPrint('[home cards] keep business card on account: $e');
+    }
+  }
+
   Future<void> _deleteSpending(String id) async {
     if (id == kNgmyHomeVoteAdCardId) return;
     final ok = await showNgmyRoboticDeleteConfirm(context, title: 'Remove this card?');
     if (!ok || !mounted) return;
+    _loadGen++;
     setState(() {
       _spending = _spending.where((e) => e.id != id).toList();
       _noteFaceIds.remove(id);
@@ -2716,6 +2789,8 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
             businessCardJson: json,
           ),
         );
+        // A business card is kept on the account too, when there is a free place, so it is still there after the app is reset.
+        unawaited(_keepBusinessCardOnAccount(json));
         return;
       }
       if (kind == 'civic_id') {
@@ -3146,29 +3221,49 @@ class _BusinessCardBody extends StatelessWidget {
         child: Center(child: Text('Business card unavailable', style: TextStyle(color: Colors.white70))),
       );
     }
-    return LayoutBuilder(
-      builder: (context, c) {
-        final w = c.maxWidth;
-        final cardH = w / kNgmyBusinessCardAspect;
-        final scale = math.max(1.0, c.maxHeight / cardH);
-        final renderedWidth = w * scale;
-        return ColoredBox(
-          color: const Color(0xFF0B1220),
-          child: ClipRect(
-            child: OverflowBox(
-              maxWidth: renderedWidth,
-              maxHeight: cardH * scale,
-              alignment: Alignment.center,
-              child: NgmyBusinessCardPreview(
-                document: doc!,
-                width: renderedWidth,
-                interactive: false,
+    return Stack(fit: StackFit.expand, children: [
+      LayoutBuilder(
+        builder: (context, c) {
+          final w = c.maxWidth;
+          final cardH = w / kNgmyBusinessCardAspect;
+          final scale = math.max(1.0, c.maxHeight / cardH);
+          final renderedWidth = w * scale;
+          return ColoredBox(
+            color: const Color(0xFF0B1220),
+            child: ClipRect(
+              child: OverflowBox(
+                maxWidth: renderedWidth,
+                maxHeight: cardH * scale,
+                alignment: Alignment.center,
+                child: NgmyBusinessCardPreview(
+                  document: doc!,
+                  width: renderedWidth,
+                  interactive: false,
+                ),
               ),
             ),
+          );
+        },
+      ),
+      // Share this card with a phone held close (AirDrop), by QR code, or by NFC.
+      Positioned(
+        right: 10,
+        top: 10,
+        child: Tooltip(
+          message: 'Share my card',
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => showNgmyCardShareSheet(context, json),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.55), shape: BoxShape.circle, border: Border.all(color: Colors.white54)),
+              child: const Icon(Icons.nfc_rounded, color: Colors.white, size: 21),
+            ),
           ),
-        );
-      },
-    );
+        ),
+      ),
+    ]);
   }
 }
 

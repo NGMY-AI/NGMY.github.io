@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ngmy/ngmy_family_fireside.dart';
 import 'package:ngmy/ngmy_family_fireside_art.dart';
 import 'package:ngmy/ngmy_family_games_engine.dart';
+import 'package:ngmy/ngmy_family_games_play.dart';
 import 'package:ngmy/ngmy_family_games_ui.dart';
 import 'package:ngmy/ngmy_worksheets_storage.dart';
 
@@ -138,7 +139,7 @@ void main() {
 
   group('playing', () {
     testWidgets('the hub shows the games, and the owner can make two games at most', (t) async {
-      t.view.physicalSize = const Size(900, 2200);
+      t.view.physicalSize = const Size(900, 4200);
       t.view.devicePixelRatio = 2.0;
       addTearDown(t.view.reset);
       var saved = <Map<String, dynamic>>[];
@@ -175,7 +176,7 @@ void main() {
     });
 
     testWidgets('a person who did not make the tree cannot make games, but can play the ones that exist', (t) async {
-      t.view.physicalSize = const Size(900, 2200);
+      t.view.physicalSize = const Size(900, 4200);
       t.view.devicePixelRatio = 2.0;
       addTearDown(t.view.reset);
       final g = CreatorGame(id: 'a', title: 'Grandma quiz', questions: [
@@ -388,6 +389,172 @@ void main() {
         }
       }
       backdrop.dispose();
+    });
+  });
+
+  group('games played with the hands', () {
+    testWidgets('the hub shows eight games, two in every row, none left alone at the bottom', (t) async {
+      t.view.physicalSize = const Size(900, 2600);
+      t.view.devicePixelRatio = 2.0;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(MaterialApp(home: NgmyFamilyGamesPage(tree: sampleTree(), userEmail: 'owner@example.com', isOwner: true, onSaveGames: (_) async {})));
+      await _settle(t);
+      final grid = t.widget<GridView>(find.byType(GridView).first);
+      final delegate = grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
+      expect(delegate.crossAxisCount, 2);
+      final cards = (grid.childrenDelegate as SliverChildListDelegate).children.length;
+      expect(cards, 8);
+      expect(cards.isEven, isTrue, reason: 'two in a row all the way down');
+      for (final name in ['Calabash Catch', 'Plant the Tree', 'Who Am I?']) {
+        expect(find.text(name), findsOneWidget, reason: name);
+      }
+    });
+
+    test('rounds for the new games come from the tree', () {
+      final who = whoAmIRounds(sampleTree(), seed: 2);
+      expect(who.length, greaterThanOrEqualTo(3));
+      for (final r in who) {
+        expect(r.clues.length, inInclusiveRange(3, 4));
+        expect(r.options, contains(r.name));
+        expect(r.options.toSet().length, r.options.length);
+      }
+      final plant = plantRounds(sampleTree(), seed: 2);
+      expect(plant, isNotEmpty);
+      for (final p in plant) {
+        expect(p.children.length, greaterThanOrEqualTo(2));
+        expect(p.others.any(p.children.contains), isFalse, reason: 'a tempting person is never a child of the parent');
+      }
+      expect(plant.any((p) => p.parent == 'Mama Zuri' && p.children.length == 3), isTrue);
+      expect(whoAmIRounds(tinyTree()), isEmpty);
+      expect(plantRounds(tinyTree()), isEmpty);
+    });
+
+    testWidgets('Calabash Catch: slide the basket under the right gourd to score, a wrong gourd costs a life', (t) async {
+      t.view.physicalSize = const Size(900, 1800);
+      t.view.devicePixelRatio = 2.0;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(MaterialApp(home: CalabashCatchPage(tree: sampleTree(), email: 'c@x.y', seed: 4)));
+      await t.pump(const Duration(milliseconds: 300));
+      await t.tap(find.text('Play'));
+      await t.pump(const Duration(milliseconds: 100));
+      final st = t.state(find.byType(CalabashCatchPage)) as CalabashCatchPageState;
+      expect(st.gourds.length, st.q.options.length);
+      // A wrong gourd: the basket goes under it, and a life is lost.
+      final wrongGourd = st.gourds.firstWhere((g) => g.option != st.q.correct);
+      st.basketX = st.targetX = wrongGourd.x;
+      for (var i = 0; i < 400 && st.lives == 3; i++) {
+        st.update(0.05);
+      }
+      expect(st.lives, 2);
+      expect(st.score, 0);
+      // Then the right ones: every time the basket slides under the right gourd.
+      var guard = 0;
+      while (!st.over && guard++ < 6000) {
+        final g = st.gourds.firstWhere((g) => g.option == st.q.correct);
+        st.basketX = st.targetX = g.x;
+        st.update(0.05);
+      }
+      expect(st.over, isTrue);
+      expect(st.right, st.questions.length - 1, reason: 'one question went to the wrong gourd');
+      expect(st.score, greaterThan(700));
+      await t.pump(const Duration(milliseconds: 300));
+      expect(find.text('Back to the games'), findsOneWidget);
+      expect(await FamilyStars.total('c@x.y'), greaterThan(30));
+    });
+
+    testWidgets('Calabash Catch: if the basket never catches the right gourd, the three lives run out', (t) async {
+      t.view.physicalSize = const Size(900, 1800);
+      t.view.devicePixelRatio = 2.0;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(MaterialApp(home: CalabashCatchPage(tree: sampleTree(), email: 'd@x.y', seed: 4)));
+      await t.pump(const Duration(milliseconds: 300));
+      await t.tap(find.text('Play'));
+      await t.pump(const Duration(milliseconds: 100));
+      final st = t.state(find.byType(CalabashCatchPage)) as CalabashCatchPageState;
+      var guard = 0;
+      while (!st.over && guard++ < 6000) {
+        // The basket stays far off to the side, where no gourd is.
+        st.basketX = st.targetX = -1;
+        st.update(0.05);
+      }
+      expect(st.over, isTrue);
+      expect(st.lives, 0);
+      expect(st.right, 0);
+    });
+
+    testWidgets('Plant the Tree: a real drag of a child onto a branch plants it, a stranger bounces back, and the tree finishes', (t) async {
+      t.view.physicalSize = const Size(900, 1800);
+      t.view.devicePixelRatio = 2.0;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(MaterialApp(home: PlantTreePage(tree: sampleTree(), email: 'p@x.y', seed: 3)));
+      await t.pump(const Duration(milliseconds: 400));
+      final st = t.state(find.byType(PlantTreePage)) as PlantTreePageState;
+      final p = st.rounds[0];
+      int chipOf(bool child) => st.chips.indexWhere((c) => child ? c.childIndex >= 0 : c.childIndex < 0);
+      // Drag a real child with a finger.
+      final kid = chipOf(true);
+      final from = t.getCenter(find.byKey(ValueKey('chip-$kid')));
+      final to = t.getCenter(find.byKey(const ValueKey('slot-0')));
+      await t.dragFrom(from, to - from);
+      await t.pump(const Duration(milliseconds: 300));
+      expect(st.slots[0], kid, reason: 'the child stays on the branch');
+      expect(st.planted, 1);
+      // A person who is not a child is refused.
+      final stranger = chipOf(false);
+      final from2 = t.getCenter(find.byKey(ValueKey('chip-$stranger')));
+      final to2 = t.getCenter(find.byKey(const ValueKey('slot-1')));
+      await t.dragFrom(from2, to2 - from2);
+      await t.pump(const Duration(milliseconds: 300));
+      expect(st.slots[1], -1);
+      expect(st.mistakes, 1);
+      expect(find.textContaining('is not a child of ${p.parent}'), findsOneWidget);
+      await t.pump(const Duration(seconds: 1));
+      // Plant the rest, round after round.
+      while (!st.done) {
+        for (var s = 0; s < st.slots.length; s++) {
+          if (st.slots[s] != -1) continue;
+          final c = st.chips.indexWhere((c) => c.childIndex >= 0 && !st.slots.contains(st.chips.indexOf(c)));
+          st.drop(s, c);
+        }
+        await t.pump(const Duration(milliseconds: 1000));
+        expect(st.roundDone, isTrue);
+        await st.next();
+        await t.pump(const Duration(milliseconds: 300));
+      }
+      expect(find.text('Back to the games'), findsOneWidget);
+      expect(await FamilyStars.total('p@x.y'), greaterThan(10));
+    });
+
+    testWidgets('Who Am I: a new clue comes by itself, a wrong name is crossed out, the right name shows the face', (t) async {
+      t.view.physicalSize = const Size(900, 2000);
+      t.view.devicePixelRatio = 2.0;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(MaterialApp(home: WhoAmIPage(tree: sampleTree(), email: 'w@x.y', seed: 6)));
+      await t.pump(const Duration(milliseconds: 400));
+      final st = t.state(find.byType(WhoAmIPage)) as WhoAmIPageState;
+      expect(st.shownClues, 1);
+      await t.pump(const Duration(milliseconds: 3300));
+      expect(st.shownClues, 2, reason: 'a new clue comes by itself');
+      for (var round = 0; round < st.rounds.length; round++) {
+        final r = st.r;
+        if (round == 0) {
+          final wrong = r.options.indexWhere((o) => o != r.name);
+          st.guess(wrong);
+          await t.pump(const Duration(milliseconds: 100));
+          expect(st.wrong, contains(wrong));
+          expect(st.revealed, isFalse);
+        }
+        st.guess(r.options.indexOf(r.name));
+        await t.pump(const Duration(milliseconds: 1000));
+        expect(st.revealed, isTrue);
+        expect(find.text('It is ${r.name}!  +${st.earned}'), findsOneWidget);
+        await st.next();
+        await t.pump(const Duration(milliseconds: 300));
+      }
+      expect(st.done, isTrue);
+      expect(st.rightCount, st.rounds.length);
+      expect(find.text('Back to the games'), findsOneWidget);
+      expect(await FamilyStars.total('w@x.y'), greaterThan(10));
     });
   });
 }

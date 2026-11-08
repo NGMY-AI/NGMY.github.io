@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'ngmy_family_fireside.dart';
+import 'ngmy_family_games_play.dart';
 import 'ngmy_family_games_engine.dart';
 import 'ngmy_worksheets_storage.dart';
 
@@ -56,8 +57,8 @@ class _KentePainter extends CustomPainter {
 }
 
 /// The page every game sits on: night blue, a kente band, a title and a back button.
-class _GameShell extends StatelessWidget {
-  const _GameShell({required this.title, required this.child, this.actions = const []});
+class FamilyGameShell extends StatelessWidget {
+  const FamilyGameShell({required this.title, required this.child, this.actions = const []});
   final String title;
   final Widget child;
   final List<Widget> actions;
@@ -85,7 +86,7 @@ class _GameShell extends StatelessWidget {
       );
 }
 
-Widget _bigButton(String label, VoidCallback? onTap, {Color color = kGold, Color ink = kEarth, IconData? icon}) => GestureDetector(
+Widget familyBigButton(String label, VoidCallback? onTap, {Color color = kGold, Color ink = kEarth, IconData? icon}) => GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
@@ -98,8 +99,8 @@ Widget _bigButton(String label, VoidCallback? onTap, {Color color = kGold, Color
     );
 
 /// What the player won, shown at the end of every game: stars, the badge, and a new record.
-class _Winnings extends StatelessWidget {
-  const _Winnings({required this.stars, required this.total, required this.record});
+class FamilyWinnings extends StatelessWidget {
+  const FamilyWinnings({required this.stars, required this.total, required this.record});
   final int stars, total;
   final bool record;
 
@@ -146,7 +147,7 @@ class _NgmyFamilyGamesPageState extends State<NgmyFamilyGamesPage> {
   final Map<String, int> _best = {};
   int _seed = DateTime.now().millisecondsSinceEpoch % 100000;
 
-  static const _ids = ['kahoot', 'fire', 'memory', 'order', 'test'];
+  static const _ids = ['kahoot', 'fire', 'catch', 'plant', 'who', 'memory', 'order', 'test'];
 
   @override
   void initState() {
@@ -240,7 +241,9 @@ class _NgmyFamilyGamesPageState extends State<NgmyFamilyGamesPage> {
     String best(String id) => (_best[id] ?? 0) > 0 ? 'Best ${_best[id]}' : 'NEW';
     final orderOk = orderRounds(tree).isNotEmpty;
     final memoryOk = memoryPairs(tree).length >= 3;
-    return _GameShell(
+    final plantOk = plantRounds(tree).isNotEmpty;
+    final whoOk = whoAmIRounds(tree).isNotEmpty;
+    return FamilyGameShell(
       title: 'Family Games · ${tree.name}',
       child: ListView(padding: const EdgeInsets.fromLTRB(14, 8, 14, 30), children: [
         Container(
@@ -274,6 +277,9 @@ class _NgmyFamilyGamesPageState extends State<NgmyFamilyGamesPage> {
           children: [
             _card('🎯', 'Family Kahoot', 'Race the clock. Answer fast, keep a streak, climb the podium against your family.', const Color(0xFF7C3AED), () => _play(FamilyKahootPage(title: 'Family Kahoot', subtitle: tree.name, questions: generateFamilyQuestions(tree, count: 10, seed: _seed), email: widget.userEmail, treeId: tree.id, gameId: 'kahoot', rivals: _rivals)), tag: best('kahoot')),
             _card('🔥', 'Fireside Stories', 'Sit by the fire in the village. The elder teaches, the children answer.', const Color(0xFFB4532A), () => _play(FamilyFiresidePage(tree: tree, email: widget.userEmail, seed: _seed)), tag: best('fire')),
+            _card('🧺', 'Calabash Catch', 'Gourds with the answers fall from the baobab. Slide the basket under the right one!', const Color(0xFFC2410C), () => _play(CalabashCatchPage(tree: tree, email: widget.userEmail, seed: _seed)), tag: best('catch')),
+            _card('🌱', 'Plant the Tree', 'Drag the children onto the branches under their parent and watch the tree grow.', const Color(0xFF166534), plantOk ? () => _play(PlantTreePage(tree: tree, email: widget.userEmail, seed: _seed)) : null, tag: best('plant'), why: 'Add a parent with two children, and one more person.'),
+            _card('🎭', 'Who Am I?', 'A shadow turns into a face as the clues come. Who is hiding in it?', const Color(0xFFBE185D), whoOk ? () => _play(WhoAmIPage(tree: tree, email: widget.userEmail, seed: _seed)) : null, tag: best('who'), why: 'Add at least 3 people with some facts about them (parents, jobs, birthplaces).'),
             _card('🪘', 'Memory Drums', 'Flip the drums and match every person with the clue about them.', const Color(0xFF0F766E), memoryOk ? () => _play(MemoryDrumsPage(tree: tree, email: widget.userEmail, seed: _seed)) : null, tag: best('memory'), why: 'Add at least 3 people with parents, children, spouses, jobs or birthplaces.'),
             _card('🌳', 'Elder Order', 'Who is older? Put the children and the generations in the right order.', const Color(0xFF15803D), orderOk ? () => _play(ElderOrderPage(tree: tree, email: widget.userEmail, seed: _seed)) : null, tag: best('order'), why: 'Add a parent with two children, or a family with more than one generation.'),
             _card('📜', 'Family Test', 'A real test of 10 questions with a grade and a certificate at the end.', const Color(0xFFB45309), () => _play(FamilyTestPage(tree: tree, email: widget.userEmail, seed: _seed)), tag: best('test')),
@@ -474,7 +480,7 @@ class FamilyKahootPageState extends State<FamilyKahootPage> {
 
   @override
   Widget build(BuildContext context) {
-    return _GameShell(title: widget.title, child: switch (phase) {
+    return FamilyGameShell(title: widget.title, child: switch (phase) {
       _KPhase.intro => _intro(),
       _KPhase.countdown => Center(child: Text('$countdown', style: const TextStyle(color: kGold, fontSize: 130, fontWeight: FontWeight.w900))),
       _KPhase.ask || _KPhase.reveal => _question(),
@@ -493,7 +499,7 @@ class FamilyKahootPageState extends State<FamilyKahootPage> {
             const SizedBox(height: 14),
             Text('${widget.questions.length} questions. The faster you answer, the more points you win. Keep a streak for a bonus.', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, height: 1.4)),
             const SizedBox(height: 22),
-            _bigButton('Play', start, icon: Icons.play_arrow_rounded),
+            familyBigButton('Play', start, icon: Icons.play_arrow_rounded),
           ]),
         ),
       );
@@ -588,9 +594,9 @@ class FamilyKahootPageState extends State<FamilyKahootPage> {
           ]),
         ),
       const SizedBox(height: 10),
-      _Winnings(stars: wonStars, total: totalStars == 0 ? wonStars : totalStars, record: record),
+      FamilyWinnings(stars: wonStars, total: totalStars == 0 ? wonStars : totalStars, record: record),
       const SizedBox(height: 16),
-      Center(child: _bigButton('Back to the games', () => Navigator.of(context).maybePop(), icon: Icons.arrow_back_rounded)),
+      Center(child: familyBigButton('Back to the games', () => Navigator.of(context).maybePop(), icon: Icons.arrow_back_rounded)),
     ]);
   }
 }
@@ -649,7 +655,7 @@ class FamilyTestPageState extends State<FamilyTestPage> {
   }
 
   @override
-  Widget build(BuildContext context) => _GameShell(title: 'Family Test · ${widget.tree.name}', child: done ? _result() : _paper());
+  Widget build(BuildContext context) => FamilyGameShell(title: 'Family Test · ${widget.tree.name}', child: done ? _result() : _paper());
 
   Widget _paper() {
     final q = qs[index];
@@ -682,7 +688,7 @@ class FamilyTestPageState extends State<FamilyTestPage> {
             ),
           ),
         const Spacer(),
-        Center(child: _bigButton(index + 1 >= qs.length ? 'Hand in the test' : 'Next question', selected < 0 ? null : next, icon: Icons.arrow_forward_rounded)),
+        Center(child: familyBigButton(index + 1 >= qs.length ? 'Hand in the test' : 'Next question', selected < 0 ? null : next, icon: Icons.arrow_forward_rounded)),
       ]),
     );
   }
@@ -709,7 +715,7 @@ class FamilyTestPageState extends State<FamilyTestPage> {
         ]),
       ),
       const SizedBox(height: 14),
-      _Winnings(stars: wonStars, total: totalStars == 0 ? wonStars : totalStars, record: record),
+      FamilyWinnings(stars: wonStars, total: totalStars == 0 ? wonStars : totalStars, record: record),
       if (wrong.isNotEmpty) ...[
         const SizedBox(height: 16),
         const Text('LET US LEARN FROM THESE', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w900, fontSize: 11.5, letterSpacing: 1.2)),
@@ -728,7 +734,7 @@ class FamilyTestPageState extends State<FamilyTestPage> {
           ),
       ],
       const SizedBox(height: 14),
-      Center(child: _bigButton('Back to the games', () => Navigator.of(context).maybePop(), icon: Icons.arrow_back_rounded)),
+      Center(child: familyBigButton('Back to the games', () => Navigator.of(context).maybePop(), icon: Icons.arrow_back_rounded)),
     ]);
   }
 }
@@ -813,7 +819,7 @@ class MemoryDrumsPageState extends State<MemoryDrumsPage> {
   }
 
   @override
-  Widget build(BuildContext context) => _GameShell(
+  Widget build(BuildContext context) => FamilyGameShell(
         title: 'Memory Drums',
         child: done
             ? ListView(padding: const EdgeInsets.all(20), children: [
@@ -821,9 +827,9 @@ class MemoryDrumsPageState extends State<MemoryDrumsPage> {
                 const Center(child: Text('Every drum is matched!', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 24))),
                 Center(child: Text('$moves moves', style: const TextStyle(color: kGold, fontWeight: FontWeight.w800))),
                 const SizedBox(height: 16),
-                _Winnings(stars: wonStars, total: totalStars == 0 ? wonStars : totalStars, record: record),
+                FamilyWinnings(stars: wonStars, total: totalStars == 0 ? wonStars : totalStars, record: record),
                 const SizedBox(height: 16),
-                Center(child: _bigButton('Back to the games', () => Navigator.of(context).maybePop(), icon: Icons.arrow_back_rounded)),
+                Center(child: familyBigButton('Back to the games', () => Navigator.of(context).maybePop(), icon: Icons.arrow_back_rounded)),
               ])
             : Padding(
                 padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
@@ -976,21 +982,21 @@ class ElderOrderPageState extends State<ElderOrderPage> {
   @override
   Widget build(BuildContext context) {
     if (done) {
-      return _GameShell(
+      return FamilyGameShell(
         title: 'Elder Order',
         child: ListView(padding: const EdgeInsets.all(20), children: [
           const Center(child: Text('🌳', style: TextStyle(fontSize: 70))),
           Center(child: Text('$rightRounds of ${rounds.length} rounds right', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 24))),
           const SizedBox(height: 16),
-          _Winnings(stars: wonStars, total: totalStars == 0 ? wonStars : totalStars, record: record),
+          FamilyWinnings(stars: wonStars, total: totalStars == 0 ? wonStars : totalStars, record: record),
           const SizedBox(height: 16),
-          Center(child: _bigButton('Back to the games', () => Navigator.of(context).maybePop(), icon: Icons.arrow_back_rounded)),
+          Center(child: familyBigButton('Back to the games', () => Navigator.of(context).maybePop(), icon: Icons.arrow_back_rounded)),
         ]),
       );
     }
     final r = rounds[round];
     final order = [for (var k = 0; k < r.names.length; k++) k]..sort((a, b) => r.ranks[a].compareTo(r.ranks[b]));
-    return _GameShell(
+    return FamilyGameShell(
       title: 'Elder Order',
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1027,8 +1033,8 @@ class ElderOrderPageState extends State<ElderOrderPage> {
           const SizedBox(height: 12),
           Center(
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              if (!checked && tapped.isNotEmpty) ...[_bigButton('Start again', reset, color: Colors.white24, ink: Colors.white), const SizedBox(width: 10)],
-              if (checked) _bigButton(round + 1 >= rounds.length ? 'See my result' : 'Next round', next, icon: Icons.arrow_forward_rounded),
+              if (!checked && tapped.isNotEmpty) ...[familyBigButton('Start again', reset, color: Colors.white24, ink: Colors.white), const SizedBox(width: 10)],
+              if (checked) familyBigButton(round + 1 >= rounds.length ? 'See my result' : 'Next round', next, icon: Icons.arrow_forward_rounded),
             ]),
           ),
         ]),
@@ -1096,7 +1102,7 @@ class FamilyGameBuilderPageState extends State<FamilyGameBuilderPage> {
     InputDecoration deco(String label) => InputDecoration(labelText: label, labelStyle: const TextStyle(color: Colors.white60), filled: true, fillColor: Colors.white10, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none), isDense: true);
     const shapes = ['▲', '◆', '●', '■'];
     const colors = [Color(0xFFE21B3C), Color(0xFF1368CE), Color(0xFFD89E00), Color(0xFF26890C)];
-    return _GameShell(
+    return FamilyGameShell(
       title: 'Make your game',
       actions: [TextButton(onPressed: save, child: const Text('SAVE', style: TextStyle(color: kGold, fontWeight: FontWeight.w900)))],
       child: ListView(padding: const EdgeInsets.fromLTRB(14, 6, 14, 40), children: [
@@ -1145,7 +1151,7 @@ class FamilyGameBuilderPageState extends State<FamilyGameBuilderPage> {
             );
           }),
         ],
-        if (game.questions.length < kMaxCreatorQuestions) Center(child: _bigButton('＋ Add a question', addQuestion, color: Colors.white24, ink: Colors.white)),
+        if (game.questions.length < kMaxCreatorQuestions) Center(child: familyBigButton('＋ Add a question', addQuestion, color: Colors.white24, ink: Colors.white)),
       ]),
     );
   }

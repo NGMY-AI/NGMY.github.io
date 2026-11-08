@@ -14,6 +14,7 @@ import 'ngmy_business_card_storage.dart';
 import 'ngmy_home_vote_ad_studio.dart';
 import 'ngmy_hub_form_ui.dart';
 import 'ngmy_hud_tech_shell.dart';
+import 'ngmy_card_share.dart';
 import 'ngmy_qr_download.dart';
 
 const _kBizCardHudColors = [
@@ -602,6 +603,15 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
                         ),
                         icon: const Icon(Icons.download_rounded),
                         label: const Text('Download'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Share the card with a phone held close (AirDrop), by QR code, or by NFC.
+                    Tooltip(
+                      message: 'Share my card',
+                      child: IconButton.filledTonal(
+                        onPressed: () => showNgmyCardShareSheet(context, jsonEncode(_doc.toJson())),
+                        icon: const Icon(Icons.nfc_rounded),
                       ),
                     ),
                   ],

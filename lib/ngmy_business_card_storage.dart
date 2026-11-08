@@ -10,15 +10,30 @@ final ValueNotifier<int> ngmyHomeCardsRevision = ValueNotifier<int>(0);
 
 void ngmyBumpHomeCardsRevision() => ngmyHomeCardsRevision.value++;
 
+/// The key the cards of one person are kept under. It is made from the email itself, so it never changes by itself (the first version used a hash of the
+/// email, and a hash can change when the app is built again, which made saved cards seem to vanish).
 String _cardsKeyForUser(String userEmail) {
   final e = userEmail.toLowerCase().trim();
   if (e.isEmpty) return kNgmyBusinessCardsKey;
-  return '${kNgmyBusinessCardsKey}_${e.hashCode.abs()}';
+  return '${kNgmyBusinessCardsKey}_u_$e';
 }
+
+/// The keys older versions used for the same person, tried when nothing is found under the new key.
+String _oldHashKey(String userEmail) => '${kNgmyBusinessCardsKey}_${userEmail.toLowerCase().trim().hashCode.abs()}';
 
 Future<List<Map<String, dynamic>>> loadNgmyBusinessCards({String userEmail = ''}) async {
   final prefs = await SharedPreferences.getInstance();
-  final raw = prefs.getString(_cardsKeyForUser(userEmail));
+  var raw = prefs.getString(_cardsKeyForUser(userEmail));
+  if (raw == null || raw.isEmpty) {
+    // Cards saved by an older version: find them, and move them under the new key.
+    final old = prefs.getString(_oldHashKey(userEmail));
+    if (old != null && old.isNotEmpty && userEmail.trim().isNotEmpty) {
+      raw = old;
+      try {
+        await prefs.setString(_cardsKeyForUser(userEmail), old);
+      } catch (_) {}
+    }
+  }
   if (raw == null || raw.isEmpty) return [];
   try {
     final list = jsonDecode(raw);
