@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_core_reaction_lab.dart';
 import 'package:ngmy/ngmy_core_studios_a.dart';
+import 'package:ngmy/ngmy_title_studio.dart';
 import 'package:ngmy/ngmy_core_circuit_lab.dart';
 import 'package:ngmy/ngmy_core_note_lab.dart';
 import 'package:ngmy/ngmy_core_studios_b.dart';
@@ -144,7 +145,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1200));
     await tester.enterText(find.byType(TextField), 'HELLO');
     await tester.pump(const Duration(milliseconds: 1200));
-    expect(find.text('H'), findsWidgets);
-    expect(find.text('O'), findsWidgets);
+    // The title is drawn by one painter, so look at what the painter was given.
+    final painters = tester.widgetList<CustomPaint>(find.byType(CustomPaint)).map((p) => p.painter).whereType<TitleCardPainter>().toList();
+    expect(painters, isNotEmpty);
+    expect(painters.first.text, 'HELLO');
   });
 }

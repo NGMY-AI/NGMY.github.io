@@ -39,6 +39,13 @@ class _NgmyUniverseHubState extends State<NgmyUniverseHub> {
   late int _fact = math.Random().nextInt(kUniverseFacts.length);
 
   @override
+  void initState() {
+    super.initState();
+    // Read the map of the world now, while the phone may be online, so the Earth Globe also opens with no internet.
+    UWorld.load().then((_) {}, onError: (Object _) {});
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF05060B),

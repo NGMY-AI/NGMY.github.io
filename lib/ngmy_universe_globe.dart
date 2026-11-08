@@ -60,10 +60,20 @@ class _NgmyGlobeStudioState extends State<NgmyGlobeStudio> with SingleTickerProv
     if (w != null) {
       _setWorld(w);
     } else {
-      UWorld.load().then((w) {
-        if (mounted) setState(() => _setWorld(w));
-      });
+      _loadWorld();
     }
+  }
+
+  /// True when the map of the world could not be read (a phone that is offline and never saved it).
+  bool _loadFailed = false;
+
+  void _loadWorld() {
+    setState(() => _loadFailed = false);
+    UWorld.load().then((w) {
+      if (mounted) setState(() => _setWorld(w));
+    }).catchError((Object _) {
+      if (mounted) setState(() => _loadFailed = true);
+    });
   }
 
   @override
@@ -253,7 +263,22 @@ class _NgmyGlobeStudioState extends State<NgmyGlobeStudio> with SingleTickerProv
                 ),
               ),
             ),
-            if (_world == null) const Center(child: CircularProgressIndicator(color: Color(0xFF38BDF8))),
+            if (_world == null && !_loadFailed) const Center(child: CircularProgressIndicator(color: Color(0xFF38BDF8))),
+            if (_world == null && _loadFailed)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(28),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.cloud_off_rounded, color: Color(0xFF38BDF8), size: 46),
+                    const SizedBox(height: 10),
+                    const Text('The map of the world is not saved on this phone yet', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                    const SizedBox(height: 6),
+                    const Text('Connect to the internet once and open the globe. After that it works with no internet at all.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, height: 1.35)),
+                    const SizedBox(height: 14),
+                    FilledButton.icon(onPressed: _loadWorld, icon: const Icon(Icons.refresh_rounded), label: const Text('Try again')),
+                  ]),
+                ),
+              ),
             if (sel != null)
               Positioned(left: 10, right: 10, bottom: 8, child: _card(sel)),
           ]),

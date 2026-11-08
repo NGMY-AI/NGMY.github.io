@@ -213,6 +213,8 @@ const CRITICAL_OFFLINE_URLS = [
   './assets/assets/fonts/Roboto-Medium.ttf',
   './assets/assets/fonts/Roboto-Bold.ttf',
   './assets/assets/fonts/NotoColorEmoji.ttf',
+  // The map of the world for the Earth Globe, so it works offline the very first time, even if it was never opened online.
+  './assets/assets/data/world110.json',
   './assets/assets/twemoji/1f4dd.png',
   './assets/assets/twemoji/1f1fa-1f1f8.png',
   './assets/assets/twemoji/1f1f9-1f1ff.png',

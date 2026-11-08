@@ -543,7 +543,7 @@ void _standing(Canvas c, Offset base, double sc, double t, _Look look, {_Stand p
 }
 
 /// A seated person drawn from the shoulders up in detail: a real face with eyes that look and blink, a mouth that talks, hands that gesture.
-void _seated(Canvas c, Offset base, double sc, _Look look, _Pose p, double t, int id) {
+void _seated(Canvas c, Offset base, double sc, _Look look, _Pose p, double t, int id, {Offset? light}) {
   c.save();
   c.translate(base.dx, base.dy - p.bounce * sc);
   c.scale(sc);
@@ -554,7 +554,7 @@ void _seated(Canvas c, Offset base, double sc, _Look look, _Pose p, double t, in
   c.saveLayer(bounds, Paint());
   _drawPerson(c, look, p, t, id);
   // The firelight falls on the side that faces the fire, only on the person.
-  final toFire = FiresideArt._fire.dx - base.dx;
+  final toFire = (light ?? FiresideArt._fire).dx - base.dx;
   final side = toFire >= 0 ? 1.0 : -1.0;
   c.drawRect(bounds, Paint()
     ..blendMode = BlendMode.srcATop
@@ -1027,3 +1027,59 @@ void _granary(Canvas c, Offset b) {
   c.drawOval(Rect.fromCenter(center: b + const Offset(0, -26), width: 36, height: 24), _f(const Color(0xFF6B4A38)));
   c.drawPath(Path()..moveTo(b.dx - 24, b.dy - 30)..lineTo(b.dx, b.dy - 54)..lineTo(b.dx + 24, b.dy - 30)..quadraticBezierTo(b.dx, b.dy - 24, b.dx - 24, b.dy - 30)..close(), _f(const Color(0xFF7A5A2E)));
 }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// The same people for the other games
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// The people of the village that the other games can draw: 0 an elder grandfather, 1 an elder grandmother, 2 a boy, 3 a girl with braids,
+/// 4 a boy in a red check shuka, 5 a girl with puffs and a wax-print dress, 6 a father, 7 a mother.
+const int kFolkLooks = 8;
+
+_Look _folkLook(int k) {
+  switch (k % kFolkLooks) {
+    case 0:
+      return const _Look(skin: Color(0xFF5C3A21), cloth: Color(0xFFB91C1C), accent: Color(0xFFF2B01E), hair: Color(0xFFE5E7EB), hairStyle: 1, elder: true, pattern: 1);
+    case 1:
+      return const _Look(skin: Color(0xFF6B4423), cloth: Color(0xFF7C3AED), accent: Color(0xFFF2B01E), hair: Color(0xFFE5E7EB), hairStyle: 2, female: true, elder: true, pattern: 2, wrap: Color(0xFFDB2777));
+    case 2:
+      return const _Look(skin: Color(0xFF8D5524), cloth: Color(0xFF2E9B4F), accent: Color(0xFFFFFFFF), hair: Color(0xFF1F1209), hairStyle: 0, child: true);
+    case 3:
+      return const _Look(skin: Color(0xFFA9703A), cloth: Color(0xFFDB2777), accent: Color(0xFFF2B01E), hair: Color(0xFF1F1209), hairStyle: 3, female: true, child: true, pattern: 2);
+    case 4:
+      return const _Look(skin: Color(0xFF6B4423), cloth: Color(0xFFD62828), accent: Color(0xFF111111), hair: Color(0xFF1F1209), hairStyle: 5, child: true, pattern: 3);
+    case 5:
+      return const _Look(skin: Color(0xFF7A4A28), cloth: Color(0xFFF59E0B), accent: Color(0xFF7C3AED), hair: Color(0xFF1F1209), hairStyle: 4, female: true, child: true, pattern: 2);
+    case 6:
+      return const _Look(skin: Color(0xFF5C3A21), cloth: Color(0xFF1D4ED8), accent: Color(0xFFF2B01E), hair: Color(0xFF1F1209), hairStyle: 5, pattern: 1);
+    default:
+      return const _Look(skin: Color(0xFF6B4423), cloth: Color(0xFF0F766E), accent: Color(0xFFF2B01E), hair: Color(0xFF1F1209), hairStyle: 2, female: true, pattern: 2, wrap: Color(0xFFF59E0B));
+  }
+}
+
+/// Draws one seated villager with a real face. [base] is where they sit, [scale] about 1 is a person 110 tall.
+/// [mouth] opens the mouth (talking), [smile] goes from -1 to 1, [gx] and [gy] are where the eyes look, [handL] and [handR] are where the hands go
+/// (relative to the person, y is up and negative), [light] is where a warm light comes from.
+void paintFolk(Canvas c, {required Offset base, required double scale, required int look, double t = 0, double mouth = 0, double smile = 0.3, double brow = 0, double squint = 0, double gx = 0, double gy = 0, double turn = 0, double tilt = 0, double nod = 0, double bounce = 0, Offset? handL, Offset? handR, bool stick = false, Offset? light}) {
+  final p = _Pose()
+    ..mouth = mouth
+    ..smile = smile
+    ..brow = brow
+    ..squint = squint
+    ..gx = gx
+    ..gy = gy
+    ..turn = turn
+    ..tilt = tilt
+    ..nod = nod
+    ..bounce = bounce
+    ..handL = handL ?? const Offset(-36, -24)
+    ..handR = handR ?? const Offset(36, -24)
+    ..stick = stick;
+  _seated(c, base, scale, _folkLook(look), p, t, look, light: light);
+}
+
+/// A talking mouth: how open it is at moment [t] (for a person who is speaking).
+double folkTalk(double t, double seed) => (0.2 + 0.8 * math.sin(t * 10 + seed).abs()) * (0.55 + 0.45 * math.sin(t * 3.1 + seed * 2));
+
+/// The still village of the Fireside game as a picture the other games can use as a backdrop (sky, hills, huts, baobab, ground).
+void paintVillageBackdrop(Canvas c, Size size, FiresideBackdrop backdrop) => c.drawPicture(backdrop.of(size));

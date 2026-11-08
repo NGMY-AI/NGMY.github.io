@@ -239,45 +239,14 @@ FamilyQuestion _shuffled(FamilyQuestion q, math.Random r) {
 /// How many questions of a tree come from its own people (the rest are culture).
 int treeQuestionCount(FamilyTree tree) => generateFamilyQuestions(tree, count: 10, seed: 7).where((q) => q.kind != 'culture').length;
 
-// ─── Memory drums: a name and a clue belong together ──────────────────────────
-
-class MemoryPair {
-  const MemoryPair(this.id, this.name, this.clue);
-  final String id, name, clue;
-}
-
-List<MemoryPair> memoryPairs(FamilyTree tree, {int pairs = 6, int seed = 1}) {
-  final d = FamilyGameData(tree);
-  final r = math.Random(seed);
-  final out = <MemoryPair>[];
-  final usedClues = <String>{};
-  final members = [...d.members]..shuffle(r);
-  for (final m in members) {
-    final name = d.nameOf(m);
-    final options = <String>[];
-    final p = d.parentOf(m);
-    if (p != null) options.add('${d.childWord(m)[0].toUpperCase()}${d.childWord(m).substring(1)} of ${d.nameOf(p)}');
-    final kids = d.childrenOf(m);
-    if (kids.isNotEmpty) options.add('${d.parentWord(m)[0].toUpperCase()}${d.parentWord(m).substring(1)} of ${d.nameOf(kids.first)}');
-    final s = d.spouseOf(m);
-    if (s != null) options.add('Married to ${d.nameOf(s)}');
-    if (m.occupation.trim().isNotEmpty) options.add('Works as ${m.occupation.trim()}');
-    if (m.birthPlace.trim().isNotEmpty) options.add('Born in ${m.birthPlace.trim()}');
-    options.shuffle(r);
-    final clue = options.where((c) => !usedClues.contains(c)).firstOrNull;
-    if (clue == null) continue;
-    usedClues.add(clue);
-    out.add(MemoryPair(m.id, name, clue));
-    if (out.length >= pairs) break;
-  }
-  return out;
-}
-
 // ─── Elder order: put people in the right order ──────────────────────────────
 
 class OrderRound {
-  const OrderRound(this.title, this.hint, this.names, this.ranks);
+  const OrderRound(this.title, this.hint, this.names, this.ranks, [this.kinds = const []]);
   final String title, hint;
+
+  /// Which portrait to draw for each person (see [portraitKindOf]); empty when it does not matter.
+  final List<int> kinds;
 
   /// The people to put in order, and where each belongs (0 first).
   final List<String> names;
@@ -292,7 +261,7 @@ List<OrderRound> orderRounds(FamilyTree tree, {int rounds = 4, int seed = 1}) {
   for (final p in parents) {
     final kids = d.childrenOf(p).take(5).toList();
     if (kids.map((k) => k.birthOrder).toSet().length < kids.length) continue;
-    out.add(OrderRound('The children of ${d.nameOf(p)}', 'Tap them from the oldest to the youngest.', [for (final k in kids) d.nameOf(k)], [for (var i = 0; i < kids.length; i++) i]));
+    out.add(OrderRound('The children of ${d.nameOf(p)}', 'Tap two people to swap them. Put them in a line from the oldest to the youngest.', [for (final k in kids) d.nameOf(k)], [for (var i = 0; i < kids.length; i++) i], [for (final k in kids) portraitKindOf(d, k)]));
     if (out.length >= rounds) return out;
   }
   // Generations: the elders first, the youngest last.
@@ -303,7 +272,7 @@ List<OrderRound> orderRounds(FamilyTree tree, {int rounds = 4, int seed = 1}) {
   if (byDepth.length >= 2 && out.length < rounds) {
     final depths = byDepth.keys.toList()..sort();
     final pick = [for (final dep in depths.take(5)) (byDepth[dep]!..shuffle(r)).first];
-    out.add(OrderRound('Which generation comes first?', 'Tap them from the eldest generation to the youngest.', [for (final m in pick) d.nameOf(m)], [for (var i = 0; i < pick.length; i++) i]));
+    out.add(OrderRound('Which generation comes first?', 'Tap two people to swap them. Put the eldest generation first and the youngest last.', [for (final m in pick) d.nameOf(m)], [for (var i = 0; i < pick.length; i++) i], [for (final m in pick) portraitKindOf(d, m)]));
   }
   return out;
 }

@@ -92,10 +92,18 @@ class UWorld {
   static UWorld? _cached;
   static Future<UWorld>? _loading;
 
-  static Future<UWorld> load() => _loading ??= _read();
+  /// Loads the map of the world. A load that failed (the phone was offline and had never saved the map) is forgotten, so the next try really tries again.
+  static Future<UWorld> load() async {
+    try {
+      return await (_loading ??= _read());
+    } catch (_) {
+      _loading = null;
+      rethrow;
+    }
+  }
 
   static Future<UWorld> _read() async {
-    final raw = await rootBundle.loadString('assets/data/world110.json');
+    final raw = await rootBundle.loadString('assets/data/world110.json', cache: false);
     return _cached = parse(raw);
   }
 

@@ -8,6 +8,7 @@ import 'package:ngmy/ngmy_family_fireside.dart';
 import 'package:ngmy/ngmy_family_fireside_art.dart';
 import 'package:ngmy/ngmy_family_games_engine.dart';
 import 'package:ngmy/ngmy_family_games_play.dart';
+import 'package:ngmy/ngmy_family_games_scenes.dart';
 import 'package:ngmy/ngmy_family_games_ui.dart';
 import 'package:ngmy/ngmy_worksheets_storage.dart';
 
@@ -92,14 +93,6 @@ void main() {
       }
     });
 
-    test('memory pairs: each person has one clue and no clue is used twice', () {
-      final pairs = memoryPairs(sampleTree(), seed: 4);
-      expect(pairs.length, greaterThanOrEqualTo(3));
-      expect(pairs.map((p) => p.clue).toSet().length, pairs.length);
-      expect(pairs.map((p) => p.id).toSet().length, pairs.length);
-      expect(memoryPairs(tinyTree()).length, lessThan(3));
-    });
-
     test('elder order: children from the oldest, and generations when no parent has two children', () {
       final rounds = orderRounds(sampleTree(), seed: 1);
       expect(rounds, isNotEmpty);
@@ -145,7 +138,7 @@ void main() {
       var saved = <Map<String, dynamic>>[];
       await t.pumpWidget(MaterialApp(home: NgmyFamilyGamesPage(tree: sampleTree(), userEmail: 'owner@example.com', isOwner: true, onSaveGames: (g) async => saved = g)));
       await _settle(t);
-      for (final name in ['Family Kahoot', 'Fireside Stories', 'Memory Drums', 'Elder Order', 'Family Test']) {
+      for (final name in ['Family Kahoot', 'Fireside Stories', 'Calabash Catch', 'Plant the Tree', 'Who Am I?', 'Safari Journey', 'Line Up', 'Village School']) {
         expect(find.text(name), findsOneWidget, reason: name);
       }
       expect(find.textContaining('Make your own game'), findsOneWidget);
@@ -244,86 +237,6 @@ void main() {
       await t.pump(const Duration(seconds: 4));
       await t.pump(const Duration(seconds: 25));
       await t.pump(const Duration(seconds: 4));
-    });
-
-    testWidgets('Family Test: ten questions, a grade and a certificate, and the mistakes are explained', (t) async {
-      t.view.physicalSize = const Size(900, 2000);
-      t.view.devicePixelRatio = 2.0;
-      addTearDown(t.view.reset);
-      await t.pumpWidget(MaterialApp(home: FamilyTestPage(tree: sampleTree(), email: 'test@x.y', seed: 4)));
-      await _settle(t);
-      final st = t.state(find.byType(FamilyTestPage)) as FamilyTestPageState;
-      for (var i = 0; i < 10; i++) {
-        final q = st.qs[i];
-        // Get every third answer wrong.
-        final pick = i % 3 == 2 ? (q.correct + 1) % q.options.length : q.correct;
-        await t.tap(find.text(q.options[pick]).first);
-        await t.pump();
-        await t.tap(find.text(i == 9 ? 'Hand in the test' : 'Next question'));
-        await t.pump(const Duration(milliseconds: 100));
-      }
-      await t.pump(const Duration(milliseconds: 300));
-      expect(st.done, isTrue);
-      expect(find.text('CERTIFICATE'), findsOneWidget);
-      expect(find.text('LET US LEARN FROM THESE'), findsOneWidget);
-      expect(await FamilyStars.total('test@x.y'), greaterThan(0));
-    });
-
-    testWidgets('Memory Drums: flipping two that do not match turns them back, matching all of them wins', (t) async {
-      t.view.physicalSize = const Size(900, 2000);
-      t.view.devicePixelRatio = 2.0;
-      addTearDown(t.view.reset);
-      await t.pumpWidget(MaterialApp(home: MemoryDrumsPage(tree: sampleTree(), email: 'm@x.y', seed: 3)));
-      await _settle(t);
-      final st = t.state(find.byType(MemoryDrumsPage)) as MemoryDrumsPageState;
-      // A wrong pair first: two cards that are not each other's partner.
-      final a = 0;
-      final b = [for (var i = 1; i < st.cards.length; i++) i].firstWhere((i) => st.cards[i].pairId != st.cards[a].pairId);
-      st.flip(a);
-      st.flip(b);
-      await t.pump();
-      expect(st.cards[a].up && st.cards[b].up, isTrue);
-      await t.pump(const Duration(milliseconds: 400));
-      expect(find.text(st.cards[a].text), findsOneWidget, reason: 'a drum that is flipped shows its words');
-      await t.pump(const Duration(seconds: 1));
-      expect(st.cards[a].up || st.cards[b].up, isFalse, reason: 'they turn back');
-      // Now match everything.
-      for (final p in st.pairs) {
-        final i = st.cards.indexWhere((c) => c.pairId == p.id && c.isName);
-        final j = st.cards.indexWhere((c) => c.pairId == p.id && !c.isName);
-        st.flip(i);
-        st.flip(j);
-        await t.pump(const Duration(milliseconds: 50));
-      }
-      await t.pump(const Duration(seconds: 1));
-      expect(st.done, isTrue);
-      expect(find.text('Every drum is matched!'), findsOneWidget);
-      expect(await FamilyStars.total('m@x.y'), greaterThanOrEqualTo(st.pairs.length * 5));
-    });
-
-    testWidgets('Elder Order: the right order wins, a wrong one is explained', (t) async {
-      t.view.physicalSize = const Size(900, 1800);
-      t.view.devicePixelRatio = 2.0;
-      addTearDown(t.view.reset);
-      await t.pumpWidget(MaterialApp(home: ElderOrderPage(tree: sampleTree(), email: 'o@x.y', seed: 2)));
-      await _settle(t);
-      final st = t.state(find.byType(ElderOrderPage)) as ElderOrderPageState;
-      for (var r = 0; r < st.rounds.length; r++) {
-        final round = st.rounds[r];
-        final wrongRound = r == 1;
-        final order = [for (var k = 0; k < round.names.length; k++) k]..sort((a, b) => round.ranks[a].compareTo(round.ranks[b]));
-        final tapOrder = wrongRound ? order.reversed.toList() : order;
-        for (final i in tapOrder) {
-          st.tap(i);
-        }
-        await t.pump();
-        expect(st.correct, !wrongRound, reason: 'round ${r + 1}');
-        expect(st.checked, isTrue);
-        await st.next();
-        await t.pump();
-      }
-      expect(st.done, isTrue);
-      expect(st.rightRounds, st.rounds.length - 1);
     });
 
     testWidgets('Fireside Stories: the elder is the oldest in the tree, teaches, asks, and the fire grows with right answers', (t) async {
@@ -555,6 +468,149 @@ void main() {
       expect(st.rightCount, st.rounds.length);
       expect(find.text('Back to the games'), findsOneWidget);
       expect(await FamilyStars.total('w@x.y'), greaterThan(10));
+    });
+
+    testWidgets('Village School: the teacher writes each question on the board, you answer, the board is wiped, and the report card comes at the end', (t) async {
+      t.view.physicalSize = const Size(900, 1800);
+      t.view.devicePixelRatio = 2.0;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(MaterialApp(home: FamilySchoolPage(tree: sampleTree(), email: 's@x.y', seed: 4)));
+      await t.pump(const Duration(milliseconds: 400));
+      final st = t.state(find.byType(FamilySchoolPage)) as FamilySchoolPageState;
+      expect(st.teacherName, 'Babu Juma');
+      await t.tap(find.text('Start the test'));
+      await t.pump(const Duration(milliseconds: 100));
+      for (var i = 0; i < 10; i++) {
+        if (i == 0) {
+          expect(st.writing, isTrue, reason: 'the teacher is writing the first question');
+          expect(find.text('The teacher is writing…'), findsOneWidget);
+        }
+        await t.pump(const Duration(seconds: 3));
+        expect(st.writing, isFalse);
+        // Every third answer is wrong.
+        final q = st.q;
+        final pick = i % 3 == 2 ? (q.correct + 1) % q.options.length : q.correct;
+        await t.tap(find.text(q.options[pick]).last);
+        await t.pump(const Duration(milliseconds: 1200));
+      }
+      await t.pump(const Duration(seconds: 1));
+      expect(st.done, isTrue);
+      expect(find.text('REPORT CARD'), findsOneWidget);
+      expect(find.text('THE TEACHER EXPLAINS THESE'), findsOneWidget);
+      expect(st.right, 7);
+      expect(await FamilyStars.total('s@x.y'), greaterThan(20));
+    });
+
+    testWidgets('Line Up: tap two people to swap them, the right line makes everybody cheer, and a wrong line is explained', (t) async {
+      t.view.physicalSize = const Size(900, 1800);
+      t.view.devicePixelRatio = 2.0;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(MaterialApp(home: FamilyLineUpPage(tree: sampleTree(), email: 'l@x.y', seed: 5)));
+      await t.pump(const Duration(milliseconds: 500));
+      final st = t.state(find.byType(FamilyLineUpPage)) as FamilyLineUpPageState;
+      expect(st.slots.length, greaterThanOrEqualTo(2));
+      final before = [...st.slots];
+      // A real tap on the screen where the first person stands picks them up, and a tap on another person swaps the two.
+      final box = t.getRect(find.byType(CustomPaint).last);
+      Offset at(int pos) {
+        final u = (box.width / 450) < (box.height / 900) ? box.width / 450 : box.height / 900;
+        final dx = box.left + (box.width - 450 * u) / 2, dy = box.top + (box.height - 900 * u) / 2;
+        return Offset(dx + 450 * (pos + 0.5) / st.slots.length * u, dy + 560 * u);
+      }
+      await t.tapAt(at(0));
+      await t.pump(const Duration(milliseconds: 100));
+      expect(st.selected, before[0]);
+      await t.tapAt(at(1));
+      await t.pump(const Duration(milliseconds: 600));
+      expect(st.slots[0], before[1]);
+      expect(st.slots[1], before[0]);
+      expect(st.selected, -1);
+      for (var round = 0; round < st.rounds.length; round++) {
+        final r = st.r;
+        // Put the line right by swapping, one swap at a time.
+        for (var k = 0; k < r.names.length; k++) {
+          final want = [for (var p = 0; p < r.names.length; p++) p].firstWhere((p) => r.ranks[p] == k);
+          if (st.slots[k] != want) {
+            st.tapPerson(st.slots[k]);
+            st.tapPerson(want);
+          }
+        }
+        await t.pump(const Duration(milliseconds: 800));
+        if (round == 1) {
+          // A wrong line first: swap two, check, and the answer is shown.
+          st.tapPerson(st.slots[0]);
+          st.tapPerson(st.slots[1]);
+          st.check();
+          await t.pump(const Duration(milliseconds: 300));
+          expect(st.correct, isFalse);
+          expect(find.textContaining('The right line is'), findsOneWidget);
+        } else {
+          st.check();
+          await t.pump(const Duration(milliseconds: 300));
+          expect(st.correct, isTrue);
+          expect(find.textContaining('right line'), findsOneWidget);
+        }
+        await st.next();
+        await t.pump(const Duration(milliseconds: 300));
+      }
+      expect(st.done, isTrue);
+      expect(st.rightRounds, st.rounds.length - 1);
+      expect(find.text('Back to the games'), findsOneWidget);
+      expect(await FamilyStars.total('l@x.y'), greaterThan(5));
+    });
+
+    testWidgets('Safari Journey: the bus drives to each stop, a villager asks, a wrong answer is a flat tyre, and Home is at the end', (t) async {
+      t.view.physicalSize = const Size(900, 1800);
+      t.view.devicePixelRatio = 2.0;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(MaterialApp(home: FamilyJourneyPage(tree: sampleTree(), email: 'j@x.y', seed: 6)));
+      await t.pump(const Duration(milliseconds: 400));
+      final st = t.state(find.byType(FamilyJourneyPage)) as FamilyJourneyPageState;
+      expect(st.stage.name, 'intro');
+      await t.tap(find.text('Start the journey'));
+      await t.pump(const Duration(milliseconds: 200));
+      expect(st.stage.name, 'driving');
+      final start = st.scroll;
+      for (var k = 0; k < 13; k++) {
+        await t.pump(const Duration(milliseconds: 100));
+      }
+      expect(st.scroll, greaterThan(start), reason: 'the bus is moving');
+      for (var i = 0; i < st.stops.length; i++) {
+        // The bus drives in small steps, like real frames.
+        for (var k = 0; k < 80 && st.stage.name == 'driving'; k++) {
+          await t.pump(const Duration(milliseconds: 100));
+        }
+        expect(st.stage.name, 'asking', reason: 'stop ${i + 1}: the bus has arrived and a villager asks');
+        expect(st.stop, i);
+        await t.pump(const Duration(seconds: 3));
+        final q = st.q;
+        final wrong = i == 2;
+        await t.tap(find.text(q.options[wrong ? (q.correct + 1) % q.options.length : q.correct]).last);
+        await t.pump(const Duration(milliseconds: 300));
+        expect(st.stage.name, 'reacting');
+        expect(st.flat, wrong, reason: 'a wrong answer is a flat tyre');
+        await t.pump(const Duration(seconds: 3));
+        await t.tap(find.text(i + 1 >= st.stops.length ? 'Drive home' : 'Drive on'));
+        await t.pump(const Duration(milliseconds: 100));
+      }
+      for (var k = 0; k < 80 && st.stage.name == 'driving'; k++) {
+        await t.pump(const Duration(milliseconds: 100));
+      }
+      await t.pump(const Duration(milliseconds: 500));
+      expect(st.stage.name, 'arrived');
+      expect(st.right, st.stops.length - 1);
+      expect(find.text('Back to the games'), findsOneWidget);
+      expect(await FamilyStars.total('j@x.y'), greaterThan(20));
+    });
+
+    test('the people of the other games draw with every look, and every kind of portrait has a villager', () async {
+      final rec = ui.PictureRecorder();
+      final c = Canvas(rec);
+      for (var look = 0; look < kFolkLooks; look++) {
+        paintFolk(c, base: Offset(50.0 + look * 60, 150), scale: 1, look: look, t: 1.0, mouth: 0.6, smile: 0.8, handL: const Offset(-30, -90), handR: const Offset(30, -100), light: const Offset(0, 0));
+      }
+      rec.endRecording().dispose();
+      expect(kFolkLooks, greaterThanOrEqualTo(8));
     });
   });
 }
