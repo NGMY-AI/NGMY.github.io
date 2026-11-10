@@ -23,5 +23,5 @@ return B.bw(y.a,y.b,y.c,y.d,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,
 u(d){var y=this
 return"HSVColor("+B.w(y.a)+", "+B.w(y.b)+", "+B.w(y.c)+", "+B.w(y.d)+")"}}
 var z=a.updateTypes([]);(function inheritance(){var y=a.inherit
-y(C.p6,B.aD)})();(function constants(){D.apI=new B.a0(983930,"MaterialIcons",!1)})()};
-(a=>{a["s1ilriYkpnPm8PfX33Xlco69dUs="]=a.current})($__dart_deferred_initializers__);
+y(C.p6,B.aD)})();(function constants(){D.apK=new B.a0(983930,"MaterialIcons",!1)})()};
+(a=>{a["aAT37CLPY7AmAuUNBzmQxEqeAn4="]=a.current})($__dart_deferred_initializers__);
