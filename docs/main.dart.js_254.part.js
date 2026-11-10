@@ -1,6 +1,18 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
-$__dart_deferred_initializers__.current=function(a,b,c,$){var A,B
-A=c[0]
-B=c[96]
-var z=a.updateTypes([]);(function constants(){B.BC=new A.ba(33e3)})()};
-(a=>{a["v58HwSSKL85eG5kLlCUNj3RIvKU="]=a.current})($__dart_deferred_initializers__);
+$__dart_deferred_initializers__.current=function(a,b,c,$){var J,C,A,B={a5e:function a5e(){}},D
+J=c[1]
+C=c[0]
+A=c[2]
+B=a.updateHolder(c[48],B)
+D=c[267]
+B.a5e.prototype={
+A(d,e){if(e==null)return!1
+if(J.bQ(e)!==C.b0(this))return!1
+return e instanceof B.a5e},
+gX(d){return C.bv("tnum",1,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h)},
+u(d){return"FontFeature('tnum', 1)"}}
+var z=a.updateTypes([]);(function inheritance(){var y=a.inherit
+y(B.a5e,C.aD)})();(function constants(){var y=a.makeConstList
+D.b7l=new B.a5e()
+D.a4f=y([D.b7l],C.at("O<a5e>"))})()};
+(a=>{a["ePW5z/Ij6MPIHOjLR+9aGF7uUnU="]=a.current})($__dart_deferred_initializers__);

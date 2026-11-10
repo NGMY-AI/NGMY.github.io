@@ -1,49 +1,22 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
-$__dart_deferred_initializers__.current=function(a,b,c,$){var A,B,C={
-huA(){var x,w=$.bBN
-$.frr=$.bBM=$.bBN=null
-if(w!=null&&B.a.a0(w,"blob:"))try{(self.URL||self.webkitURL).revokeObjectURL(w)}catch(x){}},
-hpU(){var x=window.navigator.userAgent.toLowerCase(),w=!0
-if(!B.a.t(x,"iphone"))if(!B.a.t(x,"ipad"))if(!B.a.t(x,"ipod"))w=B.a.t(x,"macintosh")&&B.a.t(x,"mobile")
-return w},
-hrT(d){var x=A.af("[^\\w\\-.]+",!0,!1,!1,!1),w=A.aN(d,x,"_")
-return B.a.c8(w,".pdf")?w:w+".pdf"},
-fQe(d,e){var x=0,w=A.j(y.g),v,u,t,s,r
-var $async$fQe=A.e(function(f,g){if(f===1)return A.f(g,w)
-for(;;)switch(x){case 0:r=C.hrT(e)
-if(C.hpU()){C.huA()
-r=C.hrT(r)
-$.frr=d
-$.bBM=r
-u=(self.URL||self.webkitURL).createObjectURL(A.hL([d],"application/pdf"))
-u.toString
-$.bBN=u
-v="__ngmy_slides_pdf_staged__"
-x=1
-break}u=(self.URL||self.webkitURL).createObjectURL(A.hL([d],"application/pdf"))
-u.toString
-t=A.mS(u)
-t.download=r
-s=t.style
-s.display="none"
-s=document.body
-if(s!=null)s.appendChild(t).toString
-t.click()
-x=3
-return A.b(A.bQ(B.jf,null,y.f),$async$fQe)
-case 3:B.AD.fl(t);(self.URL||self.webkitURL).revokeObjectURL(u)
-v="Downloaded "+r
-x=1
-break
-case 1:return A.h(v,w)}})
-return A.i($async$fQe,w)}},D
-A=c[0]
-B=c[2]
-C=a.updateHolder(c[30],C)
-D=c[171]
+$__dart_deferred_initializers__.current=function(a,b,c,$){var B,C,A
+B=c[0]
+C=c[2]
+A=c[188]
 var z=a.updateTypes([])
-var y={g:A.aw("n"),f:A.aw("~")};(function constants(){D.afZ=new A.u(1,0.0392156862745098,0.06274509803921569,0.12549019607843137,B.q)
-D.Ml=new A.u(1,0.10196078431372549,0.07058823529411765,0.03137254901960784,B.q)})();(function staticFields(){$.bBN=null
-$.bBM=null
-$.frr=null})()};
-(a=>{a["dCd5oBtMgSYsUGgH+KiKqJ80FHE="]=a.current})($__dart_deferred_initializers__);
+var y={c:B.at("O<u>")};(function constants(){var x=a.makeConstList
+A.a4S=x([C.bf,C.ei],y.c)
+A.ddI=x([C.b6,C.bD],y.c)
+A.uE=new B.a9(C.a5,C.a8,C.x,A.ddI,null,null)
+A.Bn=new B.u(1,0.10196078431372549,0.07058823529411765,0.023529411764705882,C.q)
+A.ajK=new B.Q(0,5,0,0)
+A.ak5=new B.Q(14,10,14,12)
+A.alv=new B.Q(8,8,8,10)
+A.amE=new B.a0(58029,"MaterialIcons",!1)
+A.O7=new B.a0(58031,"MaterialIcons",!1)
+A.a1_=new B.a0(58038,"MaterialIcons",!1)
+A.amF=new B.a0(58050,"MaterialIcons",!1)
+A.aeu=new B.u(1,0.16470588235294117,0.10196078431372549,0.0196078431372549,C.q)
+A.Z2=new B.u(1,0.4196078431372549,0.12941176470588237,0.6588235294117647,C.q)
+A.aac=new B.F(!0,null,null,null,null,null,10,C.U,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)})()};
+(a=>{a["X3h4IB8WKp8DHvLf19LLfbABvKQ="]=a.current})($__dart_deferred_initializers__);
