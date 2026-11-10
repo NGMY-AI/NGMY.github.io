@@ -1,10 +1,23 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
-$__dart_deferred_initializers__.current=function(a,b,c,$){var A,C,B
-A=c[0]
-C=c[2]
-B=c[178]
-var z=a.updateTypes([]);(function constants(){var y=a.makeConstList
-B.aTc=new A.F(!0,null,null,null,null,null,18,C.H,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-B.aoS=new A.a0(983333,"MaterialIcons",!1)
-B.dfF=y([0,0.25,0.5,0.75,1],A.at("O<J>"))})()};
-(a=>{a["1puwxNy3AD3DOsbtehxoIM9l/gk="]=a.current})($__dart_deferred_initializers__);
+$__dart_deferred_initializers__.current=function(a,b,c,$){var B,A,E,D={a7Z:function a7Z(d,e,f,g,h,i){var _=this
+_.c=d
+_.d=e
+_.e=f
+_.f=g
+_.r=h
+_.a=i}},C
+B=c[0]
+A=c[2]
+E=c[234]
+D=a.updateHolder(c[34],D)
+C=c[283]
+D.a7Z.prototype={
+B(d){var x=this,w=null,v=B.Q(d).ax.a===A.J,u=v?E.aiP:C.bpt,t=B.m(10),s=B.J(v?A.aX:C.bdJ,A.r,1),r=y.a
+return B.p(w,B.x(B.a([B.B(B.a([B.E(B.d(x.c,w,w,w,w,w,w,A.f3,w,w,w),1),B.aH(w,w,w,w,C.bVP,w,w,w,x.r,w,w,w,w,"Full screen sign (landscape)",A.cc)],r),A.m,w,A.e,A.i,0,w,w),new B.aIv(x.d,x.e,120,A.cq,A.N,3.5,w),new B.bM(A.a8,w,w,B.bN(!1,A.Eq,w,w,!0,w,w,w,x.f,w,w),w)],r),A.E,w,A.e,A.i,0,A.p),A.f,w,w,new B.o(u,w,s,t,w,w,A.n),w,w,w,w,A.bT,w,w,w)}}
+var z=a.updateTypes([]);(function inheritance(){var x=a.inherit
+x(D.a7Z,B.aw)})()
+B.j0(b.typeUniverse,JSON.parse('{"a7Z":{"aw":[],"v":[]}}'))
+var y={a:B.at("O<v>")};(function constants(){C.bdJ=new B.u(1,0.792156862745098,0.8392156862745098,0.9529411764705882,A.q)
+C.bpt=new B.u(1,0.9529411764705882,0.9647058823529412,1,A.q)
+C.bVP=new B.ae(A.a2e,22,A.aW,null,null,null)})()};
+(a=>{a["H5wQpBRR/CUg4l5Wrmh9xBmQMy4="]=a.current})($__dart_deferred_initializers__);
