@@ -93,7 +93,8 @@ class NgmyRoomProjectPage extends StatefulWidget {
 class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
   late RoomProject p;
   late int seed = widget.seed ?? DateTime.now().millisecondsSinceEpoch % 100000;
-  final Cam3 cam = Cam3(yaw: -0.12, pitch: 0.4, dist: 205, target: const V3(0, -4, 28))
+  // You start inside the room, close to the wall that has the boxes, not looking at a small model of it from far away. Zoom out to see all of it.
+  final Cam3 cam = Cam3(yaw: -0.12, pitch: 0.14, dist: 130, target: const V3(0, -2, 12))
     ..maxDist = 300
     // Fixing a wall: you can look a little to each side and up and down, but never round behind the room or under the floor.
     ..yawRange = 0.7
@@ -196,7 +197,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
   // ── Camera ──
 
   void _roomView() {
-    cam.glideTo(target: const V3(0, -4, 28), dist: 205, yaw: behind ? math.pi : -0.12, pitch: 0.4);
+    cam.glideTo(target: behind ? const V3(0, -4, 28) : const V3(0, -2, 12), dist: behind ? 205 : 130, yaw: behind ? math.pi : -0.12, pitch: behind ? 0.4 : 0.14);
   }
 
   /// Double tap: go to that place, like on a map. The view moves to where you tapped on the wall (or the floor) and comes close, so you can look at it from there.
@@ -219,7 +220,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
     cam.yawCenter = 0;
     setState(() => active = -1);
     _rebuild();
-    cam.glideTo(target: const V3(0, -4, 28), dist: 205, yaw: -0.12, pitch: 0.4);
+    cam.glideTo(target: const V3(0, -2, 12), dist: 130, yaw: -0.12, pitch: 0.14);
   }
 
   /// From the floor, looking up at the ceiling: easy to see the lights, the fan and their wires.
@@ -702,6 +703,8 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
   @override
   Widget build(BuildContext context) {
     final tray = picked >= 0 && phase == 2 ? _trayFor(picked) : _trays[phase];
+    // Turned on its side there is little room: no phase tabs and no hint, only the tray, with the phase as its first button.
+    final sideways = MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
     final d = active >= 0 ? p.devs[active] : null;
     final lesson = d == null ? null : electricalLesson(d.kind);
     final stageText = 'Phase ${phase + 1}/3';
@@ -766,6 +769,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
         ),
         panel: Column(mainAxisSize: MainAxisSize.min, children: [
           if (d == null) ...[
+            if (!sideways) ...[
             Row(children: [
               for (var i = 0; i < 3; i++)
                 Expanded(
@@ -796,9 +800,28 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
             else
               const Text('Practice mode: no hints. You will only hear from me when something is wrong.', style: TextStyle(color: Colors.white38, fontSize: 11.5)),
             const SizedBox(height: 6),
+            ],
             SizedBox(
               height: 52,
               child: ListView(key: const Key('room-tray'), scrollDirection: Axis.horizontal, children: [
+                if (sideways)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 7),
+                    child: GestureDetector(
+                      key: const Key('phase-chip'),
+                      onTap: () => setState(() {
+                        phase = (phase + 1) % 3;
+                        picked = -1;
+                        armed = '';
+                        _rebuild();
+                      }),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(color: kConAmber.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(14), border: Border.all(color: kConAmber)),
+                        child: Center(child: Text('${(phase == 0 ? p.roughDone : (phase == 1 ? p.drywallDone : p.devicesDone)) ? '✅ ' : ''}${kPhaseNames[phase]}', style: const TextStyle(color: kConAmber, fontWeight: FontWeight.w900, fontSize: 12.5))),
+                      ),
+                    ),
+                  ),
                 if (phase < 2 && !p.drywallDone)
                   Padding(
                     padding: const EdgeInsets.only(right: 7),

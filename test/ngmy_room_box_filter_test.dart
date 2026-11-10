@@ -4,35 +4,80 @@ import 'package:ngmy/ngmy_construction_project.dart';
 import 'package:ngmy/ngmy_construction_projectpage.dart';
 import 'package:ngmy/ngmy_construction_roomscene.dart';
 
-const _red = Color(0xFFEF4444), _green = Color(0xFF22C55E), _cyan = Color(0xFF67E8F9);
+const _red = Color(0xFFEF4444), _green = Color(0xFF22C55E);
 
-int count(List<dynamic> polys, int id, Color c) => polys.where((p) => p.id == id && p.color == c).length;
 
 void main() {
-  test('every box that is not fixed has a tiny red frame and a blinking red dot, green once it is fixed, and the picked box has no red frame', () {
+  test('every box has a little light that blinks red until its device is in and wired right, then blinks green, and there are no frames', () {
     final p = RoomProject(seed: 3, kind: 0)..fastForward();
-    final first = p.orders.first.slot, second = p.orders[1].slot;
+    final first = p.orders.first.slot;
     final marks = roomDynamic(p, 0.0, {}, marks: true);
     for (final o in p.orders) {
-      expect(count(marks, idSlotBase + o.slot, _red), greaterThan(4), reason: 'frame and dot on spot ${o.slot}');
+      final mine = marks.where((q) => q.id == idSlotBase + o.slot).toList();
+      expect(mine, isNotEmpty, reason: 'a light on spot ${o.slot}');
+      expect(mine.every((q) => q.color == _red), isTrue, reason: 'red: not fixed yet');
+      expect(mine.length, lessThan(60), reason: 'just a small light, no frame round the box');
     }
-    // No marks outside the devices phase.
-    expect(count(roomDynamic(p, 0.0, {}), idSlotBase + first, _red), 0);
-    // The dot blinks: on, then off.
-    final off = roomDynamic(p, 0.5, {}, marks: true);
-    expect(off.length, lessThan(marks.length));
-    // The box you picked loses its red frame (it shows a cyan one), the others keep theirs.
+    // No lights outside the devices phase.
+    expect(roomDynamic(p, 0.0, {}).where((q) => q.id == idSlotBase + first), isEmpty);
+    // It blinks: lit, then dark.
+    expect(roomDynamic(p, 0.5, {}, marks: true).where((q) => q.id >= idSlotBase && q.id < idSlotBase + 7), isEmpty);
+    expect(roomDynamic(p, 0.9, {}, marks: true).where((q) => q.id >= idSlotBase && q.id < idSlotBase + 7), isNotEmpty);
+    // The box you picked has a bigger light, the same colour.
+    double size(List<dynamic> polys, int slot) {
+      final xs = [for (final q in polys.where((q) => q.id == idSlotBase + slot)) for (final v in q.pts) v.x as double];
+      return xs.reduce((a, b) => a > b ? a : b) - xs.reduce((a, b) => a < b ? a : b);
+    }
+
     final pickedMarks = roomDynamic(p, 0.0, {}, marks: true, picked: first);
-    expect(count(pickedMarks, idSlotBase + first, _cyan), 24, reason: 'a frame of four bars, six faces each');
-    expect(count(pickedMarks, idSlotBase + first, _red), count(marks, idSlotBase + first, _red) - 24, reason: 'only the frame goes: the dot stays');
-    expect(count(pickedMarks, idSlotBase + second, _red), count(marks, idSlotBase + second, _red));
-    // Once the job is done every box has a green dot and no red frame.
+    expect(size(pickedMarks, first), greaterThan(size(marks, first)));
+    // One device in but not covered or not wired: still red. Everything fixed right: green.
+    p.installDevice(first, p.orders.first.device);
+    expect(roomDynamic(p, 0.0, {}, marks: true).where((q) => q.id == idSlotBase + first).every((q) => q.color == _red), isTrue);
     p.completeWiring();
     final done = roomDynamic(p, 0.0, {}, marks: true);
     for (final o in p.orders) {
-      expect(count(done, idSlotBase + o.slot, _red), 0, reason: 'spot ${o.slot} is fixed');
-      expect(count(done, idSlotBase + o.slot, _green), greaterThan(0));
+      final mine = done.where((q) => q.id == idSlotBase + o.slot).toList();
+      expect(mine, isNotEmpty);
+      expect(mine.every((q) => q.color == _green), isTrue, reason: 'spot ${o.slot} is fixed: green');
     }
+  });
+
+  testWidgets('turned on its side the job screen has no phase tabs and no hint: only the tray, with the phase as its first button', (t) async {
+    t.view.physicalSize = const Size(1800, 800);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    final p = RoomProject(seed: 3, kind: 0)..fastForward();
+    await t.pumpWidget(MaterialApp(home: NgmyRoomProjectPage(project: p)));
+    await t.pump(const Duration(milliseconds: 600));
+    expect(find.textContaining('Rough-in'), findsNothing);
+    expect(find.textContaining('Drywall'), findsNothing);
+    expect(find.textContaining('The breaker being on'), findsNothing);
+    expect(find.byKey(const Key('phase-chip')), findsOneWidget);
+    expect(find.text('3 Devices'), findsOneWidget);
+    expect(find.text('Outlet'), findsOneWidget);
+    // The phase button is the first thing in the tray, and a tap goes to the next phase.
+    final chipLeft = t.getTopLeft(find.byKey(const Key('phase-chip'))).dx;
+    expect(chipLeft, lessThan(t.getTopLeft(find.text('Outlet')).dx));
+    await t.tap(find.byKey(const Key('phase-chip')));
+    await t.pump(const Duration(milliseconds: 300));
+    expect(find.textContaining('1 Rough-in'), findsOneWidget);
+    await t.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('standing up straight the phase tabs and the hint are all there, as before', (t) async {
+    t.view.physicalSize = const Size(1000, 2000);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    final p = RoomProject(seed: 3, kind: 0)..fastForward();
+    await t.pumpWidget(MaterialApp(home: NgmyRoomProjectPage(project: p)));
+    await t.pump(const Duration(milliseconds: 600));
+    expect(find.textContaining('Rough-in'), findsOneWidget);
+    expect(find.textContaining('Drywall'), findsOneWidget);
+    expect(find.textContaining('3 Devices'), findsOneWidget);
+    expect(find.textContaining('The breaker being on'), findsOneWidget);
+    expect(find.byKey(const Key('phase-chip')), findsNothing);
+    await t.pump(const Duration(seconds: 1));
   });
 
   testWidgets('tap a box in the devices phase and the tray shows only what fits it: outlets for an outlet box, switches for a switch box, a light or a fan for the ceiling', (t) async {
