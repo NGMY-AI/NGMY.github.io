@@ -401,7 +401,7 @@ String _deviceAbout(RoomProject p, int slot) {
 }
 
 /// Things that move: the fan blades, the TV picture, glowing lamps and toasters, sparks and smoke from a mistake.
-List<Poly> roomDynamic(RoomProject p, double t, Map<int, double> fxUntil) {
+List<Poly> roomDynamic(RoomProject p, double t, Map<int, double> fxUntil, {int picked = -1, bool marks = false}) {
   final b = MeshBuilder();
   // Ceiling fan blades.
   for (final s in kSlots.where((s) => s.role == 'fan')) {
@@ -457,6 +457,46 @@ List<Poly> roomDynamic(RoomProject p, double t, Map<int, double> fxUntil) {
     final burnt = p.burnt.contains(e.key);
     if (!active && !burnt) continue;
     faultEffect(b, active ? e.value : 'smolder', (l) => slotPoint(s, l), 1.0, t);
+  }
+  // The boxes of the job, while you are in the devices phase and looking at the room: a tiny red frame and a blinking red dot on every
+  // box that is not finished yet (the frame goes while the box is the one you picked, and comes back if you pick another one first),
+  // and a blinking green dot once its device is in, wired right and covered. Tapping them picks the box, like tapping the box itself.
+  if (marks) {
+    final on = (t * 2.4).floor().isEven;
+    for (var i = 0; i < p.orders.length; i++) {
+      final s = slotById(p.orders[i].slot);
+      final done = p.orderOk(i);
+      final isPicked = s.id == picked;
+      b.id = idSlotBase + s.id;
+      b.order = 3;
+      b.bias = 0.9;
+      if (!done) {
+        const red = Color(0xFFEF4444);
+        const sel = Color(0xFF67E8F9);
+        final col = isPicked ? sel : red;
+        // The frame: red while the box still has to be fixed, cyan on the box you picked.
+        if (s.ceiling) {
+          final y = s.pos.y - 1;
+          b.box(V3(s.pos.x, y, s.pos.z + 4.4), const V3(9.2, 0.5, 0.5), col);
+          b.box(V3(s.pos.x, y, s.pos.z - 4.4), const V3(9.2, 0.5, 0.5), col);
+          b.box(V3(s.pos.x + 4.4, y, s.pos.z), const V3(0.5, 0.5, 8.4), col);
+          b.box(V3(s.pos.x - 4.4, y, s.pos.z), const V3(0.5, 0.5, 8.4), col);
+        } else {
+          const z = 1.5;
+          b.box(V3(s.pos.x, s.pos.y + 5.2, z), const V3(7.2, 0.5, 0.5), col);
+          b.box(V3(s.pos.x, s.pos.y - 5.2, z), const V3(7.2, 0.5, 0.5), col);
+          b.box(V3(s.pos.x + 3.4, s.pos.y, z), const V3(0.5, 10.4, 0.5), col);
+          b.box(V3(s.pos.x - 3.4, s.pos.y, z), const V3(0.5, 10.4, 0.5), col);
+        }
+      }
+      if (on) {
+        final dot = done ? const Color(0xFF22C55E) : const Color(0xFFEF4444);
+        final at = s.ceiling ? V3(s.pos.x, s.pos.y - 3.5, s.pos.z) : V3(s.pos.x, s.pos.y + 7.4, 2.0);
+        b.ball(at, 1.3, dot, shine: 0.2, lat: 4, lon: 8);
+      }
+      b.bias = 0;
+      b.order = 2;
+    }
   }
   return b.polys;
 }

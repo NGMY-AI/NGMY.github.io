@@ -103,6 +103,9 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
   final Map<int, double> fxUntil = {};
   int phase = 0;
   String armed = '';
+
+  /// The box (spot) you tapped in the devices phase: the tray then shows only what fits that box. -1 when none.
+  int picked = -1;
   int active = -1;
   int hl = 0;
   String chip = '';
@@ -264,6 +267,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
     cam.yawCenter = 0;
     setState(() {
       active = slot;
+      picked = -1;
       chip = '';
       armed = '';
       behind = false;
@@ -380,6 +384,10 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
     }
   }
 
+  /// For the tests: taps the box (spot) as if it had been tapped in the room.
+  // ignore: unused_element
+  void pickBoxForTest(int slot) => _pickSlot(slot);
+
   void _pickSlot(int slot) {
     if (p.devs.containsKey(slot) && armed != 'tester' && armed != 'look' && !kAppliances.contains(armed)) {
       setState(() => armed = '');
@@ -437,7 +445,10 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
     }
     // An empty box is never filled for you: you choose what goes in from the tray.
     if (p.drywallDone && p.boxes.containsKey(slot) && !p.devs.containsKey(slot)) {
-      _say('This box is empty. Pick what you want to put in (an outlet, a switch, a light or a fan) from the tray, then tap the box.', ok: true);
+      // Tap a box: it is picked (tap it again to let it go), and the tray shows only what can go in it.
+      final sl = slotById(slot);
+      setState(() => picked = picked == slot ? -1 : slot);
+      _say(picked == slot ? '${sl.name}: only what fits this box is in the tray now (${sl.ceiling ? 'a light or a fan' : (sl.role == 'switch' ? 'a switch' : 'an outlet')}). Pick one.' : 'Box let go: the tray shows everything again.', ok: true);
       return;
     }
     final info = scene.info[idSlotBase + slot];
@@ -637,6 +648,13 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
 
   // ── What to do next (learn mode) ──
 
+  /// What can go in the box you picked: an outlet box takes outlets of any kind, a switch box switches, a ceiling box a light or a fan.
+  List<_Item> _trayFor(int slot) {
+    final s = slotById(slot);
+    bool fits(String k) => s.ceiling ? (k == 'light' || k == 'fan') : (s.role == 'switch' ? isSwitchKind(k) : isOutletKind(k));
+    return [for (final it in _trays[2]) if (fits(it.key)) it];
+  }
+
   String _next() {
     if (p.failed) return 'The job is over.';
     String names(Iterable<int> ids) => ids.map((i) => slotById(i).name).join(', ');
@@ -670,7 +688,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
         final todo = p.orders.where((o) => p.devs[o.slot]?.kind != o.device).toList();
         if (todo.isNotEmpty) {
           final o = todo.first;
-          return 'The breaker being on is not the end: the job is done only when every device is in and wired. Tap the blue square at ${slotById(o.slot).name} to put in the ${deviceKindName(o.device).toLowerCase()}. (${names(todo.map((e) => e.slot))} still need a device.)';
+          return 'The breaker being on is not the end: the job is done only when every device is in and wired. Tap the box at ${slotById(o.slot).name} (small red frame, blinking red dot): the tray then shows only what fits it. Put in the ${deviceKindName(o.device).toLowerCase()}. (${names(todo.map((e) => e.slot))} still need a device.)';
         }
         final unfinished = p.orders.where((o) => (p.devs[o.slot]?.w.stage ?? 0) < 2).toList();
         if (unfinished.isNotEmpty) return 'Tap ${slotById(unfinished.first.slot).name} to work on it: breaker OFF, wires, push in, cover on.';
@@ -683,7 +701,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
 
   @override
   Widget build(BuildContext context) {
-    final tray = _trays[phase];
+    final tray = picked >= 0 && phase == 2 ? _trayFor(picked) : _trays[phase];
     final d = active >= 0 ? p.devs[active] : null;
     final lesson = d == null ? null : electricalLesson(d.kind);
     final stageText = 'Phase ${phase + 1}/3';
@@ -710,7 +728,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
           message: msg,
           good: good,
           info: hl != 0 ? scene.info[hl] : null,
-          dynamicPolys: (_) => roomDynamic(p, now, fxUntil),
+          dynamicPolys: (_) => roomDynamic(p, now, fxUntil, picked: picked, marks: phase == 2 && active < 0 && p.drywallDone),
           topLeft: [
             Row(mainAxisSize: MainAxisSize.min, children: [
               for (var i = 0; i < 3; i++) Padding(padding: const EdgeInsets.only(right: 3), child: Text(i < p.lives ? '❤️' : '🖤', style: const TextStyle(fontSize: 18))),
@@ -754,6 +772,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
                   child: GestureDetector(
                     onTap: () => setState(() {
                       phase = i;
+                      picked = -1;
                       armed = '';
                       _rebuild();
                     }),
@@ -779,7 +798,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
             const SizedBox(height: 6),
             SizedBox(
               height: 52,
-              child: ListView(scrollDirection: Axis.horizontal, children: [
+              child: ListView(key: const Key('room-tray'), scrollDirection: Axis.horizontal, children: [
                 if (phase < 2 && !p.drywallDone)
                   Padding(
                     padding: const EdgeInsets.only(right: 7),
@@ -794,16 +813,39 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
                       child: Container(padding: const EdgeInsets.symmetric(horizontal: 12), decoration: BoxDecoration(color: const Color(0xFF1D4ED8), borderRadius: BorderRadius.circular(14)), child: const Center(child: Text('⏩ Skip to the wiring', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12.5)))),
                     ),
                   ),
+                if (picked >= 0 && phase == 2)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 7),
+                    child: GestureDetector(
+                      key: const Key('tray-show-all'),
+                      onTap: () => setState(() => picked = -1),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(color: const Color(0xFF67E8F9).withValues(alpha: 0.18), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFF67E8F9))),
+                        child: Center(child: Text('✕ ${slotById(picked).name}', style: const TextStyle(color: Color(0xFF67E8F9), fontWeight: FontWeight.w800, fontSize: 12.5))),
+                      ),
+                    ),
+                  ),
                 for (final it in tray)
                   Padding(
                     padding: const EdgeInsets.only(right: 7),
                     child: GestureDetector(
-                      onTap: () => setState(() {
-                        armed = armed == it.key ? '' : it.key;
-                        hl = 0;
-                        _rebuild();
-                        if (armed.isNotEmpty) _roomHint(it.key);
-                      }),
+                      onTap: () {
+                        if (picked >= 0 && phase == 2) {
+                          // A box is picked: the item goes straight into it.
+                          final slot = picked;
+                          setState(() => armed = it.key);
+                          _pickSlot(slot);
+                          if (mounted && active < 0) setState(() => armed = '');
+                          return;
+                        }
+                        setState(() {
+                          armed = armed == it.key ? '' : it.key;
+                          hl = 0;
+                          _rebuild();
+                          if (armed.isNotEmpty) _roomHint(it.key);
+                        });
+                      },
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         decoration: BoxDecoration(color: armed == it.key ? kConAmber.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(14), border: Border.all(color: armed == it.key ? kConAmber : Colors.white24, width: armed == it.key ? 2 : 1)),
