@@ -11,13 +11,13 @@ case"brick_breaker":return new B.a3C(e,x)
 case"mystery_word":return new B.anY(e,x)
 case"higher_lower":return new B.am3(e,x)
 case"mine_sweep":return new B.anJ(e,x)
-default:return B.idI(d,e)}},
+default:return B.idJ(d,e)}},
 z4:function z4(d,e,f){this.c=d
 this.d=e
 this.a=f},
 js:function js(d,e){this.c=d
 this.a=e},
-es:function es(){},
+et:function et(){},
 bHn:function bHn(d,e){this.a=d
 this.b=e},
 a1i:function a1i(d,e,f,g,h,i){var _=this
@@ -233,7 +233,7 @@ aOf:function aOf(){},
 bAd:function bAd(){},
 aOw:function aOw(){},
 bAU:function bAU(){},
-idI(d,e){var x,w=null
+idJ(d,e){var x,w=null
 switch(d){case"merge_2048":return new B.anH(e,w)
 case"lights_out":return new B.an0(e,w)
 case"odd_one":return new B.ato(e,w)
@@ -244,12 +244,12 @@ case"coin_catcher":return new B.a43(e,w)
 case"number_rush":return new B.atk(e,w)
 case"mini_sudoku":return new B.anK(e,w)
 case"space_dodge":return new B.aaK(e,w)
-default:x=B.idJ(d,e)
-if(x==null)x=B.idK(d,e)
+default:x=B.idK(d,e)
 if(x==null)x=B.idL(d,e)
 if(x==null)x=B.idM(d,e)
 if(x==null)x=B.idN(d,e)
 if(x==null)x=B.idO(d,e)
+if(x==null)x=B.idP(d,e)
 return x==null?D.baC:x}},
 anH:function anH(d,e){this.c=d
 this.a=e},
@@ -405,7 +405,7 @@ aLa:function aLa(){},
 by_:function by_(){},
 aOg:function aOg(){},
 bAe:function bAe(){},
-idJ(d,e){var x=null
+idK(d,e){var x=null
 switch(d){case"color_gate":return new B.a47(e,x)
 case"paddle_duel":return new B.a91(e,x)
 case"beat_tiles":return new B.a3y(e,x)
@@ -721,17 +721,17 @@ bzp:function bzp(){},
 aOn:function aOn(){},
 bAp:function bAp(){},
 bAq:function bAq(){},
-idK(d,e){var x=null
+idL(d,e){var x=null
 B.cit()
 switch(d){case"pipe_flow":return new B.au_(e,x)
 case"color_flood":return new B.ajX(e,x)
 case"hanoi_tower":return new B.am1(e,x)
-case"emoji_riddle":return B.LT(e,D.dm_,10,"Guess the phrase",B.ijf(),16)
-case"bigger_sum":return B.LT(e,C.ayN,15,"Which is bigger?",B.ijc(),18)
-case"true_false":return B.LT(e,C.aB4,12,"True or false",B.ijh(),18)
-case"capital_quiz":return B.LT(e,D.d7B,10,"Name the capital",B.ijd(),18)
-case"clock_reader":return B.LT(e,C.aAg,10,"What time is it?",B.ije(),18)
-case"quick_count":return B.LT(e,C.axK,10,"How many dots?",B.ijg(),18)
+case"emoji_riddle":return B.LT(e,D.dm1,10,"Guess the phrase",B.ijg(),16)
+case"bigger_sum":return B.LT(e,C.ayN,15,"Which is bigger?",B.ijd(),18)
+case"true_false":return B.LT(e,C.aB4,12,"True or false",B.iji(),18)
+case"capital_quiz":return B.LT(e,D.d7D,10,"Name the capital",B.ije(),18)
+case"clock_reader":return B.LT(e,C.aAg,10,"What time is it?",B.ijf(),18)
+case"quick_count":return B.LT(e,C.axK,10,"How many dots?",B.ijh(),18)
 case"shell_game":return new B.aar(e,x)}return x},
 huh(d){return(d<<1|d>>>3)&15},
 hpB(d,e){var x=new B.aed(d)
@@ -753,11 +753,11 @@ v=q.b
 if(!(w===v||v===0||w===0))break
 q=s.$0()
 p=s.$0()}t=A.a([q.a,p.a],y.s)
-return new B.xb(D.fKu,t,v>w?0:1)},
-i8Y(d,e){var x=null,w=D.crH[B.hly("true_false",300,e)],v=A.d(w.a,x,x,x,x,x,x,C.pG,x,x,x)
-return new B.xb(v,D.da_,w.b?0:1)},
+return new B.xb(D.fKy,t,v>w?0:1)},
+i8Z(d,e){var x=null,w=D.crI[B.hly("true_false",300,e)],v=A.d(w.a,x,x,x,x,x,x,C.pG,x,x,x)
+return new B.xb(v,D.da1,w.b?0:1)},
 i_M(d,e){var x=null,w=D.aC3[e.ap(50)],v=B.aPY(w.b,new A.N(D.aC3,new B.fl7(),y.d),e)
-return new B.xb(A.x(A.a([D.bQy,C.Q,A.d(w.a,x,x,x,x,x,x,C.x6,x,x,x)],y.p),C.m,x,C.e,C.P,0,C.p),v.a,v.b)},
+return new B.xb(A.x(A.a([D.bQz,C.Q,A.d(w.a,x,x,x,x,x,x,C.x6,x,x,x)],y.p),C.m,x,C.e,C.P,0,C.p),v.a,v.b)},
 i03(d,e){var x,w,v,u,t,s,r,q=null,p=d<4?15:5,o=1+e.ap(12),n=e.ap(C.o.ec(60,p))*p,m=""+o+":"+C.a.aX(C.o.u(n),2,"0"),l=A.aX(y.N)
 for(x=n+30,w=o+5;l.a<3;){v=e.ap(3)
 if(v===0)u=C.o.F(o,12)+1
@@ -767,7 +767,7 @@ else t=v===1?n:C.o.F(x,60)
 s=""+u+":"+C.a.aX(C.o.u(t),2,"0")
 if(s!==m)l.M(0,s)}r=B.aPY(m,l,e)
 return new B.xb(new A.a4(170,170,A.b4(q,q,q,new B.bcH(o,n,q),C.aw),q),r.a,r.b)},
-i6f(d,e){var x,w,v,u,t=5+e.ap(6+Math.min(d,9)),s=A.aX(y.N)
+i6g(d,e){var x,w,v,u,t=5+e.ap(6+Math.min(d,9)),s=A.aX(y.N)
 for(x=[-3,-2,-1,1,2,3],w=0;w<6;++w){v=t+x[w]
 if(v>0)s.M(0,""+v)}u=B.aPY(""+t,s,e)
 return new B.xb(new B.aB1(t,e.ap(1073741824),null),u.a,u.b)},
@@ -874,7 +874,7 @@ bdv:function bdv(d){this.a=d},
 aOa:function aOa(){},
 bA4:function bA4(){},
 bA5:function bA5(){},
-idL(d,e){var x=null
+idM(d,e){var x=null
 switch(d){case"gem_swap":return new B.alS(e,x)
 case"block_collapse":return new B.aj7(e,x)
 case"ball_sort":return new B.aj2(e,x)
@@ -1146,19 +1146,19 @@ byH:function byH(){},
 aMb:function aMb(){},
 byJ:function byJ(){},
 byK:function byK(){},
-idM(d,e){var x=null
+idN(d,e){var x=null
 switch(d){case"treasure_hunt":return new B.axC(e,x)
 case"safe_cracker":return new B.avx(e,x)
 case"gold_miner":return new B.a5m(e,x)
-case"cash_counter":return B.LT(e,C.asd,10,"Count the cash",B.iji(),18)
+case"cash_counter":return B.LT(e,C.asd,10,"Count the cash",B.ijj(),18)
 case"plinko_drop":return new B.a9n(e,x)
 case"slot_stopper":return new B.aaF(e,x)
 case"change_maker":return new B.ajz(e,x)
-case"price_guess":return B.LT(e,C.aAf,10,"Which costs more?",B.ijj(),15)
+case"price_guess":return B.LT(e,C.aAf,10,"Which costs more?",B.ijk(),15)
 case"make_13":return new B.ang(e,x)
 case"find_it":return new B.alt(e,x)}return x},
 frz(d){return C.o.F(d,100)===0?"$"+C.o.ao(d,100):"$"+C.k.ac(d/100,2)},
-i_O(d,e){var x,w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h=null,g=A.C(D.du2,y.aq)
+i_O(d,e){var x,w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h=null,g=A.C(D.du4,y.aq)
 C.d.e_(g,e)
 x=A.d5(g,0,A.dC(3+Math.min(C.o.ao(d,2),3),"count",y.S),A.T(g).c).dn(0)
 w=A.a([],y.p)
@@ -1178,12 +1178,12 @@ w.push(A.p(C.A,new A.y(r,h,new A.F(!0,j,h,h,h,h,12,C.u,h,h,h,h,h,h,h,h,h,h,h,h,h
 for(r=[-25,-15,-10,-5,5,10,15,25],u=0;u<8;++u){o=v+r[u]
 if(o>0)g.M(0,C.o.F(o,100)===0?"$"+C.o.ao(o,100):"$"+C.k.ac(o/100,2))}i=B.aPY(B.frz(v),g,e)
 return new B.xb(new A.a4(260,h,A.bY(C.fI,w,C.br,h,0,0),h),i.a,i.b)},
-i60(d,e){var x,w,v=null,u=A.dm(),t=A.dm()
+i61(d,e){var x,w,v=null,u=A.dl(),t=A.dl()
 do{u.b=D.az6[e.ap(19)]
-t.b=D.az6[e.ap(19)]}while(J.A(u.bk(),t.bk())||Math.max(u.bk().c,t.bk().c)/Math.min(u.bk().c,t.bk().c)<2.5)
-x=A.B(A.a([A.d(u.bk().a,v,v,v,v,v,v,I.V4,v,v,v),D.enK,A.d(t.bk().a,v,v,v,v,v,v,I.V4,v,v,v)],y.p),C.m,v,C.e,C.P,0,v,v)
-w=A.a([u.bk().b,t.bk().b],y.s)
-return new B.xb(x,w,u.bk().c>t.bk().c?0:1)},
+t.b=D.az6[e.ap(19)]}while(J.A(u.bi(),t.bi())||Math.max(u.bi().c,t.bi().c)/Math.min(u.bi().c,t.bi().c)<2.5)
+x=A.B(A.a([A.d(u.bi().a,v,v,v,v,v,v,I.V4,v,v,v),D.enM,A.d(t.bi().a,v,v,v,v,v,v,I.V4,v,v,v)],y.p),C.m,v,C.e,C.P,0,v,v)
+w=A.a([u.bi().b,t.bi().b],y.s)
+return new B.xb(x,w,u.bi().c>t.bi().c?0:1)},
 axC:function axC(d,e){this.c=d
 this.a=e},
 bwg:function bwg(d,e,f,g){var _=this
@@ -1359,13 +1359,13 @@ aOe:function aOe(){},
 bAb:function bAb(){},
 bAc:function bAc(){},
 bAN:function bAN(){},
-idN(d,e){var x=null
+idO(d,e){var x=null
 switch(d){case"knife_throw":return new B.a5V(e,x)
 case"fall_down":return new B.a57(e,x)
 case"stick_bridge":return new B.aaQ(e,x)
 case"zigzag_run":return new B.abV(e,x)
 case"word_search":return new B.ay7(e,x)
-case"emoji_math":return B.LT(e,C.aAR,10,"Solve the emoji maths",B.ijk(),18)
+case"emoji_math":return B.LT(e,C.aAR,10,"Solve the emoji maths",B.ijl(),18)
 case"connect_four":return new B.ak3(e,x)
 case"pop_lock":return new B.a9r(e,x)
 case"asteroid_blaster":return new B.a3q(e,x)
@@ -1377,8 +1377,8 @@ C.d.e_(j,e)
 x=A.d5(j,0,A.dC(3,"count",y.S),A.T(j).c).dn(0)
 w=[2+e.ap(9),1+e.ap(9),1+e.ap(6)]
 v=A.a([],k)
-u=A.dm()
-t=A.dm()
+u=A.dl()
+t=A.dl()
 if(d<3){s=2+e.ap(2)
 k=C.d.aG(A.bZ(s,x[0],!1,y.N)," + ")
 j=w[0]
@@ -1410,11 +1410,11 @@ for(j=[-3,-2,-1,1,2,3,5],r=u.a,o=0;o<7;++o){n=j[o]
 q=u.b
 if(q===u)A.b9(A.mi(r))
 q+=n
-if(q>=0)k.M(0,A.w(q))}m=B.aPY(A.w(u.bk()),k,e)
+if(q>=0)k.M(0,A.w(q))}m=B.aPY(A.w(u.bi()),k,e)
 k=A.a([],y.p)
-for(j=v.length,o=0;o<v.length;v.length===j||(0,A.L)(v),++o)k.push(new A.D(C.w1,new A.y(v[o],l,C.Kk,l,l,l,l,l,l,l,l,l),l))
-k.push(D.bwU)
-k.push(A.d(t.bk(),l,l,l,l,l,l,D.fvo,l,l,l))
+for(j=v.length,o=0;o<v.length;v.length===j||(0,A.L)(v),++o)k.push(new A.D(C.w2,new A.y(v[o],l,C.Kk,l,l,l,l,l,l,l,l,l),l))
+k.push(D.bwV)
+k.push(A.d(t.bi(),l,l,l,l,l,l,D.fvs,l,l,l))
 return new B.xb(A.x(k,C.m,l,C.e,C.P,0,C.p),m.a,m.b)},
 a5V:function a5V(d,e){this.c=d
 this.a=e},
@@ -1671,7 +1671,7 @@ bAs:function bAs(){},
 aOA:function aOA(){},
 bAX:function bAX(){},
 bAY:function bAY(){},
-idO(d,e){switch(d){case"air_hockey":return new B.a3l(e,null)}return null},
+idP(d,e){switch(d){case"air_hockey":return new B.a3l(e,null)}return null},
 a3l:function a3l(d,e){this.c=d
 this.a=e},
 bas:function bas(d,e,f,g,h,i,j,k,l,m,n,o,p,q,r){var _=this
@@ -1724,7 +1724,7 @@ w=A.a([d],y.s)
 C.d.v(w,A.d5(x,0,A.dC(3,"count",y.S),A.T(x).c))
 C.d.e_(w,f)
 return new A.z(w,C.d.cp(w,d))},
-jh:function jh(){},
+ji:function ji(){},
 xb:function xb(d,e,f){this.a=d
 this.b=e
 this.c=f},
@@ -1833,12 +1833,12 @@ Q=c[155]
 A1=c[195]
 B.z4.prototype={
 B(d){var x,w,v,u=null,t=A.a([],y.p)
-for(x=this.d,w=this.c,v=0;v<x;++v)t.push(new A.D(D.bFe,A.X(v<w?C.hB:C.Hb,C.hd,u,u,u,20),u))
+for(x=this.d,w=this.c,v=0;v<x;++v)t.push(new A.D(D.bFf,A.X(v<w?C.hB:C.Hb,C.hd,u,u,u,20),u))
 return A.B(t,C.m,u,C.e,C.P,0,u,u)}}
 B.js.prototype={
 B(d){var x=null,w=C.w.j(0.35),v=A.m(16),u=A.J(C.bz,C.r,1)
-return A.p(x,A.eO(C.A,A.n4(this.c,x,x,C.eM,!0,C.j6,x,x,C.bW),C.f,C.e3),C.f,x,x,new A.o(w,x,u,v,x,x,C.n),x,x,x,C.bT,C.lF,x,x,x)}}
-B.es.prototype={
+return A.p(x,A.eO(C.A,A.n4(this.c,x,x,C.eM,!0,C.j6,x,x,C.bV),C.f,C.e3),C.f,x,x,new A.o(w,x,u,v,x,x,C.n),x,x,x,C.bT,C.lF,x,x,x)}}
+B.et.prototype={
 hr(d){var x=this.pS(new B.bHn(this,d))
 x.h8(0)
 this.d0$=x},
@@ -1928,13 +1928,13 @@ w.r=x
 w.a.c.a.$2(x,20)
 if(w.r>=20){w.pf()
 w.a.c.b.$0()}},
-B(d){var x,w,v,u,t,s,r=this,q=null,p=y.p,o=A.B(A.a([D.fG3,new B.z4(r.w,3,q)],p),C.m,q,C.e,C.P,0,q,q),n=A.a([],p)
+B(d){var x,w,v,u,t,s,r=this,q=null,p=y.p,o=A.B(A.a([D.fG7,new B.z4(r.w,3,q)],p),C.m,q,C.e,C.P,0,q,q),n=A.a([],p)
 for(x=r.e,w=r.d,v=0;v<9;++v){u=new A.ay(C.fV,4,C.r,-1)
 t=w[v]>0?1:0
 s=x[v]
 if(s===2)s="\ud83d\udca3"
 else s=s===1?"\ud83c\udf1f":"\ud83d\udc39"
-n.push(A.aA(q,A.p(q,new A.cf(C.A,q,q,new A.z1(new A.y(s,q,new A.F(!0,q,q,q,q,q,46,q,q,q,q,q,1,q,q,q,q,q,q,q,q,q,q,q,q,q),q,C.K,q,q,q,q,q,q,q),t,C.b5,C.jh,q,q),q),C.f,q,q,new A.o(q,q,new A.bH(u,u,u,u),q,q,D.euH,C.a6),q,q,q,q,q,q,q,q),C.y,!1,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,new B.fg8(r,v),q,q,q,q,!1,C.a3))}return A.x(A.a([new B.js(o,q),A.E(new A.D(C.bD,A.kQ(1,n,3,14,14,q,C.dS,!1),q),1)],p),C.m,q,C.e,C.i,0,C.p)}}
+n.push(A.aA(q,A.p(q,new A.cf(C.A,q,q,new A.z1(new A.y(s,q,new A.F(!0,q,q,q,q,q,46,q,q,q,q,q,1,q,q,q,q,q,q,q,q,q,q,q,q,q),q,C.K,q,q,q,q,q,q,q),t,C.b5,C.jh,q,q),q),C.f,q,q,new A.o(q,q,new A.bH(u,u,u,u),q,q,D.euJ,C.a6),q,q,q,q,q,q,q,q),C.y,!1,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,new B.fg8(r,v),q,q,q,q,!1,C.a3))}return A.x(A.a([new B.js(o,q),A.E(new A.D(C.bD,A.kQ(1,n,3,14,14,q,C.dS,!1),q),1)],p),C.m,q,C.e,C.i,0,C.p)}}
 B.aav.prototype={
 R(){return new B.btf(A.a([],y.C),null,C.bC,null,null)}}
 B.btf.prototype={
@@ -1960,7 +1960,7 @@ w.a.c.b.$0()}},
 B(d){var x=null
 return A.aA(x,A.cu(new B.f5e(this)),C.y,!1,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,new B.f5f(this),x,x,x,x,!1,C.a3)}}
 B.aaH.prototype={
-R(){return new B.btC(A.a([D.etn,D.etm,D.etl],y.U),D.a8a,D.a8a,null,C.bC,null,null)}}
+R(){return new B.btC(A.a([D.etp,D.eto,D.etn],y.U),D.a8a,D.a8a,null,C.bC,null,null)}}
 B.btC.prototype={
 garJ(){var x=this.r
 return x===$?this.r=this.aZ9():x},
@@ -1975,7 +1975,7 @@ aCK(d){var x=this.e
 if(d.a===-x.a&&d.b===-x.b)return
 this.f=d},
 B(d){var x=null,w=new B.f6J(this),v=A.m(14),u=A.J(C.bf,C.r,2),t=y.p
-return A.aA(x,A.x(A.a([A.E(A.as(new A.fI(1,A.p(x,A.cu(new B.f6H(this)),C.f,x,x,new A.o(C.l6,x,u,v,x,x,C.n),x,x,x,C.bT,x,x,x,x),x),x,x,x),1),A.B(A.a([w.$2(C.rH,D.etj)],t),C.m,x,C.b9,C.i,0,x,x),A.B(A.a([w.$2(C.km,D.eto),I.aSf,w.$2(C.jB,D.a8a)],t),C.m,x,C.b9,C.i,0,x,x),A.B(A.a([w.$2(C.qr,D.eti)],t),C.m,x,C.b9,C.i,0,x,x),C.Q],t),C.m,x,C.e,C.i,0,C.p),C.y,!1,x,x,x,x,x,x,x,x,x,x,x,x,x,new B.f6I(this),x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,!1,C.a3)}}
+return A.aA(x,A.x(A.a([A.E(A.as(new A.fI(1,A.p(x,A.cu(new B.f6H(this)),C.f,x,x,new A.o(C.l6,x,u,v,x,x,C.n),x,x,x,C.bT,x,x,x,x),x),x,x,x),1),A.B(A.a([w.$2(C.rH,D.etl)],t),C.m,x,C.b9,C.i,0,x,x),A.B(A.a([w.$2(C.km,D.etq),I.aSf,w.$2(C.jB,D.a8a)],t),C.m,x,C.b9,C.i,0,x,x),A.B(A.a([w.$2(C.qr,D.etk)],t),C.m,x,C.b9,C.i,0,x,x),C.Q],t),C.m,x,C.e,C.i,0,C.p),C.y,!1,x,x,x,x,x,x,x,x,x,x,x,x,x,new B.f6I(this),x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,!1,C.a3)}}
 B.aau.prototype={
 R(){return new B.bte(A.a([],y.E),C.aw,null,C.bC,null,null)}}
 B.bte.prototype={
@@ -1990,7 +1990,7 @@ B(d){return A.cu(new B.f59(this))}}
 B.aGd.prototype={
 B(d){var x=null,w=this.c,v=w?C.bH:C.fE
 v=A.xf(w?C.fE:C.bH,v)
-return A.c4(x,new A.o(x,x,A.J(C.dY,C.r,2),v,x,D.c4M,C.n),C.bh)}}
+return A.c4(x,new A.o(x,x,A.J(C.dY,C.r,2),v,x,D.c4N,C.n),C.bh)}}
 B.a3C.prototype={
 R(){return new B.bbG(A.bZ(24,!0,!1,y.y),null,C.bC,null,null)}}
 B.bbG.prototype={
@@ -2004,7 +2004,7 @@ R(){return new B.bkk(A.aX(y.N))}}
 B.bkk.prototype={
 Z(){var x,w=this
 w.a2()
-x=A.C(D.d7H,y.W)
+x=A.C(D.d7J,y.W)
 C.d.e_(x,w.a.c.d)
 x=A.d5(x,0,A.dC(3,"count",y.S),A.T(x).c).dn(0)
 w.d!==$&&A.aQ()
@@ -2062,15 +2062,15 @@ w=++v.f
 v.a.c.a.$2(w,8)
 if(v.f>=8)v.a.c.b.$0()},
 aZF(d,e,f){var x=null,w=e===1||e===2?C.bB:C.av,v=A.m(16),u=A.a([new A.ac(0,C.G,C.w.j(0.5),C.ds,18)],y.V)
-return A.p(x,new A.an(C.a_,x,C.ab,C.t,A.a([new A.bM(C.ay,x,x,A.d(D.dbS[d]+"\n"+D.a59[e],x,x,x,x,x,x,A.l(x,x,w,x,x,x,x,x,x,x,x,f*0.15,x,x,C.u,x,1,!0,x,x,x,x,x,x,x,x),x,x,x),x),A.as(A.d(D.a59[e],x,x,x,x,x,x,A.l(x,x,w,x,x,x,x,x,x,x,x,f*0.5,x,x,x,x,x,!0,x,x,x,x,x,x,x,x),x,x,x),x,x,x)],y.p),x),C.f,x,x,new A.o(C.c,x,x,v,u,x,C.n),x,f*1.4,x,x,C.bT,x,x,f)},
+return A.p(x,new A.an(C.a_,x,C.ab,C.t,A.a([new A.bM(C.ay,x,x,A.d(D.dbU[d]+"\n"+D.a59[e],x,x,x,x,x,x,A.l(x,x,w,x,x,x,x,x,x,x,x,f*0.15,x,x,C.u,x,1,!0,x,x,x,x,x,x,x,x),x,x,x),x),A.as(A.d(D.a59[e],x,x,x,x,x,x,A.l(x,x,w,x,x,x,x,x,x,x,x,f*0.5,x,x,x,x,x,!0,x,x,x,x,x,x,x,x),x,x,x),x,x,x)],y.p),x),C.f,x,x,new A.o(C.c,x,x,v,u,x,C.n),x,f*1.4,x,x,C.bT,x,x,f)},
 B(d){var x,w,v=this,u=null,t=A.d("Streak "+v.f+" / 8 \xb7 same card counts as right",u,u,u,u,u,u,u,u,u,u),s=y.p,r=A.a([],s),q=v.r
 if(q!=null)r.push(A.db(v.aZF(q,C.o.F(v.gaC9()+1,4),80),0.45))
 r.push(C.oL)
 q=v.gRe()
 x=v.gaC9()
 w=v.f
-r.push(A.p_(new A.mH(v.aZF(v.gRe(),v.gaC9(),150),new A.bR(""+q+"-"+x+"-"+w,y.X)),C.iE,A.qs(),C.b5,C.b5,new B.dkT()))
-return A.x(A.a([new B.js(t,u),A.E(A.as(A.B(r,C.m,u,C.b9,C.i,0,u,u),u,u,u),1),new A.D(C.bD,A.B(A.a([A.E(A.di(D.bPT,D.bId,new B.dkU(v),A.bo(C.bl,u,u,u,u,D.aS_,u,u,u,u,u,u)),1),C.bc,A.E(A.di(D.bZR,D.bIf,new B.dkV(v),A.bo(C.bB,u,u,u,u,D.aS_,u,u,u,u,u,u)),1)],s),C.m,u,C.e,C.i,0,u,u),u)],s),C.m,u,C.e,C.i,0,C.p)}}
+r.push(A.p_(new A.mG(v.aZF(v.gRe(),v.gaC9(),150),new A.bR(""+q+"-"+x+"-"+w,y.X)),C.iF,A.qs(),C.b5,C.b5,new B.dkT()))
+return A.x(A.a([new B.js(t,u),A.E(A.as(A.B(r,C.m,u,C.b9,C.i,0,u,u),u,u,u),1),new A.D(C.bD,A.B(A.a([A.E(A.di(D.bPU,D.bIe,new B.dkU(v),A.bo(C.bl,u,u,u,u,D.aS_,u,u,u,u,u,u)),1),C.bc,A.E(A.di(D.bZS,D.bIg,new B.dkV(v),A.bo(C.bB,u,u,u,u,D.aS_,u,u,u,u,u,u)),1)],s),C.m,u,C.e,C.i,0,u,u),u)],s),C.m,u,C.e,C.i,0,C.p)}}
 B.anJ.prototype={
 R(){var x=y.y
 return new B.bk_(A.bZ(49,!1,!1,x),A.bZ(49,!1,!1,x),A.bZ(49,!1,!1,x))}}
@@ -2126,7 +2126,7 @@ u.m(new B.dvi())
 u.a.c.a.$2(u.gb1T(),41)
 if(u.gb1T()>=41)u.a.c.b.$0()},
 B(d){var x,w,v,u,t,s,r,q=this,p=null,o=A.d("8 mines hidden \xb7 ",p,p,p,p,p,p,p,p,p,p),n=q.w,m=n?C.ax:C.bz,l=A.m(99),k=y.p
-l=A.B(A.a([o,A.aA(p,A.p(p,A.d(n?"\ud83d\udea9 Flag mode ON":"\ud83d\udea9 Flag mode",p,p,p,p,p,p,p,p,p,p),C.f,p,p,new A.o(m,p,p,l,p,p,C.n),p,p,p,p,D.bz7,p,p,p),C.y,!1,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,new B.dvm(q),p,p,p,p,p,p,!1,C.a3)],k),C.m,p,C.e,C.P,0,p,p)
+l=A.B(A.a([o,A.aA(p,A.p(p,A.d(n?"\ud83d\udea9 Flag mode ON":"\ud83d\udea9 Flag mode",p,p,p,p,p,p,p,p,p,p),C.f,p,p,new A.o(m,p,p,l,p,p,C.n),p,p,p,p,D.bz8,p,p,p),C.y,!1,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,new B.dvm(q),p,p,p,p,p,p,!1,C.a3)],k),C.m,p,C.e,C.P,0,p,p)
 m=A.a([],k)
 for(o=q.f,n=q.e,x=q.d,w=0;w<49;++w){v=new A.aP(6,6)
 u=n[w]
@@ -2135,7 +2135,7 @@ else t=C.al
 s=u?p:D.b3J
 if(u)if(x[w])u=new A.y("\ud83d\udca3",p,new A.F(!0,p,p,p,p,p,20,p,p,p,p,p,1,p,p,p,p,p,p,p,p,p,p,p,p,p),p,C.K,p,p,p,p,p,p,p)
 else{u=q.ae8(0,w)===0?"":""+q.ae8(0,w)
-r=D.d8O[q.ae8(0,w)]
+r=D.d8Q[q.ae8(0,w)]
 u=new A.y(u,p,new A.F(!0,r,p,p,p,p,18,C.u,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p),p,p,p,p,p,p,p,p,p)}else if(o[w])u=new A.y("\ud83d\udea9",p,new A.F(!0,p,p,p,p,p,18,p,p,p,p,p,1,p,p,p,p,p,p,p,p,p,p,p,p,p),p,C.K,p,p,p,p,p,p,p)
 else u=p
 m.push(A.aA(p,A.p(p,new A.cf(C.A,p,p,u,p),C.f,p,p,new A.o(t,p,s,new A.bh(v,v,v,v),p,p,C.n),p,p,p,p,p,p,p,p),C.y,!1,p,p,p,p,p,p,p,p,new B.dvn(q,w),p,p,p,p,p,p,p,p,p,p,p,p,p,p,new B.dvo(q,w),p,p,p,p,p,p,!1,C.a3))}return A.x(A.a([new B.js(l,p),A.E(A.as(new A.fI(1,new A.D(C.bT,A.kQ(1,m,7,3,3,p,C.dS,!1),p),p),p,p,p),1)],k),C.m,p,C.e,C.i,0,C.p)}}
@@ -2266,18 +2266,18 @@ B(d){var x,w,v,u,t,s,r=null,q=A.m(16),p=y.p,o=A.a([],p)
 for(x=this.d,w=0;w<16;++w){v=x[w]
 u=v===0
 if(u)t=C.aK
-else{t=D.dzu.h(0,v)
+else{t=D.dzw.h(0,v)
 if(t==null)t=C.aK}s=new A.aP(10,10)
 if(u)u=r
 else{u=v<=4?C.fV:C.c
 u=new A.qD(C.dz,C.A,C.f,new A.D(C.hP,new A.y(""+v,r,new A.F(!0,u,r,r,r,r,28,C.u,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r),r,r,r,r,r,r,r,r,r),r),r)}o.push(A.cY(r,new A.cf(C.A,r,r,u,r),r,r,C.b5,new A.o(t,r,r,new A.bh(s,s,s,s),r,r,C.n),C.jh,r,r,r,r,r,r,r,r))}q=A.E(A.as(new A.fI(1,A.p(r,A.kQ(1,o,4,8,8,r,C.dS,!1),C.f,r,r,new A.o(C.bo,r,r,q,r,r,C.n),r,r,r,C.bD,C.ck,r,r,r),r),r,r,r),1)
 o=A.a([],p)
 for(w=0;w<4;++w){x={}
-u=D.cXz[w]
+u=D.cXA[w]
 x.a=x.b=null
 x.b=u.b
 x.a=u.c
-o.push(new A.D(C.eZ,A.hgX(A.X(u.a,r,r,r,r,r),new B.dv8(x,this)),r))}return A.aA(r,A.x(A.a([D.b0Y,q,new A.D(C.d1,A.B(o,C.m,r,C.b9,C.i,0,r,r),r)],p),C.m,r,C.e,C.i,0,C.p),C.y,!1,r,r,r,r,r,r,r,r,r,r,r,r,r,new B.dv9(this),r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,!1,C.a3)}}
+o.push(new A.D(C.f_,A.hgX(A.X(u.a,r,r,r,r,r),new B.dv8(x,this)),r))}return A.aA(r,A.x(A.a([D.b0Y,q,new A.D(C.d1,A.B(o,C.m,r,C.b9,C.i,0,r,r),r)],p),C.m,r,C.e,C.i,0,C.p),C.y,!1,r,r,r,r,r,r,r,r,r,r,r,r,r,new B.dv9(this),r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,!1,C.a3)}}
 B.an0.prototype={
 R(){return new B.aCm(A.bZ(16,!1,!1,y.y))}}
 B.aCm.prototype={
@@ -2285,7 +2285,7 @@ Z(){this.a2()
 this.aZa()
 this.a.c.a.$2(0,3)},
 aCz(d){var x,w,v,u,t,s=C.o.ao(d,4),r=C.o.F(d,4)
-for(x=this.d,w=0;w<5;++w){v=D.d4h[w]
+for(x=this.d,w=0;w<5;++w){v=D.d4i[w]
 u=s+v.a
 t=r+v.b
 if(u>=0&&t>=0&&u<4&&t<4){v=u*4+t
@@ -2309,7 +2309,7 @@ s=t?C.dB:C.dv
 t=t?A.a([new A.ac(0,C.G,C.dB.j(0.7),C.I,16)],w):o
 r=new A.ay(C.bz,1,C.r,-1)
 q=x[v]
-p=q?C.qx:D.bO0
+p=q?C.qx:D.bO1
 l.push(A.aA(o,A.cY(o,new A.cf(C.A,o,o,A.X(p,q?C.xP:C.aX,o,o,o,o),o),o,o,C.b5,new A.o(s,o,new A.bH(r,r,r,r),new A.bh(u,u,u,u),t,o,C.n),C.h4,o,o,o,o,o,o,o,o),C.y,!1,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,new B.doj(this,v),o,o,o,o,o,o,!1,C.a3))}return A.x(A.a([new B.js(n,o),A.E(A.as(new A.fI(1,new A.D(C.fm,A.kQ(1,l,4,10,10,o,C.dS,!1),o),o),o,o,o),1)],m),C.m,o,C.e,C.i,0,C.p)}}
 B.ato.prototype={
 R(){return new B.aFZ()}}
@@ -2319,7 +2319,7 @@ Z(){this.a2()
 this.Ei()
 this.a.c.a.$2(0,10)},
 Ei(){var x,w=this
-w.r=D.dbi[w.a.c.d.ap(28)]
+w.r=D.dbk[w.a.c.d.ap(28)]
 if(w.a.c.d.h6()){x=w.r
 w.r=new A.z(x.b,x.a)}w.f=w.a.c.d.ap(w.gaBt()*w.gaBt())},
 ZN(d){var x,w=this
@@ -2336,7 +2336,7 @@ B.awr.prototype={
 R(){return new B.aIK()}}
 B.aIK.prototype={
 gaxx(){var x,w=this,v=w.d
-if(v===$){x=D.duy[w.a.c.d.ap(3)]
+if(v===$){x=D.duA[w.a.c.d.ap(3)]
 w.d!==$&&A.bF()
 w.d=x
 v=x}return v},
@@ -2357,7 +2357,7 @@ if(x.e>=20){x.a.c.b.$0()
 return}}else{A.fN()
 if(--x.f<=0){x.a.c.c.$1("Too many in the wrong side")
 return}}x.m(x.gZM())},
-B(d){var x=this,w=null,v=new B.f71(x),u=y.p,t=A.B(A.a([D.fHM,new B.z4(x.f,3,w)],u),C.m,w,C.e,C.P,0,w,w),s=x.x,r=A.m(30),q=A.a([new A.ac(0,C.G,C.w.j(0.4),C.I,20)],y.V),p=x.r
+B(d){var x=this,w=null,v=new B.f71(x),u=y.p,t=A.B(A.a([D.fHQ,new B.z4(x.f,3,w)],u),C.m,w,C.e,C.P,0,w,w),s=x.x,r=A.m(30),q=A.a([new A.ac(0,C.G,C.w.j(0.4),C.I,20)],y.V),p=x.r
 p===$&&A.c()
 s=A.E(A.aA(w,A.as(A.dR(A.eM(C.A,s/600,A.p(w,A.as(A.d(p,w,w,w,w,w,w,A.l(w,w,w,w,w,w,w,w,w,w,w,80,w,w,w,w,1,!0,w,w,w,w,w,w,w,w),C.K,w,w),w,w,w),C.f,w,w,new A.o(C.c,w,w,r,q,w,C.n),w,150,w,w,w,w,w,150),w),new A.t(s,0)),w,w,w),C.y,!1,w,w,w,w,w,new B.f7_(x),w,new B.f70(x),w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,!1,C.a3),1)
 q=x.gaxx().a
@@ -2463,7 +2463,7 @@ if(p.h6())x=A.a([1,0,2,3],o)
 if(p.h6())x=A.a([x[0],x[1],x[3],x[2]],o)
 if(p.h6())x=A.a([x[2],x[3],x[0],x[1]],o)
 o=A.a([],o)
-for(w=0;w<4;++w)for(v=x[w]*4,u=0;u<4;++u)o.push(n[D.d20[v+u]-1])
+for(w=0;w<4;++w)for(v=x[w]*4,u=0;u<4;++u)o.push(n[D.d21[v+u]-1])
 q.d=o
 o=y.S
 v=J.e0(16,o)
@@ -2535,7 +2535,7 @@ i.push(A.aA(m,A.p(m,new A.cf(C.A,m,m,new A.y(r,m,new A.F(!0,q,m,m,m,m,30,C.u,m,m
 i=A.a([],j)
 for(w=[1,2,3,4],p=0;p<4;++p){o=w[p]
 v=new A.aP(14,14)
-i.push(new A.D(C.mK,new A.a4(60,56,A.bI(new A.y(""+o,m,C.aaq,m,m,m,m,m,m,m,m,m),m,new B.dvF(n,o),A.bo(C.cw,m,m,m,m,m,m,m,new A.b8(new A.bh(v,v,v,v),C.a0),m,m,m)),m),m))}i.push(A.aH(m,m,m,m,D.bSP,m,m,m,new B.dvG(n),m,m,m,m,m,m))
+i.push(new A.D(C.mK,new A.a4(60,56,A.bI(new A.y(""+o,m,C.aaq,m,m,m,m,m,m,m,m,m),m,new B.dvF(n,o),A.bo(C.cw,m,m,m,m,m,m,m,new A.b8(new A.bh(v,v,v,v),C.a0),m,m,m)),m),m))}i.push(A.aH(m,m,m,m,D.bSQ,m,m,m,new B.dvG(n),m,m,m,m,m,m))
 return A.x(A.a([new B.js(l,m),k,new A.D(C.kK,A.B(i,C.m,m,C.b9,C.i,0,m,m),m)],j),C.m,m,C.e,C.i,0,C.p)}}
 B.aaK.prototype={
 R(){return new B.btF(A.a([],y.l),A.a([],y.a),null,C.bC,null,null)}}
@@ -2676,7 +2676,7 @@ u.x=v
 u.w=0.35
 if(v)u.jI()
 else u.jl("Stopped outside the zone")},
-B(d){var x,w,v,u=this,t=null,s=B.ij(D.dpk),r=u.w>0?1:0,q=u.x===!0,p=q?"PERFECT!":"MISS"
+B(d){var x,w,v,u=this,t=null,s=B.ij(D.dpm),r=u.w>0?1:0,q=u.x===!0,p=q?"PERFECT!":"MISS"
 r=A.Dw(A.d(p,t,t,t,t,t,t,A.l(t,t,q?C.be:C.c0,t,t,t,t,t,t,t,t,34,t,t,C.u,t,t,!0,t,t,t,t,t,t,t,t),t,t,t),C.b5,C.fO,r)
 p=A.cu(new B.eUV(u))
 x=y.p
@@ -2991,7 +2991,7 @@ B(d){var x,w,v,u,t,s,r,q,p,o,n,m,l,k,j=this,i=null,h=j.d
 h===$&&A.c()
 x=h[j.e]
 w=x.gbft()
-h=B.ij(D.dhz)
+h=B.ij(D.dhB)
 v=A.d("Turn pipes to carry water across \xb7 board "+(j.e+1)+"/2",i,i,i,i,i,i,i,i,i,i)
 u=y.p
 t=A.a([],u)
@@ -3004,13 +3004,13 @@ m=new A.aP(8,8)
 l=new A.ay(C.bz,1,C.r,-1)
 k=x.b
 k===$&&A.c()
-q.push(A.aA(i,A.p(i,new A.mB(new B.bnx(k[o],w.t(0,o),i),i,C.aw,i,i),C.f,i,i,new A.o(n,i,new A.bH(l,l,l,l),new A.bh(m,m,m,m),i,i,C.n),i,i,i,C.nv,i,i,i,i),C.y,!1,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,new B.eVq(j,o),i,i,i,i,i,i,!1,C.a3))}q=A.E(A.kQ(1,q,s,0,0,i,C.dS,!1),1)
+q.push(A.aA(i,A.p(i,new A.mA(new B.bnx(k[o],w.t(0,o),i),i,C.aw,i,i),C.f,i,i,new A.o(n,i,new A.bH(l,l,l,l),new A.bh(m,m,m,m),i,i,C.n),i,i,i,C.nv,i,i,i,i),C.y,!1,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,new B.eVq(j,o),i,i,i,i,i,i,!1,C.a3))}q=A.E(A.kQ(1,q,s,0,0,i,C.dS,!1),1)
 p=A.a([],u)
 for(r=0;r<s;++r){n=x.f
 n===$&&A.c()
 p.push(new A.by(1,C.ba,new A.cf(C.A,i,i,A.X(C.lH,r===n?C.be:C.L,i,i,i,18),i),i))}return new A.an(C.a_,i,C.ab,C.t,A.a([h,A.x(A.a([new B.js(v,i),A.E(A.as(new A.fI(1,new A.D(C.bD,A.B(A.a([t,q,A.x(p,C.m,i,C.e,C.i,0,C.p)],u),C.m,i,C.e,C.i,0,i,i),i),i),i,i,i),1)],u),C.m,i,C.e,C.i,0,C.p)],u),i)}}
 B.bnx.prototype={
-a3(d,e){var x,w,v,u,t=e.ej(C.I)
+a3(d,e){var x,w,v,u,t=e.ek(C.I)
 $.S()
 x=A.I()
 w=this.c
@@ -3070,7 +3070,7 @@ B(d){var x,w,v,u,t=this,s=null,r=B.ij(H.a4n),q=A.d("Flood the board from the top
 l===$&&A.c()
 x=l.length
 w=0
-for(;w<l.length;l.length===x||(0,A.L)(l),++w)m.push(A.cY(s,s,D.RU[l[w]],s,C.b5,s,C.iE,s,s,s,s,s,s,s,s))
+for(;w<l.length;l.length===x||(0,A.L)(l),++w)m.push(A.cY(s,s,D.RU[l[w]],s,C.b5,s,C.iF,s,s,s,s,s,s,s,s))
 p=A.E(A.as(new A.fI(1,A.p(s,A.kQ(1,m,10,0,0,s,C.dS,!1),C.ap,s,s,new A.o(s,s,o,p,s,s,C.n),s,s,s,C.bD,s,s,s,s),s),s,s,s),1)
 o=A.a([],n)
 for(m=y.V,v=0;v<6;++v){l=D.RU[v]
@@ -3091,11 +3091,11 @@ x.m(new B.dkb(x,d))
 x.a.c.a.$2(x.gb2X(),4)
 if(x.gb2X()===4){x.r=!0
 x.a.c.b.$0()}},
-B(d){var x,w=null,v=B.ij(D.dbI),u=A.d("Move the tower to the right peg \xb7 moves "+this.f,w,w,w,w,w,w,w,w,w,w),t=y.p,s=A.a([],t)
+B(d){var x,w=null,v=B.ij(D.dbK),u=A.d("Move the tower to the right peg \xb7 moves "+this.f,w,w,w,w,w,w,w,w,w,w),t=y.p,s=A.a([],t)
 for(x=0;x<3;++x)s.push(new A.by(1,C.ba,A.aA(C.c6,new A.BL(new B.dkc(this,x),w),C.y,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,new B.dkd(this,x),w,w,w,w,w,w,!1,C.a3),w))
-return new A.an(C.a_,w,C.ab,C.t,A.a([v,A.x(A.a([new B.js(u,w),D.enl,A.E(A.B(s,C.m,w,C.e,C.i,0,w,w),1)],t),C.m,w,C.e,C.i,0,C.p)],t),w)}}
+return new A.an(C.a_,w,C.ab,C.t,A.a([v,A.x(A.a([new B.js(u,w),D.enn,A.E(A.B(s,C.m,w,C.e,C.i,0,w,w),1)],t),C.m,w,C.e,C.i,0,C.p)],t),w)}}
 B.bcH.prototype={
-a3(a0,a1){var x,w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f=null,e=a1.ej(C.I),d=a1.a/2
+a3(a0,a1){var x,w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f=null,e=a1.ek(C.I),d=a1.a/2
 $.S()
 x=A.I()
 x.r=C.c.gp(0)
@@ -3118,14 +3118,14 @@ l.c=r?3:1
 k=l.G()
 x.drawLine.apply(x,[w+q*u,v+-p*u,w+o*m,v+-n*m,k])
 k.delete()}for(x=d-32,t=1;t<=12;++t){s=t/12*3.141592653589793*2
-j=new A.iN(new A.eu(""+t,f,f,C.cN,f,f,f,f,f,f,C.aU9),C.a4,C.bY,new A.jr(1),f,f,f,f,C.bW,f)
-j.el()
+j=new A.iG(new A.es(""+t,f,f,C.cK,f,f,f,f,f,f,C.aU9),C.a4,C.bX,new A.je(1),f,f,f,f,C.bV,f)
+j.eg()
 u=Math.sin(s)
 q=Math.cos(s)
 p=j.b
 o=p.c
 p=p.a.c
-j.a3(a0,new A.t(w+u*x-o/2,v+-q*x-p.gbb(p)/2))}x=this.c/60
+j.a3(a0,new A.t(w+u*x-o/2,v+-q*x-p.gba(p)/2))}x=this.c/60
 i=x*3.141592653589793*2
 h=(C.o.F(this.b,12)+x)/12*3.141592653589793*2
 $.S()
@@ -3203,7 +3203,7 @@ u.D(new A.aq(0,x))
 u.D(new A.bt())
 w=A.I()
 v=0+t
-w.sam(D.c5W.aA(0,new A.a3(0,0,v,0+x)))
+w.sam(D.c5X.aA(0,new A.a3(0,0,v,0+x)))
 d.aI(u,w)
 x-=10
 w=A.I()
@@ -3324,7 +3324,7 @@ if(q.a!==0){p.m(new B.dj2(p,q))
 p.y=A.cG(C.p9,p.gaZL())
 return}if(!p.c7_())C.d.e_(p.d,p.a.c.d)
 p.m(new B.dj3(p))},
-B(d){var x,w,v,u,t,s=this,r=null,q=B.ij(D.d8Z),p=A.d("Swap neighbours to make 3 in a row \xb7 "+s.r+"/60 gems",r,r,r,r,r,r,r,r,r,r),o=C.w.j(0.35),n=A.m(18),m=A.J(C.p1.j(0.5),C.r,2),l=y.p,k=A.a([],l)
+B(d){var x,w,v,u,t,s=this,r=null,q=B.ij(D.d90),p=A.d("Swap neighbours to make 3 in a row \xb7 "+s.r+"/60 gems",r,r,r,r,r,r,r,r,r,r),o=C.w.j(0.35),n=A.m(18),m=A.J(C.p1.j(0.5),C.r,2),l=y.p,k=A.a([],l)
 for(x=0;x<49;++x){if(s.e.t(0,x))w=0.2
 else w=s.f===x?1.15:1
 v=s.f===x?C.c.j(0.3):C.c.j(0.06)
@@ -3332,7 +3332,7 @@ u=new A.aP(10,10)
 t=s.d
 t===$&&A.c()
 t=t[x]
-k.push(A.aA(r,new A.z1(A.p(C.A,new A.qD(C.dz,C.A,C.f,new A.D(C.hl,new A.y(t<0?"":D.dsX[t],r,C.x6,r,r,r,r,r,r,r,r,r),r),r),C.f,r,r,new A.o(v,r,r,new A.bh(u,u,u,u),r,r,C.n),r,r,r,C.nv,r,r,r,r),w,C.b5,C.a2,r,r),C.y,!1,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,new B.dj8(s,x),r,r,r,r,r,r,!1,C.a3))}return new A.an(C.a_,r,C.ab,C.t,A.a([q,A.x(A.a([new B.js(p,r),A.E(A.as(new A.fI(1,A.p(r,A.kQ(1,k,7,0,0,r,C.dS,!1),C.f,r,r,new A.o(o,r,m,n,r,r,C.n),r,r,r,C.bg,C.hP,r,r,r),r),r,r,r),1)],l),C.m,r,C.e,C.i,0,C.p)],l),r)}}
+k.push(A.aA(r,new A.z1(A.p(C.A,new A.qD(C.dz,C.A,C.f,new A.D(C.hl,new A.y(t<0?"":D.dsZ[t],r,C.x6,r,r,r,r,r,r,r,r,r),r),r),C.f,r,r,new A.o(v,r,r,new A.bh(u,u,u,u),r,r,C.n),r,r,r,C.nv,r,r,r,r),w,C.b5,C.a2,r,r),C.y,!1,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,new B.dj8(s,x),r,r,r,r,r,r,!1,C.a3))}return new A.an(C.a_,r,C.ab,C.t,A.a([q,A.x(A.a([new B.js(p,r),A.E(A.as(new A.fI(1,A.p(r,A.kQ(1,k,7,0,0,r,C.dS,!1),C.f,r,r,new A.o(o,r,m,n,r,r,C.n),r,r,r,C.bg,C.hP,r,r,r),r),r,r,r),1)],l),C.m,r,C.e,C.i,0,C.p)],l),r)}}
 B.aj7.prototype={
 R(){return new B.bbs()}}
 B.bbs.prototype={
@@ -3381,7 +3381,7 @@ if(v.e>=56){v.f=!0
 v.a.c.b.$0()}else if(!v.gbD0()){v.f=!0
 v.a.c.c.$1("No more groups to clear")}},
 B(d){var x=null,w=y.p
-return new A.an(C.a_,x,C.ab,C.t,A.a([B.ij(D.d1T),A.x(A.a([new B.js(A.d("Tap groups of 2+ matching blocks \xb7 "+this.e+"/56",x,x,x,x,x,x,x,x,x,x),x),A.E(new A.D(C.uf,A.cu(new B.cLD(this)),x),1)],w),C.m,x,C.e,C.i,0,C.p)],w),x)}}
+return new A.an(C.a_,x,C.ab,C.t,A.a([B.ij(D.d1U),A.x(A.a([new B.js(A.d("Tap groups of 2+ matching blocks \xb7 "+this.e+"/56",x,x,x,x,x,x,x,x,x,x),x),A.E(new A.D(C.uf,A.cu(new B.cLD(this)),x),1)],w),C.m,x,C.e,C.i,0,C.p)],w),x)}}
 B.aj2.prototype={
 R(){return new B.bbh()}}
 B.bbh.prototype={
@@ -3431,7 +3431,7 @@ t.m(new B.cKF(t,d,x))
 t.a.c.a.$2(t.gb3u(),20)
 if(t.gaBC()){t.f=!0
 t.a.c.b.$0()}},
-B(d){var x,w,v,u,t,s,r,q,p=this,o=null,n=B.ij(D.doX),m=y.p,l=A.a([],m),k=y.O,j=0
+B(d){var x,w,v,u,t,s,r,q,p=this,o=null,n=B.ij(D.doZ),m=y.p,l=A.a([],m),k=y.O,j=0
 for(;;){x=p.d
 x===$&&A.c()
 if(!(j<x.length))break
@@ -3449,7 +3449,7 @@ for(t=p.d[j],s=A.T(t).k("dx<1>"),t=new A.dx(t,s),t=new A.bT(t,t.gL(0),s.k("bT<ak
 if(r==null)r=s.a(r)
 q=A.ar(D.D3[r],C.c,0.5)
 q.toString
-x.push(A.p(o,o,C.f,o,o,new A.o(o,o,o,o,o,new A.c_(S.xv,0.5,C.x,o,0,A.a([q,D.D3[r]],k),o,o),C.a6),o,40,o,C.ud,o,o,o,40))}l.push(A.aA(o,A.cY(o,A.x(x,C.m,o,C.mh,C.i,0,C.p),o,o,C.b5,new A.o(w,o,new A.bH(u,u,u,u),D.b2j,o,o,C.n),C.fO,o,198,o,o,D.bE7,v,o,56),C.y,!1,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,new B.cKG(p,j),o,o,o,o,o,o,!1,C.a3));++j}return new A.an(C.a_,o,C.ab,C.t,A.a([n,A.x(A.a([D.b0Z,A.E(A.as(A.bY(C.fI,l,C.br,o,26,14),o,o,o),1)],m),C.m,o,C.e,C.i,0,C.p)],m),o)}}
+x.push(A.p(o,o,C.f,o,o,new A.o(o,o,o,o,o,new A.c_(S.xv,0.5,C.x,o,0,A.a([q,D.D3[r]],k),o,o),C.a6),o,40,o,C.ud,o,o,o,40))}l.push(A.aA(o,A.cY(o,A.x(x,C.m,o,C.mh,C.i,0,C.p),o,o,C.b5,new A.o(w,o,new A.bH(u,u,u,u),D.b2j,o,o,C.n),C.fO,o,198,o,o,D.bE8,v,o,56),C.y,!1,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,new B.cKG(p,j),o,o,o,o,o,o,!1,C.a3));++j}return new A.an(C.a_,o,C.ab,C.t,A.a([n,A.x(A.a([D.b0Z,A.E(A.as(A.bY(C.fI,l,C.br,o,26,14),o,o,o),1)],m),C.m,o,C.e,C.i,0,C.p)],m),o)}}
 B.ajl.prototype={
 R(){var x=y.t
 return new B.ayT(A.a([],x),A.a([],x),0,3,!1)}}
@@ -3483,13 +3483,13 @@ break A}if(7===d){x=40
 break A}if(2===d||3===d||5===d){x=10
 break A}x=18
 break A}w=d===2?e*1.05:e
-v=D.deu[d]
+v=D.dev[d]
 if(d===7)u=D.b2o
 else u=d===0?D.b2x:A.m(8)
-return A.p(t,t,C.f,t,t,new A.o(v,t,t,u,D.dvI,t,C.n),t,x,t,C.uc,t,t,t,w)},
+return A.p(t,t,C.f,t,t,new A.o(v,t,t,u,D.dvK,t,C.n),t,x,t,C.uc,t,t,t,w)},
 B(d){var x,w,v,u,t,s=this,r=null,q=B.ij(D.ayj),p=B.kV("Build the order \xb7 "+s.cb$+"/6 burgers",!1,s.e0$),o=A.m(14),n=y.p,m=A.a([],n)
 for(x=s.e,w=0;v=s.d,w<v.length;++w){u=w<x.length?0.3:1
-m.push(new A.kB(u,new A.y(D.axh[v[w]],r,C.n2,r,r,r,r,r,r,r,r,r),r))}o=A.p(r,A.x(A.a([D.fGG,C.au,A.bY(C.fI,m,C.br,r,0,4)],n),C.m,r,C.e,C.i,0,C.p),C.f,r,r,new A.o(C.c,r,r,o,D.aAx,r,C.n),r,r,r,C.fZ,C.bT,r,r,r)
+m.push(new A.kB(u,new A.y(D.axh[v[w]],r,C.n2,r,r,r,r,r,r,r,r,r),r))}o=A.p(r,A.x(A.a([D.fGK,C.au,A.bY(C.fI,m,C.br,r,0,4)],n),C.m,r,C.e,C.i,0,C.p),C.f,r,r,new A.o(C.c,r,r,o,D.aAx,r,C.n),r,r,r,C.fZ,C.bT,r,r,r)
 m=s.f
 v=A.a([],n)
 for(u=A.T(x).k("dx<1>"),x=new A.dx(x,u),x=new A.bT(x,x.gL(0),u.k("bT<ak.E>")),u=u.k("ak.E");x.C();){t=x.d
@@ -3497,7 +3497,7 @@ v.push(s.c22(t==null?u.a(t):t,170))}v.push(A.p(r,r,C.f,r,r,new A.o(C.c,r,r,A.m(5
 m=A.E(A.dR(A.as(A.x(v,C.m,r,C.mh,C.i,0,C.p),r,r,r),new A.t(m*10,0)),1)
 x=A.a([],n)
 for(w=0;w<8;++w){v=new A.aP(12,12)
-x.push(A.aA(r,A.p(r,A.x(A.a([new A.y(D.axh[w],r,C.pG,r,r,r,r,r,r,r,r,r),new A.y(D.dfg[w],r,C.qY,r,r,r,r,r,r,r,r,r)],n),C.m,r,C.e,C.i,0,C.p),C.f,r,r,new A.o(C.hN,r,r,new A.bh(v,v,v,v),r,r,C.n),r,r,r,r,C.kL,r,r,84),C.y,!1,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,new B.cNA(s,w),r,r,r,r,r,r,!1,C.a3))}return new A.an(C.a_,r,C.ab,C.t,A.a([q,A.x(A.a([p,o,m,new A.D(D.bEI,A.bY(C.fI,x,C.br,r,6,6),r)],n),C.m,r,C.e,C.i,0,C.p)],n),r)}}
+x.push(A.aA(r,A.p(r,A.x(A.a([new A.y(D.axh[w],r,C.pG,r,r,r,r,r,r,r,r,r),new A.y(D.dfh[w],r,C.qY,r,r,r,r,r,r,r,r,r)],n),C.m,r,C.e,C.i,0,C.p),C.f,r,r,new A.o(C.hN,r,r,new A.bh(v,v,v,v),r,r,C.n),r,r,r,r,C.kL,r,r,84),C.y,!1,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,new B.cNA(s,w),r,r,r,r,r,r,!1,C.a3))}return new A.an(C.a_,r,C.ab,C.t,A.a([q,A.x(A.a([p,o,m,new A.D(D.bEJ,A.bY(C.fI,x,C.br,r,6,6),r)],n),C.m,r,C.e,C.i,0,C.p)],n),r)}}
 B.a3p.prototype={
 R(){return new B.bb0(A.a([],y.K),0,3,!1,null,C.bC,null,null)}}
 B.bb0.prototype={
@@ -3538,7 +3538,7 @@ x.e0$=2
 x.hr(new B.d7m(x))},
 B(d){return A.cu(new B.d7j(this))}}
 B.a3I.prototype={
-R(){return new B.bc2(C.aw,D.ekL,0,3,!1,null,C.bC,null,null)}}
+R(){return new B.bc2(C.aw,D.ekN,0,3,!1,null,C.bC,null,null)}}
 B.bc2.prototype={
 ghA(){return this.a.c},
 ghE(){return 10},
@@ -3743,17 +3743,17 @@ break A}x=C.aJ
 break A}return x},
 B(d){var x,w,v,u,t,s,r,q=this,p=null,o=B.ij(C.ay7),n=A.d("Find 5 treasures \xb7 found "+q.cb$+" \xb7 digs "+q.f,p,p,p,p,p,p,p,p,p,p),m=y.p,l=A.a([],m)
 for(x=q.e,w=0;w<49;++w){v=new A.aP(8,8)
-if(!x.aj(0,w))u=D.blF
+if(!x.aj(0,w))u=D.blG
 else if(x.h(0,w)===0)u=C.xP
 else{u=x.h(0,w)
 u.toString
-u=q.c_x(u).j(0.85)}t=new A.ay(C.im.j(0.5),1,C.r,-1)
-if(!x.aj(0,w))s=D.fL5
-else if(x.h(0,w)===0)s=D.fBY
+u=q.c_x(u).j(0.85)}t=new A.ay(C.io.j(0.5),1,C.r,-1)
+if(!x.aj(0,w))s=D.fL9
+else if(x.h(0,w)===0)s=D.fC1
 else{s=x.h(0,w)
 s.toString
 r=new A.y(s>=99?"\xb7":A.w(x.h(0,w)),p,C.fx,p,p,p,p,p,p,p,p,p)
-s=r}l.push(A.aA(p,A.cY(C.A,new A.qD(C.dz,C.A,C.f,new A.D(C.ev,s,p),p),p,p,C.b5,new A.o(u,p,new A.bH(t,t,t,t),new A.bh(v,v,v,v),p,p,C.n),C.a2,p,p,p,C.nv,p,p,p,p),C.y,!1,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,new B.fdl(q,w),p,p,p,p,p,p,!1,C.a3))}return new A.an(C.a_,p,C.ab,C.t,A.a([o,A.x(A.a([new B.js(n,p),D.fDV,A.E(A.as(new A.fI(1,new A.D(C.bg,A.kQ(1,l,7,0,0,p,C.dS,!1),p),p),p,p,p),1)],m),C.m,p,C.e,C.i,0,C.p)],m),p)}}
+s=r}l.push(A.aA(p,A.cY(C.A,new A.qD(C.dz,C.A,C.f,new A.D(C.ev,s,p),p),p,p,C.b5,new A.o(u,p,new A.bH(t,t,t,t),new A.bh(v,v,v,v),p,p,C.n),C.a2,p,p,p,C.nv,p,p,p,p),C.y,!1,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,new B.fdl(q,w),p,p,p,p,p,p,!1,C.a3))}return new A.an(C.a_,p,C.ab,C.t,A.a([o,A.x(A.a([new B.js(n,p),D.fDZ,A.E(A.as(new A.fI(1,new A.D(C.bg,A.kQ(1,l,7,0,0,p,C.dS,!1),p),p),p,p,p),1)],m),C.m,p,C.e,C.i,0,C.p)],m),p)}}
 B.avx.prototype={
 R(){return new B.aI0(A.a([],y.F),A.a([],y.t))}}
 B.aI0.prototype={
@@ -3772,7 +3772,7 @@ w.w=0},
 c73(d,e){var x,w=this
 if(w.x||w.y!=null)return
 if(e===-1){x=w.f
-if(x.length!==0)w.m(C.d.gcYo(x))
+if(x.length!==0)w.m(C.d.gcYp(x))
 return}x=w.f
 if(x.length>=4||C.d.t(x,e))return
 A.eY()
@@ -3801,7 +3801,7 @@ s.a.c.c.$1("The alarm went off")}},
 aSA(d,e){var x=null,w=e==null?C.w.j(0.4):e,v=A.m(8),u=A.J(C.aX,C.r,1)
 return A.p(C.A,A.d(d==null?"":A.w(d),x,x,x,x,x,x,C.fx,x,x,x),C.f,x,x,new A.o(w,x,u,v,x,x,C.n),x,42,x,C.hl,x,x,x,38)},
 bNA(d){return this.aSA(d,null)},
-B(d){var x,w,v,u,t,s,r,q,p,o=this,n=null,m=B.ij(D.ds5),l=o.e,k=A.d("Crack the 4-digit code (1\u20136, no repeats) \xb7 safe "+A.w(Math.min(o.r+1,2))+"/2 \xb7 tries "+(9-l.length),n,n,n,n,n,n,n,n,n,n),j=y.p,i=A.a([],j)
+B(d){var x,w,v,u,t,s,r,q,p,o=this,n=null,m=B.ij(D.ds7),l=o.e,k=A.d("Crack the 4-digit code (1\u20136, no repeats) \xb7 safe "+A.w(Math.min(o.r+1,2))+"/2 \xb7 tries "+(9-l.length),n,n,n,n,n,n,n,n,n,n),j=y.p,i=A.a([],j)
 for(x=l.length,w=0;w<l.length;l.length===x||(0,A.L)(l),++w){v=l[w]
 u=A.a([],j)
 for(t=J.aW(v.a);t.C();)u.push(o.bNA(t.gS(t)))
@@ -3810,16 +3810,16 @@ u.push(new A.y(C.a.aK("\ud83d\udfe2",v.b)+C.a.aK("\ud83d\udfe1",v.c),n,C.El,n,n,
 i.push(new A.ca(C.aM,C.b9,C.i,C.m,n,C.p,n,0,u,n))}l=A.a([],j)
 for(x=o.f,s=0;s<4;++s){u=s<x.length?x[s]:n
 l.push(o.aSA(u,C.mD.j(0.6)))}l.push(C.as)
-l.push(D.fMX)
+l.push(D.fN0)
 i.push(A.B(l,C.m,n,C.b9,C.i,0,n,n))
 l=A.E(A.cl(i,n,n,C.Gx,n,n,C.ah,!1),1)
 i=A.a([],j)
 for(u=[1,2,3,4,5,6,-1],w=0;w<7;++w){r=u[w]
 t=new A.aP(12,12)
 q=new A.ay(C.d.t(x,r)?C.aX:C.aC,1,C.r,-1)
-if(r===-1)p=D.bSb
-else{p=C.d.t(x,r)?C.jP:C.c
-p=new A.y(""+r,n,new A.F(!0,p,n,n,n,n,22,C.u,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n),n,n,n,n,n,n,n,n,n)}i.push(A.aA(n,A.p(C.A,p,C.f,n,n,new A.o(n,n,new A.bH(q,q,q,q),new A.bh(t,t,t,t),n,D.c4V,C.n),n,52,n,n,n,n,n,64),C.y,!1,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,new B.f2C(o,r),n,n,n,n,n,n,!1,C.a3))}return new A.an(C.a_,n,C.ab,C.t,A.a([m,A.x(A.a([new B.js(k,n),D.fEt,l,new A.D(O.yn,A.bY(C.fI,i,C.br,n,8,8),n)],j),C.m,n,C.e,C.i,0,C.p)],j),n)}}
+if(r===-1)p=D.bSc
+else{p=C.d.t(x,r)?C.jQ:C.c
+p=new A.y(""+r,n,new A.F(!0,p,n,n,n,n,22,C.u,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n),n,n,n,n,n,n,n,n,n)}i.push(A.aA(n,A.p(C.A,p,C.f,n,n,new A.o(n,n,new A.bH(q,q,q,q),new A.bh(t,t,t,t),n,D.c4W,C.n),n,52,n,n,n,n,n,64),C.y,!1,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,new B.f2C(o,r),n,n,n,n,n,n,!1,C.a3))}return new A.an(C.a_,n,C.ab,C.t,A.a([m,A.x(A.a([new B.js(k,n),D.fEx,l,new A.D(O.yn,A.bY(C.fI,i,C.br,n,8,8),n)],j),C.m,n,C.e,C.i,0,C.p)],j),n)}}
 B.a5m.prototype={
 R(){return new B.bh_(A.a([],y.c),C.aw,0,3,!1,null,C.bC,null,null)}}
 B.ads.prototype={
@@ -3831,9 +3831,9 @@ gaCy(){var x=this
 return new A.t(x.e.a/2,74).a7(0,new A.t(Math.sin(x.r),Math.cos(x.r)).aK(0,x.w))},
 aTY(){var x,w,v,u,t,s,r,q,p,o,n=this.a.c.d,m=this.e,l=m.b
 for(x=this.d,m=m.a-60,w=l*0.35,v=l*0.58;x.length<8;){u=n.ag()
-if(u<0.28)t=D.eZZ
-else if(u<0.48)t=D.f_i
-else{s=u<0.56?D.f_9:D.eZT
+if(u<0.28)t=D.f_2
+else if(u<0.48)t=D.f_m
+else{s=u<0.56?D.f_d:D.eZX
 t=s}r=new A.t(30+n.ag()*m,w+n.ag()*v)
 if(C.d.b3(x,new B.djW(r)))continue
 s=t.a
@@ -3900,15 +3900,15 @@ t.r=1.2
 if(x)if(t.jI())return
 if(t.f<=0)t.Uk("Out of spins")}},
 cq1(d){var x,w,v=null,u=this.d[d],t=C.k.bf(u),s=u-t,r=A.m(14),q=A.J(this.e[d]?C.bt:C.bK,C.r,3),p=A.a([],y.p)
-for(x=-1;x<=2;++x){w=D.dvn[C.o.F(t+x,6)]
+for(x=-1;x<=2;++x){w=D.dvp[C.o.F(t+x,6)]
 p.push(new A.cN(0,30+(x-s)*60,0,v,v,v,new A.cf(C.A,v,v,new A.y(w,v,new A.F(!0,v,v,v,v,v,46,v,v,v,v,v,1,v,v,v,v,v,v,v,v,v,v,v,v,v),v,C.K,v,v,v,v,v,v,v),v),v))}return A.p(v,new A.an(C.a_,v,C.ab,C.t,p,v),C.ap,v,v,new A.o(C.c,v,q,r,v,v,C.n),v,120,v,v,v,v,v,84)},
-B(d){var x,w=this,v=null,u=B.ij(D.d0W),t=A.m(22),s=y.p,r=A.a([],s)
-for(x=0;x<3;++x)r.push(new A.D(C.eZ,w.cq1(x),v))
-t=A.p(v,A.B(r,C.m,v,C.e,C.P,0,v,v),C.f,v,v,new A.o(v,v,v,t,D.dox,D.c6b,C.n),v,v,v,v,C.bg,v,v,v)
+B(d){var x,w=this,v=null,u=B.ij(D.d0X),t=A.m(22),s=y.p,r=A.a([],s)
+for(x=0;x<3;++x)r.push(new A.D(C.f_,w.cq1(x),v))
+t=A.p(v,A.B(r,C.m,v,C.e,C.P,0,v,v),C.f,v,v,new A.o(v,v,v,t,D.doz,D.c6c,C.n),v,v,v,v,C.bg,v,v,v)
 r=w.w
 if(r==null)r="Tap to stop reel "+C.o.E(C.d.cp(w.e,!1)+1,1,3)
 else r=r?"3 IN A ROW!":"No match"
-return A.aA(C.c6,new A.an(C.a_,v,C.ab,C.t,A.a([u,A.as(A.x(A.a([D.fTa,C.aB,t,C.aQ,A.d(r,v,v,v,v,v,v,A.l(v,v,w.w===!0?C.be:C.c,v,v,v,v,v,v,v,v,22,v,v,C.u,v,v,!0,v,v,v,v,v,v,v,v),v,v,v)],s),C.m,v,C.e,C.P,0,C.p),v,v,v),B.kV("Line up 3 of a kind \xb7 "+w.cb$+"/4 \xb7 spins "+w.f,!1,v)],s),v),C.y,!1,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,new B.f6s(w),v,v,v,v,!1,C.a3)}}
+return A.aA(C.c6,new A.an(C.a_,v,C.ab,C.t,A.a([u,A.as(A.x(A.a([D.fTe,C.aB,t,C.aQ,A.d(r,v,v,v,v,v,v,A.l(v,v,w.w===!0?C.be:C.c,v,v,v,v,v,v,v,v,22,v,v,C.u,v,v,!0,v,v,v,v,v,v,v,v),v,v,v)],s),C.m,v,C.e,C.P,0,C.p),v,v,v),B.kV("Line up 3 of a kind \xb7 "+w.cb$+"/4 \xb7 spins "+w.f,!1,v)],s),v),C.y,!1,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,new B.f6s(w),v,v,v,v,!1,C.a3)}}
 B.ajz.prototype={
 R(){return new B.aze(0,3,!1)}}
 B.aze.prototype={
@@ -3921,7 +3921,7 @@ q(){var x=this.x
 if(x!=null)x.a4(0)
 this.a1()},
 aZN(){var x,w,v=this,u=v.a.c.d
-v.d=D.d5R[u.ap(10)]
+v.d=D.d5S[u.ap(10)]
 x=v.e=100+u.ap(v.cb$<3?900:1800)
 if(v.cb$<2)x=v.e=C.o.ao(x,25)*25
 w=x<=1000?1000:2000
@@ -3934,7 +3934,7 @@ x=w.r===w.f-w.e
 w.m(new B.cSc(w,x))
 if(x){if(w.jI())return}else if(w.jl("Wrong change"))return
 w.x=A.cG(C.qh,new B.cSd(w))},
-B(d){var x,w,v,u,t,s,r,q,p=this,o=null,n=B.ij(D.doM),m=B.kV("Give exact change \xb7 "+p.cb$+"/6",!1,p.e0$),l=A.d(p.d,o,o,o,o,o,o,Q.Ke,o,o,o),k=A.d("Costs "+B.frz(p.e),o,o,o,o,o,o,C.pH,o,o,o),j=A.d("Customer pays "+B.frz(p.f),o,o,o,o,o,o,D.fvZ,o,o,o),i=p.w
+B(d){var x,w,v,u,t,s,r,q,p=this,o=null,n=B.ij(D.doO),m=B.kV("Give exact change \xb7 "+p.cb$+"/6",!1,p.e0$),l=A.d(p.d,o,o,o,o,o,o,Q.Ke,o,o,o),k=A.d("Costs "+B.frz(p.e),o,o,o,o,o,o,C.pH,o,o,o),j=A.d("Customer pays "+B.frz(p.f),o,o,o,o,o,o,D.fw2,o,o,o),i=p.w
 if(i==null)i=C.hx
 else i=i?C.cT:C.bB
 x=A.m(16)
@@ -3942,7 +3942,7 @@ w=A.J(C.bU,C.r,1)
 v=y.p
 x=A.E(A.as(A.x(A.a([l,k,j,C.aB,A.p(o,A.d("Your change: "+B.frz(p.r),o,o,o,o,o,o,C.n1,o,o,o),C.f,o,o,new A.o(i,o,w,x,o,o,C.n),o,o,o,o,I.alC,o,o,o)],v),C.m,o,C.e,C.P,0,C.p),o,o,o),1)
 w=A.a([],v)
-for(u=0;u<7;++u){t=D.drR[u]
+for(u=0;u<7;++u){t=D.drT[u]
 l=t>=100
 k=l?76:52
 j=l?40:52
@@ -3952,7 +3952,7 @@ s=new A.aP(s,s)
 r=new A.ay(l?C.ep:C.al,2,C.r,-1)
 q=l?"$"+(t/100|0):""+t+"\xa2"
 l=l?C.c:C.bk
-w.push(A.aA(o,A.p(C.A,new A.y(q,o,new A.F(!0,l,o,o,o,o,o,C.u,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o),o,o,o,o,o,o,o,o,o),C.f,o,o,new A.o(i,o,new A.bH(r,r,r,r),new A.bh(s,s,s,s),o,o,C.n),o,j,o,o,o,o,o,k),C.y,!1,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,new B.cSg(p,t),o,o,o,o,o,o,!1,C.a3))}return new A.an(C.a_,o,C.ab,C.t,A.a([n,A.x(A.a([m,x,new A.D(C.yl,A.bY(C.fI,w,C.br,o,6,6),o),new A.D(D.bAF,A.B(A.a([A.E(A.dT(C.Eu,new B.cSh(p),A.dj(o,o,o,o,o,o,o,o,o,C.c,o,o,o,o,o,W.acY,o,o,o,o)),1),C.as,A.E(A.bI(D.fR_,o,p.gbUe(),A.bo(C.aA,o,o,o,o,o,o,o,o,o,o,o)),2)],v),C.m,o,C.e,C.i,0,o,o),o)],v),C.m,o,C.e,C.i,0,C.p)],v),o)}}
+w.push(A.aA(o,A.p(C.A,new A.y(q,o,new A.F(!0,l,o,o,o,o,o,C.u,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o),o,o,o,o,o,o,o,o,o),C.f,o,o,new A.o(i,o,new A.bH(r,r,r,r),new A.bh(s,s,s,s),o,o,C.n),o,j,o,o,o,o,o,k),C.y,!1,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,new B.cSg(p,t),o,o,o,o,o,o,!1,C.a3))}return new A.an(C.a_,o,C.ab,C.t,A.a([n,A.x(A.a([m,x,new A.D(C.yl,A.bY(C.fI,w,C.br,o,6,6),o),new A.D(D.bAG,A.B(A.a([A.E(A.dT(C.Eu,new B.cSh(p),A.dj(o,o,o,o,o,o,o,o,o,C.c,o,o,o,o,o,W.acY,o,o,o,o)),1),C.as,A.E(A.bI(D.fR3,o,p.gbUe(),A.bo(C.aA,o,o,o,o,o,o,o,o,o,o,o)),2)],v),C.m,o,C.e,C.i,0,o,o),o)],v),C.m,o,C.e,C.i,0,C.p)],v),o)}}
 B.ang.prototype={
 R(){return new B.bjn()}}
 B.bjn.prototype={
@@ -4015,13 +4015,13 @@ u=q.c74(q.d[k].a)
 s=q.d[k].b
 r=D.a59[s]
 x=s===1||s===2?C.bB:C.w
-l.push(A.aA(p,A.cY(C.A,new A.y(u+"\n"+r,p,new A.F(!0,x,p,p,p,p,24,C.u,p,p,p,p,1.1,p,p,p,p,p,p,p,p,p,p,p,p,p),p,C.K,p,p,p,p,p,p,p),p,p,C.b5,new A.o(C.c,p,new A.bH(t,t,t,t),new A.bh(w,w,w,w),D.dw9,p,C.n),C.fO,p,98,p,p,p,v,p,70),C.y,!1,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,new B.dsZ(q,k),p,p,p,p,p,p,!1,C.a3));++k}return new A.an(C.a_,p,C.ab,C.t,A.a([o,A.x(A.a([new B.js(n,p),D.fAq,A.E(A.as(new A.D(C.bg,A.bY(C.fI,l,C.br,p,10,10),p),p,p,p),1)],m),C.m,p,C.e,C.i,0,C.p)],m),p)}}
+l.push(A.aA(p,A.cY(C.A,new A.y(u+"\n"+r,p,new A.F(!0,x,p,p,p,p,24,C.u,p,p,p,p,1.1,p,p,p,p,p,p,p,p,p,p,p,p,p),p,C.K,p,p,p,p,p,p,p),p,p,C.b5,new A.o(C.c,p,new A.bH(t,t,t,t),new A.bh(w,w,w,w),D.dwb,p,C.n),C.fO,p,98,p,p,p,v,p,70),C.y,!1,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,new B.dsZ(q,k),p,p,p,p,p,p,!1,C.a3));++k}return new A.an(C.a_,p,C.ab,C.t,A.a([o,A.x(A.a([new B.js(n,p),D.fAu,A.E(A.as(new A.D(C.bg,A.bY(C.fI,l,C.br,p,10,10),p),p,p,p),1)],m),C.m,p,C.e,C.i,0,C.p)],m),p)}}
 B.alt.prototype={
 R(){return new B.aB_(A.aX(y.N),0,3,!1)}}
 B.aB_.prototype={
 ghA(){return this.a.c},
 ghE(){return 15},
-aZk(){var x,w,v,u,t,s=this,r=y.N,q=A.C(D.dpy,r)
+aZk(){var x,w,v,u,t,s=this,r=y.N,q=A.C(D.dpA,r)
 C.d.e_(q,s.a.c.d)
 x=y.S
 w=A.d5(q,0,A.dC(56,"count",x),A.T(q).c).dn(0)
@@ -4050,7 +4050,7 @@ if(C.d.t(x,w)&&!v.r.t(0,w)){v.m(new B.df2(v,w))
 if(v.jI())return
 if(v.r.a===v.f.length)v.m(v.gc6b())}else if(!v.r.t(0,w)){v.m(new B.df3(v,d))
 v.jl("Tapped the wrong thing")}},
-B(d){var x,w,v,u,t,s,r,q=this,p=null,o=B.ij(D.cIm),n=B.kV("Find these \xb7 "+q.cb$+"/15",!1,q.e0$),m=y.p,l=A.a([],m),k=q.f
+B(d){var x,w,v,u,t,s,r,q=this,p=null,o=B.ij(D.cIn),n=B.kV("Find these \xb7 "+q.cb$+"/15",!1,q.e0$),m=y.p,l=A.a([],m),k=q.f
 k===$&&A.c()
 x=k.length
 w=q.r
@@ -4143,10 +4143,10 @@ g=h.G()
 p.drawLine.apply(p,[j,i,s+l*o,r+k*o,g])
 g.delete()}$.S()
 x=A.I()
-x.sam(D.ev3.aA(0,A.bX(u,t)))
+x.sam(D.ev5.aA(0,A.bX(u,t)))
 a0.ad(u,t,x)
 f=A.I()
-f.r=D.bi8.gp(0)
+f.r=D.bi9.gp(0)
 f.b=C.a9
 f.c=2
 for(e=1;e<=3;++e){g=f.G()
@@ -4246,11 +4246,11 @@ a0.a2()
 x=a0.a.c.d
 w=y.N
 a0.d=A.bZ(64,"",!1,w)
-v=A.C(D.dhn,w)
+v=A.C(D.dho,w)
 C.d.e_(v,x)
 for(w=v.length,u=y.t,t=a0.e,s=0;s<v.length;v.length===w||(0,A.L)(v),++s){r=v[s]
 if(t.a>=6)break
-for(q=r.length,p=q-1,o=0;o<60;++o){n=D.drp[x.ap(3)]
+for(q=r.length,p=q-1,o=0;o<60;++o){n=D.drr[x.ap(3)]
 m=n.a
 l=n.b
 k=x.ap(8-m*p)
@@ -4284,7 +4284,7 @@ B(d){var x,w,v,u,t,s,r,q,p,o,n=this,m=null,l=A.aX(y.S)
 for(x=n.f,w=A.en(x,x.r,A.a7(x).c),v=n.e,u=w.$ti.c;w.C();){t=w.d
 t=v.h(0,t==null?u.a(t):t)
 t.toString
-l.v(0,t)}w=B.ij(D.dof)
+l.v(0,t)}w=B.ij(D.doh)
 u=A.d("Tap the first and last letter of each word \xb7 "+x.a+"/"+v.a,m,m,m,m,m,m,m,m,m,m)
 t=y.p
 s=A.a([],t)
@@ -4299,7 +4299,7 @@ else r=l.t(0,o)?C.be:C.bN
 q=new A.aP(8,8)
 p=n.d
 p===$&&A.c()
-s.push(A.aA(m,A.p(C.A,new A.qD(C.dz,C.A,C.f,new A.D(C.ev,new A.y(p[o],m,D.fhX,m,m,m,m,m,m,m,m,m),m),m),C.f,m,m,new A.o(r,m,m,new A.bh(q,q,q,q),m,m,C.n),m,m,m,N.GJ,m,m,m,m),C.y,!1,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,new B.fih(n,o),m,m,m,m,m,m,!1,C.a3))}return new A.an(C.a_,m,C.ab,C.t,A.a([w,A.x(A.a([new B.js(u,m),x,A.E(A.as(new A.fI(1,A.p(m,A.kQ(1,s,8,0,0,C.hP,C.dS,!1),C.f,m,m,new A.o(C.c,m,m,v,D.dkM,m,C.n),m,m,m,C.bg,m,m,m,m),m),m,m,m),1)],t),C.m,m,C.e,C.i,0,C.p)],t),m)}}
+s.push(A.aA(m,A.p(C.A,new A.qD(C.dz,C.A,C.f,new A.D(C.ev,new A.y(p[o],m,D.fi0,m,m,m,m,m,m,m,m,m),m),m),C.f,m,m,new A.o(r,m,m,new A.bh(q,q,q,q),m,m,C.n),m,m,m,N.GJ,m,m,m,m),C.y,!1,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,new B.fih(n,o),m,m,m,m,m,m,!1,C.a3))}return new A.an(C.a_,m,C.ab,C.t,A.a([w,A.x(A.a([new B.js(u,m),x,A.E(A.as(new A.fI(1,A.p(m,A.kQ(1,s,8,0,0,C.hP,C.dS,!1),C.f,m,m,new A.o(C.c,m,m,v,D.dkO,m,C.n),m,m,m,C.bg,m,m,m,m),m),m,m,m),1)],t),C.m,m,C.e,C.i,0,C.p)],t),m)}}
 B.ak3.prototype={
 R(){return new B.bcS(A.aX(y.S),0,3,!1)}}
 B.bcS.prototype={
@@ -4312,7 +4312,7 @@ Oy(d,e){var x
 for(x=5;x>=0;--x)if(d[x*7+e]===0)return x
 return-1},
 aDk(d,e){var x,w,v,u,t,s,r,q,p,o,n
-for(x=y.t,w=0;w<6;++w)for(v=0;v<7;++v)for(u=0;u<4;++u){t=D.dbD[u]
+for(x=y.t,w=0;w<6;++w)for(v=0;v<7;++v)for(u=0;u<4;++u){t=D.dbF[u]
 s=t.a
 r=t.b
 q=A.a([],x)
@@ -4373,7 +4373,7 @@ x=1
 break}}else if(s&&u.jl("The CPU won")){v=!0
 x=1
 break}x=3
-return A.b(A.bP(D.bxl,null,y.H),$async$X1)
+return A.b(A.bP(D.bxm,null,y.H),$async$X1)
 case 3:if(u.c==null){v=!0
 x=1
 break}u.m(new B.d4d(u))
@@ -4382,7 +4382,7 @@ x=1
 break
 case 1:return A.h(v,w)}})
 return A.i($async$X1,w)},
-B(d){var x,w,v,u,t,s=this,r=null,q=B.ij(D.drx),p=B.kV("Win 2 games vs the CPU \xb7 won "+s.cb$,!1,s.e0$),o=A.d(s.f,r,r,r,r,r,r,C.de,r,r,r),n=A.m(16),m=y.p,l=A.a([],m)
+B(d){var x,w,v,u,t,s=this,r=null,q=B.ij(D.drz),p=B.kV("Win 2 games vs the CPU \xb7 won "+s.cb$,!1,s.e0$),o=A.d(s.f,r,r,r,r,r,r,C.de,r,r,r),n=A.m(16),m=y.p,l=A.a([],m)
 for(x=0;x<42;++x){w=s.d
 w===$&&A.c()
 v=w[x]
@@ -4391,7 +4391,7 @@ break A}if(2===v){w=C.bt
 break A}w=D.bcG
 break A}u=s.r.t(0,x)?C.c:C.dm
 t=new A.ay(u,s.r.t(0,x)?4:1,C.r,-1)
-l.push(A.aA(r,A.cY(r,r,r,r,C.b5,new A.o(w,r,new A.bH(t,t,t,t),r,r,r,C.a6),C.a2,r,r,r,C.hl,r,r,r,r),C.y,!1,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,new B.d4i(s,x),r,r,r,r,r,r,!1,C.a3))}return new A.an(C.a_,r,C.ab,C.t,A.a([q,A.x(A.a([p,o,A.E(A.as(new A.fI(1.1666666666666667,A.p(r,A.kQ(1,l,7,0,0,r,C.dS,!1),C.f,r,r,new A.o(C.bl,r,r,n,D.cTR,r,C.n),r,r,r,C.bg,C.hP,r,r,r),r),r,r,r),1)],m),C.m,r,C.e,C.i,0,C.p)],m),r)}}
+l.push(A.aA(r,A.cY(r,r,r,r,C.b5,new A.o(w,r,new A.bH(t,t,t,t),r,r,r,C.a6),C.a2,r,r,r,C.hl,r,r,r,r),C.y,!1,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,new B.d4i(s,x),r,r,r,r,r,r,!1,C.a3))}return new A.an(C.a_,r,C.ab,C.t,A.a([q,A.x(A.a([p,o,A.E(A.as(new A.fI(1.1666666666666667,A.p(r,A.kQ(1,l,7,0,0,r,C.dS,!1),C.f,r,r,new A.o(C.bl,r,r,n,D.cTS,r,C.n),r,r,r,C.bg,C.hP,r,r,r),r),r,r,r),1)],m),C.m,r,C.e,C.i,0,C.p)],m),r)}}
 B.a9r.prototype={
 R(){return new B.boe(0,3,!1,null,C.bC,null,null)}}
 B.boe.prototype={
@@ -4456,7 +4456,7 @@ ghA(){return this.a.c},
 ghE(){return 6},
 aZP(){var x=this,w=x.a.c.d.ap(7)
 x.f=w
-w=A.C(D.cPm[w],y.R)
+w=A.C(D.cPn[w],y.R)
 x.e=w
 x.r=0
 x.w=3
@@ -4514,7 +4514,7 @@ x.a2()
 x.i5()
 x.aZP()
 x.hr(new B.fbG(x))},
-ae9(d,e){var x=null,w=C.c.j(0.12),v=A.m(14),u=A.J(C.jP,C.r,1)
+ae9(d,e){var x=null,w=C.c.j(0.12),v=A.m(14),u=A.J(C.jQ,C.r,1)
 return A.aA(x,A.p(x,A.X(d,C.c,x,x,x,30),C.f,x,x,new A.o(w,x,u,v,x,x,C.n),x,52,x,x,x,x,x,64),C.y,!1,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,e,x,x,x,x,x,x,!1,C.a3)},
 B(d){var x,w,v,u,t,s,r,q,p=this,o=null,n=A.aX(y.S),m=p.e
 m===$&&A.c()
@@ -4525,12 +4525,12 @@ u=p.r+v.a
 if(u>=0)n.M(0,u*10+p.w+v.b)}m=B.ij(D.axQ)
 x=A.d("Clear 6 lines \xb7 cleared "+p.cb$,o,o,o,o,o,o,o,o,o,o)
 v=p.gcsC()
-u=A.J(C.jP,C.r,2)
+u=A.J(C.jQ,C.r,2)
 t=A.m(6)
 s=y.p
 r=A.a([],s)
 for(q=0;q<160;++q)r.push(new A.ff(new B.fbC(p,n,q),o))
-return new A.an(C.a_,o,C.ab,C.t,A.a([m,A.x(A.a([new B.js(x,o),A.E(A.as(new A.fI(0.625,A.aA(o,A.p(o,A.kQ(1,r,10,0,0,o,C.dS,!1),C.f,o,o,new A.o(o,o,u,t,o,o,C.n),o,o,o,C.kk,o,o,o,o),C.y,!1,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,v,o,o,o,o,o,o,!1,C.a3),o),o,o,o),1),new A.D(D.bzg,A.B(A.a([p.ae9(D.bMA,new B.fbD(p)),p.ae9(C.P0,v),p.ae9(D.bMC,new B.fbE(p)),p.ae9(U.a2r,p.gc_a())],s),C.m,o,C.qG,C.i,0,o,o),o)],s),C.m,o,C.e,C.i,0,C.p)],s),o)}}
+return new A.an(C.a_,o,C.ab,C.t,A.a([m,A.x(A.a([new B.js(x,o),A.E(A.as(new A.fI(0.625,A.aA(o,A.p(o,A.kQ(1,r,10,0,0,o,C.dS,!1),C.f,o,o,new A.o(o,o,u,t,o,o,C.n),o,o,o,C.kk,o,o,o,o),C.y,!1,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,v,o,o,o,o,o,o,!1,C.a3),o),o,o,o),1),new A.D(D.bzh,A.B(A.a([p.ae9(D.bMB,new B.fbD(p)),p.ae9(C.P0,v),p.ae9(D.bMD,new B.fbE(p)),p.ae9(U.a2r,p.gc_a())],s),C.m,o,C.qG,C.i,0,o,o),o)],s),C.m,o,C.e,C.i,0,C.p)],s),o)}}
 B.aKX.prototype={
 q(){var x=this,w=x.a8$
 if(w!=null)w.a5(0,x.gbB())
@@ -4651,7 +4651,7 @@ x.a2()
 x.i5()
 x.hr(new B.cIe(x))},
 atF(d,e,f){var x=null,w=e*2,v=A.a([C.c.j(0.9),f],y.O)
-return A.ap(x,A.p(x,x,C.f,x,x,new A.o(x,x,x,x,A.a([new A.ac(0,C.G,f.j(0.7),C.I,14)],y.V),new A.c_(C.A,0.5,C.x,x,0,v,D.dlT,x),C.a6),x,w,x,x,x,x,x,w),x,x,d.a-e,x,d.b-e,x)},
+return A.ap(x,A.p(x,x,C.f,x,x,new A.o(x,x,x,x,A.a([new A.ac(0,C.G,f.j(0.7),C.I,14)],y.V),new A.c_(C.A,0.5,C.x,x,0,v,D.dlV,x),C.a6),x,w,x,x,x,x,x,w),x,x,d.a-e,x,d.b-e,x)},
 B(d){return A.cu(new B.cIa(this))}}
 B.aKS.prototype={
 q(){var x=this,w=x.a8$
@@ -4667,7 +4667,7 @@ if(x!=null)x.q()
 this.bvy()}}
 B.bxI.prototype={}
 B.zH.prototype={}
-B.jh.prototype={
+B.ji.prototype={
 i5(){return this.ghA().a.$2(0,this.ghE())},
 KH(d){var x=this
 if(x.e5$)return!0
@@ -4727,7 +4727,7 @@ u=A.J(o.j(0.6),C.r,1.5)
 t=A.a([new A.ac(0,C.G,o.j(0.25),C.I,24)],y.V)
 s=q.r
 s===$&&A.c()
-l=A.E(A.as(A.p_(A.p(p,A.n4(s.a,p,p,C.eM,!0,C.Kb,C.K,p,C.bW),C.f,p,p,new A.o(w,p,u,v,t,p,C.n),p,p,new A.bR(l,y.ba),C.rE,C.fm,p,p,p),C.eR,A.qs(),C.b5,C.b5,new B.cJF()),p,p,p),1)
+l=A.E(A.as(A.p_(A.p(p,A.n4(s.a,p,p,C.eM,!0,C.Kb,C.K,p,C.bV),C.f,p,p,new A.o(w,p,u,v,t,p,C.n),p,p,new A.bR(l,y.ba),C.rE,C.fm,p,p,p),C.eR,A.qs(),C.b5,C.b5,new B.cJF()),p,p,p),1)
 t=A.a([],x)
 for(r=0;r<q.r.b.length;++r)t.push(new A.ff(new B.cJG(q,r,o),p))
 return new A.an(C.a_,p,C.ab,C.t,A.a([n,A.x(A.a([new B.js(m,p),l,new A.D(O.yn,A.bY(C.fI,t,C.br,p,10,10),p)],x),C.m,p,C.e,C.i,0,C.p)],x),p)}}
@@ -4769,7 +4769,7 @@ n=q.e
 m=q.f
 l=A.a([C.c.j(0.85),D.D3[m].j(0.85),D.D3[m]],t)
 w.push(new A.cN(p,o,k,k,k,k,A.aA(k,A.p(k,k,C.f,k,k,new A.o(k,k,k,k,A.a([new A.ac(0,C.G,D.D3[m].j(0.5),C.I,10)],s),new A.c_(Z.acm,0.5,C.x,k,0,l,R.ayY,k),C.a6),k,n,k,k,k,k,k,n),C.y,!1,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,new B.cNc(j,q),k,k,k,k,!1,C.a3),k))}v=j.e
-w.push(new A.bM(C.b0,k,k,new B.js(A.B(A.a([D.fWU,A.d(D.d2O[v],k,k,k,k,k,k,A.l(k,k,D.D3[v],k,k,k,k,k,k,k,k,k,k,k,k,k,k,!0,k,k,k,k,k,k,k,k),k,k,k),C.bc,new B.z4(j.r,3,k)],x),C.m,k,C.e,C.P,0,k,k),k),k))
+w.push(new A.bM(C.b0,k,k,new B.js(A.B(A.a([D.fWY,A.d(D.d2P[v],k,k,k,k,k,k,A.l(k,k,D.D3[v],k,k,k,k,k,k,k,k,k,k,k,k,k,k,!0,k,k,k,k,k,k,k,k),k,k,k),C.bc,new B.z4(j.r,3,k)],x),C.m,k,C.e,C.P,0,k,k),k),k))
 return new A.an(C.a_,k,C.ab,C.t,w,k)},
 $S:66}
 B.cNc.prototype={
@@ -4820,7 +4820,7 @@ q=r/2
 p=t.b
 o=t.w
 n=t.f
-n=n<0?"\ud83d\udca3":D.d52[n]
+n=n<0?"\ud83d\udca3":D.d53[n]
 x.push(new A.cN(s-q,p-q,m,m,m,m,new A.iO(A.wz(o*3),m,C.A,!0,m,new A.y(n,m,new A.F(!0,m,m,m,m,m,r*0.8,m,m,m,m,m,1,m,m,m,m,m,m,m,m,m,m,m,m,m),m,C.K,m,m,m,m,m,m,m),m),m))}w=l.e
 if(w.length>1){w=A.C(w,y.o)
 x.push(A.bS(0,A.e_(A.b4(m,m,m,new B.bvS(w,m),C.aw),!0,m),0,0,0))}x.push(D.b0b)
@@ -4874,7 +4874,7 @@ $2(d,e){var x,w,v,u,t,s,r,q=null,p=C.k.bf(e.d/26),o=this.a,n=o.d,m=Math.max(0,n.
 p=A.a([D.Jz],y.p)
 for(x=e.b,w=y.O,v=m;u=n.length,v<u;++v){u=n[v]
 t=new A.aP(6,6)
-s=D.d7p[C.o.F(v,6)]
+s=D.d7r[C.o.F(v,6)]
 r=A.ar(s,C.w,0.25)
 r.toString
 p.push(new A.cN(u.b*x,q,q,(v-m)*26+10,u.a*x,23,new A.l1(new A.o(q,q,q,new A.bh(t,t,t,t),q,new A.a9(C.a5,C.a8,C.x,A.a([s,r],w),q,q),C.n),C.bh,q,q),q))}n=o.e
@@ -4976,7 +4976,7 @@ w=A.a([D.aOY],x)
 for(v=o.f,u=v.length,t=0;t<v.length;v.length===u||(0,A.L)(v),++t){s=v[t]
 r=s.b
 q=s.a
-C.d.v(w,A.a([new A.cN(r,0,p,p,60,(q-0.15)*m,D.hrR,p),new A.cN(r,(q+0.15)*m,p,0,60,p,D.hrQ,p)],x))}x=o.d
+C.d.v(w,A.a([new A.cN(r,0,p,p,60,(q-0.15)*m,D.hrP,p),new A.cN(r,(q+0.15)*m,p,0,60,p,D.hrO,p)],x))}x=o.d
 w.push(A.ap(p,A.eM(C.A,C.k.E(o.e*0.6,-0.5,1),A.d("\ud83d\udc24",p,p,p,p,p,p,A.l(p,p,p,p,p,p,p,p,p,p,p,40,p,p,p,p,1,!0,p,p,p,p,p,p,p,p),C.K,p,p),p),p,p,n*0.28-22,p,x*m-22,p))
 if(!o.w)w.push(D.bay)
 return A.aA(p,new A.an(C.a_,p,C.ab,C.t,w,p),C.y,!1,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,new B.f58(o),p,p,p,p,!1,C.a3)},
@@ -5025,7 +5025,7 @@ $S:0}
 B.cN5.prototype={
 $2(d,e){var x,w,v,u,t,s,r,q,p,o=null,n=e.b,m=e.d,l=this.a,k=A.a([D.Jz],y.p)
 for(x=l.d,w=n/6-4,v=0.055*m-4,u=y.O,t=0;t<4;++t)for(s=t*6,r=(0.08+t*0.055)*m+2,q=0;q<6;++q)if(x[s+q]){p=new A.aP(5,5)
-k.push(new A.cN(q*n/6+2,r,o,o,w,v,new A.l1(new A.o(o,o,o,new A.bh(p,p,p,p),o,new A.a9(C.b0,C.b6,C.x,A.a([C.c.j(0.6),D.d6j[t]],u),D.d8I,o),C.n),C.bh,o,o),o))}x=l.e
+k.push(new A.cN(q*n/6+2,r,o,o,w,v,new A.l1(new A.o(o,o,o,new A.bh(p,p,p,p),o,new A.a9(C.b0,C.b6,C.x,A.a([C.c.j(0.6),D.d6k[t]],u),D.d8K,o),C.n),C.bh,o,o),o))}x=l.e
 k.push(A.ap(o,A.c4(o,new A.o(C.c,o,o,A.m(99),o,o,C.n),C.bh),12,o,(x-0.12)*n,o,0.9*m,0.24*n))
 x=l.f
 w=l.r
@@ -5253,8 +5253,8 @@ o.y=new A.av(A.aR(1/0,e.a,n),A.aR(1/0,e.c,m))
 x=y.p
 w=A.a([D.Jz],x)
 for(v=o.d,u=v.length,t=y.O,s=0;s<v.length;v.length===u||(0,A.L)(v),++s){r=v[s].a
-w.push(new A.cN(r[2]*n-24,r[3]*m-30,p,p,p,p,A.x(A.a([A.p(p,p,C.f,p,p,new A.o(p,p,p,D.b2h,p,new A.c_(C.tw,0.5,C.x,p,0,A.a([C.c.j(0.8),D.dbk[r[0]]],t),D.awC,p),C.n),p,58,p,p,p,p,p,48),A.p(p,p,C.f,C.aC,p,p,p,22,p,p,p,p,p,1)],x),C.m,p,C.e,C.i,0,C.p),p))}for(x=o.r,v=x.length,s=0;s<x.length;x.length===v||(0,A.L)(x),++s){q=x[s]
-w.push(new A.cN(q.a*n-6,q.b*m,p,p,p,p,D.bSM,p))}w.push(A.ap(p,D.bUA,p,p,o.e*n-18,p,0.85*m,p))
+w.push(new A.cN(r[2]*n-24,r[3]*m-30,p,p,p,p,A.x(A.a([A.p(p,p,C.f,p,p,new A.o(p,p,p,D.b2h,p,new A.c_(C.tw,0.5,C.x,p,0,A.a([C.c.j(0.8),D.dbm[r[0]]],t),D.awC,p),C.n),p,58,p,p,p,p,p,48),A.p(p,p,C.f,C.aC,p,p,p,22,p,p,p,p,p,1)],x),C.m,p,C.e,C.i,0,C.p),p))}for(x=o.r,v=x.length,s=0;s<x.length;x.length===v||(0,A.L)(x),++s){q=x[s]
+w.push(new A.cN(q.a*n-6,q.b*m,p,p,p,p,D.bSN,p))}w.push(A.ap(p,D.bUB,p,p,o.e*n-18,p,0.85*m,p))
 x=o.e
 w.push(A.ap(p,A.ec(p,C.c.j(0.12),!0),0.72*m,p,x*n-1,p,0.12*m,2))
 w.push(new A.bM(C.b0,p,p,new B.js(A.d("Tap to throw \xb7 "+(14-o.x)+" darts left",p,p,p,p,p,p,p,p,p,p),p),p))
@@ -5305,7 +5305,7 @@ s=u[3]
 u=["\ud83e\ude99","\ud83d\udc8e","\ud83e\udea8"][u[0]]
 m.push(new A.cN(t*q-18,s*p,r,r,r,r,new A.y(u,r,new A.F(!0,r,r,r,r,r,34,r,r,r,r,r,1,r,r,r,r,r,r,r,r,r,r,r,r,r),r,C.K,r,r,r,r,r,r,r),r))}x=o.e
 m.push(A.ap(r,A.d("\ud83e\uddfa",r,r,r,r,r,r,A.l(r,r,r,r,r,r,r,r,r,r,r,64,r,r,r,r,1,!0,r,r,r,r,r,r,r,r),C.K,r,r),r,r,x*q-40,r,0.88*p,r))
-m.push(new A.bM(C.b0,r,r,new B.js(A.B(A.a([D.fVt,new B.z4(o.w,3,r)],n),C.m,r,C.e,C.P,0,r,r),r),r))
+m.push(new A.bM(C.b0,r,r,new B.js(A.B(A.a([D.fVx,new B.z4(o.w,3,r)],n),C.m,r,C.e,C.P,0,r,r),r),r))
 return A.aA(r,new A.an(C.a_,r,C.ab,C.t,m,r),C.y,!1,r,r,r,r,r,r,r,new B.d3P(o,q),r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,new B.d3Q(o,q),r,r,r,r,!1,C.a3)},
 $S:36}
 B.d3P.prototype={
@@ -5380,7 +5380,7 @@ B.f6V.prototype={
 $0(){},
 $S:0}
 B.f6U.prototype={
-$2(d,e){var x,w,v,u,t,s,r,q,p=null,o=e.b,n=e.d,m=this.a,l=A.a([D.etU],y.p)
+$2(d,e){var x,w,v,u,t,s,r,q,p=null,o=e.b,n=e.d,m=this.a,l=A.a([D.etW],y.p)
 for(x=m.e,w=x.length,v=0;v<x.length;x.length===w||(0,A.L)(x),++v){u=x[v]
 l.push(new A.cN(u.b*o,u.c*n,p,p,p,p,A.p(p,p,C.f,C.c.j(0.4+u.a*2),p,p,p,2,p,p,p,p,p,2),p))}for(x=m.d,w=x.length,v=0;v<x.length;x.length===w||(0,A.L)(x),++v){t=x[v].a
 s=t[3]
@@ -5415,7 +5415,7 @@ B.d41.prototype={
 $0(){},
 $S:0}
 B.d4_.prototype={
-$2(d,e){var x,w,v,u,t,s,r,q,p,o,n,m=null,l=e.d,k=this.a,j=y.p,i=A.a([B.ij(D.dkH)],j)
+$2(d,e){var x,w,v,u,t,s,r,q,p,o,n,m=null,l=e.d,k=this.a,j=y.p,i=A.a([B.ij(D.dkJ)],j)
 for(x=k.d,w=x.length,v=y.V,u=0;u<x.length;x.length===w||(0,A.L)(x),++u){t=x[u]
 s=t.a
 r=t.b
@@ -5548,7 +5548,7 @@ $2(d,a0){var x,w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h=null,g=this.a,f=a0.b,e=a0.d
 g.e=new A.av(f,e)
 x=f/4
 w=e/4.6
-e=A.a([B.ij(D.cX6)],y.p)
+e=A.a([B.ij(D.cX7)],y.p)
 for(v=1;v<4;++v)e.push(new A.cN(x*v,0,h,0,h,h,A.p(h,h,C.f,C.bz,h,h,h,h,h,h,h,h,h,1),h))
 e.push(A.ap(0,A.p(h,h,C.f,C.c.j(0.04),h,h,h,h,h,h,h,h,h,h),70,h,0,0,h,h))
 for(f=g.d,u=f.length,t=y.V,s=y.O,r=x-8,q=0;q<f.length;f.length===u||(0,A.L)(f),++q){p=f[q]
@@ -5587,16 +5587,16 @@ B.fbh.prototype={
 $0(){},
 $S:0}
 B.fbe.prototype={
-$2(d,e){var x,w,v,u,t,s,r=null,q=e.b,p=e.d,o=A.a([B.ij(D.dvm)],y.p)
+$2(d,e){var x,w,v,u,t,s,r=null,q=e.b,p=e.d,o=A.a([B.ij(D.dvo)],y.p)
 for(x=this.a,w=x.d,v=w.length,u=0;u<w.length;w.length===v||(0,A.L)(w),++u)o.push(new A.ff(new B.fbd(x,w[u],q,p),r))
 for(w=x.e,v=w.length,u=0;u<w.length;w.length===v||(0,A.L)(w),++u){t=w[u]
 s=t.a
-o.push(new A.cN(t.b*q-30,t.c*p-30-s*60,r,r,r,r,new A.kB(C.k.E(1-s*2,0,1),D.fa_,r),r))}o.push(B.kV("Hit the targets \xb7 "+x.cb$+"/20",!1,x.e0$))
+o.push(new A.cN(t.b*q-30,t.c*p-30-s*60,r,r,r,r,new A.kB(C.k.E(1-s*2,0,1),D.fa3,r),r))}o.push(B.kV("Hit the targets \xb7 "+x.cb$+"/20",!1,x.e0$))
 return new A.an(C.a_,r,C.ab,C.t,o,r)},
 $S:66}
 B.fbd.prototype={
 $1(d){var x=this,w=null,v=x.b,u=x.a,t=80*(1-v.c/u.gc2q()*0.5),s=t/2,r=t*0.7,q=t*0.42,p=t*0.16
-return A.ap(w,A.aA(w,A.p(C.A,A.p(C.A,A.p(C.A,A.p(w,w,C.f,w,w,D.b5v,w,p,w,w,w,w,w,p),C.f,w,w,D.b5a,w,q,w,w,w,w,w,q),C.f,w,w,C.vF,w,r,w,w,w,w,w,r),C.f,w,w,D.b60,w,t,w,w,w,w,w,t),C.y,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,new B.fbc(u,v),w,w,w,w,!1,C.a3),w,w,v.a*x.c-s,w,v.b*x.d-s,w)},
+return A.ap(w,A.aA(w,A.p(C.A,A.p(C.A,A.p(C.A,A.p(w,w,C.f,w,w,D.b5v,w,p,w,w,w,w,w,p),C.f,w,w,D.b5a,w,q,w,w,w,w,w,q),C.f,w,w,C.vG,w,r,w,w,w,w,w,r),C.f,w,w,D.b60,w,t,w,w,w,w,w,t),C.y,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,new B.fbc(u,v),w,w,w,w,!1,C.a3),w,w,v.a*x.c-s,w,v.b*x.d-s,w)},
 $S:231}
 B.fbc.prototype={
 $1(d){return this.a.c6U(this.b)},
@@ -5622,9 +5622,9 @@ s=A.p(v,v,C.f,v,v,new A.o(t,v,A.J(C.aX,C.r,2),s,v,v,C.n),v,v,v,v,v,v,v,v)
 t=this.a
 x=t.f
 w=t.r
-w=A.ap(4,A.p(v,v,C.f,v,v,new A.o(C.bf,v,v,A.m(20),D.c78,v,C.n),v,v,v,v,v,v,v,v),v,v,x*u,v,4,w*u)
+w=A.ap(4,A.p(v,v,C.f,v,v,new A.o(C.bf,v,v,A.m(20),D.c79,v,C.n),v,v,v,v,v,v,v,v),v,v,x*u,v,4,w*u)
 t=C.k.E(t.d*u-4,0,u-8)
-return new A.a4(u,54,new A.an(C.a_,v,C.ab,C.t,A.a([s,w,A.ap(-6,A.p(v,v,C.f,v,v,new A.o(C.c,v,v,A.m(4),D.dhs,v,C.n),v,v,v,v,v,v,v,8),v,v,t,v,-6,v)],y.p),v),v)},
+return new A.a4(u,54,new A.an(C.a_,v,C.ab,C.t,A.a([s,w,A.ap(-6,A.p(v,v,C.f,v,v,new A.o(C.c,v,v,A.m(4),D.dht,v,C.n),v,v,v,v,v,v,v,8),v,v,t,v,-6,v)],y.p),v),v)},
 $S:154}
 B.dlj.prototype={
 $1(d){var x,w,v,u,t=this.a,s=t.d+(1.5+t.cb$*0.24)*d
@@ -5659,13 +5659,13 @@ B.dlh.prototype={
 $2(d,e){var x,w,v,u,t,s,r,q=null,p=e.b,o=e.d,n=this.a,m=n.f,l=m<0,k=l?0:Math.min(m,1),j=l?0.5:n.y,i=0.84-0.62*k-Math.sin(k*3.141592653589793)*0.08,h=64-26*k
 m=n.x
 x=m>=0
-if(x){w=C.jQ.aw(0,C.k.E(m,0,1))
+if(x){w=C.jR.aw(0,C.k.E(m,0,1))
 if(n.Q)i=0.215+0.19*w
 else{j=n.y+n.z*0.2*w
 i=0.215+0.55*w*w-0.06*Math.sin(w*3.141592653589793)}h=38}m=h/2
 v=A.ap(q,A.e_(A.eM(C.A,k*6+C.k.E(n.x,0,1)*4,A.d("\ud83c\udfc0",q,q,q,q,q,q,A.l(q,q,q,q,q,q,q,q,q,q,q,h,q,q,q,q,1,!0,q,q,q,q,q,q,q,q),C.K,q,q),q),!0,q),q,q,j*p-m,q,i*o-m,q)
 u=x&&n.Q
-m=B.ij(D.cYJ)
+m=B.ij(D.cYK)
 l=A.ap(0,A.p(q,q,C.f,C.d0.j(0.5),q,q,q,q,q,q,q,q,q,q),o*0.25,q,0,0,q,q)
 t=n.e
 s=C.c.j(0.9)
@@ -5674,9 +5674,9 @@ t=A.a([m,l,A.ap(q,A.p(q,q,C.f,q,q,new A.o(s,q,A.J(C.bB,C.r,4),r,q,q,C.n),q,78,q,
 if(u)t.push(v)
 m=n.e
 l=o*0.2
-t.push(A.ap(q,A.p(q,q,C.f,q,q,new A.o(C.cd,q,q,A.m(6),D.d_U,q,C.n),q,12,q,q,q,q,q,76),q,q,m*p-38,q,l,q))
+t.push(A.ap(q,A.p(q,q,C.f,q,q,new A.o(C.cd,q,q,A.m(6),D.d_V,q,C.n),q,12,q,q,q,q,q,76),q,q,m*p-38,q,l,q))
 m=n.e
-t.push(A.ap(q,A.b4(q,q,q,new B.aDr(C.ac,5,3,q),D.f8X),q,q,m*p-30,q,l+12,q))
+t.push(A.ap(q,A.b4(q,q,q,new B.aDr(C.ac,5,3,q),D.f90),q,q,m*p-30,q,l+12,q))
 if(!u)t.push(v)
 if(n.r>0){m=n.as===!0
 l=m?"SWISH!":"MISS"
@@ -5720,7 +5720,7 @@ d.toString
 v=d}u=54-22*(a1.d==null?0:a1.f)
 d=h-i
 a0=f-g
-a2=A.a([B.ij(D.dfY),A.ap(l,A.b4(l,l,l,new B.aDr(C.jP,12,6,l),C.aw),a0,l,i,l,g,d),A.ap(l,A.p(l,l,C.f,l,l,D.b4R,l,l,l,l,l,l,l,l),a0+6,l,i-6,l,g-6,d+12)],y.p)
+a2=A.a([B.ij(D.dfZ),A.ap(l,A.b4(l,l,l,new B.aDr(C.jQ,12,6,l),C.aw),a0,l,i,l,g,d),A.ap(l,A.p(l,l,C.f,l,l,D.b4R,l,l,l,l,l,l,l,l),a0+6,l,i-6,l,g-6,d+12)],y.p)
 for(t=d/6,s=a0/4,d/=3,a0/=2,r=0;r<6;++r){q=e.$1(r).a
 p=e.$1(r).b
 o=new A.aP(10,10)
@@ -5731,7 +5731,7 @@ d=u/2
 a2.push(A.ap(l,A.e_(A.d("\u26bd",l,l,l,l,l,l,A.l(l,l,l,l,l,l,l,l,l,l,l,u,l,l,l,l,1,!0,l,l,l,l,l,l,l,l),C.K,l,l),!0,l),l,l,v.a-d,l,v.b-d,l))
 if(a1.r>0){d=a1.x===!0
 a0=d?"GOOOAL!":"SAVED!"
-a2.push(A.ap(l,A.d(a0,l,l,l,l,l,l,A.l(l,l,d?C.bM:C.eO,l,l,l,l,l,l,l,l,40,l,l,C.u,l,l,!0,l,l,l,l,l,D.cZF,l,l),C.K,l,l),l,l,0,0,j*0.55,l))}a2.push(B.kV("Tap a corner to shoot \xb7 "+a1.cb$+"/8",!0,a1.e0$))
+a2.push(A.ap(l,A.d(a0,l,l,l,l,l,l,A.l(l,l,d?C.bM:C.eO,l,l,l,l,l,l,l,l,40,l,l,C.u,l,l,!0,l,l,l,l,l,D.cZG,l,l),C.K,l,l),l,l,0,0,j*0.55,l))}a2.push(B.kV("Tap a corner to shoot \xb7 "+a1.cb$+"/8",!0,a1.e0$))
 return new A.an(C.a_,l,C.ab,C.t,a2,l)},
 $S:66}
 B.eUO.prototype={
@@ -5780,7 +5780,7 @@ n.e=new A.av(m,l)
 x=l*0.74
 w=n.x
 v=w>0&&(C.k.bf(w*10)&1)===0
-w=A.a([B.ij(D.cPC),A.ap(o,A.p(o,o,C.f,o,o,D.b4Y,o,70,o,o,o,o,o,70),o,o,o,30,l*0.12,o)],y.p)
+w=A.a([B.ij(D.cPD),A.ap(o,A.p(o,o,C.f,o,o,D.b4Y,o,70,o,o,o,o,o,70),o,o,o,30,l*0.12,o)],y.p)
 for(u=m+120,t=0;t<3;++t){s=C.k.F(n.y*30+t*u/3,u)
 w.push(new A.cN(u-s-60,l*(0.18+t*0.09),o,o,o,o,new A.y("\u2601\ufe0f",o,new A.F(!0,o,o,o,o,o,46,o,o,o,o,o,1,o,o,o,o,o,o,o,o,o,o,o,o,o),o,C.K,o,o,o,o,o,o,o),o))}w.push(A.ap(0,A.p(o,o,C.f,o,o,D.b5B,o,o,o,o,o,o,o,o),o,o,0,0,x,o))
 for(l=n.d,u=l.length,s=x-50,r=0;r<l.length;l.length===u||(0,A.L)(l),++r){q=l[r]
@@ -5805,7 +5805,7 @@ if((s.x-=d)<=0){s.x=Math.max(0.5,0.95-r)
 x=s.a.c.d.ap(3)
 if(x===s.f&&s.a.c.d.h6())x=C.o.F(x+1,3)
 s.f=x
-s.d.push(new B.ace(x,-0.12,D.d9n[s.a.c.d.ap(5)]))}for(r=s.d,w=r.length,v=0;v<r.length;r.length===w||(0,A.L)(r),++v){u=r[v]
+s.d.push(new B.ace(x,-0.12,D.d9p[s.a.c.d.ap(5)]))}for(r=s.d,w=r.length,v=0;v<r.length;r.length===w||(0,A.L)(r),++v){u=r[v]
 t=u.b+=q
 if(!u.e&&Math.abs(u.a-s.r)<0.5&&Math.abs(t-0.8)<0.09){u.e=!0
 if(s.jl("Crashed into traffic"))return}if(!u.d&&u.b>0.92){u.d=!0
@@ -5819,7 +5819,7 @@ B.do6.prototype={
 $0(){},
 $S:0}
 B.do4.prototype={
-$2(d,e){var x,w,v,u,t,s,r,q,p=null,o=e.b,n=e.d,m=o/3,l=this.a,k=A.a([B.ij(D.ddp),A.ap(0,A.p(p,p,C.f,C.bt,p,p,p,p,p,p,p,p,p,p),p,p,0,p,0,6),A.ap(0,A.p(p,p,C.f,C.bt,p,p,p,p,p,p,p,p,p,p),p,p,p,0,0,6)],y.p)
+$2(d,e){var x,w,v,u,t,s,r,q,p=null,o=e.b,n=e.d,m=o/3,l=this.a,k=A.a([B.ij(D.ddq),A.ap(0,A.p(p,p,C.f,C.bt,p,p,p,p,p,p,p,p,p,p),p,p,0,p,0,6),A.ap(0,A.p(p,p,C.f,C.bt,p,p,p,p,p,p,p,p,p,p),p,p,p,0,0,6)],y.p)
 for(x=n*0.09,w=1;w<3;++w)for(v=w*m-3,u=0;u<7;++u)k.push(new A.cN(v,(u*0.2+l.w-0.1)*n,p,p,p,p,A.p(p,p,C.f,C.ac,p,p,p,x,p,p,p,p,p,6),p))
 for(x=l.d,v=x.length,t=0;t<x.length;x.length===v||(0,A.L)(x),++t){s=x[t]
 r=s.b
@@ -5975,7 +5975,7 @@ $2(d,e){var x,w,v,u,t,s,r,q,p,o,n=null,m=e.b,l=A.a([A.ap(40,A.p(n,n,C.f,n,n,new 
 for(x=this.a,w=x.d,v=this.b,u=y.O,t=0;s=w[v],r=s.length,t<r;++t){r=x.e===v&&t===r-1?30:0
 s=s[t]
 q=new A.aP(12,12)
-p=D.da6[s-1]
+p=D.da8[s-1]
 p=A.a([p,p.j(0.7)],u)
 o=new A.ay(C.c.j(x.e===v&&t===w[v].length-1?1:0.3),2,C.r,-1)
 l.push(new A.cN(n,n,n,42+t*26+r,n,n,A.cY(n,n,n,n,C.b5,new A.o(n,n,new A.bH(o,o,o,o),new A.bh(q,q,q,q),n,new A.a9(C.a5,C.a8,C.x,p,n,n),C.n),C.h4,n,24,n,n,n,n,n,m*(0.3+s*0.16)),n))}if(v===2)l.push(A.ap(6,A.d("GOAL",n,n,n,n,n,n,A.l(n,n,C.c.j(0.6),n,n,n,n,n,n,n,n,11,n,n,C.u,n,n,!0,n,n,n,n,n,n,n,n),n,n,n),n,n,n,n,n,n))
@@ -6060,11 +6060,11 @@ case 2:x="Which cup? Tap it"
 break
 case 3:x=q.f===q.e?"Found it!":"Not this one"
 break
-default:x=s}w=B.ij(D.dmK)
-v=A.ap(s,A.p(s,s,C.f,s,s,new A.o(C.im,s,s,A.m(7),s,s,C.n),s,14,s,s,s,s,s,s),s,s,20,20,n+40,s)
+default:x=s}w=B.ij(D.dmM)
+v=A.ap(s,A.p(s,s,C.f,s,s,new A.o(C.io,s,s,A.m(7),s,s,C.n),s,14,s,s,s,s,s,s),s,s,20,20,n+40,s)
 u=p.$1(q.e)
 u=A.a([w,v,A.ap(s,A.p(s,s,C.f,s,s,D.b5Q,s,32,s,s,s,s,s,32),s,s,u-16,s,n+8,s)],y.p)
-for(w=n-70,t=0;t<3;++t)u.push(new A.cN(p.$1(t)-46,w-o.$1(t),s,s,s,s,A.aA(s,new A.mB(new B.bdv(s),s,D.f91,s,s),C.y,!1,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,new B.f4F(q,t),s,s,s,s,s,s,!1,C.a3),s))
+for(w=n-70,t=0;t<3;++t)u.push(new A.cN(p.$1(t)-46,w-o.$1(t),s,s,s,s,A.aA(s,new A.mA(new B.bdv(s),s,D.f95,s,s),C.y,!1,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,new B.f4F(q,t),s,s,s,s,s,s,!1,C.a3),s))
 u.push(A.ap(s,A.d(x,s,s,s,s,s,s,C.pH,C.K,s,s),s,s,0,0,r*0.2,s))
 u.push(B.kV("Find the ball \xb7 "+q.cb$+"/8",!1,q.e0$))
 return new A.an(C.a_,s,C.ab,C.t,u,s)},
@@ -6217,16 +6217,16 @@ $2(d,e){var x,w,v,u,t,s,r,q,p=null,o=e.b,n=e.d,m=Math.min(o,n)*0.4
 o/=2
 n*=0.5
 x=this.a
-w=A.a([B.ij(D.dvp)],y.p)
+w=A.a([B.ij(D.dvr)],y.p)
 for(v=m*2,u=0;u<5;++u){t=1-u*0.2
 s=m*t
 t=v*t
 r=new A.ay(C.dm,1,C.r,-1)
-w.push(new A.cN(o-s,n-s,p,p,p,p,A.p(p,p,C.f,p,p,new A.o(D.dgc[u],p,new A.bH(r,r,r,r),p,p,p,C.a6),p,t,p,p,p,p,p,t),p))}for(v=x.d,t=v.length,q=0;q<v.length;v.length===t||(0,A.L)(v),++q){s=v[q].a
+w.push(new A.cN(o-s,n-s,p,p,p,p,A.p(p,p,C.f,p,p,new A.o(D.dgd[u],p,new A.bH(r,r,r,r),p,p,p,C.a6),p,t,p,p,p,p,p,t),p))}for(v=x.d,t=v.length,q=0;q<v.length;v.length===t||(0,A.L)(v),++q){s=v[q].a
 r=new A.ay(C.c,2,C.r,-1)
-w.push(new A.cN(o+s.a*m-6,n+s.b*m-6,p,p,p,p,A.p(p,p,C.f,p,p,new A.o(C.rq,p,new A.bH(r,r,r,r),p,p,p,C.a6),p,12,p,p,p,p,p,12),p))}w.push(A.ap(p,D.c0_,p,p,o+x.garx().a*m-22,p,n+x.garx().b*m-22,p))
+w.push(new A.cN(o+s.a*m-6,n+s.b*m-6,p,p,p,p,A.p(p,p,C.f,p,p,new A.o(C.rq,p,new A.bH(r,r,r,r),p,p,p,C.a6),p,12,p,p,p,p,p,12),p))}w.push(A.ap(p,D.c00,p,p,o+x.garx().a*m-22,p,n+x.garx().b*m-22,p))
 o=x.r
-if(o!=null)w.push(A.ap(70,A.d("+"+A.w(o),p,p,p,p,p,p,D.fvM,C.K,p,p),p,p,0,0,p,p))
+if(o!=null)w.push(A.ap(70,A.d("+"+A.w(o),p,p,p,p,p,p,D.fvQ,C.K,p,p),p,p,0,0,p,p))
 w.push(B.kV("Tap to shoot \xb7 "+x.cb$+"/70 pts \xb7 arrows "+(10-x.f),!0,p))
 return A.aA(C.c6,new A.an(C.a_,p,C.ab,C.t,w,p),C.y,!1,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,new B.cJH(x),p,p,p,p,!1,C.a3)},
 $S:36}
@@ -6270,14 +6270,14 @@ B.d7l.prototype={
 $0(){},
 $S:0}
 B.d7j.prototype={
-$2(d,e){var x,w,v,u,t,s,r,q,p=null,o=e.b,n=e.d,m=this.a,l=(0.18+m.f)*n,k=n*0.15,j=A.a([B.ij(D.dc8),A.ap(p,A.p(p,p,C.f,C.c.j(0.5),p,p,p,p,p,p,p,p,p,p),6,p,0,0,k,p)],y.p)
+$2(d,e){var x,w,v,u,t,s,r,q,p=null,o=e.b,n=e.d,m=this.a,l=(0.18+m.f)*n,k=n*0.15,j=A.a([B.ij(D.dca),A.ap(p,A.p(p,p,C.f,C.c.j(0.5),p,p,p,p,p,p,p,p,p,p),6,p,0,0,k,p)],y.p)
 for(x=m.d,w=x.length,v=l/n,u=0;u<x.length;x.length===w||(0,A.L)(x),++u){t=x[u]
 s=t.a
 r=t===m.y?v:t.b
 q=A.w4(t.c>0?-1:1,1,1)
 j.push(new A.cN(s*o-22,r*n-22,p,p,p,p,new A.iO(q,p,C.A,!0,p,new A.y(t.d,p,new A.F(!0,p,p,p,p,p,44,p,p,p,p,p,1,p,p,p,p,p,p,p,p,p,p,p,p,p),p,C.K,p,p,p,p,p,p,p),p),p))}x=m.e
 j.push(A.ap(p,A.p(p,p,C.f,C.ac,p,p,p,Math.max(0,l-k),p,p,p,p,p,2),p,p,x*o-1,p,k,p))
-j.push(A.ap(p,D.bRc,p,p,m.e*o-10,p,l-6,p))
+j.push(A.ap(p,D.bRd,p,p,m.e*o-10,p,l-6,p))
 x=m.e
 w=Math.sin(m.x*3)
 j.push(A.ap(p,A.d("\ud83d\udea3",p,p,p,p,p,p,A.l(p,p,p,p,p,p,p,p,p,p,p,56,p,p,p,p,1,!0,p,p,p,p,p,p,p,p),C.K,p,p),p,p,x*o-30,p,k-46+w*3,p))
@@ -6304,7 +6304,7 @@ w=t.gaCn()
 x=t.w
 if(x!=null){v=t.x
 v.toString
-v=v.a7(0,D.eht.aK(0,d))
+v=v.a7(0,D.ehv.aK(0,d))
 t.x=v
 v=x.a7(0,v.aK(0,d))
 t.w=v
@@ -6329,7 +6329,7 @@ p.e=new A.av(e.b,e.d)
 x=p.f!=null&&p.r!=null?p.aXK():q
 w=x==null
 v=w?-0.6:Math.atan2(x.b,x.a)
-u=A.a([B.ij(D.dgP),A.ap(0,A.p(q,q,C.f,C.Fv,q,q,q,q,q,q,q,q,q,q),40,q,0,0,q,q)],y.p)
+u=A.a([B.ij(D.dgQ),A.ap(0,A.p(q,q,C.f,C.Fv,q,q,q,q,q,q,q,q,q,q),40,q,0,0,q,q)],y.p)
 if(!w)for(t=1;t<=8;++t)u.push(new A.ff(new B.cR3(p,t,x),q))
 w=p.gaCn()
 s=p.gaCn()
@@ -6367,8 +6367,8 @@ $0(){var x=this.a
 return x.f=x.r=null},
 $S:0}
 B.cR3.prototype={
-$1(d){var x=null,w=this.b*0.08,v=new A.t(50,this.a.e.b-60).a7(0,this.c.aK(0,w)).a7(0,D.eho.aK(0,w).aK(0,w))
-return A.ap(x,A.p(x,x,C.f,x,x,C.vF,x,6,x,x,x,x,x,6),x,x,v.a-3,x,v.b-3,x)},
+$1(d){var x=null,w=this.b*0.08,v=new A.t(50,this.a.e.b-60).a7(0,this.c.aK(0,w)).a7(0,D.ehq.aK(0,w).aK(0,w))
+return A.ap(x,A.p(x,x,C.f,x,x,C.vG,x,6,x,x,x,x,x,6),x,x,v.a-3,x,v.b-3,x)},
 $S:231}
 B.dw3.prototype={
 $1(d){var x,w,v,u,t,s,r=this.a,q=r.d
@@ -6405,12 +6405,12 @@ B.dw0.prototype={
 $2(d,e){var x,w,v,u,t,s,r,q,p=null,o=this.a,n=e.b,m=e.d
 o.d=new A.av(n,m)
 x=o.f
-w=B.ij(D.ckL)
+w=B.ij(D.ckM)
 v=A.ap(p,A.d("\ud83c\udf0d",p,p,p,p,p,p,A.l(p,p,p,p,p,p,p,p,p,p,p,40,p,p,p,p,1,!0,p,p,p,p,p,p,p,p),C.K,p,p),p,p,p,24,70,p)
 m*=0.78
 u=A.ap(0,A.p(p,p,C.f,p,p,D.b5U,p,p,p,p,p,p,p,p),p,p,0,0,m,p)
 n/=2
-m=A.ap(p,A.p(p,p,C.f,p,p,new A.o(C.be,p,p,A.m(4),D.d4t,p,C.n),p,8,p,p,p,p,p,100),p,p,n-50,p,m-6,p)
+m=A.ap(p,A.p(p,p,C.f,p,p,new A.o(C.be,p,p,A.m(4),D.d4u,p,C.n),p,8,p,p,p,p,p,100),p,p,n-50,p,m-6,p)
 t=o.e
 s=y.p
 r=A.a([A.d("\ud83d\udef8",p,p,p,p,p,p,A.l(p,p,p,p,p,p,p,p,p,p,p,60,p,p,p,p,1,!0,p,p,p,p,p,p,p,p),C.K,p,p)],s)
@@ -6420,11 +6420,11 @@ t=C.k.V(o.f)
 t=A.d("Speed "+t,p,p,p,p,p,p,A.l(p,p,x>110?C.c0:C.be,p,p,p,p,p,p,p,p,16,p,p,C.u,p,p,!0,p,p,p,p,p,p,p,p),p,p,p)
 r=A.m(5)
 q=C.k.E(o.r/100,0,1)
-s=A.a([w,v,u,m,n,A.ap(p,A.x(A.a([t,C.am,A.p(C.a5,A.Bz(C.A,A.p(p,p,C.f,p,p,new A.o(C.aA,p,p,A.m(5),p,p,C.n),p,p,p,p,p,p,p,p),p,q),C.f,p,p,new A.o(C.bz,p,p,r,p,p,C.n),p,10,p,p,p,p,p,110),D.fAZ],s),C.E,p,C.e,C.i,0,C.p),p,p,16,p,70,p)],s)
+s=A.a([w,v,u,m,n,A.ap(p,A.x(A.a([t,C.am,A.p(C.a5,A.Bz(C.A,A.p(p,p,C.f,p,p,new A.o(C.aA,p,p,A.m(5),p,p,C.n),p,p,p,p,p,p,p,p),p,q),C.f,p,p,new A.o(C.bz,p,p,r,p,p,C.n),p,10,p,p,p,p,p,110),D.fB2],s),C.E,p,C.e,C.i,0,C.p),p,p,16,p,70,p)],s)
 n=o.y
 if(n.length!==0)s.push(A.as(A.d(n,p,p,p,p,p,p,A.l(p,p,C.a.a0(n,"P")?C.be:C.c0,p,p,p,p,p,p,p,p,32,p,p,C.u,p,p,!0,p,p,p,p,p,p,p,p),p,p,p),p,p,p))
 s.push(B.kV("Hold to fire the engine \xb7 land slowly \xb7 "+o.cb$+"/5",!1,o.e0$))
-return A.mI(C.c6,new A.an(C.a_,p,C.ab,C.t,s,p),p,new B.dvY(o),new B.dvZ(o),p,p,p,p,new B.dw_(o))},
+return A.mH(C.c6,new A.an(C.a_,p,C.ab,C.t,s,p),p,new B.dvY(o),new B.dvZ(o),p,p,p,p,new B.dw_(o))},
 $S:216}
 B.dvZ.prototype={
 $1(d){return this.a.x=!0},
@@ -6485,17 +6485,17 @@ B.dmO.prototype={
 $2(d,e){var x,w,v,u,t,s,r,q,p=null,o=this.a,n=e.d
 o.e=new A.av(e.b,n)
 x=new B.dmP(o,n)
-n=A.a([B.ij(D.dgb)],y.p)
+n=A.a([B.ij(D.dgc)],y.p)
 for(w=o.d,v=w.length,u=0;u<w.length;w.length===v||(0,A.L)(w),++u){t=w[u]
 s=x.$1(t.b)
 r=new A.aP(7,7)
 q=t.c<=o.z?C.RP:D.axg
-n.push(new A.cN(t.a-40,s,p,p,p,p,A.p(p,p,C.f,p,p,new A.o(p,p,p,new A.bh(r,r,r,r),D.db4,new A.a9(C.a5,C.a8,C.x,q,p,p),C.n),p,14,p,p,p,p,p,80),p))}w=o.f
+n.push(new A.cN(t.a-40,s,p,p,p,p,A.p(p,p,C.f,p,p,new A.o(p,p,p,new A.bh(r,r,r,r),D.db6,new A.a9(C.a5,C.a8,C.x,q,p,p),C.n),p,14,p,p,p,p,p,80),p))}w=o.f
 v=x.$1(o.r)
 s=o.w>500?1.15:1
 n.push(A.ap(p,A.ee(C.A,A.d("\ud83d\udc38",p,p,p,p,p,p,A.l(p,p,p,p,p,p,p,p,p,p,p,48,p,p,p,p,1,!0,p,p,p,p,p,p,p,p),C.K,p,p),p,p,s),p,p,w-24,p,v-46,p))
 n.push(B.kV("Hold left or right to steer \xb7 "+o.cb$+"/30",!1,o.e0$))
-return A.mI(C.c6,new A.an(C.a_,p,C.ab,C.t,n,p),p,new B.dmK(o),new B.dmL(o,e),p,new B.dmM(o,e),p,p,new B.dmN(o))},
+return A.mH(C.c6,new A.an(C.a_,p,C.ab,C.t,n,p),p,new B.dmK(o),new B.dmL(o,e),p,new B.dmM(o,e),p,p,new B.dmN(o))},
 $S:216}
 B.dmP.prototype={
 $1(d){return this.b-(d-this.a.x)},
@@ -6559,10 +6559,10 @@ B.dvu.prototype={
 $2(d,e){var x,w,v,u,t,s,r,q=null,p=this.a
 p.d=new A.av(e.b,e.d)
 x=p.f.A(0,C.I)&&p.as<=0&&!p.e5$
-w=A.a([B.ij(D.du3)],y.p)
+w=A.a([B.ij(D.du5)],y.p)
 for(v=p.w,u=v.length,t=0;t<v.length;v.length===u||(0,A.L)(v),++t){s=v[t]
 r=new A.aP(6,6)
-w.push(X.b4O(A.p(q,q,C.f,q,q,new A.o(C.im,q,q,new A.bh(r,r,r,r),D.cX7,q,C.n),q,q,q,q,q,q,q,q),s))}v=p.r
+w.push(X.b4O(A.p(q,q,C.f,q,q,new A.o(C.io,q,q,new A.bh(r,r,r,r),D.cX8,q,C.n),q,q,q,q,q,q,q,q),s))}v=p.r
 w.push(A.ap(q,A.p(q,q,C.f,q,q,D.b6a,q,30,q,q,q,q,q,30),q,q,v.a-15,q,v.b-15,q))
 v=p.r
 w.push(A.ap(q,A.p(q,q,C.f,C.c,q,q,q,52,q,q,q,q,q,3),q,q,v.a-2,q,v.b-54,q))
@@ -6672,16 +6672,16 @@ B.djY.prototype={
 $2(d,e){var x,w,v,u,t,s,r,q,p,o=null,n=this.a
 n.e=new A.av(e.b,e.d)
 x=n.gaCy()
-w=A.a([B.ij(D.cY3),A.ap(0,A.p(o,o,C.f,o,o,D.b4F,o,o,o,o,o,o,o,o),o,o,0,0,90,o)],y.p)
+w=A.a([B.ij(D.cY4),A.ap(0,A.p(o,o,C.f,o,o,D.b4F,o,o,o,o,o,o,o,o),o,o,0,0,90,o)],y.p)
 for(v=n.d,u=v.length,t=0;t<v.length;v.length===u||(0,A.L)(v),++t){s=v[t]
 r=s.a
 q=s.c
 p=q/2
 w.push(new A.cN(r.a-p,r.b-p,o,o,o,o,new A.y(s.b,o,new A.F(!0,o,o,o,o,o,q,o,o,o,o,o,1,o,o,o,o,o,o,o,o,o,o,o,o,o),o,C.K,o,o,o,o,o,o,o),o))}w.push(A.bS(0,A.b4(o,o,o,new B.brV(new A.t(n.e.a/2,74),x,o),C.aw),0,0,0))
-w.push(A.ap(o,A.eM(C.A,-n.r,D.c_0,o),o,o,x.a-14,o,x.b-6,o))
+w.push(A.ap(o,A.eM(C.A,-n.r,D.c_1,o),o,o,x.a-14,o,x.b-6,o))
 v=n.e
 w.push(A.ap(o,A.d("\ud83e\udd20",o,o,o,o,o,o,A.l(o,o,o,o,o,o,o,o,o,o,o,46,o,o,o,o,1,!0,o,o,o,o,o,o,o,o),C.K,o,o),o,o,v.a/2-26,o,30,o))
-if(n.Q>0)w.push(A.ap(o,A.d(n.z,o,o,o,o,o,o,D.flf,C.K,o,o),o,o,0,0,110,o))
+if(n.Q>0)w.push(A.ap(o,A.d(n.z,o,o,o,o,o,o,D.flj,C.K,o,o),o,o,0,0,110,o))
 w.push(B.kV("Tap to drop the claw \xb7 $"+n.cb$+" of $900",!0,o))
 return A.aA(C.c6,new A.an(C.a_,o,C.ab,C.t,w,o),C.y,!1,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,new B.djX(n),o,o,o,o,!1,C.a3)},
 $S:36}
@@ -6725,7 +6725,7 @@ B.eW7.prototype={
 $0(){var x,w,v=this,u=v.a,t=u.e
 t.toString
 x=C.o.E(C.k.bf(u.f),0,7)
-w=C.jQ.aw(0,C.k.E(u.f-x,0,1))
+w=C.jR.aw(0,C.k.E(u.f-x,0,1))
 u=t[x]
 return new A.t((u+(t[x+1]-u)*w+0.5)*v.b,v.c+(x+w)*v.d-Math.sin(w*3.141592653589793)*8)},
 $S:732}
@@ -6821,7 +6821,7 @@ x=k.t(0,x[i])?0.2:1
 t=l.w===i?new A.o(C.dJ.j(0.3),q,q,q,q,q,C.a6):q
 s=l.e[i]
 r=l.d[i]
-m.push(new A.cN((w+0.5+v.a)*p-j,(u+0.5+v.b)*o-j,q,q,q,q,A.aA(q,new A.Sf(A.p(q,new A.iO(A.wz(s.a*2),q,C.A,!0,q,new A.y(r,q,new A.F(!0,q,q,q,q,q,n,q,q,q,q,q,1,q,q,q,q,q,q,q,q,q,q,q,q,q),q,C.K,q,q,q,q,q,q,q),q),C.f,q,q,t,q,q,q,q,q,q,q,q),x,C.b5,C.iE,q,q),C.y,!1,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,new B.df4(l,i),q,q,q,q,q,q,!1,C.a3),q));++i}return new A.an(C.a_,q,C.ab,C.t,m,q)},
+m.push(new A.cN((w+0.5+v.a)*p-j,(u+0.5+v.b)*o-j,q,q,q,q,A.aA(q,new A.Sf(A.p(q,new A.iO(A.wz(s.a*2),q,C.A,!0,q,new A.y(r,q,new A.F(!0,q,q,q,q,q,n,q,q,q,q,q,1,q,q,q,q,q,q,q,q,q,q,q,q,q),q,C.K,q,q,q,q,q,q,q),q),C.f,q,q,t,q,q,q,q,q,q,q,q),x,C.b5,C.iF,q,q),C.y,!1,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,new B.df4(l,i),q,q,q,q,q,q,!1,C.a3),q));++i}return new A.an(C.a_,q,C.ab,C.t,m,q)},
 $S:66}
 B.df4.prototype={
 $0(){return this.a.axB(this.b)},
@@ -6854,13 +6854,13 @@ $S:0}
 B.dnI.prototype={
 $2(d,e){var x,w,v,u=null,t=e.b,s=e.d,r=t/2,q=s*0.36,p=Math.min(t,s)*0.2,o=this.a,n=o.w,m=s*0.8
 m=n<0?m:m-(m-(q+p))*n
-n=B.ij(D.dbA)
+n=B.ij(D.dbC)
 q=A.bS(0,A.b4(u,u,u,new B.bja(new A.t(r,q),p,o.e,o.d,u),C.aw),0,0,0)
 x=o.x
-r=A.ap(u,A.eM(C.A,x>0?x*8:0,D.hov,u),u,u,r-7,u,m,u)
+r=A.ap(u,A.eM(C.A,x>0?x*8:0,D.hot,u),u,u,r-7,u,m,u)
 x=y.p
 w=A.a([],x)
-for(v=0;v<7-o.y;++v)w.push(D.en8)
+for(v=0;v<7-o.y;++v)w.push(D.ena)
 return A.aA(C.c6,new A.an(C.a_,u,C.ab,C.t,A.a([n,q,r,A.ap(20,A.x(w,C.m,u,C.e,C.i,0,C.p),u,u,16,u,u,u),B.kV("Tap to throw \xb7 don't hit a knife \xb7 "+o.cb$+"/21",!0,o.e0$)],x),u),C.y,!1,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,new B.dnH(o),u,u,u,u,!1,C.a3)},
 $S:36}
 B.dnH.prototype={
@@ -6906,7 +6906,7 @@ B.dcD.prototype={
 $2(d,e){var x,w,v,u,t,s,r,q,p,o,n=null,m=this.a,l=e.b
 m.e=new A.av(l,e.d)
 x=y.p
-w=A.a([B.ij(D.dji),A.ap(n,A.p(n,n,C.f,C.hd.j(0.6),n,n,n,6,n,n,n,n,n,n),n,n,0,0,30,n)],x)
+w=A.a([B.ij(D.djk),A.ap(n,A.p(n,n,C.f,C.hd.j(0.6),n,n,n,6,n,n,n,n,n,n),n,n,0,0,30,n)],x)
 for(v=m.d,u=v.length,t=0;t<v.length;v.length===u||(0,A.L)(v),++t){s=v[t]
 r=s.b
 q=s.a
@@ -6916,7 +6916,7 @@ C.d.v(w,A.a([new A.cN(0,q,n,n,(r-0.12)*l,n,A.p(n,n,C.f,n,n,new A.o(C.b_,n,n,new 
 v=m.r
 w.push(A.ap(n,A.p(n,n,C.f,n,n,D.b5_,n,26,n,n,n,n,n,26),n,n,x*l-13,n,v-13,n))
 w.push(B.kV("Hold left / right \xb7 drop through the gaps \xb7 "+m.cb$+"/25",!0,m.e0$))
-return A.mI(C.c6,new A.an(C.a_,n,C.ab,C.t,w,n),n,new B.dcz(m),new B.dcA(m,l),n,new B.dcB(m,l),n,n,new B.dcC(m))},
+return A.mH(C.c6,new A.an(C.a_,n,C.ab,C.t,w,n),n,new B.dcz(m),new B.dcA(m,l),n,new B.dcB(m,l),n,n,new B.dcC(m))},
 $S:216}
 B.dcA.prototype={
 $1(d){var x=d.geZ().a<this.b/2?-1:1
@@ -6941,7 +6941,7 @@ case 1:v.f=v.f+340*d
 break
 case 2:x=Math.min(1.5707963267948966,v.r+d*5)
 v.r=x
-if(x>=1.5707963267948966){v.e=D.htf
+if(x>=1.5707963267948966){v.e=D.htd
 v.w=0}break
 case 3:w=v.gb3U()?v.x+v.y/2+12:v.f+12
 x=Math.min(w,v.w+240*d)
@@ -6973,7 +6973,7 @@ t=q.x
 s=q.y
 s=A.ap(0,A.p(C.b0,A.p(r,r,C.f,C.ax,r,r,r,5,r,r,r,r,r,10),C.f,C.av,r,r,r,r,r,r,r,r,r,r),r,r,100+t,r,x,s)
 t=q.f
-return A.mI(C.c6,new A.an(C.a_,r,C.ab,C.t,A.a([v,o,p,s,A.ap(r,A.eM(C.b6,q.r,A.p(r,r,C.f,C.rq,r,r,r,Math.max(0,t),r,r,r,r,r,4),r),r,r,98,r,x-t,r),A.ap(r,A.d("\ud83e\udd77",r,r,r,r,r,r,A.l(r,r,r,r,r,r,r,r,r,r,r,40,r,r,r,r,1,!0,r,r,r,r,r,r,r,r),C.K,r,r),r,r,80+w-20,r,x-40+u,r),B.kV("Hold to grow the stick, let go to drop it \xb7 "+q.cb$+"/12",!1,q.e0$)],y.p),r),r,r,new B.f7A(q),r,r,r,r,new B.f7B(q))},
+return A.mH(C.c6,new A.an(C.a_,r,C.ab,C.t,A.a([v,o,p,s,A.ap(r,A.eM(C.b6,q.r,A.p(r,r,C.f,C.rq,r,r,r,Math.max(0,t),r,r,r,r,r,4),r),r,r,98,r,x-t,r),A.ap(r,A.d("\ud83e\udd77",r,r,r,r,r,r,A.l(r,r,r,r,r,r,r,r,r,r,r,40,r,r,r,r,1,!0,r,r,r,r,r,r,r,r),C.K,r,r),r,r,80+w-20,r,x-40+u,r),B.kV("Hold to grow the stick, let go to drop it \xb7 "+q.cb$+"/12",!1,q.e0$)],y.p),r),r,r,new B.f7A(q),r,r,r,r,new B.f7B(q))},
 $S:216}
 B.f7A.prototype={
 $1(d){var x=this.a
@@ -6981,7 +6981,7 @@ if(x.e===D.Wv&&!x.e5$)x.e=D.b_4},
 $S:68}
 B.f7B.prototype={
 $1(d){var x=this.a
-if(x.e===D.b_4)x.e=D.hte},
+if(x.e===D.b_4)x.e=D.htc},
 $S:110}
 B.fiT.prototype={
 $1(d){var x,w,v,u,t,s,r=this.a,q=r.e
@@ -7107,7 +7107,7 @@ u/=2
 t*=0.55
 x=this.a
 w=s*1.1
-return A.aA(C.c6,new A.an(C.a_,v,C.ab,C.t,A.a([B.ij(x.r>0?D.dt_:D.cIl),A.ap(v,A.p(v,v,C.f,v,v,new A.o(v,v,A.J(C.bK,C.r,16),A.xf(C.bH,new A.aP(s,s)),v,v,C.n),v,w,v,v,v,v,v,w),v,v,u-s*0.55,v,t-s*1.6,v),A.bS(0,A.b4(v,v,v,new B.bj9(new A.t(u,t),s,x.d,x.e,v),C.aw),0,0,0),A.ap(v,new A.a4(120,v,A.d(""+(20-x.cb$),v,v,v,v,v,v,D.fsn,C.K,v,v),v),v,v,u-60,v,t-30,v),B.kV("Tap when the needle hits the dot",!1,x.e0$)],y.p),v),C.y,!1,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,new B.eWm(x),v,v,v,v,!1,C.a3)},
+return A.aA(C.c6,new A.an(C.a_,v,C.ab,C.t,A.a([B.ij(x.r>0?D.dt1:D.cIm),A.ap(v,A.p(v,v,C.f,v,v,new A.o(v,v,A.J(C.bK,C.r,16),A.xf(C.bH,new A.aP(s,s)),v,v,C.n),v,w,v,v,v,v,v,w),v,v,u-s*0.55,v,t-s*1.6,v),A.bS(0,A.b4(v,v,v,new B.bj9(new A.t(u,t),s,x.d,x.e,v),C.aw),0,0,0),A.ap(v,new A.a4(120,v,A.d(""+(20-x.cb$),v,v,v,v,v,v,D.fsr,C.K,v,v),v),v,v,u-60,v,t-30,v),B.kV("Tap when the needle hits the dot",!1,x.e0$)],y.p),v),C.y,!1,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,new B.eWm(x),v,v,v,v,!1,C.a3)},
 $S:36}
 B.eWm.prototype={
 $1(d){return this.a.c77()},
@@ -7149,10 +7149,10 @@ $S:0}
 B.cJP.prototype={
 $2(d,e){var x,w,v,u,t,s,r,q,p,o=null,n=this.a,m=e.b,l=e.d
 n.x=new A.av(m,l)
-x=A.a([B.ij(D.dgi)],y.p)
+x=A.a([B.ij(D.dgj)],y.p)
 for(w=n.e,v=w.length,u=0;u<w.length;w.length===v||(0,A.L)(w),++u){t=w[u]
 s=new A.aP(2,2)
-x.push(new A.cN(t.a*m-2,t.b*l,o,o,o,o,A.p(o,o,C.f,o,o,new A.o(C.b_,o,o,new A.bh(s,s,s,s),D.deS,o,C.n),o,14,o,o,o,o,o,4),o))}for(w=n.d,v=w.length,u=0;u<w.length;w.length===v||(0,A.L)(w),++u){r=w[u]
+x.push(new A.cN(t.a*m-2,t.b*l,o,o,o,o,A.p(o,o,C.f,o,o,new A.o(C.b_,o,o,new A.bh(s,s,s,s),D.deT,o,C.n),o,14,o,o,o,o,o,4),o))}for(w=n.d,v=w.length,u=0;u<w.length;w.length===v||(0,A.L)(w),++u){r=w[u]
 s=r.d
 q=s/2
 p=r.b
@@ -7197,9 +7197,9 @@ $S:0}
 B.fbC.prototype={
 $1(d){var x,w=null,v=this.c,u=this.a,t=this.b.t(0,v)?u.f:u.d[v]
 v=t<0
-u=v?C.c.j(0.03):D.d2B[t]
+u=v?C.c.j(0.03):D.d2C[t]
 x=A.m(3)
-return A.p(w,w,C.f,w,w,new A.o(u,w,v?w:A.J(C.aC,C.r,1),x,w,w,C.n),w,w,w,D.bFd,w,w,w,w)},
+return A.p(w,w,C.f,w,w,new A.o(u,w,v?w:A.J(C.aC,C.r,1),x,w,w,C.n),w,w,w,D.bFe,w,w,w,w)},
 $S:149}
 B.fbD.prototype={
 $0(){return this.a.aZO(-1)},
@@ -7409,31 +7409,31 @@ x(B.aFZ.prototype,"gZM","Ei",0)
 x(B.aIK.prototype,"gZM","Ei",0)
 x(B.aB0.prototype,"gZM","Ei",0)
 x(B.aD1.prototype,"gc6a","aZi",0)
-w(B,"ijf","i11",1)
-w(B,"ijc","i_d",1)
-w(B,"ijh","i8Y",1)
-w(B,"ijd","i_M",1)
-w(B,"ije","i03",1)
-w(B,"ijg","i6f",1)
+w(B,"ijg","i11",1)
+w(B,"ijd","i_d",1)
+w(B,"iji","i8Z",1)
+w(B,"ije","i_M",1)
+w(B,"ijf","i03",1)
+w(B,"ijh","i6g",1)
 x(B.aBq.prototype,"gaZL","c70",0)
 x(B.ayT.prototype,"gc69","aZh",0)
-w(B,"iji","i_O",1)
-w(B,"ijj","i60",1)
+w(B,"ijj","i_O",1)
+w(B,"ijk","i61",1)
 x(B.aI0.prototype,"gc65","aZc",0)
 x(B.aze.prototype,"gbUe","bUf",0)
 x(B.aB_.prototype,"gc6b","aZk",0)
-w(B,"ijk","i10",1)
+w(B,"ijl","i10",1)
 var v
 x(v=B.aJC.prototype,"gcsC","csD",0)
 x(v,"gc_a","c_b",0)})();(function inheritance(){var x=a.mixinHard,w=a.mixin,v=a.inheritMany,u=a.inherit
 v(A.aw,[B.z4,B.js,B.aGd,B.bit])
-v(A.aD,[B.es,B.a1i,B.ad1,B.ac7,B.afr,B.a0a,B.ace,B.adD,B.aed,B.acR,B.yw,B.ads,B.ac6,B.aeW,B.zH,B.jh,B.xb])
+v(A.aD,[B.et,B.a1i,B.ad1,B.ac7,B.afr,B.a0a,B.ace,B.adD,B.aed,B.acR,B.yw,B.ads,B.ac6,B.aeW,B.zH,B.ji,B.xb])
 v(A.hy,[B.bHn,B.cNg,B.cNe,B.cNc,B.dgm,B.dgk,B.dge,B.dgf,B.dgg,B.fga,B.fg8,B.f5h,B.f5f,B.f6M,B.f6I,B.f5d,B.f5a,B.f5b,B.f58,B.cN8,B.cN3,B.cN4,B.dvf,B.dve,B.dvh,B.dv7,B.dv9,B.f71,B.f70,B.f7_,B.dfh,B.cKL,B.cKJ,B.cKH,B.d3T,B.d3P,B.d3Q,B.f6W,B.f6S,B.f6T,B.d42,B.d40,B.eUv,B.eUt,B.eUo,B.eUp,B.cKX,B.cKV,B.cKT,B.fbi,B.fbf,B.fbg,B.fbd,B.fbc,B.eUY,B.eUW,B.dlj,B.dlg,B.eUQ,B.eUO,B.eUM,B.d8J,B.d8H,B.d8F,B.do7,B.do5,B.do3,B.do2,B.eVz,B.eVx,B.eVw,B.eVt,B.eVu,B.eVm,B.eVl,B.eVn,B.fml,B.fl7,B.dfk,B.f4L,B.f4J,B.f4I,B.f4H,B.cLA,B.cKC,B.cKB,B.cJK,B.cJH,B.d7m,B.d7k,B.d7i,B.d7h,B.cR9,B.cR5,B.cR6,B.cR4,B.cR3,B.dw3,B.dvZ,B.dw_,B.dvY,B.dmJ,B.dmT,B.dmQ,B.dmP,B.dmL,B.dmM,B.dmN,B.dmK,B.dvz,B.dvw,B.dvx,B.dvs,B.dvt,B.dvr,B.djW,B.dk_,B.djX,B.eW9,B.eW5,B.eW4,B.f6u,B.f6r,B.f6s,B.dnL,B.dnJ,B.dnH,B.dcH,B.dcE,B.dcF,B.dcA,B.dcB,B.dcC,B.dcz,B.f7E,B.f7A,B.f7B,B.fiT,B.fiR,B.fiP,B.d4e,B.eWp,B.eWm,B.cJT,B.cJQ,B.cJR,B.cJN,B.cJO,B.fbz,B.fbG,B.fbC,B.cIe,B.cIb,B.cI8,B.cI9,B.cJG,B.fzF])
 v(A.af,[B.a3D,B.a5k,B.abP,B.aav,B.aaH,B.aau,B.a3C,B.anY,B.am3,B.anJ,B.anH,B.an0,B.ato,B.awr,B.alv,B.a3x,B.a43,B.atk,B.anK,B.aaK,B.a47,B.a91,B.a3y,B.aba,B.a9h,B.a5r,B.a9g,B.a4I,B.a5W,B.a9k,B.au_,B.ajX,B.am1,B.aB1,B.aar,B.alS,B.aj7,B.aj2,B.ajl,B.a3p,B.a4B,B.a3I,B.a6j,B.a5P,B.a6g,B.axC,B.avx,B.a5m,B.a9n,B.aaF,B.ajz,B.ang,B.alt,B.a5V,B.a57,B.aaQ,B.abV,B.ay7,B.ak3,B.a9r,B.a3q,B.abd,B.a3l,B.aiT])
 v(A.ah,[B.aL1,B.aLG,B.aOw,B.aOc,B.aOf,B.aOb,B.aL0,B.bkk,B.bhf,B.bk_,B.bjU,B.aCm,B.aFZ,B.aIK,B.aB0,B.aKY,B.aLa,B.bmQ,B.aD1,B.aOg,B.aLb,B.aNJ,B.aKZ,B.aOn,B.aNL,B.aLR,B.aNK,B.aLu,B.aM0,B.aNM,B.bnw,B.bcK,B.bh7,B.bgc,B.aOa,B.aBq,B.bbs,B.bbh,B.bxU,B.aKW,B.aLp,B.aL3,B.aMb,B.aLX,B.aMa,B.bAN,B.aI0,B.aLM,B.aNN,B.aOe,B.bxY,B.bjn,B.byi,B.aM_,B.aLA,B.aOj,B.aOA,B.bxl,B.by2,B.aNO,B.aKX,B.aOp,B.aKS,B.bb_])
 u(B.bxT,B.aL1)
 u(B.bbJ,B.bxT)
-v(A.iG,[B.cNf,B.dgl,B.fg9,B.f5g,B.f6L,B.f6K,B.f5c,B.cN6,B.cN7,B.dwf,B.dwg,B.dwe,B.dwh,B.dkS,B.dkU,B.dkV,B.dvg,B.dvi,B.dvm,B.dvl,B.dvo,B.dvj,B.dvn,B.dvk,B.dv6,B.dv8,B.doh,B.doi,B.doj,B.eTI,B.eTJ,B.f72,B.f6Y,B.f6Z,B.dfg,B.dfi,B.cKK,B.d3S,B.eTF,B.eTG,B.eTH,B.dvB,B.dvC,B.dvE,B.dvD,B.dvF,B.dvG,B.f6V,B.d41,B.d3Z,B.d3W,B.d3Y,B.d3X,B.eUu,B.cKW,B.cKS,B.fbh,B.eUX,B.dli,B.eUP,B.d8I,B.do6,B.do0,B.do1,B.eVy,B.eVo,B.eVp,B.eVq,B.d3U,B.d3V,B.dkb,B.dkd,B.fkF,B.dfl,B.dfj,B.f4K,B.f4F,B.dj4,B.dj5,B.dj6,B.dj7,B.dj1,B.dj2,B.dj3,B.dj8,B.cLB,B.cLC,B.cKD,B.cKE,B.cKF,B.cKG,B.cNw,B.cNx,B.cNv,B.cNy,B.cNz,B.cNA,B.cJJ,B.d7l,B.cR8,B.cR1,B.cR2,B.dw1,B.dw2,B.dmS,B.dvv,B.dvy,B.dvp,B.dvq,B.fdk,B.fdl,B.f2z,B.f2A,B.f2B,B.f2C,B.djZ,B.eW8,B.eW7,B.f6t,B.cSc,B.cSd,B.cSb,B.cSg,B.cSf,B.cSh,B.cSe,B.dsW,B.dsX,B.dsY,B.dsZ,B.df2,B.df3,B.df4,B.dnK,B.dcG,B.f7D,B.fiS,B.fid,B.fie,B.fif,B.fig,B.fih,B.d4g,B.d4h,B.d4c,B.d4d,B.d4i,B.eWo,B.cJS,B.fbA,B.fbB,B.fby,B.fbF,B.fbD,B.fbE,B.cIc,B.cId,B.cJC,B.cJD,B.cJB,B.cJE])
+v(A.iH,[B.cNf,B.dgl,B.fg9,B.f5g,B.f6L,B.f6K,B.f5c,B.cN6,B.cN7,B.dwf,B.dwg,B.dwe,B.dwh,B.dkS,B.dkU,B.dkV,B.dvg,B.dvi,B.dvm,B.dvl,B.dvo,B.dvj,B.dvn,B.dvk,B.dv6,B.dv8,B.doh,B.doi,B.doj,B.eTI,B.eTJ,B.f72,B.f6Y,B.f6Z,B.dfg,B.dfi,B.cKK,B.d3S,B.eTF,B.eTG,B.eTH,B.dvB,B.dvC,B.dvE,B.dvD,B.dvF,B.dvG,B.f6V,B.d41,B.d3Z,B.d3W,B.d3Y,B.d3X,B.eUu,B.cKW,B.cKS,B.fbh,B.eUX,B.dli,B.eUP,B.d8I,B.do6,B.do0,B.do1,B.eVy,B.eVo,B.eVp,B.eVq,B.d3U,B.d3V,B.dkb,B.dkd,B.fkF,B.dfl,B.dfj,B.f4K,B.f4F,B.dj4,B.dj5,B.dj6,B.dj7,B.dj1,B.dj2,B.dj3,B.dj8,B.cLB,B.cLC,B.cKD,B.cKE,B.cKF,B.cKG,B.cNw,B.cNx,B.cNv,B.cNy,B.cNz,B.cNA,B.cJJ,B.d7l,B.cR8,B.cR1,B.cR2,B.dw1,B.dw2,B.dmS,B.dvv,B.dvy,B.dvp,B.dvq,B.fdk,B.fdl,B.f2z,B.f2A,B.f2B,B.f2C,B.djZ,B.eW8,B.eW7,B.f6t,B.cSc,B.cSd,B.cSb,B.cSg,B.cSf,B.cSh,B.cSe,B.dsW,B.dsX,B.dsY,B.dsZ,B.df2,B.df3,B.df4,B.dnK,B.dcG,B.f7D,B.fiS,B.fid,B.fie,B.fif,B.fig,B.fih,B.d4g,B.d4h,B.d4c,B.d4d,B.d4i,B.eWo,B.cJS,B.fbA,B.fbB,B.fby,B.fbF,B.fbD,B.fbE,B.cIc,B.cId,B.cJC,B.cJD,B.cJB,B.cJE])
 v(A.jv,[B.cNd,B.dgj,B.f5e,B.f6J,B.f6H,B.f59,B.cN5,B.dkT,B.eTK,B.cKI,B.d3R,B.f6U,B.d4_,B.eUs,B.cKU,B.fbe,B.eUV,B.dlh,B.eUN,B.d8G,B.do4,B.eVv,B.eVr,B.dkc,B.f4G,B.cLD,B.cKA,B.cJI,B.d7j,B.cR7,B.dw0,B.dmR,B.dmO,B.dvu,B.djY,B.eW6,B.df5,B.dnI,B.dcD,B.f7C,B.fiQ,B.d4f,B.eWn,B.cJP,B.cIa,B.cJF])
 u(B.byj,B.aLG)
 u(B.bgJ,B.byj)
@@ -7545,1212 +7545,1212 @@ u(B.bxH,B.aKS)
 u(B.bxI,B.bxH)
 u(B.bas,B.bxI)
 x(B.aL0,A.cg)
-x(B.bxS,B.es)
+x(B.bxS,B.et)
 x(B.aL1,A.cg)
-x(B.bxT,B.es)
+x(B.bxT,B.et)
 x(B.aLG,A.cg)
-x(B.byj,B.es)
+x(B.byj,B.et)
 x(B.aOb,A.cg)
-x(B.bA8,B.es)
+x(B.bA8,B.et)
 x(B.aOc,A.cg)
-x(B.bA9,B.es)
+x(B.bA9,B.et)
 x(B.aOf,A.cg)
-x(B.bAd,B.es)
+x(B.bAd,B.et)
 x(B.aOw,A.cg)
-x(B.bAU,B.es)
+x(B.bAU,B.et)
 x(B.aKY,A.cg)
-x(B.bxP,B.es)
+x(B.bxP,B.et)
 x(B.aLa,A.cg)
-x(B.by_,B.es)
+x(B.by_,B.et)
 x(B.aOg,A.cg)
-x(B.bAe,B.es)
+x(B.bAe,B.et)
 x(B.aKZ,A.cg)
-x(B.bxQ,B.es)
-w(B.bxR,B.jh)
+x(B.bxQ,B.et)
+w(B.bxR,B.ji)
 x(B.aLb,A.cg)
-x(B.by0,B.es)
-w(B.by1,B.jh)
+x(B.by0,B.et)
+w(B.by1,B.ji)
 x(B.aLu,A.cg)
-x(B.by9,B.es)
-w(B.bya,B.jh)
+x(B.by9,B.et)
+w(B.bya,B.ji)
 x(B.aLR,A.cg)
-x(B.byq,B.es)
-w(B.byr,B.jh)
+x(B.byq,B.et)
+w(B.byr,B.ji)
 x(B.aM0,A.cg)
-x(B.byz,B.es)
-w(B.byA,B.jh)
+x(B.byz,B.et)
+w(B.byA,B.ji)
 x(B.aNJ,A.cg)
-x(B.bzi,B.es)
-w(B.bzj,B.jh)
+x(B.bzi,B.et)
+w(B.bzj,B.ji)
 x(B.aNK,A.cg)
-x(B.bzk,B.es)
-w(B.bzl,B.jh)
+x(B.bzk,B.et)
+w(B.bzl,B.ji)
 x(B.aNL,A.cg)
-x(B.bzm,B.es)
-w(B.bzn,B.jh)
+x(B.bzm,B.et)
+w(B.bzn,B.ji)
 x(B.aNM,A.cg)
-x(B.bzo,B.es)
-w(B.bzp,B.jh)
+x(B.bzo,B.et)
+w(B.bzp,B.ji)
 x(B.aOn,A.cg)
-x(B.bAp,B.es)
-w(B.bAq,B.jh)
+x(B.bAp,B.et)
+w(B.bAq,B.ji)
 x(B.aOa,A.cg)
-x(B.bA4,B.es)
-w(B.bA5,B.jh)
+x(B.bA4,B.et)
+w(B.bA5,B.ji)
 x(B.aKW,A.cg)
-x(B.bxL,B.es)
-w(B.bxM,B.jh)
-w(B.bxU,B.jh)
+x(B.bxL,B.et)
+w(B.bxM,B.ji)
+w(B.bxU,B.ji)
 x(B.aL3,A.cg)
-x(B.bxV,B.es)
-w(B.bxW,B.jh)
+x(B.bxV,B.et)
+w(B.bxW,B.ji)
 x(B.aLp,A.cg)
-x(B.by6,B.es)
-w(B.by7,B.jh)
+x(B.by6,B.et)
+w(B.by7,B.ji)
 x(B.aLX,A.cg)
-x(B.byt,B.es)
-w(B.byu,B.jh)
+x(B.byt,B.et)
+w(B.byu,B.ji)
 x(B.aMa,A.cg)
-x(B.byG,B.es)
-w(B.byH,B.jh)
+x(B.byG,B.et)
+w(B.byH,B.ji)
 x(B.aMb,A.cg)
-x(B.byJ,B.es)
-w(B.byK,B.jh)
-w(B.bxY,B.jh)
-w(B.byi,B.jh)
+x(B.byJ,B.et)
+w(B.byK,B.ji)
+w(B.bxY,B.ji)
+w(B.byi,B.ji)
 x(B.aLM,A.cg)
-x(B.bym,B.es)
-w(B.byn,B.jh)
+x(B.bym,B.et)
+w(B.byn,B.ji)
 x(B.aNN,A.cg)
-x(B.bzr,B.es)
-w(B.bzs,B.jh)
+x(B.bzr,B.et)
+w(B.bzs,B.ji)
 x(B.aOe,A.cg)
-x(B.bAb,B.es)
-w(B.bAc,B.jh)
-w(B.bAN,B.jh)
+x(B.bAb,B.et)
+w(B.bAc,B.ji)
+w(B.bAN,B.ji)
 x(B.aKX,A.cg)
-x(B.bxN,B.es)
-w(B.bxO,B.jh)
-w(B.by2,B.jh)
+x(B.bxN,B.et)
+w(B.bxO,B.ji)
+w(B.by2,B.ji)
 x(B.aLA,A.cg)
-x(B.byf,B.es)
-w(B.byg,B.jh)
+x(B.byf,B.et)
+w(B.byg,B.ji)
 x(B.aM_,A.cg)
-x(B.byx,B.es)
-w(B.byy,B.jh)
+x(B.byx,B.et)
+w(B.byy,B.ji)
 x(B.aNO,A.cg)
-x(B.bzu,B.es)
-w(B.bzv,B.jh)
+x(B.bzu,B.et)
+w(B.bzv,B.ji)
 x(B.aOj,A.cg)
-x(B.bAh,B.es)
-w(B.bAi,B.jh)
+x(B.bAh,B.et)
+w(B.bAi,B.ji)
 x(B.aOp,A.cg)
-x(B.bAr,B.es)
-w(B.bAs,B.jh)
+x(B.bAr,B.et)
+w(B.bAs,B.ji)
 x(B.aOA,A.cg)
-x(B.bAX,B.es)
-w(B.bAY,B.jh)
+x(B.bAX,B.et)
+w(B.bAY,B.ji)
 x(B.aKS,A.cg)
-x(B.bxH,B.es)
-w(B.bxI,B.jh)})()
-A.j0(b.typeUniverse,JSON.parse('{"a3D":{"af":[],"v":[]},"a5k":{"af":[],"v":[]},"abP":{"af":[],"v":[]},"aav":{"af":[],"v":[]},"aaH":{"af":[],"v":[]},"aau":{"af":[],"v":[]},"a3C":{"af":[],"v":[]},"anY":{"af":[],"v":[]},"am3":{"af":[],"v":[]},"anJ":{"af":[],"v":[]},"z4":{"aw":[],"v":[]},"js":{"aw":[],"v":[]},"bbJ":{"es":["a3D"],"ah":["a3D"]},"bgJ":{"es":["a5k"],"ah":["a5k"]},"bvS":{"aC":[]},"bx4":{"es":["abP"],"ah":["abP"]},"btf":{"es":["aav"],"ah":["aav"]},"btC":{"es":["aaH"],"ah":["aaH"]},"bte":{"es":["aau"],"ah":["aau"]},"aGd":{"aw":[],"v":[]},"bbG":{"es":["a3C"],"ah":["a3C"]},"bkk":{"ah":["anY"]},"bhf":{"ah":["am3"]},"bk_":{"ah":["anJ"]},"anH":{"af":[],"v":[]},"an0":{"af":[],"v":[]},"ato":{"af":[],"v":[]},"awr":{"af":[],"v":[]},"alv":{"af":[],"v":[]},"a3x":{"af":[],"v":[]},"a43":{"af":[],"v":[]},"atk":{"af":[],"v":[]},"anK":{"af":[],"v":[]},"aaK":{"af":[],"v":[]},"bjU":{"ah":["anH"]},"aCm":{"ah":["an0"]},"aFZ":{"ah":["ato"]},"aIK":{"ah":["awr"]},"aB0":{"ah":["alv"]},"bbi":{"es":["a3x"],"ah":["a3x"]},"bcJ":{"es":["a43"],"ah":["a43"]},"bmQ":{"ah":["atk"]},"aD1":{"ah":["anK"]},"btF":{"es":["aaK"],"ah":["aaK"]},"a47":{"af":[],"v":[]},"a91":{"af":[],"v":[]},"a3y":{"af":[],"v":[]},"aba":{"af":[],"v":[]},"a9h":{"af":[],"v":[]},"a5r":{"af":[],"v":[]},"a9g":{"af":[],"v":[]},"a4I":{"af":[],"v":[]},"a5W":{"af":[],"v":[]},"a9k":{"af":[],"v":[]},"bcL":{"es":["a47"],"ah":["a47"]},"bn7":{"es":["a91"],"ah":["a91"]},"bbm":{"es":["a3y"],"ah":["a3y"]},"bv6":{"es":["aba"],"ah":["aba"]},"bnn":{"es":["a9h"],"ah":["a9h"]},"bhl":{"es":["a5r"],"ah":["a5r"]},"aDr":{"aC":[]},"bnk":{"es":["a9g"],"ah":["a9g"]},"beG":{"es":["a4I"],"ah":["a4I"]},"biz":{"es":["a5W"],"ah":["a5W"]},"bnA":{"es":["a9k"],"ah":["a9k"]},"bsW":{"aC":[]},"au_":{"af":[],"v":[]},"ajX":{"af":[],"v":[]},"am1":{"af":[],"v":[]},"aB1":{"af":[],"v":[]},"aar":{"af":[],"v":[]},"bnw":{"ah":["au_"]},"bnx":{"aC":[]},"bcK":{"ah":["ajX"]},"bh7":{"ah":["am1"]},"bcH":{"aC":[]},"bgc":{"ah":["aB1"]},"bsV":{"es":["aar"],"ah":["aar"]},"bdv":{"aC":[]},"alS":{"af":[],"v":[]},"aj7":{"af":[],"v":[]},"aj2":{"af":[],"v":[]},"ajl":{"af":[],"v":[]},"a3p":{"af":[],"v":[]},"a4B":{"af":[],"v":[]},"a3I":{"af":[],"v":[]},"a6j":{"af":[],"v":[]},"a5P":{"af":[],"v":[]},"a6g":{"af":[],"v":[]},"aBq":{"ah":["alS"]},"bbs":{"ah":["aj7"]},"bbh":{"ah":["aj2"]},"ayT":{"ah":["ajl"]},"bb0":{"es":["a3p"],"ah":["a3p"]},"bej":{"es":["a4B"],"ah":["a4B"]},"bc2":{"es":["a3I"],"ah":["a3I"]},"bk8":{"es":["a6j"],"ah":["a6j"]},"bid":{"es":["a5P"],"ah":["a5P"]},"bk0":{"es":["a6g"],"ah":["a6g"]},"bar":{"aC":[]},"axC":{"af":[],"v":[]},"avx":{"af":[],"v":[]},"a5m":{"af":[],"v":[]},"a9n":{"af":[],"v":[]},"aaF":{"af":[],"v":[]},"ajz":{"af":[],"v":[]},"ang":{"af":[],"v":[]},"alt":{"af":[],"v":[]},"bwg":{"ah":["axC"]},"aI0":{"ah":["avx"]},"bh_":{"es":["a5m"],"ah":["a5m"]},"brV":{"aC":[]},"bnG":{"es":["a9n"],"ah":["a9n"]},"btz":{"es":["aaF"],"ah":["aaF"]},"aze":{"ah":["ajz"]},"bjn":{"ah":["ang"]},"aB_":{"ah":["alt"]},"a5V":{"af":[],"v":[]},"a57":{"af":[],"v":[]},"aaQ":{"af":[],"v":[]},"abV":{"af":[],"v":[]},"ay7":{"af":[],"v":[]},"ak3":{"af":[],"v":[]},"a9r":{"af":[],"v":[]},"a3q":{"af":[],"v":[]},"abd":{"af":[],"v":[]},"biu":{"es":["a5V"],"ah":["a5V"]},"bit":{"aw":[],"v":[]},"bja":{"aC":[]},"bfK":{"es":["a57"],"ah":["a57"]},"bu5":{"es":["aaQ"],"ah":["aaQ"]},"bxx":{"es":["abV"],"ah":["abV"]},"bxw":{"aC":[]},"bxl":{"ah":["ay7"]},"bcS":{"ah":["ak3"]},"boe":{"es":["a9r"],"ah":["a9r"]},"bj9":{"aC":[]},"bb2":{"es":["a3q"],"ah":["a3q"]},"aJC":{"es":["abd"],"ah":["abd"]},"a3l":{"af":[],"v":[]},"bas":{"es":["a3l"],"ah":["a3l"]},"aiT":{"af":[],"v":[]},"bb_":{"ah":["aiT"]}}'))
-A.CW(b.typeUniverse,JSON.parse('{"jh":1}'))
+x(B.bxH,B.et)
+w(B.bxI,B.ji)})()
+A.j0(b.typeUniverse,JSON.parse('{"a3D":{"af":[],"v":[]},"a5k":{"af":[],"v":[]},"abP":{"af":[],"v":[]},"aav":{"af":[],"v":[]},"aaH":{"af":[],"v":[]},"aau":{"af":[],"v":[]},"a3C":{"af":[],"v":[]},"anY":{"af":[],"v":[]},"am3":{"af":[],"v":[]},"anJ":{"af":[],"v":[]},"z4":{"aw":[],"v":[]},"js":{"aw":[],"v":[]},"bbJ":{"et":["a3D"],"ah":["a3D"]},"bgJ":{"et":["a5k"],"ah":["a5k"]},"bvS":{"aC":[]},"bx4":{"et":["abP"],"ah":["abP"]},"btf":{"et":["aav"],"ah":["aav"]},"btC":{"et":["aaH"],"ah":["aaH"]},"bte":{"et":["aau"],"ah":["aau"]},"aGd":{"aw":[],"v":[]},"bbG":{"et":["a3C"],"ah":["a3C"]},"bkk":{"ah":["anY"]},"bhf":{"ah":["am3"]},"bk_":{"ah":["anJ"]},"anH":{"af":[],"v":[]},"an0":{"af":[],"v":[]},"ato":{"af":[],"v":[]},"awr":{"af":[],"v":[]},"alv":{"af":[],"v":[]},"a3x":{"af":[],"v":[]},"a43":{"af":[],"v":[]},"atk":{"af":[],"v":[]},"anK":{"af":[],"v":[]},"aaK":{"af":[],"v":[]},"bjU":{"ah":["anH"]},"aCm":{"ah":["an0"]},"aFZ":{"ah":["ato"]},"aIK":{"ah":["awr"]},"aB0":{"ah":["alv"]},"bbi":{"et":["a3x"],"ah":["a3x"]},"bcJ":{"et":["a43"],"ah":["a43"]},"bmQ":{"ah":["atk"]},"aD1":{"ah":["anK"]},"btF":{"et":["aaK"],"ah":["aaK"]},"a47":{"af":[],"v":[]},"a91":{"af":[],"v":[]},"a3y":{"af":[],"v":[]},"aba":{"af":[],"v":[]},"a9h":{"af":[],"v":[]},"a5r":{"af":[],"v":[]},"a9g":{"af":[],"v":[]},"a4I":{"af":[],"v":[]},"a5W":{"af":[],"v":[]},"a9k":{"af":[],"v":[]},"bcL":{"et":["a47"],"ah":["a47"]},"bn7":{"et":["a91"],"ah":["a91"]},"bbm":{"et":["a3y"],"ah":["a3y"]},"bv6":{"et":["aba"],"ah":["aba"]},"bnn":{"et":["a9h"],"ah":["a9h"]},"bhl":{"et":["a5r"],"ah":["a5r"]},"aDr":{"aC":[]},"bnk":{"et":["a9g"],"ah":["a9g"]},"beG":{"et":["a4I"],"ah":["a4I"]},"biz":{"et":["a5W"],"ah":["a5W"]},"bnA":{"et":["a9k"],"ah":["a9k"]},"bsW":{"aC":[]},"au_":{"af":[],"v":[]},"ajX":{"af":[],"v":[]},"am1":{"af":[],"v":[]},"aB1":{"af":[],"v":[]},"aar":{"af":[],"v":[]},"bnw":{"ah":["au_"]},"bnx":{"aC":[]},"bcK":{"ah":["ajX"]},"bh7":{"ah":["am1"]},"bcH":{"aC":[]},"bgc":{"ah":["aB1"]},"bsV":{"et":["aar"],"ah":["aar"]},"bdv":{"aC":[]},"alS":{"af":[],"v":[]},"aj7":{"af":[],"v":[]},"aj2":{"af":[],"v":[]},"ajl":{"af":[],"v":[]},"a3p":{"af":[],"v":[]},"a4B":{"af":[],"v":[]},"a3I":{"af":[],"v":[]},"a6j":{"af":[],"v":[]},"a5P":{"af":[],"v":[]},"a6g":{"af":[],"v":[]},"aBq":{"ah":["alS"]},"bbs":{"ah":["aj7"]},"bbh":{"ah":["aj2"]},"ayT":{"ah":["ajl"]},"bb0":{"et":["a3p"],"ah":["a3p"]},"bej":{"et":["a4B"],"ah":["a4B"]},"bc2":{"et":["a3I"],"ah":["a3I"]},"bk8":{"et":["a6j"],"ah":["a6j"]},"bid":{"et":["a5P"],"ah":["a5P"]},"bk0":{"et":["a6g"],"ah":["a6g"]},"bar":{"aC":[]},"axC":{"af":[],"v":[]},"avx":{"af":[],"v":[]},"a5m":{"af":[],"v":[]},"a9n":{"af":[],"v":[]},"aaF":{"af":[],"v":[]},"ajz":{"af":[],"v":[]},"ang":{"af":[],"v":[]},"alt":{"af":[],"v":[]},"bwg":{"ah":["axC"]},"aI0":{"ah":["avx"]},"bh_":{"et":["a5m"],"ah":["a5m"]},"brV":{"aC":[]},"bnG":{"et":["a9n"],"ah":["a9n"]},"btz":{"et":["aaF"],"ah":["aaF"]},"aze":{"ah":["ajz"]},"bjn":{"ah":["ang"]},"aB_":{"ah":["alt"]},"a5V":{"af":[],"v":[]},"a57":{"af":[],"v":[]},"aaQ":{"af":[],"v":[]},"abV":{"af":[],"v":[]},"ay7":{"af":[],"v":[]},"ak3":{"af":[],"v":[]},"a9r":{"af":[],"v":[]},"a3q":{"af":[],"v":[]},"abd":{"af":[],"v":[]},"biu":{"et":["a5V"],"ah":["a5V"]},"bit":{"aw":[],"v":[]},"bja":{"aC":[]},"bfK":{"et":["a57"],"ah":["a57"]},"bu5":{"et":["aaQ"],"ah":["aaQ"]},"bxx":{"et":["abV"],"ah":["abV"]},"bxw":{"aC":[]},"bxl":{"ah":["ay7"]},"bcS":{"ah":["ak3"]},"boe":{"et":["a9r"],"ah":["a9r"]},"bj9":{"aC":[]},"bb2":{"et":["a3q"],"ah":["a3q"]},"aJC":{"et":["abd"],"ah":["abd"]},"a3l":{"af":[],"v":[]},"bas":{"et":["a3l"],"ah":["a3l"]},"aiT":{"af":[],"v":[]},"bb_":{"ah":["aiT"]}}'))
+A.CW(b.typeUniverse,JSON.parse('{"ji":1}'))
 var y=(function rtii(){var x=A.at
-return{f:x("es<@>"),V:x("O<ac>"),O:x("O<u>"),q:x("O<ai<G>>"),g:x("O<t>"),v:x("O<fV>"),U:x("O<hk<G>>"),K:x("O<+(t,G)>"),L:x("O<+(n,n)>"),E:x("O<+gap,x(K,K)>"),C:x("O<+w,x(K,K)>"),M:x("O<+x,y(K,K)>"),n:x("O<+(G,G)>"),F:x("O<+(ai<G>,G,G)>"),x:x("O<+t,x,y(K,K,K)>"),a:x("O<+v,x,y(K,K,K)>"),Q:x("O<+color,speed,x,y(G,K,K,K)>"),_:x("O<+kind,v,x,y(G,K,K,K)>"),l:x("O<+size,spin,v,x,y(K,K,K,K,K)>"),T:x("O<a3>"),r:x("O<cW>"),s:x("O<n>"),p:x("O<v>"),J:x("O<ac6>"),Y:x("O<ac7>"),b:x("O<ace>"),A:x("O<acR>"),G:x("O<ad1>"),c:x("O<ads>"),e:x("O<adD>"),h:x("O<a0a>"),k:x("O<aed>"),m:x("O<yw>"),bP:x("O<aeW>"),z:x("O<afr>"),B:x("O<a1i>"),bx:x("O<R>"),u:x("O<K>"),t:x("O<G>"),j:x("ai<@>"),I:x("ai<G>"),P:x("a8<n,@>"),d:x("N<+(n,n),n>"),w:x("iB"),ax:x("aD"),o:x("t"),D:x("hk<G>"),W:x("+(n,n)"),aq:x("+(n,G)"),ap:x("+gap,x(K,K)"),cA:x("+x,y(K,K)"),R:x("+(G,G)"),a4:x("+color,speed,x,y(G,K,K,K)"),N:x("n"),X:x("bR<n>"),ba:x("bR<G>"),Z:x("Z<G>"),cJ:x("oa<G>"),y:x("R"),i:x("K"),S:x("G"),H:x("~")}})();(function constants(){var x=a.makeConstList
-D.fLn=new A.y("Tap to drop \xb7 line it up!",null,null,null,null,null,null,null,null,null,null,null)
-D.b1_=new B.js(D.fLn,null)
+return{f:x("et<@>"),V:x("O<ac>"),O:x("O<u>"),q:x("O<ai<G>>"),g:x("O<t>"),v:x("O<fV>"),U:x("O<hk<G>>"),K:x("O<+(t,G)>"),L:x("O<+(n,n)>"),E:x("O<+gap,x(K,K)>"),C:x("O<+w,x(K,K)>"),M:x("O<+x,y(K,K)>"),n:x("O<+(G,G)>"),F:x("O<+(ai<G>,G,G)>"),x:x("O<+t,x,y(K,K,K)>"),a:x("O<+v,x,y(K,K,K)>"),Q:x("O<+color,speed,x,y(G,K,K,K)>"),_:x("O<+kind,v,x,y(G,K,K,K)>"),l:x("O<+size,spin,v,x,y(K,K,K,K,K)>"),T:x("O<a3>"),r:x("O<cW>"),s:x("O<n>"),p:x("O<v>"),J:x("O<ac6>"),Y:x("O<ac7>"),b:x("O<ace>"),A:x("O<acR>"),G:x("O<ad1>"),c:x("O<ads>"),e:x("O<adD>"),h:x("O<a0a>"),k:x("O<aed>"),m:x("O<yw>"),bP:x("O<aeW>"),z:x("O<afr>"),B:x("O<a1i>"),bx:x("O<R>"),u:x("O<K>"),t:x("O<G>"),j:x("ai<@>"),I:x("ai<G>"),P:x("a8<n,@>"),d:x("N<+(n,n),n>"),w:x("iB"),ax:x("aD"),o:x("t"),D:x("hk<G>"),W:x("+(n,n)"),aq:x("+(n,G)"),ap:x("+gap,x(K,K)"),cA:x("+x,y(K,K)"),R:x("+(G,G)"),a4:x("+color,speed,x,y(G,K,K,K)"),N:x("n"),X:x("bR<n>"),ba:x("bR<G>"),Z:x("Z<G>"),cJ:x("oa<G>"),y:x("R"),i:x("K"),S:x("G"),H:x("~")}})();(function constants(){var x=a.makeConstList
+D.fLr=new A.y("Tap to drop \xb7 line it up!",null,null,null,null,null,null,null,null,null,null,null)
+D.b1_=new B.js(D.fLr,null)
 D.b0a=new A.bM(C.b0,null,null,D.b1_,null)
-D.fOv=new A.y("Swipe through fruit \xb7 avoid \ud83d\udca3",null,null,null,null,null,null,null,null,null,null,null)
-D.b0V=new B.js(D.fOv,null)
+D.fOz=new A.y("Swipe through fruit \xb7 avoid \ud83d\udca3",null,null,null,null,null,null,null,null,null,null,null)
+D.b0V=new B.js(D.fOz,null)
 D.b0b=new A.bM(C.b0,null,null,D.b0V,null)
-D.fQC=new A.y("Swipe to merge \u2014 reach 256",null,null,null,null,null,null,null,null,null,null,null)
-D.b0Y=new B.js(D.fQC,null)
-D.fUY=new A.y("Sort each colour into its own tube",null,null,null,null,null,null,null,null,null,null,null)
-D.b0Z=new B.js(D.fUY,null)
+D.fQG=new A.y("Swipe to merge \u2014 reach 256",null,null,null,null,null,null,null,null,null,null,null)
+D.b0Y=new B.js(D.fQG,null)
+D.fV1=new A.y("Sort each colour into its own tube",null,null,null,null,null,null,null,null,null,null,null)
+D.b0Z=new B.js(D.fV1,null)
 D.TJ=new A.aP(24,29)
 D.b2h=new A.bh(D.TJ,D.TJ,D.TJ,D.TJ)
-D.b2j=new A.bh(C.hH,C.hH,C.vd,C.vd)
+D.b2j=new A.bh(C.hH,C.hH,C.ve,C.ve)
 D.aPQ=new A.aP(60,60)
 D.b2o=new A.bh(D.aPQ,D.aPQ,C.hH,C.hH)
-D.b2x=new A.bh(C.hH,C.hH,C.it,C.it)
+D.b2x=new A.bh(C.hH,C.hH,C.id,C.id)
 D.ad0=new A.ay(C.bK,2,C.r,-1)
 D.b3J=new A.bH(D.ad0,C.a0,C.a0,D.ad0)
-D.d3n=x([C.q0,C.rq],y.O)
-D.c2Z=new A.a9(C.b0,C.b6,C.x,D.d3n,null,null)
-D.b4F=new A.o(null,null,null,null,null,D.c2Z,C.n)
-D.blP=new A.u(0.5333333333333333,0.7529411764705882,0.5176470588235295,0.9882352941176471,C.q)
-D.b7r=new A.ac(0,C.G,D.blP,C.I,6)
-D.d7b=x([D.b7r],y.V)
-D.b4M=new A.o(C.kD,null,null,null,D.d7b,null,C.a6)
-D.bif=new A.u(0.6666666666666666,0.9607843137254902,0.6196078431372549,0.043137254901960784,C.q)
-D.b6I=new A.ac(0,C.G,D.bif,C.I,10)
-D.dl2=x([D.b6I],y.V)
+D.d3o=x([C.q0,C.rq],y.O)
+D.c3_=new A.a9(C.b0,C.b6,C.x,D.d3o,null,null)
+D.b4F=new A.o(null,null,null,null,null,D.c3_,C.n)
+D.blQ=new A.u(0.5333333333333333,0.7529411764705882,0.5176470588235295,0.9882352941176471,C.q)
+D.b7r=new A.ac(0,C.G,D.blQ,C.I,6)
+D.d7c=x([D.b7r],y.V)
+D.b4M=new A.o(C.kD,null,null,null,D.d7c,null,C.a6)
+D.big=new A.u(0.6666666666666666,0.9607843137254902,0.6196078431372549,0.043137254901960784,C.q)
+D.b6I=new A.ac(0,C.G,D.big,C.I,10)
+D.dl4=x([D.b6I],y.V)
 D.ayj=x([C.fU,C.aA],y.O)
-D.ev1=new A.c_(C.A,0.5,C.x,null,0,D.ayj,null,null)
-D.b4N=new A.o(null,null,null,null,D.dl2,D.ev1,C.a6)
+D.ev3=new A.c_(C.A,0.5,C.x,null,0,D.ayj,null,null)
+D.b4N=new A.o(null,null,null,null,D.dl4,D.ev3,C.a6)
 D.WT=new A.ay(C.c,6,C.r,-1)
 D.b3M=new A.bH(D.WT,D.WT,C.a0,D.WT)
 D.b4R=new A.o(null,null,D.b3M,null,null,null,C.n)
-D.biw=new A.u(0.6666666666666666,1,1,1,C.q)
-D.b7d=new A.ac(0,C.G,D.biw,C.I,30)
-D.dub=x([D.b7d],y.V)
-D.b4Y=new A.o(C.hY,null,null,null,D.dub,null,C.a6)
-D.diA=x([C.m_,C.aA],y.O)
-D.euT=new A.c_(K.ack,0.5,C.x,null,0,D.diA,null,null)
-D.b5_=new A.o(null,null,null,null,null,D.euT,C.a6)
+D.bix=new A.u(0.6666666666666666,1,1,1,C.q)
+D.b7d=new A.ac(0,C.G,D.bix,C.I,30)
+D.dud=x([D.b7d],y.V)
+D.b4Y=new A.o(C.hY,null,null,null,D.dud,null,C.a6)
+D.diC=x([C.m_,C.aA],y.O)
+D.euV=new A.c_(K.ack,0.5,C.x,null,0,D.diC,null,null)
+D.b5_=new A.o(null,null,null,null,null,D.euV,C.a6)
 D.b5a=new A.o(C.bB,null,null,null,null,null,C.a6)
 D.b2w=new A.bh(C.qP,C.qP,C.bH,C.bH)
 D.b5o=new A.o(C.aN,null,null,D.b2w,null,null,C.n)
 D.b5v=new A.o(C.bt,null,null,null,null,null,C.a6)
-D.d6p=x([C.dZ,C.fV],y.O)
-D.c3p=new A.a9(C.b0,C.b6,C.x,D.d6p,null,null)
-D.b5B=new A.o(null,null,null,null,null,D.c3p,C.n)
-D.cPN=x([C.bM,C.aA],y.O)
-D.euW=new A.c_(C.A,0.5,C.x,null,0,D.cPN,null,null)
-D.b5Q=new A.o(null,null,null,null,null,D.euW,C.a6)
-D.cy6=x([C.dn,C.hk],y.O)
-D.c4T=new A.a9(C.b0,C.b6,C.x,D.cy6,null,null)
-D.b5U=new A.o(null,null,null,null,null,D.c4T,C.n)
+D.d6q=x([C.dZ,C.fV],y.O)
+D.c3q=new A.a9(C.b0,C.b6,C.x,D.d6q,null,null)
+D.b5B=new A.o(null,null,null,null,null,D.c3q,C.n)
+D.cPO=x([C.bM,C.aA],y.O)
+D.euY=new A.c_(C.A,0.5,C.x,null,0,D.cPO,null,null)
+D.b5Q=new A.o(null,null,null,null,null,D.euY,C.a6)
+D.cy7=x([C.dn,C.hk],y.O)
+D.c4U=new A.a9(C.b0,C.b6,C.x,D.cy7,null,null)
+D.b5U=new A.o(null,null,null,null,null,D.c4U,C.n)
 D.b5Y=new A.o(C.hd,null,null,null,L.aA4,null,C.a6)
 D.b7b=new A.ac(0,C.G,C.dL,C.cH,10)
-D.dgF=x([D.b7b],y.V)
-D.b60=new A.o(C.bB,null,null,null,D.dgF,null,C.a6)
+D.dgG=x([D.b7b],y.V)
+D.b60=new A.o(C.bB,null,null,null,D.dgG,null,C.a6)
 D.b6a=new A.o(C.l6,null,null,null,null,null,C.a6)
 D.b6L=new A.ac(0,C.G,C.hx,C.dC,3)
 D.aA3=x([D.b6L],y.V)
 D.b6i=new A.o(C.c,null,null,null,D.aA3,null,C.a6)
 D.b6s=new A.o(C.fU,null,null,null,null,null,C.a6)
-D.bhY=new A.u(0.6666666666666666,0.9254901960784314,0.2823529411764706,0.6,C.q)
-D.b78=new A.ac(0,C.G,D.bhY,C.I,8)
-D.deT=x([D.b78],y.V)
-D.b6w=new A.o(C.nW,null,null,null,D.deT,null,C.a6)
-D.fyK=new A.y("Drag to move \xb7 tap to launch",null,null,null,null,null,null,null,null,null,null,null)
-D.b0W=new B.js(D.fyK,null)
+D.bhZ=new A.u(0.6666666666666666,0.9254901960784314,0.2823529411764706,0.6,C.q)
+D.b78=new A.ac(0,C.G,D.bhZ,C.I,8)
+D.deU=x([D.b78],y.V)
+D.b6w=new A.o(C.nW,null,null,null,D.deU,null,C.a6)
+D.fyO=new A.y("Drag to move \xb7 tap to launch",null,null,null,null,null,null,null,null,null,null,null)
+D.b0W=new B.js(D.fyO,null)
 D.baa=new A.cf(C.A,null,null,D.b0W,null)
-D.fka=new A.F(!0,null,null,null,null,null,90,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fWt=new A.y("?",null,D.fka,null,null,null,null,null,null,null,null,null)
-D.bar=new A.cf(C.A,null,null,D.fWt,null)
-D.fzj=new A.y("Tap to fly \u2014 through the gates!",null,null,null,null,null,null,null,null,null,null,null)
-D.b0X=new B.js(D.fzj,null)
+D.fke=new A.F(!0,null,null,null,null,null,90,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fWx=new A.y("?",null,D.fke,null,null,null,null,null,null,null,null,null)
+D.bar=new A.cf(C.A,null,null,D.fWx,null)
+D.fzn=new A.y("Tap to fly \u2014 through the gates!",null,null,null,null,null,null,null,null,null,null,null)
+D.b0X=new B.js(D.fzn,null)
 D.bay=new A.cf(C.A,null,null,D.b0X,null)
-D.fSI=new A.y("Game not found",null,C.df,null,null,null,null,null,null,null,null,null)
-D.baC=new A.cf(C.A,null,null,D.fSI,null)
+D.fSM=new A.y("Game not found",null,C.df,null,null,null,null,null,null,null,null,null)
+D.baC=new A.cf(C.A,null,null,D.fSM,null)
 D.bcG=new A.u(1,0.043137254901960784,0.11764705882352941,0.30196078431372547,C.q)
-D.bi8=new A.u(0.3333333333333333,0.27058823529411763,0.10196078431372549,0.011764705882352941,C.q)
-D.blF=new A.u(1,0.8392156862745098,0.6392156862745098,0.3607843137254902,C.q)
+D.bi9=new A.u(0.3333333333333333,0.27058823529411763,0.10196078431372549,0.011764705882352941,C.q)
+D.blG=new A.u(1,0.8392156862745098,0.6392156862745098,0.3607843137254902,C.q)
 D.aiw=new A.u(1,0.043137254901960784,0.027450980392156862,0.09019607843137255,C.q)
-D.bwU=new A.mC(null,null,null,null,null,C.bU,null)
-D.bxl=new A.bb(13e5)
-D.bz7=new A.P(10,3,10,3)
-D.bzg=new A.P(10,8,10,12)
+D.bwV=new A.mB(null,null,null,null,null,C.bU,null)
+D.bxm=new A.bb(13e5)
+D.bz8=new A.P(10,3,10,3)
+D.bzh=new A.P(10,8,10,12)
 D.akE=new A.P(14,10,14,0)
-D.bAF=new A.P(16,0,16,14)
+D.bAG=new A.P(16,0,16,14)
 D.al6=new A.P(16,2,16,8)
-D.bE7=new A.P(4,4,4,8)
-D.bEI=new A.P(8,0,8,12)
-D.bFd=new A.P(0.8,0.8,0.8,0.8)
-D.bFe=new A.P(1.5,0,1.5,0)
-D.fJl=new A.y("LOWER",null,C.cz,null,null,null,null,null,null,null,null,null)
-D.bId=new A.qD(C.dz,C.A,C.f,D.fJl,null)
-D.fNE=new A.y("HIGHER",null,C.cz,null,null,null,null,null,null,null,null,null)
-D.bIf=new A.qD(C.dz,C.A,C.f,D.fNE,null)
-D.bMA=new A.a0(62843,"MaterialIcons",!0)
-D.bMC=new A.a0(62845,"MaterialIcons",!0)
+D.bE8=new A.P(4,4,4,8)
+D.bEJ=new A.P(8,0,8,12)
+D.bFe=new A.P(0.8,0.8,0.8,0.8)
+D.bFf=new A.P(1.5,0,1.5,0)
+D.fJp=new A.y("LOWER",null,C.cz,null,null,null,null,null,null,null,null,null)
+D.bIe=new A.qD(C.dz,C.A,C.f,D.fJp,null)
+D.fNI=new A.y("HIGHER",null,C.cz,null,null,null,null,null,null,null,null,null)
+D.bIg=new A.qD(C.dz,C.A,C.f,D.fNI,null)
+D.bMB=new A.a0(62843,"MaterialIcons",!0)
+D.bMD=new A.a0(62845,"MaterialIcons",!0)
 D.a1L=new A.a0(63276,"MaterialIcons",!1)
-D.bO0=new A.a0(63572,"MaterialIcons",!1)
-D.bPT=new A.ae(C.qr,null,null,null,null,null)
-D.bQy=new A.ae(C.wp,40,C.ac,null,null,null)
-D.bRc=new A.ae(C.apI,22,C.c,null,null,null)
-D.bSb=new A.ae(C.a1A,null,C.c,null,null,null)
-D.bSM=new A.ae(M.Ho,22,C.c,null,null,null)
-D.bSP=new A.ae(C.a1A,null,C.ac,null,null,null)
-D.bUA=new A.ae(M.Ho,36,C.bM,null,null,null)
-D.bZR=new A.ae(C.rH,null,null,null,null,null)
-D.c_0=new A.ae(A_.a1x,28,C.e9,null,null,null)
-D.bVJ=new A.ae(C.Ov,44,C.av,null,null,null)
-D.c0_=new A.BG(!0,D.bVJ,null)
+D.bO1=new A.a0(63572,"MaterialIcons",!1)
+D.bPU=new A.ae(C.qr,null,null,null,null,null)
+D.bQz=new A.ae(C.wq,40,C.ac,null,null,null)
+D.bRd=new A.ae(C.apI,22,C.c,null,null,null)
+D.bSc=new A.ae(C.a1A,null,C.c,null,null,null)
+D.bSN=new A.ae(M.Ho,22,C.c,null,null,null)
+D.bSQ=new A.ae(C.a1A,null,C.ac,null,null,null)
+D.bUB=new A.ae(M.Ho,36,C.bM,null,null,null)
+D.bZS=new A.ae(C.rH,null,null,null,null,null)
+D.c_1=new A.ae(A_.a1x,28,C.e9,null,null,null)
+D.bVK=new A.ae(C.Ov,44,C.av,null,null,null)
+D.c00=new A.BG(!0,D.bVK,null)
 D.axg=x([C.cp,C.bl],y.O)
-D.dtl=x([C.cT,C.be,C.ej],y.O)
-D.c4M=new A.a9(C.a5,C.a8,C.x,D.dtl,null,null)
-D.c4V=new A.a9(C.a5,C.a8,C.x,C.aB6,null,null)
+D.dtn=x([C.cT,C.be,C.ej],y.O)
+D.c4N=new A.a9(C.a5,C.a8,C.x,D.dtn,null,null)
+D.c4W=new A.a9(C.a5,C.a8,C.x,C.aB6,null,null)
 D.azM=x([C.jt,C.dv],y.O)
-D.deL=x([C.el,C.c0,C.nh],y.O)
-D.c5W=new A.a9(C.a5,C.a8,C.x,D.deL,null,null)
-D.c6b=new A.a9(C.a5,C.a8,C.x,C.a4u,null,null)
+D.deM=x([C.el,C.c0,C.nh],y.O)
+D.c5X=new A.a9(C.a5,C.a8,C.x,D.deM,null,null)
+D.c6c=new A.a9(C.a5,C.a8,C.x,C.a4u,null,null)
 D.bde=new A.u(0.6666666666666666,0.13333333333333333,0.7725490196078432,0.3686274509803922,C.q)
 D.b6R=new A.ac(0,C.G,D.bde,C.I,16)
-D.c78=x([D.b6R],y.V)
+D.c79=x([D.b6R],y.V)
 D.avZ=x([C.hd,C.bf,C.d3,C.bt],y.O)
-D.ckL=x([C.dG,C.bo],y.O)
+D.ckM=x([C.dG,C.bo],y.O)
 D.awC=x([0,0.45],y.u)
-D.eED=new A.z("The sun is a star.",!0)
-D.eMN=new A.z("Spiders have six legs.",!1)
-D.eM4=new A.z("Water boils at 100 \xb0C at sea level.",!0)
-D.eSI=new A.z("The Pacific is the largest ocean.",!0)
-D.eHy=new A.z("Bats are blind.",!1)
-D.eCk=new A.z("A year has 52 weeks.",!0)
-D.eUI=new A.z("Penguins can fly.",!1)
-D.exd=new A.z("Light travels faster than sound.",!0)
-D.eEl=new A.z("The moon has its own light.",!1)
-D.eAv=new A.z("Humans have 206 bones as adults.",!0)
-D.eR1=new A.z("Mount Everest is the tallest mountain above sea level.",!0)
-D.eD6=new A.z("A triangle has four sides.",!1)
-D.eRo=new A.z("Honey never really spoils.",!0)
-D.exk=new A.z("Diamonds are made of carbon.",!0)
-D.eOG=new A.z("The heart has three chambers.",!1)
-D.eID=new A.z("Africa is a country.",!1)
-D.eKj=new A.z("Octopuses have three hearts.",!0)
-D.eHO=new A.z("Ice is heavier than the same amount of water.",!1)
-D.eEp=new A.z("Plants take in carbon dioxide.",!0)
-D.eO7=new A.z("A leap year has 366 days.",!0)
-D.eEI=new A.z("Lightning never strikes the same place twice.",!1)
-D.eQw=new A.z("Sharks are mammals.",!1)
-D.eCl=new A.z("Venus is the hottest planet.",!0)
-D.eLZ=new A.z("There are 7 continents.",!0)
-D.eRs=new A.z("The Great Wall is visible from the Moon with bare eyes.",!1)
-D.eKy=new A.z("Bananas grow on trees.",!1)
-D.eCz=new A.z("Sound can travel through space.",!1)
-D.eGz=new A.z("The human body is mostly water.",!0)
-D.eOl=new A.z("Gold is a liquid at room temperature.",!1)
-D.eEa=new A.z("A dozen is 12.",!0)
-D.eTZ=new A.z("Cows have four stomach compartments.",!0)
-D.eAY=new A.z("The Sahara is the largest hot desert.",!0)
-D.eNA=new A.z("Antarctica is the driest continent.",!0)
-D.eRa=new A.z("Goldfish only remember for 3 seconds.",!1)
-D.eCe=new A.z("Kangaroos can walk backwards easily.",!1)
-D.eN3=new A.z("Saturn has rings.",!0)
-D.eM1=new A.z("Mars is called the Red Planet.",!0)
-D.eVf=new A.z("Jupiter is the smallest planet.",!1)
-D.eK0=new A.z("The Earth takes about 365 days to go around the sun.",!0)
-D.eBy=new A.z("The moon is bigger than the Earth.",!1)
-D.eO_=new A.z("Mercury is the closest planet to the sun.",!0)
-D.eTD=new A.z("There are eight planets in our solar system.",!0)
-D.eDE=new A.z("Neptune is closer to the sun than Earth.",!1)
-D.eLj=new A.z("A day on Venus is longer than a year on Venus.",!0)
-D.eQ8=new A.z("The sun rises in the west.",!1)
-D.eDX=new A.z("Astronauts float in space because there is no gravity at all.",!1)
-D.eRz=new A.z("The Milky Way is a galaxy.",!0)
-D.eJM=new A.z("Pluto is classified as a dwarf planet.",!0)
-D.exu=new A.z("Uranus spins on its side.",!0)
-D.eUR=new A.z("Comets are made of ice, dust and rock.",!0)
-D.eQV=new A.z("The first person on the moon was Neil Armstrong.",!0)
-D.ex_=new A.z("Stars are closer to Earth than the moon.",!1)
-D.eSi=new A.z("Jupiter has a giant storm called the Great Red Spot.",!0)
-D.exf=new A.z("Earth has two moons.",!1)
-D.eQ9=new A.z("The sun is mostly made of hydrogen and helium.",!0)
-D.eHW=new A.z("A light year measures time.",!1)
-D.eBu=new A.z("Adults have 32 teeth.",!0)
-D.eSC=new A.z("The human heart is about the size of a fist.",!0)
-D.eGe=new A.z("Blood is blue inside the body.",!1)
-D.exl=new A.z("The skin is the largest organ of the body.",!0)
-D.eFQ=new A.z("Humans have five senses only, with no exceptions.",!1)
-D.ew4=new A.z("The femur is the longest bone in the body.",!0)
-D.eTd=new A.z("Humans use only 10 percent of their brain.",!1)
-D.eO9=new A.z("The stomach helps to digest food.",!0)
-D.ezE=new A.z("Your nails keep growing slowly all your life.",!0)
-D.eKb=new A.z("The lungs help us to breathe.",!0)
-D.eOD=new A.z("Humans have four kidneys.",!1)
-D.eC_=new A.z("The smallest bones in the body are in the ear.",!0)
-D.eTC=new A.z("A baby has fewer bones than an adult.",!1)
-D.eOm=new A.z("Red blood cells carry oxygen.",!0)
-D.eDU=new A.z("The brain is part of the digestive system.",!1)
-D.eFP=new A.z("Vitamin C is found in oranges.",!0)
-D.eET=new A.z("Muscles move the bones.",!0)
-D.eIL=new A.z("The human body has about five liters of blood.",!0)
-D.eR6=new A.z("Hair is alive once it has grown out of the skin.",!1)
-D.eJQ=new A.z("A group of lions is called a pride.",!0)
-D.eOY=new A.z("Dolphins are fish.",!1)
-D.eJS=new A.z("Elephants are the largest land animals.",!0)
-D.eS0=new A.z("Cheetahs are the fastest land animals.",!0)
-D.eJ3=new A.z("Frogs are reptiles.",!1)
-D.eL2=new A.z("Bees make honey.",!0)
-D.ewF=new A.z("A spider is an insect.",!1)
-D.eJs=new A.z("Whales breathe air.",!0)
-D.eKe=new A.z("Snakes have eyelids.",!1)
-D.eEG=new A.z("Penguins live at the North Pole.",!1)
-D.eMe=new A.z("Owls can turn their heads almost all the way around.",!0)
-D.eQE=new A.z("Camels store water in their humps.",!1)
-D.eJI=new A.z("A baby kangaroo is called a joey.",!0)
-D.eJc=new A.z("Butterflies start life as caterpillars.",!0)
-D.eLi=new A.z("Ostriches bury their heads in the sand.",!1)
-D.eN4=new A.z("Crocodiles are reptiles.",!0)
-D.eDq=new A.z("A shark has bones.",!1)
-D.eNj=new A.z("Giraffes have the same number of neck bones as humans.",!0)
-D.eC8=new A.z("Ants can lift many times their own weight.",!0)
-D.eEu=new A.z("Bats are birds.",!1)
-D.eRW=new A.z("Horses sleep standing up.",!0)
-D.eFH=new A.z("Turtles can leave their shells.",!1)
-D.eHz=new A.z("Hummingbirds can fly backwards.",!0)
-D.exN=new A.z("A cat has nine lives.",!1)
-D.eQs=new A.z("Cows give milk only after having a calf.",!0)
-D.eEC=new A.z("The blue whale is the largest animal ever known.",!0)
-D.eI6=new A.z("Rabbits are rodents.",!1)
-D.eDn=new A.z("Spiders make silk.",!0)
-D.eKn=new A.z("Koalas are bears.",!1)
-D.eEQ=new A.z("Salmon swim up rivers to lay eggs.",!0)
-D.eLk=new A.z("The Nile is in Africa.",!0)
-D.eRT=new A.z("Australia is both a country and a continent.",!0)
-D.ePV=new A.z("Canada is south of the United States.",!1)
-D.eNS=new A.z("The capital of France is Paris.",!0)
-D.eEF=new A.z("The Amazon rainforest is in South America.",!0)
-D.eJ9=new A.z("Russia is the largest country in the world.",!0)
-D.exx=new A.z("The Atlantic Ocean lies between Africa and South America.",!0)
-D.eD7=new A.z("Mount Kilimanjaro is in Kenya.",!1)
-D.eL1=new A.z("Tokyo is the capital of Japan.",!0)
-D.eFS=new A.z("The equator runs through Africa.",!0)
-D.eQF=new A.z("Greenland is the largest island in the world.",!0)
-D.eO2=new A.z("There are 50 states in the United States.",!0)
-D.eIk=new A.z("The Sahara is in Asia.",!1)
-D.eJW=new A.z("Brazil speaks Portuguese.",!0)
-D.ezO=new A.z("Egypt is famous for its pyramids.",!0)
-D.eB1=new A.z("Lake Victoria is in Africa.",!0)
-D.eBO=new A.z("India is the biggest country in Europe.",!1)
-D.eNq=new A.z("The Dead Sea is very salty.",!0)
-D.eTN=new A.z("Vatican City is the smallest country in the world.",!0)
-D.ew8=new A.z("Mount Everest is in Africa.",!1)
-D.eF8=new A.z("The Mediterranean Sea touches Europe, Asia and Africa.",!0)
-D.eUU=new A.z("Cairo is the capital of Egypt.",!0)
-D.eUw=new A.z("Antarctica has no permanent cities.",!0)
-D.eAa=new A.z("Peru is in North America.",!1)
-D.eBF=new A.z("Water is made of hydrogen and oxygen.",!0)
-D.eSs=new A.z("Sound travels faster than light.",!1)
-D.eGb=new A.z("Metal expands when it is heated.",!0)
-D.eM7=new A.z("Plants make food using sunlight.",!0)
-D.eJ6=new A.z("The chemical symbol for gold is Au.",!0)
-D.eKF=new A.z("Oxygen is a metal.",!1)
-D.eQI=new A.z("Magnets attract wood.",!1)
-D.eBK=new A.z("The human eye can see all colours in the dark.",!1)
-D.eTY=new A.z("Ice melts at 0 \xb0C.",!0)
-D.eU2=new A.z("A rainbow is made of seven main colours.",!0)
-D.eCf=new A.z("Electricity can travel through copper.",!0)
-D.eOz=new A.z("Rubber is a good conductor of electricity.",!1)
-D.eAo=new A.z("The chemical symbol for water is H2O.",!0)
-D.eL8=new A.z("Sugar dissolves in water.",!0)
-D.eOO=new A.z("Glass is made from sand.",!0)
-D.eS5=new A.z("Fire needs oxygen to burn.",!0)
-D.eHb=new A.z("Salt water freezes at exactly the same temperature as fresh water.",!1)
-D.eDO=new A.z("A thermometer measures temperature.",!0)
-D.eLo=new A.z("Echoes are caused by sound bouncing back.",!0)
-D.eFG=new A.z("Iron rusts when it meets water and air.",!0)
-D.eHk=new A.z("The Earth is flat.",!1)
-D.ezm=new A.z("Gravity pulls things towards the Earth.",!0)
-D.eKA=new A.z("Hot air rises.",!0)
-D.eEx=new A.z("A vacuum has air in it.",!1)
-D.ey0=new A.z("Helium is lighter than air.",!0)
-D.eQS=new A.z("Mushrooms are plants.",!1)
-D.eLz=new A.z("A rainbow can be seen when the sun shines through rain.",!0)
-D.eH9=new A.z("The Arctic is around the North Pole.",!0)
-D.eI9=new A.z("A spider web is made of silk.",!0)
-D.eGQ=new A.z("A whale is the same as a fish.",!1)
-D.eDg=new A.z("The Earth spins once every 24 hours.",!0)
-D.eUH=new A.z("The heart pumps blood around the body.",!0)
-D.eCg=new A.z("Bananas are berries.",!0)
-D.eU0=new A.z("Strawberries are not berries in the botanical sense.",!0)
-D.eN1=new A.z("Cats can see in complete darkness.",!1)
-D.eLh=new A.z("A leap year happens every four years, with some exceptions.",!0)
-D.eIj=new A.z("Bees can only sting once and always die afterwards.",!1)
-D.eRI=new A.z("Dogs sweat mainly through their paws and by panting.",!0)
-D.eMr=new A.z("Fish breathe through gills.",!0)
-D.eTf=new A.z("All insects have six legs.",!0)
-D.eOe=new A.z("Plastic comes from oil.",!0)
-D.ewZ=new A.z("Lightning is hotter than the surface of the sun.",!0)
-D.eRr=new A.z("The pyramids of Giza are in Egypt.",!0)
-D.exZ=new A.z("Christopher Columbus sailed in 1492.",!0)
-D.eUa=new A.z("The Titanic sank in the Atlantic Ocean.",!0)
-D.eLg=new A.z("Nelson Mandela was president of South Africa.",!0)
-D.eBE=new A.z("The first president of the United States was George Washington.",!0)
-D.eJD=new A.z("World War Two ended in 1945.",!0)
-D.eGR=new A.z("The Olympic Games began in ancient Greece.",!0)
-D.eAW=new A.z("The Roman Empire was based in Rome.",!0)
-D.eLV=new A.z('Martin Luther King Jr. gave the speech "I Have a Dream".',!0)
-D.eJP=new A.z("The printing press was invented in the 20th century.",!1)
-D.eCs=new A.z("Cleopatra was a ruler of Egypt.",!0)
-D.eGO=new A.z("The Berlin Wall fell in 1989.",!0)
-D.eBT=new A.z("The Statue of Liberty was a gift from France.",!0)
-D.eQa=new A.z("Vikings came from Scandinavia.",!0)
-D.eJB=new A.z("Mahatma Gandhi led India with violence.",!1)
-D.eQG=new A.z("The Wright brothers built the first successful airplane.",!0)
-D.eRx=new A.z("Dinosaurs and humans lived at the same time.",!1)
-D.eNG=new A.z("The Great Fire of London was in 1666.",!0)
-D.eFc=new A.z("Julius Caesar was a Roman leader.",!0)
-D.eKt=new A.z("Barack Obama was the 44th president of the United States.",!0)
-D.eFT=new A.z("Kenya became independent from Britain in 1963.",!0)
-D.eSF=new A.z("Tanzania was formed by the union of Tanganyika and Zanzibar.",!0)
-D.eFC=new A.z("The Mona Lisa was painted by Leonardo da Vinci.",!0)
-D.eHo=new A.z("Albert Einstein developed the theory of relativity.",!0)
-D.eBA=new A.z("The Eiffel Tower is in Italy.",!1)
-D.exO=new A.z("Tomatoes are botanically a fruit.",!0)
-D.eTq=new A.z("Rice is a type of grass seed.",!0)
-D.eJp=new A.z("Honey is made by bees from nectar.",!0)
-D.eKS=new A.z("Chocolate comes from cocoa beans.",!0)
-D.eBs=new A.z("Peanuts grow underground.",!0)
-D.exU=new A.z("Coffee comes from beans on a plant.",!0)
-D.ezy=new A.z("Bread needs yeast to rise in most recipes.",!0)
-D.eEO=new A.z("Milk comes from cows, goats and other animals.",!0)
-D.eDZ=new A.z("Potatoes grow on trees.",!1)
-D.eIz=new A.z("A pizza was first made in Italy.",!0)
-D.eEH=new A.z("Eggs come from chickens and other birds.",!0)
-D.eDe=new A.z("Cheese is made from milk.",!0)
-D.eIe=new A.z("Vinegar tastes sweet.",!1)
-D.eL9=new A.z("Pineapples grow on trees.",!1)
-D.eB2=new A.z("A week has seven days.",!0)
-D.eKT=new A.z("There are 60 minutes in an hour.",!0)
-D.eIA=new A.z("There are 100 centimeters in a meter.",!0)
-D.eIQ=new A.z("A kilogram is heavier than a pound.",!0)
-D.eI_=new A.z("There are 24 hours in a day.",!0)
-D.eV5=new A.z("A square has five sides.",!1)
-D.eES=new A.z("The number zero is even.",!0)
-D.eJv=new A.z("Seven is an even number.",!1)
-D.exz=new A.z("A right angle is 90 degrees.",!0)
-D.eDl=new A.z("A circle has corners.",!1)
-D.eDv=new A.z("The number one is a prime number.",!1)
-D.eOZ=new A.z("Two is the only even prime number.",!0)
-D.eHV=new A.z("A hexagon has six sides.",!0)
-D.eIa=new A.z("A quarter is one half.",!1)
-D.eLn=new A.z("Ten tens make a hundred.",!0)
-D.eG4=new A.z("A soccer team has eleven players on the field.",!0)
-D.eBM=new A.z("A basketball hoop is ten feet high.",!0)
-D.eKB=new A.z("Tennis is played on a court.",!0)
-D.ezL=new A.z("The Olympic Games take place every four years.",!0)
-D.eEM=new A.z("A marathon is about 42 kilometers.",!0)
-D.eGy=new A.z("Golf is played with a bat.",!1)
-D.eBj=new A.z("A piano has 88 keys.",!0)
-D.eMI=new A.z("A guitar normally has six strings.",!0)
-D.eMR=new A.z("A violin is a wind instrument.",!1)
-D.eNk=new A.z("A rugby ball is round like a soccer ball.",!1)
-D.eUE=new A.z("Swimming is an Olympic sport.",!0)
-D.eMM=new A.z("There are five rings on the Olympic flag.",!0)
-D.eKC=new A.z("A baseball team has nine players on the field.",!0)
-D.eMT=new A.z("The drum is a percussion instrument.",!0)
-D.eSl=new A.z("English is written from right to left.",!1)
-D.eVp=new A.z("Swahili is spoken in East Africa.",!0)
-D.eBR=new A.z("Arabic is written from right to left.",!0)
-D.eOr=new A.z("A noun is a describing word.",!1)
-D.eEJ=new A.z("A verb is an action word.",!0)
-D.eFx=new A.z("There are 26 letters in the English alphabet.",!0)
-D.eCI=new A.z("A computer mouse has a tail on every model.",!1)
-D.exe=new A.z("Wi-Fi lets devices connect to the internet without a cable.",!0)
-D.evG=new A.z("The first website was created in the 21st century.",!1)
-D.eKR=new A.z("A smartphone can take photos.",!0)
-D.eTO=new A.z("A byte has eight bits.",!0)
-D.eRQ=new A.z("USB stands for Universal Serial Bus.",!0)
-D.eRL=new A.z("Email was invented before the telephone.",!1)
-D.eSd=new A.z("A password should be shared with friends.",!1)
-D.eSx=new A.z("A pixel is a tiny dot on a screen.",!0)
-D.eRm=new A.z("GPS uses satellites.",!0)
-D.eP3=new A.z("A robot can only be a toy.",!1)
-D.eNu=new A.z("Bluetooth is a short-range wireless technology.",!0)
-D.eOW=new A.z("A laptop battery stores electrical energy.",!0)
-D.eB3=new A.z("Solar panels turn sunlight into electricity.",!0)
-D.eLC=new A.z("A keyboard is an input device.",!0)
-D.eFt=new A.z("A monitor is an input device only.",!1)
-D.eUd=new A.z("The cloud is made of real clouds.",!1)
-D.eKU=new A.z("HTML is used to build web pages.",!0)
-D.eMj=new A.z("Binary uses only the digits 0 and 1.",!0)
-D.eBa=new A.z("A virus on a computer can be a program.",!0)
-D.eHG=new A.z("Rain comes from clouds.",!0)
-D.eHv=new A.z("Snow is frozen water.",!0)
-D.eRh=new A.z("The rainforest has very few species.",!1)
-D.eLc=new A.z("A tornado is a spinning column of air.",!0)
-D.eEd=new A.z("Thunder comes after lightning.",!0)
-D.eUA=new A.z("Deserts are always hot.",!1)
-D.eIp=new A.z("Trees give us oxygen.",!0)
-D.eCV=new A.z("A volcano can erupt lava.",!0)
-D.eBP=new A.z("Coral reefs are made by tiny animals.",!0)
-D.eFa=new A.z("Rivers flow from the sea to the mountains.",!1)
-D.eCy=new A.z("The ozone layer protects us from some of the sun's rays.",!0)
-D.ewT=new A.z("A hurricane forms over warm ocean water.",!0)
-D.eNx=new A.z("Fog is a cloud near the ground.",!0)
-D.eQO=new A.z("The Amazon is the longest river in Africa.",!1)
-D.eFb=new A.z("Leaves are usually green because of chlorophyll.",!0)
-D.eQo=new A.z("A seed grows into a plant.",!0)
-D.eKI=new A.z("Bamboo is a type of grass.",!0)
-D.ewU=new A.z("A cactus stores water.",!0)
-D.eA2=new A.z("Earthquakes happen when plates under the ground move.",!0)
-D.eJl=new A.z("Glaciers are rivers of ice.",!0)
-D.eR7=new A.z("A dollar is worth one hundred cents.",!0)
-D.eD3=new A.z("Saving money means spending it all right away.",!1)
-D.eI5=new A.z("A bank can keep your money safe.",!0)
-D.eDR=new A.z("Interest is money paid for borrowing or earned for saving.",!0)
-D.eLl=new A.z("A budget is a plan for how to use money.",!0)
-D.eOA=new A.z("Profit is what is left after paying costs.",!0)
-D.eTV=new A.z("A coupon always makes a product more expensive.",!1)
-D.eBv=new A.z("A receipt is proof of a payment.",!0)
-D.eDw=new A.z("Income is the money you earn.",!0)
-D.eUO=new A.z("A loan has to be paid back.",!0)
-D.eHI=new A.z("Inflation means prices usually go up over time.",!0)
-D.eLM=new A.z("A shop that sells goods is called a retailer.",!0)
-D.eNI=new A.z("An investment can lose value.",!0)
-D.eKW=new A.z("A debit card spends money you do not have yet.",!1)
-D.eFY=new A.z("A tip is an extra payment for good service.",!0)
-D.crH=x([D.eED,D.eMN,D.eM4,D.eSI,D.eHy,D.eCk,D.eUI,D.exd,D.eEl,D.eAv,D.eR1,D.eD6,D.eRo,D.exk,D.eOG,D.eID,D.eKj,D.eHO,D.eEp,D.eO7,D.eEI,D.eQw,D.eCl,D.eLZ,D.eRs,D.eKy,D.eCz,D.eGz,D.eOl,D.eEa,D.eTZ,D.eAY,D.eNA,D.eRa,D.eCe,D.eN3,D.eM1,D.eVf,D.eK0,D.eBy,D.eO_,D.eTD,D.eDE,D.eLj,D.eQ8,D.eDX,D.eRz,D.eJM,D.exu,D.eUR,D.eQV,D.ex_,D.eSi,D.exf,D.eQ9,D.eHW,D.eBu,D.eSC,D.eGe,D.exl,D.eFQ,D.ew4,D.eTd,D.eO9,D.ezE,D.eKb,D.eOD,D.eC_,D.eTC,D.eOm,D.eDU,D.eFP,D.eET,D.eIL,D.eR6,D.eJQ,D.eOY,D.eJS,D.eS0,D.eJ3,D.eL2,D.ewF,D.eJs,D.eKe,D.eEG,D.eMe,D.eQE,D.eJI,D.eJc,D.eLi,D.eN4,D.eDq,D.eNj,D.eC8,D.eEu,D.eRW,D.eFH,D.eHz,D.exN,D.eQs,D.eEC,D.eI6,D.eDn,D.eKn,D.eEQ,D.eLk,D.eRT,D.ePV,D.eNS,D.eEF,D.eJ9,D.exx,D.eD7,D.eL1,D.eFS,D.eQF,D.eO2,D.eIk,D.eJW,D.ezO,D.eB1,D.eBO,D.eNq,D.eTN,D.ew8,D.eF8,D.eUU,D.eUw,D.eAa,D.eBF,D.eSs,D.eGb,D.eM7,D.eJ6,D.eKF,D.eQI,D.eBK,D.eTY,D.eU2,D.eCf,D.eOz,D.eAo,D.eL8,D.eOO,D.eS5,D.eHb,D.eDO,D.eLo,D.eFG,D.eHk,D.ezm,D.eKA,D.eEx,D.ey0,D.eQS,D.eLz,D.eH9,D.eI9,D.eGQ,D.eDg,D.eUH,D.eCg,D.eU0,D.eN1,D.eLh,D.eIj,D.eRI,D.eMr,D.eTf,D.eOe,D.ewZ,D.eRr,D.exZ,D.eUa,D.eLg,D.eBE,D.eJD,D.eGR,D.eAW,D.eLV,D.eJP,D.eCs,D.eGO,D.eBT,D.eQa,D.eJB,D.eQG,D.eRx,D.eNG,D.eFc,D.eKt,D.eFT,D.eSF,D.eFC,D.eHo,D.eBA,D.exO,D.eTq,D.eJp,D.eKS,D.eBs,D.exU,D.ezy,D.eEO,D.eDZ,D.eIz,D.eEH,D.eDe,D.eIe,D.eL9,D.eB2,D.eKT,D.eIA,D.eIQ,D.eI_,D.eV5,D.eES,D.eJv,D.exz,D.eDl,D.eDv,D.eOZ,D.eHV,D.eIa,D.eLn,D.eG4,D.eBM,D.eKB,D.ezL,D.eEM,D.eGy,D.eBj,D.eMI,D.eMR,D.eNk,D.eUE,D.eMM,D.eKC,D.eMT,D.eSl,D.eVp,D.eBR,D.eOr,D.eEJ,D.eFx,D.eCI,D.exe,D.evG,D.eKR,D.eTO,D.eRQ,D.eRL,D.eSd,D.eSx,D.eRm,D.eP3,D.eNu,D.eOW,D.eB3,D.eLC,D.eFt,D.eUd,D.eKU,D.eMj,D.eBa,D.eHG,D.eHv,D.eRh,D.eLc,D.eEd,D.eUA,D.eIp,D.eCV,D.eBP,D.eFa,D.eCy,D.ewT,D.eNx,D.eQO,D.eFb,D.eQo,D.eKI,D.ewU,D.eA2,D.eJl,D.eR7,D.eD3,D.eI5,D.eDR,D.eLl,D.eOA,D.eTV,D.eBv,D.eDw,D.eUO,D.eHI,D.eLM,D.eNI,D.eKW,D.eFY],A.at("O<+(n,R)>"))
+D.eEG=new A.z("The sun is a star.",!0)
+D.eMQ=new A.z("Spiders have six legs.",!1)
+D.eM7=new A.z("Water boils at 100 \xb0C at sea level.",!0)
+D.eSM=new A.z("The Pacific is the largest ocean.",!0)
+D.eHB=new A.z("Bats are blind.",!1)
+D.eCn=new A.z("A year has 52 weeks.",!0)
+D.eUM=new A.z("Penguins can fly.",!1)
+D.exg=new A.z("Light travels faster than sound.",!0)
+D.eEo=new A.z("The moon has its own light.",!1)
+D.eAy=new A.z("Humans have 206 bones as adults.",!0)
+D.eR5=new A.z("Mount Everest is the tallest mountain above sea level.",!0)
+D.eD9=new A.z("A triangle has four sides.",!1)
+D.eRs=new A.z("Honey never really spoils.",!0)
+D.exn=new A.z("Diamonds are made of carbon.",!0)
+D.eOJ=new A.z("The heart has three chambers.",!1)
+D.eIG=new A.z("Africa is a country.",!1)
+D.eKm=new A.z("Octopuses have three hearts.",!0)
+D.eHR=new A.z("Ice is heavier than the same amount of water.",!1)
+D.eEs=new A.z("Plants take in carbon dioxide.",!0)
+D.eOa=new A.z("A leap year has 366 days.",!0)
+D.eEL=new A.z("Lightning never strikes the same place twice.",!1)
+D.eQA=new A.z("Sharks are mammals.",!1)
+D.eCo=new A.z("Venus is the hottest planet.",!0)
+D.eM1=new A.z("There are 7 continents.",!0)
+D.eRw=new A.z("The Great Wall is visible from the Moon with bare eyes.",!1)
+D.eKB=new A.z("Bananas grow on trees.",!1)
+D.eCC=new A.z("Sound can travel through space.",!1)
+D.eGC=new A.z("The human body is mostly water.",!0)
+D.eOo=new A.z("Gold is a liquid at room temperature.",!1)
+D.eEd=new A.z("A dozen is 12.",!0)
+D.eU2=new A.z("Cows have four stomach compartments.",!0)
+D.eB0=new A.z("The Sahara is the largest hot desert.",!0)
+D.eND=new A.z("Antarctica is the driest continent.",!0)
+D.eRe=new A.z("Goldfish only remember for 3 seconds.",!1)
+D.eCh=new A.z("Kangaroos can walk backwards easily.",!1)
+D.eN6=new A.z("Saturn has rings.",!0)
+D.eM4=new A.z("Mars is called the Red Planet.",!0)
+D.eVj=new A.z("Jupiter is the smallest planet.",!1)
+D.eK3=new A.z("The Earth takes about 365 days to go around the sun.",!0)
+D.eBB=new A.z("The moon is bigger than the Earth.",!1)
+D.eO2=new A.z("Mercury is the closest planet to the sun.",!0)
+D.eTH=new A.z("There are eight planets in our solar system.",!0)
+D.eDH=new A.z("Neptune is closer to the sun than Earth.",!1)
+D.eLm=new A.z("A day on Venus is longer than a year on Venus.",!0)
+D.eQc=new A.z("The sun rises in the west.",!1)
+D.eE_=new A.z("Astronauts float in space because there is no gravity at all.",!1)
+D.eRD=new A.z("The Milky Way is a galaxy.",!0)
+D.eJP=new A.z("Pluto is classified as a dwarf planet.",!0)
+D.exx=new A.z("Uranus spins on its side.",!0)
+D.eUV=new A.z("Comets are made of ice, dust and rock.",!0)
+D.eQZ=new A.z("The first person on the moon was Neil Armstrong.",!0)
+D.ex2=new A.z("Stars are closer to Earth than the moon.",!1)
+D.eSm=new A.z("Jupiter has a giant storm called the Great Red Spot.",!0)
+D.exi=new A.z("Earth has two moons.",!1)
+D.eQd=new A.z("The sun is mostly made of hydrogen and helium.",!0)
+D.eHZ=new A.z("A light year measures time.",!1)
+D.eBx=new A.z("Adults have 32 teeth.",!0)
+D.eSG=new A.z("The human heart is about the size of a fist.",!0)
+D.eGh=new A.z("Blood is blue inside the body.",!1)
+D.exo=new A.z("The skin is the largest organ of the body.",!0)
+D.eFT=new A.z("Humans have five senses only, with no exceptions.",!1)
+D.ew6=new A.z("The femur is the longest bone in the body.",!0)
+D.eTh=new A.z("Humans use only 10 percent of their brain.",!1)
+D.eOc=new A.z("The stomach helps to digest food.",!0)
+D.ezH=new A.z("Your nails keep growing slowly all your life.",!0)
+D.eKe=new A.z("The lungs help us to breathe.",!0)
+D.eOG=new A.z("Humans have four kidneys.",!1)
+D.eC2=new A.z("The smallest bones in the body are in the ear.",!0)
+D.eTG=new A.z("A baby has fewer bones than an adult.",!1)
+D.eOp=new A.z("Red blood cells carry oxygen.",!0)
+D.eDX=new A.z("The brain is part of the digestive system.",!1)
+D.eFS=new A.z("Vitamin C is found in oranges.",!0)
+D.eEW=new A.z("Muscles move the bones.",!0)
+D.eIO=new A.z("The human body has about five liters of blood.",!0)
+D.eRa=new A.z("Hair is alive once it has grown out of the skin.",!1)
+D.eJT=new A.z("A group of lions is called a pride.",!0)
+D.eP0=new A.z("Dolphins are fish.",!1)
+D.eJV=new A.z("Elephants are the largest land animals.",!0)
+D.eS4=new A.z("Cheetahs are the fastest land animals.",!0)
+D.eJ6=new A.z("Frogs are reptiles.",!1)
+D.eL5=new A.z("Bees make honey.",!0)
+D.ewH=new A.z("A spider is an insect.",!1)
+D.eJv=new A.z("Whales breathe air.",!0)
+D.eKh=new A.z("Snakes have eyelids.",!1)
+D.eEJ=new A.z("Penguins live at the North Pole.",!1)
+D.eMh=new A.z("Owls can turn their heads almost all the way around.",!0)
+D.eQI=new A.z("Camels store water in their humps.",!1)
+D.eJL=new A.z("A baby kangaroo is called a joey.",!0)
+D.eJf=new A.z("Butterflies start life as caterpillars.",!0)
+D.eLl=new A.z("Ostriches bury their heads in the sand.",!1)
+D.eN7=new A.z("Crocodiles are reptiles.",!0)
+D.eDt=new A.z("A shark has bones.",!1)
+D.eNm=new A.z("Giraffes have the same number of neck bones as humans.",!0)
+D.eCb=new A.z("Ants can lift many times their own weight.",!0)
+D.eEx=new A.z("Bats are birds.",!1)
+D.eS_=new A.z("Horses sleep standing up.",!0)
+D.eFK=new A.z("Turtles can leave their shells.",!1)
+D.eHC=new A.z("Hummingbirds can fly backwards.",!0)
+D.exQ=new A.z("A cat has nine lives.",!1)
+D.eQw=new A.z("Cows give milk only after having a calf.",!0)
+D.eEF=new A.z("The blue whale is the largest animal ever known.",!0)
+D.eI9=new A.z("Rabbits are rodents.",!1)
+D.eDq=new A.z("Spiders make silk.",!0)
+D.eKq=new A.z("Koalas are bears.",!1)
+D.eET=new A.z("Salmon swim up rivers to lay eggs.",!0)
+D.eLn=new A.z("The Nile is in Africa.",!0)
+D.eRX=new A.z("Australia is both a country and a continent.",!0)
+D.ePZ=new A.z("Canada is south of the United States.",!1)
+D.eNV=new A.z("The capital of France is Paris.",!0)
+D.eEI=new A.z("The Amazon rainforest is in South America.",!0)
+D.eJc=new A.z("Russia is the largest country in the world.",!0)
+D.exA=new A.z("The Atlantic Ocean lies between Africa and South America.",!0)
+D.eDa=new A.z("Mount Kilimanjaro is in Kenya.",!1)
+D.eL4=new A.z("Tokyo is the capital of Japan.",!0)
+D.eFV=new A.z("The equator runs through Africa.",!0)
+D.eQJ=new A.z("Greenland is the largest island in the world.",!0)
+D.eO5=new A.z("There are 50 states in the United States.",!0)
+D.eIn=new A.z("The Sahara is in Asia.",!1)
+D.eJZ=new A.z("Brazil speaks Portuguese.",!0)
+D.ezR=new A.z("Egypt is famous for its pyramids.",!0)
+D.eB4=new A.z("Lake Victoria is in Africa.",!0)
+D.eBR=new A.z("India is the biggest country in Europe.",!1)
+D.eNt=new A.z("The Dead Sea is very salty.",!0)
+D.eTR=new A.z("Vatican City is the smallest country in the world.",!0)
+D.ewa=new A.z("Mount Everest is in Africa.",!1)
+D.eFb=new A.z("The Mediterranean Sea touches Europe, Asia and Africa.",!0)
+D.eUY=new A.z("Cairo is the capital of Egypt.",!0)
+D.eUA=new A.z("Antarctica has no permanent cities.",!0)
+D.eAd=new A.z("Peru is in North America.",!1)
+D.eBI=new A.z("Water is made of hydrogen and oxygen.",!0)
+D.eSw=new A.z("Sound travels faster than light.",!1)
+D.eGe=new A.z("Metal expands when it is heated.",!0)
+D.eMa=new A.z("Plants make food using sunlight.",!0)
+D.eJ9=new A.z("The chemical symbol for gold is Au.",!0)
+D.eKI=new A.z("Oxygen is a metal.",!1)
+D.eQM=new A.z("Magnets attract wood.",!1)
+D.eBN=new A.z("The human eye can see all colours in the dark.",!1)
+D.eU1=new A.z("Ice melts at 0 \xb0C.",!0)
+D.eU6=new A.z("A rainbow is made of seven main colours.",!0)
+D.eCi=new A.z("Electricity can travel through copper.",!0)
+D.eOC=new A.z("Rubber is a good conductor of electricity.",!1)
+D.eAr=new A.z("The chemical symbol for water is H2O.",!0)
+D.eLb=new A.z("Sugar dissolves in water.",!0)
+D.eOR=new A.z("Glass is made from sand.",!0)
+D.eS9=new A.z("Fire needs oxygen to burn.",!0)
+D.eHe=new A.z("Salt water freezes at exactly the same temperature as fresh water.",!1)
+D.eDR=new A.z("A thermometer measures temperature.",!0)
+D.eLr=new A.z("Echoes are caused by sound bouncing back.",!0)
+D.eFJ=new A.z("Iron rusts when it meets water and air.",!0)
+D.eHn=new A.z("The Earth is flat.",!1)
+D.ezp=new A.z("Gravity pulls things towards the Earth.",!0)
+D.eKD=new A.z("Hot air rises.",!0)
+D.eEA=new A.z("A vacuum has air in it.",!1)
+D.ey3=new A.z("Helium is lighter than air.",!0)
+D.eQW=new A.z("Mushrooms are plants.",!1)
+D.eLC=new A.z("A rainbow can be seen when the sun shines through rain.",!0)
+D.eHc=new A.z("The Arctic is around the North Pole.",!0)
+D.eIc=new A.z("A spider web is made of silk.",!0)
+D.eGT=new A.z("A whale is the same as a fish.",!1)
+D.eDj=new A.z("The Earth spins once every 24 hours.",!0)
+D.eUL=new A.z("The heart pumps blood around the body.",!0)
+D.eCj=new A.z("Bananas are berries.",!0)
+D.eU4=new A.z("Strawberries are not berries in the botanical sense.",!0)
+D.eN4=new A.z("Cats can see in complete darkness.",!1)
+D.eLk=new A.z("A leap year happens every four years, with some exceptions.",!0)
+D.eIm=new A.z("Bees can only sting once and always die afterwards.",!1)
+D.eRM=new A.z("Dogs sweat mainly through their paws and by panting.",!0)
+D.eMu=new A.z("Fish breathe through gills.",!0)
+D.eTj=new A.z("All insects have six legs.",!0)
+D.eOh=new A.z("Plastic comes from oil.",!0)
+D.ex1=new A.z("Lightning is hotter than the surface of the sun.",!0)
+D.eRv=new A.z("The pyramids of Giza are in Egypt.",!0)
+D.ey1=new A.z("Christopher Columbus sailed in 1492.",!0)
+D.eUe=new A.z("The Titanic sank in the Atlantic Ocean.",!0)
+D.eLj=new A.z("Nelson Mandela was president of South Africa.",!0)
+D.eBH=new A.z("The first president of the United States was George Washington.",!0)
+D.eJG=new A.z("World War Two ended in 1945.",!0)
+D.eGU=new A.z("The Olympic Games began in ancient Greece.",!0)
+D.eAZ=new A.z("The Roman Empire was based in Rome.",!0)
+D.eLY=new A.z('Martin Luther King Jr. gave the speech "I Have a Dream".',!0)
+D.eJS=new A.z("The printing press was invented in the 20th century.",!1)
+D.eCv=new A.z("Cleopatra was a ruler of Egypt.",!0)
+D.eGR=new A.z("The Berlin Wall fell in 1989.",!0)
+D.eBW=new A.z("The Statue of Liberty was a gift from France.",!0)
+D.eQe=new A.z("Vikings came from Scandinavia.",!0)
+D.eJE=new A.z("Mahatma Gandhi led India with violence.",!1)
+D.eQK=new A.z("The Wright brothers built the first successful airplane.",!0)
+D.eRB=new A.z("Dinosaurs and humans lived at the same time.",!1)
+D.eNJ=new A.z("The Great Fire of London was in 1666.",!0)
+D.eFf=new A.z("Julius Caesar was a Roman leader.",!0)
+D.eKw=new A.z("Barack Obama was the 44th president of the United States.",!0)
+D.eFW=new A.z("Kenya became independent from Britain in 1963.",!0)
+D.eSJ=new A.z("Tanzania was formed by the union of Tanganyika and Zanzibar.",!0)
+D.eFF=new A.z("The Mona Lisa was painted by Leonardo da Vinci.",!0)
+D.eHr=new A.z("Albert Einstein developed the theory of relativity.",!0)
+D.eBD=new A.z("The Eiffel Tower is in Italy.",!1)
+D.exR=new A.z("Tomatoes are botanically a fruit.",!0)
+D.eTu=new A.z("Rice is a type of grass seed.",!0)
+D.eJs=new A.z("Honey is made by bees from nectar.",!0)
+D.eKV=new A.z("Chocolate comes from cocoa beans.",!0)
+D.eBv=new A.z("Peanuts grow underground.",!0)
+D.exX=new A.z("Coffee comes from beans on a plant.",!0)
+D.ezB=new A.z("Bread needs yeast to rise in most recipes.",!0)
+D.eER=new A.z("Milk comes from cows, goats and other animals.",!0)
+D.eE1=new A.z("Potatoes grow on trees.",!1)
+D.eIC=new A.z("A pizza was first made in Italy.",!0)
+D.eEK=new A.z("Eggs come from chickens and other birds.",!0)
+D.eDh=new A.z("Cheese is made from milk.",!0)
+D.eIh=new A.z("Vinegar tastes sweet.",!1)
+D.eLc=new A.z("Pineapples grow on trees.",!1)
+D.eB5=new A.z("A week has seven days.",!0)
+D.eKW=new A.z("There are 60 minutes in an hour.",!0)
+D.eID=new A.z("There are 100 centimeters in a meter.",!0)
+D.eIT=new A.z("A kilogram is heavier than a pound.",!0)
+D.eI2=new A.z("There are 24 hours in a day.",!0)
+D.eV9=new A.z("A square has five sides.",!1)
+D.eEV=new A.z("The number zero is even.",!0)
+D.eJy=new A.z("Seven is an even number.",!1)
+D.exC=new A.z("A right angle is 90 degrees.",!0)
+D.eDo=new A.z("A circle has corners.",!1)
+D.eDy=new A.z("The number one is a prime number.",!1)
+D.eP1=new A.z("Two is the only even prime number.",!0)
+D.eHY=new A.z("A hexagon has six sides.",!0)
+D.eId=new A.z("A quarter is one half.",!1)
+D.eLq=new A.z("Ten tens make a hundred.",!0)
+D.eG7=new A.z("A soccer team has eleven players on the field.",!0)
+D.eBP=new A.z("A basketball hoop is ten feet high.",!0)
+D.eKE=new A.z("Tennis is played on a court.",!0)
+D.ezO=new A.z("The Olympic Games take place every four years.",!0)
+D.eEP=new A.z("A marathon is about 42 kilometers.",!0)
+D.eGB=new A.z("Golf is played with a bat.",!1)
+D.eBm=new A.z("A piano has 88 keys.",!0)
+D.eML=new A.z("A guitar normally has six strings.",!0)
+D.eMU=new A.z("A violin is a wind instrument.",!1)
+D.eNn=new A.z("A rugby ball is round like a soccer ball.",!1)
+D.eUI=new A.z("Swimming is an Olympic sport.",!0)
+D.eMP=new A.z("There are five rings on the Olympic flag.",!0)
+D.eKF=new A.z("A baseball team has nine players on the field.",!0)
+D.eMW=new A.z("The drum is a percussion instrument.",!0)
+D.eSp=new A.z("English is written from right to left.",!1)
+D.eVt=new A.z("Swahili is spoken in East Africa.",!0)
+D.eBU=new A.z("Arabic is written from right to left.",!0)
+D.eOu=new A.z("A noun is a describing word.",!1)
+D.eEM=new A.z("A verb is an action word.",!0)
+D.eFA=new A.z("There are 26 letters in the English alphabet.",!0)
+D.eCL=new A.z("A computer mouse has a tail on every model.",!1)
+D.exh=new A.z("Wi-Fi lets devices connect to the internet without a cable.",!0)
+D.evI=new A.z("The first website was created in the 21st century.",!1)
+D.eKU=new A.z("A smartphone can take photos.",!0)
+D.eTS=new A.z("A byte has eight bits.",!0)
+D.eRU=new A.z("USB stands for Universal Serial Bus.",!0)
+D.eRP=new A.z("Email was invented before the telephone.",!1)
+D.eSh=new A.z("A password should be shared with friends.",!1)
+D.eSB=new A.z("A pixel is a tiny dot on a screen.",!0)
+D.eRq=new A.z("GPS uses satellites.",!0)
+D.eP6=new A.z("A robot can only be a toy.",!1)
+D.eNx=new A.z("Bluetooth is a short-range wireless technology.",!0)
+D.eOZ=new A.z("A laptop battery stores electrical energy.",!0)
+D.eB6=new A.z("Solar panels turn sunlight into electricity.",!0)
+D.eLF=new A.z("A keyboard is an input device.",!0)
+D.eFw=new A.z("A monitor is an input device only.",!1)
+D.eUh=new A.z("The cloud is made of real clouds.",!1)
+D.eKX=new A.z("HTML is used to build web pages.",!0)
+D.eMm=new A.z("Binary uses only the digits 0 and 1.",!0)
+D.eBd=new A.z("A virus on a computer can be a program.",!0)
+D.eHJ=new A.z("Rain comes from clouds.",!0)
+D.eHy=new A.z("Snow is frozen water.",!0)
+D.eRl=new A.z("The rainforest has very few species.",!1)
+D.eLf=new A.z("A tornado is a spinning column of air.",!0)
+D.eEg=new A.z("Thunder comes after lightning.",!0)
+D.eUE=new A.z("Deserts are always hot.",!1)
+D.eIs=new A.z("Trees give us oxygen.",!0)
+D.eCY=new A.z("A volcano can erupt lava.",!0)
+D.eBS=new A.z("Coral reefs are made by tiny animals.",!0)
+D.eFd=new A.z("Rivers flow from the sea to the mountains.",!1)
+D.eCB=new A.z("The ozone layer protects us from some of the sun's rays.",!0)
+D.ewW=new A.z("A hurricane forms over warm ocean water.",!0)
+D.eNA=new A.z("Fog is a cloud near the ground.",!0)
+D.eQS=new A.z("The Amazon is the longest river in Africa.",!1)
+D.eFe=new A.z("Leaves are usually green because of chlorophyll.",!0)
+D.eQs=new A.z("A seed grows into a plant.",!0)
+D.eKL=new A.z("Bamboo is a type of grass.",!0)
+D.ewX=new A.z("A cactus stores water.",!0)
+D.eA5=new A.z("Earthquakes happen when plates under the ground move.",!0)
+D.eJo=new A.z("Glaciers are rivers of ice.",!0)
+D.eRb=new A.z("A dollar is worth one hundred cents.",!0)
+D.eD6=new A.z("Saving money means spending it all right away.",!1)
+D.eI8=new A.z("A bank can keep your money safe.",!0)
+D.eDU=new A.z("Interest is money paid for borrowing or earned for saving.",!0)
+D.eLo=new A.z("A budget is a plan for how to use money.",!0)
+D.eOD=new A.z("Profit is what is left after paying costs.",!0)
+D.eTZ=new A.z("A coupon always makes a product more expensive.",!1)
+D.eBy=new A.z("A receipt is proof of a payment.",!0)
+D.eDz=new A.z("Income is the money you earn.",!0)
+D.eUS=new A.z("A loan has to be paid back.",!0)
+D.eHL=new A.z("Inflation means prices usually go up over time.",!0)
+D.eLP=new A.z("A shop that sells goods is called a retailer.",!0)
+D.eNL=new A.z("An investment can lose value.",!0)
+D.eKZ=new A.z("A debit card spends money you do not have yet.",!1)
+D.eG0=new A.z("A tip is an extra payment for good service.",!0)
+D.crI=x([D.eEG,D.eMQ,D.eM7,D.eSM,D.eHB,D.eCn,D.eUM,D.exg,D.eEo,D.eAy,D.eR5,D.eD9,D.eRs,D.exn,D.eOJ,D.eIG,D.eKm,D.eHR,D.eEs,D.eOa,D.eEL,D.eQA,D.eCo,D.eM1,D.eRw,D.eKB,D.eCC,D.eGC,D.eOo,D.eEd,D.eU2,D.eB0,D.eND,D.eRe,D.eCh,D.eN6,D.eM4,D.eVj,D.eK3,D.eBB,D.eO2,D.eTH,D.eDH,D.eLm,D.eQc,D.eE_,D.eRD,D.eJP,D.exx,D.eUV,D.eQZ,D.ex2,D.eSm,D.exi,D.eQd,D.eHZ,D.eBx,D.eSG,D.eGh,D.exo,D.eFT,D.ew6,D.eTh,D.eOc,D.ezH,D.eKe,D.eOG,D.eC2,D.eTG,D.eOp,D.eDX,D.eFS,D.eEW,D.eIO,D.eRa,D.eJT,D.eP0,D.eJV,D.eS4,D.eJ6,D.eL5,D.ewH,D.eJv,D.eKh,D.eEJ,D.eMh,D.eQI,D.eJL,D.eJf,D.eLl,D.eN7,D.eDt,D.eNm,D.eCb,D.eEx,D.eS_,D.eFK,D.eHC,D.exQ,D.eQw,D.eEF,D.eI9,D.eDq,D.eKq,D.eET,D.eLn,D.eRX,D.ePZ,D.eNV,D.eEI,D.eJc,D.exA,D.eDa,D.eL4,D.eFV,D.eQJ,D.eO5,D.eIn,D.eJZ,D.ezR,D.eB4,D.eBR,D.eNt,D.eTR,D.ewa,D.eFb,D.eUY,D.eUA,D.eAd,D.eBI,D.eSw,D.eGe,D.eMa,D.eJ9,D.eKI,D.eQM,D.eBN,D.eU1,D.eU6,D.eCi,D.eOC,D.eAr,D.eLb,D.eOR,D.eS9,D.eHe,D.eDR,D.eLr,D.eFJ,D.eHn,D.ezp,D.eKD,D.eEA,D.ey3,D.eQW,D.eLC,D.eHc,D.eIc,D.eGT,D.eDj,D.eUL,D.eCj,D.eU4,D.eN4,D.eLk,D.eIm,D.eRM,D.eMu,D.eTj,D.eOh,D.ex1,D.eRv,D.ey1,D.eUe,D.eLj,D.eBH,D.eJG,D.eGU,D.eAZ,D.eLY,D.eJS,D.eCv,D.eGR,D.eBW,D.eQe,D.eJE,D.eQK,D.eRB,D.eNJ,D.eFf,D.eKw,D.eFW,D.eSJ,D.eFF,D.eHr,D.eBD,D.exR,D.eTu,D.eJs,D.eKV,D.eBv,D.exX,D.ezB,D.eER,D.eE1,D.eIC,D.eEK,D.eDh,D.eIh,D.eLc,D.eB5,D.eKW,D.eID,D.eIT,D.eI2,D.eV9,D.eEV,D.eJy,D.exC,D.eDo,D.eDy,D.eP1,D.eHY,D.eId,D.eLq,D.eG7,D.eBP,D.eKE,D.ezO,D.eEP,D.eGB,D.eBm,D.eML,D.eMU,D.eNn,D.eUI,D.eMP,D.eKF,D.eMW,D.eSp,D.eVt,D.eBU,D.eOu,D.eEM,D.eFA,D.eCL,D.exh,D.evI,D.eKU,D.eTS,D.eRU,D.eRP,D.eSh,D.eSB,D.eRq,D.eP6,D.eNx,D.eOZ,D.eB6,D.eLF,D.eFw,D.eUh,D.eKX,D.eMm,D.eBd,D.eHJ,D.eHy,D.eRl,D.eLf,D.eEg,D.eUE,D.eIs,D.eCY,D.eBS,D.eFd,D.eCB,D.ewW,D.eNA,D.eQS,D.eFe,D.eQs,D.eKL,D.ewX,D.eA5,D.eJo,D.eRb,D.eD6,D.eI8,D.eDU,D.eLo,D.eOD,D.eTZ,D.eBy,D.eDz,D.eUS,D.eHL,D.eLP,D.eNL,D.eKZ,D.eG0],A.at("O<+(n,R)>"))
 D.axh=x(["\ud83c\udf5e","\ud83e\udd69","\ud83e\uddc0","\ud83e\udd6c","\ud83c\udf45","\ud83e\uddc5","\ud83e\udd53","\ud83c\udf54"],y.s)
-D.cIl=x([C.q7,C.dv],y.O)
-D.cIm=x([C.u_,C.pT],y.O)
+D.cIm=x([C.q7,C.dv],y.O)
+D.cIn=x([C.u_,C.pT],y.O)
 D.axQ=x([C.av,C.hW],y.O)
-D.dmT=x([C.A5,F.lp,H.JC,H.a8k],y.n)
-D.cLG=x([F.lp,G.qQ,E.wU,K.ve],y.n)
-D.dho=x([C.A5,G.qQ,E.wU,K.ve],y.n)
-D.cY7=x([H.JC,G.qQ,E.wU,K.ve],y.n)
-D.d5g=x([F.lp,H.JC,G.qQ,E.wU],y.n)
-D.ddN=x([C.A5,F.lp,E.wU,K.ve],y.n)
-D.cPm=x([D.dmT,E.aBN,D.cLG,D.dho,D.cY7,D.d5g,D.ddN],A.at("O<ai<+(G,G)>>"))
-D.cPC=x([C.mB,C.bM],y.O)
+D.dmV=x([C.A5,F.lp,H.JC,H.a8k],y.n)
+D.cLH=x([F.lp,G.qQ,E.wU,K.vf],y.n)
+D.dhp=x([C.A5,G.qQ,E.wU,K.vf],y.n)
+D.cY8=x([H.JC,G.qQ,E.wU,K.vf],y.n)
+D.d5h=x([F.lp,H.JC,G.qQ,E.wU],y.n)
+D.ddO=x([C.A5,F.lp,E.wU,K.vf],y.n)
+D.cPn=x([D.dmV,E.aBN,D.cLH,D.dhp,D.cY8,D.d5h,D.ddO],A.at("O<ai<+(G,G)>>"))
+D.cPD=x([C.mB,C.bM],y.O)
 D.b7t=new A.ac(0,C.G,C.dL,C.I,12)
-D.cTR=x([D.b7t],y.V)
-D.cX6=x([C.dv,C.Ya],y.O)
+D.cTS=x([D.b7t],y.V)
+D.cX7=x([C.dv,C.Ya],y.O)
 D.b77=new A.ac(0,C.G,C.hx,C.en,4)
-D.cX7=x([D.b77],y.V)
-D.eYd=new A.b7(C.km,-1,0)
-D.eYN=new A.b7(C.rH,0,-1)
-D.eWh=new A.b7(C.qr,0,1)
-D.eWL=new A.b7(C.jB,1,0)
-D.cXz=x([D.eYd,D.eYN,D.eWh,D.eWL],A.at("O<+(a0,G,G)>"))
-D.cY3=x([C.hj,C.hj],y.O)
-D.cYJ=x([C.hN,C.dP],y.O)
-D.f6J=new A.cW(C.w,C.I,12)
-D.cZF=x([D.f6J],y.r)
-D.bnP=new A.u(0.5333333333333333,0.9764705882352941,0.45098039215686275,0.08627450980392157,C.q)
-D.b75=new A.ac(0,C.G,D.bnP,C.I,10)
-D.d_U=x([D.b75],y.V)
-D.d0W=x([C.el,C.jO],y.O)
-D.eSg=new A.z("\ud83c\uddfa\ud83c\uddf8","United States")
-D.eKX=new A.z("\ud83c\udde8\ud83c\udde6","Canada")
-D.eOk=new A.z("\ud83c\uddf2\ud83c\uddfd","Mexico")
-D.eFj=new A.z("\ud83c\udde7\ud83c\uddf7","Brazil")
-D.eQc=new A.z("\ud83c\uddec\ud83c\udde7","United Kingdom")
-D.eMt=new A.z("\ud83c\uddeb\ud83c\uddf7","France")
-D.eLv=new A.z("\ud83c\udde9\ud83c\uddea","Germany")
-D.exR=new A.z("\ud83c\uddee\ud83c\uddf9","Italy")
-D.eA_=new A.z("\ud83c\uddea\ud83c\uddf8","Spain")
-D.eJ0=new A.z("\ud83c\uddf3\ud83c\uddec","Nigeria")
-D.eQd=new A.z("\ud83c\uddf0\ud83c\uddea","Kenya")
-D.eUM=new A.z("\ud83c\uddf9\ud83c\uddff","Tanzania")
-D.eSk=new A.z("\ud83c\uddec\ud83c\udded","Ghana")
-D.ezW=new A.z("\ud83c\uddff\ud83c\udde6","South Africa")
-D.eV1=new A.z("\ud83c\uddea\ud83c\uddec","Egypt")
-D.eF3=new A.z("\ud83c\uddef\ud83c\uddf5","Japan")
-D.ew9=new A.z("\ud83c\udde8\ud83c\uddf3","China")
-D.eIs=new A.z("\ud83c\uddee\ud83c\uddf3","India")
-D.eQJ=new A.z("\ud83c\uddf0\ud83c\uddf7","South Korea")
-D.eBm=new A.z("\ud83c\udde6\ud83c\uddfa","Australia")
-D.eR0=new A.z("\ud83c\udde6\ud83c\uddf7","Argentina")
-D.eNh=new A.z("\ud83c\udde8\ud83c\udde9","DR Congo")
-D.eBb=new A.z("\ud83c\uddfa\ud83c\uddec","Uganda")
-D.eOS=new A.z("\ud83c\uddf7\ud83c\uddfc","Rwanda")
-D.eIC=new A.z("\ud83c\uddef\ud83c\uddf2","Jamaica")
-D.eRY=new A.z("\ud83c\udde8\ud83c\uddf4","Colombia")
-D.eGd=new A.z("\ud83c\uddf5\ud83c\uddf9","Portugal")
-D.evQ=new A.z("\ud83c\uddf3\ud83c\uddf1","Netherlands")
-D.eKq=new A.z("\ud83c\uddf8\ud83c\uddea","Sweden")
-D.eT6=new A.z("\ud83c\uddf9\ud83c\uddf7","Turkey")
-D.eCh=new A.z("\ud83c\uddea\ud83c\uddf9","Ethiopia")
-D.eJo=new A.z("\ud83c\udde8\ud83c\uddf2","Cameroon")
-D.ewH=new A.z("\ud83c\uddf8\ud83c\uddf3","Senegal")
-D.eJi=new A.z("\ud83c\uddf2\ud83c\udde6","Morocco")
-D.eHr=new A.z("\ud83c\uddf5\ud83c\udded","Philippines")
-D.eMJ=new A.z("\ud83c\udded\ud83c\uddf9","Haiti")
-D.az4=x([D.eSg,D.eKX,D.eOk,D.eFj,D.eQc,D.eMt,D.eLv,D.exR,D.eA_,D.eJ0,D.eQd,D.eUM,D.eSk,D.ezW,D.eV1,D.eF3,D.ew9,D.eIs,D.eQJ,D.eBm,D.eR0,D.eNh,D.eBb,D.eOS,D.eIC,D.eRY,D.eGd,D.evQ,D.eKq,D.eT6,D.eCh,D.eJo,D.ewH,D.eJi,D.eHr,D.eMJ],y.L)
-D.eZi=new A.b7("\ud83c\udf6c","A pack of gum",1)
-D.eXT=new A.b7("\ud83e\udd5b","A gallon of milk",4)
-D.eYW=new A.b7("\u2615","A cup of coffee",5)
-D.eWC=new A.b7("\ud83c\udf9f\ufe0f","A movie ticket",15)
-D.eVr=new A.b7("\ud83d\udc87","A haircut",30)
-D.eZa=new A.b7("\ud83d\udc56","A pair of jeans",60)
-D.eXr=new A.b7("\ud83d\udc5f","Running shoes",120)
-D.eZd=new A.b7("\ud83c\udfa7","Good headphones",250)
-D.eXc=new A.b7("\u2708\ufe0f","A plane ticket",450)
-D.eY1=new A.b7("\ud83d\udeb2","A bicycle",600)
-D.eYz=new A.b7("\ud83d\udcf1","A new smartphone",1000)
-D.eYy=new A.b7("\ud83d\udcbb","A laptop",1300)
-D.eYe=new A.b7("\ud83d\udecb\ufe0f","A sofa",1500)
-D.eXk=new A.b7("\ud83d\udc8d","A diamond ring",6000)
-D.eXK=new A.b7("\ud83d\ude97","A new car",35e3)
-D.eZ3=new A.b7("\ud83e\ude99","A 1 kg gold bar",9e4)
-D.eXB=new A.b7("\ud83c\udfe0","A house",4e5)
-D.eYT=new A.b7("\ud83d\udee5\ufe0f","A yacht",5e6)
-D.eWj=new A.b7("\ud83d\udee9\ufe0f","A private jet",25e6)
-D.az6=x([D.eZi,D.eXT,D.eYW,D.eWC,D.eVr,D.eZa,D.eXr,D.eZd,D.eXc,D.eY1,D.eYz,D.eYy,D.eYe,D.eXk,D.eXK,D.eZ3,D.eXB,D.eYT,D.eWj],A.at("O<+(n,n,G)>"))
-D.d1T=x([C.cQ,C.o6],y.O)
-D.d20=x([1,2,3,4,3,4,1,2,2,1,4,3,4,3,2,1],y.t)
-D.d2B=x([C.b8,C.bt,C.f6,C.d3,C.cd,C.bf,C.ax],y.O)
-D.d2O=x(["RED","GREEN","BLUE","YELLOW","PURPLE"],y.s)
-D.d4h=x([C.A5,G.qQ,A0.TS,F.lp,I.aPW],y.n)
-D.bnO=new A.u(0.6666666666666666,0.2901960784313726,0.8705882352941177,0.5019607843137255,C.q)
-D.b6T=new A.ac(0,C.G,D.bnO,C.I,10)
-D.d4t=x([D.b6T],y.V)
-D.d52=x(["\ud83c\udf49","\ud83c\udf4d","\ud83c\udf4a","\ud83c\udf4e","\ud83e\udd5d","\ud83c\udf51","\ud83c\udf4b","\ud83c\udf47"],y.s)
-D.d5R=x(["\ud83c\udf54","\ud83c\udf55","\ud83e\uddc3","\ud83c\udf66","\ud83d\udcda","\ud83e\uddf8","\ud83c\udfa7","\ud83c\udf2e","\u2615","\ud83c\udf69"],y.s)
-D.d6j=x([C.hd,C.cd,C.bt,C.b8],y.O)
-D.d7p=x([C.cd,C.aA,C.lZ,C.vS,C.bf,C.bP],y.O)
-D.d7B=x([C.b7,C.jt],y.O)
-D.eG1=new A.z("JUNGLE","Thick forest")
-D.eUt=new A.z("PLANET","Earth is one")
-D.eHC=new A.z("GUITAR","Has six strings")
-D.eHP=new A.z("BRIDGE","Crosses a river")
-D.eMA=new A.z("CASTLE","Where kings lived")
-D.eUk=new A.z("ROCKET","Flies to space")
-D.eCD=new A.z("TURTLE","Slow with a shell")
-D.eJV=new A.z("WINDOW","Glass in a wall")
-D.eGc=new A.z("PEPPER","Hot spice")
-D.eOt=new A.z("MARKET","Place to buy food")
-D.eV0=new A.z("PILLOW","For your head at night")
-D.eER=new A.z("SUMMER","Hottest season")
-D.eGF=new A.z("DOCTOR","Treats the sick")
-D.eK1=new A.z("CAMERA","Takes photos")
-D.eP4=new A.z("ORANGE","Fruit and colour")
-D.eH8=new A.z("MONKEY","Loves bananas")
-D.eUp=new A.z("GARDEN","Where flowers grow")
-D.eUx=new A.z("SILVER","Shiny metal")
-D.eI8=new A.z("TICKET","Lets you on the bus")
-D.eOp=new A.z("DRAGON","Breathes fire")
-D.d7H=x([D.eG1,D.eUt,D.eHC,D.eHP,D.eMA,D.eUk,D.eCD,D.eJV,D.eGc,D.eOt,D.eV0,D.eER,D.eGF,D.eK1,D.eP4,D.eH8,D.eUp,D.eUx,D.eI8,D.eOp],y.L)
-D.D3=x([C.ax,C.bf,C.d3,C.bt,C.f6],y.O)
-D.d8I=x([0,0.4],y.u)
-D.d8O=x([C.L,C.cp,C.be,C.c0,C.p1,C.aT,C.hh,C.c,C.c],y.O)
-D.d8Z=x([C.y1,C.dv],y.O)
-D.d9n=x(["\ud83d\ude97","\ud83d\ude99","\ud83d\ude95","\ud83d\ude93","\ud83d\ude90"],y.s)
-D.da_=x(["TRUE","FALSE"],y.s)
-D.da6=x([C.hd,C.aA,C.bf,C.d3],y.O)
+D.cX8=x([D.b77],y.V)
+D.eYh=new A.b7(C.km,-1,0)
+D.eYR=new A.b7(C.rH,0,-1)
+D.eWl=new A.b7(C.qr,0,1)
+D.eWP=new A.b7(C.jB,1,0)
+D.cXA=x([D.eYh,D.eYR,D.eWl,D.eWP],A.at("O<+(a0,G,G)>"))
+D.cY4=x([C.hj,C.hj],y.O)
+D.cYK=x([C.hN,C.dP],y.O)
+D.f6N=new A.cW(C.w,C.I,12)
+D.cZG=x([D.f6N],y.r)
+D.bnQ=new A.u(0.5333333333333333,0.9764705882352941,0.45098039215686275,0.08627450980392157,C.q)
+D.b75=new A.ac(0,C.G,D.bnQ,C.I,10)
+D.d_V=x([D.b75],y.V)
+D.d0X=x([C.el,C.jP],y.O)
+D.eSk=new A.z("\ud83c\uddfa\ud83c\uddf8","United States")
+D.eL_=new A.z("\ud83c\udde8\ud83c\udde6","Canada")
+D.eOn=new A.z("\ud83c\uddf2\ud83c\uddfd","Mexico")
+D.eFm=new A.z("\ud83c\udde7\ud83c\uddf7","Brazil")
+D.eQg=new A.z("\ud83c\uddec\ud83c\udde7","United Kingdom")
+D.eMw=new A.z("\ud83c\uddeb\ud83c\uddf7","France")
+D.eLy=new A.z("\ud83c\udde9\ud83c\uddea","Germany")
+D.exU=new A.z("\ud83c\uddee\ud83c\uddf9","Italy")
+D.eA2=new A.z("\ud83c\uddea\ud83c\uddf8","Spain")
+D.eJ3=new A.z("\ud83c\uddf3\ud83c\uddec","Nigeria")
+D.eQh=new A.z("\ud83c\uddf0\ud83c\uddea","Kenya")
+D.eUQ=new A.z("\ud83c\uddf9\ud83c\uddff","Tanzania")
+D.eSo=new A.z("\ud83c\uddec\ud83c\udded","Ghana")
+D.ezZ=new A.z("\ud83c\uddff\ud83c\udde6","South Africa")
+D.eV5=new A.z("\ud83c\uddea\ud83c\uddec","Egypt")
+D.eF6=new A.z("\ud83c\uddef\ud83c\uddf5","Japan")
+D.ewb=new A.z("\ud83c\udde8\ud83c\uddf3","China")
+D.eIv=new A.z("\ud83c\uddee\ud83c\uddf3","India")
+D.eQN=new A.z("\ud83c\uddf0\ud83c\uddf7","South Korea")
+D.eBp=new A.z("\ud83c\udde6\ud83c\uddfa","Australia")
+D.eR4=new A.z("\ud83c\udde6\ud83c\uddf7","Argentina")
+D.eNk=new A.z("\ud83c\udde8\ud83c\udde9","DR Congo")
+D.eBe=new A.z("\ud83c\uddfa\ud83c\uddec","Uganda")
+D.eOV=new A.z("\ud83c\uddf7\ud83c\uddfc","Rwanda")
+D.eIF=new A.z("\ud83c\uddef\ud83c\uddf2","Jamaica")
+D.eS1=new A.z("\ud83c\udde8\ud83c\uddf4","Colombia")
+D.eGg=new A.z("\ud83c\uddf5\ud83c\uddf9","Portugal")
+D.evS=new A.z("\ud83c\uddf3\ud83c\uddf1","Netherlands")
+D.eKt=new A.z("\ud83c\uddf8\ud83c\uddea","Sweden")
+D.eTa=new A.z("\ud83c\uddf9\ud83c\uddf7","Turkey")
+D.eCk=new A.z("\ud83c\uddea\ud83c\uddf9","Ethiopia")
+D.eJr=new A.z("\ud83c\udde8\ud83c\uddf2","Cameroon")
+D.ewJ=new A.z("\ud83c\uddf8\ud83c\uddf3","Senegal")
+D.eJl=new A.z("\ud83c\uddf2\ud83c\udde6","Morocco")
+D.eHu=new A.z("\ud83c\uddf5\ud83c\udded","Philippines")
+D.eMM=new A.z("\ud83c\udded\ud83c\uddf9","Haiti")
+D.az4=x([D.eSk,D.eL_,D.eOn,D.eFm,D.eQg,D.eMw,D.eLy,D.exU,D.eA2,D.eJ3,D.eQh,D.eUQ,D.eSo,D.ezZ,D.eV5,D.eF6,D.ewb,D.eIv,D.eQN,D.eBp,D.eR4,D.eNk,D.eBe,D.eOV,D.eIF,D.eS1,D.eGg,D.evS,D.eKt,D.eTa,D.eCk,D.eJr,D.ewJ,D.eJl,D.eHu,D.eMM],y.L)
+D.eZm=new A.b7("\ud83c\udf6c","A pack of gum",1)
+D.eXX=new A.b7("\ud83e\udd5b","A gallon of milk",4)
+D.eZ_=new A.b7("\u2615","A cup of coffee",5)
+D.eWG=new A.b7("\ud83c\udf9f\ufe0f","A movie ticket",15)
+D.eVv=new A.b7("\ud83d\udc87","A haircut",30)
+D.eZe=new A.b7("\ud83d\udc56","A pair of jeans",60)
+D.eXv=new A.b7("\ud83d\udc5f","Running shoes",120)
+D.eZh=new A.b7("\ud83c\udfa7","Good headphones",250)
+D.eXg=new A.b7("\u2708\ufe0f","A plane ticket",450)
+D.eY5=new A.b7("\ud83d\udeb2","A bicycle",600)
+D.eYD=new A.b7("\ud83d\udcf1","A new smartphone",1000)
+D.eYC=new A.b7("\ud83d\udcbb","A laptop",1300)
+D.eYi=new A.b7("\ud83d\udecb\ufe0f","A sofa",1500)
+D.eXo=new A.b7("\ud83d\udc8d","A diamond ring",6000)
+D.eXO=new A.b7("\ud83d\ude97","A new car",35e3)
+D.eZ7=new A.b7("\ud83e\ude99","A 1 kg gold bar",9e4)
+D.eXF=new A.b7("\ud83c\udfe0","A house",4e5)
+D.eYX=new A.b7("\ud83d\udee5\ufe0f","A yacht",5e6)
+D.eWn=new A.b7("\ud83d\udee9\ufe0f","A private jet",25e6)
+D.az6=x([D.eZm,D.eXX,D.eZ_,D.eWG,D.eVv,D.eZe,D.eXv,D.eZh,D.eXg,D.eY5,D.eYD,D.eYC,D.eYi,D.eXo,D.eXO,D.eZ7,D.eXF,D.eYX,D.eWn],A.at("O<+(n,n,G)>"))
+D.d1U=x([C.cQ,C.o6],y.O)
+D.d21=x([1,2,3,4,3,4,1,2,2,1,4,3,4,3,2,1],y.t)
+D.d2C=x([C.b8,C.bt,C.f7,C.d3,C.cd,C.bf,C.ax],y.O)
+D.d2P=x(["RED","GREEN","BLUE","YELLOW","PURPLE"],y.s)
+D.d4i=x([C.A5,G.qQ,A0.TS,F.lp,I.aPW],y.n)
+D.bnP=new A.u(0.6666666666666666,0.2901960784313726,0.8705882352941177,0.5019607843137255,C.q)
+D.b6T=new A.ac(0,C.G,D.bnP,C.I,10)
+D.d4u=x([D.b6T],y.V)
+D.d53=x(["\ud83c\udf49","\ud83c\udf4d","\ud83c\udf4a","\ud83c\udf4e","\ud83e\udd5d","\ud83c\udf51","\ud83c\udf4b","\ud83c\udf47"],y.s)
+D.d5S=x(["\ud83c\udf54","\ud83c\udf55","\ud83e\uddc3","\ud83c\udf66","\ud83d\udcda","\ud83e\uddf8","\ud83c\udfa7","\ud83c\udf2e","\u2615","\ud83c\udf69"],y.s)
+D.d6k=x([C.hd,C.cd,C.bt,C.b8],y.O)
+D.d7r=x([C.cd,C.aA,C.lZ,C.vT,C.bf,C.bP],y.O)
+D.d7D=x([C.b7,C.jt],y.O)
+D.eG4=new A.z("JUNGLE","Thick forest")
+D.eUx=new A.z("PLANET","Earth is one")
+D.eHF=new A.z("GUITAR","Has six strings")
+D.eHS=new A.z("BRIDGE","Crosses a river")
+D.eMD=new A.z("CASTLE","Where kings lived")
+D.eUo=new A.z("ROCKET","Flies to space")
+D.eCG=new A.z("TURTLE","Slow with a shell")
+D.eJY=new A.z("WINDOW","Glass in a wall")
+D.eGf=new A.z("PEPPER","Hot spice")
+D.eOw=new A.z("MARKET","Place to buy food")
+D.eV4=new A.z("PILLOW","For your head at night")
+D.eEU=new A.z("SUMMER","Hottest season")
+D.eGI=new A.z("DOCTOR","Treats the sick")
+D.eK4=new A.z("CAMERA","Takes photos")
+D.eP7=new A.z("ORANGE","Fruit and colour")
+D.eHb=new A.z("MONKEY","Loves bananas")
+D.eUt=new A.z("GARDEN","Where flowers grow")
+D.eUB=new A.z("SILVER","Shiny metal")
+D.eIb=new A.z("TICKET","Lets you on the bus")
+D.eOs=new A.z("DRAGON","Breathes fire")
+D.d7J=x([D.eG4,D.eUx,D.eHF,D.eHS,D.eMD,D.eUo,D.eCG,D.eJY,D.eGf,D.eOw,D.eV4,D.eEU,D.eGI,D.eK4,D.eP7,D.eHb,D.eUt,D.eUB,D.eIb,D.eOs],y.L)
+D.D3=x([C.ax,C.bf,C.d3,C.bt,C.f7],y.O)
+D.d8K=x([0,0.4],y.u)
+D.d8Q=x([C.L,C.cp,C.be,C.c0,C.p1,C.aT,C.hh,C.c,C.c],y.O)
+D.d90=x([C.y1,C.dv],y.O)
+D.d9p=x(["\ud83d\ude97","\ud83d\ude99","\ud83d\ude95","\ud83d\ude93","\ud83d\ude90"],y.s)
+D.da1=x(["TRUE","FALSE"],y.s)
+D.da8=x([C.hd,C.aA,C.bf,C.d3],y.O)
 D.b79=new A.ac(0,C.G,C.dm,C.en,4)
-D.db4=x([D.b79],y.V)
-D.eLA=new A.z("\ud83d\ude00","\ud83d\ude03")
-D.eFR=new A.z("\ud83d\udc36","\ud83d\udc3a")
-D.exv=new A.z("\ud83c\udf4e","\ud83c\udf45")
-D.eV3=new A.z("\u2b50","\ud83c\udf1f")
-D.eFN=new A.z("\ud83c\udf19","\ud83c\udf1b")
-D.eS1=new A.z("\ud83d\udc31","\ud83d\udc2f")
-D.eIO=new A.z("\ud83d\ude97","\ud83d\ude99")
-D.exh=new A.z("\ud83c\udf69","\ud83c\udf6a")
-D.eD8=new A.z("\ud83d\ude3a","\ud83d\ude38")
-D.eK9=new A.z("\ud83c\udf32","\ud83c\udf33")
-D.eMd=new A.z("\ud83d\udc20","\ud83d\udc1f")
-D.eNl=new A.z("\ud83c\udf4a","\ud83c\udf51")
-D.eNa=new A.z("\u26bd","\ud83c\udfd0")
-D.eUX=new A.z("\ud83c\udf88","\ud83d\udd34")
-D.eLX=new A.z("\ud83d\udc38","\ud83d\udc22")
-D.eRS=new A.z("\ud83d\udc99","\ud83d\udc9c")
-D.eNH=new A.z("\ud83c\udf3c","\ud83c\udf3b")
-D.eEA=new A.z("\ud83e\udd51","\ud83e\udd5d")
-D.eIy=new A.z("\ud83d\udc3b","\ud83d\udc28")
-D.eE0=new A.z("\ud83d\udd11","\ud83d\udddd\ufe0f")
-D.ey5=new A.z("\ud83d\ude42","\ud83d\ude43")
-D.eTL=new A.z("\ud83d\ude0a","\u263a\ufe0f")
-D.eDB=new A.z("\ud83d\udd50","\ud83d\udd51")
-D.eLd=new A.z("\ud83d\udd35","\ud83d\udfe6")
-D.ew3=new A.z("\ud83c\udf53","\ud83c\udf52")
-D.eM5=new A.z("\ud83d\udc2d","\ud83d\udc39")
-D.eMD=new A.z("\ud83c\udf15","\ud83c\udf1d")
-D.eLW=new A.z("\ud83e\udde1","\u2764\ufe0f")
-D.dbi=x([D.eLA,D.eFR,D.exv,D.eV3,D.eFN,D.eS1,D.eIO,D.exh,D.eD8,D.eK9,D.eMd,D.eNl,D.eNa,D.eUX,D.eLX,D.eRS,D.eNH,D.eEA,D.eIy,D.eE0,D.ey5,D.eTL,D.eDB,D.eLd,D.ew3,D.eM5,D.eMD,D.eLW],y.L)
-D.dbk=x([C.hd,C.d3,C.bt,C.bf,C.f6],y.O)
-D.dbA=x([C.bo,C.N],y.O)
-D.ewR=new A.z(1,-1)
-D.dbD=x([F.lp,G.qQ,E.wU,D.ewR],y.n)
-D.dbI=x([C.fV,C.dP],y.O)
-D.dbS=x(["2","3","4","5","6","7","8","9","10","J","Q","K","A"],y.s)
+D.db6=x([D.b79],y.V)
+D.eLD=new A.z("\ud83d\ude00","\ud83d\ude03")
+D.eFU=new A.z("\ud83d\udc36","\ud83d\udc3a")
+D.exy=new A.z("\ud83c\udf4e","\ud83c\udf45")
+D.eV7=new A.z("\u2b50","\ud83c\udf1f")
+D.eFQ=new A.z("\ud83c\udf19","\ud83c\udf1b")
+D.eS5=new A.z("\ud83d\udc31","\ud83d\udc2f")
+D.eIR=new A.z("\ud83d\ude97","\ud83d\ude99")
+D.exk=new A.z("\ud83c\udf69","\ud83c\udf6a")
+D.eDb=new A.z("\ud83d\ude3a","\ud83d\ude38")
+D.eKc=new A.z("\ud83c\udf32","\ud83c\udf33")
+D.eMg=new A.z("\ud83d\udc20","\ud83d\udc1f")
+D.eNo=new A.z("\ud83c\udf4a","\ud83c\udf51")
+D.eNd=new A.z("\u26bd","\ud83c\udfd0")
+D.eV0=new A.z("\ud83c\udf88","\ud83d\udd34")
+D.eM_=new A.z("\ud83d\udc38","\ud83d\udc22")
+D.eRW=new A.z("\ud83d\udc99","\ud83d\udc9c")
+D.eNK=new A.z("\ud83c\udf3c","\ud83c\udf3b")
+D.eED=new A.z("\ud83e\udd51","\ud83e\udd5d")
+D.eIB=new A.z("\ud83d\udc3b","\ud83d\udc28")
+D.eE3=new A.z("\ud83d\udd11","\ud83d\udddd\ufe0f")
+D.ey8=new A.z("\ud83d\ude42","\ud83d\ude43")
+D.eTP=new A.z("\ud83d\ude0a","\u263a\ufe0f")
+D.eDE=new A.z("\ud83d\udd50","\ud83d\udd51")
+D.eLg=new A.z("\ud83d\udd35","\ud83d\udfe6")
+D.ew5=new A.z("\ud83c\udf53","\ud83c\udf52")
+D.eM8=new A.z("\ud83d\udc2d","\ud83d\udc39")
+D.eMG=new A.z("\ud83c\udf15","\ud83c\udf1d")
+D.eLZ=new A.z("\ud83e\udde1","\u2764\ufe0f")
+D.dbk=x([D.eLD,D.eFU,D.exy,D.eV7,D.eFQ,D.eS5,D.eIR,D.exk,D.eDb,D.eKc,D.eMg,D.eNo,D.eNd,D.eV0,D.eM_,D.eRW,D.eNK,D.eED,D.eIB,D.eE3,D.ey8,D.eTP,D.eDE,D.eLg,D.ew5,D.eM8,D.eMG,D.eLZ],y.L)
+D.dbm=x([C.hd,C.d3,C.bt,C.bf,C.f7],y.O)
+D.dbC=x([C.bo,C.N],y.O)
+D.ewU=new A.z(1,-1)
+D.dbF=x([F.lp,G.qQ,E.wU,D.ewU],y.n)
+D.dbK=x([C.fV,C.dP],y.O)
+D.dbU=x(["2","3","4","5","6","7","8","9","10","J","Q","K","A"],y.s)
 D.Rp=x([C.ax,C.bf,C.d3,C.bt],y.O)
-D.dc8=x([C.hj,C.jx,C.pZ],y.O)
+D.dca=x([C.hj,C.jx,C.pZ],y.O)
 D.a4K=x([C.o7,C.b8,C.bt,C.be],y.O)
-D.ddp=x([C.e9,C.cr],y.O)
-D.deu=x([C.dZ,C.hN,C.bt,C.bf,C.bB,C.kD,C.el,C.aA],y.O)
+D.ddq=x([C.e9,C.cr],y.O)
+D.dev=x([C.dZ,C.hN,C.bt,C.bf,C.bB,C.kD,C.el,C.aA],y.O)
 D.b6S=new A.ac(0,C.G,C.b8,C.I,6)
-D.deS=x([D.b6S],y.V)
-D.dfg=x(["Bun","Patty","Cheese","Lettuce","Tomato","Onion","Bacon","Top bun"],y.s)
-D.dfY=x([C.cw,C.ej,C.dY],y.O)
-D.dgb=x([C.ik,C.eG],y.O)
-D.dgc=x([C.c,C.w,C.bl,C.bB,C.bt],y.O)
-D.dgi=x([T.M4,C.nV],y.O)
-D.dgP=x([C.aJ,C.fl],y.O)
-D.dhn=x(["MONEY","CASH","GOLD","COIN","BANK","SAVE","PROFIT","PRIZE","LUCKY","BONUS","WALLET","RICH","STAKE","WIN","VAULT","JEWEL"],y.s)
+D.deT=x([D.b6S],y.V)
+D.dfh=x(["Bun","Patty","Cheese","Lettuce","Tomato","Onion","Bacon","Top bun"],y.s)
+D.dfZ=x([C.cw,C.ej,C.dY],y.O)
+D.dgc=x([C.il,C.eG],y.O)
+D.dgd=x([C.c,C.w,C.bl,C.bB,C.bt],y.O)
+D.dgj=x([T.M4,C.nV],y.O)
+D.dgQ=x([C.aJ,C.fl],y.O)
+D.dho=x(["MONEY","CASH","GOLD","COIN","BANK","SAVE","PROFIT","PRIZE","LUCKY","BONUS","WALLET","RICH","STAKE","WIN","VAULT","JEWEL"],y.s)
 D.b7i=new A.ac(0,C.G,C.ac,C.I,10)
-D.dhs=x([D.b7i],y.V)
-D.dhz=x([C.p_,C.pZ],y.O)
+D.dht=x([D.b7i],y.V)
+D.dhB=x([C.p_,C.pZ],y.O)
 D.b7h=new A.ac(0,C.G,C.dm,C.I,8)
 D.aAx=x([D.b7h],y.V)
-D.dji=x([C.eP,C.Y_],y.O)
-D.dkH=x([C.N,C.dv],y.O)
+D.djk=x([C.eP,C.Y_],y.O)
+D.dkJ=x([C.N,C.dv],y.O)
 D.b7x=new A.ac(0,C.G,C.dm,C.I,10)
-D.dkM=x([D.b7x],y.V)
-D.eRf=new A.z("\ud83c\udf27\ufe0f\ud83c\udf80","Rainbow")
-D.eGC=new A.z("\u2600\ufe0f\ud83c\udf3b","Sunflower")
-D.exT=new A.z("\u2b50\ud83d\udc1f","Starfish")
-D.eLq=new A.z("\ud83d\udc1d\ud83c\udfe0","Beehive")
-D.eLS=new A.z("\ud83c\udf6f\ud83c\udf19","Honeymoon")
-D.eCC=new A.z("\ud83e\uddb7\ud83e\uddda","Tooth fairy")
-D.eRO=new A.z("\ud83d\udd25\ud83e\udeb5","Campfire")
-D.eCt=new A.z("\ud83e\udde0\ud83c\udf2a\ufe0f","Brainstorm")
-D.eCo=new A.z("\ud83d\udc1f\ud83e\udd63","Fishbowl")
-D.eP0=new A.z("\ud83d\udc41\ufe0f\ud83c\udf6d","Eye candy")
-D.eS_=new A.z("\ud83d\udd11\ud83e\udeb5","Keyboard")
-D.eDc=new A.z("\ud83e\udd5c\ud83e\uddc8","Peanut butter")
-D.eRV=new A.z("\ud83e\uddca\ud83c\udfd2","Ice hockey")
-D.eUJ=new A.z("\ud83d\udc31\ud83d\udc1f","Catfish")
-D.eSP=new A.z("\ud83d\udc36\ud83c\udfe0","Doghouse")
-D.eMx=new A.z("\ud83d\udeaa\ud83d\udd14","Doorbell")
-D.eLH=new A.z("\ud83e\uddb7\ud83e\udea5","Toothbrush")
-D.eAe=new A.z("\ud83d\udca1\ud83c\udfe0","Lighthouse")
-D.eDV=new A.z("\u2744\ufe0f\u26c4","Snowman")
-D.eIV=new A.z("\ud83c\udf3d\ud83d\udc15","Corn dog")
-D.eQz=new A.z("\u23f0\ud83d\udcb0","Time is money")
-D.eJU=new A.z("\ud83c\udf27\ufe0f\ud83d\udc31\ud83d\udc36","Raining cats and dogs")
-D.eGn=new A.z("\ud83c\udf82\ud83c\udf89","Birthday party")
-D.eHt=new A.z("\ud83c\udf0a\ud83c\udfc4","Surfing")
-D.eRt=new A.z("\ud83d\udd25\ud83d\ude92","Fire truck")
-D.eEN=new A.z("\ud83c\udf0d\ud83c\udf21\ufe0f","Global warming")
-D.eTt=new A.z("\ud83d\udc1e\ud83d\udc1e","Ladybugs")
-D.eJG=new A.z("\u2b50\ud83c\udf19","Night sky")
-D.eBV=new A.z("\ud83c\udf7f\ud83c\udfac","Movie night")
-D.eOR=new A.z("\ud83c\udf85\ud83c\udf84","Christmas")
-D.ewG=new A.z("\ud83c\udf19\ud83d\udca1","Moonlight")
-D.eCF=new A.z("\u2600\ufe0f\ud83d\udc53","Sunglasses")
-D.evJ=new A.z("\ud83c\udf27\ufe0f\ud83e\udde5","Raincoat")
-D.eKh=new A.z("\u2744\ufe0f\u26bd","Snowball")
-D.eO5=new A.z("\ud83e\uddfa\u26bd","Basketball")
-D.eEk=new A.z("\ud83e\uddb6\u26bd","Football")
-D.ezp=new A.z("\ud83e\uddc8\ud83e\udeb0","Butterfly")
-D.eCT=new A.z("\ud83c\udf73\ud83c\udf70","Pancake")
-D.eG3=new A.z("\u2615\ud83c\udf70","Cupcake")
-D.eVg=new A.z("\u2b50\ud83d\udca1","Starlight")
-D.eUu=new A.z("\u2600\ufe0f\u2b06\ufe0f","Sunrise")
-D.eRg=new A.z("\u2600\ufe0f\u2b07\ufe0f","Sunset")
-D.eDT=new A.z("\ud83c\udf27\ufe0f\ud83d\udca7","Raindrop")
-D.eDm=new A.z("\u2744\ufe0f\ud83c\udf38","Snowflake")
-D.eNE=new A.z("\ud83c\udf0d\ud83e\udee8","Earthquake")
-D.eEs=new A.z("\ud83d\udd25\ud83e\udeb0","Firefly")
-D.eUZ=new A.z("\ud83d\udd25\ud83d\udc68","Fireman")
-D.eNF=new A.z("\ud83d\udcee\ud83d\udc68","Postman")
-D.eMX=new A.z("\ud83d\udcda\ud83e\ude91","Library")
-D.eEE=new A.z("\ud83d\udcdd\ud83d\udcd6","Notebook")
-D.eTu=new A.z("\ud83d\udecf\ufe0f\ud83d\udeaa","Bedroom")
-D.eGV=new A.z("\ud83d\udec1\ud83d\udeaa","Bathroom")
-D.eNn=new A.z("\ud83c\udfeb\ud83d\udeaa","Classroom")
-D.eRM=new A.z("\ud83e\uddb7\ud83c\udfa8","Toothpaste")
-D.eUr=new A.z("\ud83d\udc26\ud83c\udfe0","Birdhouse")
-D.ezH=new A.z("\ud83d\udc14\ud83c\udfe0","Chicken coop")
-D.eU1=new A.z("\ud83d\udc34\ud83d\udc5f","Horseshoe")
-D.eVl=new A.z("\ud83d\udc34\ud83e\uddd1","Horseman")
-D.eFO=new A.z("\ud83d\udc18\ud83e\uddf3","Elephant trunk")
-D.eJZ=new A.z("\ud83e\udd81\ud83d\udc51","Lion king")
-D.eJN=new A.z("\ud83d\udc2f\ud83e\udd81","Liger")
-D.eIc=new A.z("\ud83d\udc3a\ud83c\udf19","Werewolf")
-D.eOJ=new A.z("\ud83e\udddb\ud83e\udd87","Vampire bat")
-D.eA0=new A.z("\ud83e\udddf\ud83c\udf4e","Zombie apocalypse")
-D.eNr=new A.z("\ud83d\udd77\ufe0f\ud83e\uddd1","Spider-Man")
-D.eNb=new A.z("\ud83e\udd87\ud83e\uddd1","Batman")
-D.eC5=new A.z("\ud83e\uddd1\ud83d\ude80\ud83c\udf19","Moon landing")
-D.eDd=new A.z("\ud83d\ude80\ud83c\udf0d","Space travel")
-D.eSn=new A.z("\ud83d\udef8\ud83d\udc7d","Alien invasion")
-D.eA5=new A.z("\ud83c\udf0c\ud83d\udd2d","Stargazing")
-D.eCi=new A.z("\ud83e\ude90\ud83d\udc8d","Saturn")
-D.ezU=new A.z("\ud83c\udf1e\ud83e\ude90","Solar system")
-D.eNo=new A.z("\ud83c\udf11\u2600\ufe0f","Solar eclipse")
-D.eNw=new A.z("\ud83c\udf11\ud83c\udf0d","Lunar eclipse")
-D.eMV=new A.z("\ud83c\udf4e\ud83e\udd67","Apple pie")
-D.eRF=new A.z("\ud83c\udf53\ud83c\udf70","Strawberry shortcake")
-D.eM3=new A.z("\ud83c\udf6b\ud83e\udd5b","Chocolate milk")
-D.eC2=new A.z("\ud83c\udf4c\ud83c\udf66","Banana split")
-D.ewp=new A.z("\ud83e\udd6a\ud83e\uddc0","Cheese sandwich")
-D.eKO=new A.z("\ud83c\udf55\ud83e\uddc0","Cheese pizza")
-D.eEn=new A.z("\ud83c\udf54\ud83c\udf5f","Burger and fries")
-D.eJA=new A.z("\ud83c\udf2d\ud83e\udd64","Hot dog and soda")
-D.eJE=new A.z("\ud83c\udf69\u2615","Donut and coffee")
-D.eUB=new A.z("\ud83e\udd5e\ud83c\udf41","Pancakes with syrup")
-D.eRD=new A.z("\ud83c\udf5e\ud83e\uddc8","Bread and butter")
-D.eHU=new A.z("\ud83c\udf73\ud83e\udd53","Bacon and eggs")
-D.eUm=new A.z("\ud83e\udd54\ud83c\udf5f","French fries")
-D.eRn=new A.z("\ud83c\udf2e\ud83c\udf36\ufe0f","Spicy taco")
-D.eGJ=new A.z("\ud83c\udf63\ud83c\udf5a","Sushi")
-D.eKL=new A.z("\ud83c\udf5c\ud83e\udd62","Noodles")
-D.eC1=new A.z("\ud83e\udd6d\ud83c\udf79","Mango juice")
-D.eIt=new A.z("\ud83c\udf49\ud83c\udfd6\ufe0f","Summer")
-D.eB_=new A.z("\ud83c\udf42\ud83c\udf41","Autumn")
-D.eDQ=new A.z("\u2744\ufe0f\ud83c\udfbf","Skiing")
-D.eS6=new A.z("\ud83c\udf37\ud83d\udc1d","Spring")
-D.eDx=new A.z("\ud83c\udf34\ud83c\udfdd\ufe0f","Tropical island")
-D.eRZ=new A.z("\ud83c\udfd4\ufe0f\ud83e\uddd7","Mountain climbing")
-D.eAs=new A.z("\u26fa\ud83d\udd25","Camping")
-D.eHq=new A.z("\ud83c\udfa3\ud83d\udc1f","Fishing")
-D.eGX=new A.z("\ud83c\udfca\ud83c\udf0a","Swimming")
-D.eP5=new A.z("\ud83d\udeb4\ud83c\udfd4\ufe0f","Mountain biking")
-D.eL0=new A.z("\ud83c\udfc3\ud83d\udc5f","Running shoes")
-D.eDJ=new A.z("\u26bd\ud83e\udd45","Soccer goal")
-D.ew1=new A.z("\ud83c\udfc0\ud83c\udfc6","Basketball champion")
-D.eRp=new A.z("\ud83c\udfbe\ud83c\udff8","Racket sports")
-D.eUv=new A.z("\ud83e\udd4a\ud83c\udfc6","Boxing champion")
-D.eS3=new A.z("\ud83c\udfb3\ud83c\udfaf","Bowling")
-D.eB0=new A.z("\u26f3\ud83c\udfcc\ufe0f","Golf")
-D.eSz=new A.z("\ud83c\udff9\ud83c\udfaf","Archery")
-D.eMP=new A.z("\ud83e\uddd8\ud83d\udd6f\ufe0f","Meditation")
-D.eFk=new A.z("\ud83c\udfb8\ud83c\udfa4","Rock band")
-D.eGK=new A.z("\ud83c\udfb9\ud83c\udfb6","Piano music")
-D.ex9=new A.z("\ud83e\udd41\ud83c\udfb7","Jazz band")
-D.eV_=new A.z("\ud83c\udfbb\ud83c\udfbc","Orchestra")
-D.eVb=new A.z("\ud83c\udfa4\ud83c\udfb5","Karaoke")
-D.eTX=new A.z("\ud83c\udfa7\ud83c\udfb6","Headphones")
-D.ewy=new A.z("\ud83d\udcfb\ud83c\udfb5","Radio")
-D.eJz=new A.z("\ud83d\udcfa\ud83c\udf7f","Television")
-D.eHw=new A.z("\ud83d\udcf7\ud83c\udf05","Photography")
-D.eF7=new A.z("\ud83c\udfa8\ud83d\udd8c\ufe0f","Painting")
-D.eTS=new A.z("\u270f\ufe0f\ud83d\udccf","Drawing")
-D.eAB=new A.z("\ud83d\udcd6\ud83c\udf19","Bedtime story")
-D.eB8=new A.z("\ud83e\uddd9\u200d\u2642\ufe0f\ud83d\udcd6","Wizard book")
-D.eE_=new A.z("\ud83d\udc09\ud83c\udff0","Dragon castle")
-D.eHE=new A.z("\ud83e\uddda\ud83c\udf38","Fairy garden")
-D.eGx=new A.z("\ud83d\udc78\ud83d\udc38","Frog prince")
-D.eTA=new A.z("\ud83d\udc3a\ud83d\udc75","Little Red Riding Hood")
-D.eBf=new A.z("\ud83d\udc37\ud83c\udfe0","Three little pigs")
-D.exP=new A.z("\ud83e\ude84\ud83d\udc07","Magic trick")
-D.eIn=new A.z("\ud83c\udfa9\ud83d\udc07","Magician")
-D.eBC=new A.z("\ud83e\udd21\ud83c\udfaa","Circus")
-D.eVe=new A.z("\ud83c\udfa1\ud83c\udfa2","Theme park")
-D.eLx=new A.z("\ud83c\udf81\ud83c\udf80","Gift")
-D.eUo=new A.z("\ud83d\udc8d\ud83d\udc92","Wedding")
-D.eQW=new A.z("\ud83c\udf93\ud83c\udfa9","Graduation")
-D.ePc=new A.z("\ud83c\udfe5\ud83d\ude91","Hospital")
-D.ewz=new A.z("\ud83d\udc89\ud83e\ude7a","Doctor")
-D.eCc=new A.z("\ud83e\uddb7\ud83d\udc68\u200d\u2695\ufe0f","Dentist")
-D.eNY=new A.z("\ud83e\uddd1\u200d\ud83c\udfeb\ud83d\udcda","Teacher")
-D.eHB=new A.z("\ud83d\udc6e\ud83d\ude94","Police car")
-D.eNN=new A.z("\ud83d\ude92\ud83d\udc68\u200d\ud83d\ude92","Firefighter")
-D.eGU=new A.z("\u2708\ufe0f\ud83e\uddd1\u200d\u2708\ufe0f","Pilot")
-D.ezM=new A.z("\ud83d\udea2\u2693","Ship anchor")
-D.eDk=new A.z("\ud83d\ude82\ud83d\ude83","Train")
-D.eK5=new A.z("\ud83d\ude8c\ud83c\udfeb","School bus")
-D.eE5=new A.z("\ud83d\udeb2\ud83d\udede","Bicycle")
-D.ex4=new A.z("\ud83c\udfcd\ufe0f\ud83d\udca8","Motorcycle")
-D.eIF=new A.z("\ud83d\ude97\u26fd","Gas station")
-D.eAM=new A.z("\ud83d\udee3\ufe0f\ud83d\udea6","Traffic")
-D.eEh=new A.z("\ud83c\udf09\ud83c\udf0a","Bridge")
-D.eCS=new A.z("\ud83c\udff0\ud83d\udc51","Palace")
-D.eI3=new A.z("\ud83d\uddfd\ud83c\uddfa\ud83c\uddf8","Statue of Liberty")
-D.eBG=new A.z("\ud83d\uddfc\ud83c\uddeb\ud83c\uddf7","Eiffel Tower")
-D.ezq=new A.z("\ud83c\udfef\ud83c\uddef\ud83c\uddf5","Japanese castle")
-D.exg=new A.z("\ud83d\udd4c\ud83c\udf19","Mosque")
-D.eKo=new A.z("\u26ea\ud83d\udd14","Church bell")
-D.eJY=new A.z("\ud83d\udc2b\ud83c\udfdc\ufe0f","Desert camel")
-D.eP8=new A.z("\ud83d\udc27\ud83e\uddca","Penguin")
-D.eRP=new A.z("\ud83d\udc3b\u200d\u2744\ufe0f\u2744\ufe0f","Polar bear")
-D.eCd=new A.z("\ud83d\udc28\ud83c\udf3f","Koala")
-D.eRq=new A.z("\ud83e\udd98\ud83c\udde6\ud83c\uddfa","Kangaroo")
-D.eRA=new A.z("\ud83e\udd92\ud83c\udf33","Giraffe")
-D.eKY=new A.z("\ud83e\udd93\ud83e\udd81","Zebra")
-D.ewC=new A.z("\ud83d\udc18\ud83d\udc2d","Elephant and mouse")
-D.eEg=new A.z("\ud83d\udc22\ud83d\udc07","The tortoise and the hare")
-D.eMH=new A.z("\ud83d\udc1c\ud83d\udc1c\ud83d\udc1c","Ant colony")
-D.eII=new A.z("\ud83d\udc1d\ud83c\udf6f","Honey bee")
-D.eEz=new A.z("\ud83d\udd78\ufe0f\ud83d\udd77\ufe0f","Spider web")
-D.eFU=new A.z("\ud83d\udc1b\ud83e\udd8b","Metamorphosis")
-D.eCj=new A.z("\ud83d\udc38\ud83e\udeb7","Lily pad")
-D.eAk=new A.z("\ud83e\udd86\ud83c\udf0a","Duck pond")
-D.eRe=new A.z("\ud83d\udc13\ud83c\udf05","Rooster")
-D.eBQ=new A.z("\ud83d\udc04\ud83e\udd5b","Dairy cow")
-D.eVq=new A.z("\ud83d\udc11\ud83e\uddf6","Wool")
-D.eFK=new A.z("\ud83d\udc16\ud83e\udd53","Bacon")
-D.eQC=new A.z("\ud83c\udf3d\ud83c\udf3e","Farm")
-D.eKP=new A.z("\ud83e\udd55\ud83d\udc07","Carrot")
-D.eGW=new A.z("\ud83c\udf33\ud83c\udf4e","Apple tree")
-D.eFA=new A.z("\ud83c\udf32\ud83c\udf84","Christmas tree")
-D.eA1=new A.z("\ud83c\udf43\ud83c\udf2c\ufe0f","Windy day")
-D.eOx=new A.z("\u26c8\ufe0f\u26a1","Thunderstorm")
-D.eK4=new A.z("\ud83c\udf2a\ufe0f\ud83c\udfe0","Tornado")
-D.eCp=new A.z("\ud83c\udf0a\ud83c\udf0b","Tsunami")
-D.eOE=new A.z("\ud83c\udf0b\ud83d\udd25","Volcano")
-D.eFr=new A.z("\ud83c\udfdd\ufe0f\ud83e\udd65","Coconut")
-D.eNK=new A.z("\ud83d\udc1a\ud83c\udf0a","Seashell")
-D.eAp=new A.z("\ud83e\udd80\ud83c\udfd6\ufe0f","Crab")
-D.eBh=new A.z("\ud83d\udc19\ud83c\udf0a","Octopus")
-D.eAQ=new A.z("\ud83e\udd88\ud83c\udf0a","Shark attack")
-D.ezw=new A.z("\ud83d\udc2c\ud83c\udf0a","Dolphin")
-D.eQK=new A.z("\ud83d\udc33\ud83d\udca6","Whale")
-D.eCB=new A.z("\ud83e\udd3f\ud83d\udc20","Scuba diving")
-D.ezF=new A.z("\ud83d\udd26\ud83c\udf11","Flashlight")
-D.eId=new A.z("\ud83d\udd6f\ufe0f\ud83c\udf82","Birthday candle")
-D.eVc=new A.z("\ud83d\udd0b\u26a1","Battery")
-D.eQk=new A.z("\ud83d\udcbb\ud83d\uddb1\ufe0f","Computer mouse")
-D.eFg=new A.z("\ud83d\udcf1\ud83d\udd0b","Phone charger")
-D.eI2=new A.z("\ud83d\udce7\ud83d\udce8","Email")
-D.eLY=new A.z("\ud83c\udf10\ud83d\udd0d","Search engine")
-D.eOi=new A.z("\ud83c\udfae\ud83d\udd79\ufe0f","Video game")
-D.eEX=new A.z("\ud83e\udd16\ud83e\udde0","Artificial intelligence")
-D.eMk=new A.z("\ud83e\uddca\ud83e\uddca","Ice cubes")
-D.ex0=new A.z("\ud83e\udd76\ud83e\udde4","Mittens")
-D.eJL=new A.z("\ud83e\udde3\ud83e\udde6","Winter clothes")
-D.eSp=new A.z("\ud83d\udc5f\ud83e\udde6","Shoes and socks")
-D.eOP=new A.z("\ud83d\udc54\ud83d\udc56","Business suit")
-D.eIv=new A.z("\ud83d\udc57\ud83d\udc60","Fancy dress")
-D.eRi=new A.z("\ud83d\udd76\ufe0f\ud83e\udde2","Cool outfit")
-D.eIG=new A.z("\ud83d\uded2\ud83d\udecd\ufe0f","Shopping")
-D.eOC=new A.z("\ud83d\udcb3\ud83d\udcb5","Money")
-D.eQu=new A.z("\ud83c\udfe6\ud83d\udcb0","Bank")
-D.eQL=new A.z("\ud83d\udcc8\ud83d\udcb0","Profit")
-D.eDp=new A.z("\ud83d\udcc9\ud83d\ude22","Loss")
-D.ezG=new A.z("\ud83e\ude99\ud83e\ude99\ud83e\ude99","Coins")
-D.eU5=new A.z("\u23f3\u231b","Hourglass")
-D.eGq=new A.z("\ud83d\uddd3\ufe0f\ud83c\udf89","Holiday")
-D.eKc=new A.z("\ud83c\udf83\ud83d\udc7b","Halloween")
-D.ey3=new A.z("\ud83e\udd83\ud83c\udf7d\ufe0f","Thanksgiving")
-D.ewY=new A.z("\ud83c\udf86\ud83d\udd5b","New Year")
-D.eP1=new A.z("\u2764\ufe0f\ud83c\udf39","Valentine")
-D.eGl=new A.z("\ud83d\udc30\ud83e\udd5a","Easter")
-D.eV8=new A.z("\ud83c\udf87\ud83c\uddfa\ud83c\uddf8","Fourth of July")
-D.eHc=new A.z("\ud83d\udd4e\ud83d\udd6f\ufe0f","Hanukkah")
-D.eS4=new A.z("\ud83c\udf19\u2b50","Ramadan")
-D.eOF=new A.z("\ud83e\ude94\u2728","Diwali")
-D.ex6=new A.z("\ud83e\udd73\ud83c\udf88","Celebration")
-D.eUq=new A.z("\ud83d\ude34\ud83d\udecf\ufe0f","Sleeping")
-D.eTK=new A.z("\ud83d\ude02\ud83e\udd23","Laughing")
-D.eHu=new A.z("\ud83d\ude22\ud83d\udca7","Crying")
-D.eEK=new A.z("\ud83d\ude21\ud83d\udd25","Angry")
-D.eS8=new A.z("\ud83e\udd14\ud83d\udcad","Thinking")
-D.eML=new A.z("\ud83d\ude4f\ud83d\udd4a\ufe0f","Peace")
-D.eUS=new A.z("\ud83e\udd1d\ud83c\udf0d","Unity")
-D.exm=new A.z("\u2764\ufe0f\ud83c\udfe0","Home sweet home")
-D.eU7=new A.z("\ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67\u200d\ud83d\udc66\ud83c\udfe1","Family")
-D.eCv=new A.z("\ud83d\udc76\ud83c\udf7c","Baby bottle")
-D.eTI=new A.z("\ud83d\udc74\ud83d\udc75","Grandparents")
-D.eKw=new A.z("\ud83c\udfeb\ud83c\udf92","Back to school")
-D.eT_=new A.z("\ud83d\udcda\ud83e\udde0","Knowledge")
-D.eS9=new A.z("\ud83d\udd2c\ud83e\uddea","Science lab")
-D.eF1=new A.z("\ud83e\uddec\ud83e\uddeb","Biology")
-D.ewW=new A.z("\u2795\u2796\u2716\ufe0f\u2797","Mathematics")
-D.eGT=new A.z("\ud83c\udf0d\ud83d\uddfa\ufe0f","World map")
-D.eGA=new A.z("\ud83e\udded\u26f0\ufe0f","Adventure")
-D.eRH=new A.z("\ud83c\udff4\u200d\u2620\ufe0f\ud83e\udd9c","Pirate")
-D.eIT=new A.z("\ud83d\udc8e\u26cf\ufe0f","Mining")
-D.eRc=new A.z("\ud83c\udfc6\ud83e\udd47","First place")
-D.ex3=new A.z("\ud83c\udfaf\ud83d\udcaf","Bullseye")
-D.ezs=new A.z("\ud83d\udd11\ud83d\udd12","Lock and key")
-D.eSB=new A.z("\ud83d\udeaa\ud83d\udd11","Front door")
-D.eC0=new A.z("\ud83e\ude9e\ud83d\udc64","Mirror")
-D.eIx=new A.z("\ud83e\uddfc\ud83e\udee7","Soap bubbles")
-D.eGN=new A.z("\ud83d\udebf\ud83e\uddf4","Shower")
-D.eQU=new A.z("\ud83e\udea5\ud83d\ude01","Smile")
-D.eIJ=new A.z("\u2602\ufe0f\ud83c\udf27\ufe0f","Umbrella")
-D.eU6=new A.z("\ud83c\udf08\u2600\ufe0f","Sun shower")
-D.eDo=new A.z("\ud83c\udf05\ud83c\udfd6\ufe0f","Beach sunrise")
-D.eFZ=new A.z("\ud83c\udfd5\ufe0f\ud83c\udf32","Forest camp")
-D.eHp=new A.z("\ud83e\udd8c\ud83c\udf32","Deer in the woods")
-D.eOj=new A.z("\ud83e\udd89\ud83c\udf19","Night owl")
-D.eI4=new A.z("\ud83d\udc26\ud83c\udf05","Early bird")
-D.eM2=new A.z("\ud83d\udc1f\ud83c\udfa3\ud83c\udf7d\ufe0f","Fish dinner")
-D.eHD=new A.z("\ud83e\udd5b\ud83c\udf6a","Milk and cookies")
-D.eCY=new A.z("\ud83c\udf6f\ud83d\udc3b","Winnie the Pooh")
-D.eJ7=new A.z("\ud83d\udc2d\ud83e\uddc0","Mouse and cheese")
-D.eTT=new A.z("\ud83d\udc31\ud83d\udc2d","Cat and mouse")
-D.eFs=new A.z("\ud83d\udc36\ud83e\uddb4","Dog bone")
-D.eUz=new A.z("\ud83d\udc36\ud83c\udfbe","Fetch")
-D.eQB=new A.z("\ud83d\udc31\ud83e\uddf6","Ball of yarn")
-D.eBJ=new A.z("\ud83e\udd9c\ud83d\udde3\ufe0f","Talking parrot")
-D.eDD=new A.z("\ud83e\udda2\ud83c\udf0a","Swan lake")
-D.eAA=new A.z("\ud83e\udd85\ud83c\udfd4\ufe0f","Eagle")
-D.eKf=new A.z("\ud83e\udd8b\ud83c\udf38","Butterfly garden")
-D.eLG=new A.z("\ud83d\udc1d\ud83c\udf38","Pollination")
-D.eFl=new A.z("\ud83c\udf3d\ud83c\udf7f","Popcorn")
-D.eMl=new A.z("\ud83e\udd5a\ud83c\udf73","Fried egg")
-D.eLP=new A.z("\ud83e\uddc0\ud83d\udc2d\ud83e\udea4","Mousetrap")
-D.eDY=new A.z("\ud83c\udf4e\ud83d\udcf1","Apple phone")
-D.eO6=new A.z("\ud83c\udf82\ud83d\udd6f\ufe0f\ud83c\udf88","Birthday")
-D.eMb=new A.z("\ud83e\udd47\ud83c\udfc5\ud83e\udd48","Medals")
-D.eCX=new A.z("\ud83c\udfe0\ud83d\udd11","House keys")
-D.eJa=new A.z("\ud83e\uddb7\ud83d\udccf","Braces")
-D.eGt=new A.z("\ud83c\udf15\ud83d\udc3a","Howling wolf")
-D.ezK=new A.z("\ud83e\uddd1\u200d\ud83c\udf73\ud83c\udf72","Chef")
-D.eAX=new A.z("\ud83e\uddd1\u200d\ud83c\udf3e\ud83d\ude9c","Farmer")
-D.eG9=new A.z("\ud83e\uddd1\u200d\ud83c\udfa8\ud83c\udfa8","Artist")
-D.eL4=new A.z("\ud83e\uddd1\u200d\ud83d\udd27\ud83d\udd27","Mechanic")
-D.eMG=new A.z("\ud83e\uddd1\u200d\ud83d\udcbb\u2328\ufe0f","Programmer")
-D.eAG=new A.z("\ud83e\uddd1\u200d\ud83d\ude80\ud83e\ude90","Astronaut")
-D.eBg=new A.z("\ud83e\uddd1\u200d\u2696\ufe0f\u2696\ufe0f","Judge")
-D.eSh=new A.z("\ud83e\uddd1\u200d\ud83c\udfa4\ud83c\udfb6","Singer")
-D.eAL=new A.z("\ud83c\udfc4\u200d\u2642\ufe0f\ud83c\udf0a","Surfer")
-D.eOH=new A.z("\ud83d\udeb0\ud83d\udca7","Tap water")
-D.ezx=new A.z("\ud83c\udf2c\ufe0f\ud83c\udf3e","Windmill")
-D.eH1=new A.z("\u26f5\ud83c\udf05","Sailing")
-D.eCG=new A.z("\ud83d\udef6\ud83c\udfde\ufe0f","Canoe")
-D.ex5=new A.z("\ud83c\udff0\ud83d\udee1\ufe0f","Knight")
-D.eMc=new A.z("\ud83d\udddd\ufe0f\ud83c\udff0","Castle key")
-D.eTg=new A.z("\ud83e\uddca\ud83c\udf79","Iced drink")
-D.eK_=new A.z("\ud83c\udf75\ud83e\uded6","Teapot")
-D.aB_=x([D.eRf,D.eGC,D.exT,D.eLq,D.eLS,D.eCC,D.eRO,D.eCt,D.eCo,D.eP0,D.eS_,D.eDc,D.eRV,D.eUJ,D.eSP,D.eMx,D.eLH,D.eAe,D.eDV,D.eIV,D.eQz,D.eJU,D.eGn,D.eHt,D.eRt,D.eEN,D.eTt,D.eJG,D.eBV,D.eOR,D.ewG,D.eCF,D.evJ,D.eKh,D.eO5,D.eEk,D.ezp,D.eCT,D.eG3,D.eVg,D.eUu,D.eRg,D.eDT,D.eDm,D.eNE,D.eEs,D.eUZ,D.eNF,D.eMX,D.eEE,D.eTu,D.eGV,D.eNn,D.eRM,D.eUr,D.ezH,D.eU1,D.eVl,D.eFO,D.eJZ,D.eJN,D.eIc,D.eOJ,D.eA0,D.eNr,D.eNb,D.eC5,D.eDd,D.eSn,D.eA5,D.eCi,D.ezU,D.eNo,D.eNw,D.eMV,D.eRF,D.eM3,D.eC2,D.ewp,D.eKO,D.eEn,D.eJA,D.eJE,D.eUB,D.eRD,D.eHU,D.eUm,D.eRn,D.eGJ,D.eKL,D.eC1,D.eIt,D.eB_,D.eDQ,D.eS6,D.eDx,D.eRZ,D.eAs,D.eHq,D.eGX,D.eP5,D.eL0,D.eDJ,D.ew1,D.eRp,D.eUv,D.eS3,D.eB0,D.eSz,D.eMP,D.eFk,D.eGK,D.ex9,D.eV_,D.eVb,D.eTX,D.ewy,D.eJz,D.eHw,D.eF7,D.eTS,D.eAB,D.eB8,D.eE_,D.eHE,D.eGx,D.eTA,D.eBf,D.exP,D.eIn,D.eBC,D.eVe,D.eLx,D.eUo,D.eQW,D.ePc,D.ewz,D.eCc,D.eNY,D.eHB,D.eNN,D.eGU,D.ezM,D.eDk,D.eK5,D.eE5,D.ex4,D.eIF,D.eAM,D.eEh,D.eCS,D.eI3,D.eBG,D.ezq,D.exg,D.eKo,D.eJY,D.eP8,D.eRP,D.eCd,D.eRq,D.eRA,D.eKY,D.ewC,D.eEg,D.eMH,D.eII,D.eEz,D.eFU,D.eCj,D.eAk,D.eRe,D.eBQ,D.eVq,D.eFK,D.eQC,D.eKP,D.eGW,D.eFA,D.eA1,D.eOx,D.eK4,D.eCp,D.eOE,D.eFr,D.eNK,D.eAp,D.eBh,D.eAQ,D.ezw,D.eQK,D.eCB,D.ezF,D.eId,D.eVc,D.eQk,D.eFg,D.eI2,D.eLY,D.eOi,D.eEX,D.eMk,D.ex0,D.eJL,D.eSp,D.eOP,D.eIv,D.eRi,D.eIG,D.eOC,D.eQu,D.eQL,D.eDp,D.ezG,D.eU5,D.eGq,D.eKc,D.ey3,D.ewY,D.eP1,D.eGl,D.eV8,D.eHc,D.eS4,D.eOF,D.ex6,D.eUq,D.eTK,D.eHu,D.eEK,D.eS8,D.eML,D.eUS,D.exm,D.eU7,D.eCv,D.eTI,D.eKw,D.eT_,D.eS9,D.eF1,D.ewW,D.eGT,D.eGA,D.eRH,D.eIT,D.eRc,D.ex3,D.ezs,D.eSB,D.eC0,D.eIx,D.eGN,D.eQU,D.eIJ,D.eU6,D.eDo,D.eFZ,D.eHp,D.eOj,D.eI4,D.eM2,D.eHD,D.eCY,D.eJ7,D.eTT,D.eFs,D.eUz,D.eQB,D.eBJ,D.eDD,D.eAA,D.eKf,D.eLG,D.eFl,D.eMl,D.eLP,D.eDY,D.eO6,D.eMb,D.eCX,D.eJa,D.eGt,D.ezK,D.eAX,D.eG9,D.eL4,D.eMG,D.eAG,D.eBg,D.eSh,D.eAL,D.eOH,D.ezx,D.eH1,D.eCG,D.ex5,D.eMc,D.eTg,D.eK_],y.L)
-D.dlT=x([0,0.8],y.u)
-D.dm_=x([C.aA,C.kh],y.O)
-D.dmK=x([C.ek,C.M9],y.O)
+D.dkO=x([D.b7x],y.V)
+D.eRj=new A.z("\ud83c\udf27\ufe0f\ud83c\udf80","Rainbow")
+D.eGF=new A.z("\u2600\ufe0f\ud83c\udf3b","Sunflower")
+D.exW=new A.z("\u2b50\ud83d\udc1f","Starfish")
+D.eLt=new A.z("\ud83d\udc1d\ud83c\udfe0","Beehive")
+D.eLV=new A.z("\ud83c\udf6f\ud83c\udf19","Honeymoon")
+D.eCF=new A.z("\ud83e\uddb7\ud83e\uddda","Tooth fairy")
+D.eRS=new A.z("\ud83d\udd25\ud83e\udeb5","Campfire")
+D.eCw=new A.z("\ud83e\udde0\ud83c\udf2a\ufe0f","Brainstorm")
+D.eCr=new A.z("\ud83d\udc1f\ud83e\udd63","Fishbowl")
+D.eP3=new A.z("\ud83d\udc41\ufe0f\ud83c\udf6d","Eye candy")
+D.eS3=new A.z("\ud83d\udd11\ud83e\udeb5","Keyboard")
+D.eDf=new A.z("\ud83e\udd5c\ud83e\uddc8","Peanut butter")
+D.eRZ=new A.z("\ud83e\uddca\ud83c\udfd2","Ice hockey")
+D.eUN=new A.z("\ud83d\udc31\ud83d\udc1f","Catfish")
+D.eST=new A.z("\ud83d\udc36\ud83c\udfe0","Doghouse")
+D.eMA=new A.z("\ud83d\udeaa\ud83d\udd14","Doorbell")
+D.eLK=new A.z("\ud83e\uddb7\ud83e\udea5","Toothbrush")
+D.eAh=new A.z("\ud83d\udca1\ud83c\udfe0","Lighthouse")
+D.eDY=new A.z("\u2744\ufe0f\u26c4","Snowman")
+D.eIY=new A.z("\ud83c\udf3d\ud83d\udc15","Corn dog")
+D.eQD=new A.z("\u23f0\ud83d\udcb0","Time is money")
+D.eJX=new A.z("\ud83c\udf27\ufe0f\ud83d\udc31\ud83d\udc36","Raining cats and dogs")
+D.eGq=new A.z("\ud83c\udf82\ud83c\udf89","Birthday party")
+D.eHw=new A.z("\ud83c\udf0a\ud83c\udfc4","Surfing")
+D.eRx=new A.z("\ud83d\udd25\ud83d\ude92","Fire truck")
+D.eEQ=new A.z("\ud83c\udf0d\ud83c\udf21\ufe0f","Global warming")
+D.eTx=new A.z("\ud83d\udc1e\ud83d\udc1e","Ladybugs")
+D.eJJ=new A.z("\u2b50\ud83c\udf19","Night sky")
+D.eBY=new A.z("\ud83c\udf7f\ud83c\udfac","Movie night")
+D.eOU=new A.z("\ud83c\udf85\ud83c\udf84","Christmas")
+D.ewI=new A.z("\ud83c\udf19\ud83d\udca1","Moonlight")
+D.eCI=new A.z("\u2600\ufe0f\ud83d\udc53","Sunglasses")
+D.evL=new A.z("\ud83c\udf27\ufe0f\ud83e\udde5","Raincoat")
+D.eKk=new A.z("\u2744\ufe0f\u26bd","Snowball")
+D.eO8=new A.z("\ud83e\uddfa\u26bd","Basketball")
+D.eEn=new A.z("\ud83e\uddb6\u26bd","Football")
+D.ezs=new A.z("\ud83e\uddc8\ud83e\udeb0","Butterfly")
+D.eCW=new A.z("\ud83c\udf73\ud83c\udf70","Pancake")
+D.eG6=new A.z("\u2615\ud83c\udf70","Cupcake")
+D.eVk=new A.z("\u2b50\ud83d\udca1","Starlight")
+D.eUy=new A.z("\u2600\ufe0f\u2b06\ufe0f","Sunrise")
+D.eRk=new A.z("\u2600\ufe0f\u2b07\ufe0f","Sunset")
+D.eDW=new A.z("\ud83c\udf27\ufe0f\ud83d\udca7","Raindrop")
+D.eDp=new A.z("\u2744\ufe0f\ud83c\udf38","Snowflake")
+D.eNH=new A.z("\ud83c\udf0d\ud83e\udee8","Earthquake")
+D.eEv=new A.z("\ud83d\udd25\ud83e\udeb0","Firefly")
+D.eV2=new A.z("\ud83d\udd25\ud83d\udc68","Fireman")
+D.eNI=new A.z("\ud83d\udcee\ud83d\udc68","Postman")
+D.eN_=new A.z("\ud83d\udcda\ud83e\ude91","Library")
+D.eEH=new A.z("\ud83d\udcdd\ud83d\udcd6","Notebook")
+D.eTy=new A.z("\ud83d\udecf\ufe0f\ud83d\udeaa","Bedroom")
+D.eGY=new A.z("\ud83d\udec1\ud83d\udeaa","Bathroom")
+D.eNq=new A.z("\ud83c\udfeb\ud83d\udeaa","Classroom")
+D.eRQ=new A.z("\ud83e\uddb7\ud83c\udfa8","Toothpaste")
+D.eUv=new A.z("\ud83d\udc26\ud83c\udfe0","Birdhouse")
+D.ezK=new A.z("\ud83d\udc14\ud83c\udfe0","Chicken coop")
+D.eU5=new A.z("\ud83d\udc34\ud83d\udc5f","Horseshoe")
+D.eVp=new A.z("\ud83d\udc34\ud83e\uddd1","Horseman")
+D.eFR=new A.z("\ud83d\udc18\ud83e\uddf3","Elephant trunk")
+D.eK1=new A.z("\ud83e\udd81\ud83d\udc51","Lion king")
+D.eJQ=new A.z("\ud83d\udc2f\ud83e\udd81","Liger")
+D.eIf=new A.z("\ud83d\udc3a\ud83c\udf19","Werewolf")
+D.eOM=new A.z("\ud83e\udddb\ud83e\udd87","Vampire bat")
+D.eA3=new A.z("\ud83e\udddf\ud83c\udf4e","Zombie apocalypse")
+D.eNu=new A.z("\ud83d\udd77\ufe0f\ud83e\uddd1","Spider-Man")
+D.eNe=new A.z("\ud83e\udd87\ud83e\uddd1","Batman")
+D.eC8=new A.z("\ud83e\uddd1\ud83d\ude80\ud83c\udf19","Moon landing")
+D.eDg=new A.z("\ud83d\ude80\ud83c\udf0d","Space travel")
+D.eSr=new A.z("\ud83d\udef8\ud83d\udc7d","Alien invasion")
+D.eA8=new A.z("\ud83c\udf0c\ud83d\udd2d","Stargazing")
+D.eCl=new A.z("\ud83e\ude90\ud83d\udc8d","Saturn")
+D.ezX=new A.z("\ud83c\udf1e\ud83e\ude90","Solar system")
+D.eNr=new A.z("\ud83c\udf11\u2600\ufe0f","Solar eclipse")
+D.eNz=new A.z("\ud83c\udf11\ud83c\udf0d","Lunar eclipse")
+D.eMY=new A.z("\ud83c\udf4e\ud83e\udd67","Apple pie")
+D.eRJ=new A.z("\ud83c\udf53\ud83c\udf70","Strawberry shortcake")
+D.eM6=new A.z("\ud83c\udf6b\ud83e\udd5b","Chocolate milk")
+D.eC5=new A.z("\ud83c\udf4c\ud83c\udf66","Banana split")
+D.ewr=new A.z("\ud83e\udd6a\ud83e\uddc0","Cheese sandwich")
+D.eKR=new A.z("\ud83c\udf55\ud83e\uddc0","Cheese pizza")
+D.eEq=new A.z("\ud83c\udf54\ud83c\udf5f","Burger and fries")
+D.eJD=new A.z("\ud83c\udf2d\ud83e\udd64","Hot dog and soda")
+D.eJH=new A.z("\ud83c\udf69\u2615","Donut and coffee")
+D.eUF=new A.z("\ud83e\udd5e\ud83c\udf41","Pancakes with syrup")
+D.eRH=new A.z("\ud83c\udf5e\ud83e\uddc8","Bread and butter")
+D.eHX=new A.z("\ud83c\udf73\ud83e\udd53","Bacon and eggs")
+D.eUq=new A.z("\ud83e\udd54\ud83c\udf5f","French fries")
+D.eRr=new A.z("\ud83c\udf2e\ud83c\udf36\ufe0f","Spicy taco")
+D.eGM=new A.z("\ud83c\udf63\ud83c\udf5a","Sushi")
+D.eKO=new A.z("\ud83c\udf5c\ud83e\udd62","Noodles")
+D.eC4=new A.z("\ud83e\udd6d\ud83c\udf79","Mango juice")
+D.eIw=new A.z("\ud83c\udf49\ud83c\udfd6\ufe0f","Summer")
+D.eB2=new A.z("\ud83c\udf42\ud83c\udf41","Autumn")
+D.eDT=new A.z("\u2744\ufe0f\ud83c\udfbf","Skiing")
+D.eSa=new A.z("\ud83c\udf37\ud83d\udc1d","Spring")
+D.eDA=new A.z("\ud83c\udf34\ud83c\udfdd\ufe0f","Tropical island")
+D.eS2=new A.z("\ud83c\udfd4\ufe0f\ud83e\uddd7","Mountain climbing")
+D.eAv=new A.z("\u26fa\ud83d\udd25","Camping")
+D.eHt=new A.z("\ud83c\udfa3\ud83d\udc1f","Fishing")
+D.eH_=new A.z("\ud83c\udfca\ud83c\udf0a","Swimming")
+D.eP8=new A.z("\ud83d\udeb4\ud83c\udfd4\ufe0f","Mountain biking")
+D.eL3=new A.z("\ud83c\udfc3\ud83d\udc5f","Running shoes")
+D.eDM=new A.z("\u26bd\ud83e\udd45","Soccer goal")
+D.ew3=new A.z("\ud83c\udfc0\ud83c\udfc6","Basketball champion")
+D.eRt=new A.z("\ud83c\udfbe\ud83c\udff8","Racket sports")
+D.eUz=new A.z("\ud83e\udd4a\ud83c\udfc6","Boxing champion")
+D.eS7=new A.z("\ud83c\udfb3\ud83c\udfaf","Bowling")
+D.eB3=new A.z("\u26f3\ud83c\udfcc\ufe0f","Golf")
+D.eSD=new A.z("\ud83c\udff9\ud83c\udfaf","Archery")
+D.eMS=new A.z("\ud83e\uddd8\ud83d\udd6f\ufe0f","Meditation")
+D.eFn=new A.z("\ud83c\udfb8\ud83c\udfa4","Rock band")
+D.eGN=new A.z("\ud83c\udfb9\ud83c\udfb6","Piano music")
+D.exc=new A.z("\ud83e\udd41\ud83c\udfb7","Jazz band")
+D.eV3=new A.z("\ud83c\udfbb\ud83c\udfbc","Orchestra")
+D.eVf=new A.z("\ud83c\udfa4\ud83c\udfb5","Karaoke")
+D.eU0=new A.z("\ud83c\udfa7\ud83c\udfb6","Headphones")
+D.ewA=new A.z("\ud83d\udcfb\ud83c\udfb5","Radio")
+D.eJC=new A.z("\ud83d\udcfa\ud83c\udf7f","Television")
+D.eHz=new A.z("\ud83d\udcf7\ud83c\udf05","Photography")
+D.eFa=new A.z("\ud83c\udfa8\ud83d\udd8c\ufe0f","Painting")
+D.eTW=new A.z("\u270f\ufe0f\ud83d\udccf","Drawing")
+D.eAE=new A.z("\ud83d\udcd6\ud83c\udf19","Bedtime story")
+D.eBb=new A.z("\ud83e\uddd9\u200d\u2642\ufe0f\ud83d\udcd6","Wizard book")
+D.eE2=new A.z("\ud83d\udc09\ud83c\udff0","Dragon castle")
+D.eHH=new A.z("\ud83e\uddda\ud83c\udf38","Fairy garden")
+D.eGA=new A.z("\ud83d\udc78\ud83d\udc38","Frog prince")
+D.eTE=new A.z("\ud83d\udc3a\ud83d\udc75","Little Red Riding Hood")
+D.eBi=new A.z("\ud83d\udc37\ud83c\udfe0","Three little pigs")
+D.exS=new A.z("\ud83e\ude84\ud83d\udc07","Magic trick")
+D.eIq=new A.z("\ud83c\udfa9\ud83d\udc07","Magician")
+D.eBF=new A.z("\ud83e\udd21\ud83c\udfaa","Circus")
+D.eVi=new A.z("\ud83c\udfa1\ud83c\udfa2","Theme park")
+D.eLA=new A.z("\ud83c\udf81\ud83c\udf80","Gift")
+D.eUs=new A.z("\ud83d\udc8d\ud83d\udc92","Wedding")
+D.eR_=new A.z("\ud83c\udf93\ud83c\udfa9","Graduation")
+D.ePf=new A.z("\ud83c\udfe5\ud83d\ude91","Hospital")
+D.ewB=new A.z("\ud83d\udc89\ud83e\ude7a","Doctor")
+D.eCf=new A.z("\ud83e\uddb7\ud83d\udc68\u200d\u2695\ufe0f","Dentist")
+D.eO0=new A.z("\ud83e\uddd1\u200d\ud83c\udfeb\ud83d\udcda","Teacher")
+D.eHE=new A.z("\ud83d\udc6e\ud83d\ude94","Police car")
+D.eNQ=new A.z("\ud83d\ude92\ud83d\udc68\u200d\ud83d\ude92","Firefighter")
+D.eGX=new A.z("\u2708\ufe0f\ud83e\uddd1\u200d\u2708\ufe0f","Pilot")
+D.ezP=new A.z("\ud83d\udea2\u2693","Ship anchor")
+D.eDn=new A.z("\ud83d\ude82\ud83d\ude83","Train")
+D.eK8=new A.z("\ud83d\ude8c\ud83c\udfeb","School bus")
+D.eE8=new A.z("\ud83d\udeb2\ud83d\udede","Bicycle")
+D.ex7=new A.z("\ud83c\udfcd\ufe0f\ud83d\udca8","Motorcycle")
+D.eII=new A.z("\ud83d\ude97\u26fd","Gas station")
+D.eAP=new A.z("\ud83d\udee3\ufe0f\ud83d\udea6","Traffic")
+D.eEk=new A.z("\ud83c\udf09\ud83c\udf0a","Bridge")
+D.eCV=new A.z("\ud83c\udff0\ud83d\udc51","Palace")
+D.eI6=new A.z("\ud83d\uddfd\ud83c\uddfa\ud83c\uddf8","Statue of Liberty")
+D.eBJ=new A.z("\ud83d\uddfc\ud83c\uddeb\ud83c\uddf7","Eiffel Tower")
+D.ezt=new A.z("\ud83c\udfef\ud83c\uddef\ud83c\uddf5","Japanese castle")
+D.exj=new A.z("\ud83d\udd4c\ud83c\udf19","Mosque")
+D.eKr=new A.z("\u26ea\ud83d\udd14","Church bell")
+D.eK0=new A.z("\ud83d\udc2b\ud83c\udfdc\ufe0f","Desert camel")
+D.ePb=new A.z("\ud83d\udc27\ud83e\uddca","Penguin")
+D.eRT=new A.z("\ud83d\udc3b\u200d\u2744\ufe0f\u2744\ufe0f","Polar bear")
+D.eCg=new A.z("\ud83d\udc28\ud83c\udf3f","Koala")
+D.eRu=new A.z("\ud83e\udd98\ud83c\udde6\ud83c\uddfa","Kangaroo")
+D.eRE=new A.z("\ud83e\udd92\ud83c\udf33","Giraffe")
+D.eL0=new A.z("\ud83e\udd93\ud83e\udd81","Zebra")
+D.ewE=new A.z("\ud83d\udc18\ud83d\udc2d","Elephant and mouse")
+D.eEj=new A.z("\ud83d\udc22\ud83d\udc07","The tortoise and the hare")
+D.eMK=new A.z("\ud83d\udc1c\ud83d\udc1c\ud83d\udc1c","Ant colony")
+D.eIL=new A.z("\ud83d\udc1d\ud83c\udf6f","Honey bee")
+D.eEC=new A.z("\ud83d\udd78\ufe0f\ud83d\udd77\ufe0f","Spider web")
+D.eFX=new A.z("\ud83d\udc1b\ud83e\udd8b","Metamorphosis")
+D.eCm=new A.z("\ud83d\udc38\ud83e\udeb7","Lily pad")
+D.eAn=new A.z("\ud83e\udd86\ud83c\udf0a","Duck pond")
+D.eRi=new A.z("\ud83d\udc13\ud83c\udf05","Rooster")
+D.eBT=new A.z("\ud83d\udc04\ud83e\udd5b","Dairy cow")
+D.eVu=new A.z("\ud83d\udc11\ud83e\uddf6","Wool")
+D.eFN=new A.z("\ud83d\udc16\ud83e\udd53","Bacon")
+D.eQG=new A.z("\ud83c\udf3d\ud83c\udf3e","Farm")
+D.eKS=new A.z("\ud83e\udd55\ud83d\udc07","Carrot")
+D.eGZ=new A.z("\ud83c\udf33\ud83c\udf4e","Apple tree")
+D.eFD=new A.z("\ud83c\udf32\ud83c\udf84","Christmas tree")
+D.eA4=new A.z("\ud83c\udf43\ud83c\udf2c\ufe0f","Windy day")
+D.eOA=new A.z("\u26c8\ufe0f\u26a1","Thunderstorm")
+D.eK7=new A.z("\ud83c\udf2a\ufe0f\ud83c\udfe0","Tornado")
+D.eCs=new A.z("\ud83c\udf0a\ud83c\udf0b","Tsunami")
+D.eOH=new A.z("\ud83c\udf0b\ud83d\udd25","Volcano")
+D.eFu=new A.z("\ud83c\udfdd\ufe0f\ud83e\udd65","Coconut")
+D.eNN=new A.z("\ud83d\udc1a\ud83c\udf0a","Seashell")
+D.eAs=new A.z("\ud83e\udd80\ud83c\udfd6\ufe0f","Crab")
+D.eBk=new A.z("\ud83d\udc19\ud83c\udf0a","Octopus")
+D.eAT=new A.z("\ud83e\udd88\ud83c\udf0a","Shark attack")
+D.ezz=new A.z("\ud83d\udc2c\ud83c\udf0a","Dolphin")
+D.eQO=new A.z("\ud83d\udc33\ud83d\udca6","Whale")
+D.eCE=new A.z("\ud83e\udd3f\ud83d\udc20","Scuba diving")
+D.ezI=new A.z("\ud83d\udd26\ud83c\udf11","Flashlight")
+D.eIg=new A.z("\ud83d\udd6f\ufe0f\ud83c\udf82","Birthday candle")
+D.eVg=new A.z("\ud83d\udd0b\u26a1","Battery")
+D.eQo=new A.z("\ud83d\udcbb\ud83d\uddb1\ufe0f","Computer mouse")
+D.eFj=new A.z("\ud83d\udcf1\ud83d\udd0b","Phone charger")
+D.eI5=new A.z("\ud83d\udce7\ud83d\udce8","Email")
+D.eM0=new A.z("\ud83c\udf10\ud83d\udd0d","Search engine")
+D.eOl=new A.z("\ud83c\udfae\ud83d\udd79\ufe0f","Video game")
+D.eF_=new A.z("\ud83e\udd16\ud83e\udde0","Artificial intelligence")
+D.eMn=new A.z("\ud83e\uddca\ud83e\uddca","Ice cubes")
+D.ex3=new A.z("\ud83e\udd76\ud83e\udde4","Mittens")
+D.eJO=new A.z("\ud83e\udde3\ud83e\udde6","Winter clothes")
+D.eSt=new A.z("\ud83d\udc5f\ud83e\udde6","Shoes and socks")
+D.eOS=new A.z("\ud83d\udc54\ud83d\udc56","Business suit")
+D.eIy=new A.z("\ud83d\udc57\ud83d\udc60","Fancy dress")
+D.eRm=new A.z("\ud83d\udd76\ufe0f\ud83e\udde2","Cool outfit")
+D.eIJ=new A.z("\ud83d\uded2\ud83d\udecd\ufe0f","Shopping")
+D.eOF=new A.z("\ud83d\udcb3\ud83d\udcb5","Money")
+D.eQy=new A.z("\ud83c\udfe6\ud83d\udcb0","Bank")
+D.eQP=new A.z("\ud83d\udcc8\ud83d\udcb0","Profit")
+D.eDs=new A.z("\ud83d\udcc9\ud83d\ude22","Loss")
+D.ezJ=new A.z("\ud83e\ude99\ud83e\ude99\ud83e\ude99","Coins")
+D.eU9=new A.z("\u23f3\u231b","Hourglass")
+D.eGt=new A.z("\ud83d\uddd3\ufe0f\ud83c\udf89","Holiday")
+D.eKf=new A.z("\ud83c\udf83\ud83d\udc7b","Halloween")
+D.ey6=new A.z("\ud83e\udd83\ud83c\udf7d\ufe0f","Thanksgiving")
+D.ex0=new A.z("\ud83c\udf86\ud83d\udd5b","New Year")
+D.eP4=new A.z("\u2764\ufe0f\ud83c\udf39","Valentine")
+D.eGo=new A.z("\ud83d\udc30\ud83e\udd5a","Easter")
+D.eVc=new A.z("\ud83c\udf87\ud83c\uddfa\ud83c\uddf8","Fourth of July")
+D.eHf=new A.z("\ud83d\udd4e\ud83d\udd6f\ufe0f","Hanukkah")
+D.eS8=new A.z("\ud83c\udf19\u2b50","Ramadan")
+D.eOI=new A.z("\ud83e\ude94\u2728","Diwali")
+D.ex9=new A.z("\ud83e\udd73\ud83c\udf88","Celebration")
+D.eUu=new A.z("\ud83d\ude34\ud83d\udecf\ufe0f","Sleeping")
+D.eTO=new A.z("\ud83d\ude02\ud83e\udd23","Laughing")
+D.eHx=new A.z("\ud83d\ude22\ud83d\udca7","Crying")
+D.eEN=new A.z("\ud83d\ude21\ud83d\udd25","Angry")
+D.eSc=new A.z("\ud83e\udd14\ud83d\udcad","Thinking")
+D.eMO=new A.z("\ud83d\ude4f\ud83d\udd4a\ufe0f","Peace")
+D.eUW=new A.z("\ud83e\udd1d\ud83c\udf0d","Unity")
+D.exp=new A.z("\u2764\ufe0f\ud83c\udfe0","Home sweet home")
+D.eUb=new A.z("\ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67\u200d\ud83d\udc66\ud83c\udfe1","Family")
+D.eCy=new A.z("\ud83d\udc76\ud83c\udf7c","Baby bottle")
+D.eTM=new A.z("\ud83d\udc74\ud83d\udc75","Grandparents")
+D.eKz=new A.z("\ud83c\udfeb\ud83c\udf92","Back to school")
+D.eT3=new A.z("\ud83d\udcda\ud83e\udde0","Knowledge")
+D.eSd=new A.z("\ud83d\udd2c\ud83e\uddea","Science lab")
+D.eF4=new A.z("\ud83e\uddec\ud83e\uddeb","Biology")
+D.ewZ=new A.z("\u2795\u2796\u2716\ufe0f\u2797","Mathematics")
+D.eGW=new A.z("\ud83c\udf0d\ud83d\uddfa\ufe0f","World map")
+D.eGD=new A.z("\ud83e\udded\u26f0\ufe0f","Adventure")
+D.eRL=new A.z("\ud83c\udff4\u200d\u2620\ufe0f\ud83e\udd9c","Pirate")
+D.eIW=new A.z("\ud83d\udc8e\u26cf\ufe0f","Mining")
+D.eRg=new A.z("\ud83c\udfc6\ud83e\udd47","First place")
+D.ex6=new A.z("\ud83c\udfaf\ud83d\udcaf","Bullseye")
+D.ezv=new A.z("\ud83d\udd11\ud83d\udd12","Lock and key")
+D.eSF=new A.z("\ud83d\udeaa\ud83d\udd11","Front door")
+D.eC3=new A.z("\ud83e\ude9e\ud83d\udc64","Mirror")
+D.eIA=new A.z("\ud83e\uddfc\ud83e\udee7","Soap bubbles")
+D.eGQ=new A.z("\ud83d\udebf\ud83e\uddf4","Shower")
+D.eQY=new A.z("\ud83e\udea5\ud83d\ude01","Smile")
+D.eIM=new A.z("\u2602\ufe0f\ud83c\udf27\ufe0f","Umbrella")
+D.eUa=new A.z("\ud83c\udf08\u2600\ufe0f","Sun shower")
+D.eDr=new A.z("\ud83c\udf05\ud83c\udfd6\ufe0f","Beach sunrise")
+D.eG1=new A.z("\ud83c\udfd5\ufe0f\ud83c\udf32","Forest camp")
+D.eHs=new A.z("\ud83e\udd8c\ud83c\udf32","Deer in the woods")
+D.eOm=new A.z("\ud83e\udd89\ud83c\udf19","Night owl")
+D.eI7=new A.z("\ud83d\udc26\ud83c\udf05","Early bird")
+D.eM5=new A.z("\ud83d\udc1f\ud83c\udfa3\ud83c\udf7d\ufe0f","Fish dinner")
+D.eHG=new A.z("\ud83e\udd5b\ud83c\udf6a","Milk and cookies")
+D.eD0=new A.z("\ud83c\udf6f\ud83d\udc3b","Winnie the Pooh")
+D.eJa=new A.z("\ud83d\udc2d\ud83e\uddc0","Mouse and cheese")
+D.eTX=new A.z("\ud83d\udc31\ud83d\udc2d","Cat and mouse")
+D.eFv=new A.z("\ud83d\udc36\ud83e\uddb4","Dog bone")
+D.eUD=new A.z("\ud83d\udc36\ud83c\udfbe","Fetch")
+D.eQF=new A.z("\ud83d\udc31\ud83e\uddf6","Ball of yarn")
+D.eBM=new A.z("\ud83e\udd9c\ud83d\udde3\ufe0f","Talking parrot")
+D.eDG=new A.z("\ud83e\udda2\ud83c\udf0a","Swan lake")
+D.eAD=new A.z("\ud83e\udd85\ud83c\udfd4\ufe0f","Eagle")
+D.eKi=new A.z("\ud83e\udd8b\ud83c\udf38","Butterfly garden")
+D.eLJ=new A.z("\ud83d\udc1d\ud83c\udf38","Pollination")
+D.eFo=new A.z("\ud83c\udf3d\ud83c\udf7f","Popcorn")
+D.eMo=new A.z("\ud83e\udd5a\ud83c\udf73","Fried egg")
+D.eLS=new A.z("\ud83e\uddc0\ud83d\udc2d\ud83e\udea4","Mousetrap")
+D.eE0=new A.z("\ud83c\udf4e\ud83d\udcf1","Apple phone")
+D.eO9=new A.z("\ud83c\udf82\ud83d\udd6f\ufe0f\ud83c\udf88","Birthday")
+D.eMe=new A.z("\ud83e\udd47\ud83c\udfc5\ud83e\udd48","Medals")
+D.eD_=new A.z("\ud83c\udfe0\ud83d\udd11","House keys")
+D.eJd=new A.z("\ud83e\uddb7\ud83d\udccf","Braces")
+D.eGw=new A.z("\ud83c\udf15\ud83d\udc3a","Howling wolf")
+D.ezN=new A.z("\ud83e\uddd1\u200d\ud83c\udf73\ud83c\udf72","Chef")
+D.eB_=new A.z("\ud83e\uddd1\u200d\ud83c\udf3e\ud83d\ude9c","Farmer")
+D.eGc=new A.z("\ud83e\uddd1\u200d\ud83c\udfa8\ud83c\udfa8","Artist")
+D.eL7=new A.z("\ud83e\uddd1\u200d\ud83d\udd27\ud83d\udd27","Mechanic")
+D.eMJ=new A.z("\ud83e\uddd1\u200d\ud83d\udcbb\u2328\ufe0f","Programmer")
+D.eAJ=new A.z("\ud83e\uddd1\u200d\ud83d\ude80\ud83e\ude90","Astronaut")
+D.eBj=new A.z("\ud83e\uddd1\u200d\u2696\ufe0f\u2696\ufe0f","Judge")
+D.eSl=new A.z("\ud83e\uddd1\u200d\ud83c\udfa4\ud83c\udfb6","Singer")
+D.eAO=new A.z("\ud83c\udfc4\u200d\u2642\ufe0f\ud83c\udf0a","Surfer")
+D.eOK=new A.z("\ud83d\udeb0\ud83d\udca7","Tap water")
+D.ezA=new A.z("\ud83c\udf2c\ufe0f\ud83c\udf3e","Windmill")
+D.eH4=new A.z("\u26f5\ud83c\udf05","Sailing")
+D.eCJ=new A.z("\ud83d\udef6\ud83c\udfde\ufe0f","Canoe")
+D.ex8=new A.z("\ud83c\udff0\ud83d\udee1\ufe0f","Knight")
+D.eMf=new A.z("\ud83d\udddd\ufe0f\ud83c\udff0","Castle key")
+D.eTk=new A.z("\ud83e\uddca\ud83c\udf79","Iced drink")
+D.eK2=new A.z("\ud83c\udf75\ud83e\uded6","Teapot")
+D.aB_=x([D.eRj,D.eGF,D.exW,D.eLt,D.eLV,D.eCF,D.eRS,D.eCw,D.eCr,D.eP3,D.eS3,D.eDf,D.eRZ,D.eUN,D.eST,D.eMA,D.eLK,D.eAh,D.eDY,D.eIY,D.eQD,D.eJX,D.eGq,D.eHw,D.eRx,D.eEQ,D.eTx,D.eJJ,D.eBY,D.eOU,D.ewI,D.eCI,D.evL,D.eKk,D.eO8,D.eEn,D.ezs,D.eCW,D.eG6,D.eVk,D.eUy,D.eRk,D.eDW,D.eDp,D.eNH,D.eEv,D.eV2,D.eNI,D.eN_,D.eEH,D.eTy,D.eGY,D.eNq,D.eRQ,D.eUv,D.ezK,D.eU5,D.eVp,D.eFR,D.eK1,D.eJQ,D.eIf,D.eOM,D.eA3,D.eNu,D.eNe,D.eC8,D.eDg,D.eSr,D.eA8,D.eCl,D.ezX,D.eNr,D.eNz,D.eMY,D.eRJ,D.eM6,D.eC5,D.ewr,D.eKR,D.eEq,D.eJD,D.eJH,D.eUF,D.eRH,D.eHX,D.eUq,D.eRr,D.eGM,D.eKO,D.eC4,D.eIw,D.eB2,D.eDT,D.eSa,D.eDA,D.eS2,D.eAv,D.eHt,D.eH_,D.eP8,D.eL3,D.eDM,D.ew3,D.eRt,D.eUz,D.eS7,D.eB3,D.eSD,D.eMS,D.eFn,D.eGN,D.exc,D.eV3,D.eVf,D.eU0,D.ewA,D.eJC,D.eHz,D.eFa,D.eTW,D.eAE,D.eBb,D.eE2,D.eHH,D.eGA,D.eTE,D.eBi,D.exS,D.eIq,D.eBF,D.eVi,D.eLA,D.eUs,D.eR_,D.ePf,D.ewB,D.eCf,D.eO0,D.eHE,D.eNQ,D.eGX,D.ezP,D.eDn,D.eK8,D.eE8,D.ex7,D.eII,D.eAP,D.eEk,D.eCV,D.eI6,D.eBJ,D.ezt,D.exj,D.eKr,D.eK0,D.ePb,D.eRT,D.eCg,D.eRu,D.eRE,D.eL0,D.ewE,D.eEj,D.eMK,D.eIL,D.eEC,D.eFX,D.eCm,D.eAn,D.eRi,D.eBT,D.eVu,D.eFN,D.eQG,D.eKS,D.eGZ,D.eFD,D.eA4,D.eOA,D.eK7,D.eCs,D.eOH,D.eFu,D.eNN,D.eAs,D.eBk,D.eAT,D.ezz,D.eQO,D.eCE,D.ezI,D.eIg,D.eVg,D.eQo,D.eFj,D.eI5,D.eM0,D.eOl,D.eF_,D.eMn,D.ex3,D.eJO,D.eSt,D.eOS,D.eIy,D.eRm,D.eIJ,D.eOF,D.eQy,D.eQP,D.eDs,D.ezJ,D.eU9,D.eGt,D.eKf,D.ey6,D.ex0,D.eP4,D.eGo,D.eVc,D.eHf,D.eS8,D.eOI,D.ex9,D.eUu,D.eTO,D.eHx,D.eEN,D.eSc,D.eMO,D.eUW,D.exp,D.eUb,D.eCy,D.eTM,D.eKz,D.eT3,D.eSd,D.eF4,D.ewZ,D.eGW,D.eGD,D.eRL,D.eIW,D.eRg,D.ex6,D.ezv,D.eSF,D.eC3,D.eIA,D.eGQ,D.eQY,D.eIM,D.eUa,D.eDr,D.eG1,D.eHs,D.eOm,D.eI7,D.eM5,D.eHG,D.eD0,D.eJa,D.eTX,D.eFv,D.eUD,D.eQF,D.eBM,D.eDG,D.eAD,D.eKi,D.eLJ,D.eFo,D.eMo,D.eLS,D.eE0,D.eO9,D.eMe,D.eD_,D.eJd,D.eGw,D.ezN,D.eB_,D.eGc,D.eL7,D.eMJ,D.eAJ,D.eBj,D.eSl,D.eAO,D.eOK,D.ezA,D.eH4,D.eCJ,D.ex8,D.eMf,D.eTk,D.eK2],y.L)
+D.dlV=x([0,0.8],y.u)
+D.dm1=x([C.aA,C.kh],y.O)
+D.dmM=x([C.ek,C.M9],y.O)
 D.a59=x(["\u2660","\u2665","\u2666","\u2663"],y.s)
-D.RU=x([C.ax,C.aA,C.bf,C.d3,C.f6,C.bE],y.O)
-D.dof=x([C.eA,C.fl],y.O)
+D.RU=x([C.ax,C.aA,C.bf,C.d3,C.f7,C.bE],y.O)
+D.doh=x([C.eA,C.fl],y.O)
 D.bcO=new A.u(0.5333333333333333,0.9607843137254902,0.6196078431372549,0.043137254901960784,C.q)
 D.b71=new A.ac(0,C.G,D.bcO,C.I,24)
-D.dox=x([D.b71],y.V)
-D.doM=x([C.h3,C.q1],y.O)
-D.doX=x([C.fe,C.dG],y.O)
-D.dpk=x([C.fe,C.Ya],y.O)
-D.dpy=x(["\ud83c\udf4e","\ud83c\udf4c","\ud83c\udf47","\ud83c\udf53","\ud83e\udd55","\ud83c\udf3d","\ud83c\udf44","\ud83c\udf35","\ud83c\udf32","\ud83c\udf3b","\ud83d\udc36","\ud83d\udc31","\ud83d\udc2d","\ud83d\udc30","\ud83e\udd8a","\ud83d\udc3b","\ud83d\udc3c","\ud83d\udc38","\ud83d\udc35","\ud83d\udc14","\ud83d\udc27","\ud83e\udd89","\ud83d\udc22","\ud83d\udc0d","\ud83d\udc19","\ud83e\udd80","\ud83d\udc33","\ud83e\udd8b","\ud83d\udc1e","\u26bd","\ud83c\udfc0","\ud83c\udfb8","\ud83c\udfba","\ud83c\udfb2","\ud83e\udde9","\ud83c\udf81","\ud83c\udf88","\ud83d\udd11","\ud83d\udd14","\ud83d\udca1","\ud83d\udcf7","\u23f0","\u2702\ufe0f","\ud83d\udccc","\ud83e\uddf2","\ud83e\ude81","\ud83d\ude97","\ud83d\udeb2","\ud83d\ude80","\u26f5","\ud83c\udfe0","\u2b50","\ud83c\udf19","\u2602\ufe0f","\ud83d\udc51","\ud83d\udc53","\ud83e\udde2","\ud83d\udc5f","\ud83e\udde6","\ud83c\udf69"],y.s)
+D.doz=x([D.b71],y.V)
+D.doO=x([C.h3,C.q1],y.O)
+D.doZ=x([C.fe,C.dG],y.O)
+D.dpm=x([C.fe,C.Ya],y.O)
+D.dpA=x(["\ud83c\udf4e","\ud83c\udf4c","\ud83c\udf47","\ud83c\udf53","\ud83e\udd55","\ud83c\udf3d","\ud83c\udf44","\ud83c\udf35","\ud83c\udf32","\ud83c\udf3b","\ud83d\udc36","\ud83d\udc31","\ud83d\udc2d","\ud83d\udc30","\ud83e\udd8a","\ud83d\udc3b","\ud83d\udc3c","\ud83d\udc38","\ud83d\udc35","\ud83d\udc14","\ud83d\udc27","\ud83e\udd89","\ud83d\udc22","\ud83d\udc0d","\ud83d\udc19","\ud83e\udd80","\ud83d\udc33","\ud83e\udd8b","\ud83d\udc1e","\u26bd","\ud83c\udfc0","\ud83c\udfb8","\ud83c\udfba","\ud83c\udfb2","\ud83e\udde9","\ud83c\udf81","\ud83c\udf88","\ud83d\udd11","\ud83d\udd14","\ud83d\udca1","\ud83d\udcf7","\u23f0","\u2702\ufe0f","\ud83d\udccc","\ud83e\uddf2","\ud83e\ude81","\ud83d\ude97","\ud83d\udeb2","\ud83d\ude80","\u26f5","\ud83c\udfe0","\u2b50","\ud83c\udf19","\u2602\ufe0f","\ud83d\udc51","\ud83d\udc53","\ud83e\udde2","\ud83d\udc5f","\ud83e\udde6","\ud83c\udf69"],y.s)
 D.aBJ=x([C.ja,C.pZ],y.O)
-D.drp=x([F.lp,G.qQ,E.wU],y.n)
-D.drx=x([C.dF,C.Mi],y.O)
+D.drr=x([F.lp,G.qQ,E.wU],y.n)
+D.drz=x([C.dF,C.Mi],y.O)
 D.a5r=x([4,1,0,1,3,1,0,1,4],y.t)
-D.drR=x([1000,500,100,25,10,5,1],y.t)
-D.ds5=x([C.aK,C.N],y.O)
-D.dsX=x(["\ud83d\udc8e","\ud83c\udf40","\ud83d\udd25","\u2b50","\ud83c\udf47","\ud83c\udf38"],y.s)
-D.dt_=x([C.nh,C.jO],y.O)
-D.eDS=new A.z("France","Paris")
-D.eFe=new A.z("Japan","Tokyo")
-D.eFF=new A.z("Kenya","Nairobi")
-D.eCL=new A.z("Canada","Ottawa")
-D.eC3=new A.z("Australia","Canberra")
-D.ew2=new A.z("Brazil","Bras\xedlia")
-D.eDt=new A.z("Egypt","Cairo")
-D.eF_=new A.z("Italy","Rome")
-D.eIl=new A.z("Spain","Madrid")
-D.eE8=new A.z("Germany","Berlin")
-D.eGE=new A.z("Nigeria","Abuja")
-D.eEb=new A.z("Ghana","Accra")
-D.eTo=new A.z("India","New Delhi")
-D.eCP=new A.z("China","Beijing")
-D.eBd=new A.z("Mexico","Mexico City")
-D.eEf=new A.z("Argentina","Buenos Aires")
-D.eHX=new A.z("Russia","Moscow")
-D.eIP=new A.z("Turkey","Ankara")
-D.eKG=new A.z("South Korea","Seoul")
-D.eIH=new A.z("Thailand","Bangkok")
-D.eHn=new A.z("Portugal","Lisbon")
-D.eEj=new A.z("Greece","Athens")
-D.eGG=new A.z("Norway","Oslo")
-D.eIo=new A.z("Sweden","Stockholm")
-D.eHm=new A.z("Poland","Warsaw")
-D.eGi=new A.z("Morocco","Rabat")
-D.eO0=new A.z("Ethiopia","Addis Ababa")
-D.eHi=new A.z("Peru","Lima")
-D.eCO=new A.z("Chile","Santiago")
-D.eJx=new A.z("Colombia","Bogot\xe1")
-D.eRK=new A.z("Haiti","Port-au-Prince")
-D.eFd=new A.z("Jamaica","Kingston")
-D.eCU=new A.z("Cuba","Havana")
-D.eEY=new A.z("Ireland","Dublin")
-D.eGB=new A.z("Netherlands","Amsterdam")
-D.eCn=new A.z("Belgium","Brussels")
-D.eC4=new A.z("Austria","Vienna")
-D.eIq=new A.z("Switzerland","Bern")
-D.eJm=new A.z("Vietnam","Hanoi")
-D.eHj=new A.z("Philippines","Manila")
-D.eEW=new A.z("Indonesia","Jakarta")
-D.eIg=new A.z("Senegal","Dakar")
-D.eHZ=new A.z("Rwanda","Kigali")
-D.eHN=new A.z("South Africa","Pretoria")
-D.eJK=new A.z("United States","Washington, D.C.")
-D.eNm=new A.z("United Kingdom","London")
-D.eDG=new A.z("Saudi Arabia","Riyadh")
-D.eHf=new A.z("Pakistan","Islamabad")
-D.eC6=new A.z("New Zealand","Wellington")
-D.eJq=new A.z("Dominican Republic","Santo Domingo")
-D.aC3=x([D.eDS,D.eFe,D.eFF,D.eCL,D.eC3,D.ew2,D.eDt,D.eF_,D.eIl,D.eE8,D.eGE,D.eEb,D.eTo,D.eCP,D.eBd,D.eEf,D.eHX,D.eIP,D.eKG,D.eIH,D.eHn,D.eEj,D.eGG,D.eIo,D.eHm,D.eGi,D.eO0,D.eHi,D.eCO,D.eJx,D.eRK,D.eFd,D.eCU,D.eEY,D.eGB,D.eCn,D.eC4,D.eIq,D.eJm,D.eHj,D.eEW,D.eIg,D.eHZ,D.eHN,D.eJK,D.eNm,D.eDG,D.eHf,D.eC6,D.eJq],y.L)
-D.evE=new A.z("$20",2000)
-D.evC=new A.z("$10",1000)
-D.evF=new A.z("$5",500)
-D.evD=new A.z("$1",100)
-D.eNB=new A.z("25\xa2",25)
-D.eVh=new A.z("10\xa2",10)
-D.eBI=new A.z("5\xa2",5)
-D.du2=x([D.evE,D.evC,D.evF,D.evD,D.eNB,D.eVh,D.eBI],A.at("O<+(n,G)>"))
-D.du3=x([C.cT,C.ej],y.O)
-D.d6f=x(["\ud83c\udf4e","\ud83c\udf4c","\ud83c\udf47","\ud83c\udf53","\ud83c\udf4d","\ud83e\udd6d","\ud83c\udf50"],y.s)
-D.cy0=x(["\ud83d\udc36","\ud83d\udc31","\ud83e\udd81","\ud83d\udc38","\ud83d\udc35","\ud83e\udd92","\ud83d\udc18"],y.s)
-D.f_4=new A.cw(["Fruit",D.d6f,"Animal",D.cy0])
-D.d6V=x(["\ud83d\ude97","\ud83d\ude8c","\ud83d\udeb2","\u2708\ufe0f","\ud83d\ude80","\ud83d\ude82","\u26f5"],y.s)
-D.cTo=x(["\ud83c\udf55","\ud83c\udf54","\ud83c\udf2e","\ud83c\udf5c","\ud83c\udf69","\ud83c\udf5f","\ud83e\udd50"],y.s)
-D.f__=new A.cw(["Ride",D.d6V,"Food",D.cTo])
-D.dfK=x(["\u26bd","\ud83c\udfc0","\ud83c\udfbe","\ud83c\udfc8","\ud83c\udfd3","\ud83c\udfd0","\u26f3"],y.s)
-D.dju=x(["\ud83c\udfb8","\ud83c\udfb9","\ud83e\udd41","\ud83c\udfba","\ud83c\udfbb","\ud83c\udfb7","\ud83c\udfa4"],y.s)
-D.f_H=new A.cw(["Sport",D.dfK,"Music",D.dju])
-D.duy=x([D.f_4,D.f__,D.f_H],A.at("O<+(n,ai<n>,n,ai<n>)>"))
-D.dvm=x([C.xO,C.Xw],y.O)
-D.dvn=x(["\ud83c\udf52","\ud83c\udf4b","\ud83d\udd14","\u2b50","7\ufe0f\u20e3","\ud83d\udc8e"],y.s)
-D.dvp=x([C.ep,C.hg],y.O)
+D.drT=x([1000,500,100,25,10,5,1],y.t)
+D.ds7=x([C.aK,C.N],y.O)
+D.dsZ=x(["\ud83d\udc8e","\ud83c\udf40","\ud83d\udd25","\u2b50","\ud83c\udf47","\ud83c\udf38"],y.s)
+D.dt1=x([C.nh,C.jP],y.O)
+D.eDV=new A.z("France","Paris")
+D.eFh=new A.z("Japan","Tokyo")
+D.eFI=new A.z("Kenya","Nairobi")
+D.eCO=new A.z("Canada","Ottawa")
+D.eC6=new A.z("Australia","Canberra")
+D.ew4=new A.z("Brazil","Bras\xedlia")
+D.eDw=new A.z("Egypt","Cairo")
+D.eF2=new A.z("Italy","Rome")
+D.eIo=new A.z("Spain","Madrid")
+D.eEb=new A.z("Germany","Berlin")
+D.eGH=new A.z("Nigeria","Abuja")
+D.eEe=new A.z("Ghana","Accra")
+D.eTs=new A.z("India","New Delhi")
+D.eCS=new A.z("China","Beijing")
+D.eBg=new A.z("Mexico","Mexico City")
+D.eEi=new A.z("Argentina","Buenos Aires")
+D.eI_=new A.z("Russia","Moscow")
+D.eIS=new A.z("Turkey","Ankara")
+D.eKJ=new A.z("South Korea","Seoul")
+D.eIK=new A.z("Thailand","Bangkok")
+D.eHq=new A.z("Portugal","Lisbon")
+D.eEm=new A.z("Greece","Athens")
+D.eGJ=new A.z("Norway","Oslo")
+D.eIr=new A.z("Sweden","Stockholm")
+D.eHp=new A.z("Poland","Warsaw")
+D.eGl=new A.z("Morocco","Rabat")
+D.eO3=new A.z("Ethiopia","Addis Ababa")
+D.eHl=new A.z("Peru","Lima")
+D.eCR=new A.z("Chile","Santiago")
+D.eJA=new A.z("Colombia","Bogot\xe1")
+D.eRO=new A.z("Haiti","Port-au-Prince")
+D.eFg=new A.z("Jamaica","Kingston")
+D.eCX=new A.z("Cuba","Havana")
+D.eF0=new A.z("Ireland","Dublin")
+D.eGE=new A.z("Netherlands","Amsterdam")
+D.eCq=new A.z("Belgium","Brussels")
+D.eC7=new A.z("Austria","Vienna")
+D.eIt=new A.z("Switzerland","Bern")
+D.eJp=new A.z("Vietnam","Hanoi")
+D.eHm=new A.z("Philippines","Manila")
+D.eEZ=new A.z("Indonesia","Jakarta")
+D.eIj=new A.z("Senegal","Dakar")
+D.eI1=new A.z("Rwanda","Kigali")
+D.eHQ=new A.z("South Africa","Pretoria")
+D.eJN=new A.z("United States","Washington, D.C.")
+D.eNp=new A.z("United Kingdom","London")
+D.eDJ=new A.z("Saudi Arabia","Riyadh")
+D.eHi=new A.z("Pakistan","Islamabad")
+D.eC9=new A.z("New Zealand","Wellington")
+D.eJt=new A.z("Dominican Republic","Santo Domingo")
+D.aC3=x([D.eDV,D.eFh,D.eFI,D.eCO,D.eC6,D.ew4,D.eDw,D.eF2,D.eIo,D.eEb,D.eGH,D.eEe,D.eTs,D.eCS,D.eBg,D.eEi,D.eI_,D.eIS,D.eKJ,D.eIK,D.eHq,D.eEm,D.eGJ,D.eIr,D.eHp,D.eGl,D.eO3,D.eHl,D.eCR,D.eJA,D.eRO,D.eFg,D.eCX,D.eF0,D.eGE,D.eCq,D.eC7,D.eIt,D.eJp,D.eHm,D.eEZ,D.eIj,D.eI1,D.eHQ,D.eJN,D.eNp,D.eDJ,D.eHi,D.eC9,D.eJt],y.L)
+D.evG=new A.z("$20",2000)
+D.evE=new A.z("$10",1000)
+D.evH=new A.z("$5",500)
+D.evF=new A.z("$1",100)
+D.eNE=new A.z("25\xa2",25)
+D.eVl=new A.z("10\xa2",10)
+D.eBL=new A.z("5\xa2",5)
+D.du4=x([D.evG,D.evE,D.evH,D.evF,D.eNE,D.eVl,D.eBL],A.at("O<+(n,G)>"))
+D.du5=x([C.cT,C.ej],y.O)
+D.d6g=x(["\ud83c\udf4e","\ud83c\udf4c","\ud83c\udf47","\ud83c\udf53","\ud83c\udf4d","\ud83e\udd6d","\ud83c\udf50"],y.s)
+D.cy1=x(["\ud83d\udc36","\ud83d\udc31","\ud83e\udd81","\ud83d\udc38","\ud83d\udc35","\ud83e\udd92","\ud83d\udc18"],y.s)
+D.f_8=new A.cw(["Fruit",D.d6g,"Animal",D.cy1])
+D.d6W=x(["\ud83d\ude97","\ud83d\ude8c","\ud83d\udeb2","\u2708\ufe0f","\ud83d\ude80","\ud83d\ude82","\u26f5"],y.s)
+D.cTp=x(["\ud83c\udf55","\ud83c\udf54","\ud83c\udf2e","\ud83c\udf5c","\ud83c\udf69","\ud83c\udf5f","\ud83e\udd50"],y.s)
+D.f_3=new A.cw(["Ride",D.d6W,"Food",D.cTp])
+D.dfL=x(["\u26bd","\ud83c\udfc0","\ud83c\udfbe","\ud83c\udfc8","\ud83c\udfd3","\ud83c\udfd0","\u26f3"],y.s)
+D.djw=x(["\ud83c\udfb8","\ud83c\udfb9","\ud83e\udd41","\ud83c\udfba","\ud83c\udfbb","\ud83c\udfb7","\ud83c\udfa4"],y.s)
+D.f_L=new A.cw(["Sport",D.dfL,"Music",D.djw])
+D.duA=x([D.f_8,D.f_3,D.f_L],A.at("O<+(n,ai<n>,n,ai<n>)>"))
+D.dvo=x([C.xO,C.Xw],y.O)
+D.dvp=x(["\ud83c\udf52","\ud83c\udf4b","\ud83d\udd14","\u2b50","7\ufe0f\u20e3","\ud83d\udc8e"],y.s)
+D.dvr=x([C.ep,C.hg],y.O)
 D.b73=new A.ac(0,C.G,C.dm,C.dC,3)
-D.dvI=x([D.b73],y.V)
+D.dvK=x([D.b73],y.V)
 D.b6Z=new A.ac(0,C.G,C.hx,C.en,6)
-D.dw9=x([D.b6Z],y.V)
-D.dzu=new A.dp([2,C.fU,4,C.bM,8,C.mB,16,C.cL,32,C.c0,64,C.ax,128,C.bt,256,C.lZ],A.at("dp<G,u>"))
-D.eho=new A.t(0,300)
-D.eht=new A.t(0,600)
-D.ekL=new A.t(0.75,0.4)
-D.bUT=new A.ae(V.Hh,16,C.aC,null,null,null)
-D.en8=new A.D(N.GJ,D.bUT,null)
-D.fIT=new A.y("Tap a peg to lift its top disc, then tap where it goes. A big disc can never sit on a small one.",null,C.oP,null,C.K,null,null,null,null,null,null,null)
-D.enl=new A.D(C.m7,D.fIT,null)
-D.fjO=new A.F(!0,C.ac,null,null,null,null,20,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fzn=new A.y("or",null,D.fjO,null,null,null,null,null,null,null,null,null)
-D.enK=new A.D(C.hO,D.fzn,null)
-D.eti=new A.hk(0,1,y.D)
-D.etj=new A.hk(0,-1,y.D)
+D.dwb=x([D.b6Z],y.V)
+D.dzw=new A.dp([2,C.fU,4,C.bM,8,C.mB,16,C.cM,32,C.c0,64,C.ax,128,C.bt,256,C.lZ],A.at("dp<G,u>"))
+D.ehq=new A.t(0,300)
+D.ehv=new A.t(0,600)
+D.ekN=new A.t(0.75,0.4)
+D.bUU=new A.ae(V.Hh,16,C.aC,null,null,null)
+D.ena=new A.D(N.GJ,D.bUU,null)
+D.fIX=new A.y("Tap a peg to lift its top disc, then tap where it goes. A big disc can never sit on a small one.",null,C.oP,null,C.K,null,null,null,null,null,null,null)
+D.enn=new A.D(C.m7,D.fIX,null)
+D.fjS=new A.F(!0,C.ac,null,null,null,null,20,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fzr=new A.y("or",null,D.fjS,null,null,null,null,null,null,null,null,null)
+D.enM=new A.D(C.hO,D.fzr,null)
+D.etk=new A.hk(0,1,y.D)
+D.etl=new A.hk(0,-1,y.D)
 D.a8a=new A.hk(1,0,y.D)
-D.etl=new A.hk(3,7,y.D)
-D.etm=new A.hk(4,7,y.D)
-D.etn=new A.hk(5,7,y.D)
-D.eto=new A.hk(-1,0,y.D)
-D.cTs=x([C.hj,C.eA],y.O)
-D.c2W=new A.a9(C.b0,C.b6,C.x,D.cTs,null,null)
-D.b5s=new A.o(null,null,null,null,null,D.c2W,C.n)
-D.bvz=new A.l1(D.b5s,C.bh,null,null)
-D.aOY=new A.cN(0,0,0,0,null,null,D.bvz,null)
-D.etU=new A.cN(0,0,0,0,null,null,C.ajl,null)
+D.etn=new A.hk(3,7,y.D)
+D.eto=new A.hk(4,7,y.D)
+D.etp=new A.hk(5,7,y.D)
+D.etq=new A.hk(-1,0,y.D)
+D.cTt=x([C.hj,C.eA],y.O)
+D.c2X=new A.a9(C.b0,C.b6,C.x,D.cTt,null,null)
+D.b5s=new A.o(null,null,null,null,null,D.c2X,C.n)
+D.bvA=new A.l1(D.b5s,C.bh,null,null)
+D.aOY=new A.cN(0,0,0,0,null,null,D.bvA,null)
+D.etW=new A.cN(0,0,0,0,null,null,C.ajl,null)
 D.Jz=new A.cN(0,0,0,0,null,null,C.ajp,null)
-D.da0=x([C.dP,C.m0],y.O)
-D.doY=x([0.55,1],y.u)
-D.euH=new A.c_(C.A,0.5,C.x,null,0,D.da0,D.doY,null)
-D.ev3=new A.c_(C.A,0.5,C.x,null,0,L.azm,null,null)
-D.eZT=new A.cw(["\ud83e\udea8",56,10,2.8])
-D.eZZ=new A.cw(["\ud83e\ude99",30,50,0.5])
-D.f_9=new A.cw(["\ud83d\udc8e",28,200,0.3])
-D.f_i=new A.cw(["\ud83d\udfe8",54,150,2])
+D.da2=x([C.dP,C.m0],y.O)
+D.dp_=x([0.55,1],y.u)
+D.euJ=new A.c_(C.A,0.5,C.x,null,0,D.da2,D.dp_,null)
+D.ev5=new A.c_(C.A,0.5,C.x,null,0,L.azm,null,null)
+D.eZX=new A.cw(["\ud83e\udea8",56,10,2.8])
+D.f_2=new A.cw(["\ud83e\ude99",30,50,0.5])
+D.f_d=new A.cw(["\ud83d\udc8e",28,200,0.3])
+D.f_m=new A.cw(["\ud83d\udfe8",54,150,2])
 D.aS_=new A.av(0,56)
-D.f8X=new A.av(60,34)
-D.f91=new A.av(92,112)
-D.fn3=new A.F(!0,C.bM,null,null,null,null,26,C.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fR8=new A.y("+1",null,D.fn3,null,C.K,null,null,null,null,null,null,null)
-D.fa_=new A.a4(60,null,D.fR8,null)
+D.f90=new A.av(60,34)
+D.f95=new A.av(92,112)
+D.fn7=new A.F(!0,C.bM,null,null,null,null,26,C.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fRc=new A.y("+1",null,D.fn7,null,C.K,null,null,null,null,null,null,null)
+D.fa3=new A.a4(60,null,D.fRc,null)
 D.aSm=new A.hK(3,10,10,1,null)
-D.fhX=new A.F(!0,C.N,null,null,null,null,20,C.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.flf=new A.F(!0,C.bM,null,null,null,null,30,C.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,P.Ic,null,null,null)
+D.fi0=new A.F(!0,C.N,null,null,null,null,20,C.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.flj=new A.F(!0,C.bM,null,null,null,null,30,C.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,P.Ic,null,null,null)
 D.aa_=new A.F(!0,null,null,null,null,null,null,C.u,null,1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fsn=new A.F(!0,C.c,null,null,null,null,50,C.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fvo=new A.F(!0,C.bM,null,null,null,null,26,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fvM=new A.F(!0,C.c,null,null,null,null,30,C.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,P.Ic,null,null,null)
-D.fvZ=new A.F(!0,C.q9,null,null,null,null,18,C.H,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fsr=new A.F(!0,C.c,null,null,null,null,50,C.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fvs=new A.F(!0,C.bM,null,null,null,null,26,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fvQ=new A.F(!0,C.c,null,null,null,null,30,C.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,P.Ic,null,null,null)
+D.fw2=new A.F(!0,C.q9,null,null,null,null,18,C.H,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.aV9=new A.y("Play Again",null,C.cz,null,null,null,null,null,null,null,null,null)
-D.fAq=new A.y("A = 1 \xb7 J = 11 \xb7 Q = 12 \xb7 K = 13",null,C.UW,null,null,null,null,null,null,null,null,null)
-D.fAZ=new A.y("fuel",null,C.Eg,null,null,null,null,null,null,null,null,null)
-D.fBY=new A.y("\ud83d\udcb0",null,C.n2,null,null,null,null,null,null,null,null,null)
-D.frU=new A.F(!0,C.bk,null,null,null,null,11.5,C.U,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fDV=new A.y("Red = very close \xb7 orange = close \xb7 yellow = near \xb7 blue = far",null,D.frU,null,null,null,null,null,null,null,null,null)
-D.fEt=new A.y("\ud83d\udfe2 right digit, right spot   \ud83d\udfe1 right digit, wrong spot",null,C.UW,null,null,null,null,null,null,null,null,null)
-D.fG3=new A.y("Bonk \ud83d\udc39 \xb7 \u2728 = +2 \xb7 not \ud83d\udca3  ",null,null,null,null,null,null,null,null,null,null,null)
-D.fos=new A.F(!0,C.aS,null,null,null,null,11,C.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fGG=new A.y("ORDER (bottom \u2192 top)",null,D.fos,null,null,null,null,null,null,null,null,null)
-D.fHM=new A.y("Swipe or tap the right side  ",null,null,null,null,null,null,null,null,null,null,null)
-D.fKu=new A.y("Tap the bigger one",null,C.pG,null,null,null,null,null,null,null,null,null)
-D.frF=new A.F(!0,C.dm,null,null,null,null,18,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fL5=new A.y("\u26cf\ufe0f",null,D.frF,null,null,null,null,null,null,null,null,null)
-D.fMX=new A.y("\ud83d\udd12",null,C.n2,null,null,null,null,null,null,null,null,null)
-D.fR_=new A.y("Give change",null,C.cz,null,null,null,null,null,null,null,null,null)
-D.f6D=new A.cW(C.aA,C.I,16)
-D.cYZ=x([D.f6D],y.r)
-D.fn8=new A.F(!0,C.bM,null,null,null,null,34,C.u,null,4,null,null,null,null,null,null,null,null,null,null,null,null,D.cYZ,null,null,null)
-D.fTa=new A.y("JACKPOT",null,D.fn8,null,null,null,null,null,null,null,null,null)
-D.fVt=new A.y("Drag the basket \xb7 \ud83d\udc8e = +3  ",null,null,null,null,null,null,null,null,null,null,null)
-D.fWU=new A.y("Pop only ",null,null,null,null,null,null,null,null,null,null,null)
-D.hov=new B.bit(null)
-D.hrQ=new B.aGd(!1,null)
-D.hrR=new B.aGd(!0,null)
+D.fAu=new A.y("A = 1 \xb7 J = 11 \xb7 Q = 12 \xb7 K = 13",null,C.UW,null,null,null,null,null,null,null,null,null)
+D.fB2=new A.y("fuel",null,C.Eg,null,null,null,null,null,null,null,null,null)
+D.fC1=new A.y("\ud83d\udcb0",null,C.n2,null,null,null,null,null,null,null,null,null)
+D.frY=new A.F(!0,C.bk,null,null,null,null,11.5,C.U,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fDZ=new A.y("Red = very close \xb7 orange = close \xb7 yellow = near \xb7 blue = far",null,D.frY,null,null,null,null,null,null,null,null,null)
+D.fEx=new A.y("\ud83d\udfe2 right digit, right spot   \ud83d\udfe1 right digit, wrong spot",null,C.UW,null,null,null,null,null,null,null,null,null)
+D.fG7=new A.y("Bonk \ud83d\udc39 \xb7 \u2728 = +2 \xb7 not \ud83d\udca3  ",null,null,null,null,null,null,null,null,null,null,null)
+D.fow=new A.F(!0,C.aS,null,null,null,null,11,C.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fGK=new A.y("ORDER (bottom \u2192 top)",null,D.fow,null,null,null,null,null,null,null,null,null)
+D.fHQ=new A.y("Swipe or tap the right side  ",null,null,null,null,null,null,null,null,null,null,null)
+D.fKy=new A.y("Tap the bigger one",null,C.pG,null,null,null,null,null,null,null,null,null)
+D.frJ=new A.F(!0,C.dm,null,null,null,null,18,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fL9=new A.y("\u26cf\ufe0f",null,D.frJ,null,null,null,null,null,null,null,null,null)
+D.fN0=new A.y("\ud83d\udd12",null,C.n2,null,null,null,null,null,null,null,null,null)
+D.fR3=new A.y("Give change",null,C.cz,null,null,null,null,null,null,null,null,null)
+D.f6H=new A.cW(C.aA,C.I,16)
+D.cZ_=x([D.f6H],y.r)
+D.fnc=new A.F(!0,C.bM,null,null,null,null,34,C.u,null,4,null,null,null,null,null,null,null,null,null,null,null,null,D.cZ_,null,null,null)
+D.fTe=new A.y("JACKPOT",null,D.fnc,null,null,null,null,null,null,null,null,null)
+D.fVx=new A.y("Drag the basket \xb7 \ud83d\udc8e = +3  ",null,null,null,null,null,null,null,null,null,null,null)
+D.fWY=new A.y("Pop only ",null,null,null,null,null,null,null,null,null,null,null)
+D.hot=new B.bit(null)
+D.hrO=new B.aGd(!1,null)
+D.hrP=new B.aGd(!0,null)
 D.abW=new B.af7(0,"show")
 D.abX=new B.af7(1,"shuffle")
 D.aZY=new B.af7(2,"pick")
 D.aZZ=new B.af7(3,"reveal")
 D.Wv=new B.a15(0,"idle")
 D.b_4=new B.a15(1,"grow")
-D.hte=new B.a15(2,"fall")
-D.htf=new B.a15(3,"walk")
+D.htc=new B.a15(2,"fall")
+D.htd=new B.a15(3,"walk")
 D.b_5=new B.a15(4,"drop")})();(function staticFields(){$.cis=null
 $.h4r=A.U(y.N,A.at("+order,pos(ai<G>,G)"))})()};
-(a=>{a["lvMkFU5mIP1JZ2GfmJyrQNaKk1I="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["/+usrF4eD18sKgQXLWY6sAPJDVA="]=a.current})($__dart_deferred_initializers__);
