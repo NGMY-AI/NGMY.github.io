@@ -32,7 +32,14 @@ class PlumbState {
 
   /// The faucet lesson: which hose is fastened to which place.
   final Map<int, String> attached = {};
-  bool valvesOpen = false;
+  /// Each shut-off valve is turned by hand: the red one for the hot line, the blue one for the cold line.
+  bool hotOpen = false, coldOpen = false;
+  bool get valvesOpen => hotOpen && coldOpen;
+  set valvesOpen(bool v) {
+    hotOpen = v;
+    coldOpen = v;
+  }
+
   bool hints = false;
 }
 
@@ -156,28 +163,103 @@ Scene3D buildPtrapScene(PlumbState s) {
   return Scene3D(b.polys, info: info);
 }
 
-/// Moving water: a leak that drips from a loose nut, or the flow when you run the tap.
+// ─── Water that looks like water ─────────────────────────────────────────────
+
+const Color _waterBlue = Color(0xFF7CC4FF);
+
+V3 _along(List<V3> path, double f) {
+  final x = f.clamp(0.0, 1.0) * (path.length - 1);
+  final i = x.floor().clamp(0, path.length - 2);
+  return V3.lerp(path[i], path[i + 1], x - i);
+}
+
+/// A running stream: a clear tube with bright streaks that slide along it.
+void _flow(MeshBuilder b, List<V3> path, double t, Color col, {double r = 0.3, double speed = 0.7}) {
+  b.id = 0;
+  b.bias = 0.3;
+  b.alpha = 0.55;
+  b.tube(path, r, col, shine: 0.9, sides: 8, joints: true, endCaps: false);
+  b.alpha = 0.95;
+  for (var i = 0; i < 5; i++) {
+    final f = (t * speed + i / 5) % 1.0;
+    b.tube([_along(path, f), _along(path, math.min(1.0, f + 0.09))], r * 0.5, const Color(0xFFEAF6FF), shine: 1, sides: 6, joints: false, endCaps: false);
+  }
+  b.alpha = 1;
+  b.bias = 0;
+}
+
+/// Where a stream lands in water: rings that spread and fade, and a few drops that jump.
+void _splash(MeshBuilder b, V3 at, double t, {double size = 1.0}) {
+  b.id = 0;
+  b.bias = 0.4;
+  for (var k = 0; k < 3; k++) {
+    final ph = (t * 1.3 + k / 3) % 1.0;
+    final r = (0.5 + ph * 3.0) * size;
+    b.alpha = 0.7 * (1 - ph);
+    b.ring(at + const V3(0, 0.05, 0), at + const V3(0, 0.12, 0), r, math.max(0.1, r - 0.3 * size), const Color(0xFFEAF6FF), shine: 0.6, sides: 16);
+  }
+  b.alpha = 0.9;
+  for (var i = 0; i < 6; i++) {
+    final ph = (t * 1.8 + i / 6) % 1.0;
+    final a = i * 1.05;
+    b.ball(at + V3(math.cos(a) * ph * 1.4 * size, 4.0 * ph * (1 - ph) * size, math.sin(a) * ph * 1.4 * size), 0.16 * size, const Color(0xFFEAF6FF), shine: 1, lat: 3, lon: 6);
+  }
+  b.alpha = 1;
+  b.bias = 0;
+}
+
+/// A soft pulsing light on the places a lesson wants you to look at (a double tap on the name of a part).
+List<Poly> glowSpots(List<V3> spots, double t, {Color color = const Color(0xFFFFE066)}) {
+  final b = MeshBuilder();
+  b.id = 0;
+  b.bias = 0.9;
+  final pulse = 0.5 + 0.5 * math.sin(t * 7);
+  for (final p in spots) {
+    b.alpha = 0.25 + 0.25 * pulse;
+    b.ball(p, 1.5 + 0.7 * pulse, color, shine: 0, lat: 5, lon: 10);
+    b.alpha = 0.8;
+    b.ring(p + const V3(0, 0, 0.6), p + const V3(0, 0, 0.9), 2.3 + 0.9 * pulse, 1.9 + 0.9 * pulse, color, shine: 0.2, sides: 20);
+  }
+  b.alpha = 1;
+  b.bias = 0;
+  return b.polys;
+}
+
 List<Poly> ptrapWater(PlumbState s, double t) {
   final b = MeshBuilder();
   if (s.leakAt.isNotEmpty) {
     final at = s.leakAt == 'n1' ? const V3(0, 3.0, 0.9) : const V3(8.9, 1.9, 0.9);
+    b.id = 0;
     for (var i = 0; i < 5; i++) {
       final ph = (t * 1.4 + i * 0.2) % 1.0;
-      b.ball(at + V3(0, -ph * 6.0 * ph - ph * 1.5, 0), 0.22 * (1 - ph * 0.3), const Color(0xFF5CB3FF), shine: 0.9, lat: 3, lon: 6);
+      b.alpha = 0.85;
+      b.ball(at + V3(0, -ph * 6.0 * ph - ph * 1.5, 0), 0.24 * (1 - ph * 0.3), const Color(0xFF5CB3FF), shine: 0.9, lat: 3, lon: 6);
     }
-  } else if (s.running) {
-    final path = [...ptrapTailPath(), ...ptrapTrapPath().skip(1), ...ptrapArmPath().skip(1)];
-    for (var i = 0; i < 18; i++) {
-      final ph = (t * 0.45 + i / 18) % 1.0;
-      final idx = (ph * (path.length - 1)).floor().clamp(0, path.length - 2);
-      final f = ph * (path.length - 1) - idx;
-      b.ball(V3.lerp(path[idx], path[idx + 1], f), 0.38, const Color(0xFF4FA8FF), shine: 0.9, lat: 3, lon: 6);
+    b.alpha = 1;
+  }
+  if (s.running) {
+    // The tap pours into the basin, the water rises a little and swirls down the drain.
+    const tip = V3(0, 19.2, -2.3);
+    const level = 11.0;
+    _flow(b, [tip, tip + const V3(0, -2.0, 0), V3(0, level, tip.z)], t, _waterBlue, r: 0.42, speed: 1.4);
+    b.id = 0;
+    b.alpha = 0.5;
+    b.bias = 0.2;
+    b.box(const V3(0, (9.9 + level) / 2, 0), V3(12.6, level - 9.9, 7.6), const Color(0xFF8FD0FF), shine: 0.7);
+    b.alpha = 1;
+    b.bias = 0;
+    _splash(b, V3(0, level + 0.05, tip.z), t);
+    // A little whirl over the drain.
+    b.id = 0;
+    b.bias = 0.4;
+    for (var k = 0; k < 2; k++) {
+      final ph = (t * 0.9 + k / 2) % 1.0;
+      final r = 2.2 * (1 - ph);
+      b.alpha = 0.7;
+      b.ring(V3(0, level + 0.06, 0), V3(0, level + 0.12, 0), r + 0.25, r, const Color(0xFFEAF6FF), shine: 0.5, sides: 14);
     }
-    // The tap pours into the sink.
-    for (var i = 0; i < 6; i++) {
-      final ph = (t * 2.2 + i / 6) % 1.0;
-      b.ball(V3(0, 14.0 - ph * 5.4, 0), 0.3, const Color(0xFF8DC8FF), shine: 0.9, lat: 3, lon: 6);
-    }
+    b.alpha = 1;
+    b.bias = 0;
   }
   return b.polys;
 }
@@ -244,7 +326,14 @@ Scene3D buildFaucetScene(PlumbState s) {
     b.cyl(V3(x, -1.5, _vz - 0.8), V3(x, 0.7, _vz - 0.8), 1.0, kChrome, shine: 0.9, sides: 14);
     b.cyl(V3(x, 0.7, _vz - 0.8), V3(x, 1.5, _vz), 0.45, kChrome, shine: 0.9, sides: 10);
     b.cyl(V3(x, -0.2, _vz - 0.8), V3(x, -0.2, _vz + 0.5), 0.2, const Color(0xFFA7ADB5), shine: 0.7, sides: 8);
-    b.cyl(V3(x, -0.2, _vz + 0.5), V3(x, -0.2, _vz + 1.2), 1.45, handle, shine: 0.5, sides: 14);
+    // The handle is a lever you turn: across the pipe when the valve is shut, along the pipe when it is open.
+    final open = id == idValveHot ? s.hotOpen : s.coldOpen;
+    final hub = V3(x, -0.2, _vz + 1.0);
+    final lever = open ? const V3(0, 1, 0) : const V3(1, 0, 0);
+    b.cyl(V3(x, -0.2, _vz + 0.5), V3(x, -0.2, _vz + 1.4), 1.0, handle, shine: 0.5, sides: 12);
+    b.cyl(hub - lever * 1.9, hub + lever * 1.9, 0.5, handle, shine: 0.5, sides: 8);
+    b.ball(hub - lever * 1.9, 0.75, handle, shine: 0.5, lat: 4, lon: 8);
+    b.ball(hub + lever * 1.9, 0.75, handle, shine: 0.5, lat: 4, lon: 8);
     b.ring(V3(x, 1.2, _vz), V3(x, 1.9, _vz), 0.78, 0.4, kBrassValve, shine: 0.8, sides: 8);
   }
   // The hoses (braided steel with a coloured band) once both ends are fastened; otherwise a free end.
@@ -294,41 +383,44 @@ Scene3D buildFaucetScene(PlumbState s) {
 
 List<Poly> faucetWater(PlumbState s, double t) {
   final b = MeshBuilder();
-  if (!s.valvesOpen) return b.polys;
-  final hotOk = s.attached[idValveHot] == 'hot' && s.attached[idInletHot] == 'hot';
-  final coldOk = s.attached[idValveCold] == 'cold' && s.attached[idInletCold] == 'cold';
-  void spray(int valveId, Color col) {
+  const hotCol = Color(0xFFFFB0A8), coldCol = Color(0xFF9CCBFF);
+  // A valve that is open and has no hose sprays into the cabinet.
+  void spray(int valveId, Color col, double side) {
     final p = faucetHookPoint(valveId);
-    for (var i = 0; i < 7; i++) {
-      final ph = (t * 1.6 + i / 7) % 1.0;
-      b.ball(p + V3(math.sin(i * 2.1) * ph * 1.4, ph * 2.4 - ph * ph * 6.5, 1.0 + ph * 2.5), 0.2, col, shine: 0.9, lat: 3, lon: 6);
-    }
+    final path = [for (var j = 0; j <= 8; j++) p + V3(side * j / 8 * 2.0, 2.4 * j / 8 - 9.0 * math.pow(j / 8, 2), 1.0 + 3.5 * j / 8)];
+    _flow(b, path, t, col, r: 0.28, speed: 1.2);
   }
-  if (hotOk) {
-    final p = hosePath('hot');
-    for (var i = 0; i < 10; i++) {
-      final ph = (t * 0.5 + i / 10) % 1.0;
-      final idx = (ph * (p.length - 1)).floor().clamp(0, p.length - 2);
-      b.ball(V3.lerp(p[idx], p[idx + 1], ph * (p.length - 1) - idx), 0.2, const Color(0xFFFF8A80), shine: 0.9, lat: 3, lon: 6);
+
+  final hotRun = s.hotOpen && s.attached[idValveHot] == 'hot' && s.attached[idInletHot] == 'hot';
+  final coldRun = s.coldOpen && s.attached[idValveCold] == 'cold' && s.attached[idInletCold] == 'cold';
+  if (s.hotOpen && !hotRun) spray(idValveHot, hotCol, -1);
+  if (s.coldOpen && !coldRun) spray(idValveCold, coldCol, 1);
+  // Inside the hose the water shows as a faint moving glow at each end that is connected.
+  for (final (run, kind, col) in [(hotRun, 'hot', hotCol), (coldRun, 'cold', coldCol)]) {
+    if (!run) continue;
+    final p = hosePath(kind);
+    b.id = 0;
+    b.bias = 0.3;
+    b.alpha = 0.9;
+    for (var i = 0; i < 4; i++) {
+      final f = (t * 0.6 + i / 4) % 1.0;
+      b.ball(_along(p, f) + const V3(0, 0, 0.32), 0.2, col, shine: 0.9, lat: 3, lon: 6);
     }
-  } else if (s.attached[idValveHot] == null) {
-    spray(idValveHot, const Color(0xFFFF8A80));
+    b.alpha = 1;
+    b.bias = 0;
   }
-  if (coldOk) {
-    final p = hosePath('cold');
-    for (var i = 0; i < 10; i++) {
-      final ph = (t * 0.5 + i / 10) % 1.0;
-      final idx = (ph * (p.length - 1)).floor().clamp(0, p.length - 2);
-      b.ball(V3.lerp(p[idx], p[idx + 1], ph * (p.length - 1) - idx), 0.2, const Color(0xFF7FB8FF), shine: 0.9, lat: 3, lon: 6);
-    }
-  } else if (s.attached[idValveCold] == null) {
-    spray(idValveCold, const Color(0xFF7FB8FF));
-  }
-  if (hotOk && coldOk) {
-    for (var i = 0; i < 8; i++) {
-      final ph = (t * 2.0 + i / 8) % 1.0;
-      b.ball(V3(0, 21.0 - ph * 6.5, _vz + 5.2), 0.26, Color.lerp(const Color(0xFFFF9E9E), const Color(0xFF7FB8FF), 0.5)!, shine: 0.9, lat: 3, lon: 6);
-    }
+  if (hotRun || coldRun) {
+    const tip = V3(0, 21.1, _vz + 5.2);
+    const level = 10.6;
+    final col = hotRun && coldRun ? const Color(0xFFB5D8FF) : (hotRun ? hotCol : coldCol);
+    _flow(b, [tip, tip + const V3(0, -2.5, 0), V3(0, level, tip.z)], t, col, r: 0.42, speed: 1.4);
+    b.id = 0;
+    b.alpha = 0.5;
+    b.bias = 0.2;
+    b.box(V3(0, (9.5 + level) / 2, 3.7), V3(12.8, level - 9.5, 5.8), const Color(0xFF8FD0FF), shine: 0.7);
+    b.alpha = 1;
+    b.bias = 0;
+    _splash(b, V3(0, level + 0.05, tip.z), t);
   }
   return b.polys;
 }

@@ -571,6 +571,34 @@ class LessonScaffold extends StatelessWidget {
 // ─── Electrical lessons ──────────────────────────────────────────────────────
 
 /// The close-up wiring bench for one device. A room can hand it the state it is keeping, so the work carries on there.
+/// Tap the name of a part twice (quickly or slowly) and the place it goes lights up for a few seconds.
+mixin _GlowMixin<T extends StatefulWidget> on State<T> {
+  List<V3> glow = const [];
+  Timer? _glowTimer;
+  String _lastChip = '';
+  DateTime _lastChipAt = DateTime(2000);
+
+  /// True when this is the second tap on the same name within a few seconds.
+  bool chipTapTwice(String k) {
+    final now = DateTime.now();
+    final twice = _lastChip == k && now.difference(_lastChipAt).inMilliseconds < 2500;
+    _lastChip = twice ? '' : k;
+    _lastChipAt = now;
+    return twice;
+  }
+
+  void lightUp(List<V3> spots) {
+    if (spots.isEmpty) return;
+    _glowTimer?.cancel();
+    setState(() => glow = spots);
+    _glowTimer = Timer(const Duration(seconds: 6), () {
+      if (mounted) setState(() => glow = const []);
+    });
+  }
+
+  void disposeGlow() => _glowTimer?.cancel();
+}
+
 class ElectricalLessonPage extends StatefulWidget {
   const ElectricalLessonPage({super.key, required this.id, this.state});
   final String id;
@@ -580,7 +608,7 @@ class ElectricalLessonPage extends StatefulWidget {
   State<ElectricalLessonPage> createState() => _ElectricalPageState();
 }
 
-class _ElectricalPageState extends State<ElectricalLessonPage> {
+class _ElectricalPageState extends State<ElectricalLessonPage> with _GlowMixin {
   late final ElectricalLesson lesson = electricalLesson(widget.id);
   late final WiringState s = widget.state ?? WiringState();
   // A ceiling light or fan is seen from the side, where the house wires, the fixture wires and the nuts between them are all in view.
@@ -614,6 +642,7 @@ class _ElectricalPageState extends State<ElectricalLessonPage> {
   @override
   void dispose() {
     _msgTimer?.cancel();
+    disposeGlow();
     super.dispose();
   }
 
@@ -649,9 +678,10 @@ class _ElectricalPageState extends State<ElectricalLessonPage> {
       cam.glideTo(target: const V3(0, -0.3, 3.2), dist: 9, yaw: 1.15, pitch: 0.12);
       return;
     }
-    if (key == 'ground') {
+    final role = lesson.chips.where((c) => c.key == key).map((c) => c.role).firstOrNull ?? '';
+    if (key == 'ground' || role == 'ground') {
       cam.glideTo(target: const V3(0, -1.2, 5.0), dist: 8, yaw: 0.15, pitch: 0.55);
-    } else if (key == 'white') {
+    } else if (key == 'white' || role == 'neutral') {
       cam.glideTo(target: const V3(-0.9, 0.0, 4.4), dist: 8.5, yaw: 0.95, pitch: 0.2);
     } else {
       cam.glideTo(target: const V3(0.9, 0.0, 4.4), dist: 8.5, yaw: -0.95, pitch: 0.2);
@@ -859,7 +889,7 @@ class _ElectricalPageState extends State<ElectricalLessonPage> {
           if (active || (s.burnt && s.fx.isNotEmpty)) {
             faultEffect(b, active ? s.fx : 'smolder', (l) => V3(l.x * 0.32, -0.2 + l.y * 0.32, 0.8 + l.z * 0.32), 0.32, _now);
           }
-          return b.polys;
+          return [...b.polys, if (glow.isNotEmpty) ...glowSpots(glow, _now)];
         },
         message: msg,
         good: good,
@@ -917,10 +947,17 @@ class _ElectricalPageState extends State<ElectricalLessonPage> {
                         _say('That wire is already fastened. Tap the wire in the 3D view to take it off if you want to move it.');
                         return;
                       }
-                      setState(() => chip = chip == c.key ? '' : c.key);
+                      final twice = chipTapTwice(c.key);
+                      setState(() => chip = twice ? c.key : (chip == c.key ? '' : c.key));
                       if (chip.isNotEmpty) {
                         _lookFor(c.key);
-                        _say('${c.label}: now tap the screw it belongs on.', ok: true);
+                        if (twice) {
+                          final spots = [for (final h in lesson.hookups) if (h.accepts.contains(c.key) && s.attached[h.id] == null && scene.info[h.id] != null) scene.info[h.id]!.focus];
+                          lightUp(spots);
+                          _say('${c.label}: the glowing place is where it goes.', ok: true);
+                        } else {
+                          _say('${c.label}: now tap the screw it belongs on. Tap its name again to light up where it goes.', ok: true);
+                        }
                       }
                     },
                     child: Container(
@@ -1007,7 +1044,7 @@ class PtrapLessonPage extends StatefulWidget {
   State<PtrapLessonPage> createState() => _PtrapPageState();
 }
 
-class _PtrapPageState extends State<PtrapLessonPage> {
+class _PtrapPageState extends State<PtrapLessonPage> with _GlowMixin {
   late final PlumbState s = widget.state ?? PlumbState();
   late final Cam3 cam = Cam3(yaw: -0.3, pitch: 0.18, dist: 40, target: const V3(7, 3, 0));
   late Scene3D scene = buildPtrapScene(s);
@@ -1027,6 +1064,7 @@ class _PtrapPageState extends State<PtrapLessonPage> {
   @override
   void dispose() {
     _t?.cancel();
+    disposeGlow();
     super.dispose();
   }
 
@@ -1111,6 +1149,20 @@ class _PtrapPageState extends State<PtrapLessonPage> {
         return;
       }
     }
+    // The sink and its tap turn the water on and off, once the whole drain is built.
+    if (id == idSink && s.placed.length == 3 && chip.isEmpty) {
+      if (s.running) {
+        setState(() {
+          s.running = false;
+          s.leakAt = '';
+          _rebuild();
+        });
+        _say('Water turned off.', ok: true);
+      } else {
+        _run();
+      }
+      return;
+    }
     final info = scene.info[id];
     if (info != null) {
       setState(() => hl = id);
@@ -1154,7 +1206,7 @@ class _PtrapPageState extends State<PtrapLessonPage> {
         message: msg,
         good: good,
         info: hl != 0 ? scene.info[hl] : null,
-        dynamicPolys: (t) => ptrapWater(s, t),
+        dynamicPolys: (t) => [...ptrapWater(s, t), if (glow.isNotEmpty) ...glowSpots(glow, t)],
       ),
       panel: Column(mainAxisSize: MainAxisSize.min, children: [
         Wrap(spacing: 8, runSpacing: 6, children: [
@@ -1162,7 +1214,16 @@ class _PtrapPageState extends State<PtrapLessonPage> {
               Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: GestureDetector(
-                  onTap: s.placed.contains(k) ? null : () => setState(() => chip = chip == k ? '' : k),
+                  onTap: s.placed.contains(k)
+                      ? null
+                      : () {
+                          final twice = chipTapTwice(k);
+                          setState(() => chip = twice ? k : (chip == k ? '' : k));
+                          if (twice) {
+                            lightUp([switch (k) { 'tail' => const V3(0, 6.2, 0), 'trap' => const V3(3, 0.6, 0), _ => const V3(12, 2.6, 0) }]);
+                            _say('${k == 'tail' ? 'Tailpiece' : (k == 'trap' ? 'P-trap' : 'Trap arm')}: the glowing place is where it goes. Tap it.', ok: true);
+                          }
+                        },
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                     decoration: BoxDecoration(color: s.placed.contains(k) ? Colors.white10 : const Color(0xFF1E3A5F), borderRadius: BorderRadius.circular(14), border: Border.all(color: chip == k ? const Color(0xFF67E8F9) : Colors.white24, width: chip == k ? 3 : 1)),
@@ -1206,7 +1267,7 @@ class FaucetLessonPage extends StatefulWidget {
   State<FaucetLessonPage> createState() => _FaucetPageState();
 }
 
-class _FaucetPageState extends State<FaucetLessonPage> {
+class _FaucetPageState extends State<FaucetLessonPage> with _GlowMixin {
   late final PlumbState s = widget.state ?? PlumbState();
   late final Cam3 cam = Cam3(yaw: -0.25, pitch: 0.2, dist: 36, target: const V3(0, 9, -3));
   late Scene3D scene = buildFaucetScene(s);
@@ -1219,12 +1280,13 @@ class _FaucetPageState extends State<FaucetLessonPage> {
     'Look under the sink. The wall has two shut-off valves: hot on the LEFT (red handle) and cold on the RIGHT (blue handle).',
     'Pick the red hot hose. Tap the left shut-off valve, then the left faucet inlet.',
     'Pick the blue cold hose. Tap the right shut-off valve, then the right faucet inlet.',
-    'Open the valves slowly and turn on the faucet. Check every connection for drips.',
+    'Turn each valve handle (tap it) to let the water in. Check every connection for drips.',
   ];
 
   @override
   void dispose() {
     _t?.cancel();
+    disposeGlow();
     super.dispose();
   }
 
@@ -1276,6 +1338,11 @@ class _FaucetPageState extends State<FaucetLessonPage> {
       }
       return;
     }
+    // A tap on a shut-off valve (with no hose picked up) turns its handle, like turning a real valve by hand.
+    if ((id == idValveHot || id == idValveCold) && chip.isEmpty) {
+      _turnValve(id);
+      return;
+    }
     // A tap on a hose takes it off.
     if (id == idHoseHot || id == idHoseCold) {
       final k = id == idHoseHot ? 'hot' : 'cold';
@@ -1293,6 +1360,35 @@ class _FaucetPageState extends State<FaucetLessonPage> {
     if (info != null) {
       setState(() => hl = id);
       cam.glideTo(target: info.focus, dist: info.dist);
+    }
+  }
+
+  void _turnValve(int id) {
+    final hot = id == idValveHot;
+    final word = hot ? 'hot' : 'cold';
+    setState(() {
+      if (hot) {
+        s.hotOpen = !s.hotOpen;
+      } else {
+        s.coldOpen = !s.coldOpen;
+      }
+      _rebuild();
+      hl = id;
+    });
+    if (!(hot ? s.hotOpen : s.coldOpen)) {
+      _say('The $word valve is turned off.', ok: true);
+      return;
+    }
+    final whole = s.attached[id] == word && s.attached[hot ? idInletHot : idInletCold] == word;
+    if (!whole) {
+      conBad();
+      _say(s.attached[id] == null ? 'Water is spraying out of the $word valve: it has no hose! Turn it off and connect the hose first.' : 'Water is leaking: the $word hose is only fastened at one end. Turn the valve off and finish the connection.');
+    } else if (s.valvesOpen && faucetComplete(s)) {
+      conGood();
+      _say('Hot and cold flow through the hoses and out of the faucet. No leaks. The lesson is complete!', ok: true);
+    } else {
+      conGood();
+      _say('The $word water is flowing. Now turn the ${hot ? 'cold' : 'hot'} valve too: tap its handle.', ok: true);
     }
   }
 
@@ -1332,7 +1428,7 @@ class _FaucetPageState extends State<FaucetLessonPage> {
         message: msg,
         good: good,
         info: hl != 0 ? scene.info[hl] : null,
-        dynamicPolys: (t) => faucetWater(s, t),
+        dynamicPolys: (t) => [...faucetWater(s, t), if (glow.isNotEmpty) ...glowSpots(glow, t)],
         topRight: [
           conPill('Hints', on: s.hints, icon: Icons.lightbulb_rounded, onTap: () => setState(() {
                 s.hints = !s.hints;
@@ -1347,7 +1443,17 @@ class _FaucetPageState extends State<FaucetLessonPage> {
               Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: GestureDetector(
-                  onTap: () => setState(() => chip = chip == k ? '' : k),
+                  onTap: () {
+                    final twice = chipTapTwice(k);
+                    setState(() => chip = twice ? k : (chip == k ? '' : k));
+                    if (twice) {
+                      final hot = k == 'hot';
+                      final left = [for (final h in kFaucetHooks) if (h.accepts.contains(k) && s.attached[h.id] == null) faucetHookPoint(h.id) + const V3(0, 0, 1.2)];
+                      // Everything is connected: the thing left to do is turn the valve.
+                      lightUp(left.isNotEmpty ? left : [faucetHookPoint(hot ? idValveHot : idValveCold) + const V3(0, -1.7, 1.6)]);
+                      _say(left.isNotEmpty ? '${hot ? 'Hot' : 'Cold'} hose: the glowing places are where its two ends go.' : '${hot ? 'Hot' : 'Cold'} hose is on. Now turn its valve: tap the handle.', ok: true);
+                    }
+                  },
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                     decoration: BoxDecoration(color: col, borderRadius: BorderRadius.circular(14), border: Border.all(color: chip == k ? const Color(0xFF67E8F9) : Colors.white24, width: chip == k ? 3 : 1)),
