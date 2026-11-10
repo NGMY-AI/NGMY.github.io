@@ -1237,3 +1237,38 @@ _Blocks _blocksOf(Scene3D scene) {
   _blockCache[scene] = out;
   return out;
 }
+
+/// A real sink in a counter, so it reads as a sink and not as a table with a plate on it: the counter has a hole, the basin goes DOWN into it (four walls
+/// and a floor, with a drain), and the faucet stands behind it. The counter spans [cw] by [cd] and is [t] thick with its top at [top]; the basin is
+/// [bw] by [bd] and [depth] deep, nearer the front of the counter (+z) so there is room behind it for the faucet. [wt] is the thickness of the basin walls.
+extension SinkBuilder on MeshBuilder {
+  void sink({required double x, required double z, required double top, required double cw, required double cd, required double bw, required double bd, required double depth, required Color counter, required Color bowl, bool faucet = true, double t = 2.0, double wt = 0.6, Color chrome = const Color(0xFFC9CED6)}) {
+    final sideW = (cw - bw) / 2;
+    final frontD = math.max(wt * 2, (cd - bd) * 0.3), backD = cd - bd - frontD;
+    final cy = top - t / 2;
+    // The counter, with a hole in it.
+    box(V3(x - (cw / 2 - sideW / 2), cy, z), V3(sideW, t, cd), counter, shine: 0.5);
+    box(V3(x + (cw / 2 - sideW / 2), cy, z), V3(sideW, t, cd), counter, shine: 0.5);
+    box(V3(x, cy, z - cd / 2 + backD / 2), V3(bw, t, backD), counter, shine: 0.5);
+    box(V3(x, cy, z + cd / 2 - frontD / 2), V3(bw, t, frontD), counter, shine: 0.5);
+    // The basin: the hole's walls going down (not the front one: from the front you look over the counter edge into the basin, and a wall there would only show through it), and its floor.
+    final hz = z - cd / 2 + backD + bd / 2;
+    final wy = top - depth / 2;
+    box(V3(x - bw / 2 + wt / 2, wy, hz), V3(wt, depth, bd), bowl, shine: 0.7);
+    box(V3(x + bw / 2 - wt / 2, wy, hz), V3(wt, depth, bd), bowl, shine: 0.7);
+    box(V3(x, wy, hz - bd / 2 + wt / 2), V3(bw, depth, wt), bowl, shine: 0.7);
+    box(V3(x, top - depth + wt / 2, hz), V3(bw, wt, bd), Color.lerp(bowl, const Color(0xFF9CA3AF), 0.18)!, shine: 0.6);
+    // The drain, dark, in the middle of the floor.
+    cyl(V3(x, top - depth + wt, hz), V3(x, top - depth + wt + 0.05, hz), math.min(bw, bd) * 0.09, const Color(0xFF2B2D33), sides: 14);
+    if (!faucet) return;
+    // The faucet behind the basin: a base, a neck that rises and arches over the basin, and two small handles.
+    final fz = hz - bd / 2 - backD * 0.38;
+    final k = math.min(bw, bd);
+    cyl(V3(x, top, fz), V3(x, top + k * 0.08, fz), k * 0.12, chrome, shine: 0.9, sides: 16);
+    tube(roundedPath([V3(x, top + k * 0.08, fz), V3(x, top + k * 0.5, fz), V3(x, top + k * 0.62, fz + k * 0.12), V3(x, top + k * 0.62, fz + k * 0.38), V3(x, top + k * 0.5, fz + k * 0.42)], k * 0.1), k * 0.045, chrome, shine: 0.9, sides: 8, joints: true);
+    for (final sx in const [-1.0, 1.0]) {
+      cyl(V3(x + sx * k * 0.3, top, fz), V3(x + sx * k * 0.3, top + k * 0.2, fz), k * 0.035, chrome, shine: 0.9, sides: 8);
+      cyl(V3(x + sx * k * 0.3, top + k * 0.2, fz), V3(x + sx * k * 0.3, top + k * 0.24, fz), k * 0.075, chrome, shine: 0.9, sides: 10);
+    }
+  }
+}

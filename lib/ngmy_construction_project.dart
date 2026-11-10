@@ -419,6 +419,11 @@ class RoomProject {
     if (!drywallDone) return _mistake('Finish the drywall first. Devices go in after the walls are painted.');
     if (!boxes.containsKey(slot) || !cabled.contains(slot)) return _mistake('There is no box with cable at ${s.name}.');
     if (devs.containsKey(slot)) return _mistake('There is already a device there. Pull it out first if you want to move it.');
+    // A real electrician never puts a device into a live box: the breaker has to be OFF first, whatever the mode.
+    if (power) {
+      mistakes++;
+      return const Act(false, 'STOP! The breaker is ON, so this box is live (120 volts). Nobody puts a device into a live box. Turn the breaker OFF first, test that the wires are dead, then put the device in.');
+    }
     final bad = _kindOkFor(s, kind);
     if (bad.isNotEmpty) return _mistake(bad);
     if ((isSwitchKind(kind) && s.role == 'low') || (!isSwitchKind(kind) && !s.ceiling && s.role == 'switch')) {

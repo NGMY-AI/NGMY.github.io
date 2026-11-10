@@ -114,7 +114,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       }
       home = HomeProject.session!;
     }
-    home.practice = widget.practice || home.practice;
+    // Everything in the house and the city is real work (real consequences). Only a lesson room is a place to learn.
+    home.practice = widget.lesson.isEmpty ? true : (widget.practice || home.practice);
     cam = Cam3(yaw: -0.05, pitch: 0.1, dist: 120, target: const V3(0, 40, 40))..maxDist = 560;
     if (widget.focus == 'city') home.current = 11;
     if (widget.focus.isNotEmpty) {
@@ -1719,7 +1720,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     final f = inn.door;
     final key = inn.isTower ? f.id * 100 + inn.level : f.id;
     final p = _houseProjects.putIfAbsent(key, () => RoomProject(seed: f.id * 13 + 5 + inn.level, kind: 0, variants: true)..fastForward());
-    await _pushPage((_) => NgmyRoomProjectPage(project: p));
+    await _pushPage((_) => NgmyRoomProjectPage(project: p, paysStars: false));
     if (!mounted) return;
     _syncFixtures(inn, p);
     if (_workReady) {
@@ -3105,7 +3106,12 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       } else {
         made = Community(houseSeed: home.seed, seed: home.seed)..syncCalls(home);
       }
+
       Community.active = made;
+      // Stars paid for jobs done in the Construction Lab since the city was last open (it does not hold anything up).
+      Community.takeBonus().then((n) {
+        if (n > 0 && mounted) comm?.points += n;
+      });
       for (final c in made.calls) {
         _knownCalls.add(c.id);
       }
@@ -3424,7 +3430,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     }
     r.wiring!.practice = home.practice;
     final wasWired = r.wired;
-    await _pushPage((_) => NgmyRoomProjectPage(project: r.wiring));
+    await _pushPage((_) => NgmyRoomProjectPage(project: r.wiring, paysStars: false));
     if (!mounted) return;
     setState(_rebuild);
     if (r.wired && !wasWired) {
@@ -3446,7 +3452,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (!r.plumbNeeded && !r.plumb!.allPlaced) r.plumb!.completeAll();
     r.plumb!.practice = home.practice;
     final wasPlumbed = r.plumbed;
-    await _pushPage((_) => NgmyPlumbJobPage(job: r.plumb));
+    await _pushPage((_) => NgmyPlumbJobPage(job: r.plumb, paysStars: false));
     if (!mounted) return;
     setState(_rebuild);
     if (r.plumbed && !wasPlumbed) {
@@ -3492,7 +3498,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   void _addExtra(String kind) {
     final r = room;
     if (!r.indoor || r.kind == 'hall') {
-      _say('Add devices in a room, not in the hall or the garden.', ok: false);
+      _say('Add devices in a room, not in the hall or in NGMY City.', ok: false);
       return;
     }
     if (r.extras.length >= 4) {

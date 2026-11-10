@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'ngmy_3d.dart';
+import 'ngmy_construction_community.dart' show Community;
 import 'ngmy_construction_lab.dart';
 import 'ngmy_construction_plumbjob.dart';
 import 'ngmy_construction_project.dart' show Act;
@@ -12,7 +13,10 @@ import 'ngmy_construction_project.dart' show Act;
 // ═════════════════════════════════════════════════════════════════════════════
 
 class NgmyPlumbJobPage extends StatefulWidget {
-  const NgmyPlumbJobPage({super.key, this.seed, this.practice = false, this.job});
+  const NgmyPlumbJobPage({super.key, this.seed, this.practice = false, this.job, this.paysStars = true});
+
+  /// A finished job pays stars (the house of the city pays its own).
+  final bool paysStars;
   final int? seed;
   /// A job that is already under way (the one for a room of the house).
   final PlumbJob? job;
@@ -38,7 +42,7 @@ class _NgmyPlumbJobPageState extends State<NgmyPlumbJobPage> {
   @override
   void initState() {
     super.initState();
-    job = widget.job ?? PlumbJob(seed: seed, practice: widget.practice);
+    job = widget.job ?? PlumbJob(seed: seed, practice: true);
     scene = buildPlumbJobScene(job, armed: armed, labels: !job.practice);
   }
 
@@ -139,12 +143,14 @@ class _NgmyPlumbJobPageState extends State<NgmyPlumbJobPage> {
   }
 
   void _done() {
+    final pay = widget.paysStars ? Community.jobStars(size: job.placed.length, mistakes: job.mistakes) : 0;
+    if (pay > 0) Community.addStars(pay);
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1B1B1F),
         title: const Text('Job done! 🎉', style: TextStyle(color: Color(0xFF4ADE80), fontWeight: FontWeight.w900)),
-        content: Text('The ${job.variant.title.toLowerCase()} is finished and nothing leaks.\n\nMistakes: ${job.mistakes}\n\nThe next job is different.', style: const TextStyle(color: Colors.white70, height: 1.45)),
+        content: Text('The ${job.variant.title.toLowerCase()} is finished and nothing leaks.${pay > 0 ? '\n\nYou are paid $pay stars! ⭐' : ''}\n\nMistakes: ${job.mistakes}\n\nThe next job is different.', style: const TextStyle(color: Colors.white70, height: 1.45)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Stay')),
           FilledButton(onPressed: () {
@@ -282,7 +288,7 @@ class _NgmyPlumbJobPageState extends State<NgmyPlumbJobPage> {
           ),
         Align(
           alignment: Alignment.centerLeft,
-          child: Text(job.practice ? 'Practice mode: no hints. Build it in the right order.' : (job.allPlaced ? 'Everything is fitted. Tighten every joint, then turn the main water on to test.' : 'Job: ${job.variant.blurb}'), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.3, fontWeight: FontWeight.w700)),
+          child: Text(job.practice ? 'Real work: no hints. Build it in the right order.' : (job.allPlaced ? 'Everything is fitted. Tighten every joint, then turn the main water on to test.' : 'Job: ${job.variant.blurb}'), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.3, fontWeight: FontWeight.w700)),
         ),
         const SizedBox(height: 8),
         SizedBox(
@@ -319,16 +325,6 @@ class _NgmyPlumbJobPageState extends State<NgmyPlumbJobPage> {
           const SizedBox(height: 6),
           const Text('Tip: pick a part, then tap its glowing spot. Joints on hoses, bolts and the drain are only loose: pick the Wrench and tap them. Use your Hand on the main water valve: turn the water OFF before you cut into a pipe, and ON to test for leaks.', style: TextStyle(color: Colors.white54, fontSize: 12.5, height: 1.4)),
           const SizedBox(height: 8),
-          Row(children: [
-            const Expanded(child: Text('Practice mode (no hints, no labels)', style: TextStyle(color: Colors.white70, fontSize: 12.5, fontWeight: FontWeight.w700))),
-            Switch(value: job.practice, onChanged: (v) {
-              setState(() {
-                job.practice = v;
-                _rebuild();
-              });
-              Navigator.pop(ctx);
-            }),
-          ]),
           FilledButton(onPressed: () {
             Navigator.pop(ctx);
             _newJob();

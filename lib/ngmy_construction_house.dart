@@ -189,8 +189,8 @@ Scene3D buildHouseScene(HouseState s) {
   b.box(const V3(0.7, 1.5, -7.2), const V3(0.12, 3.0, 1.9), kWood, shine: 0.1);
   b.box(const V3(6.3, 1.5, -7.2), const V3(0.12, 3.0, 1.9), kWood, shine: 0.1);
   b.box(const V3(3.5, 0.15, -7.2), const V3(5.6, 0.3, 1.9), kWood, shine: 0.1);
-  b.box(const V3(3.5, 3.1, -7.15), const V3(6.2, 0.18, 2.1), kGranite, shine: 0.5, split: 2);
-  b.box(const V3(3.0, 3.21, -7.2), const V3(1.9, 0.05, 1.35), kStainless, shine: 0.7);
+  // The counter with a basin sunk into it (walls, floor, drain), not a flat patch painted on it.
+  b.sink(x: 3.0, z: -7.15, top: 3.19, cw: 6.0, cd: 2.1, bw: 2.5, bd: 1.35, depth: 0.55, t: 0.18, wt: 0.06, counter: kGranite, bowl: kStainless, faucet: false, chrome: kChrome);
   b.id = idHFaucet;
   b.tube(roundedPath(const [V3(3.0, 3.2, -7.85), V3(3.0, 4.0, -7.85), V3(3.0, 4.2, -7.4), V3(3.0, 3.95, -7.0)], 0.2), 0.055, kChrome, shine: 0.9, sides: 8, joints: false);
   b.id = idHGfci;

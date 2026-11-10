@@ -64,7 +64,9 @@ void main() {
     final first = plan.orders.firstWhere((o) => !slotById(o.slot).ceiling).slot;
     await t.pumpWidget(const MaterialApp(home: NgmyRoomProjectPage(seed: 3)));
     await t.pump(const Duration(milliseconds: 700));
-    expect(find.textContaining('Mount a box at'), findsOneWidget);
+    // A job is real work: no hint tells you what to do next.
+    expect(find.textContaining('Real work: no hints'), findsOneWidget);
+    expect(find.textContaining('Mount a box at'), findsNothing);
     expect(find.text('Behind the wall'), findsOneWidget);
     await t.ensureVisible(find.text('Wall box'));
     await t.pump(const Duration(milliseconds: 300));
@@ -90,7 +92,7 @@ void main() {
     addTearDown(t.view.reset);
     await t.pumpWidget(const MaterialApp(home: NgmyRoomProjectPage(seed: 3, practice: true)));
     await t.pump(const Duration(milliseconds: 700));
-    expect(find.textContaining('Practice mode: no hints'), findsOneWidget);
+    expect(find.textContaining('Real work: no hints'), findsOneWidget);
     expect(find.textContaining('Mount a box at'), findsNothing);
     await t.pump(const Duration(seconds: 12));
   });

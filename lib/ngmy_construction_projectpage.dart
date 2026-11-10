@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'ngmy_3d.dart';
 import 'ngmy_construction_electrical.dart';
 import 'ngmy_construction_electrical_more.dart';
+import 'ngmy_construction_community.dart' show Community;
 import 'ngmy_construction_lab.dart';
 import 'ngmy_construction_project.dart';
 import 'ngmy_construction_roomscene.dart';
@@ -75,7 +76,10 @@ const List<List<_Item>> _trays = [
 ];
 
 class NgmyRoomProjectPage extends StatefulWidget {
-  const NgmyRoomProjectPage({super.key, this.seed, this.practice = false, this.quick = false, this.project, this.test = false});
+  const NgmyRoomProjectPage({super.key, this.seed, this.practice = false, this.quick = false, this.project, this.test = false, this.paysStars = true});
+
+  /// A finished job pays stars (the house of the city pays its own).
+  final bool paysStars;
 
   /// Start in test mode (an inspection).
   final bool test;
@@ -122,7 +126,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
   @override
   void initState() {
     super.initState();
-    p = widget.project ?? RoomProject(seed: seed, practice: widget.practice, variants: true);
+    p = widget.project ?? RoomProject(seed: seed, practice: true, variants: true);
     if (widget.test) p.test = true;
     if (widget.project != null && p.drywallDone) phase = 2;
     if (widget.quick) {
@@ -611,12 +615,14 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
   }
 
   void _complete() {
+    final pay = widget.paysStars ? Community.jobStars(size: p.orders.length, mistakes: p.mistakes, shocks: p.shocks) : 0;
+    if (pay > 0) Community.addStars(pay);
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1B1B1F),
         title: const Text('Job complete! 🎉', style: TextStyle(color: Color(0xFF4ADE80), fontWeight: FontWeight.w900)),
-        content: Text('The ${p.roomName.toLowerCase()} is built, wired, painted and tested.\n\nMistakes: ${p.mistakes}\nShocks: ${p.shocks}\nLives left: ${p.lives}\n\nEvery job is a little different. Ready for another one?', style: const TextStyle(color: Colors.white70, height: 1.45)),
+        content: Text('The ${p.roomName.toLowerCase()} is built, wired, painted and tested.${pay > 0 ? '\n\nYou are paid $pay stars! ⭐' : ''}\n\nMistakes: ${p.mistakes}\nShocks: ${p.shocks}\nLives left: ${p.lives}\n\nEvery job is a little different. Ready for another one?', style: const TextStyle(color: Colors.white70, height: 1.45)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Stay in the room')),
           FilledButton(
@@ -634,7 +640,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
   void _newJob({bool sameSeed = false}) {
     setState(() {
       if (!sameSeed) seed = DateTime.now().millisecondsSinceEpoch % 100000;
-      p = RoomProject(seed: seed, practice: p.practice, variants: true);
+      p = RoomProject(seed: seed, practice: true, variants: true);
       phase = 0;
       armed = '';
       active = -1;
@@ -881,7 +887,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
                 child: Text('👉 ${_next()}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFFBAE6FD), fontSize: 11.5, height: 1.25, fontWeight: FontWeight.w700)),
               )
             else
-              const Text('Practice mode: no hints. You will only hear from me when something is wrong.', style: TextStyle(color: Colors.white38, fontSize: 11.5)),
+              const Text('Real work: no hints. You will only hear from me when something is wrong.', style: TextStyle(color: Colors.white38, fontSize: 11.5)),
             const SizedBox(height: 6),
             ],
             SizedBox(
@@ -1103,35 +1109,6 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
                   child: Text('${p.devs[o.slot]?.w.stage == 2 ? '✅' : '⬜'} ${o.device == 'gfci' ? 'A GFCI outlet' : (o.device == 'outlet' ? 'An outlet' : (o.device == 'switch' ? 'A light switch' : (o.device == 'light' ? 'A ceiling light' : (o.device == 'fan' ? 'A ceiling fan' : 'A ${deviceKindName(o.device).toLowerCase()}'))))} at ${slotById(o.slot).name}${o.controlledBy != null ? ', turned on by ${slotById(o.controlledBy!).name}' : ''}', style: const TextStyle(color: Colors.white, fontSize: 13)),
                 ),
               const SizedBox(height: 10),
-              Row(children: [
-                const Expanded(child: Text('Practice mode (no hints, real shocks and fires)', style: TextStyle(color: Colors.white70, fontSize: 12.5, fontWeight: FontWeight.w700))),
-                Switch(
-                  value: p.practice,
-                  onChanged: (v) {
-                    p.practice = v;
-                    for (final dv in p.devs.values) {
-                      dv.w.practice = v;
-                    }
-                    set(() {});
-                    setState(() {});
-                  },
-                ),
-              ]),
-              Row(children: [
-                const Expanded(child: Text('Test mode (an inspection: nothing is explained until you submit)', style: TextStyle(color: Colors.white70, fontSize: 12.5, fontWeight: FontWeight.w700))),
-                Switch(
-                  value: p.test,
-                  onChanged: (v) {
-                    p.test = v;
-                    for (final dv in p.devs.values) {
-                      dv.w.test = v;
-                      if (v) dv.w.labels = false;
-                    }
-                    set(() {});
-                    setState(_rebuild);
-                  },
-                ),
-              ]),
               const SizedBox(height: 6),
               Row(children: [
                 Expanded(child: OutlinedButton(onPressed: () => showWireGuide(context), child: const Text('Wire guide'))),

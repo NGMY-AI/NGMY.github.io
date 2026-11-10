@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'ngmy_3d.dart';
+import 'ngmy_construction_community.dart' show Community;
 import 'ngmy_construction_house.dart';
 import 'ngmy_construction_lab.dart';
 import 'ngmy_construction_service.dart';
@@ -122,12 +123,14 @@ class _NgmyServiceCallPageState extends State<NgmyServiceCallPage> {
   }
 
   void _done() {
+    final pay = Community.jobStars(size: call.faults.length, mistakes: call.mistakes, shocks: call.shocks);
+    Community.addStars(pay);
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1B1B1F),
         title: const Text('All fixed! 🎉', style: TextStyle(color: Color(0xFF4ADE80), fontWeight: FontWeight.w900)),
-        content: Text('Every problem on the customer\'s list is fixed.\n\nMistakes: ${call.mistakes}\nShocks: ${call.shocks}\nLives left: ${call.lives}\n\nThe next call will have different problems.', style: const TextStyle(color: Colors.white70, height: 1.45)),
+        content: Text('Every problem on the customer\'s list is fixed.\n\nYou are paid $pay stars! ⭐\n\nMistakes: ${call.mistakes}\nShocks: ${call.shocks}\nLives left: ${call.lives}\n\nThe next call will have different problems.', style: const TextStyle(color: Colors.white70, height: 1.45)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Stay')),
           FilledButton(onPressed: () {

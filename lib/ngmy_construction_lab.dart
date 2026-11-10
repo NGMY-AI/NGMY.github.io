@@ -85,7 +85,8 @@ class NgmyConstructionLab extends StatefulWidget {
 }
 
 class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
-  bool practice = false;
+  /// The jobs are real work: wrong moves have real consequences and nothing is explained for you. Only the lessons teach.
+  final bool practice = true;
 
   void _push(Widget page) => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
 
@@ -139,7 +140,7 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
                   const SizedBox(height: 12),
                   const Text('My House', textAlign: TextAlign.center, style: TextStyle(color: kConAmber, fontWeight: FontWeight.w900, fontSize: 22)),
                   const SizedBox(height: 4),
-                  const Text('5 bedrooms, 3 bathrooms and a garden. Walk in, look all round, fix what is wrong.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.35)),
+                  const Text('5 bedrooms, 3 bathrooms and NGMY City outside. Walk in, look all round, fix what is wrong.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.35)),
                   const SizedBox(height: 14),
                   Container(padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10), decoration: BoxDecoration(color: kConAmber, borderRadius: BorderRadius.circular(20)), child: const Text('Go in', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 14))),
                 ]),

@@ -598,12 +598,10 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
       }
       // Vanity and sink.
       b.id = idHSinkF;
-      b.box(V3(sx, 14, 10), const V3(30, 28, 18), const Color(0xFF8B5E3C), shine: 0.1);
-      b.box(V3(sx, 29, 10), const V3(32, 2, 20), const Color(0xFFE4E7EA), shine: 0.4);
-      if (ok) {
-        b.cyl(V3(sx, 29.3, 10), V3(sx, 30.1, 10), 6.5, const Color(0xFFFFFFFF), shine: 0.6, sides: 18);
-        b.tube([V3(sx, 30, 4), V3(sx, 36, 4), V3(sx, 38, 7)], 0.6, kChromeC, shine: 0.9, sides: 8);
-      } else {
+      _hollowCabinet(b, V3(sx, 14, 10), 30, 28, 18, const Color(0xFF8B5E3C));
+      // The counter has a basin sunk into it (walls, floor, drain), and the faucet stands behind it once the sink is plumbed.
+      b.sink(x: sx, z: 10, top: 30, cw: 32, cd: 20, bw: 18, bd: 11, depth: 7, counter: const Color(0xFFE4E7EA), bowl: const Color(0xFFFFFFFF), faucet: ok, chrome: kChromeC);
+      if (!ok) {
         stub(sx - 6, 18);
         stub(sx + 6, 18);
       }
@@ -638,12 +636,9 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
       b.box(V3(w / 2 - 15, 32.4, 14), const V3(9, 1, 9), const Color(0xFF111111), shine: 0.3);
       b.box(V3(w / 2 - 5, 32.4, 14), const V3(9, 1, 9), const Color(0xFF111111), shine: 0.3);
       b.id = idHKSink;
-      b.box(V3(sx, 15, 14), const V3(40, 30, 26), const Color(0xFF8B5E3C), shine: 0.1);
-      b.box(V3(sx, 31, 14), const V3(42, 2, 28), const Color(0xFF4A4C54), shine: 0.5);
-      if (ok) {
-        b.cyl(V3(sx, 32.1, 14), V3(sx, 32.7, 14), 8, const Color(0xFFB6BCC4), shine: 0.8, sides: 18);
-        b.tube([V3(sx, 32, 5), V3(sx, 42, 5), V3(sx, 44, 9), V3(sx, 44, 13)], 0.7, kChromeC, shine: 0.9, sides: 8);
-      } else {
+      _hollowCabinet(b, V3(sx, 15, 14), 40, 30, 26, const Color(0xFF8B5E3C));
+      b.sink(x: sx, z: 14, top: 32, cw: 42, cd: 28, bw: 28, bd: 17, depth: 8.5, counter: const Color(0xFF4A4C54), bowl: const Color(0xFFD1D5DB), faucet: ok, chrome: kChromeC);
+      if (!ok) {
         stub(sx - 8, 18);
         stub(sx + 8, 18);
       }
@@ -1856,4 +1851,14 @@ void _furniture(MeshBuilder b, String kind, Color c) {
     default:
       b.box(const V3(0, 6, 0), const V3(10, 12, 10), c);
   }
+}
+
+/// A cabinet that is a box of panels, hollow inside (a front, a back, two sides and a floor), so a sink basin can go down into it from the counter above.
+void _hollowCabinet(MeshBuilder b, V3 c, double w, double h, double d, Color col) {
+  const th = 1.0;
+  b.box(V3(c.x, c.y, c.z + d / 2 - th / 2), V3(w, h, th), col, shine: 0.1);
+  b.box(V3(c.x, c.y, c.z - d / 2 + th / 2), V3(w, h, th), col, shine: 0.1);
+  b.box(V3(c.x - w / 2 + th / 2, c.y, c.z), V3(th, h, d), col, shine: 0.1);
+  b.box(V3(c.x + w / 2 - th / 2, c.y, c.z), V3(th, h, d), col, shine: 0.1);
+  b.box(V3(c.x, c.y - h / 2 + th / 2, c.z), V3(w, th, d), col, shine: 0.1);
 }

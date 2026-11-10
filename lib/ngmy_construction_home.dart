@@ -492,7 +492,7 @@ class HomeProject {
       HRoom(8, 'Bathroom 3', 'bathroom', 4, 3, 1, 2, [const HDoor('right', 50, 5)]),
       HRoom(9, 'Kitchen', 'kitchen', 5, 3, 2, 2, [HDoor('back', -26, 5), const HDoor('right', 40, 10)]),
       HRoom(10, 'Living room', 'living', 7, 3, 2, 2, [HDoor('back', -70, 5), const HDoor('left', 40, 9), const HDoor('back', 56, 11)]),
-      HRoom(11, 'Garden', 'outside', 0, 5, 9, 1, [const HDoor('back', 0, 10)]),
+      HRoom(11, 'NGMY City', 'outside', 0, 5, 9, 1, [const HDoor('back', 0, 10)]),
     ];
     rooms = list;
     // What is wrong in this house: a different mix every time.

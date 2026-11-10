@@ -473,6 +473,38 @@ class Community {
     return c;
   }
 
+  /// Stars paid for a job done outside the city (a job of the Construction Lab): the same stars the city shows. Into the community that is running, or kept
+  /// until the city is next opened.
+  static const String kStarsBonusKey = 'ngmy_construction_bonus_stars';
+
+  static Future<void> addStars(int n) async {
+    if (n <= 0) return;
+    final a = active;
+    if (a != null) {
+      a.points += n;
+      return;
+    }
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.setInt(kStarsBonusKey, (p.getInt(kStarsBonusKey) ?? 0) + n);
+    } catch (_) {}
+  }
+
+  /// The stars kept for the city since it was last open (and forgets them).
+  static Future<int> takeBonus() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      final n = p.getInt(kStarsBonusKey) ?? 0;
+      if (n != 0) await p.remove(kStarsBonusKey);
+      return n;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// What a finished job pays: more for a bigger job, less for every mistake and shock, never less than 6.
+  static int jobStars({required int size, int mistakes = 0, int shocks = 0}) => math.max(6, 12 + 4 * size - 2 * mistakes - 5 * shocks);
+
   static Future<Map<String, dynamic>?> loadJson() async {
     try {
       final p = await SharedPreferences.getInstance();
