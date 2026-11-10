@@ -6,8 +6,10 @@ import 'ngmy_vphone_link.dart';
 
 /// The player of the virtual phone off the web: video files play here, other links open in the phone's browser.
 class VPhonePlayer extends StatefulWidget {
-  const VPhonePlayer({super.key, required this.link});
+  const VPhonePlayer({super.key, required this.link, this.onEnded, this.muted = false});
   final VPhoneLink link;
+  final VoidCallback? onEnded;
+  final bool muted;
 
   @override
   State<VPhonePlayer> createState() => _VPhonePlayerState();
@@ -16,6 +18,7 @@ class VPhonePlayer extends StatefulWidget {
 class _VPhonePlayerState extends State<VPhonePlayer> {
   VideoPlayerController? _c;
   String? _error;
+  bool _done = false;
 
   @override
   void initState() {
@@ -26,7 +29,15 @@ class _VPhonePlayerState extends State<VPhonePlayer> {
       c.initialize().then((_) {
         if (!mounted) return;
         setState(() {});
+        if (widget.muted) c.setVolume(0);
         c.play();
+        c.addListener(() {
+          final v = c.value;
+          if (!_done && v.isInitialized && v.duration > Duration.zero && v.position >= v.duration) {
+            _done = true;
+            widget.onEnded?.call();
+          }
+        });
       }).catchError((Object _) {
         if (mounted) setState(() => _error = 'This link could not be played. It may not be a video file.');
       });
@@ -46,12 +57,15 @@ class _VPhonePlayerState extends State<VPhonePlayer> {
       return Container(
         color: Colors.black,
         alignment: Alignment.center,
-        padding: const EdgeInsets.all(16),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text(_error ?? 'This kind of link plays in the phone browser.', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
-          const SizedBox(height: 10),
-          FilledButton(onPressed: () => launchUrl(Uri.parse(widget.link.url), mode: LaunchMode.externalApplication), child: const Text('Open the link')),
-        ]),
+        padding: const EdgeInsets.all(8),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            SizedBox(width: 220, child: Text(_error ?? 'This kind of link plays in the phone browser.', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70))),
+            const SizedBox(height: 10),
+            FilledButton(onPressed: () => launchUrl(Uri.parse(widget.link.url), mode: LaunchMode.externalApplication), child: const Text('Open the link')),
+          ]),
+        ),
       );
     }
     if (!c.value.isInitialized) return const ColoredBox(color: Colors.black, child: Center(child: CircularProgressIndicator()));

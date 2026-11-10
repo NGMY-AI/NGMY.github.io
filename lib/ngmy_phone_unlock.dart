@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_stripe_payments.dart';
 import 'ngmy_virtual_phone.dart';
+import 'ngmy_vphone_wall.dart';
 
 abstract final class NgmyPhoneUnlockColors {
   static const sky = Color(0xFF0EA5E9);
@@ -178,7 +179,34 @@ class NgmyPhoneUnlockPage extends StatelessWidget {
                         pulse: pulse,
                         onTap: () => _launch(context, label: 'Settings', open: ngmyOpenPhoneSettings),
                       ),
-const SizedBox(height: 22),                      Text(                        'Phone',                        style: TextStyle(color: Colors.white.withValues(alpha: 0.92), fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 0.2),                      ),                      const SizedBox(height: 6),                      Text(                        'A whole phone of its own inside NGMY, separate from the device you are using. Paste the link of any video and it plays on it.',                        style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12.5, height: 1.45),                      ),                      const SizedBox(height: 14),                      _QuickOpenButton(                        label: 'Phone',                        subtitle: 'Videos from any link, web, notes, calculator, clock',                        icon: Icons.smartphone_rounded,                        colors: const [Color(0xFFEC4899), Color(0xFF8B5CF6), Color(0xFF0EA5E9)],                        pulse: pulse,                        onTap: () => showNgmyVirtualPhone(context),                      ),
+                      const SizedBox(height: 22),
+                      Text(
+                        'Phone',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.92), fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 0.2),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'A whole phone of its own inside NGMY, separate from the device you are using. Paste the link of any video and it plays on it.',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12.5, height: 1.45),
+                      ),
+                      const SizedBox(height: 14),
+                      _QuickOpenButton(
+                        label: 'Phone',
+                        subtitle: 'Videos from any link, web, notes, calculator, clock',
+                        icon: Icons.smartphone_rounded,
+                        colors: const [Color(0xFFEC4899), Color(0xFF8B5CF6), Color(0xFF0EA5E9)],
+                        pulse: pulse,
+                        onTap: () => showNgmyVirtualPhone(context),
+                      ),
+                      const SizedBox(height: 10),
+                      _QuickOpenButton(
+                        label: 'Phone Wall',
+                        subtitle: '100 phones, four at a time, all playing your video',
+                        icon: Icons.dashboard_customize_rounded,
+                        colors: const [Color(0xFF0EA5E9), Color(0xFF6366F1), Color(0xFFEC4899)],
+                        pulse: pulse,
+                        onTap: () => showNgmyPhoneWall(context),
+                      ),
                       const SizedBox(height: 24),
                       Text(
                         'Unlock tools',
