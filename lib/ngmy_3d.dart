@@ -532,6 +532,9 @@ class Scene3DPainter extends CustomPainter {
 
   static const _toLight = V3(-0.28, 0.55, -0.8);
 
+  /// How many faces the last picture drew (for tests and tuning).
+  static int lastDrawn = 0;
+
   void _paintSky(Canvas canvas, Size size) {
     final w = size.width, h = size.height;
     final rect = Offset.zero & size;
@@ -634,50 +637,95 @@ class Scene3DPainter extends CustomPainter {
     final toLight = _toLight.unit;
     final half = (toLight + const V3(0, 0, -1)).unit;
     final drawn = <_Face>[];
-    final all = dynamicPolys == null ? scene.polys : [...scene.polys, ...dynamicPolys!(time)];
-    for (final p in all) {
-      if (layerOn != null && !layerOn!(p.layer)) continue;
+    final dyn = dynamicPolys == null ? const <Poly>[] : dynamicPolys!(time);
+    // The camera turned into plain numbers once, so the thousands of faces below cost no objects to work out.
+    final tgx = cam.target.x, tgy = cam.target.y, tgz = cam.target.z, camDist = cam.dist;
+    final lx = toLight.x, ly = toLight.y, lz = toLight.z, hx = half.x, hy = half.y, hz = half.z;
+    var cxs = Float64List(24), cys = Float64List(24), czs = Float64List(24), sxs = Float64List(24), sys = Float64List(24);
+    void facePoly(Poly p, int seqNo) {
+      if (layerOn != null && !layerOn!(p.layer)) return;
+      final pts = p.pts;
+      var cnt = pts.length;
+      if (cnt > cxs.length) {
+        cxs = Float64List(cnt * 2);
+        cys = Float64List(cnt * 2);
+        czs = Float64List(cnt * 2);
+        sxs = Float64List(cnt * 2);
+        sys = Float64List(cnt * 2);
+      }
+      var allNear = true;
+      for (var i = 0; i < cnt; i++) {
+        final q = pts[i];
+        final dx = q.x - tgx, dy = q.y - tgy, dz = q.z - tgz;
+        final x1 = dx * cyw + dz * syw;
+        final z1 = -dx * syw + dz * cyw;
+        cxs[i] = x1;
+        cys[i] = dy * cp - z1 * sp;
+        final zc = -(dy * sp + z1 * cp) + camDist;
+        czs[i] = zc;
+        if (zc < 0.5) allNear = false;
+      }
       // A face that looks away is dropped before anything else is worked out (it is about half of them).
-      var n = rotN(p.n);
-      final away = n.dot(toCam(p.pts[0])) > 0;
-      if (away && !p.twoSided) continue;
-      if (away) n = n * -1;
-      final cp3 = _clipNear([for (final v in p.pts) toCam(v)]);
-      if (cp3.length < 3) continue;
-      var zs = 0.0;
-      var mid = V3.zero;
-      for (final v in cp3) {
-        zs += v.z;
-        mid = mid + v;
+      final pn = p.n;
+      final nz1 = -pn.x * syw + pn.z * cyw;
+      var nX = pn.x * cyw + pn.z * syw, nY = pn.y * cp - nz1 * sp, nZ = -(pn.y * sp + nz1 * cp);
+      final away = nX * cxs[0] + nY * cys[0] + nZ * czs[0] > 0;
+      if (away && !p.twoSided) return;
+      if (away) {
+        nX = -nX;
+        nY = -nY;
+        nZ = -nZ;
       }
-      mid = mid * (1 / cp3.length);
-      if (outside && p.order == 0 && (p.group != 0 ? wallSum[p.group]! / wallN[p.group]! : mid.z) < roomDepth) continue;
-      var nearest = double.infinity;
-      for (final v in cp3) {
-        if (v.z < nearest) nearest = v.z;
+      if (!allNear) {
+        final cp3 = _clipNear([for (var i = 0; i < cnt; i++) V3(cxs[i], cys[i], czs[i])]);
+        if (cp3.length < 3) return;
+        cnt = cp3.length;
+        if (cnt > cxs.length) {
+          cxs = Float64List(cnt * 2);
+          cys = Float64List(cnt * 2);
+          czs = Float64List(cnt * 2);
+          sxs = Float64List(cnt * 2);
+          sys = Float64List(cnt * 2);
+        }
+        for (var i = 0; i < cnt; i++) {
+          cxs[i] = cp3[i].x;
+          cys[i] = cp3[i].y;
+          czs[i] = cp3[i].z;
+        }
+      } else if (cnt < 3) {
+        return;
       }
-      if (nearest > far) continue;
+      var zsum = 0.0, nearest = double.infinity;
       var pxMin = double.infinity, pxMax = -double.infinity, pyMin = double.infinity, pyMax = -double.infinity;
-      for (final v in cp3) {
-        final x = cx + v.x * f / v.z, y = cy - v.y * f / v.z;
+      for (var i = 0; i < cnt; i++) {
+        final z = czs[i];
+        zsum += z;
+        if (z < nearest) nearest = z;
+        final x = cx + cxs[i] * f / z, y = cy - cys[i] * f / z;
+        sxs[i] = x;
+        sys[i] = y;
         if (x < pxMin) pxMin = x;
         if (x > pxMax) pxMax = x;
         if (y < pyMin) pyMin = y;
         if (y > pyMax) pyMax = y;
       }
+      final zMid = zsum / cnt;
+      if (outside && p.order == 0 && (p.group != 0 ? wallSum[p.group]! / wallN[p.group]! : zMid) < roomDepth) return;
+      if (nearest > far) return;
       // A face smaller than a pixel cannot be seen: it costs nothing to leave it out.
-      if (pxMax - pxMin < 0.6 && pyMax - pyMin < 0.6) continue;
+      final bw = pxMax - pxMin, bh = pyMax - pyMin;
+      if (bw < 0.6 && bh < 0.6) return;
       if (pxMax < -8 || pxMin > w + 8 || pyMax < -8 || pyMin > h + 8) {
         if (p.group != 0) {
-          offZ[p.group] = (offZ[p.group] ?? 0) + zs / cp3.length - p.bias;
+          offZ[p.group] = (offZ[p.group] ?? 0) + zMid - p.bias;
           offN[p.group] = (offN[p.group] ?? 0) + 1;
         }
-        continue;
+        return;
       }
-      final lam = math.max(0.0, n.dot(toLight));
+      final lam = math.max(0.0, nX * lx + nY * ly + nZ * lz);
       var shade = 0.56 + 0.58 * lam;
       var spec = 0.0;
-      if (p.shine > 0) spec = math.pow(math.max(0.0, n.dot(half)), 28) * p.shine;
+      if (p.shine > 0) spec = math.pow(math.max(0.0, nX * hx + nY * hy + nZ * hz), 28) * p.shine;
       var col = p.color;
       if (highlight != 0 && p.id == highlight) {
         col = Color.lerp(col, const Color(0xFF67E8F9), 0.28 + 0.14 * math.sin(time * 6))!;
@@ -686,14 +734,59 @@ class Scene3DPainter extends CustomPainter {
       final r = (col.r * 255 * shade + 255 * spec * 0.55).clamp(0.0, 255.0).round();
       final g = (col.g * 255 * shade + 255 * spec * 0.55).clamp(0.0, 255.0).round();
       final b = (col.b * 255 * shade + 255 * spec * 0.55).clamp(0.0, 255.0).round();
-      final path = Path();
-      for (var i = 0; i < cp3.length; i++) {
-        final v = cp3[i];
-        final x = cx + v.x * f / v.z, y = cy - v.y * f / v.z;
-        i == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
+      final path = Path()..moveTo(sxs[0], sys[0]);
+      for (var i = 1; i < cnt; i++) {
+        path.lineTo(sxs[i], sys[i]);
       }
       path.close();
-      drawn.add(_Face(path, Color.fromRGBO(r, g, b, p.alpha), zs / cp3.length - p.bias, p.id, p.alpha < 0.99, p.id == highlight && highlight != 0, null, p.order, p.group));
+      final face = _Face(path, Color.fromRGBO(r, g, b, p.alpha), zMid - p.bias, p.id, p.alpha < 0.99, p.id == highlight && highlight != 0, null, p.order, p.group);
+      // A face only a couple of pixels wide needs no outline to close the seams round it.
+      face.tiny = bw < 2.0 && bh < 2.0;
+      drawn.add(face);
+      face.seq = seqNo;
+    }
+
+    // The still part of the scene is cut into little blocks once; a block that is wholly behind you, too far, or off the side of the screen costs one test instead of one test per face.
+    final still = scene.polys;
+    final blocks = still.length > 1500 ? _blocksOf(scene) : null;
+    if (blocks == null) {
+      for (var i = 0; i < still.length; i++) {
+        facePoly(still[i], i);
+      }
+    } else {
+      for (final blk in blocks.blocks) {
+        if (!blk.always) {
+          var anyNear = false, allBeyond = true, anyBehind = false;
+          var sxLo = double.infinity, sxHi = -double.infinity, syLo = double.infinity, syHi = -double.infinity;
+          for (var k = 0; k < 8; k++) {
+            final dx = (k & 1 == 0 ? blk.x0 : blk.x1) - tgx, dy = (k & 2 == 0 ? blk.y0 : blk.y1) - tgy, dz = (k & 4 == 0 ? blk.z0 : blk.z1) - tgz;
+            final x1 = dx * cyw + dz * syw;
+            final z1 = -dx * syw + dz * cyw;
+            final yc = dy * cp - z1 * sp;
+            final zc = -(dy * sp + z1 * cp) + camDist;
+            if (zc <= far) allBeyond = false;
+            if (zc < 1.0) {
+              anyBehind = true;
+              continue;
+            }
+            anyNear = true;
+            final sx = cx + x1 * f / zc, sy = cy - yc * f / zc;
+            if (sx < sxLo) sxLo = sx;
+            if (sx > sxHi) sxHi = sx;
+            if (sy < syLo) syLo = sy;
+            if (sy > syHi) syHi = sy;
+          }
+          if (allBeyond) continue;
+          if (!anyNear) continue;
+          if (!anyBehind && (sxHi < -40 || sxLo > w + 40 || syHi < -40 || syLo > h + 40)) continue;
+        }
+        for (var k = 0; k < blk.polys.length; k++) {
+          facePoly(blk.polys[k], blk.index[k]);
+        }
+      }
+    }
+    for (var i = 0; i < dyn.length; i++) {
+      facePoly(dyn[i], still.length + i);
     }
     final allScreens = dynamicScreens == null ? scene.screens : [...scene.screens, ...dynamicScreens!(time)];
     // Painting a picture (an ad) is the dearest thing in a frame, so only the biggest few are painted in full and the small, far ones are a flat colour.
@@ -788,16 +881,17 @@ class Scene3DPainter extends CustomPainter {
         gn[f.group] = (gn[f.group] ?? 0) + 1;
       }
     }
-    double key(_Face f) => f.group != 0 ? gz[f.group]! / gn[f.group]! : f.z;
     for (var i = 0; i < drawn.length; i++) {
-      drawn[i].seq = i;
+      final d = drawn[i];
+      d.key = d.group != 0 ? gz[d.group]! / gn[d.group]! : d.z;
     }
     drawn.sort((a, b) {
       final c = a.order.compareTo(b.order);
       if (c != 0) return c;
-      final k = key(b).compareTo(key(a));
+      final k = b.key.compareTo(a.key);
       return k != 0 ? k : a.seq.compareTo(b.seq);
     });
+    lastDrawn = drawn.length;
     hits.list.clear();
     final fill = Paint()..style = PaintingStyle.fill;
     final edge = Paint()..style = PaintingStyle.stroke..strokeWidth = 0.8;
@@ -809,7 +903,7 @@ class Scene3DPainter extends CustomPainter {
       }
       fill.color = d.color;
       canvas.drawPath(d.path, fill);
-      if (!d.see) {
+      if (!d.see && !d.tiny) {
         edge.color = d.color;
         canvas.drawPath(d.path, edge);
       }
@@ -933,6 +1027,8 @@ class _Face {
   final int order;
   final int group;
   int seq = 0;
+  double key = 0;
+  bool tiny = false;
   final void Function(Canvas canvas)? draw;
   final Path path;
   final Color color;
@@ -1035,4 +1131,73 @@ class _Scene3DViewState extends State<Scene3DView> with SingleTickerProviderStat
       ),
     );
   }
+}
+
+/// A little block of the still scene: its faces (and where each stood in the scene's list, so the order of equal depths never changes) and the box round them.
+class _Block {
+  _Block(this.always);
+  final bool always;
+  final List<Poly> polys = [];
+  final List<int> index = [];
+  double x0 = double.infinity, x1 = -double.infinity, y0 = double.infinity, y1 = -double.infinity, z0 = double.infinity, z1 = -double.infinity;
+
+  void add(Poly p, int i) {
+    polys.add(p);
+    index.add(i);
+    for (final v in p.pts) {
+      if (v.x < x0) x0 = v.x;
+      if (v.x > x1) x1 = v.x;
+      if (v.y < y0) y0 = v.y;
+      if (v.y > y1) y1 = v.y;
+      if (v.z < z0) z0 = v.z;
+      if (v.z > z1) z1 = v.z;
+    }
+  }
+}
+
+class _Blocks {
+  _Blocks(this.blocks);
+  final List<_Block> blocks;
+}
+
+final Expando<_Blocks> _blockCache = Expando<_Blocks>();
+
+/// Cuts the still faces of a scene into blocks about 60 units wide. Faces of one part (a group) always stay in one block, and a face bigger than a block
+/// (the lawn, a wall) goes in a block that is never skipped.
+_Blocks _blocksOf(Scene3D scene) {
+  final cached = _blockCache[scene];
+  if (cached != null) return cached;
+  const cell = 60.0;
+  final always = _Block(true);
+  final cells = <int, _Block>{};
+  final groupCell = <int, _Block>{};
+  final polys = scene.polys;
+  for (var i = 0; i < polys.length; i++) {
+    final p = polys[i];
+    if (p.group != 0 && groupCell[p.group] != null) {
+      groupCell[p.group]!.add(p, i);
+      continue;
+    }
+    var lox = double.infinity, hix = -double.infinity, loy = double.infinity, hiy = -double.infinity, loz = double.infinity, hiz = -double.infinity;
+    for (final v in p.pts) {
+      if (v.x < lox) lox = v.x;
+      if (v.x > hix) hix = v.x;
+      if (v.y < loy) loy = v.y;
+      if (v.y > hiy) hiy = v.y;
+      if (v.z < loz) loz = v.z;
+      if (v.z > hiz) hiz = v.z;
+    }
+    final big = hix - lox > cell * 1.5 || hiy - loy > cell * 1.5 || hiz - loz > cell * 1.5;
+    if (big) {
+      always.add(p, i);
+      continue;
+    }
+    final key = ((((lox / cell).floor() + 4096) * 8192 + ((loy / cell).floor() + 4096)) * 8192) + ((loz / cell).floor() + 4096);
+    final blk = cells.putIfAbsent(key, () => _Block(false));
+    blk.add(p, i);
+    if (p.group != 0) groupCell[p.group] = blk;
+  }
+  final out = _Blocks([always, ...cells.values]);
+  _blockCache[scene] = out;
+  return out;
 }

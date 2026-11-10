@@ -49,25 +49,30 @@ class PersonPose {
 
 /// The colours of a person: skin, hair, shirt and trousers. The tour person and every resident are built the same way.
 class PersonStyle {
-  const PersonStyle({this.skin = const Color(0xFFE0A47C), this.hair = const Color(0xFF2A1A10), this.shirt = const Color(0xFF2F6FB5), this.pants = const Color(0xFF2E3440), this.avatar = 'human'});
+  const PersonStyle({this.skin = const Color(0xFFE0A47C), this.hair = const Color(0xFF2A1A10), this.shirt = const Color(0xFF2F6FB5), this.pants = const Color(0xFF2E3440), this.avatar = 'human', this.female = false, this.hairStyle = 0, this.height = 1.0});
   final Color skin, hair, shirt, pants;
 
   /// Which character it is: human, xbot (a white robot), michelle (the dancer) or soldier.
   final String avatar;
+
+  /// A woman's build (narrower shoulders, a skirt), the hair (0 short, 1 long, 2 afro, 3 head wrap, 4 thin and grey), and how tall (1 is usual).
+  final bool female;
+  final int hairStyle;
+  final double height;
 }
 
 /// The characters of the city: the X Bot, the Dancer, the Soldier and an ordinary person.
 const Map<String, PersonStyle> kAvatars = {
   'xbot': PersonStyle(avatar: 'xbot', skin: Color(0xFFE9EBEF), hair: Color(0xFF2B2F36), shirt: Color(0xFFE9EBEF), pants: Color(0xFFDADDE3)),
-  'michelle': PersonStyle(avatar: 'michelle', skin: Color(0xFF7A4B30), hair: Color(0xFF140C08), shirt: Color(0xFF1F2937), pants: Color(0xFF111827)),
-  'soldier': PersonStyle(avatar: 'soldier', skin: Color(0xFFD9A57C), hair: Color(0xFF3B2A1A), shirt: Color(0xFF5B6B3A), pants: Color(0xFF8A7B55)),
+  'michelle': PersonStyle(avatar: 'michelle', skin: Color(0xFF7A4B30), hair: Color(0xFF140C08), shirt: Color(0xFF9CA3AF), pants: Color(0xFFF5C518), female: true, hairStyle: 2),
+  'soldier': PersonStyle(avatar: 'soldier', skin: Color(0xFFD9A57C), hair: Color(0xFF3B2A1A), shirt: Color(0xFF5B6B3A), pants: Color(0xFF8A7B55), height: 1.04),
   'human': PersonStyle(),
 };
 
 const Map<String, String> kAvatarNames = {'xbot': '🤖 X Bot', 'michelle': '💃 Dancer', 'soldier': '🪖 Soldier', 'human': '🙂 Person'};
 
 /// The character that does the house tour and that you steer outside. The X Bot to begin with; the tour sheet changes it.
-String ngmyPlayerAvatar = 'xbot';
+String ngmyPlayerAvatar = 'human';
 
 PersonStyle get playerStyle => kAvatars[ngmyPlayerAvatar] ?? const PersonStyle();
 

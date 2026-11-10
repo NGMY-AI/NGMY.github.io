@@ -122,7 +122,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       if (want.isNotEmpty) home.current = want.first.id;
     }
     // The real characters are read from their files in the background; plain figures stand in until each is ready.
-    GlbAvatar.preload(ngmyPlayerAvatar);
+    if (ngmyPlayerAvatar != 'human') GlbAvatar.preload(ngmyPlayerAvatar);
     NgmyLogo.load();
     _startLife();
     _refreshFigs();

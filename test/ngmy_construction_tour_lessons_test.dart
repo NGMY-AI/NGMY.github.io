@@ -160,9 +160,9 @@ void main() {
       for (final q in polys) {
         for (final v in q.pts) {
           if (v.y < minY) minY = v.y;
-          // Nothing of the person is outside the room (a little slack for the arms at a door).
+          // Nothing of the person is outside the room (a little slack for the arms and fingers at a door).
           expect(v.x.abs(), lessThan(r.w / 2 + 4), reason: '${r.name} at $t');
-          expect(v.z, greaterThan(-4), reason: '${r.name} at $t');
+          expect(v.z, greaterThan(-5), reason: '${r.name} at $t');
         }
       }
       if (polys.isNotEmpty) {
