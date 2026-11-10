@@ -88,6 +88,10 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
   /// The jobs are real work: wrong moves have real consequences and nothing is explained for you. Only the lessons teach.
   final bool practice = true;
 
+  /// The little search box of the LESSONS (only there): what has been typed, and whether it is open.
+  bool _searching = false;
+  String _query = '';
+
   void _push(Widget page) => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
 
   /// Every lesson plays inside a furnished room, with a big TV on the wall showing the NGMY Jobs ad.
@@ -170,24 +174,73 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
               _tile('📞', 'Service calls', 'A customer rings with problems', const Color(0xFFFB7185), () => _push(NgmyServiceCallPage(practice: practice))),
               _tile('🏘', 'Neighbourhood jobs', 'Fix lights and wiring around the city', const Color(0xFF38BDF8), () => _push(const NgmyHousePage(focus: 'city'))),
             ]),
-            _section('LESSONS'),
-            _grid([
-              for (final l in _lessons) _tile(l.emoji, l.title, l.blurb, l.color, () => _lesson(l.id)),
-              _tile('🧠', 'Diagram lessons', 'Three-way switch, fan with light', const Color(0xFFA78BFA), () => _push(const NgmyElectricalDiagramPage())),
-              _tile('📘', 'Learn the trades', 'Short cards for beginners', const Color(0xFFA78BFA), () => _push(const NgmyConstructionLearnPage())),
-            ]),
+            _section(
+              'LESSONS',
+              trailing: GestureDetector(
+                key: const Key('lessons-search'),
+                onTap: () => setState(() {
+                  _searching = !_searching;
+                  if (!_searching) _query = '';
+                }),
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(color: _searching ? kConAmber.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.07), shape: BoxShape.circle, border: Border.all(color: _searching ? kConAmber : Colors.white24)),
+                  child: Icon(_searching ? Icons.close_rounded : Icons.search_rounded, size: 19, color: _searching ? kConAmber : Colors.white70),
+                ),
+              ),
+            ),
+            if (_searching)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: TextField(
+                  key: const Key('lessons-search-field'),
+                  autofocus: true,
+                  onChanged: (v) => setState(() => _query = v),
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: 'Search the lessons: outlet, switch, dryer, sink...',
+                    hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+                    prefixIcon: const Icon(Icons.search_rounded, color: Colors.white54),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.07),
+                    isDense: true,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  ),
+                ),
+              ),
+            ..._lessonTiles(),
           ],
         ),
       ),
     );
   }
 
-  Widget _section(String t) => Padding(
+  /// The lessons as tiles, or only those that match what is typed in the search box (the title, the line under it or the name of the lesson).
+  List<Widget> _lessonTiles() {
+    final all = <({String emoji, String title, String blurb, Color color, VoidCallback open, String words})>[
+      for (final l in _lessons) (emoji: l.emoji, title: l.title, blurb: l.blurb, color: l.color, open: () => _lesson(l.id), words: l.id),
+      (emoji: '🧠', title: 'Diagram lessons', blurb: 'Three-way switch, fan with light', color: const Color(0xFFA78BFA), open: () => _push(const NgmyElectricalDiagramPage()), words: 'diagram wiring picture'),
+      (emoji: '📘', title: 'Learn the trades', blurb: 'Short cards for beginners', color: const Color(0xFFA78BFA), open: () => _push(const NgmyConstructionLearnPage()), words: 'cards beginner trade'),
+    ];
+    final words = _query.toLowerCase().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    final shown = [for (final t in all) if (words.every((w) => '${t.title} ${t.blurb} ${t.words}'.toLowerCase().contains(w))) t];
+    if (shown.isEmpty) {
+      return [const Padding(padding: EdgeInsets.symmetric(vertical: 26), child: Center(child: Text('No lesson found. Try another word.', key: Key('lessons-none'), style: TextStyle(color: Colors.white54, fontSize: 13.5))))];
+    }
+    return [
+      _grid([for (final t in shown) _tile(t.emoji, t.title, t.blurb, t.color, t.open)]),
+    ];
+  }
+
+
+  Widget _section(String t, {Widget? trailing}) => Padding(
         padding: const EdgeInsets.fromLTRB(4, 22, 4, 12),
         child: Row(children: [
           Expanded(child: Container(height: 1, color: kConAmber.withValues(alpha: 0.35))),
           Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Text(t, style: const TextStyle(color: kConAmber, fontWeight: FontWeight.w900, fontSize: 12.5, letterSpacing: 2))),
           Expanded(child: Container(height: 1, color: kConAmber.withValues(alpha: 0.35))),
+          if (trailing != null) ...[const SizedBox(width: 10), trailing],
         ]),
       );
 

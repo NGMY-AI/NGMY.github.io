@@ -1,5 +1,8 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ngmy/ngmy_3d.dart';
 import 'package:ngmy/ngmy_construction_community.dart';
 import 'package:ngmy/ngmy_construction_home.dart';
 import 'package:ngmy/ngmy_construction_homepage.dart';
@@ -10,6 +13,7 @@ import 'package:ngmy/ngmy_construction_projectpage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  zoomAndSearchTests();
   test('a device can not be put into a box while the breaker is on: the breaker has to be off first, in every mode', () {
     for (final practice in [true, false]) {
       final p = RoomProject(seed: 3, kind: 0, practice: practice)..fastForward();
@@ -105,6 +109,93 @@ void main() {
       final counterTop = id == 2 ? 30.0 : 32.0;
       expect(sink.any((p) => p.pts.every((v) => v.y < counterTop - 4 && v.y > counterTop - 10)), isTrue, reason: 'basin walls below the counter top');
       expect(hi, greaterThan(counterTop + 4), reason: 'a faucet above the counter');
+    }
+  });
+}
+
+void zoomAndSearchTests() {
+  testWidgets('the lessons have a little search icon on the line under their title, and only the lessons', (t) async {
+    t.view.physicalSize = const Size(900, 9000);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(const MaterialApp(home: NgmyConstructionLab()));
+    await t.pump(const Duration(milliseconds: 500));
+    expect(find.byKey(const Key('lessons-search')), findsOneWidget, reason: 'one search icon, on the LESSONS line');
+    expect(find.byKey(const Key('lessons-search-field')), findsNothing);
+    expect(find.text('Wall outlet'), findsOneWidget);
+    // The icon opens a search box. A word shows only the lessons with it.
+    await t.tap(find.byKey(const Key('lessons-search')));
+    await t.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const Key('lessons-search-field')), findsOneWidget);
+    await t.enterText(find.byKey(const Key('lessons-search-field')), 'sink');
+    await t.pump(const Duration(milliseconds: 300));
+    expect(find.text('Sink drain (P-trap)'), findsOneWidget);
+    expect(find.text('Wall outlet'), findsNothing);
+    expect(find.text('Light switch'), findsNothing);
+    // The jobs are not searched: they are all still there.
+    expect(find.text('Wiring bench'), findsOneWidget);
+    expect(find.text('Neighbourhood jobs'), findsOneWidget);
+    await t.enterText(find.byKey(const Key('lessons-search-field')), 'dryer');
+    await t.pump(const Duration(milliseconds: 300));
+    expect(find.textContaining('Dryer outlet, 4-wire'), findsOneWidget);
+    expect(find.textContaining('Dryer outlet, 3-wire'), findsOneWidget);
+    expect(find.textContaining('Dryer cord'), findsWidgets);
+    expect(find.text('Sink drain (P-trap)'), findsNothing);
+    // Several words must all match.
+    await t.enterText(find.byKey(const Key('lessons-search-field')), 'dryer 4-wire');
+    await t.pump(const Duration(milliseconds: 300));
+    expect(find.textContaining('Dryer outlet, 4-wire'), findsOneWidget);
+    expect(find.textContaining('Dryer outlet, 3-wire'), findsNothing);
+    await t.enterText(find.byKey(const Key('lessons-search-field')), 'zzzz');
+    await t.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const Key('lessons-none')), findsOneWidget);
+    // The icon closes the box and everything is back.
+    await t.tap(find.byKey(const Key('lessons-search')));
+    await t.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const Key('lessons-search-field')), findsNothing);
+    expect(find.text('Wall outlet'), findsOneWidget);
+    expect(find.text('Sink drain (P-trap)'), findsOneWidget);
+    await t.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('a lesson that was found by searching opens', (t) async {
+    t.view.physicalSize = const Size(900, 9000);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(const MaterialApp(home: NgmyConstructionLab()));
+    await t.pump(const Duration(milliseconds: 500));
+    await t.tap(find.byKey(const Key('lessons-search')));
+    await t.pump(const Duration(milliseconds: 300));
+    await t.enterText(find.byKey(const Key('lessons-search-field')), 'faucet');
+    await t.pump(const Duration(milliseconds: 300));
+    await t.tap(find.text('Faucet supply lines'));
+    await t.pump(const Duration(milliseconds: 500));
+    await t.pump(const Duration(milliseconds: 500));
+    expect(find.byType(NgmyHousePage), findsOneWidget);
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(seconds: 10));
+  });
+
+  testWidgets('in any room you can zoom back until you see the whole wall, and still turn right round', (t) async {
+    t.view.physicalSize = const Size(900, 1600);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    for (final lesson in ['faucet', 'outlet']) {
+      await t.pumpWidget(MaterialApp(home: NgmyHousePage(lesson: lesson)));
+      await t.pump(const Duration(milliseconds: 700));
+      final view = t.widget<Scene3DView>(find.byType(Scene3DView).first);
+      final cam = view.cam;
+      final room = HomeProject.lesson(lesson).rooms.first;
+      expect(cam.maxDist, greaterThanOrEqualTo(math.max(room.w, room.d) * 1.9), reason: '$lesson: far enough back to see all of the wall');
+      for (var i = 0; i < 40; i++) {
+        cam.zoomBy(1.2);
+      }
+      expect(cam.dist, cam.maxDist);
+      expect(cam.dist, greaterThan(room.w), reason: 'a view of the whole wall is a distance bigger than the wall is wide');
+      cam.orbit(3.0, 0);
+      expect(cam.free || cam.yawRange > 3, isTrue, reason: 'turning right round is allowed');
+      await t.pumpWidget(const SizedBox());
+      await t.pump(const Duration(seconds: 10));
     }
   });
 }
