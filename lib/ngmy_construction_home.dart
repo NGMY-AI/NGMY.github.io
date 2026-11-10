@@ -163,6 +163,9 @@ const List<HomeAppliance> kHomeAppliances = [
   HomeAppliance('lamp', 'Table lamp', '💡'),
   HomeAppliance('toaster', 'Toaster', '🍞'),
   HomeAppliance('hairdryer', 'Hair dryer', '💇'),
+  HomeAppliance('washer', 'Washing machine', '🧺'),
+  HomeAppliance('dryer', 'Clothes dryer', '🌀'),
+  HomeAppliance('range', 'Kitchen range', '🍳'),
 ];
 
 HomeAppliance applianceByKey(String k) => kHomeAppliances.firstWhere((a) => a.key == k, orElse: () => kHomeAppliances[3]);

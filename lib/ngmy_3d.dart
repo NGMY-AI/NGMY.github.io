@@ -332,9 +332,15 @@ class Cam3 extends ChangeNotifier {
   (double, double, double, double, double)? keepIn;
   double _want = 0, _lastSet = -1;
 
+  /// 1 is the normal view; a smaller number is a wider one (more of the room fits). Only a room view with [keepIn] uses it.
+  double lens = 1.0;
+  double minLens = 0.5;
+
   void _fit({bool sync = true}) {
     if (sync && dist != _lastSet) _want = dist;
-    var d = _want.clamp(minDist, maxDist).toDouble();
+    final w = _want.clamp(minDist, maxDist).toDouble();
+    var d = w;
+    lens = 1.0;
     final k = keepIn;
     if (k != null) {
       const m = 5.0, low = 4.0;
@@ -343,6 +349,8 @@ class Cam3 extends ChangeNotifier {
       double lim(double c, double t, double lo, double hi) => c > 1e-6 ? (hi - t) / c : (c < -1e-6 ? (lo - t) / c : double.infinity);
       final room = math.min(math.min(lim(dx, target.x, k.$1 + m, k.$2 - m), lim(dz, target.z, k.$3 + m, k.$4 - m)), lim(dy, target.y, low, k.$5 - m));
       d = math.min(d, math.max(minDist, room));
+      // The camera cannot go back any further (the wall is behind it): zooming out then widens the view instead, like standing back in a small room.
+      if (w > d) lens = math.sqrt(d / w).clamp(minLens, 1.0).toDouble();
     }
     dist = d;
     _lastSet = d;
@@ -451,7 +459,7 @@ class Cam3 extends ChangeNotifier {
   /// when that point of the screen looks at the sky. This is what makes "double tap where you want to go" possible.
   /// Where the finger on [p] touches the vertical plane z = [z] (a wall), or null when it points away from it.
   V3? wallPoint(Offset p, Size size, {double z = 0}) {
-    final f = math.min(size.width, size.height) * 1.15;
+    final f = math.min(size.width, size.height) * 1.15 * lens;
     final dx = (p.dx - size.width / 2) / f, dy = -(p.dy - size.height / 2) / f;
     final cy = math.cos(yaw), sy = math.sin(yaw), cp = math.cos(pitch), sp = math.sin(pitch);
     V3 unrot(V3 r) {
@@ -471,7 +479,7 @@ class Cam3 extends ChangeNotifier {
   }
 
   V3? floorPoint(Offset p, Size size, {double y = 0}) {
-    final f = math.min(size.width, size.height) * 1.15;
+    final f = math.min(size.width, size.height) * 1.15 * lens;
     final dx = (p.dx - size.width / 2) / f, dy = -(p.dy - size.height / 2) / f;
     final cy = math.cos(yaw), sy = math.sin(yaw), cp = math.cos(pitch), sp = math.sin(pitch);
     // Camera-space offset (without the distance) back to a world offset.
@@ -494,7 +502,7 @@ class Cam3 extends ChangeNotifier {
   void zoomBy(double factor) {
     _toDist = null;
     if (dist != _lastSet) _want = dist;
-    _want = ((factor < 1 ? dist : math.max(_want, dist)) * factor).clamp(minDist, maxDist);
+    _want = (math.max(_want, dist) * factor).clamp(minDist, maxDist);
     _fit(sync: false);
     notifyListeners();
   }
@@ -620,7 +628,7 @@ class Scene3DPainter extends CustomPainter {
       canvas.drawRect(Offset.zero & size, Paint()..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color.lerp(background, Colors.white, 0.06)!, background]).createShader(Offset.zero & size));
     }
     final w = size.width, h = size.height;
-    final f = math.min(w, h) * 1.15;
+    final f = math.min(w, h) * 1.15 * cam.lens;
     final cx = w / 2, cy = h / 2;
     final cyw = math.cos(cam.yaw), syw = math.sin(cam.yaw), cp = math.cos(cam.pitch), sp = math.sin(cam.pitch);
     V3 rotN(V3 q) {

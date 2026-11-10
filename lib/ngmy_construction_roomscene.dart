@@ -371,6 +371,29 @@ Scene3D buildRoomScene(RoomProject p, RoomView v) {
       case 'toaster':
         b.box(V3(x, -42.5, 24), const V3(18, 9, 11), const Color(0xFFC9CED6), shine: 0.8);
         b.box(V3(x, -38, 24), const V3(14, 0.4, 7), const Color(0xFF30333A));
+      case 'washerM':
+      case 'dryerM':
+        {
+          // A washing machine or a dryer: a white cabinet with a round glass door and a dark control strip on top.
+          final w = e.value == 'washerM';
+          b.box(V3(x, -30, 22), const V3(32, 35, 26), w ? const Color(0xFFEDEFF2) : const Color(0xFFE3DCCF), shine: 0.4);
+          b.box(V3(x, -15.5, 35.2), const V3(32, 6, 1.2), const Color(0xFF2E333B), shine: 0.3);
+          b.cyl(V3(x, -29, 35), V3(x, -29, 36.2), 10.5, const Color(0xFFB8BEC6), shine: 0.8, sides: 20);
+          b.cyl(V3(x, -29, 36.1), V3(x, -29, 36.6), 8.2, w ? const Color(0xFF7FB6E8) : const Color(0xFF9FA8B3), shine: 0.9, sides: 20);
+        }
+      case 'rangeM':
+        {
+          // The kitchen range: a steel oven with four burners on top and a dark window.
+          b.box(V3(x, -30, 22), const V3(32, 35, 26), const Color(0xFFB9BEC6), shine: 0.7);
+          b.box(V3(x, -28, 35.3), const V3(24, 14, 0.8), const Color(0xFF15181D), shine: 0.9);
+          b.box(V3(x, -19.5, 36.4), const V3(26, 1.2, 1.2), const Color(0xFF8A9099), shine: 0.9);
+          b.box(V3(x, -12.2, 22), const V3(32, 0.8, 26), const Color(0xFF23262B), shine: 0.5);
+          for (final bx in const [-7.0, 7.0]) {
+            for (final bz in const [16.0, 28.0]) {
+              b.cyl(V3(x + bx, -11.6, bz), V3(x + bx, -11.2, bz), 4.2, const Color(0xFF3A3D44), shine: 0.3, sides: 14);
+            }
+          }
+        }
       default:
         b.box(V3(x, -43.5, 24), const V3(22, 3, 10), const Color(0xFF3B2F26), shine: 0.2);
         b.cyl(V3(x - 6, -38, 24), V3(x + 8, -38, 24), 3.4, const Color(0xFFE2455A), shine: 0.6, sides: 12, r1: 3);
@@ -389,7 +412,7 @@ Scene3D buildRoomScene(RoomProject p, RoomView v) {
 
 String _deviceName(String kind) => switch (kind) { 'gfci' => 'GFCI outlet', 'switch' => 'Light switch', 'light' => 'Ceiling light', 'fan' => 'Ceiling fan', 'outlet' => 'Outlet', _ => deviceKindName(kind) };
 
-String _appNameFull(String a) => switch (a) { 'tv' => 'TV', 'lamp' => 'Lamp', 'toaster' => 'Toaster', _ => 'Hair dryer' };
+String _appNameFull(String a) => switch (a) { 'tv' => 'TV', 'lamp' => 'Lamp', 'toaster' => 'Toaster', 'washerM' => 'Washing machine', 'dryerM' => 'Dryer', 'rangeM' => 'Kitchen range', _ => 'Hair dryer' };
 
 String _deviceAbout(RoomProject p, int slot) {
   final d = p.devs[slot];
@@ -397,7 +420,7 @@ String _deviceAbout(RoomProject p, int slot) {
   if (d.w.burnt) return 'BURNT. It was wired wrong and it burnt out. Pull it out and put in a new one.';
   if (isSwitchKind(d.kind)) return p.switchOn.contains(slot) ? 'The switch is ON. Tap to turn it off.' : 'The switch is OFF. Tap to flip it on.';
   if (d.kind == 'light' || d.kind == 'fan') return p.loadRuns(slot) ? 'It is running.' : 'It is off. Flip its switch (breaker on).';
-  return 'Tap with a TV, lamp, toaster or hair dryer in your hand to plug it in. Plugged: ${p.plugged[slot] ?? 'nothing'}.';
+  return 'Tap with a TV, lamp, toaster, hair dryer, washing machine, dryer or range in your hand to plug it in. Plugged: ${p.plugged[slot] ?? 'nothing'}.';
 }
 
 /// Things that move: the fan blades, the TV picture, glowing lamps and toasters, sparks and smoke from a mistake.
@@ -442,6 +465,28 @@ List<Poly> roomDynamic(RoomProject p, double t, Map<int, double> fxUntil, {int p
         b.bias = 0.8;
         b.box(V3(x, -38.2, 24), V3(13, 0.3, 6), Color.lerp(const Color(0xFFFF5A1F), const Color(0xFFFFB347), (math.sin(t * 6) + 1) / 2)!);
         b.bias = 0;
+      case 'washerM':
+      case 'dryerM':
+        {
+          // Clothes tumbling behind the glass; the washer's water sloshes blue, the dryer's clothes are warm colours.
+          final w = e.value == 'washerM';
+          b.bias = 0.8;
+          for (var i = 0; i < 3; i++) {
+            final a = t * (w ? 5 : 7) + i * 2.1;
+            b.ball(V3(x + math.cos(a) * 4.5, -29 + math.sin(a) * 4.5, 36.8), 1.9, w ? (i.isEven ? const Color(0xFFF2F2F2) : const Color(0xFFE2455A)) : (i.isEven ? const Color(0xFFFFB347) : const Color(0xFFF59E0B)), shine: 0.2, lat: 3, lon: 6);
+          }
+          b.bias = 0;
+        }
+      case 'rangeM':
+        {
+          b.bias = 0.8;
+          for (final bx in const [-7.0, 7.0]) {
+            for (final bz in const [16.0, 28.0]) {
+              b.ring(V3(x + bx, -11.1, bz), V3(x + bx, -10.9, bz), 3.8, 1.8, Color.lerp(const Color(0xFFFF3B1F), const Color(0xFFFFA347), (math.sin(t * 5 + bx) + 1) / 2)!, shine: 0, sides: 12);
+            }
+          }
+          b.bias = 0;
+        }
       default:
         for (var i = 0; i < 6; i++) {
           final ph = (t * 1.6 + i / 6) % 1.0;

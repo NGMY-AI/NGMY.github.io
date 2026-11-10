@@ -479,6 +479,23 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
       b.cyl(V3(x, 0, 14), V3(x, 1, 14), 6, const Color(0xFF8A6A47), shine: 0.4, sides: 14);
       b.cyl(V3(x, 1, 14), V3(x, 22, 14), 1, const Color(0xFFB08A5B), shine: 0.5, sides: 8);
       b.cyl(V3(x, 20, 14), V3(x, 32, 14), 9, r.lightOn ? const Color(0xFFFFF1A8) : const Color(0xFFF3E7C8), shine: 0.2, sides: 16, caps: false, inner: true, r1: 5.5);
+    } else if (a.key == 'washer' || a.key == 'dryer') {
+      // A washing machine or a dryer: a cabinet with a dark control strip and a round glass door.
+      final w = a.key == 'washer';
+      b.box(V3(x, 15, 20), const V3(28, 30, 22), w ? const Color(0xFFEDEFF2) : const Color(0xFFE3DCCF), shine: 0.4);
+      b.box(V3(x, 28, 31.2), const V3(28, 4, 1), const Color(0xFF2E333B), shine: 0.3);
+      b.cyl(V3(x, 14, 31), V3(x, 14, 31.8), 8.5, const Color(0xFFB8BEC6), shine: 0.8, sides: 20);
+      b.cyl(V3(x, 14, 31.7), V3(x, 14, 32.2), 6.5, w ? const Color(0xFF7FB6E8) : const Color(0xFF9FA8B3), shine: 0.9, sides: 20);
+    } else if (a.key == 'range') {
+      b.box(V3(x, 15, 20), const V3(28, 30, 22), const Color(0xFFB9BEC6), shine: 0.7);
+      b.box(V3(x, 13, 31.2), const V3(20, 11, 0.7), const Color(0xFF15181D), shine: 0.9);
+      b.box(V3(x, 22, 32.2), const V3(22, 1, 1), const Color(0xFF8A9099), shine: 0.9);
+      b.box(V3(x, 30.3, 20), const V3(28, 0.8, 22), const Color(0xFF23262B), shine: 0.5);
+      for (final bx in const [-6.0, 6.0]) {
+        for (final bz in const [15.0, 25.0]) {
+          b.cyl(V3(x + bx, 30.8, bz), V3(x + bx, 31.1, bz), 3.6, const Color(0xFF3A3D44), shine: 0.3, sides: 14);
+        }
+      }
     } else {
       b.box(V3(x, 9, 15), const V3(18, 18, 14), const Color(0xFF8B5E3C), shine: 0.1);
       if (a.key == 'toaster') {

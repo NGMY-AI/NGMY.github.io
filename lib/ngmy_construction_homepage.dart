@@ -244,6 +244,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (snap) {
       cam.target = target;
       cam.dist = dist;
+      cam.lens = 1.0;
       cam.yaw = yaw;
       cam.pitch = pitch;
     } else {

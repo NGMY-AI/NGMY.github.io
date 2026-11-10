@@ -88,7 +88,16 @@ class Act {
 
 const List<String> kPhaseNames = ['1 Rough-in', '2 Drywall', '3 Devices'];
 
-const List<String> kAppliances = ['tv', 'lamp', 'toaster', 'hairdryer'];
+const List<String> kAppliances = ['tv', 'lamp', 'toaster', 'hairdryer', 'washerM', 'dryerM', 'rangeM'];
+
+/// The big machines only fit their own outlet: the washing machine, the dryer and the range each have a plug nothing else fits.
+const Map<String, Set<String>> kMachineOutlets = {
+  'washerM': {'washer'},
+  'dryerM': {'dryer4', 'dryer3'},
+  'rangeM': {'range4', 'range3'},
+};
+
+String applianceName(String a) => switch (a) { 'tv' => 'The TV', 'lamp' => 'The lamp', 'toaster' => 'The toaster', 'washerM' => 'The washing machine', 'dryerM' => 'The dryer', 'rangeM' => 'The range', _ => 'The hair dryer' };
 
 class RoomProject {
   RoomProject({this.seed = 1, this.practice = false, int? kind, String? name, bool variants = false}) {
@@ -657,6 +666,8 @@ class RoomProject {
     final d = devs[slot];
     if (d == null || !isOutletKind(d.kind) || d.w.stage < 2) return _mistake('There is no finished outlet there to plug into.');
     if (plugged.containsKey(slot)) return _mistake('Something is already plugged in.');
+    final fits = kMachineOutlets[appliance];
+    if (fits != null && !fits.contains(d.kind)) return _mistake('The plug does not fit. ${applianceName(appliance)} has a big plug made for its own outlet: ' + (appliance == 'washerM' ? 'the washer outlet (5-20).' : (appliance == 'dryerM' ? 'a dryer outlet (14-30 or 10-30).' : 'a range outlet (14-50 or 10-50).')));
     plugged[slot] = appliance;
     if (d.w.burnt) return const Act(false, 'The outlet is burnt. Nothing works. Pull it out and put in a new one.', danger: true);
     final v = verdict(slot);
@@ -685,7 +696,7 @@ class RoomProject {
 
   bool applianceRuns(int slot) => plugged.containsKey(slot) && power && deviceOk(slot);
 
-  static String _appName(String a) => switch (a) { 'tv' => 'The TV', 'lamp' => 'The lamp', 'toaster' => 'The toaster', _ => 'The hair dryer' };
+  static String _appName(String a) => applianceName(a);
 
   /// How far this fixture is: 0 nothing yet, 1 started (a device is in but not finished), 2 finished and right.
   int orderProgress(int i) {

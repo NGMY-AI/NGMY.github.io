@@ -70,6 +70,9 @@ const List<List<_Item>> _trays = [
     _Item('lamp', 'Lamp', Icons.light_rounded),
     _Item('toaster', 'Toaster', Icons.breakfast_dining_rounded),
     _Item('hairdryer', 'Hair dryer', Icons.dry_rounded),
+    _Item('washerM', 'Washing machine', Icons.local_laundry_service_rounded),
+    _Item('dryerM', 'Dryer', Icons.dry_cleaning_rounded),
+    _Item('rangeM', 'Kitchen range', Icons.microwave_rounded),
     _Item('flip', 'Flip switch', Icons.toggle_on_rounded),
     _Item('tester', 'Voltage tester', Icons.flash_on_rounded),
   ],
@@ -376,7 +379,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
     if (id >= idAppBase && id < idAppBase + 7) {
       // The TV or lamp itself is not a button: it only tells you how to unplug it.
       final slot = id - idAppBase;
-      final name = switch (p.plugged[slot]) { 'tv' => 'The TV', 'lamp' => 'The lamp', 'toaster' => 'The toaster', _ => 'The hair dryer' };
+      final name = applianceName(p.plugged[slot] ?? '');
       _say('$name is plugged in. To pull the plug, go behind it (the Behind the TV button) and tap the plug on the wall.', ok: true);
       return;
     }
@@ -556,7 +559,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
         'knife' => !s.ceiling && p.boxes.containsKey(s.id),
         _ when isOutletKind(armed) || isSwitchKind(armed) => !s.ceiling && p.boxes.containsKey(s.id) && !has,
         'light' || 'fan' => s.ceiling && p.boxes.containsKey(s.id) && !has,
-        'tv' || 'lamp' || 'toaster' || 'hairdryer' => has && isOutletKind(p.devs[s.id]!.kind),
+        _ when kAppliances.contains(armed) => has && isOutletKind(p.devs[s.id]!.kind),
         'tester' => p.boxes.containsKey(s.id),
         _ => false,
       };
@@ -1078,7 +1081,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
       'flip' => 'Tap a finished switch to turn the light or the fan on and off.',
       'unplug' => 'Tap whatever is plugged in to pull the plug.',
       'tester' => 'Tap a box or a device to test it for power.',
-      'tv' || 'lamp' || 'toaster' || 'hairdryer' => 'Tap a finished outlet to plug it in.',
+      _ when kAppliances.contains(armed) => 'Tap a finished outlet to plug it in.',
       _ => 'Tap a glowing box to put it there.',
     };
     _say(text, ok: true);
