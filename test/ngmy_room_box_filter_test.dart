@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ngmy/ngmy_3d.dart';
 import 'package:ngmy/ngmy_construction_project.dart';
 import 'package:ngmy/ngmy_construction_projectpage.dart';
 import 'package:ngmy/ngmy_construction_roomscene.dart';
@@ -13,7 +14,7 @@ void main() {
     final first = p.orders.first.slot;
     final marks = roomDynamic(p, 0.0, {}, marks: true);
     for (final o in p.orders) {
-      final mine = marks.where((q) => q.id == idSlotBase + o.slot).toList();
+      final mine = marks.where((q) => q.id == idSlotBase + o.slot && q.alpha > 0.5).toList();
       expect(mine, isNotEmpty, reason: 'a light on spot ${o.slot}');
       expect(mine.every((q) => q.color == _red), isTrue, reason: 'red: not fixed yet');
       expect(mine.length, lessThan(60), reason: 'just a small light, no frame round the box');
@@ -21,11 +22,11 @@ void main() {
     // No lights outside the devices phase.
     expect(roomDynamic(p, 0.0, {}).where((q) => q.id == idSlotBase + first), isEmpty);
     // It blinks: lit, then dark.
-    expect(roomDynamic(p, 0.5, {}, marks: true).where((q) => q.id >= idSlotBase && q.id < idSlotBase + 7), isEmpty);
-    expect(roomDynamic(p, 0.9, {}, marks: true).where((q) => q.id >= idSlotBase && q.id < idSlotBase + 7), isNotEmpty);
+    expect(roomDynamic(p, 0.5, {}, marks: true).where((q) => q.id >= idSlotBase && q.id < idSlotBase + 7 && q.alpha > 0.5), isEmpty);
+    expect(roomDynamic(p, 0.9, {}, marks: true).where((q) => q.id >= idSlotBase && q.id < idSlotBase + 7 && q.alpha > 0.5), isNotEmpty);
     // The box you picked has a bigger light, the same colour.
     double size(List<dynamic> polys, int slot) {
-      final xs = [for (final q in polys.where((q) => q.id == idSlotBase + slot)) for (final v in q.pts) v.x as double];
+      final xs = [for (final q in polys.where((q) => q.id == idSlotBase + slot && q.alpha > 0.5)) for (final v in q.pts) v.x as double];
       return xs.reduce((a, b) => a > b ? a : b) - xs.reduce((a, b) => a < b ? a : b);
     }
 
@@ -33,11 +34,11 @@ void main() {
     expect(size(pickedMarks, first), greaterThan(size(marks, first)));
     // One device in but not covered or not wired: still red. Everything fixed right: green.
     p.installDevice(first, p.orders.first.device);
-    expect(roomDynamic(p, 0.0, {}, marks: true).where((q) => q.id == idSlotBase + first).every((q) => q.color == _red), isTrue);
+    expect(roomDynamic(p, 0.0, {}, marks: true).where((q) => q.id == idSlotBase + first && q.alpha > 0.5).every((q) => q.color == _red), isTrue);
     p.completeWiring();
     final done = roomDynamic(p, 0.0, {}, marks: true);
     for (final o in p.orders) {
-      final mine = done.where((q) => q.id == idSlotBase + o.slot).toList();
+      final mine = done.where((q) => q.id == idSlotBase + o.slot && q.alpha > 0.5).toList();
       expect(mine, isNotEmpty);
       expect(mine.every((q) => q.color == _green), isTrue, reason: 'spot ${o.slot} is fixed: green');
     }
@@ -65,7 +66,7 @@ void main() {
     await t.pump(const Duration(seconds: 1));
   });
 
-  testWidgets('turned on its side, working on a device: the buttons are icons in one row with the wires, and the messages are small and out of the way', (t) async {
+  testWidgets('turned on its side, working on a device: small buttons with their words in one row with the wires, the screw options in a small row under it, and small messages', (t) async {
     t.view.physicalSize = const Size(1800, 800);
     t.view.devicePixelRatio = 2.0;
     addTearDown(t.view.reset);
@@ -79,30 +80,83 @@ void main() {
     await t.tap(find.text('Outlet'));
     await t.pump(const Duration(milliseconds: 900));
     await t.pump(const Duration(milliseconds: 600));
-    // The bench is open: one row, no big buttons with words.
+    // The bench is open: one row, the buttons have their words, and the frames are not bigger than the wire chips.
     expect(find.byKey(const Key('work-row')), findsOneWidget);
-    expect(find.text('Back to the room'), findsNothing);
-    expect(find.text('Fasten every wire'), findsNothing);
-    expect(find.textContaining('Take it out and put in'), findsNothing);
-    expect(find.byTooltip('Back to the room'), findsOneWidget);
-    expect(find.byTooltip('Fasten every wire first'), findsOneWidget);
-    expect(find.byTooltip('Take it out and put in a different one'), findsOneWidget);
-    // They are all the same height and on the same line as the wire chips.
-    final back = t.getRect(find.byTooltip('Back to the room'));
-    final wire = t.getRect(find.text('Bare copper · ground'));
-    expect((back.center.dy - wire.center.dy).abs(), lessThan(8), reason: 'in line with the wires');
-    expect(back.height, inInclusiveRange(44, 46));
+    expect(find.text('Back to the room'), findsOneWidget);
+    expect(find.text('Fasten every wire'), findsOneWidget);
+    expect(find.text('Take it out, put in another'), findsOneWidget);
+    final backBox = t.getRect(find.ancestor(of: find.text('Back to the room'), matching: find.byType(Container)).first);
+    final wireBox = t.getRect(find.ancestor(of: find.text('Black · hot'), matching: find.byType(Container)).first);
+    expect(backBox.height, 44);
+    expect(wireBox.height, 44);
+    expect((backBox.center.dy - wireBox.center.dy).abs(), lessThan(2), reason: 'in line with the wires');
+    expect(t.widget<Text>(find.text('Back to the room')).style!.fontSize, lessThanOrEqualTo(11), reason: 'small words');
     // The message that tells what happened is a small note in a corner.
     final note = find.textContaining('is held up to');
     expect(note, findsOneWidget);
     final box = t.getRect(find.ancestor(of: note, matching: find.byType(Container)).first);
     expect(box.width, lessThan(900 * 0.45), reason: 'a small note, not a banner across the work');
     expect(box.left, greaterThan(200), reason: 'clear of the hearts and the breaker button');
-    // Wires can still be picked from that row: pick one and the screws appear in the same row.
-    await t.tap(find.text('Bare copper · ground'));
+    // No screw options until a wire is picked. Then they come in their own small row UNDER the buttons, not along the side.
+    expect(find.byKey(const Key('screw-row')), findsNothing);
+    await t.tap(find.text('Black · hot'));
     await t.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const Key('screw-row')), findsOneWidget);
     expect(find.textContaining('➜'), findsWidgets);
+    final screw = t.getRect(find.byKey(const Key('screw-row')));
+    final row = t.getRect(find.byKey(const Key('work-row')));
+    expect(screw.top, greaterThanOrEqualTo(row.bottom), reason: 'under the buttons');
+    expect(screw.height, lessThanOrEqualTo(34), reason: 'low and slim');
+    final chipBox = t.getRect(find.ancestor(of: find.textContaining('➜').first, matching: find.byType(Container)).first);
+    expect(chipBox.height, lessThan(36), reason: 'the options are not big');
     await t.pump(const Duration(seconds: 12));
+  });
+
+  testWidgets('a single tap on the 3D view answers at once (it does not wait for a double tap), even when the view also listens for double taps', (t) async {
+    final picks = <int>[];
+    const wall = Poly([V3(-40, -40, 0), V3(40, -40, 0), V3(40, 40, 0), V3(-40, 40, 0)], V3(0, 0, 1), Color(0xFF888888), 7);
+    await t.pumpWidget(MaterialApp(
+      home: SizedBox(
+        width: 400,
+        height: 400,
+        child: Scene3DView(scene: const Scene3D([wall]), cam: Cam3(yaw: 0, pitch: 0, dist: 120, target: V3.zero), onPick: picks.add, onDoubleTap: (a, b) {}),
+      ),
+    ));
+    await t.pump(const Duration(milliseconds: 200));
+    await t.tapAt(const Offset(200, 200));
+    // No waiting for the double-tap window: it is answered straight away.
+    await t.pump(const Duration(milliseconds: 20));
+    expect(picks, [7]);
+    // Tapping again quickly is a second pick (it is not swallowed as a double tap).
+    await t.tapAt(const Offset(200, 200));
+    await t.pump(const Duration(milliseconds: 20));
+    expect(picks.length, 2);
+    // Dragging the view is not a tap.
+    final g = await t.startGesture(const Offset(150, 150));
+    await g.moveBy(const Offset(60, 0));
+    await g.up();
+    await t.pump(const Duration(milliseconds: 50));
+    expect(picks.length, 2);
+    await t.pump(const Duration(seconds: 1));
+  });
+
+  test('the lights are small, and an empty box has a bigger invisible pad round it that a finger can hit', () {
+    final p = RoomProject(seed: 3, kind: 0)..fastForward();
+    final marks = roomDynamic(p, 0.0, {}, marks: true);
+    final slot = p.orders.first.slot;
+    double width(Iterable<dynamic> polys) {
+      final xs = [for (final q in polys) for (final v in q.pts) v.x as double];
+      return xs.reduce((a, b) => a > b ? a : b) - xs.reduce((a, b) => a < b ? a : b);
+    }
+
+    final light = marks.where((q) => q.id == idSlotBase + slot && q.alpha > 0.5);
+    final pad = marks.where((q) => q.id == idSlotBase + slot && q.alpha < 0.1);
+    expect(width(light), lessThan(2.0), reason: 'a small light');
+    expect(pad, isNotEmpty);
+    expect(width(pad), greaterThan(9.0), reason: 'a pad bigger than the 5.6 wide box');
+    // With a device in the box there is no pad (the device is tapped itself, and appliances are plugged into it).
+    p.installDevice(slot, p.orders.first.device);
+    expect(roomDynamic(p, 0.0, {}, marks: true).where((q) => q.id == idSlotBase + slot && q.alpha < 0.1), isEmpty);
   });
 
   testWidgets('standing up straight the bench keeps its big buttons with words', (t) async {

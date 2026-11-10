@@ -1072,6 +1072,13 @@ class _Scene3DViewState extends State<Scene3DView> with SingleTickerProviderStat
   int _lastFingers = 0;
   Offset _lastDouble = Offset.zero;
 
+  // A tap is read from the raw touches, not from the gesture recognisers: a recogniser that also waits for a double tap holds every single tap back (and
+  // often drops it), so a box had to be tapped two or three times. This answers on the finger lifting.
+  Offset? _downAt;
+  Duration _downTime = Duration.zero;
+  bool _moved = false;
+  int _pointers = 0;
+
   @override
   void initState() {
     super.initState();
@@ -1117,16 +1124,42 @@ class _Scene3DViewState extends State<Scene3DView> with SingleTickerProviderStat
             widget.cam.orbit(d.focalPointDelta.dx * 0.009 * (Cam3.invertX ? -1 : 1), -d.focalPointDelta.dy * 0.009 * (Cam3.invertY ? -1 : 1));
           }
         },
-        onTapUp: (d) => widget.onPick?.call(_hits.pick(d.localPosition)),
         onDoubleTapDown: widget.onDoubleTap == null ? null : (d) => _lastDouble = d.localPosition,
         onDoubleTap: widget.onDoubleTap == null ? null : () => widget.onDoubleTap!(_lastDouble, context.size ?? Size.zero),
         child: Stack(fit: StackFit.expand, children: [
           ClipRect(
-            child: RepaintBoundary(
+            child: Listener(
+              onPointerDown: (e) {
+                _pointers++;
+                if (_pointers == 1) {
+                  _downAt = e.localPosition;
+                  _downTime = e.timeStamp;
+                  _moved = false;
+                } else {
+                  _moved = true;
+                }
+              },
+              onPointerMove: (e) {
+                final a = _downAt;
+                if (a != null && (e.localPosition - a).distance > 14) _moved = true;
+              },
+              onPointerCancel: (e) {
+                _pointers = math.max(0, _pointers - 1);
+                _moved = true;
+              },
+              onPointerUp: (e) {
+                final alone = _pointers == 1;
+                _pointers = math.max(0, _pointers - 1);
+                final a = _downAt;
+                if (alone && !_moved && a != null && (e.timeStamp - _downTime).inMilliseconds < 450) widget.onPick?.call(_hits.pick(e.localPosition));
+                if (_pointers == 0) _downAt = null;
+              },
+              child: RepaintBoundary(
               child: CustomPaint(
                 painter: Scene3DPainter(scene: widget.scene, cam: widget.cam, hits: _hits, highlight: widget.highlight, layerOn: widget.layerOn, clock: _time, dynamicPolys: widget.dynamicPolys, dynamicScreens: widget.dynamicScreens, repaint: Listenable.merge([widget.cam, _time]), background: widget.background, sky: widget.sky),
                 size: Size.infinite,
               ),
+            ),
             ),
           ),
           if (widget.overlay != null) widget.overlay!,

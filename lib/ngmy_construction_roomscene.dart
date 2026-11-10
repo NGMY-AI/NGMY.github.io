@@ -459,23 +459,34 @@ List<Poly> roomDynamic(RoomProject p, double t, Map<int, double> fxUntil, {int p
     faultEffect(b, active ? e.value : 'smolder', (l) => slotPoint(s, l), 1.0, t);
   }
   // The little light on every box of the job, in the devices phase while you look at the room: it blinks RED while the box is not fixed,
-  // and blinks GREEN only when its device is in, wired right and covered (everything about that box is right). No frames. Tapping the light
-  // picks the box, like tapping the box itself; the box you picked has a bigger light.
+  // and blinks GREEN only when its device is in, wired right and covered (everything about that box is right). No frames. The light is small,
+  // but round each box there is an invisible pad a good deal bigger than the box, so a finger taps it at once: tapping the pad or the light
+  // picks the box, like tapping the box itself. The box you picked has a slightly bigger light.
   if (marks) {
     final on = (t * 2.4).floor().isEven;
-    if (on) {
-      for (var i = 0; i < p.orders.length; i++) {
-        final s = slotById(p.orders[i].slot);
-        final done = p.orderOk(i);
-        b.id = idSlotBase + s.id;
-        b.order = 3;
-        b.bias = 0.9;
+    for (var i = 0; i < p.orders.length; i++) {
+      final s = slotById(p.orders[i].slot);
+      final done = p.orderOk(i);
+      b.id = idSlotBase + s.id;
+      b.order = 3;
+      b.bias = 0.9;
+      b.alpha = 0.02;
+      // (Only on an empty box: a box with a device has the device to tap, and a TV or a lamp is plugged into the device.)
+      if (!p.devs.containsKey(s.id)) {
+      if (s.ceiling) {
+        b.box(V3(s.pos.x, s.pos.y - 1.5, s.pos.z), const V3(14, 0.3, 14), Colors.white);
+      } else {
+        b.box(V3(s.pos.x, s.pos.y, 2.2), const V3(11, 15, 0.3), Colors.white);
+      }
+      }
+      b.alpha = 1;
+      if (on) {
         final dot = done ? const Color(0xFF22C55E) : const Color(0xFFEF4444);
         final at = s.ceiling ? V3(s.pos.x, s.pos.y - 3.5, s.pos.z) : V3(s.pos.x, s.pos.y + 7.4, 2.0);
-        b.ball(at, s.id == picked ? 2.0 : 1.4, dot, shine: 0.2, lat: 4, lon: 8);
-        b.bias = 0;
-        b.order = 2;
+        b.ball(at, s.id == picked ? 1.15 : 0.8, dot, shine: 0.2, lat: 4, lon: 8);
       }
+      b.bias = 0;
+      b.order = 2;
     }
   }
   return b.polys;

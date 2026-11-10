@@ -657,38 +657,44 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
     return [for (final it in _trays[2]) if (fits(it.key)) it];
   }
 
-  /// An icon-only button of the same height as the chips next to it (a tooltip says what it does).
-  Widget _iconAction(IconData icon, String tip, VoidCallback? onTap, {Color color = kConAmber}) => Padding(
+  /// A small button with an icon and a few words in it, as high as the wire chips next to it (44): the words are small, the frame does not grow.
+  Widget _wordAction(IconData icon, String label, VoidCallback? onTap, {Color color = kConAmber}) => Padding(
         padding: const EdgeInsets.only(right: 7),
-        child: Tooltip(
-          message: tip,
-          child: GestureDetector(
-            onTap: onTap,
-            child: Container(width: 44, height: 44, decoration: BoxDecoration(color: onTap == null ? Colors.white10 : color.withValues(alpha: 0.9), borderRadius: BorderRadius.circular(14)), child: Icon(icon, size: 21, color: onTap == null ? Colors.white38 : Colors.black)),
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(color: onTap == null ? Colors.white10 : color.withValues(alpha: 0.9), borderRadius: BorderRadius.circular(14)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(icon, size: 17, color: onTap == null ? Colors.white38 : Colors.black),
+              const SizedBox(width: 5),
+              Text(label, maxLines: 1, style: TextStyle(color: onTap == null ? Colors.white38 : Colors.black, fontWeight: FontWeight.w800, fontSize: 10.5)),
+            ]),
           ),
         ),
       );
 
-  /// Working on a device with the phone turned on its side: everything in ONE row of the same height (the buttons as icons, then the wires,
-  /// then the screws they can go on), so it takes little room and leaves the work in view.
+  /// Working on a device with the phone turned on its side: the buttons (small, with their words) and the wires in ONE row of the same height.
+  /// The screws a picked wire can go on come in their own small row under it, see [_screwRow].
   List<Widget> _workRow(Dev d, ElectricalLesson lesson) {
     return [
-      _iconAction(Icons.arrow_back_rounded, 'Back to the room', _leave, color: Colors.white70),
-      if (d.w.stage == 0) _iconAction(Icons.move_down_rounded, wiringComplete(lesson, d.w) ? 'Push it into the box' : 'Fasten every wire first', wiringComplete(lesson, d.w) ? () => _apply(p.pushIn(active)) : null),
+      _wordAction(Icons.arrow_back_rounded, 'Back to the room', _leave, color: Colors.white70),
+      if (d.w.stage == 0) _wordAction(Icons.move_down_rounded, wiringComplete(lesson, d.w) ? 'Push into the box' : 'Fasten every wire', wiringComplete(lesson, d.w) ? () => _apply(p.pushIn(active)) : null),
       if (d.w.stage == 1) ...[
-        _iconAction(Icons.undo_rounded, 'Pull it out', () => _apply(p.pullOut(active)), color: Colors.white70),
-        _iconAction(Icons.crop_square_rounded, 'Cover on', () => _apply(p.coverOn(active))),
+        _wordAction(Icons.undo_rounded, 'Pull it out', () => _apply(p.pullOut(active)), color: Colors.white70),
+        _wordAction(Icons.crop_square_rounded, 'Cover on', () => _apply(p.coverOn(active))),
       ],
       if (d.w.stage >= 2 && d.w.burnt)
-        _iconAction(Icons.eject_rounded, 'Take out the burnt one', () {
+        _wordAction(Icons.eject_rounded, 'Take out the burnt one', () {
           final a = p.removeDevice(active);
           _apply(a);
           if (a.ok) _leave();
         }, color: const Color(0xFFF87171))
       else if (d.w.stage >= 2)
-        _iconAction(Icons.eject_rounded, 'Pull it out of the wall', () => _apply(p.pullOut(active)), color: Colors.white70),
+        _wordAction(Icons.eject_rounded, 'Pull it out of the wall', () => _apply(p.pullOut(active)), color: Colors.white70),
       if (!d.w.burnt)
-        _iconAction(Icons.swap_horiz_rounded, 'Take it out and put in a different ${isSwitchKind(d.kind) ? 'switch' : 'one'}', () {
+        _wordAction(Icons.swap_horiz_rounded, 'Take it out, put in another', () {
           final a = p.removeDevice(active);
           _apply(a);
           if (a.ok) {
@@ -713,22 +719,25 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
               ),
             ),
           ),
-      if (d.w.stage == 0 && chip.isNotEmpty)
+    ];
+  }
+
+  /// The screws a picked wire can go on, as a small row under the buttons (sideways): low and slim, so it does not take the room of the work.
+  List<Widget> _screwRow(Dev d, ElectricalLesson lesson) => [
         for (final hk in lesson.hookups.where((hk) => !d.w.attached.containsKey(hk.id)))
           Padding(
-            padding: const EdgeInsets.only(right: 7),
+            padding: const EdgeInsets.only(right: 6),
             child: GestureDetector(
               onTap: () => _pickBench(active, hk.id),
               child: Container(
-                height: 44,
-                padding: const EdgeInsets.symmetric(horizontal: 11),
-                decoration: BoxDecoration(color: const Color(0xFF0E7490).withValues(alpha: 0.35), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFF67E8F9))),
-                child: Center(child: Text('➜ ${hk.name}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11.5))),
+                height: 32,
+                padding: const EdgeInsets.symmetric(horizontal: 9),
+                decoration: BoxDecoration(color: const Color(0xFF0E7490).withValues(alpha: 0.35), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFF67E8F9))),
+                child: Center(child: Text('➜ ${hk.name}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 10.5))),
               ),
             ),
           ),
-    ];
-  }
+      ];
 
   String _next() {
     if (p.failed) return 'The job is over.';
@@ -962,7 +971,11 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
             ),
             if (armed.isNotEmpty) _spotButtons(),
           ] else if (sideways) ...[
-            SizedBox(key: const Key('work-row'), height: 46, child: ListView(scrollDirection: Axis.horizontal, children: _workRow(d, lesson!))),
+            SizedBox(key: const Key('work-row'), height: 44, child: ListView(scrollDirection: Axis.horizontal, children: _workRow(d, lesson!))),
+            if (d.w.stage == 0 && chip.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              SizedBox(key: const Key('screw-row'), height: 32, child: ListView(scrollDirection: Axis.horizontal, children: _screwRow(d, lesson))),
+            ],
           ] else ...[
             Wrap(spacing: 8, runSpacing: 6, children: [
               if (d.w.stage == 0)
