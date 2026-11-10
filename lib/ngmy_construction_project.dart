@@ -130,7 +130,9 @@ class RoomProject {
 
   void _plan(int? forced, String? name, bool variants) {
     final r = math.Random(seed);
-    final kind = forced ?? r.nextInt(3);
+    // The usual three jobs, and (for the lab's own random jobs, whose seed is a big number) two out of five jobs are the laundry or the kitchen with a range.
+    final usual = r.nextInt(3);
+    final kind = forced ?? (seed >= 100 && seed % 5 >= 3 ? seed % 5 : usual);
     final outlets = [0, 1, 2]..shuffle(r);
     final sw = 3 + r.nextInt(2);
     switch (kind) {
@@ -140,11 +142,19 @@ class RoomProject {
       case 1:
         roomName = name ?? 'Bedroom';
         orders = [Order(outlets[0], 'outlet'), Order(outlets[1], 'outlet'), Order(6, 'fan', controlledBy: sw), Order(sw, 'switch')];
-      default:
+      case 2:
         roomName = name ?? 'Kitchen';
         orders = [Order(outlets[0], 'gfci'), Order(outlets[1], 'gfci'), Order(5, 'light', controlledBy: sw), Order(sw, 'switch')];
+      case 3:
+        // The laundry: the washing machine on its own 20 amp outlet and the dryer on its 240 volt outlet (new houses have the 4-wire 14-30, old ones the 3-wire 10-30).
+        roomName = name ?? 'Laundry room';
+        orders = [Order(outlets[0], 'washer'), Order(outlets[1], r.nextBool() ? 'dryer4' : 'dryer3'), Order(5, 'light', controlledBy: sw), Order(sw, 'switch')];
+      default:
+        // The kitchen with an electric range: the 50 amp 240 volt outlet (the 4-wire 14-50 or the old 3-wire 10-50) and a GFCI outlet for the counter.
+        roomName = name ?? 'Kitchen with a range';
+        orders = [Order(outlets[0], r.nextBool() ? 'range4' : 'range3'), Order(outlets[1], 'gfci'), Order(5, 'light', controlledBy: sw), Order(sw, 'switch')];
     }
-    if (variants) {
+    if (variants && kind < 3) {
       // Every job teaches a different outlet and a different switch: the second outlet and the wall switch can be any of the other types.
       orders[1] = Order(orders[1].slot, kOutletVariants[r.nextInt(kOutletVariants.length)]);
       orders[3] = Order(orders[3].slot, kSwitchVariants[r.nextInt(kSwitchVariants.length)]);

@@ -53,6 +53,11 @@ const List<List<_Item>> _trays = [
     _Item('v240three', '240 V 3-wire', Icons.electrical_services_rounded),
     _Item('v240only', '240 V only', Icons.electrical_services_rounded),
     _Item('isolated', 'Isolated ground', Icons.power_rounded),
+    _Item('dryer4', 'Dryer 4-wire (14-30)', Icons.dry_cleaning_rounded),
+    _Item('dryer3', 'Dryer 3-wire (10-30)', Icons.dry_cleaning_rounded),
+    _Item('range4', 'Range 4-wire (14-50)', Icons.microwave_rounded),
+    _Item('range3', 'Range 3-wire (10-50)', Icons.microwave_rounded),
+    _Item('washer', 'Washer (5-20)', Icons.local_laundry_service_rounded),
     _Item('switch2p', 'Double-pole', Icons.toggle_on_rounded),
     _Item('switch3', '3-way switch', Icons.toggle_on_rounded),
     _Item('switch4', '4-way switch', Icons.toggle_on_rounded),
@@ -401,6 +406,11 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
       case 'v240three':
       case 'v240only':
       case 'isolated':
+      case 'dryer4':
+      case 'dryer3':
+      case 'range4':
+      case 'range3':
+      case 'washer':
       case 'switch2p':
       case 'switch3':
       case 'switch4':

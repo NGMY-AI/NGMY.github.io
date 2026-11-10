@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'ngmy_construction_electrical_more.dart';
@@ -34,6 +35,9 @@ const int idWall = 1, idStud = 2, idBox = 3, idCable = 4, idCableB = 5, idWireNu
 const int idBlack = 10, idWhite = 11, idGround = 12, idBlack2 = 13;
 const int idDevice = 20, idBrassTop = 21, idBrassBottom = 22, idSilverTop = 23, idSilverBottom = 24, idGreen = 25, idYoke = 26, idFace = 27, idButtons = 28;
 const int idPlate = 30, idTester = 31;
+
+/// The metal ground strap on the terminal block of a dryer or range (3-wire: it stays; 4-wire: it comes off).
+const int idStrap = 40;
 const int idNutBlack = 51, idNutWhite = 52, idNutGround = 53, idFixture = 54, idCanopy = 55;
 
 /// A place on the device where a wire can be fastened.
@@ -59,6 +63,9 @@ class WiringState {
   bool testing = false;
   bool hints = false;
   bool labels = false;
+
+  /// The ground strap on the terminal block of a dryer or range cord is still on (a 4-wire cord needs it taken off).
+  bool strap = true;
 
   /// In practice mode a wrong wire is allowed and the mistake shows when the power comes on.
   bool practice = false;
@@ -259,6 +266,8 @@ ElectricalLesson electricalLesson(String id) => kElectricalLessons.firstWhere((l
 bool wiringComplete(ElectricalLesson lesson, WiringState s) {
   final needed = lesson.chips.map((c) => c.key).toSet();
   final have = s.attached.values.toSet();
+  // A 4-wire cord is not finished while the ground strap is still on the terminal block.
+  if (lesson.id == 'cord4' && s.strap) return false;
   return needed.every(have.contains);
 }
 
@@ -270,6 +279,7 @@ String? tryFasten(ElectricalLesson lesson, WiringState s, String chip, Hookup h,
     return 'STOP! The breaker is still ON, so these wires are live (120 volts). Turn the breaker OFF first. This can shock you badly.';
   }
   if (s.stage != 0) return 'The device is already in the box. Pull it out again to change the wires.';
+  if (lesson.id == 'cord4' && s.strap && !s.practice && !s.test && (chip == 'neutral' || chip == 'ground')) return 'Take the ground strap off first: tap the metal strap on the terminal block. On a 4-wire cord the neutral must not touch the frame, because the green wire grounds the frame.';
   if (!s.practice && !s.test && !allowWrong && !h.accepts.contains(chip)) return lesson.wrongHint(chip, h);
   if (s.attached[h.id] != null) return 'That place already has a wire. Tap the wire to take it off first.';
   if (s.attached.values.contains(chip)) return 'That wire is already fastened. Tap it to take it off if you want to move it.';
@@ -321,6 +331,9 @@ DeviceRules rulesOf(ElectricalLesson lesson) => DeviceRules(
     );
 
 Verdict evaluateWiring(ElectricalLesson lesson, WiringState s) {
+  if (lesson.id == 'cord4' && s.strap) {
+    return const Verdict('bonded', 'The ground strap is still on the terminal block, so the neutral is joined to the metal frame of the appliance. On a 4-wire cord the strap must come off: the frame is grounded by the green wire, and the neutral carries current.', works: true, effect: 'none', fix: 'Take the metal ground strap off the terminal block.');
+  }
   final r = evaluateConnections(rulesOf(lesson), connectionsOf(lesson, s), supported: s.supported);
   final c = r.consequence;
   bool has(String code) => r.findings.any((f) => f.code == code);
@@ -389,6 +402,19 @@ V3 hookupPoint(String lesson, int id, WiringState s) {
     }
   }
   final z = _deviceZ(lesson, s);
+  if (lesson.startsWith('terminal') || lesson == 'cord3' || lesson == 'cord4') {
+    // The terminal block of a dryer or range: black on the left, white (neutral) in the middle, red on the right, and the frame screw below.
+    switch (id) {
+      case idSilverTop:
+        return V3(_cx - 1.15, _cy + 0.35, z - 0.3);
+      case idBrassTop:
+        return V3(_cx, _cy + 0.35, z - 0.3);
+      case idBrassBottom:
+        return V3(_cx + 1.15, _cy + 0.35, z - 0.3);
+      default:
+        return V3(_cx, _cy - 1.45, z - 0.1);
+    }
+  }
   switch (id) {
     case idBrassTop:
       return V3(_cx + 0.98, _cy + (lesson == 'gfci' ? 0.95 : 0.85), z - 0.45);
@@ -479,7 +505,7 @@ Scene3D buildBench(ElectricalLesson lesson, WiringState s, {bool withWall = true
   if (ceilingKind) {
     _fixture(b, kind, s);
   } else {
-    _device(b, kind, _deviceZ(kind, s), s.burnt, fourScrews: !lesson.legacy);
+    _device(b, kind, _deviceZ(kind, s), s.burnt, fourScrews: !lesson.legacy, strap: s.strap);
   }
   if (s.hints && s.stage == 0) {
     b.id = 0;
@@ -492,7 +518,7 @@ Scene3D buildBench(ElectricalLesson lesson, WiringState s, {bool withWall = true
     b.alpha = 1;
   }
   if (s.stage >= 2 && !ceilingKind) _plate(b, s.burnt);
-  if (s.stage >= 2 && s.testing && (kind == 'outlet' || kind == 'gfci')) _tester(b, s.power && !s.burnt);
+  if (s.stage >= 2 && s.testing && (kind == 'outlet' || kind == 'gfci' || kind.startsWith('nema'))) _tester(b, s.power && !s.burnt);
 
   final info = <int, ObjInfo>{
     idWall: const ObjInfo('Drywall', 'The wall surface. A hole is cut in it for the electrical box.', V3(0, 0, 0), 22),
@@ -505,7 +531,8 @@ Scene3D buildBench(ElectricalLesson lesson, WiringState s, {bool withWall = true
     idWhite: ObjInfo('White wire: neutral', 'The neutral wire carries the power back to the panel. ${ceilingKind ? 'It joins the fixture white wire.' : 'It goes on a silver screw.'}', V3(0, -0.8, 1.2), 7),
     idGround: ObjInfo('Bare copper wire: ground', 'The ground wire is a safety path. If a wire touches metal, the current runs down the ground instead of through you. ${ceilingKind ? 'It joins the green fixture ground wire.' : 'It goes on the green screw.'}', V3(0.5, -0.8, 1.2), 7),
     idWireNut: const ObjInfo('Wire nut', 'A twist-on cap that joins wires safely. The two white wires are joined here because a switch only cuts the hot wire.', V3(0, -1, -0.6), 5),
-    idDevice: ObjInfo(kind == 'gfci' ? 'GFCI outlet' : (kind == 'switch' ? 'Light switch' : 'Receptacle (outlet)'), kind == 'gfci' ? 'It checks that the current going out equals the current coming back. If some leaks (through water or a person) it shuts off in a fraction of a second.' : (kind == 'switch' ? 'A rocker that opens and closes the black wire to the light.' : 'The outlet. Each side has two slots and a ground hole. The short slot is hot, the long slot is neutral.'), V3(0, -0.2, _deviceZ(kind, s)), 9),
+    idDevice: ObjInfo(!lesson.legacy && (kind.startsWith('nema') || kind.startsWith('terminal')) ? lesson.title : (kind == 'gfci' ? 'GFCI outlet' : (kind == 'switch' ? 'Light switch' : 'Receptacle (outlet)')), !lesson.legacy && (kind.startsWith('nema') || kind.startsWith('terminal')) ? lesson.blurb : (kind == 'gfci' ? 'It checks that the current going out equals the current coming back. If some leaks (through water or a person) it shuts off in a fraction of a second.' : (kind == 'switch' ? 'A rocker that opens and closes the black wire to the light.' : 'The outlet. Each side has two slots and a ground hole. The short slot is hot, the long slot is neutral.')), V3(0, -0.2, _deviceZ(kind, s)), 9),
+    idStrap: const ObjInfo('Ground strap', 'A metal strap from the middle (neutral) terminal to the frame of the appliance. On a 3-wire cord it stays: the neutral also grounds the frame. On a 4-wire cord you take it off, because the green wire grounds the frame.', V3(0, -0.7, 4.8), 7),
     idBrassTop: const ObjInfo('BRASS screw: HOT side', 'The gold screws are BRASS. They are for the HOT wire (black).', V3(1.0, 0.6, 4.3), 5),
     idBrassBottom: const ObjInfo('BRASS screw: HOT side', 'The gold screws are BRASS. They are for the HOT wire (black).', V3(1.0, -0.8, 4.3), 5),
     idSilverTop: const ObjInfo('SILVER screw: NEUTRAL side', 'The white-silver screws are NICKEL. They are for the NEUTRAL wire (white).', V3(-1.0, 0.6, 4.3), 5),
@@ -626,7 +653,11 @@ String? _legacyWireKey(String lesson, int id) => switch (id) {
 
 // ─── The device itself ───────────────────────────────────────────────────────
 
-void _device(MeshBuilder b, String kind, double z, bool burnt, {bool faceOnly = false, bool fourScrews = false}) {
+void _device(MeshBuilder b, String kind, double z, bool burnt, {bool faceOnly = false, bool fourScrews = false, bool strap = true}) {
+  if (kind.startsWith('terminal')) {
+    _terminal(b, kind, z, burnt, strap);
+    return;
+  }
   final c = V3(_cx, _cy, z);
   final isSwitch = kind == 'switch';
   final isGfci = kind == 'gfci';
@@ -652,6 +683,9 @@ void _device(MeshBuilder b, String kind, double z, bool burnt, {bool faceOnly = 
   } else {
     b.bias = 0.6;
     const dark = Color(0xFF17181B);
+    if (kind.startsWith('nema')) {
+      _nemaFace(b, c, kind, burnt);
+    } else {
     for (final oy in isGfci ? const [1.0, -1.0] : const [0.72, -0.72]) {
       b.id = idFace;
       b.box(c + V3(-0.28, oy + 0.04, 0.47), const V3(0.07, 0.4, 0.03), dark);
@@ -663,6 +697,7 @@ void _device(MeshBuilder b, String kind, double z, bool burnt, {bool faceOnly = 
       b.id = idButtons;
       b.box(c + const V3(-0.32, 0.0, 0.5), const V3(0.42, 0.34, 0.12), const Color(0xFF202226), shine: 0.3);
       b.box(c + const V3(0.32, 0.0, 0.5), const V3(0.42, 0.34, 0.12), const Color(0xFFD72A2A), shine: 0.3);
+    }
     }
   }
   if (faceOnly) {
@@ -773,4 +808,102 @@ void _tester(MeshBuilder b, bool live) {
     b.ball(const V3(0, y + 0.1, 2.85), 0.5, const Color(0xFFFF3B30), shine: 0, lat: 4, lon: 8);
     b.alpha = 1;
   }
+}
+
+/// The face of a NEMA receptacle for the big appliances, seen from the front: a round dark plate with the slots of its type.
+/// W is the neutral, X and Y the two hots, G the ground. The shapes follow the real faces: the 10-30 and 10-50 have no ground hole.
+void _nemaFace(MeshBuilder b, V3 c, String kind, bool burnt) {
+  const zf = 0.5;
+  b.id = idFace;
+  b.bias = 0.62;
+  b.cyl(c + const V3(0, 0, 0.46), c + const V3(0, 0, zf), 0.64, burnt ? kChar : const Color(0xFF3B2F2A), shine: 0.35, sides: 28);
+  b.bias = 0.7;
+  const dark = Color(0xFF0B0B0D);
+  // A slot (a thin rectangle), turned [angle] radians in the plane of the face.
+  void slot(double x, double y, double w, double h, [double angle = 0]) {
+    final ca = math.cos(angle), sa = math.sin(angle);
+    V3 p(double dx, double dy) => V3(c.x + x + dx * ca - dy * sa, c.y + y + dx * sa + dy * ca, c.z + zf + 0.012);
+    b.quad(p(-w / 2, -h / 2), p(w / 2, -h / 2), p(w / 2, h / 2), p(-w / 2, h / 2), dark, normal: const V3(0, 0, 1));
+  }
+
+  void round(double x, double y) => b.cyl(c + V3(x, y, zf), c + V3(x, y, zf + 0.012), 0.065, dark, sides: 12);
+  // The L-shaped neutral slot: a tall bar and a foot at its bottom.
+  void ell(double x, double y) {
+    slot(x, y, 0.075, 0.3);
+    slot(x + 0.09, y - 0.115, 0.2, 0.075);
+  }
+
+  switch (kind) {
+    case 'nema1030':
+      ell(-0.05, 0.14);
+      slot(-0.3, -0.24, 0.075, 0.3, -0.5);
+      slot(0.3, -0.24, 0.075, 0.3, 0.5);
+    case 'nema1430':
+      ell(-0.05, 0.28);
+      slot(-0.4, -0.04, 0.075, 0.32);
+      slot(0.4, -0.04, 0.075, 0.32);
+      round(0, -0.4);
+    case 'nema1050':
+      slot(-0.3, 0.2, 0.075, 0.3, 0.5);
+      slot(0.3, 0.2, 0.075, 0.3, -0.5);
+      slot(0, -0.26, 0.075, 0.32);
+    case 'nema1450':
+      slot(0, 0.3, 0.075, 0.28);
+      slot(-0.4, -0.04, 0.075, 0.32);
+      slot(0.4, -0.04, 0.075, 0.32);
+      round(0, -0.4);
+    default:
+      // The 5-20 of the washing machine: a T-shaped neutral slot on the left, a straight hot slot on the right, and the ground hole below.
+      slot(0.2, 0.12, 0.075, 0.3);
+      slot(-0.2, 0.12, 0.075, 0.3);
+      slot(-0.3, 0.12, 0.14, 0.075);
+      round(0, -0.3);
+  }
+  b.bias = 0;
+}
+
+/// The terminal block at the back of a dryer or a range: three terminals (black left, white neutral in the middle, red right),
+/// the metal frame with its green ground screw, and the ground strap from the middle terminal to the frame while it is on.
+void _terminal(MeshBuilder b, String kind, double z, bool burnt, bool strap) {
+  final c = V3(_cx, _cy, z);
+  b.bias = 0;
+  b.id = idYoke;
+  b.box(c + const V3(0, -0.2, -0.1), const V3(4.1, 3.4, 0.12), burnt ? const Color(0xFF59514B) : kSilver, shine: 0.8);
+  b.bias = 0.2;
+  b.id = idDevice;
+  b.box(c + const V3(0, 0.35, 0.18), const V3(3.7, 1.35, 0.5), burnt ? kChar : const Color(0xFF3B2F2A), shine: 0.25);
+  // Raised walls between the terminals.
+  b.bias = 0.3;
+  for (final x in const [-0.58, 0.58]) {
+    b.box(c + V3(x, 0.35, 0.5), const V3(0.1, 1.35, 0.2), const Color(0xFF241B18));
+  }
+  // The colour of the wire that belongs on each terminal, over it.
+  b.id = idFace;
+  b.bias = 0.4;
+  b.box(c + const V3(-1.15, 1.18, 0.45), const V3(0.7, 0.14, 0.06), kBlack);
+  b.box(c + const V3(0, 1.18, 0.45), const V3(0.7, 0.14, 0.06), kWhiteWire);
+  b.box(c + const V3(1.15, 1.18, 0.45), const V3(0.7, 0.14, 0.06), const Color(0xFFD14B3A));
+  void screw(int id, double x, double y, Color col, Color plate) {
+    b.bias = 0.9;
+    b.id = id;
+    b.cyl(V3(c.x + x, c.y + y, c.z + 0.43), V3(c.x + x, c.y + y, c.z + 0.78), 0.3, col, shine: 0.9, sides: 14);
+    b.box(V3(c.x + x, c.y + y, c.z + 0.79), const V3(0.42, 0.07, 0.03), const Color(0xFF3A3F47));
+    b.box(V3(c.x + x, c.y + y, c.z + 0.79), const V3(0.07, 0.42, 0.03), const Color(0xFF3A3F47));
+  }
+
+  screw(idSilverTop, -1.15, 0.35, kBrass, kBrassPlate);
+  screw(idBrassTop, 0, 0.35, kBrass, kBrassPlate);
+  screw(idBrassBottom, 1.15, 0.35, kBrass, kBrassPlate);
+  // The green ground screw on the frame.
+  b.bias = 0.9;
+  b.id = idGreen;
+  b.cyl(c + const V3(0, -1.45, 0.0), c + const V3(0, -1.45, 0.3), 0.26, kGreenScrew, shine: 0.7, sides: 12);
+  b.box(c + const V3(0, -1.45, 0.32), const V3(0.34, 0.05, 0.02), const Color(0xFF14532D));
+  // The ground strap: from the middle terminal down to the frame screw.
+  if (strap) {
+    b.bias = 0.8;
+    b.id = idStrap;
+    b.box(c + const V3(0, -0.55, 0.36), const V3(0.42, 1.95, 0.07), kCopper, shine: 0.7);
+  }
+  b.bias = 0;
 }

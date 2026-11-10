@@ -15,11 +15,17 @@ const Color _copper = Color(0xFFC2763A);
 const Color _stripe = Color(0xFF2FA24F);
 
 const List<String> kSwitchKinds = ['switch', 'switch2p', 'switch3', 'switch4', 'switchsmart', 'switchcombo'];
-const List<String> kOutletKinds = ['outlet', 'gfci', 'split', 'v240four', 'v240three', 'v240only', 'isolated'];
+const List<String> kOutletKinds = ['outlet', 'gfci', 'split', 'v240four', 'v240three', 'v240only', 'isolated', 'dryer4', 'dryer3', 'range4', 'range3', 'washer'];
 
 /// The devices that are not the five the lab began with.
 const List<String> kSwitchVariants = ['switch2p', 'switch3', 'switch4', 'switchsmart', 'switchcombo'];
 const List<String> kOutletVariants = ['split', 'v240four', 'v240three', 'v240only', 'isolated'];
+
+/// The outlets for the big appliances: the dryer, the range and the washing machine (American NEMA style).
+const List<String> kApplianceOutlets = ['dryer4', 'dryer3', 'range4', 'range3', 'washer'];
+
+/// The cord of a dryer or range, wired at the appliance (not an outlet in the wall).
+const List<String> kCordKinds = ['cord3', 'cord4'];
 
 /// The five devices the lab began with.
 const Set<String> kLegacyKinds = {'outlet', 'gfci', 'switch', 'light', 'fan'};
@@ -372,6 +378,238 @@ final List<ElectricalLesson> kMoreLessons = [
       'isoground' => 'The isolated ground wire only goes on the green screw with the orange triangle.',
       'neutral' => 'The white neutral wire goes on a silver screw.',
       _ => h.id == idGreen ? 'A hot wire never goes on the ground screw.' : 'The black hot wire goes on a brass screw.',
+    },
+  ),
+  ...kApplianceLessons,
+];
+
+// ═════════════════════════════════════════════════════════════════════════════
+// THE BIG APPLIANCE OUTLETS (American NEMA style): the dryer (10-30 and 14-30), the range (10-50 and 14-50), the washing machine
+// (5-20) and the cord of a dryer or range (3-wire and 4-wire hookup). Letters on the face and in the lessons: W is the neutral
+// (white), X and Y are the two hots (black and red, 120 volts each, 240 volts between them) and G is the ground.
+// ═════════════════════════════════════════════════════════════════════════════
+
+
+/// The wrong-hint of the four dryer and range outlets.
+String _bigHint(String chip, Hookup h, {required bool hasGround}) => switch (chip) {
+      'ground' => 'The bare copper ground wire only goes on the GREEN screw.',
+      'neutral' => 'The white neutral wire goes on the silver W screw.',
+      _ => h.id == idGreen ? 'A hot wire never goes on the green ground screw.' : 'The black and red hot wires go on the two brass screws, X and Y. The silver W screw is for the neutral.',
+    };
+
+final List<ElectricalLesson> kApplianceLessons = [
+  ElectricalLesson(
+    id: 'dryer4',
+    title: 'Dryer outlet, 4-wire (NEMA 14-30)',
+    blurb: 'The dryer outlet of every new house: 30 amp, 240 volts. Two hots (X, Y), a neutral (W) and a separate ground (G).',
+    look: 'nema1430',
+    strict: true,
+    steps: const [
+      ..._intro,
+      'Look at the face: an L-shaped slot (W, neutral), two straight slots at the sides (X and Y, hot) and a round hole (G, ground). That is a NEMA 14-30, the 4-wire dryer outlet. It takes 10 gauge wire and a 30 amp double breaker.',
+      'Fasten the bare copper ground to the GREEN screw.',
+      'Fasten the white neutral to the silver NEUTRAL (W) screw.',
+      'Fasten the black hot to one HOT (X or Y) brass screw.',
+      'Fasten the red hot to the other HOT brass screw.',
+      ..._tail,
+    ],
+    chips: const [
+      WireChoice('ground', 'Bare copper · ground', _copper, Colors.white, role: 'ground'),
+      WireChoice('neutral', 'White · neutral', _white, Color(0xFF111827), role: 'neutral'),
+      WireChoice('hot1', 'Black · hot 1', _black, Colors.white, role: 'hot'),
+      WireChoice('hot2', 'Red · hot 2', _red, Colors.white, role: 'hot'),
+    ],
+    hookups: const [
+      Hookup(idGreen, 'Green screw G: GROUND', {'ground'}, 'The bare copper ground goes on the green screw.', role: 'ground'),
+      Hookup(idSilverTop, 'Silver screw W: NEUTRAL', {'neutral'}, 'The white neutral wire goes on the silver W screw.', role: 'neutral'),
+      Hookup(idBrassTop, 'Brass screw X: HOT', {'hot1', 'hot2'}, 'The two hot wires (black and red) go on the two brass screws, X and Y, in either order.', role: 'hot'),
+      Hookup(idBrassBottom, 'Brass screw Y: HOT', {'hot1', 'hot2'}, 'The two hot wires (black and red) go on the two brass screws, X and Y, in either order.', role: 'hot'),
+    ],
+    solution: const {idGreen: 'ground', idSilverTop: 'neutral', idBrassTop: 'hot1', idBrassBottom: 'hot2'},
+    wrongHint: (chip, h) => _bigHint(chip, h, hasGround: true),
+  ),
+  ElectricalLesson(
+    id: 'dryer3',
+    title: 'Dryer outlet, 3-wire (NEMA 10-30)',
+    blurb: 'The dryer outlet of older houses (before 1996): 30 amp, 240 volts. Two hots and a neutral that also grounds the dryer. No separate ground.',
+    look: 'nema1030',
+    strict: true,
+    needsGround: false,
+    steps: const [
+      'Turn the breaker OFF and test that the wires are dead.',
+      'Look at the face: an L-shaped slot (W, neutral) and two slanted slots (X and Y, hot), and no ground hole. That is a NEMA 10-30, the old 3-wire dryer outlet. The neutral also grounds the dryer, which is only allowed in old houses.',
+      'Fasten the white neutral to the silver NEUTRAL (W) screw.',
+      'Fasten the black hot to one HOT (X or Y) brass screw.',
+      'Fasten the red hot to the other HOT brass screw.',
+      ..._tail,
+    ],
+    chips: const [
+      WireChoice('neutral', 'White · neutral', _white, Color(0xFF111827), role: 'neutral'),
+      WireChoice('hot1', 'Black · hot 1', _black, Colors.white, role: 'hot'),
+      WireChoice('hot2', 'Red · hot 2', _red, Colors.white, role: 'hot'),
+    ],
+    hookups: const [
+      Hookup(idSilverTop, 'Silver screw W: NEUTRAL', {'neutral'}, 'The white neutral wire goes on the silver W screw.', role: 'neutral'),
+      Hookup(idBrassTop, 'Brass screw X: HOT', {'hot1', 'hot2'}, 'The two hot wires go on the two brass screws, X and Y, in either order.', role: 'hot'),
+      Hookup(idBrassBottom, 'Brass screw Y: HOT', {'hot1', 'hot2'}, 'The two hot wires go on the two brass screws, X and Y, in either order.', role: 'hot'),
+    ],
+    solution: const {idSilverTop: 'neutral', idBrassTop: 'hot1', idBrassBottom: 'hot2'},
+    wrongHint: (chip, h) => _bigHint(chip, h, hasGround: false),
+  ),
+  ElectricalLesson(
+    id: 'range4',
+    title: 'Range outlet, 4-wire (NEMA 14-50)',
+    blurb: 'The electric stove outlet of every new house: 50 amp, 240 volts. Two hots (X, Y), a neutral (W) and a separate ground (G). Also used for car chargers.',
+    look: 'nema1450',
+    strict: true,
+    steps: const [
+      ..._intro,
+      'Look at the face: a straight slot at the top (W, neutral), two straight slots at the sides (X and Y, hot) and a round hole at the bottom (G, ground). That is a NEMA 14-50, the 4-wire range outlet. It takes 6 gauge wire and a 50 amp double breaker.',
+      'Fasten the bare copper ground to the GREEN screw.',
+      'Fasten the white neutral to the silver NEUTRAL (W) screw.',
+      'Fasten the black hot to one HOT (X or Y) brass screw.',
+      'Fasten the red hot to the other HOT brass screw.',
+      ..._tail,
+    ],
+    chips: const [
+      WireChoice('ground', 'Bare copper · ground', _copper, Colors.white, role: 'ground'),
+      WireChoice('neutral', 'White · neutral', _white, Color(0xFF111827), role: 'neutral'),
+      WireChoice('hot1', 'Black · hot 1', _black, Colors.white, role: 'hot'),
+      WireChoice('hot2', 'Red · hot 2', _red, Colors.white, role: 'hot'),
+    ],
+    hookups: const [
+      Hookup(idGreen, 'Green screw G: GROUND', {'ground'}, 'The bare copper ground goes on the green screw.', role: 'ground'),
+      Hookup(idSilverTop, 'Silver screw W: NEUTRAL', {'neutral'}, 'The white neutral wire goes on the silver W screw.', role: 'neutral'),
+      Hookup(idBrassTop, 'Brass screw X: HOT', {'hot1', 'hot2'}, 'The two hot wires (black and red) go on the two brass screws, X and Y, in either order.', role: 'hot'),
+      Hookup(idBrassBottom, 'Brass screw Y: HOT', {'hot1', 'hot2'}, 'The two hot wires (black and red) go on the two brass screws, X and Y, in either order.', role: 'hot'),
+    ],
+    solution: const {idGreen: 'ground', idSilverTop: 'neutral', idBrassTop: 'hot1', idBrassBottom: 'hot2'},
+    wrongHint: (chip, h) => _bigHint(chip, h, hasGround: true),
+  ),
+  ElectricalLesson(
+    id: 'range3',
+    title: 'Range outlet, 3-wire (NEMA 10-50)',
+    blurb: 'The electric stove outlet of older houses (before 1996): 50 amp, 240 volts. Two hots and a neutral that also grounds the range. No separate ground.',
+    look: 'nema1050',
+    strict: true,
+    needsGround: false,
+    steps: const [
+      'Turn the breaker OFF and test that the wires are dead.',
+      'Look at the face: two slanted slots at the top (X and Y, hot) and one straight slot at the bottom (W, neutral), and no ground hole. That is a NEMA 10-50, the old 3-wire range outlet.',
+      'Fasten the white neutral to the silver NEUTRAL (W) screw.',
+      'Fasten the black hot to one HOT (X or Y) brass screw.',
+      'Fasten the red hot to the other HOT brass screw.',
+      ..._tail,
+    ],
+    chips: const [
+      WireChoice('neutral', 'White · neutral', _white, Color(0xFF111827), role: 'neutral'),
+      WireChoice('hot1', 'Black · hot 1', _black, Colors.white, role: 'hot'),
+      WireChoice('hot2', 'Red · hot 2', _red, Colors.white, role: 'hot'),
+    ],
+    hookups: const [
+      Hookup(idSilverTop, 'Silver screw W: NEUTRAL', {'neutral'}, 'The white neutral wire goes on the silver W screw.', role: 'neutral'),
+      Hookup(idBrassTop, 'Brass screw X: HOT', {'hot1', 'hot2'}, 'The two hot wires go on the two brass screws, X and Y, in either order.', role: 'hot'),
+      Hookup(idBrassBottom, 'Brass screw Y: HOT', {'hot1', 'hot2'}, 'The two hot wires go on the two brass screws, X and Y, in either order.', role: 'hot'),
+    ],
+    solution: const {idSilverTop: 'neutral', idBrassTop: 'hot1', idBrassBottom: 'hot2'},
+    wrongHint: (chip, h) => _bigHint(chip, h, hasGround: false),
+  ),
+  ElectricalLesson(
+    id: 'washer',
+    title: 'Washing machine outlet (NEMA 5-20)',
+    blurb: 'A dedicated 120 volt, 20 amp outlet for the washer, with a T-shaped neutral slot. Near water, so it needs GFCI protection.',
+    look: 'nema520',
+    strict: true,
+    steps: const [
+      ..._intro,
+      'This outlet has its own 20 amp breaker and 12 gauge wire (a yellow cable): the washer must not share its circuit with anything else. The T-shaped slot tells you it takes both 15 and 20 amp plugs. In a laundry area the new code asks for GFCI protection, from a GFCI breaker or a GFCI outlet before it.',
+      'Fasten the bare copper ground to the GREEN screw.',
+      'Fasten the white neutral to a SILVER screw.',
+      'Fasten the black hot to a BRASS screw.',
+      ..._tail,
+    ],
+    chips: const [
+      WireChoice('ground', 'Bare copper · ground', _copper, Colors.white, role: 'ground'),
+      WireChoice('neutral', 'White · neutral', _white, Color(0xFF111827), role: 'neutral'),
+      WireChoice('hot', 'Black · hot', _black, Colors.white, role: 'hot'),
+    ],
+    hookups: const [
+      Hookup(idGreen, 'Green screw: GROUND', {'ground'}, 'The bare copper ground goes on the green screw.', role: 'ground'),
+      Hookup(idSilverTop, 'Silver screw: NEUTRAL', {'neutral'}, 'The white neutral wire goes on a silver screw.', role: 'neutral'),
+      Hookup(idBrassTop, 'Brass screw: HOT', {'hot'}, 'The black hot wire goes on a brass screw.', role: 'hot'),
+    ],
+    solution: const {idGreen: 'ground', idSilverTop: 'neutral', idBrassTop: 'hot'},
+    wrongHint: (chip, h) => switch (chip) {
+      'ground' => 'The bare copper ground wire only goes on the GREEN screw.',
+      'neutral' => 'The white neutral wire goes on a silver screw.',
+      _ => h.id == idGreen ? 'A hot wire never goes on the green ground screw.' : 'The black hot wire goes on a brass screw.',
+    },
+  ),
+  ElectricalLesson(
+    id: 'cord3',
+    title: 'Dryer or range cord, 3-wire hookup',
+    blurb: 'At the back of the appliance: black to the left terminal, white (neutral) to the middle one, red to the right one. The ground strap STAYS: it joins the neutral to the frame.',
+    look: 'terminal3',
+    strict: true,
+    needsGround: false,
+    steps: const [
+      ..._intro,
+      'Look at the terminal block. There is a metal GROUND STRAP from the middle terminal to the frame of the appliance. On a 3-wire cord it stays on: the neutral also grounds the frame.',
+      'Fasten the white neutral to the MIDDLE terminal, under the strap.',
+      'Fasten the black wire to the LEFT terminal.',
+      'Fasten the red wire to the RIGHT terminal.',
+      ..._tail,
+    ],
+    chips: const [
+      WireChoice('neutral', 'White · neutral (middle)', _white, Color(0xFF111827), role: 'neutral'),
+      WireChoice('hot1', 'Black · hot (left)', _black, Colors.white, role: 'hot'),
+      WireChoice('hot2', 'Red · hot (right)', _red, Colors.white, role: 'hot'),
+    ],
+    hookups: const [
+      Hookup(idBrassTop, 'MIDDLE terminal: NEUTRAL (white)', {'neutral'}, 'The white neutral wire goes on the middle terminal.', role: 'neutral'),
+      Hookup(idSilverTop, 'LEFT terminal: black', {'hot1'}, 'The black wire goes on the left terminal.', role: 'hot'),
+      Hookup(idBrassBottom, 'RIGHT terminal: red', {'hot2'}, 'The red wire goes on the right terminal.', role: 'hot'),
+    ],
+    solution: const {idBrassTop: 'neutral', idSilverTop: 'hot1', idBrassBottom: 'hot2'},
+    wrongHint: (chip, h) => switch (chip) {
+      'neutral' => 'The white neutral wire goes on the MIDDLE terminal, the one with the ground strap.',
+      'hot1' => 'The black wire goes on the LEFT terminal.',
+      _ => 'The red wire goes on the RIGHT terminal.',
+    },
+  ),
+  ElectricalLesson(
+    id: 'cord4',
+    title: 'Dryer or range cord, 4-wire hookup',
+    blurb: 'At the back of the appliance: REMOVE the ground strap first, then black left, white (neutral) middle, red right, and the green ground wire to the frame.',
+    look: 'terminal4',
+    strict: true,
+    steps: const [
+      ..._intro,
+      'Take the metal GROUND STRAP off: tap it. On a 4-wire cord the neutral must NOT touch the frame, because the green wire grounds the frame.',
+      'Fasten the green ground wire to the GREEN frame screw where the strap was.',
+      'Fasten the white neutral to the MIDDLE terminal.',
+      'Fasten the black wire to the LEFT terminal.',
+      'Fasten the red wire to the RIGHT terminal.',
+      ..._tail,
+    ],
+    chips: const [
+      WireChoice('ground', 'Green · ground (to the frame)', _stripe, Colors.white, role: 'ground'),
+      WireChoice('neutral', 'White · neutral (middle)', _white, Color(0xFF111827), role: 'neutral'),
+      WireChoice('hot1', 'Black · hot (left)', _black, Colors.white, role: 'hot'),
+      WireChoice('hot2', 'Red · hot (right)', _red, Colors.white, role: 'hot'),
+    ],
+    hookups: const [
+      Hookup(idGreen, 'FRAME screw: GROUND (green)', {'ground'}, 'The green ground wire goes on the screw on the frame, where the strap was.', role: 'ground'),
+      Hookup(idBrassTop, 'MIDDLE terminal: NEUTRAL (white)', {'neutral'}, 'The white neutral wire goes on the middle terminal.', role: 'neutral'),
+      Hookup(idSilverTop, 'LEFT terminal: black', {'hot1'}, 'The black wire goes on the left terminal.', role: 'hot'),
+      Hookup(idBrassBottom, 'RIGHT terminal: red', {'hot2'}, 'The red wire goes on the right terminal.', role: 'hot'),
+    ],
+    solution: const {idGreen: 'ground', idBrassTop: 'neutral', idSilverTop: 'hot1', idBrassBottom: 'hot2'},
+    wrongHint: (chip, h) => switch (chip) {
+      'ground' => 'The green ground wire goes on the frame screw, where the strap was.',
+      'neutral' => 'The white neutral wire goes on the MIDDLE terminal.',
+      'hot1' => 'The black wire goes on the LEFT terminal.',
+      _ => 'The red wire goes on the RIGHT terminal.',
     },
   ),
 ];

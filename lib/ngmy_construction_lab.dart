@@ -63,6 +63,13 @@ const List<_LessonInfo> _lessons = [
   _LessonInfo('v240three', '🕰️', '3-wire 240 V outlet', 'Old dryer or range: no separate ground', Color(0xFFFB923C)),
   _LessonInfo('v240only', '❄️', '240 V only outlet', 'Window AC, welder: two hots and ground', Color(0xFF22D3EE)),
   _LessonInfo('isolated', '🏭', 'Isolated-ground outlet', 'Its own ground wire to the panel', Color(0xFF34D399)),
+  _LessonInfo('dryer4', '👕', 'Dryer outlet, 4-wire (14-30)', 'New houses: X, Y, W and a ground', Color(0xFFFB7185)),
+  _LessonInfo('dryer3', '🧦', 'Dryer outlet, 3-wire (10-30)', 'Old houses: the neutral also grounds', Color(0xFFFB923C)),
+  _LessonInfo('range4', '🍳', 'Range outlet, 4-wire (14-50)', '50 amp stove: X, Y, W and a ground', Color(0xFFF87171)),
+  _LessonInfo('range3', '🥘', 'Range outlet, 3-wire (10-50)', 'Old 50 amp stove: no separate ground', Color(0xFFFBBF24)),
+  _LessonInfo('washer', '🧺', 'Washing machine outlet (5-20)', 'Its own 20 amp circuit, near water', Color(0xFF38BDF8)),
+  _LessonInfo('cord3', '🔌', 'Dryer cord, 3-wire hookup', 'The ground strap stays on', Color(0xFFA78BFA)),
+  _LessonInfo('cord4', '⚡', 'Dryer cord, 4-wire hookup', 'Take the ground strap off', Color(0xFF34D399)),
   _LessonInfo('ptrap', '🪠', 'Sink drain (P-trap)', 'Build a drain with a water seal', Color(0xFF60A5FA)),
   _LessonInfo('faucet', '🚰', 'Faucet supply lines', 'Hot left, cold right', Color(0xFFF87171)),
   _LessonInfo('house', '🏗️', 'Build and fix a house', 'Stage by stage, then repair', Color(0xFFA78BFA)),
@@ -602,7 +609,7 @@ class _ElectricalPageState extends State<ElectricalLessonPage> {
         return [off, off, has('ground'), has('white'), has('black'), s.stage >= 1, s.stage >= 2 && s.testing];
       default:
         // The other switches and outlets: the two first steps, one step for each wire, then in the box and tested.
-        return [off, off, for (final c in lesson.chips) has(c.key), s.stage >= 1, s.stage >= 2 && s.testing];
+        return [off, off, if (lesson.id == 'cord3') s.strap, if (lesson.id == 'cord4') !s.strap, for (final c in lesson.chips) has(c.key), s.stage >= 1, s.stage >= 2 && s.testing];
     }
   }
 
@@ -613,6 +620,25 @@ class _ElectricalPageState extends State<ElectricalLessonPage> {
     }
     // The wall, the studs, the box and the cable are only the scenery: they cannot be tapped, so a tap on a wire never lands on them.
     if (const {idWall, idStud, idBox, idCable, idCableB}.contains(id)) return;
+    // The ground strap on the terminal block of a dryer or range: a 4-wire cord needs it off, a 3-wire cord needs it kept.
+    if (id == idStrap) {
+      if (s.power) {
+        conBad();
+        _say('STOP! The power is still on. Turn the breaker OFF before you touch the strap.');
+      } else if (lesson.id == 'cord3') {
+        _say('Leave the ground strap on. On a 3-wire cord it joins the neutral to the frame of the appliance. That is what grounds it.', ok: true);
+      } else if (s.stage != 0) {
+        _say('The device is already in the box. Pull it out again to change it.');
+      } else {
+        setState(() {
+          s.strap = false;
+          _rebuild();
+        });
+        conGood();
+        _say('Ground strap removed. Now the frame will be grounded by the green wire, and the neutral stays clear of it.', ok: true);
+      }
+      return;
+    }
     final hook = lesson.hookups.where((h) => h.id == id).toList();
     // A tap on a wire that is fastened takes it off the screw.
     final key = wireKeyForId(lesson.id, id);

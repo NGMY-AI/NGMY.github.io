@@ -1719,7 +1719,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     final f = inn.door;
     final key = inn.isTower ? f.id * 100 + inn.level : f.id;
     final p = _houseProjects.putIfAbsent(key, () => RoomProject(seed: f.id * 13 + 5 + inn.level, kind: 0, variants: true)..fastForward());
-    await _pushPage(MaterialPageRoute<void>(builder: (_) => NgmyRoomProjectPage(project: p)));
+    await _pushPage((_) => NgmyRoomProjectPage(project: p));
     if (!mounted) return;
     _syncFixtures(inn, p);
     if (_workReady) {
@@ -1738,7 +1738,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   /// A street light that went out: the lamp wiring lesson, then the light comes back.
   Future<void> _fixLamp(Furn f) async {
     final st = room.lampWork.putIfAbsent(f.id, () => WiringState());
-    await _pushPage(MaterialPageRoute<void>(builder: (_) => ElectricalLessonPage(id: 'light', state: st)));
+    await _pushPage((_) => ElectricalLessonPage(id: 'light', state: st));
     if (!mounted) return;
     if (st.stage >= 2 && evaluateWiring(electricalLesson('light'), st).ok) {
       room.lampWork.remove(f.id);
@@ -1778,7 +1778,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       final f = houses[_rnd.nextInt(houses.length)];
       city.darkHouses.add(f.id);
       _lastHouse = f.id;
-      _ringCall(_NCall(f, f.kind == 'bighouse' ? 'the big house' : 'the house'));
+      _ringCall(_NCall(f, f.kind == 'bighouse' ? 'the big house' : 'the house', appliance: _applianceFault()));
     }
     final lamps = [for (final f in city.furn) if ((f.kind == 'pole' || f.kind == 'lamppost') && !city.brokenLamps.contains(f.id)) f];
     if (city.brokenLamps.length < 3 && lamps.isNotEmpty && _beat % 90 == 0) {
@@ -2823,10 +2823,13 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   int _pages = 0;
   String _figSig = '';
 
-  Future<void> _pushPage(Route<void> r) async {
+  Future<void> _pushPage(WidgetBuilder build) async {
     _pages++;
+    // In full screen the city is turned on its side. The job page is turned the same way, so the screen is NOT turned back upright when a fix
+    // starts (a call came, you accepted, you tapped the red outlet). A little button on the page turns it upright or on its side again.
+    final turns = full ? _fullTurns : 0;
     try {
-      await Navigator.of(context).push(r);
+      await Navigator.of(context).push(MaterialPageRoute<void>(builder: (ctx) => turns == 0 ? build(ctx) : _TurnedPage(turns: turns, child: build(ctx))));
     } finally {
       _pages--;
     }
@@ -2884,6 +2887,18 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   /// Is something happening that should stop new work from coming in?
   bool get _isBusy => _pages > 0 || _job != null || _locked || _droneOn;
 
+  /// What is wrong in a house that rings: most calls are about a big appliance (the dryer, the range or the washing machine), the rest about the whole
+  /// house. The room that holds that appliance (the kitchen for the range, the hall laundry corner for the dryer and the washer) gets a new wiring job.
+  String _applianceFault() {
+    final a = const ['dryer', 'range', 'washer', '', 'dryer', 'range'][_rnd.nextInt(6)];
+    if (a.isNotEmpty && home.rooms.length > 9) {
+      final r = home.rooms[a == 'range' ? 9 : 5];
+      r.wiringNeeded = true;
+      r.wiring = null;
+    }
+    return a;
+  }
+
   /// A fresh job at a house that is chosen by chance, never the same one twice running. Marks the fault in the city.
   _NCall? _newJob() {
     final city = home.rooms.firstWhere((r) => !r.indoor);
@@ -2898,7 +2913,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         final f = houses[_rnd.nextInt(houses.length)];
         city.darkHouses.add(f.id);
         _lastHouse = f.id;
-        return _NCall(f, f.kind == 'bighouse' ? 'the big house' : 'the house');
+        return _NCall(f, f.kind == 'bighouse' ? 'the big house' : 'the house', appliance: _applianceFault());
       }
       if (k == 1 && cm != null && hospital.isNotEmpty) {
         final well = cm.living.where((p) => !p.sick && p.inBed < 0).toList();
@@ -3364,10 +3379,10 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     }
     if (r.lessonIsPlumbing) {
       r.lessonPlumb ??= PlumbState();
-      await _pushPage(MaterialPageRoute<void>(builder: (_) => r.lesson == 'ptrap' ? PtrapLessonPage(state: r.lessonPlumb) : FaucetLessonPage(state: r.lessonPlumb)));
+      await _pushPage((_) => r.lesson == 'ptrap' ? PtrapLessonPage(state: r.lessonPlumb) : FaucetLessonPage(state: r.lessonPlumb));
     } else {
       r.lessonState ??= WiringState();
-      await _pushPage(MaterialPageRoute<void>(builder: (_) => ElectricalLessonPage(id: r.lesson, state: r.lessonState)));
+      await _pushPage((_) => ElectricalLessonPage(id: r.lesson, state: r.lessonState));
     }
     if (!mounted) return;
     setState(_rebuild);
@@ -3387,25 +3402,29 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   Future<void> _wireExtra(int i) async {
     final e = room.extras[i];
     final was = e.done;
-    await _pushPage(MaterialPageRoute<void>(builder: (_) => ElectricalLessonPage(id: e.kind, state: e.state)));
+    await _pushPage((_) => ElectricalLessonPage(id: e.kind, state: e.state));
     if (!mounted) return;
     setState(_rebuild);
     if (e.done && !was) comm?.points += 8;
     if (e.done) _say('Wired! ${was ? '' : 'You are paid 8 stars. '}${e.kind == 'switch' ? 'Tap it to turn the light on and off.' : 'Tap it to plug something in.'}');
   }
 
+  /// For the tests: opens the wiring job of the room as if the red outlet had been tapped.
+  // ignore: unused_element
+  Future<void> openWiringForTest() => _openWiring();
+
   Future<void> _openWiring() async {
     final r = room;
     if (!r.indoor) return;
     // A finished room opens finished: you can pull a device out, change it, or wire it again.
     if (r.wiring == null) {
-      final np = RoomProject(seed: home.seed * 37 + r.id, kind: wiringKindFor(r), name: r.name)..fastForward();
+      final np = RoomProject(seed: home.seed * 37 + r.id, kind: wiringKindFor(r), name: r.kind == 'hall' ? 'Hall laundry corner' : r.name)..fastForward();
       if (!r.wiringNeeded) np.completeWiring();
       r.wiring = np;
     }
     r.wiring!.practice = home.practice;
     final wasWired = r.wired;
-    await _pushPage(MaterialPageRoute<void>(builder: (_) => NgmyRoomProjectPage(project: r.wiring)));
+    await _pushPage((_) => NgmyRoomProjectPage(project: r.wiring));
     if (!mounted) return;
     setState(_rebuild);
     if (r.wired && !wasWired) {
@@ -3427,7 +3446,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (!r.plumbNeeded && !r.plumb!.allPlaced) r.plumb!.completeAll();
     r.plumb!.practice = home.practice;
     final wasPlumbed = r.plumbed;
-    await _pushPage(MaterialPageRoute<void>(builder: (_) => NgmyPlumbJobPage(job: r.plumb)));
+    await _pushPage((_) => NgmyPlumbJobPage(job: r.plumb));
     if (!mounted) return;
     setState(_rebuild);
     if (r.plumbed && !wasPlumbed) {
@@ -3455,7 +3474,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
             const Text('It goes on the back wall, not wired yet. Tap the red one to wire it yourself.', style: TextStyle(color: Colors.white60, fontSize: 12.5)),
             const SizedBox(height: 12),
             Wrap(spacing: 8, runSpacing: 8, children: [
-              for (final (kind, label) in const [('outlet', '🔌 Outlet'), ('gfci', '🛡️ GFCI outlet'), ('switch', '💡 Light switch')])
+              for (final (kind, label) in const [('outlet', '🔌 Outlet'), ('gfci', '🛡️ GFCI outlet'), ('switch', '💡 Light switch'), ('dryer4', '👕 Dryer outlet 4-wire'), ('dryer3', '🧦 Dryer outlet 3-wire'), ('range4', '🍳 Range outlet 4-wire'), ('range3', '🥘 Range outlet 3-wire'), ('washer', '🧺 Washer outlet'), ('cord4', '⚡ Dryer cord 4-wire'), ('cord3', '🔌 Dryer cord 3-wire')])
                 GestureDetector(
                   onTap: () {
                     Navigator.pop(ctx);
@@ -4085,7 +4104,7 @@ class DroneLeg {
 }
 
 class _NCall {
-  _NCall(this.furn, this.name, {this.kind = 'power', this.who = '', this.level = 0});
+  _NCall(this.furn, this.name, {this.kind = 'power', this.who = '', this.level = 0, this.appliance = ''});
   final Furn furn;
   final String name;
 
@@ -4093,16 +4112,22 @@ class _NCall {
   final String kind;
   final String who;
 
+  /// For a house call: what is wrong with the big appliances, dryer, range or washer (empty: all the lights went out).
+  final String appliance;
+
   /// For an office call: the level of the tower that has no power.
   final int level;
 
-  String get emoji => switch (kind) { 'sick' => '🤒', 'light' => '💡', 'office' => '🏢', _ => '⚡' };
+  String get emoji => switch (kind) { 'sick' => '🤒', 'light' => '💡', 'office' => '🏢', _ => switch (appliance) { 'dryer' => '👕', 'range' => '🍳', 'washer' => '🧺', _ => '⚡' } };
   String get caller => switch (kind) { 'sick' => who.isEmpty ? 'A neighbour' : who, 'light' => 'City lights office', 'office' => 'Office manager', _ => 'Your neighbour' };
-  String get subtitle => switch (kind) { 'sick' => 'Needs a doctor', 'light' => 'A street light is out', 'office' => 'No power in an office', _ => 'No power at a house' };
+  String get subtitle => switch (kind) { 'sick' => 'Needs a doctor', 'light' => 'A street light is out', 'office' => 'No power in an office', _ => switch (appliance) { 'dryer' => 'The dryer outlet at a house', 'range' => 'The stove outlet at a house', 'washer' => 'The washer outlet at a house', _ => 'No power at a house' } };
   List<String> get lines => switch (kind) {
         'sick' => ['Hello! $caller is very sick and cannot get up.', 'Please take them to the hospital: walk into the hospital and onto the desk to admit them.', 'I will pay you between 10 and 35 stars. Thank you!'],
         'office' => ['Hello, this is the office manager. The office on level $level of $name has lost its power and nobody can work.', 'Please take the elevator up to level $level, and fix the wiring at the breaker panel there.', 'I will pay you between 10 and 35 stars. Thank you!'],
         'light' => ['Hello! A street light is out and the street is dark.', 'It is the dark one with the red sign. Could you fix its wiring?', 'I will pay you between 10 and 35 stars. Thank you!'],
+        _ when appliance == 'dryer' => ['Hello! The dryer in $name does not heat any more and the plug is hot to the touch.', 'It is on the 240 volt outlet in the hall, the laundry corner. Could you look at the dryer outlet and wire it again? Switch the power off before you touch anything, and check if it is the old 3-wire or the new 4-wire kind.', 'I will pay you between 10 and 35 stars. Thank you!'],
+        _ when appliance == 'range' => ['Hello! The electric stove in $name has stopped working and the outlet behind it smells burnt.', 'It is the 50 amp outlet in the kitchen. Could you wire the range outlet again? Switch the power off before you touch anything, and check if it is the old 3-wire or the new 4-wire kind.', 'I will pay you between 10 and 35 stars. Thank you!'],
+        _ when appliance == 'washer' => ['Hello! The washing machine in $name keeps tripping the breaker.', 'It is on its own 20 amp outlet in the laundry corner in the hall. Could you wire the washer outlet again? Switch the power off before you touch anything.', 'I will pay you between 10 and 35 stars. Thank you!'],
         _ => ['Hello! All the lights went out in $name. The power is off in the whole house.', 'Could you check the breaker panel inside and fix the wiring? Switch the power off before you touch anything.', 'I will pay you between 10 and 35 stars. Thank you!'],
       };
 }
@@ -4360,3 +4385,50 @@ List<DroneLeg> buildDroneLegs(HRoom city, String what) {
   return legs;
 }
 
+
+/// A page shown on its side (a quarter turn), like the city in full screen, with a small button that turns it upright and back.
+class _TurnedPage extends StatefulWidget {
+  const _TurnedPage({required this.turns, required this.child});
+  final int turns;
+  final Widget child;
+
+  @override
+  State<_TurnedPage> createState() => _TurnedPageState();
+}
+
+class _TurnedPageState extends State<_TurnedPage> {
+  bool straight = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    final button = Positioned(
+      right: 6,
+      top: 0,
+      bottom: 0,
+      child: Center(
+        child: GestureDetector(
+          key: const Key('turned-page-rotate'),
+          onTap: () => setState(() => straight = !straight),
+          child: Container(width: 38, height: 38, decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.55), shape: BoxShape.circle, border: Border.all(color: Colors.white38)), child: Icon(straight ? Icons.stay_current_landscape_rounded : Icons.stay_current_portrait_rounded, color: Colors.white, size: 20)),
+        ),
+      ),
+    );
+    if (straight) {
+      return Scaffold(backgroundColor: Colors.black, body: Stack(children: [Positioned.fill(child: widget.child), button]));
+    }
+    final land = Size(mq.size.height, mq.size.width);
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
+        child: RotatedBox(
+          quarterTurns: widget.turns,
+          child: MediaQuery(
+            data: mq.copyWith(size: land, padding: EdgeInsets.zero, viewPadding: EdgeInsets.zero),
+            child: SizedBox(width: land.width, height: land.height, child: Stack(children: [Positioned.fill(child: widget.child), button])),
+          ),
+        ),
+      ),
+    );
+  }
+}

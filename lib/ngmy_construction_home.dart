@@ -766,5 +766,5 @@ class HomeProject {
   int get finishedCount => indoor.where((e) => e.finished).length;
 }
 
-/// Which wiring job a room gets: bedrooms a fan, the kitchen and bathrooms water-safe GFCI outlets.
-int wiringKindFor(HRoom r) => switch (r.kind) { 'bedroom' => 1, 'kitchen' || 'bathroom' => 2, _ => 0 };
+/// Which wiring job a room gets: bedrooms a fan, bathrooms water-safe GFCI outlets, the kitchen an electric range outlet, the hall a laundry corner (washer and dryer outlets).
+int wiringKindFor(HRoom r) => switch (r.kind) { 'bedroom' => 1, 'bathroom' => 2, 'kitchen' => 4, 'hall' => 3, _ => 0 };
