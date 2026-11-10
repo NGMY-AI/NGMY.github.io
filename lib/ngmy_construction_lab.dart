@@ -237,10 +237,11 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
   Widget _section(String t, {Widget? trailing}) => Padding(
         padding: const EdgeInsets.fromLTRB(4, 22, 4, 12),
         child: Row(children: [
+          if (trailing != null) const SizedBox(width: 44),
           Expanded(child: Container(height: 1, color: kConAmber.withValues(alpha: 0.35))),
           Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Text(t, style: const TextStyle(color: kConAmber, fontWeight: FontWeight.w900, fontSize: 12.5, letterSpacing: 2))),
           Expanded(child: Container(height: 1, color: kConAmber.withValues(alpha: 0.35))),
-          if (trailing != null) ...[const SizedBox(width: 10), trailing],
+          if (trailing != null) ...[const SizedBox(width: 10), SizedBox(width: 34, child: trailing)],
         ]),
       );
 

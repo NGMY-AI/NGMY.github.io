@@ -186,14 +186,25 @@ void zoomAndSearchTests() {
       final view = t.widget<Scene3DView>(find.byType(Scene3DView).first);
       final cam = view.cam;
       final room = HomeProject.lesson(lesson).rooms.first;
-      expect(cam.maxDist, greaterThanOrEqualTo(math.max(room.w, room.d) * 1.9), reason: '$lesson: far enough back to see all of the wall');
+      bool inRoom() {
+        final cp = math.cos(cam.pitch);
+        final x = cam.target.x - cam.dist * cp * math.sin(cam.yaw), z = cam.target.z + cam.dist * cp * math.cos(cam.yaw), y = cam.target.y + cam.dist * math.sin(cam.pitch);
+        return x > -room.w / 2 && x < room.w / 2 && z > 0 && z < room.d && y > 0 && y < 130;
+      }
       for (var i = 0; i < 40; i++) {
         cam.zoomBy(1.2);
+        expect(inRoom(), isTrue, reason: "$lesson: zooming out keeps the camera in the room");
       }
-      expect(cam.dist, cam.maxDist);
-      expect(cam.dist, greaterThan(room.w), reason: 'a view of the whole wall is a distance bigger than the wall is wide');
-      cam.orbit(3.0, 0);
-      expect(cam.free || cam.yawRange > 3, isTrue, reason: 'turning right round is allowed');
+      final far = cam.dist;
+      expect(far, greaterThan(room.d * 0.5), reason: "zoomed well back");
+      for (var i = 0; i < 24; i++) {
+        cam.orbit(0.27, i.isEven ? 0.05 : -0.05);
+        expect(inRoom(), isTrue, reason: "$lesson: turning round keeps the camera in the room");
+      }
+      for (var i = 0; i < 40; i++) {
+        cam.zoomBy(0.8);
+      }
+      expect(cam.dist, cam.minDist);
       await t.pumpWidget(const SizedBox());
       await t.pump(const Duration(seconds: 10));
     }

@@ -328,6 +328,26 @@ class Cam3 extends ChangeNotifier {
   V3 target;
   double minDist = 6, maxDist = 160;
 
+  /// When set (x min, x max, z min, z max, highest y), the camera itself never leaves this box: zooming out or turning stops at the walls and the ceiling, so you stay in the room.
+  (double, double, double, double, double)? keepIn;
+  double _want = 0, _lastSet = -1;
+
+  void _fit({bool sync = true}) {
+    if (sync && dist != _lastSet) _want = dist;
+    var d = _want.clamp(minDist, maxDist).toDouble();
+    final k = keepIn;
+    if (k != null) {
+      const m = 5.0, low = 4.0;
+      final cp = math.cos(pitch);
+      final dx = -cp * math.sin(yaw), dy = math.sin(pitch), dz = cp * math.cos(yaw);
+      double lim(double c, double t, double lo, double hi) => c > 1e-6 ? (hi - t) / c : (c < -1e-6 ? (lo - t) / c : double.infinity);
+      final room = math.min(math.min(lim(dx, target.x, k.$1 + m, k.$2 - m), lim(dz, target.z, k.$3 + m, k.$4 - m)), lim(dy, target.y, low, k.$5 - m));
+      d = math.min(d, math.max(minDist, room));
+    }
+    dist = d;
+    _lastSet = d;
+  }
+
   /// When above zero nothing nearer than this is left out because it is far away (the drone flies over the whole town).
   double farExtra = 0;
 
@@ -374,6 +394,7 @@ class Cam3 extends ChangeNotifier {
     this.dist = dist;
     this.yaw = yaw;
     this.pitch = pitch;
+    _fit();
     notifyListeners();
   }
 
@@ -382,6 +403,7 @@ class Cam3 extends ChangeNotifier {
   void tick(double dt) {
     if (!gliding) return;
     final k = 1 - math.exp(-dt * 7);
+    if (_toDist != null && dist != _lastSet) _want = dist;
     if (_toTarget != null) {
       target = V3.lerp(target, _toTarget!, k);
       if ((target - _toTarget!).len < 0.02) {
@@ -410,6 +432,7 @@ class Cam3 extends ChangeNotifier {
         _toPitch = null;
       }
     }
+    _fit();
     notifyListeners();
   }
 
@@ -419,6 +442,7 @@ class Cam3 extends ChangeNotifier {
     yaw += dYaw;
     if (!free) yaw = yaw.clamp(yawCenter - yawRange, yawCenter + yawRange);
     pitch = (pitch + dPitch).clamp(minPitch, maxPitch);
+    _fit();
     notifyListeners();
   }
 
@@ -469,7 +493,9 @@ class Cam3 extends ChangeNotifier {
 
   void zoomBy(double factor) {
     _toDist = null;
-    dist = (dist * factor).clamp(minDist, maxDist);
+    if (dist != _lastSet) _want = dist;
+    _want = ((factor < 1 ? dist : math.max(_want, dist)) * factor).clamp(minDist, maxDist);
+    _fit(sync: false);
     notifyListeners();
   }
 }

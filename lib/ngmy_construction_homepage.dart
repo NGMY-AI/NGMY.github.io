@@ -197,6 +197,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       cam
         ..minDist = 20
         ..maxDist = math.max(math.max(r.w, r.d) * 2.0, 380.0)
+        ..keepIn = (-r.w / 2, r.w / 2, 0.0, r.d, HRoom.h)
         ..minPitch = -1.2
         ..maxPitch = 1.2
         ..setFree(true);
@@ -209,6 +210,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       cam
         ..minDist = 30
         ..maxDist = 2400
+        ..keepIn = null
         ..minPitch = 0.03
         ..maxPitch = 1.35
         ..setFree(true);
@@ -220,8 +222,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       yaw = 0;
       cam
         ..minDist = 6
-        // You can zoom out until the whole wall fits, even out past the front wall (the near walls are left out then, like a doll house).
+        // You can zoom out as far as the room allows, but the camera never leaves the room.
         ..maxDist = math.max(math.max(r.w, r.d) * 2.0, 380.0)
+        ..keepIn = (-r.w / 2, r.w / 2, 0.0, r.d, HRoom.h)
         ..minPitch = 0.02
         ..maxPitch = 1.35
         ..setFree(true);
@@ -233,6 +236,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       cam
         ..minDist = 6
         ..maxDist = 560
+        ..keepIn = null
         ..minPitch = 0.1
         ..maxPitch = 1.35
         ..setFree(true);
