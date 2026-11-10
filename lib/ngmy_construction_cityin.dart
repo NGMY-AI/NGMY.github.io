@@ -367,9 +367,6 @@ class CityInterior {
     if (cm != null) labels.add(Label3D(const V3(0, h - 14, 4), '⭐ ${cm.points}   🍞 ${cm.food}   💊 ${cm.medicine}${carrying != null ? '   📦 carrying' : ''}', const Color(0xFF0F172A)));
     final tv = <ScreenQuad>[];
     if (isTower) {
-      tv.add(ScreenQuad([const V3(-28, 72, 3.8), const V3(28, 72, 3.8), const V3(28, 40, 3.8), const V3(-28, 40, 3.8)], 0, (c, size, t) => paintCityAdLoop(c, size, t, door.id + level + 9), width: 720, height: 410, bias: 60, order: 2));
-    }
-    if (isTower) {
       // Big TVs on the walls of every level, playing the NGMY ads.
       b.order = 2;
       b.bias = 0;
@@ -657,10 +654,9 @@ class CityInterior {
     b.id = idCinElevator;
     // The shaft is thin and flat on the wall, so nothing of it can hide the doors; the frame is three bars round it.
     b.box(const V3(0, 42, 1.5), const V3(88, 84, 3), const Color(0xFFC9D0DA), shine: 0.3);
-    // Behind the doors is the lit inside of the car: a light strip, a handrail and a screen playing the NGMY ads, so an open door never shows a black hole.
+    // Behind the doors is the lit inside of the car: a light strip, a handrail and so an open door never shows a black hole.
     b.box(const V3(0, 80, 3.4), const V3(72, 2.4, 1.4), const Color(0xFFFFF7D6), shine: 0.2);
     b.box(const V3(0, 34, 3.6), const V3(80, 2.4, 2), const Color(0xFF94A3B8), shine: 0.7);
-    b.box(const V3(0, 56, 3.3), const V3(60, 36, 0.8), const Color(0xFF111827), shine: 0.3);
     b.box(const V3(-47, 48, 3.5), const V3(7, 96, 7), const Color(0xFF475569), shine: 0.5);
     b.box(const V3(47, 48, 3.5), const V3(7, 96, 7), const Color(0xFF475569), shine: 0.5);
     b.box(const V3(0, 93, 3.5), const V3(100, 7, 7), const Color(0xFF475569), shine: 0.5);
@@ -842,6 +838,23 @@ class CityInterior {
   }
 
   /// The person you steer, the people who work here, the patients lying in their beds, and the crate you carry.
+  /// The words on the lobby elevator doors: NGMY on the left door and ELEVATOR on the right one. They slide with the doors.
+  List<ScreenQuad> doorScreens() {
+    if (!isTower) return const [];
+    return [
+      for (final (s, word) in const [(-1.0, 'NGMY'), (1.0, 'ELEVATOR')])
+        ScreenQuad(
+          [V3(s * (22 + 22 * doorOpen) - 18, 62, 7.35), V3(s * (22 + 22 * doorOpen) + 18, 62, 7.35), V3(s * (22 + 22 * doorOpen) + 18, 48, 7.35), V3(s * (22 + 22 * doorOpen) - 18, 48, 7.35)],
+          0,
+          (c, size, t) => _paintDoorWord(c, size, word),
+          width: 540,
+          height: 210,
+          bias: 20,
+          order: 2,
+        ),
+    ];
+  }
+
   List<Poly> dynamicPolys(double t, PersonStyle style) {
     final b = MeshBuilder();
     if (isTower || isCabin) {
@@ -852,7 +865,7 @@ class CityInterior {
       if (isTower) {
         db.bias = 16;
         for (final s in const [-1.0, 1.0]) {
-          db.box(V3(s * (24 + 21 * doorOpen), 42, 6.6), const V3(42, 84, 1.2), const Color(0xFFF8FAFC), shine: 0.7);
+          db.box(V3(s * (22 + 22 * doorOpen), 42, 6.6), const V3(44, 84, 1.2), const Color(0xFFF8FAFC), shine: 0.7);
         }
       } else {
         db.bias = 16;
@@ -901,4 +914,21 @@ class CityInterior {
     }
     return b.polys;
   }
+}
+
+/// A word in dark blue on the steel of an elevator door, as big as the door allows.
+void _paintDoorWord(Canvas c, Size s, String word) {
+  c.drawRRect(RRect.fromRectAndRadius(Offset.zero & s, const Radius.circular(18)), Paint()..color = const Color(0xFFE6EAF0));
+  c.drawRRect(RRect.fromRectAndRadius(Offset(6, 6) & Size(s.width - 12, s.height - 12), const Radius.circular(14)), Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 5
+    ..color = const Color(0xFFF5C14B));
+  var size = 120.0;
+  late TextPainter tp;
+  while (true) {
+    tp = TextPainter(text: TextSpan(text: word, style: TextStyle(color: const Color(0xFF0B1F4B), fontSize: size, fontWeight: FontWeight.w900, letterSpacing: 4)), textDirection: TextDirection.ltr)..layout();
+    if (tp.width <= s.width - 50 || size < 20) break;
+    size -= 6;
+  }
+  tp.paint(c, Offset((s.width - tp.width) / 2, (s.height - tp.height) / 2));
 }

@@ -3931,7 +3931,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         messageTop: full ? 62 : (_phone ? MediaQuery.of(context).padding.top + 66 : ((showMap && !isLesson) ? 104 : 10)),
         layerOn: (l) => l <= 5,
         dynamicPolys: (_) => inner != null ? inner!.dynamicPolys(now, playerStyle) : [...homeDynamic(room, now, person: _pose(), personStyle: playerStyle, residents: _figs, mode: mode, drive: _driveNow(), carrying: _carrying != null || (_boardMaybe?.carrying ?? false), couriers: room.indoor ? const [] : [...(_boardMaybe?.figures(now) ?? const <CourierFigure>[]), ...(_uberMaybe?.figures(now) ?? const <CourierFigure>[])]), if (!room.indoor) ..._trafficPolysNow(), if (!room.indoor) ..._beacon(), ...((_job != null || _boardMaybe?.active != null || _uberMaybe?.active != null) ? _routePolys() : const <Poly>[])],
-        dynamicScreens: (_) => (inner == null && !room.indoor) ? trafficScreens(now) : const [],
+        dynamicScreens: (_) => (inner == null && !room.indoor) ? trafficScreens(now) : (inner?.doorScreens() ?? const []),
         bottom: _pad(),
         topLeft: [
           if (showMap && !isLesson && !full) _MiniMap(home: home, onTap: _go, maxWidth: math.min(138.0, screenW * 0.36)),
