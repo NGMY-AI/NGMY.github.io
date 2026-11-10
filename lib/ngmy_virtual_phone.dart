@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -20,6 +21,9 @@ Future<void> showNgmyVirtualPhone(BuildContext context) => Navigator.of(context)
 
 const String _kPrefs = 'ngmy_vphone_v1';
 
+/// How far from its first size to the full screen the phone is at each step.
+const List<double> kPhoneSizeSteps = [0.0, 0.4, 0.75, 1.0];
+
 class PhoneAppDef {
   const PhoneAppDef(this.id, this.label, this.icon, this.colors);
   final String id, label;
@@ -30,11 +34,7 @@ class PhoneAppDef {
 const List<PhoneAppDef> kPhoneApps = [
   PhoneAppDef('videos', 'Videos', Icons.play_circle_fill_rounded, [Color(0xFFEF4444), Color(0xFFF97316)]),
   PhoneAppDef('web', 'Web', Icons.public_rounded, [Color(0xFF0EA5E9), Color(0xFF6366F1)]),
-  PhoneAppDef('notes', 'Notes', Icons.sticky_note_2_rounded, [Color(0xFFFACC15), Color(0xFFF59E0B)]),
-  PhoneAppDef('calc', 'Calculator', Icons.calculate_rounded, [Color(0xFF475569), Color(0xFF1E293B)]),
-  PhoneAppDef('clock', 'Clock', Icons.access_time_filled_rounded, [Color(0xFF22C55E), Color(0xFF14B8A6)]),
   PhoneAppDef('store', 'App Store', Icons.shopping_bag_rounded, [Color(0xFF3B82F6), Color(0xFF1D4ED8)]),
-  PhoneAppDef('files', 'Files', Icons.folder_rounded, [Color(0xFFFB923C), Color(0xFFC2410C)]),
   PhoneAppDef('settings', 'Settings', Icons.settings_rounded, [Color(0xFF94A3B8), Color(0xFF64748B)]),
 ];
 
@@ -66,7 +66,6 @@ class NgmyVirtualPhoneState extends State<NgmyVirtualPhonePage> {
   int wallpaper = 0;
   double brightness = 1.0;
   String phoneName = 'My NGMY Phone';
-  final List<String> notes = [];
   final List<SavedVideo> saved = [];
   final List<SavedVideo> recent = [];
   String? banner;
@@ -75,10 +74,16 @@ class NgmyVirtualPhoneState extends State<NgmyVirtualPhonePage> {
   bool loaded = false;
   final PhoneData data = PhoneData();
 
+  /// The app that is open has a dark page (the Videos app and the NGMY apps).
+  bool get darkApp => app == 'videos' || (app != null && kNgmyApps.any((a) => a.def.id == app));
+
   /// The video that the wall of phones is playing (null: just this one phone), and the last video, so coming back to one phone plays it here.
   VPhoneLink? wallLink;
   VPhoneLink lastLink = VPhoneLink.none;
   int wallRun = 0;
+
+  /// How big the phone is: 0 as it first is, then bigger each time its top is double-tapped, 3 is the full screen.
+  int sizeLevel = 0;
 
   void startWall(VPhoneLink l) => setState(() {
         lastLink = l;
@@ -89,7 +94,7 @@ class NgmyVirtualPhoneState extends State<NgmyVirtualPhonePage> {
   void endWall() => setState(() => wallLink = null);
 
   /// The built-in apps and the ones installed from the App Store.
-  List<PhoneAppDef> get allApps => [...kPhoneApps, for (final a in kStoreApps) if (data.isInstalled(a.def.id)) a.def];
+  List<PhoneAppDef> get allApps => [...kPhoneApps, for (final a in kNgmyApps) if (data.isInstalled(a.def.id)) a.def];
 
   void saveData() => _save();
 
@@ -129,9 +134,6 @@ class NgmyVirtualPhoneState extends State<NgmyVirtualPhonePage> {
         brightness = ((m['bright'] as num?)?.toDouble() ?? 1.0).clamp(0.3, 1.0);
         phoneName = (m['name'] as String?) ?? phoneName;
         data.load((m['data'] as Map?)?.cast<String, dynamic>());
-        notes
-          ..clear()
-          ..addAll(((m['notes'] as List?) ?? const []).map((e) => '$e'));
         SavedVideo v(dynamic e) => SavedVideo('${(e as Map)['u']}', '${e['t']}');
         saved
           ..clear()
@@ -147,7 +149,7 @@ class NgmyVirtualPhoneState extends State<NgmyVirtualPhonePage> {
   Future<void> _save() async {
     try {
       final p = await SharedPreferences.getInstance();
-      await p.setString(_kPrefs, jsonEncode({'wall': wallpaper, 'bright': brightness, 'name': phoneName, 'notes': notes, 'saved': [for (final s in saved) s.toJson()], 'recent': [for (final s in recent) s.toJson()], 'data': data.toJson()}));
+      await p.setString(_kPrefs, jsonEncode({'wall': wallpaper, 'bright': brightness, 'name': phoneName, 'saved': [for (final s in saved) s.toJson()], 'recent': [for (final s in recent) s.toJson()], 'data': data.toJson()}));
     } catch (_) {}
   }
 
@@ -196,14 +198,6 @@ class NgmyVirtualPhoneState extends State<NgmyVirtualPhonePage> {
     _save();
   }
 
-  void setNotes(List<String> n) {
-    setState(() {
-      notes
-        ..clear()
-        ..addAll(n);
-    });
-    _save();
-  }
 
   void setWallpaper(int i) {
     setState(() => wallpaper = i);
@@ -222,7 +216,6 @@ class NgmyVirtualPhoneState extends State<NgmyVirtualPhonePage> {
 
   Future<void> resetPhone() async {
     setState(() {
-      notes.clear();
       saved.clear();
       recent.clear();
       wallpaper = 0;
@@ -237,53 +230,76 @@ class NgmyVirtualPhoneState extends State<NgmyVirtualPhonePage> {
 
   @override
   Widget build(BuildContext context) {
+    final full = sizeLevel == 3 && wallLink == null;
     return Scaffold(
       backgroundColor: const Color(0xFF0B1020),
       body: SafeArea(
+        top: !full,
+        bottom: !full,
         child: Column(children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(6, 4, 14, 0),
-            child: Row(children: [
-              IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(Icons.arrow_back_rounded, color: Colors.white)),
-              const Icon(Icons.smartphone_rounded, color: Color(0xFF38BDF8)),
-              const SizedBox(width: 8),
-              const Text('Phone', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-              const SizedBox(width: 10),
-              Expanded(child: Text(wallLink != null ? '100 phones, four at a time' : 'A phone of its own, inside NGMY', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12.5))),
-            ]),
-          ),
+          if (!full)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(6, 4, 14, 0),
+              child: Row(children: [
+                IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(Icons.arrow_back_rounded, color: Colors.white)),
+                const Icon(Icons.smartphone_rounded, color: Color(0xFF38BDF8)),
+                const SizedBox(width: 8),
+                const Text('Phone', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                const SizedBox(width: 10),
+                Expanded(child: Text(wallLink != null ? '100 phones, four at a time' : 'Double-tap the top of the phone to make it bigger', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12.5))),
+              ]),
+            ),
           Expanded(
-            child: wallLink != null ? NgmyPhoneWallView(key: ValueKey('wall$wallRun'), link: wallLink!, onOneDevice: endWall) : LayoutBuilder(builder: (context, c) {
-              final h = (c.maxHeight - 16).clamp(300.0, 900.0);
-              final w = (h * 9 / 19).clamp(180.0, c.maxWidth - 16);
-              final height = w * 19 / 9 > c.maxHeight - 8 ? c.maxHeight - 8 : w * 19 / 9;
-              return Center(child: SizedBox(width: w, height: height, child: _device(w)));
-            }),
+            child: wallLink != null
+                ? NgmyPhoneWallView(key: ValueKey('wall$wallRun'), link: wallLink!, onOneDevice: endWall)
+                : LayoutBuilder(builder: (context, c) {
+                    // The phone as it is, then bigger each time the top of it is double-tapped, until it fills the whole screen.
+                    final h0 = (c.maxHeight - 16).clamp(300.0, 900.0);
+                    final w0 = (h0 * 9 / 19).clamp(180.0, c.maxWidth - 16);
+                    final baseH = w0 * 19 / 9 > c.maxHeight - 8 ? c.maxHeight - 8 : w0 * 19 / 9;
+                    final f = kPhoneSizeSteps[sizeLevel];
+                    final w = w0 + (c.maxWidth - w0) * f, height = baseH + (c.maxHeight - baseH) * f;
+                    return Center(
+                      child: AnimatedContainer(
+                        key: const Key('vphone-device'),
+                        duration: const Duration(milliseconds: 260),
+                        curve: Curves.easeOutCubic,
+                        width: w,
+                        height: height,
+                        child: _device(math.min(w, height * 9 / 19), full: sizeLevel == 3),
+                      ),
+                    );
+                  }),
           ),
         ]),
       ),
     );
   }
 
+  /// Double-tap on the top of the phone (the black bar with the camera): the phone gets bigger, step by step, up to the full screen, then back to its first size.
+  void growPhone() => setState(() => sizeLevel = (sizeLevel + 1) % kPhoneSizeSteps.length);
+
   // ── The device ──
 
-  Widget _device(double w) {
-    final bezel = w * 0.035;
+  Widget _device(double w, {bool full = false}) {
+    final bezel = full ? 0.0 : w * 0.035;
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF0A0A0C),
-        borderRadius: BorderRadius.circular(w * 0.16),
-        border: Border.all(color: const Color(0xFF3B3F4A), width: 2.5),
+        borderRadius: BorderRadius.circular(full ? 0 : w * 0.16),
+        border: full ? null : Border.all(color: const Color(0xFF3B3F4A), width: 2.5),
         boxShadow: [BoxShadow(color: const Color(0xFF38BDF8).withValues(alpha: 0.18), blurRadius: 40, spreadRadius: 2)],
       ),
       padding: EdgeInsets.all(bezel),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(w * 0.13),
+        borderRadius: BorderRadius.circular(full ? 0 : w * 0.13),
         child: Stack(fit: StackFit.expand, children: [
           _wallpaperLayer(),
           Positioned.fill(top: w * 0.13, bottom: w * 0.08, child: _screen()),
           Positioned(top: 0, left: 0, right: 0, child: _statusBar(w)),
           Positioned(top: w * 0.028, left: 0, right: 0, child: Center(child: Container(width: w * 0.24, height: w * 0.07, decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(w * 0.04))))),
+          // Double-tap the top (the black bar with the camera) to make the phone bigger.
+          Positioned(top: 0, left: 0, right: 0, height: w * 0.17, child: GestureDetector(key: const Key('vphone-top'), behavior: HitTestBehavior.opaque, onDoubleTap: growPhone, child: const SizedBox.expand())),
           if (banner != null) Positioned(top: w * 0.11, left: 12, right: 12, child: _bannerView()),
           Positioned(left: 0, right: 0, bottom: 0, height: w * 0.08, child: _homeBar()),
           IgnorePointer(child: ColoredBox(color: Colors.black.withValues(alpha: (1 - brightness) * 0.8))),
@@ -293,14 +309,14 @@ class NgmyVirtualPhoneState extends State<NgmyVirtualPhonePage> {
   }
 
   Widget _wallpaperLayer() {
-    if (!locked && app != null) return ColoredBox(color: app == 'calc' ? Colors.black : (app == 'videos' || app == 'music' ? const Color(0xFF0B0B0F) : const Color(0xFFF8FAFC)));
+    if (!locked && app != null) return ColoredBox(color: darkApp ? const Color(0xFF0B0B0F) : const Color(0xFFF8FAFC));
     final c = kPhoneWallpapers[wallpaper];
     return Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: c)));
   }
 
   Widget _statusBar(double w) {
     final hh = now.hour.toString().padLeft(2, '0'), mm = now.minute.toString().padLeft(2, '0');
-    final dark = app != null && app != 'videos' && app != 'calc' && app != 'music';
+    final dark = app != null && !darkApp;
     final col = dark ? Colors.black87 : Colors.white;
     final fs = (w * 0.04).clamp(10.0, 15.0);
     return Padding(
@@ -334,7 +350,7 @@ class NgmyVirtualPhoneState extends State<NgmyVirtualPhonePage> {
           if ((d.primaryVelocity ?? 0) < -200) goHome();
         },
         child: Center(
-          child: Container(width: 110, height: 5, decoration: BoxDecoration(color: (app != null && app != 'videos' && app != 'calc' && app != 'music') ? Colors.black54 : Colors.white70, borderRadius: BorderRadius.circular(3))),
+          child: Container(width: 110, height: 5, decoration: BoxDecoration(color: (app != null && !darkApp) ? Colors.black54 : Colors.white70, borderRadius: BorderRadius.circular(3))),
         ),
       );
 
@@ -344,9 +360,6 @@ class NgmyVirtualPhoneState extends State<NgmyVirtualPhonePage> {
     final Widget content = switch (app) {
       'videos' => _VideosApp(phone: this),
       'web' => _WebApp(phone: this),
-      'notes' => _NotesApp(phone: this),
-      'calc' => const _CalcApp(),
-      'clock' => _ClockApp(phone: this),
       'settings' => _SettingsApp(phone: this),
       _ => (app == null ? null : buildExtraApp(app!, this)) ?? _homeScreen(),
     };
@@ -390,7 +403,7 @@ class NgmyVirtualPhoneState extends State<NgmyVirtualPhonePage> {
         child: Row(children: [
           Text('$hh:$mm', style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w300)),
           const SizedBox(width: 14),
-          Expanded(child: Text('$phoneName\n${saved.length} saved videos · ${notes.length} notes', style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.35))),
+          Expanded(child: Text('$phoneName\n${saved.length} saved videos · ${data.installed.length} apps', style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.35))),
         ]),
       ),
       const SizedBox(height: 22),
@@ -660,280 +673,6 @@ class _WebAppState extends State<_WebApp> {
   }
 }
 
-// ── Notes ──────────────────────────────────────────────────────────────────
-
-class _NotesApp extends StatefulWidget {
-  const _NotesApp({required this.phone});
-  final NgmyVirtualPhoneState phone;
-
-  @override
-  State<_NotesApp> createState() => _NotesAppState();
-}
-
-class _NotesAppState extends State<_NotesApp> {
-  final _text = TextEditingController();
-
-  @override
-  void dispose() {
-    _text.dispose();
-    super.dispose();
-  }
-
-  void _add() {
-    final s = _text.text.trim();
-    if (s.isEmpty) return;
-    widget.phone.setNotes([s, ...widget.phone.notes]);
-    _text.clear();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final notes = widget.phone.notes;
-    return _AppPage(
-      title: 'Notes',
-      child: Column(children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Row(children: [
-            Expanded(child: TextField(key: const Key('vphone-note-field'), controller: _text, minLines: 1, maxLines: 3, decoration: InputDecoration(hintText: 'Write a note', filled: true, fillColor: const Color(0xFFFEF9C3), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none)))),
-            IconButton(key: const Key('vphone-note-add'), onPressed: _add, icon: const Icon(Icons.add_circle_rounded, color: Color(0xFFF59E0B), size: 32)),
-          ]),
-        ),
-        Expanded(
-          child: notes.isEmpty
-              ? const Center(child: Text('No notes yet', style: TextStyle(color: Colors.black45)))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: notes.length,
-                  itemBuilder: (_, i) => Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
-                    decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(14)),
-                    child: Row(children: [
-                      Expanded(child: Text(notes[i], style: const TextStyle(color: Color(0xFF422006), fontSize: 14, height: 1.35))),
-                      IconButton(onPressed: () => widget.phone.setNotes([...notes]..removeAt(i)), icon: const Icon(Icons.close_rounded, size: 18, color: Colors.black45)),
-                    ]),
-                  ),
-                ),
-        ),
-      ]),
-    );
-  }
-}
-
-// ── Calculator ─────────────────────────────────────────────────────────────
-
-/// The working of the calculator, apart from the buttons, so it can be tested.
-class PhoneCalc {
-  String shown = '0';
-  double? _acc;
-  String? _op;
-  bool _fresh = true;
-
-  static String _fmt(double v) {
-    if (v.isNaN || v.isInfinite) return 'Error';
-    if (v == v.roundToDouble() && v.abs() < 1e12) return v.round().toString();
-    var s = v.toStringAsPrecision(10);
-    if (s.contains('.') && !s.contains('e')) s = s.replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
-    return s;
-  }
-
-  double get _cur => double.tryParse(shown) ?? 0;
-
-  double _apply(double a, String op, double b) => switch (op) {
-        '+' => a + b,
-        '−' => a - b,
-        '×' => a * b,
-        '÷' => b == 0 ? double.nan : a / b,
-        _ => b,
-      };
-
-  void press(String k) {
-    if (shown == 'Error' && k != 'C') return;
-    if (RegExp(r'^[0-9]$').hasMatch(k)) {
-      shown = _fresh || shown == '0' ? k : (shown.length < 14 ? shown + k : shown);
-      _fresh = false;
-    } else if (k == '.') {
-      if (_fresh) {
-        shown = '0.';
-        _fresh = false;
-      } else if (!shown.contains('.')) {
-        shown += '.';
-      }
-    } else if (k == 'C') {
-      shown = '0';
-      _acc = null;
-      _op = null;
-      _fresh = true;
-    } else if (k == '±') {
-      if (shown != '0') shown = shown.startsWith('-') ? shown.substring(1) : '-$shown';
-    } else if (k == '%') {
-      shown = _fmt(_cur / 100);
-      _fresh = true;
-    } else if (k == '=') {
-      if (_op != null && _acc != null) {
-        shown = _fmt(_apply(_acc!, _op!, _cur));
-        _acc = null;
-        _op = null;
-        _fresh = true;
-      }
-    } else {
-      if (_op != null && _acc != null && !_fresh) {
-        final r = _apply(_acc!, _op!, _cur);
-        shown = _fmt(r);
-        _acc = r;
-      } else {
-        _acc = _cur;
-      }
-      _op = k;
-      _fresh = true;
-    }
-  }
-}
-
-class _CalcApp extends StatefulWidget {
-  const _CalcApp();
-
-  @override
-  State<_CalcApp> createState() => _CalcAppState();
-}
-
-class _CalcAppState extends State<_CalcApp> {
-  final calc = PhoneCalc();
-
-  @override
-  Widget build(BuildContext context) {
-    const rows = [
-      ['C', '±', '%', '÷'],
-      ['7', '8', '9', '×'],
-      ['4', '5', '6', '−'],
-      ['1', '2', '3', '+'],
-      ['0', '.', '='],
-    ];
-    return Container(
-      color: Colors.black,
-      padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-      child: Column(children: [
-        Expanded(child: Align(alignment: Alignment.bottomRight, child: Padding(padding: const EdgeInsets.all(10), child: FittedBox(child: Text(calc.shown, key: const Key('vphone-calc-display'), style: const TextStyle(color: Colors.white, fontSize: 60, fontWeight: FontWeight.w300)))))),
-        for (final r in rows)
-          Expanded(
-            child: Row(children: [
-              for (final k in r)
-                Expanded(
-                  flex: k == '0' ? 2 : 1,
-                  child: Padding(
-                    padding: const EdgeInsets.all(3),
-                    child: Material(
-                      color: '÷×−+='.contains(k) ? const Color(0xFFF59E0B) : (k == 'C' || k == '±' || k == '%' ? const Color(0xFF64748B) : const Color(0xFF27272A)),
-                      shape: const StadiumBorder(),
-                      child: InkWell(key: Key('vphone-calc-$k'), customBorder: const StadiumBorder(), onTap: () => setState(() => calc.press(k)), child: Center(child: Text(k, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w500)))),
-                    ),
-                  ),
-                ),
-            ]),
-          ),
-      ]),
-    );
-  }
-}
-
-// ── Clock ──────────────────────────────────────────────────────────────────
-
-class _ClockApp extends StatefulWidget {
-  const _ClockApp({required this.phone});
-  final NgmyVirtualPhoneState phone;
-
-  @override
-  State<_ClockApp> createState() => _ClockAppState();
-}
-
-class _ClockAppState extends State<_ClockApp> {
-  final _sw = Stopwatch();
-  Timer? _t;
-  int _timerLeft = 0;
-  bool _timerOn = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _t = Timer.periodic(const Duration(milliseconds: 100), (_) {
-      if (!mounted) return;
-      setState(() {});
-    });
-  }
-
-  @override
-  void dispose() {
-    _t?.cancel();
-    super.dispose();
-  }
-
-  String _two(int n) => n.toString().padLeft(2, '0');
-
-  void _timerTick() {
-    if (!_timerOn) return;
-    Future.delayed(const Duration(seconds: 1), () {
-      if (!mounted || !_timerOn) return;
-      setState(() {
-        _timerLeft--;
-        if (_timerLeft <= 0) {
-          _timerLeft = 0;
-          _timerOn = false;
-          widget.phone.showBanner('Timer finished');
-        }
-      });
-      _timerTick();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final n = widget.phone.now;
-    final ms = _sw.elapsedMilliseconds;
-    final sw = '${_two(ms ~/ 60000)}:${_two(ms ~/ 1000 % 60)}.${(ms ~/ 100 % 10)}';
-    return _AppPage(
-      title: 'Clock',
-      child: ListView(padding: const EdgeInsets.all(16), children: [
-        Center(child: Text('${_two(n.hour)}:${_two(n.minute)}:${_two(n.second)}', style: const TextStyle(fontSize: 54, fontWeight: FontWeight.w200))),
-        const SizedBox(height: 18),
-        _card('Stopwatch', Text(sw, key: const Key('vphone-stopwatch'), style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w300)), [
-          FilledButton(key: const Key('vphone-sw-toggle'), onPressed: () => setState(() => _sw.isRunning ? _sw.stop() : _sw.start()), child: Text(_sw.isRunning ? 'Stop' : 'Start')),
-          OutlinedButton(onPressed: () => setState(() => _sw..stop()..reset()), child: const Text('Reset')),
-        ]),
-        const SizedBox(height: 14),
-        _card('Timer', Text('${_two(_timerLeft ~/ 60)}:${_two(_timerLeft % 60)}', key: const Key('vphone-timer'), style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w300)), [
-          OutlinedButton(onPressed: _timerOn ? null : () => setState(() => _timerLeft += 60), child: const Text('+1 min')),
-          FilledButton(
-            key: const Key('vphone-timer-toggle'),
-            onPressed: _timerLeft == 0 && !_timerOn
-                ? null
-                : () {
-                    setState(() => _timerOn = !_timerOn);
-                    _timerTick();
-                  },
-            child: Text(_timerOn ? 'Pause' : 'Start'),
-          ),
-          OutlinedButton(onPressed: () => setState(() {
-                _timerOn = false;
-                _timerLeft = 0;
-              }), child: const Text('Clear')),
-        ]),
-      ]),
-    );
-  }
-
-  Widget _card(String title, Widget body, List<Widget> buttons) => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)]),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.black54)),
-          body,
-          const SizedBox(height: 8),
-          Wrap(spacing: 8, children: buttons),
-        ]),
-      );
-}
-
 // ── Settings ───────────────────────────────────────────────────────────────
 
 class _SettingsApp extends StatefulWidget {
@@ -959,8 +698,6 @@ class _SettingsAppState extends State<_SettingsApp> {
     return _AppPage(
       title: 'Settings',
       child: ListView(padding: const EdgeInsets.all(16), children: [
-        PhoneIdentitySection(phone: p),
-        const SizedBox(height: 18),
         const Text('Phone name', style: TextStyle(fontWeight: FontWeight.w800)),
         const SizedBox(height: 6),
         TextField(controller: _name, onChanged: p.setName, decoration: InputDecoration(filled: true, fillColor: const Color(0xFFE2E8F0), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none))),
@@ -982,6 +719,9 @@ class _SettingsAppState extends State<_SettingsApp> {
         const SizedBox(height: 18),
         const Text('Brightness', style: TextStyle(fontWeight: FontWeight.w800)),
         Slider(min: 0.3, max: 1.0, value: p.brightness, onChanged: (v) => setState(() => p.setBrightness(v))),
+        const SizedBox(height: 8),
+        PhoneIdentitySection(phone: p),
+        const SizedBox(height: 18),
         const SizedBox(height: 10),
         ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.lock_outline_rounded), title: const Text('Lock the phone'), onTap: p.lock),
         ListTile(
@@ -989,7 +729,7 @@ class _SettingsAppState extends State<_SettingsApp> {
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.restart_alt_rounded, color: Colors.red),
           title: const Text('Reset this phone', style: TextStyle(color: Colors.red)),
-          subtitle: const Text('Clears its notes, saved videos and settings. Your real phone is not touched.'),
+          subtitle: const Text('Clears its saved videos, apps and settings. Your real phone is not touched.'),
           onTap: p.resetPhone,
         ),
       ]),

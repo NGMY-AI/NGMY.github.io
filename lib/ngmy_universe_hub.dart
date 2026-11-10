@@ -76,7 +76,7 @@ class _NgmyUniverseHubState extends State<NgmyUniverseHub> {
                 onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => t.build())),
                 child: Container(
                   width: w,
-                  height: w * 1.15,
+                  height: math.max(w * 1.15, 140.0),
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: t.color.withValues(alpha: 0.5)), gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [t.color.withValues(alpha: 0.28), const Color(0xFF0B0D14)])),
                   child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [

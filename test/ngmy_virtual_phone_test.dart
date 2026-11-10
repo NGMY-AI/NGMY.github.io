@@ -1,14 +1,16 @@
+import 'package:flutter/rendering.dart';
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_virtual_phone.dart';
-import 'package:ngmy/ngmy_vphone_link.dart';
 import 'package:ngmy/ngmy_vphone_extra.dart';
+import 'package:ngmy/ngmy_vphone_link.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-Future<NgmyVirtualPhoneState> open(WidgetTester t) async {
+Future<NgmyVirtualPhoneState> open(WidgetTester t, {Size size = const Size(1000, 2000)}) async {
   SharedPreferences.setMockInitialValues({});
-  t.view.physicalSize = const Size(1000, 2000);
+  t.view.physicalSize = size;
   t.view.devicePixelRatio = 2.0;
   addTearDown(t.view.reset);
   await t.pumpWidget(const MaterialApp(home: NgmyVirtualPhonePage()));
@@ -18,11 +20,11 @@ Future<NgmyVirtualPhoneState> open(WidgetTester t) async {
 }
 
 void main() {
-  phoneExtraTests();
   test('every kind of video link is understood', () {
     final yt = parseVideoLink('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
     expect(yt.kind, VPhoneLinkKind.youtube);
     expect(yt.embed, contains('youtube-nocookie.com/embed/dQw4w9WgXcQ'));
+    expect(yt.embed, isNot(contains('enablejsapi')), reason: 'the plain player starts at once, with nothing extra asked of it');
     expect(parseVideoLink('https://youtu.be/dQw4w9WgXcQ?t=42').embed, contains('start=42'));
     expect(parseVideoLink('youtube.com/shorts/abcDEF12345').kind, VPhoneLinkKind.youtube);
     expect(parseVideoLink('https://www.youtube.com/embed/dQw4w9WgXcQ').kind, VPhoneLinkKind.youtube);
@@ -40,56 +42,39 @@ void main() {
     }
   });
 
-  test('the calculator works', () {
-    final c = PhoneCalc();
-    for (final k in ['1', '2', '+', '3', '=']) {
-      c.press(k);
-    }
-    expect(c.shown, '15');
-    c.press('×');
-    c.press('2');
-    c.press('=');
-    expect(c.shown, '30');
-    c.press('C');
-    for (final k in ['7', '÷', '0', '=']) {
-      c.press(k);
-    }
-    expect(c.shown, 'Error');
-    c.press('C');
-    for (final k in ['1', '÷', '4', '=']) {
-      c.press(k);
-    }
-    expect(c.shown, '0.25');
-    c.press('C');
-    for (final k in ['9', '−', '2', '×', '3', '=']) {
-      c.press(k);
-    }
-    expect(c.shown, '21', reason: 'it works left to right like a phone calculator');
-    c.press('±');
-    expect(c.shown, '-21');
-    c.press('%');
-    expect(c.shown, '-0.21');
+  test('every phone is its own: its own device ID, number, place and apps, kept apart from any other', () {
+    final a = PhoneData(), b = PhoneData();
+    expect(a.deviceId, isNot(b.deviceId));
+    expect(a.number, isNot(b.number));
+    expect(a.number, startsWith('+1 555 01'));
+    a.installed.add('title');
+    a.city = 5;
+    expect(b.installed, isEmpty);
+    expect(b.city, 0);
+    final c = PhoneData()..load(jsonDecode(jsonEncode(a.toJson())) as Map<String, dynamic>);
+    expect(c.deviceId, a.deviceId);
+    expect(c.installed, {'title'});
+    expect(c.where.name, kPhoneCities[5].name);
+    c.reset();
+    expect(c.deviceId, isNot(a.deviceId), reason: 'a reset phone is a new phone');
+    expect(c.installed, isEmpty);
   });
 
-  testWidgets('the phone starts locked, unlocks, shows its apps, and goes home', (t) async {
+  testWidgets('the phone has only Videos, Web, the App Store and Settings of its own: no notes, calculator, clock or files', (t) async {
     final p = await open(t);
-    expect(find.byKey(const Key('vphone-lock')), findsOneWidget);
-    expect(p.locked, isTrue);
+    expect([for (final a in kPhoneApps) a.id], ['videos', 'web', 'store', 'settings']);
     await t.tap(find.byKey(const Key('vphone-lock')));
     await t.pump(const Duration(milliseconds: 400));
     expect(p.locked, isFalse);
-    for (final a in kPhoneApps) {
-      expect(find.byKey(Key('vphone-app-${a.id}')), findsOneWidget, reason: a.label);
+    for (final id in ['videos', 'web', 'store', 'settings']) {
+      expect(find.byKey(Key('vphone-app-$id')), findsOneWidget, reason: id);
     }
-    await t.tap(find.byKey(const Key('vphone-app-calc')));
+    for (final id in ['notes', 'calc', 'clock', 'files', 'contacts', 'messages']) {
+      expect(find.byKey(Key('vphone-app-$id')), findsNothing, reason: id);
+    }
+    await t.tap(find.byKey(const Key('vphone-app-web')));
     await t.pump(const Duration(milliseconds: 400));
-    expect(p.app, 'calc');
-    await t.tap(find.byKey(const Key('vphone-calc-7')));
-    await t.tap(find.byKey(const Key('vphone-calc-×')));
-    await t.tap(find.byKey(const Key('vphone-calc-6')));
-    await t.tap(find.byKey(const Key('vphone-calc-=')));
-    await t.pump();
-    expect(find.text('42'), findsOneWidget);
+    expect(p.app, 'web');
     await t.tap(find.byKey(const Key('vphone-home-bar')));
     await t.pump(const Duration(milliseconds: 400));
     expect(p.app, isNull);
@@ -106,6 +91,7 @@ void main() {
     await t.enterText(find.byKey(const Key('vphone-link-field')), 'https://youtu.be/dQw4w9WgXcQ');
     await t.tap(find.byKey(const Key('vphone-play')));
     await t.pump(const Duration(milliseconds: 700));
+    expect(p.wallLink, isNotNull, reason: 'a video opens the four phones');
     await t.tap(find.byKey(const Key('wall-one')));
     await t.pump(const Duration(milliseconds: 800));
     expect(p.wallLink, isNull);
@@ -118,7 +104,6 @@ void main() {
     expect(p.saved.length, 1);
     expect(find.text('Saved to Videos'), findsOneWidget);
     await t.pump(const Duration(seconds: 4));
-    // A new phone window reads what was saved.
     await t.pumpWidget(const SizedBox());
     await t.pumpWidget(const MaterialApp(home: NgmyVirtualPhonePage()));
     await t.pump(const Duration(milliseconds: 400));
@@ -127,154 +112,99 @@ void main() {
     await t.pump(const Duration(seconds: 1));
   });
 
-  testWidgets('Notes are kept, wallpaper can be changed, and Reset wipes only the virtual phone', (t) async {
+  testWidgets('Settings: wallpaper and place can be changed, and Reset wipes only the virtual phone', (t) async {
     final p = await open(t);
-    p.openApp('notes');
-    await t.pump(const Duration(milliseconds: 400));
-    await t.enterText(find.byKey(const Key('vphone-note-field')), 'Buy bread');
-    await t.tap(find.byKey(const Key('vphone-note-add')));
-    await t.pump();
-    expect(p.notes, ['Buy bread']);
-    expect(find.text('Buy bread'), findsOneWidget);
+    p.data.installed.add('title');
     p.openApp('settings');
     await t.pump(const Duration(milliseconds: 400));
-    await t.dragUntilVisible(find.byKey(const Key('vphone-wall-3')), find.byType(ListView).last, const Offset(0, -150));
     await t.tap(find.byKey(const Key('vphone-wall-3')));
     await t.pump();
     expect(p.wallpaper, 3);
+    await t.dragUntilVisible(find.byKey(const Key('vphone-city')), find.byType(ListView).last, const Offset(0, -150));
+    expect(find.text(p.data.deviceId), findsOneWidget);
+    (t.widget(find.byKey(const Key('vphone-city'))) as DropdownButtonFormField<int>).onChanged!(13);
+    await t.pump(const Duration(milliseconds: 300));
+    expect(p.data.where.name, 'Tokyo');
     await t.dragUntilVisible(find.byKey(const Key('vphone-reset')), find.byType(ListView).last, const Offset(0, -150));
+    await t.ensureVisible(find.byKey(const Key('vphone-reset')));
     await t.tap(find.byKey(const Key('vphone-reset')));
     await t.pump(const Duration(milliseconds: 400));
-    expect(p.notes, isEmpty);
+    expect(p.data.installed, isEmpty);
     expect(p.wallpaper, 0);
     expect(p.locked, isTrue);
   });
 
-  testWidgets('Clock: the stopwatch runs', (t) async {
-    final p = await open(t);
-    p.openApp('clock');
-    await t.pump(const Duration(milliseconds: 400));
-    await t.tap(find.byKey(const Key('vphone-sw-toggle')));
-    await t.pump(const Duration(milliseconds: 1500));
-    final txt = (t.widget(find.byKey(const Key('vphone-stopwatch'))) as Text).data!;
-    expect(txt, isNotEmpty);
-    await t.tap(find.byKey(const Key('vphone-sw-toggle')));
-    await t.pump(const Duration(milliseconds: 200));
-  });
-}
-
-void phoneExtraTests() {
-  test('every phone is its own: its own device ID, number, place, apps and files, kept apart from any other', () {
-    final a = PhoneData(), b = PhoneData();
-    expect(a.deviceId, isNot(b.deviceId));
-    expect(a.number, isNot(b.number));
-    expect(a.number, startsWith('+1 555 01'));
-    a.installed.add('maps');
-    a.city = 5;
-    a.files.add(PhoneFile('x.txt', 'text/plain', base64Encode([1, 2, 3]), 3, DateTime(2026, 1, 1)));
-    a.contacts.add(PhoneContact('Ama', '+255 700 000 000'));
-    expect(b.installed, isEmpty);
-    expect(b.files, isEmpty);
-    expect(b.city, 0);
-    // What one phone keeps can be read back by the same phone only.
-    final c = PhoneData()..load(jsonDecode(jsonEncode(a.toJson())) as Map<String, dynamic>);
-    expect(c.deviceId, a.deviceId);
-    expect(c.installed, {'maps'});
-    expect(c.where.name, kPhoneCities[5].name);
-    expect(c.files.single.bytes, [1, 2, 3]);
-    expect(c.contacts.single.name, 'Ama');
-    c.reset();
-    expect(c.deviceId, isNot(a.deviceId), reason: 'a reset phone is a new phone');
-    expect(c.files, isEmpty);
-  });
-
-  test('noughts and crosses: the phone blocks and wins, and a full board is a draw', () {
-    final g = TicTacToe();
-    g.play(0);
-    expect(g.cells[4], 'O');
-    g.play(1);
-    expect(g.cells[2], 'O', reason: 'it blocked 0-1-2');
-    g.play(3);
-    expect(g.cells[6], 'O', reason: 'it blocked 0-3-6');
-    expect(g.winner == null || g.winner == 'O', isTrue);
-    for (var i = 0; i < 9 && !g.over; i++) {
-      g.play(i);
-    }
-    expect(g.over, isTrue);
-    expect(g.winner, isNot('X'), reason: 'the phone never loses this way');
-  });
-
-  testWidgets('App Store: Get installs an app on the home screen, it is kept, and Remove takes it away', (t) async {
+  testWidgets('the App Store has NGMY apps: Get puts one on the home screen, it opens inside the phone, and Remove takes it away', (t) async {
     final p = await open(t);
     p.unlock();
     await t.pump(const Duration(milliseconds: 300));
-    expect(find.byKey(const Key('vphone-app-maps')), findsNothing);
+    expect(find.byKey(const Key('vphone-app-title')), findsNothing);
     p.openApp('store');
     await t.pump(const Duration(milliseconds: 400));
-    await t.tap(find.byKey(const Key('vphone-get-maps')));
+    expect(find.text('Title Animator'), findsOneWidget);
+    await t.tap(find.byKey(const Key('vphone-get-title')));
     await t.pump(const Duration(seconds: 3));
-    expect(p.data.isInstalled('maps'), isTrue);
-    expect(find.byKey(const Key('vphone-open-maps')), findsOneWidget);
+    expect(p.data.isInstalled('title'), isTrue);
     p.goHome();
     await t.pump(const Duration(milliseconds: 400));
-    expect(find.byKey(const Key('vphone-app-maps')), findsOneWidget);
-    p.openApp('maps');
-    await t.pump(const Duration(milliseconds: 400));
-    expect(find.text('This phone is in Dar es Salaam, Tanzania'), findsOneWidget);
+    expect(find.byKey(const Key('vphone-app-title')), findsOneWidget);
+    await t.tap(find.byKey(const Key('vphone-app-title')));
+    await t.pump(const Duration(milliseconds: 800));
+    await t.pump(const Duration(milliseconds: 800));
+    expect(find.text('Download the animation (GIF)'), findsOneWidget, reason: 'the Title Animator itself runs inside the phone');
     p.openApp('store');
-    await t.pump(const Duration(milliseconds: 400));
-    await t.tap(find.byKey(const Key('vphone-remove-maps')));
+    await t.pump(const Duration(milliseconds: 800));
+    await t.tap(find.byKey(const Key('vphone-remove-title')));
     await t.pump(const Duration(milliseconds: 300));
-    expect(p.data.isInstalled('maps'), isFalse);
+    expect(p.data.isInstalled('title'), isFalse);
     await t.pump(const Duration(seconds: 4));
   });
 
-  testWidgets('Contacts and Messages keep what is written, and Settings can move the phone to another city', (t) async {
-    final p = await open(t);
-    p.data.installed.addAll(['contacts', 'messages']);
-    p.openApp('contacts');
-    await t.pump(const Duration(milliseconds: 400));
-    await t.enterText(find.byKey(const Key('vphone-con-name')), 'Ama');
-    await t.enterText(find.byKey(const Key('vphone-con-num')), '0712345678');
-    await t.tap(find.byKey(const Key('vphone-con-add')));
-    await t.pump();
-    expect(p.data.contacts.single.name, 'Ama');
-    p.openApp('messages');
-    await t.pump(const Duration(milliseconds: 400));
-    await t.tap(find.byKey(const Key('vphone-msg-Ama')));
-    await t.pump();
-    await t.enterText(find.byKey(const Key('vphone-msg-field')), 'Hello Ama');
-    await t.tap(find.byKey(const Key('vphone-msg-send')));
-    await t.pump();
-    expect(p.data.messages.single.text, 'Hello Ama');
-    expect(find.text('Hello Ama'), findsOneWidget);
-    p.openApp('settings');
-    await t.pump(const Duration(milliseconds: 400));
-    expect(find.text(p.data.deviceId), findsOneWidget);
-    await t.tap(find.byKey(const Key('vphone-city')));
-    await t.pump(const Duration(milliseconds: 400));
-    await t.tap(find.text('Tokyo, Japan').last);
-    await t.pump(const Duration(milliseconds: 400));
-    expect(p.data.where.name, 'Tokyo');
+  testWidgets('every NGMY app opens inside the phone screen without breaking its layout', (t) async {
+    final p = await open(t, size: const Size(780, 1500));
+    p.unlock();
+    for (final a in kNgmyApps) {
+      p.data.installed.add(a.def.id);
+      p.openApp(a.def.id);
+      await t.pump(const Duration(milliseconds: 500));
+      await t.pump(const Duration(milliseconds: 500));
+      final e = t.takeException();
+      expect(e, isNull, reason: '${a.def.label}: $e');
+      p.goHome();
+      await t.pump(const Duration(milliseconds: 400));
+    }
   });
 
-  testWidgets('Files and Photos: a downloaded picture is stored on the phone and shows in Photos', (t) async {
-    final p = await open(t);
-    p.data.installed.add('photos');
-    // A 1 by 1 picture, as if it had been downloaded.
-    const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
-    p.data.addFile(PhoneFile('dot.png', 'image/png', png, 70, DateTime(2026, 1, 1)));
-    p.openApp('files');
+  testWidgets('double-tap the top of the phone: it gets bigger step by step, up to the full screen, then back', (t) async {
+    final p = await open(t, size: const Size(780, 1500));
+    expect(p.sizeLevel, 0);
+    final w0 = t.getSize(find.byKey(const Key('vphone-device'))).width;
+    final sizes = [w0];
+    for (var i = 1; i <= 3; i++) {
+      await t.tap(find.byKey(const Key('vphone-top')));
+      await t.pump(const Duration(milliseconds: 60));
+      await t.tap(find.byKey(const Key('vphone-top')));
+      await t.pump(const Duration(milliseconds: 600));
+      await t.pump(const Duration(milliseconds: 400));
+      expect(p.sizeLevel, i);
+      sizes.add(t.getSize(find.byKey(const Key('vphone-device'))).width);
+    }
+    expect(sizes[1], greaterThan(sizes[0]));
+    expect(sizes[2], greaterThan(sizes[1]));
+    expect(sizes[3], greaterThan(sizes[2]));
+    expect(sizes[3], closeTo(390, 1), reason: 'the last step fills the whole screen width');
+    expect(t.getSize(find.byKey(const Key('vphone-device'))).height, closeTo(750, 1), reason: 'and the whole height');
+    // Once more, and it is back to its first size.
+    await t.tap(find.byKey(const Key('vphone-top')));
+    await t.pump(const Duration(milliseconds: 60));
+    await t.tap(find.byKey(const Key('vphone-top')));
+    await t.pump(const Duration(milliseconds: 600));
     await t.pump(const Duration(milliseconds: 400));
-    expect(find.text('dot.png'), findsOneWidget);
-    await t.enterText(find.byKey(const Key('vphone-dl-field')), 'nonsense');
-    await t.tap(find.byKey(const Key('vphone-dl')));
-    await t.pump();
-    expect(find.text('Paste the link of the file to download.'), findsOneWidget);
-    p.openApp('photos');
-    await t.pump(const Duration(milliseconds: 800));
-    await t.pump(const Duration(seconds: 1));
-    expect(find.byType(Image), findsOneWidget);
-    expect(find.textContaining('No pictures yet'), findsNothing);
+    expect(p.sizeLevel, 0);
+    expect(t.getSize(find.byKey(const Key('vphone-device'))).width, closeTo(w0, 1));
+    // One tap does nothing.
+    await t.tap(find.byKey(const Key('vphone-top')));
+    await t.pump(const Duration(milliseconds: 700));
+    expect(p.sizeLevel, 0);
   });
 }

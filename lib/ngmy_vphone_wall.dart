@@ -240,10 +240,8 @@ class NgmyPhoneWallState extends State<NgmyPhoneWallView> {
           top: 4,
           right: 4,
           bottom: 4,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 600),
-            transitionBuilder: (child, anim) => SlideTransition(position: Tween<Offset>(begin: const Offset(0.35, 0), end: Offset.zero).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)), child: FadeTransition(opacity: anim, child: child)),
-            child: KeyedSubtree(
+          // No slide or fade over the videos: an effect laid over a playing video can freeze its picture on some browsers.
+          child: KeyedSubtree(
               key: ValueKey('${plan.round}-${plan.set}-$_run'),
               child: OverflowBox(
                 minWidth: 0,
@@ -261,7 +259,6 @@ class NgmyPhoneWallState extends State<NgmyPhoneWallView> {
                     ]),
                   ],
                 ]),
-              ),
             ),
           ),
         ),
