@@ -9,10 +9,10 @@ B.a5g.prototype={
 A(d,e){if(e==null)return!1
 if(J.bQ(e)!==C.b0(this))return!1
 return e instanceof B.a5g},
-gX(d){return C.bv("tnum",1,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h)},
+gX(d){return C.bw("tnum",1,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h)},
 u(d){return"FontFeature('tnum', 1)"}}
 var z=a.updateTypes([]);(function inheritance(){var y=a.inherit
 y(B.a5g,C.aD)})();(function constants(){var y=a.makeConstList
-D.b7Z=new B.a5g()
-D.a4m=y([D.b7Z],C.at("O<a5g>"))})()};
-(a=>{a["z/qg+e4eKTp4xI7B2SPqUBiiZRw="]=a.current})($__dart_deferred_initializers__);
+D.b8c=new B.a5g()
+D.a4p=y([D.b8c],C.at("O<a5g>"))})()};
+(a=>{a["pBepzbhCsnjI3ORjglBJVR5cNOM="]=a.current})($__dart_deferred_initializers__);
