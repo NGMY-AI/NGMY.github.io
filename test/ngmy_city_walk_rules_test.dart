@@ -20,7 +20,7 @@ Future<dynamic> _open(WidgetTester t) async {
 }
 
 void main() {
-  testWidgets('walking up to a door does not open it: a button appears, and pressing it opens the door; the zoom and angle stay as set', (t) async {
+  testWidgets('walking through a door takes you in, walking past it does not; the zoom and angle stay as set', (t) async {
     t.view.physicalSize = const Size(900, 1700);
     t.view.devicePixelRatio = 1.0;
     addTearDown(t.view.reset);
@@ -31,17 +31,9 @@ void main() {
     final door = _doorOf(shop);
     final cam = t.widget<Scene3DView>(find.byType(Scene3DView).first).cam;
     cam.setView(target: cam.target, dist: 300, yaw: 0.6, pitch: 0.5);
-    st.standAtForTest(door.$1, door.$2);
-    await t.pump(const Duration(milliseconds: 400));
-    expect(st.inner, isNull, reason: 'standing at a door does not take you in');
-    expect(st.actLabelForTest, contains('Open the door'));
-    // Far from every door there is no button.
-    st.standAtForTest(door.$1 + 400, door.$2 + 400);
-    await t.pump(const Duration(milliseconds: 100));
-    expect(st.actLabelForTest, isNull);
-    st.standAtForTest(door.$1, door.$2);
-    await t.pump(const Duration(milliseconds: 100));
-    st.pressActForTest();
+    expect(st.walkIntoForTest(door.$1 + 400, door.$2 + 400), isFalse, reason: "walking past a door goes nowhere");
+    expect(st.inner, isNull);
+    expect(st.walkIntoForTest(door.$1, door.$2), isTrue, reason: "walking through the door takes you in");
     await t.pump(const Duration(milliseconds: 100));
     for (var i = 0; i < 12; i++) {
       await t.pump(const Duration(milliseconds: 300));
@@ -68,9 +60,7 @@ void main() {
     final city = HomeProject.session!.rooms[11];
     final shop = city.furn.firstWhere((f) => f.kind == 'shop');
     final door = _doorOf(shop);
-    st.standAtForTest(door.$1, door.$2);
-    await t.pump(const Duration(milliseconds: 300));
-    st.pressActForTest();
+    expect(st.walkIntoForTest(door.$1, door.$2), isTrue);
     for (var i = 0; i < 6; i++) {
       await t.pump(const Duration(milliseconds: 300));
     }

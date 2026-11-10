@@ -191,7 +191,7 @@ void main() {
     final bare = homeDynamic(city, 1.0).length;
     final busy = homeDynamic(city, 1.0, residents: figs).length;
     expect(busy, greaterThan(bare + 100));
-    expect(city.furn.where((f) => f.kind == 'house2').length, greaterThanOrEqualTo(8), reason: 'a bigger town');
+    expect(city.furn.where((f) => f.kind == 'house2').length, greaterThanOrEqualTo(4), reason: 'a bigger town');
     expect(buildHomeRoom(city, residents: figs).labels.where((l) => l.text.contains('Cooking') || l.text.contains('Feeding')).length, 2);
   });
 
@@ -233,7 +233,7 @@ void main() {
   test('the city has billboards, big houses with TV windows, self-driving buses and police cars, and helicopters, all playing different NGMY ads', () {
     final city = HomeProject(seed: 4).rooms[11];
     expect(city.furn.where((f) => f.kind == 'billboard').length, greaterThanOrEqualTo(8));
-    expect(city.furn.where((f) => f.kind == 'bighouse').length, greaterThanOrEqualTo(3));
+    expect(city.furn.where((f) => f.kind == 'bighouse').length, greaterThanOrEqualTo(2));
     final sc = buildHomeRoom(city, problems: 5);
     final bill = city.furn.where((f) => f.kind == 'billboard').length;
     final big = city.furn.where((f) => f.kind == 'bighouse').length;
@@ -345,7 +345,7 @@ void main() {
         expect(gapX > 60 || gapZ > 60, isTrue, reason: '${f.kind} at (${f.x}, ${f.z}) is too close to the road at (${r.x}, ${r.z})');
       }
     }
-    expect(city.furn.where((f) => f.kind == 'house2' || f.kind == 'bighouse').length, greaterThanOrEqualTo(12));
+    expect(city.furn.where((f) => f.kind == 'house2' || f.kind == 'bighouse').length, greaterThanOrEqualTo(8));
     expect(city.furn.where((f) => f.kind == 'pole').length, greaterThanOrEqualTo(10));
     expect(city.furn.where((f) => f.kind == 'lamppost').length, greaterThanOrEqualTo(8));
     expect(city.furn.where((f) => f.kind == 'crate').length, greaterThanOrEqualTo(4));

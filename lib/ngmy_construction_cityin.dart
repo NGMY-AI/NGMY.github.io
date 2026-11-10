@@ -744,6 +744,26 @@ class CityInterior {
     _screens
       ..add(ScreenQuad([const V3(-34.6, 86, 69), const V3(-34.6, 86, 7), const V3(-34.6, 34, 7), const V3(-34.6, 34, 69)], 0, (c, size, t) => paintCityAdLoop(c, size, t, 1), width: 720, height: 600, bias: 30, order: 2))
       ..add(ScreenQuad([const V3(34.6, 86, 7), const V3(34.6, 86, 69), const V3(34.6, 34, 69), const V3(34.6, 34, 7)], 0, (c, size, t) => paintCityAdLoop(c, size, t, 4), width: 720, height: 600, bias: 30, order: 2));
+    // The lobby beyond the doors, lit and furnished, so when the doors open you see where you are going and not a black hole.
+    const lobbyWall = Color(0xFFEDEFF3);
+    b.order = -1;
+    b.box(const V3(0, -0.6, 180), const V3(300, 1.2, 200), const Color(0xFFB8BEC8), shine: 0.2, split: 3);
+    b.order = 0;
+    for (final (cx, cz, sx, sz) in const [(-150.0, 180.0, 2.0, 200.0), (150.0, 180.0, 2.0, 200.0), (0.0, 280.0, 302.0, 2.0)]) {
+      b.startGroup();
+      b.box(V3(cx, 70, cz), V3(sx, 140, sz), lobbyWall, split: 3);
+      b.endGroup();
+    }
+    b.order = 1;
+    b.box(const V3(0, 141, 180), const V3(302, 2, 200), const Color(0xFFF4F5F8));
+    b.box(const V3(0, 139.4, 180), const V3(120, 1.4, 150), const Color(0xFFFFF7D6), shine: 0.2);
+    b.order = 1;
+    for (final cx in const [-75.0, 75.0]) {
+      b.box(V3(cx, 75, 278.6), const V3(96, 56, 1.6), const Color(0xFF111827), shine: 0.3);
+      _screens.add(ScreenQuad([V3(cx + 42, 100, 277.7), V3(cx - 42, 100, 277.7), V3(cx - 42, 50, 277.7), V3(cx + 42, 50, 277.7)], 0, (c, size, t) => paintCityAdLoop(c, size, t, cx > 0 ? 2 : 5), width: 720, height: 420));
+    }
+    b.box(const V3(0, 120, 278.6), const V3(124, 26, 1.6), const Color(0xFF0B1F4B), shine: 0.3);
+    _screens.add(ScreenQuad([const V3(58, 130, 277.7), const V3(-58, 130, 277.7), const V3(-58, 110, 277.7), const V3(58, 110, 277.7)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY', 'Welcome'), width: 900, height: 160));
     scene = Scene3D(b.polys, screens: List<ScreenQuad>.of(_screens));
   }
 

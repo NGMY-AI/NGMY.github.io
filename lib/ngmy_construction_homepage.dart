@@ -2542,7 +2542,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     _walkTimer?.cancel();
     _walkTimer = FrameLoop(_walkTick, testEvery: const Duration(milliseconds: 40))..start();
     setState(() {});
-    _say('Slide the round stick to walk. Walk up to a door and press the Open the door button to go in: the house, the hospital or the shop. Double tap a spot to go there.');
+    _say('Slide the round stick to walk. Walk up to a door and through it to go in: the house, the hospital or the shop. Double tap a spot to go there.');
   }
 
   void _stopSteer() {
@@ -2640,31 +2640,30 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       if (hit >= 0) _roadAccident(hit);
     }
     if (inn == null && _driving != null) _uberTick(w);
-    // Nobody goes through a door by walking past it: a button appears when you stand at one (see _updateAct), and you press it to open the door.
+    // Walking up to a door and through it takes you in.
+    if (moved && _driving == null && _walkThroughDoor(w)) return;
     _updateAct(w);
     if (moved || _rememberTicks++ % 25 == 0) _rememberWhere();
   }
 
-  /// A door close by: the front door of the house, or the door of a building. Pressing the button opens it.
-  ({String label, VoidCallback go})? _doorAct(WorldWalker w) {
-    if (w.atDoor) {
-      return (
-        label: '🚪 Open the door',
-        go: () {
-          _stopSteer();
-          _go(10);
-          _say('You are inside the living room. Use Go outside to come back out.');
-        }
-      );
+  /// Walking up to a door and through it: the front door of the house, or the door of a building. True when the person went in.
+  bool _walkThroughDoor(WorldWalker w) {
+    if (w.atDoor && (w.yaw.abs() > 2.2 || w.target != null && w.target!.$2 < 4)) {
+      // Walked up to the front door facing the house: in they go.
+      _stopSteer();
+      _go(10);
+      _say('You are inside the living room. Use Go outside to come back out.');
+      return true;
     }
     for (final f in room.furn.where((f) => kEnterable.contains(f.kind))) {
       final k = kFurnKinds[f.kind]!;
       final dv = rotY(V3(0, 0, k.d / 2 + 10), f.rot * math.pi / 2);
-      if ((w.x - (f.x + dv.x)).abs() < 40 && (w.z - (f.z + dv.z)).abs() < 34) {
-        return (label: '🚪 Open the door: ${k.name}', go: () => _enterBuilding(f));
+      if ((w.x - (f.x + dv.x)).abs() < 22 && (w.z - (f.z + dv.z)).abs() < 16) {
+        _enterBuilding(f);
+        return true;
       }
     }
-    return null;
+    return false;
   }
 
   // ── Hooks for the tests ──
@@ -2679,11 +2678,12 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     _updateAct(walker!);
   }
 
+  /// Puts the person at the spot and does what the walking does there: goes through a door if it is one.
   @visibleForTesting
-  String? get actLabelForTest => _act?.label;
-
-  @visibleForTesting
-  void pressActForTest() => _act?.go();
+  bool walkIntoForTest(double x, double z) {
+    standAtForTest(x, z);
+    return _walkThroughDoor(walker!);
+  }
 
   @visibleForTesting
   void leaveForTest() => _leaveBuilding();
@@ -2749,18 +2749,17 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     );
   }
 
-  /// A bright arrow above the person, and a ring on the ground, so they can always be found, however far the view is zoomed out or whatever is in the way.
+  /// A bright arrow above the person, only when the view is zoomed far out, so they can be found whatever is in the way.
   List<Poly> _beacon() {
     final w = walker;
-    if (w == null || room.indoor || inner != null || !steer || _driving != null || cam.dist < 190) return const [];
-    final k = math.max(1.0, cam.dist / 190);
+    if (w == null || room.indoor || inner != null || !steer || _driving != null || cam.dist < 340) return const [];
+    final k = cam.dist / 340;
     final b = MeshBuilder()
       ..id = 0
       ..order = 3;
     final y = 78 + 6 * k;
     b.cyl(V3(w.x, y, w.z), V3(w.x, y + 16 * k, w.z), 0, const Color(0xFFFFD60A), shine: 0.2, sides: 6, r1: 7 * k);
     b.cyl(V3(w.x, y + 16 * k, w.z), V3(w.x, y + 30 * k, w.z), 2.2 * k, const Color(0xFFFFD60A), shine: 0.2, sides: 6);
-    b.ring(V3(w.x, 0.6, w.z), V3(w.x, 1.0, w.z), 13 * k, 10 * k, const Color(0xFFFFFFFF), shine: 0, sides: 18);
     return b.polys;
   }
 
@@ -2867,7 +2866,6 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         }
       }
     }
-    act ??= _doorAct(w);
     if (act?.label != _act?.label) setState(() => _act = act);
   }
 

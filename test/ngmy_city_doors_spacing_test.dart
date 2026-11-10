@@ -15,7 +15,7 @@ void main() {
         final ka = kFurnKinds[a.kind]!, kb = kFurnKinds[b.kind]!;
         final gapX = (a.x - b.x).abs() - (ka.w + kb.w) / 2;
         final gapZ = (a.z - b.z).abs() - (ka.d + kb.d) / 2;
-        expect(gapX > 100 || gapZ > 100, isTrue, reason: 'house ${a.id} and ${b.id} are too close (gap $gapX, $gapZ)');
+        expect(gapX > 200 || gapZ > 200, isTrue, reason: 'house ${a.id} and ${b.id} are too close (gap $gapX, $gapZ)');
       }
     }
   });
