@@ -367,6 +367,9 @@ class CityInterior {
     if (cm != null) labels.add(Label3D(const V3(0, h - 14, 4), '⭐ ${cm.points}   🍞 ${cm.food}   💊 ${cm.medicine}${carrying != null ? '   📦 carrying' : ''}', const Color(0xFF0F172A)));
     final tv = <ScreenQuad>[];
     if (isTower) {
+      tv.add(ScreenQuad([const V3(-28, 72, 3.8), const V3(28, 72, 3.8), const V3(28, 40, 3.8), const V3(-28, 40, 3.8)], 0, (c, size, t) => paintCityAdLoop(c, size, t, door.id + level + 9), width: 720, height: 410, bias: 60, order: 2));
+    }
+    if (isTower) {
       // Big TVs on the walls of every level, playing the NGMY ads.
       b.order = 2;
       b.bias = 0;
@@ -653,7 +656,11 @@ class CityInterior {
     // The elevator: a steel frame, two doors, a display with the level and a button panel.
     b.id = idCinElevator;
     // The shaft is thin and flat on the wall, so nothing of it can hide the doors; the frame is three bars round it.
-    b.box(const V3(0, 42, 1.5), const V3(88, 84, 3), const Color(0xFF0F172A));
+    b.box(const V3(0, 42, 1.5), const V3(88, 84, 3), const Color(0xFFC9D0DA), shine: 0.3);
+    // Behind the doors is the lit inside of the car: a light strip, a handrail and a screen playing the NGMY ads, so an open door never shows a black hole.
+    b.box(const V3(0, 80, 3.4), const V3(72, 2.4, 1.4), const Color(0xFFFFF7D6), shine: 0.2);
+    b.box(const V3(0, 34, 3.6), const V3(80, 2.4, 2), const Color(0xFF94A3B8), shine: 0.7);
+    b.box(const V3(0, 56, 3.3), const V3(60, 36, 0.8), const Color(0xFF111827), shine: 0.3);
     b.box(const V3(-47, 48, 3.5), const V3(7, 96, 7), const Color(0xFF475569), shine: 0.5);
     b.box(const V3(47, 48, 3.5), const V3(7, 96, 7), const Color(0xFF475569), shine: 0.5);
     b.box(const V3(0, 93, 3.5), const V3(100, 7, 7), const Color(0xFF475569), shine: 0.5);
@@ -718,6 +725,9 @@ class CityInterior {
     b.endGroup();
     b.startGroup();
     b.box(const V3(37, 50, 38), const V3(2, 100, 90), steel, shine: 0.4);
+    b.endGroup();
+    b.startGroup();
+    b.box(const V3(0, 50, -8), const V3(76, 100, 2), steel, shine: 0.4);
     b.endGroup();
     b.order = 1;
     b.box(const V3(0, 101, 38), const V3(76, 2, 90), const Color(0xFFE2E8F0));

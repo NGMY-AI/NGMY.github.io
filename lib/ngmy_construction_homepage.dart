@@ -1305,6 +1305,10 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
           inner = cab;
           _rideLabel.value = '${up ? '▲' : '▼'}  ${r.from == 1 ? 'L' : r.from}';
           setState(_rebuild);
+          // The camera stays inside the car, so turning it never shows the outside (blank) or a wall from behind.
+          cam
+            ..widen = false
+            ..keepIn = (-33.0, 33.0, -5.0, 76.0, 98.0);
           cam.setView(target: const V3(0, 52, 52), dist: 54, yaw: math.pi, pitch: 0.1);
           conBeep(520, ms: 70, volume: 0.25);
         }
@@ -1378,7 +1382,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
           w.walking = false;
           lobby.doorOpen = 0;
           setState(_rebuild);
-          cam.glideTo(target: const V3(0, 30, 110), dist: 170, yaw: 0.0, pitch: 0.4);
+          cam.keepIn = (-CityInterior.w / 2 + 10, CityInterior.w / 2 - 10, 12.0, CityInterior.d - 10, CityInterior.h - 8);
+          final oc = _outCam;
+          cam.glideTo(target: const V3(0, 30, 110), dist: (oc?.$1 ?? 170).clamp(60.0, 420.0), yaw: oc?.$2 ?? 0.0, pitch: (oc?.$3 ?? 0.4).clamp(0.15, 1.35));
           conBeep(660, ms: 80);
           _say(dark ? 'Level ${lobby.level}. This office has no power: walk onto the red mat at the breaker panel, or tap the red frames.' : 'Level ${lobby.level} of ${lobby.levels}.', ok: true);
         }
