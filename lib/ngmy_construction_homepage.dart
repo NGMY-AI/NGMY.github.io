@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'ngmy_city_traffic.dart';
 import 'ngmy_city_delivery.dart';
 import 'ngmy_city_needs.dart';
@@ -55,6 +56,10 @@ class NgmyHousePage extends StatefulWidget {
 
   @override
   State<NgmyHousePage> createState() => _NgmyHousePageState();
+
+  /// Forgets where the person was in the city (for the tests).
+  @visibleForTesting
+  static void forgetWhereForTest() => _NgmyHousePageState._where = null;
 }
 
 class _NgmyHousePageState extends State<NgmyHousePage> {
@@ -118,7 +123,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     home.practice = widget.lesson.isEmpty ? true : (widget.practice || home.practice);
     cam = Cam3(yaw: -0.05, pitch: 0.1, dist: 120, target: const V3(0, 40, 40))..maxDist = 560;
     if (widget.focus == 'city') home.current = 11;
-    if (widget.focus.isNotEmpty) {
+    if (widget.focus.isNotEmpty && widget.focus != 'city') {
       final want = home.indoor.where((e) => switch (widget.focus) { 'wiring' => !e.wired, 'plumbing' => !e.plumbed, _ => !e.finished });
       if (want.isNotEmpty) home.current = want.first.id;
     }
@@ -162,6 +167,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   @override
   void dispose() {
+    _rememberWhere(disk: true);
     _rideTimer?.cancel();
     _droneTimer?.cancel();
     _walkTimer?.cancel();
@@ -185,6 +191,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   // ── The camera ──
 
   void _frame({bool snap = false}) {
+    cam.widen = true;
     final r = room;
     V3 target;
     double dist, pitch, yaw;
@@ -318,7 +325,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       msg = null;
       _rebuild();
     });
-    if (!room.indoor) walker = WorldWalker(room, x: 0, z: 24);
+    if (!room.indoor) walker = _newWalker();
     _frame();
     conBeep(520, ms: 60);
   }
@@ -1897,7 +1904,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
           setState(() => _cardCall = null);
           if (!steer) _startSteer();
           final w = walker;
-          if (w != null) cam.glideTo(target: V3(w.x, 30, w.z), dist: 220, pitch: 0.5);
+          if (w != null) cam.glideTo(target: V3(w.x, 30, w.z));
           _say('Follow the yellow line on the ground to get there.', ok: true);
         }, primary: true),
         action(Icons.directions_walk_rounded, 'Take me there', const Color(0xFF4ADE80), () {
@@ -2512,16 +2519,30 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   String? _carrying;
   _NCall? _nCall;
 
+  /// The person starts where they were last in the city (the first time, in front of the house).
+  WorldWalker _newWalker() {
+    final w = WorldWalker(room, x: 0, z: 24);
+    final s = _where;
+    if (s != null && (s["seed"] as num?)?.toInt() == home.seed && s["x"] is num && s["z"] is num) {
+      w
+        ..x = (s["x"] as num).toDouble()
+        ..z = (s["z"] as num).toDouble()
+        ..yaw = (s["yaw"] as num?)?.toDouble() ?? 0
+        ..refresh();
+    }
+    return w;
+  }
+
   void _startSteer() {
     if (room.indoor) return;
-    walker ??= WorldWalker(room, x: 0, z: 24);
+    walker ??= _newWalker();
     walker!.refresh();
     steer = true;
     _lastWalkMs = DateTime.now().millisecondsSinceEpoch;
     _walkTimer?.cancel();
     _walkTimer = FrameLoop(_walkTick, testEvery: const Duration(milliseconds: 40))..start();
     setState(() {});
-    _say('Slide the round stick to walk. Walk up to a door to go in: the house, the hospital or the shop. Double tap a spot to go there.');
+    _say('Slide the round stick to walk. Walk up to a door and press the Open the door button to go in: the house, the hospital or the shop. Double tap a spot to go there.');
   }
 
   void _stopSteer() {
@@ -2602,13 +2623,13 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         _onBalcony = inn.onBalcony;
         // Out on the balcony the view turns to look over the town, and comes back when you step in.
         if (_onBalcony) {
-          cam.glideTo(target: const V3(230, -40, 100), dist: 330, yaw: 1.35, pitch: 0.35);
+          cam.glideTo(target: const V3(230, -40, 100));
         } else {
-          cam.glideTo(target: V3(0, 30, 110), dist: 170, yaw: 0.0, pitch: 0.4);
+          cam.glideTo(target: V3(0, 30, 110));
         }
       }
       if (inn.leaving) _leaveBuilding();
-      if (!_onBalcony && _ride == null) _keepCamInside();
+      // The camera itself is kept inside the walls by Cam3.keepIn (set when you walk in), and your zoom comes back when you turn away from a wall.
       return;
     }
     if (inn == null && _driving == null && _boardMaybe?.active != null) _deliveryEvent(_boardMaybe!.updatePlayer(w.x, w.z, now));
@@ -2619,41 +2640,132 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       if (hit >= 0) _roadAccident(hit);
     }
     if (inn == null && _driving != null) _uberTick(w);
-    if (moved && _driving == null) {
-      if (w.atDoor && (w.yaw.abs() > 2.2 || w.target != null && w.target!.$2 < 4)) {
-        // Walked up to the front door facing the house: in they go.
-        _stopSteer();
-        _go(10);
-        _say('You are inside the living room. Use Go outside to come back out.');
-        return;
+    // Nobody goes through a door by walking past it: a button appears when you stand at one (see _updateAct), and you press it to open the door.
+    _updateAct(w);
+    if (moved || _rememberTicks++ % 25 == 0) _rememberWhere();
+  }
+
+  /// A door close by: the front door of the house, or the door of a building. Pressing the button opens it.
+  ({String label, VoidCallback go})? _doorAct(WorldWalker w) {
+    if (w.atDoor) {
+      return (
+        label: '🚪 Open the door',
+        go: () {
+          _stopSteer();
+          _go(10);
+          _say('You are inside the living room. Use Go outside to come back out.');
+        }
+      );
+    }
+    for (final f in room.furn.where((f) => kEnterable.contains(f.kind))) {
+      final k = kFurnKinds[f.kind]!;
+      final dv = rotY(V3(0, 0, k.d / 2 + 10), f.rot * math.pi / 2);
+      if ((w.x - (f.x + dv.x)).abs() < 40 && (w.z - (f.z + dv.z)).abs() < 34) {
+        return (label: '🚪 Open the door: ${k.name}', go: () => _enterBuilding(f));
       }
-      for (final f in room.furn.where((f) => kEnterable.contains(f.kind))) {
-        final k = kFurnKinds[f.kind]!;
-        final dv = rotY(V3(0, 0, k.d / 2 + 10), f.rot * math.pi / 2);
-        if ((w.x - (f.x + dv.x)).abs() < 22 && (w.z - (f.z + dv.z)).abs() < 16) {
+    }
+    return null;
+  }
+
+  // ── Hooks for the tests ──
+  @visibleForTesting
+  void standAtForTest(double x, double z) {
+    if (!steer) _startSteer();
+    walker!
+      ..x = x
+      ..z = z
+      ..target = null
+      ..refresh();
+    _updateAct(walker!);
+  }
+
+  @visibleForTesting
+  String? get actLabelForTest => _act?.label;
+
+  @visibleForTesting
+  void pressActForTest() => _act?.go();
+
+  @visibleForTesting
+  void leaveForTest() => _leaveBuilding();
+
+
+  // ── Remembering where you were, so coming back puts you right there ──
+
+  /// Where the person was last (kept in memory, and on the phone): the city spot, the building they were in, and the way they had the view.
+  static Map<String, dynamic>? _where;
+  int _rememberTicks = 0;
+  int _wherePutMs = 0;
+
+  void _rememberWhere({bool disk = false}) {
+    final w = walker;
+    if (isLesson || w == null || room.indoor || !mounted) return;
+    _where = {
+      'seed': home.seed,
+      'steer': steer,
+      'x': w.x,
+      'z': w.z,
+      'yaw': w.yaw,
+      'inner': inner?.door.id,
+      'cy': cam.yaw,
+      'cp': cam.pitch,
+      'cd': cam.dist,
+    };
+    final ms = DateTime.now().millisecondsSinceEpoch;
+    if (disk || ms - _wherePutMs > 4000) {
+      _wherePutMs = ms;
+      final raw = jsonEncode(_where);
+      SharedPreferences.getInstance().then((p) => p.setString('ngmy_city_where', raw)).catchError((_) => false);
+    }
+  }
+
+  /// The person is put back where they were; if they were inside a building, they are inside it again.
+  Future<void> _restoreWhere() async {
+    var s = _where;
+    if (s == null) {
+      try {
+        final p = await SharedPreferences.getInstance();
+        final raw = p.getString('ngmy_city_where');
+        if (raw != null) s = (jsonDecode(raw) as Map).cast<String, dynamic>();
+      } catch (_) {}
+    }
+    if (!mounted || s == null || room.indoor || s['steer'] != true || (s['seed'] as num?)?.toInt() != home.seed) return;
+    _where = s;
+    if (!steer) _startSteer();
+    final innerId = (s['inner'] as num?)?.toInt();
+    if (innerId != null && inner == null) {
+      for (final f in room.furn) {
+        if (f.id == innerId && kEnterable.contains(f.kind)) {
           _enterBuilding(f);
-          return;
+          break;
         }
       }
     }
-    _updateAct(w);
+    final w = inner?.walker ?? walker;
+    cam.setView(
+      target: inner != null ? cam.target : V3(w?.x ?? cam.target.x, 30, w?.z ?? cam.target.z),
+      dist: ((s['cd'] as num?)?.toDouble() ?? cam.dist).clamp(cam.minDist, cam.maxDist),
+      yaw: (s['cy'] as num?)?.toDouble() ?? cam.yaw,
+      pitch: ((s['cp'] as num?)?.toDouble() ?? cam.pitch).clamp(cam.minPitch, cam.maxPitch),
+    );
   }
 
-  /// Inside a building the camera stays inside the walls, so turning round never shows a wall from behind (black) or the outside.
-  void _keepCamInside() {
-    final hw = CityInterior.w / 2 - 10, z0 = 12.0, z1 = CityInterior.d - 10, top = CityInterior.h - 8;
-    final before = cam.dist;
-    for (var i = 0; i < 40; i++) {
-      final cp = math.cos(cam.pitch), sp = math.sin(cam.pitch);
-      final ex = cam.target.x - cam.dist * cp * math.sin(cam.yaw);
-      final ez = cam.target.z + cam.dist * cp * math.cos(cam.yaw);
-      final ey = cam.target.y + cam.dist * sp;
-      if (ex.abs() <= hw && ez >= z0 && ez <= z1 && ey <= top) break;
-      if (cam.dist <= cam.minDist) break;
-      cam.dist = math.max(cam.minDist, cam.dist * 0.93);
-    }
-    if (cam.dist != before) cam.glideTo(dist: cam.dist);
+  /// A bright arrow above the person, and a ring on the ground, so they can always be found, however far the view is zoomed out or whatever is in the way.
+  List<Poly> _beacon() {
+    final w = walker;
+    if (w == null || room.indoor || inner != null || !steer || _driving != null || cam.dist < 190) return const [];
+    final k = math.max(1.0, cam.dist / 190);
+    final b = MeshBuilder()
+      ..id = 0
+      ..order = 3;
+    final y = 78 + 6 * k;
+    b.cyl(V3(w.x, y, w.z), V3(w.x, y + 16 * k, w.z), 0, const Color(0xFFFFD60A), shine: 0.2, sides: 6, r1: 7 * k);
+    b.cyl(V3(w.x, y + 16 * k, w.z), V3(w.x, y + 30 * k, w.z), 2.2 * k, const Color(0xFFFFD60A), shine: 0.2, sides: 6);
+    b.ring(V3(w.x, 0.6, w.z), V3(w.x, 1.0, w.z), 13 * k, 10 * k, const Color(0xFFFFFFFF), shine: 0, sides: 18);
+    return b.polys;
   }
+
+  /// The zoom and angle the person had outside, to give back when they come out of a building.
+  (double, double, double)? _outCam;
 
   void _enterBuilding(Furn f) {
     _inX = 0;
@@ -2671,13 +2783,17 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         _cardElevator = true;
       }
     }
+    // The view is the way the person had it: the same zoom and angle, only kept inside the walls.
+    _outCam = (cam.dist, cam.yaw, cam.pitch);
     cam
       ..minDist = 60
       ..maxDist = 420
       ..minPitch = 0.15
       ..maxPitch = 1.35
+      ..widen = false
+      ..keepIn = (-CityInterior.w / 2 + 10, CityInterior.w / 2 - 10, 12.0, CityInterior.d - 10, CityInterior.h - 8)
       ..setFree(true);
-    cam.glideTo(target: V3(0, 30, 110), dist: 170, yaw: 0.0, pitch: 0.4);
+    cam.glideTo(target: V3(0, 30, 110), dist: cam.dist.clamp(60.0, 420.0), yaw: cam.yaw, pitch: cam.pitch.clamp(0.15, 1.35));
     setState(_rebuild);
     _say(switch (inn.kind) {
       'hospital' => 'The hospital. Walk onto the blue mat to admit the sick, and up to a bed to treat the patient. Walk to the green mat to go out.',
@@ -2710,7 +2826,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       ..refresh();
     setState(_rebuild);
     _frame();
-    cam.glideTo(target: V3(w.x, 30, w.z));
+    final oc = _outCam;
+    cam.glideTo(target: V3(w.x, 30, w.z), dist: oc?.$1, yaw: oc?.$2, pitch: oc?.$3);
     _say('You are back in the city.');
   }
 
@@ -2750,6 +2867,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         }
       }
     }
+    act ??= _doorAct(w);
     if (act?.label != _act?.label) setState(() => _act = act);
   }
 
@@ -2995,7 +3113,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       ..x = spot.$1
       ..z = spot.$2;
     w.unstick();
-    cam.glideTo(target: V3(w.x, 30, w.z), dist: 170);
+    cam.glideTo(target: V3(w.x, 30, w.z));
     if (!steer) _startSteer();
   }
 
@@ -3126,6 +3244,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         _frame(snap: true);
       });
       _lifeTimer = Timer.periodic(const Duration(seconds: 1), (_) => _life());
+      if (widget.focus == 'city') _restoreWhere();
     }
   }
 
@@ -3807,7 +3926,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         bare: _clean,
         messageTop: full ? 62 : (_phone ? MediaQuery.of(context).padding.top + 66 : ((showMap && !isLesson) ? 104 : 10)),
         layerOn: (l) => l <= 5,
-        dynamicPolys: (_) => inner != null ? inner!.dynamicPolys(now, playerStyle) : [...homeDynamic(room, now, person: _pose(), personStyle: playerStyle, residents: _figs, mode: mode, drive: _driveNow(), carrying: _carrying != null || (_boardMaybe?.carrying ?? false), couriers: room.indoor ? const [] : [...(_boardMaybe?.figures(now) ?? const <CourierFigure>[]), ...(_uberMaybe?.figures(now) ?? const <CourierFigure>[])]), if (!room.indoor) ..._trafficPolysNow(), ...((_job != null || _boardMaybe?.active != null || _uberMaybe?.active != null) ? _routePolys() : const <Poly>[])],
+        dynamicPolys: (_) => inner != null ? inner!.dynamicPolys(now, playerStyle) : [...homeDynamic(room, now, person: _pose(), personStyle: playerStyle, residents: _figs, mode: mode, drive: _driveNow(), carrying: _carrying != null || (_boardMaybe?.carrying ?? false), couriers: room.indoor ? const [] : [...(_boardMaybe?.figures(now) ?? const <CourierFigure>[]), ...(_uberMaybe?.figures(now) ?? const <CourierFigure>[])]), if (!room.indoor) ..._trafficPolysNow(), if (!room.indoor) ..._beacon(), ...((_job != null || _boardMaybe?.active != null || _uberMaybe?.active != null) ? _routePolys() : const <Poly>[])],
         dynamicScreens: (_) => (inner == null && !room.indoor) ? trafficScreens(now) : const [],
         bottom: _pad(),
         topLeft: [

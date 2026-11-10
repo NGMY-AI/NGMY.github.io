@@ -334,6 +334,9 @@ class Cam3 extends ChangeNotifier {
 
   /// 1 is the normal view; a smaller number is a wider one (more of the room fits). Only a room view with [keepIn] uses it.
   double lens = 1.0;
+
+  /// Whether zooming out past the walls widens the view ([lens]); a building interior only stops the camera at the walls.
+  bool widen = true;
   double minLens = 0.5;
 
   void _fit({bool sync = true}) {
@@ -350,7 +353,7 @@ class Cam3 extends ChangeNotifier {
       final room = math.min(math.min(lim(dx, target.x, k.$1 + m, k.$2 - m), lim(dz, target.z, k.$3 + m, k.$4 - m)), lim(dy, target.y, low, k.$5 - m));
       d = math.min(d, math.max(minDist, room));
       // The camera cannot go back any further (the wall is behind it): zooming out then widens the view instead, like standing back in a small room.
-      if (w > d) lens = math.sqrt(d / w).clamp(minLens, 1.0).toDouble();
+      if (widen && w > d) lens = math.sqrt(d / w).clamp(minLens, 1.0).toDouble();
     }
     dist = d;
     _lastSet = d;
@@ -389,6 +392,7 @@ class Cam3 extends ChangeNotifier {
   void follow(V3 t) {
     _toTarget = null;
     target = t;
+    _fit();
     notifyListeners();
   }
 

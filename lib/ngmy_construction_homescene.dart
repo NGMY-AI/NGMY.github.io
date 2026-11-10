@@ -878,12 +878,16 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
       adScreens.add(ScreenQuad([w(-85.9, 118, -36), w(-85.9, 118, 36), w(-85.9, 62, 36), w(-85.9, 62, -36)], 0, (c, size, t) => paintCityAdLoop(c, size, t, f.id + 3), width: 720, height: 560, bias: 8, order: 2, group: grp));
     } else if (f.kind == 'store') {
       adScreens.add(ScreenQuad([w(-54, 85, 37.7), w(54, 85, 37.7), w(54, 67, 37.7), w(-54, 67, 37.7)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY STORE', 'Everything you need'), width: 900, height: 150, bias: 6, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(-72, 152, 30.3), w(72, 152, 30.3), w(72, 96, 30.3), w(-72, 96, 30.3)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY STORE', 'Everything you need'), width: 1200, height: 470, bias: 8, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(72, 152, 25.7), w(-72, 152, 25.7), w(-72, 96, 25.7), w(72, 96, 25.7)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY STORE', 'Everything you need'), width: 1200, height: 470, bias: 8, order: 2, group: grp));
     } else if (f.kind == 'ubstation') {
       // The sign on the pole says NGMY Uber.
       adScreens.add(ScreenQuad([w(40, 106, 31.9), w(76, 106, 31.9), w(76, 86, 31.9), w(40, 86, 31.9)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY UBER', 'Rides home'), width: 480, height: 270, bias: 8, order: 2, group: grp));
       adScreens.add(ScreenQuad([w(76, 106, 28.1), w(40, 106, 28.1), w(40, 86, 28.1), w(76, 86, 28.1)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY UBER', 'Rides home'), width: 480, height: 270, bias: 8, order: 2, group: grp));
     } else if (f.kind == 'dmv') {
       adScreens.add(ScreenQuad([w(-50, 85, 38.6), w(50, 85, 38.6), w(50, 67, 38.6), w(-50, 67, 38.6)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY LICENCE', 'Get your Uber licence'), width: 900, height: 160, bias: 8, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(-72, 152, 30.3), w(72, 152, 30.3), w(72, 96, 30.3), w(-72, 96, 30.3)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY LICENCE', 'Get your Uber licence'), width: 1200, height: 470, bias: 8, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(72, 152, 25.7), w(-72, 152, 25.7), w(-72, 96, 25.7), w(72, 96, 25.7)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY LICENCE', 'Get your Uber licence'), width: 1200, height: 470, bias: 8, order: 2, group: grp));
     } else if (f.kind == 'gasstation') {
       adScreens.add(ScreenQuad([w(-86, 107, 35.7), w(-54, 107, 35.7), w(-54, 85, 35.7), w(-86, 85, 35.7)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY GAS', 'Open 24 hours'), width: 480, height: 330, bias: 6, order: 2, group: grp));
     } else {
@@ -1737,6 +1741,13 @@ void _furniture(MeshBuilder b, String kind, Color c) {
       _patch(b, const V3(0, 24, 40.2), const V3(1, 0, 0), const V3(0, 1, 0), 112, 30, const Color(0xFF9BD3F5), const V3(0, 0, 1), shine: 0.6);
       b.box(const V3(0, 44, 46), const V3(130, 4, 14), const Color(0xFFDC2626));
       b.box(const V3(0, 76, 36), const V3(112, 22, 3), const Color(0xFF111827));
+      // The big sign on the roof, standing on two posts, with a face to the front and one to the back.
+      for (final x in const [-62.0, 62.0]) {
+        b.cyl(V3(x, 58, 28), V3(x, 96, 28), 2.5, const Color(0xFF3F3F46), sides: 6);
+      }
+      b.box(const V3(0, 124, 28), const V3(150, 62, 4), const Color(0xFF0B1F4B), shine: 0.3);
+      b.box(const V3(0, 156, 28), const V3(150, 4, 7), const Color(0xFFF5C14B));
+      b.box(const V3(0, 92, 28), const V3(150, 4, 7), const Color(0xFFF5C14B));
       b.endGroup();
     case 'dmv':
       b.startGroup();
@@ -1747,6 +1758,13 @@ void _furniture(MeshBuilder b, String kind, Color c) {
       b.box(const V3(0, 76, 36), const V3(112, 22, 3), const Color(0xFF1E3A8A));
       b.box(const V3(0, 76, 37.8), const V3(100, 14, 0.6), const Color(0xFFFACC15));
       b.box(const V3(-28, 76, 38.3), const V3(14, 9, 0.5), const Color(0xFF1E3A8A));
+      // The big sign on the roof, standing on two posts, with a face to the front and one to the back.
+      for (final x in const [-62.0, 62.0]) {
+        b.cyl(V3(x, 58, 28), V3(x, 96, 28), 2.5, const Color(0xFF3F3F46), sides: 6);
+      }
+      b.box(const V3(0, 124, 28), const V3(150, 62, 4), const Color(0xFF0B1F4B), shine: 0.3);
+      b.box(const V3(0, 156, 28), const V3(150, 4, 7), const Color(0xFFF5C14B));
+      b.box(const V3(0, 92, 28), const V3(150, 4, 7), const Color(0xFFF5C14B));
       b.endGroup();
     case 'ubstation':
       b.startGroup();
