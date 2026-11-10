@@ -152,7 +152,8 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
       msg = t;
       good = ok;
     });
-    _msgTimer = Timer(const Duration(seconds: 10), () {
+    final wide = mounted && MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
+    _msgTimer = Timer(Duration(seconds: wide ? 6 : 10), () {
       if (mounted) setState(() => msg = null);
     });
   }
@@ -656,6 +657,79 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
     return [for (final it in _trays[2]) if (fits(it.key)) it];
   }
 
+  /// An icon-only button of the same height as the chips next to it (a tooltip says what it does).
+  Widget _iconAction(IconData icon, String tip, VoidCallback? onTap, {Color color = kConAmber}) => Padding(
+        padding: const EdgeInsets.only(right: 7),
+        child: Tooltip(
+          message: tip,
+          child: GestureDetector(
+            onTap: onTap,
+            child: Container(width: 44, height: 44, decoration: BoxDecoration(color: onTap == null ? Colors.white10 : color.withValues(alpha: 0.9), borderRadius: BorderRadius.circular(14)), child: Icon(icon, size: 21, color: onTap == null ? Colors.white38 : Colors.black)),
+          ),
+        ),
+      );
+
+  /// Working on a device with the phone turned on its side: everything in ONE row of the same height (the buttons as icons, then the wires,
+  /// then the screws they can go on), so it takes little room and leaves the work in view.
+  List<Widget> _workRow(Dev d, ElectricalLesson lesson) {
+    return [
+      _iconAction(Icons.arrow_back_rounded, 'Back to the room', _leave, color: Colors.white70),
+      if (d.w.stage == 0) _iconAction(Icons.move_down_rounded, wiringComplete(lesson, d.w) ? 'Push it into the box' : 'Fasten every wire first', wiringComplete(lesson, d.w) ? () => _apply(p.pushIn(active)) : null),
+      if (d.w.stage == 1) ...[
+        _iconAction(Icons.undo_rounded, 'Pull it out', () => _apply(p.pullOut(active)), color: Colors.white70),
+        _iconAction(Icons.crop_square_rounded, 'Cover on', () => _apply(p.coverOn(active))),
+      ],
+      if (d.w.stage >= 2 && d.w.burnt)
+        _iconAction(Icons.eject_rounded, 'Take out the burnt one', () {
+          final a = p.removeDevice(active);
+          _apply(a);
+          if (a.ok) _leave();
+        }, color: const Color(0xFFF87171))
+      else if (d.w.stage >= 2)
+        _iconAction(Icons.eject_rounded, 'Pull it out of the wall', () => _apply(p.pullOut(active)), color: Colors.white70),
+      if (!d.w.burnt)
+        _iconAction(Icons.swap_horiz_rounded, 'Take it out and put in a different ${isSwitchKind(d.kind) ? 'switch' : 'one'}', () {
+          final a = p.removeDevice(active);
+          _apply(a);
+          if (a.ok) {
+            _leave();
+            _say('The ${deviceKindName(d.kind)} is out and the box is empty. Pick the kind you want from the tray, then tap the box.', ok: true);
+          }
+        }, color: const Color(0xFF38BDF8)),
+      if (d.w.stage == 0)
+        for (final c in lesson.chips.where((c) => !d.w.attached.containsValue(c.key)))
+          Padding(
+            padding: const EdgeInsets.only(right: 7),
+            child: GestureDetector(
+              onTap: () => setState(() {
+                chip = chip == c.key ? '' : c.key;
+                if (chip.isNotEmpty) _say('${c.label}: now tap the screw it belongs on.', ok: true);
+              }),
+              child: Container(
+                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(color: c.color, borderRadius: BorderRadius.circular(14), border: Border.all(color: chip == c.key ? const Color(0xFF67E8F9) : Colors.white24, width: chip == c.key ? 3 : 1)),
+                child: Center(child: Text(c.label, style: TextStyle(color: c.ink, fontWeight: FontWeight.w900, fontSize: 12))),
+              ),
+            ),
+          ),
+      if (d.w.stage == 0 && chip.isNotEmpty)
+        for (final hk in lesson.hookups.where((hk) => !d.w.attached.containsKey(hk.id)))
+          Padding(
+            padding: const EdgeInsets.only(right: 7),
+            child: GestureDetector(
+              onTap: () => _pickBench(active, hk.id),
+              child: Container(
+                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 11),
+                decoration: BoxDecoration(color: const Color(0xFF0E7490).withValues(alpha: 0.35), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFF67E8F9))),
+                child: Center(child: Text('➜ ${hk.name}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11.5))),
+              ),
+            ),
+          ),
+    ];
+  }
+
   String _next() {
     if (p.failed) return 'The job is over.';
     String names(Iterable<int> ids) => ids.map((i) => slotById(i).name).join(', ');
@@ -887,6 +961,8 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
               ]),
             ),
             if (armed.isNotEmpty) _spotButtons(),
+          ] else if (sideways) ...[
+            SizedBox(key: const Key('work-row'), height: 46, child: ListView(scrollDirection: Axis.horizontal, children: _workRow(d, lesson!))),
           ] else ...[
             Wrap(spacing: 8, runSpacing: 6, children: [
               if (d.w.stage == 0)

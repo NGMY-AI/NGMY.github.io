@@ -316,6 +316,7 @@ class Stage3D extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final sideways = MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
     if (bare) return Scene3DView(scene: scene, cam: cam, highlight: highlight, onPick: onPick, dynamicPolys: dynamicPolys, dynamicScreens: dynamicScreens, layerOn: layerOn, background: kConBg, onDoubleTap: onDoubleTap, sky: sky);
     return Stack(children: [
       Positioned.fill(child: Scene3DView(scene: scene, cam: cam, highlight: highlight, onPick: onPick, dynamicPolys: dynamicPolys, dynamicScreens: dynamicScreens, layerOn: layerOn, background: kConBg, onDoubleTap: onDoubleTap, sky: sky)),
@@ -346,34 +347,41 @@ class Stage3D extends StatelessWidget {
       if (bottom != null) Positioned(left: 0, right: 0, bottom: 14, child: Center(child: bottom!)),
       if (message != null)
         Positioned(
-          left: 10,
-          right: 62,
-          top: messageTop ?? (topLeft != null ? 60 : 10),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
-            decoration: BoxDecoration(color: (good ? const Color(0xFF14532D) : const Color(0xFF7F1D1D)).withValues(alpha: 0.95), borderRadius: BorderRadius.circular(14), border: Border.all(color: good ? const Color(0xFF4ADE80) : const Color(0xFFF87171))),
-            child: Text(message!, style: const TextStyle(color: Colors.white, fontSize: 12.5, height: 1.35, fontWeight: FontWeight.w700)),
+          // Turned on its side the message is a small note in a corner, not a wide banner across the work.
+          left: sideways ? 236 : 10,
+          right: sideways ? null : 62,
+          top: sideways ? 6 : (messageTop ?? (topLeft != null ? 60 : 10)),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: sideways ? (MediaQuery.of(context).size.width * 0.4).clamp(190.0, 330.0).toDouble() : double.infinity),
+            child: Container(
+              padding: sideways ? const EdgeInsets.fromLTRB(9, 6, 9, 6) : const EdgeInsets.fromLTRB(12, 9, 12, 9),
+              decoration: BoxDecoration(color: (good ? const Color(0xFF14532D) : const Color(0xFF7F1D1D)).withValues(alpha: sideways ? 0.88 : 0.95), borderRadius: BorderRadius.circular(sideways ? 10 : 14), border: Border.all(color: good ? const Color(0xFF4ADE80) : const Color(0xFFF87171))),
+              child: Text(message!, maxLines: sideways ? 3 : null, overflow: sideways ? TextOverflow.ellipsis : null, style: TextStyle(color: Colors.white, fontSize: sideways ? 10.5 : 12.5, height: 1.3, fontWeight: FontWeight.w700)),
+            ),
           ),
         ),
       if (info != null)
         Positioned(
-          left: 10,
-          right: 10,
+          left: sideways ? 8 : 10,
+          right: sideways ? null : 10,
           bottom: 8,
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
-            decoration: BoxDecoration(color: const Color(0xF2111318), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white24)),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(info!.name, style: const TextStyle(color: Color(0xFF67E8F9), fontWeight: FontWeight.w900, fontSize: 14.5)),
-                  const SizedBox(height: 3),
-                  Text(info!.about, style: const TextStyle(color: Colors.white70, fontSize: 12.5, height: 1.4)),
-                  if (infoAction != null) ...[const SizedBox(height: 6), infoAction!],
-                ]),
-              ),
-              IconButton(visualDensity: VisualDensity.compact, onPressed: onHome, icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 20)),
-            ]),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: sideways ? (MediaQuery.of(context).size.width * 0.36).clamp(180.0, 300.0).toDouble() : double.infinity),
+            child: Container(
+              padding: sideways ? const EdgeInsets.fromLTRB(9, 6, 2, 6) : const EdgeInsets.fromLTRB(14, 10, 10, 10),
+              decoration: BoxDecoration(color: sideways ? const Color(0xD9111318) : const Color(0xF2111318), borderRadius: BorderRadius.circular(sideways ? 11 : 16), border: Border.all(color: Colors.white24)),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(info!.name, maxLines: sideways ? 1 : null, overflow: sideways ? TextOverflow.ellipsis : null, style: TextStyle(color: const Color(0xFF67E8F9), fontWeight: FontWeight.w900, fontSize: sideways ? 11.5 : 14.5)),
+                    SizedBox(height: sideways ? 1 : 3),
+                    Text(info!.about, maxLines: sideways ? 2 : null, overflow: sideways ? TextOverflow.ellipsis : null, style: TextStyle(color: Colors.white70, fontSize: sideways ? 10 : 12.5, height: sideways ? 1.25 : 1.4)),
+                    if (infoAction != null) ...[const SizedBox(height: 6), infoAction!],
+                  ]),
+                ),
+                IconButton(visualDensity: VisualDensity.compact, constraints: sideways ? const BoxConstraints(minWidth: 30, minHeight: 30) : null, padding: sideways ? EdgeInsets.zero : const EdgeInsets.all(8), onPressed: onHome, icon: Icon(Icons.close_rounded, color: Colors.white54, size: sideways ? 16 : 20)),
+              ]),
+            ),
           ),
         ),
     ]);

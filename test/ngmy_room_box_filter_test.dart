@@ -65,6 +65,64 @@ void main() {
     await t.pump(const Duration(seconds: 1));
   });
 
+  testWidgets('turned on its side, working on a device: the buttons are icons in one row with the wires, and the messages are small and out of the way', (t) async {
+    t.view.physicalSize = const Size(1800, 800);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    final p = RoomProject(seed: 3, kind: 0)..fastForward();
+    await t.pumpWidget(MaterialApp(home: NgmyRoomProjectPage(project: p)));
+    await t.pump(const Duration(milliseconds: 600));
+    final st = t.state(find.byType(NgmyRoomProjectPage)) as dynamic;
+    final slot = p.orders.firstWhere((o) => o.device == 'outlet').slot;
+    st.pickBoxForTest(slot);
+    await t.pump(const Duration(milliseconds: 300));
+    await t.tap(find.text('Outlet'));
+    await t.pump(const Duration(milliseconds: 900));
+    await t.pump(const Duration(milliseconds: 600));
+    // The bench is open: one row, no big buttons with words.
+    expect(find.byKey(const Key('work-row')), findsOneWidget);
+    expect(find.text('Back to the room'), findsNothing);
+    expect(find.text('Fasten every wire'), findsNothing);
+    expect(find.textContaining('Take it out and put in'), findsNothing);
+    expect(find.byTooltip('Back to the room'), findsOneWidget);
+    expect(find.byTooltip('Fasten every wire first'), findsOneWidget);
+    expect(find.byTooltip('Take it out and put in a different one'), findsOneWidget);
+    // They are all the same height and on the same line as the wire chips.
+    final back = t.getRect(find.byTooltip('Back to the room'));
+    final wire = t.getRect(find.text('Bare copper · ground'));
+    expect((back.center.dy - wire.center.dy).abs(), lessThan(8), reason: 'in line with the wires');
+    expect(back.height, inInclusiveRange(44, 46));
+    // The message that tells what happened is a small note in a corner.
+    final note = find.textContaining('is held up to');
+    expect(note, findsOneWidget);
+    final box = t.getRect(find.ancestor(of: note, matching: find.byType(Container)).first);
+    expect(box.width, lessThan(900 * 0.45), reason: 'a small note, not a banner across the work');
+    expect(box.left, greaterThan(200), reason: 'clear of the hearts and the breaker button');
+    // Wires can still be picked from that row: pick one and the screws appear in the same row.
+    await t.tap(find.text('Bare copper · ground'));
+    await t.pump(const Duration(milliseconds: 300));
+    expect(find.textContaining('➜'), findsWidgets);
+    await t.pump(const Duration(seconds: 12));
+  });
+
+  testWidgets('standing up straight the bench keeps its big buttons with words', (t) async {
+    t.view.physicalSize = const Size(1000, 2000);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    final p = RoomProject(seed: 3, kind: 0)..fastForward();
+    await t.pumpWidget(MaterialApp(home: NgmyRoomProjectPage(project: p)));
+    await t.pump(const Duration(milliseconds: 600));
+    final st = t.state(find.byType(NgmyRoomProjectPage)) as dynamic;
+    st.pickBoxForTest(p.orders.firstWhere((o) => o.device == 'outlet').slot);
+    await t.pump(const Duration(milliseconds: 300));
+    await t.tap(find.text('Outlet'));
+    await t.pump(const Duration(milliseconds: 900));
+    await t.pump(const Duration(milliseconds: 600));
+    expect(find.byKey(const Key('work-row')), findsNothing);
+    expect(find.text('Back to the room'), findsOneWidget);
+    await t.pump(const Duration(seconds: 12));
+  });
+
   testWidgets('standing up straight the phase tabs and the hint are all there, as before', (t) async {
     t.view.physicalSize = const Size(1000, 2000);
     t.view.devicePixelRatio = 2.0;
