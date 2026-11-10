@@ -1,23 +1,23 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var J,A,C,B={
-bE7(d){var x,w,v=null
+bE8(d){var x,w,v=null
 if(d==null||C.a.i(d).length===0)return v
 x=C.a.a0(d,"ngmy:ws-thumb:")
 if(x)return v
 if(C.a.a0(d,"data:image"))try{x=A.us(d)
 x.toString
 return x}catch(w){return v}return v},
-idT(d){var x,w,v=d==null?null:C.a.i(d)
+ie0(d){var x,w,v=d==null?null:C.a.i(d)
 if(v==null)v=""
 if(v.length===0)return null
-x=$.frL.h(0,v)
+x=$.frQ.h(0,v)
 if(x!=null)return x
-w=B.bE7(v)
-if(w!=null){if($.frL.a>64)$.frL.aa(0)
-$.frL.n(0,v,w)}return w},
+w=B.bE8(v)
+if(w!=null){if($.frQ.a>64)$.frQ.aa(0)
+$.frQ.n(0,v,w)}return w},
 aQL(d,e,f,g,h,i,j){var x,w,v=null,u=d==null?A.m(12):d
 if(i!=null&&C.a.a0(i,"ngmy:ws-thumb:"))return A.bx(u,new B.aFQ(i,j,f,e,g,h,v),C.ap)
-x=B.idT(i)
+x=B.ie0(i)
 if(x!=null)return A.bx(u,A.tv(C.A,v,C.h8,e,!0,f,x,!1,v,j),C.ap)
 w=C.cY.j(0.15)
 return A.p(v,A.X(g,h==null?C.cY:h,v,v,v,32),C.f,v,v,new A.o(w,v,v,u,v,v,C.n),v,f,v,v,v,v,v,j)},
@@ -29,24 +29,24 @@ _.f=g
 _.r=h
 _.w=i
 _.a=j},
-bmu:function bmu(){this.c=this.a=this.d=null},
-eQT:function eQT(d,e){this.a=d
+bmv:function bmv(){this.c=this.a=this.d=null},
+eQY:function eQY(d,e){this.a=d
 this.b=e},
-h8u(){var x,w=window
+h8D(){var x,w=window
 w.toString
 x=w.indexedDB||w.webkitIndexedDB||w.mozIndexedDB
 if(x==null)throw A.W(A.be("IndexedDB not available"))
-return C.zg.Ml(x,"ngmy_worksheet_thumbs_v1",new B.fsw(),1)},
-hZS(d){var x,w,v=null
+return C.zg.Mn(x,"ngmy_worksheet_thumbs_v1",new B.fsB(),1)},
+i__(d){var x,w,v=null
 if(d==null)return v
 if(y.o.b(d))return new Uint8Array(A.cn(d))
 if(y.i.b(d))return new Uint8Array(A.cn(J.eH(d,0,null)))
-if(y.A.b(d))return new Uint8Array(A.cn(A.ym(d,0,v)))
+if(y.A.b(d))return new Uint8Array(A.cn(A.yn(d,0,v)))
 if(y.w.b(d))return new Uint8Array(A.cn(d))
 if(typeof d=="string")try{x=C.cF.aO(d)
 return x}catch(w){return v}return v},
-aRo(d){return B.iiW(d)},
-iiW(d){var x=0,w=A.j(y.n),v,u=2,t=[],s,r,q,p,o,n,m,l
+aRo(d){return B.ij3(d)},
+ij3(d){var x=0,w=A.j(y.n),v,u=2,t=[],s,r,q,p,o,n,m,l
 var $async$aRo=A.e(function(e,f){if(e===1){t.push(f)
 x=u}for(;;)switch(x){case 0:m=C.a.i(d)
 if(m.length===0){v=null
@@ -54,15 +54,15 @@ x=1
 break}u=4
 o=$.aOL
 x=7
-return A.b(o==null?$.aOL=B.h8u():o,$async$aRo)
+return A.b(o==null?$.aOL=B.h8D():o,$async$aRo)
 case 7:s=f
 r=J.mX(s,"thumbs","readonly")
 x=8
-return A.b(C.j1.zG(J.mW(r,"thumbs"),m),$async$aRo)
+return A.b(C.j2.zH(J.mW(r,"thumbs"),m),$async$aRo)
 case 8:q=f
 x=9
 return A.b(J.pN(r),$async$aRo)
-case 9:m=B.hZS(q)
+case 9:m=B.i__(q)
 v=m
 x=1
 break
@@ -83,57 +83,57 @@ break
 case 6:case 1:return A.h(v,w)
 case 2:return A.f(t.at(-1),w)}})
 return A.i($async$aRo,w)},
-fsw:function fsw(){},
-hyY(d){if(!(d!=null&&C.a.a0(d,"ngmy:ws-thumb:")))return null
+fsB:function fsB(){},
+hz5(d){if(!(d!=null&&C.a.a0(d,"ngmy:ws-thumb:")))return null
 return C.a.b5(d,14)},
-clS(d){var x=0,w=A.j(y.n),v,u
-var $async$clS=A.e(function(e,f){if(e===1)return A.f(f,w)
-for(;;)switch(x){case 0:u=B.hyY(d)
+clT(d){var x=0,w=A.j(y.n),v,u
+var $async$clT=A.e(function(e,f){if(e===1)return A.f(f,w)
+for(;;)switch(x){case 0:u=B.hz5(d)
 if(u==null){v=null
 x=1
-break}v=B.clR(u)
+break}v=B.clS(u)
 x=1
 break
 case 1:return A.h(v,w)}})
-return A.i($async$clS,w)},
-clR(d){var x=0,w=A.j(y.n),v,u,t,s
-var $async$clR=A.e(function(e,f){if(e===1)return A.f(f,w)
+return A.i($async$clT,w)},
+clS(d){var x=0,w=A.j(y.n),v,u,t,s
+var $async$clS=A.e(function(e,f){if(e===1)return A.f(f,w)
 for(;;)switch(x){case 0:s=C.a.i(d)
 if(s.length===0){v=null
 x=1
-break}u=$.clP.h(0,s)
+break}u=$.clQ.h(0,s)
 if(u!=null&&!C.aG.gan(u)){v=u
 x=1
 break}x=3
-return A.b(B.aRo(s),$async$clR)
+return A.b(B.aRo(s),$async$clS)
 case 3:t=f
-if(t!=null&&!C.aG.gan(t)){$.clP.n(0,s,t)
+if(t!=null&&!C.aG.gan(t)){$.clQ.n(0,s,t)
 v=t
 x=1
 break}v=null
 x=1
 break
 case 1:return A.h(v,w)}})
-return A.i($async$clR,w)}}
+return A.i($async$clS,w)}}
 J=c[1]
 A=c[0]
 C=c[2]
 B=a.updateHolder(c[61],B)
 B.aFQ.prototype={
-R(){return new B.bmu()}}
-B.bmu.prototype={
+R(){return new B.bmv()}}
+B.bmv.prototype={
 Z(){this.a2()
-this.a_R()},
+this.a_U()},
 bz(d){this.bH(d)
-if(d.c!==this.a.c)this.a_R()},
-a_R(){var x=0,w=A.j(y.v),v=this,u
-var $async$a_R=A.e(function(d,e){if(d===1)return A.f(e,w)
+if(d.c!==this.a.c)this.a_U()},
+a_U(){var x=0,w=A.j(y.v),v=this,u
+var $async$a_U=A.e(function(d,e){if(d===1)return A.f(e,w)
 for(;;)switch(x){case 0:x=2
-return A.b(B.clS(v.a.c),$async$a_R)
+return A.b(B.clT(v.a.c),$async$a_U)
 case 2:u=e
-if(v.c!=null)v.m(new B.eQT(v,u))
+if(v.c!=null)v.m(new B.eQY(v,u))
 return A.h(null,w)}})
-return A.i($async$a_R,w)},
+return A.i($async$a_U,w)},
 B(d){var x,w,v,u,t=this,s=null,r=t.d
 if(r!=null&&!C.aG.gan(r)){r=t.d
 r.toString
@@ -149,19 +149,19 @@ u=v.r
 v=v.w
 return A.p(s,A.X(u,v==null?C.cY:v,s,s,s,32),C.f,w,s,s,s,r,s,s,s,s,s,x)}}
 var z=a.updateTypes([])
-B.eQT.prototype={
+B.eQY.prototype={
 $0(){return this.a.d=this.b},
 $S:0}
-B.fsw.prototype={
-$1(d){var x=y.h.a(new A.r_([],[]).oA(d.target.result,!1)),w=C.ye.t(x.objectStoreNames,"thumbs")
-if(!w)C.ya.L3(x,"thumbs")},
+B.fsB.prototype={
+$1(d){var x=y.h.a(new A.r_([],[]).oz(d.target.result,!1)),w=C.ye.t(x.objectStoreNames,"thumbs")
+if(!w)C.ya.L5(x,"thumbs")},
 $S:190};(function inheritance(){var x=a.inherit
 x(B.aFQ,A.af)
-x(B.bmu,A.ah)
-x(B.eQT,A.iG)
-x(B.fsw,A.hy)})()
-A.j0(b.typeUniverse,JSON.parse('{"aFQ":{"af":[],"v":[]},"bmu":{"ah":["aFQ"]}}'))
-var y={i:A.at("uz"),h:A.at("ri"),w:A.at("ai<G>"),A:A.at("lZ"),o:A.at("dK"),n:A.at("dK?"),v:A.at("~")};(function staticFields(){$.frL=A.U(A.at("n"),A.at("mh<aD>"))
-$.clP=A.U(A.at("n"),y.o)
+x(B.bmv,A.ah)
+x(B.eQY,A.iG)
+x(B.fsB,A.hy)})()
+A.j0(b.typeUniverse,JSON.parse('{"aFQ":{"af":[],"v":[]},"bmv":{"ah":["aFQ"]}}'))
+var y={i:A.at("uz"),h:A.at("ri"),w:A.at("ai<G>"),A:A.at("lZ"),o:A.at("dK"),n:A.at("dK?"),v:A.at("~")};(function staticFields(){$.frQ=A.U(A.at("n"),A.at("mh<aD>"))
+$.clQ=A.U(A.at("n"),y.o)
 $.aOL=null})()};
-(a=>{a["a3RE0uXTQXe3pzeZc1IpNhOy5YM="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["moRJ/GVqSBwzSYXfmUv2cpxGIxE="]=a.current})($__dart_deferred_initializers__);
