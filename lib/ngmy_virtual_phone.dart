@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_vphone_extra.dart';
 import 'ngmy_vphone_link.dart';
 import 'ngmy_vphone_player.dart';
 
@@ -31,6 +32,8 @@ const List<PhoneAppDef> kPhoneApps = [
   PhoneAppDef('notes', 'Notes', Icons.sticky_note_2_rounded, [Color(0xFFFACC15), Color(0xFFF59E0B)]),
   PhoneAppDef('calc', 'Calculator', Icons.calculate_rounded, [Color(0xFF475569), Color(0xFF1E293B)]),
   PhoneAppDef('clock', 'Clock', Icons.access_time_filled_rounded, [Color(0xFF22C55E), Color(0xFF14B8A6)]),
+  PhoneAppDef('store', 'App Store', Icons.shopping_bag_rounded, [Color(0xFF3B82F6), Color(0xFF1D4ED8)]),
+  PhoneAppDef('files', 'Files', Icons.folder_rounded, [Color(0xFFFB923C), Color(0xFFC2410C)]),
   PhoneAppDef('settings', 'Settings', Icons.settings_rounded, [Color(0xFF94A3B8), Color(0xFF64748B)]),
 ];
 
@@ -69,6 +72,22 @@ class NgmyVirtualPhoneState extends State<NgmyVirtualPhonePage> {
   Timer? _tick, _bannerTimer;
   DateTime now = DateTime.now();
   bool loaded = false;
+  final PhoneData data = PhoneData();
+
+  /// The built-in apps and the ones installed from the App Store.
+  List<PhoneAppDef> get allApps => [...kPhoneApps, for (final a in kStoreApps) if (data.isInstalled(a.def.id)) a.def];
+
+  void saveData() => _save();
+
+  void installApp(String id) {
+    setState(() => data.installed.add(id));
+    _save();
+  }
+
+  void removeApp(String id) {
+    setState(() => data.installed.remove(id));
+    _save();
+  }
 
   @override
   void initState() {
@@ -95,6 +114,7 @@ class NgmyVirtualPhoneState extends State<NgmyVirtualPhonePage> {
         wallpaper = ((m['wall'] as num?)?.toInt() ?? 0).clamp(0, kPhoneWallpapers.length - 1);
         brightness = ((m['bright'] as num?)?.toDouble() ?? 1.0).clamp(0.3, 1.0);
         phoneName = (m['name'] as String?) ?? phoneName;
+        data.load((m['data'] as Map?)?.cast<String, dynamic>());
         notes
           ..clear()
           ..addAll(((m['notes'] as List?) ?? const []).map((e) => '$e'));
@@ -113,7 +133,7 @@ class NgmyVirtualPhoneState extends State<NgmyVirtualPhonePage> {
   Future<void> _save() async {
     try {
       final p = await SharedPreferences.getInstance();
-      await p.setString(_kPrefs, jsonEncode({'wall': wallpaper, 'bright': brightness, 'name': phoneName, 'notes': notes, 'saved': [for (final s in saved) s.toJson()], 'recent': [for (final s in recent) s.toJson()]}));
+      await p.setString(_kPrefs, jsonEncode({'wall': wallpaper, 'bright': brightness, 'name': phoneName, 'notes': notes, 'saved': [for (final s in saved) s.toJson()], 'recent': [for (final s in recent) s.toJson()], 'data': data.toJson()}));
     } catch (_) {}
   }
 
@@ -194,6 +214,7 @@ class NgmyVirtualPhoneState extends State<NgmyVirtualPhonePage> {
       wallpaper = 0;
       brightness = 1;
       phoneName = 'My NGMY Phone';
+      data.reset();
       app = null;
       locked = true;
     });
@@ -258,14 +279,14 @@ class NgmyVirtualPhoneState extends State<NgmyVirtualPhonePage> {
   }
 
   Widget _wallpaperLayer() {
-    if (!locked && app != null) return ColoredBox(color: app == 'calc' ? Colors.black : (app == 'videos' ? const Color(0xFF0B0B0F) : const Color(0xFFF8FAFC)));
+    if (!locked && app != null) return ColoredBox(color: app == 'calc' ? Colors.black : (app == 'videos' || app == 'music' ? const Color(0xFF0B0B0F) : const Color(0xFFF8FAFC)));
     final c = kPhoneWallpapers[wallpaper];
     return Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: c)));
   }
 
   Widget _statusBar(double w) {
     final hh = now.hour.toString().padLeft(2, '0'), mm = now.minute.toString().padLeft(2, '0');
-    final dark = app != null && app != 'videos' && app != 'calc';
+    final dark = app != null && app != 'videos' && app != 'calc' && app != 'music';
     final col = dark ? Colors.black87 : Colors.white;
     final fs = (w * 0.04).clamp(10.0, 15.0);
     return Padding(
@@ -299,7 +320,7 @@ class NgmyVirtualPhoneState extends State<NgmyVirtualPhonePage> {
           if ((d.primaryVelocity ?? 0) < -200) goHome();
         },
         child: Center(
-          child: Container(width: 110, height: 5, decoration: BoxDecoration(color: (app != null && app != 'videos' && app != 'calc') ? Colors.black54 : Colors.white70, borderRadius: BorderRadius.circular(3))),
+          child: Container(width: 110, height: 5, decoration: BoxDecoration(color: (app != null && app != 'videos' && app != 'calc' && app != 'music') ? Colors.black54 : Colors.white70, borderRadius: BorderRadius.circular(3))),
         ),
       );
 
@@ -313,7 +334,7 @@ class NgmyVirtualPhoneState extends State<NgmyVirtualPhonePage> {
       'calc' => const _CalcApp(),
       'clock' => _ClockApp(phone: this),
       'settings' => _SettingsApp(phone: this),
-      _ => _homeScreen(),
+      _ => (app == null ? null : buildExtraApp(app!, this)) ?? _homeScreen(),
     };
     return AnimatedSwitcher(duration: const Duration(milliseconds: 220), child: KeyedSubtree(key: ValueKey(app ?? 'home'), child: content));
   }
@@ -344,7 +365,7 @@ class NgmyVirtualPhoneState extends State<NgmyVirtualPhonePage> {
   }
 
   Widget _homeScreen() {
-    const dock = ['videos', 'web', 'notes', 'settings'];
+    const dock = ['videos', 'web', 'store', 'settings'];
     final hh = now.hour.toString().padLeft(2, '0'), mm = now.minute.toString().padLeft(2, '0');
     return Column(children: [
       const SizedBox(height: 14),
@@ -365,8 +386,7 @@ class NgmyVirtualPhoneState extends State<NgmyVirtualPhonePage> {
           padding: const EdgeInsets.symmetric(horizontal: 12),
           mainAxisSpacing: 14,
           childAspectRatio: 0.82,
-          physics: const NeverScrollableScrollPhysics(),
-          children: [for (final a in kPhoneApps) _AppIcon(a, onTap: () => openApp(a.id))],
+                    children: [for (final a in allApps) _AppIcon(a, onTap: () => openApp(a.id))],
         ),
       ),
       Container(
@@ -920,6 +940,8 @@ class _SettingsAppState extends State<_SettingsApp> {
     return _AppPage(
       title: 'Settings',
       child: ListView(padding: const EdgeInsets.all(16), children: [
+        PhoneIdentitySection(phone: p),
+        const SizedBox(height: 18),
         const Text('Phone name', style: TextStyle(fontWeight: FontWeight.w800)),
         const SizedBox(height: 6),
         TextField(controller: _name, onChanged: p.setName, decoration: InputDecoration(filled: true, fillColor: const Color(0xFFE2E8F0), isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none))),
