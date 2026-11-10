@@ -13,10 +13,13 @@ int _counter = 0;
 /// The player of the virtual phone on the web: a real video element for video files, and a frame for YouTube, Vimeo and web pages.
 /// [onEnded] is called when the video reaches its end. [muted] starts it without sound (a browser only starts several videos by themselves when they are muted).
 class VPhonePlayer extends StatefulWidget {
-  const VPhonePlayer({super.key, required this.link, this.onEnded, this.muted = false});
+  const VPhonePlayer({super.key, required this.link, this.onEnded, this.muted = false, this.cover = false});
   final VPhoneLink link;
   final VoidCallback? onEnded;
   final bool muted;
+
+  /// Fill the whole screen with the picture (the sides of a wide video are cut) instead of leaving black round it.
+  final bool cover;
 
   @override
   State<VPhonePlayer> createState() => _VPhonePlayerState();
@@ -36,17 +39,21 @@ class _VPhonePlayerState extends State<VPhonePlayer> {
   }
 
   String _embedFor(VPhoneLink link) {
+    // A player that nobody listens to is left exactly as it was (it starts at once). Only a player on the wall, which has to tell
+    // when the video is over, asks for the player messages, and starts without sound.
     var u = link.embed;
+    if (widget.onEnded == null) return u;
     if (link.kind == VPhoneLinkKind.youtube) {
-      u += '&enablejsapi=1&origin=${Uri.encodeComponent(html.window.location.origin)}${widget.muted ? '&mute=1' : ''}';
-    } else if (link.kind == VPhoneLinkKind.vimeo && widget.muted) {
-      u += '&muted=1';
+      u += '&enablejsapi=1${widget.muted ? '&mute=1' : ''}${widget.cover ? '&controls=0&disablekb=1' : ''}';
+    } else if (link.kind == VPhoneLinkKind.vimeo) {
+      u += '${widget.muted ? '&muted=1' : ''}${widget.cover ? '&controls=0' : ''}';
     }
     return u;
   }
 
   void _listen() {
     final link = widget.link;
+    if (widget.onEnded == null) return;
     if (link.kind != VPhoneLinkKind.youtube && link.kind != VPhoneLinkKind.vimeo) return;
     _messages = html.window.onMessage.listen((e) {
       final f = _frame;
@@ -89,7 +96,7 @@ class _VPhonePlayerState extends State<VPhonePlayer> {
           ..setAttribute('webkit-playsinline', 'true')
           ..style.width = '100%'
           ..style.height = '100%'
-          ..style.objectFit = 'contain'
+          ..style.objectFit = widget.cover ? 'cover' : 'contain'
           ..style.backgroundColor = '#000';
         if (widget.muted) v.setAttribute('muted', 'true');
         v.onError.listen((_) {
@@ -115,7 +122,7 @@ class _VPhonePlayerState extends State<VPhonePlayer> {
         ..setAttribute('allow', 'autoplay; fullscreen; picture-in-picture; encrypted-media; clipboard-write')
         ..setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
       _frame = f;
-      f.onLoad.listen((_) {
+      if (widget.onEnded != null) f.onLoad.listen((_) {
         // Ask the player to tell us when it finishes.
         try {
           if (link.kind == VPhoneLinkKind.youtube) {
@@ -146,6 +153,19 @@ class _VPhonePlayerState extends State<VPhonePlayer> {
         child: Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 11, height: 1.3)),
       );
     }
-    return ColoredBox(color: Colors.black, child: HtmlElementView(viewType: _viewType));
+    final view = HtmlElementView(viewType: _viewType);
+    if (!widget.cover || widget.link.kind == VPhoneLinkKind.file) return ColoredBox(color: Colors.black, child: view);
+    // Cover: the frame is made as big as it needs to be for the picture (16 by 9) to fill the screen, and what sticks out is cut off.
+    return ClipRect(
+      child: ColoredBox(
+        color: Colors.black,
+        child: LayoutBuilder(builder: (context, c) {
+          final sw = c.maxWidth, sh = c.maxHeight;
+          final w = sw / sh > 16 / 9 ? sw : sh * 16 / 9;
+          final h = sw / sh > 16 / 9 ? sw * 9 / 16 : sh;
+          return OverflowBox(minWidth: w, maxWidth: w, minHeight: h, maxHeight: h, child: SizedBox(width: w, height: h, child: view));
+        }),
+      ),
+    );
   }
 }

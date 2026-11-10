@@ -105,6 +105,10 @@ void main() {
     expect(find.byKey(const Key('vphone-problem')), findsOneWidget);
     await t.enterText(find.byKey(const Key('vphone-link-field')), 'https://youtu.be/dQw4w9WgXcQ');
     await t.tap(find.byKey(const Key('vphone-play')));
+    await t.pump(const Duration(milliseconds: 700));
+    await t.tap(find.byKey(const Key('wall-one')));
+    await t.pump(const Duration(milliseconds: 800));
+    expect(p.wallLink, isNull);
     await t.pump(const Duration(milliseconds: 300));
     expect(find.byKey(const Key('vphone-problem')), findsNothing);
     expect(find.text('YouTube video dQw4w9WgXcQ'), findsWidgets);

@@ -6,10 +6,11 @@ import 'ngmy_vphone_link.dart';
 
 /// The player of the virtual phone off the web: video files play here, other links open in the phone's browser.
 class VPhonePlayer extends StatefulWidget {
-  const VPhonePlayer({super.key, required this.link, this.onEnded, this.muted = false});
+  const VPhonePlayer({super.key, required this.link, this.onEnded, this.muted = false, this.cover = false});
   final VPhoneLink link;
   final VoidCallback? onEnded;
   final bool muted;
+  final bool cover;
 
   @override
   State<VPhonePlayer> createState() => _VPhonePlayerState();

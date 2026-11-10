@@ -7,7 +7,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_stripe_payments.dart';
 import 'ngmy_virtual_phone.dart';
-import 'ngmy_vphone_wall.dart';
 
 abstract final class NgmyPhoneUnlockColors {
   static const sky = Color(0xFF0EA5E9);
@@ -197,15 +196,6 @@ class NgmyPhoneUnlockPage extends StatelessWidget {
                         colors: const [Color(0xFFEC4899), Color(0xFF8B5CF6), Color(0xFF0EA5E9)],
                         pulse: pulse,
                         onTap: () => showNgmyVirtualPhone(context),
-                      ),
-                      const SizedBox(height: 10),
-                      _QuickOpenButton(
-                        label: 'Phone Wall',
-                        subtitle: '100 phones, four at a time, all playing your video',
-                        icon: Icons.dashboard_customize_rounded,
-                        colors: const [Color(0xFF0EA5E9), Color(0xFF6366F1), Color(0xFFEC4899)],
-                        pulse: pulse,
-                        onTap: () => showNgmyPhoneWall(context),
                       ),
                       const SizedBox(height: 24),
                       Text(

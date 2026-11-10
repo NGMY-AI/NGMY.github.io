@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_vphone_extra.dart';
 import 'ngmy_vphone_link.dart';
+import 'ngmy_vphone_wall.dart';
 import 'ngmy_vphone_player.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -73,6 +74,19 @@ class NgmyVirtualPhoneState extends State<NgmyVirtualPhonePage> {
   DateTime now = DateTime.now();
   bool loaded = false;
   final PhoneData data = PhoneData();
+
+  /// The video that the wall of phones is playing (null: just this one phone), and the last video, so coming back to one phone plays it here.
+  VPhoneLink? wallLink;
+  VPhoneLink lastLink = VPhoneLink.none;
+  int wallRun = 0;
+
+  void startWall(VPhoneLink l) => setState(() {
+        lastLink = l;
+        wallLink = l;
+        wallRun++;
+      });
+
+  void endWall() => setState(() => wallLink = null);
 
   /// The built-in apps and the ones installed from the App Store.
   List<PhoneAppDef> get allApps => [...kPhoneApps, for (final a in kStoreApps) if (data.isInstalled(a.def.id)) a.def];
@@ -235,11 +249,11 @@ class NgmyVirtualPhoneState extends State<NgmyVirtualPhonePage> {
               const SizedBox(width: 8),
               const Text('Phone', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
               const SizedBox(width: 10),
-              Expanded(child: Text('A phone of its own, inside NGMY', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12.5))),
+              Expanded(child: Text(wallLink != null ? '100 phones, four at a time' : 'A phone of its own, inside NGMY', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12.5))),
             ]),
           ),
           Expanded(
-            child: LayoutBuilder(builder: (context, c) {
+            child: wallLink != null ? NgmyPhoneWallView(key: ValueKey('wall$wallRun'), link: wallLink!, onOneDevice: endWall) : LayoutBuilder(builder: (context, c) {
               final h = (c.maxHeight - 16).clamp(300.0, 900.0);
               final w = (h * 9 / 19).clamp(180.0, c.maxWidth - 16);
               final height = w * 19 / 9 > c.maxHeight - 8 ? c.maxHeight - 8 : w * 19 / 9;
@@ -463,8 +477,8 @@ class _VideosApp extends StatefulWidget {
 }
 
 class _VideosAppState extends State<_VideosApp> {
-  final _text = TextEditingController();
-  VPhoneLink _now = VPhoneLink.none;
+  late final _text = TextEditingController(text: widget.phone.lastLink.url);
+  late VPhoneLink _now = widget.phone.lastLink;
   String? _problem;
   int _playId = 0;
 
@@ -484,6 +498,11 @@ class _VideosAppState extends State<_VideosApp> {
     }
     FocusManager.instance.primaryFocus?.unfocus();
     phone.remember(l);
+    // A video link opens the four phones of the wall, all playing it. (A web page link stays on this one phone.)
+    if (l.kind != VPhoneLinkKind.page) {
+      phone.startWall(l);
+      return;
+    }
     setState(() {
       _problem = null;
       _now = l;

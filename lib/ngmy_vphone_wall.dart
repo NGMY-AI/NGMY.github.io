@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_virtual_phone.dart';
@@ -16,8 +15,6 @@ import 'ngmy_vphone_player.dart';
 // Four are in front, two in a row. Paste a video link and all four play it by themselves. When the video is over the next four
 // phones come in and play it too, set after set, until all 100 have, and then it starts again from the first set.
 // ═════════════════════════════════════════════════════════════════════════════
-
-Future<void> showNgmyPhoneWall(BuildContext context) => Navigator.of(context).push<void>(MaterialPageRoute<void>(builder: (_) => const NgmyPhoneWallPage()));
 
 /// Which phones are in front: set after set, and round after round.
 class PhoneWallPlan {
@@ -77,36 +74,37 @@ List<WallPhoneInfo> makeWallPhones({int count = 100, math.Random? random}) {
   ];
 }
 
-class NgmyPhoneWallPage extends StatefulWidget {
-  const NgmyPhoneWallPage({super.key});
+/// The wall inside the Phone: it opens when a video starts in the Videos app. [link] is played on all the phones, four at a time.
+/// [onOneDevice] goes back to the single phone.
+class NgmyPhoneWallView extends StatefulWidget {
+  const NgmyPhoneWallView({super.key, required this.link, required this.onOneDevice});
+  final VPhoneLink link;
+  final VoidCallback onOneDevice;
 
   @override
-  State<NgmyPhoneWallPage> createState() => NgmyPhoneWallState();
+  State<NgmyPhoneWallView> createState() => NgmyPhoneWallState();
 }
 
-class NgmyPhoneWallState extends State<NgmyPhoneWallPage> {
+class NgmyPhoneWallState extends State<NgmyPhoneWallView> {
   final plan = PhoneWallPlan();
   List<WallPhoneInfo> phones = [];
   VPhoneLink link = VPhoneLink.none;
   bool playing = false;
-  bool landscape = true;
   bool loaded = false;
-  String? problem;
   int _token = 0;
   int _run = 0;
   Timer? _advance;
-  final _text = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    link = widget.link;
     _load();
   }
 
   @override
   void dispose() {
     _advance?.cancel();
-    _text.dispose();
     super.dispose();
   }
 
@@ -127,7 +125,9 @@ class NgmyPhoneWallState extends State<NgmyPhoneWallPage> {
     } catch (_) {}
     phones = read ?? makeWallPhones();
     if (read == null) _save();
-    if (mounted) setState(() => loaded = true);
+    if (!mounted) return;
+    setState(() => loaded = true);
+    play(link);
   }
 
   Future<void> _save() async {
@@ -149,22 +149,16 @@ class NgmyPhoneWallState extends State<NgmyPhoneWallPage> {
     _save();
   }
 
-  void play(String raw) {
-    final l = parseVideoLink(raw);
-    if (l.kind != VPhoneLinkKind.youtube && l.kind != VPhoneLinkKind.vimeo && l.kind != VPhoneLinkKind.file) {
-      setState(() => problem = 'Paste the link of a video: YouTube, Vimeo, or a video file (mp4, webm...).');
-      return;
-    }
-    FocusManager.instance.primaryFocus?.unfocus();
+  /// Plays [l] on the phones, from the first four.
+  void play(VPhoneLink l) {
+    if (!l.playable) return;
     _advance?.cancel();
     setState(() {
-      problem = null;
       link = l;
       playing = true;
       _token++;
       _run++;
       plan.restart();
-      _text.text = l.url;
     });
     _startSet();
   }
@@ -196,162 +190,90 @@ class NgmyPhoneWallState extends State<NgmyPhoneWallPage> {
     });
   }
 
-  void restart() {
-    if (!link.playable) return;
-    play(link.url);
-  }
+  void restart() => play(link);
 
-  /// Tells the page that the video of the front set is over (what the players do by themselves; the buttons and the tests use it too).
+  /// Tells the wall that the video of the front set is over (what the players do by themselves; the buttons and the tests use it too).
   void videoEnded() => _ended(_token);
-
-  Future<void> _paste() async {
-    final d = await Clipboard.getData(Clipboard.kTextPlain);
-    final s = d?.text?.trim() ?? '';
-    if (s.isEmpty) return;
-    _text.text = s;
-    play(s);
-  }
 
   @override
   Widget build(BuildContext context) {
     final first = plan.phones.isEmpty ? 0 : plan.phones.first + 1, last = plan.phones.isEmpty ? 0 : plan.phones.last + 1;
-    return Scaffold(
-      backgroundColor: const Color(0xFF0B1020),
-      body: SafeArea(
-        child: !loaded
-            ? const Center(child: CircularProgressIndicator())
-            : Column(children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(6, 4, 12, 0),
-                  child: Row(children: [
-                    IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(Icons.arrow_back_rounded, color: Colors.white)),
-                    const Icon(Icons.dashboard_customize_rounded, color: Color(0xFF38BDF8)),
-                    const SizedBox(width: 8),
-                    const Text('Phone Wall', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text('100 phones, four at a time', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12.5))),
-                    IconButton(key: const Key('wall-orient'), tooltip: landscape ? 'Hold the phones upright' : 'Hold the phones sideways', onPressed: () => setState(() => landscape = !landscape), icon: Icon(landscape ? Icons.stay_current_portrait_rounded : Icons.stay_current_landscape_rounded, color: Colors.white70)),
-                  ]),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 2, 12, 0),
-                  child: Row(children: [
-                    Expanded(
-                      child: TextField(
-                        key: const Key('wall-link'),
-                        controller: _text,
-                        style: const TextStyle(color: Colors.white, fontSize: 14),
-                        keyboardType: TextInputType.url,
-                        textInputAction: TextInputAction.go,
-                        onSubmitted: play,
-                        decoration: InputDecoration(
-                          hintText: 'Paste a video link',
-                          hintStyle: const TextStyle(color: Colors.white38),
-                          filled: true,
-                          fillColor: Colors.white10,
-                          isDense: true,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-                          suffixIcon: IconButton(key: const Key('wall-paste'), onPressed: _paste, icon: const Icon(Icons.content_paste_rounded, color: Colors.white70, size: 20)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton(key: const Key('wall-play'), onPressed: () => play(_text.text), style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444), padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14)), child: const Icon(Icons.play_arrow_rounded)),
-                  ]),
-                ),
-                if (problem != null) Padding(padding: const EdgeInsets.fromLTRB(14, 6, 14, 0), child: Text(problem!, key: const Key('wall-problem'), style: const TextStyle(color: Color(0xFFFCA5A5), fontSize: 12.5))),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                  child: Row(children: [
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('Set ${plan.set + 1} of ${plan.sets} · phones $first to $last · round ${plan.round}', key: const Key('wall-status'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
-                        const SizedBox(height: 5),
-                        LinearProgressIndicator(value: (plan.set + 1) / plan.sets, minHeight: 5, backgroundColor: Colors.white12, color: const Color(0xFF38BDF8)),
-                      ]),
-                    ),
-                    IconButton(key: const Key('wall-skip'), tooltip: 'Next four phones', onPressed: playing ? nextSet : null, icon: const Icon(Icons.skip_next_rounded, color: Colors.white)),
-                    IconButton(key: const Key('wall-restart'), tooltip: 'Start again from phone 1', onPressed: link.playable ? restart : null, icon: const Icon(Icons.replay_rounded, color: Colors.white)),
-                    IconButton(key: const Key('wall-stop'), tooltip: 'Stop', onPressed: playing ? stop : null, icon: const Icon(Icons.stop_circle_rounded, color: Colors.white)),
-                  ]),
-                ),
-                Expanded(child: Padding(padding: const EdgeInsets.fromLTRB(10, 0, 18, 10), child: _wall())),
-              ]),
+    return Column(children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 4, 2),
+        child: Row(children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Set ${plan.set + 1} of ${plan.sets} · phones $first to $last · round ${plan.round}', key: const Key('wall-status'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
+              const SizedBox(height: 5),
+              LinearProgressIndicator(value: (plan.set + 1) / plan.sets, minHeight: 5, backgroundColor: Colors.white12, color: const Color(0xFF38BDF8)),
+            ]),
+          ),
+          IconButton(key: const Key('wall-skip'), tooltip: 'Next four phones', onPressed: playing ? nextSet : null, icon: const Icon(Icons.skip_next_rounded, color: Colors.white)),
+          IconButton(key: const Key('wall-restart'), tooltip: 'Start again from phone 1', onPressed: link.playable ? restart : null, icon: const Icon(Icons.replay_rounded, color: Colors.white)),
+          IconButton(key: const Key('wall-one'), tooltip: 'Back to one phone', onPressed: widget.onOneDevice, icon: const Icon(Icons.smartphone_rounded, color: Color(0xFF38BDF8))),
+        ]),
       ),
-    );
+      Expanded(child: loaded ? Padding(padding: const EdgeInsets.fromLTRB(8, 4, 14, 8), child: _wall()) : const Center(child: CircularProgressIndicator())),
+    ]);
   }
 
   Widget _wall() {
     final token = _token;
     return LayoutBuilder(builder: (context, c) {
-      const gap = 10.0, cap = 30.0;
-      final aspect = landscape ? 19 / 9 : 9 / 19;
-      // The biggest phones that fit two by two, with their captions.
-      final availW = c.maxWidth - 16, availH = c.maxHeight - 16;
-      var w = (availW - gap) / 2;
-      var h = w / aspect;
-      if (2 * (h + cap) + gap > availH) {
-        h = (availH - gap - 2 * cap) / 2;
-        w = h * aspect;
-      }
-      w = w.clamp(60.0, 700.0);
-      h = h.clamp(40.0, 900.0);
-      final gridW = 2 * w + gap, gridH = 2 * (h + cap) + gap;
-      return Center(
-        child: SizedBox(
-          width: gridW + 16,
-          height: gridH + 16,
-          child: Stack(children: [
-            // The phones waiting behind the four in front.
-            for (final k in [2, 1])
-              Positioned(
-                left: 8 + k * 5.0,
-                top: 8 - k * 4.0,
-                width: gridW,
-                height: gridH,
-                child: IgnorePointer(child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), color: Colors.white.withValues(alpha: 0.03 * (3 - k)), border: Border.all(color: Colors.white.withValues(alpha: 0.10 * (3 - k)))))),
-              ),
-            Positioned(
-              left: 8,
-              top: 8,
-              width: gridW,
-              height: gridH,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 600),
-                transitionBuilder: (child, anim) => SlideTransition(position: Tween<Offset>(begin: const Offset(0.35, 0), end: Offset.zero).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)), child: FadeTransition(opacity: anim, child: child)),
-                child: KeyedSubtree(
-                  key: ValueKey('${plan.round}-${plan.set}-$_run-$landscape'),
-                  child: OverflowBox(
-                    minWidth: 0,
-                    minHeight: 0,
-                    maxWidth: double.infinity,
-                    maxHeight: double.infinity,
-                    child: Column(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [
-                    for (var row = 0; row < 2; row++) ...[
-                      if (row == 1) const SizedBox(height: gap),
-                      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        for (var col = 0; col < 2; col++) ...[
-                          if (col == 1) const SizedBox(width: gap),
-                          _phone(plan.phones.length > row * 2 + col ? plan.phones[row * 2 + col] : -1, w, h, cap, token),
-                        ],
-                      ]),
-                    ],
+      const gap = 10.0, cap = 28.0;
+      // Four phones that fill all the room there is: two across, two down, each as big as its share.
+      final w = ((c.maxWidth - 8) - gap) / 2;
+      final h = ((c.maxHeight - 8) - gap) / 2 - cap;
+      return Stack(children: [
+        // The phones waiting behind the four in front.
+        for (final k in [2, 1])
+          Positioned(
+            left: 4 + k * 4.0,
+            top: 4 - k * 3.0,
+            right: 4 - k * 4.0,
+            bottom: 4 + k * 3.0,
+            child: IgnorePointer(child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), color: Colors.white.withValues(alpha: 0.03 * (3 - k)), border: Border.all(color: Colors.white.withValues(alpha: 0.10 * (3 - k)))))),
+          ),
+        Positioned.fill(
+          left: 4,
+          top: 4,
+          right: 4,
+          bottom: 4,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 600),
+            transitionBuilder: (child, anim) => SlideTransition(position: Tween<Offset>(begin: const Offset(0.35, 0), end: Offset.zero).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)), child: FadeTransition(opacity: anim, child: child)),
+            child: KeyedSubtree(
+              key: ValueKey('${plan.round}-${plan.set}-$_run'),
+              child: OverflowBox(
+                minWidth: 0,
+                minHeight: 0,
+                maxWidth: double.infinity,
+                maxHeight: double.infinity,
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  for (var row = 0; row < 2; row++) ...[
+                    if (row == 1) const SizedBox(height: gap),
+                    Row(mainAxisSize: MainAxisSize.min, children: [
+                      for (var col = 0; col < 2; col++) ...[
+                        if (col == 1) const SizedBox(width: gap),
+                        _phone(plan.phones.length > row * 2 + col ? plan.phones[row * 2 + col] : -1, row * 2 + col, w, h, cap, token),
+                      ],
                     ]),
-                  ),
-                ),
+                  ],
+                ]),
               ),
             ),
-          ]),
+          ),
         ),
-      );
+      ]);
     });
   }
 
-  Widget _phone(int index, double w, double h, double cap, int token) {
+  Widget _phone(int index, int position, double w, double h, double cap, int token) {
     if (index < 0) return SizedBox(width: w, height: h + cap);
     final info = phones[index];
     final small = math.min(w, h);
-    final bezel = small * 0.045;
+    final bezel = math.max(3.0, small * 0.03);
     return SizedBox(
       key: Key('wall-phone-$index'),
       width: w,
@@ -361,19 +283,64 @@ class NgmyPhoneWallState extends State<NgmyPhoneWallPage> {
           width: w,
           height: h,
           padding: EdgeInsets.all(bezel),
-          decoration: BoxDecoration(color: const Color(0xFF0A0A0C), borderRadius: BorderRadius.circular(small * 0.16), border: Border.all(color: const Color(0xFF3B3F4A), width: 1.5), boxShadow: [BoxShadow(color: const Color(0xFF38BDF8).withValues(alpha: 0.15), blurRadius: 14)]),
+          decoration: BoxDecoration(color: const Color(0xFF0A0A0C), borderRadius: BorderRadius.circular(small * 0.12), border: Border.all(color: const Color(0xFF3B3F4A), width: 1.5), boxShadow: [BoxShadow(color: const Color(0xFF38BDF8).withValues(alpha: 0.15), blurRadius: 14)]),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(small * 0.12),
-            child: playing && link.playable
-                ? VPhonePlayer(key: ValueKey('p$index-$_run'), link: link, muted: true, onEnded: () => _ended(token))
-                : Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: kPhoneWallpapers[index % kPhoneWallpapers.length])), alignment: Alignment.center, child: Icon(Icons.smartphone_rounded, color: Colors.white.withValues(alpha: 0.7), size: small * 0.4)),
+            borderRadius: BorderRadius.circular(small * 0.09),
+            child: Stack(fit: StackFit.expand, children: [
+              if (playing && link.playable)
+                _Delayed(
+                  // One after the other, so the first phone is not kept waiting by the others.
+                  delay: Duration(milliseconds: 300 * position),
+                  child: VPhonePlayer(key: ValueKey('p$index-$_run'), link: link, muted: true, cover: true, onEnded: () => _ended(token)),
+                )
+              else
+                Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: kPhoneWallpapers[index % kPhoneWallpapers.length])), alignment: Alignment.center, child: Icon(Icons.smartphone_rounded, color: Colors.white.withValues(alpha: 0.7), size: small * 0.3)),
+              // The little camera pill of a phone.
+              Positioned(top: 4, left: 0, right: 0, child: IgnorePointer(child: Center(child: Container(width: small * 0.22, height: 7, decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(4)))))),
+            ]),
           ),
         ),
         SizedBox(
           height: cap,
-          child: Center(child: Text('Phone ${index + 1} · ${info.number} · ${info.where.name} · seen ${info.watched.length}', maxLines: 2, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: math.max(8.0, math.min(10.5, w / 22)), height: 1.15))),
+          child: Center(child: Text('Phone ${index + 1} · ${info.number} · ${info.where.name} · seen ${info.watched.length}', maxLines: 2, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: math.max(8.0, math.min(10.5, w / 24)), height: 1.15))),
         ),
       ]),
     );
   }
+}
+
+/// Shows [child] after [delay] (black until then).
+class _Delayed extends StatefulWidget {
+  const _Delayed({required this.delay, required this.child});
+  final Duration delay;
+  final Widget child;
+
+  @override
+  State<_Delayed> createState() => _DelayedState();
+}
+
+class _DelayedState extends State<_Delayed> {
+  bool _go = false;
+  Timer? _t;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.delay == Duration.zero) {
+      _go = true;
+    } else {
+      _t = Timer(widget.delay, () {
+        if (mounted) setState(() => _go = true);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => _go ? widget.child : const ColoredBox(color: Colors.black);
 }
