@@ -25,7 +25,7 @@ const double kAvatarUnitsPerMetre = 36.0;
 
 /// How many faces the body keeps: the one on the tour (close up) and the people who live in the house.
 const int kAvatarFacesGuide = 5000;
-const int kAvatarFacesResident = 1100;
+const int kAvatarFacesResident = 1800;
 
 class _Chan {
   _Chan(this.node, this.path, this.times, this.values, this.step);
@@ -72,6 +72,10 @@ class GlbAvatar {
 
   static final Map<String, GlbAvatar> _ready = {};
   static final Map<String, Future<GlbAvatar?>> _loading = {};
+  static final Set<String> _failed = {};
+
+  /// True when reading the character file was tried and did not work (no internet and never kept on the phone).
+  static bool failed(String key) => _failed.contains(key);
 
   /// Set to false to keep the plain figures (some tests do).
   static bool enabled = true;
@@ -91,9 +95,11 @@ class GlbAvatar {
         final a = GlbAvatar._(key);
         await a._read(data);
         _ready[key] = a;
+        _failed.remove(key);
         return a;
       } catch (e) {
         debugPrint('Could not read the character $key: $e');
+        _failed.add(key);
         return null;
       } finally {
         _loading.remove(key);
@@ -397,8 +403,12 @@ class GlbAvatar {
       final ids = <int, int>{};
       final out = Int32List(nv);
       for (var i = 0; i < nv; i++) {
-        final ix = ((m.pos[i * 3] - lox) / cell).floor(), iy = ((m.pos[i * 3 + 1] - loy) / cell).floor(), iz = ((m.pos[i * 3 + 2] - loz) / cell).floor();
-        out[i] = ids.putIfAbsent((ix * 1024 + iy) * 1024 + iz, () => ids.length);
+        // The head (face) and the hands (fingers) are cut into smaller cells, so they keep their shape while the rest of the body is thinned out.
+        final px = m.pos[i * 3], py = m.pos[i * 3 + 1];
+        final fine = py > loy + 0.86 * (hiy - loy) || (px - (lox + hix) / 2).abs() > 0.3 * (hix - lox);
+        final cs = fine ? cell * 0.4 : cell;
+        final ix = ((px - lox) / cs).floor(), iy = ((py - loy) / cs).floor(), iz = ((m.pos[i * 3 + 2] - loz) / cs).floor();
+        out[i] = ids.putIfAbsent(((ix * 1024 + iy) * 1024 + iz) * 2 + (fine ? 1 : 0), () => ids.length);
       }
       count[0] = ids.length;
       return out;
@@ -722,7 +732,7 @@ class GlbAvatar {
 
   /// The character as faces of the game: feet on y = 0, facing +z (turned by [yaw]), standing at [x], [z].
   /// [walkedUnits] is how far the person has walked (it keeps the feet in step with the ground); null means just use [time].
-  List<Poly> polys({required double time, required double x, required double z, required double yaw, bool walking = false, bool running = false, double lift = 0, double? walkedUnits, int id = 0, bool close = true, Color? tint}) {
+  List<Poly> polys({required double time, required double x, required double z, required double yaw, bool walking = false, bool running = false, double lift = 0, double? walkedUnits, int id = 0, bool close = true, Color? tint, Color? skin, Color? pants}) {
     final lod = close ? _guide : _resident;
     final clip = clipFor(walking: walking, running: running);
     final len = clipLength(clip);
@@ -753,9 +763,74 @@ class GlbAvatar {
     for (var t = 0; t < lod.tris.length; t += 3) {
       final va = pts[lod.tris[t]], vb = pts[lod.tris[t + 1]], vd = pts[lod.tris[t + 2]];
       final n = (vb - va).cross(vd - va).unit;
-      out.add(Poly([va, vb, vd], n, tint == null ? Color(lod.colors[t ~/ 3]) : _tinted(lod.colors[t ~/ 3], tint), id, shine: 0.08, group: groups[lod.region[lod.tris[t]]]));
+      final region = lod.region[lod.tris[t]];
+      // A person of the city is dressed: shirt on the body, trousers on the legs, and the head and arms in their own skin.
+      final cy = (va.y + vb.y + vd.y) / 3;
+      Color? tone = tint;
+      if (tint != null && skin != null && pants != null) {
+        // Head and hands in skin, short sleeves from the shoulder to the elbow, shirt down to the hips, trousers below.
+        if (region == 0 || ((region == 1 || region == 2) && cy < 40)) {
+          tone = skin;
+        } else if (region == 3 || region == 4 || (region == 5 && cy < 33)) {
+          tone = pants;
+        }
+      }
+      out.add(Poly([va, vb, vd], n, tone == null ? Color(lod.colors[t ~/ 3]) : _tinted(lod.colors[t ~/ 3], tone), id, shine: 0.08, group: groups[region]));
     }
+    if (skin != null && tint != null && key != 'michelle') out.addAll(_facePolys(lod, pts, a, skin, id, groups[0]));
     return out;
+  }
+
+  /// A face for the characters that have none (the X Bot is a smooth head, the Soldier wears a hood): eyes with a dark middle, brows,
+  /// a nose and a mouth, put on the front of the head wherever the head is in this moment of the animation.
+  List<Poly> _facePolys(_Lod lod, List<V3> pts, double a, Color skin, int id, int group) {
+    var maxY = -1e9, minY = 1e9;
+    for (var i = 0; i < lod.vertices; i++) {
+      if (lod.region[i] != 0) continue;
+      final y = pts[i].y;
+      if (y > maxY) maxY = y;
+      if (y < minY) minY = y;
+    }
+    if (maxY < minY) return const [];
+    final c = math.cos(a), sn = math.sin(a);
+    final fwd = V3(sn, 0, c), right = V3(c, 0, -sn);
+    // The head is the top of the region (the rest is the neck).
+    final top = maxY, bottom = math.max(minY, maxY - (maxY - minY) * 0.75);
+    var cx = 0.0, cz = 0.0, n = 0, wMax = 0.0;
+    for (var i = 0; i < lod.vertices; i++) {
+      if (lod.region[i] != 0 || pts[i].y < bottom) continue;
+      cx += pts[i].x;
+      cz += pts[i].z;
+      n++;
+    }
+    if (n == 0) return const [];
+    final ctr = V3(cx / n, (top + bottom) / 2, cz / n);
+    var front = 0.0;
+    for (var i = 0; i < lod.vertices; i++) {
+      if (lod.region[i] != 0 || pts[i].y < bottom) continue;
+      final d = V3(pts[i].x - ctr.x, 0, pts[i].z - ctr.z);
+      front = math.max(front, d.dot(fwd));
+      wMax = math.max(wMax, d.dot(right).abs());
+    }
+    final r = wMax <= 0 ? (top - bottom) / 2 : wMax;
+    final u = V3(0, 1, 0);
+    V3 at(double sx, double sy, [double out = 1.0]) => ctr + fwd * (front * out + 0.25) + right * (sx * r) + u * (sy * r);
+    final dark = Color.lerp(skin, const Color(0xFF15100C), 0.88)!;
+    final shade = Color.lerp(skin, Colors.black, 0.25)!;
+    final lip = Color.lerp(skin, const Color(0xFF8A2F3A), 0.6)!;
+    final polys = <Poly>[];
+    void quad(V3 p0, V3 p1, V3 p2, V3 p3, Color col, double bias) => polys.add(Poly([p0, p1, p2, p3], fwd, col, id, group: group, bias: bias));
+    // A little shape round a centre: a diamond [w] wide and [h] high.
+    void gem(double sx, double sy, double w, double h, Color col, double bias) => quad(at(sx - w, sy), at(sx, sy - h), at(sx + w, sy), at(sx, sy + h), col, bias);
+    for (final s in const [-1.0, 1.0]) {
+      gem(s * 0.34, 0.08, 0.2, 0.11, Colors.white, 1.2);
+      gem(s * 0.34, 0.08, 0.085, 0.085, dark, 1.6);
+      quad(at(s * 0.34 - 0.22, 0.33), at(s * 0.34 + 0.22, 0.31 + 0.04 * s), at(s * 0.34 + 0.22, 0.25 + 0.04 * s), at(s * 0.34 - 0.22, 0.27), dark, 1.2);
+    }
+    polys.add(Poly([at(0, 0.12), at(-0.1, -0.22), at(0.1, -0.22)], fwd, shade, id, group: group, bias: 1.2));
+    quad(at(-0.2, -0.46), at(0.2, -0.46), at(0.17, -0.53), at(-0.17, -0.53), lip, 1.2);
+    quad(at(-0.2, -0.46), at(0.2, -0.46), at(0.2, -0.485), at(-0.2, -0.485), dark, 1.5);
+    return polys;
   }
 }
 

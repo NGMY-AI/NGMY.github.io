@@ -1268,10 +1268,16 @@ void _figure(MeshBuilder b, PersonPose p, double t, PersonStyle style, {int id =
   }
   final av = GlbAvatar.ready(style.avatar);
   if (av == null) {
+    // The character's file is still being read: draw nobody rather than somebody else. Only when it could not be read at all
+    // (no internet and never kept on the phone) is a plain person drawn in the same colours.
+    if (GlbAvatar.enabled && kGlbFiles.containsKey(style.avatar) && !GlbAvatar.failed(style.avatar)) {
+      GlbAvatar.load(style.avatar);
+      return;
+    }
     _person(b, p, t, style: style, id: id, detail: close || p.crawl);
     return;
   }
-  b.polys.addAll(av.polys(time: t, x: p.x, z: p.z, yaw: p.yaw, walking: p.walking, running: p.running, lift: p.lift, walkedUnits: p.walking && !p.running && p.phase > 0 ? p.phase * 12 : null, id: id, close: close, tint: tint));
+  b.polys.addAll(av.polys(time: t, x: p.x, z: p.z, yaw: p.yaw, walking: p.walking, running: p.running, lift: p.lift, walkedUnits: p.walking && !p.running && p.phase > 0 ? p.phase * 12 : null, id: id, close: close, tint: tint, skin: tint == null ? null : style.skin, pants: tint == null ? null : style.pants));
 }
 
 /// An adult person for the house tour, about 5 feet 8 inches tall, made of rounded parts (limbs with real joints, an

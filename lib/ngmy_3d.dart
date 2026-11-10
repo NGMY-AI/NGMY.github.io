@@ -881,8 +881,11 @@ class Scene3DPainter extends CustomPainter {
         gn[f.group] = (gn[f.group] ?? 0) + 1;
       }
     }
+    // A picture (an ad, a TV) comes after the faces of the scene, so inside its frame it is drawn on top of the board behind it.
+    var nextSeq = still.length + dyn.length;
     for (var i = 0; i < drawn.length; i++) {
       final d = drawn[i];
+      if (d.draw != null) d.seq = nextSeq++;
       d.key = d.group != 0 ? gz[d.group]! / gn[d.group]! : d.z;
     }
     drawn.sort((a, b) {

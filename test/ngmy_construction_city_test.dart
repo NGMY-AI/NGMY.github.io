@@ -15,6 +15,8 @@ import "package:ngmy/ngmy_construction_tour.dart";
 import 'package:ngmy/ngmy_construction_world.dart';
 
 void main() {
+  // These checks are about where people stand, not about the character files, so plain stand-in people are used.
+  setUpAll(() => GlbAvatar.enabled = false);
   test('the person can run (faster), jump (up and down again), and a stick pushed half way walks half as fast', () {
     final room = HomeProject(seed: 3).rooms[11];
     final a = WorldWalker(room, x: 0, z: 200), b = WorldWalker(room, x: 0, z: 200), c = WorldWalker(room, x: 0, z: 200);

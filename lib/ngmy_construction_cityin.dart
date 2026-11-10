@@ -834,12 +834,12 @@ class CityInterior {
     }
     switch (kind) {
       case 'shop':
-        drawPerson(b, const PersonPose(room: 0, x: 0, z: 18, yaw: 0), t, _staff(const Color(0xFF8B5CF6), skin: const Color(0xFF7A4B30)), id: 0, close: true);
+        drawPerson(b, const PersonPose(room: 0, x: 0, z: 18, yaw: 0), t, kAvatars['soldier']!, id: 0, close: false, tint: const Color(0xFF8B5CF6));
       case 'hospital':
-        drawPerson(b, const PersonPose(room: 0, x: -80, z: 50, yaw: 0), t, _staff(const Color(0xFF14B8A6), female: true, hair: 1, skin: const Color(0xFF8A5A3C)), id: 0, close: true);
+        drawPerson(b, const PersonPose(room: 0, x: -80, z: 50, yaw: 0), t, kAvatars['xbot']!, id: 0, close: false, tint: const Color(0xFF14B8A6));
         final len = 110.0, run = (t * 12) % (2 * len);
         final z = 40 + (run < len ? run : 2 * len - run);
-        drawPerson(b, PersonPose(room: 0, x: 6, z: z, yaw: run < len ? 0 : math.pi, walking: true, phase: run / 12), t, _staff(const Color(0xFFE5E7EB), skin: const Color(0xFFA06B47)), id: 0, close: true);
+        drawPerson(b, PersonPose(room: 0, x: 6, z: z, yaw: run < len ? 0 : math.pi, walking: true, phase: run / 12), t, kAvatars['soldier']!, id: 0, close: false, tint: const Color(0xFFE5E7EB));
         final cm = _cm;
         if (cm != null) {
           for (var i = 0; i < cm.beds.length && i < 3; i++) {
@@ -852,14 +852,14 @@ class CityInterior {
           }
         }
       case 'school':
-        drawPerson(b, const PersonPose(room: 0, x: 0, z: 56, yaw: 0), t, _staff(const Color(0xFF2563EB), female: true, hair: 3, skin: const Color(0xFF8C5B3B)), id: 0, close: true);
+        drawPerson(b, const PersonPose(room: 0, x: 0, z: 56, yaw: 0), t, kAvatars['xbot']!, id: 0, close: false, tint: const Color(0xFF2563EB));
         const kids = [(-80.0, 100.0, Color(0xFFEF4444)), (80.0, 100.0, Color(0xFF22C55E)), (-80.0, 150.0, Color(0xFFF59E0B))];
         for (final (x, z, c) in kids) {
-          drawPerson(b, PersonPose(room: 0, x: x, z: z, yaw: math.pi), t, _staff(c, skin: const Color(0xFF6B4530), height: 0.78), id: 0, close: true);
+          drawPerson(b, PersonPose(room: 0, x: x, z: z, yaw: math.pi), t, kAvatars['soldier']!, id: 0, close: false, tint: c);
         }
       case 'firestation':
-        drawPerson(b, const PersonPose(room: 0, x: 100, z: 120, yaw: -2.2), t, _staff(const Color(0xFFDC2626), skin: const Color(0xFFC98B5E), hair: 4), id: 0, close: true);
-        drawPerson(b, const PersonPose(room: 0, x: 40, z: 150, yaw: 0.5), t, _staff(const Color(0xFFF59E0B), female: true, skin: const Color(0xFFA06B47)), id: 0, close: true);
+        drawPerson(b, const PersonPose(room: 0, x: 100, z: 120, yaw: -2.2), t, kAvatars['soldier']!, id: 0, close: false, tint: const Color(0xFFDC2626));
+        drawPerson(b, const PersonPose(room: 0, x: 40, z: 150, yaw: 0.5), t, kAvatars['xbot']!, id: 0, close: false, tint: const Color(0xFFF59E0B));
       default:
         break;
     }
@@ -872,7 +872,3 @@ class CityInterior {
     return b.polys;
   }
 }
-
-/// The people who work in the buildings of the city (the shopkeeper, the nurse, the teacher, the firefighters): ordinary people in their work colours.
-PersonStyle _staff(Color shirt, {bool female = false, int hair = 0, Color skin = const Color(0xFF8A5A3C), double height = 1.0}) =>
-    PersonStyle(skin: skin, hair: hair == 4 ? const Color(0xFFB8BDC5) : const Color(0xFF1B1210), shirt: shirt, pants: female ? const Color(0xFF3B3F5C) : const Color(0xFF2E3440), female: female, hairStyle: hair, height: height);

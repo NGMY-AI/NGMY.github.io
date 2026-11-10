@@ -72,7 +72,7 @@ const Map<String, PersonStyle> kAvatars = {
 const Map<String, String> kAvatarNames = {'xbot': '🤖 X Bot', 'michelle': '💃 Dancer', 'soldier': '🪖 Soldier', 'human': '🙂 Person'};
 
 /// The character that does the house tour and that you steer outside. The X Bot to begin with; the tour sheet changes it.
-String ngmyPlayerAvatar = 'human';
+String ngmyPlayerAvatar = 'xbot';
 
 PersonStyle get playerStyle => kAvatars[ngmyPlayerAvatar] ?? const PersonStyle();
 

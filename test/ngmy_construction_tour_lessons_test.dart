@@ -1,3 +1,4 @@
+import 'package:ngmy/ngmy_avatar_glb.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 
@@ -47,6 +48,8 @@ Offset? _find3d(WidgetTester t, int id) {
 }
 
 void main() {
+  // These checks are about where people stand, not about the character files, so plain stand-in people are used.
+  setUpAll(() => GlbAvatar.enabled = false);
   setUp(() => NgmyTone.enabled = false);
 
   test('no NGMY ad or TV app is about Growth Income any more, and every ad still draws', () {

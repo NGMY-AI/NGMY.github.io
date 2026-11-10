@@ -1,3 +1,4 @@
+import 'package:ngmy/ngmy_avatar_glb.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_construction_community.dart';
@@ -20,6 +21,8 @@ HomeProject _goodHouse() {
 }
 
 void main() {
+  // These checks are about where people stand, not about the character files, so plain stand-in people are used.
+  setUpAll(() => GlbAvatar.enabled = false);
   setUp(() {
     NgmyTone.enabled = false;
     SharedPreferences.setMockInitialValues({});
