@@ -89,8 +89,7 @@ Scene3D buildPtrapScene(PlumbState s) {
   b.box(const V3(0, 0, -8.8), const V3(40, 28, 1), kDrywall, split: 3);
   b.box(const V3(19.6, 0, -1.5), const V3(1, 28, 14), kDrywall, split: 3);
   b.id = idSink;
-  b.box(const V3(0, 14.3, -1.5), const V3(40, 1.6, 14), kGranite, shine: 0.5, split: 3);
-  b.cyl(const V3(0, 9.2, 0), const V3(0, 14.0, 0), 6.5, kStainless, shine: 0.7, sides: 20, caps: true);
+  b.sink(x: 0, z: -1.2, top: 15.1, cw: 40, cd: 15, bw: 14, bd: 9, depth: 5.9, t: 1.8, wt: 0.6, counter: kGranite, bowl: kStainless, faucet: true, chrome: kChrome, split: 2);
   b.cyl(const V3(0, 8.2, 0), const V3(0, 9.3, 0), 1.5, kChrome, shine: 0.85, sides: 14);
   // The wall drain hub.
   b.id = idHub;
@@ -213,21 +212,24 @@ Scene3D buildFaucetScene(PlumbState s) {
   b.id = idWallF;
   b.box(const V3(0, 3, -6.5), const V3(36, 30, 1), kDrywall, split: 3);
   b.id = idDeck;
-  b.box(const V3(0, 14.5, -1.5), const V3(36, 1.6, 12), kGranite, shine: 0.5, split: 3);
-  // The sink: a white basin sunk into the counter, with a chrome drain, and the cabinet walls under it.
-  b.cyl(const V3(0, 9.4, -1.5), const V3(0, 14.7, -1.5), 7.6, const Color(0xFFF4F4F0), shine: 0.7, sides: 28, inner: true, caps: false);
-  b.cyl(const V3(0, 9.4, -1.5), const V3(0, 9.6, -1.5), 7.6, const Color(0xFFE6E6E0), shine: 0.5, sides: 28);
-  b.cyl(const V3(0, 9.5, -1.5), const V3(0, 9.8, -1.5), 1.2, kChrome, shine: 0.9, sides: 14);
-  b.box(const V3(-11.5, 4, -1.5), const V3(1, 22, 11), const Color(0xFFC49A62), shine: 0.1);
-  b.box(const V3(11.5, 4, -1.5), const V3(1, 22, 11), const Color(0xFFC49A62), shine: 0.1);
+  // A real sink: the counter has a hole, the white basin goes down into it, and an open cabinet stands under it.
+  b.sink(x: 0, z: 1.5, top: 15.3, cw: 36, cd: 18, bw: 14, bd: 7, depth: 7, t: 1.6, wt: 0.6, counter: kGranite, bowl: const Color(0xFFF4F4F0), faucet: false, split: 2);
+  const wood = Color(0xFFC49A62);
+  b.box(const V3(-17.5, 1.9, 1.5), const V3(1, 23.6, 18), wood, shine: 0.1, split: 2);
+  b.box(const V3(17.5, 1.9, 1.5), const V3(1, 23.6, 18), wood, shine: 0.1, split: 2);
+  b.box(const V3(0, -10.5, 1.5), const V3(36, 1, 18), wood, shine: 0.1, split: 3);
+  b.box(const V3(0, -8, 10.2), const V3(34, 3, 0.8), wood, shine: 0.1, split: 2);
+  b.box(const V3(0, 12.6, 10.2), const V3(34, 2, 0.8), wood, shine: 0.1, split: 2);
   // The faucet on top of the counter.
   b.id = idFaucet;
-  b.cyl(const V3(0, 15.3, _vz), const V3(0, 15.5, _vz), 3.4, kChrome, shine: 0.9, sides: 20);
+  b.bias = 0.5;
+  b.box(const V3(0, 15.55, _vz), const V3(8.6, 0.5, 3.4), kChrome, shine: 0.9);
   b.tube(roundedPath(const [V3(0, 15.5, _vz), V3(0, 20, _vz), V3(0, 22.5, _vz + 1.6), V3(0, 22.5, _vz + 4.8), V3(0, 21.1, _vz + 5.2)], 1.4), 0.5, kChrome, shine: 0.9, sides: 12, joints: true);
   for (final x in const [-2.4, 2.4]) {
     b.cyl(V3(x * 1.2, 15.5, _vz), V3(x * 1.2, 17.7, _vz), 0.38, kChrome, shine: 0.9, sides: 10);
     b.cyl(V3(x * 1.2, 17.7, _vz), V3(x * 1.2, 18.6, _vz), 0.6, x < 0 ? kHot : kCold, shine: 0.6, sides: 12);
   }
+  b.bias = 0;
   // The faucet's two inlet tails under the counter.
   for (final (id, x) in [(idInletHot, -2.4), (idInletCold, 2.4)]) {
     b.id = id;
