@@ -480,12 +480,25 @@ Scene3D buildDrywallScene(DrywallHouse d, {String tool = 'look', double now = 0}
       ..order = 2;
   }
 
+  // A bright ball on each place: a ball looks the same from every side, so it never vanishes when the view turns.
+  void dot(int id, V3 c, Color col, {double r = 3}) {
+    b
+      ..id = id
+      ..order = 2
+      ..bias = 3
+      ..alpha = 0.95;
+    b.ball(c, r, col, shine: 0.3, lat: 4, lon: 8);
+    b
+      ..alpha = 1
+      ..bias = 0;
+  }
+
   void wash(int id, DSlot s, Color col, {bool padToo = true}) {
     b
       ..id = id
       ..order = 3
       ..bias = 0.8
-      ..alpha = 0.32;
+      ..alpha = 0.22;
     if (s.ceiling) {
       b.box(V3((s.a0 + s.a1) / 2, 95.2, (s.b0 + s.b1) / 2), V3(s.width - 1, 0.2, s.length - 1), col);
       b
@@ -493,6 +506,7 @@ Scene3D buildDrywallScene(DrywallHouse d, {String tool = 'look', double now = 0}
         ..bias = 0
         ..order = 2;
       if (padToo) pad(id, V3((s.a0 + s.a1) / 2, 94.5, (s.b0 + s.b1) / 2), V3(s.width, 2, s.length));
+      dot(id, V3((s.a0 + s.a1) / 2, 94.2, (s.b0 + s.b1) / 2), col);
     } else {
       b.box(wallPt(s.wall, (s.a0 + s.a1) / 2, 48, kStD + 0.9), wallSize(s.wall, s.width - 1, 94, 0.2), col);
       b
@@ -500,6 +514,7 @@ Scene3D buildDrywallScene(DrywallHouse d, {String tool = 'look', double now = 0}
         ..bias = 0
         ..order = 2;
       if (padToo) pad(id, wallPt(s.wall, (s.a0 + s.a1) / 2, 48, kStD + 1.2), wallSize(s.wall, s.width, 94, 1.0));
+      dot(id, wallPt(s.wall, (s.a0 + s.a1) / 2, 48, kStD + 2.2), col);
     }
   }
 
@@ -538,8 +553,10 @@ Scene3D buildDrywallScene(DrywallHouse d, {String tool = 'look', double now = 0}
           ..order = 2;
         if (s.ceiling) {
           pad(c.id, V3((c.u0 + c.u1) / 2, 94.5, 0), V3(c.u1 - c.u0 + 6, 2, c.y1 - c.y0 + 6));
+          dot(c.id, V3((c.u0 + c.u1) / 2, 94.5, 0), const Color(0xFFEF4444), r: 2);
         } else {
           pad(c.id, wallPt(s.wall, (c.u0 + c.u1) / 2, (c.y0 + c.y1) / 2, kStD + kSheetT + 0.4), wallSize(s.wall, math.max(8, c.u1 - c.u0), math.max(10, c.y1 - c.y0), 0.8));
+          dot(c.id, wallPt(s.wall, (c.u0 + c.u1) / 2, (c.y0 + c.y1) / 2, kStD + kSheetT + 1.8), const Color(0xFFEF4444), r: c.opening >= 0 ? 3.5 : 1.8);
         }
       }
     case 'bead':
@@ -557,6 +574,7 @@ Scene3D buildDrywallScene(DrywallHouse d, {String tool = 'look', double now = 0}
           ..bias = 0
           ..order = 2;
         pad(idBead0 + i, wallPt(o.wall, (o.u0 + o.u1) / 2, (o.sill + o.top) / 2, kStD + kSheetT + 0.4), wallSize(o.wall, o.u1 - o.u0 + 8, o.top - o.sill + 8, 0.8));
+        dot(idBead0 + i, wallPt(o.wall, (o.u0 + o.u1) / 2, (o.sill + o.top) / 2, kStD + kSheetT + 2.5), const Color(0xFFC3CAD3), r: 3.5);
       }
     case 'mud' || 'tape' || 'sand' || 'paint':
       final want = switch (tool) {
@@ -579,6 +597,7 @@ Scene3D buildDrywallScene(DrywallHouse d, {String tool = 'look', double now = 0}
             ..bias = 0
             ..order = 2;
           pad(idSurf0, const V3(0, 94.4, 0), const V3(144, 2, 120));
+          dot(idSurf0, const V3(0, 93, 0), const Color(0xFF38BDF8), r: 4);
         } else {
           final k = si - 1;
           b
@@ -592,6 +611,7 @@ Scene3D buildDrywallScene(DrywallHouse d, {String tool = 'look', double now = 0}
             ..bias = 0
             ..order = 2;
           pad(idSurf0 + si, wallPt(k, wallLen(k) / 2, 48, kStD + 1.2), wallSize(k, wallLen(k), 94, 1.0));
+          dot(idSurf0 + si, wallPt(k, wallLen(k) / 2, 70, kStD + 3.5), const Color(0xFF38BDF8), r: 4);
         }
       }
   }
@@ -692,6 +712,10 @@ class NgmyDrywallPageState extends State<NgmyDrywallPage> {
   late Scene3D scene = buildDrywallScene(d);
   Timer? _msgT, _dryT;
   String _wetKey = '';
+  V3? _goAt;
+  double _goT = -99;
+  int _lastPick = 0;
+  double _lastPickAt = -9;
 
   double get now => _clock.elapsedMilliseconds / 1000;
 
@@ -751,10 +775,46 @@ class NgmyDrywallPageState extends State<NgmyDrywallPage> {
     _say(_howTo[t]!);
   }
 
+  /// Two quick taps on the same piece do the thing once, not twice (the second tap may be the first half of a double tap to walk there).
+  bool _again(int id) {
+    final again = id == _lastPick && now - _lastPickAt < 0.45;
+    _lastPick = id;
+    _lastPickAt = now;
+    return again;
+  }
+
+  /// Double tap: walk over there, inside the room (from the view of the whole room too).
+  void _goTo(Offset local, Size size) {
+    final p = frameGoPoint(cam, local, size);
+    if (p == null) {
+      _say('Double tap the floor or a wall to walk over there.', ok: false);
+      return;
+    }
+    if (dollhouse) {
+      dollhouse = false;
+      cam
+        ..keepIn = (-64.5, 64.5, -52.5, 52.5, 92.0)
+        ..maxDist = 520;
+    }
+    setState(() {
+      _goAt = p;
+      _goT = now;
+    });
+    cam.glideTo(target: p, dist: math.min(cam.dist, 70.0), pitch: 0.07);
+    _say('You walked over here. Drag to turn round.');
+  }
+
   @visibleForTesting
-  void pickForTest(int id) => _pick(id);
+  void doubleTapForTest(Offset local, Size size) => _goTo(local, size);
+
+  @visibleForTesting
+  void pickForTest(int id) {
+    _lastPickAt = -9;
+    _pick(id);
+  }
 
   void _pick(int id) {
+    if (id != 0 && _again(id)) return;
     if (id == 0) {
       setState(() => hl = 0);
       return;
@@ -887,11 +947,12 @@ class NgmyDrywallPageState extends State<NgmyDrywallPage> {
         },
         message: msg,
         messageTop: 54,
+        onDoubleTap: _goTo,
         good: good,
         info: hl != 0 ? scene.info[hl] : null,
         dynamicPolys: (t) {
           final cp = math.cos(cam.pitch);
-          return drywallCeiling(d, now, V3(-cp * math.sin(cam.yaw), math.sin(cam.pitch), cp * math.cos(cam.yaw)));
+          return [...drywallCeiling(d, now, V3(-cp * math.sin(cam.yaw), math.sin(cam.pitch), cp * math.cos(cam.yaw))), ...frameGoRing(_goAt, _goT, now), ...frameBackdrops(cam)];
         },
         topRight: [
           conPill(dollhouse ? 'Inside' : 'Whole room', on: dollhouse, icon: dollhouse ? Icons.login_rounded : Icons.view_in_ar_rounded, onTap: _toggleView),
@@ -899,24 +960,7 @@ class NgmyDrywallPageState extends State<NgmyDrywallPage> {
         ],
       ),
       panel: Column(mainAxisSize: MainAxisSize.min, children: [
-        SizedBox(
-          height: 46,
-          child: ListView(scrollDirection: Axis.horizontal, children: [
-            for (final (k, label, icon) in _tools)
-              Padding(
-                padding: const EdgeInsets.only(right: 7),
-                child: GestureDetector(
-                  key: Key('tool-$k'),
-                  onTap: () => setTool(k),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(color: tool == k ? kConAmber.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(14), border: Border.all(color: tool == k ? kConAmber : Colors.white24, width: tool == k ? 2 : 1)),
-                    child: Row(children: [Icon(icon, size: 19, color: tool == k ? kConAmber : Colors.white70), const SizedBox(width: 6), Text(label, style: TextStyle(color: tool == k ? kConAmber : Colors.white, fontWeight: FontWeight.w800, fontSize: 12.5))]),
-                  ),
-                ),
-              ),
-          ]),
-        ),
+        frameToolTray(_tools, tool, setTool),
         const SizedBox(height: 8),
         Row(children: [
           Expanded(

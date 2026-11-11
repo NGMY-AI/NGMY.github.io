@@ -222,6 +222,75 @@ void main() {
   });
 
   group('the pages', () {
+    for (final drywall in [false, true]) {
+      testWidgets('double tap on the floor walks there, ${drywall ? 'in the drywall lesson' : 'in the wiring lesson'}, also from the view of the whole room', (t) async {
+        t.view.physicalSize = const Size(900, 1700);
+        t.view.devicePixelRatio = 1.0;
+        addTearDown(t.view.reset);
+        await t.pumpWidget(MaterialApp(home: drywall ? const NgmyDrywallPage() : const NgmyWiringHousePage()));
+        await t.pump(const Duration(milliseconds: 600));
+        final cam = t.widget<Scene3DView>(find.byType(Scene3DView).first).cam;
+        final r = t.getRect(find.byType(Scene3DView).first);
+        final p = Offset(r.center.dx, r.bottom - 150);
+        final before = cam.target;
+        await t.tapAt(p);
+        await t.pump(const Duration(milliseconds: 80));
+        await t.tapAt(p);
+        await t.pump(const Duration(milliseconds: 1800));
+        expect((cam.target - before).len, greaterThan(8), reason: 'the view moved to where the double tap was');
+        // From the whole room, a double tap goes back inside, to that spot.
+        await t.tap(find.text('Whole room'));
+        await t.pump(const Duration(milliseconds: 1800));
+        expect(find.text('Inside'), findsOneWidget);
+        final r2 = t.getRect(find.byType(Scene3DView).first);
+        await t.tapAt(Offset(r2.center.dx, r2.center.dy + 40));
+        await t.pump(const Duration(milliseconds: 80));
+        await t.tapAt(Offset(r2.center.dx, r2.center.dy + 40));
+        await t.pump(const Duration(milliseconds: 1800));
+        expect(find.text('Whole room'), findsOneWidget, reason: 'back inside the room');
+        await t.pump(const Duration(seconds: 14));
+        await t.pumpWidget(const SizedBox());
+        await t.pump(const Duration(seconds: 14));
+      });
+    }
+
+    testWidgets('every tool is on the screen at once: the tools wrap into rows and none is hidden at the side', (t) async {
+      t.view.physicalSize = const Size(900, 1700);
+      t.view.devicePixelRatio = 1.0;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(const MaterialApp(home: NgmyDrywallPage()));
+      await t.pump(const Duration(milliseconds: 600));
+      for (final k in ['look', 'sheet', 'cut', 'screw', 'saw', 'bead', 'mud', 'tape', 'sand', 'paint']) {
+        expect(find.byKey(Key('tool-$k')), findsOneWidget, reason: k);
+      }
+      await t.pump(const Duration(seconds: 14));
+      await t.pumpWidget(const SizedBox());
+      await t.pump(const Duration(seconds: 14));
+    });
+
+    testWidgets('after a cable cannot be pulled, the lit studs can be drilled in one tap and then the cable goes through', (t) async {
+      t.view.physicalSize = const Size(900, 1700);
+      t.view.devicePixelRatio = 1.0;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(const MaterialApp(home: NgmyWiringHousePage()));
+      await t.pump(const Duration(milliseconds: 600));
+      final st = t.state<NgmyWiringHousePageState>(find.byType(NgmyWiringHousePage));
+      st.setTool('outlet');
+      st.pickForTest(stud(2, 112).id);
+      st.setTool('cable');
+      st.pickForTest(st.w.boxes.first.id);
+      await t.pump(const Duration(milliseconds: 200));
+      expect(st.glow.length, greaterThan(3), reason: 'every stud still to drill is lit, not only a few');
+      await t.tap(find.text('Drill the lit'));
+      await t.pump(const Duration(milliseconds: 200));
+      st.pickForTest(st.w.boxes.first.id);
+      await t.pump(const Duration(milliseconds: 300));
+      expect(st.w.boxes.first.cable, isNotNull);
+      await t.pump(const Duration(seconds: 14));
+      await t.pumpWidget(const SizedBox());
+      await t.pump(const Duration(seconds: 14));
+    });
+
     testWidgets('the wiring page: pick a tool, put a box on a stud, drill, pull the cable', (t) async {
       t.view.physicalSize = const Size(900, 1700);
       t.view.devicePixelRatio = 1.0;
@@ -287,7 +356,7 @@ void main() {
       await t.pump(const Duration(seconds: 14));
     });
 
-    testWidgets('the two lessons are in the Lessons list, just before Learn the trades, and open', (t) async {
+    testWidgets('the two lessons sit side by side in the second row from the bottom of the Lessons list, and open', (t) async {
       t.view.physicalSize = const Size(900, 9000);
       t.view.devicePixelRatio = 2.0;
       addTearDown(t.view.reset);
@@ -296,9 +365,9 @@ void main() {
       Offset at(String s) => t.getTopLeft(find.text(s));
       bool before(Offset a, Offset b) => a.dy < b.dy || (a.dy == b.dy && a.dx < b.dx);
       final w = at('Wiring a house'), dw = at('Hanging drywall'), last = at('Learn the trades'), diagram = at('Diagram lessons');
-      expect(before(diagram, w), isTrue);
-      expect(before(w, dw), isTrue);
-      expect(before(dw, last), isTrue);
+      expect((w.dy - dw.dy).abs() < 1, isTrue, reason: "wiring and drywall are side by side in one row");
+      expect((diagram.dy - last.dy).abs() < 1, isTrue, reason: "the diagram lessons and learn the trades are the last row");
+      expect(w.dy < diagram.dy, isTrue, reason: "the wiring and drywall row is the second row from the bottom");
       await t.tap(find.text('Wiring a house'));
       await t.pump(const Duration(milliseconds: 500));
       await t.pump(const Duration(milliseconds: 500));

@@ -174,7 +174,7 @@ class WiringHouse {
     final route = _route(p0, p1, dir, own: needOwn ? studHere.id : null);
     final missing = [for (final s in route) if (!drilled.contains(s.id)) s];
     if (missing.isNotEmpty) {
-      return _bad('The cable has to go through every stud on its way, and ${missing.length} still ${missing.length == 1 ? 'has' : 'have'} no hole. Drill ${missing.length == 1 ? 'the lit one' : 'the lit ones'} first.', show: [for (final s in missing.take(4)) s.id]);
+      return _bad('The cable has to go through every stud on its way, and ${missing.length} still ${missing.length == 1 ? 'has' : 'have'} no hole. Drill ${missing.length == 1 ? 'the lit one' : 'the lit ones'} first.', show: [for (final s in missing.take(40)) s.id]);
     }
     final pts = <V3>[wallPt(kPanelWall, kPanelU, kPanelY0 + 1, kMidD), wallPt(kPanelWall, kPanelU, kDrillY, kMidD)];
     var wall = kPanelWall;
@@ -257,13 +257,14 @@ Scene3D buildWiringScene(WiringHouse w, {String tool = 'look'}) {
       ..order = 2;
   }
 
-  void mark(int id, V3 c, V3 s, Color col) {
+  // A bright ball on each place: a ball looks the same from every side, so it never vanishes when the view turns.
+  void dot(int id, V3 c, Color col, {double r = 1.5}) {
     b
       ..id = id
       ..order = 2
-      ..bias = 0.8
-      ..alpha = 0.85;
-    b.box(c, s, col, shine: 0.2);
+      ..bias = 3
+      ..alpha = 0.95;
+    b.ball(c, r, col, shine: 0.3, lat: 4, lon: 8);
     b
       ..alpha = 1
       ..bias = 0;
@@ -273,27 +274,27 @@ Scene3D buildWiringScene(WiringHouse w, {String tool = 'look'}) {
     case 'drill':
       for (final s in kStuds) {
         if (!s.atCableHeight || w.drilled.contains(s.id)) continue;
-        mark(s.id, wallPt(s.wall, s.u, kDrillY, kStD + 0.1), wallSize(s.wall, 2.6, 2.6, 0.2), const Color(0xFFFFD60A));
+        dot(s.id, wallPt(s.wall, s.u, kDrillY, kStD + 1.3), const Color(0xFFFFD60A), r: 1.5);
         pad(s.id, wallPt(s.wall, s.u, (s.y0 + s.y1) / 2, kStD / 2 + 0.6), wallSize(s.wall, 7, s.y1 - s.y0, kStD + 1.2));
       }
       for (var k = 0; k < 4; k++) {
         for (var s = 0; s < topSegCount(k); s++) {
           final id = topSegId(k, s);
           if (w.drilled.contains(id)) continue;
-          mark(id, wallPt(k, topSegU(k, s), 94.5, kStD + 0.1), wallSize(k, 2.6, 2.6, 0.2), const Color(0xFFFB923C));
+          dot(id, wallPt(k, topSegU(k, s), 94.5, kStD + 1.3), const Color(0xFFFB923C), r: 1.5);
         }
       }
     case 'outlet' || 'switch':
       final y = tool == 'switch' ? 48.0 : 16.0;
       for (final s in kStuds) {
         if (!s.takesBox || w.boxes.any((x) => x.studId == s.id)) continue;
-        mark(s.id, wallPt(s.wall, s.u, y, kStD + 0.1), wallSize(s.wall, 3.4, 4.6, 0.2), const Color(0xFF4ADE80));
+        dot(s.id, wallPt(s.wall, s.u, y, kStD + 1.5), const Color(0xFF4ADE80), r: 1.8);
         pad(s.id, wallPt(s.wall, s.u, (s.y0 + s.y1) / 2, kStD / 2 + 0.6), wallSize(s.wall, 7, s.y1 - s.y0, kStD + 1.2));
       }
     case 'ceiling':
       if (!w.boxes.any((x) => x.kind == 'ceiling')) {
         for (var i = 0; i < kJoists; i++) {
-          mark(idJoist0 + i, V3(joistX(i), 95.85, 0), const V3(3.4, 0.2, 9), const Color(0xFF4ADE80));
+          dot(idJoist0 + i, V3(joistX(i), 94.6, 0), const Color(0xFF4ADE80), r: 1.7);
           pad(idJoist0 + i, V3(joistX(i), 97, 0), const V3(8, 6, 40));
         }
       }
@@ -302,12 +303,7 @@ Scene3D buildWiringScene(WiringHouse w, {String tool = 'look'}) {
         if (x.cable != null) continue;
         final c = x.kind == 'ceiling' ? V3(joistX(x.joist!) + 3, 98, 0) : wallPt(x.wall, x.u + x.side * 1.9, x.y, kStD);
         pad(x.id, c, const V3(8, 9, 8));
-        b
-          ..id = x.id
-          ..order = 2
-          ..bias = 0.8;
-        b.ball(c + const V3(0, 5, 0), 0.95, const Color(0xFFFFD60A), shine: 0.3, lat: 4, lon: 8);
-        b.bias = 0;
+        dot(x.id, c + const V3(0, 5.5, 0), const Color(0xFFFFD60A), r: 1.7);
       }
   }
 
@@ -437,6 +433,10 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
   final Stopwatch _clock = Stopwatch()..start();
   final Map<int, double> _started = {};
   Set<int> glow = {};
+  V3? _goAt;
+  double _goT = -99;
+  int _lastPick = 0;
+  double _lastPickAt = -9;
   Timer? _msgT, _glowT;
 
   double get _now => _clock.elapsedMilliseconds / 1000;
@@ -479,7 +479,10 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
   };
 
   @visibleForTesting
-  void pickForTest(int id) => _pick(id);
+  void pickForTest(int id) {
+    _lastPickAt = -9;
+    _pick(id);
+  }
 
   void setTool(String t) {
     setState(() {
@@ -490,7 +493,52 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
     _say(_howTo[t]!);
   }
 
+  /// Two quick taps on the same piece do the thing once, not twice (the second tap may be the first half of a double tap to walk there).
+  bool _again(int id) {
+    final again = id == _lastPick && _now - _lastPickAt < 0.45;
+    _lastPick = id;
+    _lastPickAt = _now;
+    return again;
+  }
+
+  /// Double tap: walk over there, inside the room (from the view of the whole room too).
+  void _goTo(Offset local, Size size) {
+    final p = frameGoPoint(cam, local, size);
+    if (p == null) {
+      _say("Double tap the floor or a wall to walk over there.", ok: false);
+      return;
+    }
+    if (dollhouse) {
+      dollhouse = false;
+      cam
+        ..keepIn = (-64.5, 64.5, -52.5, 52.5, 92.0)
+        ..maxDist = 520;
+    }
+    setState(() {
+      _goAt = p;
+      _goT = _now;
+    });
+    cam.glideTo(target: p, dist: math.min(cam.dist, 70.0), pitch: 0.07);
+    _say("You walked over here. Drag to turn round.");
+  }
+
+  @visibleForTesting
+  void doubleTapForTest(Offset local, Size size) => _goTo(local, size);
+
+  void _drillLit() {
+    var n = 0;
+    for (final id in glow.toList()) {
+      if (w.drill(id).ok) n++;
+    }
+    setState(() {
+      glow = {};
+      _rebuild();
+    });
+    _say("$n ${n == 1 ? 'hole' : 'holes'} drilled. Now tap the box with the Cable roll again.");
+  }
+
   void _pick(int id) {
+    if (id != 0 && _again(id)) return;
     if (id == 0) {
       setState(() => hl = 0);
       return;
@@ -607,31 +655,15 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
         messageTop: 54,
         good: good,
         info: hl != 0 ? scene.info[hl] : null,
-        dynamicPolys: (t) => wiringDynamic(w, t, _started, glow),
+        dynamicPolys: (t) => [...wiringDynamic(w, t, _started, glow), ...frameGoRing(_goAt, _goT, _now), ...frameBackdrops(cam)],
+        onDoubleTap: _goTo,
         topRight: [
           conPill(dollhouse ? 'Inside' : 'Whole room', on: dollhouse, icon: dollhouse ? Icons.login_rounded : Icons.view_in_ar_rounded, onTap: _toggleView),
           const SizedBox(height: 8),
         ],
       ),
       panel: Column(mainAxisSize: MainAxisSize.min, children: [
-        SizedBox(
-          height: 46,
-          child: ListView(scrollDirection: Axis.horizontal, children: [
-            for (final (k, label, icon) in _tools)
-              Padding(
-                padding: const EdgeInsets.only(right: 7),
-                child: GestureDetector(
-                  key: Key('tool-$k'),
-                  onTap: () => setTool(k),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(color: tool == k ? kConAmber.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(14), border: Border.all(color: tool == k ? kConAmber : Colors.white24, width: tool == k ? 2 : 1)),
-                    child: Row(children: [Icon(icon, size: 19, color: tool == k ? kConAmber : Colors.white70), const SizedBox(width: 6), Text(label, style: TextStyle(color: tool == k ? kConAmber : Colors.white, fontWeight: FontWeight.w800, fontSize: 12.5))]),
-                  ),
-                ),
-              ),
-          ]),
-        ),
+        frameToolTray(_tools, tool, setTool),
         const SizedBox(height: 8),
         Row(children: [
           Expanded(
@@ -642,6 +674,7 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
             ),
           ),
           const SizedBox(width: 8),
+          if (glow.isNotEmpty) ...[conBigButton('Drill the lit', Icons.construction_rounded, _drillLit, color: const Color(0xFFFFD60A)), const SizedBox(width: 8)],
           conBigButton('Start over', Icons.restart_alt_rounded, _reset, color: Colors.white70),
         ]),
       ]),

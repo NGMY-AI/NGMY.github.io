@@ -29,10 +29,6 @@ void drawFrame(MeshBuilder b, {Set<int> drilled = const {}}) {
   b.id = 0;
   b.order = -1;
   b.box(const V3(0, -1, 0), const V3(154, 2, 130), const Color(0xFFC9B38E), shine: 0.05, split: 4);
-  // Daylight seen through the window and through the door, with the grass outside the door.
-  b.box(wallPt(1, (kWindow.u0 + kWindow.u1) / 2, 54, -14), wallSize(1, 70, 90, 0.5), const Color(0xFF9AD0F5));
-  b.box(wallPt(2, (kDoor.u0 + kDoor.u1) / 2, 50, -16), wallSize(2, 64, 104, 0.5), const Color(0xFF9AD0F5));
-  b.box(wallPt(2, (kDoor.u0 + kDoor.u1) / 2, 8, -15.5), wallSize(2, 64, 16, 0.5), const Color(0xFF6BAA5A));
   b.order = 0;
   for (var k = 0; k < 4; k++) {
     final len = wallLen(k);
@@ -145,4 +141,62 @@ void drawWiringProps(MeshBuilder b) {
   b.box(const V3(dx - 1.5, 0.9, dz), const V3(6.0, 1.8, 3.6), const Color(0xFF22262C), shine: 0.2);
   b.cyl(const V3(dx + 5, 3.4, dz), const V3(dx + 8.2, 3.4, dz), 1.25, const Color(0xFF9AA2AD), shine: 0.8, sides: 10);
   b.cyl(const V3(dx + 8.2, 3.4, dz), const V3(dx + 12.5, 3.4, dz), 0.38, const Color(0xFFC9CED6), shine: 0.9, sides: 6);
+}
+
+/// The tools as chips in rows that wrap, so every tool is on the screen at once and none is hidden to the side.
+Widget frameToolTray(List<(String, String, IconData)> tools, String current, void Function(String) onTap) {
+  const amber = Color(0xFFF59E0B);
+  return Wrap(spacing: 6, runSpacing: 6, children: [
+    for (final (k, label, icon) in tools)
+      GestureDetector(
+        key: Key('tool-$k'),
+        onTap: () => onTap(k),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(color: current == k ? amber.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(13), border: Border.all(color: current == k ? amber : Colors.white24, width: current == k ? 2 : 1)),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 17, color: current == k ? amber : Colors.white70), const SizedBox(width: 5), Text(label, style: TextStyle(color: current == k ? amber : Colors.white, fontWeight: FontWeight.w800, fontSize: 12))]),
+        ),
+      ),
+  ]);
+}
+
+/// Where a double tap on the floor (or on a wall, which points to the floor behind it) takes the person: a spot inside the room.
+V3? frameGoPoint(Cam3 cam, Offset local, Size size) {
+  final p = cam.floorPoint(local, size);
+  if (p == null) return null;
+  return V3(p.x.clamp(-56.0, 56.0).toDouble(), 46, p.z.clamp(-44.0, 44.0).toDouble());
+}
+
+/// Rings that spread over the floor where the person is going, for a moment.
+List<Poly> frameGoRing(V3? at, double since, double now) {
+  final age = now - since;
+  if (at == null || age < 0 || age > 1.6) return const [];
+  final b = MeshBuilder()
+    ..id = 0
+    ..order = 3
+    ..bias = 2;
+  for (var k = 0; k < 2; k++) {
+    final ph = (age * 0.9 + k * 0.5) % 1.0;
+    final r = 3 + ph * 14;
+    b.alpha = 0.85 * (1 - ph);
+    b.ring(V3(at.x, 0.4, at.z), V3(at.x, 0.6, at.z), r, r - 1.3, const Color(0xFFFFD60A), shine: 0, sides: 20);
+  }
+  return b.polys;
+}
+
+/// Daylight seen through the window and the door (and the grass outside the door). They are only put in the picture when the person looks
+/// that way, so they are never in the way when the view turns round.
+List<Poly> frameBackdrops(Cam3 cam) {
+  if (cam.keepIn == null) return const [];
+  final b = MeshBuilder()
+    ..id = 0
+    ..order = -1;
+  if (math.sin(cam.yaw) > -0.35) {
+    b.box(wallPt(1, (kWindow.u0 + kWindow.u1) / 2, 54, -3), wallSize(1, 40, 38, 0.5), const Color(0xFF9AD0F5));
+  }
+  if (math.cos(cam.yaw) < 0.35) {
+    b.box(wallPt(2, (kDoor.u0 + kDoor.u1) / 2, 42, -3), wallSize(2, 40, 84, 0.5), const Color(0xFF9AD0F5));
+    b.box(wallPt(2, (kDoor.u0 + kDoor.u1) / 2, 4, -2.7), wallSize(2, 40, 8, 0.5), const Color(0xFF6BAA5A));
+  }
+  return b.polys;
 }
