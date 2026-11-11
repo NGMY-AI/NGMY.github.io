@@ -2,6 +2,8 @@ import 'dart:async';
 import 'ngmy_construction_electrical_more.dart';
 import 'ngmy_electrical_diagram_page.dart';
 import 'ngmy_electrical_fx.dart';
+import 'ngmy_frame_drywall.dart';
+import 'ngmy_frame_wiring.dart';
 import 'ngmy_electrical_safety.dart';
 import 'ngmy_electrical_ui.dart';
 
@@ -221,6 +223,8 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
     final all = <({String emoji, String title, String blurb, Color color, VoidCallback open, String words})>[
       for (final l in _lessons) (emoji: l.emoji, title: l.title, blurb: l.blurb, color: l.color, open: () => _lesson(l.id), words: l.id),
       (emoji: '🧠', title: 'Diagram lessons', blurb: 'Three-way switch, fan with light', color: const Color(0xFFA78BFA), open: () => _push(const NgmyElectricalDiagramPage()), words: 'diagram wiring picture'),
+      (emoji: '🏠', title: 'Wiring a house', blurb: 'A bare frame: boxes, holes, cable', color: const Color(0xFFF59E0B), open: () => _push(const NgmyWiringHousePage()), words: 'wire wiring house frame studs drill cable box outlet switch panel'),
+      (emoji: '🧱', title: 'Hanging drywall', blurb: 'Sheets, screws, tape, mud, sand', color: const Color(0xFF38BDF8), open: () => _push(const NgmyDrywallPage()), words: 'drywall sheetrock sheet screws tape mud sand paint primer ceiling walls'),
       (emoji: '📘', title: 'Learn the trades', blurb: 'Short cards for beginners', color: const Color(0xFFA78BFA), open: () => _push(const NgmyConstructionLearnPage()), words: 'cards beginner trade'),
     ];
     final words = _query.toLowerCase().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();

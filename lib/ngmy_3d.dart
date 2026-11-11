@@ -80,7 +80,7 @@ class Label3D {
 }
 
 class Scene3D {
-  const Scene3D(this.polys, {this.info = const {}, this.labels = const [], this.screens = const [], this.shell, this.farMin = 0});
+  const Scene3D(this.polys, {this.info = const {}, this.labels = const [], this.screens = const [], this.shell, this.farMin = 0, this.closedShell = false});
   final List<Poly> polys;
   final Map<int, ObjInfo> info;
   final List<Label3D> labels;
@@ -90,6 +90,9 @@ class Scene3D {
 
   /// The room box (x from, x to, z from, z to) whose walls are tier 0. When the camera is outside it, those walls are drawn last, so they hide the room.
   final (double, double, double, double)? shell;
+
+  /// A room with all four walls (no open front): the camera is also outside when it is past the last wall in z.
+  final bool closedShell;
 
   /// Nothing nearer than this is left out because it is far away (a whole town is seen from the air, so nothing may switch off).
   final double farMin;
@@ -652,7 +655,7 @@ class Scene3DPainter extends CustomPainter {
     final sh = scene.shell;
     if (sh != null) {
       final ex = cam.target.x - cam.dist * cp * syw, ez = cam.target.z + cam.dist * cp * cyw;
-      outside = ex < sh.$1 - 1 || ex > sh.$2 + 1 || ez < sh.$3 - 1;
+      outside = ex < sh.$1 - 1 || ex > sh.$2 + 1 || ez < sh.$3 - 1 || (scene.closedShell && ez > sh.$4 + 1);
       // Seen from outside, the walls nearer to you than the middle of the room are left out (a doll's house), so nothing inside is ever hidden.
       if (outside) roomDepth = toCam(V3((sh.$1 + sh.$2) / 2, 40, (sh.$3 + sh.$4) / 2)).z;
     }
