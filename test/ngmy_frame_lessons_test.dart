@@ -254,6 +254,85 @@ void main() {
       });
     }
 
+    testWidgets('tap a tool lying on the floor and you pick it up: the cable roll and the drill in the wiring room', (t) async {
+      t.view.physicalSize = const Size(900, 1700);
+      t.view.devicePixelRatio = 1.0;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(const MaterialApp(home: NgmyWiringHousePage()));
+      await t.pump(const Duration(milliseconds: 600));
+      final st = t.state<NgmyWiringHousePageState>(find.byType(NgmyWiringHousePage));
+      expect(st.msg, contains('Tap a tool on the floor'), reason: 'the first message says how to start');
+      expect(st.tool, 'look');
+      st.pickForTest(idPropRoll);
+      await t.pump(const Duration(milliseconds: 200));
+      expect(st.tool, 'cable');
+      expect(st.msg, contains('picked up the roll of cable'));
+      expect(st.msg, contains('no box yet'), reason: 'and it says what to do first');
+      st.pickForTest(idPropDrill);
+      await t.pump(const Duration(milliseconds: 200));
+      expect(st.tool, 'drill');
+      // They are really in the picture, with a pad round each so a finger finds them.
+      for (final id in [idPropRoll, idPropDrill]) {
+        expect(st.scene.polys.where((p) => p.id == id).length, greaterThan(5), reason: 'prop $id');
+        expect(st.scene.polys.any((p) => p.id == id && p.alpha < 0.1), isTrue, reason: 'pad of $id');
+        expect(st.scene.info[id], isNotNull);
+      }
+      await t.pump(const Duration(seconds: 14));
+      await t.pumpWidget(const SizedBox());
+      await t.pump(const Duration(seconds: 14));
+    });
+
+    testWidgets('a real finger tap on the cable roll in the picture picks it up', (t) async {
+      t.view.physicalSize = const Size(900, 1700);
+      t.view.devicePixelRatio = 1.0;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(const MaterialApp(home: NgmyWiringHousePage()));
+      await t.pump(const Duration(milliseconds: 600));
+      final st = t.state<NgmyWiringHousePageState>(find.byType(NgmyWiringHousePage));
+      final r = t.getRect(find.byType(Scene3DView).first);
+      // Look for the roll where it is on the screen: tap along the floor until something is picked up.
+      var found = false;
+      for (var y = r.bottom - 40; y > r.center.dy && !found; y -= 25) {
+        for (var x = r.left + 40; x < r.right - 60 && !found; x += 25) {
+          await t.tapAt(Offset(x, y));
+          await t.pump(const Duration(milliseconds: 500));
+          if (st.tool == 'cable' || st.tool == 'drill') found = true;
+        }
+      }
+      expect(found, isTrue, reason: 'a tap on a tool on the floor picks it up');
+      await t.pump(const Duration(seconds: 14));
+      await t.pumpWidget(const SizedBox());
+      await t.pump(const Duration(seconds: 14));
+    });
+
+    testWidgets('tap any tool on the drywall floor and you pick it up: the saw, the roller, the sander, the mud, the tape and the rest', (t) async {
+      t.view.physicalSize = const Size(900, 1700);
+      t.view.devicePixelRatio = 1.0;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(const MaterialApp(home: NgmyDrywallPage()));
+      await t.pump(const Duration(milliseconds: 600));
+      final st = t.state<NgmyDrywallPageState>(find.byType(NgmyDrywallPage));
+      expect(st.msg, contains('Tap a tool on the floor'));
+      final expected = {idPropStack: 'sheet', idPropMud: 'mud', idPropTape: 'tape', idPropKnife: 'mud', idPropGun: 'screw', idPropSquare: 'cut', idPropPole: 'sand', idPropBead: 'bead', idPropTray: 'paint', idPropSaw: 'saw'};
+      for (final e in expected.entries) {
+        st.pickForTest(e.key);
+        await t.pump(const Duration(milliseconds: 100));
+        expect(st.tool, e.value, reason: 'prop ${e.key}');
+        expect(st.msg, contains('picked up'));
+        expect(st.scene.polys.any((p) => p.id == e.key && p.alpha < 0.1), isTrue, reason: 'a pad round prop ${e.key}');
+      }
+      // With nothing hung yet, the tools that need work done first say what to do first.
+      st.pickForTest(idPropSaw);
+      expect(st.msg, contains('Hang the sheets'));
+      st.pickForTest(idPropTray);
+      expect(st.msg, contains('sanded'));
+      st.pickForTest(idPropMud);
+      expect(st.msg, contains('Nothing is ready for mud'));
+      await t.pump(const Duration(seconds: 14));
+      await t.pumpWidget(const SizedBox());
+      await t.pump(const Duration(seconds: 14));
+    });
+
     testWidgets('every tool is on the screen at once: the tools wrap into rows and none is hidden at the side', (t) async {
       t.view.physicalSize = const Size(900, 1700);
       t.view.devicePixelRatio = 1.0;

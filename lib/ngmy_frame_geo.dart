@@ -144,3 +144,38 @@ double joistX(int i) => -70 + i * (140 / (kJoists - 1));
 bool isStudId(int id) => studById(id) != null;
 bool isJoistId(int id) => id >= idJoist0 && id < idJoist0 + kJoists;
 bool isBoxId(int id) => id >= idBox0 && id < idBox0 + 100;
+
+// ── The tools lying on the floor: tap one to pick it up ──
+
+const int idPropRoll = 7000, idPropDrill = 7001, idPropStack = 7010, idPropMud = 7011, idPropTape = 7012, idPropKnife = 7013, idPropGun = 7014, idPropSquare = 7015, idPropPole = 7016, idPropBead = 7017, idPropTray = 7018, idPropSaw = 7019;
+
+/// The tool each thing on the floor is.
+const Map<int, String> kPropTool = {
+  idPropRoll: 'cable',
+  idPropDrill: 'drill',
+  idPropStack: 'sheet',
+  idPropMud: 'mud',
+  idPropTape: 'tape',
+  idPropKnife: 'mud',
+  idPropGun: 'screw',
+  idPropSquare: 'cut',
+  idPropPole: 'sand',
+  idPropBead: 'bead',
+  idPropTray: 'paint',
+  idPropSaw: 'saw',
+};
+
+const Map<int, (String, String, V3)> kPropInfo = {
+  idPropRoll: ('Roll of cable', 'Yellow 12 gauge cable for the outlets and white 14 gauge for the light. Tap it to pick up the cable roll, then tap a box.', V3(36, 8, -40)),
+  idPropDrill: ('Cordless drill', 'Drills the holes in the studs for the cable. Tap it to pick it up, then tap a stud.', V3(-30, 3, -38)),
+  idPropStack: ('Stack of drywall', 'Sheets of half inch drywall, 4 by 8 feet. Tap them to pick up a sheet, then tap where it goes.', V3(-40, 5, 4)),
+  idPropMud: ('Bucket of joint compound', 'The mud: it fills the joints and covers the screw heads. Tap it to pick up the mud and the knife.', V3(40, 8, 36)),
+  idPropTape: ('Paper tape', 'Paper tape is pressed into the first coat of mud over every joint. Tap it to pick it up.', V3(56, 3, 24)),
+  idPropKnife: ('Taping knife', 'Spreads the mud. Tap it to pick up the mud and the knife.', V3(26, 1.5, 46)),
+  idPropGun: ('Screw gun', 'Drives the drywall screws just under the paper. Tap it to pick it up, then tap a hung sheet.', V3(-2, 3, 44)),
+  idPropSquare: ('T-square and knife', 'A straight edge to score a sheet against before it is snapped. Tap it to pick up the cutter.', V3(8, 1.5, -34)),
+  idPropPole: ('Sanding pole', 'Sands the dry mud smooth. Tap it to pick up the sander.', V3(14, 1.5, -46)),
+  idPropBead: ('Corner bead', 'Metal angle for the corners of the door and the window. Tap it to pick it up.', V3(60, 1.5, -8)),
+  idPropTray: ('Paint tray and roller', 'Primer on the roller seals the paper and the mud so they look the same. Tap it to pick up the roller.', V3(-8, 2, -22)),
+  idPropSaw: ('Drywall saw', 'A pointed saw to cut the holes for the boxes, the door and the window. Tap it to pick it up.', V3(20, 1, 12)),
+};

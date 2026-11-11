@@ -320,6 +320,7 @@ Scene3D buildWiringScene(WiringHouse w, {String tool = 'look'}) {
       for (var s = 0; s < topSegCount(k); s++) topSegId(k, s): ObjInfo('Top plate', 'Two boards across the tops of the studs. A cable going up to the ceiling light passes through a hole drilled in it.', wallPt(k, topSegU(k, s), 94.5, kStD), 60),
     for (var k = 0; k < 4; k++) idBottom0 + k: ObjInfo('Bottom plate', 'The board the studs stand on, nailed to the floor.', wallPt(k, wallLen(k) / 2, 1, kStD), 90),
     for (var i = 0; i < kJoists; i++) idJoist0 + i: ObjInfo('Ceiling joist', 'A 2 by 6 across the top of the room. The ceiling drywall will be screwed to the bottom of it, and a light box hangs from the side.', V3(joistX(i), 98, 0), 90),
+    for (final e in kPropInfo.entries) e.key: ObjInfo(e.value.$1, e.value.$2, e.value.$3, 60),
     idPanel: const ObjInfo('Breaker panel', 'Every cable in the house starts here, one breaker for each circuit. The power is off while you work.', V3(-48, 59, -58), 50),
     idHeader0: const ObjInfo('Door header', 'A thick beam over the door that carries the weight of the wall above it.', V3(8, 85, 58), 70),
     idHeader0 + 1: const ObjInfo('Window header', 'A thick beam over the window, held up by the jack studs.', V3(70, 76, -2), 70),
@@ -433,6 +434,14 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
   final Stopwatch _clock = Stopwatch()..start();
   final Map<int, double> _started = {};
   Set<int> glow = {};
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _say("Tap a tool on the floor (the cable roll, the drill), or choose one from the list, to pick it up. Then tap where it works.");
+    });
+  }
   V3? _goAt;
   double _goT = -99;
   int _lastPick = 0;
@@ -478,6 +487,23 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
     'cable': 'Cable roll: tap a box and the cable unrolls from the breaker panel to it, through the holes. Tap a box that has cable to pull it out again.',
   };
 
+  /// What is missing when the tool has nothing to work on yet.
+  String _needs(String t) => switch (t) {
+        'cable' when w.boxes.isEmpty => ' There is no box yet: put an outlet box on a stud first, then pull the cable to it.',
+        'ceiling' when w.count('ceiling') > 0 => ' The light box is already hung.',
+        _ => '',
+      };
+
+  /// A tap on a tool lying on the floor picks it up.
+  void _grab(int id, String t) {
+    setState(() {
+      tool = t;
+      hl = id;
+      _rebuild();
+    });
+    _say('You picked up the ${kPropInfo[id]!.$1.toLowerCase()}. ${_howTo[t]}${_needs(t)}');
+  }
+
   @visibleForTesting
   void pickForTest(int id) {
     _lastPickAt = -9;
@@ -490,7 +516,7 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
       hl = 0;
       _rebuild();
     });
-    _say(_howTo[t]!);
+    _say(_howTo[t]! + _needs(t));
   }
 
   /// Two quick taps on the same piece do the thing once, not twice (the second tap may be the first half of a double tap to walk there).
@@ -539,6 +565,11 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
 
   void _pick(int id) {
     if (id != 0 && _again(id)) return;
+    final grabbed = kPropTool[id];
+    if (grabbed != null) {
+      _grab(id, grabbed);
+      return;
+    }
     if (id == 0) {
       setState(() => hl = 0);
       return;

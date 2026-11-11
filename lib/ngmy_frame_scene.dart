@@ -130,10 +130,12 @@ void drawCeilingBox(MeshBuilder b, {required int id, required double x, int orde
 void drawWiringProps(MeshBuilder b) {
   b.order = 2;
   b.id = 0;
+  b.id = idPropRoll;
   // The roll, standing on its edge: a thick ring of yellow cable, a black label, a white band.
   b.ring(const V3(36, 8, -44), const V3(36, 8, -37), 8, 3, kNmYellow, shine: 0.3, sides: 20);
   b.ring(const V3(36, 8, -43.4), const V3(36, 8, -37.6), 8.15, 7.2, const Color(0xFFE9E7DC), shine: 0.2, sides: 20);
   b.box(const V3(36, 4.2, -40.5), const V3(2.4, 2.6, 6.2), const Color(0xFF1E2228), shine: 0.1);
+  b.id = idPropDrill;
   // A cordless drill lying on the floor: body, handle, battery, chuck and bit.
   const dx = -34.0, dz = -38.0;
   b.box(const V3(dx, 3.2, dz), const V3(10, 4.6, 3.6), const Color(0xFFF2B100), shine: 0.4);
@@ -141,6 +143,8 @@ void drawWiringProps(MeshBuilder b) {
   b.box(const V3(dx - 1.5, 0.9, dz), const V3(6.0, 1.8, 3.6), const Color(0xFF22262C), shine: 0.2);
   b.cyl(const V3(dx + 5, 3.4, dz), const V3(dx + 8.2, 3.4, dz), 1.25, const Color(0xFF9AA2AD), shine: 0.8, sides: 10);
   b.cyl(const V3(dx + 8.2, 3.4, dz), const V3(dx + 12.5, 3.4, dz), 0.38, const Color(0xFFC9CED6), shine: 0.9, sides: 6);
+  _propPad(b, idPropRoll, const V3(36, 8, -40), const V3(19, 18, 12));
+  _propPad(b, idPropDrill, const V3(-30, 3, -38), const V3(20, 9, 10));
 }
 
 /// The tools as chips in rows that wrap, so every tool is on the screen at once and none is hidden to the side.
@@ -200,3 +204,19 @@ List<Poly> frameBackdrops(Cam3 cam) {
   }
   return b.polys;
 }
+
+/// An invisible pad round a tool on the floor, so a finger picks it up at once.
+void _propPad(MeshBuilder b, int id, V3 c, V3 s) {
+  b
+    ..id = id
+    ..order = 3
+    ..bias = 0.9
+    ..alpha = 0.02;
+  b.box(c, s, Colors.white);
+  b
+    ..alpha = 1
+    ..bias = 0
+    ..order = 2;
+}
+
+void propPad(MeshBuilder b, int id, V3 c, V3 s) => _propPad(b, id, c, s);

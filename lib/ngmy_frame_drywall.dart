@@ -282,6 +282,31 @@ class DrywallHouse {
     return FAct(true, '${kSurfaceNames[s][0].toUpperCase()}${kSurfaceNames[s].substring(1)} primed with the roller: the paper and the mud now look the same, and the joints have disappeared.');
   }
 
+
+  /// What has to be done first when a tool has nothing to work on yet ('' when it has something to do).
+  String whyNot(String tool, double now) {
+    bool any(Iterable<bool> x) => x.any((e) => e);
+    switch (tool) {
+      case 'sheet':
+        return any([for (final s in kDSlots) !sheets[s.id]!.placed && (!s.needsCut || sheets[s.id]!.cut)]) ? '' : (allHung ? ' Every sheet is up.' : ' The pieces that are left are narrow: cut them to size with the Cutter first.');
+      case 'cut':
+        return any([for (final s in kDSlots) s.needsCut && !sheets[s.id]!.cut && !sheets[s.id]!.placed]) ? '' : ' Nothing needs cutting right now.';
+      case 'screw':
+        return any([for (final s in kDSlots) sheets[s.id]!.placed && !sheets[s.id]!.screwed]) ? '' : ' Hang a sheet first: the screws go into a sheet that is up.';
+      case 'saw':
+        return any([for (final c in kDCuts) sheets[c.slot]!.placed && !sheets[c.slot]!.cutDone.contains(c.id)]) ? '' : ' Hang the sheets over the boxes, the door and the window first: the holes are cut in a sheet that is up.';
+      case 'bead':
+        return any([for (var i = 0; i < kOpenings.length; i++) !beads.contains(i) && openingCut(i)]) ? '' : ' Cut the door and window openings with the Saw first.';
+      case 'mud':
+        return any([for (var s = 0; s < 5; s++) (surf[s].stage == 0 && _notReady(s) == null) || ((surf[s].stage == 2 || surf[s].stage == 3) && dry(s, now))]) ? '' : ' Nothing is ready for mud yet: on a wall or the ceiling every sheet needs to be up and screwed, the holes cut and the door and window beaded. After a coat, wait for it to dry.';
+      case 'tape':
+        return any([for (final s in surf) s.stage == 1]) ? '' : ' Tape goes into wet mud: put mud on a surface first.';
+      case 'sand':
+        return any([for (var s = 0; s < 5; s++) surf[s].stage == 4 && dry(s, now)]) ? '' : ' Sand only after the third coat has dried.';
+      default:
+        return any([for (final s in surf) s.stage == 5]) ? '' : ' Prime after the mud is sanded.';
+    }
+  }
   bool get complete => surf.every((s) => s.stage == 6);
   int get hung => sheets.values.where((s) => s.placed).length;
   int get screwedCount => sheets.values.where((s) => s.screwed).length;
@@ -621,6 +646,7 @@ Scene3D buildDrywallScene(DrywallHouse d, {String tool = 'look', double now = 0}
     for (final c in kDCuts) c.id: ObjInfo(c.name, 'A hole to cut in the sheet.', c.opening >= 0 ? wallPt(kOpenings[c.opening].wall, (c.u0 + c.u1) / 2, 40, kStD) : V3((c.u0 + c.u1) / 2, 60, 0), 90),
     for (var i = 0; i < kOpenings.length; i++) idBead0 + i: ObjInfo('Corner bead', 'Metal angle nailed on an outside corner (the corner of the door or window opening).', wallPt(kOpenings[i].wall, (kOpenings[i].u0 + kOpenings[i].u1) / 2, 40, kStD), 100),
     for (var s = 0; s < 5; s++) idSurf0 + s: ObjInfo(kSurfaceNames[s][0].toUpperCase() + kSurfaceNames[s].substring(1), 'All the joints and screw heads here get mud, tape, three coats, sanding and primer.', s == 0 ? const V3(0, 90, 0) : wallPt(s - 1, wallLen(s - 1) / 2, 48, kStD), 110),
+    for (final e in kPropInfo.entries) e.key: ObjInfo(e.value.$1, e.value.$2, e.value.$3, 60),
     ...buildWiringScene(d.wiring).info,
   };
   return Scene3D(b.polys, info: info, shell: (-72, 72, -60, 60), closedShell: true);
@@ -632,44 +658,69 @@ void _drawEquipment(MeshBuilder b) {
   b
     ..order = 2
     ..id = 0;
+  b.id = idPropStack;
   // The stack: twelve sheets, face paper on top, the long edge showing the white gypsum.
   b.box(const V3(-40, 3, 4), const V3(48, 6, 96), const Color(0xFFE2DDCE), shine: 0.02, split: 2);
   for (var i = 0; i < 6; i++) {
     b.box(V3(-40, 0.5 + i, 52.1), const V3(47.6, 0.12, 0.1), const Color(0xFFB9B3A0));
   }
   b.box(const V3(-40, 6.05, 4), const V3(48, 0.1, 96), const Color(0xFFEAE6DA));
+  b.id = idPropMud;
   // The bucket of joint compound, with its lid off and a taping knife across it.
   b.cyl(const V3(40, 0, 36), const V3(40, 14.5, 36), 6.6, const Color(0xFFF1F1EC), shine: 0.2, sides: 16);
   b.cyl(const V3(40, 7, 36), const V3(40, 11, 36), 6.7, const Color(0xFF2F6FD6), shine: 0.2, sides: 16);
   b.cyl(const V3(40, 14.4, 36), const V3(40, 14.6, 36), 5.8, const Color(0xFFDCD6C5), shine: 0.1, sides: 16);
   b.box(const V3(40, 15, 36), const V3(13, 0.12, 4.6), const Color(0xFFC9CED6), shine: 0.9);
   b.box(const V3(46.5, 15.5, 36), const V3(5, 1.2, 1.4), const Color(0xFF22262C), shine: 0.2);
+  b.id = idPropTape;
   // Two rolls of paper tape.
   for (final x in const [54.0, 59.5]) {
     b.ring(V3(x, 0, 24), V3(x, 2.1, 24), 3.4, 1.0, const Color(0xFFF1EDE0), shine: 0.05, sides: 14);
   }
+  b.id = idPropKnife;
   // A taping knife lying flat.
   b.box(const V3(22, 0.3, 46), const V3(12, 0.12, 4.4), const Color(0xFFC9CED6), shine: 0.9);
   b.box(const V3(30, 0.8, 46), const V3(5.5, 1.3, 1.4), const Color(0xFF22262C), shine: 0.2);
+  b.id = idPropGun;
   // The screw gun.
   const gx = -8.0, gz = 44.0;
   b.box(const V3(gx, 3.0, gz), const V3(11, 4.4, 3.8), const Color(0xFFD33B2F), shine: 0.4);
   b.box(const V3(gx - 2, 1.8, gz), const V3(3.4, 3.6, 3.2), const Color(0xFF22262C), shine: 0.3);
   b.cyl(const V3(gx + 5.5, 3.0, gz), const V3(gx + 13, 3.0, gz), 1.2, const Color(0xFF9AA2AD), shine: 0.8, sides: 10);
+  b.id = idPropSquare;
   // The T-square: a long blade and a head, for scoring a straight cut.
   b.box(const V3(8, 0.5, -34), const V3(48, 0.7, 2.2), const Color(0xFFB4BAC4), shine: 0.7);
   b.box(const V3(-15.5, 0.6, -34), const V3(2.4, 0.9, 9), const Color(0xFF22262C), shine: 0.2);
+  b.id = idPropPole;
   // The sanding pole: a long handle and a pad of sandpaper.
   b.box(const V3(14, 0.5, -46), const V3(50, 1.0, 1.0), const Color(0xFFA17C4C), shine: 0.1);
   b.box(const V3(-12.5, 0.9, -46), const V3(9.5, 1.3, 4.2), const Color(0xFFD8D1BE), shine: 0.05);
+  b.id = idPropBead;
   // Corner bead, in short lengths.
   for (var i = 0; i < 3; i++) {
     b.box(V3(58 + i * 2.2, 0.7, -8), const V3(1.6, 1.4, 48), const Color(0xFFC3CAD3), shine: 0.8);
   }
+  b.id = idPropTray;
   // The paint tray with a roller in it.
   b.box(const V3(-12, 0.8, -22), const V3(12, 1.6, 18), const Color(0xFFD9D5C8), shine: 0.2);
   b.cyl(const V3(-17, 3.2, -22), const V3(-7, 3.2, -22), 2.2, const Color(0xFFF0F0EA), shine: 0.1, sides: 12);
   b.cyl(const V3(-7, 3.2, -22), const V3(-2, 3.2, -22), 0.35, const Color(0xFFB4BAC4), shine: 0.8, sides: 6);
+  // The drywall saw: a pointed blade with teeth along one edge and a red handle.
+  b.id = idPropSaw;
+  b.box(const V3(20, 0.7, 12), const V3(14, 0.14, 2.2), const Color(0xFFC9CED6), shine: 0.9);
+  b.box(const V3(20, 0.55, 13.2), const V3(14, 0.1, 0.35), const Color(0xFF8A9099), shine: 0.5);
+  b.box(const V3(29.5, 1.0, 12), const V3(5.5, 1.5, 2.2), const Color(0xFFD33B2F), shine: 0.3);
+  // An invisible pad round each tool, so a finger picks it up at once.
+  propPad(b, idPropStack, const V3(-40, 3.5, 4), const V3(48, 7, 96));
+  propPad(b, idPropMud, const V3(40, 8, 36), const V3(16, 18, 16));
+  propPad(b, idPropTape, const V3(56, 3, 24), const V3(13, 8, 8));
+  propPad(b, idPropKnife, const V3(26, 1.5, 46), const V3(22, 5, 9));
+  propPad(b, idPropGun, const V3(-2, 3, 44), const V3(22, 8, 9));
+  propPad(b, idPropSquare, const V3(8, 1.5, -34), const V3(50, 5, 10));
+  propPad(b, idPropPole, const V3(14, 1.5, -46), const V3(52, 5, 8));
+  propPad(b, idPropBead, const V3(60, 1.5, -8), const V3(10, 5, 50));
+  propPad(b, idPropTray, const V3(-8, 2, -22), const V3(22, 6, 20));
+  propPad(b, idPropSaw, const V3(20, 1.5, 12), const V3(18, 5, 7));
 }
 
 /// The panel wall, the door wall and the rest, in the order of the buttons.
@@ -722,6 +773,9 @@ class NgmyDrywallPageState extends State<NgmyDrywallPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _say('Tap a tool on the floor (the stack of sheets, the saw, the mud, the tape...), or choose one from the list, to pick it up. Then tap where it works.');
+    });
     // The mud changes colour as it dries.
     _dryT = Timer.periodic(const Duration(milliseconds: 500), (_) {
       if (!mounted) return;
@@ -772,7 +826,7 @@ class NgmyDrywallPageState extends State<NgmyDrywallPage> {
       hl = 0;
       _rebuild();
     });
-    _say(_howTo[t]!);
+    _say(_howTo[t]! + (t == "look" ? "" : d.whyNot(t, now)));
   }
 
   /// Two quick taps on the same piece do the thing once, not twice (the second tap may be the first half of a double tap to walk there).
@@ -804,6 +858,16 @@ class NgmyDrywallPageState extends State<NgmyDrywallPage> {
     _say('You walked over here. Drag to turn round.');
   }
 
+  /// A tap on a tool lying on the floor picks it up.
+  void _grab(int id, String t) {
+    setState(() {
+      tool = t;
+      hl = id;
+      _rebuild();
+    });
+    _say('You picked up the ${kPropInfo[id]!.$1.toLowerCase()}. ${_howTo[t]}${d.whyNot(t, now)}');
+  }
+
   @visibleForTesting
   void doubleTapForTest(Offset local, Size size) => _goTo(local, size);
 
@@ -815,6 +879,11 @@ class NgmyDrywallPageState extends State<NgmyDrywallPage> {
 
   void _pick(int id) {
     if (id != 0 && _again(id)) return;
+    final grabbed = kPropTool[id];
+    if (grabbed != null) {
+      _grab(id, grabbed);
+      return;
+    }
     if (id == 0) {
       setState(() => hl = 0);
       return;
