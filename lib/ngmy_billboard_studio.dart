@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_3d.dart';
+import 'ngmy_billboard_decor.dart';
 import 'ngmy_city_ads.dart';
 import 'ngmy_construction_homescene.dart';
 import 'ngmy_frame_loop.dart';
@@ -437,6 +438,7 @@ Scene3D buildBillboardScene(BbTemplate tp, BbContent content) {
         }
     }
     b.polys.addAll(sb.polys);
+    if (tp.id != 'roof') billboardDecor(b, tp.id, place, yaw: pl.yaw, bw: bw, bh: bh, yBottom: yb, yTop: yt, thick: thick, frame: frame);
     // The sign, on both sides.
     final signFront = content.signs[bi];
     screens.add(ScreenQuad([place(V3(x0, yt, 0.8)), place(V3(x1, yt, 0.8)), place(V3(x1, yb, 0.8)), place(V3(x0, yb, 0.8))], 0, (c, size, t) => paintBillboard(c, size, t, signFront, bi), width: pw, height: ph, bias: 60, order: bo));
