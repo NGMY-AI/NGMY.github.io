@@ -357,10 +357,16 @@ void main() {
       st.setTool('outlet');
       st.pickForTest(stud(0, 80).id);
       final box = st.w.boxes.first;
-      expect(st.focus, box.id, reason: 'the new box is the one the view is on');
+      expect(st.focus, 0, reason: 'putting a box on a stud does not move the view');
+      await t.pump(const Duration(seconds: 2));
+      expect(cam.dist, greaterThan(100), reason: 'the view stayed where it was');
+      // A tap on the box closes in on it, and its tabs show.
+      st.setTool('look');
+      st.pickForTest(box.id);
       for (var i = 0; i < 10; i++) {
         await t.pump(const Duration(milliseconds: 250));
       }
+      expect(st.focus, box.id);
       expect(cam.dist, lessThan(30), reason: 'closed in on the box');
       expect(st.msg, contains('tab'));
       // The tabs are in the picture as marks that can be tapped.
@@ -407,6 +413,41 @@ void main() {
       await t.pump(const Duration(seconds: 16));
     });
 
+
+    testWidgets('what was done is kept when the lesson is left and opened again, and Start over clears it', (t) async {
+      t.view.physicalSize = const Size(900, 1700);
+      t.view.devicePixelRatio = 1.0;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(const MaterialApp(home: NgmyWiringHousePage()));
+      await t.pump(const Duration(milliseconds: 600));
+      var st = t.state<NgmyWiringHousePageState>(find.byType(NgmyWiringHousePage));
+      st.setTool('outlet');
+      st.pickForTest(stud(0, 80).id);
+      st.w.knockout(koId(st.w.boxes.first.id, 1));
+      st.setTool('look');
+      await t.pump(const Duration(milliseconds: 300));
+      await t.pumpWidget(const SizedBox());
+      await t.pump(const Duration(seconds: 15));
+      // Opened again: the box is still there, with its knockout out.
+      await t.pumpWidget(const MaterialApp(home: NgmyWiringHousePage()));
+      await t.pump(const Duration(milliseconds: 600));
+      st = t.state<NgmyWiringHousePageState>(find.byType(NgmyWiringHousePage));
+      expect(st.w.boxes.length, 1);
+      expect(st.w.boxes.first.kos[1], isTrue);
+      // Start over: gone for good.
+      await t.tap(find.byKey(const Key('tool-reset')));
+      await t.pump(const Duration(milliseconds: 300));
+      expect(st.w.boxes, isEmpty);
+      await t.pumpWidget(const SizedBox());
+      await t.pump(const Duration(seconds: 15));
+      await t.pumpWidget(const MaterialApp(home: NgmyWiringHousePage()));
+      await t.pump(const Duration(milliseconds: 600));
+      st = t.state<NgmyWiringHousePageState>(find.byType(NgmyWiringHousePage));
+      expect(st.w.boxes, isEmpty);
+      await t.pump(const Duration(seconds: 15));
+      await t.pumpWidget(const SizedBox());
+      await t.pump(const Duration(seconds: 15));
+    });
     testWidgets('a job finished without a hint earns a star and a hint costs two', (t) async {
       t.view.physicalSize = const Size(900, 1700);
       t.view.devicePixelRatio = 1.0;

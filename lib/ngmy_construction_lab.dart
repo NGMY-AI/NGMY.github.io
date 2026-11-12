@@ -5,6 +5,7 @@ import 'ngmy_electrical_diagram_page.dart';
 import 'ngmy_electrical_fx.dart';
 import 'ngmy_frame_drywall.dart';
 import 'ngmy_frame_wiring.dart';
+import 'ngmy_frame_save.dart';
 import 'ngmy_electrical_safety.dart';
 import 'ngmy_electrical_ui.dart';
 
@@ -549,10 +550,10 @@ class LessonScaffold extends StatelessWidget {
               if (titleExtra == null)
                 Expanded(child: Text(title, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 16)))
               else ...[
-                Text(title, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 16)),
-                const SizedBox(width: 10),
+                Flexible(flex: 0, child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 16))),
+                const SizedBox(width: 6),
                 Expanded(child: titleExtra!),
-                const SizedBox(width: 10),
+                const SizedBox(width: 6),
               ],
               GestureDetector(
                 onTap: onSteps,
@@ -650,6 +651,33 @@ class _ElectricalPageState extends State<ElectricalLessonPage> with _GlowMixin {
     _say(switch (m) { 'practice' => 'Practice: you can put a wire anywhere. The mistake shows when the power goes on.', 'test' => 'Test: put every wire where you think it goes. Nothing is marked until you submit.', _ => 'Learn: a wrong wire is refused and explained.' }, ok: true);
   }
 
+  bool _benchLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.state == null) {
+      FrameSave.load('bench_${widget.id}').then((j) {
+        if (!mounted) return;
+        if (j != null) {
+          s.loadJson(j);
+          setState(_rebuild);
+        }
+        _benchLoaded = true;
+      });
+    }
+  }
+
+  /// What was done here stays on the device until the job is finished.
+  void _saveBench() {
+    if (!(widget.state == null) || !_benchLoaded) return;
+    if (s.stage >= 2) {
+      FrameSave.clear('bench_${widget.id}');
+    } else {
+      FrameSave.save('bench_${widget.id}', s.toJson());
+    }
+  }
+
   @override
   void dispose() {
     _msgTimer?.cancel();
@@ -671,6 +699,7 @@ class _ElectricalPageState extends State<ElectricalLessonPage> with _GlowMixin {
   void _rebuild() {
     s.testing = s.testing && s.power && s.stage >= 2;
     scene = buildElectricalScene(lesson, s);
+    _saveBench();
   }
 
   void _home() {
@@ -1073,6 +1102,33 @@ class _PtrapPageState extends State<PtrapLessonPage> with _GlowMixin {
     'Run the water and look for leaks. The U-bend keeps a plug of water that blocks sewer gas.',
   ];
 
+  bool _benchLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.state == null) {
+      FrameSave.load('bench_ptrap').then((j) {
+        if (!mounted) return;
+        if (j != null) {
+          s.loadJson(j);
+          setState(_rebuild);
+        }
+        _benchLoaded = true;
+      });
+    }
+  }
+
+  /// What was done here stays on the device until the job is finished.
+  void _saveBench() {
+    if (!(widget.state == null) || !_benchLoaded) return;
+    if (s.running && s.leakAt.isEmpty && s.placed.length >= 3) {
+      FrameSave.clear('bench_ptrap');
+    } else {
+      FrameSave.save('bench_ptrap', s.toJson());
+    }
+  }
+
   @override
   void dispose() {
     _t?.cancel();
@@ -1104,7 +1160,10 @@ class _PtrapPageState extends State<PtrapLessonPage> with _GlowMixin {
         s.running && s.leakAt.isEmpty,
       ];
 
-  void _rebuild() => scene = buildPtrapScene(s);
+  void _rebuild() {
+    scene = buildPtrapScene(s);
+    _saveBench();
+  }
 
   void _pick(int id) {
     if (id == 0) {
@@ -1295,6 +1354,33 @@ class _FaucetPageState extends State<FaucetLessonPage> with _GlowMixin {
     'Turn each valve handle (tap it) to let the water in. Check every connection for drips.',
   ];
 
+  bool _benchLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.state == null) {
+      FrameSave.load('bench_faucet').then((j) {
+        if (!mounted) return;
+        if (j != null) {
+          s.loadJson(j);
+          setState(_rebuild);
+        }
+        _benchLoaded = true;
+      });
+    }
+  }
+
+  /// What was done here stays on the device until the job is finished.
+  void _saveBench() {
+    if (!(widget.state == null) || !_benchLoaded) return;
+    if (s.valvesOpen && s.attached.length >= 2) {
+      FrameSave.clear('bench_faucet');
+    } else {
+      FrameSave.save('bench_faucet', s.toJson());
+    }
+  }
+
   @override
   void dispose() {
     _t?.cancel();
@@ -1318,7 +1404,10 @@ class _FaucetPageState extends State<FaucetLessonPage> with _GlowMixin {
     setState(() => hl = 0);
   }
 
-  void _rebuild() => scene = buildFaucetScene(s);
+  void _rebuild() {
+    scene = buildFaucetScene(s);
+    _saveBench();
+  }
 
   List<bool> _done() => [
         s.hints || s.attached.isNotEmpty,

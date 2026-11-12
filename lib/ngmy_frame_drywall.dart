@@ -7,6 +7,7 @@ import 'ngmy_3d.dart';
 import 'ngmy_construction_community.dart' show Community;
 import 'ngmy_construction_lab.dart';
 import 'ngmy_frame_geo.dart';
+import 'ngmy_frame_save.dart';
 import 'ngmy_frame_scene.dart';
 import 'ngmy_frame_wiring.dart';
 
@@ -134,6 +135,38 @@ class DrywallHouse {
     }
     beads.clear();
     mistakes = 0;
+  }
+
+  // ── Saving ──
+
+  Map<String, dynamic> toJson() => {
+        'sheets': {
+          for (final e in sheets.entries)
+            '${e.key}': [e.value.placed, e.value.cut, e.value.screwed, e.value.cutDone.toList()],
+        },
+        'surf': [for (final s in surf) s.stage],
+        'beads': beads.toList(),
+        'mistakes': mistakes,
+      };
+
+  void loadJson(Map<String, dynamic> j) {
+    reset();
+    for (final e in ((j['sheets'] as Map?) ?? const {}).entries) {
+      final st = sheets[int.tryParse('${e.key}')];
+      if (st == null) continue;
+      final v = e.value as List;
+      st
+        ..placed = v[0] == true
+        ..cut = v[1] == true
+        ..screwed = v[2] == true;
+      st.cutDone.addAll([for (final c in v[3] as List) (c as num).toInt()]);
+    }
+    final sf = (j['surf'] as List?) ?? const [];
+    for (var i = 0; i < surf.length && i < sf.length; i++) {
+      surf[i].stage = (sf[i] as num).toInt();
+    }
+    beads.addAll([for (final e in (j['beads'] as List? ?? const [])) (e as num).toInt()]);
+    mistakes = (j['mistakes'] as num?)?.toInt() ?? 0;
   }
 
   FAct _bad(String m) {
@@ -831,6 +864,7 @@ class NgmyDrywallPageState extends State<NgmyDrywallPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _say('Tap a tool on the floor (the stack of sheets, the saw, the mud, the tape...), or choose one from the list, to pick it up. Then tap where it works. Stuck? Press Hint (it costs 2 stars; a job done without a hint earns 1).');
     });
+    _restore();
     // The mud changes colour as it dries.
     _dryT = Timer.periodic(const Duration(milliseconds: 500), (_) {
       if (!mounted) return;
@@ -850,7 +884,39 @@ class NgmyDrywallPageState extends State<NgmyDrywallPage> {
     super.dispose();
   }
 
-  void _rebuild() => scene = buildDrywallScene(d, tool: tool, now: now);
+  bool _loaded = false, _completed = false;
+
+  /// What was done here before comes back (kept on the device until the lesson is finished or started over).
+  Future<void> _restore() async {
+    final j = await FrameSave.load('drywall');
+    if (!mounted) return;
+    if (j != null) {
+      try {
+        d.loadJson(j['house'] as Map<String, dynamic>);
+        _paid.addAll([for (final e in (j['paid'] as List? ?? const [])) '$e']);
+        hintsUsed = (j['hints'] as num?)?.toInt() ?? 0;
+        setState(_rebuild);
+        _say('Welcome back: your drywall work is here, just as you left it.');
+      } catch (_) {
+        d.reset();
+      }
+    }
+    _loaded = true;
+  }
+
+  void _save() {
+    if (!_loaded) return;
+    if (_completed) {
+      FrameSave.clear('drywall');
+      return;
+    }
+    FrameSave.save('drywall', {'house': d.toJson(), 'paid': _paid.toList(), 'hints': hintsUsed});
+  }
+
+  void _rebuild() {
+    scene = buildDrywallScene(d, tool: tool, now: now);
+    _save();
+  }
 
   void _say(String t, {bool ok = true}) {
     _msgT?.cancel();
@@ -1036,6 +1102,8 @@ class NgmyDrywallPageState extends State<NgmyDrywallPage> {
     _say(a.msg + note, ok: a.ok);
     if (d.complete && !_doneShown) {
       _doneShown = true;
+      _completed = true;
+      FrameSave.clear('drywall');
       WidgetsBinding.instance.addPostFrameCallback((_) => _finished());
     }
   }
@@ -1080,6 +1148,9 @@ class NgmyDrywallPageState extends State<NgmyDrywallPage> {
       d.reset();
       hl = 0;
       _doneShown = false;
+      _completed = false;
+      _paid.clear();
+      FrameSave.clear('drywall');
       _rebuild();
     });
     _say('The drywall is taken down again. Start with the ceiling.');

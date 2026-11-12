@@ -11,6 +11,7 @@ import 'ngmy_construction_lab.dart';
 import 'ngmy_construction_project.dart' show kMachineOutlets;
 import 'ngmy_frame_devices.dart';
 import 'ngmy_frame_geo.dart';
+import 'ngmy_frame_save.dart';
 import 'ngmy_frame_scene.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -115,6 +116,98 @@ class WiringHouse {
     _next = idBox0;
     breaker = false;
     tripped = false;
+  }
+
+  // ── Saving ──
+
+  Map<String, dynamic> toJson() => {
+        'drilled': drilled.toList(),
+        'plugged': {for (final e in plugged.entries) '${e.key}': e.value},
+        'mistakes': mistakes,
+        'next': _next,
+        'breaker': breaker,
+        'tripped': tripped,
+        'boxes': [
+          for (final b in boxes)
+            {
+              'id': b.id,
+              'kind': b.kind,
+              'wall': b.wall,
+              'u': b.u,
+              'stud': b.studId,
+              'joist': b.joist,
+              'side': b.side,
+              'cable': b.cable == null
+                  ? null
+                  : {
+                      'light': b.cable!.light,
+                      'path': [for (final p in b.cable!.path) [p.x, p.y, p.z]],
+                    },
+              'kos': b.kos,
+              'used': b.usedKo.toList(),
+              'entry': b.entryKo,
+              'fromKo': b.fromKo,
+              'from': b.from,
+              'dev': b.dev,
+              'on': b.on,
+              'ws': b.ws == null
+                  ? null
+                  : {
+                      'attached': {for (final e in b.ws!.attached.entries) '${e.key}': e.value},
+                      'stage': b.ws!.stage,
+                      'strap': b.ws!.strap,
+                      'burnt': b.ws!.burnt,
+                      'supported': b.ws!.supported,
+                      'practice': b.ws!.practice,
+                    },
+            },
+        ],
+      };
+
+  void loadJson(Map<String, dynamic> j) {
+    reset();
+    drilled.addAll([for (final e in (j['drilled'] as List? ?? const [])) (e as num).toInt()]);
+    for (final e in ((j['plugged'] as Map?) ?? const {}).entries) {
+      plugged[int.parse('${e.key}')] = '${e.value}';
+    }
+    mistakes = (j['mistakes'] as num?)?.toInt() ?? 0;
+    _next = (j['next'] as num?)?.toInt() ?? idBox0;
+    breaker = j['breaker'] == true;
+    tripped = j['tripped'] == true;
+    for (final raw in (j['boxes'] as List? ?? const [])) {
+      final m = raw as Map;
+      final b = FBox((m['id'] as num).toInt(), '${m['kind']}', (m['wall'] as num).toInt(), (m['u'] as num).toDouble(), studId: (m['stud'] as num?)?.toInt(), joist: (m['joist'] as num?)?.toInt());
+      b.side = (m['side'] as num?)?.toDouble() ?? 1;
+      final c = m['cable'] as Map?;
+      if (c != null) {
+        b.cable = FCable([for (final p in c['path'] as List) V3((p[0] as num).toDouble(), (p[1] as num).toDouble(), (p[2] as num).toDouble())], light: c['light'] == true);
+      }
+      final ks = m['kos'] as List? ?? const [false, false];
+      b.kos[0] = ks[0] == true;
+      b.kos[1] = ks[1] == true;
+      b.usedKo.addAll([for (final e in (m['used'] as List? ?? const [])) (e as num).toInt()]);
+      b.entryKo = (m['entry'] as num?)?.toInt() ?? 0;
+      b.fromKo = (m['fromKo'] as num?)?.toInt() ?? 0;
+      b.from = (m['from'] as num?)?.toInt() ?? 0;
+      b.dev = m['dev'] as String?;
+      b.on = m['on'] == true;
+      final wsj = m['ws'] as Map?;
+      if (wsj != null) {
+        final ws = WiringState();
+        for (final e in ((wsj['attached'] as Map?) ?? const {}).entries) {
+          ws.attached[int.parse('${e.key}')] = '${e.value}';
+        }
+        ws
+          ..stage = (wsj['stage'] as num?)?.toInt() ?? 0
+          ..strap = wsj['strap'] != false
+          ..burnt = wsj['burnt'] == true
+          ..supported = wsj['supported'] != false
+          ..practice = wsj['practice'] == true
+          ..power = breaker;
+        b.ws = ws;
+      }
+      boxes.add(b);
+    }
   }
 
   FAct _bad(String m, {List<int> show = const []}) {
@@ -905,6 +998,36 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _say('Tap a tool on the floor (the cable roll, the drill), or choose one from the list, to pick it up. Stuck? Press Hint (it costs 2 stars; a job done without a hint earns 1).');
     });
+    _restore();
+  }
+
+  /// What was done here before comes back (the lesson is kept on the device until it is finished or started over).
+  bool _loaded = false, _completed = false;
+
+  Future<void> _restore() async {
+    final j = await FrameSave.load('wiring');
+    if (!mounted) return;
+    if (j != null) {
+      try {
+        w.loadJson(j['house'] as Map<String, dynamic>);
+        _paid.addAll([for (final e in (j['paid'] as List? ?? const [])) '$e']);
+        hintsUsed = (j['hints'] as num?)?.toInt() ?? 0;
+        setState(_rebuild);
+        _say('Welcome back: your work on the house is here, just as you left it.');
+      } catch (_) {
+        w.reset();
+      }
+    }
+    _loaded = true;
+  }
+
+  void _save() {
+    if (!_loaded) return;
+    if (_completed) {
+      FrameSave.clear('wiring');
+      return;
+    }
+    FrameSave.save('wiring', {'house': w.toJson(), 'paid': _paid.toList(), 'hints': hintsUsed});
   }
 
   @override
@@ -925,7 +1048,10 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
     });
   }
 
-  void _rebuild() => scene = buildWiringScene(w, tool: tool, source: source, focus: focus);
+  void _rebuild() {
+    scene = buildWiringScene(w, tool: tool, source: source, focus: focus);
+    _save();
+  }
 
   void _lightUp(List<int> ids) {
     _glowT?.cancel();
@@ -1125,8 +1251,11 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
   }
 
   void _checkDone() {
+    _save();
     if (w.fullyWired && !_doneShown) {
       _doneShown = true;
+      _completed = true;
+      FrameSave.clear('wiring');
       WidgetsBinding.instance.addPostFrameCallback((_) => _finished());
     }
   }
@@ -1263,10 +1392,8 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
         case 'outlet' || 'switch' || 'ceiling':
           a = w.place(tool, id);
           if (a.ok) {
-            // The new box is shown close up, with its tabs.
-            final nb = w.boxes.last;
-            _zoomToBox(nb);
-            a = FAct(true, '${a.msg} The view is close on it: tap an orange tab to break it out.');
+            // The view stays where it is: tap the box to look closer when you want to break out a knockout.
+            a = FAct(true, "${a.msg} Tap the box to look closer and break out a knockout.");
           }
         case 'drill':
           a = w.drill(id);
@@ -1348,6 +1475,9 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
       source = 0;
       focus = 0;
       _doneShown = false;
+      _completed = false;
+      _paid.clear();
+      FrameSave.clear('wiring');
       _rebuild();
     });
     _say('Everything is taken out again. Start with the boxes.');
@@ -1430,6 +1560,7 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
       for (final c in _cats.skip(1)) _chip('cat-${c.key}', c.label, c.icon, on: inCat(c), small: '▸', onTap: () => setState(() => menu = c.key), tile: true),
       _chip('tool-breaker', w.tripped ? 'Breaker TRIPPED' : (w.breaker ? 'Breaker ON' : 'Breaker OFF'), Icons.power_settings_new_rounded, on: w.breaker, color: w.tripped ? const Color(0xFFF87171) : const Color(0xFF4ADE80), onTap: _toggleBreaker, tile: true),
       _chip('tool-hint', 'Hint', Icons.lightbulb_rounded, on: false, small: '−2⭐', color: const Color(0xFFFACC15), onTap: _hint, tile: true),
+      _chip('tool-reset', 'Start over', Icons.restart_alt_rounded, on: false, color: Colors.white70, onTap: _reset, tile: true),
     ];
     return _rows(all, (all.length / 2).ceil());
   }
@@ -1455,6 +1586,14 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
     ];
     return LessonScaffold(
       title: 'Wiring a house',
+      titleExtra: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(9), border: Border.all(color: Colors.white24)),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text('${tasks.where((t) => t.done).length}/${tasks.length} cables · devices $devs/${w.boxes.length} · ${w.feet.toStringAsFixed(0)} ft', maxLines: 1, style: const TextStyle(color: Colors.white70, fontSize: 10.5, fontWeight: FontWeight.w700)),
+        ),
+      ),
       color: const Color(0xFFF59E0B),
       stepText: next < 0 ? 'All done' : 'Step ${next + 1}/${steps.length}',
       onSteps: () => showConSteps(context, 'Wiring a house', steps, done),
@@ -1484,20 +1623,8 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
         ],
       ),
       panel: Column(mainAxisSize: MainAxisSize.min, children: [
+        if (glow.isNotEmpty && glow.any((id) => isStudId(id) || topSegOf(id) != null)) Padding(padding: const EdgeInsets.only(bottom: 4), child: SizedBox(width: double.infinity, child: conPill('Drill the lit', on: true, icon: Icons.construction_rounded, onTap: _drillLit))),
         _tray(),
-        const SizedBox(height: 8),
-        Row(children: [
-          Expanded(
-            child: Text(
-              '${tasks.where((t) => t.done).length}/${tasks.length} cables · outlets ${w.count('outlet')} · switch ${w.count('switch')} · light ${w.count('ceiling')} · devices $devs/${w.boxes.length} · ${w.feet.toStringAsFixed(0)} ft',
-              maxLines: 2,
-              style: const TextStyle(color: Colors.white70, fontSize: 11.5, height: 1.3, fontWeight: FontWeight.w700),
-            ),
-          ),
-          const SizedBox(width: 8),
-          if (glow.isNotEmpty && glow.any((id) => isStudId(id) || topSegOf(id) != null)) ...[conBigButton('Drill the lit', Icons.construction_rounded, _drillLit, color: const Color(0xFFFFD60A)), const SizedBox(width: 8)],
-          conBigButton('Start over', Icons.restart_alt_rounded, _reset, color: Colors.white70),
-        ]),
       ]),
     );
   }
