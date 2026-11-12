@@ -9,6 +9,14 @@ import 'package:ngmy/ngmy_studio_kit.dart';
 
 Stud stud(int wall, double u) => kStuds.firstWhere((s) => s.wall == wall && s.u == u);
 
+/// Breaks out the knockouts of every box (a cable cannot go into a box without one).
+void open(WiringHouse w) {
+  for (final b in w.boxes) {
+    b.kos[0] = true;
+    b.kos[1] = true;
+  }
+}
+
 void main() {
   setUp(() => NgmyTone.enabled = false);
 
@@ -61,6 +69,7 @@ void main() {
     test('the cable only goes through studs that have a hole, and the lit ones are the ones still to drill', () {
       final w = WiringHouse();
       w.place('outlet', stud(0, 80).id);
+      open(w);
       final box = w.boxes.first;
       final no = w.pull(box.id);
       expect(no.ok, isFalse);
@@ -93,8 +102,10 @@ void main() {
       }
       final f = WiringHouse();
       f.place('ceiling', idJoist0 + 4);
+      open(f);
       expect(f.pull(f.boxes.first.id).msg, contains('switch'));
       f.place('switch', stud(2, 80).id);
+      open(f);
       for (final s in kStuds.where((s) => s.atCableHeight)) {
         f.drilled.add(s.id);
       }
@@ -113,6 +124,7 @@ void main() {
         w.drilled.add(s.id);
       }
       w.place('switch', stud(2, 128).id);
+      open(w);
       w.pull(w.boxes.first.id);
       expect(w.tasks.firstWhere((t) => t.text.contains('switch')).done, isFalse, reason: 'far from the door');
       w.reset();
@@ -120,6 +132,7 @@ void main() {
         w.drilled.add(s.id);
       }
       w.place('switch', stud(2, 80).id);
+      open(w);
       w.pull(w.boxes.first.id);
       expect(w.tasks.firstWhere((t) => t.text.contains('switch')).done, isTrue);
     });
@@ -356,6 +369,8 @@ void main() {
       final st = t.state<NgmyWiringHousePageState>(find.byType(NgmyWiringHousePage));
       st.setTool('outlet');
       st.pickForTest(stud(2, 112).id);
+      st.setTool('knock');
+      st.pickForTest(koId(st.w.boxes.first.id, 1));
       st.setTool('cable');
       st.pickForTest(st.w.boxes.first.id);
       await t.pump(const Duration(milliseconds: 200));
@@ -377,7 +392,7 @@ void main() {
       await t.pumpWidget(const MaterialApp(home: NgmyWiringHousePage()));
       await t.pump(const Duration(milliseconds: 600));
       expect(find.text('Wiring a house'), findsOneWidget);
-      for (final k in ['look', 'outlet', 'switch']) {
+      for (final k in ['look', 'knock', 'drill', 'cable']) {
         expect(find.byKey(Key('tool-$k'), skipOffstage: false), findsOneWidget);
       }
       final st = t.state<NgmyWiringHousePageState>(find.byType(NgmyWiringHousePage));
@@ -386,6 +401,9 @@ void main() {
       st.pickForTest(stud(0, 80).id);
       await t.pump(const Duration(milliseconds: 200));
       expect(st.w.boxes.length, 1);
+      st.setTool('knock');
+      st.pickForTest(koId(st.w.boxes.first.id, 1));
+      expect(st.w.boxes.first.openKo, 1);
       st.setTool('cable');
       await t.pump(const Duration(milliseconds: 200));
       st.pickForTest(st.w.boxes.first.id);

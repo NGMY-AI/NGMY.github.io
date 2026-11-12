@@ -3238,7 +3238,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       Community.active = made;
       // Stars paid for jobs done in the Construction Lab since the city was last open (it does not hold anything up).
       Community.takeBonus().then((n) {
-        if (n > 0 && mounted) comm?.points += n;
+        if (n != 0 && mounted && comm != null) comm!.points = math.max(0, comm!.points + n);
       });
       for (final c in made.calls) {
         _knownCalls.add(c.id);

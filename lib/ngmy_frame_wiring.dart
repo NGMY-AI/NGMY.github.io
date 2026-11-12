@@ -4,13 +4,19 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'ngmy_3d.dart';
+import 'ngmy_construction_community.dart' show Community;
+import 'ngmy_construction_electrical.dart';
+import 'ngmy_construction_electrical_more.dart';
 import 'ngmy_construction_lab.dart';
+import 'ngmy_construction_project.dart' show kMachineOutlets;
+import 'ngmy_frame_devices.dart';
 import 'ngmy_frame_geo.dart';
 import 'ngmy_frame_scene.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
-// WIRING A HOUSE. A bare room of four framed walls, no drywall: put the electrical boxes on the studs, drill the studs, and pull
-// the cable from the breaker panel through the wood to every box. Every rule here is a real one.
+// WIRING A HOUSE. A bare room of four framed walls, no drywall: put the electrical boxes on the studs, break the knockouts, drill the
+// studs, pull the cable from the breaker panel (or from the box before) through the wood to every box, then wire a device in each box in
+// the close-up, and switch the power on to test it. Every rule here is a real one.
 // ═════════════════════════════════════════════════════════════════════════════
 
 class FAct {
@@ -18,7 +24,7 @@ class FAct {
   final bool ok;
   final String msg;
 
-  /// Pieces of wood to light up (the ones that still need a hole).
+  /// Pieces to light up (the studs that still need a hole, the knockout to break).
   final List<int> show;
 }
 
@@ -49,6 +55,18 @@ class FBox {
   double side = 1;
   FCable? cable;
 
+  /// The two knockouts (round tabs): true once the tab is broken out.
+  final List<bool> kos = [false, false];
+  int get openKo => kos.where((e) => e).length;
+
+  /// Where the cable of this box comes from: 0 the breaker panel, otherwise the box before it.
+  int from = 0;
+
+  /// The device wired in this box (a kind of the electrical lessons) and its wiring, and a switch's position.
+  String? dev;
+  WiringState? ws;
+  bool on = false;
+
   /// An outlet box is 16 inches up to its middle, a switch box 48.
   double get y => kind == 'switch' ? 48 : 16;
 }
@@ -59,11 +77,24 @@ class WTask {
   final bool done;
 }
 
+/// What to do next (the hint button): the words, the pieces of the room to light up, and the tool to take.
+class WHint {
+  const WHint(this.text, {this.ids = const [], this.tool = ''});
+  final String text;
+  final List<int> ids;
+  final String tool;
+}
+
 class WiringHouse {
   final Set<int> drilled = {};
   final List<FBox> boxes = [];
+  final Map<int, String> plugged = {};
   int mistakes = 0;
   int _next = idBox0;
+
+  /// The breaker of the whole house.
+  bool breaker = false;
+  bool tripped = false;
 
   FBox? boxById(int id) {
     for (final b in boxes) {
@@ -75,8 +106,11 @@ class WiringHouse {
   void reset() {
     drilled.clear();
     boxes.clear();
+    plugged.clear();
     mistakes = 0;
     _next = idBox0;
+    breaker = false;
+    tripped = false;
   }
 
   FAct _bad(String m, {List<int> show = const []}) {
@@ -91,7 +125,7 @@ class WiringHouse {
       if (!isJoistId(target)) return _bad(isStudId(target) ? 'A ceiling box hangs from a joist, the boards over your head. Tap one of those.' : 'A ceiling box goes on a joist: the boards across the top of the room.');
       if (boxes.any((b) => b.kind == 'ceiling')) return _bad('This room has one light, and its box is already hung. Pull the cable to it.');
       boxes.add(FBox(_next++, 'ceiling', -1, 0, joist: target - idJoist0));
-      return const FAct(true, 'Ceiling box hung on the joist, level with the bottom of the board. The cable will come in through the side, and the light hangs from it.');
+      return const FAct(true, 'Ceiling box hung on the joist, level with the bottom of the board. Break a knockout in it for the cable, then the light hangs from it.');
     }
     final s = studById(target);
     if (s == null) return _bad(isJoistId(target) ? 'That is a ceiling joist. An outlet or switch box is nailed to a stud, a tall board in the wall.' : 'Tap a stud: one of the tall boards in the wall.');
@@ -106,12 +140,26 @@ class WiringHouse {
     boxes.add(b);
     if (kind == 'switch') {
       final near = _nearDoor(b);
-      return FAct(true, near ? 'Switch box nailed on, 48 inches up and right beside the door, where a hand finds it in the dark.' : 'Switch box nailed on, 48 inches up. A light switch belongs beside the door, on the side the door opens.');
+      return FAct(true, near ? 'Switch box nailed on, 48 inches up and right beside the door, where a hand finds it in the dark. Next, break a knockout in it.' : 'Switch box nailed on, 48 inches up. A light switch belongs beside the door, on the side the door opens. Next, break a knockout.');
     }
-    return const FAct(true, 'Outlet box nailed to the side of the stud, 16 inches up to its middle (the usual height), with its front level with the wood so the drywall will fit.');
+    return const FAct(true, 'Outlet box nailed to the side of the stud, 16 inches up to its middle (the usual height), with its front level with the wood so the drywall will fit. Next, break a knockout in it.');
   }
 
   bool _nearDoor(FBox b) => b.wall == kDoor.wall && ((b.u >= kDoor.u0 - 18 && b.u <= kDoor.u0) || (b.u >= kDoor.u1 && b.u <= kDoor.u1 + 18));
+
+  // ── Knockouts ──
+
+  FAct knockout(int id) {
+    if (!isKoId(id)) return _bad('Tap one of the little round tabs on a box to break it out.');
+    final b = boxById(koBoxOf(id));
+    if (b == null) return _bad('Tap one of the little round tabs on a box to break it out.');
+    final k = koIndexOf(id);
+    if (b.kos[k]) return _bad('That knockout is out already.');
+    b.kos[k] = true;
+    return const FAct(true, 'Knockout broken out: a screwdriver on the tab and a tap, and it pops out, leaving a clean round hole for the cable to go through. A box needs one open knockout for each cable that comes in.');
+  }
+
+  List<int> _closedKo(FBox b) => [for (var k = 0; k < 2; k++) if (!b.kos[k]) koId(b.id, k)];
 
   // ── Holes ──
 
@@ -136,6 +184,30 @@ class WiringHouse {
 
   // ── Cable ──
 
+  /// The cables that end in or leave a box.
+  int cablesAt(FBox b) => (b.cable != null ? 1 : 0) + boxes.where((o) => o.cable != null && o.from == b.id).length;
+
+  /// Does the box have power coming to it: its cable, and the cable of the box before it, and so on back to the panel.
+  bool powered(FBox b) {
+    var x = b;
+    for (var n = 0; n < 30; n++) {
+      if (x.cable == null) return false;
+      if (x.from == 0) return true;
+      final p = boxById(x.from);
+      if (p == null) return false;
+      x = p;
+    }
+    return false;
+  }
+
+  void _unpull(FBox b) {
+    b.cable = null;
+    b.from = 0;
+    for (final o in boxes) {
+      if (o.cable != null && o.from == b.id) _unpull(o);
+    }
+  }
+
   List<Stud> _route(double p0, double p1, int dir, {int? own}) {
     double dist(double p) => dir > 0 ? ((p - p0) % kPerim + kPerim) % kPerim : ((p0 - p) % kPerim + kPerim) % kPerim;
     final end = dist(p1);
@@ -151,16 +223,25 @@ class WiringHouse {
     return end > dist(first) + 0.01;
   }
 
-  FAct pull(int id) {
+  /// Taps a box with the cable roll: the cable unrolls from the breaker panel ([from] 0) or from a box that already has power, to this box.
+  /// A box that has its cable already gets it pulled back out (and the cables that came from it).
+  FAct pull(int id, {int from = 0}) {
     if (id == idPanel) return const FAct(true, 'The cable starts at the breaker panel. Tap the box it must reach.');
     final b = boxById(id);
-    if (b == null) return _bad('Tap one of the blue boxes: the cable runs from the panel to it.');
+    if (b == null) return _bad('Tap one of the blue boxes: the cable runs to it.');
     if (b.cable != null) {
-      b.cable = null;
-      return const FAct(true, 'Cable pulled back out of the box.');
+      _unpull(b);
+      return const FAct(true, 'Cable pulled back out of the box (and the cables that went on from it).');
     }
-    if (b.kind == 'ceiling') return _pullCeiling(b);
-    final p0 = perim(kPanelWall, kPanelU), p1 = perim(b.wall, b.u);
+    final FBox? src = from == 0 ? null : boxById(from);
+    if (from != 0) {
+      if (src == null || src.cable == null || !powered(src)) return _bad('A cable can only start at the breaker panel, or at a box that already has power.');
+      if (src.kind == 'ceiling') return _bad('The light box is the end of the line: a cable cannot go on from it.');
+      if (src.openKo < cablesAt(src) + 1) return _bad('The box the cable leaves from has no free knockout: a second cable needs a second hole. Break out its other knockout first.', show: _closedKo(src));
+    }
+    if (b.openKo < cablesAt(b) + 1) return _bad('The cable has to go into the box through a knockout, and this box has none open for it. Break one out first (the Knockout tool).', show: _closedKo(b));
+    if (b.kind == 'ceiling') return _pullCeiling(b, src);
+    final p0 = src == null ? perim(kPanelWall, kPanelU) : perim(src.wall, src.u), p1 = perim(b.wall, b.u);
     final dirs = [for (final d in const [1, -1]) if (!_crossesDoor(p0, p1, d)) d];
     if (dirs.isEmpty) return _bad('A doorway is in the way both ways round: there is no wood to run a cable through across it.');
     double span(int d) => d > 0 ? ((p1 - p0) % kPerim + kPerim) % kPerim : ((p0 - p1) % kPerim + kPerim) % kPerim;
@@ -172,12 +253,27 @@ class WiringHouse {
     if (!fixed) b.side = -dir.toDouble();
     final needOwn = b.side != -dir;
     final route = _route(p0, p1, dir, own: needOwn ? studHere.id : null);
+    // A box the cable leaves from: when the box is not on the side the cable goes to, the cable crosses the box's own stud.
+    final needOwnSrc = src != null && src.side != dir;
+    final srcStud = src == null ? null : studById(src.studId!);
+    if (needOwnSrc && srcStud != null) route.insert(0, srcStud);
     final missing = [for (final s in route) if (!drilled.contains(s.id)) s];
     if (missing.isNotEmpty) {
       return _bad('The cable has to go through every stud on its way, and ${missing.length} still ${missing.length == 1 ? 'has' : 'have'} no hole. Drill ${missing.length == 1 ? 'the lit one' : 'the lit ones'} first.', show: [for (final s in missing.take(40)) s.id]);
     }
-    final pts = <V3>[wallPt(kPanelWall, kPanelU, kPanelY0 + 1, kMidD), wallPt(kPanelWall, kPanelU, kDrillY, kMidD)];
+    final pts = <V3>[];
     var wall = kPanelWall;
+    if (src == null) {
+      pts
+        ..add(wallPt(kPanelWall, kPanelU, kPanelY0 + 1, kMidD))
+        ..add(wallPt(kPanelWall, kPanelU, kDrillY, kMidD));
+    } else {
+      final us = src.u + src.side * (kStT / 2 + 1.15);
+      pts
+        ..add(wallPt(src.wall, us, src.y, 2.4))
+        ..add(wallPt(src.wall, us, kDrillY, kMidD));
+      wall = src.wall;
+    }
     for (final s in route) {
       if (s.wall != wall) {
         pts.add(cornerAfter(dir > 0 ? wall : s.wall, kDrillY));
@@ -192,14 +288,19 @@ class WiringHouse {
     pts.add(wallPt(b.wall, uc, kDrillY, kMidD));
     pts.add(wallPt(b.wall, uc, b.y, 2.4));
     b.cable = FCable(pts, light: false);
+    b.from = from;
     final feet = b.cable!.inches / 12;
-    return FAct(true, '${b.kind == 'switch' ? 'Switch' : 'Outlet'} box connected: the cable runs from the panel through ${route.length} ${route.length == 1 ? 'stud' : 'studs'}, ${feet.toStringAsFixed(1)} feet in all. Leave a loose end at the box to wire the device later.');
+    return FAct(true, '${b.kind == 'switch' ? 'Switch' : 'Outlet'} box connected: the cable runs from ${src == null ? 'the panel' : 'the ${src.kind} box'} through ${route.length} ${route.length == 1 ? 'stud' : 'studs'}, ${feet.toStringAsFixed(1)} feet in all. Leave a loose end in the box to wire the device to.');
   }
 
-  FAct _pullCeiling(FBox c) {
-    final sw = [for (final b in boxes) if (b.kind == 'switch' && b.cable != null) b];
-    if (sw.isEmpty) return _bad('The light is fed from the switch: the power goes to the switch first. Pull the cable to a switch box before this one.');
-    final s = sw.first;
+  FAct _pullCeiling(FBox c, FBox? src) {
+    if (src != null && src.kind != 'switch') return _bad('The light is fed from a switch: the power goes to the switch first, then up to the light. Start the cable at a switch box.');
+    final sws = [for (final s in boxes) if (s.kind == 'switch' && s.cable != null && powered(s) && s.openKo >= cablesAt(s) + 1) s];
+    final s = src ?? (sws.isEmpty ? null : sws.first);
+    if (s == null) {
+      final any = boxes.any((x) => x.kind == 'switch' && x.cable != null);
+      return _bad(any ? 'The switch box has no free knockout for the cable that goes up to the light. Break out its other knockout first.' : 'The light is fed from the switch: the power goes to the switch first. Pull the cable to a switch box before this one.');
+    }
     final seg = math.min(topSegCount(s.wall) - 1, (s.u / 16).floor());
     final tid = topSegId(s.wall, seg);
     if (!drilled.contains(tid)) return _bad('The cable goes up inside the wall, through the top plate and into the ceiling. Drill the top plate right over the switch first.', show: [tid]);
@@ -214,7 +315,103 @@ class WiringHouse {
       V3(cx, 101.95, 0),
       V3(cx, 99, 0),
     ], light: true);
+    c.from = s.id;
     return FAct(true, 'Light connected: the cable goes up from the switch, through the top plate, and lies across the joists to the ceiling box, ${(c.cable!.inches / 12).toStringAsFixed(1)} feet.');
+  }
+
+  // ── Devices, the breaker, the things plugged in ──
+
+  /// Puts a device (a kind of the electrical lessons) in a box that has its cable. The wiring is done in the close-up.
+  FAct installDevice(int boxId, String kind) {
+    final b = boxById(boxId);
+    if (b == null) return _bad('Tap one of the blue boxes: the device goes in it.');
+    if (b.cable == null) return _bad('Pull the cable to this box first: the device is wired to the cable.');
+    final fits = b.kind == 'ceiling' ? (kind == 'light' || kind == 'fan') : (b.kind == 'switch' ? isSwitchKind(kind) : isOutletKind(kind));
+    if (!fits) return _bad(b.kind == 'ceiling' ? 'A ceiling box takes a light or a fan.' : (b.kind == 'switch' ? 'This is a switch box (48 inches up): it takes a switch.' : 'This is an outlet box (16 inches up): it takes an outlet.'));
+    if (b.dev != null && b.dev != kind) {
+      if (b.ws != null && (b.ws!.stage > 0 || b.ws!.attached.isNotEmpty)) return _bad('There is a ${deviceKindName(b.dev!).toLowerCase()} wired in this box already. Pick that one to carry on with it.');
+    }
+    if (b.dev != kind) {
+      b.dev = kind;
+      b.ws = WiringState()..power = breaker;
+      b.on = false;
+    }
+    return FAct(true, 'Close-up: ${deviceKindName(kind)}. Connect each wire to its screw.');
+  }
+
+  void _sync() {
+    for (final b in boxes) {
+      b.ws?.power = breaker;
+    }
+  }
+
+  bool deviceDone(FBox b) => b.dev != null && b.ws != null && b.ws!.stage >= 2 && !b.ws!.burnt;
+  Verdict? verdictOf(FBox b) => b.dev == null || b.ws == null ? null : evaluateWiring(electricalLesson(b.dev!), b.ws!);
+  bool works(FBox b) => deviceDone(b) && (verdictOf(b)?.works ?? false);
+
+  /// Does it run now: the breaker on, power to it, a finished device that works (a light or fan also needs its switch on).
+  bool runs(FBox b) {
+    if (!breaker || !powered(b) || !works(b)) return false;
+    if (b.kind == 'ceiling') {
+      final f = boxById(b.from);
+      return f != null && f.kind == 'switch' && works(f) && f.on;
+    }
+    return true;
+  }
+
+  FAct toggleBreaker() {
+    if (tripped) {
+      tripped = false;
+      breaker = false;
+      _sync();
+      return const FAct(true, 'You flipped the tripped breaker fully OFF. Fix the problem before you turn it on again.');
+    }
+    breaker = !breaker;
+    _sync();
+    if (!breaker) return const FAct(true, 'Breaker OFF. It is safe to work on the wires.');
+    var done = 0;
+    for (final b in boxes) {
+      if (!deviceDone(b)) continue;
+      done++;
+      final v = verdictOf(b)!;
+      if (v.trips || v.burns) {
+        tripped = true;
+        breaker = false;
+        mistakes++;
+        _sync();
+        return FAct(false, 'The breaker TRIPPED. ${v.message} Flip it fully off, fix the wiring in that box and try again.');
+      }
+    }
+    if (done == 0) return const FAct(true, 'Breaker ON. There is nothing to test yet: wire a device in a box first.');
+    final bad = boxes.where((b) => deviceDone(b) && !(verdictOf(b)!.ok)).toList();
+    if (bad.isNotEmpty) return FAct(false, 'Breaker ON. It works, but a device is not wired safely: ${verdictOf(bad.first)!.message}');
+    return FAct(true, 'Breaker ON. Every finished device works. Flip the switch to turn the light on, and plug something in.');
+  }
+
+  FAct flip(int boxId) {
+    final b = boxById(boxId);
+    if (b == null || b.kind != 'switch') return _bad('Tap a switch to flip it.');
+    if (!deviceDone(b)) return _bad('Wire the switch and put its plate on first.');
+    if (!breaker) return const FAct(true, 'The breaker is OFF, so the switch does nothing yet. Turn the breaker on.');
+    b.on = !b.on;
+    final lights = [for (final c in boxes) if (c.kind == 'ceiling' && c.from == b.id) c];
+    return FAct(true, b.on ? (lights.any(runs) ? 'Switch ON: the light is on.' : 'Switch ON.${lights.isEmpty ? '' : ' The light does not come on: check its wiring.'}') : 'Switch OFF.');
+  }
+
+  FAct plug(int boxId, String key) {
+    final b = boxById(boxId);
+    if (b == null || b.kind != 'outlet' || b.dev == null || !isOutletKind(b.dev!)) return _bad('Plug it into a finished outlet: tap an outlet on the wall.');
+    if (!deviceDone(b)) return _bad('Wire the outlet and put its plate on first.');
+    final machine = kMachineOutlets[key];
+    if (machine != null && !machine.contains(b.dev)) return _bad('The plug does not fit. That machine has a big plug made for its own outlet.');
+    if (plugged[boxId] == key) {
+      plugged.remove(boxId);
+      return const FAct(true, 'Unplugged.');
+    }
+    plugged[boxId] = key;
+    if (!breaker) return const FAct(true, 'Plugged in. Nothing happens because the breaker is off.');
+    if (!runs(b)) return _bad('Plugged in, but nothing happens: the outlet is not working. Check how it is wired.');
+    return const FAct(true, 'Plugged in and running.');
   }
 
   // ── The job ──
@@ -225,14 +422,98 @@ class WiringHouse {
         WTask('A light box in the ceiling, with its cable', boxes.any((b) => b.kind == 'ceiling' && b.cable != null)),
       ];
 
+  /// The rough wiring is done: the boxes are in and the cable is pulled to every one.
   bool get complete => tasks.every((t) => t.done);
+
+  /// Every box has its device wired and finished, and the power is on.
+  bool get fullyWired => complete && boxes.every(works) && breaker;
   double get feet => boxes.fold(0.0, (a, b) => a + (b.cable?.inches ?? 0)) / 12;
   int count(String kind) => boxes.where((b) => b.kind == kind).length;
+
+  /// Every job of the lesson, finished or not: each task, each device that works, and the power test.
+  Map<String, bool> get jobs {
+    final t = tasks;
+    return {
+      for (var i = 0; i < t.length; i++) 'task$i': t[i].done,
+      for (final b in boxes) 'dev${b.id}': works(b) && (verdictOf(b)?.ok ?? false),
+      'power': breaker && boxes.isNotEmpty && boxes.every(works),
+    };
+  }
+
+  // ── What to do next ──
+
+  List<Stud> _missingFor(FBox b, {int from = 0}) {
+    // The studs a cable to this box from the panel would still need holes in (the same choice of way round that pull makes).
+    final src = from == 0 ? null : boxById(from);
+    final p0 = src == null ? perim(kPanelWall, kPanelU) : perim(src.wall, src.u), p1 = perim(b.wall, b.u);
+    final dirs = [for (final d in const [1, -1]) if (!_crossesDoor(p0, p1, d)) d];
+    if (dirs.isEmpty) return const [];
+    double span(int d) => d > 0 ? ((p1 - p0) % kPerim + kPerim) % kPerim : ((p0 - p1) % kPerim + kPerim) % kPerim;
+    dirs.sort((a, c) => span(a).compareTo(span(c)));
+    final dir = dirs.first;
+    final st = studById(b.studId!)!;
+    final fixed = st.kind == 'king' || st.kind == 'jack';
+    final side = fixed ? b.side : -dir.toDouble();
+    final route = _route(p0, p1, dir, own: side != -dir ? st.id : null);
+    return [for (final s in route) if (!drilled.contains(s.id)) s];
+  }
+
+  WHint hint() {
+    Stud pick(int wall, double near) {
+      final c = kStuds.where((s) => s.wall == wall && s.kind == 'common' && !boxes.any((b) => b.studId == s.id)).toList()..sort((a, b) => (a.u - near).abs().compareTo((b.u - near).abs()));
+      return c.first;
+    }
+
+    for (var k = 0; k < 4; k++) {
+      if (!boxes.any((b) => b.kind == 'outlet' && b.wall == k)) {
+        final s = pick(k, k == kDoor.wall ? 112 : 80);
+        return WHint('Put an outlet box on ${kWallNames[k]}: open Boxes, pick Outlet box, and tap the lit stud.', ids: [s.id], tool: 'outlet');
+      }
+    }
+    if (!boxes.any((b) => b.kind == 'switch')) {
+      final s = pick(kDoor.wall, 80);
+      return WHint('Put a switch box beside the door: open Boxes, pick Switch box, and tap the lit stud next to the door.', ids: [s.id], tool: 'switch');
+    }
+    if (!boxes.any((b) => b.kind == 'ceiling')) return const WHint('Hang a ceiling box for the light: open Boxes, pick Ceiling box, and tap a lit joist.', ids: [idJoist0 + 4], tool: 'ceiling');
+    for (final b in boxes) {
+      if (b.cable == null && b.openKo == 0) {
+        return WHint('Break a knockout in the lit box: pick Knockout and tap the round tab. The view zooms in to the box.', ids: [koId(b.id, b.kind == 'switch' ? 0 : 1)], tool: 'knock');
+      }
+    }
+    for (final b in boxes) {
+      if (b.cable != null) continue;
+      if (b.kind == 'ceiling') {
+        final s = boxes.where((x) => x.kind == 'switch' && x.cable != null).firstOrNull;
+        if (s == null) continue;
+        if (s.openKo < cablesAt(s) + 1) return WHint('The cable up to the light leaves the switch box through a second knockout: pick Knockout and tap the lit tab.', ids: _closedKo(s).take(1).toList(), tool: 'knock');
+        final seg = math.min(topSegCount(s.wall) - 1, (s.u / 16).floor());
+        final tid = topSegId(s.wall, seg);
+        if (!drilled.contains(tid)) return WHint('The light is fed from the switch: drill the lit piece of top plate, right over the switch.', ids: [tid], tool: 'drill');
+        return WHint('Pull the cable up to the light: pick Cable roll and tap the lit ceiling box.', ids: [b.id], tool: 'cable');
+      }
+      final miss = _missingFor(b);
+      if (miss.isNotEmpty) return WHint('The cable needs a hole in every stud on its way: pick Drill and tap the lit studs (or press Drill the lit).', ids: [for (final s in miss.take(40)) s.id], tool: 'drill');
+      return WHint('Pull the cable: pick Cable roll and tap the lit box. It unrolls from the panel.', ids: [b.id], tool: 'cable');
+    }
+    for (final b in boxes) {
+      if (b.cable != null && !works(b)) {
+        final what = b.kind == 'ceiling' ? 'Lights' : (b.kind == 'switch' ? 'Switches' : 'Outlets');
+        final started = b.dev != null;
+        return WHint(started ? 'Carry on wiring the device in the lit box: pick it again and tap the box. Ground goes to the green screw, white to silver, black to brass; then push it in and put the plate on.' : 'Wire a device in the lit box: open $what, pick one and tap the box. In the close-up, ground goes to the green screw, white to silver, black to brass.', ids: [b.id], tool: started ? 'dev:${b.dev}' : '');
+      }
+    }
+    if (!breaker) return const WHint('Turn the power on to test everything: press the Breaker button.', tool: 'breaker');
+    final sw = boxes.where((b) => b.kind == 'switch' && !b.on).firstOrNull;
+    if (sw != null) return WHint('Flip the switch to light the ceiling: pick Look and tap the switch.', ids: [sw.id]);
+    return const WHint('Everything works. Try it: open TVs or Phones, pick one and tap a finished outlet to plug it in.');
+  }
 }
 
 // ─── The picture ─────────────────────────────────────────────────────────────
 
-Scene3D buildWiringScene(WiringHouse w, {String tool = 'look'}) {
+/// The still picture of the room. [tool] decides which marks are shown (where the tool in hand can be used); [source] is the box the cable roll
+/// starts from (0 for the breaker panel).
+Scene3D buildWiringScene(WiringHouse w, {String tool = 'look', int source = 0}) {
   final b = MeshBuilder();
   drawFrame(b, drilled: w.drilled);
   drawWiringProps(b);
@@ -242,7 +523,10 @@ Scene3D buildWiringScene(WiringHouse w, {String tool = 'look'}) {
     } else {
       drawElectricalBox(b, id: x.id, wall: x.wall, u: x.u, y: x.y, side: x.side);
     }
+    drawKnockouts(b, x);
+    drawDeviceFace(b, x, w);
   }
+  drawPlugged(b, w);
   // What can be tapped with the tool in hand: a bright mark on each place, and an invisible pad round it so a finger finds it at once.
   void pad(int id, V3 c, V3 s) {
     b
@@ -270,43 +554,75 @@ Scene3D buildWiringScene(WiringHouse w, {String tool = 'look'}) {
       ..bias = 0;
   }
 
-  switch (tool) {
-    case 'drill':
-      for (final s in kStuds) {
-        if (!s.atCableHeight || w.drilled.contains(s.id)) continue;
-        dot(s.id, wallPt(s.wall, s.u, kDrillY, kStD + 1.3), const Color(0xFFFFD60A), r: 1.5);
-        pad(s.id, wallPt(s.wall, s.u, (s.y0 + s.y1) / 2, kStD / 2 + 0.6), wallSize(s.wall, 7, s.y1 - s.y0, kStD + 1.2));
-      }
-      for (var k = 0; k < 4; k++) {
-        for (var s = 0; s < topSegCount(k); s++) {
-          final id = topSegId(k, s);
-          if (w.drilled.contains(id)) continue;
-          dot(id, wallPt(k, topSegU(k, s), 94.5, kStD + 1.3), const Color(0xFFFB923C), r: 1.5);
-        }
-      }
-    case 'outlet' || 'switch':
-      final y = tool == 'switch' ? 48.0 : 16.0;
-      for (final s in kStuds) {
-        if (!s.takesBox || w.boxes.any((x) => x.studId == s.id)) continue;
-        dot(s.id, wallPt(s.wall, s.u, y, kStD + 1.5), const Color(0xFF4ADE80), r: 1.8);
-        pad(s.id, wallPt(s.wall, s.u, (s.y0 + s.y1) / 2, kStD / 2 + 0.6), wallSize(s.wall, 7, s.y1 - s.y0, kStD + 1.2));
-      }
-    case 'ceiling':
-      if (!w.boxes.any((x) => x.kind == 'ceiling')) {
-        for (var i = 0; i < kJoists; i++) {
-          dot(idJoist0 + i, V3(joistX(i), 94.6, 0), const Color(0xFF4ADE80), r: 1.7);
-          pad(idJoist0 + i, V3(joistX(i), 97, 0), const V3(8, 6, 40));
-        }
-      }
-    case 'cable':
-      for (final x in w.boxes) {
-        if (x.cable != null) continue;
-        final c = x.kind == 'ceiling' ? V3(joistX(x.joist!) + 3, 98, 0) : wallPt(x.wall, x.u + x.side * 1.9, x.y, kStD);
-        pad(x.id, c, const V3(8, 9, 8));
-        dot(x.id, c + const V3(0, 5.5, 0), const Color(0xFFFFD60A), r: 1.7);
-      }
+  void onBox(FBox x, Color col, {double r = 1.7}) {
+    final c = boxFace(x);
+    pad(x.id, c, const V3(8, 9, 8));
+    dot(x.id, c + const V3(0, 5.5, 0), col, r: r);
   }
 
+  if (tool.startsWith('dev:')) {
+    final kind = tool.substring(4);
+    for (final x in w.boxes) {
+      final fits = x.kind == 'ceiling' ? (kind == 'light' || kind == 'fan') : (x.kind == 'switch' ? isSwitchKind(kind) : isOutletKind(kind));
+      if (x.cable != null && fits && !(w.deviceDone(x) && x.dev == kind)) onBox(x, const Color(0xFF4ADE80));
+    }
+  } else if (tool.startsWith('app:')) {
+    for (final x in w.boxes) {
+      if (x.kind == 'outlet' && w.deviceDone(x)) onBox(x, const Color(0xFF4ADE80));
+    }
+  } else {
+    switch (tool) {
+      case 'drill':
+        for (final s in kStuds) {
+          if (!s.atCableHeight || w.drilled.contains(s.id)) continue;
+          dot(s.id, wallPt(s.wall, s.u, kDrillY, kStD + 1.3), const Color(0xFFFFD60A), r: 1.5);
+          pad(s.id, wallPt(s.wall, s.u, (s.y0 + s.y1) / 2, kStD / 2 + 0.6), wallSize(s.wall, 7, s.y1 - s.y0, kStD + 1.2));
+        }
+        for (var k = 0; k < 4; k++) {
+          for (var s = 0; s < topSegCount(k); s++) {
+            final id = topSegId(k, s);
+            if (w.drilled.contains(id)) continue;
+            dot(id, wallPt(k, topSegU(k, s), 94.5, kStD + 1.3), const Color(0xFFFB923C), r: 1.5);
+          }
+        }
+      case 'outlet' || 'switch':
+        final y = tool == 'switch' ? 48.0 : 16.0;
+        for (final s in kStuds) {
+          if (!s.takesBox || w.boxes.any((x) => x.studId == s.id)) continue;
+          dot(s.id, wallPt(s.wall, s.u, y, kStD + 1.5), const Color(0xFF4ADE80), r: 1.8);
+          pad(s.id, wallPt(s.wall, s.u, (s.y0 + s.y1) / 2, kStD / 2 + 0.6), wallSize(s.wall, 7, s.y1 - s.y0, kStD + 1.2));
+        }
+      case 'ceiling':
+        if (!w.boxes.any((x) => x.kind == 'ceiling')) {
+          for (var i = 0; i < kJoists; i++) {
+            dot(idJoist0 + i, V3(joistX(i), 94.6, 0), const Color(0xFF4ADE80), r: 1.7);
+            pad(idJoist0 + i, V3(joistX(i), 97, 0), const V3(8, 6, 40));
+          }
+        }
+      case 'knock':
+        for (final x in w.boxes) {
+          for (var k = 0; k < 2; k++) {
+            if (x.kos[k]) continue;
+            final c = koPos(x, k);
+            pad(koId(x.id, k), c, const V3(5, 5, 5));
+            dot(koId(x.id, k), c + (x.kind == 'ceiling' ? V3(k == 0 ? -1.4 : 1.4, 0, 0) : V3(0, k == 0 ? -1.4 : 1.4, 0)), const Color(0xFFFB923C), r: 1.2);
+          }
+        }
+      case 'cable':
+        // The panel and every box with power can start a cable; a box without a cable is where one ends.
+        pad(idPanel, wallPt(kPanelWall, kPanelU, (kPanelY0 + kPanelY1) / 2, 2.5), wallSize(kPanelWall, 16, 28, 6));
+        dot(idPanel, wallPt(kPanelWall, kPanelU, kPanelY0 - 3, kStD + 2.5), source == 0 ? const Color(0xFFFFFFFF) : const Color(0xFF38BDF8), r: source == 0 ? 2.4 : 1.8);
+        for (final x in w.boxes) {
+          if (x.cable == null) {
+            onBox(x, const Color(0xFFFFD60A));
+          } else if (w.powered(x) && x.kind != 'ceiling') {
+            onBox(x, x.id == source ? const Color(0xFFFFFFFF) : const Color(0xFF38BDF8), r: x.id == source ? 2.4 : 1.7);
+          }
+        }
+    }
+  }
+
+  String boxName(FBox x) => x.kind == 'ceiling' ? 'Ceiling box' : (x.kind == 'switch' ? 'Switch box' : 'Outlet box');
   final info = <int, ObjInfo>{
     for (final s in kStuds)
       s.id: ObjInfo(s.label, switch (s.kind) {
@@ -321,12 +637,14 @@ Scene3D buildWiringScene(WiringHouse w, {String tool = 'look'}) {
     for (var k = 0; k < 4; k++) idBottom0 + k: ObjInfo('Bottom plate', 'The board the studs stand on, nailed to the floor.', wallPt(k, wallLen(k) / 2, 1, kStD), 90),
     for (var i = 0; i < kJoists; i++) idJoist0 + i: ObjInfo('Ceiling joist', 'A 2 by 6 across the top of the room. The ceiling drywall will be screwed to the bottom of it, and a light box hangs from the side.', V3(joistX(i), 98, 0), 90),
     for (final e in kPropInfo.entries) e.key: ObjInfo(e.value.$1, e.value.$2, e.value.$3, 60),
-    idPanel: const ObjInfo('Breaker panel', 'Every cable in the house starts here, one breaker for each circuit. The power is off while you work.', V3(-48, 59, -58), 50),
+    idPanel: const ObjInfo('Breaker panel', 'Every cable in the house starts here, one breaker for each circuit. Tap it with the Cable roll to start a cable from here.', V3(-48, 59, -58), 50),
     idHeader0: const ObjInfo('Door header', 'A thick beam over the door that carries the weight of the wall above it.', V3(8, 85, 58), 70),
     idHeader0 + 1: const ObjInfo('Window header', 'A thick beam over the window, held up by the jack studs.', V3(70, 76, -2), 70),
     idHeader0 + 2: const ObjInfo('Window sill', 'The board the window sits on. The short studs under it hold it up.', V3(70, 37, -2), 70),
-    for (final x in w.boxes)
-      x.id: ObjInfo(x.kind == 'ceiling' ? 'Ceiling box' : (x.kind == 'switch' ? 'Switch box' : 'Outlet box'), x.kind == 'ceiling' ? 'The box the light will hang from.' : 'A plastic box nailed to the stud. The cable ends inside it, and the device goes in later.', x.kind == 'ceiling' ? V3(joistX(x.joist!), 98, 0) : wallPt(x.wall, x.u, x.y, kStD), 50),
+    for (final x in w.boxes) ...{
+      x.id: ObjInfo(x.dev == null ? boxName(x) : '${boxName(x)}: ${deviceKindName(x.dev!)}', x.kind == 'ceiling' ? 'The box the light hangs from. Knockouts open: ${x.openKo} of 2.' : 'A plastic box nailed to the stud. Knockouts open: ${x.openKo} of 2. The cable ends inside it, and the device is wired to the cable.', boxFace(x), 24),
+      for (var k = 0; k < 2; k++) koId(x.id, k): ObjInfo('Knockout', x.kos[k] ? 'A knockout that is broken out: a round hole for a cable.' : 'A round tab in the box. Break it out with the Knockout tool to make a hole for a cable.', koPos(x, k), 14),
+    },
   };
   return Scene3D(b.polys, info: info, shell: (-72, 72, -60, 60), closedShell: true);
 }
@@ -360,6 +678,15 @@ List<Poly> wiringDynamic(WiringHouse w, double t, Map<int, double> started, Set<
       } else if (seg != null) {
         c = wallPt(seg.wall, topSegU(seg.wall, seg.seg), 94.5, kStD / 2);
         s = wallSize(seg.wall, 14, 8, kStD + 4);
+      } else if (isKoId(id) && w.boxById(koBoxOf(id)) != null) {
+        c = koPos(w.boxById(koBoxOf(id))!, koIndexOf(id));
+        s = const V3(7, 7, 7);
+      } else if (isBoxId(id) && w.boxById(id) != null) {
+        c = boxFace(w.boxById(id)!);
+        s = const V3(9, 10, 9);
+      } else if (isJoistId(id)) {
+        c = V3(joistX(id - idJoist0), 98, 0);
+        s = const V3(8, 8, 40);
       }
       if (c == null || s == null) continue;
       b
@@ -399,14 +726,32 @@ List<V3> _trim(List<V3> path, double p) {
 
 // ─── The page ────────────────────────────────────────────────────────────────
 
-const List<(String, String, IconData)> _tools = [
-  ('look', 'Look', Icons.search_rounded),
-  ('outlet', 'Outlet box', Icons.crop_portrait_rounded),
-  ('switch', 'Switch box', Icons.toggle_on_rounded),
-  ('ceiling', 'Ceiling box', Icons.circle_outlined),
-  ('drill', 'Drill', Icons.construction_rounded),
-  ('cable', 'Cable roll', Icons.cable_rounded),
+class _Item {
+  const _Item(this.key, this.label, this.icon);
+  final String key, label;
+  final IconData icon;
+}
+
+/// A button on the first screen of the tools that opens more of them (all the TVs, all the switches...).
+class _Cat {
+  const _Cat(this.key, this.label, this.icon, this.items);
+  final String key, label;
+  final IconData icon;
+  final List<_Item> items;
+}
+
+final List<_Cat> _cats = [
+  const _Cat('boxes', 'Boxes', Icons.crop_portrait_rounded, [_Item('outlet', 'Outlet box', Icons.crop_portrait_rounded), _Item('switch', 'Switch box', Icons.toggle_on_rounded), _Item('ceiling', 'Ceiling box', Icons.circle_outlined)]),
+  _Cat('outlets', 'Outlets', Icons.power_rounded, [for (final k in ['outlet', 'gfci', ...kOutletVariants, ...kApplianceOutlets]) _Item('dev:$k', deviceKindName(k), Icons.power_rounded)]),
+  _Cat('switches', 'Switches', Icons.toggle_on_rounded, [for (final k in ['switch', ...kSwitchVariants]) _Item('dev:$k', deviceKindName(k), Icons.toggle_on_rounded)]),
+  const _Cat('lights', 'Lights', Icons.lightbulb_rounded, [_Item('dev:light', 'Ceiling light', Icons.lightbulb_rounded), _Item('dev:fan', 'Ceiling fan', Icons.mode_fan_off_rounded)]),
+  _Cat('tvs', 'TVs', Icons.tv_rounded, [for (final a in kTvs) _Item('app:${a.key}', a.label, Icons.tv_rounded)]),
+  _Cat('phones', 'Phones', Icons.smartphone_rounded, [for (final a in kPhones) _Item('app:${a.key}', a.label, a.key == 'tablet' ? Icons.tablet_rounded : Icons.smartphone_rounded)]),
+  _Cat('appliances', 'Appliances', Icons.kitchen_rounded, [for (final a in kHomeApps) _Item('app:${a.key}', a.label, Icons.kitchen_rounded)]),
 ];
+
+/// The yaw that puts the camera in front of a wall, looking at it.
+double _yawFor(int wall) => const [0.0, math.pi / 2, math.pi, -math.pi / 2][wall];
 
 class NgmyWiringHousePage extends StatefulWidget {
   const NgmyWiringHousePage({super.key});
@@ -418,14 +763,20 @@ class NgmyWiringHousePage extends StatefulWidget {
 class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
   final WiringHouse w = WiringHouse();
   late final Cam3 cam = Cam3(yaw: 0, pitch: 0.07, dist: 120, target: const V3(0, 46, 0))
-    ..minDist = 12
+    ..minDist = 8
     ..maxDist = 520
-    ..minPitch = 0.0
+    ..minPitch = -0.9
     ..maxPitch = 1.3
     ..keepIn = (-64.5, 64.5, -52.5, 52.5, 92.0)
     ..setFree(true);
   late Scene3D scene = buildWiringScene(w);
   String tool = 'look';
+
+  /// The category whose tools are open (null on the first screen of tools).
+  String? menu;
+
+  /// The box the cable roll starts from (0 is the breaker panel).
+  int source = 0;
   int hl = 0;
   String? msg;
   bool good = true;
@@ -434,21 +785,27 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
   final Stopwatch _clock = Stopwatch()..start();
   final Map<int, double> _started = {};
   Set<int> glow = {};
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _say("Tap a tool on the floor (the cable roll, the drill), or choose one from the list, to pick it up. Then tap where it works.");
-    });
-  }
   V3? _goAt;
   double _goT = -99;
   int _lastPick = 0;
   double _lastPickAt = -9;
   Timer? _msgT, _glowT;
 
+  /// The stars: a job finished without a hint pays one, each hint costs two. [net] is what this page has added or taken.
+  int net = 0;
+  int hintsSinceJob = 0;
+  int hintsUsed = 0;
+  final Set<String> _paid = {};
+
   double get _now => _clock.elapsedMilliseconds / 1000;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _say('Tap a tool on the floor (the cable roll, the drill), or choose one from the list, to pick it up. Stuck? Press Hint (it costs 2 stars; a job done without a hint earns 1).');
+    });
+  }
 
   @override
   void dispose() {
@@ -463,60 +820,52 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
       msg = t;
       good = ok;
     });
-    _msgT = Timer(const Duration(seconds: 12), () {
+    _msgT = Timer(const Duration(seconds: 14), () {
       if (mounted) setState(() => msg = null);
     });
   }
 
-  void _rebuild() => scene = buildWiringScene(w, tool: tool);
+  void _rebuild() => scene = buildWiringScene(w, tool: tool, source: source);
 
   void _lightUp(List<int> ids) {
     _glowT?.cancel();
     setState(() => glow = ids.toSet());
-    _glowT = Timer(const Duration(seconds: 6), () {
+    _glowT = Timer(const Duration(seconds: 8), () {
       if (mounted) setState(() => glow = {});
     });
   }
 
-  static const _howTo = {
-    'look': 'Look: tap any piece of the frame to learn its name and what it does. Turn the view by dragging, zoom with the buttons.',
-    'outlet': 'Outlet box: tap a stud (a green mark shows where the box will sit, 16 inches up). Put one on each of the four walls.',
-    'switch': 'Switch box: tap a stud, ideally right beside the door. It sits 48 inches up.',
-    'ceiling': 'Ceiling box: tap a joist, one of the boards across the top. The light will hang from it.',
-    'drill': 'Drill: tap a yellow mark to drill a hole through that stud, 20 inches up. The cable can only pass through studs that have a hole.',
-    'cable': 'Cable roll: tap a box and the cable unrolls from the breaker panel to it, through the holes. Tap a box that has cable to pull it out again.',
-  };
+  String _howTo(String t) {
+    if (t.startsWith('dev:')) return '${deviceKindName(t.substring(4))}: tap a box that has its cable. The view closes in on it and you connect each wire to its screw.';
+    if (t.startsWith('app:')) return '${appInfo(t.substring(4))?.label ?? 'It'}: tap a finished outlet to plug it in (tap it again to unplug it). Turn the breaker on so it runs.';
+    return switch (t) {
+      'look' => 'Look: tap any piece to learn its name and what it does. Tap a finished switch to flip it. Drag to turn round.',
+      'outlet' => 'Outlet box: tap a stud (a green mark shows where the box will sit, 16 inches up). Put one on each of the four walls.',
+      'switch' => 'Switch box: tap a stud, ideally right beside the door. It sits 48 inches up.',
+      'ceiling' => 'Ceiling box: tap a joist, one of the boards across the top. The light will hang from it.',
+      'knock' => 'Knockout: tap the orange mark on a box to break out its round tab. The cable goes in through that hole.',
+      'drill' => 'Drill: tap a yellow mark to drill a hole through that stud, 20 inches up. The cable can only pass through studs that have a hole.',
+      _ => 'Cable roll: tap a box and the cable unrolls from the panel to it. To go on from a box instead, tap a blue box that has power first, then the next box. Tap the panel to start from it again.',
+    };
+  }
 
-  /// What is missing when the tool has nothing to work on yet.
-  String _needs(String t) => switch (t) {
-        'cable' when w.boxes.isEmpty => ' There is no box yet: put an outlet box on a stud first, then pull the cable to it.',
-        'ceiling' when w.count('ceiling') > 0 => ' The light box is already hung.',
-        _ => '',
-      };
+  String _needs(String t) {
+    if (t == 'cable' && w.boxes.isEmpty) return ' There is no box yet: put an outlet box on a stud first.';
+    if (t == 'knock' && w.boxes.isEmpty) return ' There is no box yet: put a box on a stud first.';
+    if (t.startsWith('dev:') && !w.boxes.any((b) => b.cable != null)) return ' No box has its cable yet: pull the cable to a box first.';
+    if (t.startsWith('app:') && !w.boxes.any((b) => b.kind == 'outlet' && w.deviceDone(b))) return ' No outlet is finished yet: wire an outlet in a box first.';
+    return '';
+  }
 
   /// A tap on a tool lying on the floor picks it up.
   void _grab(int id, String t) {
     setState(() {
       tool = t;
       hl = id;
+      menu = null;
       _rebuild();
     });
-    _say('You picked up the ${kPropInfo[id]!.$1.toLowerCase()}. ${_howTo[t]}${_needs(t)}');
-  }
-
-  @visibleForTesting
-  void pickForTest(int id) {
-    _lastPickAt = -9;
-    _pick(id);
-  }
-
-  void setTool(String t) {
-    setState(() {
-      tool = t;
-      hl = 0;
-      _rebuild();
-    });
-    _say(_howTo[t]! + _needs(t));
+    _say('You picked up the ${kPropInfo[id]!.$1.toLowerCase()}. ${_howTo(t)}${_needs(t)}');
   }
 
   /// Two quick taps on the same piece do the thing once, not twice (the second tap may be the first half of a double tap to walk there).
@@ -551,6 +900,16 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
   @visibleForTesting
   void doubleTapForTest(Offset local, Size size) => _goTo(local, size);
 
+  /// The view closes in on a box (to break its knockouts, or to see what is in it).
+  void _zoomToBox(FBox x) {
+    final c = boxFace(x);
+    if (x.kind == 'ceiling') {
+      cam.glideTo(target: c, dist: 24, yaw: 0.6, pitch: -0.7);
+    } else {
+      cam.glideTo(target: c, dist: 20, yaw: _yawFor(x.wall), pitch: 0.05);
+    }
+  }
+
   void _drillLit() {
     var n = 0;
     for (final id in glow.toList()) {
@@ -561,12 +920,97 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
       _rebuild();
     });
     _say("$n ${n == 1 ? 'hole' : 'holes'} drilled. Now tap the box with the Cable roll again.");
+    _afterJobs();
+  }
+
+  /// Pays one star for each job that is finished now and was done without a hint since the last one.
+  String _afterJobs() {
+    var earned = 0;
+    for (final e in w.jobs.entries) {
+      if (!e.value || _paid.contains(e.key)) continue;
+      _paid.add(e.key);
+      if (hintsSinceJob == 0) earned++;
+      hintsSinceJob = 0;
+    }
+    if (earned > 0) {
+      net += earned;
+      Community.addStars(earned);
+      return '  ⭐ +$earned for a job finished without a hint.';
+    }
+    return '';
+  }
+
+  void _hint() {
+    final h = w.hint();
+    hintsUsed++;
+    hintsSinceJob++;
+    net -= 2;
+    Community.spendStars(2);
+    if (h.ids.isNotEmpty) _lightUp(h.ids);
+    final first = h.ids.isEmpty ? null : h.ids.first;
+    if (first != null && isBoxId(first)) {
+      final bx = w.boxById(first);
+      if (bx != null && h.tool == 'knock') _zoomToBox(bx);
+    }
+    if (first != null && isKoId(first)) {
+      final bx = w.boxById(koBoxOf(first));
+      if (bx != null) _zoomToBox(bx);
+    }
+    _say('Hint (−2 ⭐): ${h.text}');
+  }
+
+  @visibleForTesting
+  void hintForTest() => _hint();
+
+  @visibleForTesting
+  void pickForTest(int id) {
+    _lastPickAt = -9;
+    _pick(id);
+  }
+
+  void setTool(String t) {
+    setState(() {
+      tool = t;
+      hl = 0;
+      _rebuild();
+    });
+    _say(_howTo(t) + _needs(t));
+  }
+
+  void _toggleBreaker() {
+    final a = w.toggleBreaker();
+    if (a.ok) {
+      conGood();
+    } else {
+      conBad();
+    }
+    setState(_rebuild);
+    final note = _afterJobs();
+    _say(a.msg + note, ok: a.ok);
+  }
+
+  Future<void> _openDevice(FBox x) async {
+    x.ws?.power = w.breaker;
+    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ElectricalLessonPage(id: x.dev!, state: x.ws)));
+    if (!mounted) return;
+    setState(_rebuild);
+    final note = _afterJobs();
+    final ws = x.ws!;
+    _say(ws.stage >= 2 ? '${deviceKindName(x.dev!)} wired and finished.$note' : 'Not finished: the device is in the box but the job is not done. Pick it again and tap the box to carry on.$note', ok: ws.stage >= 2);
+    _checkDone();
+  }
+
+  void _checkDone() {
+    if (w.fullyWired && !_doneShown) {
+      _doneShown = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _finished());
+    }
   }
 
   void _pick(int id) {
     if (id != 0 && _again(id)) return;
     final grabbed = kPropTool[id];
-    if (grabbed != null) {
+    if (grabbed != null && (grabbed == 'cable' || grabbed == 'drill')) {
       _grab(id, grabbed);
       return;
     }
@@ -575,6 +1019,16 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
       return;
     }
     if (tool == 'look') {
+      final bx = w.boxById(id);
+      if (bx != null && bx.kind == 'switch' && w.deviceDone(bx)) {
+        final a = w.flip(id);
+        setState(() {
+          _rebuild();
+          hl = id;
+        });
+        _say(a.msg, ok: a.ok);
+        return;
+      }
       final i = scene.info[id];
       if (i != null) {
         setState(() => hl = id);
@@ -583,30 +1037,66 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
       }
       return;
     }
-    final a = switch (tool) {
-      'outlet' || 'switch' || 'ceiling' => w.place(tool, id),
-      'drill' => w.drill(id),
-      _ => w.pull(id),
-    };
+    FAct a;
+    if (tool.startsWith('dev:')) {
+      a = w.installDevice(id, tool.substring(4));
+      if (a.ok) {
+        conGood();
+        final bx = w.boxById(id)!;
+        setState(() {
+          hl = id;
+          _rebuild();
+        });
+        _say(a.msg);
+        _openDevice(bx);
+        return;
+      }
+    } else if (tool.startsWith('app:')) {
+      a = w.plug(id, tool.substring(4));
+    } else {
+      switch (tool) {
+        case 'outlet' || 'switch' || 'ceiling':
+          a = w.place(tool, id);
+        case 'drill':
+          a = w.drill(id);
+        case 'knock':
+          final bx = w.boxById(isKoId(id) ? koBoxOf(id) : id);
+          if (bx != null) _zoomToBox(bx);
+          a = isKoId(id) ? w.knockout(id) : FAct(true, bx == null ? 'Tap a box.' : 'Close up on the box: tap an orange mark to break out a knockout.');
+        default:
+          if (id == idPanel) {
+            source = 0;
+            a = const FAct(true, 'The cable will start at the breaker panel. Tap the box it must reach.');
+          } else {
+            final bx = w.boxById(id);
+            if (bx != null && bx.cable != null && w.powered(bx) && bx.kind != 'ceiling' && source != bx.id) {
+              source = bx.id;
+              a = FAct(true, 'The cable will go on from this ${bx.kind} box. Tap the next box it must reach. (Tap it again to pull its cable out.)');
+            } else {
+              final wasSource = source == id;
+              a = w.pull(id, from: source);
+              if (a.ok) {
+                final after = w.boxById(id);
+                if (after?.cable != null) _started[id] = _now;
+                if (wasSource) source = 0;
+              }
+            }
+          }
+      }
+    }
     if (a.ok) {
       conGood();
     } else {
       conBad();
     }
-    if (tool == 'cable' && a.ok) {
-      final bx = w.boxById(id);
-      if (bx?.cable != null) _started[id] = _now;
-    }
     setState(() {
       _rebuild();
       hl = a.ok ? id : 0;
     });
-    _say(a.msg, ok: a.ok);
+    final note = a.ok ? _afterJobs() : '';
+    _say(a.msg + note, ok: a.ok);
     if (a.show.isNotEmpty) _lightUp(a.show);
-    if (w.complete && !_doneShown) {
-      _doneShown = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _finished());
-    }
+    _checkDone();
   }
 
   void _finished() {
@@ -616,8 +1106,8 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1B1B1F),
         title: const Text('The house is wired! 🎉', style: TextStyle(color: Color(0xFF4ADE80), fontWeight: FontWeight.w900)),
-        content: Text('Every wall has its outlet, the switch is beside the door and the light is connected, with ${w.feet.toStringAsFixed(0)} feet of cable.\n\nMistakes: ${w.mistakes}\n\nNext the walls get their drywall: try the Hanging drywall lesson.', style: const TextStyle(color: Colors.white70, height: 1.45)),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Keep looking')), FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Great'))],
+        content: Text('Every box has its cable and its device, the power is on and everything works, with ${w.feet.toStringAsFixed(0)} feet of cable.\n\nMistakes: ${w.mistakes}   Hints: $hintsUsed   Stars this lesson: ${net >= 0 ? '+' : ''}$net\n\nTry plugging in a TV or a phone, then the Hanging drywall lesson.', style: const TextStyle(color: Colors.white70, height: 1.45)),
+        actions: [FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Great'))],
       ),
     );
   }
@@ -645,25 +1135,69 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
       _started.clear();
       glow = {};
       hl = 0;
+      source = 0;
       _doneShown = false;
       _rebuild();
     });
     _say('Everything is taken out again. Start with the boxes.');
   }
 
+  Widget _chip(String key, String label, IconData icon, {required bool on, required VoidCallback onTap, Color color = kConAmber, String? small}) {
+    return GestureDetector(
+      key: Key(key),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(color: on ? color.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(13), border: Border.all(color: on ? color : Colors.white24, width: on ? 2 : 1)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 17, color: on ? color : Colors.white70),
+          const SizedBox(width: 5),
+          Text(label, style: TextStyle(color: on ? color : Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+          if (small != null) ...[const SizedBox(width: 5), Text(small, style: TextStyle(color: on ? color : Colors.white54, fontWeight: FontWeight.w700, fontSize: 10.5))],
+        ]),
+      ),
+    );
+  }
+
+  Widget _tray() {
+    final m = menu == null ? null : _cats.firstWhere((c) => c.key == menu);
+    if (m != null) {
+      return Wrap(spacing: 6, runSpacing: 6, children: [
+        _chip('menu-back', 'Back', Icons.arrow_back_rounded, on: false, onTap: () => setState(() => menu = null), color: Colors.white70),
+        for (final it in m.items) _chip('tool-${it.key}', it.label, it.icon, on: tool == it.key, onTap: () => setTool(it.key)),
+      ]);
+    }
+    bool inCat(_Cat c) => c.items.any((i) => i.key == tool);
+    return Wrap(spacing: 6, runSpacing: 6, children: [
+      _chip('tool-look', 'Look', Icons.search_rounded, on: tool == 'look', onTap: () => setTool('look')),
+      for (final c in _cats.take(1)) _chip('cat-${c.key}', c.label, c.icon, on: inCat(c), small: '▸', onTap: () => setState(() => menu = c.key)),
+      _chip('tool-knock', 'Knockout', Icons.radio_button_unchecked_rounded, on: tool == 'knock', onTap: () => setTool('knock')),
+      _chip('tool-drill', 'Drill', Icons.construction_rounded, on: tool == 'drill', onTap: () => setTool('drill')),
+      _chip('tool-cable', 'Cable roll', Icons.cable_rounded, on: tool == 'cable', onTap: () => setTool('cable')),
+      for (final c in _cats.skip(1)) _chip('cat-${c.key}', c.label, c.icon, on: inCat(c), small: '▸', onTap: () => setState(() => menu = c.key)),
+      _chip('tool-breaker', w.tripped ? 'Breaker: TRIPPED' : (w.breaker ? 'Breaker: ON' : 'Breaker: OFF'), Icons.power_settings_new_rounded, on: w.breaker, color: w.tripped ? const Color(0xFFF87171) : const Color(0xFF4ADE80), onTap: _toggleBreaker),
+      _chip('tool-hint', 'Hint', Icons.lightbulb_rounded, on: false, small: '−2 ⭐', color: const Color(0xFFFACC15), onTap: _hint),
+    ]);
+  }
+
+  int get _stars => (Community.active?.points ?? 0) + (Community.active == null ? net : 0);
+
   @override
   Widget build(BuildContext context) {
     final tasks = w.tasks;
-    final done = [true, w.boxes.length >= 5 || w.count('outlet') >= 1, w.count('switch') >= 1, w.count('ceiling') >= 1, w.drilled.isNotEmpty, w.boxes.isNotEmpty && w.boxes.every((b) => b.cable != null), w.complete];
+    final devs = w.boxes.where(w.works).length;
+    final done = [true, w.count('outlet') >= 1, w.count('switch') >= 1, w.count('ceiling') >= 1, w.boxes.any((b) => b.openKo > 0), w.drilled.isNotEmpty, w.complete, w.boxes.isNotEmpty && devs == w.boxes.length, w.fullyWired];
     final next = done.indexWhere((d) => !d);
     const steps = [
       'Look round the bare frame: the studs, the plates, the joists, the door, the window and the breaker panel.',
       'Put an outlet box on a stud on each of the four walls (16 inches up).',
       'Put a switch box on a stud beside the door (48 inches up).',
       'Hang a ceiling box on a joist for the light.',
+      'Break out a knockout in each box: the round tab the cable goes in through.',
       'Drill the studs the cable has to pass through (20 inches up, in the middle of the stud).',
-      'Pull the cable from the breaker panel to every box. The light is fed from the switch, through a hole in the top plate.',
-      'Every task is done: the house is wired.',
+      'Pull the cable from the breaker panel to every box (or on from one box to the next). The light is fed from the switch, through a hole in the top plate.',
+      'Wire a device in every box: in the close-up connect each wire to its screw, push the device in and put the plate on.',
+      'Turn the breaker on and test everything: flip the switch, plug in a TV or a phone. The house is wired.',
     ];
     return LessonScaffold(
       title: 'Wiring a house',
@@ -685,8 +1219,10 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
         message: msg,
         messageTop: 54,
         good: good,
+        stars: () => _stars,
         info: hl != 0 ? scene.info[hl] : null,
-        dynamicPolys: (t) => [...wiringDynamic(w, t, _started, glow), ...frameGoRing(_goAt, _goT, _now), ...frameBackdrops(cam)],
+        dynamicPolys: (t) => [...wiringDynamic(w, t, _started, glow), ...deviceDynamic(w, t), ...frameGoRing(_goAt, _goT, _now), ...frameBackdrops(cam)],
+        dynamicScreens: (_) => applianceScreens(w),
         onDoubleTap: _goTo,
         topRight: [
           conPill(dollhouse ? 'Inside' : 'Whole room', on: dollhouse, icon: dollhouse ? Icons.login_rounded : Icons.view_in_ar_rounded, onTap: _toggleView),
@@ -694,18 +1230,18 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
         ],
       ),
       panel: Column(mainAxisSize: MainAxisSize.min, children: [
-        frameToolTray(_tools, tool, setTool),
+        _tray(),
         const SizedBox(height: 8),
         Row(children: [
           Expanded(
             child: Text(
-              '${tasks.where((t) => t.done).length}/${tasks.length} done · outlets ${w.count('outlet')} · switch ${w.count('switch')} · light ${w.count('ceiling')} · ${w.feet.toStringAsFixed(0)} ft of cable',
+              '${tasks.where((t) => t.done).length}/${tasks.length} cables · outlets ${w.count('outlet')} · switch ${w.count('switch')} · light ${w.count('ceiling')} · devices $devs/${w.boxes.length} · ${w.feet.toStringAsFixed(0)} ft',
               maxLines: 2,
               style: const TextStyle(color: Colors.white70, fontSize: 11.5, height: 1.3, fontWeight: FontWeight.w700),
             ),
           ),
           const SizedBox(width: 8),
-          if (glow.isNotEmpty) ...[conBigButton('Drill the lit', Icons.construction_rounded, _drillLit, color: const Color(0xFFFFD60A)), const SizedBox(width: 8)],
+          if (glow.isNotEmpty && glow.any((id) => isStudId(id) || topSegOf(id) != null)) ...[conBigButton('Drill the lit', Icons.construction_rounded, _drillLit, color: const Color(0xFFFFD60A)), const SizedBox(width: 8)],
           conBigButton('Start over', Icons.restart_alt_rounded, _reset, color: Colors.white70),
         ]),
       ]),
@@ -730,6 +1266,10 @@ WiringHouse finishedWiring() {
     w.place(kind, stud(k, u));
   }
   w.place('ceiling', idJoist0 + 4);
+  for (final b in w.boxes) {
+    b.kos[0] = true;
+    b.kos[1] = true;
+  }
   for (final b in [...w.boxes]) {
     if (b.kind != 'ceiling') w.pull(b.id);
   }
@@ -738,4 +1278,21 @@ WiringHouse finishedWiring() {
   }
   w.mistakes = 0;
   return w;
+}
+
+/// Wires a device the right way and finishes it (pushed in, plate on), the way the close-up bench leaves it when the job is done. For the tests.
+void wireDeviceRight(WiringState ws, String kind) {
+  final more = electricalLesson(kind);
+  final plan = !more.legacy
+      ? more.solution
+      : switch (kind) {
+          'outlet' => {idGreen: 'ground', idSilverTop: 'white', idBrassTop: 'black'},
+          'gfci' => {idGreen: 'ground', idSilverBottom: 'white', idBrassBottom: 'black'},
+          'switch' => {idGreen: 'ground', idBrassTop: 'blackLine', idBrassBottom: 'blackLoad'},
+          _ => {idNutGround: 'ground', idNutWhite: 'white', idNutBlack: 'black'},
+        };
+  for (final e in plan.entries) {
+    tryFasten(more, ws, e.value, more.hookups.firstWhere((h) => h.id == e.key));
+  }
+  ws.stage = 2;
 }

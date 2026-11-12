@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'ngmy_3d.dart';
+import 'ngmy_construction_community.dart' show Community;
 import 'ngmy_construction_lab.dart';
 import 'ngmy_frame_geo.dart';
 import 'ngmy_frame_scene.dart';
@@ -306,6 +307,54 @@ class DrywallHouse {
       default:
         return any([for (final s in surf) s.stage == 5]) ? '' : ' Prime after the mud is sanded.';
     }
+  }
+
+  /// Every job of the lesson, finished or not (a star is paid for each one done without a hint).
+  Map<String, bool> get jobs => {
+        'ceiling': ceilingUp,
+        'walls': allHung,
+        'screws': allScrewed,
+        'holes': allCut,
+        'beads': beads.length == kOpenings.length,
+        for (var i = 0; i < 5; i++) 'surface$i': surf[i].stage == 6,
+      };
+
+  /// What to do next, and what to light up for it.
+  WHint hint(double now) {
+    for (final ceil in [true, false]) {
+      for (final s in kDSlots.where((s) => s.ceiling == ceil)) {
+        if (sheets[s.id]!.placed) continue;
+        if (s.needsCut && !sheets[s.id]!.cut) return WHint('This piece is narrower than a sheet: pick the Cutter and tap the lit place to cut it to size.', ids: [s.id], tool: 'cut');
+        return WHint(ceil ? 'The ceiling goes first: pick Drywall sheet and tap the lit place.' : 'Now the walls: pick Drywall sheet and tap the lit place.', ids: [s.id], tool: 'sheet');
+      }
+    }
+    for (final s in kDSlots) {
+      if (!sheets[s.id]!.screwed) return WHint('Screw the sheet to the studs: pick the Screw gun and tap the lit sheet.', ids: [s.id], tool: 'screw');
+    }
+    for (final c in kDCuts) {
+      if (!sheets[c.slot]!.cutDone.contains(c.id)) return WHint('Cut the hole for the ${c.name.toLowerCase()}: pick the Saw and tap the lit place.', ids: [c.id], tool: 'saw');
+    }
+    for (var i = 0; i < kOpenings.length; i++) {
+      if (!beads.contains(i)) return WHint('Put corner bead on the ${kOpenings[i].name}: pick Corner bead and tap the lit opening.', ids: [idBead0 + i], tool: 'bead');
+    }
+    for (var s = 0; s < 5; s++) {
+      final st = surf[s];
+      final id = idSurf0 + s;
+      switch (st.stage) {
+        case 0:
+          return WHint('Mud first: pick Mud and tap the lit surface for the bed coat.', ids: [id], tool: 'mud');
+        case 1:
+          return WHint('Press the tape into the wet mud now: pick Tape and tap the lit surface.', ids: [id], tool: 'tape');
+        case 2:
+        case 3:
+          return dry(s, now) ? WHint('Next coat of mud: pick Mud and tap the lit surface.', ids: [id], tool: 'mud') : WHint('The mud is still wet: wait ${(st.wetUntil - now).ceil()} seconds, then put on the next coat.', ids: [id]);
+        case 4:
+          return dry(s, now) ? WHint('Sand it smooth: pick the Sander and tap the lit surface.', ids: [id], tool: 'sand') : WHint('The last coat is still wet: wait ${(st.wetUntil - now).ceil()} seconds, then sand.', ids: [id]);
+        case 5:
+          return WHint('Prime it: pick the Roller and tap the lit surface.', ids: [id], tool: 'paint');
+      }
+    }
+    return const WHint('The room is finished. Well done.');
   }
   bool get complete => surf.every((s) => s.stage == 6);
   int get hung => sheets.values.where((s) => s.placed).length;
@@ -767,6 +816,12 @@ class NgmyDrywallPageState extends State<NgmyDrywallPage> {
   double _goT = -99;
   int _lastPick = 0;
   double _lastPickAt = -9;
+  Set<int> glow = {};
+  Timer? _glowT;
+  int net = 0;
+  int hintsSinceJob = 0;
+  int hintsUsed = 0;
+  final Set<String> _paid = {};
 
   double get now => _clock.elapsedMilliseconds / 1000;
 
@@ -774,7 +829,7 @@ class NgmyDrywallPageState extends State<NgmyDrywallPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _say('Tap a tool on the floor (the stack of sheets, the saw, the mud, the tape...), or choose one from the list, to pick it up. Then tap where it works.');
+      if (mounted) _say('Tap a tool on the floor (the stack of sheets, the saw, the mud, the tape...), or choose one from the list, to pick it up. Then tap where it works. Stuck? Press Hint (it costs 2 stars; a job done without a hint earns 1).');
     });
     // The mud changes colour as it dries.
     _dryT = Timer.periodic(const Duration(milliseconds: 500), (_) {
@@ -791,6 +846,7 @@ class NgmyDrywallPageState extends State<NgmyDrywallPage> {
   void dispose() {
     _msgT?.cancel();
     _dryT?.cancel();
+    _glowT?.cancel();
     super.dispose();
   }
 
@@ -857,6 +913,46 @@ class NgmyDrywallPageState extends State<NgmyDrywallPage> {
     cam.glideTo(target: p, dist: math.min(cam.dist, 70.0), pitch: 0.07);
     _say('You walked over here. Drag to turn round.');
   }
+
+  void _lightUp(List<int> ids) {
+    _glowT?.cancel();
+    setState(() => glow = ids.toSet());
+    _glowT = Timer(const Duration(seconds: 8), () {
+      if (mounted) setState(() => glow = {});
+    });
+  }
+
+  /// Pays one star for each job that is finished now and was done without a hint since the last one.
+  String _afterJobs() {
+    var earned = 0;
+    for (final e in d.jobs.entries) {
+      if (!e.value || _paid.contains(e.key)) continue;
+      _paid.add(e.key);
+      if (hintsSinceJob == 0) earned++;
+      hintsSinceJob = 0;
+    }
+    if (earned > 0) {
+      net += earned;
+      Community.addStars(earned);
+      return '  ⭐ +$earned for a job finished without a hint.';
+    }
+    return '';
+  }
+
+  void _hint() {
+    final h = d.hint(now);
+    hintsUsed++;
+    hintsSinceJob++;
+    net -= 2;
+    Community.spendStars(2);
+    if (h.ids.isNotEmpty) _lightUp(h.ids);
+    _say('Hint (−2 ⭐): ${h.text}');
+  }
+
+  @visibleForTesting
+  void hintForTest() => _hint();
+
+  int get _stars => (Community.active?.points ?? 0) + (Community.active == null ? net : 0);
 
   /// A tap on a tool lying on the floor picks it up.
   void _grab(int id, String t) {
@@ -929,7 +1025,8 @@ class NgmyDrywallPageState extends State<NgmyDrywallPage> {
       _rebuild();
       hl = a.ok ? id : 0;
     });
-    _say(a.msg, ok: a.ok);
+    final note = a.ok ? _afterJobs() : "";
+    _say(a.msg + note, ok: a.ok);
     if (d.complete && !_doneShown) {
       _doneShown = true;
       WidgetsBinding.instance.addPostFrameCallback((_) => _finished());
@@ -1017,11 +1114,12 @@ class NgmyDrywallPageState extends State<NgmyDrywallPage> {
         message: msg,
         messageTop: 54,
         onDoubleTap: _goTo,
+        stars: () => _stars,
         good: good,
         info: hl != 0 ? scene.info[hl] : null,
         dynamicPolys: (t) {
           final cp = math.cos(cam.pitch);
-          return [...drywallCeiling(d, now, V3(-cp * math.sin(cam.yaw), math.sin(cam.pitch), cp * math.cos(cam.yaw))), ...frameGoRing(_goAt, _goT, now), ...frameBackdrops(cam)];
+          return [...drywallCeiling(d, now, V3(-cp * math.sin(cam.yaw), math.sin(cam.pitch), cp * math.cos(cam.yaw))), ...frameGoRing(_goAt, _goT, now), ...frameBackdrops(cam), ...drywallGlow(glow, now)];
         },
         topRight: [
           conPill(dollhouse ? 'Inside' : 'Whole room', on: dollhouse, icon: dollhouse ? Icons.login_rounded : Icons.view_in_ar_rounded, onTap: _toggleView),
@@ -1029,7 +1127,17 @@ class NgmyDrywallPageState extends State<NgmyDrywallPage> {
         ],
       ),
       panel: Column(mainAxisSize: MainAxisSize.min, children: [
-        frameToolTray(_tools, tool, setTool),
+        frameToolTray(_tools, tool, setTool, extra: [
+          GestureDetector(
+            key: const Key("tool-hint"),
+            onTap: _hint,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(13), border: Border.all(color: Colors.white24)),
+              child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.lightbulb_rounded, size: 17, color: Color(0xFFFACC15)), SizedBox(width: 5), Text("Hint", style: TextStyle(color: Color(0xFFFACC15), fontWeight: FontWeight.w800, fontSize: 12)), SizedBox(width: 5), Text("−2 ⭐", style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w700, fontSize: 10.5))]),
+            ),
+          ),
+        ]),
         const SizedBox(height: 8),
         Row(children: [
           Expanded(
@@ -1108,6 +1216,53 @@ List<Poly> drywallCeiling(DrywallHouse d, double now, V3 towardViewer) {
     q(c.u0 - 0.15, c.u1 + 0.15, c.y0 - 0.15, c.y1 + 0.15, 95.47, const Color(0xFF111827));
     b.bias = 1.4;
     q(c.u0 + 0.5, c.u1 - 0.5, c.y0 + 0.5, c.y1 - 0.5, 95.46, kBoxBlue);
+  }
+  return b.polys;
+}
+
+/// A soft pulsing light on the places a hint points at.
+List<Poly> drywallGlow(Set<int> ids, double t) {
+  if (ids.isEmpty) return const [];
+  final b = MeshBuilder()
+    ..id = 0
+    ..order = 3
+    ..bias = 1.2;
+  final pulse = 0.5 + 0.5 * math.sin(t * 7);
+  b.alpha = 0.22 + 0.25 * pulse;
+  const col = Color(0xFFFFE066);
+  for (final id in ids) {
+    final s = dSlotById(id);
+    if (s != null) {
+      if (s.ceiling) {
+        b.box(V3((s.a0 + s.a1) / 2, 94.6, (s.b0 + s.b1) / 2), V3(s.width, 1.2, s.length), col);
+      } else {
+        b.box(wallPt(s.wall, (s.a0 + s.a1) / 2, 48, kStD + 1.6), wallSize(s.wall, s.width, 95, 0.6), col);
+      }
+      continue;
+    }
+    final c = kDCuts.where((c) => c.id == id).firstOrNull;
+    if (c != null) {
+      final sl = dSlotById(c.slot)!;
+      if (sl.ceiling) {
+        b.box(V3((c.u0 + c.u1) / 2, 94.6, 0), V3(c.u1 - c.u0 + 5, 1.2, c.y1 - c.y0 + 5), col);
+      } else {
+        b.box(wallPt(sl.wall, (c.u0 + c.u1) / 2, (c.y0 + c.y1) / 2, kStD + kSheetT + 1.2), wallSize(sl.wall, c.u1 - c.u0 + (c.opening >= 0 ? 0 : 5), c.y1 - c.y0 + (c.opening >= 0 ? 0 : 5), 0.6), col);
+      }
+      continue;
+    }
+    if (id >= idBead0 && id < idBead0 + kOpenings.length) {
+      final o = kOpenings[id - idBead0];
+      b.box(wallPt(o.wall, (o.u0 + o.u1) / 2, (o.sill + o.top) / 2, kStD + kSheetT + 1.2), wallSize(o.wall, o.u1 - o.u0 + 5, o.top - o.sill + 5, 0.6), col);
+      continue;
+    }
+    if (id >= idSurf0 && id < idSurf0 + 5) {
+      final si = id - idSurf0;
+      if (si == 0) {
+        b.box(const V3(0, 94.6, 0), const V3(140, 1.2, 116), col);
+      } else {
+        b.box(wallPt(si - 1, wallLen(si - 1) / 2, 48, kStD + 1.6), wallSize(si - 1, wallLen(si - 1) - 2, 94, 0.6), col);
+      }
+    }
   }
   return b.polys;
 }

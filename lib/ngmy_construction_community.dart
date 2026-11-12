@@ -490,6 +490,20 @@ class Community {
     } catch (_) {}
   }
 
+  /// Stars spent (a hint in a lesson costs 2): out of the community that is running, or kept as a debt until the city is next opened.
+  static Future<void> spendStars(int n) async {
+    if (n <= 0) return;
+    final a = active;
+    if (a != null) {
+      a.points = math.max(0, a.points - n);
+      return;
+    }
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.setInt(kStarsBonusKey, (p.getInt(kStarsBonusKey) ?? 0) - n);
+    } catch (_) {}
+  }
+
   /// The stars kept for the city since it was last open (and forgets them).
   static Future<int> takeBonus() async {
     try {

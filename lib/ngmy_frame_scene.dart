@@ -148,7 +148,7 @@ void drawWiringProps(MeshBuilder b) {
 }
 
 /// The tools as chips in rows that wrap, so every tool is on the screen at once and none is hidden to the side.
-Widget frameToolTray(List<(String, String, IconData)> tools, String current, void Function(String) onTap) {
+Widget frameToolTray(List<(String, String, IconData)> tools, String current, void Function(String) onTap, {List<Widget> extra = const []}) {
   const amber = Color(0xFFF59E0B);
   return Wrap(spacing: 6, runSpacing: 6, children: [
     for (final (k, label, icon) in tools)
@@ -161,6 +161,7 @@ Widget frameToolTray(List<(String, String, IconData)> tools, String current, voi
           child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 17, color: current == k ? amber : Colors.white70), const SizedBox(width: 5), Text(label, style: TextStyle(color: current == k ? amber : Colors.white, fontWeight: FontWeight.w800, fontSize: 12))]),
         ),
       ),
+    ...extra,
   ]);
 }
 

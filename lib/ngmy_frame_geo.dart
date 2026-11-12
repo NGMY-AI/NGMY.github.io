@@ -179,3 +179,10 @@ const Map<int, (String, String, V3)> kPropInfo = {
   idPropTray: ('Paint tray and roller', 'Primer on the roller seals the paper and the mud so they look the same. Tap it to pick up the roller.', V3(-8, 2, -22)),
   idPropSaw: ('Drywall saw', 'A pointed saw to cut the holes for the boxes, the door and the window. Tap it to pick it up.', V3(20, 1, 12)),
 };
+
+/// The two knockouts of a box (round tabs in its top and bottom that are broken out for a cable to go in): their ids, from the box's own number.
+const int idKo0 = 4200;
+int koId(int boxId, int k) => idKo0 + (boxId - idBox0) * 2 + k;
+bool isKoId(int id) => id >= idKo0 && id < idKo0 + 200;
+int koBoxOf(int id) => idBox0 + (id - idKo0) ~/ 2;
+int koIndexOf(int id) => (id - idKo0) % 2;
