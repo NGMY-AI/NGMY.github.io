@@ -4,6 +4,6 @@ A=c[0]
 C=c[2]
 B=c[197]
 var z=a.updateTypes([]);(function constants(){B.lF=new A.u(1,0.5450980392156862,0.27058823529411763,0.07450980392156863,C.q)
-B.aiw=new A.u(1,0.07058823529411765,0.0392156862745098,0.13333333333333333,C.q)
-B.a35=new A.a0(984557,"MaterialIcons",!1)})()};
-(a=>{a["qbmSzrJVDfWmZ2MgaZkVwx9kLnA="]=a.current})($__dart_deferred_initializers__);
+B.aiv=new A.u(1,0.07058823529411765,0.0392156862745098,0.13333333333333333,C.q)
+B.a34=new A.a0(984557,"MaterialIcons",!1)})()};
+(a=>{a["7qrg7huw8r1vAEzv9jHpUsMErwA="]=a.current})($__dart_deferred_initializers__);
