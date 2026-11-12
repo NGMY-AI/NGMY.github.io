@@ -1,167 +1,23 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
-$__dart_deferred_initializers__.current=function(a,b,c,$){var J,A,C,B={
-bEZ(d){var x,w,v=null
-if(d==null||C.a.i(d).length===0)return v
-x=C.a.a0(d,"ngmy:ws-thumb:")
-if(x)return v
-if(C.a.a0(d,"data:image"))try{x=A.uC(d)
-x.toString
-return x}catch(w){return v}return v},
-ikD(d){var x,w,v=d==null?null:C.a.i(d)
-if(v==null)v=""
-if(v.length===0)return null
-x=$.fvF.h(0,v)
-if(x!=null)return x
-w=B.bEZ(v)
-if(w!=null){if($.fvF.a>64)$.fvF.a8(0)
-$.fvF.n(0,v,w)}return w},
-aRt(d,e,f,g,h,i,j){var x,w,v=null,u=d==null?A.m(12):d
-if(i!=null&&C.a.a0(i,"ngmy:ws-thumb:"))return A.by(u,new B.aGy(i,j,f,e,g,h,v),C.aq)
-x=B.ikD(i)
-if(x!=null)return A.by(u,A.tJ(C.A,v,C.he,e,!0,f,x,!1,v,j),C.aq)
-w=C.d0.j(0.15)
-return A.q(v,A.X(g,h==null?C.d0:h,v,v,v,32),C.f,v,v,new A.p(w,v,v,u,v,v,C.n),v,f,v,v,v,v,v,j)},
-aGy:function aGy(d,e,f,g,h,i,j){var _=this
-_.c=d
-_.d=e
-_.e=f
-_.f=g
-_.r=h
-_.w=i
-_.a=j},
-bng:function bng(){this.c=this.a=this.d=null},
-eUG:function eUG(d,e){this.a=d
-this.b=e},
-hdv(){var x,w=window
-w.toString
-x=w.indexedDB||w.webkitIndexedDB||w.mozIndexedDB
-if(x==null)throw A.W(A.bc("IndexedDB not available"))
-return C.zz.My(x,"ngmy_worksheet_thumbs_v1",new B.fwq(),1)},
-i5d(d){var x,w,v=null
-if(d==null)return v
-if(y.o.b(d))return new Uint8Array(A.cc(d))
-if(y.i.b(d))return new Uint8Array(A.cc(J.eD(d,0,null)))
-if(y.A.b(d))return new Uint8Array(A.cc(A.wQ(d,0,v)))
-if(y.w.b(d))return new Uint8Array(A.cc(d))
-if(typeof d=="string")try{x=C.cI.aN(d)
-return x}catch(w){return v}return v},
-aS6(d){return B.ipG(d)},
-ipG(d){var x=0,w=A.j(y.n),v,u=2,t=[],s,r,q,p,o,n,m,l
-var $async$aS6=A.e(function(e,f){if(e===1){t.push(f)
-x=u}for(;;)switch(x){case 0:m=C.a.i(d)
-if(m.length===0){v=null
+$__dart_deferred_initializers__.current=function(a,b,c,$){var A,B,C={
+Ht(d,e){var x=0,w=A.j(y.c),v,u,t
+var $async$Ht=A.e(function(f,g){if(f===1)return A.f(g,w)
+for(;;)switch(x){case 0:x=3
+return A.b(new A.hU().l8(d,e,B.eO),$async$Ht)
+case 3:t=g
+if(t==null){v=null
 x=1
-break}u=4
-o=$.aPs
-x=7
-return A.b(o==null?$.aPs=B.hdv():o,$async$aS6)
-case 7:s=f
-r=J.n1(s,"thumbs","readonly")
-x=8
-return A.b(C.j8.A4(J.n0(r,"thumbs"),m),$async$aS6)
-case 8:q=f
-x=9
-return A.b(J.pW(r),$async$aS6)
-case 9:m=B.i5d(q)
-v=m
-x=1
-break
-u=2
-x=6
-break
-case 4:u=3
-l=t.pop()
-p=A.ab(l)
-$.am.$1("[worksheet-thumb idb get] "+A.w(p))
-v=null
-x=1
-break
-x=6
-break
-case 3:x=2
-break
-case 6:case 1:return A.h(v,w)
-case 2:return A.f(t.at(-1),w)}})
-return A.i($async$aS6,w)},
-fwq:function fwq(){},
-hEC(d){if(!(d!=null&&C.a.a0(d,"ngmy:ws-thumb:")))return null
-return C.a.b2(d,14)},
-coP(d){var x=0,w=A.j(y.n),v,u
-var $async$coP=A.e(function(e,f){if(e===1)return A.f(f,w)
-for(;;)switch(x){case 0:u=B.hEC(d)
-if(u==null){v=null
-x=1
-break}v=B.coO(u)
+break}x=4
+return A.b(t.fp(),$async$Ht)
+case 4:u=g
+v="data:image/jpeg;base64,"+B.cP.gcu().aN(u)
 x=1
 break
 case 1:return A.h(v,w)}})
-return A.i($async$coP,w)},
-coO(d){var x=0,w=A.j(y.n),v,u,t,s
-var $async$coO=A.e(function(e,f){if(e===1)return A.f(f,w)
-for(;;)switch(x){case 0:s=C.a.i(d)
-if(s.length===0){v=null
-x=1
-break}u=$.coM.h(0,s)
-if(u!=null&&!C.aI.gau(u)){v=u
-x=1
-break}x=3
-return A.b(B.aS6(s),$async$coO)
-case 3:t=f
-if(t!=null&&!C.aI.gau(t)){$.coM.n(0,s,t)
-v=t
-x=1
-break}v=null
-x=1
-break
-case 1:return A.h(v,w)}})
-return A.i($async$coO,w)}}
-J=c[1]
+return A.i($async$Ht,w)}}
 A=c[0]
-C=c[2]
-B=a.updateHolder(c[61],B)
-B.aGy.prototype={
-S(){return new B.bng()}}
-B.bng.prototype={
-Y(){this.a2()
-this.a0f()},
-bz(d){this.bJ(d)
-if(d.c!==this.a.c)this.a0f()},
-a0f(){var x=0,w=A.j(y.v),v=this,u
-var $async$a0f=A.e(function(d,e){if(d===1)return A.f(e,w)
-for(;;)switch(x){case 0:x=2
-return A.b(B.coP(v.a.c),$async$a0f)
-case 2:u=e
-if(v.c!=null)v.m(new B.eUG(v,u))
-return A.h(null,w)}})
-return A.i($async$a0f,w)},
-B(d){var x,w,v,u,t=this,s=null,r=t.d
-if(r!=null&&!C.aI.gau(r)){r=t.d
-r.toString
-x=t.a
-w=x.d
-v=x.e
-return A.tJ(C.A,s,C.he,x.f,!0,v,new A.q9(r,1),!1,s,w)}r=t.a
-x=r.d
-r=r.e
-w=C.d0.j(0.12)
-v=t.a
-u=v.r
-v=v.w
-return A.q(s,A.X(u,v==null?C.d0:v,s,s,s,32),C.f,w,s,s,s,r,s,s,s,s,s,x)}}
+B=c[2]
+C=a.updateHolder(c[64],C)
 var z=a.updateTypes([])
-B.eUG.prototype={
-$0(){return this.a.d=this.b},
-$S:0}
-B.fwq.prototype={
-$1(d){var x=y.h.a(new A.r6([],[]).oL(d.target.result,!1)),w=C.yu.q(x.objectStoreNames,"thumbs")
-if(!w)C.yq.Ll(x,"thumbs")},
-$S:184};(function inheritance(){var x=a.inherit
-x(B.aGy,A.ag)
-x(B.bng,A.ah)
-x(B.eUG,A.iJ)
-x(B.fwq,A.ht)})()
-A.iT(b.typeUniverse,JSON.parse('{"aGy":{"ag":[],"v":[]},"bng":{"ah":["aGy"]}}'))
-var y={i:A.as("uK"),h:A.as("rr"),w:A.as("ai<G>"),A:A.as("m2"),o:A.as("dK"),n:A.as("dK?"),v:A.as("~")};(function staticFields(){$.fvF=A.T(A.as("n"),A.as("mm<aE>"))
-$.coM=A.T(A.as("n"),y.o)
-$.aPs=null})()};
-(a=>{a["DwHkidLB55sSq9weHameU4XVXP0="]=a.current})($__dart_deferred_initializers__);
+var y={c:A.as("n?")}};
+(a=>{a["NB3YhXEKikAWuUQoy8xBLCSHoC8="]=a.current})($__dart_deferred_initializers__);
