@@ -39,6 +39,8 @@ Widget ngmyCrispAppWrapper(BuildContext context, Widget child) {
     data: mq.copyWith(
       textScaler: mq.textScaler.clamp(minScaleFactor: 1.0, maxScaleFactor: 1.0),
       boldText: false,
+      // No page keeps a strip free at the bottom (the phone's home-bar area): screens run to the very edge, so no dark bar shows there and the menu sits low.
+      padding: mq.padding.copyWith(bottom: 0),
     ),
     child: _StaleKeyboardGuard(child: child),
   );
