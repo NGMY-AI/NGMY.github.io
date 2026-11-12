@@ -4,10 +4,10 @@ bEY(d){var x,w,v=null
 if(d==null||C.a.i(d).length===0)return v
 x=C.a.a0(d,"ngmy:ws-thumb:")
 if(x)return v
-if(C.a.a0(d,"data:image"))try{x=A.uA(d)
+if(C.a.a0(d,"data:image"))try{x=A.uB(d)
 x.toString
 return x}catch(w){return v}return v},
-ikx(d){var x,w,v=d==null?null:C.a.i(d)
+iky(d){var x,w,v=d==null?null:C.a.i(d)
 if(v==null)v=""
 if(v.length===0)return null
 x=$.fvE.h(0,v)
@@ -16,12 +16,12 @@ w=B.bEY(v)
 if(w!=null){if($.fvE.a>64)$.fvE.a8(0)
 $.fvE.n(0,v,w)}return w},
 aRs(d,e,f,g,h,i,j){var x,w,v=null,u=d==null?A.m(12):d
-if(i!=null&&C.a.a0(i,"ngmy:ws-thumb:"))return A.by(u,new B.aGw(i,j,f,e,g,h,v),C.aq)
-x=B.ikx(i)
+if(i!=null&&C.a.a0(i,"ngmy:ws-thumb:"))return A.by(u,new B.aGx(i,j,f,e,g,h,v),C.aq)
+x=B.iky(i)
 if(x!=null)return A.by(u,A.tI(C.A,v,C.he,e,!0,f,x,!1,v,j),C.aq)
 w=C.d0.j(0.15)
 return A.q(v,A.X(g,h==null?C.d0:h,v,v,v,32),C.f,v,v,new A.p(w,v,v,u,v,v,C.n),v,f,v,v,v,v,v,j)},
-aGw:function aGw(d,e,f,g,h,i,j){var _=this
+aGx:function aGx(d,e,f,g,h,i,j){var _=this
 _.c=d
 _.d=e
 _.e=f
@@ -36,8 +36,8 @@ hdr(){var x,w=window
 w.toString
 x=w.indexedDB||w.webkitIndexedDB||w.mozIndexedDB
 if(x==null)throw A.W(A.bc("IndexedDB not available"))
-return C.zy.My(x,"ngmy_worksheet_thumbs_v1",new B.fwp(),1)},
-i58(d){var x,w,v=null
+return C.zz.My(x,"ngmy_worksheet_thumbs_v1",new B.fwp(),1)},
+i59(d){var x,w,v=null
 if(d==null)return v
 if(y.o.b(d))return new Uint8Array(A.cc(d))
 if(y.i.b(d))return new Uint8Array(A.cc(J.eD(d,0,null)))
@@ -45,24 +45,24 @@ if(y.A.b(d))return new Uint8Array(A.cc(A.wP(d,0,v)))
 if(y.w.b(d))return new Uint8Array(A.cc(d))
 if(typeof d=="string")try{x=C.cI.aN(d)
 return x}catch(w){return v}return v},
-aS5(d){return B.ipA(d)},
-ipA(d){var x=0,w=A.j(y.n),v,u=2,t=[],s,r,q,p,o,n,m,l
+aS5(d){return B.ipB(d)},
+ipB(d){var x=0,w=A.j(y.n),v,u=2,t=[],s,r,q,p,o,n,m,l
 var $async$aS5=A.e(function(e,f){if(e===1){t.push(f)
 x=u}for(;;)switch(x){case 0:m=C.a.i(d)
 if(m.length===0){v=null
 x=1
 break}u=4
-o=$.aPq
+o=$.aPr
 x=7
-return A.b(o==null?$.aPq=B.hdr():o,$async$aS5)
+return A.b(o==null?$.aPr=B.hdr():o,$async$aS5)
 case 7:s=f
 r=J.n0(s,"thumbs","readonly")
 x=8
-return A.b(C.j9.A4(J.n_(r,"thumbs"),m),$async$aS5)
+return A.b(C.j8.A4(J.n_(r,"thumbs"),m),$async$aS5)
 case 8:q=f
 x=9
 return A.b(J.pV(r),$async$aS5)
-case 9:m=B.i58(q)
+case 9:m=B.i59(q)
 v=m
 x=1
 break
@@ -84,11 +84,11 @@ case 6:case 1:return A.h(v,w)
 case 2:return A.f(t.at(-1),w)}})
 return A.i($async$aS5,w)},
 fwp:function fwp(){},
-hEx(d){if(!(d!=null&&C.a.a0(d,"ngmy:ws-thumb:")))return null
+hEy(d){if(!(d!=null&&C.a.a0(d,"ngmy:ws-thumb:")))return null
 return C.a.b2(d,14)},
 coO(d){var x=0,w=A.j(y.n),v,u
 var $async$coO=A.e(function(e,f){if(e===1)return A.f(f,w)
-for(;;)switch(x){case 0:u=B.hEx(d)
+for(;;)switch(x){case 0:u=B.hEy(d)
 if(u==null){v=null
 x=1
 break}v=B.coN(u)
@@ -119,7 +119,7 @@ J=c[1]
 A=c[0]
 C=c[2]
 B=a.updateHolder(c[61],B)
-B.aGw.prototype={
+B.aGx.prototype={
 S(){return new B.bnf()}}
 B.bnf.prototype={
 Y(){this.a2()
@@ -153,15 +153,15 @@ B.eUF.prototype={
 $0(){return this.a.d=this.b},
 $S:0}
 B.fwp.prototype={
-$1(d){var x=y.h.a(new A.r5([],[]).oL(d.target.result,!1)),w=C.yt.q(x.objectStoreNames,"thumbs")
-if(!w)C.yp.Ll(x,"thumbs")},
+$1(d){var x=y.h.a(new A.r5([],[]).oL(d.target.result,!1)),w=C.yu.q(x.objectStoreNames,"thumbs")
+if(!w)C.yq.Ll(x,"thumbs")},
 $S:184};(function inheritance(){var x=a.inherit
-x(B.aGw,A.ag)
+x(B.aGx,A.ag)
 x(B.bnf,A.ah)
 x(B.eUF,A.iJ)
 x(B.fwp,A.ht)})()
-A.iT(b.typeUniverse,JSON.parse('{"aGw":{"ag":[],"v":[]},"bnf":{"ah":["aGw"]}}'))
-var y={i:A.as("uI"),h:A.as("rq"),w:A.as("ai<G>"),A:A.as("m2"),o:A.as("dK"),n:A.as("dK?"),v:A.as("~")};(function staticFields(){$.fvE=A.T(A.as("n"),A.as("mm<aE>"))
+A.iT(b.typeUniverse,JSON.parse('{"aGx":{"ag":[],"v":[]},"bnf":{"ah":["aGx"]}}'))
+var y={i:A.as("uJ"),h:A.as("rq"),w:A.as("ai<G>"),A:A.as("m2"),o:A.as("dK"),n:A.as("dK?"),v:A.as("~")};(function staticFields(){$.fvE=A.T(A.as("n"),A.as("mm<aE>"))
 $.coL=A.T(A.as("n"),y.o)
-$.aPq=null})()};
-(a=>{a["KH1JEJ9e77CDmKS/eCpEOgidK3Y="]=a.current})($__dart_deferred_initializers__);
+$.aPr=null})()};
+(a=>{a["o6qTw3N4L6oLdRcs5JkMbDc4uFs="]=a.current})($__dart_deferred_initializers__);
