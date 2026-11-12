@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'ngmy_frame_save.dart';
 import 'package:flutter/services.dart';
 
 import 'ngmy_auto_back.dart';
@@ -99,6 +100,40 @@ class _DiagramPageState extends State<NgmyElectricalDiagramPage> with SingleTick
 
   DiagramLesson get l => kDiagramLessons[lesson];
 
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    FrameSave.load('diagram').then((j) {
+      if (!mounted) return;
+      if (j != null) {
+        final i = (j['lesson'] as num?)?.toInt() ?? 0;
+        if (i >= 0 && i < kDiagramLessons.length) {
+          setState(() {
+            lesson = i;
+            test = j['test'] == true;
+            picked
+              ..clear()
+              ..addAll({for (final e in ((j['picked'] as Map?) ?? const {}).entries) '${e.key}': '${e.value}'});
+          });
+        }
+      }
+      _loaded = true;
+    });
+  }
+
+  /// What was picked stays on the device until the diagram is finished or another lesson is opened.
+  void _save() {
+    if (!_loaded) return;
+    final done = picked.length == l.expected.length && l.expected.entries.every((e) => picked[e.key] == e.value);
+    if (done || picked.isEmpty) {
+      FrameSave.clear('diagram');
+    } else {
+      FrameSave.save('diagram', {'lesson': lesson, 'test': test, 'picked': picked});
+    }
+  }
+
   @override
   void dispose() {
     _draw.dispose();
@@ -107,14 +142,17 @@ class _DiagramPageState extends State<NgmyElectricalDiagramPage> with SingleTick
 
   Color _col(SafetyStatus s) => s == SafetyStatus.correct ? const Color(0xFF4ADE80) : (s == SafetyStatus.incomplete ? const Color(0xFFFACC15) : const Color(0xFFF87171));
 
-  void _reset(int i) => setState(() {
-        lesson = i;
-        picked.clear();
-        result = null;
-        sel = null;
-        lastLead = null;
-        coach = null;
-      });
+  void _reset(int i) {
+    setState(() {
+          lesson = i;
+          picked.clear();
+          result = null;
+          sel = null;
+          lastLead = null;
+          coach = null;
+    });
+    _save();
+  }
 
   void _tapLead(String lead) => setState(() {
         sel = sel == lead ? null : lead;
@@ -146,6 +184,7 @@ class _DiagramPageState extends State<NgmyElectricalDiagramPage> with SingleTick
         coach = null;
       }
     });
+    _save();
     _draw.forward(from: 0);
     HapticFeedback.selectionClick();
   }
@@ -221,12 +260,15 @@ class _DiagramPageState extends State<NgmyElectricalDiagramPage> with SingleTick
           Expanded(child: Text(target, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12, height: 1.15))),
           if (here.isNotEmpty)
             GestureDetector(
-              onTap: () => setState(() {
+              onTap: () {
+                setState(() {
                 for (final k in here) {
                   picked.remove(k);
                 }
                 result = null;
-              }),
+                });
+                _save();
+              },
               child: const Padding(padding: EdgeInsets.only(left: 4), child: Icon(Icons.close_rounded, size: 18, color: Colors.white54)),
             ),
         ]),
