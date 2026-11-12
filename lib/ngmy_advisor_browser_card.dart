@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'ngmy_advisor_browser_session.dart';
 import 'ngmy_advisor_chat_extras.dart';
 import 'ngmy_advisor_embedded_browser.dart';
-import 'ngmy_advisor_trading_academy.dart';
 import 'ngmy_edge_invoke.dart';
 
 /// Draggable in-chat browser port — clipped preview; never full-app takeover.
@@ -86,13 +85,6 @@ class _NgmyAdvisorBrowserPanelState extends State<NgmyAdvisorBrowserPanel> {
               iconSize: 20,
               onPressed: widget.session.url.isEmpty ? null : () => ngmyOpenInRealBrowser(widget.session.url),
               icon: Icon(Icons.open_in_new_rounded, color: muted),
-            ),
-            IconButton(
-              key: const Key('browser-academy'),
-              tooltip: 'Trading Academy: the advisor learns the markets',
-              iconSize: 20,
-              onPressed: () => showAdvisorTradingAcademy(context, widget.advisorName),
-              icon: const Icon(Icons.candlestick_chart_rounded, color: Color(0xFF22C55E)),
             ),
             IconButton(
               tooltip: 'Bigger preview',

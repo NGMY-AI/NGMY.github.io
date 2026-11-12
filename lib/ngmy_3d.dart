@@ -535,6 +535,28 @@ class Cam3 extends ChangeNotifier {
 
   void zoomBy(double factor) {
     _toDist = null;
+    // In a room the + and - go toward and away from what the middle of the screen looks at (the outlet, the switch, the wall), not toward the middle of the room.
+    final k = keepIn;
+    if (k != null && factor != 1.0) {
+      final cp = math.cos(pitch);
+      final v = V3(-cp * math.sin(yaw), math.sin(pitch), cp * math.cos(yaw));
+      final cam = target + v * dist;
+      final fwd = v * -1.0;
+      double exit(double s, double d, double lo, double hi) => d.abs() < 1e-9 ? double.infinity : ((d > 0 ? hi : lo) - s) / d;
+      final t = [exit(cam.x, fwd.x, k.$1 - 7, k.$2 + 7), exit(cam.y, fwd.y, 0, k.$5 + 4), exit(cam.z, fwd.z, k.$3 - 7, k.$4 + 7)].reduce(math.min);
+      if (t.isFinite && t > minDist + 1) {
+        final hit = cam + fwd * t;
+        final len = (t * factor).clamp(minDist, maxDist).toDouble();
+        _toTarget = null;
+        target = hit;
+        dist = len;
+        _want = len;
+        _lastSet = -1;
+        _fit(sync: false);
+        notifyListeners();
+        return;
+      }
+    }
     if (dist != _lastSet) _want = dist;
     _want = (math.max(_want, dist) * factor).clamp(minDist, maxDist);
     _fit(sync: false);
