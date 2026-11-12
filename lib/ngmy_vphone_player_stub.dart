@@ -76,3 +76,6 @@ class _VPhonePlayerState extends State<VPhonePlayer> {
     );
   }
 }
+
+/// How many videos the wall may play at the same moment (all four here).
+int vphoneLiveLimit(VPhoneLink link) => 4;

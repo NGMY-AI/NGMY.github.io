@@ -48,6 +48,28 @@ void main() {
     expect(phones.map((p) => p.number).toSet().length, greaterThan(95));
   });
 
+
+  testWidgets('on a phone that cannot hold four players, the phones of a set take turns (nothing crashes), set after set', (t) async {
+    NgmyPhoneWallState.limitForTest = 1;
+    addTearDown(() => NgmyPhoneWallState.limitForTest = null);
+    final w = await openWall(t);
+    expect(w.liveNow, [0], reason: 'only one video at a time');
+    expect(w.phones[0].watched, isNotEmpty);
+    expect(w.phones[1].watched, isEmpty, reason: 'it has not had its turn yet');
+    expect(find.text('Waiting its turn'), findsNWidgets(3));
+    w.videoEnded();
+    await t.pump(const Duration(milliseconds: 1600));
+    expect(w.liveNow, [1]);
+    expect(w.plan.set, 0, reason: 'still the first set: the other phones of it have not played yet');
+    for (var i = 0; i < 3; i++) {
+      w.nextSet();
+      await t.pump(const Duration(milliseconds: 100));
+    }
+    expect(w.plan.set, 1, reason: 'after the fourth phone the next set comes');
+    expect(w.liveNow, [4]);
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(seconds: 2));
+  });
   testWidgets('four phones fill the room two by two, and the video plays on all four', (t) async {
     final w = await openWall(t);
     for (var i = 0; i < 4; i++) {

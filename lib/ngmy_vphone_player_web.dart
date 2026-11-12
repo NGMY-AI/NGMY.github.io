@@ -169,3 +169,17 @@ class _VPhonePlayerState extends State<VPhonePlayer> {
     );
   }
 }
+
+/// How many videos the wall may play at the same moment on this device. A phone cannot hold four web players at once (the browser
+/// closes the page when it runs out of memory), so there a frame (YouTube, Vimeo, a page) plays one at a time and a video file two.
+/// The phones of a set take turns: the next ones start when these have finished.
+int vphoneLiveLimit(VPhoneLink link) {
+  try {
+    final ua = html.window.navigator.userAgent.toLowerCase();
+    final phone = ua.contains('iphone') || ua.contains('ipad') || ua.contains('android') || ua.contains('mobile') || (html.window.navigator.maxTouchPoints ?? 0) > 1;
+    if (!phone) return 4;
+    return link.kind == VPhoneLinkKind.file ? 2 : 1;
+  } catch (_) {
+    return 1;
+  }
+}

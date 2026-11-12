@@ -94,6 +94,13 @@ class NgmyPhoneWallState extends State<NgmyPhoneWallView> {
   int _token = 0;
   int _run = 0;
   Timer? _advance;
+  /// The phones of the front set take turns when the device cannot play four videos at once: this is which turn it is.
+  int _batch = 0;
+  static int? limitForTest;
+  int get _limit => (limitForTest ?? vphoneLiveLimit(link)).clamp(1, 4);
+
+  /// The phones that play right now.
+  List<int> get liveNow => plan.phones.skip(_batch * _limit).take(_limit).toList();
 
   @override
   void initState() {
@@ -139,7 +146,7 @@ class NgmyPhoneWallState extends State<NgmyPhoneWallView> {
 
   /// The set that is in front starts the video: each of its phones remembers it watched it.
   void _startSet() {
-    for (final i in plan.phones) {
+    for (final i in liveNow) {
       final w = phones[i].watched;
       if (w.isEmpty || w.last != link.url) {
         w.add(link.url);
@@ -159,6 +166,7 @@ class NgmyPhoneWallState extends State<NgmyPhoneWallView> {
       _token++;
       _run++;
       plan.restart();
+      _batch = 0;
     });
     _startSet();
   }
@@ -175,7 +183,12 @@ class NgmyPhoneWallState extends State<NgmyPhoneWallView> {
     if (!playing) return;
     _advance?.cancel();
     setState(() {
-      plan.next();
+      if ((_batch + 1) * _limit < plan.phones.length) {
+        _batch++;
+      } else {
+        plan.next();
+        _batch = 0;
+      }
       _token++;
       _run++;
     });
@@ -284,14 +297,14 @@ class NgmyPhoneWallState extends State<NgmyPhoneWallView> {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(small * 0.09),
             child: Stack(fit: StackFit.expand, children: [
-              if (playing && link.playable)
+              if (playing && link.playable && liveNow.contains(index))
                 _Delayed(
                   // One after the other, so the first phone is not kept waiting by the others.
-                  delay: Duration(milliseconds: 300 * position),
+                  delay: Duration(milliseconds: 600 * liveNow.indexOf(index)),
                   child: VPhonePlayer(key: ValueKey('p$index-$_run'), link: link, muted: true, cover: true, onEnded: () => _ended(token)),
                 )
               else
-                Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: kPhoneWallpapers[index % kPhoneWallpapers.length])), alignment: Alignment.center, child: Icon(Icons.smartphone_rounded, color: Colors.white.withValues(alpha: 0.7), size: small * 0.3)),
+                Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: kPhoneWallpapers[index % kPhoneWallpapers.length])), alignment: Alignment.center, child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.smartphone_rounded, color: Colors.white.withValues(alpha: 0.7), size: small * 0.3), if (playing && link.playable) Text('Waiting its turn', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: math.max(9.0, small * 0.07), fontWeight: FontWeight.w700))])),
               // The little camera pill of a phone.
               Positioned(top: 4, left: 0, right: 0, child: IgnorePointer(child: Center(child: Container(width: small * 0.22, height: 7, decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(4)))))),
             ]),

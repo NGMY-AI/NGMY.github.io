@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'ngmy_electronics_tv_ads.dart';
+import 'ngmy_electronics_tv_movies.dart';
 
 import 'ngmy_electronics_cartoons.dart';
 import 'ngmy_electronics_screens.dart';
@@ -21,7 +22,7 @@ class NgmyTvChannel {
 
 const List<NgmyTvChannel> kNgmyTvChannels = [
   NgmyTvChannel('NGMY Tree Story', 'A family grows, one branch at a time'),
-  NgmyTvChannel('Coin Hero', 'A little coin saves up and wins the day'),
+  NgmyTvChannel('NGMY Store', 'Open the doors to something new'),
   NgmyTvChannel('NGMY Construction Lab', 'Build, wire and finish a real house'),
   NgmyTvChannel('NGMY Electronics Lab', 'Build circuits that really light up'),
   NgmyTvChannel('NGMY Advisors', 'Say hi to a friendly advisor'),
@@ -48,7 +49,7 @@ void paintNgmyTv(Canvas c, Size s, int channel, double t, {double age = 99, int 
       case 0:
         _treeStory(c, s, t);
       case 1:
-        _coinHero(c, s, t);
+        paintNgmyTvAd(c, s, 7, t);
       case 2:
         paintNgmyTvAd(c, s, 0, t);
       case 3:
@@ -246,317 +247,15 @@ void _treeStory(Canvas c, Size s, double t) {
   if (fade > 0) c.drawRect(Offset.zero & s, Paint()..color = Colors.black.withValues(alpha: fade));
 }
 
-// 1 ── A coin hops over hills collecting stars.
-void _coinHero(Canvas c, Size s, double t) {
-  final w = s.width, h = s.height;
-  c.drawRect(Offset.zero & s, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF312E81), Color(0xFFDB2777), Color(0xFFFB923C)]).createShader(Offset.zero & s));
-  final scroll = t * 40;
-  for (var layer = 0; layer < 2; layer++) {
-    final path = Path()..moveTo(0, h);
-    for (var x = 0.0; x <= w; x += 6) {
-      final sx = x + scroll * (layer == 0 ? 0.4 : 1);
-      path.lineTo(x, h * (layer == 0 ? 0.62 : 0.78) + math.sin(sx / (layer == 0 ? 40 : 28)) * h * 0.05);
-    }
-    path.lineTo(w, h);
-    c.drawPath(path, Paint()..color = layer == 0 ? const Color(0xFF4C1D95) : const Color(0xFF14532D));
-  }
-  var stars = 0;
-  for (var i = 0; i < 6; i++) {
-    final x = ((i * 90.0 - scroll * 1.3) % (w + 60)) - 30;
-    final y = h * (0.35 + 0.08 * math.sin(i * 1.7 + t));
-    final near = (x - w * 0.3).abs() < 12;
-    if (near) stars++;
-    _star(c, Offset(x, y), h * 0.04, const Color(0xFFFDE047));
-  }
-  final hop = (math.sin(t * 5)).abs();
-  final cp = Offset(w * 0.3, h * 0.72 - hop * h * 0.22);
-  c.drawOval(Rect.fromCenter(center: Offset(cp.dx, h * 0.82), width: h * 0.14 * (1 - hop * 0.4), height: h * 0.025), Paint()..color = Colors.black26);
-  c.drawCircle(cp, h * 0.085, Paint()..shader = const RadialGradient(center: Alignment(-0.3, -0.3), colors: [Color(0xFFFEF08A), Color(0xFFEAB308)]).createShader(Rect.fromCircle(center: cp, radius: h * 0.085)));
-  c.drawCircle(cp, h * 0.085, Paint()..style = PaintingStyle.stroke..strokeWidth = 2..color = const Color(0xFFA16207));
-  _text(c, '\$', cp + Offset(-h * 0.03, -h * 0.045), h * 0.09, const Color(0xFFA16207));
-  c.drawCircle(cp + Offset(-h * 0.028, -h * 0.01), 2.4, Paint()..color = Colors.black);
-  c.drawCircle(cp + Offset(h * 0.028, -h * 0.01), 2.4, Paint()..color = Colors.black);
-  _text(c, 'Saved: \$${(t * 3).floor() % 1000 + stars}', Offset(h * 0.05, h * 0.06), h * 0.08, Colors.white);
-}
 
-void _star(Canvas c, Offset p, double r, Color col) {
-  final path = Path();
-  for (var i = 0; i < 10; i++) {
-    final a = -math.pi / 2 + i * math.pi / 5;
-    final rr = i.isEven ? r : r * 0.45;
-    final o = p + Offset(math.cos(a) * rr, math.sin(a) * rr);
-    i == 0 ? path.moveTo(o.dx, o.dy) : path.lineTo(o.dx, o.dy);
-  }
-  path.close();
-  c.drawPath(path, Paint()..color = col);
-}
 
-// 2 ── The NGMY rocket flies past planets.
-void _space(Canvas c, Size s, double t) {
-  final w = s.width, h = s.height;
-  c.drawRect(Offset.zero & s, Paint()..color = const Color(0xFF030617));
-  final r = math.Random(7);
-  for (var i = 0; i < 60; i++) {
-    final x = ((r.nextDouble() * w - t * (10 + r.nextDouble() * 60)) % w + w) % w;
-    c.drawCircle(Offset(x, r.nextDouble() * h * 0.85), 0.6 + r.nextDouble() * 1.4, Paint()..color = Colors.white.withValues(alpha: 0.5 + 0.5 * math.sin(t * 3 + i)));
-  }
-  final px = w * 1.2 - ((t * 22) % (w * 1.6));
-  c.drawCircle(Offset(px, h * 0.3), h * 0.2, Paint()..shader = const RadialGradient(center: Alignment(-0.4, -0.4), colors: [Color(0xFFFCA5A5), Color(0xFFB91C1C), Color(0xFF450A0A)]).createShader(Rect.fromCircle(center: Offset(px, h * 0.3), radius: h * 0.2)));
-  c.drawOval(Rect.fromCenter(center: Offset(px, h * 0.3), width: h * 0.6, height: h * 0.07), Paint()..style = PaintingStyle.stroke..strokeWidth = 3..color = const Color(0xFFFDE68A).withValues(alpha: 0.7));
-  final rx = w * 0.42, ry = h * 0.52 + math.sin(t * 2) * h * 0.04;
-  c.save();
-  c.translate(rx, ry);
-  c.rotate(-0.25);
-  final flame = Path()..moveTo(-h * 0.04, h * 0.1)..quadraticBezierTo(0, h * (0.2 + 0.05 * math.sin(t * 30)), h * 0.04, h * 0.1)..close();
-  c.drawPath(flame, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFFDE047), Color(0xFFEF4444)]).createShader(Rect.fromLTWH(-h * 0.04, h * 0.1, h * 0.08, h * 0.12)));
-  final body = Path()..moveTo(0, -h * 0.17)..quadraticBezierTo(h * 0.09, -h * 0.05, h * 0.05, h * 0.1)..lineTo(-h * 0.05, h * 0.1)..quadraticBezierTo(-h * 0.09, -h * 0.05, 0, -h * 0.17)..close();
-  c.drawPath(body, Paint()..shader = const LinearGradient(colors: [Color(0xFFE5E7EB), Colors.white, Color(0xFF94A3B8)]).createShader(Rect.fromLTWH(-h * 0.08, -h * 0.17, h * 0.16, h * 0.27)));
-  c.drawCircle(Offset(0, -h * 0.05), h * 0.035, Paint()..color = const Color(0xFF38BDF8));
-  c.drawPath(Path()..moveTo(-h * 0.05, h * 0.04)..lineTo(-h * 0.1, h * 0.12)..lineTo(-h * 0.05, h * 0.1)..close(), Paint()..color = const Color(0xFFEF4444));
-  c.drawPath(Path()..moveTo(h * 0.05, h * 0.04)..lineTo(h * 0.1, h * 0.12)..lineTo(h * 0.05, h * 0.1)..close(), Paint()..color = const Color(0xFFEF4444));
-  c.restore();
-}
 
-// 3 ── Fish, bubbles and a whale.
-void _ocean(Canvas c, Size s, double t) {
-  final w = s.width, h = s.height;
-  c.drawRect(Offset.zero & s, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF38BDF8), Color(0xFF0369A1), Color(0xFF082F49)]).createShader(Offset.zero & s));
-  for (var i = 0; i < 4; i++) {
-    final x = w * (0.1 + 0.25 * i);
-    c.drawPath(Path()..moveTo(x, h)..quadraticBezierTo(x + math.sin(t + i) * 10, h * 0.85, x + 4, h * 0.7 + i * 6), Paint()..style = PaintingStyle.stroke..strokeWidth = 5..color = const Color(0xFF16A34A));
-  }
-  final wx = ((t * 18) % (w * 1.5)) - w * 0.25;
-  c.save();
-  c.translate(wx, h * 0.35 + math.sin(t) * 6);
-  c.drawOval(Rect.fromCenter(center: Offset.zero, width: h * 0.5, height: h * 0.22), Paint()..color = const Color(0xFF475569));
-  c.drawPath(Path()..moveTo(-h * 0.22, 0)..quadraticBezierTo(-h * 0.36, -h * 0.12 + math.sin(t * 3) * 5, -h * 0.34, -h * 0.16)..quadraticBezierTo(-h * 0.28, -h * 0.02, -h * 0.22, 0), Paint()..color = const Color(0xFF475569));
-  c.drawOval(Rect.fromCenter(center: Offset(0, h * 0.03), width: h * 0.34, height: h * 0.1), Paint()..color = const Color(0xFFE2E8F0));
-  c.drawCircle(Offset(h * 0.15, -h * 0.02), 3, Paint()..color = Colors.white);
-  c.drawCircle(Offset(h * 0.155, -h * 0.02), 1.5, Paint()..color = Colors.black);
-  c.restore();
-  const cols = [Color(0xFFFB923C), Color(0xFFFACC15), Color(0xFFF472B6), Color(0xFF4ADE80)];
-  for (var i = 0; i < 6; i++) {
-    final dir = i.isEven ? 1.0 : -1.0;
-    final x = (((t * (24 + i * 7) * dir) + i * 80) % (w + 40) + w + 40) % (w + 40) - 20;
-    final y = h * (0.52 + 0.06 * i) + math.sin(t * 2 + i) * 6;
-    c.save();
-    c.translate(x, y);
-    c.scale(dir, 1);
-    c.drawOval(Rect.fromCenter(center: Offset.zero, width: h * 0.1, height: h * 0.06), Paint()..color = cols[i % 4]);
-    c.drawPath(Path()..moveTo(-h * 0.04, 0)..lineTo(-h * 0.08, -h * 0.03)..lineTo(-h * 0.08, h * 0.03)..close(), Paint()..color = cols[i % 4]);
-    c.drawCircle(Offset(h * 0.03, -h * 0.005), 1.8, Paint()..color = Colors.black);
-    c.restore();
-  }
-  for (var i = 0; i < 14; i++) {
-    final x = w * ((i * 0.071 + 0.05) % 1);
-    final y = h - ((t * (14 + i * 3) + i * 40) % h);
-    c.drawCircle(Offset(x + math.sin(t * 2 + i) * 4, y), 2 + (i % 3), Paint()..style = PaintingStyle.stroke..strokeWidth = 1.2..color = Colors.white.withValues(alpha: 0.7));
-  }
-}
 
-// 4 ── A storm, then a rainbow.
-void _rain(Canvas c, Size s, double t) {
-  final w = s.width, h = s.height;
-  final cycle = t % 12.0;
-  final storm = cycle < 7;
-  c.drawRect(Offset.zero & s, Paint()..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: storm ? const [Color(0xFF334155), Color(0xFF64748B)] : const [Color(0xFF7DD3FC), Color(0xFFFEF9C3)]).createShader(Offset.zero & s));
-  c.drawRect(Rect.fromLTWH(0, h * 0.74, w, h * 0.26), Paint()..color = storm ? const Color(0xFF3F6212) : const Color(0xFF65A30D));
-  for (var i = 0; i < 4; i++) {
-    final x = w * (0.08 + 0.24 * i);
-    final hh = h * (0.14 + 0.03 * (i % 2));
-    c.drawRect(Rect.fromLTWH(x, h * 0.74 - hh, h * 0.2, hh), Paint()..color = const [Color(0xFFFCA5A5), Color(0xFFFDE68A), Color(0xFFA5B4FC), Color(0xFF86EFAC)][i]);
-    c.drawPath(Path()..moveTo(x - 4, h * 0.74 - hh)..lineTo(x + h * 0.1, h * 0.74 - hh - h * 0.09)..lineTo(x + h * 0.2 + 4, h * 0.74 - hh)..close(), Paint()..color = const Color(0xFF7F1D1D));
-    c.drawRect(Rect.fromLTWH(x + h * 0.07, h * 0.74 - hh * 0.55, h * 0.06, hh * 0.55), Paint()..color = storm && (t * 2).floor() % 2 == 0 ? const Color(0xFFFEF08A) : const Color(0xFF78350F));
-  }
-  if (storm) {
-    for (var i = 0; i < 70; i++) {
-      final x = (i * 37.0 + t * 20) % w;
-      final y = ((i * 53.0 + t * 260) % (h * 0.8));
-      c.drawLine(Offset(x, y), Offset(x - 3, y + 9), Paint()..color = const Color(0xFFBAE6FD)..strokeWidth = 1.4);
-    }
-    if ((t * 3).floor() % 7 == 0 && (t * 3) % 1 < 0.3) {
-      c.drawRect(Offset.zero & s, Paint()..color = Colors.white.withValues(alpha: 0.5));
-      c.drawPath(Path()..moveTo(w * 0.6, h * 0.1)..lineTo(w * 0.55, h * 0.3)..lineTo(w * 0.62, h * 0.3)..lineTo(w * 0.55, h * 0.55), Paint()..style = PaintingStyle.stroke..strokeWidth = 4..color = const Color(0xFFFEF08A));
-    }
-  } else {
-    const rb = [Color(0xFFEF4444), Color(0xFFF97316), Color(0xFFFACC15), Color(0xFF22C55E), Color(0xFF3B82F6), Color(0xFF8B5CF6)];
-    final k = ((cycle - 7) / 2).clamp(0.0, 1.0);
-    for (var i = 0; i < rb.length; i++) {
-      c.drawArc(Rect.fromCenter(center: Offset(w * 0.5, h * 0.74), width: w * (0.9 - i * 0.07), height: w * (0.9 - i * 0.07)), math.pi, math.pi * k, false, Paint()..style = PaintingStyle.stroke..strokeWidth = h * 0.035..color = rb[i].withValues(alpha: 0.9));
-    }
-    c.drawCircle(Offset(w * 0.86, h * 0.16), h * 0.08, Paint()..color = const Color(0xFFFDE047));
-  }
-  for (var i = 0; i < 3; i++) {
-    final x = ((t * (8 + i * 4) + i * 120) % (w + 120)) - 60;
-    for (final o in const [Offset(0, 0), Offset(26, -8), Offset(52, 0), Offset(26, 8)]) {
-      c.drawCircle(Offset(x, h * (0.12 + 0.1 * i)) + o, h * 0.07, Paint()..color = storm ? const Color(0xFF1E293B) : Colors.white.withValues(alpha: 0.95));
-    }
-  }
-}
 
-// 5 ── A spark runs round a circuit and lights the bulb.
-void _spark(Canvas c, Size s, double t) {
-  final w = s.width, h = s.height;
-  c.drawRect(Offset.zero & s, Paint()..color = const Color(0xFF0B1220));
-  final grid = Paint()..color = Colors.white.withValues(alpha: 0.05);
-  for (var x = 0.0; x < w; x += 16) {
-    c.drawLine(Offset(x, 0), Offset(x, h), grid);
-  }
-  for (var y = 0.0; y < h; y += 16) {
-    c.drawLine(Offset(0, y), Offset(w, y), grid);
-  }
-  final loop = RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.14, h * 0.2, w * 0.72, h * 0.5), Radius.circular(h * 0.08));
-  final path = Path()..addRRect(loop);
-  c.drawPath(path, Paint()..style = PaintingStyle.stroke..strokeWidth = 5..color = const Color(0xFF475569));
-  final m = path.computeMetrics().first;
-  final d = (t * m.length / 5) % m.length;
-  for (var k = 0; k < 10; k++) {
-    final pos = m.getTangentForOffset((d - k * 9) % m.length)!.position;
-    c.drawCircle(pos, 6.0 - k * 0.5, Paint()..color = const Color(0xFFFDE047).withValues(alpha: 1 - k * 0.09)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2));
-  }
-  // Battery on the left, bulb on the right.
-  c.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: Offset(w * 0.14, h * 0.45), width: h * 0.12, height: h * 0.22), const Radius.circular(4)), Paint()..color = const Color(0xFF16A34A));
-  _text(c, '+', Offset(w * 0.14 - 5, h * 0.33), h * 0.07, Colors.white);
-  final lit = (math.sin(t * 2) + 1) / 2;
-  final bc = Offset(w * 0.86, h * 0.45);
-  c.drawCircle(bc, h * 0.16, Paint()..color = const Color(0xFFFDE047).withValues(alpha: 0.25 + 0.5 * lit)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12));
-  c.drawCircle(bc, h * 0.08, Paint()..color = Color.lerp(const Color(0xFF94A3B8), const Color(0xFFFEF9C3), lit)!);
-  _text(c, 'Electricity needs a full loop!', Offset(0, h * 0.74), h * 0.075, const Color(0xFF7DD3FC), align: TextAlign.center, width: w);
-}
 
-// 6 ── Fireworks over the NGMY tower.
-void _fireworks(Canvas c, Size s, double t) {
-  final w = s.width, h = s.height;
-  c.drawRect(Offset.zero & s, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF020617), Color(0xFF1E1B4B)]).createShader(Offset.zero & s));
-  c.drawRect(Rect.fromLTWH(0, h * 0.82, w, h * 0.18), Paint()..color = const Color(0xFF0B1220));
-  for (var k = 0; k < 7; k++) {
-    final bx = w * (0.05 + k * 0.15), bh = h * (0.1 + 0.07 * ((k * 5) % 4));
-    c.drawRect(Rect.fromLTWH(bx, h * 0.82 - bh, w * 0.1, bh), Paint()..color = const Color(0xFF111827));
-  }
-  const cols = [Color(0xFFF472B6), Color(0xFF38BDF8), Color(0xFFFDE047), Color(0xFF4ADE80), Color(0xFFFB923C)];
-  for (var f = 0; f < 4; f++) {
-    final cyc = (t * 0.55 + f * 0.27) % 1.0;
-    final seed = ((t * 0.55 + f * 0.27).floor() * 7 + f * 3);
-    final cx = w * (0.15 + 0.7 * ((seed * 0.37) % 1.0)), cy = h * (0.2 + 0.25 * ((seed * 0.53) % 1.0));
-    final col = cols[seed.abs() % cols.length];
-    if (cyc < 0.3) {
-      final k = cyc / 0.3;
-      c.drawCircle(Offset(cx, h * 0.82 - (h * 0.82 - cy) * k), 2.5, Paint()..color = Colors.white);
-    } else {
-      final k = (cyc - 0.3) / 0.7;
-      for (var i = 0; i < 28; i++) {
-        final a = i * math.pi * 2 / 28;
-        final r = h * 0.2 * Curves.easeOut.transform(k);
-        final p = Offset(cx + math.cos(a) * r, cy + math.sin(a) * r + k * k * h * 0.08);
-        c.drawCircle(p, 2.4 * (1 - k) + 0.4, Paint()..color = col.withValues(alpha: (1 - k).clamp(0.0, 1.0))..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.2));
-      }
-    }
-  }
-}
 
-// 7 ── A little train crosses the hills.
-void _train(Canvas c, Size s, double t) {
-  final w = s.width, h = s.height;
-  c.drawRect(Offset.zero & s, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF7DD3FC), Color(0xFFFEF3C7)]).createShader(Offset.zero & s));
-  for (var layer = 0; layer < 2; layer++) {
-    final path = Path()..moveTo(0, h);
-    for (var x = 0.0; x <= w; x += 6) {
-      final sx = x + t * (layer == 0 ? 8 : 20);
-      path.lineTo(x, h * (layer == 0 ? 0.55 : 0.68) + math.sin(sx / (layer == 0 ? 50 : 34)) * h * 0.06);
-    }
-    path.lineTo(w, h);
-    c.drawPath(path, Paint()..color = layer == 0 ? const Color(0xFF4D7C0F) : const Color(0xFF65A30D));
-  }
-  c.drawRect(Rect.fromLTWH(0, h * 0.8, w, h * 0.04), Paint()..color = const Color(0xFF475569));
-  for (var x = -((t * 80) % 24); x < w; x += 24) {
-    c.drawRect(Rect.fromLTWH(x, h * 0.84, 8, h * 0.03), Paint()..color = const Color(0xFF78350F));
-  }
-  final bob = math.sin(t * 14) * 1.2;
-  double cx = w * 0.12;
-  for (var k = 0; k < 4; k++) {
-    final isEngine = k == 0;
-    final body = Rect.fromLTWH(cx, h * 0.62 + bob, w * (isEngine ? 0.16 : 0.15), h * 0.18);
-    c.drawRRect(RRect.fromRectAndRadius(body, Radius.circular(h * 0.02)), Paint()..color = isEngine ? const Color(0xFFDC2626) : const [Color(0xFF2563EB), Color(0xFFF59E0B), Color(0xFF16A34A)][k - 1]);
-    for (var q = 0; q < 3; q++) {
-      c.drawRect(Rect.fromLTWH(body.left + body.width * (0.12 + q * 0.28), body.top + h * 0.03, body.width * 0.18, h * 0.06), Paint()..color = const Color(0xFFBAE6FD));
-    }
-    c.drawCircle(Offset(body.left + body.width * 0.25, h * 0.8 + bob), h * 0.025, Paint()..color = Colors.black87);
-    c.drawCircle(Offset(body.left + body.width * 0.75, h * 0.8 + bob), h * 0.025, Paint()..color = Colors.black87);
-    cx += body.width + w * 0.012;
-  }
-  for (var k = 0; k < 5; k++) {
-    final ph = (t * 0.8 + k * 0.2) % 1.0;
-    c.drawCircle(Offset(w * 0.2 - ph * w * 0.12, h * 0.6 - ph * h * 0.25), h * 0.02 + ph * h * 0.04, Paint()..color = Colors.white.withValues(alpha: 0.7 * (1 - ph)));
-  }
-}
 
-// 8 ── A friendly robot dances to the beat.
-void _robotDance(Canvas c, Size s, double t) {
-  final w = s.width, h = s.height;
-  c.drawRect(Offset.zero & s, Paint()..shader = LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color.lerp(const Color(0xFF4C1D95), const Color(0xFF0E7490), (math.sin(t * 2) + 1) / 2)!, const Color(0xFF111827)]).createShader(Offset.zero & s));
-  for (var k = 0; k < 8; k++) {
-    final on = (t * 2 + k) % 2 < 1;
-    c.drawRect(Rect.fromLTWH(w * k / 8, h * 0.86, w / 8 - 2, h * 0.14), Paint()..color = (on ? const Color(0xFFF472B6) : const Color(0xFF38BDF8)).withValues(alpha: 0.5));
-  }
-  final beat = math.sin(t * 6);
-  c.save();
-  c.translate(w * 0.5, h * 0.55 + beat.abs() * -h * 0.03);
-  c.rotate(beat * 0.06);
-  c.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: Offset.zero, width: h * 0.26, height: h * 0.3), Radius.circular(h * 0.04)), Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFE2E8F0), Color(0xFF64748B)]).createShader(Rect.fromCenter(center: Offset.zero, width: h * 0.26, height: h * 0.3)));
-  c.drawRect(Rect.fromCenter(center: Offset(0, h * 0.02), width: h * 0.14, height: h * 0.08), Paint()..color = const Color(0xFF22D3EE).withValues(alpha: 0.7));
-  c.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: Offset(0, -h * 0.25), width: h * 0.22, height: h * 0.17), Radius.circular(h * 0.04)), Paint()..color = const Color(0xFFCBD5E1));
-  final blink = (t * 1.3) % 1.0 > 0.08;
-  for (final x in const [-0.05, 0.05]) {
-    c.drawCircle(Offset(x * h, -h * 0.26), h * 0.025, Paint()..color = blink ? const Color(0xFF22D3EE) : const Color(0xFF0E7490));
-  }
-  c.drawLine(Offset(0, -h * 0.335), Offset(0, -h * 0.38), Paint()..color = Colors.white70..strokeWidth = 3);
-  c.drawCircle(Offset(0, -h * 0.39), h * 0.015, Paint()..color = const Color(0xFFEF4444));
-  for (final side in const [-1.0, 1.0]) {
-    c.save();
-    c.translate(side * h * 0.14, -h * 0.08);
-    c.rotate(side * (0.7 + math.sin(t * 6 + (side > 0 ? 0 : math.pi)) * 0.8));
-    c.drawLine(Offset.zero, Offset(side * h * 0.16, 0), Paint()..color = const Color(0xFF94A3B8)..strokeWidth = h * 0.035..strokeCap = StrokeCap.round);
-    c.restore();
-    c.drawLine(Offset(side * h * 0.06, h * 0.15), Offset(side * h * 0.08, h * 0.28 + (side > 0 ? beat : -beat) * h * 0.02), Paint()..color = const Color(0xFF94A3B8)..strokeWidth = h * 0.04..strokeCap = StrokeCap.round);
-  }
-  c.restore();
-  for (var k = 0; k < 4; k++) {
-    final ph = (t * 0.7 + k * 0.25) % 1.0;
-    _text(c, '♪', Offset(w * (0.2 + 0.18 * k) + math.sin(t * 2 + k) * 8, h * 0.7 - ph * h * 0.5), h * 0.08, Colors.white.withValues(alpha: 1 - ph));
-  }
-}
 
-// 9 ── A garden with butterflies and growing flowers.
-void _garden(Canvas c, Size s, double t) {
-  final w = s.width, h = s.height;
-  c.drawRect(Offset.zero & s, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF93C5FD), Color(0xFFFEF9C3)]).createShader(Offset.zero & s));
-  c.drawCircle(Offset(w * 0.12, h * 0.16), h * 0.07, Paint()..color = const Color(0xFFFDE047));
-  c.drawRect(Rect.fromLTWH(0, h * 0.72, w, h * 0.28), Paint()..color = const Color(0xFF4D7C0F));
-  const cols = [Color(0xFFF472B6), Color(0xFFFACC15), Color(0xFFEF4444), Color(0xFFA78BFA), Color(0xFFFB923C)];
-  for (var k = 0; k < 9; k++) {
-    final x = w * (0.07 + k * 0.105);
-    final grow = ((t * 0.25 - k * 0.12) % 3.0).clamp(0.0, 1.0);
-    final stemH = h * (0.12 + 0.05 * (k % 3)) * grow;
-    final top = Offset(x + math.sin(t + k) * 3, h * 0.78 - stemH);
-    c.drawLine(Offset(x, h * 0.78), top, Paint()..color = const Color(0xFF166534)..strokeWidth = 3);
-    if (grow > 0.7) {
-      for (var p = 0; p < 6; p++) {
-        final a = p * math.pi / 3 + t * 0.3;
-        c.drawCircle(top + Offset(math.cos(a), math.sin(a)) * h * 0.028, h * 0.022, Paint()..color = cols[k % cols.length]);
-      }
-      c.drawCircle(top, h * 0.016, Paint()..color = const Color(0xFFFDE047));
-    }
-  }
-  for (var k = 0; k < 3; k++) {
-    final x = w * (0.2 + 0.28 * k) + math.sin(t * 0.9 + k * 2) * w * 0.12;
-    final y = h * (0.3 + 0.1 * k) + math.cos(t * 1.3 + k) * h * 0.06;
-    final flap = math.sin(t * 18 + k).abs();
-    for (final side in const [-1.0, 1.0]) {
-      c.drawOval(Rect.fromCenter(center: Offset(x + side * h * 0.025 * flap, y), width: h * 0.05 * flap + 2, height: h * 0.06), Paint()..color = cols[(k + 2) % cols.length]);
-    }
-    c.drawLine(Offset(x, y - h * 0.03), Offset(x, y + h * 0.03), Paint()..color = Colors.black87..strokeWidth = 2);
-  }
-}
 
 // ─── The big screen ──────────────────────────────────────────────────────────
 
