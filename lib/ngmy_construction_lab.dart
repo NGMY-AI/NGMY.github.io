@@ -6,6 +6,7 @@ import 'ngmy_electrical_fx.dart';
 import 'ngmy_frame_drywall.dart';
 import 'ngmy_frame_wiring.dart';
 import 'ngmy_frame_save.dart';
+import 'ngmy_screw_why.dart';
 import 'ngmy_electrical_safety.dart';
 import 'ngmy_electrical_ui.dart';
 
@@ -595,6 +596,8 @@ mixin _GlowMixin<T extends StatefulWidget> on State<T> {
   Timer? _glowTimer;
   String _lastChip = '';
   DateTime _lastChipAt = DateTime(2000);
+  int _lastScrew = 0;
+  DateTime _lastScrewAt = DateTime(2000);
 
   /// True when this is the second tap on the same name within a few seconds.
   bool chipTapTwice(String k) {
@@ -761,6 +764,9 @@ class _ElectricalPageState extends State<ElectricalLessonPage> with _GlowMixin {
     }
   }
 
+  @visibleForTesting
+  void pickForTest(int id) => _pick(id);
+
   void _pick(int id) {
     if (id == 0) {
       _home();
@@ -860,6 +866,17 @@ class _ElectricalPageState extends State<ElectricalLessonPage> with _GlowMixin {
         chip = '';
       }
       return;
+    }
+    // Two quick taps on a screw (or a nut) that has no wire: a pop-up in the middle says which wire goes there and why it is empty.
+    if (hook.isNotEmpty && !s.attached.containsKey(id)) {
+      final now = DateTime.now();
+      final twice = _lastScrew == id && now.difference(_lastScrewAt).inMilliseconds < 900;
+      _lastScrew = twice ? 0 : id;
+      _lastScrewAt = now;
+      if (twice) {
+        showScrewWhy(context, lesson, s, hook.first);
+        return;
+      }
     }
     final info = scene.info[id];
     if (info != null) {

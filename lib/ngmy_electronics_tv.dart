@@ -292,10 +292,34 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
   bool _hud = true;
   Timer? _hudTimer;
 
+  /// The TV plays its channels one after another: each one for ten seconds (one whole advert), then the next, round and round.
+  Timer? _cycle;
+  late double _chStart = widget.showBoot ? 3.0 : 0.0;
+  double get _nowSec => (_clock.lastElapsedDuration?.inMilliseconds ?? 0) / 1000;
+
+  void _armCycle() {
+    _cycle?.cancel();
+    _cycle = Timer(Duration(seconds: _chStart > 0 && _nowSec < 3.2 ? 13 : 10), _nextChannel);
+  }
+
+  void _nextChannel() {
+    if (!mounted) return;
+    if (_app < 0 && !_menu) {
+      setState(() {
+        _ch = (_ch + 1) % kNgmyTvChannels.length;
+        _channelSince = _clock.lastElapsedDuration?.inMilliseconds.toDouble() ?? 1;
+        _chStart = _nowSec;
+      });
+      NgmyTone.play(900, ms: 40, wave: 'noise', volume: 0.2);
+    }
+    _armCycle();
+  }
+
   @override
   void initState() {
     super.initState();
     _auto = Timer(widget.stayFor, _close);
+    _armCycle();
     _hideHudSoon();
     NgmyTone.play(520, ms: 80, wave: 'tri', volume: 0.25);
   }
@@ -324,7 +348,9 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
       _app = -1;
       _ch = (_ch + d) % kNgmyTvChannels.length;
       if (_ch < 0) _ch += kNgmyTvChannels.length;
-      _channelSince = _clock.lastElapsedDuration?.inMilliseconds.toDouble() ?? 0;
+      _channelSince = _clock.lastElapsedDuration?.inMilliseconds.toDouble() ?? 1;
+      _chStart = _nowSec;
+      _armCycle();
       _touched();
     });
     NgmyTone.play(900, ms: 40, wave: 'noise', volume: 0.3);
@@ -343,6 +369,7 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
   void dispose() {
     _auto?.cancel();
     _hudTimer?.cancel();
+    _cycle?.cancel();
     _clock.dispose();
     super.dispose();
   }
@@ -371,7 +398,7 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
                         final t = ms / 1000;
                         // The logo only shows when the TV first starts, not at every channel change.
                         final age = _channelSince == 0 && widget.showBoot ? t : 99.0;
-                        return CustomPaint(painter: _TvPainter(_ch, t, age, _app), size: Size.infinite);
+                        return CustomPaint(painter: _TvPainter(_ch, age < 3.0 ? t : math.max(0.0, t - _chStart), age, _app), size: Size.infinite);
                       },
                     ),
                       if (_menu) _appsMenu(),
