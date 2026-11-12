@@ -182,6 +182,12 @@ const Map<int, (String, String, V3)> kPropInfo = {
 
 /// The two knockouts of a box (round tabs in its top and bottom that are broken out for a cable to go in): their ids, from the box's own number.
 const int idKo0 = 4200;
+const int idPlug0 = 4400;
+
+/// The plug and cord of what is plugged into a box: a tap pulls it out.
+int plugId(int boxId) => idPlug0 + (boxId - idBox0);
+bool isPlugId(int id) => id >= idPlug0 && id < idPlug0 + 100;
+int plugBoxOf(int id) => idBox0 + (id - idPlug0);
 int koId(int boxId, int k) => idKo0 + (boxId - idBox0) * 2 + k;
 bool isKoId(int id) => id >= idKo0 && id < idKo0 + 200;
 int koBoxOf(int id) => idBox0 + (id - idKo0) ~/ 2;

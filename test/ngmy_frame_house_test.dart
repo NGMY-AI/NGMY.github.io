@@ -414,6 +414,31 @@ void main() {
     });
 
 
+
+    testWidgets('a tap on the plug or cord of a TV pulls it out of the outlet', (t) async {
+      t.view.physicalSize = const Size(900, 1700);
+      t.view.devicePixelRatio = 1.0;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(const MaterialApp(home: NgmyWiringHousePage()));
+      await t.pump(const Duration(milliseconds: 600));
+      final st = t.state<NgmyWiringHousePageState>(find.byType(NgmyWiringHousePage));
+      st.w.loadJson(finishedWiring().toJson());
+      final outlet = st.w.boxes.firstWhere((b) => b.kind == 'outlet');
+      st.w.installDevice(outlet.id, 'outlet');
+      wireDeviceRight(outlet.ws!, 'outlet');
+      st.w.toggleBreaker();
+      expect(st.w.plug(outlet.id, 'tv').ok, isTrue);
+      st.setTool('look');
+      await t.pump(const Duration(milliseconds: 300));
+      expect(st.scene.polys.any((p) => p.id == plugId(outlet.id)), isTrue, reason: 'the plug and cord can be tapped');
+      st.pickForTest(plugId(outlet.id));
+      await t.pump(const Duration(milliseconds: 300));
+      expect(st.w.plugged, isEmpty);
+      expect(st.msg, contains('pulled the plug'));
+      await t.pump(const Duration(seconds: 15));
+      await t.pumpWidget(const SizedBox());
+      await t.pump(const Duration(seconds: 15));
+    });
     testWidgets('what was done is kept when the lesson is left and opened again, and Start over clears it', (t) async {
       t.view.physicalSize = const Size(900, 1700);
       t.view.devicePixelRatio = 1.0;

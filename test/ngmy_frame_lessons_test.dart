@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_3d.dart';
+import 'package:ngmy/ngmy_construction_electrical.dart';
 import 'package:ngmy/ngmy_construction_lab.dart';
 import 'package:ngmy/ngmy_frame_drywall.dart';
 import 'package:ngmy/ngmy_frame_geo.dart';
@@ -324,6 +325,32 @@ void main() {
       await t.pump(const Duration(seconds: 14));
     });
 
+
+    testWidgets('in the device close-up a tap on a wire turns the view to the side of the device where that wire goes', (t) async {
+      t.view.physicalSize = const Size(900, 1700);
+      t.view.devicePixelRatio = 1.0;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(const MaterialApp(home: ElectricalLessonPage(id: 'outlet')));
+      await t.pump(const Duration(milliseconds: 600));
+      final cam = t.widget<Scene3DView>(find.byType(Scene3DView).first).cam;
+      final ch = electricalLesson('outlet').chips;
+      Future<double> yawFor(String key) async {
+        await t.tap(find.text(ch.firstWhere((c) => c.key == key).label));
+        for (var i = 0; i < 40; i++) {
+          await t.pump(const Duration(milliseconds: 100));
+        }
+        return cam.yaw;
+      }
+      final white = await yawFor('white');
+      final black = await yawFor('black');
+      final ground = await yawFor('ground');
+      expect(white, greaterThan(0.5), reason: 'the silver side (neutral)');
+      expect(black, lessThan(-0.5), reason: 'the brass side (hot) is on the other side');
+      expect(ground.abs(), lessThan(0.4), reason: 'the green screw is seen from the front');
+      await t.pump(const Duration(seconds: 14));
+      await t.pumpWidget(const SizedBox());
+      await t.pump(const Duration(seconds: 14));
+    });
     testWidgets('a real finger tap on the cable roll in the picture picks it up', (t) async {
       t.view.physicalSize = const Size(900, 1700);
       t.view.devicePixelRatio = 1.0;

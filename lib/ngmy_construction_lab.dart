@@ -718,6 +718,15 @@ class _ElectricalPageState extends State<ElectricalLessonPage> with _GlowMixin {
       cam.glideTo(target: const V3(0, -0.3, 3.2), dist: 9, yaw: 1.15, pitch: 0.12);
       return;
     }
+    // Turn to the side of the device where this wire goes: the place that takes it (the first one still free), seen from the side it is on.
+    final spots = [for (final h in lesson.hookups) if (h.accepts.contains(key) && s.attached[h.id] == null && scene.info[h.id] != null) scene.info[h.id]!.focus];
+    if (spots.isNotEmpty) {
+      final f = spots.first;
+      final low = f.y < -0.8;
+      final yaw = low ? 0.15 : (f.x.abs() < 0.35 ? 0.0 : (f.x < 0 ? 0.95 : -0.95));
+      cam.glideTo(target: V3(f.x, low ? f.y : 0.0, f.z), dist: low ? 8 : 8.5, yaw: yaw, pitch: low ? 0.55 : 0.2);
+      return;
+    }
     final role = lesson.chips.where((c) => c.key == key).map((c) => c.role).firstOrNull ?? '';
     if (key == 'ground' || role == 'ground') {
       cam.glideTo(target: const V3(0, -1.2, 5.0), dist: 8, yaw: 0.15, pitch: 0.55);

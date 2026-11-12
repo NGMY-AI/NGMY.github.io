@@ -260,13 +260,23 @@ List<Poly> appliancePolys(FBox x, String key, {required bool running, required d
 void drawCord(MeshBuilder b, FBox x, String key) {
   final plug = boxFace(x) + wallIn(x.wall) * 0.5;
   final base = appliancePos(x, key) + wallIn(x.wall) * 2.0;
+  // The plug and the cord can be tapped: that pulls the plug out of the outlet.
   b
-    ..id = 0
+    ..id = plugId(x.id)
     ..order = 2
     ..bias = 0.6;
   b.box(plug, wallSize(x.wall, 2.0, 2.4, 0.9), const Color(0xFF22262C), shine: 0.2);
   b.tube([plug, V3(plug.x, 2.0, plug.z) + wallIn(x.wall) * 1.0, V3(base.x, 1.0, base.z)], 0.22, const Color(0xFF1B1B1D), shine: 0.2, sides: 6, joints: true);
-  b.bias = 0;
+  b
+    ..order = 3
+    ..bias = 0.9
+    ..alpha = 0.02;
+  b.box(plug, const V3(6, 6, 6), Colors.white);
+  b.box(V3((plug.x + base.x) / 2, (plug.y + 1.0) / 2, (plug.z + base.z) / 2), V3(5, math.max(4.0, plug.y - 1.0), 5), Colors.white);
+  b
+    ..alpha = 1
+    ..order = 2
+    ..bias = 0;
 }
 
 /// Everything that moves: the fan blades, the glow of a light that is on, and the appliances that run.

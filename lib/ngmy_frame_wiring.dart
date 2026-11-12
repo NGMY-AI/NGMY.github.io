@@ -1337,6 +1337,18 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
       setState(() => hl = 0);
       return;
     }
+    // The plug or the cord of something that is plugged in: a tap pulls the plug out.
+    if (isPlugId(id)) {
+      final box = plugBoxOf(id);
+      final key = w.plugged[box];
+      if (key != null) {
+        final a = w.plug(box, key);
+        conGood();
+        setState(_rebuild);
+        _say(a.ok ? 'You pulled the plug out of the outlet.' : a.msg, ok: a.ok);
+        return;
+      }
+    }
     final handTool = tool.startsWith('dev:') || tool.startsWith('app:');
     if (isKoId(id) && !handTool) {
       _tapKo(id);
