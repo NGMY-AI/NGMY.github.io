@@ -7,7 +7,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 
 import 'package:flutter/material.dart';
-import 'ngmy_construction_electrical_more.dart' show isOutletKind;
+import 'ngmy_construction_electrical_more.dart' show isOutletKind, isSwitchKind;
 
 import 'ngmy_3d.dart';
 import 'ngmy_avatar_glb.dart';
@@ -205,7 +205,7 @@ void paintNgmyPoster(Canvas c, Size s, double t, int variant) {
 void _outletFace(MeshBuilder b, String kind, double x, bool ok) {
   const slotCol = Color(0xFF0B0B0D), dark = Color(0xFF17181B);
   const plate = Color(0xFFF2EEE2);
-  const layouts = {'dryer3': 'nema1030', 'dryer4': 'nema1430', 'range3': 'nema1050', 'range4': 'nema1450', 'washer': 'nema520', 'v240three': 'nema1030', 'v240four': 'nema1430', 'v240only': 'nema520'};
+  const layouts = {'dryer3': 'nema1030', 'dryer4': 'nema1430', 'range3': 'nema1050', 'range4': 'nema1450', 'washer': 'nema520', 'v240three': 'nema1030', 'v240four': 'nema1430', 'v240only': 'nema620'};
   final layout = layouts[kind];
   if (layout != null) {
     final small = kind.startsWith('v240');
@@ -245,6 +245,11 @@ void _outletFace(MeshBuilder b, String kind, double x, bool ok) {
         slot(-0.4, -0.04, 0.075, 0.32);
         slot(0.4, -0.04, 0.075, 0.32);
         round(0, -0.4);
+      case 'nema620':
+        slot(0, 0.2, 0.32, 0.075);
+        slot(0, 0.0, 0.32, 0.075);
+        slot(0.15, -0.07, 0.075, 0.14);
+        round(0, -0.36);
       default:
         slot(0.2, 0.12, 0.075, 0.3);
         slot(-0.2, 0.12, 0.075, 0.3);
@@ -266,7 +271,7 @@ void _outletFace(MeshBuilder b, String kind, double x, bool ok) {
   } else {
     b.box(V3(x, 14, 1.7), const V3(1.2, 1.2, 0.3), const Color(0xFF9CA3AF));
   }
-  if (kind == 'isolated') b.box(V3(x, 19.6, 1.8), const V3(2.2, 1.4, 0.3), const Color(0xFFF97316));
+  if (kind == 'isolated') b.tri(V3(x, 15.0, 1.9), V3(x - 1.2, 12.9, 1.9), V3(x + 1.2, 12.9, 1.9), const Color(0xFFF97316));
 }
 /// Edit modes: look, furniture, walls, floor, ceiling, doors.
 Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int problems = 0, bool closed = false, List<ResidentFigure> residents = const [], Set<int> hideFurn = const {}}) {
@@ -507,13 +512,29 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
     b.bias = 0.4;
     b.alpha = 0.55;
     final sst = ok ? 2 : (id == idHSwitch ? r.fixtureState(3) : 0);
-    b.box(V3(x, 48, 0.25), const V3(10, 15, 0.5), ok ? okRing : (sst == 1 ? const Color(0xFFF59E0B) : badRing));
+    final skind = id == idHSwitch && isSwitchKind(r.lesson) ? r.lesson : 'switch';
+    final combo = skind == 'switchcombo';
+    final cy = combo ? 46.5 : 48.0;
+    b.box(V3(x, cy, 0.25), V3(10, combo ? 20 : 15, 0.5), ok ? okRing : (sst == 1 ? const Color(0xFFF59E0B) : badRing));
     b.alpha = 1;
     b.bias = 0;
-    b.box(V3(x, 48, 0.9), const V3(6, 10, 1.4), ok ? const Color(0xFFF7F2E6) : const Color(0xFF3F3F46), shine: 0.25);
-    b.box(V3(x, r.lightOn && ok ? 49.2 : 46.8, 1.9), const V3(1.8, 4, 1.0), const Color(0xFFD9D2C2));
+    // The plate looks the same before and after the wiring (the frame round it is what says it is still to do).
+    b.box(V3(x, cy, 0.9), V3(6, combo ? 15 : 10, 1.4), const Color(0xFFF7F2E6), shine: 0.25);
+    final rockerY = combo ? 51.4 : 48.0;
+    b.box(V3(x, rockerY + (r.lightOn && ok ? 1.2 : -1.2), 1.9), const V3(1.8, 4, 1.0), const Color(0xFFD9D2C2));
+    if (skind == 'switchsmart') {
+      // A smart switch has a little blue light and a thin bar under the rocker.
+      b.ball(V3(x, 52.6, 1.9), 0.5, const Color(0xFF38BDF8), shine: 0.8, lat: 4, lon: 8);
+      b.box(V3(x, 43.6, 1.7), const V3(2.6, 0.3, 0.3), const Color(0xFF9CA3AF));
+    }
+    if (combo) {
+      for (final dx in const [-1.0, 1.0]) {
+        b.box(V3(x + dx, 42.6, 1.7), const V3(0.5, 1.8, 0.3), const Color(0xFF17181B));
+      }
+      b.cyl(V3(x, 40.2, 1.6), V3(x, 40.2, 1.9), 0.5, const Color(0xFF17181B), sides: 8);
+    }
     b.endGroup();
-    info[id] = ObjInfo('Light switch', !ok ? 'Not wired yet. Tap it to wire it.' : (r.lightOn ? 'On. Tap to turn the ${fan ? 'fan' : 'light'} off.' : 'Off. Tap to turn the ${fan ? 'fan' : 'light'} on.'), V3(x, 48, 2), 60);
+    info[id] = ObjInfo(id == idHSwitch && isSwitchKind(r.lesson) ? shortDeviceName(r.lesson) : 'Light switch', !ok ? 'Not wired yet. Tap it to wire it.' : (r.lightOn ? 'On. Tap to turn the ${fan ? 'fan' : 'light'} off.' : 'Off. Tap to turn the ${fan ? 'fan' : 'light'} on.'), V3(x, 48, 2), 60);
   }
   if (r.lesson.isEmpty && !r.wired) {
     final todo = r.missing;

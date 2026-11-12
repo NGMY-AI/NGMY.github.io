@@ -511,6 +511,7 @@ Scene3D buildBench(ElectricalLesson lesson, WiringState s, {bool withWall = true
     _fixture(b, kind, s);
   } else {
     _device(b, kind, _deviceZ(kind, s), s.burnt, fourScrews: !lesson.legacy, strap: s.strap);
+    _variantFace(b, lesson.id, _deviceZ(kind, s), s.burnt);
   }
   if (s.hints && s.stage == 0) {
     b.id = 0;
@@ -633,6 +634,7 @@ Scene3D buildFinished(String kind, {bool burnt = false}) {
     _fixture(b, kind, s);
   } else {
     _device(b, lookOf(kind), -0.25, burnt, faceOnly: true);
+    _variantFace(b, kind, -0.25, burnt);
     _plate(b, burnt);
   }
   return Scene3D(b.polys);
@@ -815,6 +817,30 @@ void _tester(MeshBuilder b, bool live) {
   }
 }
 
+
+/// What makes some devices differ from the plain ones on the face: the blue light of a smart switch, the little outlet in a switch-and-outlet,
+/// the orange triangle of an isolated ground outlet.
+void _variantFace(MeshBuilder b, String lesson, double z, bool burnt) {
+  final c = V3(_cx, _cy, z);
+  b.bias = 0.9;
+  b.id = idFace;
+  switch (lesson) {
+    case 'switchsmart':
+      b.ball(c + const V3(0, 1.12, 0.52), 0.1, burnt ? kChar : const Color(0xFF38BDF8), shine: 0.8, lat: 4, lon: 8);
+      b.box(c + const V3(0, -0.98, 0.78), const V3(0.5, 0.06, 0.04), const Color(0xFFB8BCC4));
+    case 'switchcombo':
+      // The switch above and a small outlet below it, on the same plate.
+      b.bias = 1.0;
+      b.box(c + const V3(0, -0.98, 0.82), const V3(1.05, 0.95, 0.08), burnt ? kChar : const Color(0xFFF1EEE2), shine: 0.3);
+      const dark = Color(0xFF17181B);
+      b.box(c + const V3(-0.2, -0.9, 0.88), const V3(0.06, 0.3, 0.02), dark);
+      b.box(c + const V3(0.2, -0.9, 0.88), const V3(0.06, 0.22, 0.02), dark);
+      b.cyl(c + const V3(0, -1.2, 0.86), c + const V3(0, -1.2, 0.9), 0.08, dark, sides: 8);
+    case 'isolated':
+      b.tri(c + const V3(0, 0.2, 0.5), c + const V3(-0.17, -0.1, 0.5), c + const V3(0.17, -0.1, 0.5), burnt ? kChar : const Color(0xFFF97316));
+  }
+  b.bias = 0;
+}
 /// The face of a NEMA receptacle for the big appliances, seen from the front: a round dark plate with the slots of its type.
 /// W is the neutral, X and Y the two hots, G the ground. The shapes follow the real faces: the 10-30 and 10-50 have no ground hole.
 void _nemaFace(MeshBuilder b, V3 c, String kind, bool burnt) {
@@ -857,6 +883,12 @@ void _nemaFace(MeshBuilder b, V3 c, String kind, bool burnt) {
       slot(-0.4, -0.04, 0.075, 0.32);
       slot(0.4, -0.04, 0.075, 0.32);
       round(0, -0.4);
+    case 'nema620':
+      // The 6-20 of a 240 volt only outlet (a window air conditioner, a welder): two flat blades lying down, one with a T foot, and the ground hole below.
+      slot(0, 0.2, 0.32, 0.075);
+      slot(0, 0.0, 0.32, 0.075);
+      slot(0.15, -0.07, 0.075, 0.14);
+      round(0, -0.36);
     default:
       // The 5-20 of the washing machine: a T-shaped neutral slot on the left, a straight hot slot on the right, and the ground hole below.
       slot(0.2, 0.12, 0.075, 0.3);

@@ -267,7 +267,7 @@ final List<ElectricalLesson> kMoreLessons = [
     id: 'v240four',
     title: '4-wire 240 V outlet (dryer, range, EV)',
     blurb: 'Two hots, a neutral and a ground: the dryer 14-30, and the range and car charger 14-50.',
-    look: 'outlet',
+    look: 'nema1430',
     strict: true,
     steps: const [
       ..._intro,
@@ -300,7 +300,7 @@ final List<ElectricalLesson> kMoreLessons = [
     id: 'v240three',
     title: '3-wire 240 V outlet (old dryer or range)',
     blurb: 'Two hots and a neutral, with no separate ground: the old 10-30 and 10-50, from before 1996.',
-    look: 'outlet',
+    look: 'nema1030',
     strict: true,
     needsGround: false,
     steps: const [
@@ -328,7 +328,7 @@ final List<ElectricalLesson> kMoreLessons = [
     id: 'v240only',
     title: '240 V only outlet (window AC, welder)',
     blurb: 'Two hots and a ground, and no neutral at all: the 6-series outlets.',
-    look: 'outlet',
+    look: 'nema620',
     strict: true,
     steps: const [
       ..._intro,
