@@ -169,8 +169,12 @@ Scene3D buildHouseScene(HouseState s) {
 
   plate(idHOutlet, const V3(-3.2, 1.3, -7.82), s.burntOutlet ? const Color(0xFF2A2523) : kIvory);
   b.id = idHOutlet;
-  b.box(const V3(-3.2, 1.45, -7.78), const V3(0.05, 0.12, 0.03), const Color(0xFF17181B));
-  b.box(const V3(-3.2, 1.15, -7.78), const V3(0.05, 0.12, 0.03), const Color(0xFF17181B));
+  // The two receptacles of the outlet, as on the bench: two upright slots and a round ground hole each.
+  for (final oy in const [0.17, -0.17]) {
+    b.box(V3(-3.2 - 0.07, 1.3 + oy + 0.01, -7.78), const V3(0.03, 0.1, 0.03), const Color(0xFF17181B));
+    b.box(V3(-3.2 + 0.07, 1.3 + oy + 0.01, -7.78), const V3(0.03, 0.075, 0.03), const Color(0xFF17181B));
+    b.cyl(V3(-3.2, 1.3 + oy - 0.07, -7.78), V3(-3.2, 1.3 + oy - 0.07, -7.76), 0.025, const Color(0xFF17181B), sides: 8);
+  }
   plate(idHSwitch, const V3(-3.6, 4.0, -7.82), const Color(0xFFFFFDF6), h: 0.65, w: 0.4);
   b.id = idHSwitch;
   b.box(const V3(-3.6, 4.0, -7.76), const V3(0.16, 0.32, 0.07), const Color(0xFFF2F0E6), shine: 0.4);
@@ -195,7 +199,12 @@ Scene3D buildHouseScene(HouseState s) {
   b.tube(roundedPath(const [V3(3.0, 3.2, -7.85), V3(3.0, 4.0, -7.85), V3(3.0, 4.2, -7.4), V3(3.0, 3.95, -7.0)], 0.2), 0.055, kChrome, shine: 0.9, sides: 8, joints: false);
   b.id = idHGfci;
   b.box(const V3(5.2, 3.9, -7.82), const V3(0.45, 0.72, 0.06), kIvory, shine: 0.3);
-  b.box(const V3(5.2, 3.9, -7.76), const V3(0.12, 0.1, 0.03), s.gfciTripped ? const Color(0xFFFF5A1F) : const Color(0xFFD72A2A));
+  b.box(const V3(5.2 + 0.1, 3.9, -7.76), const V3(0.12, 0.1, 0.03), s.gfciTripped ? const Color(0xFFFF5A1F) : const Color(0xFFD72A2A));
+  b.box(const V3(5.2 - 0.1, 3.9, -7.76), const V3(0.12, 0.1, 0.03), const Color(0xFF202226));
+  for (final oy in const [0.22, -0.22]) {
+    b.box(V3(5.2 - 0.07, 3.9 + oy, -7.78), const V3(0.03, 0.1, 0.03), const Color(0xFF17181B));
+    b.box(V3(5.2 + 0.07, 3.9 + oy, -7.78), const V3(0.03, 0.075, 0.03), const Color(0xFF17181B));
+  }
   b.id = idHTrap;
   b.tube(roundedPath(const [V3(3.0, 3.1, -7.1), V3(3.0, 1.7, -7.1), V3(3.0, 1.0, -7.1), V3(3.65, 0.5, -7.1), V3(4.3, 1.0, -7.1), V3(4.3, 1.8, -7.1), V3(5.0, 1.8, -7.1), V3(5.0, 1.8, -7.85)], 0.35, steps: 3), 0.11, kPvc, shine: 0.3, sides: 8, joints: false);
   b.id = idHNut;

@@ -7,7 +7,6 @@ import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 
 import 'package:flutter/material.dart';
-import 'ngmy_construction_electrical_more.dart' show isOutletKind, isSwitchKind;
 
 import 'ngmy_3d.dart';
 import 'ngmy_avatar_glb.dart';
@@ -474,10 +473,10 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
   info[idHLight] = ObjInfo(fixName, lightText, V3(lightX, h - 8, lightZ), 80);
 
   // Every outlet in the room: the two that belong to it and the ones that were added.
-  final bathKitchen = r.kind == 'bathroom' || r.kind == 'kitchen' || r.lesson == 'gfci';
+  String outletName(String k) => k == 'outlet' ? 'Wall outlet' : (k == 'gfci' ? 'GFCI outlet' : shortDeviceName(k));
   final outlets = <(int, int, double, bool, String)>[
-    (0, idHOutletA, -w / 4, r.okOutA, r.lesson.isNotEmpty && isOutletKind(r.lesson) ? shortDeviceName(r.lesson) : (bathKitchen ? 'GFCI outlet' : 'Wall outlet')),
-    (1, idHOutletB, w / 4, r.okOutB, bathKitchen ? 'GFCI outlet' : 'Wall outlet'),
+    (0, idHOutletA, -w / 4, r.okOutA, outletName(r.outletKind(0))),
+    (1, idHOutletB, w / 4, r.okOutB, outletName(r.outletKind(1))),
     for (var i = 0; i < r.extras.length; i++)
       if (r.extras[i].kind != 'switch') (2 + i, idHExtra + i, r.extras[i].x, r.extras[i].done, r.extras[i].kind == 'gfci' ? 'Added GFCI outlet' : 'Added outlet'),
   ];
@@ -512,7 +511,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
     b.bias = 0.4;
     b.alpha = 0.55;
     final sst = ok ? 2 : (id == idHSwitch ? r.fixtureState(3) : 0);
-    final skind = id == idHSwitch && isSwitchKind(r.lesson) ? r.lesson : 'switch';
+    final skind = id == idHSwitch ? r.switchKind() : 'switch';
     final combo = skind == 'switchcombo';
     final cy = combo ? 46.5 : 48.0;
     b.box(V3(x, cy, 0.25), V3(10, combo ? 20 : 15, 0.5), ok ? okRing : (sst == 1 ? const Color(0xFFF59E0B) : badRing));
@@ -534,7 +533,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
       b.cyl(V3(x, 40.2, 1.6), V3(x, 40.2, 1.9), 0.5, const Color(0xFF17181B), sides: 8);
     }
     b.endGroup();
-    info[id] = ObjInfo(id == idHSwitch && isSwitchKind(r.lesson) ? shortDeviceName(r.lesson) : 'Light switch', !ok ? 'Not wired yet. Tap it to wire it.' : (r.lightOn ? 'On. Tap to turn the ${fan ? 'fan' : 'light'} off.' : 'Off. Tap to turn the ${fan ? 'fan' : 'light'} on.'), V3(x, 48, 2), 60);
+    info[id] = ObjInfo(id == idHSwitch && skind != 'switch' ? shortDeviceName(skind) : 'Light switch', !ok ? 'Not wired yet. Tap it to wire it.' : (r.lightOn ? 'On. Tap to turn the ${fan ? 'fan' : 'light'} off.' : 'Off. Tap to turn the ${fan ? 'fan' : 'light'} on.'), V3(x, 48, 2), 60);
   }
   if (r.lesson.isEmpty && !r.wired) {
     final todo = r.missing;

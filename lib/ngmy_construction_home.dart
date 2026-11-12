@@ -333,10 +333,26 @@ class HRoom {
   WiringState? lessonState;
   PlumbState? lessonPlumb;
   bool get lessonIsPlumbing => lesson == 'ptrap' || lesson == 'faucet';
+  /// The device a job asked for at fixture [i] (outlet, outlet, light or fan, switch), while a job is on.
+  String? orderedDevice(int i) {
+    final w = wiring;
+    if (w == null || i < 0 || i >= w.orders.length) return null;
+    return w.orders[i].device;
+  }
+
+  /// The kind of the wall switch of the room: the one being fixed in a lesson, the one a job asked for, or the plain one.
+  String switchKind() {
+    if (lesson.isNotEmpty && isSwitchKind(lesson)) return lesson;
+    final asked = orderedDevice(3);
+    return asked != null && isSwitchKind(asked) ? asked : 'switch';
+  }
+
 
   /// The kind of outlet number [i] of the room: in a lesson room the first one is the very outlet being fixed (a dryer outlet, a range outlet...).
   String outletKind(int i) {
     if (lesson.isNotEmpty && i == 0 && isOutletKind(lesson)) return lesson;
+    final asked = orderedDevice(i);
+    if (i < 2 && asked != null && isOutletKind(asked)) return asked;
     return (kind == 'bathroom' || kind == 'kitchen' || lesson == 'gfci') ? 'gfci' : 'outlet';
   }
   bool get lessonDone {

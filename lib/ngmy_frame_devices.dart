@@ -131,17 +131,41 @@ void drawDeviceFace(MeshBuilder b, FBox x, WiringHouse w) {
     b.box(at(0, 0, kStD - 0.02), wallSize(x.wall, 0.9, 0.5, 0.06), const Color(0xFFC9A03A), shine: 0.6);
     return;
   }
-  final big = kApplianceOutlets.contains(kind);
-  b.box(at(0, 0, kStD + 0.1), wallSize(x.wall, big ? 4.6 : 2.9, big ? 6.4 : 4.6, 0.22), const Color(0xFFF1EFE6), shine: 0.35);
+  final layout = nemaLayoutOf(kind);
+  final big = layout != null;
+  b.box(at(0, 0, kStD + 0.1), wallSize(x.wall, big ? 4.6 : 2.9, big ? 5.4 : 4.6, 0.22), const Color(0xFFF1EFE6), shine: 0.35);
   final f = kStD + 0.24;
   const dark = Color(0xFF2B2D33);
   if (isSwitchKind(kind)) {
-    // The toggle: up when it is on, down when it is off.
+    // The rocker: up when it is on, down when it is off. A smart switch has its blue light, a switch and outlet its little outlet under the rocker.
     final up = x.on;
-    b.box(at(0, 0, f + 0.08), wallSize(x.wall, 0.9, 2.4, 0.16), const Color(0xFFE6E3D8), shine: 0.3);
-    b.box(at(0, up ? 0.55 : -0.55, f + 0.3), wallSize(x.wall, 0.55, 1.2, 0.45), white, shine: 0.5);
-    if (kind == 'switchcombo') b.box(at(1.0, 0, f + 0.2), wallSize(x.wall, 0.5, 1.0, 0.3), white, shine: 0.4);
+    final combo = kind == 'switchcombo';
+    final ry = combo ? 0.9 : 0.0;
+    b.box(at(0, ry, f + 0.08), wallSize(x.wall, 0.9, 2.0, 0.16), const Color(0xFFE6E3D8), shine: 0.3);
+    b.box(at(0, ry + (up ? 0.5 : -0.5), f + 0.3), wallSize(x.wall, 0.55, 1.0, 0.45), white, shine: 0.5);
     if (kind == 'switchsmart') b.ball(at(0, 1.7, f + 0.1), 0.18, const Color(0xFF38BDF8), shine: 0.2, lat: 3, lon: 5);
+    if (combo) {
+      b.box(at(-0.38, -1.2, f + 0.05), wallSize(x.wall, 0.12, 0.5, 0.05), dark);
+      b.box(at(0.38, -1.2, f + 0.05), wallSize(x.wall, 0.12, 0.34, 0.05), dark);
+      b.ball(at(0, -1.75, f + 0.05), 0.16, dark, shine: 0.1, lat: 3, lon: 5);
+    }
+    return;
+  }
+  if (big) {
+    // The same round face as everywhere: a dark disc with the slots of its type.
+    const r = 1.9;
+    const k = r / 0.64;
+    final c = at(0, 0, f);
+    b.cyl(c, wallPt(x.wall, uc, x.y, f + 0.1), r, const Color(0xFF3B2F2A), sides: 24, shine: 0.35);
+    for (final s in nemaSlotsFor(layout)) {
+      if (s.round) {
+        b.cyl(at(s.x * k, s.y * k, f + 0.1), at(s.x * k, s.y * k, f + 0.14), s.w * k / 2, const Color(0xFF0B0B0D), sides: 10);
+        continue;
+      }
+      final ca = math.cos(s.angle), sa = math.sin(s.angle);
+      V3 p(double dx, double dy) => at((s.x + dx * ca - dy * sa) * k, (s.y + dx * sa + dy * ca) * k, f + 0.12);
+      b.quad(p(-s.w / 2, -s.h / 2), p(s.w / 2, -s.h / 2), p(s.w / 2, s.h / 2), p(-s.w / 2, s.h / 2), const Color(0xFF0B0B0D));
+    }
     return;
   }
   if (kind == 'gfci') {
@@ -149,22 +173,14 @@ void drawDeviceFace(MeshBuilder b, FBox x, WiringHouse w) {
     b.box(at(0, 0.75, f + 0.16), wallSize(x.wall, 0.8, 0.45, 0.2), const Color(0xFF22262C), shine: 0.3);
     b.box(at(0, -0.75, f + 0.16), wallSize(x.wall, 0.8, 0.45, 0.2), const Color(0xFFD33B2F), shine: 0.3);
   }
-  // The slots of every outlet (two upright slots and a round hole for the ground), top and bottom.
-  final rows = big ? const [0.0] : const [1.1, -1.1];
-  for (final dy in rows) {
-    if (big) {
-      for (final (du, rot) in const [(-0.9, 0.0), (0.9, 0.0)]) {
-        b.box(at(du, 0.5, f + 0.03), wallSize(x.wall, 0.26, 1.2, 0.05), dark);
-        if (rot != 0) continue;
-      }
-      b.box(at(0, -1.0, f + 0.03), wallSize(x.wall, 1.0, 0.3, 0.05), dark);
-      b.ball(at(0, 1.6, f + 0.03), 0.3, dark, shine: 0.1, lat: 3, lon: 5);
-    } else {
-      b.box(at(-0.38, dy + 0.1, f + 0.03), wallSize(x.wall, 0.12, 0.5, 0.05), dark);
-      b.box(at(0.38, dy + 0.1, f + 0.03), wallSize(x.wall, 0.12, 0.34, 0.05), dark);
-      b.ball(at(0, dy - 0.45, f + 0.03), 0.16, dark, shine: 0.1, lat: 3, lon: 5);
-    }
+  // The slots of every plain outlet (two upright slots and a round hole for the ground), top and bottom.
+  for (final dy in const [1.1, -1.1]) {
+    b.box(at(-0.38, dy + 0.1, f + 0.03), wallSize(x.wall, 0.12, 0.5, 0.05), dark);
+    b.box(at(0.38, dy + 0.1, f + 0.03), wallSize(x.wall, 0.12, 0.34, 0.05), dark);
+    b.ball(at(0, dy - 0.45, f + 0.03), 0.16, dark, shine: 0.1, lat: 3, lon: 5);
   }
+  // The orange triangle of an isolated ground outlet.
+  if (kind == 'isolated') b.tri(at(0, 0.35, f + 0.06), at(-0.3, -0.2, f + 0.06), at(0.3, -0.2, f + 0.06), const Color(0xFFF97316));
 }
 
 /// A thing that plugs in, built standing on the floor with its front towards +z (the middle of its back at the origin).

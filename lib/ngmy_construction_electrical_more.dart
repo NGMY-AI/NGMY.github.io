@@ -613,3 +613,36 @@ final List<ElectricalLesson> kApplianceLessons = [
     },
   ),
 ];
+
+/// One slot or hole on the round face of a big-appliance outlet, in the units of the lessons' bench (the disc is 0.64 across the middle).
+class NemaSlot {
+  const NemaSlot(this.x, this.y, this.w, this.h, {this.angle = 0, this.round = false});
+  final double x, y, w, h, angle;
+  final bool round;
+}
+
+/// Which face a kind of outlet has when it is a round one (dryer, range, washer, 240 volt), or null for the plain wall outlets.
+String? nemaLayoutOf(String kind) => const {
+      'dryer3': 'nema1030',
+      'dryer4': 'nema1430',
+      'range3': 'nema1050',
+      'range4': 'nema1450',
+      'washer': 'nema520',
+      'v240three': 'nema1030',
+      'v240four': 'nema1430',
+      'v240only': 'nema620',
+    }[kind];
+
+/// The slots of a round face, the same everywhere an outlet is drawn (the bench, the room, the framed house).
+List<NemaSlot> nemaSlotsFor(String layout) {
+  const ellA = [NemaSlot(0, 0, 0.075, 0.3), NemaSlot(0.09, -0.115, 0.2, 0.075)];
+  List<NemaSlot> ell(double x, double y) => [for (final s in ellA) NemaSlot(x + s.x, y + s.y, s.w, s.h)];
+  return switch (layout) {
+    'nema1030' => [...ell(-0.05, 0.14), const NemaSlot(-0.3, -0.24, 0.075, 0.3, angle: -0.5), const NemaSlot(0.3, -0.24, 0.075, 0.3, angle: 0.5)],
+    'nema1430' => [...ell(-0.05, 0.28), const NemaSlot(-0.4, -0.04, 0.075, 0.32), const NemaSlot(0.4, -0.04, 0.075, 0.32), const NemaSlot(0, -0.4, 0.13, 0.13, round: true)],
+    'nema1050' => [const NemaSlot(-0.3, 0.2, 0.075, 0.3, angle: 0.5), const NemaSlot(0.3, 0.2, 0.075, 0.3, angle: -0.5), const NemaSlot(0, -0.26, 0.075, 0.32)],
+    'nema1450' => [const NemaSlot(0, 0.3, 0.075, 0.28), const NemaSlot(-0.4, -0.04, 0.075, 0.32), const NemaSlot(0.4, -0.04, 0.075, 0.32), const NemaSlot(0, -0.4, 0.13, 0.13, round: true)],
+    'nema620' => [const NemaSlot(0, 0.2, 0.32, 0.075), const NemaSlot(0, 0.0, 0.32, 0.075), const NemaSlot(0.15, -0.07, 0.075, 0.14), const NemaSlot(0, -0.36, 0.13, 0.13, round: true)],
+    _ => [const NemaSlot(0.2, 0.12, 0.075, 0.3), const NemaSlot(-0.2, 0.12, 0.075, 0.3), const NemaSlot(-0.3, 0.12, 0.14, 0.075), const NemaSlot(0, -0.3, 0.13, 0.13, round: true)],
+  };
+}
