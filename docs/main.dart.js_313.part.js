@@ -5,7 +5,7 @@ B=c[0]
 A=a.updateHolder(c[52],A)
 C=c[278]
 A.atv.prototype={
-a6(){return"NgmyWalletPaymentTheme."+this.b}}
+a7(){return"NgmyWalletPaymentTheme."+this.b}}
 var z=a.updateTypes([]);(function inheritance(){var y=a.inherit
-y(A.atv,B.lB)})();(function constants(){C.efZ=new A.atv(0,"standard")})()};
-(a=>{a["f+AtxqZWFeiIUE5Fi6ecyd9NXCo="]=a.current})($__dart_deferred_initializers__);
+y(A.atv,B.lB)})();(function constants(){C.eg1=new A.atv(0,"standard")})()};
+(a=>{a["aLZyYZI4irw8cSr3Yi8DfQbJPGo="]=a.current})($__dart_deferred_initializers__);
