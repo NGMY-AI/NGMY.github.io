@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_auto_back.dart';
+
 import 'ngmy_construction_lab.dart';
 import 'ngmy_studio_kit.dart';
 
@@ -75,7 +77,7 @@ class NgmyConstructionLearnPage extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
           children: [
             Row(children: [
-              IconButton(onPressed: () => Navigator.of(context).maybePop(), icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20)),
+              AutoHideBack(child: IconButton(onPressed: () => Navigator.of(context).maybePop(), icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20))),
               const Text('Learn the trades', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 19)),
             ]),
             for (final g in kLearnGroups) ...[

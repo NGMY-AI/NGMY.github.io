@@ -372,12 +372,12 @@ void main() {
       st.setTool('knock');
       st.pickForTest(koId(st.w.boxes.first.id, 1));
       st.setTool('cable');
-      st.pickForTest(st.w.boxes.first.id);
+      st.pickForTest(koId(st.w.boxes.first.id, 1));
       await t.pump(const Duration(milliseconds: 200));
       expect(st.glow.length, greaterThan(3), reason: 'every stud still to drill is lit, not only a few');
       await t.tap(find.text('Drill the lit'));
       await t.pump(const Duration(milliseconds: 200));
-      st.pickForTest(st.w.boxes.first.id);
+      st.pickForTest(koId(st.w.boxes.first.id, 1));
       await t.pump(const Duration(milliseconds: 300));
       expect(st.w.boxes.first.cable, isNotNull);
       await t.pump(const Duration(seconds: 14));
@@ -406,7 +406,7 @@ void main() {
       expect(st.w.boxes.first.openKo, 1);
       st.setTool('cable');
       await t.pump(const Duration(milliseconds: 200));
-      st.pickForTest(st.w.boxes.first.id);
+      st.pickForTest(koId(st.w.boxes.first.id, 1));
       await t.pump(const Duration(milliseconds: 200));
       expect(st.w.boxes.first.cable, isNull, reason: 'no holes yet');
       expect(st.glow, isNotEmpty, reason: 'the studs to drill light up');
@@ -416,7 +416,7 @@ void main() {
         st.pickForTest(id);
       }
       st.setTool('cable');
-      st.pickForTest(st.w.boxes.first.id);
+      st.pickForTest(koId(st.w.boxes.first.id, 1));
       await t.pump(const Duration(milliseconds: 300));
       expect(st.w.boxes.first.cable, isNotNull);
       await t.tap(find.text('Whole room'));

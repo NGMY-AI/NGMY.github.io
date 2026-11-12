@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'ngmy_auto_back.dart';
+
 import 'ngmy_electrical_safety.dart';
 import 'ngmy_electrical_ui.dart';
 
@@ -241,6 +243,8 @@ class _DiagramPageState extends State<NgmyElectricalDiagramPage> with SingleTick
       backgroundColor: const Color(0xFF0E1218),
       appBar: AppBar(
         backgroundColor: const Color(0xFF0E1218),
+        automaticallyImplyLeading: false,
+        leading: AutoHideBack(child: IconButton(onPressed: () => Navigator.of(context).maybePop(), icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20))),
         title: const Text('Diagram lessons', style: TextStyle(fontWeight: FontWeight.w900)),
         actions: [IconButton(tooltip: 'Wire guide', onPressed: () => showWireGuide(context), icon: const Icon(Icons.menu_book_rounded))],
       ),

@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_auto_back.dart';
+
 import 'ngmy_construction_community.dart';
 import 'ngmy_construction_home.dart';
 import 'ngmy_construction_homepage.dart';
@@ -320,7 +322,7 @@ class _NgmyCommunityPageState extends State<NgmyCommunityPage> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(4, 6, 12, 4),
                   child: Row(children: [
-                    IconButton(onPressed: () => Navigator.of(context).maybePop(), icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20)),
+                    AutoHideBack(child: IconButton(onPressed: () => Navigator.of(context).maybePop(), icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20))),
                     const Expanded(child: Center(child: Text('🏘 Community', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 19)))),
                     _pill('⭐ ${cm.points}', kConAmber),
                   ]),

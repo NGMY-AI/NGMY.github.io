@@ -159,7 +159,7 @@ void main() {
     expect(lobby.scene.screens.length, 3);
     lobby.goToLevel(5, darkHere: false);
     expect(lobby.scene.screens.length, 3, reason: 'every level has its TVs');
-    expect((CityInterior('cabin', tower)..build(null)).scene.screens.length, 3);
+    expect((CityInterior('cabin', tower)..build(null)).scene.screens.length, 6, reason: 'the display, a TV on each side wall, and two TVs and a sign in the lit lobby beyond the doors');
   });
 
   test('wires and screws are easy to hit: a tap near a thin thing picks it', () {

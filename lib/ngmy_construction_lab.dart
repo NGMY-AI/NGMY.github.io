@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'ngmy_construction_electrical_more.dart';
+import 'ngmy_auto_back.dart';
 import 'ngmy_electrical_diagram_page.dart';
 import 'ngmy_electrical_fx.dart';
 import 'ngmy_frame_drywall.dart';
@@ -538,7 +539,7 @@ class LessonScaffold extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(4, 4, 8, 4),
             child: Row(children: [
-              IconButton(onPressed: () => Navigator.of(context).maybePop(), icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20)),
+              AutoHideBack(child: IconButton(onPressed: () => Navigator.of(context).maybePop(), icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20))),
               if (titleExtra == null)
                 Expanded(child: Text(title, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 16)))
               else ...[

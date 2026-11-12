@@ -70,6 +70,60 @@ void main() {
     });
   });
 
+  group('choosing the knockout the cable goes in through', () {
+    test('the cable ends in the knockout that was chosen, a closed or a used one is refused', () {
+      final w = WiringHouse();
+      w.place('outlet', stud(0, 80).id);
+      w.place('switch', stud(2, 80).id);
+      final out = w.boxes[0], sw = w.boxes[1];
+      for (final s in kStuds.where((s) => s.atCableHeight)) {
+        w.drilled.add(s.id);
+      }
+      final closed = w.pull(out.id, via: 1);
+      expect(closed.ok, isFalse);
+      expect(closed.msg, contains('still closed'));
+      w.knockout(koId(out.id, 0));
+      w.knockout(koId(out.id, 1));
+      expect(w.pull(out.id, via: 0).ok, isTrue);
+      expect(out.entryKo, 0);
+      expect(out.usedKo, {0});
+      expect((out.cable!.path.last - koPos(out, 0)).len, lessThan(0.6), reason: 'the cable ends right in the tab it was told to');
+      // The switch: the other knockout.
+      w.knockout(koId(sw.id, 1));
+      w.knockout(koId(sw.id, 0));
+      expect(w.pull(sw.id, via: 1).ok, isTrue);
+      expect((sw.cable!.path.last - koPos(sw, 1)).len, lessThan(0.6));
+      expect(sw.entryKo, 1);
+      // From the first box, the cable leaves through its other knockout, and a used one is not offered again.
+      w.place('outlet', stud(0, 112).id);
+      final nxt = w.boxes.last;
+      w.knockout(koId(nxt.id, 1));
+      expect(w.pull(nxt.id, from: out.id, via: 1).ok, isTrue);
+      expect(out.usedKo, {0, 1}, reason: 'the box has two cables in two knockouts');
+      expect(nxt.fromKo, 1);
+      // Pulling it back out gives the knockouts back.
+      w.pull(nxt.id);
+      expect(out.usedKo, {0});
+      expect(w.freeKo(out), 1);
+      expect(w.pull(out.id).ok, isTrue);
+      expect(out.usedKo, isEmpty);
+    });
+
+    test('every knockout position of every kind of box gives a cable that ends at the tab', () {
+      for (final ceiling in [false, true]) {
+        for (var k = 0; k < 2; k++) {
+          final w = finishedWiring();
+          final b = w.boxes.firstWhere((b) => ceiling ? b.kind == 'ceiling' : b.kind == 'switch');
+          w.pull(b.id);
+          expect(b.cable, isNull);
+          w.knockout(koId(b.id, k));
+          expect(w.pull(b.id, via: k).ok, isTrue, reason: 'ceiling $ceiling ko $k');
+          expect((b.cable!.path.last - koPos(b, k)).len, lessThan(0.7), reason: 'ceiling $ceiling ko $k');
+        }
+      }
+    });
+  });
+
   group('devices, the breaker, and the things that plug in', () {
     WiringHouse wired() {
       final w = finishedWiring();
@@ -273,6 +327,59 @@ void main() {
       await t.pump(const Duration(seconds: 16));
     });
 
+    testWidgets('a new box is shown close up with its tabs; a tap on a tab breaks it out; with the cable roll a tap on a tab rolls the cable in through that tab', (t) async {
+      t.view.physicalSize = const Size(900, 1700);
+      t.view.devicePixelRatio = 1.0;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(const MaterialApp(home: NgmyWiringHousePage()));
+      await t.pump(const Duration(milliseconds: 600));
+      final st = t.state<NgmyWiringHousePageState>(find.byType(NgmyWiringHousePage));
+      final cam = t.widget<Scene3DView>(find.byType(Scene3DView).first).cam;
+      st.setTool('outlet');
+      st.pickForTest(stud(0, 80).id);
+      final box = st.w.boxes.first;
+      expect(st.focus, box.id, reason: 'the new box is the one the view is on');
+      for (var i = 0; i < 10; i++) {
+        await t.pump(const Duration(milliseconds: 250));
+      }
+      expect(cam.dist, lessThan(30), reason: 'closed in on the box');
+      expect(st.msg, contains('tab'));
+      // The tabs are in the picture as marks that can be tapped.
+      expect(st.scene.polys.where((p) => p.id == koId(box.id, 0)).length, greaterThan(4));
+      // A tap on a tab breaks it out, whatever the tool.
+      st.setTool('look');
+      st.pickForTest(koId(box.id, 0));
+      expect(box.kos[0], isTrue);
+      expect(st.w.mistakes, 0);
+      st.pickForTest(koId(box.id, 0));
+      expect(st.msg, contains('out already'));
+      // The studs get their holes, then the cable roll: a tap on the box asks which knockout; a tap on a closed tab breaks it and rolls the cable in.
+      for (final s in kStuds.where((s) => s.atCableHeight)) {
+        st.w.drilled.add(s.id);
+      }
+      st.setTool('cable');
+      st.pickForTest(box.id);
+      expect(box.cable, isNull, reason: 'the box only asks which knockout');
+      expect(st.msg, contains('Tap the knockout'));
+      st.pickForTest(koId(box.id, 1));
+      await t.pump(const Duration(milliseconds: 300));
+      expect(box.cable, isNotNull);
+      expect(box.entryKo, 1);
+      expect(box.kos[1], isTrue, reason: 'it was broken out on the way');
+      expect(st.msg, contains('broke out'));
+      expect(st.w.mistakes, 0);
+      // A tap on a box that has power makes it the place the next cable starts from; a second tap takes its cable out again.
+      st.pickForTest(box.id);
+      expect(st.source, box.id);
+      expect(box.cable, isNotNull);
+      st.pickForTest(box.id);
+      expect(box.cable, isNull);
+      expect(st.source, 0);
+      await t.pump(const Duration(seconds: 16));
+      await t.pumpWidget(const SizedBox());
+      await t.pump(const Duration(seconds: 16));
+    });
+
     testWidgets('a job finished without a hint earns a star and a hint costs two', (t) async {
       t.view.physicalSize = const Size(900, 1700);
       t.view.devicePixelRatio = 1.0;
@@ -291,7 +398,7 @@ void main() {
         st.pickForTest(s.id);
       }
       st.setTool('cable');
-      st.pickForTest(st.w.boxes.first.id);
+      st.pickForTest(koId(st.w.boxes.first.id, 1));
       await t.pump(const Duration(milliseconds: 200));
       expect(st.w.boxes.first.cable, isNotNull);
       expect(st.net, 1, reason: 'one star for the job done without a hint');
@@ -313,7 +420,7 @@ void main() {
         st.pickForTest(s.id);
       }
       st.setTool('cable');
-      st.pickForTest(st.w.boxes[1].id);
+      st.pickForTest(koId(st.w.boxes[1].id, 1));
       await t.pump(const Duration(milliseconds: 200));
       expect(st.w.boxes[1].cable, isNotNull);
       expect(st.net, -1, reason: 'no star for a job done after a hint');
@@ -323,7 +430,7 @@ void main() {
       st.setTool('knock');
       st.pickForTest(koId(st.w.boxes[2].id, 0));
       st.setTool('cable');
-      st.pickForTest(st.w.boxes[2].id);
+      st.pickForTest(koId(st.w.boxes[2].id, 0));
       await t.pump(const Duration(milliseconds: 200));
       expect(st.net, 0);
       await t.pump(const Duration(seconds: 16));
@@ -346,7 +453,7 @@ void main() {
         st.w.drilled.add(s.id);
       }
       st.setTool('cable');
-      st.pickForTest(box.id);
+      st.pickForTest(koId(box.id, 1));
       await t.tap(find.byKey(const Key('cat-outlets')));
       await t.pump(const Duration(milliseconds: 200));
       await t.tap(find.byKey(const Key('tool-dev:gfci')));

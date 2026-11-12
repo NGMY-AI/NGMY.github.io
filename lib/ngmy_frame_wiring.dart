@@ -59,6 +59,10 @@ class FBox {
   final List<bool> kos = [false, false];
   int get openKo => kos.where((e) => e).length;
 
+  /// The knockouts that have a cable in them, the one the cable of this box comes in through, and the one of the box before it that it leaves through.
+  final Set<int> usedKo = {};
+  int entryKo = 0, fromKo = 0;
+
   /// Where the cable of this box comes from: 0 the breaker panel, otherwise the box before it.
   int from = 0;
 
@@ -201,6 +205,10 @@ class WiringHouse {
   }
 
   void _unpull(FBox b) {
+    if (b.cable == null) return;
+    b.usedKo.remove(b.entryKo);
+    final p = b.from == 0 ? null : boxById(b.from);
+    p?.usedKo.remove(b.fromKo);
     b.cable = null;
     b.from = 0;
     for (final o in boxes) {
@@ -223,9 +231,35 @@ class WiringHouse {
     return end > dist(first) + 0.01;
   }
 
-  /// Taps a box with the cable roll: the cable unrolls from the breaker panel ([from] 0) or from a box that already has power, to this box.
-  /// A box that has its cable already gets it pulled back out (and the cables that came from it).
-  FAct pull(int id, {int from = 0}) {
+  /// The first knockout of a box that is broken out and has no cable in it yet.
+  int? freeKo(FBox b) {
+    for (var k = 0; k < 2; k++) {
+      if (b.kos[k] && !b.usedKo.contains(k)) return k;
+    }
+    return null;
+  }
+
+  double _alongOf(int wall, V3 p) {
+    final s = wallPt(wall, 0, 0, 0), a = wallAlong(wall);
+    return (p.x - s.x) * a.x + (p.z - s.z) * a.z;
+  }
+
+  /// The points that lead a cable from the cable line (20 inches up, beside the box) into knockout [k] of a wall box, coming from the side [toward] (+1 or -1 along the wall).
+  List<V3> _toKo(FBox x, int k, double toward) {
+    final uc = x.u + x.side * (kStT / 2 + 1.15);
+    final us = uc + toward * 1.9;
+    final yk = koPos(x, k).y;
+    V3 p(double u, double y) => wallPt(x.wall, u, y, 2.1);
+    final fromAbove = k == 1;
+    final straight = fromAbove ? kDrillY > yk : kDrillY < yk;
+    if (straight) return [p(us, kDrillY), p(uc, kDrillY), p(uc, yk)];
+    final yPast = fromAbove ? yk + 2.5 : yk - 2.5;
+    return [p(us, kDrillY), p(us, yPast), p(uc, yPast), p(uc, yk)];
+  }
+
+  /// Taps a box with the cable roll: the cable unrolls from the breaker panel ([from] 0) or from a box that already has power, to this box, and goes in
+  /// through the knockout [via] (the first free open one when it is null). A box that has its cable already gets it pulled back out (and the cables that came from it).
+  FAct pull(int id, {int from = 0, int? via}) {
     if (id == idPanel) return const FAct(true, 'The cable starts at the breaker panel. Tap the box it must reach.');
     final b = boxById(id);
     if (b == null) return _bad('Tap one of the blue boxes: the cable runs to it.');
@@ -234,13 +268,18 @@ class WiringHouse {
       return const FAct(true, 'Cable pulled back out of the box (and the cables that went on from it).');
     }
     final FBox? src = from == 0 ? null : boxById(from);
+    int? srcKo;
     if (from != 0) {
       if (src == null || src.cable == null || !powered(src)) return _bad('A cable can only start at the breaker panel, or at a box that already has power.');
       if (src.kind == 'ceiling') return _bad('The light box is the end of the line: a cable cannot go on from it.');
-      if (src.openKo < cablesAt(src) + 1) return _bad('The box the cable leaves from has no free knockout: a second cable needs a second hole. Break out its other knockout first.', show: _closedKo(src));
+      srcKo = freeKo(src);
+      if (srcKo == null) return _bad('The box the cable leaves from has no free knockout: a second cable needs a second hole. Break out its other knockout first.', show: _closedKo(src));
     }
-    if (b.openKo < cablesAt(b) + 1) return _bad('The cable has to go into the box through a knockout, and this box has none open for it. Break one out first (the Knockout tool).', show: _closedKo(b));
-    if (b.kind == 'ceiling') return _pullCeiling(b, src);
+    final v = via ?? freeKo(b);
+    if (v == null) return _bad('The cable goes into the box through a knockout, and this box has none open and free for it. Tap the box, then tap a tab to break it out.', show: _closedKo(b));
+    if (!b.kos[v]) return _bad('That knockout is still closed: break it out first.', show: [koId(b.id, v)]);
+    if (b.usedKo.contains(v)) return _bad('A cable already goes in through that knockout: choose the other one.');
+    if (b.kind == 'ceiling') return _pullCeiling(b, src, v);
     final p0 = src == null ? perim(kPanelWall, kPanelU) : perim(src.wall, src.u), p1 = perim(b.wall, b.u);
     final dirs = [for (final d in const [1, -1]) if (!_crossesDoor(p0, p1, d)) d];
     if (dirs.isEmpty) return _bad('A doorway is in the way both ways round: there is no wood to run a cable through across it.');
@@ -268,10 +307,8 @@ class WiringHouse {
         ..add(wallPt(kPanelWall, kPanelU, kPanelY0 + 1, kMidD))
         ..add(wallPt(kPanelWall, kPanelU, kDrillY, kMidD));
     } else {
-      final us = src.u + src.side * (kStT / 2 + 1.15);
-      pts
-        ..add(wallPt(src.wall, us, src.y, 2.4))
-        ..add(wallPt(src.wall, us, kDrillY, kMidD));
+      // The cable leaves the first box through its knockout and goes down (or up) to the cable line.
+      pts.addAll(_toKo(src, srcKo!, dir.toDouble()).reversed);
       wall = src.wall;
     }
     for (final s in route) {
@@ -285,38 +322,55 @@ class WiringHouse {
       pts.add(cornerAfter(dir > 0 ? wall : b.wall, kDrillY));
     }
     final uc = b.u + b.side * (kStT / 2 + 1.15);
-    pts.add(wallPt(b.wall, uc, kDrillY, kMidD));
-    pts.add(wallPt(b.wall, uc, b.y, 2.4));
+    final lastU = _alongOf(b.wall, pts.last);
+    pts.addAll(_toKo(b, v, lastU >= uc ? 1.0 : -1.0));
     b.cable = FCable(pts, light: false);
     b.from = from;
+    b.entryKo = v;
+    b.usedKo.add(v);
+    if (src != null) {
+      b.fromKo = srcKo!;
+      src.usedKo.add(srcKo);
+    }
     final feet = b.cable!.inches / 12;
-    return FAct(true, '${b.kind == 'switch' ? 'Switch' : 'Outlet'} box connected: the cable runs from ${src == null ? 'the panel' : 'the ${src.kind} box'} through ${route.length} ${route.length == 1 ? 'stud' : 'studs'}, ${feet.toStringAsFixed(1)} feet in all. Leave a loose end in the box to wire the device to.');
+    return FAct(true, '${b.kind == 'switch' ? 'Switch' : 'Outlet'} box connected: the cable runs from ${src == null ? 'the panel' : 'the ${src.kind} box'} through ${route.length} ${route.length == 1 ? 'stud' : 'studs'} and goes in through the ${v == 1 ? 'top' : 'bottom'} knockout, ${feet.toStringAsFixed(1)} feet in all. Leave a loose end in the box to wire the device to.');
   }
 
-  FAct _pullCeiling(FBox c, FBox? src) {
+  FAct _pullCeiling(FBox c, FBox? src, int v) {
     if (src != null && src.kind != 'switch') return _bad('The light is fed from a switch: the power goes to the switch first, then up to the light. Start the cable at a switch box.');
-    final sws = [for (final s in boxes) if (s.kind == 'switch' && s.cable != null && powered(s) && s.openKo >= cablesAt(s) + 1) s];
+    final sws = [for (final s in boxes) if (s.kind == 'switch' && s.cable != null && powered(s) && freeKo(s) != null) s];
     final s = src ?? (sws.isEmpty ? null : sws.first);
     if (s == null) {
       final any = boxes.any((x) => x.kind == 'switch' && x.cable != null);
       return _bad(any ? 'The switch box has no free knockout for the cable that goes up to the light. Break out its other knockout first.' : 'The light is fed from the switch: the power goes to the switch first. Pull the cable to a switch box before this one.');
     }
+    final sv = freeKo(s)!;
     final seg = math.min(topSegCount(s.wall) - 1, (s.u / 16).floor());
     final tid = topSegId(s.wall, seg);
     if (!drilled.contains(tid)) return _bad('The cable goes up inside the wall, through the top plate and into the ceiling. Drill the top plate right over the switch first.', show: [tid]);
-    final uc = s.u + s.side * (kStT / 2 + 1.15);
     final uh = topSegU(s.wall, seg);
     final cx = joistX(c.joist!) + 0.75 + 2.3;
+    final sgn = v == 0 ? -1.0 : 1.0;
+    // Out of the switch box through its knockout, then up beside the box.
+    final ucs = s.u + s.side * (kStT / 2 + 1.15);
+    final uside = ucs + s.side * 1.9;
+    final kp = koPos(s, sv);
+    V3 q(double u, double y) => wallPt(s.wall, u, y, 2.1);
+    final leave = sv == 1 ? [q(ucs, kp.y), q(ucs, 88)] : [q(ucs, kp.y), q(ucs, kp.y - 2.5), q(uside, kp.y - 2.5), q(uside, 88)];
     c.cable = FCable([
-      wallPt(s.wall, uc, 50.5, kMidD),
-      wallPt(s.wall, uc, 88, kMidD),
+      ...leave,
       wallPt(s.wall, uh, 92, kMidD),
       wallPt(s.wall, uh, 101.95, kMidD),
-      V3(cx, 101.95, 0),
-      V3(cx, 99, 0),
+      V3(cx + sgn * 5.5, 101.95, 0),
+      V3(cx + sgn * 5.5, 97.9, 0),
+      V3(cx + sgn * 2.6, 97.9, 0),
     ], light: true);
     c.from = s.id;
-    return FAct(true, 'Light connected: the cable goes up from the switch, through the top plate, and lies across the joists to the ceiling box, ${(c.cable!.inches / 12).toStringAsFixed(1)} feet.');
+    c.entryKo = v;
+    c.usedKo.add(v);
+    c.fromKo = sv;
+    s.usedKo.add(sv);
+    return FAct(true, 'Light connected: the cable goes up from the switch through its ${sv == 1 ? 'top' : 'bottom'} knockout, through the top plate, and lies across the joists to the ceiling box, ${(c.cable!.inches / 12).toStringAsFixed(1)} feet.');
   }
 
   // ── Devices, the breaker, the things plugged in ──
@@ -485,7 +539,7 @@ class WiringHouse {
       if (b.kind == 'ceiling') {
         final s = boxes.where((x) => x.kind == 'switch' && x.cable != null).firstOrNull;
         if (s == null) continue;
-        if (s.openKo < cablesAt(s) + 1) return WHint('The cable up to the light leaves the switch box through a second knockout: pick Knockout and tap the lit tab.', ids: _closedKo(s).take(1).toList(), tool: 'knock');
+        if (freeKo(s) == null) return WHint('The cable up to the light leaves the switch box through a second knockout: pick Knockout and tap the lit tab.', ids: _closedKo(s).take(1).toList(), tool: 'knock');
         final seg = math.min(topSegCount(s.wall) - 1, (s.u / 16).floor());
         final tid = topSegId(s.wall, seg);
         if (!drilled.contains(tid)) return WHint('The light is fed from the switch: drill the lit piece of top plate, right over the switch.', ids: [tid], tool: 'drill');
@@ -513,7 +567,7 @@ class WiringHouse {
 
 /// The still picture of the room. [tool] decides which marks are shown (where the tool in hand can be used); [source] is the box the cable roll
 /// starts from (0 for the breaker panel).
-Scene3D buildWiringScene(WiringHouse w, {String tool = 'look', int source = 0}) {
+Scene3D buildWiringScene(WiringHouse w, {String tool = 'look', int source = 0, int focus = 0}) {
   final b = MeshBuilder();
   drawFrame(b, drilled: w.drilled);
   drawWiringProps(b);
@@ -619,6 +673,17 @@ Scene3D buildWiringScene(WiringHouse w, {String tool = 'look', int source = 0}) 
             onBox(x, x.id == source ? const Color(0xFFFFFFFF) : const Color(0xFF38BDF8), r: x.id == source ? 2.4 : 1.7);
           }
         }
+    }
+  }
+
+  // The box the view is closed in on shows its two tabs: orange when closed (tap to break it out), green when it is out and free, grey when a cable is in it.
+  final fb = focus == 0 ? null : w.boxById(focus);
+  if (fb != null && !tool.startsWith('dev:') && !tool.startsWith('app:')) {
+    for (var k = 0; k < 2; k++) {
+      final c = koPos(fb, k);
+      final col = !fb.kos[k] ? const Color(0xFFFB923C) : (fb.usedKo.contains(k) ? const Color(0xFF9CA3AF) : const Color(0xFF4ADE80));
+      pad(koId(fb.id, k), c, const V3(6, 6, 6));
+      dot(koId(fb.id, k), c + (fb.kind == 'ceiling' ? V3(k == 0 ? -1.6 : 1.6, 0, 0) : V3(0, k == 0 ? -1.6 : 1.6, 0)), col, r: 1.3);
     }
   }
 
@@ -777,6 +842,9 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
 
   /// The box the cable roll starts from (0 is the breaker panel).
   int source = 0;
+
+  /// The box the view is closed in on (its tabs show): 0 when none.
+  int focus = 0;
   int hl = 0;
   String? msg;
   bool good = true;
@@ -825,7 +893,7 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
     });
   }
 
-  void _rebuild() => scene = buildWiringScene(w, tool: tool, source: source);
+  void _rebuild() => scene = buildWiringScene(w, tool: tool, source: source, focus: focus);
 
   void _lightUp(List<int> ids) {
     _glowT?.cancel();
@@ -843,9 +911,9 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
       'outlet' => 'Outlet box: tap a stud (a green mark shows where the box will sit, 16 inches up). Put one on each of the four walls.',
       'switch' => 'Switch box: tap a stud, ideally right beside the door. It sits 48 inches up.',
       'ceiling' => 'Ceiling box: tap a joist, one of the boards across the top. The light will hang from it.',
-      'knock' => 'Knockout: tap the orange mark on a box to break out its round tab. The cable goes in through that hole.',
+      'knock' => 'Knockout: tap a box to close in on it, then tap an orange tab to break it out. The cable goes in through that hole.',
       'drill' => 'Drill: tap a yellow mark to drill a hole through that stud, 20 inches up. The cable can only pass through studs that have a hole.',
-      _ => 'Cable roll: tap a box and the cable unrolls from the panel to it. To go on from a box instead, tap a blue box that has power first, then the next box. Tap the panel to start from it again.',
+      _ => 'Cable roll: tap a box (the view closes in on it), then tap the knockout the cable goes in through: the cable unrolls from the panel to it. To go on from a box instead, tap a blue box that has power first, then the next box. Tap the panel to start from it again.',
     };
   }
 
@@ -902,6 +970,7 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
 
   /// The view closes in on a box (to break its knockouts, or to see what is in it).
   void _zoomToBox(FBox x) {
+    focus = x.id;
     final c = boxFace(x);
     if (x.kind == 'ceiling') {
       cam.glideTo(target: c, dist: 24, yaw: 0.6, pitch: -0.7);
@@ -950,12 +1019,13 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
     final first = h.ids.isEmpty ? null : h.ids.first;
     if (first != null && isBoxId(first)) {
       final bx = w.boxById(first);
-      if (bx != null && h.tool == 'knock') _zoomToBox(bx);
+      if (bx != null && (h.tool == 'knock' || h.tool == 'cable')) _zoomToBox(bx);
     }
     if (first != null && isKoId(first)) {
       final bx = w.boxById(koBoxOf(first));
       if (bx != null) _zoomToBox(bx);
     }
+    setState(_rebuild);
     _say('Hint (−2 ⭐): ${h.text}');
   }
 
@@ -1007,6 +1077,72 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
     }
   }
 
+  /// The tab of a box was tapped.
+  void _tapKo(int id) {
+    final bx = w.boxById(koBoxOf(id));
+    if (bx == null) return;
+    final k = koIndexOf(id);
+    if (cam.dist > 40) _zoomToBox(bx);
+    if (tool == 'cable') {
+      _cableThrough(bx, k);
+      return;
+    }
+    if (bx.kos[k]) {
+      setState(() => hl = id);
+      _say('That knockout is out already. To pull a cable in through it: pick the Cable roll, tap the box, then tap this knockout.');
+      return;
+    }
+    final a = w.knockout(id);
+    conGood();
+    setState(() {
+      focus = bx.id;
+      hl = id;
+      _rebuild();
+    });
+    _say('${a.msg} Now pick the Cable roll and tap the box, then the knockout the cable goes in through.');
+    _checkDone();
+  }
+
+  /// The cable roll in hand and a knockout tapped: the knockout is broken out if it was closed, and the cable rolls in through it.
+  void _cableThrough(FBox bx, int k) {
+    if (bx.cable != null) {
+      _say('This box has its cable already. Tap the box to pull the cable out again.', ok: false);
+      return;
+    }
+    var note = '';
+    final src = source == 0 ? null : w.boxById(source);
+    if (src != null && w.freeKo(src) == null) {
+      final closed = [for (var j = 0; j < 2; j++) if (!src.kos[j]) j];
+      if (closed.isNotEmpty) {
+        w.knockout(koId(src.id, closed.first));
+        note = ' A knockout was broken out in the first box for the cable to leave through.';
+      }
+    }
+    if (!bx.kos[k]) {
+      w.knockout(koId(bx.id, k));
+      note = ' You broke out the knockout.$note';
+    }
+    final a = w.pull(bx.id, from: source, via: k);
+    if (a.ok) {
+      conGood();
+      _started[bx.id] = _now;
+      // Back far enough to watch the cable come along the wall.
+      final c = boxFace(bx);
+      cam.glideTo(target: c, dist: 70, yaw: bx.kind == 'ceiling' ? 0.6 : _yawFor(bx.wall), pitch: bx.kind == 'ceiling' ? -0.3 : 0.07);
+    } else {
+      conBad();
+    }
+    setState(() {
+      focus = bx.id;
+      hl = bx.id;
+      _rebuild();
+    });
+    final jobs = a.ok ? _afterJobs() : '';
+    _say('${a.msg}$note$jobs', ok: a.ok);
+    if (a.show.isNotEmpty) _lightUp(a.show);
+    _checkDone();
+  }
+
   void _pick(int id) {
     if (id != 0 && _again(id)) return;
     final grabbed = kPropTool[id];
@@ -1018,9 +1154,15 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
       setState(() => hl = 0);
       return;
     }
-    if (tool == 'look') {
-      final bx = w.boxById(id);
-      if (bx != null && bx.kind == 'switch' && w.deviceDone(bx)) {
+    final handTool = tool.startsWith('dev:') || tool.startsWith('app:');
+    if (isKoId(id) && !handTool) {
+      _tapKo(id);
+      return;
+    }
+    final bx = w.boxById(id);
+    // A tap on a box (with any tool that is not putting something in it): the view closes in on it, so its tabs show.
+    if (bx != null && !handTool && tool != 'cable') {
+      if (tool == 'look' && bx.kind == 'switch' && w.deviceDone(bx)) {
         final a = w.flip(id);
         setState(() {
           _rebuild();
@@ -1029,6 +1171,15 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
         _say(a.msg, ok: a.ok);
         return;
       }
+      _zoomToBox(bx);
+      setState(() {
+        hl = id;
+        _rebuild();
+      });
+      _say('Close up on the ${bx.kind == 'ceiling' ? 'ceiling' : bx.kind} box. Tap an orange tab to break out a knockout (green ones are out already). Then pick the Cable roll, tap the box and tap the knockout the cable goes in through.');
+      return;
+    }
+    if (tool == 'look') {
       final i = scene.info[id];
       if (i != null) {
         setState(() => hl = id);
@@ -1042,13 +1193,13 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
       a = w.installDevice(id, tool.substring(4));
       if (a.ok) {
         conGood();
-        final bx = w.boxById(id)!;
+        final nb = w.boxById(id)!;
         setState(() {
           hl = id;
           _rebuild();
         });
         _say(a.msg);
-        _openDevice(bx);
+        _openDevice(nb);
         return;
       }
     } else if (tool.startsWith('app:')) {
@@ -1057,30 +1208,31 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
       switch (tool) {
         case 'outlet' || 'switch' || 'ceiling':
           a = w.place(tool, id);
+          if (a.ok) {
+            // The new box is shown close up, with its tabs.
+            final nb = w.boxes.last;
+            _zoomToBox(nb);
+            a = FAct(true, '${a.msg} The view is close on it: tap an orange tab to break it out.');
+          }
         case 'drill':
           a = w.drill(id);
-        case 'knock':
-          final bx = w.boxById(isKoId(id) ? koBoxOf(id) : id);
-          if (bx != null) _zoomToBox(bx);
-          a = isKoId(id) ? w.knockout(id) : FAct(true, bx == null ? 'Tap a box.' : 'Close up on the box: tap an orange mark to break out a knockout.');
         default:
           if (id == idPanel) {
             source = 0;
-            a = const FAct(true, 'The cable will start at the breaker panel. Tap the box it must reach.');
+            a = const FAct(true, 'The cable will start at the breaker panel. Tap the box it must reach, then the knockout it goes in through.');
+          } else if (bx != null && bx.cable != null && w.powered(bx) && bx.kind != 'ceiling' && source != bx.id) {
+            source = bx.id;
+            a = FAct(true, 'The cable will go on from this ${bx.kind} box. Tap the next box it must reach, then the knockout it goes in through. (Tap this box again to pull its cable out.)');
+          } else if (bx != null && bx.cable != null) {
+            final wasSource = source == id;
+            a = w.pull(id);
+            if (a.ok && wasSource) source = 0;
+          } else if (bx != null) {
+            // A box that needs its cable: close in on it and choose the knockout the cable goes in through.
+            _zoomToBox(bx);
+            a = FAct(true, 'Close up. Tap the knockout the cable goes in through: a green one is open already, an orange one is broken out for you.');
           } else {
-            final bx = w.boxById(id);
-            if (bx != null && bx.cable != null && w.powered(bx) && bx.kind != 'ceiling' && source != bx.id) {
-              source = bx.id;
-              a = FAct(true, 'The cable will go on from this ${bx.kind} box. Tap the next box it must reach. (Tap it again to pull its cable out.)');
-            } else {
-              final wasSource = source == id;
-              a = w.pull(id, from: source);
-              if (a.ok) {
-                final after = w.boxById(id);
-                if (after?.cable != null) _started[id] = _now;
-                if (wasSource) source = 0;
-              }
-            }
+            a = w.pull(id, from: source);
           }
       }
     }
@@ -1136,6 +1288,7 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
       glow = {};
       hl = 0;
       source = 0;
+      focus = 0;
       _doneShown = false;
       _rebuild();
     });
