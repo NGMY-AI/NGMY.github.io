@@ -459,7 +459,8 @@ void screenTests() {
       await t.pump(const Duration(milliseconds: 120));
     }
     await t.pump(const Duration(milliseconds: 700));
-    expect(find.textContaining('Resize the'), findsOneWidget);
+    expect(find.textContaining('Pick how big'), findsOneWidget);
+    expect(find.text('5×'), findsOneWidget, reason: 'a screen can be made up to five times bigger');
     await t.tap(find.text('Done'));
     await t.pump(const Duration(milliseconds: 600));
     for (var i = 0; i < 3; i++) {

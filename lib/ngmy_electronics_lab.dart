@@ -111,36 +111,116 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
     _tvOpen = false;
   }
 
-  /// A screen starts at its normal size and can only be made bigger.
+  /// A screen starts at its normal size and can only be made bigger: up to five times.
   Future<void> _resizeSheet(Part p) async {
+    const maxScale = 5.2;
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF17171C),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (ctx) => StatefulBuilder(builder: (ctx, set) {
         void change(double v) {
-          setState(() => p.scale = v.clamp(1.0, 5.2));
+          setState(() => p.scale = v.clamp(1.0, maxScale));
           set(() {});
           widget.onChanged?.call();
         }
+        final col = p.info.color;
+        final shown = (p.scale / 1.04).round();
+        Widget preset(String label, double v) {
+          final on = (p.scale - v).abs() < 0.05;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => change(v),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                padding: const EdgeInsets.symmetric(vertical: 11),
+                decoration: BoxDecoration(
+                  color: on ? col.withValues(alpha: 0.28) : Colors.white.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: on ? col : Colors.white12, width: on ? 2 : 1),
+                ),
+                child: Center(child: FittedBox(fit: BoxFit.scaleDown, child: Text(label, style: TextStyle(color: on ? col : Colors.white70, fontWeight: FontWeight.w900, fontSize: 14)))),
+              ),
+            ),
+          );
+        }
         return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
-            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Resize the ${p.info.name}', style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 4),
-              const Text('Make it bigger to see it better. It can never be smaller than its normal size.', style: TextStyle(color: Colors.white54, fontSize: 12.5)),
-              const SizedBox(height: 10),
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+            padding: const EdgeInsets.fromLTRB(18, 10, 18, 16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1F2430), Color(0xFF12141A)]),
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(color: col.withValues(alpha: 0.55), width: 1.4),
+              boxShadow: [BoxShadow(color: col.withValues(alpha: 0.25), blurRadius: 26)],
+            ),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(width: 42, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(3))),
+              const SizedBox(height: 12),
               Row(children: [
-                IconButton(onPressed: () => change(p.scale - 0.4), icon: const Icon(Icons.remove_circle_outline_rounded, color: Colors.white70)),
-                Expanded(child: Slider(value: p.scale.clamp(1.0, 5.2), min: 1.0, max: 5.2, activeColor: p.info.color, onChanged: change)),
-                IconButton(onPressed: () => change(p.scale + 0.4), icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.white70)),
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: col.withValues(alpha: 0.2), border: Border.all(color: col)),
+                  child: Center(child: Text(p.info.emoji, style: const TextStyle(fontSize: 22))),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(p.info.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
+                    const Text('Pick how big the screen is on the board', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                  ]),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(color: col.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(14), border: Border.all(color: col)),
+                  child: Text('${(p.scale * 100).round()}%', style: TextStyle(color: col, fontWeight: FontWeight.w900, fontSize: 15)),
+                ),
+              ]),
+              const SizedBox(height: 14),
+              // A live preview: the screen grows with the slider (it never leaves its box).
+              Container(
+                height: 120,
+                width: double.infinity,
+                decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.35), borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white10)),
+                child: Center(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: 30.0 + 28 * p.scale,
+                    height: (30.0 + 28 * p.scale) * 0.58,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [col.withValues(alpha: 0.85), const Color(0xFF111827)]),
+                      border: Border.all(color: Colors.white54, width: 2),
+                      boxShadow: [BoxShadow(color: col.withValues(alpha: 0.5), blurRadius: 14)],
+                    ),
+                    child: Center(child: FittedBox(child: Padding(padding: const EdgeInsets.all(6), child: Text(p.info.emoji, style: const TextStyle(fontSize: 26))))),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(children: [
+                preset('1×', 1.0),
+                preset('2×', 2.0),
+                preset('3×', 3.0),
+                preset('4×', 4.0),
+                preset('5×', 5.0),
+              ]),
+              const SizedBox(height: 4),
+              Row(children: [
+                IconButton(onPressed: () => change(p.scale - 0.4), icon: Icon(Icons.remove_circle_rounded, color: col, size: 30)),
+                Expanded(
+                  child: SliderTheme(
+                    data: SliderTheme.of(ctx).copyWith(trackHeight: 8, activeTrackColor: col, inactiveTrackColor: Colors.white12, thumbColor: Colors.white, overlayColor: col.withValues(alpha: 0.2)),
+                    child: Slider(value: p.scale.clamp(1.0, maxScale), min: 1.0, max: maxScale, onChanged: change),
+                  ),
+                ),
+                IconButton(onPressed: () => change(p.scale + 0.4), icon: Icon(Icons.add_circle_rounded, color: col, size: 30)),
               ]),
               Row(children: [
-                Text('${(p.scale * 100).round()}%', style: TextStyle(color: p.info.color, fontWeight: FontWeight.w900)),
-                const Spacer(),
-                TextButton(onPressed: () => change(1.0), child: const Text('Normal size')),
-                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Done')),
+                Expanded(child: Text(shown <= 1 ? 'Normal size' : 'About $shown times the normal size', style: const TextStyle(color: Colors.white54, fontSize: 12))),
+                TextButton(onPressed: () => Navigator.pop(ctx), style: TextButton.styleFrom(backgroundColor: col.withValues(alpha: 0.25), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 22)), child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w900))),
               ]),
             ]),
           ),

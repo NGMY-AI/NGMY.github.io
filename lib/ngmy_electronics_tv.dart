@@ -25,9 +25,9 @@ const List<NgmyTvChannel> kNgmyTvChannels = [
   NgmyTvChannel('NGMY Construction Lab', 'Build, wire and finish a real house'),
   NgmyTvChannel('NGMY Electronics Lab', 'Build circuits that really light up'),
   NgmyTvChannel('NGMY Advisors', 'Say hi to a friendly advisor'),
-  NgmyTvChannel('Spark Adventure', 'Follow a spark round a circuit'),
+  NgmyTvChannel('Spark Adventure', 'Follow Sparky round a circuit board'),
   NgmyTvChannel('NGMY Game Center', 'Play games and win coins'),
-  NgmyTvChannel('Little Train', 'A train rolls past the hills'),
+  NgmyTvChannel('NGMY Business Cards', 'Make a card people remember'),
   NgmyTvChannel('NGMY Vault', 'Keep what matters safe'),
   NgmyTvChannel('NGMY Studios', 'Make music, art, titles and more'),
 ];
@@ -56,11 +56,11 @@ void paintNgmyTv(Canvas c, Size s, int channel, double t, {double age = 99, int 
       case 4:
         paintNgmyTvAd(c, s, 2, t);
       case 5:
-        _spark(c, s, t);
+        paintSparkAdventure(c, s, t);
       case 6:
         paintNgmyTvAd(c, s, 3, t);
       case 7:
-        _train(c, s, t);
+        paintNgmyTvAd(c, s, 6, t);
       case 8:
         paintNgmyTvAd(c, s, 4, t);
       default:
