@@ -949,7 +949,7 @@ class NgmyWiringHousePage extends StatefulWidget {
 
 class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
   final WiringHouse w = WiringHouse();
-  late final Cam3 cam = Cam3(yaw: 0, pitch: 0.07, dist: 120, target: const V3(0, 46, 0))
+  late final Cam3 cam = Cam3(yaw: math.pi / 2, pitch: 0.07, dist: 120, target: const V3(0, 46, 0))
     ..minDist = 8
     ..maxDist = 520
     ..minPitch = -0.9
@@ -996,7 +996,7 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _say('Tap a tool on the floor (the cable roll, the drill), or choose one from the list, to pick it up. Stuck? Press Hint (it costs 2 stars; a job done without a hint earns 1).');
+      if (mounted) _say('Tap a tool on the shelves by the window (the cable roll, the drill), or choose one from the list, to pick it up. Stuck? Press Hint (it costs 2 stars; a job done without a hint earns 1).');
     });
     _restore();
   }
@@ -1461,7 +1461,7 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
       cam
         ..keepIn = (-64.5, 64.5, -52.5, 52.5, 92.0)
         ..maxDist = 520;
-      cam.glideTo(target: const V3(0, 46, 0), dist: 120, yaw: 0, pitch: 0.07);
+      cam.glideTo(target: const V3(0, 46, 0), dist: 120, yaw: math.pi / 2, pitch: 0.07);
       _say('Back inside the room. Drag to turn round and see every wall.');
     }
   }
@@ -1552,13 +1552,15 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
     }
     bool inCat(_Cat c) => c.items.any((i) => i.key == tool);
     final all = <Widget>[
+      // First line: the boxes and the things that go in them, then the hand tools.
+      for (final c in _cats.take(4)) _chip('cat-${c.key}', c.label, c.icon, on: inCat(c), small: '▸', onTap: () => setState(() => menu = c.key), tile: true),
       _chip('tool-look', 'Look', Icons.search_rounded, on: tool == 'look', onTap: () => setTool('look'), tile: true),
-      for (final c in _cats.take(1)) _chip('cat-${c.key}', c.label, c.icon, on: inCat(c), small: '▸', onTap: () => setState(() => menu = c.key), tile: true),
-      _chip('tool-knock', 'Knockout', Icons.radio_button_unchecked_rounded, on: tool == 'knock', onTap: () => setTool('knock'), tile: true),
       _chip('tool-drill', 'Drill', Icons.construction_rounded, on: tool == 'drill', onTap: () => setTool('drill'), tile: true),
       _chip('tool-cable', 'Cable roll', Icons.cable_rounded, on: tool == 'cable', onTap: () => setTool('cable'), tile: true),
-      for (final c in _cats.skip(1)) _chip('cat-${c.key}', c.label, c.icon, on: inCat(c), small: '▸', onTap: () => setState(() => menu = c.key), tile: true),
+      // Second line: the breaker first (the most important), then what plugs in.
       _chip('tool-breaker', w.tripped ? 'Breaker TRIPPED' : (w.breaker ? 'Breaker ON' : 'Breaker OFF'), Icons.power_settings_new_rounded, on: w.breaker, color: w.tripped ? const Color(0xFFF87171) : const Color(0xFF4ADE80), onTap: _toggleBreaker, tile: true),
+      for (final c in _cats.skip(4)) _chip('cat-${c.key}', c.label, c.icon, on: inCat(c), small: '▸', onTap: () => setState(() => menu = c.key), tile: true),
+      _chip('tool-knock', 'Knockout', Icons.radio_button_unchecked_rounded, on: tool == 'knock', onTap: () => setTool('knock'), tile: true),
       _chip('tool-hint', 'Hint', Icons.lightbulb_rounded, on: false, small: '−2⭐', color: const Color(0xFFFACC15), onTap: _hint, tile: true),
       _chip('tool-reset', 'Start over', Icons.restart_alt_rounded, on: false, color: Colors.white70, onTap: _reset, tile: true),
     ];
@@ -1606,7 +1608,7 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
           if (dollhouse) {
             cam.glideTo(target: const V3(0, 40, 0), dist: 330, yaw: 0.5, pitch: 0.85);
           } else {
-            cam.glideTo(target: const V3(0, 46, 0), dist: 120, yaw: 0, pitch: 0.07);
+            cam.glideTo(target: const V3(0, 46, 0), dist: 120, yaw: math.pi / 2, pitch: 0.07);
           }
         },
         message: msg,

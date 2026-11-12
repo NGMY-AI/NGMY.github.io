@@ -126,25 +126,38 @@ void drawCeilingBox(MeshBuilder b, {required int id, required double x, int orde
   b.cyl(V3(cx, 95.95, 0), V3(cx, 96.05, 0), 1.7, const Color(0xFF123A82), sides: 12);
 }
 
-/// A roll of cable on the floor (yellow 12 gauge, with its white band), a cordless drill and a box of staples: the tools of the job.
+/// Two shelves on the wall beside the window (the roll of cable on the lower one, the cordless drill on the upper one): the tools of the job hang
+/// on the wall, off the floor.
+const double kShelfU = 100, kShelfLow = 30, kShelfHigh = 52;
+
 void drawWiringProps(MeshBuilder b) {
   b.order = 2;
   b.id = 0;
+  V3 p(double du, double y, double d) => wallPt(1, kShelfU + du, y, d);
+  // The shelves: a board on two brackets, screwed to the studs.
+  for (final y in const [kShelfLow, kShelfHigh]) {
+    b.box(p(0, y - 0.75, 3.5 + 4.5), wallSize(1, 34, 1.5, 9), const Color(0xFFB98A52), shine: 0.15);
+    for (final du in const [-12.0, 12.0]) {
+      b.box(p(du, y - 3.6, 3.5 + 1.2), wallSize(1, 1.2, 4.2, 2.4), const Color(0xFF6B7380), shine: 0.4);
+      b.box(p(du, y - 2.0, 3.5 + 3.8), wallSize(1, 1.2, 1.0, 6.0), const Color(0xFF6B7380), shine: 0.4);
+    }
+  }
   b.id = idPropRoll;
-  // The roll, standing on its edge: a thick ring of yellow cable, a black label, a white band.
-  b.ring(const V3(36, 8, -44), const V3(36, 8, -37), 8, 3, kNmYellow, shine: 0.3, sides: 20);
-  b.ring(const V3(36, 8, -43.4), const V3(36, 8, -37.6), 8.15, 7.2, const Color(0xFFE9E7DC), shine: 0.2, sides: 20);
-  b.box(const V3(36, 4.2, -40.5), const V3(2.4, 2.6, 6.2), const Color(0xFF1E2228), shine: 0.1);
+  // The roll, standing on its edge facing the room: a thick ring of yellow cable, a black label, a white band.
+  const yc = kShelfLow + 8;
+  b.ring(p(0, yc, 4), p(0, yc, 11), 8, 3, kNmYellow, shine: 0.3, sides: 20);
+  b.ring(p(0, yc, 4.6), p(0, yc, 10.4), 8.15, 7.2, const Color(0xFFE9E7DC), shine: 0.2, sides: 20);
+  b.box(p(0, kShelfLow + 4.2, 7.5), wallSize(1, 2.4, 2.6, 6.2), const Color(0xFF1E2228), shine: 0.1);
   b.id = idPropDrill;
-  // A cordless drill lying on the floor: body, handle, battery, chuck and bit.
-  const dx = -34.0, dz = -38.0;
-  b.box(const V3(dx, 3.2, dz), const V3(10, 4.6, 3.6), const Color(0xFFF2B100), shine: 0.4);
-  b.box(const V3(dx - 1.5, 2.0, dz), const V3(3.2, 4.0, 3.2), const Color(0xFF22262C), shine: 0.3);
-  b.box(const V3(dx - 1.5, 0.9, dz), const V3(6.0, 1.8, 3.6), const Color(0xFF22262C), shine: 0.2);
-  b.cyl(const V3(dx + 5, 3.4, dz), const V3(dx + 8.2, 3.4, dz), 1.25, const Color(0xFF9AA2AD), shine: 0.8, sides: 10);
-  b.cyl(const V3(dx + 8.2, 3.4, dz), const V3(dx + 12.5, 3.4, dz), 0.38, const Color(0xFFC9CED6), shine: 0.9, sides: 6);
-  _propPad(b, idPropRoll, const V3(36, 8, -40), const V3(19, 18, 12));
-  _propPad(b, idPropDrill, const V3(-30, 3, -38), const V3(20, 9, 10));
+  // A cordless drill lying on the upper shelf: body, handle, battery, chuck and bit.
+  const ox = -3.5, y0 = kShelfHigh, d = 7.0;
+  b.box(p(ox, y0 + 3.2, d), wallSize(1, 10, 4.6, 3.6), const Color(0xFFF2B100), shine: 0.4);
+  b.box(p(ox - 1.5, y0 + 2.0, d), wallSize(1, 3.2, 4.0, 3.2), const Color(0xFF22262C), shine: 0.3);
+  b.box(p(ox - 1.5, y0 + 0.9, d), wallSize(1, 6.0, 1.8, 3.6), const Color(0xFF22262C), shine: 0.2);
+  b.cyl(p(ox + 5, y0 + 3.4, d), p(ox + 8.2, y0 + 3.4, d), 1.25, const Color(0xFF9AA2AD), shine: 0.8, sides: 10);
+  b.cyl(p(ox + 8.2, y0 + 3.4, d), p(ox + 12.5, y0 + 3.4, d), 0.38, const Color(0xFFC9CED6), shine: 0.9, sides: 6);
+  _propPad(b, idPropRoll, p(0, yc, 7.5), wallSize(1, 19, 18, 12));
+  _propPad(b, idPropDrill, p(ox + 3, y0 + 3, d), wallSize(1, 20, 9, 10));
 }
 
 /// The tools as chips in rows that wrap, so every tool is on the screen at once and none is hidden to the side.

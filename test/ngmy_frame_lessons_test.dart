@@ -303,7 +303,7 @@ void main() {
       await t.pumpWidget(const MaterialApp(home: NgmyWiringHousePage()));
       await t.pump(const Duration(milliseconds: 600));
       final st = t.state<NgmyWiringHousePageState>(find.byType(NgmyWiringHousePage));
-      expect(st.msg, contains('Tap a tool on the floor'), reason: 'the first message says how to start');
+      expect(st.msg, contains('Tap a tool on the'), reason: 'the first message says how to start');
       expect(st.tool, 'look');
       st.pickForTest(idPropRoll);
       await t.pump(const Duration(milliseconds: 200));
@@ -332,9 +332,9 @@ void main() {
       await t.pump(const Duration(milliseconds: 600));
       final st = t.state<NgmyWiringHousePageState>(find.byType(NgmyWiringHousePage));
       final r = t.getRect(find.byType(Scene3DView).first);
-      // Look for the roll where it is on the screen: tap along the floor until something is picked up.
+      // Look for the roll where it is on the screen: tap along the picture until something is picked up.
       var found = false;
-      for (var y = r.bottom - 40; y > r.center.dy && !found; y -= 25) {
+      for (var y = r.bottom - 40; y > r.top + 120 && !found; y -= 25) {
         for (var x = r.left + 40; x < r.right - 60 && !found; x += 25) {
           await t.tapAt(Offset(x, y));
           await t.pump(const Duration(milliseconds: 500));
@@ -354,7 +354,7 @@ void main() {
       await t.pumpWidget(const MaterialApp(home: NgmyDrywallPage()));
       await t.pump(const Duration(milliseconds: 600));
       final st = t.state<NgmyDrywallPageState>(find.byType(NgmyDrywallPage));
-      expect(st.msg, contains('Tap a tool on the floor'));
+      expect(st.msg, contains('Tap a tool on the'));
       final expected = {idPropStack: 'sheet', idPropMud: 'mud', idPropTape: 'tape', idPropKnife: 'mud', idPropGun: 'screw', idPropSquare: 'cut', idPropPole: 'sand', idPropBead: 'bead', idPropTray: 'paint', idPropSaw: 'saw'};
       for (final e in expected.entries) {
         st.pickForTest(e.key);

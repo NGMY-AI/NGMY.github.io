@@ -166,8 +166,8 @@ const Map<int, String> kPropTool = {
 };
 
 const Map<int, (String, String, V3)> kPropInfo = {
-  idPropRoll: ('Roll of cable', 'Yellow 12 gauge cable for the outlets and white 14 gauge for the light. Tap it to pick up the cable roll, then tap a box.', V3(36, 8, -40)),
-  idPropDrill: ('Cordless drill', 'Drills the holes in the studs for the cable. Tap it to pick it up, then tap a stud.', V3(-30, 3, -38)),
+  idPropRoll: ('Roll of cable', 'Yellow 12 gauge cable for the outlets and white 14 gauge for the light. Tap it to pick up the cable roll, then tap a box.', V3(65, 38, 40)),
+  idPropDrill: ('Cordless drill', 'Drills the holes in the studs for the cable. Tap it to pick it up, then tap a stud.', V3(65, 55, 40)),
   idPropStack: ('Stack of drywall', 'Sheets of half inch drywall, 4 by 8 feet. Tap them to pick up a sheet, then tap where it goes.', V3(-40, 5, 4)),
   idPropMud: ('Bucket of joint compound', 'The mud: it fills the joints and covers the screw heads. Tap it to pick up the mud and the knife.', V3(40, 8, 36)),
   idPropTape: ('Paper tape', 'Paper tape is pressed into the first coat of mud over every joint. Tap it to pick it up.', V3(56, 3, 24)),
