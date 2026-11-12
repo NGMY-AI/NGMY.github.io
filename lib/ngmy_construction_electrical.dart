@@ -438,14 +438,19 @@ Scene3D buildBench(ElectricalLesson lesson, WiringState s, {bool withWall = true
   final ceilingKind = _ceiling(kind);
   if (withWall) {
     b.id = idWall;
-    b.box(const V3(-6.575, 0, -0.25), const V3(10.85, 18, 0.5), kDrywall, split: 3);
-    b.box(const V3(6.575, 0, -0.25), const V3(10.85, 18, 0.5), kDrywall, split: 3);
-    b.box(const V3(0, 5.5, -0.25), const V3(2.3, 7, 0.5), kDrywall, split: 2);
-    b.box(const V3(0, -5.5, -0.25), const V3(2.3, 7, 0.5), kDrywall, split: 2);
+    // The studs are behind the wall: they are drawn first (tier 0), then the wall (tier 1), then everything in front of it (tier 2), so from no side does wood show through the wall.
+    b.order = 1;
+    // A wide, tall wall (so the picture is always full of wall, never an edge), cut in tiles so every tile sorts properly from any side.
+    b.box(const V3(-15.575, 0, -0.25), const V3(28.85, 40, 0.5), kDrywall, split: 6);
+    b.box(const V3(15.575, 0, -0.25), const V3(28.85, 40, 0.5), kDrywall, split: 6);
+    b.box(const V3(0, 12.5, -0.25), const V3(2.3, 21, 0.5), kDrywall, split: 4);
+    b.box(const V3(0, -12.5, -0.25), const V3(2.3, 21, 0.5), kDrywall, split: 4);
     b.id = idStud;
-    b.box(const V3(-1.9, 0, -2.25), const V3(1.5, 18, 3.5), kWood, shine: 0.05, split: 3);
-    b.box(const V3(11.25, 0, -2.25), const V3(1.5, 18, 3.5), kWood, shine: 0.05, split: 3);
+    b.order = 0;
+    b.box(const V3(-1.9, 0, -2.25), const V3(1.5, 40, 3.5), kWood, shine: 0.05, split: 5);
+    b.box(const V3(11.25, 0, -2.25), const V3(1.5, 40, 3.5), kWood, shine: 0.05, split: 5);
     b.box(const V3(5.0, 8.6, -2.25), const V3(14, 1.5, 3.5), kWood, shine: 0.05, split: 2);
+    b.order = 2;
   }
   final cableEnds = _boxAndCable(b, lesson.legacy ? kind : 'outlet', true);
   // ── Wires ──
