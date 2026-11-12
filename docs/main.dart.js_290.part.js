@@ -1904,7 +1904,7 @@ s=t.$0()
 for(r=0,q=5003;q<65536;q*=2)++r
 r=8-r
 for(p=0;p<5003;++p)x[p]=-1
-j.YJ(j.cy)
+j.YK(j.cy)
 for(o=!0;o;){n=t.$0()
 for(o=!1;n!==-1;){m=(n<<12>>>0)+s
 p=(A.o.dX(n,r)^s)>>>0
@@ -1919,7 +1919,7 @@ v=x[p]
 if(v===m){s=w[p]
 o=!0
 break}}while(v>=0)
-if(o)break}j.YJ(s)
+if(o)break}j.YK(s)
 v=j.db
 if(v<4096){j.db=v+1
 w[p]=v
@@ -1927,12 +1927,12 @@ x[p]=m}else{for(p=0;p<5003;++p)x[p]=-1
 v=j.cy
 j.db=v+2
 j.dx=!0
-j.YJ(v)}k=t.$0()
+j.YK(v)}k=t.$0()
 s=n
-n=k}}j.YJ(s)
-j.YJ(j.CW)
+n=k}}j.YK(s)
+j.YK(j.CW)
 j.fx.bu(0)},
-YJ(d){var x,w=this,v=w.at,u=w.ax
+YK(d){var x,w=this,v=w.at,u=w.ax
 v&=D.dgz[u]
 w.at=v
 if(u>0){v=(v|A.o.dX(d,u))>>>0
@@ -2248,7 +2248,7 @@ x=u?A.c:A.aW
 x=C.L(x,A.r,u?2.5:1)
 return C.aA(v,C.cV(v,v,v,v,A.b6,new C.o(q,v,x,v,u?C.a([new C.ac(0,A.G,w.c.j(0.6),A.I,10)],y.V):v,r,A.a7),A.h8,v,s,v,D.akV,v,v,v,t),A.y,!1,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,new B.cAv(w),v,v,v,v,v,v,!1,A.a4)}}
 B.nB.prototype={
-UB(d,e){var x=C.dj()
+UC(d,e){var x=C.dj()
 x.seU(C.cz(C.dv(0,0,0,d,0,0),new B.cAq(this,x,e)))
 this.h6$.push(x.bl())},
 me(){var x=this,w=x.pY(new B.cAs(x))
@@ -2298,8 +2298,8 @@ this.m(new B.clL(this,d))
 x=this.gJx()
 x.ix(0,0)
 x.cP(0)},
-TO(){var x=0,w=C.j(y.H),v,u=2,t=[],s=this,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d
-var $async$TO=C.e(function(a0,a1){if(a0===1){t.push(a1)
+TP(){var x=0,w=C.j(y.H),v,u=2,t=[],s=this,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d
+var $async$TP=C.e(function(a0,a1){if(a0===1){t.push(a1)
 x=u}for(;;)switch(x){case 0:if(s.at>=0){x=1
 break}s.m(new B.clG(s))
 u=4
@@ -2312,7 +2312,7 @@ j=s.y
 i=s.gtF()
 h=s.x
 x=7
-return C.b(B.aRG(D.a5Q[s.z].b,j,i,h,l,new B.clH(s),k,m),$async$TO)
+return C.b(B.aRG(D.a5Q[s.z].b,j,i,h,l,new B.clH(s),k,m),$async$TP)
 case 7:r=a1
 if(J.ad(r)===0){o=C.bc("empty")
 throw C.W(o)}n=A.a.i(n.a.a)
@@ -2322,7 +2322,7 @@ q=C.aL(n,m,"_")
 o.a=!1
 u=9
 x=12
-return C.b(C.awv(C.a([C.cFK(r,"image/gif",C.w(q)+".gif")],y.u),null,"Made in NGMY Core Protocol"),$async$TO)
+return C.b(C.awv(C.a([C.cFK(r,"image/gif",C.w(q)+".gif")],y.u),null,"Made in NGMY Core Protocol"),$async$TP)
 case 12:p=a1
 o.a=p.b!==A.UJ
 u=4
@@ -2338,7 +2338,7 @@ case 11:x=!o.a?13:14
 break
 case 13:d=o
 x=15
-return C.b(B.fRN(r,C.w(q)+".gif","image/gif"),$async$TO)
+return C.b(B.fRN(r,C.w(q)+".gif","image/gif"),$async$TP)
 case 15:d.a=a1
 case 14:if(s.c!=null)s.m(new B.clI(o,s))
 u=2
@@ -2354,7 +2354,7 @@ break
 case 6:if(s.c!=null)s.m(new B.clK(s))
 case 1:return C.h(v,w)
 case 2:return C.f(t.at(-1),w)}})
-return C.i($async$TO,w)},
+return C.i($async$TP,w)},
 B(d){var x,w,v,u,t,s,r,q,p,o,n,m,l=this,k=null,j=C.at(new C.fF(D.a5Q[l.z].b,C.bx(C.n(22),new C.em(C.c9(l.gJx(),new B.clv(l),k),k),A.aq),k),k,k,k),i=A.c.j(0.06)
 i=C.aM(k,A.Z,!1,k,!0,A.t,k,C.aN(),l.e,k,k,k,k,k,2,C.bs(k,new C.b6(4,C.n(14),A.a1),k,k,k,k,"",k,!0,k,k,k,k,k,k,i,!0,k,k,k,k,k,k,k,k,k,k,k,k,k,K.EG,"Type your title",k,k,k,k,k,!0,k,k,k,!0,!0,!1,k,k,k,k,k,k,k,k,k,k,k,k,k,k),A.y,!0,k,!0,k,!1,k,A.ak,k,k,k,k,k,k,k,28,k,1,k,k,!1,"\u2022",k,new B.clw(l),k,k,k,!1,k,k,!1,k,!0,k,A.ab,k,k,k,k,k,k,k,k,k,k,k,A.fW,!0,A.a5,k,A.ao,k,k,k,k)
 x=y.p
@@ -2493,7 +2493,7 @@ for(w=d.a,v=w.length,u=y.l,t=0;t<w.length;w.length===v||(0,C.J)(w),++t){s=w[t]
 r=C.a([],u)
 for(q=s.y,p=q.length,o=0;o<q.length;q.length===p||(0,C.J)(q),++o)r.push(new B.e4P(q[o]).$0())
 x.push(r)}this.w=x},
-gWT(){var x=this.fy
+gWU(){var x=this.fy
 return x.A(0,A.az)?100:Math.min(x.a,x.b)*0.43},
 avc(d,e,f){var x=this
 x.at=d
@@ -2539,10 +2539,10 @@ q.y=w}},
 cdE(d){var x,w,v,u,t,s,r,q,p,o=this,n=o.r
 if(n==null||o.fy.A(0,A.az))return null
 x=o.fy
-w=o.gWT()
+w=o.gWU()
 v=o.z
 u=(d.a-x.a/2)/(w*v)
-t=(x.b/2-d.b)/(o.gWT()*v)
+t=(x.b/2-d.b)/(o.gWU()*v)
 s=u*u+t*t
 if(s>1)return null
 r=Math.sqrt(1-s)
@@ -3369,9 +3369,9 @@ S(){var x=y.q,w=y.g
 return new B.blA(new C.cw(null,y.z),new B.PR(A.cM),C.a([],x),A.I,A.I,C.a([],x),C.a([],w),C.a([],w),C.a([],w),C.a([],w),A.I,A.I,$,A.bD,0,C.a([],y.X),null,null)}}
 B.blA.prototype={
 Y(){this.a3()
-this.a_Z()
+this.a0_()
 this.me()},
-a_Z(){var x,w,v,u,t,s,r,q,p=this,o=new C.e4()
+a0_(){var x,w,v,u,t,s,r,q,p=this,o=new C.e4()
 o.d_(5)
 x=C.a([],y.q)
 w=p.Q==="elliptical"?1800:2300
@@ -4110,7 +4110,7 @@ x=p.r
 w=p.w
 v=p.x
 u=p.y
-t=p.gWT()
+t=p.gWU()
 s=p.z
 r=y.p
 o=C.a([C.aA(A.c5,C.b4(q,q,q,new B.bhh(x,w,v,u,t*s,s,p.fx,p.CW,p.cx,p.cy,p.dy,p.fr,q),o),A.y,!1,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,new B.e4W(p),new B.e4X(p),new B.e4Y(p),q,q,q,q,q,q,q,new B.e4Z(p),q,q,q,!1,A.a4)],r)
@@ -4129,7 +4129,7 @@ $S:255}
 B.e4Y.prototype={
 $1(d){var x,w,v=this.a
 if(d.w>=2)v.z=A.k.F(v.go*d.d,0.8,16)
-else{x=57.2958/(v.gWT()*v.z)
+else{x=57.2958/(v.gWU()*v.z)
 w=d.a
 v.y=v.y-w.a*x
 v.x=A.k.F(v.x+w.b*x,-85,85)}},
@@ -4137,7 +4137,7 @@ $S:219}
 B.e4W.prototype={
 $1(d){var x,w,v=this.a
 v.dx=!1
-x=57.2958/(v.gWT()*v.z)
+x=57.2958/(v.gWU()*v.z)
 w=d.a.a
 v.Q=A.k.F(-w.a*x,-160,160)
 v.as=A.k.F(w.b*x,-100,100)},
@@ -4761,7 +4761,7 @@ w.ch=!1
 x=this.b.a
 w.Q=x
 w.w=x==="barred"?1:0
-w.a_Z()},
+w.a0_()},
 $S:0}
 B.e3X.prototype={
 $0(){var x=this.a
@@ -4770,7 +4770,7 @@ $S:0}
 B.e3T.prototype={
 $0(){var x=this.a
 if(x.Q==="elliptical"){x.Q="spiral"
-x.a_Z()}x.cB_()},
+x.a0_()}x.cB_()},
 $S:0}
 B.e3Y.prototype={
 $1(d){var x=this.a
@@ -4779,7 +4779,7 @@ $S:6}
 B.e3S.prototype={
 $0(){var x=this.a
 x.f=A.k.V(this.b)
-x.a_Z()},
+x.a0_()},
 $S:0}
 B.e3Z.prototype={
 $1(d){var x=this.a
@@ -4788,7 +4788,7 @@ $S:6}
 B.e3R.prototype={
 $0(){var x=this.a
 x.r=this.b
-x.a_Z()},
+x.a0_()},
 $S:0}
 B.e4_.prototype={
 $1(d){var x=this.a
@@ -4913,7 +4913,7 @@ x=B.aNG.prototype
 x.bzp=x.t})();(function installTearOffs(){var x=a._instance_0u,w=a._instance_1u
 var v
 x(v=B.at3.prototype,"gcdz","cdA",0)
-x(v,"gcQC","TO",4)
+x(v,"gcQC","TP",4)
 x(v=B.aES.prototype,"gc4A","aZ3",0)
 w(v,"gcdC","cdD",5)
 x(v,"gbSp","bSq",0)
@@ -5312,4 +5312,4 @@ $.h94=null
 $.i0y=C.U(C.as("m"),C.as("iF"))
 $.i1C=C.U(C.as("m"),C.as("iF"))})();(function lazyInitializers(){var x=a.lazyFinal
 x($,"iyo","hHf",()=>C.a([B.ag_("EARTH GLOBE","Turn it, tap a country",A.mW,A.aJ,new B.frl()),B.ag_("SOLAR SYSTEM","The Sun and its worlds",D.ap_,A.aU,new B.frm()),B.ag_("GRAVITY LAB","Drop, weigh, orbit",F.a2U,A.cJ,new B.frn()),B.ag_("BLACK HOLE","Throw in a star",A.H9,A.bt,new B.fro()),B.ag_("GALAXY","Build, tilt, collide",A.wu,A.hk,new B.frp()),B.ag_("SIZE COMPARE","Earth next to a star",D.bPb,A.c1,new B.frq()),B.ag_("SEASONS & MOON","Why it is summer",A.ws,A.bw,new B.frr())],C.as("O<bw1>")))})()};
-(a=>{a["de+HG7YV/90Jzv7pKU8nN4yHiYQ="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["dcw5udDYYDdKtRKlgp5MAOf/E6E="]=a.current})($__dart_deferred_initializers__);

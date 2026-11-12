@@ -1233,15 +1233,15 @@ S(){return new C.azV()}}
 C.azV.prototype={
 gn7(){var x=this.d
 return x===$?this.d=this.a.c.e:x},
-a18(){var x=0,w=A.j(y.H),v,u=2,t=[],s=this,r,q,p,o,n,m
-var $async$a18=A.e(function(d,e){if(d===1){t.push(e)
+a19(){var x=0,w=A.j(y.H),v,u=2,t=[],s=this,r,q,p,o,n,m
+var $async$a19=A.e(function(d,e){if(d===1){t.push(e)
 x=u}for(;;)switch(x){case 0:u=4
 x=7
-return A.b(new A.hT().l8(82,1400,B.eN),$async$a18)
+return A.b(new A.hT().l8(82,1400,B.eN),$async$a19)
 case 7:r=e
 if(r==null){x=1
 break}x=8
-return A.b(r.fp(),$async$a18)
+return A.b(r.fp(),$async$a19)
 case 8:q=e
 o=r.a
 if(o==null)o=B.a.c8(r.b.toLowerCase(),".png")?"image/png":"image/jpeg"
@@ -1258,9 +1258,9 @@ case 3:x=2
 break
 case 6:case 1:return A.h(v,w)
 case 2:return A.f(t.at(-1),w)}})
-return A.i($async$a18,w)},
+return A.i($async$a19,w)},
 cxp(d){this.m(new C.d75(this,d))},
-a2t(d,e){var x=null
+a2u(d,e){var x=null
 return new A.D(D.bA8,A.x(A.a([A.d(d,x,x,x,x,x,x,D.frj,x,x,x),B.R,e],y.p),B.E,x,B.e,B.i,0,B.p),x)},
 Oi(d,e,f){var x=null,w=A.d(d,x,x,x,x,x,x,x,x,x,x)
 return new A.D(D.bA_,A.js(x,x,x,w,A.l(x,x,e?B.c:E.iY,x,x,x,x,x,x,x,x,x,x,x,B.V,x,x,!0,x,x,x,x,x,x,x,x),new C.d71(f),e,B.d2,x,x,x),x)},
@@ -1276,18 +1276,18 @@ break}x=y.p
 w=A.eF(A.a([A.bM(!1,D.fLk,i,i,!0,i,i,i,new C.d7o(j,d),i,i)],x),i,i,!0,!0,B.L,i,1,i,i,i,!1,i,!1,D.nr,i,i,i,!0,i,i,i,i,i,D.fZ3,i,i,i,1,i,!0)
 v=A.a([new A.ac(0,B.G,B.w.j(0.45),B.eY,24)],y.V)
 v=A.at(A.p(i,new A.a5(220,340,A.eL(B.A,C.aph(j.a.c.alZ(j.gn7())),B.f,B.dC),i),B.f,i,i,new A.o(i,i,i,i,v,i,B.n),i,i,i,i,i,i,i,i),i,i,i)
-u=j.a2t("Templates",new A.a5(i,150,A.hN(i,new C.d7p(j),10,i,i,B.aM,new C.d7q(),!1),i))
+u=j.a2u("Templates",new A.a5(i,150,A.hN(i,new C.d7p(j),10,i,i,B.aM,new C.d7q(),!1),i))
 t=A.bn(B.d2,i,i,i,i,i,i,i,i,i,i,i)
 t=A.a([A.dh(D.bY3,A.d(j.gn7().f.length===0?"Add a picture":"Change picture",i,i,i,i,i,i,i,i,i,i),j.gcnx(),t)],x)
 if(j.gn7().f.length!==0)B.d.v(t,A.a([B.ae,A.bM(!1,D.fLM,i,i,!0,i,i,i,new C.d7B(j),i,i)],x))
-t=j.a2t("Your picture",A.A(t,B.m,i,B.e,B.i,0,i,i))
+t=j.a2u("Your picture",A.A(t,B.m,i,B.e,B.i,0,i,i))
 s=A.bW(B.bG,A.a([j.Oi("Background",j.e==="bg1",new C.d7F(j)),j.Oi("Second colour",j.e==="bg2",new C.d7G(j)),j.Oi("Accent",j.e==="accent",new C.d7H(j)),j.Oi("Title",j.e==="ink",new C.d7I(j))],x),B.br,i,0,0)
 r=A.a([],x)
 for(q=0;q<24;++q){p=D.d1M[q]
 o=A.b0(p)
 n=h.l()===p?B.bN:B.aW
 m=new A.ay(n,h.l()===p?3:1,B.r,-1)
-r.push(A.aA(i,A.p(i,i,B.f,i,i,new A.o(o,i,new A.bG(m,m,m,m),i,i,i,B.a7),i,34,i,i,i,i,i,34),B.y,!1,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,new C.d7J(j,p),i,i,i,i,i,i,!1,B.a4))}h=j.a2t("Colours",A.x(A.a([s,A.bW(B.bG,r,B.br,i,8,8),A.ho(D.c2_,D.fBR,new C.d7K(j),i)],x),B.E,i,B.e,B.i,0,B.p))
+r.push(A.aA(i,A.p(i,i,B.f,i,i,new A.o(o,i,new A.bG(m,m,m,m),i,i,i,B.a7),i,34,i,i,i,i,i,34),B.y,!1,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,new C.d7J(j,p),i,i,i,i,i,i,!1,B.a4))}h=j.a2u("Colours",A.x(A.a([s,A.bW(B.bG,r,B.br,i,8,8),A.ho(D.c2_,D.fBR,new C.d7K(j),i)],x),B.E,i,B.e,B.i,0,B.p))
 s=A.a([],x)
 for(q=0;q<4;++q){r={}
 o=D.d1F[q]
@@ -1296,7 +1296,7 @@ l=o.a
 r.a=l
 k=j.d
 if(k===$)k=j.d=j.a.c.e
-s.push(j.Oi(o.b,k.r===l,new C.d7L(r,j)))}s=j.a2t("Title place",A.bW(B.bG,s,B.br,i,0,0))
+s.push(j.Oi(o.b,k.r===l,new C.d7L(r,j)))}s=j.a2u("Title place",A.bW(B.bG,s,B.br,i,0,0))
 r=A.a([],x)
 for(q=0;q<4;++q){o={}
 n=D.dgP[q]
@@ -1305,7 +1305,7 @@ l=n.a
 o.a=l
 k=j.d
 if(k===$)k=j.d=j.a.c.e
-r.push(j.Oi(n.b,k.w===l,new C.d7r(o,j)))}return A.c5(w,D.YO,A.cj(A.a([v,u,t,h,s,j.a2t("Lettering",A.bW(B.bG,r,B.br,i,0,0))],x),i,i,B.alR,i,i,B.ai,!1),i,!1,!1,i,i)}}
+r.push(j.Oi(n.b,k.w===l,new C.d7r(o,j)))}return A.c5(w,D.YO,A.cj(A.a([v,u,t,h,s,j.a2u("Lettering",A.bW(B.bG,r,B.br,i,0,0))],x),i,i,B.alR,i,i,B.ai,!1),i,!1,!1,i,i)}}
 C.ZC.prototype={
 S(){return new C.az9(D.Tk,new A.cw(null,y.A))}}
 C.az9.prototype={
@@ -2157,7 +2157,7 @@ gFY(){var x=this.p1
 return x.gFY()/x.gN5()},
 gx_(){var x=this.p1
 return x.gx_()/x.gN5()},
-VN(d){var x,w,v=this.p1,u=v.d.h(0,d)
+VO(d){var x,w,v=this.p1,u=v.d.h(0,d)
 if(u==null)return B.JA
 x=D.dBC.il(0,d)
 if(x){w=v.r.h(0,u)
@@ -2176,7 +2176,7 @@ x===$&&A.c()
 w.n(0,"/FontDescriptor",new A.jn(x.a,x.b))
 for(v=32;v<=255;++v){t=u.ok
 t===$&&A.c()
-t.c.a.push(new A.h2(B.k.M(u.VN(v).r*1000)))}w.n(0,"/FirstChar",new A.h2(32))
+t.c.a.push(new A.h2(B.k.M(u.VO(v).r*1000)))}w.n(0,"/FirstChar",new A.h2(32))
 w.n(0,"/LastChar",new A.h2(255))
 t=u.ok
 t===$&&A.c()
@@ -2204,7 +2204,7 @@ t.n(0,"/DescendantFonts",A.OV(A.a([r],y.W),y.l))
 n=o.k2
 t.n(0,"/ToUnicode",new A.jn(n.a,n.b))
 q=o.k2.k3.length-1
-for(p=0;p<=q;++p)o.ok.c.a.push(new A.h2(B.k.M(o.VN(o.k2.k3[p]).r*1000)))},
+for(p=0;p<=q;++p)o.ok.c.a.push(new A.h2(B.k.M(o.VO(o.k2.k3[p]).r*1000)))},
 nu(){var x,w=this
 w.btS()
 x=w.c
@@ -3042,13 +3042,13 @@ $S:43}
 C.cD0.prototype={
 $1(d){return d.a===this.a},
 $S:z+17};(function installTearOffs(){var x=a._instance_0u,w=a._instance_1u
-x(C.azV.prototype,"gcnx","a18",1)
+x(C.azV.prototype,"gcnx","a19",1)
 var v
 x(v=C.az9.prototype,"gayo","ym",1)
 x(v,"gaAq","JM",3)
 x(v,"gcuX","Bi",3)
 x(C.az5.prototype,"gbVL","acd",1)
-w(C.a9A.prototype,"gaqC","VN",18)})();(function inheritance(){var x=a.inheritMany,w=a.inherit
+w(C.a9A.prototype,"gaqC","VO",18)})();(function inheritance(){var x=a.inheritMany,w=a.inherit
 x(A.jt,[C.fUP,C.fUQ,C.d7q,C.d7p,C.cOW,C.cOj,C.frM,C.fKe])
 x(A.hu,[C.fUO,C.fRI,C.fRH,C.fMs,C.fM9,C.c5Z,C.c5Y,C.fW8,C.d71,C.fKb,C.fQl,C.fQm,C.fU4,C.fuC,C.fuD,C.fuG,C.fuH,C.fBL,C.fW9,C.cP4,C.cOT,C.cOU,C.cOV,C.cP3,C.f70,C.cOs,C.cOt,C.c6_,C.c61,C.c60,C.fU3,C.fQi,C.frZ,C.fs_,C.frN,C.frK,C.frL,C.fKi,C.fKh,C.fKf,C.fKg,C.cD_,C.cD0])
 w(C.aXD,A.dI)
@@ -3222,4 +3222,4 @@ D.fZ3=new A.B("Design the cover",null,B.cB,null,null,null,null,null,null,null,nu
 D.h1a=new C.cCY(6,"postScriptName")
 D.hyE=new C.bti(null)})();(function staticFields(){$.hv2=null
 $.hx4=A.U(y.N,A.as("aB<m?>"))})()};
-(a=>{a["A/0PzpkP/e+BbXOZZCv1PtLFDiM="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["2sP4DAlDiNgnkMPsceScivc7Eag="]=a.current})($__dart_deferred_initializers__);
