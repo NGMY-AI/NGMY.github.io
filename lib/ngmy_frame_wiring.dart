@@ -1353,42 +1353,85 @@ class NgmyWiringHousePageState extends State<NgmyWiringHousePage> {
     _say('Everything is taken out again. Start with the boxes.');
   }
 
-  Widget _chip(String key, String label, IconData icon, {required bool on, required VoidCallback onTap, Color color = kConAmber, String? small, bool compact = false}) {
-    return GestureDetector(
-      key: Key(key),
-      onTap: onTap,
-      child: Container(
-        padding: compact ? const EdgeInsets.symmetric(horizontal: 7, vertical: 4) : const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(color: on ? color.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(13), border: Border.all(color: on ? color : Colors.white24, width: on ? 2 : 1)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: compact ? 13 : 17, color: on ? color : Colors.white70),
-          const SizedBox(width: 5),
-          Text(label, style: TextStyle(color: on ? color : Colors.white, fontWeight: FontWeight.w800, fontSize: compact ? 10.5 : 12)),
-          if (small != null) ...[const SizedBox(width: 5), Text(small, style: TextStyle(color: on ? color : Colors.white54, fontWeight: FontWeight.w700, fontSize: 10.5))],
+  /// A tool button. [tile]: a small square button (icon over the name) so all of them fit in two rows; [compact]: a half-width button of an open group.
+  Widget _chip(String key, String label, IconData icon, {required bool on, required VoidCallback onTap, Color color = kConAmber, String? small, bool compact = false, bool tile = false}) {
+    final fg = on ? color : Colors.white;
+    final deco = BoxDecoration(color: on ? color.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(tile ? 10 : 12), border: Border.all(color: on ? color : Colors.white24, width: on ? 2 : 1));
+    Widget body;
+    if (tile) {
+      body = Container(
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        decoration: deco,
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(icon, size: 16, color: on ? color : Colors.white70),
+          const SizedBox(height: 2),
+          FittedBox(fit: BoxFit.scaleDown, child: Text(small == null ? label : '$label $small', maxLines: 1, style: TextStyle(color: fg, fontWeight: FontWeight.w800, fontSize: 9.5))),
         ]),
-      ),
-    );
+      );
+    } else if (compact) {
+      body = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
+        decoration: deco,
+        child: Row(children: [
+          Icon(icon, size: 14, color: on ? color : Colors.white70),
+          const SizedBox(width: 5),
+          Expanded(child: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: fg, fontWeight: FontWeight.w800, fontSize: 10.5, height: 1.1))),
+        ]),
+      );
+    } else {
+      body = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: deco,
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 17, color: on ? color : Colors.white70),
+          const SizedBox(width: 5),
+          Text(label, style: TextStyle(color: fg, fontWeight: FontWeight.w800, fontSize: 12)),
+        ]),
+      );
+    }
+    return GestureDetector(key: Key(key), onTap: onTap, child: body);
+  }
+
+  /// [items] in rows of [per] buttons that share the width.
+  Widget _rows(List<Widget> items, int per, {double gap = 4}) {
+    final rows = <Widget>[];
+    for (var i = 0; i < items.length; i += per) {
+      final part = items.sublist(i, math.min(items.length, i + per));
+      rows.add(Padding(
+        padding: EdgeInsets.only(top: i == 0 ? 0 : gap),
+        child: Row(children: [
+          for (var j = 0; j < per; j++) ...[
+            if (j > 0) SizedBox(width: gap),
+            Expanded(child: j < part.length ? part[j] : const SizedBox()),
+          ],
+        ]),
+      ));
+    }
+    return Column(children: rows);
   }
 
   Widget _tray() {
     final m = menu == null ? null : _cats.firstWhere((c) => c.key == menu);
     if (m != null) {
-      return Wrap(spacing: 4, runSpacing: 4, children: [
+      // An open group: two buttons in every row, the Back button first.
+      return _rows([
         _chip('menu-back', 'Back', Icons.arrow_back_rounded, on: false, onTap: () => setState(() => menu = null), color: Colors.white70, compact: true),
         for (final it in m.items) _chip('tool-${it.key}', it.label, it.icon, on: tool == it.key, onTap: () => setTool(it.key), compact: true),
-      ]);
+      ], 2);
     }
     bool inCat(_Cat c) => c.items.any((i) => i.key == tool);
-    return Wrap(spacing: 6, runSpacing: 6, children: [
-      _chip('tool-look', 'Look', Icons.search_rounded, on: tool == 'look', onTap: () => setTool('look')),
-      for (final c in _cats.take(1)) _chip('cat-${c.key}', c.label, c.icon, on: inCat(c), small: '▸', onTap: () => setState(() => menu = c.key)),
-      _chip('tool-knock', 'Knockout', Icons.radio_button_unchecked_rounded, on: tool == 'knock', onTap: () => setTool('knock')),
-      _chip('tool-drill', 'Drill', Icons.construction_rounded, on: tool == 'drill', onTap: () => setTool('drill')),
-      _chip('tool-cable', 'Cable roll', Icons.cable_rounded, on: tool == 'cable', onTap: () => setTool('cable')),
-      for (final c in _cats.skip(1)) _chip('cat-${c.key}', c.label, c.icon, on: inCat(c), small: '▸', onTap: () => setState(() => menu = c.key)),
-      _chip('tool-breaker', w.tripped ? 'Breaker: TRIPPED' : (w.breaker ? 'Breaker: ON' : 'Breaker: OFF'), Icons.power_settings_new_rounded, on: w.breaker, color: w.tripped ? const Color(0xFFF87171) : const Color(0xFF4ADE80), onTap: _toggleBreaker),
-      _chip('tool-hint', 'Hint', Icons.lightbulb_rounded, on: false, small: '−2 ⭐', color: const Color(0xFFFACC15), onTap: _hint),
-    ]);
+    final all = <Widget>[
+      _chip('tool-look', 'Look', Icons.search_rounded, on: tool == 'look', onTap: () => setTool('look'), tile: true),
+      for (final c in _cats.take(1)) _chip('cat-${c.key}', c.label, c.icon, on: inCat(c), small: '▸', onTap: () => setState(() => menu = c.key), tile: true),
+      _chip('tool-knock', 'Knockout', Icons.radio_button_unchecked_rounded, on: tool == 'knock', onTap: () => setTool('knock'), tile: true),
+      _chip('tool-drill', 'Drill', Icons.construction_rounded, on: tool == 'drill', onTap: () => setTool('drill'), tile: true),
+      _chip('tool-cable', 'Cable roll', Icons.cable_rounded, on: tool == 'cable', onTap: () => setTool('cable'), tile: true),
+      for (final c in _cats.skip(1)) _chip('cat-${c.key}', c.label, c.icon, on: inCat(c), small: '▸', onTap: () => setState(() => menu = c.key), tile: true),
+      _chip('tool-breaker', w.tripped ? 'Breaker TRIPPED' : (w.breaker ? 'Breaker ON' : 'Breaker OFF'), Icons.power_settings_new_rounded, on: w.breaker, color: w.tripped ? const Color(0xFFF87171) : const Color(0xFF4ADE80), onTap: _toggleBreaker, tile: true),
+      _chip('tool-hint', 'Hint', Icons.lightbulb_rounded, on: false, small: '−2⭐', color: const Color(0xFFFACC15), onTap: _hint, tile: true),
+    ];
+    return _rows(all, (all.length / 2).ceil());
   }
 
   int get _stars => (Community.active?.points ?? 0) + (Community.active == null ? net : 0);

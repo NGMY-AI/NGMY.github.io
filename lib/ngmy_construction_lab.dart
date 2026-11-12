@@ -519,7 +519,7 @@ Future<void> showConSteps(BuildContext context, String title, List<String> steps
 
 /// A lesson page: a header with the title, the menu under it, then the 3D area.
 class LessonScaffold extends StatelessWidget {
-  const LessonScaffold({required this.title, required this.color, required this.stage, required this.panel, required this.onSteps, required this.stepText, this.titleExtra});
+  const LessonScaffold({required this.title, required this.color, required this.stage, required this.panel, required this.onSteps, required this.stepText, this.titleExtra, this.autoHideBack = true});
   final String title;
   final Color color;
   final Widget stage;
@@ -530,6 +530,9 @@ class LessonScaffold extends StatelessWidget {
   /// Something shown right after the title, as wide as the room allows (the energy bar in the city).
   final Widget? titleExtra;
 
+  /// The back button fades away after a few seconds; the close-up benches inside a job keep theirs on the screen.
+  final bool autoHideBack;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -539,7 +542,10 @@ class LessonScaffold extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(4, 4, 8, 4),
             child: Row(children: [
-              AutoHideBack(child: IconButton(onPressed: () => Navigator.of(context).maybePop(), icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20))),
+              if (autoHideBack)
+                AutoHideBack(child: IconButton(onPressed: () => Navigator.of(context).maybePop(), icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20)))
+              else
+                IconButton(onPressed: () => Navigator.of(context).maybePop(), icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20)),
               if (titleExtra == null)
                 Expanded(child: Text(title, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 16)))
               else ...[
@@ -878,6 +884,7 @@ class _ElectricalPageState extends State<ElectricalLessonPage> with _GlowMixin {
     final stepText = next < 0 ? 'All done' : 'Step ${next + 1}/${lesson.steps.length}';
     final canPush = wiringComplete(lesson, s) && !s.power;
     return LessonScaffold(
+      autoHideBack: widget.state == null,
       title: lesson.title,
       color: kConAmber,
       stepText: stepText,
