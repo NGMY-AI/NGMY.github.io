@@ -1,8 +1,8 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var D,A,E,C={
-hrj(d){switch(d.a){case 1:return B.egW
-case 2:return B.egY
-case 0:return B.egX}},
+hro(d){switch(d.a){case 1:return B.egX
+case 2:return B.egZ
+case 0:return B.egY}},
 atQ:function atQ(d,e,f,g,h,i){var _=this
 _.a=d
 _.b=e
@@ -20,18 +20,18 @@ var z=a.updateTypes([]);(function inheritance(){var x=a.inherit
 x(C.atQ,D.aE)})()
 var y={c:D.as("O<u>")};(function constants(){var x=a.makeConstList
 B.aV3=new D.H(!0,A.c,null,null,null,null,9,A.u,null,2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-B.d2_=x([A.dx,A.kn,A.aE],y.c)
+B.d1Z=x([A.dx,A.kn,A.aE],y.c)
 B.dzJ=x([A.aE,A.fd],y.c)
-B.daB=x([A.kM,A.pa,A.aE],y.c)
-B.egW=new C.atQ(B.d2_,B.dzJ,A.fd,A.js,"PREMIUM",B.daB)
-B.drS=x([A.cG,A.fo,A.bR],y.c)
-B.dn3=x([A.bR,A.aY],y.c)
-B.d9e=x([A.w9,A.bR,A.fo],y.c)
-B.egX=new C.atQ(B.drS,B.dn3,A.bR,A.k5,"NGMY WALLET",B.d9e)
-B.doX=x([A.ep,A.dT,A.pb],y.c)
-B.dty=x([A.aC,A.aV],y.c)
-B.dbs=x([A.u7,A.aC,A.c4],y.c)
-B.egY=new C.atQ(B.doX,B.dty,A.aC,A.mm,"LUXURY",B.dbs)
-B.eh_=new E.atP(1,"premium")
-B.eh0=new E.atP(2,"luxury")})()};
-(a=>{a["1b/8+C1mY00D+XhBsLtDCst9WhU="]=a.current})($__dart_deferred_initializers__);
+B.daA=x([A.kM,A.pa,A.aE],y.c)
+B.egX=new C.atQ(B.d1Z,B.dzJ,A.fd,A.js,"PREMIUM",B.daA)
+B.drR=x([A.cG,A.fo,A.bR],y.c)
+B.dn2=x([A.bR,A.aY],y.c)
+B.d9d=x([A.w9,A.bR,A.fo],y.c)
+B.egY=new C.atQ(B.drR,B.dn2,A.bR,A.k5,"NGMY WALLET",B.d9d)
+B.doW=x([A.ep,A.dT,A.pb],y.c)
+B.dtx=x([A.aC,A.aV],y.c)
+B.dbr=x([A.u7,A.aC,A.c4],y.c)
+B.egZ=new C.atQ(B.doW,B.dtx,A.aC,A.mm,"LUXURY",B.dbr)
+B.eh0=new E.atP(1,"premium")
+B.eh1=new E.atP(2,"luxury")})()};
+(a=>{a["JjrBb2h6+1rFGw1Y2qNs98i5n80="]=a.current})($__dart_deferred_initializers__);
