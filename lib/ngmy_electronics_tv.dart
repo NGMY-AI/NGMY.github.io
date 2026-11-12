@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'ngmy_electronics_tv_ads.dart';
 
 import 'ngmy_electronics_cartoons.dart';
 import 'ngmy_electronics_screens.dart';
@@ -21,14 +22,14 @@ class NgmyTvChannel {
 const List<NgmyTvChannel> kNgmyTvChannels = [
   NgmyTvChannel('NGMY Tree Story', 'A family grows, one branch at a time'),
   NgmyTvChannel('Coin Hero', 'A little coin saves up and wins the day'),
-  NgmyTvChannel('Space Voyage', 'The NGMY rocket explores the stars'),
-  NgmyTvChannel('Ocean Friends', 'Fish, bubbles and a friendly whale'),
-  NgmyTvChannel('Rainy Village', 'Storm clouds, then a rainbow'),
+  NgmyTvChannel('NGMY Construction Lab', 'Build, wire and finish a real house'),
+  NgmyTvChannel('NGMY Electronics Lab', 'Build circuits that really light up'),
+  NgmyTvChannel('NGMY Advisors', 'Say hi to a friendly advisor'),
   NgmyTvChannel('Spark Adventure', 'Follow a spark round a circuit'),
-  NgmyTvChannel('Fireworks Night', 'Colour bursts over the city'),
+  NgmyTvChannel('NGMY Game Center', 'Play games and win coins'),
   NgmyTvChannel('Little Train', 'A train rolls past the hills'),
-  NgmyTvChannel('Robot Disco', 'A robot dances to the beat'),
-  NgmyTvChannel('Garden Time', 'Flowers grow and butterflies fly'),
+  NgmyTvChannel('NGMY Vault', 'Keep what matters safe'),
+  NgmyTvChannel('NGMY Studios', 'Make music, art, titles and more'),
 ];
 
 /// Paints one frame of the TV picture (the boot logo for the first seconds, then the channel).
@@ -49,21 +50,21 @@ void paintNgmyTv(Canvas c, Size s, int channel, double t, {double age = 99, int 
       case 1:
         _coinHero(c, s, t);
       case 2:
-        _space(c, s, t);
+        paintNgmyTvAd(c, s, 0, t);
       case 3:
-        _ocean(c, s, t);
+        paintNgmyTvAd(c, s, 1, t);
       case 4:
-        _rain(c, s, t);
+        paintNgmyTvAd(c, s, 2, t);
       case 5:
         _spark(c, s, t);
       case 6:
-        _fireworks(c, s, t);
+        paintNgmyTvAd(c, s, 3, t);
       case 7:
         _train(c, s, t);
       case 8:
-        _robotDance(c, s, t);
+        paintNgmyTvAd(c, s, 4, t);
       default:
-        _garden(c, s, t);
+        paintNgmyTvAd(c, s, 5, t);
     }
     _bug(c, s, channel, t);
     if (k < 1) c.drawRect(Offset.zero & s, Paint()..color = Colors.white.withValues(alpha: 0.6 * (1 - k)));

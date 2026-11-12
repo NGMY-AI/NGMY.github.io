@@ -65,7 +65,7 @@ String encodeLab(ElectronicsBoard b, int challenge, Set<int> done) {
       p.charge = (m['c'] as num? ?? p.charge).toDouble();
       p.channel = (m['ch'] as num? ?? 0).toInt();
       p.vc = (m['vc'] as num? ?? 0).toDouble();
-      p.scale = (m['s'] as num? ?? 1).toDouble().clamp(1.0, 2.6);
+      p.scale = (m['s'] as num? ?? 1).toDouble().clamp(1.0, 5.2);
       made.add(p);
     }
     for (final e in (j['wires'] as List? ?? const [])) {

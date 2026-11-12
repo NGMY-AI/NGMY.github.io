@@ -119,7 +119,7 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
       builder: (ctx) => StatefulBuilder(builder: (ctx, set) {
         void change(double v) {
-          setState(() => p.scale = v.clamp(1.0, 2.6));
+          setState(() => p.scale = v.clamp(1.0, 5.2));
           set(() {});
           widget.onChanged?.call();
         }
@@ -132,9 +132,9 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
               const Text('Make it bigger to see it better. It can never be smaller than its normal size.', style: TextStyle(color: Colors.white54, fontSize: 12.5)),
               const SizedBox(height: 10),
               Row(children: [
-                IconButton(onPressed: () => change(p.scale - 0.2), icon: const Icon(Icons.remove_circle_outline_rounded, color: Colors.white70)),
-                Expanded(child: Slider(value: p.scale.clamp(1.0, 2.6), min: 1.0, max: 2.6, activeColor: p.info.color, onChanged: change)),
-                IconButton(onPressed: () => change(p.scale + 0.2), icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.white70)),
+                IconButton(onPressed: () => change(p.scale - 0.4), icon: const Icon(Icons.remove_circle_outline_rounded, color: Colors.white70)),
+                Expanded(child: Slider(value: p.scale.clamp(1.0, 5.2), min: 1.0, max: 5.2, activeColor: p.info.color, onChanged: change)),
+                IconButton(onPressed: () => change(p.scale + 0.4), icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.white70)),
               ]),
               Row(children: [
                 Text('${(p.scale * 100).round()}%', style: TextStyle(color: p.info.color, fontWeight: FontWeight.w900)),

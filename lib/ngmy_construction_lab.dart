@@ -110,21 +110,29 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
           children: [
+            // The header: the back arrow at the side and the name of the lab in a frame in the middle.
             Row(children: [
               IconButton(onPressed: () => Navigator.of(context).maybePop(), icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20)),
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(color: kConAmber.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(13), border: Border.all(color: kConAmber.withValues(alpha: 0.6))),
-                child: const Center(child: Text('🏗️', style: TextStyle(fontSize: 22))),
+              Expanded(
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [kConAmber.withValues(alpha: 0.22), kConAmber.withValues(alpha: 0.06)]),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: kConAmber.withValues(alpha: 0.75), width: 1.6),
+                      boxShadow: [BoxShadow(color: kConAmber.withValues(alpha: 0.22), blurRadius: 16)],
+                    ),
+                    child: const Column(mainAxisSize: MainAxisSize.min, children: [
+                      Text('🏗️', style: TextStyle(fontSize: 24)),
+                      SizedBox(height: 2),
+                      Text('Construction Lab', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 19)),
+                      Text('Wire it. Plumb it. Fix a house.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white60, fontSize: 12)),
+                    ]),
+                  ),
+                ),
               ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Construction Lab', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 19)),
-                  Text('Wire it. Plumb it. Fix a house.', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                ]),
-              ),
+              const SizedBox(width: 48),
             ]),
             const SizedBox(height: 12),
             Stack(children: [
