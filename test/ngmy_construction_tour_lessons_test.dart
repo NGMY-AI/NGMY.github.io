@@ -348,7 +348,7 @@ void main() {
     for (var i = 0; i < 12; i++) {
       await t.pump(const Duration(milliseconds: 100));
     }
-    expect(find.text('Dryer outlet, 4-wire (NEMA 14-30)'), findsOneWidget, reason: 'the title says what is being fixed');
+    expect(find.text('Dryer outlet 4-wire'), findsOneWidget, reason: 'the title says what is being fixed');
     expect(find.text('Faucet'), findsNothing);
     expect(find.byKey(const Key('equip-search')), findsOneWidget);
     await t.ensureVisible(find.byKey(const Key('equip-dryer'), skipOffstage: false));
@@ -364,7 +364,7 @@ void main() {
     expect(find.byKey(const Key('find-range')), findsNothing);
     await t.tap(find.byKey(const Key('find-dryer')));
     await t.pump(const Duration(milliseconds: 400));
-    expect(find.textContaining('Wire the dryer outlet'), findsOneWidget, reason: 'it is plugged only once the outlet is wired');
+    expect(find.textContaining('Wire the dryer outlet 4-wire'), findsOneWidget, reason: 'it is plugged only once the outlet is wired');
     await t.pump(const Duration(seconds: 12));
   });
 

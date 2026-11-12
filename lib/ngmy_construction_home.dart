@@ -451,7 +451,7 @@ class HomeProject {
   HomeProject.lesson(String id) : seed = 7 {
     lessonId = id;
     final kind = switch (id) { 'gfci' || 'faucet' => 'bathroom', 'fan' => 'bedroom', 'ptrap' => 'kitchen', _ => 'living' };
-    final title = switch (id) { 'outlet' => 'Wall outlet', 'switch' => 'Light switch', 'gfci' => 'GFCI outlet', 'fan' => 'Ceiling fan', 'ptrap' => 'Sink drain', 'faucet' => 'Faucet', _ => deviceKindName(id) };
+    final title = switch (id) { 'outlet' => 'Wall outlet', 'switch' => 'Light switch', 'gfci' => 'GFCI outlet', 'fan' => 'Ceiling fan', 'ptrap' => 'Sink drain', 'faucet' => 'Faucet', _ => shortDeviceName(id) };
     final r = HRoom(0, title, kind, 0, 0, 1, 1, []);
     r.lesson = id;
     r.ceilingFix = id == 'fan' ? 'fan' : 'light';
@@ -795,3 +795,20 @@ class HomeProject {
 
 /// Which wiring job a room gets: bedrooms a fan, bathrooms water-safe GFCI outlets, the kitchen an electric range outlet, the hall a laundry corner (washer and dryer outlets).
 int wiringKindFor(HRoom r) => switch (r.kind) { 'bedroom' => 1, 'bathroom' => 2, 'kitchen' => 4, 'hall' => 3, _ => 0 };
+
+/// A short name for the title of a lesson room: just what is being fixed ("Dryer outlet 4-wire"), never a long line.
+String shortDeviceName(String id) {
+  const names = {
+    'dryer4': 'Dryer outlet 4-wire',
+    'dryer3': 'Dryer outlet 3-wire',
+    'range4': 'Range outlet 4-wire',
+    'range3': 'Range outlet 3-wire',
+    'washer': 'Washer outlet',
+    'v240four': '240 V outlet 4-wire',
+    'v240three': '240 V outlet 3-wire',
+    'v240only': '240 V only outlet',
+    'isolated': 'Isolated ground outlet',
+    'split': 'Split outlet',
+  };
+  return names[id] ?? deviceKindName(id).split('(').first.split(',').first.trim();
+}

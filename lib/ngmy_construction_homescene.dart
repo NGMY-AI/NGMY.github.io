@@ -7,7 +7,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 
 import 'package:flutter/material.dart';
-import 'ngmy_construction_electrical_more.dart' show deviceKindName, isOutletKind;
+import 'ngmy_construction_electrical_more.dart' show isOutletKind;
 
 import 'ngmy_3d.dart';
 import 'ngmy_avatar_glb.dart';
@@ -199,51 +199,72 @@ void paintNgmyPoster(Canvas c, Size s, double t, int variant) {
 }
 
 
-/// The face of an outlet of the wall: the kind being fixed looks like itself (a round big-appliance outlet for a dryer or a range, a GFCI with its two
-/// buttons, an isolated ground with its orange mark), even before it is wired. [ok] is the wired one (pale plate); the unwired one has a dark plate.
+/// The face of an outlet of the wall, the same as the one on the wiring bench: a dryer or range outlet is a round dark receptacle with the slots of its
+/// type on a cream plate (the 14-30 and 14-50 with their ground hole, the 10-30 and 10-50 without), a GFCI has its TEST and RESET buttons, an isolated
+/// ground its orange mark. It looks like this before it is wired too: only the red frame says it still has to be done.
 void _outletFace(MeshBuilder b, String kind, double x, bool ok) {
-  const blade = Color(0xFF22252B), steel = Color(0xFF9CA3AF);
-  final plate = ok ? const Color(0xFFF7F2E6) : const Color(0xFF3F3F46);
-  final bladeCol = ok ? blade : const Color(0xFFD1D5DB);
-  // The big round receptacles: dryer and range (3 or 4 holes) and the 240 volt ones.
-  final big = const {'dryer4': (1.0, true, 3), 'dryer3': (1.0, false, 3), 'range4': (1.25, true, 3), 'range3': (1.25, false, 3), 'v240four': (0.8, true, 2), 'v240three': (0.8, false, 2), 'v240only': (0.75, false, 1)}[kind];
-  if (big != null) {
-    final (sc, ground, hots) = big;
-    final r = 5.4 * sc;
-    b.box(V3(x, 14, 0.9), V3(13 * sc + 1, 13 * sc + 3, 1.4), plate, shine: 0.25);
-    // The round body of the receptacle.
-    b.cyl(V3(x, 14, 1.6), V3(x, 14, 2.1), r, ok ? const Color(0xFFD6D3CB) : const Color(0xFF52525B), sides: 20, shine: 0.3);
-    b.ring(V3(x, 14, 2.1), V3(x, 14, 2.3), r, r - 0.7 * sc, steel, sides: 20, shine: 0.5);
-    if (kind == 'v240only') {
-      for (final dy in const [-1.2, 1.2]) {
-        b.box(V3(x, 14 + dy * sc, 2.4), V3(3.4 * sc, 0.8 * sc, 0.3), bladeCol);
-      }
-      b.cyl(V3(x, 14 - 3.0 * sc, 2.1), V3(x, 14 - 3.0 * sc, 2.5), 0.7 * sc, bladeCol, sides: 8);
-      return;
+  const slotCol = Color(0xFF0B0B0D), dark = Color(0xFF17181B);
+  const plate = Color(0xFFF2EEE2);
+  const layouts = {'dryer3': 'nema1030', 'dryer4': 'nema1430', 'range3': 'nema1050', 'range4': 'nema1450', 'washer': 'nema520', 'v240three': 'nema1030', 'v240four': 'nema1430', 'v240only': 'nema520'};
+  final layout = layouts[kind];
+  if (layout != null) {
+    final small = kind.startsWith('v240');
+    final r = small ? 4.6 : 5.6;
+    final k = r / 0.64;
+    b.box(V3(x, 14, 0.9), V3(2 * r + 3.2, 2 * r + 4.2, 1.4), plate, shine: 0.25);
+    b.cyl(V3(x, 14, 1.6), V3(x, 14, 2.1), r, const Color(0xFF3B2F2A), sides: 28, shine: 0.35);
+    // A slot: a thin rectangle turned [angle] in the plane of the face (sizes as on the bench, in tenths of an inch of the bench).
+    void slot(double sx, double sy, double w, double h, [double angle = 0]) {
+      final ca = math.cos(angle), sa = math.sin(angle);
+      V3 p(double dx, double dy) => V3(x + sx * k + (dx * ca - dy * sa) * k, 14 + sy * k + (dx * sa + dy * ca) * k, 2.14);
+      b.quad(p(-w / 2, -h / 2), p(w / 2, -h / 2), p(w / 2, h / 2), p(-w / 2, h / 2), slotCol, normal: const V3(0, 0, 1));
     }
-    // Two hot blades, slanted in, and the neutral blade in an L.
-    for (final dx in const [-1.0, 1.0]) {
-      b.box(V3(x + dx * 2.5 * sc, 14 + 1.6 * sc, 2.4), V3(0.9 * sc, 3.0 * sc, 0.3), bladeCol);
+
+    void round(double sx, double sy) => b.cyl(V3(x + sx * k, 14 + sy * k, 2.1), V3(x + sx * k, 14 + sy * k, 2.15), 0.065 * k, slotCol, sides: 12);
+    void ell(double sx, double sy) {
+      slot(sx, sy, 0.075, 0.3);
+      slot(sx + 0.09, sy - 0.115, 0.2, 0.075);
     }
-    b.box(V3(x + 2.2 * sc, 14 - 2.6 * sc, 2.4), V3(3.0 * sc, 0.9 * sc, 0.3), bladeCol);
-    if (ground) b.cyl(V3(x - 2.4 * sc, 14 - 2.6 * sc, 2.1), V3(x - 2.4 * sc, 14 - 2.6 * sc, 2.5), 0.85 * sc, bladeCol, sides: 8);
-    if (hots == 3) b.box(V3(x, 14 + 5.8 * sc, 1.9), V3(2.4 * sc, 0.8, 0.3), const Color(0xFFF59E0B));
+
+    switch (layout) {
+      case 'nema1030':
+        ell(-0.05, 0.14);
+        slot(-0.3, -0.24, 0.075, 0.3, -0.5);
+        slot(0.3, -0.24, 0.075, 0.3, 0.5);
+      case 'nema1430':
+        ell(-0.05, 0.28);
+        slot(-0.4, -0.04, 0.075, 0.32);
+        slot(0.4, -0.04, 0.075, 0.32);
+        round(0, -0.4);
+      case 'nema1050':
+        slot(-0.3, 0.2, 0.075, 0.3, 0.5);
+        slot(0.3, 0.2, 0.075, 0.3, -0.5);
+        slot(0, -0.26, 0.075, 0.32);
+      case 'nema1450':
+        slot(0, 0.3, 0.075, 0.28);
+        slot(-0.4, -0.04, 0.075, 0.32);
+        slot(0.4, -0.04, 0.075, 0.32);
+        round(0, -0.4);
+      default:
+        slot(0.2, 0.12, 0.075, 0.3);
+        slot(-0.2, 0.12, 0.075, 0.3);
+        slot(-0.3, 0.12, 0.14, 0.075);
+        round(0, -0.3);
+    }
     return;
   }
   b.box(V3(x, 14, 0.9), const V3(9.5, 13.5, 1.4), plate, shine: 0.25);
   for (final dz in const [-1.0, 1.0]) {
     for (final dx in const [-1.6, 1.6]) {
-      b.box(V3(x + dx, 14 + dz * 2.8, 1.7), const V3(0.8, 2.4, 0.3), blade);
+      b.box(V3(x + dx, 14 + dz * 2.8, 1.7), const V3(0.8, 2.4, 0.3), dark);
     }
-    // The washing machine outlet has a T-shaped slot (the 20 amp one).
-    if (kind == 'washer') b.box(V3(x + 1.6, 14 + dz * 2.8, 1.75), const V3(2.0, 0.7, 0.3), blade);
   }
   if (kind == 'gfci') {
     // The TEST and RESET buttons between the two receptacles.
-    b.box(V3(x - 1.5, 14, 1.8), const V3(1.6, 1.1, 0.4), const Color(0xFF111827));
-    b.box(V3(x + 1.5, 14, 1.8), const V3(1.6, 1.1, 0.4), const Color(0xFFDC2626));
+    b.box(V3(x - 1.5, 14, 1.8), const V3(1.6, 1.1, 0.4), const Color(0xFF202226));
+    b.box(V3(x + 1.5, 14, 1.8), const V3(1.6, 1.1, 0.4), const Color(0xFFD72A2A));
   } else {
-    b.box(V3(x, 14, 1.7), const V3(1.2, 1.2, 0.3), steel);
+    b.box(V3(x, 14, 1.7), const V3(1.2, 1.2, 0.3), const Color(0xFF9CA3AF));
   }
   if (kind == 'isolated') b.box(V3(x, 19.6, 1.8), const V3(2.2, 1.4, 0.3), const Color(0xFFF97316));
 }
@@ -450,7 +471,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
   // Every outlet in the room: the two that belong to it and the ones that were added.
   final bathKitchen = r.kind == 'bathroom' || r.kind == 'kitchen' || r.lesson == 'gfci';
   final outlets = <(int, int, double, bool, String)>[
-    (0, idHOutletA, -w / 4, r.okOutA, r.lesson.isNotEmpty && isOutletKind(r.lesson) ? deviceKindName(r.lesson) : (bathKitchen ? 'GFCI outlet' : 'Wall outlet')),
+    (0, idHOutletA, -w / 4, r.okOutA, r.lesson.isNotEmpty && isOutletKind(r.lesson) ? shortDeviceName(r.lesson) : (bathKitchen ? 'GFCI outlet' : 'Wall outlet')),
     (1, idHOutletB, w / 4, r.okOutB, bathKitchen ? 'GFCI outlet' : 'Wall outlet'),
     for (var i = 0; i < r.extras.length; i++)
       if (r.extras[i].kind != 'switch') (2 + i, idHExtra + i, r.extras[i].x, r.extras[i].done, r.extras[i].kind == 'gfci' ? 'Added GFCI outlet' : 'Added outlet'),
@@ -465,7 +486,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
     b.alpha = 0.55;
     final st = ok ? 2 : (i < 2 ? r.fixtureState(i) : 0);
     final kindOf = i < 2 ? r.outletKind(i) : (r.extras[i - 2].kind == 'gfci' ? 'gfci' : 'outlet');
-    final frameW = const {'range4': 20.0, 'range3': 20.0, 'dryer4': 17.0, 'dryer3': 17.0}[kindOf] ?? 15.0;
+    final frameW = const {'range4': 17.5, 'range3': 17.5, 'dryer4': 17.5, 'dryer3': 17.5, 'washer': 17.5, 'v240four': 15.0, 'v240three': 15.0, 'v240only': 15.0}[kindOf] ?? 15.0;
     b.box(V3(x, 14, 0.25), V3(frameW, frameW > 15 ? frameW + 3 : 19.0, 0.5), ok ? okRing : (st == 1 ? const Color(0xFFF59E0B) : badRing));
     b.alpha = 1;
     b.bias = 0;

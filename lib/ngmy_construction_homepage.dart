@@ -2047,7 +2047,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   /// Plugs [a] into the outlet that is being fixed (once it is wired).
   void _plugLesson(HomeAppliance a) {
-    final nice = deviceKindName(room.lesson).toLowerCase();
+    final nice = shortDeviceName(room.lesson).toLowerCase();
     if (!room.lessonDone) {
       conBad();
       _say('Wire the $nice first (tap the red one), then plug the ${a.name.toLowerCase()} into it.', ok: false);
@@ -2068,7 +2068,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     return Padding(
       padding: const EdgeInsets.only(top: 6),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Fits the ${deviceKindName(kind).toLowerCase()}:', style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w800)),
+        Text('Fits the ${shortDeviceName(kind).toLowerCase()}:', style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w800)),
         const SizedBox(height: 4),
         if (list.isEmpty)
           const Text('Nothing in the house plugs into this one: it is for special equipment.', style: TextStyle(color: Colors.white38, fontSize: 11.5))
@@ -2112,7 +2112,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Plug into the ${deviceKindName(kind).toLowerCase()}', style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
+                Text('Plug into the ${shortDeviceName(kind).toLowerCase()}', style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 10),
                 TextField(
                   key: const Key('equip-query'),
