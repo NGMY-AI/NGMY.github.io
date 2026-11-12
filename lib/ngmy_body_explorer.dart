@@ -150,6 +150,10 @@ class _BodyModel {
   /// The raw anatomy file, kept so the 3D page can be given it.
   static Uint8List? rawBytes;
   static Future<_BodyModel>? _lightLoading;
+  static Future<String>? _threeLoading;
+
+  /// The 3D engine of the web page, read once and kept.
+  static Future<String> loadThree() => _threeLoading ??= rootBundle.loadString('assets/data/three.min.js');
 
   /// The web build draws with a real 3D engine in its own page, so here only the list of parts is needed.
   static Future<_BodyModel> loadLight() => _lightLoading ??= _readLight();
@@ -305,6 +309,17 @@ class _BodyModel {
 class NgmyBodyExplorer extends StatefulWidget {
   const NgmyBodyExplorer({super.key});
 
+  /// Reads the body model and the 3D engine in the background (call it early: the Body Explorer then opens at once, with no waiting).
+  static Future<void> warmUp() async {
+    try {
+      if (kIsWeb) {
+        await Future.wait<Object>([_BodyModel.loadLight(), _BodyModel.loadThree()]);
+      } else {
+        await _BodyModel.load();
+      }
+    } catch (_) {}
+  }
+
   @override
   State<NgmyBodyExplorer> createState() => _NgmyBodyExplorerState();
 }
@@ -320,6 +335,9 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
   // The web build: a real 3D engine in its own page, driven with messages.
   NgmyBodyViewerLink? _link;
   bool _viewerReady = false;
+
+  /// The 3D page has built the body (until then a loading card is shown instead of a black screen).
+  bool _bodyShown = false;
   String _lastSig = '';
   bool get _web => kIsWeb && kNgmyBodyViewerSupported;
 
@@ -365,7 +383,7 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
     if (_web) {
       _link = NgmyBodyViewerLink(onEvent: _onViewer);
       () async {
-        final got = await Future.wait<Object>([_BodyModel.loadLight(), rootBundle.loadString('assets/data/three.min.js')]);
+        final got = await Future.wait<Object>([_BodyModel.loadLight(), _BodyModel.loadThree()]);
         if (!mounted) return;
         _link!.start(got[1] as String);
         setState(() => _modelN = got[0] as _BodyModel);
@@ -383,6 +401,31 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
     super.dispose();
   }
 
+  /// What shows while the body is being made ready: a friendly card (it fades away by itself), never a black screen.
+  Widget _loadingCard() {
+    return IgnorePointer(
+      ignoring: _bodyShown,
+      child: AnimatedOpacity(
+        opacity: _bodyShown ? 0 : 1,
+        duration: const Duration(milliseconds: 400),
+        child: Container(
+          key: const Key('body-loading'),
+          decoration: const BoxDecoration(gradient: RadialGradient(center: Alignment(0, -0.2), radius: 1.1, colors: [Color(0xFF1B2030), Color(0xFF07080F)])),
+          alignment: Alignment.center,
+          child: Column(mainAxisSize: MainAxisSize.min, children: const [
+            Text('🧍', style: TextStyle(fontSize: 54)),
+            SizedBox(height: 14),
+            SizedBox(width: 150, child: LinearProgressIndicator(minHeight: 5, color: Color(0xFFF472B6), backgroundColor: Colors.white12)),
+            SizedBox(height: 12),
+            Text('Getting the body ready...', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w800, fontSize: 14)),
+            SizedBox(height: 4),
+            Text('Real 3D anatomy, kept on your phone', style: TextStyle(color: Colors.white38, fontSize: 11.5)),
+          ]),
+        ),
+      ),
+    );
+  }
+
   void _onViewer(Map<dynamic, dynamic> m) {
     if (!mounted) return;
     switch (m['ngmyBody']) {
@@ -391,12 +434,15 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
         _viewerReady = true;
         _lastSig = '';
         _pushState();
+      case 'parts':
+        setState(() => _bodyShown = true);
       case 'pick':
         setState(() => _handlePick(m['group'] as String?));
       case 'shot':
         _shareShot('${m['data']}');
       case 'error':
         debugPrint('[body viewer] ${m['text']}');
+        if (mounted && !_bodyShown) setState(() => _bodyShown = true);
     }
   }
 
@@ -792,7 +838,10 @@ class _NgmyBodyExplorerState extends State<NgmyBodyExplorer> with SingleTickerPr
       actions: [IconButton(onPressed: _web ? () => _link?.send({'t': 'shot'}) : () => studioShare(context, _shot, name: 'body'), icon: const Icon(Icons.ios_share_rounded, color: Colors.white70, size: 21), tooltip: 'Share')],
       stage: _web
           ? Column(children: [
-              Expanded(child: _link?.started == true ? _link!.build() : const SizedBox.expand()),
+              Expanded(child: Stack(fit: StackFit.expand, children: [
+                if (_link?.started == true) _link!.build(),
+                _loadingCard(),
+              ])),
               Padding(padding: const EdgeInsets.fromLTRB(10, 6, 10, 8), child: _infoBox(sel, info)),
             ])
           : LayoutBuilder(builder: (context, box) {

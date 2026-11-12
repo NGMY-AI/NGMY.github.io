@@ -118,6 +118,13 @@ class _NgmyCoreProtocolSimsScreenState extends State<NgmyCoreProtocolSimsScreen>
   ScrollController _sc = ScrollController();
   double _savedOffset = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    // The Body Explorer is read in the background while the studios are shown, so it opens at once.
+    Future<void>.delayed(const Duration(milliseconds: 1500), NgmyBodyExplorer.warmUp);
+  }
+
   void _open(_UnfoldMeta m) {
     if (_sc.hasClients) _savedOffset = _sc.offset;
     setState(() => _active = m);

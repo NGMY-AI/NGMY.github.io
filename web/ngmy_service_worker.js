@@ -215,6 +215,10 @@ const CRITICAL_OFFLINE_URLS = [
   './assets/assets/fonts/NotoColorEmoji.ttf',
   // The map of the world for the Earth Globe, so it works offline the very first time, even if it was never opened online.
   './assets/assets/data/world110.json',
+  // The Body Explorer (the anatomy and the 3D engine), so it opens offline the very first time too.
+  './assets/assets/data/body3d.bin',
+  './assets/assets/data/body3d_lite.bin',
+  './assets/assets/data/three.min.js',
   './assets/assets/twemoji/1f4dd.png',
   './assets/assets/twemoji/1f1fa-1f1f8.png',
   './assets/assets/twemoji/1f1f9-1f1ff.png',
