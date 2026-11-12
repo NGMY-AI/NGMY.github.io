@@ -77,6 +77,16 @@ class GlbAvatar {
   /// True when reading the character file was tried and did not work (no internet and never kept on the phone).
   static bool failed(String key) => _failed.contains(key);
 
+  static final Map<String, DateTime> _triedAt = {};
+
+  /// A character that could not be read is tried again now and then (every 20 seconds), so it takes the place of the plain figure as soon as it can be had.
+  static void retryLater(String key) {
+    final last = _triedAt[key];
+    if (last != null && DateTime.now().difference(last).inSeconds < 20) return;
+    _triedAt[key] = DateTime.now();
+    load(key);
+  }
+
   /// Set to false to keep the plain figures (some tests do).
   static bool enabled = true;
 

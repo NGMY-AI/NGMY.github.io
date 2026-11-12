@@ -1290,6 +1290,7 @@ void _figure(MeshBuilder b, PersonPose p, double t, PersonStyle style, {int id =
       GlbAvatar.load(style.avatar);
       return;
     }
+    if (GlbAvatar.enabled && kGlbFiles.containsKey(style.avatar)) GlbAvatar.retryLater(style.avatar);
     _person(b, p, t, style: style, id: id, detail: close || p.crawl);
     return;
   }

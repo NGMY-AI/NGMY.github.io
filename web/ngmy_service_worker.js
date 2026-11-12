@@ -219,6 +219,10 @@ const CRITICAL_OFFLINE_URLS = [
   './assets/assets/data/body3d.bin',
   './assets/assets/data/body3d_lite.bin',
   './assets/assets/data/three.min.js',
+  // The three characters of the city, so the people look right offline from the very first visit too.
+  './assets/assets/avatars/Xbot.glb',
+  './assets/assets/avatars/Michelle.glb',
+  './assets/assets/avatars/Soldier.glb',
   './assets/assets/twemoji/1f4dd.png',
   './assets/assets/twemoji/1f1fa-1f1f8.png',
   './assets/assets/twemoji/1f1f9-1f1ff.png',
