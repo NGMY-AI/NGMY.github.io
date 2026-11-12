@@ -2043,6 +2043,114 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     );
   }
 
+  // ── The equipment of an outlet lesson ──
+
+  /// Plugs [a] into the outlet that is being fixed (once it is wired).
+  void _plugLesson(HomeAppliance a) {
+    final nice = deviceKindName(room.lesson).toLowerCase();
+    if (!room.lessonDone) {
+      conBad();
+      _say('Wire the $nice first (tap the red one), then plug the ${a.name.toLowerCase()} into it.', ok: false);
+      return;
+    }
+    setState(() {
+      room.plugged[0] = a.key;
+      _rebuild();
+    });
+    conBeep(820, ms: 70);
+    _say('${a.name} is plugged into the $nice and running.');
+  }
+
+  /// All the equipment that fits the outlet being fixed, in a row at the bottom.
+  Widget _equipmentBar() {
+    final kind = room.lesson;
+    final list = equipmentFor(kind);
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Fits the ${deviceKindName(kind).toLowerCase()}:', style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 4),
+        if (list.isEmpty)
+          const Text('Nothing in the house plugs into this one: it is for special equipment.', style: TextStyle(color: Colors.white38, fontSize: 11.5))
+        else
+          Wrap(spacing: 6, runSpacing: 6, children: [
+            for (final a in list)
+              GestureDetector(
+                key: Key('equip-${a.key}'),
+                onTap: () => _plugLesson(a),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+                  decoration: BoxDecoration(color: room.plugged[0] == a.key ? kConAmber.withValues(alpha: 0.28) : Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(11), border: Border.all(color: room.plugged[0] == a.key ? kConAmber : Colors.white24)),
+                  child: Text('${a.emoji} ${a.name}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11.5)),
+                ),
+              ),
+          ]),
+      ]),
+    );
+  }
+
+  /// The search icon by the title: type what to plug in (dryer, range, lamp...) and pick it.
+  Widget _searchIcon() => Align(
+        alignment: Alignment.centerRight,
+        child: IconButton(key: const Key('equip-search'), tooltip: 'Search the equipment that fits', onPressed: _findSheet, icon: const Icon(Icons.search_rounded, color: kConAmber)),
+      );
+
+  Future<void> _findSheet() {
+    final kind = room.lesson;
+    var q = '';
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF17171C),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      builder: (ctx) => StatefulBuilder(builder: (ctx, set) {
+        final all = equipmentFor(kind);
+        final found = [for (final a in all) if (q.isEmpty || a.name.toLowerCase().contains(q.toLowerCase()) || a.key.contains(q.toLowerCase())) a];
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Plug into the ${deviceKindName(kind).toLowerCase()}', style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 10),
+                TextField(
+                  key: const Key('equip-query'),
+                  autofocus: true,
+                  onChanged: (v) => set(() => q = v),
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Search: dryer, range, washing machine, lamp...',
+                    hintStyle: const TextStyle(color: Colors.white38),
+                    prefixIcon: const Icon(Icons.search_rounded, color: Colors.white54),
+                    filled: true,
+                    fillColor: Colors.white10,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                if (found.isEmpty)
+                  Text(all.isEmpty ? 'Nothing in the house plugs into this outlet.' : 'Nothing that fits matches "$q".', style: const TextStyle(color: Colors.white54))
+                else
+                  Wrap(spacing: 8, runSpacing: 8, children: [
+                    for (final a in found)
+                      GestureDetector(
+                        key: Key('find-${a.key}'),
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          _plugLesson(a);
+                        },
+                        child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white24)), child: Text('${a.emoji} ${a.name}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13))),
+                      ),
+                  ]),
+              ]),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
   // ── The plug-in sheet ──
 
   /// Choose what to plug into an outlet, or unplug it.
@@ -2058,7 +2166,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
             const Text('Plug in', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
             const SizedBox(height: 10),
             Wrap(spacing: 8, runSpacing: 8, children: [
-              for (final a in kHomeAppliances.where((a) => !a.wallOnly))
+              for (final a in equipmentFor(outlet < 2 ? room.outletKind(outlet) : (room.extras[outlet - 2].kind == 'gfci' ? 'gfci' : 'outlet')))
                 GestureDetector(
                   onTap: () {
                     Navigator.pop(ctx);
@@ -3972,6 +4080,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       stepText: isLesson ? (r.lessonDone ? 'Done ✓' : 'To do') : '${home.finishedCount}/${home.indoor.length} done',
       onSteps: () => isLesson ? _openLesson() : _problems(context),
       titleExtra: room.indoor ? null : NeedsBars(needs: needs, driving: _driving != null, height: 12),
+      titleAction: room.indoor && isLesson && isOutletKind(room.lesson) ? _searchIcon() : null,
       stage: stage,
       panel: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         _row(!room.indoor ? _cityChips() : [
@@ -4025,6 +4134,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         ]),
         const SizedBox(height: 4),
         _context(),
+        if (isLesson && isOutletKind(room.lesson)) _equipmentBar(),
       ]),
     );
   }

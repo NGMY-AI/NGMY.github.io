@@ -527,7 +527,7 @@ Future<void> showConSteps(BuildContext context, String title, List<String> steps
 
 /// A lesson page: a header with the title, the menu under it, then the 3D area.
 class LessonScaffold extends StatelessWidget {
-  const LessonScaffold({required this.title, required this.color, required this.stage, required this.panel, required this.onSteps, required this.stepText, this.titleExtra, this.autoHideBack = true});
+  const LessonScaffold({required this.title, required this.color, required this.stage, required this.panel, required this.onSteps, required this.stepText, this.titleExtra, this.titleAction, this.autoHideBack = true});
   final String title;
   final Color color;
   final Widget stage;
@@ -537,6 +537,9 @@ class LessonScaffold extends StatelessWidget {
 
   /// Something shown right after the title, as wide as the room allows (the energy bar in the city).
   final Widget? titleExtra;
+
+  /// A small button right after the title (the search icon of the outlet lessons): the title gives it room.
+  final Widget? titleAction;
 
   /// The back button fades away after a few seconds; the close-up benches inside a job keep theirs on the screen.
   final bool autoHideBack;
@@ -554,10 +557,12 @@ class LessonScaffold extends StatelessWidget {
                 AutoHideBack(child: IconButton(onPressed: () => Navigator.of(context).maybePop(), icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20)))
               else
                 IconButton(onPressed: () => Navigator.of(context).maybePop(), icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20)),
-              if (titleExtra == null)
-                Expanded(child: Text(title, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 16)))
+              if (titleExtra == null) ...[
+                Expanded(child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 16))),
+                if (titleAction != null) titleAction!,
+              ]
               else ...[
-                Flexible(flex: 0, child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 16))),
+                Text(title, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 16)),
                 const SizedBox(width: 6),
                 Expanded(child: titleExtra!),
                 const SizedBox(width: 6),

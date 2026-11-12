@@ -339,6 +339,35 @@ void main() {
     await t.pump(const Duration(seconds: 12));
   });
 
+
+  testWidgets('the dryer outlet room is called after what is fixed, shows that outlet, has a search icon and lists only the equipment that fits', (t) async {
+    t.view.physicalSize = const Size(900, 1800);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(const MaterialApp(home: NgmyHousePage(lesson: 'dryer4')));
+    for (var i = 0; i < 12; i++) {
+      await t.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.text('Dryer outlet, 4-wire (NEMA 14-30)'), findsOneWidget, reason: 'the title says what is being fixed');
+    expect(find.text('Faucet'), findsNothing);
+    expect(find.byKey(const Key('equip-search')), findsOneWidget);
+    await t.ensureVisible(find.byKey(const Key('equip-dryer'), skipOffstage: false));
+    expect(find.byKey(const Key('equip-dryer'), skipOffstage: false), findsOneWidget, reason: 'the dryer fits');
+    expect(find.byKey(const Key('equip-toaster'), skipOffstage: false), findsNothing, reason: 'a toaster does not fit a dryer outlet');
+    expect(find.byKey(const Key('equip-range'), skipOffstage: false), findsNothing);
+    // Search: type dryer and pick it.
+    await t.tap(find.byKey(const Key('equip-search')));
+    await t.pump(const Duration(milliseconds: 500));
+    await t.enterText(find.byKey(const Key('equip-query')), 'dry');
+    await t.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const Key('find-dryer')), findsOneWidget);
+    expect(find.byKey(const Key('find-range')), findsNothing);
+    await t.tap(find.byKey(const Key('find-dryer')));
+    await t.pump(const Duration(milliseconds: 400));
+    expect(find.textContaining('Wire the dryer outlet'), findsOneWidget, reason: 'it is plugged only once the outlet is wired');
+    await t.pump(const Duration(seconds: 12));
+  });
+
   testWidgets('Go outside and Go inside are buttons: the view never takes you out of the house by itself', (t) async {
     t.view.physicalSize = const Size(900, 1600);
     t.view.devicePixelRatio = 2.0;

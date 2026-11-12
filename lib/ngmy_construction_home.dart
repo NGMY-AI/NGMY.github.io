@@ -170,6 +170,24 @@ const List<HomeAppliance> kHomeAppliances = [
 
 HomeAppliance applianceByKey(String k) => kHomeAppliances.firstWhere((a) => a.key == k, orElse: () => kHomeAppliances[3]);
 
+/// The outlets a big machine fits (its plug is made for them); everything else takes a normal outlet.
+const Map<String, Set<String>> kApplianceOutletKinds = {
+  'washer': {'washer'},
+  'dryer': {'dryer4', 'dryer3'},
+  'range': {'range4', 'range3'},
+};
+const Set<String> kNormalOutletKinds = {'outlet', 'gfci', 'split', 'isolated'};
+
+/// Does the plug of [appliance] fit an outlet of kind [outletKind] (an outlet of the electrical lessons)?
+bool applianceFitsOutlet(String appliance, String outletKind) {
+  final machine = kApplianceOutletKinds[appliance];
+  if (machine != null) return machine.contains(outletKind);
+  return kNormalOutletKinds.contains(outletKind);
+}
+
+/// What can be plugged into an outlet of kind [outletKind]: the equipment whose plug fits it, and that stands on the floor (not the wall TVs).
+List<HomeAppliance> equipmentFor(String outletKind) => [for (final a in kHomeAppliances) if (!a.wallOnly && applianceFitsOutlet(a.key, outletKind)) a];
+
 /// Where a wall TV is and how big it is: width, height, centre along the wall and centre height. It is as big as the free stretch
 /// of wall allows (between the doors, clear of the vanity in a bathroom), and in the hall it hangs on an end wall.
 class WallTvBox {
@@ -315,6 +333,12 @@ class HRoom {
   WiringState? lessonState;
   PlumbState? lessonPlumb;
   bool get lessonIsPlumbing => lesson == 'ptrap' || lesson == 'faucet';
+
+  /// The kind of outlet number [i] of the room: in a lesson room the first one is the very outlet being fixed (a dryer outlet, a range outlet...).
+  String outletKind(int i) {
+    if (lesson.isNotEmpty && i == 0 && isOutletKind(lesson)) return lesson;
+    return (kind == 'bathroom' || kind == 'kitchen' || lesson == 'gfci') ? 'gfci' : 'outlet';
+  }
   bool get lessonDone {
     if (lessonIsPlumbing) {
       final p = lessonPlumb;
@@ -427,7 +451,7 @@ class HomeProject {
   HomeProject.lesson(String id) : seed = 7 {
     lessonId = id;
     final kind = switch (id) { 'gfci' || 'faucet' => 'bathroom', 'fan' => 'bedroom', 'ptrap' => 'kitchen', _ => 'living' };
-    final title = switch (id) { 'outlet' => 'Wall outlet', 'switch' => 'Light switch', 'gfci' => 'GFCI outlet', 'fan' => 'Ceiling fan', 'ptrap' => 'Sink drain', _ => 'Faucet' };
+    final title = switch (id) { 'outlet' => 'Wall outlet', 'switch' => 'Light switch', 'gfci' => 'GFCI outlet', 'fan' => 'Ceiling fan', 'ptrap' => 'Sink drain', 'faucet' => 'Faucet', _ => deviceKindName(id) };
     final r = HRoom(0, title, kind, 0, 0, 1, 1, []);
     r.lesson = id;
     r.ceilingFix = id == 'fan' ? 'fan' : 'light';
