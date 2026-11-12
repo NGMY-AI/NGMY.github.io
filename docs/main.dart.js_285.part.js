@@ -1903,7 +1903,7 @@ s=t.$0()
 for(r=0,q=5003;q<65536;q*=2)++r
 r=8-r
 for(p=0;p<5003;++p)x[p]=-1
-j.YQ(j.cy)
+j.YR(j.cy)
 for(o=!0;o;){n=t.$0()
 for(o=!1;n!==-1;){m=(n<<12>>>0)+s
 p=(A.o.dX(n,r)^s)>>>0
@@ -1918,7 +1918,7 @@ v=x[p]
 if(v===m){s=w[p]
 o=!0
 break}}while(v>=0)
-if(o)break}j.YQ(s)
+if(o)break}j.YR(s)
 v=j.db
 if(v<4096){j.db=v+1
 w[p]=v
@@ -1926,12 +1926,12 @@ x[p]=m}else{for(p=0;p<5003;++p)x[p]=-1
 v=j.cy
 j.db=v+2
 j.dx=!0
-j.YQ(v)}k=t.$0()
+j.YR(v)}k=t.$0()
 s=n
-n=k}}j.YQ(s)
-j.YQ(j.CW)
+n=k}}j.YR(s)
+j.YR(j.CW)
 j.fx.bu(0)},
-YQ(d){var x,w=this,v=w.at,u=w.ax
+YR(d){var x,w=this,v=w.at,u=w.ax
 v&=D.dh9[u]
 w.at=v
 if(u>0){v=(v|A.o.dX(d,u))>>>0
@@ -3282,7 +3282,7 @@ s=p.x
 r=p.y
 q=r?A.ll:D.HI
 return B.lA(A.br,x,'A black hole is so heavy, squeezed into so small a place, that nothing can get out of it once it crosses the edge, called the event horizon. Not even light.\n\nTap anywhere to throw in a star and watch it spiral inwards, faster and faster. The stars behind the hole look bent, because the hole bends light itself (that is called lensing).\n\nChange the mass to see how big its edge is: if the Sun were squeezed into a ball only 3 km wide it would be a black hole. The "Time" number shows how much slower a clock runs for the star that is closest to the edge, as seen by someone far away.',w,"BLACK HOLE",C.x(C.a([u,new B.fb(v,"LIKE",o),new B.fb(C.a([new B.dW("Glowing ring",t,new B.dOX(p),o,A.br,o),new B.dW("Bent light",s,new B.dOY(p),o,A.br,o),new B.dW("Music",r,new B.dOZ(p),q,A.br,o),new B.fB(A.nK,"Clear",new B.dOR(p),A.c,o)],n),o,o)],n),A.l,o,A.e,A.R,0,A.p))},
-ag8(d,e){var x=null
+ag9(d,e){var x=null
 return C.E(C.x(C.a([C.d(d,x,x,x,x,x,x,D.fp7,x,x,x),A.bG,C.d(e,x,2,x,x,x,x,Z.AG,A.K,x,x)],y.p),A.l,x,A.e,A.j,0,A.p),1)}}
 B.bc9.prototype={
 a4(a9,b0){var x,w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7=b0.a,a8=b0.b
@@ -3368,9 +3368,9 @@ S(){var x=y.q,w=y.g
 return new B.blZ(new C.cw(null,y.z),new B.Q_(A.cN),C.a([],x),A.I,A.I,C.a([],x),C.a([],w),C.a([],w),C.a([],w),C.a([],w),A.I,A.I,$,A.bD,0,C.a([],y.X),null,null)}}
 B.blZ.prototype={
 Y(){this.a2()
-this.a07()
+this.a08()
 this.me()},
-a07(){var x,w,v,u,t,s,r,q,p=this,o=new C.e1()
+a08(){var x,w,v,u,t,s,r,q,p=this,o=new C.e1()
 o.cY(5)
 x=C.a([],y.q)
 w=p.Q==="elliptical"?1800:2300
@@ -4646,10 +4646,10 @@ v=C.L(A.by,A.r,1)
 u=q.r
 if(u<1000)u=A.i.ac(u,u<10?1:0)+" Suns"
 else u=B.fHu(u)+" Suns"
-u=q.ag8("MASS",u)
+u=q.ag9("MASS",u)
 t=2.953*q.r
 s=y.p
-s=C.a([p,C.ap(r,C.q(r,C.A(C.a([u,q.ag8("EDGE WIDTH",(t<100?A.i.ac(t,1):B.HC(t))+" km"),q.ag8("TIME",A.i.ac(this.b*100,0)+"%"),q.ag8("EATEN",""+q.as)],s),A.l,r,A.e,A.j,0,r,r),A.f,r,r,new C.p(x,r,v,w,r,r,A.n),r,r,r,r,A.bV,r,r,r),r,r,10,10,8,r)],s)
+s=C.a([p,C.ap(r,C.q(r,C.A(C.a([u,q.ag9("EDGE WIDTH",(t<100?A.i.ac(t,1):B.HC(t))+" km"),q.ag9("TIME",A.i.ac(this.b*100,0)+"%"),q.ag9("EATEN",""+q.as)],s),A.l,r,A.e,A.j,0,r,r),A.f,r,r,new C.p(x,r,v,w,r,r,A.n),r,r,r,r,A.bV,r,r,r),r,r,10,10,8,r)],s)
 if(q.z.length===0&&q.as===0)s.push(D.ext)
 return new C.em(new C.an(A.a0,r,A.b2,A.t,s,r),q.d)},
 $S:232}
@@ -4760,7 +4760,7 @@ w.ch=!1
 x=this.b.a
 w.Q=x
 w.w=x==="barred"?1:0
-w.a07()},
+w.a08()},
 $S:0}
 B.e54.prototype={
 $0(){var x=this.a
@@ -4769,7 +4769,7 @@ $S:0}
 B.e50.prototype={
 $0(){var x=this.a
 if(x.Q==="elliptical"){x.Q="spiral"
-x.a07()}x.cBJ()},
+x.a08()}x.cBJ()},
 $S:0}
 B.e55.prototype={
 $1(d){var x=this.a
@@ -4778,7 +4778,7 @@ $S:6}
 B.e5_.prototype={
 $0(){var x=this.a
 x.f=A.i.V(this.b)
-x.a07()},
+x.a08()},
 $S:0}
 B.e56.prototype={
 $1(d){var x=this.a
@@ -4787,7 +4787,7 @@ $S:6}
 B.e4Z.prototype={
 $0(){var x=this.a
 x.r=this.b
-x.a07()},
+x.a08()},
 $S:0}
 B.e57.prototype={
 $1(d){var x=this.a
@@ -5312,4 +5312,4 @@ $.haI=null
 $.i2w=C.T(C.as("n"),C.as("iH"))
 $.i3A=C.T(C.as("n"),C.as("iH"))})();(function lazyInitializers(){var x=a.lazyFinal
 x($,"iBq","hJ6",()=>C.a([B.age("EARTH GLOBE","Turn it, tap a country",A.n2,A.aH,new B.fsI()),B.age("SOLAR SYSTEM","The Sun and its worlds",D.ap9,A.aU,new B.fsJ()),B.age("GRAVITY LAB","Drop, weigh, orbit",F.a35,A.cF,new B.fsK()),B.age("BLACK HOLE","Throw in a star",A.He,A.br,new B.fsL()),B.age("GALAXY","Build, tilt, collide",A.ww,A.hm,new B.fsM()),B.age("SIZE COMPARE","Earth next to a star",D.bPA,A.bU,new B.fsN()),B.age("SEASONS & MOON","Why it is summer",A.wu,A.bx,new B.fsO())],C.as("O<bwr>")))})()};
-(a=>{a["o6wXnkO5fY4+CnbfC+ZWD51cmdU="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["N/afmzojPIA5NlfFAelQFHtE/Jw="]=a.current})($__dart_deferred_initializers__);
