@@ -2,8 +2,8 @@
 $__dart_deferred_initializers__.current=function(a,b,c,$){var A,B,C
 A=c[0]
 B=c[2]
-C=c[106]
-var z=a.updateTypes([]);(function constants(){C.xR=new A.t(1,1,0.8784313725490196,0.5411764705882353,B.q)
-C.tq=new A.F(!0,B.aR,null,null,null,null,12.5,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-C.Ew=new A.F(!0,B.bU,null,null,null,null,11.5,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["q/rniMMAGyDTGeWHeh/rgBXz2c0="]=a.current})($__dart_deferred_initializers__);
+C=c[105]
+var z=a.updateTypes([]);(function constants(){C.xV=new A.u(1,1,0.8784313725490196,0.5411764705882353,B.q)
+C.tw=new A.G(!0,B.aS,null,null,null,null,12.5,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+C.ED=new A.G(!0,B.bV,null,null,null,null,11.5,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)})()};
+(a=>{a["oEFOREXe+WipBF3euZzpKglxJL0="]=a.current})($__dart_deferred_initializers__);

@@ -2,14 +2,14 @@
 $__dart_deferred_initializers__.current=function(a,b,c,$){var A,C,B
 A=c[0]
 C=c[2]
-B=c[158]
+B=c[157]
 var z=a.updateTypes([]);(function constants(){var y=a.makeConstList
-B.aQI=new A.z("rainbow","Rainbow")
-B.aQw=new A.z("Square",1)
-B.a4C=y([0,0.4,1],A.as("O<I>"))
-B.aQH=new A.z("outline","Outline")
-B.aQJ=new A.z("retro","Retro")
-B.aQB=new A.z("glitch","Glitch")
-B.aae=new A.F(!0,null,null,null,null,null,16,C.u,null,1.4,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-B.aVG=new A.F(!0,C.aR,null,null,null,null,11.5,null,null,null,null,null,1.35,null,null,null,null,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["GMF7TElpz9yK4eEJ3BaUETiD37c="]=a.current})($__dart_deferred_initializers__);
+B.aQR=new A.y("rainbow","Rainbow")
+B.aQF=new A.y("Square",1)
+B.a4L=y([0,0.4,1],A.as("O<H>"))
+B.aQQ=new A.y("outline","Outline")
+B.aQS=new A.y("retro","Retro")
+B.aQK=new A.y("glitch","Glitch")
+B.aax=new A.G(!0,null,null,null,null,null,16,C.u,null,1.4,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+B.aW_=new A.G(!0,C.aS,null,null,null,null,11.5,null,null,null,null,null,1.35,null,null,null,null,null,null,null,null,null,null,null,null,null)})()};
+(a=>{a["+jnI5wa/9UMJsTO9Wbu3aG6Ou9w="]=a.current})($__dart_deferred_initializers__);
