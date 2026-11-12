@@ -221,3 +221,10 @@ void _propPad(MeshBuilder b, int id, V3 c, V3 s) {
 }
 
 void propPad(MeshBuilder b, int id, V3 c, V3 s) => _propPad(b, id, c, s);
+
+/// Where a double tap on a wall or the ceiling touches the room (looking from inside); null when it touches the floor or nothing at all.
+V3? frameLookPoint(Cam3 cam, Offset local, Size size) {
+  final h = cam.roomPoint(local, size, -72, 72, 0, 96, -60, 60);
+  if (h == null || h.y < 3) return null;
+  return h;
+}

@@ -7,7 +7,6 @@ import 'ngmy_city_ads.dart';
 import 'ngmy_construction_electrical_more.dart';
 import 'ngmy_electronics_screens.dart';
 import 'ngmy_frame_geo.dart';
-import 'ngmy_frame_scene.dart';
 import 'ngmy_frame_wiring.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -52,30 +51,53 @@ double wallYaw(int wall) => switch (wall) {
       _ => math.pi / 2,
     };
 
-/// The two knockouts of a box: round tabs in the top and the bottom (a ceiling box has them in its side). Closed they are grey; broken out they are dark holes.
+/// Where the punched tab of a knockout is, which way it faces, and (for a wall box) the strip of the box it sits on.
+(V3 centre, V3 normal) koTab(FBox x, int k) {
+  if (x.kind == 'ceiling') {
+    final cx = joistX(x.joist!) + 3.05;
+    final s = k == 0 ? -1.0 : 1.0;
+    return (V3(cx + s * 2.32, 97.9, 0), V3(s, 0, 0));
+  }
+  final uc = x.u + x.side * (kStT / 2 + 1.15);
+  final y = k == 0 ? x.y - 2.7 : x.y + 2.7;
+  final c = wallPt(x.wall, uc, y, kStD + 0.12);
+  return (c, wallPt(x.wall, uc, y, kStD + 1) - wallPt(x.wall, uc, y, kStD));
+}
+
+/// The two knockouts of a box, as on a real steel box: a flat strip along the edge of the box with a round tab punched in it (two rings pressed
+/// into the metal and a dimple in the middle). Broken out, the tab is gone: a black hole with a bright torn edge and the bent tab hanging by it.
 void drawKnockouts(MeshBuilder b, FBox x) {
   b
     ..order = 2
     ..bias = 0.7;
+  const steel = Color(0xFFA9B0BA), dark = Color(0xFF6B7380), light = Color(0xFFD5DAE1), hole = Color(0xFF05080F);
   for (var k = 0; k < 2; k++) {
     b.id = koId(x.id, k);
     final open = x.kos[k];
-    final col = open ? const Color(0xFF0B1220) : const Color(0xFFB8BEC8);
+    final (c, n) = koTab(x, k);
+    V3 at(double d) => c + n * d;
     if (x.kind == 'ceiling') {
-      final cx = joistX(x.joist!) + 3.05;
-      final s = k == 0 ? -1.0 : 1.0;
-      b.cyl(V3(cx + s * 2.2, 97.9, 0), V3(cx + s * 2.5, 97.9, 0), 0.62, col, shine: open ? 0 : 0.6, sides: 10);
+      // A small square flange on the side of the round box.
+      b.cyl(at(-0.12), at(0.02), 1.15, const Color(0xFF8E96A3), shine: 0.5, sides: 14);
     } else {
       final uc = x.u + x.side * (kStT / 2 + 1.15);
-      final yy = k == 0 ? x.y - 2.1 : x.y + 2.1;
-      final dir = k == 0 ? -1.0 : 1.0;
-      final c = wallPt(x.wall, uc, yy, kStD - 1.25);
-      b.cyl(c, c + const V3(0, 1, 0) * (0.14 * dir), 0.62, col, shine: open ? 0 : 0.6, sides: 10);
-      if (open) {
-        // The torn edge of the hole.
-        b.ring(c, c + const V3(0, 1, 0) * (0.2 * dir), 0.8, 0.55, const Color(0xFF9AA2AD), shine: 0.5, sides: 10);
-      }
+      final y = k == 0 ? x.y - 2.7 : x.y + 2.7;
+      b.box(wallPt(x.wall, uc, y, kStD + 0.0), wallSize(x.wall, 2.3, 1.15, 0.28), const Color(0xFF8E96A3), shine: 0.5);
     }
+    b.bias = 1.4;
+    if (!open) {
+      b.cyl(at(0.0), at(0.06), 0.52, steel, shine: 0.7, sides: 14);
+      b.ring(at(0.06), at(0.1), 0.52, 0.42, dark, shine: 0.3, sides: 14);
+      b.ring(at(0.06), at(0.1), 0.32, 0.24, dark, shine: 0.3, sides: 14);
+      b.cyl(at(0.06), at(0.14), 0.1, light, shine: 0.9, sides: 8);
+    } else {
+      b.cyl(at(0.0), at(0.08), 0.5, hole, sides: 14);
+      b.ring(at(0.08), at(0.14), 0.58, 0.46, light, shine: 0.8, sides: 14);
+      // The tab bent out of the way and hanging by its edge.
+      final down = x.kind == 'ceiling' ? V3(0, 0, 0.6) : (V3(0, k == 0 ? -1 : 1, 0) * 0.62);
+      b.cyl(at(0.1) + down, at(0.3) + down, 0.3, steel, shine: 0.7, sides: 8);
+    }
+    b.bias = 0.7;
   }
   b.bias = 0;
 }

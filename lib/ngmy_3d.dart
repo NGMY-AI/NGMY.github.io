@@ -485,6 +485,33 @@ class Cam3 extends ChangeNotifier {
     return at(t);
   }
 
+  /// The first spot of the box [x0..x1] x [y0..y1] x [z0..z1] (a room: its floor, its four walls and its ceiling) that the finger on [p] touches,
+  /// looking from inside; null when the ray never meets it. The view may look up or down: the ray still hits a wall, the ceiling or the floor.
+  V3? roomPoint(Offset p, Size size, double x0, double x1, double y0, double y1, double z0, double z1) {
+    final f = math.min(size.width, size.height) * 1.15 * lens;
+    final dx = (p.dx - size.width / 2) / f, dy = -(p.dy - size.height / 2) / f;
+    final cy = math.cos(yaw), sy = math.sin(yaw), cp = math.cos(pitch), sp = math.sin(pitch);
+    V3 unrot(V3 r) {
+      final t = -r.z;
+      final qy = r.y * cp + t * sp;
+      final z1v = t * cp - r.y * sp;
+      return V3(r.x * cy - z1v * sy, qy, r.x * sy + z1v * cy);
+    }
+
+    V3 at(double t) => target + unrot(V3(dx * t, dy * t, t - dist));
+    final a = at(0), b = at(1);
+    final d = b - a;
+    // The farthest exit of the ray out of the box is where it meets the room: for each axis the ray leaves through the lo or hi side.
+    double exit(double s, double v, double lo, double hi) {
+      if (v.abs() < 1e-9) return double.infinity;
+      return ((v > 0 ? hi : lo) - s) / v;
+    }
+
+    final t = [exit(a.x, d.x, x0, x1), exit(a.y, d.y, y0, y1), exit(a.z, d.z, z0, z1)].reduce(math.min);
+    if (!t.isFinite || t <= 0) return null;
+    return a + d * t;
+  }
+
   V3? floorPoint(Offset p, Size size, {double y = 0}) {
     final f = math.min(size.width, size.height) * 1.15 * lens;
     final dx = (p.dx - size.width / 2) / f, dy = -(p.dy - size.height / 2) / f;

@@ -111,6 +111,10 @@ void main() {
       }
       expect(f.pull(f.boxes.last.id).ok, isTrue);
       final c = f.boxes.firstWhere((b) => b.kind == 'ceiling');
+      expect(f.pull(c.id).msg, contains('Connect the wires'), reason: 'the switch is not wired yet');
+      final swb = f.boxes.firstWhere((b) => b.kind == 'switch');
+      f.installDevice(swb.id, 'switch');
+      wireDeviceRight(swb.ws!, 'switch');
       final r = f.pull(c.id);
       expect(r.ok, isFalse);
       expect(r.msg, contains('top plate'));
@@ -261,6 +265,31 @@ void main() {
         await t.tapAt(Offset(r2.center.dx, r2.center.dy + 40));
         await t.pump(const Duration(milliseconds: 1800));
         expect(find.text('Whole room'), findsOneWidget, reason: 'back inside the room');
+        await t.pump(const Duration(seconds: 14));
+        await t.pumpWidget(const SizedBox());
+        await t.pump(const Duration(seconds: 14));
+      });
+
+      testWidgets('looking up at the ceiling, a double tap closes in on the spot that was tapped${drywall ? ' (drywall)' : ' (wiring)'}', (t) async {
+        t.view.physicalSize = const Size(900, 1700);
+        t.view.devicePixelRatio = 1.0;
+        addTearDown(t.view.reset);
+        await t.pumpWidget(MaterialApp(home: drywall ? const NgmyDrywallPage() : const NgmyWiringHousePage()));
+        await t.pump(const Duration(milliseconds: 600));
+        final cam = t.widget<Scene3DView>(find.byType(Scene3DView).first).cam;
+        cam.glideTo(pitch: -0.9, dist: 60);
+        await t.pump(const Duration(milliseconds: 1800));
+        final r = t.getRect(find.byType(Scene3DView).first);
+        final p = Offset(r.center.dx + 60, r.center.dy - 60);
+        final spot = cam.roomPoint(p - r.topLeft, r.size, -72, 72, 0, 96, -60, 60);
+        expect(spot, isNotNull, reason: 'looking up, the finger still touches the ceiling or a wall');
+        expect(spot!.y, greaterThan(40));
+        final before = cam.target;
+        await t.tapAt(p);
+        await t.pump(const Duration(milliseconds: 80));
+        await t.tapAt(p);
+        await t.pump(const Duration(milliseconds: 1800));
+        expect((cam.target - before).len, greaterThan(3), reason: 'the view moved to the spot that was tapped');
         await t.pump(const Duration(seconds: 14));
         await t.pumpWidget(const SizedBox());
         await t.pump(const Duration(seconds: 14));

@@ -38,6 +38,11 @@ void main() {
       w.place('outlet', stud(0, 112).id);
       final b = w.boxes.last;
       w.knockout(koId(b.id, 0));
+      // The power does not go on from a box until its wires are connected.
+      expect(w.pull(b.id, from: a.id).msg, contains('Connect the wires'));
+      expect(w.powered(a), isTrue);
+      w.installDevice(a.id, 'outlet');
+      wireDeviceRight(a.ws!, 'outlet');
       final noSrc = w.pull(b.id, from: a.id);
       expect(noSrc.ok, isFalse);
       expect(noSrc.msg, contains('free knockout'));
@@ -94,7 +99,9 @@ void main() {
       expect(w.pull(sw.id, via: 1).ok, isTrue);
       expect((sw.cable!.path.last - koPos(sw, 1)).len, lessThan(0.6));
       expect(sw.entryKo, 1);
-      // From the first box, the cable leaves through its other knockout, and a used one is not offered again.
+      // From the first box, the cable leaves through its other knockout, and a used one is not offered again (once its wires are connected).
+      w.installDevice(out.id, 'outlet');
+      wireDeviceRight(out.ws!, 'outlet');
       w.place('outlet', stud(0, 112).id);
       final nxt = w.boxes.last;
       w.knockout(koId(nxt.id, 1));
@@ -114,6 +121,11 @@ void main() {
         for (var k = 0; k < 2; k++) {
           final w = finishedWiring();
           final b = w.boxes.firstWhere((b) => ceiling ? b.kind == 'ceiling' : b.kind == 'switch');
+          if (ceiling) {
+            final s = w.boxes.firstWhere((b) => b.kind == 'switch');
+            w.installDevice(s.id, 'switch');
+            wireDeviceRight(s.ws!, 'switch');
+          }
           w.pull(b.id);
           expect(b.cable, isNull);
           w.knockout(koId(b.id, k));
@@ -225,6 +237,12 @@ void main() {
           case 'cable':
             final r = w.pull(h.ids.first);
             expect(r.ok, isTrue, reason: '${h.text} ${r.msg}');
+          case '' || 'dev:switch':
+            // The power only goes up to the light through a switch whose wires are connected.
+            final sb = w.boxById(h.ids.first)!;
+            expect(sb.kind, 'switch', reason: h.text);
+            w.installDevice(sb.id, 'switch');
+            wireDeviceRight(sb.ws!, 'switch');
           default:
             fail('unexpected hint: ${h.text}');
         }
@@ -233,6 +251,7 @@ void main() {
       expect(w.mistakes, 0);
       // Then the devices, the power and the switch.
       for (final b in w.boxes) {
+        if (w.deviceDone(b)) continue;
         final h = w.hint();
         expect(h.ids, contains(b.id));
         w.installDevice(b.id, b.kind == 'ceiling' ? 'light' : (b.kind == 'switch' ? 'switch' : 'outlet'));
@@ -368,12 +387,20 @@ void main() {
       expect(box.kos[1], isTrue, reason: 'it was broken out on the way');
       expect(st.msg, contains('broke out'));
       expect(st.w.mistakes, 0);
-      // A tap on a box that has power makes it the place the next cable starts from; a second tap takes its cable out again.
+      // The wires of the box are not connected yet: the power stops here, and a tap on the box only says so.
+      st.pickForTest(box.id);
+      expect(st.source, 0);
+      expect(box.cable, isNotNull);
+      expect(st.msg, contains('not connected'));
+      // Once the player has connected them, a tap makes it the place the next cable starts from; a second tap takes its cable out again.
+      st.w.installDevice(box.id, 'outlet');
+      wireDeviceRight(box.ws!, 'outlet');
       st.pickForTest(box.id);
       expect(st.source, box.id);
       expect(box.cable, isNotNull);
       st.pickForTest(box.id);
       expect(box.cable, isNull);
+      expect(st.source, 0);
       expect(st.source, 0);
       await t.pump(const Duration(seconds: 16));
       await t.pumpWidget(const SizedBox());

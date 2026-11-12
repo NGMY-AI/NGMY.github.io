@@ -190,6 +190,9 @@ class _SequencePicker extends StatelessWidget {
 
   static const _grid = SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 0.82);
 
+  /// The studios are small tiles, five in a row, so they fit in two rows.
+  static const _studioGrid = SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 5, mainAxisSpacing: 8, crossAxisSpacing: 8, childAspectRatio: 0.74);
+
   Widget _heading(String t, String sub) => Padding(
         padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -202,6 +205,7 @@ class _SequencePicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
+      bottom: false,
       child: Column(children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(8, 6, 16, 0),
@@ -217,7 +221,7 @@ class _SequencePicker extends StatelessWidget {
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 14),
               sliver: SliverGrid(
-                gridDelegate: _grid,
+                gridDelegate: _studioGrid,
                 delegate: SliverChildBuilderDelegate(
                   (_, i) => _StudioTile(def: _kStudios[i], onTap: () {
                     NgmyTone.theme = kStudioSoundThemes[_kStudios[i].title] ?? 'music';
@@ -229,7 +233,7 @@ class _SequencePicker extends StatelessWidget {
             ),
             SliverToBoxAdapter(child: _heading('SCENES', 'Each one is a studio too: change the style, colours and words')),
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 30),
+              padding: EdgeInsets.fromLTRB(14, 0, 14, 30 + MediaQuery.of(context).padding.bottom),
               sliver: SliverGrid(
                 gridDelegate: _grid,
                 delegate: SliverChildBuilderDelegate((_, i) => _PickTile(meta: _kSequences[i], onTap: () => onPick(_kSequences[i])), childCount: _kSequences.length),
@@ -253,27 +257,25 @@ class _StudioTile extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(14),
         onTap: onTap,
         child: Ink(
-          padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
+          padding: const EdgeInsets.fromLTRB(3, 6, 3, 6),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(14),
             gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color.lerp(const Color(0xFF1B1B1F), c, 0.3)!, const Color(0xFF151518)]),
             border: Border.all(color: c.withValues(alpha: 0.6), width: 1.2),
             boxShadow: [BoxShadow(color: c.withValues(alpha: 0.22), blurRadius: 14, spreadRadius: -4)],
           ),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             Container(
-              width: 44,
-              height: 44,
+              width: 30,
+              height: 30,
               decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [c, Color.lerp(c, Colors.black, 0.45)!]), boxShadow: [BoxShadow(color: c.withValues(alpha: 0.5), blurRadius: 12)]),
-              child: Icon(def.icon, color: Colors.white, size: 24),
+              child: Icon(def.icon, color: Colors.white, size: 17),
             ),
-            const SizedBox(height: 8),
-            Text(def.title, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: c, fontWeight: FontWeight.w900, letterSpacing: 0.5, fontSize: 10.5, height: 1.15)),
-            const SizedBox(height: 3),
-            Text(def.blurb, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 9.5, height: 1.2)),
+            const SizedBox(height: 5),
+            Text(def.title, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: c, fontWeight: FontWeight.w900, letterSpacing: 0.5, fontSize: 9, height: 1.15)),
           ]),
         ),
       ),

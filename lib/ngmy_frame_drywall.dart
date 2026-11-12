@@ -895,6 +895,13 @@ class NgmyDrywallPageState extends State<NgmyDrywallPage> {
 
   /// Double tap: walk over there, inside the room (from the view of the whole room too).
   void _goTo(Offset local, Size size) {
+    // A tap on a wall or the ceiling (looking up or down too): the view closes in on that spot.
+    final look = dollhouse ? null : frameLookPoint(cam, local, size);
+    if (look != null) {
+      cam.glideTo(target: look, dist: math.min(cam.dist, 34.0));
+      _say('Closer to this spot. Drag to turn round.');
+      return;
+    }
     final p = frameGoPoint(cam, local, size);
     if (p == null) {
       _say('Double tap the floor or a wall to walk over there.', ok: false);
