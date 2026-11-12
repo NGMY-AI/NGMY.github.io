@@ -1,11 +1,11 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
-$__dart_deferred_initializers__.current=function(a,b,c,$){var B,A={atv:function atv(d,e){this.a=d
+$__dart_deferred_initializers__.current=function(a,b,c,$){var B,A={atA:function atA(d,e){this.a=d
 this.b=e}},C
 B=c[0]
 A=a.updateHolder(c[52],A)
 C=c[278]
-A.atv.prototype={
+A.atA.prototype={
 a7(){return"NgmyWalletPaymentTheme."+this.b}}
 var z=a.updateTypes([]);(function inheritance(){var y=a.inherit
-y(A.atv,B.lB)})();(function constants(){C.eg3=new A.atv(0,"standard")})()};
-(a=>{a["AU/u7pEwObH5nfSscgTOkb3v4Pk="]=a.current})($__dart_deferred_initializers__);
+y(A.atA,B.lB)})();(function constants(){C.eg3=new A.atA(0,"standard")})()};
+(a=>{a["5fN3ErxaYfgs3KM1y3rBwP+xLXs="]=a.current})($__dart_deferred_initializers__);
