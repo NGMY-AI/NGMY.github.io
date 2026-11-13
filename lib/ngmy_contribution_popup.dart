@@ -294,7 +294,7 @@ class _NgmyContributionPopupCardState extends State<NgmyContributionPopupCard> w
                             Row(children: [
                               Container(width: 26, height: 26, decoration: const BoxDecoration(shape: BoxShape.circle, color: _kAmber), child: const Icon(Icons.help_outline_rounded, color: _kBrown, size: 18)),
                               const SizedBox(width: 9),
-                              const Flexible(child: Text('NI KWA AJILI YA NINI?', style: TextStyle(color: _kAmber, fontWeight: FontWeight.w900, fontSize: 14.5, letterSpacing: 0.6))),
+                              const Flexible(child: Text('MCHANGO HUU NI WA NINI?', style: TextStyle(color: _kAmber, fontWeight: FontWeight.w900, fontSize: 14.5, letterSpacing: 0.6))),
                             ]),
                             const SizedBox(height: 9),
                             Text(widget.purpose.trim().isEmpty ? 'Mchango wa jamii' : widget.purpose.trim(), style: const TextStyle(color: Colors.white, fontSize: 18.5, fontWeight: FontWeight.w900, height: 1.3)),
