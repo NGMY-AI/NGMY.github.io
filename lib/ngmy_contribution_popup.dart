@@ -287,17 +287,22 @@ class _NgmyContributionPopupCardState extends State<NgmyContributionPopupCard> w
                         2,
                         Container(
                           width: double.infinity,
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(color: const Color(0xFFFFF7ED).withValues(alpha: 0.16), borderRadius: BorderRadius.circular(22), border: Border.all(color: _kAmber.withValues(alpha: 0.7), width: 1.3)),
+                          padding: const EdgeInsets.fromLTRB(16, 13, 16, 15),
+                          // A dark, solid frame with a bright border, so the words stand out clearly from the orange.
+                          decoration: BoxDecoration(color: const Color(0xFF2A0F04).withValues(alpha: 0.92), borderRadius: BorderRadius.circular(22), border: Border.all(color: _kAmber, width: 2), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 4))]),
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            const Text('NI KWA AJILI YA NINI', style: TextStyle(color: _kAmber, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 0.8)),
-                            const SizedBox(height: 4),
-                            Text(widget.purpose.trim().isEmpty ? 'Mchango wa jamii' : widget.purpose.trim(), style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800, height: 1.3)),
+                            Row(children: [
+                              Container(width: 26, height: 26, decoration: const BoxDecoration(shape: BoxShape.circle, color: _kAmber), child: const Icon(Icons.help_outline_rounded, color: _kBrown, size: 18)),
+                              const SizedBox(width: 9),
+                              const Flexible(child: Text('NI KWA AJILI YA NINI?', style: TextStyle(color: _kAmber, fontWeight: FontWeight.w900, fontSize: 14.5, letterSpacing: 0.6))),
+                            ]),
+                            const SizedBox(height: 9),
+                            Text(widget.purpose.trim().isEmpty ? 'Mchango wa jamii' : widget.purpose.trim(), style: const TextStyle(color: Colors.white, fontSize: 18.5, fontWeight: FontWeight.w900, height: 1.3)),
                           ]),
                         ),
                       ),
                       const SizedBox(height: 14),
-                      _in(3, const Align(alignment: Alignment.centerLeft, child: Padding(padding: EdgeInsets.only(left: 4, bottom: 8), child: Text('TUMA MCHANGO WAKO KWA', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11.5, letterSpacing: 0.8))))),
+                      _in(3, const Align(alignment: Alignment.centerLeft, child: Padding(padding: EdgeInsets.only(left: 4, bottom: 8), child: Text('TUMA MCHANGO WAKO KWA', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13.5, letterSpacing: 0.6, shadows: [Shadow(color: Colors.black54, blurRadius: 6)]))))),
                       if (cash.isNotEmpty) _row(index: 4 + row++, key: 'cash', icon: Icons.attach_money_rounded, title: 'CASH APP', value: cash, color: const Color(0xFF22C55E), hint: 'Gusa kufungua Cash App', onTap: () => _open(Uri.parse('https://cash.app/\$$handle'))),
                       if (zelle.isNotEmpty) _row(index: 4 + row++, key: 'zelle', icon: Icons.account_balance_wallet_rounded, title: 'ZELLE', value: zelle, color: const Color(0xFFA78BFA), hint: 'Gusa kunakili'),
                       if (phone.isNotEmpty) _row(index: 4 + row++, key: 'phone', icon: Icons.call_rounded, title: 'PIGA SIMU KUOMBA MSAADA', value: phone, color: const Color(0xFF38BDF8), hint: 'Gusa kupiga simu', onTap: () => _open(Uri.parse('tel:$phone'))),
