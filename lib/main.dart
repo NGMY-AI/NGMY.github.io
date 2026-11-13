@@ -17688,7 +17688,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     if (!ngmyShouldAllowGlobalInterrupt() || _contributionPopupOpen) return;
     _contributionPopupOpen = true;
     final scopeType = config.helpScopeTypeFor(state);
-    final scopeLabel = scopeType == 'city' ? 'City: ${config.helpScopeValueFor(state)}' : (scopeType == 'room' ? 'Room: ${config.helpScopeValueFor(state)}' : 'All members');
+    final scopeLabel = scopeType == 'city' ? 'Jiji: ${config.helpScopeValueFor(state)}' : (scopeType == 'room' ? 'Chumba: ${config.helpScopeValueFor(state)}' : 'Wanachama wote');
+    // A Zelle number is shown with its dashes like the phone number (an email stays as it is).
+    final zelleRaw = config.helpZelleFor(state).trim();
+    final zelleShown = !zelleRaw.contains('@') && zelleRaw.replaceAll(RegExp(r'[^0-9]'), '').length >= 10 ? ngmyFormatPhoneDisplay(zelleRaw) : zelleRaw;
     try {
       await showNgmyContributionPopup(
         context,
@@ -17696,7 +17699,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         purpose: config.helpPurposeFor(state),
         scopeLabel: scopeLabel,
         cashApp: config.helpCashAppFor(state),
-        zelle: config.helpZelleFor(state),
+        zelle: zelleShown,
         phone: ngmyFormatPhoneDisplay(config.helpPhoneFor(state)),
         onOpenRegistry: () {
           if (!mounted) return;

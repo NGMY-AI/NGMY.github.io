@@ -54,7 +54,7 @@ void main() {
     t.view.devicePixelRatio = 2.0;
     addTearDown(t.view.reset);
     var opened = 0;
-    await t.pumpWidget(MaterialApp(home: Builder(builder: (context) => Scaffold(body: Center(child: TextButton(onPressed: () => showNgmyContributionPopup(context, state: 'Georgia', purpose: 'Funeral support', scopeLabel: 'All members', cashApp: r'$NgmyGeorgia', zelle: 'help@ga.org', phone: '(555) 123-4567', onOpenRegistry: () => opened++), child: const Text('go')))))));
+    await t.pumpWidget(MaterialApp(home: Builder(builder: (context) => Scaffold(body: Center(child: TextButton(onPressed: () => showNgmyContributionPopup(context, state: 'Georgia', purpose: 'Funeral support', scopeLabel: 'Wanachama wote', cashApp: r'$NgmyGeorgia', zelle: 'help@ga.org', phone: '(555) 123-4567', onOpenRegistry: () => opened++), child: const Text('go')))))));
     await t.tap(find.text('go'));
     await t.pump(const Duration(milliseconds: 700));
     final card = t.getRect(find.byKey(const Key('contribution-popup')));
@@ -62,7 +62,7 @@ void main() {
     expect(450 - card.right, greaterThan(18), reason: 'not touching the right side');
     expect((card.center.dx - 225).abs(), lessThan(3), reason: 'in the middle sideways');
     expect((card.center.dy - 425).abs(), lessThan(40), reason: 'in the middle up and down');
-    expect(find.text('Contribution open in Georgia'), findsOneWidget);
+    expect(find.text('Mchango umefunguliwa katika Georgia'), findsOneWidget);
     expect(find.text('Funeral support'), findsOneWidget);
     expect(find.text(r'$NgmyGeorgia'), findsOneWidget);
     expect(find.text('help@ga.org'), findsOneWidget);
