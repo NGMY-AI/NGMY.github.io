@@ -3313,8 +3313,8 @@ d.L(x.Z)
 w=A.S(d)
 return w.aH},
 igi(){var w,v,u=A.a([],x.Y)
-for(w=0;w<25;++w){v=D.d8O[w]
-u.push(C.hvG(D.d1f[w],v,D.vi))
+for(w=0;w<25;++w){v=D.d8N[w]
+u.push(C.hvG(D.d1e[w],v,D.vi))
 u.push(C.hvG(D.ctF[w],v,D.a8e))}return u},
 hvG(d,e,f){var w=C.i6B(e),v=C.hWH(e),u=e.a>=15?"Luxury Collection":"Broadcast Overlay",t=w.a
 return new C.Xt(d,v,u,C.i8u(e),f,D.dw3,t[0],t[1],t[2],t[3],e,t[4])},
@@ -3517,7 +3517,7 @@ $.Q()
 w=A.K()
 w.b=B.a9
 w.c=3
-w.sav(new A.a9(B.a6,B.aa,B.x,D.d4k,null,null).aK(0,e))
+w.sav(new A.a9(B.a6,B.aa,B.x,D.d4j,null,null).aK(0,e))
 C.Jv(d,e,f,w)
 w.c=1.4
 w.r=B.hU.j(0.9).gp(0)
@@ -4179,19 +4179,19 @@ i.KP(d,v,u.a,t.b+(s.d-s.b)*0.28,(p.d-p.b)*0.36,B.c,B.V)}i.wA(d,e,B.aD,B.as,B.aT)
 break
 case 14:i.c5L(d,e)
 break
-case 15:i.axO(d,e,B.cZ,"ROYAL",D.dhr,B.rF,B.bL,!0,B.dT,B.hF)
+case 15:i.axO(d,e,B.cZ,"ROYAL",D.dhq,B.rF,B.bL,!0,B.dT,B.hF)
 break
-case 16:i.adM(d,e,B.bC,"STATE",D.d5T,B.T,B.c,B.dA,B.c)
+case 16:i.adM(d,e,B.bC,"STATE",D.d5S,B.T,B.c,B.dA,B.c)
 break
 case 17:i.aZA(d,e,B.aS,"REGAL",B.aDj,B.kq,B.rJ,!0,!0,B.dT,B.wb)
 break
 case 18:i.bPk(d,e)
 break
-case 19:i.c5K(d,e,B.kp,"PALACE",D.dae,B.m5,B.jx,B.oh,!0,B.dT)
+case 19:i.c5K(d,e,B.kp,"PALACE",D.dad,B.m5,B.jx,B.oh,!0,B.dT)
 break
 case 20:i.aZA(d,e,B.aS,"THRONE",B.axG,B.o4,B.qc,!1,!0,B.dx,B.qa)
 break
-case 21:i.adM(d,e,B.bP,"SILVER",D.dh0,B.as,B.iE,B.i5,B.jj)
+case 21:i.adM(d,e,B.bP,"SILVER",D.dh_,B.as,B.iE,B.i5,B.jj)
 break
 case 22:i.axO(d,e,B.aS,"JEWEL",D.dtE,B.dx,B.bL,!0,B.ahK,B.hU)
 w=C.td(e,i.w)
@@ -4199,7 +4199,7 @@ i.aUb(d,new A.o(w.gpV().gbw().a,w.gpV().b-6))
 break
 case 23:i.adM(d,e,B.be,"EXEC",W.RT,B.dA,B.c,B.w,B.c)
 break
-case 24:i.axO(d,e,B.fp,"HERALD",D.d3q,B.pc,B.ql,!0,B.dT,B.hF)
+case 24:i.axO(d,e,B.fp,"HERALD",D.d3p,B.pc,B.ql,!0,B.dT,B.hF)
 q=C.td(e,i.w).gpV()
 v=q.a
 u=q.b
@@ -4964,7 +4964,7 @@ j=j>0.01?B.j.D(j,0.02,0.99):n
 j=A.ko(B.bA,A.m(6),B.aN,8,n,j,n)
 m.push(A.bR(0,A.aI(!1,B.a3,!0,n,A.at(new A.cQ(S.Xx,A.uN(new A.D(B.ac,A.x(A.a([k,B.aB,j,B.X,A.d(o.w>0.01?""+q+"% complete":"Please keep this screen open",n,n,n,n,n,n,B.AO,B.K,n,n),B.aQ,A.dU(B.dn,o.gbJ_(),A.di(n,n,n,n,n,n,n,n,n,B.ab,n,n,n,n,n,n,n,n,n,n))],r),B.l,n,B.e,B.Q,0,B.p),n),B.nn,n,n,n),n),n,n,n),B.f,B.aV,0,n,n,n,n,n,B.aj),0,0,0))}return A.oM(!l,new A.an(B.a0,n,B.ad,B.t,m,n),new C.eTM(o,d),x.K)},
 aVF(){var w=null,v=A.m(14),u=A.L(B.bA,B.r,1),t=x.e
-t=A.C(new A.N(D.d4M,new C.eTi(this),t),t.k("ak.E"))
+t=A.C(new A.N(D.d4L,new C.eTi(this),t),t.k("ak.E"))
 return A.q(w,A.A(t,B.l,w,B.e,B.i,0,w,w),B.f,w,w,new A.p(B.nn,w,u,v,w,w,B.n),w,w,w,w,B.eA,w,w,w)},
 bah(){var w,v,u,t=this,s=null,r=C.ioP(t.d),q=A.m(16),p=t.c
 p.toString
@@ -5041,7 +5041,7 @@ m=i.azF("Social handle (left)",i.fx)
 l=i.azF("Social handle (right)",i.fy)
 k=A.d("Brand & social text style",h,h,h,h,h,h,A.l(h,h,A.a_(140,B.c.l()>>>16&255,B.c.l()>>>8&255,B.c.l()&255),h,h,h,h,h,h,h,h,10,h,h,h,h,h,!0,h,h,h,h,h,h,h,h),h,h,h)
 j=x.C
-j=A.C(new A.N(D.d2P,new C.eT7(i),j),j.k("ak.E"))
+j=A.C(new A.N(D.d2O,new C.eT7(i),j),j.k("ak.E"))
 B.d.v(w,A.a([B.af,A.q(h,A.x(A.a([q,B.ax,p,B.U,o,n,m,l,B.U,k,B.an,A.bU(B.bG,j,B.bs,h,6,6),i.azG("Overlay scale",i.go,0.6,1.8,new C.eT8(i))],s),B.al,h,B.e,B.i,0,B.p),B.f,h,h,new A.p(B.nn,h,r,v,h,h,B.n),h,h,h,h,B.bh,h,h,h)],s))
 return w},
 ah3(d,e){var w=null
@@ -5443,7 +5443,7 @@ $0(){return this.a.dx=!0},
 $S:0}
 C.eSO.prototype={
 $1(d){var w=null
-return A.eg(A.a([A.bN(!1,D.fS2,w,w,!0,w,w,w,new C.eSM(d),w,w),A.bI(D.fU8,w,new C.eSN(d),A.bp(B.nq,w,w,w,w,w,w,w,w,w,w,w))],x.p),w,w,B.nn,D.fPi,w,w,w,w,D.fRm,w)},
+return A.eg(A.a([A.bN(!1,D.fS2,w,w,!0,w,w,w,new C.eSM(d),w,w),A.bI(D.fU8,w,new C.eSN(d),A.bp(B.nq,w,w,w,w,w,w,w,w,w,w,w))],x.p),w,w,B.nn,D.fPh,w,w,w,w,D.fRl,w)},
 $S:18}
 C.eSM.prototype={
 $0(){A.a6(this.a,!1).O(!1)
@@ -6130,8 +6130,8 @@ D.b67=new A.aY(24,1/0,24,1/0)
 D.b5K=new A.bG(B.a1,B.a1,B.Bk,B.a1)
 D.bvb=new A.u(1,0.07450980392156863,0.043137254901960784,0.14901960784313725,B.q)
 D.bjy=new A.u(1,0.023529411764705882,0.12549019607843137,0.09411764705882353,B.q)
-D.ddA=w([D.bvb,D.bjy],x.O)
-D.c7r=new A.a9(B.aA,B.aE,B.x,D.ddA,null,null)
+D.ddz=w([D.bvb,D.bjy],x.O)
+D.c7r=new A.a9(B.aA,B.aE,B.x,D.ddz,null,null)
 D.b73=new A.p(null,null,D.b5K,null,null,D.c7r,B.n)
 D.bca=new A.cg(B.A,null,null,H.ffe,null)
 D.be4=new A.fk(null,null,null,null,null,B.aN,null,null,null,null)
@@ -6212,7 +6212,7 @@ D.egr=new C.fS(38,"ytBanner21")
 D.egs=new C.fS(39,"ytBanner22")
 D.egt=new C.fS(40,"ytBanner23")
 D.egu=new C.fS(41,"ytBanner24")
-D.d1f=w([D.aL3,D.eg7,D.eg8,D.eg9,D.ega,D.egb,D.egc,D.egd,D.ege,D.egf,D.egg,D.egh,D.egi,D.egj,D.egk,D.egl,D.egm,D.egn,D.ego,D.egp,D.egq,D.egr,D.egs,D.egt,D.egu],x.c)
+D.d1e=w([D.aL3,D.eg7,D.eg8,D.eg9,D.ega,D.egb,D.egc,D.egd,D.ege,D.egf,D.egg,D.egh,D.egi,D.egj,D.egk,D.egl,D.egm,D.egn,D.ego,D.egp,D.egq,D.egr,D.egs,D.egt,D.egu],x.c)
 D.Tn=new C.wq(0,"broadcastClassic")
 D.dI8=new C.wq(1,"neonHandles")
 D.dI9=new C.wq(2,"goldCrest")
@@ -6221,13 +6221,13 @@ D.dIb=new C.wq(4,"minimalCaps")
 D.dIc=new C.wq(5,"splitBar")
 D.dId=new C.wq(6,"glassBrand")
 D.dIe=new C.wq(7,"boldRibbon")
-D.d2P=w([D.Tn,D.dI8,D.dI9,D.dIa,D.dIb,D.dIc,D.dId,D.dIe],A.as("O<wq>"))
-D.d3q=w([B.y_,B.y9,B.bi],x.O)
-D.d4k=w([B.bL,B.dX,B.aS],x.O)
+D.d2O=w([D.Tn,D.dI8,D.dI9,D.dIa,D.dIb,D.dIc,D.dId,D.dIe],A.as("O<wq>"))
+D.d3p=w([B.y_,B.y9,B.bi],x.O)
+D.d4j=w([B.bL,B.dX,B.aS],x.O)
 D.a8e=new C.OW(1,"tiktok")
 D.vi=new C.OW(0,"youtube")
-D.d4M=w([D.a8e,D.vi],A.as("O<OW>"))
-D.d5T=w([B.d6,B.dJ,B.d5],x.O)
+D.d4L=w([D.a8e,D.vi],A.as("O<OW>"))
+D.d5S=w([B.d6,B.dJ,B.d5],x.O)
 D.dW4=new C.lx(0,"broadcastGradient")
 D.dW5=new C.lx(1,"ngmyPrime")
 D.dWg=new C.lx(2,"sunsetPulse")
@@ -6253,10 +6253,10 @@ D.dWi=new C.lx(21,"sovereignSilver")
 D.dWj=new C.lx(22,"crownJewel")
 D.dWk=new C.lx(23,"executiveBrief")
 D.dWl=new C.lx(24,"gildedHerald")
-D.d8O=w([D.dW4,D.dW5,D.dWg,D.dWm,D.dWn,D.dWo,D.dWp,D.dWq,D.dWr,D.dWs,D.dW6,D.dW7,D.dW8,D.dW9,D.dWa,D.dWb,D.dWc,D.dWd,D.dWe,D.dWf,D.dWh,D.dWi,D.dWj,D.dWk,D.dWl],A.as("O<lx>"))
-D.dae=w([B.w1,B.p8],x.O)
-D.dh0=w([B.e7,B.br,B.db],x.O)
-D.dhr=w([B.ha,B.dX,B.aS],x.O)
+D.d8N=w([D.dW4,D.dW5,D.dWg,D.dWm,D.dWn,D.dWo,D.dWp,D.dWq,D.dWr,D.dWs,D.dW6,D.dW7,D.dW8,D.dW9,D.dWa,D.dWb,D.dWc,D.dWd,D.dWe,D.dWf,D.dWh,D.dWi,D.dWj,D.dWk,D.dWl],A.as("O<lx>"))
+D.dad=w([B.w1,B.p8],x.O)
+D.dh_=w([B.e7,B.br,B.db],x.O)
+D.dhq=w([B.ha,B.dX,B.aS],x.O)
 D.zT=w([],x.w)
 D.dqG=w([B.bC,B.c8,B.aS],x.O)
 D.drG=w([B.j_,B.fd,B.bT],x.O)
@@ -6342,8 +6342,8 @@ D.fZc=new A.B("Export cancelled.",null,null,null,null,null,null,null,null,null,n
 D.fkp=new A.b1(D.fZc,null,null,null,null,null,null,null,null,null,null,null,null,B.a_,!1,null,null,null,B.t,null)
 D.fuc=new A.G(!0,B.aD,null,null,null,null,9,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fHw=new A.B("Save your video",null,B.h_,null,null,null,null,null,null,null,null,null)
-D.fPi=new A.B("Template recording is in progress. Cancel and go back?",null,B.hj,null,null,null,null,null,null,null,null,null)
-D.fRm=new A.B("Cancel export?",null,B.dg,null,null,null,null,null,null,null,null,null)
+D.fPh=new A.B("Template recording is in progress. Cancel and go back?",null,B.hj,null,null,null,null,null,null,null,null,null)
+D.fRl=new A.B("Cancel export?",null,B.dg,null,null,null,null,null,null,null,null,null)
 D.fS2=new A.B("Keep recording",null,null,null,null,null,null,null,null,null,null,null)
 D.fU8=new A.B("Cancel export",null,null,null,null,null,null,null,null,null,null,null)
 D.fWT=new A.B("Show brand logo",null,O.Vq,null,null,null,null,null,null,null,null,null)
@@ -6361,4 +6361,4 @@ w($,"izh","hi7",()=>A.nV(B.jC))
 w($,"izi","hHP",()=>A.nV(B.dH))
 w($,"izj","hHQ",()=>A.nf(0,0.5,x.W))
 w($,"iD4","hiH",()=>A.h74(C.igi(),!0,A.as("Xt")))})()};
-(a=>{a["xGFYzuzAN1+7bme92Yk2fnrqVGw="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["ZAjZtQUT9ZFk63SaE+qKaJRPMvc="]=a.current})($__dart_deferred_initializers__);

@@ -548,7 +548,7 @@ $0(){A.a6(this.a,!1).O(null)
 return null},
 $S:0}
 C.ec4.prototype={
-$2(d,e){var x,w,v,u,t,s,r,q,p,o,n,m,l=null,k=D.dib[e],j=this.a,i=k.a,h=j.e.h(0,i)
+$2(d,e){var x,w,v,u,t,s,r,q,p,o,n,m,l=null,k=D.dia[e],j=this.a,i=k.a,h=j.e.h(0,i)
 if(h==null)h=0
 x=j.r===i
 w=B.j.F(this.b+e*0.08,1)
@@ -600,16 +600,16 @@ D.huk=new C.yM("notes","Notes",I.a2Z,B.bp,G.aBS)
 D.hui=new C.yM("tasks","Quick Tasks",B.D1,B.bx,B.a5X)
 D.dzi=x([B.aF,B.bp],y.O)
 D.huj=new C.yM("where","Where I Put It",B.n3,B.bp,D.dzi)
-D.d74=x([B.fp,B.aS],y.O)
-D.hud=new C.yM("alarms","Alarms",B.a2m,B.c8,D.d74)
+D.d73=x([B.fp,B.aS],y.O)
+D.hud=new C.yM("alarms","Alarms",B.a2m,B.c8,D.d73)
 D.dpa=x([B.oe,B.cy],y.O)
 D.huc=new C.yM("menu","Local Menu",B.wJ,B.cy,D.dpa)
 D.drF=x([B.jX,B.ch],y.O)
 D.huf=new C.yM("bio","Local Bio",B.hM,B.ch,D.drF)
-D.dib=x([D.hug,D.huh,D.hue,D.hub,D.huk,D.hui,D.huj,D.hud,D.huc,D.huf],A.as("O<yM>"))
+D.dia=x([D.hug,D.huh,D.hue,D.hub,D.huk,D.hui,D.huj,D.hud,D.huc,D.huf],A.as("O<yM>"))
 D.dlF=x([],A.as("O<jL>"))
 D.fdj=new A.av(0,42)
 D.ffD=new A.hG(2,10,10,1.28,null)
 D.fAE=new A.G(!0,B.c,null,null,null,null,12,B.u,null,null,null,null,1.15,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.h0I=new A.B("Open / add",null,B.cg,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["GGefQdFoubFz9MwbNcvWgB2q3W8="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["FR2U4K0mhOHMa3H3seqAronkRyw="]=a.current})($__dart_deferred_initializers__);

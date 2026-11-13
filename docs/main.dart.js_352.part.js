@@ -2675,7 +2675,7 @@ o=g.y
 n=g.aeu(o,"Text shown under the QR (optional \u2014 link itself stays hidden)")
 m=g.Q
 l=x.e
-l=A.C(new A.N(D.dfl,new B.dHf(),l),l.k("ak.E"))
+l=A.C(new A.N(D.dfk,new B.dHf(),l),l.k("ak.E"))
 m=A.E(A.nv(D.c3u,C.cr,m,!1,l,f,new B.dHg(g),C.dg,f,x.W),1)
 l=g.as?f:g.gc8F()
 g.a.toString
@@ -3175,7 +3175,7 @@ return H.aVP(new B.fkY(v,w),u,new B.fkZ(v),u,u,u,x.N)}}
 B.bqa.prototype={
 B(d){var w,v,u,t,s=null,r=A.a([],x.p)
 for(w=this.c,v=0;v<11;++v){u={}
-t=D.d6k[v]
+t=D.d6j[v]
 u.a=null
 u.a=t.a
 t=A.d(t.b,s,s,s,s,s,s,C.lW,s,s,s)
@@ -3278,7 +3278,7 @@ u=n.d.h(0,j)
 if(J.z(u==null?i:u,"snack")){u=n.d.h(0,"message")
 w.push(n.eM("Snack message",J.k(u==null?"":u),new B.fjU(n)))}u=n.d.h(0,j)
 if(J.z(u==null?i:u,"clear")){u=n.d.h(0,h)
-w.push(n.eM("Collection to clear",J.k(u==null?"":u),new B.fk4(n)))}w.push(A.iQ(l,l,l,l,l,new B.fkf(n),l,l,l,D.fPC,J.z(n.d.h(0,"large"),!0)))
+w.push(n.eM("Collection to clear",J.k(u==null?"":u),new B.fk4(n)))}w.push(A.iQ(l,l,l,l,l,new B.fkf(n),l,l,l,D.fPB,J.z(n.d.h(0,"large"),!0)))
 C.d.v(v,w)}return v
 case"text":w=n.d
 w===$&&A.c()
@@ -3321,9 +3321,9 @@ return A.a([w,v,u,t,s,n.aBP("Add button opens",J.k(r==null?"":r),new B.fjV(n),!0
 case"menuGrid":w=n.d
 w===$&&A.c()
 w=w.h(0,"style")
-w=n.IB(g,J.k(w==null?a6:w),D.dke,new B.fjX(n))
+w=n.IB(g,J.k(w==null?a6:w),D.dkd,new B.fjX(n))
 v=n.d.h(0,"columns")
-return A.a([w,n.IB("Columns",J.k(v==null?2:v),D.d3U,new B.fjY(n)),C.U,A.d("Menu items",l,l,l,l,l,l,A.l(l,l,C.kL,l,l,l,l,l,l,l,l,13,l,l,C.V,l,l,!0,l,l,l,l,l,l,l,l),l,l,l),new B.aDD(n.d.h(0,"items"),n.a.e,new B.fjZ(n),l)],x.p)
+return A.a([w,n.IB("Columns",J.k(v==null?2:v),D.d3T,new B.fjY(n)),C.U,A.d("Menu items",l,l,l,l,l,l,A.l(l,l,C.kL,l,l,l,l,l,l,l,l,13,l,l,C.V,l,l,!0,l,l,l,l,l,l,l,l),l,l,l),new B.aDD(n.d.h(0,"items"),n.a.e,new B.fjZ(n),l)],x.p)
 case"switch":w=n.d
 w===$&&A.c()
 w=w.h(0,"setting")
@@ -4561,7 +4561,7 @@ $S:0}
 B.fl0.prototype={
 $2(d,e){var w,v,u,t,s,r,q,p=null
 if(e>=35)return C.bM
-w=D.ddI[e]
+w=D.ddH[e]
 v=w.a
 u=w.b
 t=w.c
@@ -5032,7 +5032,7 @@ $1(d){return d.a===this.a.a},
 $S:159}
 B.fIk.prototype={
 $1(d){var w=x.N,v=x.z,u=x.K,t=x.J
-return B.ni(d,"Travel Explorer","Maps, trips & reservations",4279150057,A.a([B.dc("home","Map",A.I(["type","mapView","collection","places","titleField","name","subtitleField","address","latField","lat","lngField","lng","height",440,"placeholder","Search cities, hotels, airports\u2026","centerLat",48.8566,"centerLng",2.3522],w,v),!0,!0),B.dc("add_place","Add destination",A.I(["type","column","children",A.a([A.I(["type","text","text","Save a place","style","title"],w,w),A.I(["type","form","collection","places","submitLabel","Save on map","successMessage","Place saved!","navigateAfter","home","fields",A.a([A.I(["id","name","label","Place name","type","text"],w,w),A.I(["id","address","label","Address","type","text"],w,w),A.I(["id","lat","label","Latitude","type","text"],w,w),A.I(["id","lng","label","Longitude","type","text"],w,w)],x.m)],w,u)],t)],w,v),!1,!1),B.dc("trips","My trips",A.I(["type","column","children",A.a([A.I(["type","text","text","Saved trips","style","title"],w,w),A.I(["type","dataList","collection","places","titleField","name","subtitleField","address","emptyText","No trips yet \u2014 add a destination on the map.","addTarget","add_place","addLabel","Add trip","allowDelete",!0],w,u)],t)],w,v),!1,!1),B.dc("settings","Settings",B.nk("home"),!1,!1)],x.X),"\u2708\ufe0f",A.I(["bottomNav",D.df4],w,v))},
+return B.ni(d,"Travel Explorer","Maps, trips & reservations",4279150057,A.a([B.dc("home","Map",A.I(["type","mapView","collection","places","titleField","name","subtitleField","address","latField","lat","lngField","lng","height",440,"placeholder","Search cities, hotels, airports\u2026","centerLat",48.8566,"centerLng",2.3522],w,v),!0,!0),B.dc("add_place","Add destination",A.I(["type","column","children",A.a([A.I(["type","text","text","Save a place","style","title"],w,w),A.I(["type","form","collection","places","submitLabel","Save on map","successMessage","Place saved!","navigateAfter","home","fields",A.a([A.I(["id","name","label","Place name","type","text"],w,w),A.I(["id","address","label","Address","type","text"],w,w),A.I(["id","lat","label","Latitude","type","text"],w,w),A.I(["id","lng","label","Longitude","type","text"],w,w)],x.m)],w,u)],t)],w,v),!1,!1),B.dc("trips","My trips",A.I(["type","column","children",A.a([A.I(["type","text","text","Saved trips","style","title"],w,w),A.I(["type","dataList","collection","places","titleField","name","subtitleField","address","emptyText","No trips yet \u2014 add a destination on the map.","addTarget","add_place","addLabel","Add trip","allowDelete",!0],w,u)],t)],w,v),!1,!1),B.dc("settings","Settings",B.nk("home"),!1,!1)],x.X),"\u2708\ufe0f",A.I(["bottomNav",D.df3],w,v))},
 $S:57}
 B.fIl.prototype={
 $1(d){var w=x.N,v=x.m,u=x.K,t=x.J,s=x.z
@@ -5816,7 +5816,7 @@ D.efg=new B.JI("Portfolio Web App","Showcase work & contact",D.bPh,"video_hub",C
 D.bOP=new A.a0(61573,"MaterialIcons",!1)
 D.efe=new B.JI("Travel Booking App","Trips, maps & reservations",D.bOP,"qr_studio",C.av)
 D.cZS=w([D.efb,D.eff,D.efd,D.efc,D.efg,D.efe],A.as("O<JI>"))
-D.d3U=w(["2","3","4"],x.s)
+D.d3T=w(["2","3","4"],x.s)
 D.ePJ=new A.y("button","Button")
 D.eRs=new A.y("form","Form")
 D.eQm=new A.y("dataList","List")
@@ -5828,7 +5828,7 @@ D.eWu=new A.y("reelFeed","Reels")
 D.eX0=new A.y("socialFeed","Feed")
 D.eWe=new A.y("qrGenerator","QR")
 D.eX9=new A.y("stat","Stat")
-D.d6k=w([D.ePJ,D.eRs,D.eQm,D.eUA,D.eUE,D.eS4,D.eXe,D.eWu,D.eX0,D.eWe,D.eX9],A.as("O<+(n,n)>"))
+D.d6j=w([D.ePJ,D.eRs,D.eQm,D.eUA,D.eUE,D.eS4,D.eXe,D.eWu,D.eX0,D.eWe,D.eX9],A.as("O<+(n,n)>"))
 D.f_W=new A.b5("button",D.aoV,"Button")
 D.bOF=new A.a0(61341,"MaterialIcons",!1)
 D.f00=new A.b5("outlined_button",D.bOF,"Outline")
@@ -5877,15 +5877,15 @@ D.bOm=new A.a0(58877,"MaterialIcons",!1)
 D.f3f=new A.b5("rating",D.bOm,"Rating")
 D.f04=new A.b5("contact",C.a26,"Contact")
 D.f0W=new A.b5("video",Q.a2f,"Video")
-D.ddI=w([D.f_W,D.f00,D.f0I,D.f1K,D.f1g,D.f25,D.f_Y,D.eZN,D.f0z,D.f1G,D.f2p,D.f2n,D.f15,D.f2L,D.f0v,D.f39,D.f1M,D.f_f,D.f0X,D.f0F,D.f1u,D.f0q,D.f22,D.f2l,D.f2j,D.f0l,D.f1V,D.f1a,D.eZV,D.eZU,D.f13,D.f1x,D.f3f,D.f04,D.f0W],A.as("O<+(n,a0,n)>"))
+D.ddH=w([D.f_W,D.f00,D.f0I,D.f1K,D.f1g,D.f25,D.f_Y,D.eZN,D.f0z,D.f1G,D.f2p,D.f2n,D.f15,D.f2L,D.f0v,D.f39,D.f1M,D.f_f,D.f0X,D.f0F,D.f1u,D.f0q,D.f22,D.f2l,D.f2j,D.f0l,D.f1V,D.f1a,D.eZV,D.eZU,D.f13,D.f1x,D.f3f,D.f04,D.f0W],A.as("O<+(n,a0,n)>"))
 D.tm={icon:0,label:1,target:2}
 D.dDQ=new A.bu(D.tm,["map","Map","home"],x.w)
 D.dDR=new A.bu(D.tm,["list","Trips","trips"],x.w)
 D.dDP=new A.bu(D.tm,["add","Add","add_place"],x.w)
 D.dDM=new A.bu(D.tm,["settings","Settings","settings"],x.w)
-D.df4=w([D.dDQ,D.dDR,D.dDP,D.dDM],x.m)
-D.dfl=w([C.GE,C.yx,C.oo,C.a_I,C.a_Q,null],A.as("O<bd?>"))
-D.dke=w(["classic","neon","hologram","pulse"],x.s)
+D.df3=w([D.dDQ,D.dDR,D.dDP,D.dDM],x.m)
+D.dfk=w([C.GE,C.yx,C.oo,C.a_I,C.a_Q,null],A.as("O<bd?>"))
+D.dkd=w(["classic","neon","hologram","pulse"],x.s)
 D.hEL=w([],x.X)
 D.dDS=new A.bu(D.tm,["feed","Feed","feed"],x.w)
 D.dDO=new A.bu(D.tm,["create","Post","create"],x.w)
@@ -5916,7 +5916,7 @@ D.bOl=new A.a0(58818,"MaterialIcons",!1)
 D.f2Z=new A.b5("button","Button",D.bOl)
 D.bNW=new A.a0(57774,"MaterialIcons",!1)
 D.f_U=new A.b5("outlined_button","Outlined button",D.bNW)
-D.djk=w([D.f2Z,D.f_U],x.c)
+D.djj=w([D.f2Z,D.f_U],x.c)
 D.f_2=new A.b5("title","Title text",O.a23)
 D.f2a=new A.b5("text","Body text",D.a22)
 D.bOt=new A.a0(59054,"MaterialIcons",!1)
@@ -5931,7 +5931,7 @@ D.bOa=new A.a0(58244,"MaterialIcons",!0)
 D.f_H=new A.b5("dataList","Data list",D.bOa)
 D.bNA=new A.a0(57475,"MaterialIcons",!1)
 D.f2O=new A.b5("stat","Stat counter",D.bNA)
-D.dcj=w([D.f_L,D.f_H,D.f2O],x.c)
+D.dci=w([D.f_L,D.f_H,D.f2O],x.c)
 D.bO5=new A.a0(58090,"MaterialIcons",!1)
 D.f0w=new A.b5("menuGrid","Menu grid",D.bO5)
 D.f32=new A.b5("list","Link list",K.OR)
@@ -5949,7 +5949,7 @@ D.do1=w([D.f24,D.f1X,D.f37,D.f0f,D.f_G],x.c)
 D.f0o=new A.b5("qrGenerator","QR generator",D.a2_)
 D.f0B=new A.b5("qrCode","Static QR",D.aov)
 D.f1e=new A.b5("invoiceBuilder","Invoice",F.OU)
-D.d9k=w([D.f0o,D.f0B,D.f1e],x.c)
+D.d9j=w([D.f0o,D.f0B,D.f1e],x.c)
 D.f2W=new A.b5("reelFeed","TikTok feed",L.aqf)
 D.f0g=new A.b5("socialFeed","Social feed",F.apq)
 D.f_I=new A.b5("postComposer","Post / reel",C.aqs)
@@ -5970,7 +5970,7 @@ D.f1C=new A.b5("contact","Contact card",D.bNU)
 D.bOs=new A.a0(59048,"MaterialIcons",!1)
 D.f1N=new A.b5("video","Video",D.bOs)
 D.dsJ=w([D.f2G,D.f0t,D.f35,D.f_d,D.f1C,D.f1N],x.c)
-D.aIt=new A.bu(D.ekd,[D.djk,D.cB4,D.dcj,D.cBk,D.do1,D.d9k,D.cWm,D.dm_,D.dsJ],A.as("bu<n,ai<+(n,n,a0)>>"))
+D.aIt=new A.bu(D.ekd,[D.djj,D.cB4,D.dci,D.cBk,D.do1,D.d9j,D.cWm,D.dm_,D.dsJ],A.as("bu<n,ai<+(n,n,a0)>>"))
 D.dH7=new B.F0(null,"Invalid backup format. Export again from App Studio \u2192 menu \u2192 Download backup.")
 D.dH8=new B.F0(null,"Invalid backup \u2014 choose a .ngmy.json file exported from App Studio.")
 D.dH9=new B.F0(null,"No file selected.")
@@ -6002,26 +6002,26 @@ D.exI=new A.jF("inspector",48,D.fDP,null,x._)
 D.frn=new A.G(!0,C.bC,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fJw=new A.B("Delete",null,D.frn,null,null,null,null,null,null,null,null,null)
 D.exL=new A.jF("delete",48,D.fJw,null,x._)
-D.fPB=new A.B("Save project",null,null,null,null,null,null,null,null,null,null,null)
-D.exN=new A.jF("save",48,D.fPB,null,x._)
+D.fPA=new A.B("Save project",null,null,null,null,null,null,null,null,null,null,null)
+D.exN=new A.jF("save",48,D.fPA,null,x._)
 D.fMz=new A.B("Publish app",null,null,null,null,null,null,null,null,null,null,null)
 D.exO=new A.jF("publish",48,D.fMz,null,x._)
 D.fXC=new A.B("Open in canvas",null,null,null,null,null,null,null,null,null,null,null)
 D.exT=new A.jF("canvas",48,D.fXC,null,x._)
-D.fR5=new A.B("Download code",null,null,null,null,null,null,null,null,null,null,null)
-D.exU=new A.jF("download",48,D.fR5,null,x._)
+D.fR4=new A.B("Download code",null,null,null,null,null,null,null,null,null,null,null)
+D.exU=new A.jF("download",48,D.fR4,null,x._)
 D.fMN=new A.B("Edit screen",null,null,null,null,null,null,null,null,null,null,null)
 D.exY=new A.jF("edit",48,D.fMN,null,x._)
 D.ffC=new A.hG(5,8,8,0.82,null)
 D.ffP=new A.hG(5,8,8,0.85,null)
-D.fOu=new A.B("Use Exit in the menu to leave App Builder.",null,null,null,null,null,null,null,null,null,null,null)
-D.fge=new A.b1(D.fOu,null,null,null,null,null,null,null,null,null,null,null,null,C.a_,!1,null,null,null,C.t,null)
+D.fOt=new A.B("Use Exit in the menu to leave App Builder.",null,null,null,null,null,null,null,null,null,null,null)
+D.fge=new A.b1(D.fOt,null,null,null,null,null,null,null,null,null,null,null,null,C.a_,!1,null,null,null,C.t,null)
 D.fKp=new A.B("Copied JSON",null,null,null,null,null,null,null,null,null,null,null)
 D.fgj=new A.b1(D.fKp,null,null,null,null,null,null,null,null,null,null,null,null,C.a_,!1,null,null,null,C.t,null)
 D.fUR=new A.B("Link copied.",null,null,null,null,null,null,null,null,null,null,null)
 D.aTR=new A.b1(D.fUR,null,null,null,null,null,null,null,null,null,null,null,null,C.a_,!1,null,null,null,C.t,null)
-D.fPQ=new A.B("Integrations saved.",null,null,null,null,null,null,null,null,null,null,null)
-D.fgO=new A.b1(D.fPQ,null,null,null,null,null,null,null,null,null,null,null,null,C.a_,!1,null,null,null,C.t,null)
+D.fPP=new A.B("Integrations saved.",null,null,null,null,null,null,null,null,null,null,null)
+D.fgO=new A.b1(D.fPP,null,null,null,null,null,null,null,null,null,null,null,null,C.a_,!1,null,null,null,C.t,null)
 D.fX_=new A.B("Link copied!",null,null,null,null,null,null,null,null,null,null,null)
 D.fh0=new A.b1(D.fX_,null,null,null,null,null,null,null,null,null,null,null,null,C.a_,!1,null,null,null,C.t,null)
 D.h_D=new A.B("Saved on this device. Admin can review on this device.",null,null,null,null,null,null,null,null,null,null,null)
@@ -6030,12 +6030,12 @@ D.fEx=new A.B("Open a project to publish.",null,null,null,null,null,null,null,nu
 D.fhw=new A.b1(D.fEx,null,null,null,null,null,null,null,null,null,null,null,null,C.a_,!1,null,null,null,C.t,null)
 D.fKs=new A.B("Open or create a project first (My Projects or Templates).",null,null,null,null,null,null,null,null,null,null,null)
 D.fix=new A.b1(D.fKs,null,null,null,null,null,null,null,null,null,null,null,null,C.a_,!1,null,null,null,C.t,null)
-D.fQe=new A.B("Open a project first \u2014 then connect Supabase or other backends.",null,null,null,null,null,null,null,null,null,null,null)
-D.fjT=new A.b1(D.fQe,null,null,null,null,null,null,null,null,null,null,null,null,C.a_,!1,null,null,null,C.t,null)
+D.fQd=new A.B("Open a project first \u2014 then connect Supabase or other backends.",null,null,null,null,null,null,null,null,null,null,null)
+D.fjT=new A.b1(D.fQd,null,null,null,null,null,null,null,null,null,null,null,null,C.a_,!1,null,null,null,C.t,null)
 D.fLc=new A.B("Client name and amount are required.",null,null,null,null,null,null,null,null,null,null,null)
 D.fkG=new A.b1(D.fLc,C.ay,null,null,null,null,null,null,null,null,null,null,null,C.a_,!1,null,null,null,C.t,null)
-D.fON=new A.B("Open a project with screens first.",null,null,null,null,null,null,null,null,null,null,null)
-D.fkO=new A.b1(D.fON,null,null,null,null,null,null,null,null,null,null,null,null,C.a_,!1,null,null,null,C.t,null)
+D.fOM=new A.B("Open a project with screens first.",null,null,null,null,null,null,null,null,null,null,null)
+D.fkO=new A.b1(D.fOM,null,null,null,null,null,null,null,null,null,null,null,null,C.a_,!1,null,null,null,C.t,null)
 D.fpq=new A.G(!0,C.bl,null,null,null,null,10,C.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.ftT=new A.G(!0,C.bx,null,null,null,null,12,C.V,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fCm=new A.G(!0,C.bl,null,null,null,null,13,C.V,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
@@ -6062,7 +6062,7 @@ D.fn2=new A.G(!0,C.co,null,null,null,null,null,C.I,null,null,null,null,null,null
 D.fLW=new A.B("Use on canvas",null,D.fn2,null,null,null,null,null,null,null,null,null)
 D.fMG=new A.B("Open live app",null,null,null,null,null,null,null,null,null,null,null)
 D.fMM=new A.B("Integrations",null,C.iA,null,null,null,null,null,null,null,null,null)
-D.fPC=new A.B("Large button",null,null,null,null,null,null,null,null,null,null,null)
+D.fPB=new A.B("Large button",null,null,null,null,null,null,null,null,null,null,null)
 D.fSr=new A.B("Subscribe",null,null,null,null,null,null,null,null,null,null,null)
 D.fSt=new A.B("Invoices",null,C.ne,null,null,null,null,null,null,null,null,null)
 D.fWe=new A.B("My Projects",null,C.dg,null,null,null,null,null,null,null,null,null)
@@ -6075,4 +6075,4 @@ D.fZD=new A.B("My Projects",null,null,null,null,null,null,null,null,null,null,nu
 D.h_V=new A.B("Invoice published",null,C.iA,null,null,null,null,null,null,null,null,null)})();(function lazyInitializers(){var w=a.lazyFinal
 w($,"iCZ","hJR",()=>{var v=4279150057,u=4284704497
 return A.a([B.mP("Featured",new B.fIk(),"Map, saved trips & destinations.","\u2708\ufe0f","qr_studio","Travel Explorer",v),B.mP("",new B.fIl(),"Product feed, cart & checkout.","\ud83d\udecd\ufe0f","luxe_store","Luxe Store",4293675161),B.mP("",new B.fIm(),"Posts, profiles & engagement.","\ud83d\udcac","creator_hub","Social Pulse",4287323382),B.mP("",new B.fIx(),"Workouts, check-ins & nutrition.","\ud83d\udcaa","pulse_fitness","Pulse Fitness",4279286145),B.mP("",new B.fID(),"Clients, invoices & pipeline.","\ud83d\udcca","invoice_pro","CRM Dashboard",u),B.mP("",new B.fIE(),"Showcase work & contact.","\ud83c\udf10","video_hub","Portfolio Hub",v),B.mP("",new B.fIF(),"Live QR for websites & text.","\ud83d\udcf1","qr_code_studio","QR Code Studio",4278630100),B.mP("New",new B.fIG(),"Sell, track sales & get paid.","\ud83d\udcb5","side_hustle","Side Hustle Marketplace",4279673674),B.mP("",new B.fIH(),"Services, bookings & client earnings.","\ud83d\udcc5","booking_pro","Booking & Services",4286331629),B.mP("",new B.fII(),"Daily checklist, streaks & progress.","\ud83d\udd25","habit_tracker","Habit Tracker",4279548070),B.mP("",new B.fIJ(),"Income, spending & budget at a glance.","\ud83d\udcb0","finance_dash","Money Tracker",4282090230),B.mP("",new B.fIn(),"Post roles, track applicants.","\ud83d\udcbc","job_board","Job Board",4281549141),B.mP("",new B.fIo(),"Discussion feed, posts & replies.","\ud83d\udde3\ufe0f","community_forum","Community Forum",4288814255),B.mP("",new B.fIp(),"Episodes, categories & playback links.","\ud83c\udf99\ufe0f","podcast_hub","Podcast Hub",4280232247),B.mP("",new B.fIq(),"Events, RSVPs & shareable QR codes.","\ud83c\udfab","event_tickets","Event Ticketing",4294286859),B.mP("New",new B.fIr(),"Raise funds, track donors, share a link.","\u2764\ufe0f","donate_nonprofit","Giving Campaign",4292943176),B.mP("",new B.fIs(),"Sessions, bookings & client roster.","\ud83e\uddd8","coaching_booking","Coaching Studio",4286456526),B.mP("",new B.fIt(),"Showcase galleries & booking requests.","\ud83d\udcf7","photo_portfolio","Photo Portfolio",4279310375),B.mP("",new B.fIu(),"Save recipes, ingredients & steps.","\ud83c\udf73","recipe_box","Recipe Box",4293548044),B.mP("",new B.fIv(),"Daily care, vet visits & reminders.","\ud83d\udc3e","pet_care","Pet Care Tracker",4284850957),B.mP("",new B.fIw(),"Create invoices, track clients & income.","\ud83e\uddfe","freelance_invoicing","Freelancer Invoicing",4280171146),B.mP("",new B.fIy(),"Log rounds, track scores & leaderboard.","\ud83c\udfc6","trivia_game","Trivia Night Scorekeeper",4292552567),B.mP("New",new B.fIz(),"Map of properties, inquiries & saves.","\ud83c\udfe0","real_estate","Real Estate Listings",4278995566),B.mP("",new B.fIA(),"Menu by category, tap to add to order.","\ud83c\udf7d\ufe0f","restaurant_menu","Restaurant Menu & Orders",4290321436),B.mP("",new B.fIB(),"Members, renewals & revenue.","\ud83e\udeaa","membership_manager","Membership Manager",4278483031),B.mP("",new B.fIC(),"Start fresh \u2014 describe any app to NGMY AI.","\ud83d\ude80","blank","Blank Canvas",u)],A.as("O<a7a>"))})})()};
-(a=>{a["p+mli97he2s7eKJI4+sp5a5QmF0="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["aEQTy+Prw82o7Tn/GAAK6RKc59E="]=a.current})($__dart_deferred_initializers__);

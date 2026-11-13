@@ -710,7 +710,7 @@ x=w.b
 v=x.c
 x=x.a.c
 w.a5(d,f.aJ(0,new B.o(v/2,x.gba(x)/2)))},
-M1(d,e,f,g){var x,w,v,u,t,s,r,q,p,o=A.o.F(g==null?A.j.bh(f/6):g,11),n=A.j.F(f,6),m=D.dhO[o],l=e.a,k=e.b,j=0+l,i=0+k
+M1(d,e,f,g){var x,w,v,u,t,s,r,q,p,o=A.o.F(g==null?A.j.bh(f/6):g,11),n=A.j.F(f,6),m=D.dhN[o],l=e.a,k=e.b,j=0+l,i=0+k
 $.Q()
 x=B.K()
 x.sav(new B.a9(A.aA,A.aE,A.x,B.a([m.c,m.d],y.O),null,null).aK(0,new B.a1(0,0,j,i)))
@@ -1814,7 +1814,7 @@ m=n+8
 l=q.c-o
 k=q.d
 n=k-n
-j=D.dhN[r]
+j=D.dhM[r]
 p=B.bm(new B.a1(p,m,p+(l-16),m+n*0.55),new B.aN(8,8))
 i=new B.ao(A.O,A.M,A.R,A.S,A.P)
 i.r=j.gp(0)
@@ -2058,7 +2058,7 @@ q=new B.ao(A.O,A.M,A.R,A.S,A.P)
 q.b=A.a9
 q.c=u
 q.d=A.bu
-q.r=D.d9u[t].gp(0)
+q.r=D.d9t[t].gp(0)
 d.cB(r,3.141592653589793,3.141592653589793*s,!1,q)}p=3.141592653589793+3.141592653589793*m
 o=new B.o(w+Math.cos(p)*n*0.2,v+Math.sin(p)*n*0.2)
 C.lF(d,o,n*0.03,A.c)
@@ -2067,7 +2067,7 @@ ieB(d,e,f){var x,w,v,u,t,s,r,q,p,o,n=e.b,m=e.a
 for(x=f*7,w=m/2,v=n*0.5,u=n*0.07,t=0;t<7;++t){s=n*(0.08+0.2*(0.5+0.5*Math.sin(x+t*1.3)))
 r=w+(t-3.5)*n*0.09
 q=v-s
-p=D.d9Q[t]
+p=D.d9P[t]
 q=B.bm(new B.a1(r,q,r+u,q+s),new B.aN(5,5))
 $.Q()
 r=new B.ao(A.O,A.M,A.R,A.S,A.P)
@@ -2092,7 +2092,7 @@ ieE(d,e,f){var x,w,v,u,t,s,r,q=e.b
 for(x=e.a/2,w=q*0.14,v=q*0.26,u=0;u<4;++u){t=A.j.D((f-u*0.3)/0.7,0,1)
 if(t<=0)continue
 s=G.XJ.aA(0,t)
-C.Bj(d,"NGMY"[u],new B.o(x+(u-1.5)*q*0.2,w-(1-s)*q*0.25),v,D.dgs[u],!0,!1,0)}r=A.j.D((f-1.4)/0.6,0,1)
+C.Bj(d,"NGMY"[u],new B.o(x+(u-1.5)*q*0.2,w-(1-s)*q*0.25),v,D.dgr[u],!0,!1,0)}r=A.j.D((f-1.4)/0.6,0,1)
 x-=q*0.4
 w=q*0.46
 $.Q()
@@ -2648,7 +2648,7 @@ return C.hdU(x.a,x.b,x.c*0.065,w)},
 $S:0}
 C.fmK.prototype={
 $0(){var x=this
-return C.fnQ(x.a,x.b,x.c*0.075,D.dhS[x.d])},
+return C.fnQ(x.a,x.b,x.c*0.075,D.dhR[x.d])},
 $S:0}
 C.fBz.prototype={
 $0(){var x=this.a,w=this.b,v=this.c,u=v*0.16
@@ -2750,8 +2750,8 @@ D.c7c=new B.a9(A.aA,A.aE,A.x,D.dxG,null,null)
 D.b79=new B.p(null,null,null,null,null,D.c7c,A.n)
 D.b2l=new B.da(0.5,-0.6)
 D.buV=new B.u(1,0.22745098039215686,0.054901960784313725,0.10980392156862745,A.q)
-D.dg8=x([D.buV,A.ep],y.O)
-D.ezj=new B.bY(D.b2l,1.3,A.x,null,0,D.dg8,null,null)
+D.dg7=x([D.buV,A.ep],y.O)
+D.ezj=new B.bY(D.b2l,1.3,A.x,null,0,D.dg7,null,null)
 D.b7i=new B.p(null,null,null,null,null,D.ezj,A.n)
 D.u3=new B.u(1,0.8392156862745098,0.7176470588235294,0.4823529411764706,A.q)
 D.b5o=new B.ay(D.u3,1,A.r,-1)
@@ -2795,8 +2795,8 @@ D.c_R=new B.ae(A.eS,13,A.ab,null,null,null)
 D.bSb=new B.a0(983768,"MaterialIcons",!1)
 D.c0t=new B.ae(D.bSb,13,A.c,null,null,null)
 D.c67=new B.a9(A.b7,A.b8,A.x,I.RT,null,null)
-D.djO=x([A.dA,A.T,A.FX],y.O)
-D.c7b=new B.a9(A.b7,A.b8,A.x,D.djO,null,null)
+D.djN=x([A.dA,A.T,A.FX],y.O)
+D.c7b=new B.a9(A.b7,A.b8,A.x,D.djN,null,null)
 D.Mq=new B.u(1,0.11764705882352941,0.30980392156862746,0.6392156862745098,A.q)
 D.cNV=x([D.iG,D.Mq,A.av,A.bL],y.O)
 D.doR=x([0,0.42,0.8,1],y.n)
@@ -2841,23 +2841,23 @@ D.hAJ=new C.js("Paint with light","Colours that glow",C.iqc())
 D.hAH=new C.js("Make music","Beats, notes and tunes",C.iqb())
 D.hAq=new C.js("Add your title","Moving words for any picture",C.iqe())
 D.cXv=x([D.hAE,D.hAJ,D.hAH,D.hAq],y.f)
-D.d21=x([A.cZ,A.fV],y.O)
-D.d25=x([A.cG,A.d6],y.O)
+D.d20=x([A.cZ,A.fV],y.O)
+D.d24=x([A.cG,A.d6],y.O)
 D.hAN=new C.js("NGMY Business Cards","Design a card in seconds",C.ipT())
 D.hAA=new C.js("Make it yours","Pick your colours and your look",C.ipS())
 D.hAp=new C.js("Share it","One tap and it is on their phone",C.ipU())
 D.hAo=new C.js("Be remembered","Cards people keep",C.ipV())
-D.d43=x([D.hAN,D.hAA,D.hAp,D.hAo],y.f)
+D.d42=x([D.hAN,D.hAA,D.hAp,D.hAo],y.f)
 D.eH0=new B.y("Chairs",120)
 D.eH3=new B.y("Cloth",80)
 D.eHn=new B.y("Delivery",25)
 D.aAb=x([D.eH0,D.eH3,D.eHn],B.as("O<+(n,H)>"))
-D.d9u=x([A.ay,A.av,A.bi,A.b4,A.aH,A.bp],y.O)
-D.d9Q=x([A.aH,A.b4,A.bi,A.cF,A.bT,A.bp,A.aH],y.O)
-D.d9V=x([A.cX,A.eV],y.O)
+D.d9t=x([A.ay,A.av,A.bi,A.b4,A.aH,A.bp],y.O)
+D.d9P=x([A.aH,A.b4,A.bi,A.cF,A.bT,A.bp,A.aH],y.O)
+D.d9U=x([A.cX,A.eV],y.O)
 D.RY=x([A.ay,A.d5,A.av],y.O)
-D.dby=x([A.aF,A.kJ],y.O)
-D.dcW=x([A.jX,A.cy],y.O)
+D.dbx=x([A.aF,A.kJ],y.O)
+D.dcV=x([A.jX,A.cy],y.O)
 D.dHq=new C.wp("NGMY Ads","\ud83d\udce2","Every NGMY promotion, as cartoons",A.bT,-1)
 D.dHl=new C.wp("Civic Registry","\ud83e\udeaa","Enroll your family in your community",A.d5,0)
 D.dHr=new C.wp("Jobs","\ud83d\udcbc","Find work and get hired",A.av,1)
@@ -2867,8 +2867,8 @@ D.dHu=new C.wp("Doc Scanner","\ud83d\udcc4","Scan, save and share",A.ch,4)
 D.dHm=new C.wp("Invoices","\ud83e\uddfe","Professional invoices",A.bD,5)
 D.dHj=new C.wp("Calendar","\ud83d\udcc5","This month, today lit up",A.ay,-2)
 D.kx=x([D.dHq,D.dHl,D.dHr,D.dHw,D.dHx,D.dHu,D.dHm,D.dHj],B.as("O<wp>"))
-D.df8=x([A.dX,A.rz],y.O)
-D.dgs=x([A.aH,A.b4,A.bi,A.bT],y.O)
+D.df7=x([A.dX,A.rz],y.O)
+D.dgr=x([A.aH,A.b4,A.bi,A.bT],y.O)
 D.eOm=new B.y("Jambo! Habari yako?","Nzuri, asante!")
 D.eHw=new B.y("Jina lako nani?","Jina langu ni Amina.")
 D.eIf=new B.y("Karibu nyumbani!","Asante sana!")
@@ -2897,8 +2897,8 @@ D.hAL=new C.js("NGMY Construction Lab","Frame a room, stud by stud",C.ipX())
 D.hAx=new C.js("Wire it","Pull the cable, set the box, no shocks",C.ipZ())
 D.hAu=new C.js("Hang the drywall","Screw it, tape it, mud it, sand it",C.ipW())
 D.hAm=new C.js("Move in","Learn real trades, one room at a time",C.ipY())
-D.dhf=x([D.hAL,D.hAx,D.hAu,D.hAm],y.f)
-D.dhN=x([A.co,A.bx,A.bT],y.O)
+D.dhe=x([D.hAL,D.hAx,D.hAu,D.hAm],y.f)
+D.dhM=x([A.co,A.bx,A.bT],y.O)
 D.hrU=new C.wW("NGMY Civic Registry","Enroll your family. Stay counted and helped together.",A.d6,A.aH)
 D.hs7=new C.wW("NGMY Jobs","Find work. Get hired. Get paid.",A.cZ,A.aS)
 D.hs4=new C.wW("NGMY Store","African food and traditions. Support our Congolese and African community.",A.kr,A.bi)
@@ -2910,18 +2910,18 @@ D.hrT=new C.wW("NGMY Wallet","Save, send and earn coins.",A.ua,A.dy)
 D.hrW=new C.wW("Vault Games","Play, win and learn.",A.dJ,A.ba)
 D.hs5=new C.wW("Electronics Lab","Build real circuits and learn.",A.eX,A.b0)
 D.hs0=new C.wW("NGMY Helper and Advisors","Friendly help, any time.",A.kJ,A.cF)
-D.dhO=x([D.hrU,D.hs7,D.hs4,D.hs_,D.hrX,D.hrV,D.hrR,D.hrT,D.hrW,D.hs5,D.hs0],B.as("O<wW>"))
-D.dhS=x([A.bT,A.aH,A.bi,A.b4,A.bp,A.cF],y.O)
+D.dhN=x([D.hrU,D.hs7,D.hs4,D.hs_,D.hrX,D.hrV,D.hrR,D.hrT,D.hrW,D.hs5,D.hs0],B.as("O<wW>"))
+D.dhR=x([A.bT,A.aH,A.bi,A.b4,A.bp,A.cF],y.O)
 D.hAC=new C.js("NGMY Electronics Lab","Power goes round a loop",C.iq0())
 D.hAn=new C.js("Build it","Drop in resistors, LEDs and capacitors",C.iq_())
 D.hAw=new C.js("Run a TV","Real volts, real gadgets",C.iq2())
 D.hAI=new C.js("Measure it","Read the volts like a pro",C.iq1())
-D.die=x([D.hAC,D.hAn,D.hAw,D.hAI],y.f)
+D.did=x([D.hAC,D.hAn,D.hAw,D.hAI],y.f)
 D.hAl=new C.js("NGMY Vault","Lock away what matters",C.iqg())
 D.hAK=new C.js("Dial it","Only you know the code",C.iqf())
 D.hAt=new C.js("Store it","Photos, notes and documents",C.iqi())
 D.hAP=new C.js("Stay safe","Private, protected, always yours",C.iqh())
-D.diQ=x([D.hAl,D.hAK,D.hAt,D.hAP],y.f)
+D.diP=x([D.hAl,D.hAK,D.hAt,D.hAP],y.f)
 D.hAM=new C.js("NGMY Store","Open the doors to something new",C.iq9())
 D.hAk=new C.js("Find anything","Shop gadgets, books and more",C.iqa())
 D.hAv=new C.js("Add to cart","Fill it up, pay your way",C.iq7())
@@ -2980,5 +2980,5 @@ D.fSG=new B.B("LG",null,A.xl,null,null,null,null,null,null,null,null,null)
 D.fYR=new B.B("tv",null,A.r9,null,null,null,null,null,null,null,null,null)
 D.fsk=new B.G(!0,D.u3,null,null,null,null,8.5,null,null,2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.h_Z=new B.B("OPEN",null,D.fsk,null,null,null,null,null,null,null,null,null)})();(function staticFields(){$.i4B=function(){var x=B.as("O<aE>")
-return B.a([B.a([D.d21,D.dhf],x),B.a([D.dmd,D.die],x),B.a([D.dby,D.dzI],x),B.a([D.d9V,D.cIu],x),B.a([N.aCS,D.diQ],x),B.a([D.dcW,D.cXv],x),B.a([D.d25,D.d43],x),B.a([D.df8,D.dkS],x)],B.as("O<ai<aE>>"))}()})()};
-(a=>{a["fEjn2PqkmUBx76/MbCnrN8z8Z1I="]=a.current})($__dart_deferred_initializers__);
+return B.a([B.a([D.d20,D.dhe],x),B.a([D.dmd,D.did],x),B.a([D.dbx,D.dzI],x),B.a([D.d9U,D.cIu],x),B.a([N.aCS,D.diP],x),B.a([D.dcV,D.cXv],x),B.a([D.d24,D.d42],x),B.a([D.df7,D.dkS],x)],B.as("O<ai<aE>>"))}()})()};
+(a=>{a["LpupRBMlMoaQ41OxKmXFapSg7II="]=a.current})($__dart_deferred_initializers__);

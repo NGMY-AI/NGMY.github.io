@@ -8,7 +8,7 @@ for(;;)switch(x){case 0:x=3
 return A.b(A.az(),$async$fto)
 case 3:u=f
 t=C.frd("ngmy_bible_dictionary_lang_v1",d)
-v=B.d.dP(D.dgF,new C.ftp(A.aT(J.t(u.a,t))),new C.ftq())
+v=B.d.dP(D.dgE,new C.ftp(A.aT(J.t(u.a,t))),new C.ftq())
 x=1
 break
 case 1:return A.h(v,w)}})
@@ -1862,7 +1862,7 @@ A.jX()},
 cac(d,e){this.m(new C.dUY(this,e))},
 cae(){this.m(new C.dV0(this))},
 B(a4){var x,w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f=this,e=null,d=new A.jE(a4),a0=A.S(a4),a1=A.S(a4).ax.a===B.J?B.c:B.T,a2=A.S(a4).ax.a===B.J?B.c.j(0.55):B.aM,a3=A.aH(a4,B.eo,y.w).w.r
-a0=a0.ax.a===B.J?D.dej:D.dxl
+a0=a0.ax.a===B.J?D.dei:D.dxl
 x=y.V
 w=y.p
 v=A.A(A.a([A.q(e,D.bd6,B.f,e,e,new A.p(e,e,e,A.m(14),A.a([new A.ac(0,B.G,B.bD.j(0.35),B.j7,14)],x),D.c98,B.n),e,42,e,e,e,e,e,42),B.au,A.E(A.x(A.a([A.d("Paint Mix",e,e,e,e,e,e,A.l(e,e,a1,e,e,e,e,e,e,e,e,22,e,e,B.u,e,e,!0,e,e,e,e,e,e,e,e),e,e,e),A.d("Pick a color, pour it in a bucket, then mix!",e,e,e,e,e,e,A.l(e,e,a2,e,e,e,e,e,e,e,e,12,e,e,B.a8,e,e,!0,e,e,e,e,e,e,e,e),e,e,e)],w),B.E,e,B.e,B.i,0,B.p),1),f.b6B(d,B.oy,f.gcad()),B.ae,f.b6B(d,B.cz,new C.dV3(a4))],w),B.l,e,B.e,B.i,0,e,e)
@@ -1973,7 +1973,7 @@ m.r=n.j(B.j.D(u,0,1)).gp(0)
 d.N(new A.o(x+l*t,w+o*t),s,m)}},
 aD(d){return d.b!==this.b||!d.c.A(0,this.c)}}
 C.bcs.prototype={
-a5(d,a0){var x,w,v,u,t,s,r,q,p,o,n,m,l=this,k=null,j=a0.a,i=a0.b,h=l.e,g=h?D.bkJ:D.bmE,f=h?D.car:D.dj9,e=h?D.buj:B.cu
+a5(d,a0){var x,w,v,u,t,s,r,q,p,o,n,m,l=this,k=null,j=a0.a,i=a0.b,h=l.e,g=h?D.bkJ:D.bmE,f=h?D.car:D.dj8,e=h?D.buj:B.cu
 h=$.Q().r
 x=y.v
 w=new A.aF(h,B.ai,k,k,A.a([],x))
@@ -2211,7 +2211,7 @@ s=A.CK(o.e,A.l(n,n,A.S(d).ax.a===B.J?B.c:B.T,n,n,n,n,n,n,n,n,42,n,n,B.u,n,n,!0,n
 r=o.f
 q=r===1?"y":"ies"
 p=y.p
-return A.c4(l,m,new A.D(B.ac,A.x(A.a([A.E(A.cc(A.q(n,A.x(A.a([u,t,B.X,s,B.U,A.d(""+r+" categor"+q+" \xb7 valid 24 hours \xb7 scan on any phone",n,n,n,n,n,n,A.l(n,n,A.S(d).ax.a===B.J?B.c.j(0.55):B.aM,n,n,n,n,n,n,n,n,12,n,n,n,n,1.35,!0,n,n,n,n,n,n,n,n),B.K,n,n),B.aQ,A.bU(B.fQ,A.a([A.dh(W.D8,B.VT,new C.deW(o,d),A.bp(B.aH,n,n,n,B.w,n,n,n,n,n,n,n)),A.dh(D.bSQ,D.fYG,new C.deX(o,d),A.bp(B.bx,n,n,n,B.w,n,n,n,n,n,n,n)),A.es(D.c_O,D.fP6,new C.deY(o),n)],p),B.bs,n,10,10)],p),B.l,n,B.bb,B.i,0,B.p),B.f,n,n,new A.p(x,n,v,w,n,n,B.n),n,n,n,n,B.uw,n,n,1/0),B.t,n,B.y,n,n,n,n,B.ah),1),B.aB,new A.a5(1/0,n,A.bI(O.aWT,n,new C.deZ(d),A.bp(B.bx,n,n,n,B.w,B.oU,n,n,n,n,n,n)),n)],p),B.l,n,B.e,B.i,0,B.p),n),n,!1,!1,n,n)}}
+return A.c4(l,m,new A.D(B.ac,A.x(A.a([A.E(A.cc(A.q(n,A.x(A.a([u,t,B.X,s,B.U,A.d(""+r+" categor"+q+" \xb7 valid 24 hours \xb7 scan on any phone",n,n,n,n,n,n,A.l(n,n,A.S(d).ax.a===B.J?B.c.j(0.55):B.aM,n,n,n,n,n,n,n,n,12,n,n,n,n,1.35,!0,n,n,n,n,n,n,n,n),B.K,n,n),B.aQ,A.bU(B.fQ,A.a([A.dh(W.D8,B.VT,new C.deW(o,d),A.bp(B.aH,n,n,n,B.w,n,n,n,n,n,n,n)),A.dh(D.bSQ,D.fYG,new C.deX(o,d),A.bp(B.bx,n,n,n,B.w,n,n,n,n,n,n,n)),A.es(D.c_O,D.fP5,new C.deY(o),n)],p),B.bs,n,10,10)],p),B.l,n,B.bb,B.i,0,B.p),B.f,n,n,new A.p(x,n,v,w,n,n,B.n),n,n,n,n,B.uw,n,n,1/0),B.t,n,B.y,n,n,n,n,B.ah),1),B.aB,new A.a5(1/0,n,A.bI(O.aWT,n,new C.deZ(d),A.bp(B.bx,n,n,n,B.w,B.oU,n,n,n,n,n,n)),n)],p),B.l,n,B.e,B.i,0,B.p),n),n,!1,!1,n,n)}}
 C.a_p.prototype={
 S(){return new C.aBn(new A.au(B.aw,$.aw()))}}
 C.aBn.prototype={
@@ -2246,7 +2246,7 @@ A.a6(s,!1).O(t)
 case 1:return A.h(v,w)}})
 return A.i($async$a_C,w)},
 B(d){var x,w,v,u,t,s,r,q,p=this,o=null,n=A.S(d).ax.a===B.J?B.c3:B.bO,m=A.S(d).ax.a===B.J?B.c3:B.bO
-m=A.eH(o,o,o,!0,!0,m,o,1,!0,o,0,!1,o,!1,A.S(d).ax.a===B.J?B.c:B.T,o,o,o,!0,o,o,o,o,o,D.fQp,o,o,o,1,o,!0)
+m=A.eH(o,o,o,!0,!0,m,o,1,!0,o,0,!1,o,!1,A.S(d).ax.a===B.J?B.c:B.T,o,o,o,!0,o,o,o,o,o,D.fQo,o,o,o,1,o,!0)
 x=A.d("Type the 6-character code from the sender",o,o,o,o,o,o,A.l(o,o,A.S(d).ax.a===B.J?B.c.j(0.55):B.aM,o,o,o,o,o,o,o,o,14,o,o,o,o,o,!0,o,o,o,o,o,o,o,o),o,o,o)
 w=A.l(o,o,A.S(d).ax.a===B.J?B.c:B.T,o,o,o,o,o,o,o,o,36,o,o,B.u,o,o,!0,o,10,o,o,o,o,o,o)
 v=A.l(o,o,A.S(d).ax.a===B.J?B.c.j(0.48):B.bw,o,o,o,o,o,o,o,o,o,o,o,o,o,o,!0,o,10,o,o,o,o,o,o)
@@ -2309,7 +2309,7 @@ t.toString
 A.a6(t,!1).O(u)}return A.h(null,w)}})
 return A.i($async$agy,w)},
 B(d){var x,w=this,v=null,u=A.aG(v,v,v,v,F.a3E,v,v,v,w.gcm7(),v,v,v,v,"Paste code",v),t=A.aG(v,v,v,v,F.ar6,v,v,v,w.gciB(),v,v,v,v,"Enter code",v),s=y.p
-t=A.eH(A.a([u,t,A.aG(v,v,v,v,A.X(w.f?B.uJ:T.Pl,v,v,v,v,v),v,v,v,new C.df1(w),v,v,v,v,v,v)],s),v,v,!0,!0,B.w,v,1,v,v,v,!1,v,!1,B.c,v,v,v,!0,v,v,v,v,v,D.fPs,v,v,v,1,v,!0)
+t=A.eH(A.a([u,t,A.aG(v,v,v,v,A.X(w.f?B.uJ:T.Pl,v,v,v,v,v),v,v,v,new C.df1(w),v,v,v,v,v,v)],s),v,v,!0,!0,B.w,v,1,v,v,v,!1,v,!1,B.c,v,v,v,!0,v,v,v,v,v,D.fPr,v,v,v,1,v,!0)
 u=A.zV(w.d,B.c_,w.gcbP())
 x=A.m(22)
 return A.c4(t,B.w,new A.an(B.a0,v,B.ad,B.t,A.a([u,A.at(A.q(v,v,B.f,v,v,new A.p(v,v,A.L(B.aH,B.r,4),x,v,v,B.n),v,280,v,v,v,v,v,280),v,v,v),D.eyi],s),v),v,!1,!1,v,v)}}
@@ -3022,7 +3022,7 @@ C.cO1.prototype={
 $2(d,e){return B.ae},
 $S:36}
 C.cO0.prototype={
-$2(d,e){var x,w,v,u,t=null,s=D.deC[e],r=this.a
+$2(d,e){var x,w,v,u,t=null,s=D.deB[e],r=this.a
 r=r.x?t:new C.cO_(r,s)
 x=this.b.a
 w=A.S(x).ax.a===B.J?B.iH:B.aO
@@ -3226,7 +3226,7 @@ C.dV5.prototype={
 $2(d,e){return B.au},
 $S:36}
 C.dV4.prototype={
-$2(d,e){var x,w,v,u,t,s=null,r=D.dj1[e],q=this.a,p=q.d
+$2(d,e){var x,w,v,u,t,s=null,r=D.dj0[e],q=this.a,p=q.d
 p=p==null?s:p.a
 x=r.a
 w=p===x
@@ -3733,14 +3733,14 @@ D.b4S=new A.ay(B.aH,2,B.r,-1)
 D.b6s=new A.aY(0,260,0,1/0)
 D.bpl=new A.u(1,0.1411764705882353,0.10588235294117647,0.22745098039215686,B.q)
 D.bqO=new A.u(1,0.08235294117647059,0.06274509803921569,0.1411764705882353,B.q)
-D.d5I=x([D.bpl,D.bqO],y.O)
-D.c6R=new A.a9(B.aA,B.aE,B.x,D.d5I,null,null)
+D.d5H=x([D.bpl,D.bqO],y.O)
+D.c6R=new A.a9(B.aA,B.aE,B.x,D.d5H,null,null)
 D.aet=new A.p(null,null,null,null,null,D.c6R,B.n)
 D.b7H=new A.p(B.afO,null,null,null,null,null,B.a7)
 D.bnD=new A.u(1,0.09411764705882353,0.07058823529411765,0.1607843137254902,B.q)
 D.bi9=new A.u(1,0.043137254901960784,0.058823529411764705,0.10980392156862745,B.q)
-D.dck=x([B.Yl,D.bnD,D.bi9],y.O)
-D.c9v=new A.a9(B.aA,B.aE,B.x,D.dck,null,null)
+D.dcj=x([B.Yl,D.bnD,D.bi9],y.O)
+D.c9v=new A.a9(B.aA,B.aE,B.x,D.dcj,null,null)
 D.b7Z=new A.p(null,null,null,null,null,D.c9v,B.n)
 D.b8m=new A.p(B.N3,null,null,null,null,null,B.a7)
 D.fFB=new A.B("Video unavailable",null,B.lV,null,null,null,null,null,null,null,null,null)
@@ -3787,20 +3787,20 @@ D.c_O=new A.ae(B.PG,18,null,null,null,null)
 D.c_V=new A.ae(B.wF,34,B.bW,null,null,null)
 D.atd=x([B.aF,B.aC],y.O)
 D.asK=new A.a9(B.a6,B.aa,B.x,D.atd,null,null)
-D.dbE=x([B.c8,B.bD,B.b9],y.O)
-D.c82=new A.a9(B.a6,B.aa,B.x,D.dbE,null,null)
+D.dbD=x([B.c8,B.bD,B.b9],y.O)
+D.c82=new A.a9(B.a6,B.aa,B.x,D.dbD,null,null)
 D.I6=new A.a9(B.a6,B.aa,B.x,B.a5B,null,null)
-D.d7U=x([B.c8,B.bD],y.O)
-D.c98=new A.a9(B.a6,B.aa,B.x,D.d7U,null,null)
+D.d7T=x([B.c8,B.bD],y.O)
+D.c98=new A.a9(B.a6,B.aa,B.x,D.d7T,null,null)
 D.bkv=new A.u(1,0.16470588235294117,0.1411764705882353,0.2196078431372549,B.q)
 D.blp=new A.u(1,0.10588235294117647,0.08627450980392157,0.14901960784313725,B.q)
 D.car=x([D.bkv,D.blp],y.O)
 D.bmD=new A.u(1,0.07058823529411765,0.043137254901960784,0.11764705882352941,B.q)
-D.dej=x([D.bmD,N.ahj,B.dh],y.O)
-D.deC=x(["agape","John 3:16","grace in Ephesians 2:8","logos","shalom","Psalm 23"],A.as("O<n>"))
+D.dei=x([D.bmD,N.ahj,B.dh],y.O)
+D.deB=x(["agape","John 3:16","grace in Ephesians 2:8","logos","shalom","Psalm 23"],A.as("O<n>"))
 D.Aa=new C.F3("en","English","\ud83c\uddfa\ud83c\uddf8",0,"en")
 D.a7i=new C.F3("sw","Swahili","\ud83c\uddf9\ud83c\uddff",1,"sw")
-D.dgF=x([D.Aa,D.a7i],A.as("O<F3>"))
+D.dgE=x([D.Aa,D.a7i],A.as("O<F3>"))
 D.hzm=new C.um("Cherry Red","\ud83c\udf52",B.ay)
 D.hzp=new C.um("Orange Pop","\ud83c\udf4a",B.c8)
 D.hzj=new C.um("Sunny Yellow","\ud83c\udf1e",B.bi)
@@ -3814,10 +3814,10 @@ D.hzi=new C.um("Bubblegum Pink","\ud83c\udf6c",B.bD)
 D.hzg=new C.um("Choco Brown","\ud83c\udf6b",B.i8)
 D.hzn=new C.um("Snow White","\u26c4",B.aP)
 D.hzq=new C.um("Jet Black","\ud83d\udda4",B.kP)
-D.dj1=x([D.hzm,D.hzp,D.hzj,D.hzk,D.hzf,D.hzh,D.hzl,D.hzo,D.hze,D.hzi,D.hzg,D.hzn,D.hzq],A.as("O<um>"))
+D.dj0=x([D.hzm,D.hzp,D.hzj,D.hzk,D.hzf,D.hzh,D.hzl,D.hzo,D.hze,D.hzi,D.hzg,D.hzn,D.hzq],A.as("O<um>"))
 D.bmW=new A.u(1,0.9803921568627451,0.984313725490196,1,B.q)
 D.blb=new A.u(1,0.9058823529411765,0.9215686274509803,0.9529411764705882,B.q)
-D.dj9=x([D.bmW,D.blb],y.O)
+D.dj8=x([D.bmW,D.blb],y.O)
 D.dlD=x([],A.as("O<lk>"))
 D.bs_=new A.u(1,0.9921568627450981,0.9490196078431372,1,B.q)
 D.dxl=x([B.hU,D.bs_,B.kO],y.O)
@@ -3828,8 +3828,8 @@ D.hsZ=new C.yJ(B.wH,G.axI)
 D.ht0=new C.yJ(B.zu,G.azC)
 D.ht1=new C.yJ(V.a2Z,G.aBS)
 D.hsW=new C.yJ(B.D1,B.a5X)
-D.das=x([B.qk,B.ch],y.O)
-D.hsV=new C.yJ(B.n3,D.das)
+D.dar=x([B.qk,B.ch],y.O)
+D.hsV=new C.yJ(B.n3,D.dar)
 D.hE0=new A.u(1,0.8392156862745098,0.6588235294117647,0,B.q)
 D.bgm=new A.u(1,0.7725490196078432,0.6039215686274509,0.10588235294117647,B.q)
 D.cSy=x([B.eg,D.bgm],y.O)
@@ -3865,12 +3865,12 @@ D.feh=new A.av(96,96)
 D.feS=new A.a5(22,22,M.afk,null)
 D.bdV=new A.fk(1.8,null,null,null,null,B.aU,null,null,null,null)
 D.aTC=new A.a5(16,16,D.bdV,null)
-D.fRe=new A.B("Code not found \u2014 check the 6-character code or create a new QR",null,null,null,null,null,null,null,null,null,null,null)
-D.fgs=new A.b1(D.fRe,null,null,null,null,null,null,null,null,null,null,null,null,B.a_,!1,null,null,null,B.t,null)
+D.fRd=new A.B("Code not found \u2014 check the 6-character code or create a new QR",null,null,null,null,null,null,null,null,null,null,null)
+D.fgs=new A.b1(D.fRd,null,null,null,null,null,null,null,null,null,null,null,null,B.a_,!1,null,null,null,B.t,null)
 D.h0A=new A.B("Could not save video. Storage may be full \u2014 free space and try again.",null,null,null,null,null,null,null,null,null,null,null)
 D.fgt=new A.b1(D.h0A,null,null,null,null,null,null,null,null,null,null,null,null,B.a_,!1,null,null,null,B.t,null)
-D.fPM=new A.B("Invalid backup data",null,null,null,null,null,null,null,null,null,null,null)
-D.fgG=new A.b1(D.fPM,null,null,null,null,null,null,null,null,null,null,null,null,B.a_,!1,null,null,null,B.t,null)
+D.fPL=new A.B("Invalid backup data",null,null,null,null,null,null,null,null,null,null,null)
+D.fgG=new A.b1(D.fPL,null,null,null,null,null,null,null,null,null,null,null,null,B.a_,!1,null,null,null,B.t,null)
 D.fXP=new A.B("Select at least one category",null,null,null,null,null,null,null,null,null,null,null)
 D.fhp=new A.b1(D.fXP,null,null,null,null,null,null,null,null,null,null,null,null,B.a_,!1,null,null,null,B.t,null)
 D.fFr=new A.B("Could not upload backup \u2014 check internet and try again",null,null,null,null,null,null,null,null,null,null,null)
@@ -3887,8 +3887,8 @@ D.h_I=new A.B("Essentials imported successfully",null,null,null,null,null,null,n
 D.fju=new A.b1(D.h_I,null,null,null,null,null,null,null,null,null,null,null,null,B.a_,!1,null,null,null,B.t,null)
 D.fO5=new A.B("Clipboard does not contain a valid Essentials QR, code, or backup",null,null,null,null,null,null,null,null,null,null,null)
 D.fjw=new A.b1(D.fO5,null,null,null,null,null,null,null,null,null,null,null,null,B.a_,!1,null,null,null,B.t,null)
-D.fOA=new A.B("Full backup copied \u2014 paste on other phone",null,null,null,null,null,null,null,null,null,null,null)
-D.fjF=new A.b1(D.fOA,null,null,null,null,null,null,null,null,null,null,null,null,B.a_,!1,null,null,null,B.t,null)
+D.fOz=new A.B("Full backup copied \u2014 paste on other phone",null,null,null,null,null,null,null,null,null,null,null)
+D.fjF=new A.b1(D.fOz,null,null,null,null,null,null,null,null,null,null,null,null,B.a_,!1,null,null,null,B.t,null)
 D.fGL=new A.B("6-character code copied",null,null,null,null,null,null,null,null,null,null,null)
 D.fjZ=new A.b1(D.fGL,null,null,null,null,null,null,null,null,null,null,null,null,B.a_,!1,null,null,null,B.t,null)
 D.fGo=new A.B("Nothing selected to back up",null,null,null,null,null,null,null,null,null,null,null)
@@ -3896,15 +3896,15 @@ D.fkc=new A.b1(D.fGo,null,null,null,null,null,null,null,null,null,null,null,null
 D.fkZ=new A.axa(2,null)
 D.frH=new A.G(!0,B.aC,null,null,null,null,13,B.V,B.cH,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fbP=new A.cU(B.ds,B.ik,4)
-D.dba=x([D.fbP],A.as("O<cU>"))
-D.fvl=new A.G(!0,B.c,null,null,null,null,14.5,B.u,null,null,null,null,1.1,null,null,null,null,null,null,null,null,null,D.dba,null,null,null)
+D.db9=x([D.fbP],A.as("O<cU>"))
+D.fvl=new A.G(!0,B.c,null,null,null,null,14.5,B.u,null,null,null,null,1.1,null,null,null,null,null,null,null,null,null,D.db9,null,null,null)
 D.abf=new A.G(!0,B.aF,null,null,null,null,11,B.I,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fzE=new A.G(!0,B.c,null,null,null,null,40,B.cT,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fHF=new A.B("Add photos or a video",null,B.l4,null,null,null,null,null,null,null,null,null)
 D.fLZ=new A.B("Backup QR",null,B.cC,null,null,null,null,null,null,null,null,null)
-D.fP6=new A.B("Share backup",null,null,null,null,null,null,null,null,null,null,null)
-D.fPs=new A.B("Scan Essentials QR",null,null,null,null,null,null,null,null,null,null,null)
-D.fQp=new A.B("Enter code",null,B.cC,null,null,null,null,null,null,null,null,null)
+D.fP5=new A.B("Share backup",null,null,null,null,null,null,null,null,null,null,null)
+D.fPr=new A.B("Scan Essentials QR",null,null,null,null,null,null,null,null,null,null,null)
+D.fQo=new A.B("Enter code",null,B.cC,null,null,null,null,null,null,null,null,null)
 D.fSx=new A.B("\ud83d\udd4a\ufe0f",null,B.Vl,null,null,null,null,null,null,null,null,null)
 D.fWl=new A.B("Nothing here yet",null,B.tI,null,null,null,null,null,null,null,null,null)
 D.fYG=new A.B("Copy backup",null,null,null,null,null,null,null,null,null,null,null)
@@ -3916,4 +3916,4 @@ D.htF=new C.a_q(null)
 D.b0E=new C.aJB(0,"unlock")
 D.b0F=new C.aJB(1,"setFirst")
 D.hBi=new C.aJB(2,"setConfirm")})();(function staticFields(){$.h9g=null})()};
-(a=>{a["GmjbCCZP+Qbv+u+BTf7k6ohA9KA="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["c4hic+3YIkwxgwCSPOCwy60Ph34="]=a.current})($__dart_deferred_initializers__);

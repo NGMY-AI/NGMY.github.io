@@ -755,7 +755,7 @@ t*=0.45
 b1.$9$sides(t,14,70,t,w,70,3,D.dU,6)}b0.$7(0,w,70,c0*0.9,4,4,D.dU)
 for(w=c4+22,q=0;q<5;++q){p=v+q*c0*0.18
 b0.$7(p,w,70,16,12,14,D.as)
-b0.$8$shine(p,o,70,12,1.4,10,B.d1q[q],0.8)}for(q=-7;q<=7;++q){w=q*c0*0.075
+b0.$8$shine(p,o,70,12,1.4,10,B.d1p[q],0.8)}for(q=-7;q<=7;++q){w=q*c0*0.075
 b1.$9$sides(w,0,220,w,20,220,1.6,D.dU,5)}b0.$7(0,18,220,c0*1.2,2,2,D.dU)
 break
 case"gate":for(v=b4+41,s=b4+46,t+=110,u=0;u<2;++u){p=F.fK[u]
@@ -1052,7 +1052,7 @@ d6=h[a8]
 i.push(new A.fh(C.a([b3.$1(new A.r(b9,c1,0.8)),b3.$1(new A.r(c0,c1,0.8)),b3.$1(new A.r(c0,c2,0.8)),b3.$1(new A.r(b9,c2,0.8))],g),0,new A.fDG(d6,a8),k,j,60,l,0,!1))
 i.push(new A.fh(C.a([b3.$1(new A.r(c0,c1,e)),b3.$1(new A.r(b9,c1,e)),b3.$1(new A.r(b9,c2,e)),b3.$1(new A.r(c0,c2,e))],g),0,new A.fDH(d6,a8),k,j,60,l,0,!1))}d8=C.a([],d8)
 d7=new A.eL(d8)
-for(d4=0;d4<9;++d4){v=B.d6h[d4]
+for(d4=0;d4<9;++d4){v=B.d6g[d4]
 w=v.a
 d2=v.b
 if(m&&d2>200)continue
@@ -1085,7 +1085,7 @@ return new C.y(new A.r(o.a+r*3,Math.max(o.b+v*2.5,18),o.c+w*3),n)},
 if2(d){return $.if1.c3(0,d.a,new A.fCf(d))},
 hzV(d){return $.if3.c3(0,d.a,new A.fCc(d))},
 ig6(d,e){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i=d.a
-if(i==="scatter")return A.hxv(B.dkp,e,null)
+if(i==="scatter")return A.hxv(B.dko,e,null)
 if(d.w.length!==0)return A.hxv(A.hzV(d),e,A.if2(d))
 w=B.dCm.h(0,i)
 if(w==null)w=B.aQZ
@@ -1303,7 +1303,7 @@ s.r=D.c.j(0.12).gp(0)
 a6.ar(new C.a1(v,0,v+w*0.12,t),s)
 u.restore()
 return}if(a5>=8){L.M2(a6,a7,a5-8,a8)
-return}r=B.d0b[a5-1]
+return}r=B.d0a[a5-1]
 w=a7.a
 u=a7.b
 q=new C.a1(0,0,0+w,0+u)
@@ -2300,8 +2300,8 @@ d.aE(B.hb4,B.aZ2,B.yi,0.3)
 d.aE(B.hhy,B.aZw,B.yi,0.3)
 d.aE(B.hgQ,B.aZw,B.yi,0.3)}w=C.a([],x.o)
 v=new A.fo6(d,f,w)
-if(e==="switch"){v.$2(4,B.d7x)
-v.$2(5,B.d5x)}else v.$2(4,B.dkq)
+if(e==="switch"){v.$2(4,B.d7w)
+v.$2(5,B.d5w)}else v.$2(4,B.dkp)
 return w},
 hFx(d,e){var w,v=$.h59(),u=new C.Y(v,new A.h4t(d),C.U(v).k("Y<1>"))
 if(!u.gau(0)){w=e-60
@@ -2418,7 +2418,7 @@ d.cw(B.hgA,B.hi8,0.1,B.yd,0.8,10)
 d.e=0},
 ieS(d,e){var w,v
 d.b=31
-for(w=0;w<2;++w){v=B.dah[w]
+for(w=0;w<2;++w){v=B.dag[w]
 d.cw(new A.r(v,0.52,0.2),new A.r(v,0.52,1.9),0.04,B.yd,0.8,6)}d.aE(B.h7M,B.hn6,B.Mz,0.35)
 d.bdQ(B.aZs,0.2,e?D.YN:B.boF,0.9)
 if(e){d.d=0.35
@@ -2490,7 +2490,7 @@ d.b=20
 w=u.a2(0,B.hnz)
 d.aE(w,B.hiP,g?B.pd:B.Nb,0.25)
 d.e=0.3
-for(w=f+0.5,v=0;v<2;++v)d.aF(new A.r(0+B.d8r[v],0.14999999999999997,w),B.hhx,B.bsG)
+for(w=f+0.5,v=0;v<2;++v)d.aF(new A.r(0+B.d8q[v],0.14999999999999997,w),B.hhx,B.bsG)
 d.b=27
 d.e=0.4
 d.aF(u.a2(0,B.hl2),B.ac8,B.FL)
@@ -4456,7 +4456,7 @@ return}d.o8(B.hhR,B.hp0,B.hfo,B.hdN,B.N1,B.dZ)
 d.e=90
 switch(e){case"roadturn":u=B.dpH
 break
-case"roadtee":u=B.d6n
+case"roadtee":u=B.d6m
 break
 default:u=B.cmZ
 break}for(t=u.length,w=0;w<t;++w){s=u[w]
@@ -4493,7 +4493,7 @@ d.aF(B.h5j,B.hpC,D.o5)
 d.aF(B.hdE,B.aYn,D.bP)
 d.aF(B.hp8,B.aYn,D.bP)
 d.df(B.h5x,B.h6H,0.7,B.f1,5)
-w.$5(B.dag,11,11,3.2,D.bP)
+w.$5(B.daf,11,11,3.2,D.bP)
 break
 case"sheep":d.eg(B.abZ,8.5,D.qf,4,8)
 d.eg(B.h5a,7,D.qf,4,8)
@@ -4505,14 +4505,14 @@ d.eg(B.h4Q,2.2,f,3,6)
 d.aF(B.h5_,B.hmX,D.bC)
 d.aF(B.heE,B.he8,D.av)
 d.aF(B.h6J,B.hb5,f)
-w.$5(B.d8d,3,3,0.8,D.av)
+w.$5(B.d8c,3,3,0.8,D.av)
 break
 case"horse":d.aE(B.h5B,B.h7r,f,0.1)
 d.Gh(B.h5L,B.h62,4.2,f,3,8)
 d.aF(B.h64,B.hbI,f)
 d.aF(B.h6d,B.hmW,B.f1)
 d.df(B.h5R,B.h6I,1.8,B.f1,6)
-w.$5(B.d7w,16,16,2.6,f)
+w.$5(B.d7v,16,16,2.6,f)
 break
 default:d.aF(B.AY,B.hdl,f)}},
 bDr(d,e,f){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h=C.a([],x.z)
@@ -4774,7 +4774,7 @@ break A}if("dining"===e){d.aE(B.Wb,B.hbk,f,0.2)
 for(v=0;v<4;++v){w=B.cSp[v]
 d.aF(new A.r(w.a,13,w.b),B.hao,g)}break A}if("chair"===e){d.aE(B.h5h,B.h8i,f,0.1)
 d.aE(B.h5T,B.h8g,f,0.1)
-for(v=0;v<4;++v){w=B.dg_[v]
+for(v=0;v<4;++v){w=B.dfZ[v]
 d.aF(new A.r(w.a,7.5,w.b),B.h8N,g)}break A}if("plant"===e){d.df(B.e1,B.ac3,5,D.cZ,10)
 d.eg(B.ac_,8,B.Fy,5,8)
 d.eg(B.han,5,B.Yz,4,8)
@@ -4966,7 +4966,7 @@ q.f=d.f
 q.r=!0
 q.cw(B.e1,B.hlg,28,B.br0,0.8,22)
 D.d.v(d.a,A.bDr(g,B.he9,B.e1))
-for(v=0;v<3;++v){g=B.dbt[v]
+for(v=0;v<3;++v){g=B.dbs[v]
 d.eg(new A.r(g.a,1.2,g.b),2.6,B.ahJ,3,6)}break A}if("swing"===e){d.df(B.hlT,B.h9h,1.6,D.cZ,8)
 for(v=0;v<2;++v){t=E.IF[v]
 d.df(new A.r(t,38,0),new A.r(t,0,14),1.4,D.cZ,6)
@@ -5193,15 +5193,15 @@ u.$2(B.cur,B.rB)
 u.$2(B.dnN,B.nr)
 u.$2(B.dsV,B.nr)
 t=new A.fEu(a1)
-t.$1(B.d3T)
-t.$1(B.da4)
+t.$1(B.d3S)
+t.$1(B.da3)
 a1.c=3
 a1.b=93
 s=new A.fEx(a1)
-s.$1(B.d2L)
-s.$2$col(B.d13,B.m3)
-s.$2$col(B.d07,B.m3)
-s.$1(B.dkw)
+s.$1(B.d2K)
+s.$2$col(B.d12,B.m3)
+s.$2$col(B.d06,B.m3)
+s.$1(B.dkv)
 a1.c=4
 a1.b=0
 a1.d=0.22
@@ -5261,7 +5261,7 @@ a1.aE(B.hiY,B.b_1,B.iF,0.1)
 a1.aE(B.hoq,B.heZ,B.iF,0.1)
 A.b7W(a1,1.35,B.MG,2.5,2.1,B.ho,B.MS,6,0.55,!1,1,0.18,3.19,0.06,3,-7.15)
 a1.b=85
-a1.iI(A.DH(B.ddT,0.2,6),0.055,B.ho,!1,0.9,8)
+a1.iI(A.DH(B.ddS,0.2,6),0.055,B.ho,!1,0.9,8)
 a1.b=84
 a1.aE(B.ho_,B.hlk,B.Zs,0.3)
 a1.aF(B.hfS,B.aZW,a2.y?B.YX:B.a__)
@@ -5269,7 +5269,7 @@ a1.aF(B.hnI,B.aZW,B.Zt)
 for(f=0;f<2;++f){p=3.9+B.dxk[f]
 a1.aF(new A.r(5.13,p,-7.78),B.aZn,B.ns)
 a1.aF(new A.r(5.2700000000000005,p,-7.78),B.aYH,B.ns)}a1.b=86
-a1.iI(A.DH(B.d4o,0.35,3),0.11,B.qd,!1,0.3,8)
+a1.iI(A.DH(B.d4n,0.35,3),0.11,B.qd,!1,0.3,8)
 a1.b=87
 a1.cw(B.hhk,B.hkv,0.19,a2.c?B.Yu:B.bqE,0.3,8)
 a1.b=88
@@ -5695,7 +5695,7 @@ w.n(0,v,e)
 return null},
 hgX(){var w,v,u=C.a([B.aYK,B.hh3],x.o)
 for(w=1;w<=12;++w){v=3.141592653589793+3.141592653589793*w/12
-u.push(new A.r(3+3*Math.cos(v),0.2+3*Math.sin(v),0))}D.d.v(u,A.DH(B.dff,1,6))
+u.push(new A.r(3+3*Math.cos(v),0.2+3*Math.sin(v),0))}D.d.v(u,A.DH(B.dfe,1,6))
 return u},
 ahn(d){var w,v,u,t,s="trap",r=C.a([],x.z),q=new A.eL(r)
 q.b=49
@@ -5800,7 +5800,7 @@ a4.b=65
 a4.e=0.5
 a4.aE(B.hne,B.hgh,B.ho,0.9)
 a4.iI(A.DH(B.dl6,1.4,6),0.5,B.ho,!0,0.9,12)
-for(w=0;w<2;++w){v=B.dg1[w]
+for(w=0;w<2;++w){v=B.dg0[w]
 u=v*1.2
 a4.cw(new A.r(u,15.5,-3.6),new A.r(u,17.7,-3.6),0.38,B.ho,0.9,10)
 t=v<0?B.rB:B.nr
@@ -7618,7 +7618,7 @@ a0.aE(w,n?new A.r(1.8,4,0.14):new A.r(0.14,4,1.8),B.ajr,0.3)
 w=t.$3(0,0.75,3.9000000000000004)
 a0.aE(w,n?new A.r(0.8,0.45,0.2):new A.r(0.2,0.45,0.8),B.qq,0.3)
 w=t.$3(0,-0.75,3.9000000000000004)
-a0.aE(w,n?new A.r(0.8,0.45,0.2):new A.r(0.2,0.45,0.8),B.MA,0.3)}for(i=0;i<2;++i){f=B.dhj[i]
+a0.aE(w,n?new A.r(0.8,0.45,0.2):new A.r(0.2,0.45,0.8),B.MA,0.3)}for(i=0;i<2;++i){f=B.dhi[i]
 w=f+0.1
 v=t.$3(-0.38,w,3.77)
 a0.aF(v,n?new A.r(0.12,0.5,0.05):new A.r(0.05,0.5,0.12),B.f1)
@@ -8183,7 +8183,7 @@ a4.e=0.4+f*0.1
 for(r=d/2,a2=0;a2<2;++a2){h=E.IF[a2]
 a5.$6(h-r,h+r,-59,59,a1,a0)}a5.$6(-71,71,36-r,36+r,a1,a0)
 for(r=d*0.3,a2=0;a2<2;++a2){i=B.cSz[a2]
-a5.$6(-71,71,i-r,i+r,a1,a0)}for(a2=0;a2<2;++a2){h=B.d41[a2]
+a5.$6(-71,71,i-r,i+r,a1,a0)}for(a2=0;a2<2;++a2){h=B.d40[a2]
 a5.$6(h-r,h+r,-59,59,a1,a0)}++f}}for(a6=$.xt(),w=a6.length,e=0;e<a6.length;a6.length===w||(0,C.J)(a6),++e){a0=a6[e]
 u=a0.b
 t=a0.a
@@ -8517,7 +8517,7 @@ u=(h&1)===0
 d.aE(v,u?new A.r(2.3,4.2,2.5):new A.r(2.5,4.2,2.3),B.Nc,0.3)
 v=A.eS(h,w,i,3.52)
 d.aE(v,u?new A.r(1.7,3.5,0.06):new A.r(0.06,3.5,1.7),B.ahL,0.1)
-for(v=w-f*1.18,t=0;t<2;++t)d.es(A.eS(h,v,i+B.dgg[t],2.6),0.22,B.ho,3,5,0.7)},
+for(v=w-f*1.18,t=0;t<2;++t)d.es(A.eS(h,v,i+B.dgf[t],2.6),0.22,B.ho,3,5,0.7)},
 hAD(d,e,f,g){var w
 d.f=f
 d.b=e
@@ -8814,7 +8814,7 @@ v=(r&1)===0
 s=0
 for(;;){if(!(s<D.j.cL((v?144:120)/16)))break
 u.J(0,w+s);++s}}q=new A.fHg()
-for(t=0;t<5;++t){w=B.d3b[t]
+for(t=0;t<5;++t){w=B.d3a[t]
 m.UZ(w.c,q.$2(w.a,w.b))}m.UZ("ceiling",3004)
 for(w=m.b,v=w.length,t=0;t<v;++t){u=w[t].x
 u[0]=!0
@@ -9643,7 +9643,7 @@ g.sav(B.ezc.aK(0,C.bX(j,i)))
 b0.N(j,i,g)
 e=C.K()
 e.r=B.bjG.gp(0)
-for(d=0;d<4;++d){u=B.d57[d].a
+for(d=0;d<4;++d){u=B.d56[d].a
 a0=u[0]
 a1=u[1]
 a2=u[2]
@@ -9652,7 +9652,7 @@ u=q.a
 b0.bZ(C.bs(new C.o(m+(a0*i+Math.sin((u==null?0:u)*0.05)*i*0.08),k+a1*i),a3*i*2,a2*i*2),e)}$.Q()
 a4=C.K()
 a4.r=D.c.j(0.55).gp(0)
-for(u=i*0.16,d=0;d<3;++d){q=B.d1W[d]
+for(u=i*0.16,d=0;d<3;++d){q=B.d1V[d]
 b0.bZ(C.bs(new C.o(m+q.a*i,k+q.b*i),u,q.c*i*2),a4)}u=j.a2(0,new C.o(i*0.45,i*0.35))
 $.Q()
 q=C.K()
@@ -11418,29 +11418,29 @@ cf_(){switch(this.a){case"hospital":var w=B.cBr
 break
 case"dmv":w=B.dwR
 break
-case"shop":w=B.d0U
+case"shop":w=B.d0T
 break
-case"school":w=B.dau
+case"school":w=B.dat
 break
 case"firestation":w=B.dq3
 break
-case"tower":w=B.dk5
+case"tower":w=B.dk4
 break
 default:w=B.duR
 break}return w},
 cK9(){switch(this.a){case"hospital":var w=B.cBn
 break
-case"dmv":w=B.dcu
+case"dmv":w=B.dct
 break
-case"shop":w=B.d6Y
+case"shop":w=B.d6X
 break
-case"school":w=B.djQ
+case"school":w=B.djP
 break
-case"firestation":w=B.dgL
+case"firestation":w=B.dgK
 break
 case"tower":w=B.dzj
 break
-default:w=B.d0n
+default:w=B.d0m
 break}return w},
 fH(d,e){var w,v,u,t,s,r,q,p=this,o=p.ax
 o===$&&C.c()
@@ -11679,11 +11679,11 @@ e.push(B.c4X)
 e.push(B.c4Q)
 e.push(B.c4Y)},
 aWO(a5,a6,a7){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4=a6*128
-switch(a7){case 1:w=B.dfL
+switch(a7){case 1:w=B.dfK
 break
-case 2:w=B.dh9
+case 2:w=B.dh8
 break
-default:w=B.daL
+default:w=B.daK
 break}a5.x=$.dm=$.dm+1
 a5.aF(new A.r(a6*148,40,120),B.hb_,B.agC)
 for(v=0;v<2;++v)a5.aF(new A.r(a4,40,B.cN4[v]),B.haF,B.agC)
@@ -11713,7 +11713,7 @@ d.aF(new A.r(e,33,22.4),B.hbe,D.bq)
 for(w=e-21,v=0;v<3;++v){u=v*17
 d.aF(new A.r(e,15+u,21),B.hb8,D.bK)
 for(t=16+u,u=27+u,s=v*2,r=0;r<7;++r){q=w+r*7
-d.cw(new A.r(q,t,21.6),new A.r(q,u,21.6),2.2,B.d58[D.o.F(r+s,6)],0.5,6)}}d.x=0
+d.cw(new A.r(q,t,21.6),new A.r(q,u,21.6),2.2,B.d57[D.o.F(r+s,6)],0.5,6)}}d.x=0
 p=d.f
 d.f=3
 d.d=0.2
@@ -11767,7 +11767,7 @@ cwD(d,e){var w,v,u,t,s
 d.aE(B.h6A,B.hpD,D.e6,0.1)
 d.aF(B.ho4,B.hkb,B.brp)
 d.aE(B.h59,B.h7D,B.o6,0.15)
-for(w=0;w<4;++w){v=B.diJ[w]
+for(w=0;w<4;++w){v=B.diI[w]
 u=v.a
 t=v.b
 for(s=0;s<2;++s){v=u+B.a63[s]
@@ -11806,7 +11806,7 @@ d.eg(B.heY,2,D.bi,3,5)
 d.eg(B.haW,2,D.be,3,5)
 d.b=d.e=0
 n.rQ(d,0,70,26,D.aH)
-for(w=0;w<3;++w){v=B.d0s[w]
+for(w=0;w<3;++w){v=B.d0r[w]
 u=v.a
 t=v.b
 d.aE(new A.r(u,15,t),B.haI,B.o6,0.2)
@@ -11820,7 +11820,7 @@ d.f=3
 d.aF(new A.r(144,14,100),B.haX,B.a_4)
 d.d=1
 d.f=2
-for(w=0;w<5;++w)d.aE(new A.r(144,14,B.d8I[w]),B.hh5,D.db,0.5)
+for(w=0;w<5;++w)d.aE(new A.r(144,14,B.d8H[w]),B.hh5,D.db,0.5)
 d.eg(B.h7F,10,B.Fy,3,6)
 d.aF(B.h7y,B.h9X,B.o6)
 s=-(n.f*22)
@@ -11829,7 +11829,7 @@ d.aF(new A.r(520,s-1,105),B.hdr,B.Yk)
 d.aF(B.hcm,B.h9B,B.ia)
 d.f=1
 for(v=n.b.a,r=v*7,q=0;q<15;++q){p=30+D.o.F(r+q*13,90)
-o=B.de3[D.o.F(v+q,4)]
+o=B.de2[D.o.F(v+q,4)]
 d.aF(new A.r(215+D.o.F(q,5)*80,s+p/2,-60+D.o.aq(q,5)*135),new A.r(38,p,38),o)}e.push(new A.hd(B.h4R,"\ud83c\udfe2 LEVEL "+n.f+" of "+n.gMl(),D.dJ,19502))
 e.push(B.c4M)
 e.push(B.c4O)
@@ -11867,7 +11867,7 @@ v.push(new A.fh(C.a([B.hhg,B.hl9,B.hil,B.hgN],u),0,new A.bLn(),720,600,30,2,0,!1
 m.f=-1
 m.kZ(B.hoP,B.hoA,B.agR,0.2,3)
 m.f=0
-for(w=0;w<3;++w){t=B.d9a[w].a
+for(w=0;w<3;++w){t=B.d99[w].a
 s=t[0]
 r=t[1]
 q=t[2]
@@ -11966,7 +11966,7 @@ p=w[q.a].a.e
 A.x7(new A.eL(f),B.evV,d,p,!1,0,p.c)
 D.d.v(i,A.no(f,-1.5707963267948966,-1.5707963267948966,new A.r(46,27,48+r*50)))}++r}}break
 case"school":A.x7(h,B.evX,d,B.Ua,!1,0,D.bl)
-for(u=0;u<3;++u){g=B.dcm[u]
+for(u=0;u<3;++u){g=B.dcl[u]
 A.x7(h,new A.yp(0,g.a,g.b,3.141592653589793,!1,!1,!1,!1,!1,0,!1,!1,"","",-1,0,-1,0),d,B.JJ,!1,0,g.c)}break
 case"firestation":A.x7(h,B.evT,d,B.JJ,!1,0,D.bC)
 A.x7(h,B.evU,d,B.Ua,!1,0,D.av)
@@ -12108,12 +12108,12 @@ t=d.d
 t===$&&C.c()
 r=q.a
 p=t[r.c]
-if(!p.gkT()&&!n.aXB(r.a,"power")){m.push(new A.IB(n.Q++,r.a,"power",B.d4W[u.aw(3)],15))
+if(!p.gkT()&&!n.aXB(r.a,"power")){m.push(new A.IB(n.Q++,r.a,"power",B.d4V[u.aw(3)],15))
 D.d.c4(j,0,r.b+" is calling for help: no power.")
 if(j.length>12)j.pop()}t=r.d
 o=t>=0?d.d[t]:p
 t=o.c
-if((t==="bathroom"||t==="kitchen")&&!o.gjX()&&!n.aXB(r.a,"leak")&&m.length<4){m.push(new A.IB(n.Q++,r.a,"leak",B.ddV[u.aw(3)],15))
+if((t==="bathroom"||t==="kitchen")&&!o.gjX()&&!n.aXB(r.a,"leak")&&m.length<4){m.push(new A.IB(n.Q++,r.a,"leak",B.ddU[u.aw(3)],15))
 D.d.c4(j,0,r.b+" is calling for help: a leak.")
 if(j.length>12)j.pop()}}},
 cLG(d){var w,v,u,t,s,r,q=this
@@ -12754,7 +12754,7 @@ b3.dD(0,"shop",-250,225)
 b3.dD(0,"hospital",250,215)
 b3.dD(0,"firestation",-480,225)
 b3.dD(0,"school",520,210)
-for(t=0;t<14;++t){v=B.deJ[t]
+for(t=0;t<14;++t){v=B.deI[t]
 w=v.a
 u=v.b
 if(r.$4(w,u,60,40))b3.dD(0,"billboard",w,u)}for(t=0;t<4;++t){v=B.dvq[t]
@@ -12778,9 +12778,9 @@ for(o=b3.x,n=o.length,t=0;t<o.length;o.length===n||(0,C.J)(o),++t){m=o[t]
 l=m.b
 if(D.d.q(B.SF,l)||l==="roundabout")v.push(m)}k=new A.bWi(v,b3)
 j=new A.bWj(b3,new A.bWm(b3))
-j.$3("gasstation",6,B.d9n)
+j.$3("gasstation",6,B.d9m)
 j.$3("dmv",1,B.dy8)
-j.$3("ubstation",3,B.d_H)
+j.$3("ubstation",3,B.d_G)
 i=0
 h=0
 for(;;){if(!(h<6&&i<90))break
@@ -12793,13 +12793,13 @@ A:{w=-1040+g*520
 if(Math.abs(w)<170&&o)break A
 f=D.o.F(g*7+v,5)===0?a9:a8
 e=B.hN.h(0,f)
-if(k.$4(w,u,e.c,e.d)){b3.dD(0,f,w,u);++i}}++g}++h}for(d=0,t=0;t<11;++t,d=a0){v=B.d2y[t]
+if(k.$4(w,u,e.c,e.d)){b3.dD(0,f,w,u);++i}}++g}++h}for(d=0,t=0;t<11;++t,d=a0){v=B.d2x[t]
 a0=d+1
 b3.dD(0,v.b,v.a,1560).f=D.o.F(d,6)}for(t=0;t<11;++t,d=a0){v=B.dtc[t]
 a0=d+1
 b3.dD(0,v.b,v.a,1860).f=D.o.F(d,6)}b3.dD(0,"townsign",0,640)
 for(t=0;t<4;++t){v=B.dnz[t]
-b3.dD(0,"cornersign",v.a,v.b)}for(t=0;t<5;++t)b3.dD(0,b0,B.dcR[t],2045)
+b3.dD(0,"cornersign",v.a,v.b)}for(t=0;t<5;++t)b3.dD(0,b0,B.dcQ[t],2045)
 for(t=0;t<4;++t)b3.dD(0,b0,B.drc[t],-690)
 for(t=0;t<4;++t){u=B.cvj[t]
 a1=b3.dD(0,b0,-1245,u)
@@ -13551,7 +13551,7 @@ if(u)q.push(new C.a5(190,k,new A.Ve(l.c6,w,14,k),k))
 q.push(D.bd)
 q.push(C.aA(k,B.bWZ,D.y,!1,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,new A.egG(l),k,k,k,k,k,k,!1,D.a4))
 o=C.A(q,D.l,k,D.e,D.i,0,k,k)
-n=t.$2("FOOD AND DRINKS (energy)",B.de6)
+n=t.$2("FOOD AND DRINKS (energy)",B.de5)
 s=w?"GAS":"HEALTH AND THE TOWN"
 m=t.$2(s,w?B.dqU:B.dnD)
 t=D.w.j(0.55)
@@ -13580,7 +13580,7 @@ v=D.w.j(0.55)
 n=C.m(28)
 m=C.L(D.aU,D.r,1)
 l=x.p
-k=C.a([C.A(C.a([B.fRk,D.au,C.E(C.x(C.a([B.fTb,C.d("Race "+a2.as+": first to 8 wins +40",a1,a1,a1,a1,a1,a1,K.tD,a1,a1,a1)],l),D.E,a1,D.e,D.i,0,D.p),1),C.aA(a1,D.t7,D.y,!1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,new A.efA(a0),a1,a1,a1,a1,a1,a1,!1,D.a4)],l),D.l,a1,D.e,D.i,0,a1,a1),D.af],l)
+k=C.a([C.A(C.a([B.fRj,D.au,C.E(C.x(C.a([B.fTb,C.d("Race "+a2.as+": first to 8 wins +40",a1,a1,a1,a1,a1,a1,K.tD,a1,a1,a1)],l),D.E,a1,D.e,D.i,0,D.p),1),C.aA(a1,D.t7,D.y,!1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,new A.efA(a0),a1,a1,a1,a1,a1,a1,!1,D.a4)],l),D.l,a1,D.e,D.i,0,a1,a1),D.af],l)
 if(s!=null){j=D.bi.j(0.14)
 i=C.m(16)
 h=C.L(D.bi,D.r,1)
@@ -14819,7 +14819,7 @@ n===$&&C.c()
 o=n[o.e].k3.q(0,r.a)&&q<60}else o=!1
 if(o){l.a=new C.GJ(new A.ehB(m,r),"\ud83d\udd27 Fix the street light")
 break}if(D.d.q(B.Iu,t)&&q<36){l.a=new C.GJ(new A.ehC(m,r),"\ud83c\udf4e Feed the "+p)
-break}if(D.d.q(B.dk_,t)&&q<60){l.a=new C.GJ(new A.ehD(m,r),"\ud83d\ude97 Get in the "+p)
+break}if(D.d.q(B.djZ,t)&&q<60){l.a=new C.GJ(new A.ehD(m,r),"\ud83d\ude97 Get in the "+p)
 break}}}w=l.a
 w=w==null?null:w.b
 u=m.cP
@@ -15020,7 +15020,7 @@ j=u.c
 i=u.a
 t=-i
 s=C.a([],x.f)
-if(w)for(r=0;r<5;++r)for(q=v+B.dgK[r],p=i*q,q=j*q,o=0;o<5;++o){n=B.d5J[o]
+if(w)for(r=0;r<5;++r)for(q=v+B.dgJ[r],p=i*q,q=j*q,o=0;o<5;++o){n=B.d5I[o]
 s.push(new C.y(d.c+p+j*n,d.d+q+t*n))}else for(m=0;m<12;++m){l=m*3.141592653589793/6
 s.push(new C.y(d.c+Math.cos(l)*v,d.d+Math.sin(l)*v))}for(j=s.length,r=0;r<s.length;s.length===j||(0,C.J)(s),++r){k=s[r]
 if(!e.L6(k.a,k.b))return k}return D.d.gH(s)},
@@ -15410,7 +15410,7 @@ w===$&&C.c()
 v=w[t.e].Cj(u.Q)
 if(v==null)return
 u.m(new A.egm(u,v))
-u.iw(B.hN.h(0,v.b).a+": "+B.d_N[v.f]+".")},
+u.iw(B.hN.h(0,v.b).a+": "+B.d_M[v.f]+".")},
 caH(d){var w,v,u=this,t=u.d
 t===$&&C.c()
 w=t.d
@@ -15812,7 +15812,7 @@ if(n.e){v=D.c.j(0.07)
 w.push(new C.D(D.d3,C.aM(m,D.Z,!0,m,!0,D.t,m,C.aO(),m,m,m,m,m,m,2,C.bt(m,new C.b6(4,C.m(16),D.a1),m,m,m,m,m,m,!0,m,m,m,m,m,m,v,!0,m,m,m,m,m,m,m,m,m,m,m,m,m,A6.ED,"Search the lessons: outlet, switch, dryer, sink...",m,m,m,m,m,!0,m,m,m,!0,!0,!1,m,B.as8,m,m,m,m,m,m,m,m,m,m,m,m),D.y,!0,m,!0,m,!1,m,D.ak,m,m,m,B.hpQ,m,m,m,m,m,1,m,m,!1,"\u2022",m,new A.dWm(n),m,m,m,!1,m,m,!1,m,!0,m,D.ac,m,m,m,m,m,m,m,m,m,m,m,D.KS,!0,D.a5,m,D.ao,m,m,m,m),m))}D.d.v(w,n.c4m())
 return C.c4(m,D.c3,C.bn(!0,C.cl(w,m,m,B.alN,m,m,D.ah,!1),!0,!1,D.ag,!0,!0),m,!1,!1,m,m)},
 c4m(){var w,v,u,t,s,r,q,p=this,o=x.dz,n=C.a([],o)
-for(w=0;w<24;++w){v=B.djj[w]
+for(w=0;w<24;++w){v=B.dji[w]
 n.push(new C.QZ([v.d,v.e,v.b,new A.dW8(p,v),v.c,v.a]))}n.push(new C.QZ(["Sheets, screws, tape, mud, sand",D.aH,"\ud83e\uddf1",new A.dW9(p),"Hanging drywall","drywall sheetrock sheet screws tape mud sand paint primer ceiling walls"]))
 n.push(new C.QZ(["A bare frame: boxes, holes, cable",D.av,"\ud83c\udfe0",new A.dWa(p),"Wiring a house","wire wiring house frame studs drill cable box outlet switch panel"]))
 n.push(new C.QZ(["Three-way switch, fan with light",D.bp,"\ud83e\udde0",new A.dWb(p),"Diagram lessons","diagram wiring picture"]))
@@ -17742,7 +17742,7 @@ if(o.length!==0)return"Pick the TV or the lamp and plug it into "+A.j6(D.d.gH(o)
 m=n.d.d
 m===$&&C.c()
 return"Flip the wall switch to test the "+(D.d.aV(m,new A.eyL())?"fan":"light")+"."}},
-B(a6){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2=this,a3=null,a4=a2.Q,a5=a4>=0&&a2.y===2?a2.cGH(a4):B.d80[a2.y]
+B(a6){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2=this,a3=null,a4=a2.Q,a5=a4>=0&&a2.y===2?a2.cGH(a4):B.d8_[a2.y]
 a4=x.w
 w=C.aH(a6,a3,a4).w.a.a>C.aH(a6,a3,a4).w.a.b
 a4=a2.as
@@ -17895,7 +17895,7 @@ A.N1.prototype={}
 A.cyI.prototype={
 bCi(d,e,f){var w,v,u,t,s,r,q,p=this,o=new C.e4()
 o.d_(p.a)
-w=C.C(B.diZ,x.eP)
+w=C.C(B.diY,x.eP)
 D.d.e0(w,o)
 v=C.aR(x.S)
 u=C.a([],x.gw)
@@ -19120,7 +19120,7 @@ u.b0S()
 return}u.adk(10,11,9,"Coming in through the front door")
 u.aZb(9,10,5)
 u.adk(5,9,0,"Walking down the hall")
-for(w=0;w<8;++w){v=B.d1Q[w]
+for(w=0;w<8;++w){v=B.d1P[w]
 u.aZb(v,5,w===7?null:5)}u.b0S()},
 b0S(){var w,v,u,t,s,r,q,p,o=this,n=o.c,m=Math.min(1,n/120)
 for(w=o.d,v=w.length,u=0,t=0,s=0;s<v;++s){r=w[s]
@@ -19917,7 +19917,7 @@ w=A.Kp(!1,r,m,new A.ceu(s),r,i,k,h,r,r,j,54,s.gcc8(),new A.cev(s),s.gcce(),n,!1,
 u=s.f
 v=D.c.j(0.07)
 n=C.m(13)
-return A.IQ(!0,D.aH,new A.cex(d,f),C.x(C.a([A.ihR(B.d1M,u,s.gbrD(),C.a([C.aA(r,C.q(r,B.f90,D.f,r,r,new C.p(v,r,C.L(D.aU,D.r,1),n,r,r,D.n),r,r,r,r,D.k3,r,r,r),D.y,!1,B.hpX,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,s.gccb(),r,r,r,r,r,r,!1,D.a4)],t)),D.U,C.A(C.a([C.E(C.d("Sheets "+q.ganM()+"/"+l.length+" \xb7 screwed "+q.gar_()+"/"+l.length+" \xb7 holes "+q.gaGk()+"/"+g.length+" \xb7 surfaces finished "+o+"/5",r,2,r,r,r,r,B.fpg,r,r,r),1),D.ae,A.ti("Start over",D.k7,s.gccg(),D.ab)],t),D.l,r,D.e,D.i,0,r,r)],t),D.l,r,D.e,D.Q,0,D.p),w,p,"Hanging drywall",r,r)}}
+return A.IQ(!0,D.aH,new A.cex(d,f),C.x(C.a([A.ihR(B.d1L,u,s.gbrD(),C.a([C.aA(r,C.q(r,B.f90,D.f,r,r,new C.p(v,r,C.L(D.aU,D.r,1),n,r,r,D.n),r,r,r,r,D.k3,r,r,r),D.y,!1,B.hpX,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,s.gccb(),r,r,r,r,r,r,!1,D.a4)],t)),D.U,C.A(C.a([C.E(C.d("Sheets "+q.ganM()+"/"+l.length+" \xb7 screwed "+q.gar_()+"/"+l.length+" \xb7 holes "+q.gaGk()+"/"+g.length+" \xb7 surfaces finished "+o+"/5",r,2,r,r,r,r,B.fpg,r,r,r),1),D.ae,A.ti("Start over",D.k7,s.gccg(),D.ab)],t),D.l,r,D.e,D.i,0,r,r)],t),D.l,r,D.e,D.Q,0,D.p),w,p,"Hanging drywall",r,r)}}
 A.XE.prototype={}
 A.yy.prototype={
 gcLg(){return this.d<=20&&this.e>=20},
@@ -21880,8 +21880,8 @@ return new C.cu([d+100*Math.cos(w),e+100*Math.sin(w),-Math.sin(w),Math.cos(w)])}
 $S:1801}
 A.fme.prototype={
 $1(a0){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i=this.b,h=A.LH(i,a0).a,g=h[0],f=h[1],e=h[2],d=h[3]
-for(h=this.a,w=h.a,v=h.b,u=h.c,h=h.d,t=0;t<5;++t){s=B.d15[t]
-for(r=d*s,q=e*s,p=0;p<3;++p){o=B.dg2[p]
+for(h=this.a,w=h.a,v=h.b,u=h.c,h=h.d,t=0;t<5;++t){s=B.d14[t]
+for(r=d*s,q=e*s,p=0;p<3;++p){o=B.dg1[p]
 n=i.a==="bus"
 m=n?120:95.94999999999999
 l=n?33.54:31.45
@@ -23373,7 +23373,7 @@ w===$&&C.c()
 u=w.d
 u===$&&C.c()
 if(u[w.e].fx.h(0,i)!=null)j.push(C.aA(l,C.q(l,B.fUA,D.f,l,l,new C.p(D.ej,l,l,C.m(12),l,l,D.n),l,l,l,l,D.ey,l,l,l),D.y,!1,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,new A.egd(v,d,i),l,l,l,l,l,l,!1,D.a4))
-return C.bn(!0,new C.D(D.bQ,C.x(C.a([B.fQz,D.X,C.bU(D.bG,j,D.bs,l,8,8)],k),D.E,l,D.e,D.Q,0,D.p),l),!0,!1,D.ag,!0,!0)},
+return C.bn(!0,new C.D(D.bQ,C.x(C.a([B.fQy,D.X,C.bU(D.bG,j,D.bs,l,8,8)],k),D.E,l,D.e,D.Q,0,D.p),l),!0,!1,D.ag,!0,!0)},
 $S:25}
 A.egc.prototype={
 $0(){var w,v,u,t=this
@@ -23428,7 +23428,7 @@ q=p[q.e].k1===s.a?D.av:D.eX
 v.push(k.$3$color(r,new A.ehm(l,s),q))}j=C.a([j,D.X,C.bU(D.bG,v,D.bs,m,8,8)],w)
 if(l.d.a.length!==0){v=C.a([],w)
 for(o=0;o<3;++o){u={}
-t=B.dbc[o]
+t=B.dbb[o]
 u.a=null
 n=t.a
 u.a=n
@@ -23858,7 +23858,7 @@ m=C.d("Add to "+w[m.e].b,o,o,o,o,o,o,D.di,o,o,o)
 w=x.p
 v=C.a([],w)
 for(u=0;u<10;++u){t={}
-s=B.d60[u]
+s=B.d6_[u]
 t.a=null
 t.a=s.a
 r=D.eX.j(0.4)
@@ -25064,7 +25064,7 @@ A.fEy.prototype={
 $4$alongX(d,e,f,g){var w,v,u,t,s,r,q,p,o,n
 for(w=this.a,v=0;v<=f;++v){u=A.oS(d,e,v/f)
 w.aF3(new A.r(u.a,4,u.c),B.hps,B.Z9,!1,0.05)}t=A.oS(d,e,0.5)
-for(s=e.aJ(0,d).gp7()+0.15,r=t.a,q=t.c,p=0;p<2;++p){o=B.dk9[p]
+for(s=e.aJ(0,d).gp7()+0.15,r=t.a,q=t.c,p=0;p<2;++p){o=B.dk8[p]
 n=g?new A.r(s,0.16,0.3):new A.r(0.3,0.16,s)
 w.aE(new A.r(r,o,q),n,B.Z9,0.05)}},
 $3(d,e,f){return this.$4$alongX(d,e,f,!0)},
@@ -25963,7 +25963,7 @@ w===$&&C.c()
 v=this.b
 v=v>0?"\n\nYou are paid "+v+" stars! \u2b50":""
 s=C.d("The "+w.b.toLowerCase()+" is finished and nothing leaks."+v+"\n\nMistakes: "+s.w+"\n\nThe next job is different.",u,u,u,u,u,u,B.KB,u,u,u)
-return C.eg(C.a([C.bN(!1,B.aX3,u,u,!0,u,u,u,new A.eux(d),u,u),C.bI(B.fNi,u,new A.euy(t,d),u)],x.p),u,u,G.m7,s,u,u,u,u,B.fOX,u)},
+return C.eg(C.a([C.bN(!1,B.aX3,u,u,!0,u,u,u,new A.eux(d),u,u),C.bI(B.fNi,u,new A.euy(t,d),u)],x.p),u,u,G.m7,s,u,u,u,u,B.fOW,u)},
 $S:18}
 A.eux.prototype={
 $0(){C.a6(this.a,!1).O(null)
@@ -26250,7 +26250,7 @@ else w.aAt(u)},
 $S:0}
 A.eyC.prototype={
 $1(d){var w=null
-return C.eg(C.a([C.bN(!1,B.fQZ,w,w,!0,w,w,w,new A.eyA(d),w,w),C.bI(D.EO,w,new A.eyB(this.a,d),w)],x.p),w,w,G.m7,B.fFR,w,w,w,w,B.fNI,w)},
+return C.eg(C.a([C.bN(!1,B.fQY,w,w,!0,w,w,w,new A.eyA(d),w,w),C.bI(D.EO,w,new A.eyB(this.a,d),w)],x.p),w,w,G.m7,B.fFR,w,w,w,w,B.fNI,w)},
 $S:18}
 A.eyA.prototype={
 $0(){C.a6(this.a,!1).O(null)
@@ -26605,7 +26605,7 @@ h===$&&C.c()
 w=h.c
 w===$&&C.c()
 v=x.p
-h=C.a([C.d("Job: "+w,k,k,k,k,k,k,D.di,k,k,k),D.ax,C.d("Mistakes "+h.f+" \xb7 Shocks "+h.r+" \xb7 Lives "+h.e,k,k,k,k,k,k,B.KE,k,k,k),D.X,B.fRz,D.an],v)
+h=C.a([C.d("Job: "+w,k,k,k,k,k,k,D.di,k,k,k),D.ax,C.d("Mistakes "+h.f+" \xb7 Shocks "+h.r+" \xb7 Lives "+h.e,k,k,k,k,k,k,B.KE,k,k,k),D.X,B.fRy,D.an],v)
 w=i.d.d
 w===$&&C.c()
 u=w.length
@@ -26629,7 +26629,7 @@ l=l!=null?", turned on by "+A.j6(l).b:""
 h.push(C.q(k,C.d(n+" "+m+" at "+o.b+l,k,k,k,k,k,k,D.pS,k,k,k),D.f,k,k,new C.p(r,k,new C.bG(p,p,p,p),new C.be(q,q,q,q),k,k,D.n),k,k,k,D.eM,D.bV,k,k,k))}h.push(D.X)
 h.push(D.an)
 w=this.b
-h.push(C.A(C.a([C.E(C.dU(B.fP0,new A.eyX(w),k),1),D.ae,C.E(C.bI(B.fMS,k,new A.eyY(i,d,w),k),1)],v),D.l,k,D.e,D.i,0,k,k))
+h.push(C.A(C.a([C.E(C.dU(B.fP_,new A.eyX(w),k),1),D.ae,C.E(C.bI(B.fMS,k,new A.eyY(i,d,w),k),1)],v),D.l,k,D.e,D.i,0,k,k))
 h.push(D.an)
 h.push(D.an)
 h.push(C.A(C.a([C.E(C.dU(B.fH_,new A.eyZ(i,d),k),1),D.ae,C.E(C.bI(B.aX5,k,new A.ez_(i,d),k),1)],v),D.l,k,D.e,D.i,0,k,k))
@@ -26764,7 +26764,7 @@ $1(d){return this.a.cb2()},
 $S:7}
 A.eBh.prototype={
 $1(d){var w=null
-return C.eg(C.a([C.bI(B.fOS,w,new A.eBg(this.a,d),w)],x.p),w,w,G.m7,B.fNZ,w,w,w,w,B.fUs,w)},
+return C.eg(C.a([C.bI(B.fOR,w,new A.eBg(this.a,d),w)],x.p),w,w,G.m7,B.fNZ,w,w,w,w,B.fUs,w)},
 $S:18}
 A.eBg.prototype={
 $0(){C.a6(this.b,!1).O(null)
@@ -26774,7 +26774,7 @@ A.eBd.prototype={
 $1(d){var w=null,v=this.a,u=v.d
 u===$&&C.c()
 u=C.d("Every problem on the customer's list is fixed.\n\nYou are paid "+this.b+" stars! \u2b50\n\nMistakes: "+u.f+"\nShocks: "+u.r+"\nLives left: "+u.e+"\n\nThe next call will have different problems.",w,w,w,w,w,w,B.KB,w,w,w)
-return C.eg(C.a([C.bN(!1,B.aX3,w,w,!0,w,w,w,new A.eBb(d),w,w),C.bI(B.fQb,w,new A.eBc(v,d),w)],x.p),w,w,G.m7,u,w,w,w,w,B.fWX,w)},
+return C.eg(C.a([C.bN(!1,B.aX3,w,w,!0,w,w,w,new A.eBb(d),w,w),C.bI(B.fQa,w,new A.eBc(v,d),w)],x.p),w,w,G.m7,u,w,w,w,w,B.fWX,w)},
 $S:18}
 A.eBb.prototype={
 $0(){C.a6(this.a,!1).O(null)
@@ -26841,7 +26841,7 @@ o=s.c?"\u2705":"\ud83d\udd27"
 n=B.wY.h(0,s.a).a
 m=s.c?D.aD:D.c
 j.push(C.q(l,C.d(o+" "+n,l,l,l,l,l,l,new C.G(!0,m,l,l,l,l,13.5,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l),l,l,l),D.f,l,l,new C.p(r,l,new C.bG(p,p,p,p),new C.be(q,q,q,q),l,l,D.n),l,l,l,D.cx,D.bh,l,l,l))}j.push(D.an)
-j.push(B.fRK)
+j.push(B.fRJ)
 j.push(D.U)
 j.push(C.A(C.a([B.bIe,C.b8X(l,l,l,l,!1,D.y,l,l,l,l,l,l,new A.eBs(k,e),l,l,l,l,l,l,l,l,k.d.b)],w),D.l,l,D.e,D.i,0,l,l))
 j.push(C.bI(B.fUV,l,new A.eBt(k,d),l))
@@ -27092,7 +27092,7 @@ else if(w!==e)this.b.push(new A.wI("LEAD_WRONG",B.aRN,"The "+d+" lead is connect
 $S:117}
 A.h3H.prototype={
 $1(d){var w,v,u,t,s,r=null,q=C.aH(d,r,x.w).w,p=x.p,o=C.a([B.fDd,D.an,B.fX0,D.X],p)
-for(w=0;w<5;++w){v=B.dgi[w]
+for(w=0;w<5;++w){v=B.dgh[w]
 u=D.c.j(0.05)
 t=new C.aN(12,12)
 s=new C.ay(D.bA,1,D.r,-1)
@@ -27423,7 +27423,7 @@ A.cet.prototype={
 $1(d){return!d},
 $S:98}
 A.cex.prototype={
-$0(){return A.aSh(this.a,"Hanging drywall",B.dcM,this.b)},
+$0(){return A.aSh(this.a,"Hanging drywall",B.dcL,this.b)},
 $S:0}
 A.cev.prototype={
 $0(){var w=this.a
@@ -28064,8 +28064,8 @@ B.aeg=new C.aY(0,290,0,1/0)
 B.b4l=new C.be(H.Uq,H.Uq,D.bI,D.bI)
 B.bvn=new C.u(1,0.12156862745098039,0.13725490196078433,0.18823529411764706,D.q)
 B.bvw=new C.u(1,0.054901960784313725,0.06274509803921569,0.09411764705882353,D.q)
-B.dam=w([B.bvn,B.bvw],x.O)
-B.c5K=new C.a9(D.b7,D.b8,D.x,B.dam,null,null)
+B.dal=w([B.bvn,B.bvw],x.O)
+B.c5K=new C.a9(D.b7,D.b8,D.x,B.dal,null,null)
 B.b7l=new C.p(null,null,H.ae4,B.b4l,null,B.c5K,D.n)
 B.G1=new C.u(1,0.08627450980392157,0.10588235294117647,0.1411764705882353,D.q)
 B.b5J=new C.bG(D.a1,D.a1,Aj.vP,D.a1)
@@ -28379,8 +28379,8 @@ B.fEv=new C.B("\ud83c\udfd8 Community",null,Y.vw,null,null,null,null,null,null,n
 B.bch=new C.cg(D.A,null,null,B.fEv,null)
 B.bIm=new C.bz(1,D.bc,B.bch,null)
 B.fJ7=new C.B("House tour",null,D.ne,null,null,null,null,null,null,null,null,null)
-B.fPJ=new C.B("A film of your whole house, with every TV on.",null,D.aaP,null,null,null,null,null,null,null,null,null)
-B.dqC=w([B.fJ7,D.bH,B.fPJ],x.p)
+B.fPI=new C.B("A film of your whole house, with every TV on.",null,D.aaP,null,null,null,null,null,null,null,null,null)
+B.dqC=w([B.fJ7,D.bH,B.fPI],x.p)
 B.bwW=new C.fj(D.ah,D.e,D.i,D.E,null,D.p,null,0,B.dqC,null)
 B.bIr=new C.bz(1,D.bc,B.bwW,null)
 B.aVm=new C.G(!0,D.c,null,null,null,null,14,D.I,null,null,null,null,1.3,null,null,null,null,null,null,null,null,null,null,null,null,null)
@@ -28503,27 +28503,27 @@ B.bhQ=new C.u(1,0.16470588235294117,0.12156862745098039,0.07058823529411765,D.q)
 B.dsB=w([B.bsL,B.bpr,B.bhQ],x.O)
 B.c70=new C.a9(D.aA,D.aE,D.x,B.dsB,null,null)
 B.bjS=new C.u(1,0.8509803921568627,0.6039215686274509,0.11764705882352941,D.q)
-B.deH=w([F.f2,B.bjS],x.O)
-B.c78=new C.a9(D.aA,D.aE,D.x,B.deH,null,null)
+B.deG=w([F.f2,B.bjS],x.O)
+B.c78=new C.a9(D.aA,D.aE,D.x,B.deG,null,null)
 B.brW=new C.u(1,0.0392156862745098,0.058823529411764705,0.1803921568627451,D.q)
 B.buN=new C.u(1,0.1411764705882353,0.08235294117647059,0.3215686274509804,D.q)
 B.cQ5=w([E.ah5,B.brW,B.buN],x.O)
 B.c7Q=new C.a9(D.b7,D.b8,D.x,B.cQ5,null,null)
-B.db9=w([E.iG,E.Mq,E.iG],x.O)
-B.asV=new C.a9(D.a6,D.aa,D.x,B.db9,null,null)
+B.db8=w([E.iG,E.Mq,E.iG],x.O)
+B.asV=new C.a9(D.a6,D.aa,D.x,B.db8,null,null)
 B.bph=new C.u(1,0.8901960784313725,0.9254901960784314,0.9803921568627451,D.q)
-B.d9A=w([D.c,B.bph],x.O)
-B.c95=new C.a9(D.b7,D.b8,D.x,B.d9A,null,null)
+B.d9z=w([D.c,B.bph],x.O)
+B.c95=new C.a9(D.b7,D.b8,D.x,B.d9z,null,null)
 B.bvJ=new C.u(1,0.07058823529411765,0.22745098039215686,0.47843137254901963,D.q)
-B.d2I=w([E.iG,B.bvJ],x.O)
-B.c9f=new C.a9(D.aA,D.aE,D.x,B.d2I,null,null)
+B.d2H=w([E.iG,B.bvJ],x.O)
+B.c9f=new C.a9(D.aA,D.aE,D.x,B.d2H,null,null)
 B.dti=w([D.cr,D.dh],x.O)
 B.zG=new C.a9(D.b7,D.b8,D.x,B.dti,null,null)
 B.cn6=w([E.iG,E.Mq],x.O)
 B.c9u=new C.a9(D.a6,D.aa,D.x,B.cn6,null,null)
 B.bqu=new C.u(1,0.06666666666666667,0.0784313725490196,0.10196078431372549,D.q)
-B.deZ=w([E.afz,B.bqu],x.O)
-B.c9z=new C.a9(D.b7,D.b8,D.x,B.deZ,null,null)
+B.deY=w([E.afz,B.bqu],x.O)
+B.c9z=new C.a9(D.b7,D.b8,D.x,B.deY,null,null)
 B.eko={ground:0}
 B.AC=new C.de(B.eko,1,x.M)
 B.uC=new A.fm(25,"Green screw: GROUND",B.AC,y.H,!1,"ground")
@@ -28603,7 +28603,7 @@ B.hvX=new A.hj(21.5,-4.6,1.5,1.5,0,0,0)
 B.hvM=new A.hj(24.5,-5.4,0.9,-0.4,0,0,0)
 B.hw4=new A.hj(27.5,-6.28,0.75,0.05,0,0,0)
 B.hvN=new A.hj(30,-6,2.4,1.7,0,0,0)
-B.d7V=w([B.hvL,B.hvA,B.hvU,B.hw2,B.hw_,B.hvz,B.hvT,B.hvX,B.hvM,B.hw4,B.hvN],x.D)
+B.d7U=w([B.hvL,B.hvA,B.hvU,B.hw2,B.hw_,B.hvz,B.hvT,B.hvX,B.hvM,B.hw4,B.hvN],x.D)
 B.hvD=new A.hj(0,-3.14,1.2,-0.3,0,0,0)
 B.hvw=new A.hj(4,-2.2,1.1,0,0,0,0)
 B.hw3=new A.hj(8,-1.2,1,0.4,0,0,0)
@@ -28614,7 +28614,7 @@ B.hvC=new A.hj(21,0,0.9,-0.2,0.35,0.25,0)
 B.hvI=new A.hj(24,0.6,1.4,0.1,-0.2,0,0)
 B.hvJ=new A.hj(27,1.4,1.2,0.8,0,0,0)
 B.hvH=new A.hj(30,2.4,2.3,1.5,0,0,0)
-B.dfn=w([B.hvD,B.hvw,B.hw3,B.hvB,B.hvE,B.hvv,B.hvC,B.hvI,B.hvJ,B.hvH],x.D)
+B.dfm=w([B.hvD,B.hvw,B.hw3,B.hvB,B.hvE,B.hvv,B.hvC,B.hvI,B.hvJ,B.hvH],x.D)
 B.hvF=new A.hj(0,0.3,2.6,0.5,0,0,0)
 B.hvZ=new A.hj(3,0.1,1,0,0,0,0)
 B.hw1=new A.hj(6,0,0.95,0.05,0.2,0.15,0)
@@ -28636,8 +28636,8 @@ B.hvt=new A.hj(20,3.5,0.9,-0.35,0,0,0)
 B.hvG=new A.hj(24,4.7,1.1,0,0,0,0)
 B.hvP=new A.hj(28,6,1,0.3,0,0,0)
 B.hvR=new A.hj(30,6.3,2.2,1.4,0,0,0)
-B.d7z=w([B.hvY,B.hvy,B.hw0,B.hvs,B.hvW,B.hvt,B.hvG,B.hvP,B.hvR],x.D)
-B.czE=w([B.d7V,B.dfn,B.cL8,B.d7z],C.as("O<ai<hj>>"))
+B.d7y=w([B.hvY,B.hvy,B.hw0,B.hvs,B.hvW,B.hvt,B.hvG,B.hvP,B.hvR],x.D)
+B.czE=w([B.d7U,B.dfm,B.cL8,B.d7y],C.as("O<ai<hj>>"))
 B.czF=w([380,820,1420,1660],x.n)
 B.ekS={neutral:0}
 B.Ew=new C.de(B.ekS,1,x.M)
@@ -28671,8 +28671,8 @@ B.b3J=new A.rl("screen","\ud83d\udcfa","Big screen","A giant TV screen on a stan
 B.b3R=new A.rl("gate","\ud83d\udeaa","Town gate","A huge arch with the board across it",600,200,200,B.DA,0,1)
 B.b3v=new A.lO(-420,140,0.35,0,1)
 B.b3t=new A.lO(460,-420,-0.3,160,1.35)
-B.d5L=w([B.b3v,B.b3t],x.m)
-B.b3I=new A.rl("duo","\ud83e\udea7","Two far apart","Two separate boards: a near one and a taller one far behind it",320,160,140,B.d5L,0,0.7)
+B.d5K=w([B.b3v,B.b3t],x.m)
+B.b3I=new A.rl("duo","\ud83e\udea7","Two far apart","Two separate boards: a near one and a taller one far behind it",320,160,140,B.d5K,0,0.7)
 B.b3o=new A.lO(-460,0,0,0,1)
 B.b3w=new A.lO(460,0,0,0,1)
 B.drL=w([B.b3o,B.adF,B.b3w],x.m)
@@ -28823,12 +28823,12 @@ B.eTO=new C.y(-300,1000)
 B.eBO=new C.y(300,1000)
 B.eUf=new C.y(-700,800)
 B.eES=new C.y(700,800)
-B.d_H=w([B.eA4,B.eTB,B.eAz,B.eTO,B.eBO,B.eUf,B.eES],x.f)
-B.d_N=w(["Walnut","Blue grey","Brick red","Sage green","Sand","Charcoal"],x.s)
+B.d_G=w([B.eA4,B.eTB,B.eAz,B.eTO,B.eBO,B.eUf,B.eES],x.f)
+B.d_M=w(["Walnut","Blue grey","Brick red","Sage green","Sand","Charcoal"],x.s)
 B.ih=w(["switch","switch2p","switch3","switch4","switchsmart","switchcombo"],x.s)
 B.hfD=new A.r(-6.5,7.5,-7.85)
 B.hfJ=new A.r(-6.5,7.8,-3)
-B.d07=w([B.hfD,B.hfJ],x.o)
+B.d06=w([B.hfD,B.hfJ],x.o)
 B.hrZ=new A.Gm("NGMY JOBS","Find work. Get hired. Get paid.",D.av,D.i8,D.u5)
 B.hs6=new A.Gm("NGMY LOANS","Help when you need it most.",D.cX,D.e6,D.w5)
 B.hs1=new A.Gm("KISWAHILI SCHOOL","Learn Swahili and English, step by step.",D.bR,D.u2,D.wa)
@@ -28836,25 +28836,25 @@ B.hs3=new A.Gm("CIVIC REGISTRY","Your family, your community, registered.",D.d5,
 B.hrY=new A.Gm("CORE PROTOCOL","Studios for curious minds.",D.b9,D.kn,D.qc)
 B.hs2=new A.Gm("BUILD AND FIX","The Construction Lab: wire it, plumb it.",D.fp,D.fV,D.ug)
 B.hrS=new A.Gm("CREATE WITH NGMY","Videos, slides, bios and books.",D.bD,D.km,D.q9)
-B.d0b=w([B.hrZ,B.hs6,B.hs1,B.hs3,B.hrY,B.hs2,B.hrS],C.as("O<Gm>"))
+B.d0a=w([B.hrZ,B.hs6,B.hs1,B.hs3,B.hrY,B.hs2,B.hrS],C.as("O<Gm>"))
 B.dym=w(["Switch 1 common","Switch 2 common","Traveler terminal (both switches)","Green ground screw","Neutral splice (not on a switch)"],x.s)
 B.ejT={"Line (from the breaker)":0,"Load (to the light)":1,"Traveler A":2,"Traveler B":3,Ground:4,Neutral:5}
 B.dCv=new C.bu(B.ejT,["Switch 1 common","Switch 2 common","Traveler terminal (both switches)","Traveler terminal (both switches)","Green ground screw","Neutral splice (not on a switch)"],x.l)
 B.dsf=w(["Never assume the dark screw is the same on every brand: read the diagram on the switch.","A switch loop or an old house may not follow the colors: verify the wires."],x.s)
 B.bz2=new A.al8("threeway","Three-way switch (two switches, one light)","Two three-way switches control one light from two places. Each switch has a COMMON terminal (dark screw) and two TRAVELER terminals. Power (line) goes to the common of the first switch, the light (load) to the common of the second, and two travelers join the switches. The ground goes to the green screw. A standard single-pole switch cannot do this job.",B.dym,B.dCv,B.dsf)
-B.d16=w(["Fan (motor) control wire","Light control wire","Neutral","Ground","Fan-rated support"],x.s)
+B.d15=w(["Fan (motor) control wire","Light control wire","Neutral","Ground","Fan-rated support"],x.s)
 B.ekA={"Motor lead (black)":0,"Light lead (blue)":1,"Neutral (white)":2,"Ground (green)":3,Support:4}
 B.dD5=new C.bu(B.ekA,["Fan (motor) control wire","Light control wire","Neutral","Ground","Fan-rated support"],x.l)
-B.d5K=w(["A blue wire is a light-kit lead on many fans, but not on all: read the diagram.","A fan that spins does not prove the installation is safe."],x.s)
-B.bz3=new A.al8("fanlight","Ceiling fan with a light kit","A fan has a motor and often a light kit, and they are not always switched together. Follow the fan maker's diagram: the motor lead goes to the fan control (or switched hot), the light lead to the light control, the white to neutral and the green to the ground. The box must be fan rated.",B.d16,B.dD5,B.d5K)
+B.d5J=w(["A blue wire is a light-kit lead on many fans, but not on all: read the diagram.","A fan that spins does not prove the installation is safe."],x.s)
+B.bz3=new A.al8("fanlight","Ceiling fan with a light kit","A fan has a motor and often a light kit, and they are not always switched together. Follow the fan maker's diagram: the motor lead goes to the fan control (or switched hot), the light lead to the light control, the white to neutral and the green to the ground. The box must be fan rated.",B.d15,B.dD5,B.d5J)
 B.oK=w([B.bz2,B.bz3],C.as("O<al8>"))
 B.hDw=new A.pP(0,-100,100,24)
 B.hDD=new A.pP(1,90,100,24)
-B.d0n=w([B.hDw,B.hDD],x.X)
+B.d0m=w([B.hDw,B.hDD],x.X)
 B.eUp=new C.y(-95,160)
 B.eTW=new C.y(-35,175)
 B.eFG=new C.y(95,170)
-B.d0s=w([B.eUp,B.eTW,B.eFG],x.f)
+B.d0r=w([B.eUp,B.eTW,B.eFG],x.f)
 B.bl6=new C.u(1,0.9176470588235294,0.9490196078431372,0.9686274509803922,D.q)
 B.bqT=new C.u(1,0.9647058823529412,0.9098039215686274,0.9098039215686274,D.q)
 B.bpL=new C.u(1,0.9529411764705882,0.9215686274509803,0.7843137254901961,D.q)
@@ -28862,7 +28862,7 @@ B.azK=w([B.BN,B.bl6,B.bqT,B.bpL],x.O)
 B.b_l=new A.iS("neutral","White \xb7 neutral (middle)",B.m3,D.as,"neutral")
 B.b_o=new A.iS("hot1","Black \xb7 hot (left)",B.rG,D.c,"hot")
 B.b_m=new A.iS("hot2","Red \xb7 hot (right)",B.vX,D.c,"hot")
-B.d0y=w([B.b_l,B.b_o,B.b_m],x.d)
+B.d0x=w([B.b_l,B.b_o,B.b_m],x.d)
 B.ekb={common:0}
 B.fbw=new C.de(B.ekb,1,x.M)
 B.bN1=new A.fm(23,"COMMON screw (the odd one)",B.fbw,"The COMMON screw is the one with a different colour. The black wire that brings the power in, or goes to the light, belongs here.",!1,"hot")
@@ -28870,19 +28870,19 @@ B.elb={trav1:0,trav2:1}
 B.aSP=new C.de(B.elb,2,x.M)
 B.bN8=new A.fm(21,"Traveler screw (top)",B.aSP,y.a,!1,"hot")
 B.bNn=new A.fm(22,"Traveler screw (bottom)",B.aSP,y.a,!1,"hot")
-B.d0F=w([B.uC,B.bN1,B.bN8,B.bNn],x.r)
+B.d0E=w([B.uC,B.bN1,B.bN8,B.bNn],x.r)
 B.dFz=new A.ic(-60,60,28,50)
 B.dFv=new A.ic(-150,-100,70,170)
 B.dF8=new A.ic(100,150,70,170)
 B.dFA=new A.ic(-60,-20,156,186)
 B.dFd=new A.ic(20,60,156,186)
-B.d0U=w([B.dFz,B.dFv,B.dF8,B.dFA,B.dFd],x.T)
-B.d0W=w([y.O,"The cable comes in through the top of the box. Strip about 3/4 inch of insulation from each wire.","Fasten the bare copper ground wire to the GREEN screw.","Fasten the white (neutral) wire to a SILVER screw.","Fasten the black (hot) wire to a BRASS screw. Wrap each wire clockwise under its screw.","Fold the wires back and push the outlet into the box.","Put the cover plate on, then turn the power on and test."],x.s)
+B.d0T=w([B.dFz,B.dFv,B.dF8,B.dFA,B.dFd],x.T)
+B.d0V=w([y.O,"The cable comes in through the top of the box. Strip about 3/4 inch of insulation from each wire.","Fasten the bare copper ground wire to the GREEN screw.","Fasten the white (neutral) wire to a SILVER screw.","Fasten the black (hot) wire to a BRASS screw. Wrap each wire clockwise under its screw.","Fold the wires back and push the outlet into the box.","Put the cover plate on, then turn the power on and test."],x.s)
 B.ho6=new A.r(-3.6,7.5,-7.85)
 B.heX=new A.r(-3.6,4.2,-7.85)
-B.d13=w([B.ho6,B.heX],x.o)
-B.d15=w([-0.5,-0.25,0,0.25,0.5],x.n)
-B.d1q=w([D.bD,D.ba,D.bi,D.b4,D.bp],x.O)
+B.d12=w([B.ho6,B.heX],x.o)
+B.d14=w([-0.5,-0.25,0,0.25,0.5],x.n)
+B.d1p=w([D.bD,D.ba,D.bi,D.b4,D.bp],x.O)
 B.f2x=new C.b5("look","Look",D.eS)
 B.f2I=new C.b5("sheet","Drywall sheet",D.zq)
 B.f_x=new C.b5("cut","Cutter",D.CI)
@@ -28895,12 +28895,12 @@ B.f1S=new C.b5("tape","Tape",D.t1)
 B.f05=new C.b5("sand","Sander",D.CH)
 B.aqR=new C.a0(985109,"MaterialIcons",!1)
 B.f2H=new C.b5("paint","Roller",B.aqR)
-B.d1M=w([B.f2x,B.f2I,B.f_x,B.f1v,B.f2v,B.f1o,B.f1k,B.f1S,B.f05,B.f2H],C.as("O<+(n,n,a0)>"))
-B.d1Q=w([0,2,1,3,4,6,7,8],x.t)
+B.d1L=w([B.f2x,B.f2I,B.f_x,B.f1v,B.f2v,B.f1o,B.f1k,B.f1S,B.f05,B.f2H],C.as("O<+(n,n,a0)>"))
+B.d1P=w([0,2,1,3,4,6,7,8],x.t)
 B.f0e=new C.b5(-0.1,0,0.5)
 B.f2w=new C.b5(0.35,-0.4,0.3)
 B.f1d=new C.b5(-0.4,0.55,0.35)
-B.d1W=w([B.f0e,B.f2w,B.f1d],C.as("O<+(F,F,F)>"))
+B.d1V=w([B.f0e,B.f2w,B.f1d],C.as("O<+(F,F,F)>"))
 B.eTv=new C.y(-1050,"store")
 B.aRd=new C.y(-840,"tower")
 B.eU7=new C.y(-630,"tower")
@@ -28912,24 +28912,24 @@ B.eCm=new C.y(420,"store")
 B.eEv=new C.y(630,"tower")
 B.aR2=new C.y(840,"tower")
 B.eAp=new C.y(1050,"gasstation")
-B.d2y=w([B.eTv,B.aRd,B.eU7,B.eTY,B.aRc,B.eA9,B.aR0,B.eCm,B.eEv,B.aR2,B.eAp],x.d6)
+B.d2x=w([B.eTv,B.aRd,B.eU7,B.eTY,B.aRc,B.eA9,B.aR0,B.eCm,B.eEv,B.aR2,B.eAp],x.d6)
 B.a5d=w(["Always switch the breaker OFF and test the wires with a tester before you touch them.","Never use water on an electrical fire: switch the power off at the breaker first.","Reversed hot and neutral can look fine and still be a shock hazard.","A GFCI outlet protects you near water: press TEST every month.","A ceiling fan needs a fan-rated box, because it is heavy and it shakes."],x.s)
 B.hkA=new A.r(9.8,6,-7.85)
 B.hdU=new A.r(9.8,7.5,-7.85)
 B.hox=new A.r(-8,7.5,-7.85)
 B.hh4=new A.r(-8,1.5,-7.85)
-B.d2L=w([B.hkA,B.hdU,B.hox,B.hh4],x.o)
+B.d2K=w([B.hkA,B.hdU,B.hox,B.hh4],x.o)
 B.eZL=new C.b5(0,32,"outlet")
 B.eZS=new C.b5(1,96,"outlet")
 B.eZZ=new C.b5(2,112,"outlet")
 B.f_6=new C.b5(3,64,"outlet")
 B.f__=new C.b5(2,80,"switch")
-B.d3b=w([B.eZL,B.eZS,B.eZZ,B.f_6,B.f__],C.as("O<+(H,F,n)>"))
+B.d3a=w([B.eZL,B.eZS,B.eZZ,B.f_6,B.f__],C.as("O<+(H,F,n)>"))
 B.aZq=new A.r(5,1.8,-7.85)
 B.hi9=new A.r(5,-0.1,-7.85)
 B.hjr=new A.r(12.5,-0.1,-7.85)
-B.d3T=w([B.aZq,B.hi9,B.hjr],x.o)
-B.d41=w([-69.5,69.5],x.n)
+B.d3S=w([B.aZq,B.hi9,B.hjr],x.o)
+B.d40=w([-69.5,69.5],x.n)
 B.h4D=new A.r(3,3.1,-7.1)
 B.aZg=new A.r(3,1.7,-7.1)
 B.hjk=new A.r(3,1,-7.1)
@@ -28937,36 +28937,36 @@ B.h9t=new A.r(3.65,0.5,-7.1)
 B.hbA=new A.r(4.3,1,-7.1)
 B.hi6=new A.r(4.3,1.8,-7.1)
 B.hoB=new A.r(5,1.8,-7.1)
-B.d4o=w([B.h4D,B.aZg,B.hjk,B.h9t,B.hbA,B.hi6,B.hoB,B.aZq],x.o)
+B.d4n=w([B.h4D,B.aZg,B.hjk,B.h9t,B.hbA,B.hi6,B.hoB,B.aZq],x.o)
 B.zN=w(["tv","lamp","toaster","hairdryer","washerM","dryerM","rangeM"],x.s)
 B.ON=new A.fm(23,"Silver screw W: NEUTRAL",B.Ew,y.I,!1,"neutral")
 B.ekr={hot1:0,hot2:1}
 B.Eu=new C.de(B.ekr,2,x.M)
 B.anZ=new A.fm(21,"Brass screw X: HOT",B.Eu,y.l,!1,"hot")
 B.ao7=new A.fm(22,"Brass screw Y: HOT",B.Eu,y.l,!1,"hot")
-B.d4z=w([B.uC,B.ON,B.anZ,B.ao7],x.r)
+B.d4y=w([B.uC,B.ON,B.anZ,B.ao7],x.r)
 B.ao6=new A.fm(23,"Silver screw: NEUTRAL",B.Ew,y._,!1,"neutral")
 B.ekt={hot:0}
 B.a9Y=new C.de(B.ekt,1,x.M)
 B.ao2=new A.fm(21,"Brass screw: HOT",B.a9Y,y.u,!1,"hot")
-B.d4B=w([B.uC,B.ao6,B.ao2],x.r)
-B.d4W=w(["My outlet is dead and it is dark in here. Please come and wire it.","The light in my room does not work, and my phone will not charge. Can you fix the wiring?","I have no power in my room at all. Can an electrician come?"],x.s)
+B.d4A=w([B.uC,B.ao6,B.ao2],x.r)
+B.d4V=w(["My outlet is dead and it is dark in here. Please come and wire it.","The light in my room does not work, and my phone will not charge. Can you fix the wiring?","I have no power in my room at all. Can an electrician come?"],x.s)
 B.f4o=new C.cu([-0.35,-0.2,0.42,0.3])
 B.f4C=new C.cu([0.3,0.25,0.32,0.38])
 B.f3r=new C.cu([0.05,-0.55,0.22,0.14])
 B.f3U=new C.cu([-0.5,0.45,0.2,0.16])
-B.d57=w([B.f4o,B.f4C,B.f3r,B.f3U],x.eV)
-B.d58=w([D.ay,D.be,D.av,D.d5,D.bP,D.fd],x.O)
+B.d56=w([B.f4o,B.f4C,B.f3r,B.f3U],x.eV)
+B.d57=w([D.ay,D.be,D.av,D.d5,D.bP,D.fd],x.O)
 B.hnJ=new A.r(0.6,11,-3.4)
 B.hcG=new A.r(0.6,3.2,-3.2)
 B.hn7=new A.r(0.6,2.2,-1.9)
 B.hc8=new A.r(0.6,0.7,-1.5)
-B.d5x=w([B.hnJ,B.hcG,B.hn7,B.hc8],x.o)
-B.d5J=w([0,24,-24,48,-48],x.n)
+B.d5w=w([B.hnJ,B.hcG,B.hn7,B.hc8],x.o)
+B.d5I=w([0,24,-24,48,-48],x.n)
 B.EV=new A.iS("neutral","White \xb7 neutral",B.m3,D.as,"neutral")
 B.hri=new A.iS("line","Black \xb7 hot from the panel (LINE)",B.rG,D.c,"hot")
 B.hrA=new A.iS("load","Black \xb7 hot to the light (LOAD)",B.MT,D.c,"hot")
-B.d5X=w([B.re,B.EV,B.hri,B.hrA],x.d)
+B.d5W=w([B.re,B.EV,B.hri,B.hrA],x.d)
 B.eGA=new C.y("outlet","\ud83d\udd0c Outlet")
 B.eV4=new C.y("gfci","\ud83d\udee1\ufe0f GFCI outlet")
 B.eQy=new C.y("switch","\ud83d\udca1 Light switch")
@@ -28977,9 +28977,9 @@ B.eLu=new C.y("range3","\ud83e\udd58 Range outlet 3-wire")
 B.eBl=new C.y("washer","\ud83e\uddfa Washer outlet")
 B.eT8=new C.y("cord4","\u26a1 Dryer cord 4-wire")
 B.eYY=new C.y("cord3","\ud83d\udd0c Dryer cord 3-wire")
-B.d60=w([B.eGA,B.eV4,B.eQy,B.eM4,B.eVq,B.eSw,B.eLu,B.eBl,B.eT8,B.eYY],x.L)
+B.d6_=w([B.eGA,B.eV4,B.eQy,B.eM4,B.eVq,B.eSw,B.eLu,B.eBl,B.eT8,B.eYY],x.L)
 B.aAf=w([3,3.6,3.3,2.6],x.n)
-B.d6e=w([y.O,y.x,y.R,"Fasten the white NEUTRAL wire to the NEUTRAL (silver) screw. A regular switch never touches the neutral, this one does.","Fasten the black wire from the panel to the LINE screw.","Fasten the black wire that goes to the light to the LOAD screw.",y.b,y.n],x.s)
+B.d6d=w([y.O,y.x,y.R,"Fasten the white NEUTRAL wire to the NEUTRAL (silver) screw. A regular switch never touches the neutral, this one does.","Fasten the black wire from the panel to the LINE screw.","Fasten the black wire that goes to the light to the LOAD screw.",y.b,y.n],x.s)
 B.eUe=new C.y(-700,330)
 B.eER=new C.y(700,380)
 B.eTx=new C.y(-1100,-420)
@@ -28989,8 +28989,8 @@ B.eAC=new C.y(1350,30)
 B.eAa=new C.y(0,-900)
 B.eTE=new C.y(-1500,-300)
 B.eAD=new C.y(1550,-200)
-B.d6h=w([B.eUe,B.eER,B.eTx,B.eAv,B.eTD,B.eAC,B.eAa,B.eTE,B.eAD],x.f)
-B.d6n=w([Z.r1,Ac.Ux,V.lv],x.f)
+B.d6g=w([B.eUe,B.eER,B.eTx,B.eAv,B.eTD,B.eAC,B.eAa,B.eTE,B.eAD],x.f)
+B.d6m=w([Z.r1,Ac.Ux,V.lv],x.f)
 B.bNe=new A.fm(25,"FRAME screw: GROUND (green)",B.AC,"The green ground wire goes on the screw on the frame, where the strap was.",!1,"ground")
 B.ao1=new A.fm(21,"MIDDLE terminal: NEUTRAL (white)",B.Ew,"The white neutral wire goes on the middle terminal.",!1,"neutral")
 B.ekq={hot1:0}
@@ -28999,25 +28999,25 @@ B.ao5=new A.fm(23,"LEFT terminal: black",B.fbh,"The black wire goes on the left 
 B.eks={hot2:0}
 B.fbp=new C.de(B.eks,1,x.M)
 B.ao4=new A.fm(22,"RIGHT terminal: red",B.fbp,"The red wire goes on the right terminal.",!1,"hot")
-B.d6q=w([B.bNe,B.ao1,B.ao5,B.ao4],x.r)
+B.d6p=w([B.bNe,B.ao1,B.ao5,B.ao4],x.r)
 B.hDy=new A.pP(0,-64,120,26)
 B.hDB=new A.pP(1,64,120,26)
 B.hDG=new A.pP(2,0,84,24)
-B.d6Y=w([B.hDy,B.hDB,B.hDG],x.X)
+B.d6X=w([B.hDy,B.hDB,B.hDG],x.X)
 B.hat=new A.r(0,8.3,0)
 B.aYK=new A.r(0,3.9,0)
 B.aAk=w([B.hat,B.aYK],x.o)
-B.d7d=w([y.O,"Make sure the box is rated for a fan. A plain light box cannot carry the weight and the shaking.","Join the house ground wire to the fan ground.","Join the house white wire to the fan white wire with a wire nut.","Join the house black wire to the fan black wire with a wire nut.","Push the wires up into the box and fasten the canopy to the ceiling.",y.f],x.s)
+B.d7c=w([y.O,"Make sure the box is rated for a fan. A plain light box cannot carry the weight and the shaking.","Join the house ground wire to the fan ground.","Join the house white wire to the fan white wire with a wire nut.","Join the house black wire to the fan black wire with a wire nut.","Push the wires up into the box and fasten the canopy to the ceiling.",y.f],x.s)
 B.eSx=new C.y(-3.5,11)
 B.eHV=new C.y(3.5,11)
 B.eG8=new C.y(-3.5,-11)
 B.eDI=new C.y(3.5,-11)
-B.d7w=w([B.eSx,B.eHV,B.eG8,B.eDI],x.f)
+B.d7v=w([B.eSx,B.eHV,B.eG8,B.eDI],x.f)
 B.hl6=new A.r(-0.6,11,-3.4)
 B.he0=new A.r(-0.6,3.2,-3.2)
 B.hjV=new A.r(-0.6,2.2,-1.9)
 B.hp1=new A.r(-0.6,0.7,-1.5)
-B.d7x=w([B.hl6,B.he0,B.hjV,B.hp1],x.o)
+B.d7w=w([B.hl6,B.he0,B.hjV,B.hp1],x.o)
 B.Iu=w(["dog","cat","cow","sheep","chicken","horse"],x.s)
 B.acD=new A.hI("look","Look",D.eS)
 B.huE=new A.hI("wall","Wall box",N.Pf)
@@ -29033,7 +29033,7 @@ B.hv9=new A.hI("tape","Tape",D.t1)
 B.hv1=new A.hI("mud","Mud",W.Pq)
 B.hve=new A.hI("sand","Sander",D.CH)
 B.huQ=new A.hI("paint","Roller",B.aqR)
-B.dj5=w([B.acD,B.hv4,B.huL,B.huH,B.hv9,B.hv1,B.hve,B.huQ],x.C)
+B.dj4=w([B.acD,B.hv4,B.huL,B.huH,B.hv9,B.hv1,B.hve,B.huQ],x.C)
 B.hva=new A.hI("outlet","Outlet",B.CX)
 B.huN=new A.hI("gfci","GFCI",D.uT)
 B.hv8=new A.hI("switch","Switch",E.pv)
@@ -29071,12 +29071,12 @@ B.hv6=new A.hI("rangeM","Kitchen range",B.a2U)
 B.hvb=new A.hI("flip","Flip switch",E.pv)
 B.huY=new A.hI("tester","Voltage tester",D.uJ)
 B.aAZ=w([B.acD,B.hva,B.huN,B.hv8,B.huG,B.hvc,B.huC,B.huU,B.huK,B.hv2,B.huJ,B.huF,B.hv_,B.hux,B.hv3,B.hv5,B.huV,B.huS,B.huy,B.hv0,B.huR,B.huZ,B.huO,B.huM,B.hvd,B.huD,B.huI,B.hv6,B.hvb,B.huY],x.C)
-B.d80=w([B.dmX,B.dj5,B.aAZ],C.as("O<ai<hI>>"))
+B.d8_=w([B.dmX,B.dj4,B.aAZ],C.as("O<ai<hI>>"))
 B.ePv=new C.y(-1.2,0)
 B.eYy=new C.y(1.2,0)
-B.d8d=w([B.ePv,B.eYy],x.f)
-B.d8r=w([-0.58,0.58],x.n)
-B.d8I=w([40,70,100,130,160],x.n)
+B.d8c=w([B.ePv,B.eYy],x.f)
+B.d8q=w([-0.58,0.58],x.n)
+B.d8H=w([40,70,100,130,160],x.n)
 B.bN3=new A.fm(23,"NEUTRAL screw (silver)",B.Ew,"The electronics inside need the neutral wire to run. White goes on the silver screw.",!1,"neutral")
 B.ekI={line:0}
 B.fbF=new C.de(B.ekI,1,x.M)
@@ -29084,7 +29084,7 @@ B.bNh=new A.fm(21,"LINE screw (brass, hot in)",B.fbF,"The black wire from the br
 B.ekM={load:0}
 B.faE=new C.de(B.ekM,1,x.M)
 B.bNj=new A.fm(22,"LOAD screw (brass, hot out)",B.faE,"The black wire that goes to the light goes on the LOAD screw.",!1,"hot")
-B.d8S=w([B.uC,B.bN3,B.bNh,B.bNj],x.r)
+B.d8R=w([B.uC,B.bN3,B.bNh,B.bNj],x.r)
 B.er_=new A.nE("flange","flange","Toilet flange",D.Z,"The flange is fixed to the floor over the drain. Everything else sits on it.",!1,0)
 B.dmA=w(["flange"],x.s)
 B.eqY=new A.nE("wax","wax","Wax ring",B.dmA,"The wax ring goes on the flange before the toilet. It makes the seal against sewer gas and water.",!1,0)
@@ -29107,15 +29107,15 @@ B.dvZ=w(["tail"],x.s)
 B.aMh=new A.nE("trap","trap","P-trap",B.dvZ,"The P-trap joins the tailpiece. Build the drain from the top down.",!1,1)
 B.dw6=w(["trap"],x.s)
 B.aMi=new A.nE("arm","arm","Trap arm",B.dw6,"The trap arm joins the trap and goes into the wall.",!1,1)
-B.d3l=w([B.er_,B.eqY,B.eqV,B.eqZ,B.eqW,B.eqX,B.aMc,B.aMf,B.aMd,B.aMg,B.aMe,B.aMb,B.aMh,B.aMi],x.fI)
-B.exk=new A.Y_("bathroom","Bathroom",B.d3l,"Fit out a bathroom: a toilet and a sink with its faucet, supply hoses and drain.")
+B.d3k=w([B.er_,B.eqY,B.eqV,B.eqZ,B.eqW,B.eqX,B.aMc,B.aMf,B.aMd,B.aMg,B.aMe,B.aMb,B.aMh,B.aMi],x.fI)
+B.exk=new A.Y_("bathroom","Bathroom",B.d3k,"Fit out a bathroom: a toilet and a sink with its faucet, supply hoses and drain.")
 B.dov=w([B.aMc,B.aMf,B.aMd,B.aMg,B.aMe,B.aMb,B.aMh,B.aMi],x.fI)
 B.exl=new A.Y_("kitchen","Kitchen",B.dov,"Fit out a kitchen sink: the faucet, the hot and cold supplies and the drain.")
 B.aAA=w([B.exk,B.exl],C.as("O<Y_>"))
 B.f4z=new C.cu([-150,180,2,200])
 B.f3m=new C.cu([150,180,2,200])
 B.f3i=new C.cu([0,280,302,2])
-B.d9a=w([B.f4z,B.f3m,B.f3i],x.eV)
+B.d99=w([B.f4z,B.f3m,B.f3i],x.eV)
 B.eUo=new C.y(-900,400)
 B.eFC=new C.y(900,400)
 B.eUm=new C.y(-900,1000)
@@ -29128,30 +29128,30 @@ B.eU8=new C.y(-640,90)
 B.eEw=new C.y(640,90)
 B.eUn=new C.y(-900,1400)
 B.eFB=new C.y(900,1400)
-B.d9n=w([B.eUo,B.eFC,B.eUm,B.eFA,B.eTP,B.eBP,B.eTt,B.eAm,B.eU8,B.eEw,B.eUn,B.eFB],x.f)
-B.d9U=w([B.ao1,B.ao5,B.ao4],x.r)
+B.d9m=w([B.eUo,B.eFC,B.eUm,B.eFA,B.eTP,B.eBP,B.eTt,B.eAm,B.eU8,B.eEw,B.eUn,B.eFB],x.f)
+B.d9T=w([B.ao1,B.ao5,B.ao4],x.r)
 B.h4A=new A.r(8.2,0.9,-6.3)
 B.hk8=new A.r(8.2,-0.1,-6.3)
 B.h8G=new A.r(8.2,-0.1,-7.85)
-B.da4=w([B.h4A,B.hk8,B.h8G],x.o)
+B.da3=w([B.h4A,B.hk8,B.h8G],x.o)
 B.eEs=new C.y(-4.5,10)
 B.eVe=new C.y(4.5,10)
 B.eYw=new C.y(-4.5,-10)
 B.eVa=new C.y(4.5,-10)
-B.dag=w([B.eEs,B.eVe,B.eYw,B.eVa],x.f)
-B.dah=w([-0.28,0.28],x.n)
+B.daf=w([B.eEs,B.eVe,B.eYw,B.eVa],x.f)
+B.dag=w([-0.28,0.28],x.n)
 B.dFC=new A.ic(-70,70,20,44)
 B.dFn=new A.ic(-110,-50,80,100)
 B.dFi=new A.ic(50,110,80,100)
 B.dFm=new A.ic(-110,-50,130,150)
 B.dFh=new A.ic(50,110,130,150)
-B.dau=w([B.dFC,B.dFn,B.dFi,B.dFm,B.dFh],x.T)
-B.daL=w([D.ay,D.av,D.be,D.mK,D.d5,D.c8,D.fd],x.O)
+B.dat=w([B.dFC,B.dFn,B.dFi,B.dFm,B.dFh],x.T)
+B.daK=w([D.ay,D.av,D.be,D.mK,D.d5,D.c8,D.fd],x.O)
 B.eNT=new C.y("back","Back wall")
 B.eYh=new C.y("left","Left wall")
 B.eQ9=new C.y("right","Right wall")
-B.dbc=w([B.eNT,B.eYh,B.eQ9],x.L)
-B.dbh=w(["dryer4","dryer3","range4","range3","washer"],x.s)
+B.dbb=w([B.eNT,B.eYh,B.eQ9],x.L)
+B.dbg=w(["dryer4","dryer3","range4","range3","washer"],x.s)
 B.ek5={black:0}
 B.K9=new C.de(B.ek5,1,x.M)
 B.bMV=new A.fm(51,"Black wire nut: HOT",B.K9,"The house black wire joins the fixture black wire.",!1,"hot")
@@ -29159,12 +29159,12 @@ B.eli={white:0}
 B.K8=new C.de(B.eli,1,x.M)
 B.bNq=new A.fm(52,"White wire nut: NEUTRAL",B.K8,"The house white wire joins the fixture white wire.",!1,"neutral")
 B.bMQ=new A.fm(53,"Green ground connection",B.AC,"The bare copper house ground joins the green fixture ground wire.",!1,"ground")
-B.dbo=w([B.bMV,B.bNq,B.bMQ],x.r)
+B.dbn=w([B.bMV,B.bNq,B.bMQ],x.r)
 B.eTV=new C.y(-34,-6)
 B.eBR=new C.y(30,10)
 B.eTw=new C.y(-10,24)
-B.dbt=w([B.eTV,B.eBR,B.eTw],x.f)
-B.dbB=w([y.O,y.x,y.R,"Fasten hot leg 1 from the panel (black) to the top LEFT screw.","Fasten hot leg 2 from the panel (red) to the top RIGHT screw.","Fasten hot leg 1 to the heater (black) to the bottom LEFT screw.","Fasten hot leg 2 to the heater (red) to the bottom RIGHT screw.",y.b,y.n],x.s)
+B.dbs=w([B.eTV,B.eBR,B.eTw],x.f)
+B.dbA=w([y.O,y.x,y.R,"Fasten hot leg 1 from the panel (black) to the top LEFT screw.","Fasten hot leg 2 from the panel (red) to the top RIGHT screw.","Fasten hot leg 1 to the heater (black) to the bottom LEFT screw.","Fasten hot leg 2 to the heater (red) to the bottom RIGHT screw.",y.b,y.n],x.s)
 B.bLn=new A.Ew("Oak",B.ym,"wood")
 B.bLp=new A.Ew("Dark wood",B.qp,"wood")
 B.ajW=new C.u(1,0.5529411764705883,0.5647058823529412,0.5882352941176471,D.q)
@@ -29182,9 +29182,9 @@ B.a5s=w([B.EV,B.acm,B.acn],x.d)
 B.f_y=new C.b5(-80,100,D.ay)
 B.f1U=new C.b5(80,100,D.be)
 B.f0L=new C.b5(-80,150,D.av)
-B.dcm=w([B.f_y,B.f1U,B.f0L],x.dV)
+B.dcl=w([B.f_y,B.f1U,B.f0L],x.dV)
 B.hDu=new A.pP(0,0,78,26)
-B.dcu=w([B.hDu],x.X)
+B.dct=w([B.hDu],x.X)
 B.el8={store:0,gasstation:1}
 B.fbH=new C.de(B.el8,2,x.M)
 B.by7=new A.zA("food","\ud83c\udf54","Food",B.fbH)
@@ -29201,24 +29201,24 @@ B.ejw={school:0,firestation:1,hq:2}
 B.faQ=new C.de(B.ejw,3,x.M)
 B.by8=new A.zA("letters","\u2709\ufe0f","Letters",B.faQ)
 B.S_=w([B.by7,B.by6,B.by9,B.by5,B.by8],C.as("O<zA>"))
-B.dcJ=w([y.O,y.x,y.F,"Fasten the black hot to a BRASS screw.","Fasten the green wire with the yellow stripe (the isolated ground, which runs all the way to the panel) to the GREEN screw with the orange triangle. The box itself is grounded with its own bare copper wire.",y.b,y.n],x.s)
-B.dcM=w(["Look round: the stack of sheets, the mud, the tape, the knife, the screw gun and the rest of the tools are on the floor.","Hang the ceiling first. Cut the 24 inch pieces to size with the Cutter before you hang them.","Hang the wall sheets, cutting the narrow ones.","Screw every sheet to the studs and joists with the Screw gun.","Cut the holes for the boxes, the door and the window with the Saw.","Put corner bead on the door and the window.","On each surface: mud (bed coat), tape, then mud twice more, waiting for each coat to dry.","Sand each surface smooth when the last coat is dry.","Prime every surface with the Roller. The room is finished."],x.s)
-B.dcR=w([-1000,-500,0,500,1000],x.n)
-B.ddQ=w([y.O,y.x,"Take the metal GROUND STRAP off: tap it. On a 4-wire cord the neutral must NOT touch the frame, because the green wire grounds the frame.","Fasten the green ground wire to the GREEN frame screw where the strap was.","Fasten the white neutral to the MIDDLE terminal.",y.A,y.d,y.b,y.n],x.s)
+B.dcI=w([y.O,y.x,y.F,"Fasten the black hot to a BRASS screw.","Fasten the green wire with the yellow stripe (the isolated ground, which runs all the way to the panel) to the GREEN screw with the orange triangle. The box itself is grounded with its own bare copper wire.",y.b,y.n],x.s)
+B.dcL=w(["Look round: the stack of sheets, the mud, the tape, the knife, the screw gun and the rest of the tools are on the floor.","Hang the ceiling first. Cut the 24 inch pieces to size with the Cutter before you hang them.","Hang the wall sheets, cutting the narrow ones.","Screw every sheet to the studs and joists with the Screw gun.","Cut the holes for the boxes, the door and the window with the Saw.","Put corner bead on the door and the window.","On each surface: mud (bed coat), tape, then mud twice more, waiting for each coat to dry.","Sand each surface smooth when the last coat is dry.","Prime every surface with the Roller. The room is finished."],x.s)
+B.dcQ=w([-1000,-500,0,500,1000],x.n)
+B.ddP=w([y.O,y.x,"Take the metal GROUND STRAP off: tap it. On a 4-wire cord the neutral must NOT touch the frame, because the green wire grounds the frame.","Fasten the green ground wire to the GREEN frame screw where the strap was.","Fasten the white neutral to the MIDDLE terminal.",y.A,y.d,y.b,y.n],x.s)
 B.hjW=new A.r(3,3.2,-7.85)
 B.hp5=new A.r(3,4,-7.85)
 B.ho7=new A.r(3,4.2,-7.4)
 B.h6W=new A.r(3,3.95,-7)
-B.ddT=w([B.hjW,B.hp5,B.ho7,B.h6W],x.o)
-B.ddV=w(["The sink leaks and there is water on the floor. Please fix the plumbing.","The toilet is not connected and the water is running everywhere. Help!","There is no water at my sink and the pipes are open. Can a plumber come?"],x.s)
+B.ddS=w([B.hjW,B.hp5,B.ho7,B.h6W],x.o)
+B.ddU=w(["The sink leaks and there is water on the floor. Please fix the plumbing.","The toilet is not connected and the water is running everywhere. Help!","There is no water at my sink and the pipes are open. Can a plumber come?"],x.s)
 B.Yj=new C.u(1,0.23137254901960785,0.3568627450980392,0.47843137254901963,D.q)
-B.de3=w([D.am,B.Yj,D.bK,D.bw],x.O)
+B.de2=w([D.am,B.Yj,D.bK,D.bw],x.O)
 B.fce=new A.t1("apple","\ud83c\udf4e","Apple","A little energy",3,0.12,0,0.1,!1)
 B.fcf=new A.t1("water","\ud83d\udca7","Water","Quenches your thirst",2,0,0,0.8,!1)
 B.fcg=new A.t1("juice","\ud83e\udd64","Juice","Some energy and a drink",4,0.18,0,0.5,!1)
 B.fcl=new A.t1("sandwich","\ud83e\udd6a","Sandwich","A good bit of energy",6,0.3,0,0,!1)
 B.fcd=new A.t1("meal","\ud83c\udf54","Burger meal","Lots of energy",10,0.55,0,0,!1)
-B.de6=w([B.fce,B.fcf,B.fcg,B.fcl,B.fcd],x.a_)
+B.de5=w([B.fce,B.fcf,B.fcg,B.fcl,B.fcd],x.a_)
 B.a8x=new A.XE("door",2,31.5,67.5,0,80.5)
 B.U0=new A.XE("window",1,40,76,36,72)
 B.zP=w([B.a8x,B.U0],C.as("O<XE>"))
@@ -29236,41 +29236,41 @@ B.eBV=new C.y(330,780)
 B.eEA=new C.y(660,780)
 B.eU2=new C.y(-500,940)
 B.eE2=new C.y(500,940)
-B.deJ=w([B.eU9,B.eTS,B.eBS,B.eEy,B.eUa,B.eTT,B.eBT,B.eEz,B.eUb,B.eTU,B.eBV,B.eEA,B.eU2,B.eE2],x.f)
+B.deI=w([B.eU9,B.eTS,B.eBS,B.eEy,B.eUa,B.eTT,B.eBT,B.eEz,B.eUb,B.eTU,B.eBV,B.eEA,B.eU2,B.eE2],x.f)
 B.iQ=w(["outlet","gfci","split","v240four","v240three","v240only","isolated","dryer4","dryer3","range4","range3","washer"],x.s)
 B.hkF=new A.r(6,0.2,0)
 B.hiE=new A.r(6,2.6,0)
 B.b__=new A.r(8.6,2.6,0)
-B.dff=w([B.hkF,B.hiE,B.b__],x.o)
+B.dfe=w([B.hkF,B.hiE,B.b__],x.o)
 B.v0=w([B.hm,B.p3,B.pZ,B.h7],x.o)
-B.dfL=w([D.c,D.dk,D.er,D.eU,D.bO,D.bL],x.O)
+B.dfK=w([D.c,D.dk,D.er,D.eU,D.bO,D.bL],x.O)
 B.eUi=new C.y(-7,-7)
 B.eF6=new C.y(7,-7)
 B.eUh=new C.y(-7,7)
 B.eF5=new C.y(7,7)
-B.dg_=w([B.eUi,B.eF6,B.eUh,B.eF5],x.f)
-B.dg1=w([-2.4,2.4],x.n)
-B.dg2=w([-0.5,0,0.5],x.n)
+B.dfZ=w([B.eUi,B.eF6,B.eUh,B.eF5],x.f)
+B.dg0=w([-2.4,2.4],x.n)
+B.dg1=w([-0.5,0,0.5],x.n)
 B.ao3=new A.fm(21,"Brass screw X: HOT",B.Eu,y.p,!1,"hot")
 B.ao_=new A.fm(22,"Brass screw Y: HOT",B.Eu,y.p,!1,"hot")
-B.dgd=w([B.uC,B.ao3,B.ao_],x.r)
-B.dgg=w([-1.2,1.2],x.n)
+B.dgc=w([B.uC,B.ao3,B.ao_],x.r)
+B.dgf=w([-1.2,1.2],x.n)
 B.hrF=new A.Qf("Black","Hot (line or switched)","Brass terminal","120 V branch circuit","Carries the power from the breaker. Treat it as live until it is tested dead.","Can be a traveler in a three-way switch, or a switched hot. Verify with a tester.")
 B.hrD=new A.Qf("Red","Hot (second hot or traveler)","Brass or the marked traveler terminal","Switch legs, travelers, fan and light controls","Often the switched wire to a fan or light, or a traveler.","Check the diagram: red can be a traveler or a second circuit.")
 B.hrC=new A.Qf("White","Neutral","Silver terminal","120 V branch circuit","The return path for the current. It can still be live if something is wrong.","In a switch loop a white wire can be re-marked as a hot. A white wire is not always neutral.")
 B.hrB=new A.Qf("Bare copper or green","Equipment ground","Green screw or the ground lead","Every grounded device","Not for current in normal use. It is the safety path if a fault happens.","Never use the neutral as a ground. Older homes may have no ground at all: that needs verification.")
 B.hrE=new A.Qf("Gray / blue / others","Depends on the installation","See the device diagram","Low voltage, control wires, other systems","Do not guess what a wire does from its color.","Colors and their meaning are not the same everywhere. REQUIRES VERIFICATION.")
-B.dgi=w([B.hrF,B.hrD,B.hrC,B.hrB,B.hrE],C.as("O<Qf>"))
+B.dgh=w([B.hrF,B.hrD,B.hrC,B.hrB,B.hrE],C.as("O<Qf>"))
 B.S7=w([-1.6,1.6],x.n)
 B.hrg=new A.iS("blackLine","Black \xb7 from the breaker",B.rG,D.c,"hot")
 B.hrw=new A.iS("blackLoad","Black \xb7 to the light",B.MT,D.c,"hot")
-B.dgr=w([B.hrg,B.hrw,B.re],x.d)
-B.dgK=w([0,10,22,36,52],x.n)
+B.dgq=w([B.hrg,B.hrw,B.re],x.d)
+B.dgJ=w([0,10,22,36,52],x.n)
 B.hDx=new A.pP(0,-60,130,26)
 B.hDC=new A.pP(1,80,56,22)
-B.dgL=w([B.hDx,B.hDC],x.X)
-B.dh9=w([D.bq,D.bi,D.ay,D.aH,D.bw],x.O)
-B.dhj=w([1.1,-1.1],x.n)
+B.dgK=w([B.hDx,B.hDC],x.X)
+B.dh8=w([D.bq,D.bi,D.ay,D.aH,D.bw],x.O)
+B.dhi=w([1.1,-1.1],x.n)
 B.b2J=new A.p9("lamp","Table lamp",11)
 B.b2P=new A.p9("toaster","Toaster",10)
 B.b2H=new A.p9("hairdryer","Hair dryer",9)
@@ -29281,7 +29281,7 @@ B.aBb=w([B.b2J,B.b2P,B.b2H,B.b2D,B.b2G,B.b2I],x.I)
 B.ekz={isoground:0}
 B.faI=new C.de(B.ekz,1,x.M)
 B.bNp=new A.fm(25,"Isolated-ground screw (green, orange triangle)",B.faI,"The dedicated ground wire goes on the green screw with the orange triangle. It does not touch the box or the strap.",!1,"ground")
-B.dhm=w([B.bNp,B.ao6,B.ao2],x.r)
+B.dhl=w([B.bNp,B.ao6,B.ao2],x.r)
 B.bhz=new C.u(1,0.9294117647058824,0.9019607843137255,0.8392156862745098,D.q)
 B.bfs=new C.u(1,0.9137254901960784,0.8274509803921568,0.8274509803921568,D.q)
 B.beB=new C.u(1,0.8352941176470589,0.8941176470588236,0.8156862745098039,D.q)
@@ -29294,23 +29294,23 @@ B.aSw=new C.de(B.ek4,2,x.M)
 B.bN4=new A.fm(21,"Brass screw (top)",B.aSw,y.v,!1,"hot")
 B.bMR=new A.fm(22,"Brass screw (bottom)",B.aSw,y.v,!1,"hot")
 B.ao0=new A.fm(25,"Green screw: GROUND",B.AC,y.Z,!1,"ground")
-B.di_=w([B.bN4,B.bMR,B.ao0],x.r)
+B.dhZ=w([B.bN4,B.bMR,B.ao0],x.r)
 B.eUk=new C.y(-80,90)
 B.eFk=new C.y(80,90)
 B.eUj=new C.y(-80,140)
 B.eFj=new C.y(80,140)
-B.diJ=w([B.eUk,B.eFk,B.eUj,B.eFj],x.f)
+B.diI=w([B.eUk,B.eFk,B.eUj,B.eFj],x.f)
 B.bNr=new A.fm(51,"Black wire nut: HOT",B.K9,"The house black wire joins the fan black wire.",!1,"hot")
 B.bMP=new A.fm(52,"White wire nut: NEUTRAL",B.K8,"The house white wire joins the fan white wire.",!1,"neutral")
 B.bNc=new A.fm(53,"Green ground connection",B.AC,"The bare copper house ground joins the green fan ground wire.",!1,"ground")
-B.diR=w([B.bNr,B.bMP,B.bNc],x.r)
+B.diQ=w([B.bNr,B.bMP,B.bNc],x.r)
 B.bem=new A.T9("bus",-575,-25,0,1)
 B.beo=new A.T9("police",-575,-25,854,5)
 B.ben=new A.T9("bus",25,575,850,3)
 B.bep=new A.T9("police",25,575,1704,6)
 B.ky=w([B.bem,B.beo,B.ben,B.bep],C.as("O<T9>"))
 B.anK=new A.rx(4,"deadOutlet")
-B.diZ=w([B.a1t,B.a1u,B.OD,B.OE,B.anK,B.a1x,B.a1y,B.a1z,B.a1A,B.a1B,B.a1v,B.a1w],C.as("O<rx>"))
+B.diY=w([B.a1t,B.a1u,B.OD,B.OE,B.anK,B.a1x,B.a1y,B.a1z,B.a1A,B.a1B,B.a1v,B.a1w],C.as("O<rx>"))
 B.f3j=new C.cu([0,560,240,7])
 B.f3k=new C.cu([0,560,300,9])
 B.a5E=w([B.f3j,B.f3k],C.as("O<+(F,F,F,H)>"))
@@ -29338,25 +29338,25 @@ B.hwe=new A.m7("cord4","\u26a1","Dryer cord, 4-wire hookup","Take the ground str
 B.hwl=new A.m7("ptrap","\ud83e\udea0","Sink drain (P-trap)","Build a drain with a water seal",D.co)
 B.hwd=new A.m7("faucet","\ud83d\udeb0","Faucet supply lines","Hot left, cold right",D.c0)
 B.hw9=new A.m7("house","\ud83c\udfd7\ufe0f","Build and fix a house","Stage by stage, then repair",D.bp)
-B.djj=w([B.hwn,B.hwf,B.hwg,B.hwo,B.hw8,B.hwh,B.hwt,B.hwr,B.hwi,B.hwb,B.hwp,B.hwq,B.hwa,B.hwk,B.hwc,B.hwm,B.hwj,B.hwu,B.hw7,B.hws,B.hwe,B.hwl,B.hwd,B.hw9],C.as("O<m7>"))
+B.dji=w([B.hwn,B.hwf,B.hwg,B.hwo,B.hw8,B.hwh,B.hwt,B.hwr,B.hwi,B.hwb,B.hwp,B.hwq,B.hwa,B.hwk,B.hwc,B.hwm,B.hwj,B.hwu,B.hw7,B.hws,B.hwe,B.hwl,B.hwd,B.hw9],C.as("O<m7>"))
 B.hru=new A.iS("always","Black \xb7 always hot (from the panel)",B.rG,D.c,"hot")
 B.hro=new A.iS("switched","Red \xb7 switched hot (from the wall switch)",B.vX,D.c,"hot")
-B.djp=w([B.re,B.EV,B.hru,B.hro],x.d)
-B.djt=w([y.O,"Find the LINE and LOAD screws. LOAD is covered with yellow tape. Leave it covered unless you feed another outlet.",y.R,"Fasten the white wire to the silver LINE screw.","Fasten the black wire to the brass LINE screw.","Push the GFCI into the box and put the plate on.","Turn the power on, press RESET, then press TEST. It must click off."],x.s)
-B.djw=w([y.O,y.x,y.R,"Fasten the black wire (power in, or to the light) to the COMMON screw: the odd-coloured one.","Fasten the first traveler (red) to a TRAVELER screw.","Fasten the second traveler (white wire taped black) to the other TRAVELER screw.",y.b,y.n],x.s)
+B.djo=w([B.re,B.EV,B.hru,B.hro],x.d)
+B.djs=w([y.O,"Find the LINE and LOAD screws. LOAD is covered with yellow tape. Leave it covered unless you feed another outlet.",y.R,"Fasten the white wire to the silver LINE screw.","Fasten the black wire to the brass LINE screw.","Push the GFCI into the box and put the plate on.","Turn the power on, press RESET, then press TEST. It must click off."],x.s)
+B.djv=w([y.O,y.x,y.R,"Fasten the black wire (power in, or to the light) to the COMMON screw: the odd-coloured one.","Fasten the first traveler (red) to a TRAVELER screw.","Fasten the second traveler (white wire taped black) to the other TRAVELER screw.",y.b,y.n],x.s)
 B.hDv=new A.pP(0,0,80,26)
 B.hDE=new A.pP(1,90,56,22)
-B.djQ=w([B.hDv,B.hDE],x.X)
-B.dk_=w(["car","ambulance","firetruck"],x.s)
-B.dk0=w([y.O,y.x,"This outlet has its own 20 amp breaker and 12 gauge wire (a yellow cable): the washer must not share its circuit with anything else. The T-shaped slot tells you it takes both 15 and 20 amp plugs. In a laundry area the new code asks for GFCI protection, from a GFCI breaker or a GFCI outlet before it.",y.R,y.F,"Fasten the black hot to a BRASS screw.",y.b,y.n],x.s)
+B.djP=w([B.hDv,B.hDE],x.X)
+B.djZ=w(["car","ambulance","firetruck"],x.s)
+B.dk_=w([y.O,y.x,"This outlet has its own 20 amp breaker and 12 gauge wire (a yellow cable): the washer must not share its circuit with anything else. The T-shaped slot tells you it takes both 15 and 20 amp plugs. In a laundry area the new code asks for GFCI protection, from a GFCI breaker or a GFCI outlet before it.",y.R,y.F,"Fasten the black hot to a BRASS screw.",y.b,y.n],x.s)
 B.dFB=new A.ic(-62,62,6,46)
 B.dFo=new A.ic(-117,-73,149,171)
 B.dFy=new A.ic(-57,-13,164,186)
 B.dFj=new A.ic(73,117,159,181)
 B.dFb=new A.ic(120,144,140,160)
 B.dF9=new A.ic(108,142,48,60)
-B.dk5=w([B.dFB,B.dFo,B.dFy,B.dFj,B.dFb,B.dF9],x.T)
-B.dk9=w([0.1,8.05],x.n)
+B.dk4=w([B.dFB,B.dFo,B.dFy,B.dFj,B.dFb,B.dF9],x.T)
+B.dk8=w([0.1,8.05],x.n)
 B.h7_=new A.r(1000,900,1500)
 B.h5r=new A.r(0,200,0)
 B.aRb=new C.y(B.h7_,B.h5r)
@@ -29402,15 +29402,15 @@ B.eHj=new C.y(B.hmu,B.hlu)
 B.h8K=new A.r(200,170,1300)
 B.h5F=new A.r(0,230,150)
 B.eXY=new C.y(B.h8K,B.h5F)
-B.dkp=w([B.aRb,B.eOa,B.eK8,B.eFJ,B.eT0,B.eRZ,B.eW0,B.eYd,B.eUz,B.eKK,B.eJk,B.eYb,B.eNB,B.eHj,B.eXY,B.aRb],x.dt)
+B.dko=w([B.aRb,B.eOa,B.eK8,B.eFJ,B.eT0,B.eRZ,B.eW0,B.eYd,B.eUz,B.eKK,B.eJk,B.eYb,B.eNB,B.eHj,B.eXY,B.aRb],x.dt)
 B.hgj=new A.r(-0.35,11,-3.4)
 B.hec=new A.r(-0.35,3.2,-3.2)
 B.hiN=new A.r(-0.35,2.2,-1.9)
 B.hc1=new A.r(-0.35,0.7,-1.5)
-B.dkq=w([B.hgj,B.hec,B.hiN,B.hc1],x.o)
+B.dkp=w([B.hgj,B.hec,B.hiN,B.hc1],x.o)
 B.hnW=new A.r(5.2,7.5,-7.85)
 B.hiz=new A.r(5.2,4,-7.85)
-B.dkw=w([B.hnW,B.hiz],x.o)
+B.dkv=w([B.hnW,B.hiz],x.o)
 B.eTH=new C.y(-1,"NGMY")
 B.eB_=new C.y(1,"ELEVATOR")
 B.dkW=w([B.eTH,B.eB_],x.d6)
@@ -29459,11 +29459,11 @@ B.bNd=new A.fm(22,"OUT screw (bottom right)",B.aSB,y.e,!1,"hot")
 B.dmy=w([B.uC,B.bMT,B.bNk,B.bNb,B.bNd],x.r)
 B.dmI=w(["city","billboards","edges","houses","hospital","traffic"],x.s)
 B.dmU=w(["Look at the pieces: the tailpiece, the P-trap and the trap arm. Pick the tailpiece first and tap its glowing outline under the sink.","Pick the P-trap (the U-shaped bend) and tap its glowing outline. It joins the tailpiece.","Pick the trap arm and tap its outline. It joins the trap to the wall drain.","Slide each slip nut up to its joint and hand tighten it: tap the nuts.","Run the water and look for leaks. The U-bend keeps a plug of water that blocks sewer gas."],x.s)
-B.fR1=new C.B("\u2728",null,D.aaN,null,null,null,null,null,null,null,null,null)
+B.fR0=new C.B("\u2728",null,D.aaN,null,null,null,null,null,null,null,null,null)
 B.h0B=new C.B("Nobody needs help right now.",null,D.fD,null,D.K,null,null,null,null,null,null,null)
 B.fAQ=new C.G(!0,D.aT,null,null,null,null,13,null,null,null,null,null,1.4,null,null,null,null,null,null,null,null,null,null,null,null,null)
 B.fTs=new C.B("Everybody's wiring and plumbing works. Keep an eye on food and health: things break when you least expect it.",null,B.fAQ,null,D.K,null,null,null,null,null,null,null)
-B.dnj=w([B.fR1,D.U,B.h0B,D.ax,B.fTs],x.p)
+B.dnj=w([B.fR0,D.U,B.h0B,D.ax,B.fTs],x.p)
 B.dnq=w(["road","roundabout","roadturn","roadtee","roadcross","house2","bighouse","billboard","tower","hq","store","gasstation","dmv","ubstation","townsign","cornersign","adboard","shop","hospital","firestation","school","car","firetruck","ambulance","dog","cat","cow","sheep","chicken","horse","tree","pine","bush","flowers","fence","lamppost","bench","pond","swing","shed","doghouse"],x.s)
 B.eTA=new C.y(-1150,80)
 B.eAy=new C.y(1150,80)
@@ -29703,8 +29703,8 @@ B.c5B=new A.jY("Switches","A switch cuts the hot wire only. The neutral goes str
 B.c5C=new A.jY("GFCI","A GFCI outlet watches the current going out and coming back. If a little leaks (through water or a person) it cuts the power in a fraction of a second.")
 B.c5a=new A.jY("Ceiling fans","A fan shakes and is heavy. It needs a box that says fan rated, fixed to the joist, not a plain light box.")
 B.c5c=new A.jY("Heights","Outlets sit about 16 inches from the floor. Switches sit about 48 inches up, where your hand falls.")
-B.dhp=w([B.c5t,B.c5A,B.c5n,B.c5h,B.c5v,B.c5B,B.c5C,B.c5a,B.c5c],x.e)
-B.c5H=new A.Nx("Wiring basics","\u26a1",D.bi,B.dhp)
+B.dho=w([B.c5t,B.c5A,B.c5n,B.c5h,B.c5v,B.c5B,B.c5C,B.c5a,B.c5c],x.e)
+B.c5H=new A.Nx("Wiring basics","\u26a1",D.bi,B.dho)
 B.c59=new A.jY("Hot left, cold right","On a faucet, hot is on the left and cold on the right. Hot lines are marked red and cold lines blue.")
 B.c5m=new A.jY("The P-trap","The curved pipe under a sink always holds a little water. That water seal stops sewer gas coming up the drain.")
 B.c5x=new A.jY("Shut-off valves","Every sink and toilet has its own small valve, so you can stop the water to one fixture without turning off the whole house.")
@@ -29719,8 +29719,8 @@ B.c5p=new A.jY("Drilling studs","Holes for cable go through the middle of the st
 B.c5g=new A.jY("Drywall","A sheet is 4 feet wide, so its edges land on studs 48 inches apart. Screws go into studs only, just under the paper.")
 B.c5j=new A.jY("Taping and mud","Seams get paper tape and three thin coats of joint compound, sanded smooth between coats, then primer and paint.")
 B.c5y=new A.jY("Order of a build","Frame, run the pipes and wires (rough-in), inspect, hang drywall, finish it, paint, then fit the fixtures and devices.")
-B.d1y=w([B.c5b,B.c5p,B.c5g,B.c5j,B.c5y],x.e)
-B.c5D=new A.Nx("Framing and walls","\ud83c\udfe0",D.dX,B.d1y)
+B.d1x=w([B.c5b,B.c5p,B.c5g,B.c5j,B.c5y],x.e)
+B.c5D=new A.Nx("Framing and walls","\ud83c\udfe0",D.dX,B.d1x)
 B.c5k=new A.jY("Voltage tester","A pen that glows or beeps near live wires. Test it on a known live outlet first, so you know it works.")
 B.c5q=new A.jY("Wire strippers","Strip the plastic off without nicking the copper. A nick weakens the wire.")
 B.c5w=new A.jY("Adjustable wrench","For nuts on valves and hoses. Hold the fitting steady with a second wrench so you do not twist the pipe.")
@@ -29881,34 +29881,34 @@ B.aIB=new C.bu(B.ej8,["Look: tap a sheet, a hole or a surface to learn about it.
 B.dDA=new C.cZ([25,"ground",23,"neutral",21,"hot"],x.v)
 B.dDB=new C.cZ([25,"isoground",23,"neutral",21,"hot"],x.v)
 B.ej_={outlet:0,switch:1,light:2,fan:3,gfci:4}
-B.dcz=w(["Silver","Brass","Green"],x.s)
-B.fm1=new A.vw("On a standard receptacle, which terminal does the hot wire go on?",B.dcz,1,"Brass is the hot side. Silver is neutral and green is the ground.")
+B.dcy=w(["Silver","Brass","Green"],x.s)
+B.fm1=new A.vw("On a standard receptacle, which terminal does the hot wire go on?",B.dcy,1,"Brass is the hot side. Silver is neutral and green is the ground.")
 B.cNK=w(["Yes, it works","No: reversed polarity leaves live parts that should be dead","Yes if there is a ground"],x.s)
 B.fm_=new A.vw("The outlet works with hot and neutral swapped. Is it safe?",B.cNK,1,"Working is not the same as safe. Reversed polarity energizes the wrong parts.")
-B.d62=w(["Yes","No, never","Only in old houses"],x.s)
-B.flW=new A.vw("May the neutral be used as the equipment ground?",B.d62,1,"The ground is a separate safety path. The neutral carries current in normal use.")
-B.di1=w([B.fm1,B.fm_,B.flW],x.J)
+B.d61=w(["Yes","No, never","Only in old houses"],x.s)
+B.flW=new A.vw("May the neutral be used as the equipment ground?",B.d61,1,"The ground is a separate safety path. The neutral carries current in normal use.")
+B.di0=w([B.fm1,B.fm_,B.flW],x.J)
 B.ca5=w(["The hot to the light","The neutral","The ground"],x.s)
 B.fm2=new A.vw("A single-pole switch opens and closes which conductor?",B.ca5,0,"The switch breaks the hot conductor to the load.")
-B.d3z=w(["Yes","No, never","If the wire is thick"],x.s)
-B.fm3=new A.vw("May the ground wire be used to carry current to the light?",B.d3z,1,"The equipment ground is only for safety.")
-B.dbv=w(["Yes","No: never assume it does","Only new houses"],x.s)
-B.flX=new A.vw("Does every switch box have a neutral?",B.dbv,1,"Many switch boxes have no neutral. Smart switches need to be chosen for that.")
+B.d3y=w(["Yes","No, never","If the wire is thick"],x.s)
+B.fm3=new A.vw("May the ground wire be used to carry current to the light?",B.d3y,1,"The equipment ground is only for safety.")
+B.dbu=w(["Yes","No: never assume it does","Only new houses"],x.s)
+B.flX=new A.vw("Does every switch box have a neutral?",B.dbu,1,"Many switch boxes have no neutral. Smart switches need to be chosen for that.")
 B.dxO=w([B.fm2,B.fm3,B.flX],x.J)
 B.dpg=w(["Yes","No: the wires, the ground and the support must be right","Only with a switch"],x.s)
 B.fm0=new A.vw("Does a light that turns on prove the fixture is wired safely?",B.dpg,1,"A fixture can light up with an unsafe connection.")
 B.doi=w(["Its wires","A box or mount rated for its weight","Tape"],x.s)
 B.fm4=new A.vw("A fixture must hang from:",B.doi,1,"The box carries the weight. The wires never do.")
-B.dbW=w([B.fm0,B.fm4],x.J)
-B.dd0=w(["Any ceiling box","Rated for a fan","Plastic only"],x.s)
-B.flZ=new A.vw("A ceiling fan needs a box that is:",B.dd0,1,"A fan shakes and is heavy. A plain light box can let it fall.")
+B.dbV=w([B.fm0,B.fm4],x.J)
+B.dd_=w(["Any ceiling box","Rated for a fan","Plastic only"],x.s)
+B.flZ=new A.vw("A ceiling fan needs a box that is:",B.dd_,1,"A fan shakes and is heavy. A plain light box can let it fall.")
 B.dsl=w(["Yes","No: support, ground and wiring must all be right","Yes if it is quiet"],x.s)
 B.flY=new A.vw("The fan spins. Is the installation safe?",B.dsl,1,"A spinning fan says nothing about the box, the ground or the connections.")
-B.dce=w([B.flZ,B.flY],x.J)
-B.d7K=w(["LINE","LOAD","Either"],x.s)
-B.flV=new A.vw("On a GFCI, power from the breaker goes on:",B.d7K,0,"LINE is the supply. LOAD feeds outlets further down the line.")
+B.dcd=w([B.flZ,B.flY],x.J)
+B.d7J=w(["LINE","LOAD","Either"],x.s)
+B.flV=new A.vw("On a GFCI, power from the breaker goes on:",B.d7J,0,"LINE is the supply. LOAD feeds outlets further down the line.")
 B.cSs=w([B.flV],x.J)
-B.aIC=new C.bu(B.ej_,[B.di1,B.dxO,B.dbW,B.dce,B.cSs],C.as("bu<n,ai<vw>>"))
+B.aIC=new C.bu(B.ej_,[B.di0,B.dxO,B.dbV,B.dcd,B.cSs],C.as("bu<n,ai<vw>>"))
 B.ejM={house2:0,bighouse:1,shop:2,billboard:3,crate:4,car:5,tree:6,bench:7,tower:8,hq:9,store:10,gasstation:11,cornersign:12}
 B.dDE=new C.bu(B.ejM,[40,80,70,15,4,25,5,4,120,200,90,90,30],C.as("bu<n,H>"))
 B.bKJ=new A.uS("The living room has no power at all.","The living room breaker is sitting in the middle (orange). It has tripped. Flip it fully OFF and ON again, by hand.","hand","Breaker reset. The living room has power again.",72,0,"")
@@ -30174,8 +30174,8 @@ B.eyt=new A.aah(null,null)
 B.bme=new C.u(1,0.30980392156862746,0.7019607843137254,0.9647058823529412,D.q)
 B.buS=new C.u(1,0.11372549019607843,0.37254901960784315,0.7686274509803922,D.q)
 B.brx=new C.u(1,0.043137254901960784,0.16470588235294117,0.4196078431372549,D.q)
-B.d5Y=w([B.bme,B.buS,B.brx],x.O)
-B.ezc=new C.bY(Af.B9,0.5,D.x,null,0,B.d5Y,null,null)
+B.d5X=w([B.bme,B.buS,B.brx],x.O)
+B.ezc=new C.bY(Af.B9,0.5,D.x,null,0,B.d5X,null,null)
 B.bv5=new C.u(1,0.8392156862745098,0.9019607843137255,0.9176470588235294,D.q)
 B.ezU=new C.y(B.bv5,B.YT)
 B.eA2=new C.y(0,120)
@@ -30257,34 +30257,34 @@ B.aUM=new C.G(!0,D.bW,null,null,null,null,11,D.u,null,2,null,null,null,null,null
 B.fX6=new C.B("WIRES",null,B.aUM,null,D.K,null,null,null,null,null,null,null)
 B.bIA=new C.bz(1,D.bc,B.fX6,null)
 B.feG=new C.a5(56,null,null,null)
-B.fRh=new C.B("DIAGRAM",null,B.aUM,null,D.K,null,null,null,null,null,null,null)
-B.bJt=new C.bz(1,D.bc,B.fRh,null)
+B.fRg=new C.B("DIAGRAM",null,B.aUM,null,D.K,null,null,null,null,null,null,null)
+B.bJt=new C.bz(1,D.bc,B.fRg,null)
 B.dpW=w([B.bIA,B.feG,B.bJt],x.p)
 B.f8C=new C.c6(D.aL,D.e,D.i,D.l,null,D.p,null,0,B.dpW,null)
 B.fI4=new C.B("\u260e",null,D.pU,null,null,null,null,null,null,null,null,null)
 B.bdH=new C.qF(B.fI4,D.ay,null,24,null)
 B.fKB=new C.B("City office",null,D.di,null,null,null,null,null,null,null,null,null)
-B.dfk=w([B.bdH,D.bd,B.fKB],x.p)
-B.f8Q=new C.c6(D.aL,D.e,D.i,D.l,null,D.p,null,0,B.dfk,null)
+B.dfj=w([B.bdH,D.bd,B.fKB],x.p)
+B.f8Q=new C.c6(D.aL,D.e,D.i,D.l,null,D.p,null,0,B.dfj,null)
 B.bXD=new C.ae(D.PA,26,D.bT,null,null,null)
 B.fY2=new C.B("Hallway tour",null,D.hl,null,null,null,null,null,null,null,null,null)
 B.fJ3=new C.B("Just the hall and its big TVs, 45 seconds",null,D.AR,null,null,null,null,null,null,null,null,null)
 B.dxz=w([B.fY2,B.fJ3],x.p)
 B.bwD=new C.fj(D.ah,D.e,D.i,D.E,null,D.p,null,0,B.dxz,null)
 B.bJ9=new C.bz(1,D.bc,B.bwD,null)
-B.d1E=w([B.bXD,D.bd,B.bJ9,A8.PQ],x.p)
-B.f8T=new C.c6(D.aL,D.e,D.i,D.l,null,D.p,null,0,B.d1E,null)
+B.d1D=w([B.bXD,D.bd,B.bJ9,A8.PQ],x.p)
+B.f8T=new C.c6(D.aL,D.e,D.i,D.l,null,D.p,null,0,B.d1D,null)
 B.bVg=new C.ae(D.hx,30,D.c,null,null,null)
 B.h_3=new C.B("Play the tour",null,D.jP,null,null,null,null,null,null,null,null,null)
-B.daV=w([B.bVg,D.bm,B.h_3],x.p)
-B.f8Z=new C.c6(D.aL,D.bb,D.i,D.l,null,D.p,null,0,B.daV,null)
+B.daU=w([B.bVg,D.bm,B.h_3],x.p)
+B.f8Z=new C.c6(D.aL,D.bb,D.i,D.l,null,D.p,null,0,B.daU,null)
 B.bZU=new C.ae(D.mh,17,D.bi,null,null,null)
 B.aUY=new C.G(!0,D.bi,null,null,null,null,12,D.I,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 B.fSS=new C.B("Hint",null,B.aUY,null,null,null,null,null,null,null,null,null)
 B.fpT=new C.G(!0,D.aD,null,null,null,null,10.5,D.V,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 B.fMf=new C.B("\u22122 \u2b50",null,B.fpT,null,null,null,null,null,null,null,null,null)
-B.d2i=w([B.bZU,D.e4,B.fSS,D.e4,B.fMf],x.p)
-B.f90=new C.c6(D.aL,D.e,D.Q,D.l,null,D.p,null,0,B.d2i,null)
+B.d2h=w([B.bZU,D.e4,B.fSS,D.e4,B.fMf],x.p)
+B.f90=new C.c6(D.aL,D.e,D.Q,D.l,null,D.p,null,0,B.d2h,null)
 B.r2=new A.Kb(0,"correct")
 B.aRN=new A.Kb(1,"incorrect")
 B.ts=new A.Kb(2,"unsafe")
@@ -30399,15 +30399,15 @@ B.fNI=new C.B("Job over",null,B.aVx,null,null,null,null,null,null,null,null,null
 B.fNX=new C.B("Got it",null,D.nf,null,null,null,null,null,null,null,null,null)
 B.fNZ=new C.B("Three shocks. In real life you switch the breaker off and test the wires, every time. Try another call.",null,D.xm,null,null,null,null,null,null,null,null,null)
 B.fO4=new C.B("Learn the trades",null,Y.vw,null,null,null,null,null,null,null,null,null)
-B.fOS=new C.B("New call",null,null,null,null,null,null,null,null,null,null,null)
-B.fOX=new C.B("Job done! \ud83c\udf89",null,M.AP,null,null,null,null,null,null,null,null,null)
-B.fP0=new C.B("Wire guide",null,null,null,null,null,null,null,null,null,null,null)
-B.fQb=new C.B("Next call",null,null,null,null,null,null,null,null,null,null,null)
-B.fQz=new C.B("Plug in",null,D.di,null,null,null,null,null,null,null,null,null)
-B.fQZ=new C.B("Look around",null,null,null,null,null,null,null,null,null,null,null)
-B.fRk=new C.B("\ud83d\udef5",null,D.xj,null,null,null,null,null,null,null,null,null)
-B.fRz=new C.B("The customer wants:",null,D.VD,null,null,null,null,null,null,null,null,null)
-B.fRK=new C.B('Tip: pick "Look and test" and tap things to find out what is wrong. Then pick the right tool. Turn the breaker off (hand) before you touch any wire.',null,D.KA,null,null,null,null,null,null,null,null,null)
+B.fOR=new C.B("New call",null,null,null,null,null,null,null,null,null,null,null)
+B.fOW=new C.B("Job done! \ud83c\udf89",null,M.AP,null,null,null,null,null,null,null,null,null)
+B.fP_=new C.B("Wire guide",null,null,null,null,null,null,null,null,null,null,null)
+B.fQa=new C.B("Next call",null,null,null,null,null,null,null,null,null,null,null)
+B.fQy=new C.B("Plug in",null,D.di,null,null,null,null,null,null,null,null,null)
+B.fQY=new C.B("Look around",null,null,null,null,null,null,null,null,null,null,null)
+B.fRj=new C.B("\ud83d\udef5",null,D.xj,null,null,null,null,null,null,null,null,null)
+B.fRy=new C.B("The customer wants:",null,D.VD,null,null,null,null,null,null,null,null,null)
+B.fRJ=new C.B('Tip: pick "Look and test" and tap things to find out what is wrong. Then pick the right tool. Turn the breaker off (hand) before you touch any wire.',null,D.KA,null,null,null,null,null,null,null,null,null)
 B.fur=new C.G(!0,D.aD,null,null,null,null,11.5,D.I,null,1.1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 B.fS1=new C.B("INCOMING CALL",null,B.fur,null,null,null,null,null,null,null,null,null)
 B.fS6=new C.B("Elevator",null,D.fC,null,null,null,null,null,null,null,null,null)
@@ -31773,8 +31773,8 @@ B.hsR=new A.Qn("lights","Lights",D.mh,B.cnz)
 B.huP=new A.D7("outlet","Outlet box",N.Pf)
 B.huz=new A.D7("switch","Switch box",E.pv)
 B.huB=new A.D7("ceiling","Ceiling box",D.po)
-B.d6T=w([B.huP,B.huz,B.huB],x.aM)
-B.hsS=new A.Qn("boxes","Boxes",N.Pf,B.d6T)
+B.d6S=w([B.huP,B.huz,B.huB],x.aM)
+B.hsS=new A.Qn("boxes","Boxes",N.Pf,B.d6S)
 B.eTK=new C.y(-20,46)
 B.hu_=new A.AX(B.eTK,0,2.4,"Having the drink",!0,!1,!1,"")
 B.eBY=new C.y(34,62)
@@ -31806,13 +31806,13 @@ for(v=0;v<2;++v){u=v*9
 D.d.v(s,C.a([A.h5T(v,175,u),A.h5T(v,612,u+14),A.h5T(v,1013,u+7)],t))}return s})
 w($,"iCw","h53",()=>C.a([A.hvc(-80,80,400,565),A.hvc(-80,80,715,885)],C.as("O<byj>")))
 w($,"iv3","aSt",()=>A.hLM())
-w($,"iCW","hJQ",()=>{var v=C.a([A.oA("Wire a standard 120 volt receptacle: black to brass, white to silver, bare copper to green.",B.Sv,B.dv3,"outlet","",!0,B.IZ,B.d0W,!1,"Wall outlet",new A.fI5()),A.oA("A single-pole switch breaks the hot wire to the light: two black wires go on the two brass screws.",B.dgr,B.di_,"switch","",!0,B.IZ,B.d_j,!1,"Light switch",new A.fI6()),A.oA("A GFCI protects you near water. Power comes in on LINE. The LOAD screws (covered with tape) feed other outlets.",B.Sv,B.dl0,"gfci","",!0,B.IZ,B.djt,!1,"GFCI outlet",new A.fI7()),A.oA("Join the house wires to the fixture wires with wire nuts: black to black, white to white, ground to ground.",B.Sv,B.dbo,"light","",!0,B.IZ,B.dwK,!1,"Ceiling light",new A.fI8()),A.oA("A fan hangs from a strong fan-rated box. Join black, white and ground with wire nuts, then fasten the canopy.",B.Sv,B.diR,"fan","",!0,B.IZ,B.d7d,!1,"Ceiling fan",new A.fI9())],C.as("O<MY>"))
+w($,"iCW","hJQ",()=>{var v=C.a([A.oA("Wire a standard 120 volt receptacle: black to brass, white to silver, bare copper to green.",B.Sv,B.dv3,"outlet","",!0,B.IZ,B.d0V,!1,"Wall outlet",new A.fI5()),A.oA("A single-pole switch breaks the hot wire to the light: two black wires go on the two brass screws.",B.dgq,B.dhZ,"switch","",!0,B.IZ,B.d_j,!1,"Light switch",new A.fI6()),A.oA("A GFCI protects you near water. Power comes in on LINE. The LOAD screws (covered with tape) feed other outlets.",B.Sv,B.dl0,"gfci","",!0,B.IZ,B.djs,!1,"GFCI outlet",new A.fI7()),A.oA("Join the house wires to the fixture wires with wire nuts: black to black, white to white, ground to ground.",B.Sv,B.dbn,"light","",!0,B.IZ,B.dwK,!1,"Ceiling light",new A.fI8()),A.oA("A fan hangs from a strong fan-rated box. Join black, white and ground with wire nuts, then fasten the canopy.",B.Sv,B.diQ,"fan","",!0,B.IZ,B.d7c,!1,"Ceiling fan",new A.fI9())],C.as("O<MY>"))
 D.d.v(v,$.h59())
 return v})
-w($,"iCY","h59",()=>{var v="switch",u=C.a([A.oA("Breaks BOTH hot legs of a 240 volt circuit at once: water heaters and baseboard heat.",B.dzG,B.c9S,"switch2p",v,!0,B.dC9,B.dbB,!0,"Double-pole switch (240 V)",new A.fIa()),A.oA("One light, two switches. One COMMON screw and two TRAVELER screws; it pairs with a second three-way.",B.dsW,B.d0F,"switch3",v,!0,B.dCr,B.djw,!0,"Three-way switch",new A.fIb()),A.oA("Sits in the middle of two three-way switches: two traveler wires in on one side, two out on the other.",B.dy5,B.dmy,"switch4",v,!0,B.dCa,B.drK,!0,"Four-way switch",new A.fIc()),A.oA("Needs a NEUTRAL wire in the box as well: hot in, hot out to the light, neutral and ground.",B.d5X,B.d8S,"switchsmart",v,!0,B.dCs,B.d6e,!0,"Smart, motion or timer switch",new A.fId()),A.oA("Two switches in one device: one hot feed is split between them, and two separate lights come out.",B.cOt,B.dpX,"switchcombo",v,!0,B.dEa,B.cBu,!0,"Combination (double) switch",new A.fIe()),A.oA("The tab between the brass screws is broken off: the top half is switched, the bottom half is always on.",B.djp,B.cAS,"split","outlet",!0,B.dCt,B.doT,!0,"Split (half-switched) outlet",new A.fIf()),A.oA("Two hots, a neutral and a ground: the dryer 14-30, and the range and car charger 14-50.",B.a6m,B.d4z,"v240four","nema1430",!0,B.a6U,B.cST,!0,"4-wire 240 V outlet (dryer, range, EV)",new A.fIg()),A.oA("Two hots and a neutral, with no separate ground: the old 10-30 and 10-50, from before 1996.",B.a5s,B.dyB,"v240three","nema1030",!1,B.a70,B.dxN,!0,"3-wire 240 V outlet (old dryer or range)",new A.fIh()),A.oA("Two hots and a ground, and no neutral at all: the 6-series outlets.",B.dwp,B.dgd,"v240only","nema620",!0,B.dCI,B.dv9,!0,"240 V only outlet (window AC, welder)",new A.fIi()),A.oA("Hot and neutral as usual, but the ground goes on its own wire straight back to the panel: shops and offices.",B.dyp,B.dhm,"isolated","outlet",!0,B.dDB,B.dcJ,!0,"Isolated-ground outlet",new A.fIj())],C.as("O<MY>"))
+w($,"iCY","h59",()=>{var v="switch",u=C.a([A.oA("Breaks BOTH hot legs of a 240 volt circuit at once: water heaters and baseboard heat.",B.dzG,B.c9S,"switch2p",v,!0,B.dC9,B.dbA,!0,"Double-pole switch (240 V)",new A.fIa()),A.oA("One light, two switches. One COMMON screw and two TRAVELER screws; it pairs with a second three-way.",B.dsW,B.d0E,"switch3",v,!0,B.dCr,B.djv,!0,"Three-way switch",new A.fIb()),A.oA("Sits in the middle of two three-way switches: two traveler wires in on one side, two out on the other.",B.dy5,B.dmy,"switch4",v,!0,B.dCa,B.drK,!0,"Four-way switch",new A.fIc()),A.oA("Needs a NEUTRAL wire in the box as well: hot in, hot out to the light, neutral and ground.",B.d5W,B.d8R,"switchsmart",v,!0,B.dCs,B.d6d,!0,"Smart, motion or timer switch",new A.fId()),A.oA("Two switches in one device: one hot feed is split between them, and two separate lights come out.",B.cOt,B.dpX,"switchcombo",v,!0,B.dEa,B.cBu,!0,"Combination (double) switch",new A.fIe()),A.oA("The tab between the brass screws is broken off: the top half is switched, the bottom half is always on.",B.djo,B.cAS,"split","outlet",!0,B.dCt,B.doT,!0,"Split (half-switched) outlet",new A.fIf()),A.oA("Two hots, a neutral and a ground: the dryer 14-30, and the range and car charger 14-50.",B.a6m,B.d4y,"v240four","nema1430",!0,B.a6U,B.cST,!0,"4-wire 240 V outlet (dryer, range, EV)",new A.fIg()),A.oA("Two hots and a neutral, with no separate ground: the old 10-30 and 10-50, from before 1996.",B.a5s,B.dyB,"v240three","nema1030",!1,B.a70,B.dxN,!0,"3-wire 240 V outlet (old dryer or range)",new A.fIh()),A.oA("Two hots and a ground, and no neutral at all: the 6-series outlets.",B.dwp,B.dgc,"v240only","nema620",!0,B.dCI,B.dv9,!0,"240 V only outlet (window AC, welder)",new A.fIi()),A.oA("Hot and neutral as usual, but the ground goes on its own wire straight back to the panel: shops and offices.",B.dyp,B.dhl,"isolated","outlet",!0,B.dDB,B.dcI,!0,"Isolated-ground outlet",new A.fIj())],C.as("O<MY>"))
 D.d.v(u,$.hJP())
 return u})
-w($,"iCR","hJP",()=>C.a([A.oA("The dryer outlet of every new house: 30 amp, 240 volts. Two hots (X, Y), a neutral (W) and a separate ground (G).",B.a6m,B.aC2,"dryer4","nema1430",!0,B.a6U,B.dp3,!0,"Dryer outlet, 4-wire (NEMA 14-30)",new A.fHZ()),A.oA("The dryer outlet of older houses (before 1996): 30 amp, 240 volts. Two hots and a neutral that also grounds the dryer. No separate ground.",B.a5s,B.aCB,"dryer3","nema1030",!1,B.a70,B.cWI,!0,"Dryer outlet, 3-wire (NEMA 10-30)",new A.fI_()),A.oA("The electric stove outlet of every new house: 50 amp, 240 volts. Two hots (X, Y), a neutral (W) and a separate ground (G). Also used for car chargers.",B.a6m,B.aC2,"range4","nema1450",!0,B.a6U,B.dma,!0,"Range outlet, 4-wire (NEMA 14-50)",new A.fI0()),A.oA("The electric stove outlet of older houses (before 1996): 50 amp, 240 volts. Two hots and a neutral that also grounds the range. No separate ground.",B.a5s,B.aCB,"range3","nema1050",!1,B.a70,B.dm8,!0,"Range outlet, 3-wire (NEMA 10-50)",new A.fI1()),A.oA("A dedicated 120 volt, 20 amp outlet for the washer, with a T-shaped neutral slot. Near water, so it needs GFCI protection.",B.dq9,B.d4B,"washer","nema520",!0,B.dDA,B.dk0,!0,"Washing machine outlet (NEMA 5-20)",new A.fI2()),A.oA("At the back of the appliance: black to the left terminal, white (neutral) to the middle one, red to the right one. The ground strap STAYS: it joins the neutral to the frame.",B.d0y,B.d9U,"cord3","terminal3",!1,B.dCZ,B.dum,!0,"Dryer or range cord, 3-wire hookup",new A.fI3()),A.oA("At the back of the appliance: REMOVE the ground strap first, then black left, white (neutral) middle, red right, and the green ground wire to the frame.",B.dv0,B.d6q,"cord4","terminal4",!0,B.dCy,B.ddQ,!0,"Dryer or range cord, 4-wire hookup",new A.fI4())],C.as("O<MY>")))
+w($,"iCR","hJP",()=>C.a([A.oA("The dryer outlet of every new house: 30 amp, 240 volts. Two hots (X, Y), a neutral (W) and a separate ground (G).",B.a6m,B.aC2,"dryer4","nema1430",!0,B.a6U,B.dp3,!0,"Dryer outlet, 4-wire (NEMA 14-30)",new A.fHZ()),A.oA("The dryer outlet of older houses (before 1996): 30 amp, 240 volts. Two hots and a neutral that also grounds the dryer. No separate ground.",B.a5s,B.aCB,"dryer3","nema1030",!1,B.a70,B.cWI,!0,"Dryer outlet, 3-wire (NEMA 10-30)",new A.fI_()),A.oA("The electric stove outlet of every new house: 50 amp, 240 volts. Two hots (X, Y), a neutral (W) and a separate ground (G). Also used for car chargers.",B.a6m,B.aC2,"range4","nema1450",!0,B.a6U,B.dma,!0,"Range outlet, 4-wire (NEMA 14-50)",new A.fI0()),A.oA("The electric stove outlet of older houses (before 1996): 50 amp, 240 volts. Two hots and a neutral that also grounds the range. No separate ground.",B.a5s,B.aCB,"range3","nema1050",!1,B.a70,B.dm8,!0,"Range outlet, 3-wire (NEMA 10-50)",new A.fI1()),A.oA("A dedicated 120 volt, 20 amp outlet for the washer, with a T-shaped neutral slot. Near water, so it needs GFCI protection.",B.dq9,B.d4A,"washer","nema520",!0,B.dDA,B.dk_,!0,"Washing machine outlet (NEMA 5-20)",new A.fI2()),A.oA("At the back of the appliance: black to the left terminal, white (neutral) to the middle one, red to the right one. The ground strap STAYS: it joins the neutral to the frame.",B.d0x,B.d9T,"cord3","terminal3",!1,B.dCZ,B.dum,!0,"Dryer or range cord, 3-wire hookup",new A.fI3()),A.oA("At the back of the appliance: REMOVE the ground strap first, then black left, white (neutral) middle, red right, and the green ground wire to the frame.",B.dv0,B.d6p,"cord4","terminal4",!0,B.dCy,B.ddP,!0,"Dryer or range cord, 4-wire hookup",new A.fI4())],C.as("O<MY>")))
 w($,"iD8","HF",()=>{var v,u=C.a([],x.n)
 for(v=0;v<10;++v)u.push(-72+16*v)
 return u})
@@ -31820,7 +31820,7 @@ w($,"iCT","k5",()=>A.i5a())
 w($,"iCS","xt",()=>A.i59(A.hAO()))
 w($,"iD9","zi",()=>A.i5d())
 w($,"iAu","h4S",()=>{var v,u,t,s,r,q,p,o,n=x.aM,m=C.a([],n)
-for(v=x.s,u=C.a(["outlet","gfci"],v),D.d.v(u,B.aC3),D.d.v(u,B.dbh),t=u.length,s=0;s<u.length;u.length===t||(0,C.J)(u),++s){r=u[s]
+for(v=x.s,u=C.a(["outlet","gfci"],v),D.d.v(u,B.aC3),D.d.v(u,B.dbg),t=u.length,s=0;s<u.length;u.length===t||(0,C.J)(u),++s){r=u[s]
 m.push(A.biQ("dev:"+r,A.ut(r),B.CX))}m=A.bcP("outlets","Outlets",B.CX,m)
 u=C.a([],n)
 for(v=C.a(["switch"],v),D.d.v(v,B.aCo),t=v.length,s=0;s<v.length;v.length===t||(0,C.J)(v),++s){r=v[s]
@@ -31836,4 +31836,4 @@ t.push(A.biQ("app:"+p,q.b,o))}t=A.bcP("phones","Phones",D.zl,t)
 n=C.a([],n)
 for(s=0;s<6;++s){q=B.aBb[s]
 n.push(A.biQ("app:"+q.a,q.b,W.Pw))}return C.a([B.hsS,m,v,B.hsR,u,t,A.bcP("appliances","Appliances",W.Pw,n)],C.as("O<Qn>"))})})()};
-(a=>{a["ViXTH0EjHehVYXdv3GsIy8+jXnE="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["B8QSpjcWZeJ1a9XsRLf/9ig3CT4="]=a.current})($__dart_deferred_initializers__);

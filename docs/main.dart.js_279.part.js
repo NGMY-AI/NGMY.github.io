@@ -6037,7 +6037,7 @@ q.push(A.d(m.gcbz(),l,l,l,l,l,l,A.l(l,l,x[4],l,l,l,l,l,l,l,l,12,l,l,l,l,1.45,!0,
 t=m.a.f
 o=t.length
 if(o!==0){t=o===1?"Type-in code: "+C.d.gH(t):"Type-in codes: "+C.d.aO(t,", ")
-C.d.v(q,A.a([C.X,A.d(t,l,l,l,l,l,l,A.l(l,l,x[4],l,l,l,l,l,l,l,l,11,l,l,C.V,l,l,!0,l,l,l,l,l,l,l,l),C.K,l,l),A.ho(D.c2F,D.fPu,new B.dcn(m,d),l)],p))}if(m.a.e===D.J7&&m.gaZ_()!=null)C.d.v(q,A.a([C.X,A.d("Code: "+h,l,l,l,l,l,l,A.l(l,l,x[4],l,l,l,l,l,l,l,l,11,l,l,C.a8,l,l,!0,l,l,l,l,l,l,l,l),C.K,l,l),A.ho(D.c_8,D.fM2,new B.dco(m,d),l)],p))
+C.d.v(q,A.a([C.X,A.d(t,l,l,l,l,l,l,A.l(l,l,x[4],l,l,l,l,l,l,l,l,11,l,l,C.V,l,l,!0,l,l,l,l,l,l,l,l),C.K,l,l),A.ho(D.c2F,D.fPt,new B.dcn(m,d),l)],p))}if(m.a.e===D.J7&&m.gaZ_()!=null)C.d.v(q,A.a([C.X,A.d("Code: "+h,l,l,l,l,l,l,A.l(l,l,x[4],l,l,l,l,l,l,l,l,11,l,l,C.a8,l,l,!0,l,l,l,l,l,l,l,l),C.K,l,l),A.ho(D.c_8,D.fM2,new B.dco(m,d),l)],p))
 if(m.a.e===D.Ae){x=(m.w?C.dI:C.aF).j(0.12)
 t=A.m(20)
 o=m.w?"Ready to receive":"Uploading "+C.j.ad(C.j.D(m.x*100,0,99),0)+"%"
@@ -7356,8 +7356,8 @@ D.ai1=new A.u(1,0.03137254901960784,0.06274509803921569,0.09411764705882353,C.q)
 D.ajP=new A.u(1,0.07058823529411765,0.10196078431372549,0.14901960784313725,C.q)
 D.fFM=new A.B("Your team portal",null,C.di,null,null,null,null,null,null,null,null,null)
 D.fUE=new A.B("Share the access code and member password with your team. They only sign in once.",null,G.EI,null,null,null,null,null,null,null,null,null)
-D.dj6=x([D.fFM,C.an,D.fUE],y.p)
-D.bwz=new A.fj(C.ah,C.e,C.i,C.E,null,C.p,null,0,D.dj6,null)
+D.dj5=x([D.fFM,C.an,D.fUE],y.p)
+D.bwz=new A.fj(C.ah,C.e,C.i,C.E,null,C.p,null,0,D.dj5,null)
 D.fZ6=new A.B("Create your organization",null,C.fC,null,null,null,null,null,null,null,null,null)
 D.fKe=new A.B("Set an access code and member password. Share them with your team \u2014 they sign in once.",null,G.EI,null,null,null,null,null,null,null,null,null)
 D.dzX=x([D.fZ6,C.an,D.fKe],y.p)
@@ -7401,8 +7401,8 @@ D.ekw={iceServers:0}
 D.aLd={urls:0}
 D.dDH=new A.bu(D.aLd,["stun:stun.l.google.com:19302"],y.m)
 D.dDG=new A.bu(D.aLd,["stun:stun1.l.google.com:19302"],y.m)
-D.d8C=x([D.dDH,D.dDG],A.as("O<a8<n,n>>"))
-D.dCY=new A.bu(D.ekw,[D.d8C],A.as("bu<n,@>"))
+D.d8B=x([D.dDH,D.dDG],A.as("O<a8<n,n>>"))
+D.dCY=new A.bu(D.ekw,[D.d8B],A.as("bu<n,@>"))
 D.J7=new B.Od(0,"lanDirect")
 D.Ts=new B.Od(1,"cloudStash")
 D.dP1=new B.Od(2,"inlineInstant")
@@ -7448,8 +7448,8 @@ D.bdZ=new A.fk(2,null,null,null,null,C.aF,null,null,null,null)
 D.ff5=new A.a5(16,16,D.bdZ,null)
 D.fJy=new A.B("Could not create portal. Access code may already be in use.",null,null,null,null,null,null,null,null,null,null,null)
 D.fgy=new A.b1(D.fJy,null,null,null,null,null,null,null,null,null,null,null,null,C.a_,!1,null,null,null,C.t,null)
-D.fRg=new A.B("Access code or password incorrect, or organization subscription expired.",null,null,null,null,null,null,null,null,null,null,null)
-D.fgB=new A.b1(D.fRg,null,null,null,null,null,null,null,null,null,null,null,null,C.a_,!1,null,null,null,C.t,null)
+D.fRf=new A.B("Access code or password incorrect, or organization subscription expired.",null,null,null,null,null,null,null,null,null,null,null)
+D.fgB=new A.b1(D.fRf,null,null,null,null,null,null,null,null,null,null,null,null,C.a_,!1,null,null,null,C.t,null)
 D.h_a=new A.B("Enter a valid 5\u20136 character code.",null,null,null,null,null,null,null,null,null,null,null)
 D.fgI=new A.b1(D.h_a,null,null,null,null,null,null,null,null,null,null,null,null,C.a_,!1,null,null,null,C.t,null)
 D.fJ8=new A.B("Could not read this image to share.",null,null,null,null,null,null,null,null,null,null,null)
@@ -7483,7 +7483,7 @@ D.fKF=new A.B("Organization settings",null,C.cC,null,null,null,null,null,null,nu
 D.fL3=new A.B("Sign in",null,C.cg,null,null,null,null,null,null,null,null,null)
 D.fM2=new A.B("Copy link for Paste",null,null,null,null,null,null,null,null,null,null,null)
 D.fMA=new A.B("Scan answer QR",null,null,null,null,null,null,null,null,null,null,null)
-D.fPu=new A.B("Copy 6-digit code",null,null,null,null,null,null,null,null,null,null,null)
+D.fPt=new A.B("Copy 6-digit code",null,null,null,null,null,null,null,null,null,null,null)
 D.fSi=new A.B("Send to their Doc Share",null,C.nW,null,null,null,null,null,null,null,null,null)
 D.fSE=new A.B("Scan receiver answer QR",null,null,null,null,null,null,null,null,null,null,null)
 D.fSZ=new A.B("Share code & instructions",null,null,null,null,null,null,null,null,null,null,null)
@@ -7510,4 +7510,4 @@ $.i4u=null
 $.hdA=null})();(function lazyInitializers(){var x=a.lazyFinal
 x($,"ixJ","hH2",()=>new B.crG())
 x($,"ivD","hhA",()=>C.a.q(A.bA(A.bA(A.bA(A.HA(),"window"),"navigator"),"userAgent"),"Firefox"))})()};
-(a=>{a["ODOGKcXOxz0IbHQ60lWygXifBZw="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["iS9u5ox2c51gKq2IGVok2Jz9xhk="]=a.current})($__dart_deferred_initializers__);
