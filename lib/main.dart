@@ -186,6 +186,8 @@ import 'ngmy_communicate_sync_download_io.dart'
 import 'package:file_picker/file_picker.dart';
 import 'ngmy_civic_id_photo.dart';
 import 'ngmy_civic_contribution_report.dart';
+import 'ngmy_contribution_popup.dart';
+import 'ngmy_contribution_popup_logic.dart';
 import 'ngmy_civic_state_wallet.dart';
 import 'ngmy_civic_user_groups_ui.dart' deferred as lightning;
 import 'ngmy_civic_voting_ui.dart';
@@ -17651,6 +17653,72 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     });
   }
 
+  // ── The contribution pop-up of the home screen ──
+
+  bool _contributionPopupOpen = false;
+  DateTime? _contributionPopupAt;
+
+  /// When the app opens (and when it comes back after a while), a member of a state with a contribution going who has not contributed yet gets the
+  /// pop-up in the middle of the screen. Someone who has contributed to this campaign never gets it; the Civic Registry still shows everything.
+  Future<void> _maybeShowContributionPopup() async {
+    if (_contributionPopupOpen) return;
+    final last = _contributionPopupAt;
+    if (last != null && DateTime.now().difference(last) < const Duration(minutes: 8)) return;
+    final u = widget.user;
+    final state = ngmyMemberStateForContribution(widget.config, u);
+    if (state.isEmpty) return;
+    _contributionPopupAt = DateTime.now();
+    try {
+      if (!ngmyShouldDeferRemoteConfigOverwrite()) await ngmyHydrateCivicHelpModeFromAllBackups(widget.config, fresh: true);
+    } catch (_) {}
+    if (!mounted) return;
+    final config = widget.config;
+    if (!config.helpActiveFor(state) || !ngmyMemberInHelpScope(config, u, state)) return;
+    // Has this member contributed to the campaign that is going now? Everything that is known is looked at (the whole ledger, the copy kept on the phone, this phone's own).
+    final all = <AppTransaction>[...widget.allTransactions];
+    try {
+      all.addAll(await ngmyFetchApprovedContributionsFromCloud());
+    } catch (_) {
+      return; // It cannot be told (no connection): better no pop-up than one for somebody who already gave.
+    }
+    try {
+      all.addAll(await ngmyHydrateCivicContributionsLocal(deletedIds: config.civicDeletedContributionIds));
+    } catch (_) {}
+    if (!mounted || ngmyMemberContributedToCampaign(config, u, all, state)) return;
+    if (!ngmyShouldAllowGlobalInterrupt() || _contributionPopupOpen) return;
+    _contributionPopupOpen = true;
+    final scopeType = config.helpScopeTypeFor(state);
+    final scopeLabel = scopeType == 'city' ? 'City: ${config.helpScopeValueFor(state)}' : (scopeType == 'room' ? 'Room: ${config.helpScopeValueFor(state)}' : 'All members');
+    try {
+      await showNgmyContributionPopup(
+        context,
+        state: state,
+        purpose: config.helpPurposeFor(state),
+        scopeLabel: scopeLabel,
+        cashApp: config.helpCashAppFor(state),
+        zelle: config.helpZelleFor(state),
+        phone: ngmyFormatPhoneDisplay(config.helpPhoneFor(state)),
+        onOpenRegistry: () {
+          if (!mounted) return;
+          NgmyNavigator.push(
+            context,
+            CivicRegistryScreen(
+              user: widget.user,
+              allUsers: widget.allUsers,
+              allTransactions: widget.allTransactions,
+              onAddTransaction: widget.onAddTransaction,
+              onDataChanged: widget.onDataChanged,
+              config: widget.config,
+            ),
+            routeName: 'CivicRegistryScreen',
+          );
+        },
+      );
+    } finally {
+      _contributionPopupOpen = false;
+    }
+  }
+
   void _runScheduledPopups() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -17667,6 +17735,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             videoPopupsRaw: widget.config.ngmyVideoPopups,
             userEmail: widget.user.email,
           );
+          Future<void>.delayed(const Duration(milliseconds: 1800), () {
+            if (mounted) unawaited(_maybeShowContributionPopup());
+          });
         });
         return;
       }
@@ -17676,6 +17747,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         videoPopupsRaw: widget.config.ngmyVideoPopups,
         userEmail: widget.user.email,
       );
+      Future<void>.delayed(const Duration(milliseconds: 1800), () {
+        if (mounted) unawaited(_maybeShowContributionPopup());
+      });
     });
   }
 
