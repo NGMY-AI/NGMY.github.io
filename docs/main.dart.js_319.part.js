@@ -338,7 +338,7 @@ A=c[0]
 C=c[2]
 E=c[63]
 F=c[202]
-G=c[281]
+G=c[280]
 H=c[39]
 I=c[189]
 B=a.updateHolder(c[30],B)
@@ -812,9 +812,9 @@ x.a3()}}
 B.aew.prototype={
 B(d){var x=this,w=null,v=x.r,u=A.m(20),t=v.c,s=A.a([C.w.j(0.45),t.j(0.12)],y.O),r=A.L(t.j(0.45),C.r,1),q=y.V,p=A.a([new A.ac(1,C.G,t.j(0.22),C.H,18)],q),o=A.d("AMOUNT DUE",w,w,w,w,w,w,A.l(w,w,t.j(0.85),w,w,w,w,w,w,w,w,10,w,w,C.u,w,w,!0,w,2.2,w,w,w,w,w,w),w,w,w),n=x.e,m=A.oe(C.jT,A.d("$"+C.j.ad(n,2),w,w,w,w,w,w,D.ftJ,w,w,w),new B.eTT(x)),l=C.c.j(0.06),k=A.m(20),j=A.L(C.c.j(0.12),C.r,1),i=y.p
 s=A.q(w,A.x(A.a([o,C.U,m,C.af,A.q(w,A.d("Balance: $"+C.j.ad(x.f,2),w,w,w,w,w,w,A.l(w,w,C.c.j(0.75),w,w,w,w,w,w,w,w,12,w,w,C.a8,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),C.f,w,w,new A.p(l,w,j,k,w,w,C.n),w,w,w,w,C.mc,w,w,w)],i),C.l,w,C.e,C.i,0,C.p),C.f,w,w,new A.p(w,w,r,u,p,new A.a9(C.aA,C.aE,C.x,s,w,w),C.n),w,w,w,w,K.a0t,w,w,1/0)
-p=A.A(A.a([A.X(C.uT,t.j(0.85),w,w,w,16),C.ae,A.E(A.d("Charged instantly from your NGMY wallet. This payment cannot be reversed.",w,w,w,w,w,w,A.l(w,w,C.c.j(0.55),w,w,w,w,w,w,w,w,11,w,w,w,w,1.4,!0,w,w,w,w,w,w,w,w),w,w,w),1)],i),C.E,w,C.e,C.i,0,w,w)
+p=A.A(A.a([A.X(C.uU,t.j(0.85),w,w,w,16),C.ae,A.E(A.d("Charged instantly from your NGMY wallet. This payment cannot be reversed.",w,w,w,w,w,w,A.l(w,w,C.c.j(0.55),w,w,w,w,w,w,w,w,11,w,w,w,w,1.4,!0,w,w,w,w,w,w,w,w),w,w,w),1)],i),C.E,w,C.e,C.i,0,w,w)
 u=C.c.j(0.22)
-u=A.E(A.dU(C.nY,new B.eTU(d),A.di(w,w,w,w,w,w,w,w,w,C.ab,w,w,C.cp,w,new A.b9(A.m(14),C.a1),new A.ay(u,1,C.r,-1),w,w,w,w)),1)
+u=A.E(A.dU(C.nZ,new B.eTU(d),A.di(w,w,w,w,w,w,w,w,w,C.ab,w,w,C.cp,w,new A.b9(A.m(14),C.a1),new A.ay(u,1,C.r,-1),w,w,w,w)),1)
 r=A.m(14)
 q=A.a([new A.ac(0,C.G,t.j(0.45),C.cL,14)],q)
 return A.eP(w,C.L,new B.b2W(v,x.c,x.d,A.x(A.a([s,C.af,p,C.aQ,A.A(A.a([u,C.bd,A.E(A.c2(A.aI(!1,C.a3,!0,w,A.aP(!1,A.m(14),!0,new A.D(C.cp,A.A(A.a([D.bUu,C.ae,A.d("Pay $"+C.j.ad(n,2),w,w,w,w,w,w,C.iA,w,w,w)],i),C.l,w,C.bb,C.i,0,w,w),w),w,!0,w,w,w,w,w,w,w,w,w,w,w,new B.eTV(d),w,w,w,w,w,w,w),C.f,C.L,0,w,w,w,w,w,C.aj),new A.p(w,w,w,r,q,new A.a9(C.a6,C.aa,C.x,v.b,w,w),C.n),C.bj),2)],i),C.l,w,C.e,C.i,0,w,w)],i),C.l,w,C.e,C.i,0,C.p),w),w,w,w,F.Cl,C.d7,w,w,w)}}
@@ -926,7 +926,7 @@ B.f5f.prototype={
 $0(){},
 $S:0}
 B.cuP.prototype={
-$1(d){var x=this.a,w=this.b,v=A.dO(w,C.xC),u=v==null?null:v.cy,t=w.v8(y.b)
+$1(d){var x=this.a,w=this.b,v=A.dO(w,C.xD),u=v==null?null:v.cy,t=w.v8(y.b)
 if(t!=null){w=x.cPV()
 w.b=u
 t.bsP(d,x.d,w)}return null},
@@ -1001,7 +1001,7 @@ A.Dh(b.typeUniverse,JSON.parse('{"aVN":1}'))
 var y=(function rtii(){var x=A.as
 return{k:x("aY"),D:x("BK"),I:x("rt"),P:x("hNf"),V:x("O<ac>"),O:x("O<u>"),p:x("O<v>"),w:x("iC"),d:x("+adoptedCloud,creditedTxnIds,transactions,updatedAt,user,walletStateRevision(P,ai<n>,ai<d7>,V,eZ,H)"),x:x("aX"),b:x("abe"),N:x("n"),Y:x("eZ"),a:x("Qd"),W:x("afu"),q:x("mz"),y:x("P"),S:x("H"),B:x("aX?"),H:x("~"),M:x("~()")}})();(function constants(){D.bNY=new A.a0(57862,"MaterialIcons",!1)
 D.a23=new A.a0(58984,"MaterialIcons",!1)
-D.bUu=new A.ae(C.qL,18,C.c,null,null,null)
+D.bUu=new A.ae(C.qM,18,C.c,null,null,null)
 D.ftJ=new A.G(!0,C.c,null,null,null,null,44,C.u,null,null,null,null,1,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fud=new A.G(!0,C.c,null,null,null,null,20,C.u,null,null,null,null,1.2,null,null,null,null,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["3eD7dnPy4QbMw5WtH+FI/xZ19QY="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["/QnNpdyXiPvaK42gJzO+H6n7FUQ="]=a.current})($__dart_deferred_initializers__);
