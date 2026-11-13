@@ -95,15 +95,15 @@ if(A.a.i(l).length!==0)A.d.v(r,B.a([A.cU,B.d(l,u,u,u,u,u,u,B.l(u,u,B.S(m.a).ax.a
 return B.x(r,A.E,u,A.e,A.i,0,A.p)},
 c1Y(d,e,f,g,h,i,j,k,l,m,n){return this.awV(null,d,e,f,g,h,i,j,k,l,m,n)}}
 C.bcz.prototype={
-B(d){var x=null,w=B.m(12),v=this.d,u=v?A.a5F:D.cLh,t=B.L(A.aC.j(0.6),A.r,1),s=B.a([new B.ac(0,A.G,this.c.j(0.25),A.h5,24)],y.r),r=B.d("KB PABLO QR",x,x,x,x,x,x,B.l(x,x,v?A.aC:A.i8,x,x,x,x,x,x,x,x,12,x,x,A.I,x,x,!0,x,1.6,x,x,x,x,x,x),x,x,x),q=B.q(x,x,A.f,v?A.aC:A.cZ,x,x,x,2,x,x,x,x,x,40)
-return B.at(B.eN(A.A,-0.06,B.q(x,B.x(B.a([r,A.b5,q,A.an,B.d("Business Card Studio",x,x,x,x,x,x,B.l(x,x,v?A.c.j(0.5):A.T,x,x,x,x,x,x,x,x,10,x,x,A.V,x,x,!0,x,x,x,x,x,x,x,x),x,x,x)],y.u),A.E,x,A.e,A.i,0,A.p),A.f,x,x,new B.p(x,x,t,w,s,new B.a9(A.a6,A.aa,A.x,u,x,x),A.n),x,114,x,H.NQ,A.bF,x,x,200),x),x,x,x)}}
+B(d){var x=null,w=B.m(12),v=this.d,u=v?A.a5H:D.cLm,t=B.L(A.aC.j(0.6),A.r,1),s=B.a([new B.ac(0,A.G,this.c.j(0.25),A.h5,24)],y.r),r=B.d("KB PABLO QR",x,x,x,x,x,x,B.l(x,x,v?A.aC:A.i8,x,x,x,x,x,x,x,x,12,x,x,A.I,x,x,!0,x,1.6,x,x,x,x,x,x),x,x,x),q=B.q(x,x,A.f,v?A.aC:A.cZ,x,x,x,2,x,x,x,x,x,40)
+return B.at(B.eN(A.A,-0.06,B.q(x,B.x(B.a([r,A.b5,q,A.an,B.d("Business Card Studio",x,x,x,x,x,x,B.l(x,x,v?A.c.j(0.5):A.T,x,x,x,x,x,x,x,x,10,x,x,A.V,x,x,!0,x,x,x,x,x,x,x,x),x,x,x)],y.u),A.E,x,A.e,A.i,0,A.p),A.f,x,x,new B.p(x,x,t,w,s,new B.a9(A.a6,A.aa,A.x,u,x,x),A.n),x,114,x,H.NR,A.bF,x,x,200),x),x,x,x)}}
 C.bkv.prototype={
-B(d){var x=null,w=B.m(12),v=this.d,u=v?D.ddb:D.dej,t=this.c,s=B.L(t.j(0.65),A.r,1),r=B.a([new B.ac(0,A.G,t.j(0.3),A.h5,24)],y.r),q=B.X(A.wJ,v?t:A.i8,x,x,x,22)
+B(d){var x=null,w=B.m(12),v=this.d,u=v?D.ddg:D.deo,t=this.c,s=B.L(t.j(0.65),A.r,1),r=B.a([new B.ac(0,A.G,t.j(0.3),A.h5,24)],y.r),q=B.X(A.wJ,v?t:A.i8,x,x,x,22)
 t=B.d("YOUR MENU",x,x,x,x,x,x,B.l(x,x,v?t:A.ha,x,x,x,x,x,x,x,x,13,x,x,A.u,x,x,!0,x,1.2,x,x,x,x,x,x),x,x,x)
-return B.at(B.eN(A.A,-0.04,B.q(x,B.x(B.a([q,A.U,t,A.b5,B.d("Burgers \xb7 Drinks \xb7 QR",x,x,x,x,x,x,B.l(x,x,v?A.aD:A.T,x,x,x,x,x,x,x,x,10,x,x,A.V,x,x,!0,x,x,x,x,x,x,x,x),x,x,x)],y.u),A.E,x,A.e,A.i,0,A.p),A.f,x,x,new B.p(x,x,s,w,r,new B.a9(A.a6,A.aa,A.x,u,x,x),A.n),x,114,x,H.NQ,A.bF,x,x,200),x),x,x,x)}}
+return B.at(B.eN(A.A,-0.04,B.q(x,B.x(B.a([q,A.U,t,A.b5,B.d("Burgers \xb7 Drinks \xb7 QR",x,x,x,x,x,x,B.l(x,x,v?A.aD:A.T,x,x,x,x,x,x,x,x,10,x,x,A.V,x,x,!0,x,x,x,x,x,x,x,x),x,x,x)],y.u),A.E,x,A.e,A.i,0,A.p),A.f,x,x,new B.p(x,x,s,w,r,new B.a9(A.a6,A.aa,A.x,u,x,x),A.n),x,114,x,H.NR,A.bF,x,x,200),x),x,x,x)}}
 C.bgf.prototype={
-B(d){var x=null,w=B.m(12),v=this.c,u=v?D.duM:K.azB,t=B.L(A.aH.j(0.65),A.r,1.3),s=B.a([new B.ac(0,A.G,A.aH.j(0.3),A.h5,24)],y.r),r=y.u,q=B.A(B.a([B.q(x,D.c02,A.f,x,x,new B.p(x,x,x,B.m(8),x,D.c7Q,A.n),x,28,x,x,x,x,x,28),A.b5,C.hb8(A.aH),A.de,C.hb8(A.bp),A.de,C.hb8(A.bD)],r),A.l,x,A.e,A.i,0,x,x),p=B.d("ESSENTIALS",x,x,x,x,x,x,B.l(x,x,v?A.c:A.jf,x,x,x,x,x,x,x,x,13,x,x,A.u,x,x,!0,x,1.3,x,x,x,x,x,x),x,x,x)
-return B.at(B.eN(A.A,-0.05,B.q(x,B.x(B.a([q,A.X,p,A.b5,B.d("Notes \xb7 Contacts \xb7 Tools",x,x,x,x,x,x,B.l(x,x,v?A.aD:A.T,x,x,x,x,x,x,x,x,10,x,x,A.V,x,x,!0,x,x,x,x,x,x,x,x),x,x,x)],r),A.E,x,A.e,A.i,0,A.p),A.f,x,x,new B.p(x,x,t,w,s,new B.a9(A.aA,A.aE,A.x,u,x,x),A.n),x,114,x,H.NQ,A.bF,x,x,200),x),x,x,x)}}
+B(d){var x=null,w=B.m(12),v=this.c,u=v?D.duQ:K.azB,t=B.L(A.aH.j(0.65),A.r,1.3),s=B.a([new B.ac(0,A.G,A.aH.j(0.3),A.h5,24)],y.r),r=y.u,q=B.A(B.a([B.q(x,D.c06,A.f,x,x,new B.p(x,x,x,B.m(8),x,D.c7V,A.n),x,28,x,x,x,x,x,28),A.b5,C.hb8(A.aH),A.de,C.hb8(A.bp),A.de,C.hb8(A.bD)],r),A.l,x,A.e,A.i,0,x,x),p=B.d("ESSENTIALS",x,x,x,x,x,x,B.l(x,x,v?A.c:A.jf,x,x,x,x,x,x,x,x,13,x,x,A.u,x,x,!0,x,1.3,x,x,x,x,x,x),x,x,x)
+return B.at(B.eN(A.A,-0.05,B.q(x,B.x(B.a([q,A.X,p,A.b5,B.d("Notes \xb7 Contacts \xb7 Tools",x,x,x,x,x,x,B.l(x,x,v?A.aD:A.T,x,x,x,x,x,x,x,x,10,x,x,A.V,x,x,!0,x,x,x,x,x,x,x,x),x,x,x)],r),A.E,x,A.e,A.i,0,A.p),A.f,x,x,new B.p(x,x,t,w,s,new B.a9(A.aA,A.aE,A.x,u,x,x),A.n),x,114,x,H.NR,A.bF,x,x,200),x),x,x,x)}}
 var z=a.updateTypes([])
 C.fMr.prototype={
 $2(d,e){return d+e},
@@ -116,10 +116,10 @@ $S:0}
 C.eq8.prototype={
 $4(d,e,f,g){var x,w=this,v=null,u=w.a,t=w.c,s=w.d,r=t.a,q=u.c1Y(A.wU,new C.eq5(u,d),g,0,new C.bcz(A.be,B.S(r).ax.a===A.J,v),e,f,"",t,s,"Business Card Creator"),p=u.d
 p=p>0?""+p+" saved":v
-p=u.awV(p,D.dwp,new C.eq6(u,d),g,0.22,new C.bkv(A.c4,B.S(r).ax.a===A.J,v),e,f,"",t,s,"Menu Studio")
+p=u.awV(p,D.dwt,new C.eq6(u,d),g,0.22,new C.bkv(A.c4,B.S(r).ax.a===A.J,v),e,f,"",t,s,"Menu Studio")
 x=u.e
 x=x>0?""+x+" saved":v
-return B.cl(B.a([q,A.bz,p,A.bz,u.awV(x,D.dvf,new C.eq7(u,d),g,0.44,new C.bgf(B.S(r).ax.a===A.J,v),e,f,"",t,s,"Business Essentials")],y.u),v,v,new B.R(16,8,16,w.b),v,v,A.ah,!1)},
+return B.cl(B.a([q,A.bz,p,A.bz,u.awV(x,D.dvj,new C.eq7(u,d),g,0.44,new C.bgf(B.S(r).ax.a===A.J,v),e,f,"",t,s,"Business Essentials")],y.u),v,v,new B.R(16,8,16,w.b),v,v,A.ah,!1)},
 $C:"$4",
 $R:4,
 $S:606}
@@ -134,7 +134,7 @@ for(;;)switch(x){case 0:u=v.a
 t=u.a
 s=t.c
 x=2
-return B.b(I.h1K(v.b,G.aKV,G.Js,t.e,s),$async$$0)
+return B.b(I.h1K(v.b,G.aKW,G.Js,t.e,s),$async$$0)
 case 2:x=3
 return B.b(u.RB(),$async$$0)
 case 3:return B.h(null,w)}})
@@ -159,12 +159,12 @@ x(C.eq8,B.ht)
 w(B.ax,[C.bcz,C.bkv,C.bgf])})()
 B.iT(b.typeUniverse,JSON.parse('{"OG":{"af":[],"v":[]},"bmv":{"ah":["OG"]},"bcz":{"ax":[],"v":[]},"bkv":{"ax":[],"v":[]},"bgf":{"ax":[],"v":[]}}'))
 var y={r:B.as("O<ac>"),c:B.as("O<u>"),B:B.as("O<aB<H>>"),u:B.as("O<v>"),x:B.as("iC"),e:B.as("H"),v:B.as("~")};(function constants(){var x=a.makeConstList
-D.c02=new B.ae(A.CE,16,A.c,null,null,null)
-D.c7Q=new B.a9(A.a6,A.aa,A.x,A.RE,null,null)
-D.cLh=x([A.aP,A.aO],y.c)
-D.ddb=x([G.ZS,A.ep],y.c)
-D.dej=x([A.qm,A.fy],y.c)
-D.duM=x([A.c3,A.eX,A.d6],y.c)
-D.dvf=x([A.aH,A.d6,A.eX],y.c)
-D.dwp=x([A.c4,A.aC,L.iZ],y.c)})()};
-(a=>{a["WNua8p1z4BrixifkcbRhpawqit4="]=a.current})($__dart_deferred_initializers__);
+D.c06=new B.ae(A.CE,16,A.c,null,null,null)
+D.c7V=new B.a9(A.a6,A.aa,A.x,A.RF,null,null)
+D.cLm=x([A.aP,A.aO],y.c)
+D.ddg=x([G.ZU,A.ep],y.c)
+D.deo=x([A.qm,A.fy],y.c)
+D.duQ=x([A.c3,A.eX,A.d6],y.c)
+D.dvj=x([A.aH,A.d6,A.eX],y.c)
+D.dwt=x([A.c4,A.aC,L.iZ],y.c)})()};
+(a=>{a["tvtc3BVIjT8I0sH1QNdNMLcvKYE="]=a.current})($__dart_deferred_initializers__);

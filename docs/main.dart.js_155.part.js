@@ -14,7 +14,7 @@ A.bch.prototype={
 vz(d){return A.i57(d)}}
 var z=a.updateTypes([]);(function inheritance(){var y=a.inherit
 y(A.bch,B.pc)})()
-B.iT(b.typeUniverse,JSON.parse('{"bch":{"pc":[]}}'));(function constants(){C.XH=new A.bch()
+B.iT(b.typeUniverse,JSON.parse('{"bch":{"pc":[]}}'));(function constants(){C.XJ=new A.bch()
 C.ahO=new B.u(1,0.3607843137254902,0.22745098039215686,0.11764705882352941,D.q)
 C.alj=new B.R(10,6,10,0)})()};
-(a=>{a["P7pmJ9XaNnPQr8qUnY1kJCnGycw="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["nFiGCD3wg+x2r76A/qcA6Q+rIL4="]=a.current})($__dart_deferred_initializers__);
