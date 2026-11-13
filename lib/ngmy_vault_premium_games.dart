@@ -484,7 +484,7 @@ class _NeonDriftPainter extends CustomPainter {
         ..shader = ui.Gradient.linear(
           Offset.zero,
           Offset(0, skyRect.height),
-          [const Color(0xFF0B1026), const Color(0xFF1E1B4B), const Color(0xFF312E81)],
+          [const Color(0xFF0B1026), const Color(0xFF1E1B4B), const Color(0xFF312E81)], const [0.0, 0.5, 1.0],
         ),
     );
     final buildingPaint = Paint()..color = const Color(0xFF0F172A).withValues(alpha: 0.85);
@@ -797,6 +797,7 @@ class _SkyFlapPainter extends CustomPainter {
             Color.lerp(const Color(0xFFBAE6FD), const Color(0xFF7C3AED), dusk)!,
             Color.lerp(const Color(0xFFFEF3C7), const Color(0xFF1E1B4B), dusk)!,
           ],
+          const [0.0, 0.5, 1.0],
         ),
     );
     final cloud = Paint()..color = Colors.white.withValues(alpha: 0.55);
@@ -1374,7 +1375,7 @@ class _FruitSlashPainter extends CustomPainter {
     canvas.drawRect(
       Offset.zero & size,
       Paint()
-        ..shader = ui.Gradient.linear(Offset.zero, Offset(0, size.height), const [Color(0xFF1E293B), Color(0xFF0F172A), Color(0xFF020617)]),
+        ..shader = ui.Gradient.linear(Offset.zero, Offset(0, size.height), const [Color(0xFF1E293B), Color(0xFF0F172A), Color(0xFF020617)], const [0.0, 0.5, 1.0]),
     );
     for (final f in fruits) {
       canvas.save();
@@ -1664,7 +1665,7 @@ class _PeakHopperPainter extends CustomPainter {
         ..shader = ui.Gradient.linear(
           Offset.zero,
           Offset(0, size.height),
-          [const Color(0xFF38BDF8), const Color(0xFFBAE6FD), const Color(0xFFE0F2FE)],
+          [const Color(0xFF38BDF8), const Color(0xFFBAE6FD), const Color(0xFFE0F2FE)], const [0.0, 0.5, 1.0],
         ),
     );
     for (final p in plats) {
@@ -1909,7 +1910,7 @@ class _BubbleRushPainter extends CustomPainter {
     canvas.drawRect(
       Offset.zero & size,
       Paint()
-        ..shader = ui.Gradient.linear(Offset.zero, Offset(0, size.height), const [Color(0xFF0C4A6E), Color(0xFF082F49), Color(0xFF020617)]),
+        ..shader = ui.Gradient.linear(Offset.zero, Offset(0, size.height), const [Color(0xFF0C4A6E), Color(0xFF082F49), Color(0xFF020617)], const [0.0, 0.5, 1.0]),
     );
     final badge = RRect.fromRectAndRadius(Rect.fromLTWH(size.width / 2 - 54, 10, 108, 36), const Radius.circular(18));
     canvas.drawRRect(badge, Paint()..color = Colors.black.withValues(alpha: 0.35));

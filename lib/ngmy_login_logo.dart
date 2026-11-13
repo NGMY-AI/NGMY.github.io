@@ -488,6 +488,7 @@ class _NgmyTouchRingPainter extends CustomPainter {
           Color.lerp(const Color(0xFF2563EB), const Color(0xFF38BDF8), idlePulse * 0.45)!,
           const Color(0xFF1E3A5F),
         ],
+        const [0.0, 0.5, 1.0],
       );
     canvas.drawCircle(center, radius, base);
 
@@ -531,6 +532,7 @@ class _NgmyTouchRingPainter extends CustomPainter {
               Colors.white.withValues(alpha: 0.82 + touchStrength * 0.18),
               const Color(0xFF38BDF8).withValues(alpha: 0.45),
             ],
+            const [0.0, 0.5, 1.0],
           )
           ..strokeWidth = 3.5 + touchStrength * 3.2
           ..strokeCap = StrokeCap.round;

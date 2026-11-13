@@ -1,0 +1,17 @@
+---
+description: Always commit, push, and verify ngmy.org deploy after app changes
+alwaysApply: true
+---
+
+# Always deploy NGMY after every task
+
+Whenever you finish a user-facing change in this repo (Flutter `lib/`, `web/`, assets, or anything that should appear on the live app):
+
+1. **Commit** the relevant files (unless the user said not to).
+2. **Push to `main`** (`git pull --rebase origin main` then `git push origin HEAD`) so GitHub Actions runs `Deploy GitHub Pages`.
+3. **Verify deploy** when possible:
+   - Remote has a follow-up commit like `Deploy web build to docs/ for ngmy.org [skip ci]`, and/or
+   - `https://ngmy.org/version.json` `build_number` / `deployed_at` is newer than before the push.
+4. Tell the user the app was pushed and to hard-refresh / close and reopen if the phone still shows the old UI (PWA service worker cache).
+
+Do not leave finished app work sitting only on the local machine. Deploy is part of “done.”
