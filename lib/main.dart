@@ -9122,6 +9122,7 @@ String? ngmyApplyReferralCodeToUser({
 
 Future<List<AppTransaction>> ngmyFetchApprovedContributionsFromCloud({
   String? state,
+  bool strict = false, // true: a failed fetch throws instead of looking like "nobody has contributed"
 }) async {
   Future<List<AppTransaction>> fetchPages({bool useStateColumn = true}) async {
     // The sync relay returns at most 500 rows per page. Asking for 1000 made
@@ -9163,6 +9164,7 @@ Future<List<AppTransaction>> ngmyFetchApprovedContributionsFromCloud({
   try {
     return await fetchPages();
   } catch (e) {
+    if (strict && (state ?? '').trim().isEmpty) rethrow;
     // Compatibility while the civicState migration is being installed. The
     // unscoped fallback still paginates every receipt; UI state filtering is
     // applied after hydration.
@@ -17677,14 +17679,58 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     // Has this member contributed to the campaign that is going now? Everything that is known is looked at (the whole ledger, the copy kept on the phone, this phone's own).
     final all = <AppTransaction>[...widget.allTransactions];
     try {
-      all.addAll(await ngmyFetchApprovedContributionsFromCloud());
+      all.addAll(await ngmyFetchApprovedContributionsFromCloud(strict: true));
     } catch (_) {
       return; // It cannot be told (no connection): better no pop-up than one for somebody who already gave.
     }
     try {
       all.addAll(await ngmyHydrateCivicContributionsLocal(deletedIds: config.civicDeletedContributionIds));
     } catch (_) {}
-    if (!mounted || ngmyMemberContributedToCampaign(config, u, all, state)) return;
+    if (!mounted) return;
+    // What this phone remembers: once somebody was seen as contributed to THIS campaign, they are never asked again for it, even if a list is slow to arrive.
+    final campaignKey = config.helpCampaignIdFor(state).trim().isNotEmpty
+        ? config.helpCampaignIdFor(state).trim()
+        : '${config.helpPurposeFor(state)}|${config.helpScopeTypeFor(state)}|${config.helpScopeValueFor(state)}|$state';
+    final memberKey = NgmyCivicRegistryMembers.emailKey(u.email);
+    final doneKey = 'ngmy_contrib_done_$memberKey';
+    final thanksKey = 'ngmy_contrib_thanks_$memberKey';
+    SharedPreferences? prefs;
+    try {
+      prefs = await SharedPreferences.getInstance();
+    } catch (_) {}
+    var total = ngmyMemberCampaignTotal(config, u, all, state);
+    var contributed = total > 0 || ngmyMemberContributedToCampaign(config, u, all, state);
+    final remembered = prefs?.getString(doneKey) ?? '';
+    final rememberedParts = remembered.split('\u0001');
+    if (rememberedParts.length >= 2 && rememberedParts[0] == campaignKey) {
+      contributed = true;
+      final before = double.tryParse(rememberedParts[1]) ?? 0;
+      if (before > total) total = before;
+    }
+    if (contributed) {
+      // Never the ask again. Instead, once a day, a thank-you with the amount.
+      try {
+        await prefs?.setString(doneKey, '$campaignKey\u0001$total');
+      } catch (_) {}
+      if (!mounted || !ngmyShouldAllowGlobalInterrupt() || _contributionPopupOpen) return;
+      final today = ngmyTodayKey();
+      if ((prefs?.getString(thanksKey) ?? '') == '$campaignKey\u0001$today') return;
+      _contributionPopupOpen = true;
+      try {
+        await prefs?.setString(thanksKey, '$campaignKey\u0001$today');
+      } catch (_) {}
+      try {
+        await showNgmyContributionThanksPopup(
+          context,
+          state: state,
+          purpose: config.helpPurposeFor(state),
+          amount: total,
+        );
+      } finally {
+        _contributionPopupOpen = false;
+      }
+      return;
+    }
     if (!ngmyShouldAllowGlobalInterrupt() || _contributionPopupOpen) return;
     _contributionPopupOpen = true;
     final scopeType = config.helpScopeTypeFor(state);

@@ -40,6 +40,45 @@ void main() {
     expect(ngmyMemberContributedToCampaign(config, u, [pending], 'Georgia'), isFalse);
   });
 
+  test('a registrar record is found whichever way it names the member (record email, member email inside it, registry number), and the amount is added up once', () {
+    final config = campaign();
+    final id = config.helpCampaignIdFor('Georgia');
+    final u = UserData(email: 'mary@x.com')
+      ..state = 'Georgia'
+      ..registryId = 'GA-123';
+    AppTransaction rec(String rid, String email, String meta, double amount) => AppTransaction(
+          id: rid,
+          userEmail: email,
+          amount: amount,
+          type: TransactionType.contribution,
+          method: PaymentMethod.system,
+          status: TransactionStatus.approved,
+          timestamp: DateTime.now(),
+          sourceDetails: meta,
+        );
+    // Written under the registrar's email, but with the member inside.
+    final byMember = rec('r1', 'registrar@x.com', jsonEncode({'campaignId': id, 'memberEmail': 'mary@x.com'}), 15);
+    expect(ngmyMemberContributedToCampaign(config, u, [byMember], 'Georgia'), isTrue);
+    final byNumber = rec('r2', 'registrar@x.com', jsonEncode({'campaignId': id, 'registryId': 'ga-123'}), 5);
+    expect(ngmyMemberContributedToCampaign(config, u, [byNumber], 'Georgia'), isTrue);
+    // The same record arriving from three places counts once.
+    expect(ngmyMemberCampaignTotal(config, u, [byMember, byMember, byNumber], 'Georgia'), 20);
+    expect(ngmyMemberCampaignTotal(config, u, const [], 'Georgia'), 0);
+    expect(ngmyTodayKey(DateTime(2026, 3, 9, 23, 59)), '2026-03-09');
+  });
+
+  testWidgets('the thank-you shows the congratulation and the amount, and closes', (t) async {
+    await t.pumpWidget(MaterialApp(home: Builder(builder: (context) => Scaffold(body: Center(child: TextButton(onPressed: () => showNgmyContributionThanksPopup(context, state: 'Georgia', purpose: 'Funeral support', amount: 25.5), child: const Text('go')))))));
+    await t.tap(find.text('go'));
+    await t.pump(const Duration(milliseconds: 700));
+    expect(find.text('Hongera!'), findsOneWidget);
+    expect(find.text(r'$25.50'), findsOneWidget);
+    expect(find.byKey(const Key('contribution-popup')), findsNothing, reason: 'it is not the ask');
+    await t.tap(find.byKey(const Key('contribution-thanks-close')));
+    await t.pump(const Duration(milliseconds: 600));
+    expect(find.byKey(const Key('contribution-thanks')), findsNothing);
+  });
+
   test('a campaign for one city only asks the members of that city, and nobody is asked when it is off', () {
     final config = campaign(scope: 'city', value: 'Atlanta');
     final atl = UserData(email: 'a@x.com')..state = 'Georgia'..city = 'Atlanta';

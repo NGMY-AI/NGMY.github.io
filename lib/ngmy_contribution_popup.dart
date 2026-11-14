@@ -52,7 +52,160 @@ Future<void> showNgmyContributionPopup(
   );
 }
 
-const Color _kOrange = Color(0xFFF97316), _kDeep = Color(0xFFC2410C), _kAmber = Color(0xFFFBBF24), _kBrown = Color(0xFF7C2D12);
+/// The thank-you for someone who has contributed to the campaign going now: once a day, with the amount they gave. Never the ask again.
+Future<void> showNgmyContributionThanksPopup(
+  BuildContext context, {
+  required String state,
+  required String purpose,
+  required double amount,
+}) {
+  return showGeneralDialog<void>(
+    context: context,
+    useRootNavigator: true,
+    barrierDismissible: true,
+    barrierLabel: 'Hongera',
+    barrierColor: Colors.black.withValues(alpha: 0.74),
+    transitionDuration: const Duration(milliseconds: 420),
+    pageBuilder: (ctx, a, b) => const SizedBox.shrink(),
+    transitionBuilder: (ctx, anim, secondary, _) {
+      final k = Curves.easeOutBack.transform(anim.value.clamp(0.0, 1.0));
+      return Opacity(
+        opacity: anim.value.clamp(0.0, 1.0),
+        child: Transform.scale(
+          scale: 0.78 + 0.22 * k,
+          child: NgmyContributionThanksCard(state: state, purpose: purpose, amount: amount, onClose: () => Navigator.of(ctx, rootNavigator: true).pop()),
+        ),
+      );
+    },
+  );
+}
+
+String ngmyContributionAmountText(double amount) {
+  final whole = amount == amount.roundToDouble();
+  return '\$${whole ? amount.toStringAsFixed(0) : amount.toStringAsFixed(2)}';
+}
+
+class NgmyContributionThanksCard extends StatefulWidget {
+  const NgmyContributionThanksCard({super.key, required this.state, required this.purpose, required this.amount, required this.onClose});
+  final String state, purpose;
+  final double amount;
+  final VoidCallback onClose;
+
+  @override
+  State<NgmyContributionThanksCard> createState() => _NgmyContributionThanksCardState();
+}
+
+class _NgmyContributionThanksCardState extends State<NgmyContributionThanksCard> with SingleTickerProviderStateMixin {
+  late final AnimationController _loop = AnimationController(vsync: this, duration: const Duration(seconds: 7))..repeat();
+
+  @override
+  void dispose() {
+    _loop.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      type: MaterialType.transparency,
+      child: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 400),
+              child: AnimatedBuilder(
+                animation: _loop,
+                builder: (context, child) {
+                  final glow = 0.5 + 0.5 * math.sin(_loop.value * 2 * math.pi);
+                  return Container(
+                    key: const Key('contribution-thanks'),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(32),
+                      border: Border.all(color: Color.lerp(_kOrange, _kAmber, glow)!, width: 2.2),
+                      boxShadow: [BoxShadow(color: Color.lerp(_kOrange, _kAmber, glow)!.withValues(alpha: 0.45), blurRadius: 34 + 14 * glow, spreadRadius: 1)],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(30),
+                      child: Stack(children: [
+                        const Positioned.fill(child: DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFFB923C), _kOrange, _kDeep, _kBrown])))),
+                        Positioned.fill(child: IgnorePointer(child: CustomPaint(painter: _BackPainter(_loop.value)))),
+                        child!,
+                      ]),
+                    ),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 14, 18, 20),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: _Press(
+                        key: const Key('contribution-thanks-close'),
+                        onTap: widget.onClose,
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.black.withValues(alpha: 0.3), border: Border.all(color: Colors.white54, width: 1.4)),
+                          child: const Icon(Icons.close_rounded, color: Colors.white, size: 24),
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 104,
+                      height: 104,
+                      child: AnimatedBuilder(
+                        animation: _loop,
+                        builder: (context, _) => CustomPaint(
+                          painter: _RingPainter(_loop.value),
+                          child: Center(
+                            child: Container(
+                              width: 76,
+                              height: 76,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: const RadialGradient(colors: [Color(0xFFFFF7ED), Color(0xFFFDE68A), Color(0xFFF59E0B)]),
+                                boxShadow: [BoxShadow(color: _kAmber.withValues(alpha: 0.4 + 0.3 * math.sin(_loop.value * 2 * math.pi * 2).abs()), blurRadius: 24, spreadRadius: 2)],
+                              ),
+                              child: Transform.scale(scale: 1 + 0.07 * math.sin(_loop.value * 2 * math.pi * 3), child: const Icon(Icons.celebration_rounded, color: _kBrown, size: 40)),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text('Hongera!', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 30, height: 1.1, shadows: [Shadow(color: Colors.black38, blurRadius: 8)])),
+                    const SizedBox(height: 6),
+                    Text('Asante kwa kuchangia katika ${widget.state}', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16, height: 1.25)),
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(16, 13, 16, 15),
+                      decoration: BoxDecoration(color: const Color(0xFF2A0F04).withValues(alpha: 0.92), borderRadius: BorderRadius.circular(22), border: Border.all(color: _kAmber, width: 2)),
+                      child: Column(children: [
+                        const Text('ULICHANGIA', style: TextStyle(color: _kAmber, fontWeight: FontWeight.w900, fontSize: 13.5, letterSpacing: 0.8)),
+                        const SizedBox(height: 4),
+                        Text(ngmyContributionAmountText(widget.amount), key: const Key('contribution-thanks-amount'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 42, height: 1.1)),
+                        if (widget.purpose.trim().isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text('kwa ${widget.purpose.trim()}', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15, height: 1.3)),
+                        ],
+                      ]),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text('Mungu akubariki. Mchango wako umeandikwa na msajili.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.3)),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+const Color _kOrange = Color(0xFFF97316),_kDeep = Color(0xFFC2410C), _kAmber = Color(0xFFFBBF24), _kBrown = Color(0xFF7C2D12);
 
 class NgmyContributionPopupCard extends StatefulWidget {
   const NgmyContributionPopupCard({super.key, required this.state, required this.purpose, this.scopeLabel = '', this.cashApp = '', this.zelle = '', this.phone = '', required this.onOpenRegistry, required this.onClose});

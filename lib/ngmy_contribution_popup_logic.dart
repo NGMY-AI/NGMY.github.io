@@ -34,7 +34,17 @@ String _campaignIdFor(AppConfig config, String state) {
 }
 
 /// Has [u] an approved contribution to the campaign that is going now in [state] (a contribution to an earlier campaign does not count)?
-bool ngmyMemberContributedToCampaign(AppConfig config, UserData u, Iterable<AppTransaction> all, String state) {
+bool ngmyMemberContributedToCampaign(AppConfig config, UserData u, Iterable<AppTransaction> all, String state) =>
+    ngmyMemberCampaignContributions(config, u, all, state).isNotEmpty;
+
+/// How much [u] has given to the campaign that is going now in [state] (0 when nothing).
+double ngmyMemberCampaignTotal(AppConfig config, UserData u, Iterable<AppTransaction> all, String state) =>
+    ngmyMemberCampaignContributions(config, u, all, state).fold<double>(0, (a, t) => a + (t.amount > 0 ? t.amount : 0));
+
+/// The approved contributions of [u] to the campaign going now in [state], each record once. The member is recognised the same way the registrar's
+/// own report does it: by the email of the record, the member email written inside it, or the registry number.
+List<AppTransaction> ngmyMemberCampaignContributions(AppConfig config, UserData u, Iterable<AppTransaction> all, String state) {
+  final found = <String, AppTransaction>{};
   final campaignId = _campaignIdFor(config, state).trim();
   final startedAt = DateTime.tryParse(config.helpCampaignStartedAtFor(state).trim());
   final emailKey = NgmyCivicRegistryMembers.emailKey(u.email);
@@ -57,18 +67,27 @@ bool ngmyMemberContributedToCampaign(AppConfig config, UserData u, Iterable<AppT
         if (d is Map) meta = Map<String, dynamic>.from(d);
       } catch (_) {}
     }
-    final mine = emails.contains(NgmyCivicRegistryMembers.emailKey(t.userEmail)) || (rid.isNotEmpty && (meta['registryId'] ?? '').toString().trim().toUpperCase() == rid);
+    final metaEmail = NgmyCivicRegistryMembers.emailKey((meta['memberEmail'] ?? '').toString());
+    final mine = emails.contains(NgmyCivicRegistryMembers.emailKey(t.userEmail)) ||
+        (metaEmail.isNotEmpty && emails.contains(metaEmail)) ||
+        (rid.isNotEmpty && ((meta['registryId'] ?? '').toString().trim().toUpperCase() == rid || t.id.toUpperCase().contains(rid)));
     if (!mine) continue;
     final cid = (meta['campaignId'] ?? '').toString().trim();
     if (campaignId.isNotEmpty && cid.isNotEmpty) {
-      if (cid == campaignId) return true;
+      if (cid == campaignId) found[t.id] = t;
       continue;
     }
     // An old row without a campaign number: it counts only when it was made after this campaign began, in this state.
     if (cid.isEmpty && startedAt != null && !t.timestamp.isBefore(startedAt)) {
       final receiptState = (meta['state'] ?? '').toString().trim();
-      if (receiptState.isEmpty || NgmyCivicRegistryStats.statesMatch(receiptState, state)) return true;
+      if (receiptState.isEmpty || NgmyCivicRegistryStats.statesMatch(receiptState, state)) found[t.id] = t;
     }
   }
-  return false;
+  return found.values.toList();
+}
+
+/// Today as a key, for "once a day".
+String ngmyTodayKey([DateTime? now]) {
+  final d = (now ?? DateTime.now()).toLocal();
+  return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 }
