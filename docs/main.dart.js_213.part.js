@@ -2050,7 +2050,7 @@ return B.i($async$Rp,w)},
 clF(d,e,f,g){return B.c8(e,new C.dR8(e,g,f),d)},
 b8C(d,e,f,g){var x=null,w=Math.min(6,Math.max(f,1)),v=this.c
 v.toString
-return new B.je(new C.dSH(f),new B.a5(x,w*g,B.b7t(B.yv(v).aFX(!1),B.kp(!0,x,d,new C.dSI(this,d,g,e),f,g,x,R.ae6,!1,!1,!1)),x),x,y.R)},
+return new B.je(new C.dSH(f),new B.a5(x,w*g,B.b7t(B.yv(v).aFX(!1),B.kq(!0,x,d,new C.dSI(this,d,g,e),f,g,x,R.ae6,!1,!1,!1)),x),x,y.R)},
 c4i(d,e){var x,w,v,u,t,s,r=null,q=d.f,p=q!=null
 if(p){x=e.a
 w=A.bC.j(x?0.22:0.12)
@@ -2104,7 +2104,7 @@ r=B.E(new C.aC_("State Trust","Registrar reserve",r,q.r>0?"In "+d.hk(o)+" \xc2\x
 o=d.hk(w)
 q=d.d
 n=q.b
-r=B.A(B.a([r,A.bd,B.E(new C.aC_("Contribution Case","Community funds",o,q.f>0?"In "+d.hk(n)+" \xc2\xb7 Credits "+d.hk(d.d.f)+" \xc2\xb7 Out "+d.hk(x):"In "+d.hk(n)+" \xc2\xb7 Out "+d.hk(x),D.dfF,A.mj,a0),1)],p),A.l,a0,A.e,A.i,0,a0,a0)
+r=B.A(B.a([r,A.bd,B.E(new C.aC_("Contribution Case","Community funds",o,q.f>0?"In "+d.hk(n)+" \xc2\xb7 Credits "+d.hk(d.d.f)+" \xc2\xb7 Out "+d.hk(x):"In "+d.hk(n)+" \xc2\xb7 Out "+d.hk(x),D.dfE,A.mj,a0),1)],p),A.l,a0,A.e,A.i,0,a0,a0)
 q=B.d("Contribution money never enters State Trust. Only an authorized registrar can deposit into Trust or record spending from either ledger.",a0,a0,a0,a0,a0,a0,B.l(a0,a0,a1?A.bv:A.am,a0,a0,a0,a0,a0,a0,a0,a0,11,a0,a0,a0,a0,1.35,!0,a0,a0,a0,a0,a0,a0,a0,a0),A.K,a0,a0)
 o=B.a([],p)
 if(d.d.w.length!==0){n=B.a([],p)
@@ -2117,7 +2117,7 @@ n.push(B.aI(!1,A.a3,!0,a0,B.aP(!1,B.m(8),!0,new B.D(A.eA,B.X(D.bQK,A.b2.j(0.9),a
 n=B.A(n,A.E,a0,A.e,A.i,0,a0,a0)
 m=B.A(B.a([B.E(new C.azC(a2,"Spent",d.hk(x)+" / "+d.hk(v),!1,a0),1),B.E(new C.azC(a2,"Available",d.hk(w),!0,a0),1)],p),A.l,a0,A.e,A.i,0,a0,a0)
 l=B.m(99)
-o.push(new C.acS(a2,B.x(B.a([n,A.aB,m,A.aB,B.by(l,B.ko(a1?A.Mg:A.aO,a0,a0,10,a0,u,D.b2v),A.aq)],p),A.E,a0,A.e,A.i,0,A.p),a0))
+o.push(new C.acS(a2,B.x(B.a([n,A.aB,m,A.aB,B.by(l,B.kp(a1?A.Mg:A.aO,a0,a0,10,a0,u,D.b2v),A.aq)],p),A.E,a0,A.e,A.i,0,A.p),a0))
 o.push(A.aB)
 n=B.d("Expenses",a0,a0,a0,a0,a0,a0,B.l(a0,a0,a1?A.c:A.T,a0,a0,a0,a0,a0,a0,a0,a0,18,a0,a0,A.u,a0,a0,!0,a0,a0,a0,a0,a0,a0,a0,a0),a0,a0,a0)
 m=B.a([],p)
@@ -2928,7 +2928,7 @@ t=B.L(w?A.eg:A.bP,A.r,1)
 s=B.a([new B.ac(0,A.G,A.w.j(w?0.45:0.12),A.h5,28)],y.V)
 r=i.a
 q=y.p
-r=B.A(B.a([B.E(C.dF1(A.dk,!1,A.bE,D.dkl,A.ps,"Members",j,A.o.u(r.a)),1),A.au,B.E(C.dF1(A.eL,!0,Q.C8,D.dhF,A.zc,"Family total",j,A.o.u(r.b)),1)],q),A.E,j,A.e,A.i,0,j,j)
+r=B.A(B.a([B.E(C.dF1(A.dk,!1,A.bE,D.dkk,A.ps,"Members",j,A.o.u(r.a)),1),A.au,B.E(C.dF1(A.eL,!0,Q.C8,D.dhE,A.zc,"Family total",j,A.o.u(r.b)),1)],q),A.E,j,A.e,A.i,0,j,j)
 p=i.a
 o=k.b
 n=B.E(C.dF1(A.b0,!1,A.h2,D.dbW,A.hy,"Contributions",new C.dSC(i,o,d),A.o.u(p.d)),1)
@@ -3801,7 +3801,7 @@ x(C.aMQ,B.eM)
 x(C.aMR,B.cd)})()
 B.iT(b.typeUniverse,JSON.parse('{"akZ":{"af":[],"v":[]},"azN":{"af":[],"v":[]},"azP":{"af":[],"v":[]},"aBS":{"dD":[],"dp":[],"v":[]},"aDN":{"af":[],"v":[]},"aAC":{"af":[],"v":[]},"aCM":{"af":[],"v":[]},"adV":{"ah":["aCM"]},"aAA":{"ah":["akZ"]},"bcH":{"ax":[],"v":[]},"azO":{"ah":["azN"]},"azQ":{"ah":["azP"]},"beM":{"ax":[],"v":[]},"aDO":{"ah":["aDN"]},"beN":{"ah":["aAC"]},"aCp":{"aC":[]},"biB":{"ax":[],"v":[]},"auZ":{"pA":["0&"],"af":[],"v":[]},"boU":{"ah":["auZ"]},"b5B":{"ax":[],"Yb":[],"v":[]},"aDX":{"af":[],"v":[]},"aDW":{"af":[],"v":[]},"a_s":{"af":[],"v":[]},"O1":{"af":[],"v":[]},"aEC":{"ah":["O1"]},"bo0":{"ax":[],"v":[]},"azC":{"ax":[],"v":[]},"bl0":{"ah":["aDX"]},"bl_":{"ah":["aDW"]},"aC_":{"ax":[],"v":[]},"acS":{"ax":[],"v":[]},"bgk":{"ah":["a_s"]},"bhl":{"aC":[]},"bfz":{"aC":[]}}'))
 var y=(function rtii(){var x=B.as
-return{E:x("f2<eV>"),Y:x("hr<tD>"),M:x("hr<y4>"),P:x("hr<yr>"),G:x("u"),g:x("hkt"),T:x("I5<V>"),I:x("rt"),F:x("jU"),r:x("amH"),V:x("O<ac>"),O:x("O<u>"),X:x("O<pA<n>>"),s:x("O<n>"),p:x("O<v>"),n:x("O<F>"),U:x("O<aC?>"),k:x("O<~(f2<eV>)>"),z:x("cw<ah<af>>"),Z:x("cw<adV>"),y:x("ER"),w:x("iC"),S:x("v7"),R:x("je<u6>"),j:x("ed<~(f2<eV>)>"),a:x("kw<aE?>"),N:x("n"),L:x("br<o>"),t:x("br<F>"),x:x("t9"),C:x("hi"),Q:x("aBS"),q:x("mz"),b:x("cN<u?>"),v:x("P"),i:x("F"),A:x("@"),_:x("u?"),c:x("I5<V>?"),W:x("kt?"),u:x("P?"),H:x("~"),d:x("~()")}})();(function constants(){var x=a.makeConstList
+return{E:x("f2<eV>"),Y:x("hr<tD>"),M:x("hr<y4>"),P:x("hr<yr>"),G:x("u"),g:x("hkt"),T:x("I5<V>"),I:x("rt"),F:x("jU"),r:x("amH"),V:x("O<ac>"),O:x("O<u>"),X:x("O<pA<n>>"),s:x("O<n>"),p:x("O<v>"),n:x("O<F>"),U:x("O<aC?>"),k:x("O<~(f2<eV>)>"),z:x("cw<ah<af>>"),Z:x("cw<adV>"),y:x("ER"),w:x("iC"),S:x("v7"),R:x("je<u6>"),j:x("ed<~(f2<eV>)>"),a:x("kw<aE?>"),N:x("n"),L:x("br<o>"),t:x("br<F>"),x:x("t9"),C:x("hi"),Q:x("aBS"),q:x("mz"),b:x("cN<u?>"),v:x("P"),i:x("F"),A:x("@"),_:x("u?"),c:x("I5<V>?"),W:x("ku?"),u:x("P?"),H:x("~"),d:x("~()")}})();(function constants(){var x=a.makeConstList
 D.b2v=new B.lN(A.c8,B.as("lN<u?>"))
 D.ae7=new B.aY(0,420,0,560)
 D.b63=new B.aY(0,410,0,1/0)
@@ -3830,15 +3830,15 @@ D.bXn=new B.ae(A.zl,18,A.c,null,null,null)
 D.bXP=new B.ae(A.eh,null,A.bC,null,null,null)
 D.bYp=new B.ae(A.pt,18,A.c,null,null,null)
 D.bZ5=new B.ae(A.jK,null,A.bl,null,null,null)
-D.dq5=x([A.d6,A.mS],y.O)
-D.c6m=new B.a9(A.a6,A.aa,A.x,D.dq5,null,null)
+D.dq4=x([A.d6,A.mS],y.O)
+D.c6m=new B.a9(A.a6,A.aa,A.x,D.dq4,null,null)
 D.d0d=x([A.am,A.bw,A.aM],y.O)
 D.d27=x(["Day","Week","Month","Year"],y.s)
 D.d2V=x([A.cG,A.od],y.O)
 D.dbW=x([A.jg,A.eX,A.G6],y.O)
-D.dfF=x([A.fT,A.hb],y.O)
-D.dhF=x([A.aF,A.j_,A.oh],y.O)
-D.dkl=x([A.bl,A.dJ,A.d6],y.O)
+D.dfE=x([A.fT,A.hb],y.O)
+D.dhE=x([A.aF,A.j_,A.oh],y.O)
+D.dkk=x([A.bl,A.dJ,A.d6],y.O)
 D.aBB=x([],B.as("O<tS>"))
 D.elw=new B.o(0,36)
 D.exG=new C.auZ(null)
@@ -3875,4 +3875,4 @@ D.hu7=new C.adN(0,"none")
 D.b0_=new C.adN(1,"highlightLeading")
 D.acB=new C.adN(2,"highlightTrailing")
 D.b00=new C.adN(3,"highlightAll")})()};
-(a=>{a["babFzWhxSMsO6diqL1NkydtI5do="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["8nYAUEjXwDj41ZHruoeEOMnWPsI="]=a.current})($__dart_deferred_initializers__);

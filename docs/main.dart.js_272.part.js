@@ -1343,8 +1343,8 @@ cCi(d){var w=null,v=B.a.co(d,"."),u=v>0,t=u?B.a.aC(d,0,v):"\u2022",s=u?B.a.i(B.a
 u=B.bR.j(0.35)
 return new A.D(B.d3,A.A(A.a([A.q(B.A,A.d(t,w,w,w,w,w,w,B.vB,w,w,w),B.f,w,w,new A.p(u,w,w,w,w,w,B.a7),w,24,w,w,w,w,w,24),B.au,A.E(A.d(s,w,w,w,w,w,w,D.ftu,w,w,w),1)],x.p),B.E,w,B.e,B.i,0,w,w),w)},
 cCj(d){switch(d.a){case 0:return D.dvF
-case 1:return D.dqs
-case 2:return D.dgu}}}
+case 1:return D.dqr
+case 2:return D.dgt}}}
 C.aNf.prototype={
 aY(){this.b5()
 this.b4()
@@ -3515,13 +3515,13 @@ D.bSC=new A.a0(985101,"MaterialIcons",!1)
 D.bV3=new A.ae(B.pv,22,B.c,null,null,null)
 D.bVT=new A.ae(I.a2L,22,B.c,null,null,null)
 D.bWh=new A.ae(B.lO,16,B.c,null,null,null)
-D.dgu=w(["1. Open ngmy.org in Chrome, Edge, or Safari.","2. Click Start Video in Recorder Studio.","3. Click Allow in the browser microphone prompt.","4. If blocked: click the lock icon in the address bar \u2192 Site settings \u2192 Microphone \u2192 Allow.","5. On Mac: System Settings \u2192 Privacy & Security \u2192 Microphone \u2192 enable your browser.","6. On Windows: Settings \u2192 Privacy \u2192 Microphone \u2192 allow desktop apps and your browser.","7. Refresh ngmy.org and click Start Video again."],x.s)
+D.dgt=w(["1. Open ngmy.org in Chrome, Edge, or Safari.","2. Click Start Video in Recorder Studio.","3. Click Allow in the browser microphone prompt.","4. If blocked: click the lock icon in the address bar \u2192 Site settings \u2192 Microphone \u2192 Allow.","5. On Mac: System Settings \u2192 Privacy & Security \u2192 Microphone \u2192 enable your browser.","6. On Windows: Settings \u2192 Privacy \u2192 Microphone \u2192 allow desktop apps and your browser.","7. Refresh ngmy.org and click Start Video again."],x.s)
 D.a7m=new C.Ce(0,"instant")
 D.a7n=new C.Ce(1,"slideHorizontal")
 D.dOc=new C.Ce(2,"slideVertical")
 D.dOd=new C.Ce(3,"fade")
 D.a5W=w([D.a7m,D.a7n,D.dOc,D.dOd],A.as("O<Ce>"))
-D.dqs=w(["1. Open ngmy.org in Chrome (recommended).",y.k,"3. When Android asks, tap Allow while using the app.","4. If blocked: tap the lock icon in the address bar \u2192 Permissions \u2192 Microphone \u2192 Allow.","5. Or go to Settings \u2192 Apps \u2192 Chrome \u2192 Permissions \u2192 Microphone \u2192 Allow.","6. Refresh the page and tap Start Video again."],x.s)
+D.dqr=w(["1. Open ngmy.org in Chrome (recommended).",y.k,"3. When Android asks, tap Allow while using the app.","4. If blocked: tap the lock icon in the address bar \u2192 Permissions \u2192 Microphone \u2192 Allow.","5. Or go to Settings \u2192 Apps \u2192 Chrome \u2192 Permissions \u2192 Microphone \u2192 Allow.","6. Refresh the page and tap Start Video again."],x.s)
 D.dvF=w(["1. Open ngmy.org in Safari (Add to Home Screen works too).",y.k,"3. Tap Allow when ngmy.org asks \u2014 this works with Safari set to Ask or Allow.","4. Recommended: Settings \u2192 Safari \u2192 Microphone \u2192 Ask, then Allow inside ngmy.org when recording.","5. If no prompt appears: tap the AA icon in the address bar \u2192 Website Settings \u2192 Microphone \u2192 Allow.","6. Also check: Settings \u2192 Privacy & Security \u2192 Microphone \u2192 Safari ON.","7. Close Safari completely, reopen ngmy.org, tap Start Video, then Allow."],x.s)
 D.bek=new A.fk(null,null,null,null,null,B.bR,null,null,null,null)
 D.bcO=new A.cg(B.A,null,null,D.bek,null)
@@ -3573,4 +3573,4 @@ D.hwP=new C.aDG(1,"android")
 D.hwQ=new C.aDG(2,"computer")
 D.hwR=new C.a08(null)})();(function staticFields(){$.h8w=null})();(function lazyInitializers(){var w=a.lazyFinal
 w($,"iDp","ot",()=>new C.b27(new C.b25(A.a([],A.as("O<nr>"))),B.bE,$.aw()))})()};
-(a=>{a["uxFx/TO4+STQPpGUkG39CZjJdMc="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["xPabesTYq/sDX5fc1D4Rn9lUQNM="]=a.current})($__dart_deferred_initializers__);

@@ -8,7 +8,7 @@ for(;;)switch(x){case 0:x=3
 return A.b(A.az(),$async$fto)
 case 3:u=f
 t=C.frd("ngmy_bible_dictionary_lang_v1",d)
-v=B.d.dP(D.dgF,new C.ftp(A.aT(J.t(u.a,t))),new C.ftq())
+v=B.d.dP(D.dgE,new C.ftp(A.aT(J.t(u.a,t))),new C.ftq())
 x=1
 break
 case 1:return A.h(v,w)}})
@@ -1973,7 +1973,7 @@ m.r=n.j(B.j.D(u,0,1)).gp(0)
 d.N(new A.o(x+l*t,w+o*t),s,m)}},
 aD(d){return d.b!==this.b||!d.c.A(0,this.c)}}
 C.bcs.prototype={
-a5(d,a0){var x,w,v,u,t,s,r,q,p,o,n,m,l=this,k=null,j=a0.a,i=a0.b,h=l.e,g=h?D.bkJ:D.bmE,f=h?D.car:D.dj9,e=h?D.buj:B.cu
+a5(d,a0){var x,w,v,u,t,s,r,q,p,o,n,m,l=this,k=null,j=a0.a,i=a0.b,h=l.e,g=h?D.bkJ:D.bmE,f=h?D.car:D.dj8,e=h?D.buj:B.cu
 h=$.Q().r
 x=y.v
 w=new A.aF(h,B.ai,k,k,A.a([],x))
@@ -2481,7 +2481,7 @@ x=6
 break
 case 4:u=3
 g=t.pop()
-h=D.dlD
+h=D.dlC
 x=6
 break
 case 3:x=2
@@ -3226,7 +3226,7 @@ C.dV5.prototype={
 $2(d,e){return B.au},
 $S:36}
 C.dV4.prototype={
-$2(d,e){var x,w,v,u,t,s=null,r=D.dj1[e],q=this.a,p=q.d
+$2(d,e){var x,w,v,u,t,s=null,r=D.dj0[e],q=this.a,p=q.d
 p=p==null?s:p.a
 x=r.a
 w=p===x
@@ -3800,7 +3800,7 @@ D.dei=x([D.bmD,N.ahj,B.dh],y.O)
 D.deB=x(["agape","John 3:16","grace in Ephesians 2:8","logos","shalom","Psalm 23"],A.as("O<n>"))
 D.Aa=new C.F3("en","English","\ud83c\uddfa\ud83c\uddf8",0,"en")
 D.a7i=new C.F3("sw","Swahili","\ud83c\uddf9\ud83c\uddff",1,"sw")
-D.dgF=x([D.Aa,D.a7i],A.as("O<F3>"))
+D.dgE=x([D.Aa,D.a7i],A.as("O<F3>"))
 D.hzm=new C.um("Cherry Red","\ud83c\udf52",B.ay)
 D.hzp=new C.um("Orange Pop","\ud83c\udf4a",B.c8)
 D.hzj=new C.um("Sunny Yellow","\ud83c\udf1e",B.bi)
@@ -3814,11 +3814,11 @@ D.hzi=new C.um("Bubblegum Pink","\ud83c\udf6c",B.bD)
 D.hzg=new C.um("Choco Brown","\ud83c\udf6b",B.i8)
 D.hzn=new C.um("Snow White","\u26c4",B.aP)
 D.hzq=new C.um("Jet Black","\ud83d\udda4",B.kP)
-D.dj1=x([D.hzm,D.hzp,D.hzj,D.hzk,D.hzf,D.hzh,D.hzl,D.hzo,D.hze,D.hzi,D.hzg,D.hzn,D.hzq],A.as("O<um>"))
+D.dj0=x([D.hzm,D.hzp,D.hzj,D.hzk,D.hzf,D.hzh,D.hzl,D.hzo,D.hze,D.hzi,D.hzg,D.hzn,D.hzq],A.as("O<um>"))
 D.bmW=new A.u(1,0.9803921568627451,0.984313725490196,1,B.q)
 D.blb=new A.u(1,0.9058823529411765,0.9215686274509803,0.9529411764705882,B.q)
-D.dj9=x([D.bmW,D.blb],y.O)
-D.dlD=x([],A.as("O<lk>"))
+D.dj8=x([D.bmW,D.blb],y.O)
+D.dlC=x([],A.as("O<lk>"))
 D.bs_=new A.u(1,0.9921568627450981,0.9490196078431372,1,B.q)
 D.dxl=x([B.hU,D.bs_,B.kO],y.O)
 D.eiG={Contacts:0,"Site Map":1,Hotlines:2,Medicines:3,Notes:4,"Quick Tasks":5,"Where I Put It":6,"Paint Mix":7,"Bible Dictionary":8,"Quick Dial":9}
@@ -3916,4 +3916,4 @@ D.htF=new C.a_q(null)
 D.b0E=new C.aJB(0,"unlock")
 D.b0F=new C.aJB(1,"setFirst")
 D.hBi=new C.aJB(2,"setConfirm")})();(function staticFields(){$.h9g=null})()};
-(a=>{a["6lpd32b+HxOEmssFpVBzHvZ5Fw4="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["wE0v1YyiQZDyoIyLUQ4rnddw9Yo="]=a.current})($__dart_deferred_initializers__);

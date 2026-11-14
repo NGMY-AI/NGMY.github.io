@@ -1202,7 +1202,7 @@ if(d==="share")x.a.a2O(x.b)
 if(d==="delete")x.a.XP(x.b.a)},
 $S:2}
 C.evl.prototype={
-$1(d){return D.dgl},
+$1(d){return D.dgk},
 $S:145}
 C.evk.prototype={
 $0(){return this.a.b4F(this.b)},
@@ -1289,8 +1289,8 @@ var y=(function rtii(){var x=A.as
 return{V:x("O<ac>"),O:x("O<u>"),k:x("O<oK>"),p:x("O<v>"),A:x("cw<ah<af>>"),S:x("ai<oK>"),j:x("ai<@>"),P:x("a8<n,@>"),f:x("a8<@,@>"),n:x("oK"),I:x("qS"),C:x("aE"),_:x("jF<n>"),N:x("n"),l:x("v"),q:x("mz"),z:x("@"),W:x("oK?"),X:x("aE?"),D:x("qk?"),K:x("dK?"),H:x("~")}})();(function constants(){var x=a.makeConstList
 D.b5_=new A.ay(B.aY,1,B.r,-1)
 D.fX7=new A.B("Looking up product\u2026",null,B.hj,null,null,null,null,null,null,null,null,null)
-D.dsE=x([H.Y_,B.X,D.fX7],y.p)
-D.bwP=new A.fj(B.ah,B.e,B.Q,B.l,null,B.p,null,0,D.dsE,null)
+D.dsD=x([H.Y_,B.X,D.fX7],y.p)
+D.bwP=new A.fj(B.ah,B.e,B.Q,B.l,null,B.p,null,0,D.dsD,null)
 D.bce=new A.cg(B.A,null,null,D.bwP,null)
 D.fv0=new A.G(!0,B.kl,null,null,null,null,10,B.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.h0v=new A.B("N",null,D.fv0,null,null,null,null,null,null,null,null,null)
@@ -1310,8 +1310,8 @@ D.c1e=new A.ae(B.a1Z,null,B.aD,null,null,null)
 D.c3t=new A.e5(null,null,null,null,null,null,null,null,null,null,"UPC / EAN / QR payload",null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,!0,null,null,null,null)
 D.d4k=x([B.ua,B.kl,B.e6],y.O)
 D.c72=new A.a9(B.aA,B.aE,B.x,D.d4k,null,null)
-D.dvh=x([B.ua,B.kl,B.e6,B.kl],y.O)
-D.c7w=new A.a9(B.aA,B.aE,B.x,D.dvh,B.Dj,null)
+D.dvg=x([B.ua,B.kl,B.e6,B.kl],y.O)
+D.c7w=new A.a9(B.aA,B.aE,B.x,D.dvg,B.Dj,null)
 D.bWn=new A.ae(B.jp,20,null,null,null,null)
 D.flN=new A.CR("Scan",D.bWn,null)
 D.bVb=new A.ae(B.pr,20,null,null,null,null)
@@ -1324,7 +1324,7 @@ D.exP=new A.jF("save_qr",48,D.fDJ,null,y._)
 D.fWh=new A.B("Share QR",null,null,null,null,null,null,null,null,null,null,null)
 D.exQ=new A.jF("share",48,D.fWh,null,y._)
 D.exV=new A.jF("delete",48,B.xo,null,y._)
-D.dgl=x([D.exS,D.exK,D.exP,D.exQ,D.exV],A.as("O<pA<n>>"))
+D.dgk=x([D.exS,D.exK,D.exP,D.exQ,D.exV],A.as("O<pA<n>>"))
 D.fSV=new A.B("Save a price in My Catalog first, or enroll this product.",null,null,null,null,null,null,null,null,null,null,null)
 D.fhd=new A.b1(D.fSV,null,null,null,null,null,null,null,null,null,null,null,null,B.a_,!1,null,null,null,B.t,null)
 D.fFo=new A.B("Enter a product name.",null,null,null,null,null,null,null,null,null,null,null)
@@ -1347,4 +1347,4 @@ D.fVP=new A.B("Product Scanner",null,B.cC,null,null,null,null,null,null,null,nul
 D.fYX=new A.B("Enter barcode",null,null,null,null,null,null,null,null,null,null,null)
 D.h0q=new A.B("Store QR code",null,B.ng,null,null,null,null,null,null,null,null,null)
 D.h18=new A.B("Camera scan works on the NGMY phone app.\nOn desktop web, enter the barcode below.",null,B.VN,null,B.K,null,null,null,null,null,null,null)})()};
-(a=>{a["YsDa0+L1d6C2r70HLTe+uQ052dk="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["VMqZZjbmc3O3w1ZFNFNiVU6ovGU="]=a.current})($__dart_deferred_initializers__);

@@ -624,7 +624,7 @@ try{J.aK(t,x,A.aoh(w))}catch(u){}}return t},
 hxF(d,e,f,g,h){var x,w,v=new C.fsX(d,C.hBY(e),f,g,h),u=new C.fsU(),t=v.$1(11.5)
 if(h||J.z(u.$1(t),0))return t
 if(B.d.cJ(d.d,0,new C.fsW())>4e4)return t
-for(x=0;x<3;++x){w=v.$1(D.dul[x])
+for(x=0;x<3;++x){w=v.$1(D.duk[x])
 if(u.$1(w)<u.$1(t))t=w
 if(J.z(u.$1(t),0))break}return t},
 fLD(d,e,f){var x=0,w=A.j(y.U),v,u,t,s,r,q,p,o,n
@@ -1299,7 +1299,7 @@ if(k===$)k=j.d=j.a.c.e
 s.push(j.Ol(o.b,k.r===l,new C.d88(r,j)))}s=j.a2C("Title place",A.bU(B.bG,s,B.bs,i,0,0))
 r=A.a([],x)
 for(q=0;q<4;++q){o={}
-n=D.dhP[q]
+n=D.dhO[q]
 o.a=null
 l=n.a
 o.a=l
@@ -3066,7 +3066,7 @@ w(C.b59,A.a9M)
 x(A.YN,[C.aVc,C.aUC,C.wD])
 w(C.ayo,A.rz)
 w(C.abn,A.a6V)})()
-A.iT(b.typeUniverse,JSON.parse('{"aXV":{"dJ":[],"cB":[],"v":[]},"aCz":{"aX":[],"d9":["aX"],"aV":[],"cA":[]},"a_2":{"af":[],"v":[]},"b_s":{"ax":[],"v":[]},"bdZ":{"ax":[],"v":[]},"be0":{"aC":[]},"bnz":{"ax":[],"v":[]},"aAe":{"ah":["a_2"]},"ZN":{"af":[],"v":[]},"Qm":{"af":[],"v":[]},"azt":{"ah":["ZN"]},"btE":{"ax":[],"v":[]},"beC":{"aC":[]},"NO":{"ax":[],"v":[]},"bb0":{"aC":[]},"azp":{"ah":["Qm"]},"b52":{"kH":["fy<eW>"],"ku":["fy<eW>"]},"a9O":{"yn":[],"kH":["fy<eW>"],"ku":["fy<eW>"]},"b59":{"kH":["fy<eW>"],"ku":["fy<eW>"]},"aVc":{"jf":[],"fi":[]},"aUC":{"jf":[],"fi":[]},"ayo":{"rz":[]},"abn":{"fi":[]},"wD":{"jf":[],"fi":[]}}'))
+A.iT(b.typeUniverse,JSON.parse('{"aXV":{"dJ":[],"cB":[],"v":[]},"aCz":{"aX":[],"d9":["aX"],"aV":[],"cA":[]},"a_2":{"af":[],"v":[]},"b_s":{"ax":[],"v":[]},"bdZ":{"ax":[],"v":[]},"be0":{"aC":[]},"bnz":{"ax":[],"v":[]},"aAe":{"ah":["a_2"]},"ZN":{"af":[],"v":[]},"Qm":{"af":[],"v":[]},"azt":{"ah":["ZN"]},"btE":{"ax":[],"v":[]},"beC":{"aC":[]},"NO":{"ax":[],"v":[]},"bb0":{"aC":[]},"azp":{"ah":["Qm"]},"b52":{"kH":["fy<eW>"],"kv":["fy<eW>"]},"a9O":{"yn":[],"kH":["fy<eW>"],"kv":["fy<eW>"]},"b59":{"kH":["fy<eW>"],"kv":["fy<eW>"]},"aVc":{"jf":[],"fi":[]},"aUC":{"jf":[],"fi":[]},"ayo":{"rz":[]},"abn":{"fi":[]},"wD":{"jf":[],"fi":[]}}'))
 var y=(function rtii(){var x=A.as
 return{M:x("de<n>"),q:x("aB<~>"),K:x("cZ<H,H>"),V:x("O<ac>"),O:x("O<u>"),m:x("O<a8<n,n>>"),c:x("O<mQ>"),P:x("O<b_t>"),X:x("O<rN>"),x:x("O<b_u>"),Q:x("O<o>"),v:x("O<fT>"),R:x("O<eW>"),W:x("O<fy<eW>>"),L:x("O<+(n,n)>"),y:x("O<+(H,H)>"),s:x("O<n>"),I:x("O<AG>"),p:x("O<v>"),n:x("O<fi>"),t:x("O<H>"),T:x("O<aB<~>()>"),A:x("cw<ah<af>>"),k:x("ai<+(n,n)>"),j:x("ai<@>"),f:x("a8<@,@>"),g:x("N<pp,n>"),r:x("N<H,Cv>"),w:x("iC"),E:x("aog"),B:x("mQ"),J:x("v5"),Z:x("rM"),a:x("ct"),o:x("o"),F:x("vi<eW>"),C:x("eW"),l:x("fy<eW>"),G:x("Cv"),Y:x("+(n,n)"),U:x("+filled,pages,sheets(H,H,H)"),_:x("Ka"),N:x("n"),d:x("b9P"),e:x("AG"),D:x("dK"),h:x("c3<~>"),b:x("azr"),i:x("bk<~>"),bP:x("aCz"),z:x("@"),S:x("H"),a1:x("a8<n,n>?"),aP:x("qk?"),aT:x("Pz<b1,wM>?"),u:x("n?"),ac:x("dK?"),H:x("~")}})();(function constants(){var x=a.makeConstList
 D.Xe=new A.SK(-1,1)
@@ -3082,8 +3082,8 @@ D.YZ=new A.u(1,0.16862745098039217,0.11372549019607843,0.0784313725490196,B.q)
 D.BR=new A.u(1,0.1411764705882353,0.0784313725490196,0.03529411764705882,B.q)
 D.aj3=new A.u(1,0.9529411764705882,0.9137254901960784,0.8549019607843137,B.q)
 D.brI=new A.u(0.13333333333333333,0,0,0,B.q)
-D.dl5=x([B.L,D.brI,B.Z_],y.O)
-D.c9c=new A.a9(B.b7,B.b8,B.x,D.dl5,B.Dv,null)
+D.dl4=x([B.L,D.brI,B.Z_],y.O)
+D.c9c=new A.a9(B.b7,B.b8,B.x,D.dl4,B.Dv,null)
 D.b7G=new A.p(null,null,null,null,null,D.c9c,B.n)
 D.by_=new A.l5(D.b7G,B.bj,null,null)
 D.GB=new A.bd(15e7)
@@ -3129,10 +3129,10 @@ D.d9F=x(["A children's story about a brave little lion","Hadithi ya familia yetu
 D.eQ0=new A.y("classic","Classic")
 D.eUL=new A.y("modern","Modern")
 D.eQq=new A.y("display","Bold")
-D.dhP=x([D.aRa,D.eQ0,D.eUL,D.eQq],y.L)
+D.dhO=x([D.aRa,D.eQ0,D.eUL,D.eQq],y.L)
 D.Sg=x([],y.P)
 D.Sh=x([],y.x)
-D.dul=x([12,11,12.5],A.as("O<F>"))
+D.duk=x([12,11,12.5],A.as("O<F>"))
 D.dOT=new C.pp("royal","Royal",4279180093,4280171146,4292128567,4294965479,"middle","classic","small",!0)
 D.dOY=new C.pp("sunset","Sunset",4294933061,4292887931,4294955366,4294967295,"bottom","display","small",!1)
 D.dOX=new C.pp("photo","Big Photo",4279310375,4281811281,4294286859,4294967295,"bottom","display","full",!1)
@@ -3179,8 +3179,8 @@ D.c_P=new A.ae(B.ox,null,F.lF,null,null,null)
 D.fyo=new A.G(!0,E.iZ,null,null,null,null,18,B.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fWM=new A.B("Print as a book",null,D.fyo,null,null,null,null,null,null,null,null,null)
 D.bIO=new A.bz(1,B.bc,D.fWM,null)
-D.dfv=x([D.c_P,B.ae,D.bIO],y.p)
-D.f9_=new A.c6(B.aL,B.e,B.i,B.l,null,B.p,null,0,D.dfv,null)
+D.dfu=x([D.c_P,B.ae,D.bIO],y.p)
+D.f9_=new A.c6(B.aL,B.e,B.i,B.l,null,B.p,null,0,D.dfu,null)
 D.ek_={the:0,and:1,of:2,to:3,was:4,is:5,in:6,that:7,he:8,she:9,his:10,her:11,with:12,for:13,as:14,they:15,their:16,from:17,by:18,were:19,are:20,it:21,this:22,be:23,on:24,at:25,who:26,had:27,have:28,our:29,we:30}
 D.faR=new A.de(D.ek_,31,y.M)
 D.el2={na:0,ya:1,wa:2,za:3,ni:4,la:5,katika:6,ambao:7,ambayo:8,hawa:9,yake:10,wake:11,zao:12,yao:13,kuwa:14,alikuwa:15,walikuwa:16,mtu:17,watu:18,wakati:19,baada:20,kila:21}
@@ -3221,4 +3221,4 @@ D.h_J=new A.B("Design the cover",null,B.cC,null,null,null,null,null,null,null,nu
 D.h2P=new C.cDl(6,"postScriptName")
 D.hAS=new C.btE(null)})();(function staticFields(){$.hwP=null
 $.hyR=A.T(y.N,A.as("aB<n?>"))})()};
-(a=>{a["VCT/8/cPPusWm6excicH4Wm3q2Q="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["L/djDCd4PEf91sJroLtAuJyHZyE="]=a.current})($__dart_deferred_initializers__);

@@ -317,7 +317,7 @@ t=A.C(t,t.$ti.k("ak.E"))
 v=t
 x=1
 break
-case 15:v=D.dlF
+case 15:v=D.dlE
 x=1
 break
 case 4:case 1:return A.h(v,w)}})
@@ -548,7 +548,7 @@ $0(){A.a6(this.a,!1).O(null)
 return null},
 $S:0}
 C.ec4.prototype={
-$2(d,e){var x,w,v,u,t,s,r,q,p,o,n,m,l=null,k=D.dib[e],j=this.a,i=k.a,h=j.e.h(0,i)
+$2(d,e){var x,w,v,u,t,s,r,q,p,o,n,m,l=null,k=D.dia[e],j=this.a,i=k.a,h=j.e.h(0,i)
 if(h==null)h=0
 x=j.r===i
 w=B.j.F(this.b+e*0.08,1)
@@ -602,14 +602,14 @@ D.dzi=x([B.aF,B.bp],y.O)
 D.huj=new C.yM("where","Where I Put It",B.n3,B.bp,D.dzi)
 D.d73=x([B.fp,B.aS],y.O)
 D.hud=new C.yM("alarms","Alarms",B.a2m,B.c8,D.d73)
-D.dpa=x([B.of,B.cy],y.O)
-D.huc=new C.yM("menu","Local Menu",B.wK,B.cy,D.dpa)
-D.drF=x([B.jX,B.ch],y.O)
-D.huf=new C.yM("bio","Local Bio",B.hM,B.ch,D.drF)
-D.dib=x([D.hug,D.huh,D.hue,D.hub,D.huk,D.hui,D.huj,D.hud,D.huc,D.huf],A.as("O<yM>"))
-D.dlF=x([],A.as("O<jL>"))
+D.dp9=x([B.of,B.cy],y.O)
+D.huc=new C.yM("menu","Local Menu",B.wK,B.cy,D.dp9)
+D.drE=x([B.jX,B.ch],y.O)
+D.huf=new C.yM("bio","Local Bio",B.hM,B.ch,D.drE)
+D.dia=x([D.hug,D.huh,D.hue,D.hub,D.huk,D.hui,D.huj,D.hud,D.huc,D.huf],A.as("O<yM>"))
+D.dlE=x([],A.as("O<jL>"))
 D.fdj=new A.av(0,42)
 D.ffD=new A.hG(2,10,10,1.28,null)
 D.fAE=new A.G(!0,B.c,null,null,null,null,12,B.u,null,null,null,null,1.15,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.h0I=new A.B("Open / add",null,B.cg,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["/Te3ha0kSbc1X3NwQQTtREp73ys="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["Sby2Kp0sLesvuGW3cH1r5ffzUfw="]=a.current})($__dart_deferred_initializers__);

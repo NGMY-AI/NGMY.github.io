@@ -4422,7 +4422,7 @@ r=A.I(["mandatory",A.T(t,t),"optional",A.a([A.I(["DtlsSrtpKeyAgreement",!0],s,y.
 q=b.G.RTCPeerConnection
 t=A.dN(r,s,t)
 t.v(0,d)
-u=new q(A.kh(A.cv(t)))
+u=new q(A.ki(A.cv(t)))
 t=J.k(u)
 v=B.hZ4(C.cP.gcu().aN(new A.d8(t)),u)
 x=1
@@ -4480,7 +4480,7 @@ var $async$ami=A.e(function(e,f){if(e===1)return A.f(f,w)
 for(;;)switch(x){case 0:s=u.at
 s===$&&A.c()
 x=3
-return A.b(A.ef(s.createAnswer(A.kh(A.cv(A.T(y.N,y.z)))),y.aQ),$async$ami)
+return A.b(A.ef(s.createAnswer(A.ki(A.cv(A.T(y.N,y.z)))),y.aQ),$async$ami)
 case 3:t=f
 v=new B.Yh(t.sdp,t.type)
 x=1
@@ -5571,14 +5571,14 @@ n=y.O
 p=A.ap(u,new A.dw(!0,A.q(u,u,C.f,u,u,new A.p(u,u,u,u,u,new A.bY(C.A,0.5,C.x,u,0,A.a([p.j(A.S(d).ax.a===C.J?0.18:0.12),s[5].j(0)],n),u,u),C.a7),u,220,u,u,u,u,u,220),u),u,u,u,-60,-80,u)
 n=A.ap(40,new A.dw(!0,A.q(u,u,C.f,u,u,new A.p(u,u,u,u,u,new A.bY(C.A,0.5,C.x,u,0,A.a([C.aF.j(A.S(d).ax.a===C.J?0.12:0.08),C.aF.j(0)],n),u,u),C.a7),u,180,u,u,u,u,u,180),u),u,u,-70,u,u,u)
 x=A.a([],o)
-if(v.f!=null)x.push(A.ko(s[1].j(0.5),u,C.aF,2.5,u,u,u))
+if(v.f!=null)x.push(A.kp(s[1].j(0.5),u,C.aF,2.5,u,u,u))
 if(v.d.length!==0){s=v.r.a
 s=s===0?"Share QR":"QR ("+s+")"
 w=v.e
 s=A.E(new B.aAS(C.jJ,s,!0,t,w?u:v.gcAe(),u),1)
 x.push(new A.D(D.bDe,A.lC(new B.dZE(),A.A(A.a([s,C.au,A.E(new B.aAS(C.uO,"Export",!1,t,w?u:v.gbSK(),u),1)],o),C.l,u,C.e,C.i,0,u,u),C.cw,C.iK,u,u,new A.br(0,1,y.X),y.i),u))}s=v.d.length
 if(s===0)s=new B.bft(t,v.e?u:v.gb4i(),u)
-else s=A.kp(!0,u,u,new B.dZF(v,t),s,u,D.bD5,u,u,!1,!1)
+else s=A.kq(!0,u,u,new B.dZF(v,t),s,u,D.bD5,u,u,!1,!1)
 x.push(A.E(s,1))
 return A.c4(q,r,new A.an(C.a0,u,C.ad,C.t,A.a([p,n,A.x(x,C.l,u,C.e,C.i,0,C.p)],o),u),u,!1,!1,u,u)}}
 B.aAS.prototype={
@@ -5605,7 +5605,7 @@ r=A.m(18)
 q=A.m(14)
 p=i.c
 o=!C.a.a0(p,"video/")
-if(!o||i.mI(D.n6))p=D.ds3
+if(!o||i.mI(D.n6))p=D.ds2
 else{p=C.a.a0(p,"image/")||i.mI(D.S8)
 n=y.O
 p=p?A.a([C.cG,C.aF],n):A.a([C.aN.j(0.85),C.aF.j(0.7)],n)}p=A.q(j,A.X(k.w,C.c,j,j,j,22),C.f,j,j,new A.p(j,j,j,q,j,new A.a9(C.aA,C.aE,C.x,p,j,j),C.n),j,48,j,j,j,j,j,48)
@@ -7356,8 +7356,8 @@ D.ai1=new A.u(1,0.03137254901960784,0.06274509803921569,0.09411764705882353,C.q)
 D.ajP=new A.u(1,0.07058823529411765,0.10196078431372549,0.14901960784313725,C.q)
 D.fFM=new A.B("Your team portal",null,C.di,null,null,null,null,null,null,null,null,null)
 D.fUE=new A.B("Share the access code and member password with your team. They only sign in once.",null,G.EI,null,null,null,null,null,null,null,null,null)
-D.dj6=x([D.fFM,C.an,D.fUE],y.p)
-D.bwz=new A.fj(C.ah,C.e,C.i,C.E,null,C.p,null,0,D.dj6,null)
+D.dj5=x([D.fFM,C.an,D.fUE],y.p)
+D.bwz=new A.fj(C.ah,C.e,C.i,C.E,null,C.p,null,0,D.dj5,null)
 D.fZ6=new A.B("Create your organization",null,C.fC,null,null,null,null,null,null,null,null,null)
 D.fKe=new A.B("Set an access code and member password. Share them with your team \u2014 they sign in once.",null,G.EI,null,null,null,null,null,null,null,null,null)
 D.dzX=x([D.fZ6,C.an,D.fKe],y.p)
@@ -7396,7 +7396,7 @@ D.cSg=x(["mp3","wav","m4a","aac","ogg","flac","opus","wma","weba"],y.s)
 D.RS=x([C.fo,C.aF],y.O)
 D.S8=x(["jpg","jpeg","jfif","png","gif","webp","heic","heif","bmp","tif","tiff"],y.s)
 D.n6=x(["mp4","mov","m4v","webm","avi","mkv","3gp"],y.s)
-D.ds3=x([C.oh,C.aF],y.O)
+D.ds2=x([C.oh,C.aF],y.O)
 D.ekw={iceServers:0}
 D.aLd={urls:0}
 D.dDH=new A.bu(D.aLd,["stun:stun.l.google.com:19302"],y.m)
@@ -7510,4 +7510,4 @@ $.i4u=null
 $.hdA=null})();(function lazyInitializers(){var x=a.lazyFinal
 x($,"ixJ","hH2",()=>new B.crG())
 x($,"ivD","hhA",()=>C.a.q(A.bA(A.bA(A.bA(A.HA(),"window"),"navigator"),"userAgent"),"Firefox"))})()};
-(a=>{a["1B0KYnDcEP46vUNxjg6gG5aG1s8="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["TUBCYtYkOEG4bg9kjunD5XwnbcU="]=a.current})($__dart_deferred_initializers__);

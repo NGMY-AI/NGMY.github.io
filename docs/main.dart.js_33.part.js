@@ -102,7 +102,7 @@ B(d){var x=null,w=B.m(12),v=this.d,u=v?D.ddf:D.den,t=this.c,s=B.L(t.j(0.65),A.r,
 t=B.d("YOUR MENU",x,x,x,x,x,x,B.l(x,x,v?t:A.ha,x,x,x,x,x,x,x,x,13,x,x,A.u,x,x,!0,x,1.2,x,x,x,x,x,x),x,x,x)
 return B.at(B.eN(A.A,-0.04,B.q(x,B.x(B.a([q,A.U,t,A.b5,B.d("Burgers \xb7 Drinks \xb7 QR",x,x,x,x,x,x,B.l(x,x,v?A.aD:A.T,x,x,x,x,x,x,x,x,10,x,x,A.V,x,x,!0,x,x,x,x,x,x,x,x),x,x,x)],y.u),A.E,x,A.e,A.i,0,A.p),A.f,x,x,new B.p(x,x,s,w,r,new B.a9(A.a6,A.aa,A.x,u,x,x),A.n),x,114,x,H.NR,A.bF,x,x,200),x),x,x,x)}}
 C.bgf.prototype={
-B(d){var x=null,w=B.m(12),v=this.c,u=v?D.duQ:K.azB,t=B.L(A.aH.j(0.65),A.r,1.3),s=B.a([new B.ac(0,A.G,A.aH.j(0.3),A.h5,24)],y.r),r=y.u,q=B.A(B.a([B.q(x,D.c06,A.f,x,x,new B.p(x,x,x,B.m(8),x,D.c7V,A.n),x,28,x,x,x,x,x,28),A.b5,C.hb8(A.aH),A.de,C.hb8(A.bp),A.de,C.hb8(A.bD)],r),A.l,x,A.e,A.i,0,x,x),p=B.d("ESSENTIALS",x,x,x,x,x,x,B.l(x,x,v?A.c:A.jf,x,x,x,x,x,x,x,x,13,x,x,A.u,x,x,!0,x,1.3,x,x,x,x,x,x),x,x,x)
+B(d){var x=null,w=B.m(12),v=this.c,u=v?D.duP:K.azB,t=B.L(A.aH.j(0.65),A.r,1.3),s=B.a([new B.ac(0,A.G,A.aH.j(0.3),A.h5,24)],y.r),r=y.u,q=B.A(B.a([B.q(x,D.c06,A.f,x,x,new B.p(x,x,x,B.m(8),x,D.c7V,A.n),x,28,x,x,x,x,x,28),A.b5,C.hb8(A.aH),A.de,C.hb8(A.bp),A.de,C.hb8(A.bD)],r),A.l,x,A.e,A.i,0,x,x),p=B.d("ESSENTIALS",x,x,x,x,x,x,B.l(x,x,v?A.c:A.jf,x,x,x,x,x,x,x,x,13,x,x,A.u,x,x,!0,x,1.3,x,x,x,x,x,x),x,x,x)
 return B.at(B.eN(A.A,-0.05,B.q(x,B.x(B.a([q,A.X,p,A.b5,B.d("Notes \xb7 Contacts \xb7 Tools",x,x,x,x,x,x,B.l(x,x,v?A.aD:A.T,x,x,x,x,x,x,x,x,10,x,x,A.V,x,x,!0,x,x,x,x,x,x,x,x),x,x,x)],r),A.E,x,A.e,A.i,0,A.p),A.f,x,x,new B.p(x,x,t,w,s,new B.a9(A.aA,A.aE,A.x,u,x,x),A.n),x,114,x,H.NR,A.bF,x,x,200),x),x,x,x)}}
 var z=a.updateTypes([])
 C.fMr.prototype={
@@ -119,7 +119,7 @@ p=p>0?""+p+" saved":v
 p=u.awV(p,D.dwt,new C.eq6(u,d),g,0.22,new C.bkv(A.c4,B.S(r).ax.a===A.J,v),e,f,"",t,s,"Menu Studio")
 x=u.e
 x=x>0?""+x+" saved":v
-return B.cl(B.a([q,A.bz,p,A.bz,u.awV(x,D.dvj,new C.eq7(u,d),g,0.44,new C.bgf(B.S(r).ax.a===A.J,v),e,f,"",t,s,"Business Essentials")],y.u),v,v,new B.R(16,8,16,w.b),v,v,A.ah,!1)},
+return B.cl(B.a([q,A.bz,p,A.bz,u.awV(x,D.dvi,new C.eq7(u,d),g,0.44,new C.bgf(B.S(r).ax.a===A.J,v),e,f,"",t,s,"Business Essentials")],y.u),v,v,new B.R(16,8,16,w.b),v,v,A.ah,!1)},
 $C:"$4",
 $R:4,
 $S:606}
@@ -164,7 +164,7 @@ D.c7V=new B.a9(A.a6,A.aa,A.x,A.RF,null,null)
 D.cLm=x([A.aP,A.aO],y.c)
 D.ddf=x([G.ZU,A.ep],y.c)
 D.den=x([A.qn,A.fy],y.c)
-D.duQ=x([A.c3,A.eX,A.d6],y.c)
-D.dvj=x([A.aH,A.d6,A.eX],y.c)
+D.duP=x([A.c3,A.eX,A.d6],y.c)
+D.dvi=x([A.aH,A.d6,A.eX],y.c)
 D.dwt=x([A.c4,A.aC,L.iZ],y.c)})()};
-(a=>{a["NyTVPU2egSThPbSa/qJ2sNi8d/o="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["UesBZCNQVVe0vMHYlgCJkVvBQ8E="]=a.current})($__dart_deferred_initializers__);
