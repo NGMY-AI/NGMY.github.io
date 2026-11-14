@@ -639,15 +639,24 @@ class _ElectricalPageState extends State<ElectricalLessonPage> with _GlowMixin {
   late final WiringState s = widget.state ?? WiringState();
   // A ceiling light or fan is seen from the side, where the house wires, the fixture wires and the nuts between them are all in view.
   bool get _ceilingLesson => lesson.id == 'light' || lesson.id == 'fan';
-  // The view turns round the device but never goes behind the wall, under it or far above it: the wall always shows its face.
+  // The view turns round the device as far as its back (to the left or to the right), but not all the way round. The wall is left out once the view is behind it, so the back of the device can be seen.
   late final Cam3 cam = (_ceilingLesson ? Cam3(yaw: 1.15, pitch: 0.12, dist: 11, target: const V3(0, -0.3, 3.2)) : Cam3(yaw: 0.42, pitch: 0.26, dist: 12, target: const V3(0, 0.2, 2.8)))
-    ..yawCenter = _ceilingLesson ? 0.7 : 0.0
-    ..yawRange = _ceilingLesson ? 0.95 : 1.0
+    ..yawCenter = 0.0
+    ..yawRange = 2.9
     ..minPitch = -0.3
     ..maxPitch = 0.85
     ..minDist = 5
     ..maxDist = 26;
+  bool _wallShown = true;
   late Scene3D scene = buildElectricalScene(lesson, s);
+
+  /// The wall is drawn while the view is in front of it and left out once the view has gone round behind it.
+  void _checkWall() {
+    final show = cam.yaw.abs() < 1.5;
+    if (show == _wallShown || !mounted) return;
+    _wallShown = show;
+    setState(_rebuild);
+  }
   String chip = '';
   int hl = 0;
   String? msg;
@@ -677,6 +686,7 @@ class _ElectricalPageState extends State<ElectricalLessonPage> with _GlowMixin {
   @override
   void initState() {
     super.initState();
+    cam.addListener(_checkWall);
     if (widget.state == null) {
       FrameSave.load('bench_${widget.id}').then((j) {
         if (!mounted) return;
@@ -701,6 +711,7 @@ class _ElectricalPageState extends State<ElectricalLessonPage> with _GlowMixin {
 
   @override
   void dispose() {
+    cam.removeListener(_checkWall);
     _msgTimer?.cancel();
     disposeGlow();
     super.dispose();
@@ -719,7 +730,7 @@ class _ElectricalPageState extends State<ElectricalLessonPage> with _GlowMixin {
 
   void _rebuild() {
     s.testing = s.testing && s.power && s.stage >= 2;
-    scene = buildElectricalScene(lesson, s);
+    scene = buildBench(lesson, s, withWall: _wallShown);
     _saveBench();
   }
 
