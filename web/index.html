@@ -7,6 +7,31 @@
   <base href="$FLUTTER_BASE_HREF">
 
   <script>
+    // The engine measures the page with documentElement.clientHeight. After the keyboard (or a toolbar) has come and gone, iOS can keep
+    // that number smaller than the screen that is really visible, and the app is drawn short, with a dark strip at the bottom. When the visible
+    // area (visualViewport) is taller than that number, the taller one is reported. While the keyboard is up the visible area is the smaller one,
+    // so then nothing changes.
+    (function () {
+      try {
+        var de = document.documentElement;
+        var d = Object.getOwnPropertyDescriptor(Element.prototype, 'clientHeight');
+        if (!d || !d.get) return;
+        Object.defineProperty(de, 'clientHeight', {
+          configurable: true,
+          get: function () {
+            var h = d.get.call(de);
+            var vv = window.visualViewport;
+            if (vv) {
+              var v = Math.round(vv.height + vv.offsetTop);
+              if (v > h && v - h < 200) return v;
+            }
+            return h;
+          },
+        });
+      } catch (e) {}
+    })();
+  </script>
+  <script>
     (function () {
       try {
         var p = new URLSearchParams(location.search);

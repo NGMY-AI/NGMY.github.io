@@ -584,7 +584,8 @@ Scene3D buildBench(ElectricalLesson lesson, WiringState s, {bool withWall = true
     }
   }
   if (s.power && s.stage == 0) labels.add(const Label3D(V3(-0.4, 4.2, -2.4), 'LIVE 120 V', Color(0xFFDC2626)));
-  return Scene3D(b.polys, info: info, labels: labels);
+  // Every face is drawn from both sides: seen from behind or from inside the open box nothing goes missing and nothing can be seen through.
+  return Scene3D([for (final p in b.polys) p.twoSided ? p : Poly(p.pts, p.n, p.color, p.id, shine: p.shine, alpha: p.alpha, twoSided: true, layer: p.layer, bias: p.bias, order: p.order, group: p.group)], info: info, labels: labels);
 }
 
 /// The blue box and the yellow cable coming into it. Returns where the cable ends (one end per cable).
