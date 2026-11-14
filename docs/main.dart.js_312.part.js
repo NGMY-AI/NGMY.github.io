@@ -1,9 +1,9 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var D,A,E,C={
-hr6(d){switch(d.a){case 1:return B.ehn
-case 2:return B.ehp
-case 0:return B.eho}},
-atR:function atR(d,e,f,g,h,i){var _=this
+hrf(d){switch(d.a){case 1:return B.ehs
+case 2:return B.ehu
+case 0:return B.eht}},
+atS:function atS(d,e,f,g,h,i){var _=this
 _.a=d
 _.b=e
 _.c=f
@@ -15,23 +15,23 @@ A=c[2]
 E=c[53]
 C=a.updateHolder(c[39],C)
 B=c[189]
-C.atR.prototype={}
+C.atS.prototype={}
 var z=a.updateTypes([]);(function inheritance(){var x=a.inherit
-x(C.atR,D.aE)})()
-var y={c:D.as("O<u>")};(function constants(){var x=a.makeConstList
-B.aV4=new D.G(!0,A.c,null,null,null,null,9,A.u,null,2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-B.d2b=x([A.dx,A.kn,A.aF],y.c)
-B.dzW=x([A.aF,A.fd],y.c)
-B.daO=x([A.kK,A.pc,A.aF],y.c)
-B.ehn=new C.atR(B.d2b,B.dzW,A.fd,A.jq,"PREMIUM",B.daO)
-B.ds3=x([A.cG,A.fo,A.bR],y.c)
-B.dne=x([A.bR,A.aY],y.c)
-B.d9r=x([A.wb,A.bR,A.fo],y.c)
-B.eho=new C.atR(B.ds3,B.dne,A.bR,A.jF,"NGMY WALLET",B.d9r)
-B.dp8=x([A.ep,A.dT,A.pd],y.c)
-B.dtK=x([A.aC,A.aS],y.c)
-B.dbG=x([A.u9,A.aC,A.c4],y.c)
-B.ehp=new C.atR(B.dp8,B.dtK,A.aC,A.mk,"LUXURY",B.dbG)
-B.ehr=new E.atQ(1,"premium")
-B.ehs=new E.atQ(2,"luxury")})()};
-(a=>{a["pJGbxjKSeDxWnVIqjepgZ/tyqsY="]=a.current})($__dart_deferred_initializers__);
+x(C.atS,D.aE)})()
+var y={c:D.at("O<u>")};(function constants(){var x=a.makeConstList
+B.aVb=new D.F(!0,A.c,null,null,null,null,9,A.u,null,2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+B.d2g=x([A.dx,A.ko,A.aF],y.c)
+B.dA0=x([A.aF,A.fd],y.c)
+B.daT=x([A.kK,A.pc,A.aF],y.c)
+B.ehs=new C.atS(B.d2g,B.dA0,A.fd,A.jq,"PREMIUM",B.daT)
+B.ds8=x([A.cG,A.fo,A.bR],y.c)
+B.dnj=x([A.bR,A.aY],y.c)
+B.d9w=x([A.wb,A.bR,A.fo],y.c)
+B.eht=new C.atS(B.ds8,B.dnj,A.bR,A.jG,"NGMY WALLET",B.d9w)
+B.dpd=x([A.ep,A.dT,A.pd],y.c)
+B.dtP=x([A.aC,A.aS],y.c)
+B.dbL=x([A.u9,A.aC,A.c4],y.c)
+B.ehu=new C.atS(B.dpd,B.dtP,A.aC,A.mk,"LUXURY",B.dbL)
+B.ehw=new E.atR(1,"premium")
+B.ehx=new E.atR(2,"luxury")})()};
+(a=>{a["p7WSpLEZCaIxPgIyxJuHx5gwxZ4="]=a.current})($__dart_deferred_initializers__);
