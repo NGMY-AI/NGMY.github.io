@@ -2177,7 +2177,7 @@ v=f.c===0?w-3.2:w
 switch(e){case 51:return new A.r(-1.5,-0.3,v)
 case 52:return new A.r(0,-0.3,v)
 default:return new A.r(1.5,-0.3,v)}}w=A.agD(d,f)
-if(D.a.a0(d,"terminal")||d==="cord3"||d==="cord4")switch(e){case 23:return new A.r(-1.15,0.14999999999999997,w-0.3)
+if(D.a.a_(d,"terminal")||d==="cord3"||d==="cord4")switch(e){case 23:return new A.r(-1.15,0.14999999999999997,w-0.3)
 case 21:return new A.r(0,0.14999999999999997,w-0.3)
 case 22:return new A.r(1.15,0.14999999999999997,w-0.3)
 default:return new A.r(0,-1.65,w-0.1)}switch(e){case 21:return new A.r(0.98,-0.2+(d==="gfci"?0.95:0.85),w-0.45)
@@ -2235,7 +2235,7 @@ else p=p<-0.4?-0.12:0}if(b6)o=0.6
 else o=Math.abs(a0.a)<0.4?0.2:0
 b3.es(new A.r(a0.a+p,a0.b+0,a0.c+o),0.36,a1,4,8,0.1)}b3.d=1}if(b8.c>=2&&!b6)A.hz1(b3,b8.x)
 b4=!1
-if(b8.c>=2)if(b8.d)b4=b5==="outlet"||b5==="gfci"||D.a.a0(b5,a9)
+if(b8.c>=2)if(b8.d)b4=b5==="outlet"||b5==="gfci"||D.a.a_(b5,a9)
 if(b4)A.if1(b3,b8.a&&!b8.x)
 b4=b6?"Ceiling box":"Electrical box"
 r=b5==="fan"
@@ -2245,12 +2245,12 @@ n=o?"Cable from the breaker panel (LINE)":"NM-B cable (Romex)"
 m=b6?"It joins the fixture black wire with a wire nut.":"It goes on a brass screw."
 l=b6?"It joins the fixture white wire.":"It goes on a silver screw."
 h=b6?"It joins the green fixture ground wire.":"It goes on the green screw."
-if(s)g=D.a.a0(b5,a9)||D.a.a0(b5,b0)
+if(s)g=D.a.a_(b5,a9)||D.a.a_(b5,b0)
 else g=!1
 if(g)g=b7.b
 else if(b5==="gfci")g="GFCI outlet"
 else g=o?"Light switch":"Receptacle (outlet)"
-if(s)a2=D.a.a0(b5,a9)||D.a.a0(b5,b0)
+if(s)a2=D.a.a_(b5,a9)||D.a.a_(b5,b0)
 else a2=!1
 if(a2)o=b7.c
 else if(b5==="gfci")o="It checks that the current going out equals the current coming back. If some leaks (through water or a person) it shuts off in a fraction of a second."
@@ -2320,7 +2320,7 @@ break
 default:w=null
 break}return w},
 hwz(d,e,f,g,h,a0,a1){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i
-if(D.a.a0(e,"terminal")){A.if0(d,e,f,g,a1)
+if(D.a.a_(e,"terminal")){A.if0(d,e,f,g,a1)
 return}w=new A.r(0,-0.2,f)
 v=e==="switch"
 u=e==="gfci"
@@ -2344,7 +2344,7 @@ r=w.a2(0,B.hj0)
 d.aE(r,B.hfQ,g?B.pe:H.ZE,0.35)
 r=w.a2(0,B.hmZ)
 d.aE(r,B.hlf,g?B.pe:B.ah3,0.35)}else{d.e=0.6
-if(D.a.a0(e,"nema"))A.ias(d,w,e,g)
+if(D.a.a_(e,"nema"))A.ias(d,w,e,g)
 else{r=u?G.ax5:B.dyl
 q=r.length
 p=f+0.47
@@ -2950,7 +2950,7 @@ _.y1=null
 _.y2=!1
 _.bn=k
 _.bb=!1
-_.a_=l
+_.a0=l
 _.aG=null
 _.aL=0
 _.aR=!1
@@ -3695,7 +3695,7 @@ w.$1(C.bs(new C.o(q,g*0.42),u,h*0.6))
 v.$3("NGMY",new C.o(q,g*0.68),r)
 v.$4$w(i,new C.o(q,g*0.82),g*0.06,D.V)}},
 ibm(d,e,f,g){var w,v,u,t,s,r,q,p,o=B.aIT.h(0,e)
-if(o!=null){w=D.a.a0(e,"v240")?4.6:5.6
+if(o!=null){w=D.a.a_(e,"v240")?4.6:5.6
 v=w/0.64
 u=2*w
 d.aE(new A.r(f,14,0.9),new A.r(u+3.2,u+4.2,1.4),B.ajq,0.25)
@@ -8629,7 +8629,7 @@ A.ihu(a9,t,b1)}A.ihw(a9,b1)
 q=new A.fFs(a9)
 p=new A.fFq(a9)
 o=new A.fFr(q,p)
-v=D.a.a0(b4,"dev:")
+v=D.a.a_(b4,"dev:")
 if(v){n=D.a.b2(b4,4)
 for(b0=w.length,s=n!=="light",r=n==="fan",u=0;u<w.length;w.length===b0||(0,C.J)(w),++u){t=w[u]
 m=t.b
@@ -8639,7 +8639,7 @@ m=!1
 if(t.w!=null)if(l){m=t.at
 if(m!=null){k=t.ax
 k=k!=null&&k.c>=2&&!k.x}else k=!1
-m=!(k&&m===n)}if(m)o.$2(t,D.b4)}}else if(D.a.a0(b4,"app:"))for(b0=w.length,u=0;u<w.length;w.length===b0||(0,C.J)(w),++u){t=w[u]
+m=!(k&&m===n)}if(m)o.$2(t,D.b4)}}else if(D.a.a_(b4,"app:"))for(b0=w.length,u=0;u<w.length;w.length===b0||(0,C.J)(w),++u){t=w[u]
 s=!1
 if(t.b==="outlet")if(t.at!=null){s=t.ax
 s=s!=null&&s.c>=2&&!s.x}if(s)o.$2(t,D.b4)}else A:{if("drill"===b4){for(s=$.zi(),r=s.length,u=0;u<s.length;s.length===r||(0,C.J)(s),++u){j=s[u]
@@ -8694,7 +8694,7 @@ s=s&&t.b!=="ceiling"}else s=!1
 if(s){s=t.a===b3
 r=s?D.c:D.aH
 o.$3$r(t,r,s?2.4:1.7)}}}}}a2=b2===0?null:b1.l_(b2)
-if(a2!=null&&!v&&!D.a.a0(b4,"app:"))for(b0=4200+(a2.a-4000)*2,v=a2.y,s=a2.x,f=0;f<2;++f){a1=A.aQV(a2,f)
+if(a2!=null&&!v&&!D.a.a_(b4,"app:"))for(b0=4200+(a2.a-4000)*2,v=a2.y,s=a2.x,f=0;f<2;++f){a1=A.aQV(a2,f)
 if(!s[f])a3=D.cF
 else a3=v.q(0,f)?D.db:D.b4
 r=b0+f
@@ -13488,7 +13488,7 @@ if(i==null)return
 w=d.a
 v=w==="bread"
 if(v||w==="medicine"){u=i.aFa(v?"food":"medicine")
-t=!D.a.a0(u,"You need")}else{v=d.r
+t=!D.a.a_(u,"You need")}else{v=d.r
 t=!1
 if(v>0){w=w==="tank"
 s=w?A.heQ(k.c6.b):d.e
@@ -14344,7 +14344,7 @@ q=s.ax
 n=q.h(0,v)
 if((n==null?0:n)!==o){q.n(0,v,o)
 p=!0}}q=u.at
-if(D.a.a0(q,"ad")&&i.bn.J(0,q)){s.p3=D.o.F(s.p3+1,8)
+if(D.a.a_(q,"ad")&&i.bn.J(0,q)){s.p3=D.o.F(s.p3+1,8)
 A.fr(1000,50,0.25,"tri")
 p=!0}if(p)i.m(i.gj3())
 m=Math.max(s.gec(0)*0.95,s.gh3(0)*1.15)+20
@@ -14368,7 +14368,7 @@ w=t}for(;;)switch(w){case 0:l={}
 r.bb=!0
 l.a=null
 t=4
-p=$.aW.ap$.x.h(0,r.a_)
+p=$.aW.ap$.x.h(0,r.a0)
 p=p==null?null:p.gbg()
 q=x.cU.a(p)
 p=q
@@ -15514,7 +15514,7 @@ r=s.gkT()&&s.gjX()
 w.push(k.B_("\ud83d\udeaa "+s.b,!1,new A.ees(k,l),D.b0,!r))}}return new C.a5(j,30,C.cl(w,j,j,j,j,j,D.aL,!1),j)}},
 B(d){var w,v=this,u=null
 if(Date.now()<0){w=C.dw(0,0,0,0-Date.now(),0,0).a
-return C.c4(u,F.nx,C.bm(!0,C.as(new C.D(D.qD,C.x(C.a([B.fUI,D.af,B.fUP,D.X,B.fV2,D.aB,C.d("It opens again in "+D.o.aq(w,36e8)+"h "+D.o.F(D.o.aq(w,6e7),60)+"m",u,u,u,u,u,u,B.fws,u,u,u),D.dY,C.bJ(D.aWE,u,new A.ehR(d),u)],x.p),D.l,u,D.e,D.Q,0,D.p),u),u,u,u),!0,!1,D.ag,!0,!0),u,!1,!1,u,u)}w=C.a([C.bR(0,new C.em(v.bHX(d),v.a_),0,0,0)],x.p)
+return C.c4(u,F.nx,C.bm(!0,C.as(new C.D(D.qD,C.x(C.a([B.fUI,D.af,B.fUP,D.X,B.fV2,D.aB,C.d("It opens again in "+D.o.aq(w,36e8)+"h "+D.o.F(D.o.aq(w,6e7),60)+"m",u,u,u,u,u,u,B.fws,u,u,u),D.dY,C.bJ(D.aWE,u,new A.ehR(d),u)],x.p),D.l,u,D.e,D.Q,0,D.p),u),u,u,u),!0,!1,D.ag,!0,!0),u,!1,!1,u,u)}w=C.a([C.bR(0,new C.em(v.bHX(d),v.a0),0,0,0)],x.p)
 if(v.aG!=null)w.push(C.bR(0,new C.du(!0,C.lC(new A.ehS(v),u,D.dC,D.hG,new C.bI(v.aL,x.ac),new A.ehT(v),new C.br(1,0,x.e7),x.i),u),0,0,0))
 return new C.am(D.a0,u,D.ab,D.t,w,u)},
 bKf(){var w,v,u=this,t=null,s=C.a([],x.p)
@@ -17129,8 +17129,8 @@ u=A.hhu(w,r.b,e,v,!0)
 t=u==null
 if(t&&s.dx)return B.b1j
 if(t){if(!s.b&&!v.c.q(0,e)){++s.f
-return new A.eu(!0,v.b+": fastened. Careful: "+C.w(w.r.$2(e,v))+" It will burn or trip the breaker when the power comes on.",!0,"")}return new A.eu(!0,v.b+": wire fastened.",!1,"")}if(D.a.a0(u,"SHOCK"))return s.a2P()
-if(D.a.a0(u,"STOP"))return s.a33();++s.f
+return new A.eu(!0,v.b+": fastened. Careful: "+C.w(w.r.$2(e,v))+" It will burn or trip the breaker when the power comes on.",!0,"")}return new A.eu(!0,v.b+": wire fastened.",!1,"")}if(D.a.a_(u,"SHOCK"))return s.a2P()
+if(D.a.a_(u,"STOP"))return s.a33();++s.f
 return new A.eu(!1,u,!1,"")},
 bm3(d,e){var w,v=this,u=v.at.h(0,d)
 if(u==null)return B.Xc
@@ -20591,8 +20591,8 @@ if(v!=null)v.a1(0)
 w.m(new A.cnv(w,d))
 w.fx=C.cy(D.ek,new A.cnw(w))},
 aY8(d){var w
-if(D.a.a0(d,"dev:"))return A.uu(D.a.b2(d,4))+": tap a box that has its cable. The view closes in on it and you connect each wire to its screw."
-if(D.a.a0(d,"app:")){w=A.fDi(D.a.b2(d,4))
+if(D.a.a_(d,"dev:"))return A.uu(D.a.b2(d,4))+": tap a box that has its cable. The view closes in on it and you connect each wire to its screw."
+if(D.a.a_(d,"app:")){w=A.fDi(D.a.b2(d,4))
 w=w==null?null:w.b
 return(w==null?"It":w)+": tap a finished outlet to plug it in (tap it again to unplug it). Turn the breaker on so it runs."}switch(d){case"look":w="Look: tap any piece to learn its name and what it does. Tap a finished switch to flip it. Drag to turn round."
 break
@@ -20611,8 +20611,8 @@ break}return w},
 b_s(d){var w=this
 if(d==="cable"&&w.d.b.length===0)return" There is no box yet: put an outlet box on a stud first."
 if(d==="knock"&&w.d.b.length===0)return" There is no box yet: put a box on a stud first."
-if(D.a.a0(d,"dev:")&&!D.d.aV(w.d.b,new A.cnx()))return" No box has its cable yet: pull the cable to a box first."
-if(D.a.a0(d,"app:")&&!D.d.aV(w.d.b,new A.cny(w)))return" No outlet is finished yet: wire an outlet in a box first."
+if(D.a.a_(d,"dev:")&&!D.d.aV(w.d.b,new A.cnx()))return" No box has its cable yet: pull the cable to a box first."
+if(D.a.a_(d,"app:")&&!D.d.aV(w.d.b,new A.cny(w)))return" No outlet is finished yet: wire an outlet in a box first."
 return""},
 bWx(d,e){var w=this
 w.m(new A.cnt(w,e,d))
@@ -20765,7 +20765,7 @@ k.m(k.ga_D())
 i=r.a
 k.B2(i?"You pulled the plug out of the outlet.":r.b,i)
 return}}i=k.r
-q=D.a.a0(i,"dev:")||D.a.a0(i,"app:")
+q=D.a.a_(i,"dev:")||D.a.a_(i,"app:")
 if(d>=4200&&d<4400&&!q){k.cEc(d)
 return}i=k.d
 p=i.l_(d)
@@ -20782,14 +20782,14 @@ if(o==="look"){n=k.glc().b.h(0,d)
 if(n!=null){k.m(new A.cnD(k,d))
 k.geh().Di(n.c)
 k.nJ(n.a+": "+n.b)}return}j.a=null
-if(D.a.a0(o,"dev:")){r=j.a=i.a64(d,D.a.b2(o,4))
+if(D.a.a_(o,"dev:")){r=j.a=i.a64(d,D.a.b2(o,4))
 if(r.a){A.nL()
 i=i.l_(d)
 i.toString
 k.m(new A.cnE(k,d))
 k.nJ(r.b)
 k.afj(i)
-return}i=r}else if(D.a.a0(o,"app:")){r=i.a6N(d,D.a.b2(o,4))
+return}i=r}else if(D.a.a_(o,"app:")){r=i.a6N(d,D.a.b2(o,4))
 j.a=r
 i=r}else A:{if("outlet"===o||"switch"===o||"ceiling"===o){r=j.a=i.V_(o,d)
 if(r.a){r=new A.ib(!0,r.b+" Tap the box to look closer and break out a knockout.",D.ec)
@@ -25841,7 +25841,7 @@ $S:14}
 A.cqu.prototype={
 $1(d){var w
 if(!this.a.e.q(0,d.a)){w=d.b
-w=w==="valve"||D.a.a0(w,"hose")}else w=!1
+w=w==="valve"||D.a.a_(w,"hose")}else w=!1
 return w},
 $S:z+4}
 A.cqv.prototype={
@@ -31849,4 +31849,4 @@ t.push(A.biT("app:"+p,q.b,o))}t=A.bcS("phones","Phones",D.zn,t)
 n=C.a([],n)
 for(s=0;s<6;++s){q=B.aBg[s]
 n.push(A.biT("app:"+q.a,q.b,W.Px))}return C.a([B.ht5,m,v,B.ht4,u,t,A.bcS("appliances","Appliances",W.Px,n)],C.at("O<Qn>"))})})()};
-(a=>{a["uIoVfHLXMIAXwU3yNauqExmXQc0="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["nCjB3dnuQx2/VJpLpiPmjLuStkA="]=a.current})($__dart_deferred_initializers__);

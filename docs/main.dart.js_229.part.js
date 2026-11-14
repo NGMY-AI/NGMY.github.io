@@ -383,7 +383,7 @@ bCL(d){var w=0,v=A.j(x.H),u,t,s
 var $async$bCL=A.e(function(e,f){if(e===1)return A.f(f,v)
 for(;;)switch(w){case 0:s=B.a.i(d)
 if(s.length===0){w=1
-break}t=A.cD("https://cash.app/$"+(B.a.a0(s,"$")?B.a.b2(s,1):s),0,null)
+break}t=A.cD("https://cash.app/$"+(B.a.a_(s,"$")?B.a.b2(s,1):s),0,null)
 w=5
 return A.b(A.pT(t),$async$bCL)
 case 5:w=f?3:4
@@ -3483,4 +3483,4 @@ D.acG=new C.Da(0,"all")
 D.b0p=new C.Da(1,"contributions")
 D.b0q=new C.Da(2,"missed")
 D.hxw=new C.aEH(null)})()};
-(a=>{a["O2cGHfxJb8WOQ3k2zCNp18TgYE8="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["v6FH3InkZgIre7BE2V/xE7QJw8Q="]=a.current})($__dart_deferred_initializers__);

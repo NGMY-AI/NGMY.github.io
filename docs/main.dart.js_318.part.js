@@ -51,7 +51,7 @@ _.c=f
 _.a=g
 _.$ti=h},
 ikt(d){var w=B.a.i(d)
-while(B.a.a0(w,"$"))w=B.a.i(B.a.b2(w,1))
+while(B.a.a_(w,"$"))w=B.a.i(B.a.b2(w,1))
 return w},
 hDr(d){var w=C.ikt(d)
 if(w.length===0)return""
@@ -294,7 +294,7 @@ _.to=-1
 _.x1=0
 _.x2=1
 _.xr=!1
-_.a_=_.bb=_.bn=_.y2=_.y1=0
+_.a0=_.bb=_.bn=_.y2=_.y1=0
 _.aH=_.aR=_.aL=_.aG=$
 _.bK=_.bf=_.b6=_.b8=null
 _.aP=!1
@@ -2612,7 +2612,7 @@ case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
 return A.i($async$b2u,v)},
 hq4(d){var w,v=B.a.i(d)
-if(B.a.a0(v,"NGMYLOCALDEP1|")){w=B.a.i(B.a.b2(v,14))
+if(B.a.a_(v,"NGMYLOCALDEP1|")){w=B.a.i(B.a.b2(v,14))
 return w.length===0?null:w}return null},
 hWf(d,e,f){var w=B.a.i(f)
 if(w.length===0)return!1
@@ -4211,9 +4211,9 @@ w=1
 break}u=C.asb(t)
 w=1
 break
-case 4:if(B.a.a0(q,"NGMYLOCALSYNC1|")){u=C.asb(B.a.i(B.a.b2(q,15)))
+case 4:if(B.a.a_(q,"NGMYLOCALSYNC1|")){u=C.asb(B.a.i(B.a.b2(q,15)))
 w=1
-break}w=B.a.a0(q,"NGMYLOCALLIVE1|")?6:7
+break}w=B.a.a_(q,"NGMYLOCALLIVE1|")?6:7
 break
 case 6:w=8
 return A.b(C.asb(B.a.i(B.a.b2(q,15))),$async$b2D)
@@ -4299,8 +4299,8 @@ s=A.ca(t==null?"":t,null)
 if(s==null||s<=0)continue
 r=u[2]
 if(r==null)r="minute"
-if(B.a.a0(r,"sec"))return new A.bd(1e6*B.o.D(s,5,86400))
-if(B.a.a0(r,"hour")||B.a.a0(r,"hr"))return new A.bd(36e8*B.o.D(s,1,168))
+if(B.a.a_(r,"sec"))return new A.bd(1e6*B.o.D(s,5,86400))
+if(B.a.a_(r,"hour")||B.a.a_(r,"hr"))return new A.bd(36e8*B.o.D(s,1,168))
 return new A.bd(6e7*B.o.D(s,1,10080))}return null},
 ifR(d){var w=d==null?"work":d,v=w.toLowerCase()
 if(B.a.q(v,"meeting")||B.a.q(v,"appointment"))return"Meeting"
@@ -4771,7 +4771,7 @@ case"sequence":return s.y1
 case"math":return s.y2
 case"scramble":return s.bn
 case"color":return s.bb
-case"reflex":return s.a_
+case"reflex":return s.a0
 default:u=s.b6
 if(u!=null){t=u.a
 u=u.b
@@ -5364,7 +5364,7 @@ case"color":r.bb=0
 r.b7V()
 r.r="Round 1 of 5 \u2014 tap the COLOR of the text"
 break
-case"reflex":r.a_=0
+case"reflex":r.a0=0
 r.y=!1
 r.z=null
 r.r="Round 1 of 5 \u2014 wait for green, tap fast"
@@ -5413,17 +5413,17 @@ w.z=null
 w.cx=A.cy(A.dw(0,0,0,120+w.d.aw(280),0,0),new C.dlu(w))},
 c_o(){var w,v,u,t=this
 if(t.f)return
-if(!t.y){t.rM("Too early \u2014 paid for "+t.a_+"/5.")
+if(!t.y){t.rM("Too early \u2014 paid for "+t.a0+"/5.")
 return}if(t.z==null)w=999
 else{v=Date.now()
 u=t.z
 u.toString
 w=B.o.aq(new A.V(v,0,!1).bD(u).a,1000)}if(w<520){t.m(new C.dkZ(t))
-v=t.a_
+v=t.a0
 if(v>=5){t.ps()
 t.ut("All 5 reflex rounds \u2014 lightning fast!")}else{t.r="Round "+(v+1)+" of 5 \u2014 wait for green, tap fast"
 t.b9g()
-t.m(new C.dl_())}}else t.rM("Too slow ("+w+"ms) \u2014 paid for "+t.a_+"/5.")},
+t.m(new C.dl_())}}else t.rM("Too slow ("+w+"ms) \u2014 paid for "+t.a0+"/5.")},
 cEj(d){var w,v,u,t=this
 if(!t.f)w=d>=t.ch.length
 else w=!0
@@ -6060,7 +6060,7 @@ p=m?B.be:B.c5
 w=o.r
 w===$&&A.c()
 w=A.d(w,n,n,n,n,n,n,B.ab3,B.K,n,n)
-v=A.d("Fast taps "+o.a_+"/5",n,n,n,n,n,n,D.fpz,n,n,n)
+v=A.d("Fast taps "+o.a0+"/5",n,n,n,n,n,n,D.fpz,n,n,n)
 m=m?"TAP!":"WAIT\u2026"
 s=o.c
 s.toString
@@ -7121,7 +7121,7 @@ w=3
 return A.b(A.a6(s,!1).cd(A.ec(new C.dFK(),!0,null,x.N)),$async$PL)
 case 3:r=e
 if(r==null||B.a.i(r).length===0){w=1
-break}w=B.a.a0(B.a.i(r),"NGMYLOCALDEP1|")?4:5
+break}w=B.a.a_(B.a.i(r),"NGMYLOCALDEP1|")?4:5
 break
 case 4:w=6
 return A.b(t.AT(new C.dFL(t,r),"Applying deposit\u2026"),$async$PL)
@@ -7549,7 +7549,7 @@ if(g)if(!B.a.q(h.e.toLowerCase(),"%")){w=h.w
 w=w!=null&&h.d<w
 v=w}else v=!0
 else v=!1
-u=g&&B.a.a0(h.e.toLowerCase(),"draw")
+u=g&&B.a.a_(h.e.toLowerCase(),"draw")
 w=!g
 if(w)t="LOST"
 else if(u)t="DRAW"
@@ -8264,8 +8264,8 @@ p===$&&A.c()
 p=B.a.fw(p.a.a,A.ag("\\n\\s*\\n",!0,!1,!1,!1))
 w=new A.N(p,new C.e9t(),A.U(p).k("N<1,n>")).bY(0,new C.e9u())
 for(p=J.aU(w.a),v=new A.eF(p,w.b),u=x.s,t=x.dv;v.C();){s=p.gR(p)
-if(B.a.a0(s,"## "))q.push(new C.lY("heading",B.a.i(B.a.b2(s,3)),r,r))
-else if(B.a.a0(s,"\u2022 ")||B.a.a0(s,"- "))q.push(new C.lY("bullets",new A.N(A.a(s.split("\n"),u),new C.e9v(),t).bY(0,new C.e9w()).aO(0,"\n"),r,r))
+if(B.a.a_(s,"## "))q.push(new C.lY("heading",B.a.i(B.a.b2(s,3)),r,r))
+else if(B.a.a_(s,"\u2022 ")||B.a.a_(s,"- "))q.push(new C.lY("bullets",new A.N(A.a(s.split("\n"),u),new C.e9v(),t).bY(0,new C.e9w()).aO(0,"\n"),r,r))
 else q.push(new C.lY("text",s,r,r))}p=this.e
 p===$&&A.c()
 B.d.v(q,p)
@@ -8989,7 +8989,7 @@ k=C.h8N(n,m)
 if(k)t.K_(n.d,!1)
 i=Date.now()
 s=t.a.c
-if(!s.w)s=s.a_&&s.aG>0
+if(!s.w)s=s.a0&&s.aG>0
 else s=!0
 j=A.hqb(n,m,new A.V(i,0,!1),s)
 i=j!=null
@@ -10863,7 +10863,7 @@ w.y=!0
 w.z=new A.V(Date.now(),0,!1)},
 $S:0}
 C.dkZ.prototype={
-$0(){var w=this.a;++w.a_
+$0(){var w=this.a;++w.a0
 w.y=!1
 w.z=null},
 $S:0}
@@ -11746,7 +11746,7 @@ if(r.e)return
 for(w=d.a,v=w.length,u=0;u<v;++u){t=w[u].z
 s=t==null?null:B.a.i(t)
 if(s==null||s.length===0)continue
-if(!(B.a.a0(s,"NGMYSNAP1|")||B.a.a0(s,"NGMYLOCALSYNC1|")||B.a.a0(s,"NGMYLOCALLIVE1|")||B.a.a0(s,"NGMYLOCALDEP1|")))continue
+if(!(B.a.a_(s,"NGMYSNAP1|")||B.a.a_(s,"NGMYLOCALSYNC1|")||B.a.a_(s,"NGMYLOCALLIVE1|")||B.a.a_(s,"NGMYLOCALDEP1|")))continue
 r.e=!0
 A.a6(this.b,!1).O(s)
 return}},
@@ -14363,4 +14363,4 @@ w($,"izy","bGB",()=>C.igr())
 w($,"izk","hHU",()=>{var v=null,u=A.fq(v,B.cs,v,v,v,D.fmz,B.a5,B.bX,v,B.dz,B.bY)
 u.e5()
 return u})})()};
-(a=>{a["6GIvsMv3hNXIdsMKzsfAKUWecqg="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["KxF/heE4mKVOdUwZ1U14uDwLChI="]=a.current})($__dart_deferred_initializers__);

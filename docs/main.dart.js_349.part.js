@@ -2834,7 +2834,7 @@ w=3
 return B.b(C.bBU(C.i50(q,C.ihm(p),o,t.ay)),$async$PO)
 case 3:s=e
 r=s==null?null:J.iZ(s)
-if(r==null||r.length===0||A.a.a0(r,"{"))r=C.iiT(q,p,o)
+if(r==null||r.length===0||A.a.a_(r,"{"))r=C.iiT(q,p,o)
 if(t.c==null){w=1
 break}t.m(new C.eiN(t,o,r))
 $.aW.x1$.push(new C.eiO(t))
@@ -4543,7 +4543,7 @@ v=B.U(w).k("Y<1>")
 q=B.C(new B.Y(w,new C.dqM(o),v),v.k("M.E"))
 if(q.length!==0){A.d.bt(w,new C.dqN(o))
 for(w=q.length,v=o.b,t=0;t<q.length;q.length===w||(0,B.J)(q),++t){u=q[t].b
-if(A.a.a0(u,"~")){p=A.a.b2(u,1)
+if(A.a.a_(u,"~")){p=A.a.b2(u,1)
 for(u=A.d.gae(v),r=new B.eF(u,new C.dqO(p));r.C();)o.aC6(u.gR(0),o.ax)}else o.aHb(u)}}A.d.bt(o.d,new C.dqP(o))
 A.d.bt(o.e,new C.dqQ(o))
 A.d.bt(o.f,new C.dqR(o))
@@ -10838,4 +10838,4 @@ for(v=0;v<76;++v){u=D.Sn[v]
 t.n(0,u.a,u)}return t})
 w($,"iBb","aj_",()=>B.a([C.Go("Light the bulb","You need a battery and a bulb joined in a loop. Wire the + of the battery to the bulb, and the bulb back to the battery.",new C.fsc()),C.Go("Make a flashlight","Add a switch into the loop, so you can turn the bulb on and off.",new C.fsd()),C.Go("Spin the motor","A battery and a motor in a loop will make it spin.",new C.fse()),C.Go("Light an LED safely","An LED burns out on its own. Put a resistor in the loop with it. Mind the + side of the LED!",new C.fsf()),C.Go("Light a bulb with no battery","Use a solar panel, a hand crank or a wind turbine instead of a battery.",new C.fsg()),C.Go("Play the radio","A radio needs about 3 volts or more. Try a 9 volt battery.",new C.fs3()),C.Go("Watch TV","A TV needs 6 volts or more. Set a battery to 12 volts, and wire the TV's + (left) dot towards the battery +.",new C.fs4()),C.Go("Charge a battery","A 1.5 V battery starts flat. Join it to a solar panel (+ to +, \u2212 to \u2212) until its charge bar is full.",new C.fs5()),C.Go("One battery, two gadgets","A TV needs 9 volts but a phone burns out. Use a step-down converter to give the phone 5 V from the same battery.",new C.fs6()),C.Go("Protect a radio","Put a diode in the loop with a radio. It only lets electricity go one way.",new C.fs7()),C.Go("Make toast","A heater turns electricity into heat. Make it glow bright orange.",new C.fs8())],B.at("O<bcY>")))
 w($,"iBE","hJf",()=>B.a([C.a21("Spin the Wheel","Let luck decide","\ud83c\udfa1",A.aS,A.c5,new C.fsH()),C.a21("Focus Timer","Work, then rest","\u23f1\ufe0f",A.c0,A.bC,new C.fsI()),C.a21("Breathe","Calm down in a minute","\ud83e\udee7",A.hr,A.cz,new C.fsJ()),C.a21("Draw Pad","Sketch and share","\ud83c\udfa8",A.bD,A.b9,new C.fsK()),C.a21("Memory Match","Find the pairs","\ud83c\udccf",A.aH,A.ch,new C.fsL()),C.a21("Simon Sounds","Copy the tune","\ud83c\udfb5",A.bi,A.be,new C.fsM()),C.a21("Tip & Split","Share the bill","\ud83e\uddfe",A.b4,A.b2,new C.fsN()),C.a21("Lucky Pocket","Dice, coin, number","\ud83c\udfb2",A.bp,A.aF,new C.fsO())],B.at("O<bwv>")))})()};
-(a=>{a["fsErL/6kZvTdT3GoabrZG4clHew="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["+4aUBU76MQbLpV/rlH88Z5mPW+g="]=a.current})($__dart_deferred_initializers__);

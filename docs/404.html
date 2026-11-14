@@ -20,11 +20,25 @@
           configurable: true,
           get: function () {
             var h = d.get.call(de);
-            var vv = window.visualViewport;
-            if (vv) {
-              var v = Math.round(vv.height + vv.offsetTop);
-              if (v > h && v - h < 200) return v;
-            }
+            try {
+              // Three more ways to know the real visible height: the visible area, the window, and a box fixed to all four edges of the screen
+              // (what an installed app and a browser tab both fill). The tallest of them wins, unless the keyboard is up (the visible area is then
+              // far shorter than the others) - then nothing changes.
+              var vv = window.visualViewport;
+              var vh = vv ? Math.round(vv.height + vv.offsetTop) : 0;
+              var ih = Math.round(window.innerHeight || 0);
+              var probe = window.__ngmyProbe;
+              if (!probe && (document.body || de)) {
+                probe = document.createElement('div');
+                probe.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;width:0;visibility:hidden;pointer-events:none;z-index:-1';
+                (document.body || de).appendChild(probe);
+                window.__ngmyProbe = probe;
+              }
+              var ph = probe ? Math.round(probe.getBoundingClientRect().height) : 0;
+              var best = Math.max(vh, ih, ph);
+              if (vh && best - vh > 120) return h; // the keyboard is up
+              if (best > h && best - h < 200) return best;
+            } catch (e) {}
             return h;
           },
         });
@@ -76,7 +90,7 @@
 
   <script>
     (function () {
-      var embedded = '20261114015416';
+      var embedded = '20261114124453';
       var base = window.__NGMY_BASE_PATH__ || '/';
       var KEY = 'ngmy_deploy_id';
       function forceRefreshForBuild(serverBuild, opts) {
@@ -868,7 +882,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20261114015416";
+      var CURRENT = "20261114124453";
 
       function showError(msg) {
 
@@ -1017,7 +1031,7 @@
 
   <script>
     (function () {
-      var deployId = '20261114015416';
+      var deployId = '20261114124453';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;
