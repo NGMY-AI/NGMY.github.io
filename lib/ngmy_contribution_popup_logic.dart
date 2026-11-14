@@ -70,17 +70,18 @@ List<AppTransaction> ngmyMemberCampaignContributions(AppConfig config, UserData 
     final metaEmail = NgmyCivicRegistryMembers.emailKey((meta['memberEmail'] ?? '').toString());
     final mine = emails.contains(NgmyCivicRegistryMembers.emailKey(t.userEmail)) ||
         (metaEmail.isNotEmpty && emails.contains(metaEmail)) ||
-        (rid.isNotEmpty && ((meta['registryId'] ?? '').toString().trim().toUpperCase() == rid || t.id.toUpperCase().contains(rid)));
+        (rid.isNotEmpty && ((meta['registryId'] ?? '').toString().trim().toUpperCase() == rid || t.id.toUpperCase().contains(rid))) ||
+        (emailKey.isNotEmpty && t.id.toLowerCase().startsWith('contrib_${emailKey}_'));
     if (!mine) continue;
     final cid = (meta['campaignId'] ?? '').toString().trim();
-    if (campaignId.isNotEmpty && cid.isNotEmpty) {
-      if (cid == campaignId) found[t.id] = t;
-      continue;
-    }
-    // An old row without a campaign number: it counts only when it was made after this campaign began, in this state.
-    if (cid.isEmpty && startedAt != null && !t.timestamp.isBefore(startedAt)) {
-      final receiptState = (meta['state'] ?? '').toString().trim();
-      if (receiptState.isEmpty || NgmyCivicRegistryStats.statesMatch(receiptState, state)) found[t.id] = t;
+    final receiptState = (meta['state'] ?? '').toString().trim();
+    if (receiptState.isNotEmpty && !NgmyCivicRegistryStats.statesMatch(receiptState, state)) continue;
+    // The same rule the registrar's list uses: the campaign number is the one going now, or the gift was recorded after this campaign began
+    // (a registrar phone that had not yet received the newest campaign number must not make the member look like a non-giver).
+    if (campaignId.isNotEmpty && cid == campaignId) {
+      found[t.id] = t;
+    } else if (startedAt != null && !t.timestamp.isBefore(startedAt)) {
+      found[t.id] = t;
     }
   }
   return found.values.toList();

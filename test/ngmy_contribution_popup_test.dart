@@ -33,7 +33,19 @@ void main() {
     expect(id, isNotEmpty);
     expect(ngmyMemberContributedToCampaign(config, u, const [], 'Georgia'), isFalse, reason: 'nothing given yet: the pop-up comes');
     expect(ngmyMemberContributedToCampaign(config, u, [_gift('mary@x.com', id)], 'Georgia'), isTrue, reason: 'given to this campaign: no pop-up');
-    expect(ngmyMemberContributedToCampaign(config, u, [_gift('mary@x.com', 'help_old')], 'Georgia'), isFalse, reason: 'a gift to an earlier campaign does not count');
+    final old = AppTransaction(
+      id: 'old1',
+      userEmail: 'mary@x.com',
+      amount: 20,
+      type: TransactionType.contribution,
+      method: PaymentMethod.system,
+      status: TransactionStatus.approved,
+      timestamp: DateTime.now().subtract(const Duration(days: 30)),
+      sourceDetails: jsonEncode({'campaignId': 'help_old', 'state': 'Georgia'}),
+    );
+    expect(ngmyMemberContributedToCampaign(config, u, [old], 'Georgia'), isFalse, reason: 'a gift to an earlier campaign does not count');
+    // A gift written after this campaign began counts even when it carries another campaign number (the registrar phone was behind).
+    expect(ngmyMemberContributedToCampaign(config, u, [_gift('mary@x.com', 'help_other')], 'Georgia'), isTrue);
     expect(ngmyMemberContributedToCampaign(config, u, [_gift('someone@x.com', id)], 'Georgia'), isFalse, reason: 'somebody else gave');
     // A pending gift does not count yet.
     final pending = _gift('mary@x.com', id)..status = TransactionStatus.pending;
