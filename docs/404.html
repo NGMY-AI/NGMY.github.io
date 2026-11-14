@@ -46,6 +46,46 @@
     })();
   </script>
   <script>
+    // Only when the app is drawn shorter than the screen: the numbers go into the empty strip itself, so one screenshot shows what the phone reports.
+    // It is not there at all when the app fills the screen.
+    (function () {
+      function canvasBottom() {
+        var b = 0;
+        try {
+          var gp = document.querySelector('flt-glass-pane');
+          var cs = gp && gp.shadowRoot ? gp.shadowRoot.querySelectorAll('canvas') : [];
+          for (var i = 0; i < cs.length; i++) { var bb = cs[i].getBoundingClientRect().bottom; if (bb > b) b = bb; }
+        } catch (e) {}
+        return b;
+      }
+      function tick() {
+        try {
+          var el = document.getElementById('ngmy-diag');
+          var probe = window.__ngmyProbe;
+          var ph = probe ? Math.round(probe.getBoundingClientRect().height) : 0;
+          var cb = Math.round(canvasBottom());
+          var gap = ph - cb;
+          if (!cb || gap < 8) { if (el) el.style.display = 'none'; return; }
+          if (!el) {
+            el = document.createElement('div');
+            el.id = 'ngmy-diag';
+            el.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:2147483000;pointer-events:none;color:#9ca3af;font:10px/12px monospace;padding:3px 6px;overflow:hidden;background:#121212';
+            document.documentElement.appendChild(el);
+          }
+          var vv = window.visualViewport;
+          // Ask the engine to measure again (it only does so on this event).
+          try { if (vv && !document.activeElement || (document.activeElement && !/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName))) vv.dispatchEvent(new Event('resize')); } catch (e) {}
+          el.style.display = 'block';
+          el.style.height = gap + 'px';
+          el.textContent = 'gap ' + gap + ' | canvas ' + cb + ' | probe ' + ph + ' | inner ' + Math.round(window.innerHeight) + ' | client ' + document.documentElement.clientHeight +
+            ' | vv ' + (vv ? Math.round(vv.height) + '+' + Math.round(vv.offsetTop) : '-') + ' | screen ' + screen.height + ' | outer ' + window.outerHeight +
+            ' | standalone ' + (navigator.standalone === true ? 'y' : 'n') + ' | dm ' + (window.matchMedia('(display-mode: standalone)').matches ? 'standalone' : 'browser');
+        } catch (e) {}
+      }
+      setInterval(tick, 1500);
+    })();
+  </script>
+  <script>
     (function () {
       try {
         var p = new URLSearchParams(location.search);
@@ -90,7 +130,7 @@
 
   <script>
     (function () {
-      var embedded = '20261114124453';
+      var embedded = '20261114132223';
       var base = window.__NGMY_BASE_PATH__ || '/';
       var KEY = 'ngmy_deploy_id';
       function forceRefreshForBuild(serverBuild, opts) {
@@ -882,7 +922,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20261114124453";
+      var CURRENT = "20261114132223";
 
       function showError(msg) {
 
@@ -1031,7 +1071,7 @@
 
   <script>
     (function () {
-      var deployId = '20261114124453';
+      var deployId = '20261114132223';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;
