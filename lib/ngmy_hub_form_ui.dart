@@ -423,11 +423,23 @@ class NgmyFramedTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = NgmyHubTheme.of(context);
+    // Light mode: a plain white frame with a soft lifted shadow (no coloured glow).
+    final calmLight = !onDark && Theme.of(context).brightness == Brightness.light;
     return Center(
       child: Container(
         key: const Key('ngmy-framed-title'),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-        decoration: BoxDecoration(
+        decoration: calmLight
+            ? BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE4E7EC)),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x240F172A), blurRadius: 18, spreadRadius: -4, offset: Offset(0, 8)),
+                  BoxShadow(color: Color(0x140F172A), blurRadius: 4, offset: Offset(0, 1)),
+                ],
+              )
+            : BoxDecoration(
           gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [accent.withValues(alpha: 0.22), accent.withValues(alpha: 0.06)]),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: accent.withValues(alpha: 0.75), width: 1.6),

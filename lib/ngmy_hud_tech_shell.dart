@@ -63,9 +63,10 @@ class NgmyCalmLight {
   static const Color ink = Color(0xFF111827);
   static const Color sub = Color(0xFF6B7280);
 
+  /// A real lifted shadow: a wide soft one under the card and a tight one at its edge.
   static const List<BoxShadow> shadow = [
-    BoxShadow(color: Color(0x14101828), blurRadius: 14, offset: Offset(0, 4)),
-    BoxShadow(color: Color(0x0A101828), blurRadius: 3, offset: Offset(0, 1)),
+    BoxShadow(color: Color(0x240F172A), blurRadius: 26, spreadRadius: -6, offset: Offset(0, 12)),
+    BoxShadow(color: Color(0x140F172A), blurRadius: 6, offset: Offset(0, 2)),
   ];
 
   /// The accent made dark enough to read on white.
@@ -96,18 +97,29 @@ class NgmyCalmIconTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Like a phone app icon: a rich colour tile, lighter at the top, with a white icon and a soft coloured shadow.
+    final hsl = HSLColor.fromColor(accent);
+    final base = hsl.withLightness(hsl.lightness.clamp(0.40, 0.50)).withSaturation(hsl.saturation.clamp(0.55, 0.85)).toColor();
+    final top = Color.lerp(base, Colors.white, 0.22)!;
+    final hasEmoji = emoji != null && emoji!.trim().isNotEmpty;
     return Container(
       key: const Key('ngmy-calm-icon'),
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: NgmyCalmLight.accentWash(accent),
-        borderRadius: BorderRadius.circular(size * 0.3),
+        borderRadius: BorderRadius.circular(size * 0.28),
+        color: hasEmoji ? NgmyCalmLight.accentWash(accent) : null,
+        gradient: hasEmoji
+            ? null
+            : LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [top, base]),
+        boxShadow: [
+          BoxShadow(color: base.withValues(alpha: 0.28), blurRadius: size * 0.22, offset: Offset(0, size * 0.08)),
+        ],
       ),
       alignment: Alignment.center,
-      child: emoji != null && emoji!.trim().isNotEmpty
+      child: hasEmoji
           ? NgmyOfflineEmoji(emoji!, fontSize: size * 0.48)
-          : (icon != null ? Icon(icon, color: NgmyCalmLight.accentInk(accent), size: size * 0.5) : null),
+          : (icon != null ? Icon(icon, color: Colors.white, size: size * 0.5) : null),
     );
   }
 }

@@ -18905,11 +18905,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                   curve: Curves.easeOutCubic,
                   child: Icon(
                     icon,
-                    color: _idx == i
-                        ? (selectedColor ?? const Color(0xFF67E8F9))
-                        : (Theme.of(context).brightness == Brightness.dark
-                            ? Colors.white70
-                            : const Color(0xFF0F172A)),
+                    // Light mode: grey icons, the chosen one white on the dark circle (no blue).
+                    color: Theme.of(context).brightness == Brightness.light
+                        ? (_idx == i ? Colors.white : const Color(0xFF6B7280))
+                        : (_idx == i
+                            ? (selectedColor ?? const Color(0xFF67E8F9))
+                            : Colors.white70),
                     size: NgmyBottomNavMetrics.sideIconSize,
                   ),
                 ),
@@ -30085,7 +30086,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
             width: 124,
             height: 124,
             padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
+            // Light mode: a clean white ring with a soft grey shadow (no blue glow).
+            decoration: NgmyHudInk.calm(context)
+                ? const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(color: Color(0x2E0F172A), blurRadius: 22, spreadRadius: -4, offset: Offset(0, 10)),
+                      BoxShadow(color: Color(0x140F172A), blurRadius: 4, offset: Offset(0, 1)),
+                    ],
+                  )
+                : BoxDecoration(
               shape: BoxShape.circle,
               gradient: SweepGradient(
                 colors: [
@@ -30137,7 +30148,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           fontWeight: FontWeight.w900,
           fontSize: 22,
           letterSpacing: 0.4,
-          shadows: [Shadow(color: const Color(0xFF22D3EE).withValues(alpha: 0.4 + pulse * 0.25), blurRadius: 12)],
+          shadows: NgmyHudInk.calm(context) ? null : [Shadow(color: const Color(0xFF22D3EE).withValues(alpha: 0.4 + pulse * 0.25), blurRadius: 12)],
         ),
       ),
       const SizedBox(height: 16),

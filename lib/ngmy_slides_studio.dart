@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_hati_document_transfer.dart';
+import 'ngmy_hud_tech_shell.dart' show NgmyCalmLight, NgmyCalmIconTile;
 import 'ngmy_hati_kiapo_uongozi.dart';
 import 'ngmy_state_picker.dart';
 import 'ngmy_hati_kuhowa_templates.dart';
@@ -3403,8 +3404,14 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
 
   Widget _buildLibrary() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Light mode is calm: the cards stop pulsing.
+    if (isDark) {
+      if (!_framePulse.isAnimating) _framePulse.repeat(reverse: true);
+    } else if (_framePulse.isAnimating) {
+      _framePulse.stop(canceled: false);
+    }
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF1F5F9),
+      backgroundColor: isDark ? const Color(0xFF121212) : NgmyCalmLight.page,
       // The list runs right up under the clock when scrolled (no dark band at the top); only its start is kept below the clock.
       body: SafeArea(
         top: false,
@@ -3668,6 +3675,26 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
   }
 
   Widget _aliveEmptyPresentationsFrame(bool isDark) {
+    if (!isDark) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(24),
+        decoration: NgmyCalmLight.cardDecoration(radius: 22),
+        child: const Column(
+          children: [
+            NgmyCalmIconTile(accent: Color(0xFF2563EB), size: 56, icon: Icons.view_carousel_outlined),
+            SizedBox(height: 14),
+            Text('No presentations yet', style: TextStyle(fontWeight: FontWeight.w800, color: NgmyCalmLight.ink)),
+            SizedBox(height: 6),
+            Text(
+              'Open Blank or Class Template to start — nothing is saved until you edit.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: NgmyCalmLight.sub),
+            ),
+          ],
+        ),
+      );
+    }
     return AnimatedBuilder(
       animation: _framePulse,
       builder: (context, _) {
@@ -3820,7 +3847,9 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
         final phase = ((_framePulse.value + index * 0.12) % 1.0);
         final t = Curves.easeInOut.transform(phase);
         return Container(
-          margin: const EdgeInsets.only(bottom: 10),
+          margin: const EdgeInsets.only(bottom: 12),
+          // Light mode: a soft lifted shadow under each project card.
+          decoration: isDark ? null : BoxDecoration(borderRadius: BorderRadius.circular(20), boxShadow: NgmyCalmLight.shadow),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(20),
             child: NgmyNoBackdrop(
@@ -3839,13 +3868,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                                 Colors.white.withValues(alpha: 0.10 + t * 0.04),
                                 const Color(0xFF111827).withValues(alpha: 0.78),
                               ]
-                            : [
-                                Colors.white.withValues(alpha: 0.92),
-                                const Color(0xFFF0F9FF).withValues(alpha: 0.82),
-                              ],
+                            : [Colors.white, Colors.white],
                       ),
                       border: Border.all(
-                        color: accent.first.withValues(alpha: (isDark ? 0.34 : 0.26) + t * 0.22),
+                        color: !isDark ? NgmyCalmLight.border : accent.first.withValues(alpha: 0.34 + t * 0.22),
                         width: 1.25,
                       ),
                     ),
@@ -5799,12 +5825,14 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
                     gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        accent,
-                        Color.lerp(accent, const Color(0xFF67E8F9), 0.35 + t * 0.15)!,
-                      ],
+                      begin: Theme.of(context).brightness == Brightness.light ? Alignment.topCenter : Alignment.topLeft,
+                      end: Theme.of(context).brightness == Brightness.light ? Alignment.bottomCenter : Alignment.bottomRight,
+                      colors: Theme.of(context).brightness == Brightness.light
+                          ? [Color.lerp(accent, Colors.white, 0.22)!, accent]
+                          : [
+                              accent,
+                              Color.lerp(accent, const Color(0xFF67E8F9), 0.35 + t * 0.15)!,
+                            ],
                     ),
                     border: Border.all(color: Colors.white.withValues(alpha: 0.30 + t * 0.2), width: 1.2),
                   ),
@@ -5895,7 +5923,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     // A compact frame around the one-line header (icon, title, tagline).
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-      decoration: BoxDecoration(
+      decoration: !isDark ? NgmyCalmLight.cardDecoration(radius: 20) : BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -5919,6 +5947,33 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     required Color color,
     required VoidCallback onTap,
   }) {
+    if (Theme.of(context).brightness == Brightness.light) {
+      // Light mode: a white card with a soft shadow, an icon tile and dark words.
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(22),
+          child: Ink(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
+            decoration: NgmyCalmLight.cardDecoration(radius: 22),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                NgmyCalmIconTile(accent: color, size: 48, icon: icon),
+                const SizedBox(height: 12),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: NgmyCalmLight.ink, fontWeight: FontWeight.w800, fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     return AnimatedBuilder(
       animation: _framePulse,
       builder: (context, _) {

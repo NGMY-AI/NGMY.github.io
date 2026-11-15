@@ -61,6 +61,28 @@ class _NgmySculptedBottomNavFrameState extends State<NgmySculptedBottomNavFrame>
     final height = widget.barHeight ?? NgmyBottomNavMetrics.barHeight;
     final radius = widget.borderRadius ?? 30.0;
 
+    if (!isDark) {
+      // Light mode: a still white bar with a soft grey shadow. No blue edge, no breathing glow.
+      if (_breathe.isAnimating) _breathe.stop(canceled: false);
+      return SizedBox(
+        height: height,
+        child: DecoratedBox(
+          key: const Key('ngmy-nav-calm'),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(radius),
+            border: Border.all(color: const Color(0xFFE4E7EC)),
+            boxShadow: const [
+              BoxShadow(color: Color(0x290F172A), blurRadius: 28, spreadRadius: -6, offset: Offset(0, 12)),
+              BoxShadow(color: Color(0x140F172A), blurRadius: 6, offset: Offset(0, 2)),
+            ],
+          ),
+          child: ClipRRect(borderRadius: BorderRadius.circular(radius), child: widget.child),
+        ),
+      );
+    }
+    if (!_breathe.isAnimating) _breathe.repeat(reverse: true);
+
     return SizedBox(
       height: height,
       child: AnimatedBuilder(
@@ -162,6 +184,16 @@ class NgmyNavSelectionOrb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    if (!isDark) {
+      // Light mode: a solid dark circle behind the chosen tab (its icon is white).
+      return const DecoratedBox(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Color(0xFF111827),
+          boxShadow: [BoxShadow(color: Color(0x330F172A), blurRadius: 10, offset: Offset(0, 4))],
+        ),
+      );
+    }
     return DecoratedBox(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
