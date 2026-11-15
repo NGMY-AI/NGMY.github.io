@@ -70,6 +70,15 @@ jobs:
           channel: stable
           cache: true
 
+      # Approved fixes (no black bar at the top or bottom on iPhone, page layouts the owner approved) were undone by accident more than once.
+      # Nothing is published unless these checks pass, so a change that breaks one of them never reaches ngmy.org - the last good version
+      # stays live. Change a check only when the owner asked for that exact thing to change.
+      - name: Guard the approved layout
+        run: |
+          set -e
+          flutter pub get
+          flutter test test/ngmy_layout_guard_test.dart test/ngmy_phone_unlock_test.dart test/ngmy_contribution_popup_test.dart
+
       - name: Build web and sync docs/
         run: |
           set -e

@@ -208,19 +208,42 @@ class _SequencePicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const accent = Color(0xFF38BDF8);
+    // Like the Construction Lab: the back arrow at the side and the name in a frame in the middle at the top. The whole page slides up under
+    // the clock when scrolled (no dark band at the top); only its start is kept below the clock.
     return SafeArea(
+      top: false,
       bottom: false,
       child: Column(children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8, 6, 16, 0),
-          child: Row(children: [
-            IconButton(onPressed: onClose, icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20)),
-            const SizedBox(width: 2),
-            const Expanded(child: Text('CORE PROTOCOL', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 17))),
-          ]),
-        ),
         Expanded(
           child: CustomScrollView(controller: controller, slivers: [
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(8, MediaQuery.paddingOf(context).top + 6, 8, 4),
+              sliver: SliverToBoxAdapter(
+                child: Row(children: [
+                  IconButton(key: const Key('core-protocol-back'), onPressed: onClose, icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20)),
+                  Expanded(
+                    child: Center(
+                      child: Container(
+                        key: const Key('core-protocol-title-frame'),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [accent.withValues(alpha: 0.22), accent.withValues(alpha: 0.06)]),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: accent.withValues(alpha: 0.75), width: 1.6),
+                          boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.22), blurRadius: 8)],
+                        ),
+                        child: const Column(mainAxisSize: MainAxisSize.min, children: [
+                          Text('🧪 Core Protocol', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+                          Text('Play, make things, keep them.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white60, fontSize: 10.5)),
+                        ]),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 48),
+                ]),
+              ),
+            ),
             SliverToBoxAdapter(child: _heading('STUDIOS', 'Play, make things, and keep what you make')),
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 14),
