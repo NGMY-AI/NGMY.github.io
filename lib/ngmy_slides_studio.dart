@@ -817,6 +817,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
       state: state,
       canEdit: canEdit,
       bypassEditWindow: widget.isAdmin,
+      isAppAdmin: widget.isAdmin,
       openDraftEditor: (d) => _openMarriageDraft(ngmyEnsureHatiKiapoLayout(d)),
       openSavedDeck: (d) => _openDeck(ngmyEnsureHatiKiapoLayout(d)),
     );
@@ -1547,9 +1548,25 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
 
   Future<void> _deleteDeck(NgmySlideDeck deck) async {
     if (ngmyIsHatiKiapoUongoziDeck(deck.deckKind)) {
+      // Only the app admin deletes the leadership oath paper, and it is then gone for everyone, everywhere, until the admin makes a new one.
+      if (!widget.isAdmin) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Only the admin can delete Hati ya Kiapo cha Uongozi.')));
+        }
+        return;
+      }
       final state = (deck.marriageState ?? _kiapoStateForUser).trim();
-      await NgmyHatiKiapoHiddenPresentations.hide(widget.userEmail, state);
-      _hiddenKiapoStates.add(state.toLowerCase());
+      final synced = await NgmyHatiKiapoStore.delete(state);
+      // A new paper made later must show again here: never keep it hidden on this phone.
+      _hiddenKiapoStates.remove(state.toLowerCase());
+      unawaited(NgmyHatiKiapoHiddenPresentations.unhide(widget.userEmail, state));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(synced
+              ? 'Hati ya Kiapo cha Uongozi of $state is deleted for everyone. Tap "Create Hati ya Kiapo" to make a new one.'
+              : 'Deleted on this phone. It will be deleted for everyone as soon as the app is online.'),
+        ));
+      }
     }
     unawaited(NgmySlidesTransferQrStash.releaseBundle(deck.id));
     // Saving never drops a presentation by itself — only this does.
@@ -3430,6 +3447,19 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                 ),
               ],
             ),
+            // The app admin only: when there is no leadership oath paper (it was deleted, or never made), a button to make a new one.
+            if (widget.isAdmin && _hasCivicRegistryAccess && !_decks.any((d) => ngmyIsHatiKiapoUongoziDeck(d.deckKind))) ...[
+              const SizedBox(height: 10),
+              KeyedSubtree(
+                key: const Key('slides-create-kiapo'),
+                child: _actionCard(
+                  icon: Icons.workspace_premium_rounded,
+                  label: 'Create Hati ya Kiapo',
+                  color: const Color(0xFFB8860B),
+                  onTap: _launchHatiKiapoUongozi,
+                ),
+              ),
+            ],
             const SizedBox(height: 24),
             Text(
               'YOUR PRESENTATIONS',
@@ -3553,7 +3583,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
           opacity: curve,
           child: Transform.scale(
             scale: 0.94 + curve * 0.06,
-            child: _DeckActionsDialog(deck: deck, isDark: isDark),
+            child: _DeckActionsDialog(deck: deck, isDark: isDark, isAdmin: widget.isAdmin),
           ),
         );
       },
@@ -5970,10 +6000,11 @@ class _UndoSnapshot {
 }
 
 class _DeckActionsDialog extends StatefulWidget {
-  const _DeckActionsDialog({required this.deck, required this.isDark});
+  const _DeckActionsDialog({required this.deck, required this.isDark, this.isAdmin = false});
 
   final NgmySlideDeck deck;
   final bool isDark;
+  final bool isAdmin;
 
   @override
   State<_DeckActionsDialog> createState() => _DeckActionsDialogState();
@@ -6218,15 +6249,18 @@ class _DeckActionsDialogState extends State<_DeckActionsDialog> with TickerProvi
                                     enter: _stagger(ngmyHatiIsTransferableDeck(deck) ? 3 : 2),
                                   ),
                                 ],
-                                const SizedBox(height: 8),
-                                _DeckActionTile(
-                                  icon: Icons.delete_outline_rounded,
-                                  label: 'Delete presentation',
-                                  value: 'delete',
-                                  tint: const Color(0xFFEF4444),
-                                  destructive: true,
-                                  enter: _stagger(deck.transferReceived ? 1 : (ngmyHatiIsTransferableDeck(deck) ? 4 : 3)),
-                                ),
+                                // The leadership oath paper: only the app admin can delete it - and then it is gone for everyone.
+                                if (!ngmyIsHatiKiapoUongoziDeck(deck.deckKind) || widget.isAdmin) ...[
+                                  const SizedBox(height: 8),
+                                  _DeckActionTile(
+                                    icon: Icons.delete_outline_rounded,
+                                    label: ngmyIsHatiKiapoUongoziDeck(deck.deckKind) ? 'Delete for everyone' : 'Delete presentation',
+                                    value: 'delete',
+                                    tint: const Color(0xFFEF4444),
+                                    destructive: true,
+                                    enter: _stagger(deck.transferReceived ? 1 : (ngmyHatiIsTransferableDeck(deck) ? 4 : 3)),
+                                  ),
+                                ],
                                 const SizedBox(height: 4),
                                 Transform.translate(
                                   offset: Offset(0, (1 - _stagger(deck.transferReceived ? 2 : (ngmyHatiIsTransferableDeck(deck) ? 5 : 4))) * 8),

@@ -86,6 +86,30 @@ void main() {
     }
   });
 
+  group('Approved by the owner on 2026-11-15', () {
+    test('Business Essentials: the name in a frame in the middle of the top bar (as in the owner\'s screenshot)', () {
+      expect(_read('lib/ngmy_business_essentials.dart'), contains('framed: true,'));
+      expect(_read('lib/ngmy_hud_tech_shell.dart'), contains('Expanded(child: NgmyFramedTitle(title: title, subtitle: subtitle ?? \'\', accent: colors.first))'));
+    });
+
+    test('Civic Registry: the ID icon follows the same rule as the home card and falls back to the account (never disappears after a reset)', () {
+      final m = _read('lib/main.dart');
+      expect(m, contains("return (record['registryId'] ?? '').toString().trim().isNotEmpty;"));
+      expect(m, contains('final rid = (widget.user.registryId ?? \'\').trim();'));
+      expect(m, contains('return NgmyCivicRegistryMembers.buildRecord('));
+    });
+
+    test('Hati ya Kiapo cha Uongozi: only the admin deletes it, and then it is gone for everyone', () {
+      final s = _read('lib/ngmy_slides_studio.dart');
+      expect(s, contains('if (!ngmyIsHatiKiapoUongoziDeck(deck.deckKind) || widget.isAdmin) ...['));
+      expect(s, contains('final synced = await NgmyHatiKiapoStore.delete(state);'));
+      expect(s, contains("key: const Key('slides-create-kiapo'),"));
+      final k = _read('lib/ngmy_hati_kiapo_uongozi.dart');
+      expect(k, contains("'deletedByState': _deleted,"));
+      expect(k, contains('if (!isAppAdmin && await NgmyHatiKiapoStore.isDeleted(trimmed)) {'));
+    });
+  });
+
   group('Core Protocol page', () {
     setUp(() {
       SharedPreferences.setMockInitialValues({});

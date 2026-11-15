@@ -77,7 +77,7 @@ jobs:
         run: |
           set -e
           flutter pub get
-          flutter test test/ngmy_layout_guard_test.dart test/ngmy_phone_unlock_test.dart test/ngmy_contribution_popup_test.dart test/ngmy_essentials_saving_test.dart
+          flutter test test/ngmy_layout_guard_test.dart test/ngmy_phone_unlock_test.dart test/ngmy_contribution_popup_test.dart test/ngmy_essentials_saving_test.dart test/ngmy_kiapo_delete_test.dart
 
       - name: Build web and sync docs/
         run: |

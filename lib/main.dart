@@ -33693,6 +33693,18 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
         .toList();
     unawaited(_hydrateReceiptReadState());
     unawaited(_restoreLocalUnlockImmediately());
+    // After the phone was reset the member list may not hold this person yet: fetch it now, so the ID icon and the name at the top come
+    // back from the database straight away.
+    if (NgmyCivicRegistryMembers.findByEmail(widget.config, widget.user.email) == null && _civicPassportForCurrentUser() == null) {
+      unawaited(ngmyHydrateCivicRegistryMembersFromAllBackups(
+        widget.config,
+        widget.allUsers,
+        requesterEmail: widget.user.email,
+        state: widget.user.state,
+      ).then((_) {
+        if (mounted) setState(() {});
+      }).catchError((_) {}));
+    }
     _registrarHydrateFuture = _hydrateRegistrarApplication();
     unawaited(() async {
       await _registrarHydrateFuture;
@@ -34834,6 +34846,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
       state: state,
     ).then((_) {
       if (!mounted) return;
+      setState(() {}); // the ID icon and the name show as soon as the member list is in
       unawaited(_loadSharedCivicDirectory());
     }));
     widget.onDataChanged();
@@ -45081,11 +45094,42 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
         phone: widget.user.phone,
       );
 
+  /// This person's registry record. It must never go missing just because this phone was reset: the member list on the phone, then the
+  /// record with the registry number of the account, then (last) a record made from the account itself, which lives in the database -
+  /// the same number the home card shows.
   Map<String, dynamic>? _civicMemberRecordForCurrentUser() {
     final byEmail = NgmyCivicRegistryMembers.findByEmail(widget.config, widget.user.email);
-    if (byEmail != null) return byEmail;
     final passport = _civicPassportForCurrentUser();
-    return passport;
+    // The record that carries the ID (linked to this account) wins over an older one with the same email.
+    if (byEmail != null && (byEmail['registryId'] ?? '').toString().trim().isNotEmpty) {
+      if (!NgmyCivicRegistryMembers.passportGranted(byEmail) && passport != null) return passport;
+      return byEmail;
+    }
+    if (passport != null) return passport;
+    final rid = (widget.user.registryId ?? '').trim();
+    if (rid.isEmpty) return byEmail;
+    final byId = NgmyCivicRegistryMembers.findByRegistryId(widget.config, rid);
+    if (byId != null) return byId;
+    // Removed from the registry by a registrar: no ID comes back from leftover account fields (same as the home card).
+    final removed = NgmyCivicRegistryMembers.removedFrom(widget.config).any((m) =>
+        (m['registryId'] ?? '').toString().trim().toUpperCase() == rid.toUpperCase() ||
+        NgmyCivicRegistryMembers.emailKey((m['email'] ?? '').toString()) == NgmyCivicRegistryMembers.emailKey(widget.user.email));
+    if (removed) return null;
+    final u = widget.user;
+    return NgmyCivicRegistryMembers.buildRecord(
+      email: u.email,
+      fullName: (u.fullName ?? '').trim().isNotEmpty ? u.fullName!.trim() : u.username,
+      dob: u.dob ?? '',
+      idType: u.idType ?? '',
+      homeAddress: u.homeAddress ?? '',
+      phone: u.phone,
+      city: u.city ?? '',
+      room: u.room ?? '',
+      state: u.state,
+      registryId: rid,
+      helps: u.helps,
+      missed: u.missed,
+    );
   }
 
   bool _civicIsOpenedAsName(String raw) =>
@@ -45117,13 +45161,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     return '';
   }
 
+  /// The ID icon at the top of the Civic Registry: shown whenever this person has a registry ID - the same rule as the ID card on the
+  /// home page, so the two never disagree (it used to also need a flag that could be missing after the phone was reset).
   bool _canViewCivicIdForCurrentUser() {
     final record = _civicMemberRecordForCurrentUser();
     if (record == null) return false;
-    final id = (record['registryId'] ?? '').toString().trim();
-    if (id.isEmpty) return false;
-    if (NgmyCivicRegistryMembers.passportGranted(record)) return true;
-    return _userIsCivicRegistryEnrolled(widget.config, widget.user);
+    return (record['registryId'] ?? '').toString().trim().isNotEmpty;
   }
 
   Future<void> _persistCivicIdPhotoChange() async {

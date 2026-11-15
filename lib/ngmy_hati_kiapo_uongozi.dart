@@ -146,8 +146,93 @@ class NgmyHatiKiapoStore {
 
   static Map<String, NgmySlideDeck> _byState = {};
   static bool _loaded = false;
+  static DateTime? _cloudAt;
+
+  /// Tests only: never touch the real database.
+  @visibleForTesting
+  static bool offlineForTests = false;
+
+  /// Tests only: forget everything held in memory (as after the app restarts).
+  @visibleForTesting
+  static void resetForTests() {
+    _byState = {};
+    _deleted = {};
+    _loaded = false;
+    _cloudAt = null;
+  }
+
+  static Future<bool> _online() async => !offlineForTests && await ngmyCanReachCloud();
+
+  /// DELETED BY THE ADMIN: per state, when and which paper. A deleted paper is gone for everyone - every phone drops it, and nobody can
+  /// save that paper back (not even an old copy on a phone). Only a NEW paper the admin creates shows again.
+  static Map<String, Map<String, String>> _deleted = {};
+  static const String _kDeletedPrefsKey = '${_kNgmyHatiKiapoPrefsKey}_deleted';
 
   static String _stateKey(String state) => state.trim().toLowerCase();
+
+  static DateTime? _deletedAt(String key) => DateTime.tryParse(_deleted[key]?['at'] ?? '');
+
+  /// Is [deck] the paper the admin deleted in its state (or an older copy from before the delete)?
+  static bool _isDeletedPaper(String key, NgmySlideDeck deck) {
+    final mark = _deleted[key];
+    if (mark == null) return false;
+    // Known which paper was deleted: exactly that paper (any copy of it) is gone; a new paper the admin makes is not.
+    if ((mark['id'] ?? '').isNotEmpty) return mark['id'] == deck.id;
+    final at = _deletedAt(key);
+    return at != null && !deck.updatedAt.isAfter(at);
+  }
+
+  static void _mergeDeleted(Map? raw) {
+    if (raw == null) return;
+    for (final e in raw.entries) {
+      if (e.value is! Map) continue;
+      final m = Map<String, dynamic>.from(e.value as Map);
+      final at = DateTime.tryParse((m['at'] ?? '').toString());
+      if (at == null) continue;
+      final key = e.key.toString();
+      final mine = _deletedAt(key);
+      if (mine == null || at.isAfter(mine)) _deleted[key] = {'at': at.toUtc().toIso8601String(), 'id': (m['id'] ?? '').toString()};
+    }
+  }
+
+  static void _dropDeleted() => _byState.removeWhere((key, deck) => _isDeletedPaper(key, deck));
+
+  static Future<void> _pullCloud() async {
+    final row = await ngmyFetchSettingsValueViaRest(kNgmyHatiKiapoSettingsKey);
+    if (row == null) return;
+    // A delete made on this phone while offline that the database does not know yet: send it up now.
+    final cloudDeleted = row['deletedByState'] is Map ? Map<String, dynamic>.from(row['deletedByState'] as Map) : <String, dynamic>{};
+    final notSynced = _deleted.entries.any((e) {
+      final c = cloudDeleted[e.key];
+      final cAt = c is Map ? DateTime.tryParse((c['at'] ?? '').toString()) : null;
+      final mine = DateTime.tryParse(e.value['at'] ?? '');
+      return mine != null && (cAt == null || mine.isAfter(cAt));
+    });
+    if (row['deletedByState'] is Map) _mergeDeleted(row['deletedByState'] as Map);
+    if (row['byState'] is Map) {
+      for (final e in (row['byState'] as Map).entries) {
+        if (e.value is! Map) continue;
+        final remote = NgmySlideDeck.fromJson(Map<String, dynamic>.from(e.value as Map));
+        final local = _byState[e.key.toString()];
+        if (local == null || !remote.updatedAt.isBefore(local.updatedAt)) _byState[e.key.toString()] = remote;
+      }
+    }
+    // A state that is not in the cloud any more but has a delete mark: gone here too.
+    _dropDeleted();
+    _cloudAt = DateTime.now();
+    await _saveLocal();
+    if (notSynced) {
+      try {
+        await ngmyUpsertSettingsRowReliable(kNgmyHatiKiapoSettingsKey, {
+          'byState': {for (final e in _byState.entries) e.key: e.value.toJson()},
+          'deletedByState': _deleted,
+          'updatedAt': DateTime.now().toUtc().toIso8601String(),
+        });
+      } catch (e) {
+        debugPrint('[kiapo] push delete: $e');
+      }
+    }
+  }
 
   static Future<void> load({bool forceCloud = false}) async {
     if (_loaded && !forceCloud) return;
@@ -164,26 +249,18 @@ class NgmyHatiKiapoStore {
           };
         }
       }
+      final del = prefs.getString(_kDeletedPrefsKey);
+      if (del != null && del.trim().isNotEmpty) {
+        final d = jsonDecode(del);
+        if (d is Map) _mergeDeleted(d);
+      }
+      _dropDeleted();
     } catch (e) {
       debugPrint('[kiapo] local load: $e');
     }
-    if (forceCloud || await ngmyCanReachCloud()) {
+    if (!offlineForTests && (forceCloud || await ngmyCanReachCloud())) {
       try {
-        final row = await ngmyFetchSettingsValueViaRest(kNgmyHatiKiapoSettingsKey);
-        if (row != null && row['byState'] is Map) {
-          final remote = <String, NgmySlideDeck>{};
-          for (final e in (row['byState'] as Map).entries) {
-            if (e.value is! Map) continue;
-            remote[e.key.toString()] = NgmySlideDeck.fromJson(Map<String, dynamic>.from(e.value as Map));
-          }
-          for (final e in remote.entries) {
-            final local = _byState[e.key];
-            if (local == null || !e.value.updatedAt.isBefore(local.updatedAt)) {
-              _byState[e.key] = e.value;
-            }
-          }
-          await _saveLocal();
-        }
+        await _pullCloud();
       } catch (e) {
         debugPrint('[kiapo] cloud load: $e');
       }
@@ -198,6 +275,7 @@ class NgmyHatiKiapoStore {
         _kNgmyHatiKiapoPrefsKey,
         jsonEncode({for (final e in _byState.entries) e.key: e.value.toJson()}),
       );
+      await prefs.setString(_kDeletedPrefsKey, jsonEncode(_deleted));
     } catch (e) {
       debugPrint('[kiapo] local save: $e');
     }
@@ -205,6 +283,13 @@ class NgmyHatiKiapoStore {
 
   static Future<NgmySlideDeck?> loadForState(String state) async {
     await load();
+    // Look at the database again at least every minute, so a paper the admin deleted disappears from every phone soon.
+    final last = _cloudAt;
+    if (last == null || DateTime.now().difference(last) > const Duration(minutes: 1)) {
+      try {
+        if (await _online()) await _pullCloud();
+      } catch (_) {}
+    }
     final key = _stateKey(state);
     if (key.isEmpty) return null;
     final deck = _byState[key]?.copy();
@@ -212,10 +297,48 @@ class NgmyHatiKiapoStore {
     return ngmyEnsureHatiKiapoLayout(deck);
   }
 
+  /// Was the paper of [state] deleted by the admin (and no new one made since)?
+  static Future<bool> isDeleted(String state) async {
+    await load();
+    final key = _stateKey(state);
+    return _deleted.containsKey(key) && _byState[key] == null;
+  }
+
+  /// THE ADMIN deletes the paper of [state]: gone for everyone, everywhere, until the admin creates a new one.
+  static Future<bool> delete(String state) async {
+    final key = _stateKey(state);
+    if (key.isEmpty) return false;
+    await load();
+    final gone = _byState.remove(key);
+    _deleted[key] = {'at': DateTime.now().toUtc().toIso8601String(), 'id': gone?.id ?? ''};
+    _loaded = true;
+    await _saveLocal();
+    if (!await _online()) return false;
+    try {
+      return await ngmyUpsertSettingsRowReliable(kNgmyHatiKiapoSettingsKey, {
+        'byState': {for (final e in _byState.entries) e.key: e.value.toJson()},
+        'deletedByState': _deleted,
+        'updatedAt': DateTime.now().toUtc().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('[kiapo] cloud delete: $e');
+      return false;
+    }
+  }
+
   static Future<bool> save(NgmySlideDeck deck) async {
     final state = (deck.marriageState ?? '').trim();
     final key = _stateKey(state);
     if (key.isEmpty) return false;
+    // Know about every delete first, so an old copy is never sent back up.
+    try {
+      if (await _online()) await _pullCloud();
+    } catch (_) {}
+    final mark = _deleted[key];
+    if (mark != null && (mark['id'] ?? '').isNotEmpty && mark['id'] == deck.id) {
+      debugPrint('[kiapo] not saved: this paper was deleted by the admin');
+      return false;
+    }
     deck.deckKind = kNgmyHatiKiapoUongoziDeckKind;
     deck.updatedAt = DateTime.now();
     // Never persist inline data:video blobs into shared prefs / cloud.
@@ -229,12 +352,14 @@ class NgmyHatiKiapoStore {
       }
     }
     _byState[key] = safe;
+    _dropDeleted(); // never send a deleted paper of another state back up
     _loaded = true;
     await _saveLocal();
-    if (!await ngmyCanReachCloud()) return false;
+    if (!await _online()) return false;
     try {
       return await ngmyUpsertSettingsRowReliable(kNgmyHatiKiapoSettingsKey, {
         'byState': {for (final e in _byState.entries) e.key: e.value.toJson()},
+        'deletedByState': _deleted,
         'updatedAt': DateTime.now().toUtc().toIso8601String(),
       });
     } catch (e) {
@@ -742,6 +867,8 @@ Future<void> launchNgmyHatiKiapoUongozi({
   required void Function(NgmySlideDeck deck) openDraftEditor,
   required void Function(NgmySlideDeck deck) openSavedDeck,
   bool bypassEditWindow = false,
+  /// The app admin: the only one who may make a new paper after one was deleted.
+  bool isAppAdmin = false,
 }) async {
   final trimmed = state.trim();
   if (trimmed.isEmpty) {
@@ -839,6 +966,16 @@ Future<void> launchNgmyHatiKiapoUongozi({
       return;
     }
     openSavedDeck(existing);
+    return;
+  }
+
+  // Deleted by the admin: nobody makes it again except the admin.
+  if (!isAppAdmin && await NgmyHatiKiapoStore.isDeleted(trimmed)) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Hati ya Kiapo cha Uongozi ya $trimmed imefutwa na Admin. Admin pekee anaweza kuunda mpya.')),
+      );
+    }
     return;
   }
 
