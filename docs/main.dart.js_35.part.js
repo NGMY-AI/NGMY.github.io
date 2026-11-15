@@ -310,8 +310,8 @@ if(v==null){w=A.vM(new A.lh("IndexedDB unavailable"),null)
 u=new A.bk($.bF,x.cr)
 u.n7(w)
 return $.hdn=u}return $.hdn=B.zB.MA(v,"ngmy_business_note_images_v1",new C.fwk(),1)},
-S4(d,e,f,g){return C.ikl(d,e,f,g)},
-ikl(d,e,a0,a1){var w=0,v=A.j(x.y),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f
+S4(d,e,f,g){return C.ikm(d,e,f,g)},
+ikm(d,e,a0,a1){var w=0,v=A.j(x.y),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f
 var $async$S4=A.e(function(a2,a3){if(a2===1){s.push(a3)
 w=t}for(;;)switch(w){case 0:i=B.a.i(d)
 if(J.ad(i)===0||B.a.i(a0).length===0||B.a.i(e).length===0){u=!1
@@ -379,8 +379,8 @@ break
 case 6:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
 return A.i($async$S4,v)},
-aRf(d,e,f){return C.ikk(d,e,f)},
-ikk(d,e,f){var w=0,v=A.j(x.u),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i
+aRf(d,e,f){return C.ikl(d,e,f)},
+ikl(d,e,f){var w=0,v=A.j(x.u),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i
 var $async$aRf=A.e(function(g,h){if(g===1){s.push(h)
 w=t}for(;;)switch(w){case 0:k=C.hcb(f,e,d)
 t=4
@@ -426,8 +426,8 @@ break
 case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
 return A.i($async$aRf,v)},
-ahR(d,e,f){return C.ikj(d,e,f)},
-ikj(d,e,f){var w=0,v=A.j(x.H),u=1,t=[],s,r,q,p,o,n,m
+ahR(d,e,f){return C.ikk(d,e,f)},
+ikk(d,e,f){var w=0,v=A.j(x.H),u=1,t=[],s,r,q,p,o,n,m
 var $async$ahR=A.e(function(g,h){if(g===1){t.push(h)
 w=u}for(;;)switch(w){case 0:o=C.hcb(f,e,d)
 u=3
@@ -1616,7 +1616,7 @@ w=1
 break
 case 1:return A.h(u,v)}})
 return A.i($async$aRE,v)},
-imK(d){var w,v=d.Q,u=v==null?null:v.bT()
+imL(d){var w,v=d.Q,u=v==null?null:v.bT()
 if(u==null)return!1
 v=Date.now()
 w=new A.V(v,0,!1).bT()
@@ -1988,9 +1988,9 @@ u=j
 w=1
 break}j=J.ad(q)===0?"Saved place":q
 n=J.t(r,"lat")
-n=A.d_(J.k(n==null?"":n))
+n=A.cX(J.k(n==null?"":n))
 m=J.t(r,"lng")
-o=C.cka(p,"Client Site",null,null,null,n,A.d_(J.k(m==null?"":m)),j,"",0)
+o=C.cka(p,"Client Site",null,null,null,n,A.cX(J.k(m==null?"":m)),j,"",0)
 j=x.M
 w=8
 return A.b(C.ah6(d,A.a([o],j)),$async$bCv)
@@ -4816,7 +4816,7 @@ if(f.y)k.push(D.hwW)
 else k.push(D.hwV)
 u=A.a([u,B.ax,l,B.b5,A.bV(B.bG,k,B.bs,g,4,6)],j)
 if(e.length!==0)B.d.v(u,A.a([B.am,A.A(A.a([A.X(B.ap7,v.j(0.85),g,g,g,13),B.de,A.E(A.d(new A.N(e,A.hgZ(),A.U(e).k("N<1,n>")).aO(0," \xb7 "),g,1,B.a2,g,g,g,A.l(g,g,B.q7.j(0.9),g,g,g,g,g,g,g,g,10.5,g,g,B.V,g,g,!0,g,g,g,g,g,g,g,g),g,g,g),1)],j),B.l,g,B.e,B.i,0,g,g)],j))
-if(C.imK(f)){v=f.as
+if(C.imL(f)){v=f.as
 B.d.v(u,A.a([B.fP,A.A(A.a([D.bUU,B.de,A.E(A.d("Taken today"+(v.length===0?"":" \xb7 "+A.hCH(v)),g,1,B.a2,g,g,g,D.fyo,g,g,g),1)],j),B.l,g,B.e,B.i,0,g,g)],j))}f=B.a.i(f.f)
 if(f.length!==0)B.d.v(u,A.a([B.ax,A.d(f,g,1,B.a2,g,g,g,A.l(g,g,B.kJ.j(0.75),g,g,g,g,g,g,g,g,10,g,g,B.a8,g,g,!0,g,g,g,g,g,g,g,g),g,g,g)],j))
 return A.q(g,A.aI(!1,B.a3,!0,g,A.aP(!1,r,!0,A.by(q,new A.am(B.a0,g,B.ab,B.t,A.a([o,p,m,new A.D(D.bCu,A.A(A.a([n,B.bd,A.E(A.x(u,B.E,g,B.e,B.i,0,B.p),1),A.x(A.a([new C.aDu(B.j2,s,!1,g),B.am,new C.aDu(B.eh,h.f,!0,g)],j),B.l,g,B.e,B.i,0,B.p)],j),B.l,g,B.e,B.i,0,g,g),g)],j),g),B.aq),g,!0,g,g,g,g,g,g,g,g,g,g,g,s,g,g,g,g,g,g,g),B.f,B.L,0,g,g,g,g,g,B.aj),B.f,g,D.b6A,new A.p(g,g,g,w,t,g,B.n),g,g,g,B.el,g,g,g,g)}}
@@ -8116,11 +8116,11 @@ $.hkB=A.T(x.N,x.y)
 $.hdn=null
 $.fsq=function(){var w=x.N
 return A.T(w,w)}()})();(function lazyInitializers(){var w=a.lazyFinal,v=a.lazy
-w($,"iyk","hHq",()=>new C.deN())
-w($,"iCX","hJX",()=>new C.bN7("en_US",D.d0D,D.dyt,D.aBZ,D.aBZ,B.oK,B.oK,B.iP,B.iP,D.azM,D.azM,D.azZ,D.azZ,B.Sr,B.Sr,D.daL,D.dvY,D.d_Z))
-v($,"iAP","h51",()=>C.htq("initializeDateFormatting(<locale>)",$.hJX()))
-v($,"iCS","hiN",()=>C.htq("initializeDateFormatting(<locale>)",D.dDK))
-w($,"ivw","hG1",()=>A.a([A.ag("^'(?:[^']|'')*'",!0,!1,!1,!1),A.ag("^(?:G+|y+|M+|k+|S+|E+|a+|h+|K+|H+|c+|L+|Q+|d+|D+|m+|s+|v+|z+|Z+)",!0,!1,!1,!1),A.ag("^[^'GyMkSEahKHcLQdDmsvzZ]+",!0,!1,!1,!1)],A.at("O<hac>")))
-w($,"izr","hHY",()=>A.ag("''",!0,!1,!1,!1))
-w($,"ixy","hH4",()=>C.hMC("MMM d, yyyy"))})()};
-(a=>{a["aiHdM2+LQTTm+6m2lB3BmbwOKRs="]=a.current})($__dart_deferred_initializers__);
+w($,"iyl","hHq",()=>new C.deN())
+w($,"iCY","hJX",()=>new C.bN7("en_US",D.d0D,D.dyt,D.aBZ,D.aBZ,B.oK,B.oK,B.iP,B.iP,D.azM,D.azM,D.azZ,D.azZ,B.Sr,B.Sr,D.daL,D.dvY,D.d_Z))
+v($,"iAQ","h51",()=>C.htq("initializeDateFormatting(<locale>)",$.hJX()))
+v($,"iCT","hiN",()=>C.htq("initializeDateFormatting(<locale>)",D.dDK))
+w($,"ivx","hG1",()=>A.a([A.ag("^'(?:[^']|'')*'",!0,!1,!1,!1),A.ag("^(?:G+|y+|M+|k+|S+|E+|a+|h+|K+|H+|c+|L+|Q+|d+|D+|m+|s+|v+|z+|Z+)",!0,!1,!1,!1),A.ag("^[^'GyMkSEahKHcLQdDmsvzZ]+",!0,!1,!1,!1)],A.at("O<hac>")))
+w($,"izs","hHY",()=>A.ag("''",!0,!1,!1,!1))
+w($,"ixz","hH4",()=>C.hMC("MMM d, yyyy"))})()};
+(a=>{a["fCaPXx0yG77SssOMZU/rcxaIVYc="]=a.current})($__dart_deferred_initializers__);

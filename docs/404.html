@@ -21,83 +21,35 @@
           get: function () {
             var h = d.get.call(de);
             try {
-              // Three more ways to know the real visible height: the visible area, the window, and a box fixed to all four edges of the screen
-              // (what an installed app and a browser tab both fill). The tallest of them wins, unless the keyboard is up (the visible area is then
-              // far shorter than the others) - then nothing changes.
+              // In Safari on iPhone the bottom bar floats over the page, and the page is meant to go on under it (other sites show their own
+              // colour there). The app used to stop above the bar, so the dark page background showed under it. Now, in a Safari tab, the app
+              // is as tall as the large viewport (100lvh: down to the bottom edge of the screen), and data-ngmy-overlap on the page tells the app how
+              // much of it is under the bar, so the menu and buttons stay above the bar while the backgrounds run under it.
               var vv = window.visualViewport;
               var vh = vv ? Math.round(vv.height + vv.offsetTop) : 0;
               var ih = Math.round(window.innerHeight || 0);
-              var probe = window.__ngmyProbe;
-              if (!probe && (document.body || de)) {
-                probe = document.createElement('div');
-                probe.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;width:0;visibility:hidden;pointer-events:none;z-index:-1';
-                (document.body || de).appendChild(probe);
-                window.__ngmyProbe = probe;
+              var seen = Math.max(vh, ih);
+              var big = window.__ngmyBig;
+              if (!big && (document.body || de)) {
+                big = document.createElement('div');
+                big.style.cssText = 'position:fixed;top:0;left:0;width:0;height:100vh;height:100lvh;visibility:hidden;pointer-events:none;z-index:-1';
+                (document.body || de).appendChild(big);
+                window.__ngmyBig = big;
               }
-              var ph = probe ? Math.round(probe.getBoundingClientRect().height) : 0;
-              var best = Math.max(vh, ih, ph);
-              if (vh && best - vh > 120) return h; // the keyboard is up
-              if (best > h && best - h < 200) return best;
+              var lh = big ? Math.round(big.getBoundingClientRect().height) : 0;
+              var ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+              var installed = navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+              // The keyboard is up: the visible area is far shorter than the window. Then nothing changes.
+              if (vh && Math.max(ih, lh) - vh > 160) { de.setAttribute('data-ngmy-overlap', '0'); return h; }
+              var best = seen;
+              if (ios && !installed && lh > seen && lh - seen < 200) best = lh;
+              de.setAttribute('data-ngmy-overlap', String(Math.max(0, best - seen)));
+              if (best > h && best - h < 260) return best;
             } catch (e) {}
             return h;
           },
         });
       } catch (e) {}
-    })();
-  </script>
-  <script>
-    // Only when the app is drawn shorter than the screen: the numbers go into the empty strip itself, so one screenshot shows what the phone reports.
-    // It is not there at all when the app fills the screen.
-    (function () {
-      // The bottom of the app's own drawing area (the flutter-view box, or the first canvas if that is not there).
-      function viewBottom() {
-        try {
-          var fv = document.querySelector('flutter-view');
-          if (fv) return fv.getBoundingClientRect().bottom;
-          var c = document.querySelector('canvas');
-          if (c) return c.getBoundingClientRect().bottom;
-        } catch (e) {}
-        return 0;
-      }
-      // The app is drawn on canvases; the lowest edge of them.
-      function canvasBottom(cs) {
-        var b = 0;
-        for (var i = 0; i < cs.length; i++) { var bb = cs[i].getBoundingClientRect().bottom; if (bb > b) b = bb; }
-        return b;
-      }
-      var lastGap = 0, asked = false;
-      // Forget the stretch when the screen turns, so the engine can size the drawing again.
-      window.addEventListener('orientationchange', function () { asked = false; document.querySelectorAll('canvas').forEach(function (c) { c.style.height = ''; }); });
-      function tick() {
-        try {
-          var el = document.getElementById('ngmy-diag');
-          var vb = Math.round(viewBottom());
-          var cs = document.querySelectorAll('canvas');
-          var cb = Math.round(canvasBottom(cs));
-          var gap = vb - cb;
-          var typing = document.activeElement && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName);
-          if (typing || !vb || !cb) return;
-          if (gap >= 8) {
-            lastGap = gap;
-            // Stretch the drawing down to the bottom edge (a few pixels at most), and ask the engine to measure again, once.
-            for (var k = 0; k < cs.length; k++) {
-              var r = cs[k].getBoundingClientRect();
-              if (r.bottom < vb - 4) cs[k].style.height = (vb - r.top) + 'px';
-            }
-            if (!asked) { asked = true; window.dispatchEvent(new Event('resize')); }
-          }
-          if (!el) {
-            el = document.createElement('div');
-            el.id = 'ngmy-diag';
-            el.style.cssText = 'position:fixed;left:0;right:0;bottom:0;height:12px;z-index:2147483000;pointer-events:none;color:#9ca3af;font:9px/12px monospace;padding:0 4px;overflow:hidden;background:rgba(18,18,18,0.85);white-space:nowrap';
-            document.documentElement.appendChild(el);
-          }
-          var vv = window.visualViewport;
-          el.textContent = 'gap was ' + lastGap + ' | view ' + vb + ' | canvas ' + cb + ' | inner ' + Math.round(window.innerHeight) +
-            ' | vv ' + (vv ? Math.round(vv.height) + '+' + Math.round(vv.offsetTop) : '-') + ' | standalone ' + (navigator.standalone === true ? 'y' : 'n');
-        } catch (e) {}
-      }
-      setInterval(tick, 1000);
     })();
   </script>
   <script>
@@ -145,7 +97,7 @@
 
   <script>
     (function () {
-      var embedded = '20261115021724';
+      var embedded = '20261115150158';
       var base = window.__NGMY_BASE_PATH__ || '/';
       var KEY = 'ngmy_deploy_id';
       function forceRefreshForBuild(serverBuild, opts) {
@@ -720,6 +672,14 @@
       html, body { height: 100vh; height: 100dvh; }
       flutter-view { position: fixed; inset: 0; width: 100%; height: 100vh; height: 100dvh; }
     }
+    /* Safari on iPhone (only it knows -webkit-touch-callout), in a tab: the page goes on under the floating bottom bar, so the app is as tall as the
+       large viewport - down to the bottom edge of the screen - and no dark band is left under the bar. The app keeps its menu above the bar. */
+    @supports (-webkit-touch-callout: none) {
+      @media (display-mode: browser) {
+        html, body { height: 100vh; height: 100lvh; }
+        flutter-view { top: 0; bottom: auto; height: 100vh; height: 100lvh; }
+      }
+    }
     flt-glass-pane {
 
       width: 100%;
@@ -937,7 +897,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20261115021724";
+      var CURRENT = "20261115150158";
 
       function showError(msg) {
 
@@ -1086,7 +1046,7 @@
 
   <script>
     (function () {
-      var deployId = '20261115021724';
+      var deployId = '20261115150158';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;
