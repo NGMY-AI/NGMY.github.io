@@ -12,16 +12,16 @@ _.d=null
 _.e=$
 _.Gw$=d
 _.c=_.a=null
-_.$ti=e},bqs:function bqs(d){this.a=d},aOF:function aOF(){},
+_.$ti=e},bqs:function bqs(d){this.a=d},aOE:function aOE(){},
 oV(d,e,f){var w=d.a,v=d.b,u=d.c
 return new A.r(w+(e.a-w)*f,v+(e.b-v)*f,u+(e.c-u)*f)},
 tp(d,e){var w=Math.cos(e),v=Math.sin(e),u=d.a,t=d.c
 return new A.r(u*w+t*v,d.b,-u*v+t*w)},
-np(d,e,f,g){var w,v,u,t,s,r,q,p,o=new A.h4q(Math.cos(e),Math.sin(e)),n=new A.h4o(f),m=new A.h4p(n,e,o,g),l=new A.h4n(n,e,o),k=C.a([],x.z)
+np(d,e,f,g){var w,v,u,t,s,r,q,p,o=new A.h4r(Math.cos(e),Math.sin(e)),n=new A.h4p(f),m=new A.h4q(n,e,o,g),l=new A.h4o(n,e,o),k=C.a([],x.z)
 for(w=d.length,v=x.o,u=0;u<d.length;d.length===w||(0,C.J)(d),++u){t=d[u]
 s=C.a([],v)
 for(r=t.a,q=r.length,p=0;p<r.length;r.length===q||(0,C.J)(r),++p)s.push(m.$1(r[p]))
-k.push(new A.kf(s,l.$1(t.b),t.c,t.d,t.e,t.f,t.r,t.w,t.x,t.y,t.z))}return k},
+k.push(new A.jF(s,l.$1(t.b),t.c,t.d,t.e,t.f,t.r,t.w,t.x,t.y,t.z))}return k},
 DM(d,e,a0){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f
 if(d.length<3)return d
 w=C.a([D.d.gH(d)],x.o)
@@ -52,14 +52,14 @@ p=v+2
 o=p<t?a3[p]:q
 for(t=s.a,p=r.a,n=q.a,m=o.a,l=s.b,k=r.b,j=q.b,i=o.b,h=s.c,g=r.c,f=q.c,e=o.c,d=0;d<a4;++d){a0=d/a4
 a1=a0*a0
-a2=new A.h4d(a0,a1,a1*a0)
+a2=new A.h4e(a0,a1,a1*a0)
 w.push(new A.r(a2.$4(t,p,n,m),a2.$4(l,k,j,i),a2.$4(h,g,f,e)))}}w.push(D.d.gan(a3))
 return w},
-hLZ(){if($.hkm)return
-$.hkm=!0
+hM_(){if($.hkn)return
+$.hkn=!0
 C.aA().bG(new A.bKQ(),x.P).eB(new A.bKR())},
-hkn(){C.aA().bG(new A.bKV(),x.P).eB(new A.bKW())},
-i6t(d){var w,v,u,t,s,r,q,p,o,n
+hko(){C.aA().bG(new A.bKV(),x.P).eB(new A.bKW())},
+i6u(d){var w,v,u,t,s,r,q,p,o,n
 for(w=d.length,v=!0,u=!0,t=0;t<w;++t)if(d[t].c>=0.5)u=!1
 else v=!1
 if(v)return d
@@ -72,7 +72,7 @@ o=w>=0.5
 n=p.c
 if(o)s.push(q)
 if(o!==n>=0.5)s.push(A.oV(q,p,(0.5-w)/(n-w)))}return s},
-hdY(a2,a3,a4){var w,v,u,t,s,r,q,p=J.a7(a2),o=p.h(a2,0).a,n=p.h(a2,0).b,m=p.h(a2,1).a,l=p.h(a2,1).b,k=p.h(a2,2).a,j=p.h(a2,2).b,i=p.h(a2,3).a,h=p.h(a2,3).b,g=m-k,f=i-k,e=o-m+k-i,d=l-j,a0=h-j,a1=n-l+j-h
+hdZ(a2,a3,a4){var w,v,u,t,s,r,q,p=J.a7(a2),o=p.h(a2,0).a,n=p.h(a2,0).b,m=p.h(a2,1).a,l=p.h(a2,1).b,k=p.h(a2,2).a,j=p.h(a2,2).b,i=p.h(a2,3).a,h=p.h(a2,3).b,g=m-k,f=i-k,e=o-m+k-i,d=l-j,a0=h-j,a1=n-l+j-h
 if(Math.abs(e)<1e-9&&Math.abs(a1)<1e-9){w=m-o
 v=i-o
 u=l-n
@@ -103,7 +103,7 @@ p[2]=0
 p[1]=u/a3
 p[0]=w/a3
 return new C.eK(p)},
-i7p(d,e,f,g){var w,v=e.d,u=e.e,t=A.hdY(f,v,u)
+i7q(d,e,f,g){var w,v=e.d,u=e.e,t=A.hdZ(f,v,u)
 if(t==null)return
 w=d.c
 J.bo(w.save())
@@ -111,7 +111,7 @@ d.aA(0,t.a)
 w.clipRect(C.hU(new C.a1(0,0,v,0+u)),$.mh()[1],!0)
 e.c.$3(d,new C.av(v,u),g)
 w.restore()},
-i7q(d,e,f,g,h,i){var w,v,u,t,s,r,q,p,o,n,m,l,k=e.d,j=e.e
+i7r(d,e,f,g,h,i){var w,v,u,t,s,r,q,p,o,n,m,l,k=e.d,j=e.e
 $.Q()
 w=new C.q1(new C.pD())
 e.c.$3(C.zy(w,null),new C.av(k,j),i)
@@ -119,17 +119,17 @@ v=w.o1()
 u=k/g
 t=j/h
 for(s=f.length,r=d.c,q=0+u,p=0+t,o=0;o<f.length;f.length===s||(0,C.J)(f),++o){n=f[o]
-m=A.hdY(n.c,u,t)
+m=A.hdZ(n.c,u,t)
 if(m==null)continue
 J.bo(r.save())
 l=m.a
-r.concat(C.h4i(C.HG(l)))
+r.concat(C.h4j(C.HH(l)))
 r.clipRect(C.hU(new C.a1(0,0,q,p)),$.mh()[1],!0)
 r.translate(-n.a*u,-n.b*t)
 d.zn(v)
 r.restore()}v.t()},
-haB(d,e,f,g,h,i,j,k,l,m){return new A.awp(l,e,h,k,i,f,g,d,m,j,null)},
-i5z(a4){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3=$.hiE()
+haC(d,e,f,g,h,i,j,k,l,m){return new A.awo(l,e,h,k,i,f,g,d,m,j,null)},
+i5A(a4){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3=$.hiF()
 C.xP(a4)
 w=a3.a.get(a4)
 if(w!=null)return w
@@ -158,16 +158,16 @@ a1.tb(0,p,q)
 if(u)s.n(0,a3,a1)}a3=C.a([v],x.dF)
 D.d.v(a3,new C.b7(t,t.$ti.k("b7<2>")))
 a2=new A.cOP(a3)
-$.hiE().n(0,a4,a2)
+$.hiF().n(0,a4,a2)
 return a2},
 b83(d,e,f,g,h,i,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9){var w,v,u,t,s,r,q,p,o,n=(a1-g)/2,m=h-e,l=Math.max(a7*2,m*0.3),k=m-l,j=a6-a5/2
 m=a1/2-n/2
-d.alD(new A.r(a8-m,j,a9),new A.r(n,a5,h),a0,0.5,4,a4)
-d.alD(new A.r(a8+m,j,a9),new A.r(n,a5,h),a0,0.5,8,a4)
+d.alE(new A.r(a8-m,j,a9),new A.r(n,a5,h),a0,0.5,4,a4)
+d.alE(new A.r(a8+m,j,a9),new A.r(n,a5,h),a0,0.5,8,a4)
 m=h/2
 w=a9-m
-d.alD(new A.r(a8,j,w+k/2),new A.r(g,a5,k),a0,0.5,13,a4)
-d.alD(new A.r(a8,j,a9+m-l/2),new A.r(g,a5,l),a0,0.5,14,a4)
+d.alE(new A.r(a8,j,w+k/2),new A.r(g,a5,k),a0,0.5,13,a4)
+d.alE(new A.r(a8,j,a9+m-l/2),new A.r(g,a5,l),a0,0.5,14,a4)
 m=e/2
 v=w+k+m
 u=a6-a2/2
@@ -200,7 +200,7 @@ d.cw(new A.r(o,m,q),new A.r(o,s,q),r,i,0.9,10)}d.e=0},
 r:function r(d,e,f){this.a=d
 this.b=e
 this.c=f},
-kf:function kf(d,e,f,g,h,i,j,k,l,m,n){var _=this
+jF:function jF(d,e,f,g,h,i,j,k,l,m,n){var _=this
 _.a=d
 _.b=e
 _.c=f
@@ -266,18 +266,18 @@ this.b=e},
 c1o:function c1o(d,e,f){this.a=d
 this.b=e
 this.c=f},
-h4q:function h4q(d,e){this.a=d
+h4r:function h4r(d,e){this.a=d
 this.b=e},
-h4o:function h4o(d){this.a=d},
-h4p:function h4p(d,e,f,g){var _=this
+h4p:function h4p(d){this.a=d},
+h4q:function h4q(d,e,f,g){var _=this
 _.a=d
 _.b=e
 _.c=f
 _.d=g},
-h4n:function h4n(d,e,f){this.a=d
+h4o:function h4o(d,e,f){this.a=d
 this.b=e
 this.c=f},
-h4d:function h4d(d,e,f){this.a=d
+h4e:function h4e(d,e,f){this.a=d
 this.b=e
 this.c=f},
 uO:function uO(d,e,f,g,h){var _=this
@@ -418,7 +418,7 @@ _.x=i
 _.y=j
 _.z=k
 _.Q=l},
-awp:function awp(d,e,f,g,h,i,j,k,l,m,n){var _=this
+awo:function awo(d,e,f,g,h,i,j,k,l,m,n){var _=this
 _.c=d
 _.d=e
 _.e=f
@@ -468,7 +468,7 @@ _.w=1/0
 _.x=-1/0},
 cOP:function cOP(d){this.a=d},
 fom:function fom(){},
-aOO:function aOO(){},
+aON:function aON(){},
 bIK(d){return new A.ajM(d,null)},
 ajM:function ajM(d,e){this.c=d
 this.a=e},
@@ -479,36 +479,36 @@ cNw:function cNw(d){this.a=d},
 cNv:function cNv(d){this.a=d},
 cNy:function cNy(d){this.a=d},
 cNx:function cNx(d){this.a=d},
-hPj(d){var w=$.hlZ.h(0,d)
+hPk(d){var w=$.hm_.h(0,d)
 if(w!=null&&D.o.aq(new C.V(Date.now(),0,!1).bD(w).a,1e6)<20)return
-$.hlZ.n(0,d,new C.V(Date.now(),0,!1))
-A.aXc(d)},
-aXc(d){var w,v,u=$.h7b.h(0,d)
+$.hm_.n(0,d,new C.V(Date.now(),0,!1))
+A.aXb(d)},
+aXb(d){var w,v,u=$.h7c.h(0,d)
 if(u!=null)return C.f3(u,x.g7)
 w=B.IY.h(0,d)
 if(w==null)return C.f3(null,x.g7)
-v=$.h7a.h(0,d)
+v=$.h7b.h(0,d)
 if(v==null){v=new A.bVg(w,d).$0()
-$.h7a.n(0,d,v)}return v},
-aXd(d){var w=0,v=C.j(x.H),u
-var $async$aXd=C.e(function(e,f){if(e===1)return C.f(f,v)
+$.h7b.n(0,d,v)}return v},
+aXc(d){var w=0,v=C.j(x.H),u
+var $async$aXc=C.e(function(e,f){if(e===1)return C.f(f,v)
 for(;;)switch(w){case 0:w=2
-return C.b(A.aXc(d),$async$aXd)
+return C.b(A.aXb(d),$async$aXc)
 case 2:u=J.aT(B.IY.gev(B.IY))
 case 3:if(!u.C()){w=4
 break}w=5
-return C.b(A.aXc(u.gR(u)),$async$aXd)
+return C.b(A.aXb(u.gR(u)),$async$aXc)
 case 5:w=3
 break
 case 4:return C.h(null,v)}})
-return C.i($async$aXd,v)},
-hPh(d){var w,v,u=new Float64Array(d*16)
+return C.i($async$aXc,v)},
+hPi(d){var w,v,u=new Float64Array(d*16)
 for(w=0;w<d;++w){v=w*16
 u[v+15]=1
 u[v+10]=1
 u[v+5]=1
 u[v]=1}return u},
-hlX(d,e,f){var w,v,u,t
+hlY(d,e,f){var w,v,u,t
 if(d>e){w=d
 v=e}else{w=e
 v=d}if(w>f){u=w
@@ -516,7 +516,7 @@ w=f}else u=f
 if(v>w){t=w
 w=v
 v=t}return(v*65536+w)*65536+u},
-hPi(d,a0,a1){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h=d.c,g=d.b===1,f=g?4:3,e=h.length
+hPj(d,a0,a1){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h=d.c,g=d.b===1,f=g?4:3,e=h.length
 if(e===0)return
 w=d.a*f
 if(a0<=h[0]||e===1){for(g=d.d,v=a1.$flags|0,u=0;u<f;++u){t=g[u]
@@ -543,7 +543,7 @@ if(j>1e-9)for(u=0;u<4;++u){g=w+u
 v=a1[g]
 t&2&&C.aj(a1)
 a1[g]=v/j}},
-hlY(d,a0,a1,a2,a3,a4){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e
+hlZ(d,a0,a1,a2,a3,a4){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e
 for(w=a0+4,v=a0+8,u=a0+12,t=a3.$flags|0,s=0;s<4;++s)for(r=s*4,q=a4+r,r=a2+r,p=r+1,o=r+2,n=r+3,m=0;m<4;++m){l=d[a0+m]
 k=a1[r]
 j=d[w+m]
@@ -554,7 +554,7 @@ f=d[u+m]
 e=a1[n]
 t&2&&C.aj(a3)
 a3[q+m]=l*k+j*i+h*g+f*e}},
-ifp(d,e){var w=D.o.aI(d,16)&255,v=D.o.aI(d,8)&255,u=d&255,t=0.35+(0.299*w+0.587*v+0.114*u)/255,s=new A.fCx()
+ifq(d,e){var w=D.o.aI(d,16)&255,v=D.o.aI(d,8)&255,u=d&255,t=0.35+(0.299*w+0.587*v+0.114*u)/255,s=new A.fCx()
 return C.a_(255,s.$2(w,e.gb9(e)*255*t),s.$2(v,e.gbe()*255*t),s.$2(u,e.gbc(e)*255*t))},
 bd4:function bd4(d,e,f,g,h){var _=this
 _.a=d
@@ -644,7 +644,7 @@ _.e=h
 _.f=i},
 dmW:function dmW(d,e){this.a=d
 this.b=e},
-igA(b6,b7,b8,b9,c0,c1,c2,c3,c4,c5){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7=-150,a8=C.a([],x.z),a9=new A.eL(a8),b0=new A.fDP(a9,b8,c5),b1=new A.fDQ(a9,b8),b2=new A.fDO(a9,b8),b3=new A.fDR(a9,b8),b4=-c2/2,b5=Math.max(0.8,c0/400)
+igB(b6,b7,b8,b9,c0,c1,c2,c3,c4,c5){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7=-150,a8=C.a([],x.z),a9=new A.eL(a8),b0=new A.fDP(a9,b8,c5),b1=new A.fDQ(a9,b8),b2=new A.fDO(a9,b8),b3=new A.fDR(a9,b8),b4=-c2/2,b5=Math.max(0.8,c0/400)
 if(b7!=="tower"&&b7!=="screen"&&b7!=="gate"){for(w=30*b5,v=22*b5,u=0;u<2;++u){t=F.fK[u]*c0*0.3
 b0.$8$shine(t,7,b4,w,14,w,D.db,0.05)
 b0.$7(t,16,b4,v,4,v,D.dV)}w=-c0*0.3
@@ -765,7 +765,7 @@ for(o=f-30,q=0;q<4;++q)b0.$8$shine(o+q*20,270,b4,12,16,80,B.ahd,0.05)
 b0.$7(f,100,v,26,36,2,D.as)
 b1.$9$sides(f,280,b4,f,330,b4,1.8,D.dV,5)
 o=f+p*46
-a9.aK5(b8.$1(new A.r(f,330,b4)),b8.$1(new A.r(o,322,b4)),b8.$1(new A.r(o,298,b4)),b8.$1(new A.r(f,306,b4)),c1,B.hm,!0)
+a9.aK6(b8.$1(new A.r(f,330,b4)),b8.$1(new A.r(o,322,b4)),b8.$1(new A.r(o,298,b4)),b8.$1(new A.r(f,306,b4)),c1,B.hm,!0)
 o=f+p*52
 b2.$6$shine(o,60,s,7,D.c6,0.8)
 b3.$5(o,60,s,15,D.c6)}a9.o9(b8.$1(new A.r(w*0.35,0.7,-80)),b8.$1(new A.r(c0*0.35,0.7,-80)),b8.$1(new A.r(c0*0.3,0.7,320)),b8.$1(new A.r(w*0.3,0.7,320)),B.bnR,B.dZ)
@@ -779,17 +779,17 @@ fDO:function fDO(d,e){this.a=d
 this.b=e},
 fDR:function fDR(d,e){this.a=d
 this.b=e},
-hLF(){var w,v=J.e3(6,x.ff)
-for(w=0;w<6;++w)v[w]=new A.aU2()
+hLG(){var w,v=J.e3(6,x.ff)
+for(w=0;w<6;++w)v[w]=new A.aU1()
 return new A.bJ5(v)},
-agK(d){return A.i6Y(d)},
-i6Y(d){var w=0,v=C.j(x.eT),u,t=2,s=[],r,q,p,o
+agK(d){return A.i6Z(d)},
+i6Z(d){var w=0,v=C.j(x.eT),u,t=2,s=[],r,q,p,o
 var $async$agK=C.e(function(e,f){if(e===1){s.push(f)
 w=t}for(;;)switch(w){case 0:if(d==null){u=null
 w=1
 break}t=4
 w=7
-return C.b(C.fIg(d,null),$async$agK)
+return C.b(C.fIh(d,null),$async$agK)
 case 7:r=f
 w=8
 return C.b(r.lb(),$async$agK)
@@ -812,7 +812,7 @@ break
 case 6:case 1:return C.h(u,v)
 case 2:return C.f(s.at(-1),v)}})
 return C.i($async$agK,v)},
-hEW(a5,a6,a7,a8,a9){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4
+hEX(a5,a6,a7,a8,a9){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4
 if(a8.a){w=a7/8
 if(a9===0){v=D.i.bh(w)
 A.mH(a5,a6,a7,D.o.F(v,2)===0?0:1+D.o.aq(v,2))}else A.mH(a5,a6,a7,a9+1+D.i.bh(w))
@@ -870,7 +870,7 @@ v=Math.min(o*0.8/j,(p-m)*0.8/i)
 o=C.bs(d.gbw(),i*v,j*v)
 h=C.K()
 h.z=D.cj
-a5.q2(e,new C.a1(0,0,j,i),o,h)}o=new A.fW8()
+a5.q2(e,new C.a1(0,0,j,i),o,h)}o=new A.fW9()
 a0=w-f-m
 j=u.d
 a1=o.$4(a8.b,t*0.17,j,a0)
@@ -891,7 +891,7 @@ t=C.K()
 t.r=D.c.j(0.1).gp(0)
 a5.ar(new C.a1(a4,0,a4+w*0.1,s),t)
 j.restore()},
-igC(d,e){var w,v,u,t,s=d.w
+igD(d,e){var w,v,u,t,s=d.w
 if(s.length===0){s=d.e
 w=d.r
 return new C.cu([-s/2,s/2,w+d.f,w])}v=s[e]
@@ -921,10 +921,10 @@ d.ar(new C.a1(0,0,s,r),q)
 p=t*0.82
 J.bo(w.save())
 w.translate((u-p)/2,(t-p)/2)
-A.hF0(d,new C.av(p,p),f)
+A.hF1(d,new C.av(p,p),f)
 w.restore()}else A.mH(d,new C.av(u,t),f,g)
 w.restore()},
-ibL(d,e,f){var w,v,u,t,s=e.a,r=e.b
+ibM(d,e,f){var w,v,u,t,s=e.a,r=e.b
 $.Q()
 w=C.K()
 w.r=B.ajW.gp(0)
@@ -940,7 +940,7 @@ d.ar(new C.a1(w,u,t,u+r*0.4),v)
 u=C.K()
 u.r=F.f2.gp(0)
 d.N(new C.o(s*0.82,r*0.5),s*0.05,u)},
-heJ(e1,e2){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,d0,d1,d2,d3,d4,d5,d6,d7,d8=x.z,d9=C.a([],d8),e0=new A.eL(d9)
+heK(e1,e2){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,d0,d1,d2,d3,d4,d5,d6,d7,d8=x.z,d9=C.a([],d8),e0=new A.eL(d9)
 e0.f=0
 e0.o9(B.hmd,B.ha1,B.ha0,B.hmc,B.bnv,B.dZ)
 e0.f=1
@@ -988,14 +988,14 @@ for(h=e2.b,g=x.o,f=-o,e=f-0.8,d=!m,a0=p==="highway",a1=f/2,f=p!=="neon",a2=a1-0.
 b0=a9.e
 b1=u*b0
 b2=t*b0
-b3=new A.fE6(a9)
+b3=new A.fE7(a9)
 b4=C.a([],d8)
 b5=new A.eL(b4)
 b5.f=l
 b6=C.a([],d8)
 b7=new A.eL(b6)
 b7.f=l
-b8=A.igC(e1,a8).a
+b8=A.igD(e1,a8).a
 b9=b8[0]
 c0=b8[1]
 c1=b8[2]
@@ -1018,7 +1018,7 @@ D.d.v(d9,b6)
 b6=C.a([],d8)
 c8=new A.eL(b6)
 c9=Math.max(6,b1*0.018)
-d0=new A.fE7(i,l)
+d0=new A.fE8(i,l)
 switch(q?"sep":p){case"tower":c8.df(new A.r(0,0,a1),new A.r(0,a7,a1),c9*1.9,D.dV,12)
 c8.df(new A.r(0,0,a1),new A.r(0,14,a1),c9*2.8,D.as,12)
 break
@@ -1032,25 +1032,25 @@ c8.kZ(B.hmr,B.h90,B.bkJ,0.1,2)
 c8.hl(B.hmq,B.h9d,D.db,2)
 c8.aF(B.h9s,B.haV,B.o7)
 c8.aF(B.h5i,B.h7F,D.es)
-d0.$6$px(B.hkg,0,210,126,new A.fE_(),360)
-d0.$6$px(B.hlw,0,210,126,new A.fE0(),360)
-d0.$6$px(B.hgv,0,72,116,A.iq6(),140)
-d0.$6$px(B.hpo,0,130,80,new A.fE1(),300)
+d0.$6$px(B.hkg,0,210,126,new A.fE0(),360)
+d0.$6$px(B.hlw,0,210,126,new A.fE1(),360)
+d0.$6$px(B.hgv,0,72,116,A.iq7(),140)
+d0.$6$px(B.hpo,0,130,80,new A.fE2(),300)
 for(d1=0;d1<3;++d1){d2=-60-d1*90
-d0.$6$px(new A.r(310.8,140,d2),1.5707963267948966,80,64,new A.fE2(d1),240)
-d0.$6$px(new A.r(310.8,55,d2),1.5707963267948966,60,60,A.hhd(),200)}for(d1=0;d1<2;++d1){d2=-65-d1*110
-d0.$6$px(new A.r(-490.8,95,d2),-1.5707963267948966,90,60,new A.fE3(d1),240)
-d0.$6$px(new A.r(-490.8,40,d2),-1.5707963267948966,50,50,A.hhd(),180)}d0.$6$px(new A.r(0,100,-285.8),3.141592653589793,580,170,A.hEN(),900)
+d0.$6$px(new A.r(310.8,140,d2),1.5707963267948966,80,64,new A.fE3(d1),240)
+d0.$6$px(new A.r(310.8,55,d2),1.5707963267948966,60,60,A.hhe(),200)}for(d1=0;d1<2;++d1){d2=-65-d1*110
+d0.$6$px(new A.r(-490.8,95,d2),-1.5707963267948966,90,60,new A.fE4(d1),240)
+d0.$6$px(new A.r(-490.8,40,d2),-1.5707963267948966,50,50,A.hhe(),180)}d0.$6$px(new A.r(0,100,-285.8),3.141592653589793,580,170,A.hEO(),900)
 break
 case"gate":for(b4=b1/2+25,b8=s+b2,c5=b8+26,d3=c9*1.6,d4=0;d4<2;++d4){d5=F.fK[d4]*b4
 c8.df(new A.r(d5,0,a1),new A.r(d5,c5,a1),d3,D.dV,12)}c8.aE(new A.r(0,b8+17,a1),new A.r(b1+80,18,22),D.dV,0.2)
 break
 default:for(b4=s+a9.d-7,d4=0;d4<2;++d4){b8=F.fK[d4]*b1*0.3
 c8.df(b3.$1(new A.r(b8,0,a1)),b3.$1(new A.r(b8,b4,a1)),c9,D.dV,10)}if(a0)c8.aF(new A.r(0,a4,14),new A.r(c5,3,24),D.dV)}D.d.v(d9,b6)
-if(d)A.igA(e0,p,b3,b2,b1,n,o,c2,c1,c6)
+if(d)A.igB(e0,p,b3,b2,b1,n,o,c2,c1,c6)
 d6=h[a8]
-i.push(new A.fh(C.a([b3.$1(new A.r(b9,c1,0.8)),b3.$1(new A.r(c0,c1,0.8)),b3.$1(new A.r(c0,c2,0.8)),b3.$1(new A.r(b9,c2,0.8))],g),0,new A.fE4(d6,a8),k,j,60,l,0,!1))
-i.push(new A.fh(C.a([b3.$1(new A.r(c0,c1,e)),b3.$1(new A.r(b9,c1,e)),b3.$1(new A.r(b9,c2,e)),b3.$1(new A.r(c0,c2,e))],g),0,new A.fE5(d6,a8),k,j,60,l,0,!1))}d8=C.a([],d8)
+i.push(new A.fh(C.a([b3.$1(new A.r(b9,c1,0.8)),b3.$1(new A.r(c0,c1,0.8)),b3.$1(new A.r(c0,c2,0.8)),b3.$1(new A.r(b9,c2,0.8))],g),0,new A.fE5(d6,a8),k,j,60,l,0,!1))
+i.push(new A.fh(C.a([b3.$1(new A.r(c0,c1,e)),b3.$1(new A.r(b9,c1,e)),b3.$1(new A.r(b9,c2,e)),b3.$1(new A.r(c0,c2,e))],g),0,new A.fE6(d6,a8),k,j,60,l,0,!1))}d8=C.a([],d8)
 d7=new A.eL(d8)
 for(d4=0;d4<9;++d4){v=B.d6m[d4]
 w=v.a
@@ -1061,10 +1061,10 @@ d7.eg(new A.r(w,98,d2),46,E.Ml,3,6)}for(d4=0;d4<6;++d4){w=B.dwD[d4]
 d7.df(new A.r(w,0,580),new A.r(w,90,580),3,D.dV,5)
 d7.eg(new A.r(w,95,580),8,B.mM,3,6)}D.d.v(d9,d8)
 return new A.r_(d9,B.T4,B.v4,i,null,!1,6000)},
-hx_(d){return d*d*(3-2*d)},
+hx0(d){return d*d*(3-2*d)},
 fpD(d,e,f,g,h){var w=new A.fpE(h)
 return new A.r(w.$4(d.a,e.a,f.a,g.a),w.$4(d.b,e.b,f.b,g.b),w.$4(d.c,e.c,f.c,g.c))},
-hxY(d,e,f){var w,v,u,t,s,r,q,p,o,n,m=D.i.D(e,0,30)
+hxZ(d,e,f){var w,v,u,t,s,r,q,p,o,n,m=D.i.D(e,0,30)
 if(f==null){w=C.a([],x.n)
 for(v=J.a7(d),u=0;u<v.gI(d);++u)w.push(30*u/(v.gI(d)-1))
 t=w}else t=f
@@ -1073,7 +1073,7 @@ v=J.a7(t)
 s=0
 for(;;){r=s+2
 if(!(r<w.gI(d)&&v.h(t,s+1)<=m))break;++s}w=s+1
-q=A.hx_(D.i.D((m-v.h(t,s))/(v.h(t,w)-v.h(t,s)),0,1))
+q=A.hx0(D.i.D((m-v.h(t,s))/(v.h(t,w)-v.h(t,s)),0,1))
 v=new A.ft5(d)
 p=s-1
 o=A.fpD(v.$1(p).a,v.$1(s).a,v.$1(w).a,v.$1(r).a,q)
@@ -1082,16 +1082,16 @@ r=Math.sin(m*1.3)
 v=Math.sin(m*1.9)
 w=Math.cos(m*1.1)
 return new C.y(new A.r(o.a+r*3,Math.max(o.b+v*2.5,18),o.c+w*3),n)},
-ifx(d){return $.ifw.c3(0,d.a,new A.fCE(d))},
-hAo(d){return $.ify.c3(0,d.a,new A.fCB(d))},
-igB(d,e){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i=d.a
-if(i==="scatter")return A.hxY(B.dku,e,null)
-if(d.w.length!==0)return A.hxY(A.hAo(d),e,A.ifx(d))
+ify(d){return $.ifx.c3(0,d.a,new A.fCE(d))},
+hAp(d){return $.ifz.c3(0,d.a,new A.fCB(d))},
+igC(d,e){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i=d.a
+if(i==="scatter")return A.hxZ(B.dkv,e,null)
+if(d.w.length!==0)return A.hxZ(A.hAp(d),e,A.ify(d))
 w=B.dCs.h(0,i)
 if(w==null)w=B.aR4
 v=B.czK[w.a]
 u=w.b?-1:1
-t=new A.r(d.ga4V(0),d.r+d.gH8()/2,d.ga4X())
+t=new A.r(d.ga4W(0),d.r+d.gH8()/2,d.ga4Y())
 s=new A.fDS(t,u,d)
 r=new A.fDT(t,u,d)
 q=D.i.D(e,0,30)
@@ -1100,7 +1100,7 @@ p=0
 for(;;){o=p+2
 if(!(o<i&&v[p+1].a<=q))break;++p}i=v[p].a
 n=p+1
-m=A.hx_(D.i.D((q-i)/(v[n].a-i),0,1))
+m=A.hx0(D.i.D((q-i)/(v[n].a-i),0,1))
 i=new A.fDU(v)
 l=p-1
 k=A.fpD(s.$1(i.$1(l)),s.$1(i.$1(p)),s.$1(i.$1(n)),s.$1(i.$1(o)),m)
@@ -1124,13 +1124,13 @@ _.w=k
 _.x=l
 _.y=m},
 bJ7:function bJ7(d){this.a=d},
-HW:function HW(d,e,f,g,h){var _=this
+HX:function HX(d,e,f,g,h){var _=this
 _.a=d
 _.b=e
 _.c=f
 _.d=g
 _.e=h},
-aU2:function aU2(){var _=this
+aU1:function aU1(){var _=this
 _.a=!0
 _.b="NEW GLOBAL MOVEMENT FOR YOUTH"
 _.c="Videos, slides, blogs and books."
@@ -1140,20 +1140,20 @@ _.x=_.w=_.r=_.f=null},
 bJ5:function bJ5(d){this.a="highway"
 this.b=d},
 bJ6:function bJ6(d){this.a=d},
-fW8:function fW8(){},
-fE6:function fE6(d){this.a=d},
-fE7:function fE7(d,e){this.a=d
-this.b=e},
+fW9:function fW9(){},
+fE7:function fE7(d){this.a=d},
 fE8:function fE8(d,e){this.a=d
 this.b=e},
-fE_:function fE_(){},
+fE9:function fE9(d,e){this.a=d
+this.b=e},
 fE0:function fE0(){},
 fE1:function fE1(){},
-fE2:function fE2(d){this.a=d},
+fE2:function fE2(){},
 fE3:function fE3(d){this.a=d},
-fE4:function fE4(d,e){this.a=d
-this.b=e},
+fE4:function fE4(d){this.a=d},
 fE5:function fE5(d,e){this.a=d
+this.b=e},
+fE6:function fE6(d,e){this.a=d
 this.b=e},
 hk:function hk(d,e,f,g,h,i,j){var _=this
 _.a=d
@@ -1182,8 +1182,8 @@ fDT:function fDT(d,e,f){this.a=d
 this.b=e
 this.c=f},
 fDU:function fDU(d){this.a=d},
-apx:function apx(d){this.a=d},
-apy:function apy(d,e){var _=this
+apw:function apw(d){this.a=d},
+apx:function apx(d,e){var _=this
 _.d=d
 _.r=_.f=_.e=$
 _.w=e
@@ -1278,19 +1278,19 @@ c5j:function c5j(d){this.a=d},
 c5h:function c5h(d){this.a=d},
 c5k:function c5k(d){this.a=d},
 c5g:function c5g(d){this.a=d},
-hew(d,e,f,g){var w,v,u,t=null,s=e.r
+hex(d,e,f,g){var w,v,u,t=null,s=e.r
 s=s==null?t:D.i.V(s)
 w=D.i.V(f)
 v=e.b
 v=v==null?t:v.l()
 u=d+"|"+C.w(s)+"|"+w+"|"+C.w(v)
-v=$.hAk.h(0,u)
+v=$.hAl.h(0,u)
 if(v==null){s=C.fq(t,D.cs,t,g,t,C.cQ(t,t,t,t,t,t,t,t,t,e,d),D.a5,D.bX,t,D.dz,D.bY)
 s.o6(f)
-$.hAk.n(0,u,s)}else s=v
+$.hAl.n(0,u,s)}else s=v
 return s},
 mH(a6,a7,a8,a9){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4=null,a5=D.o.F(a9,17)
-if(a5===0){A.fWf(a6,a7,a8,0)
+if(a5===0){A.fWg(a6,a7,a8,0)
 w=a7.a
 v=(D.i.F(a8*0.35,1.6)-0.3)*w
 u=a6.c
@@ -1302,7 +1302,7 @@ s=C.K()
 s.r=D.c.j(0.12).gp(0)
 a6.ar(new C.a1(v,0,v+w*0.12,t),s)
 u.restore()
-return}if(a5>=8){L.M7(a6,a7,a5-8,a8)
+return}if(a5>=8){L.M8(a6,a7,a5-8,a8)
 return}r=B.d0g[a5-1]
 w=a7.a
 u=a7.b
@@ -1349,8 +1349,8 @@ n.r=m.j(0.18).gp(0)
 a6.N(new C.o(w*0.88,u*0.3),u*(0.22+0.03*t),n)
 s.restore()
 s=w*0.06
-A.hew(r.a,C.n(a4,a4,D.c,a4,a4,a4,a4,a4,a4,a4,a4,u*0.22,a4,a4,D.u,a4,a4,!0,a4,u*0.012,a4,a4,a4,a4,a4,a4),w*0.9,1).a5(a6,new C.o(s,u*0.2))
-A.hew(r.b,C.n(a4,a4,m,a4,a4,a4,a4,a4,a4,a4,a4,u*0.1,a4,a4,D.V,a4,a4,!0,a4,a4,a4,a4,a4,a4,a4,a4),w*0.8,2).a5(a6,new C.o(s,u*0.5))
+A.hex(r.a,C.n(a4,a4,D.c,a4,a4,a4,a4,a4,a4,a4,a4,u*0.22,a4,a4,D.u,a4,a4,!0,a4,u*0.012,a4,a4,a4,a4,a4,a4),w*0.9,1).a5(a6,new C.o(s,u*0.2))
+A.hex(r.b,C.n(a4,a4,m,a4,a4,a4,a4,a4,a4,a4,a4,u*0.1,a4,a4,D.V,a4,a4,!0,a4,a4,a4,a4,a4,a4,a4,a4),w*0.8,2).a5(a6,new C.o(s,u*0.5))
 a0=$.X2
 m=u*0.76
 if(a0!=null){t=a0.c
@@ -1360,7 +1360,7 @@ o=C.K()
 o.z=D.cj
 a6.q2(a0,new C.a1(0,0,t,n),new C.a1(s,m,s+t*a1,m+n*a1),o)}else{a2=C.fq(a4,D.cs,a4,a4,a4,C.cQ(a4,a4,a4,a4,a4,a4,a4,a4,a4,C.n(a4,a4,D.c,a4,a4,a4,a4,a4,a4,a4,a4,u*0.12,a4,a4,D.u,a4,a4,!0,a4,a4,a4,a4,a4,a4,a4,a4),"NGMY"),D.a5,D.bX,a4,D.dz,D.bY)
 a2.e5()
-a2.a5(a6,new C.o(s,m))}a3=A.hew("ngmy.org",C.n(a4,a4,D.ac,a4,a4,a4,a4,a4,a4,a4,a4,u*0.08,a4,a4,D.I,a4,a4,!0,a4,a4,a4,a4,a4,a4,a4,a4),400,1)
+a2.a5(a6,new C.o(s,m))}a3=A.hex("ngmy.org",C.n(a4,a4,D.ac,a4,a4,a4,a4,a4,a4,a4,a4,u*0.08,a4,a4,D.I,a4,a4,!0,a4,a4,a4,a4,a4,a4,a4,a4),400,1)
 a3.a5(a6,new C.o(w-a3.b.c-w*0.05,u*0.82))},
 Gr:function Gr(d,e,f,g,h){var _=this
 _.a=d
@@ -1368,10 +1368,10 @@ _.b=e
 _.c=f
 _.d=g
 _.e=h},
-LI(d){return D.d.dP(B.RZ,new A.fGF(d),new A.fGG())},
+LJ(d){return D.d.dP(B.RZ,new A.fGG(d),new A.fGH())},
 zc(d){var w=B.hN.h(0,d.b),v=d.e*3.141592653589793/2,u=w.d/2+30
 return new C.y(d.c+Math.sin(v)*u,d.d+Math.cos(v)*u)},
-hNd(d){var w=C.a([],x.U),v=C.a([],x.fW),u=new C.e5()
+hNe(d){var w=C.a([],x.U),v=C.a([],x.fW),u=new C.e5()
 u.d_(7)
 w=new A.bNz(d,u,w,v)
 w.bBy(d,7)
@@ -1381,8 +1381,8 @@ _.a=d
 _.b=e
 _.c=f
 _.d=g},
-fGF:function fGF(d){this.a=d},
-fGG:function fGG(){},
+fGG:function fGG(d){this.a=d},
+fGH:function fGH(){},
 xJ:function xJ(d,e,f,g){var _=this
 _.b=d
 _.c=e
@@ -1391,7 +1391,7 @@ _.e=g
 _.f=null
 _.w=_.r=!1
 _.x=0},
-aV7:function aV7(d,e,f,g,h,i,j){var _=this
+aV6:function aV6(d,e,f,g,h,i,j){var _=this
 _.a=d
 _.b=e
 _.c=f
@@ -1438,12 +1438,12 @@ bNF:function bNF(){},
 bNC:function bNC(d,e,f){this.a=d
 this.b=e
 this.c=f},
-hks(d){var w=d.x
+hkt(d){var w=d.x
 return C.bx(w.length,D.d.cF(w,0,new A.bLI()),D.h,D.h,D.h,D.h,D.h,D.h,D.h,D.h,D.h,D.h,D.h,D.h,D.h,D.h,D.h,D.h,D.h,D.h)},
-irQ(d){var w,v,u
+irR(d){var w,v,u
 for(w=0,v=0;u=v+1,u<d.length;v=u)w+=Math.sqrt(Math.pow(d[u].a-d[v].a,2)+Math.pow(d[u].b-d[v].b,2))
 return w},
-irW(d,e){var w,v,u,t,s,r,q,p,o
+irX(d,e){var w,v,u,t,s,r,q,p,o
 for(w=e,v=0;u=v+1,u<d.length;v=u){t=d[u]
 s=d[v]
 r=t.a-s.a
@@ -1460,9 +1460,9 @@ _.f=-1},
 bLI:function bLI(){},
 dnr:function dnr(d,e){this.a=d
 this.b=e},
-h7H(d,e,f){return new A.aZQ(f,d,e,null)},
-hf6(d){return D.i.cL((1-D.i.D(d,0,1))*12)},
-aUv:function aUv(d){var _=this
+h7I(d,e,f){return new A.aZQ(f,d,e,null)},
+hf7(d){return D.i.cL((1-D.i.D(d,0,1))*12)},
+aUu:function aUu(d){var _=this
 _.b=_.a=1
 _.d=_.c=0
 _.e=1
@@ -1495,11 +1495,11 @@ _.w=k
 _.x=l},
 fu9(d){var w=d.d-d.b-200
 return new C.brB([157.07963267948966,2*w+380+628.3185307179587,w,190])},
-LM(d,e){var w,v=A.fu9(d).a,u=v[2],t=v[3],s=v[0]
+LN(d,e){var w,v=A.fu9(d).a,u=v[2],t=v[3],s=v[0]
 v=v[1]
 w=D.i.F(e,v)
 if(w<0)w+=v
-v=new A.fKj()
+v=new A.fKk()
 if(w<u)return new C.cu([d.b+100+w,445,1,0])
 w-=u
 if(w<s)return v.$4(d.d-100,545,-1.5707963267948966,w)
@@ -1514,24 +1514,24 @@ if(w<s)return v.$4(d.b+100,735,1.5707963267948966,w)
 w-=s
 if(w<t)return new C.cu([d.b,735-w,0,-1])
 return v.$4(d.b+100,545,3.141592653589793,w-t)},
-h6k(d,e,f){return new A.aUu(d,e,f)},
-hfo(d,e){var w=D.i.F(e+d.c,28)
+h6l(d,e,f){return new A.aUt(d,e,f)},
+hfp(d,e){var w=D.i.F(e+d.c,28)
 if(w<12)return 0
 if(w<15)return 1
 return 2},
-hvF(d,e,f,g){var w=x.n
+hvG(d,e,f,g){var w=x.n
 w=new A.byq(d,e,f,g,C.a([],w),C.a([],w))
 w.bCH(d,e,f,g)
 return w},
-hMg(){var w,v=C.a([],x.n)
+hMh(){var w,v=C.a([],x.n)
 for(w=0;w<4;++w)v.push(B.ky[w].r)
 return new A.bLJ(v,C.c_(4,0,!1,x.i),B.aBM)},
-idY(d,e){var w,v,u,t,s,r,q,p,o,n,m,l,k=C.a([],x.z)
+idZ(d,e){var w,v,u,t,s,r,q,p,o,n,m,l,k=C.a([],x.z)
 for(w=d.length,v=e.a,u=e.b,t=e.c,s=x.o,r=0;r<d.length;d.length===w||(0,C.J)(d),++r){q=d[r]
 p=C.a([],s)
 for(o=q.a,n=o.length,m=0;m<o.length;o.length===n||(0,C.J)(o),++m){l=o[m]
-p.push(new A.r(l.a*v,l.b*u,l.c*t))}k.push(new A.kf(p,q.b,q.c,q.d,q.e,q.f,q.r,q.w,q.x,q.y,q.z))}return k},
-i5M(){var w,v,u,t,s=new A.eL(C.a([],x.z))
+p.push(new A.r(l.a*v,l.b*u,l.c*t))}k.push(new A.jF(p,q.b,q.c,q.d,q.e,q.f,q.r,q.w,q.x,q.y,q.z))}return k},
+i5N(){var w,v,u,t,s=new A.eL(C.a([],x.z))
 s.r=!0
 s.aE(B.h5L,B.h8i,D.d6,0.3)
 s.aE(B.hmF,B.h88,D.bO,0.2)
@@ -1542,32 +1542,32 @@ for(w=0;w<2;++w)s.aF(new A.r(75.5,9,B.a64[w]),B.ac4,B.mM)
 for(w=0;w<2;++w){v=B.dr5[w]
 for(u=0;u<2;++u){t=B.dqX[u]
 s.df(new A.r(v,7,t-1.5),new A.r(v,7,t+1.5),7.5,D.nz,12)}}return s},
-icC(d,e){var w,v,u,t,s,r=new A.eL(C.a([],x.z))
+icD(d,e){var w,v,u,t,s,r=new A.eL(C.a([],x.z))
 r.r=!0
 r.aE(B.aY2,B.h7j,D.bO,0.4)
 r.aE(B.hmZ,B.hbo,D.bO,0.4)
 r.aE(B.hn_,B.hbu,B.ia,0.6)
-r.aF(B.xx,B.h7o,D.dK)
+r.aF(B.xx,B.h7o,D.dJ)
 w=D.i.F(d*5+e,2)<1
 r.aE(B.hpA,B.aYi,w?D.ay:D.ek,0.6)
 r.aE(B.hkJ,B.aYi,w?D.d6:D.d5,0.6)
 for(v=0;v<2;++v){u=B.dr1[v]
 for(t=0;t<2;++t){s=B.dqU[t]
 r.df(new A.r(u,6.5,s-1.5),new A.r(u,6.5,s+1.5),6.5,D.nz,12)}}return r},
-iu7(a6){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4=x.z,a5=C.a([],a4)
+iu8(a6){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4=x.z,a5=C.a([],a4)
 for(w=0;w<4;++w){v=B.ky[w]
-u=$.aSB()
+u=$.aSA()
 t=D.d.co(B.ky,v)
 u.G0(0,a6)
-t=A.LM(B.ky[t],u.a[t]).a
+t=A.LN(B.ky[t],u.a[t]).a
 s=t[0]
 r=t[1]
 q=t[2]
 p=t[3]
 u=v.a==="bus"
-o=u?A.i5M():A.icC(a6,w)
+o=u?A.i5N():A.icD(a6,w)
 u=u?B.aZc:B.aYr
-D.d.v(a5,A.np(A.idY(o.a,u),0,Math.atan2(q,p)-1.5707963267948966,new A.r(s,0,r)))}for(u=$.bGR(),t=u.length,n=0;n<u.length;u.length===t||(0,C.J)(u),++n)D.d.v(a5,A.i9W(u[n],a6))
+D.d.v(a5,A.np(A.idZ(o.a,u),0,Math.atan2(q,p)-1.5707963267948966,new A.r(s,0,r)))}for(u=$.bGR(),t=u.length,n=0;n<u.length;u.length===t||(0,C.J)(u),++n)D.d.v(a5,A.i9X(u[n],a6))
 for(u=a6*0.9,t=x.o,m=a6*22,l=a6*0.09,w=0;w<2;++w){k=B.a5F[w].a
 j=k[0]
 i=k[1]
@@ -1584,23 +1584,23 @@ a0.aE(B.h8u,B.h7s,B.ia,0.7)
 a0.df(B.h8B,B.hcd,2.6,D.bC,8)
 a0.aF(B.hca,B.hki,D.bO)
 a0.df(B.xx,B.abY,1.2,B.f1,8)
-for(a1=0;a1<2;++a1)a0.aF3(new A.r(0,13.4,0),B.heD,B.f1,m+a1*3.141592653589793/2)
+for(a1=0;a1<2;++a1)a0.aF4(new A.r(0,13.4,0),B.heD,B.f1,m+a1*3.141592653589793/2)
 for(n=0;n<2;++n){a2=E.aCn[n]
 a0.aF(new A.r(0,-11,a2),B.heh,B.f1)
 a0.aF(new A.r(-10,-6,a2),B.aZa,B.f1)
 a0.aF(new A.r(10,-6,a2),B.aZa,B.f1)}for(n=0;n<2;++n){a3=B.a65[n]
 a0.iJ(C.a([new A.r(a3*0.45,-10,0),new A.r(a3,-22,0)],t),0.3,B.f1,!1,0,4)}D.d.v(a5,A.np(d,0,e-1.5707963267948966,new A.r(j+520*k,h+Math.sin(u+w)*5,i+520*f)))}return a5},
-iu8(d){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g=C.a([],x.a),f=new A.h4l()
+iu9(d){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g=C.a([],x.a),f=new A.h4m()
 for(w=0;w<4;++w){v={}
 u=B.ky[w]
 v.a=v.b=null
-t=$.aSB()
+t=$.aSA()
 s=D.d.co(B.ky,u)
 t.G0(0,d)
-s=A.LM(B.ky[s],t.a[s]).a
+s=A.LN(B.ky[s],t.a[s]).a
 v.b=s[0]
 v.a=s[1]
-s=new A.h4j(v,Math.atan2(s[2],s[3])-1.5707963267948966)
+s=new A.h4k(v,Math.atan2(s[2],s[3])-1.5707963267948966)
 v=u.a==="bus"
 r=v?B.aZc:B.aYr
 t=v?51:38
@@ -1623,13 +1623,13 @@ i=s[3]
 h=v+w*3.141592653589793
 s=Math.cos(h)
 p=Math.sin(h)
-p=new A.h4k(Math.atan2(-Math.sin(h),Math.cos(h))-1.5707963267948966,l+520*s,j+Math.sin(t+w)*5,k+520*p)
+p=new A.h4l(Math.atan2(-Math.sin(h),Math.cos(h))-1.5707963267948966,l+520*s,j+Math.sin(t+w)*5,k+520*p)
 g.push(f.$7(p.$2(-42,-22),p.$2(42,-22),p.$2(42,-44),p.$2(-42,-44),i,900,230))
 g.push(f.$7(p.$2(42,-22.3),p.$2(-42,-22.3),p.$2(-42,-44.3),p.$2(42,-44.3),i,900,230))}return g},
-i9W(d,a0){var w,v,u,t,s,r,q,p,o,n,m,l,k=B.ky[d.a*2],j=d.b,i=A.LM(k,j).a,h=i[0],g=i[1],f=i[2],e=i[3]
-j=A.LM(k,j+22).a
+i9X(d,a0){var w,v,u,t,s,r,q,p,o,n,m,l,k=B.ky[d.a*2],j=d.b,i=A.LN(k,j).a,h=i[0],g=i[1],f=i[2],e=i[3]
+j=A.LN(k,j+22).a
 j=[j[0],j[1],f,e,h+-e*56,g+f*56]
-w=A.hfo(d,a0)
+w=A.hfp(d,a0)
 v=D.i.F(a0+d.c,28)
 u=v>=17&&v<26
 i=C.a([],x.z)
@@ -1639,7 +1639,7 @@ t.df(B.e3,B.aYc,1.7,D.dV,6)
 t.aE(B.h6R,B.hd1,D.as,0.3)
 for(s=w===2,r=w===1,q=w===0,p=0;p<3;++p){o=!0
 if(!(p===0&&s))if(!(p===1&&r)){n=p===2&&q
-o=n}n=o?B.dnM[p]:B.cO1[p]
+o=n}n=o?B.dnN[p]:B.cO1[p]
 m=o?0.9:0.1
 t.es(new A.r(-3.9,74-p*8,0),3.3,n,4,7,m)}t.aE(B.h6l,B.h7t,D.as,0.3)
 if(u){t.eg(B.hel,1.6,D.be,4,6)
@@ -1648,20 +1648,20 @@ t.aF(B.heP,B.aZD,D.be)
 t.aF(B.hiN,B.aZD,D.be)}else{t.aF(B.hgb,B.hli,D.ay)
 for(l=-2;l<=1;++l)t.aF(new A.r(l*1.25+0.6,40,-4.9),B.hlH,D.ay)
 t.aF(B.hoM,B.hgl,D.ay)}return A.np(i,0,Math.atan2(j[2],j[3])-1.5707963267948966,new A.r(j[4],0,j[5]))},
-ihx(){var w,v,u,t,s,r,q,p,o,n,m,l,k,j=C.a([],x.z),i=new A.eL(j)
+ihy(){var w,v,u,t,s,r,q,p,o,n,m,l,k,j=C.a([],x.z),i=new A.eL(j)
 i.f=1
 i.e=90
-w=new A.fGe(i)
+w=new A.fGf(i)
 for(v=$.bGR(),u=v.length,t=0;t<v.length;v.length===u||(0,C.J)(v),++t){s=v[t]
 r=B.ky[s.a*2]
 q=s.b
-p=A.LM(r,q+22).a
+p=A.LN(r,q+22).a
 o=p[0]
 n=p[1]
 m=p[2]
 l=p[3]
 for(k=-4;k<=4;++k)w.$8(o,n,m,l,0,-25+k*11,18,5)
-q=A.LM(r,q-6).a
+q=A.LN(r,q-6).a
 w.$8(q[0],q[1],m,l,0,0,2.2,46)}return j},
 Tj:function Tj(d,e,f,g,h){var _=this
 _.a=d
@@ -1669,8 +1669,8 @@ _.b=e
 _.d=f
 _.r=g
 _.w=h},
-fKj:function fKj(){},
-aUu:function aUu(d,e,f){this.a=d
+fKk:function fKk(){},
+aUt:function aUt(d,e,f){this.a=d
 this.b=e
 this.c=f},
 byq:function byq(d,e,f,g,h,i){var _=this
@@ -1689,17 +1689,17 @@ _.b=e
 _.c=0
 _.d=f},
 bLK:function bLK(){},
-h4l:function h4l(){},
-h4m:function h4m(d){this.a=d},
-h4j:function h4j(d,e){this.a=d
+h4m:function h4m(){},
+h4n:function h4n(d){this.a=d},
+h4k:function h4k(d,e){this.a=d
 this.b=e},
-h4k:function h4k(d,e,f,g){var _=this
+h4l:function h4l(d,e,f,g){var _=this
 _.a=d
 _.b=e
 _.c=f
 _.d=g},
-fGe:function fGe(d){this.a=d},
-fGf:function fGf(d,e,f,g,h,i){var _=this
+fGf:function fGf(d){this.a=d},
+fGg:function fGg(d,e,f,g,h,i){var _=this
 _.a=d
 _.b=e
 _.c=f
@@ -1727,12 +1727,12 @@ _.y=0},
 cDI:function cDI(d){this.a=d},
 cDJ:function cDJ(){},
 cDH:function cDH(){},
-hFW(d){return d.b==="hq"?12:D.o.D(D.i.bh((210+D.o.F(B.zM[d.f].l(),5)*24)/22),8,14)},
-h6j(d,e,f){var w=new A.bLs(d,e,f,B.aBU,B.a44,C.a([],x.a),C.aR(x.S))
+hFX(d){return d.b==="hq"?12:D.o.D(D.i.bh((210+D.o.F(B.zM[d.f].l(),5)*24)/22),8,14)},
+h6k(d,e,f){var w=new A.bLs(d,e,f,B.aBU,B.a44,C.a([],x.a),C.aR(x.S))
 w.at=new A.baH(null,-138,138,12,316,0,296,3.141592653589793,w.cf4())
 w.ax=w.cKe()
 return w},
-ibM(d,e,f){var w,v,u,t,s=null,r=e.a,q=e.b,p=C.bn(new C.a1(0,0,0+r,0+q),D.il)
+ibN(d,e,f){var w,v,u,t,s=null,r=e.a,q=e.b,p=C.bn(new C.a1(0,0,0+r,0+q),D.il)
 $.Q()
 w=C.K()
 w.r=B.bfY.gp(0)
@@ -1789,12 +1789,12 @@ bLz:function bLz(d){this.a=d},
 bLA:function bLA(d){this.a=d},
 bLB:function bLB(d){this.a=d},
 bLG:function bLG(d){this.a=d},
-h6r(d,e){var w=C.a([],x.gM),v=C.a([new A.MA(),new A.MA(),new A.MA()],x.gQ),u=C.a([],x.s),t=new C.e5()
+h6s(d,e){var w=C.a([],x.gM),v=C.a([new A.MA(),new A.MA(),new A.MA()],x.gQ),u=C.a([],x.s),t=new C.e5()
 t.d_(e)
-w=new A.aUS(d,t,w,v,u)
+w=new A.aUR(d,t,w,v,u)
 w.bBw(d,e)
 return w},
-hkG(d,e){var w,v,u,t,s,r,q,p,o=J.a7(e),n=x.Y,m=n.a(o.h(e,"wired"))
+hkH(d,e){var w,v,u,t,s,r,q,p,o=J.a7(e),n=x.Y,m=n.a(o.h(e,"wired"))
 if(m==null)m=D.ms
 w=n.a(o.h(e,"plumbed"))
 if(w==null)w=D.ms
@@ -1807,12 +1807,12 @@ if(C.re(p)){r=s.c
 r=r==="bathroom"||r==="kitchen"}else r=!1
 if(r){s.ch=!p
 s.fr=null}}},
-h6s(d){var w,v,u,t,s,r,q,p,o,n,m,l=null,k=J.a7(d),j=C.aJ(k.h(d,"seed"))
+h6t(d){var w,v,u,t,s,r,q,p,o,n,m,l=null,k=J.a7(d),j=C.aJ(k.h(d,"seed"))
 j=j==null?l:D.i.M(j)
 if(j==null)j=1
 w=C.aJ(k.h(d,"clock"))
 w=w==null?l:D.i.M(w)
-v=A.h6r(j,(w==null?0:w)+7)
+v=A.h6s(j,(w==null?0:w)+7)
 j=C.aJ(k.h(d,"points"))
 j=j==null?l:D.i.M(j)
 v.r=j==null?10:j
@@ -1869,14 +1869,14 @@ k=J.aT(k==null?D.cq:k)
 j=v.d
 while(k.C()){m=t.a(k.gR(k))
 w=J.a7(m)
-r=new A.IG(D.i.M(C.dC(w.h(m,"id"))),D.i.M(C.dC(w.h(m,"res"))),C.cO(w.h(m,"kind")),C.cO(w.h(m,"msg")),D.i.M(C.dC(w.h(m,"reward"))))
+r=new A.IH(D.i.M(C.dC(w.h(m,"id"))),D.i.M(C.dC(w.h(m,"res"))),C.cO(w.h(m,"kind")),C.cO(w.h(m,"msg")),D.i.M(C.dC(w.h(m,"reward"))))
 r.f=C.dC(w.h(m,"age"))
 j.push(r)}return v},
-Tz(d){return A.hMy(d)},
-hMy(d){var w=0,v=C.j(x.H),u,t=2,s=[],r,q,p,o,n
+Tz(d){return A.hMz(d)},
+hMz(d){var w=0,v=C.j(x.H),u,t=2,s=[],r,q,p,o,n
 var $async$Tz=C.e(function(e,f){if(e===1){s.push(f)
 w=t}for(;;)switch(w){case 0:if(d<=0){w=1
-break}q=$.I7
+break}q=$.I8
 if(q!=null){q.r+=d
 w=1
 break}t=4
@@ -1899,11 +1899,11 @@ break
 case 6:case 1:return C.h(u,v)
 case 2:return C.f(s.at(-1),v)}})
 return C.i($async$Tz,v)},
-akJ(d){return A.hMz(d)},
-hMz(d){var w=0,v=C.j(x.H),u,t=2,s=[],r,q,p,o,n
+akJ(d){return A.hMA(d)},
+hMA(d){var w=0,v=C.j(x.H),u,t=2,s=[],r,q,p,o,n
 var $async$akJ=C.e(function(e,f){if(e===1){s.push(f)
 w=t}for(;;)switch(w){case 0:if(d<=0){w=1
-break}q=$.I7
+break}q=$.I8
 if(q!=null){q.r=Math.max(0,q.r-d)
 w=1
 break}t=4
@@ -1926,18 +1926,18 @@ break
 case 6:case 1:return C.h(u,v)
 case 2:return C.f(s.at(-1),v)}})
 return C.i($async$akJ,v)},
-aUV(){var w=0,v=C.j(x.S),u,t=2,s=[],r,q,p,o,n
-var $async$aUV=C.e(function(d,e){if(d===1){s.push(e)
+aUU(){var w=0,v=C.j(x.S),u,t=2,s=[],r,q,p,o,n
+var $async$aUU=C.e(function(d,e){if(d===1){s.push(e)
 w=t}for(;;)switch(w){case 0:t=4
 w=7
-return C.b(C.aA(),$async$aUV)
+return C.b(C.aA(),$async$aUU)
 case 7:r=e
 p=C.el(J.t(r.a,"ngmy_construction_bonus_stars"))
 q=p==null?0:p
 w=!J.z(q,0)?8:9
 break
 case 8:w=10
-return C.b(J.h9(r,"ngmy_construction_bonus_stars"),$async$aUV)
+return C.b(J.h9(r,"ngmy_construction_bonus_stars"),$async$aUU)
 case 10:case 9:u=q
 w=1
 break
@@ -1955,13 +1955,13 @@ case 3:w=2
 break
 case 6:case 1:return C.h(u,v)
 case 2:return C.f(s.at(-1),v)}})
-return C.i($async$aUV,v)},
-hkH(d,e,f){return Math.max(6,12+4*f-2*d-5*e)},
-aUU(){var w=0,v=C.j(x.c9),u,t=2,s=[],r,q,p,o,n
-var $async$aUU=C.e(function(d,e){if(d===1){s.push(e)
+return C.i($async$aUU,v)},
+hkI(d,e,f){return Math.max(6,12+4*f-2*d-5*e)},
+aUT(){var w=0,v=C.j(x.c9),u,t=2,s=[],r,q,p,o,n
+var $async$aUT=C.e(function(d,e){if(d===1){s.push(e)
 w=t}for(;;)switch(w){case 0:t=4
 w=7
-return C.b(C.aA(),$async$aUU)
+return C.b(C.aA(),$async$aUT)
 case 7:r=e
 q=C.aV(J.t(r.a,"ngmy_community_v1"))
 if(q==null){u=null
@@ -1984,15 +1984,15 @@ case 3:w=2
 break
 case 6:case 1:return C.h(u,v)
 case 2:return C.f(s.at(-1),v)}})
-return C.i($async$aUU,v)},
-aUT(){var w=0,v=C.j(x.H),u=1,t=[],s,r,q
-var $async$aUT=C.e(function(d,e){if(d===1){t.push(e)
+return C.i($async$aUT,v)},
+aUS(){var w=0,v=C.j(x.H),u=1,t=[],s,r,q
+var $async$aUS=C.e(function(d,e){if(d===1){t.push(e)
 w=u}for(;;)switch(w){case 0:u=3
 w=6
-return C.b(C.aA(),$async$aUT)
+return C.b(C.aA(),$async$aUS)
 case 6:s=e
 w=7
-return C.b(J.h9(s,"ngmy_community_v1"),$async$aUT)
+return C.b(J.h9(s,"ngmy_community_v1"),$async$aUS)
 case 7:u=1
 w=5
 break
@@ -2004,7 +2004,7 @@ case 2:w=1
 break
 case 5:return C.h(null,v)
 case 1:return C.f(t.at(-1),v)}})
-return C.i($async$aUT,v)},
+return C.i($async$aUS,v)},
 FW:function FW(d,e,f,g,h,i){var _=this
 _.a=d
 _.b=e
@@ -2019,7 +2019,7 @@ _.d=_.c=100
 _.e=!1
 _.f=!0
 _.r=-1},
-IG:function IG(d,e,f,g,h){var _=this
+IH:function IH(d,e,f,g,h){var _=this
 _.a=d
 _.b=e
 _.c=f
@@ -2029,7 +2029,7 @@ _.f=0},
 MA:function MA(){this.a=-1
 this.b=100
 this.c=0},
-aUS:function aUS(d,e,f,g,h){var _=this
+aUR:function aUR(d,e,f,g,h){var _=this
 _.a=d
 _.b=e
 _.c=$
@@ -2053,7 +2053,7 @@ bMj:function bMj(d){this.a=d},
 bMk:function bMk(){},
 bMi:function bMi(d){this.a=d},
 bMm:function bMm(){},
-aqx:function aqx(d,e){this.c=d
+aqw:function aqw(d,e){this.c=d
 this.a=e},
 blH:function blH(){var _=this
 _.d=null
@@ -2112,14 +2112,14 @@ this.a=f},
 bgt:function bgt(d,e){this.b=d
 this.a=e},
 oD(d,e,f,g,h,i,j,k,l,m,n){return new A.N2(g,m,d,k,e,f,n,h,l,i,j)},
-nP(d){return D.d.fe($.hKk(),new A.fGX(d))},
-aj_(d,e){var w,v,u=d.e,t=new C.N(u,new A.h4X(),C.U(u).k("N<1,m>")).fM(0)
+nP(d){return D.d.fe($.hKl(),new A.fGY(d))},
+aj_(d,e){var w,v,u=d.e,t=new C.N(u,new A.h4Y(),C.U(u).k("N<1,m>")).fM(0)
 u=e.b
 w=C.a4(u).k("b7<2>")
 v=C.d2(new C.b7(u,w),w.k("M.E"))
 if(d.a==="cord4"&&e.r)return!1
 return t.cD(0,v.gkd(v))},
-hhL(d,e,f,g,h){var w,v
+hhM(d,e,f,g,h){var w,v
 if(e.a&&e.c===0){if(e.w)return"SHOCK! The breaker was still ON and you touched a live wire. Always turn the power OFF and test the wires first."
 return"STOP! The breaker is still ON, so these wires are live (120 volts). Turn the breaker OFF first. This can shock you badly."}if(e.c!==0)return"The device is already in the box. Pull it out again to change the wires."
 w=!1
@@ -2132,21 +2132,21 @@ if(w.h(0,v)!=null)return"That place already has a wire. Tap the wire to take it 
 if(new C.b7(w,C.a4(w).k("b7<2>")).q(0,f))return"That wire is already fastened. Tap it to take it off if you want to move it."
 w.n(0,v,f)
 return null},
-heV(d,e){var w,v,u,t,s,r,q=new A.fG0(),p=new A.fG1(),o=C.a([],x.bm)
+heW(d,e){var w,v,u,t,s,r,q=new A.fG1(),p=new A.fG2(),o=C.a([],x.bm)
 for(w=e.b,w=new C.cb(w,C.a4(w).k("cb<1,2>")).gae(0),v=d.f,u=d.e;w.C();){t=w.d
 t.toString
-s=D.d.fe(v,new A.fFZ(t))
-r=D.d.fe(u,new A.fG_(t))
+s=D.d.fe(v,new A.fG_(t))
+r=D.d.fe(u,new A.fG0(t))
 o.push(new A.a50(new A.cFu(r.a,q.$1(r.e)),new A.cBV(p.$1(s.f))))}return o},
-fX1(d){var w=d.e,v=C.U(w).k("Y<1>")
-return new A.bNJ(new C.Y(w,new A.fX2(),v).gI(0),new C.Y(w,new A.fX3(),v).gI(0),d.y)},
+fX2(d){var w=d.e,v=C.U(w).k("Y<1>")
+return new A.bNJ(new C.Y(w,new A.fX3(),v).gI(0),new C.Y(w,new A.fX4(),v).gI(0),d.y)},
 xh(d,e){var w,v,u,t,s,r,q,p,o,n,m
 if(d.a==="cord4"&&e.r)return B.hrc
-w=A.hBb(A.fX1(d),A.heV(d,e),e.y)
+w=A.hBc(A.fX2(d),A.heW(d,e),e.y)
 v=w.c
-u=new A.fH9(w)
+u=new A.fHa(w)
 t=w.b
-s=t.length===0?null:D.d.f1(t,new A.fH6())
+s=t.length===0?null:D.d.f1(t,new A.fH7())
 t=w.a===B.r4
 if(t)r="ok"
 else if(u.$1("SHORT")||u.$1("HOT_TO_GROUND"))r="short"
@@ -2158,20 +2158,20 @@ else if(u.$1("UNVERIFIED"))q="unverified"
 else q=u.$1("MISSING_GROUND")?"noGround":"dead"
 r=q}if(d.x&&!e.z)for(q=e.b,q=new C.cb(q,C.a4(q).k("cb<1,2>")).gae(0),p=d.f;q.C();){o=q.d
 o.toString
-n=D.d.fe(p,new A.fH7(o))
+n=D.d.fe(p,new A.fH8(o))
 if(!n.c.q(0,o.b)){t=n.d
-return new A.ayD("dead","The "+D.d.fe(d.e,new A.fH8(o)).b+" is on the wrong terminal ("+n.b+"). "+t,!1,!1,!1,"none",t)}}m=t?"Wired correctly. Hot, neutral and ground are all in the right place, and every safety check passes.":s.c+" "+v.c
+return new A.ayC("dead","The "+D.d.fe(d.e,new A.fH9(o)).b+" is on the wrong terminal ("+n.b+"). "+t,!1,!1,!1,"none",t)}}m=t?"Wired correctly. Hot, neutral and ground are all in the right place, and every safety check passes.":s.c+" "+v.c
 t=s==null?null:s.e
 if(t==null)t=""
-return new A.ayD(r,m,v.d,v.e,v.f,v.b,t)},
-hfp(d){var w,v,u,t
-for(w=$.h5C(),v=w.length,u=0;u<v;++u){t=w[u]
+return new A.ayC(r,m,v.d,v.e,v.f,v.b,t)},
+hfq(d){var w,v,u,t
+for(w=$.h5D(),v=w.length,u=0;u<v;++u){t=w[u]
 if(t.a===d)return t.w}return d},
 agN(d,e){var w
 if(d==="light"||d==="fan")w=e.c===0?6.4:0.6
 else w=e.c===0?4.7:-0.25
 return w},
-aQY(d,e,f){var w,v
+aQX(d,e,f){var w,v
 if(d==="light"||d==="fan"){w=A.agN(d,f)
 v=f.c===0?w-3.2:w
 switch(e){case 51:return new A.r(-1.5,-0.3,v)
@@ -2185,87 +2185,87 @@ case 22:return new A.r(0.98,-0.2+(d==="gfci"?-0.75:-0.55),w-0.45)
 case 23:return new A.r(-0.98,-0.2+(d==="gfci"?0.95:0.85),w-0.45)
 case 24:return new A.r(-0.98,-0.2+(d==="gfci"?-0.75:-0.55),w-0.45)
 default:return new A.r(0,-1.98,w+0.52)}},
-aht(b7,b8,b9){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9="nema",b0="terminal",b1=x.z,b2=C.a([],b1),b3=new A.eL(b2),b4=b7.a,b5=A.hfp(b4),b6=b5==="light"||b5==="fan"
-if(b9){b3.f=b3.b=1
-b3.hl(B.hhM,B.aZg,B.w2,6)
-b3.hl(B.hib,B.aZg,B.w2,6)
-b3.hl(B.hjq,B.aZZ,B.w2,4)
-b3.hl(B.hnA,B.aZZ,B.w2,4)
-b3.b=2
-b3.f=0
-b3.kZ(B.hiw,B.aZd,B.iH,0.05,5)
-b3.kZ(B.hhU,B.aZd,B.iH,0.05,5)
-b3.kZ(B.hhL,B.hof,B.iH,0.05,2)
-b3.f=2}w=b7.w.length===0
-v=A.hwd(b3,w?b5:"outlet",!0)
-u=new A.fDY(b3,b8,b5,b6)
+aht(b8,b9,c0){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0="nema",b1="terminal",b2=x.z,b3=C.a([],b2),b4=new A.eL(b3),b5=b8.a,b6=A.hfq(b5),b7=b6==="light"||b6==="fan"
+if(c0){b4.f=b4.b=1
+b4.hl(B.hhM,B.aZg,B.w2,6)
+b4.hl(B.hib,B.aZg,B.w2,6)
+b4.hl(B.hjq,B.aZZ,B.w2,4)
+b4.hl(B.hnA,B.aZZ,B.w2,4)
+b4.b=2
+b4.f=0
+b4.kZ(B.hiw,B.aZd,B.iH,0.05,5)
+b4.kZ(B.hhU,B.aZd,B.iH,0.05,5)
+b4.kZ(B.hhL,B.hof,B.iH,0.05,2)
+b4.f=2}w=b8.w.length===0
+v=A.hwe(b4,w?b6:"outlet",!0)
+u=new A.fDZ(b4,b9,b6,b7)
 t=D.d.gH(v)
 s=!w
-if(s){r=b7.e
+if(s){r=b8.e
 q=r.length
 for(p=t.a,o=t.b+0,n=t.c,m=q-1,l=q===1,k=0;k<q;++k){j=r[k]
 i=l?0:k/m-0.5
 h=D.o.F(k,2)
 if(j.e==="ground")g=B.ug
 else{g=j.c
-if(g.A(0,B.m3))g=B.m3}u.$5(60+k,new A.r(p+i*0.5,o,n+0.04*k),new A.r(i*3.6,-1.7-0.12*h,2.3+0.15*k),j.a,g)}}else if(b5==="switch"){f=D.d.gan(v)
+if(g.A(0,B.m3))g=B.m3}u.$5(60+k,new A.r(p+i*0.5,o,n+0.04*k),new A.r(i*3.6,-1.7-0.12*h,2.3+0.15*k),j.a,g)}}else if(b6==="switch"){f=D.d.gan(v)
 u.$5(10,t.a2(0,B.h9O),B.hnK,"blackLine",B.FL)
 u.$5(13,f.a2(0,B.hnV),B.hfO,"blackLoad",B.FL)
 u.$5(12,t.a2(0,B.hk4),B.heN,"ground",B.ug)
-b3.b=6
+b4.b=6
 r=x.o
-b3.iJ(C.a([t.a2(0,B.aZn),B.haz,B.Wf],r),0.075,B.m3,!1,0.3,8)
-b3.iJ(C.a([f.a2(0,B.aZn),B.hj9,B.Wf],r),0.075,B.m3,!1,0.3,8)
-b3.x0(B.Wf,B.hnC,0.28,B.aga,0.18,0.3,10)}else{u.$5(10,t.a2(0,B.hg_),B.hal,"black",B.FL)
+b4.iJ(C.a([t.a2(0,B.aZn),B.haz,B.Wf],r),0.075,B.m3,!1,0.3,8)
+b4.iJ(C.a([f.a2(0,B.aZn),B.hj9,B.Wf],r),0.075,B.m3,!1,0.3,8)
+b4.x0(B.Wf,B.hnC,0.28,B.aga,0.18,0.3,10)}else{u.$5(10,t.a2(0,B.hg_),B.hal,"black",B.FL)
 u.$5(11,t.a2(0,B.hhF),B.hjm,"white",B.m3)
-u.$5(12,t.a2(0,B.hi5),B.hhW,"ground",B.ug)}if(b6)A.hxf(b3,b5,b8)
-else{A.hwT(b3,b5,A.agN(b5,b8),b8.x,!1,s,b8.r)
-A.hAy(b3,b4,A.agN(b5,b8),b8.x)}if(b8.e&&b8.c===0){b3.b=0
-b3.d=0.5
-for(b4=b7.f,r=b4.length,e=0;e<r;++e){d=b4[e]
-a0=A.aQY(b5,d.a,b8)
+u.$5(12,t.a2(0,B.hi5),B.hhW,"ground",B.ug)}if(b7)A.hxg(b4,b6,b9)
+else{A.hwU(b4,b6,A.agN(b6,b9),b9.x,!1,s,b9.r)
+A.hAz(b4,b5,A.agN(b6,b9),b9.x)}if(b9.e&&b9.c===0){b4.b=0
+b4.d=0.5
+for(b5=b8.f,r=b5.length,e=0;e<r;++e){d=b5[e]
+a0=A.aQX(b6,d.a,b9)
 if(d.e)a1=D.bi
 else{p=d.f
 if(p==="ground")a1=D.be
 else{p=p==="neutral"?D.c:B.BI
-a1=p}}if(b6)p=0
+a1=p}}if(b7)p=0
 else{p=a0.a
 if(p>0.4)p=0.12
-else p=p<-0.4?-0.12:0}if(b6)o=0.6
+else p=p<-0.4?-0.12:0}if(b7)o=0.6
 else o=Math.abs(a0.a)<0.4?0.2:0
-b3.es(new A.r(a0.a+p,a0.b+0,a0.c+o),0.36,a1,4,8,0.1)}b3.d=1}if(b8.c>=2&&!b6)A.hzm(b3,b8.x)
-b4=!1
-if(b8.c>=2)if(b8.d)b4=b5==="outlet"||b5==="gfci"||D.a.a_(b5,a9)
-if(b4)A.ifm(b3,b8.a&&!b8.x)
-b4=b6?"Ceiling box":"Electrical box"
-r=b5==="fan"
+b4.es(new A.r(a0.a+p,a0.b+0,a0.c+o),0.36,a1,4,8,0.1)}b4.d=1}if(b9.c>=2&&!b7)A.hzn(b4,b9.x)
+b5=!1
+if(b9.c>=2)if(b9.d)b5=b6==="outlet"||b6==="gfci"||D.a.a_(b6,b0)
+if(b5)A.ifn(b4,b9.a&&!b9.x)
+b5=b7?"Ceiling box":"Electrical box"
+r=b6==="fan"
 p=r?' A fan needs a box that says "fan rated".':""
-o=b5==="switch"
+o=b6==="switch"
 n=o?"Cable from the breaker panel (LINE)":"NM-B cable (Romex)"
-m=b6?"It joins the fixture black wire with a wire nut.":"It goes on a brass screw."
-l=b6?"It joins the fixture white wire.":"It goes on a silver screw."
-h=b6?"It joins the green fixture ground wire.":"It goes on the green screw."
-if(s)g=D.a.a_(b5,a9)||D.a.a_(b5,b0)
+m=b7?"It joins the fixture black wire with a wire nut.":"It goes on a brass screw."
+l=b7?"It joins the fixture white wire.":"It goes on a silver screw."
+h=b7?"It joins the green fixture ground wire.":"It goes on the green screw."
+if(s)g=D.a.a_(b6,b0)||D.a.a_(b6,b1)
 else g=!1
-if(g)g=b7.b
-else if(b5==="gfci")g="GFCI outlet"
+if(g)g=b8.b
+else if(b6==="gfci")g="GFCI outlet"
 else g=o?"Light switch":"Receptacle (outlet)"
-if(s)a2=D.a.a_(b5,a9)||D.a.a_(b5,b0)
+if(s)a2=D.a.a_(b6,b0)||D.a.a_(b6,b1)
 else a2=!1
-if(a2)o=b7.c
-else if(b5==="gfci")o="It checks that the current going out equals the current coming back. If some leaks (through water or a person) it shuts off in a fraction of a second."
+if(a2)o=b8.c
+else if(b6==="gfci")o="It checks that the current going out equals the current coming back. If some leaks (through water or a person) it shuts off in a fraction of a second."
 else o=o?"A rocker that opens and closes the black wire to the light.":"The outlet. Each side has two slots and a ground hole. The short slot is hot, the long slot is neutral."
-a2=A.agN(b5,b8)
+a2=A.agN(b6,b9)
 a3=r?"Ceiling fan":"Ceiling light"
 r=r?"The motor housing with blades. It has three wires: black (motor), white (neutral) and green (ground).":"The light fixture with a frosted dome. It has three wires: black, white and green."
-a4=C.I([1,B.ei6,2,B.eim,3,new A.cI(b4,"A box that holds the wire connections. Every connection must be inside a box, never loose in the wall or the ceiling."+p,new A.r(0,0,-1.2),9),4,new A.cI(n,"The yellow jacket holds three wires: black (hot), white (neutral) and bare copper (ground). Yellow means 12 gauge wire for a 20 amp circuit. White jackets are 14 gauge for 15 amps.",new A.r(-0.4,1.5,-1.8),8),5,B.eiL,10,new A.cI("Black wire: hot","The hot wire brings the power from the breaker. It is the dangerous one. "+m,new A.r(-0.8,-0.8,1.2),7),13,B.ehT,11,new A.cI("White wire: neutral","The neutral wire carries the power back to the panel. "+l,new A.r(0,-0.8,1.2),7),12,new A.cI("Bare copper wire: ground","The ground wire is a safety path. If a wire touches metal, the current runs down the ground instead of through you. "+h,new A.r(0.5,-0.8,1.2),7),6,B.eik,20,new A.cI(g,o,new A.r(0,-0.2,a2),9),40,B.ehL,21,B.eip,22,B.eiK,23,B.eii,24,B.ein,25,B.ei9,26,B.eiq,27,B.eiD,28,B.ei4,30,B.ehO,31,B.ehM,51,B.eil,52,B.ehQ,53,B.eiu,54,new A.cI(a3,r,new A.r(0,0,6.4),9),55,B.eiF],x.S,x.q)
-if(s){a4.n(0,20,new A.cI(b7.b,b7.c,new A.r(0,-0.2,A.agN(b5,b8)),9))
-for(b4=b7.e,s=b4.length,k=0;k<s;++k)a4.n(0,60+k,new A.cI(b4[k].b,"Pick this wire up, then tap the screw it belongs on. Tap it again on the screw to take it off.",new A.r(-0.8+k*0.5,-0.8,1.2),7))
-for(b4=b7.f,s=b4.length,e=0;e<s;++e){a5=b4[e]
+a4=C.I([1,B.ei6,2,B.eim,3,new A.cI(b5,"A box that holds the wire connections. Every connection must be inside a box, never loose in the wall or the ceiling."+p,new A.r(0,0,-1.2),9),4,new A.cI(n,"The yellow jacket holds three wires: black (hot), white (neutral) and bare copper (ground). Yellow means 12 gauge wire for a 20 amp circuit. White jackets are 14 gauge for 15 amps.",new A.r(-0.4,1.5,-1.8),8),5,B.eiL,10,new A.cI("Black wire: hot","The hot wire brings the power from the breaker. It is the dangerous one. "+m,new A.r(-0.8,-0.8,1.2),7),13,B.ehT,11,new A.cI("White wire: neutral","The neutral wire carries the power back to the panel. "+l,new A.r(0,-0.8,1.2),7),12,new A.cI("Bare copper wire: ground","The ground wire is a safety path. If a wire touches metal, the current runs down the ground instead of through you. "+h,new A.r(0.5,-0.8,1.2),7),6,B.eik,20,new A.cI(g,o,new A.r(0,-0.2,a2),9),40,B.ehL,21,B.eip,22,B.eiK,23,B.eii,24,B.ein,25,B.ei9,26,B.eiq,27,B.eiD,28,B.ei4,30,B.ehO,31,B.ehM,51,B.eil,52,B.ehQ,53,B.eiu,54,new A.cI(a3,r,new A.r(0,0,6.4),9),55,B.eiF],x.S,x.q)
+if(s){a4.n(0,20,new A.cI(b8.b,b8.c,new A.r(0,-0.2,A.agN(b6,b9)),9))
+for(b5=b8.e,s=b5.length,k=0;k<s;++k)a4.n(0,60+k,new A.cI(b5[k].b,"Pick this wire up, then tap the screw it belongs on. Tap it again on the screw to take it off.",new A.r(-0.8+k*0.5,-0.8,1.2),7))
+for(b5=b8.f,s=b5.length,e=0;e<s;++e){a5=b5[e]
 r=a5.a
-a4.n(0,r,new A.cI(a5.b,a5.d,A.aQY(b5,r,b8),5))}}a6=C.a([],x.E)
-if(b8.f&&b8.c===0)for(b4=b7.f,s=b4.length,e=0;e<s;++e){d=b4[e]
-a0=A.aQY(b5,d.a,b8)
+a4.n(0,r,new A.cI(a5.b,a5.d,A.aQX(b6,r,b9),5))}}a6=C.a([],x.E)
+if(b9.f&&b9.c===0)for(b5=b8.f,s=b5.length,e=0;e<s;++e){d=b5[e]
+a0=A.aQX(b6,d.a,b9)
 r=d.f
 switch(r){case"hot":p=B.eZk
 break
@@ -2275,13 +2275,13 @@ case"ground":p=B.eRF
 break
 default:p=B.eDO
 break}a7=p.a
-if(b6){switch(r){case"hot":o="BLACK NUT \xb7 HOT"
+if(b7){switch(r){case"hot":o="BLACK NUT \xb7 HOT"
 break
 case"neutral":o="WHITE NUT \xb7 NEUTRAL"
 break
 default:o="GROUND"
 break}i=o}else i=w?a7:d.b
-if(b6){switch(r){case"hot":r=B.hhg
+if(b7){switch(r){case"hot":r=B.hhg
 break
 case"neutral":r=B.hh8
 break
@@ -2289,26 +2289,27 @@ default:r=B.how
 break}a8=r}else{r=a0.a
 if(r>0.4)o=3.8
 else o=r<-0.4?-4.2:0
-a8=new A.r(o,Math.abs(r)<0.4?-3:-0.4,1)}a6.push(new A.he(new A.r(a0.a+a8.a,a0.b+a8.b,a0.c+a8.c),i,p.b,0))}if(b8.a&&b8.c===0)a6.push(B.c53)
-b1=C.a([],b1)
-for(b4=b2.length,e=0;e<b2.length;b2.length===b4||(0,C.J)(b2),++e){a0=b2[e]
-b1.push(a0.r?a0:new A.kf(a0.a,a0.b,a0.c,a0.d,a0.e,a0.f,!0,a0.w,a0.x,a0.y,a0.z))}return new A.r_(b1,a4,a6,B.qS,null,!1,0)},
-hwd(d,e,f){var w,v,u=e==="light"||e==="fan"
+a8=new A.r(o,Math.abs(r)<0.4?-3:-0.4,1)}a6.push(new A.he(new A.r(a0.a+a8.a,a0.b+a8.b,a0.c+a8.c),i,p.b,0))}if(b9.a&&b9.c===0)a6.push(B.c53)
+a9=new A.fDY(c0)
+b2=C.a([],b2)
+for(b5=b3.length,e=0;e<b3.length;b3.length===b5||(0,C.J)(b3),++e){a0=b3[e]
+b2.push(new A.jF(a0.a,a0.b,a0.c,a0.d,a0.e,a0.f,!0,a0.w,a0.x,a9.$1(a0),a0.z))}return new A.r_(b2,a4,a6,B.qS,null,!1,0)},
+hwe(d,e,f){var w,v,u=e==="light"||e==="fan"
 d.b=3
 if(u){d.cw(B.b_0,B.aZx,2.2,B.yn,0.3,18)
-d.a4W(B.aZx,B.e3,2.2,B.yn,!1,!0,0.3,18)}else{d.aE(B.b_0,B.hiI,B.yn,0.3)
+d.a4X(B.aZx,B.e3,2.2,B.yn,!1,!0,0.3,18)}else{d.aE(B.b_0,B.hiI,B.yn,0.3)
 d.aE(B.hfo,B.aZ8,B.yn,0.3)
 d.aE(B.hbm,B.aZ8,B.yn,0.3)
 d.aE(B.hhQ,B.aZC,B.yn,0.3)
 d.aE(B.hh7,B.aZC,B.yn,0.3)}w=C.a([],x.o)
 v=new A.fot(d,f,w)
 if(e==="switch"){v.$2(4,B.d7C)
-v.$2(5,B.d5C)}else v.$2(4,B.dkv)
+v.$2(5,B.d5C)}else v.$2(4,B.dkw)
 return w},
-hG1(d,e){var w,v=$.h5C(),u=new C.Y(v,new A.h4W(d),C.U(v).k("Y<1>"))
+hG2(d,e){var w,v=$.h5D(),u=new C.Y(v,new A.h4X(d),C.U(v).k("Y<1>"))
 if(!u.gau(0)){w=e-60
-return w>=0&&w<u.gH(0).e.length?u.gH(0).e[w].a:null}return A.i9T(d,e)},
-i9T(d,e){var w
+return w>=0&&w<u.gH(0).e.length?u.gH(0).e[w].a:null}return A.i9U(d,e)},
+i9U(d,e){var w
 switch(e){case 10:w=d==="switch"?"blackLine":"black"
 break
 case 13:w="blackLoad"
@@ -2319,8 +2320,8 @@ case 12:w="ground"
 break
 default:w=null
 break}return w},
-hwT(d,e,f,g,h,a0,a1){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i
-if(D.a.a_(e,"terminal")){A.ifl(d,e,f,g,a1)
+hwU(d,e,f,g,h,a0,a1){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i
+if(D.a.a_(e,"terminal")){A.ifm(d,e,f,g,a1)
 return}w=new A.r(0,-0.2,f)
 v=e==="switch"
 u=e==="gfci"
@@ -2344,7 +2345,7 @@ r=w.a2(0,B.hj7)
 d.aE(r,B.hfX,g?B.pe:H.ZE,0.35)
 r=w.a2(0,B.hn5)
 d.aE(r,B.hlm,g?B.pe:B.ah2,0.35)}else{d.e=0.6
-if(D.a.a_(e,"nema"))A.iaO(d,w,e,g)
+if(D.a.a_(e,"nema"))A.iaP(d,w,e,g)
 else{r=u?G.ax5:B.dyl
 q=r.length
 p=f+0.47
@@ -2373,7 +2374,7 @@ d.cw(w.a2(0,B.hhN),w.a2(0,B.hoB),0.18,B.ajK,0.7,12)
 d.aF(w.a2(0,B.hha),B.hhS,D.e7)
 d.aE(w.a2(0,B.he1),B.hjM,B.bfU,0.6)
 d.e=0},
-hxf(d,e,f){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i=e==="fan",h=A.agN(e,f)
+hxg(d,e,f){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i=e==="fan",h=A.agN(e,f)
 d.e=0
 d.b=55
 w=h-0.3
@@ -2398,7 +2399,7 @@ n=o?r:h
 o=t.b.a
 d.iJ(C.a([new A.r(o,-0.3,w),new A.r(o,-0.3,n+0.4)],u),0.07,t.a,!1,0.3,6)}if(f.c===0)for(w=[B.eHQ,B.eQM,B.eZN],v=w.length,u=f.b,p=0;p<v;++p){m=w[p]
 t=m.a
-l=A.aQY(e,t,f)
+l=A.aQX(e,t,f)
 d.b=t
 d.e=0.8
 o=l.a+0
@@ -2407,7 +2408,7 @@ j=l.c
 d.cw(new A.r(o,k,j+-0.2),new A.r(o,k,j+0.3),0.09,B.ug,0.6,6)
 if(u.al(0,t))d.x0(new A.r(o,k,j+-0.5),new A.r(o,k,j+0.9),0.4,m.b,0.26,0.4,8)
 d.e=0}},
-hzm(d,e){var w
+hzn(d,e){var w
 d.e=0.4
 d.b=30
 w=e?B.pe:B.beU
@@ -2418,7 +2419,7 @@ d.aE(B.hcs,B.hed,w,0.3)
 d.aE(B.hot,B.aZR,w,0.3)
 d.cw(B.hgS,B.hiq,0.1,B.yi,0.8,10)
 d.e=0},
-ifm(d,e){var w,v
+ifn(d,e){var w,v
 d.b=31
 for(w=0;w<2;++w){v=B.dam[w]
 d.cw(new A.r(v,0.52,0.2),new A.r(v,0.52,1.9),0.04,B.yi,0.8,6)}d.aE(B.h83,B.hno,B.MA,0.35)
@@ -2426,7 +2427,7 @@ d.bdT(B.aZy,0.2,e?D.YO:B.boJ,0.9)
 if(e){d.d=0.35
 d.es(B.aZy,0.5,D.YO,4,8,0)
 d.d=1}},
-hAy(d,e,f,g){var w,v,u,t=new A.r(0,-0.2,f)
+hAz(d,e,f,g){var w,v,u,t=new A.r(0,-0.2,f)
 d.e=0.9
 d.b=27
 switch(e){case"switchsmart":w=t.a2(0,B.hf9)
@@ -2443,9 +2444,9 @@ break
 case"isolated":w=t.a2(0,B.hhe)
 v=t.a2(0,B.hnU)
 u=t.a2(0,B.hfn)
-d.a7B(w,v,u,g?B.pe:D.c6)
+d.a7C(w,v,u,g?B.pe:D.c6)
 break}d.e=0},
-iaO(d,e,f,g){var w,v,u,t,s
+iaP(d,e,f,g){var w,v,u,t,s
 d.b=27
 d.e=0.62
 w=e.a2(0,B.hhA)
@@ -2482,7 +2483,7 @@ default:u.$4(0.2,0.12,0.075,0.3)
 u.$4(-0.2,0.12,0.075,0.3)
 u.$4(-0.3,0.12,0.14,0.075)
 t.$2(0,-0.3)}d.e=0},
-ifl(d,e,f,g,h){var w,v,u=new A.r(0,-0.2,f)
+ifm(d,e,f,g,h){var w,v,u=new A.r(0,-0.2,f)
 d.e=0
 d.b=26
 w=u.a2(0,B.hhs)
@@ -2544,14 +2545,14 @@ _.w=k
 _.x=l
 _.y=m
 _.z=n},
-fIu:function fIu(){},
 fIv:function fIv(){},
 fIw:function fIw(){},
 fIx:function fIx(){},
 fIy:function fIy(){},
-fGX:function fGX(d){this.a=d},
-h4X:function h4X(){},
-ayD:function ayD(d,e,f,g,h,i,j){var _=this
+fIz:function fIz(){},
+fGY:function fGY(d){this.a=d},
+h4Y:function h4Y(){},
+ayC:function ayC(d,e,f,g,h,i,j){var _=this
 _.a=d
 _.b=e
 _.c=f
@@ -2559,27 +2560,28 @@ _.d=g
 _.e=h
 _.r=i
 _.w=j},
-fG0:function fG0(){},
 fG1:function fG1(){},
-fFZ:function fFZ(d){this.a=d},
+fG2:function fG2(){},
 fG_:function fG_(d){this.a=d},
-fX2:function fX2(){},
+fG0:function fG0(d){this.a=d},
 fX3:function fX3(){},
-fH9:function fH9(d){this.a=d},
+fX4:function fX4(){},
 fHa:function fHa(d){this.a=d},
-fH6:function fH6(){},
-fH7:function fH7(d){this.a=d},
+fHb:function fHb(d){this.a=d},
+fH7:function fH7(){},
 fH8:function fH8(d){this.a=d},
-fDY:function fDY(d,e,f,g){var _=this
+fH9:function fH9(d){this.a=d},
+fDZ:function fDZ(d,e,f,g){var _=this
 _.a=d
 _.b=e
 _.c=f
 _.d=g},
-fDZ:function fDZ(d){this.a=d},
+fE_:function fE_(d){this.a=d},
+fDY:function fDY(d){this.a=d},
 fot:function fot(d,e,f){this.a=d
 this.b=e
 this.c=f},
-h4W:function h4W(d){this.a=d},
+h4X:function h4X(d){this.a=d},
 fpV:function fpV(d,e){this.a=d
 this.b=e},
 fvx:function fvx(d,e){this.a=d
@@ -2615,7 +2617,7 @@ case"neutral":w=y.I
 break
 default:w=e.a===25?y.T:y.S
 break}return w},
-ijE(d){var w,v=new A.fKD()
+ijF(d){var w,v=new A.fKE()
 switch(d){case"nema1030":w=C.C(v.$2(-0.05,0.14),x.eR)
 w.push(B.dG2)
 w.push(B.dFS)
@@ -2633,7 +2635,6 @@ case"nema620":w=C.a([B.dFT,B.dG3,B.dFQ,B.dFV],x.Z)
 break
 default:w=C.a([B.dFU,B.dFY,B.dFW,B.dFX],x.Z)
 break}return w},
-fIz:function fIz(){},
 fIA:function fIA(){},
 fIB:function fIB(){},
 fIC:function fIC(){},
@@ -2643,13 +2644,14 @@ fIF:function fIF(){},
 fIG:function fIG(){},
 fIH:function fIH(){},
 fII:function fII(){},
-fIn:function fIn(){},
+fIJ:function fIJ(){},
 fIo:function fIo(){},
 fIp:function fIp(){},
 fIq:function fIq(){},
 fIr:function fIr(){},
 fIs:function fIs(){},
 fIt:function fIt(){},
+fIu:function fIu(){},
 mt:function mt(d,e,f,g,h,i){var _=this
 _.a=d
 _.b=e
@@ -2657,15 +2659,15 @@ _.c=f
 _.d=g
 _.e=h
 _.f=i},
-fKD:function fKD(){},
-aQN(d){return D.d.dP(B.a4Z,new A.fDD(d),new A.fDE())},
-igh(d,e){var w=B.dEB.h(0,d)
+fKE:function fKE(){},
+aQM(d){return D.d.dP(B.a4Z,new A.fDD(d),new A.fDE())},
+igi(d,e){var w=B.dEB.h(0,d)
 if(w!=null)return w.q(0,e)
 return B.fb1.q(0,e)},
-hf4(d){var w,v,u=C.a([],x.dj)
+hf5(d){var w,v,u=C.a([],x.dj)
 for(w=0;w<15;++w){v=B.a4Z[w]
-if(!(v.d>70||v.e)&&A.igh(v.a,d))u.push(v)}return u},
-hhS(d,a0,a1){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i={},h=new A.h4S(),g=new A.h4P(),f=d.c,e=f==="hall"
+if(!(v.d>70||v.e)&&A.igi(v.a,d))u.push(v)}return u},
+hhT(d,a0,a1){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i={},h=new A.h4T(),g=new A.h4Q(),f=d.c,e=f==="hall"
 if(!e&&d.p1!=="back"){w=a0.e?d.gh3(0)-14:Math.min(a0.d,d.gh3(0)-14)
 v=h.$1(w)
 return new A.acy(w,v,d.gh3(0)/2,g.$1(v))}if(e&&a1<2){w=a0.e?d.gh3(0)-14:Math.min(a0.d,d.gh3(0)-14)
@@ -2682,9 +2684,9 @@ if(f==="bathroom"&&!d.ok)q=14
 f=C.a([],x.f)
 for(u=d.w,o=u.length,t=0;t<u.length;u.length===o||(0,C.J)(u),++t){s=u[t]
 if(s.b==="back"&&!s.a){n=s.c
-f.push(new C.y(n-19,n+19))}}D.d.aZ(f,new A.h4Q())
+f.push(new C.y(n-19,n+19))}}D.d.aZ(f,new A.h4R())
 m=i.a=i.b=-e/2+6
-l=new A.h4R(i)
+l=new A.h4S(i)
 for(e=f.length,t=0;t<f.length;f.length===e||(0,C.J)(f),++t){u=f[t]
 k=u.a
 if(k>m)l.$2(m,Math.min(k,q))
@@ -2695,13 +2697,13 @@ v=h.$1(w)
 return new A.acy(w,v,(i.b+i.a)/2,g.$1(v))},
 zK(d,e,f,g,h,i,j,k){var w=x.S
 return new A.a65(d,e,f,g,h,i,j,k,C.a([],x._),C.a([0,0,0],x.t),C.aR(w),C.T(w,x.i),C.T(w,x.cR),C.T(w,w),C.T(w,x.gh),C.T(w,x.N),C.a([],x.cX),C.aR(w),C.aR(w))},
-aXq(d){var w=new A.aXp(d)
+aXp(d){var w=new A.aXo(d)
 w.caB()
 return w},
-hPx(d){var w=new A.aXp(7)
+hPy(d){var w=new A.aXo(7)
 w.bBJ(d)
 return w},
-iv1(d){var w
+iv2(d){var w
 switch(d.c){case"bedroom":w=1
 break
 case"bathroom":w=2
@@ -2741,16 +2743,16 @@ _.a=d
 _.b=e
 _.c=f
 _.d=g},
-h4S:function h4S(){},
-h4P:function h4P(){},
+h4T:function h4T(){},
 h4Q:function h4Q(){},
-h4R:function h4R(d){this.a=d},
+h4R:function h4R(){},
+h4S:function h4S(d){this.a=d},
 oF:function oF(d,e,f,g){var _=this
 _.a=d
 _.b=e
 _.c=f
 _.d=g},
-aXk:function aXk(d,e,f){this.a=d
+aXj:function aXj(d,e,f){this.a=d
 this.b=e
 this.c=f},
 a65:function a65(d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v){var _=this
@@ -2789,7 +2791,7 @@ _.p4=""
 _.RG=_.R8=null},
 bVN:function bVN(){},
 bVM:function bVM(){},
-aXp:function aXp(d){var _=this
+aXo:function aXo(d){var _=this
 _.a=""
 _.b=d
 _.c=!1
@@ -2818,30 +2820,30 @@ bWz:function bWz(){},
 bWy:function bWy(){},
 bWx:function bWx(){},
 bWw:function bWw(){},
-b1S(d,e,f){return new A.Jv(f,d,e,null)},
-hBa(d){var w=A.tp(B.hm,d.e*3.141592653589793/2)
+b1S(d,e,f){return new A.Jw(f,d,e,null)},
+hBb(d){var w=A.tp(B.hm,d.e*3.141592653589793/2)
 return new C.y(w.a,w.c)},
-igI(b3,b4){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8=null,a9="A helicopter with its billboard",b0={},b1=C.a([],x.dI),b2=x.o
+igJ(b3,b4){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8=null,a9="A helicopter with its billboard",b0={},b1=C.a([],x.dI),b2=x.o
 b0.a=C.a([],b2)
 b0.b=C.a([],b2)
 b0.c=C.a([],x.s)
 b0.d=!1
-w=new A.fEi(b0,b1)
-v=new A.fEp(b0)
-u=new A.fEk(b3)
-t=new A.fEq(b3)
-s=new A.fEa(new A.fEj(t),new A.fEg(t,u))
-r=new A.fEm(b0,u,s,v)
-q=new A.fEn(b0,new A.fEo(r),s)
-p=new A.fEl(b0,w,b1)
-b2=D.d.q(B.dmN,b4)
+w=new A.fEj(b0,b1)
+v=new A.fEq(b0)
+u=new A.fEl(b3)
+t=new A.fEr(b3)
+s=new A.fEb(new A.fEk(t),new A.fEh(t,u))
+r=new A.fEn(b0,u,s,v)
+q=new A.fEo(b0,new A.fEp(r),s)
+p=new A.fEm(b0,w,b1)
+b2=D.d.q(B.dmO,b4)
 o=!b2
 n=x._
 m=C.a([],n)
 for(l=b3.x,k=l.length,j=0;j<l.length;l.length===k||(0,C.J)(l),++j){i=l[j]
 h=i.b
 if(h==="billboard"||h==="cornersign"||h==="adboard"||h==="tower"||h==="hq")m.push(i)}k=C.U(l).k("Y<1>")
-g=new C.Y(l,new A.fEb(),k)
+g=new C.Y(l,new A.fEc(),k)
 h=C.a([],n)
 for(f=l.length,j=0;j<l.length;l.length===f||(0,C.J)(l),++j){i=l[j]
 e=i.b
@@ -2868,14 +2870,14 @@ a1=0
 for(;;){if(a0.length!==0)m=a1<(o?8:80)
 else m=!1
 if(!m)break
-D.d.aZ(a0,new A.fEc(d))
+D.d.aZ(a0,new A.fEd(d))
 i=D.d.cG(a0,0)
 q.$1(i)
 d.a=new A.r(i.c,0,i.d);++a1}w.$1$speed(105)
 for(a2=0;a2<2;++a2)b1.push(new A.MY(B.nN,B.nN,130,6,a9,a8,!1,a8,a2))}if(b4==="edges"){n=C.a([],n)
 for(m=l.length,j=0;j<l.length;l.length===m||(0,C.J)(l),++j){i=l[j]
 f=i.b
-if(f==="adboard"||f==="cornersign")n.push(i)}D.d.aZ(n,new A.fEd(new A.fE9()))
+if(f==="adboard"||f==="cornersign")n.push(i)}D.d.aZ(n,new A.fEe(new A.fEa()))
 for(m=n.length,j=0;j<n.length;n.length===m||(0,C.J)(n),++j){i=n[j]
 f=b0.a
 if(f.length>1){a3=D.d.gan(f)
@@ -2887,14 +2889,14 @@ if(a2<n)m=a2<(o?2:5)
 else m=!1
 if(!m)break
 i=h[(a2*5+1)%n]
-r.$7$note(i,150,50,270,330,70,i.b==="bighouse"?"A big house with TV windows":"A house");++a2}a4=new C.Y(h,new A.fEe(),x.am)
+r.$7$note(i,150,50,270,330,70,i.b==="bighouse"?"A big house with TV windows":"A house");++a2}a4=new C.Y(h,new A.fEf(),x.am)
 if(!a4.gau(0)){i=a4.gH(0)
-a5=A.hBa(i)
+a5=A.hBb(i)
 n=i.c
 m=i.d
 v.$2(new A.r(n+a5.a*220,110,m+a5.b*220),new A.r(n,45,m))
-p.$1(i)}}if(b4==="hospital"||o)for(j=0;j<3;++j){a6=B.dnW[j]
-i=new C.Y(l,new A.fEf(a6),k)
+p.$1(i)}}if(b4==="hospital"||o)for(j=0;j<3;++j){a6=B.dnX[j]
+i=new C.Y(l,new A.fEg(a6),k)
 if(!i.gae(0).C())continue
 a7=i.gae(0)
 if(!a7.C())C.bj(C.fp())
@@ -2908,12 +2910,12 @@ for(;;){if(a2<4)b2=a2<(o?2:4)
 else b2=!1
 if(!b2)break
 b1.push(new A.MY(B.nN,B.nN,130,6,B.ky[a2].a==="bus"?"A self-driving bus with its billboards":"A self-driving police car",a8,!1,a2,a8));++a2}}return b1},
-Jv:function Jv(d,e,f,g){var _=this
+Jw:function Jw(d,e,f,g){var _=this
 _.d=d
 _.f=e
 _.r=f
 _.a=g},
-aFx:function aFx(d,e,f,g,h,i,j,k,l,m,n,o,p,q){var _=this
+aFw:function aFw(d,e,f,g,h,i,j,k,l,m,n,o,p,q){var _=this
 _.f=_.e=_.d=$
 _.r="look"
 _.w=!1
@@ -3451,7 +3453,7 @@ dyN:function dyN(d,e){this.a=d
 this.b=e},
 bkc:function bkc(d,e){this.b=d
 this.a=e},
-aJL:function aJL(d,e){this.c=d
+aJK:function aJK(d,e){this.c=d
 this.a=e},
 bv_:function bv_(){this.c=this.a=this.d=null},
 fbm:function fbm(d,e){this.a=d
@@ -3488,46 +3490,46 @@ _.c=f
 _.d=g
 _.e=h
 _.f=i},
-fEi:function fEi(d,e){this.a=d
+fEj:function fEj(d,e){this.a=d
 this.b=e},
-fEp:function fEp(d){this.a=d},
-fEk:function fEk(d){this.a=d},
 fEq:function fEq(d){this.a=d},
-fEj:function fEj(d){this.a=d},
-fEg:function fEg(d,e){this.a=d
-this.b=e},
+fEl:function fEl(d){this.a=d},
+fEr:function fEr(d){this.a=d},
+fEk:function fEk(d){this.a=d},
 fEh:function fEh(d,e){this.a=d
 this.b=e},
-fEa:function fEa(d,e){this.a=d
+fEi:function fEi(d,e){this.a=d
 this.b=e},
-fEm:function fEm(d,e,f,g){var _=this
+fEb:function fEb(d,e){this.a=d
+this.b=e},
+fEn:function fEn(d,e,f,g){var _=this
 _.a=d
 _.b=e
 _.c=f
 _.d=g},
-fEo:function fEo(d){this.a=d},
-fEn:function fEn(d,e,f){this.a=d
+fEp:function fEp(d){this.a=d},
+fEo:function fEo(d,e,f){this.a=d
 this.b=e
 this.c=f},
-fEl:function fEl(d,e,f){this.a=d
+fEm:function fEm(d,e,f){this.a=d
 this.b=e
 this.c=f},
-fEb:function fEb(){},
-fEc:function fEc(d){this.a=d},
-fE9:function fE9(){},
+fEc:function fEc(){},
 fEd:function fEd(d){this.a=d},
-fEe:function fEe(){},
-fEf:function fEf(d){this.a=d},
-aKJ:function aKJ(d,e,f){this.c=d
+fEa:function fEa(){},
+fEe:function fEe(d){this.a=d},
+fEf:function fEf(){},
+fEg:function fEg(d){this.a=d},
+aKI:function aKI(d,e,f){this.c=d
 this.d=e
 this.a=f},
 bxa:function bxa(){this.d=!1
 this.c=this.a=null},
 fh5:function fh5(d){this.a=d},
 fh4:function fh4(d){this.a=d},
-hqF(){var w=$.hqE
-return w==null?$.hqE=new A.cim().$0():w},
-irL(d,e,f){var w,v,u,t,s,r,q,p,o,n=null,m=e.a,l=e.b,k=new C.a1(0,0,0+m,0+l),j=C.bn(k,D.il)
+hqG(){var w=$.hqF
+return w==null?$.hqF=new A.cim().$0():w},
+irM(d,e,f){var w,v,u,t,s,r,q,p,o,n=null,m=e.a,l=e.b,k=new C.a1(0,0,0+m,0+l),j=C.bn(k,D.il)
 $.Q()
 w=C.K()
 w.sav(B.c9l.aK(0,k))
@@ -3572,7 +3574,7 @@ m=o.b
 l=m.c
 m=m.a.c
 o.a5(d,u.aJ(0,new C.o(l/2,m.gba(m)/2)))}},
-hF0(d,e,f){var w,v,u,t,s,r,q,p,o=null,n=e.ei(D.H),m=e.gdA()/2
+hF1(d,e,f){var w,v,u,t,s,r,q,p,o=null,n=e.ei(D.H),m=e.gdA()/2
 $.Q()
 w=C.K()
 w.r=F.f2.gp(0)
@@ -3635,11 +3637,11 @@ i=o.b
 w=i.c
 i=i.a.c
 o.a5(d,u.aJ(0,new C.o(w/2,i.gba(i)/2)))}n=k*1.08
-l=new A.fWj(l-n-k*0.2,d,n)
+l=new A.fWk(l-n-k*0.2,d,n)
 l.$4(g,k*0.36,D.c,k*0.16)
 l.$4(h,k*0.14,F.f2,k*0.62)},
-hAp(d){return 210+D.o.F(d.l(),5)*24},
-fWf(d,e,a0,a1){var w,v,u,t,s,r,q,p,o,n,m,l,k="NEW GLOBAL",j="MOVEMENT",i="FOR YOUTH",h=e.a,g=e.b,f=new C.a1(0,0,0+h,0+g)
+hAq(d){return 210+D.o.F(d.l(),5)*24},
+fWg(d,e,a0,a1){var w,v,u,t,s,r,q,p,o,n,m,l,k="NEW GLOBAL",j="MOVEMENT",i="FOR YOUTH",h=e.a,g=e.b,f=new C.a1(0,0,0+h,0+g)
 switch(a1){case 0:w=B.at_
 break
 case 1:w=B.c9b
@@ -3666,8 +3668,8 @@ t.c=e.gdA()*0.012
 d.am(v,t)
 if(a1===1)s=E.iI
 else s=w?E.iI:D.c
-w=new A.fWh($.X2,d,s)
-v=new A.fWg(s,e,d)
+w=new A.fWi($.X2,d,s)
+v=new A.fWh(s,e,d)
 u=g*0.4
 r=g*0.12
 if(a1===0){q=g*0.5
@@ -3681,7 +3683,7 @@ d.N(p,g*0.3,o)
 w.$1(C.bs(p,u,q))
 n=g*1.04
 m=h-r
-r=new A.fWi(e)
+r=new A.fWj(e)
 h=r.$1(k)
 q=r.$1(j)
 r=r.$1(i)
@@ -3694,7 +3696,7 @@ v.$3(i,new C.o(l,g*0.6),r)}else{q=h/2
 w.$1(C.bs(new C.o(q,g*0.42),u,h*0.6))
 v.$3("NGMY",new C.o(q,g*0.68),r)
 v.$4$w(i,new C.o(q,g*0.82),g*0.06,D.V)}},
-ibI(d,e,f,g){var w,v,u,t,s,r,q,p,o=B.aIT.h(0,e)
+ibJ(d,e,f,g){var w,v,u,t,s,r,q,p,o=B.aIT.h(0,e)
 if(o!=null){w=D.a.a_(e,"v240")?4.6:5.6
 v=w/0.64
 u=2*w
@@ -3733,9 +3735,9 @@ s.$2(0,-0.3)}return}d.aE(new A.r(f,14,0.9),B.hjD,B.ajp,0.25)
 for(q=0;q<2;++q)for(u=14+F.fK[q]*2.8,p=0;p<2;++p)d.aF(new A.r(f+B.S6[p],u,1.7),B.hpp,B.ns)
 if(e==="gfci"){d.aF(new A.r(f-1.5,14,1.8),B.aZY,B.Zu)
 d.aF(new A.r(f+1.5,14,1.8),B.aZY,B.a_0)}else d.aF(new A.r(f,14,1.7),B.hjB,D.db)
-if(e==="isolated")d.a7B(new A.r(f,15,1.9),new A.r(f-1.2,12.9,1.9),new A.r(f+1.2,12.9,1.9),D.c6)},
-hAK(g1,g2,g3,g4,g5,g6,g7){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,d0,d1,d2,d3,d4,d5,d6,d7,d8,d9,e0,e1,e2,e3,e4,e5,e6,e7,e8,e9,f0,f1,f2,f3,f4,f5,f6,f7,f8="walls",f9="\ud83d\udeb0 Needs plumbing",g0=g1.c
-if(g0==="outside")return A.ibJ(g1,g5,g4,g7,g6,g3)
+if(e==="isolated")d.a7C(new A.r(f,15,1.9),new A.r(f-1.2,12.9,1.9),new A.r(f+1.2,12.9,1.9),D.c6)},
+hAL(g1,g2,g3,g4,g5,g6,g7){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,d0,d1,d2,d3,d4,d5,d6,d7,d8,d9,e0,e1,e2,e3,e4,e5,e6,e7,e8,e9,f0,f1,f2,f3,f4,f5,f6,f7,f8="walls",f9="\ud83d\udeb0 Needs plumbing",g0=g1.c
+if(g0==="outside")return A.ibK(g1,g5,g4,g7,g6,g3)
 g1.cMo()
 w=x.z
 v=C.a([],w)
@@ -3748,7 +3750,7 @@ p=g1.gh3(0)
 o=C.a([],x.O)
 for(n=g1.z,m=n.length,l=0;l<n.length;n.length===m||(0,C.J)(n),++l)o.push(B.aBj[n[l]])
 k=B.aB0[g1.Q]
-j=new A.fES(g4)
+j=new A.fET(g4)
 u.f=-1
 u.b=j.$2("floor",310)
 i=$.dm+1
@@ -3773,7 +3775,7 @@ if(g){a1=Math.min(q*0.5,p*1.5)
 a2=p-14
 f=-a1/2
 e=a1/2
-r.push(new A.fh(C.a([new A.r(f,0.5,14),new A.r(e,0.5,14),new A.r(e,0.5,a2),new A.r(f,0.5,a2)],x.o),0,A.hEN(),900,900*(a2-14)/a1,60,-1,i,!1))}u.f=0
+r.push(new A.fh(C.a([new A.r(f,0.5,14),new A.r(e,0.5,14),new A.r(e,0.5,a2),new A.r(f,0.5,a2)],x.o),0,A.hEO(),900,900*(a2-14)/a1,60,-1,i,!1))}u.f=0
 u.b=j.$2(f8,300)
 a3=u.x=$.dm=$.dm+1
 u.hl(new A.r(0,65,-0.6),new A.r(m,130,1.2),o[0],3)
@@ -3818,8 +3820,8 @@ u.aE(new A.r(d-1,128,n),new A.r(1.4,3,p),D.c,0.2)
 u.x=0
 t.n(0,320,new A.cI("Ceiling","Pick a colour above to paint the ceiling.",new A.r(0,130,n),140))
 h=g1.w
-a6=D.d.aV(h,new A.fED())?"left":"right"
-if(!g){o=new A.fEO()
+a6=D.d.aV(h,new A.fEE())?"left":"right"
+if(!g){o=new A.fEP()
 a7=p*0.55
 if(g2)D.d.v(v,A.np(o.$0(),0,3.141592653589793,new A.r(0,0,p+0.2)))
 D.d.v(v,a6==="right"?A.np(o.$0(),0,-1.5707963267948966,new A.r(d,0,a7)):A.np(o.$0(),0,1.5707963267948966,new A.r(e,0,a7)))}for(o=g1.ax,m=g1.at,a0=0;a0<h.length;++a0){a8=h[a0]
@@ -3837,7 +3839,7 @@ b4=new A.eL(b3)
 b4.r=!0
 b4.b=b2
 if(a9>0.04){b1.b=0
-b5=A.i8F(a8.d)
+b5=A.i8G(a8.d)
 b6=b5.a
 b1.aF(B.hh1,B.hcZ,b6)
 b1.aF(B.hic,B.hpI,b5.b)
@@ -3849,7 +3851,7 @@ b7=A.tp(B.hpC,b8)
 b4.tc(new A.r(-12.5+b7.a,0+b7.b,1.2+b7.c),B.hbl,B.vX,0.15,b8)}else{b1.aE(B.hhi,B.hg4,B.vX,0.15)
 b1.aE(B.hhp,B.hhO,B.FA,0.8)
 b1.aF(B.hhR,B.aZX,B.Nq)
-b1.aF(B.hoX,B.aZX,B.Nq)}b7=new A.fEP(a8,q,p)
+b1.aF(B.hoX,B.aZX,B.Nq)}b7=new A.fEQ(a8,q,p)
 D.d.v(v,b7.$1(b0))
 D.d.v(v,b7.$1(b3))
 t.n(0,b2,new A.cI("Door","Tap the door to go through it.",B.ES,90))}for(o=g1.x,m=o.length,l=0;l<o.length;o.length===m||(0,C.J)(o),++l){b9=o[l]
@@ -3862,16 +3864,16 @@ c0.r=!0
 c0.f=b0==="rug"?1:2
 b7=100+b9.a
 c0.b=j.$2("furniture",b7)
-A.hcN(c0,b0,B.zM[b9.f])
-D.d.v(v,A.np(A.iey(b3,0.8),0,b9.e*3.141592653589793/2,new A.r(b9.c,0,b9.d)))
+A.hcO(c0,b0,B.zM[b9.f])
+D.d.v(v,A.np(A.iez(b3,0.8),0,b9.e*3.141592653589793/2,new A.r(b9.c,0,b9.d)))
 t.n(0,b7,new A.cI(b2.a,y.M,new A.r(b9.c,12,b9.d),90))}u.f=2
 u.r=!0
 c1=p*0.5
 w=C.U(h)
 o=d-10
-c2=D.i.D(new C.cM(new C.Y(h,new A.fEE(),w.k("Y<1>")),new A.fEF(),w.k("cM<1,F>")).cF(0,e+30,new A.fEG())+24,e+10,o)
+c2=D.i.D(new C.cM(new C.Y(h,new A.fEF(),w.k("Y<1>")),new A.fEG(),w.k("cM<1,F>")).cF(0,e+30,new A.fEH())+24,e+10,o)
 c3=g1.go==="fan"
-c4=g1.ga6B()
+c4=g1.ga6C()
 c5=c4&&g1.gMy()&&g1.fy
 u.b=703
 if(c3){u.df(new A.r(0,129.5,c1),new A.r(0,120,c1),1,B.f1,8)
@@ -3888,11 +3890,11 @@ if(!c4)c7="It has no power yet. "+(g1.p4.length!==0?"Tap it to wire it.":"The ro
 else if(!g1.gMy())c7="It is ready: wire the wall switch to turn it on."
 else{w=g1.fy?"It is on. Tap the wall switch (or tap this) to turn it off.":"It is off. Tap the wall switch (or tap this) to turn it on."
 c7=w}t.n(0,703,new A.cI(c6,c7,new A.r(0,122,c1),80))
-c8=new A.fEQ()
-w=g1.gaom()
-m=c8.$1(g1.aoL(0))
+c8=new A.fER()
+w=g1.gaon()
+m=c8.$1(g1.aoM(0))
 h=g1.p4.length!==0||g1.II(1)
-h=C.a([new C.dX([0,700,f/4,w,m]),new C.dX([1,701,q/4,h,c8.$1(g1.aoL(1))])],x.az)
+h=C.a([new C.dX([0,700,f/4,w,m]),new C.dX([1,701,q/4,h,c8.$1(g1.aoM(1))])],x.az)
 for(w=g1.id,a0=0;a0<w.length;++a0){m=w[a0]
 f=m.a
 if(f!=="switch"){b0=m.c
@@ -3916,7 +3918,7 @@ if(b0.length!==0)b0=d3
 else{b0=g1.CW
 if(b0!=null)b0=b0.bki(a0)
 else b0=g1.ay?0:2}d3=b0}else d3=0
-if(a0<2)d4=g1.aoL(a0)
+if(a0<2)d4=g1.aoM(a0)
 else d4=w[a0-2].a==="gfci"?"gfci":"outlet"
 d5=B.dCi.h(0,d4)
 if(d5==null)d5=15
@@ -3926,7 +3928,7 @@ else b2=d3===1?D.av:D.ay
 u.aF(new A.r(d0,14,0.25),new A.r(d5,b0,0.5),b2)
 u.d=1
 u.e=0
-A.ibI(u,d4,d0,d1)
+A.ibJ(u,d4,d0,d1)
 u.x=0
 if(!d1)b0="This one is not wired yet. Tap it to wire it."
 else b0=f.h(0,a0)==null?"Tap it to plug something in.":"Tap it to plug something else in, or to unplug."
@@ -3974,9 +3976,9 @@ t.n(0,c9,new A.cI(b0,b2,new A.r(d0,48,2),60))}if(g1.p4.length===0&&!g1.gkT()){if
 else w=!0
 if(w)e2=D.a_
 else{w=C.a([],x.s)
-if(!g1.gaom())w.push("outlet 1")
+if(!g1.gaon())w.push("outlet 1")
 if(!(g1.p4.length!==0||g1.II(1)))w.push("outlet 2")
-if(!g1.ga6B())w.push(g1.go==="fan"?"ceiling fan":"ceiling light")
+if(!g1.ga6C())w.push(g1.go==="fan"?"ceiling fan":"ceiling light")
 if(!g1.gMy())w.push("switch")
 e2=w}w=e2.length===0?"\u26a1 No power: needs wiring":"\u26a1 Still to wire: "+D.d.aO(e2,", ")
 s.push(new A.he(new A.r(0,104,c1),w,D.bC,0))}w=!1
@@ -3990,7 +3992,7 @@ d0=b2[2]
 d1=b2[3]
 e3=f.h(0,a0)
 if(e3==null||!d1)continue
-e4=A.aQN(e3)
+e4=A.aQM(e3)
 b2=u.b=720+a0
 u.iJ(C.a([new A.r(d0,12,1.8),new A.r(d0,6,3),new A.r(d0,2,11)],m),0.3,B.MX,!1,0.2,6)
 b3=e4.d
@@ -4008,7 +4010,7 @@ e8=(b8-3.5)/2
 e9=e6+e8
 b3=d0+b3
 e8=e6-e8
-r.push(new A.fh(C.a([new A.r(e7,e9,16.6),new A.r(b3,e9,16.6),new A.r(b3,e8,16.6),new A.r(e7,e8,16.6)],m),b2,new A.fEH(a0*7+b0),320,180,9,2,e5,!0))
+r.push(new A.fh(C.a([new A.r(e7,e9,16.6),new A.r(b3,e9,16.6),new A.r(b3,e8,16.6),new A.r(e7,e8,16.6)],m),b2,new A.fEI(a0*7+b0),320,180,9,2,e5,!0))
 u.x=0}else{b3=e4.a
 if(b3==="lamp"){u.cw(new A.r(d0,0,14),new A.r(d0,1,14),6,B.FD,0.4,14)
 u.cw(new A.r(d0,1,14),new A.r(d0,22,14),1,B.yr,0.5,8)
@@ -4030,7 +4032,7 @@ u.aF(new A.r(d0,28.2,15),B.hl0,B.ZI)}else{u.x0(new A.r(d0-7,21,15),new A.r(d0+7,
 u.aE(new A.r(d0-8,14.5,15),B.hhJ,B.w8,0.6)}}}}b3=!b7||e4.e?"It is playing NGMY ads. Tap it to watch full screen with the remote.":"It is plugged in and running. Tap the outlet to unplug it or plug in something else."
 t.n(0,b2,new A.cI(e4.b,b3,new A.r(d0,16,14),90))}u.f=1
 u.r=!1
-f2=new A.fEJ(g1,u,q,r,t)
+f2=new A.fEK(g1,u,q,r,t)
 f2.$2(g1.k1,0)
 if(g){f2.$2(g1.k2,1)
 f2.$2(g1.k1,2)
@@ -4054,7 +4056,7 @@ w=g0==="bathroom"
 if(w||g0==="kitchen"){g0=g1.p4
 g0=g0.length===0||g0==="ptrap"||g0==="faucet"}else g0=!1
 if(g0){d1=g1.gjX()
-g0=new A.fER(u)
+g0=new A.fES(u)
 if(w){f7=e+17
 if(d1){u.b=710
 u.x0(new A.r(6,0.5,14),new A.r(6,15,14),8,B.BJ,5.6,0.8,18)
@@ -4067,7 +4069,7 @@ u.aF(new A.r(6,14,9),B.h8z,D.b0)
 u.d=1
 u.f=2
 g0.$2(-4,8)}u.b=711
-A.hxG(u,new A.r(34,14,10),30,28,18,B.o7)
+A.hxH(u,new A.r(34,14,10),30,28,18,B.o7)
 A.b83(u,11,D.c,18,20,B.ho,B.YU,32,7,d1,1,2,30,0.6,34,10)
 w=!d1
 if(w){g0.$2(28,18)
@@ -4095,17 +4097,17 @@ u.aE(new A.r(o,31,14),B.h9l,B.f1,0.5)
 u.aE(new A.r(d-15,32.4,14),B.aZ9,D.ib,0.3)
 u.aE(new A.r(d-5,32.4,14),B.aZ9,D.ib,0.3)
 u.b=713
-A.hxG(u,new A.r(30,15,14),40,30,26,B.o7)
+A.hxH(u,new A.r(30,15,14),40,30,26,B.o7)
 A.b83(u,17,D.eb,28,28,B.ho,B.MT,42,8.5,d1,1,2,32,0.6,30,14)
 w=!d1
 if(w){g0.$2(22,18)
 g0.$2(38,18)}g0=d1?"The faucet, the hoses and the drain are fitted.":"The kitchen sink is not plumbed yet. Use the Plumbing button."
 t.n(0,713,new A.cI("Kitchen sink",g0,new A.r(30,30,14),70))
-if(w)s.push(new A.he(new A.r(30,48,14),f9,D.bl,0))}}for(g0=D.d.gae(g6),w=new C.eF(g0,new A.fEI(g1));w.C();){o=g0.gR(0)
+if(w)s.push(new A.he(new A.r(30,48,14),f9,D.bl,0))}}for(g0=D.d.gae(g6),w=new C.eF(g0,new A.fEJ(g1));w.C();){o=g0.gR(0)
 t.n(0,900+o.a,new A.cI(o.r,"Tap to see how they are, feed them or give medicine.",new A.r(o.c,36,o.d),90))}return new A.r_(v,t,s,r,new C.cu([e,d,0,p]),!1,0)},
 kN(d,e,f,g,h,i,j,k,l){var w=-h/2,v=i/2,u=h/2,t=-i/2
 d.d_l(e.a2(0,f.aM(0,w)).a2(0,g.aM(0,v)),e.a2(0,f.aM(0,u)).a2(0,g.aM(0,v)),e.a2(0,f.aM(0,u)).a2(0,g.aM(0,t)),e.a2(0,f.aM(0,w)).a2(0,g.aM(0,t)),j,k,l)},
-ibJ(d7,d8,d9,e0,e1,e2){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,c0,c1,c2,c3,c4,c5=-158,c6=1000,c7=1200,c8=x.z,c9=C.a([],c8),d0=new A.eL(c9),d1=x.S,d2=C.T(d1,x.q),d3=C.a([],x.E),d4=d7.gec(0),d5=d7.gh3(0),d6=new A.fxp(d9)
+ibK(d7,d8,d9,e0,e1,e2){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,c0,c1,c2,c3,c4,c5=-158,c6=1000,c7=1200,c8=x.z,c9=C.a([],c8),d0=new A.eL(c9),d1=x.S,d2=C.T(d1,x.q),d3=C.a([],x.E),d4=d7.gec(0),d5=d7.gh3(0),d6=new A.fxp(d9)
 d0.f=0
 d0.b=d6.$2("floor",310)
 d0.hl(new A.r(0,-0.6,d5/2-60),new A.r(d4*2.5,1.2,d5*2.5),B.Yl,5)
@@ -4131,8 +4133,8 @@ for(s=0;s<2;++s){q=B.a64[s]
 u.$5(B.h7L,B.q0,B.h8,q,62)
 u.$5(B.hlT,B.hm,B.p4,-q,62)}p=C.a([],c8)
 new A.eL(p).kZ(B.e3,B.h9D,B.MR,0.1,2)
-d0.a7C(B.hlJ,B.hka,B.hjb,B.MO,B.h8,!1)
-d0.a7C(B.hjh,B.hc2,B.hjL,B.MO,B.p4,!1)
+d0.a7D(B.hlJ,B.hka,B.hjb,B.MO,B.h8,!1)
+d0.a7D(B.hjh,B.hc2,B.hjL,B.MO,B.p4,!1)
 d0.x=0
 d0.r=!0
 D.d.v(c9,A.np(p,0.5,0,B.h5x))
@@ -4168,7 +4170,7 @@ d=e.r=!0
 e.f=D.d.q(B.a6g,h)?1:2
 a0=h==="hospital"
 e.b=(!a0?h==="shop":d)?i:d6.$2("furniture",i)
-A.hcN(e,h,B.zM[k.f])
+A.hcO(e,h,B.zM[k.f])
 if(f.length!==0)m.n(0,j,D.d.gH(f).z)
 D.d.v(c9,A.np(f,0,k.e*3.141592653589793/2,new A.r(k.c,0,k.d)))
 if(a0)j="The hospital: tap it to see the beds and treat the patients."
@@ -4218,7 +4220,7 @@ b1.d=0.45
 d=h.c
 b1.aF(new A.r(d,30,h.d),new A.r(f.c+2,60,f.d+2),D.dh)
 b1.d=1
-D.d.v(c9,g)}if(d7.c==="outside")D.d.v(c9,A.ihx())
+D.d.v(c9,g)}if(d7.c==="outside")D.d.v(c9,A.ihy())
 b2=C.a([],p)
 for(c8=D.d.gae(d1),d1=new C.eF(c8,new A.fx6());d1.C();){p=c8.gR(0)
 d4=new A.fxo(p.e*3.141592653589793/2,p)
@@ -4276,13 +4278,13 @@ for(s=0;s<2;++s){r=B.aCm[s]
 d0.df(new A.r(r,0,-118),new A.r(r,215,-118),3,D.jm,8)}d0.aE(B.AX,B.h9A,D.as,0.3)
 d0.x=0
 o.push(new A.fh(B.cSN,0,new A.fxd(),c6,336,4,2,c4,!1))
-o.push(new A.fh(B.dnQ,0,new A.fxe(),c6,336,4,2,c4,!1))
+o.push(new A.fh(B.dnR,0,new A.fxe(),c6,336,4,2,c4,!1))
 c8=C.C(o,x.fd)
 D.d.v(c8,b2)
 return new A.r_(c9,d2,d3,c8,null,!1,4000)},
-iiB(a5,a6,a7,a8,a9,b0,b1,b2,b3){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2=x.z,a3=C.a([],a2),a4=new A.eL(a3)
+iiC(a5,a6,a7,a8,a9,b0,b1,b2,b3){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2=x.z,a3=C.a([],a2),a4=new A.eL(a3)
 a4.r=!0
-if(a5.c==="outside"){w=new A.fI8(b1)
+if(a5.c==="outside"){w=new A.fI9(b1)
 v=b1!=null
 if(v&&b1.a===a5.a)A.xa(a4,b1,a6,b2,!0,0,null)
 if(a7&&v&&b1.a===a5.a){v=C.a([],a2)
@@ -4293,8 +4295,8 @@ D.d.v(a3,v)}if(a9!=null){v=C.a([],a2)
 s=new A.eL(v)
 s.r=!0
 u=a9.a
-A.hcN(s,u[0],B.zM[u[4]])
-D.d.v(a3,A.np(v,0,u[3]-1.5707963267948966,new A.r(u[1],0,u[2])))}for(v=D.d.gae(a5.x),u=new C.eF(v,new A.fI5()),t=a6*6,r=b0==="furniture";u.C();){q=v.gR(0)
+A.hcO(s,u[0],B.zM[u[4]])
+D.d.v(a3,A.np(v,0,u[3]-1.5707963267948966,new A.r(u[1],0,u[2])))}for(v=D.d.gae(a5.x),u=new C.eF(v,new A.fI6()),t=a6*6,r=b0==="furniture";u.C();){q=v.gR(0)
 p=q.a
 o=a6*(0.25+D.o.F(p,5)*0.04)+p*1.7
 n=q.c
@@ -4306,15 +4308,15 @@ i=C.a([],a2)
 h=new A.eL(i)
 h.r=!0
 h.b=r?100+p:0
-A.hvK(h,q.b,B.zM[q.f],Math.sin(t+p)*0.5)
-D.d.v(a3,A.np(i,0,j,new A.r(n+m*10,0,l+k*10)))}for(v=D.d.gae(b3),u=new C.eF(v,new A.fI6(a5)),t=a5.a;u.C();){r=v.gR(0)
+A.hvL(h,q.b,B.zM[q.f],Math.sin(t+p)*0.5)
+D.d.v(a3,A.np(i,0,j,new A.r(n+m*10,0,l+k*10)))}for(v=D.d.gae(b3),u=new C.eF(v,new A.fI7(a5)),t=a5.a;u.C();){r=v.gR(0)
 q=r.c
 p=r.d
 n=r.e
 m=r.f
 l=r.a
 A.xa(a4,new A.yt(t,q,p,n,!1,!1,!1,!1,!1,0,!1,!1,"","",-1,0,-1,0),a6,m,w.$2(q,p),900+l,m.c)
-A.i50(a4,r,a6)}for(v=a8.length,g=0;g<a8.length;a8.length===v||(0,C.J)(a8),++g){f=a8[g]
+A.i51(a4,r,a6)}for(v=a8.length,g=0;g<a8.length;a8.length===v||(0,C.J)(a8),++g){f=a8[g]
 u=f.b
 r=f.c
 q=f.d
@@ -4322,7 +4324,7 @@ A.xa(a4,new A.yt(t,u,r,q,f.f,!1,!1,!1,!1,0,!1,!1,"","",-1,0,-1,f.e),a6,f.w,w.$2(
 if(f.r){p=C.a([],a2)
 new A.eL(p).aF(new A.r(u+Math.sin(q)*9,46,r+Math.cos(q)*9),B.h8_,F.f2)
 D.d.v(a3,p)}}return a3}if(b1!=null&&b1.a===a5.a)A.xa(a4,b1,a6,b2,!0,0,null)
-for(a2=D.d.gae(b3),v=new C.eF(a2,new A.fI7(a5)),u=a5.a,t=a6*0.5;v.C();){r=a2.gR(0)
+for(a2=D.d.gae(b3),v=new C.eF(a2,new A.fI8(a5)),u=a5.a,t=a6*0.5;v.C();){r=a2.gR(0)
 q=r.y
 p=q>0
 e=p?Math.sin(t+r.a)*q:0
@@ -4331,11 +4333,11 @@ n=r.d
 if(p)m=Math.cos(t+r.a)>=0?1.5707963267948966:-1.5707963267948966
 else m=r.x?0.5:r.e
 A.xa(a4,new A.yt(u,q+e,n,m,p,!1,!1,!1,r.x,0,!1,!1,"","",-1,0,-1,0),a6,r.f,!0,900+r.a,null)}d=a5.gh3(0)
-if(a5.go==="fan"){a0=a5.ga6B()&&a5.gMy()&&a5.fy?a6*7:0
+if(a5.go==="fan"){a0=a5.ga6C()&&a5.gMy()&&a5.fy?a6*7:0
 a4.b=703
 for(a2=d*0.5,a1=0;a1<4;++a1){o=a0+a1*3.141592653589793/2
 a4.tc(new A.r(Math.cos(o)*15,115,a2+Math.sin(o)*15),B.hoQ,B.o7,0.1,-o)}}return a3},
-i8F(d){var w
+i8G(d){var w
 A:{if(5===d){w=B.eSm
 break A}if(9===d){w=B.eXx
 break A}if(10===d){w=B.eKy
@@ -4349,7 +4351,7 @@ for(a0=b6.length,a1=s+v*d,a2=t+w*d+0,a3=r+u*d+0,a4=a2+p,a5=a3+l,a6=a2+k,a7=a3+i,
 A.kN(b0,new A.r(a4,a9+n,a5),b2,B.dZ,14,17,B.kN,b3,0)
 A.kN(b0,new A.r(a6,a9+j,a7),b2,B.dZ,11,14,b7,b3,0.6)
 A.kN(b0,new A.r(a2,a9+o,a3),b2,B.dZ,11,0.9,B.kN,b3,0)}}},
-hwf(a1,a2,a3){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0
+hwg(a1,a2,a3){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0
 switch(a2){case"shop":w=B.f6b
 break
 case"hospital":w=B.f66
@@ -4424,9 +4426,9 @@ a0=-u
 D.d.v(n,A.np(w,-0.42,0,new A.r(0,k,a0*0.25)))
 k=p+0.2
 w=t+12
-a1.a7C(new A.r(k,t,q),new A.r(k,t,j),new A.r(k,w,0),s,B.h8,!1)
+a1.a7D(new A.r(k,t,q),new A.r(k,t,j),new A.r(k,w,0),s,B.h8,!1)
 i-=0.2
-a1.a7C(new A.r(i,t,j),new A.r(i,t,q),new A.r(i,w,0),s,B.p4,!1)
+a1.a7D(new A.r(i,t,j),new A.r(i,t,q),new A.r(i,w,0),s,B.p4,!1)
 if(a2==="school"){w=q-10
 e.aF(new A.r(0,t+18,w),B.h8x,D.ahq)
 e.aF(new A.r(0,t+30,w),B.h9n,r)
@@ -4441,7 +4443,7 @@ e.aF(new A.r(w,t+6.2,k),B.hkU,D.c)}if(n){w=p-10
 n=-u*0.2
 e.aF(new A.r(w,t+16,n),B.h8f,B.ahX)
 e.aF(new A.r(w,t+32,n),B.aYp,r)}}D.d.v(a1.a,g)},
-idG(d,e){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g=d.f,f=d.e
+idH(d,e){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g=d.f,f=d.e
 d.f=1
 d.e=0
 if(e==="road"){d.o9(B.hgT,B.hhZ,B.hfI,B.hil,B.N2,B.dZ)
@@ -4471,7 +4473,7 @@ i=p?36:1.4
 h=s?36:1.4
 d.aF(new A.r(k,0.95,j),new A.r(i,0.1,h),I.MF)}}d.f=g
 d.e=f},
-hvK(d,e,f,g){var w=new A.fnb(d,g)
+hvL(d,e,f,g){var w=new A.fnb(d,g)
 switch(e){case"dog":d.aE(B.xx,B.hor,f,0.05)
 d.eg(B.heM,3.4,f,4,8)
 d.aF(B.hiB,B.hdt,D.MW)
@@ -4485,7 +4487,7 @@ d.eg(B.h6X,2.7,f,4,8)
 d.aF(B.hnT,B.aYs,f)
 d.aF(B.hnY,B.aYs,f)
 d.df(B.h6W,B.h5l,0.7,f,5)
-w.$5(B.dm6,4,4,1.2,f)
+w.$5(B.dm7,4,4,1.2,f)
 break
 case"cow":d.aE(B.abZ,B.h8b,D.bO,0.05)
 d.aF(B.ho8,B.hnl,B.f1)
@@ -4500,7 +4502,7 @@ break
 case"sheep":d.eg(B.abY,8.5,D.qh,4,8)
 d.eg(B.h5s,7,D.qh,4,8)
 d.eg(B.h5o,3.4,B.f1,4,8)
-w.$5(B.dop,8,8,1.8,B.f1)
+w.$5(B.doq,8,8,1.8,B.f1)
 break
 case"chicken":d.eg(B.AZ,4,f,4,8)
 d.eg(B.h57,2.2,f,3,6)
@@ -4522,8 +4524,8 @@ for(w=d.length,v=e.a,u=e.b,t=e.c,s=f.a,r=f.b,q=f.c,p=x.o,o=0;o<d.length;d.length
 m=C.a([],p)
 for(l=n.a,k=l.length,j=0;j<l.length;l.length===k||(0,C.J)(l),++j){i=l[j]
 m.push(new A.r(s+(i.a-s)*v,r+(i.b-r)*u,q+(i.c-q)*t))}l=n.b
-h.push(new A.kf(m,new A.r(l.a/v,l.b/u,l.c/t).gn2(0),n.c,n.d,n.e,n.f,n.r,n.w,n.x,n.y,n.z))}return h},
-i50(d,e,f){var w,v,u,t,s,r=e.z
+h.push(new A.jF(m,new A.r(l.a/v,l.b/u,l.c/t).gn2(0),n.c,n.d,n.e,n.f,n.r,n.w,n.x,n.y,n.z))}return h},
+i51(d,e,f){var w,v,u,t,s,r=e.z
 if(r.length===0)return
 w=e.e
 v=new A.fmW(e,Math.sin(w),Math.cos(w))
@@ -4551,14 +4553,14 @@ case"duty":d.aF(v.$3(0,74,0),B.hgo,D.L)
 break}d.b=u},
 xa(d,e,f,g,h,i,j){var w,v,u,t,s,r
 if(e.Q){w=C.a([],x.z)
-A.xa(new A.eL(w),A.auH(!1,0,-1,"",!1,0,"",-1,e.CW*0.5,!1,!1,!1,e.a,!1,e.e,0,0,0),f,g,h,i,j)
+A.xa(new A.eL(w),A.auG(!1,0,-1,"",!1,0,"",-1,e.CW*0.5,!1,!1,!1,e.a,!1,e.e,0,0,0),f,g,h,i,j)
 D.d.v(d.a,A.np(w,1.5707963267948966,e.d,new A.r(e.b,9,e.c)))
 return}w=g.e
-v=$.h7b.h(0,w)
-if(v==null){if(B.IY.al(0,w)&&!$.h79.q(0,w)){A.aXc(w)
+v=$.h7c.h(0,w)
+if(v==null){if(B.IY.al(0,w)&&!$.h7a.q(0,w)){A.aXb(w)
 return}u=B.IY.al(0,w)
-if(u)A.hPj(w)
-A.icu(d,e,f,h,i,g)
+if(u)A.hPk(w)
+A.icv(d,e,f,h,i,g)
 return}w=e.e
 u=e.z
 t=w&&!u&&e.CW>0?e.CW*12:null
@@ -4566,7 +4568,7 @@ s=j==null
 r=s?null:g.a
 s=s?null:g.d
 D.d.v(d.a,v.cZM(h,i,e.y,s,u,r,f,j,t,w,e.b,e.d,e.c))},
-icu(e6,e7,e8,e9,f0,f1){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,d0,d1,d2=e7.e,d3=d2?D.i.V(e7.CW*24):-1,d4=f1.a,d5=f1.b,d6=f1.c,d7=f1.d,d8=f1.f,d9=f1.r,e0=f1.w,e1=e7.f,e2=e7.r,e3=e7.w,e4=C.bx(d4.l(),d5.l(),d6.l(),d7.l(),d8,d9,e0,e9,d3,e1,e2,e3,f0,D.h,D.h,D.h,D.h,D.h,D.h,D.h),e5=$.fxM.h(0,e4)
+icv(e6,e7,e8,e9,f0,f1){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,d0,d1,d2=e7.e,d3=d2?D.i.V(e7.CW*24):-1,d4=f1.a,d5=f1.b,d6=f1.c,d7=f1.d,d8=f1.f,d9=f1.r,e0=f1.w,e1=e7.f,e2=e7.r,e3=e7.w,e4=C.bx(d4.l(),d5.l(),d6.l(),d7.l(),d8,d9,e0,e9,d3,e1,e2,e3,f0,D.h,D.h,D.h,D.h,D.h,D.h,D.h),e5=$.fxM.h(0,e4)
 if(e5!=null){D.d.v(e6.a,A.np(e5,0,e7.d,new A.r(e7.b,e7.y,e7.c)))
 return}w=C.a([],x.z)
 v=new A.eL(w)
@@ -4726,12 +4728,12 @@ v.aF(new A.r(t,m+0.2,l+3.8),B.hey,D.ay)}}if(e0!==1)w=A.bDy(w,new A.r(e0,e0,e0),B
 if($.fxM.a>900)$.fxM.a8(0)
 $.fxM.n(0,e4,w)
 D.d.v(e6.a,A.np(w,0,e7.d,new A.r(e7.b,e7.y,e7.c)))},
-iey(d,e){var w,v,u,t,s,r,q,p,o,n=C.a([],x.z)
+iez(d,e){var w,v,u,t,s,r,q,p,o,n=C.a([],x.z)
 for(w=d.length,v=x.o,u=0;u<d.length;d.length===w||(0,C.J)(d),++u){t=d[u]
 s=C.a([],v)
 for(r=t.a,q=r.length,p=0;p<r.length;r.length===q||(0,C.J)(r),++p){o=r[p]
-s.push(new A.r(o.a*e,o.b*e,o.c*e))}n.push(new A.kf(s,t.b,t.c,t.d,t.e,t.f,t.r,t.w,t.x,t.y,t.z))}return n},
-hcN(d,e,f){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g=C.ar(f,D.w,Math.abs(-0.25))
+s.push(new A.r(o.a*e,o.b*e,o.c*e))}n.push(new A.jF(s,t.b,t.c,t.d,t.e,t.f,t.r,t.w,t.x,t.y,t.z))}return n},
+hcO(d,e,f){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g=C.ar(f,D.w,Math.abs(-0.25))
 g.toString
 w=C.ar(f,D.c,Math.abs(0.2))
 w.toString
@@ -4791,8 +4793,8 @@ break A}if("shelf"===e){d.aE(B.ac_,B.has,f,0.1)
 for(u=0;u<4;++u){g=10+u*15
 d.aF(new A.r(0,g,1),B.hag,B.f1)
 w=D.o.F(u,2)
-d.aF(new A.r(-8+w*6,g,2),B.hc1,[D.es,D.dK,D.eq,D.dY][u])
-d.aF(new A.r(4+w*4,g,2),B.aZ5,[D.dY,D.eq,D.es,D.dK][u])}break A}if("tree"===e){d.Gj(B.e3,B.h6i,4.2,B.qr,3,8)
+d.aF(new A.r(-8+w*6,g,2),B.hc1,[D.es,D.dJ,D.eq,D.dY][u])
+d.aF(new A.r(4+w*4,g,2),B.aZ5,[D.dY,D.eq,D.es,D.dJ][u])}break A}if("tree"===e){d.Gj(B.e3,B.h6i,4.2,B.qr,3,8)
 d.eg(B.aY9,17,B.Fy,5,9)
 d.eg(B.hdS,11,B.YA,4,8)
 d.eg(B.hn1,12,B.boG,4,8)
@@ -4820,7 +4822,7 @@ d.aF(B.hnr,B.ac4,B.mM)
 d.aF(B.hgM,B.ac4,B.mM)
 for(v=0;v<2;++v){t=B.SA[v]
 d.df(new A.r(t,5,-18),new A.r(t,5,-21),5.5,D.nz,12)
-d.df(new A.r(t,5,18),new A.r(t,5,21),5.5,D.nz,12)}break A}if("road"===e||"roadturn"===e||"roadtee"===e||"roadcross"===e){A.idG(d,e)
+d.df(new A.r(t,5,18),new A.r(t,5,21),5.5,D.nz,12)}break A}if("road"===e||"roadturn"===e||"roadtee"===e||"roadcross"===e){A.idH(d,e)
 break A}if("roundabout"===e){d.df(B.e3,B.hfR,72,B.N2,16)
 d.df(B.hgf,B.aZK,17,D.br,10)
 d.df(B.aZK,B.aZp,15,B.bnP,10)
@@ -4831,14 +4833,14 @@ r=new A.eL(g)
 r.b=d.b
 r.r=!0
 r.f=d.f
-A.hwf(r,e,f)
+A.hwg(r,e,f)
 D.d.v(d.a,A.bDy(g,B.hkx,B.e3))
 break A}if("bighouse"===e){g=C.a([],x.z)
 q=new A.eL(g)
 q.b=d.b
 q.r=!0
 q.f=d.f
-A.hwf(q,"house2",f)
+A.hwg(q,"house2",f)
 D.d.v(d.a,A.bDy(g,B.hlu,B.e3))
 break A}if("pole"===e){d.Gj(B.e3,B.h5f,2.6,B.qr,2,5)
 d.aF(B.h5b,B.hb5,B.bjr)
@@ -4857,7 +4859,7 @@ break A}if("tower"===e||"hq"===e){d.x=$.dm=$.dm+1
 p=e==="hq"
 o=p?170:100
 n=p?90:70
-m=p?150:A.hAp(f)
+m=p?150:A.hAq(f)
 l=p?D.bP:B.dwv[D.o.F(f.l()>>>4,6)]
 k=new A.fre(d)
 d.aE(new A.r(0,m/2,0),new A.r(o,m,n),l,0.25)
@@ -4960,7 +4962,7 @@ d.aF(B.aZT,B.hf1,D.bC)
 d.aF(B.ha9,B.aZ3,D.ay)
 for(v=0;v<2;++v){t=B.SA[v]
 d.df(new A.r(t,6,-19),new A.r(t,6,-22.5),6,D.nz,12)
-d.df(new A.r(t,6,19),new A.r(t,6,22.5),6,D.nz,12)}break A}if("dog"===e||"cat"===e||"cow"===e||"sheep"===e||"chicken"===e||"horse"===e){A.hvK(d,e,f,0)
+d.df(new A.r(t,6,19),new A.r(t,6,22.5),6,D.nz,12)}break A}if("dog"===e||"cat"===e||"cow"===e||"sheep"===e||"chicken"===e||"horse"===e){A.hvL(d,e,f,0)
 break A}if("pond"===e){g=C.a([],x.z)
 q=new A.eL(g)
 q.b=d.b
@@ -4981,7 +4983,7 @@ break A}if("doghouse"===e){d.aE(B.ac1,B.h9y,f,0.05)
 d.aF(B.ha_,B.hnH,B.YQ)
 d.aF(B.hjj,B.hoV,B.Mu)
 break A}d.aF(B.AZ,B.h7r,f)}},
-hxG(d,e,f,g,h,i){var w=e.a,v=e.b,u=e.c,t=h/2
+hxH(d,e,f,g,h,i){var w=e.a,v=e.b,u=e.c,t=h/2
 d.aE(new A.r(w,v,u+t-0.5),new A.r(f,g,1),i,0.1)
 d.aE(new A.r(w,v,u-t+0.5),new A.r(f,g,1),i,0.1)
 t=f/2
@@ -4989,16 +4991,16 @@ d.aE(new A.r(w-t+0.5,v,u),new A.r(1,g,h),i,0.1)
 d.aE(new A.r(w+t-0.5,v,u),new A.r(1,g,h),i,0.1)
 d.aE(new A.r(w,v-g/2+0.5,u),new A.r(f,1,h),i,0.1)},
 cim:function cim(){},
-fWj:function fWj(d,e,f){this.a=d
+fWk:function fWk(d,e,f){this.a=d
+this.b=e
+this.c=f},
+fWi:function fWi(d,e,f){this.a=d
 this.b=e
 this.c=f},
 fWh:function fWh(d,e,f){this.a=d
 this.b=e
 this.c=f},
-fWg:function fWg(d,e,f){this.a=d
-this.b=e
-this.c=f},
-fWi:function fWi(d){this.a=d},
+fWj:function fWj(d){this.a=d},
 fwH:function fwH(d,e,f){this.a=d
 this.b=e
 this.c=f},
@@ -5013,26 +5015,23 @@ fwG:function fwG(d,e,f){this.a=d
 this.b=e
 this.c=f},
 fwF:function fwF(d){this.a=d},
-fES:function fES(d){this.a=d},
-fED:function fED(){},
-fEO:function fEO(){},
-fEP:function fEP(d,e,f){this.a=d
+fET:function fET(d){this.a=d},
+fEE:function fEE(){},
+fEP:function fEP(){},
+fEQ:function fEQ(d,e,f){this.a=d
 this.b=e
 this.c=f},
-fEE:function fEE(){},
 fEF:function fEF(){},
 fEG:function fEG(){},
-fEQ:function fEQ(){},
-fEH:function fEH(d){this.a=d},
-fEJ:function fEJ(d,e,f,g,h){var _=this
+fEH:function fEH(){},
+fER:function fER(){},
+fEI:function fEI(d){this.a=d},
+fEK:function fEK(d,e,f,g,h){var _=this
 _.a=d
 _.b=e
 _.c=f
 _.d=g
 _.e=h},
-fEK:function fEK(d,e,f){this.a=d
-this.b=e
-this.c=f},
 fEL:function fEL(d,e,f){this.a=d
 this.b=e
 this.c=f},
@@ -5042,8 +5041,11 @@ this.c=f},
 fEN:function fEN(d,e,f){this.a=d
 this.b=e
 this.c=f},
-fER:function fER(d){this.a=d},
-fEI:function fEI(d){this.a=d},
+fEO:function fEO(d,e,f){this.a=d
+this.b=e
+this.c=f},
+fES:function fES(d){this.a=d},
+fEJ:function fEJ(d){this.a=d},
 fxp:function fxp(d){this.a=d},
 fxq:function fxq(d){this.a=d},
 fxl:function fxl(d){this.a=d},
@@ -5092,10 +5094,10 @@ fxb:function fxb(d){this.a=d},
 fxc:function fxc(d){this.a=d},
 fxd:function fxd(){},
 fxe:function fxe(){},
-fI8:function fI8(d){this.a=d},
-fI5:function fI5(){},
-fI6:function fI6(d){this.a=d},
+fI9:function fI9(d){this.a=d},
+fI6:function fI6(){},
 fI7:function fI7(d){this.a=d},
+fI8:function fI8(d){this.a=d},
 fnb:function fnb(d,e){this.a=d
 this.b=e},
 fmW:function fmW(d,e,f){this.a=d
@@ -5166,9 +5168,9 @@ fy7:function fy7(d,e){this.a=d
 this.b=e},
 fy8:function fy8(d){this.a=d},
 fre:function fre(d){this.a=d},
-hm8(){var w=x.S
+hm9(){var w=x.S
 return new A.bWC(C.ez([72],w),C.aR(w),C.aR(w),C.aR(w))},
-iiC(d){var w
+iiD(d){var w
 A:{if(81===d){w="outlet"
 break A}if(82===d){w="switch"
 break A}if(84===d){w="gfci"
@@ -5181,29 +5183,29 @@ a1.b=70
 a1.hl(B.hkz,B.hnF,B.bnD,4)
 a1.c=1
 a1.b=91
-w=new A.fEX(a1)
+w=new A.fEY(a1)
 w.$3(B.hf0,B.hea,15)
 w.$4$alongX(B.hn7,B.hiX,11,!1)
 w.$4$alongX(B.hbO,B.hek,11,!1)
 w.$4$alongX(B.hm2,B.hft,6,!1)
 w.$4$alongX(B.hd_,B.hiY,6,!1)
-for(v=0;v<=12;++v)a1.aF4(new A.r(-12+v*2,8.4,0),B.hjN,B.Za,!1,0.05)
+for(v=0;v<=12;++v)a1.aF5(new A.r(-12+v*2,8.4,0),B.hjN,B.Za,!1,0.05)
 a1.c=2
 a1.b=92
-u=new A.fEU(a1)
+u=new A.fEV(a1)
 u.$2(B.cux,B.rD)
-u.$2(B.dnS,B.nr)
+u.$2(B.dnT,B.nr)
 u.$2(B.dt_,B.nr)
-t=new A.fET(a1)
+t=new A.fEU(a1)
 t.$1(B.d3Y)
 t.$1(B.da9)
 a1.c=3
 a1.b=93
-s=new A.fEW(a1)
+s=new A.fEX(a1)
 s.$1(B.d2Q)
 s.$2$col(B.d18,B.m3)
 s.$2$col(B.d0c,B.m3)
-s.$1(B.dkB)
+s.$1(B.dkC)
 a1.c=4
 a1.b=0
 a1.d=0.22
@@ -5239,7 +5241,7 @@ a1.aE(B.hiZ,B.hbX,B.bvt,0.1)
 a1.aE(B.hnc,B.heJ,B.ZN,0.1)
 a1.aE(B.hpR,B.b_2,B.ZN,0.1)
 a1.aE(B.heB,B.b_2,B.ZN,0.1)
-g=new A.fEV(a1)
+g=new A.fEW(a1)
 g.$3(81,B.hd9,a2.x?B.pe:B.Zt)
 a1.b=81
 for(f=0;f<2;++f){p=1.3+B.cEa[f]
@@ -5295,10 +5297,10 @@ a1.cw(B.hie,B.hhr,0.1,D.cZ,0.7,8)}a1.e=0
 a1.c=6
 a1.b=0
 a1.d=0.4
-a1.aK5(B.aYX,B.aZU,B.acd,B.acb,B.agm,B.hiU,!0)
-a1.aK5(B.aZL,B.b__,B.acb,B.acd,B.agm,B.hlb,!0)
-a1.a7B(B.aYX,B.b__,B.acb,B.agB)
-a1.a7B(B.aZU,B.aZL,B.acd,B.agB)
+a1.aK6(B.aYX,B.aZU,B.acd,B.acb,B.agm,B.hiU,!0)
+a1.aK6(B.aZL,B.b__,B.acb,B.acd,B.agm,B.hlb,!0)
+a1.a7C(B.aYX,B.b__,B.acb,B.agB)
+a1.a7C(B.aZU,B.aZL,B.acd,B.agB)
 a1.d=1
 p=q.q(0,72)?"This breaker has TRIPPED (it is in the middle, orange). The living room has no power. Tap it to flip it off and on again.":"This breaker is ON. The living room has power."
 q=q.q(0,72)?"The light is off because the living room breaker has tripped.":"The ceiling light is on."
@@ -5306,7 +5308,7 @@ m=a2.b
 j=m&&!a2.c?"Water is dripping from the slip nut here. Pick the wrench, then tap the nut to tighten it.":"The P-trap holds a water seal that blocks sewer gas. Tap Open lesson to build one."
 m=m&&!a2.c?"This slip nut is loose and the trap is dripping. Pick the wrench and tap here to tighten it.":"The slip nut is tight."
 return new A.r_(a0,C.I([70,B.eiH,91,B.ei3,92,B.eio,93,B.eiw,71,B.eiM,72,new A.cI("Living room breaker",p,B.hpm,3.5),73,B.eif,74,B.eiy,75,B.ehU,76,B.eir,81,B.eit,82,B.ehK,83,new A.cI("Ceiling light",q,B.aZj,7),84,B.eiA,85,B.ehW,86,new A.cI("P-trap under the sink",j,B.hkv,4.5),87,new A.cI("Slip nut (leaking?)",m,B.aZm,3.5),88,B.ehH,89,B.eix,90,B.eiC,94,B.eie,95,B.eiE,96,B.ehN],x.S,x.q),B.v4,B.qS,null,!1,0)},
-hBD(d,e){var w,v,u,t,s,r,q,p=C.a([],x.z),o=new A.eL(p)
+hBE(d,e){var w,v,u,t,s,r,q,p=C.a([],x.z),o=new A.eL(p)
 o.c=5
 o.e=0.8
 if(d.w)for(w=e*1.5,v=0;v<6;++v){u=D.i.F(w+v/6,1)
@@ -5336,26 +5338,26 @@ _.e=e
 _.f=f
 _.r=g
 _.at=_.as=_.Q=_.z=_.y=_.x=_.w=!1},
-fEX:function fEX(d){this.a=d},
-fEU:function fEU(d){this.a=d},
-fET:function fET(d){this.a=d},
-fEW:function fEW(d){this.a=d},
+fEY:function fEY(d){this.a=d},
 fEV:function fEV(d){this.a=d},
+fEU:function fEU(d){this.a=d},
+fEX:function fEX(d){this.a=d},
+fEW:function fEW(d){this.a=d},
 fr(d,e,f,g){var w
 try{Ap.dE(d,"",e,0,f,g)}catch(w){}},
 nO(){A.fr(880,80,0.25,"tri")
-C.bP(R.al0,new A.fFY(),x.H)},
-hUj(){return new A.Of(null)},
-Ku(d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w){return new A.b8G(t,d,u,s,f,r,q,j,g,h,m,n,i,k,v,w,l,o,p,e,null)},
+C.bP(R.al0,new A.fFZ(),x.H)},
+hUk(){return new A.Of(null)},
+Kv(d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w){return new A.b8G(t,d,u,s,f,r,q,j,g,h,m,n,i,k,v,w,l,o,p,e,null)},
 tl(d,e,f,g,h){var w=null,v=g?e.j(0.25):D.w.j(0.5),u=C.l(18),t=C.L(g?e:D.aU,D.r,1),s=x.p,r=C.a([],s)
 D.d.v(r,C.a([C.X(f,g?e:D.ac,w,w,w,16),D.e5],s))
 r.push(C.d(d,w,w,w,w,w,w,C.n(w,w,g?e:D.ac,w,w,w,w,w,w,w,w,12,w,w,D.I,w,w,!0,w,w,w,w,w,w,w,w),w,w,w))
 return C.az(w,C.q(w,C.A(r,D.l,w,D.e,D.P,0,w,w),D.f,w,w,new C.p(v,w,t,u,w,w,D.n),w,w,w,w,D.hf,w,w,w),D.y,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,h,w,w,w,w,w,w,!1,D.a4)},
 tk(d,e,f,g){var w=null,v=f==null,u=v?D.dl:g.j(0.9),t=C.l(14),s=C.X(e,v?D.bW:D.w,w,w,w,18)
 return C.E(C.az(w,C.q(w,C.A(C.a([s,D.bm,new C.dl(1,D.cm,C.d(d,w,w,w,w,w,w,C.n(w,w,v?D.bW:D.w,w,w,w,w,w,w,w,w,12.5,w,w,D.u,w,w,!0,w,w,w,w,w,w,w,w),D.K,w,w),w)],x.p),D.l,w,D.bb,D.j,0,w,w),D.f,w,w,new C.p(u,w,w,t,w,w,D.n),w,w,w,w,D.qB,w,w,w),D.y,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,f,w,w,w,w,w,w,!1,D.a4),1)},
-aSp(d,e,f,g){return C.bT(E.mR,null,new A.fXy(e,g,f),d,!0,!0,!0,D.kf,!1,!1,x.H)},
-IV(d,e,f,g,h,i,j,k,l){return new A.aYR(j,e,h,g,f,i,l,k,d,null)},
-fFY:function fFY(){},
+aSo(d,e,f,g){return C.bT(E.mR,null,new A.fXz(e,g,f),d,!0,!0,!0,D.kg,!1,!1,x.H)},
+IW(d,e,f,g,h,i,j,k,l){return new A.aYQ(j,e,h,g,f,i,l,k,d,null)},
+fFZ:function fFZ(){},
 m8:function m8(d,e,f,g,h){var _=this
 _.a=d
 _.b=e
@@ -5392,7 +5394,7 @@ dWu:function dWu(d){this.a=d},
 dWv:function dWv(d){this.a=d},
 dWw:function dWw(){},
 dWx:function dWx(d){this.a=d},
-axk:function axk(d,e){this.c=d
+axj:function axj(d,e){this.c=d
 this.a=e},
 buN:function buN(){this.c=this.a=this.d=null},
 fbc:function fbc(d){this.a=d},
@@ -5421,11 +5423,11 @@ _.dx=w
 _.a=a0},
 cA7:function cA7(){},
 cA8:function cA8(){},
-fXy:function fXy(d,e,f){this.a=d
+fXz:function fXz(d,e,f){this.a=d
 this.b=e
 this.c=f},
-fXx:function fXx(){},
-aYR:function aYR(d,e,f,g,h,i,j,k,l,m){var _=this
+fXy:function fXy(){},
+aYQ:function aYQ(d,e,f,g,h,i,j,k,l,m){var _=this
 _.c=d
 _.d=e
 _.e=f
@@ -5446,7 +5448,7 @@ dn2:function dn2(d){this.a=d},
 BS:function BS(d,e,f){this.c=d
 this.d=e
 this.a=f},
-aBl:function aBl(d,e,f,g,h,i,j){var _=this
+aBk:function aBk(d,e,f,g,h,i,j){var _=this
 _.f=_.e=_.d=$
 _.r=!0
 _.w=$
@@ -5460,11 +5462,11 @@ _.ax=d
 _.ay=0
 _.ch=!1
 _.LZ$=e
-_.a5z$=f
-_.an6$=g
-_.an7$=h
-_.an8$=i
-_.an9$=j
+_.a5A$=f
+_.an7$=g
+_.an8$=h
+_.an9$=i
+_.ana$=j
 _.c=_.a=null},
 der:function der(d,e){this.a=d
 this.b=e},
@@ -5532,7 +5534,7 @@ deK:function deK(d){this.a=d},
 deu:function deu(d){this.a=d},
 aas:function aas(d,e){this.c=d
 this.a=e},
-aHi:function aHi(d,e,f,g,h,i){var _=this
+aHh:function aHh(d,e,f,g,h,i){var _=this
 _.f=_.e=_.d=$
 _.r=""
 _.w=0
@@ -5541,11 +5543,11 @@ _.y=!1
 _.z=null
 _.Q=!1
 _.LZ$=d
-_.a5z$=e
-_.an6$=f
-_.an7$=g
-_.an8$=h
-_.an9$=i
+_.a5A$=e
+_.an7$=f
+_.an8$=g
+_.an9$=h
+_.ana$=i
 _.c=_.a=null},
 f0C:function f0C(d){this.a=d},
 f0s:function f0s(d,e,f){this.a=d
@@ -5578,7 +5580,7 @@ f0v:function f0v(d){this.a=d},
 f0u:function f0u(){},
 a5S:function a5S(d,e){this.c=d
 this.a=e},
-aBF:function aBF(d,e,f,g,h,i){var _=this
+aBE:function aBE(d,e,f,g,h,i){var _=this
 _.f=_.e=_.d=$
 _.r=""
 _.w=0
@@ -5587,11 +5589,11 @@ _.y=!1
 _.z=null
 _.Q=!1
 _.LZ$=d
-_.a5z$=e
-_.an6$=f
-_.an7$=g
-_.an8$=h
-_.an9$=i
+_.a5A$=e
+_.an7$=f
+_.an8$=g
+_.an9$=h
+_.ana$=i
 _.c=_.a=null},
 dhH:function dhH(d){this.a=d},
 dhu:function dhu(d,e,f){this.a=d
@@ -5626,8 +5628,8 @@ this.c=f},
 dhD:function dhD(d){this.a=d},
 dhF:function dhF(d){this.a=d},
 dhx:function dhx(d){this.a=d},
-aCy:function aCy(d){this.a=d},
-aCz:function aCz(d){var _=this
+aCx:function aCx(d){this.a=d},
+aCy:function aCy(d){var _=this
 _.d=d
 _.f=_.e=$
 _.r=0
@@ -5679,7 +5681,7 @@ fmF:function fmF(d){this.a=d},
 bz2:function bz2(){},
 bz7:function bz7(){},
 bAn:function bAn(){},
-jY:function jY(d,e){this.a=d
+jZ:function jZ(d,e){this.a=d
 this.b=e},
 NC:function NC(d,e,f,g){var _=this
 _.a=d
@@ -5688,16 +5690,16 @@ _.c=f
 _.d=g},
 a7U:function a7U(d){this.a=d},
 cda:function cda(d){this.a=d},
-ha6(){var w=x.N
+ha7(){var w=x.N
 return new A.cqJ(C.aR(w),C.I(["n1",!1,"n2",!1],w,x.y),C.T(x.S,w))},
-iuc(d,e,f){var w,v
+iud(d,e,f){var w,v
 if(!f.c.q(0,e)){w=f.d
 return e==="hot"?"The red (hot) hose goes on the LEFT side only. "+w:"The blue (cold) hose goes on the RIGHT side only. "+w}w=d.e
 v=f.a
 if(w.h(0,v)!=null)return"That connection already has a hose."
 w.n(0,v,e)
 return null},
-hhm(){var w,v,u=C.a([B.aYQ,B.hhl],x.o)
+hhn(){var w,v,u=C.a([B.aYQ,B.hhl],x.o)
 for(w=1;w<=12;++w){v=3.141592653589793+3.141592653589793*w/12
 u.push(new A.r(3+3*Math.cos(v),0.2+3*Math.sin(v),0))}D.d.v(u,A.DM(B.dfk,1,6))
 return u},
@@ -5712,37 +5714,37 @@ q.b=46
 A.b83(q,9,B.MH,14,15,B.ho,B.MT,40,5.9,!0,2,1.8,15.1,0.6,0,-1.2)
 q.cw(B.hkn,B.hgX,1.5,B.ho,0.85,14)
 q.b=48
-q.a4W(B.acf,B.heY,0.92,B.qf,!1,!0,0.3,14)
+q.a4X(B.acf,B.heY,0.92,B.qf,!1,!0,0.3,14)
 q.d0V(B.acf,B.hoc,1,0.72,B.qf,0.3)
-w=new A.fFy(d,q)
+w=new A.fFz(d,q)
 w.$5(41,B.aAp,B.ho,0.85,"tail")
-w.$5(42,A.hhm(),B.qf,0.3,s)
+w.$5(42,A.hhn(),B.qf,0.3,s)
 w.$5(43,B.aCY,B.qf,0.3,"arm")
-w=new A.fFx(d,q)
+w=new A.fFy(d,q)
 v=d.a
 w.$6(44,"n1",B.aca,B.dZ,B.hfp,v.q(0,"tail")&&v.q(0,s))
 w.$6(45,"n2",B.acc,B.h8,B.hlB,v.q(0,s)&&v.q(0,"arm"))
 if(v.q(0,s)){q.b=0
 q.d=0.55
 q.e=0.4
-u=A.hhm()
+u=A.hhn()
 w=C.U(u).k("Y<1>")
-t=C.C(new C.Y(u,new A.fFw(),w),w.k("M.E"))
+t=C.C(new C.Y(u,new A.fFx(),w),w.k("M.E"))
 if(t.length>1)q.Vs(t,0.4092,B.a_6,!1,!0,0.6,8)
 q.d=1
 q.e=0}return new A.r_(r,C.I([41,B.ehY,42,B.ei_,43,B.eiv,44,B.eij,45,B.eiJ,46,B.ei5,47,B.eic,48,B.ehF,49,B.ei1],x.S,x.q),B.v4,B.qS,null,!1,0)},
-hc9(d,e){var w=D.i.D(e,0,1)*(d.length-1),v=D.o.D(D.i.bh(w),0,d.length-2)
+hca(d,e){var w=D.i.D(e,0,1)*(d.length-1),v=D.o.D(D.i.bh(w),0,d.length-2)
 return A.oV(d[v],d[v+1],w-v)},
-hcK(d,e,f,g,h,i){var w,v,u,t,s
+hcL(d,e,f,g,h,i){var w,v,u,t,s
 d.b=0
 d.e=0.3
 d.d=0.55
 d.Vs(e,h,g,!1,!0,0.9,8)
 d.d=0.95
 for(w=f*i,v=x.o,u=h*0.5,t=0;t<5;++t){s=D.i.F(w+t/5,1)
-d.Vs(C.a([A.hc9(e,s),A.hc9(e,Math.min(1,s+0.09))],v),u,B.Nj,!1,!1,1,6)}d.d=1
+d.Vs(C.a([A.hca(e,s),A.hca(e,Math.min(1,s+0.09))],v),u,B.Nj,!1,!1,1,6)}d.d=1
 d.e=0},
-hA1(d,e,f){var w,v,u,t,s,r,q,p,o,n,m,l,k
+hA2(d,e,f){var w,v,u,t,s,r,q,p,o,n,m,l,k
 d.b=0
 d.e=0.4
 for(w=f*1.3,v=e.a,u=v+0,t=e.b,s=t+0.05,r=e.c,q=r+0,p=t+0.12,o=0;o<3;++o){n=D.i.F(w+o/3,1)
@@ -5753,7 +5755,7 @@ for(w=f*1.8,l=0;l<6;++l){n=D.i.F(w+l/6,1)
 k=l*1.05
 d.es(new A.r(v+Math.cos(k)*n*1.4,t+4*n*(1-n),r+Math.sin(k)*n*1.4),0.16,B.Nj,3,6,1)}d.d=1
 d.e=0},
-hfd(d,e){var w,v,u,t,s,r,q,p,o,n,m,l=C.a([],x.z),k=new A.eL(l)
+hfe(d,e){var w,v,u,t,s,r,q,p,o,n,m,l=C.a([],x.z),k=new A.eL(l)
 k.e=0.9
 w=0.5+0.5*Math.sin(e*7)
 for(v=d.length,u=0.25+0.25*w,t=1.5+0.7*w,s=0.9*w,r=2.3+s,s=1.9+s,q=0;q<d.length;d.length===v||(0,C.J)(d),++q){p=d[q]
@@ -5766,18 +5768,18 @@ m=p.c
 k.lt(new A.r(o,n,m+0.6),new A.r(o,n,m+0.9),r,s,G.qq,0.2,20)}k.d=1
 k.e=0
 return l},
-is2(d,e){var w,v,u,t,s,r,q,p,o=C.a([],x.z),n=new A.eL(o),m=d.d
+is3(d,e){var w,v,u,t,s,r,q,p,o=C.a([],x.z),n=new A.eL(o),m=d.d
 if(m.length!==0){w=m==="n1"?B.hpE:B.hny
 for(m=e*1.4,v=w.a+0,u=w.b,t=w.c+0,s=0;s<5;++s){r=D.i.F(m+s*0.2,1)
 n.d=0.85
-n.es(new A.r(v,u+(-r*6*r-r*1.5),t),0.24*(1-r*0.3),B.ZR,3,6,0.9)}n.d=1}if(d.c){A.hcK(n,C.a([B.aZM,B.aZM.a2(0,B.h79),new A.r(0,11,-2.3)],x.o),e,B.bj9,0.42,1.4)
+n.es(new A.r(v,u+(-r*6*r-r*1.5),t),0.24*(1-r*0.3),B.ZR,3,6,0.9)}n.d=1}if(d.c){A.hcL(n,C.a([B.aZM,B.aZM.a2(0,B.h79),new A.r(0,11,-2.3)],x.o),e,B.bj9,0.42,1.4)
 n.b=0
 n.d=0.5
 n.e=0.2
 n.aE(B.hpb,new A.r(12.6,1.0999999999999996,7.6),B.air,0.7)
 n.d=1
 n.e=0
-A.hA1(n,new A.r(0,11.05,-2.3),e)
+A.hA2(n,new A.r(0,11.05,-2.3),e)
 n.b=0
 n.e=0.4
 for(m=e*0.9,q=0;q<2;++q){p=2.2*(1-D.i.F(m+q/2,1))
@@ -5788,7 +5790,7 @@ S8(d){switch(d){case 61:return B.h8O
 case 62:return B.hnt
 case 63:return B.hhT
 default:return B.hhI}},
-hBB(d){var w=d==="hot",v=A.S8(w?61:62),u=A.S8(w?63:64),t=w?-1:1
+hBC(d){var w=d==="hot",v=A.S8(w?61:62),u=A.S8(w?63:64),t=w?-1:1
 return A.aiT(C.a([v,v.a2(0,new A.r(t*0.6,2.2,1.2)),A.oV(v,u,0.5).a2(0,new A.r(t*1.4,0,2.6)),u.a2(0,new A.r(-t*0.2,-2,1)),u],x.o),6)},
 a32(a5){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3=C.a([],x.z),a4=new A.eL(a3)
 a4.b=67
@@ -5803,7 +5805,7 @@ a4.kZ(B.hko,B.hkD,B.iH,0.1,2)
 a4.b=65
 a4.e=0.5
 a4.aE(B.hnw,B.hgz,B.ho,0.9)
-a4.iJ(A.DM(B.dlb,1.4,6),0.5,B.ho,!0,0.9,12)
+a4.iJ(A.DM(B.dlc,1.4,6),0.5,B.ho,!0,0.9,12)
 for(w=0;w<2;++w){v=B.dg6[w]
 u=v*1.2
 a4.cw(new A.r(u,15.5,-3.6),new A.r(u,17.7,-3.6),0.38,B.ho,0.9,10)
@@ -5837,15 +5839,15 @@ n=-2.6+n
 a4.cw(new A.r(m,l,k),new A.r(s,o,n),0.5,q,0.5,8)
 a4.es(new A.r(m,l,k),0.75,q,4,8,0.5)
 a4.es(new A.r(s,o,n),0.75,q,4,8,0.5)
-a4.lt(new A.r(v,1.2,-3.6),new A.r(v,1.9,-3.6),0.78,0.4,B.u_,0.8,8)}for(u=x.o,w=0;w<2;++w){j=B.dnX[w]
+a4.lt(new A.r(v,1.2,-3.6),new A.r(v,1.9,-3.6),0.78,0.4,B.u_,0.8,8)}for(u=x.o,w=0;w<2;++w){j=B.dnY[w]
 t=j==="hot"
 i=t?B.cLY:B.cMa
 s=C.U(i).k("Y<1>")
-h=C.C(new C.Y(i,new A.fEC(a5,j),s),s.k("M.E"))
+h=C.C(new C.Y(i,new A.fED(a5,j),s),s.k("M.E"))
 a4.b=t?68:69
 g=t?B.rD:B.nr
 t=h.length
-if(t===2){f=A.hBB(j)
+if(t===2){f=A.hBC(j)
 a4.iJ(f,0.34,B.yo,!1,0.7,8)
 e=f.length/2|0
 a4.iJ(C.a([f[e-1],f[e],f[e+1]],u),0.4,g,!1,0.4,8)
@@ -5868,7 +5870,7 @@ if(u.h(0,t)!=null)continue
 t=A.S8(t)
 s=a2.c.q(0,"hot")?B.rD:B.nr
 a4.es(new A.r(t.a+0,t.b+0,t.c+0.9),0.65,s,4,8,0.1)}a4.d=1}return new A.r_(a3,C.I([61,B.ehP,62,B.ehR,63,B.ehJ,64,B.ehS,65,B.eid,66,B.ei8,67,B.ehG,68,B.eiN,69,B.eig],x.S,x.q),B.v4,B.qS,null,!1,0)},
-ii8(d,e){var w,v,u,t,s,r,q,p,o,n,m=C.a([],x.z),l=new A.eL(m),k=new A.fHr(l,e)
+ii9(d,e){var w,v,u,t,s,r,q,p,o,n,m=C.a([],x.z),l=new A.eL(m),k=new A.fHs(l,e)
 if(d.f){w=d.e
 v=w.h(0,61)==="hot"&&w.h(0,63)==="hot"}else v=!1
 if(d.r){w=d.e
@@ -5878,23 +5880,23 @@ if(d.r&&!u)k.$3(62,B.Z8,1)
 for(w=[new C.b5(v,"hot",B.a_8),new C.b5(u,"cold",B.Z8)],t=w.length,s=e*0.6,r=0;r<t;++r){q=w[r]
 p=q.c
 if(!q.a)continue
-o=A.hBB(q.b)
+o=A.hBC(q.b)
 l.b=0
 l.e=0.3
 l.d=0.9
-for(n=0;n<4;++n){q=A.hc9(o,D.i.F(s+n/4,1))
+for(n=0;n<4;++n){q=A.hca(o,D.i.F(s+n/4,1))
 l.es(new A.r(q.a+0,q.b+0,q.c+0.32),0.2,p,3,6,0.9)}l.d=1
 l.e=0}if(v||u){if(v&&u)p=B.bfR
 else p=v?B.a_8:B.Z8
-A.hcK(l,C.a([B.ac9,B.ac9.a2(0,B.hnN),new A.r(0,10.6,1.6)],x.o),e,p,0.42,1.4)
+A.hcL(l,C.a([B.ac9,B.ac9.a2(0,B.hnN),new A.r(0,10.6,1.6)],x.o),e,p,0.42,1.4)
 l.b=0
 l.d=0.5
 l.e=0.2
 l.aE(new A.r(0,10.05,3.7),new A.r(12.8,1.0999999999999996,5.8),B.air,0.7)
 l.d=1
 l.e=0
-A.hA1(l,new A.r(0,10.65,1.6),e)}return m},
-bE4(d){return D.d.cD(B.SC,new A.fHq(d))},
+A.hA2(l,new A.r(0,10.65,1.6),e)}return m},
+bE4(d){return D.d.cD(B.SC,new A.fHr(d))},
 cqJ:function cqJ(d,e,f){var _=this
 _.a=d
 _.b=e
@@ -5907,21 +5909,21 @@ _.a=d
 _.b=e
 _.c=f
 _.d=g},
+fFz:function fFz(d,e){this.a=d
+this.b=e},
 fFy:function fFy(d,e){this.a=d
 this.b=e},
-fFx:function fFx(d,e){this.a=d
+fFx:function fFx(){},
+fED:function fED(d,e){this.a=d
 this.b=e},
-fFw:function fFw(){},
-fEC:function fEC(d,e){this.a=d
+fHs:function fHs(d,e){this.a=d
 this.b=e},
-fHr:function fHr(d,e){this.a=d
-this.b=e},
-fHq:function fHq(d){this.a=d},
-ha5(d,e,f){var w=x.N
+fHr:function fHr(d){this.a=d},
+ha6(d,e,f){var w=x.N
 w=new A.cqz(e,d,C.aR(w),C.T(w,x.S),C.aR(w))
 w.bC8(d,e,f)
 return w},
-hAM(c0,c1,c2){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5=C.a([],x.z),b6=new A.eL(b5),b7=C.T(x.S,x.q),b8=C.a([],x.E),b9=c0.c
+hAN(c0,c1,c2){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5=C.a([],x.z),b6=new A.eL(b5),b7=C.T(x.S,x.q),b8=C.a([],x.E),b9=c0.c
 b9===$&&C.c()
 w=b9.a==="bathroom"
 v=w?28:0
@@ -5935,11 +5937,11 @@ b6.aE(new A.r(v,0.6,10),B.hnO,B.iH,0.1)
 b6.aE(new A.r(v,29.4,18.6),B.hgw,B.iH,0.1)
 b6.aE(new A.r(v-19.4,13.6,10.5),B.hoJ,B.iH,0.1)
 for(u=[B.f5g,B.f5c,B.f48,B.f45],t=u.length,s=0;s<t;++s){r=u[s].a
-b6.aE(new A.r(v+r[0],33,r[1]),new A.r(r[2],2.4,r[3]),B.bvW,0.6)}b6.a4W(new A.r(v,27,8),new A.r(v,34.3,8),10.5,B.ZS,!1,!0,0.7,24)
+b6.aE(new A.r(v+r[0],33,r[1]),new A.r(r[2],2.4,r[3]),B.bvW,0.6)}b6.a4X(new A.r(v,27,8),new A.r(v,34.3,8),10.5,B.ZS,!1,!0,0.7,24)
 b6.cw(new A.r(v,27,8),new A.r(v,27.2,8),10.5,B.blW,0.5,24)
 if(w){b6.aE(new A.r(v,46,0.6),B.hgG,D.bP,0.3)
 b6.aE(new A.r(v,46,1.1),B.hfv,B.ia,0.9)}b6.df(new A.r(v,27.1,8),new A.r(v,27.3,8),1.4,B.f1,12)
-b6.a4W(new A.r(v+15,23.6,8),new A.r(v+19.4,23.6,8),0.92,B.qf,!1,!0,0.3,12)
+b6.a4X(new A.r(v+15,23.6,8),new A.r(v+19.4,23.6,8),0.92,B.qf,!1,!0,0.3,12)
 b7.n(0,9198,B.eis)
 b6.b=9400
 b6.cw(new A.r(-56,18,0),new A.r(-56,18,6),1.5,B.u_,0.8,12)
@@ -5950,19 +5952,19 @@ u=c0.r?"The water is ON. Turn it OFF with your hand before you cut into any pipe
 b7.n(0,9400,new A.cI("Main water valve",u,new A.r(-56,18,4),22))
 u=c0.r
 t=u?"MAIN WATER: ON":"MAIN WATER: OFF"
-u=u?D.dK:D.br
+u=u?D.dJ:D.br
 b8.push(new A.he(new A.r(-56,24,6),t,u,0))
-q=new A.fFv(b6)
+q=new A.fFw(b6)
 u=v-8
 q.$1(u)
 t=v+8
 q.$1(t)
 if(w)q.$1(-40)
 p=new A.r(v,21,8)
-o=new A.fFt(p)
-n=new A.fFn(b6,c0)
-m=new A.fFo(b6,c0)
-l=new A.fFu(c0,b7,c2,c1,b8)
+o=new A.fFu(p)
+n=new A.fFo(b6,c0)
+m=new A.fFp(b6,c0)
+l=new A.fFv(c0,b7,c2,c1,b8)
 k=b9.c
 for(r=k.length,j=c0.x,i=c0.e,h=c0.f,g=x.o,s=0;s<r;++s){f=k[s]
 e=f.a
@@ -6008,7 +6010,7 @@ e=-30+a7
 b6.df(new A.r(e,0.5,17),new A.r(e,4.6,17),1.2,D.b0,8)
 b6.d=1}l.$3(f,new A.r(-30,3,17),"Bolts")
 break
-case"tvalve":A.heA(b6,a4,new A.r(-40,8,1.6),d,B.nr,new A.fFj(m,f,-30))
+case"tvalve":A.heB(b6,a4,new A.r(-40,8,1.6),d,B.nr,new A.fFk(m,f,-30))
 l.$3(f,new A.r(-40,8,2),"Valve")
 break
 case"those":if(d){b6.b=a4
@@ -6028,10 +6030,10 @@ b6.cw(new A.r(e,36.6,8),new A.r(e,37.6,8),0.8,a0,0.6,10)}for(a6=0;a6<2;++a6){e=v
 b6.cw(new A.r(e,34,8),new A.r(e,28.4,8),0.45,B.ho,0.9,8)}}else m.$3(e,new A.r(v,38,9),B.h7z)
 l.$3(f,new A.r(v,38,8),"Faucet spot")
 break
-case"vhot":A.heA(b6,a4,new A.r(u,8,1.6),d,B.rD,new A.fFk(m,f,v))
+case"vhot":A.heB(b6,a4,new A.r(u,8,1.6),d,B.rD,new A.fFl(m,f,v))
 l.$3(f,new A.r(u,8,2),"Hot valve")
 break
-case"vcold":A.heA(b6,a4,new A.r(t,8,1.6),d,B.nr,new A.fFl(m,f,v))
+case"vcold":A.heB(b6,a4,new A.r(t,8,1.6),d,B.nr,new A.fFm(m,f,v))
 l.$3(f,new A.r(t,8,2),"Cold valve")
 break
 case"hhot":case"hcold":a8=e==="hhot"
@@ -6053,31 +6055,31 @@ l.$3(f,e,a8?"Hot hose":"Cold hose")
 break
 case"tail":case"trap":case"arm":a0=e==="tail"
 if(a0)a1=B.aAp
-else a1=e==="trap"?A.hhm():B.aCY
+else a1=e==="trap"?A.hhn():B.aCY
 b2=o.$1(a1)
 if(d){b6.b=a4
 a1=a0?B.ho:B.qf
-b6.aq8(b2,0.66,a1,!1,!0,!0,a0?0.85:0.3,12)}else n.$3$r(e,b2,0.78)
+b6.aq9(b2,0.66,a1,!1,!0,!0,a0?0.85:0.3,12)}else n.$3$r(e,b2,0.78)
 a1=J.a7(b2)
 a1=a1.h(b2,a1.gI(b2)/2|0)
 if(a0)e="Tailpiece"
 else e=e==="trap"?"P-trap":"Trap arm"
 l.$3(f,a1,e)
-break}}b3=new A.fFr(k,c0,b6,b7)
+break}}b3=new A.fFs(k,c0,b6,b7)
 b3.$4("trap",p.a2(0,B.aca),B.dZ,0)
 b3.$4("arm",p.a2(0,B.acc),B.h8,1)
 for(u=C.dZ(j,j.r,C.a4(j).c),t=u.$ti.c;u.C();){r=u.d
 if(r==null)r=t.a(r)
-b4=D.d.fe(b9.c,new A.fFm(r))
-r=A.hF8(c0,r)
+b4=D.d.fe(b9.c,new A.fFn(r))
+r=A.hF9(c0,r)
 b8.push(new A.he(new A.r(r.a+0,r.b+6,r.c+4),"\ud83d\udca7 LEAK: "+b4.c,D.bC,0))}return new A.r_(b5,b7,b8,B.qS,null,!1,0)},
-heA(d,e,f,g,h,i){if(!g){i.$0()
+heB(d,e,f,g,h,i){if(!g){i.$0()
 return}d.b=e
 d.cw(f.a2(0,B.hkb),f.a2(0,B.aZJ),0.9,B.u_,0.8,12)
 d.cw(f.a2(0,B.aZJ),f.a2(0,B.hgm),0.45,B.u_,0.8,10)
 d.cw(f.a2(0,B.hnJ),f.a2(0,B.b_8),0.3,B.afX,0.7,8)
 d.cw(f.a2(0,B.b_8),f.a2(0,B.hoi),1.2,h,0.5,12)},
-hF8(d,e){var w,v=d.c
+hF9(d,e){var w,v=d.c
 v===$&&C.c()
 w=v.a==="bathroom"?28:0
 A:{if("vhot"===e||"hhot"===e){v=new A.r(w-8,9,2)
@@ -6089,14 +6091,14 @@ break A}if("tail"===e){v=new A.r(w,22,8)
 break A}if("trap"===e){v=new A.r(w,24.7,8)
 break A}v=new A.r(w+8.9,23.6,8)
 break A}return v},
-irV(d,a0){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g=C.a([],x.z),f=new A.eL(g),e=d.x
+irW(d,a0){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g=C.a([],x.z),f=new A.eL(g),e=d.x
 if(e.a===0)return g
 for(e=C.dZ(e,e.r,C.a4(e).c),w=a0*2,v=e.$ti.c,u=d.e;e.C();){t=e.d
 if(t==null)t=v.a(t)
-s=A.hF8(d,t)
+s=A.hF9(d,t)
 r=d.c
 r===$&&C.c()
-q=D.d.fe(r.c,new A.fWD(t)).b==="valve"||!u.q(0,t)
+q=D.d.fe(r.c,new A.fWE(t)).b==="valve"||!u.q(0,t)
 t=s.a
 r=s.b
 p=s.c
@@ -6146,41 +6148,41 @@ cqH:function cqH(){},
 cqI:function cqI(){},
 cqB:function cqB(d){this.a=d},
 cqC:function cqC(d){this.a=d},
-fFv:function fFv(d){this.a=d},
-fFt:function fFt(d){this.a=d},
-fFn:function fFn(d,e){this.a=d
-this.b=e},
-fFq:function fFq(d){this.a=d},
+fFw:function fFw(d){this.a=d},
+fFu:function fFu(d){this.a=d},
 fFo:function fFo(d,e){this.a=d
 this.b=e},
-fFp:function fFp(d){this.a=d},
-fFu:function fFu(d,e,f,g,h){var _=this
+fFr:function fFr(d){this.a=d},
+fFp:function fFp(d,e){this.a=d
+this.b=e},
+fFq:function fFq(d){this.a=d},
+fFv:function fFv(d,e,f,g,h){var _=this
 _.a=d
 _.b=e
 _.c=f
 _.d=g
 _.e=h},
-fFj:function fFj(d,e,f){this.a=d
-this.b=e
-this.c=f},
 fFk:function fFk(d,e,f){this.a=d
 this.b=e
 this.c=f},
 fFl:function fFl(d,e,f){this.a=d
 this.b=e
 this.c=f},
-fFr:function fFr(d,e,f,g){var _=this
+fFm:function fFm(d,e,f){this.a=d
+this.b=e
+this.c=f},
+fFs:function fFs(d,e,f,g){var _=this
 _.a=d
 _.b=e
 _.c=f
 _.d=g},
-fFs:function fFs(d){this.a=d},
-fFm:function fFm(d){this.a=d},
-fWD:function fWD(d){this.a=d},
+fFt:function fFt(d){this.a=d},
+fFn:function fFn(d){this.a=d},
+fWE:function fWE(d){this.a=d},
 X8:function X8(d,e,f){this.c=d
 this.e=e
 this.a=f},
-aG_:function aG_(d,e){var _=this
+aFZ:function aFZ(d,e){var _=this
 _.e=_.d=$
 _.f=d
 _.r=$
@@ -6233,8 +6235,8 @@ this.b=e},
 ev_:function ev_(d){this.a=d},
 euZ:function euZ(d,e){this.a=d
 this.b=e},
-j7(d){return D.d.fe(B.v_,new A.h4c(d))},
-aQO(d){var w
+j7(d){return D.d.fe(B.v_,new A.h4d(d))},
+aQN(d){var w
 switch(d){case"tv":w="The TV"
 break
 case"lamp":w="The lamp"
@@ -6253,7 +6255,7 @@ cvw(d,e,f,g,h){var w=x.S,v=x.N
 v=new A.YF(g,f,C.T(w,v),C.aR(w),C.aR(w),C.T(w,x.cH),C.a([new A.YP(),new A.YP()],x.gD),C.T(w,x.cD),C.aR(w),C.T(w,v),C.aR(w),C.a([],x.s),C.T(w,v))
 v.coD(d,e,h)
 return v},
-hay(d,e){var w=!0
+haz(d,e){var w=!0
 if(d!==e)if(!(D.d.q(B.iR,d)&&D.d.q(B.iR,e)))if(!(D.d.q(B.ih,d)&&D.d.q(B.ih,e)))if(d==="light"||d==="fan")w=e==="light"||e==="fan"
 else w=!1
 return w},
@@ -6263,7 +6265,7 @@ _.b=e
 _.c=f
 _.d=g
 _.e=h},
-h4c:function h4c(d){this.a=d},
+h4d:function h4d(d){this.a=d},
 lg:function lg(d,e,f){this.a=d
 this.b=e
 this.c=f},
@@ -6272,12 +6274,12 @@ _.a=!1
 _.b=0
 _.c=!0
 _.d=!1},
-awU:function awU(d,e){var _=this
+awT:function awT(d,e){var _=this
 _.a=!1
 _.b=d
 _.c=e
 _.e=_.d=!1},
-aVI:function aVI(d,e){this.a=d
+aVH:function aVH(d,e){this.a=d
 this.b=e
 this.c=!1},
 eu:function eu(d,e,f,g){var _=this
@@ -6335,7 +6337,7 @@ _.d=e
 _.f=f
 _.r=g
 _.a=h},
-aG6:function aG6(d,e,f){var _=this
+aG5:function aG5(d,e,f){var _=this
 _.e=_.d=$
 _.f=d
 _.r=$
@@ -6504,19 +6506,19 @@ this.b=e},
 aiS(d,e){var w=d.d,v=e.a,u=e.c,t=e.b,s=w.a,r=w.b
 w=w.c
 return d.c?new A.r(s+v,r-u,w+t):new A.r(s+v,r+t,w+u)},
-hdM(d,e,f,g){var w,v,u,t,s,r=d.a,q=e.d,p=e.c?A.np(r,1.5707963267948966,0,q):A.np(r,0,0,q)
+hdN(d,e,f,g){var w,v,u,t,s,r=d.a,q=e.d,p=e.c?A.np(r,1.5707963267948966,0,q):A.np(r,0,0,q)
 r=C.a([],x.z)
 for(q=p.length,w=0;w<p.length;p.length===q||(0,C.J)(p),++w){v=p[w]
 u=v.d
 u=u===0?0:f.$1(u)
 t=v.f
 s=t<0.99?3:2
-r.push(new A.kf(v.a,v.b,v.c,u,v.e,t,v.r,v.w,v.x,s,g))}q=C.T(x.S,x.q)
+r.push(new A.jF(v.a,v.b,v.c,u,v.e,t,v.r,v.w,v.x,s,g))}q=C.T(x.S,x.q)
 for(u=d.b,u=u.gdO(u),u=u.gae(u);u.C();){t=u.gR(u)
 s=f.$1(t.a)
 t=t.b
 q.n(0,s,new A.cI(t.a,t.b,A.aiS(e,t.c),t.d))}return new C.y(r,q)},
-ibO(a3,a4,a5,a6,a7,a8,a9,b0,b1){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1=x.i,a2=C.ez([a4,a5],a1)
+ibP(a3,a4,a5,a6,a7,a8,a9,b0,b1){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1=x.i,a2=C.ez([a4,a5],a1)
 for(w=b1.length,v=0;v<b1.length;b1.length===w||(0,C.J)(b1),++v){u=b1[v].a
 a2.J(0,D.i.D(u[0],a4,a5))
 a2.J(0,D.i.D(u[1],a4,a5))}t=C.C(a2,a2.$ti.k("ci.E"))
@@ -6559,7 +6561,7 @@ c6.hl(B.haB,B.hk1,d3.gtl()?B.kN:B.beH,3)
 c6.d=1
 c6.f=2
 c6.b=8001
-if(!d3.gtl())for(w=0;w<10;++w)c6.aF4(new A.r(-72+w*16,51.3,55),B.hkH,B.iH,!1,0.05)
+if(!d3.gtl())for(w=0;w<10;++w)c6.aF5(new A.r(-72+w*16,51.3,55),B.hkH,B.iH,!1,0.05)
 else{c6.x=d2
 c6.aE(B.hiQ,B.hfH,D.c,0.2)
 c6.aE(B.hpT,B.aZu,D.c,0.2)
@@ -6579,7 +6581,7 @@ c6.b=8002
 c6.kZ(B.hpy,B.aZ1,B.iH,0.05,3)
 c6.kZ(B.hba,B.aZ1,B.iH,0.05,3)
 d1.n(0,8002,B.eia)
-for(v=d3.y,w=0;u=$.HK(),w<u.length;++w){t=1000+w
+for(v=d3.y,w=0;u=$.HL(),w<u.length;++w){t=1000+w
 c6.b=t
 c6.cLJ(new A.r(u[w],0,-2.25),B.hkm,B.iH,!1,0.05,2)
 s=v.q(0,w)?"This one has a hole for the cable.":"Tap it with the drill to put a hole through it."
@@ -6620,7 +6622,7 @@ for(m=i.b,l=C.a4(m),g=new C.mA(m,m.r,l.k("mA<1>")),g.c=m.e,l=l.c;g.C();){m=g.d
 if(m==null)m=l.a(m)
 o.push(new C.cu([A.j7(m).d.a-1.15,A.j7(m).d.a+1.15,A.j7(m).d.b-2,A.j7(m).d.b+2]))}m=6100+k
 c6.b=m
-A.ibO(c6,j,j+48,-47,47,-0.25,0.5,h,o)
+A.ibP(c6,j,j+48,-47,47,-0.25,0.5,h,o)
 o=i.e?"Painted and finished.":"A 4 by 8 foot sheet of drywall (gypsum between two layers of paper). It is screwed to the studs."
 d1.n(0,m,new A.cI("Drywall sheet",o,new A.r(j+24,0,0),90))
 c6.b=0
@@ -6629,7 +6631,7 @@ for(o=i.c,m=C.a4(o),l=new C.mA(o,o.r,m.k("mA<1>")),l.c=o.e,m=m.c;l.C();){o=l.d
 if(o==null)o=m.a(o)
 f=D.o.aq(o,10)
 e=D.o.F(o,10)
-c6.es(new A.r($.HK()[f],-40+e*16,0.1),0.34,B.y7,3,5,0.3)}c6.e=0}for(u=d4.a,o=u!=="tape",m=d3.as,l=u!=="mud",g=u==="sand",w=0;w<2;w=a1){d=-24+48*w
+c6.es(new A.r($.HL()[f],-40+e*16,0.1),0.34,B.y7,3,5,0.3)}c6.e=0}for(u=d4.a,o=u!=="tape",m=d3.as,l=u!=="mud",g=u==="sand",w=0;w<2;w=a1){d=-24+48*w
 a0=s.h(0,B.oO[w])
 a0=a0==null?c3:a0.a
 a1=w+1
@@ -6665,7 +6667,7 @@ else{a4=a7==null?c3:a7.a
 a9=a4==null?"outlet":a4}if(a8){b0=A.nP(a7.a)
 a0=a7.b
 b1=A.aht(b0,a0,!1)
-b2=A.hdM(b1,n,new A.fFz(n),d2)
+b2=A.hdN(b1,n,new A.fFA(n),d2)
 D.d.v(c5,b2.a)
 d1.v(0,b2.b)
 if(a0.f&&a0.c===0){a0=C.a([],c8)
@@ -6678,10 +6680,10 @@ b8=new A.eL(b7)
 b9=new A.yL(C.T(d0,g))
 b9.c=2
 b9.x=b6
-if(a4==="light"||a4==="fan")A.hxf(b8,a4,b9)
-else{A.hwT(b8,A.hfp(a4),-0.25,b6,!0,!1,!0)
-A.hAy(b8,a4,-0.25,b6)
-A.hzm(b8,b6)}D.d.v(c5,A.hdM(new A.r_(b7,B.T4,B.v4,B.qS,c3,!1,0),n,new A.fFA(n),d2).a)
+if(a4==="light"||a4==="fan")A.hxg(b8,a4,b9)
+else{A.hwU(b8,A.hfq(a4),-0.25,b6,!0,!1,!0)
+A.hAz(b8,a4,-0.25,b6)
+A.hzn(b8,b6)}D.d.v(c5,A.hdN(new A.r_(b7,B.T4,B.v4,B.qS,c3,!1,0),n,new A.fFB(n),d2).a)
 if(!a2){c6.f=3
 c6.b=3000+a0
 c6.e=0.4
@@ -6691,14 +6693,14 @@ b5=b5.x?D.ay:D.ba
 c6.aF(new A.r(a2.a,a2.b,a2.c+0.2),B.hg7,b5)
 c6.d=1
 c6.f=2
-c6.e=0}d1.n(0,3000+a0,new A.cI(A.i7g(a4),A.i7f(d3,a0),A.aiS(n,B.abW),22))}else{a4=C.a([],c4)
-b5=A.hfp(a9)===a9?a9:"outlet"
-A.hwd(new A.eL(a4),b5,!1)
-D.d.v(c5,A.hdM(new A.r_(a4,B.dEF,B.v4,B.qS,c3,!1,0),n,new A.fFB(n),d2).a)
+c6.e=0}d1.n(0,3000+a0,new A.cI(A.i7h(a4),A.i7g(d3,a0),A.aiS(n,B.abW),22))}else{a4=C.a([],c4)
+b5=A.hfq(a9)===a9?a9:"outlet"
+A.hwe(new A.eL(a4),b5,!1)
+D.d.v(c5,A.hdN(new A.r_(a4,B.dEF,B.v4,B.qS,c3,!1,0),n,new A.fFC(n),d2).a)
 a2=a2?"Ceiling box":"Electrical box"
 a4=v.q(0,a0)?"The box is mounted and the cable is in. A device can be wired here.":"The box is mounted. Pull the cable to it."
 d1.n(0,2000+a0,new A.cI(a2,a4,A.aiS(n,B.abW),24))}}c6.x=0
-c0=new A.fFE(c6)
+c0=new A.fFF(c6)
 if(u==="wall"||u==="ceiling"||u==="fanbox")for(a5=0;a5<7;++a5){n=B.v_[a5]
 c4=n.a
 if(m.al(0,c4))continue
@@ -6723,16 +6725,16 @@ c0.$5$col$round(2000+c4,d0,s,D.bi,c8)}else if(u==="knife")for(a5=0;a5<7;++a5){n=
 if(n.c||!m.al(0,n.a))continue
 c4=n.d
 c8=c4.a
-i=d3.are(c8)
+i=d3.arf(c8)
 if(i==null||i.b.q(0,n.a))continue
 c0.$4$col(2000+n.a,new A.r(c8,c4.b,0.5),B.hfz,D.cF)}else if(u==="sheet")for(w=0;w<5;){j=B.a6j[w]
 c0.$3(6000+w,new A.r(j,0,0.3),B.hkr);++w
 c9.push(new A.he(new A.r(j,50,1),"edge "+w,D.eX,0))}else if(u==="screw")for(a5=0;a5<3;++a5){j=B.oO[a5]
 i=s.h(0,j)
 if(i==null||!i.a)continue
-for(c4=d3.arA(j),c8=c4.length,d0=i.c,o=j+48,b3=0;b3<c4.length;c4.length===c8||(0,C.J)(c4),++b3){f=c4[b3]
+for(c4=d3.arB(j),c8=c4.length,d0=i.c,o=j+48,b3=0;b3<c4.length;c4.length===c8||(0,C.J)(c4),++b3){f=c4[b3]
 for(a0=f*10,a2=7000+a0,r=0;r<6;++r){if(d0.q(0,a0+r))continue
-c0.$3(a2+r,new A.r($.HK()[f],-40+r*16,0.5),B.aYU)}a2=$.HK()
+c0.$3(a2+r,new A.r($.HL()[f],-40+r*16,0.5),B.aYU)}a2=$.HL()
 if(f+1<a2.length&&a2[f]+16<=o)for(a0=7500+a0,r=0;r<6;r+=2)c0.$4$col(a0+r,new A.r(a2[f]+8,-40+r*16+8,0.5),B.aYU,D.dj)}}if(!C.ez(["wall","ceiling","fanbox","cable","knife","sheet","screw",""],g).q(0,u))c4=D.d.q(B.zP,u)||C.ez(["outlet","gfci","switch","light","fan"],g).q(0,u)||D.d.q(B.iR,u)||D.d.q(B.ih,u)
 else c4=!1
 if(c4)for(c4=d3.CW,a5=0;a5<7;++a5){n=B.v_[a5]
@@ -6760,11 +6762,11 @@ v=c6.b=8100+d0
 u=j.b
 switch(u){case"tv":c6.aE(new A.r(d,-45,24),B.hby,B.Zf,0.2)
 c6.aE(new A.r(d,-19,24),B.hdh,E.yd,0.4)
-if(c4.al(0,d0))d0=d3.ax&&!d3.ay&&d3.a59(d0)
+if(c4.al(0,d0))d0=d3.ax&&!d3.ay&&d3.a5a(d0)
 else d0=!1
 if(d0){d0=d-38.5
 s=d+38.5
-c7.push(new A.fh(C.a([new A.r(d0,1.5,25.7),new A.r(s,1.5,25.7),new A.r(s,-39.5,25.7),new A.r(d0,-39.5,25.7)],t),v,new A.fFC(j),320,180,9,2,0,!1))}break
+c7.push(new A.fh(C.a([new A.r(d0,1.5,25.7),new A.r(s,1.5,25.7),new A.r(s,-39.5,25.7),new A.r(d0,-39.5,25.7)],t),v,new A.fFD(j),320,180,9,2,0,!1))}break
 case"lamp":c6.cw(new A.r(d,-47.5,24),new A.r(d,-46.5,24),6,B.FD,0.4,14)
 c6.cw(new A.r(d,-46.5,24),new A.r(d,-22,24),1,B.yr,0.5,8)
 c6.x3(new A.r(d,-26,24),new A.r(d,-12,24),9,I.N6,!1,!0,5.5,0.2,16)
@@ -6788,13 +6790,13 @@ for(a5=0;a5<2;++a5)for(d0=d+B.a67[a5],b3=0;b3<2;++b3){c2=B.awN[b3]
 c6.cw(new A.r(d0,-11.6,c2),new A.r(d0,-11.2,c2),4.2,B.Zh,0.3,14)}break
 default:c6.aE(new A.r(d,-43.5,24),B.h9m,B.Zf,0.2)
 c6.x0(new A.r(d-6,-38,24),new A.r(d+8,-38,24),3.4,B.w8,3,0.6,12)
-c6.tc(new A.r(d-8,-43,24),B.h8Q,B.w8,0.6,0)}d0=A.i5d(u)
+c6.tc(new A.r(d-8,-43,24),B.h8Q,B.w8,0.6,0)}d0=A.i5e(u)
 s="Plugged into "+n.b
 u=u==="tv"?s+". To unplug it, go behind it (the Behind the TV button) and tap the plug on the wall.":s+". Tap it to unplug."
 d1.n(0,v,new A.cI(d0,u,new A.r(d,-35,20),60))}c6.r=!1
 for(a5=0;a5<7;++a5){n=B.v_[a5]
-d1.c3(0,2000+n.a,new A.fFD(n))}return new A.r_(c5,d1,c9,c7,c3,!1,0)},
-i7g(d){var w
+d1.c3(0,2000+n.a,new A.fFE(n))}return new A.r_(c5,d1,c9,c7,c3,!1,0)},
+i7h(d){var w
 switch(d){case"gfci":w="GFCI outlet"
 break
 case"switch":w="Light switch"
@@ -6807,7 +6809,7 @@ case"outlet":w="Outlet"
 break
 default:w=A.uw(d)
 break}return w},
-i5d(d){var w
+i5e(d){var w
 switch(d){case"tv":w="TV"
 break
 case"lamp":w="Lamp"
@@ -6822,20 +6824,20 @@ case"rangeM":w="Kitchen range"
 break
 default:w="Hair dryer"
 break}return w},
-i7f(d,e){var w,v=d.at.h(0,e)
+i7g(d,e){var w,v=d.at.h(0,e)
 if(v==null)return""
 if(v.b.x)return"BURNT. It was wired wrong and it burnt out. Pull it out and put in a new one."
 w=v.a
 if(D.d.q(B.ih,w))return d.ch.q(0,e)?"The switch is ON. Tap to turn it off.":"The switch is OFF. Tap to flip it on."
-if(w==="light"||w==="fan")return d.ao6(e)?"It is running.":"It is off. Flip its switch (breaker on)."
+if(w==="light"||w==="fan")return d.ao7(e)?"It is running.":"It is off. Flip its switch (breaker on)."
 w=d.CW.h(0,e)
 return"Tap with a TV, lamp, toaster, hair dryer, washing machine, dryer or range in your hand to plug it in. Plugged: "+(w==null?"nothing":w)+"."},
-isb(b3,b4,b5,b6,b7){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1=C.a([],x.z),b2=new A.eL(b1)
-for(w=D.d.gae(B.v_),v=new C.eF(w,new A.fWY()),u=b3.at,t=b4*7;v.C();){s=w.gR(0)
+isc(b3,b4,b5,b6,b7){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1=C.a([],x.z),b2=new A.eL(b1)
+for(w=D.d.gae(B.v_),v=new C.eF(w,new A.fWZ()),u=b3.at,t=b4*7;v.C();){s=w.gR(0)
 r=s.a
 q=u.h(0,r)
 if(q==null||q.b.c<1)continue
-p=b3.ao6(r)?t:0.4
+p=b3.ao7(r)?t:0.4
 b2.b=3000+r
 s=s.d
 r=s.a
@@ -6846,17 +6848,17 @@ l=A.tp(B.h7Z,m)
 b2.tc(new A.r(r+l.a,o+l.b,s+l.c),B.hoU,B.agg,0.3,m)}}w=b3.d
 w===$&&C.c()
 v=D.d.gae(w)
-s=new C.eF(v,new A.fWZ())
+s=new C.eF(v,new A.fX_())
 r=b4*5
 while(s.C()){o=v.gR(0).a
-if(b3.ao6(o)){k=A.j7(o)
+if(b3.ao7(o)){k=A.j7(o)
 b2.b=0
 b2.d=0.25+0.05*Math.sin(r)
 o=k.d
 b2.es(new A.r(o.a,o.b-5,o.c),11,B.My,4,10,0)
 b2.d=1}}for(v=b3.CW,s=new C.cb(v,C.a4(v).k("cb<1,2>")).gae(0),o=b4*1.6,l=b4*6;s.C();){j=s.d
 i=j.a
-if(v.al(0,i))h=b3.ax&&!b3.ay&&b3.a59(i)
+if(v.al(0,i))h=b3.ax&&!b3.ay&&b3.a5a(i)
 else h=!1
 if(!h)continue
 g=A.j7(i).d.a
@@ -6898,7 +6900,7 @@ a5=b4<=(a4==null?0:a4)
 a6=s.q(0,r)
 if(!a5&&!a6)continue
 r=a5?j.b:"smolder"
-A.hBf(b2,r,new A.fX_(k),1,b4)}if(b6){a7=(D.i.bh(b4*2.4)&1)===0
+A.hBg(b2,r,new A.fX0(k),1,b4)}if(b6){a7=(D.i.bh(b4*2.4)&1)===0
 for(e=0;e<w.length;++e){k=A.j7(w[e].a)
 a8=b3.rl(e)
 v=k.a
@@ -6923,16 +6925,16 @@ this.b=e
 this.c=f},
 fxt:function fxt(d){this.a=d},
 fxu:function fxu(d){this.a=d},
-fFz:function fFz(d){this.a=d},
 fFA:function fFA(d){this.a=d},
 fFB:function fFB(d){this.a=d},
-fFE:function fFE(d){this.a=d},
 fFC:function fFC(d){this.a=d},
+fFF:function fFF(d){this.a=d},
 fFD:function fFD(d){this.a=d},
-fWY:function fWY(){},
+fFE:function fFE(d){this.a=d},
 fWZ:function fWZ(){},
-fX_:function fX_(d){this.a=d},
-hsS(d,e){var w=new A.cyW(e,d,A.hm8())
+fX_:function fX_(){},
+fX0:function fX0(d){this.a=d},
+hsT(d,e){var w=new A.cyW(e,d,A.hm9())
 w.bCm(4,d,e)
 return w},
 rz:function rz(d,e){this.a=d
@@ -6961,9 +6963,9 @@ cyX:function cyX(){},
 cyZ:function cyZ(){},
 cz_:function cz_(){},
 cyY:function cyY(d){this.a=d},
-asO:function asO(d,e){this.d=d
+asN:function asN(d,e){this.d=d
 this.a=e},
-aGa:function aGa(d,e){var _=this
+aG9:function aG9(d,e){var _=this
 _.e=_.d=$
 _.f=d
 _.r=$
@@ -7012,8 +7014,8 @@ this.b=e},
 eBM:function eBM(){},
 eBO:function eBO(d,e){this.a=d
 this.b=e},
-auH(d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u){return new A.yt(p,s,u,t,r,h,o,n,m,i,q,d,j,g,k,e,f,l)},
-irC(d){var w,v,u,t,s,r,q,p,o,n,m=d.gec(0),l=C.a([],x.T)
+auG(d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u){return new A.yt(p,s,u,t,r,h,o,n,m,i,q,d,j,g,k,e,f,l)},
+irD(d){var w,v,u,t,s,r,q,p,o,n,m=d.gec(0),l=C.a([],x.T)
 for(w=d.x,v=w.length,u=0;u<w.length;w.length===v||(0,C.J)(w),++u){t=w[u]
 s=t.b
 if(s==="rug")continue
@@ -7038,7 +7040,7 @@ break}return l},
 btj(d,e,f,g,h,i,j,k,l,m,n,o){var w=new A.bti(d,i,m,o,n,l,g,f,k,j,e,h,C.a([],x.n))
 w.bCD(d,e,f,g,h,i,j,k,l,m,n,o)
 return w},
-hwW(d,e){var w,v,u,t=d.w,s=D.d.bj(t,new A.fpW(e))
+hwX(d,e){var w,v,u,t=d.w,s=D.d.bj(t,new A.fpW(e))
 if(s<0)s=0
 w=t[s]
 v=d.gec(0)
@@ -7122,7 +7124,7 @@ _.as=p
 _.ax=_.at=0
 _.ay=-1},
 fpW:function fpW(d){this.a=d},
-aXr:function aXr(d,e,f,g){var _=this
+aXq:function aXq(d,e,f,g){var _=this
 _.a=d
 _.b=e
 _.c=f
@@ -7131,7 +7133,7 @@ _.e=$},
 bWA:function bWA(d,e){this.a=d
 this.b=e},
 bWB:function bWB(d){this.a=d},
-hET(d,e){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i=C.a([B.dFv],x.T)
+hEU(d,e){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i=C.a([B.dFv],x.T)
 for(w=d.x,v=w.length,u=0;u<w.length;w.length===v||(0,C.J)(w),++u){t=w[u]
 if(t.a===e)continue
 s=t.b
@@ -7173,7 +7175,7 @@ _.ax=l
 _.ay=7
 _.ch=1
 _.CW=null},
-hy9(d){var w=d.toLowerCase()
+hya(d){var w=d.toLowerCase()
 if(D.a.q(w,"blue"))return B.nr
 if(D.a.q(w,"ground")||D.a.q(w,"green"))return B.Yg
 if(D.a.q(w,"neutral")||D.a.q(w,"white"))return B.m3
@@ -7182,14 +7184,14 @@ if(D.a.q(w,"traveler b"))return D.av
 if(D.a.q(w,"load"))return B.ajW
 if(D.a.q(w,"support"))return D.db
 return B.bqJ},
-ibK(d){var w=d.toLowerCase()
+ibL(d){var w=d.toLowerCase()
 if(D.a.q(w,"ground"))return B.Yg
 if(D.a.q(w,"common"))return D.Ms
 if(D.a.q(w,"traveler"))return B.u_
 if(D.a.q(w,"neutral"))return B.yi
 if(D.a.q(w,"support"))return D.db
 return D.av},
-i9R(d){var w=d.toLowerCase()
+i9S(d){var w=d.toLowerCase()
 if(D.a.q(w,"ground"))return G.a3e
 if(D.a.q(w,"neutral"))return D.wM
 if(D.a.q(w,"support"))return Ar.a2p
@@ -7204,7 +7206,7 @@ _.c=f
 _.d=g
 _.e=h
 _.f=i},
-aqY:function aqY(d){this.a=d},
+aqX:function aqX(d){this.a=d},
 bfj:function bfj(d,e,f){var _=this
 _.d=0
 _.e=!1
@@ -7260,12 +7262,12 @@ _.f=h
 _.r=i
 _.a=j},
 flx:function flx(){},
-aM8:function aM8(){},
-hBf(d,e,a0,a1,a2){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f
+aM7:function aM7(){},
+hBg(d,e,a0,a1,a2){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f
 if(e==="none"||e.length===0)return
 d.b=0
-w=new A.fHt(a2,d,a0,a1)
-v=new A.fHs(d,a2,a0,a1)
+w=new A.fHu(a2,d,a0,a1)
+v=new A.fHt(d,a2,a0,a1)
 switch(e){case"arc":u=D.i.bh(a2*14)
 for(t=0.1*a1,s=x.o,r=u*3.1,q=0;q<3;++q){p=Math.sin((r+q*7.7)*12.9898)*43758.5453
 if(p-Math.floor(p)<0.3)continue
@@ -7308,17 +7310,17 @@ v.$3(10,1,13)
 break
 case"smolder":v.$3(4,0.9,9)
 break}},
+fHu:function fHu(d,e,f,g){var _=this
+_.a=d
+_.b=e
+_.c=f
+_.d=g},
 fHt:function fHt(d,e,f,g){var _=this
 _.a=d
 _.b=e
 _.c=f
 _.d=g},
-fHs:function fHs(d,e,f,g){var _=this
-_.a=d
-_.b=e
-_.c=f
-_.d=g},
-haA(d){var w
+haB(d){var w
 switch(d.a){case 0:w="CORRECT"
 break
 case 1:w="INCORRECT"
@@ -7330,7 +7332,7 @@ break
 case 4:w="REQUIRES VERIFICATION"
 break
 default:w=null}return w},
-awk(d){var w
+awj(d){var w
 switch(d.a){case 0:w=0
 break
 case 3:w=1
@@ -7342,10 +7344,10 @@ break
 case 2:w=4
 break
 default:w=null}return w},
-hBb(d,e,a0){var w,v,u,t,s=C.a([],x.fB),r=new A.fGZ(s),q=new A.fH3(e),p=q.$2(B.Wn,B.Kr),o=q.$2(B.Wn,B.Ks),n=q.$2(B.Wn,B.Kt),m=q.$2(B.Wo,B.Ks),l=q.$2(B.Wo,B.Kr),k=q.$2(B.Wo,B.Kt),j=q.$2(B.Wp,B.Kt),i=q.$2(B.Wp,B.Kr),h=q.$2(B.Wp,B.Ks),g=new C.Y(e,new A.fH_(),C.U(e).k("Y<1>")).gI(0),f=D.d.aV(e,new A.fH0())
+hBc(d,e,a0){var w,v,u,t,s=C.a([],x.fB),r=new A.fH_(s),q=new A.fH4(e),p=q.$2(B.Wn,B.Kr),o=q.$2(B.Wn,B.Ks),n=q.$2(B.Wn,B.Kt),m=q.$2(B.Wo,B.Ks),l=q.$2(B.Wo,B.Kr),k=q.$2(B.Wo,B.Kt),j=q.$2(B.Wp,B.Kt),i=q.$2(B.Wp,B.Kr),h=q.$2(B.Wp,B.Ks),g=new C.Y(e,new A.fH0(),C.U(e).k("Y<1>")).gI(0),f=D.d.aV(e,new A.fH1())
 if(f)r.$5("UNVERIFIED",B.f9n,"A conductor is in use whose function was never verified. A wire color alone does not prove what a wire does.","Verify every conductor with a tester before you connect it.","Identify each wire with a tester and the device diagram, then connect it.")
-if(D.d.aV(e,new A.fH1()))r.$5("LOOSE",B.tt,"A connection is loose. A loose connection heats up and can arc.","Every conductor must be fastened tightly under its screw or connector.","Tighten the connection.")
-if(D.d.aV(e,new A.fH2()))r.$5("EXPOSED",B.tt,"Bare copper is showing outside the terminal. An exposed energized conductor can shock or short.","No conductor may be left exposed.","Trim the wire so only the part under the screw is bare.")
+if(D.d.aV(e,new A.fH2()))r.$5("LOOSE",B.tt,"A connection is loose. A loose connection heats up and can arc.","Every conductor must be fastened tightly under its screw or connector.","Tighten the connection.")
+if(D.d.aV(e,new A.fH3()))r.$5("EXPOSED",B.tt,"Bare copper is showing outside the terminal. An exposed energized conductor can shock or short.","No conductor may be left exposed.","Trim the wire so only the part under the screw is bare.")
 if(!a0)r.$5("SUPPORT",B.tt,"The box or support is not rated for this device. It can fall.","A fixture or fan must hang from a box or bracket rated for its weight.","Use a box rated for this fixture (a fan-rated box for a fan).")
 if(n>0||i>0)r.$5("HOT_TO_GROUND",B.tt,"The hot wire is connected to the ground. That is a short circuit to ground: a very large current.","The equipment ground never carries current in normal use, and the hot wire never touches it.","Hot goes on the hot terminal (brass). Ground goes only on the green screw.")
 f=o>0
@@ -7365,8 +7367,8 @@ f=m<f&&f>0&&l===0&&k===0}else f=!1
 if(f)r.$5("OPEN_NEUTRAL",B.tt,"The neutral is not connected, but the hot wire is. The device will not run, and parts of it can still be live. There may be nothing to see.","The neutral return conductor must be connected.","Connect the white (neutral) wire to the silver terminal.")
 if(d.d&&j===0)r.$5("MISSING_GROUND",B.tt,"There is no equipment ground. It may seem to work, but nothing protects you if a fault happens.","A required equipment ground must be connected to the ground terminal.","Connect the bare copper (ground) wire to the green screw.")
 for(f=s.length,v=B.r4,u=0;u<f;++u){t=s[u].b
-if(A.awk(t)>A.awk(v))v=t}return new A.b7m(v,s,A.i6J(s,e))},
-i6J(d,e){var w=new A.fps(d)
+if(A.awj(t)>A.awj(v))v=t}return new A.b7m(v,s,A.i6K(s,e))},
+i6K(d,e){var w=new A.fps(d)
 if(w.$1("SHORT")||w.$1("HOT_TO_GROUND"))return B.bxb
 if(w.$1("LOOSE"))return B.bx3
 if(w.$1("EXPOSED"))return B.bx9
@@ -7379,7 +7381,7 @@ if(w.$1("LOAD_SIDE")||w.$1("MISSING_HOT"))return B.bx1
 if(w.$1("UNVERIFIED"))return B.bx2
 if(w.$1("MISSING_GROUND"))return B.bx5
 return B.bx7},
-i0s(d){var w
+i0t(d){var w
 switch(d.a.c.a){case 0:w=d.b.c===B.Kr
 break
 case 1:w=d.b.c===B.Ks
@@ -7389,11 +7391,11 @@ break
 case 3:w=!1
 break
 default:w=null}return w},
-hBc(d,e,f){var w,v,u,t,s=C.a([],x.fB)
-e.bO(0,new A.fH5(f,s))
+hBd(d,e,f){var w,v,u,t,s=C.a([],x.fB)
+e.bO(0,new A.fH6(f,s))
 for(w=s.length,v=B.r4,u=0;u<w;++u){t=s[u].b
-if(A.awk(t)>A.awk(v))v=t}return new A.b7m(v,s,v===B.r4?B.bx6:B.bx4)},
-Kg:function Kg(d,e){this.a=d
+if(A.awj(t)>A.awj(v))v=t}return new A.b7m(v,s,v===B.r4?B.bx6:B.bx4)},
+Kh:function Kh(d,e){this.a=d
 this.b=e},
 Gf:function Gf(d,e){this.a=d
 this.b=e},
@@ -7422,14 +7424,14 @@ _.f=h},
 b7m:function b7m(d,e,f){this.a=d
 this.b=e
 this.c=f},
-fGZ:function fGZ(d){this.a=d},
-fH3:function fH3(d){this.a=d},
-fH4:function fH4(d,e){this.a=d
+fH_:function fH_(d){this.a=d},
+fH4:function fH4(d){this.a=d},
+fH5:function fH5(d,e){this.a=d
 this.b=e},
-fH_:function fH_(){},
 fH0:function fH0(){},
 fH1:function fH1(){},
 fH2:function fH2(){},
+fH3:function fH3(){},
 fps:function fps(d){this.a=d},
 fpt:function fpt(d){this.a=d},
 abX:function abX(d,e,f,g){var _=this
@@ -7465,9 +7467,9 @@ _.c=f
 _.d=g
 _.e=h
 _.f=i},
-fH5:function fH5(d,e){this.a=d
+fH6:function fH6(d,e){this.a=d
 this.b=e},
-hek(d){var w
+hel(d){var w
 switch(d.a){case 0:w=D.b4
 break
 case 1:w=D.cF
@@ -7479,11 +7481,11 @@ break
 case 4:w=D.bp
 break
 default:w=null}return w},
-hhF(d){return C.bT(E.mR,null,new A.h49(),d,!0,!0,!0,D.kf,!1,!1,x.H)},
-hFN(d,e,f,g){var w=x.S
-return C.bT(E.mR,null,new A.h47(new A.cBX(e,f,C.T(w,w)),g),d,!0,!0,!0,D.kf,!1,!1,x.dZ)},
-h49:function h49(){},
-h47:function h47(d,e){this.a=d
+hhG(d){return C.bT(E.mR,null,new A.h4a(),d,!0,!0,!0,D.kg,!1,!1,x.H)},
+hFO(d,e,f,g){var w=x.S
+return C.bT(E.mR,null,new A.h48(new A.cBX(e,f,C.T(w,w)),g),d,!0,!0,!0,D.kg,!1,!1,x.dZ)},
+h4a:function h4a(){},
+h48:function h48(d,e){this.a=d
 this.b=e},
 a25:function a25(d,e,f){this.c=d
 this.d=e
@@ -7508,15 +7510,15 @@ w=t.length
 v=0
 for(;v<w;++v){u=t[v]
 if(u.a===d)return u}return null},
-hBQ(d){return D.d.aV(B.a6d,new A.fIl(d))},
-hBP(d){return D.d.aV(B.a4y,new A.fIk(d))},
+hBR(d){return D.d.aV(B.a6d,new A.fIm(d))},
+hBQ(d){return D.d.aV(B.a4y,new A.fIl(d))},
 S7(d){var w,v=d.b
 if(v==="ceiling"){v=d.f
 v.toString
 return new A.r(-70+v*15.555555555555555+3.05,96,0)}w=d.r
 v=v==="switch"?48:16
 return A.eS(d.c,d.d+w*1.9,v,3.5)},
-hG_(d){var w
+hG0(d){var w
 switch(d){case 0:w=0
 break
 case 1:w=-1.5707963267948966
@@ -7525,7 +7527,7 @@ case 2:w=3.141592653589793
 break
 default:w=1.5707963267948966
 break}return w},
-hBS(d,e){var w,v,u,t=d.b
+hBT(d,e){var w,v,u,t=d.b
 if(t==="ceiling"){t=d.f
 t.toString
 w=e===0?-1:1
@@ -7534,17 +7536,17 @@ if(e===0)u=(t==="switch"?48:16)-2.7
 else u=(t==="switch"?48:16)+2.7
 t=d.c
 return new C.y(A.eS(t,v,u,3.62),A.eS(t,v,u,4.5).aJ(0,A.eS(t,v,u,3.5)))},
-ihQ(d,e){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f
+ihR(d,e){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f
 d.f=2
 d.e=0.7
 for(w=e.b,v=w==="ceiling",u=e.c,w=w==="switch",t=e.d,s=4200+(e.a-4000)*2,r=e.x,q=0;q<2;++q){p={}
 d.b=s+q
 o=r[q]
 p.a=p.b=null
-n=A.hBS(e,q)
+n=A.hBT(e,q)
 p.b=n.a
 p.a=n.b
-p=new A.fGR(p)
+p=new A.fGS(p)
 if(v)d.cw(p.$1(-0.12),p.$1(0.02),1.15,B.ahg,0.5,14)
 else{m=e.r
 if(q===0)l=(w?48:16)-2.7
@@ -7567,7 +7569,7 @@ m=m.c
 f=k.c
 p=p.$1(0.3)
 d.cw(new A.r(j+i,h+g,m+f),new A.r(p.a+i,p.b+g,p.c+f),0.3,B.aiO,0.7,8)}d.e=0.7}d.e=0},
-ihP(a0,a1,a2){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e=a1.ax,d=a1.at
+ihQ(a0,a1,a2){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e=a1.ax,d=a1.at
 if(e==null||d==null||e.c<1)return
 a0.f=2
 a0.b=a1.a
@@ -7577,7 +7579,7 @@ if(v==="ceiling"){w=A.S7(a1).a
 if(d==="fan"){a0.cw(new A.r(w,96,0),new A.r(w,91,0),1.2,B.FD,0.3,10)
 a0.cw(new A.r(w,91,0),new A.r(w,87.5,0),4.2,B.bsj,0.35,14)}else{a0.cw(new A.r(w,96,0),new A.r(w,94.6,0),3.4,B.ho,0.7,14)
 a0.es(new A.r(w,93,0),4,B.ZL,5,10,0.5)}return}u=a1.d+a1.r*1.9
-t=new A.fGO(a1,u)
+t=new A.fGP(a1,u)
 if(w<2){w=t.$3(0,0,3.2)
 v=(a1.c&1)===0
 a0.aE(w,v?new A.r(1.7,3.5,0.5):new A.r(0.5,3.5,1.7),B.ZL,0.3)
@@ -7605,12 +7607,12 @@ w=t.$3(0.38,-1.2,3.79)
 a0.aF(w,n?new A.r(0.12,0.34,0.05):new A.r(0.05,0.34,0.12),B.f1)
 a0.es(t.$3(0,-1.75,3.79),0.16,B.f1,3,5,0.1)}return}if(r){j=t.$3(0,0,3.74)
 a0.cw(j,A.eS(q,u,v==="switch"?48:16,3.8400000000000003),1.9,B.Nc,0.35,24)
-for(w=A.ijE(s),v=w.length,i=0;i<w.length;w.length===v||(0,C.J)(w),++i){h=w[i]
+for(w=A.ijF(s),v=w.length,i=0;i<w.length;w.length===v||(0,C.J)(w),++i){h=w[i]
 if(h.f){q=h.a*2.96875
 p=h.b*2.96875
 a0.df(t.$3(q,p,3.8400000000000003),t.$3(q,p,3.8800000000000003),h.c*2.96875/2,B.BU,10)
 continue}q=h.e
-q=new A.fGP(t,h,Math.cos(q),Math.sin(q),3.74)
+q=new A.fGQ(t,h,Math.cos(q),Math.sin(q),3.74)
 p=h.c
 o=-p/2
 n=h.d
@@ -7628,13 +7630,13 @@ v=t.$3(-0.38,w,3.77)
 a0.aF(v,n?new A.r(0.12,0.5,0.05):new A.r(0.05,0.5,0.12),B.f1)
 w=t.$3(0.38,w,3.77)
 a0.aF(w,n?new A.r(0.12,0.34,0.05):new A.r(0.05,0.34,0.12),B.f1)
-a0.es(t.$3(0,f-0.45,3.77),0.16,B.f1,3,5,0.1)}if(d==="isolated")a0.a7B(t.$3(0,0.35,3.8000000000000003),t.$3(-0.3,-0.2,3.8000000000000003),t.$3(0.3,-0.2,3.8000000000000003),D.c6)},
-i5f(d,e,f){var w,v,u,t,s,r,q,p,o,n,m,l=C.a([],x.z),k=new A.eL(l),j=A.fDC(d).c
-if(A.hBQ(d)){w=j*0.56
+a0.es(t.$3(0,f-0.45,3.77),0.16,B.f1,3,5,0.1)}if(d==="isolated")a0.a7C(t.$3(0,0.35,3.8000000000000003),t.$3(-0.3,-0.2,3.8000000000000003),t.$3(0.3,-0.2,3.8000000000000003),D.c6)},
+i5g(d,e,f){var w,v,u,t,s,r,q,p,o,n,m,l=C.a([],x.z),k=new A.eL(l),j=A.fDC(d).c
+if(A.hBR(d)){w=j*0.56
 k.aE(B.hen,new A.r(j*0.4,1.6,10),B.f1,0.3)
 k.aE(B.hoH,B.hbU,B.f1,0.3)
 k.aE(new A.r(0,11.5+w/2,9),new A.r(j,w,2.4),E.yd,0.5)
-return l}if(A.hBP(d)){if(d==="tablet")w=10
+return l}if(A.hBQ(d)){if(d==="tablet")w=10
 else w=d==="bigphone"?6.8:6.1
 k.aE(new A.r(0,0.4,5),new A.r(j+1.2,0.8,3.4),B.f1,0.3)
 k.aE(new A.r(0,0.8+w/2,5),new A.r(j,w,0.5),E.yd,0.5)
@@ -7681,14 +7683,14 @@ r=Math.sin(m)
 if(n)o=(u&1)===0?B.ag_:B.w8
 else o=(u&1)===0?U.yp:D.av
 k.es(new A.r(v*4,17+r*4,28.9),1.7,o,3,6,0.2)}k.e=0}}return l},
-heH(d,e){A.fDC(e)
+heI(d,e){A.fDC(e)
 return A.eS(d.c,d.d+d.r*1.9,0,5)},
-ihK(d,e){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i=C.a([],x.z),h=new A.eL(i)
+ihL(d,e){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i=C.a([],x.z),h=new A.eL(i)
 for(w=d.b,v=w.length,u=e*8,t=e*5,s=0;s<w.length;w.length===v||(0,C.J)(w),++s){r=w[s]
 q=!1
 if(r.b==="ceiling")if(r.at!=null){q=r.ax
 q=q!=null&&q.c>=2&&!q.x}if(q){p=A.S7(r)
-o=d.a7l(r)
+o=d.a7m(r)
 if(r.at==="fan"){n=o?u:0.4
 for(q=p.a,m=0;m<4;++m){l=n+m*3.141592653589793/2
 k=A.tp(B.h7I,l)
@@ -7700,8 +7702,8 @@ h.e=0}}}for(w=d.c,w=new C.cb(w,C.a4(w).k("cb<1,2>")).gae(0);w.C();){j=w.d
 r=d.l_(j.a)
 if(r==null)continue
 v=j.b
-D.d.v(i,A.np(A.i5f(v,d.a7l(r),e),0,A.hG_(r.c),A.heH(r,v)))}return i},
-ihR(d,e){var w,v,u,t,s,r,q,p,o,n,m,l
+D.d.v(i,A.np(A.i5g(v,d.a7m(r),e),0,A.hG0(r.c),A.heI(r,v)))}return i},
+ihS(d,e){var w,v,u,t,s,r,q,p,o,n,m,l
 for(w=e.c,w=new C.cb(w,C.a4(w).k("cb<1,2>")).gae(0),v=x.o;w.C();){u=w.d
 t=e.l_(u.a)
 if(t!=null){s=u.b
@@ -7712,7 +7714,7 @@ o=r.a+p.a*0.5
 n=r.b+p.b*0.5
 p=r.c+p.c*0.5
 m=new A.r(o,n,p)
-s=A.heH(t,s)
+s=A.heI(t,s)
 r=B.v1[q]
 l=s.a+r.a*2
 r=s.c+r.c*2
@@ -7730,27 +7732,27 @@ d.aF(new A.r((o+l)/2,(n+1)/2,(p+r)/2),new A.r(5,Math.max(4,n-1),5),D.c)
 d.d=1
 d.f=2
 d.e=0}}},
-igi(d){var w,v,u,t,s,r,q,p,o,n,m=C.a([],x.a)
+igj(d){var w,v,u,t,s,r,q,p,o,n,m=C.a([],x.a)
 for(w=d.c,w=new C.cb(w,C.a4(w).k("cb<1,2>")).gae(0),v=x.o;w.C();){u=w.d
 t=d.l_(u.a)
-if(t==null||!d.a7l(t))continue
+if(t==null||!d.a7m(t))continue
 s=u.b
 r=A.fDC(s)
 r.toString
-q=new A.fDH(A.hG_(t.c),A.heH(t,s))
-if(A.hBQ(s)){s=r.c
+q=new A.fDH(A.hG0(t.c),A.heI(t,s))
+if(A.hBR(s)){s=r.c
 p=s-3
 r=-p/2
 s=13+(s*0.56-3)
 o=p/2
-m.push(new A.fh(C.a([q.$3(r,s,10.3),q.$3(o,s,10.3),q.$3(o,13,10.3),q.$3(r,13,10.3)],v),0,new A.fDF(t,u),960,540,2,2,0,!1))}else if(A.hBP(s)){if(s==="tablet")n=10
+m.push(new A.fh(C.a([q.$3(r,s,10.3),q.$3(o,s,10.3),q.$3(o,13,10.3),q.$3(r,13,10.3)],v),0,new A.fDF(t,u),960,540,2,2,0,!1))}else if(A.hBQ(s)){if(s==="tablet")n=10
 else n=s==="bigphone"?6.8:6.1
 p=r.c-0.6
 s=-p/2
 r=1.1+(n-0.6)
 o=p/2
 m.push(new A.fh(C.a([q.$3(s,r,5.3),q.$3(o,r,5.3),q.$3(o,1.1,5.3),q.$3(s,1.1,5.3)],v),0,new A.fDG(),360,640,2,2,0,!1))}}return m},
-aR_(d,e){var w,v,u=d.b
+aQZ(d,e){var w,v,u=d.b
 if(u==="ceiling"){u=d.f
 u.toString
 w=e===0?-2.7:2.7
@@ -7761,12 +7763,12 @@ u=v}return A.eS(d.c,d.d+w*1.9,u,2.25)},
 pd:function pd(d,e,f){this.a=d
 this.b=e
 this.c=f},
+fIm:function fIm(d){this.a=d},
 fIl:function fIl(d){this.a=d},
-fIk:function fIk(d){this.a=d},
-fGR:function fGR(d){this.a=d},
-fGO:function fGO(d,e){this.a=d
+fGS:function fGS(d){this.a=d},
+fGP:function fGP(d,e){this.a=d
 this.b=e},
-fGP:function fGP(d,e,f,g,h){var _=this
+fGQ:function fGQ(d,e,f,g,h){var _=this
 _.a=d
 _.b=e
 _.c=f
@@ -7777,7 +7779,7 @@ this.b=e},
 fDF:function fDF(d,e){this.a=d
 this.b=e},
 fDG:function fDG(){},
-i5G(){var w,v,u,t,s,r,q,p=C.a([],x.ar)
+i5H(){var w,v,u,t,s,r,q,p=C.a([],x.ar)
 for(w=0;w<3;++w){v=-72+48*w
 u=v+48
 p.push(new A.zC(5000+p.length,0,v,u,-60,36))
@@ -7789,36 +7791,36 @@ r=v?144:120
 q=s+48
 p.push(new A.zC(5000+u,t,s,Math.min(r,q),0,95.5))
 s=q}}return p},
-hf_(d){var w=d-5000
-return w>=0&&w<$.k5().length?$.k5()[w]:null},
-i5F(a0){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d=C.a([],x.Q)
+hf0(d){var w=d-5000
+return w>=0&&w<$.k6().length?$.k6()[w]:null},
+i5G(a0){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d=C.a([],x.Q)
 for(w=a0.b,v=w.length,u=0;u<w.length;w.length===v||(0,C.J)(w),++u){t=w[u]
 s=t.b
 if(s==="ceiling"){s=t.f
 s.toString
 r=-70+s*15.555555555555555+3.05
-q=D.d.fe($.k5(),new A.fov(r))
+q=D.d.fe($.k6(),new A.fov(r))
 d.push(new A.MT(6000+d.length,q.a,"Ceiling light box",-1,r-2.4,r+2.4,-2.4,2.4))}else{p=t.d+t.r*1.9
-q=D.d.fe($.k5(),new A.fow(t,p))
+q=D.d.fe($.k6(),new A.fow(t,p))
 o=d.length
 s=s==="switch"
 n=s?"Switch box":"Outlet box"
 m=s?48:16
 s=s?48:16
 d.push(new A.MT(6000+o,q.a,n,-1,p-1.4,p+1.4,m-2.4,s+2.4))}}for(l=0;l<2;++l){k=B.zQ[l]
-for(w=D.d.gae($.k5()),v=new C.eF(w,new A.fox(k)),s=k.c,o=k.d,n=k.e,m=k.f,j=k.a==="door";v.C();){i=w.gR(0)
+for(w=D.d.gae($.k6()),v=new C.eF(w,new A.fox(k)),s=k.c,o=k.d,n=k.e,m=k.f,j=k.a==="door";v.C();){i=w.gR(0)
 h=Math.max(i.c,s)
 g=Math.min(i.d,o)
 if(g-h>0.5){f=d.length
 i=i.a
 e=j?"Door opening":"Window opening"
 d.push(new A.MT(6000+f,i,e,l,h,g,n,m))}}}return d},
-hNT(){var w,v,u,t,s=x.S,r=C.T(s,x.ag)
-for(w=$.k5(),v=w.length,u=0;u<w.length;w.length===v||(0,C.J)(w),++u)r.n(0,w[u].a,new A.MU(C.aR(s)))
+hNU(){var w,v,u,t,s=x.S,r=C.T(s,x.ag)
+for(w=$.k6(),v=w.length,u=0;u<w.length;w.length===v||(0,C.J)(w),++u)r.n(0,w[u].a,new A.MU(C.aR(s)))
 w=C.a([],x.gc)
 for(t=0;t<5;++t)w.push(new A.a5e())
-return new A.bOG(A.hBh(),r,w,C.aR(s))},
-hAf(d,e){var w,v
+return new A.bOG(A.hBi(),r,w,C.aR(s))},
+hAg(d,e){var w,v
 switch(d){case 6:w=B.bsv
 break
 case 5:w=B.aiK
@@ -7826,30 +7828,30 @@ break
 default:v=D.o.F(e*29,7)-3
 w=C.a_(255,233+v,228+v,214+v)
 break}return w},
-hAJ(c7,c8,c9){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,c0,c1,c2,c3,c4=C.a([],x.z),c5=new A.eL(c4),c6=c7.a
-A.hB8(c5,c6.a)
+hAK(c7,c8,c9){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,c0,c1,c2,c3,c4=C.a([],x.z),c5=new A.eL(c4),c6=c7.a
+A.hB9(c5,c6.a)
 for(w=c6.b,v=w.length,u=0;t=w.length,u<t;w.length===v||(0,C.J)(w),++u){s=w[u]
 t=s.b
 r=s.a
 if(t==="ceiling"){t=s.f
 t.toString
-A.hB6(c5,r,1,-70+t*15.555555555555555)}else{t=t==="switch"?48:16
-A.hB7(c5,r,s.r,s.d,s.c,t)}}c5.b=0
+A.hB7(c5,r,1,-70+t*15.555555555555555)}else{t=t==="switch"?48:16
+A.hB8(c5,r,s.r,s.d,s.c,t)}}c5.b=0
 c5.f=1
 c5.e=0.6
 for(u=0;u<w.length;w.length===t||(0,C.J)(w),++u){q=w[u].w
 if(q!=null){v=q.a
 c5.iJ(v,0.36,q.b?B.a_1:B.MA,!0,0.35,6)}}c5.e=0
-A.i7j(c5)
-p=new A.fEw(c7)
-o=new A.fEz(c5)
-for(w=$.k5(),v=w.length,t=x.Q,r=c7.b,n=c7.c,u=0;u<w.length;w.length===v||(0,C.J)(w),++u){m=w[u]
+A.i7k(c5)
+p=new A.fEx(c7)
+o=new A.fEA(c5)
+for(w=$.k6(),v=w.length,t=x.Q,r=c7.b,n=c7.c,u=0;u<w.length;w.length===v||(0,C.J)(w),++u){m=w[u]
 l=m.a
 k=r.h(0,l)
 j=m.b
 i=n[j].a
 if(!k.a)continue
-h=A.hAf(i,l)
+h=A.hAg(i,l)
 if(j===0)continue
 c5.f=0
 c5.b=l
@@ -7866,7 +7868,7 @@ o.$8(l,j,g,0,95.5,3.75,0.5,h)
 j=q.f
 o.$8(l,j,f,0,95.5,3.75,0.5,h)
 o.$8(l,g,j,q.w,95.5,3.75,0.5,h)
-o.$8(l,g,j,0,q.r,3.75,0.5,h)}c5.x=0}for(w=$.k5(),v=w.length,u=0;u<w.length;w.length===v||(0,C.J)(w),++u){m=w[u]
+o.$8(l,g,j,0,q.r,3.75,0.5,h)}c5.x=0}for(w=$.k6(),v=w.length,u=0;u<w.length;w.length===v||(0,C.J)(w),++u){m=w[u]
 t=m.a
 k=r.h(0,t)
 l=m.b
@@ -7884,7 +7886,7 @@ c5.e=0.5
 if(l===0)continue
 else{c5.f=0
 c5.x=$.dm=$.dm+1
-for(t=D.d.gae($.zl()),j=new C.eF(t,new A.fEs(m)),--l,g=0*a2;j.C();){f=t.gR(0)
+for(t=D.d.gae($.zl()),j=new C.eF(t,new A.fEt(m)),--l,g=0*a2;j.C();){f=t.gR(0)
 for(e=f.c,d=f.d,f=f.e+6,a3=8;a3<92;a3+=16){if(a3<d||a3>f||p.$3(m,e,a3))continue
 a4=B.v1[l]
 a5=B.Rd[l]
@@ -7907,7 +7909,7 @@ t=q.b
 l=q.a
 if(!r.h(0,t).d.q(0,l)||q.d>=0)continue
 b5=t-5000
-t=b5>=0&&b5<$.k5().length?$.k5()[b5]:null
+t=b5>=0&&b5<$.k6().length?$.k6()[b5]:null
 t.toString
 c5.b=l
 c5.f=2
@@ -7933,7 +7935,7 @@ if(l==null)l=t.a(l)
 b8=B.zQ[l]
 c5.b=6500+l
 c5.f=2
-l=new A.fEr(c5,b8,4.12)
+l=new A.fEs(c5,b8,4.12)
 j=b8.c
 g=j-0.9
 f=b8.e
@@ -7955,25 +7957,25 @@ t=b9>0
 if(t)c5.x=$.dm=$.dm+1
 c0=b9-1
 c1=(c0&1)===0?144:120
-new A.fEy(i).$2(new A.fEu(i,!(c8>=v)),new A.fEt(c1,o,c0))
+new A.fEz(i).$2(new A.fEv(i,!(c8>=v)),new A.fEu(c1,o,c0))
 if(t)c5.x=0}c5.e=0
 c5.f=2
-c2=new A.fEx(c5)
-a1=new A.fEv(c5)
-c3=new A.fEA(c5,c2,a1)
-A:{if("sheet"===c9){for(w=$.k5(),v=w.length,u=0;u<w.length;w.length===v||(0,C.J)(w),++u){m=w[u]
+c2=new A.fEy(c5)
+a1=new A.fEw(c5)
+c3=new A.fEB(c5,c2,a1)
+A:{if("sheet"===c9){for(w=$.k6(),v=w.length,u=0;u<w.length;w.length===v||(0,C.J)(w),++u){m=w[u]
 t=m.a
 if(!r.h(0,t).a){if(!(m.d-m.c<47.9))if(m.b===0)n=m.f-m.e<95.9
 else n=!1
 else n=!0
 n=!n||r.h(0,t).b}else n=!1
-if(n)c3.$3(t,m,D.b4)}break A}if("cut"===c9){for(w=$.k5(),v=w.length,u=0;u<w.length;w.length===v||(0,C.J)(w),++u){m=w[u]
+if(n)c3.$3(t,m,D.b4)}break A}if("cut"===c9){for(w=$.k6(),v=w.length,u=0;u<w.length;w.length===v||(0,C.J)(w),++u){m=w[u]
 if(!(m.d-m.c<47.9))if(m.b===0)t=m.f-m.e<95.9
 else t=!1
 else t=!0
 if(t){t=m.a
 t=!r.h(0,t).b&&!r.h(0,t).a}else t=!1
-if(t)c3.$3(m.a,m,D.cF)}break A}if("screw"===c9){for(w=$.k5(),v=w.length,u=0;u<w.length;w.length===v||(0,C.J)(w),++u){m=w[u]
+if(t)c3.$3(m.a,m,D.cF)}break A}if("screw"===c9){for(w=$.k6(),v=w.length,u=0;u<w.length;w.length===v||(0,C.J)(w),++u){m=w[u]
 t=m.a
 k=r.h(0,t)
 if(k.a&&!k.c)c3.$3(t,m,D.bi)}break A}if("saw"===c9){for(w=$.xw(),v=w.length,u=0;u<w.length;w.length===v||(0,C.J)(w),++u){q=w[u]
@@ -7981,7 +7983,7 @@ t=q.b
 k=r.h(0,t)
 if(!k.a||k.d.q(0,q.a))continue
 b5=t-5000
-t=b5>=0&&b5<$.k5().length?$.k5()[b5]:null
+t=b5>=0&&b5<$.k6().length?$.k6()[b5]:null
 t.toString
 n=c5.b=q.a
 c5.f=3
@@ -8018,7 +8020,7 @@ j=Math.max(8,j)
 g=Math.max(10,g)
 c2.$3(n,e,(t&1)===0?new A.r(j,g,0.8):new A.r(0.8,g,j))
 t=A.eS(t,d,f,5.8)
-a1.$4$r(n,t,D.ay,q.d>=0?3.5:1.8)}}break A}if("bead"===c9){for(b5=0;b5<2;++b5){if(w.q(0,b5)||!c7.aJG(b5))continue
+a1.$4$r(n,t,D.ay,q.d>=0?3.5:1.8)}}break A}if("bead"===c9){for(b5=0;b5<2;++b5){if(w.q(0,b5)||!c7.aJH(b5))continue
 b8=B.zQ[b5]
 v=c5.b=6500+b5
 c5.f=3
@@ -8078,7 +8080,7 @@ r=A.eS(c0,(t?144:120)/2,48,4.7)
 l=t?144:120
 c2.$3(v,r,t?new A.r(l,94,1):new A.r(1,94,l))
 a1.$4$r(v,A.eS(c0,(t?144:120)/2,70,7),D.aH,4)}}}}w=C.T(x.S,x.q)
-for(v=$.k5(),t=v.length,u=0;u<v.length;v.length===t||(0,C.J)(v),++u){m=v[u]
+for(v=$.k6(),t=v.length,u=0;u<v.length;v.length===t||(0,C.J)(v),++u){m=v[u]
 r=m.b
 n=r===0
 l=n?"Ceiling sheet":"Wall sheet"
@@ -8097,9 +8099,9 @@ else{r=m-1
 r=A.eS(r,((r&1)===0?144:120)/2,48,3.5)}w.n(0,6700+m,new A.cI(t.toUpperCase()+v,"All the joints and screw heads here get mud, tape, three coats, sanding and primer.",r,110))}for(v=B.DJ.gdO(B.DJ),v=v.gae(v);v.C();){t=v.gR(v)
 r=t.a
 t=t.b
-w.n(0,r,new A.cI(t.a,t.b,t.c,60))}w.v(0,A.heK(c6,0,0,"look").b)
+w.n(0,r,new A.cI(t.a,t.b,t.c,60))}w.v(0,A.heL(c6,0,0,"look").b)
 return new A.r_(c4,w,B.v4,B.qS,B.aRt,!0,0)},
-i7j(d){var w,v,u
+i7k(d){var w,v,u
 d.f=2
 d.b=0
 d.b=7010
@@ -8147,8 +8149,8 @@ A.Dx(d,7016,B.aZQ,B.hbx)
 A.Dx(d,7017,B.aZA,B.h7x)
 A.Dx(d,7018,B.aZP,B.h9q)
 A.Dx(d,7019,B.hnn,B.h8C)},
-ihT(a9,b0,b1){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3=C.a([],x.z),a4=new A.eL(a3),a5=new A.fGV(a4,b1),a6=a9.c[0],a7=a6.a,a8=!(b0>=a6.b)
-for(a6=D.d.gae($.k5()),w=new C.eF(a6,new A.fGU()),v=a9.b,u=a7<6,t=a7===0,s=a7>=5;w.C();){r=a6.gR(0)
+ihU(a9,b0,b1){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3=C.a([],x.z),a4=new A.eL(a3),a5=new A.fGW(a4,b1),a6=a9.c[0],a7=a6.a,a8=!(b0>=a6.b)
+for(a6=D.d.gae($.k6()),w=new C.eF(a6,new A.fGV()),v=a9.b,u=a7<6,t=a7===0,s=a7>=5;w.C();){r=a6.gR(0)
 q=r.a
 p=v.h(0,q)
 if(!p.a)continue
@@ -8158,7 +8160,7 @@ n=r.c
 m=r.d
 l=r.e
 r=r.f
-a5.$6(n+0.1,m-0.1,l+0.1,r-0.1,95.5,A.hAf(a7,q))
+a5.$6(n+0.1,m-0.1,l+0.1,r-0.1,95.5,A.hAg(a7,q))
 if(p.c&&u){if(t)k=B.ahy
 else if(s)k=B.MM
 else{q=a8?B.No:B.FR
@@ -8193,7 +8195,7 @@ u=a0.b
 t=a0.a
 s=!0
 if(v.h(0,u).d.q(0,t))if(a0.d<0){o=u-5000
-u=(o>=0&&o<$.k5().length?$.k5()[o]:null).b!==0}else u=s
+u=(o>=0&&o<$.k6().length?$.k6()[o]:null).b!==0}else u=s
 else u=s
 if(u)continue
 a4.b=t
@@ -8205,7 +8207,7 @@ r=a0.w
 a5.$6(u-0.15,t+0.15,s-0.15,r+0.15,95.47,D.as)
 a4.e=1.4
 a5.$6(u+0.5,t-0.5,s+0.5,r-0.5,95.46,B.Nd)}return a3},
-ihU(d,e){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i
+ihV(d,e){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i
 if(d.a===0)return B.v5
 w=C.a([],x.z)
 v=new A.eL(w)
@@ -8215,7 +8217,7 @@ v.d=0.22+0.25*(0.5+0.5*Math.sin(e*7))
 for(u=C.dZ(d,d.r,C.a4(d).c),t=u.$ti.c;u.C();){s=u.d
 if(s==null)s=t.a(s)
 r=s-5000
-q=r>=0&&r<$.k5().length?$.k5()[r]:null
+q=r>=0&&r<$.k6().length?$.k6()[r]:null
 if(q!=null){s=q.b
 p=q.c
 o=q.d
@@ -8226,9 +8228,9 @@ o=q.f
 v.aF(new A.r(n/2,94.6,(s+o)/2),new A.r(p,1.2,o-s),G.qq)}else{--s
 n=A.eS(s,n/2,48,5.1)
 v.aF(n,(s&1)===0?new A.r(p,95,0.6):new A.r(0.6,95,p),G.qq)}continue}p=$.xw()
-m=C.nB(new C.Y(p,new A.fGW(s),C.U(p).k("Y<1>")))
+m=C.nB(new C.Y(p,new A.fGX(s),C.U(p).k("Y<1>")))
 if(m!=null){r=m.b-5000
-s=(r>=0&&r<$.k5().length?$.k5()[r]:null).b
+s=(r>=0&&r<$.k6().length?$.k6()[r]:null).b
 p=m.e
 o=m.f
 n=m.w
@@ -8299,25 +8301,25 @@ bOI:function bOI(){},
 bOL:function bOL(){},
 bOO:function bOO(){},
 bOJ:function bOJ(){},
-fEw:function fEw(d){this.a=d},
+fEx:function fEx(d){this.a=d},
+fEA:function fEA(d){this.a=d},
+fEt:function fEt(d){this.a=d},
+fEs:function fEs(d,e,f){this.a=d
+this.b=e
+this.c=f},
 fEz:function fEz(d){this.a=d},
-fEs:function fEs(d){this.a=d},
-fEr:function fEr(d,e,f){this.a=d
+fEv:function fEv(d,e){this.a=d
+this.b=e},
+fEu:function fEu(d,e,f){this.a=d
 this.b=e
 this.c=f},
 fEy:function fEy(d){this.a=d},
-fEu:function fEu(d,e){this.a=d
-this.b=e},
-fEt:function fEt(d,e,f){this.a=d
+fEw:function fEw(d){this.a=d},
+fEB:function fEB(d,e,f){this.a=d
 this.b=e
 this.c=f},
-fEx:function fEx(d){this.a=d},
-fEv:function fEv(d){this.a=d},
-fEA:function fEA(d,e,f){this.a=d
-this.b=e
-this.c=f},
-aqW:function aqW(d){this.a=d},
-aqX:function aqX(d,e,f,g){var _=this
+aqV:function aqV(d){this.a=d},
+aqW:function aqW(d,e,f,g){var _=this
 _.d=d
 _.e=$
 _.f="look"
@@ -8379,14 +8381,14 @@ this.b=e},
 ceF:function ceF(d){this.a=d},
 ceG:function ceG(d){this.a=d},
 ceE:function ceE(d){this.a=d},
-fGV:function fGV(d,e){this.a=d
+fGW:function fGW(d,e){this.a=d
 this.b=e},
-fGU:function fGU(){},
-fGW:function fGW(d){this.a=d},
+fGV:function fGV(){},
+fGX:function fGX(d){this.a=d},
 eS(d,e,f,g){var w=B.dzA[d],v=B.Rd[d],u=B.v1[d]
 return new A.r(w.a+v.a*e+u.a*g,f,w.c+v.c*e+u.c*g)},
-ihm(d,e){return A.eS(d,(d&1)===0?144:120,e,0).a2(0,B.v1[d].aM(0,1.75)).a2(0,B.v1[D.o.F(d+1,4)].aM(0,1.75))},
-i5J(){var w,v,u,t,s,r,q,p,o="king",n="jack",m="cripple",l=C.a([],x.x),k=new A.foy(l)
+ihn(d,e){return A.eS(d,(d&1)===0?144:120,e,0).a2(0,B.v1[d].aM(0,1.75)).a2(0,B.v1[D.o.F(d+1,4)].aM(0,1.75))},
+i5K(){var w,v,u,t,s,r,q,p,o="king",n="jack",m="cripple",l=C.a([],x.x),k=new A.foy(l)
 for(w=0;w<4;++w){v=(w&1)===0?144:120
 k.$5(w,0.75,1.5,93,"corner")
 k.$5(w,v-0.75,1.5,93,"corner")
@@ -8408,12 +8410,12 @@ k.$5(1,58,79.5,93,m)
 return l},
 aiU(d){var w=d-1000
 return w>=0&&w<$.zl().length?$.zl()[w]:null},
-hhJ(d){var w,v,u=d-2100
+hhK(d){var w,v,u=d-2100
 if(u<0||u>=80)return null
 w=D.o.aq(u,20)
 v=D.o.F(u,20)
 return v<D.i.cL(((w&1)===0?144:120)/16)?new C.brc(v,w):null},
-hfm(d,e){return 4200+(d-4000)*2+e},
+hfn(d,e){return 4200+(d-4000)*2+e},
 XP:function XP(d,e,f,g,h,i){var _=this
 _.a=d
 _.b=e
@@ -8436,9 +8438,9 @@ _.c=!1
 _.d=null},
 bU5:function bU5(d){this.a=d},
 bU4:function bU4(d){this.a=d},
-aSz(d,e){var w=new A.h4Y(D.o.F(d*37,17)-8,e)
+aSy(d,e){var w=new A.h4Z(D.o.F(d*37,17)-8,e)
 return C.a_(255,w.$1(218),w.$1(182),w.$1(126))},
-hB8(a0,a1){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d
+hB9(a0,a1){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d
 a0.b=0
 a0.f=-1
 a0.kZ(B.h78,B.h8m,B.bsU,0.05,4)
@@ -8453,9 +8455,9 @@ n=p.b
 p=A.eS(w,(o+n)/2,0.75,1.75)
 m=n-o
 m=v?new A.r(m,1.5,3.5):new A.r(3.5,1.5,m)
-a0.aE(p,m,A.aSz(r,0.15),0.05)}else{t=A.eS(w,u/2,0.75,1.75)
+a0.aE(p,m,A.aSy(r,0.15),0.05)}else{t=A.eS(w,u/2,0.75,1.75)
 s=v?new A.r(u,1.5,3.5):new A.r(3.5,1.5,u)
-a0.aE(t,s,A.aSz(w+3,0.15),0.05)}t=w*20
+a0.aE(t,s,A.aSy(w+3,0.15),0.05)}t=w*20
 s=2100+t
 l=0
 for(;;){if(!(l<D.i.cL((v?144:120)/16)))break
@@ -8465,7 +8467,7 @@ a0.b=s+l
 r=A.eS(w,(o+n)/2,94.5,1.75)
 p=n-o-0.12
 p=v?new A.r(p,3,3.5):new A.r(3.5,3,p)
-a0.aE(r,p,A.aSz(t+l+11,0.08),0.05)
+a0.aE(r,p,A.aSy(t+l+11,0.08),0.05)
 if(a1.q(0,a0.b)){r=v?144:120
 k=A.eS(w,Math.min(r,o+8),94.5,1.75)
 r=k.a+0
@@ -8478,7 +8480,7 @@ s=a0.b=l.a
 r=l.e
 p=l.d
 j=r-p
-k=A.aSz(s,0)
+k=A.aSy(s,0)
 m=l.b
 i=l.c
 r=A.eS(m,i,(p+r)/2,1.75)
@@ -8494,13 +8496,13 @@ m=h.a
 i=h.b
 g=h.c
 a0.df(new A.r(m-s,i-r,g-p),new A.r(m+s,i+r,g+p),0.5,B.ahR,8)}}a0.f=0
-f=new A.fGQ(a0)
+f=new A.fGR(a0)
 f.$4(2300,B.a8y,80.5,88)
 f.$4(2301,B.U_,72,79.5)
 f.$4(2302,B.U_,36,37.5)
 a0.f=1
 for(e=0;e<10;++e){a0.b=3000+e
-a0.kZ(new A.r(-70+e*15.555555555555555,98.75,0),B.hkj,A.aSz(e+40,0),0.05,2)}a0.f=2
+a0.kZ(new A.r(-70+e*15.555555555555555,98.75,0),B.hkj,A.aSy(e+40,0),0.05,2)}a0.f=2
 a0.b=2200
 v=A.eS(0,24,59,1.75)
 a0.aE(v,new A.r(14.25,26,3.4),B.bme,0.35)
@@ -8512,7 +8514,7 @@ s=v?B.MB:E.Ya
 a0.aE(t,new A.r(3.2,2.2,0.3),s,0.2)}}v=A.eS(0,24,69.8,3.8)
 a0.aF(v,new A.r(8,1.6,0.25),B.m3)
 a0.b=0},
-hB7(d,e,f,g,h,i){var w,v,u,t
+hB8(d,e,f,g,h,i){var w,v,u,t
 d.f=2
 d.b=e
 w=g+f*1.9
@@ -8522,16 +8524,16 @@ d.aE(v,u?new A.r(2.3,4.2,2.5):new A.r(2.5,4.2,2.3),B.Nd,0.3)
 v=A.eS(h,w,i,3.52)
 d.aE(v,u?new A.r(1.7,3.5,0.06):new A.r(0.06,3.5,1.7),B.ahL,0.1)
 for(v=w-f*1.18,t=0;t<2;++t)d.es(A.eS(h,v,i+B.dgl[t],2.6),0.22,B.ho,3,5,0.7)},
-hB6(d,e,f,g){var w
+hB7(d,e,f,g){var w
 d.f=f
 d.b=e
 w=g+0.75+2.3
 d.cw(new A.r(w,96,0),new A.r(w,99.8,0),2.3,B.Nd,0.3,12)
 d.df(new A.r(w,95.95,0),new A.r(w,96.05,0),1.7,B.ahL,12)},
-ihS(d){var w,v,u,t,s,r,q,p
+ihT(d){var w,v,u,t,s,r,q,p
 d.f=2
 d.b=0
-w=new A.fGT()
+w=new A.fGU()
 for(v=0;v<2;++v){u=B.cvV[v]
 t=w.$3(0,u-0.75,8)
 d.aE(t,new A.r(9,1.5,34),B.bvu,0.15)
@@ -8557,7 +8559,7 @@ t=w.$3(0,38,7.5)
 A.Dx(d,7000,t,new A.r(12,18,19))
 t=w.$3(-0.5,55,7)
 A.Dx(d,7001,t,new A.r(10,9,20))},
-iil(d,e,f,g){var w,v,u,t,s,r,q,p,o,n,m=null,l=x.p,k=C.a([],l)
+iim(d,e,f,g){var w,v,u,t,s,r,q,p,o,n,m=null,l=x.p,k=C.a([],l)
 for(w=x.W,v=0;v<10;++v){u={}
 t=d[v]
 u.a=null
@@ -8570,12 +8572,12 @@ n=new C.ay(o,p?2:1,D.r,-1)
 o=p?D.av:D.ac
 o=C.X(t.c,o,m,m,m,17)
 p=p?D.av:D.c
-k.push(C.az(m,C.q(m,new C.c8(D.aL,D.e,D.P,D.l,m,D.p,m,0,C.a([o,D.e5,C.d(t.b,m,m,m,m,m,m,new C.G(!0,p,m,m,m,m,12,D.I,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m),m,m,m)],l),m),D.f,m,m,new C.p(r,m,new C.bH(n,n,n,n),new C.be(q,q,q,q),m,m,D.n),m,m,m,m,D.k3,m,m,m),D.y,!1,new C.bE("tool-"+s,w),m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,new A.fHO(u,f),m,m,m,m,m,m,!1,D.a4))}D.d.v(k,g)
+k.push(C.az(m,C.q(m,new C.c8(D.aL,D.e,D.P,D.l,m,D.p,m,0,C.a([o,D.e5,C.d(t.b,m,m,m,m,m,m,new C.G(!0,p,m,m,m,m,12,D.I,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m),m,m,m)],l),m),D.f,m,m,new C.p(r,m,new C.bH(n,n,n,n),new C.be(q,q,q,q),m,m,D.n),m,m,m,m,D.k3,m,m,m),D.y,!1,new C.bE("tool-"+s,w),m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,new A.fHP(u,f),m,m,m,m,m,m,!1,D.a4))}D.d.v(k,g)
 return C.bV(D.bG,k,D.bs,m,6,6)},
-hBo(d,e,f){var w=d.bhd(e,f)
+hBp(d,e,f){var w=d.bhd(e,f)
 if(w==null)return null
 return new A.r(D.i.D(w.a,-56,56),46,D.i.D(w.c,-44,44))},
-hBp(d,e,f){var w,v,u,t,s,r,q,p,o=f-e
+hBq(d,e,f){var w,v,u,t,s,r,q,p,o=f-e
 if(d==null||o<0||o>1.6)return B.v5
 w=C.a([],x.z)
 v=new A.eL(w)
@@ -8585,7 +8587,7 @@ for(u=o*0.9,t=d.a,s=d.c,r=0;r<2;++r){q=D.i.F(u+r*0.5,1)
 p=3+q*14
 v.d=0.85*(1-q)
 v.lt(new A.r(t,0.4,s),new A.r(t,0.6,s),p,p-1.3,B.Gk,0,20)}return w},
-hBn(d){var w,v,u
+hBo(d){var w,v,u
 if(d.r==null)return B.v5
 w=C.a([],x.z)
 v=new A.eL(w)
@@ -8603,32 +8605,32 @@ d.aF(f,g,D.c)
 d.d=1
 d.e=0
 d.f=2},
-hBq(d,e,f){var w=d.d0X(e,f,-72,72,0,96,-60,60)
+hBr(d,e,f){var w=d.d0X(e,f,-72,72,0,96,-60,60)
 if(w==null||w.b<3)return null
 return w},
-h4Y:function h4Y(d,e){this.a=d
+h4Z:function h4Z(d,e){this.a=d
 this.b=e},
-fGQ:function fGQ(d){this.a=d},
-fGT:function fGT(){},
-fHO:function fHO(d,e){this.a=d
+fGR:function fGR(d){this.a=d},
+fGU:function fGU(){},
+fHP:function fHP(d,e){this.a=d
 this.b=e},
-hlw(d,e,f,g,h,i){return new A.wc(d,e,f,g,i,h,C.a([!1,!1],x.u),C.aR(x.S))},
-hu1(){var w=x.S
+hlx(d,e,f,g,h,i){return new A.wc(d,e,f,g,i,h,C.a([!1,!1],x.u),C.aR(x.S))},
+hu2(){var w=x.S
 return new A.baC(C.aR(w),C.a([],x.bC),C.T(w,x.N))},
-heK(b1,b2,b3,b4){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8=C.a([],x.z),a9=new A.eL(a8),b0=b1.a
-A.hB8(a9,b0)
-A.ihS(a9)
+heL(b1,b2,b3,b4){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8=C.a([],x.z),a9=new A.eL(a8),b0=b1.a
+A.hB9(a9,b0)
+A.ihT(a9)
 for(w=b1.b,v=w.length,u=0;u<w.length;w.length===v||(0,C.J)(w),++u){t=w[u]
 s=t.b
 r=t.a
 if(s==="ceiling"){s=t.f
 s.toString
-A.hB6(a9,r,2,-70+s*15.555555555555555)}else{s=s==="switch"?48:16
-A.hB7(a9,r,t.r,t.d,t.c,s)}A.ihQ(a9,t)
-A.ihP(a9,t,b1)}A.ihR(a9,b1)
-q=new A.fFM(a9)
-p=new A.fFK(a9)
-o=new A.fFL(q,p)
+A.hB7(a9,r,2,-70+s*15.555555555555555)}else{s=s==="switch"?48:16
+A.hB8(a9,r,t.r,t.d,t.c,s)}A.ihR(a9,t)
+A.ihQ(a9,t,b1)}A.ihS(a9,b1)
+q=new A.fFN(a9)
+p=new A.fFL(a9)
+o=new A.fFM(q,p)
 v=D.a.a_(b4,"dev:")
 if(v){n=D.a.b2(b4,4)
 for(b0=w.length,s=n!=="light",r=n==="fan",u=0;u<w.length;w.length===b0||(0,C.J)(w),++u){t=w[u]
@@ -8661,7 +8663,7 @@ if(b0.q(0,e))break B
 m=s?144:120
 p.$4$r(e,A.eS(f,Math.min(m,j*16+8),94.5,4.8),D.cF,1.5)}++j}}break A}if("outlet"===b4||"switch"===b4){d=b4==="switch"?48:16
 for(b0=$.zl(),s=b0.length,u=0;u<b0.length;b0.length===s||(0,C.J)(b0),++u){j=b0[u]
-if(j.f==="cripple"||D.d.aV(w,new A.fFI(j)))continue
+if(j.f==="cripple"||D.d.aV(w,new A.fFJ(j)))continue
 r=j.a
 m=j.b
 k=j.c
@@ -8670,12 +8672,12 @@ i=j.d
 h=j.e
 k=A.eS(m,k,(i+h)/2,2.35)
 i=h-i
-q.$3(r,k,(m&1)===0?new A.r(7,i,4.7):new A.r(4.7,i,7))}break A}if("ceiling"===b4){if(!D.d.aV(w,new A.fFJ()))for(a0=0;a0<10;++a0){b0=3000+a0
+q.$3(r,k,(m&1)===0?new A.r(7,i,4.7):new A.r(4.7,i,7))}break A}if("ceiling"===b4){if(!D.d.aV(w,new A.fFK()))for(a0=0;a0<10;++a0){b0=3000+a0
 s=-70+a0*15.555555555555555
 p.$4$r(b0,new A.r(s,94.6,0),D.b4,1.7)
 q.$3(b0,new A.r(s,97,0),B.hdA)}break A}if("knock"===b4){for(b0=w.length,u=0;u<w.length;w.length===b0||(0,C.J)(w),++u){t=w[u]
 for(s=t.b==="ceiling",r=4200+(t.a-4000)*2,m=t.x,f=0;f<2;++f){if(m[f])continue
-a1=A.aR_(t,f)
+a1=A.aQZ(t,f)
 k=r+f
 q.$3(k,a1,B.aYW)
 if(s)i=new A.r(f===0?-1.4:1.4,0,0)
@@ -8688,18 +8690,18 @@ r=s?D.c:D.aH
 p.$4$r(2200,b0,r,s?2.4:1.8)
 for(b0=w.length,u=0;u<w.length;w.length===b0||(0,C.J)(w),++u){t=w[u]
 if(t.w==null)o.$2(t,B.Gk)
-else{if(b1.apl(t)){if(t.at!=null){s=t.ax
+else{if(b1.apm(t)){if(t.at!=null){s=t.ax
 s=s!=null&&s.c>=2&&!s.x}else s=!1
 s=s&&t.b!=="ceiling"}else s=!1
 if(s){s=t.a===b3
 r=s?D.c:D.aH
 o.$3$r(t,r,s?2.4:1.7)}}}}}a2=b2===0?null:b1.l_(b2)
-if(a2!=null&&!v&&!D.a.a_(b4,"app:"))for(b0=4200+(a2.a-4000)*2,v=a2.y,s=a2.x,f=0;f<2;++f){a1=A.aR_(a2,f)
+if(a2!=null&&!v&&!D.a.a_(b4,"app:"))for(b0=4200+(a2.a-4000)*2,v=a2.y,s=a2.x,f=0;f<2;++f){a1=A.aQZ(a2,f)
 if(!s[f])a3=D.cF
 else a3=v.q(0,f)?D.db:D.b4
 r=b0+f
 q.$3(r,a1,B.ac6)
-a4=A.hBS(a2,f)
+a4=A.hBT(a2,f)
 a5=a4.a
 a6=a4.b
 a9.b=r
@@ -8714,7 +8716,7 @@ h=a5.b
 g=a5.c
 a9.lt(new A.r(i+r*0.2,h+m*0.2,g+k*0.2),new A.r(i+r*0.26,h+m*0.26,g+k*0.26),0.82,0.68,a3,0.2,16)
 a9.d=1
-a9.e=0}a7=new A.fFH()
+a9.e=0}a7=new A.fFI()
 b0=x.S
 v=x.q
 s=C.T(b0,v)
@@ -8751,17 +8753,17 @@ else{i=C.w(a7.$1(t))
 h=t.at
 h.toString
 h=i+": "+A.uw(h)
-i=h}h=t.b==="ceiling"?"The box the light hangs from. Knockouts open: "+t.gaoJ()+" of 2.":"A plastic box nailed to the stud. Knockouts open: "+t.gaoJ()+" of 2. The cable ends inside it, and the device is wired to the cable."
+i=h}h=t.b==="ceiling"?"The box the light hangs from. Knockouts open: "+t.gaoK()+" of 2.":"A plastic box nailed to the stud. Knockouts open: "+t.gaoK()+" of 2. The cable ends inside it, and the device is wired to the cable."
 m.n(0,k,new A.cI(i,h,A.S7(t),24))
 for(i=t.x,k=4200+(k-4000)*2,f=0;f<2;++f){h=i[f]?"A knockout that is broken out: a round hole for a cable.":"A round tab in the box. Break it out with the Knockout tool to make a hole for a cable."
-m.n(0,k+f,new A.cI("Knockout",h,A.aR_(t,f),14))}s.v(0,m)}return new A.r_(a8,s,B.v4,B.qS,B.aRt,!0,0)},
-iv0(d,e,a0,a1){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g=C.a([],x.z),f=new A.eL(g)
+m.n(0,k+f,new A.cI("Knockout",h,A.aQZ(t,f),14))}s.v(0,m)}return new A.r_(a8,s,B.v4,B.qS,B.aRt,!0,0)},
+iv1(d,e,a0,a1){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g=C.a([],x.z),f=new A.eL(g)
 for(w=d.b,v=w.length,u=0;u<w.length;w.length===v||(0,C.J)(w),++u){t=w[u]
 s=t.w
 if(s==null)continue
 r=a0.h(0,t.a)
 q=D.i.D((e-(r==null?-99:r))/1.6,0,1)
-p=A.ifB(s.a,q)
+p=A.ifC(s.a,q)
 if(p.length<2)continue
 f.b=0
 f.f=2
@@ -8772,7 +8774,7 @@ for(v=C.dZ(a1,a1.r,C.a4(a1).c),w=0.25+0.25*(0.5+0.5*w),r=v.$ti.c;v.C();){o=v.d
 if(o==null)o=r.a(o)
 n=o-1000
 m=n>=0&&n<$.zl().length?$.zl()[n]:null
-l=A.hhJ(o)
+l=A.hhK(o)
 if(m!=null){o=m.b
 s=A.eS(o,m.c,20,1.75)
 k=(o&1)===0?new A.r(8,14,7.5):new A.r(7.5,14,8)}else if(l!=null){o=l.b
@@ -8783,7 +8785,7 @@ s=A.eS(o,Math.min(h,j*16+8),94.5,1.75)
 k=i?new A.r(14,8,7.5):new A.r(7.5,8,14)}else if(o>=4200&&o<4400&&d.l_(4000+D.o.aq(o-4200,2))!=null){o-=4200
 j=d.l_(4000+D.o.aq(o,2))
 j.toString
-s=A.aR_(j,D.o.F(o,2))
+s=A.aQZ(j,D.o.F(o,2))
 k=B.hd4}else if(o>=4000&&o<4100&&d.l_(o)!=null){o=d.l_(o)
 o.toString
 s=A.S7(o)
@@ -8796,7 +8798,7 @@ f.e=1.2
 f.d=w
 f.aF(s,k,G.qq)}f.d=1
 f.e=0}return g},
-ifB(d,e){var w,v,u,t,s,r,q,p
+ifC(d,e){var w,v,u,t,s,r,q,p
 if(e>=1)return d
 for(w=0,v=1;v<d.length;++v){u=d[v]
 t=d[v-1]
@@ -8811,13 +8813,13 @@ s-=p}else{if(s>0.01)r.push(A.oV(d[t],d[v],s/p))
 break}}return r},
 biX(d,e,f){return new A.Dc(d,e,f)},
 bcW(d,e,f,g){return new A.Qv(d,e,f,g)},
-hBh(){var w,v,u,t,s,r,q,p,o,n,m=A.hu1()
+hBi(){var w,v,u,t,s,r,q,p,o,n,m=A.hu2()
 for(w=$.zl(),v=w.length,u=m.a,t=0;t<w.length;w.length===v||(0,C.J)(w),++t){s=w[t]
 if(s.d<=20&&s.e>=20)u.J(0,s.a)}for(r=0;r<4;++r){w=2100+r*20
 v=(r&1)===0
 s=0
 for(;;){if(!(s<D.i.cL((v?144:120)/16)))break
-u.J(0,w+s);++s}}q=new A.fHF()
+u.J(0,w+s);++s}}q=new A.fHG()
 for(t=0;t<5;++t){w=B.d3g[t]
 m.V_(w.c,q.$2(w.a,w.b))}m.V_("ceiling",3004)
 for(w=m.b,v=w.length,t=0;t<v;++t){u=w[t].x
@@ -8827,19 +8829,19 @@ u=C.C(w,v)
 p=u.length
 t=0
 for(;t<u.length;u.length===p||(0,C.J)(u),++t){o=u[t]
-if(o.b!=="ceiling")m.aK1(0,o.a)}for(u=D.d.gae(w),p=new C.eF(u,new A.fHD());p.C();){n=u.gR(0)
-m.a65(n.a,"switch")
+if(o.b!=="ceiling")m.aK2(0,o.a)}for(u=D.d.gae(w),p=new C.eF(u,new A.fHE());p.C();){n=u.gR(0)
+m.a66(n.a,"switch")
 n=n.ax
 n.toString
-A.iv_(n,"switch")}v=C.C(w,v)
+A.iv0(n,"switch")}v=C.C(w,v)
 u=v.length
 t=0
 for(;t<v.length;v.length===u||(0,C.J)(v),++t){o=v[t]
-if(o.b==="ceiling")m.aK1(0,o.a)}for(w=D.d.gae(w),v=new C.eF(w,new A.fHE());v.C();){u=w.gR(0)
+if(o.b==="ceiling")m.aK2(0,o.a)}for(w=D.d.gae(w),v=new C.eF(w,new A.fHF());v.C();){u=w.gR(0)
 u.ax=u.at=null
 u.ay=!1}m.d=0
 return m},
-iv_(d,e){var w,v,u,t,s=A.nP(e)
+iv0(d,e){var w,v,u,t,s=A.nP(e)
 if(s.w.length!==0)w=s.z
 else{v=x.S
 u=x.N
@@ -8851,7 +8853,7 @@ case"switch":v=C.I([25,"ground",21,"blackLine",22,"blackLoad"],v,u)
 break
 default:v=C.I([53,"ground",52,"white",51,"black"],v,u)
 break}w=v}for(v=w.gdO(w),v=v.gae(v),u=s.f;v.C();){t=v.gR(v)
-A.hhL(s,d,t.b,D.d.fe(u,new A.h4V(t)),!1)}d.c=2},
+A.hhM(s,d,t.b,D.d.fe(u,new A.h4W(t)),!1)}d.c=2},
 ib:function ib(d,e,f){this.a=d
 this.b=e
 this.c=f},
@@ -8917,13 +8919,13 @@ cFI:function cFI(){},
 cFJ:function cFJ(){},
 cFK:function cFK(){},
 cFL:function cFL(){},
-fFM:function fFM(d){this.a=d},
-fFK:function fFK(d){this.a=d},
-fFL:function fFL(d,e){this.a=d
+fFN:function fFN(d){this.a=d},
+fFL:function fFL(d){this.a=d},
+fFM:function fFM(d,e){this.a=d
 this.b=e},
-fFI:function fFI(d){this.a=d},
-fFJ:function fFJ(){},
-fFH:function fFH(){},
+fFJ:function fFJ(d){this.a=d},
+fFK:function fFK(){},
+fFI:function fFI(){},
 Dc:function Dc(d,e,f){this.a=d
 this.b=e
 this.c=f},
@@ -8932,8 +8934,8 @@ _.a=d
 _.b=e
 _.c=f
 _.d=g},
-atV:function atV(d){this.a=d},
-atW:function atW(d,e,f,g,h){var _=this
+atU:function atU(d){this.a=d},
+atV:function atV(d,e,f,g,h){var _=this
 _.d=d
 _.f=_.e=$
 _.r="look"
@@ -9030,13 +9032,13 @@ coh:function coh(d){this.a=d},
 coe:function coe(d){this.a=d},
 cof:function cof(d){this.a=d},
 coi:function coi(){},
-fHF:function fHF(){},
-fHG:function fHG(d,e){this.a=d
+fHG:function fHG(){},
+fHH:function fHH(d,e){this.a=d
 this.b=e},
-fHD:function fHD(){},
 fHE:function fHE(){},
-h4V:function h4V(d){this.a=d},
-isn(d){var w
+fHF:function fHF(){},
+h4W:function h4W(d){this.a=d},
+iso(d){var w
 switch(d.f){case"hot":w=H.ajr
 break
 case"neutral":w=B.yi
@@ -9045,12 +9047,12 @@ case"ground":w=B.Yg
 break
 default:w=D.av
 break}return w},
-hG3(d,e){var w,v,u,t,s,r=C.a([],x.d)
+hG4(d,e){var w,v,u,t,s,r=C.a([],x.d)
 for(w=d.e,v=w.length,u=e.c,t=0;t<v;++t){s=w[t]
 if(u.q(0,s.a))r.push(s)}return r},
-iso(d,e,f){var w,v,u,t,s,r,q,p,o="matching",n=A.hG3(d,f),m=n.length===0?"its wire":new C.N(n,new A.fXq(),C.U(n).k("N<1,m>")).aO(0," or "),l=C.a([],x.r)
+isp(d,e,f){var w,v,u,t,s,r,q,p,o="matching",n=A.hG4(d,f),m=n.length===0?"its wire":new C.N(n,new A.fXr(),C.U(n).k("N<1,m>")).aO(0," or "),l=C.a([],x.r)
 for(w=d.f,v=w.length,u=f.a,t=f.c,s=0;s<v;++s){r=w[s]
-if(r.a!==u&&r.c.aV(0,t.gkd(t)))l.push(r)}q=D.d.aV(l,new A.fXr(e))
+if(r.a!==u&&r.c.aV(0,t.gkd(t)))l.push(r)}q=D.d.aV(l,new A.fXs(e))
 if(f.e)return"This is a LOAD screw and it is covered with tape on purpose. Power comes in on the LINE screws. The LOAD screws only matter when you want this GFCI to protect other outlets further along the same wire: then the cable that carries on to them goes here, and the tape comes off. For a single outlet, leave it covered."
 l=f.f
 if(l==="ground")return e.b.al(0,u)?"It has its wire: the bare copper ground.":"Nothing is on it yet, and it must never stay empty. The ground wire gives a stray current a safe road to the earth, so a fault trips the breaker instead of shocking you. The bare copper wire goes here, and nowhere else."
@@ -9060,12 +9062,12 @@ else p=l==="neutral"?"silver":o
 if(w)l="hot"
 else l=l==="neutral"?"neutral":o
 return"This is a spare. A cable brings in only ONE "+l+" wire, and the "+p+" screws on the two sides of the device are joined inside by a metal bridge, so the wire on the other screw already feeds this one. Use this free screw to pass the power on to the next outlet or switch with a second cable, never for a wire of a different colour."}return"No wire is on it yet. "+m+" goes here: "+f.d},
-itH(d,e,f,g){var w=A.isn(g),v=A.hG3(e,g),u=f.b.al(0,g.a)
-return C.cg(null,D.w.j(0.7),!0,null,new A.h40(w,g,!u,new A.h41(),v,e,f),d,null,!0,!0,x.H)},
-fXq:function fXq(){},
-fXr:function fXr(d){this.a=d},
-h41:function h41(){},
-h40:function h40(d,e,f,g,h,i,j){var _=this
+itI(d,e,f,g){var w=A.iso(g),v=A.hG4(e,g),u=f.b.al(0,g.a)
+return C.cg(null,D.w.j(0.7),!0,null,new A.h41(w,g,!u,new A.h42(),v,e,f),d,null,!0,!0,x.H)},
+fXr:function fXr(){},
+fXs:function fXs(d){this.a=d},
+h42:function h42(){},
+h41:function h41(d,e,f,g,h,i,j){var _=this
 _.a=d
 _.b=e
 _.c=f
@@ -9073,9 +9075,9 @@ _.d=g
 _.e=h
 _.f=i
 _.r=j},
-h4_:function h4_(d){this.a=d},
-Nb(d){return A.hP5(d)},
-hP5(d){var w=0,v=C.j(x.c9),u,t=2,s=[],r,q,p,o,n
+h40:function h40(d){this.a=d},
+Nb(d){return A.hP6(d)},
+hP6(d){var w=0,v=C.j(x.c9),u,t=2,s=[],r,q,p,o,n
 var $async$Nb=C.e(function(e,f){if(e===1){s.push(f)
 w=t}for(;;)switch(w){case 0:t=4
 w=7
@@ -9103,15 +9105,15 @@ break
 case 6:case 1:return C.h(u,v)
 case 2:return C.f(s.at(-1),v)}})
 return C.i($async$Nb,v)},
-IC(d,e){return A.hP6(d,e)},
-hP6(d,e){var w=0,v=C.j(x.H),u=1,t=[],s,r,q
-var $async$IC=C.e(function(f,g){if(f===1){t.push(g)
+ID(d,e){return A.hP7(d,e)},
+hP7(d,e){var w=0,v=C.j(x.H),u=1,t=[],s,r,q
+var $async$ID=C.e(function(f,g){if(f===1){t.push(g)
 w=u}for(;;)switch(w){case 0:u=3
 w=6
-return C.b(C.aA(),$async$IC)
+return C.b(C.aA(),$async$ID)
 case 6:s=g
 w=7
-return C.b(s.aC("String","lesson_save_"+d,D.Y.aw(e,null)),$async$IC)
+return C.b(s.aC("String","lesson_save_"+d,D.Y.aw(e,null)),$async$ID)
 case 7:u=1
 w=5
 break
@@ -9123,9 +9125,9 @@ case 2:w=1
 break
 case 5:return C.h(null,v)
 case 1:return C.f(t.at(-1),v)}})
-return C.i($async$IC,v)},
-xT(d){return A.hP4(d)},
-hP4(d){var w=0,v=C.j(x.H),u=1,t=[],s,r,q
+return C.i($async$ID,v)},
+xT(d){return A.hP5(d)},
+hP5(d){var w=0,v=C.j(x.H),u=1,t=[],s,r,q
 var $async$xT=C.e(function(e,f){if(e===1){t.push(f)
 w=u}for(;;)switch(w){case 0:u=3
 w=6
@@ -9145,10 +9147,10 @@ break
 case 5:return C.h(null,v)
 case 1:return C.f(t.at(-1),v)}})
 return C.i($async$xT,v)},
-i29(d){var w,v,u=x.N,t=C.T(u,u)
+i2a(d){var w,v,u=x.N,t=C.T(u,u)
 for(w=d.b,w=new C.cb(w,C.a4(w).k("cb<1,2>")).gae(0);w.C();){v=w.d
 t.n(0,""+v.a,v.b)}return C.I(["attached",t,"stage",d.c,"strap",d.r,"burnt",d.x],u,x.A)},
-i28(d,e){var w,v,u,t=d.b
+i29(d,e){var w,v,u,t=d.b
 t.a8(0)
 w=J.a7(e)
 v=x.Y.a(w.h(e,"attached"))
@@ -9160,7 +9162,7 @@ t=t==null?null:D.i.M(t)
 d.c=t==null?0:t
 d.r=!J.z(w.h(e,"strap"),!1)
 d.x=J.z(w.h(e,"burnt"),!0)},
-hs9(d){var w,v,u,t,s,r,q=d.a
+hsa(d){var w,v,u,t,s,r,q=d.a
 q=C.C(q,C.a4(q).k("ci.E"))
 w=d.c
 v=d.d
@@ -9168,7 +9170,7 @@ u=x.N
 t=C.T(u,u)
 for(s=d.e,s=new C.cb(s,C.a4(s).k("cb<1,2>")).gae(0);s.C();){r=s.d
 t.n(0,""+r.a,r.b)}return C.I(["placed",q,"tight",d.b,"running",w,"leakAt",v,"attached",t,"hot",d.f,"cold",d.r],u,x.A)},
-hs8(d,e){var w,v,u,t,s=d.a
+hs9(d,e){var w,v,u,t,s=d.a
 s.a8(0)
 w=C.a([],x.s)
 v=J.a7(e)
@@ -9257,55 +9259,55 @@ S(){return new A.af7(null,this.$ti.k("af7<1>"))}}
 A.af7.prototype={
 gcrn(){var w=this.e
 return w===$?this.e=new A.bqs(this):w},
-gamL(){var w=this.Gw$
-w=w==null?null:w.gaqS()
+gamM(){var w=this.Gw$
+w=w==null?null:w.gaqT()
 return w==null?this.a.d:w},
-gaAV(){this.a.toString
+gaAW(){this.a.toString
 return!0},
-bYX(){var w=this,v=w.a.c,u=w.gamL()
+bYX(){var w=this,v=w.a.c,u=w.gamM()
 if(v===u)return
-w.a5J(v===w.gamL()?null:v)},
-a5J(d){var w=this.Gw$
+w.a5K(v===w.gamM()?null:v)},
+a5K(d){var w=this.Gw$
 if(w!=null)w.glN().$1(d)
 this.a.e.$1(d)},
 d8(){var w,v=this
 v.eL()
 w=v.c
 w.toString
-v.sa7b(S.han(w,v.$ti.c))},
-t(){this.sa7b(null)
+v.sa7c(S.hao(w,v.$ti.c))},
+t(){this.sa7c(null)
 var w=this.d
 if(w!=null)w.t()
 this.a3()},
 B(d){var w,v,u,t,s,r,q,p,o=this,n=null,m=o.a
 m.toString
 switch(0){case 0:w=o.gcrn()
-v=w.a.gamL()
+v=w.a.gamM()
 o.a.toString
-u=new C.In(!0,S.hZB(n,!1,n,o.gaAV(),n,w,v,n,n,D.kz,n,n,n,n,n,!1,m.c,o.$ti.c),n)
+u=new C.Io(!0,S.hZC(n,!1,n,o.gaAW(),n,w,v,n,n,D.kz,n,n,n,n,n,!1,m.c,o.$ti.c),n)
 break}C.anQ(d)
 o.a.toString
 A:{m=new C.y(u,n)
 break A}t=C.S(d)
-s=S.hao(d)
+s=S.hap(d)
 o.a.toString
 w=s.b
 w=w==null?n:w.aX(C.aR(x.c1))
 r=w
 if(r==null)r=t.ax.y
 w=o.a.at
-v=o.gaAV()
-q=o.gaAV()?o.gbYW():n
+v=o.gaAW()
+q=o.gaAW()?o.gbYW():n
 p=o.d
-if(p==null){p=C.k9(!0,n,!0,!0,n,n,!1)
+if(p==null){p=C.ka(!0,n,!0,!0,n,n,!1)
 o.d=p}return new C.zW(C.dG(!1,n,!0,n,v,p,n,n,!1,n,n,m.a,n,n,n,n,q,!1,r,n,n,n,n,n,n,w,n,m.b,n),n)}}
 A.bqs.prototype={
-gaqS(){return this.a.gamL()},
+gaqT(){return this.a.gamM()},
 glN(){return this.a.gM3()},
 bl4(d){},
 bma(d){},
 gd6(d){return this.a}}
-A.aOF.prototype={}
+A.aOE.prototype={}
 A.r.prototype={
 a2(d,e){return new A.r(this.a+e.a,this.b+e.b,this.c+e.c)},
 aJ(d,e){return new A.r(this.a-e.a,this.b-e.b,this.c-e.c)},
@@ -9316,7 +9318,7 @@ gp7(){var w=this.a,v=this.b,u=this.c
 return Math.sqrt(w*w+v*v+u*u)},
 gn2(d){var w=this,v=w.gp7()
 return v<1e-9?w:new A.r(w.a/v,w.b/v,w.c/v)}}
-A.kf.prototype={}
+A.jF.prototype={}
 A.cI.prototype={}
 A.he.prototype={}
 A.r_.prototype={}
@@ -9326,15 +9328,15 @@ X_(){var w=this.x
 if(!(w!==0))if(this.r){w=$.dm+1
 $.dm=w}else w=0
 this.w=w},
-ape(d,e,f,g,h,i,j,k){var w=this,v=(i==null?e.aJ(0,d).C6(g.aJ(0,d)):i).gn2(0)
-w.a.push(new A.kf(C.a([d,e,f,g],x.o),v,h,w.b,j,w.d,k,w.c,w.e,w.f,w.w))},
-d_k(d,e,f,g,h){return this.ape(d,e,f,g,h,null,0,!1)},
-o9(d,e,f,g,h,i){return this.ape(d,e,f,g,h,i,0,!1)},
-aK5(d,e,f,g,h,i,j){return this.ape(d,e,f,g,h,i,0,j)},
-d_l(d,e,f,g,h,i,j){return this.ape(d,e,f,g,h,i,j,!1)},
-a7C(d,e,f,g,h,i){var w=this,v=(h==null?e.aJ(0,d).C6(f.aJ(0,d)):h).gn2(0)
-w.a.push(new A.kf(C.a([d,e,f],x.o),v,g,w.b,0,w.d,i,w.c,w.e,w.f,w.w))},
-a7B(d,e,f,g){return this.a7C(d,e,f,g,null,!0)},
+apf(d,e,f,g,h,i,j,k){var w=this,v=(i==null?e.aJ(0,d).C6(g.aJ(0,d)):i).gn2(0)
+w.a.push(new A.jF(C.a([d,e,f,g],x.o),v,h,w.b,j,w.d,k,w.c,w.e,w.f,w.w))},
+d_k(d,e,f,g,h){return this.apf(d,e,f,g,h,null,0,!1)},
+o9(d,e,f,g,h,i){return this.apf(d,e,f,g,h,i,0,!1)},
+aK6(d,e,f,g,h,i,j){return this.apf(d,e,f,g,h,i,0,j)},
+d_l(d,e,f,g,h,i,j){return this.apf(d,e,f,g,h,i,j,!1)},
+a7D(d,e,f,g,h,i){var w=this,v=(h==null?e.aJ(0,d).C6(f.aJ(0,d)):h).gn2(0)
+w.a.push(new A.jF(C.a([d,e,f],x.o),v,g,w.b,0,w.d,i,w.c,w.e,w.f,w.w))},
+a7C(d,e,f,g){return this.a7D(d,e,f,g,null,!0)},
 BU(d,e,f,g,h,i,j,k){var w,v,u,t,s,r
 this.X_()
 w=e.a/2
@@ -9354,10 +9356,10 @@ aE(d,e,f,g){return this.BU(d,e,f,!0,g,0,1,0)},
 kZ(d,e,f,g,h){return this.BU(d,e,f,!0,g,0,h,0)},
 hl(d,e,f,g){return this.BU(d,e,f,!0,0,0,g,0)},
 tc(d,e,f,g,h){return this.BU(d,e,f,!0,g,0,1,h)},
-aF4(d,e,f,g,h){return this.BU(d,e,f,g,h,0,1,0)},
-alD(d,e,f,g,h,i){return this.BU(d,e,f,!0,g,h,i,0)},
+aF5(d,e,f,g,h){return this.BU(d,e,f,g,h,0,1,0)},
+alE(d,e,f,g,h,i){return this.BU(d,e,f,!0,g,h,i,0)},
 cLJ(d,e,f,g,h,i){return this.BU(d,e,f,g,h,0,i,0)},
-aF3(d,e,f,g){return this.BU(d,e,f,!0,0,0,1,g)},
+aF4(d,e,f,g){return this.BU(d,e,f,!0,0,0,1,g)},
 x3(b3,b4,b5,b6,b7,b8,b9,c0,c1){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2=this
 b2.X_()
 w=b4.aJ(0,b3).gn2(0)
@@ -9387,11 +9389,11 @@ a4=k+a4*s
 d=m+d*s
 a1=l+a1*s
 a3=k+a3*s
-q.push(new A.kf(C.a([new A.r(a6,a7,a8),new A.r(a9,b0,b1),new A.r(a0,a2,a4),new A.r(d,a1,a3)],j),a5,b6,b2.b,c0,b2.d,b8,b2.c,b2.e,b2.f,b2.w))
-if(b7){q.push(new A.kf(C.a([b3,new A.r(a9,b0,b1),new A.r(a6,a7,a8)],j),new A.r(i,v,h),b6,b2.b,c0,b2.d,!1,b2.c,b2.e,b2.f,b2.w))
-q.push(new A.kf(C.a([b4,new A.r(d,a1,a3),new A.r(a0,a2,a4)],j),w,b6,b2.b,c0,b2.d,!1,b2.c,b2.e,b2.f,b2.w))}}},
+q.push(new A.jF(C.a([new A.r(a6,a7,a8),new A.r(a9,b0,b1),new A.r(a0,a2,a4),new A.r(d,a1,a3)],j),a5,b6,b2.b,c0,b2.d,b8,b2.c,b2.e,b2.f,b2.w))
+if(b7){q.push(new A.jF(C.a([b3,new A.r(a9,b0,b1),new A.r(a6,a7,a8)],j),new A.r(i,v,h),b6,b2.b,c0,b2.d,!1,b2.c,b2.e,b2.f,b2.w))
+q.push(new A.jF(C.a([b4,new A.r(d,a1,a3),new A.r(a0,a2,a4)],j),w,b6,b2.b,c0,b2.d,!1,b2.c,b2.e,b2.f,b2.w))}}},
 cQf(d,e,f,g,h,i,j){return this.x3(d,e,f,g,h,!1,-1,i,j)},
-a4W(d,e,f,g,h,i,j,k){return this.x3(d,e,f,g,h,i,-1,j,k)},
+a4X(d,e,f,g,h,i,j,k){return this.x3(d,e,f,g,h,i,-1,j,k)},
 cw(d,e,f,g,h,i){return this.x3(d,e,f,g,!0,!1,-1,h,i)},
 df(d,e,f,g,h){return this.x3(d,e,f,g,!0,!1,-1,0,h)},
 x0(d,e,f,g,h,i,j){return this.x3(d,e,f,g,!0,!1,h,i,j)},
@@ -9418,10 +9420,10 @@ a2=k.c
 a3=j.a
 a4=j.b
 a5=j.c
-v.push(new A.kf(C.a([new A.r(u+i*a8,t+h*a8,s+g*a8),new A.r(u+f*a8,t+e*a8,s+d*a8),new A.r(u+a0*a8,t+a1*a8,s+a2*a8),new A.r(u+a3*a8,t+a4*a8,s+a5*a8)],r),new A.r(i+f+a0+a3,h+e+a1+a4,g+d+a2+a5).gn2(0),a9,a6.b,b2,a6.d,!1,a6.c,a6.e,a6.f,a6.w))}},
+v.push(new A.jF(C.a([new A.r(u+i*a8,t+h*a8,s+g*a8),new A.r(u+f*a8,t+e*a8,s+d*a8),new A.r(u+a0*a8,t+a1*a8,s+a2*a8),new A.r(u+a3*a8,t+a4*a8,s+a5*a8)],r),new A.r(i+f+a0+a3,h+e+a1+a4,g+d+a2+a5).gn2(0),a9,a6.b,b2,a6.d,!1,a6.c,a6.e,a6.f,a6.w))}},
 bdT(d,e,f,g){return this.es(d,e,f,6,10,g)},
 eg(d,e,f,g,h){return this.es(d,e,f,g,h,0.4)},
-aq8(d,e,f,g,h,i,j,k){var w,v,u,t,s
+aq9(d,e,f,g,h,i,j,k){var w,v,u,t,s
 this.X_()
 for(w=0;v=w+1,v<d.length;w=v){u=d[v]
 t=d[w]
@@ -9430,9 +9432,9 @@ u=d[w]
 t=d[v]
 if(g)s=w===0||w===d.length-2
 else s=!1
-this.a4W(u,t,e,f,s,h,j,k)}if(i)for(u=e*0.98,w=1;v=w+1,v<d.length;w=v)this.es(d[w],u,f,4,k,j)},
-iJ(d,e,f,g,h,i){return this.aq8(d,e,f,!0,!1,g,h,i)},
-Vs(d,e,f,g,h,i,j){return this.aq8(d,e,f,g,!1,h,i,j)},
+this.a4X(u,t,e,f,s,h,j,k)}if(i)for(u=e*0.98,w=1;v=w+1,v<d.length;w=v)this.es(d[w],u,f,4,k,j)},
+iJ(d,e,f,g,h,i){return this.aq9(d,e,f,!0,!1,g,h,i)},
+Vs(d,e,f,g,h,i,j){return this.aq9(d,e,f,g,!1,h,i,j)},
 lt(a5,a6,a7,a8,a9,b0,b1){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4=this
 a4.X_()
 a4.cQf(a5,a6,a7,a9,!1,b0,b1)
@@ -9455,10 +9457,10 @@ a1=a0.a
 a2=a0.b
 a0=a0.c
 a3=u.$1(j)
-r.push(new A.kf(C.a([new A.r(o+h*a8,l+g*a8,k+i*a8),new A.r(o+e*a7,l+d*a7,k+f*a7),new A.r(o+a1*a7,l+a2*a7,k+a0*a7),new A.r(o+a3.a*a8,l+a3.b*a8,k+a3.c*a8)],q),m,a9,a4.b,b0,a4.d,!1,a4.c,a4.e,a4.f,a4.w))}}},
+r.push(new A.jF(C.a([new A.r(o+h*a8,l+g*a8,k+i*a8),new A.r(o+e*a7,l+d*a7,k+f*a7),new A.r(o+a1*a7,l+a2*a7,k+a0*a7),new A.r(o+a3.a*a8,l+a3.b*a8,k+a3.c*a8)],q),m,a9,a4.b,b0,a4.d,!1,a4.c,a4.e,a4.f,a4.w))}}},
 d0V(d,e,f,g,h,i){return this.lt(d,e,f,g,h,i,16)}}
 A.uO.prototype={
-ayl(d){var w,v,u,t,s,r,q,p,o,n,m,l=this
+aym(d){var w,v,u,t,s,r,q,p,o,n,m,l=this
 if(d&&l.c!==l.x)l.w=l.c
 w=D.i.D(l.w,l.e,l.f)
 l.y=1
@@ -9476,7 +9478,7 @@ n=Math.min(Math.min(C.jh(p),C.jh(r)),C.jh(q.$4(s,l.d.b,4,o[4]-5)))
 m=Math.min(w,Math.max(l.e,n))
 if(l.z&&w>m)l.y=D.i.D(Math.sqrt(m/w),0.5,1)}else m=w
 l.x=l.c=m},
-aek(){return this.ayl(!0)},
+ael(){return this.aym(!0)},
 pl(d){var w,v,u,t=this
 t.CW=d
 if(!d){w=t.a
@@ -9491,16 +9493,16 @@ w.dx=e
 w.b0()},
 Di(d){return this.fI(null,null,d,null)},
 vF(d,e){return this.fI(d,null,e,null)},
-a8c(d,e,f){return this.fI(d,e,f,null)},
+a8d(d,e,f){return this.fI(d,e,f,null)},
 HG(d,e,f,g){var w=this
 w.dx=w.db=w.cy=w.cx=null
 w.d=f
 w.c=d
 w.a=g
 w.b=e
-w.aek()
+w.ael()
 w.b0()},
-a7p(d){var w,v,u,t=this
+a7q(d){var w,v,u,t=this
 if(!(t.cx!=null||t.cy!=null||t.db!=null||t.dx!=null))return
 w=1-Math.exp(-d*7)
 if(t.cy!=null&&t.c!==t.x)t.w=t.c
@@ -9525,7 +9527,7 @@ if(v!=null){u=t.b
 u+=(v-u)*w
 t.b=u
 if(Math.abs(u-v)<0.003){t.b=v
-t.dx=null}}t.aek()
+t.dx=null}}t.ael()
 t.b0()},
 d2g(d,e){var w,v,u,t,s=this,r=e.a,q=e.b,p=Math.min(r,q)*1.15*s.y,o=Math.cos(s.a),n=Math.sin(s.a)
 q=new A.bKX(s,new A.bKY(Math.cos(s.b),Math.sin(s.b),o,n),(d.a-r/2)/p,-(d.b-q/2)/p)
@@ -9556,7 +9558,7 @@ t=(f-v)/u
 if(t<=0)return null
 return q.$1(t)},
 bhd(d,e){return this.bhe(d,e,0)},
-aqr(d){var w,v,u,t,s,r,q,p,o,n,m=this
+aqs(d){var w,v,u,t,s,r,q,p,o,n,m=this
 m.cy=null
 w=m.r
 if(w!=null&&d!==1){v=Math.cos(m.b)
@@ -9572,12 +9574,12 @@ m.cx=null
 m.d=o
 m.w=m.c=n
 m.x=-1
-m.ayl(!1)
+m.aym(!1)
 m.b0()
 return}}r=m.c
 if(r!==m.x)m.w=r
 m.w=D.i.D(Math.max(m.w,r)*d,m.e,m.f)
-m.ayl(!1)
+m.aym(!1)
 m.b0()}}
 A.bWl.prototype={
 cZw(a0){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g=this.a,f=g.length-1,e=a0.a,d=a0.b
@@ -9640,7 +9642,7 @@ f.sav(new C.bY(D.A,0.5,D.x,a6,0,C.a([D.aH.j(0.28),B.bqt],u),a6,a6).aK(0,C.bX(j,h
 b0.N(j,h,f)
 J.bo(w.save())
 g=new C.aG(g.r,D.ai,a6,a6,C.a([],x.h))
-g.E(new C.jR(C.bX(j,i)))
+g.E(new C.jS(C.bX(j,i)))
 b0.mR(0,g)
 g=C.K()
 g.sav(B.ezm.aK(0,C.bX(j,i)))
@@ -9749,7 +9751,7 @@ j2.f=new Float64Array(24)
 j2.r=new Float64Array(24)
 c2=new A.cwu(j2,j0,b8,b9,c0,m,l,k,j,c1,o,p,n,a0,a1,b1,r,q,b2,b3,b4.a,b4.b,b4.c,b5.a,b5.b,b5.c,b6)
 c3=v.a
-c4=c3.length>1500?A.i5z(v):j1
+c4=c3.length>1500?A.i5A(v):j1
 if(c4==null)for(c5=0;c5<c3.length;++c5)c2.$2(c3[c5],c5)
 else for(w=c4.a,u=w.length,a2=r+40,a5=q+40,a3=0;a3<w.length;w.length===u||(0,C.J)(w),++a3){c6=w[a3]
 if(!c6.a){for(a6=c6.x,a9=c6.r,c7=c6.e,c8=c6.d,c9=c6.f,d0=c6.w,d1=!1,d2=!0,d3=!1,d4=1/0,d5=-1/0,d6=1/0,d7=-1/0,d8=0;d8<8;++d8){d9=((d8&1)===0?c8:c7)-b8
@@ -9922,12 +9924,12 @@ w.push(new C.y(a5,t))}}},
 aD(d){return!0}}
 A.cGN.prototype={}
 A.GA.prototype={}
-A.awp.prototype={
+A.awo.prototype={
 S(){return new A.bt5(new A.bWl(C.a([],x.aB)),new C.eA(0,$.aw()),D.bE,D.H,D.bE,null,null)}}
 A.bt5.prototype={
 Y(){var w,v=this
 v.a4()
-A.hLZ()
+A.hM_()
 w=v.q_(new A.f6Y(v))
 w.fX(0)
 v.d!==$&&C.aQ()
@@ -9968,7 +9970,7 @@ s=t.c
 if(s<r.w)r.w=s
 if(s>r.x)r.x=s}}}
 A.cOP.prototype={}
-A.aOO.prototype={
+A.aON.prototype={
 t(){var w=this,v=w.a9$
 if(v!=null)v.a6(0,w.gbB())
 w.a9$=null
@@ -9980,8 +9982,8 @@ A.ajM.prototype={
 S(){return new A.bbV()}}
 A.bbV.prototype={
 Y(){this.a4()
-this.aPO()},
-aPO(){var w=this,v=w.e
+this.aPP()},
+aPP(){var w=this,v=w.e
 if(v!=null)v.a1(0)
 w.a.toString
 w.e=C.cy(C.dw(0,0,0,0,0,3),new A.cNw(w))},
@@ -10006,7 +10008,7 @@ var $async$PR=C.e(function(e5,e6){if(e5===1)return C.f(e6,v)
 for(;;)switch(w){case 0:if(e3.getUint32(0,!0)!==1179937895)throw C.W("not a glb file")
 for(n=x.b,m=12,l=null,k=null;m+8<=e3.byteLength;){j=e3.getUint32(m,!0)
 i=e3.getUint32(m+4,!0)
-h=J.eD(D.dO.gaU(e3),e3.byteOffset+m+8,j)
+h=J.eD(D.dN.gaU(e3),e3.byteOffset+m+8,j)
 if(i===1313821514)l=n.a(D.Y.aQ(0,new C.GW(!1).E3(h,0,null,!0),null))
 if(i===5130562)k=h
 m+=8+j}if(l==null||k==null)throw C.W("empty glb")
@@ -10078,7 +10080,7 @@ for(a3=J.a7(b7),a4=J.aT(e.a(a3.h(b7,"joints")));a4.C();)a0.push(D.i.M(C.dC(a4.gR
 u.Q.push(a0)
 c1=a3.h(b7,"inverseBindMatrices")!=null?g.FV(D.i.M(C.dC(a3.h(b7,"inverseBindMatrices")))).a:null
 a3=u.as
-a3.push(c1==null?A.hPh(a0.length):c1)}n=a8.a(f.h(l,"animations"))
+a3.push(c1==null?A.hPi(a0.length):c1)}n=a8.a(f.h(l,"animations"))
 n=J.aT(n==null?D.cq:n)
 a0=u.z
 a3=x.G
@@ -10127,7 +10129,7 @@ if(!(a0<(a2==null?0:a2))){w=3
 break}r=g.cUE(s)
 if(r==null){w=4
 break}try{a0=r
-d5=C.hf8(a0)
+d5=C.hf9(a0)
 q=d5==null?null:d5.q0(0,a0,null)
 if(q!=null){p=q.cN4(D.cc,4)
 a0=s
@@ -10164,7 +10166,7 @@ n=u.at
 n.r=u.b5N(n)
 n=u.ax
 n.r=u.b5N(n)
-e0=u.aAG(null,0)
+e0=u.aAH(null,0)
 e1=u.b8G(u.at,e0)
 for(n=e1.length,e2=1/0,s=1;s<n;s+=3)e2=Math.min(e2,e1[s])
 u.ay=isFinite(e2)?e2:0
@@ -10344,7 +10346,7 @@ for(u=d7.e,t=u.length,s=d7.f,r=x.n,c1=0;c1<t;c1+=3){c2=a2[u[c1]]
 c3=a2[u[c1+1]]
 b1=a2[u[c1+2]]
 if(c2===c3||c3===b1||c2===b1)continue
-c4=A.hlX(c2,c3,b1)
+c4=A.hlY(c2,c3,b1)
 c5=s[D.o.aq(c1,3)]
 c6=b9.h(0,c4)
 q=c5&255
@@ -10369,7 +10371,7 @@ for(r=b1*4,q=d2*4,c4=0;c4<4;++c4){p=r+c4
 d3=q+c4
 c9[p]=t[d3]
 d0[p]=s[d3]}d1[b1]=u[d2]}return new A.dsN(c8,c9,d0,d1,new Int32Array(C.cd(b8)),c7)},
-aAG(a1,a2){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d=this,a0=d.b
+aAH(a1,a2){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d=this,a0=d.b
 a0===$&&C.c()
 w=d.w
 w===$&&C.c()
@@ -10387,7 +10389,7 @@ for(w=s.c,q=w.length,p=0;p<w.length;w.length===q||(0,C.J)(w),++p){o=w[p]
 n=o.b
 if(n===0)n=v
 else n=n===1?u:t
-A.hPi(o,r,n)}}m=d.CW.c3(0,"world",new A.bV6(a0.length))
+A.hPj(o,r,n)}}m=d.CW.c3(0,"world",new A.bV6(a0.length))
 l=new A.bV7(d,v,u,t,new Float64Array(16),m)
 a0=d.r
 a0===$&&C.c()
@@ -10407,7 +10409,7 @@ for(i=0,h=0;w=d.Q,h<w.length;++h){g=w[h]
 for(f=0;f<g.length;++f){w=g[f]
 q=d.as
 q===$&&C.c()
-A.hlY(m,w*16,q[h],f*16,j,i)
+A.hlZ(m,w*16,q[h],f*16,j,i)
 i+=16}}for(w=a0.length,p=0;p<a0.length;a0.length===w||(0,C.J)(a0),++p,i=e){e=i+16
 D.nR.ep(j,i,e,m,a0[p].c*16)}return j},
 b8G(b8,b9){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3=b8.a,b4=b3.length/3|0,b5=new Float64Array(b4*3),b6=C.a([],x.t),b7=this.Q
@@ -10459,10 +10461,10 @@ if(c5&&c4!=null&&D.a.q(u.toLowerCase(),"walk"))s=c4/50*t
 else{w=B.dE0.h(0,b3.a)
 s=c2*(w==null?1:w)}w=b3.e
 r=w.h(0,u)
-if(r==null){b3.aAG(u,0)
+if(r==null){b3.aAH(u,0)
 if(b3.d>=0){q=b3.CW
 r=new C.y(q.h(0,b4)[b3.d*16+12],q.h(0,b4)[b3.d*16+14])}else r=D.Ar
-w.n(0,u,r)}p=b3.aAG(u,s)
+w.n(0,u,r)}p=b3.aAH(u,s)
 b5.a=b5.b=0
 if(b3.d>=0){w=b3.CW
 b5.b=w.h(0,b4)[b3.d*16+12]-r.a
@@ -10495,8 +10497,8 @@ else{a4=!0
 if(b0!==3)if(b0!==4)a4=b0===5&&b1<33
 b2=a4?b9:c3}}else b2=c3
 a4=C.a([a1,a2,a3],g)
-a5=b2==null?C.b1(h[D.o.aq(a0,3)]):A.ifp(h[D.o.aq(a0,3)],b2)
-j.push(new A.kf(a4,a9,a5,b7,0.08,1,!1,0,0,2,q[b0]))}if(e&&f&&w!=="michelle")D.d.v(j,b3.bSZ(v,m,n,c1,b7,q[0]))
+a5=b2==null?C.b1(h[D.o.aq(a0,3)]):A.ifq(h[D.o.aq(a0,3)],b2)
+j.push(new A.jF(a4,a9,a5,b7,0.08,1,!1,0,0,2,q[b0]))}if(e&&f&&w!=="michelle")D.d.v(j,b3.bSZ(v,m,n,c1,b7,q[0]))
 return j},
 bSZ(a6,a7,a8,a9,b0,b1){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5={}
 for(w=a6.a.length/3|0,v=a6.r,u=-1e9,t=1e9,s=0;s<w;++s){v===$&&C.c()
@@ -10542,7 +10544,7 @@ a2.$6(i,0.08,0.085,0.085,w,1.6)
 g=i-0.22
 i+=0.22
 f=0.04*a4
-a1.$6(d.$2(g,0.33),d.$2(i,0.31+f),d.$2(i,0.25+f),d.$2(g,0.27),w,1.2)}a0.push(new A.kf(C.a([d.$2(0,0.12),d.$2(-0.1,-0.22),d.$2(0.1,-0.22)],x.o),o,v,b0,0,1,!1,0,1.2,2,b1))
+a1.$6(d.$2(g,0.33),d.$2(i,0.31+f),d.$2(i,0.25+f),d.$2(g,0.27),w,1.2)}a0.push(new A.jF(C.a([d.$2(0,0.12),d.$2(-0.1,-0.22),d.$2(0.1,-0.22)],x.o),o,v,b0,0,1,!1,0,1.2,2,b1))
 a1.$6(d.$2(-0.2,-0.46),d.$2(0.2,-0.46),d.$2(0.17,-0.53),d.$2(-0.17,-0.53),m,1.2)
 a1.$6(d.$2(-0.2,-0.46),d.$2(0.2,-0.46),d.$2(0.2,-0.485),d.$2(-0.2,-0.485),w,1.5)
 return a0}}
@@ -10620,16 +10622,16 @@ s=Math.max(s,d)
 d=e.c+k
 t=Math.min(t,d)
 u=Math.max(u,d)}}}return new C.cu([r,s,t,u])},
-gaq9(){return this.gDQ().a[1]-this.gDQ().a[0]},
+gaqa(){return this.gDQ().a[1]-this.gDQ().a[0]},
 gH8(){var w=this.w
 return w.length===0?this.f:new C.N(w,new A.bJ7(this),C.U(w).k("N<1,F>")).f1(0,D.q4)},
 gbg5(){return this.gDQ().a[3]-this.gDQ().a[2]},
-ga4V(d){return this.w.length===0?0:(this.gDQ().a[0]+this.gDQ().a[1])/2},
-ga4X(){return this.w.length===0?0:(this.gDQ().a[2]+this.gDQ().a[3])/2},
+ga4W(d){return this.w.length===0?0:(this.gDQ().a[0]+this.gDQ().a[1])/2},
+ga4Y(){return this.w.length===0?0:(this.gDQ().a[2]+this.gDQ().a[3])/2},
 gdU(d){var w=this
-return Math.max(Math.max(w.gaq9(),w.gbg5()),Math.max(w.gH8()*1.3,w.x))*w.y}}
-A.HW.prototype={}
-A.aU2.prototype={
+return Math.max(Math.max(w.gaqa(),w.gbg5()),Math.max(w.gH8()*1.3,w.x))*w.y}}
+A.HX.prototype={}
+A.aU1.prototype={
 bls(){var w=this
 w.a=!0
 w.b="NEW GLOBAL MOVEMENT FOR YOUTH"
@@ -10679,11 +10681,11 @@ q=0
 for(;;){if(!(q<6&&q<v.gI(w)))break
 if(u.b(v.h(w,q)))t[q].Uk(C.a2(u.a(v.h(w,q)),s,r));++q}}else this.b[0].Uk(d)}}
 A.hk.prototype={}
-A.apx.prototype={
-S(){var w=A.hLF()
+A.apw.prototype={
+S(){var w=A.hLG()
 $.vY()
-return new A.apy(w,new C.vv())}}
-A.apy.prototype={
+return new A.apx(w,new C.vv())}}
+A.apx.prototype={
 geh(){var w,v=this.e
 if(v===$){w=new A.uO(0.5,0.25,420,B.h5d,$.aw())
 w.e=30
@@ -10694,21 +10696,21 @@ w.pl(!0)
 this.e!==$&&C.bD()
 this.e=w
 v=w}return v},
-gayB(){var w=this.r
+gayC(){var w=this.r
 return w===$?this.r=new A.a60(this.gc9o(),A1.C5):w},
 gzZ(){return D.d.fe(B.a4z,new A.c5o(this))},
 Y(){var w=this
 w.a4()
-w.f=A.heJ(w.gzZ(),w.d)
-w.abZ()
-A.hqF().bG(new A.c5m(w),x.P)
+w.f=A.heK(w.gzZ(),w.d)
+w.ac_()
+A.hqG().bG(new A.c5m(w),x.P)
 w.PV()},
-t(){this.gayB().bQ(0)
+t(){this.gayC().bQ(0)
 var w=this.geh()
 w.U$=$.aw()
 w.P$=0
 this.a3()},
-abZ(){var w=this.gzZ(),v=this.geh(),u=w.ga4V(0),t=w.gH8(),s=w.ga4X()
+ac_(){var w=this.gzZ(),v=this.geh(),u=w.ga4W(0),t=w.gH8(),s=w.ga4Y()
 v.HG(w.gdU(0)*1.9,0.22,new A.r(u,w.r+t/2,s),0.45)},
 PV(){var w=0,v=C.j(x.H),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i
 var $async$PV=C.e(function(d,e){if(d===1){s.push(e)
@@ -10771,8 +10773,8 @@ return C.i($async$Jf,v)},
 c9p(){var w,v,u,t,s,r,q,p=this
 if(!(p.x>=0)||p.c==null)return
 w=p.w.gf_()/1000
-if(w>=30){p.aCX(!0)
-return}v=A.igB(p.gzZ(),w)
+if(w>=30){p.aCY(!0)
+return}v=A.igC(p.gzZ(),w)
 u=v.b
 t=u.aJ(0,v.a)
 s=Math.max(8,t.gp7())
@@ -10786,21 +10788,21 @@ w=v.w
 w.ir(0)
 w.fX(0)
 v.m(new A.c5n(v))
-v.gayB().fX(0)},
-aCX(d){var w,v=this
-v.gayB().bQ(0)
+v.gayC().fX(0)},
+aCY(d){var w,v=this
+v.gayC().bQ(0)
 w=v.w
 if(w.b==null)w.b=$.aan.$0()
 v.geh().at=0.02
 v.m(new A.c5c(v,d))
-v.abZ()},
-cCt(){return this.aCX(!1)},
+v.ac_()},
+cCt(){return this.aCY(!1)},
 cyo(d){var w=this
 w.d.a=d
 w.m(new A.c5b(w))
-w.abZ()
+w.ac_()
 w.Jf()},
-a_5(d){this.d.b[d].a=!1
+a_6(d){this.d.b[d].a=!1
 this.m(new A.c4K())
 this.Jf()},
 Je(d,e){return this.co4(d,e)},
@@ -10822,7 +10824,7 @@ if(o==null){w=1
 break}n=r.d.b[d]
 if(e){n.f=p
 n.w=o}else{n.r=p
-n.x=o}r.a_5(d)
+n.x=o}r.a_6(d)
 t=2
 w=6
 break
@@ -10838,7 +10840,7 @@ case 2:return C.f(s.at(-1),v)}})
 return C.i($async$Je,v)},
 cEz(){var w=this.c
 w.toString
-C.bT(D.as,null,new A.c5e(this),w,!0,!0,!0,D.kf,!1,!1,x.H)},
+C.bT(D.as,null,new A.c5e(this),w,!0,!0,!0,D.kg,!1,!1,x.H)},
 bRd(){var w,v,u,t,s,r,q=this,p={}
 p.a=0
 w=q.d.b[0]
@@ -10851,15 +10853,15 @@ w=w.d
 r=new C.au(new C.ba(w,D.b6,D.aR),u)
 w=q.c
 w.toString
-C.bT(D.as,null,new A.c57(p,q,new A.c58(p,q,t,s,r),t,s,r),w,!0,!0,!0,D.kf,!1,!1,x.H)},
-ayD(d,e,f,g){var w=null,v=g?f.j(0.3):D.w.j(0.6),u=C.l(20),t=C.L(f,D.r,1)
+C.bT(D.as,null,new A.c57(p,q,new A.c58(p,q,t,s,r),t,s,r),w,!0,!0,!0,D.kg,!1,!1,x.H)},
+ayE(d,e,f,g){var w=null,v=g?f.j(0.3):D.w.j(0.6),u=C.l(20),t=C.L(f,D.r,1)
 return C.az(w,C.q(w,C.d(d,w,w,w,w,w,w,C.n(w,w,f,w,w,w,w,w,w,w,w,13,w,w,D.I,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),D.f,w,w,new C.p(v,w,t,u,w,w,D.n),w,w,w,w,D.iw,w,w,w),D.y,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,e,w,w,w,w,w,w,!1,D.a4)},
-ayC(d,e,f){return this.ayD(d,e,f,!1)},
-c9n(d,e,f){return this.ayD(d,e,D.aH,f)},
+ayD(d,e,f){return this.ayE(d,e,f,!1)},
+c9n(d,e,f){return this.ayE(d,e,D.aH,f)},
 B(d){var w,v,u,t,s,r=this,q=null,p=C.aF(d,q,x.w).w.r,o=r.f
 o===$&&C.c()
 w=x.p
-o=C.a([C.bR(0,A.haB(E.yh,r.geh(),q,q,0,q,q,q,o,!0),0,0,0)],w)
+o=C.a([C.bR(0,A.haC(E.yh,r.geh(),q,q,0,q,q,q,o,!0),0,0,0)],w)
 if(!(r.x>=0))o.push(C.ap(q,C.A(C.a([C.az(q,C.q(q,D.a3v,D.f,q,q,new C.p(D.w.j(0.55),q,C.L(D.bW,D.r,1),q,q,q,D.a6),q,40,q,q,q,q,q,40),D.y,!1,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,new A.c5i(d),q,q,q,q,q,q,!1,D.a4),D.au,C.E(C.d("Billboard studio \xb7 "+r.gzZ().c,q,q,q,q,q,q,B.fnQ,q,q,q),1)],w),D.l,q,D.e,D.j,0,q,q),q,q,8,8,p.b+8,q))
 if(r.x>=0&&r.y)o.push(C.bR(0,C.az(D.c3,q,D.y,!1,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,new A.c5j(r),q,q,q,q,q,q,!1,D.a4),0,0,0))
 if(!(r.x>=0&&r.y)){v=C.a([],w)
@@ -10867,17 +10869,17 @@ if(r.z.length!==0&&!(r.x>=0)){u=D.e7.j(0.95)
 t=C.l(12)
 s=C.L(D.b4,D.r,1)
 v.push(C.q(q,C.d(r.z,q,q,q,q,q,q,D.Vq,q,q,q),D.f,q,q,new C.p(u,q,s,t,q,q,D.n),q,q,q,D.cx,D.bV,q,q,q))}w=C.a([],w)
-if(!(r.x>=0))w.push(r.ayC("\ud83e\udea7 Choose billboard",r.gcEy(),F.f2))
-if(!(r.x>=0))w.push(r.ayC("\u270f\ufe0f Edit",r.gbRc(),D.b4))
-if(r.x>=0)w.push(r.ayD("\u23f9 Stop the drone",r.gcCs(),D.c0,!0))
-if(r.x>=0)w.push(r.ayC("\ud83d\udc41 Hide everything",new A.c5k(r),D.aO))
+if(!(r.x>=0))w.push(r.ayD("\ud83e\udea7 Choose billboard",r.gcEy(),F.f2))
+if(!(r.x>=0))w.push(r.ayD("\u270f\ufe0f Edit",r.gbRc(),D.b4))
+if(r.x>=0)w.push(r.ayE("\u23f9 Stop the drone",r.gcCs(),D.c0,!0))
+if(r.x>=0)w.push(r.ayD("\ud83d\udc41 Hide everything",new A.c5k(r),D.aO))
 if(!(r.x>=0))w.push(r.c9n("\ud83c\udfac 30 second drone shot",r.gbsT(),!0))
 v.push(C.bV(D.fR,w,D.bs,q,8,8))
 o.push(C.ap(p.d+12,C.x(v,D.l,q,D.e,D.P,0,D.p),q,q,10,10,q,q))}return C.c4(q,D.w,new C.an(D.a0,q,D.ab,D.t,o,q),q,!1,!1,q,q)}}
 A.Gr.prototype={}
 A.zD.prototype={}
 A.xJ.prototype={}
-A.aV7.prototype={}
+A.aV6.prototype={}
 A.a55.prototype={}
 A.al8.prototype={}
 A.bNz.prototype={
@@ -10892,8 +10894,8 @@ if(D.d.aV(B.RZ,new A.bNB(t)))o.push(t)}p.c!==$&&C.aQ()
 p.c=o
 for(o=p.f,r=0;r<5;++r){q=p.crp()
 n=B.dzT[r]
-w=B.do_[r]
-o.push(new A.aV7(n,w,new A.u2(B.azs[r],B.MN,w,B.M9,B.dtd[r],!1,0,1),58+r*7.5,q.a,q.b,B.aBM))}p.V8(0)},
+w=B.do0[r]
+o.push(new A.aV6(n,w,new A.u2(B.azs[r],B.MN,w,B.M9,B.dtd[r],!1,0,1),58+r*7.5,q.a,q.b,B.aBM))}p.V8(0)},
 crp(){var w,v=this.c
 v===$&&C.c()
 w=v.length
@@ -10948,18 +10950,18 @@ if(w==null)return
 w.f=null
 w.r=!1
 this.x=null},
-ga7n(d){var w=this.x
+ga7o(d){var w=this.x
 if(w==null)return null
 return A.zc(w.r?w.d:w.c)},
 bmo(d,e,f){var w,v,u,t,s,r,q,p=this,o=p.x
 if(o==null)return null
 if(f-o.x>360){p.a1(0)
-return B.by9}w=p.ga7n(0)
+return B.by9}w=p.ga7o(0)
 if(Math.sqrt(Math.pow(w.a-d,2)+Math.pow(w.b-e,2))>58)return null
 if(!o.r){o.r=!0
 v=o.b
-u=A.LI(v)
-v=A.LI(v)
+u=A.LJ(v)
+v=A.LJ(v)
 t=B.hN.h(0,o.c.b).a
 s=o.w?"hospital":"house"
 return new A.al8("pickup",u.b+" You picked up the "+v.c.toLowerCase()+" at the "+t.toLowerCase()+". Now take it to the "+s+".",0)}D.d.W(p.e,o)
@@ -10968,7 +10970,7 @@ v=p.Q
 u=o.e
 p.Q=v+u
 p.V8(f)
-r=A.LI(o.b).b+" Delivered! +"+u+" points."
+r=A.LJ(o.b).b+" Delivered! +"+u+" points."
 if(p.y>=8){p.Q+=40
 r+=" You won the race with 8 deliveries: +40 points!"
 p.b_H()
@@ -11016,21 +11018,21 @@ if(w===$){v=new A.bLH(t.a)
 v.b0w()
 t.w!==$&&C.bD()
 t.w=v
-w=v}u=C.C(w.apP(new C.y(d.e,d.f),s),x.a6)
+w=v}u=C.C(w.apQ(new C.y(d.e,d.f),s),x.a6)
 u.push(new C.y(o,n))
 d.cx=u
-o=A.irQ(u)
+o=A.irR(u)
 d.cy=o
 d.z=e
 d.Q=e+Math.max(1,o/d.d)},
-ana(d){var w,v,u,t,s,r,q,p,o,n,m,l,k=C.a([],x.K)
+anb(d){var w,v,u,t,s,r,q,p,o,n,m,l,k=C.a([],x.K)
 for(w=this.f,v=w.length,u=d*2.2,t=0;t<w.length;w.length===v||(0,C.J)(w),++t){s=w[t]
 r=s.e
 q=s.f
 if(s.db)continue
 if(s.ch!==0&&d>=s.z&&s.cx.length>1){p=s.z
 o=D.i.D((d-p)/Math.max(0.01,s.Q-p),0,1)
-n=A.irW(s.cx,s.cy*o)
+n=A.irX(s.cx,s.cy*o)
 r=n.a
 q=n.b
 m=n.c
@@ -11044,28 +11046,28 @@ rk(d,e,f){var w,v,u,t,s=C.a([],x.U)
 for(w=this.e,v=w.length,u=0;u<w.length;w.length===v||(0,C.J)(w),++u){t=w[u]
 if(t.f==null)s.push(t)}D.d.aZ(s,new A.bNC(this,e,f))
 return s},
-aaW(d,e,f){return Math.sqrt(Math.pow(f.a-d,2)+Math.pow(f.b-e,2))}}
+aaX(d,e,f){return Math.sqrt(Math.pow(f.a-d,2)+Math.pow(f.b-e,2))}}
 A.bLH.prototype={
 b0z(d){return-this.a.gec(0)/2+8+d*24},
 b0w(){var w,v,u,t,s=this,r=s.a
-s.d=A.hET(r,null)
+s.d=A.hEU(r,null)
 s.b=D.i.cL((r.gec(0)-16)/24)+1
 w=D.i.cL((r.gh3(0)-10- -750)/24)+1
 s.c=w
 s.e=C.c_(s.b*w,!1,!1,x.y)
-for(v=0;v<s.b;++v)for(w=v*24,u=0;t=s.c,u<t;++u)s.e[v*t+u]=s.acQ(-r.gec(0)/2+8+w,-750+u*24)
-s.f=A.hks(r)},
-acQ(d,e){var w,v,u=this.a
+for(v=0;v<s.b;++v)for(w=v*24,u=0;t=s.c,u<t;++u)s.e[v*t+u]=s.acR(-r.gec(0)/2+8+w,-750+u*24)
+s.f=A.hkt(r)},
+acR(d,e){var w,v,u=this.a
 if(d<-u.gec(0)/2+12||d>u.gec(0)/2-12||e<-756||e>u.gh3(0)-14)return!0
 u=this.d
 u===$&&C.c()
 w=u.length
 v=0
-for(;v<w;++v)if(u[v].aHV(d,e,14))return!0
+for(;v<w;++v)if(u[v].aHW(d,e,14))return!0
 return!1},
 b0x(d,e,f){var w,v,u=e.a,t=f.a-u,s=e.b,r=f.b-s,q=Math.max(1,D.i.cL(Math.sqrt(Math.pow(t,2)+Math.pow(r,2))/8))
 for(w=0;w<=q;++w){v=w/q
-if(this.acQ(u+t*v,s+r*v))return!1}return!0},
+if(this.acR(u+t*v,s+r*v))return!1}return!0},
 b0y(d){var w,v,u,t,s,r,q,p,o,n,m,l,k,j=this,i=d.a,h=j.a,g=D.i.V((i+h.gec(0)/2-8)/24),f=j.b
 f===$&&C.c()
 w=D.o.D(g,0,f-1)
@@ -11085,16 +11087,16 @@ v=l}}if(v)continue
 k=Math.pow(-h.gec(0)/2+8+o*24-i,2)+Math.pow(-750+m*24-f,2)
 if(k<p){q=new C.y(o,m)
 p=k}}if(q!=null)return q}return null},
-apP(d,e){var w,v,u,t,s,r,q,p,o,n,m=this
-if(A.hks(m.a)!==m.f)m.b0w()
+apQ(d,e){var w,v,u,t,s,r,q,p,o,n,m=this
+if(A.hkt(m.a)!==m.f)m.b0w()
 w=m.b0y(d)
 v=m.b0y(e)
 if(w==null||v==null)return C.a([d,e],x.f)
 u=new C.y(m.b0z(w.a),-750+w.b*24)
 t=new C.y(m.b0z(v.a),-750+v.b*24)
 s=x.f
-r=m.acQ(d.a,d.b)?C.a([d],s):C.a([],s)
-q=m.acQ(e.a,e.b)?C.a([e],s):C.a([],s)
+r=m.acR(d.a,d.b)?C.a([d],s):C.a([],s)
+q=m.acR(e.a,e.b)?C.a([e],s):C.a([],s)
 p=C.a([],s)
 o=r.length===0?d:u
 n=q.length===0?e:t
@@ -11114,7 +11116,7 @@ t=b0.a
 s=b0.b
 r=t*w+s
 a8.n(0,u,0)
-a5.apa(u,a2.c9U(a6,v,b0))
+a5.apb(u,a2.c9U(a6,v,b0))
 p=0
 for(;;){if(a4.length!==0){o=p+1
 a6=p<4e4
@@ -11147,7 +11149,7 @@ d=g+(w&&i!==0?1.4142:1)
 g=a8.h(0,e)
 if(d<(g==null?1e9:g)){a7.n(0,e,n)
 a8.n(0,e,d)
-a5.apa(e,d+Math.sqrt(Math.pow(v,2)+Math.pow(h-s,2)))}}}if(!q)return C.a([b1,b2],x.f)
+a5.apb(e,d+Math.sqrt(Math.pow(v,2)+Math.pow(h-s,2)))}}}if(!q)return C.a([b1,b2],x.f)
 a0=C.a([r],a3)
 while(a7.al(0,D.d.gan(a0))){a3=a7.h(0,D.d.gan(a0))
 a3.toString
@@ -11164,7 +11166,7 @@ for(;;){if(!(h>a3&&!a2.b0x(0,a4[j],a4[h])))break;--h}a1.push(a4[h])}return a1},
 c9U(d,e,f){return Math.sqrt(Math.pow(d-f.a,2)+Math.pow(e-f.b,2))}}
 A.dnr.prototype={
 gcm(d){return this.a.length!==0},
-apa(d,e){var w,v,u,t=this.a
+apb(d,e){var w,v,u,t=this.a
 t.push(d)
 w=this.b
 w.push(e)
@@ -11189,7 +11191,7 @@ v=this.b
 w=v[d]
 v[d]=v[e]
 v[e]=w}}
-A.aUv.prototype={
+A.aUu.prototype={
 blQ(d,e,f){var w,v,u,t,s=this,r=null,q=s.d
 if(q>0){q-=d
 s.d=q
@@ -11221,7 +11223,7 @@ q=s.b=D.i.D(v-d/120,0,1)
 if(q<=0&&v>0)w="The car is out of gas. Get to a gas station (walk, then buy gas) to carry on."
 else if(v>=0.25&&q<0.25)w="The gas is low. Drive to a gas station."
 s.b0()}return w},
-a7p(d){return this.blQ(d,!1,!1)}}
+a7q(d){return this.blQ(d,!1,!1)}}
 A.aZQ.prototype={
 B(d){var w,v,u,t,s,r=null,q=D.i.D(this.c,0,1)
 if(q>0.5)w=D.be
@@ -11239,7 +11241,7 @@ B(d){return new C.wm(new A.c3_(this),null,this.c,null)}}
 A.t3.prototype={}
 A.Tj.prototype={
 gI(d){return this.a==="bus"?120:95.94999999999999}}
-A.aUu.prototype={}
+A.aUt.prototype={}
 A.byq.prototype={
 bCH(d,e,f,g){var w,v,u,t,s,r,q,p,o,n,m
 for(w=this.e,v=this.f,u=0;u<4;++u){t=B.ky[u]
@@ -11253,7 +11255,7 @@ A.bLJ.prototype={
 ir(d){var w,v,u,t
 for(w=this.a,v=this.b,u=0;u<4;++u){w[u]=B.ky[u].r
 v[u]=0}t=this.c=0
-for(w=$.h5w();t<2;++t)w[t].r=-1},
+for(w=$.h5x();t<2;++t)w[t].r=-1},
 G0(d,e){var w,v,u,t=this
 if(e<t.c-0.0001)t.ir(0)
 w=t.c
@@ -11262,7 +11264,7 @@ t.c=w}for(v=e-1e-9;w<v;){u=Math.min(0.05,e-w)
 t.cCi(u)
 w=t.c+=u}},
 cCi(b8){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5,b6,b7=this
-for(w=$.h5w(),v=b7.a,u=0;u<2;++u){t=w[u]
+for(w=$.h5x(),v=b7.a,u=0;u<2;++u){t=w[u]
 s=t.r
 if(s<0)continue
 r=A.fu9(B.ky[s]).a[1]
@@ -11279,14 +11281,14 @@ if(g<0)g+=r
 g-=k+(B.ky[h].a==="bus"?120:95.94999999999999)/2
 if(g<400)i=Math.min(i,C.jh(j.$1(g-18)))}for(f=$.bGR(),e=f.length,d=r-30,u=0;u<f.length;f.length===e||(0,C.J)(f),++u){a0=f[u]
 if(a0.a!==D.o.aq(n,2))continue
-a1=A.hfo(a0,b7.c)
+a1=A.hfp(a0,b7.c)
 if(a1===0)continue
 a2=D.i.F(a0.b-(v[n]+k),r)
 if(a2<0)a2+=r
 if(a2>d)continue
 if(a2<260)a3=!(a1===1&&a2<w[n]*1.2)
 else a3=!1
-if(a3)i=Math.min(i,C.jh(j.$1(a2-4)))}for(f=$.h5w(),u=0;u<2;++u){t=f[u]
+if(a3)i=Math.min(i,C.jh(j.$1(a2-4)))}for(f=$.h5x(),u=0;u<2;++u){t=f[u]
 a4=t.e[n]
 if(a4<0)continue
 e=v[n]
@@ -11296,10 +11298,10 @@ if(D.i.F(e-a4,r)<t.f[n]){if(t.r<0)t.r=n
 continue}if(t.r===n)continue
 e=w[n]
 for(d=$.bGR(),a3=d.length,a5=b7.c,a6=!1,a7=0;a7<a3;++a7){a0=d[a7]
-if(a0.a!==D.o.aq(n,2)||A.hfo(a0,a5)===0)continue
+if(a0.a!==D.o.aq(n,2)||A.hfp(a0,a5)===0)continue
 a8=D.i.F(a0.b-(v[n]+k),r)
 if((a8<0?a8+r:a8)<a2)a6=!0}if(t.r<0&&a2<40+e*e/220+20&&!a6){t.r=n
-continue}if(a2<400)i=Math.min(i,C.jh(j.$1(a2-10)))}f=A.LM(m,v[n]).a
+continue}if(a2<400)i=Math.min(i,C.jh(j.$1(a2-10)))}f=A.LN(m,v[n]).a
 a9=f[0]
 b0=f[1]
 b1=f[2]
@@ -11316,11 +11318,11 @@ w[n]=l
 if(l<0){w[n]=0
 l=0}v[n]=v[n]+l*b8}},
 cZR(d,e,f){this.G0(0,f)
-return A.LM(B.ky[e],this.a[e])},
+return A.LN(B.ky[e],this.a[e])},
 cUw(d,e){var w,v,u,t,s,r,q,p,o,n,m,l
 for(w=this.a,v=this.b,u=0;u<4;++u){if(v[u]<4)continue
 t=B.ky[u]
-s=A.LM(t,w[u]).a
+s=A.LN(t,w[u]).a
 r=s[0]
 q=s[1]
 p=s[2]
@@ -11333,7 +11335,7 @@ if(Math.abs(n*p+m*o)<l/2+6){s=s?33.54:31.45
 s=Math.abs(-n*o+m*p)<s/2+7}else s=!1
 if(s)return u}return-1}}
 A.AJ.prototype={
-ga8V(){var w=this.d,v=w.e*3.141592653589793/2,u=Math.sin(v),t=Math.cos(v),s=this.r-1
+ga8W(){var w=this.d,v=w.e*3.141592653589793/2,u=Math.sin(v),t=Math.cos(v),s=this.r-1
 return new C.y(w.c+u*42-t*s*24,w.d+t*42+u*s*24)}}
 A.cDG.prototype={
 bCu(d,e){var w,v,u,t,s=this,r=x._,q=C.a([],r)
@@ -11375,7 +11377,7 @@ h=Math.sqrt(Math.pow(o.c-i.a,2)+Math.pow(o.d-i.b,2))
 l=new A.AJ(l,B.dov[u.az(12)],new A.u2(B.azs[u.az(5)],B.MN,B.dwB[u.az(6)],D.aM,"human",!1,0,1),o,j,6+D.o.D(D.i.V(h/45),0,30),m)
 l.x=d
 t.push(l)}}},
-arw(d,e){var w,v,u,t=this.c
+arx(d,e){var w,v,u,t=this.c
 t===$&&C.c()
 w=t.length
 v=0
@@ -11383,7 +11385,7 @@ for(;v<t.length;t.length===w||(0,C.J)(t),++v){u=t[v]
 if(Math.sqrt(Math.pow(u.c-d,2)+Math.pow(u.d-e,2))<150)return u}return null},
 cZC(d,e){var w,v,u,t,s,r,q=this
 if(q.f!=null)return null
-w=q.arw(d,e)
+w=q.arx(d,e)
 if(w==null)return null
 v=C.a([],x.bz)
 for(u=q.e,t=u.length,s=0;s<u.length;u.length===t||(0,C.J)(u),++s){r=u[s]
@@ -11392,9 +11394,9 @@ D.d.aZ(v,new A.cDH())
 r=D.d.gH(v)
 D.d.W(u,r)
 return q.f=r},
-ga7n(d){var w=this.f
+ga7o(d){var w=this.f
 return w==null?null:A.zc(w.e)},
-cRp(d,e,f){var w,v,u=this,t=u.f,s=u.ga7n(0)
+cRp(d,e,f){var w,v,u=this,t=u.f,s=u.ga7o(0)
 if(t==null||s==null)return 0
 if(Math.sqrt(Math.pow(s.a-d,2)+Math.pow(s.b-e,2))>70)return 0
 u.f=null;++u.r
@@ -11404,17 +11406,17 @@ u.w=w+v
 u.y=f+4
 u.V8(f)
 return v},
-ana(d){var w,v,u,t,s,r,q,p
+anb(d){var w,v,u,t,s,r,q,p
 if(d<this.y)return B.IE
 w=C.a([],x.K)
 for(v=this.e,u=v.length,t=d*1.4,s=0;s<v.length;v.length===u||(0,C.J)(v),++s){r=v[s]
 q=r.d
 p=r.c
-w.push(new A.a55(r.ga8V().a,r.ga8V().b,Math.atan2(q.c-r.ga8V().a,q.d-r.ga8V().b)+3.141592653589793,t+r.a,!1,!1,p,p.c))}return w}}
+w.push(new A.a55(r.ga8W().a,r.ga8W().b,Math.atan2(q.c-r.ga8W().a,q.d-r.ga8W().b)+3.141592653589793,t+r.a,!1,!1,p,p.c))}return w}}
 A.pT.prototype={}
 A.bLs.prototype={
 gMo(){var w,v=this,u=v.r
-if(u===$){w=A.hFW(v.b)
+if(u===$){w=A.hFX(v.b)
 v.r!==$&&C.bD()
 v.r=w
 u=w}return u},
@@ -11428,7 +11430,7 @@ case"school":w=B.daz
 break
 case"firestation":w=B.dq8
 break
-case"tower":w=B.dka
+case"tower":w=B.dkb
 break
 default:w=B.duW
 break}return w},
@@ -11438,7 +11440,7 @@ case"dmv":w=B.dcz
 break
 case"shop":w=B.d72
 break
-case"school":w=B.djV
+case"school":w=B.djW
 break
 case"firestation":w=B.dgQ
 break
@@ -11468,7 +11470,7 @@ if(d===0){w=e.gCx()
 v=C.U(w).k("Y<1>")
 u=C.C(new C.Y(w,new A.bLt(),v),v.k("M.E"))
 if(u.length===0)return"The desk: nobody needs the hospital right now. "+e.x+" doses of medicine in stock."
-return e.aEF(D.d.gH(u))}t=d-1
+return e.aEG(D.d.gH(u))}t=d-1
 if(e.e[t].a<0)return"This bed is empty. Admit someone at the desk first."
 return e.bm2(t)
 case"shop":if(e==null)return q
@@ -11660,7 +11662,7 @@ d.x=0
 d.x=$.dm=$.dm+1
 d.aF(B.hlZ,B.haI,D.aP)
 for(w=0;w<3;++w){v=90+w*30
-d.aF3(new A.r(-146,62,v),B.h8S,[D.bC,D.bi,D.bl][w],0)
+d.aF4(new A.r(-146,62,v),B.h8S,[D.bC,D.bi,D.bl][w],0)
 d.aF(new A.r(-145.6,62,v),B.hnx,D.c)}d.aF(B.h89,B.haH,D.fy)
 d.aF(B.hhx,B.hoq,D.c)
 d.aF(B.hgF,B.hn6,D.bC)
@@ -11682,7 +11684,7 @@ this.rQ(d,0,78,24,D.aH)
 e.push(B.c51)
 e.push(B.c4V)
 e.push(B.c52)},
-aWQ(a5,a6,a7){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4=a6*128
+aWR(a5,a6,a7){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4=a6*128
 switch(a7){case 1:w=B.dfQ
 break
 case 2:w=B.dhe
@@ -11710,7 +11712,7 @@ default:a3=t?B.bvQ:a2
 a5.aE(new A.r(a1,o,f),B.hiS,a3,0.05)
 a3=t?B.bix:D.c
 a5.aF(new A.r(a1,p,f),B.he3,a3)}}}}a5.x=0},
-aVM(d,e){var w,v,u,t,s,r,q,p
+aVN(d,e){var w,v,u,t,s,r,q,p
 d.x=$.dm=$.dm+1
 d.aE(new A.r(e,32,11),B.hbI,D.bP,0.3)
 d.aF(new A.r(e,33,22.4),B.hbw,D.bq)
@@ -11742,10 +11744,10 @@ d.aF(B.hj_,B.hh_,D.w7)
 d.eg(B.aYI,5.5,B.agF,5,8)
 d.eg(B.aYJ,5.7,B.bjI,3,8)
 d.x=0
-n.aWQ(d,-1,0)
-n.aWQ(d,1,m?l:1)
-n.aVM(d,-104)
-n.aVM(d,104)
+n.aWR(d,-1,0)
+n.aWR(d,1,m?l:1)
+n.aVN(d,-104)
+n.aVN(d,104)
 for(l=[B.eFz,B.eV_],v=l.length,u=0;u<v;++u){t=l[u]
 s=t.a
 r=t.b
@@ -11771,7 +11773,7 @@ cwI(d,e){var w,v,u,t,s
 d.aE(B.h6S,B.hpV,D.e7,0.1)
 d.aF(B.hom,B.hkt,B.brt)
 d.aE(B.h5r,B.h7V,B.o7,0.15)
-for(w=0;w<4;++w){v=B.diO[w]
+for(w=0;w<4;++w){v=B.diP[w]
 u=v.a
 t=v.b
 for(s=0;s<2;++s){v=u+B.a64[s]
@@ -11834,7 +11836,7 @@ d.aF(B.hcE,B.h9T,B.ia)
 d.f=1
 for(v=n.b.a,r=v*7,q=0;q<15;++q){p=30+D.o.F(r+q*13,90)
 o=B.de8[D.o.F(v+q,4)]
-d.aF(new A.r(215+D.o.F(q,5)*80,s+p/2,-60+D.o.aq(q,5)*135),new A.r(38,p,38),o)}e.push(new A.he(B.h58,"\ud83c\udfe2 LEVEL "+n.f+" of "+n.gMo(),D.dK,19502))
+d.aF(new A.r(215+D.o.F(q,5)*80,s+p/2,-60+D.o.aq(q,5)*135),new A.r(38,p,38),o)}e.push(new A.he(B.h58,"\ud83c\udfe2 LEVEL "+n.f+" of "+n.gMo(),D.dJ,19502))
 e.push(B.c4R)
 e.push(B.c4T)
 n.bcL(d,e)},
@@ -11937,7 +11939,7 @@ cRd(){var w,v,u,t,s,r
 if(this.a!=="tower")return B.qS
 w=C.a([],x.a)
 for(v=x.o,u=0;u<2;++u){t={}
-s=B.dl0[u]
+s=B.dl1[u]
 t.a=null
 t.a=s.b
 s=s.a*(22+22*this.y)
@@ -11956,7 +11958,7 @@ t=D.i.F(d*12,220)
 g=t<110
 f=g?t:220-t
 g=g?0:3.141592653589793
-A.xa(h,A.auH(!1,0,-1,"",!1,0,"",-1,t/12,!1,!1,!1,0,!1,!0,6,g,40+f),d,B.JK,!1,0,D.bP)
+A.xa(h,A.auG(!1,0,-1,"",!1,0,"",-1,t/12,!1,!1,!1,0,!1,!0,6,g,40+f),d,B.JK,!1,0,D.bP)
 s=k.ch
 if(s!=null){g=s.e
 r=0
@@ -11983,7 +11985,7 @@ o=g.w
 n=g.x
 m=g.y
 l=g.z&&n
-A.xa(h,A.auH(!1,0,-1,"",!1,g.Q,"",-1,m,!1,!1,!1,0,l,n,f,o,w),d,e,!0,0,null)
+A.xa(h,A.auG(!1,0,-1,"",!1,g.Q,"",-1,m,!1,!1,!1,0,l,n,f,o,w),d,e,!0,0,null)
 if(k.cx!=null){j=C.a([],j)
 new A.eL(j).aF(new A.r(g.f+Math.sin(g.w)*9,48+g.Q,g.r+Math.cos(g.w)*9),B.aYn,B.iH)
 D.d.v(i,j)}return i},
@@ -12000,7 +12002,7 @@ if(w>80)return"starving"
 if(w>55)return"hungry"
 if(v.d<40)return"unhappy at home"
 return"fine"},
-gaEZ(d){var w,v=this.gUN()
+gaF_(d){var w,v=this.gUN()
 A:{if("has died"===v){w="\ud83d\udd6f"
 break A}if("in hospital"===v){w="\ud83c\udfe5"
 break A}if("in danger"===v){w="\ud83c\udd98"
@@ -12009,9 +12011,9 @@ break A}if("starving"===v||"hungry"===v){w="\ud83c\udf7d"
 break A}if("unhappy at home"===v){w="\ud83d\ude1f"
 break A}w="\ud83d\ude42"
 break A}return w}}
-A.IG.prototype={}
+A.IH.prototype={}
 A.MA.prototype={}
-A.aUS.prototype={
+A.aUR.prototype={
 bBw(d,e){var w,v=C.a([],x.fP)
 for(w=0;w<7;++w)v.push(new A.PA(B.Df[w]))
 this.c=v
@@ -12029,7 +12031,7 @@ return new C.Y(w,new A.bMh(),C.U(w).k("Y<1>")).gI(0)},
 Q7(d){var w=this.f
 D.d.c9(w,0,d)
 if(w.length>12)w.pop()},
-aEG(a2,a3,a4){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1=this
+aEH(a2,a3,a4){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1=this
 a1.as+=a3
 for(w=a1.gCx(),v=w.length,u=-0.6*a3,t=0.8*a3,s=0.2*a3,r=a1.b,q=0.012*a3,p=a1.f,o=0.15*a3,n=0;n<w.length;w.length===v||(0,C.J)(w),++n){m=w[n]
 l=a4.d
@@ -12056,7 +12058,7 @@ if(m.d<15)e+=0.4
 if(e>0)l=m.c=m.c-e*a3
 else{l=m.c
 if(l<100){l=Math.min(100,l+o)
-m.c=l}}if(l<=0)a1.aTM(m)}}for(w=a1.e,v=1.2*a3,u=2.2*a3,d=0;d<w.length;++d){a0=w[d]
+m.c=l}}if(l<=0)a1.aTN(m)}}for(w=a1.e,v=1.2*a3,u=2.2*a3,d=0;d<w.length;++d){a0=w[d]
 t=a0.a
 if(t<0)continue
 s=a1.c
@@ -12065,7 +12067,7 @@ m=s[t]
 if(!m.f){a0.a=-1
 continue}t=a0.b=Math.max(0,a0.b-a3)
 if(t>30)a0.c=Math.min(100,a0.c+u)
-else if(t<=0)if((m.c-=v)<=0){a1.aTM(m)
+else if(t<=0)if((m.c-=v)<=0){a1.aTN(m)
 a0.a=-1
 continue}if(a0.c>=100){m.e=!1
 m.r=-1
@@ -12080,7 +12082,7 @@ if(p.length>12)p.pop()}}for(w=a1.d,v=w.length,n=0;n<v;++n)w[n].f+=a3
 a1.NU(a4)
 if((a1.at-=a3)<=0){a1.at=60+r.ai()*50
 a1.cLL(a4)}},
-aTM(d){var w
+aTN(d){var w
 d.f=!1
 d.c=0
 w=d.r
@@ -12088,7 +12090,7 @@ if(w>=0)this.e[w].a=-1
 d.r=-1
 D.d.br(this.d,new A.bMe(d))
 this.Q7(d.a.b+" has died. Keep up with everybody's needs: food, medicine and a home that works.")},
-aXD(d,e){return D.d.aV(this.d,new A.bMf(d,e))},
+aXE(d,e){return D.d.aV(this.d,new A.bMf(d,e))},
 NU(d){var w,v,u,t,s,r,q,p,o,n=this,m=n.d,l=C.C(m,x.fC),k=l.length,j=n.f,i=0
 for(;i<l.length;l.length===k||(0,C.J)(l),++i){w=l[i]
 v=B.Df[w.b]
@@ -12112,12 +12114,12 @@ t=d.d
 t===$&&C.c()
 r=q.a
 p=t[r.c]
-if(!p.gkT()&&!n.aXD(r.a,"power")){m.push(new A.IG(n.Q++,r.a,"power",B.d50[u.az(3)],15))
+if(!p.gkT()&&!n.aXE(r.a,"power")){m.push(new A.IH(n.Q++,r.a,"power",B.d50[u.az(3)],15))
 D.d.c9(j,0,r.b+" is calling for help: no power.")
 if(j.length>12)j.pop()}t=r.d
 o=t>=0?d.d[t]:p
 t=o.c
-if((t==="bathroom"||t==="kitchen")&&!o.gjX()&&!n.aXD(r.a,"leak")&&m.length<4){m.push(new A.IG(n.Q++,r.a,"leak",B.de_[u.az(3)],15))
+if((t==="bathroom"||t==="kitchen")&&!o.gjX()&&!n.aXE(r.a,"leak")&&m.length<4){m.push(new A.IH(n.Q++,r.a,"leak",B.de_[u.az(3)],15))
 D.d.c9(j,0,r.b+" is calling for help: a leak.")
 if(j.length>12)j.pop()}}},
 cLL(d){var w,v,u,t,s,r,q=this
@@ -12150,7 +12152,7 @@ t.r+=2
 u=d.a.b+" ate and feels better. +2 points."
 t.Q7(u)
 return u},
-aMj(d){var w,v,u=this
+aMk(d){var w,v,u=this
 if(!d.f)return d.a.b+" has died."
 if(!d.e)return d.a.b+" is not sick."
 w=u.x
@@ -12162,7 +12164,7 @@ u.r+=3
 v=d.a.b+" took the medicine and is better. +3 points."
 u.Q7(v)
 return v},
-aEF(d){var w,v,u,t
+aEG(d){var w,v,u,t
 if(!d.f)return d.a.b+" has died."
 if(d.r>=0)return d.a.b+" is already in hospital."
 if(!d.e&&d.c>60)return d.a.b+" is not ill enough for the hospital."
@@ -12190,7 +12192,7 @@ w===$&&C.c()
 v=w[s].a.b+" was treated. +1 point."
 u.Q7(v)
 return v},
-aFb(d){var w,v=this
+aFc(d){var w,v=this
 switch(d){case"food":w=v.r
 if(w<10)return"You need 10 points for 5 portions of food."
 v.r=w-10
@@ -12218,7 +12220,7 @@ k=p[4]
 p=r.a
 j=q?0.4:m
 i=q?"\ud83d\udcde ":""
-h=r.gaEZ(0)
+h=r.gaF_(0)
 r.gUN()
 r=q?"":l
 g=q?"":k
@@ -12263,19 +12265,19 @@ break
 case 5:return C.h(null,v)
 case 1:return C.f(t.at(-1),v)}})
 return C.i($async$Dj,v)}}
-A.aqx.prototype={
+A.aqw.prototype={
 S(){return new A.blH()}}
 A.blH.prototype={
 gblO(){var w=this.r
 return w===$?this.r=this.a.c:w},
 Y(){this.a4()
-this.a_p()},
-a_p(){return this.c4X()},
+this.a_q()},
+a_q(){return this.c4X()},
 c4X(){var w=0,v=C.j(x.H),u,t=this,s,r,q,p,o,n,m,l
-var $async$a_p=C.e(function(d,e){if(d===1)return C.f(e,v)
+var $async$a_q=C.e(function(d,e){if(d===1)return C.f(e,v)
 for(;;)switch(w){case 0:m={}
 w=3
-return C.b(A.aUU(),$async$a_p)
+return C.b(A.aUT(),$async$a_q)
 case 3:l=e
 if(t.c==null){w=1
 break}m.a=null
@@ -12285,9 +12287,9 @@ q=r==null?null:D.i.M(r)
 if(q==null)q=1
 r=$.EF
 if((r==null?null:r.b)===q){r.toString
-t.e=r}else{r=A.aXq(q)
+t.e=r}else{r=A.aXp(q)
 t.e=$.EF=r
-A.hkG(r,l)}m.a=A.h6s(l)
+A.hkH(r,l)}m.a=A.h6t(l)
 r=Date.now()
 s=C.aJ(s.h(l,"at"))
 s=s==null?null:D.i.M(s)
@@ -12296,25 +12298,25 @@ while(p>0){o=p>5?5:p
 s=m.a
 r=t.e
 r===$&&C.c()
-s.aEG(0,o,r)
+s.aEH(0,o,r)
 p-=o}}else{s=$.EF
-if(s==null)s=$.EF=A.aXq(D.o.F(Date.now(),1e5))
+if(s==null)s=$.EF=A.aXp(D.o.F(Date.now(),1e5))
 t.e=s
 s=s.b
-n=A.h6r(s,s)
+n=A.h6s(s,s)
 m.a=n
-n.NU(t.e)}$.I7=m.a
+n.NU(t.e)}$.I8=m.a
 t.m(new A.dW7(m,t))
 t.f=C.df(D.fH,new A.dW8(t))
 case 1:return C.h(u,v)}})
-return C.i($async$a_p,v)},
+return C.i($async$a_q,v)},
 caA(){var w,v,u,t=this,s=t.d
 if(s==null||t.c==null)return
 w=s.f
 v=w.length===0?"":D.d.gH(w)
 u=t.e
 u===$&&C.c()
-s.aEG(0,1,u)
+s.aEH(0,1,u)
 if(w.length!==0&&D.d.gH(w)!==v)t.Jo(D.d.gH(w))
 if(++t.y%8===0)s.Dj(0,t.e)
 t.m(new A.dWk())},
@@ -12330,9 +12332,9 @@ Jo(d){var w=this,v=w.x
 if(v!=null)v.a1(0)
 w.m(new A.dWe(w,d))
 w.x=C.cy(D.qA,new A.dWf(w))},
-acp(d){return this.bWs(d)},
+acq(d){return this.bWs(d)},
 bWs(d){var w=0,v=C.j(x.H),u,t=this,s,r,q
-var $async$acp=C.e(function(e,f){if(e===1)return C.f(f,v)
+var $async$acq=C.e(function(e,f){if(e===1)return C.f(f,v)
 for(;;)switch(w){case 0:q=B.Df[d.b]
 if(d.c==="power")s=q.c
 else{r=q.d
@@ -12342,7 +12344,7 @@ r.e=s
 r=t.c
 r.toString
 w=3
-return C.b(C.a6(r,!1).ce(C.ec(new A.dW3(),!1,null,x.H)),$async$acp)
+return C.b(C.a6(r,!1).ce(C.ec(new A.dW3(),!1,null,x.H)),$async$acq)
 case 3:if(t.c==null){w=1
 break}r=t.d
 if(r!=null)r.NU(t.e)
@@ -12350,30 +12352,30 @@ r=t.d
 if(r!=null)r.Dj(0,t.e)
 t.m(new A.dW4())
 case 1:return C.h(u,v)}})
-return C.i($async$acp,v)},
-akM(d){return this.cJ5(d)},
+return C.i($async$acq,v)},
+akN(d){return this.cJ5(d)},
 cJ5(d){var w=0,v=C.j(x.H),u,t=this,s
-var $async$akM=C.e(function(e,f){if(e===1)return C.f(f,v)
+var $async$akN=C.e(function(e,f){if(e===1)return C.f(f,v)
 for(;;)switch(w){case 0:s=t.e
 s===$&&C.c()
 s.e=d.a.c
 s=t.c
 s.toString
 w=3
-return C.b(C.a6(s,!1).ce(C.ec(new A.dWn(),!1,null,x.H)),$async$akM)
+return C.b(C.a6(s,!1).ce(C.ec(new A.dWn(),!1,null,x.H)),$async$akN)
 case 3:if(t.c==null){w=1
 break}s=t.d
 if(s!=null)s.NU(t.e)
 t.m(new A.dWo())
 case 1:return C.h(u,v)}})
-return C.i($async$akM,v)},
-a_q(d,e){var w=null,v=e.j(0.18),u=C.l(14),t=C.L(e.j(0.7),D.r,1)
+return C.i($async$akN,v)},
+a_r(d,e){var w=null,v=e.j(0.18),u=C.l(14),t=C.L(e.j(0.7),D.r,1)
 return C.q(w,C.d(d,w,w,w,w,w,w,C.n(w,w,e,w,w,w,w,w,w,w,w,12.5,w,w,D.u,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),D.f,w,w,new C.p(v,w,t,u,w,w,D.n),w,w,w,w,P.alm,w,w,w)},
 WY(d,e,f){var w=null
 return new C.D(D.mZ,C.A(C.a([new C.a5(62,w,C.d(d,w,w,w,w,w,w,Aa.ab4,w,w,w),w),C.E(C.by(C.l(6),C.kp(D.bA,w,w,8,w,D.i.D(e/100,0,1),new C.lN(f,x.dw)),D.aq),1)],x.p),D.l,w,D.e,D.j,0,w,w),w)},
 Q8(d,e,f){var w=null,v=e==null,u=v?D.dl:f.j(0.22),t=C.l(12),s=C.L(v?D.aU:f,D.r,1)
 return C.az(w,C.q(w,C.d(d,w,w,w,w,w,w,C.n(w,w,v?D.bW:f,w,w,w,w,w,w,w,w,12.5,w,w,D.u,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),D.f,w,w,new C.p(u,w,s,t,w,w,D.n),w,w,w,w,D.nE,w,w,w),D.y,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,e,w,w,w,w,w,w,!1,D.a4)},
-aeX(d,e){return this.Q8(d,e,D.av)},
+aeY(d,e){return this.Q8(d,e,D.av)},
 Q9(d,e){var w=null,v=C.a([e.j(0.1),B.G1],x.O),u=C.l(18)
 return C.q(w,d,D.f,w,w,new C.p(w,w,C.L(e.j(0.5),D.r,1),u,w,new C.a8(D.b7,D.b9,D.x,v,w,w),D.n),w,w,w,D.d3,D.bh,w,w,w)},
 caw(d){return this.Q9(d,D.aU)},
@@ -12381,9 +12383,9 @@ b0I(d,e,f){var w,v=null,u=this.gblO()===d,t=u?D.av.j(0.22):D.c.j(0.06),s=C.l(14)
 r=C.L(r,D.r,u?2:1)
 w=f>0?e+" ("+f+")":e
 return C.E(C.az(v,C.q(v,C.as(C.d(w,v,v,v,v,v,v,C.n(v,v,u?D.av:D.ac,v,v,v,v,v,v,v,v,12.5,v,v,D.u,v,v,!0,v,v,v,v,v,v,v,v),v,v,v),v,v,v),D.f,v,v,new C.p(t,v,r,s,v,v,D.n),v,v,v,D.jp,D.k2,v,v,v),D.y,!1,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,new A.dWm(this,d),v,v,v,v,v,v,!1,D.a4),1)},
-ayN(d,e){return this.b0I(d,e,0)},
+ayO(d,e){return this.b0I(d,e,0)},
 bIY(d){var w,v,u,t,s,r,q,p,o,n,m=this,l=null,k=d.d
-if(k.length===0)return new C.D(D.ez,C.x(B.dno,D.l,l,D.e,D.j,0,D.p),l)
+if(k.length===0)return new C.D(D.ez,C.x(B.dnp,D.l,l,D.e,D.j,0,D.p),l)
 w=x.p
 v=C.a([],w)
 for(u=k.length,t=0;t<k.length;k.length===u||(0,C.J)(k),++t){s=k[t]
@@ -12393,7 +12395,7 @@ p=B.Df[s.b]
 o=C.d(p.b,l,l,l,l,l,l,D.h7,l,l,l)
 n=r?"\u26a1 Power":"\ud83d\udeb0 Leak"
 r=r?D.bi:D.co
-v.push(m.Q9(C.x(C.a([new C.c8(D.aL,D.e,D.j,D.l,l,D.p,l,0,C.a([new A.adB(p.e,44,l),D.au,new C.bz(1,D.bc,o,l),m.a_q(n+"  +"+s.e,r)],w),l),D.T,C.d('"'+s.d+'"',l,l,l,l,l,l,B.fvN,l,l,l),D.X,new C.bM(D.aa,l,l,m.aeX("\ud83d\udd27 Go and fix it",new A.dW2(m,s)),l)],w),D.E,l,D.e,D.j,0,D.p),q))}return C.x(v,D.l,l,D.e,D.j,0,D.p)},
+v.push(m.Q9(C.x(C.a([new C.c8(D.aL,D.e,D.j,D.l,l,D.p,l,0,C.a([new A.adB(p.e,44,l),D.au,new C.bz(1,D.bc,o,l),m.a_r(n+"  +"+s.e,r)],w),l),D.T,C.d('"'+s.d+'"',l,l,l,l,l,l,B.fvN,l,l,l),D.X,new C.bM(D.aa,l,l,m.aeY("\ud83d\udd27 Go and fix it",new A.dW2(m,s)),l)],w),D.E,l,D.e,D.j,0,D.p),q))}return C.x(v,D.l,l,D.e,D.j,0,D.p)},
 cay(d){var w,v,u,t,s,r,q,p,o,n,m=this,l=null,k=x.p,j=C.a([],k),i=d.c
 i===$&&C.c()
 w=i.length
@@ -12404,30 +12406,30 @@ if(!t)s=D.aU
 else s=u.gUN()==="fine"?D.b4:D.c0
 t=t?1:0.5
 r=u.a
-q=C.d(r.b+"  "+u.gaEZ(0),l,l,l,l,l,l,D.h7,l,l,l)
+q=C.d(r.b+"  "+u.gaF_(0),l,l,l,l,l,l,D.h7,l,l,l)
 p=C.d(r.f,l,l,l,l,l,l,B.aV1,l,l,l)
 o=u.gUN()
 n=u.gUN()==="fine"?D.er:D.eU
 r=C.a([new C.c8(D.aL,D.e,D.j,D.l,l,D.p,l,0,C.a([new A.adB(r.e,50,l),D.au,new C.bz(1,D.bc,C.x(C.a([q,p,C.d("Now: "+o,l,l,l,l,l,l,new C.G(!0,n,l,l,l,l,12.5,D.I,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l),l,l,l)],k),D.E,l,D.e,D.j,0,D.p),l)],k),l),D.T,m.WY("Food",100-u.b,D.cF),m.WY("Health",u.c,D.b4),m.WY("Home",u.d,D.co)],k)
-if(u.f){q=m.aeX("\ud83c\udf5e Feed",new A.dW9(m,d,u))
+if(u.f){q=m.aeY("\ud83c\udf5e Feed",new A.dW9(m,d,u))
 p=m.Q8("\ud83d\udc8a Medicine",u.e?new A.dWa(m,d,u):l,D.bp)
 D.d.v(r,C.a([D.an,new C.D2(D.bG,8,8,D.bs,C.a([q,p,m.Q8("\ud83c\udfe5 Hospital",u.r>=0?l:new A.dWb(m,d,u),D.c0),m.Q8("\ud83c\udfe0 Visit",new A.dWc(m,u),D.b0)],k),l)],k))}j.push(m.Q9(new C.kG(t,C.x(r,D.E,l,D.e,D.j,0,D.p),l),s))}return C.x(j,D.l,l,D.e,D.j,0,D.p)},
 cax(d){var w,v,u,t,s=null,r=x.p,q=C.a([B.erJ],r)
 for(w=d.e,v=0;v<w.length;++v){u=w[v].a<0
 t=u?D.aU:D.c0
 q.push(this.Q9(u?new C.c8(D.aL,D.e,D.j,D.l,s,D.p,s,0,C.a([B.fVE,D.au,C.d("Bed "+(v+1)+": empty",s,s,s,s,s,s,B.fp7,s,s,s)],r),s):new C.ff(new A.dW6(this,d,v),s),t))}return C.x(q,D.l,s,D.e,D.j,0,D.p)},
-caz(d){var w=this,v=null,u=x.p,t=w.Q9(C.A(C.a([B.fGN,D.au,B.bIE,w.aeX("Buy",new A.dWh(w,d))],u),D.l,v,D.e,D.j,0,v,v),D.cF),s=w.Q9(C.A(C.a([B.h1K,D.au,B.bIV,w.Q8("Buy",new A.dWi(w,d),D.bp)],u),D.l,v,D.e,D.j,0,v,v),D.bp),r=C.a([B.fWF,D.an,C.d("Calls answered: "+d.y+"\nPatients sent home better: "+d.z+"\nPeople lost: "+d.gcQl(),v,v,v,v,v,v,B.aW1,v,v,v)],u)
-if(d.gCx().length===0)D.d.v(r,C.a([D.X,w.aeX("Start a new community",new A.dWj(w))],u))
+caz(d){var w=this,v=null,u=x.p,t=w.Q9(C.A(C.a([B.fGN,D.au,B.bIE,w.aeY("Buy",new A.dWh(w,d))],u),D.l,v,D.e,D.j,0,v,v),D.cF),s=w.Q9(C.A(C.a([B.h1K,D.au,B.bIV,w.Q8("Buy",new A.dWi(w,d),D.bp)],u),D.l,v,D.e,D.j,0,v,v),D.bp),r=C.a([B.fWF,D.an,C.d("Calls answered: "+d.y+"\nPatients sent home better: "+d.z+"\nPeople lost: "+d.gcQl(),v,v,v,v,v,v,B.aW1,v,v,v)],u)
+if(d.gCx().length===0)D.d.v(r,C.a([D.X,w.aeY("Start a new community",new A.dWj(w))],u))
 return C.x(C.a([t,s,w.caw(C.x(r,D.E,v,D.e,D.j,0,D.p))],u),D.l,v,D.e,D.j,0,D.p)},
 B(d){var w,v,u,t,s,r=this,q=null,p=r.d
 if(p==null)w=D.m2
 else{w=x.p
-v=C.A(C.a([A.bIK(C.aH(q,q,q,q,O.mn,q,q,q,new A.dWp(d),q,q,q,q,q,q)),B.bIm,r.a_q("\u2b50 "+p.r,D.av)],w),D.l,q,D.e,D.j,0,q,q)
-u=r.a_q("\ud83c\udf5e "+p.w,D.cF)
-t=r.a_q("\ud83d\udc8a "+p.x,D.bp)
+v=C.A(C.a([A.bIK(C.aH(q,q,q,q,O.mn,q,q,q,new A.dWp(d),q,q,q,q,q,q)),B.bIm,r.a_r("\u2b50 "+p.r,D.av)],w),D.l,q,D.e,D.j,0,q,q)
+u=r.a_r("\ud83c\udf5e "+p.w,D.cF)
+t=r.a_r("\ud83d\udc8a "+p.x,D.bp)
 s=p.e
-s=C.A(C.a([u,D.ae,t,D.ae,r.a_q("\ud83c\udfe5 "+new C.Y(s,new A.dWq(),C.U(s).k("Y<1>")).gI(0)+"/"+s.length,D.c0)],w),D.l,q,D.bb,D.j,0,q,q)
-t=C.A(C.a([r.b0I("calls","\ud83d\udcde Calls",p.d.length),r.ayN("people","\ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67 People"),r.ayN("hospital","\ud83c\udfe5 Hospital"),r.ayN("shop","\ud83d\uded2 Shop")],w),D.l,q,D.e,D.j,0,q,q)
+s=C.A(C.a([u,D.ae,t,D.ae,r.a_r("\ud83c\udfe5 "+new C.Y(s,new A.dWq(),C.U(s).k("Y<1>")).gI(0)+"/"+s.length,D.c0)],w),D.l,q,D.bb,D.j,0,q,q)
+t=C.A(C.a([r.b0I("calls","\ud83d\udcde Calls",p.d.length),r.ayO("people","\ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67 People"),r.ayO("hospital","\ud83c\udfe5 Hospital"),r.ayO("shop","\ud83d\uded2 Shop")],w),D.l,q,D.e,D.j,0,q,q)
 switch(r.gblO()){case"people":u=r.cay(p)
 break
 case"hospital":u=r.cax(p)
@@ -12454,7 +12456,7 @@ p=d.c
 J.bo(p.save())
 q=new C.aG(q.r,D.ai,null,null,C.a([],x.h))
 r=0+s
-q.E(new C.jR(new C.a1(0,0,r,r)))
+q.E(new C.jS(new C.a1(0,0,r,r)))
 d.mR(0,q)
 q=s*0.1
 r=s*0.78
@@ -12492,7 +12494,7 @@ A.fm.prototype={}
 A.yL.prototype={}
 A.iS.prototype={}
 A.N2.prototype={}
-A.ayD.prototype={
+A.ayC.prototype={
 gjF(){return this.a==="ok"}}
 A.mt.prototype={}
 A.mo.prototype={}
@@ -12501,7 +12503,7 @@ A.EB.prototype={}
 A.o0.prototype={}
 A.acy.prototype={}
 A.oF.prototype={}
-A.aXk.prototype={
+A.aXj.prototype={
 gx8(){var w=this.c
 return w.c>=2&&A.xh(A.nP(this.a),w).a==="ok"},
 gd6(d){return this.c}}
@@ -12517,7 +12519,7 @@ bBq(){var w,v=this.p4
 if(v.length!==0&&D.d.q(B.ih,v))return this.p4
 w=this.bkj(3)
 return w!=null&&D.d.q(B.ih,w)?w:"switch"},
-aoL(d){var w,v=this,u=v.p4
+aoM(d){var w,v=this,u=v.p4
 if(u.length!==0&&d===0&&D.d.q(B.iR,u))return v.p4
 w=v.bkj(d)
 if(d<2&&w!=null&&D.d.q(B.iR,w))return w
@@ -12535,7 +12537,7 @@ II(d){var w
 if(this.c!=="outside"){w=this.CW
 w=w!=null?w.rl(d):!this.ay}else w=!0
 return w},
-ga6B(){var w=this.p4
+ga6C(){var w=this.p4
 if(w.length===0)w=this.II(2)
 else w=w!=="fan"||this.gxo()
 return w},
@@ -12543,7 +12545,7 @@ gMy(){var w=this.p4
 if(w.length===0)w=this.II(3)
 else w=!D.d.q(B.ih,w)||this.gxo()
 return w},
-gaom(){var w=this.p4
+gaon(){var w=this.p4
 if(w.length===0)w=this.II(0)
 else w=!D.d.q(B.iR,w)||this.gxo()
 return w},
@@ -12592,14 +12594,14 @@ for(w=this.x,v=w.length,u=0;u<v;++u){t=w[u]
 if(t.a===d)return t}return null},
 dD(d,e,f,g){var w=this,v=w.y++,u=f==null?0:f,t=new A.mo(v,e,u,g==null?w.gh3(0)*0.6:g)
 w.x.push(t)
-w.a4u(0,t)
+w.a4v(0,t)
 return t},
 J(d,e){return this.dD(0,e,null,null)},
 cMo(){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d=this,a0=d.k1
 if(a0!=null){w=d.c
 w=w==="outside"||w==="hall"}else w=!0
 if(w)return
-v=A.hhS(d,A.aQN(a0),0)
+v=A.hhT(d,A.aQM(a0),0)
 w=v.c
 u=v.a/2
 t=w-u-6
@@ -12641,7 +12643,7 @@ e=t-m-1
 if(f<=d.gh3(0)-m-1)r.d=f
 else if(e>=m+1)r.d=e
 else r.c=q?h+52+l+1:h-52-l-1}}},
-a4u(d,e){var w,v,u,t,s,r=this,q=e.b,p=B.hN.h(0,q)
+a4v(d,e){var w,v,u,t,s,r=this,q=e.b,p=B.hN.h(0,q)
 p.toString
 w=(e.e&1)===1
 v=w?p.d:p.c
@@ -12654,7 +12656,7 @@ s=r.c==="outside"?-760+t:t+1
 e.d=D.i.D(p,s,r.gh3(0)-t-1)
 if(D.d.q(B.SE,q)){e.c=D.i.V(e.c/40)*40
 e.d=D.i.V(e.d/40)*40}}}
-A.aXp.prototype={
+A.aXo.prototype={
 bBJ(d){var w,v,u
 this.a=d
 A:{if("gfci"===d||"faucet"===d){w="bathroom"
@@ -12703,7 +12705,7 @@ for(t=0;t<7;++t){s=B.cnJ[t]
 u.push(new A.oF(!0,o,-150+s.a*50,s.b))}r=p.d=C.a([A.zK(0,"Bedroom 1",n,0,0,2,2,C.a([w.$1(-48)],v)),A.zK(1,"Bedroom 2",n,2,0,2,2,C.a([w.$1(-48)],v)),A.zK(2,"Bathroom 1",m,4,0,1,2,C.a([B.a1L],v)),A.zK(3,"Bedroom 3",n,5,0,2,2,C.a([w.$1(-48)],v)),A.zK(4,"Bathroom 2",m,7,0,2,2,C.a([B.a1L],v)),A.zK(5,"Hall","hall",0,2,9,1,u),A.zK(6,"Bedroom 4",n,0,3,2,2,C.a([w.$1(-48)],v)),A.zK(7,"Bedroom 5",n,2,3,2,2,C.a([w.$1(-48)],v)),A.zK(8,"Bathroom 3",m,4,3,1,2,C.a([B.a1L],v)),A.zK(9,"Kitchen","kitchen",5,3,2,2,C.a([new A.oF(!1,o,-26,5),B.bMC],v)),A.zK(10,"Living room","living",7,3,2,2,C.a([new A.oF(!1,o,-70,5),B.bMB,B.bMz],v)),A.zK(11,"NGMY City","outside",0,5,9,1,C.a([B.bMw],v))],x.bF)
 for(v=r.length,t=0;t<r.length;r.length===v||(0,C.J)(r),++t){q=r[t]
 u=q.c
-if(u==="outside"){p.aVO(q)
+if(u==="outside"){p.aVP(q)
 continue}q.go=u==="bedroom"?"fan":"light"
 q.ay=l.ai()<0.6
 q.ch=(u==="bathroom"||u==="kitchen")&&l.ai()<0.7
@@ -12719,13 +12721,13 @@ break
 default:u=l.az(2)
 break}q.Q=u
 q.as=l.az(4)
-p.aVO(q)}v=p.d
+p.aVP(q)}v=p.d
 u=v[5]
 u.k2=u.k1="tv100"
 u.p2=!0
 v[3].ay=!0
 v[2].ch=!0},
-aVO(b3){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4="plant",a5="roadcross",a6="road",a7="roundabout",a8="house2",a9="bighouse",b0="adboard",b1="flowers",b2=b3.gec(0)/2
+aVP(b3){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4="plant",a5="roadcross",a6="road",a7="roundabout",a8="house2",a9="bighouse",b0="adboard",b1="flowers",b2=b3.gec(0)/2
 switch(b3.c){case"bedroom":b3.dD(0,"rug",0,b3.gh3(0)*0.55)
 b3.dD(0,"bed",24,46)
 b3.dD(0,"nightstand",-8,14)
@@ -12802,18 +12804,18 @@ a0=d+1
 b3.dD(0,v.b,v.a,1560).f=D.o.F(d,6)}for(t=0;t<11;++t,d=a0){v=B.dth[t]
 a0=d+1
 b3.dD(0,v.b,v.a,1860).f=D.o.F(d,6)}b3.dD(0,"townsign",0,640)
-for(t=0;t<4;++t){v=B.dnE[t]
+for(t=0;t<4;++t){v=B.dnF[t]
 b3.dD(0,"cornersign",v.a,v.b)}for(t=0;t<5;++t)b3.dD(0,b0,B.dcW[t],2045)
 for(t=0;t<4;++t)b3.dD(0,b0,B.drh[t],-690)
 for(t=0;t<4;++t){u=B.cvp[t]
 a1=b3.dD(0,b0,-1245,u)
 a1.e=1
 a1.c=-1245
-b3.a4u(0,a1)
+b3.a4v(0,a1)
 a2=b3.dD(0,b0,1245,u)
 a2.e=3
 a2.c=1245
-b3.a4u(0,a2)}for(w=-1200;w<=1200;w+=480){for(t=0;t<4;++t)b3.dD(0,"pole",w,B.czL[t])
+b3.a4v(0,a2)}for(w=-1200;w<=1200;w+=480){for(t=0;t<4;++t)b3.dD(0,"pole",w,B.czL[t])
 for(v=Math.abs(w)<1100,o=w+240,t=0;t<4;++t){u=B.cGW[t]
 if(v)b3.dD(0,"lamppost",o,u)}}b3.dD(0,"car",-300,490).e=2
 b3.dD(0,"ambulance",110,345)
@@ -12856,24 +12858,24 @@ w===$&&C.c()
 return new C.Y(w,new A.bWx(),C.U(w).k("Y<1>")).gI(0)},
 gcSt(){var w=this.gra()
 return new C.Y(w,new A.bWw(),C.U(w).k("Y<1>")).gI(0)}}
-A.Jv.prototype={
+A.Jw.prototype={
 S(){var w,v,u,t,s=new C.vv()
 $.vY()
 s.fX(0)
 w=$.aw()
-v=$.hGf()
+v=$.hGg()
 u=x.S
 t=C.a([],x.aQ)
-return new A.aFx(s,B.aBL,new C.eA("",w),B.dlR,B.nN,B.nN,D.Dw,C.aR(x.N),new C.cw(null,x.eF),v,C.T(u,x.i),C.aR(u),t,D.cN)}}
-A.aFx.prototype={
-ghx(){var w,v,u=$.I7
+return new A.aFw(s,B.aBL,new C.eA("",w),B.dlS,B.nN,B.nN,D.Dw,C.aR(x.N),new C.cw(null,x.eF),v,C.T(u,x.i),C.aR(u),t,D.cN)}}
+A.aFw.prototype={
+ghx(){var w,v,u=$.I8
 if(u!=null){w=u.a
 v=this.d
 v===$&&C.c()
 v=w===v.b
 w=v}else w=!1
 return w?u:null},
-aB3(){var w,v,u=this.ghx()
+aB4(){var w,v,u=this.ghx()
 if(u==null)u=null
 else{w=this.d
 w===$&&C.c()
@@ -12888,10 +12890,10 @@ return new C.Y(w,new A.eid(),C.U(w).k("Y<1>")).gI(0)},
 Y(){var w,v,u,t,s,r=this
 r.a4()
 w=r.a.r
-if(w.length!==0)w=r.d=A.hPx(w)
+if(w.length!==0)w=r.d=A.hPy(w)
 else{w=$.EF==null
 if(w){w=D.o.F(Date.now(),1e5)
-$.EF=A.aXq(w)
+$.EF=A.aXp(w)
 r.em=!0}w=$.EF
 w.toString
 w=r.d=w}v=r.a
@@ -12908,10 +12910,10 @@ if(v.length!==0&&!u){w=w.gra()
 t=new C.Y(w,new A.eia(r),C.U(w).k("Y<1>"))
 if(!t.gau(0)){w=r.d
 w===$&&C.c()
-w.e=t.gH(0).a}}A.aXd($.air)
-A.hqF()
-r.ajD()
-r.aB3()
+w.e=t.gH(0).a}}A.aXc($.air)
+A.hqG()
+r.ajE()
+r.aB4()
 w=r.d
 w===$&&C.c()
 v=w.d
@@ -12921,9 +12923,9 @@ v=r.gbkM()
 u=r.d
 s=u.d
 s===$&&C.c()
-r.f=A.hAK(w,s[u.e].c!=="outside",B.aSO,"look",v,r.fr,0)
-r.aeY(!0)
-r.Zs()
+r.f=A.hAL(w,s[u.e].c!=="outside",B.aSO,"look",v,r.fr,0)
+r.aeZ(!0)
+r.Zt()
 r.fx=C.df(D.h3,new A.eib(r))
 $.aW.x1$.push(new A.eic(r))},
 t(){var w,v=this
@@ -12959,7 +12961,7 @@ case"ptrap":w="The sink has no drain yet. Tap the sink and build the drain under
 break
 default:w="The faucet is not connected yet. Tap the sink and connect the hoses."
 break}return w},
-aeY(d){var w,v,u,t,s,r,q,p=this,o=p.e
+aeZ(d){var w,v,u,t,s,r,q,p=this,o=p.e
 o===$&&C.c()
 o.z=!0
 w=p.d
@@ -13009,7 +13011,7 @@ o.c=s
 o.y=1
 o.a=q
 o.b=r}else o.fI(s,r,t,q)},
-yt(){return this.aeY(!1)},
+yt(){return this.aeZ(!1)},
 bQd(d,e){var w,v,u,t,s,r,q,p,o=this,n=o.e
 n===$&&C.c()
 w=n.bhd(d,e)
@@ -13030,12 +13032,12 @@ n.toString
 n.at=new C.y(D.i.D(w.a,-u.gec(0)/2+12,u.gec(0)/2-12),D.i.D(w.c,-290,u.gh3(0)-12))}else{v=o.e
 q=w.a
 p=w.c
-if(n)v.a8c(Math.max(70,v.c*0.4),0.32,new A.r(q,30,p))
+if(n)v.a8d(Math.max(70,v.c*0.4),0.32,new A.r(q,30,p))
 else{n=D.i.D(q,-u.gec(0)/2+8,u.gec(0)/2-8)
 p=D.i.D(p,8,u.gh3(0)-8)
-v.a8c(Math.max(36,o.e.c*0.35),0.2,new A.r(n,40,p))}}}A.fr(560,50,0.25,"tri")},
+v.a8d(Math.max(36,o.e.c*0.35),0.2,new A.r(n,40,p))}}}A.fr(560,50,0.25,"tri")},
 iv(){var w,v,u,t,s,r,q,p,o=this
-o.aB3()
+o.aB4()
 w=o.aP
 if(w!=null){v=w.ay
 v===$&&C.c()}else{v=o.d
@@ -13053,7 +13055,7 @@ r=q[r.e].c!=="outside"&&o.cx==null}else r=!1
 else r=!0
 q=o.fr
 p=o.bH
-v=A.hAK(v,r,p!=null?C.ez([100+p.a],x.S):B.aSO,u,s,q,t)}o.f=v},
+v=A.hAL(v,r,p!=null?C.ez([100+p.a],x.S):B.aSO,u,s,q,t)}o.f=v},
 ef(d,e){var w=this,v=w.ch
 if(v!=null)v.a1(0)
 w.m(new A.egX(w,d,e))
@@ -13061,13 +13063,13 @@ w.ch=C.cy(D.el,new A.egY(w))},
 iw(d){return this.ef(d,!0)},
 Qa(d){this.m(new A.egZ(this,d))
 A.fr(660,50,0.25,"tri")},
-ayO(d,e){var w,v=this,u=v.d
+ayP(d,e){var w,v=this,u=v.d
 u===$&&C.c()
 if(d!==u.e){u=u.d
 u===$&&C.c()
 u=d>=u.length}else u=!0
 if(u)return
-if(v.aR&&d!==11)v.a3d()
+if(v.aR&&d!==11)v.a3e()
 v.cP=v.bH=v.aP=null
 if(!e&&v.cx!=null)v.Sy()
 v.m(new A.efs(v,d))
@@ -13077,13 +13079,13 @@ w===$&&C.c()
 if(w[u.e].c==="outside")v.aH=v.b_L()
 v.yt()
 A.fr(520,60,0.25,"tri")},
-B0(d){return this.ayO(d,!1)},
+B0(d){return this.ayP(d,!1)},
 aZp(d){var w,v,u,t=this
 if(d===700){w=t.d
 w===$&&C.c()
 v=w.d
 v===$&&C.c()
-return v[w.e].gaom()}if(d===701){w=t.d
+return v[w.e].gaon()}if(d===701){w=t.d
 w===$&&C.c()
 v=w.d
 v===$&&C.c()
@@ -13096,7 +13098,7 @@ return v[w.e].gMy()}if(d===703){w=t.d
 w===$&&C.c()
 v=w.d
 v===$&&C.c()
-return v[w.e].ga6B()}if(d>=800&&d<820){u=d-800
+return v[w.e].ga6C()}if(d>=800&&d<820){u=d-800
 w=t.d
 w===$&&C.c()
 v=w.d
@@ -13106,7 +13108,7 @@ return u<w.length&&w[u].gx8()}if(d===720){w=t.d
 w===$&&C.c()
 v=w.d
 v===$&&C.c()
-return v[w.e].gaom()}if(d===721){w=t.d
+return v[w.e].gaon()}if(d===721){w=t.d
 w===$&&C.c()
 v=w.d
 v===$&&C.c()
@@ -13220,8 +13222,8 @@ i=u}if(d.w&&i){h=d.aZp(a0)
 A.fr(h?1400:500,160,0.25,"tri")
 w=h?"The tester glows and beeps: LIVE, 120 volts. Never touch a live wire. Switch the breaker off first.":"The tester stays dark: no power here. It still needs wiring."
 d.ef(w,!h)
-return}if(!v||a0===701){if(d.aZp(a0))d.aAE(w?0:1)
-else d.aVt()
+return}if(!v||a0===701){if(d.aZp(a0))d.aAF(w?0:1)
+else d.aVu()
 return}if(a0>=800&&a0<820){j=a0-800
 w=d.d
 w===$&&C.c()
@@ -13230,9 +13232,9 @@ v===$&&C.c()
 w=v[w.e].id
 if(j>=w.length)return
 g=w[j]
-if(!g.gx8())d.akT(j)
+if(!g.gx8())d.akU(j)
 else if(g.a==="switch")d.baP()
-else d.aAE(2+j)
+else d.aAF(2+j)
 return}if(a0===702||a0===703){w=d.d
 w===$&&C.c()
 v=w.d
@@ -13240,8 +13242,8 @@ v===$&&C.c()
 if(v[w.e].gMy()){w=d.d
 v=w.d
 v===$&&C.c()
-w=!v[w.e].ga6B()}else w=!0
-if(w)d.aVt()
+w=!v[w.e].ga6C()}else w=!0
+if(w)d.aVu()
 else d.baP()
 return}if(a0>=730&&a0<=733){w=a0===730||a0===732
 v=d.d
@@ -13261,26 +13263,26 @@ if(!w[u].p2){d.m(new A.egt(d))
 w=d.d
 v=w.d
 v===$&&C.c()
-d.iw("The TV is on and playing "+E.kx[v[w.e].p3].a+".")}else{e=A.aQN(f)
+d.iw("The TV is on and playing "+E.kx[v[w.e].p3].a+".")}else{e=A.aQM(f)
 w=d.c
 w.toString
-L.hhE(w,0,e.a,!0,D.yA,e.b)}return}if(a0>=720&&a0<728){w=d.d
+L.hhF(w,0,e.a,!0,D.yA,e.b)}return}if(a0>=720&&a0<728){w=d.d
 w===$&&C.c()
 v=w.d
 v===$&&C.c()
 u=a0-720
 f=v[w.e].fx.h(0,u)
 if(f==null)return
-e=A.aQN(f)
+e=A.aQM(f)
 if(e.d>0||e.e){w=d.c
 w.toString
-L.hhE(w,0,e.a,!0,D.yA,e.b)}else d.aAE(u)
+L.hhF(w,0,e.a,!0,D.yA,e.b)}else d.aAF(u)
 return}if(a0===710||a0===711||a0===712||a0===713){w=d.d
 w===$&&C.c()
 v=w.d
 v===$&&C.c()
 if(!v[w.e].gjX())if(d.d.a.length!==0)d.EJ()
-else d.a0L()
+else d.a0M()
 else{w=d.f
 w===$&&C.c()
 j=w.b.h(0,a0)
@@ -13293,7 +13295,7 @@ v=w[t.e].w[d].d
 u=v<w.length?w[v].b:"the next room"
 t=this.c
 t.toString
-return C.bT(E.mR,null,new A.eeQ(this,u,d,v),t,!0,!0,!1,D.kf,!1,!1,x.H)},
+return C.bT(E.mR,null,new A.eeQ(this,u,d,v),t,!0,!0,!1,D.kg,!1,!1,x.H)},
 bSc(){var w,v,u=this
 u.m(new A.eeZ(u))
 if(!u.aR){w=u.d
@@ -13310,7 +13312,7 @@ if(v[w.e].c!=="outside")u.yt()},
 bSe(){this.m(new A.ef_(this))
 this.ef("Phone view: the city fills your phone standing up. Pick a drone film and start filming.",!0)},
 bSA(){var w=this
-if(w.p4)w.a3c()
+if(w.p4)w.a3d()
 w.m(new A.ef1(w))},
 cnE(d){var w,v,u,t,s,r,q,p=this,o=null,n=p.c
 n.toString
@@ -13333,7 +13335,7 @@ if(q.eu){v=w.a
 u=v.b
 v=v.a
 t=q.ac
-s=w.ame(D.ag,new C.av(u,v),D.ag)
+s=w.amf(D.ag,new C.av(u,v),D.ag)
 return C.c4(p,D.w,C.as(new C.wK(t,C.qa(new C.a5(u,v,new C.an(D.a0,p,D.ab,D.t,C.a([C.bR(0,d,0,0,0),C.ap(p,C.az(D.iP,B.feG,D.y,!1,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,o,p,p,p,p,p,p,!1,D.a4),p,p,0,p,0,p)],x.p),p),p),s),p),p,p,p),p,!1,!1,p,p)}r=q.f4?w.r.b:0
 return C.c4(p,D.w,new C.an(D.a0,p,D.ab,D.t,C.a([C.bR(0,d,0,0,0),C.ap(p,C.az(D.iP,B.feH,D.y,!1,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,o,p,p,p,p,p,p,!1,D.a4),p,p,0,p,r,p)],x.p),p),p,!1,!1,p,p)},
 bUH(d){var w,v,u,t,s,r,q,p,o,n,m=this,l=null,k=m.c
@@ -13344,7 +13346,7 @@ v=k.b
 k=k.a
 u=new A.efg(m)
 t=m.ac
-s=w.ame(D.ag,new C.av(v,k),D.ag)
+s=w.amf(D.ag,new C.av(v,k),D.ag)
 r=x.p
 q=C.a([C.bR(0,d,0,0,0)],r)
 if(m.fD)q.push(C.ap(l,C.az(D.iP,B.fez,D.y,!1,l,new A.efj(m),l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,!1,D.a4),l,l,0,l,0,l))
@@ -13357,7 +13359,7 @@ p===$&&C.c()
 o=p.d
 o===$&&C.c()
 if(o[p.e].c==="outside"){p=m.p4?D.zp:D.CN
-r.push(u.$2(p,new A.efo(m)))}if(m.gakU())r.push(C.az(l,C.q(l,B.c_q,D.f,l,l,new C.p(D.cX,l,C.L(D.c,D.r,1),l,l,l,D.a6),l,40,l,D.iN,l,l,l,40),D.y,!1,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,m.gaSh(),l,l,l,l,l,l,!1,D.a4))
+r.push(u.$2(p,new A.efo(m)))}if(m.gakV())r.push(C.az(l,C.q(l,B.c_q,D.f,l,l,new C.p(D.cX,l,C.L(D.c,D.r,1),l,l,l,D.a6),l,40,l,D.iN,l,l,l,40),D.y,!1,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,m.gaSi(),l,l,l,l,l,l,!1,D.a4))
 q.push(C.ap(l,C.A(r,D.l,l,D.e,D.j,0,l,l),l,l,10,l,10,l))}return C.c4(l,D.w,C.as(new C.wK(t,C.qa(new C.a5(v,k,new C.an(D.a0,l,D.ab,D.t,q,l),l),s),l),l,l,l),l,!1,!1,l,l)},
 cEH(d){var w,v,u,t=B.Df[d.b]
 if(d.c==="power")w=t.c
@@ -13396,8 +13398,8 @@ w=new C.Y(u,new A.edp(),C.U(u).k("Y<1>"))
 if(!w.gae(0).C())return null
 v=w.gH(0)
 u=v.dx
-return u==null?v.dx=A.hNd(v):u},
-aTy(d){var w,v,u=this
+return u==null?v.dx=A.hNe(v):u},
+aTz(d){var w,v,u=this
 if(d==null)return
 w=d.c
 if(w>0){v=u.ghx()
@@ -13452,7 +13454,7 @@ if(w!=null)w.r+=v
 A.fr(940,140,0.25,"tri")
 t.ef("\ud83d\ude96 You dropped the passenger at the house. Fare: +"+v+" points. Thank you!",!0)
 t.m(t.gj3())
-return}if(s.f==null&&s.arw(d.f,d.r)!=null&&D.d.aV(s.e,new A.ehS(s,d))){w=t.c5
+return}if(s.f==null&&s.arx(d.f,d.r)!=null&&D.d.aV(s.e,new A.ehS(s,d))){w=t.c5
 if(!w.w){if(Date.now()-t.k1>2e4){t.k1=Date.now()
 t.ef("People are waiting for a ride, but you need an Uber licence first. Get it at the licence office.",!1)}return}if(w.b<=0)return
 u=s.cZC(d.f,d.r)
@@ -13483,15 +13485,15 @@ v=C.C(v,x.eB)
 D.d.aZ(v,new A.ehQ(q))
 p.SM(D.d.gH(v))
 p.ef("You are at an Uber station. Get in the car parked next to it and drive up to the people waiting. They get in by themselves.",!0)},
-aQP(d){var w,v,u,t,s,r,q,p,o,n,m,l,k=this,j=" points for the ",i=k.ghx()
+aQQ(d){var w,v,u,t,s,r,q,p,o,n,m,l,k=this,j=" points for the ",i=k.ghx()
 if(i==null)return
 w=d.a
 v=w==="bread"
-if(v||w==="medicine"){u=i.aFb(v?"food":"medicine")
+if(v||w==="medicine"){u=i.aFc(v?"food":"medicine")
 t=!D.a.a_(u,"You need")}else{v=d.r
 t=!1
 if(v>0){w=w==="tank"
-s=w?A.hf6(k.c5.b):d.e
+s=w?A.hf7(k.c5.b):d.e
 r=k.c5
 q=r.b
 if(q>=0.99)u="The tank is already full."
@@ -13557,7 +13559,7 @@ q.push(C.az(k,B.bX0,D.y,!1,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,new A.e
 o=C.A(q,D.l,k,D.e,D.j,0,k,k)
 n=t.$2("FOOD AND DRINKS (energy)",B.deb)
 s=w?"GAS":"HEALTH AND THE TOWN"
-m=t.$2(s,w?B.dqZ:B.dnI)
+m=t.$2(s,w?B.dqZ:B.dnJ)
 t=D.w.j(0.55)
 i=u?Math.min(i-24,820):340
 s=C.l(28)
@@ -13589,8 +13591,8 @@ if(s!=null){j=D.bi.j(0.14)
 i=C.l(16)
 h=C.L(D.bi,D.r,1)
 g=s.b
-f=C.d(A.LI(g).b,a1,a1,a1,a1,a1,a1,D.KJ,a1,a1,a1)
-k.push(C.q(a1,C.A(C.a([f,D.au,C.E(C.d(s.r?"You have the "+A.LI(g).c.toLowerCase()+". Take it to the house (follow the yellow line).":"Go to the "+r.$1(s.c).toLowerCase()+" to pick up the "+A.LI(g).c.toLowerCase()+".",a1,a1,a1,a1,a1,a1,D.pU,a1,a1,a1),1),C.az(a1,B.fHz,D.y,!1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,new A.efW(a0,a2),a1,a1,a1,a1,a1,a1,!1,D.a4)],l),D.l,a1,D.e,D.j,0,a1,a1),D.f,a1,a1,new C.p(j,a1,h,i,a1,a1,D.n),a1,a1,a1,D.d3,D.bh,a1,a1,a1))}else{j=C.a([B.fWh,D.T],l)
+f=C.d(A.LJ(g).b,a1,a1,a1,a1,a1,a1,D.KJ,a1,a1,a1)
+k.push(C.q(a1,C.A(C.a([f,D.au,C.E(C.d(s.r?"You have the "+A.LJ(g).c.toLowerCase()+". Take it to the house (follow the yellow line).":"Go to the "+r.$1(s.c).toLowerCase()+" to pick up the "+A.LJ(g).c.toLowerCase()+".",a1,a1,a1,a1,a1,a1,D.pU,a1,a1,a1),1),C.az(a1,B.fHz,D.y,!1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,a1,new A.efW(a0,a2),a1,a1,a1,a1,a1,a1,!1,D.a4)],l),D.l,a1,D.e,D.j,0,a1,a1),D.f,a1,a1,new C.p(j,a1,h,i,a1,a1,D.n),a1,a1,a1,D.d3,D.bh,a1,a1,a1))}else{j=C.a([B.fWh,D.T],l)
 for(a2=a2.rk(0,u,t),a2=C.cW(a2,0,C.dA(6,"count",x.S),C.U(a2).c),i=a2.$ti,a2=new C.bQ(a2,a2.gI(0),i.k("bQ<ak.E>")),i=i.k("ak.E");a2.C();){h=a2.d
 j.push(q.$1(h==null?i.a(h):h))}D.d.v(k,j)}k.push(D.an)
 k.push(B.fKX)
@@ -13657,7 +13659,7 @@ if(u>=2.6){a2.d=1
 a2.c=v
 a2.f=3+D.o.D(Math.abs(w-t)-1,0,99)*1.1
 a2.e=t
-m=A.h6j("cabin",a3.b,!1)
+m=A.h6k("cabin",a3.b,!1)
 m.z=t
 m.Q=s
 m.y=1
@@ -13720,7 +13722,7 @@ w.w=3.141592653589793
 a3.x=!1
 a3.CW.a8(0)
 a3.B(a3.ch)
-d.ajW(a3,g)
+d.ajX(a3,g)
 a3.B(d.ghx())
 w.f=0
 w.r=16
@@ -13790,7 +13792,7 @@ k=k?D.w:D.c
 l=C.a([C.d(l,h,h,h,h,h,h,new C.G(!0,k,h,h,h,h,19,D.u,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h),h,h,h)],q)
 if(m)l.push(B.h_H)
 p.push(C.az(h,C.q(D.A,C.x(l,D.l,h,D.bb,D.j,0,D.p),D.f,h,h,new C.p(o,h,new C.bH(j,j,j,j),new C.be(n,n,n,n),h,h,D.n),h,52,h,h,h,h,h,58),D.y,!1,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,new A.eeY(i,r),h,h,h,h,h,h,!1,D.a4))}return C.q(D.A,C.ev(D.A,C.q(h,C.x(C.a([s,D.af,B.fYB,D.X,C.bV(D.bG,p,D.bs,h,8,8),D.an,B.fJq],q),D.al,h,D.e,D.P,0,D.p),D.f,h,h,new C.p(h,h,t,v,h,B.zI,D.n),h,h,h,D.bF,D.bQ,h,h,330),D.f,D.e4),D.f,w,h,h,h,h,h,h,h,h,h,h)},
-avb(){var w,v,u,t,s,r,q=this,p=q.e
+avc(){var w,v,u,t,s,r,q=this,p=q.e
 p===$&&C.c()
 w=Math.cos(p.b)
 v=Math.sin(q.e.b)
@@ -13801,17 +13803,17 @@ p=Math.sin(p.a)
 s=q.e
 r=s.c
 return new C.y(u.a2(0,new A.r(-t*w*p,r*v,r*w*Math.cos(s.a))),q.e.d)},
-aST(d,e,f,g,h){var w=new A.eeJ(h)
+aSU(d,e,f,g,h){var w=new A.eeJ(h)
 return new A.r(w.$4(d.a,e.a,f.a,g.a),w.$4(d.b,e.b,f.b,g.b),w.$4(d.c,e.c,f.c,g.c))},
 c67(d){var w=this.d
 w===$&&C.c()
 w=w.d
 w===$&&C.c()
-return A.igI(D.d.fe(w,new A.efH()),d)},
+return A.igJ(D.d.fe(w,new A.efH()),d)},
 cBM(d){var w,v,u=this
 u.Bw()
 u.Sy()
-if(u.aR)u.a3d()
+if(u.aR)u.a3e()
 u.aP=null
 w=u.c67(d)
 if(w.length===0)return
@@ -13824,14 +13826,14 @@ v.f=2600
 v.at=-1.2
 v.ax=1.4
 v.pl(!0)
-u.aei()
+u.aej()
 v=u.RG
 if(v!=null)v.bQ(0)
 v=new A.a60(u.gbQT(),A1.C5)
 v.fX(0)
 u.RG=v},
-aei(){var w,v,u,t,s,r,q,p=this,o=++p.ry,n=p.rx
-if(o>=n.length){p.a3c()
+aej(){var w,v,u,t,s,r,q,p=this,o=++p.ry,n=p.rx
+if(o>=n.length){p.a3d()
 return}w=n[o]
 p.to=Date.now()
 o=w.f
@@ -13845,17 +13847,17 @@ t=u.d
 t===$&&C.c()
 u=t[u.e]
 t=o.a
-u=A.h6j(v,o,u.k4.q(0,t))
+u=A.h6k(v,o,u.k4.q(0,t))
 u.B(p.ghx())
 p.aP=u
-p.ajW(u,p.gIT().h(0,t))
+p.ajX(u,p.gIT().h(0,t))
 t=p.aP
 t.toString
 t.B(p.ghx())
 p.m(p.gj3())}s=w.r
 if(s&&p.aP!=null){p.aP=null
 p.m(p.gj3())}if(w.w==null&&w.x==null){s=!n||s
-r=p.avb()
+r=p.avc()
 o=x.o
 n=C.a([],o)
 v=!s
@@ -13895,24 +13897,24 @@ l=u+v*0.5
 k=new A.r(s+Math.cos(l)*175,n+35,t+Math.sin(l)*175)
 if(v<3){j=v/3
 i=j*j*(3-2*j)
-h=a2.avb()
+h=a2.avc()
 k=A.oV(h.a,k,i)
-m=A.oV(h.b,m,i)}if(v>=w.d){a2.aei()
+m=A.oV(h.b,m,i)}if(v>=w.d){a2.aej()
 return}}else{u=w.w
 if(u!=null){u=B.ky[u]
 t=a2.CW.gf_()
-t=$.aSB().cZR(0,D.d.co(B.ky,u),t/1000).a
+t=$.aSA().cZR(0,D.d.co(B.ky,u),t/1000).a
 u=t[0]
 m=new A.r(u,26,t[1])
 l=v*0.6+0.8
 k=new A.r(u+Math.sin(l)*190,85,t[1]+Math.cos(l)*190)
 if(v<2.5){j=v/2.5
 i=j*j*(3-2*j)
-g=a2.avb()
+g=a2.avc()
 k=A.oV(g.a,k,i)
-m=A.oV(g.b,m,i)}if(v>=w.d){a2.aei()
+m=A.oV(g.b,m,i)}if(v>=w.d){a2.aej()
 return}}else{f=v*w.c
-if(a2.x1.length<2||f>=D.d.gan(a2.xr)){a2.aei()
+if(a2.x1.length<2||f>=D.d.gan(a2.xr)){a2.aej()
 return}u=a2.xr
 t=u.length
 e=0
@@ -13922,14 +13924,14 @@ n=e+1
 d=D.i.D((f-t)/(u[n]-t),0,1)
 t=new A.eeV()
 u=e-1
-k=a2.aST(t.$2(a2.x1,u),t.$2(a2.x1,e),t.$2(a2.x1,n),t.$2(a2.x1,s),d)
-m=a2.aST(t.$2(a2.x2,u),t.$2(a2.x2,e),t.$2(a2.x2,n),t.$2(a2.x2,s),d)}}a0=m.aJ(0,k)
+k=a2.aSU(t.$2(a2.x1,u),t.$2(a2.x1,e),t.$2(a2.x1,n),t.$2(a2.x1,s),d)
+m=a2.aSU(t.$2(a2.x2,u),t.$2(a2.x2,e),t.$2(a2.x2,n),t.$2(a2.x2,s),d)}}a0=m.aJ(0,k)
 a1=Math.max(8,a0.gp7())
 u=a2.e
 u===$&&C.c()
 t=Math.atan2(a0.a,-a0.c)
 u.HG(a1,Math.asin(D.i.D(-a0.b/a1,-1,1)),m,t)},
-a3c(){var w=this,v=w.e
+a3d(){var w=this,v=w.e
 v===$&&C.c()
 v.as=0
 v=w.RG
@@ -13946,7 +13948,7 @@ w===$&&C.c()
 w=w.d
 w===$&&C.c()
 return D.d.fe(w,new A.efw()).cx},
-avo(d){var w,v=C.a([],x.u)
+avp(d){var w,v=C.a([],x.u)
 for(w=0;w<4;++w)v.push(d.rl(w))
 return v},
 cCa(d){var w,v,u=C.a([],x.t)
@@ -13963,24 +13965,24 @@ v=d.at.h(0,r)
 u=v==null
 t=u?null:v.a
 s=A.uw(t==null?w.b:t).toLowerCase()
-if(u||!A.hay(w.b,v.a))return"nothing put in yet at "+A.j7(r).b
+if(u||!A.haz(w.b,v.a))return"nothing put in yet at "+A.j7(r).b
 if(v.b.c<2)return"the "+s+" at "+A.j7(r).b+" is not finished: fasten every wire and close it"
-return"the "+s+" at "+A.j7(r).b+" works but is NOT wired safely: "+d.aqn(r).b},
-ajW(d,e){var w=e==null
-d.d=w?B.aBU:this.avo(e)
+return"the "+s+" at "+A.j7(r).b+" works but is NOT wired safely: "+d.aqo(r).b},
+ajX(d,e){var w=e==null
+d.d=w?B.aBU:this.avp(e)
 d.e=w?B.a44:this.cCa(e)},
 gbcO(){var w,v,u=this.aP
 if(u==null||!u.c)return null
 w=u.a
 v=u.b.a
 return w==="tower"?v*100+u.f:v},
-gakU(){var w,v=this.gbcO(),u=v==null?null:this.gIT().h(0,v)
-if(u!=null)w=u.gbmB()||D.d.cD(this.avo(u),new A.ei4())
+gakV(){var w,v=this.gbcO(),u=v==null?null:this.gIT().h(0,v)
+if(u!=null)w=u.gbmB()||D.d.cD(this.avp(u),new A.ei4())
 else w=!1
 return w},
-atO(){var w,v,u,t,s,r=this,q=r.aP,p=r.gbcO(),o=p==null,n=o?null:r.gIT().h(0,p)
+atP(){var w,v,u,t,s,r=this,q=r.aP,p=r.gbcO(),o=p==null,n=o?null:r.gIT().h(0,p)
 if(q==null||o||n==null)return
-if(!D.d.cD(r.avo(n),new A.ees())){r.ef("Not quite done: the wiring is not right yet. Open the wiring bench again (tap the panel) and check every wire.",!1)
+if(!D.d.cD(r.avp(n),new A.ees())){r.ef("Not quite done: the wiring is not right yet. Open the wiring bench again (tap the panel) and check every wire.",!1)
 return}w=q.b
 r.gIT().W(0,p)
 o=q.a==="tower"
@@ -14023,8 +14025,8 @@ s=t.gIT().c3(0,k,new A.eft(l,d))
 w=3
 return C.b(t.yI(new A.efu(s)),$async$Z0)
 case 3:if(t.c==null){w=1
-break}t.ajW(d,s)
-if(t.gakU())t.atO()
+break}t.ajX(d,s)
+if(t.gakV())t.atP()
 else{d.B(t.ghx())
 t.m(t.gj3())
 r=x.s
@@ -14047,9 +14049,9 @@ p=D.d.aO(p,", ")
 q=m.length===0?"":"Why: "+C.cW(m,0,C.dA(2,"count",x.S),C.U(m).c).aO(0,"; ")+". "
 t.ef(r+". Still to do: "+p+". "+q+"Tap the red frames to carry on.",!1)}case 1:return C.h(u,v)}})
 return C.i($async$Z0,v)},
-abR(d){return this.bTP(d)},
+abS(d){return this.bTP(d)},
 bTP(d){var w=0,v=C.j(x.H),u,t=this,s,r,q,p,o
-var $async$abR=C.e(function(e,f){if(e===1)return C.f(f,v)
+var $async$abS=C.e(function(e,f){if(e===1)return C.f(f,v)
 for(;;)switch(w){case 0:o=t.d
 o===$&&C.c()
 s=o.d
@@ -14057,7 +14059,7 @@ s===$&&C.c()
 r=d.a
 q=s[o.e].db.c3(0,r,new A.ef8())
 w=3
-return C.b(t.yI(new A.ef9(q)),$async$abR)
+return C.b(t.yI(new A.ef9(q)),$async$abS)
 case 3:if(t.c==null){w=1
 break}if(q.c>=2&&A.xh(A.nP("light"),q).a==="ok"){o=t.d
 s=o.d
@@ -14073,7 +14075,7 @@ if(r!=null)r.r+=p
 t.m(t.gj3())
 t.ef("The street light is on again. You wired it correctly: black to black, white to white, ground to ground. +"+p+" stars.",!0)}else t.ef("The light is still out: finish the wiring and fit the cover, then it comes on.",!1)
 case 1:return C.h(u,v)}})
-return C.i($async$abR,v)},
+return C.i($async$abS,v)},
 caD(){var w,v,u=this,t=u.aH
 if(t==null)return
 w=u.d
@@ -14089,7 +14091,7 @@ n===$&&C.c()
 n=n.d
 n===$&&C.c()
 w=D.d.fe(n,new A.efJ())
-if(o.gaYI())return
+if(o.gaYJ())return
 n=x._
 v=C.a([],n)
 for(u=w.x,t=u.length,s=w.k4,r=0;r<u.length;u.length===t||(0,C.J)(u),++r){q=u[r]
@@ -14101,7 +14103,7 @@ v=q.a
 s.J(0,v)
 o.jm=v
 v=q.b==="bighouse"?"the big house":"the house"
-o.b6v(new A.QY(q,v,"power","",o.aPA(),0))}n=C.a([],n)
+o.b6v(new A.QY(q,v,"power","",o.aPB(),0))}n=C.a([],n)
 for(v=u.length,t=w.k3,r=0;r<u.length;u.length===v||(0,C.J)(u),++r){q=u[r]
 s=q.b
 if((s==="pole"||s==="lamppost")&&!t.q(0,q.a))n.push(q)}if(t.a<3&&n.length!==0&&D.o.F(o.bW,90)===0){t.J(0,n[D.o.F(o.bW*5,n.length)].a)
@@ -14109,25 +14111,25 @@ o.ef("\u26a1 A street light went out in the town. Find it (it is dark, with a re
 v=n.d
 v===$&&C.c()
 if(v[n.e].c==="outside"&&o.aP==null)o.m(o.gj3())},
-aye(d){return this.c83(d)},
+ayf(d){return this.c83(d)},
 c83(d){var w=0,v=C.j(x.H),u=this
-var $async$aye=C.e(function(e,f){if(e===1)return C.f(f,v)
+var $async$ayf=C.e(function(e,f){if(e===1)return C.f(f,v)
 for(;;)switch(w){case 0:u.m(new A.efK(u,d))
 return C.h(null,v)}})
-return C.i($async$aye,v)},
-aYU(){var w,v=this.fE,u=v==null?null:v.a
+return C.i($async$ayf,v)},
+aYV(){var w,v=this.fE,u=v==null?null:v.a
 if(u==null)return null
 w=A.tp(new A.r(0,0,B.hN.h(0,u.b).d/2+60),u.e*3.141592653589793/2)
 return new C.y(u.c+w.a,u.d+w.c)},
-axk(){var w=this.aH,v=this.aYU()
+axl(){var w=this.aH,v=this.aYV()
 if(w==null||v==null)return null
 return D.i.V(Math.sqrt(Math.pow(v.a-w.f,2)+Math.pow(v.b-w.r,2))/10)},
 cvk(){var w,v,u,t,s,r,q,p,o,n,m,l,k,j=this,i=null,h=j.aH,g=j.gKU()
-g=g==null?i:g.ga7n(0)
+g=g==null?i:g.ga7o(0)
 if(g==null){g=j.gpv()
-g=g==null?i:g.ga7n(0)
+g=g==null?i:g.ga7o(0)
 w=g}else w=g
-if(w==null)w=j.aYU()
+if(w==null)w=j.aYV()
 g=!1
 if(j.fE==null){v=j.gpv()
 if((v==null?i:v.x)==null){g=j.gKU()
@@ -14155,16 +14157,16 @@ m=q-30
 l=0
 k=46
 for(;;){if(!(k<m&&l<70))break
-u.aF3(new A.r(h.f+o*k,1.4,h.r+n*k),B.hpG,D.bi,p)
+u.aF4(new A.r(h.f+o*k,1.4,h.r+n*k),B.hpG,D.bi,p)
 k+=26;++l}}u.f=3
 u.d=0.4
 u.df(new A.r(v,0,s),new A.r(v,170,s),4,D.bi,8)
 u.df(new A.r(v,0,s),new A.r(v,1.6,s),24,D.bi,14)
 return g},
 bJd(){var w,v,u,t,s,r,q,p=this,o=null,n=p.y1,m=new A.edX(),l=new A.edW(),k=x.p
-if(n!=null){w=p.axk()
-v=C.a([C.A(C.a([C.ha(D.av,o,C.d(n.gbgE(),o,o,o,o,o,o,D.pW,o,o,o),o,24),D.bd,C.E(C.x(C.a([C.d(n.gaFd(),o,o,o,o,o,o,D.dk,o,o,o),B.fTO],k),D.E,o,D.e,D.j,0,D.p),1),C.az(o,D.t8,D.y,!1,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,new A.edY(p),o,o,o,o,o,o,!1,D.a4)],k),D.l,o,D.e,D.j,0,o,o),D.af],k)
-for(u=n.gaIy(0),t=0;t<3;++t)v.push(m.$1(u[t]))
+if(n!=null){w=p.axl()
+v=C.a([C.A(C.a([C.ha(D.av,o,C.d(n.gbgE(),o,o,o,o,o,o,D.pW,o,o,o),o,24),D.bd,C.E(C.x(C.a([C.d(n.gaFe(),o,o,o,o,o,o,D.dk,o,o,o),B.fTO],k),D.E,o,D.e,D.j,0,D.p),1),C.az(o,D.t8,D.y,!1,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,new A.edY(p),o,o,o,o,o,o,!1,D.a4)],k),D.l,o,D.e,D.j,0,o,o),D.af],k)
+for(u=n.gaIz(0),t=0;t<3;++t)v.push(m.$1(u[t]))
 u=D.bi.j(0.12)
 s=C.l(14)
 r=C.L(D.bi.j(0.5),D.r,1)
@@ -14224,7 +14226,7 @@ w===$&&C.c()
 v=w[d]
 w=this.c
 w.toString
-return C.bT(E.mR,null,new A.egS(this,v,u),w,!0,!0,!0,D.kf,!1,!1,x.H)},
+return C.bT(E.mR,null,new A.egS(this,v,u),w,!0,!0,!0,D.kg,!1,!1,x.H)},
 b4u(d){var w,v,u=this,t=u.d
 t===$&&C.c()
 w=t.d
@@ -14243,7 +14245,7 @@ h===$&&C.c()
 w=h.d
 w===$&&C.c()
 v=w[h.e].p4
-u=A.hf4(v)
+u=A.hf5(v)
 h=x.p
 w=C.a([C.d("Fits the "+A.bG7(v).toLowerCase()+":",i,i,i,i,i,i,B.fAi,i,i,i),D.ax],h)
 if(u.length===0)w.push(B.fT3)
@@ -14268,13 +14270,13 @@ v=w[t.e].p4
 u.a=""
 t=this.c
 t.toString
-return C.bT(E.mR,null,new A.ef7(u,this,v),t,!0,!0,!0,D.kf,!1,!1,x.H)},
-aAE(d){var w=this.c
+return C.bT(E.mR,null,new A.ef7(u,this,v),t,!0,!0,!0,D.kg,!1,!1,x.H)},
+aAF(d){var w=this.c
 w.toString
-return C.bT(E.mR,null,new A.egz(this,d),w,!0,!0,!1,D.kf,!1,!1,x.H)},
+return C.bT(E.mR,null,new A.egz(this,d),w,!0,!0,!1,D.kg,!1,!1,x.H)},
 cH2(){var w=this.c
 w.toString
-return C.bT(E.mR,null,new A.ehP(this),w,!0,!0,!0,D.kf,!1,!1,x.H)},
+return C.bT(E.mR,null,new A.ehP(this),w,!0,!0,!0,D.kg,!1,!1,x.H)},
 cGp(){var w=this.c
 w.toString
 return C.bT(D.L,null,new A.ehB(this),w,!0,!0,!0,null,!1,!1,x.H)},
@@ -14291,8 +14293,8 @@ if(u.c==="hall")if(u.k2==null)u.k2="tv100"
 u.p2=!0}t.z=!1
 s=x.fG
 w=t.d
-if(e){s=new A.aXr(!0,w,d,C.a([],s))
-s.b0T()}else{s=new A.aXr(!1,w,d,C.a([],s))
+if(e){s=new A.aXq(!0,w,d,C.a([],s))
+s.b0T()}else{s=new A.aXq(!1,w,d,C.a([],s))
 s.b0T()}t.cx=s
 t.cy=t.CW.gf_()/1000
 t.x=!0
@@ -14325,7 +14327,7 @@ u=h.bdN(w)
 v=i.d
 v===$&&C.c()
 t=v.e
-if(u.a!==t){i.akj(u)
+if(u.a!==t){i.akk(u)
 return}v=v.d
 v===$&&C.c()
 s=v[t]
@@ -14361,9 +14363,9 @@ else n=j==="right"?-0.55*k:-0.03
 v.fI(m+(70-m)*k,0.2-0.07*k,new A.r(l.a*0.9+q*0.1,36,l.c+t),n)}else{v=i.e
 v===$&&C.c()
 v.fI(m,0.24,new A.r(q*0.7,30,u.c*0.6+8),-0.05-q/(s.gec(0)/2)*0.2)}if(u.as!==i.dy)i.m(new A.ehC(i,u))},
-akj(d){return this.cGo(d)},
+akk(d){return this.cGo(d)},
 cGo(d){var w=0,v=C.j(x.H),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j
-var $async$akj=C.e(function(e,f){if(e===1){s.push(f)
+var $async$akk=C.e(function(e,f){if(e===1){s.push(f)
 w=t}for(;;)switch(w){case 0:l={}
 r.bb=!0
 l.a=null
@@ -14375,7 +14377,7 @@ p=q
 p=p==null?null:p.me(0.6).dh(0,D.iM)
 j=l
 w=7
-return C.b(x.fa.b(p)?p:C.dL(p,x.eT),$async$akj)
+return C.b(x.fa.b(p)?p:C.dL(p,x.eT),$async$akk)
 case 7:j.a=f
 t=2
 w=6
@@ -14394,7 +14396,7 @@ p===$&&C.c()
 n=p.d
 n===$&&C.c()
 n[p.e].ax.a8(0)
-r.ayO(d.a,!0)
+r.ayP(d.a,!0)
 p=r.d
 n=p.d
 n===$&&C.c()
@@ -14411,7 +14413,7 @@ l.b=0.15
 r.bb=!1
 case 1:return C.h(u,v)
 case 2:return C.f(s.at(-1),v)}})
-return C.i($async$akj,v)},
+return C.i($async$akk,v)},
 Sy(){var w,v,u,t=this,s=t.dx
 if(s!=null)s.a1(0)
 t.dx=null
@@ -14448,7 +14450,7 @@ r=w.x
 q=w.y
 p=w.z&&r
 o=w.Q
-return A.auH(n.c5.d>0,0,-1,"",!1,o,"",-1,q,!1,!1,!1,v.a,p,r,u,s,t)}return null},
+return A.auG(n.c5.d>0,0,-1,"",!1,o,"",-1,q,!1,!1,!1,v.a,p,r,u,s,t)}return null},
 ba9(){var w,v=this,u=v.c5,t=u.r
 if(t<=0)return
 u.r=0
@@ -14460,7 +14462,7 @@ t===$&&C.c()
 w=t.d
 w===$&&C.c()
 t=w[t.e]
-v=new A.baH(t,-t.gec(0)/2+10,t.gec(0)/2-10,-760,t.gh3(0)-10,0,24,0,B.dlT)
+v=new A.baH(t,-t.gec(0)/2+10,t.gec(0)/2-10,-760,t.gh3(0)-10,0,24,0,B.dlU)
 v.GZ(0)
 u=$.bmj
 if(u!=null){t=C.aJ(u.h(0,"seed"))
@@ -14487,7 +14489,7 @@ u.fX(0)
 v.b8=u
 v.m(new A.ehb())
 v.iw("Slide the round stick to walk. Walk up to a door and through it to go in: the house, the hospital or the shop. Double tap a spot to go there.")},
-a3d(){var w,v=this
+a3e(){var w,v=this
 v.aR=!1
 v.bf=v.b6=0
 v.bm=!1
@@ -14515,7 +14517,7 @@ s=D.i.D((t-h.bK)/1000,0,0.1)
 h.bK=t
 w.GZ(0)
 w.z=h.bm&&h.bH==null
-if(h.bH==null)w.aKW()
+if(h.bH==null)w.aKX()
 w.cSb(s)
 v=h.e
 v===$&&C.c()
@@ -14530,7 +14532,7 @@ if(p)w.ch=o.d>0?0.28:1
 if(n){if((u!==0||v!==0||w.at!=null)&&t-h.c8>6000){h.c8=t
 h.ef(p?"You are too tired to walk. Rest a little, or buy some food in a shop.":"The car has no gas. Get out, walk to a gas station and buy gas.",!1)}w.at=null
 m=!1}else if(u!==0||v!==0){w.at=null
-m=w.aNf(0,r*v+q*u,-q*v+r*u,s)}else m=w.G0(0,s)
+m=w.aNg(0,r*v+q*u,-q*v+r*u,s)}else m=w.G0(0,s)
 v=!m
 if(v)w.x=!1
 if(h.ey===0){u=h.d
@@ -14547,7 +14549,7 @@ p=w.f
 o=w.r
 u.cx=null
 u.d=new A.r(p,30,o)
-u.aek()
+u.ael()
 u.b0()}if(!f){g.cx=h.ap
 j=g.fH(0,h.ghx())
 h.ap=g.cx
@@ -14571,12 +14573,12 @@ return}f=!1
 if(h.bH==null){f=h.gpv()
 f=(f==null?null:f.x)!=null}if(f){f=h.gpv()
 f.toString
-h.aTy(f.bmo(w.f,w.r,h.CW.gf_()/1000))}f=!1
+h.aTz(f.bmo(w.f,w.r,h.CW.gf_()/1000))}f=!1
 if(h.bH==null){f=h.d
 f===$&&C.c()
 u=f.d
 u===$&&C.c()
-f=u[f.e].c==="outside"&&h.ok==null&&h.ey===0}if(f){f=$.aSB()
+f=u[f.e].c==="outside"&&h.ok==null&&h.ey===0}if(f){f=$.aSA()
 f.G0(0,h.CW.gf_()/1000)
 i=f.cUw(w.f,w.r)
 if(i>=0)h.cv6(i)}f=h.bH
@@ -14590,7 +14592,7 @@ w=w>-2&&w<14}else w=!1
 if(w)if(!(Math.abs(d.w)>2.2)){w=d.at
 w=w!=null&&w.b<4}else w=!0
 else w=!1
-if(w){s.a3d()
+if(w){s.a3e()
 s.B0(10)
 s.iw("You are inside the living room. Use Go outside to come back out.")
 return!0}w=s.d
@@ -14623,14 +14625,14 @@ if(d||q-o.dz>4000){o.dz=q
 p=D.Y.aw($.bmj,null)
 C.aA().bG(new A.egI(p),x.y).eB(new A.egJ())}},
 ctt(){return this.b5T(!1)},
-aiq(){var w=0,v=C.j(x.H),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0
-var $async$aiq=C.e(function(a1,a2){if(a1===1){s.push(a2)
+air(){var w=0,v=C.j(x.H),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0
+var $async$air=C.e(function(a1,a2){if(a1===1){s.push(a2)
 w=t}for(;;)switch(w){case 0:d=$.bmj
 w=d==null?3:4
 break
 case 3:t=6
 w=9
-return C.b(C.aA(),$async$aiq)
+return C.b(C.aA(),$async$air)
 case 9:q=a2
 p=C.aV(J.t(q.a,"ngmy_city_where"))
 if(p!=null)d=J.BD(x.G.a(D.Y.aQ(0,p,null)),x.N,x.A)
@@ -14692,7 +14694,7 @@ e=r.e
 n.HG(g,D.i.D(f,e.at,e.ax),m,l)
 case 1:return C.h(u,v)
 case 2:return C.f(s.at(-1),v)}})
-return C.i($async$aiq,v)},
+return C.i($async$air,v)},
 bGl(){var w,v,u,t,s,r,q=this,p=q.aH,o=!0
 if(p!=null){w=q.d
 w===$&&C.c()
@@ -14726,10 +14728,10 @@ v===$&&C.c()
 u=v.d
 u===$&&C.c()
 t=d.a
-s=A.h6j(w,d,u[v.e].k4.q(0,t))
+s=A.h6k(w,d,u[v.e].k4.q(0,t))
 s.cx=p.ap
 s.B(p.ghx())
-p.ajW(s,p.gIT().h(0,t))
+p.ajX(s,p.gIT().h(0,t))
 s.B(p.ghx())
 p.aP=s
 p.cP=null
@@ -14801,7 +14803,7 @@ u===$&&C.c()
 t=u.d
 t===$&&C.c()
 u=D.d.aV(t[u.e].x,new A.ehT(d))
-v=u}}if(v)l.a=new C.GO(new A.ehU(m),"\u26fd Buy gas ("+A.hf6(m.c5.b)+" \u2b50)")
+v=u}}if(v)l.a=new C.GO(new A.ehU(m),"\u26fd Buy gas ("+A.hf7(m.c5.b)+" \u2b50)")
 else if(!w)l.a=new C.GO(m.gbVV(),"\ud83d\udeaa Get out")
 else{if(m.ap!=null)l.a=new C.GO(m.gcaC(),"\u2b07 Put the crate down")
 w=m.d
@@ -14823,7 +14825,7 @@ n===$&&C.c()
 o=n[o.e].k3.q(0,r.a)&&q<60}else o=!1
 if(o){l.a=new C.GO(new A.ehW(m,r),"\ud83d\udd27 Fix the street light")
 break}if(D.d.q(B.Iv,t)&&q<36){l.a=new C.GO(new A.ehX(m,r),"\ud83c\udf4e Feed the "+p)
-break}if(D.d.q(B.dk4,t)&&q<60){l.a=new C.GO(new A.ehY(m,r),"\ud83d\ude97 Get in the "+p)
+break}if(D.d.q(B.dk5,t)&&q<60){l.a=new C.GO(new A.ehY(m,r),"\ud83d\ude97 Get in the "+p)
 break}}}w=l.a
 w=w==null?null:w.b
 u=m.cP
@@ -14870,7 +14872,7 @@ r=n.f+Math.sin(v)*s
 q=n.r+Math.cos(v)*s
 if(!n.La(r,q)){n.f=r
 n.r=q
-break}}n.aKW()
+break}}n.aKX()
 p.m(p.gj3())
 p.iw("You got out.")},
 bQR(){var w=this.bH,v=this.aH
@@ -14896,16 +14898,16 @@ break
 case 4:return C.h(null,v)
 case 1:return C.f(t.at(-1),v)}})
 return C.i($async$yI,v)},
-Zs(){var w=0,v=C.j(x.H),u=1,t=[],s,r,q
-var $async$Zs=C.e(function(d,e){if(d===1){t.push(e)
+Zt(){var w=0,v=C.j(x.H),u=1,t=[],s,r,q
+var $async$Zt=C.e(function(d,e){if(d===1){t.push(e)
 w=u}for(;;)switch(w){case 0:u=3
 w=6
-return C.b(C.aA(),$async$Zs)
+return C.b(C.aA(),$async$Zt)
 case 6:s=e
 w=C.el(J.t(s.a,"ngmy_city_locked_until"))!=null?7:8
 break
 case 7:w=9
-return C.b(J.h9(s,"ngmy_city_locked_until"),$async$Zs)
+return C.b(J.h9(s,"ngmy_city_locked_until"),$async$Zt)
 case 9:case 8:u=1
 w=5
 break
@@ -14917,16 +14919,16 @@ case 2:w=1
 break
 case 5:return C.h(null,v)
 case 1:return C.f(t.at(-1),v)}})
-return C.i($async$Zs,v)},
-aD5(d){var w=this,v=++w.kH
+return C.i($async$Zt,v)},
+aD6(d){var w=this,v=++w.kH
 if(v>=3){w.kH=0
 w.Bw()
 w.b2t()}else if(v===2){w.ef(d+". That is two in a row.",!1)
 w.b2t()}else w.ef(d+". Answer the phone and finish the job, or you lose your place.",!1)},
 b2t(){A.fr(1046,160,0.3,"sine")
 this.m(new A.efO(this))},
-gaYI(){return this.ey>0||this.fE!=null||Date.now()<0||this.p4},
-aPA(){var w,v,u=B.dvE[this.jn.az(6)]
+gaYJ(){return this.ey>0||this.fE!=null||Date.now()<0||this.p4},
+aPB(){var w,v,u=B.dvE[this.jn.az(6)]
 if(u.length!==0){w=this.d
 w===$&&C.c()
 w=w.d
@@ -14967,7 +14969,7 @@ a2=p.a
 r.J(0,a2)
 a1.jm=a2
 a2=p.b==="bighouse"?"the big house":"the house"
-return new A.QY(p,a2,"power","",a1.aPA(),0)}if(h===1&&m&&!l.gau(0)){i=v.gCx()
+return new A.QY(p,a2,"power","",a1.aPB(),0)}if(h===1&&m&&!l.gau(0)){i=v.gCx()
 g=C.U(i).k("Y<1>")
 f=C.C(new C.Y(i,new A.efN(),g),g.k("M.E"))
 i=f.length
@@ -14977,12 +14979,12 @@ e.c=Math.min(e.c,70)
 d=l.gae(0)
 if(!d.C())C.bj(C.fp())
 return new A.QY(d.gR(0),"the hospital","sick",e.a.b,"",0)}}if(h===3&&a2.length!==0&&j.a<3){p=a2[o.az(a2.length)]
-a0=2+o.az(A.hFW(p)-1)
+a0=2+o.az(A.hFX(p)-1)
 j.n(0,p.a,a0)
 return new A.QY(p,p.b==="hq"?"the NGMY company building":"the office tower","office","","",a0)}if(h===2&&s.length!==0&&n.a<4){p=s[o.az(s.length)]
 n.J(0,p.a)
 return new A.QY(p,"the street","light","","",0)}}return null},
-aYT(d){var w,v,u,t=this.d
+aYU(d){var w,v,u,t=this.d
 t===$&&C.c()
 t=t.d
 t===$&&C.c()
@@ -15010,7 +15012,7 @@ s.GZ(0)
 u=t.bUE(d,s)
 s.f=u.a
 s.r=u.b
-s.aKW()
+s.aKX()
 w=t.e
 w===$&&C.c()
 w.Di(new A.r(s.f,30,s.r))
@@ -15049,14 +15051,14 @@ u=d.b
 if(u==="house2"||u==="bighouse")v.Yg(d)
 else if(u==="tower"||u==="hq"){v.Yg(d)
 v.m(new A.efr(v))}else v.ef(y.Y,!0)},
-cGy(){var w,v,u,t=$.aSB(),s=C.a([],x.f),r=this.gpv()
-r=r==null?null:r.ana(this.CW.gf_()/1000)
+cGy(){var w,v,u,t=$.aSA(),s=C.a([],x.f),r=this.gpv()
+r=r==null?null:r.anb(this.CW.gf_()/1000)
 if(r==null)r=B.IE
 w=r.length
 v=0
 for(;v<r.length;r.length===w||(0,C.J)(r),++v){u=r[v]
 s.push(new C.y(u.b,u.c))}t.d=s
-return A.iu7(this.CW.gf_()/1000)},
+return A.iu8(this.CW.gf_()/1000)},
 cv6(d){var w,v,u,t,s,r=this,q=Date.now()
 if(q-r.tn<1e4)return
 r.tn=q
@@ -15084,18 +15086,18 @@ r.SM(D.d.gH(s))
 r.Yg(D.d.gH(s))
 r.ef("\ud83d\ude91 A "+u+" ran you over! An ambulance brought you to the hospital. Medicine and food are being ordered for you: they are on the Orders board. Cross at the zebra crossing when the green walking person shows.",!1)
 r.m(new A.egV(r))},
-ajD(){var w=0,v=C.j(x.H),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i,h,g
-var $async$ajD=C.e(function(d,e){if(d===1){s.push(e)
+ajE(){var w=0,v=C.j(x.H),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i,h,g
+var $async$ajE=C.e(function(d,e){if(d===1){s.push(e)
 w=t}for(;;)switch(w){case 0:h=r.d
 h===$&&C.c()
 if(h.a.length!==0){w=1
 break}q=null
-p=$.I7
+p=$.I8
 w=p==null||p.a!==h.b?3:4
 break
 case 3:t=6
 w=9
-return C.b(A.aUU(),$async$ajD)
+return C.b(A.aUT(),$async$ajE)
 case 9:q=e
 t=2
 w=8
@@ -15107,43 +15109,43 @@ break
 case 5:w=2
 break
 case 8:case 4:if(r.c==null){w=1
-break}n=$.I7
+break}n=$.I8
 if(n!=null&&n.a===r.d.b)m=n
 else{if(q!=null){h=C.aJ(J.t(q,"seed"))
 h=h==null?null:D.i.M(h)
 if(h==null)h=-1
 h=h===r.d.b}else h=!1
-if(h)m=A.h6s(q)
+if(h)m=A.h6t(q)
 else if(q!=null&&r.em){h=C.aJ(J.t(q,"seed"))
 l=h==null?null:D.i.M(h)
-h=A.aXq(l==null?r.d.b:l)
+h=A.aXp(l==null?r.d.b:l)
 r.d=$.EF=h
-A.hkG(h,q)
-m=A.h6s(q)}else{h=r.d.b
-m=A.h6r(h,h)
-m.NU(r.d)}}$.I7=m
-A.aUV().bG(new A.eh6(r),x.P)
+A.hkH(h,q)
+m=A.h6t(q)}else{h=r.d.b
+m=A.h6s(h,h)
+m.NU(r.d)}}$.I8=m
+A.aUU().bG(new A.eh6(r),x.P)
 for(h=m.d,k=h.length,j=r.bL,i=0;i<h.length;h.length===k||(0,C.J)(h),++i)j.J(0,h[i].a)
 r.m(new A.eh7(r))
 r.by=C.df(D.fH,new A.eh8(r))
-if(r.a.f==="city")r.aiq()
+if(r.a.f==="city")r.air()
 case 1:return C.h(u,v)
 case 2:return C.f(s.at(-1),v)}})
-return C.i($async$ajD,v)},
+return C.i($async$ajE,v)},
 caF(){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i=this,h=i.ghx()
 if(h==null||i.c==null)return
 if(i.cx==null){w=i.d
 w===$&&C.c()
-h.aEG(0,1,w)}if(++i.bW%8===0){w=i.d
+h.aEH(0,1,w)}if(++i.bW%8===0){w=i.d
 w===$&&C.c()
-h.Dj(0,w)}if(i.aP!=null&&i.gakU())i.atO()
+h.Dj(0,w)}if(i.aP!=null&&i.gakV())i.atP()
 w=!1
 if(!i.aR)if(i.ey===0){v=i.d
 v===$&&C.c()
 u=v.d
 u===$&&C.c()
 if(u[v.e].c==="outside"){w=i.c5
-w=w.c>0||w.d>0}}if(w){t=i.c5.a7p(1)
+w=w.c>0||w.d>0}}if(w){t=i.c5.a7q(1)
 if(t!=null)i.ef(t,!1)
 i.ba9()}if(i.aR){w=i.d
 w===$&&C.c()
@@ -15174,9 +15176,9 @@ if(r!=null){w=i.gpv()
 w=(w==null?null:w.x)!=null&&i.aP==null}else w=!1
 if(w){w=i.gpv()
 w.toString
-i.aTy(w.bmo(r.f,r.r,i.CW.gf_()/1000))}q=i.fE
+i.aTz(w.bmo(r.f,r.r,i.CW.gf_()/1000))}q=i.fE
 if(q!=null){++i.hE
-if(i.aYT(q)){i.kH=0
+if(i.aYU(q)){i.kH=0
 i.r9=Date.now()
 i.hR=0
 i.fE=null
@@ -15186,9 +15188,9 @@ w=i.ghx()
 if(w!=null)w.r+=p
 i.ef("The sick person is at the hospital. +"+p+" stars. Well done.",!0)}if(i.c!=null)i.m(i.gj3())}else if(i.hE>=240){i.fE=null
 i.hE=0
-i.aD5("The job was not finished in time")}}else{w=i.iW
+i.aD6("The job was not finished in time")}}else{w=i.iW
 if(w.length!==0&&i.aP==null&&i.bF==null&&i.bE==null&&Date.now()-i.r9>1e4){o=D.d.cG(w,0)
-if(!i.aYT(o))i.cBU(o)}else if(i.bF==null&&i.bE==null&&++i.hR>=45)i.cxX()}}else{v=w.d
+if(!i.aYU(o))i.cBU(o)}else if(i.bF==null&&i.bE==null&&++i.hR>=45)i.cxX()}}else{v=w.d
 v===$&&C.c()
 if(v[w.e].c!=="outside")i.hR=0}for(w=h.d,v=w.length,u=i.bL,n=0;n<w.length;w.length===v||(0,C.J)(w),++n){m=w[n]
 l=i.d
@@ -15206,7 +15208,7 @@ cxX(){var w,v,u=this
 u.hR=0
 w=u.caG()
 if(w==null)return
-if(u.gaYI()){v=u.iW
+if(u.gaYJ()){v=u.iW
 if(v.length<3)v.push(w)
 return}u.b6v(w)},
 b6v(d){var w=this
@@ -15241,7 +15243,7 @@ v=new A.egb(r)
 q=x.p
 p=C.a([],q)
 if(s!=null){o=C.ha(D.av,k,C.d(s.gbgE(),k,k,k,k,k,k,D.mB,k,k,k),k,28)
-n=s.gaFd()
+n=s.gaFe()
 p.push(v.$7$about$avatar$glow$onAnswer$onDecline$onLater$who(s.gbt1(),o,D.bi,new A.eg4(l,s),new A.eg5(l),new A.eg6(l,s),n))}if(t!=null){o=B.Df[t.b]
 n=o.b
 p.push(v.$6$about$avatar$glow$onAnswer$onDecline$who("NGMY City \xb7 mobile",C.ha(o.e.c,k,C.d(n[0],k,k,k,k,k,k,D.KA,k,k,k),k,28),D.b4,new A.eg7(l,t),l.gcCr(),n))}if(u){v=C.a([],q)
@@ -15255,11 +15257,11 @@ v.push(C.A(o,D.l,k,D.e,D.P,0,k,k))
 w=l.bH==null
 o=w?206:140
 v.push(new C.D(D.a0O,new C.a5(o,k,new A.Vo(l.c5,!w,12,k),k),k))
-p.push(new C.D(B.bF5,C.A(C.a([new A.aJL(new A.ega(l),k),C.x(v,D.dM,k,D.e,D.P,0,D.p)],q),D.dM,k,D.iT,D.j,0,k,k),k))}return new C.a5(r,k,C.x(p,D.l,k,D.e,D.P,0,D.p),k)},
-aVt(){var w=this.d
+p.push(new C.D(B.bF5,C.A(C.a([new A.aJK(new A.ega(l),k),C.x(v,D.dL,k,D.e,D.P,0,D.p)],q),D.dL,k,D.iT,D.j,0,k,k),k))}return new C.a5(r,k,C.x(p,D.l,k,D.e,D.P,0,D.p),k)},
+aVu(){var w=this.d
 w===$&&C.c()
 if(w.a.length!==0)this.EJ()
-else this.a0U()},
+else this.a0V()},
 EJ(){var w=0,v=C.j(x.H),u,t=this,s,r,q,p
 var $async$EJ=C.e(function(d,e){if(d===1)return C.f(e,v)
 for(;;)switch(w){case 0:p=t.d
@@ -15272,7 +15274,7 @@ w=1
 break}p=r.p4
 w=p==="ptrap"||p==="faucet"?3:5
 break
-case 3:if(r.RG==null)r.RG=A.ha6()
+case 3:if(r.RG==null)r.RG=A.ha7()
 w=6
 return C.b(t.yI(new A.efP(r)),$async$EJ)
 case 6:w=4
@@ -15296,9 +15298,9 @@ if(s)break A
 p="Done! The sink works."
 break A}t.iw(p)}case 1:return C.h(u,v)}})
 return C.i($async$EJ,v)},
-akT(d){return this.cJE(d)},
+akU(d){return this.cJE(d)},
 cJE(d){var w=0,v=C.j(x.H),u,t=this,s,r,q,p
-var $async$akT=C.e(function(e,f){if(e===1)return C.f(f,v)
+var $async$akU=C.e(function(e,f){if(e===1)return C.f(f,v)
 for(;;)switch(w){case 0:p=t.d
 p===$&&C.c()
 s=p.d
@@ -15306,16 +15308,16 @@ s===$&&C.c()
 r=s[p.e].id[d]
 q=r.gx8()
 w=3
-return C.b(t.yI(new A.ei3(r)),$async$akT)
+return C.b(t.yI(new A.ei3(r)),$async$akU)
 case 3:if(t.c==null){w=1
 break}t.m(t.gj3())
 if(r.gx8()&&!q){p=t.ghx()
 if(p!=null)p.r+=8}if(r.gx8()){p=q?"":"You are paid 8 stars. "
 s=r.a==="switch"?"Tap it to turn the light on and off.":"Tap it to plug something in."
 t.iw("Wired! "+p+s)}case 1:return C.h(u,v)}})
-return C.i($async$akT,v)},
-a0U(){var w=0,v=C.j(x.H),u,t=this,s,r,q,p,o,n,m
-var $async$a0U=C.e(function(d,e){if(d===1)return C.f(e,v)
+return C.i($async$akU,v)},
+a0V(){var w=0,v=C.j(x.H),u,t=this,s,r,q,p,o,n,m
+var $async$a0V=C.e(function(d,e){if(d===1)return C.f(e,v)
 for(;;)switch(w){case 0:m=t.d
 m===$&&C.c()
 s=m.d
@@ -15324,17 +15326,17 @@ r=s[m.e]
 s=r.c
 if(s==="outside"){w=1
 break}q=r.CW
-if(q==null){q=A.iv1(r)
+if(q==null){q=A.iv2(r)
 s=s==="hall"?"Hall laundry corner":r.b
 p=A.cvw(q,s,!1,m.b*37+r.a,!1)
-p.amV()
+p.amW()
 if(!r.ay)p.cMP()
 r.CW=p
 m=p}else m=q
 m.b=t.d.c
 o=r.gkT()
 w=3
-return C.b(t.yI(new A.efS(r)),$async$a0U)
+return C.b(t.yI(new A.efS(r)),$async$a0V)
 case 3:if(t.c==null){w=1
 break}t.m(t.gj3())
 if(r.gkT()&&!o){n=10+t.jn.az(26)
@@ -15343,9 +15345,9 @@ if(m!=null)m.r+=n
 m=r.gjX()?"":" The room still needs its plumbing, so it stays red until the pipes are done too."
 t.ef(r.b+": the wiring is finished and the light has power. You are paid "+n+" stars!"+m,!0)}else if(r.gkT()){m=r.gjX()?"":" The room still needs its plumbing."
 t.iw(r.b+": the wiring is finished. The light has power."+m)}case 1:return C.h(u,v)}})
-return C.i($async$a0U,v)},
-a0L(){var w=0,v=C.j(x.H),u,t=this,s,r,q,p,o,n
-var $async$a0L=C.e(function(d,e){if(d===1)return C.f(e,v)
+return C.i($async$a0V,v)},
+a0M(){var w=0,v=C.j(x.H),u,t=this,s,r,q,p,o,n
+var $async$a0M=C.e(function(d,e){if(d===1)return C.f(e,v)
 for(;;)switch(w){case 0:n=t.d
 n===$&&C.c()
 s=n.d
@@ -15356,13 +15358,13 @@ if(!(s==="bathroom"||s==="kitchen")){t.ef("This room has no plumbing. Bathrooms 
 w=1
 break}q=r.fr
 if(q==null){s=s==="kitchen"?"kitchen":"bathroom"
-s=r.fr=A.ha5(!1,n.b*41+r.a,s)
+s=r.fr=A.ha6(!1,n.b*41+r.a,s)
 n=s}else n=q
-if(!r.ch&&!n.ga4a())r.fr.cMO()
+if(!r.ch&&!n.ga4b())r.fr.cMO()
 r.fr.b=t.d.c
 p=r.gjX()
 w=3
-return C.b(t.yI(new A.efR(r)),$async$a0L)
+return C.b(t.yI(new A.efR(r)),$async$a0M)
 case 3:if(t.c==null){w=1
 break}t.m(t.gj3())
 if(r.gjX()&&!p){o=10+t.jn.az(26)
@@ -15370,10 +15372,10 @@ n=t.ghx()
 if(n!=null)n.r+=o
 t.ef(r.b+": the plumbing is finished and nothing leaks. You are paid "+o+" stars!",!0)}else if(r.gjX())t.iw(r.b+": the plumbing is finished and nothing leaks.")
 case 1:return C.h(u,v)}})
-return C.i($async$a0L,v)},
+return C.i($async$a0M,v)},
 bDT(){var w=this.c
 w.toString
-return C.bT(E.mR,null,new A.edo(this),w,!0,!0,!1,D.kf,!1,!1,x.H)},
+return C.bT(E.mR,null,new A.edo(this),w,!0,!0,!1,D.kg,!1,!1,x.H)},
 bDx(d){var w,v,u,t,s,r,q,p,o=this,n=o.d
 n===$&&C.c()
 w=n.d
@@ -15393,7 +15395,7 @@ break}if(D.d.cD(w,new A.edk(p))){q=p
 break}p+=6}if(q==null){o.ef("There is no free place left on the back wall.",!1)
 return}o.m(new A.edl(o,v,d,q))
 o.iw("Added. It is red because it is not wired: tap it to wire it.")},
-aeZ(d,e){var w,v,u=this,t=u.d
+af_(d,e){var w,v,u=this,t=u.d
 t===$&&C.c()
 w=t.d
 w===$&&C.c()
@@ -15435,12 +15437,12 @@ if(h)v.push(C.ap(w,C.q(w,w,D.f,w,w,new C.p(D.ay,w,C.L(B.G1,D.r,2),w,w,w,D.a6),w,
 return new C.D(D.fB,C.az(w,new C.an(D.a0,w,D.ab,D.f,v,w),D.y,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,f,w,w,w,w,w,w,!1,D.a4),w)},
 iu(d,e,f,g){return this.B_(d,e,f,g,!1)},
 Jp(d,e,f){return this.B_(d,e,f,D.av,!1)},
-aDc(d,e,f,g){var w=null,v=g==null,u=v?34:w,t=v?w:D.ku,s=C.l(10),r=e?D.c:D.aU
+aDd(d,e,f,g){var w=null,v=g==null,u=v?34:w,t=v?w:D.kv,s=C.l(10),r=e?D.c:D.aU
 r=C.L(r,D.r,e?3:1)
 if(v)v=w
 else v=C.as(C.d(g,w,w,w,w,w,w,C.n(w,w,d.iV()>0.5?D.w:D.c,w,w,w,w,w,w,w,w,12,w,w,D.I,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),w,w,w)
 return new C.D(G.oq,C.az(w,C.q(w,v,D.f,w,w,new C.p(d,w,r,s,w,w,D.n),w,34,w,w,t,w,w,u),D.y,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,f,w,w,w,w,w,w,!1,D.a4),w)},
-cDk(d,e,f){return this.aDc(d,e,f,null)},
+cDk(d,e,f){return this.aDd(d,e,f,null)},
 DN(d,e){var w=null,v=D.c.j(0.1),u=C.l(10),t=C.L(D.aU,D.r,1)
 return new C.D(D.fB,C.az(w,C.q(w,C.X(d,D.c,w,w,w,20),D.f,w,w,new C.p(v,w,t,u,w,w,D.n),w,36,w,w,w,w,w,40),D.y,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,e,w,w,w,w,w,w,!1,D.a4),w)},
 bM1(){var w,v,u,t,s,r,q,p,o,n,m,l,k=this,j=null
@@ -15461,7 +15463,7 @@ t.push(k.DN(D.ei,k.gcaL(k)))
 v.push(new C.a5(j,30,C.cl(t,j,j,j,j,j,D.aL,!1),j))}else v.push(B.b1Z)
 w=C.a([],w)
 for(t=B.hN.gdO(B.hN),t=t.gae(t);t.C();){s=t.gR(t)
-r=D.d.q(B.dnv,s.a)
+r=D.d.q(B.dnw,s.a)
 q=k.d
 p=q.d
 p===$&&C.c()
@@ -15472,7 +15474,7 @@ case"walls":w=k.as
 v=w<0
 w=v?"All walls":"Wall "+(w+1)+": tap Look to reset"
 v=C.a([k.Jp(w,v,new A.eeD(k))],x.p)
-for(o=0;o<8;++o)v.push(k.aDc(B.aBj[o],!1,new A.eeE(k,o),B.dy7[o]))
+for(o=0;o<8;++o)v.push(k.aDd(B.aBj[o],!1,new A.eeE(k,o),B.dy7[o]))
 return new C.a5(j,30,C.cl(v,j,j,j,j,j,D.aL,!1),j)
 case"floor":w=C.a([],x.p)
 for(o=0;o<7;++o){v=B.aB0[o]
@@ -15480,7 +15482,7 @@ t=k.d
 t===$&&C.c()
 s=t.d
 s===$&&C.c()
-w.push(k.aDc(v.b,s[t.e].Q===o,new A.eeF(k,o),v.a))}return new C.a5(j,30,C.cl(w,j,j,j,j,j,D.aL,!1),j)
+w.push(k.aDd(v.b,s[t.e].Q===o,new A.eeF(k,o),v.a))}return new C.a5(j,30,C.cl(w,j,j,j,j,j,D.aL,!1),j)
 case"ceiling":w=k.d
 w===$&&C.c()
 v=w.d
@@ -15518,11 +15520,11 @@ return C.c4(u,F.nx,C.bm(!0,C.as(new C.D(D.qD,C.x(C.a([B.fUP,D.af,B.fUW,D.X,B.fV9
 if(v.aG!=null)w.push(C.bR(0,new C.du(!0,C.lC(new A.ei7(v),u,D.dC,D.hG,new C.bE(v.aL,x.ac),new A.ei8(v),new C.br(1,0,x.e7),x.i),u),0,0,0))
 return new C.an(D.a0,u,D.ab,D.t,w,u)},
 bKh(){var w,v,u=this,t=null,s=C.a([],x.p)
-if(u.gakU())s.push(u.iu("\u2705 Complete work",!0,u.gaSh(),D.be))
+if(u.gakV())s.push(u.iu("\u2705 Complete work",!0,u.gaSi(),D.be))
 w=u.aR
 v=w?"\u23f9 Stop walking":"\ud83d\udeb6 Walk the city"
 s.push(u.iu(v,w,w?u.gb9C():u.gb9n(),D.b4))
-s.push(u.iu("\ud83c\udfd7 Build",!1,u.gaOX(),D.b4))
+s.push(u.iu("\ud83c\udfd7 Build",!1,u.gaOY(),D.b4))
 w=u.ghx()
 w=w==null?t:w.d.length
 if(w==null)w=0
@@ -15535,7 +15537,7 @@ w=u.aP
 if((w==null?t:w.a==="shop")===!0)s.push(u.iu("\ud83d\uded2 Buy things",u.k2,new A.eei(u),D.bi))
 w=u.aP
 if((w==null?t:w.a==="tower")===!0)s.push(u.iu("\ud83c\udfe2 Level "+w.f+" of "+w.gMo(),!1,new A.eej(u),D.co))
-if(u.fE!=null)s.push(u.iu("\ud83d\udccb My job"+(u.axk()==null?"":" \xb7 "+C.w(u.axk())+" m"),!1,new A.eek(u),D.bi))
+if(u.fE!=null)s.push(u.iu("\ud83d\udccb My job"+(u.axl()==null?"":" \xb7 "+C.w(u.axl())+" m"),!1,new A.eek(u),D.bi))
 w=u.iW.length
 if(w!==0)s.push(u.iu("\u23f3 Waiting: "+w,!1,new A.eel(u),D.av))
 s.push(u.B_("\ud83d\udef5 Orders",u.gpv().x!=null,new A.eem(u),D.bi,u.gpv().x==null))
@@ -15593,7 +15595,7 @@ m=f.caI()
 l=x.p
 k=C.a([],l)
 if(f.y&&f.d.a.length===0&&!f.eu)k.push(new A.bkN(f.d,f.gcaE(),Math.min(138,u*0.36),e))
-j=A.Ku(n,m,r,new A.edw(f),new A.edx(f),o,q,e,e,new A.edI(),p,d,f.gbQc(),new A.edJ(f),f.gcaJ(),s,t,w,k,e)
+j=A.Kv(n,m,r,new A.edw(f),new A.edx(f),o,q,e,e,new A.edI(),p,d,f.gbQc(),new A.edJ(f),f.gcaJ(),s,t,w,k,e)
 i=f.y1!=null||f.y2||f.R8||f.k3||f.go||f.k2||f.id
 d=f.ok
 h=(d==null?e:d.d)===1
@@ -15603,7 +15605,7 @@ else if(f.k2)w=f.cz1()
 else if(f.go)w=f.ckf()
 else if(f.k3)w=f.bRD()
 else w=f.R8?f.bQS():f.bJd()
-d.push(C.bR(0,w,0,0,0))}if(h)d.push(C.ap(e,new C.du(!0,C.as(new C.k3(f.p3,new A.edK(),e,e,x.cI),e,e,e),e),e,e,0,0,74,e))
+d.push(C.bR(0,w,0,0,0))}if(h)d.push(C.ap(e,new C.du(!0,C.as(new C.k4(f.p3,new A.edK(),e,e,x.cI),e,e,e),e),e,e,0,0,74,e))
 g=new C.an(D.a0,e,D.b3,D.t,d,e)}else g=j
 if(f.ao)return f.bKu(g)
 if(f.eu)return f.bUH(g)
@@ -15640,7 +15642,7 @@ q=s.d
 q===$&&C.c()
 if(q[s.e].c==="outside"){s=f.aR
 q=s?"\u23f9 Stop walking":"\ud83d\udeb6 Walk about"
-t.push(f.iu(q,s,s?f.gb9C():f.gb9n(),D.b4))}if(f.d.a.length===0)t.push(f.iu("\u2795 Add",!1,f.gaOX(),D.b4))
+t.push(f.iu(q,s,s?f.gb9C():f.gb9n(),D.b4))}if(f.d.a.length===0)t.push(f.iu("\u2795 Add",!1,f.gaOY(),D.b4))
 if(f.d.a.length===0){s=f.ghx()
 s=s==null?e:s.d.length
 if(s==null)s=0
@@ -15655,8 +15657,8 @@ if(t.a.length!==0){s=t.d
 s===$&&C.c()
 t=D.d.q(B.iR,s[t.e].p4)}else t=!1
 if(t)l.push(f.bSh())
-return A.IV(!0,D.av,new A.edH(f,a0),C.x(l,D.E,e,D.e,D.P,0,D.p),g,d,v.b,w,r)},
-cqe(d){return C.bT(E.mR,null,new A.egF(this),d,!0,!0,!0,D.kf,!1,!1,x.H)}}
+return A.IW(!0,D.av,new A.edH(f,a0),C.x(l,D.E,e,D.e,D.P,0,D.p),g,d,v.b,w,r)},
+cqe(d){return C.bT(E.mR,null,new A.egF(this),d,!0,!0,!0,D.kg,!1,!1,x.H)}}
 A.bkN.prototype={
 B(d){var w=null,v=D.i.D((this.e-10)/126,0.5,1),u=D.w.j(0.6),t=C.l(12),s=C.L(D.aU,D.r,1)
 return C.q(w,new C.a5(126*v,84*v,C.az(w,C.ev(D.A,C.b4(w,w,w,new A.bkc(this.c,w),B.fdB),D.f,D.vT),D.y,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,new A.dyN(this,v),w,w,w,w,!1,D.a4),w),D.f,w,w,new C.p(u,w,s,t,w,w,D.n),w,w,w,w,D.me,w,w,w)}}
@@ -15703,7 +15705,7 @@ l=m.c
 m=m.a.c
 k.a5(d,new C.o(t+(r-t)/2-l/2,s+(q-s)/2-m.gba(m)/2))}},
 aD(d){return!0}}
-A.aJL.prototype={
+A.aJK.prototype={
 S(){return new A.bv_()},
 bk4(d,e){return this.c.$2(d,e)}}
 A.bv_.prototype={
@@ -15736,7 +15738,7 @@ case"washer":w="\ud83e\uddfa"
 break
 default:w="\u26a1"
 break}break}return w},
-gaFd(){switch(this.c){case"sick":var w=this.d
+gaFe(){switch(this.c){case"sick":var w=this.d
 if(w.length===0)w="A neighbour"
 break
 case"light":w="City lights office"
@@ -15759,8 +15761,8 @@ case"washer":w="The washer outlet at a house"
 break
 default:w="No power at a house"
 break}break}return w},
-gaIy(d){var w,v=this,u="I will pay you between 10 and 35 stars. Thank you!",t=v.c
-A:{if("sick"===t){w=C.a(["Hello! "+v.gaFd()+" is very sick and cannot get up.","Please take them to the hospital: walk into the hospital and onto the desk to admit them.",u],x.s)
+gaIz(d){var w,v=this,u="I will pay you between 10 and 35 stars. Thank you!",t=v.c
+A:{if("sick"===t){w=C.a(["Hello! "+v.gaFe()+" is very sick and cannot get up.","Please take them to the hospital: walk into the hospital and onto the desk to admit them.",u],x.s)
 break A}if("office"===t){w=""+v.f
 w=C.a(["Hello, this is the office manager. The office on level "+w+" of "+v.b+" has lost its power and nobody can work.","Please take the elevator up to level "+w+", and fix the wiring at the breaker panel there.",u],x.s)
 break A}if("light"===t){w=C.a(["Hello! A street light is out and the street is dark.","It is the dark one with the red sign. Could you fix its wiring?",u],x.s)
@@ -15770,7 +15772,7 @@ break A}if(w==="range"){w=C.a(["Hello! The electric stove in "+v.b+" has stopped
 break A}if(w==="washer"){w=C.a(["Hello! The washing machine in "+v.b+" keeps tripping the breaker.","It is on its own 20 amp outlet in the laundry corner in the hall. Could you wire the washer outlet again? Switch the power off before you touch anything.",u],x.s)
 break A}w=C.a(["Hello! All the lights went out in "+v.b+". The power is off in the whole house.","Could you check the breaker panel inside and fix the wiring? Switch the power off before you touch anything.",u],x.s)
 break A}return w}}
-A.aKJ.prototype={
+A.aKI.prototype={
 S(){return new A.bxa()}}
 A.bxa.prototype={
 B(d){var w,v,u=this,t=null,s=C.aF(d,t,x.w).w,r=D.w.j(0.55),q=C.L(D.bW,D.r,1),p=u.d,o=C.ap(0,C.as(C.az(t,C.q(t,C.X(p?B.bRR:B.bRS,D.c,t,t,t,20),D.f,t,t,new C.p(r,t,q,t,t,t,D.a6),t,38,t,t,t,t,t,38),D.y,!1,B.hqB,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,new A.fh5(u),t,t,t,t,t,t,!1,D.a4),t,t,t),t,t,t,6,0,t)
@@ -15780,7 +15782,7 @@ q=r.b
 r=r.a
 p=u.a
 w=p.c
-v=s.ame(D.ag,new C.av(q,r),D.ag)
+v=s.amf(D.ag,new C.av(q,r),D.ag)
 return C.c4(t,D.w,C.as(new C.wK(w,C.qa(new C.a5(q,r,new C.an(D.a0,t,D.ab,D.t,C.a([C.bR(0,p.d,0,0,0),o],x.p),t),t),v),t),t,t,t),t,!1,!1,t,t)}}
 A.bWC.prototype={}
 A.m8.prototype={}
@@ -15791,8 +15793,8 @@ pD(d){var w=this.c
 w.toString
 return C.a6(w,!1).ce(C.ec(new A.dWy(d),!1,null,x.H))},
 B(d){var w,v,u,t,s,r,q,p,o,n,m=this,l=null
-$.atr="tech"
-w=C.aF(d,D.dJ,x.w).w
+$.atq="tech"
+w=C.aF(d,D.dO,x.w).w
 v=C.aH(l,l,l,l,O.mn,l,l,l,new A.dWB(d),l,l,l,l,l,l)
 u=C.a([D.av.j(0.22),D.av.j(0.06)],x.O)
 t=C.l(14)
@@ -15817,7 +15819,7 @@ if(m.e){u=D.c.j(0.07)
 v.push(new C.D(D.d3,C.aM(l,D.a_,!0,l,!0,D.t,l,C.aO(),l,l,l,l,l,l,2,C.bt(l,new C.b6(4,C.l(16),D.a1),l,l,l,l,l,l,!0,l,l,l,l,l,l,u,!0,l,l,l,l,l,l,l,l,l,l,l,l,l,A6.ED,"Search the lessons: outlet, switch, dryer, sink...",l,l,l,l,l,!0,l,l,l,!0,!0,!1,l,B.asd,l,l,l,l,l,l,l,l,l,l,l,l),D.y,!0,l,!0,l,!1,l,D.ak,l,l,l,B.hq7,l,l,l,l,l,1,l,l,!1,"\u2022",l,new A.dWF(m),l,l,l,!1,l,l,!1,l,!0,l,D.ad,l,l,l,l,l,l,l,l,l,l,l,D.KT,!0,D.a5,l,D.ao,l,l,l,l),l))}D.d.v(v,m.c4r())
 return C.c4(l,D.c5,C.bm(!0,C.cl(v,l,l,new C.R(14,w.r.b+8,14,24),l,l,D.ah,!1),!0,!1,D.ag,!0,!1),l,!1,!1,l,l)},
 c4r(){var w,v,u,t,s,r,q,p=this,o=x.dz,n=C.a([],o)
-for(w=0;w<24;++w){v=B.djo[w]
+for(w=0;w<24;++w){v=B.djp[w]
 n.push(new C.R7([v.d,v.e,v.b,new A.dWr(p,v),v.c,v.a]))}n.push(new C.R7(["Sheets, screws, tape, mud, sand",D.aH,"\ud83e\uddf1",new A.dWs(p),"Hanging drywall","drywall sheetrock sheet screws tape mud sand paint primer ceiling walls"]))
 n.push(new C.R7(["A bare frame: boxes, holes, cable",D.av,"\ud83c\udfe0",new A.dWt(p),"Wiring a house","wire wiring house frame studs drill cable box outlet switch panel"]))
 n.push(new C.R7(["Three-way switch, fan with light",D.bp,"\ud83e\udde0",new A.dWu(p),"Diagram lessons","diagram wiring picture"]))
@@ -15848,7 +15850,7 @@ q.push(new C.D(D.cx,new C.EP(new C.c8(D.aL,D.e,D.j,D.al,s,D.p,s,0,C.a([new C.bz(
 B1(d,e,f,g,h){var w=null,v=C.a([g.j(0.2),B.G1],x.O),u=C.l(22),t=C.L(g.j(0.55),D.r,1.4),s=x.V,r=C.a([new C.ac(0,D.G,g.j(0.18),D.cA,16)],s),q=g.j(0.22),p=C.L(g.j(0.7),D.r,1.5)
 s=C.a([new C.ac(0,D.G,g.j(0.35),D.H,14)],s)
 return C.az(w,C.q(w,C.x(C.a([C.q(w,C.as(C.d(d,w,w,w,w,w,w,D.xn,w,w,w),w,w,w),D.f,w,w,new C.p(q,w,p,w,s,w,D.a6),w,56,w,w,w,w,w,56),D.X,C.d(e,w,w,w,w,w,w,D.jb,D.K,w,w),D.cU,C.d(f,w,2,D.a2,w,w,w,B.fCb,D.K,w,w)],x.p),D.l,w,D.bb,D.j,0,D.p),D.f,w,w,new C.p(w,w,t,u,r,new C.a8(D.b7,D.b9,D.x,v,w,w),D.n),w,w,w,w,B.bBs,w,w,w),D.y,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,h,w,w,w,w,w,w,!1,D.a4)}}
-A.axk.prototype={
+A.axj.prototype={
 S(){return new A.buN()},
 bsH(){return this.c.$0()}}
 A.buN.prototype={
@@ -15861,10 +15863,10 @@ B(d){var w=null,v=D.w.j(0.6),u=C.l(18),t=C.L(D.bi,D.r,1.5)
 return C.q(w,C.d("\u2b50 "+C.w(this.a.bsH()),w,w,w,w,w,w,B.fqA,w,w,w),D.f,w,w,new C.p(v,w,t,u,w,w,D.n),w,w,w,D.iN,D.pm,w,w,w)}}
 A.b8G.prototype={
 B(d){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h=this,g=null,f=x.w,e=C.aF(d,g,f).w.a.a>C.aF(d,g,f).w.a.b
-if(h.d)return A.haB(E.yh,h.r,h.z,h.Q,h.y,h.as,h.db,h.w,h.f,h.c)
+if(h.d)return A.haC(E.yh,h.r,h.z,h.Q,h.y,h.as,h.db,h.w,h.f,h.c)
 w=h.r
 v=x.p
-u=C.a([C.bR(0,A.haB(E.yh,w,h.z,h.Q,h.y,h.as,h.db,h.w,h.f,h.c),0,0,0)],v)
+u=C.a([C.bR(0,A.haC(E.yh,w,h.z,h.Q,h.y,h.as,h.db,h.w,h.f,h.c),0,0,0)],v)
 t=h.ch
 s=t!=null
 if(s)u.push(C.ap(g,C.x(t,D.E,g,D.e,D.j,0,D.p),g,g,8,g,8,g))
@@ -15873,15 +15875,15 @@ r=h.CW
 if(r!=null)D.d.v(t,r)
 r=C.a([],v)
 q=h.e
-if(q!=null)r.push(new A.axk(q,g))
+if(q!=null)r.push(new A.axj(q,g))
 r.push(new A.agA(D.hY,"Zoom in",w,!1,g))
 t.push(C.A(r,D.l,g,D.e,D.P,0,g,g))
 t.push(new A.agA(D.wM,"Zoom out",w,!0,g))
 w=h.x
-t.push(h.ayP(B.bPO,"Back to the whole view",w))
-t.push(h.ayP(At.D0,"Flip up and down swiping",new A.cA7()))
-t.push(h.ayP(D.jL,"Flip left and right swiping",new A.cA8()))
-u.push(C.ap(g,C.x(t,D.dM,g,D.e,D.j,0,D.p),g,g,g,8,8,g))
+t.push(h.ayQ(B.bPO,"Back to the whole view",w))
+t.push(h.ayQ(At.D0,"Flip up and down swiping",new A.cA7()))
+t.push(h.ayQ(D.jL,"Flip left and right swiping",new A.cA8()))
+u.push(C.ap(g,C.x(t,D.dL,g,D.e,D.j,0,D.p),g,g,g,8,8,g))
 t=h.dx
 if(t!=null)u.push(C.ap(14,C.as(t,g,g,g),g,g,0,0,g,g))
 t=h.at
@@ -15923,9 +15925,9 @@ t=C.E(C.x(t,D.E,g,D.e,D.j,0,D.p),1)
 m=e?D.aem:g
 l=e?D.ag:D.cl
 u.push(C.ap(8,new C.cP(new C.aY(0,f,0,1/0),C.q(g,C.A(C.a([t,C.aH(g,m,g,g,C.X(D.cy,D.aD,g,g,g,e?16:20),g,g,g,w,l,g,g,g,g,D.cf)],v),D.E,g,D.e,D.j,0,g,g),D.f,g,g,new C.p(p,g,n,o,g,g,D.n),g,g,g,g,q,g,g,g),g),g,g,s,r,g,g))}return new C.an(D.a0,g,D.ab,D.t,u,g)},
-ayP(d,e,f){var w=null,v=D.w.j(0.55),u=C.L(D.aU,D.r,1)
+ayQ(d,e,f){var w=null,v=D.w.j(0.55),u=C.L(D.aU,D.r,1)
 return new C.D(D.eM,C.h6(C.az(w,C.q(w,C.X(d,D.c,w,w,w,20),D.f,w,w,new C.p(v,w,u,w,w,w,D.a6),w,38,w,w,w,w,w,38),D.y,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,f,w,w,w,w,w,w,!1,D.a4),w,e,w,w),w)}}
-A.aYR.prototype={
+A.aYQ.prototype={
 B(d){var w,v,u,t,s=this,r=null,q=x.p,p=C.a([],q)
 if(s.z)p.push(A.bIK(C.aH(r,r,r,r,O.mn,r,r,r,new A.bYF(d),r,r,r,r,r,r)))
 else p.push(C.aH(r,r,r,r,O.mn,r,r,r,new A.bYG(d),r,r,r,r,r,r))
@@ -15944,25 +15946,25 @@ p=C.A(p,D.l,r,D.e,D.j,0,r,r)
 v=C.aF(d,r,x.w).w
 return C.c4(r,D.c5,C.bm(!0,C.x(C.a([new C.D(B.bGC,p,r),C.q(r,C.ce(s.f,D.t,r,D.y,r,r,r,r,D.ah),D.f,r,new C.aY(0,1/0,0,v.a.b*0.34),B.b8h,r,r,r,r,E.a03,r,r,1/0),C.E(C.by(As.adJ,s.e,D.aq),1)],q),D.l,r,D.e,D.j,0,D.p),!0,!1,D.ag,!0,!0),r,!1,!1,r,r)}}
 A.adT.prototype={
-aFn(d){var w=this,v=new C.V(Date.now(),0,!1),u=w.an6$===d&&D.o.aq(v.bD(w.an7$).a,1000)<2500
-w.an6$=u?"":d
-w.an7$=v
+aFo(d){var w=this,v=new C.V(Date.now(),0,!1),u=w.an7$===d&&D.o.aq(v.bD(w.an8$).a,1000)<2500
+w.an7$=u?"":d
+w.an8$=v
 return u},
-aIw(d){var w,v=this
+aIx(d){var w,v=this
 if(d.length===0)return
-w=v.a5z$
+w=v.a5A$
 if(w!=null)w.a1(0)
 v.m(new A.dn3(v,d))
-v.a5z$=C.cy(D.k1,new A.dn4(v))},
-aGI(){var w=this.a5z$
+v.a5A$=C.cy(D.k1,new A.dn4(v))},
+aGJ(){var w=this.a5A$
 return w==null?null:w.a1(0)}}
 A.BS.prototype={
 S(){var w=new C.vv()
 $.vY()
 w.fX(0)
-return new A.aBl(w,B.nN,null,"",C.c1(2000,1,1,0,0,0,0,0),0,C.c1(2000,1,1,0,0,0,0,0))},
+return new A.aBk(w,B.nN,null,"",C.c1(2000,1,1,0,0,0,0,0),0,C.c1(2000,1,1,0,0,0,0,0))},
 gd6(d){return this.d}}
-A.aBl.prototype={
+A.aBk.prototype={
 gtw(){var w,v=this,u=v.d
 if(u===$){w=A.nP(v.a.c)
 v.d!==$&&C.bD()
@@ -15971,10 +15973,10 @@ u=w}return u},
 gda(d){var w,v=this.e
 if(v===$){w=this.a.d
 v=this.e=w==null?new A.yL(C.T(x.S,x.N)):w}return v},
-gatc(){var w=this.gtw().a
+gatd(){var w=this.gtw().a
 return w==="light"||w==="fan"},
 geh(){var w,v=this,u=v.f
-if(u===$){w=v.gatc()?new A.uO(1.15,0.12,11,B.Wg,$.aw()):new A.uO(0.42,0.26,12,B.heQ,$.aw())
+if(u===$){w=v.gatd()?new A.uO(1.15,0.12,11,B.Wg,$.aw()):new A.uO(0.42,0.26,12,B.heQ,$.aw())
 w.ay=0
 w.ch=2.9
 w.at=-0.3
@@ -15990,7 +15992,7 @@ bJU(){var w=this,v=Math.abs(w.geh().a)<1.5
 if(v===w.r||w.c==null)return
 w.r=v
 w.m(w.gJt())},
-aC9(d){var w
+aCa(d){var w
 this.m(new A.der(this,d))
 switch(d){case"practice":w="Practice: you can put a wire anywhere. The mistake shows when the power goes on."
 break
@@ -16000,7 +16002,7 @@ default:w="Learn: a wrong wire is refused and explained."
 break}this.hv(w,!0)},
 Y(){var w,v=this
 v.a4()
-v.geh().aW(0,v.gaRv())
+v.geh().aW(0,v.gaRw())
 w=v.a
 if(w.d==null)A.Nb("bench_"+w.c).bG(new A.deU(v),x.P)},
 oC(){var w,v,u,t=this
@@ -16009,12 +16011,12 @@ w=t.gda(0)
 v=w.c
 u=t.a
 if(v>=2)A.xT("bench_"+u.c)
-else A.IC("bench_"+u.c,A.i29(w))},
+else A.ID("bench_"+u.c,A.i2a(w))},
 t(){var w,v=this
-v.geh().a6(0,v.gaRv())
+v.geh().a6(0,v.gaRw())
 w=v.at
 if(w!=null)w.a1(0)
-v.aGI()
+v.aGJ()
 v.a3()},
 hv(d,e){var w=this,v=w.at
 if(v!=null)v.a1(0)
@@ -16026,7 +16028,7 @@ v.d=v.d&&v.a&&v.c>=2
 w.w=A.aht(w.gtw(),v,w.r)
 w.oC()},
 ov(){var w,v,u,t=this
-if(t.gatc()&&t.gda(0).c===0){t.geh().fI(11,0.12,B.Wg,1.15)
+if(t.gatd()&&t.gda(0).c===0){t.geh().fI(11,0.12,B.Wg,1.15)
 t.m(new A.de9(t))
 return}w=t.geh()
 v=t.gda(0).c===0
@@ -16035,7 +16037,7 @@ v=v?12:10
 w.fI(v,0.26,new A.r(0,0.1,u),0.42)
 t.m(new A.dea(t))},
 aZA(d){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i=this
-if(i.gatc()){i.geh().fI(9,0.12,B.Wg,1.15)
+if(i.gatd()){i.geh().fI(9,0.12,B.Wg,1.15)
 return}w=C.a([],x.o)
 for(v=i.gtw(),u=v.f,t=u.length,s=0;s<t;++s){r=u[s]
 q=!1
@@ -16099,7 +16101,7 @@ v=w.f
 u=C.U(v).k("Y<1>")
 t=C.C(new C.Y(v,new A.dee(d),u),u.k("M.E"))
 v=w.a
-s=A.hG1(v,d)
+s=A.hG2(v,d)
 u=s!=null
 if(u){r=l.gda(0)
 r=r.c===0&&r.b.il(0,s)}else r=!1
@@ -16124,7 +16126,7 @@ u=u.c===0&&!u.b.il(0,s)&&D.d.aV(w.e,new A.deh(s))}else u=!1
 if(u){l.m(new A.dei(l,s,d))
 if(l.x.length!==0){l.aZA(s)
 l.hv(D.d.fe(w.e,new A.dej(s)).b+": picked up. Now tap the screw, nut or wire it joins.",!0)}return}if(t.length!==0&&l.x.length!==0&&l.gda(0).c===0){u=l.gda(0)
-p=A.hhL(w,u,l.x,D.d.gH(t),!1)
+p=A.hhM(w,u,l.x,D.d.gH(t),!1)
 if(p!=null){++l.as
 A.fr(180,220,0.25,k)
 l.ml(p)}else if(u.z){A.fr(520,60,0.25,"tri")
@@ -16135,14 +16137,14 @@ l.m(new A.del(l,d))
 if(u.w)l.hv(D.d.gH(t).b+": fastened.",!0)
 else if(A.aj_(w,u))l.hv("Every wire is on the right screw. Now push the device into the box.",!0)
 else l.hv(D.d.gH(t).b+": fastened correctly.",!0)
-l.geh().vF(7,A.aQY(v,d,u))
+l.geh().vF(7,A.aQX(v,d,u))
 l.x=""}return}if(t.length!==0&&!l.gda(0).b.al(0,d)){o=new C.V(Date.now(),0,!1)
-n=l.an8$===d&&D.o.aq(o.bD(l.an9$).a,1000)<900
-l.an8$=n?0:d
-l.an9$=o
+n=l.an9$===d&&D.o.aq(o.bD(l.ana$).a,1000)<900
+l.an9$=n?0:d
+l.ana$=o
 if(n){v=l.c
 v.toString
-A.itH(v,w,l.gda(0),D.d.gH(t))
+A.itI(v,w,l.gda(0),D.d.gH(t))
 return}}m=l.glc().b.h(0,d)
 if(m!=null){l.m(new A.dem(l,d))
 w=l.geh()
@@ -16184,7 +16186,7 @@ g.push(A.tl("Brass side",B.btq,E.aqe,!1,new A.deQ(v)))
 g.push(D.an)
 g.push(A.tl("Silver side",B.yi,D.PD,!1,new A.deR(v)))
 g.push(D.T)
-m=A.Ku(!1,u,l,new A.deS(v),u,i,k,h,u,u,j,u,u,v.gJq(),v.gJr(),m,!1,u,f,g)
+m=A.Kv(!1,u,l,new A.deS(v),u,i,k,h,u,u,j,u,u,v.gJq(),v.gJr(),m,!1,u,f,g)
 l=C.a([],a1)
 k=p.c
 if(k===0){k=C.a([],a1)
@@ -16211,14 +16213,14 @@ D.d.v(l,k)}else if(k===1)D.d.v(l,C.a([C.A(C.a([A.tk("Pull it back out",D.py,new 
 else{k=A.tk("Start over",D.k8,new A.deK(v),D.ac)
 p=p.d
 j=p?"Tested \u2713":"Power on and test"
-D.d.v(l,C.a([C.A(C.a([k,D.ae,A.tk(j,D.hw,p?u:v.gcEB(),D.av)],a1),D.l,u,D.e,D.j,0,u,u)],a1))}return A.IV(n==null,D.av,new A.deL(v,a2,t),C.x(l,D.l,u,D.e,D.P,0,D.p),m,r,q.b,u,u)}}
+D.d.v(l,C.a([C.A(C.a([k,D.ae,A.tk(j,D.hw,p?u:v.gcEB(),D.av)],a1),D.l,u,D.e,D.j,0,u,u)],a1))}return A.IW(n==null,D.av,new A.deL(v,a2,t),C.x(l,D.l,u,D.e,D.P,0,D.p),m,r,q.b,u,u)}}
 A.aas.prototype={
-S(){return new A.aHi(B.nN,null,"",C.c1(2000,1,1,0,0,0,0,0),0,C.c1(2000,1,1,0,0,0,0,0))},
+S(){return new A.aHh(B.nN,null,"",C.c1(2000,1,1,0,0,0,0,0),0,C.c1(2000,1,1,0,0,0,0,0))},
 gd6(d){return this.c}}
-A.aHi.prototype={
+A.aHh.prototype={
 gda(d){var w,v=this.d
 if(v===$){w=this.a.c
-v=this.d=w==null?A.ha6():w}return v},
+v=this.d=w==null?A.ha7():w}return v},
 geh(){var w=this.e
 return w===$?this.e=new A.uO(-0.3,0.18,40,B.aZ_,$.aw()):w},
 glc(){var w=this.f
@@ -16229,10 +16231,10 @@ oC(){var w,v="bench_ptrap"
 if(this.a.c!=null||!this.Q)return
 w=this.gda(0)
 if(w.c&&w.d.length===0&&w.a.a>=3)A.xT(v)
-else A.IC(v,A.hs9(w))},
+else A.ID(v,A.hsa(w))},
 t(){var w=this.z
 if(w!=null)w.a1(0)
-this.aGI()
+this.aGJ()
 this.a3()},
 hv(d,e){var w=this,v=w.z
 if(v!=null)v.a1(0)
@@ -16293,7 +16295,7 @@ f=l.w
 e=l.x
 t=l.y
 s=f!==0?l.glc().b.h(0,l.w):k
-h=A.Ku(!1,k,g,new A.f0y(l),k,t,f,s,k,k,e,k,k,l.gJq(),l.gJr(),h,!1,k,k,k)
+h=A.Kv(!1,k,g,new A.f0y(l),k,t,f,s,k,k,e,k,k,l.gJq(),l.gJr(),h,!1,k,k,k)
 e=x.p
 s=C.a([],e)
 for(r=0;r<3;++r){q=B.dw4[r]
@@ -16312,14 +16314,14 @@ o.push(C.d(p,k,k,k,k,k,k,new C.G(!0,m,k,k,k,k,13,D.u,k,k,k,k,k,k,k,k,k,k,k,k,k,k
 s.push(new C.D(D.iN,C.az(k,C.q(k,new C.c8(D.aL,D.e,D.j,D.l,k,D.p,k,0,o,k),D.f,k,k,new C.p(f,k,new C.bH(n,n,n,n),new C.be(t,t,t,t),k,k,D.n),k,k,k,k,D.hX,k,k,k),D.y,!1,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,g,k,k,k,k,k,k,!1,D.a4),k))}i=C.bV(D.bG,s,D.bs,k,6,8)
 g=A.tk("Start over",D.k8,new A.f0A(l),D.ac)
 f=u?"Run the water":"Build the drain first"
-return A.IV(!0,D.co,new A.f0B(d,w),C.x(C.a([i,D.T,C.A(C.a([g,D.ae,A.tk(f,D.pC,u?l.gcvm():k,D.co)],e),D.l,k,D.e,D.j,0,k,k)],e),D.l,k,D.e,D.P,0,D.p),h,j,"Sink drain (P-trap)",k,k)}}
+return A.IW(!0,D.co,new A.f0B(d,w),C.x(C.a([i,D.T,C.A(C.a([g,D.ae,A.tk(f,D.pC,u?l.gcvm():k,D.co)],e),D.l,k,D.e,D.j,0,k,k)],e),D.l,k,D.e,D.P,0,D.p),h,j,"Sink drain (P-trap)",k,k)}}
 A.a5S.prototype={
-S(){return new A.aBF(B.nN,null,"",C.c1(2000,1,1,0,0,0,0,0),0,C.c1(2000,1,1,0,0,0,0,0))},
+S(){return new A.aBE(B.nN,null,"",C.c1(2000,1,1,0,0,0,0,0),0,C.c1(2000,1,1,0,0,0,0,0))},
 gd6(d){return this.c}}
-A.aBF.prototype={
+A.aBE.prototype={
 gda(d){var w,v=this.d
 if(v===$){w=this.a.c
-v=this.d=w==null?A.ha6():w}return v},
+v=this.d=w==null?A.ha7():w}return v},
 geh(){var w=this.e
 return w===$?this.e=new A.uO(-0.25,0.2,36,B.aYf,$.aw()):w},
 glc(){var w=this.f
@@ -16330,10 +16332,10 @@ oC(){var w,v="bench_faucet"
 if(this.a.c!=null||!this.Q)return
 w=this.gda(0)
 if(w.f&&w.r&&w.e.a>=2)A.xT(v)
-else A.IC(v,A.hs9(w))},
+else A.ID(v,A.hsa(w))},
 t(){var w=this.z
 if(w!=null)w.a1(0)
-this.aGI()
+this.aGJ()
 this.a3()},
 hv(d,e){var w=this,v=w.z
 if(v!=null)v.a1(0)
@@ -16349,7 +16351,7 @@ if(d===0){q.ov()
 return}w=x.fZ
 v=C.C(new C.Y(B.SC,new A.dhp(d),w),w.k("M.E"))
 if(v.length!==0&&q.r.length!==0){w=q.gda(0)
-u=A.iuc(w,q.r,D.d.gH(v))
+u=A.iud(w,q.r,D.d.gH(v))
 if(u!=null){A.fr(180,220,0.25,"square")
 q.ml(u)}else{A.nO()
 q.m(new A.dhq(q,d))
@@ -16392,7 +16394,7 @@ v=n.x
 u=n.y
 t=w!==0?n.glc().b.h(0,n.w):m
 s=x.p
-i=A.Ku(!1,m,h,new A.dhB(n),m,u,w,t,m,m,v,m,m,n.gJq(),n.gJr(),i,!1,m,m,C.a([A.tl("Hints",D.av,D.mh,l.w,new A.dhC(n)),D.T],s))
+i=A.Kv(!1,m,h,new A.dhB(n),m,u,w,t,m,m,v,m,m,n.gJq(),n.gJr(),i,!1,m,m,C.a([A.tl("Hints",D.av,D.mh,l.w,new A.dhC(n)),D.T],s))
 v=C.a([],s)
 for(r=0;r<2;++r){h={}
 w=B.dvx[r]
@@ -16410,10 +16412,10 @@ p.push(C.d(w.b,m,m,m,m,m,m,D.tI,m,m,m))
 v.push(new C.D(D.iN,C.az(m,C.q(m,new C.c8(D.aL,D.e,D.j,D.l,m,D.p,m,0,p,m),D.f,m,m,new C.p(w.c,m,new C.bH(o,o,o,o),new C.be(u,u,u,u),m,m,D.n),m,m,m,m,D.hX,m,m,m),D.y,!1,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,new A.dhE(h,n),m,m,m,m,m,m,!1,D.a4),m))}j=C.bV(D.bG,v,D.bs,m,6,8)
 h=A.tk("Start over",D.k8,new A.dhF(n),D.ac)
 l=l.f&&l.r?"Close the valves":"Open the valves"
-return A.IV(!0,D.c0,new A.dhG(d,g),C.x(C.a([j,D.T,C.A(C.a([h,D.ae,A.tk(l,D.pC,n.gcaQ(n),D.c0)],s),D.l,m,D.e,D.j,0,m,m)],s),D.l,m,D.e,D.P,0,D.p),i,k,"Faucet supply lines",m,m)}}
+return A.IW(!0,D.c0,new A.dhG(d,g),C.x(C.a([j,D.T,C.A(C.a([h,D.ae,A.tk(l,D.pC,n.gcaQ(n),D.c0)],s),D.l,m,D.e,D.j,0,m,m)],s),D.l,m,D.e,D.P,0,D.p),i,k,"Faucet supply lines",m,m)}}
+A.aCx.prototype={
+S(){return new A.aCy(A.hm9())}}
 A.aCy.prototype={
-S(){return new A.aCz(A.hm8())}}
-A.aCz.prototype={
 geh(){var w,v=this.e
 if(v===$){w=new A.uO(-0.3,0.48,46,B.Wd,$.aw())
 w.f=80
@@ -16460,7 +16462,7 @@ default:w=new A.BS(d,null,null)
 break}v=this.c
 v.toString
 C.a6(v,!1).ce(C.ec(new A.doy(w),!1,null,x.H))},
-B(d){var w,v,u,t,s,r,q,p,o=this,n=null,m=o.d,l=B.dq4[m.a],k=o.r,j=k===0?n:A.iiC(k)
+B(d){var w,v,u,t,s,r,q,p,o=this,n=null,m=o.d,l=B.dq4[m.a],k=o.r,j=k===0?n:A.iiD(k)
 k=m.d.q(0,72)
 w=!m.b||m.c
 v=C.a([!k,w],x.u)
@@ -16472,7 +16474,7 @@ s=o.x
 r=o.y
 q=t!==0?o.glc().b.h(0,o.r):n
 p=j==null?n:C.az(n,C.q(n,B.fDZ,D.f,n,n,new C.p(D.av,n,n,C.l(12),n,n,D.n),n,n,n,n,D.pm,n,n,n),D.y,!1,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,new A.doH(o,j),n,n,n,n,n,n,!1,D.a4)
-k=A.Ku(!1,n,u,new A.doI(o),n,r,t,q,p,new A.doJ(o),s,n,n,o.gJq(),o.gJr(),k,!1,n,n,n)
+k=A.Kv(!1,n,u,new A.doI(o),n,r,t,q,p,new A.doJ(o),s,n,n,o.gJq(),o.gJr(),k,!1,n,n,n)
 s=l.a
 p=x.p
 q=C.A(C.a([C.E(C.d(""+(m.a+1)+". "+s,n,n,n,n,n,n,B.fw2,n,n,n),1),A.tl("Wrench",D.aH,D.ov,o.w==="wrench",new A.doK(o))],p),D.l,n,D.e,D.j,0,n,n)
@@ -16483,7 +16485,7 @@ s=u?"\u2705 Living room power fixed":"\u26a0 Living room has no power"
 s=C.E(C.d(s,n,n,n,n,n,n,C.n(n,n,u?D.er:D.eU,n,n,n,n,n,n,n,n,11.5,n,n,D.I,n,n,!0,n,n,n,n,n,n,n,n),n,n,n),1)
 u=v[1]
 r=u?"\u2705 Sink leak fixed":"\u26a0 Kitchen sink drips"
-return A.IV(!0,D.bp,new A.doM(d,v),C.x(C.a([q,D.bH,t,m,C.A(C.a([s,C.E(C.d(r,n,n,n,n,n,n,C.n(n,n,u?D.er:D.eU,n,n,n,n,n,n,n,n,11.5,n,n,D.I,n,n,!0,n,n,n,n,n,n,n,n),D.e1,n,n),1)],p),D.l,n,D.e,D.j,0,n,n)],p),D.l,n,D.e,D.P,0,D.p),k,"Stage "+(w+1)+"/7","Build and fix a house",n,n)}}
+return A.IW(!0,D.bp,new A.doM(d,v),C.x(C.a([q,D.bH,t,m,C.A(C.a([s,C.E(C.d(r,n,n,n,n,n,n,C.n(n,n,u?D.er:D.eU,n,n,n,n,n,n,n,n,11.5,n,n,D.I,n,n,!0,n,n,n,n,n,n,n,n),D.e1,n,n),1)],p),D.l,n,D.e,D.j,0,n,n)],p),D.l,n,D.e,D.P,0,D.p),k,"Stage "+(w+1)+"/7","Build and fix a house",n,n)}}
 A.agA.prototype={
 S(){return new A.byr()}}
 A.byr.prototype={
@@ -16495,7 +16497,7 @@ caT(d){var w,v,u=this
 u.m(new A.fmC(u))
 w=u.a
 v=w.e
-v.aqr(w.f?1.45:0.69)
+v.aqs(w.f?1.45:0.69)
 v=u.d
 if(v!=null)v.a1(0)
 u.d=C.cy(D.kR,new A.fmD(u))},
@@ -16508,10 +16510,10 @@ return new C.D(D.eM,C.h6(C.mP(D.c3,C.q(v,C.X(w.a.c,D.c,v,v,v,22),D.f,v,v,new C.p
 A.bz2.prototype={}
 A.bz7.prototype={}
 A.bAn.prototype={}
-A.jY.prototype={}
+A.jZ.prototype={}
 A.NC.prototype={}
 A.a7U.prototype={
-B(d){var w,v,u,t,s,r,q,p,o,n,m=null,l=C.aF(d,D.dJ,x.w).w,k=x.p,j=C.a([C.A(C.a([A.bIK(C.aH(m,m,m,m,O.mn,m,m,m,new A.cda(d),m,m,m,m,m,m)),B.fOj],k),D.l,m,D.e,D.j,0,m,m)],k)
+B(d){var w,v,u,t,s,r,q,p,o,n,m=null,l=C.aF(d,D.dO,x.w).w,k=x.p,j=C.a([C.A(C.a([A.bIK(C.aH(m,m,m,m,O.mn,m,m,m,new A.cda(d),m,m,m,m,m,m)),B.fOj],k),D.l,m,D.e,D.j,0,m,m)],k)
 for(w=0;w<5;++w){v=B.dxP[w]
 u=v.c
 t=C.a([new C.D(D.amP,C.d(v.b+"  "+v.a.toUpperCase(),m,m,m,m,m,m,new C.G(!0,u,m,m,m,m,12,D.u,m,1.1,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m),m,m,m),m)],k)
@@ -16567,10 +16569,10 @@ s.x.a8(0)
 s.y=!1
 v=r.c
 return new A.eu(!0,t>=w?v+": every joint is tight now.":v+": one joint tightened, one to go.",!1,"")},
-aIH(d){var w=this.vJ(0,d),v=this.f.h(0,d)
+aII(d){var w=this.vJ(0,d),v=this.f.h(0,d)
 if(v==null)v=0
 return w.r-v},
-aKP(){var w,v,u,t,s,r,q=this
+aKQ(){var w,v,u,t,s,r,q=this
 q.r=!q.r
 w=q.x
 w.a8(0)
@@ -16586,11 +16588,11 @@ r=C.C(new C.Y(v,new A.cqG(q),u),u.k("M.E"))
 q.y=!0
 if(s.length!==0){w.v(0,new C.N(s,new A.cqH(),C.U(s).k("N<1,m>")));++q.w
 return new A.eu(!1,"Water is spraying from an open pipe where the "+D.d.gH(s).c.toLowerCase()+" should be! Turn the water off and finish the job.",!0,"")}if(r.length!==0){w.v(0,new C.N(r,new A.cqI(),C.U(r).k("N<1,m>")));++q.w
-return new A.eu(!1,"The "+D.d.gH(r).c.toLowerCase()+" is leaking from a loose joint. Turn the water off, tighten it with the wrench, then test again.",!0,"")}if(!q.ga4a())return B.b1u
+return new A.eu(!1,"The "+D.d.gH(r).c.toLowerCase()+" is leaking from a loose joint. Turn the water off, tighten it with the wrench, then test again.",!0,"")}if(!q.ga4b())return B.b1u
 return B.b1f},
 cMO(){var w,v,u,t,s,r,q,p=this
 p.r=!0
-p.aKP()
+p.aKQ()
 w=p.c
 w===$&&C.c()
 v=w.c
@@ -16598,24 +16600,24 @@ u=v.length
 t=0
 for(;t<u;++t){s=v[t]
 p.V_(s.b,s.a)}for(w=w.c,v=w.length,t=0;t<v;++t){s=w[t]
-for(u=s.r,r=s.a,q=0;q<u;++q)p.blR(r)}p.aKP()
+for(u=s.r,r=s.a,q=0;q<u;++q)p.blR(r)}p.aKQ()
 p.w=0},
-ga4a(){var w=this.c
+ga4b(){var w=this.c
 w===$&&C.c()
 return D.d.cD(w.c,new A.cqB(this))},
 gcKV(){var w=this.c
 w===$&&C.c()
 return D.d.cD(w.c,new A.cqC(this))},
 gx8(){var w=this
-return w.ga4a()&&w.gcKV()&&w.r&&w.y&&w.x.a===0}}
+return w.ga4b()&&w.gcKV()&&w.r&&w.y&&w.x.a===0}}
 A.X8.prototype={
 S(){var w,v=new A.uO(-0.25,0.4,135,B.aZO,$.aw())
 v.f=200
 w=new C.vv()
 $.vY()
 w.fX(0)
-return new A.aG_(v,w)}}
-A.aG_.prototype={
+return new A.aFZ(v,w)}}
+A.aFZ.prototype={
 gDk(d){var w=this.d
 if(w===$){this.a.toString
 w=D.o.F(Date.now(),1e5)
@@ -16623,16 +16625,16 @@ this.d=w}return w},
 Y(){var w,v=this
 v.a4()
 w=v.a.e
-if(w==null)w=A.ha5(!0,v.gDk(0),null)
+if(w==null)w=A.ha6(!0,v.gDk(0),null)
 v.e=w
-v.r=A.hAM(w,v.x,!w.b)},
+v.r=A.hAN(w,v.x,!w.b)},
 t(){var w=this.at
 if(w!=null)w.a1(0)
 this.a3()},
-af_(){var w=this.e
+af0(){var w=this.e
 w===$&&C.c()
-return this.r=A.hAM(w,this.x,!w.b)},
-ayR(d,e){var w=this,v=w.at
+return this.r=A.hAN(w,this.x,!w.b)},
+ayS(d,e){var w=this,v=w.at
 if(v!=null)v.a1(0)
 w.m(new A.ev2(w,d,e))
 w.at=C.cy(D.k_,new A.ev3(w))},
@@ -16649,7 +16651,7 @@ if(d>=9200&&d<9260){v=D.o.aq(d-9200,2)
 if(v<w)return u[v].a}if(d===9260)return"trap"
 if(d===9261)return"arm"
 return null},
-azM(d){var w=this.e
+azN(d){var w=this.e
 w===$&&C.c();++w.w
 return new A.eu(!1,d,!1,"")},
 caX(d){return this.b0N(d)},
@@ -16695,27 +16697,27 @@ w=r.r
 w===$&&C.c()
 v=w.b.h(0,d)
 if(r.x.length===0){r.m(new A.euN(r,d))
-if(v!=null)r.ayR(v.a+": "+v.b,!0)
+if(v!=null)r.ayS(v.a+": "+v.b,!0)
 return}u=r.cCh(d)
 w=r.x
 if(w==="hand")if(d===9400){w=r.e
 w===$&&C.c()
-t=w.aKP()}else{w=r.e
+t=w.aKQ()}else{w=r.e
 w===$&&C.c()
-t=r.azM(w.b?"Your hand is only for the main water valve.":"Your hand is for the main water valve. Parts are placed by picking them from the tray.")}else if(w==="wrench")if(u==null){w=r.e
+t=r.azN(w.b?"Your hand is only for the main water valve.":"Your hand is for the main water valve. Parts are placed by picking them from the tray.")}else if(w==="wrench")if(u==null){w=r.e
 w===$&&C.c()
-t=r.azM(w.b?"Nothing to tighten.":"There is nothing to tighten there.")}else{w=r.e
+t=r.azN(w.b?"Nothing to tighten.":"There is nothing to tighten there.")}else{w=r.e
 w===$&&C.c()
 t=w.blR(u)}else if(u==null){w=r.e
 w===$&&C.c()
-t=r.azM(w.b?"Not there.":"That does not go there. Tap one of the glowing spots.")}else{s=r.e
+t=r.azN(w.b?"Not there.":"That does not go there. Tap one of the glowing spots.")}else{s=r.e
 s===$&&C.c()
 t=s.V_(w,u)}w=t.a
 if(w)A.nO()
 else A.fr(180,220,0.25,"square")
 r.m(new A.euO(r,d))
 w=w&&!t.c
-r.ayR(t.b,w)
+r.ayS(t.b,w)
 w=r.e
 w===$&&C.c()
 if(w.gx8()&&!r.as){r.as=!0
@@ -16745,7 +16747,7 @@ for(;v<w;++v){u=s[v]
 if(!this.e.e.q(0,u.a)){t=this.e.e
 t=D.d.cD(u.d,t.gkd(t))}else t=!1
 if(t)return u}return null},
-aWU(){var w,v,u,t=this,s=t.e
+aWV(){var w,v,u,t=this,s=t.e
 s===$&&C.c()
 if(s.x.a!==0){s=s.c
 s===$&&C.c()
@@ -16754,7 +16756,7 @@ w=C.U(s)
 v=new C.cM(new C.Y(s,new A.euV(t),w.k("Y<1>")),new A.euW(),w.k("cM<1,m>")).aO(0,", ")
 s=t.e
 if(s.r)return new C.b5("\ud83d\udca7 Water is leaking at: "+v+". First turn the main water OFF: pick Hand and tap the main valve.","hand","main")
-return new C.b5("\ud83d\udca7 It leaked at: "+v+". Pick the Wrench and tap it to tighten the joint. Then turn the water ON again to test.","wrench",s.x.gH(0))}if(!s.ga4a()){u=t.c8r()
+return new C.b5("\ud83d\udca7 It leaked at: "+v+". Pick the Wrench and tap it to tighten the joint. Then turn the water ON again to test.","wrench",s.x.gH(0))}if(!s.ga4b()){u=t.c8r()
 if(u==null)return B.f2I
 if(u.f&&t.e.r)return B.f2a
 s=u.b
@@ -16770,7 +16772,7 @@ if(!t.e.r)return B.f0Q
 return B.f3a},
 czS(){var w,v,u,t,s=this,r={}
 r.a=r.b=null
-w=s.aWU()
+w=s.aWV()
 r.b=w.b
 r.a=w.c
 s.m(new A.ev4(r,s))
@@ -16784,8 +16786,8 @@ u=9100+D.d.bj(v.c,new A.ev5(r))}r=s.r
 r===$&&C.c()
 t=r.b.h(0,u)
 if(t!=null)s.f.fI(70,0.3,t.c,-0.2)
-s.m(new A.ev6(s,u))}s.ayR(w.a,!0)},
-ayQ(d,e,f){var w,v=null,u=this.x===d,t=u?D.av.j(0.25):D.c.j(0.07),s=C.l(14),r=u?D.av:D.aU
+s.m(new A.ev6(s,u))}s.ayS(w.a,!0)},
+ayR(d,e,f){var w,v=null,u=this.x===d,t=u?D.av.j(0.25):D.c.j(0.07),s=C.l(14),r=u?D.av:D.aU
 r=C.L(r,D.r,u?2:1)
 w=C.X(f,u?D.av:D.ac,v,v,v,19)
 return new C.D(G.oq,C.az(v,C.q(v,C.A(C.a([w,D.bm,C.d(e,v,v,v,v,v,v,C.n(v,v,u?D.av:D.c,v,v,v,v,v,v,v,v,12.5,v,v,D.I,v,v,!0,v,v,v,v,v,v,v,v),v,v,v)],x.p),D.l,v,D.e,D.j,0,v,v),D.f,v,v,new C.p(t,v,r,s,v,v,D.n),v,v,v,v,D.f3,v,v,v),D.y,!1,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,new A.euR(this,u,d),v,v,v,v,v,v,!1,D.a4),v)},
@@ -16803,13 +16805,13 @@ u=i.y
 t=i.z
 s=i.Q
 r=u!==0?v.b.h(0,u):h
-v=A.Ku(!1,h,i.f,new A.eva(i),h,s,u,r,h,new A.evb(),t,h,h,i.gcaV(),i.gcaW(),v,!1,h,h,h)
+v=A.Kv(!1,h,i.f,new A.eva(i),h,s,u,r,h,new A.evb(),t,h,h,i.gcaV(),i.gcaW(),v,!1,h,h,h)
 t=x.p
 r=C.a([],t)
 if(!i.e.b){u=D.aH.j(0.12)
 s=C.l(12)
 q=C.L(D.aH.j(0.6),D.r,1)
-r.push(C.q(h,C.A(C.a([C.E(C.d("\ud83d\udc49 "+i.aWU().a,h,4,D.a2,h,h,h,B.fD7,h,h,h),1),D.bm,C.bJ(B.fGO,h,i.gczR(),C.bp(h,h,h,h,h,B.fdr,D.ku,h,h,h,h,h))],t),D.l,h,D.e,D.j,0,h,h),D.f,h,h,new C.p(u,h,q,s,h,h,D.n),h,h,h,D.eM,D.a05,h,h,1/0))}if(i.x.length!==0&&i.b93().length!==0){u=C.a([],t)
+r.push(C.q(h,C.A(C.a([C.E(C.d("\ud83d\udc49 "+i.aWV().a,h,4,D.a2,h,h,h,B.fD7,h,h,h),1),D.bm,C.bJ(B.fGO,h,i.gczR(),C.bp(h,h,h,h,h,B.fdr,D.kv,h,h,h,h,h))],t),D.l,h,D.e,D.j,0,h,h),D.f,h,h,new C.p(u,h,q,s,h,h,D.n),h,h,h,D.eM,D.a05,h,h,1/0))}if(i.x.length!==0&&i.b93().length!==0){u=C.a([],t)
 for(s=i.b93(),q=s.length,p=0;p<s.length;s.length===q||(0,C.J)(s),++p){o={}
 n=s[p]
 o.a=null
@@ -16819,23 +16821,23 @@ l=new C.aN(12,12)
 k=new C.ay(D.b0,1,D.r,-1)
 u.push(C.az(h,C.q(h,C.d("\ud83d\udccd "+n.b,h,h,h,h,h,h,D.oY,h,h,h),D.f,h,h,new C.p(m,h,new C.bH(k,k,k,k),new C.be(l,l,l,l),h,h,D.n),h,h,h,h,B.a06,h,h,h),D.y,!1,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,new A.evc(o,i),h,h,h,h,h,h,!1,D.a4))}r.push(new C.D(D.eM,C.bV(D.bG,u,D.bs,h,6,6),h))}u=i.e
 if(u.b)u="Real work: no hints. Build it in the right order."
-else if(u.ga4a())u="Everything is fitted. Tighten every joint, then turn the main water on to test."
+else if(u.ga4b())u="Everything is fitted. Tighten every joint, then turn the main water on to test."
 else{u=i.e.c
 u===$&&C.c()
 u="Job: "+u.d}r.push(new C.bM(D.a7,h,h,C.d(u,h,2,D.a2,h,h,h,B.aVg,h,h,h),h))
 r.push(D.T)
-t=C.a([i.ayQ("hand","Hand",B.aqD),i.ayQ("wrench","Wrench",D.ov)],t)
+t=C.a([i.ayR("hand","Hand",B.aqD),i.ayR("wrench","Wrench",D.ov)],t)
 for(u=i.gcaY(),s=u.length,p=0;p<u.length;u.length===s||(0,C.J)(u),++p){j=u[p]
 q=B.aIq.h(0,j)
 q.toString
-t.push(i.ayQ(j,q,An.aq7))}r.push(new C.a5(h,52,C.cl(t,h,h,h,h,h,D.aL,!1),h))
-return A.IV(!0,D.aH,new A.evd(i,d),C.x(r,D.l,h,D.e,D.P,0,D.p),v,""+w+"/"+g.c.length+" fitted","Plumbing job: "+g.b,h,h)},
-c4K(d){return C.bT(E.mR,null,new A.ev_(this),d,!0,!0,!0,D.kf,!1,!1,x.H)}}
+t.push(i.ayR(j,q,An.aq7))}r.push(new C.a5(h,52,C.cl(t,h,h,h,h,h,D.aL,!1),h))
+return A.IW(!0,D.aH,new A.evd(i,d),C.x(r,D.l,h,D.e,D.P,0,D.p),v,""+w+"/"+g.c.length+" fitted","Plumbing job: "+g.b,h,h)},
+c4K(d){return C.bT(E.mR,null,new A.ev_(this),d,!0,!0,!0,D.kg,!1,!1,x.H)}}
 A.zx.prototype={}
 A.lg.prototype={}
 A.YP.prototype={}
-A.awU.prototype={}
-A.aVI.prototype={}
+A.awT.prototype={}
+A.aVH.prototype={}
 A.eu.prototype={
 gjF(){return this.a}}
 A.YF.prototype={
@@ -16891,7 +16893,7 @@ k=s}if(f&&v<3){k[1]=new A.lg(k[1].a,B.aC8[j.az(5)],p)
 k=q.d
 k===$&&C.c()
 k[3]=new A.lg(k[3].a,B.aCt[j.az(5)],p)}},
-gaoj(){var w,v,u=C.aR(x.S),t=this.d
+gaok(){var w,v,u=C.aR(x.S),t=this.d
 t===$&&C.c()
 w=t.length
 v=0
@@ -16905,7 +16907,7 @@ for(;v<w;++v){u=t[v]
 if(u.a===d)return u}return null},
 fP(d){++this.f
 return new A.eu(!1,d,!1,"")},
-amV(){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h=this,g=h.d
+amW(){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h=this,g=h.d
 g===$&&C.c()
 w=g.length
 v=h.x
@@ -16915,16 +16917,16 @@ s=A.j7(t)
 if(s.e==="fan")r="fan"
 else r=s.c?"ceiling":"wall"
 v.n(0,t,r)}g=C.a([],x.t)
-for(q=0;q<$.HK().length;++q)g.push(q)
+for(q=0;q<$.HL().length;++q)g.push(q)
 h.y.v(0,g)
-h.z.v(0,h.gaoj())
+h.z.v(0,h.gaok())
 for(g=h.Q,w=x.S,u=0;u<3;++u){p=B.oO[u]
 v=C.aR(w)
 t=C.aR(w)
-o=new A.awU(v,t)
+o=new A.awT(v,t)
 o.d=o.e=o.a=!0
-for(r=h.arA(p),n=r.length,m=0;m<r.length;r.length===n||(0,C.J)(r),++m)for(l=r[m]*10,k=0;k<6;++k)t.J(0,l+k)
-for(t=h.gaoj(),r=C.a4(t),n=new C.mA(t,t.r,r.k("mA<1>")),n.c=t.e,r=r.c,t=p+48;n.C();){l=n.d
+for(r=h.arB(p),n=r.length,m=0;m<r.length;r.length===n||(0,C.J)(r),++m)for(l=r[m]*10,k=0;k<6;++k)t.J(0,l+k)
+for(t=h.gaok(),r=C.a4(t),n=new C.mA(t,t.r,r.k("mA<1>")),n.c=t.e,r=r.c,t=p+48;n.C();){l=n.d
 if(l==null)l=r.a(l)
 s=A.j7(l)
 if(!s.c){j=s.d.a
@@ -16938,7 +16940,7 @@ j===$&&C.c()
 w=j.length
 v=0
 for(;v<j.length;j.length===w||(0,C.J)(j),++v){u=j[v]
-k.a65(u.a,u.b)}for(w=j.length,t=x.S,s=x.N,r=k.at,v=0;v<j.length;j.length===w||(0,C.J)(j),++v){q=j[v].a
+k.a66(u.a,u.b)}for(w=j.length,t=x.S,s=x.N,r=k.at,v=0;v<j.length;j.length===w||(0,C.J)(j),++v){q=j[v].a
 p=r.h(0,q)
 if(p==null)continue
 o=p.a
@@ -16952,16 +16954,16 @@ case"switch":o=C.I([25,"ground",21,"blackLine",22,"blackLoad"],t,s)
 break
 default:o=C.I([53,"ground",52,"white",51,"black"],t,s)
 break}m=o}for(o=m.gdO(m),o=o.gae(o);o.C();){l=o.gR(o)
-k.bgP(q,l.b,l.a)}k.aK3(q)
-k.aGd(q)}if(!k.ax)k.a7w()
+k.bgP(q,l.b,l.a)}k.aK4(q)
+k.aGe(q)}if(!k.ax)k.a7x()
 for(w=j.length,v=0;v<j.length;j.length===w||(0,C.J)(j),++v){u=j[v]
 if(D.d.q(B.iR,u.b)){t=u.a
-k.a6O(t,"lamp")
+k.a6P(t,"lamp")
 k.bm8(t)}}for(j=D.d.gae(j),w=new C.eF(j,new A.cvA());w.C();){t=j.gR(0).a
-k.aHf(t)
-k.aHf(t)}},
-aNi(d){var w,v,u=A.j7(d).d.a,t=C.a([],x.t)
-for(w=0;v=$.HK(),w<v.length;++w){v=v[w]
+k.aHg(t)
+k.aHg(t)}},
+aNj(d){var w,v,u=A.j7(d).d.a,t=C.a([],x.t)
+for(w=0;v=$.HL(),w<v.length;++w){v=v[w]
 if(v>u&&v<64)t.push(w)}return t},
 cWS(d,e){var w,v,u=this,t=u.x
 if(t.al(0,d))return u.fP("There is already a box at "+A.j7(d).b+".")
@@ -16975,7 +16977,7 @@ return B.b1S}t.n(0,d,e)
 t=v?"ceiling joist":"side of the stud"
 return new A.eu(!0,w.b+": box fixed to the "+t+".",!1,"")},
 cRl(d){var w,v=this
-if(d<0||d>=$.HK().length)return B.b1M
+if(d<0||d>=$.HL().length)return B.b1M
 w=v.y
 if(w.q(0,d))return v.fP("That stud already has a hole.")
 if(v.x.a===0)return v.fP("Mount the boxes first. Then you know where the cable has to go and which studs need a hole.")
@@ -16985,23 +16987,23 @@ d_6(d){var w,v,u,t,s=this,r=A.j7(d)
 if(!s.x.al(0,d))return s.fP("There is no box at "+r.b+". Mount the box first, then pull the cable to it.")
 w=s.z
 if(w.q(0,d))return s.fP("The cable is already there.")
-v=s.aNi(d)
+v=s.aNj(d)
 u=C.U(v).k("Y<1>")
 t=C.C(new C.Y(v,new A.cvH(s),u),u.k("M.E"))
-if(t.length!==0){w=D.o.V($.HK()[D.d.gH(t)])
+if(t.length!==0){w=D.o.V($.HL()[D.d.gH(t)])
 v=t.length
 u=v===1?"it":"the studs"
 return s.fP("The cable is stuck: the stud at "+w+" inches has no hole. Drill "+u+" first ("+v+" left on the way).")}w.J(0,d)
 return new A.eu(!0,"Cable pulled from the panel to "+r.b+", through the studs and along the ceiling.",!1,"")},
-gapO(){return this.gaoj().cD(0,new A.cvI(this))},
-are(d){var w,v,u,t
+gapP(){return this.gaok().cD(0,new A.cvI(this))},
+arf(d){var w,v,u,t
 for(w=this.Q,w=new C.cb(w,C.a4(w).k("cb<1,2>")).gae(0);w.C();){v=w.d
 u=v.b
 if(u.a){t=v.a
 t=d>=t&&d<=t+48}else t=!1
 if(t)return u}return null},
 cUa(d){var w,v,u=this
-if(!u.gapO())return u.fP("Finish the rough-in first. The cable and the boxes must be in before the drywall hides the studs.")
+if(!u.gapP())return u.fP("Finish the rough-in first. The cable and the boxes must be in before the drywall hides the studs.")
 if(!D.d.q(B.a6j,d))return B.b1j
 if(!D.d.q(B.oO,d))return u.fP("The edge of the sheet would land between two studs. The sheet needs a stud under every edge, so there is nothing to screw it to. Start at the left corner (a stud) and move one sheet width (48 inches) at a time.")
 w=u.Q
@@ -17009,22 +17011,22 @@ v=w.h(0,d)
 if((v==null?null:v.a)===!0)return u.fP("There is already a sheet there.")
 v=w.h(0,d)
 if(v==null){v=x.S
-v=new A.awU(C.aR(v),C.aR(v))}v.a=!0
+v=new A.awT(C.aR(v),C.aR(v))}v.a=!0
 w.n(0,d,v)
 return B.b1v},
-arA(d){var w,v,u,t=C.a([],x.t)
-for(w=d+48,v=0;u=$.HK(),v<u.length;++v){u=u[v]
+arB(d){var w,v,u,t=C.a([],x.t)
+for(w=d+48,v=0;u=$.HL(),v<u.length;++v){u=u[v]
 if(u>=d&&u<=w)t.push(v)}return t},
 cQc(d){var w,v,u=this,t=A.j7(d)
 if(t.c)return u.fP("Ceiling fixtures do not need an opening in the wall.")
 if(!u.x.al(0,d))return u.fP("There is no box at "+t.b+".")
-w=u.are(t.d.a)
+w=u.arf(t.d.a)
 if(w==null)return u.fP("There is no sheet over this box yet. Hang the sheet first, then cut the opening.")
 v=w.b
 if(v.q(0,d))return u.fP("The opening is already cut.")
 v.J(0,d)
 return B.b1F},
-aMy(d,e,f){var w,v,u,t,s,r=this
+aMz(d,e,f){var w,v,u,t,s,r=this
 if(f)return r.fP("Missed the stud! There is only air behind the sheet here. The screw would pull through the paper. Screw only where a stud is behind the sheet (every 16 inches).")
 w=x.dD
 v=C.C(new C.Y(B.oO,new A.cvJ(r,d),w),w.k("M.E"))
@@ -17033,16 +17035,16 @@ u=d*10+e
 if(D.d.cD(v,new A.cvK(r,u)))return r.fP("There is already a screw there.")
 for(w=v.length,t=r.Q,s=0;s<v.length;v.length===w||(0,C.J)(v),++s)t.h(0,v[s]).c.J(0,u)
 return B.b1H},
-bqm(d,e){return this.aMy(d,e,!1)},
+bqm(d,e){return this.aMz(d,e,!1)},
 bs0(d){var w=this.Q.h(0,d)
 if(w==null||!w.a)return!1
-return D.d.cD(this.arA(d),new A.cvM(w))},
-gaEI(){return D.d.cD(B.oO,new A.cvz(this))},
-gaEH(){var w=this.gaoj()
+return D.d.cD(this.arB(d),new A.cvM(w))},
+gaEJ(){return D.d.cD(B.oO,new A.cvz(this))},
+gaEI(){var w=this.gaok()
 return new C.Y(w,new A.cvx(),C.a4(w).k("Y<ci.E>")).cD(0,new A.cvy(this))},
 d1f(d){var w,v=this
-if(!v.gaEI())return v.fP("Hang all the sheets first.")
-if(!D.d.cD(B.oO,v.garf()))return v.fP("Finish screwing every sheet to the studs first. Tape goes on a solid wall.")
+if(!v.gaEJ())return v.fP("Hang all the sheets first.")
+if(!D.d.cD(B.oO,v.garg()))return v.fP("Finish screwing every sheet to the studs first. Tape goes on a solid wall.")
 w=v.as[d]
 if(w.a)return v.fP("This seam already has tape.")
 w.c=w.a=!0
@@ -17067,19 +17069,19 @@ v.d=!0
 return B.b1k},
 cZf(d){var w=this,v=w.Q.h(0,d)
 if(v==null||!v.a)return w.fP("There is no sheet there.")
-if(!w.gaEH())return w.fP("Cut the openings for the boxes before you paint. Otherwise the paint covers the boxes.")
+if(!w.gaEI())return w.fP("Cut the openings for the boxes before you paint. Otherwise the paint covers the boxes.")
 if(!D.d.cD(w.as,new A.cvG()))return w.fP("Sand the seams first. Paint shows every bump.")
 if(v.e)return w.fP("This sheet is already painted.")
 v.e=!0
 return B.b1g},
 gtl(){var w=this
-return w.gaEI()&&D.d.cD(B.oO,w.garf())&&w.gaEH()&&D.d.cD(w.as,new A.cvB())&&D.d.cD(B.oO,new A.cvC(w))},
+return w.gaEJ()&&D.d.cD(B.oO,w.garg())&&w.gaEI()&&D.d.cD(w.as,new A.cvB())&&D.d.cD(B.oO,new A.cvC(w))},
 NV(){var w,v
 for(w=this.at,w=new C.dq(w,w.r,w.e);w.C();){v=w.d.b
 v.a=this.ax&&!this.ay}},
 c3X(d,e){if(d.c)return e==="light"||e==="fan"?"":"A ceiling box holds a light or a fan, not an outlet or a switch."
 return D.d.q(B.iR,e)||D.d.q(B.ih,e)?"":"A light or a fan hangs from the ceiling. A wall box holds an outlet, a GFCI or a switch."},
-a65(d,e){var w,v,u,t,s,r=this,q=A.j7(d)
+a66(d,e){var w,v,u,t,s,r=this,q=A.j7(d)
 if(!r.gtl())return r.fP("Finish the drywall first. Devices go in after the walls are painted.")
 w=r.x
 if(!w.al(0,d)||!r.z.q(0,d))return r.fP("There is no box with cable at "+q.b+".")
@@ -17098,23 +17100,23 @@ s.w=r.b
 s.z=r.dx
 s.y=!(t&&w.h(0,d)!=="fan")
 s.a=r.ax&&!r.ay
-v.n(0,d,new A.aVI(e,s))
+v.n(0,d,new A.aVH(e,s))
 if(e==="light")w="Light fixture"
 else if(t)w="Ceiling fan"
 else if(e==="gfci")w="GFCI outlet"
 else w=e==="switch"?"Switch":A.uw(e)
 return new A.eu(!0,w+" is held up to "+q.b+". Turn the breaker OFF, then wire it.",!1,"")},
-apz(d){var w=this,v=w.at,u=v.h(0,d)
+apA(d){var w=this,v=w.at,u=v.h(0,d)
 if(u==null)return B.b1s
-if(w.ax&&!w.ay&&!u.b.x){if(w.b)return w.a2Q()
-return w.a34()}v.W(0,d)
+if(w.ax&&!w.ay&&!u.b.x){if(w.b)return w.a2R()
+return w.a35()}v.W(0,d)
 w.CW.W(0,d)
 w.cx.W(0,d)
 w.ch.W(0,d)
 return B.b1K},
-a34(){++this.r;++this.f
+a35(){++this.r;++this.f
 return B.b1I},
-a2Q(){var w,v,u=this;++u.r;--u.e
+a2R(){var w,v,u=this;++u.r;--u.e
 u.ax=!1
 u.NV()
 w=u.e
@@ -17126,37 +17128,37 @@ if(r==null)return B.adb
 s.NV()
 w=A.nP(r.a)
 v=D.d.fe(w.f,new A.cvD(f))
-u=A.hhL(w,r.b,e,v,!0)
+u=A.hhM(w,r.b,e,v,!0)
 t=u==null
 if(t&&s.dx)return B.b1i
 if(t){if(!s.b&&!v.c.q(0,e)){++s.f
-return new A.eu(!0,v.b+": fastened. Careful: "+C.w(w.r.$2(e,v))+" It will burn or trip the breaker when the power comes on.",!0,"")}return new A.eu(!0,v.b+": wire fastened.",!1,"")}if(D.a.a_(u,"SHOCK"))return s.a2Q()
-if(D.a.a_(u,"STOP"))return s.a34();++s.f
+return new A.eu(!0,v.b+": fastened. Careful: "+C.w(w.r.$2(e,v))+" It will burn or trip the breaker when the power comes on.",!0,"")}return new A.eu(!0,v.b+": wire fastened.",!1,"")}if(D.a.a_(u,"SHOCK"))return s.a2R()
+if(D.a.a_(u,"STOP"))return s.a35();++s.f
 return new A.eu(!1,u,!1,"")},
 bm5(d,e){var w,v=this,u=v.at.h(0,d)
 if(u==null)return B.Xc
 v.NV()
 w=u.b
-if(w.a&&w.c===0){if(v.b)return v.a2Q()
-return v.a34()}w=w.b
+if(w.a&&w.c===0){if(v.b)return v.a2R()
+return v.a35()}w=w.b
 w.br(w,new A.cvN(e))
 return B.b1P},
-aK3(d){var w,v,u=this,t=u.at.h(0,d)
+aK4(d){var w,v,u=this,t=u.at.h(0,d)
 if(t==null)return B.adb
 w=A.nP(t.a)
 v=t.b
 if(!A.aj_(w,v))return u.fP("Every wire must be fastened first.")
-if(u.ax&&!u.ay){if(u.b)return u.a2Q()
-return u.a34()}v.c=1
+if(u.ax&&!u.ay){if(u.b)return u.a2R()
+return u.a35()}v.c=1
 return B.b1A},
-ap9(d){var w,v=this,u=v.at.h(0,d)
+apa(d){var w,v=this,u=v.at.h(0,d)
 if(u==null)return B.Xc
-if(v.ax&&!v.ay){if(v.b)return v.a2Q()
-return v.a34()}w=u.b
+if(v.ax&&!v.ay){if(v.b)return v.a2R()
+return v.a35()}w=u.b
 w.c=0
 w.d=!1
 return B.b1G},
-aGd(d){var w=this.at.h(0,d)
+aGe(d){var w=this.at.h(0,d)
 if(w==null||w.b.c!==1)return this.fP("Push the device into the box first.")
 w.b.c=2
 return B.b1J},
@@ -17171,10 +17173,10 @@ r=v.h(0,s)
 q=t.b
 p=A.nP(q)
 o=A.j7(s).b+": "+p.b
-if(r==null||r.a!==q){n.push(new A.abX(o,A.fX1(p),B.dlS,!0))
-continue}s=A.fX1(p)
+if(r==null||r.a!==q){n.push(new A.abX(o,A.fX2(p),B.dlT,!0))
+continue}s=A.fX2(p)
 q=r.b
-n.push(new A.abX(o,s,A.heV(p,q),q.y))}return n},
+n.push(new A.abX(o,s,A.heW(p,q),q.y))}return n},
 d1h(){var w,v,u,t,s,r=C.aR(x.N),q=this.d
 q===$&&C.c()
 w=q.length
@@ -17188,9 +17190,9 @@ t=C.U(u)
 s=new C.iu(u,0,2,t.k("iu<1>"))
 s.n6(u,0,2,t.c)
 D.d.v(q,s)}return q},
-aqn(d){var w=this.at
+aqo(d){var w=this.at
 return A.xh(A.nP(w.h(0,d).a),w.h(0,d).b)},
-a7w(){var w=this
+a7x(){var w=this
 if(w.ay){w.ax=w.ay=!1
 w.NV()
 return B.b1y}w.ax=!w.ax
@@ -17218,7 +17220,7 @@ i=k.dx?"The breaker tripped.":l+" The breaker tripped. "+D.d.aO(j," ")+" Fix it,
 return new A.eu(!1,i,!0,s?"burn":"trip")}if(r)return new A.eu(!1,k.dx?"Power is on.":"Power is on, and something is wrong. "+D.d.aO(j," "),!0,"arc")
 if(j.length!==0)return new A.eu(!0,"Power is on. "+D.d.aO(j," "),!0,"")
 return B.b1D},
-aHf(d){var w,v,u,t,s,r,q=this,p=q.at,o=p.h(0,d)
+aHg(d){var w,v,u,t,s,r,q=this,p=q.at,o=p.h(0,d)
 if(o==null||!D.d.q(B.ih,o.a)||o.b.c<2)return B.b1O
 w=q.ch
 if(w.q(0,d))w.W(0,d)
@@ -17230,42 +17232,42 @@ t=C.C(new C.Y(v,new A.cvE(d),u),u.k("M.E"))
 if(t.length===0)return B.b1z
 s=D.d.gH(t)
 v=s.a
-r=q.ao6(v)
+r=q.ao7(v)
 if(w.q(0,d)&&r){p=p.h(0,v)
 if(p!=null)p.c=!0
 return new A.eu(!0,(s.b==="fan"?"The fan spins":"The light turns on")+". The switch works.",!1,"")}if(w.q(0,d)){p=s.b
 return new A.eu(!1,(p==="fan"?"The fan":"The light")+" did not come on. Check the breaker and the wires on the switch and on the "+p+".",!1,"")}return B.b1N},
-a59(d){var w,v=this.at.h(0,d)
+a5a(d){var w,v=this.at.h(0,d)
 if(v!=null){w=v.b
 w=w.c<2||w.x}else w=!0
 if(w)return!1
-return this.aqn(d).c},
-ao6(d){var w=this,v=w.cZ0(d),u=v==null,t=u?null:v.c,s=!0
-if(!u)if(t!=null)u=!(w.ax&&!w.ay)||!w.a59(d)||!w.a59(t)
+return this.aqo(d).c},
+ao7(d){var w=this,v=w.cZ0(d),u=v==null,t=u?null:v.c,s=!0
+if(!u)if(t!=null)u=!(w.ax&&!w.ay)||!w.a5a(d)||!w.a5a(t)
 else u=s
 else u=s
 if(u)return!1
 return w.ch.q(0,t)},
-a6O(d,e){var w,v,u,t,s=this,r="Nothing happens.",q=s.at.h(0,d)
+a6P(d,e){var w,v,u,t,s=this,r="Nothing happens.",q=s.at.h(0,d)
 if(q==null||!D.d.q(B.iR,q.a)||q.b.c<2)return s.fP("There is no finished outlet there to plug into.")
 w=s.CW
 if(w.al(0,d))return s.fP("Something is already plugged in.")
 v=B.aJ3.h(0,e)
-if(v!=null&&!v.q(0,q.a)){w=A.aQO(e)
+if(v!=null&&!v.q(0,q.a)){w=A.aQN(e)
 if(e==="washerM")u="the washer outlet (5-20)."
 else u=e==="dryerM"?"a dryer outlet (14-30 or 10-30).":"a range outlet (14-50 or 10-50)."
 return s.fP("The plug does not fit. "+w+" has a big plug made for its own outlet: "+u)}w.n(0,d,e)
 w=q.b
 if(w.x)return B.b1t
-t=s.aqn(d)
-if(s.ax&&!s.ay&&s.a59(d)){q.c=!0
+t=s.aqo(d)
+if(s.ax&&!s.ay&&s.a5a(d)){q.c=!0
 if(t.a!=="ok"){w=s.dx
-u=w?A.aQO(e)+" runs.":A.aQO(e)+" runs, but this outlet is NOT safe. "+t.b
-return new A.eu(!0,u,!w,"")}return new A.eu(!0,A.aQO(e)+" runs. The outlet works.",!1,"")}if(!(s.ax&&!s.ay))return B.b1x
+u=w?A.aQN(e)+" runs.":A.aQN(e)+" runs, but this outlet is NOT safe. "+t.b
+return new A.eu(!0,u,!w,"")}return new A.eu(!0,A.aQN(e)+" runs. The outlet works.",!1,"")}if(!(s.ax&&!s.ay))return B.b1x
 u=t.r
 if(u!=="none"){s.db.n(0,d,u)
 w.Q=u
-w=s.dx?r:A.aQO(e)+" does not run. "+t.b
+w=s.dx?r:A.aQN(e)+" does not run. "+t.b
 return new A.eu(!1,w,!0,u==="fire"?"burn":"arc")}return new A.eu(!1,s.dx?r:"Nothing happens. "+t.b,!0,"")},
 bm8(d){if(this.CW.W(0,d)==null)return B.Xc
 return B.b1p},
@@ -17288,8 +17290,8 @@ w===$&&C.c()
 v=w[d]
 w=v.a
 u=t.at.h(0,w)
-if(u==null||!A.hay(v.b,u.a)||u.b.c<2)return!1
-return t.aqn(w).a==="ok"},
+if(u==null||!A.haz(v.b,u.a)||u.b.c<2)return!1
+return t.aqo(w).a==="ok"},
 gbmB(){var w,v,u,t,s,r,q,p,o,n=this.d
 n===$&&C.c()
 w=n.length
@@ -17309,7 +17311,7 @@ else q=o
 q=!q||r.b.c<2}else q=!0
 if(q)return!1
 if(A.xh(A.nP(v.h(0,s).a),v.h(0,s).b).a!=="ok")return!1}return!0},
-gaGv(){var w,v,u,t,s,r,q,p,o,n=this.d
+gaGw(){var w,v,u,t,s,r,q,p,o,n=this.d
 n===$&&C.c()
 w=n.length
 v=this.at
@@ -17339,8 +17341,8 @@ v.at=0.05
 w=new C.vv()
 $.vY()
 w.fX(0)
-return new A.aG6(v,w,C.T(x.S,x.i))}}
-A.aG6.prototype={
+return new A.aG5(v,w,C.T(x.S,x.i))}}
+A.aG5.prototype={
 gDk(d){var w=this.e
 if(w===$){this.a.toString
 w=D.o.F(Date.now(),1e5)
@@ -17353,7 +17355,7 @@ u.d=w
 v=u.a
 if(v.d)w.dx=!0
 if(v.f!=null&&w.gtl())u.y=2
-if(u.a.r){u.d.amV()
+if(u.a.r){u.d.amW()
 u.y=2}u.r=A.xg(u.d,new A.t1(u.z,u.as,!1))
 w=u.f
 w.ay=0
@@ -17371,7 +17373,7 @@ v=t.c
 v.toString
 u=s.a.a>C.aF(v,null,w).w.a.b}else u=!1
 t.db=C.cy(C.dw(0,0,0,0,0,u?6:10),new A.ezE(t))},
-af0(d){return this.ow(d,!1)},
+af1(d){return this.ow(d,!1)},
 ii(d){var w,v,u,t,s,r,q,p,o=this,n=d.a
 if(n)A.nO()
 else A.fr(180,220,0.25,"square")
@@ -17400,7 +17402,7 @@ o.r=A.xg(w,new A.t1(o.z,o.as,!1))
 n=n&&!d.c
 o.ow(d.b,n)
 if(o.d.w&&o.c!=null)$.aW.x1$.push(new A.eyN(o))
-if(o.d.gaGv()&&!o.cy){o.cy=!0
+if(o.d.gaGw()&&!o.cy){o.cy=!0
 $.aW.x1$.push(new A.eyO(o))}},
 b6y(){var w=this.CW,v=w?B.h7a:B.ac3,u=w?205:130,t=w?3.141592653589793:-0.12
 w=w?0.4:0.14
@@ -17416,7 +17418,7 @@ t=D.i.D(v.b,-46,48)
 s=D.i.D(v.c,-6,100)
 w.vF(Math.max(34,w.c*0.45),new A.r(u,t,s))
 A.fr(560,50,0.25,"tri")},
-aVN(){var w,v,u=this
+aVO(){var w,v,u=this
 u.CW=!1
 w=u.f
 w.at=0.05
@@ -17446,7 +17448,7 @@ r=r.CW
 w=C.a4(r).k("cb<1,2>")
 v=w.k("Y<M.E>")
 u=C.C(new C.Y(new C.cb(r,w),new A.eyP(),v),v.k("M.E"))
-if(u.length===0){s.af0("Plug a TV into an outlet first. Then you can look behind it.")
+if(u.length===0){s.af1("Plug a TV into an outlet first. Then you can look behind it.")
 return}t=A.j7(D.d.gH(u).a).d.a
 s.CW=!1
 r=s.f
@@ -17468,7 +17470,7 @@ v=u.d
 v===$&&C.c()
 u.r=A.xg(v,new A.t1(u.z,u.as,!1))
 w.fI(190,0.3,B.h7b,3.141592653589793)},
-a_r(d,e){var w,v,u,t,s=this,r=A.j7(e),q=s.f
+a_s(d,e){var w,v,u,t,s=this,r=A.j7(e),q=s.f
 q.pl(!1)
 q.ay=0
 s.m(new A.ezg(s,e))
@@ -17494,13 +17496,13 @@ else v=!1
 if(v)return
 if(d>=5000&&d<5700){v=d-5000
 u=D.o.aq(v,100)
-if(w!==u){if(q.z==="tester")q.aDs(u)
+if(w!==u){if(q.z==="tester")q.aDt(u)
 else{q.m(new A.ezA(q))
-q.a_r(0,u)}return}q.aAr(u,D.o.F(v,100))
+q.a_s(0,u)}return}q.aAs(u,D.o.F(v,100))
 return}if(d>=1000&&d<1010)if(q.z==="drill"){w=q.d
 w===$&&C.c()
 q.ii(w.cRl(d-1000))
-return}if(d>=2000&&d<2007){q.aAu(d-2000)
+return}if(d>=2000&&d<2007){q.aAv(d-2000)
 return}if(d>=3000&&d<3007){q.b4i(d-3000)
 return}if(d>=6000&&d<6005){if(q.z==="sheet"){w=q.d
 w===$&&C.c()
@@ -17526,27 +17528,27 @@ v=d-7000
 q.ii(w.bqm(D.o.aq(v,10),D.o.F(v,10)))}return}if(d>=7500&&d<7600){if(q.z==="screw"){w=q.d
 w===$&&C.c()
 v=d-7500
-q.ii(w.aMy(D.o.aq(v,10),D.o.F(v,10),!0))}return}if(d===8000){w=q.d
+q.ii(w.aMz(D.o.aq(v,10),D.o.F(v,10),!0))}return}if(d===8000){w=q.d
 w===$&&C.c()
-q.ii(w.a7w())
+q.ii(w.a7x())
 return}if(d>=8200&&d<8207){w=q.d
 w===$&&C.c()
 q.ii(w.bm8(d-8200))
 return}if(d>=8100&&d<8107){w=q.d
 w===$&&C.c()
 w=w.CW.h(0,d-8100)
-q.ow(A.aQO(w==null?"":w)+" is plugged in. To pull the plug, go behind it (the Behind the TV button) and tap the plug on the wall.",!0)
+q.ow(A.aQN(w==null?"":w)+" is plugged in. To pull the plug, go behind it (the Behind the TV button) and tap the plug on the wall.",!0)
 return}if(q.z==="look"){w=q.r
 w===$&&C.c()
 r=w.b.h(0,d)
 if(r!=null){q.m(new A.ezB(q,d))
 q.ow(r.a+": "+r.b,!0)}}},
-aAu(d){var w,v,u,t,s=this,r=s.d
+aAv(d){var w,v,u,t,s=this,r=s.d
 r===$&&C.c()
 if(r.at.al(0,d)){r=s.z
 r=r!=="tester"&&r!=="look"&&!D.d.q(B.zP,r)}else r=!1
 if(r){s.m(new A.ezw(s))
-s.a_r(0,d)
+s.a_s(0,d)
 return}r=s.z
 switch(r){case"wall":case"ceiling":case"fanbox":w=s.d
 s.ii(w.cWS(d,r==="fanbox"?"fan":r))
@@ -17555,15 +17557,15 @@ case"cable":s.ii(s.d.d_6(d))
 return
 case"knife":s.ii(s.d.cQc(d))
 return
-case"outlet":case"gfci":case"switch":case"split":case"v240four":case"v240three":case"v240only":case"isolated":case"dryer4":case"dryer3":case"range4":case"range3":case"washer":case"switch2p":case"switch3":case"switch4":case"switchsmart":case"switchcombo":case"light":case"fan":v=s.d.a65(d,r)
+case"outlet":case"gfci":case"switch":case"split":case"v240four":case"v240three":case"v240only":case"isolated":case"dryer4":case"dryer3":case"range4":case"range3":case"washer":case"switch2p":case"switch3":case"switch4":case"switchsmart":case"switchcombo":case"light":case"fan":v=s.d.a66(d,r)
 s.ii(v)
 if(v.a){r=s.d.at.h(0,d).b
 w=s.d
 r.f=!w.b&&!w.dx
 s.z=""
-s.a_r(0,d)}return
-case"tester":s.aDs(d)
-return}if(s.d.at.al(0,d)){s.a_r(0,d)
+s.a_s(0,d)}return
+case"tester":s.aDt(d)
+return}if(s.d.at.al(0,d)){s.a_s(0,d)
 return}if(s.d.gtl()&&s.d.x.al(0,d)&&!s.d.at.al(0,d)){u=A.j7(d)
 s.m(new A.ezx(s,d))
 if(s.Q===d){if(u.c)r="a light or a fan"
@@ -17575,7 +17577,7 @@ r===$&&C.c()
 t=r.b.h(0,2000+d)
 if(t!=null){s.m(new A.ezy(s,d))
 s.ow(t.a+": "+t.b,!0)}},
-aDs(d){var w,v=this.d
+aDt(d){var w,v=this.d
 v===$&&C.c()
 w=v.ax&&!v.ay&&v.x.al(0,d)&&this.d.z.q(0,d)
 v=w?"The tester glows: this box is LIVE (120 volts). Turn the breaker OFF before you touch any wire.":"The tester stays dark: no power here. It is safe to work. (Test again after you turn the breaker off, every time.)"
@@ -17585,14 +17587,14 @@ b4i(d){var w,v=this,u=v.d
 u===$&&C.c()
 w=u.at.h(0,d)
 if(w==null)return
-if(D.d.q(B.zP,v.z)){v.ii(v.d.a6O(d,v.z))
+if(D.d.q(B.zP,v.z)){v.ii(v.d.a6P(d,v.z))
 return}u=v.z
-if(u==="tester"){v.aDs(d)
-return}if(u==="flip"){if(D.d.q(B.ih,w.a)&&w.b.c>=2)v.ii(v.d.aHf(d))
-else v.af0("Only a finished switch can be flipped.")
+if(u==="tester"){v.aDt(d)
+return}if(u==="flip"){if(D.d.q(B.ih,w.a)&&w.b.c>=2)v.ii(v.d.aHg(d))
+else v.af1("Only a finished switch can be flipped.")
 return}v.m(new A.ezv(v))
-v.a_r(0,d)},
-aAr(d,e){var w,v,u,t,s,r,q,p,o=this,n=o.d
+v.a_s(0,d)},
+aAs(d,e){var w,v,u,t,s,r,q,p,o=this,n=o.d
 n===$&&C.c()
 w=n.at.h(0,d)
 if(w==null)return
@@ -17602,7 +17604,7 @@ v=A.nP(n)
 u=v.f
 t=C.U(u).k("Y<1>")
 s=C.C(new C.Y(u,new A.ezn(e),t),t.k("M.E"))
-r=A.hG1(n,e)
+r=A.hG2(n,e)
 n=r!=null
 if(n){u=w.b
 u=u.b.il(0,r)&&u.c===0}else u=!1
@@ -17620,7 +17622,7 @@ n=n.c===0&&!n.b.il(0,r)&&D.d.aV(v.e,new A.ezp(r))}else n=!1
 if(n){o.m(new A.ezq(o,r,d,e))
 if(o.ax.length!==0)o.ow(D.d.fe(v.e,new A.ezr(r)).b+": picked up. Now tap where it joins.",!0)
 return}if(s.length!==0&&w.b.c===0){n=o.ax
-if(n.length===0){o.af0("Pick a wire below first, then tap "+D.d.gH(s).b+".")
+if(n.length===0){o.af1("Pick a wire below first, then tap "+D.d.gH(s).b+".")
 o.m(new A.ezs(o,d,e))
 return}q=o.d.bgP(d,n,e)
 o.ii(q)
@@ -17669,19 +17671,19 @@ w===$&&C.c()
 v=w.d
 v===$&&C.c()
 v=v.length
-u=A.hkH(w.f,w.r,v)}else u=0
+u=A.hkI(w.f,w.r,v)}else u=0
 if(u>0)A.Tz(u)
 w=t.c
 w.toString
 C.cg(s,s,!0,s,new A.eyU(t,u),w,s,!0,!0,x.H)},
-ayS(d){this.m(new A.ez0(this,d))
-this.aVN()},
-b0Q(){return this.ayS(!1)},
+ayT(d){this.m(new A.ez0(this,d))
+this.aVO()},
+b0Q(){return this.ayT(!1)},
 cGM(d){var w,v,u=new A.ezI(A.j7(d)),t=C.a([],x.C)
 for(w=0;w<30;++w){v=B.aB3[w]
 if(u.$1(v.a))t.push(v)}return t},
 T3(d,e,f,g){var w=null,v=f==null,u=v?D.dl:g.j(0.9),t=C.l(14),s=C.X(d,v?D.bW:D.w,w,w,w,17)
-return new C.D(G.oq,C.az(w,C.q(w,C.A(C.a([s,D.e5,C.d(e,w,1,w,w,w,w,C.n(w,w,v?D.bW:D.w,w,w,w,w,w,w,w,w,10.5,w,w,D.I,w,w,!0,w,w,w,w,w,w,w,w),w,w,w)],x.p),D.l,w,D.e,D.P,0,w,w),D.f,w,w,new C.p(u,w,w,t,w,w,D.n),w,44,w,w,D.ku,w,w,w),D.y,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,f,w,w,w,w,w,w,!1,D.a4),w)},
+return new C.D(G.oq,C.az(w,C.q(w,C.A(C.a([s,D.e5,C.d(e,w,1,w,w,w,w,C.n(w,w,v?D.bW:D.w,w,w,w,w,w,w,w,w,10.5,w,w,D.I,w,w,!0,w,w,w,w,w,w,w,w),w,w,w)],x.p),D.l,w,D.e,D.P,0,w,w),D.f,w,w,new C.p(u,w,w,t,w,w,D.n),w,44,w,w,D.kv,w,w,w),D.y,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,f,w,w,w,w,w,w,!1,D.a4),w)},
 bcN(d,e,f){return this.T3(d,e,f,D.av)},
 cJN(d,e){var w,v,u,t,s,r,q,p=this,o=null,n=x.p,m=C.a([p.T3(D.k6,"Back to the room",p.gb0P(),D.ac)],n),l=d.b
 if(l.c===0){w=A.aj_(e,l)?"Push into the box":"Fasten every wire"
@@ -17722,13 +17724,13 @@ m===$&&C.c()
 w=C.U(m).k("Y<1>")
 s=C.C(new C.Y(m,new A.ez2(n),w),w.k("M.E"))
 if(s.length!==0){t=D.d.gH(s).a
-m=n.d.aNi(t)
+m=n.d.aNj(t)
 r=new C.Y(m,new A.ez3(n),C.U(m).k("Y<1>")).gI(0)
 return r>0?"The cable comes from the panel on the right. Pick the drill and tap each stud on the way to "+A.j7(t).b+" ("+r+" left).":"Pick the cable roll and tap "+A.j7(t).b+"."}return"Rough-in done! Open 2 Drywall."
-case 1:if(!m.gapO())return"Finish the rough-in first (tab 1). Drywall hides the wires."
-if(!n.d.gaEI())return"Pick a drywall sheet and tap a stud edge to hang it. Three sheets cover the wall."
-if(!n.d.gaEH())return"Pick the drywall saw and tap each box to cut its opening."
-if(!D.d.cD(B.oO,n.d.garf()))return"Pick the screw gun and put a screw in every glowing spot on the studs."
+case 1:if(!m.gapP())return"Finish the rough-in first (tab 1). Drywall hides the wires."
+if(!n.d.gaEJ())return"Pick a drywall sheet and tap a stud edge to hang it. Three sheets cover the wall."
+if(!n.d.gaEI())return"Pick the drywall saw and tap each box to cut its opening."
+if(!D.d.cD(B.oO,n.d.garg()))return"Pick the screw gun and put a screw in every glowing spot on the studs."
 if(D.d.aV(n.d.as,new A.ez6()))return"Pick the tape and tap each seam between two sheets."
 if(D.d.aV(n.d.as,new A.ez7()))return D.d.aV(n.d.as,new A.ez8())?'The mud is wet. Press "Let it dry", then the next coat.':"Pick the mud and tap each seam. It needs three coats, with drying in between."
 if(D.d.aV(n.d.as,new A.ez9()))return D.d.aV(n.d.as,new A.eza())?'Press "Let it dry", then sand.':"Pick the sander and tap each seam."
@@ -17780,7 +17782,7 @@ l=C.a([],m)
 for(k=0;k<3;++k)l.push(new C.D(D.NV,C.d(k<a2.d.e?"\u2764\ufe0f":"\ud83d\udda4",a3,a3,a3,a3,a3,a3,D.AR,a3,a3,a3),a3))
 l.push(D.bm)
 j=a2.d
-if(j.ay)j=D.ks
+if(j.ay)j=D.kt
 else{j=j.ax
 j=j?D.ek:D.e7}j=j.j(0.95)
 i=C.l(16)
@@ -17798,7 +17800,7 @@ i=j?"In front":"Behind the wall"
 h=j?H.apE:H.apD
 j=C.a([A.tl(i,D.bp,h,j,j?a2.gbUD():a2.gbGp()),D.an,A.tl("Look up",D.b0,B.bS4,!1,a2.gc5x()),D.an,A.tl("Behind the TV",D.cF,R.HR,!1,a2.gbGr()),D.an],m)
 if(!a4){i=u.b
-D.d.v(j,C.a([A.tl("Labels",D.aH,Q.CS,i.f,new A.eA3(a2,u)),D.an,A.tl("Hints",D.av,D.mh,i.e,new A.eA4(a2,u)),D.T],m))}r=A.Ku(!1,a3,a2.f,new A.eAf(a2),a3,o,q,n,a3,a3,p,a3,a2.gcb0(),new A.eAh(a2),a2.gcb3(),r,!1,a3,l,j)
+D.d.v(j,C.a([A.tl("Labels",D.aH,Q.CS,i.f,new A.eA3(a2,u)),D.an,A.tl("Hints",D.av,D.mh,i.e,new A.eA4(a2,u)),D.T],m))}r=A.Kv(!1,a3,a2.f,new A.eAf(a2),a3,o,q,n,a3,a3,p,a3,a2.gcb0(),new A.eAh(a2),a2.gcb3(),r,!1,a3,l,j)
 q=C.a([],m)
 if(a4){a4=C.a([],m)
 if(!w){p=C.a([],m)
@@ -17806,9 +17808,9 @@ for(k=0;k<3;++k){o=k<2?6:0
 n=a2.y===k?D.av.j(0.2):D.dl
 l=new C.aN(12,12)
 e=new C.ay(a2.y===k?D.av:D.bA,1,D.r,-1)
-if(k===0)j=a2.d.gapO()
+if(k===0)j=a2.d.gapP()
 else{j=a2.d
-j=k===1?j.gtl():j.gaGv()}j=j?"\u2705 ":""
+j=k===1?j.gtl():j.gaGw()}j=j?"\u2705 ":""
 i=B.aCN[k]
 h=a2.y===k?D.av:D.ac
 p.push(new C.bz(1,D.bc,C.az(a3,C.q(a3,new C.ch(D.A,a3,a3,C.d(j+i,a3,a3,a3,a3,a3,a3,new C.G(!0,h,a3,a3,a3,a3,12,D.u,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3),a3,a3,a3),a3),D.f,a3,a3,new C.p(n,a3,new C.bH(e,e,e,e),new C.be(l,l,l,l),a3,a3,D.n),a3,a3,a3,new C.R(0,0,o,0),Aa.NY,a3,a3,a3),D.y,!1,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,new A.eAi(a2,k),a3,a3,a3,a3,a3,a3,!1,D.a4),a3))}p=C.a([C.A(p,D.l,a3,D.e,D.j,0,a3,a3),D.an],m)
@@ -17823,10 +17825,10 @@ if(w){o=D.av.j(0.2)
 n=C.l(14)
 l=C.L(D.av,D.r,1)
 j=a2.y
-if(j===0)j=a2.d.gapO()
+if(j===0)j=a2.d.gapP()
 else{i=a2.d
-j=j===1?i.gtl():i.gaGv()}j=j?"\u2705 ":""
-p.push(new C.D(G.oq,C.az(a3,C.q(a3,C.as(C.d(j+B.aCN[a2.y],a3,a3,a3,a3,a3,a3,B.fAM,a3,a3,a3),a3,a3,a3),D.f,a3,a3,new C.p(o,a3,l,n,a3,a3,D.n),a3,a3,a3,a3,D.f3,a3,a3,a3),D.y,!1,B.hq_,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,new A.eAj(a2),a3,a3,a3,a3,a3,a3,!1,D.a4),a3))}if(a2.y<2&&!a2.d.gtl())p.push(new C.D(G.oq,C.az(a3,C.q(a3,B.bcA,D.f,a3,a3,new C.p(D.dK,a3,a3,C.l(14),a3,a3,D.n),a3,a3,a3,a3,D.f3,a3,a3,a3),D.y,!1,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,new A.eAk(a2),a3,a3,a3,a3,a3,a3,!1,D.a4),a3))
+j=j===1?i.gtl():i.gaGw()}j=j?"\u2705 ":""
+p.push(new C.D(G.oq,C.az(a3,C.q(a3,C.as(C.d(j+B.aCN[a2.y],a3,a3,a3,a3,a3,a3,B.fAM,a3,a3,a3),a3,a3,a3),D.f,a3,a3,new C.p(o,a3,l,n,a3,a3,D.n),a3,a3,a3,a3,D.f3,a3,a3,a3),D.y,!1,B.hq_,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,new A.eAj(a2),a3,a3,a3,a3,a3,a3,!1,D.a4),a3))}if(a2.y<2&&!a2.d.gtl())p.push(new C.D(G.oq,C.az(a3,C.q(a3,B.bcA,D.f,a3,a3,new C.p(D.dJ,a3,a3,C.l(14),a3,a3,D.n),a3,a3,a3,a3,D.f3,a3,a3,a3),D.y,!1,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3,new A.eAk(a2),a3,a3,a3,a3,a3,a3,!1,D.a4),a3))
 if(a2.Q>=0&&a2.y===2){o=D.b0.j(0.18)
 n=C.l(14)
 l=C.L(D.b0,D.r,1)
@@ -17877,7 +17879,7 @@ if(n&&p.x)o.push(A.tk("Take out the burnt one",B.Pg,new A.eAc(a2),D.c0))
 else if(n)o.push(A.tk("Pull it out of the wall",B.Pg,new A.eAd(a2),D.ac))
 a4.push(C.A(o,D.l,a3,D.e,D.j,0,a3,a3))
 if(!p.x)D.d.v(a4,C.a([D.T,C.A(C.a([A.tk("Take it out and put in a different "+(D.d.q(B.ih,u.a)?"switch":"one"),D.jL,new A.eAe(a2,u),D.aH)],m),D.l,a3,D.e,D.j,0,a3,a3)],m))
-D.d.v(q,a4)}a4=C.a([A.IV(!0,D.av,new A.eAg(a2,a6),C.x(q,D.l,a3,D.e,D.P,0,D.p),r,"Phase "+(v+1)+"/3",s+" job",a3,a3)],m)
+D.d.v(q,a4)}a4=C.a([A.IW(!0,D.av,new A.eAg(a2,a6),C.x(q,D.l,a3,D.e,D.P,0,D.p),r,"Phase "+(v+1)+"/3",s+" job",a3,a3)],m)
 if(a2.cx)a4.push(C.bR(0,new C.du(!0,C.q(a3,a3,D.f,B.ajH,a3,a3,a3,a3,a3,a3,a3,a3,a3,a3),a3),0,0,0))
 return new C.an(D.a0,a3,D.ab,D.t,a4,a3)},
 cv9(d){var w=this.d
@@ -17899,7 +17901,7 @@ break A}w=D.d.q(B.zP,this.z)
 if(w){w="Tap a finished outlet to plug it in."
 break A}w="Tap a glowing box to put it there."
 break A}this.ow(w,!0)},
-cke(d){return C.bT(E.mR,null,new A.ezm(this,d),d,!0,!0,!0,D.kf,!1,!1,x.H)}}
+cke(d){return C.bT(E.mR,null,new A.ezm(this,d),d,!0,!0,!0,D.kg,!1,!1,x.H)}}
 A.t1.prototype={}
 A.rz.prototype={
 a7(){return"FaultKind."+this.b}}
@@ -17908,7 +17910,7 @@ A.N6.prototype={}
 A.cyW.prototype={
 bCm(d,e,f){var w,v,u,t,s,r,q,p=this,o=new C.e5()
 o.d_(p.a)
-w=C.C(B.dj3,x.eP)
+w=C.C(B.dj4,x.eP)
 D.d.e0(w,o)
 v=C.aR(x.S)
 u=C.a([],x.gw)
@@ -17919,11 +17921,11 @@ v.J(0,q)
 u.push(new A.N6(r,o.az(3)))
 if(u.length>=d)break}p.c!==$&&C.aQ()
 p.c=u
-p.ayT()},
+p.ayU()},
 qc(d,e){var w=this.c
 w===$&&C.c()
 return D.d.aV(w,new A.cz0(e))},
-ayT(){var w,v,u,t,s=this,r=s.d,q=r.d
+ayU(){var w,v,u,t,s=this,r=s.d,q=r.d
 q.a8(0)
 if(s.qc(0,B.a1u))q.J(0,72)
 if(s.qc(0,B.a1v))q.J(0,75)
@@ -17990,7 +17992,7 @@ if(u!==0){t=s.d
 u=!t.d.q(0,u)&&!t.e.q(0,u)}else u=!1
 if(u){if(s.b)return s.cb6()
 return s.b0R("STOP! "+v.r+" The wires here are live (120 volts). Tap the breaker in the panel (with your hand) to switch it off.")}w.c=!0
-s.ayT()
+s.ayU()
 return new A.eu(!0,v.d,!1,"")},
 bGW(d,e){var w,v,u,t,s=this
 if(d==="inspect"){w=s.d
@@ -18004,20 +18006,20 @@ w===$&&C.c()
 u=C.U(w).k("Y<1>")
 t=C.C(new C.Y(w,new A.cyY(e),u),u.k("M.E"))
 if(t.length!==0){D.d.gH(t).c=!0
-s.ayT()
+s.ayU()
 return new A.eu(!0,B.x2.h(0,D.d.gH(t).a).d,!1,"")}v.W(0,e)
 return B.b1R}w=w.e
 if(w.q(0,e)){w.W(0,e)
 return B.b1L}w.J(0,e)
 return B.b1B}}
-A.asO.prototype={
+A.asN.prototype={
 S(){var w,v=new A.uO(-0.3,0.48,46,B.Wd,$.aw())
 v.f=80
 w=new C.vv()
 $.vY()
 w.fX(0)
-return new A.aGa(v,w)}}
-A.aGa.prototype={
+return new A.aG9(v,w)}}
+A.aG9.prototype={
 gK(){var w=this.d
 w===$&&C.c()
 return w},
@@ -18029,7 +18031,7 @@ Y(){var w,v=this
 v.a4()
 w=v.gDk(0)
 v.a.toString
-w=A.hsS(!0,w)
+w=A.hsT(!0,w)
 v.d=w
 v.r=A.ahu(w.d)},
 t(){var w=this.ax
@@ -18066,12 +18068,12 @@ t===$&&C.c()
 w=t.c
 w===$&&C.c()
 w=w.length
-v=A.hkH(t.f,t.r,w)
+v=A.hkI(t.f,t.r,w)
 A.Tz(v)
 w=this.c
 w.toString
 C.cg(u,u,!0,u,new A.eBy(this,v),w,u,!0,!0,x.H)},
-ayg(){this.m(new A.eBA(this))
+ayh(){this.m(new A.eBA(this))
 this.b0S()},
 B(d){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i=this,h=null,g=i.d
 g===$&&C.c()
@@ -18088,7 +18090,7 @@ r=u!==0?v.b.h(0,u):h
 q=x.p
 p=C.a([],q)
 for(o=0;o<3;++o)p.push(new C.D(D.NV,C.d(o<i.d.e?"\u2764\ufe0f":"\ud83d\udda4",h,h,h,h,h,h,D.AR,h,h,h),h))
-v=A.Ku(!1,h,i.f,new A.eBS(i),h,s,u,r,h,new A.eBT(),t,h,h,i.gcb8(),i.gcb9(),v,!1,h,C.a([C.A(p,D.l,h,D.e,D.P,0,h,h)],q),h)
+v=A.Kv(!1,h,i.f,new A.eBS(i),h,s,u,r,h,new A.eBT(),t,h,h,i.gcb8(),i.gcb9(),v,!1,h,C.a([C.A(p,D.l,h,D.e,D.P,0,h,h)],q),h)
 u=i.d.c
 u===$&&C.c()
 t=C.U(u)
@@ -18106,10 +18108,10 @@ p=C.X(l,i.x===m?D.av:D.ac,h,h,h,19)
 l=B.T6.h(0,m)
 l.toString
 j=i.x===m?D.av:D.c
-t.push(new C.D(G.oq,C.az(h,C.q(h,new C.c8(D.aL,D.e,D.j,D.l,h,D.p,h,0,C.a([p,D.bm,C.d(l,h,h,h,h,h,h,new C.G(!0,j,h,h,h,h,12.5,D.I,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h),h,h,h)],q),h),D.f,h,h,new C.p(s,h,new C.bH(k,k,k,k),new C.be(r,r,r,r),h,h,D.n),h,h,h,h,D.f3,h,h,h),D.y,!1,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,new A.eBW(i,m),h,h,h,h,h,h,!1,D.a4),h))}g=C.a([A.IV(!0,D.aH,new A.eBX(i,d),C.x(C.a([new C.bM(D.a7,h,h,u,h),D.T,new C.a5(h,52,C.cl(t,h,h,h,h,h,D.aL,!1),h)],q),D.l,h,D.e,D.P,0,D.p),v,""+g+"/"+w+" fixed","Service call",h,h)],q)
+t.push(new C.D(G.oq,C.az(h,C.q(h,new C.c8(D.aL,D.e,D.j,D.l,h,D.p,h,0,C.a([p,D.bm,C.d(l,h,h,h,h,h,h,new C.G(!0,j,h,h,h,h,12.5,D.I,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h),h,h,h)],q),h),D.f,h,h,new C.p(s,h,new C.bH(k,k,k,k),new C.be(r,r,r,r),h,h,D.n),h,h,h,h,D.f3,h,h,h),D.y,!1,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,new A.eBW(i,m),h,h,h,h,h,h,!1,D.a4),h))}g=C.a([A.IW(!0,D.aH,new A.eBX(i,d),C.x(C.a([new C.bM(D.a7,h,h,u,h),D.T,new C.a5(h,52,C.cl(t,h,h,h,h,h,D.aL,!1),h)],q),D.l,h,D.e,D.P,0,D.p),v,""+g+"/"+w+" fixed","Service call",h,h)],q)
 if(i.as)g.push(C.bR(0,new C.du(!0,C.q(h,h,D.f,B.ajH,h,h,h,h,h,h,h,h,h,h),h),0,0,0))
 return new C.an(D.a0,h,D.ab,D.t,g,h)},
-cFa(d){return C.bT(E.mR,null,new A.eBQ(this),d,!0,!0,!0,D.kf,!1,!1,x.H)},
+cFa(d){return C.bT(E.mR,null,new A.eBQ(this),d,!0,!0,!0,D.kg,!1,!1,x.H)},
 $0(){return this.gK().$0()},
 $1(d){return this.gK().$1(d)},
 $2(d,e){return this.gK().$2(d,e)},
@@ -18977,17 +18979,17 @@ giF(d){return this.x}}
 A.u2.prototype={}
 A.aaP.prototype={}
 A.ic.prototype={
-aHV(d,e,f){var w=this
+aHW(d,e,f){var w=this
 return d>w.a-f&&d<w.b+f&&e>w.c-f&&e<w.d+f}}
 A.cvv.prototype={
 cbc(d){return-this.a.gec(0)/2+d*4},
-a5I(d,e){var w,v,u=this.a
+a5J(d,e){var w,v,u=this.a
 if(d<-u.gec(0)/2+6||d>u.gec(0)/2-6||e<6||e>u.gh3(0)-6)return!1
-for(u=this.b,w=u.length,v=0;v<w;++v)if(u[v].aHV(d,e,9))return!1
+for(u=this.b,w=u.length,v=0;v<w;++v)if(u[v].aHW(d,e,9))return!1
 return!0},
 b0U(d,e,f){var w,v,u=e.a,t=f.a-u,s=e.b,r=f.b-s,q=Math.max(1,D.i.cL(Math.sqrt(Math.pow(t,2)+Math.pow(r,2))/2))
 for(w=0;w<=q;++w){v=w/q
-if(!this.a5I(u+t*v,s+r*v))return!1}return!0},
+if(!this.a5J(u+t*v,s+r*v))return!1}return!0},
 b_t(a0){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h=this,g=a0.a,f=h.a,e=D.i.V((g+f.gec(0)/2)/4),d=h.c
 d===$&&C.c()
 w=D.o.D(e,0,d-1)
@@ -19001,11 +19003,11 @@ l=t+m
 if(n<0||l<0||n>=d||l>=u)continue
 k=n*4
 j=l*4
-if(!h.a5I(-f.gec(0)/2+k,j))continue
+if(!h.a5J(-f.gec(0)/2+k,j))continue
 i=Math.pow(-f.gec(0)/2+k-g,2)+Math.pow(j-e,2)
 if(i<o){p=new C.y(n,l)
 o=i}}if(p!=null)return p}return null},
-apP(b9,c0){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5=this,b6=1e9,b7=b5.b_t(b9),b8=b5.b_t(c0)
+apQ(b9,c0){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5=this,b6=1e9,b7=b5.b_t(b9),b8=b5.b_t(c0)
 if(b7==null||b8==null)return C.a([b9,c0],x.f)
 w=b8.a
 v=b5.cbc(w)
@@ -19049,9 +19051,9 @@ a9=a2+a8
 b0=!0
 if(a5>=0)if(a9>=0){b0=b5.c
 b0===$&&C.c()
-b0=a5>=b0||a9>=s||!b5.a5I(-v.gec(0)/2+a6,a9*4)}if(b0)continue
+b0=a5>=b0||a9>=s||!b5.a5J(-v.gec(0)/2+a6,a9*4)}if(b0)continue
 b0=!1
-if(a4)if(a8!==0)b0=!b5.a5I(-v.gec(0)/2+a6,n)||!b5.a5I(-v.gec(0)/2+e,a9*4)
+if(a4)if(a8!==0)b0=!b5.a5J(-v.gec(0)/2+a6,n)||!b5.a5J(-v.gec(0)/2+e,a9*4)
 if(b0)continue
 b1=a5*s+a9
 b0=m.h(0,f)
@@ -19081,8 +19083,8 @@ if(s!=null)for(w=this.as,v=1;v<s.length;++v){u=v-1
 t=Math.sqrt(Math.pow(s[v].a-s[u].a,2)+Math.pow(s[v].b-s[u].b,2))
 w.push(t)
 this.at+=t}}}
-A.aXr.prototype={
-aw8(d){var w,v,u=d.gec(0),t=new A.bWA(d,u)
+A.aXq.prototype={
+aw9(d){var w,v,u=d.gec(0),t=new A.bWA(d,u)
 switch(d.c){case"living":w=t.$1(46)
 return C.a([B.huq,new A.AZ(w.a,w.b,4,"Switching the ad on the big TV",!1,!0,!0,"ad")],x.k)
 case"kitchen":return C.a([new A.AZ(new C.y(-u/2+40,42),3.141592653589793,2.8,"Getting a drink from the fridge",!0,!1,!1,""),B.hup],x.k)
@@ -19092,34 +19094,34 @@ return C.a([new A.AZ(v.a,v.b,3.4,"Switching the ad on the TV",!1,!0,!0,"ad")],x.
 case"hall":if(!this.a)return B.aBN
 return C.a([new A.AZ(new C.y(-d.gec(0)/2+80,90),3.141592653589793,3,"Looking at the left video wall",!1,!1,!0,""),new A.AZ(B.eAc,0,2.4,"Looking over the lounge and the logo carpet",!1,!1,!1,""),new A.AZ(new C.y(d.gec(0)/2-80,90),3.141592653589793,3,"Looking at the right video wall",!1,!1,!0,"")],x.k)
 default:return B.aBN}},
-adj(a0,a1,a2,a3){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e=this,d=e.b.d
+adk(a0,a1,a2,a3){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e=this,d=e.b.d
 d===$&&C.c()
 w=d[a0]
-v=new A.cvv(w,A.irC(w))
+v=new A.cvv(w,A.irD(w))
 v.c=D.i.cL(w.gec(0)/4)+1
 v.d=D.i.cL(w.gh3(0)/4)+1
-u=A.hwW(w,a1)
+u=A.hwX(w,a1)
 t=u.a
 s=u.c
 d=e.d
 r=d.length
 q=a3.length===0?"Walking in":a3
 d.push(A.btj(a0,"",!1,q,-1,null,!1,!1,0.5,t.a,u.b,t.b))
-for(q=e.aw8(w),p=q.length,o=t,n=0;n<q.length;q.length===p||(0,C.J)(q),++n){m=q[n]
-l=v.apP(o,m.a)
+for(q=e.aw9(w),p=q.length,o=t,n=0;n<q.length;q.length===p||(0,C.J)(q),++n){m=q[n]
+l=v.apQ(o,m.a)
 k=m.e
 if(k)j=C.cS(m.d,"Having",0)
 else j=!1
 d.push(A.btj(a0,"",j,"Walking",-1,l,!1,!1,0,0,0,0))
 o=D.d.gan(l)
-d.push(A.btj(a0,m.w,k,m.d,-1,null,m.r,m.f,m.c,o.a,m.b,o.b))}if(a2!=null){i=A.hwW(w,a2)
+d.push(A.btj(a0,m.w,k,m.d,-1,null,m.r,m.f,m.c,o.a,m.b,o.b))}if(a2!=null){i=A.hwX(w,a2)
 h=i.c
-l=v.apP(o,i.a)
-g=e.aw8(w).length!==0&&D.d.gan(e.aw8(w)).e
+l=v.apQ(o,i.a)
+g=e.aw9(w).length!==0&&D.d.gan(e.aw9(w)).e
 d.push(A.btj(a0,"",g,"Walking to the next room",-1,l,!1,!1,0,0,0,0))
 o=D.d.gan(l)
 d.push(A.btj(a0,"",g,"Opening the door",h,null,!1,!1,1.8,o.a,e.bQ8(w,h),o.b))}for(f=r;f<d.length;++f)d[f].ay=s},
-aZe(d,e,f){return this.adj(d,e,f,"")},
+aZe(d,e,f){return this.adk(d,e,f,"")},
 bQ8(d,e){var w
 switch(d.w[e].b){case"left":w=-1.5707963267948966
 break
@@ -19128,11 +19130,11 @@ break
 default:w=3.141592653589793
 break}return w},
 b0T(){var w,v,u=this
-if(u.a){u.adj(5,10,9,"Walking into the hall")
+if(u.a){u.adk(5,10,9,"Walking into the hall")
 u.b0V()
-return}u.adj(10,11,9,"Coming in through the front door")
+return}u.adk(10,11,9,"Coming in through the front door")
 u.aZe(9,10,5)
-u.adj(5,9,0,"Walking down the hall")
+u.adk(5,9,0,"Walking down the hall")
 for(w=0;w<8;++w){v=B.d1V[w]
 u.aZe(v,5,w===7?null:5)}u.b0V()},
 b0V(){var w,v,u,t,s,r,q,p,o=this,n=o.c,m=Math.min(1,n/120)
@@ -19162,7 +19164,7 @@ s=f.y&&q
 p=q&&f.z.length!==0?f.z+":"+v:""
 o=f.Q
 n=o>=0?r:0
-return A.auH(!1,n,f.ay,p,f.w,0,f.r,o,0,!1,s,f.x,v,!1,!1,f.c,f.e,f.d)}v=new A.bWB(g)
+return A.auG(!1,n,f.ay,p,f.w,0,f.r,o,0,!1,s,f.x,v,!1,!1,f.c,f.e,f.d)}v=new A.bWB(g)
 m=r*f.at
 l=v.$1(m)
 k=v.$1(Math.min(g.a.at,m+7))
@@ -19185,11 +19187,11 @@ v=l.a
 s=l.b
 p=Math.atan2(i,h)
 o=g.a
-return A.auH(!1,0,o.ay,"",o.w,0,o.r,-1,m/12,!1,!1,!1,f.a,!1,!0,v,p,s)}}
+return A.auG(!1,0,o.ay,"",o.w,0,o.r,-1,m/12,!1,!1,!1,f.a,!1,!0,v,p,s)}}
 A.baH.prototype={
 GZ(d){var w=this.a
-if(w!=null)this.ax=A.hET(w,this.CW)},
-aKW(){var w,v,u,t,s,r,q=this
+if(w!=null)this.ax=A.hEU(w,this.CW)},
+aKX(){var w,v,u,t,s,r,q=this
 if(!q.La(q.f,q.r))return!1
 for(w=6;w<=320;w+=6){v=Math.max(8,D.i.V(w/6)*3)
 for(u=0;u<v;++u){t=u*2*3.141592653589793/v
@@ -19201,9 +19203,9 @@ q.at=null
 return!0}}}return!1},
 La(d,e){var w,v,u,t,s=this
 if(d<s.b||d>s.c||e<s.d||e>s.e)return!0
-for(w=s.ax,v=w.length,u=s.ay,t=0;t<v;++t)if(w[t].aHV(d,e,u))return!0
+for(w=s.ax,v=w.length,u=s.ay,t=0;t<v;++t)if(w[t].aHW(d,e,u))return!0
 return!1},
-aNf(d,e,f,g){var w,v,u,t,s,r,q,p,o=this,n=Math.sqrt(e*e+f*f)
+aNg(d,e,f,g){var w,v,u,t,s,r,q,p,o=this,n=Math.sqrt(e*e+f*f)
 if(n<0.000001)return o.x=!1
 w=e/n
 v=f/n
@@ -19231,22 +19233,22 @@ if(s==null)return!1
 w=s.a-t.f
 v=s.b-t.r
 if(Math.sqrt(w*w+v*v)<4){t.at=null
-return t.x=!1}u=t.aNf(0,w,v,e)
+return t.x=!1}u=t.aNg(0,w,v,e)
 if(!u){t.at=null
 t.x=!1}return u}}
 A.ald.prototype={}
-A.aqY.prototype={
+A.aqX.prototype={
 S(){var w=x.N
 return new A.bfj(C.T(w,w),null,null)}}
 A.bfj.prototype={
-gabk(){var w,v=this,u=v.Q
+gabl(){var w,v=this,u=v.Q
 if(u===$){w=C.bl(null,D.mb,null,1,null,v)
 v.Q!==$&&C.bD()
 v.Q=w
 u=w}return u},
 Y(){this.a4()
 A.Nb("diagram").bG(new A.db7(this),x.P)},
-az3(){var w,v,u,t,s=this
+az4(){var w,v,u,t,s=this
 if(!s.as)return
 w=s.f
 v=w.a
@@ -19255,28 +19257,28 @@ if(v===u.gI(u)){v=B.oL[s.d].e
 v=v.gdO(v)
 t=v.cD(v,new A.daS(s))}else t=!1
 if(t||w.a===0)A.xT("diagram")
-else A.IC("diagram",C.I(["lesson",s.d,"test",s.e,"picked",w],x.N,x.A))},
-t(){this.gabk().t()
+else A.ID("diagram",C.I(["lesson",s.d,"test",s.e,"picked",w],x.N,x.A))},
+t(){this.gabl().t()
 this.bxU()},
 cbK(d){this.m(new A.daR(this,d))
-this.az3()},
+this.az4()},
 cEf(d){return this.m(new A.daT(this,d))},
 cEq(d){var w=this,v=w.w
 if(v==null){w.m(new A.daU(w))
 return}w.m(new A.daV(w,v,d))
-w.az3()
-w.gabk().iA(0,0)
+w.az4()
+w.gabl().iA(0,0)
 C.eY()},
 b16(d,e,f,g){var w,v=null,u=e?D.av.j(0.2):D.c.j(0.05),t=C.l(14),s=e?D.av:D.bA
 s=C.L(s,D.r,e?2:1)
 w=C.X(f,e?D.av:D.aD,v,v,v,17)
 return C.E(C.az(v,C.cT(v,C.A(C.a([w,D.bm,new C.dl(1,D.cm,C.d(d,v,v,v,v,v,v,C.n(v,v,e?D.av:D.ac,v,v,v,v,v,v,v,v,12.5,v,v,D.I,v,v,!0,v,v,v,v,v,v,v,v),D.K,v,v),v)],x.p),D.l,v,D.bb,D.j,0,v,v),v,v,D.b1,new C.p(u,v,s,t,v,v,D.n),D.eH,v,v,v,v,D.qB,v,v,v),D.y,!1,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,g,v,v,v,v,v,v,!1,D.a4),1)},
-c4e(d){var w,v=null,u=A.hy9(d),t=this.w===d,s=this.f.h(0,d),r=u.iV()>0.5?D.as:D.c,q=t?D.b0:D.aU
+c4e(d){var w,v=null,u=A.hya(d),t=this.w===d,s=this.f.h(0,d),r=u.iV()>0.5?D.as:D.c,q=t?D.b0:D.aU
 q=C.L(q,D.r,t?3:1)
 w=C.a([],x.V)
 if(t)w.push(new C.ac(0,D.G,D.b0.j(0.5),D.H,14))
-return C.az(v,C.cT(v,C.A(C.a([C.X(s!=null?D.ec:A.i9R(d),r,v,v,v,20),A7.AF,C.E(C.d(d,v,2,D.a2,v,v,v,C.n(v,v,r,v,v,v,v,v,v,v,v,12.5,v,v,D.u,v,1.15,!0,v,v,v,v,v,v,v,v),v,v,v),1)],x.p),D.l,v,D.e,D.j,0,v,v),v,v,D.b1,new C.p(u,v,q,B.b4m,w,v,D.n),D.h2,v,58,v,D.cx,B.bBg,v,v,v),D.y,!1,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,new A.daN(this,d),v,v,v,v,v,v,!1,D.a4)},
-cks(d){var w,v,u,t,s,r=this,q=null,p=A.ibK(d),o=C.a([],x.s)
+return C.az(v,C.cT(v,C.A(C.a([C.X(s!=null?D.ec:A.i9S(d),r,v,v,v,20),A7.AF,C.E(C.d(d,v,2,D.a2,v,v,v,C.n(v,v,r,v,v,v,v,v,v,v,v,12.5,v,v,D.u,v,1.15,!0,v,v,v,v,v,v,v,v),v,v,v),1)],x.p),D.l,v,D.e,D.j,0,v,v),v,v,D.b1,new C.p(u,v,q,B.b4m,w,v,D.n),D.h2,v,58,v,D.cx,B.bBg,v,v,v),D.y,!1,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,new A.daN(this,d),v,v,v,v,v,v,!1,D.a4)},
+cks(d){var w,v,u,t,s,r=this,q=null,p=A.ibL(d),o=C.a([],x.s)
 for(w=r.f,w=new C.cb(w,C.a4(w).k("cb<1,2>")).gae(0);w.C();){v=w.d
 if(v.b===d)o.push(v.a)}w=r.w==null
 if(!w)u=D.b0.j(0.7)
@@ -19339,7 +19341,7 @@ else s=s===B.K_?D.bi:D.c0
 s=C.L(s.j(0.6),D.r,1)
 q=i.r.a
 o=q===B.r4
-n=o?"CORRECT: every lead follows the diagram.":A.haA(q)+": not passed"
+n=o?"CORRECT: every lead follows the diagram.":A.haB(q)+": not passed"
 if(o)q=D.b4
 else q=q===B.K_?D.bi:D.c0
 q=C.a([C.d(n,h,h,h,h,h,h,C.n(h,h,q,h,h,h,h,h,h,h,h,15,h,h,D.u,h,h,!0,h,h,h,h,h,h,h,h),h,h,h),D.T],w)
@@ -19380,7 +19382,7 @@ a0=d.e[a5.b].b
 a0===$&&C.c()
 a0=a0.a.length()
 d=d.a
-a1=new C.aG(d.a,d.b,a8,new C.cu([a5,0,a0*o,!0]),C.a([],q))}a6=A.hy9(i)
+a1=new C.aG(d.a,d.b,a8,new C.cu([a5,0,a0*o,!0]),C.a([],q))}a6=A.hya(i)
 i=new C.ao(D.O,D.M,D.R,D.S,D.Q)
 i.b=D.a9
 i.c=9
@@ -19406,7 +19408,7 @@ i=new C.ao(D.O,D.M,D.R,D.S,D.Q)
 i.r=a6.gp(0)
 b2.N(new C.o(b1,e),5.5,i)}}},
 aD(d){return!0}}
-A.aM8.prototype={
+A.aM7.prototype={
 t(){var w=this,v=w.a9$
 if(v!=null)v.a6(0,w.gbB())
 w.a9$=null
@@ -19414,7 +19416,7 @@ w.a3()},
 aY(){this.b5()
 this.b3()
 this.bC()}}
-A.Kg.prototype={
+A.Kh.prototype={
 a7(){return"SafetyStatus."+this.b}}
 A.Gf.prototype={
 a7(){return"TerminalRole."+this.b}}
@@ -19437,7 +19439,7 @@ bt_(d){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i=C.a([],x.dH)
 for(w=this.a,v=w.length,u=0;u<w.length;w.length===v||(0,C.J)(w),++u){t=w[u]
 s=t.b
 r=t.c
-q=A.hBb(s,r,t.d)
+q=A.hBc(s,r,t.d)
 p=new C.Y(r,new A.cBY(),C.U(r).k("Y<1>")).gI(0)
 r=s.d?1:0
 o=s.b+s.c+r
@@ -19477,16 +19479,16 @@ h.push(D.X)
 for(u=v.length,t=0;t<v.length;v.length===u||(0,C.J)(v),++t){s=v[t]
 r=s.b
 q=r.a
-p=A.hek(q).j(0.1)
+p=A.hel(q).j(0.1)
 o=new C.aN(12,12)
-n=new C.ay(A.hek(q).j(0.6),1,D.r,-1)
-m=A.haA(q)
-q=A.hek(q)
+n=new C.ay(A.hel(q).j(0.6),1,D.r,-1)
+m=A.haB(q)
+q=A.hel(q)
 q=C.a([C.d(s.a+": "+m+" ("+s.c+"%)",i,i,i,i,i,i,new C.G(!0,q,i,i,i,i,13.5,D.u,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i),i,i,i)],w)
 r=r.b
 if(r.length===0)q.push(B.fTF)
 for(m=r.length,l=0;l<r.length;r.length===m||(0,C.J)(r),++l){k=r[l]
-D.d.v(q,C.a([D.ax,C.d(A.haA(k.b)+": "+k.c,i,i,i,i,i,i,B.fn7,i,i,i),C.d("Rule: "+k.d,i,i,i,i,i,i,P.abk,i,i,i),C.d("Fix: "+k.e,i,i,i,i,i,i,B.ftf,i,i,i)],w))}h.push(C.q(i,C.x(q,D.E,i,D.e,D.j,0,D.p),D.f,i,i,new C.p(p,i,new C.bH(n,n,n,n),new C.be(o,o,o,o),i,i,D.n),i,i,i,D.cx,D.yG,i,i,i))}for(v=d.b,u=v.length,t=0;t<v.length;v.length===u||(0,C.J)(v),++t){j=v[t]
+D.d.v(q,C.a([D.ax,C.d(A.haB(k.b)+": "+k.c,i,i,i,i,i,i,B.fn7,i,i,i),C.d("Rule: "+k.d,i,i,i,i,i,i,P.abk,i,i,i),C.d("Fix: "+k.e,i,i,i,i,i,i,B.ftf,i,i,i)],w))}h.push(C.q(i,C.x(q,D.E,i,D.e,D.j,0,D.p),D.f,i,i,new C.p(p,i,new C.bH(n,n,n,n),new C.be(o,o,o,o),i,i,D.n),i,i,i,D.cx,D.yG,i,i,i))}for(v=d.b,u=v.length,t=0;t<v.length;v.length===u||(0,C.J)(v),++t){j=v[t]
 r=D.c.j(0.05)
 q=new C.aN(12,12)
 p=j.a
@@ -19528,7 +19530,7 @@ for(v=n.c,t=v.length,o=0;o<v.length;v.length===t||(0,C.J)(v),++o)w.push(v[o].a)
 v=n.d
 v=C.C(v,C.a4(v).k("ci.E"))
 return C.I(["sheets",l,"surf",w,"beads",v,"mistakes",n.e],m,x.A)},
-aID(d){var w,v,u,t,s,r,q,p,o,n,m,l,k=this
+aIE(d){var w,v,u,t,s,r,q,p,o,n,m,l,k=this
 k.ir(0)
 w=J.a7(d)
 v=x.Y.a(w.h(d,"sheets"))
@@ -19565,11 +19567,11 @@ w=w==null?null:D.i.M(w)
 k.e=w==null?0:w},
 j4(d){++this.e
 return new A.ib(!1,d,D.ed)},
-arm(d){var w,v,u,t,s=C.a([],x.ar)
-for(w=$.k5(),v=w.length,u=0;u<w.length;w.length===v||(0,C.J)(w),++u){t=w[u]
+arn(d){var w,v,u,t,s=C.a([],x.ar)
+for(w=$.k6(),v=w.length,u=0;u<w.length;w.length===v||(0,C.J)(w),++u){t=w[u]
 if(t.b===d)s.push(t)}return s},
-gbel(){return D.d.cD(this.arm(0),new A.bOH(this))},
-cU9(d){var w,v,u,t=this,s=A.hf_(d)
+gbel(){return D.d.cD(this.arn(0),new A.bOH(this))},
+cU9(d){var w,v,u,t=this,s=A.hf0(d)
 if(s==null)return t.j4("A sheet goes where the green mark is: tap one of those places.")
 w=t.b.h(0,d)
 if(w.a)return t.j4("There is a sheet up here already.")
@@ -19580,7 +19582,7 @@ if(u<47.9)v=""+D.i.V(u)+" inches wide"
 else{u=""+D.i.V(v?s.f-s.e:95.5)+" inches long"
 v=u}return t.j4("This place is only "+v+". A whole sheet is too big: measure it and cut it to size first (the Cutter).")}w.a=!0
 return new A.ib(!0,v?"Sheet lifted tight against the joists. Screws next, so it cannot sag.":"Sheet stood up against the studs, snug under the ceiling and a hair off the floor. Screws next.",D.ed)},
-cQb(d){var w,v,u=this,t=A.hf_(d)
+cQb(d){var w,v,u=this,t=A.hf0(d)
 if(t==null)return u.j4("The cutter is for a sheet that has to be made smaller: tap an orange place.")
 w=u.b.h(0,d)
 if(w.a)return u.j4("The sheet is already up. Cutting is done on the floor, before it goes up.")
@@ -19591,7 +19593,7 @@ v=t.d-t.c
 if(v<47.9)v=""+D.i.V(v)
 else v=""+D.i.V(t.b===0?t.f-t.e:95.5)
 return new A.ib(!0,"Measured, then scored the face paper with the knife against the T-square, snapped the sheet over the edge and cut the back paper. Cut to "+v+" inches. Now hang it.",D.ed)},
-bql(d){var w,v=this,u=A.hf_(d)
+bql(d){var w,v=this,u=A.hf0(d)
 if(u==null)return v.j4("Screws go into a hung sheet: tap one.")
 w=v.b.h(0,d)
 if(!w.a)return v.j4("Hang the sheet first, then screw it.")
@@ -19608,28 +19610,28 @@ t.J(0,d)
 t=s.d
 v=s.c
 return new A.ib(!0,t>=0?v+": cut along the frame with the drywall saw, so the sheet ends exactly on the wood.":v+": the hole is cut just big enough for the box. The box now shows through, and the device will fit in later.",D.ed)},
-aJG(d){var w,v,u,t,s=C.a([],x.Q)
+aJH(d){var w,v,u,t,s=C.a([],x.Q)
 for(w=$.xw(),v=w.length,u=0;u<w.length;w.length===v||(0,C.J)(w),++u){t=w[u]
 if(t.d===d)s.push(t)}return D.d.cD(s,new A.bOM(this))},
 cLt(d){var w,v=this
 if(d<0||d>=2)return v.j4("Corner bead goes on the corners of the door and the window.")
 w=v.d
 if(w.q(0,d))return v.j4("This opening has its corner bead.")
-if(!v.aJG(d))return v.j4("Cut the opening in both sheets first.")
+if(!v.aJH(d))return v.j4("Cut the opening in both sheets first.")
 w.J(0,d)
 return B.bK3},
-azO(d){var w,v,u,t,s,r,q,p,o=this,n=C.a([],x.s)
-for(w=o.arm(d),v=w.length,u=o.b,t=0;t<w.length;w.length===v||(0,C.J)(w),++t){s=u.h(0,w[t].a)
+azP(d){var w,v,u,t,s,r,q,p,o=this,n=C.a([],x.s)
+for(w=o.arn(d),v=w.length,u=o.b,t=0;t<w.length;w.length===v||(0,C.J)(w),++t){s=u.h(0,w[t].a)
 if(!s.a){n.push("a sheet is missing")
 break}if(!s.c){n.push("a sheet has no screws")
 break}}if(n.length===0)for(w=$.xw(),v=w.length,t=0;t<w.length;w.length===v||(0,C.J)(w),++t){r=w[t]
 q=r.b
 p=q-5000
-if((p>=0&&p<$.k5().length?$.k5()[p]:null).b===d&&!u.h(0,q).d.q(0,r.a)){n.push("a hole is not cut")
+if((p>=0&&p<$.k6().length?$.k6()[p]:null).b===d&&!u.h(0,q).d.q(0,r.a)){n.push("a hole is not cut")
 break}}if(n.length===0&&d===2&&!o.d.q(0,1))n.push("the window has no corner bead")
 if(n.length===0&&d===3&&!o.d.q(0,0))n.push("the door has no corner bead")
 return n.length===0?null:"Not yet: "+B.a6i[d]+" is not ready, "+D.d.gH(n)+"."},
-cWV(d,e){var w,v,u,t=this,s=t.azO(d)
+cWV(d,e){var w,v,u,t=this,s=t.azP(d)
 if(s!=null)return t.j4(s)
 w=t.c[d]
 v=w.a
@@ -19644,7 +19646,7 @@ w.b=e+4
 return new A.ib(!0,v===3?"Second coat: wider than the first, to hide the tape and its edges. Let it dry.":"Third coat: the widest and thinnest, feathered out to nothing at the edges. Let it dry, then sand.",D.ed)
 case 4:return t.j4("That is the third coat. Let it dry, then sand with the Sander.")
 default:return t.j4("The mud is finished here. "+(v===5?"Prime it with the Roller.":"This is done."))}},
-d1e(d,e){var w,v,u=this,t=u.azO(d)
+d1e(d,e){var w,v,u=this,t=u.azP(d)
 if(t!=null)return u.j4(t)
 w=u.c[d]
 v=w.a
@@ -19668,17 +19670,17 @@ v=B.a6i[d]
 return new A.ib(!0,v[0].toUpperCase()+D.a.b2(v,1)+" primed with the roller: the paper and the mud now look the same, and the joints have disappeared.",D.ed)},
 bmz(d,e){var w,v,u,t,s,r,q,p,o,n,m=this,l=new A.bOP()
 switch(d){case"sheet":w=C.a([],x.u)
-for(v=$.k5(),u=v.length,t=m.b,s=0;s<v.length;v.length===u||(0,C.J)(v),++s){r=v[s]
+for(v=$.k6(),u=v.length,t=m.b,s=0;s<v.length;v.length===u||(0,C.J)(v),++s){r=v[s]
 q=r.a
 if(!t.h(0,q).a){if(!(r.d-r.c<47.9))if(r.b===0)p=r.f-r.e<95.9
 else p=!1
 else p=!0
 q=!p||t.h(0,q).b}else q=!1
 w.push(q)}if(l.$1(w))w=""
-else w=m.ganL()===$.k5().length?" Every sheet is up.":" The pieces that are left are narrow: cut them to size with the Cutter first."
+else w=m.ganM()===$.k6().length?" Every sheet is up.":" The pieces that are left are narrow: cut them to size with the Cutter first."
 return w
 case"cut":w=C.a([],x.u)
-for(v=$.k5(),u=v.length,t=m.b,s=0;s<v.length;v.length===u||(0,C.J)(v),++s){r=v[s]
+for(v=$.k6(),u=v.length,t=m.b,s=0;s<v.length;v.length===u||(0,C.J)(v),++s){r=v[s]
 if(!(r.d-r.c<47.9))if(r.b===0)q=r.f-r.e<95.9
 else q=!1
 else q=!0
@@ -19686,17 +19688,17 @@ if(q){q=r.a
 q=!t.h(0,q).b&&!t.h(0,q).a}else q=!1
 w.push(q)}return l.$1(w)?"":" Nothing needs cutting right now."
 case"screw":w=C.a([],x.u)
-for(v=$.k5(),u=v.length,t=m.b,s=0;s<v.length;v.length===u||(0,C.J)(v),++s){q=v[s].a
+for(v=$.k6(),u=v.length,t=m.b,s=0;s<v.length;v.length===u||(0,C.J)(v),++s){q=v[s].a
 w.push(t.h(0,q).a&&!t.h(0,q).c)}return l.$1(w)?"":" Hang a sheet first: the screws go into a sheet that is up."
 case"saw":w=C.a([],x.u)
 for(v=$.xw(),u=v.length,t=m.b,s=0;s<v.length;v.length===u||(0,C.J)(v),++s){o=v[s]
 q=o.b
 w.push(t.h(0,q).a&&!t.h(0,q).d.q(0,o.a))}return l.$1(w)?"":" Hang the sheets over the boxes, the door and the window first: the holes are cut in a sheet that is up."
 case"bead":w=C.a([],x.u)
-for(v=m.d,n=0;n<2;++n)w.push(!v.q(0,n)&&m.aJG(n))
+for(v=m.d,n=0;n<2;++n)w.push(!v.q(0,n)&&m.aJH(n))
 return l.$1(w)?"":" Cut the door and window openings with the Saw first."
 case"mud":w=C.a([],x.u)
-for(v=m.c,r=0;r<5;++r){if(!(v[r].a===0&&m.azO(r)==null)){u=v[r]
+for(v=m.c,r=0;r<5;++r){if(!(v[r].a===0&&m.azP(r)==null)){u=v[r]
 t=u.a
 u=(t===2||t===3)&&e>=u.b}else u=!0
 w.push(u)}return l.$1(w)?"":" Nothing is ready for mud yet: on a wall or the ceiling every sheet needs to be up and screwed, the holes cut and the door and window beaded. After a coat, wait for it to dry."
@@ -19709,19 +19711,19 @@ w.push(u.a===4&&e>=u.b)}return l.$1(w)?"":" Sand only after the third coat has d
 default:w=C.a([],x.u)
 for(v=m.c,u=v.length,s=0;s<v.length;v.length===u||(0,C.J)(v),++s)w.push(v[s].a===5)
 return l.$1(w)?"":" Prime after the mud is sanded."}},
-gaIr(){var w,v,u,t=this,s=C.T(x.N,x.y)
+gaIs(){var w,v,u,t=this,s=C.T(x.N,x.y)
 s.n(0,"ceiling",t.gbel())
-w=t.ganL()
-v=$.k5()
+w=t.ganM()
+v=$.k6()
 s.n(0,"walls",w===v.length)
-s.n(0,"screws",t.gaqZ()===v.length)
-s.n(0,"holes",t.gaGl()===$.xw().length)
+s.n(0,"screws",t.gar_()===v.length)
+s.n(0,"holes",t.gaGm()===$.xw().length)
 s.n(0,"beads",t.d.a===2)
 for(w=t.c,u=0;u<5;++u)s.n(0,"surface"+u,w[u].a===6)
 return s},
 cUv(d,e){var w,v,u,t,s,r,q,p,o,n,m,l,k,j
 for(w=[!0,!1],v=w.length,u=this.b,t=0;t<v;++t){s=w[t]
-for(r=D.d.gae($.k5()),q=new C.eF(r,new A.bOK(s));q.C();){p=r.gR(0)
+for(r=D.d.gae($.k6()),q=new C.eF(r,new A.bOK(s));q.C();){p=r.gR(0)
 o=p.a
 if(u.h(0,o).a)continue
 if(!(p.d-p.c<47.9))if(p.b===0){w=p.f
@@ -19730,7 +19732,7 @@ w=w-p<95.9}else w=!1
 else w=!0
 if(w&&!u.h(0,o).b)return new A.lj("This piece is narrower than a sheet: pick the Cutter and tap the lit place to cut it to size.",C.a([o],x.t),"cut")
 w=s?"The ceiling goes first: pick Drywall sheet and tap the lit place.":"Now the walls: pick Drywall sheet and tap the lit place."
-return new A.lj(w,C.a([o],x.t),"sheet")}}for(w=$.k5(),v=w.length,t=0;t<w.length;w.length===v||(0,C.J)(w),++t){r=w[t].a
+return new A.lj(w,C.a([o],x.t),"sheet")}}for(w=$.k6(),v=w.length,t=0;t<w.length;w.length===v||(0,C.J)(w),++t){r=w[t].a
 if(!u.h(0,r).c)return new A.lj("Screw the sheet to the studs: pick the Screw gun and tap the lit sheet.",C.a([r],x.t),"screw")}for(w=$.xw(),v=w.length,t=0;t<w.length;w.length===v||(0,C.J)(w),++t){n=w[t]
 r=n.a
 if(!u.h(0,n.b).d.q(0,r))return new A.lj("Cut the hole for the "+n.c.toLowerCase()+": pick the Saw and tap the lit place.",C.a([r],x.t),"saw")}for(w=this.d,m=0;m<2;++m)if(!w.q(0,m))return new A.lj("Put corner bead on the "+B.zQ[m].a+": pick Corner bead and tap the lit opening.",C.a([6500+m],x.t),"bead")
@@ -19746,18 +19748,18 @@ v=x.t
 return e>=w?new A.lj("Sand it smooth: pick the Sander and tap the lit surface.",C.a([j],v),"sand"):new A.lj("The last coat is still wet: wait "+D.i.cL(w-e)+" seconds, then sand.",C.a([j],v),"")
 case 5:return new A.lj("Prime it: pick the Roller and tap the lit surface.",C.a([j],x.t),"paint")}}return B.hrp},
 gC1(d){return D.d.cD(this.c,new A.bOI())},
-ganL(){var w=this.b,v=C.a4(w).k("b7<2>")
+ganM(){var w=this.b,v=C.a4(w).k("b7<2>")
 return new C.Y(new C.b7(w,v),new A.bOL(),v.k("Y<M.E>")).gI(0)},
-gaqZ(){var w=this.b,v=C.a4(w).k("b7<2>")
+gar_(){var w=this.b,v=C.a4(w).k("b7<2>")
 return new C.Y(new C.b7(w,v),new A.bOO(),v.k("Y<M.E>")).gI(0)},
-gaGl(){var w=this.b
+gaGm(){var w=this.b
 return new C.b7(w,C.a4(w).k("b7<2>")).cF(0,0,new A.bOJ())}}
-A.aqW.prototype={
-S(){var w=A.hNT(),v=new C.vv()
+A.aqV.prototype={
+S(){var w=A.hNU(),v=new C.vv()
 $.vY()
 v.fX(0)
-return new A.aqX(w,v,C.aR(x.S),C.aR(x.N))}}
-A.aqX.prototype={
+return new A.aqW(w,v,C.aR(x.S),C.aR(x.N))}}
+A.aqW.prototype={
 geh(){var w,v=this.e
 if(v===$){w=new A.uO(0,0.07,120,B.AY,$.aw())
 w.e=12
@@ -19770,11 +19772,11 @@ this.e!==$&&C.bD()
 this.e=w
 v=w}return v},
 glc(){var w=this.as
-return w===$?this.as=A.hAJ(this.d,0,"look"):w},
+return w===$?this.as=A.hAK(this.d,0,"look"):w},
 Y(){var w=this
 w.a4()
 $.aW.x1$.push(new A.ceI(w))
-w.afh()
+w.afi()
 w.ax=C.df(D.iM,new A.ceJ(w))},
 t(){var w=this,v=w.at
 if(v!=null)v.a1(0)
@@ -19783,13 +19785,13 @@ if(v!=null)v.a1(0)
 v=w.dx
 if(v!=null)v.a1(0)
 w.a3()},
-afh(){var w=0,v=C.j(x.H),u,t=this,s,r,q,p,o
-var $async$afh=C.e(function(d,e){if(d===1)return C.f(e,v)
+afi(){var w=0,v=C.j(x.H),u,t=this,s,r,q,p,o
+var $async$afi=C.e(function(d,e){if(d===1)return C.f(e,v)
 for(;;)switch(w){case 0:w=3
-return C.b(A.Nb("drywall"),$async$afh)
+return C.b(A.Nb("drywall"),$async$afi)
 case 3:o=e
 if(t.c==null){w=1
-break}if(o!=null)try{t.d.aID(x.b.a(J.t(o,"house")))
+break}if(o!=null)try{t.d.aIE(x.b.a(J.t(o,"house")))
 s=C.a([],x.s)
 q=x.g.a(J.t(o,"paid"))
 q=J.aT(q==null?D.cq:q)
@@ -19801,45 +19803,45 @@ t.fx=s==null?0:s
 t.m(t.gb1e())
 t.wa("Welcome back: your drywall work is here, just as you left it.")}catch(n){t.d.ir(0)}t.go=!0
 case 1:return C.h(u,v)}})
-return C.i($async$afh,v)},
+return C.i($async$afi,v)},
 ccn(){var w,v,u=this
 if(!u.go)return
 if(u.id){A.xT("drywall")
 return}w=u.d.aj()
 v=u.fy
 v=C.C(v,C.a4(v).k("ci.E"))
-A.IC("drywall",C.I(["house",w,"paid",v,"hints",u.fx],x.N,x.A))},
-a_D(){var w=this,v=w.f
-w.as=A.hAJ(w.d,w.Q.gf_()/1000,v)
+A.ID("drywall",C.I(["house",w,"paid",v,"hints",u.fx],x.N,x.A))},
+a_E(){var w=this,v=w.f
+w.as=A.hAK(w.d,w.Q.gf_()/1000,v)
 w.ccn()},
-az8(d,e){var w=this,v=w.at
+az9(d,e){var w=this,v=w.at
 if(v!=null)v.a1(0)
 w.m(new A.cew(w,d,e))
 w.at=C.cy(D.bN,new A.cex(w))},
-wa(d){return this.az8(d,!0)},
+wa(d){return this.az9(d,!0)},
 HE(d){var w,v=this
 v.m(new A.ceK(v,d))
 w=B.aIG.h(0,d)
 w.toString
 v.wa(w+(d==="look"?"":v.d.bmz(d,v.Q.gf_()/1000)))},
-cce(d,e){var w,v,u=this,t=u.y?null:A.hBq(u.geh(),d,e)
+cce(d,e){var w,v,u=this,t=u.y?null:A.hBr(u.geh(),d,e)
 if(t!=null){w=u.geh()
 w.vF(Math.min(w.c,34),t)
 u.wa("Closer to this spot. Drag to turn round.")
 return}w=u.geh()
-v=A.hBo(w,d,e)
-if(v==null){u.az8(y.c,!1)
+v=A.hBp(w,d,e)
+if(v==null){u.az9(y.c,!1)
 return}if(u.y){u.y=!1
 w.r=B.Eq
 w.f=520}u.m(new A.cek(u,v))
-w.a8c(Math.min(w.c,70),0.07,v)
+w.a8d(Math.min(w.c,70),0.07,v)
 u.wa(y.L)},
 cci(d){var w=this,v=w.dx
 if(v!=null)v.a1(0)
 w.m(new A.cen(w,d))
 w.dx=C.cy(D.el,new A.ceo(w))},
 ccb(){var w,v,u,t,s=this
-for(w=s.d.gaIr(),w=new C.cb(w,C.a4(w).k("cb<1,2>")).gae(0),v=s.fy,u=0;w.C();){t=w.d
+for(w=s.d.gaIs(),w=new C.cb(w,C.a4(w).k("cb<1,2>")).gae(0),v=s.fy,u=0;w.C();){t=w.d
 if(!t.b||v.q(0,t.a))continue
 v.J(0,t.a)
 if(s.fr===0)++u
@@ -19881,22 +19883,22 @@ case"saw":n=o.a=p.d.bqe(d)
 break
 case"bead":n=o.a=p.d.cLt(d-6500)
 break
-case"mud":n=o.a=r?p.d.cWV(s.$1(d),p.Q.gf_()/1000):p.al0()
+case"mud":n=o.a=r?p.d.cWV(s.$1(d),p.Q.gf_()/1000):p.al1()
 break
-case"tape":n=o.a=r?p.d.d1e(s.$1(d),p.Q.gf_()/1000):p.al0()
+case"tape":n=o.a=r?p.d.d1e(s.$1(d),p.Q.gf_()/1000):p.al1()
 break
-case"sand":n=o.a=r?p.d.bq5(s.$1(d),p.Q.gf_()/1000):p.al0()
+case"sand":n=o.a=r?p.d.bq5(s.$1(d),p.Q.gf_()/1000):p.al1()
 break
-default:n=o.a=r?p.d.fV(s.$1(d)):p.al0()}if(n.a)A.nO()
+default:n=o.a=r?p.d.fV(s.$1(d)):p.al1()}if(n.a)A.nO()
 else A.fr(180,220,0.25,"square")
 p.m(new A.cer(o,p,d))
 q=o.a.a?p.ccb():""
 n=o.a
-p.az8(n.b+q,n.a)
+p.az9(n.b+q,n.a)
 if(p.d.gC1(0)&&!p.z){p.id=p.z=!0
 A.xT("drywall")
 $.aW.x1$.push(new A.ces(p))}},
-al0(){++this.d.e
+al1(){++this.d.e
 return B.bJO},
 ccc(){var w=null,v=this.c
 if(v==null)return
@@ -19914,7 +19916,7 @@ w.fI(120,0.07,B.AY,0)
 v.wa("Back inside the room. Drag to turn round.")}},
 ccm(){this.m(new A.ceu(this))
 this.wa("The drywall is taken down again. Start with the ceiling.")},
-B(d){var w,v,u,t,s=this,r=null,q=s.d,p=q.c,o=new C.Y(p,new A.cez(),C.U(p).k("Y<1>")).gI(0),n=D.d.cD(q.arm(0),new A.ceA(s)),m=q.ganL(),l=$.k5(),k=l.length,j=q.gaqZ(),i=l.length,h=q.gaGl(),g=$.xw(),f=C.a([!0,n,m===k,j===i,h===g.length,q.d.a===2,D.d.cD(p,new A.ceB()),D.d.cD(p,new A.ceC()),q.gC1(0)],x.u),e=D.d.bj(f,new A.ceD())
+B(d){var w,v,u,t,s=this,r=null,q=s.d,p=q.c,o=new C.Y(p,new A.cez(),C.U(p).k("Y<1>")).gI(0),n=D.d.cD(q.arn(0),new A.ceA(s)),m=q.ganM(),l=$.k6(),k=l.length,j=q.gar_(),i=l.length,h=q.gaGm(),g=$.xw(),f=C.a([!0,n,m===k,j===i,h===g.length,q.d.a===2,D.d.cD(p,new A.ceB()),D.d.cD(p,new A.ceC()),q.gC1(0)],x.u),e=D.d.bj(f,new A.ceD())
 p=e<0?"All done":"Step "+(e+1)+"/9"
 n=s.glc()
 m=s.geh()
@@ -19926,11 +19928,11 @@ w=s.y
 v=w?"Inside":"Whole room"
 u=w?D.Py:D.PK
 t=x.p
-w=A.Ku(!1,r,m,new A.ceE(s),r,i,k,h,r,r,j,54,s.gccd(),new A.ceF(s),s.gccj(),n,!1,new A.ceG(s),r,C.a([A.tl(v,D.av,u,w,s.gcco()),D.T],t))
+w=A.Kv(!1,r,m,new A.ceE(s),r,i,k,h,r,r,j,54,s.gccd(),new A.ceF(s),s.gccj(),n,!1,new A.ceG(s),r,C.a([A.tl(v,D.av,u,w,s.gcco()),D.T],t))
 u=s.f
 v=D.c.j(0.07)
 n=C.l(13)
-return A.IV(!0,D.aH,new A.ceH(d,f),C.x(C.a([A.iil(B.d1R,u,s.gbrG(),C.a([C.az(r,C.q(r,B.f9a,D.f,r,r,new C.p(v,r,C.L(D.aU,D.r,1),n,r,r,D.n),r,r,r,r,D.k3,r,r,r),D.y,!1,B.hqf,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,s.gccg(),r,r,r,r,r,r,!1,D.a4)],t)),D.T,C.A(C.a([C.E(C.d("Sheets "+q.ganL()+"/"+l.length+" \xb7 screwed "+q.gaqZ()+"/"+l.length+" \xb7 holes "+q.gaGl()+"/"+g.length+" \xb7 surfaces finished "+o+"/5",r,2,r,r,r,r,B.fpt,r,r,r),1),D.ae,A.tk("Start over",D.k8,s.gccl(),D.ac)],t),D.l,r,D.e,D.j,0,r,r)],t),D.l,r,D.e,D.P,0,D.p),w,p,"Hanging drywall",r,r)}}
+return A.IW(!0,D.aH,new A.ceH(d,f),C.x(C.a([A.iim(B.d1R,u,s.gbrG(),C.a([C.az(r,C.q(r,B.f9a,D.f,r,r,new C.p(v,r,C.L(D.aU,D.r,1),n,r,r,D.n),r,r,r,r,D.k3,r,r,r),D.y,!1,B.hqf,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,s.gccg(),r,r,r,r,r,r,!1,D.a4)],t)),D.T,C.A(C.a([C.E(C.d("Sheets "+q.ganM()+"/"+l.length+" \xb7 screwed "+q.gar_()+"/"+l.length+" \xb7 holes "+q.gaGm()+"/"+g.length+" \xb7 surfaces finished "+o+"/5",r,2,r,r,r,r,B.fpt,r,r,r),1),D.ae,A.tk("Start over",D.k8,s.gccl(),D.ac)],t),D.l,r,D.e,D.j,0,r,r)],t),D.l,r,D.e,D.P,0,D.p),w,p,"Hanging drywall",r,r)}}
 A.XP.prototype={}
 A.yC.prototype={
 gcLl(){return this.d<=20&&this.e>=20},
@@ -19962,12 +19964,12 @@ this.d=null}}
 A.ib.prototype={
 gjF(){return this.a}}
 A.alW.prototype={
-gaI4(){var w,v,u,t,s
+gaI5(){var w,v,u,t,s
 for(w=this.a,v=0,u=1;u<w.length;++u){t=w[u]
 s=w[u-1]
 v+=new A.r(t.a-s.a,t.b-s.b,t.c-s.c).gp7()}return v}}
 A.wc.prototype={
-gaoJ(){var w=this.x
+gaoK(){var w=this.x
 return new C.Y(w,new A.bR0(),C.U(w).k("Y<1>")).gI(0)}}
 A.Qj.prototype={}
 A.lj.prototype={}
@@ -20012,7 +20014,7 @@ else{a7=C.T(w,w)
 for(a6=a6.b,a6=new C.NF(a6,a6.r,a6.e,C.a4(a6).k("NF<1,2>"));a6.C();){t=a6.d
 a7.n(0,""+t.a,t.b)}a6=h.ax
 a6=C.I(["attached",a7,"stage",a6.c,"strap",a6.r,"burnt",a6.x,"supported",a6.y,"practice",a6.w],w,l)}p.push(C.I(["id",h.a,"kind",h.b,"wall",h.c,"u",h.d,"stud",h.e,"joist",h.f,"side",g,"cable",f,"kos",h.x,"used",e,"entry",d,"fromKo",a0,"from",a3,"dev",a4,"on",a5,"ws",a6],w,m))}return C.I(["drilled",a9,"plugged",v,"mistakes",u,"next",s,"breaker",r,"tripped",q,"boxes",p],w,x.A)},
-aID(a9){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7=this,a8=null
+aIE(a9){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7=this,a8=null
 a7.ir(0)
 w=x.t
 v=C.a([],w)
@@ -20066,7 +20068,7 @@ if(a2!=null){j=C.a([],n)
 for(i=J.a7(a2),h=J.aT(o.a(i.h(a2,"path")));h.C();){a3=h.gR(h)
 g=J.a7(a3)
 j.push(new A.r(C.dC(g.h(a3,0)),C.dC(g.h(a3,1)),C.dC(g.h(a3,2))))}a1.w=new A.alW(j,J.z(i.h(a2,"light"),!0))}a4=t.a(k.h(l,"kos"))
-if(a4==null)a4=B.dmx
+if(a4==null)a4=B.dmy
 j=J.a7(a4)
 d[0]=J.z(j.h(a4,0),!0)
 d[1]=J.z(j.h(a4,1),!0)
@@ -20110,7 +20112,7 @@ V_(d,e){var w,v,u,t,s,r,q,p,o=this
 if(d==="ceiling"){if(!(e>=3000&&e<3010))return o.i0(A.aiU(e)!=null?"A ceiling box hangs from a joist, the boards over your head. Tap one of those.":"A ceiling box goes on a joist: the boards across the top of the room.")
 w=o.b
 if(D.d.aV(w,new A.cFQ()))return o.i0("This room has one light, and its box is already hung. Pull the cable to it.")
-w.push(A.hlw(o.e++,"ceiling",-1,0,e-3000,null))
+w.push(A.hlx(o.e++,"ceiling",-1,0,e-3000,null))
 return B.bK2}v=A.aiU(e)
 if(v==null)return o.i0(e>=3000&&e<3010?"That is a ceiling joist. An outlet or switch box is nailed to a stud, a tall board in the wall.":"Tap a stud: one of the tall boards in the wall.")
 w=v.f
@@ -20120,7 +20122,7 @@ if(D.d.aV(u,new A.cFR(v)))return o.i0("There is a box on this stud already.")
 t=o.e++
 s=v.b
 r=v.c
-q=A.hlw(t,d,s,r,null,v.a)
+q=A.hlx(t,d,s,r,null,v.a)
 if(w==="king"||w==="jack"){p=s===2?B.a8y:B.U_
 q.r=r<(p.c+p.d)/2?-1:1}u.push(q)
 if(d==="switch")return new A.ib(!0,o.b_s(q)?"Switch box nailed on, 48 inches up and right beside the door, where a hand finds it in the dark. Next, break a knockout in it.":"Switch box nailed on, 48 inches up. A light switch belongs beside the door, on the side the door opens. Next, break a knockout.",D.ed)
@@ -20140,11 +20142,11 @@ w=v.x
 if(w[u])return t.i0("That knockout is out already.")
 w[u]=!0
 return B.bK4},
-atF(d){var w,v,u,t=C.a([],x.t)
+atG(d){var w,v,u,t=C.a([],x.t)
 for(w=d.x,v=4200+(d.a-4000)*2,u=0;u<2;++u)if(!w[u])t.push(v+u)
 return t},
 bgz(d){var w,v,u,t=this
-if(A.hhJ(d)!=null){w=t.a
+if(A.hhK(d)!=null){w=t.a
 if(w.q(0,d))return t.i0("The top plate has its hole here already.")
 w.J(0,d)
 return B.bJS}v=A.aiU(d)
@@ -20156,7 +20158,7 @@ if(w.q(0,u))return t.i0("This stud has its hole already.")
 if(!v.gcLl())return t.i0("There is no wood at the cable line here: this short stud only sits over the door or window. Drill a stud that reaches the line (20 inches up).")
 w.J(0,u)
 return B.bJZ},
-apl(d){var w,v,u,t
+apm(d){var w,v,u,t
 for(w=d,v=0;v<30;++v,w=t){if(w.w==null)return!1
 u=w.as
 if(u===0)return!0
@@ -20188,30 +20190,30 @@ if(s.d<=20&&s.e>=20){q=s.b
 p=s.c
 if(o.$1(B.zK[q]+p)>0.000001)r=o.$1(B.zK[q]+p)<u||s.a===g}if(r)m.push(s)}D.d.aZ(m,new A.cFB(o))
 return m},
-aT8(d,e,f){var w=new A.cFv(f,d),v=w.$1(e)
+aT9(d,e,f){var w=new A.cFv(f,d),v=w.$1(e)
 return v>w.$1(f>0?295.5:331.5)+0.01},
 Uj(d){var w,v,u
 for(w=d.x,v=d.y,u=0;u<2;++u)if(w[u]&&!v.q(0,u))return u
 return null},
-baL(d,e,f){var w,v=d.d+d.r*1.9,u=v+f*1.9,t=A.aR_(d,e).b,s=new A.cFD(d),r=e===1
+baL(d,e,f){var w,v=d.d+d.r*1.9,u=v+f*1.9,t=A.aQZ(d,e).b,s=new A.cFD(d),r=e===1
 if(r?20>t:20<t)return C.a([s.$2(u,20),s.$2(v,20),s.$2(v,t)],x.o)
 w=r?t+2.5:t-2.5
 return C.a([s.$2(u,20),s.$2(u,w),s.$2(v,w),s.$2(v,t)],x.o)},
-aK2(b1,b2,b3,b4){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9=this,b0=null
+aK3(b1,b2,b3,b4){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9=this,b0=null
 if(b2===2200)return B.bJP
 w=a9.l_(b2)
 if(w==null)return a9.i0("Tap one of the blue boxes: the cable runs to it.")
 if(w.w!=null){a9.bbf(w)
 return B.bJX}v=b3===0
 u=v?b0:a9.l_(b3)
-if(!v){if(u==null||u.w==null||!a9.apl(u))return a9.i0("A cable can only start at the breaker panel, or at a box that already has power.")
+if(!v){if(u==null||u.w==null||!a9.apm(u))return a9.i0("A cable can only start at the breaker panel, or at a box that already has power.")
 if(!a9.x7(u))return a9.i0("Connect the wires in the first box before the cable goes on from it: put a device in it, tap the device and join each wire to its screw. The power does not go on to the next box until you have.")
 if(u.b==="ceiling")return a9.i0("The light box is the end of the line: a cable cannot go on from it.")
 t=a9.Uj(u)
-if(t==null)return a9.Oa("The box the cable leaves from has no free knockout: a second cable needs a second hole. Break out its other knockout first.",a9.atF(u))}else t=b0
+if(t==null)return a9.Oa("The box the cable leaves from has no free knockout: a second cable needs a second hole. Break out its other knockout first.",a9.atG(u))}else t=b0
 s=b4==null?a9.Uj(w):b4
-if(s==null)return a9.Oa("The cable goes into the box through a knockout, and this box has none open and free for it. Tap the box, then tap a tab to break it out.",a9.atF(w))
-if(!w.x[s])return a9.Oa("That knockout is still closed: break it out first.",C.a([A.hfm(w.a,s)],x.t))
+if(s==null)return a9.Oa("The cable goes into the box through a knockout, and this box has none open and free for it. Tap the box, then tap a tab to break it out.",a9.atG(w))
+if(!w.x[s])return a9.Oa("That knockout is still closed: break it out first.",C.a([A.hfn(w.a,s)],x.t))
 v=w.y
 if(v.q(0,s))return a9.i0("A cable already goes in through that knockout: choose the other one.")
 r=w.b
@@ -20226,7 +20228,7 @@ m=B.zK[o]+n
 l=x.t
 k=C.a([],l)
 for(j=0;j<2;++j){i=B.ax4[j]
-if(!a9.aT8(p,m,i))k.push(i)}if(k.length===0)return a9.i0("A doorway is in the way both ways round: there is no wood to run a cable through across it.")
+if(!a9.aT9(p,m,i))k.push(i)}if(k.length===0)return a9.i0("A doorway is in the way both ways round: there is no wood to run a cable through across it.")
 D.d.aZ(k,new A.cFS(new A.cFT(m,p)))
 h=D.d.gH(k)
 k=w.e
@@ -20262,7 +20264,7 @@ a2=A.eS(a1,(a1&1)===0?144:120,20,0)
 a7=B.v1[a1]
 a1=B.v1[D.o.F(a1+1,4)]
 a4.push(new A.r(a2.a+a7.a*1.75+a1.a*1.75,a2.b+a7.b*1.75+a1.b*1.75,a2.c+a7.c*1.75+a1.c*1.75))
-a5=a6}a4.push(A.eS(a6,a3.c,20,1.75))}if(o!==a5)a4.push(A.ihm(a0?a5:o,20))
+a5=a6}a4.push(A.eS(a6,a3.c,20,1.75))}if(o!==a5)a4.push(A.ihn(a0?a5:o,20))
 l=w.r
 a0=D.d.gan(a4)
 a3=A.eS(o,0,0,0)
@@ -20274,15 +20276,15 @@ w.z=s
 v.J(0,s)
 if(k){t.toString
 w.Q=t
-u.y.J(0,t)}v=w.w.gaI4()
+u.y.J(0,t)}v=w.w.gaI5()
 r=r==="switch"?"Switch":"Outlet"
 q=q?"the panel":"the "+u.b+" box"
 o=f.length
 n=o===1?"stud":"studs"
 l=s===1?"top":"bottom"
 return new A.ib(!0,r+" box connected: the cable runs from "+q+" through "+o+" "+n+" and goes in through the "+l+" knockout, "+D.i.ad(v/12,1)+" feet in all. Leave a loose end in the box to wire the device to.",D.ed)},
-aK1(d,e){return this.aK2(0,e,0,null)},
-d_5(d,e,f){return this.aK2(0,e,f,null)},
+aK2(d,e){return this.aK3(0,e,0,null)},
+d_5(d,e,f){return this.aK3(0,e,f,null)},
 cqX(d,a0,a1){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h=this,g="Connect the wires in the switch box first: wire the switch to its screws. The power only goes up to the light after that.",f=a0==null,e=!f
 if(e&&a0.b!=="switch")return h.i0("The light is fed from a switch: the power goes to the switch first, then up to the light. Start the cable at a switch box.")
 if(e&&!h.x7(a0))return h.i0(g)
@@ -20315,7 +20317,7 @@ l=m+w
 w=new A.cFA(t)
 v=f===1
 s=x.o
-k=A.aR_(t,f).b
+k=A.aQZ(t,f).b
 if(v)j=C.a([w.$2(m,k),w.$2(m,88)],s)
 else{i=k-2.5
 j=C.a([w.$2(m,k),w.$2(m,i),w.$2(l,i),w.$2(l,88)],s)}w=C.C(j,x.cv)
@@ -20332,8 +20334,8 @@ d.y.J(0,a1)
 d.Q=f
 t.y.J(0,f)
 f=v?"top":"bottom"
-return new A.ib(!0,"Light connected: the cable goes up from the switch through its "+f+" knockout, through the top plate, and lies across the joists to the ceiling box, "+D.i.ad(d.w.gaI4()/12,1)+" feet.",D.ed)},
-a65(d,e){var w,v,u,t=this,s=t.l_(d)
+return new A.ib(!0,"Light connected: the cable goes up from the switch through its "+f+" knockout, through the top plate, and lies across the joists to the ceiling box, "+D.i.ad(d.w.gaI5()/12,1)+" feet.",D.ed)},
+a66(d,e){var w,v,u,t=this,s=t.l_(d)
 if(s==null)return t.i0("Tap one of the blue boxes: the device goes in it.")
 if(s.w==null)return t.i0("Pull the cable to this box first: the device is wired to the cable.")
 w=s.b
@@ -20351,14 +20353,14 @@ w=new A.yL(C.T(x.S,x.N))
 w.a=t.f
 s.ax=w
 s.ay=!1}return new A.ib(!0,"Close-up: "+A.uw(e)+". Connect each wire to its screw.",D.ed)},
-az9(){var w,v,u,t
+aza(){var w,v,u,t
 for(w=this.b,v=w.length,u=0;u<v;++u){t=w[u].ax
 if(t!=null)t.a=this.f}},
 x7(d){var w
 if(d.at!=null){w=d.ax
 w=w!=null&&w.c>=2&&!w.x}else w=!1
 return w},
-aLd(d){var w,v=d.at
+aLe(d){var w,v=d.at
 if(v==null||d.ax==null)v=null
 else{v=A.nP(v)
 w=d.ax
@@ -20366,19 +20368,19 @@ w.toString
 w=A.xh(v,w)
 v=w}return v},
 tO(d){var w
-if(this.x7(d)){w=this.aLd(d)
+if(this.x7(d)){w=this.aLe(d)
 w=w==null?null:w.c
 w=w===!0}else w=!1
 return w},
-a7l(d){var w,v=this
+a7m(d){var w,v=this
 if(!v.f||!v.bkF(d)||!v.tO(d))return!1
 if(d.b==="ceiling"){w=v.l_(d.as)
 return w!=null&&w.b==="switch"&&v.tO(w)&&w.ay}return!0},
-a7w(){var w,v,u,t,s,r,q,p,o,n,m=this
+a7x(){var w,v,u,t,s,r,q,p,o,n,m=this
 if(m.r){m.f=m.r=!1
-m.az9()
+m.aza()
 return B.bJW}m.f=!m.f
-m.az9()
+m.aza()
 if(!m.f)return B.bJQ
 for(w=m.b,v=w.length,u=0,t=0;t<w.length;w.length===v||(0,C.J)(w),++t){s=w[t]
 r=s.at
@@ -20392,11 +20394,11 @@ q=s.ax
 q.toString
 o=A.xh(r,q)}if(o.d||o.e){m.r=!0
 m.f=!1;++m.d
-m.az9()
+m.aza()
 return new A.ib(!1,"The breaker TRIPPED. "+o.b+" Flip it fully off, fix the wiring in that box and try again.",D.ed)}}if(u===0)return B.bK0
 v=C.U(w).k("Y<1>")
 n=C.C(new C.Y(w,new A.cFX(m),v),v.k("M.E"))
-if(n.length!==0)return new A.ib(!1,"Breaker ON. It works, but a device is not wired safely: "+m.aLd(D.d.gH(n)).b,D.ed)
+if(n.length!==0)return new A.ib(!1,"Breaker ON. It works, but a device is not wired safely: "+m.aLe(D.d.gH(n)).b,D.ed)
 return new A.ib(!0,"Breaker ON. Every finished device works. Flip the switch to turn the light on, and plug something in.",D.ed)},
 cSA(d){var w,v,u,t,s,r,q=this,p=q.l_(d)
 if(p==null||p.b!=="switch")return q.i0("Tap a switch to flip it.")
@@ -20409,7 +20411,7 @@ if(r.b==="ceiling"&&r.as===t)w.push(r)}if(p.ay)if(D.d.aV(w,q.gd14()))w="Switch O
 else{v="Switch ON."+(w.length===0?"":" The light does not come on: check its wiring.")
 w=v}else w="Switch OFF."
 return new A.ib(!0,w,D.ed)},
-a6O(d,e){var w,v=this,u=v.l_(d),t=!0
+a6P(d,e){var w,v=this,u=v.l_(d),t=!0
 if(u!=null)if(u.b==="outlet"){t=u.at
 t=t==null||!D.d.q(B.iR,t)}if(t)return v.i0("Plug it into a finished outlet: tap an outlet on the wall.")
 if(!v.x7(u))return v.i0("Wire the outlet and put its plate on first.")
@@ -20419,20 +20421,20 @@ t=v.c
 if(t.h(0,d)===e){t.W(0,d)
 return B.bJT}t.n(0,d,e)
 if(!v.f)return B.bJV
-if(!v.a7l(u))return v.i0("Plugged in, but nothing happens: the outlet is not working. Check how it is wired.")
+if(!v.a7m(u))return v.i0("Plugged in, but nothing happens: the outlet is not working. Check how it is wired.")
 return B.bK_},
-gaKF(){var w,v,u=C.a([],x.eo)
+gaKG(){var w,v,u=C.a([],x.eo)
 for(w=this.b,v=0;v<4;++v)u.push(new A.Qj(D.d.aV(w,new A.cFU(v))))
 u.push(new A.Qj(D.d.aV(w,new A.cFV(this))))
 u.push(new A.Qj(D.d.aV(w,new A.cFW())))
 return u},
-gC1(d){return D.d.cD(this.gaKF(),new A.cFE())},
+gC1(d){return D.d.cD(this.gaKG(),new A.cFE())},
 gbhD(){var w=this
-return w.gC1(0)&&D.d.cD(w.b,w.gaLx())&&w.f},
+return w.gC1(0)&&D.d.cD(w.b,w.gaLy())&&w.f},
 gbgR(){return D.d.cF(this.b,0,new A.cFG())/12},
-aGc(d,e){var w=this.b
+aGd(d,e){var w=this.b
 return new C.Y(w,new A.cFF(e),C.U(w).k("Y<1>")).gI(0)},
-gaIr(){var w,v,u,t,s,r,q,p,o=this,n=null,m=o.gaKF(),l=C.T(x.N,x.y)
+gaIs(){var w,v,u,t,s,r,q,p,o=this,n=null,m=o.gaKG(),l=C.T(x.N,x.y)
 for(w=0;w<m.length;++w)l.n(0,"task"+w,m[w].b)
 for(v=o.b,u=v.length,t=0;s=v.length,t<s;v.length===u||(0,C.J)(v),++t){r=v[t]
 s=r.at
@@ -20454,11 +20456,11 @@ q.toString
 q=A.xh(s,q)
 s=q}s=s==null?n:s.a==="ok"
 s=s===!0}else s=!1
-l.n(0,"dev"+r.a,s)}l.n(0,"power",o.f&&s!==0&&D.d.cD(v,o.gaLx()))
+l.n(0,"dev"+r.a,s)}l.n(0,"power",o.f&&s!==0&&D.d.cD(v,o.gaLy()))
 return l},
 c7m(d){var w,v,u,t,s,r,q,p,o,n=B.zK[d.c]+d.d,m=C.a([],x.t)
 for(w=0;w<2;++w){v=B.ax4[w]
-if(!this.aT8(24,n,v))m.push(v)}if(m.length===0)return B.dlQ
+if(!this.aT9(24,n,v))m.push(v)}if(m.length===0)return B.dlR
 D.d.aZ(m,new A.cFw(new A.cFx(n,24)))
 u=D.d.gH(m)
 m=d.e
@@ -20472,10 +20474,10 @@ for(q=r.length,p=this.a,w=0;w<r.length;r.length===q||(0,C.J)(r),++w){o=r[w]
 if(!p.q(0,o.a))m.push(o)}return m},
 cUu(d){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h=this,g=new A.cFM(h)
 for(w=h.b,v=0;v<4;++v)if(!D.d.aV(w,new A.cFH(v))){u=g.$2(v,v===2?112:80)
-return new A.lj("Put an outlet box on "+B.dlq[v]+": open Boxes, pick Outlet box, and tap the lit stud.",C.a([u.a],x.t),"outlet")}if(!D.d.aV(w,new A.cFI()))return new A.lj("Put a switch box beside the door: open Boxes, pick Switch box, and tap the lit stud next to the door.",C.a([g.$2(2,80).a],x.t),"switch")
+return new A.lj("Put an outlet box on "+B.dlr[v]+": open Boxes, pick Outlet box, and tap the lit stud.",C.a([u.a],x.t),"outlet")}if(!D.d.aV(w,new A.cFI()))return new A.lj("Put a switch box beside the door: open Boxes, pick Switch box, and tap the lit stud next to the door.",C.a([g.$2(2,80).a],x.t),"switch")
 if(!D.d.aV(w,new A.cFJ()))return B.hrq
 for(t=w.length,s=0;r=w.length,s<r;w.length===t||(0,C.J)(w),++s){q=w[s]
-if(q.w==null&&q.gaoJ()===0){w=q.b==="switch"?0:1
+if(q.w==null&&q.gaoK()===0){w=q.b==="switch"?0:1
 return new A.lj("Break a knockout in the lit box: pick Knockout and tap the round tab. The view zooms in to the box.",C.a([4200+(q.a-4000)*2+w],x.t),"knock")}}for(t=C.U(w).k("Y<1>"),s=0;p=w.length,s<p;w.length===r||(0,C.J)(w),++s){q=w[s]
 if(q.w!=null)continue
 if(q.b==="ceiling"){u=C.nB(new C.Y(w,new A.cFK(),t))
@@ -20484,7 +20486,7 @@ if(u.at!=null){w=u.ax
 w=w!=null&&w.c>=2&&!w.x}else w=!1
 if(!w){w=C.a([u.a],x.t)
 t=u.at
-return new A.lj("The power goes up to the light through the switch, so connect the wires in the lit switch box first: pick a switch from Switches and tap the box, then join each wire to its screw.",w,t==null?"":"dev:"+t)}if(h.Uj(u)==null){w=h.atF(u)
+return new A.lj("The power goes up to the light through the switch, so connect the wires in the lit switch box first: pick a switch from Switches and tap the box, then join each wire to its screw.",w,t==null?"":"dev:"+t)}if(h.Uj(u)==null){w=h.atG(u)
 t=C.U(w)
 r=new C.iu(w,0,1,t.k("iu<1>"))
 r.n6(w,0,1,t.c)
@@ -20525,13 +20527,13 @@ if(i!=null)return new A.lj("Flip the switch to light the ceiling: pick Look and 
 return B.hro}}
 A.Dc.prototype={}
 A.Qv.prototype={}
-A.atV.prototype={
-S(){var w,v=A.hu1(),u=new C.vv()
+A.atU.prototype={
+S(){var w,v=A.hu2(),u=new C.vv()
 $.vY()
 u.fX(0)
 w=x.S
-return new A.atW(v,u,C.T(w,x.i),C.aR(w),C.aR(x.N))}}
-A.atW.prototype={
+return new A.atV(v,u,C.T(w,x.i),C.aR(w),C.aR(x.N))}}
+A.atV.prototype={
 geh(){var w,v=this.e
 if(v===$){w=new A.uO(1.5707963267948966,0.07,120,B.AY,$.aw())
 w.e=8
@@ -20544,17 +20546,17 @@ this.e!==$&&C.bD()
 this.e=w
 v=w}return v},
 glc(){var w=this.f
-return w===$?this.f=A.heK(this.d,0,0,"look"):w},
+return w===$?this.f=A.heL(this.d,0,0,"look"):w},
 Y(){this.a4()
 $.aW.x1$.push(new A.cok(this))
-this.afk()},
-afk(){var w=0,v=C.j(x.H),u,t=this,s,r,q,p,o
-var $async$afk=C.e(function(d,e){if(d===1)return C.f(e,v)
+this.afl()},
+afl(){var w=0,v=C.j(x.H),u,t=this,s,r,q,p,o
+var $async$afl=C.e(function(d,e){if(d===1)return C.f(e,v)
 for(;;)switch(w){case 0:w=3
-return C.b(A.Nb("wiring"),$async$afk)
+return C.b(A.Nb("wiring"),$async$afl)
 case 3:o=e
 if(t.c==null){w=1
-break}if(o!=null)try{t.d.aID(x.b.a(J.t(o,"house")))
+break}if(o!=null)try{t.d.aIE(x.b.a(J.t(o,"house")))
 s=C.a([],x.s)
 q=x.g.a(J.t(o,"paid"))
 q=J.aT(q==null?D.cq:q)
@@ -20563,17 +20565,17 @@ J.c7(s,C.w(r))}t.k1.v(0,s)
 s=C.aJ(J.t(o,"hints"))
 s=s==null?null:D.i.M(s)
 t.id=s==null?0:s
-t.m(t.ga_E())
+t.m(t.ga_F())
 t.nJ("Welcome back: your work on the house is here, just as you left it.")}catch(n){t.d.ir(0)}t.k2=!0
 case 1:return C.h(u,v)}})
-return C.i($async$afk,v)},
+return C.i($async$afl,v)},
 b1i(){var w,v,u=this
 if(!u.k2)return
 if(u.k3){A.xT("wiring")
 return}w=u.d.aj()
 v=u.k1
 v=C.C(v,C.a4(v).k("ci.E"))
-A.IC("wiring",C.I(["house",w,"paid",v,"hints",u.id],x.N,x.A))},
+A.ID("wiring",C.I(["house",w,"paid",v,"hints",u.id],x.N,x.A))},
 t(){var w=this.fr
 if(w!=null)w.a1(0)
 w=this.fx
@@ -20585,13 +20587,13 @@ w.m(new A.cnT(w,d,e))
 w.fr=C.cy(D.cM,new A.cnU(w))},
 nJ(d){return this.B2(d,!0)},
 wb(){var w=this,v=w.r,u=w.x
-w.f=A.heK(w.d,w.y,u,v)
+w.f=A.heL(w.d,w.y,u,v)
 w.b1i()},
-axr(d){var w=this,v=w.fx
+axs(d){var w=this,v=w.fx
 if(v!=null)v.a1(0)
 w.m(new A.cnG(w,d))
 w.fx=C.cy(D.el,new A.cnH(w))},
-aY9(d){var w
+aYa(d){var w
 if(D.a.a_(d,"dev:"))return A.uw(D.a.b2(d,4))+": tap a box that has its cable. The view closes in on it and you connect each wire to its screw."
 if(D.a.a_(d,"app:")){w=A.fDC(D.a.b2(d,4))
 w=w==null?null:w.b
@@ -20617,8 +20619,8 @@ if(D.a.a_(d,"app:")&&!D.d.aV(w.d.b,new A.cnJ(w)))return" No outlet is finished y
 return""},
 bWz(d,e){var w=this
 w.m(new A.cnE(w,e,d))
-w.nJ("You picked up the "+B.DJ.h(0,d).a.toLowerCase()+". "+w.aY9(e)+w.b_u(e))},
-bWv(d,e){var w,v,u,t,s,r,q,p,o,n,m,l,k=this,j=k.at?null:A.hBq(k.geh(),d,e)
+w.nJ("You picked up the "+B.DJ.h(0,d).a.toLowerCase()+". "+w.aYa(e)+w.b_u(e))},
+bWv(d,e){var w,v,u,t,s,r,q,p,o,n,m,l,k=this,j=k.at?null:A.hBr(k.geh(),d,e)
 if(j!=null){w={}
 w.a=null
 for(v=k.d.b,u=v.length,t=j.a,s=j.b,r=j.c,q=14,p=0;p<v.length;v.length===u||(0,C.J)(v),++p){o=v[p]
@@ -20632,12 +20634,12 @@ v=w.a.b
 k.nJ("Close up on the "+(v==="ceiling"?"ceiling":v)+" box.")}else{v=k.geh()
 v.vF(Math.min(v.c,34),j)
 k.nJ("Closer to this spot. Drag to turn round.")}return}v=k.geh()
-l=A.hBo(v,d,e)
+l=A.hBp(v,d,e)
 if(l==null){k.B2(y.c,!1)
 return}if(k.at){k.at=!1
 v.r=B.Eq
 v.f=520}k.m(new A.cnD(k,l))
-v.a8c(Math.min(v.c,70),0.07,l)
+v.a8d(Math.min(v.c,70),0.07,l)
 k.nJ(y.L)},
 T5(d){var w
 this.y=d.a
@@ -20656,7 +20658,7 @@ r=u===1?"hole":"holes"
 s.nJ(""+u+" "+r+" drilled. Now tap the box with the Cable roll again.")
 s.WG()},
 WG(){var w,v,u,t,s=this
-for(w=s.d.gaIr(),w=new C.cb(w,C.a4(w).k("cb<1,2>")).gae(0),v=s.k1,u=0;w.C();){t=w.d
+for(w=s.d.gaIs(),w=new C.cb(w,C.a4(w).k("cb<1,2>")).gae(0),v=s.k1,u=0;w.C();){t=w.d
 if(!t.b||v.q(0,t.a))continue
 v.J(0,t.a)
 if(s.go===0)++u
@@ -20667,44 +20669,44 @@ ccu(){var w,v,u,t,s=this,r=s.d,q=r.cUu(0);++s.id;++s.go
 s.fy-=2
 A.akJ(2)
 w=q.b
-if(w.length!==0)s.axr(w)
+if(w.length!==0)s.axs(w)
 v=w.length===0?null:D.d.gH(w)
 w=v!=null
 if(w&&v>=4000&&v<4100){u=r.l_(v)
 if(u!=null){t=q.c
 t=t==="knock"||t==="cable"}else t=!1
 if(t)s.T5(u)}if(w&&v>=4200&&v<4400){u=r.l_(4000+D.o.aq(v-4200,2))
-if(u!=null)s.T5(u)}s.m(s.ga_E())
+if(u!=null)s.T5(u)}s.m(s.ga_F())
 s.nJ("Hint (\u22122 \u2b50): "+q.a)},
 HE(d){var w=this
 w.m(new A.col(w,d))
-w.nJ(w.aY9(d)+w.b_u(d))},
-cFH(){var w=this,v=w.d.a7w(),u=v.a
+w.nJ(w.aYa(d)+w.b_u(d))},
+cFH(){var w=this,v=w.d.a7x(),u=v.a
 if(u)A.nO()
 else A.fr(180,220,0.25,"square")
-w.m(w.ga_E())
+w.m(w.ga_F())
 w.B2(v.b+w.WG(),u)},
-afj(d){return this.ciq(d)},
+afk(d){return this.ciq(d)},
 ciq(d){var w=0,v=C.j(x.H),u,t=this,s,r,q
-var $async$afj=C.e(function(e,f){if(e===1)return C.f(f,v)
+var $async$afk=C.e(function(e,f){if(e===1)return C.f(f,v)
 for(;;)switch(w){case 0:q=d.ax
 if(q!=null)q.a=t.d.f
 q=t.c
 q.toString
 w=3
-return C.b(C.a6(q,!1).ce(C.ec(new A.cnK(d),!1,null,x.H)),$async$afj)
+return C.b(C.a6(q,!1).ce(C.ec(new A.cnK(d),!1,null,x.H)),$async$afk)
 case 3:if(t.c==null){w=1
-break}t.m(t.ga_E())
+break}t.m(t.ga_F())
 s=t.WG()
 r=d.ax
 if(r.c>=2){q=d.at
 q.toString
 q=A.uw(q)+" wired and finished."+s}else q="Not finished: the device is in the box but the job is not done. Pick it again and tap the box to carry on."+s
 t.B2(q,r.c>=2)
-t.aab()
+t.aac()
 case 1:return C.h(u,v)}})
-return C.i($async$afj,v)},
-aab(){var w=this
+return C.i($async$afk,v)},
+aac(){var w=this
 w.b1i()
 if(w.d.gbhD()&&!w.ax){w.k3=w.ax=!0
 A.xT("wiring")
@@ -20720,7 +20722,7 @@ return}v=t.zC(d)
 A.nO()
 u.m(new A.cnW(u,r,d))
 u.nJ(v.b+" Now pick the Cable roll and tap the box, then the knockout the cable goes in through.")
-u.aab()},
+u.aac()},
 bIG(d,e){var w,v,u,t,s,r,q,p,o,n,m=this
 if(d.w!=null){m.B2("This box has its cable already. Tap the box to pull the cable out again.",!1)
 return}w=m.x
@@ -20728,10 +20730,10 @@ v=w===0?null:m.d.l_(w)
 u=""
 if(v!=null&&m.d.Uj(v)==null){w=C.a([],x.t)
 for(t=v.x,s=0;s<2;++s)if(!t[s])w.push(s)
-if(w.length!==0){m.d.zC(A.hfm(v.a,D.d.gH(w)))
-u=" A knockout was broken out in the first box for the cable to leave through."}}if(!d.x[e]){m.d.zC(A.hfm(d.a,e))
+if(w.length!==0){m.d.zC(A.hfn(v.a,D.d.gH(w)))
+u=" A knockout was broken out in the first box for the cable to leave through."}}if(!d.x[e]){m.d.zC(A.hfn(d.a,e))
 u=" You broke out the knockout."+u}w=d.a
-r=m.d.aK2(0,w,m.x,e)
+r=m.d.aK3(0,w,m.x,e)
 t=r.a
 if(t){A.nO()
 m.ch.n(0,w,m.ay.gf_()/1000)
@@ -20744,8 +20746,8 @@ m.m(new A.cnx(m,d))
 n=t?m.WG():""
 m.B2(r.b+u+n,t)
 w=r.c
-if(w.length!==0)m.axr(w)
-m.aab()},
+if(w.length!==0)m.axs(w)
+m.aac()},
 ccw(d){var w,v,u,t,s,r,q,p,o,n,m,l,k=this,j={},i=d===0
 if(!i){w=d===k.db&&k.ay.gf_()/1000-k.dy<0.45
 k.db=d
@@ -20760,9 +20762,9 @@ return}if(i){k.m(new A.cnL(k))
 return}if(d>=4400&&d<4500){t=4000+(d-4400)
 i=k.d
 s=i.c.h(0,t)
-if(s!=null){r=i.a6O(t,s)
+if(s!=null){r=i.a6P(t,s)
 A.nO()
-k.m(k.ga_E())
+k.m(k.ga_F())
 i=r.a
 k.B2(i?"You pulled the plug out of the outlet.":r.b,i)
 return}}i=k.r
@@ -20783,14 +20785,14 @@ if(o==="look"){n=k.glc().b.h(0,d)
 if(n!=null){k.m(new A.cnO(k,d))
 k.geh().Di(n.c)
 k.nJ(n.a+": "+n.b)}return}j.a=null
-if(D.a.a_(o,"dev:")){r=j.a=i.a65(d,D.a.b2(o,4))
+if(D.a.a_(o,"dev:")){r=j.a=i.a66(d,D.a.b2(o,4))
 if(r.a){A.nO()
 i=i.l_(d)
 i.toString
 k.m(new A.cnP(k,d))
 k.nJ(r.b)
-k.afj(i)
-return}i=r}else if(D.a.a_(o,"app:")){r=i.a6O(d,D.a.b2(o,4))
+k.afk(i)
+return}i=r}else if(D.a.a_(o,"app:")){r=i.a6P(d,D.a.b2(o,4))
 j.a=r
 i=r}else A:{if("outlet"===o||"switch"===o||"ceiling"===o){r=j.a=i.V_(o,d)
 if(r.a){r=new A.ib(!0,r.b+" Tap the box to look closer and break out a knockout.",D.ed)
@@ -20801,14 +20803,14 @@ j.a=r
 i=r
 break A}if(d===2200){k.x=0
 j.a=B.anL
-i=B.anL}else if(v&&p.w!=null&&i.apl(p)&&!i.x7(p)&&p.b!=="ceiling"&&k.dx!==p.a){k.dx=p.a
+i=B.anL}else if(v&&p.w!=null&&i.apm(p)&&!i.x7(p)&&p.b!=="ceiling"&&k.dx!==p.a){k.dx=p.a
 j.a=B.anM
-i=B.anM}else if(v&&p.w!=null&&i.apl(p)&&i.x7(p)&&p.b!=="ceiling"&&k.x!==p.a){k.x=p.a
+i=B.anM}else if(v&&p.w!=null&&i.apm(p)&&i.x7(p)&&p.b!=="ceiling"&&k.x!==p.a){k.x=p.a
 r=new A.ib(!0,"The cable will go on from this "+p.b+" box. Tap the next box it must reach, then the knockout it goes in through. (Tap this box again to pull its cable out.)",D.ed)
 j.a=r
 i=r}else if(v&&p.w!=null){m=k.x===d
 k.dx=0
-r=j.a=i.aK1(0,d)
+r=j.a=i.aK2(0,d)
 if(r.a&&m)k.x=0
 i=r}else if(v){k.T5(p)
 r=new A.ib(!0,"Close up. Tap the knockout the cable goes in through: a green one is open already, an orange one is broken out for you.",D.ed)
@@ -20822,8 +20824,8 @@ l=j.a.a?k.WG():""
 i=j.a
 k.B2(i.b+l,i.a)
 i=j.a.c
-if(i.length!==0)k.axr(i)
-k.aab()},
+if(i.length!==0)k.axs(i)
+k.aac()},
 bTK(){var w=null,v=this.c
 if(v==null)return
 C.cg(w,w,!0,w,new A.cnB(this),v,w,!0,!0,x.H)},
@@ -20849,7 +20851,7 @@ return C.az(v,w,D.y,!1,new C.bE(d,x.W),v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v
 ccr(d,e,f,g,h,i,j){return this.Qk(d,e,f,g,h,i,j,null,!1)},
 ccq(d,e,f,g,h,i){return this.Qk(d,e,f,D.av,g,h,i,null,!1)},
 b1h(d,e,f,g,h,i,j){return this.Qk(d,e,f,D.av,!1,g,h,i,j)},
-afi(d,e,f,g,h,i){return this.Qk(d,e,f,D.av,!1,g,h,null,i)},
+afj(d,e,f,g,h,i){return this.Qk(d,e,f,D.av,!1,g,h,null,i)},
 b1g(d,e,f,g,h,i,j){return this.Qk(d,e,f,g,!1,h,i,null,j)},
 ccs(d,e,f,g,h,i,j,k){return this.Qk(d,e,f,g,!1,h,i,j,k)},
 b6K(d,e,f){var w,v,u,t,s,r,q,p=null,o=x.p,n=C.a([],o)
@@ -20861,17 +20863,17 @@ for(r=0;r<f;++r){q=C.a([],o)
 if(r>0)q.push(new C.a5(4,p,p,p))
 q.push(new C.bz(1,D.bc,r<t.length?t[r]:D.xf,p))
 D.d.v(s,q)}n.push(new C.D(new C.R(0,v,0,0),new C.c8(D.aL,D.e,D.j,D.l,p,D.p,p,0,s,p),p))}return C.x(n,D.l,p,D.e,D.j,0,D.p)},
-cGL(){var w,v,u,t,s,r,q,p=this,o=p.w==null?null:D.d.fe($.h5k(),new A.co0(p))
+cGL(){var w,v,u,t,s,r,q,p=this,o=p.w==null?null:D.d.fe($.h5l(),new A.co0(p))
 if(o!=null){w=C.a([p.ccr("menu-back","Back",D.k6,D.ac,!0,!1,new A.co1(p))],x.p)
 for(v=o.d,u=v.length,t=0;t<v.length;v.length===u||(0,C.J)(v),++t){s=v[t]
 r=s.a
 w.push(p.ccq("tool-"+r,s.b,s.c,!0,p.r===r,new A.co2(p,s)))}return p.b6K(0,w,2)}q=new A.co9(p)
 w=C.a([],x.p)
-for(v=$.h5k(),v=C.cW(v,0,C.dA(4,"count",x.S),C.U(v).c),u=v.$ti,v=new C.bQ(v,v.gI(0),u.k("bQ<ak.E>")),u=u.k("ak.E");v.C();){r=v.d
+for(v=$.h5l(),v=C.cW(v,0,C.dA(4,"count",x.S),C.U(v).c),u=v.$ti,v=new C.bQ(v,v.gI(0),u.k("bQ<ak.E>")),u=u.k("ak.E");v.C();){r=v.d
 if(r==null)r=u.a(r)
-w.push(p.b1h("cat-"+r.a,r.b,r.c,q.$1(r),new A.co3(p,r),"\u25b8",!0))}w.push(p.afi("tool-look","Look",D.eS,p.r==="look",new A.co4(p),!0))
-w.push(p.afi("tool-drill","Drill",D.uI,p.r==="drill",new A.co5(p),!0))
-w.push(p.afi("tool-cable","Cable roll",E.P9,p.r==="cable",new A.co6(p),!0))
+w.push(p.b1h("cat-"+r.a,r.b,r.c,q.$1(r),new A.co3(p,r),"\u25b8",!0))}w.push(p.afj("tool-look","Look",D.eS,p.r==="look",new A.co4(p),!0))
+w.push(p.afj("tool-drill","Drill",D.uI,p.r==="drill",new A.co5(p),!0))
+w.push(p.afj("tool-cable","Cable roll",E.P9,p.r==="cable",new A.co6(p),!0))
 v=p.d
 u=v.r
 if(u)r="Breaker TRIPPED"
@@ -20879,13 +20881,13 @@ else r=v.f?"Breaker ON":"Breaker OFF"
 v=v.f
 u=u?D.c0:D.b4
 w.push(p.b1g("tool-breaker",r,B.bRt,u,v,p.gcFG(),!0))
-for(v=$.h5k(),v=C.cW(v,4,null,C.U(v).c),u=v.$ti,v=new C.bQ(v,v.gI(0),u.k("bQ<ak.E>")),u=u.k("ak.E");v.C();){r=v.d
+for(v=$.h5l(),v=C.cW(v,4,null,C.U(v).c),u=v.$ti,v=new C.bQ(v,v.gI(0),u.k("bQ<ak.E>")),u=u.k("ak.E");v.C();){r=v.d
 if(r==null)r=u.a(r)
-w.push(p.b1h("cat-"+r.a,r.b,r.c,q.$1(r),new A.co7(p,r),"\u25b8",!0))}w.push(p.afi("tool-knock","Knockout",D.zm,p.r==="knock",new A.co8(p),!0))
+w.push(p.b1h("cat-"+r.a,r.b,r.c,q.$1(r),new A.co7(p,r),"\u25b8",!0))}w.push(p.afj("tool-knock","Knockout",D.zm,p.r==="knock",new A.co8(p),!0))
 w.push(p.ccs("tool-hint","Hint",D.mh,D.bi,!1,p.gcct(),"\u22122\u2b50",!0))
 w.push(p.b1g("tool-reset","Start over",D.k8,D.ac,!1,p.gccx(),!0))
 return p.b6K(0,w,D.i.cL(w.length/2))},
-B(d){var w,v,u,t,s,r=this,q=null,p=r.d,o=p.gaKF(),n=p.b,m=new C.Y(n,p.gaLx(),C.U(n).k("Y<1>")).gI(0),l=p.aGc(0,"outlet"),k=p.aGc(0,"switch"),j=p.aGc(0,"ceiling"),i=D.d.aV(n,new A.cob()),h=p.a.a,g=p.gC1(0),f=n.length
+B(d){var w,v,u,t,s,r=this,q=null,p=r.d,o=p.gaKG(),n=p.b,m=new C.Y(n,p.gaLy(),C.U(n).k("Y<1>")).gI(0),l=p.aGd(0,"outlet"),k=p.aGd(0,"switch"),j=p.aGd(0,"ceiling"),i=D.d.aV(n,new A.cob()),h=p.a.a,g=p.gC1(0),f=n.length
 f=f!==0&&m===f
 w=C.a([!0,l>=1,k>=1,j>=1,i,h!==0,g,f,p.gbhD()],x.u)
 v=D.d.bj(w,new A.coc())
@@ -20904,13 +20906,13 @@ f=r.at
 u=f?"Inside":"Whole room"
 t=f?D.Py:D.PK
 s=x.p
-f=A.Ku(!1,q,l,new A.coe(r),new A.cof(r),i,k,h,q,q,j,54,r.gbWu(),new A.cog(r),r.gccv(),n,!1,new A.coh(r),q,C.a([A.tl(u,D.av,t,f,r.gcGd()),D.T],s))
+f=A.Kv(!1,q,l,new A.coe(r),new A.cof(r),i,k,h,q,q,j,54,r.gbWu(),new A.cog(r),r.gccv(),n,!1,new A.coh(r),q,C.a([A.tl(u,D.av,t,f,r.gcGd()),D.T],s))
 s=C.a([],s)
 n=r.CW
 if(n.a!==0&&n.aV(0,new A.coi()))s.push(new C.D(D.mZ,new C.a5(1/0,q,A.tl("Drill the lit",D.av,D.uI,!0,r.gbQP()),q),q))
 s.push(r.cGL())
-return A.IV(!0,D.av,new A.coj(d,w),C.x(s,D.l,q,D.e,D.P,0,D.p),f,p,"Wiring a house",q,g)}}
-var z=a.updateTypes(["~()","~(eL)","P(wc)","m(m,fm)","P(nG)","P(mo)","r(r)","P(a65)","P(iS)","~(H)","ai<kf>(F)","P(lg)","r(F,F)","P(fm)","P(YP)","P(zC)","r(F,F,F)","aB<~>()","P(aaP)","P(a50)","P(N6)","P(oF)","H(mo,mo)","P(PA)","P(IG)","BS(Z)","P(r)","P(a5e)","r(F)","~(o,av)","~(mo)","~(uP,av,F)","P(yC)","m(iS)","P(MT)","r(H)","m(nG)","P(zD)","P(Qv)","Jv(Z)","P(N2)","r(F,F[F])","P(wL)","P(rn)","P(o0)","r(hk)","OU(Z)","P(abY)","ai<fh>(F)","P(FL)","H(xJ,xJ)","P(zx)","P(AJ)","P(pd)","P(MU)","P(MA)","~(H,r,r)","~(H,r,u{r:F})","H(yC,yC)","P(Qj)","~({done:P})","~(r,r,r,r)","Gf(m)","v(t3)","v(m,ai<t3>)","m(mo)","v(xJ)","r(ai<r>,H)","YF()","~(r,r,r,r,u,F)","yL()","hk(H)","X8(Z)","F(lO)","+(F,F,F,m,m)(PA,H)","Qt()","a7U(Z)","~(r,r{note:m?})","mo?(r,r)","P(r,r)","r?(r,r)","F(r)","ai<r>(r,r[H])","~(mo,F,F,F,F,F{note:m?})","~(kf,H)","F(mo)","ai<kf>()","ai<kf>(ai<kf>)","F(oF)","~(r,r,r,F,F)","~(r,r,r,F,H)","~(r,r,r,r{poster:H})","~(~(eL),r,r)","~(r,r,F,F,u{joint:P})","zD()","~(r,r,H{alongX:P})","~(ai<r>,u)","~(aE?)","~(ai<r>{col:u})","~(H,r,u{h:F,w:F})","aB<Nd?>()","~(H,ai<r>,u,F,m)","~(H,m,r,r,r,P)","P(Ya)","P(xJ)","~(H,r,r,m,u)","ai<r>(ai<r>)","~(m,ai<r>{r:F})","~(m,r,r)","~(nG,r,m)","P(Dc)","~(H,ai<r>)","P(H)","H(H,mo)","fh(r,r,r,r,H,F,F)","H(lg)","~(H,r,r{col:u,round:P})","cI()","ai<mt>(F,F)","m(N6)","~(m,Kg,m,m,m)","H(Gn,Gf)","H(AJ)","~(ai<r>)","a25(Z)","Gn(m)","H(AJ,AJ)","r(H,H)","H(GA,GA)","o0()","H(H,MU)","P(zC,F,F)","~(r,F,F,F,~(uP,av,F){px:F})","P(ws)","oF(F)","~(H,zC,u{padToo:P})","~(m)","~(H,XP,F,F)","mo?(m)","+(r,r)(H)","~(H{keepTour:P})","F(F,wc)","yC(H,F)","~(wc,u{r:F})","m(wc)","ai<+(r,r)>()","~(m,r,r,H)","wL(wL,wL)"])
+return A.IW(!0,D.av,new A.coj(d,w),C.x(s,D.l,q,D.e,D.P,0,D.p),f,p,"Wiring a house",q,g)}}
+var z=a.updateTypes(["~()","~(eL)","P(wc)","m(m,fm)","P(nG)","P(mo)","r(r)","P(a65)","P(iS)","~(H)","ai<jF>(F)","P(lg)","r(F,F)","P(fm)","P(YP)","P(zC)","r(F,F,F)","aB<~>()","P(aaP)","P(a50)","P(N6)","P(oF)","H(mo,mo)","P(PA)","P(IH)","BS(Z)","P(r)","P(a5e)","r(F)","~(o,av)","~(mo)","~(uP,av,F)","P(yC)","m(iS)","P(MT)","r(H)","m(nG)","P(zD)","P(Qv)","Jw(Z)","P(N2)","r(F,F[F])","P(wL)","P(rn)","P(o0)","P(abY)","r(hk)","OU(Z)","ai<fh>(F)","P(FL)","H(xJ,xJ)","P(zx)","P(AJ)","P(pd)","P(MU)","P(MA)","~(H,r,r)","~(H,r,u{r:F})","H(yC,yC)","P(Qj)","~(r,F,F,F,~(uP,av,F){px:F})","ai<+(r,r)>()","~(r,r,r,r)","~(r,r,r,r,u,F)","v(t3)","v(m,ai<t3>)","m(mo)","v(xJ)","r(ai<r>,H)","YF()","F(lO)","yL()","hk(H)","X8(Z)","+(F,F,F,m,m)(PA,H)","~({done:P})","Qt()","a7U(Z)","~(r,r{note:m?})","mo?(r,r)","P(r,r)","r?(r,r)","F(r)","ai<r>(r,r[H])","~(mo,F,F,F,F,F{note:m?})","~(jF,H)","F(mo)","ai<jF>()","ai<jF>(ai<jF>)","F(oF)","~(r,r,r,F,F)","~(r,r,r,F,H)","~(r,r,r,r{poster:H})","~(~(eL),r,r)","~(r,r,F,F,u{joint:P})","zD()","~(r,r,H{alongX:P})","~(ai<r>,u)","~(aE?)","~(ai<r>{col:u})","~(H,r,u{h:F,w:F})","wL(wL,wL)","~(H,ai<r>,u,F,m)","~(H,m,r,r,r,P)","P(Ya)","P(xJ)","aB<Nd?>()","ai<r>(ai<r>)","~(m,ai<r>{r:F})","~(m,r,r)","P(Dc)","~(m,r,r,H)","H(jF)","P(H)","H(H,mo)","fh(r,r,r,r,H,F,F)","H(lg)","~(H,r,r{col:u,round:P})","cI()","~(H,ai<r>)","m(N6)","~(m,Kh,m,m,m)","H(Gn,Gf)","H(AJ)","~(ai<r>)","a25(Z)","ai<mt>(F,F)","H(AJ,AJ)","r(H,H)","H(GA,GA)","Gn(m)","H(H,MU)","P(zC,F,F)","o0()","Gf(m)","P(ws)","~(H,zC,u{padToo:P})","~(m)","~(H,XP,F,F)","mo?(m)","oF(F)","+(r,r)(H)","F(F,wc)","yC(H,F)","~(wc,u{r:F})","m(wc)","~(H{keepTour:P})","~(nG,r,m)","~(H,r,r,m,u)"])
 A.c1l.prototype={
 $1(d){var w=this.a
 w=w===0?d:A.tp(d,w)
@@ -20929,8 +20931,8 @@ a8=a4+n*a8
 b1=a9+l
 b2=b0+k
 b3=a8+j
-f.push(new A.kf(C.a([e.$1(new A.r(a9,b0,a8)),e.$1(new A.r(b1,b2,b3)),e.$1(new A.r(b1+i,b2+h,b3+m)),e.$1(new A.r(a9+i,b0+h,a8+m))],d),a0.$1(b5),a1,g.b,a2,g.d,!1,g.c,g.e,g.f,g.w))}},
-$S:z+61}
+f.push(new A.jF(C.a([e.$1(new A.r(a9,b0,a8)),e.$1(new A.r(b1,b2,b3)),e.$1(new A.r(b1+i,b2+h,b3+m)),e.$1(new A.r(a9+i,b0+h,a8+m))],d),a0.$1(b5),a1,g.b,a2,g.d,!1,g.c,g.e,g.f,g.w))}},
+$S:z+62}
 A.c1n.prototype={
 $1(d){var w=d*2*3.141592653589793/this.b
 return this.a.aM(0,Math.cos(w)).a2(0,this.c.aM(0,Math.sin(w)))},
@@ -20938,35 +20940,35 @@ $S:z+35}
 A.c1j.prototype={
 $2(d,e){var w=3.141592653589793*d/this.a,v=6.283185307179586*e/this.b
 return new A.r(Math.sin(w)*Math.cos(v),Math.cos(w),Math.sin(w)*Math.sin(v))},
-$S:z+127}
+$S:z+128}
 A.c1o.prototype={
 $1(d){var w=d*2*3.141592653589793/this.b
 return this.a.aM(0,Math.cos(w)).a2(0,this.c.aM(0,Math.sin(w)))},
 $S:z+35}
-A.h4q.prototype={
+A.h4r.prototype={
 $1(d){var w=d.b,v=this.a,u=d.c,t=this.b
 return new A.r(d.a,w*v-u*t,w*t+u*v)},
 $S:z+6}
-A.h4o.prototype={
+A.h4p.prototype={
 $1(d){var w=this.a
 return w===0?d:A.tp(d,w)},
 $S:z+6}
-A.h4p.prototype={
+A.h4q.prototype={
 $1(d){var w=this,v=w.b===0?d:w.c.$1(d)
-return J.h5G(w.a.$1(v),w.d)},
+return J.h5H(w.a.$1(v),w.d)},
 $S:z+6}
-A.h4n.prototype={
+A.h4o.prototype={
 $1(d){var w=this.b===0?d:this.c.$1(d)
 return this.a.$1(w)},
 $S:z+6}
-A.h4d.prototype={
+A.h4e.prototype={
 $4(d,e,f,g){var w=-d
 return 0.5*(2*e+(w+f)*this.a+(2*d-5*e+4*f-g)*this.b+(w+3*e-3*f+g)*this.c)},
 $S:190}
 A.bKQ.prototype={
-$1(d){var w=d.a,v=J.a7(w),u=C.k4(v.h(w,"ngmy_swipe_x3"))
+$1(d){var w=d.a,v=J.a7(w),u=C.k5(v.h(w,"ngmy_swipe_x3"))
 $.akc=u===!0
-w=C.k4(v.h(w,"ngmy_swipe_y3"))
+w=C.k5(v.h(w,"ngmy_swipe_y3"))
 $.akd=w!==!1},
 $S:319}
 A.bKR.prototype={
@@ -21066,7 +21068,7 @@ if(a9){a6=-a6
 a7=-a7
 a8=-a8}if(!g){u=C.a([],x.o)
 for(f=0;f<v;++f)u.push(new A.r(d3.c[f],d3.d[f],d3.e[f]))
-b0=A.i6t(u)
+b0=A.i6u(u)
 v=b0.length
 if(v<3)return
 u=d3.c
@@ -21137,21 +21139,21 @@ r=c9.f
 if(r!=null)d2.ak(r)
 c9.ab()}c9.E(new C.bv())
 d2=d4.f
-d3=C.h6n(c6,c7,c8,d2)
+d3=C.h6o(c6,c7,c8,d2)
 s=d4.d
 u=s===u&&t
 d0=new A.GA(d4.y,d4.z,null,c9,d3,c0-d4.x,s,d2<0.99,u)
 d0.e=c1<2&&c2<2
 d1.go.push(d0)
 d0.c=d5},
-$S:z+84}
+$S:z+85}
 A.cwo.prototype={
 $1(d){return d.c>=1},
 $S:z+26}
 A.cwp.prototype={
 $1(d){var w,v,u,t,s,r,q,p,o=this,n=!o.c||o.d>=o.e[0],m=o.f,l=o.b
-if(n)A.i7p(d,m,o.r,l.gHa(0))
-else{n=$.hIO()
+if(n)A.i7q(d,m,o.r,l.gHa(0))
+else{n=$.hIP()
 C.xP(m)
 w=n.a
 v=w.get(m)
@@ -21171,7 +21173,7 @@ n=w.get(m)
 q=n==null?null:n.b
 if(q!=null){n=m.d
 m=m.e
-p=A.hdY(o.r,n,m)
+p=A.hdZ(o.r,n,m)
 if(p!=null){l=d.c
 J.bo(l.save())
 d.aA(0,p.a)
@@ -21190,7 +21192,7 @@ A.cwq.prototype={
 $1(d){return d.c<1},
 $S:z+26}
 A.cwr.prototype={
-$1(d){return A.i7q(d,this.b,this.c,8,6,this.a.gHa(0))},
+$1(d){return A.i7r(d,this.b,this.c,8,6,this.a.gHa(0))},
 $S:732}
 A.cws.prototype={
 $2(d,e){return D.i.aS(e,d)},
@@ -21200,15 +21202,15 @@ $2(d,e){var w,v=D.o.aS(d.a,e.a)
 if(v!==0)return v
 w=D.i.aS(e.d,d.d)
 return w!==0?w:D.o.aS(d.c,e.c)},
-$S:z+128}
+$S:z+129}
 A.f6Y.prototype={
 $1(d){var w=this.a,v=w.r,u=d.a
 w.r=d
-w.a.d.a7p(D.i.D((u-v.a)/1e6,0,0.1))
+w.a.d.a7q(D.i.D((u-v.a)/1e6,0,0.1))
 w.f.sp(0,u/1e6)},
 $S:8}
 A.f6X.prototype={
-$1(d){if(x.ej.b(d))this.a.a.d.aqr(1+d.gtU().b*0.0012)},
+$1(d){if(x.ej.b(d))this.a.a.d.aqs(1+d.gtU().b*0.0012)},
 $S:252}
 A.f6V.prototype={
 $1(d){var w=this.a
@@ -21221,7 +21223,7 @@ if(r!==q.x){q.x=r
 q.w=d.d}if(r>=2){r=d.d
 w=q.w/r
 q.w=r
-if(isFinite(w)&&w>0)q.a.d.aqr(w)}else{r=q.a.d
+if(isFinite(w)&&w>0)q.a.d.aqs(w)}else{r=q.a.d
 q=d.a
 v=$.akc?-1:1
 v=q.a*0.009*v
@@ -21231,7 +21233,7 @@ v=r.a+=v
 if(!r.CW){t=r.ay
 s=r.ch
 r.a=D.i.D(v,t-s,t+s)}r.b=D.i.D(r.b+-q.b*0.009*u,r.at,r.ax)
-r.aek()
+r.ael()
 r.b0()}},
 $S:217}
 A.f6P.prototype={
@@ -21268,7 +21270,7 @@ if(u!=null)u.$1(v.e.cZw(d.gf0()))}if(v.at===0)v.z=null},
 $S:114}
 A.fom.prototype={
 $0(){return new A.Qt(!1,C.a([],x.z),C.a([],x.t))},
-$S:z+75}
+$S:z+76}
 A.cNw.prototype={
 $0(){var w=this.a
 if(w.c!=null)w.m(new A.cNv(w))},
@@ -21279,7 +21281,7 @@ $S:0}
 A.cNy.prototype={
 $0(){var w=this.a
 w.m(new A.cNx(w))
-w.aPO()},
+w.aPP()},
 $S:0}
 A.cNx.prototype={
 $0(){return this.a.d=!0},
@@ -21296,8 +21298,8 @@ l=x.N
 o=new A.Nd(m,C.T(l,x.a6),C.T(l,x.bB),C.a([],x.dQ),C.T(l,x.gN))
 w=8
 return C.b(o.PR(p),$async$$0)
-case 8:$.h7b.n(0,m,o)
-$.h79.W(0,m)
+case 8:$.h7c.n(0,m,o)
+$.h7a.W(0,m)
 u=o
 r=[1]
 w=5
@@ -21310,7 +21312,7 @@ j=s.pop()
 n=C.ab(j)
 m=q.b
 $.am.$1("Could not read the character "+m+": "+C.w(n))
-$.h79.J(0,m)
+$.h7a.J(0,m)
 u=null
 r=[1]
 w=5
@@ -21320,13 +21322,13 @@ w=5
 break
 case 3:r=[2]
 case 5:t=2
-$.h7a.W(0,q.b)
+$.h7b.W(0,q.b)
 w=r.pop()
 break
 case 6:case 1:return C.h(u,v)
 case 2:return C.f(s.at(-1),v)}})
 return C.i($async$$0,v)},
-$S:z+100}
+$S:z+106}
 A.bV8.prototype={
 $1(d){return D.a.q(d,"hips")},
 $S:3}
@@ -21371,7 +21373,7 @@ for(w=this.a.e,v=w.length,u=0;u<v;u+=3){t=d[w[u]]
 s=d[w[u+1]]
 r=d[w[u+2]]
 if(t===s||s===r||t===r)continue
-q.J(0,A.hlX(t,s,r))}return q.a},
+q.J(0,A.hlY(t,s,r))}return q.a},
 $S:1788}
 A.bV9.prototype={
 $2(d,e){var w,v,u,t=this.a,s=this.b.h(0,d)
@@ -21427,7 +21429,7 @@ n=k[a1]
 k=l.f
 j=a1*16
 if(n<0)D.nR.h9(k,j,j+16,h)
-else A.hlY(k,n*16,h,0,k,j)
+else A.hlZ(k,n*16,h,0,k,j)
 k=u.f
 k===$&&C.c()
 k=k[a1]
@@ -21461,8 +21463,8 @@ $2(d,e){return this.$3(d,e,1)},
 $S:z+41}
 A.bV5.prototype={
 $6(d,e,f,g,h,i){var w=this
-return w.a.push(new A.kf(C.a([d,e,f,g],x.o),w.b,h,w.c,0,1,!1,0,i,2,w.d))},
-$S:z+69}
+return w.a.push(new A.jF(C.a([d,e,f,g],x.o),w.b,h,w.c,0,1,!1,0,i,2,w.d))},
+$S:z+63}
 A.bV4.prototype={
 $6(d,e,f,g,h,i){var w=this.b
 return this.a.$6(w.$2(d-f,e),w.$2(d,e-g),w.$2(d+f,e),w.$2(d,e+g),h,i)},
@@ -21496,49 +21498,49 @@ w.e=0},
 $S:1796}
 A.bJ7.prototype={
 $1(d){return d.d+this.a.f*d.e},
-$S:z+73}
+$S:z+70}
 A.bJ6.prototype={
 $1(d){return d.a===J.t(this.a,"template")},
 $S:z+43}
-A.fW8.prototype={
+A.fW9.prototype={
 $6$lines$w(d,e,f,g,h,i){var w=null,v=C.fq("\u2026",D.cs,w,h,w,C.cQ(w,w,w,w,w,w,w,w,w,C.n(w,w,f,w,w,w,w,w,w,w,w,e,w,w,i,w,1.1,!0,w,w,w,w,w,w,w,w),d),D.a5,D.bX,w,D.dz,D.bY)
 v.o6(g)
 return v},
 $4(d,e,f,g){return this.$6$lines$w(d,e,f,g,2,D.u)},
 $5$w(d,e,f,g,h){return this.$6$lines$w(d,e,f,g,2,h)},
 $S:1797}
-A.fE6.prototype={
+A.fE7.prototype={
 $1(d){var w=this.a
 return A.tp(d,w.c).a2(0,new A.r(w.a,0,w.b))},
 $S:z+6}
-A.fE7.prototype={
-$6$px(d,e,f,g,h,i){var w=new A.fE8(e,d),v=-f/2,u=g/2,t=f/2,s=-g/2
+A.fE8.prototype={
+$6$px(d,e,f,g,h,i){var w=new A.fE9(e,d),v=-f/2,u=g/2,t=f/2,s=-g/2
 this.a.push(new A.fh(C.a([w.$2(v,u),w.$2(t,u),w.$2(t,s),w.$2(v,s)],x.o),0,h,i,i*g/f,30,this.b,0,!1))},
 $5(d,e,f,g,h){return this.$6$px(d,e,f,g,h,260)},
-$S:z+132}
-A.fE8.prototype={
+$S:z+60}
+A.fE9.prototype={
 $2(d,e){return A.tp(new A.r(d,e,0),this.a).a2(0,this.b)},
 $S:z+12}
-A.fE_.prototype={
+A.fE0.prototype={
 $3(d,e,f){return A.bCR(d,e,f,0)},
 $S:24}
-A.fE0.prototype={
+A.fE1.prototype={
 $3(d,e,f){return A.bCR(d,e,f,3)},
 $S:24}
-A.fE1.prototype={
+A.fE2.prototype={
 $3(d,e,f){return A.bCR(d,e,f,8)},
 $S:24}
-A.fE2.prototype={
+A.fE3.prototype={
 $3(d,e,f){return A.bCR(d,e,f,9+this.a)},
 $S:24}
-A.fE3.prototype={
+A.fE4.prototype={
 $3(d,e,f){return A.bCR(d,e,f,12+this.a)},
 $S:24}
-A.fE4.prototype={
-$3(d,e,f){return A.hEW(d,e,f,this.a,this.b)},
-$S:24}
 A.fE5.prototype={
-$3(d,e,f){return A.hEW(d,e,f,this.a,this.b)},
+$3(d,e,f){return A.hEX(d,e,f,this.a,this.b)},
+$S:24}
+A.fE6.prototype={
+$3(d,e,f){return A.hEX(d,e,f,this.a,this.b)},
 $S:24}
 A.fpE.prototype={
 $4(d,e,f,g){var w=-d,v=this.a
@@ -21547,9 +21549,9 @@ $S:190}
 A.ft5.prototype={
 $1(d){var w=this.a,v=J.a7(w)
 return v.h(w,D.o.D(d,0,v.gI(w)-1))},
-$S:z+139}
+$S:z+141}
 A.fCE.prototype={
-$0(){var w,v,u,t,s,r,q,p,o,n=A.hAo(this.a),m=x.n,l=C.a([],m)
+$0(){var w,v,u,t,s,r,q,p,o,n=A.hAp(this.a),m=x.n,l=C.a([],m)
 for(w=J.a7(n),v=0;v<w.gI(n)-1;v=u){u=v+1
 t=w.h(n,u).a
 s=w.h(n,v).a
@@ -21568,12 +21570,12 @@ v=a7.w.length
 u=v===0
 t=0
 for(;;){if(!(t<(u?1:v)))break
-w.push(t);++t}a8=new C.y(w,0)}s=Math.max(Math.max(a7.gaq9(),a7.gbg5()),a7.gH8()*1.3)
+w.push(t);++t}a8=new C.y(w,0)}s=Math.max(Math.max(a7.gaqa(),a7.gbg5()),a7.gH8()*1.3)
 w=a7.r
-r=new A.r(a7.ga4V(0),w+a7.gH8()/2,a7.ga4X())
+r=new A.r(a7.ga4W(0),w+a7.gH8()/2,a7.ga4Y())
 q=w+a7.gH8()
 v=s*0.55
-p=C.a([new C.y(new A.r(a7.ga4V(0)+v,q+s*0.5,a7.ga4X()+s*1.15),r)],x.dt)
+p=C.a([new C.y(new A.r(a7.ga4W(0)+v,q+s*0.5,a7.ga4Y()+s*1.15),r)],x.dt)
 for(u=a8.a,o=x.o,n=a7.w,m=a7.e,l=a7.f,k=a8.b,v=q+v,j=null,i=0;i<u.length;++i,j=a2){h=n[u[i]]
 g=h.e
 f=m*g
@@ -21591,27 +21593,27 @@ break
 default:g=C.a([a3.$3(1.3,0.2,-0.45),a3.$3(1.1,0,0.45),a3.$3(1.7,-0.3,1.3)],o)
 break}if(j!=null&&j.a*a0+j.c*a1<0.3){a0=D.d.gan(p).a
 a1=D.d.gH(g)
-p.push(new C.y(new A.r((a0.a+a1.a)*0.5+j.c*s*0.5,v,(a0.c+a1.c)*0.5-j.a*s*0.5),r))}for(a4=0;a4<3;++a4)p.push(new C.y(g[a4],d))}a5=new A.r(a7.ga4V(0)-s*0.7,q+s*0.6,a7.ga4X()-s)
+p.push(new C.y(new A.r((a0.a+a1.a)*0.5+j.c*s*0.5,v,(a0.c+a1.c)*0.5-j.a*s*0.5),r))}for(a4=0;a4<3;++a4)p.push(new C.y(g[a4],d))}a5=new A.r(a7.ga4W(0)-s*0.7,q+s*0.6,a7.ga4Y()-s)
 if(j!=null){a6=D.d.gan(p).a.a2(0,a5).aM(0,0.5)
 p.push(new C.y(new A.r(a6.a+j.c*s*0.5,v,a6.c-j.a*s*0.5),r))}p.push(new C.y(a5,r))
 return p},
-$S:z+145}
+$S:z+61}
 A.fCC.prototype={
 $3(d,e,f){var w=this
 return w.a.a2(0,w.b.aM(0,w.c*d)).a2(0,w.d.aM(0,w.e*e)).a2(0,new A.r(0,w.f*f,0))},
 $S:z+16}
 A.fDS.prototype={
 $1(d){var w=this.b,v=w*d.b,u=d.c,t=this.c
-return this.a.a2(0,new A.r(Math.sin(v)*u*t.gdU(0)+w*d.e*t.gaq9(),d.d*t.gH8(),Math.cos(v)*u*t.gdU(0)))},
-$S:z+45}
+return this.a.a2(0,new A.r(Math.sin(v)*u*t.gdU(0)+w*d.e*t.gaqa(),d.d*t.gH8(),Math.cos(v)*u*t.gdU(0)))},
+$S:z+46}
 A.fDT.prototype={
 $1(d){var w=this.c
-return this.a.a2(0,new A.r(this.b*d.f*w.gaq9(),d.r*w.gH8(),0))},
-$S:z+45}
+return this.a.a2(0,new A.r(this.b*d.f*w.gaqa(),d.r*w.gH8(),0))},
+$S:z+46}
 A.fDU.prototype={
 $1(d){var w=this.a
 return w[D.o.D(d,0,w.length-1)]},
-$S:z+71}
+$S:z+72}
 A.c5o.prototype={
 $1(d){return d.a===this.a.d.a},
 $S:z+43}
@@ -21624,8 +21626,8 @@ $0(){},
 $S:0}
 A.c59.prototype={
 $0(){var w=this.a
-w.f=A.heJ(w.gzZ(),w.d)
-w.abZ()},
+w.f=A.heK(w.gzZ(),w.d)
+w.ac_()},
 $S:0}
 A.c5f.prototype={
 $0(){return this.a.x=this.b},
@@ -21644,7 +21646,7 @@ w.z=this.b?"That was the 30 second drone shot. Press it again any time, or chang
 $S:0}
 A.c5b.prototype={
 $0(){var w=this.a
-return w.f=A.heJ(w.gzZ(),w.d)},
+return w.f=A.heK(w.gzZ(),w.d)},
 $S:0}
 A.c4K.prototype={
 $0(){},
@@ -21726,7 +21728,7 @@ return new C.D(D.d3,C.aM(w,D.a_,!1,w,!0,D.t,w,C.aO(),e,w,w,w,w,w,2,C.bt(w,new C.
 $S:1800}
 A.c5_.prototype={
 $1(d){this.c.$1(d)
-this.b.a_5(this.a.a)},
+this.b.a_6(this.a.a)},
 $S:2}
 A.c56.prototype={
 $4(d,e,f,g){var w=null,v=this.a,u=e?D.ec:D.uE
@@ -21778,7 +21780,7 @@ $S:0}
 A.c4U.prototype={
 $0(){var w=this.c
 w.w=w.f=null
-this.b.a_5(this.a.a)},
+this.b.a_6(this.a.a)},
 $S:0}
 A.c4V.prototype={
 $0(){return this.b.Je(this.a.a,!1)},
@@ -21786,12 +21788,12 @@ $S:0}
 A.c4W.prototype={
 $0(){var w=this.c
 w.x=w.r=null
-this.b.a_5(this.a.a)},
+this.b.a_6(this.a.a)},
 $S:0}
 A.c4X.prototype={
 $0(){var w=this
 w.c.e=w.d
-w.b.a_5(w.a.a)
+w.b.a_6(w.a.a)
 w.e.$1(new A.c4N())},
 $S:0}
 A.c4N.prototype={
@@ -21833,22 +21835,22 @@ $S:0}
 A.c5g.prototype={
 $0(){return this.a.y=!0},
 $S:0}
-A.fGF.prototype={
+A.fGG.prototype={
 $1(d){return d.a===this.a},
 $S:z+37}
-A.fGG.prototype={
+A.fGH.prototype={
 $0(){return D.d.gH(B.RZ)},
-$S:z+94}
+$S:z+95}
 A.bNB.prototype={
 $1(d){return d.d.q(0,this.a.b)},
 $S:z+37}
 A.bND.prototype={
 $2(d,e){var w=this.a,v=this.b
-return D.i.aS(w.aaW(d.c,d.d,new C.y(v.c,v.d)),w.aaW(e.c,e.d,new C.y(v.c,v.d)))},
+return D.i.aS(w.aaX(d.c,d.d,new C.y(v.c,v.d)),w.aaX(e.c,e.d,new C.y(v.c,v.d)))},
 $S:z+22}
 A.bNE.prototype={
 $1(d){return d.f==null},
-$S:z+104}
+$S:z+105}
 A.bNA.prototype={
 $2(d,e){var w,v=d.w
 if(v!==e.w)return v?-1:1
@@ -21866,11 +21868,11 @@ if(u!==e.w)return u?-1:1
 u=this.a
 w=this.b
 v=this.c
-return D.i.aS(u.aaW(w,v,A.zc(d.c)),u.aaW(w,v,A.zc(e.c)))},
+return D.i.aS(u.aaX(w,v,A.zc(d.c)),u.aaX(w,v,A.zc(e.c)))},
 $S:z+50}
 A.bLI.prototype={
 $2(d,e){return(d^D.i.V(e.c)*31+D.i.V(e.d))>>>0},
-$S:z+113}
+$S:z+114}
 A.c3_.prototype={
 $2(d,e){var w,v,u,t,s=null,r=this.a,q=r.c,p=q.d>0
 if(p)w=0
@@ -21879,20 +21881,20 @@ w=w>0?(1-w/180)*0.5:q.a}v=r.e
 if(p)p="\ud83d\udc1b"
 else p=q.c>0?"\ud83d\ude34":"\u26a1"
 u=x.p
-w=C.a([A.h7H(v,p,w)],u)
+w=C.a([A.h7I(v,p,w)],u)
 p=q.e
 if(p<0.3||q.f){t=q.f
 if(t)p=0.2
 t=t?"\ud83e\udd12":"\ud83d\udca7"
-D.d.v(w,C.a([new C.a5(s,v/4,s,s),A.h7H(v*0.7,t,p)],u))}if(r.d)D.d.v(w,C.a([new C.a5(s,v/3,s,s),A.h7H(v,"\u26fd",q.b)],u))
+D.d.v(w,C.a([new C.a5(s,v/4,s,s),A.h7I(v*0.7,t,p)],u))}if(r.d)D.d.v(w,C.a([new C.a5(s,v/3,s,s),A.h7I(v,"\u26fd",q.b)],u))
 return C.x(w,D.l,s,D.e,D.P,0,D.p)},
 $S:395}
-A.fKj.prototype={
+A.fKk.prototype={
 $4(d,e,f,g){var w=f+g/100
 return new C.cu([d+100*Math.cos(w),e+100*Math.sin(w),-Math.sin(w),Math.cos(w)])},
 $S:1803}
 A.fmA.prototype={
-$1(a0){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i=this.b,h=A.LM(i,a0).a,g=h[0],f=h[1],e=h[2],d=h[3]
+$1(a0){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i=this.b,h=A.LN(i,a0).a,g=h[0],f=h[1],e=h[2],d=h[3]
 for(h=this.a,w=h.a,v=h.b,u=h.c,h=h.d,t=0;t<5;++t){s=B.d1a[t]
 for(r=d*s,q=e*s,p=0;p<3;++p){o=B.dg7[p]
 n=i.a==="bus"
@@ -21907,26 +21909,26 @@ $S:118}
 A.bLK.prototype={
 $1(d){return d<=0?0:Math.sqrt(220*d)},
 $S:5}
-A.h4l.prototype={
-$7(d,e,f,g,h,i,j){return new A.fh(C.a([d,e,f,g],x.o),0,new A.h4m(h),i,j,6,2,0,!1)},
-$S:z+114}
 A.h4m.prototype={
+$7(d,e,f,g,h,i,j){return new A.fh(C.a([d,e,f,g],x.o),0,new A.h4n(h),i,j,6,2,0,!1)},
+$S:z+115}
+A.h4n.prototype={
 $3(d,e,f){return A.mH(d,e,f,this.a+D.i.bh(f/7))},
 $S:24}
-A.h4j.prototype={
+A.h4k.prototype={
 $3(d,e,f){var w=this.a,v=w.b
 w=w.a
 return A.tp(new A.r(d,e,f),this.b).a2(0,new A.r(v,0,w))},
 $S:z+16}
-A.h4k.prototype={
+A.h4l.prototype={
 $2(d,e){var w=this
 return A.tp(new A.r(d,e,0),w.a).a2(0,new A.r(w.b,w.c,w.d))},
 $S:z+12}
-A.fGe.prototype={
-$8(d,e,f,g,h,i,j,k){var w=-g,v=new A.fGf(d+f*h+w*i,f,w,e+g*h+f*i,g,f),u=-j/2,t=-k/2,s=j/2,r=k/2
+A.fGf.prototype={
+$8(d,e,f,g,h,i,j,k){var w=-g,v=new A.fGg(d+f*h+w*i,f,w,e+g*h+f*i,g,f),u=-j/2,t=-k/2,s=j/2,r=k/2
 this.a.o9(v.$2(u,t),v.$2(s,t),v.$2(s,r),v.$2(u,r),D.bP,B.dZ)},
 $S:1804}
-A.fGf.prototype={
+A.fGg.prototype={
 $2(d,e){var w=this
 return new A.r(w.a+w.b*d+w.c*e,0.95,w.d+w.e*d+w.f*e)},
 $S:z+12}
@@ -21935,10 +21937,10 @@ $1(d){return d.d===this.a},
 $S:z+52}
 A.cDJ.prototype={
 $1(d){return d.r},
-$S:z+122}
+$S:z+123}
 A.cDH.prototype={
 $2(d,e){return D.i.aS(d.x,e.x)},
-$S:z+126}
+$S:z+127}
 A.bLt.prototype={
 $1(d){var w
 if(d.r<0)w=d.e||d.c<60
@@ -22031,7 +22033,7 @@ A.bLB.prototype={
 $1(d){return this.a.e[d]},
 $S:71}
 A.bLG.prototype={
-$3(d,e,f){return A.ibM(d,e,this.a.a)},
+$3(d,e,f){return A.ibN(d,e,this.a.a)},
 $S:24}
 A.bMh.prototype={
 $1(d){return!d.f},
@@ -22049,7 +22051,7 @@ A.bMl.prototype={
 $1(d){var w,v,u,t
 for(w=this.a.x,v=w.length,u=0;u<v;++u){t=w[u]
 if(t.b===d)return t}return null},
-$S:z+138}
+$S:z+139}
 A.bMj.prototype={
 $2(d,e){var w,v,u,t,s,r,q,p,o,n=this,m=new A.bMk()
 switch(d.a.a){case 0:w=n.a.$1("hospital")
@@ -22132,19 +22134,19 @@ A.dWl.prototype={
 $0(){return this.a.r=this.b},
 $S:0}
 A.dW2.prototype={
-$0(){return this.a.acp(this.b)},
+$0(){return this.a.acq(this.b)},
 $S:0}
 A.dW9.prototype={
 $0(){return this.a.Jo(this.b.bgQ(this.c))},
 $S:0}
 A.dWa.prototype={
-$0(){return this.a.Jo(this.b.aMj(this.c))},
+$0(){return this.a.Jo(this.b.aMk(this.c))},
 $S:0}
 A.dWb.prototype={
-$0(){return this.a.Jo(this.b.aEF(this.c))},
+$0(){return this.a.Jo(this.b.aEG(this.c))},
 $S:0}
 A.dWc.prototype={
-$0(){return this.a.akM(this.b)},
+$0(){return this.a.akN(this.b)},
 $S:0}
 A.dW6.prototype={
 $1(d){var w,v,u=null,t=this.b,s=this.c,r=t.e[s],q=t.c
@@ -22160,24 +22162,24 @@ A.dW5.prototype={
 $0(){return this.a.Jo(this.b.bm2(this.c))},
 $S:0}
 A.dWh.prototype={
-$0(){return this.a.Jo(this.b.aFb("food"))},
+$0(){return this.a.Jo(this.b.aFc("food"))},
 $S:0}
 A.dWi.prototype={
-$0(){return this.a.Jo(this.b.aFb("medicine"))},
+$0(){return this.a.Jo(this.b.aFc("medicine"))},
 $S:0}
 A.dWj.prototype={
 $0(){var w=0,v=C.j(x.H),u,t=this,s,r
 var $async$$0=C.e(function(d,e){if(d===1)return C.f(e,v)
 for(;;)switch(w){case 0:w=3
-return C.b(A.aUT(),$async$$0)
+return C.b(A.aUS(),$async$$0)
 case 3:$.EF=null
 s=t.a
 if(s.c==null){w=1
 break}r=s.f
 if(r!=null)r.a1(0)
-$.I7=null
+$.I8=null
 s.m(new A.dWg(s))
-s.a_p()
+s.a_q()
 case 1:return C.h(u,v)}})
 return C.i($async$$0,v)},
 $S:1}
@@ -22190,7 +22192,7 @@ $S:0}
 A.dWq.prototype={
 $1(d){return d.a>=0},
 $S:z+55}
-A.fIu.prototype={
+A.fIv.prototype={
 $2(d,e){var w
 switch(d){case"black":w=e.a===25?"The black wire carries the power (hot). It never goes on the green ground screw. Hot goes to a BRASS screw.":"The black (hot) wire goes on a BRASS screw, not on the silver one. Silver is for white (neutral)."
 break
@@ -22199,10 +22201,10 @@ break
 default:w="The bare copper ground wire only goes on the GREEN screw. It keeps you safe if something goes wrong."
 break}return w},
 $S:z+3}
-A.fIv.prototype={
+A.fIw.prototype={
 $2(d,e){return d==="ground"?y.t:"A black (hot) wire never goes on the green ground screw. The two black wires go on the two BRASS screws."},
 $S:z+3}
-A.fIw.prototype={
+A.fIx.prototype={
 $2(d,e){var w
 if(e.e)w="Those are the LOAD screws. They are covered with tape because power must come in on the LINE side. If you wire the LOAD side the GFCI will not protect you."
 else switch(d){case"black":w="The black (hot) wire goes on the BRASS LINE screw."
@@ -22212,7 +22214,7 @@ break
 default:w=y.t
 break}return w},
 $S:z+3}
-A.fIx.prototype={
+A.fIy.prototype={
 $2(d,e){var w
 switch(d){case"black":w="The black (hot) wire joins the fixture BLACK wire. Not the white one, and never the green ground."
 break
@@ -22221,7 +22223,7 @@ break
 default:w="The bare copper ground wire joins the fixture GREEN ground wire only."
 break}return w},
 $S:z+3}
-A.fIy.prototype={
+A.fIz.prototype={
 $2(d,e){var w
 switch(d){case"black":w="The black (hot) wire joins the fan BLACK wire. Not the white one, and never the green ground."
 break
@@ -22230,13 +22232,13 @@ break
 default:w="The bare copper ground wire joins the fan GREEN ground wire only."
 break}return w},
 $S:z+3}
-A.fGX.prototype={
+A.fGY.prototype={
 $1(d){return d.a===this.a},
 $S:z+40}
-A.h4X.prototype={
+A.h4Y.prototype={
 $1(d){return d.a},
 $S:z+33}
-A.fG0.prototype={
+A.fG1.prototype={
 $1(d){var w
 switch(d){case"hot":w=B.Wn
 break
@@ -22246,8 +22248,8 @@ case"ground":w=B.Wp
 break
 default:w=B.b_v
 break}return w},
-$S:z+125}
-A.fG1.prototype={
+$S:z+130}
+A.fG2.prototype={
 $1(d){var w
 switch(d){case"hot":w=B.Kr
 break
@@ -22257,48 +22259,48 @@ case"ground":w=B.Kt
 break
 default:w=B.aUx
 break}return w},
-$S:z+62}
-A.fFZ.prototype={
+$S:z+134}
+A.fG_.prototype={
 $1(d){return d.a===this.a.a},
 $S:z+13}
-A.fG_.prototype={
+A.fG0.prototype={
 $1(d){return d.a===this.a.b},
-$S:z+8}
-A.fX2.prototype={
-$1(d){return d.e==="hot"},
 $S:z+8}
 A.fX3.prototype={
+$1(d){return d.e==="hot"},
+$S:z+8}
+A.fX4.prototype={
 $1(d){return d.e==="neutral"},
 $S:z+8}
-A.fH9.prototype={
-$1(d){return D.d.aV(this.a.b,new A.fHa(d))},
-$S:3}
 A.fHa.prototype={
+$1(d){return D.d.aV(this.a.b,new A.fHb(d))},
+$S:3}
+A.fHb.prototype={
 $1(d){return d.a===this.a},
 $S:z+42}
-A.fH6.prototype={
-$2(d,e){return A.awk(e.b)>A.awk(d.b)?e:d},
-$S:z+147}
 A.fH7.prototype={
+$2(d,e){return A.awj(e.b)>A.awj(d.b)?e:d},
+$S:z+101}
+A.fH8.prototype={
 $1(d){return d.a===this.a.a},
 $S:z+13}
-A.fH8.prototype={
+A.fH9.prototype={
 $1(d){return d.a===this.a.b},
 $S:z+8}
-A.fDY.prototype={
+A.fDZ.prototype={
 $5(d,e,f,g,h){var w,v,u,t,s,r,q,p,o,n,m,l,k,j=this,i=j.a
 i.b=d
 w=j.b
 v=w.b
 u=C.a4(v).k("cb<1,2>")
 t=u.k("Y<M.E>")
-s=C.C(new C.Y(new C.cb(v,u),new A.fDZ(g),t),t.k("M.E"))
+s=C.C(new C.Y(new C.cb(v,u),new A.fE_(g),t),t.k("M.E"))
 r=g==="ground"
 q=r?B.ug:h
 p=r?0.6:0.3
 if(w.c>0){o=e.a2(0,B.hix)
 i.iJ(A.aiT(C.a([e,e.a2(0,B.hgg),o],x.o),4),0.12,q,!1,p,8)
-return}if(s.length!==0){n=A.aQY(j.c,D.d.gH(s).a,w)
+return}if(s.length!==0){n=A.aQX(j.c,D.d.gH(s).a,w)
 w=A.oV(e,n,0.5)
 v=n.a>0
 m=w.a2(0,new A.r(v?0.5:-0.5,0.2,0.9))
@@ -22312,18 +22314,24 @@ if(!r)i.iJ(D.d.fO(l,k.length-1),0.08639999999999999,B.ug,!1,0.6,8)}else{l=A.aiT(
 k=r?l:D.d.dt(l,0,D.i.bh(l.length*0.86))
 i.iJ(k,0.12,q,!1,p,8)
 if(!r)i.iJ(D.d.fO(l,k.length-1),0.08639999999999999,B.ug,!1,0.6,8)}},
-$S:z+105}
-A.fDZ.prototype={
+$S:z+148}
+A.fE_.prototype={
 $1(d){return d.b===this.a},
 $S:735}
+A.fDY.prototype={
+$1(d){var w,v,u
+if(!this.a||d.y!==2)return d.y
+for(w=d.a,v=w.length,u=0;u<v;++u)if(w[u].c>0.02)return 2
+return 0},
+$S:z+112}
 A.fot.prototype={
 $2(d,e){var w,v=this.a
 v.b=d
 w=A.DM(e,0.9,6)
 if(this.b)v.iJ(w,0.2,B.Zk,!1,0.35,10)
 this.c.push(D.d.gan(w))},
-$S:z+111}
-A.h4W.prototype={
+$S:z+119}
+A.h4X.prototype={
 $1(d){return d.a===this.a},
 $S:z+40}
 A.fpV.prototype={
@@ -22371,26 +22379,26 @@ w+=0.79
 t.aF(new A.r(v,u,w),B.hf2,B.y7)
 t.aF(new A.r(v,u,w),B.hj3,B.y7)},
 $S:1809}
-A.fIz.prototype={
+A.fIA.prototype={
 $2(d,e){var w
 if(d==="ground")w=y.t
 else w=e.a===25?y.T:"A double-pole switch has two LINE screws on top (power in) and two LOAD screws on the bottom (power out to the heater). Each leg goes straight down the same side: left leg on the left screws, right leg on the right ones."
 return w},
 $S:z+3}
-A.fIA.prototype={
+A.fIB.prototype={
 $2(d,e){var w
 if(d==="ground")w=y.t
 else if(e.a===25)w=y.T
 else w=d==="common"?"The COMMON wire does not go on a traveler screw. It goes on the odd-coloured COMMON screw.":"The travelers go on the two brass TRAVELER screws. The COMMON screw is for the black power wire only."
 return w},
 $S:z+3}
-A.fIB.prototype={
+A.fIC.prototype={
 $2(d,e){var w
 if(d==="ground")w=y.t
 else w=e.a===25?"A traveler never goes on the green ground screw.":"A four-way has a pair of screws for the travelers coming IN (top) and a pair for the travelers going OUT (bottom). Do not mix the two pairs."
 return w},
 $S:z+3}
-A.fIC.prototype={
+A.fID.prototype={
 $2(d,e){var w
 switch(d){case"ground":w=y.t
 break
@@ -22400,14 +22408,14 @@ default:if(e.a===25)w=y.T
 else w=d==="line"?"The wire from the panel is the LINE: it goes on the LINE screw.":"The wire to the light is the LOAD: it goes on the LOAD screw."
 break}return w},
 $S:z+3}
-A.fID.prototype={
+A.fIE.prototype={
 $2(d,e){var w
 if(d==="ground")w=y.t
 else if(e.a===25)w=y.T
 else w=d==="feed"?"The feed goes on the FEED screw, where the two switches are joined.":"The wires to the lights go on the separate screws, one for each switch."
 return w},
 $S:z+3}
-A.fIE.prototype={
+A.fIF.prototype={
 $2(d,e){var w,v=y.T
 switch(d){case"ground":w=y.t
 break
@@ -22418,7 +22426,7 @@ break
 default:w=e.a===25?v:"The switched hot wire (red) goes on the TOP brass screw."
 break}return w},
 $S:z+3}
-A.fIF.prototype={
+A.fIG.prototype={
 $2(d,e){var w
 switch(d){case"ground":w=y.t
 break
@@ -22427,16 +22435,16 @@ break
 default:w=e.a===25?y.T:y.S
 break}return w},
 $S:z+3}
-A.fIG.prototype={
+A.fIH.prototype={
 $2(d,e){return d==="neutral"?y.I:"The black and red hot wires go on the two brass screws, X and Y."},
 $S:z+3}
-A.fIH.prototype={
+A.fII.prototype={
 $2(d,e){var w
 if(d==="ground")w=y.t
 else w=e.a===25?y.T:"Both hot wires go on the two brass screws."
 return w},
 $S:z+3}
-A.fII.prototype={
+A.fIJ.prototype={
 $2(d,e){var w
 switch(d){case"isoground":w="The isolated ground wire only goes on the green screw with the orange triangle."
 break
@@ -22445,19 +22453,19 @@ break
 default:w=e.a===25?"A hot wire never goes on the ground screw.":y.u
 break}return w},
 $S:z+3}
-A.fIn.prototype={
-$2(d,e){return A.foe(d,e,!0)},
-$S:z+3}
 A.fIo.prototype={
-$2(d,e){return A.foe(d,e,!1)},
+$2(d,e){return A.foe(d,e,!0)},
 $S:z+3}
 A.fIp.prototype={
-$2(d,e){return A.foe(d,e,!0)},
-$S:z+3}
-A.fIq.prototype={
 $2(d,e){return A.foe(d,e,!1)},
 $S:z+3}
+A.fIq.prototype={
+$2(d,e){return A.foe(d,e,!0)},
+$S:z+3}
 A.fIr.prototype={
+$2(d,e){return A.foe(d,e,!1)},
+$S:z+3}
+A.fIs.prototype={
 $2(d,e){var w
 switch(d){case"ground":w=y.t
 break
@@ -22466,7 +22474,7 @@ break
 default:w=e.a===25?y.T:y.u
 break}return w},
 $S:z+3}
-A.fIs.prototype={
+A.fIt.prototype={
 $2(d,e){var w
 switch(d){case"neutral":w="The white neutral wire goes on the MIDDLE terminal, the one with the ground strap."
 break
@@ -22475,7 +22483,7 @@ break
 default:w="The red wire goes on the RIGHT terminal."
 break}return w},
 $S:z+3}
-A.fIt.prototype={
+A.fIu.prototype={
 $2(d,e){var w
 switch(d){case"ground":w="The green ground wire goes on the frame screw, where the strap was."
 break
@@ -22486,28 +22494,28 @@ break
 default:w="The red wire goes on the RIGHT terminal."
 break}return w},
 $S:z+3}
-A.fKD.prototype={
+A.fKE.prototype={
 $2(d,e){var w,v,u=C.a([],x.Z)
 for(w=0;w<2;++w){v=B.cv7[w]
 u.push(new A.mt(d+v.a,e+v.b,v.c,v.d,0,!1))}return u},
-$S:z+118}
+$S:z+126}
 A.fDD.prototype={
 $1(d){return d.a===this.a},
 $S:z+44}
 A.fDE.prototype={
 $0(){return B.ao2},
-$S:z+129}
-A.h4S.prototype={
+$S:z+133}
+A.h4T.prototype={
 $1(d){var w=d>60?62:99
 return Math.min(d*0.5625,w)},
 $S:5}
-A.h4P.prototype={
+A.h4Q.prototype={
 $1(d){return d>40?30+d/2:58},
 $S:5}
-A.h4Q.prototype={
+A.h4R.prototype={
 $2(d,e){return D.i.aS(d.a,e.a)},
 $S:1810}
-A.h4R.prototype={
+A.h4S.prototype={
 $2(d,e){var w=this.a
 if(e-d>w.a-w.b){w.b=d
 w.a=e}},
@@ -22520,10 +22528,10 @@ $1(d){return B.fb8.q(0,d.b)},
 $S:z+5}
 A.bWn.prototype={
 $1(d){return d.a==="Jobs"},
-$S:z+133}
+$S:z+135}
 A.bWo.prototype={
 $1(d){return new A.oF(!1,"back",d,5)},
-$S:z+134}
+$S:z+140}
 A.bWp.prototype={
 $4(d,e,f,g){return!D.d.aV(this.a.x,new A.bWq(d,f,e,g))},
 $2(d,e){return this.$4(d,e,340,270)},
@@ -22833,7 +22841,7 @@ $0(){return this.a.fD=!1},
 $S:0}
 A.egm.prototype={
 $0(){var w=this.a
-return w.p4?w.a3c():w.m(new A.egg(w))},
+return w.p4?w.a3d():w.m(new A.egg(w))},
 $S:0}
 A.egg.prototype={
 $0(){return this.a.R8=!0},
@@ -22915,7 +22923,7 @@ $0(){return this.a.ao=!0},
 $S:0}
 A.efo.prototype={
 $0(){var w=this.a
-return w.p4?w.a3c():w.m(new A.efa(w))},
+return w.p4?w.a3d():w.m(new A.efa(w))},
 $S:0}
 A.efa.prototype={
 $0(){return this.a.R8=!0},
@@ -22952,7 +22960,7 @@ A.ehn.prototype={
 $0(){var w,v=this
 C.a6(v.b,!1).O(null)
 w=v.a
-if(w.aR)w.a3d()
+if(w.aR)w.a3e()
 w.eu=!1
 w.B0(v.c)
 w.ef("You are in "+v.d+". Fix the problem with the Wiring or Plumbing button.",!0)},
@@ -22989,7 +22997,7 @@ $0(){return this.a.id=!1},
 $S:0}
 A.ehS.prototype={
 $1(d){var w=this.b
-return d.d===this.a.arw(w.f,w.r)},
+return d.d===this.a.arx(w.f,w.r)},
 $S:z+52}
 A.ehQ.prototype={
 $2(d,e){var w,v,u,t,s,r,q,p,o,n=null,m=d.c,l=this.a,k=l==null,j=k?n:l.f
@@ -23014,7 +23022,7 @@ if(l==null)l=0
 return D.i.aS((m-j)*(m-w)+(v-u)*(v-t),(s-r)*(s-q)+(p-o)*(p-l))},
 $S:z+22}
 A.eh2.prototype={
-$1(d){var w,v,u,t,s,r,q,p,o,n,m,l=this,k=null,j=d.a==="tank"?A.hf6(l.a.c5.b):d.e,i=l.b
+$1(d){var w,v,u,t,s,r,q,p,o,n,m,l=this,k=null,j=d.a==="tank"?A.hf7(l.a.c5.b):d.e,i=l.b
 i=i==null?k:i.r
 w=(i==null?0:i)>=j
 i=l.c
@@ -23038,9 +23046,9 @@ n=C.E(C.x(C.a([C.d(o,k,k,k,k,k,k,D.nW,k,k,k),C.d(n,k,k,k,k,k,k,B.aV1,k,k,k)],p),
 o=w?D.bi:D.bA
 m=C.l(14)
 i=C.A(C.a([i,D.au,n,C.q(k,C.d(""+j+" \u2b50",k,k,k,k,k,k,C.n(k,k,w?D.w:D.bW,k,k,k,k,k,k,k,k,k,k,k,D.u,k,k,!0,k,k,k,k,k,k,k,k),k,k,k),D.f,k,k,new C.p(o,k,k,m,k,k,D.n),k,k,k,k,D.nE,k,k,k)],p),D.l,k,D.e,D.j,0,k,k)}return C.az(k,C.q(k,i,D.f,k,k,new C.p(s,k,q,r,k,k,D.n),k,k,k,D.cx,new C.R(u,t,u,t),k,k,v),D.y,!1,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,k,new A.eh3(l.a,d),k,k,k,k,k,k,!1,D.a4)},
-$S:z+63}
+$S:z+64}
 A.eh3.prototype={
-$0(){return this.a.aQP(this.b)},
+$0(){return this.a.aQQ(this.b)},
 $S:0}
 A.eh1.prototype={
 $2(d,e){var w,v,u,t=null,s=x.p,r=C.a([new C.D(B.bAW,C.d(d,t,t,t,t,t,t,B.fzh,t,t,t),t)],s)
@@ -23048,7 +23056,7 @@ if(this.a){s=C.a([],s)
 for(w=e.length,v=this.b,u=0;u<w;++u)s.push(v.$1(e[u]))
 r.push(C.bV(D.bG,s,D.bs,t,0,8))}else for(s=e.length,w=this.b,u=0;u<s;++u)r.push(w.$1(e[u]))
 return C.x(r,D.E,t,D.e,D.P,0,D.p)},
-$S:z+64}
+$S:z+65}
 A.eh0.prototype={
 $0(){var w=this.a
 return w.m(new A.eh_(w))},
@@ -23062,10 +23070,10 @@ return C.q(w,C.d(d,w,w,w,w,w,w,C.n(w,w,e,w,w,w,w,w,w,w,w,11.5,w,w,D.u,w,w,!0,w,w
 $S:1815}
 A.eg0.prototype={
 $1(d){return B.hN.h(0,d.b).a},
-$S:z+65}
+$S:z+66}
 A.efX.prototype={
-$1(d){var w,v,u,t,s=this,r=null,q=d.c,p=A.zc(q),o=D.i.V(Math.sqrt(Math.pow(p.a-s.b,2)+Math.pow(p.b-s.c,2))/10),n=D.c.j(0.07),m=C.l(16),l=C.L(D.bA,D.r,1),k=d.b,j=C.d(A.LI(k).b,r,r,r,r,r,r,D.mB,r,r,r),i=s.d
-k=C.d(d.w?"\ud83d\ude91 "+A.LI(k).c+": "+C.w(i.$1(q))+" \u2192 "+C.w(i.$1(d.d))+" (somebody was run over)":A.LI(k).c+": "+C.w(i.$1(q))+" \u2192 a house",r,r,r,r,r,r,B.aWx,r,r,r)
+$1(d){var w,v,u,t,s=this,r=null,q=d.c,p=A.zc(q),o=D.i.V(Math.sqrt(Math.pow(p.a-s.b,2)+Math.pow(p.b-s.c,2))/10),n=D.c.j(0.07),m=C.l(16),l=C.L(D.bA,D.r,1),k=d.b,j=C.d(A.LJ(k).b,r,r,r,r,r,r,D.mB,r,r,r),i=s.d
+k=C.d(d.w?"\ud83d\ude91 "+A.LJ(k).c+": "+C.w(i.$1(q))+" \u2192 "+C.w(i.$1(d.d))+" (somebody was run over)":A.LJ(k).c+": "+C.w(i.$1(q))+" \u2192 a house",r,r,r,r,r,r,B.aWx,r,r,r)
 w=s.e
 v=w.$2(""+d.e+" points",D.bi)
 u=w.$2(""+o+" m to the shop",D.aH)
@@ -23078,12 +23086,12 @@ i=k?r:new A.efZ(s.a,s.r,d,i)
 v=k?D.bA:D.bi
 u=C.l(14)
 return C.q(r,C.A(C.a([j,D.au,w,D.ae,C.az(r,C.q(r,C.d("Take",r,r,r,r,r,r,C.n(r,r,k?D.bW:D.w,r,r,r,r,r,r,r,r,r,r,r,D.u,r,r,!0,r,r,r,r,r,r,r,r),r,r,r),D.f,r,r,new C.p(v,r,r,u,r,r,D.n),r,r,r,r,D.iw,r,r,r),D.y,!1,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,i,r,r,r,r,r,r,!1,D.a4)],q),D.l,r,D.e,D.j,0,r,r),D.f,r,r,new C.p(n,r,l,m,r,r,D.n),r,r,r,D.cx,D.bV,r,r,r)},
-$S:z+66}
+$S:z+67}
 A.efZ.prototype={
 $0(){var w=this,v=w.c,u=w.a
 if(w.b.d1a(0,v,u.CW.gf_()/1000)){u.m(new A.efY(u))
 if(!u.aR)u.Ss()
-u.ef(A.LI(v.b).b+" Order taken: go to the "+w.d.$1(v.c).toLowerCase()+" (follow the yellow line), then to the house.",!0)}},
+u.ef(A.LJ(v.b).b+" Order taken: go to the "+w.d.$1(v.c).toLowerCase()+" (follow the yellow line), then to the house.",!0)}},
 $S:0}
 A.efY.prototype={
 $0(){return this.a.go=!1},
@@ -23139,7 +23147,7 @@ w.ry=-1},
 $S:0}
 A.eeV.prototype={
 $2(d,e){return d[D.o.D(e,0,d.length-1)]},
-$S:z+67}
+$S:z+68}
 A.ehg.prototype={
 $0(){var w=this.a
 w.p4=!1
@@ -23168,7 +23176,7 @@ $0(){var w,v,u=this.a,t=u.d
 t===$&&C.c()
 w=t[this.b]
 v=u.at.h(0,w.a)
-if(v==null||!A.hay(w.b,v.a))return 0
+if(v==null||!A.haz(w.b,v.a))return 0
 return v.b.c<2?1:2},
 $S:87}
 A.ei4.prototype={
@@ -23179,18 +23187,18 @@ $1(d){return d},
 $S:98}
 A.eft.prototype={
 $0(){var w=A.cvw(0,null,!1,this.a.a*13+5+this.b.f,!0)
-w.amV()
+w.amW()
 return w},
-$S:z+68}
+$S:z+69}
 A.efu.prototype={
 $1(d){return A.cke(!1,!1,this.a,!1)},
-$S:z+46}
+$S:z+47}
 A.efv.prototype={
 $1(d){return d.length!==0},
 $S:3}
 A.ef8.prototype={
 $0(){return new A.yL(C.T(x.S,x.N))},
-$S:z+70}
+$S:z+71}
 A.ef9.prototype={
 $1(d){return new A.BS("light",this.a,null)},
 $S:z+25}
@@ -23264,18 +23272,18 @@ $0(){return this.a.y2=!1},
 $S:0}
 A.eeo.prototype={
 $1(d){var w=null
-return C.by(D.rn,new C.a5(w,C.aF(d,w,x.w).w.a.b*0.82,new A.aqx(this.a,w),w),D.aq)},
+return C.by(D.rn,new C.a5(w,C.aF(d,w,x.w).w.a.b*0.82,new A.aqw(this.a,w),w),D.aq)},
 $S:1818}
 A.eep.prototype={
 $0(){var w=this.a
-w.aB3()
+w.aB4()
 w.iv()},
 $S:0}
 A.egS.prototype={
 $1(d){return new C.dY(new A.egQ(this.a,this.b,this.c),null)},
 $S:20}
 A.egQ.prototype={
-$2(d,e){var w,v,u,t,s=null,r=new A.egR(this.a,e),q=this.b,p=q.a,o=C.d(p.b+" "+q.gaEZ(0),s,s,s,s,s,s,Y.vy,s,s,s)
+$2(d,e){var w,v,u,t,s=null,r=new A.egR(this.a,e),q=this.b,p=q.a,o=C.d(p.b+" "+q.gaF_(0),s,s,s,s,s,s,Y.vy,s,s,s)
 p=C.d(p.f,s,s,s,s,s,s,D.AS,s,s,s)
 w=C.d("Now: "+q.gUN()+"\nFood "+D.i.V(100-q.b)+"%   Health "+D.i.V(q.c)+"%   Home "+D.i.V(q.d)+"%",s,s,s,s,s,s,B.aW1,s,s,s)
 v=this.c
@@ -23304,10 +23312,10 @@ A.egN.prototype={
 $0(){return this.a.bgQ(this.b)},
 $S:23}
 A.egO.prototype={
-$0(){return this.a.aMj(this.b)},
+$0(){return this.a.aMk(this.b)},
 $S:23}
 A.egP.prototype={
-$0(){return this.a.aEF(this.b)},
+$0(){return this.a.aEG(this.b)},
 $S:23}
 A.egu.prototype={
 $0(){var w,v=this.a,u=v.d
@@ -23324,7 +23332,7 @@ A.ef7.prototype={
 $1(d){return new C.dY(new A.ef6(this.a,this.b,this.c),null)},
 $S:20}
 A.ef6.prototype={
-$2(d,e){var w,v,u,t,s,r,q,p,o,n,m=null,l=this.c,k=A.hf4(l),j=C.a([],x.dj)
+$2(d,e){var w,v,u,t,s,r,q,p,o,n,m=null,l=this.c,k=A.hf5(l),j=C.a([],x.dj)
 for(w=k.length,v=this.a,u=0;u<k.length;k.length===w||(0,C.J)(k),++u){t=k[u]
 s=v.a
 r=!0
@@ -23333,7 +23341,7 @@ s=C.cS(t.a,s.toLowerCase(),0)}else s=r
 else s=r
 if(s)j.push(t)}w=C.aF(d,m,x.w).w
 s=x.p
-l=C.a([C.d("Plug into the "+A.bG7(l).toLowerCase(),m,m,m,m,m,m,D.jP,m,m,m),D.X,C.aM(m,D.a_,!0,m,!0,D.t,m,C.aO(),m,m,m,m,m,m,2,C.bt(m,new C.b6(4,C.l(14),D.a1),m,m,m,m,m,m,!0,m,m,m,m,m,m,D.dl,!0,m,m,m,m,m,m,m,m,m,m,m,m,m,D.ki,"Search: dryer, range, washing machine, lamp...",m,m,m,m,m,m,m,m,m,!0,!0,!1,m,B.asd,m,m,m,m,m,m,m,m,m,m,m,m),D.y,!0,m,!0,m,!1,m,D.ak,m,m,m,B.hqS,m,m,m,m,m,1,m,m,!1,"\u2022",m,new A.ef4(v,e),m,m,m,!1,m,m,!1,m,!0,m,D.ad,m,m,m,m,m,m,m,m,m,m,m,D.dg,!0,D.a5,m,D.ao,m,m,m,m),D.X],s)
+l=C.a([C.d("Plug into the "+A.bG7(l).toLowerCase(),m,m,m,m,m,m,D.jP,m,m,m),D.X,C.aM(m,D.a_,!0,m,!0,D.t,m,C.aO(),m,m,m,m,m,m,2,C.bt(m,new C.b6(4,C.l(14),D.a1),m,m,m,m,m,m,!0,m,m,m,m,m,m,D.dl,!0,m,m,m,m,m,m,m,m,m,m,m,m,m,D.kj,"Search: dryer, range, washing machine, lamp...",m,m,m,m,m,m,m,m,m,!0,!0,!1,m,B.asd,m,m,m,m,m,m,m,m,m,m,m,m),D.y,!0,m,!0,m,!1,m,D.ak,m,m,m,B.hqS,m,m,m,m,m,1,m,m,!1,"\u2022",m,new A.ef4(v,e),m,m,m,!1,m,m,!1,m,!0,m,D.ad,m,m,m,m,m,m,m,m,m,m,m,D.dg,!0,D.a5,m,D.ao,m,m,m,m),D.X],s)
 if(j.length===0)l.push(C.d(k.length===0?"Nothing in the house plugs into this outlet.":'Nothing that fits matches "'+v.a+'".',m,m,m,m,m,m,D.lV,m,m,m))
 else{v=C.a([],s)
 for(s=j.length,r=x.W,q=this.b,u=0;u<j.length;j.length===s||(0,C.J)(j),++u){t=j[u]
@@ -23359,7 +23367,7 @@ v=w.d
 v===$&&C.c()
 u=v.d
 u===$&&C.c()
-v=u[v.e].aoL(i)
+v=u[v.e].aoM(i)
 t=v
 v=w
 w=t}else{w=this.a
@@ -23370,7 +23378,7 @@ u===$&&C.c()
 v=u[v.e].id[i-2].a==="gfci"?"gfci":"outlet"
 t=v
 v=w
-w=t}w=A.hf4(w)
+w=t}w=A.hf5(w)
 u=w.length
 s=0
 for(;s<w.length;w.length===u||(0,C.J)(w),++s){r=w[s]
@@ -23582,7 +23590,7 @@ $S:141}
 A.ehv.prototype={
 $0(){var w=this.c
 this.b.$1(new A.eht(w))
-A.aXc(w.a)
+A.aXb(w.a)
 this.a.m(new A.ehu())},
 $S:0}
 A.eht.prototype={
@@ -23666,7 +23674,7 @@ w=Math.sqrt(Math.pow(w.f-d.c,2)+Math.pow(w.r-d.d,2))<135}else w=!1
 return w},
 $S:z+5}
 A.ehU.prototype={
-$0(){return this.a.aQP(B.aSY)},
+$0(){return this.a.aQQ(B.aSY)},
 $S:0}
 A.ehV.prototype={
 $0(){var w,v=this.a,u=v.d
@@ -23681,7 +23689,7 @@ A.fr(700,60,0.25,"tri")
 return null},
 $S:0}
 A.ehW.prototype={
-$0(){return this.a.abR(this.b)},
+$0(){return this.a.abS(this.b)},
 $S:0}
 A.ehX.prototype={
 $0(){return this.a.bT3(this.b)},
@@ -23697,7 +23705,7 @@ $0(){},
 $S:0}
 A.egG.prototype={
 $1(d){var w=this.a,v=this.b
-return w===0?v.$1(d):new A.aKJ(w,v.$1(d),null)},
+return w===0?v.$1(d):new A.aKI(w,v.$1(d),null)},
 $S:39}
 A.efO.prototype={
 $0(){var w=this.a
@@ -23743,7 +23751,7 @@ $S:1821}
 A.eh7.prototype={
 $0(){var w=this.a
 w.iv()
-w.aeY(!0)},
+w.aeZ(!0)},
 $S:0}
 A.eh8.prototype={
 $1(d){return this.a.caF()},
@@ -23763,7 +23771,7 @@ if(u.c==null)return
 w=++u.U
 if(w>36){v=u.bE
 u.Bw()
-if(v!=null)u.aD5("Nobody answered the phone")
+if(v!=null)u.aD6("Nobody answered the phone")
 return}if(w%8<4){A.fr((w&1)===0?1046:1318,160,0.3,"sine")
 if(D.o.F(u.U,8)===0)C.Up()}},
 $S:11}
@@ -23802,7 +23810,7 @@ $S:22}
 A.eg5.prototype={
 $0(){var w=this.a
 w.Bw()
-w.aD5("You turned the call down")},
+w.aD6("You turned the call down")},
 $S:0}
 A.eg6.prototype={
 $0(){var w=this.a
@@ -23815,7 +23823,7 @@ $0(){var w=this.b,v=this.a
 v.Bw()
 v.fE=w
 v.hE=0
-v.aye(w)},
+v.ayf(w)},
 $S:0}
 A.eg7.prototype={
 $0(){var w=this.a
@@ -23858,10 +23866,10 @@ return new A.BS(w.a,w.c,null)},
 $S:z+25}
 A.efS.prototype={
 $1(d){return A.cke(!1,!1,this.a.CW,!1)},
-$S:z+46}
+$S:z+47}
 A.efR.prototype={
 $1(d){return new A.X8(!1,this.a.fr,null)},
-$S:z+72}
+$S:z+73}
 A.edo.prototype={
 $1(d){var w,v,u,t,s,r,q,p,o=null,n=this.a,m=n.d
 m===$&&C.c()
@@ -23894,7 +23902,7 @@ $1(d){return Math.abs(d-this.a)>13},
 $S:118}
 A.edl.prototype={
 $0(){var w=this
-w.b.id.push(new A.aXk(w.c,w.d,new A.yL(C.T(x.S,x.N))))
+w.b.id.push(new A.aXj(w.c,w.d,new A.yL(C.T(x.S,x.N))))
 w.a.iv()},
 $S:0}
 A.efI.prototype={
@@ -23908,7 +23916,7 @@ r=t.d
 r===$&&C.c()
 w=r.d
 w===$&&C.c()
-w[r.e].a4u(0,u)
+w[r.e].a4v(0,u)
 t.iv()},
 $S:0}
 A.ehD.prototype={
@@ -23919,7 +23927,7 @@ v=w.d
 v===$&&C.c()
 u=v.d
 u===$&&C.c()
-u[v.e].a4u(0,t)
+u[v.e].a4v(0,t)
 w.iv()},
 $S:0}
 A.egH.prototype={
@@ -23943,16 +23951,16 @@ w.at=100+v
 w.iv()},
 $S:0}
 A.eey.prototype={
-$0(){return this.a.aeZ(-6,0)},
+$0(){return this.a.af_(-6,0)},
 $S:0}
 A.eez.prototype={
-$0(){return this.a.aeZ(6,0)},
+$0(){return this.a.af_(6,0)},
 $S:0}
 A.eeA.prototype={
-$0(){return this.a.aeZ(0,-6)},
+$0(){return this.a.af_(0,-6)},
 $S:0}
 A.eeB.prototype={
-$0(){return this.a.aeZ(0,6)},
+$0(){return this.a.af_(0,6)},
 $S:0}
 A.eeC.prototype={
 $0(){return this.a.bDA(this.b.a)},
@@ -24082,7 +24090,7 @@ $0(){return this.a.go=!0},
 $S:0}
 A.een.prototype={
 $0(){var w=this.a
-return w.p4?w.a3c():w.m(new A.ee5(w))},
+return w.p4?w.a3d():w.m(new A.ee5(w))},
 $S:0}
 A.ee5.prototype={
 $0(){return this.a.R8=!0},
@@ -24148,13 +24156,13 @@ o=p.d
 o===$&&C.c()
 if(o[p.e].c!=="outside")k=B.IE
 else{p=m.gpv()
-p=p==null?n:p.ana(k.gf_()/1000)
+p=p==null?n:p.anb(k.gf_()/1000)
 if(p==null)p=B.IE
 p=C.C(p,x.hg)
 o=m.gKU()
-k=o==null?n:o.ana(k.gf_()/1000)
+k=o==null?n:o.anb(k.gf_()/1000)
 D.d.v(p,k==null?B.IE:k)
-k=p}l=C.C(A.iiB(l,w/1000,q,k,r,s,v,u,t),x.c)
+k=p}l=C.C(A.iiC(l,w/1000,q,k,r,s,v,u,t),x.c)
 k=m.d
 w=k.d
 w===$&&C.c()
@@ -24176,7 +24184,7 @@ w===$&&C.c()
 v=w.d
 v===$&&C.c()
 w=v[w.e].c==="outside"}else w=!1
-if(w)u=A.iu8(u.CW.gf_()/1000)
+if(w)u=A.iu9(u.CW.gf_()/1000)
 else{u=s?null:t.cRd()
 if(u==null)u=B.qS}return u},
 $S:z+48}
@@ -24270,7 +24278,7 @@ $0(){return C.a6(this.a,!1).ce(C.ec(new A.edq(),!1,null,x.H))},
 $S:0}
 A.edq.prototype={
 $1(d){return B.aJX},
-$S:z+76}
+$S:z+77}
 A.egF.prototype={
 $1(d){var w,v,u,t,s,r,q,p,o,n,m,l=null,k=C.aF(d,l,x.w).w,j=this.a,i=j.d
 i===$&&C.c()
@@ -24308,10 +24316,10 @@ w.iv()},
 $S:0}
 A.egE.prototype={
 $0(){C.a6(this.b,!1).O(null)
-$.EF=A.aXq(D.o.F(Date.now(),1e5))
+$.EF=A.aXp(D.o.F(Date.now(),1e5))
 var w=this.a
 w.m(new A.egA(w))
-w.aeY(!0)},
+w.aeZ(!0)},
 $S:0}
 A.egA.prototype={
 $0(){var w=this.a,v=$.EF
@@ -24357,7 +24365,7 @@ $S:114}
 A.fbn.prototype={
 $1(d){return this.a.b0J()},
 $S:134}
-A.fEi.prototype={
+A.fEj.prototype={
 $1$speed(d){var w,v,u,t=null,s=this.a,r=s.a
 if(r.length===0)return
 w=s.b
@@ -24372,14 +24380,14 @@ s.c=C.a([],x.s)
 s.d=!1},
 $0(){return this.$1$speed(130)},
 $S:1827}
-A.fEp.prototype={
+A.fEq.prototype={
 $3$note(d,e,f){var w=this.a
 w.a.push(d)
 w.b.push(e)
 if(f!=null)w.c.push(f)},
 $2(d,e){return this.$3$note(d,e,null)},
-$S:z+77}
-A.fEk.prototype={
+$S:z+78}
+A.fEl.prototype={
 $1(d){var w,v,u,t,s,r,q,p,o,n,m,l,k
 for(w=this.a.x,v=w.length,u=d.a,t=d.c,s=d.b,r=0;r<v;++r){q=w[r]
 p=q.b
@@ -24401,7 +24409,7 @@ k=m?o:n
 p=Math.abs(t-l)<k&&s<p.c}else p=!1
 if(p)return!0}return!1},
 $S:z+26}
-A.fEq.prototype={
+A.fEr.prototype={
 $2(d,e){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i
 for(w=this.a.x,v=w.length,u=0;u<=1;u+=0.02){t=A.oV(d,e,u)
 for(s=t.a,r=t.c,q=t.b,p=0;p<v;++p){o=w[p]
@@ -24423,11 +24431,11 @@ if(Math.abs(s-j)<i){j=o.d
 i=k?m:l
 n=Math.abs(r-j)<i&&q<n.c}else n=!1
 if(n)return o}}return null},
-$S:z+78}
-A.fEj.prototype={
-$2(d,e){return this.a.$2(d,e)!=null},
 $S:z+79}
-A.fEg.prototype={
+A.fEk.prototype={
+$2(d,e){return this.a.$2(d,e)!=null},
+$S:z+80}
+A.fEh.prototype={
 $2(d,e){var w,v,u,t,s,r,q,p,o,n,m,l,k,j=this.a.$2(d,e)
 if(j==null)return null
 switch(j.b){case"townsign":w=B.a9l
@@ -24449,7 +24457,7 @@ p=j.d
 o=u/s*v
 n=new A.r(w+q,r,p+o)
 m=new A.r(w-q,r,p-o)
-o=new A.fEh(d,e)
+o=new A.fEi(d,e)
 p=this.b
 l=!p.$1(n)
 k=!p.$1(m)
@@ -24457,11 +24465,11 @@ if(l&&k)return o.$1(n)<=o.$1(m)?n:m
 if(l)w=n
 else w=k?m:null
 return w},
-$S:z+80}
-A.fEh.prototype={
-$1(d){return d.aJ(0,this.a).gp7()+this.b.aJ(0,d).gp7()},
 $S:z+81}
-A.fEa.prototype={
+A.fEi.prototype={
+$1(d){return d.aJ(0,this.a).gp7()+this.b.aJ(0,d).gp7()},
+$S:z+82}
+A.fEb.prototype={
 $3(d,e,f){var w,v,u,t=this
 if(!t.a.$2(d,e))return B.nN
 w=f>=3?null:t.b.$2(d,e)
@@ -24472,9 +24480,9 @@ u.push(w)
 D.d.v(u,t.$3(w,e,v))
 return u},
 $2(d,e){return this.$3(d,e,0)},
-$S:z+82}
-A.fEm.prototype={
-$7$note(a2,a3,a4,a5,a6,a7,a8){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d=this,a0=A.hBa(a2),a1=new A.r(a2.c,a4,a2.d)
+$S:z+83}
+A.fEn.prototype={
+$7$note(a2,a3,a4,a5,a6,a7,a8){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d=this,a0=A.hBb(a2),a1=new A.r(a2.c,a4,a2.d)
 for(w=d.d,v=d.a,u=d.b,t=Math.atan2(a0.a,a0.b)-0.55,s=a6-a5,r=d.c,q=null,p=0;p<6;++p){o=t+p*0.38
 n=a5+s*p/5
 m=a2.c
@@ -24492,8 +24500,8 @@ g=u.$1(A.oV(h,i,f))
 f+=0.02}if(g)for(m=r.$2(h,i),l=m.length,e=0;e<m.length;m.length===l||(0,C.J)(m),++e)w.$2(m[e],D.d.gan(v.b))}w.$3$note(i,a1,k?a8:q)
 q=null}},
 $6(d,e,f,g,h,i){return this.$7$note(d,e,f,g,h,i,null)},
-$S:z+83}
-A.fEo.prototype={
+$S:z+84}
+A.fEp.prototype={
 $1(d){var w=d.b,v=this.a
 switch(w){case"townsign":v.$7$note(d,255,250,430,520,60,"The biggest billboard in the city: NGMY Town")
 break
@@ -24501,13 +24509,13 @@ case"cornersign":v.$7$note(d,115,120,210,260,50,"A corner billboard: NGMY Town")
 break
 case"adboard":v.$7$note(d,160,142,330,410,55,"A big NGMY ad billboard")
 break
-case"tower":v.$7$note(d,430,(w==="hq"?278:A.hAp(B.zM[d.f]))+40,150,210,20,"A tower with NGMY ad boards")
+case"tower":v.$7$note(d,430,(w==="hq"?278:A.hAq(B.zM[d.f]))+40,150,210,20,"A tower with NGMY ad boards")
 break
 case"hq":v.$7$note(d,440,312,190,250,20,"The NGMY company building")
 break
 default:v.$7$note(d,75,48,130,175,45,"An NGMY billboard")}},
 $S:z+30}
-A.fEn.prototype={
+A.fEo.prototype={
 $1(d){var w,v,u,t,s,r,q,p=this.a,o=p.a.length
 this.b.$1(d)
 if(o>0&&o<p.a.length){w=p.a
@@ -24521,31 +24529,31 @@ for(q=0;q<w.gI(u);){v=o+q
 D.d.c9(p.a,v,w.h(u,q));++q
 D.d.c9(p.b,v,A.oV(s,r,q/(w.gI(u)+1)))}}}},
 $S:z+30}
-A.fEl.prototype={
+A.fEm.prototype={
 $1(d){var w
 this.b.$0()
 w=x.o
 this.c.push(new A.MY(C.a([B.hlL,B.h56,B.h7i],w),C.a([B.hmh,B.h6s,B.hac],w),55,8,"Inside the "+B.hN.h(0,d.b).a.toLowerCase(),d,!1,null,null))
 this.a.d=!0},
 $S:z+30}
-A.fEb.prototype={
+A.fEc.prototype={
 $1(d){return d.b==="townsign"},
 $S:z+5}
-A.fEc.prototype={
+A.fEd.prototype={
 $2(d,e){var w=this.a
 return D.i.aS(Math.pow(d.c-w.a.a,2)+Math.pow(d.d-w.a.c,2),Math.pow(e.c-w.a.a,2)+Math.pow(e.d-w.a.c,2))},
 $S:z+22}
-A.fE9.prototype={
+A.fEa.prototype={
 $1(d){return Math.atan2(d.d-1000,d.c)},
-$S:z+85}
-A.fEd.prototype={
+$S:z+86}
+A.fEe.prototype={
 $2(d,e){var w=this.a
 return J.xx(w.$1(d),w.$1(e))},
 $S:z+22}
-A.fEe.prototype={
+A.fEf.prototype={
 $1(d){return d.b==="bighouse"},
 $S:z+5}
-A.fEf.prototype={
+A.fEg.prototype={
 $1(d){return d.b===this.a},
 $S:z+5}
 A.fh5.prototype={
@@ -24564,7 +24572,7 @@ w=6
 return C.b($.rk().jo(0,"assets/images/ngmy_logo.png"),$async$$0)
 case 6:s=e
 w=7
-return C.b(C.fIg(J.eT(J.w1(s)),null),$async$$0)
+return C.b(C.fIh(J.eT(J.w1(s)),null),$async$$0)
 case 7:r=e
 o=$
 w=8
@@ -24584,7 +24592,7 @@ case 5:return C.h(null,v)
 case 1:return C.f(t.at(-1),v)}})
 return C.i($async$$0,v)},
 $S:51}
-A.fWj.prototype={
+A.fWk.prototype={
 $4(d,e,f,g){var w,v,u=null,t=e*0.05,s=C.fq(u,D.cs,u,1,u,C.cQ(u,u,u,u,u,u,u,u,u,C.n(u,u,f,u,u,u,u,u,u,u,u,e,u,u,D.u,u,u,!0,u,t,u,u,u,u,u,u),d),D.a5,D.bX,u,D.dz,D.bY)
 s.e5()
 w=s.b.c
@@ -24592,7 +24600,7 @@ v=this.a
 if(w>v){s=C.fq(u,D.cs,u,1,u,C.cQ(u,u,u,u,u,u,u,u,u,C.n(u,u,f,u,u,u,u,u,u,u,u,e*v/w,u,u,D.u,u,u,!0,u,t,u,u,u,u,u,u),d),D.a5,D.bX,u,D.dz,D.bY)
 s.e5()}s.a5(this.b,new C.o(this.c+v/2-s.b.c/2,g))},
 $S:1828}
-A.fWh.prototype={
+A.fWi.prototype={
 $1(d){var w,v,u,t,s,r=null,q=this.a,p=this.b,o=d.d-d.b
 if(q!=null){w=q.c
 v=q.d
@@ -24609,13 +24617,13 @@ w=o.c
 o=o.a.c
 s.a5(p,q.aJ(0,new C.o(w/2,o.gba(o)/2)))}},
 $S:1829}
-A.fWg.prototype={
+A.fWh.prototype={
 $4$w(d,e,f,g){var w=null,v=C.fq(w,D.cs,w,w,w,C.cQ(w,w,w,w,w,w,w,w,w,C.n(w,w,this.a,w,w,w,w,w,w,w,w,f,w,w,g,w,w,!0,w,f*0.08,w,w,w,w,w,w),d),D.a5,D.bX,w,D.dz,D.bY)
 v.o6(this.b.a*0.9)
 v.a5(this.c,e.aJ(0,new C.o(v.b.c/2,0)))},
 $3(d,e,f){return this.$4$w(d,e,f,D.u)},
 $S:1830}
-A.fWi.prototype={
+A.fWj.prototype={
 $1(d){var w=null,v=this.a.b*0.16
 v=C.fq(w,D.cs,w,w,w,C.cQ(w,w,w,w,w,w,w,w,w,C.n(w,w,w,w,w,w,w,w,w,w,w,v,w,w,D.u,w,w,!0,w,v*0.08,w,w,w,w,w,w),d),D.a5,D.bX,w,D.dz,D.bY)
 v.e5()
@@ -24639,13 +24647,13 @@ $2(d,e){var w=this.a
 w.$4(d,e,0.075,0.3)
 w.$4(d+0.09,e-0.115,0.2,0.075)},
 $S:153}
-A.fES.prototype={
+A.fET.prototype={
 $2(d,e){return this.a===d?e:0},
 $S:738}
-A.fED.prototype={
+A.fEE.prototype={
 $1(d){return d.b==="right"},
 $S:z+21}
-A.fEO.prototype={
+A.fEP.prototype={
 $0(){var w=C.a([],x.z),v=new A.eL(w)
 v.f=1
 v.x=$.dm=$.dm+1
@@ -24654,8 +24662,8 @@ v.aE(B.h4T,B.hhq,B.ia,0.5)
 v.aF(B.aYD,B.hje,B.BN)
 v.aF(B.aYD,B.heC,B.BN)
 return w},
-$S:z+86}
-A.fEP.prototype={
+$S:z+87}
+A.fEQ.prototype={
 $1(d){var w=this,v=w.a,u=v.c
 switch(v.b){case"left":v=A.np(d,0,1.5707963267948966,new A.r(-w.b/2,0,u+w.c/2-40))
 break
@@ -24663,31 +24671,31 @@ case"right":v=A.np(d,0,-1.5707963267948966,new A.r(w.b/2,0,u+w.c/2-40))
 break
 default:v=A.np(d,0,0,new A.r(u,0,0))
 break}return v},
-$S:z+87}
-A.fEE.prototype={
+$S:z+88}
+A.fEF.prototype={
 $1(d){return d.b==="back"},
 $S:z+21}
-A.fEF.prototype={
-$1(d){return d.c},
-$S:z+88}
 A.fEG.prototype={
+$1(d){return d.c},
+$S:z+89}
+A.fEH.prototype={
 $2(d,e){return e},
 $S:79}
-A.fEQ.prototype={
+A.fER.prototype={
 $1(d){var w
 if(d==="outlet")w="Wall outlet"
 else w=d==="gfci"?"GFCI outlet":A.bG7(d)
 return w},
 $S:13}
-A.fEH.prototype={
-$3(d,e,f){return L.M7(d,e,0,f+this.a)},
+A.fEI.prototype={
+$3(d,e,f){return L.M8(d,e,0,f+this.a)},
 $S:24}
-A.fEJ.prototype={
+A.fEK.prototype={
 $2(a8,a9){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7=this
 if(a8==null)return
-w=A.aQN(a8)
+w=A.aQM(a8)
 v=a7.a
-u=A.hhS(v,w,a9)
+u=A.hhT(v,w,a9)
 t=u.a
 s=u.b
 r=u.d
@@ -24718,9 +24726,9 @@ a1=r+j
 j=r-j
 a2=x.o
 a3=320*p/q
-k.push(new A.fh(C.a([new A.r(e,a1,d),new A.r(e,a1,a0),new A.r(e,j,a0),new A.r(e,j,d)],a2),m,new A.fEK(o,v,a9),320,a3,9,1,l,!1))
+k.push(new A.fh(C.a([new A.r(e,a1,d),new A.r(e,a1,a0),new A.r(e,j,a0),new A.r(e,j,d)],a2),m,new A.fEL(o,v,a9),320,a3,9,1,l,!1))
 a4=h+g*0.05
-k.push(new A.fh(C.a([new A.r(a4,a1,a0),new A.r(a4,a1,d),new A.r(a4,j,d),new A.r(a4,j,a0)],a2),m,new A.fEL(o,v,a9),320,a3,9,1,l,!1))}}else{h=u.c
+k.push(new A.fh(C.a([new A.r(a4,a1,a0),new A.r(a4,a1,d),new A.r(a4,j,d),new A.r(a4,j,a0)],a2),m,new A.fEM(o,v,a9),320,a3,9,1,l,!1))}}else{h=u.c
 n.aE(new A.r(h,r,1.4),new A.r(t+3,s+3,2.6),B.Mu,0.5)
 n.aE(new A.r(h,r,2.8),new A.r(t,s,0.2),F.nx,0.7)
 if(v.p2){k=a7.d
@@ -24732,24 +24740,24 @@ j=h+j
 a2=r-a2
 a5=x.o
 a6=320*p/q
-k.push(new A.fh(C.a([new A.r(a1,a3,2.95),new A.r(j,a3,2.95),new A.r(j,a2,2.95),new A.r(a1,a2,2.95)],a5),m,new A.fEM(o,v,a9),320,a6,9,1,l,!1))
-k.push(new A.fh(C.a([new A.r(j,a3,0.05),new A.r(a1,a3,0.05),new A.r(a1,a2,0.05),new A.r(j,a2,0.05)],a5),m,new A.fEN(o,v,a9),320,a6,9,1,l,!1))}}n.e=n.x=0
+k.push(new A.fh(C.a([new A.r(a1,a3,2.95),new A.r(j,a3,2.95),new A.r(j,a2,2.95),new A.r(a1,a2,2.95)],a5),m,new A.fEN(o,v,a9),320,a6,9,1,l,!1))
+k.push(new A.fh(C.a([new A.r(j,a3,0.05),new A.r(a1,a3,0.05),new A.r(a1,a2,0.05),new A.r(j,a2,0.05)],a5),m,new A.fEO(o,v,a9),320,a6,9,1,l,!1))}}n.e=n.x=0
 v=v.p2?"It is on and playing "+E.kx[D.o.F(o,8)].a+". Tap it to watch full screen with the remote.":"The TV is off. Tap it to turn it on."
 a7.e.n(0,m,new A.cI(w.b,v,new A.r(0,r,4),110))},
 $S:1832}
-A.fEK.prototype={
-$3(d,e,f){return L.M7(d,e,this.a,f+this.b.a+this.c*3)},
-$S:24}
 A.fEL.prototype={
-$3(d,e,f){return L.M7(d,e,this.a,f+this.b.a+this.c*3)},
+$3(d,e,f){return L.M8(d,e,this.a,f+this.b.a+this.c*3)},
 $S:24}
 A.fEM.prototype={
-$3(d,e,f){return L.M7(d,e,this.a,f+this.b.a+this.c*3)},
+$3(d,e,f){return L.M8(d,e,this.a,f+this.b.a+this.c*3)},
 $S:24}
 A.fEN.prototype={
-$3(d,e,f){return L.M7(d,e,this.a,f+this.b.a+this.c*3)},
+$3(d,e,f){return L.M8(d,e,this.a,f+this.b.a+this.c*3)},
 $S:24}
-A.fER.prototype={
+A.fEO.prototype={
+$3(d,e,f){return L.M8(d,e,this.a,f+this.b.a+this.c*3)},
+$S:24}
+A.fES.prototype={
 $2(d,e){var w=this.a,v=w.f,u=w.r
 w.f=1
 w.r=!1
@@ -24758,7 +24766,7 @@ w.cw(new A.r(d,e,0),new A.r(d,e,2.2),0.7,B.Mj,0.7,10)
 w.f=v
 w.r=u},
 $S:153}
-A.fEI.prototype={
+A.fEJ.prototype={
 $1(d){return d.b===this.a.a},
 $S:z+18}
 A.fxp.prototype={
@@ -24770,7 +24778,7 @@ A.kN(v,w.a2(0,f.aM(0,0.1)),e,B.dZ,26,30,B.kN,f,0)
 A.kN(v,w.a2(0,f.aM(0,0.2)),e,B.dZ,22,26,B.ia,f,0.6)
 A.kN(v,w.a2(0,f.aM(0,0.3)),e,B.dZ,22,1.2,B.kN,f,0)
 A.kN(v,w.a2(0,f.aM(0,0.3)),e,B.dZ,1.2,26,B.kN,f,0)},
-$S:z+89}
+$S:z+90}
 A.fxl.prototype={
 $5(d,e,f,g,h){var w=d.a2(0,e.aM(0,g)),v=this.a,u=v.b
 A.kN(v,w.a2(0,new A.r(0,42,0)).a2(0,f.aM(0,0.1)),e,B.dZ,34,84,B.kN,f,0)
@@ -24781,15 +24789,15 @@ A.kN(v,w.a2(0,new A.r(0,58,0)).a2(0,f.aM(0,0.3)),e,B.dZ,20,26,B.Nq,f,0)
 A.kN(v,w.a2(0,new A.r(0,22,0)).a2(0,f.aM(0,0.3)),e,B.dZ,20,26,B.Nq,f,0)
 v.aE(w.a2(0,e.aM(0,9)).a2(0,new A.r(0,40,0)).a2(0,f.aM(0,1)),new A.r(2.6,2.6,2.6),B.FA,0.8)
 v.b=u},
-$S:z+90}
+$S:z+91}
 A.fxm.prototype={
-$5$poster(d,e,f,g,h){var w=C.a([d,e,f,g],x.o),v=h<0?A.hhd():new A.fxn(h),u=h===0,t=u?1000:256
+$5$poster(d,e,f,g,h){var w=C.a([d,e,f,g],x.o),v=h<0?A.hhe():new A.fxn(h),u=h===0,t=u?1000:256
 u=u?424:256
 return this.a.push(new A.fh(w,0,v,t,u,1,2,this.b,!1))},
 $4(d,e,f,g){return this.$5$poster(d,e,f,g,-1)},
-$S:z+91}
+$S:z+92}
 A.fxn.prototype={
-$3(d,e,f){return A.fWf(d,e,f,this.a)},
+$3(d,e,f){return A.fWg(d,e,f,this.a)},
 $S:24}
 A.fwJ.prototype={
 $1(d){var w=d.b
@@ -24908,25 +24916,25 @@ A.fxc.prototype={
 $1(d){return d.b===this.a.a&&d.x},
 $S:z+18}
 A.fxd.prototype={
-$3(d,e,f){return A.fWf(d,e,f,0)},
+$3(d,e,f){return A.fWg(d,e,f,0)},
 $S:24}
 A.fxe.prototype={
-$3(d,e,f){return A.fWf(d,e,f,0)},
+$3(d,e,f){return A.fWg(d,e,f,0)},
 $S:24}
-A.fI8.prototype={
+A.fI9.prototype={
 $2(d,e){var w,v=this.a
 if(v!=null){w=v.b-d
 v=v.c-e
 v=w*w+v*v<1e4}else v=!0
 return v},
 $S:1833}
-A.fI5.prototype={
+A.fI6.prototype={
 $1(d){return D.d.q(B.Iv,d.b)},
 $S:z+5}
-A.fI6.prototype={
+A.fI7.prototype={
 $1(d){return d.b===this.a.a},
 $S:z+18}
-A.fI7.prototype={
+A.fI8.prototype={
 $1(d){return d.b===this.a.a},
 $S:z+18}
 A.fnb.prototype={
@@ -24957,14 +24965,14 @@ k=C.a([],k)
 for(j=A.bDy(j,e,B.e3),w=j.length,v=f.a,u=f.b,t=f.c,s=x.o,r=0;r<j.length;j.length===w||(0,C.J)(j),++r){q=j[r]
 p=C.a([],s)
 for(o=q.a,n=o.length,m=0;m<o.length;o.length===n||(0,C.J)(o),++m){l=o[m]
-p.push(new A.r(l.a+v,l.b+u,l.c+t))}k.push(new A.kf(p,q.b,q.c,q.d,q.e,q.f,q.r,q.w,q.x,q.y,q.z))}D.d.v(this.b.a,k)},
-$S:z+92}
+p.push(new A.r(l.a+v,l.b+u,l.c+t))}k.push(new A.jF(p,q.b,q.c,q.d,q.e,q.f,q.r,q.w,q.x,q.y,q.z))}D.d.v(this.b.a,k)},
+$S:z+93}
 A.fxO.prototype={
 $6$joint(d,e,f,g,h,i){var w=this.a
 w.TG(d,e,f,h,!1,g,this.b)
 if(this.c&&i)w.eg(e,g*1.04,h,3,6)},
 $5(d,e,f,g,h){return this.$6$joint(d,e,f,g,h,!0)},
-$S:z+93}
+$S:z+94}
 A.fxP.prototype={
 $1(d){return d.es(B.e3,2.6,B.MX,this.a,this.b,0.15)},
 $S:z+1}
@@ -25073,33 +25081,33 @@ A.kN(w,new A.r(0,p,t),B.p4,B.dZ,u,9,B.ia,B.q0,0.6)
 A.kN(w,new A.r(s,p,0),B.q0,B.dZ,r,9,B.ia,B.h8,0.6)
 A.kN(w,new A.r(q,p,0),B.hm,B.dZ,r,9,B.ia,B.p4,0.6)}},
 $S:739}
-A.fEX.prototype={
+A.fEY.prototype={
 $4$alongX(d,e,f,g){var w,v,u,t,s,r,q,p,o,n
 for(w=this.a,v=0;v<=f;++v){u=A.oV(d,e,v/f)
-w.aF4(new A.r(u.a,4,u.c),B.hpK,B.Za,!1,0.05)}t=A.oV(d,e,0.5)
-for(s=e.aJ(0,d).gp7()+0.15,r=t.a,q=t.c,p=0;p<2;++p){o=B.dke[p]
+w.aF5(new A.r(u.a,4,u.c),B.hpK,B.Za,!1,0.05)}t=A.oV(d,e,0.5)
+for(s=e.aJ(0,d).gp7()+0.15,r=t.a,q=t.c,p=0;p<2;++p){o=B.dkf[p]
 n=g?new A.r(s,0.16,0.3):new A.r(0.3,0.16,s)
 w.aE(new A.r(r,o,q),n,B.Za,0.05)}},
 $3(d,e,f){return this.$4$alongX(d,e,f,!0)},
-$S:z+95}
-A.fEU.prototype={
-$2(d,e){return this.a.iJ(A.DM(d,0.35,3),0.06,e,!1,0.4,6)},
 $S:z+96}
-A.fET.prototype={
+A.fEV.prototype={
+$2(d,e){return this.a.iJ(A.DM(d,0.35,3),0.06,e,!1,0.4,6)},
+$S:z+97}
+A.fEU.prototype={
 $1(d){return this.a.iJ(A.DM(d,0.5,3),0.14,B.qf,!1,0.3,8)},
-$S:z+123}
-A.fEW.prototype={
+$S:z+124}
+A.fEX.prototype={
 $2$col(d,e){return this.a.iJ(A.DM(d,0.4,3),0.055,e,!1,0.35,6)},
 $1(d){return this.$2$col(d,B.Zk)},
-$S:z+98}
-A.fEV.prototype={
+$S:z+99}
+A.fEW.prototype={
 $5$h$w(d,e,f,g,h){var w=this.a
 w.b=d
 w.aE(e,new A.r(h,g,0.06),f,0.3)},
 $3(d,e,f){return this.$5$h$w(d,e,f,0.7,0.45)},
 $4$w(d,e,f,g){return this.$5$h$w(d,e,f,0.7,g)},
-$S:z+99}
-A.fFY.prototype={
+$S:z+100}
+A.fFZ.prototype={
 $0(){return A.fr(1320,120,0.25,"tri")},
 $S:0}
 A.dWy.prototype={
@@ -25133,7 +25141,7 @@ A.dWL.prototype={
 $0(){return this.a.pD(B.edn)},
 $S:0}
 A.dWM.prototype={
-$0(){return this.a.pD(new A.asO(!0,null))},
+$0(){return this.a.pD(new A.asN(!0,null))},
 $S:0}
 A.dWN.prototype={
 $0(){return this.a.pD(B.dSy)},
@@ -25187,16 +25195,16 @@ $0(){},
 $S:0}
 A.cA7.prototype={
 $0(){$.akd=!$.akd
-A.hkn()
+A.hko()
 A.fr($.akd?520:420,60,0.25,"tri")},
 $S:0}
 A.cA8.prototype={
 $0(){$.akc=!$.akc
-A.hkn()
+A.hko()
 A.fr($.akc?520:420,60,0.25,"tri")},
 $S:0}
-A.fXy.prototype={
-$1(d){var w,v,u,t,s,r,q,p=null,o=C.aF(d,p,x.w).w,n=this.b,m=this.c,l=m.length,k=x.p,j=C.a([C.d(this.a,p,p,p,p,p,p,D.dk,p,p,p),D.ax,C.d(""+new C.Y(n,new A.fXx(),C.U(n).k("Y<1>")).gI(0)+" of "+l+" steps done",p,p,p,p,p,p,B.KF,p,p,p),D.X],k)
+A.fXz.prototype={
+$1(d){var w,v,u,t,s,r,q,p=null,o=C.aF(d,p,x.w).w,n=this.b,m=this.c,l=m.length,k=x.p,j=C.a([C.d(this.a,p,p,p,p,p,p,D.dk,p,p,p),D.ax,C.d(""+new C.Y(n,new A.fXy(),C.U(n).k("Y<1>")).gI(0)+" of "+l+" steps done",p,p,p,p,p,p,B.KF,p,p,p),D.X],k)
 for(w=0;w<l;++w){v=D.c.j(0.05)
 u=new C.aN(14,14)
 t=new C.ay(n[w]?D.b4.j(0.6):D.bA,1,D.r,-1)
@@ -25208,7 +25216,7 @@ q=m[w]
 s=s?D.aD:D.c
 j.push(C.q(p,new C.c8(D.aL,D.e,D.j,D.E,p,D.p,p,0,C.a([r,D.au,new C.bz(1,D.bc,C.d(q,p,p,p,p,p,p,new C.G(!0,s,p,p,p,p,13,p,p,p,p,p,1.4,p,p,p,p,p,p,p,p,p,p,p,p,p),p,p,p),p)],k),p),D.f,p,p,new C.p(v,p,new C.bH(t,t,t,t),new C.be(u,u,u,u),p,p,D.n),p,p,p,D.cx,D.bh,p,p,p))}return C.bm(!0,new C.cP(new C.aY(0,1/0,0,o.a.b*0.75),C.cl(j,p,p,D.bQ,p,p,D.ah,!0),p),!0,!1,D.ag,!0,!0)},
 $S:25}
-A.fXx.prototype={
+A.fXy.prototype={
 $1(d){return d},
 $S:98}
 A.bYF.prototype={
@@ -25238,7 +25246,7 @@ $S:0}
 A.deU.prototype={
 $1(d){var w=this.a
 if(w.c==null)return
-if(d!=null){A.i28(w.gda(0),d)
+if(d!=null){A.i29(w.gda(0),d)
 w.m(w.gJt())}w.ch=!0},
 $S:275}
 A.dep.prototype={
@@ -25336,7 +25344,7 @@ $1(d){return!d},
 $S:98}
 A.deL.prototype={
 $0(){var w=this.a.gtw()
-return A.aSp(this.b,w.b,w.d,this.c)},
+return A.aSo(this.b,w.b,w.d,this.c)},
 $S:0}
 A.deS.prototype={
 $1(d){var w,v,u,t,s=C.a([],x.z),r=this.a,q=r.gda(0),p=q.Q
@@ -25349,22 +25357,22 @@ p=v}else t=!1
 if(!t)q=q.x&&p.length!==0
 else q=!0
 if(q){q=t?p:"smolder"
-A.hBf(new A.eL(s),q,new A.dez(),0.32,r.ax.gf_()/1000)}s=C.C(s,x.c)
+A.hBg(new A.eL(s),q,new A.dez(),0.32,r.ax.gf_()/1000)}s=C.C(s,x.c)
 q=r.LZ$
-if(q.length!==0)D.d.v(s,A.hfd(q,r.ax.gf_()/1000))
+if(q.length!==0)D.d.v(s,A.hfe(q,r.ax.gf_()/1000))
 return s},
 $S:z+10}
 A.dez.prototype={
 $1(d){return new A.r(d.a*0.32,-0.2+d.b*0.32,0.8+d.c*0.32)},
 $S:z+6}
 A.deD.prototype={
-$0(){return this.a.aC9("learn")},
+$0(){return this.a.aCa("learn")},
 $S:0}
 A.deE.prototype={
-$0(){return this.a.aC9("practice")},
+$0(){return this.a.aCa("practice")},
 $S:0}
 A.deM.prototype={
-$0(){return this.a.aC9("test")},
+$0(){return this.a.aCa("test")},
 $S:0}
 A.deN.prototype={
 $0(){var w=this.a
@@ -25385,7 +25393,7 @@ v.f=!v.f
 w.mM()},
 $S:0}
 A.deP.prototype={
-$0(){return A.hhF(this.a)},
+$0(){return A.hhG(this.a)},
 $S:0}
 A.deQ.prototype={
 $0(){var w=this.a,v=w.geh()
@@ -25401,7 +25409,7 @@ $S:z+8}
 A.deF.prototype={
 $0(){var w,v,u,t,s,r,q,p,o,n,m=this.a,l=m.gda(0),k=l.b,j=this.b,i=j.a
 if(k.il(0,i)){m.ml("That wire is already fastened. Tap the wire in the 3D view to take it off if you want to move it.")
-return}w=m.aFn(i)
+return}w=m.aFo(i)
 m.m(new A.dey(m,w,j))
 if(m.x.length!==0){m.aZA(i)
 if(w){v=C.a([],x.o)
@@ -25410,7 +25418,7 @@ p=!1
 if(q.c.q(0,i)){o=q.a
 if(k.h(0,o)==null){n=m.w
 p=(n===$?m.w=A.aht(u,l,!0):n).b.h(0,o)!=null}}if(p){n=m.w
-v.push((n===$?m.w=A.aht(u,l,!0):n).b.h(0,q.a).c)}}m.aIw(v)
+v.push((n===$?m.w=A.aht(u,l,!0):n).b.h(0,q.a).c)}}m.aIx(v)
 m.hv(j.b+": the glowing place is where it goes.",!0)}else m.hv(j.b+": now tap the screw it belongs on. Tap its name again to light up where it goes.",!0)}},
 $S:0}
 A.dey.prototype={
@@ -25420,12 +25428,12 @@ else{w=v.c.a
 if(u.x===w)w=""}return u.x=w},
 $S:0}
 A.deG.prototype={
-$0(){var w=this.a,v=w.gtw(),u=v.b,t=A.fX1(v)
+$0(){var w=this.a,v=w.gtw(),u=v.b,t=A.fX2(v)
 w=w.gda(0)
-w=C.a([new A.abX(u,t,A.heV(v,w),w.y)],x.fJ)
+w=C.a([new A.abX(u,t,A.heW(v,w),w.y)],x.fJ)
 v=B.aIH.h(0,v.a)
 if(v==null)v=B.aBK
-return A.hFN(this.b,w,v,u)},
+return A.hFO(this.b,w,v,u)},
 $S:0}
 A.deH.prototype={
 $0(){var w=this.a
@@ -25480,7 +25488,7 @@ $S:0}
 A.f0C.prototype={
 $1(d){var w=this.a
 if(w.c==null)return
-if(d!=null){A.hs8(w.gda(0),d)
+if(d!=null){A.hs9(w.gda(0),d)
 w.m(w.gJt())}w.Q=!0},
 $S:275}
 A.f0s.prototype={
@@ -25539,23 +25547,23 @@ A.f0x.prototype={
 $1(d){return!d},
 $S:98}
 A.f0B.prototype={
-$0(){return A.aSp(this.a,"Sink drain (P-trap)",B.dmZ,this.b)},
+$0(){return A.aSo(this.a,"Sink drain (P-trap)",B.dn_,this.b)},
 $S:0}
 A.f0y.prototype={
-$1(d){var w=this.a,v=C.C(A.is2(w.gda(0),d),x.c)
+$1(d){var w=this.a,v=C.C(A.is3(w.gda(0),d),x.c)
 w=w.LZ$
-if(w.length!==0)D.d.v(v,A.hfd(w,d))
+if(w.length!==0)D.d.v(v,A.hfe(w,d))
 return v},
 $S:z+10}
 A.f0z.prototype={
-$0(){var w,v=this.a,u=this.b,t=v.aFn(u)
+$0(){var w,v=this.a,u=this.b,t=v.aFo(u)
 v.m(new A.f0w(v,t,u))
 if(t){switch(u){case"tail":w=B.hk6
 break
 case"trap":w=B.hpM
 break
 default:w=B.aZe
-break}v.aIw(C.a([w],x.o))
+break}v.aIx(C.a([w],x.o))
 if(u==="tail")u="Tailpiece"
 else u=u==="trap"?"P-trap":"Trap arm"
 v.hv(u+": the glowing place is where it goes. Tap it.",!0)}},
@@ -25575,7 +25583,7 @@ A.f0v.prototype={
 $0(){var w,v=this.a,u=v.gda(0)
 u.a.a8(0)
 w=u.b
-w.aKX(w,new A.f0u())
+w.aKY(w,new A.f0u())
 u.c=!1
 v.r=u.d=""
 v.w=0
@@ -25588,7 +25596,7 @@ $S:1837}
 A.dhH.prototype={
 $1(d){var w=this.a
 if(w.c==null)return
-if(d!=null){A.hs8(w.gda(0),d)
+if(d!=null){A.hs9(w.gda(0),d)
 w.m(w.gJt())}w.Q=!0},
 $S:275}
 A.dhu.prototype={
@@ -25647,12 +25655,12 @@ A.dhA.prototype={
 $1(d){return!d},
 $S:98}
 A.dhG.prototype={
-$0(){return A.aSp(this.a,"Faucet supply lines",B.drf,this.b)},
+$0(){return A.aSo(this.a,"Faucet supply lines",B.drf,this.b)},
 $S:0}
 A.dhB.prototype={
-$1(d){var w=this.a,v=C.C(A.ii8(w.gda(0),d),x.c)
+$1(d){var w=this.a,v=C.C(A.ii9(w.gda(0),d),x.c)
 w=w.LZ$
-if(w.length!==0)D.d.v(v,A.hfd(w,d))
+if(w.length!==0)D.d.v(v,A.hfe(w,d))
 return v},
 $S:z+10}
 A.dhC.prototype={
@@ -25666,7 +25674,7 @@ w.f=A.a32(v)
 w.oC()},
 $S:0}
 A.dhE.prototype={
-$0(){var w,v,u,t,s,r,q=this.b,p=this.a,o=q.aFn(p.a)
+$0(){var w,v,u,t,s,r,q=this.b,p=this.a,o=q.aFo(p.a)
 q.m(new A.dhy(p,q,o))
 if(o){w=p.a==="hot"
 v=x.o
@@ -25675,7 +25683,7 @@ for(t=0;t<4;++t){s=B.SC[t]
 if(s.c.q(0,p.a)&&q.gda(0).e.h(0,s.a)==null){r=A.S8(s.a)
 u.push(new A.r(r.a+0,r.b+0,r.c+1.2))}}if(u.length!==0)p=u
 else p=C.a([A.S8(w?61:62).a2(0,B.hez)],v)
-q.aIw(p)
+q.aIx(p)
 if(u.length!==0)p=(w?"Hot":"Cold")+" hose: the glowing places are where its two ends go."
 else p=(w?"Hot":"Cold")+" hose is on. Now turn its valve: tap the handle."
 q.hv(p,!0)}},
@@ -25739,7 +25747,7 @@ A.doy.prototype={
 $1(d){return this.a},
 $S:39}
 A.doM.prototype={
-$0(){return A.aSp(this.a,"Fix the house",B.cuv,this.b)},
+$0(){return A.aSo(this.a,"Fix the house",B.cuv,this.b)},
 $S:0}
 A.doH.prototype={
 $0(){return this.a.cjc(this.b)},
@@ -25748,7 +25756,7 @@ A.doJ.prototype={
 $1(d){return d<=this.a.d.a},
 $S:34}
 A.doI.prototype={
-$1(d){return A.hBD(this.a.d,d)},
+$1(d){return A.hBE(this.a.d,d)},
 $S:z+10}
 A.doK.prototype={
 $0(){var w=this.a
@@ -25780,7 +25788,7 @@ w.d=C.df(B.bA5,new A.fmB(w))},
 $S:0}
 A.fmB.prototype={
 $1(d){var w=this.a.a,v=w.e
-return v.aqr(w.f?1.06:0.94)},
+return v.aqs(w.f?1.06:0.94)},
 $S:11}
 A.fmG.prototype={
 $1(d){return this.a.caT(0)},
@@ -25794,15 +25802,15 @@ $S:134}
 A.cda.prototype={
 $0(){return C.a6(this.a,!1).hU()},
 $S:0}
-A.fFy.prototype={
+A.fFz.prototype={
 $5(d,e,f,g,h){var w=this.a.a.q(0,h),v=this.b
 v.b=d
-if(w)v.aq8(e,0.66,f,!1,!0,!0,g,14)
+if(w)v.aq9(e,0.66,f,!1,!0,!0,g,14)
 else{v.d=0.3
 v.Vs(e,0.74,D.b0,!1,!0,0,8)
 v.d=1}},
-$S:z+101}
-A.fFx.prototype={
+$S:z+102}
+A.fFy.prototype={
 $6(d,e,f,g,h,i){var w,v
 if(!i)return
 w=this.a.b.h(0,e)
@@ -25815,24 +25823,24 @@ w.lt(v.aJ(0,g.aM(0,0.62)),v.aJ(0,g.aM(0,0.5)),1.2,0.5,B.Yv,0.2,8)
 w.b=0
 w.lt(f.aJ(0,g.aM(0,0.05)),f.a2(0,g.aM(0,0.08)),0.82,0.55,B.bsq,0.1,12)
 w.e=0},
-$S:z+102}
-A.fFw.prototype={
+$S:z+103}
+A.fFx.prototype={
 $1(d){return d.b<-0.6},
 $S:z+26}
-A.fEC.prototype={
+A.fED.prototype={
 $1(d){return this.a.e.h(0,d)===this.b},
 $S:34}
-A.fHr.prototype={
+A.fHs.prototype={
 $3(d,e,f){var w,v,u,t,s=A.S8(d),r=C.a([],x.o)
 for(w=s.a,v=s.b,u=s.c,t=0;t<=8;++t)r.push(new A.r(w+f*t/8*2,v+(2.4*t/8-9*Math.pow(t/8,2)),u+(1+3.5*t/8)))
-A.hcK(this.a,r,this.b,e,0.28,1.2)},
+A.hcL(this.a,r,this.b,e,0.28,1.2)},
 $S:1838}
-A.fHq.prototype={
+A.fHr.prototype={
 $1(d){return this.a.e.h(0,d.a)!=null},
 $S:z+49}
 A.cqD.prototype={
 $1(d){return d.a===this.a},
-$S:z+103}
+$S:z+104}
 A.cqE.prototype={
 $1(d){return d.a===this.a},
 $S:z+4}
@@ -25847,7 +25855,7 @@ return w},
 $S:z+4}
 A.cqG.prototype={
 $1(d){var w=this.a,v=d.a
-return w.e.q(0,v)&&w.aIH(v)>0},
+return w.e.q(0,v)&&w.aII(v)>0},
 $S:z+4}
 A.cqH.prototype={
 $1(d){return d.a},
@@ -25860,42 +25868,42 @@ $1(d){return this.a.e.q(0,d.a)},
 $S:z+4}
 A.cqC.prototype={
 $1(d){var w=this.a,v=d.a
-return w.aIH(v)<=0||!w.e.q(0,v)},
+return w.aII(v)<=0||!w.e.q(0,v)},
 $S:z+4}
-A.fFv.prototype={
+A.fFw.prototype={
 $1(d){var w=this.a
 w.b=0
 w.cw(new A.r(d,8,0),new A.r(d,8,1.6),0.5,B.Mj,0.7,10)},
 $S:6}
-A.fFt.prototype={
+A.fFu.prototype={
 $1(d){var w,v,u,t,s,r,q=C.a([],x.o)
 for(w=d.length,v=this.a,u=v.a,t=v.b,v=v.c,s=0;s<d.length;d.length===w||(0,C.J)(d),++s){r=d[s]
 q.push(new A.r(r.a+u,r.b+t,r.c+v))}return q},
-$S:z+106}
-A.fFn.prototype={
+$S:z+107}
+A.fFo.prototype={
 $3$r(d,e,f){var w=this.a,v=this.b.c
 v===$&&C.c()
-w.b=9100+D.d.bj(v.c,new A.fFq(d))
+w.b=9100+D.d.bj(v.c,new A.fFr(d))
 w.d=0.32
 w.Vs(e,f,D.b0,!1,!0,0,8)
 w.d=1},
 $2(d,e){return this.$3$r(d,e,1.2)},
-$S:z+107}
-A.fFq.prototype={
+$S:z+108}
+A.fFr.prototype={
 $1(d){return d.a===this.a},
 $S:z+4}
-A.fFo.prototype={
+A.fFp.prototype={
 $3(d,e,f){var w=this.a,v=this.b.c
 v===$&&C.c()
-w.b=9100+D.d.bj(v.c,new A.fFp(d))
+w.b=9100+D.d.bj(v.c,new A.fFq(d))
 w.d=0.32
 w.aF(e,f,D.b0)
 w.d=1},
-$S:z+108}
-A.fFp.prototype={
+$S:z+109}
+A.fFq.prototype={
 $1(d){return d.a===this.a},
 $S:z+4}
-A.fFu.prototype={
+A.fFv.prototype={
 $3(d,e,f){var w,v,u,t=this,s=t.a,r=s.c
 r===$&&C.c()
 w=D.d.co(r.c,d)
@@ -25906,19 +25914,19 @@ if(v.q(0,u))s="Fitted."
 else{s=s.b?"":d.e
 s="A spot for the "+r.toLowerCase()+". "+s}t.b.n(0,9100+w,new A.cI(r,s,e,26))
 if(t.c&&!v.q(0,u)&&t.d.length!==0)t.e.push(new A.he(e.a2(0,B.h6P),f,D.eX,0))},
-$S:z+109}
-A.fFj.prototype={
+$S:z+147}
+A.fFk.prototype={
 $0(){return this.a.$3(this.b.a,new A.r(this.c-10,9,2.4),B.ac5)},
 $S:0}
-A.fFk.prototype={
+A.fFl.prototype={
 $0(){return this.a.$3(this.b.a,new A.r(this.c-8,9,2.4),B.ac5)},
 $S:0}
-A.fFl.prototype={
+A.fFm.prototype={
 $0(){return this.a.$3(this.b.a,new A.r(this.c+8,9,2.4),B.ac5)},
 $S:0}
-A.fFr.prototype={
+A.fFs.prototype={
 $4(d,e,f,g){var w,v,u,t,s=this
-if(D.d.bj(s.a,new A.fFs(d))<0||!s.b.e.q(0,d))return
+if(D.d.bj(s.a,new A.fFt(d))<0||!s.b.e.q(0,d))return
 w=s.b.f.h(0,d)
 v=(w==null?0:w)>=1
 w=s.c
@@ -25929,14 +25937,14 @@ w.cw(t.aJ(0,f.aM(0,0.6)),t.a2(0,f.aM(0,0.6)),1.12,B.qf,0.35,8)
 w.lt(t.aJ(0,f.aM(0,0.62)),t.aJ(0,f.aM(0,0.5)),1.2,0.5,B.Yv,0.2,8)
 w=v?"Tight.":"Loose. Tap it with the wrench to tighten it."
 s.d.n(0,u,new A.cI("Slip nut",w,e,10))},
-$S:z+146}
-A.fFs.prototype={
+$S:z+111}
+A.fFt.prototype={
 $1(d){return d.a===this.a},
 $S:z+4}
-A.fFm.prototype={
+A.fFn.prototype={
 $1(d){return d.a===this.a},
 $S:z+4}
-A.fWD.prototype={
+A.fWE.prototype={
 $1(d){return d.a===this.a},
 $S:z+4}
 A.ev2.prototype={
@@ -25962,7 +25970,7 @@ $0(){return this.a.y=this.b},
 $S:0}
 A.euO.prototype={
 $0(){var w=this.a
-w.af_()
+w.af0()
 w.y=this.b},
 $S:0}
 A.euP.prototype={
@@ -25992,12 +26000,12 @@ u.d=D.o.F(Date.now(),1e5)
 w=u.gDk(0)
 v=u.e
 v===$&&C.c()
-u.e=A.ha5(v.b,w,null)
+u.e=A.ha6(v.b,w,null)
 u.x=""
 u.as=!1
 u.z=null
 u.y=0
-u.af_()},
+u.af0()},
 $S:0}
 A.ev8.prototype={
 $1(d){return d.b===this.a},
@@ -26013,12 +26021,12 @@ $S:z+36}
 A.euX.prototype={
 $1(d){var w=this.a.e
 w===$&&C.c()
-return w.aIH(d.a)>0},
+return w.aII(d.a)>0},
 $S:z+4}
 A.ev4.prototype={
 $0(){var w=this.b
 w.x=this.a.b
-w.af_()},
+w.af0()},
 $S:0}
 A.ev5.prototype={
 $1(d){return d.a===this.a.a},
@@ -26033,7 +26041,7 @@ $S:0}
 A.euQ.prototype={
 $0(){var w=this.a
 w.x=this.b?"":this.c
-w.af_()},
+w.af0()},
 $S:0}
 A.ev9.prototype={
 $1(d){var w=this.a.e
@@ -26049,7 +26057,7 @@ $S:34}
 A.eva.prototype={
 $1(d){var w=this.a,v=w.e
 v===$&&C.c()
-return A.irV(v,w.w.gf_()/1000)},
+return A.irW(v,w.w.gf_()/1000)},
 $S:z+10}
 A.evc.prototype={
 $0(){return this.b.cBw(this.a.a)},
@@ -26076,7 +26084,7 @@ A.euZ.prototype={
 $0(){C.a6(this.b,!1).O(null)
 this.a.b_D()},
 $S:0}
-A.h4c.prototype={
+A.h4d.prototype={
 $1(d){return d.a===this.a},
 $S:z+51}
 A.cvA.prototype={
@@ -26090,7 +26098,7 @@ $1(d){var w=this.a
 return w.x.al(0,d)&&w.z.q(0,d)},
 $S:34}
 A.cvJ.prototype={
-$1(d){var w=$.HK()[this.b],v=!1
+$1(d){var w=$.HL()[this.b],v=!1
 if(w>=d)if(w<=d+48){w=this.a.Q.h(0,d)
 w=(w==null?null:w.a)===!0}else w=v
 else w=v
@@ -26115,7 +26123,7 @@ A.cvx.prototype={
 $1(d){return!A.j7(d).c},
 $S:34}
 A.cvy.prototype={
-$1(d){var w=this.a.are(A.j7(d).d.a)
+$1(d){var w=this.a.arf(A.j7(d).d.a)
 return(w==null?null:w.b.q(0,d))===!0},
 $S:34}
 A.cvF.prototype={
@@ -26259,7 +26267,7 @@ $S:0}
 A.ezH.prototype={
 $0(){var w=this.b,v=D.d.q(B.zP,w.z),u=this.a.a
 if(v)w.b4i(u)
-else w.aAu(u)},
+else w.aAv(u)},
 $S:0}
 A.eyX.prototype={
 $1(d){var w=null
@@ -26271,7 +26279,7 @@ return null},
 $S:0}
 A.eyW.prototype={
 $0(){C.a6(this.b,!1).O(null)
-this.a.ayS(!0)},
+this.a.ayT(!0)},
 $S:0}
 A.eyU.prototype={
 $1(d){var w,v,u=null,t=this.a,s=t.d
@@ -26314,34 +26322,34 @@ $S:3}
 A.ezK.prototype={
 $0(){var w=this.a,v=w.d
 v===$&&C.c()
-return w.ii(v.aK3(w.as))},
+return w.ii(v.aK4(w.as))},
 $S:0}
 A.ezL.prototype={
 $0(){var w=this.a,v=w.d
 v===$&&C.c()
-return w.ii(v.ap9(w.as))},
+return w.ii(v.apa(w.as))},
 $S:0}
 A.ezM.prototype={
 $0(){var w=this.a,v=w.d
 v===$&&C.c()
-return w.ii(v.aGd(w.as))},
+return w.ii(v.aGe(w.as))},
 $S:0}
 A.ezN.prototype={
 $0(){var w,v=this.a,u=v.d
 u===$&&C.c()
-w=u.apz(v.as)
+w=u.apA(v.as)
 v.ii(w)
 if(w.a)v.Qb()},
 $S:0}
 A.ezO.prototype={
 $0(){var w=this.a,v=w.d
 v===$&&C.c()
-return w.ii(v.ap9(w.as))},
+return w.ii(v.apa(w.as))},
 $S:0}
 A.ezP.prototype={
 $0(){var w,v=this.a,u=v.d
 u===$&&C.c()
-w=u.apz(v.as)
+w=u.apA(v.as)
 v.ii(w)
 if(w.a){v.Qb()
 v.ow("The "+A.uw(this.b.a)+" is out and the box is empty. Pick the kind you want from the tray, then tap the box.",!0)}},
@@ -26364,7 +26372,7 @@ $1(d){return!this.a.b.b.al(0,d.a)},
 $S:z+13}
 A.ezG.prototype={
 $0(){var w=this.a
-return w.aAr(w.as,this.b.a)},
+return w.aAs(w.as,this.b.a)},
 $S:0}
 A.eze.prototype={
 $1(d){return new C.N(d,new A.ezf(),d.$ti.k("N<ak.E,m>")).aO(0,", ")},
@@ -26411,7 +26419,7 @@ return w!==d.b},
 $S:z+11}
 A.ezc.prototype={
 $1(d){return d.a},
-$S:z+115}
+$S:z+116}
 A.ezd.prototype={
 $1(d){var w=this.a.d
 w===$&&C.c()
@@ -26448,12 +26456,12 @@ s===$&&C.c()
 w=t.w.gf_()
 v=t.Q
 u=t.y===2&&t.as<0&&t.d.gtl()
-return A.isb(s,w/1000,t.x,u,v)},
+return A.isc(s,w/1000,t.x,u,v)},
 $S:z+10}
 A.eA2.prototype={
 $0(){var w=this.a,v=w.d
 v===$&&C.c()
-return w.ii(v.a7w())},
+return w.ii(v.a7x())},
 $S:0}
 A.eA3.prototype={
 $0(){var w=this.a
@@ -26512,7 +26520,7 @@ $S:0}
 A.ezX.prototype={
 $0(){var w=this.a,v=w.d
 v===$&&C.c()
-v.amV()
+v.amW()
 w.y=2
 w.z=""
 w.r=A.xg(w.d,new A.t1("",w.as,!1))
@@ -26528,7 +26536,7 @@ $S:0}
 A.eAm.prototype={
 $0(){var w=this.a,v=w.Q
 if(v>=0&&w.y===2){w.m(new A.ezT(w,this.b))
-w.aAu(v)
+w.aAv(v)
 if(w.c!=null&&w.as<0)w.m(new A.ezU(w))
 return}w.m(new A.ezV(w,this.b))},
 $S:0}
@@ -26561,7 +26569,7 @@ return w.m(new A.ezS(w,this.b,this.c))},
 $S:0}
 A.ezS.prototype={
 $0(){var w,v=this,u=v.c,t=u.a
-if(v.b.b.b.il(0,t)){v.a.af0("That wire is already fastened. Tap the wire in the 3D view to take it off.")
+if(v.b.b.b.il(0,t)){v.a.af1("That wire is already fastened. Tap the wire in the 3D view to take it off.")
 return}w=v.a
 if(w.ax===t)t=""
 w.ax=t
@@ -26572,39 +26580,39 @@ $1(d){return!this.a.b.b.al(0,d.a)},
 $S:z+13}
 A.eA8.prototype={
 $0(){var w=this.a
-return w.aAr(w.as,this.b.a)},
+return w.aAs(w.as,this.b.a)},
 $S:0}
 A.eA9.prototype={
 $0(){var w=this.a,v=w.d
 v===$&&C.c()
-return w.ii(v.aK3(w.as))},
+return w.ii(v.aK4(w.as))},
 $S:0}
 A.eAa.prototype={
 $0(){var w=this.a,v=w.d
 v===$&&C.c()
-return w.ii(v.ap9(w.as))},
+return w.ii(v.apa(w.as))},
 $S:0}
 A.eAb.prototype={
 $0(){var w=this.a,v=w.d
 v===$&&C.c()
-return w.ii(v.aGd(w.as))},
+return w.ii(v.aGe(w.as))},
 $S:0}
 A.eAc.prototype={
 $0(){var w,v=this.a,u=v.d
 u===$&&C.c()
-w=u.apz(v.as)
+w=u.apA(v.as)
 v.ii(w)
 if(w.a)v.Qb()},
 $S:0}
 A.eAd.prototype={
 $0(){var w=this.a,v=w.d
 v===$&&C.c()
-return w.ii(v.ap9(w.as))},
+return w.ii(v.apa(w.as))},
 $S:0}
 A.eAe.prototype={
 $0(){var w,v=this.a,u=v.d
 u===$&&C.c()
-w=u.apz(v.as)
+w=u.apA(v.as)
 v.ii(w)
 if(w.a){v.Qb()
 v.ow("The "+A.uw(this.b.a)+" is out and the box is empty. Pick the kind you want from the tray (a different outlet or switch is fine), then tap the box.",!0)}},
@@ -26649,7 +26657,7 @@ h.push(C.A(C.a([C.E(C.dU(B.fHf,new A.ezj(i,d),k),1),D.ae,C.E(C.bJ(B.aXb,k,new A.
 return C.bm(!0,new C.cP(new C.aY(0,1/0,0,j.a.b*0.8),C.cl(h,k,k,D.bQ,k,k,D.ah,!0),k),!0,!1,D.ag,!0,!0)},
 $S:89}
 A.ezh.prototype={
-$0(){return A.hhF(this.a)},
+$0(){return A.hhG(this.a)},
 $S:0}
 A.ezi.prototype={
 $0(){var w=0,v=C.j(x.H),u=this,t,s,r
@@ -26661,13 +26669,13 @@ s===$&&C.c()
 r=s.c
 r===$&&C.c()
 w=2
-return C.b(A.hFN(u.c,s.d1g(),t.d.d1h(),r),$async$$0)
+return C.b(A.hFO(u.c,s.d1g(),t.d.d1h(),r),$async$$0)
 case 2:return C.h(null,v)}})
 return C.i($async$$0,v)},
 $S:1}
 A.ezj.prototype={
 $0(){C.a6(this.b,!1).O(null)
-this.a.ayS(!0)},
+this.a.ayT(!0)},
 $S:0}
 A.ezk.prototype={
 $0(){C.a6(this.b,!1).O(null)
@@ -26681,16 +26689,16 @@ A.fxu.prototype={
 $1(d){var w=this.a,v=d.a
 return w>v[2]&&w<v[3]},
 $S:740}
-A.fFz.prototype={
+A.fFA.prototype={
 $1(d){return 5000+this.a.a*100+d},
 $S:71}
-A.fFA.prototype={
+A.fFB.prototype={
 $1(d){return 3000+this.a.a},
 $S:71}
-A.fFB.prototype={
+A.fFC.prototype={
 $1(d){return 2000+this.a.a},
 $S:71}
-A.fFE.prototype={
+A.fFF.prototype={
 $5$col$round(d,e,f,g,h){var w=this.a
 w.f=3
 w.b=d
@@ -26704,23 +26712,23 @@ w.f=2},
 $3(d,e,f){return this.$5$col$round(d,e,f,D.b0,!1)},
 $4$round(d,e,f,g){return this.$5$col$round(d,e,f,D.b0,g)},
 $4$col(d,e,f,g){return this.$5$col$round(d,e,f,g,!1)},
-$S:z+116}
-A.fFC.prototype={
-$3(d,e,f){return L.M7(d,e,0,f+this.a.a*5)},
-$S:24}
+$S:z+117}
 A.fFD.prototype={
+$3(d,e,f){return L.M8(d,e,0,f+this.a.a*5)},
+$S:24}
+A.fFE.prototype={
 $0(){var w,v=this.a
 if(v.c)w="A place in the ceiling for a "+(v.e==="fan"?"fan (needs a fan-rated box)":"light")+"."
 else w="A place on the wall at "+(v.e==="switch"?"switch height, about 48 inches from the floor":"outlet height, about 16 inches from the floor")+"."
 return new A.cI(v.b,w,A.aiS(v,B.abW),26)},
-$S:z+117}
-A.fWY.prototype={
+$S:z+118}
+A.fWZ.prototype={
 $1(d){return d.e==="fan"},
 $S:z+51}
-A.fWZ.prototype={
+A.fX_.prototype={
 $1(d){return d.b==="light"},
 $S:z+11}
-A.fX_.prototype={
+A.fX0.prototype={
 $1(d){return A.aiS(this.a,d)},
 $S:z+6}
 A.cz0.prototype={
@@ -26781,7 +26789,7 @@ return C.eg(C.a([C.bJ(B.fP6,w,new A.eBB(this.a,d),w)],x.p),w,w,G.m7,B.fOd,w,w,w,
 $S:18}
 A.eBB.prototype={
 $0(){C.a6(this.b,!1).O(null)
-this.a.ayg()},
+this.a.ayh()},
 $S:0}
 A.eBy.prototype={
 $1(d){var w=null,v=this.a,u=v.d
@@ -26795,7 +26803,7 @@ return null},
 $S:0}
 A.eBx.prototype={
 $0(){C.a6(this.b,!1).O(null)
-this.a.ayg()},
+this.a.ayh()},
 $S:0}
 A.eBA.prototype={
 $0(){var w,v,u=this.a
@@ -26803,7 +26811,7 @@ u.e=D.o.F(Date.now(),1e5)
 w=u.gDk(0)
 v=u.d
 v===$&&C.c()
-w=A.hsS(v.b,w)
+w=A.hsT(v.b,w)
 u.d=w
 u.r=A.ahu(w.d)
 u.at=!1
@@ -26819,14 +26827,14 @@ $S:34}
 A.eBS.prototype={
 $1(d){var w=this.a,v=w.d
 v===$&&C.c()
-return A.hBD(v.d,w.w.gf_()/1000)},
+return A.hBE(v.d,w.w.gf_()/1000)},
 $S:z+10}
 A.eBU.prototype={
 $1(d){return!d.c},
 $S:z+20}
 A.eBV.prototype={
 $1(d){return B.x2.h(0,d.a).a},
-$S:z+119}
+$S:z+120}
 A.eBW.prototype={
 $0(){var w=this.a
 return w.m(new A.eBR(w,this.b))},
@@ -26871,7 +26879,7 @@ $0(){},
 $S:0}
 A.eBO.prototype={
 $0(){C.a6(this.b,!1).O(null)
-this.a.ayg()},
+this.a.ayh()},
 $S:0}
 A.fpW.prototype={
 $1(d){return d.d===this.a},
@@ -26880,7 +26888,7 @@ A.bWA.prototype={
 $1(d){var w,v,u,t,s=this.a,r=s.p1
 if(r!=="back"){s=r==="left"?-1.5707963267948966:1.5707963267948966
 return new C.y(new C.y(0,d),s)}r=s.k1
-w=A.hhS(s,A.aQN(r==null?"tv100":r),0)
+w=A.hhT(s,A.aQM(r==null?"tv100":r),0)
 s=w.c
 r=w.a/2
 v=s-r-18
@@ -26957,7 +26965,7 @@ if(!s.e){w=B.oL[s.d]
 v=w.e.h(0,r)
 v.toString
 u=x.N
-t=A.hBc(w.b,C.I([r,v],u,u),C.I([r,q],u,u))
+t=A.hBd(w.b,C.I([r,v],u,u),C.I([r,q],u,u))
 u=t.a===B.r4
 s.z=u
 if(u)r="Right: this follows the diagram."
@@ -26973,7 +26981,7 @@ $S:0}
 A.daP.prototype={
 $0(){var w=this.a
 w.m(new A.daO(w,this.b))
-w.az3()},
+w.az4()},
 $S:0}
 A.daO.prototype={
 $0(){var w,v,u,t,s
@@ -26984,7 +26992,7 @@ A.db_.prototype={
 $0(){return C.a6(this.a,!1).hU()},
 $S:0}
 A.db0.prototype={
-$0(){return A.hhF(this.a)},
+$0(){return A.hhG(this.a)},
 $S:0}
 A.db1.prototype={
 $0(){return this.a.cbK(this.b)},
@@ -27008,7 +27016,7 @@ w.e=!0
 w.y=w.r=null},
 $S:0}
 A.db4.prototype={
-$2(d,e){var w,v,u,t=null,s=(e.b-56)/2,r=this.a,q=C.bR(0,C.c5(r.gabk(),new A.daX(r,s),t),0,0,0),p=x.p,o=C.a([],p)
+$2(d,e){var w,v,u,t=null,s=(e.b-56)/2,r=this.a,q=C.bR(0,C.c5(r.gabl(),new A.daX(r,s),t),0,0,0),p=x.p,o=C.a([],p)
 for(w=B.oL[r.d].e,w=J.aT(w.gev(w));w.C();)o.push(r.c4e(w.gR(w)))
 o=C.ap(t,C.x(o,D.l,t,D.e,D.j,0,D.p),t,t,0,t,0,s)
 w=C.a([],p)
@@ -27022,7 +27030,7 @@ w=B.oL[s.d]
 v=x.N
 v=C.dO(s.f,v,v)
 u=s.x
-s=s.gabk().x
+s=s.gabl().x
 s===$&&C.c()
 return C.b4(t,t,t,new A.bya(r,w.d,v,this.b,u,s,t),D.az)},
 $S:55}
@@ -27032,12 +27040,12 @@ return w.m(new A.daW(w))},
 $S:0}
 A.daW.prototype={
 $0(){var w=this.a,v=B.oL[w.d]
-return w.r=A.hBc(v.b,v.e,w.f)},
+return w.r=A.hBd(v.b,v.e,w.f)},
 $S:0}
 A.flx.prototype={
 $1(d){return d*66+29},
 $S:171}
-A.fHt.prototype={
+A.fHu.prototype={
 $2(d,e){var w,v,u,t,s,r,q,p,o,n,m,l,k=this
 for(w=k.a*1.8,v=k.b,u=k.c,t=k.d,s=0.3*t,t=0.05*t,r=0;r<d;++r){q=w+r*0.173
 p=D.i.F(q,1)
@@ -27050,7 +27058,7 @@ l=C.ar(E.ZZ,F.Ni,p)
 l.toString
 v.es(q,s*(1-p*0.6)+t,l,3,5,0)}},
 $S:1843}
-A.fHs.prototype={
+A.fHt.prototype={
 $3(d,e,f){var w,v,u,t,s,r,q,p,o,n=this,m=n.a
 m.d=0.34
 for(w=n.b,v=w*0.45,u=n.c,t=n.d,s=1-e,r=0;r<d;++r){q=D.i.F(v+r/d,1)
@@ -27061,26 +27069,26 @@ o=C.ar(o,B.bf_,q)
 o.toString
 m.es(p,(1.1+q*3.4)*t,o,3,6,0)}m.d=1},
 $S:1844}
-A.fGZ.prototype={
+A.fH_.prototype={
 $5(d,e,f,g,h){return this.a.push(new A.wL(d,e,f,g,h))},
-$S:z+120}
-A.fH3.prototype={
-$2(d,e){var w=this.a
-return new C.Y(w,new A.fH4(d,e),C.U(w).k("Y<1>")).gI(0)},
 $S:z+121}
 A.fH4.prototype={
+$2(d,e){var w=this.a
+return new C.Y(w,new A.fH5(d,e),C.U(w).k("Y<1>")).gI(0)},
+$S:z+122}
+A.fH5.prototype={
 $1(d){return d.a.c===this.a&&d.b.c===this.b},
 $S:z+19}
-A.fH_.prototype={
+A.fH0.prototype={
 $1(d){return d.b.c===B.aUx},
 $S:z+19}
-A.fH0.prototype={
+A.fH1.prototype={
 $1(d){return d.a.c===B.b_v},
 $S:z+19}
-A.fH1.prototype={
+A.fH2.prototype={
 $1(d){return!1},
 $S:z+19}
-A.fH2.prototype={
+A.fH3.prototype={
 $1(d){return!1},
 $S:z+19}
 A.fps.prototype={
@@ -27090,20 +27098,20 @@ A.fpt.prototype={
 $1(d){return d.a===this.a},
 $S:z+42}
 A.cBY.prototype={
-$1(d){return A.i0s(d)},
+$1(d){return A.i0t(d)},
 $S:z+19}
 A.cBZ.prototype={
 $2(d,e){return d+e},
 $S:62}
 A.cC_.prototype={
 $1(d){return d.b.a===B.r4},
-$S:z+47}
-A.fH5.prototype={
+$S:z+45}
+A.fH6.prototype={
 $2(d,e){var w=this.a.h(0,d)
 if(w==null)this.b.push(new A.wL("LEAD_MISSING",B.K_,"The "+d+" lead is not connected.","Every lead on the diagram needs its connection.","Connect the "+d+" lead to "+e+"."))
 else if(w!==e)this.b.push(new A.wL("LEAD_WRONG",B.aRT,"The "+d+" lead is connected to "+w+", but the diagram says "+e+".","Connections follow the approved wiring diagram.","Move the "+d+" lead to "+e+"."))},
 $S:120}
-A.h49.prototype={
+A.h4a.prototype={
 $1(d){var w,v,u,t,s,r=null,q=C.aF(d,r,x.w).w,p=x.p,o=C.a([B.fDs,D.an,B.fXh,D.X],p)
 for(w=0;w<5;++w){v=B.dgn[w]
 u=D.c.j(0.05)
@@ -27113,9 +27121,9 @@ o.push(C.q(r,C.x(C.a([C.d(v.a+": "+v.b,r,r,r,r,r,r,D.aVQ,r,r,r),D.cU,C.d("Goes t
 o.push(B.fEK)
 return C.bm(!0,new C.cP(new C.aY(0,1/0,0,q.a.b*0.85),C.cl(o,r,r,D.bQ,r,r,D.ah,!0),r),!0,!1,D.ag,!0,!0)},
 $S:25}
-A.h47.prototype={
+A.h48.prototype={
 $1(d){return new A.a25(this.a,this.b,null)},
-$S:z+124}
+$S:z+125}
 A.ffa.prototype={
 $1(d){var w=this.a,v=w.a.c,u=this.b
 d.toString
@@ -27136,7 +27144,7 @@ $0(){return this.a.e=this.b},
 $S:0}
 A.ffc.prototype={
 $1(d){return d.b.a!==B.r4},
-$S:z+47}
+$S:z+45}
 A.ffd.prototype={
 $0(){var w=this.a,v=w.c
 v.toString
@@ -27144,21 +27152,21 @@ w=w.e
 C.a6(v,!1).O(w)
 return null},
 $S:0}
+A.fIm.prototype={
+$1(d){return d.a===this.a},
+$S:z+53}
 A.fIl.prototype={
 $1(d){return d.a===this.a},
 $S:z+53}
-A.fIk.prototype={
-$1(d){return d.a===this.a},
-$S:z+53}
-A.fGR.prototype={
+A.fGS.prototype={
 $1(d){var w=this.a
 return w.b.a2(0,w.a.aM(0,d))},
 $S:z+28}
-A.fGO.prototype={
+A.fGP.prototype={
 $3(d,e,f){var w=this.a,v=w.b==="switch"?48:16
 return A.eS(w.c,this.b+d,v+e,f)},
 $S:z+16}
-A.fGP.prototype={
+A.fGQ.prototype={
 $2(d,e){var w=this,v=w.b,u=w.c,t=w.d
 return w.a.$3((v.a+d*u-e*t)*2.96875,(v.b+d*t+e*u)*2.96875,w.e+0.12)},
 $S:z+12}
@@ -27169,7 +27177,7 @@ A.fDF.prototype={
 $3(d,e,f){return A.mH(d,e,f,this.a.a+this.b.b.length+D.i.bh(f/7))},
 $S:24}
 A.fDG.prototype={
-$3(d,e,f){return L.M7(d,e,0,f)},
+$3(d,e,f){return L.M8(d,e,0,f)},
 $S:24}
 A.fov.prototype={
 $1(d){var w
@@ -27217,13 +27225,13 @@ $1(d){return d.c},
 $S:z+54}
 A.bOJ.prototype={
 $2(d,e){return d+e.d.a},
-$S:z+130}
-A.fEw.prototype={
+$S:z+131}
+A.fEx.prototype={
 $3(d,e,f){var w,v,u,t,s,r
 for(w=$.xw(),v=w.length,u=d.a,t=this.a.b,s=0;s<w.length;w.length===v||(0,C.J)(w),++s){r=w[s]
 if(r.b===u&&r.d>=0&&t.h(0,u).d.q(0,r.a)&&e>r.e-0.5&&e<r.f+0.5&&f>r.r-0.5&&f<r.w+0.5)return!0}return!1},
-$S:z+131}
-A.fEz.prototype={
+$S:z+132}
+A.fEA.prototype={
 $9$shine(d,e,f,g,h,i,j,k,l){var w,v,u=f-e
 if(u<0.05||h-g<0.05)return
 w=A.eS(d,(e+f)/2,(g+h)/2,i)
@@ -27232,18 +27240,18 @@ u=(d&1)===0?new A.r(u,v,j):new A.r(j,v,u)
 this.a.aE(w,u,k,l)},
 $8(d,e,f,g,h,i,j,k){return this.$9$shine(d,e,f,g,h,i,j,k,0)},
 $S:1846}
-A.fEs.prototype={
+A.fEt.prototype={
 $1(d){var w,v=this.a
 if(d.b===v.b-1){w=d.c
 v=w>v.c+0.9&&w<v.d-0.9}else v=!1
 return v},
 $S:z+32}
-A.fEr.prototype={
+A.fEs.prototype={
 $4(d,e,f,g){var w=this.b.b,v=A.eS(w,(d+e)/2,(f+g)/2,this.c),u=e-d,t=g-f
 w=(w&1)===0?new A.r(u,t,0.28):new A.r(0.28,t,u)
 return this.a.aE(v,w,B.Nr,0.8)},
 $S:739}
-A.fEy.prototype={
+A.fEz.prototype={
 $2(d,e){var w,v,u=C.a([5.5],x.n),t=this.a
 if(t>=2)u.push(4.6)
 if(t>=3)u.push(10)
@@ -27253,7 +27261,7 @@ w=0
 v=0
 for(;v<u.length;u.length===t||(0,C.J)(u),++v){e.$3(u[v],0.02+w*0.03,d.$1(w));++w}},
 $S:1847}
-A.fEu.prototype={
+A.fEv.prototype={
 $1(d){var w,v
 if(d===1)w=B.aih
 else{w=this.a
@@ -27262,7 +27270,7 @@ else v=!1
 if(w>=5)w=B.MM
 else w=v?B.No:B.FR}return w},
 $S:1848}
-A.fEt.prototype={
+A.fEu.prototype={
 $3(d,e,f){var w,v,u,t,s,r,q=4+e
 for(w=this.a,v=w-1,u=this.b,t=this.c,s=d/2,r=48;r<v;r+=48)u.$8(t,r-s,r+s,0,95.5,q,0.08,f)
 v=d*0.5
@@ -27271,7 +27279,7 @@ s=w-0.4
 u.$8(t,s-v,s,0,95.5,q,0.08,f)
 u.$8(t,0,w,95.5-v,95.5,q,0.08,f)},
 $S:741}
-A.fEx.prototype={
+A.fEy.prototype={
 $3(d,e,f){var w=this.a
 w.b=d
 w.f=3
@@ -27282,7 +27290,7 @@ w.d=1
 w.e=0
 w.f=2},
 $S:z+56}
-A.fEv.prototype={
+A.fEw.prototype={
 $4$r(d,e,f,g){var w=this.a
 w.b=d
 w.f=2
@@ -27293,7 +27301,7 @@ w.d=1
 w.e=0},
 $3(d,e,f){return this.$4$r(d,e,f,3)},
 $S:z+57}
-A.fEA.prototype={
+A.fEB.prototype={
 $4$padToo(d,e,f,g){var w,v,u,t,s,r,q=this,p=q.a
 p.b=d
 p.f=3
@@ -27328,7 +27336,7 @@ v=r?new A.r(v,94,1):new A.r(1,94,v)
 q.b.$3(d,p,v)
 q.c.$3(d,A.eS(w,t,48,5.7),f)}},
 $3(d,e,f){return this.$4$padToo(d,e,f,!0)},
-$S:z+135}
+$S:z+136}
 A.ceI.prototype={
 $1(d){var w=this.a
 if(w.c!=null)w.wa("Tap a tool on the floor (the stack of sheets, the saw, the mud, the tape...), or choose one from the list, to pick it up. Then tap where it works. Stuck? Press Hint (it costs 2 stars; a job done without a hint earns 1).")},
@@ -27358,7 +27366,7 @@ A.ceK.prototype={
 $0(){var w=this.a
 w.f=this.b
 w.r=0
-w.a_D()},
+w.a_E()},
 $S:0}
 A.cek.prototype={
 $0(){var w=this.a
@@ -27380,7 +27388,7 @@ A.cel.prototype={
 $0(){var w=this.a
 w.f=this.b
 w.r=this.c
-w.a_D()},
+w.a_E()},
 $S:0}
 A.cep.prototype={
 $0(){return this.a.r=0},
@@ -27393,7 +27401,7 @@ $1(d){return d-6700},
 $S:71}
 A.cer.prototype={
 $0(){var w=this.b
-w.a_D()
+w.a_E()
 w.r=this.a.a.a?this.c:0},
 $S:0}
 A.ces.prototype={
@@ -27418,7 +27426,7 @@ w.r=0
 w.id=w.z=!1
 w.fy.a8(0)
 A.xT("drywall")
-w.a_D()},
+w.a_E()},
 $S:0}
 A.cez.prototype={
 $1(d){return d.a===6},
@@ -27436,7 +27444,7 @@ A.ceD.prototype={
 $1(d){return!d},
 $S:98}
 A.ceH.prototype={
-$0(){return A.aSp(this.a,"Hanging drywall",B.dcR,this.b)},
+$0(){return A.aSo(this.a,"Hanging drywall",B.dcR,this.b)},
 $S:0}
 A.ceF.prototype={
 $0(){var w=this.a
@@ -27444,25 +27452,25 @@ if(w.y)w.geh().fI(330,0.85,B.ES,0.5)
 else w.geh().fI(120,0.07,B.AY,0)},
 $S:0}
 A.ceG.prototype={
-$0(){var w=$.I7,v=w==null
+$0(){var w=$.I8,v=w==null
 w=v?null:w.r
 if(w==null)w=0
 return w+(v?this.a.dy:0)},
 $S:87}
 A.ceE.prototype={
-$1(d){var w=this.a,v=w.geh(),u=Math.cos(v.b),t=w.Q,s=C.C(A.ihT(w.d,t.gf_()/1000,new A.r(-u*Math.sin(v.a),Math.sin(v.b),u*Math.cos(v.a))),x.c)
-D.d.v(s,A.hBp(w.ch,w.CW,t.gf_()/1000))
-D.d.v(s,A.hBn(v))
-D.d.v(s,A.ihU(w.db,t.gf_()/1000))
+$1(d){var w=this.a,v=w.geh(),u=Math.cos(v.b),t=w.Q,s=C.C(A.ihU(w.d,t.gf_()/1000,new A.r(-u*Math.sin(v.a),Math.sin(v.b),u*Math.cos(v.a))),x.c)
+D.d.v(s,A.hBq(w.ch,w.CW,t.gf_()/1000))
+D.d.v(s,A.hBo(v))
+D.d.v(s,A.ihV(w.db,t.gf_()/1000))
 return s},
 $S:z+10}
-A.fGV.prototype={
+A.fGW.prototype={
 $6(d,e,f,g,h,i){return this.a.o9(new A.r(d,h,f),new A.r(e,h,f),new A.r(e,h,g),new A.r(d,h,g),i,this.b)},
 $S:1850}
-A.fGU.prototype={
+A.fGV.prototype={
 $1(d){return d.b===0},
 $S:z+15}
-A.fGW.prototype={
+A.fGX.prototype={
 $1(d){return d.a===this.a},
 $S:z+34}
 A.foy.prototype={
@@ -27478,10 +27486,10 @@ if(!w.c)return
 w.a.$0()
 if(w.c)w.b1f()},
 $S:8}
-A.h4Y.prototype={
+A.h4Z.prototype={
 $1(d){return D.o.D(d+this.a-D.i.V(this.b*40),0,255)},
 $S:71}
-A.fGQ.prototype={
+A.fGR.prototype={
 $4(d,e,f,g){var w,v,u,t,s=this.a
 s.x=$.dm=$.dm+1
 s.b=d
@@ -27492,13 +27500,13 @@ t=A.eS(w,(v+u)/2,(f+g)/2,1.75)
 v=u-v+1.5
 u=g-f
 w=(w&1)===0?new A.r(v,u,3.5):new A.r(3.5,u,v)
-s.aE(t,w,A.aSz(d,0),0.05)
+s.aE(t,w,A.aSy(d,0),0.05)
 s.x=0},
-$S:z+137}
-A.fGT.prototype={
+$S:z+138}
+A.fGU.prototype={
 $3(d,e,f){return A.eS(1,100+d,e,f)},
 $S:z+16}
-A.fHO.prototype={
+A.fHP.prototype={
 $0(){return this.b.$1(this.a.a)},
 $S:0}
 A.bR0.prototype={
@@ -27544,7 +27552,7 @@ $2(d,e){return A.eS(this.a.c,d,e,2.1)},
 $S:z+12}
 A.cFX.prototype={
 $1(d){var w=this.a
-return w.x7(d)&&w.aLd(d).a!=="ok"},
+return w.x7(d)&&w.aLe(d).a!=="ok"},
 $S:z+2}
 A.cFU.prototype={
 $1(d){return d.b==="outlet"&&d.c===this.a&&d.w!=null},
@@ -27560,9 +27568,9 @@ $1(d){return d.b},
 $S:z+59}
 A.cFG.prototype={
 $2(d,e){var w=e.w
-w=w==null?null:w.gaI4()
+w=w==null?null:w.gaI5()
 return d+(w==null?0:w)},
-$S:z+141}
+$S:z+142}
 A.cFF.prototype={
 $1(d){return d.b===this.a},
 $S:z+2}
@@ -27578,7 +27586,7 @@ A.cFM.prototype={
 $2(d,e){var w=$.zl(),v=C.U(w).k("Y<1>"),u=C.C(new C.Y(w,new A.cFO(this.a,d),v),v.k("M.E"))
 D.d.aZ(u,new A.cFP(e))
 return D.d.gH(u)},
-$S:z+142}
+$S:z+143}
 A.cFO.prototype={
 $1(d){return d.b===this.b&&d.f==="common"&&!D.d.aV(this.a.b,new A.cFN(d))},
 $S:z+32}
@@ -27604,7 +27612,7 @@ $S:z+2}
 A.cFL.prototype={
 $1(d){return d.b==="switch"&&!d.ay},
 $S:z+2}
-A.fFM.prototype={
+A.fFN.prototype={
 $3(d,e,f){var w=this.a
 w.b=d
 w.f=3
@@ -27615,7 +27623,7 @@ w.d=1
 w.e=0
 w.f=2},
 $S:z+56}
-A.fFK.prototype={
+A.fFL.prototype={
 $4$r(d,e,f,g){var w=this.a
 w.b=d
 w.f=2
@@ -27626,24 +27634,24 @@ w.d=1
 w.e=0},
 $3(d,e,f){return this.$4$r(d,e,f,1.5)},
 $S:z+57}
-A.fFL.prototype={
+A.fFM.prototype={
 $3$r(d,e,f){var w=A.S7(d),v=d.a
 this.a.$3(v,w,B.aZ5)
 this.b.$4$r(v,w.a2(0,B.hg6),e,f)},
 $2(d,e){return this.$3$r(d,e,1.7)},
-$S:z+143}
-A.fFI.prototype={
+$S:z+144}
+A.fFJ.prototype={
 $1(d){return d.e===this.a.a},
 $S:z+2}
-A.fFJ.prototype={
+A.fFK.prototype={
 $1(d){return d.b==="ceiling"},
 $S:z+2}
-A.fFH.prototype={
+A.fFI.prototype={
 $1(d){var w=d.b
 if(w==="ceiling")w="Ceiling box"
 else w=w==="switch"?"Switch box":"Outlet box"
 return w},
-$S:z+144}
+$S:z+145}
 A.cok.prototype={
 $1(d){var w=this.a
 if(w.c!=null)w.nJ("Tap a tool on the shelves by the window (the cable roll, the drill), or choose one from the list, to pick it up. Stuck? Press Hint (it costs 2 stars; a job done without a hint earns 1).")},
@@ -27825,7 +27833,7 @@ A.co8.prototype={
 $0(){return this.a.HE("knock")},
 $S:0}
 A.cob.prototype={
-$1(d){return d.gaoJ()>0},
+$1(d){return d.gaoK()>0},
 $S:z+2}
 A.coc.prototype={
 $1(d){return!d},
@@ -27834,7 +27842,7 @@ A.cod.prototype={
 $1(d){return d.b},
 $S:z+59}
 A.coj.prototype={
-$0(){return A.aSp(this.a,"Wiring a house",B.cKw,this.b)},
+$0(){return A.aSo(this.a,"Wiring a house",B.cKw,this.b)},
 $S:0}
 A.cog.prototype={
 $0(){var w=this.a
@@ -27842,50 +27850,50 @@ if(w.at)w.geh().fI(330,0.85,B.ES,0.5)
 else w.geh().fI(120,0.07,B.AY,1.5707963267948966)},
 $S:0}
 A.coh.prototype={
-$0(){var w=$.I7,v=w==null
+$0(){var w=$.I8,v=w==null
 w=v?null:w.r
 if(w==null)w=0
 return w+(v?this.a.fy:0)},
 $S:87}
 A.coe.prototype={
-$1(d){var w=this.a,v=w.d,u=C.C(A.iv0(v,d,w.ch,w.CW),x.c)
-D.d.v(u,A.ihK(v,d))
-D.d.v(u,A.hBp(w.cx,w.cy,w.ay.gf_()/1000))
-D.d.v(u,A.hBn(w.geh()))
+$1(d){var w=this.a,v=w.d,u=C.C(A.iv1(v,d,w.ch,w.CW),x.c)
+D.d.v(u,A.ihL(v,d))
+D.d.v(u,A.hBq(w.cx,w.cy,w.ay.gf_()/1000))
+D.d.v(u,A.hBo(w.geh()))
 return u},
 $S:z+10}
 A.cof.prototype={
-$1(d){return A.igi(this.a.d)},
+$1(d){return A.igj(this.a.d)},
 $S:z+48}
 A.coi.prototype={
-$1(d){return A.aiU(d)!=null||A.hhJ(d)!=null},
+$1(d){return A.aiU(d)!=null||A.hhK(d)!=null},
 $S:34}
-A.fHF.prototype={
-$2(d,e){return D.d.fe($.zl(),new A.fHG(d,e)).a},
-$S:734}
 A.fHG.prototype={
+$2(d,e){return D.d.fe($.zl(),new A.fHH(d,e)).a},
+$S:734}
+A.fHH.prototype={
 $1(d){return d.b===this.a&&d.c===this.b&&d.f!=="cripple"},
 $S:z+32}
-A.fHD.prototype={
+A.fHE.prototype={
 $1(d){return d.b==="switch"&&d.w!=null},
 $S:z+2}
-A.fHE.prototype={
+A.fHF.prototype={
 $1(d){return d.b==="switch"},
 $S:z+2}
-A.h4V.prototype={
+A.h4W.prototype={
 $1(d){return d.a===this.a.a},
 $S:z+13}
-A.fXq.prototype={
+A.fXr.prototype={
 $1(d){return d.b},
 $S:z+33}
-A.fXr.prototype={
+A.fXs.prototype={
 $1(d){return this.a.b.al(0,d.a)},
 $S:z+13}
-A.h41.prototype={
+A.h42.prototype={
 $4(d,e,f,g){var w=null,v=C.a([f.j(0.16),f.j(0.04)],x.O),u=C.l(16),t=C.L(f.j(0.65),D.r,1.4),s=x.p
 return C.q(w,C.x(C.a([C.A(C.a([C.X(e,f,w,w,w,17),A7.AF,C.E(C.d(d,w,w,w,w,w,w,C.n(w,w,f,w,w,w,w,w,w,w,w,12.5,w,w,D.u,w,w,!0,w,0.5,w,w,w,w,w,w),w,w,w),1)],s),D.l,w,D.e,D.j,0,w,w),D.an,g],s),D.E,w,D.e,D.j,0,D.p),D.f,w,w,new C.p(w,w,t,u,w,new C.a8(D.aA,D.aE,D.x,v,w,w),D.n),w,w,w,D.uq,Ai.a0e,w,w,1/0)},
 $S:1852}
-A.h40.prototype={
+A.h41.prototype={
 $1(d){var w,v,u,t,s,r,q,p,o,n=this,m=null,l=C.l(26),k=n.a,j=C.L(k.j(0.8),D.r,1.8),i=C.a([new C.ac(0,D.G,k.j(0.3),D.H,30)],x.V),h=C.a([D.c.j(0.9),k],x.O),g=C.L(D.hu,D.r,2)
 h=C.q(m,C.as(C.q(m,m,D.f,D.aV,m,m,m,4,m,m,m,m,m,20),m,m,m),D.f,m,m,new C.p(m,m,g,m,m,new C.bY(D.A,0.5,D.x,m,0,h,m,m),D.a6),m,46,m,m,m,m,m,46)
 g=n.b
@@ -27900,28 +27908,28 @@ if(t.length===0)h.push(C.d(g.d,m,m,m,m,m,m,A5.Kw,m,m,m))
 for(s=t.length,r=0;r<t.length;t.length===s||(0,C.J)(t),++r){q=t[r]
 p=new C.aN(14,14)
 o=new C.ay(D.bW,1,D.r,-1)
-h.push(C.q(m,C.d(q.b,m,m,m,m,m,m,new C.G(!0,q.d,m,m,m,m,12.5,D.u,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m),m,m,m),D.f,m,m,new C.p(q.c,m,new C.bH(o,o,o,o),new C.be(p,p,p,p),m,m,D.n),m,m,m,m,D.pm,m,m,m))}return C.eP(m,D.L,new C.cP(Al.Xx,C.q(m,C.ce(C.x(C.a([v,w.$4("THE WIRE THAT GOES HERE",E.P9,D.aH,C.bV(D.bG,h,D.bs,m,6,8)),w.$4("WHY IT HAS NO WIRE",D.CR,D.bi,C.d(A.iso(n.f,n.r,g),m,m,m,m,m,m,B.fn9,m,m,m)),w.$4("REMEMBER",D.mh,D.b4,C.d(g.d,m,m,m,m,m,m,Ak.EI,m,m,m)),D.af,new C.a5(1/0,m,C.bJ(B.fOb,m,new A.h4_(d),C.bp(k.j(0.9),m,m,m,D.w,m,D.fg,m,new C.b9(C.l(16),D.a1),m,m,m)),m)],u),D.l,m,D.e,D.P,0,D.p),D.t,m,D.y,m,m,m,m,D.ah),D.f,m,m,new C.p(m,m,j,l,i,B.c9F,D.n),m,m,B.hpZ,m,D.GP,m,m,m),m),m,m,m,I.a0w,D.d7,m,m,m)},
+h.push(C.q(m,C.d(q.b,m,m,m,m,m,m,new C.G(!0,q.d,m,m,m,m,12.5,D.u,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m),m,m,m),D.f,m,m,new C.p(q.c,m,new C.bH(o,o,o,o),new C.be(p,p,p,p),m,m,D.n),m,m,m,m,D.pm,m,m,m))}return C.eP(m,D.L,new C.cP(Al.Xx,C.q(m,C.ce(C.x(C.a([v,w.$4("THE WIRE THAT GOES HERE",E.P9,D.aH,C.bV(D.bG,h,D.bs,m,6,8)),w.$4("WHY IT HAS NO WIRE",D.CR,D.bi,C.d(A.isp(n.f,n.r,g),m,m,m,m,m,m,B.fn9,m,m,m)),w.$4("REMEMBER",D.mh,D.b4,C.d(g.d,m,m,m,m,m,m,Ak.EI,m,m,m)),D.af,new C.a5(1/0,m,C.bJ(B.fOb,m,new A.h40(d),C.bp(k.j(0.9),m,m,m,D.w,m,D.fg,m,new C.b9(C.l(16),D.a1),m,m,m)),m)],u),D.l,m,D.e,D.P,0,D.p),D.t,m,D.y,m,m,m,m,D.ah),D.f,m,m,new C.p(m,m,j,l,i,B.c9F,D.n),m,m,B.hpZ,m,D.GP,m,m,m),m),m,m,m,I.a0w,D.d7,m,m,m)},
 $S:49}
-A.h4_.prototype={
+A.h40.prototype={
 $0(){C.a6(this.a,!1).O(null)
 return null},
-$S:0};(function aliases(){var w=A.aOO.prototype
+$S:0};(function aliases(){var w=A.aON.prototype
 w.bAL=w.t
-w=A.aM8.prototype
+w=A.aM7.prototype
 w.bxU=w.t})();(function installTearOffs(){var w=a._instance_0u,v=a._instance_1u,u=a.installStaticTearOff,t=a.installInstanceTearOff,s=a._instance_2u,r=a._instance_0i
 var q
 w(q=A.af7.prototype,"gbYW","bYX",0)
-v(q,"gM3","a5J",97)
-u(A,"iq6",3,null,["$3"],["ibL"],31,0)
-w(q=A.apy.prototype,"gc9o","c9p",0)
+v(q,"gM3","a5K",98)
+u(A,"iq7",3,null,["$3"],["ibM"],31,0)
+w(q=A.apx.prototype,"gc9o","c9p",0)
 w(q,"gbsT","bsU",0)
-t(q,"gcCs",0,0,null,["$1$done","$0"],["aCX","cCt"],60,0,0)
+t(q,"gcCs",0,0,null,["$1$done","$0"],["aCY","cCt"],75,0,0)
 w(q,"gcEy","cEz",0)
 w(q,"gbRc","bRd",0)
-v(A.aUS.prototype,"gcVq","cVr",23)
-s(q=A.aFx.prototype,"gbQc","bQd",29)
+v(A.aUR.prototype,"gcVq","cVr",23)
+s(q=A.aFw.prototype,"gbQc","bQd",29)
 w(q,"gj3","iv",0)
-t(q,"gcaE",0,1,null,["$2$keepTour","$1"],["ayO","B0"],140,0,0)
+t(q,"gcaE",0,1,null,["$2$keepTour","$1"],["ayP","B0"],146,0,0)
 v(q,"gcaJ","caK",9)
 w(q,"gbSb","bSc",0)
 w(q,"gbSd","bSe",0)
@@ -27931,65 +27939,65 @@ w(q,"gbIz","bIA",0)
 w(q,"gcH7","cH8",0)
 w(q,"gcv1","cv2",0)
 w(q,"gbQT","bQU",0)
-w(q,"gaSh","atO",0)
+w(q,"gaSi","atP",0)
 w(q,"gcaC","caD",0)
 w(q,"gcxC","cxD",0)
 w(q,"gbTz","bTA",17)
 w(q,"gcH1","cH2",17)
 w(q,"gcCu","Sy",0)
 w(q,"gb9n","Ss",0)
-w(q,"gb9C","a3d",0)
+w(q,"gb9C","a3e",0)
 w(q,"gcJc","cJd",0)
 w(q,"gbVV","bVW",0)
 w(q,"gcCr","Bw",0)
 w(q,"gcaH","EJ",17)
-w(q,"gck8","a0U",17)
-w(q,"gcjy","a0L",17)
-w(q,"gaOX","bDT",17)
+w(q,"gck8","a0V",17)
+w(q,"gcjy","a0M",17)
+w(q,"gaOY","bDT",17)
 w(q,"gcaN","caO",0)
 w(q,"gcsd","cse",0)
 r(q,"gcaL","caM",0)
-u(A,"hEN",3,null,["$3"],["irL"],31,0)
-u(A,"hhd",3,null,["$3"],["hF0"],31,0)
-w(q=A.aBl.prototype,"gaRv","bJU",0)
+u(A,"hEO",3,null,["$3"],["irM"],31,0)
+u(A,"hhe",3,null,["$3"],["hF1"],31,0)
+w(q=A.aBk.prototype,"gaRw","bJU",0)
 w(q,"gJt","mM",0)
 w(q,"gJq","ov",0)
 v(q,"gJr","Js",9)
 w(q,"gcpc","cpd",0)
 w(q,"gcEB","cEC",0)
-w(q=A.aHi.prototype,"gJq","ov",0)
+w(q=A.aHh.prototype,"gJq","ov",0)
 w(q,"gJt","mM",0)
 v(q,"gJr","Js",9)
 w(q,"gcvm","b6L",0)
-w(q=A.aBF.prototype,"gJq","ov",0)
+w(q=A.aBE.prototype,"gJq","ov",0)
 w(q,"gJt","mM",0)
 v(q,"gJr","Js",9)
 r(q,"gcaQ","caR",0)
-w(q=A.aCz.prototype,"gJq","ov",0)
+w(q=A.aCy.prototype,"gJq","ov",0)
 v(q,"gJr","Js",9)
-w(q=A.aG_.prototype,"gcaV","b0O",0)
+w(q=A.aFZ.prototype,"gcaV","b0O",0)
 v(q,"gcaW","caX",9)
 w(q,"gczR","czS",0)
-v(A.YF.prototype,"garf","bs0",112)
-s(q=A.aG6.prototype,"gcb0","cb1",29)
-w(q,"gbUD","aVN",0)
+v(A.YF.prototype,"garg","bs0",113)
+s(q=A.aG5.prototype,"gcb0","cb1",29)
+w(q,"gbUD","aVO",0)
 w(q,"gc5x","c5y",0)
 w(q,"gbGr","bGs",0)
 w(q,"gbGp","bGq",0)
 w(q,"gb0P","Qb",0)
 v(q,"gcb3","cb4",9)
-w(q=A.aGa.prototype,"gcb8","b0S",0)
+w(q=A.aG9.prototype,"gcb8","b0S",0)
 v(q,"gcb9","cba",9)
-w(q=A.aqX.prototype,"gb1e","a_D",0)
-v(q,"gbrG","HE",136)
+w(q=A.aqW.prototype,"gb1e","a_E",0)
+v(q,"gbrG","HE",137)
 s(q,"gccd","cce",29)
 w(q,"gccg","cch",0)
 v(q,"gccj","cck",9)
 w(q,"gcco","ccp",0)
 w(q,"gccl","ccm",0)
-v(q=A.baC.prototype,"gaLx","tO",2)
-v(q,"gd14","a7l",2)
-w(q=A.atW.prototype,"ga_E","wb",0)
+v(q=A.baC.prototype,"gaLy","tO",2)
+v(q,"gd14","a7m",2)
+w(q=A.atV.prototype,"ga_F","wb",0)
 s(q,"gbWu","bWv",29)
 w(q,"gbQP","bQQ",0)
 w(q,"gcct","ccu",0)
@@ -27997,34 +28005,34 @@ w(q,"gcFG","cFH",0)
 v(q,"gccv","ccw",9)
 w(q,"gcGd","cGe",0)
 w(q,"gccx","ccy",0)})();(function inheritance(){var w=a.mixin,v=a.mixinHard,u=a.inheritMany,t=a.inherit
-u(C.lE,[A.f3x,A.rz,A.Kg,A.Gf,A.Gn])
-u(C.af,[A.aaz,A.awp,A.ajM,A.apx,A.aqx,A.Jv,A.aJL,A.aKJ,A.Of,A.axk,A.BS,A.aas,A.a5S,A.aCy,A.agA,A.X8,A.OU,A.asO,A.aqY,A.a25,A.aqW,A.atV])
-u(C.ah,[A.aOF,A.aOO,A.bbV,A.apy,A.blH,A.aFx,A.bv_,A.bxa,A.blI,A.buN,A.bz2,A.bAn,A.bz7,A.aCz,A.byr,A.aG_,A.aG6,A.aGa,A.aM8,A.bw4,A.aqX,A.atW])
-t(A.af7,A.aOF)
-t(A.bqs,S.avk)
-u(C.aE,[A.r,A.kf,A.cI,A.he,A.r_,A.fh,A.eL,A.bWl,A.cGN,A.GA,A.Qt,A.cOP,A.bd4,A.bdp,A.biw,A.dsN,A.Nd,A.dyn,A.dmW,A.lO,A.rn,A.HW,A.aU2,A.bJ5,A.hk,A.Gr,A.zD,A.xJ,A.aV7,A.a55,A.al8,A.bNz,A.bLH,A.dnr,A.t3,A.Tj,A.aUu,A.byq,A.bLJ,A.AJ,A.cDG,A.pT,A.bLs,A.FW,A.PA,A.IG,A.MA,A.aUS,A.fm,A.yL,A.iS,A.N2,A.ayD,A.mt,A.mo,A.fo,A.EB,A.o0,A.acy,A.oF,A.aXk,A.a65,A.aXp,A.f5V,A.MY,A.QY,A.bWC,A.m8,A.adT,A.jY,A.NC,A.cqJ,A.FL,A.nG,A.Ya,A.cqz,A.zx,A.lg,A.YP,A.awU,A.aVI,A.eu,A.YF,A.hI,A.t1,A.uV,A.N6,A.cyW,A.yt,A.u2,A.aaP,A.ic,A.cvv,A.AZ,A.bti,A.aXr,A.baH,A.ald,A.cBV,A.cFu,A.a50,A.bNJ,A.wL,A.tD,A.b7m,A.abX,A.abY,A.vA,A.b65,A.b9e,A.cBX,A.Qn,A.pd,A.zC,A.MT,A.MU,A.a5e,A.bOG,A.XP,A.yC,A.a60,A.ib,A.alW,A.wc,A.Qj,A.lj,A.baC,A.Dc,A.Qv])
-u(C.ht,[A.c1l,A.c1m,A.c1k,A.c1n,A.c1o,A.h4q,A.h4o,A.h4p,A.h4n,A.h4d,A.bKQ,A.bKR,A.bKV,A.bKW,A.bKN,A.bKY,A.bKX,A.bKU,A.bKS,A.bKT,A.bKP,A.bKO,A.bKZ,A.cwv,A.cww,A.cwo,A.cwp,A.cwq,A.cwr,A.f6Y,A.f6X,A.f6V,A.f6W,A.f6P,A.f6S,A.f6T,A.f6R,A.f6U,A.bV8,A.bV1,A.bVc,A.bV7,A.bVf,A.bVd,A.bVh,A.bV3,A.bV5,A.bV4,A.fDP,A.fDQ,A.fDO,A.fDR,A.bJ7,A.bJ6,A.fW8,A.fE6,A.fE7,A.fE_,A.fE0,A.fE1,A.fE2,A.fE3,A.fE4,A.fE5,A.fpE,A.ft5,A.fCC,A.fDS,A.fDT,A.fDU,A.c5o,A.c5m,A.c5e,A.c57,A.c55,A.c5_,A.c56,A.c4Q,A.c4R,A.c4S,A.fGF,A.bNB,A.bNE,A.fKj,A.fmA,A.bLK,A.h4l,A.h4m,A.h4j,A.fGe,A.cDI,A.cDJ,A.bLt,A.bLC,A.bLD,A.bLE,A.bLF,A.bLu,A.bLv,A.bLw,A.bLx,A.bLy,A.bLA,A.bLB,A.bLG,A.bMh,A.bMe,A.bMf,A.bMg,A.bMl,A.bMk,A.bMi,A.bMm,A.dW8,A.dW3,A.dWn,A.dW6,A.dWq,A.fGX,A.h4X,A.fG0,A.fG1,A.fFZ,A.fG_,A.fX2,A.fX3,A.fH9,A.fHa,A.fH7,A.fH8,A.fDY,A.fDZ,A.h4W,A.fpV,A.fvx,A.fCu,A.fDD,A.h4S,A.h4P,A.bVN,A.bVM,A.bWn,A.bWo,A.bWp,A.bWq,A.bWr,A.bWv,A.bWs,A.bWt,A.bWz,A.bWy,A.bWx,A.bWw,A.eid,A.eia,A.eib,A.eic,A.eeQ,A.eho,A.ehp,A.ehl,A.edp,A.ehR,A.ehS,A.eh2,A.eg0,A.efX,A.eeJ,A.efH,A.eeT,A.efw,A.ei4,A.ees,A.efu,A.efv,A.ef9,A.efJ,A.edX,A.edW,A.eeo,A.egS,A.egR,A.ef7,A.ef4,A.egz,A.ehP,A.ehO,A.ehG,A.ehB,A.ehA,A.ehd,A.ei_,A.egI,A.egJ,A.ehT,A.egG,A.efL,A.efM,A.efN,A.efx,A.efy,A.egU,A.eh6,A.eh8,A.efE,A.efD,A.efF,A.eh9,A.eg2,A.eg3,A.egb,A.egc,A.egd,A.efP,A.efQ,A.ei3,A.efS,A.efR,A.edo,A.edi,A.edj,A.edk,A.ei7,A.edI,A.edw,A.edx,A.edK,A.edq,A.egF,A.dyN,A.fbo,A.fbp,A.fbq,A.fbn,A.fEi,A.fEp,A.fEk,A.fEh,A.fEa,A.fEm,A.fEo,A.fEn,A.fEl,A.fEb,A.fE9,A.fEe,A.fEf,A.fWj,A.fWh,A.fWg,A.fWi,A.fwH,A.fED,A.fEP,A.fEE,A.fEF,A.fEQ,A.fEH,A.fEK,A.fEL,A.fEM,A.fEN,A.fEI,A.fxq,A.fxl,A.fxm,A.fxn,A.fwJ,A.fwL,A.fwW,A.fx6,A.fxo,A.fxf,A.fxg,A.fxh,A.fxi,A.fxj,A.fxk,A.fwM,A.fwN,A.fwO,A.fwP,A.fwQ,A.fwR,A.fwS,A.fwT,A.fwU,A.fwV,A.fwX,A.fwY,A.fwZ,A.fx_,A.fx0,A.fx1,A.fx2,A.fx3,A.fx4,A.fx5,A.fx7,A.fx8,A.fx9,A.fxa,A.fxb,A.fxc,A.fxd,A.fxe,A.fI5,A.fI6,A.fI7,A.fnb,A.fmW,A.fyg,A.fxO,A.fxP,A.fxQ,A.fxR,A.fy1,A.fy9,A.fya,A.fyb,A.fyc,A.fyd,A.fye,A.fyf,A.fxS,A.fxT,A.fxU,A.fxV,A.fxW,A.fxX,A.fxY,A.fxZ,A.fy_,A.fy0,A.fy2,A.fy3,A.fy4,A.fy5,A.fy6,A.fy7,A.fy8,A.fre,A.fEX,A.fET,A.fEW,A.fEV,A.dWy,A.dWF,A.dWw,A.dWx,A.fbc,A.fXy,A.fXx,A.deU,A.deb,A.dec,A.de8,A.dee,A.deh,A.dej,A.deC,A.deS,A.dez,A.deT,A.f0C,A.f0p,A.f0x,A.f0y,A.dhH,A.dhp,A.dhA,A.dhB,A.dhD,A.doy,A.doJ,A.doI,A.doL,A.fmB,A.fmG,A.fmH,A.fmF,A.fFy,A.fFx,A.fFw,A.fEC,A.fHr,A.fHq,A.cqD,A.cqE,A.cqA,A.cqF,A.cqG,A.cqH,A.cqI,A.cqB,A.cqC,A.fFv,A.fFt,A.fFn,A.fFq,A.fFo,A.fFp,A.fFu,A.fFr,A.fFs,A.fFm,A.fWD,A.ev7,A.euP,A.euU,A.ev8,A.euV,A.euW,A.euX,A.ev5,A.ev9,A.evb,A.eva,A.ev_,A.h4c,A.cvA,A.cvH,A.cvI,A.cvJ,A.cvK,A.cvM,A.cvL,A.cvz,A.cvx,A.cvy,A.cvF,A.cvG,A.cvB,A.cvC,A.cvD,A.cvE,A.eyN,A.eyO,A.eyP,A.ezn,A.ezp,A.ezr,A.eyX,A.eyU,A.ezI,A.ezQ,A.ezF,A.eze,A.ezf,A.ez1,A.ez2,A.ez3,A.ez6,A.ez7,A.ez8,A.ez9,A.eza,A.ezb,A.ezc,A.ezd,A.ez4,A.ez5,A.eAf,A.eA5,A.eA7,A.ezm,A.fxt,A.fxu,A.fFz,A.fFA,A.fFB,A.fFE,A.fFC,A.fWY,A.fWZ,A.fX_,A.cz0,A.cyX,A.cyZ,A.cz_,A.cyY,A.eBH,A.eBI,A.eBC,A.eBy,A.eBT,A.eBS,A.eBU,A.eBV,A.eBQ,A.eBN,A.fpW,A.bWA,A.bWB,A.db7,A.daS,A.flx,A.fHs,A.fGZ,A.fH4,A.fH_,A.fH0,A.fH1,A.fH2,A.fps,A.fpt,A.cBY,A.cC_,A.h49,A.h47,A.ffa,A.ffc,A.fIl,A.fIk,A.fGR,A.fGO,A.fDH,A.fDF,A.fDG,A.fov,A.fow,A.fox,A.bOH,A.bON,A.bOM,A.bOP,A.bOQ,A.bOK,A.bOI,A.bOL,A.bOO,A.fEw,A.fEz,A.fEs,A.fEr,A.fEu,A.fEt,A.fEx,A.fEv,A.fEA,A.ceI,A.ceJ,A.cet,A.ces,A.cej,A.cez,A.ceA,A.ceB,A.ceC,A.ceD,A.ceE,A.fGV,A.fGU,A.fGW,A.foy,A.bU5,A.bU4,A.h4Y,A.fGQ,A.fGT,A.bR0,A.cFQ,A.cFR,A.cFC,A.cFv,A.cFT,A.cFy,A.cFz,A.cFX,A.cFU,A.cFV,A.cFW,A.cFE,A.cFF,A.cFx,A.cFO,A.cFN,A.cFH,A.cFI,A.cFJ,A.cFK,A.cFL,A.fFM,A.fFK,A.fFL,A.fFI,A.fFJ,A.fFH,A.cok,A.cnI,A.cnJ,A.cnK,A.cny,A.cnB,A.co0,A.co9,A.coa,A.cob,A.coc,A.cod,A.coe,A.cof,A.coi,A.fHG,A.fHD,A.fHE,A.h4V,A.fXq,A.fXr,A.h41,A.h40])
-u(C.jx,[A.c1j,A.cwu,A.cwn,A.cws,A.cwt,A.bV2,A.bVa,A.bV9,A.fCx,A.fE8,A.fCD,A.c54,A.bND,A.bNA,A.bNF,A.bNC,A.bLI,A.c3_,A.h4k,A.fGf,A.cDH,A.bLz,A.bMj,A.fIu,A.fIv,A.fIw,A.fIx,A.fIy,A.fH6,A.fot,A.fvy,A.fvw,A.fvv,A.fIz,A.fIA,A.fIB,A.fIC,A.fID,A.fIE,A.fIF,A.fIG,A.fIH,A.fII,A.fIn,A.fIo,A.fIp,A.fIq,A.fIr,A.fIs,A.fIt,A.fKD,A.h4Q,A.h4R,A.bWu,A.egi,A.efg,A.ehQ,A.eh1,A.eg_,A.eeV,A.egQ,A.ef6,A.ehN,A.ehz,A.ega,A.fEq,A.fEj,A.fEg,A.fEc,A.fEd,A.fwI,A.fwG,A.fwF,A.fES,A.fEG,A.fEJ,A.fER,A.fxp,A.fwK,A.fI8,A.fEU,A.def,A.f0u,A.dho,A.cvN,A.ezl,A.eBP,A.db4,A.daX,A.fHt,A.fH3,A.cBZ,A.fH5,A.fGP,A.bOJ,A.fEy,A.cFB,A.cFD,A.cFS,A.cFA,A.cFG,A.cFw,A.cFM,A.cFP,A.fHF])
-u(C.pf,[A.uO,A.aUv])
+u(C.lE,[A.f3x,A.rz,A.Kh,A.Gf,A.Gn])
+u(C.af,[A.aaz,A.awo,A.ajM,A.apw,A.aqw,A.Jw,A.aJK,A.aKI,A.Of,A.axj,A.BS,A.aas,A.a5S,A.aCx,A.agA,A.X8,A.OU,A.asN,A.aqX,A.a25,A.aqV,A.atU])
+u(C.ah,[A.aOE,A.aON,A.bbV,A.apx,A.blH,A.aFw,A.bv_,A.bxa,A.blI,A.buN,A.bz2,A.bAn,A.bz7,A.aCy,A.byr,A.aFZ,A.aG5,A.aG9,A.aM7,A.bw4,A.aqW,A.atV])
+t(A.af7,A.aOE)
+t(A.bqs,S.avj)
+u(C.aE,[A.r,A.jF,A.cI,A.he,A.r_,A.fh,A.eL,A.bWl,A.cGN,A.GA,A.Qt,A.cOP,A.bd4,A.bdp,A.biw,A.dsN,A.Nd,A.dyn,A.dmW,A.lO,A.rn,A.HX,A.aU1,A.bJ5,A.hk,A.Gr,A.zD,A.xJ,A.aV6,A.a55,A.al8,A.bNz,A.bLH,A.dnr,A.t3,A.Tj,A.aUt,A.byq,A.bLJ,A.AJ,A.cDG,A.pT,A.bLs,A.FW,A.PA,A.IH,A.MA,A.aUR,A.fm,A.yL,A.iS,A.N2,A.ayC,A.mt,A.mo,A.fo,A.EB,A.o0,A.acy,A.oF,A.aXj,A.a65,A.aXo,A.f5V,A.MY,A.QY,A.bWC,A.m8,A.adT,A.jZ,A.NC,A.cqJ,A.FL,A.nG,A.Ya,A.cqz,A.zx,A.lg,A.YP,A.awT,A.aVH,A.eu,A.YF,A.hI,A.t1,A.uV,A.N6,A.cyW,A.yt,A.u2,A.aaP,A.ic,A.cvv,A.AZ,A.bti,A.aXq,A.baH,A.ald,A.cBV,A.cFu,A.a50,A.bNJ,A.wL,A.tD,A.b7m,A.abX,A.abY,A.vA,A.b65,A.b9e,A.cBX,A.Qn,A.pd,A.zC,A.MT,A.MU,A.a5e,A.bOG,A.XP,A.yC,A.a60,A.ib,A.alW,A.wc,A.Qj,A.lj,A.baC,A.Dc,A.Qv])
+u(C.ht,[A.c1l,A.c1m,A.c1k,A.c1n,A.c1o,A.h4r,A.h4p,A.h4q,A.h4o,A.h4e,A.bKQ,A.bKR,A.bKV,A.bKW,A.bKN,A.bKY,A.bKX,A.bKU,A.bKS,A.bKT,A.bKP,A.bKO,A.bKZ,A.cwv,A.cww,A.cwo,A.cwp,A.cwq,A.cwr,A.f6Y,A.f6X,A.f6V,A.f6W,A.f6P,A.f6S,A.f6T,A.f6R,A.f6U,A.bV8,A.bV1,A.bVc,A.bV7,A.bVf,A.bVd,A.bVh,A.bV3,A.bV5,A.bV4,A.fDP,A.fDQ,A.fDO,A.fDR,A.bJ7,A.bJ6,A.fW9,A.fE7,A.fE8,A.fE0,A.fE1,A.fE2,A.fE3,A.fE4,A.fE5,A.fE6,A.fpE,A.ft5,A.fCC,A.fDS,A.fDT,A.fDU,A.c5o,A.c5m,A.c5e,A.c57,A.c55,A.c5_,A.c56,A.c4Q,A.c4R,A.c4S,A.fGG,A.bNB,A.bNE,A.fKk,A.fmA,A.bLK,A.h4m,A.h4n,A.h4k,A.fGf,A.cDI,A.cDJ,A.bLt,A.bLC,A.bLD,A.bLE,A.bLF,A.bLu,A.bLv,A.bLw,A.bLx,A.bLy,A.bLA,A.bLB,A.bLG,A.bMh,A.bMe,A.bMf,A.bMg,A.bMl,A.bMk,A.bMi,A.bMm,A.dW8,A.dW3,A.dWn,A.dW6,A.dWq,A.fGY,A.h4Y,A.fG1,A.fG2,A.fG_,A.fG0,A.fX3,A.fX4,A.fHa,A.fHb,A.fH8,A.fH9,A.fDZ,A.fE_,A.fDY,A.h4X,A.fpV,A.fvx,A.fCu,A.fDD,A.h4T,A.h4Q,A.bVN,A.bVM,A.bWn,A.bWo,A.bWp,A.bWq,A.bWr,A.bWv,A.bWs,A.bWt,A.bWz,A.bWy,A.bWx,A.bWw,A.eid,A.eia,A.eib,A.eic,A.eeQ,A.eho,A.ehp,A.ehl,A.edp,A.ehR,A.ehS,A.eh2,A.eg0,A.efX,A.eeJ,A.efH,A.eeT,A.efw,A.ei4,A.ees,A.efu,A.efv,A.ef9,A.efJ,A.edX,A.edW,A.eeo,A.egS,A.egR,A.ef7,A.ef4,A.egz,A.ehP,A.ehO,A.ehG,A.ehB,A.ehA,A.ehd,A.ei_,A.egI,A.egJ,A.ehT,A.egG,A.efL,A.efM,A.efN,A.efx,A.efy,A.egU,A.eh6,A.eh8,A.efE,A.efD,A.efF,A.eh9,A.eg2,A.eg3,A.egb,A.egc,A.egd,A.efP,A.efQ,A.ei3,A.efS,A.efR,A.edo,A.edi,A.edj,A.edk,A.ei7,A.edI,A.edw,A.edx,A.edK,A.edq,A.egF,A.dyN,A.fbo,A.fbp,A.fbq,A.fbn,A.fEj,A.fEq,A.fEl,A.fEi,A.fEb,A.fEn,A.fEp,A.fEo,A.fEm,A.fEc,A.fEa,A.fEf,A.fEg,A.fWk,A.fWi,A.fWh,A.fWj,A.fwH,A.fEE,A.fEQ,A.fEF,A.fEG,A.fER,A.fEI,A.fEL,A.fEM,A.fEN,A.fEO,A.fEJ,A.fxq,A.fxl,A.fxm,A.fxn,A.fwJ,A.fwL,A.fwW,A.fx6,A.fxo,A.fxf,A.fxg,A.fxh,A.fxi,A.fxj,A.fxk,A.fwM,A.fwN,A.fwO,A.fwP,A.fwQ,A.fwR,A.fwS,A.fwT,A.fwU,A.fwV,A.fwX,A.fwY,A.fwZ,A.fx_,A.fx0,A.fx1,A.fx2,A.fx3,A.fx4,A.fx5,A.fx7,A.fx8,A.fx9,A.fxa,A.fxb,A.fxc,A.fxd,A.fxe,A.fI6,A.fI7,A.fI8,A.fnb,A.fmW,A.fyg,A.fxO,A.fxP,A.fxQ,A.fxR,A.fy1,A.fy9,A.fya,A.fyb,A.fyc,A.fyd,A.fye,A.fyf,A.fxS,A.fxT,A.fxU,A.fxV,A.fxW,A.fxX,A.fxY,A.fxZ,A.fy_,A.fy0,A.fy2,A.fy3,A.fy4,A.fy5,A.fy6,A.fy7,A.fy8,A.fre,A.fEY,A.fEU,A.fEX,A.fEW,A.dWy,A.dWF,A.dWw,A.dWx,A.fbc,A.fXz,A.fXy,A.deU,A.deb,A.dec,A.de8,A.dee,A.deh,A.dej,A.deC,A.deS,A.dez,A.deT,A.f0C,A.f0p,A.f0x,A.f0y,A.dhH,A.dhp,A.dhA,A.dhB,A.dhD,A.doy,A.doJ,A.doI,A.doL,A.fmB,A.fmG,A.fmH,A.fmF,A.fFz,A.fFy,A.fFx,A.fED,A.fHs,A.fHr,A.cqD,A.cqE,A.cqA,A.cqF,A.cqG,A.cqH,A.cqI,A.cqB,A.cqC,A.fFw,A.fFu,A.fFo,A.fFr,A.fFp,A.fFq,A.fFv,A.fFs,A.fFt,A.fFn,A.fWE,A.ev7,A.euP,A.euU,A.ev8,A.euV,A.euW,A.euX,A.ev5,A.ev9,A.evb,A.eva,A.ev_,A.h4d,A.cvA,A.cvH,A.cvI,A.cvJ,A.cvK,A.cvM,A.cvL,A.cvz,A.cvx,A.cvy,A.cvF,A.cvG,A.cvB,A.cvC,A.cvD,A.cvE,A.eyN,A.eyO,A.eyP,A.ezn,A.ezp,A.ezr,A.eyX,A.eyU,A.ezI,A.ezQ,A.ezF,A.eze,A.ezf,A.ez1,A.ez2,A.ez3,A.ez6,A.ez7,A.ez8,A.ez9,A.eza,A.ezb,A.ezc,A.ezd,A.ez4,A.ez5,A.eAf,A.eA5,A.eA7,A.ezm,A.fxt,A.fxu,A.fFA,A.fFB,A.fFC,A.fFF,A.fFD,A.fWZ,A.fX_,A.fX0,A.cz0,A.cyX,A.cyZ,A.cz_,A.cyY,A.eBH,A.eBI,A.eBC,A.eBy,A.eBT,A.eBS,A.eBU,A.eBV,A.eBQ,A.eBN,A.fpW,A.bWA,A.bWB,A.db7,A.daS,A.flx,A.fHt,A.fH_,A.fH5,A.fH0,A.fH1,A.fH2,A.fH3,A.fps,A.fpt,A.cBY,A.cC_,A.h4a,A.h48,A.ffa,A.ffc,A.fIm,A.fIl,A.fGS,A.fGP,A.fDH,A.fDF,A.fDG,A.fov,A.fow,A.fox,A.bOH,A.bON,A.bOM,A.bOP,A.bOQ,A.bOK,A.bOI,A.bOL,A.bOO,A.fEx,A.fEA,A.fEt,A.fEs,A.fEv,A.fEu,A.fEy,A.fEw,A.fEB,A.ceI,A.ceJ,A.cet,A.ces,A.cej,A.cez,A.ceA,A.ceB,A.ceC,A.ceD,A.ceE,A.fGW,A.fGV,A.fGX,A.foy,A.bU5,A.bU4,A.h4Z,A.fGR,A.fGU,A.bR0,A.cFQ,A.cFR,A.cFC,A.cFv,A.cFT,A.cFy,A.cFz,A.cFX,A.cFU,A.cFV,A.cFW,A.cFE,A.cFF,A.cFx,A.cFO,A.cFN,A.cFH,A.cFI,A.cFJ,A.cFK,A.cFL,A.fFN,A.fFL,A.fFM,A.fFJ,A.fFK,A.fFI,A.cok,A.cnI,A.cnJ,A.cnK,A.cny,A.cnB,A.co0,A.co9,A.coa,A.cob,A.coc,A.cod,A.coe,A.cof,A.coi,A.fHH,A.fHE,A.fHF,A.h4W,A.fXr,A.fXs,A.h42,A.h41])
+u(C.jx,[A.c1j,A.cwu,A.cwn,A.cws,A.cwt,A.bV2,A.bVa,A.bV9,A.fCx,A.fE9,A.fCD,A.c54,A.bND,A.bNA,A.bNF,A.bNC,A.bLI,A.c3_,A.h4l,A.fGg,A.cDH,A.bLz,A.bMj,A.fIv,A.fIw,A.fIx,A.fIy,A.fIz,A.fH7,A.fot,A.fvy,A.fvw,A.fvv,A.fIA,A.fIB,A.fIC,A.fID,A.fIE,A.fIF,A.fIG,A.fIH,A.fII,A.fIJ,A.fIo,A.fIp,A.fIq,A.fIr,A.fIs,A.fIt,A.fIu,A.fKE,A.h4R,A.h4S,A.bWu,A.egi,A.efg,A.ehQ,A.eh1,A.eg_,A.eeV,A.egQ,A.ef6,A.ehN,A.ehz,A.ega,A.fEr,A.fEk,A.fEh,A.fEd,A.fEe,A.fwI,A.fwG,A.fwF,A.fET,A.fEH,A.fEK,A.fES,A.fxp,A.fwK,A.fI9,A.fEV,A.def,A.f0u,A.dho,A.cvN,A.ezl,A.eBP,A.db4,A.daX,A.fHu,A.fH4,A.cBZ,A.fH6,A.fGQ,A.bOJ,A.fEz,A.cFB,A.cFD,A.cFS,A.cFA,A.cFG,A.cFw,A.cFM,A.cFP,A.fHG])
+u(C.pf,[A.uO,A.aUu])
 u(C.mn,[A.b7p,A.bgt,A.bkc,A.bya])
-t(A.bt5,A.aOO)
-u(C.iJ,[A.f6Q,A.fom,A.cNw,A.cNv,A.cNy,A.cNx,A.bVg,A.bVb,A.bV6,A.bVe,A.fCE,A.fCB,A.c5l,A.c59,A.c5f,A.c5n,A.c5c,A.c5b,A.c4K,A.c5a,A.c5d,A.c58,A.c52,A.c51,A.c53,A.c50,A.c4P,A.c4O,A.c4T,A.c4U,A.c4V,A.c4W,A.c4X,A.c4N,A.c4Y,A.c4L,A.c4M,A.c4Z,A.c5i,A.c5j,A.c5h,A.c5k,A.c5g,A.fGG,A.dW7,A.dWk,A.dWe,A.dWf,A.dWd,A.dW4,A.dWo,A.dWm,A.dWl,A.dW2,A.dW9,A.dWa,A.dWb,A.dWc,A.dW5,A.dWh,A.dWi,A.dWj,A.dWg,A.dWp,A.fDE,A.ei9,A.egX,A.egY,A.egW,A.egZ,A.efs,A.ehq,A.egp,A.egq,A.egr,A.egs,A.egt,A.eeO,A.eeN,A.eeP,A.eeL,A.eeM,A.eeK,A.eeZ,A.ef_,A.ef1,A.egk,A.egj,A.egl,A.egh,A.egm,A.egg,A.egn,A.egf,A.ego,A.ege,A.eeq,A.eer,A.efi,A.efh,A.efj,A.eff,A.efk,A.efe,A.efl,A.efd,A.efm,A.efc,A.efn,A.efb,A.efo,A.efa,A.ehm,A.ehn,A.efG,A.edQ,A.efB,A.efA,A.efC,A.efz,A.eh3,A.eh0,A.eh_,A.efZ,A.efY,A.efV,A.efU,A.efW,A.efT,A.efp,A.efq,A.egT,A.eeX,A.eeW,A.eeY,A.eh4,A.ehg,A.eeU,A.eeS,A.eeR,A.ehf,A.eft,A.ef8,A.efK,A.edY,A.edV,A.edZ,A.edU,A.ee_,A.edT,A.ee0,A.edS,A.ee1,A.edR,A.eep,A.egM,A.egL,A.egN,A.egO,A.egP,A.egu,A.ef0,A.ef3,A.ef5,A.egx,A.egw,A.egy,A.egv,A.ehF,A.ehE,A.ehH,A.ehI,A.ehJ,A.ehK,A.ehL,A.ehM,A.ehv,A.eht,A.ehu,A.ehw,A.ehs,A.ehx,A.ehy,A.ehc,A.ehe,A.ehC,A.ehr,A.ehj,A.ehk,A.ehb,A.ehi,A.ei0,A.ei1,A.ei2,A.ehU,A.ehV,A.ehW,A.ehX,A.ehY,A.ehZ,A.ef2,A.efO,A.eh5,A.efr,A.egV,A.eh7,A.eha,A.ehh,A.eg5,A.eg6,A.eg4,A.eg7,A.eg8,A.eg1,A.eg9,A.edn,A.edl,A.efI,A.ehD,A.egH,A.egK,A.edm,A.eey,A.eez,A.eeA,A.eeB,A.eeC,A.eeD,A.eex,A.eeE,A.eew,A.eeF,A.eev,A.eeG,A.eeu,A.eeH,A.eet,A.eeI,A.ei6,A.ei8,A.ei5,A.eea,A.eeb,A.eec,A.eeg,A.eeh,A.eei,A.ee9,A.eej,A.ee8,A.eek,A.ee7,A.eel,A.eem,A.ee6,A.een,A.ee5,A.eed,A.ee4,A.eee,A.ee3,A.eef,A.ee2,A.edv,A.edJ,A.edH,A.edL,A.edu,A.edM,A.edN,A.edt,A.edO,A.edP,A.edy,A.eds,A.edz,A.edr,A.edA,A.edB,A.edC,A.edD,A.edE,A.edF,A.edG,A.egC,A.egD,A.egB,A.egE,A.egA,A.fbm,A.fbl,A.fh5,A.fh4,A.cim,A.fEO,A.fFY,A.dWB,A.dWC,A.dWD,A.dWG,A.dWH,A.dWI,A.dWJ,A.dWK,A.dWL,A.dWM,A.dWN,A.dWE,A.dWA,A.dWz,A.dWr,A.dWs,A.dWt,A.dWu,A.dWv,A.fbb,A.cA7,A.cA8,A.bYF,A.bYG,A.dn3,A.dn4,A.dn2,A.der,A.dep,A.deq,A.deo,A.de9,A.dea,A.ded,A.deg,A.dei,A.dek,A.del,A.dem,A.den,A.des,A.det,A.deL,A.deD,A.deE,A.deM,A.deN,A.deB,A.deO,A.deA,A.deP,A.deQ,A.deR,A.deF,A.dey,A.deG,A.deH,A.dex,A.deI,A.dew,A.deJ,A.dev,A.deK,A.deu,A.f0s,A.f0t,A.f0r,A.f0k,A.f0l,A.f0m,A.f0n,A.f0o,A.f0q,A.f0B,A.f0z,A.f0w,A.f0A,A.f0v,A.dhu,A.dhv,A.dht,A.dhm,A.dhq,A.dhr,A.dhs,A.dhw,A.dhn,A.dhG,A.dhC,A.dhz,A.dhE,A.dhy,A.dhF,A.dhx,A.doD,A.doE,A.doC,A.dox,A.doz,A.doA,A.doB,A.doM,A.doH,A.doK,A.doG,A.doF,A.fmE,A.fmC,A.fmD,A.cda,A.fFj,A.fFk,A.fFl,A.ev2,A.ev3,A.ev1,A.euY,A.euN,A.euO,A.euS,A.euT,A.ev0,A.ev4,A.ev6,A.euR,A.euQ,A.evd,A.evc,A.euZ,A.ezD,A.ezE,A.ezC,A.eyJ,A.eyK,A.eyI,A.eyL,A.eyM,A.eyH,A.eyY,A.ez_,A.eyQ,A.eyR,A.ezg,A.eyZ,A.ezz,A.ezA,A.ezB,A.ezw,A.ezx,A.ezy,A.ezv,A.ezo,A.ezq,A.ezs,A.ezt,A.ezu,A.ezH,A.eyV,A.eyW,A.eyS,A.eyT,A.ez0,A.ezK,A.ezL,A.ezM,A.ezN,A.ezO,A.ezP,A.ezR,A.ezJ,A.ezG,A.eAg,A.eAh,A.eA_,A.eA2,A.eA3,A.eA1,A.eA4,A.eA0,A.eAi,A.ezZ,A.eAj,A.ezY,A.eAk,A.ezX,A.eAl,A.ezW,A.eAm,A.ezT,A.ezU,A.ezV,A.eAn,A.eA6,A.ezS,A.eA8,A.eA9,A.eAa,A.eAb,A.eAc,A.eAd,A.eAe,A.ezh,A.ezi,A.ezj,A.ezk,A.fFD,A.eBK,A.eBL,A.eBJ,A.eBz,A.eBE,A.eBF,A.eBD,A.eBG,A.eBB,A.eBw,A.eBx,A.eBA,A.eBX,A.eBW,A.eBR,A.eBM,A.eBO,A.db6,A.daR,A.daT,A.daU,A.daV,A.daN,A.daQ,A.daP,A.daO,A.db_,A.db0,A.db1,A.db2,A.daZ,A.db3,A.daY,A.db5,A.daW,A.ff9,A.ffb,A.ff8,A.ffd,A.cew,A.cex,A.cev,A.ceK,A.cek,A.cen,A.ceo,A.cem,A.cel,A.cep,A.ceq,A.cer,A.cei,A.cey,A.ceu,A.ceH,A.ceF,A.ceG,A.fHO,A.cnT,A.cnU,A.cnS,A.cnG,A.cnH,A.cnF,A.cnE,A.cnC,A.cnD,A.cnz,A.col,A.cnV,A.cnW,A.cnx,A.cnL,A.cnM,A.cnN,A.cnO,A.cnP,A.cnQ,A.cnA,A.cnX,A.cnR,A.co1,A.co_,A.co2,A.co3,A.cnZ,A.co4,A.co5,A.co6,A.co7,A.cnY,A.co8,A.coj,A.cog,A.coh,A.h4_])
-u(C.ax,[A.aZQ,A.Vo,A.adB,A.bkN,A.b8G,A.aYR,A.a7U])
-t(A.aBl,A.bz2)
-t(A.aHi,A.bAn)
-t(A.aBF,A.bz7)
-t(A.bfj,A.aM8)
-w(A.aOF,S.avj)
-v(A.aOO,C.cc)
+t(A.bt5,A.aON)
+u(C.iJ,[A.f6Q,A.fom,A.cNw,A.cNv,A.cNy,A.cNx,A.bVg,A.bVb,A.bV6,A.bVe,A.fCE,A.fCB,A.c5l,A.c59,A.c5f,A.c5n,A.c5c,A.c5b,A.c4K,A.c5a,A.c5d,A.c58,A.c52,A.c51,A.c53,A.c50,A.c4P,A.c4O,A.c4T,A.c4U,A.c4V,A.c4W,A.c4X,A.c4N,A.c4Y,A.c4L,A.c4M,A.c4Z,A.c5i,A.c5j,A.c5h,A.c5k,A.c5g,A.fGH,A.dW7,A.dWk,A.dWe,A.dWf,A.dWd,A.dW4,A.dWo,A.dWm,A.dWl,A.dW2,A.dW9,A.dWa,A.dWb,A.dWc,A.dW5,A.dWh,A.dWi,A.dWj,A.dWg,A.dWp,A.fDE,A.ei9,A.egX,A.egY,A.egW,A.egZ,A.efs,A.ehq,A.egp,A.egq,A.egr,A.egs,A.egt,A.eeO,A.eeN,A.eeP,A.eeL,A.eeM,A.eeK,A.eeZ,A.ef_,A.ef1,A.egk,A.egj,A.egl,A.egh,A.egm,A.egg,A.egn,A.egf,A.ego,A.ege,A.eeq,A.eer,A.efi,A.efh,A.efj,A.eff,A.efk,A.efe,A.efl,A.efd,A.efm,A.efc,A.efn,A.efb,A.efo,A.efa,A.ehm,A.ehn,A.efG,A.edQ,A.efB,A.efA,A.efC,A.efz,A.eh3,A.eh0,A.eh_,A.efZ,A.efY,A.efV,A.efU,A.efW,A.efT,A.efp,A.efq,A.egT,A.eeX,A.eeW,A.eeY,A.eh4,A.ehg,A.eeU,A.eeS,A.eeR,A.ehf,A.eft,A.ef8,A.efK,A.edY,A.edV,A.edZ,A.edU,A.ee_,A.edT,A.ee0,A.edS,A.ee1,A.edR,A.eep,A.egM,A.egL,A.egN,A.egO,A.egP,A.egu,A.ef0,A.ef3,A.ef5,A.egx,A.egw,A.egy,A.egv,A.ehF,A.ehE,A.ehH,A.ehI,A.ehJ,A.ehK,A.ehL,A.ehM,A.ehv,A.eht,A.ehu,A.ehw,A.ehs,A.ehx,A.ehy,A.ehc,A.ehe,A.ehC,A.ehr,A.ehj,A.ehk,A.ehb,A.ehi,A.ei0,A.ei1,A.ei2,A.ehU,A.ehV,A.ehW,A.ehX,A.ehY,A.ehZ,A.ef2,A.efO,A.eh5,A.efr,A.egV,A.eh7,A.eha,A.ehh,A.eg5,A.eg6,A.eg4,A.eg7,A.eg8,A.eg1,A.eg9,A.edn,A.edl,A.efI,A.ehD,A.egH,A.egK,A.edm,A.eey,A.eez,A.eeA,A.eeB,A.eeC,A.eeD,A.eex,A.eeE,A.eew,A.eeF,A.eev,A.eeG,A.eeu,A.eeH,A.eet,A.eeI,A.ei6,A.ei8,A.ei5,A.eea,A.eeb,A.eec,A.eeg,A.eeh,A.eei,A.ee9,A.eej,A.ee8,A.eek,A.ee7,A.eel,A.eem,A.ee6,A.een,A.ee5,A.eed,A.ee4,A.eee,A.ee3,A.eef,A.ee2,A.edv,A.edJ,A.edH,A.edL,A.edu,A.edM,A.edN,A.edt,A.edO,A.edP,A.edy,A.eds,A.edz,A.edr,A.edA,A.edB,A.edC,A.edD,A.edE,A.edF,A.edG,A.egC,A.egD,A.egB,A.egE,A.egA,A.fbm,A.fbl,A.fh5,A.fh4,A.cim,A.fEP,A.fFZ,A.dWB,A.dWC,A.dWD,A.dWG,A.dWH,A.dWI,A.dWJ,A.dWK,A.dWL,A.dWM,A.dWN,A.dWE,A.dWA,A.dWz,A.dWr,A.dWs,A.dWt,A.dWu,A.dWv,A.fbb,A.cA7,A.cA8,A.bYF,A.bYG,A.dn3,A.dn4,A.dn2,A.der,A.dep,A.deq,A.deo,A.de9,A.dea,A.ded,A.deg,A.dei,A.dek,A.del,A.dem,A.den,A.des,A.det,A.deL,A.deD,A.deE,A.deM,A.deN,A.deB,A.deO,A.deA,A.deP,A.deQ,A.deR,A.deF,A.dey,A.deG,A.deH,A.dex,A.deI,A.dew,A.deJ,A.dev,A.deK,A.deu,A.f0s,A.f0t,A.f0r,A.f0k,A.f0l,A.f0m,A.f0n,A.f0o,A.f0q,A.f0B,A.f0z,A.f0w,A.f0A,A.f0v,A.dhu,A.dhv,A.dht,A.dhm,A.dhq,A.dhr,A.dhs,A.dhw,A.dhn,A.dhG,A.dhC,A.dhz,A.dhE,A.dhy,A.dhF,A.dhx,A.doD,A.doE,A.doC,A.dox,A.doz,A.doA,A.doB,A.doM,A.doH,A.doK,A.doG,A.doF,A.fmE,A.fmC,A.fmD,A.cda,A.fFk,A.fFl,A.fFm,A.ev2,A.ev3,A.ev1,A.euY,A.euN,A.euO,A.euS,A.euT,A.ev0,A.ev4,A.ev6,A.euR,A.euQ,A.evd,A.evc,A.euZ,A.ezD,A.ezE,A.ezC,A.eyJ,A.eyK,A.eyI,A.eyL,A.eyM,A.eyH,A.eyY,A.ez_,A.eyQ,A.eyR,A.ezg,A.eyZ,A.ezz,A.ezA,A.ezB,A.ezw,A.ezx,A.ezy,A.ezv,A.ezo,A.ezq,A.ezs,A.ezt,A.ezu,A.ezH,A.eyV,A.eyW,A.eyS,A.eyT,A.ez0,A.ezK,A.ezL,A.ezM,A.ezN,A.ezO,A.ezP,A.ezR,A.ezJ,A.ezG,A.eAg,A.eAh,A.eA_,A.eA2,A.eA3,A.eA1,A.eA4,A.eA0,A.eAi,A.ezZ,A.eAj,A.ezY,A.eAk,A.ezX,A.eAl,A.ezW,A.eAm,A.ezT,A.ezU,A.ezV,A.eAn,A.eA6,A.ezS,A.eA8,A.eA9,A.eAa,A.eAb,A.eAc,A.eAd,A.eAe,A.ezh,A.ezi,A.ezj,A.ezk,A.fFE,A.eBK,A.eBL,A.eBJ,A.eBz,A.eBE,A.eBF,A.eBD,A.eBG,A.eBB,A.eBw,A.eBx,A.eBA,A.eBX,A.eBW,A.eBR,A.eBM,A.eBO,A.db6,A.daR,A.daT,A.daU,A.daV,A.daN,A.daQ,A.daP,A.daO,A.db_,A.db0,A.db1,A.db2,A.daZ,A.db3,A.daY,A.db5,A.daW,A.ff9,A.ffb,A.ff8,A.ffd,A.cew,A.cex,A.cev,A.ceK,A.cek,A.cen,A.ceo,A.cem,A.cel,A.cep,A.ceq,A.cer,A.cei,A.cey,A.ceu,A.ceH,A.ceF,A.ceG,A.fHP,A.cnT,A.cnU,A.cnS,A.cnG,A.cnH,A.cnF,A.cnE,A.cnC,A.cnD,A.cnz,A.col,A.cnV,A.cnW,A.cnx,A.cnL,A.cnM,A.cnN,A.cnO,A.cnP,A.cnQ,A.cnA,A.cnX,A.cnR,A.co1,A.co_,A.co2,A.co3,A.cnZ,A.co4,A.co5,A.co6,A.co7,A.cnY,A.co8,A.coj,A.cog,A.coh,A.h40])
+u(C.ax,[A.aZQ,A.Vo,A.adB,A.bkN,A.b8G,A.aYQ,A.a7U])
+t(A.aBk,A.bz2)
+t(A.aHh,A.bAn)
+t(A.aBE,A.bz7)
+t(A.bfj,A.aM7)
+w(A.aOE,S.avi)
+v(A.aON,C.cc)
 w(A.bz2,A.adT)
 w(A.bz7,A.adT)
 w(A.bAn,A.adT)
-v(A.aM8,C.cc)})()
-C.iT(b.typeUniverse,JSON.parse('{"aaz":{"af":[],"v":[]},"af7":{"ah":["aaz<1>"]},"awp":{"af":[],"v":[]},"uO":{"aC":[]},"b7p":{"aC":[]},"bt5":{"ah":["awp"]},"ajM":{"af":[],"v":[]},"bbV":{"ah":["ajM"]},"apx":{"af":[],"v":[]},"apy":{"ah":["apx"]},"aUv":{"aC":[]},"aZQ":{"ax":[],"v":[]},"Vo":{"ax":[],"v":[]},"aqx":{"af":[],"v":[]},"blH":{"ah":["aqx"]},"adB":{"ax":[],"v":[]},"bgt":{"aC":[]},"Jv":{"af":[],"v":[]},"aJL":{"af":[],"v":[]},"aKJ":{"af":[],"v":[]},"aFx":{"ah":["Jv"]},"bkN":{"ax":[],"v":[]},"bkc":{"aC":[]},"bv_":{"ah":["aJL"]},"bxa":{"ah":["aKJ"]},"axk":{"af":[],"v":[]},"BS":{"af":[],"v":[]},"aas":{"af":[],"v":[]},"a5S":{"af":[],"v":[]},"aCy":{"af":[],"v":[]},"agA":{"af":[],"v":[]},"Of":{"af":[],"v":[]},"blI":{"ah":["Of"]},"buN":{"ah":["axk"]},"b8G":{"ax":[],"v":[]},"aYR":{"ax":[],"v":[]},"aBl":{"ah":["BS"]},"aHi":{"ah":["aas"]},"aBF":{"ah":["a5S"]},"aCz":{"ah":["aCy"]},"byr":{"ah":["agA"]},"a7U":{"ax":[],"v":[]},"X8":{"af":[],"v":[]},"aG_":{"ah":["X8"]},"OU":{"af":[],"v":[]},"aG6":{"ah":["OU"]},"asO":{"af":[],"v":[]},"aGa":{"ah":["asO"]},"aqY":{"af":[],"v":[]},"bfj":{"ah":["aqY"]},"bya":{"aC":[]},"a25":{"af":[],"v":[]},"bw4":{"ah":["a25"]},"aqW":{"af":[],"v":[]},"aqX":{"ah":["aqW"]},"atV":{"af":[],"v":[]},"atW":{"ah":["atV"]}}'))
-C.Dm(b.typeUniverse,JSON.parse('{"bqs":1,"aOF":1,"adT":1}'))
+v(A.aM7,C.cc)})()
+C.iT(b.typeUniverse,JSON.parse('{"aaz":{"af":[],"v":[]},"af7":{"ah":["aaz<1>"]},"awo":{"af":[],"v":[]},"uO":{"aC":[]},"b7p":{"aC":[]},"bt5":{"ah":["awo"]},"ajM":{"af":[],"v":[]},"bbV":{"ah":["ajM"]},"apw":{"af":[],"v":[]},"apx":{"ah":["apw"]},"aUu":{"aC":[]},"aZQ":{"ax":[],"v":[]},"Vo":{"ax":[],"v":[]},"aqw":{"af":[],"v":[]},"blH":{"ah":["aqw"]},"adB":{"ax":[],"v":[]},"bgt":{"aC":[]},"Jw":{"af":[],"v":[]},"aJK":{"af":[],"v":[]},"aKI":{"af":[],"v":[]},"aFw":{"ah":["Jw"]},"bkN":{"ax":[],"v":[]},"bkc":{"aC":[]},"bv_":{"ah":["aJK"]},"bxa":{"ah":["aKI"]},"axj":{"af":[],"v":[]},"BS":{"af":[],"v":[]},"aas":{"af":[],"v":[]},"a5S":{"af":[],"v":[]},"aCx":{"af":[],"v":[]},"agA":{"af":[],"v":[]},"Of":{"af":[],"v":[]},"blI":{"ah":["Of"]},"buN":{"ah":["axj"]},"b8G":{"ax":[],"v":[]},"aYQ":{"ax":[],"v":[]},"aBk":{"ah":["BS"]},"aHh":{"ah":["aas"]},"aBE":{"ah":["a5S"]},"aCy":{"ah":["aCx"]},"byr":{"ah":["agA"]},"a7U":{"ax":[],"v":[]},"X8":{"af":[],"v":[]},"aFZ":{"ah":["X8"]},"OU":{"af":[],"v":[]},"aG5":{"ah":["OU"]},"asN":{"af":[],"v":[]},"aG9":{"ah":["asN"]},"aqX":{"af":[],"v":[]},"bfj":{"ah":["aqX"]},"bya":{"aC":[]},"a25":{"af":[],"v":[]},"bw4":{"ah":["a25"]},"aqV":{"af":[],"v":[]},"aqW":{"ah":["aqV"]},"atU":{"af":[],"v":[]},"atV":{"ah":["atU"]}}'))
+C.Dm(b.typeUniverse,JSON.parse('{"bqs":1,"aOE":1,"adT":1}'))
 var y={T:"A hot wire never goes on the green ground screw.",X:"A shut-off valve goes on the pipe that comes out of the wall.",v:"Both black wires go on brass screws. It does not matter which one.",N:"Brass screws are for the HOT wire (black).",m:"Breaker OFF. It is safe to work on the wires.",c:"Double tap the floor or a wall to walk over there.",q:"Each switch has its own screw on the other side, and each goes to its own light.",R:"Fasten the bare copper ground to the GREEN screw.",E:"Fasten the black hot to one HOT (X or Y) brass screw.",A:"Fasten the black wire to the LEFT terminal.",k:"Fasten the red hot to the other HOT brass screw.",d:"Fasten the red wire to the RIGHT terminal.",F:"Fasten the white neutral to a SILVER screw.",r:"Fasten the white neutral to the silver NEUTRAL (W) screw.",b:"Fold the wires back and push the device into the box.",W:"Hot and cold flow through the hoses and out of the faucet. No leaks. The lesson is complete!",P:"LOAD is for feeding other outlets further down the line. It is covered with tape. Power comes in on the LINE screws.",x:"Look at the device and the wires. Learn which wire is which before you touch a screw.",M:"Move it with the arrow buttons, turn it, change its colour or take it out.",G:"Neutral goes on a silver screw. The silver screws stay joined, so one wire feeds both halves.",o:"Pick a paint colour above to change this wall.",n:"Put the cover plate on, turn the power on and test.",Q:"Silver screws are for the NEUTRAL wire (white).",f:"Switch the power on and flip the wall switch.",H:"The bare copper ground goes on the green screw.",t:"The bare copper ground wire only goes on the GREEN screw.",S:"The black and red hot wires go on the two brass screws, X and Y. The silver W screw is for the neutral.",u:"The black hot wire goes on a brass screw.",J:"The black wire goes on the LEFT terminal.",C:"The gold screws are BRASS. They are for the HOT wire (black).",Z:"The green screw is for the bare copper ground wire.",l:"The two hot wires (black and red) go on the two brass screws, X and Y, in either order.",s:"The two hot wires go on the two brass screws, X and Y, in either order.",p:"The two hot wires go on the two brass screws, in either order.",a:"The two traveler wires go on the two brass traveler screws, in either order.",g:"The two travelers coming from the first three-way go on the two top screws.",e:"The two travelers going to the second three-way go on the two bottom screws.",_:"The white neutral wire goes on a silver screw.",I:"The white neutral wire goes on the silver W screw.",B:"The white-silver screws are NICKEL. They are for the NEUTRAL wire (white).",i:"The whole room from above: the near walls are left out so you can see in.",D:"There is no medicine left. Buy some in the shop.",O:"Turn the breaker OFF and test that the wires are dead.",Y:"You are at the street light. Press Fix the street light.",K:"You flipped the tripped breaker fully OFF. Fix the problem before you turn it on again.",L:"You walked over here. Drag to turn round."}
 var x=(function rtii(){var w=C.at
-return{dw:w("lN<u?>"),gk:w("pd"),ff:w("aU2"),l:w("bu<m,m>"),F:w("bu<m,F>"),d7:w("bu<m,e0<m>>"),M:w("de<m>"),hg:w("a55"),ag:w("MU"),cD:w("aVI"),ha:w("wc"),eP:w("rz"),gN:w("Iy"),eB:w("mo"),fa:w("aB<C4?>"),v:w("d_<H,m>"),R:w("iM<H>"),fC:w("IG"),I:w("O<pd>"),f5:w("O<T1>"),m:w("O<lO>"),gQ:w("O<MA>"),V:w("O<ac>"),O:w("O<u>"),bm:w("O<a50>"),fW:w("O<aV7>"),K:w("O<a55>"),Q:w("O<MT>"),ar:w("O<zC>"),gc:w("O<a5e>"),U:w("O<xJ>"),dI:w("O<MY>"),bC:w("O<wc>"),gw:w("O<N6>"),dh:w("O<Iy>"),_:w("O<mo>"),dY:w("O<oF>"),cX:w("O<aXk>"),bF:w("O<a65>"),gM:w("O<IG>"),dj:w("O<o0>"),r:w("O<fm>"),E:w("O<he>"),e:w("O<jY>"),gy:w("O<ai<F>>"),gL:w("O<ai<H>>"),ez:w("O<a9<m,aE>>"),c7:w("O<a9<m,@>>"),f4:w("O<a9<m,cj>>"),aX:w("O<a9<m,aE?>>"),T:w("O<ic>"),Z:w("O<mt>"),fN:w("O<aE>"),dN:w("O<o>"),B:w("O<lg>"),fI:w("O<nG>"),h:w("O<fT>"),z:w("O<kf>"),gl:w("O<b65>"),aB:w("O<+(a9R,H)>"),L:w("O<+(m,m)>"),dt:w("O<+(r,r)>"),d6:w("O<+(F,m)>"),f:w("O<+(F,F)>"),ek:w("O<+(H,m)>"),aJ:w("O<+(m,H,H)>"),dV:w("O<+(F,F,u)>"),al:w("O<+(H,F,P)>"),gp:w("O<+(H,H,ai<o>)>"),dQ:w("O<+(H,H,H)>"),eV:w("O<+(F,F,F,F)>"),az:w("O<+(H,H,F,P,m)>"),dz:w("O<+blurb,color,emoji,open,title,words(m,u,m,~(),m,m)>"),fP:w("O<PA>"),e3:w("O<aaP>"),fB:w("O<wL>"),a:w("O<fh>"),gD:w("O<YP>"),a_:w("O<t3>"),s:w("O<m>"),x:w("O<yC>"),fJ:w("O<abX>"),dH:w("O<abY>"),J:w("O<vA>"),bz:w("O<AJ>"),o:w("O<r>"),eo:w("O<Qj>"),p:w("O<v>"),d:w("O<iS>"),dF:w("O<Qt>"),gR:w("O<bd4>"),bl:w("O<GA>"),k:w("O<AZ>"),C:w("O<hI>"),aM:w("O<Dc>"),D:w("O<hk>"),aQ:w("O<QY>"),fG:w("O<bti>"),X:w("O<pT>"),u:w("O<P>"),n:w("O<F>"),t:w("O<H>"),dS:w("O<aC?>"),cA:w("O<cj>"),eF:w("cw<ah<af>>"),ew:w("ai<aE>"),dg:w("ai<F>"),j:w("ai<@>"),b:w("a9<m,@>"),G:w("a9<@,@>"),w:w("iC"),eR:w("mt"),P:w("ct"),q:w("cI"),aU:w("aE"),dx:w("o"),dc:w("fT"),ej:w("K0"),c:w("kf"),cE:w("aaz<H>"),a6:w("+(F,F)"),c5:w("ds<H>"),cR:w("YF"),fd:w("fh"),cH:w("awU"),N:w("m"),c0:w("yC"),ec:w("iu<m>"),dZ:w("b9e"),e7:w("br<F>"),cv:w("r"),W:w("bE<m>"),ac:w("bE<H>"),cI:w("k3<m>"),am:w("Y<mo>"),fZ:w("Y<FL>"),cc:w("Y<m>"),dD:w("Y<H>"),c1:w("hj"),gh:w("yL"),gf:w("Qt"),bB:w("bdp"),dy:w("biw"),y:w("P"),i:w("F"),A:w("@"),S:w("H"),g7:w("Nd?"),eT:w("C4?"),g:w("ai<@>?"),c9:w("a9<m,@>?"),Y:w("a9<@,@>?"),cK:w("aE?"),cU:w("ql?"),di:w("cj"),H:w("~")}})();(function constants(){var w=a.makeConstList
+return{dw:w("lN<u?>"),gk:w("pd"),ff:w("aU1"),l:w("bu<m,m>"),F:w("bu<m,F>"),d7:w("bu<m,e0<m>>"),M:w("de<m>"),hg:w("a55"),ag:w("MU"),cD:w("aVH"),ha:w("wc"),eP:w("rz"),gN:w("Iz"),eB:w("mo"),fa:w("aB<C4?>"),v:w("d_<H,m>"),R:w("iM<H>"),fC:w("IH"),I:w("O<pd>"),f5:w("O<T1>"),m:w("O<lO>"),gQ:w("O<MA>"),V:w("O<ac>"),O:w("O<u>"),bm:w("O<a50>"),fW:w("O<aV6>"),K:w("O<a55>"),Q:w("O<MT>"),ar:w("O<zC>"),gc:w("O<a5e>"),U:w("O<xJ>"),dI:w("O<MY>"),bC:w("O<wc>"),gw:w("O<N6>"),dh:w("O<Iz>"),_:w("O<mo>"),dY:w("O<oF>"),cX:w("O<aXj>"),bF:w("O<a65>"),gM:w("O<IH>"),dj:w("O<o0>"),r:w("O<fm>"),E:w("O<he>"),e:w("O<jZ>"),gy:w("O<ai<F>>"),gL:w("O<ai<H>>"),ez:w("O<a9<m,aE>>"),c7:w("O<a9<m,@>>"),f4:w("O<a9<m,cj>>"),aX:w("O<a9<m,aE?>>"),T:w("O<ic>"),Z:w("O<mt>"),fN:w("O<aE>"),dN:w("O<o>"),B:w("O<lg>"),fI:w("O<nG>"),h:w("O<fT>"),z:w("O<jF>"),gl:w("O<b65>"),aB:w("O<+(a9R,H)>"),L:w("O<+(m,m)>"),dt:w("O<+(r,r)>"),d6:w("O<+(F,m)>"),f:w("O<+(F,F)>"),ek:w("O<+(H,m)>"),aJ:w("O<+(m,H,H)>"),dV:w("O<+(F,F,u)>"),al:w("O<+(H,F,P)>"),gp:w("O<+(H,H,ai<o>)>"),dQ:w("O<+(H,H,H)>"),eV:w("O<+(F,F,F,F)>"),az:w("O<+(H,H,F,P,m)>"),dz:w("O<+blurb,color,emoji,open,title,words(m,u,m,~(),m,m)>"),fP:w("O<PA>"),e3:w("O<aaP>"),fB:w("O<wL>"),a:w("O<fh>"),gD:w("O<YP>"),a_:w("O<t3>"),s:w("O<m>"),x:w("O<yC>"),fJ:w("O<abX>"),dH:w("O<abY>"),J:w("O<vA>"),bz:w("O<AJ>"),o:w("O<r>"),eo:w("O<Qj>"),p:w("O<v>"),d:w("O<iS>"),dF:w("O<Qt>"),gR:w("O<bd4>"),bl:w("O<GA>"),k:w("O<AZ>"),C:w("O<hI>"),aM:w("O<Dc>"),D:w("O<hk>"),aQ:w("O<QY>"),fG:w("O<bti>"),X:w("O<pT>"),u:w("O<P>"),n:w("O<F>"),t:w("O<H>"),dS:w("O<aC?>"),cA:w("O<cj>"),eF:w("cw<ah<af>>"),ew:w("ai<aE>"),dg:w("ai<F>"),j:w("ai<@>"),b:w("a9<m,@>"),G:w("a9<@,@>"),w:w("iC"),eR:w("mt"),P:w("ct"),q:w("cI"),aU:w("aE"),dx:w("o"),dc:w("fT"),ej:w("K1"),c:w("jF"),cE:w("aaz<H>"),a6:w("+(F,F)"),c5:w("ds<H>"),cR:w("YF"),fd:w("fh"),cH:w("awT"),N:w("m"),c0:w("yC"),ec:w("iu<m>"),dZ:w("b9e"),e7:w("br<F>"),cv:w("r"),W:w("bE<m>"),ac:w("bE<H>"),cI:w("k4<m>"),am:w("Y<mo>"),fZ:w("Y<FL>"),cc:w("Y<m>"),dD:w("Y<H>"),c1:w("hj"),gh:w("yL"),gf:w("Qt"),bB:w("bdp"),dy:w("biw"),y:w("P"),i:w("F"),A:w("@"),S:w("H"),g7:w("Nd?"),eT:w("C4?"),g:w("ai<@>?"),c9:w("a9<m,@>?"),Y:w("a9<@,@>?"),cK:w("aE?"),cU:w("ql?"),di:w("cj"),H:w("~")}})();(function constants(){var w=a.makeConstList
 B.b1f=new A.eu(!0,"The water is on and nothing leaks. Perfect job!",!1,"")
 B.b1g=new A.eu(!0,"Primer and paint rolled on.",!1,"")
 B.b1h=new A.eu(!1,"This call is over. Start a new one.",!1,"")
@@ -28493,7 +28501,7 @@ B.aY6=new A.r(0,26,312)
 B.c4Y=new A.he(B.aY6,"\u2b07 Walk here to go out",D.eq,0)
 B.c4Z=new A.he(B.aY6,"\ud83d\uded7 Take the elevator down to go out",D.jY,0)
 B.hdK=new A.r(90,40,56)
-B.c5_=new A.he(B.hdK,"\ud83d\udcd6 Library",D.dK,0)
+B.c5_=new A.he(B.hdK,"\ud83d\udcd6 Library",D.dJ,0)
 B.hde=new A.r(80,40,56)
 B.c50=new A.he(B.hde,"\ud83d\udd25 Fire drill",D.bC,0)
 B.aXZ=new A.r(0,100,36)
@@ -28845,9 +28853,9 @@ B.hso=new A.Gr("NGMY JOBS","Find work. Get hired. Get paid.",D.av,D.i8,D.u6)
 B.hsw=new A.Gr("NGMY LOANS","Help when you need it most.",D.cX,D.e7,D.w7)
 B.hsr=new A.Gr("KISWAHILI SCHOOL","Learn Swahili and English, step by step.",D.bR,D.u3,D.wc)
 B.hst=new A.Gr("CIVIC REGISTRY","Your family, your community, registered.",D.d5,D.d6,D.nm)
-B.hsn=new A.Gr("CORE PROTOCOL","Studios for curious minds.",D.b8,D.ko,D.qe)
+B.hsn=new A.Gr("CORE PROTOCOL","Studios for curious minds.",D.b8,D.kp,D.qe)
 B.hss=new A.Gr("BUILD AND FIX","The Construction Lab: wire it, plumb it.",D.fp,D.fF,D.uh)
-B.hsh=new A.Gr("CREATE WITH NGMY","Videos, slides, bios and books.",D.bD,D.kn,D.qb)
+B.hsh=new A.Gr("CREATE WITH NGMY","Videos, slides, bios and books.",D.bD,D.ko,D.qb)
 B.d0g=w([B.hso,B.hsw,B.hsr,B.hst,B.hsn,B.hss,B.hsh],C.at("O<Gr>"))
 B.dys=w(["Switch 1 common","Switch 2 common","Traveler terminal (both switches)","Green ground screw","Neutral splice (not on a switch)"],x.s)
 B.ek2={"Line (from the breaker)":0,"Load (to the light)":1,"Traveler A":2,"Traveler B":3,Ground:4,Neutral:5}
@@ -29037,7 +29045,7 @@ B.hv_=new A.hI("ceiling","Ceiling box",D.pq)
 B.hvl=new A.hI("fanbox","Fan box",Q.CD)
 B.hvx=new A.hI("drill","Drill",D.uI)
 B.hvm=new A.hI("cable","Cable roll",E.P9)
-B.dn1=w([B.acC,B.hv3,B.hv_,B.hvl,B.hvx,B.hvm],x.C)
+B.dn2=w([B.acC,B.hv3,B.hv_,B.hvl,B.hvx,B.hvm],x.C)
 B.hvu=new A.hI("sheet","Drywall sheet",D.zt)
 B.hva=new A.hI("knife","Drywall saw",D.CI)
 B.hv6=new A.hI("screw","Screw gun",A0.CQ)
@@ -29045,7 +29053,7 @@ B.hvz=new A.hI("tape","Tape",D.t2)
 B.hvr=new A.hI("mud","Mud",W.Pq)
 B.hvE=new A.hI("sand","Sander",D.CH)
 B.hvf=new A.hI("paint","Roller",B.aqW)
-B.dja=w([B.acC,B.hvu,B.hva,B.hv6,B.hvz,B.hvr,B.hvE,B.hvf],x.C)
+B.djb=w([B.acC,B.hvu,B.hva,B.hv6,B.hvz,B.hvr,B.hvE,B.hvf],x.C)
 B.hvA=new A.hI("outlet","Outlet",B.CX)
 B.hvc=new A.hI("gfci","GFCI",D.uU)
 B.hvy=new A.hI("switch","Switch",E.px)
@@ -29083,7 +29091,7 @@ B.hvw=new A.hI("rangeM","Kitchen range",B.a2V)
 B.hvB=new A.hI("flip","Flip switch",E.px)
 B.hvn=new A.hI("tester","Voltage tester",D.uK)
 B.aB3=w([B.acC,B.hvA,B.hvc,B.hvy,B.hv5,B.hvC,B.hv1,B.hvj,B.hv9,B.hvs,B.hv8,B.hv4,B.hvp,B.huX,B.hvt,B.hvv,B.hvk,B.hvh,B.huY,B.hvq,B.hvg,B.hvo,B.hvd,B.hvb,B.hvD,B.hv2,B.hv7,B.hvw,B.hvB,B.hvn],x.C)
-B.d85=w([B.dn1,B.dja,B.aB3],C.at("O<ai<hI>>"))
+B.d85=w([B.dn2,B.djb,B.aB3],C.at("O<ai<hI>>"))
 B.ePF=new C.y(-1.2,0)
 B.eYI=new C.y(1.2,0)
 B.d8i=w([B.ePF,B.eYI],x.f)
@@ -29098,8 +29106,8 @@ B.faO=new C.de(B.ekW,1,x.M)
 B.bNl=new A.fm(22,"LOAD screw (brass, hot out)",B.faO,"The black wire that goes to the light goes on the LOAD screw.",!1,"hot")
 B.d8X=w([B.uD,B.bN5,B.bNj,B.bNl],x.r)
 B.er9=new A.nG("flange","flange","Toilet flange",D.a_,"The flange is fixed to the floor over the drain. Everything else sits on it.",!1,0)
-B.dmF=w(["flange"],x.s)
-B.er7=new A.nG("wax","wax","Wax ring",B.dmF,"The wax ring goes on the flange before the toilet. It makes the seal against sewer gas and water.",!1,0)
+B.dmG=w(["flange"],x.s)
+B.er7=new A.nG("wax","wax","Wax ring",B.dmG,"The wax ring goes on the flange before the toilet. It makes the seal against sewer gas and water.",!1,0)
 B.dxU=w(["wax"],x.s)
 B.er4=new A.nG("toilet","toilet","Toilet",B.dxU,"The toilet is lowered straight down onto the wax ring. The ring has to be there first.",!1,0)
 B.dwa=w(["toilet"],x.s)
@@ -29311,18 +29319,18 @@ B.eUu=new C.y(-80,90)
 B.eFu=new C.y(80,90)
 B.eUt=new C.y(-80,140)
 B.eFt=new C.y(80,140)
-B.diO=w([B.eUu,B.eFu,B.eUt,B.eFt],x.f)
+B.diP=w([B.eUu,B.eFu,B.eUt,B.eFt],x.f)
 B.bNt=new A.fm(51,"Black wire nut: HOT",B.Ka,"The house black wire joins the fan black wire.",!1,"hot")
 B.bMR=new A.fm(52,"White wire nut: NEUTRAL",B.K9,"The house white wire joins the fan white wire.",!1,"neutral")
 B.bNe=new A.fm(53,"Green ground connection",B.AD,"The bare copper house ground joins the green fan ground wire.",!1,"ground")
-B.diW=w([B.bNt,B.bMR,B.bNe],x.r)
+B.diX=w([B.bNt,B.bMR,B.bNe],x.r)
 B.ber=new A.Tj("bus",-575,-25,0,1)
 B.bet=new A.Tj("police",-575,-25,854,5)
 B.bes=new A.Tj("bus",25,575,850,3)
 B.beu=new A.Tj("police",25,575,1704,6)
 B.ky=w([B.ber,B.bet,B.bes,B.beu],C.at("O<Tj>"))
 B.anP=new A.rz(4,"deadOutlet")
-B.dj3=w([B.a1u,B.a1v,B.OD,B.OE,B.anP,B.a1y,B.a1z,B.a1A,B.a1B,B.a1C,B.a1w,B.a1x],C.at("O<rz>"))
+B.dj4=w([B.a1u,B.a1v,B.OD,B.OE,B.anP,B.a1y,B.a1z,B.a1A,B.a1B,B.a1C,B.a1w,B.a1x],C.at("O<rz>"))
 B.f3t=new C.cu([0,560,240,7])
 B.f3u=new C.cu([0,560,300,9])
 B.a5F=w([B.f3t,B.f3u],C.at("O<+(F,F,F,H)>"))
@@ -29350,25 +29358,25 @@ B.hwE=new A.m8("cord4","\u26a1","Dryer cord, 4-wire hookup","Take the ground str
 B.hwL=new A.m8("ptrap","\ud83e\udea0","Sink drain (P-trap)","Build a drain with a water seal",D.co)
 B.hwD=new A.m8("faucet","\ud83d\udeb0","Faucet supply lines","Hot left, cold right",D.c0)
 B.hwz=new A.m8("house","\ud83c\udfd7\ufe0f","Build and fix a house","Stage by stage, then repair",D.bp)
-B.djo=w([B.hwN,B.hwF,B.hwG,B.hwO,B.hwy,B.hwH,B.hwT,B.hwR,B.hwI,B.hwB,B.hwP,B.hwQ,B.hwA,B.hwK,B.hwC,B.hwM,B.hwJ,B.hwU,B.hwx,B.hwS,B.hwE,B.hwL,B.hwD,B.hwz],C.at("O<m8>"))
+B.djp=w([B.hwN,B.hwF,B.hwG,B.hwO,B.hwy,B.hwH,B.hwT,B.hwR,B.hwI,B.hwB,B.hwP,B.hwQ,B.hwA,B.hwK,B.hwC,B.hwM,B.hwJ,B.hwU,B.hwx,B.hwS,B.hwE,B.hwL,B.hwD,B.hwz],C.at("O<m8>"))
 B.hrU=new A.iS("always","Black \xb7 always hot (from the panel)",B.rI,D.c,"hot")
 B.hrO=new A.iS("switched","Red \xb7 switched hot (from the wall switch)",B.vZ,D.c,"hot")
-B.dju=w([B.rg,B.EV,B.hrU,B.hrO],x.d)
-B.djy=w([y.O,"Find the LINE and LOAD screws. LOAD is covered with yellow tape. Leave it covered unless you feed another outlet.",y.R,"Fasten the white wire to the silver LINE screw.","Fasten the black wire to the brass LINE screw.","Push the GFCI into the box and put the plate on.","Turn the power on, press RESET, then press TEST. It must click off."],x.s)
-B.djB=w([y.O,y.x,y.R,"Fasten the black wire (power in, or to the light) to the COMMON screw: the odd-coloured one.","Fasten the first traveler (red) to a TRAVELER screw.","Fasten the second traveler (white wire taped black) to the other TRAVELER screw.",y.b,y.n],x.s)
+B.djv=w([B.rg,B.EV,B.hrU,B.hrO],x.d)
+B.djz=w([y.O,"Find the LINE and LOAD screws. LOAD is covered with yellow tape. Leave it covered unless you feed another outlet.",y.R,"Fasten the white wire to the silver LINE screw.","Fasten the black wire to the brass LINE screw.","Push the GFCI into the box and put the plate on.","Turn the power on, press RESET, then press TEST. It must click off."],x.s)
+B.djC=w([y.O,y.x,y.R,"Fasten the black wire (power in, or to the light) to the COMMON screw: the odd-coloured one.","Fasten the first traveler (red) to a TRAVELER screw.","Fasten the second traveler (white wire taped black) to the other TRAVELER screw.",y.b,y.n],x.s)
 B.hDV=new A.pT(0,0,80,26)
 B.hE3=new A.pT(1,90,56,22)
-B.djV=w([B.hDV,B.hE3],x.X)
-B.dk4=w(["car","ambulance","firetruck"],x.s)
-B.dk5=w([y.O,y.x,"This outlet has its own 20 amp breaker and 12 gauge wire (a yellow cable): the washer must not share its circuit with anything else. The T-shaped slot tells you it takes both 15 and 20 amp plugs. In a laundry area the new code asks for GFCI protection, from a GFCI breaker or a GFCI outlet before it.",y.R,y.F,"Fasten the black hot to a BRASS screw.",y.b,y.n],x.s)
+B.djW=w([B.hDV,B.hE3],x.X)
+B.dk5=w(["car","ambulance","firetruck"],x.s)
+B.dk6=w([y.O,y.x,"This outlet has its own 20 amp breaker and 12 gauge wire (a yellow cable): the washer must not share its circuit with anything else. The T-shaped slot tells you it takes both 15 and 20 amp plugs. In a laundry area the new code asks for GFCI protection, from a GFCI breaker or a GFCI outlet before it.",y.R,y.F,"Fasten the black hot to a BRASS screw.",y.b,y.n],x.s)
 B.dFH=new A.ic(-62,62,6,46)
 B.dFu=new A.ic(-117,-73,149,171)
 B.dFE=new A.ic(-57,-13,164,186)
 B.dFp=new A.ic(73,117,159,181)
 B.dFh=new A.ic(120,144,140,160)
 B.dFf=new A.ic(108,142,48,60)
-B.dka=w([B.dFH,B.dFu,B.dFE,B.dFp,B.dFh,B.dFf],x.T)
-B.dke=w([0.1,8.05],x.n)
+B.dkb=w([B.dFH,B.dFu,B.dFE,B.dFp,B.dFh,B.dFf],x.T)
+B.dkf=w([0.1,8.05],x.n)
 B.h7h=new A.r(1000,900,1500)
 B.h5J=new A.r(0,200,0)
 B.aRh=new C.y(B.h7h,B.h5J)
@@ -29414,39 +29422,39 @@ B.eHt=new C.y(B.hmM,B.hlM)
 B.h91=new A.r(200,170,1300)
 B.h5X=new A.r(0,230,150)
 B.eY7=new C.y(B.h91,B.h5X)
-B.dku=w([B.aRh,B.eOk,B.eKi,B.eFT,B.eTa,B.eS8,B.eWa,B.eYn,B.eUJ,B.eKU,B.eJu,B.eYl,B.eNL,B.eHt,B.eY7,B.aRh],x.dt)
+B.dkv=w([B.aRh,B.eOk,B.eKi,B.eFT,B.eTa,B.eS8,B.eWa,B.eYn,B.eUJ,B.eKU,B.eJu,B.eYl,B.eNL,B.eHt,B.eY7,B.aRh],x.dt)
 B.hgB=new A.r(-0.35,11,-3.4)
 B.heu=new A.r(-0.35,3.2,-3.2)
 B.hj4=new A.r(-0.35,2.2,-1.9)
 B.hcj=new A.r(-0.35,0.7,-1.5)
-B.dkv=w([B.hgB,B.heu,B.hj4,B.hcj],x.o)
+B.dkw=w([B.hgB,B.heu,B.hj4,B.hcj],x.o)
 B.hod=new A.r(5.2,7.5,-7.85)
 B.hiR=new A.r(5.2,4,-7.85)
-B.dkB=w([B.hod,B.hiR],x.o)
+B.dkC=w([B.hod,B.hiR],x.o)
 B.eTR=new C.y(-1,"NGMY")
 B.eB9=new C.y(1,"ELEVATOR")
-B.dl0=w([B.eTR,B.eB9],x.d6)
+B.dl1=w([B.eTR,B.eB9],x.d6)
 B.bN0=new A.fm(21,"LOAD hot (brass, taped)",D.N,y.P,!0,"load")
 B.bN2=new A.fm(22,"LINE hot (brass)",B.Ka,"The black (hot) wire from the breaker goes on the brass LINE screw.",!1,"hot")
 B.bN_=new A.fm(23,"LOAD neutral (silver, taped)",D.N,y.P,!0,"load")
 B.bNb=new A.fm(24,"LINE neutral (silver)",B.K9,"The white (neutral) wire from the breaker goes on the silver LINE screw.",!1,"neutral")
-B.dl5=w([B.bN0,B.bN2,B.bN_,B.bNb,B.ao5],x.r)
+B.dl6=w([B.bN0,B.bN2,B.bN_,B.bNb,B.ao5],x.r)
 B.hle=new A.r(0,15.5,-3.6)
 B.hgV=new A.r(0,20,-3.6)
 B.hoZ=new A.r(0,22.5,-2)
 B.he0=new A.r(0,22.5,1.1999999999999997)
 B.ac9=new A.r(0,21.1,1.6)
-B.dlb=w([B.hle,B.hgV,B.hoZ,B.he0,B.ac9],x.o)
-B.dlq=w(["the panel wall","the window wall","the door wall","the bare wall"],x.s)
-B.dlS=w([],x.bm)
+B.dlc=w([B.hle,B.hgV,B.hoZ,B.he0,B.ac9],x.o)
+B.dlr=w(["the panel wall","the window wall","the door wall","the bare wall"],x.s)
+B.dlT=w([],x.bm)
 B.IE=w([],x.K)
-B.dlR=w([],x.dI)
+B.dlS=w([],x.dI)
 B.v4=w([],x.E)
-B.dlT=w([],x.T)
+B.dlU=w([],x.T)
 B.v5=w([],x.z)
 B.aBL=w([],x.e3)
 B.qS=w([],x.a)
-B.dlQ=w([],x.x)
+B.dlR=w([],x.x)
 B.aBK=w([],x.J)
 B.nN=w([],x.o)
 B.aBN=w([],x.k)
@@ -29455,10 +29463,10 @@ B.eJO=new C.y(-1.6,3.5)
 B.eJm=new C.y(1.6,3.5)
 B.eLm=new C.y(-1.6,-3.5)
 B.eI2=new C.y(1.6,-3.5)
-B.dm6=w([B.eJO,B.eJm,B.eLm,B.eI2],x.f)
-B.dmd=w([y.O,"Look at the face: two slanted slots at the top (X and Y, hot) and one straight slot at the bottom (W, neutral), and no ground hole. That is a NEMA 10-50, the old 3-wire range outlet.",y.r,y.E,y.k,y.b,y.n],x.s)
-B.dmf=w([y.O,y.x,"Look at the face: a straight slot at the top (W, neutral), two straight slots at the sides (X and Y, hot) and a round hole at the bottom (G, ground). That is a NEMA 14-50, the 4-wire range outlet. It takes 6 gauge wire and a 50 amp double breaker.",y.R,y.r,y.E,y.k,y.b,y.n],x.s)
-B.dmx=w([!1,!1],C.at("O<@>"))
+B.dm7=w([B.eJO,B.eJm,B.eLm,B.eI2],x.f)
+B.dme=w([y.O,"Look at the face: two slanted slots at the top (X and Y, hot) and one straight slot at the bottom (W, neutral), and no ground hole. That is a NEMA 10-50, the old 3-wire range outlet.",y.r,y.E,y.k,y.b,y.n],x.s)
+B.dmg=w([y.O,y.x,"Look at the face: a straight slot at the top (W, neutral), two straight slots at the sides (X and Y, hot) and a round hole at the bottom (G, ground). That is a NEMA 14-50, the 4-wire range outlet. It takes 6 gauge wire and a 50 amp double breaker.",y.R,y.r,y.E,y.k,y.b,y.n],x.s)
+B.dmy=w([!1,!1],C.at("O<@>"))
 B.aBU=w([!1,!1,!1,!1],x.u)
 B.ekI={in1:0,in2:1}
 B.aSB=new C.de(B.ekI,2,x.M)
@@ -29468,38 +29476,38 @@ B.el6={out1:0,out2:1}
 B.aSH=new C.de(B.el6,2,x.M)
 B.bNd=new A.fm(24,"OUT screw (bottom left)",B.aSH,y.e,!1,"hot")
 B.bNf=new A.fm(22,"OUT screw (bottom right)",B.aSH,y.e,!1,"hot")
-B.dmD=w([B.uD,B.bMV,B.bNm,B.bNd,B.bNf],x.r)
-B.dmN=w(["city","billboards","edges","houses","hospital","traffic"],x.s)
-B.dmZ=w(["Look at the pieces: the tailpiece, the P-trap and the trap arm. Pick the tailpiece first and tap its glowing outline under the sink.","Pick the P-trap (the U-shaped bend) and tap its glowing outline. It joins the tailpiece.","Pick the trap arm and tap its outline. It joins the trap to the wall drain.","Slide each slip nut up to its joint and hand tighten it: tap the nuts.","Run the water and look for leaks. The U-bend keeps a plug of water that blocks sewer gas."],x.s)
+B.dmE=w([B.uD,B.bMV,B.bNm,B.bNd,B.bNf],x.r)
+B.dmO=w(["city","billboards","edges","houses","hospital","traffic"],x.s)
+B.dn_=w(["Look at the pieces: the tailpiece, the P-trap and the trap arm. Pick the tailpiece first and tap its glowing outline under the sink.","Pick the P-trap (the U-shaped bend) and tap its glowing outline. It joins the tailpiece.","Pick the trap arm and tap its outline. It joins the trap to the wall drain.","Slide each slip nut up to its joint and hand tighten it: tap the nuts.","Run the water and look for leaks. The U-bend keeps a plug of water that blocks sewer gas."],x.s)
 B.fRg=new C.B("\u2728",null,D.aaO,null,null,null,null,null,null,null,null,null)
 B.h0S=new C.B("Nobody needs help right now.",null,D.fC,null,D.K,null,null,null,null,null,null,null)
 B.fB5=new C.G(!0,D.aT,null,null,null,null,13,null,null,null,null,null,1.4,null,null,null,null,null,null,null,null,null,null,null,null,null)
 B.fTI=new C.B("Everybody's wiring and plumbing works. Keep an eye on food and health: things break when you least expect it.",null,B.fB5,null,D.K,null,null,null,null,null,null,null)
-B.dno=w([B.fRg,D.T,B.h0S,D.ax,B.fTI],x.p)
-B.dnv=w(["road","roundabout","roadturn","roadtee","roadcross","house2","bighouse","billboard","tower","hq","store","gasstation","dmv","ubstation","townsign","cornersign","adboard","shop","hospital","firestation","school","car","firetruck","ambulance","dog","cat","cow","sheep","chicken","horse","tree","pine","bush","flowers","fence","lamppost","bench","pond","swing","shed","doghouse"],x.s)
+B.dnp=w([B.fRg,D.T,B.h0S,D.ax,B.fTI],x.p)
+B.dnw=w(["road","roundabout","roadturn","roadtee","roadcross","house2","bighouse","billboard","tower","hq","store","gasstation","dmv","ubstation","townsign","cornersign","adboard","shop","hospital","firestation","school","car","firetruck","ambulance","dog","cat","cow","sheep","chicken","horse","tree","pine","bush","flowers","fence","lamppost","bench","pond","swing","shed","doghouse"],x.s)
 B.eTK=new C.y(-1150,80)
 B.eAI=new C.y(1150,80)
 B.eTJ=new C.y(-1150,1990)
 B.eAH=new C.y(1150,1990)
-B.dnE=w([B.eTK,B.eAI,B.eTJ,B.eAH],x.f)
+B.dnF=w([B.eTK,B.eAI,B.eTJ,B.eAH],x.f)
 B.fct=new A.t3("pills","\ud83e\ude79","Pain pills","Cures a headache or a cold: you walk normally again",8,0,0,0,!0)
 B.fcs=new A.t3("bread","\ud83c\udf5e","Food for the town","5 portions for the people who live here",10,0,0,0,!1)
 B.fcr=new A.t3("medicine","\ud83d\udc8a","Medicine","3 doses for the sick",12,0,0,0,!1)
-B.dnI=w([B.fct,B.fcs,B.fcr],x.a_)
-B.dnM=w([D.ay,D.bi,D.be],x.O)
+B.dnJ=w([B.fct,B.fcs,B.fcr],x.a_)
+B.dnN=w([D.ay,D.bi,D.be],x.O)
 B.hlz=new A.r(125,292,-121.5)
 B.hoO=new A.r(-125,292,-121.5)
 B.h7e=new A.r(-125,208,-121.5)
 B.hla=new A.r(125,208,-121.5)
-B.dnQ=w([B.hlz,B.hoO,B.h7e,B.hla],x.o)
+B.dnR=w([B.hlz,B.hoO,B.h7e,B.hla],x.o)
 B.h8n=new A.r(11.4,4.6,-6)
 B.hhh=new A.r(11.4,5,-7.85)
 B.hck=new A.r(2.6,5,-7.85)
 B.hd7=new A.r(2.6,3.4,-7.85)
-B.dnS=w([B.h8n,B.hhh,B.hck,B.hd7],x.o)
-B.dnW=w(["hospital","shop","school"],x.s)
-B.dnX=w(["hot","cold"],x.s)
-B.do_=w([D.ay,D.be,D.av,D.fd,D.bU],x.O)
+B.dnT=w([B.h8n,B.hhh,B.hck,B.hd7],x.o)
+B.dnX=w(["hospital","shop","school"],x.s)
+B.dnY=w(["hot","cold"],x.s)
+B.do0=w([D.ay,D.be,D.av,D.fd,D.bU],x.O)
 B.hrS=new A.iS("black","Black \xb7 hot",B.rI,D.c,"hot")
 B.hrM=new A.iS("white","White \xb7 neutral",B.m3,D.as,"neutral")
 B.Su=w([B.hrS,B.hrM,B.rg],x.d)
@@ -29507,7 +29515,7 @@ B.eGg=new C.y(-3.5,4)
 B.eNl=new C.y(3.5,4)
 B.eIv=new C.y(-3.5,-4)
 B.eA6=new C.y(3.5,-4)
-B.dop=w([B.eGg,B.eNl,B.eIv,B.eA6],x.f)
+B.doq=w([B.eGg,B.eNl,B.eIv,B.eA6],x.f)
 B.dov=w(["Ada","Ben","Chidi","Dina","Efe","Farah","Gus","Halima","Ivo","Jamal","Kemi","Lola"],x.s)
 B.eYv=new C.y(-2.4,5)
 B.eON=new C.y(2.4,5)
@@ -29660,13 +29668,13 @@ B.eC6=new C.y(34,40)
 B.hur=new A.AZ(B.eC6,3.141592653589793,2.6,"Washing hands at the sink",!1,!1,!1,"")
 B.dvz=w([B.hur],x.k)
 B.dvE=w(["dryer","range","washer","","dryer","range"],x.s)
-B.b3I=new A.HW("NGMY navy",E.iI,E.Mr,D.c,F.f2)
-B.b3N=new A.HW("Purple",D.oh,D.dL,D.c,D.bM)
-B.b3L=new A.HW("Green",D.hc,D.bR,D.c,D.m4)
-B.b3J=new A.HW("Sunset",D.es,D.av,D.c,D.hU)
-B.b3K=new A.HW("Night",D.U,D.aM,D.b0,D.bT)
-B.b3M=new A.HW("Light",D.c,D.nm,E.iI,D.dY)
-B.a6m=w([B.b3I,B.b3N,B.b3L,B.b3J,B.b3K,B.b3M],C.at("O<HW>"))
+B.b3I=new A.HX("NGMY navy",E.iI,E.Mr,D.c,F.f2)
+B.b3N=new A.HX("Purple",D.oh,D.dK,D.c,D.bM)
+B.b3L=new A.HX("Green",D.hc,D.bR,D.c,D.m4)
+B.b3J=new A.HX("Sunset",D.es,D.av,D.c,D.hU)
+B.b3K=new A.HX("Night",D.U,D.aM,D.b0,D.bT)
+B.b3M=new A.HX("Light",D.c,D.nm,E.iI,D.dY)
+B.a6m=w([B.b3I,B.b3N,B.b3L,B.b3J,B.b3K,B.b3M],C.at("O<HX>"))
 B.acf=new A.r(15,2.6,0)
 B.aCY=w([B.b_5,B.acf],x.o)
 B.a6n=w([B.rg,B.EV,B.acl,B.acm],x.d)
@@ -29699,45 +29707,45 @@ B.eU6=new C.y(-420,1100)
 B.eCv=new C.y(420,1100)
 B.dx5=w([B.eTV,B.eBu,B.eU0,B.eC3,B.eTI,B.eAG,B.eUe,B.eEk,B.eU6,B.eCv],x.f)
 B.dxp=w([0.22,-0.22],x.n)
-B.c5q=new A.jY("Breaker off, then test","Before you touch any wire, switch its breaker OFF, then check with a voltage tester that the wire is dead. A switch on the wall is not enough.")
-B.c5d=new A.jY("Lock out, tag out","On a real job you put a lock or a note on the panel so nobody switches the power back on while you work.")
-B.c5x=new A.jY("Water and power","Water carries electricity. Near sinks, tubs and outdoors the outlets must be GFCI, and wet hands never touch wires.")
-B.c5i=new A.jY("Eyes, ears, lungs","Safety glasses for drilling and cutting, ear protection for loud tools, and a mask when you sand drywall dust or cut tile.")
-B.c5w=new A.jY("Shut the water off","Before you cut or loosen a pipe, close the main water valve and open a faucet to drain the line.")
+B.c5q=new A.jZ("Breaker off, then test","Before you touch any wire, switch its breaker OFF, then check with a voltage tester that the wire is dead. A switch on the wall is not enough.")
+B.c5d=new A.jZ("Lock out, tag out","On a real job you put a lock or a note on the panel so nobody switches the power back on while you work.")
+B.c5x=new A.jZ("Water and power","Water carries electricity. Near sinks, tubs and outdoors the outlets must be GFCI, and wet hands never touch wires.")
+B.c5i=new A.jZ("Eyes, ears, lungs","Safety glasses for drilling and cutting, ear protection for loud tools, and a mask when you sand drywall dust or cut tile.")
+B.c5w=new A.jZ("Shut the water off","Before you cut or loosen a pipe, close the main water valve and open a faucet to drain the line.")
 B.dpy=w([B.c5q,B.c5d,B.c5x,B.c5i,B.c5w],x.e)
 B.c5J=new A.NC("Safety first","\ud83e\uddba",D.c0,B.dpy)
-B.c5y=new A.jY("Wire colours","Black is hot (it carries the power), white is neutral (the way back), bare copper or green is ground (the safety path). Red is a second hot, often used for a switched line.")
-B.c5F=new A.jY("Screw colours","On an outlet the brass screw takes the hot wire, the silver screw takes the neutral and the green screw takes the ground.")
-B.c5s=new A.jY("Wire size","14 gauge wire is for 15 amp circuits (lights and outlets). 12 gauge is for 20 amp circuits (kitchens). A thinner wire than the breaker allows can overheat and start a fire.")
-B.c5m=new A.jY("Breakers","A breaker is a safety switch. It trips when a circuit carries too much current, so the wires never get hot enough to burn.")
-B.c5A=new A.jY("Wire nuts","Strip about 3/4 inch, twist the bare ends together clockwise, and screw on the nut until no bare copper shows. Give each wire a gentle tug.")
-B.c5G=new A.jY("Switches","A switch cuts the hot wire only. The neutral goes straight through to the light.")
-B.c5H=new A.jY("GFCI","A GFCI outlet watches the current going out and coming back. If a little leaks (through water or a person) it cuts the power in a fraction of a second.")
-B.c5f=new A.jY("Ceiling fans","A fan shakes and is heavy. It needs a box that says fan rated, fixed to the joist, not a plain light box.")
-B.c5h=new A.jY("Heights","Outlets sit about 16 inches from the floor. Switches sit about 48 inches up, where your hand falls.")
+B.c5y=new A.jZ("Wire colours","Black is hot (it carries the power), white is neutral (the way back), bare copper or green is ground (the safety path). Red is a second hot, often used for a switched line.")
+B.c5F=new A.jZ("Screw colours","On an outlet the brass screw takes the hot wire, the silver screw takes the neutral and the green screw takes the ground.")
+B.c5s=new A.jZ("Wire size","14 gauge wire is for 15 amp circuits (lights and outlets). 12 gauge is for 20 amp circuits (kitchens). A thinner wire than the breaker allows can overheat and start a fire.")
+B.c5m=new A.jZ("Breakers","A breaker is a safety switch. It trips when a circuit carries too much current, so the wires never get hot enough to burn.")
+B.c5A=new A.jZ("Wire nuts","Strip about 3/4 inch, twist the bare ends together clockwise, and screw on the nut until no bare copper shows. Give each wire a gentle tug.")
+B.c5G=new A.jZ("Switches","A switch cuts the hot wire only. The neutral goes straight through to the light.")
+B.c5H=new A.jZ("GFCI","A GFCI outlet watches the current going out and coming back. If a little leaks (through water or a person) it cuts the power in a fraction of a second.")
+B.c5f=new A.jZ("Ceiling fans","A fan shakes and is heavy. It needs a box that says fan rated, fixed to the joist, not a plain light box.")
+B.c5h=new A.jZ("Heights","Outlets sit about 16 inches from the floor. Switches sit about 48 inches up, where your hand falls.")
 B.dhu=w([B.c5y,B.c5F,B.c5s,B.c5m,B.c5A,B.c5G,B.c5H,B.c5f,B.c5h],x.e)
 B.c5M=new A.NC("Wiring basics","\u26a1",D.bi,B.dhu)
-B.c5e=new A.jY("Hot left, cold right","On a faucet, hot is on the left and cold on the right. Hot lines are marked red and cold lines blue.")
-B.c5r=new A.jY("The P-trap","The curved pipe under a sink always holds a little water. That water seal stops sewer gas coming up the drain.")
-B.c5C=new A.jY("Shut-off valves","Every sink and toilet has its own small valve, so you can stop the water to one fixture without turning off the whole house.")
-B.c5k=new A.jY("Slip nuts","Drain joints are sealed by a washer and a slip nut. Tighten by hand and a quarter turn: too much force cracks plastic.")
-B.c5j=new A.jY("Wax ring","A toilet sits on a wax ring that seals it to the floor drain. A toilet is lowered straight down once, and cannot be slid around.")
-B.c5z=new A.jY("Drain slope","Drains fall about 1/4 inch per foot so water and waste keep moving. Too flat and it clogs, too steep and the water leaves the solids behind.")
-B.c5E=new A.jY("Order of work","Plumbing goes from the top down on the drain (tailpiece, trap, arm) and from the wall out on the supply (valve, hose, fixture).")
+B.c5e=new A.jZ("Hot left, cold right","On a faucet, hot is on the left and cold on the right. Hot lines are marked red and cold lines blue.")
+B.c5r=new A.jZ("The P-trap","The curved pipe under a sink always holds a little water. That water seal stops sewer gas coming up the drain.")
+B.c5C=new A.jZ("Shut-off valves","Every sink and toilet has its own small valve, so you can stop the water to one fixture without turning off the whole house.")
+B.c5k=new A.jZ("Slip nuts","Drain joints are sealed by a washer and a slip nut. Tighten by hand and a quarter turn: too much force cracks plastic.")
+B.c5j=new A.jZ("Wax ring","A toilet sits on a wax ring that seals it to the floor drain. A toilet is lowered straight down once, and cannot be slid around.")
+B.c5z=new A.jZ("Drain slope","Drains fall about 1/4 inch per foot so water and waste keep moving. Too flat and it clogs, too steep and the water leaves the solids behind.")
+B.c5E=new A.jZ("Order of work","Plumbing goes from the top down on the drain (tailpiece, trap, arm) and from the wall out on the supply (valve, hose, fixture).")
 B.cny=w([B.c5e,B.c5r,B.c5C,B.c5k,B.c5j,B.c5z,B.c5E],x.e)
 B.c5K=new A.NC("Plumbing basics","\ud83d\udeb0",D.co,B.cny)
-B.c5g=new A.jY("Studs","Studs are the vertical 2x4 posts inside a wall, 16 inches apart from centre to centre. Everything is fixed to them.")
-B.c5u=new A.jY("Drilling studs","Holes for cable go through the middle of the stud, so a nail or screw cannot reach the wire.")
-B.c5l=new A.jY("Drywall","A sheet is 4 feet wide, so its edges land on studs 48 inches apart. Screws go into studs only, just under the paper.")
-B.c5o=new A.jY("Taping and mud","Seams get paper tape and three thin coats of joint compound, sanded smooth between coats, then primer and paint.")
-B.c5D=new A.jY("Order of a build","Frame, run the pipes and wires (rough-in), inspect, hang drywall, finish it, paint, then fit the fixtures and devices.")
+B.c5g=new A.jZ("Studs","Studs are the vertical 2x4 posts inside a wall, 16 inches apart from centre to centre. Everything is fixed to them.")
+B.c5u=new A.jZ("Drilling studs","Holes for cable go through the middle of the stud, so a nail or screw cannot reach the wire.")
+B.c5l=new A.jZ("Drywall","A sheet is 4 feet wide, so its edges land on studs 48 inches apart. Screws go into studs only, just under the paper.")
+B.c5o=new A.jZ("Taping and mud","Seams get paper tape and three thin coats of joint compound, sanded smooth between coats, then primer and paint.")
+B.c5D=new A.jZ("Order of a build","Frame, run the pipes and wires (rough-in), inspect, hang drywall, finish it, paint, then fit the fixtures and devices.")
 B.d1D=w([B.c5g,B.c5u,B.c5l,B.c5o,B.c5D],x.e)
 B.c5I=new A.NC("Framing and walls","\ud83c\udfe0",D.dY,B.d1D)
-B.c5p=new A.jY("Voltage tester","A pen that glows or beeps near live wires. Test it on a known live outlet first, so you know it works.")
-B.c5v=new A.jY("Wire strippers","Strip the plastic off without nicking the copper. A nick weakens the wire.")
-B.c5B=new A.jY("Adjustable wrench","For nuts on valves and hoses. Hold the fitting steady with a second wrench so you do not twist the pipe.")
-B.c5t=new A.jY("Drill and screw gun","A drill makes holes through studs. A screw gun sets drywall screws to the right depth.")
-B.c5n=new A.jY("Level and tape measure","Measure twice, cut once. A level makes sure outlets, shelves and pipes are straight.")
+B.c5p=new A.jZ("Voltage tester","A pen that glows or beeps near live wires. Test it on a known live outlet first, so you know it works.")
+B.c5v=new A.jZ("Wire strippers","Strip the plastic off without nicking the copper. A nick weakens the wire.")
+B.c5B=new A.jZ("Adjustable wrench","For nuts on valves and hoses. Hold the fitting steady with a second wrench so you do not twist the pipe.")
+B.c5t=new A.jZ("Drill and screw gun","A drill makes holes through studs. A screw gun sets drywall screws to the right depth.")
+B.c5n=new A.jZ("Level and tape measure","Measure twice, cut once. A level makes sure outlets, shelves and pipes are straight.")
 B.dye=w([B.c5p,B.c5v,B.c5B,B.c5t,B.c5n],x.e)
 B.c5L=new A.NC("Tools","\ud83e\uddf0",D.bx,B.dye)
 B.dxP=w([B.c5J,B.c5M,B.c5K,B.c5I,B.c5L],C.at("O<NC>"))
@@ -29909,8 +29917,8 @@ B.fm9=new A.vA("Does every switch box have a neutral?",B.dbA,1,"Many switch boxe
 B.dxT=w([B.fmf,B.fmg,B.fm9],x.J)
 B.dpl=w(["Yes","No: the wires, the ground and the support must be right","Only with a switch"],x.s)
 B.fmd=new A.vA("Does a light that turns on prove the fixture is wired safely?",B.dpl,1,"A fixture can light up with an unsafe connection.")
-B.don=w(["Its wires","A box or mount rated for its weight","Tape"],x.s)
-B.fmh=new A.vA("A fixture must hang from:",B.don,1,"The box carries the weight. The wires never do.")
+B.doo=w(["Its wires","A box or mount rated for its weight","Tape"],x.s)
+B.fmh=new A.vA("A fixture must hang from:",B.doo,1,"The box carries the weight. The wires never do.")
 B.dc0=w([B.fmd,B.fmh],x.J)
 B.dd5=w(["Any ceiling box","Rated for a fan","Plastic only"],x.s)
 B.fmb=new A.vA("A ceiling fan needs a box that is:",B.dd5,1,"A fan shakes and is heavy. A plain light box can let it fall.")
@@ -30011,14 +30019,14 @@ B.aJm=new A.mt(0,-0.4,0.13,0.13,0,!0)
 B.dG2=new A.mt(-0.3,-0.24,0.075,0.3,-0.5,!1)
 B.dG3=new A.mt(0,0,0.32,0.075,0,!1)
 B.dG4=new A.mt(0,-0.26,0.075,0.32,0,!1)
-B.dIn=new A.apx(null)
+B.dIn=new A.apw(null)
 B.aJX=new A.a7U(null)
-B.dPa=new A.aqW(null)
-B.dPb=new A.aqY(null)
-B.dSy=new A.Jv(!1,"city","",null)
-B.aK6=new A.Jv(!1,"","",null)
+B.dPa=new A.aqV(null)
+B.dPb=new A.aqX(null)
+B.dSy=new A.Jw(!1,"city","",null)
+B.aK6=new A.Jw(!1,"","",null)
 B.edn=new A.OU(!0,!0,null,!0,null)
-B.ehE=new A.atV(null)
+B.ehE=new A.atU(null)
 B.hov=new A.r(16,2.6,0)
 B.ehF=new A.cI("Wall drain","The pipe stub that comes out of the wall. The trap arm slides into it.",B.hov,8)
 B.h6q=new A.r(0,3,-6)
@@ -30198,8 +30206,8 @@ B.eDO=new C.y("LOAD (taped)",D.cZ)
 B.biL=new C.u(1,0.9450980392156862,0.8901960784313725,0.7764705882352941,D.q)
 B.blY=new C.u(1,0.8470588235294118,0.7686274509803922,0.6274509803921569,D.q)
 B.eFa=new C.y(B.biL,B.blY)
-B.doq=w([D.ay,D.c6,D.ay],x.O)
-B.eFz=new C.y(-40,B.doq)
+B.dor=w([D.ay,D.c6,D.ay],x.O)
+B.eFz=new C.y(-40,B.dor)
 B.eH1=new C.y(63,-2.4)
 B.bkW=new C.u(1,0.8901960784313725,0.9254901960784314,0.9607843137254902,D.q)
 B.bfE=new C.u(1,0.7372549019607844,0.7843137254901961,0.8392156862745098,D.q)
@@ -30297,11 +30305,11 @@ B.fq5=new C.G(!0,D.aD,null,null,null,null,10.5,D.V,null,null,null,null,null,null
 B.fMv=new C.B("\u22122 \u2b50",null,B.fq5,null,null,null,null,null,null,null,null,null)
 B.d2n=w([B.bZX,D.e5,B.fT7,D.e5,B.fMv],x.p)
 B.f9a=new C.c8(D.aL,D.e,D.P,D.l,null,D.p,null,0,B.d2n,null)
-B.r4=new A.Kg(0,"correct")
-B.aRT=new A.Kg(1,"incorrect")
-B.tt=new A.Kg(2,"unsafe")
-B.K_=new A.Kg(3,"incomplete")
-B.f9n=new A.Kg(4,"requiresVerification")
+B.r4=new A.Kh(0,"correct")
+B.aRT=new A.Kh(1,"incorrect")
+B.tt=new A.Kh(2,"unsafe")
+B.K_=new A.Kh(3,"incomplete")
+B.f9n=new A.Kh(4,"requiresVerification")
 B.faZ=new C.iM([1],x.R)
 B.ejQ={outlet:0,gfci:1,split:2,isolated:3}
 B.fb1=new C.de(B.ejQ,4,x.M)
@@ -31768,7 +31776,7 @@ B.hqu=new C.bE("auto-back-zone",x.W)
 B.hqB=new C.bE("turned-page-rotate",x.W)
 B.hqN=new C.bE("work-row",x.W)
 B.hqS=new C.bE("equip-query",x.W)
-B.hrc=new A.ayD("bonded","The ground strap is still on the terminal block, so the neutral is joined to the metal frame of the appliance. On a 4-wire cord the strap must come off: the frame is grounded by the green wire, and the neutral carries current.",!0,!1,!1,"none","Take the metal ground strap off the terminal block.")
+B.hrc=new A.ayC("bonded","The ground strap is still on the terminal block, so the neutral is joined to the metal frame of the appliance. On a 4-wire cord the strap must come off: the frame is grounded by the green wire, and the neutral carries current.",!0,!1,!1,"none","Take the metal ground strap off the terminal block.")
 B.hro=new A.lj("Everything works. Try it: open TVs or Phones, pick one and tap a finished outlet to plug it in.",D.ed,"")
 B.hrp=new A.lj("The room is finished. Well done.",D.ed,"")
 B.cvj=w([3004],x.t)
@@ -31791,47 +31799,47 @@ B.eTU=new C.y(-20,46)
 B.hup=new A.AZ(B.eTU,0,2.4,"Having the drink",!0,!1,!1,"")
 B.eC7=new C.y(34,62)
 B.huq=new A.AZ(B.eC7,3.141592653589793,2.2,"Picking up the remote",!1,!0,!1,"")
-B.huy=new A.aCy(null)
+B.huy=new A.aCx(null)
 B.hFZ=new A.f3x(0,"material")})();(function staticFields(){$.dm=0
 $.akc=!1
 $.akd=!0
-$.hkm=!1
-$.h7b=C.T(x.N,C.at("Nd"))
-$.h7a=C.T(x.N,C.at("aB<Nd?>"))
-$.h79=C.aR(x.N)
-$.hlZ=C.T(x.N,C.at("V"))
-$.ify=C.T(x.N,C.at("ai<+(r,r)>"))
-$.ifw=C.T(x.N,x.dg)
-$.hAk=C.T(x.N,C.at("iH"))
-$.I7=null
+$.hkn=!1
+$.h7c=C.T(x.N,C.at("Nd"))
+$.h7b=C.T(x.N,C.at("aB<Nd?>"))
+$.h7a=C.aR(x.N)
+$.hm_=C.T(x.N,C.at("V"))
+$.ifz=C.T(x.N,C.at("ai<+(r,r)>"))
+$.ifx=C.T(x.N,x.dg)
+$.hAl=C.T(x.N,C.at("iH"))
+$.I8=null
 $.EF=null
 $.bmj=null
 $.X2=null
-$.hqE=null
-$.fxM=C.T(x.S,C.at("ai<kf>"))
+$.hqF=null
+$.fxM=C.T(x.S,C.at("ai<jF>"))
 $.air="xbot"})();(function lazyInitializers(){var w=a.lazyFinal
-w($,"iAK","hIO",()=>C.a5N())
-w($,"iAY","hiE",()=>C.a5N())
-w($,"ivB","hGf",()=>new A.aUv($.aw()))
-w($,"iDv","bGR",()=>{var v,u,t=C.at("O<aUu>"),s=C.a([],t)
+w($,"iAL","hIP",()=>C.a5N())
+w($,"iAZ","hiF",()=>C.a5N())
+w($,"ivC","hGg",()=>new A.aUu($.aw()))
+w($,"iDw","bGR",()=>{var v,u,t=C.at("O<aUt>"),s=C.a([],t)
 for(v=0;v<2;++v){u=v*9
-D.d.v(s,C.a([A.h6k(v,175,u),A.h6k(v,612,u+14),A.h6k(v,1013,u+7)],t))}return s})
-w($,"iD4","h5w",()=>C.a([A.hvF(-80,80,400,565),A.hvF(-80,80,715,885)],C.at("O<byq>")))
-w($,"ivC","aSB",()=>A.hMg())
-w($,"iDu","hKk",()=>{var v=C.a([A.oD("Wire a standard 120 volt receptacle: black to brass, white to silver, bare copper to green.",B.Su,B.dv8,"outlet","",!0,B.J_,B.d10,!1,"Wall outlet",new A.fIu()),A.oD("A single-pole switch breaks the hot wire to the light: two black wires go on the two brass screws.",B.dgw,B.di4,"switch","",!0,B.J_,B.d_p,!1,"Light switch",new A.fIv()),A.oD("A GFCI protects you near water. Power comes in on LINE. The LOAD screws (covered with tape) feed other outlets.",B.Su,B.dl5,"gfci","",!0,B.J_,B.djy,!1,"GFCI outlet",new A.fIw()),A.oD("Join the house wires to the fixture wires with wire nuts: black to black, white to white, ground to ground.",B.Su,B.dbt,"light","",!0,B.J_,B.dwP,!1,"Ceiling light",new A.fIx()),A.oD("A fan hangs from a strong fan-rated box. Join black, white and ground with wire nuts, then fasten the canopy.",B.Su,B.diW,"fan","",!0,B.J_,B.d7i,!1,"Ceiling fan",new A.fIy())],C.at("O<N2>"))
-D.d.v(v,$.h5C())
+D.d.v(s,C.a([A.h6l(v,175,u),A.h6l(v,612,u+14),A.h6l(v,1013,u+7)],t))}return s})
+w($,"iD5","h5x",()=>C.a([A.hvG(-80,80,400,565),A.hvG(-80,80,715,885)],C.at("O<byq>")))
+w($,"ivD","aSA",()=>A.hMh())
+w($,"iDv","hKl",()=>{var v=C.a([A.oD("Wire a standard 120 volt receptacle: black to brass, white to silver, bare copper to green.",B.Su,B.dv8,"outlet","",!0,B.J_,B.d10,!1,"Wall outlet",new A.fIv()),A.oD("A single-pole switch breaks the hot wire to the light: two black wires go on the two brass screws.",B.dgw,B.di4,"switch","",!0,B.J_,B.d_p,!1,"Light switch",new A.fIw()),A.oD("A GFCI protects you near water. Power comes in on LINE. The LOAD screws (covered with tape) feed other outlets.",B.Su,B.dl6,"gfci","",!0,B.J_,B.djz,!1,"GFCI outlet",new A.fIx()),A.oD("Join the house wires to the fixture wires with wire nuts: black to black, white to white, ground to ground.",B.Su,B.dbt,"light","",!0,B.J_,B.dwP,!1,"Ceiling light",new A.fIy()),A.oD("A fan hangs from a strong fan-rated box. Join black, white and ground with wire nuts, then fasten the canopy.",B.Su,B.diX,"fan","",!0,B.J_,B.d7i,!1,"Ceiling fan",new A.fIz())],C.at("O<N2>"))
+D.d.v(v,$.h5D())
 return v})
-w($,"iDw","h5C",()=>{var v="switch",u=C.a([A.oD("Breaks BOTH hot legs of a 240 volt circuit at once: water heaters and baseboard heat.",B.dzM,B.c9Y,"switch2p",v,!0,B.dCf,B.dbG,!0,"Double-pole switch (240 V)",new A.fIz()),A.oD("One light, two switches. One COMMON screw and two TRAVELER screws; it pairs with a second three-way.",B.dt0,B.d0K,"switch3",v,!0,B.dCx,B.djB,!0,"Three-way switch",new A.fIA()),A.oD("Sits in the middle of two three-way switches: two traveler wires in on one side, two out on the other.",B.dya,B.dmD,"switch4",v,!0,B.dCg,B.drP,!0,"Four-way switch",new A.fIB()),A.oD("Needs a NEUTRAL wire in the box as well: hot in, hot out to the light, neutral and ground.",B.d61,B.d8X,"switchsmart",v,!0,B.dCy,B.d6j,!0,"Smart, motion or timer switch",new A.fIC()),A.oD("Two switches in one device: one hot feed is split between them, and two separate lights come out.",B.cOz,B.dq1,"switchcombo",v,!0,B.dEg,B.cBA,!0,"Combination (double) switch",new A.fID()),A.oD("The tab between the brass screws is broken off: the top half is switched, the bottom half is always on.",B.dju,B.cAY,"split","outlet",!0,B.dCz,B.doZ,!0,"Split (half-switched) outlet",new A.fIE()),A.oD("Two hots, a neutral and a ground: the dryer 14-30, and the range and car charger 14-50.",B.a6n,B.d4E,"v240four","nema1430",!0,B.a6V,B.cSZ,!0,"4-wire 240 V outlet (dryer, range, EV)",new A.fIF()),A.oD("Two hots and a neutral, with no separate ground: the old 10-30 and 10-50, from before 1996.",B.a5t,B.dyH,"v240three","nema1030",!1,B.a71,B.dxS,!0,"3-wire 240 V outlet (old dryer or range)",new A.fIG()),A.oD("Two hots and a ground, and no neutral at all: the 6-series outlets.",B.dwu,B.dgi,"v240only","nema620",!0,B.dCO,B.dve,!0,"240 V only outlet (window AC, welder)",new A.fIH()),A.oD("Hot and neutral as usual, but the ground goes on its own wire straight back to the panel: shops and offices.",B.dyv,B.dhr,"isolated","outlet",!0,B.dDH,B.dcO,!0,"Isolated-ground outlet",new A.fII())],C.at("O<N2>"))
-D.d.v(u,$.hKj())
+w($,"iDx","h5D",()=>{var v="switch",u=C.a([A.oD("Breaks BOTH hot legs of a 240 volt circuit at once: water heaters and baseboard heat.",B.dzM,B.c9Y,"switch2p",v,!0,B.dCf,B.dbG,!0,"Double-pole switch (240 V)",new A.fIA()),A.oD("One light, two switches. One COMMON screw and two TRAVELER screws; it pairs with a second three-way.",B.dt0,B.d0K,"switch3",v,!0,B.dCx,B.djC,!0,"Three-way switch",new A.fIB()),A.oD("Sits in the middle of two three-way switches: two traveler wires in on one side, two out on the other.",B.dya,B.dmE,"switch4",v,!0,B.dCg,B.drP,!0,"Four-way switch",new A.fIC()),A.oD("Needs a NEUTRAL wire in the box as well: hot in, hot out to the light, neutral and ground.",B.d61,B.d8X,"switchsmart",v,!0,B.dCy,B.d6j,!0,"Smart, motion or timer switch",new A.fID()),A.oD("Two switches in one device: one hot feed is split between them, and two separate lights come out.",B.cOz,B.dq1,"switchcombo",v,!0,B.dEg,B.cBA,!0,"Combination (double) switch",new A.fIE()),A.oD("The tab between the brass screws is broken off: the top half is switched, the bottom half is always on.",B.djv,B.cAY,"split","outlet",!0,B.dCz,B.doZ,!0,"Split (half-switched) outlet",new A.fIF()),A.oD("Two hots, a neutral and a ground: the dryer 14-30, and the range and car charger 14-50.",B.a6n,B.d4E,"v240four","nema1430",!0,B.a6V,B.cSZ,!0,"4-wire 240 V outlet (dryer, range, EV)",new A.fIG()),A.oD("Two hots and a neutral, with no separate ground: the old 10-30 and 10-50, from before 1996.",B.a5t,B.dyH,"v240three","nema1030",!1,B.a71,B.dxS,!0,"3-wire 240 V outlet (old dryer or range)",new A.fIH()),A.oD("Two hots and a ground, and no neutral at all: the 6-series outlets.",B.dwu,B.dgi,"v240only","nema620",!0,B.dCO,B.dve,!0,"240 V only outlet (window AC, welder)",new A.fII()),A.oD("Hot and neutral as usual, but the ground goes on its own wire straight back to the panel: shops and offices.",B.dyv,B.dhr,"isolated","outlet",!0,B.dDH,B.dcO,!0,"Isolated-ground outlet",new A.fIJ())],C.at("O<N2>"))
+D.d.v(u,$.hKk())
 return u})
-w($,"iDp","hKj",()=>C.a([A.oD("The dryer outlet of every new house: 30 amp, 240 volts. Two hots (X, Y), a neutral (W) and a separate ground (G).",B.a6n,B.aC7,"dryer4","nema1430",!0,B.a6V,B.dp9,!0,"Dryer outlet, 4-wire (NEMA 14-30)",new A.fIn()),A.oD("The dryer outlet of older houses (before 1996): 30 amp, 240 volts. Two hots and a neutral that also grounds the dryer. No separate ground.",B.a5t,B.aCG,"dryer3","nema1030",!1,B.a71,B.cWO,!0,"Dryer outlet, 3-wire (NEMA 10-30)",new A.fIo()),A.oD("The electric stove outlet of every new house: 50 amp, 240 volts. Two hots (X, Y), a neutral (W) and a separate ground (G). Also used for car chargers.",B.a6n,B.aC7,"range4","nema1450",!0,B.a6V,B.dmf,!0,"Range outlet, 4-wire (NEMA 14-50)",new A.fIp()),A.oD("The electric stove outlet of older houses (before 1996): 50 amp, 240 volts. Two hots and a neutral that also grounds the range. No separate ground.",B.a5t,B.aCG,"range3","nema1050",!1,B.a71,B.dmd,!0,"Range outlet, 3-wire (NEMA 10-50)",new A.fIq()),A.oD("A dedicated 120 volt, 20 amp outlet for the washer, with a T-shaped neutral slot. Near water, so it needs GFCI protection.",B.dqe,B.d4G,"washer","nema520",!0,B.dDG,B.dk5,!0,"Washing machine outlet (NEMA 5-20)",new A.fIr()),A.oD("At the back of the appliance: black to the left terminal, white (neutral) to the middle one, red to the right one. The ground strap STAYS: it joins the neutral to the frame.",B.d0D,B.d9Z,"cord3","terminal3",!1,B.dD4,B.dur,!0,"Dryer or range cord, 3-wire hookup",new A.fIs()),A.oD("At the back of the appliance: REMOVE the ground strap first, then black left, white (neutral) middle, red right, and the green ground wire to the frame.",B.dv5,B.d6v,"cord4","terminal4",!0,B.dCE,B.ddV,!0,"Dryer or range cord, 4-wire hookup",new A.fIt())],C.at("O<N2>")))
-w($,"iDH","HK",()=>{var v,u=C.a([],x.n)
+w($,"iDq","hKk",()=>C.a([A.oD("The dryer outlet of every new house: 30 amp, 240 volts. Two hots (X, Y), a neutral (W) and a separate ground (G).",B.a6n,B.aC7,"dryer4","nema1430",!0,B.a6V,B.dp9,!0,"Dryer outlet, 4-wire (NEMA 14-30)",new A.fIo()),A.oD("The dryer outlet of older houses (before 1996): 30 amp, 240 volts. Two hots and a neutral that also grounds the dryer. No separate ground.",B.a5t,B.aCG,"dryer3","nema1030",!1,B.a71,B.cWO,!0,"Dryer outlet, 3-wire (NEMA 10-30)",new A.fIp()),A.oD("The electric stove outlet of every new house: 50 amp, 240 volts. Two hots (X, Y), a neutral (W) and a separate ground (G). Also used for car chargers.",B.a6n,B.aC7,"range4","nema1450",!0,B.a6V,B.dmg,!0,"Range outlet, 4-wire (NEMA 14-50)",new A.fIq()),A.oD("The electric stove outlet of older houses (before 1996): 50 amp, 240 volts. Two hots and a neutral that also grounds the range. No separate ground.",B.a5t,B.aCG,"range3","nema1050",!1,B.a71,B.dme,!0,"Range outlet, 3-wire (NEMA 10-50)",new A.fIr()),A.oD("A dedicated 120 volt, 20 amp outlet for the washer, with a T-shaped neutral slot. Near water, so it needs GFCI protection.",B.dqe,B.d4G,"washer","nema520",!0,B.dDG,B.dk6,!0,"Washing machine outlet (NEMA 5-20)",new A.fIs()),A.oD("At the back of the appliance: black to the left terminal, white (neutral) to the middle one, red to the right one. The ground strap STAYS: it joins the neutral to the frame.",B.d0D,B.d9Z,"cord3","terminal3",!1,B.dD4,B.dur,!0,"Dryer or range cord, 3-wire hookup",new A.fIt()),A.oD("At the back of the appliance: REMOVE the ground strap first, then black left, white (neutral) middle, red right, and the green ground wire to the frame.",B.dv5,B.d6v,"cord4","terminal4",!0,B.dCE,B.ddV,!0,"Dryer or range cord, 4-wire hookup",new A.fIu())],C.at("O<N2>")))
+w($,"iDI","HL",()=>{var v,u=C.a([],x.n)
 for(v=0;v<10;++v)u.push(-72+16*v)
 return u})
-w($,"iDr","k5",()=>A.i5G())
-w($,"iDq","xw",()=>A.i5F(A.hBh()))
-w($,"iDI","zl",()=>A.i5J())
-w($,"iB2","h5k",()=>{var v,u,t,s,r,q,p,o,n=x.aM,m=C.a([],n)
+w($,"iDs","k6",()=>A.i5H())
+w($,"iDr","xw",()=>A.i5G(A.hBi()))
+w($,"iDJ","zl",()=>A.i5K())
+w($,"iB3","h5l",()=>{var v,u,t,s,r,q,p,o,n=x.aM,m=C.a([],n)
 for(v=x.s,u=C.a(["outlet","gfci"],v),D.d.v(u,B.aC8),D.d.v(u,B.dbm),t=u.length,s=0;s<u.length;u.length===t||(0,C.J)(u),++s){r=u[s]
 m.push(A.biX("dev:"+r,A.uw(r),B.CX))}m=A.bcW("outlets","Outlets",B.CX,m)
 u=C.a([],n)
@@ -31848,4 +31856,4 @@ t.push(A.biX("app:"+p,q.b,o))}t=A.bcW("phones","Phones",D.zo,t)
 n=C.a([],n)
 for(s=0;s<6;++s){q=B.aBg[s]
 n.push(A.biX("app:"+q.a,q.b,W.Pw))}return C.a([B.hth,m,v,B.htg,u,t,A.bcW("appliances","Appliances",W.Pw,n)],C.at("O<Qv>"))})})()};
-(a=>{a["jKOIVPsDqK4W8DCc21FKPDxZbUU="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["RpqE9SL3ommRohFJB6wyl1g9sjg="]=a.current})($__dart_deferred_initializers__);
