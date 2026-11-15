@@ -136,8 +136,8 @@ lB(d,e,f,g,h,i){return new B.b8Q(h,d,f,g,i,e,null)},
 hFq(d,e,f,g){var x=null
 return C.cf(x,x,!0,x,new B.h3K(g,e,f),d,x,!0,!0,y.H)},
 iP(d,e,f,g,h,i,j){return new B.b8R(f,j,i,h,g,d,e,null)},
-uE(d,e,f){return B.itu(d,e,f)},
-itu(d,e,f){var x=0,w=C.j(y.H),v,u=2,t=[],s,r,q,p,o,n,m
+uE(d,e,f){return B.itt(d,e,f)},
+itt(d,e,f){var x=0,w=C.j(y.H),v,u=2,t=[],s,r,q,p,o,n,m
 var $async$uE=C.e(function(g,h){if(g===1){t.push(h)
 x=u}for(;;)switch(x){case 0:u=4
 o=$.aW.ap$.x.h(0,e)
@@ -283,7 +283,7 @@ for(v=x-1,u=0;u<x;++u)w.push(u/v)
 x=w}}else x=f
 return C.jy(A.H,new C.o(0,d.b),e,x,A.x,null)},
 i8k(d,e,f){return $.i8l.c3(0,d+"|"+A.j.V(e)+"|"+f.l(),new B.fr5(d,f,e))},
-irq(e3,e4,e5,e6){var x,w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,d0,d1,d2,d3,d4,d5,d6,d7=null,d8=e4.a,d9=e4.b,e0=0+d9,e1=new C.a1(0,0,0+d8,e0),e2=new C.e5()
+irp(e3,e4,e5,e6){var x,w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,d0,d1,d2,d3,d4,d5,d6,d7=null,d8=e4.a,d9=e4.b,e0=0+d9,e1=new C.a1(0,0,0+d8,e0),e2=new C.e5()
 e2.d_(e6*97+5)
 x=new B.fW0(e2)
 switch(A.o.F(e6,20)){case 0:$.Q()
@@ -977,7 +977,7 @@ J.bo(a4.save())
 x=a6.a
 w=a6.b
 a4.clipRect(C.hT(new C.a1(0,0,0+x,0+w)),$.mg()[1],!0)
-B.irq(a5,a6,a7,a8)
+B.irp(a5,a6,a7,a8)
 v=x<w?0.9:1
 u=b0*x/360*v
 v=A.a.i(b3)
@@ -1740,8 +1740,8 @@ aNv:function aNv(){},
 bzK:function bzK(){},
 aO4:function aO4(){},
 bzV:function bzV(){},
-fTl(d,e,f){return B.io3(d,e,f)},
-io3(d,e,f){var x=0,w=C.j(y.A),v,u=2,t=[],s,r,q,p,o,n,m
+fTl(d,e,f){return B.io2(d,e,f)},
+io2(d,e,f){var x=0,w=C.j(y.A),v,u=2,t=[],s,r,q,p,o,n,m
 var $async$fTl=C.e(function(g,h){if(g===1){t.push(h)
 x=u}for(;;)switch(x){case 0:u=4
 s=C.hL([d],f)
@@ -5228,7 +5228,7 @@ D.f1n=new C.b5(-15,-60,1.9)
 D.f0J=new C.b5(-25,140,2.4)
 D.f0z=new C.b5(-82,0,2.2)
 D.aID=new C.bu(D.ekS,[D.f01,D.f_j,D.f3h,D.f3f,D.f1n,D.f0J,D.f0z],C.at("bu<n,+(G,G,G)>"))
-D.dEC=new C.d_([A.pn,1,A.qE,1,A.qF,1,A.cc,1,A.k5,2,A.wu,4,A.z2,1,A.z3,2,A.z4,4,A.uC,2,A.wt,4,A.z1,8],C.at("d_<tI,H>"))
+D.dEC=new C.cZ([A.pn,1,A.qE,1,A.qF,1,A.cc,1,A.k5,2,A.wu,4,A.z2,1,A.z3,2,A.z4,4,A.uC,2,A.wt,4,A.z1,8],C.at("cZ<tI,H>"))
 D.dM2=new B.Vx(null)
 D.dRF=new B.Wq(null)
 D.dRG=new B.Ws(null)
@@ -5310,5 +5310,5 @@ D.fW3=new C.B("UNIVERSE EXPLORER",null,I.aaP,null,null,null,null,null,null,null,
 $.haQ=null
 $.i2D=C.T(C.at("n"),C.at("iH"))
 $.i3H=C.T(C.at("n"),C.at("iH"))})();(function lazyInitializers(){var x=a.lazyFinal
-x($,"iBE","hJe",()=>C.a([B.agf("EARTH GLOBE","Turn it, tap a country",A.n4,A.aH,new B.fsA()),B.agf("SOLAR SYSTEM","The Sun and its worlds",D.apg,A.aS,new B.fsB()),B.agf("GRAVITY LAB","Drop, weigh, orbit",F.a3e,A.cF,new B.fsC()),B.agf("BLACK HOLE","Throw in a star",A.Hf,A.bp,new B.fsD()),B.agf("GALAXY","Build, tilt, collide",A.wz,A.hp,new B.fsE()),B.agf("SIZE COMPARE","Earth next to a star",D.bPZ,A.bT,new B.fsF()),B.agf("SEASONS & MOON","Why it is summer",A.wx,A.bx,new B.fsG())],C.at("O<bwq>")))})()};
-(a=>{a["WAmSPDGko1f1FzylU77PCm2Rb7U="]=a.current})($__dart_deferred_initializers__);
+x($,"iBD","hJe",()=>C.a([B.agf("EARTH GLOBE","Turn it, tap a country",A.n4,A.aH,new B.fsA()),B.agf("SOLAR SYSTEM","The Sun and its worlds",D.apg,A.aS,new B.fsB()),B.agf("GRAVITY LAB","Drop, weigh, orbit",F.a3e,A.cF,new B.fsC()),B.agf("BLACK HOLE","Throw in a star",A.Hf,A.bp,new B.fsD()),B.agf("GALAXY","Build, tilt, collide",A.wz,A.hp,new B.fsE()),B.agf("SIZE COMPARE","Earth next to a star",D.bPZ,A.bT,new B.fsF()),B.agf("SEASONS & MOON","Why it is summer",A.wx,A.bx,new B.fsG())],C.at("O<bwq>")))})()};
+(a=>{a["I+7WNK9foaF2scqOWtz61KiW+ts="]=a.current})($__dart_deferred_initializers__);

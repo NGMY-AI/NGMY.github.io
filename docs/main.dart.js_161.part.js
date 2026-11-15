@@ -157,7 +157,7 @@ return"- LANGUAGE: write the WHOLE book, every title and sentence, in "+v+", wit
 return'- LANGUAGE: write the WHOLE book in the same language as this text the user typed: """'+w+'""". If it is English, the whole book is English; if it is Swahili, the whole book is Swahili; for any other language, use that language. The facts and notes given in the request are only information, not the language to write in. Do not mix languages (JSON keys stay as given). If you write Swahili:\nSWAHILI THAT REAL SWAHILI SPEAKERS USE (critical): translate the MEANING and write the way a Swahili speaker in Tanzania, Kenya or eastern Congo would say it. NEVER translate word for word. Many English phrases have no literal Swahili twin and sound strange or are not understood if copied. Examples:\n- "family tree" is NOT "mti wa familia": say "ukoo" (the family line), "nasaba", or "historia ya ukoo wetu". "family book" -> "kitabu cha familia" or "kitabu cha ukoo".\n- ancestors -> "mababu" / "wazee wa zamani"; grandparents -> "babu na bibi"; great-grandparent -> "babu/bibi mkubwa"; descendants -> "wazao" / "vizazi vyetu"; generation -> "kizazi"; heritage / legacy -> "urithi", "mila na desturi"; bloodline -> "ukoo", "damu moja"; roots -> "asili yetu".\n- relatives: cousin -> "binamu"; father\'s brother -> "baba mdogo" / "baba mkubwa"; mother\'s brother -> "mjomba"; father\'s sister -> "shangazi"; mother\'s sister -> "mama mdogo" / "mama mkubwa"; nephew or niece -> "mpwa"; in-laws -> "wakwe"; brother- or sister-in-law -> "shemeji"; spouse -> "mke" (wife) / "mume" (husband) / "mwenzi wake"; firstborn -> "mzaliwa wa kwanza" / "kifungua mimba"; last-born -> "kitinda mimba"; elders -> "wazee"; clan -> "ukoo" / "kabila".\n- life events: was born -> "alizaliwa"; passed away / died -> "alifariki" / "alifariki dunia"; he married -> "alimuoa", she married -> "aliolewa na"; raised -> "alilea"; moved -> "alihamia"; blessing -> "baraka"; memories -> "kumbukumbu"; story -> "hadithi" / "simulizi"; chapter -> "sura"; page -> "ukurasa"; "our family" -> "familia yetu".\n- Use everyday words, short clear sentences and natural word order. If an idea has no good Swahili word, explain it simply instead of inventing a word. Never use a rare or strange word you are not sure about.\n- WRITE AS A NATIVE AUTHOR, NOT AS A TRANSLATOR. Build every sentence the Swahili way (short, clear, with the right subject and tense markers) and join ideas with "na", "kisha", "baadaye", "hivyo", "ndipo". Never keep the shape of an English sentence.\n- KEEP IT PLAIN AND WARM. Drop flowery English phrases and pictures that do not work in Swahili ("the tree grew wider", "bloodlines shaped nations", "carried great destinies", "sacred story", "anchors the beginning") and say the plain fact instead. Never add big claims that the facts do not give.\n- Correct Swahili grammar: noun-class agreement (mtoto mmoja, watoto watatu, kijiji kimoja, vijiji vitatu), tenses (a-li- past, a-na- now, a-ta- future, a-me- done) and the right "wa / cha / la / ya / za / vya".\n- Write people\'s names with normal capitals (Ikungu Ele, Muteleka), never in ALL CAPITALS. Place names and dates stay as they are.\n- Example. English: "Through Ekama Pele the family grew, and he had three children: Muteleka, Bembesile and Nyakasi Ebulo." Good Swahili: "Familia iliendelea kukua kupitia Ekama Pele, aliyepata watoto watatu: Muteleka, Bembesile na Nyakasi Ebulo." Bad, word for word (never write like this): "Kupitia Ekama Pele, mti ulikua mpana zaidi, ukizaa watoto watatu wa msingi."\n'},
 ik2(d,e,f){var x=new A.N(D.zW,new C.fLH(),y.g).aO(0,", "),w=C.hfs(e)
 return'You write printable books that are folded and stapled. Write a book from this request:\n"""'+d+'"""\n\nRules:\n- Exactly '+f+' pages ("chapters"). Each page has a short title and 230-300 words of body text, so the printed page is full.\n- Split the body into 3-5 paragraphs separated by a blank line. Plain words, no markdown, no emojis, no lists.\n- Tell it warmly and simply, like a loving relative. Stay with the facts you were given: never invent achievements, titles, destinies or grand claims (nothing like "shaped nations" or "sacred"). Write people\'s names with normal capitals (Ikungu Ele), not in ALL CAPITALS.\n'+w+"\n"+C.fNE(e)+'\n- Give every page an "image_query": 2-3 simple ENGLISH words for a real photo that fits it (e.g. "family dinner", "african village").\n- Design the cover: "cover_template" is the best fit from: '+x+' (story = children\'s books, starry = bedtime/faith, vintage = history/family memories, royal = formal/gifts, photo/portrait/split = people and places, sunset/band/geo = modern and bold). "cover_query": 2-3 English words for a cover photo, or "" for none.\nReply with JSON only:\n{"title":"...","subtitle":"...","cover_template":"...","cover_query":"...","chapters":[{"title":"...","body":"...","image_query":"..."}]}\n'},
-ini(d,e){var x,w,v,u,t,s,r,q,p,o=null,n=B.a.co(d,"{"),m=B.a.p5(d,"}")
+inh(d,e){var x,w,v,u,t,s,r,q,p,o=null,n=B.a.co(d,"{"),m=B.a.p5(d,"}")
 if(n<0||m<=n)return o
 try{x=B.Y.aQ(0,G.ai3(B.a.aC(d,n,m+1)),o)
 if(!y.f.b(x))return o
@@ -173,8 +173,8 @@ t=w.a
 s=w.b
 q=B.d.aV(D.zW,new C.fRV(u))?u:"royal"
 return new C.rM(t,s,e,v,new C.v6(q,o,o,o,o,"","",""))}catch(p){return o}},
-a3A(d,e){return C.inC(d,e)},
-inC(d,e){var x=0,w=A.j(y.k),v,u,t,s,r,q,p,o,n
+a3A(d,e){return C.inB(d,e)},
+inB(d,e){var x=0,w=A.j(y.k),v,u,t,s,r,q,p,o,n
 var $async$a3A=A.e(function(f,g){if(f===1)return A.f(g,w)
 for(;;)switch(x){case 0:n={}
 if(d.length===0){v=d
@@ -196,8 +196,8 @@ x=1
 break
 case 1:return A.h(v,w)}})
 return A.i($async$a3A,w)},
-bFO(d,e,f,g,h){return C.ipv(d,e,f,g,h)},
-ipv(d,e,f,g,h){var x=0,w=A.j(y.Z),v,u=2,t=[],s,r,q,p,o,n,m,l,k,j,i
+bFO(d,e,f,g,h){return C.ipu(d,e,f,g,h)},
+ipu(d,e,f,g,h){var x=0,w=A.j(y.Z),v,u=2,t=[],s,r,q,p,o,n,m,l,k,j,i
 var $async$bFO=A.e(function(a0,a1){if(a0===1){t.push(a1)
 x=u}for(;;)switch(x){case 0:x=3
 return A.b(C.a2z(d,e,f,g,h),$async$bFO)
@@ -258,7 +258,7 @@ x=9
 return A.b(s.$1(C.ik2(b4,b5,b2.a)),$async$a2z)
 case 9:p=b9
 if(p==null){x=7
-break}o=C.ini(p,b3)
+break}o=C.inh(p,b3)
 if(o!=null){b6.$2("Adding pictures\u2026",0.85)
 n=A.ag('"cover_query"\\s*:\\s*"([^"]*)"',!0,!1,!1,!1).cF(p)
 if(n==null)m=null
@@ -543,7 +543,7 @@ s=u-1
 for(;;){if(!(s>1&&h.$3(B.a.aC(v,0,s),f,g)>e))break;--s}q.push(B.a.aC(v,0,s))
 v=B.a.b2(v,s)}w=v}if(w.length!==0)q.push(w)
 return q},
-inf(a5,a6,a7,a8,a9,b0,b1){var x,w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1={},a2=b1-72,a3=b0-40-50,a4=A.a([D.dMd],y.X)
+ine(a5,a6,a7,a8,a9,b0,b1){var x,w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1={},a2=b1-72,a3=b0-40-50,a4=A.a([D.dMd],y.X)
 a1.a=A.a([],y.P)
 a1.b=A.a([],y.x)
 a1.c=0
@@ -647,8 +647,8 @@ x=1
 break
 case 1:return A.h(v,w)}})
 return A.i($async$fLI,w)},
-fLJ(d,e,f,g,h,i,j){return C.ikb(d,e,f,g,h,i,j)},
-ikb(a7,a8,a9,b0,b1,b2,b3){var x=0,w=A.j(y.D),v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6
+fLJ(d,e,f,g,h,i,j){return C.ika(d,e,f,g,h,i,j)},
+ika(a7,a8,a9,b0,b1,b2,b3){var x=0,w=A.j(y.D),v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6
 var $async$fLJ=A.e(function(b5,b6){if(b5===1)return A.f(b6,w)
 for(;;)switch(x){case 0:h={}
 x=3
@@ -865,7 +865,7 @@ break
 case 1:return A.h(v,w)
 case 2:return A.f(t.at(-1),w)}})
 return A.i($async$aPF,w)},
-ioz(d){return $.hz_.c3(0,B.a.i(d).toLowerCase(),new C.fUi(d))},
+ioy(d){return $.hz_.c3(0,B.a.i(d).toLowerCase(),new C.fUi(d))},
 fUi:function fUi(d){this.a=d},
 haO(d){var x=y.N,w=y.S,v=y.t
 w=new C.cDn(d,A.T(x,w),A.T(x,w),A.T(w,w),A.a([],v),A.a([],v),A.T(w,y.G),A.T(w,y.d))
@@ -2701,7 +2701,7 @@ x=u}for(;;)switch(x){case 0:if(B.a.i(d).length===0){v=""
 x=1
 break}u=4
 x=7
-return A.b(C.ioz(d).dh(0,B.om),$async$$1)
+return A.b(C.ioy(d).dh(0,B.om),$async$$1)
 case 7:s=f
 if(s!=null)r=!(B.a.a_(s,"data:image/jpeg")||B.a.a_(s,"data:image/png")||B.a.a_(s,"data:image/jpg"))
 else r=!0
@@ -2952,7 +2952,7 @@ $R:3,
 $S:708}
 C.ft1.prototype={
 $1(d){var x=this,w=x.b,v=x.d
-return C.inf(x.a,d,v.gam2(v),x.c.c,x.e,w.a,w.b)},
+return C.ine(x.a,d,v.gam2(v),x.c.c,x.e,w.a,w.b)},
 $S:z+11}
 C.fsZ.prototype={
 $1(d){return new A.Y(d,new C.ft_(),A.U(d).k("Y<1>")).gI(0)},
@@ -3068,7 +3068,7 @@ w(C.ayp,A.rz)
 w(C.abp,A.a6X)})()
 A.iT(b.typeUniverse,JSON.parse('{"aXZ":{"dJ":[],"cB":[],"v":[]},"aCB":{"aX":[],"d9":["aX"],"aV":[],"cA":[]},"a_4":{"af":[],"v":[]},"b_w":{"ax":[],"v":[]},"be1":{"ax":[],"v":[]},"be3":{"aC":[]},"bnD":{"ax":[],"v":[]},"aAg":{"ah":["a_4"]},"ZP":{"af":[],"v":[]},"Qm":{"af":[],"v":[]},"azv":{"ah":["ZP"]},"btH":{"ax":[],"v":[]},"beF":{"aC":[]},"NO":{"ax":[],"v":[]},"bb4":{"aC":[]},"azr":{"ah":["Qm"]},"b56":{"kH":["fy<eW>"],"kv":["fy<eW>"]},"a9Q":{"yn":[],"kH":["fy<eW>"],"kv":["fy<eW>"]},"b5d":{"kH":["fy<eW>"],"kv":["fy<eW>"]},"aVg":{"jf":[],"fi":[]},"aUG":{"jf":[],"fi":[]},"ayp":{"rz":[]},"abp":{"fi":[]},"wD":{"jf":[],"fi":[]}}'))
 var y=(function rtii(){var x=A.at
-return{M:x("de<n>"),q:x("aB<~>"),K:x("d_<H,H>"),V:x("O<ac>"),O:x("O<u>"),m:x("O<a8<n,n>>"),c:x("O<mQ>"),P:x("O<b_x>"),X:x("O<rN>"),x:x("O<b_y>"),Q:x("O<o>"),v:x("O<fT>"),R:x("O<eW>"),W:x("O<fy<eW>>"),L:x("O<+(n,n)>"),y:x("O<+(H,H)>"),s:x("O<n>"),I:x("O<AG>"),p:x("O<v>"),n:x("O<fi>"),t:x("O<H>"),T:x("O<aB<~>()>"),A:x("cw<ah<af>>"),k:x("ai<+(n,n)>"),j:x("ai<@>"),f:x("a8<@,@>"),g:x("N<pq,n>"),r:x("N<H,Cv>"),w:x("iC"),E:x("aog"),B:x("mQ"),J:x("v6"),Z:x("rM"),a:x("ct"),o:x("o"),F:x("vj<eW>"),C:x("eW"),l:x("fy<eW>"),G:x("Cv"),Y:x("+(n,n)"),U:x("+filled,pages,sheets(H,H,H)"),_:x("Ka"),N:x("n"),d:x("b9T"),e:x("AG"),D:x("dK"),h:x("c3<~>"),b:x("azt"),i:x("bk<~>"),bP:x("aCB"),z:x("@"),S:x("H"),a1:x("a8<n,n>?"),aP:x("ql?"),aT:x("Pz<b1,wM>?"),u:x("n?"),ac:x("dK?"),H:x("~")}})();(function constants(){var x=a.makeConstList
+return{M:x("de<n>"),q:x("aB<~>"),K:x("cZ<H,H>"),V:x("O<ac>"),O:x("O<u>"),m:x("O<a8<n,n>>"),c:x("O<mQ>"),P:x("O<b_x>"),X:x("O<rN>"),x:x("O<b_y>"),Q:x("O<o>"),v:x("O<fT>"),R:x("O<eW>"),W:x("O<fy<eW>>"),L:x("O<+(n,n)>"),y:x("O<+(H,H)>"),s:x("O<n>"),I:x("O<AG>"),p:x("O<v>"),n:x("O<fi>"),t:x("O<H>"),T:x("O<aB<~>()>"),A:x("cw<ah<af>>"),k:x("ai<+(n,n)>"),j:x("ai<@>"),f:x("a8<@,@>"),g:x("N<pq,n>"),r:x("N<H,Cv>"),w:x("iC"),E:x("aog"),B:x("mQ"),J:x("v6"),Z:x("rM"),a:x("ct"),o:x("o"),F:x("vj<eW>"),C:x("eW"),l:x("fy<eW>"),G:x("Cv"),Y:x("+(n,n)"),U:x("+filled,pages,sheets(H,H,H)"),_:x("Ka"),N:x("n"),d:x("b9T"),e:x("AG"),D:x("dK"),h:x("c3<~>"),b:x("azt"),i:x("bk<~>"),bP:x("aCB"),z:x("@"),S:x("H"),a1:x("a8<n,n>?"),aP:x("ql?"),aT:x("Pz<b1,wM>?"),u:x("n?"),ac:x("dK?"),H:x("~")}})();(function constants(){var x=a.makeConstList
 D.Xf=new A.SL(-1,1)
 D.b5k=new A.ay(B.bp,1.5,B.r,-1)
 D.adX=new A.ay(F.lF,1,B.r,-1)
@@ -3146,8 +3146,8 @@ D.dP3=new C.pq("starry","Starry Night",4278915110,4281413249,4294829706,42949672
 D.zW=x([D.dOY,D.dP2,D.dP1,D.dOX,D.dP4,D.dP5,D.dOZ,D.dP_,D.dP0,D.dP3],A.at("O<pq>"))
 D.dxf=x([3,5,8,10,25,50,100],y.t)
 D.dzm=x(["civic","registry","registrar","mbondo","m'mbondo","mmbondo","ngmy","the system","our system","our community","the community","community","contribution","michango","jamii","jumuiya","advisor"],y.s)
-D.dCO=new A.d_([1611,1611,1612,1612,1613,1613,1614,1614,1615,1615,1616,1616,1617,1617,1618,1618,1648,1648,64606,64606,64607,64607,64608,64608,64609,64609,64610,64610,64611,64611],y.K)
-D.aIY=new A.d_([1575,65165,1576,65167,1578,65173,1579,65177,1580,65181,1581,65185,1582,65189,1583,65193,1584,65195,1585,65197,1586,65199,1587,65201,1588,65205,1589,65209,1590,65213,1591,65217,1592,65221,1593,65225,1594,65229,1601,65233,1602,65237,1603,65241,1604,65245,1605,65249,1606,65253,1607,65257,1608,65261,1610,65263,1569,65152,1570,65153,1571,65155,1572,65157,1573,65159,1574,65161,1577,65171],y.K)
+D.dCO=new A.cZ([1611,1611,1612,1612,1613,1613,1614,1614,1615,1615,1616,1616,1617,1617,1618,1618,1648,1648,64606,64606,64607,64607,64608,64608,64609,64609,64610,64610,64611,64611],y.K)
+D.aIY=new A.cZ([1575,65165,1576,65167,1578,65173,1579,65177,1580,65181,1581,65185,1582,65189,1583,65193,1584,65195,1585,65197,1586,65199,1587,65201,1588,65205,1589,65209,1590,65213,1591,65217,1592,65221,1593,65225,1594,65229,1601,65233,1602,65237,1603,65241,1604,65245,1605,65249,1606,65253,1607,65257,1608,65261,1610,65263,1569,65152,1570,65153,1571,65155,1572,65157,1573,65159,1574,65161,1577,65171],y.K)
 D.dGU=new C.NO(50,null)
 D.aJR=new C.v6("royal",null,null,null,null,"","","")
 D.a5S=x([],y.c)
@@ -3221,4 +3221,4 @@ D.h_T=new A.B("Design the cover",null,B.cC,null,null,null,null,null,null,null,nu
 D.h3_=new C.cDo(6,"postScriptName")
 D.hB5=new C.btH(null)})();(function staticFields(){$.hwY=null
 $.hz_=A.T(y.N,A.at("aB<n?>"))})()};
-(a=>{a["aKMvtMqWUlJS/GHeU7pnXmRdXKE="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["5E+cR7up4WGsRQ4M+9IgNqdQCf4="]=a.current})($__dart_deferred_initializers__);
