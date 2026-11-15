@@ -46,7 +46,7 @@ m.push("Switch on and watch it work!")
 s=n?y.d:""
 return new C.al4(w.a,w.b,m,w,s,!1)},
 ico(d){return'You are an electronics teacher for children and grown-ups, inside a circuit simulator. Design a circuit for this wish: "'+d+'".\n\nYou may ONLY use these part kinds (each has exactly 2 terminals, number 0 and 1; for battery, solar, crank and turbine terminal 0 is plus and 1 is minus; for led terminal 0 is the anode):\n'+new B.N(D.Sn,new C.fyJ(),x.bd).aO(0,"\n")+'\n\nRules for a circuit that really works in the simulator:\n- Current needs a complete loop: from the plus of a power source, through the parts, and back to its minus.\n- A bulb works at about 3 volts and burns out above about 5 volts. A LED needs a resistor of at least 100 ohms or it burns out. A radio needs 3 volts or more. A TV needs 6 volts or more. Battery volts can be 1.5, 3, 4.5, 9 or 12. Solar, crank and wind give up to 5 volts (settings are 0 to 1).\n- Be truthful about physics. Energy cannot be made from nothing, so never promise a perpetual motion or free energy machine. If asked for one, say so kindly in "honest" and design the closest real thing that harvests energy from sunlight, wind, water or muscles (solar, crank, turbine) and optionally stores it in a capacitor.\n- Use at most 7 parts. Place them on a board with x and y from 0.15 to 0.85, in a neat row or two, spread out.\n\nReply with ONLY a JSON object, no markdown, in exactly this form:\n{"title":"short name","explain":"two or three simple sentences on how it works","honest":"" ,"steps":["short build step 1","step 2","..."],\n"parts":[{"id":"a","kind":"battery","x":0.2,"y":0.3,"volts":9},{"id":"b","kind":"switch","x":0.5,"y":0.3,"on":1}],\n"wires":[["a",0,"b",0],["b",1,"c",0]]}\nOptional part settings: volts, level (0 to 1), ohms, on (1 or 0). Make sure every wire is [partId, terminal, partId, terminal] and that the wires make complete loops.\n'},
-irq(b2){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1=null
+irr(b2){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1=null
 if(b2==null)return b1
 w=A.a.co(b2,"{")
 v=A.a.p5(b2,"}")
@@ -1047,7 +1047,7 @@ _.c=f
 _.d=g
 _.e=h},
 ctq:function ctq(d){this.a=d},
-irk(d2,d3,d4,d5){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,c0,c1,c2,c3,c4,c5=null,c6=d3.fx>0&&!d3.x,c7=new C.fVQ(),c8=new C.fVS(),c9=new C.fVT(),d0=new C.fVR(),d1=d3.b
+irl(d2,d3,d4,d5){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,c0,c1,c2,c3,c4,c5=null,c6=d3.fx>0&&!d3.x,c7=new C.fVQ(),c8=new C.fVS(),c9=new C.fVT(),d0=new C.fVR(),d1=d3.b
 switch(d1){case"fridge":w=c9.$4(-16,-28,32,54)
 d2.am(w,d0.$3(new B.a1(w.a,w.b,w.c,w.d),A.bO,A.bK))
 d2.ah(D.ept,D.emo,c8.$2(A.dO,1.4))
@@ -1847,7 +1847,7 @@ azp:function azp(){},
 azq:function azq(){},
 aLx:function aLx(){},
 bzH:function bzH(){},
-irm(b9,c0,c1,c2){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5,b6=null,b7=c0.fx>0&&!c0.x,b8=c0.b
+irn(b9,c0,c1,c2){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5,b6=null,b7=c0.fx>0&&!c0.x,b8=c0.b
 switch(b8){case"voltmeter":case"ammeter":w=b8==="voltmeter"
 v=B.bX(A.vm,23)
 $.Q()
@@ -2249,7 +2249,7 @@ q=new B.ao(A.O,A.M,A.R,A.S,A.P)
 if(b0)p=D.a58[u]
 else{p=B.ar(D.a58[u],A.w,0.65)
 p.toString}q.r=p.gp(0)
-b9.af(b2,q)}return!0}return C.irk(b9,c0,c1,c2)},
+b9.af(b2,q)}return!0}return C.irl(b9,c0,c1,c2)},
 fQ:function fQ(d,e,f,g){var _=this
 _.a=d
 _.b=e
@@ -2257,7 +2257,7 @@ _.c=f
 _.d=g},
 hf3(d){var w=D.mt.h(0,d)
 return(w==null?null:w.b)===D.Ax},
-isB(d,e,f){return B.a6(d,!1).cd(B.vh(null,!1,!0,!0,new C.h_R(e,f),A.eR,null,A.pk,new C.h_S(),x.H))},
+isC(d,e,f){return B.a6(d,!1).cd(B.vh(null,!1,!0,!0,new C.h_R(e,f),A.eR,null,A.pk,new C.h_S(),x.H))},
 Kc:function Kc(d,e){this.a=d
 this.b=e},
 mt:function mt(d,e,f,g){var _=this
@@ -2637,7 +2637,7 @@ for(t=d.b,o=t.length,n=x.bN,q=0;q<t.length;t.length===o||(0,B.J)(t),++q){m=t[q]
 w.push(B.a([l.h(0,m.a),m.b,l.h(0,m.c),m.d],n))}l=B.C(f,B.a4(f).k("ch.E"))
 A.d.fi(l)
 return A.Y.az(B.I(["parts",u,"wires",w,"challenge",e,"done",l],s,r),null)},
-irL(a6,a7){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5=null
+irM(a6,a7){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5=null
 try{w=A.Y.aQ(0,a7,a5)
 i=x.f
 if(!i.b(w))return a5
@@ -2735,8 +2735,8 @@ break
 case 6:case 1:return B.h(u,v)
 case 2:return B.f(s.at(-1),v)}})
 return B.i($async$fJB,v)},
-bGk(d){return C.ito(d)},
-ito(d){var w=0,v=B.j(x.H),u=1,t=[],s,r
+bGk(d){return C.itp(d)},
+itp(d){var w=0,v=B.j(x.H),u=1,t=[],s,r
 var $async$bGk=B.e(function(e,f){if(e===1){t.push(f)
 w=u}for(;;)switch(w){case 0:u=3
 w=7
@@ -2857,7 +2857,7 @@ n=p
 m=C
 w=3
 return B.b(C.bBU(C.ico(o)),$async$Z5)
-case 3:r=n.a=m.irq(f)
+case 3:r=n.a=m.irr(f)
 p.b=""
 if(r!=null&&!C.ihn(r.d)){p.a=null
 p.b="The first idea did not make a complete loop, so I used a proven design."
@@ -3774,7 +3774,7 @@ a7(){return"_UnfoldStyle."+this.b}}
 C.B9.prototype={}
 C.aER.prototype={
 Y(){this.a4()
-B.bP(A.qv,C.ipM(),x.H)},
+B.bP(A.qv,C.ipN(),x.H)},
 cbk(d,e){var w=this,v=w.e
 if(v.f.length!==0){v=v.gcp(0).at
 v.toString
@@ -6193,7 +6193,7 @@ w.r=A.c.j(0.05).gp(0)
 c1.af(b9,w)}b9=B.K()
 b9.r=A.bw.gp(0)
 c1.ar(D.f6R,b9)
-break}C.irm(c1,c2,b3.b.d,b3.gcbK())
+break}C.irn(c1,c2,b3.b.d,b3.gcbK())
 if(t)b3.qS(c1,"\u2716",D.eqb,A.ay,14)
 if(s)c1.c.restore()},
 bGi(d,e){var w,v,u,t,s,r,q,p,o=this,n=e.e
@@ -6318,7 +6318,7 @@ break}t.ay=!0
 s=t.c
 s.toString
 w=3
-return B.b(C.isB(s,d.b,A.j.V(A.j.F(t.a.c.d*0.12,1)*100)),$async$a0x)
+return B.b(C.isC(s,d.b,A.j.V(A.j.F(t.a.c.d*0.12,1)*100)),$async$a0x)
 case 3:t.ay=!1
 case 1:return B.h(u,v)}})
 return B.i($async$a0x,v)},
@@ -6544,7 +6544,7 @@ for(;;)switch(w){case 0:w=3
 return B.b(C.fJB(),$async$afd)
 case 3:r=e
 if(t.c==null){w=1
-break}if(r!=null&&t.d.a.length===0){s=C.irL(t.d,r)
+break}if(r!=null&&t.d.a.length===0){s=C.irM(t.d,r)
 if(s!=null){t.m(new C.e0A(t,s))
 t.Q=r}}t.as=!0
 case 1:return B.h(u,v)}})
@@ -7175,7 +7175,7 @@ C.Xp.prototype={
 S(){return new C.bn1(new B.au(A.aw,$.aw()))}}
 C.bn1.prototype={
 axP(d){return B.p5(A.j.ad(d,2),B.ag("(\\d)(?=(\\d{3})+\\.)",!0,!1,!1,!1),new C.ePC(),null)},
-B(d){var w,v,u,t,s,r,q,p,o,n=this,m=null,l=n.d,k=l.a.a,j=B.d_(B.aL(k,",","."))
+B(d){var w,v,u,t,s,r,q,p,o,n=this,m=null,l=n.d,k=l.a.a,j=B.cX(B.aL(k,",","."))
 if(j==null)j=0
 w=j*n.e/100
 v=j+w
@@ -9601,7 +9601,7 @@ w.bzK=w.t
 w=C.aOl.prototype
 w.bAa=w.t})();(function installTearOffs(){var w=a._instance_0u,v=a._static_0,u=a._instance_1u,t=a._instance_1i,s=a._instance_0i,r=a.installInstanceTearOff
 w(C.aG4.prototype,"gayq","c8V",1)
-v(C,"ipM","c6k",3)
+v(C,"ipN","c6k",3)
 var q
 u(q=C.aEy.prototype,"gchO","chP",22)
 w(q,"gc9u","b0f",1)
@@ -10297,7 +10297,7 @@ D.d0K=w([A.aA,A.aE],x.M)
 D.dao=w([A.aA,A.A,A.aE],x.M)
 D.dc_=w([A.aA,A.ly,A.A,A.lz,A.aE],x.M)
 D.dqi=w([A.aA,A.ly,A.a7,A.aa,A.lz,A.aE],x.M)
-D.dDE=new B.cZ([1,D.d0n,2,D.d0K,3,D.dao,4,A.aDe,5,D.dc_,6,D.dqi],B.at("cZ<H,ai<da>>"))
+D.dDE=new B.d_([1,D.d0n,2,D.d0K,3,D.dao,4,A.aDe,5,D.dc_,6,D.dqi],B.at("d_<H,ai<da>>"))
 D.ell={Calm:0,Box:1,Sleep:2}
 D.cIr=w([4,2,6,0],x.n)
 D.cIy=w([4,4,4,4],x.n)
@@ -10830,12 +10830,12 @@ $.htY=null
 $.hAe=0
 $.i2i=B.T(x.N,B.at("iH"))
 $.i2R=B.T(x.N,B.at("iH"))})();(function lazyInitializers(){var w=a.lazyFinal
-w($,"iBa","bGG",()=>{var v="led"
+w($,"iBb","bGG",()=>{var v="led"
 return B.a([C.azZ("Both together","Make the light glow only when BOTH switches are ON.",2,new C.fs0(),v),C.azZ("Either one","Make the light glow when AT LEAST ONE switch is ON.",2,new C.fs1(),v),C.azZ("Opposites","Make the light glow when the two switches are DIFFERENT (one ON, one OFF).",2,new C.fs2(),v),C.azZ("Flip it","One switch only: make the light glow when the switch is OFF.",1,new C.fs9(),v),C.azZ("Not both","Make the light go OFF only when both switches are ON.",2,new C.fsa(),v),C.azZ("Safe lock","The buzzer must sound only when A is ON, B is ON and C is OFF.",3,new C.fsb(),"buzzer")],B.at("O<bcX>"))})
-w($,"iBC","bGH",()=>B.a([C.Rb("UNIVERSE","Earth, space and gravity",A.PK,A.aH,new C.fsr()),C.Rb("ELECTRONICS LAB","Batteries, wires, real circuits",Ag.CK,A.aH,new C.fss()),C.Rb("DISCOVERY LAB","Body Explorer: a real 3D human",D.bPD,A.b4,new C.fst()),C.Rb("TOOLBOX","Converter, clock, games",H.apj,A.cF,new C.fsu()),C.Rb("REACTION LAB","Wire parts together",A.D7,A.bx,new C.fsv()),C.Rb("SPARK PAINTER","Paint with light",A.P9,A.bT,new C.fsw()),C.Rb("ROCKET LANDER","Land softly on the pad",A.oE,A.aH,new C.fsx()),C.Rb("TITLE ANIMATOR","Make a moving title",A.wN,A.bi,new C.fsy()),C.Rb("CIRCUIT LAB","Connect logic, learn it",A.a2U,A.co,new C.fsz())],B.at("O<bvb>")))
-w($,"iDg","qD",()=>{var v,u,t=B.T(x.N,x.B)
+w($,"iBD","bGH",()=>B.a([C.Rb("UNIVERSE","Earth, space and gravity",A.PK,A.aH,new C.fsr()),C.Rb("ELECTRONICS LAB","Batteries, wires, real circuits",Ag.CK,A.aH,new C.fss()),C.Rb("DISCOVERY LAB","Body Explorer: a real 3D human",D.bPD,A.b4,new C.fst()),C.Rb("TOOLBOX","Converter, clock, games",H.apj,A.cF,new C.fsu()),C.Rb("REACTION LAB","Wire parts together",A.D7,A.bx,new C.fsv()),C.Rb("SPARK PAINTER","Paint with light",A.P9,A.bT,new C.fsw()),C.Rb("ROCKET LANDER","Land softly on the pad",A.oE,A.aH,new C.fsx()),C.Rb("TITLE ANIMATOR","Make a moving title",A.wN,A.bi,new C.fsy()),C.Rb("CIRCUIT LAB","Connect logic, learn it",A.a2U,A.co,new C.fsz())],B.at("O<bvb>")))
+w($,"iDh","qD",()=>{var v,u,t=B.T(x.N,x.B)
 for(v=0;v<76;++v){u=D.Sn[v]
 t.n(0,u.a,u)}return t})
-w($,"iBb","aj_",()=>B.a([C.Go("Light the bulb","You need a battery and a bulb joined in a loop. Wire the + of the battery to the bulb, and the bulb back to the battery.",new C.fsc()),C.Go("Make a flashlight","Add a switch into the loop, so you can turn the bulb on and off.",new C.fsd()),C.Go("Spin the motor","A battery and a motor in a loop will make it spin.",new C.fse()),C.Go("Light an LED safely","An LED burns out on its own. Put a resistor in the loop with it. Mind the + side of the LED!",new C.fsf()),C.Go("Light a bulb with no battery","Use a solar panel, a hand crank or a wind turbine instead of a battery.",new C.fsg()),C.Go("Play the radio","A radio needs about 3 volts or more. Try a 9 volt battery.",new C.fs3()),C.Go("Watch TV","A TV needs 6 volts or more. Set a battery to 12 volts, and wire the TV's + (left) dot towards the battery +.",new C.fs4()),C.Go("Charge a battery","A 1.5 V battery starts flat. Join it to a solar panel (+ to +, \u2212 to \u2212) until its charge bar is full.",new C.fs5()),C.Go("One battery, two gadgets","A TV needs 9 volts but a phone burns out. Use a step-down converter to give the phone 5 V from the same battery.",new C.fs6()),C.Go("Protect a radio","Put a diode in the loop with a radio. It only lets electricity go one way.",new C.fs7()),C.Go("Make toast","A heater turns electricity into heat. Make it glow bright orange.",new C.fs8())],B.at("O<bcY>")))
-w($,"iBE","hJf",()=>B.a([C.a20("Spin the Wheel","Let luck decide","\ud83c\udfa1",A.aS,A.c6,new C.fsH()),C.a20("Focus Timer","Work, then rest","\u23f1\ufe0f",A.c0,A.bC,new C.fsI()),C.a20("Breathe","Calm down in a minute","\ud83e\udee7",A.hr,A.cz,new C.fsJ()),C.a20("Draw Pad","Sketch and share","\ud83c\udfa8",A.bD,A.b8,new C.fsK()),C.a20("Memory Match","Find the pairs","\ud83c\udccf",A.aH,A.ch,new C.fsL()),C.a20("Simon Sounds","Copy the tune","\ud83c\udfb5",A.bi,A.be,new C.fsM()),C.a20("Tip & Split","Share the bill","\ud83e\uddfe",A.b4,A.b2,new C.fsN()),C.a20("Lucky Pocket","Dice, coin, number","\ud83c\udfb2",A.bp,A.aF,new C.fsO())],B.at("O<bwv>")))})()};
-(a=>{a["xtdx2SX8lYeNPcgkAasC64TV00A="]=a.current})($__dart_deferred_initializers__);
+w($,"iBc","aj_",()=>B.a([C.Go("Light the bulb","You need a battery and a bulb joined in a loop. Wire the + of the battery to the bulb, and the bulb back to the battery.",new C.fsc()),C.Go("Make a flashlight","Add a switch into the loop, so you can turn the bulb on and off.",new C.fsd()),C.Go("Spin the motor","A battery and a motor in a loop will make it spin.",new C.fse()),C.Go("Light an LED safely","An LED burns out on its own. Put a resistor in the loop with it. Mind the + side of the LED!",new C.fsf()),C.Go("Light a bulb with no battery","Use a solar panel, a hand crank or a wind turbine instead of a battery.",new C.fsg()),C.Go("Play the radio","A radio needs about 3 volts or more. Try a 9 volt battery.",new C.fs3()),C.Go("Watch TV","A TV needs 6 volts or more. Set a battery to 12 volts, and wire the TV's + (left) dot towards the battery +.",new C.fs4()),C.Go("Charge a battery","A 1.5 V battery starts flat. Join it to a solar panel (+ to +, \u2212 to \u2212) until its charge bar is full.",new C.fs5()),C.Go("One battery, two gadgets","A TV needs 9 volts but a phone burns out. Use a step-down converter to give the phone 5 V from the same battery.",new C.fs6()),C.Go("Protect a radio","Put a diode in the loop with a radio. It only lets electricity go one way.",new C.fs7()),C.Go("Make toast","A heater turns electricity into heat. Make it glow bright orange.",new C.fs8())],B.at("O<bcY>")))
+w($,"iBF","hJf",()=>B.a([C.a20("Spin the Wheel","Let luck decide","\ud83c\udfa1",A.aS,A.c6,new C.fsH()),C.a20("Focus Timer","Work, then rest","\u23f1\ufe0f",A.c0,A.bC,new C.fsI()),C.a20("Breathe","Calm down in a minute","\ud83e\udee7",A.hr,A.cz,new C.fsJ()),C.a20("Draw Pad","Sketch and share","\ud83c\udfa8",A.bD,A.b8,new C.fsK()),C.a20("Memory Match","Find the pairs","\ud83c\udccf",A.aH,A.ch,new C.fsL()),C.a20("Simon Sounds","Copy the tune","\ud83c\udfb5",A.bi,A.be,new C.fsM()),C.a20("Tip & Split","Share the bill","\ud83e\uddfe",A.b4,A.b2,new C.fsN()),C.a20("Lucky Pocket","Dice, coin, number","\ud83c\udfb2",A.bp,A.aF,new C.fsO())],B.at("O<bwv>")))})()};
+(a=>{a["/T/PcK5GszgJjNS/DPKJPoLZPzA="]=a.current})($__dart_deferred_initializers__);

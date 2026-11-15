@@ -70,7 +70,7 @@ break}w=3
 return A.b(A.cf(null,null,!0,null,new B.fvO(e,r,d,t),d,null,!0,!0,x.H),$async$fvL)
 case 3:case 1:return A.h(u,v)}})
 return A.i($async$fvL,v)},
-isi(d,e,f,g,h,i){return A.hy(e,new B.apb(i,d,g,h,f,null),!1,"NgmyAppBuilderScreen",x.R)},
+isj(d,e,f,g,h,i){return A.hy(e,new B.apb(i,d,g,h,f,null),!1,"NgmyAppBuilderScreen",x.R)},
 fvO:function fvO(d,e,f,g){var _=this
 _.a=d
 _.b=e
@@ -863,8 +863,8 @@ break
 case 19:case 1:return A.h(u,v)
 case 2:return A.f(s.at(-1),v)}})
 return A.i($async$agT,v)},
-aij(d){return B.inx(d)},
-inx(d){var w=0,v=A.j(x.b2),u,t=2,s=[],r,q,p,o,n,m,l,k,j
+aij(d){return B.iny(d)},
+iny(d){var w=0,v=A.j(x.b2),u,t=2,s=[],r,q,p,o,n,m,l,k,j
 var $async$aij=A.e(function(e,f){if(e===1){s.push(f)
 w=t}for(;;)switch(w){case 0:t=4
 w=7
@@ -1384,8 +1384,8 @@ break
 case 5:return A.h(null,v)
 case 1:return A.f(t.at(-1),v)}})
 return A.i($async$a2N,v)},
-aRC(d){return B.imu(d)},
-imu(d){var w=0,v=A.j(x.Y),u,t=2,s=[],r,q,p,o,n,m,l
+aRC(d){return B.imv(d)},
+imv(d){var w=0,v=A.j(x.Y),u,t=2,s=[],r,q,p,o,n,m,l
 var $async$aRC=A.e(function(e,f){if(e===1){s.push(f)
 w=t}for(;;)switch(w){case 0:if(C.a.i(d).length===0){u=A.a([],x.o)
 w=1
@@ -1533,7 +1533,7 @@ w=3
 return A.b(B.fL1(),$async$Hv)
 case 3:p=l.dI(h,new B.fSA(f))
 o=C.a.i(f.Q)
-n=o.length!==0?o.toLowerCase():B.ikf(f.b,f.d,p)
+n=o.length!==0?o.toLowerCase():B.ikg(f.b,f.d,p)
 m=C.a.i(f.at)
 if(!(m.length!==0)){p=C.a.i(f.c)
 m=p.length!==0?p:f.b+" \u2014 created with NGMY App Builder"}t=f.cPj(A.fLb(n),m,n).cPt(new A.V(Date.now(),0,!1).aa().ag(),null,C.Tl,new A.V(Date.now(),0,!1).aa().ag())
@@ -1631,7 +1631,7 @@ w=1
 break
 case 1:return A.h(u,v)}})
 return A.i($async$fRP,v)},
-ind(d){var w,v,u,t,s,r=C.a.i(d.toLowerCase())
+ine(d){var w,v,u,t,s,r=C.a.i(d.toLowerCase())
 if(r.length===0)return"user"
 w=C.d.gH(r.split("@"))
 v=A.ag("[^a-z0-9]",!0,!1,!1,!1)
@@ -1639,7 +1639,7 @@ u=A.aL(w,v,"")
 t=C.o.ft(Math.abs(C.a.gX(r)),36)
 s=t.length>5?C.a.aC(t,0,5):t
 return(u.length===0?"user":u)+"-"+s},
-ikf(d,e,f){var w,v,u,t,s,r,q=B.ind(e),p=C.a.i(d.toLowerCase()),o=A.ag("[^a-z0-9\\s-]",!0,!1,!1,!1)
+ikg(d,e,f){var w,v,u,t,s,r,q=B.ine(e),p=C.a.i(d.toLowerCase()),o=A.ag("[^a-z0-9\\s-]",!0,!1,!1,!1)
 p=A.aL(p,o,"")
 o=A.ag("\\s+",!0,!1,!1,!1)
 p=A.aL(p,o,"-")
@@ -4836,7 +4836,7 @@ B.fkL.prototype={
 $1(d){return this.a.ds("label",d)},
 $S:2}
 B.fkM.prototype={
-$1(d){var w=A.d_(d)
+$1(d){var w=A.cX(d)
 if(w==null)w=0.65
 return this.a.ds("value",w)},
 $S:2}
@@ -4844,7 +4844,7 @@ B.fkN.prototype={
 $1(d){return this.a.ds("label",d)},
 $S:2}
 B.fkO.prototype={
-$1(d){var w=A.d_(d)
+$1(d){var w=A.cX(d)
 if(w==null)w=4.5
 return this.a.ds("value",w)},
 $S:2}
@@ -6073,6 +6073,6 @@ D.fYb=new A.B("Component Library",null,C.di,null,null,null,null,null,null,null,n
 D.fZJ=new A.B("Canvas settings",null,C.di,null,null,null,null,null,null,null,null,null)
 D.fZP=new A.B("My Projects",null,null,null,null,null,null,null,null,null,null,null)
 D.h06=new A.B("Invoice published",null,C.iB,null,null,null,null,null,null,null,null,null)})();(function lazyInitializers(){var w=a.lazyFinal
-w($,"iD9","hK0",()=>{var v=4279150057,u=4284704497
+w($,"iDa","hK0",()=>{var v=4279150057,u=4284704497
 return A.a([B.mP("Featured",new B.fIp(),"Map, saved trips & destinations.","\u2708\ufe0f","qr_studio","Travel Explorer",v),B.mP("",new B.fIq(),"Product feed, cart & checkout.","\ud83d\udecd\ufe0f","luxe_store","Luxe Store",4293675161),B.mP("",new B.fIr(),"Posts, profiles & engagement.","\ud83d\udcac","creator_hub","Social Pulse",4287323382),B.mP("",new B.fIC(),"Workouts, check-ins & nutrition.","\ud83d\udcaa","pulse_fitness","Pulse Fitness",4279286145),B.mP("",new B.fII(),"Clients, invoices & pipeline.","\ud83d\udcca","invoice_pro","CRM Dashboard",u),B.mP("",new B.fIJ(),"Showcase work & contact.","\ud83c\udf10","video_hub","Portfolio Hub",v),B.mP("",new B.fIK(),"Live QR for websites & text.","\ud83d\udcf1","qr_code_studio","QR Code Studio",4278630100),B.mP("New",new B.fIL(),"Sell, track sales & get paid.","\ud83d\udcb5","side_hustle","Side Hustle Marketplace",4279673674),B.mP("",new B.fIM(),"Services, bookings & client earnings.","\ud83d\udcc5","booking_pro","Booking & Services",4286331629),B.mP("",new B.fIN(),"Daily checklist, streaks & progress.","\ud83d\udd25","habit_tracker","Habit Tracker",4279548070),B.mP("",new B.fIO(),"Income, spending & budget at a glance.","\ud83d\udcb0","finance_dash","Money Tracker",4282090230),B.mP("",new B.fIs(),"Post roles, track applicants.","\ud83d\udcbc","job_board","Job Board",4281549141),B.mP("",new B.fIt(),"Discussion feed, posts & replies.","\ud83d\udde3\ufe0f","community_forum","Community Forum",4288814255),B.mP("",new B.fIu(),"Episodes, categories & playback links.","\ud83c\udf99\ufe0f","podcast_hub","Podcast Hub",4280232247),B.mP("",new B.fIv(),"Events, RSVPs & shareable QR codes.","\ud83c\udfab","event_tickets","Event Ticketing",4294286859),B.mP("New",new B.fIw(),"Raise funds, track donors, share a link.","\u2764\ufe0f","donate_nonprofit","Giving Campaign",4292943176),B.mP("",new B.fIx(),"Sessions, bookings & client roster.","\ud83e\uddd8","coaching_booking","Coaching Studio",4286456526),B.mP("",new B.fIy(),"Showcase galleries & booking requests.","\ud83d\udcf7","photo_portfolio","Photo Portfolio",4279310375),B.mP("",new B.fIz(),"Save recipes, ingredients & steps.","\ud83c\udf73","recipe_box","Recipe Box",4293548044),B.mP("",new B.fIA(),"Daily care, vet visits & reminders.","\ud83d\udc3e","pet_care","Pet Care Tracker",4284850957),B.mP("",new B.fIB(),"Create invoices, track clients & income.","\ud83e\uddfe","freelance_invoicing","Freelancer Invoicing",4280171146),B.mP("",new B.fID(),"Log rounds, track scores & leaderboard.","\ud83c\udfc6","trivia_game","Trivia Night Scorekeeper",4292552567),B.mP("New",new B.fIE(),"Map of properties, inquiries & saves.","\ud83c\udfe0","real_estate","Real Estate Listings",4278995566),B.mP("",new B.fIF(),"Menu by category, tap to add to order.","\ud83c\udf7d\ufe0f","restaurant_menu","Restaurant Menu & Orders",4290321436),B.mP("",new B.fIG(),"Members, renewals & revenue.","\ud83e\udeaa","membership_manager","Membership Manager",4278483031),B.mP("",new B.fIH(),"Start fresh \u2014 describe any app to NGMY AI.","\ud83d\ude80","blank","Blank Canvas",u)],A.at("O<a7b>"))})})()};
-(a=>{a["dPLnh/ukWtXw3Elr4K7VZnTdIYE="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["iV5PQdrHG86W2AXvCyibggu23Y0="]=a.current})($__dart_deferred_initializers__);

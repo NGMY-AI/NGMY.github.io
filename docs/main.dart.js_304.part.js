@@ -1,6 +1,6 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var J,A,B,E,F,G,C={
-irh(d,e){A.hy(d,new C.asy(e,null),!1,null,y.X)},
+iri(d,e){A.hy(d,new C.asy(e,null),!1,null,y.X)},
 asy:function asy(d,e){this.c=d
 this.a=e},
 aG0:function aG0(d,e,f,g,h,i,j,k,l,m,n,o){var _=this
@@ -271,7 +271,7 @@ v=u.length
 if(v>=6)return B.a.b2(u,v-6)
 if(s>12)return B.a.aC(t,0,5)+"\u2026"
 return t},
-ioh(d){var x=A.ag("\\D",!0,!1,!1,!1),w=A.aL(d,x,"")
+ioi(d){var x=A.ag("\\D",!0,!1,!1,!1),w=A.aL(d,x,"")
 x=w.length
 if(x>=6)return B.a.b2(w,x-6)
 if(d.length>10)return B.a.aC(d,0,4)+"\u2026"
@@ -637,7 +637,7 @@ if(x==null)x="preview"
 w=B.a.i(q.cx.a.a)
 if(w.length===0)w="General"
 v=B.a.i(q.cy.a.a)
-u=A.d_(B.a.i(q.db.a.a))
+u=A.cX(B.a.i(q.db.a.a))
 if(u==null)u=0
 t=B.a.i(q.dy.a.a)
 s=new A.V(Date.now(),0,!1).aa().ag()
@@ -687,7 +687,7 @@ var $async$a2t=A.e(function(d,e){if(d===1)return A.f(e,w)
 for(;;)switch(x){case 0:j=B.a.i(u.ch.a.a)
 i=B.a.i(u.CW.a.a)
 h=B.a.i(u.cx.a.a)
-g=A.d_(B.a.i(u.db.a.a))
+g=A.cX(B.a.i(u.db.a.a))
 if(g==null)g=0
 t=A.ca(B.a.i(u.dx.a.a),null)
 s=B.o.D(t==null?1:t,1,9999)
@@ -1190,7 +1190,7 @@ C.evK.prototype={
 $0(){return this.a.a2O(this.b)},
 $S:0}
 C.evC.prototype={
-$1(d){var x=null,w=this.a,v=w.b51(d),u=A.d(d.c,x,x,x,x,x,x,B.h_,x,x,x),t=B.j.ad(d.f,2),s=C.ioh(d.b),r=v!=null?" \xb7 "+v:""
+$1(d){var x=null,w=this.a,v=w.b51(d),u=A.d(d.c,x,x,x,x,x,x,B.h_,x,x,x),t=B.j.ad(d.f,2),s=C.ioi(d.b),r=v!=null?" \xb7 "+v:""
 return A.uO(A.dG(!1,x,x,x,!0,x,x,x,!0,x,x,x,x,x,x,x,new C.evp(w,d),!1,x,x,x,x,x,A.d(d.d+" \xb7 $"+t+" \xb7 "+s+" \xb7 stock "+d.y+r,x,x,x,x,x,x,A.l(x,x,A.a_(140,B.c.l()>>>16&255,B.c.l()>>>8&255,B.c.l()&255),x,x,x,x,x,x,x,x,11,x,x,x,x,x,!0,x,x,x,x,x,x,x,x),x,x,x),x,u,x,A.CA(x,x,D.c1i,new C.evq(),B.H,new C.evr(w,d),B.cl,x,y.N),x),D.bkL,x,B.cx,x)},
 $S:z+5}
 C.evr.prototype={
@@ -1347,4 +1347,4 @@ D.fW0=new A.B("Product Scanner",null,B.cC,null,null,null,null,null,null,null,nul
 D.fZ8=new A.B("Enter barcode",null,null,null,null,null,null,null,null,null,null,null)
 D.h0C=new A.B("Store QR code",null,B.ng,null,null,null,null,null,null,null,null,null)
 D.h1k=new A.B("Camera scan works on the NGMY phone app.\nOn desktop web, enter the barcode below.",null,B.VO,null,B.K,null,null,null,null,null,null,null)})()};
-(a=>{a["mKnMQBa4oJT7OxE0cahsD5FVIug="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["7zFBlPdQPHJpOLLeY6zfDk2XFwI="]=a.current})($__dart_deferred_initializers__);

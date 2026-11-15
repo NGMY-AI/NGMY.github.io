@@ -228,11 +228,11 @@ _.a=i},
 aOg:function aOg(){},
 fIQ:function fIQ(d){this.a=d},
 fIR:function fIR(d){this.a=d},
-ipd(d){if(d.a==="street_racer")return C.ipe(d)
-return C.iph(d)},
-ipf(d){return B.d.aV(D.dga,new C.fV3(d))},
+ipe(d){if(d.a==="street_racer")return C.ipf(d)
+return C.ipi(d)},
+ipg(d){return B.d.aV(D.dga,new C.fV3(d))},
 fV3:function fV3(d){this.a=d},
-ipe(d){var x=d.a
+ipf(d){var x=d.a
 if(x==="street_racer")return new C.atK(d,null)
 throw A.W(A.dM("Unknown drive game: "+x,null))},
 atK:function atK(d,e){this.c=d
@@ -850,7 +850,7 @@ f5B:function f5B(d){this.a=d},
 f5C:function f5C(d,e,f){this.a=d
 this.b=e
 this.c=f},
-iph(d){var x=null,w=d.a
+ipi(d){var x=null,w=d.a
 switch(w){case"neon_drift":return new C.atF(d,x)
 case"sky_flap":return new C.atJ(d,x)
 case"crystal_breaker":return new C.atB(d,x)
@@ -1666,7 +1666,7 @@ bkL:function bkL(d,e,f){this.b=d
 this.c=e
 this.a=f},
 aPf:function aPf(){},
-ipg(d){var x,w,v,u
+iph(d){var x,w,v,u
 for(x=$.hiT(),w=x.length,v=0;v<w;++v){u=x[v]
 if(u.a===d)return u}return null}},D,G,L,H,Y
 J=c[1]
@@ -1756,11 +1756,11 @@ break}u.m(new C.eR8(u,t,s))
 case 1:return A.h(v,w)}})
 return A.i($async$Py,w)},
 gbKJ(){return J.bGS(J.h5B(this.Q),0,new C.eQZ())},
-ckv(d){var x=d.a,w=C.ipg(x)
+ckv(d){var x=d.a,w=C.iph(x)
 if(w!=null)return new C.atD(w,null)
 switch(x){case"vault_sync":return D.eg7
 case"word_match":return D.eg8
-default:if(C.ipf(x))return C.ipd(d)
+default:if(C.ipg(x))return C.ipe(d)
 if(d.f===D.b_f)return new C.atE(d,null)
 return new C.atv(d,null)}},
 QU(d){return this.ciV(d)},
@@ -7239,16 +7239,16 @@ x(s=C.aGp.prototype,"gcet","ceu",0)
 w(s,"gb28","afU",2)
 x(s,"gces","QI",2)
 v(s,"gchv","chw",16)
-u(C,"ir2",3,null,["$3"],["i6w"],1,0)
-u(C,"ir4",3,null,["$3"],["i9z"],1,0)
-u(C,"ir1",3,null,["$3"],["i6b"],1,0)
-u(C,"ir7",3,null,["$3"],["idT"],1,0)
-u(C,"ir5",3,null,["$3"],["i9Z"],1,0)
-u(C,"ir3",3,null,["$3"],["i8x"],1,0)
-u(C,"ir9",3,null,["$3"],["ieV"],1,0)
-u(C,"ir0",3,null,["$3"],["hvS"],1,0)
-u(C,"ir8",3,null,["$3"],["ieq"],1,0)
-u(C,"ir6",3,null,["$3"],["ibB"],1,0)
+u(C,"ir3",3,null,["$3"],["i6w"],1,0)
+u(C,"ir5",3,null,["$3"],["i9z"],1,0)
+u(C,"ir2",3,null,["$3"],["i6b"],1,0)
+u(C,"ir8",3,null,["$3"],["idT"],1,0)
+u(C,"ir6",3,null,["$3"],["i9Z"],1,0)
+u(C,"ir4",3,null,["$3"],["i8x"],1,0)
+u(C,"ira",3,null,["$3"],["ieV"],1,0)
+u(C,"ir1",3,null,["$3"],["hvS"],1,0)
+u(C,"ir9",3,null,["$3"],["ieq"],1,0)
+u(C,"ir7",3,null,["$3"],["ibB"],1,0)
 x(C.aD1.prototype,"gcex","cey",0)
 x(C.aE8.prototype,"gnL","nM",0)
 x(s=C.aJd.prototype,"gbTP","bTQ",0)
@@ -7294,7 +7294,7 @@ x(C.aOj,A.eM)
 x(C.aPf,A.eM)})()
 A.iT(b.typeUniverse,JSON.parse('{"adD":{"ax":[],"v":[]},"adE":{"ax":[],"v":[]},"a_C":{"af":[],"v":[]},"OU":{"af":[],"v":[]},"bn6":{"ah":["OU"]},"bbF":{"aC":[]},"bbE":{"aC":[]},"bh5":{"ah":["a_C"]},"atv":{"af":[],"v":[]},"aGo":{"ah":["atv"]},"bon":{"aC":[]},"bq8":{"aC":[]},"bjh":{"aC":[]},"bnA":{"aC":[]},"bhQ":{"aC":[]},"bhL":{"aC":[]},"atK":{"af":[],"v":[]},"aJV":{"ah":["atK"]},"bqw":{"aC":[]},"bv3":{"aC":[]},"atE":{"af":[],"v":[]},"aGp":{"ah":["atE"]},"bbI":{"aC":[]},"bup":{"aC":[]},"UK":{"af":[],"v":[]},"UJ":{"af":[],"v":[]},"UI":{"af":[],"v":[]},"bj9":{"ah":["UK"]},"bct":{"aC":[]},"buI":{"aC":[]},"bj8":{"ah":["UJ"]},"aD1":{"ah":["UI"]},"atD":{"af":[],"v":[]},"a0L":{"af":[],"v":[]},"afy":{"ax":[],"v":[]},"bn8":{"ah":["atD"]},"bn9":{"ah":["a0L"]},"atF":{"af":[],"v":[]},"atJ":{"af":[],"v":[]},"atB":{"af":[],"v":[]},"atC":{"af":[],"v":[]},"atI":{"af":[],"v":[]},"atz":{"af":[],"v":[]},"atH":{"af":[],"v":[]},"atG":{"af":[],"v":[]},"atA":{"af":[],"v":[]},"AY":{"ax":[],"v":[]},"aE8":{"ah":["atF"]},"blc":{"aC":[]},"aJd":{"ah":["atJ"]},"bu1":{"aC":[]},"aAj":{"ah":["atB"]},"bea":{"aC":[]},"aC_":{"ah":["atC"]},"bhp":{"aC":[]},"aGU":{"ah":["atI"]},"bo1":{"aC":[]},"azD":{"ah":["atz"]},"bcs":{"aC":[]},"aGO":{"ah":["atH"]},"bnP":{"aC":[]},"aGI":{"ah":["atG"]},"bnB":{"aC":[]},"azX":{"ah":["atA"]},"bcQ":{"aC":[]},"atL":{"af":[],"v":[]},"aGq":{"ah":["atL"]},"aK8":{"aC":[]},"bvx":{"aC":[]},"atM":{"af":[],"v":[]},"aLq":{"af":[],"v":[]},"aGr":{"ah":["atM"]},"bwG":{"ax":[],"v":[]},"aLr":{"ah":["aLq"]},"bdk":{"ax":[],"v":[]},"by8":{"aC":[]},"bkL":{"aC":[]}}'))
 var y=(function rtii(){var x=A.at
-return{c:x("lN<u?>"),W:x("l7<ai<n>,n>"),V:x("O<ac>"),O:x("O<u>"),g:x("O<o>"),v:x("O<fT>"),L:x("O<+(n,n)>"),s:x("O<n>"),R:x("O<uf>"),p:x("O<v>"),Q:x("O<acG>"),_:x("O<acI>"),e:x("O<acO>"),k:x("O<acP>"),x:x("O<izf>"),m:x("O<ad5>"),D:x("O<bfV>"),E:x("O<QF>"),q:x("O<a_B>"),o:x("O<adB>"),u:x("O<izB>"),y:x("O<Db>"),G:x("O<aeC>"),aU:x("O<izD>"),C:x("O<a0W>"),h:x("O<aGX>"),aY:x("O<GD>"),b:x("O<aeU>"),a5:x("O<KX>"),cr:x("O<aIB>"),a0:x("O<afS>"),T:x("O<d0>"),t:x("O<H>"),U:x("O<aC?>"),cl:x("cw<ah<af>>"),M:x("i1<n>"),bP:x("ai<d0>"),j:x("ai<@>"),J:x("ai<H>"),Z:x("bB<n,a9<n,@>>"),aN:x("a9<n,n>"),cw:x("a9<n,AL>"),P:x("a9<n,@>"),f:x("a9<@,@>"),aC:x("N<wU,D>"),d:x("N<+(n,n),n>"),w:x("iC"),K:x("aE"),c2:x("o"),bQ:x("+(H,H)"),at:x("e0<n>"),N:x("n"),aG:x("r4<G>"),X:x("br<G>"),aw:x("bI<n>"),a:x("bI<H>"),I:x("AL"),A:x("Y<+(n,n)>"),l:x("v"),bk:x("a_B"),cN:x("aD3"),n:x("Db"),Y:x("KX"),r:x("d0"),i:x("G"),z:x("@"),S:x("H"),F:x("ai<d0>?"),aL:x("ai<@>?"),cM:x("aE?"),B:x("aX?"),a9:x("wU?"),H:x("~")}})();(function constants(){var x=a.makeConstList
+return{c:x("lN<u?>"),W:x("l7<ai<n>,n>"),V:x("O<ac>"),O:x("O<u>"),g:x("O<o>"),v:x("O<fT>"),L:x("O<+(n,n)>"),s:x("O<n>"),R:x("O<uf>"),p:x("O<v>"),Q:x("O<acG>"),_:x("O<acI>"),e:x("O<acO>"),k:x("O<acP>"),x:x("O<izg>"),m:x("O<ad5>"),D:x("O<bfV>"),E:x("O<QF>"),q:x("O<a_B>"),o:x("O<adB>"),u:x("O<izC>"),y:x("O<Db>"),G:x("O<aeC>"),aU:x("O<izE>"),C:x("O<a0W>"),h:x("O<aGX>"),aY:x("O<GD>"),b:x("O<aeU>"),a5:x("O<KX>"),cr:x("O<aIB>"),a0:x("O<afS>"),T:x("O<d0>"),t:x("O<H>"),U:x("O<aC?>"),cl:x("cw<ah<af>>"),M:x("i1<n>"),bP:x("ai<d0>"),j:x("ai<@>"),J:x("ai<H>"),Z:x("bB<n,a9<n,@>>"),aN:x("a9<n,n>"),cw:x("a9<n,AL>"),P:x("a9<n,@>"),f:x("a9<@,@>"),aC:x("N<wU,D>"),d:x("N<+(n,n),n>"),w:x("iC"),K:x("aE"),c2:x("o"),bQ:x("+(H,H)"),at:x("e0<n>"),N:x("n"),aG:x("r4<G>"),X:x("br<G>"),aw:x("bI<n>"),a:x("bI<H>"),I:x("AL"),A:x("Y<+(n,n)>"),l:x("v"),bk:x("a_B"),cN:x("aD3"),n:x("Db"),Y:x("KX"),r:x("d0"),i:x("G"),z:x("@"),S:x("H"),F:x("ai<d0>?"),aL:x("ai<@>?"),cM:x("aE?"),B:x("aX?"),a9:x("wU?"),H:x("~")}})();(function constants(){var x=a.makeConstList
 D.b57=new A.ay(B.bW,1,B.r,-1)
 D.c6j=new A.a8(B.b7,B.b9,B.x,K.aCS,null,null)
 D.b8B=new A.p(null,null,null,null,null,D.c6j,B.n)
@@ -7736,16 +7736,16 @@ D.hu5=new C.a_F(2,"melon")
 D.hu6=new C.a_F(3,"banana")
 D.b03=new C.a_F(4,"bomb")
 D.hwM=new C.aD3(!1,0,!1,!1)})();(function lazyInitializers(){var x=a.lazyFinal
-x($,"iDm","hK4",()=>{var w,v,u,t=A.a([],A.at("O<Zr>"))
+x($,"iDn","hK4",()=>{var w,v,u,t=A.a([],A.at("O<Zr>"))
 for(w=0;w<36;++w){v=B.Du[w]
 u=v.a
 if(!D.fbA.q(0,u))t.push(C.haW(new C.fIQ(v),v.f,v.d,v.e,"gc_"+u,new C.fIR(v),"PLAY",v.c,v.b))}return t})
-x($,"iDn","aSR",()=>{var w,v,u,t,s,r=A.a([],y.R)
+x($,"iDo","aSR",()=>{var w,v,u,t,s,r=A.a([],y.R)
 for(w=$.hiT(),v=w.length,u=0;u<w.length;w.length===v||(0,A.J)(w),++u){t=w[u]
 s=t.b
 r.push(new C.uf(t.a,s,s,t.c,D.La,t.f,t.e))}return r})
-x($,"iDo","hK5",()=>A.a([C.Lv("kid_count","Count It","Count the things and tap the number.","\ud83d\udd22",D.bR_,D.dav,C.ir2()),C.Lv("kid_letters","First Letter","What letter does it start with?","\ud83d\udd24",D.bOj,D.dgt,C.ir4()),C.Lv("kid_colors","Colour Hunt","Learn your colours.","\ud83c\udfa8",B.mi,H.aAQ,C.ir1()),C.Lv("kid_shapes","Shape Finder","Circles, stars, hearts and more.","\ud83d\udd3a",B.Pd,D.dsA,C.ir7()),C.Lv("kid_math","Fruit Maths","Add and take away with fruit.","\ud83c\udf4e",B.Pc,D.cWy,C.ir5()),C.Lv("kid_homes","Animal Homes","Where does each animal live?","\ud83d\udc27",B.CW,D.d3m,C.ir3()),C.Lv("kid_swahili","Kiswahili Words","Jifunze maneno ya Kiswahili.","\ud83d\udde3\ufe0f",B.qP,D.d3S,C.ir9()),C.Lv("kid_bigsmall","Big or Small","Which one is bigger or smaller?","\ud83d\udc18",G.aqv,D.duS,C.ir0()),C.Lv("kid_spell","Missing Letter","Fill in the missing letter.","\u270f\ufe0f",L.aqm,D.ds4,C.ir8()),C.Lv("kid_pattern","What Comes Next","Finish the pattern.","\ud83e\udde9",F.a2D,D.d5n,C.ir6()),C.haW(new C.fIS(),B.RP,"\ud83c\udccf",Q.HP,"kid_memory",new C.fIT(),"LEARN","Flip the cards and find the pairs.","Memory Match"),C.haW(new C.fIU(),B.RL,"\ud83c\udf88",B.k7,"kid_balloons",new C.fIV(),"LEARN","Pop the balloons with the right letter.","Letter Balloons")],A.at("O<Zr>")))
-x($,"iDp","hiT",()=>{var w=A.h7d($.hK5(),!0,A.at("Zr"))
+x($,"iDp","hK5",()=>A.a([C.Lv("kid_count","Count It","Count the things and tap the number.","\ud83d\udd22",D.bR_,D.dav,C.ir3()),C.Lv("kid_letters","First Letter","What letter does it start with?","\ud83d\udd24",D.bOj,D.dgt,C.ir5()),C.Lv("kid_colors","Colour Hunt","Learn your colours.","\ud83c\udfa8",B.mi,H.aAQ,C.ir2()),C.Lv("kid_shapes","Shape Finder","Circles, stars, hearts and more.","\ud83d\udd3a",B.Pd,D.dsA,C.ir8()),C.Lv("kid_math","Fruit Maths","Add and take away with fruit.","\ud83c\udf4e",B.Pc,D.cWy,C.ir6()),C.Lv("kid_homes","Animal Homes","Where does each animal live?","\ud83d\udc27",B.CW,D.d3m,C.ir4()),C.Lv("kid_swahili","Kiswahili Words","Jifunze maneno ya Kiswahili.","\ud83d\udde3\ufe0f",B.qP,D.d3S,C.ira()),C.Lv("kid_bigsmall","Big or Small","Which one is bigger or smaller?","\ud83d\udc18",G.aqv,D.duS,C.ir1()),C.Lv("kid_spell","Missing Letter","Fill in the missing letter.","\u270f\ufe0f",L.aqm,D.ds4,C.ir9()),C.Lv("kid_pattern","What Comes Next","Finish the pattern.","\ud83e\udde9",F.a2D,D.d5n,C.ir7()),C.haW(new C.fIS(),B.RP,"\ud83c\udccf",Q.HP,"kid_memory",new C.fIT(),"LEARN","Flip the cards and find the pairs.","Memory Match"),C.haW(new C.fIU(),B.RL,"\ud83c\udf88",B.k7,"kid_balloons",new C.fIV(),"LEARN","Pop the balloons with the right letter.","Letter Balloons")],A.at("O<Zr>")))
+x($,"iDq","hiT",()=>{var w=A.h7d($.hK5(),!0,A.at("Zr"))
 B.d.v(w,$.hK4())
 return w})})()};
-(a=>{a["8W2nCzPR3enUELxCEKos8zOdmFI="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["0jKZnbnUoi78AdVfUYGU5omk1cI="]=a.current})($__dart_deferred_initializers__);
