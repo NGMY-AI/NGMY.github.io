@@ -429,6 +429,9 @@ V3 hookupPoint(String lesson, int id, WiringState s) {
   }
 }
 
+/// The front face of the wall on the bench (the wall is 0.5 thick, from z -0.5 to 0). Anything wholly behind it is inside the wall.
+const double _kWallFront = 0.02;
+
 Scene3D buildElectricalScene(ElectricalLesson lesson, WiringState s) => buildBench(lesson, s, withWall: true);
 
 /// The box, the cable, the wires and the device. With [withWall] it also draws a piece of wall around the box.
@@ -585,7 +588,20 @@ Scene3D buildBench(ElectricalLesson lesson, WiringState s, {bool withWall = true
   }
   if (s.power && s.stage == 0) labels.add(const Label3D(V3(-0.4, 4.2, -2.4), 'LIVE 120 V', Color(0xFFDC2626)));
   // Every face is drawn from both sides: seen from behind or from inside the open box nothing goes missing and nothing can be seen through.
-  return Scene3D([for (final p in b.polys) p.twoSided ? p : Poly(p.pts, p.n, p.color, p.id, shine: p.shine, alpha: p.alpha, twoSided: true, layer: p.layer, bias: p.bias, order: p.order, group: p.group)], info: info, labels: labels);
+  // And everything that is BEHIND the front of the wall (the box, the cable, the ends of the wires inside the box) is drawn before the wall,
+  // with the studs: the wall then hides it from any angle in front, and it shows only through the opening, as in a real wall. Before, it was
+  // drawn after the wall, so from the side the box and the cable showed through the wall.
+  int tierOf(Poly p) {
+    if (!withWall || p.order != 2) return p.order;
+    for (final v in p.pts) {
+      if (v.z > _kWallFront) return 2;
+    }
+    return 0;
+  }
+
+  return Scene3D([
+    for (final p in b.polys) Poly(p.pts, p.n, p.color, p.id, shine: p.shine, alpha: p.alpha, twoSided: true, layer: p.layer, bias: p.bias, order: tierOf(p), group: p.group),
+  ], info: info, labels: labels);
 }
 
 /// The blue box and the yellow cable coming into it. Returns where the cable ends (one end per cable).

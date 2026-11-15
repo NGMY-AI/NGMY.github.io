@@ -200,7 +200,8 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
             pulse: pulse,
             scan: scan,
             orbit: orbit,
-            overlayHeader: true,
+            // The header in its own row at the top and the tiles underneath it: the tiles start just below the frame and never scroll up into it.
+            overlayHeader: false,
             headerBare: true,
             header: NgmyToolkitAliveHeader(
               title: 'Business Essentials',
@@ -277,7 +278,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                   Expanded(
                     child: Builder(
                       builder: (context) {
-                        final topPad = MediaQuery.paddingOf(context).top + 92;
+                        const topPad = 14.0;
                         return GridView.count(
                           crossAxisCount: 2,
                           padding: EdgeInsets.fromLTRB(16, topPad, 16, 24),

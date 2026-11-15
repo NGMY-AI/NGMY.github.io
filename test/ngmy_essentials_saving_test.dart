@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_business_contacts.dart';
+import 'package:ngmy/ngmy_business_essentials.dart';
 import 'package:ngmy/ngmy_business_notes.dart';
 import 'package:ngmy/ngmy_hub_form_ui.dart';
 import 'package:ngmy/ngmy_local_store.dart';
@@ -70,5 +71,29 @@ void main() {
     expect(find.byKey(const Key('ngmy-framed-title')), findsOneWidget);
     expect(find.textContaining('Business Contacts'), findsWidgets);
     expect(t.getRect(find.byKey(const Key('ngmy-framed-title'))).top, lessThan(80));
+  });
+
+  testWidgets('Business Essentials: the tiles start below the top frame and never go up into it, even when scrolled', (t) async {
+    t.view.physicalSize = const Size(860, 1860);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(MaterialApp(home: Builder(builder: (ctx) => Scaffold(body: Center(child: TextButton(onPressed: () => showNgmyBusinessEssentialsHub(ctx, userEmail: _email), child: const Text('go')))))));
+    await t.tap(find.text('go'));
+    for (var i = 0; i < 40 && find.text('Notes').evaluate().isEmpty; i++) {
+      await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await t.pump(const Duration(milliseconds: 100));
+    }
+    final frame = t.getRect(find.byKey(const Key('ngmy-framed-title')));
+    final notes = find.text('Notes').first;
+    expect(t.getRect(notes).top, greaterThan(frame.bottom), reason: 'the first tile is under the frame');
+    final grid = find.byType(GridView).first;
+    final gridTop = t.getRect(grid).top;
+    expect(gridTop, greaterThan(frame.bottom), reason: 'the scrolling area itself starts below the frame, so nothing can scroll into it');
+    await t.drag(grid, const Offset(0, -400));
+    await t.pump(const Duration(milliseconds: 300));
+    final frameAfter = t.getRect(find.byKey(const Key('ngmy-framed-title')));
+    expect(t.getRect(grid).top, greaterThan(frameAfter.bottom), reason: 'after scrolling the tiles still stay below the frame');
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(seconds: 2));
   });
 }

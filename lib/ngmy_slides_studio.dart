@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_hati_document_transfer.dart';
 import 'ngmy_hati_kiapo_uongozi.dart';
+import 'ngmy_state_picker.dart';
 import 'ngmy_hati_kuhowa_templates.dart';
 import 'ngmy_marriage_agreement_templates.dart';
 import 'ngmy_book_studio.dart';
@@ -798,14 +799,25 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     );
   }
 
-  void _launchHatiKiapoUongozi() {
+  Future<void> _launchHatiKiapoUongozi() async {
     if (!_hasCivicRegistryAccess) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Sign in to Civic Registry to view Hati ya Kiapo cha Uongozi.')),
       );
       return;
     }
-    final state = _kiapoStateForUser;
+    var state = _kiapoStateForUser;
+    // The app admin grants one paper per state: first choose which state, then open, edit or create that state's paper.
+    if (widget.isAdmin) {
+      final picked = await showNgmyStatePickerSheet(
+        context,
+        states: kNgmyUsStates,
+        selected: state,
+        title: 'Hati ya Kiapo: which state?',
+      );
+      if (picked == null || picked.trim().isEmpty || !mounted) return;
+      state = picked.trim();
+    }
     var canEdit = widget.isAdmin ||
         widget.isCivicRegistryKing ||
         widget.isCivicRegistryAdmin ||
