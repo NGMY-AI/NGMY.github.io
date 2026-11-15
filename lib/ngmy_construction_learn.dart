@@ -73,8 +73,9 @@ class NgmyConstructionLearnPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: kStudioBg,
       body: SafeArea(
+        top: false,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
+          padding: EdgeInsets.fromLTRB(14, MediaQuery.paddingOf(context).top + 8, 14, 24),
           children: [
             Row(children: [
               AutoHideBack(child: IconButton(onPressed: () => Navigator.of(context).maybePop(), icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20))),

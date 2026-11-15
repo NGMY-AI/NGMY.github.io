@@ -3376,10 +3376,12 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF1F5F9),
+      // The list runs right up under the clock when scrolled (no dark band at the top); only its start is kept below the clock.
       body: SafeArea(
+        top: false,
         bottom: false,
         child: ListView(
-          padding: EdgeInsets.fromLTRB(18, 12, 18, widget.bottomScrollPadding),
+          padding: EdgeInsets.fromLTRB(18, MediaQuery.paddingOf(context).top + 12, 18, widget.bottomScrollPadding),
           children: [
             _header(
               title: 'NGMY SLIDES',

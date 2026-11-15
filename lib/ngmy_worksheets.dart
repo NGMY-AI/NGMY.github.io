@@ -604,10 +604,11 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
     return Scaffold(
       backgroundColor: p.pageBg,
       body: SafeArea(
+        top: false,
         child: _loading
             ? const Center(child: CircularProgressIndicator(color: WorksheetPalette.green))
             : SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                padding: EdgeInsets.fromLTRB(20, MediaQuery.paddingOf(context).top + 8, 20, 32),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

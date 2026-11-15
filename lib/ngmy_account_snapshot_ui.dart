@@ -458,11 +458,12 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
     return Scaffold(
       backgroundColor: bg,
       body: SafeArea(
+        top: false,
         bottom: false,
         child: Stack(
           children: [
             ListView(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+              padding: EdgeInsets.fromLTRB(20, MediaQuery.paddingOf(context).top + 8, 20, 32),
               children: [
                 Row(
                   children: [

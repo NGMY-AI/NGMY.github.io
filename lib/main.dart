@@ -26916,9 +26916,10 @@ class _InvestScreenState extends State<InvestScreen> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SafeArea(
+        top: false,
         bottom: false,
         child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(20, 10, 20, bottomPad),
+          padding: EdgeInsets.fromLTRB(20, MediaQuery.paddingOf(context).top + 10, 20, bottomPad),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -29946,12 +29947,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     const legalFrameColors = [Color(0xFF3B82F6), Color(0xFF8B5CF6)];
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF1F5F9),
+      // The list runs right up under the clock when scrolled (no dark band at the top); only its start is kept below the clock.
       body: SafeArea(
+        top: false,
         bottom: false,
         child: NgmyHudMotion(
           builder: (context, pulse, scan, orbit) {
             return SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(20, 10, 20, _ngmyBottomNavScrollPadding(context)),
+              padding: EdgeInsets.fromLTRB(20, MediaQuery.paddingOf(context).top + 10, 20, _ngmyBottomNavScrollPadding(context)),
               child: Column(children: [
       NgmyToolkitAliveSection(
         colors: profileColors,
@@ -31265,9 +31268,10 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SafeArea(
+        top: false,
         bottom: false,
         child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(20, 20, 20, _ngmyBottomNavScrollPadding(context)),
+          padding: EdgeInsets.fromLTRB(20, MediaQuery.paddingOf(context).top + 20, 20, _ngmyBottomNavScrollPadding(context)),
           child: Column(
             children: [
               FloatingTitle(

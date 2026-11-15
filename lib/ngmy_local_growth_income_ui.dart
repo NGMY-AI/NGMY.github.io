@@ -2458,9 +2458,10 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
     return ColoredBox(
       color: _ink,
       child: SafeArea(
+        top: false,
         bottom: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(18, 8, 18, 130),
+          padding: EdgeInsets.fromLTRB(18, MediaQuery.paddingOf(context).top + 8, 18, 130),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

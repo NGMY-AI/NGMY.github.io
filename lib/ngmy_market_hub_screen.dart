@@ -62,11 +62,12 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
     return Scaffold(
       backgroundColor: t.scaffold,
       body: SafeArea(
+        top: false,
         bottom: false,
         child: NgmyHudMotion(
           builder: (context, pulse, scan, orbit) {
             return ListView(
-              padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPad),
+              padding: EdgeInsets.fromLTRB(16, MediaQuery.paddingOf(context).top + 8, 16, bottomPad),
               children: [
                 _hudFrame(
                   t: t,

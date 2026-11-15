@@ -108,8 +108,9 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
     return Scaffold(
       backgroundColor: kStudioBg,
       body: SafeArea(
+        top: false,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
+          padding: EdgeInsets.fromLTRB(14, MediaQuery.paddingOf(context).top + 8, 14, 24),
           children: [
             // The header: the back arrow at the side and the name of the lab in a frame in the middle.
             Row(children: [
