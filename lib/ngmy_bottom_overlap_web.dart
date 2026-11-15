@@ -6,7 +6,7 @@ import 'dart:html' as html;
 double ngmyBrowserBottomOverlap() {
   try {
     final v = double.tryParse(html.document.documentElement?.getAttribute('data-ngmy-overlap') ?? '') ?? 0;
-    if (v > 0 && v < 260) return v;
+    if (v > 0 && v < 280) return v;
   } catch (_) {}
   return 0;
 }

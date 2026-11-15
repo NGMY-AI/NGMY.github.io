@@ -53,7 +53,20 @@
                   window.__ngmyBig = big;
                 }
                 var lh = big ? Math.round(big.getBoundingClientRect().height) : 0;
-                if (lh > best && lh - best < 200) { overlap = lh - best; best = lh; }
+                // Measured on an iPhone in Safari: page 781, large viewport (lvh) 821, but the screen is 926 (outerHeight). Everything below 821
+                // was left empty - the black behind Safari's bar. So the app is made as tall as the whole screen (outerHeight), and the part
+                // below the large viewport is kept free of the menu and buttons, so they stay exactly where they were, above the bar.
+                // The page starts below the clock (about 44-59 points on Face ID iPhones, 20 on Home-button iPhones), so the screen's bottom
+                // edge is about outerHeight minus that from the top of the page. 44 / 20 is the smallest of each, so the app reaches the edge
+                // (at most a few points past it) without running far below the screen.
+                var full = Math.round(window.outerHeight || 0) - (screen.height <= 736 ? 20 : 44);
+                var target = Math.max(lh, full);
+                if (target > best && target - best < 240) {
+                  // Kept free for the menu and buttons: everything below the page Safari reports, so they stay exactly where they were.
+                  overlap = target - best;
+                  best = target;
+                }
+                try { de.style.setProperty('--ngmy-full', best + 'px'); } catch (e2) {}
               }
               de.setAttribute('data-ngmy-overlap', String(overlap));
               if (best > h && best - h < 260) return best;
@@ -61,52 +74,6 @@
             return h;
           },
         });
-      } catch (e) {}
-    })();
-  </script>
-  <script>
-    // TEMPORARY, Safari tab on iPhone only (never the Home Screen app, never computers or Android): for 25 seconds after opening, a small line at the
-    // top lists every height Safari reports, so one screenshot shows which one reaches under Safari's bottom bar. To be removed once read.
-    (function () {
-      try {
-        var appleTouch = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-        var homeScreenApp = navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
-        if (!appleTouch || homeScreenApp) return;
-        var started = Date.now();
-        function box(css) {
-          var b = document.createElement('div');
-          b.style.cssText = 'position:fixed;top:0;left:0;width:0;visibility:hidden;pointer-events:none;' + css;
-          document.body.appendChild(b);
-          return b;
-        }
-        function show() {
-          if (!document.body) return;
-          var el = document.getElementById('ngmy-heights');
-          if (Date.now() - started > 25000) { if (el) el.remove(); clearInterval(t); return; }
-          var de = document.documentElement;
-          var d = Object.getOwnPropertyDescriptor(Element.prototype, 'clientHeight');
-          var realClient = d && d.get ? d.get.call(de) : de.clientHeight;
-          var s = box('height:100svh'), l = box('height:100lvh'), dv = box('height:100dvh'), v = box('height:100vh'), f = box('bottom:0');
-          var sa = box('padding-bottom:env(safe-area-inset-bottom);height:0');
-          var vv = window.visualViewport;
-          var g = document.querySelector('flt-glass-pane');
-          var c = g && g.shadowRoot ? g.shadowRoot.querySelector('canvas') : null;
-          var txt = 'NGMY heights | inner ' + innerHeight + ' | client ' + realClient + ' | vv ' + (vv ? Math.round(vv.height) + '+' + Math.round(vv.offsetTop) : '-') +
-            ' | svh ' + Math.round(s.getBoundingClientRect().height) + ' | dvh ' + Math.round(dv.getBoundingClientRect().height) +
-            ' | lvh ' + Math.round(l.getBoundingClientRect().height) + ' | vh ' + Math.round(v.getBoundingClientRect().height) +
-            ' | fixed ' + Math.round(f.getBoundingClientRect().height) + ' | safe ' + getComputedStyle(sa).paddingBottom +
-            ' | screen ' + screen.height + ' | outer ' + outerHeight + ' | canvas ' + (c ? Math.round(c.getBoundingClientRect().bottom) : '-') +
-            ' | overlap ' + de.getAttribute('data-ngmy-overlap');
-          [s, l, dv, v, f, sa].forEach(function (b) { b.remove(); });
-          if (!el) {
-            el = document.createElement('div');
-            el.id = 'ngmy-heights';
-            el.style.cssText = 'position:fixed;top:56px;left:8px;right:8px;z-index:2147483000;pointer-events:none;background:rgba(0,0,0,0.85);color:#fde047;font:12px/16px monospace;padding:6px 8px;border-radius:8px;border:1px solid #fde047';
-            document.documentElement.appendChild(el);
-          }
-          el.textContent = txt;
-        }
-        var t = setInterval(show, 1000);
       } catch (e) {}
     })();
   </script>
@@ -735,8 +702,8 @@
        inline bottom:0 on the page and on the app box; !important here lets the height win. */
     @supports (-webkit-touch-callout: none) {
       @media (display-mode: browser) {
-        html { height: 100vh; height: 100lvh; }
-        body, flutter-view { top: 0 !important; bottom: auto !important; height: 100vh !important; height: 100lvh !important; }
+        html { height: 100vh; height: var(--ngmy-full, 100lvh); }
+        body, flutter-view { top: 0 !important; bottom: auto !important; height: 100vh !important; height: var(--ngmy-full, 100lvh) !important; }
       }
     }
     flt-glass-pane {
