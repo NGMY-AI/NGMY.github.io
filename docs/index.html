@@ -37,6 +37,17 @@
                 window.__ngmyBig = big;
               }
               var lh = big ? Math.round(big.getBoundingClientRect().height) : 0;
+              // A box fixed to all four edges of the screen: in the installed app this is the full screen, and the app must be at least this tall
+              // (leaving it out made the installed app short again).
+              var probe = window.__ngmyProbe;
+              if (!probe && (document.body || de)) {
+                probe = document.createElement('div');
+                probe.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;width:0;visibility:hidden;pointer-events:none;z-index:-1';
+                (document.body || de).appendChild(probe);
+                window.__ngmyProbe = probe;
+              }
+              var ph = probe ? Math.round(probe.getBoundingClientRect().height) : 0;
+              if (ph > seen && ph - seen < 200) seen = ph;
               var ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
               var installed = navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
               // The keyboard is up: the visible area is far shorter than the window. Then nothing changes.
@@ -97,7 +108,7 @@
 
   <script>
     (function () {
-      var embedded = '20261115150158';
+      var embedded = '20261115152203';
       var base = window.__NGMY_BASE_PATH__ || '/';
       var KEY = 'ngmy_deploy_id';
       function forceRefreshForBuild(serverBuild, opts) {
@@ -897,7 +908,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20261115150158";
+      var CURRENT = "20261115152203";
 
       function showError(msg) {
 
@@ -1046,7 +1057,7 @@
 
   <script>
     (function () {
-      var deployId = '20261115150158';
+      var deployId = '20261115152203';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;
