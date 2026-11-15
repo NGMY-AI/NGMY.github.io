@@ -21,24 +21,12 @@
           get: function () {
             var h = d.get.call(de);
             try {
-              // In Safari on iPhone the bottom bar floats over the page, and the page is meant to go on under it (other sites show their own
-              // colour there). The app used to stop above the bar, so the dark page background showed under it. Now, in a Safari tab, the app
-              // is as tall as the large viewport (100lvh: down to the bottom edge of the screen), and data-ngmy-overlap on the page tells the app how
-              // much of it is under the bar, so the menu and buttons stay above the bar while the backgrounds run under it.
+              // Three more ways to know the real visible height: the visible area, the window, and a box fixed to all four edges of the screen
+              // (what an installed app and a browser tab both fill). The tallest of them wins, unless the keyboard is up (the visible area is then
+              // far shorter than the others) - then nothing changes.
               var vv = window.visualViewport;
               var vh = vv ? Math.round(vv.height + vv.offsetTop) : 0;
               var ih = Math.round(window.innerHeight || 0);
-              var seen = Math.max(vh, ih);
-              var big = window.__ngmyBig;
-              if (!big && (document.body || de)) {
-                big = document.createElement('div');
-                big.style.cssText = 'position:fixed;top:0;left:0;width:0;height:100vh;height:100lvh;visibility:hidden;pointer-events:none;z-index:-1';
-                (document.body || de).appendChild(big);
-                window.__ngmyBig = big;
-              }
-              var lh = big ? Math.round(big.getBoundingClientRect().height) : 0;
-              // A box fixed to all four edges of the screen: in the installed app this is the full screen, and the app must be at least this tall
-              // (leaving it out made the installed app short again).
               var probe = window.__ngmyProbe;
               if (!probe && (document.body || de)) {
                 probe = document.createElement('div');
@@ -47,15 +35,9 @@
                 window.__ngmyProbe = probe;
               }
               var ph = probe ? Math.round(probe.getBoundingClientRect().height) : 0;
-              if (ph > seen && ph - seen < 200) seen = ph;
-              var ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-              var installed = navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
-              // The keyboard is up: the visible area is far shorter than the window. Then nothing changes.
-              if (vh && Math.max(ih, lh) - vh > 160) { de.setAttribute('data-ngmy-overlap', '0'); return h; }
-              var best = seen;
-              if (ios && !installed && lh > seen && lh - seen < 200) best = lh;
-              de.setAttribute('data-ngmy-overlap', String(Math.max(0, best - seen)));
-              if (best > h && best - h < 260) return best;
+              var best = Math.max(vh, ih, ph);
+              if (vh && best - vh > 120) return h; // the keyboard is up
+              if (best > h && best - h < 200) return best;
             } catch (e) {}
             return h;
           },
@@ -682,14 +664,6 @@
     @media (display-mode: browser) {
       html, body { height: 100vh; height: 100dvh; }
       flutter-view { position: fixed; inset: 0; width: 100%; height: 100vh; height: 100dvh; }
-    }
-    /* Safari on iPhone (only it knows -webkit-touch-callout), in a tab: the page goes on under the floating bottom bar, so the app is as tall as the
-       large viewport - down to the bottom edge of the screen - and no dark band is left under the bar. The app keeps its menu above the bar. */
-    @supports (-webkit-touch-callout: none) {
-      @media (display-mode: browser) {
-        html, body { height: 100vh; height: 100lvh; }
-        flutter-view { top: 0; bottom: auto; height: 100vh; height: 100lvh; }
-      }
     }
     flt-glass-pane {
 
