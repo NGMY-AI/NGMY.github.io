@@ -122,7 +122,7 @@
 
   <script>
     (function () {
-      var embedded = '20261115165028';
+      var embedded = '20261115170416';
       var base = window.__NGMY_BASE_PATH__ || '/';
       var KEY = 'ngmy_deploy_id';
       function forceRefreshForBuild(serverBuild, opts) {
@@ -704,6 +704,11 @@
       @media (display-mode: browser) {
         html { height: 100vh; height: var(--ngmy-full, 100lvh); }
         body, flutter-view { top: 0 !important; bottom: auto !important; height: 100vh !important; height: var(--ngmy-full, 100lvh) !important; }
+        /* Safari cuts off a pinned (position: fixed) layer just above its bottom bar and fills the space under the bar with that layer's
+           background (the black). An ordinary page that is not pinned - like other sites - is drawn on under the bar. The engine pins the
+           page body; here it sits in the page instead (it still cannot scroll: touch-action none and overflow hidden stay). */
+        body { position: absolute !important; left: 0 !important; right: 0 !important; }
+        flutter-view { position: absolute !important; left: 0 !important; right: 0 !important; }
       }
     }
     flt-glass-pane {
@@ -923,7 +928,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20261115165028";
+      var CURRENT = "20261115170416";
 
       function showError(msg) {
 
@@ -1104,7 +1109,7 @@
 
   <script>
     (function () {
-      var deployId = '20261115165028';
+      var deployId = '20261115170416';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;
