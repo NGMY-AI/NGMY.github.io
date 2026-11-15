@@ -13,6 +13,10 @@ class NgmyHudInk {
 
   static bool isDark(BuildContext context) => Theme.of(context).brightness == Brightness.dark;
 
+  /// Light mode, plain and calm: no moving scan lines, glowing rings or tinted fills.
+  /// NGMY Advisors keep their own look ([NgmyHudKeepLook]).
+  static bool calm(BuildContext context) => !isDark(context) && !NgmyHudKeepLook.of(context);
+
   static Color title(BuildContext context) =>
       isDark(context) ? Colors.white : const Color(0xFF0F172A);
 
@@ -31,11 +35,81 @@ class NgmyHudInk {
 
   static Color panel(BuildContext context) => isDark(context)
       ? Colors.white.withValues(alpha: 0.06)
-      : const Color(0xFFE2E8F0);
+      : (calm(context) ? const Color(0xFFF7F8FA) : const Color(0xFFE2E8F0));
 
   static Color panelBorder(BuildContext context) => isDark(context)
       ? Colors.white.withValues(alpha: 0.14)
-      : const Color(0xFF94A3B8);
+      : (calm(context) ? NgmyCalmLight.border : const Color(0xFF94A3B8));
+}
+
+/// Wrap a page that keeps its futuristic look in light mode too (NGMY Advisors).
+class NgmyHudKeepLook extends InheritedWidget {
+  const NgmyHudKeepLook({super.key, required super.child});
+
+  static bool of(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<NgmyHudKeepLook>() != null;
+
+  @override
+  bool updateShouldNotify(NgmyHudKeepLook oldWidget) => false;
+}
+
+/// The calm light look: white cards, a hairline border, a soft shadow and one quiet accent.
+class NgmyCalmLight {
+  NgmyCalmLight._();
+
+  static const Color page = Color(0xFFF4F5F7);
+  static const Color card = Colors.white;
+  static const Color border = Color(0xFFE4E7EC);
+  static const Color ink = Color(0xFF111827);
+  static const Color sub = Color(0xFF6B7280);
+
+  static const List<BoxShadow> shadow = [
+    BoxShadow(color: Color(0x14101828), blurRadius: 14, offset: Offset(0, 4)),
+    BoxShadow(color: Color(0x0A101828), blurRadius: 3, offset: Offset(0, 1)),
+  ];
+
+  /// The accent made dark enough to read on white.
+  static Color accentInk(Color c) {
+    final h = HSLColor.fromColor(c);
+    return h.withLightness(h.lightness.clamp(0.22, 0.42)).withSaturation(h.saturation.clamp(0.0, 0.75)).toColor();
+  }
+
+  /// A very light wash of the accent, for the icon tile behind an icon.
+  static Color accentWash(Color c) => Color.lerp(Colors.white, c, 0.13)!;
+
+  static BoxDecoration cardDecoration({double radius = 20}) => BoxDecoration(
+        color: card,
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: border),
+        boxShadow: shadow,
+      );
+}
+
+/// A rounded tile with the icon in the accent colour, used instead of the glowing orb in calm light.
+class NgmyCalmIconTile extends StatelessWidget {
+  const NgmyCalmIconTile({super.key, required this.accent, required this.size, this.icon, this.emoji});
+
+  final Color accent;
+  final double size;
+  final IconData? icon;
+  final String? emoji;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('ngmy-calm-icon'),
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: NgmyCalmLight.accentWash(accent),
+        borderRadius: BorderRadius.circular(size * 0.3),
+      ),
+      alignment: Alignment.center,
+      child: emoji != null && emoji!.trim().isNotEmpty
+          ? NgmyOfflineEmoji(emoji!, fontSize: size * 0.48)
+          : (icon != null ? Icon(icon, color: NgmyCalmLight.accentInk(accent), size: size * 0.5) : null),
+    );
+  }
 }
 
 /// Shared pulse / scan / orbit clocks — same motion language as home tech frames.
@@ -85,6 +159,13 @@ class _NgmyHudMotionState extends State<NgmyHudMotion> with TickerProviderStateM
 
   void _onTick() {
     if (_scrolling || !mounted) return;
+    if (NgmyHudInk.calm(context)) {
+      // Calm light: nothing moves; the clocks wait until the look changes back.
+      for (final c in [_pulse, _scan, _orbit]) {
+        c.stop(canceled: false);
+      }
+      return;
+    }
     final now = DateTime.now().millisecondsSinceEpoch;
     if (now - _lastTick < 90) return;
     _lastTick = now;
@@ -105,6 +186,14 @@ class _NgmyHudMotionState extends State<NgmyHudMotion> with TickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    if (NgmyHudInk.calm(context)) {
+      return widget.builder(context, 0, 0, 0);
+    }
+    if (!_scrolling) {
+      for (final c in [_pulse, _scan, _orbit]) {
+        if (!c.isAnimating) c == _pulse ? c.repeat(reverse: true) : c.repeat();
+      }
+    }
     final pulse = Curves.easeInOut.transform(_pulse.value);
     return NotificationListener<ScrollNotification>(
       onNotification: (n) {
@@ -145,6 +234,26 @@ class NgmyHudTechFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (NgmyHudInk.calm(context)) {
+      final card = LayoutBuilder(
+        builder: (context, constraints) {
+          final fillH = constraints.hasBoundedHeight && constraints.maxHeight.isFinite;
+          return Container(
+            key: const Key('ngmy-calm-card'),
+            width: double.infinity,
+            height: fillH ? constraints.maxHeight : null,
+            padding: padding,
+            decoration: NgmyCalmLight.cardDecoration(radius: borderRadius),
+            child: child,
+          );
+        },
+      );
+      if (onTap == null) return card;
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(borderRadius), child: card),
+      );
+    }
     final dark = NgmyHudInk.isDark(context);
     final glow = 0.35 + pulse * 0.35;
     final scanV = (scan + phase) % 1.0;
@@ -252,6 +361,9 @@ class NgmyHudMiniOrb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (NgmyHudInk.calm(context)) {
+      return NgmyCalmIconTile(accent: colors.first, size: size, icon: icon, emoji: emoji);
+    }
     final dark = NgmyHudInk.isDark(context);
     return SizedBox(
       width: size,
@@ -440,6 +552,19 @@ class NgmyToolkitGlassPillFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (NgmyHudInk.calm(context)) {
+      return Container(
+        key: const Key('ngmy-calm-pill'),
+        padding: padding,
+        decoration: bare
+            ? BoxDecoration(
+                borderRadius: BorderRadius.circular(borderRadius),
+                border: Border.all(color: NgmyCalmLight.border),
+              )
+            : NgmyCalmLight.cardDecoration(radius: borderRadius),
+        child: child,
+      );
+    }
     final dark = NgmyHudInk.isDark(context);
     final fill = bare
         ? (dark
@@ -665,6 +790,15 @@ class NgmyToolkitAlivePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = NgmyHudInk.isDark(context);
+    if (NgmyHudInk.calm(context)) {
+      return Container(
+        width: width,
+        constraints: maxHeight == null ? null : BoxConstraints(maxHeight: maxHeight!),
+        decoration: NgmyCalmLight.cardDecoration(radius: borderRadius),
+        clipBehavior: Clip.antiAlias,
+        child: child,
+      );
+    }
     return Container(
       width: width,
       constraints: maxHeight == null ? null : BoxConstraints(maxHeight: maxHeight!),
@@ -786,18 +920,23 @@ class NgmyToolkitAlivePageChrome extends StatelessWidget {
             ),
           );
 
+    final calm = NgmyHudInk.calm(context);
     return Stack(
       fit: StackFit.expand,
       children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: pageColors,
+        if (calm)
+          const ColoredBox(color: NgmyCalmLight.page)
+        else
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: pageColors,
+              ),
             ),
           ),
-        ),
+        if (!calm)
         Positioned(
           top: -40,
           right: -30,
@@ -817,6 +956,7 @@ class NgmyToolkitAlivePageChrome extends StatelessWidget {
             ),
           ),
         ),
+        if (!calm)
         Positioned(
           bottom: 80,
           left: -50,
@@ -890,6 +1030,8 @@ class NgmyToolkitAliveButton extends StatelessWidget {
     final idleBorder = dark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFCBD5E1);
     // Selected stays on accent gradient — white label is always readable.
     final fg = selected ? Colors.white.withValues(alpha: 0.95) : idleFg;
+    final calm = NgmyHudInk.calm(context);
+    final calmFill = NgmyCalmLight.accentInk(colors.first);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -900,17 +1042,17 @@ class NgmyToolkitAliveButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            gradient: selected
+            gradient: selected && !calm
                 ? LinearGradient(colors: [
                     Color.lerp(colors.first, colors.last, pulse)!,
                     colors.last,
                   ])
                 : null,
-            color: selected ? null : idleBg,
+            color: calm ? (selected ? calmFill : Colors.white) : (selected ? null : idleBg),
             border: Border.all(
-              color: selected ? colors.first.withValues(alpha: 0.7) : idleBorder,
+              color: calm ? (selected ? calmFill : NgmyCalmLight.border) : (selected ? colors.first.withValues(alpha: 0.7) : idleBorder),
             ),
-            boxShadow: selected
+            boxShadow: selected && !calm
                 ? [BoxShadow(color: colors.first.withValues(alpha: 0.28 + pulse * 0.2), blurRadius: 12 + pulse * 6)]
                 : null,
           ),

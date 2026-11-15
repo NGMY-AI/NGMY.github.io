@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_core_protocol_sims.dart' deferred as sims;
 import 'ngmy_deferred.dart';
+import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_platform_graphics.dart';
 import 'ngmy_vault_arcade.dart' deferred as vault;
 
@@ -84,12 +85,21 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
 
   @override
   Widget build(BuildContext context) {
+    // Light mode is calm: the clocks stop and the cards stay still.
+    final calm = NgmyHudInk.calm(context);
+    for (final c in [_pulse, _scan, _orbit]) {
+      if (calm) {
+        if (c.isAnimating) c.stop(canceled: false);
+      } else if (!c.isAnimating) {
+        c == _pulse ? c.repeat(reverse: true) : c.repeat();
+      }
+    }
     return AnimatedBuilder(
       animation: Listenable.merge([_pulse, _scan, _orbit]),
       builder: (context, _) {
-        final pulse = Curves.easeInOut.transform(_pulse.value);
-        final scan = _scan.value;
-        final orbit = _orbit.value;
+        final pulse = calm ? 0.0 : Curves.easeInOut.transform(_pulse.value);
+        final scan = calm ? 0.0 : _scan.value;
+        final orbit = calm ? 0.0 : _orbit.value;
         // Twice the previous shrink (300→270 was −30; now −60 more → 210).
         const gap = 10.0;
         const topH = 210.0;
@@ -231,6 +241,7 @@ class _TechFrameCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (NgmyHudInk.calm(context)) return _calmCard(context);
     final glow = 0.35 + pulse * 0.35;
     final isLight = Theme.of(context).brightness == Brightness.light;
     final ink = isLight ? const Color(0xFF0F172A) : Colors.white;
@@ -285,6 +296,74 @@ class _TechFrameCard extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Light mode: a plain white card, an icon tile and clear text. Nothing glows or moves.
+  Widget _calmCard(BuildContext context) {
+    final accent = spec.colors.first;
+    final badge = Text(
+      spec.badge,
+      style: TextStyle(
+        color: NgmyCalmLight.accentInk(accent),
+        fontSize: 10,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1.0,
+      ),
+    );
+    final title = Text(
+      spec.title,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(color: NgmyCalmLight.ink, fontWeight: FontWeight.w800, fontSize: 14, letterSpacing: 0.6),
+    );
+    final sub = Text(
+      spec.subtitle,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(color: NgmyCalmLight.sub, fontSize: 11.5, fontWeight: FontWeight.w500),
+    );
+    final body = wide
+        ? Row(
+            children: [
+              NgmyCalmIconTile(accent: accent, size: 52, icon: spec.icon),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [badge, const SizedBox(height: 4), title, const SizedBox(height: 2), sub],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: NgmyCalmLight.sub, size: 26),
+            ],
+          )
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              badge,
+              const Spacer(),
+              Center(child: NgmyCalmIconTile(accent: accent, size: 68, icon: spec.icon)),
+              const Spacer(),
+              title,
+              const SizedBox(height: 3),
+              sub,
+            ],
+          );
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: Key('home-tech-calm-${spec.kind.name}'),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: Ink(
+          width: double.infinity,
+          height: double.infinity,
+          padding: EdgeInsets.fromLTRB(16, wide ? 12 : 16, wide ? 10 : 16, wide ? 12 : 16),
+          decoration: NgmyCalmLight.cardDecoration(radius: 22),
+          child: body,
         ),
       ),
     );

@@ -3306,7 +3306,8 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
         ),
       );
     }
-    return NgmyHudMotion(
+    // NGMY Advisors keep their own look in light mode too.
+    return NgmyHudKeepLook(child: NgmyHudMotion(
       builder: (context, pulse, scan, orbit) {
         return GridView.builder(
           addAutomaticKeepAlives: false,
@@ -3340,7 +3341,7 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
           ),
         );
       },
-    );
+    ));
   }
 }
 

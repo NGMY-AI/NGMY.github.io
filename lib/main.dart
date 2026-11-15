@@ -32553,6 +32553,32 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
   }
 
   Widget _ngmyServicesHeroCard({required bool isDark, required List<Color> topColors}) {
+    if (NgmyHudInk.calm(context)) {
+      // Light mode: a still, plain card. No tilt, glow or spinning border.
+      return Container(
+        key: const Key('hub-services-calm'),
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+        decoration: NgmyCalmLight.cardDecoration(radius: 22),
+        child: Column(
+          children: [
+            NgmyCalmIconTile(accent: topColors.first, size: 56, icon: Icons.auto_awesome_rounded),
+            const SizedBox(height: 14),
+            const Text(
+              'NGMY Services',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: NgmyCalmLight.ink, fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: 0.2),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Next Generation - Make Yours',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: NgmyCalmLight.sub, fontSize: 13.5, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      );
+    }
     return AnimatedBuilder(
       animation: _animCtrl,
       builder: (context, child) {
