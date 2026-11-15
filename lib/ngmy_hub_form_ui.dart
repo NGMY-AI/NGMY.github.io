@@ -408,3 +408,37 @@ class NgmyModernDateField extends StatelessWidget {
     );
   }
 }
+
+/// The name of a page in a frame, in the middle at the top - the same look as the Construction Lab and Core Protocol titles.
+/// Put it in the header row between the back button and any button on the right (it centres itself in the space it gets).
+class NgmyFramedTitle extends StatelessWidget {
+  const NgmyFramedTitle({super.key, required this.title, this.subtitle = '', this.accent = const Color(0xFF38BDF8), this.emoji = '', this.onDark = false});
+  /// True on a page that is always dark (white words whatever the phone theme).
+  final bool onDark;
+  final String title;
+  final String subtitle;
+  final Color accent;
+  final String emoji;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = NgmyHubTheme.of(context);
+    return Center(
+      child: Container(
+        key: const Key('ngmy-framed-title'),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [accent.withValues(alpha: 0.22), accent.withValues(alpha: 0.06)]),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: accent.withValues(alpha: 0.75), width: 1.6),
+          boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.22), blurRadius: 8)],
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text(emoji.isEmpty ? title : '$emoji $title', textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: onDark ? Colors.white : t.title, fontWeight: FontWeight.w900, fontSize: 15)),
+          if (subtitle.isNotEmpty)
+            Text(subtitle, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: onDark ? Colors.white60 : t.subtitle, fontSize: 10.5, fontWeight: FontWeight.w600)),
+        ]),
+      ),
+    );
+  }
+}

@@ -3,7 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'ngmy_local_store.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -59,8 +59,7 @@ class NgmyItemReminder {
 }
 
 Future<List<NgmyItemReminder>> loadNgmyItemReminders({String userEmail = ''}) async {
-  final prefs = await SharedPreferences.getInstance();
-  final raw = prefs.getString(_storageKey(userEmail));
+  final raw = await ngmyLocalRead(_storageKey(userEmail));
   if (raw == null || raw.isEmpty) return [];
   try {
     final list = jsonDecode(raw);
@@ -77,8 +76,7 @@ Future<List<NgmyItemReminder>> loadNgmyItemReminders({String userEmail = ''}) as
 }
 
 Future<void> saveNgmyItemReminders(List<NgmyItemReminder> items, {String userEmail = ''}) async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString(_storageKey(userEmail), jsonEncode(items.map((e) => e.toJson()).toList()));
+  await ngmyLocalWrite(_storageKey(userEmail), jsonEncode(items.map((e) => e.toJson()).toList()));
 }
 
 Future<void> _ensureNotifyReady() async {

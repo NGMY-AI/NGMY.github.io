@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'ngmy_hub_form_ui.dart';
 
 import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_item_reminder_storage.dart';
@@ -293,19 +294,7 @@ class _ItemReminderDialogState extends State<_ItemReminderDialog> {
                 child: const Icon(Icons.place_rounded, color: Colors.white, size: 28),
               ),
               const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Where I Put It', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 24, height: 1.1)),
-                    const SizedBox(height: 4),
-                    Text(
-                      due > 0 ? '$due reminder${due == 1 ? '' : 's'} ready now' : 'Never lose keys, wallet, or kids gear',
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 12.5, fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
-              ),
+              Expanded(child: NgmyFramedTitle(title: 'Where I Put It', subtitle: due > 0 ? '$due reminder${due == 1 ? '' : 's'} ready now' : 'Never lose keys, wallet, or kids gear', accent: const Color(0xFFA78BFA), emoji: '🔑', onDark: true)),
               IconButton(onPressed: () => Navigator.pop(context), icon: Icon(Icons.close_rounded, color: Colors.white.withValues(alpha: 0.7))),
             ],
           ),

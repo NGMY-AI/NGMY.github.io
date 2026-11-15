@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'ngmy_local_store.dart';
 import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_hub_form_ui.dart';
 
@@ -88,8 +89,7 @@ const _templates = [
 ];
 
 Future<List<NgmySupportLine>> _loadSupportLines(String userEmail) async {
-  final prefs = await SharedPreferences.getInstance();
-  final raw = prefs.getString(_supportKey(userEmail));
+  final raw = await ngmyLocalRead(_supportKey(userEmail));
   if (raw != null && raw.isNotEmpty) {
     try {
       final list = jsonDecode(raw);
@@ -134,8 +134,7 @@ Future<List<NgmySupportLine>> _migrateLegacySupport(String userEmail) async {
 }
 
 Future<void> _saveSupportLines(String userEmail, List<NgmySupportLine> items) async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString(_supportKey(userEmail), jsonEncode(items.map((e) => e.toJson()).toList()));
+  await ngmyLocalWrite(_supportKey(userEmail), jsonEncode(items.map((e) => e.toJson()).toList()));
 }
 
 Future<int> ngmyQuickSupportCount({required String userEmail}) async {
@@ -296,15 +295,7 @@ class _QuickSupportScreenState extends State<_QuickSupportScreen> {
                           child: Icon(Icons.arrow_back_ios_new_rounded, color: t.iconButtonIcon, size: 18),
                         ),
                       ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Hotlines', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 18)),
-                            Text('Call list', style: TextStyle(color: accent, fontWeight: FontWeight.w700, fontSize: 11)),
-                          ],
-                        ),
-                      ),
+                      Expanded(child: NgmyFramedTitle(title: 'Hotlines', subtitle: 'Call list', accent: accent, emoji: '📞')),
                       IconButton(
                         onPressed: () => _openEditor(),
                         icon: Container(

@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_hub_form_ui.dart';
 import 'ngmy_offline_close_button.dart';
 import 'ngmy_offline_icons.dart';
 import 'ngmy_platform_graphics.dart';
@@ -551,8 +552,11 @@ class NgmyToolkitAliveHeader extends StatelessWidget {
     this.onIconTap,
     this.trailing,
     this.dense = false,
+    this.framed = false,
   });
 
+  /// The name in a frame in the middle (like the Construction Lab and Core Protocol) instead of at the side.
+  final bool framed;
   final String title;
   final String? subtitle;
   final List<Color> colors;
@@ -592,6 +596,9 @@ class NgmyToolkitAliveHeader extends StatelessWidget {
             },
           ),
           const SizedBox(width: 12),
+          if (framed)
+            Expanded(child: NgmyFramedTitle(title: title, subtitle: subtitle ?? '', accent: colors.first))
+          else
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

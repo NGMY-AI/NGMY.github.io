@@ -253,29 +253,7 @@ class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Paint Mix',
-                          style: TextStyle(
-                            color: ink,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 22,
-                          ),
-                        ),
-                        Text(
-                          'Pick a color, pour it in a bucket, then mix!',
-                          style: TextStyle(
-                            color: muted,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  const Expanded(child: NgmyFramedTitle(title: 'Paint Mix', subtitle: 'Pour colours in, then mix', accent: Color(0xFFF59E0B))),
                   _roundIconButton(
                     hub: hub,
                     icon: Icons.refresh_rounded,

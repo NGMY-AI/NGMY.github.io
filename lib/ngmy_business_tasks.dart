@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_local_store.dart';
 import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_hub_form_ui.dart';
 
@@ -56,8 +56,7 @@ class NgmyBusinessTask {
 
 Future<List<NgmyBusinessTask>> _loadTasks(String userEmail) async {
   try {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_tasksKey(userEmail));
+    final raw = await ngmyLocalRead(_tasksKey(userEmail));
     if (raw == null) return [];
     final list = jsonDecode(raw);
     if (list is! List) return [];
@@ -68,8 +67,7 @@ Future<List<NgmyBusinessTask>> _loadTasks(String userEmail) async {
 }
 
 Future<void> _saveTasks(String userEmail, List<NgmyBusinessTask> items) async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString(_tasksKey(userEmail), jsonEncode(items.map((e) => e.toJson()).toList()));
+  await ngmyLocalWrite(_tasksKey(userEmail), jsonEncode(items.map((e) => e.toJson()).toList()));
 }
 
 Future<int> ngmyBusinessTasksCount({required String userEmail}) async => (await _loadTasks(userEmail)).where((t) => !t.done).length;
@@ -209,7 +207,7 @@ class _BusinessTasksScreenState extends State<_BusinessTasksScreen> {
                       child: Icon(Icons.arrow_back_ios_new_rounded, color: t.iconButtonIcon, size: 18),
                     ),
                   ),
-                  Expanded(child: Text('Quick Tasks', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 20))),
+                  const Expanded(child: NgmyFramedTitle(title: 'Quick Tasks', subtitle: 'Get it done', accent: Color(0xFF10B981), emoji: '✅')),
                   IconButton(
                     onPressed: _addTask,
                     icon: Container(

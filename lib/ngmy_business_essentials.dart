@@ -204,6 +204,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
             headerBare: true,
             header: NgmyToolkitAliveHeader(
               title: 'Business Essentials',
+              framed: true,
               colors: _kEssentialsHudColors,
               pulse: pulse,
               orbit: orbit,

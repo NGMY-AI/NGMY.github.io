@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'ngmy_local_store.dart';
 import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_hub_form_ui.dart';
 
@@ -93,8 +94,7 @@ class NgmyBusinessContact {
 }
 
 Future<List<NgmyBusinessContact>> _loadContacts(String userEmail) async {
-  final prefs = await SharedPreferences.getInstance();
-  final raw = prefs.getString(_contactsKey(userEmail));
+  final raw = await ngmyLocalRead(_contactsKey(userEmail));
   if (raw != null && raw.isNotEmpty) {
     try {
       final list = jsonDecode(raw);
@@ -139,8 +139,7 @@ Future<List<NgmyBusinessContact>> _migrateLegacyContact(String userEmail) async 
 }
 
 Future<void> _saveContacts(String userEmail, List<NgmyBusinessContact> items) async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString(_contactsKey(userEmail), jsonEncode(items.map((e) => e.toJson()).toList()));
+  await ngmyLocalWrite(_contactsKey(userEmail), jsonEncode(items.map((e) => e.toJson()).toList()));
 }
 
 Future<int> ngmyBusinessContactCount({required String userEmail}) async {
@@ -317,15 +316,7 @@ class _BusinessContactsScreenState extends State<_BusinessContactsScreen> {
                           child: Icon(Icons.arrow_back_ios_new_rounded, color: t.iconButtonIcon, size: 18),
                         ),
                       ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Business Contacts', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 18)),
-                            Text('Rolodex', style: TextStyle(color: accent, fontWeight: FontWeight.w700, fontSize: 11)),
-                          ],
-                        ),
-                      ),
+                      Expanded(child: NgmyFramedTitle(title: 'Business Contacts', subtitle: 'Rolodex', accent: accent, emoji: '📇')),
                       IconButton(
                         onPressed: () => _openEditor(),
                         icon: Container(

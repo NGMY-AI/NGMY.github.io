@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'ngmy_local_store.dart';
 import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_hub_form_ui.dart';
 import 'ngmy_store_location.dart';
@@ -97,8 +98,7 @@ class NgmySavedLocation {
 }
 
 Future<List<NgmySavedLocation>> _loadLocations(String userEmail) async {
-  final prefs = await SharedPreferences.getInstance();
-  final raw = prefs.getString(_locationsKey(userEmail));
+  final raw = await ngmyLocalRead(_locationsKey(userEmail));
   if (raw != null && raw.isNotEmpty) {
     try {
       final list = jsonDecode(raw);
@@ -141,8 +141,7 @@ Future<List<NgmySavedLocation>> _migrateLegacyLocation(String userEmail) async {
 }
 
 Future<void> _saveLocations(String userEmail, List<NgmySavedLocation> items) async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString(_locationsKey(userEmail), jsonEncode(items.map((e) => e.toJson()).toList()));
+  await ngmyLocalWrite(_locationsKey(userEmail), jsonEncode(items.map((e) => e.toJson()).toList()));
 }
 
 Future<int> ngmySavedLocationCount({required String userEmail}) async {
@@ -341,15 +340,7 @@ class _SavedLocationsScreenState extends State<_SavedLocationsScreen> {
                           child: Icon(Icons.arrow_back_ios_new_rounded, color: t.iconButtonIcon, size: 18),
                         ),
                       ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Site Map', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 18)),
-                            Text('Addresses & pins', style: TextStyle(color: accent, fontWeight: FontWeight.w700, fontSize: 11)),
-                          ],
-                        ),
-                      ),
+                      Expanded(child: NgmyFramedTitle(title: 'Site Map', subtitle: 'Addresses & pins', accent: accent, emoji: '📍')),
                       IconButton(
                         onPressed: () => _openEditor(),
                         icon: Container(

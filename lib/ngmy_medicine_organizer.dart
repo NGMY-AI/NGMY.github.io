@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_local_store.dart';
 import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_hub_form_ui.dart';
 
@@ -85,8 +85,7 @@ class NgmyMedicineEntry {
 
 Future<List<NgmyMedicineEntry>> _loadMedicines(String userEmail) async {
   try {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_medicineKey(userEmail));
+    final raw = await ngmyLocalRead(_medicineKey(userEmail));
     if (raw == null) return [];
     final list = jsonDecode(raw);
     if (list is! List) return [];
@@ -97,8 +96,7 @@ Future<List<NgmyMedicineEntry>> _loadMedicines(String userEmail) async {
 }
 
 Future<void> _saveMedicines(String userEmail, List<NgmyMedicineEntry> items) async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString(_medicineKey(userEmail), jsonEncode(items.map((e) => e.toJson()).toList()));
+  await ngmyLocalWrite(_medicineKey(userEmail), jsonEncode(items.map((e) => e.toJson()).toList()));
 }
 
 Future<int> ngmyMedicineOrganizerCount({required String userEmail}) async {
@@ -294,15 +292,7 @@ class _MedicineOrganizerScreenState extends State<_MedicineOrganizerScreen> {
                           child: Icon(Icons.arrow_back_ios_new_rounded, color: t.iconButtonIcon, size: 18),
                         ),
                       ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Medicine Organizer', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 18)),
-                            Text('Dosage & schedule tracker', style: TextStyle(color: const Color(0xFFF472B6), fontWeight: FontWeight.w700, fontSize: 11)),
-                          ],
-                        ),
-                      ),
+                      Expanded(child: NgmyFramedTitle(title: 'Medicine Organizer', subtitle: 'Dosage & schedule tracker', accent: const Color(0xFFF472B6), emoji: '💊')),
                       IconButton(
                         onPressed: () => _openEditor(),
                         icon: Container(

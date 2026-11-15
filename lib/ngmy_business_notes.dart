@@ -4,10 +4,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_business_note_images.dart';
 import 'ngmy_hub_form_ui.dart';
+import 'ngmy_local_store.dart';
 import 'ngmy_offline_icons.dart';
 import 'ngmy_worksheet_helpers.dart';
 
@@ -1076,22 +1076,24 @@ String _booksKey(String email) => '${_notesKey(email)}_books_v1';
 
 Future<List<_NoteBook>> _loadBooks(String email) async {
   try {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_booksKey(email));
+    final raw = await ngmyLocalRead(_booksKey(email));
     if (raw == null) return [];
-    return [for (final j in jsonDecode(raw) as List) ?_NoteBook.fromJson(j)];
+    final out = <_NoteBook>[];
+    for (final j in jsonDecode(raw) as List) {
+      try {
+        final b = _NoteBook.fromJson(j);
+        if (b != null) out.add(b);
+      } catch (_) {} // one damaged book is skipped, the others stay
+    }
+    return out;
   } catch (_) {
     return [];
   }
 }
 
 Future<void> _saveBooks(String email, List<_NoteBook> books) async {
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_booksKey(email), jsonEncode([for (final b in books) b.toJson()]));
-  } catch (e) {
-    debugPrint('[notes] books save: $e');
-  }
+  final ok = await ngmyLocalWrite(_booksKey(email), jsonEncode([for (final b in books) b.toJson()]));
+  if (!ok) debugPrint('[notes] books save failed');
 }
 
 /// One tile in the grid: a note, or a book of notes.
@@ -1123,14 +1125,21 @@ class _NoteDrag {
 
 Future<List<NgmyBusinessNote>> _loadNotes(String userEmail) async {
   try {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_notesKey(userEmail));
+    final raw = await ngmyLocalRead(_notesKey(userEmail));
     if (raw == null) return [];
     final list = jsonDecode(raw);
     if (list is! List) return [];
-    final notes = list.whereType<Map>().map((e) => NgmyBusinessNote.fromJson(Map<String, dynamic>.from(e))).toList();
+    final notes = <NgmyBusinessNote>[];
+    for (final e in list.whereType<Map>()) {
+      // One damaged note is skipped - it can never make the whole list look empty (an empty list saved back used to wipe every note).
+      try {
+        notes.add(NgmyBusinessNote.fromJson(Map<String, dynamic>.from(e)));
+      } catch (_) {}
+    }
     for (final n in notes) {
-      await n.hydrateImages(userEmail);
+      try {
+        await n.hydrateImages(userEmail);
+      } catch (_) {}
     }
     return notes;
   } catch (_) {
@@ -1145,11 +1154,10 @@ Future<void> _saveNotes(String userEmail, List<NgmyBusinessNote> items) async {
       throw StateError('Could not save note photos for ${n.id}');
     }
   }
-  final prefs = await SharedPreferences.getInstance();
   final encoded = jsonEncode(items.map((e) => e.toJson()).toList());
-  final ok = await prefs.setString(_notesKey(userEmail), encoded);
+  final ok = await ngmyLocalWrite(_notesKey(userEmail), encoded);
   if (!ok) {
-    throw StateError('Could not save notes (storage full)');
+    throw StateError('Could not save notes');
   }
 }
 
@@ -1373,7 +1381,14 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
         }
       }
     }
-    await _saveNotes(widget.userEmail, items);
+    try {
+      await _saveNotes(widget.userEmail, items);
+    } catch (e) {
+      debugPrint('[business notes] save after editor: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This note could not be saved on this phone. Try again; if it keeps happening, free some space.')));
+      }
+    }
     await _reload();
   }
 
@@ -2027,6 +2042,11 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
       child: Stack(children: [
         SafeArea(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            // The name of the page in a frame in the middle at the top, like the Construction Lab and Core Protocol.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 6, 14, 2),
+              child: NgmyFramedTitle(title: inBook ? book.name : 'Notes', subtitle: inBook ? 'A book of notes' : 'Write it down, keep it here', accent: _accent, emoji: '📒'),
+            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
               child: Row(children: [
@@ -2226,14 +2246,9 @@ class _NoteTemplatePickerPageState extends State<_NoteTemplatePickerPage> with S
                 children: [
                   IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, color: Colors.white70)),
                   const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Create a note', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
-                        Text('Pick a beautiful background or layout', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w600)),
-                      ],
-                    ),
+                    child: NgmyFramedTitle(title: 'Create a note', subtitle: 'Pick a background or layout', accent: Color(0xFF8B5CF6), emoji: '📝', onDark: true),
                   ),
+                  const SizedBox(width: 48),
                 ],
               ),
             ),
@@ -2839,12 +2854,19 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
       }
       await _saveNotes(widget.userEmail, items);
       if (_rev == startRev) _dirty = false;
+      _warnedSaveFailed = false;
     } catch (e) {
       debugPrint('[business notes] persist failed: $e');
-      // Keep _dirty true so we retry — never pretend photos were saved.
+      // Keep _dirty true so we retry — never pretend photos were saved. And say so, once, instead of losing it silently.
+      if (mounted && !_warnedSaveFailed) {
+        _warnedSaveFailed = true;
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(const SnackBar(content: Text('Not saved yet on this phone. Keep this note open; it will try again.')));
+      }
     }
     if (mounted) setState(() {});
   }
+
+  bool _warnedSaveFailed = false;
 
   @override
   void dispose() {

@@ -6,11 +6,13 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'ngmy_hub_form_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'ngmy_local_store.dart';
 import 'ngmy_studio_slot_video.dart';
 import 'ngmy_vault_blob_store.dart';
 import 'ngmy_vault_html_video.dart';
@@ -72,8 +74,7 @@ class NgmyVaultItem {
 }
 
 Future<List<NgmyVaultItem>> _loadIndex(String userEmail) async {
-  final prefs = await SharedPreferences.getInstance();
-  final raw = prefs.getString(_hashKey(_kIndexKey, userEmail));
+  final raw = await ngmyLocalRead(_hashKey(_kIndexKey, userEmail));
   if (raw == null || raw.isEmpty) return [];
   try {
     final list = jsonDecode(raw) as List;
@@ -84,8 +85,7 @@ Future<List<NgmyVaultItem>> _loadIndex(String userEmail) async {
 }
 
 Future<void> _saveIndex(String userEmail, List<NgmyVaultItem> items) async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString(_hashKey(_kIndexKey, userEmail), jsonEncode(items.map((e) => e.toJson()).toList()));
+  await ngmyLocalWrite(_hashKey(_kIndexKey, userEmail), jsonEncode(items.map((e) => e.toJson()).toList()));
 }
 
 String _guessImageMime(String name) {
@@ -722,18 +722,7 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
             child: const Icon(Icons.lock_rounded, color: Colors.white, size: 18),
           ),
           const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('My Vault', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-                Text(
-                  _items.isEmpty ? 'Nothing saved yet' : '${_items.length} item${_items.length == 1 ? '' : 's'}',
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 11.5, fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ),
+          Expanded(child: NgmyFramedTitle(title: 'My Vault', subtitle: _items.isEmpty ? 'Nothing saved yet' : '${_items.length} item${_items.length == 1 ? '' : 's'}', accent: _accent1, emoji: '🔒', onDark: true)),
           Material(
             color: Colors.transparent,
             child: InkWell(

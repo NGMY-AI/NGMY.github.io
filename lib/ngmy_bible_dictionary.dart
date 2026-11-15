@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_local_store.dart';
 import 'ngmy_ai_client.dart';
 import 'ngmy_hub_form_ui.dart';
 
@@ -176,8 +177,7 @@ class NgmyBibleThread {
 }
 
 Future<List<NgmyBibleThread>> _loadHistory(String userEmail) async {
-  final prefs = await SharedPreferences.getInstance();
-  final raw = prefs.getString(_hashKey(_kStorageKey, userEmail));
+  final raw = await ngmyLocalRead(_hashKey(_kStorageKey, userEmail));
   if (raw == null || raw.isEmpty) return [];
   try {
     final list = jsonDecode(raw) as List;
@@ -188,8 +188,7 @@ Future<List<NgmyBibleThread>> _loadHistory(String userEmail) async {
 }
 
 Future<void> _saveHistory(String userEmail, List<NgmyBibleThread> items) async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString(_hashKey(_kStorageKey, userEmail), jsonEncode(items.map((e) => e.toJson()).toList()));
+  await ngmyLocalWrite(_hashKey(_kStorageKey, userEmail), jsonEncode(items.map((e) => e.toJson()).toList()));
 }
 
 Future<int> ngmyBibleDictionaryCount({required String userEmail}) async => (await _loadHistory(userEmail)).length;
@@ -431,15 +430,7 @@ class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
           child: const Center(child: Text('📖', style: TextStyle(fontSize: 20))),
         ),
         const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Bible Dictionary', style: TextStyle(color: hub.title, fontWeight: FontWeight.w900, fontSize: 20)),
-              Text('Word meanings, Greek & Hebrew roots, verse study', style: TextStyle(color: hub.subtitle, fontSize: 11.5, fontWeight: FontWeight.w600)),
-            ],
-          ),
-        ),
+        const Expanded(child: NgmyFramedTitle(title: 'Bible Dictionary', subtitle: 'Meanings, roots, verse study', accent: _accent1)),
         _languageFlag(hub),
         const SizedBox(width: 8),
         IconButton(
