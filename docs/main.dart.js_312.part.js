@@ -1,37 +1,23 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
-$__dart_deferred_initializers__.current=function(a,b,c,$){var D,A,E,C={
-hrD(d){switch(d.a){case 1:return B.ehJ
-case 2:return B.ehL
-case 0:return B.ehK}},
-atS:function atS(d,e,f,g,h,i){var _=this
-_.a=d
-_.b=e
-_.c=f
-_.d=g
-_.e=h
-_.f=i}},B
-D=c[0]
+$__dart_deferred_initializers__.current=function(a,b,c,$){var B,A,E,D={a8L:function a8L(d,e,f,g,h,i){var _=this
+_.c=d
+_.d=e
+_.e=f
+_.f=g
+_.r=h
+_.a=i}},C
+B=c[0]
 A=c[2]
-E=c[53]
-C=a.updateHolder(c[39],C)
-B=c[189]
-C.atS.prototype={}
+E=c[235]
+D=a.updateHolder(c[34],D)
+C=c[283]
+D.a8L.prototype={
+B(d){var x=this,w=null,v=B.S(d).ax.a===A.J,u=v?E.ak5:C.bsp,t=B.l(10),s=B.L(v?A.aU:C.bgo,A.r,1),r=y.a
+return B.r(w,B.x(B.a([B.A(B.a([B.E(B.d(x.c,w,w,w,w,w,w,A.fa,w,w,w),1),B.aH(w,w,w,w,C.bZt,w,w,w,x.r,w,w,w,w,"Full screen sign (landscape)",A.cf)],r),A.l,w,A.e,A.j,0,w,w),new B.aJe(x.d,x.e,120,A.cu,A.U,3.5,w),new B.bM(A.aa,w,w,B.bN(!1,A.ER,w,w,!0,w,w,w,x.f,w,w),w)],r),A.E,w,A.e,A.j,0,A.p),A.f,w,w,new B.p(u,w,s,t,w,w,A.n),w,w,w,w,A.bV,w,w,w)}}
 var z=a.updateTypes([]);(function inheritance(){var x=a.inherit
-x(C.atS,D.aE)})()
-var y={c:D.at("O<u>")};(function constants(){var x=a.makeConstList
-B.aVe=new D.H(!0,A.c,null,null,null,null,9,A.u,null,2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-B.d2u=x([A.dx,A.kp,A.aF],y.c)
-B.dAd=x([A.aF,A.fd],y.c)
-B.db6=x([A.kK,A.pd,A.aF],y.c)
-B.ehJ=new C.atS(B.d2u,B.dAd,A.fd,A.j5,"PREMIUM",B.db6)
-B.dsl=x([A.cG,A.fo,A.bR],y.c)
-B.dnx=x([A.bR,A.aX],y.c)
-B.d9K=x([A.wc,A.bR,A.fo],y.c)
-B.ehK=new C.atS(B.dsl,B.dnx,A.bR,A.jG,"NGMY WALLET",B.d9K)
-B.dpq=x([A.ep,A.dU,A.pe],y.c)
-B.du1=x([A.aC,A.aS],y.c)
-B.dbZ=x([A.ua,A.aC,A.c2],y.c)
-B.ehL=new C.atS(B.dpq,B.du1,A.aC,A.mk,"LUXURY",B.dbZ)
-B.ehN=new E.atR(1,"premium")
-B.ehO=new E.atR(2,"luxury")})()};
-(a=>{a["XgJ0xW8NZ6SyarnftyaQkiteABQ="]=a.current})($__dart_deferred_initializers__);
+x(D.a8L,B.ax)})()
+B.iT(b.typeUniverse,JSON.parse('{"a8L":{"ax":[],"v":[]}}'))
+var y={a:B.at("O<v>")};(function constants(){C.bgo=new B.u(1,0.792156862745098,0.8392156862745098,0.9529411764705882,A.q)
+C.bsp=new B.u(1,0.9529411764705882,0.9647058823529412,1,A.q)
+C.bZt=new B.ae(A.a3e,22,A.aX,null,null,null)})()};
+(a=>{a["aGHVS7XUGj2dtLCP4apseoF6qvE="]=a.current})($__dart_deferred_initializers__);

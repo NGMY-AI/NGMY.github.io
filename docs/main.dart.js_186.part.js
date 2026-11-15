@@ -4,7 +4,7 @@ A=c[0]
 C=c[2]
 B=c[163]
 var z=a.updateTypes([]);(function constants(){B.uh=new A.u(1,0.047058823529411764,0.07058823529411765,0.12549019607843137,C.q)
-B.amU=new A.R(5,1,5,1)
-B.amZ=new A.R(6,6,12,6)
+B.amV=new A.R(5,1,5,1)
+B.an_=new A.R(6,6,12,6)
 B.Ho=new A.a0(62855,"MaterialIcons",!0)})()};
-(a=>{a["HMQpmEtl8Hw/xUnxxhNt7bQWICQ="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["wHbcofEUz3xBzfZ7qPtqMd8ARQY="]=a.current})($__dart_deferred_initializers__);
