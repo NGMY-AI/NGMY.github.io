@@ -444,15 +444,53 @@ Scene3D buildBench(ElectricalLesson lesson, WiringState s, {bool withWall = true
     // The studs are behind the wall: they are drawn first (tier 0), then the wall (tier 1), then everything in front of it (tier 2), so from no side does wood show through the wall.
     b.order = 1;
     // A wide, tall wall (so the picture is always full of wall, never an edge), cut in tiles so every tile sorts properly from any side.
-    b.box(const V3(-15.575, 0, -0.25), const V3(28.85, 40, 0.5), kDrywall, split: 6);
-    b.box(const V3(15.575, 0, -0.25), const V3(28.85, 40, 0.5), kDrywall, split: 6);
-    b.box(const V3(0, 12.5, -0.25), const V3(2.3, 21, 0.5), kDrywall, split: 4);
-    b.box(const V3(0, -12.5, -0.25), const V3(2.3, 21, 0.5), kDrywall, split: 4);
+    // ONE front surface and ONE back surface with a real opening for the box - no blocks butted together, so no inside seams that showed
+    // as holes and stripes in the wall when the view turned. Only the four edges of the opening are drawn besides.
+    const wx = 30.0, wy = 20.0, hx = 1.15, hy = 2.0, front = 0.0, back = -0.5;
+    void panel(double xa, double xb, double ya, double yb) {
+      final nx = math.max(1, ((xb - xa) / 4).ceil()), ny = math.max(1, ((yb - ya) / 4).ceil());
+      for (var i = 0; i < nx; i++) {
+        for (var j = 0; j < ny; j++) {
+          final x0 = xa + (xb - xa) * i / nx, x1 = xa + (xb - xa) * (i + 1) / nx;
+          final y0 = ya + (yb - ya) * j / ny, y1 = ya + (yb - ya) * (j + 1) / ny;
+          b.quad(V3(x0, y0, front), V3(x1, y0, front), V3(x1, y1, front), V3(x0, y1, front), kDrywall, normal: const V3(0, 0, 1));
+          b.quad(V3(x1, y0, back), V3(x0, y0, back), V3(x0, y1, back), V3(x1, y1, back), kDrywall, normal: const V3(0, 0, -1));
+        }
+      }
+    }
+
+    panel(-wx, -hx, -wy, wy); // left of the opening
+    panel(hx, wx, -wy, wy); // right of the opening
+    panel(-hx, hx, hy, wy); // above it
+    panel(-hx, hx, -wy, -hy); // below it
+    // The cut edges of the opening (the thickness of the drywall), facing into the opening.
+    b.quad(const V3(-hx, -hy, back), const V3(-hx, -hy, front), const V3(-hx, hy, front), const V3(-hx, hy, back), kDrywall, normal: const V3(1, 0, 0));
+    b.quad(const V3(hx, -hy, front), const V3(hx, -hy, back), const V3(hx, hy, back), const V3(hx, hy, front), kDrywall, normal: const V3(-1, 0, 0));
+    b.quad(const V3(-hx, hy, back), const V3(-hx, hy, front), const V3(hx, hy, front), const V3(hx, hy, back), kDrywall, normal: const V3(0, -1, 0));
+    b.quad(const V3(-hx, -hy, front), const V3(-hx, -hy, back), const V3(hx, -hy, back), const V3(hx, -hy, front), kDrywall, normal: const V3(0, 1, 0));
     b.id = idStud;
     b.order = 0;
     b.box(const V3(-1.9, 0, -2.25), const V3(1.5, 40, 3.5), kWood, shine: 0.05, split: 5);
     b.box(const V3(11.25, 0, -2.25), const V3(1.5, 40, 3.5), kWood, shine: 0.05, split: 5);
     b.box(const V3(5.0, 8.6, -2.25), const V3(14, 1.5, 3.5), kWood, shine: 0.05, split: 2);
+    // The room in front of the wall: a floor, a ceiling and the two side walls. Turning the view no longer looks out into black nothing
+    // (it looked as if the wall had disappeared). It is the outermost shell, so it is drawn before everything else (tier -1).
+    b.id = 0;
+    b.order = -1;
+    const depth = 34.0;
+    void tiles(V3 o, V3 u, V3 v, int nu, int nv, Color col, V3 n) {
+      for (var i = 0; i < nu; i++) {
+        for (var j = 0; j < nv; j++) {
+          final a = o + u * (i / nu) + v * (j / nv), c = o + u * ((i + 1) / nu) + v * ((j + 1) / nv);
+          b.quad(a, o + u * ((i + 1) / nu) + v * (j / nv), c, o + u * (i / nu) + v * ((j + 1) / nv), col, normal: n);
+        }
+      }
+    }
+
+    tiles(const V3(-wx, -wy, front), const V3(2 * wx, 0, 0), const V3(0, 0, depth), 12, 7, const Color(0xFF8A6E4F), const V3(0, 1, 0)); // floor
+    tiles(const V3(-wx, wy, front), const V3(2 * wx, 0, 0), const V3(0, 0, depth), 12, 7, const Color(0xFFE7E5E4), const V3(0, -1, 0)); // ceiling
+    tiles(const V3(-wx, -wy, front), const V3(0, 2 * wy, 0), const V3(0, 0, depth), 8, 7, const Color(0xFFD6D3CE), const V3(1, 0, 0)); // left wall
+    tiles(const V3(wx, -wy, front), const V3(0, 2 * wy, 0), const V3(0, 0, depth), 8, 7, const Color(0xFFD6D3CE), const V3(-1, 0, 0)); // right wall
     b.order = 2;
   }
   final cableEnds = _boxAndCable(b, lesson.legacy ? kind : 'outlet', true);
@@ -599,8 +637,45 @@ Scene3D buildBench(ElectricalLesson lesson, WiringState s, {bool withWall = true
     return 0;
   }
 
+  // Screws, slots and plates sit on one side of the device body and are drawn a little nearer so the body never covers them. That must
+  // only happen from THEIR side: from the other side the body is in front of them. So each one gets the side it is mounted on (from where it
+  // sits on the body), and the engine leaves the nudge out when that side faces away - no screws of the far side seen through the outlet.
+  final body = [for (final p in b.polys) if (p.id == idDevice || p.id == idFace) p];
+  V3? mountSide(Poly p) {
+    if (p.bias == 0 || body.isEmpty) return null;
+    var x0 = double.infinity, x1 = -double.infinity, y0 = double.infinity, y1 = -double.infinity, z0 = double.infinity, z1 = -double.infinity;
+    for (final q in body) {
+      for (final v in q.pts) {
+        if (v.x < x0) x0 = v.x;
+        if (v.x > x1) x1 = v.x;
+        if (v.y < y0) y0 = v.y;
+        if (v.y > y1) y1 = v.y;
+        if (v.z < z0) z0 = v.z;
+        if (v.z > z1) z1 = v.z;
+      }
+    }
+    var cx = 0.0, cy = 0.0, cz = 0.0;
+    for (final v in p.pts) {
+      cx += v.x;
+      cy += v.y;
+      cz += v.z;
+    }
+    cx /= p.pts.length;
+    cy /= p.pts.length;
+    cz /= p.pts.length;
+    const reach = 1.2; // only parts on or right next to the body
+    if (cx < x0 - reach || cx > x1 + reach || cy < y0 - reach || cy > y1 + reach || cz < z0 - reach || cz > z1 + reach) return null;
+    final hx = math.max((x1 - x0) / 2, 0.01), hy = math.max((y1 - y0) / 2, 0.01), hz = math.max((z1 - z0) / 2, 0.01);
+    final ux = (cx - (x0 + x1) / 2) / hx, uy = (cy - (y0 + y1) / 2) / hy, uz = (cz - (z0 + z1) / 2) / hz;
+    final ax = ux.abs(), ay = uy.abs(), az = uz.abs();
+    if (ax >= ay && ax >= az) return V3(ux.sign, 0, 0);
+    if (ay >= az) return V3(0, uy.sign, 0);
+    return V3(0, 0, uz.sign);
+  }
+
   return Scene3D([
-    for (final p in b.polys) Poly(p.pts, p.n, p.color, p.id, shine: p.shine, alpha: p.alpha, twoSided: true, layer: p.layer, bias: p.bias, order: tierOf(p), group: p.group),
+    for (final p in b.polys)
+      Poly(p.pts, p.n, p.color, p.id, shine: p.shine, alpha: p.alpha, twoSided: true, layer: p.layer, bias: p.bias, order: tierOf(p), group: p.group, biasDir: mountSide(p)),
   ], info: info, labels: labels);
 }
 

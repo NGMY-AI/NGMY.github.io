@@ -38,7 +38,11 @@ V3 rotY(V3 p, double a) {
 
 /// One flat face. [id] says which object it belongs to (0 means it cannot be tapped).
 class Poly {
-  const Poly(this.pts, this.n, this.color, this.id, {this.shine = 0, this.alpha = 1, this.twoSided = false, this.layer = 0, this.bias = 0, this.order = 2, this.group = 0});
+  const Poly(this.pts, this.n, this.color, this.id, {this.shine = 0, this.alpha = 1, this.twoSided = false, this.layer = 0, this.bias = 0, this.order = 2, this.group = 0, this.biasDir});
+
+  /// The side of the big face that a small part with a [bias] sits on (outwards). When set, the part is drawn nearer only while that side
+  /// faces you; from the other side it is sorted by its real distance, so the big face hides it (no screws or slots seen through a device).
+  final V3? biasDir;
   final List<V3> pts;
   final V3 n;
   final Color color;
@@ -265,7 +269,7 @@ List<Poly> transformPolys(List<Poly> ps, {double rx = 0, double ry = 0, V3 t = V
   V3 fix(V3 p) => ry == 0 ? p : rotY(p, ry);
   V3 pt(V3 p) => fix(rx == 0 ? p : rotX(p)) + t;
   V3 dir(V3 p) => fix(rx == 0 ? p : rotX(p));
-  return [for (final p in ps) Poly([for (final v in p.pts) pt(v)], dir(p.n), p.color, p.id, shine: p.shine, alpha: p.alpha, twoSided: p.twoSided, layer: p.layer, bias: p.bias, order: p.order, group: p.group)];
+  return [for (final p in ps) Poly([for (final v in p.pts) pt(v)], dir(p.n), p.color, p.id, shine: p.shine, alpha: p.alpha, twoSided: p.twoSided, layer: p.layer, bias: p.bias, order: p.order, group: p.group, biasDir: p.biasDir == null ? null : dir(p.biasDir!))];
 }
 
 /// Turns sharp corners of a path into smooth bends of about [radius].
@@ -800,6 +804,15 @@ class Scene3DPainter extends CustomPainter {
         if (y > pyMax) pyMax = y;
       }
       final zMid = zsum / cnt;
+      // A small part is drawn nearer only from the side it is mounted on (see [Poly.biasDir]).
+      var bias = p.bias;
+      final bd = p.biasDir;
+      if (bias != 0 && bd != null) {
+        final bz1 = -bd.x * syw + bd.z * cyw;
+        final bX = bd.x * cyw + bd.z * syw, bY = bd.y * cp - bz1 * sp, bZ = -(bd.y * sp + bz1 * cp);
+        // The mounting side faces you when it points back towards the camera from the part.
+        if (bX * cxs[0] + bY * cys[0] + bZ * czs[0] >= 0) bias = 0;
+      }
       if (outside && p.order == 0 && (p.group != 0 ? wallSum[p.group]! / wallN[p.group]! : zMid) < roomDepth) return;
       if (nearest > far) return;
       // A face smaller than a pixel cannot be seen: it costs nothing to leave it out.
@@ -807,7 +820,7 @@ class Scene3DPainter extends CustomPainter {
       if (bw < 0.6 && bh < 0.6) return;
       if (pxMax < -8 || pxMin > w + 8 || pyMax < -8 || pyMin > h + 8) {
         if (p.group != 0) {
-          offZ[p.group] = (offZ[p.group] ?? 0) + zMid - p.bias;
+          offZ[p.group] = (offZ[p.group] ?? 0) + zMid - bias;
           offN[p.group] = (offN[p.group] ?? 0) + 1;
         }
         return;
@@ -829,7 +842,7 @@ class Scene3DPainter extends CustomPainter {
         path.lineTo(sxs[i], sys[i]);
       }
       path.close();
-      final face = _Face(path, Color.fromRGBO(r, g, b, p.alpha), zMid - p.bias, p.id, p.alpha < 0.99, p.id == highlight && highlight != 0, null, p.order, p.group);
+      final face = _Face(path, Color.fromRGBO(r, g, b, p.alpha), zMid - bias, p.id, p.alpha < 0.99, p.id == highlight && highlight != 0, null, p.order, p.group);
       // A face only a couple of pixels wide needs no outline to close the seams round it.
       face.tiny = bw < 2.0 && bh < 2.0;
       drawn.add(face);
