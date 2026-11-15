@@ -59,37 +59,42 @@
         } catch (e) {}
         return 0;
       }
+      // The app is drawn on canvases; the lowest edge of them.
+      function canvasBottom(cs) {
+        var b = 0;
+        for (var i = 0; i < cs.length; i++) { var bb = cs[i].getBoundingClientRect().bottom; if (bb > b) b = bb; }
+        return b;
+      }
+      var lastGap = 0, asked = false;
+      // Forget the stretch when the screen turns, so the engine can size the drawing again.
+      window.addEventListener('orientationchange', function () { asked = false; document.querySelectorAll('canvas').forEach(function (c) { c.style.height = ''; }); });
       function tick() {
         try {
           var el = document.getElementById('ngmy-diag');
-          var probe = window.__ngmyProbe;
-          var ph = probe ? Math.round(probe.getBoundingClientRect().height) : 0;
           var vb = Math.round(viewBottom());
-          var gap = ph - vb;
-          var fv = document.querySelector('flutter-view');
+          var cs = document.querySelectorAll('canvas');
+          var cb = Math.round(canvasBottom(cs));
+          var gap = vb - cb;
           var typing = document.activeElement && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName);
-          if (!ph || !vb || gap < 8) {
-            if (el) el.style.display = 'none';
-            if (fv && !typing && fv.style.height) fv.style.height = '';
-            return;
+          if (typing || !vb || !cb) return;
+          if (gap >= 8) {
+            lastGap = gap;
+            // Stretch the drawing down to the bottom edge (a few pixels at most), and ask the engine to measure again, once.
+            for (var k = 0; k < cs.length; k++) {
+              var r = cs[k].getBoundingClientRect();
+              if (r.bottom < vb - 4) cs[k].style.height = (vb - r.top) + 'px';
+            }
+            if (!asked) { asked = true; window.dispatchEvent(new Event('resize')); }
           }
           if (!el) {
             el = document.createElement('div');
             el.id = 'ngmy-diag';
-            el.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:2147483000;pointer-events:none;color:#9ca3af;font:10px/12px monospace;padding:3px 6px;overflow:hidden;background:#121212';
+            el.style.cssText = 'position:fixed;left:0;right:0;bottom:0;height:12px;z-index:2147483000;pointer-events:none;color:#9ca3af;font:9px/12px monospace;padding:0 4px;overflow:hidden;background:rgba(18,18,18,0.85);white-space:nowrap';
             document.documentElement.appendChild(el);
           }
           var vv = window.visualViewport;
-          // Force the app to fill the screen: give its box the real visible height, and tell the engine the size changed.
-          if (!typing && fv) {
-            fv.style.height = ph + 'px';
-            window.dispatchEvent(new Event('resize'));
-          }
-          el.style.display = 'block';
-          el.style.height = gap + 'px';
-          el.textContent = 'gap ' + gap + ' | view ' + vb + ' | probe ' + ph + ' | inner ' + Math.round(window.innerHeight) + ' | client ' + document.documentElement.clientHeight +
-            ' | vv ' + (vv ? Math.round(vv.height) + '+' + Math.round(vv.offsetTop) : '-') + ' | outer ' + window.outerHeight +
-            ' | standalone ' + (navigator.standalone === true ? 'y' : 'n') + ' | dm ' + (window.matchMedia('(display-mode: standalone)').matches ? 'standalone' : 'browser');
+          el.textContent = 'gap was ' + lastGap + ' | view ' + vb + ' | canvas ' + cb + ' | inner ' + Math.round(window.innerHeight) +
+            ' | vv ' + (vv ? Math.round(vv.height) + '+' + Math.round(vv.offsetTop) : '-') + ' | standalone ' + (navigator.standalone === true ? 'y' : 'n');
         } catch (e) {}
       }
       setInterval(tick, 1000);
