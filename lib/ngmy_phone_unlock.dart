@@ -129,6 +129,28 @@ class NgmyPhoneUnlockPage extends StatelessWidget {
                   pulse: pulse,
                   orbit: orbit,
                   icon: Icons.phonelink_lock_rounded,
+                  // The Phone (paste a YouTube or any video link and it plays): a small button right beside the X.
+                  trailing: Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Tooltip(
+                      message: 'Phone: paste a video link',
+                      child: GestureDetector(
+                        key: const Key('phone-unlock-open-phone'),
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => showNgmyVirtualPhone(context),
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFEC4899), Color(0xFF8B5CF6), Color(0xFF0EA5E9)]),
+                            boxShadow: [BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.35 + 0.25 * pulse), blurRadius: 10)],
+                          ),
+                          child: const Icon(Icons.smartphone_rounded, color: Colors.white, size: 19),
+                        ),
+                      ),
+                    ),
+                  ),
                   onClose: () => Navigator.pop(context),
                 ),
                 Expanded(
@@ -177,25 +199,6 @@ class NgmyPhoneUnlockPage extends StatelessWidget {
                         colors: const [Color(0xFF64748B), Color(0xFF334155)],
                         pulse: pulse,
                         onTap: () => _launch(context, label: 'Settings', open: ngmyOpenPhoneSettings),
-                      ),
-                      const SizedBox(height: 22),
-                      Text(
-                        'Phone',
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.92), fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 0.2),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'A whole phone of its own inside NGMY, separate from the device you are using. Paste the link of any video and it plays on it.',
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12.5, height: 1.45),
-                      ),
-                      const SizedBox(height: 14),
-                      _QuickOpenButton(
-                        label: 'Phone',
-                        subtitle: 'Videos from any link, web, notes, calculator, clock',
-                        icon: Icons.smartphone_rounded,
-                        colors: const [Color(0xFFEC4899), Color(0xFF8B5CF6), Color(0xFF0EA5E9)],
-                        pulse: pulse,
-                        onTap: () => showNgmyVirtualPhone(context),
                       ),
                       const SizedBox(height: 24),
                       Text(

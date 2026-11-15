@@ -964,7 +964,8 @@
         var vv = window.visualViewport;
         var de = document.documentElement;
         return [window.innerWidth, window.innerHeight, de ? de.clientWidth : 0, de ? de.clientHeight : 0,
-          vv ? Math.round(vv.width) : 0, vv ? Math.round(vv.height) : 0, window.devicePixelRatio || 1].join('x');
+          vv ? Math.round(vv.width) : 0, vv ? Math.round(vv.height) : 0, vv ? Math.round(vv.offsetTop) : 0,
+          Math.round(window.scrollY || 0), window.devicePixelRatio || 1].join('x');
       }
 
       function remeasure() {
@@ -1026,6 +1027,37 @@
       // that happens the engine is never told, so it keeps its old height for
       // good. The window hears about it, so pass the news along.
       window.addEventListener('resize', remeasure);
+
+      // THE BLACK BAR AFTER TYPING. When the keyboard closes, iOS often leaves the page pushed up (the window stays scrolled, or the
+      // visible area stays moved down inside the page) and does not always say so. The app is the right size but sits too high, and the
+      // empty page shows as a dark bar along the bottom. Every measure of the app's own size looks fine, which is why nothing caught it.
+      // Before, the page was only put back when the app came back from the background or the phone turned - never after typing.
+      function pushedUp() {
+        var vv = window.visualViewport;
+        var de = document.documentElement;
+        return Math.abs(window.scrollY || window.pageYOffset || 0) > 0.5 ||
+          (de && Math.abs(de.scrollTop || 0) > 0.5) ||
+          (document.body && Math.abs(document.body.scrollTop || 0) > 0.5) ||
+          (vv && Math.abs(vv.offsetTop || 0) > 0.5);
+      }
+      // As soon as typing ends (the keyboard goes away), put the page back and measure again until it is steady.
+      document.addEventListener('focusout', function () {
+        setTimeout(function () { if (!isEditingText()) resettleUntilSteady(); }, 80);
+      }, true);
+      // The visible area moved or changed size while nobody is typing: put it back.
+      if (window.visualViewport) {
+        ['resize', 'scroll'].forEach(function (ev) {
+          window.visualViewport.addEventListener(ev, function () {
+            if (firing || isEditingText()) return;
+            setTimeout(function () { if (!isEditingText() && pushedUp()) resettle(); }, 60);
+          });
+        });
+      }
+      // And a light check twice a second for anything that slipped through: pushed up, or a size the app was never told about.
+      setInterval(function () {
+        if (isEditingText()) return;
+        if (pushedUp()) resettle(); else remeasure();
+      }, 500);
     })();
   </script>
 
