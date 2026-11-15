@@ -3,6 +3,8 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'ngmy_bottom_overlap_stub.dart' if (dart.library.html) 'ngmy_bottom_overlap_web.dart';
+
 /// Solid UI panels only. [BackdropFilter] blurs/smears entire screens on web & iOS PWA.
 bool get ngmyPreferLightGraphics => true;
 
@@ -39,8 +41,10 @@ Widget ngmyCrispAppWrapper(BuildContext context, Widget child) {
     data: mq.copyWith(
       textScaler: mq.textScaler.clamp(minScaleFactor: 1.0, maxScaleFactor: 1.0),
       boldText: false,
-      // No page keeps a strip free at the bottom (the phone's home-bar area): screens run to the very edge, so no dark bar shows there and the menu sits low.
-      padding: mq.padding.copyWith(bottom: 0),
+      // No page keeps a strip free for the phone's home-bar area: screens run to the very edge, so no dark bar shows there and the menu sits low.
+      // In a Safari tab on iPhone the app now runs on under Safari's floating bottom bar (as other sites do); that part is kept free for the
+      // menu and buttons, while backgrounds go on under the bar.
+      padding: mq.padding.copyWith(bottom: ngmyBrowserBottomOverlap()),
     ),
     child: _StaleKeyboardGuard(child: child),
   );
