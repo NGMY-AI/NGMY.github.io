@@ -67,6 +67,23 @@
                   best = target;
                 }
                 try { de.style.setProperty('--ngmy-full', best + 'px'); } catch (e2) {}
+              } else if (appleTouch && homeScreenApp) {
+                // THE APP SAVED TO THE HOME SCREEN ON iPHONE: the same pinned layer stopped short of the bottom edge, leaving the dark strip.
+                // It is made as tall as the screen too. There is no Safari bar here, so nothing is kept free (the menu keeps its usual place).
+                // Where the page starts: at the very top when the app runs under the clock (the clock area is then a safe area), or below
+                // the clock otherwise (44 points or more on Face ID iPhones, 20 on Home-button iPhones).
+                var st = window.__ngmySafeTop;
+                if (!st && (document.body || de)) {
+                  st = document.createElement('div');
+                  st.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;padding-top:env(safe-area-inset-top);visibility:hidden;pointer-events:none;z-index:-1';
+                  (document.body || de).appendChild(st);
+                  window.__ngmySafeTop = st;
+                }
+                var safeTop = st ? parseFloat(getComputedStyle(st).paddingTop) || 0 : 0;
+                var pageTop = safeTop > 0 ? 0 : (screen.height <= 736 ? 20 : 44);
+                var whole = Math.round(window.outerHeight || screen.height || 0) - pageTop;
+                if (whole > best && whole - best < 120) best = whole;
+                try { de.style.setProperty('--ngmy-full', best + 'px'); } catch (e3) {}
               }
               de.setAttribute('data-ngmy-overlap', String(overlap));
               if (best > h && best - h < 260) return best;
@@ -707,6 +724,13 @@
         /* Safari cuts off a pinned (position: fixed) layer just above its bottom bar and fills the space under the bar with that layer's
            background (the black). An ordinary page that is not pinned - like other sites - is drawn on under the bar. The engine pins the
            page body; here it sits in the page instead (it still cannot scroll: touch-action none and overflow hidden stay). */
+        body { position: absolute !important; left: 0 !important; right: 0 !important; }
+        flutter-view { position: absolute !important; left: 0 !important; right: 0 !important; }
+      }
+      /* The app saved to the Home Screen on iPhone: the same - not pinned, and as tall as the screen - so no strip is left at the bottom. */
+      @media (display-mode: standalone) {
+        html { height: 100%; height: var(--ngmy-full, 100%); }
+        body, flutter-view { top: 0 !important; bottom: auto !important; height: 100% !important; height: var(--ngmy-full, 100%) !important; }
         body { position: absolute !important; left: 0 !important; right: 0 !important; }
         flutter-view { position: absolute !important; left: 0 !important; right: 0 !important; }
       }
