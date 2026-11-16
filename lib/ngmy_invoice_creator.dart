@@ -287,9 +287,24 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
 
   InputDecoration _fieldDec(String label, {bool locked = false, IconData? icon}) {
     if (Theme.of(context).brightness == Brightness.dark) {
+      // Dark mode: the same rounded field with an icon, on a dark fill with a purple edge.
+      const brandD = Color(0xFFA78BFA);
+      OutlineInputBorder bd(Color c, double w) =>
+          OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: c, width: w));
       return InputDecoration(
         labelText: label,
-        suffixIcon: locked ? const Icon(Icons.lock_outline_rounded, size: 18) : null,
+        isDense: true,
+        filled: true,
+        fillColor: const Color(0xFF0F0D1A),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        labelStyle: const TextStyle(color: Colors.white60, fontWeight: FontWeight.w600, fontSize: 13),
+        floatingLabelStyle: const TextStyle(color: brandD, fontWeight: FontWeight.w700),
+        prefixIcon: icon == null ? null : Icon(icon, size: 19, color: brandD),
+        prefixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+        suffixIcon: locked ? const Icon(Icons.lock_outline_rounded, size: 18, color: Colors.white38) : null,
+        border: bd(const Color(0xFF3B3355), 1.3),
+        enabledBorder: bd(const Color(0xFF3B3355), 1.3),
+        focusedBorder: bd(brandD, 1.8),
       );
     }
     // Light mode: a rounded, softly filled field with an icon and a purple edge while typing.
@@ -314,9 +329,48 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
     );
   }
 
-  /// Light mode: a group of fields in its own soft purple frame with an icon and a title. Dark mode: unchanged.
+  /// A group of fields in its own purple frame with an icon and a title: a soft white frame in light mode, the same
+  /// frame in deep night purple in dark mode.
   Widget _formSection(String title, IconData icon, Widget child) {
-    if (Theme.of(context).brightness == Brightness.dark) return child;
+    if (Theme.of(context).brightness == Brightness.dark) {
+      return Container(
+        key: Key('invoice-section-$title'),
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF1E1B2E), Color(0xFF171427)],
+          ),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.55), width: 1.4),
+          boxShadow: const [BoxShadow(color: Color(0x337C3AED), blurRadius: 18, offset: Offset(0, 6))],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(9),
+                    gradient: const LinearGradient(colors: [Color(0xFFA78BFA), Color(0xFF7C3AED)]),
+                  ),
+                  child: Icon(icon, size: 17, color: Colors.white),
+                ),
+                const SizedBox(width: 10),
+                Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5, color: Colors.white)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            child,
+          ],
+        ),
+      );
+    }
     return Container(
       key: Key('invoice-section-$title'),
       width: double.infinity,
