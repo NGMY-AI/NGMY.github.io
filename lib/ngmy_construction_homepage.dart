@@ -3661,7 +3661,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (!r.indoor) return;
     // A finished room opens finished: you can pull a device out, change it, or wire it again.
     if (r.wiring == null) {
-      final np = RoomProject(seed: home.seed * 37 + r.id, kind: wiringKindFor(r), name: r.kind == 'hall' ? 'Hall laundry corner' : r.name)..fastForward();
+      // variants: the second outlet (and the switch) can be any of the other types, so city jobs are not always the same outlet.
+      final np = RoomProject(seed: home.seed * 37 + r.id, kind: wiringKindFor(r), name: r.kind == 'hall' ? 'Hall laundry corner' : r.name, variants: true)..fastForward();
       if (!r.wiringNeeded) np.completeWiring();
       r.wiring = np;
     }

@@ -930,6 +930,25 @@ void _variantFace(MeshBuilder b, String lesson, double z, bool burnt) {
       b.cyl(c + const V3(0, -1.2, 0.86), c + const V3(0, -1.2, 0.9), 0.08, dark, sides: 8);
     case 'isolated':
       b.tri(c + const V3(0, 0.2, 0.5), c + const V3(-0.17, -0.1, 0.5), c + const V3(0.17, -0.1, 0.5), burnt ? kChar : const Color(0xFFF97316));
+    case 'usb':
+      // Two USB-A ports between the two outlets.
+      for (final x in const [-0.26, 0.26]) {
+        b.box(c + V3(x, 0.0, 0.5), const V3(0.34, 0.12, 0.03), const Color(0xFF17181B));
+        b.box(c + V3(x, 0.02, 0.52), const V3(0.26, 0.04, 0.02), const Color(0xFFB8BCC4));
+      }
+    case 'smartoutlet':
+      // The little status light of the radio.
+      b.ball(c + const V3(0, 0.0, 0.5), 0.09, burnt ? kChar : const Color(0xFF38BDF8), shine: 0.8, lat: 4, lon: 8);
+    case 'tamper':
+      // The shutters behind the slots: a thin orange line across each pair of slots.
+      for (final y in const [0.76, -0.68]) {
+        b.box(c + V3(0, y, 0.5), const V3(0.62, 0.03, 0.02), burnt ? kChar : const Color(0xFFF59E0B));
+      }
+    case 'weather':
+      // The in-use bubble cover around the outlet (a grey frame).
+      for (final (x, y, w, h) in const [(0.0, 1.5, 1.4, 0.08), (0.0, -1.5, 1.4, 0.08), (-0.7, 0.0, 0.08, 3.0), (0.7, 0.0, 0.08, 3.0)]) {
+        b.box(c + V3(x, y, 0.62), V3(w, h, 0.06), const Color(0xFF9CA3AF));
+      }
   }
   b.bias = 0;
 }
@@ -981,6 +1000,18 @@ void _nemaFace(MeshBuilder b, V3 c, String kind, bool burnt) {
       slot(0, 0.0, 0.32, 0.075);
       slot(0.15, -0.07, 0.075, 0.14);
       round(0, -0.36);
+    case 'nematt30':
+      // The TT-30 of an RV pad (120 volts): two slanted slots leaning towards each other at the top, and the round ground hole below.
+      slot(-0.22, 0.1, 0.075, 0.3, 0.45);
+      slot(0.22, 0.1, 0.075, 0.3, -0.45);
+      round(0, -0.32);
+    case 'nemal1430':
+      // The L14-30 twist-lock of a generator: four curved slots around a circle (drawn as short slots turned along the circle).
+      for (var i = 0; i < 4; i++) {
+        final a = math.pi / 4 + i * math.pi / 2;
+        slot(math.cos(a) * 0.36, math.sin(a) * 0.36, 0.075, 0.22, a);
+      }
+      round(0, 0);
     default:
       // The 5-20 of the washing machine: a T-shaped neutral slot on the left, a straight hot slot on the right, and the ground hole below.
       slot(0.2, 0.12, 0.075, 0.3);

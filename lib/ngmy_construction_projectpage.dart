@@ -59,6 +59,16 @@ const List<List<_Item>> _trays = [
     _Item('range4', 'Range 4-wire (14-50)', Icons.microwave_rounded),
     _Item('range3', 'Range 3-wire (10-50)', Icons.microwave_rounded),
     _Item('washer', 'Washer (5-20)', Icons.local_laundry_service_rounded),
+    _Item('afci', 'AFCI outlet', Icons.local_fire_department_rounded),
+    _Item('tamper', 'Tamper-resistant', Icons.child_care_rounded),
+    _Item('usb', 'USB outlet', Icons.usb_rounded),
+    _Item('outlet20', '20 amp (5-20)', Icons.power_rounded),
+    _Item('weather', 'Outdoor WR GFCI', Icons.umbrella_rounded),
+    _Item('smartoutlet', 'Smart outlet', Icons.wifi_rounded),
+    _Item('ev1450', 'EV charger (14-50)', Icons.electric_car_rounded),
+    _Item('rv30', 'RV 30 amp (TT-30)', Icons.rv_hookup_rounded),
+    _Item('welder650', 'Welder (6-50)', Icons.construction_rounded),
+    _Item('gen1430', 'Generator (L14-30)', Icons.bolt_rounded),
     _Item('switch2p', 'Double-pole', Icons.toggle_on_rounded),
     _Item('switch3', '3-way switch', Icons.toggle_on_rounded),
     _Item('switch4', '4-way switch', Icons.toggle_on_rounded),
@@ -428,6 +438,16 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
       case 'range4':
       case 'range3':
       case 'washer':
+      case 'afci':
+      case 'tamper':
+      case 'usb':
+      case 'outlet20':
+      case 'weather':
+      case 'smartoutlet':
+      case 'ev1450':
+      case 'rv30':
+      case 'welder650':
+      case 'gen1430':
       case 'switch2p':
       case 'switch3':
       case 'switch4':

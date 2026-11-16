@@ -209,6 +209,9 @@ void main() {
       addTearDown(t.view.reset);
       await t.pumpWidget(const MaterialApp(home: NgmyConstructionLab()));
       await t.pump(const Duration(milliseconds: 500));
+      // The house tile is the last of a long list of lessons: bring it into view first.
+      await t.ensureVisible(find.text('Build and fix a house'));
+      await t.pump(const Duration(milliseconds: 300));
       await t.tap(find.text('Build and fix a house'));
       await t.pump(const Duration(milliseconds: 600));
       await t.pump(const Duration(milliseconds: 600));

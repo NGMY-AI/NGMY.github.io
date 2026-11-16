@@ -16,7 +16,9 @@ void main() {
 
   test('every new switch and outlet is a lesson with the right wiring, and only the right wiring is accepted', () {
     expect(kSwitchVariants.length, 5);
-    expect(kOutletVariants.length, 5);
+    // The five first variants and the ten more American outlets (AFCI, tamper-resistant, USB, 20 amp, outdoor, smart, EV, RV, welder, generator).
+    expect(kOutletVariants.length, 15);
+    expect(kOutletVariants, containsAll(kMoreOutletKinds));
     for (final id in newOnes) {
       final l = electricalLesson(id);
       expect(l.legacy, isFalse);
@@ -103,7 +105,7 @@ void main() {
 
   test('a job can ask for any of them: devices are picked, installed in the right place and wired by the lesson', () {
     final seen = <String>{};
-    for (var seed = 1; seed <= 40; seed++) {
+    for (var seed = 1; seed <= 300; seed++) {
       final p = RoomProject(seed: seed, kind: 0, variants: true)..fastForward()..completeWiring();
       for (final o in p.orders) {
         seen.add(o.device);

@@ -15,11 +15,12 @@ const Color _copper = Color(0xFFC2763A);
 const Color _stripe = Color(0xFF2FA24F);
 
 const List<String> kSwitchKinds = ['switch', 'switch2p', 'switch3', 'switch4', 'switchsmart', 'switchcombo'];
-const List<String> kOutletKinds = ['outlet', 'gfci', 'split', 'v240four', 'v240three', 'v240only', 'isolated', 'dryer4', 'dryer3', 'range4', 'range3', 'washer'];
+const List<String> kOutletKinds = ['outlet', 'gfci', 'split', 'v240four', 'v240three', 'v240only', 'isolated', 'dryer4', 'dryer3', 'range4', 'range3', 'washer', ...kMoreOutletKinds];
 
 /// The devices that are not the five the lab began with.
 const List<String> kSwitchVariants = ['switch2p', 'switch3', 'switch4', 'switchsmart', 'switchcombo'];
-const List<String> kOutletVariants = ['split', 'v240four', 'v240three', 'v240only', 'isolated'];
+/// Jobs (in the city and in practice) pick their second outlet from all of these, so every job can be a different kind.
+const List<String> kOutletVariants = ['split', 'v240four', 'v240three', 'v240only', 'isolated', ...kMoreOutletKinds];
 
 /// The outlets for the big appliances: the dryer, the range and the washing machine (American NEMA style).
 const List<String> kApplianceOutlets = ['dryer4', 'dryer3', 'range4', 'range3', 'washer'];
@@ -381,6 +382,206 @@ final List<ElectricalLesson> kMoreLessons = [
     },
   ),
   ...kApplianceLessons,
+  ...kMoreOutletLessons,
+];
+
+// ═════════════════════════════════════════════════════════════════════════════
+// MORE AMERICAN OUTLETS: the other receptacles found in American houses, garages, RV pads and shops. Each one is a lesson
+// (a tile on the Lessons page) and can come up as a job in the city.
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// The new outlet lessons, in the order of their tiles.
+const List<String> kMoreOutletKinds = ['afci', 'tamper', 'usb', 'outlet20', 'weather', 'smartoutlet', 'ev1450', 'rv30', 'welder650', 'gen1430'];
+
+const _groundChip = WireChoice('ground', 'Bare copper · ground', _copper, Colors.white, role: 'ground');
+const _neutralChip = WireChoice('neutral', 'White · neutral', _white, Color(0xFF111827), role: 'neutral');
+const _hotChip = WireChoice('hot', 'Black · hot', _black, Colors.white, role: 'hot');
+const _hot1Chip = WireChoice('hot1', 'Black · hot 1', _black, Colors.white, role: 'hot');
+const _hot2Chip = WireChoice('hot2', 'Red · hot 2', _red, Colors.white, role: 'hot');
+
+String _std120Hint(String chip, Hookup h, {String hotScrew = 'a BRASS screw', String neutralScrew = 'a SILVER screw'}) => switch (chip) {
+      'ground' => 'The bare copper ground wire only goes on the GREEN screw.',
+      'neutral' => 'The white neutral wire goes on $neutralScrew.',
+      _ => h.id == idGreen ? 'A hot wire never goes on the green ground screw.' : 'The black hot wire goes on $hotScrew.',
+    };
+
+/// A 120 volt outlet wired the usual way (ground green, neutral silver, hot brass), with its own words.
+ElectricalLesson _std120({
+  required String id,
+  required String title,
+  required String blurb,
+  required String look,
+  required List<String> about,
+  String neutralLabel = 'Silver screw: NEUTRAL',
+  String hotLabel = 'Brass screw: HOT',
+  String neutralWhy = 'The white neutral wire goes on a silver screw.',
+  String hotWhy = 'The black hot wire goes on a brass screw.',
+  String hotScrew = 'a BRASS screw',
+  String neutralScrew = 'a SILVER screw',
+}) =>
+    ElectricalLesson(
+      id: id,
+      title: title,
+      blurb: blurb,
+      look: look,
+      strict: true,
+      // Two steps to start (the second one says what this device is), one for each wire, two to finish: the page checks them off in that order.
+      steps: [
+        _intro.first,
+        '${_intro.last} ${about.join(' ')}',
+        'Fasten the bare copper ground to the GREEN screw.',
+        'Fasten the white neutral to the ${neutralLabel.split(':').first.toLowerCase()}.',
+        'Fasten the black hot to the ${hotLabel.split(':').first.toLowerCase()}.',
+        ..._tail,
+      ],
+      chips: const [_groundChip, _neutralChip, _hotChip],
+      hookups: [
+        const Hookup(idGreen, 'Green screw: GROUND', {'ground'}, 'The bare copper ground goes on the green screw.', role: 'ground'),
+        Hookup(idSilverTop, neutralLabel, const {'neutral'}, neutralWhy, role: 'neutral'),
+        Hookup(idBrassTop, hotLabel, const {'hot'}, hotWhy, role: 'hot'),
+      ],
+      solution: const {idGreen: 'ground', idSilverTop: 'neutral', idBrassTop: 'hot'},
+      wrongHint: (chip, h) => _std120Hint(chip, h, hotScrew: hotScrew, neutralScrew: neutralScrew),
+    );
+
+/// A 240 volt outlet with two hots, a neutral and a ground (X, Y, W, G).
+ElectricalLesson _four240({required String id, required String title, required String blurb, required String look, required List<String> about}) => ElectricalLesson(
+      id: id,
+      title: title,
+      blurb: blurb,
+      look: look,
+      strict: true,
+      steps: [
+        _intro.first,
+        '${_intro.last} ${about.join(' ')}',
+        'Fasten the bare copper ground to the GREEN screw (G).',
+        'Fasten the white neutral to the silver NEUTRAL (W) screw.',
+        'Fasten the black hot to one HOT (X or Y) brass screw.',
+        'Fasten the red hot to the other HOT brass screw.',
+        ..._tail,
+      ],
+      chips: const [_groundChip, _neutralChip, _hot1Chip, _hot2Chip],
+      hookups: const [
+        Hookup(idGreen, 'Green screw G: GROUND', {'ground'}, 'The bare copper ground goes on the green screw.', role: 'ground'),
+        Hookup(idSilverTop, 'Silver screw W: NEUTRAL', {'neutral'}, 'The white neutral wire goes on the silver W screw.', role: 'neutral'),
+        Hookup(idBrassTop, 'Brass screw X: HOT', {'hot1', 'hot2'}, 'The two hot wires (black and red) go on the two brass screws, X and Y, in either order.', role: 'hot'),
+        Hookup(idBrassBottom, 'Brass screw Y: HOT', {'hot1', 'hot2'}, 'The two hot wires (black and red) go on the two brass screws, X and Y, in either order.', role: 'hot'),
+      ],
+      solution: const {idGreen: 'ground', idSilverTop: 'neutral', idBrassTop: 'hot1', idBrassBottom: 'hot2'},
+      wrongHint: (chip, h) => _bigHint(chip, h, hasGround: true),
+    );
+
+final List<ElectricalLesson> kMoreOutletLessons = [
+  _std120(
+    id: 'afci',
+    title: 'AFCI outlet (arc-fault)',
+    blurb: 'Stops arcing from a loose or damaged wire before it starts a fire. Required in bedrooms and living rooms of new houses.',
+    look: 'gfci',
+    about: const [
+      'An AFCI outlet looks like a GFCI, with TEST and RESET buttons. It watches the current for the crackle of an arc (a loose screw, a chewed cord) and cuts the power.',
+      'The power from the panel goes on the LINE screws. The LOAD screws are for outlets further down the line; here there are none, so they stay covered.',
+    ],
+    neutralLabel: 'Silver LINE screw: NEUTRAL',
+    hotLabel: 'Brass LINE screw: HOT',
+    neutralWhy: 'The white neutral from the panel goes on the silver LINE screw.',
+    hotWhy: 'The black hot from the panel goes on the brass LINE screw.',
+    hotScrew: 'the brass LINE screw',
+    neutralScrew: 'the silver LINE screw',
+  ),
+  _std120(
+    id: 'tamper',
+    title: 'Tamper-resistant outlet (TR)',
+    blurb: 'Little shutters behind the slots keep a child from pushing a key or a pin in. Every new house must have them.',
+    look: 'outlet',
+    about: const ['Look for the letters TR on the face. Behind the slots there are spring shutters: they only open when both prongs of a plug push at the same time. It is wired like a normal outlet.'],
+  ),
+  _std120(
+    id: 'usb',
+    title: 'USB outlet',
+    blurb: 'A normal outlet with USB charging ports built in. A small charger inside the outlet turns 120 volts into 5 volts.',
+    look: 'outlet',
+    about: const ['The USB ports need room behind the face, so use a deep box. It is wired like a normal outlet: the charger inside takes its power from the same hot and neutral.'],
+  ),
+  _std120(
+    id: 'outlet20',
+    title: '20 amp outlet (5-20)',
+    blurb: 'The outlet with a sideways T on one slot: for a 20 amp circuit in a kitchen, a garage or for a big tool.',
+    look: 'nema520',
+    about: const ['Look at the face: the neutral slot has a sideways T. A 20 amp outlet must be on a 20 amp breaker with 12 gauge wire (the yellow cable). A 15 amp plug still fits it.'],
+  ),
+  _std120(
+    id: 'weather',
+    title: 'Outdoor outlet (weather-resistant GFCI)',
+    blurb: 'Outside: a GFCI marked WR, under a bubble cover that stays closed even with a cord plugged in.',
+    look: 'gfci',
+    about: const [
+      'Outside, an outlet must be a GFCI and marked WR (weather resistant), and it sits under an in-use cover (the bubble) that closes over a plugged-in cord.',
+      'The power from the panel goes on the LINE screws.',
+    ],
+    neutralLabel: 'Silver LINE screw: NEUTRAL',
+    hotLabel: 'Brass LINE screw: HOT',
+    neutralWhy: 'The white neutral from the panel goes on the silver LINE screw.',
+    hotWhy: 'The black hot from the panel goes on the brass LINE screw.',
+    hotScrew: 'the brass LINE screw',
+    neutralScrew: 'the silver LINE screw',
+  ),
+  _std120(
+    id: 'smartoutlet',
+    title: 'Smart outlet (Wi-Fi)',
+    blurb: 'An outlet you can turn on and off from your phone. Its little radio always needs the neutral wire.',
+    look: 'outlet',
+    about: const ['A smart outlet has a radio and a small light inside, so it must have the neutral. Connect it, then pair it with its app on the phone.'],
+  ),
+  _four240(
+    id: 'ev1450',
+    title: 'Electric car charger outlet (14-50)',
+    blurb: 'The 50 amp, 240 volt outlet in a garage for charging an electric car or for an RV: two hots, a neutral and a ground.',
+    look: 'nema1450',
+    about: const ['Look at the face: two straight slots at the sides (X and Y), a straight slot at the top (W, neutral) and a round hole (G). That is a NEMA 14-50. It takes 6 gauge wire and a 50 amp double breaker, and in a garage it must be GFCI protected at the breaker.'],
+  ),
+  _std120(
+    id: 'rv30',
+    title: 'RV outlet, 30 amp (TT-30)',
+    blurb: 'The camper outlet at an RV pad: 30 amp but only 120 volts, with slanted slots so only the RV plug fits.',
+    look: 'nematt30',
+    about: const ['Look at the face: two slanted slots and a round ground hole. Careful: the TT-30 is 120 volts only. Putting 240 volts on it burns out the RV. One hot, one neutral, one ground, on 10 gauge wire and a 30 amp single breaker.'],
+    hotLabel: 'Brass screw X: HOT',
+    neutralLabel: 'Silver screw W: NEUTRAL',
+    hotWhy: 'The one black hot goes on the brass X screw.',
+    neutralWhy: 'The white neutral goes on the silver W screw.',
+    hotScrew: 'the brass X screw',
+    neutralScrew: 'the silver W screw',
+  ),
+  ElectricalLesson(
+    id: 'welder650',
+    title: 'Welder outlet (6-50)',
+    blurb: 'The 50 amp, 240 volt outlet for a welder or a big compressor in a shop: two hots and a ground, no neutral.',
+    look: 'nema620',
+    strict: true,
+    steps: const [
+      'Turn the breaker OFF and test that the wires are dead.',
+      'Look at the face: two flat slots for the hots and a U-shaped ground hole, and no neutral slot. That is a NEMA 6-50, on 6 gauge wire and a 50 amp double breaker.',
+      'Fasten the bare copper ground to the GREEN screw.',
+      'Fasten the black hot to one HOT brass screw.',
+      'Fasten the red hot to the other HOT brass screw. There is no neutral.',
+      ..._tail,
+    ],
+    chips: const [_groundChip, _hot1Chip, _hot2Chip],
+    hookups: const [
+      Hookup(idGreen, 'Green screw: GROUND', {'ground'}, 'The bare copper ground goes on the green screw.', role: 'ground'),
+      Hookup(idBrassTop, 'Brass screw X: HOT', {'hot1', 'hot2'}, 'The two hot wires go on the two brass screws, in either order.', role: 'hot'),
+      Hookup(idBrassBottom, 'Brass screw Y: HOT', {'hot1', 'hot2'}, 'The two hot wires go on the two brass screws, in either order.', role: 'hot'),
+    ],
+    solution: const {idGreen: 'ground', idBrassTop: 'hot1', idBrassBottom: 'hot2'},
+    wrongHint: (chip, h) => chip == 'ground' ? 'The bare copper ground wire only goes on the GREEN screw.' : (h.id == idGreen ? 'A hot wire never goes on the green ground screw.' : 'Both hot wires go on the two brass screws.'),
+  ),
+  _four240(
+    id: 'gen1430',
+    title: 'Generator twist-lock (L14-30)',
+    blurb: 'The round twist-lock for a portable generator: the plug turns and locks, so it cannot fall out. Two hots, a neutral and a ground.',
+    look: 'nemal1430',
+    about: const ['Look at the face: four curved slots in a circle. The plug goes in and turns to lock. It feeds the house through a transfer switch or an interlock, never by back-feeding an outlet.'],
+  ),
 ];
 
 // ═════════════════════════════════════════════════════════════════════════════

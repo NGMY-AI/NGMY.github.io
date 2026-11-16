@@ -204,7 +204,7 @@ void paintNgmyPoster(Canvas c, Size s, double t, int variant) {
 void _outletFace(MeshBuilder b, String kind, double x, bool ok) {
   const slotCol = Color(0xFF0B0B0D), dark = Color(0xFF17181B);
   const plate = Color(0xFFF2EEE2);
-  const layouts = {'dryer3': 'nema1030', 'dryer4': 'nema1430', 'range3': 'nema1050', 'range4': 'nema1450', 'washer': 'nema520', 'v240three': 'nema1030', 'v240four': 'nema1430', 'v240only': 'nema620'};
+  const layouts = {'dryer3': 'nema1030', 'dryer4': 'nema1430', 'range3': 'nema1050', 'range4': 'nema1450', 'washer': 'nema520', 'v240three': 'nema1030', 'v240four': 'nema1430', 'v240only': 'nema620', 'outlet20': 'nema520', 'ev1450': 'nema1450', 'welder650': 'nema620', 'rv30': 'nematt30', 'gen1430': 'nemal1430'};
   final layout = layouts[kind];
   if (layout != null) {
     final small = kind.startsWith('v240');
@@ -249,6 +249,16 @@ void _outletFace(MeshBuilder b, String kind, double x, bool ok) {
         slot(0, 0.0, 0.32, 0.075);
         slot(0.15, -0.07, 0.075, 0.14);
         round(0, -0.36);
+      case 'nematt30':
+        slot(-0.22, 0.1, 0.075, 0.3, 0.45);
+        slot(0.22, 0.1, 0.075, 0.3, -0.45);
+        round(0, -0.32);
+      case 'nemal1430':
+        for (var i = 0; i < 4; i++) {
+          final a = math.pi / 4 + i * math.pi / 2;
+          slot(math.cos(a) * 0.36, math.sin(a) * 0.36, 0.075, 0.22, a);
+        }
+        round(0, 0);
       default:
         slot(0.2, 0.12, 0.075, 0.3);
         slot(-0.2, 0.12, 0.075, 0.3);
@@ -263,8 +273,8 @@ void _outletFace(MeshBuilder b, String kind, double x, bool ok) {
       b.box(V3(x + dx, 14 + dz * 2.8, 1.7), const V3(0.8, 2.4, 0.3), dark);
     }
   }
-  if (kind == 'gfci') {
-    // The TEST and RESET buttons between the two receptacles.
+  if (kind == 'gfci' || kind == 'afci' || kind == 'weather') {
+    // The TEST and RESET buttons between the two receptacles (a GFCI, an AFCI and the outdoor WR GFCI).
     b.box(V3(x - 1.5, 14, 1.8), const V3(1.6, 1.1, 0.4), const Color(0xFF202226));
     b.box(V3(x + 1.5, 14, 1.8), const V3(1.6, 1.1, 0.4), const Color(0xFFD72A2A));
   } else {
