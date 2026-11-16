@@ -10,6 +10,8 @@ on:
       - 'lib/**'
       - 'web/**'
       - 'assets/**'
+      # The guard checks below decide whether a deploy goes out, so a change to them starts a deploy too.
+      - 'test/**'
       - 'pubspec.yaml'
       - 'pubspec.lock'
       - '.github/workflows/deploy-pages.yml'
