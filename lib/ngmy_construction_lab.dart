@@ -361,7 +361,9 @@ class _StarsBadgeState extends State<StarsBadge> {
 
 /// The 3D view with a message banner, an info card and zoom buttons on top of it.
 class Stage3D extends StatelessWidget {
-  const Stage3D({required this.scene, required this.cam, required this.onPick, required this.onHome, this.highlight = 0, this.dynamicPolys, this.dynamicScreens, this.layerOn, this.message, this.good = false, this.info, this.topLeft, this.topRight, this.infoAction, this.messageTop, this.onDoubleTap, this.bottom, this.sky = false, this.stars, this.bare = false});
+  const Stage3D({required this.scene, required this.cam, required this.onPick, required this.onHome, this.highlight = 0, this.dynamicPolys, this.dynamicScreens, this.layerOn, this.message, this.good = false, this.info, this.topLeft, this.topRight, this.infoAction, this.messageTop, this.onDoubleTap, this.bottom, this.sky = false, this.stars, this.bare = false, this.background = kConBg});
+  /// What shows where nothing is drawn (the electrical bench uses the colour of its room, so turning round never shows black).
+  final Color background;
   final bool sky;
 
   /// Only the picture: no buttons, banners, cards or map on top of it.
@@ -396,9 +398,9 @@ class Stage3D extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sideways = MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
-    if (bare) return Scene3DView(scene: scene, cam: cam, highlight: highlight, onPick: onPick, dynamicPolys: dynamicPolys, dynamicScreens: dynamicScreens, layerOn: layerOn, background: kConBg, onDoubleTap: onDoubleTap, sky: sky);
+    if (bare) return Scene3DView(scene: scene, cam: cam, highlight: highlight, onPick: onPick, dynamicPolys: dynamicPolys, dynamicScreens: dynamicScreens, layerOn: layerOn, background: background, onDoubleTap: onDoubleTap, sky: sky);
     return Stack(children: [
-      Positioned.fill(child: Scene3DView(scene: scene, cam: cam, highlight: highlight, onPick: onPick, dynamicPolys: dynamicPolys, dynamicScreens: dynamicScreens, layerOn: layerOn, background: kConBg, onDoubleTap: onDoubleTap, sky: sky)),
+      Positioned.fill(child: Scene3DView(scene: scene, cam: cam, highlight: highlight, onPick: onPick, dynamicPolys: dynamicPolys, dynamicScreens: dynamicScreens, layerOn: layerOn, background: background, onDoubleTap: onDoubleTap, sky: sky)),
       if (topLeft != null) Positioned(left: 8, top: 8, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: topLeft!)),
       Positioned(
         right: 8,
@@ -986,6 +988,8 @@ class _ElectricalPageState extends State<ElectricalLessonPage> with _GlowMixin {
       onSteps: () => showConSteps(context, lesson.title, lesson.steps, done),
       stage: Stage3D(
         scene: scene,
+        // The colour of the room around the bench: turning all the way round never shows black.
+        background: const Color(0xFFCFCBC4),
         cam: cam,
         highlight: hl,
         onPick: _pick,

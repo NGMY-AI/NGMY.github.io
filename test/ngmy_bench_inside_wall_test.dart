@@ -35,6 +35,13 @@ void main() {
       final nudged = withWall.polys.where((p) => p.bias != 0 && (p.id == idBrassTop || p.id == idSilverTop || p.id == idGreen)).toList();
       expect(nudged, isNotEmpty);
       expect(nudged.every((p) => p.biasDir != null), isTrue);
+      // The green ground screw sits on the FRONT of the strap: it is drawn on top when seen from the front (before, only from below).
+      final green = withWall.polys.where((p) => p.id == idGreen && p.bias != 0).toList();
+      expect(green, isNotEmpty);
+      expect(green.every((p) => p.biasDir != null && p.biasDir!.z == 1), isTrue, reason: 'the ground screw faces the front');
+      // The room goes on behind the wall and is closed at both ends: turning round never shows black.
+      expect(room.any((p) => p.pts.every((v) => v.z < -0.5)), isTrue, reason: 'room behind the wall');
+      expect(room.any((p) => p.pts.every((v) => v.z > 30)), isTrue, reason: 'far wall in front');
 
       final behind = buildBench(l, s, withWall: false);
       expect(behind.polys.any((p) => p.id == idWall), isFalse);

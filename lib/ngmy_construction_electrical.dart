@@ -491,6 +491,14 @@ Scene3D buildBench(ElectricalLesson lesson, WiringState s, {bool withWall = true
     tiles(const V3(-wx, wy, front), const V3(2 * wx, 0, 0), const V3(0, 0, depth), 12, 7, const Color(0xFFE7E5E4), const V3(0, -1, 0)); // ceiling
     tiles(const V3(-wx, -wy, front), const V3(0, 2 * wy, 0), const V3(0, 0, depth), 8, 7, const Color(0xFFD6D3CE), const V3(1, 0, 0)); // left wall
     tiles(const V3(wx, -wy, front), const V3(0, 2 * wy, 0), const V3(0, 0, depth), 8, 7, const Color(0xFFD6D3CE), const V3(-1, 0, 0)); // right wall
+    // The room goes on BEHIND the wall too, and is closed at both ends: turning all the way round (behind the blue box, or to the side) shows
+    // the room, never black. It is still the outermost shell (tier -1), so these walls never cover the wall, the box or the device.
+    tiles(const V3(-wx, -wy, back - depth), const V3(2 * wx, 0, 0), const V3(0, 0, depth), 12, 7, const Color(0xFF8A6E4F), const V3(0, 1, 0)); // floor behind
+    tiles(const V3(-wx, wy, back - depth), const V3(2 * wx, 0, 0), const V3(0, 0, depth), 12, 7, const Color(0xFFE7E5E4), const V3(0, -1, 0)); // ceiling behind
+    tiles(const V3(-wx, -wy, back - depth), const V3(0, 2 * wy, 0), const V3(0, 0, depth), 8, 7, const Color(0xFFD6D3CE), const V3(1, 0, 0)); // left wall behind
+    tiles(const V3(wx, -wy, back - depth), const V3(0, 2 * wy, 0), const V3(0, 0, depth), 8, 7, const Color(0xFFD6D3CE), const V3(-1, 0, 0)); // right wall behind
+    tiles(const V3(-wx, -wy, front + depth), const V3(2 * wx, 0, 0), const V3(0, 2 * wy, 0), 12, 8, const Color(0xFFCFCBC4), const V3(0, 0, -1)); // the far wall in front
+    tiles(const V3(-wx, -wy, back - depth), const V3(2 * wx, 0, 0), const V3(0, 2 * wy, 0), 12, 8, const Color(0xFFCFCBC4), const V3(0, 0, 1)); // the far wall behind
     b.order = 2;
   }
   final cableEnds = _boxAndCable(b, lesson.legacy ? kind : 'outlet', true);
@@ -643,6 +651,10 @@ Scene3D buildBench(ElectricalLesson lesson, WiringState s, {bool withWall = true
   final body = [for (final p in b.polys) if (p.id == idDevice || p.id == idFace) p];
   V3? mountSide(Poly p) {
     if (p.bias == 0 || body.isEmpty) return null;
+    // The green ground screw and the metal strap (with its ears) face the FRONT: they sit on the front of the strap, below and above the
+    // body. Worked out from where they sit they counted as "bottom" and "top", so the green screw was only drawn on top when seen from
+    // below, and from the front the strap covered it.
+    if (p.id == idGreen || p.id == idYoke) return const V3(0, 0, 1);
     var x0 = double.infinity, x1 = -double.infinity, y0 = double.infinity, y1 = -double.infinity, z0 = double.infinity, z1 = -double.infinity;
     for (final q in body) {
       for (final v in q.pts) {
