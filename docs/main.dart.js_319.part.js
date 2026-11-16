@@ -6,7 +6,7 @@ A=c[196]
 var z=a.updateTypes([]);(function constants(){A.amg=new B.R(12,4,12,4)
 A.amr=new B.R(14,14,14,12)
 A.amK=new B.R(16,14,16,18)
-A.a2t=new B.a_(57925,"MaterialIcons",!1)
-A.bfb=new B.fl(2.5,null,null,null,null,C.aV,null,null,null,null)
-A.aUA=new B.a5(22,22,A.bfb,null)})()};
-(a=>{a["wwj3UkiNTuLdKEQzEtYSctjaqXE="]=a.current})($__dart_deferred_initializers__);
+A.a2u=new B.a_(57925,"MaterialIcons",!1)
+A.bfa=new B.fl(2.5,null,null,null,null,C.aV,null,null,null,null)
+A.aUz=new B.a5(22,22,A.bfa,null)})()};
+(a=>{a["cCJVGs93+nSQgTcS+rWPP4iatk0="]=a.current})($__dart_deferred_initializers__);
