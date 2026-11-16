@@ -17,12 +17,12 @@ Color ngmyCrispSurfaceColor(BuildContext context, {bool elevated = false}) {
     return (isDark ? const Color(0xFF111827) : Colors.white).withValues(alpha: elevated ? 0.72 : 0.70);
   }
   if (isDark) return elevated ? const Color(0xFF1F2937) : const Color(0xFF1A1F2E);
-  return elevated ? Colors.white : const Color(0xFFF8FAFC);
+  return Colors.white; // Light mode: pure white panels.
 }
 
 Color ngmyCrispBorderColor(BuildContext context) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
-  return isDark ? Colors.white.withValues(alpha: 0.14) : Colors.black.withValues(alpha: 0.08);
+  return isDark ? Colors.white.withValues(alpha: 0.14) : const Color(0xFFC4CCD8); // Light: a clearly visible grey edge.
 }
 
 /// Call once from [main] — keeps CanvasKit/image scaling sharp on web PWA.

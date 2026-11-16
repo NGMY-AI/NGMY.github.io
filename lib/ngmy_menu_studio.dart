@@ -896,8 +896,8 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
       decoration: BoxDecoration(
         color: t.listItemBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: t.border),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: t.isDark ? 0.2 : 0.04), blurRadius: 12, offset: const Offset(0, 4))],
+        border: Border.all(color: t.border, width: t.isDark ? 1 : 1.6),
+        boxShadow: t.isDark ? [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 12, offset: const Offset(0, 4))] : null,
       ),
       child: body,
     );
@@ -924,7 +924,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [_kMenuAccent.withValues(alpha: t.isDark ? 0.35 : 0.18), t.scaffold],
+                  colors: [t.isDark ? _kMenuAccent.withValues(alpha: 0.35) : t.scaffold, t.scaffold],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),

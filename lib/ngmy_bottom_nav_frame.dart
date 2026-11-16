@@ -71,11 +71,8 @@ class _NgmySculptedBottomNavFrameState extends State<NgmySculptedBottomNavFrame>
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(radius),
-            border: Border.all(color: const Color(0xFFE4E7EC)),
-            boxShadow: const [
-              BoxShadow(color: Color(0x290F172A), blurRadius: 28, spreadRadius: -6, offset: Offset(0, 12)),
-              BoxShadow(color: Color(0x140F172A), blurRadius: 6, offset: Offset(0, 2)),
-            ],
+            // A crisp grey edge, no shadow (shadows showed as dark corners on the phone).
+            border: Border.all(color: const Color(0xFFC4CCD8), width: 1.6),
           ),
           child: ClipRRect(borderRadius: BorderRadius.circular(radius), child: widget.child),
         ),
@@ -190,7 +187,6 @@ class NgmyNavSelectionOrb extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: Color(0xFF111827),
-          boxShadow: [BoxShadow(color: Color(0x330F172A), blurRadius: 10, offset: Offset(0, 4))],
         ),
       );
     }

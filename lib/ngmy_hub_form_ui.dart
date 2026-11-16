@@ -11,18 +11,18 @@ class NgmyHubTheme {
 
   bool get isDark => Theme.of(context).brightness == Brightness.dark;
 
-  Color get scaffold => isDark ? const Color(0xFF121212) : const Color(0xFFF1F5F9);
+  Color get scaffold => isDark ? const Color(0xFF121212) : Colors.white;
   Color get surface => isDark ? const Color(0xFF0B1220) : Colors.white;
-  Color get surfaceElevated => isDark ? const Color(0xFF111827) : const Color(0xFFF8FAFC);
-  Color get panel => isDark ? const Color(0xFF0B1020) : const Color(0xFFF8FAFC);
-  Color get title => isDark ? Colors.white : const Color(0xFF0F172A);
+  Color get surfaceElevated => isDark ? const Color(0xFF111827) : Colors.white;
+  Color get panel => isDark ? const Color(0xFF0B1020) : Colors.white;
+  Color get title => isDark ? Colors.white : const Color(0xFF0B1220);
   Color get subtitle => isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF334155);
   Color get muted => isDark ? Colors.white.withValues(alpha: 0.48) : const Color(0xFF475569);
   Color get iconButtonBg => isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05);
   Color get iconButtonIcon => isDark ? Colors.white70 : const Color(0xFF475569);
-  Color get border => isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFE2E8F0);
+  Color get border => isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFC4CCD8);
   Color get inputFill => isDark ? Colors.white.withValues(alpha: 0.07) : Colors.white;
-  Color get inputBorder => isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0);
+  Color get inputBorder => isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFC4CCD8);
   Color get fieldFill => isDark ? Colors.black.withValues(alpha: 0.26) : const Color(0xFFF1F5F9);
   Color get barrier => isDark ? Colors.black.withValues(alpha: 0.88) : Colors.black.withValues(alpha: 0.45);
   Color get chipOffLabel => isDark ? Colors.white70 : const Color(0xFF475569);
@@ -30,7 +30,7 @@ class NgmyHubTheme {
   Color get chipOffBorder => isDark ? Colors.white24 : const Color(0xFFCBD5E1);
   Color get overlayDark => isDark ? Colors.black.withValues(alpha: 0.82) : Colors.black.withValues(alpha: 0.35);
 
-  Color categoryCardBg(Color accent) => isDark ? accent.withValues(alpha: 0.1) : accent.withValues(alpha: 0.08);
+  Color categoryCardBg(Color accent) => isDark ? accent.withValues(alpha: 0.1) : Colors.white;
   Color categoryCardBorder(Color accent) => isDark ? accent.withValues(alpha: 0.35) : accent.withValues(alpha: 0.42);
   Color categoryIconBg(Color accent) => isDark ? accent.withValues(alpha: 0.18) : accent.withValues(alpha: 0.14);
 
@@ -38,9 +38,9 @@ class NgmyHubTheme {
 
   List<Color> dialogGradient(Color accent) => isDark
       ? [const Color(0xFF05070C), const Color(0xFF0B1020), const Color(0xFF0F172A)]
-      : [const Color(0xFFF8FAFC), const Color(0xFFF1F5F9), accent.withValues(alpha: 0.08)];
+      : [Colors.white, Colors.white, Colors.white];
 
-  Color get heroGradientEnd => isDark ? const Color(0xFF030712) : const Color(0xFFF8FAFC);
+  Color get heroGradientEnd => isDark ? const Color(0xFF030712) : Colors.white;
 
   Color get listItemBg => isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white;
 
@@ -433,11 +433,7 @@ class NgmyFramedTitle extends StatelessWidget {
             ? BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFE4E7EC)),
-                boxShadow: const [
-                  BoxShadow(color: Color(0x240F172A), blurRadius: 18, spreadRadius: -4, offset: Offset(0, 8)),
-                  BoxShadow(color: Color(0x140F172A), blurRadius: 4, offset: Offset(0, 1)),
-                ],
+                border: Border.all(color: const Color(0xFFC4CCD8), width: 1.6),
               )
             : BoxDecoration(
           gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [accent.withValues(alpha: 0.22), accent.withValues(alpha: 0.06)]),

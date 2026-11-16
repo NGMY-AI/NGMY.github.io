@@ -17,6 +17,10 @@ import 'ngmy_arcade_a.dart';
 import 'ngmy_edu_b.dart';
 import 'ngmy_fun_a.dart';
 import 'ngmy_universe_hub.dart';
+import 'ngmy_hud_tech_shell.dart' show NgmyCalmLight, NgmyCalmIconTile;
+
+/// Light mode: the Core Protocol page is white with framed tiles and dark words.
+bool _coreLight(BuildContext context) => Theme.of(context).brightness == Brightness.light;
 
 /// Core Protocol: four auto-playing "unfold" sequences. Each one builds three glass slabs in a
 /// different, physically-shaded way (a folding accordion, flipping panels, rising towers, and
@@ -152,7 +156,7 @@ class _NgmyCoreProtocolSimsScreenState extends State<NgmyCoreProtocolSimsScreen>
         if (!didPop && active != null) _leave();
       },
       child: Scaffold(
-        backgroundColor: _kBg,
+        backgroundColor: active == null && _coreLight(context) ? NgmyCalmLight.page : _kBg,
         resizeToAvoidBottomInset: false,
         body: active == null
             ? _SequencePicker(
@@ -197,18 +201,19 @@ class _SequencePicker extends StatelessWidget {
 
   static const _grid = SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 0.82);
 
-  Widget _heading(String t, String sub) => Padding(
+  Widget _heading(String t, String sub, {bool light = false}) => Padding(
         padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(t, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 1.6, fontSize: 12.5)),
+          Text(t, style: TextStyle(color: light ? NgmyCalmLight.ink : Colors.white, fontWeight: FontWeight.w900, letterSpacing: 1.6, fontSize: 12.5)),
           const SizedBox(height: 2),
-          Text(sub, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
+          Text(sub, style: TextStyle(color: light ? NgmyCalmLight.sub : Colors.white.withValues(alpha: 0.5), fontSize: 12)),
         ]),
       );
 
   @override
   Widget build(BuildContext context) {
     const accent = Color(0xFF38BDF8);
+    final light = _coreLight(context);
     // Like the Construction Lab: the back arrow at the side and the name in a frame in the middle at the top. The whole page slides up under
     // the clock when scrolled (no dark band at the top); only its start is kept below the clock.
     return SafeArea(
@@ -221,21 +226,27 @@ class _SequencePicker extends StatelessWidget {
               padding: EdgeInsets.fromLTRB(8, MediaQuery.paddingOf(context).top + 6, 8, 4),
               sliver: SliverToBoxAdapter(
                 child: Row(children: [
-                  IconButton(key: const Key('core-protocol-back'), onPressed: onClose, icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20)),
+                  IconButton(key: const Key('core-protocol-back'), onPressed: onClose, icon: Icon(Icons.arrow_back_ios_new_rounded, color: light ? NgmyCalmLight.ink : Colors.white70, size: 20)),
                   Expanded(
                     child: Center(
                       child: Container(
                         key: const Key('core-protocol-title-frame'),
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-                        decoration: BoxDecoration(
+                        decoration: light
+                            ? BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: NgmyCalmLight.border, width: NgmyCalmLight.borderWidth),
+                              )
+                            : BoxDecoration(
                           gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [accent.withValues(alpha: 0.22), accent.withValues(alpha: 0.06)]),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: accent.withValues(alpha: 0.75), width: 1.6),
                           boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.22), blurRadius: 8)],
                         ),
-                        child: const Column(mainAxisSize: MainAxisSize.min, children: [
-                          Text('🧪 Core Protocol', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
-                          Text('Play, make things, keep them.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white60, fontSize: 10.5)),
+                        child: Column(mainAxisSize: MainAxisSize.min, children: [
+                          Text('🧪 Core Protocol', textAlign: TextAlign.center, style: TextStyle(color: light ? NgmyCalmLight.ink : Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+                          Text('Play, make things, keep them.', textAlign: TextAlign.center, style: TextStyle(color: light ? NgmyCalmLight.sub : Colors.white60, fontSize: 10.5)),
                         ]),
                       ),
                     ),
@@ -244,7 +255,7 @@ class _SequencePicker extends StatelessWidget {
                 ]),
               ),
             ),
-            SliverToBoxAdapter(child: _heading('STUDIOS', 'Play, make things, and keep what you make')),
+            SliverToBoxAdapter(child: _heading('STUDIOS', 'Play, make things, and keep what you make', light: light)),
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 14),
               sliver: SliverGrid(
@@ -258,7 +269,7 @@ class _SequencePicker extends StatelessWidget {
                 ),
               ),
             ),
-            SliverToBoxAdapter(child: _heading('SCENES', 'Each one is a studio too: change the style, colours and words')),
+            SliverToBoxAdapter(child: _heading('SCENES', 'Each one is a studio too: change the style, colours and words', light: light)),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 30),
               sliver: SliverGrid(
@@ -281,6 +292,26 @@ class _StudioTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = def.color;
+    if (_coreLight(context)) {
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: onTap,
+          child: Ink(
+            padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
+            decoration: NgmyCalmLight.cardDecoration(radius: 20),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              NgmyCalmIconTile(accent: c, size: 44, icon: def.icon),
+              const SizedBox(height: 8),
+              Text(def.title, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: NgmyCalmLight.ink, fontWeight: FontWeight.w900, letterSpacing: 0.5, fontSize: 10.5, height: 1.15)),
+              const SizedBox(height: 3),
+              Text(def.blurb, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: NgmyCalmLight.sub, fontSize: 9.5, height: 1.2)),
+            ]),
+          ),
+        ),
+      );
+    }
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -320,6 +351,7 @@ class _PickTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = meta.colors;
+    final light = _coreLight(context);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -327,7 +359,7 @@ class _PickTile extends StatelessWidget {
         onTap: onTap,
         child: Ink(
           padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
-          decoration: BoxDecoration(
+          decoration: light ? NgmyCalmLight.cardDecoration(radius: 20) : BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color.lerp(const Color(0xFF1B1B1F), c.first, 0.24)!, const Color(0xFF151518)]),
             border: Border.all(color: c.first.withValues(alpha: 0.35)),
@@ -344,14 +376,14 @@ class _PickTile extends StatelessWidget {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(6),
                       gradient: LinearGradient(colors: [c.first, c.last]),
-                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.45), offset: const Offset(0, 2.5))],
+                      boxShadow: light ? null : [BoxShadow(color: Colors.black.withValues(alpha: 0.45), offset: const Offset(0, 2.5))],
                     ),
                     child: Icon(meta.icons[i], size: 11, color: Colors.white),
                   ),
               ]),
             ),
             const SizedBox(height: 10),
-            Text(meta.title, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: meta.glow, fontWeight: FontWeight.w900, letterSpacing: 0.6, fontSize: 10.5, height: 1.2)),
+            Text(meta.title, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: light ? NgmyCalmLight.accentInk(meta.glow) : meta.glow, fontWeight: FontWeight.w900, letterSpacing: 0.6, fontSize: 10.5, height: 1.2)),
             const SizedBox(height: 4),
             Icon(Icons.tune_rounded, color: c.first, size: 18),
           ]),

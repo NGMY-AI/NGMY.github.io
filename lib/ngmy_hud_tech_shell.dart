@@ -53,21 +53,20 @@ class NgmyHudKeepLook extends InheritedWidget {
   bool updateShouldNotify(NgmyHudKeepLook oldWidget) => false;
 }
 
-/// The calm light look: white cards, a hairline border, a soft shadow and one quiet accent.
+/// The calm light look: pure white, frames drawn with a crisp clearly visible grey edge, no shadows
+/// (shadows showed as dark corners under the frames on the phone), and one quiet accent.
 class NgmyCalmLight {
   NgmyCalmLight._();
 
-  static const Color page = Color(0xFFF4F5F7);
+  static const Color page = Colors.white;
   static const Color card = Colors.white;
-  static const Color border = Color(0xFFE4E7EC);
-  static const Color ink = Color(0xFF111827);
-  static const Color sub = Color(0xFF6B7280);
+  static const Color border = Color(0xFFC4CCD8);
+  static const double borderWidth = 1.6;
+  static const Color ink = Color(0xFF0B1220);
+  static const Color sub = Color(0xFF4B5563);
 
-  /// A real lifted shadow: a wide soft one under the card and a tight one at its edge.
-  static const List<BoxShadow> shadow = [
-    BoxShadow(color: Color(0x240F172A), blurRadius: 26, spreadRadius: -6, offset: Offset(0, 12)),
-    BoxShadow(color: Color(0x140F172A), blurRadius: 6, offset: Offset(0, 2)),
-  ];
+  /// No shadows in light mode: the frame is shown by its edge.
+  static const List<BoxShadow> shadow = [];
 
   /// The accent made dark enough to read on white.
   static Color accentInk(Color c) {
@@ -81,8 +80,7 @@ class NgmyCalmLight {
   static BoxDecoration cardDecoration({double radius = 20}) => BoxDecoration(
         color: card,
         borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: border),
-        boxShadow: shadow,
+        border: Border.all(color: border, width: borderWidth),
       );
 }
 
@@ -112,9 +110,6 @@ class NgmyCalmIconTile extends StatelessWidget {
         gradient: hasEmoji
             ? null
             : LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [top, base]),
-        boxShadow: [
-          BoxShadow(color: base.withValues(alpha: 0.28), blurRadius: size * 0.22, offset: Offset(0, size * 0.08)),
-        ],
       ),
       alignment: Alignment.center,
       child: hasEmoji
@@ -571,7 +566,7 @@ class NgmyToolkitGlassPillFrame extends StatelessWidget {
         decoration: bare
             ? BoxDecoration(
                 borderRadius: BorderRadius.circular(borderRadius),
-                border: Border.all(color: NgmyCalmLight.border),
+                border: Border.all(color: NgmyCalmLight.border, width: NgmyCalmLight.borderWidth),
               )
             : NgmyCalmLight.cardDecoration(radius: borderRadius),
         child: child,

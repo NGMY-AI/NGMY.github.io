@@ -7,6 +7,9 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_bottom_nav_frame.dart';
+import 'package:ngmy/ngmy_core_protocol_sims.dart';
+import 'package:ngmy/ngmy_studio_kit.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ngmy/ngmy_home_tech_frames.dart';
 import 'package:ngmy/ngmy_hub_form_ui.dart';
 import 'package:ngmy/ngmy_hud_tech_shell.dart';
@@ -153,5 +156,31 @@ void main() {
     expect(find.byKey(const Key('ngmy-calm-card')), findsNothing);
     expect(find.byWidgetPredicate((w) => w is CustomPaint && w.painter is NgmyHudFramePainter), findsWidgets);
     await tester.pumpWidget(const SizedBox());
+  });
+
+  test('light mode frames: a crisp visible edge and no shadows (shadows showed as dark corners)', () {
+    final d = NgmyCalmLight.cardDecoration();
+    expect(d.boxShadow == null || d.boxShadow!.isEmpty, isTrue);
+    expect(d.color, Colors.white);
+    expect((d.border as Border).top.width, greaterThanOrEqualTo(1.5));
+    expect(NgmyCalmLight.page, Colors.white);
+  });
+
+  testWidgets('Core Protocol is white in light mode', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    NgmyTone.enabled = false;
+    await _loadFonts();
+    await tester.binding.setSurfaceSize(const Size(430, 932));
+    await tester.pumpWidget(MaterialApp(
+      theme: ThemeData(brightness: Brightness.light, fontFamily: 'Roboto'),
+      home: const NgmyCoreProtocolSimsScreen(),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+    final scaffold = tester.widget<Scaffold>(find.byType(Scaffold).first);
+    expect(scaffold.backgroundColor, Colors.white);
+    expect(find.byKey(const Key('ngmy-calm-icon')), findsWidgets);
+    await _snap(tester, 'core_light');
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 5));
   });
 }

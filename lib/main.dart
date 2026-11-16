@@ -19465,6 +19465,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       // Match NGMY Hub darkness — solid canvas, no bluish gradient wash.
       return const ColoredBox(color: Color(0xFF121212));
     }
+    // Light mode: pure white — no bluish wash or colour blobs.
+    if (isLight) return const ColoredBox(color: Colors.white);
     final baseColors = const [Color(0xFFF7FCFF), Color(0xFFEFF8FF), Color(0xFFF9F1FF)];
     return DecoratedBox(
             decoration: BoxDecoration(
@@ -19522,8 +19524,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       decoration: BoxDecoration(
         color: ngmyCrispSurfaceColor(context, elevated: true),
         borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: ngmyCrispBorderColor(context), width: 1.2),
-        boxShadow: [
+        border: Border.all(color: ngmyCrispBorderColor(context), width: isLight ? 1.6 : 1.2),
+        boxShadow: isLight ? null : [
           BoxShadow(
             color: const Color(0xFF8B5CF6).withValues(alpha: isLight ? 0.06 : 0.12),
             blurRadius: ngmyCrispUi ? 6 : 24,
@@ -19598,7 +19600,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         child: Container(
           width: 42,
           height: 42,
-          decoration: BoxDecoration(
+          // Light mode: a white circle with a crisp grey edge and a dark icon, easy to see.
+          decoration: isLight
+              ? BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                  border: Border.all(color: NgmyCalmLight.border, width: NgmyCalmLight.borderWidth),
+                )
+              : BoxDecoration(
             shape: BoxShape.circle,
             color: ngmyCrispSurfaceColor(context),
             border: Border.all(color: ngmyCrispBorderColor(context)),
@@ -19610,7 +19619,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               ),
             ],
           ),
-          child: Icon(icon, color: isLight ? const Color(0xFF4A55D9) : const Color(0xFFA5B4FC), size: 21),
+          child: Icon(icon, color: isLight ? NgmyCalmLight.ink : const Color(0xFFA5B4FC), size: 22),
         ),
       ),
     );
@@ -30090,11 +30099,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             decoration: NgmyHudInk.calm(context)
                 ? const BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(color: Color(0x2E0F172A), blurRadius: 22, spreadRadius: -4, offset: Offset(0, 10)),
-                      BoxShadow(color: Color(0x140F172A), blurRadius: 4, offset: Offset(0, 1)),
-                    ],
+                    color: Color(0xFFC4CCD8),
                   )
                 : BoxDecoration(
               shape: BoxShape.circle,
