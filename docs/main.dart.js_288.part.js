@@ -34,7 +34,7 @@ r=A.d2U
 w=2.4
 break
 case"pluck":s=A.d8Y
-r=A.cPg
+r=A.cPh
 w=7
 break
 case"synth":s=A.dvn
@@ -42,8 +42,8 @@ r=A.dxd
 v=0.012
 u=!0
 break
-case"flute":s=A.dBX
-r=A.cpe
+case"flute":s=A.dBY
+r=A.cpf
 v=0.07
 u=!0
 t=0.035
@@ -117,7 +117,7 @@ $S:755}
 C.cn4.prototype={
 $0(){var x=this
 return C.hZU(x.a,x.b,x.c,x.d,x.e)},
-$S:348};(function inheritance(){var x=a.inherit
+$S:279};(function inheritance(){var x=a.inherit
 x(C.cn2,B.jz)
 x(C.cn4,B.iO)})()
 var y={h:B.at("O<G>"),b:B.at("G"),f:B.at("~")};(function constants(){var x=a.makeConstList
@@ -127,9 +127,9 @@ A.qu=new B.u(1,1,0.8784313725490196,0.4,D.q)
 A.ox=new B.R(0,0,7,0)
 A.a3O=new B.a_(983467,"MaterialIcons",!1)
 A.au9=x([1],y.h)
-A.cpe=x([1,2,3],y.h)
+A.cpf=x([1,2,3],y.h)
 A.axQ=x([1,-1],y.h)
-A.cPg=x([1,2,3,4,5,6,7],y.h)
+A.cPh=x([1,2,3,4,5,6,7],y.h)
 A.d2U=x([1,2.76,5.4,8.93,13.3],y.h)
 A.d4b=x([1,0.6,0.38,0.22,0.12],y.h)
 A.d8Y=x([1,0.7,0.45,0.28,0.16,0.1,0.06],y.h)
@@ -139,11 +139,11 @@ A.deF=x([1,2,3,4,5,6],y.h)
 A.duo=x([1,2,3,4,6,8],y.h)
 A.dvn=x([1,0.5,0.33,0.25,0.2,0.16,0.14,0.12],y.h)
 A.dxd=x([1,2,3,4,5,6,7,8],y.h)
-A.dBX=x([1,0.18,0.06],y.h)
-A.en4={"SPARK PAINTER":0,"MANDALA MAKER":1,"TITLE ANIMATOR":2,"PALETTE LAB":3,"GRAVITY TOY":4,"FIREWORK DESIGNER":5,"CIRCUIT LAB":6,"PERIODIC TABLE":7,"BODY EXPLORER":8,"SPIN THE WHEEL":9,"FOCUS TIMER":10,"MEMORY MATCH":11,"LUCKY POCKET":12,"ELECTRONICS LAB":13,"CONSTRUCTION LAB":14,"AI INVENTOR":15,"MAGNET LAB":16,"RADIO LAB":17,"POWER PLANT":18,"POWER GRID":19,"INTERNET JOURNEY":20,"ROBOT CODER":21,"BUG SMASHER":22,"ROCKET LANDER":23,"DATA SNAKE":24,"BINARY 2048":25,"SIGNAL BREAKER":26,"PASSWORD LAB":27,"WAVE LAB":28,"BUG HUNT":29,"OPTICS LAB":30,"ATOM BUILDER":31,"PIXEL TV":32}
-A.aJt=new B.bv(A.en4,["sparkle","sparkle","whoosh","click","bounce","pop","tech","lab","organic","click","tech","bubble","click","tech","tech","tech","tech","tech","tech","tech","tech","tech","pop","space","bubble","click","zap","click","tech","click","sparkle","lab","tech"],B.at("bv<n,n>"))
+A.dBY=x([1,0.18,0.06],y.h)
+A.en5={"SPARK PAINTER":0,"MANDALA MAKER":1,"TITLE ANIMATOR":2,"PALETTE LAB":3,"GRAVITY TOY":4,"FIREWORK DESIGNER":5,"CIRCUIT LAB":6,"PERIODIC TABLE":7,"BODY EXPLORER":8,"SPIN THE WHEEL":9,"FOCUS TIMER":10,"MEMORY MATCH":11,"LUCKY POCKET":12,"ELECTRONICS LAB":13,"CONSTRUCTION LAB":14,"AI INVENTOR":15,"MAGNET LAB":16,"RADIO LAB":17,"POWER PLANT":18,"POWER GRID":19,"INTERNET JOURNEY":20,"ROBOT CODER":21,"BUG SMASHER":22,"ROCKET LANDER":23,"DATA SNAKE":24,"BINARY 2048":25,"SIGNAL BREAKER":26,"PASSWORD LAB":27,"WAVE LAB":28,"BUG HUNT":29,"OPTICS LAB":30,"ATOM BUILDER":31,"PIXEL TV":32}
+A.aJt=new B.bv(A.en5,["sparkle","sparkle","whoosh","click","bounce","pop","tech","lab","organic","click","tech","bubble","click","tech","tech","tech","tech","tech","tech","tech","tech","tech","pop","space","bubble","click","zap","click","tech","click","sparkle","lab","tech"],B.at("bv<n,n>"))
 A.L1=new B.F(!0,D.ab,null,null,null,null,12.5,null,null,null,null,null,1.35,null,null,null,null,null,null,null,null,null,null,null,null,null)})();(function staticFields(){$.hZT=B.T(B.at("n"),B.at("dJ"))
 $.cn1=B.a([],B.at("O<ajU>"))
 $.hsM=0
 $.atH="music"})()};
-(a=>{a["qkA8Qr8QRPMDYLUR4DH3JwYzGRU="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["fAqMAKFHIlpDcbbmq2yksMgg76c="]=a.current})($__dart_deferred_initializers__);
