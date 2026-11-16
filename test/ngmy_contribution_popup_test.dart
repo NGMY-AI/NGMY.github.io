@@ -81,10 +81,12 @@ void main() {
   });
 
   testWidgets('the thank-you shows the congratulation and the amount, and closes', (t) async {
-    await t.pumpWidget(MaterialApp(home: Builder(builder: (context) => Scaffold(body: Center(child: TextButton(onPressed: () => showNgmyContributionThanksPopup(context, state: 'Georgia', purpose: 'Funeral support', amount: 25.5), child: const Text('go')))))));
+    await t.pumpWidget(MaterialApp(home: Builder(builder: (context) => Scaffold(body: Center(child: TextButton(onPressed: () => showNgmyContributionThanksPopup(context, state: 'Georgia', purpose: 'Funeral support', amount: 25.5, name: 'Asende Mkombi'), child: const Text('go')))))));
     await t.tap(find.text('go'));
     await t.pump(const Duration(milliseconds: 700));
     expect(find.text('Hongera!'), findsOneWidget);
+    expect(find.byKey(const Key('contribution-thanks-name')), findsOneWidget, reason: 'the name in its frame');
+    expect(find.descendant(of: find.byKey(const Key('contribution-thanks-name')), matching: find.text('Asende Mkombi')), findsOneWidget);
     expect(find.text(r'$25.50'), findsOneWidget);
     expect(find.byKey(const Key('contribution-popup')), findsNothing, reason: 'it is not the ask');
     await t.tap(find.byKey(const Key('contribution-thanks-close')));

@@ -17682,6 +17682,18 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     }
   }
 
+  /// The name shown in the thank-you frame: the member's name in the Civic Registry, else the name on the account.
+  String _contributorDisplayName(AppConfig config, UserData u) {
+    for (final rec in ngmyRegistryRecordsForAccount(config, u)) {
+      final n = (rec['fullName'] ?? '').toString().trim();
+      if (n.isNotEmpty) return n;
+    }
+    final full = (u.fullName ?? '').trim();
+    if (full.isNotEmpty) return full;
+    final user = u.username.trim();
+    return user.isNotEmpty && user != 'User' ? user : '';
+  }
+
   Future<void> _maybeShowContributionPopup() async {
     if (_contributionPopupOpen) return;
     final last = _contributionPopupAt;
@@ -17754,6 +17766,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           state: state,
           purpose: config.helpPurposeFor(state),
           amount: total,
+          name: _contributorDisplayName(config, u),
         );
       } finally {
         _contributionPopupOpen = false;

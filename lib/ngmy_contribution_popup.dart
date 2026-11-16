@@ -58,6 +58,7 @@ Future<void> showNgmyContributionThanksPopup(
   required String state,
   required String purpose,
   required double amount,
+  String name = '',
 }) {
   return showGeneralDialog<void>(
     context: context,
@@ -73,7 +74,7 @@ Future<void> showNgmyContributionThanksPopup(
         opacity: anim.value.clamp(0.0, 1.0),
         child: Transform.scale(
           scale: 0.78 + 0.22 * k,
-          child: NgmyContributionThanksCard(state: state, purpose: purpose, amount: amount, onClose: () => Navigator.of(ctx, rootNavigator: true).pop()),
+          child: NgmyContributionThanksCard(state: state, purpose: purpose, amount: amount, name: name, onClose: () => Navigator.of(ctx, rootNavigator: true).pop()),
         ),
       );
     },
@@ -86,8 +87,10 @@ String ngmyContributionAmountText(double amount) {
 }
 
 class NgmyContributionThanksCard extends StatefulWidget {
-  const NgmyContributionThanksCard({super.key, required this.state, required this.purpose, required this.amount, required this.onClose});
+  const NgmyContributionThanksCard({super.key, required this.state, required this.purpose, required this.amount, required this.onClose, this.name = ''});
   final String state, purpose;
+  /// Who contributed, shown in a gold frame so they see the thank-you is theirs.
+  final String name;
   final double amount;
   final VoidCallback onClose;
 
@@ -175,6 +178,11 @@ class _NgmyContributionThanksCardState extends State<NgmyContributionThanksCard>
                     ),
                     const SizedBox(height: 8),
                     const Text('Hongera!', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 30, height: 1.1, shadows: [Shadow(color: Colors.black38, blurRadius: 8)])),
+                    if (widget.name.trim().isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      _ContributorNamePlate(name: widget.name.trim()),
+                      const SizedBox(height: 4),
+                    ],
                     const SizedBox(height: 6),
                     Text('Asante kwa kuchangia katika ${widget.state}', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16, height: 1.25)),
                     const SizedBox(height: 14),
@@ -206,6 +214,67 @@ class _NgmyContributionThanksCardState extends State<NgmyContributionThanksCard>
 }
 
 const Color _kOrange = Color(0xFFF97316),_kDeep = Color(0xFFC2410C), _kAmber = Color(0xFFFBBF24), _kBrown = Color(0xFF7C2D12);
+
+/// The contributor's name in a gold frame (a gold edge around a cream plate, a small star at each side), so the member sees
+/// the thank-you is for them.
+class _ContributorNamePlate extends StatelessWidget {
+  const _ContributorNamePlate({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('contribution-thanks-name'),
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFF1B8), Color(0xFFD4A62A), Color(0xFFFFE08A), Color(0xFFB8860B)],
+        ),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 14, offset: const Offset(0, 6))],
+      ),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(17),
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFFFBEB), Color(0xFFFFF1CC)],
+          ),
+          border: Border.all(color: const Color(0xFFE9C46A), width: 1),
+        ),
+        child: Column(
+          children: [
+            const Text('MCHANGIAJI', style: TextStyle(color: Color(0xFFB45309), fontWeight: FontWeight.w900, fontSize: 11.5, letterSpacing: 2.2)),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(Icons.star_rounded, color: Color(0xFFD4A62A), size: 18),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    name,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: _kBrown, fontWeight: FontWeight.w900, fontSize: 22, height: 1.15),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(Icons.star_rounded, color: Color(0xFFD4A62A), size: 18),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class NgmyContributionPopupCard extends StatefulWidget {
   const NgmyContributionPopupCard({super.key, required this.state, required this.purpose, this.scopeLabel = '', this.cashApp = '', this.zelle = '', this.phone = '', required this.onOpenRegistry, required this.onClose});
