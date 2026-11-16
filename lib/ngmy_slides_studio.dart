@@ -3847,7 +3847,9 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
         final phase = ((_framePulse.value + index * 0.12) % 1.0);
         final t = Curves.easeInOut.transform(phase);
         return Container(
-          margin: const EdgeInsets.only(bottom: 12),
+          margin: const EdgeInsets.only(bottom: 14),
+          // Light mode: a wide soft shadow all round each project card.
+          decoration: isDark ? null : BoxDecoration(borderRadius: BorderRadius.circular(20), boxShadow: NgmyCalmLight.shadow),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(20),
             child: NgmyNoBackdrop(
@@ -3869,7 +3871,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                             : [Colors.white, Colors.white],
                       ),
                       border: Border.all(
-                        color: !isDark ? NgmyCalmLight.border : accent.first.withValues(alpha: 0.34 + t * 0.22),
+                        color: !isDark ? Colors.white : accent.first.withValues(alpha: 0.34 + t * 0.22),
                         width: !isDark ? NgmyCalmLight.borderWidth : 1.25,
                       ),
                     ),

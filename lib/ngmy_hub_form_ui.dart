@@ -11,7 +11,7 @@ class NgmyHubTheme {
 
   bool get isDark => Theme.of(context).brightness == Brightness.dark;
 
-  Color get scaffold => isDark ? const Color(0xFF121212) : Colors.white;
+  Color get scaffold => isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F7);
   Color get surface => isDark ? const Color(0xFF0B1220) : Colors.white;
   Color get surfaceElevated => isDark ? const Color(0xFF111827) : Colors.white;
   Color get panel => isDark ? const Color(0xFF0B1020) : Colors.white;
@@ -20,9 +20,9 @@ class NgmyHubTheme {
   Color get muted => isDark ? Colors.white.withValues(alpha: 0.48) : const Color(0xFF475569);
   Color get iconButtonBg => isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05);
   Color get iconButtonIcon => isDark ? Colors.white70 : const Color(0xFF475569);
-  Color get border => isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFC4CCD8);
+  Color get border => isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFDDE1E7);
   Color get inputFill => isDark ? Colors.white.withValues(alpha: 0.07) : Colors.white;
-  Color get inputBorder => isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFC4CCD8);
+  Color get inputBorder => isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFDDE1E7);
   Color get fieldFill => isDark ? Colors.black.withValues(alpha: 0.26) : const Color(0xFFF1F5F9);
   Color get barrier => isDark ? Colors.black.withValues(alpha: 0.88) : Colors.black.withValues(alpha: 0.45);
   Color get chipOffLabel => isDark ? Colors.white70 : const Color(0xFF475569);
@@ -433,7 +433,10 @@ class NgmyFramedTitle extends StatelessWidget {
             ? BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFC4CCD8), width: 1.6),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x1C0F172A), blurRadius: 24, offset: Offset(0, 8)),
+                  BoxShadow(color: Color(0x0D0F172A), blurRadius: 4, offset: Offset(0, 1)),
+                ],
               )
             : BoxDecoration(
           gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [accent.withValues(alpha: 0.22), accent.withValues(alpha: 0.06)]),

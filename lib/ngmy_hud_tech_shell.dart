@@ -53,20 +53,25 @@ class NgmyHudKeepLook extends InheritedWidget {
   bool updateShouldNotify(NgmyHudKeepLook oldWidget) => false;
 }
 
-/// The calm light look: pure white, frames drawn with a crisp clearly visible grey edge, no shadows
-/// (shadows showed as dark corners under the frames on the phone), and one quiet accent.
+/// The calm light look (the design the owner chose from two reference pictures): thick pure white
+/// cards on a very light grey page, lifted by a wide soft shadow all round, with no hard edge line.
+/// The shadow has no negative spread (that drew a dark ledge with corners under each card), and every
+/// card clips what is inside it to its round corners.
 class NgmyCalmLight {
   NgmyCalmLight._();
 
-  static const Color page = Colors.white;
+  static const Color page = Color(0xFFF5F5F7);
   static const Color card = Colors.white;
-  static const Color border = Color(0xFFC4CCD8);
-  static const double borderWidth = 1.6;
+  static const Color border = Color(0xFFDDE1E7);
+  static const double borderWidth = 1.2;
   static const Color ink = Color(0xFF0B1220);
   static const Color sub = Color(0xFF4B5563);
 
-  /// No shadows in light mode: the frame is shown by its edge.
-  static const List<BoxShadow> shadow = [];
+  /// A wide soft shadow all round the card, a little deeper below.
+  static const List<BoxShadow> shadow = [
+    BoxShadow(color: Color(0x1C0F172A), blurRadius: 30, offset: Offset(0, 10)),
+    BoxShadow(color: Color(0x0D0F172A), blurRadius: 4, offset: Offset(0, 1)),
+  ];
 
   /// The accent made dark enough to read on white.
   static Color accentInk(Color c) {
@@ -77,11 +82,26 @@ class NgmyCalmLight {
   /// A very light wash of the accent, for the icon tile behind an icon.
   static Color accentWash(Color c) => Color.lerp(Colors.white, c, 0.13)!;
 
-  static BoxDecoration cardDecoration({double radius = 20}) => BoxDecoration(
+  static BoxDecoration cardDecoration({double radius = 24}) => BoxDecoration(
         color: card,
-        borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: border, width: borderWidth),
+        borderRadius: BorderRadius.circular(radius < 22 ? 22 : radius),
+        boxShadow: shadow,
       );
+
+  /// A card filled with its own colour (home frames): a rich gradient of the accent, white words.
+  static BoxDecoration colourCardDecoration(Color accent, {double radius = 24}) {
+    final hsl = HSLColor.fromColor(accent);
+    final base = hsl.withLightness(hsl.lightness.clamp(0.38, 0.45)).withSaturation(hsl.saturation.clamp(0.60, 0.88)).toColor();
+    final deep = hsl.withLightness((hsl.lightness.clamp(0.38, 0.45) - 0.11).clamp(0.22, 0.40)).withSaturation(hsl.saturation.clamp(0.60, 0.90)).toColor();
+    return BoxDecoration(
+      borderRadius: BorderRadius.circular(radius),
+      gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [base, deep]),
+      boxShadow: [
+        BoxShadow(color: deep.withValues(alpha: 0.30), blurRadius: 26, offset: const Offset(0, 10)),
+        const BoxShadow(color: Color(0x0D0F172A), blurRadius: 4, offset: Offset(0, 1)),
+      ],
+    );
+  }
 }
 
 /// A rounded tile with the icon in the accent colour, used instead of the glowing orb in calm light.
@@ -251,6 +271,8 @@ class NgmyHudTechFrame extends StatelessWidget {
             height: fillH ? constraints.maxHeight : null,
             padding: padding,
             decoration: NgmyCalmLight.cardDecoration(radius: borderRadius),
+            // Whatever is inside keeps to the round corners (no square corners at the bottom).
+            clipBehavior: Clip.antiAlias,
             child: child,
           );
         },

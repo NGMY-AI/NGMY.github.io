@@ -236,7 +236,7 @@ class _SequencePicker extends StatelessWidget {
                             ? BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: NgmyCalmLight.border, width: NgmyCalmLight.borderWidth),
+                                boxShadow: NgmyCalmLight.shadow,
                               )
                             : BoxDecoration(
                           gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [accent.withValues(alpha: 0.22), accent.withValues(alpha: 0.06)]),

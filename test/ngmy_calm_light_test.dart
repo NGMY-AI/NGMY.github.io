@@ -11,16 +11,18 @@ import 'package:ngmy/ngmy_core_protocol_sims.dart';
 import 'package:ngmy/ngmy_studio_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ngmy/ngmy_home_tech_frames.dart';
+import 'package:ngmy/ngmy_market_hub_screen.dart';
 import 'package:ngmy/ngmy_hub_form_ui.dart';
 import 'package:ngmy/ngmy_hud_tech_shell.dart';
 
 // Light mode is calm: plain white cards, icon tiles, nothing glowing or moving.
 // NGMY Advisors keep their own look (NgmyHudKeepLook). Dark mode is unchanged.
 
-/// Real letters and icons in the saved pictures (only when pictures are asked for).
+/// Real letters (always, so sizes match the phone) and icons (when pictures are asked for).
+bool _fontsLoaded = false;
 Future<void> _loadFonts() async {
-  final dir = Platform.environment['NGMY_SNAP_DIR'];
-  if (dir == null) return;
+  if (_fontsLoaded) return;
+  _fontsLoaded = true;
   Future<void> load(String family, List<String> files) async {
     final l = FontLoader(family);
     for (final f in files) {
@@ -39,7 +41,7 @@ Widget _app(Brightness b, Widget child) => MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(brightness: b, useMaterial3: true, fontFamily: 'Roboto'),
       home: Scaffold(
-        backgroundColor: b == Brightness.light ? Colors.white : const Color(0xFF121212),
+        backgroundColor: b == Brightness.light ? NgmyCalmLight.page : const Color(0xFF121212),
         body: SingleChildScrollView(padding: const EdgeInsets.all(16), child: child),
       ),
     );
@@ -158,12 +160,16 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  test('light mode frames: a crisp visible edge and no shadows (shadows showed as dark corners)', () {
+  test('light mode frames: thick white cards with a wide soft shadow all round (the chosen reference look)', () {
     final d = NgmyCalmLight.cardDecoration();
-    expect(d.boxShadow == null || d.boxShadow!.isEmpty, isTrue);
     expect(d.color, Colors.white);
-    expect((d.border as Border).top.width, greaterThanOrEqualTo(1.5));
-    expect(NgmyCalmLight.page, Colors.white);
+    expect(d.boxShadow, isNotEmpty);
+    // No negative spread: that drew a dark ledge with corners under the cards.
+    expect(d.boxShadow!.every((s) => s.spreadRadius >= 0 && s.blurRadius >= 4), isTrue);
+    expect(d.boxShadow!.first.blurRadius, greaterThanOrEqualTo(24));
+    expect(d.border, isNull, reason: 'no hard edge line');
+    expect((d.borderRadius as BorderRadius).topLeft.x, greaterThanOrEqualTo(22), reason: 'round, thick-looking cards');
+    expect(NgmyCalmLight.page.computeLuminance(), greaterThan(0.9), reason: 'a very light page so the white cards stand out');
   });
 
   testWidgets('Core Protocol is white in light mode', (tester) async {
@@ -177,10 +183,30 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 300));
     final scaffold = tester.widget<Scaffold>(find.byType(Scaffold).first);
-    expect(scaffold.backgroundColor, Colors.white);
+    expect(scaffold.backgroundColor, NgmyCalmLight.page);
     expect(find.byKey(const Key('ngmy-calm-icon')), findsWidgets);
     await _snap(tester, 'core_light');
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('Tool Hub in light mode: no dark fade at the bottom, strong coloured sample cards', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await _loadFonts();
+    await tester.binding.setSurfaceSize(const Size(430, 1300));
+    await tester.pumpWidget(MaterialApp(
+      theme: ThemeData(brightness: Brightness.light, fontFamily: 'Roboto'),
+      home: const NgmyMarketHubScreen(userEmail: 'test@example.com'),
+    ));
+    await tester.pump(const Duration(milliseconds: 500));
+    // No black fade drawn over the cards.
+    final fades = find.byWidgetPredicate((w) =>
+        w is Container &&
+        w.decoration is BoxDecoration &&
+        ((w.decoration as BoxDecoration).gradient?.colors.any((c) => c.r < 0.05 && c.g < 0.05 && c.b < 0.05 && c.a > 0.5) ?? false));
+    expect(fades, findsNothing);
+    await _snap(tester, 'toolhub_light');
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 2));
   });
 }

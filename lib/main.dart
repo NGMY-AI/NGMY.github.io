@@ -19466,7 +19466,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       return const ColoredBox(color: Color(0xFF121212));
     }
     // Light mode: pure white — no bluish wash or colour blobs.
-    if (isLight) return const ColoredBox(color: Colors.white);
+    if (isLight) return const ColoredBox(color: NgmyCalmLight.page);
     final baseColors = const [Color(0xFFF7FCFF), Color(0xFFEFF8FF), Color(0xFFF9F1FF)];
     return DecoratedBox(
             decoration: BoxDecoration(
@@ -19524,8 +19524,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       decoration: BoxDecoration(
         color: ngmyCrispSurfaceColor(context, elevated: true),
         borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: ngmyCrispBorderColor(context), width: isLight ? 1.6 : 1.2),
-        boxShadow: isLight ? null : [
+        border: isLight ? null : Border.all(color: ngmyCrispBorderColor(context), width: 1.2),
+        boxShadow: isLight ? NgmyCalmLight.shadow : [
           BoxShadow(
             color: const Color(0xFF8B5CF6).withValues(alpha: isLight ? 0.06 : 0.12),
             blurRadius: ngmyCrispUi ? 6 : 24,
@@ -19605,7 +19605,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               ? BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.white,
-                  border: Border.all(color: NgmyCalmLight.border, width: NgmyCalmLight.borderWidth),
+                  boxShadow: const [BoxShadow(color: Color(0x1F0F172A), blurRadius: 16, offset: Offset(0, 5))],
                 )
               : BoxDecoration(
             shape: BoxShape.circle,
@@ -30099,7 +30099,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             decoration: NgmyHudInk.calm(context)
                 ? const BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Color(0xFFC4CCD8),
+                    color: Colors.white,
+                    boxShadow: [BoxShadow(color: Color(0x240F172A), blurRadius: 26, offset: Offset(0, 8))],
                   )
                 : BoxDecoration(
               shape: BoxShape.circle,

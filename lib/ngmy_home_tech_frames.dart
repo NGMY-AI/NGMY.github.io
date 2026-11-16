@@ -301,43 +301,61 @@ class _TechFrameCard extends StatelessWidget {
     );
   }
 
-  /// Light mode: a plain white card, an icon tile and clear text. Nothing glows or moves.
+  /// Light mode: each home frame filled with its own colour (a rich gradient), a white icon tile and white words.
+  /// Nothing glows or moves.
   Widget _calmCard(BuildContext context) {
     final accent = spec.colors.first;
-    final badge = Text(
-      spec.badge,
-      style: TextStyle(
-        color: NgmyCalmLight.accentInk(accent),
-        fontSize: 10,
-        fontWeight: FontWeight.w800,
-        letterSpacing: 1.0,
+    final iconInk = NgmyCalmLight.accentInk(accent);
+    final badge = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.22),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        spec.badge,
+        style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w800, letterSpacing: 1.0),
       ),
     );
     final title = Text(
       spec.title,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: const TextStyle(color: NgmyCalmLight.ink, fontWeight: FontWeight.w800, fontSize: 14, letterSpacing: 0.6),
+      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14, letterSpacing: 0.6),
     );
     final sub = Text(
       spec.subtitle,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: const TextStyle(color: NgmyCalmLight.sub, fontSize: 11.5, fontWeight: FontWeight.w500),
+      style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontSize: 11.5, fontWeight: FontWeight.w500),
     );
+    Widget tile(double size) => Container(
+          key: const Key('ngmy-calm-icon'),
+          width: size,
+          height: size,
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(size * 0.28)),
+          alignment: Alignment.center,
+          child: Icon(spec.icon, color: iconInk, size: size * 0.5),
+        );
     final body = wide
         ? Row(
             children: [
-              NgmyCalmIconTile(accent: accent, size: 52, icon: spec.icon),
+              tile(52),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: [badge, const SizedBox(height: 4), title, const SizedBox(height: 2), sub],
+                  children: [
+                    Align(alignment: Alignment.centerLeft, child: badge),
+                    const SizedBox(height: 5),
+                    title,
+                    const SizedBox(height: 2),
+                    sub,
+                  ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, color: NgmyCalmLight.sub, size: 26),
+              const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 26),
             ],
           )
         : Column(
@@ -345,7 +363,7 @@ class _TechFrameCard extends StatelessWidget {
             children: [
               badge,
               const Spacer(),
-              Center(child: NgmyCalmIconTile(accent: accent, size: 68, icon: spec.icon)),
+              Center(child: tile(66)),
               const Spacer(),
               title,
               const SizedBox(height: 3),
@@ -357,12 +375,12 @@ class _TechFrameCard extends StatelessWidget {
       child: InkWell(
         key: Key('home-tech-calm-${spec.kind.name}'),
         onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(24),
         child: Ink(
           width: double.infinity,
           height: double.infinity,
           padding: EdgeInsets.fromLTRB(16, wide ? 12 : 16, wide ? 10 : 16, wide ? 12 : 16),
-          decoration: NgmyCalmLight.cardDecoration(radius: 22),
+          decoration: NgmyCalmLight.colourCardDecoration(accent, radius: 24),
           child: body,
         ),
       ),

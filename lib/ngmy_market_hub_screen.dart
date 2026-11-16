@@ -190,6 +190,8 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
               fit: StackFit.expand,
               children: [
                 preview,
+                // Dark fade at the bottom: dark mode only. Light mode stays all white.
+                if (t.isDark)
                 Positioned(
                   left: 0,
                   right: 0,
@@ -254,15 +256,15 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
                       ),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(999),
-                        color: Colors.black.withValues(alpha: 0.45),
-                        border: Border.all(
-                          color: colors.first.withValues(alpha: 0.7),
-                        ),
+                        color: t.isDark ? Colors.black.withValues(alpha: 0.45) : NgmyCalmLight.accentInk(colors.first),
+                        border: t.isDark
+                            ? Border.all(color: colors.first.withValues(alpha: 0.7))
+                            : null,
                       ),
                       child: Text(
                         badge,
                         style: TextStyle(
-                          color: colors.first,
+                          color: t.isDark ? colors.first : Colors.white,
                           fontWeight: FontWeight.w900,
                           fontSize: 11,
                           letterSpacing: 0.4,
@@ -320,18 +322,22 @@ class _BusinessCardThumbPreview extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
               colors: isDark
                   ? const [Color(0xFF0A0A0A), Color(0xFF171717)]
-                  : const [Color(0xFFF8FAFC), Color(0xFFE2E8F0)],
+                  // Light mode: a strong deep green card.
+                  : const [Color(0xFF16A34A), Color(0xFF065F46)],
             ),
             border: Border.all(
-              color: const Color(0xFFD4AF37).withValues(alpha: 0.6),
+              color: const Color(0xFFD4AF37).withValues(alpha: isDark ? 0.6 : 0.9),
+              width: isDark ? 1 : 1.4,
             ),
             boxShadow: [
               BoxShadow(
-                color: accent.withValues(alpha: 0.25),
-                blurRadius: 24,
-                offset: const Offset(0, 12),
+                color: (isDark ? accent : const Color(0xFF065F46)).withValues(alpha: isDark ? 0.25 : 0.35),
+                blurRadius: 22,
+                offset: const Offset(0, 10),
               ),
             ],
           ),
@@ -342,7 +348,7 @@ class _BusinessCardThumbPreview extends StatelessWidget {
               Text(
                 'KB PABLO QR',
                 style: TextStyle(
-                  color: isDark ? const Color(0xFFD4AF37) : const Color(0xFF92400E),
+                  color: isDark ? const Color(0xFFD4AF37) : Colors.white,
                   fontWeight: FontWeight.w800,
                   fontSize: 12,
                   letterSpacing: 1.6,
@@ -352,13 +358,13 @@ class _BusinessCardThumbPreview extends StatelessWidget {
               Container(
                 height: 2,
                 width: 40,
-                color: isDark ? const Color(0xFFD4AF37) : const Color(0xFFB45309),
+                color: const Color(0xFFD4AF37),
               ),
               const SizedBox(height: 6),
               Text(
                 'Business Card Studio',
                 style: TextStyle(
-                  color: isDark ? Colors.white.withValues(alpha: 0.5) : const Color(0xFF0F172A),
+                  color: isDark ? Colors.white.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.92),
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                 ),
@@ -389,16 +395,19 @@ class _MenuStudioThumbPreview extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
               colors: isDark
                   ? const [Color(0xFF1A1410), Color(0xFF0A0A0A)]
-                  : const [Color(0xFFFFF8E7), Color(0xFFFEF3C7)],
+                  // Light mode: real gold.
+                  : const [Color(0xFFF3D27A), Color(0xFFD4A62A), Color(0xFFA67C00)],
             ),
-            border: Border.all(color: accent.withValues(alpha: 0.65)),
+            border: Border.all(color: isDark ? accent.withValues(alpha: 0.65) : const Color(0xFFFFE9A8), width: isDark ? 1 : 1.4),
             boxShadow: [
               BoxShadow(
-                color: accent.withValues(alpha: 0.3),
-                blurRadius: 24,
-                offset: const Offset(0, 12),
+                color: (isDark ? accent : const Color(0xFFA67C00)).withValues(alpha: isDark ? 0.3 : 0.35),
+                blurRadius: 22,
+                offset: const Offset(0, 10),
               ),
             ],
           ),
@@ -408,14 +417,14 @@ class _MenuStudioThumbPreview extends StatelessWidget {
             children: [
               Icon(
                 Icons.restaurant_menu_rounded,
-                color: isDark ? accent : const Color(0xFF92400E),
+                color: isDark ? accent : const Color(0xFF3B2A06),
                 size: 22,
               ),
               const SizedBox(height: 8),
               Text(
                 'YOUR MENU',
                 style: TextStyle(
-                  color: isDark ? accent : const Color(0xFF78350F),
+                  color: isDark ? accent : const Color(0xFF3B2A06),
                   fontWeight: FontWeight.w900,
                   fontSize: 13,
                   letterSpacing: 1.2,
@@ -425,7 +434,7 @@ class _MenuStudioThumbPreview extends StatelessWidget {
               Text(
                 'Burgers · Drinks · QR',
                 style: TextStyle(
-                  color: isDark ? Colors.white54 : const Color(0xFF0F172A),
+                  color: isDark ? Colors.white54 : const Color(0xFF3B2A06),
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                 ),
@@ -464,19 +473,20 @@ class _EssentialsThumbPreview extends StatelessWidget {
                       Color(0xFF0E7490),
                       Color(0xFF1E3A8A),
                     ]
+                  // Light mode: a strong blue card.
                   : const [
-                      Color(0xFFF0F9FF),
-                      Color(0xFFE0F2FE),
-                      Color(0xFFBAE6FD),
+                      Color(0xFF38BDF8),
+                      Color(0xFF2563EB),
+                      Color(0xFF1E40AF),
                     ],
             ),
             border: Border.all(
-              color: accent.withValues(alpha: 0.65),
+              color: isDark ? accent.withValues(alpha: 0.65) : const Color(0xFFBFDBFE),
               width: 1.3,
             ),
             boxShadow: [
               BoxShadow(
-                color: accent.withValues(alpha: 0.3),
+                color: (isDark ? accent : const Color(0xFF1E40AF)).withValues(alpha: 0.3),
                 blurRadius: 24,
                 offset: const Offset(0, 12),
               ),
@@ -493,13 +503,15 @@ class _EssentialsThumbPreview extends StatelessWidget {
                     height: 28,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(8),
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF38BDF8), Color(0xFF0EA5E9)],
-                      ),
+                      // Light mode: a white tile with a blue icon on the blue card.
+                      color: isDark ? null : Colors.white,
+                      gradient: isDark
+                          ? const LinearGradient(colors: [Color(0xFF38BDF8), Color(0xFF0EA5E9)])
+                          : null,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.business_center_rounded,
-                      color: Colors.white,
+                      color: isDark ? Colors.white : const Color(0xFF2563EB),
                       size: 16,
                     ),
                   ),
@@ -515,7 +527,7 @@ class _EssentialsThumbPreview extends StatelessWidget {
               Text(
                 'ESSENTIALS',
                 style: TextStyle(
-                  color: isDark ? Colors.white : const Color(0xFF0C4A6E),
+                  color: Colors.white,
                   fontWeight: FontWeight.w900,
                   fontSize: 13,
                   letterSpacing: 1.3,
@@ -525,7 +537,7 @@ class _EssentialsThumbPreview extends StatelessWidget {
               Text(
                 'Notes · Contacts · Tools',
                 style: TextStyle(
-                  color: isDark ? Colors.white54 : const Color(0xFF0F172A),
+                  color: isDark ? Colors.white54 : Colors.white.withValues(alpha: 0.92),
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                 ),

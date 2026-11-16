@@ -22,7 +22,7 @@ Color ngmyCrispSurfaceColor(BuildContext context, {bool elevated = false}) {
 
 Color ngmyCrispBorderColor(BuildContext context) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
-  return isDark ? Colors.white.withValues(alpha: 0.14) : const Color(0xFFC4CCD8); // Light: a clearly visible grey edge.
+  return isDark ? Colors.white.withValues(alpha: 0.14) : const Color(0xFFDDE1E7); // Light: a clearly visible grey edge.
 }
 
 /// Call once from [main] — keeps CanvasKit/image scaling sharp on web PWA.
