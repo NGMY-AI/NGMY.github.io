@@ -1,6 +1,6 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var B,A,C={
-a67(d){var y=d.ga79()/255,x=d.gVU()/255,w=d.ga4p()/255,v=Math.max(y,Math.max(x,w)),u=v-Math.min(y,Math.min(x,w)),t=d.gjC(d),s=B.hxC(y,x,w,v,u),r=v===0?0:u/v
+a67(d){var y=d.ga79()/255,x=d.gVU()/255,w=d.ga4p()/255,v=Math.max(y,Math.max(x,w)),u=v-Math.min(y,Math.min(x,w)),t=d.gjC(d),s=B.hxD(y,x,w,v,u),r=v===0?0:u/v
 return new C.pi(t/255,s,r,v)},
 pi:function pi(d,e,f,g){var _=this
 _.a=d
@@ -13,7 +13,7 @@ C=a.updateHolder(c[57],C)
 D=c[270]
 C.pi.prototype={
 jr(){var y=this,x=y.d,w=y.c*x,v=y.b
-return B.hwF(y.a,v,w,w*(1-Math.abs(A.i.F(v/60,2)-1)),x-w)},
+return B.hwG(y.a,v,w,w*(1-Math.abs(A.i.F(v/60,2)-1)),x-w)},
 A(d,e){var y=this
 if(e==null)return!1
 if(y===e)return!0
@@ -23,5 +23,5 @@ return B.bx(y.a,y.b,y.c,y.d,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,A.h,
 u(d){var y=this
 return"HSVColor("+B.w(y.a)+", "+B.w(y.b)+", "+B.w(y.c)+", "+B.w(y.d)+")"}}
 var z=a.updateTypes([]);(function inheritance(){var y=a.inherit
-y(C.pi,B.aE)})();(function constants(){D.aqU=new B.a0(983930,"MaterialIcons",!1)})()};
-(a=>{a["ZwToSIMwYgu5Kb9wZpSll4E3zds="]=a.current})($__dart_deferred_initializers__);
+y(C.pi,B.aE)})();(function constants(){D.aqP=new B.a0(983930,"MaterialIcons",!1)})()};
+(a=>{a["LtPo18pM3Bq2x9OcfMM8sxL1cw4="]=a.current})($__dart_deferred_initializers__);
