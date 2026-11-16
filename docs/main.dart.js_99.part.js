@@ -20,7 +20,7 @@ if(i!=null&&C.a.a_(i,"ngmy:ws-thumb:"))return A.bx(u,new B.aGL(i,j,f,e,g,h,v),C.
 x=B.ilF(i)
 if(x!=null)return A.bx(u,A.tL(C.A,v,C.hj,e,!0,f,x,!1,v,j),C.aq)
 w=C.cz.j(0.15)
-return A.q(v,A.X(g,h==null?C.cz:h,v,v,v,32),C.f,v,v,new A.o(w,v,v,u,v,v,C.n),v,f,v,v,v,v,v,j)},
+return A.r(v,A.X(g,h==null?C.cz:h,v,v,v,32),C.f,v,v,new A.o(w,v,v,u,v,v,C.n),v,f,v,v,v,v,v,j)},
 aGL:function aGL(d,e,f,g,h,i,j){var _=this
 _.c=d
 _.d=e
@@ -36,7 +36,7 @@ heq(){var x,w=window
 w.toString
 x=w.indexedDB||w.webkitIndexedDB||w.mozIndexedDB
 if(x==null)throw A.W(A.bc("IndexedDB not available"))
-return C.wW.GR(x,"ngmy_worksheet_thumbs_v1",new B.fwZ(),1)},
+return C.wY.GR(x,"ngmy_worksheet_thumbs_v1",new B.fwZ(),1)},
 i6e(d){var x,w,v=null
 if(d==null)return v
 if(y.o.b(d))return new Uint8Array(A.ce(d))
@@ -147,14 +147,14 @@ w=C.cz.j(0.12)
 v=t.a
 u=v.r
 v=v.w
-return A.q(s,A.X(u,v==null?C.cz:v,s,s,s,32),C.f,w,s,s,s,r,s,s,s,s,s,x)}}
+return A.r(s,A.X(u,v==null?C.cz:v,s,s,s,32),C.f,w,s,s,s,r,s,s,s,s,s,x)}}
 var z=a.updateTypes([])
 B.eV8.prototype={
 $0(){return this.a.d=this.b},
 $S:0}
 B.fwZ.prototype={
-$1(d){var x=y.h.a(new A.qs([],[]).o_(d.target.result,!1)),w=C.wn.q(x.objectStoreNames,"thumbs")
-if(!w)C.wk.Gi(x,"thumbs")},
+$1(d){var x=y.h.a(new A.qs([],[]).o_(d.target.result,!1)),w=C.wp.q(x.objectStoreNames,"thumbs")
+if(!w)C.wm.Gi(x,"thumbs")},
 $S:171};(function inheritance(){var x=a.inherit
 x(B.aGL,A.af)
 x(B.bnz,A.ah)
@@ -164,4 +164,4 @@ A.iU(b.typeUniverse,JSON.parse('{"aGL":{"af":[],"v":[]},"bnz":{"ah":["aGL"]}}'))
 var y={i:A.at("uO"),h:A.at("ru"),w:A.at("ai<H>"),A:A.at("m5"),o:A.at("dL"),n:A.at("dL?"),v:A.at("~")};(function staticFields(){$.fwd=A.T(A.at("n"),A.at("mp<aE>"))
 $.coO=A.T(A.at("n"),y.o)
 $.aPI=null})()};
-(a=>{a["Az5kxorvn89nqvpIngN1D4LsRoE="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["ZR+oIWsmNl22RjiqBg21KqLUcg0="]=a.current})($__dart_deferred_initializers__);
