@@ -17,12 +17,16 @@ class NgmyDeferred extends StatefulWidget {
   State<NgmyDeferred> createState() => _NgmyDeferredState();
 }
 
+/// Parts of the app already downloaded in this visit. Opening one again shows it at once (no loading frame).
+final Set<Object> _ngmyDeferredLoaded = {};
+
 class _NgmyDeferredState extends State<NgmyDeferred> {
-  late final Future<void> _loading = widget.load();
+  late final Future<void> _loading = widget.load().then((_) => _ngmyDeferredLoaded.add(widget.load));
   Widget? _built;
 
   @override
   Widget build(BuildContext context) {
+    if (_ngmyDeferredLoaded.contains(widget.load)) return _built ??= widget.build();
     return FutureBuilder<void>(
       future: _loading,
       builder: (context, snap) {

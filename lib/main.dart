@@ -32890,7 +32890,8 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
       scan: scan,
       orbit: orbit,
       // Light mode: blue or purple in a checkerboard (phase steps by 0.18 per tile).
-      calmTone: NgmyCalmLight.checkerTone((phase / 0.18).round()),
+      // Light mode: the four tiles all in one colour (the owner asked: one colour, not mixed).
+      calmTone: NgmyCalmLight.toneB,
       phase: phase,
       borderRadius: 20,
       onTap: onTap,
@@ -33600,6 +33601,8 @@ class CivicRegistryScreen extends StatefulWidget {
 }
 
 class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsBindingObserver {
+  /// Words in grey: a dark readable slate in light mode (plain grey was too faint on white), grey in dark mode.
+  Color get _civicMuted => Theme.of(context).brightness == Brightness.dark ? Colors.grey : const Color(0xFF4B5563);
   int _activeTab = 0; // 0: Search, 1: Enroll, 2: Members, 3: Rankings
   /// Long lists (Members, Rankings) show this many rows and grow as you near the bottom —
   /// building every member at once made those tabs lag while scrolling.
@@ -37544,7 +37547,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final panel = isDark ? const Color(0xFF151C2C) : Colors.white;
     final ink = isDark ? Colors.white : const Color(0xFF0F172A);
-    final mute = isDark ? Colors.white70 : Colors.black54;
+    final mute = isDark ? Colors.white70 : const Color(0xFF374151);
 
     Future<bool?> step({
       required int stepNum,
@@ -38762,7 +38765,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                                 ),
                                 Text(
                                   '$_selectedState · recoverable for 7 days',
-                                  style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
+                                  style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF374151)),
                                 ),
                               ],
                             ),
@@ -38792,7 +38795,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                           child: Text(
                             'No pending deletes for $_selectedState.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: isDark ? Colors.white54 : Colors.black54),
+                            style: TextStyle(color: isDark ? Colors.white54 : const Color(0xFF374151)),
                           ),
                         )
                       else
@@ -38827,7 +38830,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                                           Text(name, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: ink)),
                                           Text(
                                             '$daysLeft day(s) left to recover',
-                                            style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
+                                            style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF374151)),
                                           ),
                                         ],
                                       ),
@@ -40402,7 +40405,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                     padding: const EdgeInsets.only(left: 46),
                     child: Text(
                       campaignTitle!.trim(),
-                      style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
+                      style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : const Color(0xFF374151)),
                     ),
                   ),
                 ],
@@ -41104,17 +41107,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFD1D5DB)),
                         ),
-                        child: const Column(
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            const Text(
                               'Manage Cities & Rooms',
                               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                             ),
-                            SizedBox(height: 6),
+                            const SizedBox(height: 6),
                             Text(
                               'Add cities for your state only. They appear in enrollment for that state.',
-                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                              style: TextStyle(fontSize: 12, color: _civicMuted),
                             ),
                           ],
                         ),
@@ -41318,7 +41321,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final panel = isDark ? const Color(0xFF151C2C) : Colors.white;
     final ink = isDark ? Colors.white : const Color(0xFF0F172A);
-    final mute = isDark ? Colors.white70 : Colors.black54;
+    final mute = isDark ? Colors.white70 : const Color(0xFF374151);
 
     await showDialog<void>(
       context: context,
@@ -41750,7 +41753,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: isDark ? Colors.white60 : Colors.black54,
+                        color: isDark ? Colors.white60 : const Color(0xFF374151),
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                       ),
@@ -41920,7 +41923,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                     const SizedBox(height: 8),
                     if (contributions.isEmpty)
                       glassFrame(
-                        child: const Text('No contribution records on file.', style: TextStyle(color: Colors.grey)),
+                        child: Text('No contribution records on file.', style: TextStyle(color: _civicMuted)),
                       )
                     else
                       ...contributions.map((t) => _civicContributionRecordCard(ctx, t)),
@@ -41930,7 +41933,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                     const SizedBox(height: 8),
                     glassFrame(
                       child: claims.isEmpty
-                          ? const Text('No claim records on file.', style: TextStyle(color: Colors.grey))
+                          ? Text('No claim records on file.', style: TextStyle(color: _civicMuted))
                           : Column(
                               children: claims.asMap().entries.map((entry) {
                                 final t = entry.value;
@@ -41948,7 +41951,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                                     subtitle: Text(t.status == TransactionStatus.pending ? 'Open claim' : 'Resolved claim'),
                                     trailing: Text(
                                       '${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}',
-                                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                      style: TextStyle(fontSize: 11, color: _civicMuted),
                                     ),
                                   ),
                                 );
@@ -42221,7 +42224,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
         final panel = isDark ? const Color(0xFF151C2C) : Colors.white;
         final ink = isDark ? Colors.white : const Color(0xFF0F172A);
-        final mute = isDark ? Colors.white60 : Colors.black54;
+        final mute = isDark ? Colors.white60 : const Color(0xFF374151);
         return Dialog(
           insetPadding: const EdgeInsets.all(16),
           backgroundColor: panel,
@@ -42607,7 +42610,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                   const SizedBox(height: 8),
                   if (contributions.isEmpty)
                     glassFrame(
-                      child: const Text('No contribution records yet.', style: TextStyle(color: Colors.grey)),
+                      child: Text('No contribution records yet.', style: TextStyle(color: _civicMuted)),
                     )
                   else
                     ...contributions.take(8).map((t) => _civicContributionRecordCard(ctx, t)),
@@ -42617,7 +42620,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                   const SizedBox(height: 8),
                   glassFrame(
                     child: claims.isEmpty
-                        ? const Text('No claim records yet.', style: TextStyle(color: Colors.grey))
+                        ? Text('No claim records yet.', style: TextStyle(color: _civicMuted))
                         : Column(
                             children: claims.take(8).toList().asMap().entries.map((entry) {
                               final t = entry.value;
@@ -42634,7 +42637,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                                   trailing: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Text('${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                      Text('${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}', style: TextStyle(fontSize: 11, color: _civicMuted)),
                                       IconButton(
                                         tooltip: 'Delete claim',
                                         icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
@@ -42750,7 +42753,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          Text(label, style: TextStyle(fontSize: 12, color: _civicMuted)),
           const SizedBox(height: 2),
           Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
         ],
@@ -42957,7 +42960,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
             softWrap: false,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 11, color: Colors.black54, fontWeight: FontWeight.w600),
+            style: const TextStyle(fontSize: 11, color: const Color(0xFF374151), fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 6),
           SizedBox(
@@ -44782,7 +44785,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                         '${u.fullName ?? u.username} shows ${u.helps} help${u.helps == 1 ? '' : 's'} on file but no linked money record was found. '
                         'Remove one help credit from this member?',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 13, height: 1.35, color: isDark ? Colors.white70 : Colors.black54),
+                        style: TextStyle(fontSize: 13, height: 1.35, color: isDark ? Colors.white70 : const Color(0xFF374151)),
                       ),
                       const SizedBox(height: 18),
                       Row(
@@ -44947,7 +44950,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                                         'Recorded ${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}',
                                         style: TextStyle(
                                           fontSize: 12,
-                                          color: isDarkConfirm ? Colors.white60 : Colors.black54,
+                                          color: isDarkConfirm ? Colors.white60 : const Color(0xFF374151),
                                         ),
                                       ),
                                     ],
@@ -44960,7 +44963,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                                   style: TextStyle(
                                     fontSize: 13,
                                     height: 1.35,
-                                    color: isDarkConfirm ? Colors.white70 : Colors.black54,
+                                    color: isDarkConfirm ? Colors.white70 : const Color(0xFF374151),
                                   ),
                                 ),
                                 const SizedBox(height: 18),
@@ -45092,7 +45095,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                                 trailing: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Text('${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                    Text('${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}', style: TextStyle(fontSize: 11, color: _civicMuted)),
                                     IconButton(
                                       tooltip: 'Remove this record',
                                       icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
@@ -45591,7 +45594,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                     const SizedBox(height: 6),
                     Text(
                       'Search by email, phone, or name. Only people who share this member\'s email or phone and do not already have a Civic Registry ID can be granted a card.',
-                      style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54),
+                      style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : const Color(0xFF374151)),
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -45618,7 +45621,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                                     ? 'Type an email, phone, or name to search.'
                                     : 'No eligible app accounts. They must share this member\'s email or phone, and must not already have a Civic Registry ID.',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(color: isDark ? Colors.white54 : Colors.black45),
+                                style: TextStyle(color: isDark ? Colors.white54 : const Color(0xFF374151)),
                               ),
                             )
                           : ListView.separated(
@@ -45716,7 +45719,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
             if ((raw['linkedAppEmail'] ?? '').toString().trim().isNotEmpty)
               Text(
                 'Linked: ${raw['linkedAppEmail']}',
-                style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
+                style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF374151)),
               ),
           ] else if (appUser != null && !alreadyHasCard) ...[
             Text(
@@ -45736,12 +45739,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
           ] else if (alreadyHasCard) ...[
             Text(
               'The matching app account already has a Civic Registry ID card, so it cannot be granted another one.',
-              style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54, height: 1.35),
+              style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : const Color(0xFF374151), height: 1.35),
             ),
           ] else ...[
             Text(
               'No matching app sign-up detected yet. Tap search to find them by email or phone and grant their ID instantly — or wait until they sign up with this member\'s email/phone and the Grant button will appear automatically.',
-              style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54, height: 1.35),
+              style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : const Color(0xFF374151), height: 1.35),
             ),
           ],
         ],
@@ -45970,7 +45973,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(ngmyT('Send Contributions To:', 'Tuma Michango Kwa:'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.black87)),
-                              Text(_helpScopeLabel(), style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                              Text(_helpScopeLabel(), style: const TextStyle(fontSize: 11, color: const Color(0xFF374151))),
                             ],
                           ),
                           const SizedBox(height: 8),
@@ -46547,14 +46550,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
           decoration: BoxDecoration(
             color: isSelected ? const Color(0xFF6200EE) : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
             borderRadius: BorderRadius.circular(25),
+            border: !isDark && !isSelected ? Border.all(color: const Color(0xFFDDD6FE), width: 1.4) : null,
             boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: isSelected ? Colors.white : Colors.grey, size: 28),
+              Icon(icon, color: isSelected ? Colors.white : (isDark ? _civicMuted : const Color(0xFF6200EE)), size: 28),
               const SizedBox(height: 8),
-              Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.grey, fontWeight: FontWeight.bold, fontSize: 13)),
+              Text(label, style: TextStyle(color: isSelected ? Colors.white : (isDark ? _civicMuted : const Color(0xFF1F2937)), fontWeight: FontWeight.bold, fontSize: 13)),
             ],
           ),
         ),
@@ -46575,11 +46579,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
             onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
             decoration: InputDecoration(
               hintText: ngmyT('Search by name, ID, city...', 'Tafuta kwa jina, namba ya usajili, jiji...'),
-              hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
+              hintStyle: TextStyle(fontSize: 13, color: _civicMuted),
               prefixIcon: const Icon(Icons.search, size: 22),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
               filled: true,
-              fillColor: isDark ? Colors.black.withOpacity(0.2) : Colors.grey.shade50,
+              fillColor: isDark ? Colors.black.withOpacity(0.2) : const Color(0xFFF3F4F6),
             ),
           ),
           if (_searchQuery.isNotEmpty) ...[
@@ -46588,7 +46592,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
               alignment: Alignment.centerLeft,
               child: Text(
                 '${_registryMembersMatchingSearch().length} result(s)',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: _civicMuted),
               ),
             ),
             const SizedBox(height: 12),
@@ -46681,7 +46685,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                           else if (u.username.trim().isNotEmpty)
                             Text(
                               u.username.trim(),
-                              style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontWeight: FontWeight.w600, fontSize: 11),
+                              style: TextStyle(color: isDark ? Colors.white54 : const Color(0xFF374151), fontWeight: FontWeight.w600, fontSize: 11),
                             ),
                         ],
                       ),
@@ -46826,7 +46830,7 @@ Container(
               const SizedBox(height: 8),
               TextField(
                 controller: _fullNameC,
-                decoration: InputDecoration(hintText: 'First name and last name', hintStyle: const TextStyle(fontSize: 13, color: Colors.grey), filled: true, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16), fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
+                decoration: InputDecoration(hintText: 'First name and last name', hintStyle: TextStyle(fontSize: 13, color: _civicMuted), filled: true, contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16), fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
               ),
               const SizedBox(height: 20),
 
@@ -46840,7 +46844,7 @@ Container(
                   const NgmyCivicDobInputFormatter(),
                   LengthLimitingTextInputFormatter(10),
                 ],
-                decoration: InputDecoration(suffixIcon: ngmyParseDob(_dobC.text.trim()) == null ? null : Padding(padding: const EdgeInsets.only(right: 10), child: Center(widthFactor: 1, child: Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4), decoration: BoxDecoration(color: const Color(0xFF00B25A).withValues(alpha: 0.16), borderRadius: BorderRadius.circular(9), border: Border.all(color: const Color(0xFF00B25A).withValues(alpha: 0.6))), child: Text('Age ${ngmyAgeOn(ngmyParseDob(_dobC.text.trim())!, DateTime.now())}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFF00B25A)))))), hintText: 'MM/DD/YYYY', hintStyle: const TextStyle(fontSize: 13, color: Colors.grey), filled: true, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16), fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
+                decoration: InputDecoration(suffixIcon: ngmyParseDob(_dobC.text.trim()) == null ? null : Padding(padding: EdgeInsets.only(right: 10), child: Center(widthFactor: 1, child: Container(padding: EdgeInsets.symmetric(horizontal: 9, vertical: 4), decoration: BoxDecoration(color: Color(0xFF00B25A).withValues(alpha: 0.16), borderRadius: BorderRadius.circular(9), border: Border.all(color: Color(0xFF00B25A).withValues(alpha: 0.6))), child: Text('Age ${ngmyAgeOn(ngmyParseDob(_dobC.text.trim())!, DateTime.now())}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFF00B25A)))))), hintText: 'MM/DD/YYYY', hintStyle: TextStyle(fontSize: 13, color: _civicMuted), filled: true, contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16), fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
               ),
               const SizedBox(height: 20),
 
@@ -46871,7 +46875,7 @@ Container(
                 controller: _phoneC,
                 keyboardType: TextInputType.phone,
                 inputFormatters: [PhoneDashFormatter()],
-                decoration: InputDecoration(hintText: '123-456-7890', hintStyle: const TextStyle(fontSize: 13, color: Colors.grey), filled: true, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16), fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
+                decoration: InputDecoration(hintText: '123-456-7890', hintStyle: TextStyle(fontSize: 13, color: _civicMuted), filled: true, contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16), fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
               ),
               const SizedBox(height: 20),
 
@@ -46880,7 +46884,7 @@ Container(
               TextField(
                 controller: _emailC,
                 keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(hintText: 'member@email.com', hintStyle: const TextStyle(fontSize: 13, color: Colors.grey), filled: true, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16), fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
+                decoration: InputDecoration(hintText: 'member@email.com', hintStyle: TextStyle(fontSize: 13, color: _civicMuted), filled: true, contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16), fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
               ),
               const SizedBox(height: 20),
 
@@ -46943,7 +46947,7 @@ Container(
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: InputDecoration(
                   hintText: ngmyT('Total people in this family (required)', 'Jumla ya watu katika familia hii (lazima)'),
-                  hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
+                  hintStyle: TextStyle(fontSize: 13, color: _civicMuted),
                   filled: true,
                   fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
@@ -46952,7 +46956,7 @@ Container(
               const SizedBox(height: 12),
               Text(
                 'Male / female split is optional — leave blank if you prefer not to say.',
-                style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54, height: 1.3),
+                style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : const Color(0xFF374151), height: 1.3),
               ),
               const SizedBox(height: 8),
               Row(
@@ -46969,7 +46973,7 @@ Container(
                           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                           decoration: InputDecoration(
                             hintText: ngmyT('Optional', 'Si lazima'),
-                            hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
+                            hintStyle: TextStyle(fontSize: 13, color: _civicMuted),
                             filled: true,
                             fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
@@ -46991,7 +46995,7 @@ Container(
                           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                           decoration: InputDecoration(
                             hintText: ngmyT('Optional', 'Si lazima'),
-                            hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
+                            hintStyle: TextStyle(fontSize: 13, color: _civicMuted),
                             filled: true,
                             fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
@@ -47060,7 +47064,7 @@ Container(
             children: [
               Text(ngmyT('Enroll Existing App Users', 'Sajili Watumiaji Waliopo wa Programu'), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               const SizedBox(height: 5),
-              Text(ngmyT('Select a user who already has an account to enroll them.', 'Chagua mtumiaji mwenye akaunti tayari ili umsajili.'), style: TextStyle(fontSize: 12, color: Colors.grey)),
+              Text(ngmyT('Select a user who already has an account to enroll them.', 'Chagua mtumiaji mwenye akaunti tayari ili umsajili.'), style: TextStyle(fontSize: 12, color: _civicMuted)),
               const SizedBox(height: 20),
               TextField(
                 controller: _enrollSearchC,
@@ -47069,7 +47073,7 @@ Container(
               ),
               const SizedBox(height: 20),
               if (availableAppUsers.isEmpty)
-                Center(child: Padding(padding: EdgeInsets.all(30), child: Text(ngmyT('No matching users found.', 'Hakuna watumiaji waliopatikana.'), style: TextStyle(color: Colors.grey))))
+                Center(child: Padding(padding: EdgeInsets.all(30), child: Text(ngmyT('No matching users found.', 'Hakuna watumiaji waliopatikana.'), style: TextStyle(color: _civicMuted))))
               else
                 ...availableAppUsers.take(5).map((u) => ListTile(
                   contentPadding: EdgeInsets.zero,
@@ -47144,7 +47148,7 @@ Container(
         if (fieldKey != null) _enrollFlagLabel(label, fieldKey) else Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
         const SizedBox(height: 8),
       ],
-      TextField(controller: c, decoration: InputDecoration(hintText: hint, hintStyle: const TextStyle(fontSize: 13, color: Colors.grey), filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none))),
+      TextField(controller: c, decoration: InputDecoration(hintText: hint, hintStyle: TextStyle(fontSize: 13, color: _civicMuted), filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none))),
       const SizedBox(height: 20),
     ]);
   }
@@ -47368,7 +47372,7 @@ Container(
                               ],
                             ),
                           ),
-                          Icon(expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded, color: Colors.grey),
+                          Icon(expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded, color: _civicMuted),
                         ],
                       ),
                     ),
@@ -47422,7 +47426,7 @@ Container(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(ngmyT('Clear & Remove', 'Futa na Ondoa'), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-                              Text('Search, reset stats, clear missed, or remove', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                              Text('Search, reset stats, clear missed, or remove', style: TextStyle(fontSize: 12, color: _civicMuted)),
                             ],
                           ),
                         ),
@@ -47460,9 +47464,9 @@ Container(
                             expanded: membersExpanded,
                             onToggle: () => setSheet(() => membersExpanded = !membersExpanded),
                             child: searchResults.isEmpty
-                                ? const Padding(
+                                ? Padding(
                                     padding: EdgeInsets.symmetric(vertical: 12),
-                                    child: Text('No matches', style: TextStyle(color: Colors.grey)),
+                                    child: Text('No matches', style: TextStyle(color: _civicMuted)),
                                   )
                                 : ConstrainedBox(
                                     constraints: const BoxConstraints(maxHeight: 200),
@@ -47931,7 +47935,7 @@ Container(
         ),
 
         const SizedBox(height: 15),
-        if (members.isEmpty) const Center(child: Padding(padding: EdgeInsets.all(40), child: Text('No members match your filters.', style: TextStyle(color: Colors.grey))))
+        if (members.isEmpty) Center(child: Padding(padding: EdgeInsets.all(40), child: Text('No members match your filters.', style: TextStyle(color: _civicMuted))))
         else ...[
           ...members.take(_civicListShown(members.length)).map((m) => _memberCard(m, isDark, manageActions: _canUseRegistrarToolsHere())),
           if (members.length > _civicListLimit) _civicMoreHint(isDark, members.length),
@@ -47959,7 +47963,7 @@ Container(
             const SizedBox(width: 10),
             Text(
               ngmyT('Showing ${_civicListLimit.clamp(0, total)} of $total — keep scrolling for more', 'Inaonyesha ${_civicListLimit.clamp(0, total)} kati ya $total — endelea kusogeza kuona zaidi'),
-              style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54),
+              style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : const Color(0xFF374151)),
             ),
           ],
         ),
@@ -48000,7 +48004,7 @@ Container(
                   title: Text(ngmyT('Update contribution', 'Sasisha mchango'), style: TextStyle(fontWeight: FontWeight.w800)),
                   subtitle: Text(
                     'Adds to the current \$${formatCurrency(active.amount)} for this help campaign',
-                    style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
+                    style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : const Color(0xFF374151)),
                   ),
                   onTap: () {
                     Navigator.pop(ctx);
@@ -48115,7 +48119,7 @@ Container(
                     ),
                   ]),
                   Text(u.registryId ?? ngmyT('PENDING ID', 'KITAMBULISHO KINASUBIRI'), style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 13)),
-                  Text('ID: ${u.registryId ?? "N/A"}', style: const TextStyle(color: Colors.grey, fontSize: 10)),
+                  Text('ID: ${u.registryId ?? "N/A"}', style: TextStyle(color: _civicMuted, fontSize: 10)),
                 ]),
                 const Spacer(),
                 Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -48131,7 +48135,7 @@ Container(
                 _memberInfo(Icons.home_work_rounded, room.isEmpty ? ngmyT('No room assigned', 'Hakuna chumba kilichopewa') : room, Colors.orange),
               if (showAddress && room.isNotEmpty)
                 _memberInfo(Icons.meeting_room_rounded, room, Colors.amber.shade700),
-              _memberInfo(Icons.phone_android_rounded, ngmyFormatPhoneDisplay(u.phone), Colors.black54),
+              _memberInfo(Icons.phone_android_rounded, ngmyFormatPhoneDisplay(u.phone), const Color(0xFF374151)),
               _memberInfo(Icons.email_outlined, u.email, Colors.blueAccent),
               _memberInfo(
                 Icons.family_restroom_rounded,
@@ -48147,7 +48151,7 @@ Container(
                   if (manageActions) ...[
                     _mBtn(Icons.monetization_on_outlined, ngmyT('Money', 'Pesa'), Colors.green, () => unawaited(_openMoneyForMember(u))),
                     _mBtn(Icons.warning_amber_rounded, ngmyT('Claim', 'Dai'), Colors.orange, () => _showClaimDialog(u)),
-                    _mBtn(Icons.undo_rounded, ngmyT('Clean', 'Safisha'), Colors.grey.shade200, () => _showResolveClaimDialog(u), textColor: Colors.grey),
+                    _mBtn(Icons.undo_rounded, ngmyT('Clean', 'Safisha'), Colors.grey.shade200, () => _showResolveClaimDialog(u), textColor: _civicMuted),
                     _mBtn(Icons.delete_outline_rounded, '', Colors.red, () async {
                       final adminHard = _isGlobalCivicRegistryAdmin();
                       final confirm = await showNgmyLightConfirm(
@@ -48706,7 +48710,7 @@ Container(
     }
 
     final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final muted = isDark ? Colors.white54 : Colors.black54;
+    final muted = isDark ? Colors.white54 : const Color(0xFF374151);
     final waitingOnDirectory = _sharedDirectoryLoading && enrolled.isEmpty;
     // Show the lists a page at a time (they grow as you scroll) — all three share one budget.
     final rankTotal = topHelpers.length + leastHelpers.length + nonHelpers.length;
@@ -49085,7 +49089,7 @@ Container(
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
       ),
-      child: Text(message, textAlign: TextAlign.center, style: TextStyle(color: isDark ? Colors.white54 : Colors.black45, fontSize: 12)),
+      child: Text(message, textAlign: TextAlign.center, style: TextStyle(color: isDark ? Colors.white54 : const Color(0xFF374151), fontSize: 12)),
     );
   }
 

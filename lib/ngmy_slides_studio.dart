@@ -74,6 +74,10 @@ class NgmySlidesStudioScreen extends StatefulWidget {
   State<NgmySlidesStudioScreen> createState() => _NgmySlidesStudioScreenState();
 }
 
+/// What NGMY Slides showed last time, per account, so opening the tab again shows it at once (no spinner while
+/// the presentations are read and the oath paper is checked online); it then refreshes quietly.
+final Map<String, List<NgmySlideDeck>> _ngmySlidesShownCache = {};
+
 class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   List<NgmySlideDeck> _decks = [];
@@ -119,6 +123,11 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
       return bios.firstWhere((b) => b.isPublished, orElse: () => bios.first);
     };
     _framePulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2800))..repeat(reverse: true);
+    final shown = _ngmySlidesShownCache[widget.userEmail];
+    if (shown != null) {
+      _decks = List.of(shown);
+      _loading = false;
+    }
     unawaited(_loadDecks());
   }
 
@@ -153,6 +162,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    if (!_loading) _ngmySlidesShownCache[widget.userEmail] = List.of(_decks);
     _autosaveTimer?.cancel();
     unawaited(_flushPersistedDecks());
     _framePulse.dispose();
@@ -260,6 +270,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
       _decks = decks;
       _loading = false;
     });
+    _ngmySlidesShownCache[email] = List.of(decks);
     if (assignedCodes || decks.length > loaded.length) unawaited(_persistDecks());
   }
 
@@ -5957,11 +5968,11 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
           child: Ink(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
-            decoration: NgmyCalmLight.tintCardDecoration(label.contains('Class') ? NgmyCalmLight.toneB : NgmyCalmLight.toneA, radius: 22),
+            decoration: NgmyCalmLight.tintCardDecoration(label.contains('Kiapo') ? NgmyCalmLight.toneB : NgmyCalmLight.toneA, radius: 22),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                NgmyCalmIconTile(accent: label.contains('Class') ? NgmyCalmLight.toneB : NgmyCalmLight.toneA, size: 48, icon: icon),
+                NgmyCalmIconTile(accent: label.contains('Kiapo') ? NgmyCalmLight.toneB : NgmyCalmLight.toneA, size: 48, icon: icon),
                 const SizedBox(height: 12),
                 Text(
                   label,

@@ -238,11 +238,11 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  test('light tiles use only two colours, in a checkerboard', () {
+  test('light tiles use only two colours, a whole row at a time (one row blue, the next purple)', () {
     final tones = [for (var i = 0; i < 6; i++) NgmyCalmLight.checkerTone(i)];
     expect(tones.toSet(), {NgmyCalmLight.toneA, NgmyCalmLight.toneB});
-    expect(tones[0], isNot(tones[1]), reason: 'side by side tiles differ');
-    expect(tones[0], isNot(tones[2]), reason: 'the tile below differs');
+    expect(tones[0], tones[1], reason: 'tiles in the same row have the same colour');
+    expect(tones[0], isNot(tones[2]), reason: 'the next row has the other colour');
     expect(NgmyCalmLight.page, Colors.white, reason: 'the page is pure white, not greyish');
   });
 

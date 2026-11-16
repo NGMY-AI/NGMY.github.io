@@ -73,13 +73,13 @@ class NgmyCalmLight {
   static const Color brandEdge = Color(0xFFC4B5FD);
   static const double brandEdgeWidth = 1.5;
 
-  /// The two colours of the light look (the home frames' Neural Link blue and Signal Grid purple). Tiles take
-  /// one of the two, in a checkerboard, so pages have colour without mixing many colours.
-  static const Color toneA = Color(0xFF22D3EE);
+  /// The two colours of the light look: a soft sky blue and a soft lavender. Tiles take them a whole row at a
+  /// time (one row blue, the next row purple), never mixed tile by tile (the owner's choice).
+  static const Color toneA = Color(0xFF38BDF8);
   static const Color toneB = Color(0xFFA78BFA);
 
-  static Color checkerTone(int index, {int columns = 2}) =>
-      ((index ~/ columns) + (index % columns)).isEven ? toneA : toneB;
+  /// The colour for tile [index] in a grid of [columns]: whole rows alternate blue, purple, blue...
+  static Color checkerTone(int index, {int columns = 2}) => (index ~/ columns).isEven ? toneA : toneB;
 
   /// A tile with colour: a light wash of [tone] (white words never needed), a thin edge of the same colour
   /// and a soft shadow of that colour.
@@ -88,13 +88,16 @@ class NgmyCalmLight {
     return BoxDecoration(
       borderRadius: BorderRadius.circular(radius < 22 ? 22 : radius),
       gradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color.lerp(Colors.white, tone, 0.10)!, Color.lerp(Colors.white, tone, 0.26)!],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        // White at the top, a soft clear wash of the colour at the bottom.
+        colors: [Color.lerp(Colors.white, tone, 0.06)!, Color.lerp(Colors.white, tone, 0.20)!, Color.lerp(Colors.white, tone, 0.30)!],
+        stops: const [0, 0.55, 1],
       ),
-      border: Border.all(color: p[0].withValues(alpha: 0.75), width: 1.5),
+      border: Border.all(color: p[0].withValues(alpha: 0.85), width: 1.5),
       boxShadow: [
-        BoxShadow(color: p[1].withValues(alpha: 0.18), blurRadius: 22, offset: const Offset(0, 8)),
+        // A soft shadow of the same colour under the tile, so it sits on the page.
+        BoxShadow(color: p[1].withValues(alpha: 0.26), blurRadius: 18, offset: const Offset(0, 8)),
         const BoxShadow(color: Color(0x0A0F172A), blurRadius: 3, offset: Offset(0, 1)),
       ],
     );
