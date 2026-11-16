@@ -1,9 +1,9 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var D,A,E,C={
-hrQ(d){switch(d.a){case 1:return B.ei3
-case 2:return B.ei5
-case 0:return B.ei4}},
-atW:function atW(d,e,f,g,h,i){var _=this
+hs_(d){switch(d.a){case 1:return B.eiB
+case 2:return B.eiD
+case 0:return B.eiC}},
+au0:function au0(d,e,f,g,h,i){var _=this
 _.a=d
 _.b=e
 _.c=f
@@ -14,24 +14,24 @@ D=c[0]
 A=c[2]
 E=c[53]
 C=a.updateHolder(c[39],C)
-B=c[189]
-C.atW.prototype={}
+B=c[191]
+C.au0.prototype={}
 var z=a.updateTypes([]);(function inheritance(){var x=a.inherit
-x(C.atW,D.aE)})()
-var y={c:D.as("O<u>")};(function constants(){var x=a.makeConstList
-B.aVl=new D.F(!0,A.c,null,null,null,null,9,A.u,null,2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-B.d2J=x([A.dz,A.kq,A.aE],y.c)
-B.dAx=x([A.aE,A.fe],y.c)
-B.dbl=x([A.kM,A.pf,A.aE],y.c)
-B.ei3=new C.atW(B.d2J,B.dAx,A.fe,A.j8,"PREMIUM",B.dbl)
-B.dsD=x([A.cH,A.fp,A.bR],y.c)
-B.dnO=x([A.bR,A.aW],y.c)
-B.d9Z=x([A.wf,A.bR,A.fp],y.c)
-B.ei4=new C.atW(B.dsD,B.dnO,A.bR,A.jH,"NGMY WALLET",B.d9Z)
-B.dpH=x([A.eq,A.dW,A.pg],y.c)
-B.duk=x([A.aC,A.aQ],y.c)
-B.dce=x([A.ud,A.aC,A.c3],y.c)
-B.ei5=new C.atW(B.dpH,B.duk,A.aC,A.ml,"LUXURY",B.dce)
-B.ei7=new E.atV(1,"premium")
-B.ei8=new E.atV(2,"luxury")})()};
-(a=>{a["DOyuhr4FkLTzEZoiHuMyR8qr1O4="]=a.current})($__dart_deferred_initializers__);
+x(C.au0,D.aE)})()
+var y={c:D.at("O<u>")};(function constants(){var x=a.makeConstList
+B.aVs=new D.F(!0,A.c,null,null,null,null,9,A.u,null,2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+B.d39=x([A.dA,A.kp,A.aE],y.c)
+B.dB3=x([A.aE,A.fe],y.c)
+B.dbL=x([A.kN,A.pf,A.aE],y.c)
+B.eiB=new C.au0(B.d39,B.dB3,A.fe,A.j8,"PREMIUM",B.dbL)
+B.dt6=x([A.cH,A.fp,A.bR],y.c)
+B.dog=x([A.bR,A.aW],y.c)
+B.dap=x([A.wh,A.bR,A.fp],y.c)
+B.eiC=new C.au0(B.dt6,B.dog,A.bR,A.jG,"NGMY WALLET",B.dap)
+B.dqb=x([A.eq,A.dV,A.pg],y.c)
+B.duP=x([A.aC,A.aQ],y.c)
+B.dcE=x([A.ue,A.aC,A.c4],y.c)
+B.eiD=new C.au0(B.dqb,B.duP,A.aC,A.ml,"LUXURY",B.dcE)
+B.eiF=new E.au_(1,"premium")
+B.eiG=new E.au_(2,"luxury")})()};
+(a=>{a["54sJzFhpsqL3L6lKM4qCwmV1jgo="]=a.current})($__dart_deferred_initializers__);
