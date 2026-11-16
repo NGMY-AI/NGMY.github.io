@@ -25,7 +25,7 @@ r=A.ddh
 w=3.4
 break
 case"organ":s=A.dc3
-r=A.dsT
+r=A.dsU
 v=0.02
 u=!0
 break
@@ -37,12 +37,12 @@ case"pluck":s=A.d7C
 r=A.cO5
 w=7
 break
-case"synth":s=A.dtQ
-r=A.dvF
+case"synth":s=A.dtR
+r=A.dvG
 v=0.012
 u=!0
 break
-case"flute":s=A.dAj
+case"flute":s=A.dAk
 r=A.co8
 v=0.07
 u=!0
@@ -136,14 +136,14 @@ A.d7C=x([1,0.7,0.45,0.28,0.16,0.1,0.06],y.h)
 A.d7D=x([1,0.55,0.32,0.2,0.12,0.07],y.h)
 A.dc3=x([1,0.6,0.45,0.3,0.22,0.15],y.h)
 A.ddh=x([1,2,3,4,5,6],y.h)
-A.dsT=x([1,2,3,4,6,8],y.h)
-A.dtQ=x([1,0.5,0.33,0.25,0.2,0.16,0.14,0.12],y.h)
-A.dvF=x([1,2,3,4,5,6,7,8],y.h)
-A.dAj=x([1,0.18,0.06],y.h)
+A.dsU=x([1,2,3,4,6,8],y.h)
+A.dtR=x([1,0.5,0.33,0.25,0.2,0.16,0.14,0.12],y.h)
+A.dvG=x([1,2,3,4,5,6,7,8],y.h)
+A.dAk=x([1,0.18,0.06],y.h)
 A.ekO={"SPARK PAINTER":0,"MANDALA MAKER":1,"TITLE ANIMATOR":2,"PALETTE LAB":3,"GRAVITY TOY":4,"FIREWORK DESIGNER":5,"CIRCUIT LAB":6,"PERIODIC TABLE":7,"BODY EXPLORER":8,"SPIN THE WHEEL":9,"FOCUS TIMER":10,"MEMORY MATCH":11,"LUCKY POCKET":12,"ELECTRONICS LAB":13,"CONSTRUCTION LAB":14,"AI INVENTOR":15,"MAGNET LAB":16,"RADIO LAB":17,"POWER PLANT":18,"POWER GRID":19,"INTERNET JOURNEY":20,"ROBOT CODER":21,"BUG SMASHER":22,"ROCKET LANDER":23,"DATA SNAKE":24,"BINARY 2048":25,"SIGNAL BREAKER":26,"PASSWORD LAB":27,"WAVE LAB":28,"BUG HUNT":29,"OPTICS LAB":30,"ATOM BUILDER":31,"PIXEL TV":32}
 A.aIS=new B.bu(A.ekO,["sparkle","sparkle","whoosh","click","bounce","pop","tech","lab","organic","click","tech","bubble","click","tech","tech","tech","tech","tech","tech","tech","tech","tech","pop","space","bubble","click","zap","click","tech","click","sparkle","lab","tech"],B.at("bu<n,n>"))
 A.EP=new B.G(!0,D.ab,null,null,null,null,12.5,null,null,null,null,null,1.35,null,null,null,null,null,null,null,null,null,null,null,null,null)})();(function staticFields(){$.hYG=B.T(B.at("n"),B.at("dL"))
 $.cmC=B.a([],B.at("O<ajP>"))
 $.hrS=0
 $.aty="music"})()};
-(a=>{a["37AKwrK4erOTAOT0vWOnaLkWo38="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["IqFYWW1DXwtAmcULUEsPQ/Lt6So="]=a.current})($__dart_deferred_initializers__);

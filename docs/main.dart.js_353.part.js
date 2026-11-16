@@ -3274,7 +3274,7 @@ if(v==null)v=n.d.h(0,"targetScreenId")
 u=x.p
 v=A.a([w,n.cwP("Opens screen",J.k(v==null?"":v),new B.fkm(n))],u)
 if(b2==="button"){w=n.d.h(0,j)
-w=A.a([n.IE("Action",J.k(w==null?i:w),D.dt6,new B.fkn(n))],u)
+w=A.a([n.IE("Action",J.k(w==null?i:w),D.dt7,new B.fkn(n))],u)
 u=n.d.h(0,j)
 if(J.z(u==null?i:u,"snack")){u=n.d.h(0,"message")
 w.push(n.eN("Snack message",J.k(u==null?"":u),new B.fky(n)))}u=n.d.h(0,j)
@@ -3286,7 +3286,7 @@ w===$&&A.c()
 w=w.h(0,"text")
 w=n.ak8("Text",J.k(w==null?"":w),new B.fl4(n),3)
 v=n.d.h(0,"style")
-return A.a([w,n.IE(g,J.k(v==null?f:v),D.dx2,new B.flf(n))],x.p)
+return A.a([w,n.IE(g,J.k(v==null?f:v),D.dx3,new B.flf(n))],x.p)
 case"hero":w=n.d
 w===$&&A.c()
 w=w.h(0,"emoji")
@@ -3387,7 +3387,7 @@ w===$&&A.c()
 w=w.h(0,h)
 w=n.eN("Save to collection",J.k(w==null?a8:w),new B.fl0(n))
 v=n.d.h(0,"mode")
-v=n.IE("Mode",J.k(v==null?"reel":v),D.dvP,new B.fl1(n))
+v=n.IE("Mode",J.k(v==null?"reel":v),D.dvQ,new B.fl1(n))
 u=n.d.h(0,a1)
 return A.a([w,v,n.eN("After post go to screen ID",J.k(u==null?"":u),new B.fl2(n))],x.p)
 case"profile":w=n.d
@@ -5037,7 +5037,7 @@ return B.ni(d,"Travel Explorer","Maps, trips & reservations",4279150057,A.a([B.d
 $S:58}
 B.fJ6.prototype={
 $1(d){var w=x.N,v=x.m,u=x.K,t=x.J,s=x.z
-return B.ni(d,"Luxe Store","Curated shop with cart & checkout",4293675161,A.a([B.dc("home","Shop",A.I(["type","column","children",A.a([A.I(["type","text","text","Discover","style","title"],w,w),A.I(["type","wrap","children",A.a([A.I(["type","chip","label","New arrivals"],w,w),A.I(["type","chip","label","Best sellers"],w,w),A.I(["type","chip","label","Sale"],w,w)],v)],w,u),A.I(["type","stat","collection","products","label","Products live"],w,w),A.I(["type","dataList","collection","products","titleField","name","subtitleField","price","emptyText","Your catalog is empty.","addTarget","add_product","addLabel","Add product","allowDelete",!0],w,u)],t)],w,s),!1,!1),B.dc("add_product","Add Product",A.I(["type","column","children",A.a([A.I(["type","form","collection","products","submitLabel","List product","successMessage","Listed!","navigateAfter","home","fields",A.a([A.I(["id","name","label","Product name","type","text"],w,w),A.I(["id","price","label","Price","type","text"],w,w),A.I(["id","desc","label","Description","type","text"],w,w)],v)],w,u)],t)],w,s),!1,!1),B.dc("cart","Cart",A.I(["type","column","children",A.a([A.I(["type","text","text","Your cart","style","title"],w,w),A.I(["type","dataList","collection","cart","titleField","name","subtitleField","price","emptyText","Cart is empty."],w,w),A.I(["type","button","label","Checkout","target","checkout","large",!0],w,u)],t)],w,s),!1,!1),B.dc("checkout","Checkout",A.I(["type","column","children",A.a([A.I(["type","form","collection","orders","submitLabel","Place order","successMessage","Order placed!","navigateAfter","home","fields",A.a([A.I(["id","name","label","Name","type","text"],w,w),A.I(["id","address","label","Shipping address","type","text"],w,w)],v)],w,u)],t)],w,s),!1,!1),B.dc("profile","Profile",A.I(["type","column","children",A.a([A.I(["type","profile","collection","orders","handle","Shopper"],w,w),A.I(["type","button","label","Settings","target","settings"],w,w)],v)],w,s),!1,!1),B.dc("settings","Settings",B.nk("home"),!1,!1)],x.X),"\ud83d\udecd\ufe0f",A.I(["bottomNav",D.dvr],w,s))},
+return B.ni(d,"Luxe Store","Curated shop with cart & checkout",4293675161,A.a([B.dc("home","Shop",A.I(["type","column","children",A.a([A.I(["type","text","text","Discover","style","title"],w,w),A.I(["type","wrap","children",A.a([A.I(["type","chip","label","New arrivals"],w,w),A.I(["type","chip","label","Best sellers"],w,w),A.I(["type","chip","label","Sale"],w,w)],v)],w,u),A.I(["type","stat","collection","products","label","Products live"],w,w),A.I(["type","dataList","collection","products","titleField","name","subtitleField","price","emptyText","Your catalog is empty.","addTarget","add_product","addLabel","Add product","allowDelete",!0],w,u)],t)],w,s),!1,!1),B.dc("add_product","Add Product",A.I(["type","column","children",A.a([A.I(["type","form","collection","products","submitLabel","List product","successMessage","Listed!","navigateAfter","home","fields",A.a([A.I(["id","name","label","Product name","type","text"],w,w),A.I(["id","price","label","Price","type","text"],w,w),A.I(["id","desc","label","Description","type","text"],w,w)],v)],w,u)],t)],w,s),!1,!1),B.dc("cart","Cart",A.I(["type","column","children",A.a([A.I(["type","text","text","Your cart","style","title"],w,w),A.I(["type","dataList","collection","cart","titleField","name","subtitleField","price","emptyText","Cart is empty."],w,w),A.I(["type","button","label","Checkout","target","checkout","large",!0],w,u)],t)],w,s),!1,!1),B.dc("checkout","Checkout",A.I(["type","column","children",A.a([A.I(["type","form","collection","orders","submitLabel","Place order","successMessage","Order placed!","navigateAfter","home","fields",A.a([A.I(["id","name","label","Name","type","text"],w,w),A.I(["id","address","label","Shipping address","type","text"],w,w)],v)],w,u)],t)],w,s),!1,!1),B.dc("profile","Profile",A.I(["type","column","children",A.a([A.I(["type","profile","collection","orders","handle","Shopper"],w,w),A.I(["type","button","label","Settings","target","settings"],w,w)],v)],w,s),!1,!1),B.dc("settings","Settings",B.nk("home"),!1,!1)],x.X),"\ud83d\udecd\ufe0f",A.I(["bottomNav",D.dvs],w,s))},
 $S:58}
 B.fJ7.prototype={
 $1(d){var w=x.N,v=x.z
@@ -5903,13 +5903,13 @@ D.dod=w([D.bA9,D.bAe,D.bA5,D.bAd],x.I)
 D.dpc=w(["Build a map app with saved places and directions","Create a store with product feed and cart","Make a TikTok-style video feed with posting","Design a fitness app with workouts and check-ins","Build a booking app with calendar and payments","Create a game score tracker with leaderboards"],x.s)
 D.dpl=w(["info","warning","success"],x.s)
 D.dqa=w(["json"],x.s)
-D.dt6=w(["navigate","snack","clear"],x.s)
+D.dt7=w(["navigate","snack","clear"],x.s)
 D.dES=new A.bu(D.tr,["shop","Shop","home"],x.w)
 D.dEQ=new A.bu(D.tr,["cart","Cart","cart"],x.w)
 D.dEP=new A.bu(D.tr,["add","Sell","add_product"],x.w)
-D.dvr=w([D.dES,D.dEQ,D.dEP,D.aIY],x.m)
-D.dvP=w(["reel","post"],x.s)
-D.dx2=w(["title","subtitle","body"],x.s)
+D.dvs=w([D.dES,D.dEQ,D.dEP,D.aIY],x.m)
+D.dvQ=w(["reel","post"],x.s)
+D.dx3=w(["title","subtitle","body"],x.s)
 D.aDD=w(["add","calendar","cart","chat","earnings","fitness","food","history","home","info","list","mail","menu","music","person","phone","referral","sales","settings","share","shop","star","venue","video","wallet","withdraw"],x.s)
 D.eln={Actions:0,Content:1,"Data & forms":2,Navigation:3,Interactive:4,"QR & Invoices":5,"Social & Video":6,Layout:7,"More widgets":8}
 D.bP6=new A.a0(58818,"MaterialIcons",!1)
@@ -5969,8 +5969,8 @@ D.bOF=new A.a0(57740,"MaterialIcons",!1)
 D.f2L=new A.b5("contact","Contact card",D.bOF)
 D.bPd=new A.a0(59048,"MaterialIcons",!1)
 D.f2W=new A.b5("video","Video",D.bPd)
-D.dtH=w([D.f3R,D.f1B,D.f4h,D.f0l,D.f2L,D.f2W],x.c)
-D.aIM=new A.bu(D.eln,[D.dkg,D.cBV,D.ddc,D.cCa,D.doZ,D.dad,D.cXe,D.dmX,D.dtH],A.at("bu<n,ai<+(n,n,a0)>>"))
+D.dtI=w([D.f3R,D.f1B,D.f4h,D.f0l,D.f2L,D.f2W],x.c)
+D.aIM=new A.bu(D.eln,[D.dkg,D.cBV,D.ddc,D.cCa,D.doZ,D.dad,D.cXe,D.dmX,D.dtI],A.at("bu<n,ai<+(n,n,a0)>>"))
 D.dIc=new B.F5(null,"Invalid backup format. Export again from App Studio \u2192 menu \u2192 Download backup.")
 D.dId=new B.F5(null,"Invalid backup \u2014 choose a .ngmy.json file exported from App Studio.")
 D.dIe=new B.F5(null,"No file selected.")
@@ -6075,4 +6075,4 @@ D.h0_=new A.B("My Projects",null,null,null,null,null,null,null,null,null,null,nu
 D.h1h=new A.B("Invoice published",null,C.iG,null,null,null,null,null,null,null,null,null)})();(function lazyInitializers(){var w=a.lazyFinal
 w($,"iE7","hKU",()=>{var v=4279150057,u=4284704497
 return A.a([B.mR("Featured",new B.fJ5(),"Map, saved trips & destinations.","\u2708\ufe0f","qr_studio","Travel Explorer",v),B.mR("",new B.fJ6(),"Product feed, cart & checkout.","\ud83d\udecd\ufe0f","luxe_store","Luxe Store",4293675161),B.mR("",new B.fJ7(),"Posts, profiles & engagement.","\ud83d\udcac","creator_hub","Social Pulse",4287323382),B.mR("",new B.fJi(),"Workouts, check-ins & nutrition.","\ud83d\udcaa","pulse_fitness","Pulse Fitness",4279286145),B.mR("",new B.fJo(),"Clients, invoices & pipeline.","\ud83d\udcca","invoice_pro","CRM Dashboard",u),B.mR("",new B.fJp(),"Showcase work & contact.","\ud83c\udf10","video_hub","Portfolio Hub",v),B.mR("",new B.fJq(),"Live QR for websites & text.","\ud83d\udcf1","qr_code_studio","QR Code Studio",4278630100),B.mR("New",new B.fJr(),"Sell, track sales & get paid.","\ud83d\udcb5","side_hustle","Side Hustle Marketplace",4279673674),B.mR("",new B.fJs(),"Services, bookings & client earnings.","\ud83d\udcc5","booking_pro","Booking & Services",4286331629),B.mR("",new B.fJt(),"Daily checklist, streaks & progress.","\ud83d\udd25","habit_tracker","Habit Tracker",4279548070),B.mR("",new B.fJu(),"Income, spending & budget at a glance.","\ud83d\udcb0","finance_dash","Money Tracker",4282090230),B.mR("",new B.fJ8(),"Post roles, track applicants.","\ud83d\udcbc","job_board","Job Board",4281549141),B.mR("",new B.fJ9(),"Discussion feed, posts & replies.","\ud83d\udde3\ufe0f","community_forum","Community Forum",4288814255),B.mR("",new B.fJa(),"Episodes, categories & playback links.","\ud83c\udf99\ufe0f","podcast_hub","Podcast Hub",4280232247),B.mR("",new B.fJb(),"Events, RSVPs & shareable QR codes.","\ud83c\udfab","event_tickets","Event Ticketing",4294286859),B.mR("New",new B.fJc(),"Raise funds, track donors, share a link.","\u2764\ufe0f","donate_nonprofit","Giving Campaign",4292943176),B.mR("",new B.fJd(),"Sessions, bookings & client roster.","\ud83e\uddd8","coaching_booking","Coaching Studio",4286456526),B.mR("",new B.fJe(),"Showcase galleries & booking requests.","\ud83d\udcf7","photo_portfolio","Photo Portfolio",4279310375),B.mR("",new B.fJf(),"Save recipes, ingredients & steps.","\ud83c\udf73","recipe_box","Recipe Box",4293548044),B.mR("",new B.fJg(),"Daily care, vet visits & reminders.","\ud83d\udc3e","pet_care","Pet Care Tracker",4284850957),B.mR("",new B.fJh(),"Create invoices, track clients & income.","\ud83e\uddfe","freelance_invoicing","Freelancer Invoicing",4280171146),B.mR("",new B.fJj(),"Log rounds, track scores & leaderboard.","\ud83c\udfc6","trivia_game","Trivia Night Scorekeeper",4292552567),B.mR("New",new B.fJk(),"Map of properties, inquiries & saves.","\ud83c\udfe0","real_estate","Real Estate Listings",4278995566),B.mR("",new B.fJl(),"Menu by category, tap to add to order.","\ud83c\udf7d\ufe0f","restaurant_menu","Restaurant Menu & Orders",4290321436),B.mR("",new B.fJm(),"Members, renewals & revenue.","\ud83e\udeaa","membership_manager","Membership Manager",4278483031),B.mR("",new B.fJn(),"Start fresh \u2014 describe any app to NGMY AI.","\ud83d\ude80","blank","Blank Canvas",u)],A.at("O<a7l>"))})})()};
-(a=>{a["+FBxn5FCQBkh3b68q9KlAkuSpC0="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["GaSgwngVEnKcY99EFc4rzmdlVjE="]=a.current})($__dart_deferred_initializers__);

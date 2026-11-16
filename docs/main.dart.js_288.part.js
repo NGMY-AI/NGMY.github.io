@@ -712,7 +712,7 @@ a9.az3(v)}},
 B(d){var x,w,v,u,t,s,r,q,p,o=this,n=null,m=y.p,l=C.a([C.aI(n,n,n,n,F.oI,n,n,n,new A.e7o(o,d),n,n,n,n,"Share",n)],m),k=C.cq(new A.e7p(o)),j=C.a([],m)
 for(x=0;x<3;++x){w=D.dd0[x]
 j.push(new E.dW(w.b,o.x===w.a,new A.e7q(o,w),w.c,B.aG,n))}v=C.a([],m)
-for(x=0;x<5;++x){u=D.dts[x]
+for(x=0;x<5;++x){u=D.dtt[x]
 v.push(new E.dW(u.b,o.y===u.a,new A.e7r(o,u),u.c,B.aG,n))}t=o.z
 t=E.iP(B.aG,""+B.i.V(t/90),"Strength",2200,100,new A.e7s(o),t)
 s=o.Q
@@ -1118,7 +1118,7 @@ if(s)s=B.i.D(p.y/l.length,0,1)
 else{s=p.ch.length
 s=s===0?1:1-s/l.length}B.d.v(t,C.a([B.T,C.bw(u,C.kq(B.bA,o,B.bk,5,o,s,o),B.aq)],v))}k=C.x(C.a([C.q(o,C.x(t,B.E,o,B.e,B.j,0,B.p),B.f,o,o,new C.p(x,o,w,k,o,o,B.n),o,o,o,B.h5,B.hK,o,o,o),B.b0,new C.D(D.bHz,C.cq(new A.euQ(p,j)),o)],v),B.l,o,B.e,B.j,0,B.p)
 x=C.a([],v)
-for(r=0;r<6;++r){q=D.dy0[r]
+for(r=0;r<6;++r){q=D.dy1[r]
 x.push(new E.dW(q.b,p.r===q.a,new A.euR(p,q),o,B.bk,o))}w=p.w
 w=C.a([new E.dW(n,w==="free",new A.euS(p),B.a3b,B.bk,o),new E.dW("Learn",w==="learn",new A.euU(p),B.v_,B.bk,o),new E.dW("Listen",w==="listen",new A.euV(p),D.bRp,B.bk,o)],v)
 u=C.a([],v)
@@ -1958,8 +1958,8 @@ D.bp1=new C.u(1,0.06274509803921569,0.07450980392156863,0.10196078431372549,B.q)
 D.d2H=x([F.Gb,D.bp1],y.O)
 D.c6P=new C.a8(B.b2,B.b7,B.x,D.d2H,null,null)
 D.bgQ=new C.u(1,0.054901960784313725,0.06274509803921569,0.12549019607843137,B.q)
-D.dxJ=x([D.ahj,D.bgQ],y.O)
-D.c9c=new C.a8(B.b2,B.b7,B.x,D.dxJ,null,null)
+D.dxK=x([D.ahj,D.bgQ],y.O)
+D.c9c=new C.a8(B.b2,B.b7,B.x,D.dxK,null,null)
 D.eBe=new C.y(0,"Classic")
 D.eC6=new C.y(1,"Bright")
 D.eCL=new C.y(2,"Deep")
@@ -2014,7 +2014,7 @@ D.f1r=new C.b5("up","Up",B.t2)
 D.f41=new C.b5("left","Left",B.k6)
 D.f0V=new C.b5("right","Right",B.jH)
 D.f3g=new C.b5("zero","Off",B.wC)
-D.dts=x([D.f2O,D.f1r,D.f41,D.f0V,D.f3g],y.c)
+D.dtt=x([D.f2O,D.f1r,D.f41,D.f0V,D.f3g],y.c)
 D.f_Z=new C.b5("kick","Kick",B.c0)
 D.f0M=new C.b5("snare","Snare",B.bk)
 D.f29=new C.b5("hat","Hat",B.aG)
@@ -2040,7 +2040,7 @@ D.eQN=new C.y("bell","Bell")
 D.eWW=new C.y("pluck","Pluck")
 D.eYn=new C.y("synth","Synth")
 D.eSx=new C.y("flute","Flute")
-D.dy0=x([D.eWU,D.eWB,D.eQN,D.eWW,D.eYn,D.eSx],y.L)
+D.dy1=x([D.eWU,D.eWB,D.eQN,D.eWW,D.eYn,D.eSx],y.L)
 D.ekS={C:0,D:1,E:2,F:3,G:4,A:5,B:6}
 D.dFk=new C.bu(D.ekS,[0,2,4,5,7,9,11],C.at("bu<n,H>"))
 D.dJl=new A.apD(null)
@@ -2059,4 +2059,4 @@ D.fB6=new C.G(!0,B.an,null,null,null,null,10,B.I,null,null,null,null,null,null,n
 D.fxt=new C.G(!0,B.c0,null,null,null,null,11,B.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fQm=new C.B("\u25cf RECORDING",null,D.fxt,null,null,null,null,null,null,null,null,null)
 D.fTc=new C.B("Go",null,B.iG,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["JJvzRzQivMlaHlqaXEYOuH+/MLw="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["K8UhD2lpsDF53LpmXM2F/H89sOw="]=a.current})($__dart_deferred_initializers__);

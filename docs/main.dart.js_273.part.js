@@ -1342,7 +1342,7 @@ return A.aH(!1,B.a3,!0,w,A.aP(!1,u,!0,A.q(w,A.A(A.a([q,B.bo,A.d(d,w,w,w,w,w,w,A.
 cCp(d){var w=null,v=B.a.co(d,"."),u=v>0,t=u?B.a.aB(d,0,v):"\u2022",s=u?B.a.i(B.a.b2(d,v+1)):d
 u=B.bQ.j(0.35)
 return new A.D(B.d9,A.A(A.a([A.q(B.A,A.d(t,w,w,w,w,w,w,B.vH,w,w,w),B.f,w,w,new A.p(u,w,w,w,w,w,B.a6),w,24,w,w,w,w,w,24),B.au,A.E(A.d(s,w,w,w,w,w,w,D.fuN,w,w,w),1)],x.p),B.E,w,B.e,B.j,0,w,w),w)},
-cCq(d){switch(d.a){case 0:return D.dwG
+cCq(d){switch(d.a){case 0:return D.dwH
 case 1:return D.drp
 case 2:return D.dhp}}}
 C.aNt.prototype={
@@ -3521,7 +3521,7 @@ D.dPi=new C.Ch(2,"slideVertical")
 D.dPj=new C.Ch(3,"fade")
 D.a66=w([D.a7x,D.a7y,D.dPi,D.dPj],A.at("O<Ch>"))
 D.drp=w(["1. Open ngmy.org in Chrome (recommended).",y.k,"3. When Android asks, tap Allow while using the app.","4. If blocked: tap the lock icon in the address bar \u2192 Permissions \u2192 Microphone \u2192 Allow.","5. Or go to Settings \u2192 Apps \u2192 Chrome \u2192 Permissions \u2192 Microphone \u2192 Allow.","6. Refresh the page and tap Start Video again."],x.s)
-D.dwG=w(["1. Open ngmy.org in Safari (Add to Home Screen works too).",y.k,"3. Tap Allow when ngmy.org asks \u2014 this works with Safari set to Ask or Allow.","4. Recommended: Settings \u2192 Safari \u2192 Microphone \u2192 Ask, then Allow inside ngmy.org when recording.","5. If no prompt appears: tap the AA icon in the address bar \u2192 Website Settings \u2192 Microphone \u2192 Allow.","6. Also check: Settings \u2192 Privacy & Security \u2192 Microphone \u2192 Safari ON.","7. Close Safari completely, reopen ngmy.org, tap Start Video, then Allow."],x.s)
+D.dwH=w(["1. Open ngmy.org in Safari (Add to Home Screen works too).",y.k,"3. Tap Allow when ngmy.org asks \u2014 this works with Safari set to Ask or Allow.","4. Recommended: Settings \u2192 Safari \u2192 Microphone \u2192 Ask, then Allow inside ngmy.org when recording.","5. If no prompt appears: tap the AA icon in the address bar \u2192 Website Settings \u2192 Microphone \u2192 Allow.","6. Also check: Settings \u2192 Privacy & Security \u2192 Microphone \u2192 Safari ON.","7. Close Safari completely, reopen ngmy.org, tap Start Video, then Allow."],x.s)
 D.beW=new A.fj(null,null,null,null,null,B.bQ,null,null,null,null)
 D.bdq=new A.ci(B.A,null,null,D.beW,null)
 D.esJ=new A.D(B.ey,D.bdq,null)
@@ -3572,4 +3572,4 @@ D.hyr=new C.aDR(1,"android")
 D.hys=new C.aDR(2,"computer")
 D.hyt=new C.a0j(null)})();(function staticFields(){$.h9n=null})();(function lazyInitializers(){var w=a.lazyFinal
 w($,"iEy","ot",()=>new C.b2p(new C.b2n(A.a([],A.at("O<nr>"))),B.bF,$.ax()))})()};
-(a=>{a["X/x+6r9LYCntFBC4+t+kmBqbedY="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["tQObbU//HTRBq7wB0RauRSJ2Hmk="]=a.current})($__dart_deferred_initializers__);

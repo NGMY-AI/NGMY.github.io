@@ -3317,7 +3317,7 @@ for(w=0;w<25;++w){v=D.d9H[w]
 u.push(C.hwD(D.d27[w],v,D.vq))
 u.push(C.hwD(D.cuw[w],v,D.a8p))}return u},
 hwD(d,e,f){var w=C.i7F(e),v=C.hXL(e),u=e.a>=15?"Luxury Collection":"Broadcast Overlay",t=w.a
-return new C.XF(d,v,u,C.i9y(e),f,D.dx4,t[0],t[1],t[2],t[3],e,t[4])},
+return new C.XF(d,v,u,C.i9y(e),f,D.dx5,t[0],t[1],t[2],t[3],e,t[4])},
 i9y(d){var w
 switch(d.a){case 0:w=D.bRm
 break
@@ -3979,7 +3979,7 @@ v=A.K()
 v.r=B.bD.j(0.92).gp(0)
 d.am(q,v)
 i.KU(d,i.f.toUpperCase(),s+10,t*0.35+r*0.22,r*0.48,B.c,B.u)}switch(i.b.a){case 0:i.qJ(d,e,B.a_,B.c)
-i.auQ(d,e,D.duw,!0)
+i.auQ(d,e,D.dux,!0)
 break
 case 1:i.qJ(d,e,B.he,B.c)
 i.bQL(d,e,D.cb8)
@@ -4060,10 +4060,10 @@ i.uQ(d,i.c.toUpperCase(),v,p+n*0.44,n*0.32,B.c,B.u,s-20)
 i.wF(d,e,B.ay,B.w,B.ab)
 break
 case 6:i.qJ(d,e,B.eX,B.jV)
-i.bQM(d,e,D.dsV,!0)
+i.bQM(d,e,D.dsW,!0)
 break
 case 7:i.qJ(d,e,B.kp,B.kN)
-i.auQ(d,e,D.dsD,!0)
+i.auQ(d,e,D.dsE,!0)
 break
 case 8:w=C.tf(e,i.w)
 i.qJ(d,e,B.dW,B.aQ)
@@ -4086,7 +4086,7 @@ i.uQ(d,i.c.toUpperCase(),v+14,u+t*0.28,t*0.34,B.aQ,B.u,q.c-v-24)
 i.wF(d,e,B.aQ,B.nx,B.bL)
 break
 case 9:i.qJ(d,e,B.eZ,B.c)
-i.auQ(d,e,D.dwB,!0)
+i.auQ(d,e,D.dwC,!0)
 break
 case 10:w=C.tf(e,i.w)
 i.qJ(d,e,B.mR,B.c)
@@ -4193,7 +4193,7 @@ case 20:i.aZF(d,e,B.aQ,"THRONE",B.axY,B.o7,B.qf,!1,!0,B.dB,B.qc)
 break
 case 21:i.adO(d,e,B.bP,"SILVER",D.dhW,B.as,B.hZ,B.i9,B.j4)
 break
-case 22:i.axT(d,e,B.aQ,"JEWEL",D.duE,B.dB,B.bL,!0,B.ahY,B.hY)
+case 22:i.axT(d,e,B.aQ,"JEWEL",D.duF,B.dB,B.bL,!0,B.ahY,B.hY)
 w=C.tf(e,i.w)
 i.aUg(d,new A.o(w.gpY().gbx().a,w.gpY().b-6))
 break
@@ -5750,7 +5750,7 @@ r=A.d("Shape",n,n,n,n,n,n,A.l(n,n,A.a_(140,B.c.l()>>>16&255,B.c.l()>>>8&255,B.c.
 q=A.A(A.a([k.aZA(l,D.r2,D.aoS,"Circle"),B.af,k.aZA(l,D.vr,A0.t4,"Rectangle")],s),B.l,n,B.e,B.j,0,n,n)
 p=A.d("Logo frame",n,n,n,n,n,n,A.l(n,n,A.a_(140,B.c.l()>>>16&255,B.c.l()>>>8&255,B.c.l()&255),n,n,n,n,n,n,n,n,10,n,n,n,n,n,!0,n,n,n,n,n,n,n,n),n,n,n)
 o=x.L
-o=A.C(new A.N(D.dsL,new C.eTD(k,l),o),o.k("ak.E"))
+o=A.C(new A.N(D.dsM,new C.eTD(k,l),o),o.k("ak.E"))
 B.d.v(m,A.a([B.am,t,r,B.aw,q,B.W,p,B.am,A.bW(B.bH,o,B.bs,n,6,6),B.T],s))}t=j.c
 r=j.a
 q=w?0.06:0.08
@@ -6259,7 +6259,7 @@ D.dhW=w([B.cX,B.bi,B.d2],x.O)
 D.dim=w([B.hc,B.e0,B.aQ],x.O)
 D.zW=w([],x.w)
 D.drE=w([B.bD,B.c6,B.aQ],x.O)
-D.dsD=w([B.j5,B.fe,B.bT],x.O)
+D.dsE=w([B.j5,B.fe,B.bT],x.O)
 D.Jd=new C.qf(0,"none")
 D.Je=new C.qf(1,"goldRing")
 D.aKA=new C.qf(2,"presidentialSeal")
@@ -6270,11 +6270,11 @@ D.aKC=new C.qf(6,"marbleInset")
 D.a81=new C.qf(7,"velvetBadge")
 D.dUz=new C.qf(8,"silverLaurel")
 D.aKD=new C.qf(9,"crownJewel")
-D.dsL=w([D.Jd,D.Je,D.aKA,D.dUx,D.dUy,D.aKB,D.aKC,D.a81,D.dUz,D.aKD],A.at("O<qf>"))
-D.dsV=w([B.fX,B.aV,B.jV],x.O)
-D.duw=w([B.c6,B.bQ,B.cD],x.O)
-D.duE=w([B.fo,B.kp,B.aE],x.O)
-D.dwB=w([B.bU,B.hv,B.bx],x.O)
+D.dsM=w([D.Jd,D.Je,D.aKA,D.dUx,D.dUy,D.aKB,D.aKC,D.a81,D.dUz,D.aKD],A.at("O<qf>"))
+D.dsW=w([B.fX,B.aV,B.jV],x.O)
+D.dux=w([B.c6,B.bQ,B.cD],x.O)
+D.duF=w([B.fo,B.kp,B.aE],x.O)
+D.dwC=w([B.bU,B.hv,B.bx],x.O)
 D.aRQ=new A.a1(0,0,1,1)
 D.vr=new C.atV(0,"rect")
 D.E4=new C.at2(0,"video")
@@ -6292,7 +6292,7 @@ D.ehd=new C.wC("logo3","Brand logo 3 (bottom-left)",D.f9_,D.f7H,D.oR)
 D.f7K=new A.a1(0.72,0.82,0.9199999999999999,0.9299999999999999)
 D.f8Y=new A.a1(0.6,0.78,0.88,0.8380000000000001)
 D.ehc=new C.wC("logo4","Brand logo 4 (bottom-right)",D.f7K,D.f8Y,D.oR)
-D.dx4=w([D.ehf,D.ehe,D.ehg,D.ehd,D.ehc],A.at("O<wC>"))
+D.dx5=w([D.ehf,D.ehe,D.ehg,D.ehd,D.ehc],A.at("O<wC>"))
 D.dD0=new A.bB("","",A.at("bB<n,n>"))
 D.a8o=new C.atu(0,"background")
 D.aLh=new C.atu(1,"foreground")
@@ -6361,4 +6361,4 @@ w($,"iAp","hj1",()=>A.nX(B.jD))
 w($,"iAq","hIR",()=>A.nX(B.dK))
 w($,"iAr","hIS",()=>A.nf(0,0.5,x.W))
 w($,"iEd","hjB",()=>A.h7X(C.ihl(),!0,A.at("XF")))})()};
-(a=>{a["nFZdrZ1gbBwNFHvgJ6HYk38ollk="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["m9KIyjk4kxCJiVecrCgKVqWyNn4="]=a.current})($__dart_deferred_initializers__);

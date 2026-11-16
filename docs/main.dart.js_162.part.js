@@ -624,7 +624,7 @@ try{J.aK(t,x,A.aot(w))}catch(u){}}return t},
 hyC(d,e,f,g,h){var x,w,v=new C.ftB(d,C.hCX(e),f,g,h),u=new C.fty(),t=v.$1(11.5)
 if(h||J.z(u.$1(t),0))return t
 if(B.d.cG(d.d,0,new C.ftA())>4e4)return t
-for(x=0;x<3;++x){w=v.$1(D.dvl[x])
+for(x=0;x<3;++x){w=v.$1(D.dvm[x])
 if(u.$1(w)<u.$1(t))t=w
 if(J.z(u.$1(t),0))break}return t},
 fMo(d,e,f){var x=0,w=A.j(y.U),v,u,t,s,r,q,p,o,n
@@ -992,7 +992,7 @@ _.b=h
 _.a=null},
 abE:function abE(d){this.b=d
 this.a=null},
-fOk(d){return B.d.aV(D.dAl,B.a.gke(d.toLowerCase()))?"ABOUT THE COMMUNITY AND THE SYSTEM (facts you can use; do not invent numbers, names or dates):\n- The community is M'MBONDO (also written MBONDO). Its motto is \"EMO 'YA M'MBONDO\". Members live in different US states.\n- The Civic Registry \u2014 people also just call it \"the system\" \u2014 was built inside the NGMY app for the M'MBONDO community.\n- Why it was built: a big problem in the community was not seeing where contribution money went. People gave but were unsure what happened to their money, so trust and giving went down. The system brings light: every contribution gets a receipt, members can see where the money is going and how much has been contributed, and that transparency builds trust and the confidence to keep contributing \u2014 when you know where your money goes, you give.\n- What it does:\n  \u2022 Registers community members with their details and a member ID card (Registry ID), kept safely as the community's records.\n  \u2022 Lets each state know how many members it has (state totals, nationwide totals).\n  \u2022 Records contributions with receipts and contribution reports, so everyone sees the money trail.\n  \u2022 Authorized Registrars enroll members and help them; there is a help mode for assisted sign-up.\n  \u2022 Civic Voting for community decisions, and a Civic State Wallet that shows each state's funds.\n- How NGMY helps members beyond the registry: help finding jobs and applying for them, fixing their houses, helping them get houses, sending money, and NGMY Advisors (AI advisors) who help people apply for jobs, food stamps and other benefits and fill out applications for them.\n- Tone for this community: warm, proud, hopeful and trustworthy; it is about unity, transparency and helping each other.\n":""}},D,H,F,I,K
+fOk(d){return B.d.aV(D.dAm,B.a.gke(d.toLowerCase()))?"ABOUT THE COMMUNITY AND THE SYSTEM (facts you can use; do not invent numbers, names or dates):\n- The community is M'MBONDO (also written MBONDO). Its motto is \"EMO 'YA M'MBONDO\". Members live in different US states.\n- The Civic Registry \u2014 people also just call it \"the system\" \u2014 was built inside the NGMY app for the M'MBONDO community.\n- Why it was built: a big problem in the community was not seeing where contribution money went. People gave but were unsure what happened to their money, so trust and giving went down. The system brings light: every contribution gets a receipt, members can see where the money is going and how much has been contributed, and that transparency builds trust and the confidence to keep contributing \u2014 when you know where your money goes, you give.\n- What it does:\n  \u2022 Registers community members with their details and a member ID card (Registry ID), kept safely as the community's records.\n  \u2022 Lets each state know how many members it has (state totals, nationwide totals).\n  \u2022 Records contributions with receipts and contribution reports, so everyone sees the money trail.\n  \u2022 Authorized Registrars enroll members and help them; there is a help mode for assisted sign-up.\n  \u2022 Civic Voting for community decisions, and a Civic State Wallet that shows each state's funds.\n- How NGMY helps members beyond the registry: help finding jobs and applying for them, fixing their houses, helping them get houses, sending money, and NGMY Advisors (AI advisors) who help people apply for jobs, food stamps and other benefits and fill out applications for them.\n- Tone for this community: warm, proud, hopeful and trustworthy; it is about unity, transparency and helping each other.\n":""}},D,H,F,I,K
 J=c[1]
 A=c[0]
 B=c[2]
@@ -1631,7 +1631,7 @@ r=A.A(A.a([D.fX1,B.b0,new A.a5(96,g,A.aM(g,B.Z,!1,g,!0,B.t,g,A.aO(),s,g,g,g,g,g,
 o=B.c.j(0.06)
 n=A.m(14)
 m=A.a([],a5)
-for(u=0;u<7;++u){l=D.dyd[u]
+for(u=0;u<7;++u){l=D.dye[u]
 k=A.ca(B.a.i(s.a.a),g)
 k=B.o.D(k==null?10:k,1,100)===l?B.b8:B.L
 j=new A.aN(10,10)
@@ -3132,7 +3132,7 @@ D.eRy=new A.y("display","Bold")
 D.diK=x([D.aRu,D.eR8,D.eVT,D.eRy],y.L)
 D.Sg=x([],y.P)
 D.Sh=x([],y.x)
-D.dvl=x([12,11,12.5],A.at("O<F>"))
+D.dvm=x([12,11,12.5],A.at("O<F>"))
 D.dPZ=new C.ps("royal","Royal",4279180093,4280171146,4292128567,4294965479,"middle","classic","small",!0)
 D.dQ3=new C.ps("sunset","Sunset",4294933061,4292887931,4294955366,4294967295,"bottom","display","small",!1)
 D.dQ2=new C.ps("photo","Big Photo",4279310375,4281811281,4294286859,4294967295,"bottom","display","full",!1)
@@ -3144,8 +3144,8 @@ D.dQ0=new C.ps("geo","Geometric",4279310375,4280232247,4279286145,4294967295,"mi
 D.dQ1=new C.ps("vintage","Vintage",4294306781,4293581764,4287317267,4283053092,"middle","classic","small",!1)
 D.dQ4=new C.ps("starry","Starry Night",4278915110,4281413249,4294829706,4294967295,"middle","classic","small",!1)
 D.zY=x([D.dPZ,D.dQ3,D.dQ2,D.dPY,D.dQ5,D.dQ6,D.dQ_,D.dQ0,D.dQ1,D.dQ4],A.at("O<ps>"))
-D.dyd=x([3,5,8,10,25,50,100],y.t)
-D.dAl=x(["civic","registry","registrar","mbondo","m'mbondo","mmbondo","ngmy","the system","our system","our community","the community","community","contribution","michango","jamii","jumuiya","advisor"],y.s)
+D.dye=x([3,5,8,10,25,50,100],y.t)
+D.dAm=x(["civic","registry","registrar","mbondo","m'mbondo","mmbondo","ngmy","the system","our system","our community","the community","community","contribution","michango","jamii","jumuiya","advisor"],y.s)
 D.dDO=new A.d_([1611,1611,1612,1612,1613,1613,1614,1614,1615,1615,1616,1616,1617,1617,1618,1618,1648,1648,64606,64606,64607,64607,64608,64608,64609,64609,64610,64610,64611,64611],y.K)
 D.aJb=new A.d_([1575,65165,1576,65167,1578,65173,1579,65177,1580,65181,1581,65185,1582,65189,1583,65193,1584,65195,1585,65197,1586,65199,1587,65201,1588,65205,1589,65209,1590,65213,1591,65217,1592,65221,1593,65225,1594,65229,1601,65233,1602,65237,1603,65241,1604,65245,1605,65249,1606,65253,1607,65257,1608,65261,1610,65263,1569,65152,1570,65153,1571,65155,1572,65157,1573,65159,1574,65161,1577,65171],y.K)
 D.dHU=new C.NU(50,null)
@@ -3173,8 +3173,8 @@ D.eA3=new A.bY(B.Xg,0.5,B.x,null,0,D.dAT,B.zU,null)
 D.f8P=new A.a1(-5,-5,5,5)
 D.a3R=new A.ae(B.ed,20,B.c,null,null,null)
 D.fIR=new A.B("Write my book",null,B.fE,null,null,null,null,null,null,null,null,null)
-D.dzJ=x([D.a3R,B.af,D.fIR],y.p)
-D.f9S=new A.c8(B.aL,B.ba,B.j,B.l,null,B.p,null,0,D.dzJ,null)
+D.dzK=x([D.a3R,B.af,D.fIR],y.p)
+D.f9S=new A.c8(B.aL,B.ba,B.j,B.l,null,B.p,null,0,D.dzK,null)
 D.c0A=new A.ae(B.oy,null,F.lF,null,null,null)
 D.fzN=new A.G(!0,E.j3,null,null,null,null,18,B.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fY9=new A.B("Print as a book",null,D.fzN,null,null,null,null,null,null,null,null,null)
@@ -3221,4 +3221,4 @@ D.h15=new A.B("Design the cover",null,B.cG,null,null,null,null,null,null,null,nu
 D.h4b=new C.cDO(6,"postScriptName")
 D.hCu=new C.btW(null)})();(function staticFields(){$.hxM=null
 $.hzQ=A.T(y.N,A.at("aB<n?>"))})()};
-(a=>{a["TofB6bROELrquh9nCbB3cWR75f8="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["jQcSrlpWOLvkgV6HQ5Re5VS6XmU="]=a.current})($__dart_deferred_initializers__);
