@@ -47,7 +47,7 @@ fSj(d){var x=0,w=B.j(y.e),v,u
 var $async$fSj=B.e(function(e,f){if(e===1)return B.f(f,w)
 for(;;)switch(x){case 0:u=J
 x=3
-return B.b(I.a3m(d),$async$fSj)
+return B.b(I.a3n(d),$async$fSj)
 case 3:v=u.ad(f)
 x=1
 break
@@ -94,7 +94,7 @@ u=B.a([w[0],w[3]],v)
 t=y.r
 s=B.a([new B.ab(0,A.G,w[1].j(0.35),A.cL,10)],t)
 r=y.u
-u=B.A(B.a([B.r(p,B.X(x,A.c,p,p,p,21),A.f,p,p,new B.o(p,p,p,p,s,new B.a8(A.aA,A.aE,A.x,u,p,p),A.a6),p,40,p,p,p,p,p,40),A.bc,B.E(B.d(a0,p,1,A.a2,p,p,p,D.fyy,p,p,p),1)],r),A.l,p,A.e,A.i,0,p,p)
+u=B.A(B.a([B.r(p,B.X(x,A.c,p,p,p,21),A.f,p,p,new B.o(p,p,p,p,s,new B.a8(A.aA,A.aE,A.x,u,p,p),A.a6),p,40,p,p,p,p,p,40),A.bc,B.E(B.d(a0,p,1,A.a2,p,p,p,D.fyz,p,p,p),1)],r),A.l,p,A.e,A.i,0,p,p)
 s=B.ar(w[0],A.c,0.45)
 s.toString
 v=B.a([s,w[0],w[3]],v)
@@ -102,7 +102,7 @@ v=B.a([new B.D(A.rZ,i,p),B.ap(12,B.r(p,D.c2t,A.f,p,p,new B.o(p,p,B.L(A.c.j(0.85)
 if(d!=null){t=B.l(999)
 s=A.c.j(0.12)
 q=B.L(A.c.j(0.85),A.r,1.4)
-v.push(B.ap(p,B.r(p,B.d(d,p,p,p,p,p,p,A.o_,p,p,p),A.f,p,p,new B.o(s,p,q,t,p,p,A.n),p,p,p,p,A.Cq,p,p,p),p,p,10,p,10,p))}return B.x(B.a([new B.D(D.bHG,u,p),new B.a5(p,n,new B.a7v(o,new B.an(A.a0,p,A.b2,A.t,v,p),!0,30,10,A.ag,f,new B.bt("toolhub-frame-"+a0,y.q)),p)],r),A.E,p,A.e,A.i,0,A.p)}v=A.a.i(a0)
+v.push(B.ap(p,B.r(p,B.d(d,p,p,p,p,p,p,A.o_,p,p,p),A.f,p,p,new B.o(s,p,q,t,p,p,A.n),p,p,p,p,A.Cq,p,p,p),p,p,10,p,10,p))}return B.x(B.a([new B.D(D.bHG,u,p),new B.a5(p,n,new B.a7w(o,new B.an(A.a0,p,A.b2,A.t,v,p),!0,30,10,A.ag,f,new B.bt("toolhub-frame-"+a0,y.q)),p)],r),A.E,p,A.e,A.i,0,A.p)}v=A.a.i(a0)
 u=y.u
 t=B.a([i,B.ap(0,B.r(p,p,A.f,p,p,new B.o(p,p,p,p,p,new B.a8(A.b0,A.b7,A.x,B.a([A.L,A.w.j(0.72)],y.c),p,p),A.n),p,n*0.45,p,p,p,p,p,p),p,p,0,0,p,p)],u)
 t.push(B.ap(14,B.JB(e,p,A.hn,A.j.F(g+h,1),j,52),p,p,p,14,p,p))
@@ -118,11 +118,11 @@ C.bd_.prototype={
 B(d){var x=null,w=B.l(12),v=this.d,u=v?A.a6g:D.cN6,t=B.L(A.aC.j(0.6),A.r,1),s=B.a([new B.ab(0,A.G,this.c.j(0.25),A.h2,24)],y.r),r=B.d("KB PABLO QR",x,x,x,x,x,x,B.m(x,x,v?A.aC:A.id,x,x,x,x,x,x,x,x,12,x,x,A.I,x,x,!0,x,1.6,x,x,x,x,x,x),x,x,x),q=B.r(x,x,A.f,v?A.aC:A.d3,x,x,x,2,x,x,x,x,x,40)
 return B.as(B.eH(A.A,-0.06,B.r(x,B.x(B.a([r,A.b1,q,A.am,B.d("Business Card Studio",x,x,x,x,x,x,B.m(x,x,v?A.c.j(0.5):A.a_,x,x,x,x,x,x,x,x,10,x,x,A.U,x,x,!0,x,x,x,x,x,x,x,x),x,x,x)],y.u),A.E,x,A.e,A.i,0,A.p),A.f,x,x,new B.o(x,x,t,w,s,new B.a8(A.a7,A.aa,A.x,u,x,x),A.n),x,114,x,H.O4,A.hM,x,x,200),x),x,x,x)}}
 C.bkW.prototype={
-B(d){var x=null,w=B.l(12),v=this.d,u=v?D.dfe:D.dgn,t=this.c,s=B.L(t.j(0.65),A.r,1),r=B.a([new B.ab(0,A.G,t.j(0.3),A.h2,24)],y.r),q=B.X(A.wS,v?t:A.id,x,x,x,22)
+B(d){var x=null,w=B.l(12),v=this.d,u=v?D.dfg:D.dgp,t=this.c,s=B.L(t.j(0.65),A.r,1),r=B.a([new B.ab(0,A.G,t.j(0.3),A.h2,24)],y.r),q=B.X(A.wS,v?t:A.id,x,x,x,22)
 t=B.d("YOUR MENU",x,x,x,x,x,x,B.m(x,x,v?t:A.hf,x,x,x,x,x,x,x,x,13,x,x,A.u,x,x,!0,x,1.2,x,x,x,x,x,x),x,x,x)
 return B.as(B.eH(A.A,-0.04,B.r(x,B.x(B.a([q,A.T,t,A.b1,B.d("Burgers \xb7 Drinks \xb7 QR",x,x,x,x,x,x,B.m(x,x,v?A.aD:A.a_,x,x,x,x,x,x,x,x,10,x,x,A.U,x,x,!0,x,x,x,x,x,x,x,x),x,x,x)],y.u),A.E,x,A.e,A.i,0,A.p),A.f,x,x,new B.o(x,x,s,w,r,new B.a8(A.a7,A.aa,A.x,u,x,x),A.n),x,114,x,H.O4,A.hM,x,x,200),x),x,x,x)}}
 C.bgH.prototype={
-B(d){var x=null,w=B.l(12),v=this.c,u=v?D.dx3:K.aAn,t=B.L(A.aG.j(0.65),A.r,1.3),s=B.a([new B.ab(0,A.G,A.aG.j(0.3),A.h2,24)],y.r),r=y.u,q=B.A(B.a([B.r(x,D.c1A,A.f,x,x,new B.o(x,x,x,B.l(8),x,D.c9y,A.n),x,28,x,x,x,x,x,28),A.b1,C.hcz(A.aG),A.dh,C.hcz(A.bg),A.dh,C.hcz(A.bE)],r),A.l,x,A.e,A.i,0,x,x),p=B.d("ESSENTIALS",x,x,x,x,x,x,B.m(x,x,v?A.c:A.jj,x,x,x,x,x,x,x,x,13,x,x,A.u,x,x,!0,x,1.3,x,x,x,x,x,x),x,x,x)
+B(d){var x=null,w=B.l(12),v=this.c,u=v?D.dx4:K.aAn,t=B.L(A.aG.j(0.65),A.r,1.3),s=B.a([new B.ab(0,A.G,A.aG.j(0.3),A.h2,24)],y.r),r=y.u,q=B.A(B.a([B.r(x,D.c1A,A.f,x,x,new B.o(x,x,x,B.l(8),x,D.c9y,A.n),x,28,x,x,x,x,x,28),A.b1,C.hcz(A.aG),A.dh,C.hcz(A.bg),A.dh,C.hcz(A.bE)],r),A.l,x,A.e,A.i,0,x,x),p=B.d("ESSENTIALS",x,x,x,x,x,x,B.m(x,x,v?A.c:A.jj,x,x,x,x,x,x,x,x,13,x,x,A.u,x,x,!0,x,1.3,x,x,x,x,x,x),x,x,x)
 return B.as(B.eH(A.A,-0.05,B.r(x,B.x(B.a([q,A.W,p,A.b1,B.d("Notes \xb7 Contacts \xb7 Tools",x,x,x,x,x,x,B.m(x,x,v?A.aD:A.a_,x,x,x,x,x,x,x,x,10,x,x,A.U,x,x,!0,x,x,x,x,x,x,x,x),x,x,x)],r),A.E,x,A.e,A.i,0,A.p),A.f,x,x,new B.o(x,x,t,w,s,new B.a8(A.aA,A.aE,A.x,u,x,x),A.n),x,114,x,H.O4,A.hM,x,x,200),x),x,x,x)}}
 var z=a.updateTypes([])
 C.fNG.prototype={
@@ -136,10 +136,10 @@ $S:0}
 C.er8.prototype={
 $4(d,e,f,g){var x,w=this,v=null,u=B.aF(d,A.dN,y.x).w,t=w.a,s=w.c,r=w.d,q=s.a,p=t.c27(A.x4,new C.er5(t,d),g,0,new C.bd_(A.bd,B.P(q).ax.a===A.H,v),e,f,"",s,r,"Business Card Creator"),o=t.d
 o=o>0?""+o+" saved":v
-o=t.ax1(o,D.dyJ,new C.er6(t,d),g,0.22,new C.bkW(A.c2,B.P(q).ax.a===A.H,v),e,f,"",s,r,"Menu Studio")
+o=t.ax1(o,D.dyK,new C.er6(t,d),g,0.22,new C.bkW(A.c2,B.P(q).ax.a===A.H,v),e,f,"",s,r,"Menu Studio")
 x=t.e
 x=x>0?""+x+" saved":v
-return B.cm(B.a([p,A.bA,o,A.bA,t.ax1(x,D.dxy,new C.er7(t,d),g,0.44,new C.bgH(B.P(q).ax.a===A.H,v),e,f,"",s,r,"Business Essentials")],y.u),v,v,new B.R(16,u.r.b+8,16,w.b),v,v,A.ah,!1)},
+return B.cm(B.a([p,A.bA,o,A.bA,t.ax1(x,D.dxz,new C.er7(t,d),g,0.44,new C.bgH(B.P(q).ax.a===A.H,v),e,f,"",s,r,"Business Essentials")],y.u),v,v,new B.R(16,u.r.b+8,16,w.b),v,v,A.ah,!1)},
 $C:"$4",
 $R:4,
 $S:636}
@@ -184,10 +184,10 @@ D.c1A=new B.ae(A.zi,16,A.c,null,null,null)
 D.c2t=new B.ae(A.hn,34,A.c,null,null,null)
 D.c9y=new B.a8(A.a7,A.aa,A.x,A.RU,null,null)
 D.cN6=x([A.aS,A.bi],y.c)
-D.dfe=x([G.a_p,A.eq],y.c)
-D.dgn=x([A.qs,A.fA],y.c)
-D.dx3=x([A.c4,A.f_,A.db],y.c)
-D.dxy=x([A.aG,A.db,A.f_],y.c)
-D.dyJ=x([A.c2,A.aC,L.j4],y.c)
-D.fyy=new B.F(!0,A.bB,null,null,null,null,22,A.u,null,0.1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["CirS777F+r0HN7gEjVUwwA1El3A="]=a.current})($__dart_deferred_initializers__);
+D.dfg=x([G.a_p,A.eq],y.c)
+D.dgp=x([A.qs,A.fA],y.c)
+D.dx4=x([A.c4,A.f_,A.db],y.c)
+D.dxz=x([A.aG,A.db,A.f_],y.c)
+D.dyK=x([A.c2,A.aC,L.j4],y.c)
+D.fyz=new B.F(!0,A.bB,null,null,null,null,22,A.u,null,0.1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)})()};
+(a=>{a["F1U5N008MyYRHOk2X3NItzTmf6I="]=a.current})($__dart_deferred_initializers__);
