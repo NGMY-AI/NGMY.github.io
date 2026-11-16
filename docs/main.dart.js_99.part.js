@@ -20,7 +20,7 @@ if(i!=null&&C.a.a_(i,"ngmy:ws-thumb:"))return A.bx(u,new B.aGL(i,j,f,e,g,h,v),C.
 x=B.ilJ(i)
 if(x!=null)return A.bx(u,A.tL(C.A,v,C.hj,e,!0,f,x,!1,v,j),C.aq)
 w=C.cA.j(0.15)
-return A.q(v,A.X(g,h==null?C.cA:h,v,v,v,32),C.f,v,v,new A.o(w,v,v,u,v,v,C.n),v,f,v,v,v,v,v,j)},
+return A.r(v,A.X(g,h==null?C.cA:h,v,v,v,32),C.f,v,v,new A.o(w,v,v,u,v,v,C.n),v,f,v,v,v,v,v,j)},
 aGL:function aGL(d,e,f,g,h,i,j){var _=this
 _.c=d
 _.d=e
@@ -39,10 +39,10 @@ if(x==null)throw A.W(A.bc("IndexedDB not available"))
 return C.wZ.GR(x,"ngmy_worksheet_thumbs_v1",new B.fx2(),1)},
 i6i(d){var x,w,v=null
 if(d==null)return v
-if(y.o.b(d))return new Uint8Array(A.ce(d))
-if(y.i.b(d))return new Uint8Array(A.ce(J.eE(d,0,null)))
-if(y.A.b(d))return new Uint8Array(A.ce(A.wS(d,0,v)))
-if(y.w.b(d))return new Uint8Array(A.ce(d))
+if(y.o.b(d))return new Uint8Array(A.cf(d))
+if(y.i.b(d))return new Uint8Array(A.cf(J.eE(d,0,null)))
+if(y.A.b(d))return new Uint8Array(A.cf(A.wS(d,0,v)))
+if(y.w.b(d))return new Uint8Array(A.cf(d))
 if(typeof d=="string")try{x=C.cM.aO(d)
 return x}catch(w){return v}return v},
 aSp(d){return B.iqR(d)},
@@ -56,9 +56,9 @@ o=$.aPI
 x=7
 return A.b(o==null?$.aPI=B.heu():o,$async$aSp)
 case 7:s=f
-r=J.mj(s,"thumbs","readonly")
+r=J.mk(s,"thumbs","readonly")
 x=8
-return A.b(C.iE.xO(J.mi(r,"thumbs"),m),$async$aSp)
+return A.b(C.iE.xO(J.mj(r,"thumbs"),m),$async$aSp)
 case 8:q=f
 x=9
 return A.b(J.ow(r),$async$aSp)
@@ -147,7 +147,7 @@ w=C.cA.j(0.12)
 v=t.a
 u=v.r
 v=v.w
-return A.q(s,A.X(u,v==null?C.cA:v,s,s,s,32),C.f,w,s,s,s,r,s,s,s,s,s,x)}}
+return A.r(s,A.X(u,v==null?C.cA:v,s,s,s,32),C.f,w,s,s,s,r,s,s,s,s,s,x)}}
 var z=a.updateTypes([])
 B.eVc.prototype={
 $0(){return this.a.d=this.b},
@@ -161,7 +161,7 @@ x(B.bnz,A.ah)
 x(B.eVc,A.iK)
 x(B.fx2,A.hv)})()
 A.iU(b.typeUniverse,JSON.parse('{"aGL":{"af":[],"v":[]},"bnz":{"ah":["aGL"]}}'))
-var y={i:A.at("uO"),h:A.at("ru"),w:A.at("ai<H>"),A:A.at("m5"),o:A.at("dL"),n:A.at("dL?"),v:A.at("~")};(function staticFields(){$.fwh=A.T(A.at("n"),A.at("mp<aE>"))
+var y={i:A.at("uO"),h:A.at("ru"),w:A.at("ai<H>"),A:A.at("m6"),o:A.at("dL"),n:A.at("dL?"),v:A.at("~")};(function staticFields(){$.fwh=A.T(A.at("n"),A.at("mq<aE>"))
 $.coS=A.T(A.at("n"),y.o)
 $.aPI=null})()};
-(a=>{a["9LYmkljsEaixakzDd7b8a1iIO5Q="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["1hksFrnkmI0CJAkqvH/HPkNKDZc="]=a.current})($__dart_deferred_initializers__);
