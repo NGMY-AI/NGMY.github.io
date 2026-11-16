@@ -605,12 +605,12 @@ if(t>=0&&u!==0)k.I(0,""+t)}s=C.Dw(""+w,k,f,4)
 k=y.p
 t=A.a([],k)
 if(j+i<=12){r=A.a([],k)
-for(q=0;q<j;++q)r.push(A.d(v,n,n,n,n,n,n,B.mD,n,n,n))
+for(q=0;q<j;++q)r.push(A.d(v,n,n,n,n,n,n,B.mC,n,n,n))
 r=A.bX(B.fV,r,B.bt,n,0,0)
 p=l?"take away":"plus"
 p=A.d(p,n,n,n,n,n,n,A.m(n,n,B.bi,n,n,n,n,n,n,n,n,16,n,n,B.I,n,n,!0,n,n,n,n,n,n,n,n),n,n,n)
 o=A.a([],k)
-for(q=0;q<i;++q)o.push(A.d(v,n,n,n,n,n,n,B.mD,n,n,n))
+for(q=0;q<i;++q)o.push(A.d(v,n,n,n,n,n,n,B.mC,n,n,n))
 B.d.u(t,A.a([r,p,A.bX(B.fV,o,B.bt,n,0,0),B.T],k))}k=l?"\u2212":"+"
 t.push(A.d(""+j+" "+k+" "+i+" = ?",n,n,n,n,n,n,A.m(n,n,B.as,n,n,n,n,n,n,n,n,34,n,n,B.I,n,n,!0,n,n,n,n,n,n,n,n),n,n,n))
 return new C.pm(A.x(t,B.l,n,B.e,B.P,0,B.p),s.a,s.b,!0)},
@@ -862,7 +862,7 @@ case"orbit_dodge":return new C.atV(d,x)
 case"cascade_match":return new C.atP(d,x)
 default:throw A.W(A.dN("Unknown premium vault game: "+w,x))}},
 RU(d,e,f,g,h,i,j){var x=null,w=y.p
-w=A.a([new A.D(D.bIs,A.A(A.a([A.aI(x,x,x,x,B.lp,x,x,x,new C.fzu(f),x,x,x,x,x,x),A.E(A.d(j,x,x,x,x,x,x,A.m(x,x,B.d.gH(e),x,x,x,x,x,x,x,x,14,x,x,B.u,x,x,!0,x,1.2,x,x,x,x,x,x),B.K,x,x),1),B.fib],w),B.l,x,B.e,B.i,0,x,x),x),new A.D(B.mg,A.A(A.a([A.d("SCORE  "+i,x,x,x,x,x,x,B.hu,x,x,x),A.d(h,x,x,x,x,x,x,A.m(x,x,B.d.gal(e).j(0.95),x,x,x,x,x,x,x,x,15,x,x,B.u,x,x,!0,x,x,x,x,x,x,x,x),x,x,x)],w),B.l,x,B.iX,B.i,0,x,x),x),B.T,A.E(d,1)],w)
+w=A.a([new A.D(D.bIs,A.A(A.a([A.aI(x,x,x,x,B.lp,x,x,x,new C.fzu(f),x,x,x,x,x,x),A.E(A.d(j,x,x,x,x,x,x,A.m(x,x,B.d.gH(e),x,x,x,x,x,x,x,x,14,x,x,B.u,x,x,!0,x,1.2,x,x,x,x,x,x),B.K,x,x),1),B.fib],w),B.l,x,B.e,B.i,0,x,x),x),new A.D(B.mf,A.A(A.a([A.d("SCORE  "+i,x,x,x,x,x,x,B.hu,x,x,x),A.d(h,x,x,x,x,x,x,A.m(x,x,B.d.gal(e).j(0.95),x,x,x,x,x,x,x,x,15,x,x,B.u,x,x,!0,x,x,x,x,x,x,x,x),x,x,x)],w),B.l,x,B.iX,B.i,0,x,x),x),B.T,A.E(d,1)],w)
 w.push(new A.D(B.yP,A.d(g,x,x,x,x,x,x,A.m(x,x,B.c.j(0.35),x,x,x,x,x,x,x,x,11,x,x,x,x,x,!0,x,x,x,x,x,x,x,x),B.K,x,x),x))
 return A.c4(x,B.ia,A.bm(!0,A.x(w,B.l,x,B.e,B.i,0,B.p),!0,!1,B.ag,!0,!0),x,!1,!1,x,x)},
 Dx(d,e){var x=0,w=A.j(y.S),v,u
@@ -2659,7 +2659,7 @@ s.E(new A.aq(n+l,v))
 s.E(new A.aq(n+k,h))
 s.E(new A.bu())
 h=A.K()
-h.sav(new A.a8(B.aA,B.aE,B.x,A.a([B.hA.j(0.85),B.cD.j(0.55),B.jY.j(0.7)],t),o,o).aK(0,A.bt(new A.p(n,m-a0*0.3),a0*0.4,f*0.5)))
+h.sav(new A.a8(B.aA,B.aE,B.x,A.a([B.hA.j(0.85),B.cD.j(0.55),B.jZ.j(0.7)],t),o,o).aK(0,A.bt(new A.p(n,m-a0*0.3),a0*0.4,f*0.5)))
 d.af(s,h)
 h=f*0.12
 t=n-h
@@ -3116,7 +3116,7 @@ for(r=s.d,x=r.length,w=0;w<r.length;r.length===x||(0,A.I)(r),++w)s.aUn(d,e,r[w].
 r=s.e
 if(r!=null){v=new A.p(r.a*e.a,r.b*e.b)
 r=22*(1+Math.sin(s.r*3.5)*0.1+s.f*0.06)
-u=A.bn(A.bt(v,r,r),B.mx)
+u=A.bn(A.bt(v,r,r),B.mw)
 $.S()
 r=A.K()
 r.r=B.aQ.j(0.2).gp(0)
@@ -3206,7 +3206,7 @@ n=A.a([n,r.gaj1()],y.U)
 u=r.d
 t=A.l(30)
 s=A.a([new A.ab(0,B.G,B.w.j(0.18),B.eR,24)],y.V)
-return new A.an(B.a0,q,B.ad,B.t,A.a([o,m,A.x(A.a([new A.D(F.ami,k,q),new A.D(B.a0S,v,q),new A.D(B.lj,w,q),A.E(A.as(A.c6(new A.ha(n),new C.drn(r),A.oB(A.r(q,A.n8(r.gK6().a,q,q,B.eS,!0,D.fDX,B.K,q,B.bY),B.f,q,q,new A.o(B.c,q,q,t,s,q,B.n),q,q,new A.bs(u,y.a),B.mg,B.a12,q,q,q),B.n_,A.pW(),B.b_,B.b_,new C.dro())),q,q,q),1),new A.D(B.Cs,A.cr(new C.drp(r)),q)],l),B.l,q,B.e,B.i,0,B.p),A.bS(0,new A.du(!0,A.c6(r.gag_(),new C.drq(r),q),q),0,0,0)],l),q)},
+return new A.an(B.a0,q,B.ad,B.t,A.a([o,m,A.x(A.a([new A.D(F.ami,k,q),new A.D(B.a0S,v,q),new A.D(B.lj,w,q),A.E(A.as(A.c6(new A.ha(n),new C.drn(r),A.oB(A.r(q,A.n8(r.gK6().a,q,q,B.eS,!0,D.fDX,B.K,q,B.bY),B.f,q,q,new A.o(B.c,q,q,t,s,q,B.n),q,q,new A.bs(u,y.a),B.mf,B.a12,q,q,q),B.n_,A.pW(),B.b_,B.b_,new C.dro())),q,q,q),1),new A.D(B.Cs,A.cr(new C.drp(r)),q)],l),B.l,q,B.e,B.i,0,B.p),A.bS(0,new A.du(!0,A.c6(r.gag_(),new C.drq(r),q),q),0,0,0)],l),q)},
 ceD(d,e){var x,w,v,u,t,s,r,q=this,p=null,o=q.w,n=o===d,m=o!=null&&d===q.gK6().c
 if(m)x=B.bd
 else x=n?B.ay:B.c
@@ -3404,7 +3404,7 @@ case 2:if(!(t=v.c,t!=null)){x=3
 break}t=A.a6(t,!1)
 s=A.ec(new C.eSR(p,v),!1,null,u)
 r=t.e
-r.a.push(new A.p2(s,null,!1,B.Xe,B.mM,new A.Lp(new ($.ajf())(B.mM)),B.mM))
+r.a.push(new A.p2(s,null,!1,B.Xe,B.mL,new A.Lp(new ($.ajf())(B.mL)),B.mL))
 r.b0()
 t.Pa()
 t.Xf()
@@ -3794,7 +3794,7 @@ d.ar(new A.a1(0,0,0+f,0+e),x)
 for(x=h.d,w=x.length,v=y.O,u=0;u<x.length;x.length===w||(0,A.I)(x),++u){t=x[u]
 if(!t.c)continue
 s=t.a
-r=A.bn(s,B.mx)
+r=A.bn(s,B.mw)
 $.S()
 q=new A.ao(B.O,B.M,B.R,B.S,B.Q)
 p=t.b
@@ -3822,7 +3822,7 @@ k=new A.p(x.a*f,x.b*e)
 $.S()
 x=A.K()
 x.r=B.d.gH(w).j(0.35).gp(0)
-x.y=B.mh
+x.y=B.mg
 d.N(k,10,x)
 x=A.K()
 x.sav(A.wh(k,8,A.a([B.c,B.d.gH(w)],v),g,B.x,g,g,0))
@@ -4082,7 +4082,7 @@ i.r=B.he.j(0.45).gp(0)
 i.c=1
 d.ah(new A.p(j,m),new A.p(j+10,l),i)}}f=g.b*f
 e=g.c*e
-h=A.bn(A.bt(new A.p(f,e),36,28),B.jN)
+h=A.bn(A.bt(new A.p(f,e),36,28),B.jO)
 $.S()
 x=A.K()
 v=f+0
@@ -4204,7 +4204,7 @@ n.r=o.j(0.55).gp(0)
 d.N(q,p,n)
 n=new A.ao(B.O,B.M,B.R,B.S,B.Q)
 n.r=o.j(0.25).gp(0)
-n.y=B.mh
+n.y=B.mg
 d.N(q,p,n)
 n=-p
 o=new A.ao(B.O,B.M,B.R,B.S,B.Q)
@@ -4275,7 +4275,7 @@ o=new A.p(s.a*m,s.b*l)
 $.S()
 l=A.K()
 l.r=B.d.gH(x).j(0.4).gp(0)
-l.y=B.mh
+l.y=B.mg
 d.N(o,10,l)
 l=A.K()
 l.r=B.c.gp(0)
@@ -4550,7 +4550,7 @@ v=x-6
 u=b5.f
 t=b5.b
 s=u*t.length+12
-r=A.bn(new A.a1(w,v,w+s,v+s),B.jO)
+r=A.bn(new A.a1(w,v,w+s,v+s),B.jP)
 s=A.K()
 s.r=B.w.j(0.35).gp(0)
 b8.an(r,s)
@@ -4561,7 +4561,7 @@ a9=j[B.o.F(a8,6)]
 if(e&&i===a6){$.S()
 b0=new A.ao(B.O,B.M,B.R,B.S,B.Q)
 b0.r=g.j(0.35).gp(0)
-b0.y=B.mh
+b0.y=B.mg
 b8.N(new A.p(a7,d),h,b0)}b0=$.S().r
 b1=A.a([],s)
 b2=new A.aG(b0,B.ai,b6,b6,b1)
@@ -6792,7 +6792,7 @@ w=this.b
 $.S()
 x=A.K()
 x.r=f.j(0.35).gp(0)
-x.y=B.mh
+x.y=B.mg
 w.an(v,x)
 x=A.K()
 x.r=f.gp(0)
@@ -7355,7 +7355,7 @@ D.bSq=new A.a_(63632,"MaterialIcons",!1)
 D.bZt=new A.ae(G.zq,16,B.bq,null,null,null)
 D.c0N=new A.ae(B.zh,14,B.bW,null,null,null)
 D.c27=new A.ae(G.zq,18,B.aQ,null,null,null)
-D.c2e=new A.ae(B.jJ,18,B.aT,null,null,null)
+D.c2e=new A.ae(B.jK,18,B.aT,null,null,null)
 D.ago=new A.u(1,1,0.9686274509803922,0.6823529411764706,B.q)
 D.dab=x([D.ago,B.aQ,B.b9],y.O)
 D.c97=new A.a8(B.a7,B.aa,B.x,D.dab,null,null)
@@ -7457,7 +7457,7 @@ D.b0h=new C.Gn(3,"laserLane")
 D.d4o=x([B.bl,B.aG],y.O)
 D.hvg=new C.uj("sky_flap","Sky Flap","Sky Flap","Tap to soar. Thread the pipes. Don\u2019t fall.",D.b0h,D.d4o,B.PB)
 D.b0i=new C.Gn(4,"orbPop")
-D.hvj=new C.uj("crystal_breaker","Crystal Breaker","Crystal Breaker","Bounce the orb. Shatter every crystal.",D.b0i,B.IA,B.mn)
+D.hvj=new C.uj("crystal_breaker","Crystal Breaker","Crystal Breaker","Bounce the orb. Shatter every crystal.",D.b0i,B.IA,B.mm)
 D.b0j=new C.Gn(5,"helixHold")
 D.dg7=x([B.ay,B.aQ],y.O)
 D.hvd=new C.uj("fruit_slash","Fruit Slash","Fruit Slash","Swipe to slice. Avoid the bombs.",D.b0j,D.dg7,B.CX)
@@ -7671,7 +7671,7 @@ D.etG=new A.p(0.72,0.4)
 D.etK=new A.p(0.2,0.38)
 D.etP=new A.p(0.5,0.6)
 D.bFg=new A.R(18,10,18,6)
-D.fUv=new A.B("What do you want to learn?",null,B.mC,null,null,null,null,null,null,null,null,null)
+D.fUv=new A.B("What do you want to learn?",null,B.mB,null,null,null,null,null,null,null,null,null)
 D.eul=new A.D(D.bFg,D.fUv,null)
 D.fSe=new A.B("Drag the wheel to steer \xb7 hold GAS",null,B.AW,null,null,null,null,null,null,null,null,null)
 D.euz=new A.D(B.i0,D.fSe,null)
@@ -7744,8 +7744,8 @@ x($,"iFb","aTb",()=>{var w,v,u,t,s,r=A.a([],y.R)
 for(w=$.hkl(),v=w.length,u=0;u<w.length;w.length===v||(0,A.I)(w),++u){t=w[u]
 s=t.b
 r.push(new C.uj(t.a,s,s,t.c,D.Lk,t.f,t.e))}return r})
-x($,"iFc","hLY",()=>A.a([C.LG("kid_count","Count It","Count the things and tap the number.","\ud83d\udd22",D.bSq,D.dct,C.isN()),C.LG("kid_letters","First Letter","What letter does it start with?","\ud83d\udd24",D.bPK,D.diw,C.isP()),C.LG("kid_colors","Colour Hunt","Learn your colours.","\ud83c\udfa8",B.ml,H.aBC,C.isM()),C.LG("kid_shapes","Shape Finder","Circles, stars, hearts and more.","\ud83d\udd3a",B.Pr,D.duM,C.isS()),C.LG("kid_math","Fruit Maths","Add and take away with fruit.","\ud83c\udf4e",B.Pq,D.cYm,C.isQ()),C.LG("kid_homes","Animal Homes","Where does each animal live?","\ud83d\udc27",B.D8,D.d5g,C.isO()),C.LG("kid_swahili","Kiswahili Words","Jifunze maneno ya Kiswahili.","\ud83d\udde3\ufe0f",B.qT,D.d5M,C.isU()),C.LG("kid_bigsmall","Big or Small","Which one is bigger or smaller?","\ud83d\udc18",G.arb,D.dx6,C.isL()),C.LG("kid_spell","Missing Letter","Fill in the missing letter.","\u270f\ufe0f",L.ar2,D.duf,C.isT()),C.LG("kid_pattern","What Comes Next","Finish the pattern.","\ud83e\udde9",F.a3a,D.d7h,C.isR()),C.hcf(new C.fK1(),B.IA,"\ud83c\udccf",Q.HT,"kid_memory",new C.fK2(),"LEARN","Flip the cards and find the pairs.","Memory Match"),C.hcf(new C.fK3(),B.S_,"\ud83c\udf88",B.k8,"kid_balloons",new C.fK4(),"LEARN","Pop the balloons with the right letter.","Letter Balloons")],A.at("O<ZE>")))
+x($,"iFc","hLY",()=>A.a([C.LG("kid_count","Count It","Count the things and tap the number.","\ud83d\udd22",D.bSq,D.dct,C.isN()),C.LG("kid_letters","First Letter","What letter does it start with?","\ud83d\udd24",D.bPK,D.diw,C.isP()),C.LG("kid_colors","Colour Hunt","Learn your colours.","\ud83c\udfa8",B.mk,H.aBC,C.isM()),C.LG("kid_shapes","Shape Finder","Circles, stars, hearts and more.","\ud83d\udd3a",B.Pr,D.duM,C.isS()),C.LG("kid_math","Fruit Maths","Add and take away with fruit.","\ud83c\udf4e",B.Pq,D.cYm,C.isQ()),C.LG("kid_homes","Animal Homes","Where does each animal live?","\ud83d\udc27",B.D8,D.d5g,C.isO()),C.LG("kid_swahili","Kiswahili Words","Jifunze maneno ya Kiswahili.","\ud83d\udde3\ufe0f",B.qT,D.d5M,C.isU()),C.LG("kid_bigsmall","Big or Small","Which one is bigger or smaller?","\ud83d\udc18",G.arb,D.dx6,C.isL()),C.LG("kid_spell","Missing Letter","Fill in the missing letter.","\u270f\ufe0f",L.ar2,D.duf,C.isT()),C.LG("kid_pattern","What Comes Next","Finish the pattern.","\ud83e\udde9",F.a3a,D.d7h,C.isR()),C.hcf(new C.fK1(),B.IA,"\ud83c\udccf",Q.HT,"kid_memory",new C.fK2(),"LEARN","Flip the cards and find the pairs.","Memory Match"),C.hcf(new C.fK3(),B.S_,"\ud83c\udf88",B.k8,"kid_balloons",new C.fK4(),"LEARN","Pop the balloons with the right letter.","Letter Balloons")],A.at("O<ZE>")))
 x($,"iFd","hkl",()=>{var w=A.h8x($.hLY(),!0,A.at("ZE"))
 B.d.u(w,$.hLX())
 return w})})()};
-(a=>{a["mlNKeDpV5QhsUgLhbM3EfyfcD7U="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["wGgz2quWc+dSLghlfeBOE9L5OB0="]=a.current})($__dart_deferred_initializers__);

@@ -443,7 +443,7 @@ v=q.Q
 u=q.as
 t=q.ch
 s=t?B.oJ:I.th
-s=C.a([new E.dW("Mirror",w,new A.eqX(q),B.D0,B.be,p),new E.dW("Spin",v,new A.eqY(q),F.apX,B.be,p),new E.dW("Rainbow",u,new A.eqZ(q),B.ml,B.be,p),new E.dW("Sound",t,new A.er_(q),s,B.be,p)],o)
+s=C.a([new E.dW("Mirror",w,new A.eqX(q),B.D0,B.be,p),new E.dW("Spin",v,new A.eqY(q),F.apX,B.be,p),new E.dW("Rainbow",u,new A.eqZ(q),B.mk,B.be,p),new E.dW("Sound",t,new A.er_(q),s,B.be,p)],o)
 t=C.a([],o)
 for(r=0;r<8;++r){w=F.DO[r]
 v=!q.as&&q.at===r
@@ -552,13 +552,13 @@ if(w===$){w=p.Q=p.J8()
 v=w}else v=w
 i=w[x]
 u=new C.ay(B.aT,1,B.r,-1)
-g=m[x]?B.jJ:B.qR
+g=m[x]?B.jK:B.qR
 g=C.az(o,C.X(g,v[x].iV()>0.5?B.bq:B.c,o,o,o,20),B.y,!1,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,new A.euo(p,x),o,o,o,o,o,o,!1,B.a4)
 w=p.Q
 t=B.a.b2("#"+B.a.b2(B.o.ft((w===$?p.Q=p.J8():w)[x].l(),16),2).toUpperCase(),1)
 w=p.Q
 s=(w===$?p.Q=p.J8():w)[x].iV()>0.5?B.bq:B.c
-j.push(new C.bz(1,B.bb,C.az(o,C.r(o,C.x(C.a([g,B.am,C.d(t,o,o,o,o,o,o,new C.F(!0,s,o,o,o,o,9.5,B.u,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o),o,o,o),B.T],f),B.l,o,B.ms,B.i,0,B.p),B.f,o,o,new C.o(i,o,new C.bG(u,u,u,u),new C.be(k,k,k,k),o,o,B.n),o,112,o,new C.R(0,0,l,0),o,o,o,o),B.y,!1,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,new A.eup(p,x),o,o,o,o,o,o,!1,B.a4),o))}m=C.A(j,B.l,o,B.e,B.i,0,o,o)
+j.push(new C.bz(1,B.bb,C.az(o,C.r(o,C.x(C.a([g,B.am,C.d(t,o,o,o,o,o,o,new C.F(!0,s,o,o,o,o,9.5,B.u,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o),o,o,o),B.T],f),B.l,o,B.mr,B.i,0,B.p),B.f,o,o,new C.o(i,o,new C.bG(u,u,u,u),new C.be(k,k,k,k),o,o,B.n),o,112,o,new C.R(0,0,l,0),o,o,o,o),B.y,!1,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,new A.eup(p,x),o,o,o,o,o,o,!1,B.a4),o))}m=C.A(j,B.l,o,B.e,B.i,0,o,o)
 l=C.l(20)
 k=p.gpG()[4].j(0.35)
 j=C.L(p.gpG()[0].j(0.6),B.r,1)
@@ -1170,7 +1170,7 @@ o.r=B.w.j(0.5).gp(0)
 o.y=B.OD
 a3.an(t,o)
 o=new C.ao(B.O,B.M,B.R,B.S,B.Q)
-o.sav(new C.a8(B.b0,B.b7,B.x,k?C.a([B.bl,B.mO],w):C.a([B.br,B.dF],w),d,d).aK(0,i))
+o.sav(new C.a8(B.b0,B.b7,B.x,k?C.a([B.bl,B.mN],w):C.a([B.br,B.dF],w),d,d).aK(0,i))
 a3.an(h,o)
 if(v===m){t=Math.sin(p)
 o=new C.ao(B.O,B.M,B.R,B.S,B.Q)
@@ -1226,7 +1226,7 @@ A.bkm.prototype={
 a5(d,e){var x,w,v,u,t,s,r,q,p,o,n,m,l,k=this,j=e.a,i=j/16,h=e.b
 j=0+j
 x=0+h
-w=C.bn(new C.a1(0,0,j,x),B.jN)
+w=C.bn(new C.a1(0,0,j,x),B.jO)
 $.S()
 v=C.K()
 v.r=B.c.j(0.05).gp(0)
@@ -1248,7 +1248,7 @@ if(v>=0){t=v*i+w
 w=C.K()
 w.c=2.5
 w.r=B.c.j(0.9).gp(0)
-d.ah(new C.p(t,4),new C.p(t,h-4),w)}if(k.e){j=C.bn(new C.a1(0,0,j,x),B.jN)
+d.ah(new C.p(t,4),new C.p(t,h-4),w)}if(k.e){j=C.bn(new C.a1(0,0,j,x),B.jO)
 h=C.K()
 h.b=B.a9
 h.c=2
@@ -2012,7 +2012,7 @@ D.IH=x([D.hFC,D.hFR,D.hFI,D.hFG,D.hFH,D.hFJ,D.hFL,D.hFK,D.hFM,D.hFO,D.hFE,D.hFP,
 D.f4V=new C.b5("down","Down",B.qM)
 D.f3x=new C.b5("up","Up",B.t7)
 D.f68=new C.b5("left","Left",B.k7)
-D.f30=new C.b5("right","Right",B.jI)
+D.f30=new C.b5("right","Right",B.jJ)
 D.f5n=new C.b5("zero","Off",B.wK)
 D.duN=x([D.f4V,D.f3x,D.f68,D.f30,D.f5n],y.c)
 D.f23=new C.b5("kick","Kick",B.bZ)
@@ -2059,4 +2059,4 @@ D.fDy=new C.F(!0,B.an,null,null,null,null,10,B.I,null,null,null,null,null,null,n
 D.fzS=new C.F(!0,B.bZ,null,null,null,null,11,B.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fSY=new C.B("\u25cf RECORDING",null,D.fzS,null,null,null,null,null,null,null,null,null)
 D.fVP=new C.B("Go",null,B.iG,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["5yRj7HEwBPVDHH7xrGvan5cs+Kw="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["Mnx+mUb6P6s+clSDD/e2VYPUPx0="]=a.current})($__dart_deferred_initializers__);

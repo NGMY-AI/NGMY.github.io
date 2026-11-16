@@ -604,7 +604,7 @@ D.d98=x([B.fs,B.aQ],y.O)
 D.hyU=new C.yR("alarms","Alarms",B.a2U,B.c6,D.d98)
 D.drr=x([B.ok,B.cD],y.O)
 D.hyT=new C.yR("menu","Local Menu",B.wT,B.cD,D.drr)
-D.dtW=x([B.jX,B.ci],y.O)
+D.dtW=x([B.jY,B.ci],y.O)
 D.hyW=new C.yR("bio","Local Bio",B.hR,B.ci,D.dtW)
 D.dkn=x([D.hyX,D.hyY,D.hyV,D.hyS,D.hz0,D.hyZ,D.hz_,D.hyU,D.hyT,D.hyW],A.at("O<yR>"))
 D.dnV=x([],A.at("O<jO>"))
@@ -612,4 +612,4 @@ D.fgQ=new A.av(0,42)
 D.fj9=new A.hJ(2,10,10,1.28,null)
 D.fEw=new A.F(!0,B.c,null,null,null,null,12,B.u,null,null,null,null,1.15,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.h4H=new A.B("Open / add",null,B.cg,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["0oDoF4qJIJ5ivt0AqLbT3WxPnpc="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["6rzR6v0+/GUVnaJ1+mGRfWBrUxk="]=a.current})($__dart_deferred_initializers__);

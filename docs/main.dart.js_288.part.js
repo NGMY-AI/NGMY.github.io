@@ -2277,7 +2277,7 @@ x.dV$.I(0,this.gcei())},
 cej(){var x,w,v,u,t,s,r,q=this,p=q.gJI().x
 p===$&&C.c()
 x=q.e.a.a
-w=Math.max(1,(x.length===0?A.mz:new C.mz(x)).gJ(0))
+w=Math.max(1,(x.length===0?A.my:new C.mz(x)).gJ(0))
 if(q.Q&&p>=q.as)for(x=w-1,v=w<=1,u=0;u<w;++u){t=q.f
 s=t==="type"
 if(s)r=u/w/1.8
@@ -2846,7 +2846,7 @@ cep(d){var x,w,v,u,t,s=null,r=C.b0(d.z),q=d.c,p=q*8.317,o=new B.eJU(),n=C.l(20),
 if(j)k="Star"
 else k=k==="dwarf"?"Dwarf planet":"Planet"
 x=y.p
-k=C.A(C.a([l,A.af,C.E(C.d(d.a+"  \xb7  "+k,s,s,s,s,s,s,A.jP,s,s,s),1),C.aI(s,s,s,s,A.Q7,s,s,s,new B.eJT(this),s,s,s,s,s,A.ch)],x),A.l,s,A.e,A.i,0,s,s)
+k=C.A(C.a([l,A.af,C.E(C.d(d.a+"  \xb7  "+k,s,s,s,s,s,s,A.jQ,s,s,s),1),C.aI(s,s,s,s,A.Q7,s,s,s,new B.eJT(this),s,s,s,s,s,A.ch)],x),A.l,s,A.e,A.i,0,s,s)
 l=C.d(d.y,s,s,s,s,s,s,F.L0,s,s,s)
 w=o.$2("WIDTH",B.HK(d.d*2)+" km")
 v=q===0
@@ -4966,7 +4966,7 @@ return{V:x("O<ab>"),O:x("O<u>"),l:x("O<ID>"),y:x("O<ai<ID>>"),f:x("O<ai<ai<G>>>"
 D.fZC=new C.B("Press Drop! and watch them fall from 20 metres.",null,A.kk,null,A.K,null,null,null,null,null,null,null)
 D.eur=new C.D(A.nL,D.fZC,null)
 D.bdS=new C.cj(A.A,null,null,D.eur,null)
-D.fEj=new C.F(!0,A.jZ,null,null,null,null,18,A.I,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fEj=new C.F(!0,A.k_,null,null,null,null,18,A.I,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.h3w=new C.B("Draw anywhere",null,D.fEj,null,null,null,null,null,null,null,null,null)
 D.bdX=new C.cj(A.A,null,null,D.h3w,null)
 D.bgw=new C.u(1,0.8509803921568627,1,0.8941176470588236,A.q)
@@ -5012,7 +5012,7 @@ D.wL=new C.a_(63128,"MaterialIcons",!1)
 D.HM=new C.a_(63726,"MaterialIcons",!1)
 D.ar_=new C.a_(983415,"MaterialIcons",!1)
 D.bTY=new C.a_(984561,"MaterialIcons",!1)
-D.bUx=new C.ae(A.mk,24,A.aQ,null,null,null)
+D.bUx=new C.ae(A.mj,24,A.aQ,null,null,null)
 D.bVR=new C.ae(A.n7,21,A.ab,null,null,null)
 D.ast=new C.ae(A.eM,19,null,null,null,null)
 D.oN=new C.ae(A.uX,21,A.ab,null,null,null)
@@ -5093,7 +5093,7 @@ D.h8a=new B.yK("Betelgeuse",531e6,4294472049)
 D.h8d=new B.yK("UY Scuti",667e6,4293870660)
 D.S9=x([D.h8e,D.h8b,D.h8f,D.h8g,D.h8c,D.h8h,D.h8i,D.h89,D.h8a,D.h8d],C.at("O<yK>"))
 D.f6q=new C.b5("glow","Glow",A.Hu)
-D.f3n=new C.b5("rainbow","Rainbow",A.ml)
+D.f3n=new C.b5("rainbow","Rainbow",A.mk)
 D.f3O=new C.b5("stars","Stars",A.i4)
 D.f34=new C.b5("sparks","Sparks",A.ed)
 D.f5u=new C.b5("fire","Fire",A.uY)
@@ -5299,7 +5299,7 @@ D.fGg=new C.F(!0,A.c,null,null,null,null,13,A.a8,null,null,null,null,1.4,null,nu
 D.fMm=new C.B("Got it",null,null,null,null,null,null,null,null,null,null,null)
 D.fNe=new C.B("Your mass never changes. What changes is how hard each world pulls on it.",null,A.KM,null,null,null,null,null,null,null,null,null)
 D.fO8=new C.B("Connect to the internet once and open the globe. After that it works with no internet at all.",null,A.W5,null,A.K,null,null,null,null,null,null,null)
-D.fzJ=new C.F(!0,A.jZ,null,null,null,null,11,null,null,null,null,null,1.4,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fzJ=new C.F(!0,A.k_,null,null,null,null,11,null,null,null,null,null,1.4,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fPG=new C.B("Bars use a squeezed scale so the Sun fits. The numbers are the true values: what a scale would read, and how high you could jump.",null,D.fzJ,null,null,null,null,null,null,null,null,null)
 D.fWr=new C.B("The map of the world is not saved on this phone yet",null,A.fG,null,A.K,null,null,null,null,null,null,null)
 D.fWB=new C.B("Download the animation (GIF)",null,A.cG,null,null,null,null,null,null,null,null,null)
@@ -5310,4 +5310,4 @@ $.hc9=null
 $.i4w=C.T(C.at("n"),C.at("iK"))
 $.i5A=C.T(C.at("n"),C.at("iK"))})();(function lazyInitializers(){var x=a.lazyFinal
 x($,"iDn","hL4",()=>C.a([B.agA("EARTH GLOBE","Turn it, tap a country",A.n7,A.aG,new B.ftF()),B.agA("SOLAR SYSTEM","The Sun and its worlds",D.apZ,A.aQ,new B.ftG()),B.agA("GRAVITY LAB","Drop, weigh, orbit",F.a3M,A.cI,new B.ftH()),B.agA("BLACK HOLE","Throw in a star",A.Hi,A.be,new B.ftI()),B.agA("GALAXY","Build, tilt, collide",A.wK,A.h6,new B.ftJ()),B.agA("SIZE COMPARE","Earth next to a star",D.bRo,A.bT,new B.ftK()),B.agA("SEASONS & MOON","Why it is summer",A.wJ,A.bu,new B.ftL())],C.at("O<bwQ>")))})()};
-(a=>{a["euosdR5AnuX3cWebIzmjVDzXGw8="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["LGEEOPWZ0uGAbRIVsu9D0Zkahdg="]=a.current})($__dart_deferred_initializers__);

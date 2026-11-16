@@ -840,7 +840,7 @@ return x},
 B(b3){var x,w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0=this,b1=null,b2={}
 B.P(b3)
 x=y.w
-w=B.aF(b3,A.mI,x).w.ghI(0)
+w=B.aF(b3,A.mH,x).w.ghI(0)
 B.eG(b3,A.di,y.y).toString
 v=B.BQ(b3)
 B.P(b3)
@@ -950,7 +950,7 @@ B.P(a3)
 x=B.eG(a3,A.di,y.y)
 x.toString
 w=y.w
-v=B.aF(a3,A.mI,w).w.ghI(0)
+v=B.aF(a3,A.mH,w).w.ghI(0)
 u=B.BQ(a3)
 B.P(a3)
 t=B.yP(a3)
@@ -1115,7 +1115,7 @@ u.toString
 x=this.bVu(v,u)
 A.d.c9(x,0,A.bM)
 x.push(A.bM)
-u=B.aF(d,A.mI,y.w).w.ghI(0)===A.oX?384:480
+u=B.aF(d,A.mH,y.w).w.ghI(0)===A.oX?384:480
 return new B.cP(new B.aY(0,u,0,42),B.h8e(B.abu(x,!0,!1,!0),D.afG,null,!0),null)}}
 C.dzJ.prototype={
 Np(d){return new C.dzN(9,Math.max((d.w-16)/7,0),8,B.uy(d.x))},
@@ -1264,7 +1264,7 @@ m=m.bn.ok
 if(m==null){B.P(b5)
 m=B.yP(b5)
 m=m.gMR()}m=new B.hP(m,!0,A.I8,b2)}else m=A.I8
-a5.push(m)}A.d.u(a1,a5)}b0=B.aF(b5,A.mI,y.w).w.ghI(0)===A.oX?384:480
+a5.push(m)}A.d.u(a1,a5)}b0=B.aF(b5,A.mH,y.w).w.ghI(0)===A.oX?384:480
 return B.x(B.a([new B.cP(new B.aY(0,b0,0,1/0).N4(58),new B.D(A.h9,new B.bL(A.fd,b2,b2,new B.o_(!0,B.d(b4.ann(b1.a.x),b2,b2,b2,b2,b2,b2,b3.ok.z.nW(b3.ax.k3),b2,b2,b2),b2),b2),b2),b2),new B.cP(new B.aY(0,b0,0,s*42+(s-1)*8),B.h8e(B.abu(a1,!0,!1,!0),D.afG,A.dZ,!1),b2),A.ae],x),A.l,b2,A.e,A.i,0,A.p)}}
 C.aAU.prototype={
 S(){return new C.bfe(B.Qp(null))},
@@ -1364,7 +1364,7 @@ B(d){var x,w,v,u,t,s,r,q,p,o,n,m,l,k=this,j=null
 B.P(d)
 x=B.eG(d,A.di,y.y)
 x.toString
-w=B.aF(d,A.mI,y.w).w.ghI(0)
+w=B.aF(d,A.mH,y.w).w.ghI(0)
 v=B.BQ(d)
 B.P(d)
 u=B.yP(d)
@@ -2096,7 +2096,7 @@ r=B.E(new C.aCh("State Trust","Registrar reserve",r,q.r>0?"In "+d.hk(o)+" \xc2\x
 o=d.hk(w)
 q=d.d
 n=q.b
-r=B.A(B.a([r,A.bc,B.E(new C.aCh("Contribution Case","Community funds",o,q.f>0?"In "+d.hk(n)+" \xc2\xb7 Credits "+d.hk(d.d.f)+" \xc2\xb7 Out "+d.hk(x):"In "+d.hk(n)+" \xc2\xb7 Out "+d.hk(x),D.dhO,A.mm,a0),1)],p),A.l,a0,A.e,A.i,0,a0,a0)
+r=B.A(B.a([r,A.bc,B.E(new C.aCh("Contribution Case","Community funds",o,q.f>0?"In "+d.hk(n)+" \xc2\xb7 Credits "+d.hk(d.d.f)+" \xc2\xb7 Out "+d.hk(x):"In "+d.hk(n)+" \xc2\xb7 Out "+d.hk(x),D.dhO,A.ml,a0),1)],p),A.l,a0,A.e,A.i,0,a0,a0)
 q=B.d("Contribution money never enters State Trust. Only an authorized registrar can deposit into Trust or record spending from either ledger.",a0,a0,a0,a0,a0,a0,B.m(a0,a0,a1?A.bv:A.an,a0,a0,a0,a0,a0,a0,a0,a0,11,a0,a0,a0,a0,1.35,!0,a0,a0,a0,a0,a0,a0,a0,a0),A.K,a0,a0)
 o=B.a([],p)
 if(d.d.w.length!==0){n=B.a([],p)
@@ -2874,7 +2874,7 @@ $2(d,e){return A.T},
 $S:37}
 C.dTl.prototype={
 $2(d,e){var x,w,v=this,u=null,t=v.c[e],s=t.d,r=B.l(14),q=v.e.a,p=q?A.ry:A.aS,o=B.l(14),n=B.L(q?D.nE:A.e1,A.r,1),m=A.b3.j(0.12),l=B.l(12)
-l=B.r(A.A,B.X(A.mm,A.b3,u,u,u,20),A.f,u,u,new B.o(m,u,u,l,u,u,A.n),u,40,u,u,u,u,u,40)
+l=B.r(A.A,B.X(A.ml,A.b3,u,u,u,20),A.f,u,u,new B.o(m,u,u,l,u,u,A.n),u,40,u,u,u,u,u,40)
 m=B.d(t.b,u,2,A.a2,u,u,u,B.m(u,u,q?A.c:A.a_,u,u,u,u,u,u,u,u,14,u,u,A.u,u,u,!0,u,u,u,u,u,u,u,u),u,u,u)
 x=t.f.length
 w=y.p
@@ -3580,7 +3580,7 @@ m=B.a([n,A.aw,B.d(m,j,j,j,j,j,j,D.fC3,x.f?A.e5:A.bp,j,j),A.b1],l)
 i=i.a
 if(i.x!=null){x=i.f?A.e5:A.bp
 m.push(B.d("Tap to view",j,j,j,j,j,j,B.m(j,j,i.w.j(0.95),j,j,j,j,j,j,j,j,8,j,j,A.I,j,j,!0,j,j,j,j,j,j,j,j),x,j,j))}else m.push(A.ae)
-return B.uM(B.zp(B.r(j,new B.an(A.a0,j,A.ad,A.t,B.a([v,o,new B.D(D.bCT,B.x(m,A.al,j,A.e,A.i,0,A.p),j)],l),j),A.aq,j,j,new B.o(j,j,p,s,h,new B.a8(q,r,A.x,w,j,j),A.n),j,104,j,j,j,j,j,j),A.b_,A.k0,u),A.e3,A.iA,t)},
+return B.uM(B.zp(B.r(j,new B.an(A.a0,j,A.ad,A.t,B.a([v,o,new B.D(D.bCT,B.x(m,A.al,j,A.e,A.i,0,A.p),j)],l),j),A.aq,j,j,new B.o(j,j,p,s,h,new B.a8(q,r,A.x,w,j,j),A.n),j,104,j,j,j,j,j,j),A.b_,A.k1,u),A.e3,A.iA,t)},
 $S:1784}
 C.dFW.prototype={
 $3(d,e,f){return B.e1(A.A,f,e,null,null)},
@@ -3803,7 +3803,7 @@ D.bfS=new B.w7(A.dm,A.b3,A.c,null,null,null,null,null,null,A.yd,A.w,null,null,nu
 D.nE=new B.u(1,0.24705882352941178,0.24705882352941178,0.24705882352941178,A.q)
 D.fEW=new B.F(!0,A.et,null,null,null,null,20,A.u,null,1.4,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.h5G=new B.B("ALL STATES",null,D.fEW,null,A.K,null,null,null,null,null,null,null)
-D.fFI=new B.F(!0,A.mU,null,null,null,null,11,A.U,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fFI=new B.F(!0,A.mT,null,null,null,null,11,A.U,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fKf=new B.B("Delete all contributions \xc2\xb7 3 confirmations required",null,D.fFI,null,A.K,null,null,null,null,null,null,null)
 D.dBg=x([D.h5G,A.aw,D.fKf],y.p)
 D.bxV=new B.fm(A.ah,A.e,A.i,A.l,null,A.p,null,0,D.dBg,null)
@@ -3821,8 +3821,8 @@ D.as8=new B.ae(A.ek,16,A.bD,null,null,null)
 D.bYT=new B.ae(A.zw,18,A.c,null,null,null)
 D.bZk=new B.ae(A.ek,null,A.bD,null,null,null)
 D.bZW=new B.ae(A.pw,18,A.c,null,null,null)
-D.c_C=new B.ae(A.jM,null,A.bo,null,null,null)
-D.dsm=x([A.db,A.mX],y.O)
+D.c_C=new B.ae(A.jN,null,A.bo,null,null,null)
+D.dsm=x([A.db,A.mW],y.O)
 D.c84=new B.a8(A.a7,A.aa,A.x,D.dsm,null,null)
 D.d2b=x([A.an,A.bx,A.aM],y.O)
 D.d47=x(["Day","Week","Month","Year"],y.s)
@@ -3856,7 +3856,7 @@ D.fGA=new B.F(!0,A.et,null,null,null,null,14,A.u,null,null,null,null,null,null,n
 D.fLB=new B.B("Go back",null,A.fb,null,null,null,null,null,null,null,null,null)
 D.fOM=new B.B("Delete",null,A.cg,null,null,null,null,null,null,null,null,null)
 D.fRP=new B.B("Confirm",null,A.cg,null,null,null,null,null,null,null,null,null)
-D.fsX=new B.F(!0,A.mU,null,null,null,null,10,A.U,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fsX=new B.F(!0,A.mT,null,null,null,null,10,A.U,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fV3=new B.B("3 confirmations required \xc2\xb7 State Trust unchanged",null,D.fsX,null,A.K,null,null,null,null,null,null,null)
 D.fVV=new B.B("Deposit",null,null,null,null,null,null,null,null,null,null,null)
 D.fAL=new B.F(!0,A.bL,null,null,null,null,9,A.u,null,0.8,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
@@ -3867,4 +3867,4 @@ D.hyO=new C.ae8(0,"none")
 D.b15=new C.ae8(1,"highlightLeading")
 D.ada=new C.ae8(2,"highlightTrailing")
 D.b16=new C.ae8(3,"highlightAll")})()};
-(a=>{a["jBZQAxaCJQRZOjRwtJEwcK8cpMo="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["alS3/ADE0Nbvr1IXLvfV3ADEtXE="]=a.current})($__dart_deferred_initializers__);
