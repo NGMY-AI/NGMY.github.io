@@ -40,113 +40,111 @@ class NgmyIronTrianglePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The card, and the result plate UNDER it (not inside it), both the same width: nothing else, no empty space.
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: cardWidth),
-        child: AspectRatio(
-          aspectRatio: 1.586,
-          child: Container(
-            key: const Key('iron-triangle-steel'),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: const [
-                BoxShadow(color: Color(0x40000000), blurRadius: 14, offset: Offset(0, 6)),
-                BoxShadow(color: Color(0x26000000), blurRadius: 2, offset: Offset(0, 1)),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: CustomPaint(
-                painter: const NgmyIronMetalPainter(),
-                child: Stack(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 14, 10),
-                      child: Column(
-                        children: [
-                          Expanded(
-                            child: Row(
-                              children: [
-                                // Left: the polished triangle and the engraved title, like the logo on a card.
-                                SizedBox(
-                                  width: 92,
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      CustomPaint(
-                                        size: const Size(54, 46),
-                                        painter: NgmyChromeTrianglePainter(fastOn: triFast, cheapOn: triCheap, goodOn: triGood),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      const FittedBox(child: _Engraved('IRON TRIANGLE', size: 9, spacing: 1.6)),
-                                      const SizedBox(height: 2),
-                                      const _Engraved('Pick any two', size: 8.5, spacing: 0.4, weight: FontWeight.w700),
-                                    ],
-                                  ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AspectRatio(
+              aspectRatio: 1.586,
+              child: Container(
+                key: const Key('iron-triangle-steel'),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0x40000000), blurRadius: 8, offset: Offset(0, 3)),
+                    BoxShadow(color: Color(0x26000000), blurRadius: 2, offset: Offset(0, 1)),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: CustomPaint(
+                    painter: const NgmyIronMetalPainter(),
+                    child: Stack(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                          child: Row(
+                            children: [
+                              // Left: the polished triangle and the engraved title, like the logo on a card.
+                              SizedBox(
+                                width: 96,
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    CustomPaint(
+                                      size: const Size(66, 56),
+                                      painter: NgmyChromeTrianglePainter(fastOn: triFast, cheapOn: triCheap, goodOn: triGood),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    const FittedBox(child: _Engraved('IRON TRIANGLE', size: 10, spacing: 1.6)),
+                                    const SizedBox(height: 2),
+                                    const _Engraved('Pick any two', size: 9, spacing: 0.4, weight: FontWeight.w700),
+                                  ],
                                 ),
-                                const SizedBox(width: 10),
-                                // Right: the three switches.
-                                Expanded(
-                                  child: FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    child: SizedBox(
-                                      width: 190,
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          _ironRow(keyName: 'fast', label: 'FAST', active: triFast, accent: _fastC),
-                                          _groove(),
-                                          _ironRow(keyName: 'cheap', label: 'CHEAP', active: triCheap, accent: _cheapC),
-                                          _groove(),
-                                          _ironRow(keyName: 'good', label: 'GOOD', active: triGood, accent: _goodC),
-                                        ],
-                                      ),
+                              ),
+                              const SizedBox(width: 10),
+                              // Right: the three switches.
+                              Expanded(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: SizedBox(
+                                    width: 190,
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        _ironRow(keyName: 'fast', label: 'FAST', active: triFast, accent: _fastC),
+                                        _groove(),
+                                        _ironRow(keyName: 'cheap', label: 'CHEAP', active: triCheap, accent: _cheapC),
+                                        _groove(),
+                                        _ironRow(keyName: 'good', label: 'GOOD', active: triGood, accent: _goodC),
+                                      ],
                                     ),
                                   ),
                                 ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          // The result on an engraved dark-steel strip along the bottom of the card.
-                          Container(
-                            key: const Key('iron-triangle-result'),
-                            width: double.infinity,
-                            height: 40,
-                            alignment: Alignment.center,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              gradient: const LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [Color(0xFF4B5563), Color(0xFF1F2937), Color(0xFF374151)],
                               ),
-                              border: Border.all(color: const Color(0xFF9CA3AF), width: 1),
-                            ),
-                            child: Text(
-                              resultText,
-                              textAlign: TextAlign.center,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Color(0xFFF3F4F6),
-                                fontWeight: FontWeight.w700,
-                                fontSize: 10,
-                                height: 1.25,
-                                shadows: [Shadow(color: Colors.black54, blurRadius: 1, offset: Offset(0, 1))],
-                              ),
-                            ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                        ..._screws(),
+                      ],
                     ),
-                    ..._screws(),
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
+            const SizedBox(height: 8),
+            // The result on an engraved dark-steel plate under the card.
+            Container(
+              key: const Key('iron-triangle-result'),
+              constraints: const BoxConstraints(minHeight: 40),
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                gradient: const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFF4B5563), Color(0xFF1F2937), Color(0xFF374151)],
+                ),
+                border: Border.all(color: const Color(0xFF9CA3AF), width: 1),
+              ),
+              child: Text(
+                resultText,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFFF3F4F6),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                  height: 1.3,
+                  shadows: [Shadow(color: Colors.black54, blurRadius: 1, offset: Offset(0, 1))],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

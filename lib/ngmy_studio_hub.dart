@@ -544,6 +544,8 @@ class _StandaloneQuoteCalcDialogState extends State<_StandaloneQuoteCalcDialog> 
                     scan: scan,
                     orbit: orbit,
                     phase: 0.12,
+                    // The frame fits the card and the result plate under it: the same small edge all round.
+                    padding: const EdgeInsets.all(10),
                     child: NgmyIronTrianglePanel(
                       triFast: _triFast,
                       triCheap: _triCheap,
