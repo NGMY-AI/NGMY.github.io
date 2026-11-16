@@ -20,25 +20,25 @@ w=3
 v=0.006
 u=!1
 t=0
-switch(b3){case"piano":s=A.d7E
-r=A.ddi
+switch(b3){case"piano":s=A.d7D
+r=A.ddh
 w=3.4
 break
-case"organ":s=A.dc4
-r=A.dsU
+case"organ":s=A.dc3
+r=A.dsT
 v=0.02
 u=!0
 break
-case"bell":s=A.d2U
+case"bell":s=A.d2T
 r=A.d1C
 w=2.4
 break
-case"pluck":s=A.d7D
+case"pluck":s=A.d7C
 r=A.cO5
 w=7
 break
-case"synth":s=A.dtR
-r=A.dvG
+case"synth":s=A.dtQ
+r=A.dvF
 v=0.012
 u=!0
 break
@@ -70,7 +70,7 @@ break
 case"saw":d=D.i.F(i/6.283185307179586,1)*1.2-0.6
 break
 default:d=Math.sin(i)
-break}a0=d*(Math.min(1,h/120)*Math.pow(f,1.6))}a7.setInt16(44+h*2,D.o.D(D.i.V(a0*0.8*32e3),-32768,32767),!0)}return J.eT(D.dR.gaU(a7))},
+break}a0=d*(Math.min(1,h/120)*Math.pow(f,1.6))}a7.setInt16(44+h*2,D.o.D(D.i.V(a0*0.8*32e3),-32768,32767),!0)}return J.eT(D.dS.gaU(a7))},
 dE(d,e,f,g,h,i){return C.hYD(d,e,f,g,h,i)},
 hYD(d,e,f,g,h,i){var x=0,w=B.j(y.f),v=1,u=[],t,s,r,q,p,o
 var $async$dE=B.e(function(j,k){if(j===1){u.push(k)
@@ -131,14 +131,14 @@ A.co8=x([1,2,3],y.h)
 A.axi=x([1,-1],y.h)
 A.cO5=x([1,2,3,4,5,6,7],y.h)
 A.d1C=x([1,2.76,5.4,8.93,13.3],y.h)
-A.d2U=x([1,0.6,0.38,0.22,0.12],y.h)
-A.d7D=x([1,0.7,0.45,0.28,0.16,0.1,0.06],y.h)
-A.d7E=x([1,0.55,0.32,0.2,0.12,0.07],y.h)
-A.dc4=x([1,0.6,0.45,0.3,0.22,0.15],y.h)
-A.ddi=x([1,2,3,4,5,6],y.h)
-A.dsU=x([1,2,3,4,6,8],y.h)
-A.dtR=x([1,0.5,0.33,0.25,0.2,0.16,0.14,0.12],y.h)
-A.dvG=x([1,2,3,4,5,6,7,8],y.h)
+A.d2T=x([1,0.6,0.38,0.22,0.12],y.h)
+A.d7C=x([1,0.7,0.45,0.28,0.16,0.1,0.06],y.h)
+A.d7D=x([1,0.55,0.32,0.2,0.12,0.07],y.h)
+A.dc3=x([1,0.6,0.45,0.3,0.22,0.15],y.h)
+A.ddh=x([1,2,3,4,5,6],y.h)
+A.dsT=x([1,2,3,4,6,8],y.h)
+A.dtQ=x([1,0.5,0.33,0.25,0.2,0.16,0.14,0.12],y.h)
+A.dvF=x([1,2,3,4,5,6,7,8],y.h)
 A.dAk=x([1,0.18,0.06],y.h)
 A.ekO={"SPARK PAINTER":0,"MANDALA MAKER":1,"TITLE ANIMATOR":2,"PALETTE LAB":3,"GRAVITY TOY":4,"FIREWORK DESIGNER":5,"CIRCUIT LAB":6,"PERIODIC TABLE":7,"BODY EXPLORER":8,"SPIN THE WHEEL":9,"FOCUS TIMER":10,"MEMORY MATCH":11,"LUCKY POCKET":12,"ELECTRONICS LAB":13,"CONSTRUCTION LAB":14,"AI INVENTOR":15,"MAGNET LAB":16,"RADIO LAB":17,"POWER PLANT":18,"POWER GRID":19,"INTERNET JOURNEY":20,"ROBOT CODER":21,"BUG SMASHER":22,"ROCKET LANDER":23,"DATA SNAKE":24,"BINARY 2048":25,"SIGNAL BREAKER":26,"PASSWORD LAB":27,"WAVE LAB":28,"BUG HUNT":29,"OPTICS LAB":30,"ATOM BUILDER":31,"PIXEL TV":32}
 A.aIS=new B.bu(A.ekO,["sparkle","sparkle","whoosh","click","bounce","pop","tech","lab","organic","click","tech","bubble","click","tech","tech","tech","tech","tech","tech","tech","tech","tech","pop","space","bubble","click","zap","click","tech","click","sparkle","lab","tech"],B.at("bu<n,n>"))
@@ -146,4 +146,4 @@ A.EP=new B.G(!0,D.ab,null,null,null,null,12.5,null,null,null,null,null,1.35,null
 $.cmB=B.a([],B.at("O<ajO>"))
 $.hrO=0
 $.aty="music"})()};
-(a=>{a["kOmHqUQLc7s29/dLIL207ZPq4/o="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["osFTcRPgaXavRC79IJyjR4r4rs8="]=a.current})($__dart_deferred_initializers__);
