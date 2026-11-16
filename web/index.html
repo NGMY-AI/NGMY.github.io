@@ -1128,6 +1128,42 @@
         if (isEditingText()) return;
         if (pushedUp()) resettle(); else remeasure();
       }, 500);
+
+      // THE BAR THAT CAME BACK BY ITSELF (iPhone). The check above only tells the app when the screen numbers CHANGE. If the app
+      // measured the screen at a bad moment (busy starting up, or while Safari's bar was moving) and the numbers then went back to what
+      // they were, nothing looked changed, the app was never told, and it stayed short with the black strip under it. So here the
+      // height the app REALLY drew (its canvas) is compared with the screen: when it is shorter, the app is told to measure again.
+      // At most once every 2 seconds, and only after it was short twice in a row, so it never keeps redrawing.
+      var appleTouchDev = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      var shortSeen = 0;
+      var lastFix = 0;
+      function drawnHeight() {
+        try {
+          var pane = document.querySelector('flt-glass-pane');
+          var root = (pane && pane.shadowRoot) || document;
+          var list = root.querySelectorAll('flt-canvas-container canvas');
+          var best = 0;
+          for (var i = 0; i < list.length; i++) {
+            var h = parseFloat(list[i].style.height) || 0;
+            if (h > best) best = h;
+          }
+          return best;
+        } catch (e) { return 0; }
+      }
+      if (appleTouchDev) {
+        setInterval(function () {
+          if (firing || isEditingText()) { shortSeen = 0; return; }
+          var drawn = drawnHeight();
+          var want = document.documentElement.clientHeight;
+          if (drawn > 0 && want - drawn > 4) shortSeen++; else shortSeen = 0;
+          if (shortSeen >= 2 && Date.now() - lastFix > 2000) {
+            shortSeen = 0;
+            lastFix = Date.now();
+            lastSig = '';
+            resettle();
+          }
+        }, 500);
+      }
     })();
   </script>
 

@@ -47,6 +47,13 @@ void main() {
       expect(html, contains('if (pushedUp()) resettle(); else remeasure();'));
     });
 
+    test('The bar that came back by itself: the height the app really drew is compared with the screen and fixed when short', () {
+      expect(html, contains('function drawnHeight()'));
+      expect(html, contains("root.querySelectorAll('flt-canvas-container canvas')"));
+      expect(html, contains('if (drawn > 0 && want - drawn > 4) shortSeen++; else shortSeen = 0;'));
+      expect(html, contains("lastSig = '';"), reason: 'forces the app to measure again even when the screen numbers look unchanged');
+    });
+
     test('The temporary height readout is gone', () {
       expect(html, isNot(contains('ngmy-heights')));
       expect(html, isNot(contains('ngmy-diag')));

@@ -19105,8 +19105,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _homeMountedAt = DateTime.now();
     // Every menu that is its own download is loaded in the background a moment after the home screen opens, one
     // after another, so no menu shows a loading circle the first time it is opened after the app starts.
-    // Growth Income first (opened most), then the rest.
-    Future<void>.delayed(const Duration(seconds: 3), () {
+    // Growth Income first (opened most), then the rest. Started 6 seconds in, after the screen has settled (the iPhone bar check).
+    Future<void>.delayed(const Duration(seconds: 6), () {
       if (mounted) unawaited(ngmyWarmDeferred(ngmyAppWarmList()));
     });
     _smokeCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 10));
