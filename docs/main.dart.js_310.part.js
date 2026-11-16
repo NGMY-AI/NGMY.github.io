@@ -9,7 +9,7 @@ k=A.aU(J.t(l.a,"saved_invoices_v1"))
 if(k==null||k.length===0){x=1
 break}u=5
 s=new A.V(Date.now(),0,!1)
-r=J.kU(y.i.a(C.X.aQ(0,k,null)),y.b)
+r=J.kV(y.i.a(C.X.aQ(0,k,null)),y.b)
 p=r
 o=A.hb(p).k("Y<c0.E>")
 n=A.C(new A.Y(p,new B.fGJ(s),o),o.k("M.E"))
@@ -125,4 +125,4 @@ $S:4};(function inheritance(){var x=a.inheritMany,w=a.inherit
 x(A.hx,[B.fGJ,B.fL0,B.fL1,B.fHs])
 w(B.fL2,A.jz)})()
 var y={k:A.at("O<a9<n,@>>"),E:A.at("ai<a9<n,@>>"),i:A.at("ai<@>"),y:A.at("a9<n,@>"),B:A.at("a9<@,@>"),w:A.at("n"),b:A.at("@"),v:A.at("~")};(function constants(){D.a2F=new A.a_(61870,"MaterialIcons",!1)})()};
-(a=>{a["3myDvHpkylY/Xurj+goEpsmsGEg="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["R+LZIE15FqZDBgyRjWg6170WR4k="]=a.current})($__dart_deferred_initializers__);
