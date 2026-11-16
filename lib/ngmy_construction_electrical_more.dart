@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'ngmy_construction_electrical.dart';
@@ -832,6 +834,11 @@ String? nemaLayoutOf(String kind) => const {
       'v240three': 'nema1030',
       'v240four': 'nema1430',
       'v240only': 'nema620',
+      'outlet20': 'nema520',
+      'ev1450': 'nema1450',
+      'welder650': 'nema620',
+      'rv30': 'nematt30',
+      'gen1430': 'nemal1430',
     }[kind];
 
 /// The slots of a round face, the same everywhere an outlet is drawn (the bench, the room, the framed house).
@@ -844,6 +851,8 @@ List<NemaSlot> nemaSlotsFor(String layout) {
     'nema1050' => [const NemaSlot(-0.3, 0.2, 0.075, 0.3, angle: 0.5), const NemaSlot(0.3, 0.2, 0.075, 0.3, angle: -0.5), const NemaSlot(0, -0.26, 0.075, 0.32)],
     'nema1450' => [const NemaSlot(0, 0.3, 0.075, 0.28), const NemaSlot(-0.4, -0.04, 0.075, 0.32), const NemaSlot(0.4, -0.04, 0.075, 0.32), const NemaSlot(0, -0.4, 0.13, 0.13, round: true)],
     'nema620' => [const NemaSlot(0, 0.2, 0.32, 0.075), const NemaSlot(0, 0.0, 0.32, 0.075), const NemaSlot(0.15, -0.07, 0.075, 0.14), const NemaSlot(0, -0.36, 0.13, 0.13, round: true)],
+    'nematt30' => [const NemaSlot(-0.22, 0.1, 0.075, 0.3, angle: 0.45), const NemaSlot(0.22, 0.1, 0.075, 0.3, angle: -0.45), const NemaSlot(0, -0.32, 0.13, 0.13, round: true)],
+    'nemal1430' => [for (var i = 0; i < 4; i++) NemaSlot(math.cos(math.pi / 4 + i * math.pi / 2) * 0.36, math.sin(math.pi / 4 + i * math.pi / 2) * 0.36, 0.075, 0.22, angle: math.pi / 4 + i * math.pi / 2), const NemaSlot(0, 0, 0.13, 0.13, round: true)],
     _ => [const NemaSlot(0.2, 0.12, 0.075, 0.3), const NemaSlot(-0.2, 0.12, 0.075, 0.3), const NemaSlot(-0.3, 0.12, 0.14, 0.075), const NemaSlot(0, -0.3, 0.13, 0.13, round: true)],
   };
 }

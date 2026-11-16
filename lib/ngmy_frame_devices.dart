@@ -168,7 +168,7 @@ void drawDeviceFace(MeshBuilder b, FBox x, WiringHouse w) {
     }
     return;
   }
-  if (kind == 'gfci') {
+  if (kind == 'gfci' || kind == 'afci' || kind == 'weather') {
     b.box(at(0, 0, f + 0.05), wallSize(x.wall, 1.8, 4.0, 0.14), const Color(0xFFE6E3D8), shine: 0.3);
     b.box(at(0, 0.75, f + 0.16), wallSize(x.wall, 0.8, 0.45, 0.2), const Color(0xFF22262C), shine: 0.3);
     b.box(at(0, -0.75, f + 0.16), wallSize(x.wall, 0.8, 0.45, 0.2), const Color(0xFFD33B2F), shine: 0.3);
@@ -181,6 +181,24 @@ void drawDeviceFace(MeshBuilder b, FBox x, WiringHouse w) {
   }
   // The orange triangle of an isolated ground outlet.
   if (kind == 'isolated') b.tri(at(0, 0.35, f + 0.06), at(-0.3, -0.2, f + 0.06), at(0.3, -0.2, f + 0.06), const Color(0xFFF97316));
+  // The marks that make the other outlets look like themselves (the same as on the wiring bench).
+  if (kind == 'usb') {
+    for (final du in const [-0.4, 0.4]) {
+      b.box(at(du, 0, f + 0.06), wallSize(x.wall, 0.5, 0.18, 0.05), dark);
+    }
+  }
+  if (kind == 'smartoutlet') b.ball(at(0, 0, f + 0.08), 0.16, const Color(0xFF38BDF8), shine: 0.3, lat: 3, lon: 5);
+  if (kind == 'tamper') {
+    for (final dy in const [1.2, -1.0]) {
+      b.box(at(0, dy, f + 0.06), wallSize(x.wall, 0.9, 0.05, 0.04), const Color(0xFFF59E0B));
+    }
+  }
+  if (kind == 'weather') {
+    // The in-use bubble cover around it.
+    for (final (du, dy, sw, sh) in const [(0.0, 2.4, 2.2, 0.12), (0.0, -2.4, 2.2, 0.12), (-1.1, 0.0, 0.12, 4.8), (1.1, 0.0, 0.12, 4.8)]) {
+      b.box(at(du, dy, f + 0.3), wallSize(x.wall, sw, sh, 0.1), const Color(0xFF9CA3AF));
+    }
+  }
 }
 
 /// A thing that plugs in, built standing on the floor with its front towards +z (the middle of its back at the origin).

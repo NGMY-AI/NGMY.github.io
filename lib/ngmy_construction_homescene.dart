@@ -281,6 +281,24 @@ void _outletFace(MeshBuilder b, String kind, double x, bool ok) {
     b.box(V3(x, 14, 1.7), const V3(1.2, 1.2, 0.3), const Color(0xFF9CA3AF));
   }
   if (kind == 'isolated') b.tri(V3(x, 15.0, 1.9), V3(x - 1.2, 12.9, 1.9), V3(x + 1.2, 12.9, 1.9), const Color(0xFFF97316));
+  // The marks that make the other outlets look like themselves before they are opened (the same as on the wiring bench).
+  if (kind == 'usb') {
+    for (final dx in const [-1.9, 1.9]) {
+      b.box(V3(x + dx, 14, 1.85), const V3(2.0, 0.7, 0.3), dark);
+      b.box(V3(x + dx, 14.1, 2.0), const V3(1.5, 0.25, 0.1), const Color(0xFFB8BCC4));
+    }
+  }
+  if (kind == 'smartoutlet') b.ball(V3(x, 14, 1.95), 0.6, const Color(0xFF38BDF8), shine: 0.5, lat: 4, lon: 8);
+  if (kind == 'tamper') {
+    for (final dz in const [-1.0, 1.0]) {
+      b.box(V3(x, 14 + dz * 2.8, 1.9), const V3(4.4, 0.25, 0.1), const Color(0xFFF59E0B));
+    }
+  }
+  if (kind == 'weather') {
+    for (final (dx, dy, sw, sh) in const [(0.0, 7.4, 11.0, 0.5), (0.0, -7.4, 11.0, 0.5), (-5.5, 0.0, 0.5, 15.3), (5.5, 0.0, 0.5, 15.3)]) {
+      b.box(V3(x + dx, 14 + dy, 3.0), V3(sw, sh, 0.4), const Color(0xFF9CA3AF));
+    }
+  }
 }
 /// Edit modes: look, furniture, walls, floor, ceiling, doors.
 Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int problems = 0, bool closed = false, List<ResidentFigure> residents = const [], Set<int> hideFurn = const {}}) {
@@ -500,7 +518,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
     b.alpha = 0.55;
     final st = ok ? 2 : (i < 2 ? r.fixtureState(i) : 0);
     final kindOf = i < 2 ? r.outletKind(i) : (r.extras[i - 2].kind == 'gfci' ? 'gfci' : 'outlet');
-    final frameW = const {'range4': 17.5, 'range3': 17.5, 'dryer4': 17.5, 'dryer3': 17.5, 'washer': 17.5, 'v240four': 15.0, 'v240three': 15.0, 'v240only': 15.0}[kindOf] ?? 15.0;
+    final frameW = const {'range4': 17.5, 'range3': 17.5, 'dryer4': 17.5, 'dryer3': 17.5, 'washer': 17.5, 'v240four': 15.0, 'v240three': 15.0, 'v240only': 15.0, 'outlet20': 17.5, 'ev1450': 17.5, 'welder650': 17.5, 'rv30': 17.5, 'gen1430': 17.5}[kindOf] ?? 15.0;
     b.box(V3(x, 14, 0.25), V3(frameW, frameW > 15 ? frameW + 3 : 19.0, 0.5), ok ? okRing : (st == 1 ? const Color(0xFFF59E0B) : badRing));
     b.alpha = 1;
     b.bias = 0;
@@ -549,7 +567,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
     final todo = r.missing;
     labels.add(Label3D(V3(lightX, h - 26, lightZ), todo.isEmpty ? '⚡ No power: needs wiring' : '⚡ Still to wire: ${todo.join(', ')}', const Color(0xFFDC2626)));
   }
-  if (r.lesson.isNotEmpty && !r.lessonDone && !r.lessonIsPlumbing) labels.add(Label3D(V3(0, 40, 14), '👆 Tap the red one to wire it', const Color(0xFFDC2626)));
+  if (r.lesson.isNotEmpty && !r.lessonDone && !r.lessonIsPlumbing) labels.add(Label3D(V3(0, 4, 24), '👆 Tap the red one to wire it', const Color(0xFFDC2626)));
 
   // ── What is plugged in ──
   b.order = 2;
