@@ -1,6 +1,6 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var B,A,C={
-a68(d){var y=d.ga7b()/255,x=d.gVV()/255,w=d.ga4r()/255,v=Math.max(y,Math.max(x,w)),u=v-Math.min(y,Math.min(x,w)),t=d.gjC(d),s=B.hxU(y,x,w,v,u),r=v===0?0:u/v
+a68(d){var y=d.ga7b()/255,x=d.gVV()/255,w=d.ga4r()/255,v=Math.max(y,Math.max(x,w)),u=v-Math.min(y,Math.min(x,w)),t=d.gjC(d),s=B.hxY(y,x,w,v,u),r=v===0?0:u/v
 return new C.pi(t/255,s,r,v)},
 pi:function pi(d,e,f,g){var _=this
 _.a=d
@@ -13,7 +13,7 @@ C=a.updateHolder(c[57],C)
 D=c[274]
 C.pi.prototype={
 jd(){var y=this,x=y.d,w=y.c*x,v=y.b
-return B.hwX(y.a,v,w,w*(1-Math.abs(A.i.F(v/60,2)-1)),x-w)},
+return B.hx0(y.a,v,w,w*(1-Math.abs(A.i.F(v/60,2)-1)),x-w)},
 A(d,e){var y=this
 if(e==null)return!1
 if(y===e)return!0
@@ -24,4 +24,4 @@ u(d){var y=this
 return"HSVColor("+B.w(y.a)+", "+B.w(y.b)+", "+B.w(y.c)+", "+B.w(y.d)+")"}}
 var z=a.updateTypes([]);(function inheritance(){var y=a.inherit
 y(C.pi,B.aE)})();(function constants(){D.aqY=new B.a0(983930,"MaterialIcons",!1)})()};
-(a=>{a["qUZXme2nwWQ9mdTn5Jf2345NtDI="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["CPoBM+O/kZZryiv63CPi6+irHx4="]=a.current})($__dart_deferred_initializers__);
