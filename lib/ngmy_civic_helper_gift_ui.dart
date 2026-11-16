@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_barcode_platform.dart' if (dart.library.html) 'ngmy_barcode_platform_web.dart' as barcode_platform;
 import 'ngmy_civic_helper_gifts.dart';
@@ -297,8 +298,15 @@ Future<NgmyHelperGift?> showNgmyHelperGiftGrantSheet({
   final amountC = TextEditingController(text: '25');
   var styleId = kNgmyHelperGiftStyles.first.id;
   String? selectedListingId;
+  // How the gift is given: at an NGMY store (QR card), or by the admin with Cash App / Zelle (no store needed).
+  var payMethod = 'store';
+  final payPhoneC = TextEditingController();
+  final payNoteC = TextEditingController();
   // Stores the admin granted (Store access) show with their name and description.
-  await NgmyStoreAccessCache.load();
+  // A Cash App / Zelle gift needs no store, so the sheet opens even when the store list cannot be loaded.
+  try {
+    await NgmyStoreAccessCache.load().timeout(const Duration(seconds: 8));
+  } catch (_) {}
   if (!context.mounted) return null;
   final storeOptions = ngmyHelperGiftStoreOptions(storeListings);
   final stateColors = ngmyHelperGiftStateGradient(pending.state);
@@ -321,6 +329,7 @@ Future<NgmyHelperGift?> showNgmyHelperGiftGrantSheet({
               border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
             ),
             child: ListView(
+              key: const Key('helper-gift-grant-list'),
               padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.of(ctx).viewInsets.bottom),
               children: [
                 Container(
@@ -365,6 +374,8 @@ Future<NgmyHelperGift?> showNgmyHelperGiftGrantSheet({
                   giftName: nameC.text.trim().isEmpty ? 'Money card' : nameC.text.trim(),
                   amount: double.tryParse(amountC.text.trim()) ?? 0,
                   storeName: () {
+                    if (payMethod == 'cashapp') return 'Paid with Cash App';
+                    if (payMethod == 'zelle') return 'Paid with Zelle';
                     if (selectedListingId == null) return 'Pick a store';
                     for (final o in storeOptions) {
                       if (o['id'] == selectedListingId) return o['title'] as String;
@@ -457,6 +468,66 @@ Future<NgmyHelperGift?> showNgmyHelperGiftGrantSheet({
                 ),
                 const SizedBox(height: 16),
                 Text(
+                  'How is it given?',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    for (final m in const [('store', 'NGMY store', Icons.storefront_rounded), ('cashapp', 'Cash App', Icons.attach_money_rounded), ('zelle', 'Zelle', Icons.account_balance_rounded)]) ...[
+                      Expanded(
+                        child: InkWell(
+                          key: Key('helper-gift-method-${m.$1}'),
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: () => setST(() => payMethod = m.$1),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(14),
+                              color: payMethod == m.$1 ? stateColors.first.withValues(alpha: 0.16) : (isDark ? Colors.white.withValues(alpha: 0.04) : const Color(0xFFF8FAFC)),
+                              border: Border.all(color: payMethod == m.$1 ? stateColors.first : (isDark ? Colors.white12 : const Color(0xFFE2E8F0)), width: payMethod == m.$1 ? 2 : 1),
+                            ),
+                            child: Column(
+                              children: [
+                                Icon(m.$3, color: payMethod == m.$1 ? stateColors.first : (isDark ? Colors.white54 : const Color(0xFF475569))),
+                                const SizedBox(height: 4),
+                                Text(m.$2, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: isDark ? Colors.white : const Color(0xFF0F172A))),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (m.$1 != 'zelle') const SizedBox(width: 8),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 16),
+                if (payMethod != 'store') ...[
+                  Text(
+                    payMethod == 'zelle' ? 'You send it with Zelle' : 'You send it with Cash App',
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'No store needed. The member sees this gift every time they open the app, with the number to call or text, until they tap Received.',
+                    style: TextStyle(fontSize: 12, height: 1.35, color: isDark ? Colors.white54 : Colors.black54),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    key: const Key('helper-gift-pay-phone'),
+                    controller: payPhoneC,
+                    keyboardType: TextInputType.phone,
+                    decoration: _ngmyGiftFieldDecoration(isDark: isDark, label: 'Phone number they call or text', hint: 'e.g. 478-555-0101'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    key: const Key('helper-gift-pay-note'),
+                    controller: payNoteC,
+                    maxLines: 2,
+                    decoration: _ngmyGiftFieldDecoration(isDark: isDark, label: 'Note (optional)', hint: 'e.g. Text me your Cash App name and I will send it'),
+                  ),
+                ] else ...[
+                Text(
                   'Redeem at this NGMY store',
                   style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                 ),
@@ -538,13 +609,42 @@ Future<NgmyHelperGift?> showNgmyHelperGiftGrantSheet({
                       ),
                     );
                   }),
+                ],
                 const SizedBox(height: 16),
                 FilledButton.icon(
-                  onPressed: storeOptions.isEmpty
+                  key: const Key('helper-gift-send'),
+                  onPressed: payMethod == 'store' && storeOptions.isEmpty
                       ? null
                       : () async {
                           final amount = double.tryParse(amountC.text.trim()) ?? 0;
                           final name = nameC.text.trim();
+                          if (payMethod != 'store') {
+                            // Cash App / Zelle: no store; the number the member contacts and the admin's note go with the gift.
+                            final phone = payPhoneC.text.trim();
+                            if (name.isEmpty || amount <= 0 || phone.replaceAll(RegExp(r'[^0-9]'), '').length < 7) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(content: Text('Enter the gift name, the amount, and the phone number they should call or text.')),
+                              );
+                              return;
+                            }
+                            final gift = await onGrant(
+                              giftName: name,
+                              amount: amount,
+                              styleId: styleId,
+                              storeAddress: phone,
+                              storeSellerEmail: '',
+                              storeSellerName: payNoteC.text.trim(),
+                              storeListingId: '$kNgmyHelperGiftPayoutPrefix$payMethod',
+                            );
+                            if (gift != null && ctx.mounted) {
+                              Navigator.pop(ctx, gift);
+                            } else if (ctx.mounted) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(content: Text('The gift was not sent. The server did not confirm it, try again.'), backgroundColor: Colors.orange),
+                              );
+                            }
+                            return;
+                          }
                           Map<String, dynamic>? opt;
                           for (final o in storeOptions) {
                             if (o['id'] == selectedListingId) opt = o;
@@ -583,7 +683,7 @@ Future<NgmyHelperGift?> showNgmyHelperGiftGrantSheet({
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                   icon: const Icon(Icons.send_rounded),
-                  label: const Text('Send money card', style: TextStyle(fontWeight: FontWeight.w900)),
+                  label: Text(payMethod == 'store' ? 'Send money card' : 'Send gift', style: const TextStyle(fontWeight: FontWeight.w900)),
                 ),
               ],
             ),
@@ -596,6 +696,27 @@ Future<NgmyHelperGift?> showNgmyHelperGiftGrantSheet({
 
 /// User-facing gift card with QR for store redeem.
 Future<void> showNgmyHelperGiftReceivedDialog(BuildContext context, NgmyHelperGift gift) async {
+  if (gift.isMoneyPayout) {
+    // Cash App / Zelle gift: shows every time the app opens until the member taps Received.
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withValues(alpha: 0.6),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+        child: NgmyHelperGiftPayoutPanel(
+          gift: gift,
+          onReceived: () async {
+            await NgmyCivicHelperGifts.markGiftReceived(gift.token);
+            if (ctx.mounted) Navigator.pop(ctx);
+          },
+          onLater: () => Navigator.pop(ctx),
+        ),
+      ),
+    );
+    return;
+  }
   await showDialog<void>(
     context: context,
     barrierColor: Colors.black.withValues(alpha: 0.55),
@@ -1404,4 +1525,121 @@ class NgmyHelperGiftAdminBanner extends StatelessWidget {
 String _ngmyGiftDate(DateTime d) {
   final l = d.toLocal();
   return '${l.month}/${l.day}/${l.year}';
+}
+
+/// What a member sees for a Cash App / Zelle gift (no store): the amount, how it is paid, the number to call or text
+/// to get it, the admin's note, and a Received button. Until Received is tapped it comes back every time the app opens.
+class NgmyHelperGiftPayoutPanel extends StatelessWidget {
+  const NgmyHelperGiftPayoutPanel({super.key, required this.gift, required this.onReceived, required this.onLater});
+
+  final NgmyHelperGift gift;
+  final Future<void> Function() onReceived;
+  final VoidCallback onLater;
+
+  static const _cashApp = [Color(0xFF00D64F), Color(0xFF00A63E)];
+  static const _zelle = [Color(0xFF8B5CF6), Color(0xFF6D1ED4)];
+
+  Future<void> _open(Uri uri) async {
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = gift.payoutMethod == 'zelle' ? _zelle : _cashApp;
+    final phone = gift.payoutContactPhone.trim();
+    final dial = phone.replaceAll(RegExp(r'[^0-9+]'), '');
+    final note = gift.payoutNote.trim();
+    return Container(
+      key: const Key('helper-gift-payout'),
+      constraints: const BoxConstraints(maxWidth: 440),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: colors),
+        boxShadow: [BoxShadow(color: colors.last.withValues(alpha: 0.45), blurRadius: 28, offset: const Offset(0, 12))],
+      ),
+      padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('🎁', style: TextStyle(fontSize: 46)),
+            const SizedBox(height: 6),
+            const Text('Hongera! Umepata zawadi', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22)),
+            const SizedBox(height: 4),
+            Text('Kwa kuwa wa kwanza kuchangia mara 3 mfululizo', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 14),
+            Text('\$${gift.amount.toStringAsFixed(2)}', key: const Key('helper-gift-payout-amount'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 44, height: 1.05)),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(999)),
+              child: Text('Kwa ${gift.payoutMethodLabel}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Ili kupokea zawadi yako, piga simu au tuma ujumbe kwa:', style: TextStyle(color: Color(0xFF374151), fontSize: 13, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 6),
+                  Text(phone, key: const Key('helper-gift-payout-phone'), style: const TextStyle(color: Color(0xFF111827), fontWeight: FontWeight.w900, fontSize: 24)),
+                  if (note.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(note, style: const TextStyle(color: Color(0xFF374151), fontSize: 13, height: 1.35)),
+                  ],
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: dial.isEmpty ? null : () => _open(Uri.parse('tel:$dial')),
+                          icon: const Icon(Icons.call_rounded, size: 18),
+                          label: const Text('Piga simu', style: TextStyle(fontWeight: FontWeight.w800)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: dial.isEmpty ? null : () => _open(Uri.parse('sms:$dial')),
+                          icon: const Icon(Icons.sms_rounded, size: 18),
+                          label: const Text('Ujumbe', style: TextStyle(fontWeight: FontWeight.w800)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                key: const Key('helper-gift-payout-received'),
+                onPressed: onReceived,
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: colors.last,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                icon: const Icon(Icons.check_circle_rounded),
+                label: const Text('Nimepokea (Received)', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+              ),
+            ),
+            TextButton(
+              key: const Key('helper-gift-payout-later'),
+              onPressed: onLater,
+              child: Text('Baadaye', style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontWeight: FontWeight.w700)),
+            ),
+            Text('Ujumbe huu utaonekana kila unapofungua programu mpaka ubonyeze Nimepokea.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 11)),
+          ],
+        ),
+      ),
+    );
+  }
 }

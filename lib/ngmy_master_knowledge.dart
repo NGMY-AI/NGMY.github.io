@@ -91,6 +91,7 @@ const List<String> kNgmyFeatureFacts = [
   'MENU STUDIO: restaurant menus published as a link.',
   'BUSINESS CARD CREATOR: design and download business cards.',
   'INVOICES AND QUOTE CALC: invoices, receipts and estimates with NGMY watermarks.',
+  'HELPER GIFTS AND ROSTER: a member who is the first to contribute 3 times in a row earns a helper gift that the admin grants. The admin chooses how it is given: an NGMY store money card (a QR code the chosen store scans), or Cash App or Zelle with no store needed. For Cash App or Zelle the admin types the phone number the member should call or text and an optional note; the member then sees a green (Cash App) or purple (Zelle) gift pop-up with the amount, that number and Call and Text buttons every time they open the app, until they tap Received. The printed Civic Registry roster carries a very faint NGMY watermark behind it.',
   'DOC SHARE, QR GENERATOR, RECORDER STUDIO, VIDEO STUDIO, PLAY ZONE AND PHONE UNLOCK: tools in the Creator Hub.',
   'APP BUILDER: describe an app and the AI builds it, including real web apps you can publish.',
   'DOCUMENT SCANNER: scan papers with the phone camera.',

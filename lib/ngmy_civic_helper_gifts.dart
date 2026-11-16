@@ -22,6 +22,12 @@ const String kNgmyHelperGiftInboxPrefsKey = 'ngmy_civic_helper_gift_inbox_v1';
 const String kNgmyHelperGiftAdminPopupEnabledKey = 'ngmy_helper_gift_admin_popup_enabled_v1';
 const String kNgmyHelperGiftSeenTokensPrefsKey = 'ngmy_helper_gift_seen_tokens_v1';
 
+/// Marks a Cash App / Zelle gift (see [NgmyHelperGift.isMoneyPayout]).
+const String kNgmyHelperGiftPayoutPrefix = 'pay:';
+
+/// Cash App / Zelle gifts the member said they received on this phone (their pop-up stops).
+const String kNgmyHelperGiftReceivedTokensPrefsKey = 'ngmy_helper_gift_received_tokens_v1';
+
 /// Admin can disable full-screen helper reward pop-ups (see Helper Gifts hub).
 class NgmyHelperGiftAdminPopupSettings {
   static Future<bool> isEnabled() async {
@@ -308,9 +314,20 @@ class NgmyHelperGift {
   }
 
   bool get isExpired {
+    // A Cash App / Zelle gift does not run out: it stays until the member says they received it.
+    if (isMoneyPayout) return false;
     final e = expiresAt;
     return e != null && DateTime.now().toUtc().isAfter(e.toUtc());
   }
+
+  /// A gift paid by the admin with Cash App or Zelle (no NGMY store needed). It is kept in the same fields as a store card:
+  /// the method in [storeListingId] ('pay:cashapp' / 'pay:zelle'), the phone number the member contacts in [storeAddress],
+  /// the admin's note in [storeSellerName], and the admin (who pays) as the "store" in [storeSellerEmail].
+  bool get isMoneyPayout => storeListingId.startsWith(kNgmyHelperGiftPayoutPrefix);
+  String get payoutMethod => isMoneyPayout ? storeListingId.substring(kNgmyHelperGiftPayoutPrefix.length) : '';
+  String get payoutMethodLabel => payoutMethod == 'zelle' ? 'Zelle' : (payoutMethod == 'cashapp' ? 'Cash App' : '');
+  String get payoutContactPhone => isMoneyPayout ? storeAddress : '';
+  String get payoutNote => isMoneyPayout ? storeSellerName : '';
 
   /// Still usable at the store.
   bool get isActive => !redeemed && !isExpired;
@@ -889,7 +906,11 @@ class NgmyCivicHelperGifts {
     required String storeListingId,
     required String grantedBy,
   }) async {
-    if (amount <= 0 || giftName.trim().isEmpty || storeSellerEmail.trim().isEmpty) return null;
+    // A Cash App / Zelle gift needs no store: the admin who pays stands in as the "store".
+    final payout = storeListingId.startsWith(kNgmyHelperGiftPayoutPrefix);
+    final sellerEmail = payout ? grantedBy : storeSellerEmail;
+    if (amount <= 0 || giftName.trim().isEmpty || sellerEmail.trim().isEmpty) return null;
+    if (payout && storeAddress.replaceAll(RegExp(r"[^0-9]"), "").length < 7) return null;
     final token = _generateGiftToken();
     final qrPayload = '$kNgmyHelperGiftQrPrefix|$token';
     final now = DateTime.now().toUtc().toIso8601String();
@@ -901,7 +922,7 @@ class NgmyCivicHelperGifts {
       amount: amount,
       styleId: styleId,
       storeAddress: storeAddress.trim(),
-      storeSellerEmail: storeSellerEmail.toLowerCase().trim(),
+      storeSellerEmail: sellerEmail.toLowerCase().trim(),
       storeSellerName: storeSellerName.trim(),
       storeListingId: storeListingId,
       qrPayload: qrPayload,
@@ -1089,11 +1110,42 @@ class NgmyCivicHelperGifts {
     String email,
   ) async {
     final seen = await _seenGiftTokens();
+    final received = await _receivedGiftTokens();
     // Only the recipient, only while the card can still be used (not redeemed, not expired).
+    // A Cash App / Zelle gift shows every time the app opens until the member taps Received.
     return giftsForEmail(config, email)
-        .where((g) => g.isActive && g.token.isNotEmpty && !seen.contains(g.token))
+        .where((g) => g.isActive && g.token.isNotEmpty)
+        .where((g) => g.isMoneyPayout ? !received.contains(g.token) : !seen.contains(g.token))
         .toList();
   }
+
+  static Future<Set<String>> _receivedGiftTokens() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(kNgmyHelperGiftReceivedTokensPrefsKey);
+      if (raw == null || raw.trim().isEmpty) return {};
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return {};
+      return decoded.map((e) => e.toString().trim()).where((t) => t.isNotEmpty).toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// The member tapped Received on a Cash App / Zelle gift: its pop-up never comes back.
+  static Future<void> markGiftReceived(String token) async {
+    final t = token.trim();
+    if (t.isEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final received = await _receivedGiftTokens()..add(t);
+      await prefs.setString(kNgmyHelperGiftReceivedTokensPrefsKey, jsonEncode(received.toList()));
+    } catch (e) {
+      debugPrint('[helper gifts] mark received: $e');
+    }
+  }
+
+  static Future<bool> isGiftReceived(String token) async => (await _receivedGiftTokens()).contains(token.trim());
 
   static int unredeemedGiftCount(dynamic config, String email) =>
       giftsForEmail(config, email).where((g) => g.isActive).length;

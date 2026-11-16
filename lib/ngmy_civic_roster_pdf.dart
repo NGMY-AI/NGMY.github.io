@@ -251,8 +251,9 @@ pw.Widget ngmyRosterWatermark() => pw.FullPage(
         child: pw.Transform.rotate(
           angle: 0.6,
           child: pw.Opacity(
-            opacity: 0.07,
-            child: pw.Text('NGMY', style: pw.TextStyle(fontSize: 190, fontWeight: pw.FontWeight.bold, color: PdfColors.black)),
+            // Very light (the owner found 0.07 black a little too visible).
+            opacity: 0.035,
+            child: pw.Text('NGMY', style: pw.TextStyle(fontSize: 190, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700)),
           ),
         ),
       ),

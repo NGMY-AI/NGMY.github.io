@@ -17662,6 +17662,26 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   /// When the app opens (and when it comes back after a while), a member of a state with a contribution going who has not contributed yet gets the
   /// pop-up in the middle of the screen. Someone who has contributed to this campaign never gets it; the Civic Registry still shows everything.
+  /// A Cash App / Zelle helper gift waiting for this member (granted by the admin, no store needed): shown when the app
+  /// opens, every time, until the member taps Received.
+  Future<void> _maybeShowMemberGiftOnOpen() async {
+    if (_contributionPopupOpen || !ngmyShouldAllowGlobalInterrupt()) return;
+    try {
+      await NgmyCivicHelperGifts.hydrateFromCloud(widget.config);
+    } catch (_) {}
+    if (!mounted || _contributionPopupOpen || !ngmyShouldAllowGlobalInterrupt()) return;
+    final gifts = (await NgmyCivicHelperGifts.giftsNeedingUserPopup(widget.config, widget.user.email))
+        .where((g) => g.isMoneyPayout)
+        .toList();
+    if (gifts.isEmpty || !mounted) return;
+    _contributionPopupOpen = true;
+    try {
+      await showNgmyHelperGiftReceivedDialog(context, gifts.first);
+    } finally {
+      _contributionPopupOpen = false;
+    }
+  }
+
   Future<void> _maybeShowContributionPopup() async {
     if (_contributionPopupOpen) return;
     final last = _contributionPopupAt;
@@ -17795,6 +17815,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           );
           Future<void>.delayed(const Duration(milliseconds: 1800), () {
             if (mounted) unawaited(_maybeShowContributionPopup());
+            Future<void>.delayed(const Duration(seconds: 5), () {
+              if (mounted) unawaited(_maybeShowMemberGiftOnOpen());
+            });
           });
         });
         return;
@@ -17807,6 +17830,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       );
       Future<void>.delayed(const Duration(milliseconds: 1800), () {
         if (mounted) unawaited(_maybeShowContributionPopup());
+        // A Cash App / Zelle gift waiting for this member: shown every time the app opens until they tap Received.
+        Future<void>.delayed(const Duration(seconds: 5), () {
+          if (mounted) unawaited(_maybeShowMemberGiftOnOpen());
+        });
       });
     });
   }
