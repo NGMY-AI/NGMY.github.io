@@ -135,6 +135,7 @@ import 'ngmy_doc_share_school.dart';
 import 'ngmy_oauth.dart';
 import 'ngmy_worksheets.dart' deferred as worksheets;
 import 'ngmy_deferred.dart';
+import 'ngmy_state_code_dialog.dart';
 import 'ngmy_civic_state_wallet_ui.dart' deferred as walletui;
 import 'ngmy_menu_studio.dart' deferred as menustudio;
 import 'ngmy_business_essentials.dart' deferred as bizess;
@@ -39625,85 +39626,31 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
   /// server without a pinSig and got 403 — leaving the previous state's names
   /// on screen or an empty board.
   Future<bool> _verifyRegistrarDestinationState(String state) async {
-    final passwordC = TextEditingController();
-    var busy = false;
-    var error = '';
-    final ok = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dctx) => StatefulBuilder(
-        builder: (dctx, setDialogState) => AlertDialog(
-          title: Text('Enter $state state code'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                ngmyT('Before changing state, enter that state’s Civic Registry code. Your Authorized Registrar management tools stay limited to your home state.', 'Kabla ya kubadilisha jimbo, weka msimbo wa Civic Registry wa jimbo hilo. Zana zako za Msajili Aliyeidhinishwa zinabaki kwenye jimbo lako la nyumbani.'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: passwordC,
-                autofocus: true,
-                obscureText: true,
-                enabled: !busy,
-                textInputAction: TextInputAction.done,
-                decoration: InputDecoration(
-                  labelText: ngmyT('State code', 'Msimbo wa jimbo'),
-                  errorText: error.isEmpty ? null : error,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: busy ? null : () => Navigator.pop(dctx, false),
-              child: Text(ngmyT('Cancel', 'Ghairi')),
-            ),
-            FilledButton(
-              onPressed: busy
-                  ? null
-                  : () async {
-                      final pin = passwordC.text.trim();
-                      if (pin.isEmpty) {
-                        setDialogState(() => error = ngmyT('Enter the state code.', 'Weka msimbo wa jimbo.'));
-                        return;
-                      }
-                      setDialogState(() {
-                        busy = true;
-                        error = '';
-                      });
-                      await _ensureCivicCloudSessionInteractive(
-                        reason: 'Connect this phone so the $state state code can be verified.',
-                      );
-                      final verified = await ngmyCivicVerifyStatePin(
-                        email: widget.user.email,
-                        state: state,
-                        pin: pin,
-                      );
-                      if (!dctx.mounted) return;
-                      if (!verified.ok || (verified.pinSig ?? '').trim().isEmpty) {
-                        setDialogState(() {
-                          busy = false;
-                          error = verified.error ?? ngmyT('Incorrect state code.', 'Msimbo wa jimbo si sahihi.');
-                        });
-                        return;
-                      }
-                      await civicRegistrySaveServerUnlock(
-                        widget.user.email,
-                        state: state,
-                        pinSig: verified.pinSig!,
-                      );
-                      if (dctx.mounted) Navigator.pop(dctx, true);
-                    },
-              child: Text(busy ? ngmyT('Checking…', 'Inakagua…') : ngmyT('Verify & Change', 'Thibitisha na Badilisha')),
-            ),
-          ],
-        ),
-      ),
+    // The redesigned pop-up (lib/ngmy_state_code_dialog.dart); the code is checked exactly as before.
+    return showNgmyStateCodeDialog(
+      context,
+      fromState: _selectedState,
+      toState: state,
+      verify: (pin) async {
+        await _ensureCivicCloudSessionInteractive(
+          reason: 'Connect this phone so the $state state code can be verified.',
+        );
+        final verified = await ngmyCivicVerifyStatePin(
+          email: widget.user.email,
+          state: state,
+          pin: pin,
+        );
+        if (!verified.ok || (verified.pinSig ?? '').trim().isEmpty) {
+          return verified.error ?? ngmyT('Incorrect state code.', 'Msimbo wa jimbo si sahihi.');
+        }
+        await civicRegistrySaveServerUnlock(
+          widget.user.email,
+          state: state,
+          pinSig: verified.pinSig!,
+        );
+        return null;
+      },
     );
-    passwordC.dispose();
-    return ok == true;
   }
 
   void _resetSharedDirectoryForState(String state) {
