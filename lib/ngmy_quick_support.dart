@@ -28,7 +28,7 @@ class NgmySupportLine {
     this.notes = '',
     this.emergency = false,
     DateTime? createdAt,
-  })  : id = id ?? DateTime.now().microsecondsSinceEpoch.toString(),
+  })  : id = id ?? ngmyNewLocalId(),
         createdAt = createdAt ?? DateTime.now();
 
   final String id;

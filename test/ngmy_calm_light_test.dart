@@ -130,7 +130,8 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(420, 1400));
     await tester.pumpWidget(_app(Brightness.light, _hubGrid()));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.byKey(const Key('ngmy-calm-colour-frame')), findsNWidgets(8), reason: 'four hub tiles and four home frames get the colourful frame');
+    expect(find.byKey(const Key('ngmy-calm-colour-frame')), findsNWidgets(4), reason: 'only the four home frames are filled with colour');
+    expect(find.byKey(const Key('ngmy-calm-card')), findsNWidgets(4), reason: 'hub and toolkit tiles: white cards with a thin purple edge');
     expect(find.byKey(const Key('ngmy-calm-pill')), findsOneWidget);
     expect(find.byKey(const Key('ngmy-calm-icon')), findsWidgets);
     expect(find.byKey(const Key('home-tech-calm-neural')), findsOneWidget);
@@ -169,7 +170,9 @@ void main() {
     // No negative spread: that drew a dark ledge with corners under the cards.
     expect(d.boxShadow!.every((s) => s.spreadRadius >= 0 && s.blurRadius >= 4), isTrue);
     expect(d.boxShadow!.first.blurRadius, greaterThanOrEqualTo(24));
-    expect(d.border, isNull, reason: 'no hard edge line');
+    final edge = (d.border as Border).top;
+    expect(edge.color, NgmyCalmLight.brandEdge);
+    expect(edge.width, lessThanOrEqualTo(2), reason: 'a thin edge, never thick');
     expect((d.borderRadius as BorderRadius).topLeft.x, greaterThanOrEqualTo(22), reason: 'round, thick-looking cards');
     expect(NgmyCalmLight.page.computeLuminance(), greaterThan(0.9), reason: 'a very light page so the white cards stand out');
   });
@@ -222,5 +225,14 @@ void main() {
     final s = tester.widget<Scaffold>(find.byType(Scaffold).first);
     expect(s.backgroundColor!.computeLuminance(), greaterThan(0.85));
     await tester.pump(const Duration(seconds: 2));
+  });
+
+  testWidgets('light mode icon tiles all use the one NGMY purple (no frame in its own colour)', (tester) async {
+    await tester.pumpWidget(_app(Brightness.light, _hubGrid()));
+    await tester.pump(const Duration(milliseconds: 300));
+    final tiles = tester.widgetList<NgmyCalmIconTile>(find.byType(NgmyCalmIconTile)).toList();
+    expect(tiles, isNotEmpty);
+    expect(tiles.every((t) => t.accent == NgmyCalmLight.brand), isTrue);
+    await tester.pumpWidget(const SizedBox());
   });
 }

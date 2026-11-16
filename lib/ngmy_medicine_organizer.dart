@@ -29,7 +29,7 @@ class NgmyMedicineEntry {
     this.lastTakenAt,
     this.lastTakenSlot = '',
     DateTime? createdAt,
-  })  : id = id ?? DateTime.now().microsecondsSinceEpoch.toString(),
+  })  : id = id ?? ngmyNewLocalId(),
         reminderTimes = List<String>.from(reminderTimes ?? const []),
         createdAt = createdAt ?? DateTime.now();
 

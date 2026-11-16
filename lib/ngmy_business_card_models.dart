@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'ngmy_local_store.dart' show ngmyNewLocalId;
 import 'package:flutter/material.dart';
 
 /// Standard US business card ratio (3.5" × 2").
@@ -214,7 +215,7 @@ class NgmyBusinessCardDocument {
     this.logoBase64 = '',
     DateTime? createdAt,
     DateTime? updatedAt,
-  })  : id = id ?? DateTime.now().microsecondsSinceEpoch.toString(),
+  })  : id = id ?? ngmyNewLocalId(),
         offsetX = offsetX ?? {},
         offsetY = offsetY ?? {},
         elementScale = elementScale ?? {},

@@ -854,7 +854,7 @@ class NgmyBusinessNote {
     DateTime? createdAt,
     DateTime? updatedAt,
     this.deletedAt,
-  })  : id = id ?? DateTime.now().microsecondsSinceEpoch.toString(),
+  })  : id = id ?? ngmyNewLocalId(),
         createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now(),
         textAnims = textAnims ?? [],

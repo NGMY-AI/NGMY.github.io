@@ -8,3 +8,12 @@
 // On phones and in tests it is SharedPreferences, as before.
 
 export 'ngmy_local_store_stub.dart' if (dart.library.html) 'ngmy_local_store_web.dart';
+
+int _ngmyLocalIdCounter = 0;
+
+/// A new id for something people save (a note, contact, task...). The clock alone is not enough: two items made in
+/// the same instant (an import, or the phone clock being coarse) got the same id and one replaced the other.
+String ngmyNewLocalId() {
+  _ngmyLocalIdCounter = (_ngmyLocalIdCounter + 1) % 1000000;
+  return '${DateTime.now().microsecondsSinceEpoch}_$_ngmyLocalIdCounter';
+}

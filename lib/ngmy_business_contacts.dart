@@ -28,7 +28,7 @@ class NgmyBusinessContact {
     this.favorite = false,
     DateTime? lastContacted,
     DateTime? createdAt,
-  })  : id = id ?? DateTime.now().microsecondsSinceEpoch.toString(),
+  })  : id = id ?? ngmyNewLocalId(),
         lastContacted = lastContacted,
         createdAt = createdAt ?? DateTime.now();
 

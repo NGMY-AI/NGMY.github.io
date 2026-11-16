@@ -67,6 +67,12 @@ class NgmyCalmLight {
   static const Color ink = Color(0xFF0B1220);
   static const Color sub = Color(0xFF4B5563);
 
+  /// ONE colour for every frame and icon tile in light mode (the owner does not want each frame in its own
+  /// colour): NGMY purple. Frames get a thin purple edge, icon tiles are purple with a white icon.
+  static const Color brand = Color(0xFF7C3AED);
+  static const Color brandEdge = Color(0xFFC4B5FD);
+  static const double brandEdgeWidth = 1.5;
+
   /// A wide soft shadow all round the card, a little deeper below.
   static const List<BoxShadow> shadow = [
     BoxShadow(color: Color(0x1C0F172A), blurRadius: 30, offset: Offset(0, 10)),
@@ -85,6 +91,7 @@ class NgmyCalmLight {
   static BoxDecoration cardDecoration({double radius = 24}) => BoxDecoration(
         color: card,
         borderRadius: BorderRadius.circular(radius < 22 ? 22 : radius),
+        border: Border.all(color: brandEdge, width: brandEdgeWidth),
         boxShadow: shadow,
       );
 
@@ -380,17 +387,6 @@ class NgmyHudTechFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (NgmyHudInk.calm(context) && onTap != null) {
-      // Tappable tiles get the colourful frame (light inside so dark words stay readable).
-      return NgmyCalmColourFrame(
-        accent: colors.first,
-        radius: borderRadius < 22 ? 24 : borderRadius + 4,
-        rim: 6,
-        padding: padding,
-        onTap: onTap,
-        child: child,
-      );
-    }
     if (NgmyHudInk.calm(context)) {
       final card = LayoutBuilder(
         builder: (context, constraints) {
@@ -521,7 +517,8 @@ class NgmyHudMiniOrb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (NgmyHudInk.calm(context)) {
-      return NgmyCalmIconTile(accent: colors.first, size: size, icon: icon, emoji: emoji);
+      // One colour for every icon tile (not each tile in its own colour).
+      return NgmyCalmIconTile(accent: NgmyCalmLight.brand, size: size, icon: icon, emoji: emoji);
     }
     final dark = NgmyHudInk.isDark(context);
     return SizedBox(

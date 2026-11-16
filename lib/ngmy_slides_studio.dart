@@ -3682,7 +3682,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
         decoration: NgmyCalmLight.cardDecoration(radius: 22),
         child: const Column(
           children: [
-            NgmyCalmIconTile(accent: Color(0xFF2563EB), size: 56, icon: Icons.view_carousel_outlined),
+            NgmyCalmIconTile(accent: NgmyCalmLight.brand, size: 56, icon: Icons.view_carousel_outlined),
             SizedBox(height: 14),
             Text('No presentations yet', style: TextStyle(fontWeight: FontWeight.w800, color: NgmyCalmLight.ink)),
             SizedBox(height: 6),
@@ -3871,8 +3871,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                             : [Colors.white, Colors.white],
                       ),
                       border: Border.all(
-                        color: !isDark ? Colors.white : accent.first.withValues(alpha: 0.34 + t * 0.22),
-                        width: !isDark ? NgmyCalmLight.borderWidth : 1.25,
+                        color: !isDark ? NgmyCalmLight.brandEdge : accent.first.withValues(alpha: 0.34 + t * 0.22),
+                        width: !isDark ? NgmyCalmLight.brandEdgeWidth : 1.25,
                       ),
                     ),
                     child: ListTile(
@@ -3882,7 +3882,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                         height: 36,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(10),
-                          gradient: LinearGradient(colors: accent),
+                          gradient: LinearGradient(colors: isDark ? accent : const [Color(0xFF8B5CF6), NgmyCalmLight.brand]),
                         ),
                         child: Icon(
                           deck.isLockedTemplateDoc ? Icons.description_rounded : Icons.slideshow_rounded,
@@ -5828,7 +5828,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                       begin: Theme.of(context).brightness == Brightness.light ? Alignment.topCenter : Alignment.topLeft,
                       end: Theme.of(context).brightness == Brightness.light ? Alignment.bottomCenter : Alignment.bottomRight,
                       colors: Theme.of(context).brightness == Brightness.light
-                          ? [Color.lerp(accent, Colors.white, 0.22)!, accent]
+                          ? const [Color(0xFF8B5CF6), NgmyCalmLight.brand]
                           : [
                               accent,
                               Color.lerp(accent, const Color(0xFF67E8F9), 0.35 + t * 0.15)!,
@@ -5961,7 +5961,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                NgmyCalmIconTile(accent: color, size: 48, icon: icon),
+                NgmyCalmIconTile(accent: NgmyCalmLight.brand, size: 48, icon: icon),
                 const SizedBox(height: 12),
                 Text(
                   label,

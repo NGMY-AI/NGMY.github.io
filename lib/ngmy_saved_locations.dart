@@ -30,7 +30,7 @@ class NgmySavedLocation {
     this.visitCount = 0,
     DateTime? lastVisited,
     DateTime? createdAt,
-  })  : id = id ?? DateTime.now().microsecondsSinceEpoch.toString(),
+  })  : id = id ?? ngmyNewLocalId(),
         lastVisited = lastVisited,
         createdAt = createdAt ?? DateTime.now();
 
