@@ -66,9 +66,6 @@ class NgmyHouseCareCardFace extends StatelessWidget {
                 : daysLeft == 1
                     ? 'Due tomorrow'
                     : 'In $daysLeft days';
-    // A small card (a narrow phone) is laid out a little tighter so every line fits, nothing pushed off the bottom.
-    return LayoutBuilder(builder: (context, box) {
-    final tight = box.maxHeight.isFinite && box.maxHeight < 196;
     return DecoratedBox(
       decoration: const BoxDecoration(
         gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF0C4A6E), Color(0xFF0F766E), Color(0xFF064E3B)]),
@@ -77,7 +74,7 @@ class NgmyHouseCareCardFace extends StatelessWidget {
         children: [
           Positioned(right: -30, top: -30, child: Icon(Icons.home_work_rounded, size: 190, color: Colors.white.withValues(alpha: 0.07))),
           Padding(
-            padding: EdgeInsets.fromLTRB(22, tight ? 20 : 38, 22, tight ? 10 : 18),
+            padding: const EdgeInsets.fromLTRB(22, 38, 22, 18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -104,31 +101,43 @@ class NgmyHouseCareCardFace extends StatelessWidget {
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
-                  child: Text(dueLine, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: tight ? 26 : 30, height: 1.1)),
+                  child: Text(dueLine, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 30, height: 1.1)),
                 ),
                 if (dueNote.isNotEmpty)
                   Text(dueNote, style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 12.5)),
                 const Spacer(),
-                Text(
-                  name.isEmpty ? 'Member' : name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14),
-                ),
-                // The price and the agreement on their own line, always whole (shrunk a little on a narrow card, never cut).
-                FittedBox(
-                  key: const Key('house-care-terms'),
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    [
-                      '\$${price.toStringAsFixed(0)}/month',
-                      if (termYears > 0) '$termYears-year agreement',
-                    ].join(' · '),
-                    maxLines: 1,
-                    style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w700, fontSize: 11.5),
-                  ),
-                ),
+                // The name on the left and the price and agreement on the right, as before. The price and agreement
+                // always show whole: the name gives way first (it ends in ...), and only on a very narrow card does the
+                // price line shrink a little - it is never cut.
+                LayoutBuilder(builder: (context, row) {
+                  return Row(children: [
+                    Expanded(
+                      child: Text(
+                        name.isEmpty ? 'Member' : name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: row.maxWidth * 0.62),
+                      child: FittedBox(
+                        key: const Key('house-care-terms'),
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          [
+                            '\$${price.toStringAsFixed(0)}/month',
+                            if (termYears > 0) '$termYears-year agreement',
+                          ].join(' · '),
+                          maxLines: 1,
+                          style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w700, fontSize: 11.5),
+                        ),
+                      ),
+                    ),
+                  ]);
+                }),
                 const SizedBox(height: 2),
                 const FittedBox(
                   fit: BoxFit.scaleDown,
@@ -141,7 +150,6 @@ class NgmyHouseCareCardFace extends StatelessWidget {
         ],
       ),
     );
-    });
   }
 }
 
