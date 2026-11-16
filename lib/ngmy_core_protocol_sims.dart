@@ -261,7 +261,7 @@ class _SequencePicker extends StatelessWidget {
               sliver: SliverGrid(
                 gridDelegate: _grid,
                 delegate: SliverChildBuilderDelegate(
-                  (_, i) => _StudioTile(def: _kStudios[i], onTap: () {
+                  (_, i) => _StudioTile(index: i, def: _kStudios[i], onTap: () {
                     NgmyTone.theme = kStudioSoundThemes[_kStudios[i].title] ?? 'music';
                     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => _kStudios[i].build()));
                   }),
@@ -274,7 +274,7 @@ class _SequencePicker extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 30),
               sliver: SliverGrid(
                 gridDelegate: _grid,
-                delegate: SliverChildBuilderDelegate((_, i) => _PickTile(meta: _kSequences[i], onTap: () => onPick(_kSequences[i])), childCount: _kSequences.length),
+                delegate: SliverChildBuilderDelegate((_, i) => _PickTile(index: i, meta: _kSequences[i], onTap: () => onPick(_kSequences[i])), childCount: _kSequences.length),
               ),
             ),
           ]),
@@ -285,7 +285,8 @@ class _SequencePicker extends StatelessWidget {
 }
 
 class _StudioTile extends StatelessWidget {
-  const _StudioTile({required this.def, required this.onTap});
+  const _StudioTile({required this.def, required this.onTap, this.index = 0});
+  final int index;
   final _StudioDef def;
   final VoidCallback onTap;
 
@@ -300,9 +301,10 @@ class _StudioTile extends StatelessWidget {
           onTap: onTap,
           child: Ink(
             padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
-            decoration: NgmyCalmLight.cardDecoration(radius: 20),
+            // Light mode: blue or purple in a checkerboard (three tiles a row).
+            decoration: NgmyCalmLight.tintCardDecoration(NgmyCalmLight.checkerTone(index, columns: 3), radius: 20),
             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              NgmyCalmIconTile(accent: NgmyCalmLight.brand, size: 44, icon: def.icon),
+              NgmyCalmIconTile(accent: NgmyCalmLight.checkerTone(index, columns: 3), size: 44, icon: def.icon),
               const SizedBox(height: 8),
               Text(def.title, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: NgmyCalmLight.ink, fontWeight: FontWeight.w900, letterSpacing: 0.5, fontSize: 10.5, height: 1.15)),
               const SizedBox(height: 3),
@@ -344,7 +346,8 @@ class _StudioTile extends StatelessWidget {
 }
 
 class _PickTile extends StatelessWidget {
-  const _PickTile({required this.meta, required this.onTap});
+  const _PickTile({required this.meta, required this.onTap, this.index = 0});
+  final int index;
   final _UnfoldMeta meta;
   final VoidCallback onTap;
 
@@ -352,6 +355,7 @@ class _PickTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = meta.colors;
     final light = _coreLight(context);
+    final tone = NgmyCalmLight.checkerTone(index, columns: 3);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -359,7 +363,7 @@ class _PickTile extends StatelessWidget {
         onTap: onTap,
         child: Ink(
           padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
-          decoration: light ? NgmyCalmLight.cardDecoration(radius: 20) : BoxDecoration(
+          decoration: light ? NgmyCalmLight.tintCardDecoration(tone, radius: 20) : BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color.lerp(const Color(0xFF1B1B1F), c.first, 0.24)!, const Color(0xFF151518)]),
             border: Border.all(color: c.first.withValues(alpha: 0.35)),
@@ -375,7 +379,7 @@ class _PickTile extends StatelessWidget {
                     height: 17,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(6),
-                      gradient: LinearGradient(colors: light ? const [Color(0xFF8B5CF6), NgmyCalmLight.brand] : [c.first, c.last]),
+                      gradient: LinearGradient(colors: light ? [Color.lerp(tone, Colors.white, 0.1)!, NgmyCalmLight.framePalette(tone, strong: true)[1]] : [c.first, c.last]),
                       boxShadow: light ? null : [BoxShadow(color: Colors.black.withValues(alpha: 0.45), offset: const Offset(0, 2.5))],
                     ),
                     child: Icon(meta.icons[i], size: 11, color: Colors.white),
@@ -385,7 +389,7 @@ class _PickTile extends StatelessWidget {
             const SizedBox(height: 10),
             Text(meta.title, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: light ? NgmyCalmLight.ink : meta.glow, fontWeight: FontWeight.w900, letterSpacing: 0.6, fontSize: 10.5, height: 1.2)),
             const SizedBox(height: 4),
-            Icon(Icons.tune_rounded, color: light ? NgmyCalmLight.brand : c.first, size: 18),
+            Icon(Icons.tune_rounded, color: light ? NgmyCalmLight.framePalette(tone, strong: true)[1] : c.first, size: 18),
           ]),
         ),
       ),

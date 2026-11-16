@@ -3245,9 +3245,10 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
   }
   Widget _filterMenu(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final idleBg = isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04);
-    final idleBorder = isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.08);
-    final idleFg = isDark ? Colors.white54 : Colors.black45;
+    // Light mode: the chips are white with a purple edge and purple words, inside a purple-tinted frame.
+    final idleBg = isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white;
+    final idleBorder = isDark ? Colors.white.withValues(alpha: 0.12) : kNgmyAdvisorsHubAccent2.withValues(alpha: 0.45);
+    final idleFg = isDark ? Colors.white54 : const Color(0xFF5B21B6);
 
     Widget chip(String id, String label, IconData icon) {
       final sel = _filter == id;
@@ -3278,16 +3279,25 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
       );
     }
 
+    final chips = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+      child: Row(children: [chip('all', 'All', Icons.grid_view_rounded), chip('female', 'Girls', Icons.female_rounded), chip('male', 'Guys', Icons.male_rounded)]),
+    );
+    if (!isDark) {
+      // Light mode: a frame with colour (the owner asked), the same purple as the Advisors buttons.
+      return Container(
+        key: const Key('advisors-filter-light'),
+        decoration: NgmyCalmLight.tintCardDecoration(NgmyCalmLight.toneB, radius: 18),
+        child: chips,
+      );
+    }
     return _loveGlassPanel(
       context: context,
       isDark: isDark,
       borderRadius: BorderRadius.circular(18),
       fillAlpha: 0.46,
       blur: 12,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-        child: Row(children: [chip('all', 'All', Icons.grid_view_rounded), chip('female', 'Girls', Icons.female_rounded), chip('male', 'Guys', Icons.male_rounded)]),
-      ),
+      child: chips,
     );
   }
 

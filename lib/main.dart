@@ -31088,7 +31088,6 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
   bool _triFast = false;
   bool _triCheap = true;
   bool _triGood = true;
-  int _triDropCursor = 0;
   double _discount = 0;
   String _invoiceTemplate = 'modern';
   bool _invoicePaid = false;
@@ -31466,19 +31465,6 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
   }
 
   /// When a 3rd toggle turns on, drop one of the other two using fair rotation (fast → cheap → good → …).
-  String _nextTriangleDrop(Set<String> candidates) {
-    const order = ['fast', 'cheap', 'good'];
-    for (var i = 0; i < order.length; i++) {
-      final idx = (_triDropCursor + i) % order.length;
-      final k = order[idx];
-      if (candidates.contains(k)) {
-        _triDropCursor = (idx + 1) % order.length;
-        return k;
-      }
-    }
-    return candidates.first;
-  }
-
   void _setTriangleOption(String key, bool value) {
     if (!value) {
       setState(() => _triangleSetOn(key, false));
@@ -31497,7 +31483,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
         if (dropCandidates.isNotEmpty) {
           final toDrop = dropCandidates.length == 1
               ? dropCandidates.first
-              : _nextTriangleDrop(dropCandidates);
+              : ngmyIronTrianglePickDrop(dropCandidates);
           _triangleSetOn(toDrop, false);
         }
       }
@@ -32903,6 +32889,8 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
       pulse: pulse,
       scan: scan,
       orbit: orbit,
+      // Light mode: blue or purple in a checkerboard (phase steps by 0.18 per tile).
+      calmTone: NgmyCalmLight.checkerTone((phase / 0.18).round()),
       phase: phase,
       borderRadius: 20,
       onTap: onTap,

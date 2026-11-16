@@ -341,6 +341,8 @@ class _CreatorToolCard extends StatelessWidget {
         orbit: orbit,
         phase: phase,
         onTap: tool.onTap,
+        // Light mode: blue or purple in a checkerboard (phase steps by 0.11 per tile).
+        calmTone: NgmyCalmLight.checkerTone((phase / 0.11).round()),
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -436,7 +438,6 @@ class _StandaloneQuoteCalcDialogState extends State<_StandaloneQuoteCalcDialog> 
   bool _triFast = false;
   bool _triCheap = true;
   bool _triGood = true;
-  int _triDropCursor = 0;
   double _discount = 0;
 
   @override
@@ -462,19 +463,6 @@ class _StandaloneQuoteCalcDialogState extends State<_StandaloneQuoteCalcDialog> 
     }
   }
 
-  String _nextTriangleDrop(Set<String> candidates) {
-    const order = ['fast', 'cheap', 'good'];
-    for (var i = 0; i < order.length; i++) {
-      final idx = (_triDropCursor + i) % order.length;
-      final key = order[idx];
-      if (candidates.contains(key)) {
-        _triDropCursor = (idx + 1) % order.length;
-        return key;
-      }
-    }
-    return candidates.first;
-  }
-
   void _setTriangleOption(String key, bool value) {
     setState(() {
       if (!value) {
@@ -489,7 +477,7 @@ class _StandaloneQuoteCalcDialogState extends State<_StandaloneQuoteCalcDialog> 
       if (onKeys.length >= 2 && !onKeys.contains(key)) {
         final dropCandidates = onKeys.difference({key});
         if (dropCandidates.isNotEmpty) {
-          _triangleSetOn(dropCandidates.length == 1 ? dropCandidates.first : _nextTriangleDrop(dropCandidates), false);
+          _triangleSetOn(ngmyIronTrianglePickDrop(dropCandidates), false);
         }
       }
       _triangleSetOn(key, true);

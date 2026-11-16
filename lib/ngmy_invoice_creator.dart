@@ -285,10 +285,72 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
     return ok;
   }
 
-  InputDecoration _fieldDec(String label, {bool locked = false}) => InputDecoration(
+  InputDecoration _fieldDec(String label, {bool locked = false, IconData? icon}) {
+    if (Theme.of(context).brightness == Brightness.dark) {
+      return InputDecoration(
         labelText: label,
         suffixIcon: locked ? const Icon(Icons.lock_outline_rounded, size: 18) : null,
       );
+    }
+    // Light mode: a rounded, softly filled field with an icon and a purple edge while typing.
+    const edge = Color(0xFFDDD6FE);
+    const brand = Color(0xFF7C3AED);
+    OutlineInputBorder b(Color c, double w) =>
+        OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: c, width: w));
+    return InputDecoration(
+      labelText: label,
+      isDense: true,
+      filled: true,
+      fillColor: const Color(0xFFFBFAFF),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      labelStyle: const TextStyle(color: Color(0xFF6B7280), fontWeight: FontWeight.w600, fontSize: 13),
+      floatingLabelStyle: const TextStyle(color: brand, fontWeight: FontWeight.w700),
+      prefixIcon: icon == null ? null : Icon(icon, size: 19, color: brand),
+      prefixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+      suffixIcon: locked ? const Icon(Icons.lock_outline_rounded, size: 18, color: Color(0xFF9CA3AF)) : null,
+      border: b(edge, 1.3),
+      enabledBorder: b(edge, 1.3),
+      focusedBorder: b(brand, 1.8),
+    );
+  }
+
+  /// Light mode: a group of fields in its own soft purple frame with an icon and a title. Dark mode: unchanged.
+  Widget _formSection(String title, IconData icon, Widget child) {
+    if (Theme.of(context).brightness == Brightness.dark) return child;
+    return Container(
+      key: Key('invoice-section-$title'),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFDDD6FE), width: 1.4),
+        boxShadow: const [BoxShadow(color: Color(0x1A7C3AED), blurRadius: 18, offset: Offset(0, 6))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(9),
+                  gradient: const LinearGradient(colors: [Color(0xFFA78BFA), Color(0xFF7C3AED)]),
+                ),
+                child: Icon(icon, size: 17, color: Colors.white),
+              ),
+              const SizedBox(width: 10),
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5, color: Color(0xFF111827))),
+            ],
+          ),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
+  }
 
   Widget _lockedWrap(BuildContext ctx, Widget child) {
     if (!_contentLocked()) return child;
@@ -994,141 +1056,163 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
                 ),
               ],
               const SizedBox(height: 12),
-              _lockedWrap(
-                context,
-                Row(
-                  children: [
-                    Expanded(child: TextField(controller: _invoiceNoC, decoration: _fieldDec('Invoice #', locked: locked))),
-                    const SizedBox(width: 8),
-                    Expanded(child: TextField(controller: _issuedDateC, decoration: _fieldDec('Issued Date', locked: locked))),
-                    const SizedBox(width: 8),
-                    Expanded(child: TextField(controller: _dueDateC, decoration: _fieldDec('Due Date', locked: locked))),
-                  ],
+              // The fields, grouped. In light mode each group sits in its own frame with an icon and a title.
+              _formSection(
+                'Invoice details',
+                Icons.receipt_long_rounded,
+                _lockedWrap(
+                  context,
+                  Column(
+                    children: [
+                      TextField(controller: _invoiceNoC, decoration: _fieldDec('Invoice #', locked: locked, icon: Icons.tag_rounded)),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(child: TextField(controller: _issuedDateC, decoration: _fieldDec('Issued Date', locked: locked, icon: Icons.event_rounded))),
+                          const SizedBox(width: 8),
+                          Expanded(child: TextField(controller: _dueDateC, decoration: _fieldDec('Due Date', locked: locked, icon: Icons.event_available_rounded))),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 10),
-              _lockedWrap(
-                context,
-                TextField(
-                  controller: _bizNameC,
-                  decoration: _fieldDec('Your Business Name (auto-saved)', locked: locked),
-                  onChanged: (_) => setState(() {}),
-                ),
-              ),
-              const SizedBox(height: 8),
-              _lockedWrap(
-                context,
-                TextField(
-                  controller: _bizStreetC,
-                  decoration: _fieldDec('Street Address (auto-saved)', locked: locked),
-                  onChanged: (_) => setState(() {}),
-                ),
-              ),
-              const SizedBox(height: 8),
-              _lockedWrap(
-                context,
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _bizCityStateZipC,
-                        decoration: _fieldDec('City, State ZIP (auto-saved)', locked: locked),
+              const SizedBox(height: 12),
+              _formSection(
+                'Your business',
+                Icons.storefront_rounded,
+                _lockedWrap(
+                  context,
+                  Column(
+                    children: [
+                      TextField(
+                        controller: _bizNameC,
+                        decoration: _fieldDec('Your Business Name (auto-saved)', locked: locked, icon: Icons.business_rounded),
                         onChanged: (_) => setState(() {}),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _bizPhoneC,
-                        decoration: _fieldDec('Phone Number (auto-saved)', locked: locked),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _bizStreetC,
+                        decoration: _fieldDec('Street Address (auto-saved)', locked: locked, icon: Icons.location_on_outlined),
                         onChanged: (_) => setState(() {}),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _bizCityStateZipC,
+                              decoration: _fieldDec('City, State ZIP (auto-saved)', locked: locked, icon: Icons.map_outlined),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              controller: _bizPhoneC,
+                              decoration: _fieldDec('Phone Number (auto-saved)', locked: locked, icon: Icons.phone_rounded),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 10),
-              _lockedWrap(
-                context,
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _clientNameC,
-                        decoration: _fieldDec('Bill To (Client Name)', locked: locked),
-                        onChanged: (_) => setState(() {}),
+              const SizedBox(height: 12),
+              _formSection(
+                'Bill to',
+                Icons.person_rounded,
+                _lockedWrap(
+                  context,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _clientNameC,
+                          decoration: _fieldDec('Bill To (Client Name)', locked: locked, icon: Icons.badge_outlined),
+                          onChanged: (_) => setState(() {}),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _clientEmailC,
-                        decoration: _fieldDec('Client Email', locked: locked),
-                        onChanged: (_) => setState(() {}),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _clientEmailC,
+                          decoration: _fieldDec('Client Email', locked: locked, icon: Icons.alternate_email_rounded),
+                          onChanged: (_) => setState(() {}),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 10),
-              _lockedWrap(
-                context,
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
+              const SizedBox(height: 12),
+              _formSection(
+                'Item',
+                Icons.shopping_bag_outlined,
+                _lockedWrap(
+                  context,
+                  Column(
+                    children: [
+                      TextField(
                         controller: _itemNameC,
-                        decoration: _fieldDec('Item name', locked: locked),
+                        decoration: _fieldDec('Item name', locked: locked, icon: Icons.inventory_2_outlined),
                         onChanged: (_) => setState(() {}),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _itemPriceC,
-                        keyboardType: TextInputType.number,
-                        decoration: _fieldDec('Price', locked: locked),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _itemPriceC,
+                              keyboardType: TextInputType.number,
+                              decoration: _fieldDec('Price', locked: locked, icon: Icons.attach_money_rounded),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              controller: _itemQtyC,
+                              keyboardType: TextInputType.number,
+                              decoration: _fieldDec('Qty', locked: locked, icon: Icons.numbers_rounded),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              controller: _itemDiscountC,
+                              keyboardType: TextInputType.number,
+                              decoration: _fieldDec('Discount %', locked: locked, icon: Icons.percent_rounded),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _itemDescC,
+                        decoration: _fieldDec('Description', locked: locked, icon: Icons.notes_rounded),
                         onChanged: (_) => setState(() {}),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _itemQtyC,
-                        keyboardType: TextInputType.number,
-                        decoration: _fieldDec('Qty', locked: locked),
-                        onChanged: (_) => setState(() {}),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _itemDiscountC,
-                        keyboardType: TextInputType.number,
-                        decoration: _fieldDec('Discount %', locked: locked),
-                        onChanged: (_) => setState(() {}),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 8),
-              _lockedWrap(
-                context,
-                TextField(
-                  controller: _itemDescC,
-                  decoration: _fieldDec('Description', locked: locked),
-                  onChanged: (_) => setState(() {}),
-                ),
-              ),
-              const SizedBox(height: 8),
-              _lockedWrap(
-                context,
-                TextField(
-                  controller: _paymentInfoC,
-                  maxLines: 2,
-                  decoration: _fieldDec('Notes & Payment Instructions (auto-saved)', locked: locked),
-                  onChanged: (_) => setState(() {}),
+              const SizedBox(height: 12),
+              _formSection(
+                'Notes & payment',
+                Icons.payments_outlined,
+                _lockedWrap(
+                  context,
+                  TextField(
+                    controller: _paymentInfoC,
+                    maxLines: 2,
+                    decoration: _fieldDec('Notes & Payment Instructions (auto-saved)', locked: locked, icon: Icons.sticky_note_2_outlined),
+                    onChanged: (_) => setState(() {}),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),

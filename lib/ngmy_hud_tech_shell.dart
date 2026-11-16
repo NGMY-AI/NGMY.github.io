@@ -60,7 +60,7 @@ class NgmyHudKeepLook extends InheritedWidget {
 class NgmyCalmLight {
   NgmyCalmLight._();
 
-  static const Color page = Color(0xFFF5F5F7);
+  static const Color page = Colors.white; // pure white (the owner: light should be actual light, not greyish)
   static const Color card = Colors.white;
   static const Color border = Color(0xFFDDE1E7);
   static const double borderWidth = 1.2;
@@ -72,6 +72,33 @@ class NgmyCalmLight {
   static const Color brand = Color(0xFF7C3AED);
   static const Color brandEdge = Color(0xFFC4B5FD);
   static const double brandEdgeWidth = 1.5;
+
+  /// The two colours of the light look (the home frames' Neural Link blue and Signal Grid purple). Tiles take
+  /// one of the two, in a checkerboard, so pages have colour without mixing many colours.
+  static const Color toneA = Color(0xFF22D3EE);
+  static const Color toneB = Color(0xFFA78BFA);
+
+  static Color checkerTone(int index, {int columns = 2}) =>
+      ((index ~/ columns) + (index % columns)).isEven ? toneA : toneB;
+
+  /// A tile with colour: a light wash of [tone] (white words never needed), a thin edge of the same colour
+  /// and a soft shadow of that colour.
+  static BoxDecoration tintCardDecoration(Color tone, {double radius = 24}) {
+    final p = framePalette(tone, strong: true);
+    return BoxDecoration(
+      borderRadius: BorderRadius.circular(radius < 22 ? 22 : radius),
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color.lerp(Colors.white, tone, 0.10)!, Color.lerp(Colors.white, tone, 0.26)!],
+      ),
+      border: Border.all(color: p[0].withValues(alpha: 0.75), width: 1.5),
+      boxShadow: [
+        BoxShadow(color: p[1].withValues(alpha: 0.18), blurRadius: 22, offset: const Offset(0, 8)),
+        const BoxShadow(color: Color(0x0A0F172A), blurRadius: 3, offset: Offset(0, 1)),
+      ],
+    );
+  }
 
   /// A wide soft shadow all round the card, a little deeper below.
   static const List<BoxShadow> shadow = [
@@ -230,6 +257,18 @@ class _NgmyCalmWavesPainter extends CustomPainter {
   bool shouldRepaint(covariant _NgmyCalmWavesPainter old) => old.top != top || old.bottom != bottom || old.strong != strong;
 }
 
+/// Tells icon tiles inside a coloured tile which of the two colours to wear.
+class NgmyCalmToneScope extends InheritedWidget {
+  const NgmyCalmToneScope({super.key, required this.tone, required super.child});
+
+  final Color tone;
+
+  static Color? of(BuildContext context) => context.getInheritedWidgetOfExactType<NgmyCalmToneScope>()?.tone;
+
+  @override
+  bool updateShouldNotify(NgmyCalmToneScope oldWidget) => oldWidget.tone != tone;
+}
+
 /// A rounded tile with the icon in the accent colour, used instead of the glowing orb in calm light.
 class NgmyCalmIconTile extends StatelessWidget {
   const NgmyCalmIconTile({super.key, required this.accent, required this.size, this.icon, this.emoji});
@@ -372,6 +411,7 @@ class NgmyHudTechFrame extends StatelessWidget {
     this.borderRadius = 22,
     this.padding = EdgeInsets.zero,
     this.phase = 0,
+    this.calmTone,
   });
 
   final List<Color> colors;
@@ -384,6 +424,8 @@ class NgmyHudTechFrame extends StatelessWidget {
   final EdgeInsetsGeometry padding;
   /// Offsets scan/orbit so neighboring cards don't animate in lockstep.
   final double phase;
+  /// Light mode: give the tile colour (one of [NgmyCalmLight.toneA] / [NgmyCalmLight.toneB]). Without it the tile is white.
+  final Color? calmTone;
 
   @override
   Widget build(BuildContext context) {
@@ -396,10 +438,12 @@ class NgmyHudTechFrame extends StatelessWidget {
             width: double.infinity,
             height: fillH ? constraints.maxHeight : null,
             padding: padding,
-            decoration: NgmyCalmLight.cardDecoration(radius: borderRadius),
+            decoration: calmTone != null
+                ? NgmyCalmLight.tintCardDecoration(calmTone!, radius: borderRadius)
+                : NgmyCalmLight.cardDecoration(radius: borderRadius),
             // Whatever is inside keeps to the round corners (no square corners at the bottom).
             clipBehavior: Clip.antiAlias,
-            child: child,
+            child: calmTone != null ? NgmyCalmToneScope(tone: calmTone!, child: child) : child,
           );
         },
       );
@@ -518,7 +562,7 @@ class NgmyHudMiniOrb extends StatelessWidget {
   Widget build(BuildContext context) {
     if (NgmyHudInk.calm(context)) {
       // One colour for every icon tile (not each tile in its own colour).
-      return NgmyCalmIconTile(accent: NgmyCalmLight.brand, size: size, icon: icon, emoji: emoji);
+      return NgmyCalmIconTile(accent: NgmyCalmToneScope.of(context) ?? NgmyCalmLight.brand, size: size, icon: icon, emoji: emoji);
     }
     final dark = NgmyHudInk.isDark(context);
     return SizedBox(

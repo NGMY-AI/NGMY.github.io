@@ -304,7 +304,11 @@ class _TechFrameCard extends StatelessWidget {
   /// Light mode: each home frame filled with its own colour (a rich gradient), a white icon tile and white words.
   /// Nothing glows or moves.
   Widget _calmCard(BuildContext context) {
-    final accent = spec.colors.first;
+    // Two colours only: Core Protocol wears Neural Link's colour, Vault Channel wears Signal Grid's (the owner's choice).
+    final accent = switch (spec.kind) {
+      _TechKind.neural || _TechKind.core => _TechFrameSpec.neural.colors.first,
+      _TechKind.signal || _TechKind.vault => _TechFrameSpec.signal.colors.first,
+    };
     final iconInk = NgmyCalmLight.accentInk(accent);
     final badge = Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

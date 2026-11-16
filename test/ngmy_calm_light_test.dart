@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -12,6 +13,7 @@ import 'package:ngmy/ngmy_studio_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ngmy/ngmy_deferred.dart';
 import 'package:ngmy/ngmy_home_tech_frames.dart';
+import 'package:ngmy/ngmy_iron_triangle_panel.dart';
 import 'package:ngmy/ngmy_market_hub_screen.dart';
 import 'package:ngmy/ngmy_hub_form_ui.dart';
 import 'package:ngmy/ngmy_hud_tech_shell.dart';
@@ -174,7 +176,7 @@ void main() {
     expect(edge.color, NgmyCalmLight.brandEdge);
     expect(edge.width, lessThanOrEqualTo(2), reason: 'a thin edge, never thick');
     expect((d.borderRadius as BorderRadius).topLeft.x, greaterThanOrEqualTo(22), reason: 'round, thick-looking cards');
-    expect(NgmyCalmLight.page.computeLuminance(), greaterThan(0.9), reason: 'a very light page so the white cards stand out');
+    expect(NgmyCalmLight.page, Colors.white, reason: 'pure white page');
   });
 
   testWidgets('Core Protocol is white in light mode', (tester) async {
@@ -234,5 +236,23 @@ void main() {
     expect(tiles, isNotEmpty);
     expect(tiles.every((t) => t.accent == NgmyCalmLight.brand), isTrue);
     await tester.pumpWidget(const SizedBox());
+  });
+
+  test('light tiles use only two colours, in a checkerboard', () {
+    final tones = [for (var i = 0; i < 6; i++) NgmyCalmLight.checkerTone(i)];
+    expect(tones.toSet(), {NgmyCalmLight.toneA, NgmyCalmLight.toneB});
+    expect(tones[0], isNot(tones[1]), reason: 'side by side tiles differ');
+    expect(tones[0], isNot(tones[2]), reason: 'the tile below differs');
+    expect(NgmyCalmLight.page, Colors.white, reason: 'the page is pure white, not greyish');
+  });
+
+  test('iron triangle: the one that turns off is not always the same next one in a line', () {
+    final r = math.Random(1);
+    final seen = <String>{};
+    for (var i = 0; i < 40; i++) {
+      seen.add(ngmyIronTrianglePickDrop({'cheap', 'good'}, random: r));
+    }
+    expect(seen, {'cheap', 'good'}, reason: 'either of the other two can turn off');
+    expect(ngmyIronTrianglePickDrop({'fast'}), 'fast');
   });
 }

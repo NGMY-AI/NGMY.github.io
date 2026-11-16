@@ -11,7 +11,7 @@ class NgmyHubTheme {
 
   bool get isDark => Theme.of(context).brightness == Brightness.dark;
 
-  Color get scaffold => isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F7);
+  Color get scaffold => isDark ? const Color(0xFF121212) : Colors.white;
   Color get surface => isDark ? const Color(0xFF0B1220) : Colors.white;
   Color get surfaceElevated => isDark ? const Color(0xFF111827) : Colors.white;
   Color get panel => isDark ? const Color(0xFF0B1020) : Colors.white;

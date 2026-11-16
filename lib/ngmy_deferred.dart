@@ -32,7 +32,7 @@ class _NgmyDeferredState extends State<NgmyDeferred> {
         }
         final light = Theme.of(context).brightness == Brightness.light;
         return Scaffold(
-          backgroundColor: widget.background ?? (light ? const Color(0xFFF5F5F7) : const Color(0xFF0B0F18)),
+          backgroundColor: widget.background ?? (light ? Colors.white : const Color(0xFF0B0F18)),
           body: Center(
             child: snap.hasError
                 ? Padding(

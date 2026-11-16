@@ -3679,10 +3679,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(24),
-        decoration: NgmyCalmLight.cardDecoration(radius: 22),
+        decoration: NgmyCalmLight.tintCardDecoration(NgmyCalmLight.toneA, radius: 22),
         child: const Column(
           children: [
-            NgmyCalmIconTile(accent: NgmyCalmLight.brand, size: 56, icon: Icons.view_carousel_outlined),
+            NgmyCalmIconTile(accent: NgmyCalmLight.toneA, size: 56, icon: Icons.view_carousel_outlined),
             SizedBox(height: 14),
             Text('No presentations yet', style: TextStyle(fontWeight: FontWeight.w800, color: NgmyCalmLight.ink)),
             SizedBox(height: 6),
@@ -3868,10 +3868,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                                 Colors.white.withValues(alpha: 0.10 + t * 0.04),
                                 const Color(0xFF111827).withValues(alpha: 0.78),
                               ]
-                            : [Colors.white, Colors.white],
+                            : [Color.lerp(Colors.white, NgmyCalmLight.checkerTone(index, columns: 1), 0.10)!, Color.lerp(Colors.white, NgmyCalmLight.checkerTone(index, columns: 1), 0.24)!],
                       ),
                       border: Border.all(
-                        color: !isDark ? NgmyCalmLight.brandEdge : accent.first.withValues(alpha: 0.34 + t * 0.22),
+                        color: !isDark ? NgmyCalmLight.framePalette(NgmyCalmLight.checkerTone(index, columns: 1), strong: true)[0].withValues(alpha: 0.75) : accent.first.withValues(alpha: 0.34 + t * 0.22),
                         width: !isDark ? NgmyCalmLight.brandEdgeWidth : 1.25,
                       ),
                     ),
@@ -3882,7 +3882,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                         height: 36,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(10),
-                          gradient: LinearGradient(colors: isDark ? accent : const [Color(0xFF8B5CF6), NgmyCalmLight.brand]),
+                          gradient: LinearGradient(colors: isDark ? accent : [NgmyCalmLight.framePalette(NgmyCalmLight.checkerTone(index, columns: 1), strong: true)[0], NgmyCalmLight.framePalette(NgmyCalmLight.checkerTone(index, columns: 1), strong: true)[1]]),
                         ),
                         child: Icon(
                           deck.isLockedTemplateDoc ? Icons.description_rounded : Icons.slideshow_rounded,
@@ -5923,7 +5923,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     // A compact frame around the one-line header (icon, title, tagline).
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-      decoration: !isDark ? NgmyCalmLight.cardDecoration(radius: 20) : BoxDecoration(
+      decoration: !isDark ? NgmyCalmLight.tintCardDecoration(NgmyCalmLight.toneB, radius: 20) : BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -5957,11 +5957,11 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
           child: Ink(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
-            decoration: NgmyCalmLight.cardDecoration(radius: 22),
+            decoration: NgmyCalmLight.tintCardDecoration(label.contains('Class') ? NgmyCalmLight.toneB : NgmyCalmLight.toneA, radius: 22),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                NgmyCalmIconTile(accent: NgmyCalmLight.brand, size: 48, icon: icon),
+                NgmyCalmIconTile(accent: label.contains('Class') ? NgmyCalmLight.toneB : NgmyCalmLight.toneA, size: 48, icon: icon),
                 const SizedBox(height: 12),
                 Text(
                   label,

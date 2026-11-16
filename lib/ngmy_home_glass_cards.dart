@@ -1906,7 +1906,19 @@ class _NgmyHomeBrandBadgeState extends State<NgmyHomeBrandBadge> with TickerProv
               sigma: 14,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
-                decoration: BoxDecoration(
+                // Light mode: a light (white to soft gold) badge with a gold edge and gold letters, still.
+                decoration: isLight
+                    ? BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Colors.white, Color(0xFFFFF6DC)],
+                        ),
+                        border: Border.all(color: const Color(0xFFD4A62A), width: 1.6),
+                        boxShadow: const [BoxShadow(color: Color(0x33B8860B), blurRadius: 14, offset: Offset(0, 5))],
+                      )
+                    : BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
                   gradient: LinearGradient(
                     begin: Alignment(-1.2 + shimmer * 2.4, -0.4),
@@ -1945,9 +1957,9 @@ class _NgmyHomeBrandBadgeState extends State<NgmyHomeBrandBadge> with TickerProv
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 2.8 + pulse * 0.6,
-                    color: isLight ? const Color(0xFF171633) : Colors.white,
-                    shadows: [
+                    letterSpacing: isLight ? 3.0 : 2.8 + pulse * 0.6,
+                    color: isLight ? const Color(0xFF9A6B00) : Colors.white,
+                    shadows: isLight ? null : [
                       Shadow(
                         color: const Color(0xFF38BDF8).withValues(alpha: 0.35 + pulse * 0.25),
                         blurRadius: 8 + pulse * 6,
