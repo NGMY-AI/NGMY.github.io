@@ -1399,28 +1399,9 @@ class _CareSheetState extends State<_CareSheet> {
             Text(v, style: TextStyle(color: c.ink, fontWeight: FontWeight.w900, fontSize: 13)),
           ]),
         );
-    final due = DateTime.tryParse((_care['nextDue'] ?? '').toString())?.toLocal();
-    final days = due?.difference(DateTime.now()).inDays;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          gradient: const LinearGradient(colors: [Color(0xFF0C4A6E), Color(0xFF0F766E)]),
-        ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Row(children: [
-            Icon(Icons.verified_user_rounded, color: Color(0xFF34D399), size: 18),
-            SizedBox(width: 6),
-            Text('ACTIVE MEMBER', style: TextStyle(color: Color(0xFF34D399), fontWeight: FontWeight.w900, fontSize: 11.5, letterSpacing: 1.2)),
-          ]),
-          const SizedBox(height: 12),
-          const Text('NEXT PAYMENT DUE', style: TextStyle(color: Colors.white60, fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 1.3)),
-          Text(_careDate(_care['nextDue']), style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
-          if (days != null)
-            Text(days < 0 ? 'Payment is late' : (days == 0 ? 'Due today' : 'In $days day${days == 1 ? '' : 's'}'), style: const TextStyle(color: Color(0xFF99F6E4), fontWeight: FontWeight.w800)),
-        ]),
-      ),
+      // The same House Care card as on the home screen, with a download button to save it as a picture.
+      NgmyHouseCareCardDownloadable(json: ngmyHouseCareSnapshot(_care, widget.clientName)),
       const SizedBox(height: 12),
       row('Monthly fee', '\$${((_care['price'] as num?) ?? 125).toStringAsFixed(0)}'),
       row('Agreement', '${_care['termYears'] ?? 1} year${(_care['termYears'] ?? 1) == 1 ? '' : 's'}'),

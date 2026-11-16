@@ -1,6 +1,11 @@
 import 'dart:convert';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+
+import 'ngmy_qr_download.dart';
 
 /// Id of the House Care card on the home screen (one per account).
 const String kNgmyHouseCareCardId = 'ngmy_house_care_card';
@@ -61,6 +66,9 @@ class NgmyHouseCareCardFace extends StatelessWidget {
                 : daysLeft == 1
                     ? 'Due tomorrow'
                     : 'In $daysLeft days';
+    // A small card (a narrow phone) is laid out a little tighter so every line fits, nothing pushed off the bottom.
+    return LayoutBuilder(builder: (context, box) {
+    final tight = box.maxHeight.isFinite && box.maxHeight < 196;
     return DecoratedBox(
       decoration: const BoxDecoration(
         gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF0C4A6E), Color(0xFF0F766E), Color(0xFF064E3B)]),
@@ -69,7 +77,7 @@ class NgmyHouseCareCardFace extends StatelessWidget {
         children: [
           Positioned(right: -30, top: -30, child: Icon(Icons.home_work_rounded, size: 190, color: Colors.white.withValues(alpha: 0.07))),
           Padding(
-            padding: const EdgeInsets.fromLTRB(22, 38, 22, 18),
+            padding: EdgeInsets.fromLTRB(22, tight ? 20 : 38, 22, tight ? 10 : 18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -96,40 +104,140 @@ class NgmyHouseCareCardFace extends StatelessWidget {
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
-                  child: Text(dueLine, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 30, height: 1.1)),
+                  child: Text(dueLine, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: tight ? 26 : 30, height: 1.1)),
                 ),
                 if (dueNote.isNotEmpty)
                   Text(dueNote, style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 12.5)),
                 const Spacer(),
-                Row(children: [
-                  Expanded(
-                    child: Text(
-                      name.isEmpty ? 'Member' : name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14),
-                    ),
+                Text(
+                  name.isEmpty ? 'Member' : name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14),
+                ),
+                // The price and the agreement on their own line, always whole (shrunk a little on a narrow card, never cut).
+                FittedBox(
+                  key: const Key('house-care-terms'),
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    [
+                      '\$${price.toStringAsFixed(0)}/month',
+                      if (termYears > 0) '$termYears-year agreement',
+                    ].join(' · '),
+                    maxLines: 1,
+                    style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w700, fontSize: 11.5),
                   ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      [
-                        '\$${price.toStringAsFixed(0)}/month',
-                        if (termYears > 0) '$termYears-year agreement',
-                      ].join(' · '),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w700, fontSize: 11.5),
-                    ),
-                  ),
-                ]),
+                ),
                 const SizedBox(height: 2),
-                const Text('Work is free of labor charges. You pay for materials only.', style: TextStyle(color: Colors.white54, fontSize: 10.5, fontWeight: FontWeight.w600)),
+                const FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text('Work is free of labor charges. You pay for materials only.', maxLines: 1, style: TextStyle(color: Colors.white54, fontSize: 10.5, fontWeight: FontWeight.w600)),
+                ),
               ],
             ),
           ),
         ],
       ),
     );
+    });
+  }
+}
+
+/// The House Care card exactly as it is on the home screen (same face, same shape, same round corners), with a
+/// white round download button on it. The button saves a picture of the card (the button itself is not in it).
+class NgmyHouseCareCardDownloadable extends StatefulWidget {
+  const NgmyHouseCareCardDownloadable({super.key, required this.json});
+
+  final String json;
+
+  @override
+  State<NgmyHouseCareCardDownloadable> createState() => _NgmyHouseCareCardDownloadableState();
+}
+
+class _NgmyHouseCareCardDownloadableState extends State<NgmyHouseCareCardDownloadable> {
+  final _captureKey = GlobalKey();
+  bool _busy = false;
+
+  Future<Uint8List?> _capture() async {
+    await WidgetsBinding.instance.endOfFrame;
+    final boundary = _captureKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+    if (boundary == null) return null;
+    final image = await boundary.toImage(pixelRatio: 3.0);
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+    return data?.buffer.asUint8List();
+  }
+
+  Future<void> _download() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    try {
+      final bytes = await _capture();
+      if (bytes == null) throw Exception('Could not make the picture.');
+      var name = 'member';
+      try {
+        final m = jsonDecode(widget.json);
+        if (m is Map) name = (m['name'] ?? '').toString().trim();
+      } catch (_) {}
+      final safe = name.replaceAll(RegExp(r'[^\w\-]+'), '_');
+      final msg = await downloadNgmyQrImage(bytes, 'ngmy_house_care_${safe.isEmpty ? 'member' : safe}');
+      messenger?.showSnackBar(SnackBar(content: Text(msg)));
+    } catch (e) {
+      messenger?.showSnackBar(SnackBar(content: Text('Download failed: $e')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, box) {
+      final w = box.maxWidth.isFinite ? box.maxWidth : 360.0;
+      // The home card shape: 1.55 : 1 (the same rule as the home cards), less the 16 at the top of the deck.
+      final h = (w / 1.55).clamp(190.0, 420.0) - 16;
+      return SizedBox(
+        width: w,
+        height: h,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: RepaintBoundary(
+                key: _captureKey,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(28),
+                  child: NgmyHouseCareCardFace(json: widget.json),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 6,
+              right: 10,
+              child: Material(
+                color: Colors.white,
+                shape: const CircleBorder(),
+                elevation: 4,
+                shadowColor: Colors.black45,
+                child: InkWell(
+                  key: const Key('house-care-download'),
+                  customBorder: const CircleBorder(),
+                  onTap: _busy ? null : _download,
+                  child: SizedBox(
+                    width: 30,
+                    height: 30,
+                    child: Center(
+                      child: _busy
+                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0F766E)))
+                          : const Icon(Icons.download_rounded, size: 18, color: Color(0xFF0F766E)),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    });
   }
 }

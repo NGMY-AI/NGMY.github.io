@@ -34605,6 +34605,42 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     return _hasEffectiveRegistrarAccess(widget.config, widget.user);
   }
 
+  /// An Authorized Registrar who opened ANOTHER state with that state's code: they may look (Search, Rankings,
+  /// Members) but change nothing there. Every tool that edits uses _canUseRegistrarToolsHere(), which is false here.
+  bool _isRegistrarVisitingOtherState() {
+    if (_isGlobalCivicRegistryAdmin() || !_hasRegistrarAccess() || _canUseRegistrarToolsHere()) return false;
+    final home = _registrarHomeState().trim();
+    return home.isNotEmpty && !NgmyCivicRegistryStats.statesMatch(_selectedState, home);
+  }
+
+  Widget _registrarViewOnlyBanner(bool isDark) {
+    final home = _registrarHomeState().trim();
+    return Container(
+      key: const Key('civic-registrar-view-only'),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF59E0B).withOpacity(isDark ? 0.14 : 0.10),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.55)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.visibility_rounded, color: Color(0xFFF59E0B), size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              ngmyT(
+                'View only in $_selectedState. You can look but not change anything here.${home.isEmpty ? '' : ' Your registrar tools work in $home.'}',
+                'Kutazama tu katika $_selectedState. Unaweza kuangalia lakini huwezi kubadilisha chochote hapa.${home.isEmpty ? '' : ' Zana zako za msajili zinafanya kazi $home.'}',
+              ),
+              style: TextStyle(color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E), fontWeight: FontWeight.w700, fontSize: 12.5, height: 1.35),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// AR tools (and PIN bypass) only in the registrar's home state, or for King/Admin.
   bool _canUseRegistrarToolsHere([String? state]) {
     if (_isGlobalCivicRegistryAdmin()) return true;
@@ -35032,7 +35068,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
         _selectedCity = 'All Cities';
         _selectedRoom = 'All Rooms';
         _registryUnlocked = true;
-        if (!_canUseRegistrarToolsHere() && _activeTab > 1) {
+        if (!_canUseRegistrarToolsHere() && _activeTab > _maxCivicTabIndex) {
           _activeTab = 0;
         }
       });
@@ -35087,7 +35123,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
       _selectedRoom = 'All Rooms';
       _registryUnlocked = true;
       // Away from home AR state → member UI (no Enroll / Members tools).
-      if (!_canUseRegistrarToolsHere() && _activeTab > 1) {
+      if (!_canUseRegistrarToolsHere() && _activeTab > _maxCivicTabIndex) {
         _activeTab = 0;
       }
     });
@@ -35147,7 +35183,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     widget.onDataChanged();
   }
 
-  int get _maxCivicTabIndex => _canUseRegistrarToolsHere() ? 3 : 1;
+  int get _maxCivicTabIndex => _canUseRegistrarToolsHere() ? 3 : (_isRegistrarVisitingOtherState() ? 2 : 1);
 
   Future<void> _hydrateRegistrarApplication() async {
     final email = widget.user.email;
@@ -46133,7 +46169,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                   Expanded(child: _tabItem(3, ngmyT('Rankings', 'Viwango'), Icons.bookmark_border_rounded)),
                 ],
               ),
-            ] else
+            ] else ...[
+              // An Authorized Registrar visiting another state (with that state's code): they see what a registrar
+              // sees (the Members list too) but can change nothing - every tool that edits checks the home state.
+              if (_isRegistrarVisitingOtherState()) ...[
+                _registrarViewOnlyBanner(isDark),
+                const SizedBox(height: 15),
+              ],
               Row(
                 children: [
                   Expanded(child: _tabItem(0, ngmyT('Search', 'Tafuta'), Icons.search_rounded)),
@@ -46141,6 +46183,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                   Expanded(child: _tabItem(1, ngmyT('Rankings', 'Viwango'), Icons.bookmark_border_rounded)),
                 ],
               ),
+              if (_isRegistrarVisitingOtherState()) ...[
+                const SizedBox(height: 15),
+                Row(
+                  children: [
+                    Expanded(child: _tabItem(2, ngmyT('Members (view only)', 'Wanachama (kutazama tu)'), Icons.people_outline_rounded)),
+                  ],
+                ),
+              ],
+            ],
             const SizedBox(height: 30),
 
             // Search/Action Box — voting card only on Search, at the bottom.
@@ -46160,6 +46211,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                 _civicVotingEntryCard(),
               ],
               if (_activeTab == 1) _rankingsSection(isDark),
+              // View only: the member cards are built without any manage buttons (manageActions is false away from home).
+              if (_activeTab == 2 && _isRegistrarVisitingOtherState()) _membersSection(isDark),
             ],
 
               const SizedBox(height: 50),
