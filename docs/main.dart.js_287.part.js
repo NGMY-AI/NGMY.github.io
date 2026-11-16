@@ -243,7 +243,7 @@ if(m==="#")++p
 if(m==="b")--p
 if(m==="+")p+=12
 if(m==="-")p-=12}i.push(new C.y(p,q))}if(i.length!==0){x=y.e
-l=new C.N(i,new A.fyf(),x).f1(0,D.bbm)
+l=new C.N(i,new A.fyf(),x).f1(0,D.bbn)
 k=new C.N(i,new A.fyg(),x).f1(0,B.y0)
 for(x=i.length;l<0;){l+=12
 k+=12
@@ -434,7 +434,7 @@ aBg(d){var x,w=this.ax,v=d.aJ(0,new C.p(w.a/2,w.b/2)),u=-this.r
 w=v.a
 x=v.b
 return new C.p(w*Math.cos(u)-x*Math.sin(u),w*Math.sin(u)+x*Math.cos(u))},
-B(d){var x,w,v,u,t,s,r,q=this,p=null,o=y.p,n=C.a([C.aI(p,p,p,p,F.oM,p,p,p,new A.eqT(q,d),p,p,p,p,"Share",p)],o),m=C.cr(new A.eqU(q)),l=q.x
+B(d){var x,w,v,u,t,s,r,q=this,p=null,o=y.p,n=C.a([C.aI(p,p,p,p,F.oN,p,p,p,new A.eqT(q,d),p,p,p,p,"Share",p)],o),m=C.cr(new A.eqU(q)),l=q.x
 l=E.iT(B.be,B.o.v(B.j.V(l)),"Segments",18,2,new A.eqV(q),l)
 x=q.y
 x=E.iT(B.be,B.o.v(B.j.V(x)),"Thickness",12,1,new A.eqW(q),x)
@@ -442,7 +442,7 @@ w=q.z
 v=q.Q
 u=q.as
 t=q.ch
-s=t?B.oI:I.th
+s=t?B.oJ:I.th
 s=C.a([new E.dW("Mirror",w,new A.eqX(q),B.D0,B.be,p),new E.dW("Spin",v,new A.eqY(q),F.apX,B.be,p),new E.dW("Rainbow",u,new A.eqZ(q),B.ml,B.be,p),new E.dW("Sound",t,new A.er_(q),s,B.be,p)],o)
 t=C.a([],o)
 for(r=0;r<8;++r){w=F.DO[r]
@@ -490,7 +490,7 @@ d.e=B.dT
 k=l.c
 d.c=k*2.4
 d.r=e.j(0.35).gp(0)
-d.y=O.ow
+d.y=O.ox
 a0=new C.ao(B.O,B.M,B.R,B.S,B.Q)
 a0.b=B.a9
 a0.d=B.bw
@@ -527,7 +527,7 @@ case"sunset":return C.a([v.$3(20,0.9,1),v.$3(340,0.8,0.95),v.$3(300,0.7,0.8),v.$
 default:u=C.a([],u)
 for(x=0;x<5;++x)u.push(v.$3(w.e+(x-2)*22,w.f,0.95-x*0.03))
 return u}},
-aY0(d,e){var x=D.dfC[B.o.D(B.j.bh(H.a6c(d).b/360*7),0,6)]+12
+aY0(d,e){var x=D.dfD[B.o.D(B.j.bh(H.a6c(d).b/360*7),0,6)]+12
 if(e===0)E.mv("bell",x,900,0.5)
 else this.z.push(C.cy(C.dw(0,0,0,e,0,0),new A.eui(x)))},
 c1B(d){return this.aY0(d,0)},
@@ -565,9 +565,9 @@ j=C.L(p.gpG()[0].j(0.6),B.r,1)
 i=C.r(o,D.bYi,B.f,o,o,new C.o(o,o,o,o,o,new C.a8(B.a7,B.aa,B.x,C.a([p.gpG()[0],p.gpG()[2]],y.O),o,o),B.a6),o,46,o,o,o,o,o,46)
 g=C.E(C.x(C.a([C.d("Preview card",o,o,o,o,o,o,C.m(o,o,p.gpG()[0],o,o,o,o,o,o,o,o,15,o,o,B.u,o,o,!0,o,o,o,o,o,o,o,o),o,o,o),C.d("This is how the colours look together",o,o,o,o,o,o,C.m(o,o,p.gpG()[1].j(0.9),o,o,o,o,o,o,o,o,12,o,o,o,o,o,!0,o,o,o,o,o,o,o,o),o,o,o)],f),B.E,o,B.e,B.i,0,B.p),1)
 t=C.l(12)
-l=C.cm(C.a([h,B.aB,m,B.aB,C.r(o,C.A(C.a([i,B.bc,g,C.r(o,D.fVP,B.f,o,o,new C.o(p.gpG()[3],o,o,t,o,o,B.n),o,o,o,o,B.pp,o,o,o)],f),B.l,o,B.e,B.i,0,o,o),B.f,o,o,new C.o(k,o,j,l,o,o,B.n),o,o,o,o,B.bS,o,o,o)],f),o,o,B.bI,o,o,B.ah,!1)
+l=C.cm(C.a([h,B.aB,m,B.aB,C.r(o,C.A(C.a([i,B.bc,g,C.r(o,D.fVP,B.f,o,o,new C.o(p.gpG()[3],o,o,t,o,o,B.n),o,o,o,o,B.ov,o,o,o)],f),B.l,o,B.e,B.i,0,o,o),B.f,o,o,new C.o(k,o,j,l,o,o,B.n),o,o,o,o,B.bS,o,o,o)],f),o,o,B.bI,o,o,B.ah,!1)
 j=C.a([],f)
-for(r=0;r<5;++r){q=D.db9[r]
+for(r=0;r<5;++r){q=D.dba[r]
 j.push(new E.dW(q.b,p.x===q.a,new A.euq(p,q),o,B.h_,o))}m=p.e
 k=B.o.v(B.j.V(m))
 m=E.iT(new H.pk(1,m,0.8,1).jd(),k,"Hue",360,0,new A.eur(p),m)
@@ -709,8 +709,8 @@ m.b=new C.p(t.a+r/a1*p*b0,t.b+s/a1*p*b0)}}if(a9.x==="drop"&&a9.ay!=null&&a9.fb$-
 v=a9.ay
 v.toString
 a9.az5(v)}},
-B(d){var x,w,v,u,t,s,r,q,p,o=this,n=null,m=y.p,l=C.a([C.aI(n,n,n,n,F.oM,n,n,n,new A.e7M(o,d),n,n,n,n,"Share",n)],m),k=C.cr(new A.e7N(o)),j=C.a([],m)
-for(x=0;x<3;++x){w=D.deb[x]
+B(d){var x,w,v,u,t,s,r,q,p,o=this,n=null,m=y.p,l=C.a([C.aI(n,n,n,n,F.oN,n,n,n,new A.e7M(o,d),n,n,n,n,"Share",n)],m),k=C.cr(new A.e7N(o)),j=C.a([],m)
+for(x=0;x<3;++x){w=D.dec[x]
 j.push(new E.dW(w.b,o.x===w.a,new A.e7O(o,w),w.c,B.aG,n))}v=C.a([],m)
 for(x=0;x<5;++x){u=D.duN[x]
 v.push(new E.dW(u.b,o.y===u.a,new A.e7P(o,u),u.c,B.aG,n))}t=o.z
@@ -720,7 +720,7 @@ s=E.iT(B.aG,""+B.j.V(s*100)+"%","Bounce",0.98,0.1,new A.e7R(o),s)
 r=o.as
 r=E.iT(B.aG,B.o.v(B.j.V(r)),"Ball size",30,6,new A.e7S(o),r)
 q=o.CW
-p=q?B.oI:I.th
+p=q?B.oJ:I.th
 return E.lD(B.aG,l,"A box of balls you control.\n\nDrop: touch and hold to pour balls out.\nWall: drag a line to build a ramp or a cup for the balls.\nPush: drag your finger through the balls to blow them around.\n\nChange the gravity direction (even turn it off), make the balls bouncier, or press Rain for a shower. Share saves a picture.",k,"GRAVITY TOY",C.x(C.a([new E.fd(j,"TOUCH",n),new E.fd(v,"GRAVITY",n),t,s,r,new E.fd(C.a([new E.dW("Sound",q,new A.e7T(o),p,B.aG,n),new E.fE(S.PH,"Rain",new A.e7U(o),B.aG,n),new E.fE(D.bSg,"Clear balls",new A.e7V(o),B.c,n),new E.fE(F.wL,"Clear walls",new A.e7W(o),B.bZ,n)],m),n,n)],m),B.l,n,B.e,B.P,0,B.p))}}
 A.bia.prototype={
 a5(d,e){var x,w,v,u,t,s,r,q,p,o,n=this,m=0+e.a,l=0+e.b
@@ -741,7 +741,7 @@ s.b=B.a9
 s.d=B.bw
 s.c=12
 s.r=B.aG.j(0.3).gp(0)
-s.y=B.kW
+s.y=B.kV
 d.ah(x,t,s)
 d.ah(x,t,w)}m=n.d
 if(m!=null&&n.e!=null){l=n.e
@@ -756,7 +756,7 @@ s=r.c
 q=new C.ao(B.O,B.M,B.R,B.S,B.Q)
 p=r.d
 q.r=p.j(0.28).gp(0)
-q.y=B.kW
+q.y=B.kV
 d.N(t,s+4,q)
 q=r.a
 t=new C.ao(B.O,B.M,B.R,B.S,B.Q)
@@ -856,7 +856,7 @@ u=l.w
 r=w.ai()
 q=D.aDO[w.az(6)]
 l.az4(new C.p(x.a*(0.1+v*0.8),u.b*(0.1+r*0.45)),w.az(4),q)}},
-B(d){var x,w,v,u,t,s,r,q,p,o=this,n=null,m=y.p,l=C.a([C.aI(n,n,n,n,F.oM,n,n,n,new A.e4f(o,d),n,n,n,n,"Share",n)],m),k=C.cr(new A.e4g(o)),j=C.a([],m)
+B(d){var x,w,v,u,t,s,r,q,p,o=this,n=null,m=y.p,l=C.a([C.aI(n,n,n,n,F.oN,n,n,n,new A.e4f(o,d),n,n,n,n,"Share",n)],m),k=C.cr(new A.e4g(o)),j=C.a([],m)
 for(x=0;x<6;++x){w=D.cUP[x]
 j.push(new E.dW(w.b,o.x===w.a,new A.e4h(o,w),w.c,B.bl,n))}v=C.a([],m)
 for(u=0;u<4;++u){t=new C.aN(18,18)
@@ -869,7 +869,7 @@ v.push(C.az(n,C.r(n,new C.c8(B.aL,B.e,B.i,B.l,n,B.p,n,0,r,n),B.f,n,n,new C.o(n,n
 t=E.iT(B.bl,B.j.ad(t,1)+"x","Size",1.8,0.4,new A.e4j(o),t)
 s=o.Q
 r=o.as
-p=r?B.oI:I.th
+p=r?B.oJ:I.th
 return E.lD(B.bl,l,"Tap anywhere in the sky and a rocket flies there and bursts.\n\nPick the shape (ball, ring, heart, spiral, weeping willow or star), the colours and how big it is. Auto show launches by itself, and Finale lights a whole volley.\n\nTurn the sound on for the whoosh and the bang.",k,"FIREWORK DESIGNER",C.x(C.a([new E.fd(j,"SHAPE",n),new E.fd(v,"COLOUR",n),t,new E.fd(C.a([new E.dW("Auto show",s,new A.e4k(o),U.aqN,B.bl,n),new E.dW("Sound",r,new A.e4l(o),p,B.bl,n),new E.fE(B.k8,"Finale",new A.e4m(o),B.bl,n)],m),n,n)],m),B.l,n,B.e,B.P,0,B.p))}}
 A.bhe.prototype={
 a5(d,e){var x,w,v,u,t,s,r,q,p,o,n,m,l=e.a,k=e.b,j=0+l,i=0+k,h=$.S(),g=C.K()
@@ -973,7 +973,7 @@ case 2:G.dE(5000,"",45,0,0.3,w)
 break
 case 3:G.dE(1100,"",90,0,0.4,w)
 break
-default:G.dE(261.63*Math.pow(2,(D.d8P[B.o.F(e,8)]+12)/12),"",260,0,0.45,"tri")}},
+default:G.dE(261.63*Math.pow(2,(D.d8Q[B.o.F(e,8)]+12)/12),"",260,0,0.45,"tri")}},
 mz(d){var x,w,v,u,t,s=this
 if(!s.f)return
 s.y+=d
@@ -987,7 +987,7 @@ B(d){var x,w,v,u,t,s,r,q,p=this,o=null,n=B.j.D(1-(p.fb$-p.z)/260,0,1),m=56+26*n
 m=C.r(B.A,C.r(o,D.c3M,B.f,o,o,new C.o(o,o,o,o,C.a([new C.ab(0,B.G,B.b4.j(0.35+0.5*n),B.J,24+30*n)],y.V),D.eCs,B.a6),o,m,o,o,o,o,o,m),B.f,o,o,o,o,90,o,o,o,o,o,o)
 x=y.p
 w=C.a([],x)
-for(v=0;v<5;++v){u=D.da8[v]
+for(v=0;v<5;++v){u=D.da9[v]
 t=D.a5B[v]
 u=C.a([new C.a5(44,o,C.d(u,o,o,o,o,o,o,new C.F(!0,t,o,o,o,o,10.5,B.u,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o),o,o,o),o)],x)
 for(s=0;s<16;++s)u.push(new C.bz(1,B.bb,C.az(o,new C.fh(new A.dNy(p,v,s),o),B.y,!1,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,new A.dNz(p,v,s),o,o,o,o,o,o,!1,B.a4),o))
@@ -998,8 +998,8 @@ u=p.f
 t=u?K.v_:B.hm
 u=u?"Pause":"Play"
 r=p.r
-q=r?B.oI:I.th
-return E.lD(B.b4,B.f7,"Each row is an instrument and each square is a beat in a loop of 16. Tap squares to turn them on. The glowing line moves along and plays everything it touches.\n\nKick is the deep thump, Snare and Clap are the crack, Hat is the tick, and Bell plays a tune. Start from House or Hip-hop, or press Random. Change the speed with Tempo.\n\nIf you hear nothing, check your phone is not on silent and that Sound is on.",m,"BEAT MAKER",C.x(C.a([w,new E.fd(C.a([new E.fE(t,u,new A.dNB(p),B.b4,o),new E.dW("Sound",r,new A.dNC(p),q,B.b4,o),new E.fE(B.lP,"House",new A.dND(p),B.c,o),new E.fE(B.py,"Hip-hop",new A.dNE(p),B.c,o),new E.fE(B.oB,"Random",new A.dNF(p),B.c,o),new E.fE(F.wL,"Clear",new A.dNG(p),B.bZ,o)],x),o,o)],x),B.l,o,B.e,B.P,0,B.p))}}
+q=r?B.oJ:I.th
+return E.lD(B.b4,B.f7,"Each row is an instrument and each square is a beat in a loop of 16. Tap squares to turn them on. The glowing line moves along and plays everything it touches.\n\nKick is the deep thump, Snare and Clap are the crack, Hat is the tick, and Bell plays a tune. Start from House or Hip-hop, or press Random. Change the speed with Tempo.\n\nIf you hear nothing, check your phone is not on silent and that Sound is on.",m,"BEAT MAKER",C.x(C.a([w,new E.fd(C.a([new E.fE(t,u,new A.dNB(p),B.b4,o),new E.dW("Sound",r,new A.dNC(p),q,B.b4,o),new E.fE(B.lP,"House",new A.dND(p),B.c,o),new E.fE(B.py,"Hip-hop",new A.dNE(p),B.c,o),new E.fE(B.oC,"Random",new A.dNF(p),B.c,o),new E.fE(F.wL,"Clear",new A.dNG(p),B.bZ,o)],x),o,o)],x),B.l,o,B.e,B.P,0,B.p))}}
 A.aNj.prototype={
 t(){var x=this,w=x.a9$
 if(w!=null)w.a6(0,x.gbB())
@@ -1163,7 +1163,7 @@ k=r-(t==null?-1000:t)<160}else k=!0
 t=(n+1)*a0-x
 i=new C.a1(t,0,t+a1,a2)
 h=C.u7(i,B.r6,B.r6,B.bJ,B.bJ)
-t=h.eQ(B.ey)
+t=h.eQ(B.ev)
 $.S()
 o=new C.ao(B.O,B.M,B.R,B.S,B.Q)
 o.r=B.w.j(0.5).gp(0)
@@ -1210,7 +1210,7 @@ for(;r<t.length;t.length===s||(0,C.I)(t),++r)q.b15(t[r].a,!0)}},
 B(d){var x,w,v,u,t,s,r,q,p=this,o=null,n=p.z,m=y.Y
 m=C.C(new C.N(D.a6Z,new A.e1e(),m),m.k("ak.E"))
 x=y.p
-m=C.x(C.a([new C.D(P.a0N,new C.a5(o,70,C.b2(o,o,o,new A.bkm(p.e,n,m,p.w,o),D.fhP),o),o),C.E(new C.D(D.bDs,C.is(!0,o,o,B.y,D.fj7,new A.e1f(p),16,o,B.dZ,B.ah,!1),o),1)],x),B.l,o,B.e,B.i,0,B.p)
+m=C.x(C.a([new C.D(P.a0N,new C.a5(o,70,C.b2(o,o,o,new A.bkm(p.e,n,m,p.w,o),D.fhP),o),o),C.E(new C.D(D.bDt,C.is(!0,o,o,B.y,D.fj7,new A.e1f(p),16,o,B.dZ,B.ah,!1),o),1)],x),B.l,o,B.e,B.i,0,B.p)
 n=p.y
 n=E.iT(B.bZ,""+B.j.V(n),"Tempo",170,60,new A.e1g(p),n)
 w=C.a([],x)
@@ -1221,7 +1221,7 @@ t=t?"Pause":"Play"
 r=p.w
 q=r?B.zz:L.a3c
 r=r?"Stop rec":"Record"
-return E.lD(B.bZ,B.f7,"Sixteen pads. Tap them to play drums, a bass note and four notes of a chord.\n\nPress Record, then tap pads in time with the beat. Whatever you tap goes into a one-bar loop that keeps playing, and you can keep adding more on top, one layer after another. Clear wipes the loop.\n\nThe row of dots shows your loop. The white line is where it is now. Change the Kit for a different sound, and the tempo for faster or slower.",m,"DRUM PADS",C.x(C.a([n,new E.fd(w,"KIT",o),new E.fd(C.a([new E.fE(s,t,new A.e1i(p),B.b4,o),new E.fE(q,r,new A.e1j(p),B.bZ,o),new E.dW("Click",p.x,new A.e1k(p),B.oH,B.bZ,o),new E.fE(F.wL,"Clear",new A.e1l(p),B.c,o)],x),o,o)],x),B.l,o,B.e,B.P,0,B.p))}}
+return E.lD(B.bZ,B.f7,"Sixteen pads. Tap them to play drums, a bass note and four notes of a chord.\n\nPress Record, then tap pads in time with the beat. Whatever you tap goes into a one-bar loop that keeps playing, and you can keep adding more on top, one layer after another. Clear wipes the loop.\n\nThe row of dots shows your loop. The white line is where it is now. Change the Kit for a different sound, and the tempo for faster or slower.",m,"DRUM PADS",C.x(C.a([n,new E.fd(w,"KIT",o),new E.fd(C.a([new E.fE(s,t,new A.e1i(p),B.b4,o),new E.fE(q,r,new A.e1j(p),B.bZ,o),new E.dW("Click",p.x,new A.e1k(p),B.oI,B.bZ,o),new E.fE(F.wL,"Clear",new A.e1l(p),B.c,o)],x),o,o)],x),B.l,o,B.e,B.P,0,B.p))}}
 A.bkm.prototype={
 a5(d,e){var x,w,v,u,t,s,r,q,p,o,n,m,l,k=this,j=e.a,i=j/16,h=e.b
 j=0+j
@@ -1943,9 +1943,9 @@ C.iW(b.typeUniverse,JSON.parse('{"ass":{"af":[],"v":[]},"asD":{"af":[],"v":[]},"
 var y=(function rtii(){var x=C.at
 return{V:x("O<ab>"),O:x("O<u>"),R:x("O<ai<Q>>"),g:x("O<p>"),v:x("O<fW>"),C:x("O<+(p,p)>"),L:x("O<+(n,n)>"),D:x("O<+(G,H)>"),P:x("O<+(H,G)>"),n:x("O<+(H,H)>"),c:x("O<+(n,n,a_)>"),s:x("O<n>"),t:x("O<Gk>"),p:x("O<v>"),a:x("O<adL>"),N:x("O<bhS>"),W:x("O<bkq>"),M:x("O<bt3>"),X:x("O<H>"),z:x("cw<ah<af>>"),e:x("N<+(H,G),H>"),Y:x("N<+(n,n,u),u>"),k:x("+(H,H)"),q:x("mC"),y:x("Q"),S:x("H"),H:x("~")}})();(function constants(){var x=a.makeConstList
 D.b3y=new C.da(-0.4,-0.45)
-D.bbm=new C.rN(C.hDh(),C.at("rN<H>"))
+D.bbn=new C.rN(C.hDh(),C.at("rN<H>"))
 D.ahP=new C.u(1,0.0196078431372549,0.0196078431372549,0.0392156862745098,B.q)
-D.bDs=new C.R(12,4,12,10)
+D.bDt=new C.R(12,4,12,10)
 D.bIg=new C.R(6,0,6,10)
 D.bS8=new C.a_(63450,"MaterialIcons",!1)
 D.bSg=new C.a_(63558,"MaterialIcons",!1)
@@ -1954,21 +1954,21 @@ D.bTK=new C.a_(983796,"MaterialIcons",!1)
 D.bYi=new C.ae(B.hP,null,B.c,null,null,null)
 D.c_3=new C.ae(B.lm,18,B.bl,null,null,null)
 D.c3M=new C.ae(B.lm,null,B.c,null,null,null)
-D.bpG=new C.u(1,0.06274509803921569,0.07450980392156863,0.10196078431372549,B.q)
-D.d3O=x([F.Gh,D.bpG],y.O)
+D.bpH=new C.u(1,0.06274509803921569,0.07450980392156863,0.10196078431372549,B.q)
+D.d3O=x([F.Gh,D.bpH],y.O)
 D.c7E=new C.a8(B.b0,B.b7,B.x,D.d3O,null,null)
-D.bhw=new C.u(1,0.054901960784313725,0.06274509803921569,0.12549019607843137,B.q)
-D.dz7=x([D.ahP,D.bhw],y.O)
+D.bhx=new C.u(1,0.054901960784313725,0.06274509803921569,0.12549019607843137,B.q)
+D.dz7=x([D.ahP,D.bhx],y.O)
 D.ca4=new C.a8(B.b0,B.b7,B.x,D.dz7,null,null)
 D.eDj=new C.y(0,"Classic")
 D.eEb=new C.y(1,"Bright")
 D.eEQ=new C.y(2,"Deep")
 D.cJQ=x([D.eDj,D.eEb,D.eEQ],C.at("O<+(H,n)>"))
-D.dk5=x([B.bZ,B.bl,B.c],y.O)
+D.dk6=x([B.bZ,B.bl,B.c],y.O)
 D.dtL=x([B.b9,B.be,B.bT],y.O)
 D.d2n=x([B.dC,B.au,B.hZ],y.O)
 D.d4Z=x([B.b4,B.aG,B.bl],y.O)
-D.azW=x([D.dk5,D.dtL,D.d2n,D.d4Z],C.at("O<ai<u>>"))
+D.azW=x([D.dk6,D.dtL,D.d2n,D.d4Z],C.at("O<ai<u>>"))
 D.f2K=new C.b5("peony","Ball",F.apZ)
 D.f4e=new C.b5("ring","Ring",B.pt)
 D.f6y=new C.b5("heart","Heart",B.hP)
@@ -1978,18 +1978,18 @@ D.f2I=new C.b5("willow","Willow",B.PJ)
 D.f49=new C.b5("star","Star",B.i4)
 D.cUP=x([D.f2K,D.f4e,D.f6y,D.f44,D.f2I,D.f49],y.c)
 D.a5B=x([B.bZ,B.bl,B.aG,B.be,B.b4],y.O)
-D.d8P=x([0,2,4,7,9,12,9,7],y.X)
-D.da8=x(["Kick","Snare","Hat","Clap","Bell"],y.s)
+D.d8Q=x([0,2,4,7,9,12,9,7],y.X)
+D.da9=x(["Kick","Snare","Hat","Clap","Bell"],y.s)
 D.eSm=new C.y("analogous","Neighbours")
 D.eTg=new C.y("complementary","Opposites")
 D.f_N=new C.y("triad","Triad")
 D.eLx=new C.y("mono","One colour")
-D.db9=x([D.eSm,D.eTg,D.f_N,D.eLx,N.aSe],y.L)
+D.dba=x([D.eSm,D.eTg,D.f_N,D.eLx,N.aSe],y.L)
 D.f4h=new C.b5("drop","Drop",B.pE)
 D.f2w=new C.b5("wall","Wall",R.Da)
 D.f6A=new C.b5("push","Push",T.CT)
-D.deb=x([D.f4h,D.f2w,D.f6A],y.c)
-D.dfC=x([0,2,4,7,9,12,14],y.X)
+D.dec=x([D.f4h,D.f2w,D.f6A],y.c)
+D.dfD=x([0,2,4,7,9,12,14],y.X)
 D.hFC=new A.p3("Twinkle Twinkle",100,"C C G G A A G:2 F F E E D D C:2 G G F F E E D:2 G G F F E E D:2 C C G G A A G:2 F F E E D D C:2")
 D.hFR=new A.p3("Ode to Joy",110,"E E F G G F E D C C D E E:1.5 D:.5 D:2 E E F G G F E D C C D E D:1.5 C:.5 C:2")
 D.hFI=new A.p3("Mary Had a Little Lamb",108,"E D C D E E E:2 D D D:2 E G G:2 E D C D E E E E D D E D C:3")
@@ -2026,7 +2026,7 @@ D.f4O=new C.b5("rim","Rim",B.bT)
 D.f5h=new C.b5("cow","Cowbell",B.dC)
 D.f69=new C.b5("crash","Crash",B.b4)
 D.f6n=new C.b5("shake","Shaker",B.h_)
-D.f4f=new C.b5("bass","Bass",B.pg)
+D.f4f=new C.b5("bass","Bass",B.ph)
 D.f5E=new C.b5("n0","C",B.cm)
 D.f3y=new C.b5("n4","E",B.bu)
 D.f3M=new C.b5("n7","G",B.aQ)
@@ -2059,4 +2059,4 @@ D.fDy=new C.F(!0,B.an,null,null,null,null,10,B.I,null,null,null,null,null,null,n
 D.fzS=new C.F(!0,B.bZ,null,null,null,null,11,B.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fSY=new C.B("\u25cf RECORDING",null,D.fzS,null,null,null,null,null,null,null,null,null)
 D.fVP=new C.B("Go",null,B.iG,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["iG3/0zURiMPV04MuPFAb2VKZ/rI="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["5yRj7HEwBPVDHH7xrGvan5cs+Kw="]=a.current})($__dart_deferred_initializers__);

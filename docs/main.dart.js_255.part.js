@@ -653,9 +653,9 @@ aef(d){var x=this.fx
 x===$&&C.c()
 return C.c6(x,new B.e5c(this,d),null)},
 aZG(d,e){var x=null,w=this.Q?0.96:1
-return C.uM(new C.a5(1/0,x,new C.bN(new C.o(x,x,x,C.l(14),C.a([new C.ab(0,D.G,C.a0(115,D.ay.l()>>>16&255,D.ay.l()>>>8&255,D.ay.l()&255),D.cz,14)],y.V),A.c9D,D.n),D.bk,C.aH(!1,D.a3,!0,x,C.aP(!1,C.l(14),!0,new C.D(D.yI,C.A(C.a([A.aLB,D.af,C.d(d,x,x,x,x,x,x,D.j0,x,x,x)],y.p),D.l,x,D.ba,D.i,0,x,x),x),x,!0,x,x,x,x,x,x,x,x,x,x,x,e,x,x,x,x,x,x,x),D.f,D.L,0,x,x,x,x,x,D.aj),x),x),D.b_,D.jp,w)},
+return C.uM(new C.a5(1/0,x,new C.bN(new C.o(x,x,x,C.l(14),C.a([new C.ab(0,D.G,C.a0(115,D.ay.l()>>>16&255,D.ay.l()>>>8&255,D.ay.l()&255),D.cz,14)],y.V),A.c9D,D.n),D.bj,C.aH(!1,D.a3,!0,x,C.aP(!1,C.l(14),!0,new C.D(D.yI,C.A(C.a([A.aLB,D.af,C.d(d,x,x,x,x,x,x,D.j0,x,x,x)],y.p),D.l,x,D.ba,D.i,0,x,x),x),x,!0,x,x,x,x,x,x,x,x,x,x,x,e,x,x,x,x,x,x,x),D.f,D.L,0,x,x,x,x,x,D.aj),x),x),D.b_,D.jp,w)},
 b_s(d,e,f){var x=null,w=C.m(x,x,C.a0(89,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255),x,x,x,x,x,x,x,x,x,x,x,x,x,x,!0,x,x,x,x,x,x,x,x),v=C.nF(f,x,22)
-return C.aM(x,D.Z,!1,x,!0,D.t,x,C.aO(),d,x,x,x,x,x,2,C.bA(x,x,x,D.bI,x,x,x,x,!0,new C.b6(4,C.l(14),new C.ay(C.a0(115,D.bE.l()>>>16&255,D.bE.l()>>>8&255,D.bE.l()&255),1.2,D.r,-1)),x,x,x,x,x,D.qd,!0,x,x,x,x,new C.b6(4,C.l(14),A.b6d),x,x,x,x,x,x,x,x,w,e,x,x,x,x,x,x,x,x,x,!0,!0,!1,x,new C.D(A.bDc,new C.bL(D.A,1,x,v,x),x),x,D.rr,x,x,x,x,x,x,x,x,x,x),D.y,!0,x,!0,x,!1,x,D.ak,x,x,x,x,x,x,x,x,x,1,x,x,!1,"\u2022",x,new B.e5e(this),x,x,x,!1,x,x,!1,x,!0,x,D.ac,x,x,x,x,x,x,x,x,x,x,x,D.VL,!0,D.a5,x,D.l7,x,x,x,x)},
+return C.aM(x,D.Z,!1,x,!0,D.t,x,C.aO(),d,x,x,x,x,x,2,C.bA(x,x,x,D.bI,x,x,x,x,!0,new C.b6(4,C.l(14),new C.ay(C.a0(115,D.bE.l()>>>16&255,D.bE.l()>>>8&255,D.bE.l()&255),1.2,D.r,-1)),x,x,x,x,x,D.qd,!0,x,x,x,x,new C.b6(4,C.l(14),A.b6d),x,x,x,x,x,x,x,x,w,e,x,x,x,x,x,x,x,x,x,!0,!0,!1,x,new C.D(A.bDd,new C.bL(D.A,1,x,v,x),x),x,D.rr,x,x,x,x,x,x,x,x,x,x),D.y,!0,x,!0,x,!1,x,D.ak,x,x,x,x,x,x,x,x,x,1,x,x,!1,"\u2022",x,new B.e5e(this),x,x,x,!1,x,x,!1,x,!0,x,D.ac,x,x,x,x,x,x,x,x,x,x,x,D.VL,!0,D.a5,x,D.l6,x,x,x,x)},
 Ku(){var x=0,w=C.j(y.H),v,u=this,t,s,r,q,p,o
 var $async$Ku=C.e(function(d,e){if(d===1)return C.f(e,w)
 for(;;)switch(x){case 0:x=!u.ax?3:4
@@ -785,14 +785,14 @@ t=C.a([m,D.ae,A.fS8,D.aw,C.d(t,o,o,o,o,o,o,C.m(o,o,D.bU,o,o,o,o,o,o,o,o,12,o,o,D
 if(p.fr&&n!=null){m=C.a([C.a0(46,D.bU.l()>>>16&255,D.bU.l()>>>8&255,D.bU.l()&255),C.a0(D.j.V(25.5),D.jk.l()>>>16&255,D.jk.l()>>>8&255,D.jk.l()&255)],y.O)
 r=C.l(14)
 q=C.L(C.a0(102,D.bU.l()>>>16&255,D.bU.l()>>>8&255,D.bU.l()&255),D.r,1)
-t.push(C.r(o,C.x(C.a([C.d(n.d,o,o,o,o,o,o,C.m(o,o,D.bU,o,o,o,o,o,o,o,o,12,o,o,D.u,o,o,!0,o,1,o,o,o,o,o,o),o,o,o),D.T,C.d(n.a,o,o,o,o,o,o,A.fu1,D.K,o,o),D.W,C.d("Lucky: "+D.d.aN(n.b," \xb7 "),o,o,o,o,o,o,C.m(o,o,C.a0(166,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255),o,o,o,o,o,o,o,o,12,o,o,D.U,o,o,!0,o,o,o,o,o,o,o,o),o,o,o)],s),D.l,o,D.e,D.i,0,D.p),D.f,o,o,new C.o(o,o,q,r,o,new C.a8(D.a7,D.aa,D.x,m,o,o),D.n),o,o,o,o,D.bI,o,o,1/0))}else t.push(C.d("Shake the crystal \u2014 tap below for your fortune.",o,o,o,o,o,o,C.m(o,o,C.a0(140,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255),o,o,o,o,o,o,o,o,12,o,o,o,o,o,!0,o,o,o,o,o,o,o,o),D.K,o,o))
+t.push(C.r(o,C.x(C.a([C.d(n.d,o,o,o,o,o,o,C.m(o,o,D.bU,o,o,o,o,o,o,o,o,12,o,o,D.u,o,o,!0,o,1,o,o,o,o,o,o),o,o,o),D.T,C.d(n.a,o,o,o,o,o,o,A.fu2,D.K,o,o),D.W,C.d("Lucky: "+D.d.aN(n.b," \xb7 "),o,o,o,o,o,o,C.m(o,o,C.a0(166,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255),o,o,o,o,o,o,o,o,12,o,o,D.U,o,o,!0,o,o,o,o,o,o,o,o),o,o,o)],s),D.l,o,D.e,D.i,0,D.p),D.f,o,o,new C.o(o,o,q,r,o,new C.a8(D.a7,D.aa,D.x,m,o,o),D.n),o,o,o,o,D.bI,o,o,1/0))}else t.push(C.d("Shake the crystal \u2014 tap below for your fortune.",o,o,o,o,o,o,C.m(o,o,C.a0(140,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255),o,o,o,o,o,o,o,o,12,o,o,o,o,o,!0,o,o,o,o,o,o,o,o),D.K,o,o))
 t.push(D.aB)
 m=p.fr?"View Today's Fortune Again":"Reveal My Fortune"
-t.push(p.a9p(A.dix,D.bU,m,p.gcv_()))
+t.push(p.a9p(A.diy,D.bU,m,p.gcv_()))
 return new C.an(D.a0,o,D.ad,D.f,C.a([x,C.r(o,C.x(t,D.l,o,D.e,D.i,0,D.p),D.f,o,o,new C.o(D.jm,o,v,w,u,o,D.n),o,o,o,o,D.wx,o,o,1/0)],s),o)},
 aee(d,e,f){return C.c6(f,new B.e5b(f,d,e),null)},
 a9p(d,e,f,g){var x=null,w=this.Q?0.96:1
-return C.uM(new C.a5(1/0,x,new C.bN(new C.o(x,x,x,C.l(14),C.a([new C.ab(0,D.G,C.a0(115,e.l()>>>16&255,e.l()>>>8&255,e.l()&255),D.cz,14)],y.V),new C.a8(D.a7,D.aa,D.x,d,x,x),D.n),D.bk,C.aH(!1,D.a3,!0,x,C.aP(!1,C.l(14),!0,new C.D(D.yI,C.A(C.a([A.aLB,D.af,C.d(f,x,x,x,x,x,x,D.j0,x,x,x)],y.p),D.l,x,D.ba,D.i,0,x,x),x),x,!0,x,x,x,x,x,x,x,x,x,x,x,g,x,x,x,x,x,x,x),D.f,D.L,0,x,x,x,x,x,D.aj),x),x),D.b_,D.jp,w)}}
+return C.uM(new C.a5(1/0,x,new C.bN(new C.o(x,x,x,C.l(14),C.a([new C.ab(0,D.G,C.a0(115,e.l()>>>16&255,e.l()>>>8&255,e.l()&255),D.cz,14)],y.V),new C.a8(D.a7,D.aa,D.x,d,x,x),D.n),D.bj,C.aH(!1,D.a3,!0,x,C.aP(!1,C.l(14),!0,new C.D(D.yI,C.A(C.a([A.aLB,D.af,C.d(f,x,x,x,x,x,x,D.j0,x,x,x)],y.p),D.l,x,D.ba,D.i,0,x,x),x),x,!0,x,x,x,x,x,x,x,x,x,x,x,g,x,x,x,x,x,x,x),D.f,D.L,0,x,x,x,x,x,D.aj),x),x),D.b_,D.jp,w)}}
 B.a_b.prototype={}
 B.a25.prototype={}
 B.aNM.prototype={
@@ -969,7 +969,7 @@ w.Q=!0
 x=this.b
 if(x===1)w.y=A.cCW[D.o.F(v,50)]
 else if(x===2)w.y=A.dmQ[D.o.F(v,51)]
-else if(x===3)w.y=A.ddP[D.o.F(v,50)]
+else if(x===3)w.y=A.ddQ[D.o.F(v,50)]
 else w.y=null},
 $S:0}
 B.e5k.prototype={
@@ -981,7 +981,7 @@ $0(){return this.a.Q=!1},
 $S:0}
 B.e5t.prototype={
 $4(d,a0,a1,a2){var x,w,v,u,t,s,r,q=null,p=C.aF(d,q,y.w).w,o=C.FE(E.RZ,!1,"\ud83c\udfae",!1,q,new B.e5s(d),q,a2,a0,"Entertainment Hub \xb7 live","Play Zone",q),n=this.a,m=C.k3(n.bJp(),E.RZ,q,a2,D.cp,0.1,a0,a1),l=A.aBc[n.d],k=l.c,j=C.a0(15,k.l()>>>16&255,k.l()>>>8&255,k.l()&255),i=C.l(12),h=C.L(C.a0(140,k.l()>>>16&255,k.l()>>>8&255,k.l()&255),D.r,1.2),g=C.nF(l.b,q,20),f=n.d===0?"Your Love Journey":l.a+" Zone",e=y.p
-i=C.a([m,D.aB,C.k3(C.r(q,C.A(C.a([g,D.af,C.d(f,q,q,q,q,q,q,C.m(q,q,k,q,q,q,q,q,q,q,q,14,q,q,D.I,q,q,!0,q,q,q,q,q,q,q,q),q,q,q)],e),D.l,q,D.ba,D.i,0,q,q),D.f,q,q,new C.o(j,q,h,i,q,q,D.n),q,q,q,q,D.k2,q,q,1/0),A.dwb,q,a2,D.bh,0.24,a0,a1),D.ae],e)
+i=C.a([m,D.aB,C.k3(C.r(q,C.A(C.a([g,D.af,C.d(f,q,q,q,q,q,q,C.m(q,q,k,q,q,q,q,q,q,q,q,14,q,q,D.I,q,q,!0,q,q,q,q,q,q,q,q),q,q,q)],e),D.l,q,D.ba,D.i,0,q,q),D.f,q,q,new C.o(j,q,h,i,q,q,D.n),q,q,q,q,D.k2,q,q,1/0),A.dwb,q,a2,D.bk,0.24,a0,a1),D.ae],e)
 m=n.d
 if(m===0)D.d.u(i,C.a([n.c5S(),D.aO,n.c5Q()],e))
 else if(m===1)i.push(n.bLH())
@@ -999,7 +999,7 @@ w=C.a0(51,D.b8.l()>>>16&255,D.b8.l()>>>8&255,D.b8.l()&255)
 v=C.l(20)
 u=D.j.V(127.5)
 t=C.L(C.a0(u,D.b8.l()>>>16&255,D.b8.l()>>>8&255,D.b8.l()&255),D.r,1)
-v=C.A(C.a([C.r(q,C.d(k.toUpperCase()+m,q,q,q,q,q,q,C.m(q,q,D.b8,q,q,q,q,q,q,q,q,11,q,q,D.I,q,q,!0,q,q,q,q,q,q,q,q),q,q,q),D.f,q,q,new C.o(w,q,t,v,q,q,D.n),q,q,q,q,D.kV,q,q,q)],e),D.l,q,D.ba,D.i,0,q,q)
+v=C.A(C.a([C.r(q,C.d(k.toUpperCase()+m,q,q,q,q,q,q,C.m(q,q,D.b8,q,q,q,q,q,q,q,q,11,q,q,D.I,q,q,!0,q,q,q,q,q,q,q,q),q,q,q),D.f,q,q,new C.o(w,q,t,v,q,q,D.n),q,q,q,q,D.lk,q,q,q)],e),D.l,q,D.ba,D.i,0,q,q)
 t=C.d(""+n.cx+" of 15 riddles left today",q,q,q,q,q,q,C.m(q,q,D.b8,q,q,q,q,q,q,q,q,12,q,q,D.U,q,q,!0,q,q,q,q,q,q,q,q),q,q,q)
 w=C.l(14)
 m=C.L(C.a0(89,D.b8.l()>>>16&255,D.b8.l()>>>8&255,D.b8.l()&255),D.r,1)
@@ -1007,7 +1007,7 @@ k=C.a([A.fRL,D.T,C.d(x.b,q,q,q,q,q,q,A.aW0,q,q,q)],e)
 if(n.cy){s=C.a([C.a0(64,D.b8.l()>>>16&255,D.b8.l()>>>8&255,D.b8.l()&255),C.a0(38,D.j6.l()>>>16&255,D.j6.l()>>>8&255,D.j6.l()&255)],y.O)
 r=C.l(12)
 u=C.L(C.a0(u,D.b8.l()>>>16&255,D.b8.l()>>>8&255,D.b8.l()&255),D.r,1)
-D.d.u(k,C.a([D.aB,C.r(q,C.x(C.a([A.fNA,D.am,C.d(x.c,q,q,q,q,q,q,D.nj,q,q,q)],e),D.E,q,D.e,D.i,0,D.p),D.f,q,q,new C.o(q,q,u,r,q,new C.a8(D.a7,D.aa,D.x,s,q,q),D.n),q,q,q,q,D.bh,q,q,1/0)],e))}m=C.a([v,D.ae,A.h0c,D.aw,t,D.aB,C.r(q,C.x(k,D.E,q,D.e,D.i,0,D.p),D.f,q,q,new C.o(D.qd,q,m,w,q,q,D.n),q,q,q,q,D.bS,q,q,1/0),D.aB],e)
+D.d.u(k,C.a([D.aB,C.r(q,C.x(C.a([A.fNA,D.am,C.d(x.c,q,q,q,q,q,q,D.nj,q,q,q)],e),D.E,q,D.e,D.i,0,D.p),D.f,q,q,new C.o(q,q,u,r,q,new C.a8(D.a7,D.aa,D.x,s,q,q),D.n),q,q,q,q,D.bk,q,q,1/0)],e))}m=C.a([v,D.ae,A.h0c,D.aw,t,D.aB,C.r(q,C.x(k,D.E,q,D.e,D.i,0,D.p),D.f,q,q,new C.o(D.qd,q,m,w,q,q,D.n),q,q,q,q,D.bS,q,q,1/0),D.aB],e)
 if(!n.cy)m.push(n.a9p(D.a5d,D.b8,"Reveal Answer",n.gcv0()))
 else m.push(n.a9p(D.a5d,D.b8,"Next Riddle \u2192",n.gc8x()))
 i.push(new C.an(D.a0,q,D.ad,D.f,C.a([j,C.r(q,C.x(m,D.l,q,D.e,D.i,0,D.p),D.f,q,q,new C.o(D.jm,q,g,h,f,q,D.n),q,q,q,q,D.wx,q,q,1/0)],e),q))}else i.push(n.bUB())
@@ -1024,7 +1024,7 @@ if(q){x=s.c
 x=new C.a8(D.a7,D.aa,D.x,C.a([x,x.j(0.65)],y.O),t,t)}else x=t
 w=q?t:s.c.j(0.15)
 v=C.l(10)
-u=C.L(q?D.bV:D.by,D.r,1)
+u=C.L(q?D.bW:D.by,D.r,1)
 x=C.r(t,C.as(C.nF(s.b,t,20),t,t,t),D.f,t,t,new C.o(w,t,u,v,t,x,D.n),t,36,t,t,t,t,t,36)
 return C.E(new C.D(new C.R(p,0,o,0),C.az(t,C.cT(t,C.x(C.a([x,D.aw,C.d(s.a,t,t,t,t,t,t,C.m(t,t,q?D.c:D.aD,t,t,t,t,t,t,t,t,9,t,t,D.U,t,t,!0,t,t,t,t,t,t,t,t),D.K,t,t)],y.p),D.l,t,D.e,D.i,0,D.p),t,t,D.b_,new C.o(n,t,l,m,t,t,D.n),D.a3,t,t,t,t,D.hL,t,t,t),D.y,!1,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,new B.e5_(r,d),t,t,t,t,t,t,!1,D.a4),t),1)},
 $S:239}
@@ -1158,7 +1158,7 @@ t.kn(0.3+Math.cos(x*0.7)*0.12)
 w=C.a0(217,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255)
 v=D.j.V(127.5)
 w=C.a([w,D.bU,C.a0(v,D.jk.l()>>>16&255,D.jk.l()>>>8&255,D.jk.l()&255)],y.O)
-return C.fB(D.A,C.r(u,A.bdP,D.f,u,u,new C.o(u,u,u,u,C.a([new C.ab(0,D.G,C.a0(v,D.bU.l()>>>16&255,D.bU.l()>>>8&255,D.bU.l()&255),D.J,20)],y.V),new C.bY(D.A,0.5,D.x,u,0,w,u,u),D.a6),u,96,u,u,u,u,u,96),u,t,!0)},
+return C.fB(D.A,C.r(u,A.bdQ,D.f,u,u,new C.o(u,u,u,u,C.a([new C.ab(0,D.G,C.a0(v,D.bU.l()>>>16&255,D.bU.l()>>>8&255,D.bU.l()&255),D.J,20)],y.V),new C.bY(D.A,0.5,D.x,u,0,w,u,u),D.a6),u,96,u,u,u,u,u,96),u,t,!0)},
 $S:45}
 B.e5b.prototype={
 $2(d,e){var x,w,v=this.a.x
@@ -1188,7 +1188,7 @@ $2(d,e){var x,w,v,u,t,s=null,r=this.a,q=r.d
 q===$&&C.c()
 x=q.x
 x===$&&C.c()
-w=D.ld.aA(0,D.j.D(x,0,1))
+w=D.lc.aA(0,D.j.D(x,0,1))
 q=q.x
 q===$&&C.c()
 x=C.dr()
@@ -1201,7 +1201,7 @@ q=Math.min(C.aF(d,D.c1,y.w).w.a.a-40,340)
 v=C.l(28)
 u=C.L(D.c.j(0.55),D.r,2)
 t=C.a([new C.ab(4,D.G,D.au.j(0.6),D.J,36)],y.V)
-return C.as(C.e1(D.A,C.fB(D.A,C.r(s,C.x(C.a([A.e_9,D.T,A.h2z,D.aB,C.d(r.a.c,s,s,s,s,s,s,A.frX,D.K,s,s),D.aO,C.d("Tap anywhere to close",s,s,s,s,s,s,C.m(s,s,D.c.j(0.7),s,s,s,s,s,s,s,s,11,s,s,s,s,s,!0,s,s,s,s,s,s,s,s),s,s,s)],y.p),D.l,s,D.e,D.P,0,D.p),D.f,s,s,new C.o(s,s,u,v,t,A.cak,D.n),s,s,s,s,A.bH4,s,s,q),s,x,!0),0.45+w*0.55,s,s),s,s,s)},
+return C.as(C.e1(D.A,C.fB(D.A,C.r(s,C.x(C.a([A.e_9,D.T,A.h2z,D.aB,C.d(r.a.c,s,s,s,s,s,s,A.frY,D.K,s,s),D.aO,C.d("Tap anywhere to close",s,s,s,s,s,s,C.m(s,s,D.c.j(0.7),s,s,s,s,s,s,s,s,11,s,s,s,s,s,!0,s,s,s,s,s,s,s,s),s,s,s)],y.p),D.l,s,D.e,D.P,0,D.p),D.f,s,s,new C.o(s,s,u,v,t,A.cak,D.n),s,s,s,s,A.bH4,s,s,q),s,x,!0),0.45+w*0.55,s,s),s,s,s)},
 $S:220}
 B.djG.prototype={
 $2(d,e){var x,w,v,u,t,s,r,q,p,o,n,m,l=null,k=this.a,j=k.d
@@ -1231,7 +1231,7 @@ m[11]=0.004
 n.fL(Math.sin(v)*0.5)
 n.kn(0.35+Math.cos(v*0.8)*0.15)
 s=C.a([D.c.j(0.9),t,t.j(0.4),D.L],s)
-n=C.fB(D.A,C.r(l,A.bea,D.f,l,l,new C.o(l,l,l,l,C.a([new C.ab(0,D.G,t.j(0.6),D.J,24)],p),new C.bY(D.A,0.5,D.x,l,0,s,D.Is,l),D.a6),l,88,l,l,l,l,l,88),l,n,!0)
+n=C.fB(D.A,C.r(l,A.beb,D.f,l,l,new C.o(l,l,l,l,C.a([new C.ab(0,D.G,t.j(0.6),D.J,24)],p),new C.bY(D.A,0.5,D.x,l,0,s,D.Is,l),D.a6),l,88,l,l,l,l,l,88),l,n,!0)
 t=C.d(k.a.c.d,l,l,l,l,l,l,C.m(l,l,t,l,l,l,l,l,l,l,l,14,l,l,D.u,l,l,!0,l,1.2,l,l,l,l,l,l),l,l,l)
 k=k.a.c
 return C.as(C.d3(C.e1(D.A,C.r(l,C.x(C.a([n,D.ae,t,D.W,C.d(k.a,l,l,l,l,l,l,A.fub,D.K,l,l),D.aB,C.d("Lucky: "+D.d.aN(k.b," \xb7 "),l,l,l,l,l,l,C.m(l,l,D.c.j(0.75),l,l,l,l,l,l,l,l,12,l,l,D.U,l,l,!0,l,l,l,l,l,l,l,l),l,l,l),D.W,C.d("Tap to close",l,l,l,l,l,l,C.m(l,l,D.c.j(0.45),l,l,l,l,l,l,l,l,10,l,l,l,l,l,!0,l,l,l,l,l,l,l,l),l,l,l)],y.p),D.l,l,D.e,D.P,0,D.p),D.f,l,l,new C.o(l,l,q,u,o,new C.a8(D.aA,D.aE,D.x,r,l,l),D.n),l,l,l,l,G.ann,l,l,x),0.7+w*0.3,l,l),j),l,l,l)},
@@ -1258,7 +1258,7 @@ $2(d,e){var x,w,v,u,t,s,r=null,q=this.a,p=q.d
 p===$&&C.c()
 x=p.x
 x===$&&C.c()
-w=D.ld.aA(0,D.j.D(x,0,1))
+w=D.lc.aA(0,D.j.D(x,0,1))
 p=p.x
 p===$&&C.c()
 v=p*3.141592653589793*2
@@ -1273,7 +1273,7 @@ u=C.l(28)
 t=C.L(D.c.j(0.55),D.r,2)
 s=C.a([new C.ab(4,D.G,D.bE.j(0.65),D.J,40),new C.ab(0,D.G,D.w.j(0.45),D.kD,24)],y.V)
 q=q.a
-return C.as(C.e1(D.A,C.fB(D.A,C.r(r,C.x(C.a([A.aLA,D.T,C.d(""+q.c+"%",r,r,r,r,r,r,A.frP,r,r,r),D.am,A.fUj,D.ae,C.d(q.d,r,r,r,r,r,r,C.m(r,r,D.c.j(0.92),r,r,r,r,r,r,r,r,14,r,r,D.a8,r,1.35,!0,r,r,r,r,r,r,r,r),D.K,r,r)],y.p),D.l,r,D.e,D.P,0,D.p),D.f,r,r,new C.o(r,r,t,u,s,A.c9C,D.n),r,r,r,r,D.bGO,r,r,x),r,p,!0),0.4+w*0.6,r,r),r,r,r)},
+return C.as(C.e1(D.A,C.fB(D.A,C.r(r,C.x(C.a([A.aLA,D.T,C.d(""+q.c+"%",r,r,r,r,r,r,A.frQ,r,r,r),D.am,A.fUj,D.ae,C.d(q.d,r,r,r,r,r,r,C.m(r,r,D.c.j(0.92),r,r,r,r,r,r,r,r,14,r,r,D.a8,r,1.35,!0,r,r,r,r,r,r,r,r),D.K,r,r)],y.p),D.l,r,D.e,D.P,0,D.p),D.f,r,r,new C.o(r,r,t,u,s,A.c9C,D.n),r,r,r,r,D.bGO,r,r,x),r,p,!0),0.4+w*0.6,r,r),r,r,r)},
 $S:220}
 B.dtx.prototype={
 $0(){var x=this.a
@@ -1288,7 +1288,7 @@ w=D.e3.aA(0,x)
 o=o.x
 o===$&&C.c()
 x=C.l(16)
-v=C.a([A.bgw.j(0.97),A.bm4.j(0.97)],y.O)
+v=C.a([A.bgx.j(0.97),A.bm5.j(0.97)],y.O)
 u=C.L(p.a.f.j(0.75),D.r,1.2)
 t=C.a([new C.ab(0,D.G,p.a.f.j(0.35),D.J,16)],y.V)
 s=p.a
@@ -1331,16 +1331,16 @@ var y=(function rtii(){var x=C.at
 return{E:x("d8"),V:x("O<ab>"),O:x("O<u>"),s:x("O<n>"),p:x("O<v>"),t:x("O<H>"),U:x("O<aC?>"),w:x("iF"),h:x("+category,loveTab(H,H)"),a:x("+contentIndex,remaining(H,H)"),N:x("+contentIndex,remaining,viewedToday(H,H,H)"),j:x("+canViewToday,contentIndex,cyclePosition,cycleTotal,todayContentIndex,todayQuote(Q,H,H,H,H,n?)"),R:x("n"),l:x("v"),q:x("mC"),S:x("H"),n:x("+contentIndex(H)?"),J:x("+contentIndex,cyclePosition,quote(H,H,n)?"),I:x("H?"),H:x("~")}})();(function constants(){var x=a.makeConstList
 A.b6d=new C.ay(D.bT,1.5,D.r,-1)
 A.e_3=new C.u0("\ud83d\udd2e",42,null,null)
-A.bdP=new C.cj(D.A,null,null,A.e_3,null)
+A.bdQ=new C.cj(D.A,null,null,A.e_3,null)
 A.e_7=new C.u0("\ud83d\udd2e",36,null,null)
-A.bea=new C.cj(D.A,null,null,A.e_7,null)
-A.bgw=new C.u(1,0.16470588235294117,0.08235294117647059,0.1568627450980392,D.q)
-A.bm4=new C.u(1,0.10196078431372549,0.06274509803921569,0.12549019607843137,D.q)
+A.beb=new C.cj(D.A,null,null,A.e_7,null)
+A.bgx=new C.u(1,0.16470588235294117,0.08235294117647059,0.1568627450980392,D.q)
+A.bm5=new C.u(1,0.10196078431372549,0.06274509803921569,0.12549019607843137,D.q)
 A.alC=new C.bd(45e5)
-A.bDc=new C.R(12,0,8,0)
+A.bDd=new C.R(12,0,8,0)
 A.bH4=new C.R(24,30,24,26)
-A.dAB=x([D.ay,D.dP],y.O)
-A.c8o=new C.a8(D.aA,D.aE,D.x,A.dAB,null,null)
+A.dAA=x([D.ay,D.dP],y.O)
+A.c8o=new C.a8(D.aA,D.aE,D.x,A.dAA,null,null)
 A.dnu=x([D.hd,D.bE,D.FJ],y.O)
 A.c9C=new C.a8(D.aA,D.aE,D.x,A.dnu,null,null)
 A.azY=x([D.ay,D.dP,D.FJ],y.O)
@@ -1580,8 +1580,8 @@ A.hxs=new B.a_b("Confidence","\ud83d\udcaa",D.au)
 A.hxt=new B.a_b("Brain","\ud83e\udde0",D.b8)
 A.hxr=new B.a_b("Fortune","\ud83d\udd2e",D.bU)
 A.aBc=x([A.hxu,A.hxs,A.hxt,A.hxr],C.at("O<a_b>"))
-A.ddP=x(["Stargazing picnic with blankets, thermoses, and a constellation app.","Couples pottery or paint-and-sip night \u2014 laugh at the masterpieces.","Sunset kayak or paddleboat if you are both comfortable on water.","Dress up for dinner at a place with live acoustic music.","Home movie marathon: their pick, your pick, popcorn, dim lights.","Botanical garden walk with a camera and zero rush.","Rooftop or hilltop picnic at golden hour with sparkling juice.","Dance class intro: salsa, bachata, or swing \u2014 beginners welcome.","Visit a museum and choose one artwork that represents your mood.","Cook a new recipe together \u2014 assign roles: chef and sous-chef.","Ice skating or roller skating \u2014 hold on if balance needs help.","Book a couples massage or spa half-day for deep calm.","Drive to a small town you have never explored; caf\xe9 hop once there.","Build a blanket fort at home with fairy lights and playlists.","Volunteer together for a few hours \u2014 shared purpose bonds hearts.","Arcade date: playful competition, share tickets for a silly prize.","Wine-free vineyard tour or orchard visit in harvest season.","Photography walk: capture ten things that feel like \u201cus.\u201d","Attend a local theater play or improv show \u2014 shared laughter.","Plan a breakfast-in-bed surprise on a lazy weekend.","Take a scenic train or ferry ride with no destination pressure.","Visit an aquarium or planetarium \u2014 wonder feels romantic.","Host a fondue night: chocolate or cheese, choose your adventure.","Go thrifting and pick one outfit piece for each other.","Write wishes on paper lanterns or jars and read them aloud.","Plan a \u201cyes day\u201d with a small budget and big imagination.","Rent bikes and explore a trail ending at a lakeside bench.","Couples yoga or stretching session \u2014 gentle, grounding.","Attend a food festival and share every bite.","Set up a backyard fire pit with s\u2019mores and old stories.","Take a cooking class: pasta, sushi, or desserts.","Plan a surprise day trip to a waterfall or scenic overlook.","Visit a Christmas market or seasonal fair hand in hand.","Record a short video diary of your date \u2014 memory for later.","Book a cozy cabin or boutique hotel for one night away.","Go to a jazz lounge with mocktails if you prefer no alcohol.","Create a scavenger hunt with inside jokes as clues.","Plant something together \u2014 herbs, flowers, a tree if allowed.","Attend a poetry open mic and dedicate a line to them afterward.","Plan a themed dinner at home: Paris, Tokyo, or their dream city.","Watch the sunrise with hot drinks and silence first, words second.","Visit a cat caf\xe9 or animal shelter visit if you love gentle creatures.","Go bowling or mini-golf \u2014 playful rivalry, sweet truce.","Take a pottery mug home and use it on your next coffee date.","Plan a photo-book page of your favorite moments together.","Attend a lantern festival or night market with matching colors.","Write love letters and exchange them to open on a future date.","Plan a stargazing drive with their favorite snacks in the trunk.","Recreate your first meeting place with a small upgrade: better dessert.","End the night saying what you are grateful for about them \u2014 specific beats generic."],y.s)
-A.dix=x([D.bU,D.jk,D.pe],y.O)
+A.ddQ=x(["Stargazing picnic with blankets, thermoses, and a constellation app.","Couples pottery or paint-and-sip night \u2014 laugh at the masterpieces.","Sunset kayak or paddleboat if you are both comfortable on water.","Dress up for dinner at a place with live acoustic music.","Home movie marathon: their pick, your pick, popcorn, dim lights.","Botanical garden walk with a camera and zero rush.","Rooftop or hilltop picnic at golden hour with sparkling juice.","Dance class intro: salsa, bachata, or swing \u2014 beginners welcome.","Visit a museum and choose one artwork that represents your mood.","Cook a new recipe together \u2014 assign roles: chef and sous-chef.","Ice skating or roller skating \u2014 hold on if balance needs help.","Book a couples massage or spa half-day for deep calm.","Drive to a small town you have never explored; caf\xe9 hop once there.","Build a blanket fort at home with fairy lights and playlists.","Volunteer together for a few hours \u2014 shared purpose bonds hearts.","Arcade date: playful competition, share tickets for a silly prize.","Wine-free vineyard tour or orchard visit in harvest season.","Photography walk: capture ten things that feel like \u201cus.\u201d","Attend a local theater play or improv show \u2014 shared laughter.","Plan a breakfast-in-bed surprise on a lazy weekend.","Take a scenic train or ferry ride with no destination pressure.","Visit an aquarium or planetarium \u2014 wonder feels romantic.","Host a fondue night: chocolate or cheese, choose your adventure.","Go thrifting and pick one outfit piece for each other.","Write wishes on paper lanterns or jars and read them aloud.","Plan a \u201cyes day\u201d with a small budget and big imagination.","Rent bikes and explore a trail ending at a lakeside bench.","Couples yoga or stretching session \u2014 gentle, grounding.","Attend a food festival and share every bite.","Set up a backyard fire pit with s\u2019mores and old stories.","Take a cooking class: pasta, sushi, or desserts.","Plan a surprise day trip to a waterfall or scenic overlook.","Visit a Christmas market or seasonal fair hand in hand.","Record a short video diary of your date \u2014 memory for later.","Book a cozy cabin or boutique hotel for one night away.","Go to a jazz lounge with mocktails if you prefer no alcohol.","Create a scavenger hunt with inside jokes as clues.","Plant something together \u2014 herbs, flowers, a tree if allowed.","Attend a poetry open mic and dedicate a line to them afterward.","Plan a themed dinner at home: Paris, Tokyo, or their dream city.","Watch the sunrise with hot drinks and silence first, words second.","Visit a cat caf\xe9 or animal shelter visit if you love gentle creatures.","Go bowling or mini-golf \u2014 playful rivalry, sweet truce.","Take a pottery mug home and use it on your next coffee date.","Plan a photo-book page of your favorite moments together.","Attend a lantern festival or night market with matching colors.","Write love letters and exchange them to open on a future date.","Plan a stargazing drive with their favorite snacks in the trunk.","Recreate your first meeting place with a small upgrade: better dessert.","End the night saying what you are grateful for about them \u2014 specific beats generic."],y.s)
+A.diy=x([D.bU,D.jk,D.pf],y.O)
 A.dmQ=x(["Send a voice note saying one specific thing you appreciated about them today.","Plan a no-phone hour together \u2014 phones face down, eyes on each other.","Remember a small detail they mentioned and bring it up later; it shows you listen.","Compliment their character, not only their appearance \u2014 depth keeps hearts close.","Schedule a weekly check-in: \u201cHow are we feeling about us?\u201d","Share a playlist of songs that remind you of them \u2014 three tracks is enough.","Apologize quickly when you are wrong; pride is the enemy of closeness.","Celebrate their wins loudly, even the small ones \u2014 promotion, recipe, good day.","Ask \u201cWhat would make this week easier for you?\u201d and follow through once.","Leave a handwritten note in their bag, book, or on the mirror.","Plan surprise comfort: their favorite snack after a hard day.","Touch base mid-day with a kind text \u2014 not demanding, just warm.","Learn one thing they care about and ask a thoughtful question about it.","Defend them kindly in public; loyalty builds trust.","Create a shared inside joke \u2014 intimacy loves private language.","Book something to look forward to: concert, class, weekend trip.","Practice patience when they need space; trust is quiet confidence.","Cook or order their favorite meal without being asked.","Take photos together that are candid, not only posed perfection.","Say thank you for ordinary things: listening, driving, patience.","Introduce them proudly to friends \u2014 belonging matters.","Keep promises small and large; reliability is romance in action.","Flirt after you are comfortable \u2014 playfulness keeps sparks alive.","Ask about their family with genuine curiosity, not interrogation.","Share your feelings with calm words instead of guessing games.","Plan a tech-free walk and hold hands if you both want that.","Respect their boundaries without making them explain twice.","Send a meme or reel that made you think of them \u2014 light connection counts.","Celebrate anniversaries of small moments: first coffee, first laugh.","Offer help before they have to ask \u2014 dishes, errands, ride.","Speak their love language: time, words, gifts, acts, touch \u2014 learn which lands.","Do not weaponize the past in arguments; solve today\u2019s issue today.","Plan a double date with friends who bring good energy.","Write three things you love about them and read one aloud.","Protect their reputation online and offline.","Wake up early once to make breakfast \u2014 effort is attractive.","Listen without fixing unless they ask for advice.","Share goals and ask how you can support, not control.","Laugh at yourselves when plans fail \u2014 resilience is sexy.","Keep dating each other: dress up for no reason sometimes.","Remember important dates in your calendar with alerts.","Give them the last bite if they love it \u2014 generosity in small things.","Plan a cozy movie night with their favorite blanket rules.","Tell them when you are proud of how they handled something hard.","Be consistent with good morning and good night kindness.","Create a shared tradition: Sunday brunch, Friday playlist, monthly adventure.","Forgive fast when intent was good \u2014 hold grace like a gift.","Ask for what you need clearly instead of testing them.","Surprise them with flowers, a plant, or something living and hopeful.","Dream aloud about the future together \u2014 direction feels safe.","Choose them again today \u2014 love is a daily decision, not a one-time event."],y.s)
 A.e2q=new B.a3("love","I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
 A.e68=new B.a3("love","Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
@@ -2602,9 +2602,9 @@ A.fXl=new C.B("One fortune per day \u2014 come back tomorrow! \ud83d\udd2e",null
 A.fnB=new C.b1(A.fXl,null,null,null,null,null,null,null,null,null,null,null,null,D.Y,!1,null,null,null,D.t,null)
 A.fNE=new C.B("15 riddles per day \u2014 your brain earned a rest! \ud83e\udde0",null,null,null,null,null,null,null,null,null,null,null)
 A.fnD=new C.b1(A.fNE,null,null,null,null,null,null,null,null,null,null,null,null,D.Y,!1,null,null,null,D.t,null)
-A.frP=new C.F(!0,D.c,null,null,null,null,56,D.u,null,null,null,null,1,null,null,null,null,null,null,null,null,null,D.Iv,null,null,null)
-A.frX=new C.F(!0,D.c,null,null,null,null,15,D.a8,null,null,null,null,1.45,null,null,null,null,null,null,null,null,null,null,null,null,null)
-A.fu1=new C.F(!0,D.c,null,null,null,null,14,D.a8,null,null,null,null,1.4,null,null,null,null,null,null,null,null,null,null,null,null,null)
+A.frQ=new C.F(!0,D.c,null,null,null,null,56,D.u,null,null,null,null,1,null,null,null,null,null,null,null,null,null,D.Iv,null,null,null)
+A.frY=new C.F(!0,D.c,null,null,null,null,15,D.a8,null,null,null,null,1.45,null,null,null,null,null,null,null,null,null,null,null,null,null)
+A.fu2=new C.F(!0,D.c,null,null,null,null,14,D.a8,null,null,null,null,1.4,null,null,null,null,null,null,null,null,null,null,null,null,null)
 A.aW0=new C.F(!0,D.c,null,null,null,null,14,D.a8,null,null,null,null,1.45,null,null,null,null,null,null,null,null,null,null,null,null,null)
 A.fub=new C.F(!0,D.c,null,null,null,null,15,D.a8,null,null,null,null,1.4,null,null,null,null,null,null,null,null,null,null,null,null,null)
 A.fuw=new C.F(!0,D.c,null,null,null,null,15,D.a8,null,null,null,null,1.35,null,null,null,null,null,null,null,null,null,null,null,null,null)
@@ -2624,4 +2624,4 @@ A.fvu=new C.F(!0,D.c,null,null,null,null,16,D.u,null,0.5,null,null,null,null,nul
 A.h2z=new C.B("Daily Confidence Boost",null,A.fvu,null,null,null,null,null,null,null,null,null)
 A.fAX=new C.F(!0,D.c,null,null,null,null,14,D.I,null,0.8,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 A.h5A=new C.B("Love Match",null,A.fAX,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["H0bosswk1dib5mNfBjv1DxtbbZQ="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["sC5zjXtJk0XyRc8HXi+p0O7aEVg="]=a.current})($__dart_deferred_initializers__);
