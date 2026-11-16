@@ -38,6 +38,15 @@ class BoardEditor extends StatefulWidget {
 
 class BoardEditorState extends State<BoardEditor> with SingleTickerProviderStateMixin, StudioFrames {
   Part? _sel;
+
+  /// The part whose info card is open. It opens only on a quick DOUBLE tap on the part (one tap just selects it), so the card no
+  /// longer jumps up every time something is touched or added.
+  Part? _info;
+
+  /// The long words of the card (what it is, how it is made) show only when "About" is pressed.
+  bool _infoMore = false;
+  Part? _lastTapPart;
+  DateTime _lastTapAt = DateTime(2000);
   Wire? _selWire;
   (Part, int)? _dragFrom;
   Offset? _dragTo;
@@ -386,7 +395,6 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
 
   @override
   Widget build(BuildContext context) {
-    final sel = _sel;
     final kinds = widget.paletteKinds ?? [for (final p in kPartInfos) p.kind];
     // Plenty of tools: all of them sit above the board, in two rows.
     final two = kinds.length > 8;
@@ -467,6 +475,18 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
                       }
                     });
                     if (isScreenKind(p.kind)) _screenTap(p);
+                    // A quick second tap on the same part opens its info card.
+                    final now = DateTime.now();
+                    if (identical(_lastTapPart, p) && now.difference(_lastTapAt) < const Duration(milliseconds: 380)) {
+                      setState(() {
+                        _info = p;
+                        _infoMore = false;
+                      });
+                      _lastTapPart = null;
+                    } else {
+                      _lastTapPart = p;
+                      _lastTapAt = now;
+                    }
                     widget.onChanged?.call();
                     return;
                   }
@@ -474,6 +494,7 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
                   setState(() {
                     _selWire = w;
                     _sel = null;
+                    _info = null;
                   });
                 },
                 child: CustomPaint(size: _size, painter: BoardPainter(b, selected: _sel, dragFrom: _dragFrom, dragTo: _dragTo, selWire: _selWire, popIn: pop ?? const {})),
@@ -512,8 +533,8 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
                     }),
                   ])),
                 )
-              else if (sel != null)
-                Positioned(left: 10, right: 10, bottom: 8, child: _partCard(sel)),
+              else if (_info != null && b.parts.contains(_info))
+                Positioned(left: 10, right: 10, bottom: 8, child: _partCard(_info!)),
             ]),
           );
         }),
@@ -557,28 +578,77 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
             widget.onChanged?.call();
           })),
         ]);
-    return _card(
+    Widget reading(String value, String unit) => Expanded(
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 5),
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(10)),
+            child: Column(children: [
+              Text(value, style: const TextStyle(color: Color(0xFFFBBF24), fontWeight: FontWeight.w900, fontSize: 13)),
+              Text(unit, style: const TextStyle(color: Colors.white38, fontSize: 9.5, fontWeight: FontWeight.w700)),
+            ]),
+          ),
+        );
+    // A small card: the name, the live reading and the controls. The long words wait behind "About".
+    return Container(
+      key: const Key('electronics-part-card'),
+      padding: const EdgeInsets.fromLTRB(12, 8, 6, 10),
+      decoration: BoxDecoration(
+        color: const Color(0xF2111318),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: info.color.withValues(alpha: 0.55), width: 1.3),
+        boxShadow: [BoxShadow(color: info.color.withValues(alpha: 0.18), blurRadius: 16, offset: const Offset(0, 6))],
+      ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 290),
+        constraints: const BoxConstraints(maxHeight: 210),
         child: SingleChildScrollView(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
             Row(children: [
-              Text(info.emoji, style: const TextStyle(fontSize: 24)),
+              Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: info.color.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(10)),
+                child: Text(info.emoji, style: const TextStyle(fontSize: 18)),
+              ),
               const SizedBox(width: 8),
-              Expanded(child: Text(info.name, style: TextStyle(color: info.color, fontWeight: FontWeight.w900, fontSize: 16))),
+              Expanded(child: Text(info.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: info.color, fontWeight: FontWeight.w900, fontSize: 15))),
+              GestureDetector(
+                key: const Key('electronics-part-about'),
+                onTap: () => setState(() => _infoMore = !_infoMore),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(999), border: Border.all(color: Colors.white24)),
+                  child: Text(_infoMore ? 'Less' : 'About', style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w800)),
+                ),
+              ),
               IconButton(visualDensity: VisualDensity.compact, tooltip: 'Remove part', onPressed: () {
                 b.remove(p);
                 _sel = null;
+                _info = null;
                 NgmyTone.play(260, ms: 70, wave: 'noise', volume: 0.35);
                 _changed();
-              }, icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFF87171), size: 21)),
-              IconButton(visualDensity: VisualDensity.compact, onPressed: () => setState(() => _sel = null), icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 20)),
+              }, icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFF87171), size: 20)),
+              IconButton(visualDensity: VisualDensity.compact, onPressed: () => setState(() => _info = null), icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 20)),
             ]),
-            Text(info.about, style: const TextStyle(color: Colors.white70, fontSize: 12.5, height: 1.35)),
-            const SizedBox(height: 4),
-            Text('How it is made: ${info.made}', style: const TextStyle(color: Colors.white38, fontSize: 11.5, height: 1.35)),
+            if (_infoMore) ...[
+              Text(info.about, style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.35)),
+              const SizedBox(height: 3),
+              Text('How it is made: ${info.made}', style: const TextStyle(color: Colors.white38, fontSize: 11, height: 1.35)),
+            ],
             const SizedBox(height: 6),
-            Text(p.burnt ? 'Burnt out! Press Repair.' : 'Now: ${p.v.abs().toStringAsFixed(2)} volts  ·  ${(p.i.abs() * 1000).toStringAsFixed(0)} milliamps  ·  ${w.toStringAsFixed(2)} watts', style: TextStyle(color: p.burnt ? const Color(0xFFF87171) : const Color(0xFFFBBF24), fontWeight: FontWeight.w800, fontSize: 12.5)),
+            if (p.burnt)
+              const Text('Burnt out! Press Repair.', style: TextStyle(color: Color(0xFFF87171), fontWeight: FontWeight.w800, fontSize: 12.5))
+            else
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Row(children: [
+                  reading(p.v.abs().toStringAsFixed(2), 'VOLTS'),
+                  const SizedBox(width: 6),
+                  reading((p.i.abs() * 1000).toStringAsFixed(0), 'MILLIAMPS'),
+                  const SizedBox(width: 6),
+                  reading(w.toStringAsFixed(2), 'WATTS'),
+                ]),
+              ),
             if (b.diagnose(p) case final why?) Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Container(
@@ -589,19 +659,28 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
             ),
             if (isTvKind(p.kind)) ...[
               const SizedBox(height: 6),
-              Wrap(spacing: 6, runSpacing: 4, children: [
-                for (var c = 0; c < kNgmyTvChannels.length; c++) StudioChip(label: 'CH ${c + 1}', selected: p.channel == c, color: info.color, onTap: () {
-                  setState(() => p.channel = c);
-                  NgmyTone.play(900, ms: 40, wave: 'noise', volume: 0.3);
-                }),
-              ]),
+              // The channels in one row that slides sideways (not a big block of chips).
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(children: [
+                  for (var c = 0; c < kNgmyTvChannels.length; c++)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: StudioChip(label: 'CH ${c + 1}', selected: p.channel == c, color: info.color, onTap: () {
+                        setState(() => p.channel = c);
+                        NgmyTone.play(900, ms: 40, wave: 'noise', volume: 0.3);
+                      }),
+                    ),
+                ]),
+              ),
               const SizedBox(height: 4),
-              Text(b.works(p) ? 'Showing: ${kNgmyTvChannels[p.channel % kNgmyTvChannels.length].title}. Tap the TV 3 times quickly to open the big screen.' : 'The TV is off. Give it power with the + dot towards the battery +.', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+              Text(b.works(p) ? 'Showing: ${kNgmyTvChannels[p.channel % kNgmyTvChannels.length].title}.${_infoMore ? ' Tap the TV 3 times quickly to open the big screen.' : ''}' : 'The TV is off. Give it power with the + dot towards the battery +.', maxLines: _infoMore ? 4 : 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white54, fontSize: 12)),
               if (b.works(p)) StudioButton(icon: Icons.fullscreen_rounded, label: 'Open big screen', color: info.color, onTap: () => _openTv(p)),
             ],
             if (isScreenKind(p.kind) && !isTvKind(p.kind)) ...[
               const SizedBox(height: 6),
-              Text(b.works(p) ? 'Playing NGMY ads. Tap it 3 times quickly, or press the button, to open it and use its apps. Tap it 4 times to make it bigger.' : 'It is off. Too few volts and it stays dark, too many and it burns out. Bring big battery volts down with a step-down converter.', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+              if (_infoMore || !b.works(p))
+                Text(b.works(p) ? 'Playing NGMY ads. Tap it 3 times quickly, or press the button, to open it and use its apps. Tap it 4 times to make it bigger.' : 'It is off. Too few volts and it stays dark, too many and it burns out. Bring big battery volts down with a step-down converter.', style: const TextStyle(color: Colors.white54, fontSize: 12)),
               if (b.works(p)) StudioButton(icon: Icons.phone_android_rounded, label: 'Open the ${p.info.name}', color: info.color, onTap: () => _openDevice(p)),
             ],
             if (isScreenKind(p.kind)) ...[

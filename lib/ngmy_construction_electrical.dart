@@ -473,6 +473,11 @@ Scene3D buildBench(ElectricalLesson lesson, WiringState s, {bool withWall = true
     b.box(const V3(-1.9, 0, -2.25), const V3(1.5, 40, 3.5), kWood, shine: 0.05, split: 5);
     b.box(const V3(11.25, 0, -2.25), const V3(1.5, 40, 3.5), kWood, shine: 0.05, split: 5);
     b.box(const V3(5.0, 8.6, -2.25), const V3(14, 1.5, 3.5), kWood, shine: 0.05, split: 2);
+  }
+  // The room is ALWAYS drawn, with or without the wall: once the view goes round to the side or behind, the page shows the bench without
+  // the wall (to see behind it), and the room used to go with the wall, so the view turned black (then white) with no floor at all.
+  {
+    const wx = 30.0, wy = 20.0, front = 0.0, back = -0.5;
     // The room in front of the wall: a floor, a ceiling and the two side walls. Turning the view no longer looks out into black nothing
     // (it looked as if the wall had disappeared). It is the outermost shell, so it is drawn before everything else (tier -1).
     b.id = 0;

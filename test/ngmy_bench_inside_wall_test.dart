@@ -45,7 +45,9 @@ void main() {
 
       final behind = buildBench(l, s, withWall: false);
       expect(behind.polys.any((p) => p.id == idWall), isFalse);
-      expect(behind.polys.every((p) => p.order == 2), isTrue, reason: 'without the wall everything is sorted together by distance');
+      expect(behind.polys.where((p) => p.order != -1).every((p) => p.order == 2), isTrue, reason: 'without the wall everything is sorted together by distance');
+      // The room stays when the wall is left out (the view seen from the side or behind): before, it went with the wall and the view turned black.
+      expect(behind.polys.where((p) => p.order == -1).length, greaterThan(100), reason: 'the room is still there without the wall');
     });
   }
 }
