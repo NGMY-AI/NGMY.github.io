@@ -975,7 +975,7 @@ void _nemaFace(MeshBuilder b, V3 c, String kind, bool burnt) {
   const zf = 0.5;
   b.id = idFace;
   b.bias = 0.62;
-  b.cyl(c + const V3(0, 0, 0.46), c + const V3(0, 0, zf), 0.64, burnt ? kChar : const Color(0xFF3B2F2A), shine: 0.35, sides: 28);
+  b.cyl(c + const V3(0, 0, 0.46), c + const V3(0, 0, zf), 0.64, burnt ? kChar : nemaFaceColor(kind), shine: 0.35, sides: 28);
   b.bias = 0.7;
   const dark = Color(0xFF0B0B0D);
   // A slot (a thin rectangle), turned [angle] radians in the plane of the face.
@@ -985,56 +985,13 @@ void _nemaFace(MeshBuilder b, V3 c, String kind, bool burnt) {
     b.quad(p(-w / 2, -h / 2), p(w / 2, -h / 2), p(w / 2, h / 2), p(-w / 2, h / 2), dark, normal: const V3(0, 0, 1));
   }
 
-  void round(double x, double y) => b.cyl(c + V3(x, y, zf), c + V3(x, y, zf + 0.012), 0.065, dark, sides: 12);
-  // The L-shaped neutral slot: a tall bar and a foot at its bottom.
-  void ell(double x, double y) {
-    slot(x, y, 0.075, 0.3);
-    slot(x + 0.09, y - 0.115, 0.2, 0.075);
-  }
-
-  switch (kind) {
-    case 'nema1030':
-      ell(-0.05, 0.14);
-      slot(-0.3, -0.24, 0.075, 0.3, -0.5);
-      slot(0.3, -0.24, 0.075, 0.3, 0.5);
-    case 'nema1430':
-      ell(-0.05, 0.28);
-      slot(-0.4, -0.04, 0.075, 0.32);
-      slot(0.4, -0.04, 0.075, 0.32);
-      round(0, -0.4);
-    case 'nema1050':
-      slot(-0.3, 0.2, 0.075, 0.3, 0.5);
-      slot(0.3, 0.2, 0.075, 0.3, -0.5);
-      slot(0, -0.26, 0.075, 0.32);
-    case 'nema1450':
-      slot(0, 0.3, 0.075, 0.28);
-      slot(-0.4, -0.04, 0.075, 0.32);
-      slot(0.4, -0.04, 0.075, 0.32);
-      round(0, -0.4);
-    case 'nema620':
-      // The 6-20 of a 240 volt only outlet (a window air conditioner, a welder): two flat blades lying down, one with a T foot, and the ground hole below.
-      slot(0, 0.2, 0.32, 0.075);
-      slot(0, 0.0, 0.32, 0.075);
-      slot(0.15, -0.07, 0.075, 0.14);
-      round(0, -0.36);
-    case 'nematt30':
-      // The TT-30 of an RV pad (120 volts): two slanted slots leaning towards each other at the top, and the round ground hole below.
-      slot(-0.22, 0.1, 0.075, 0.3, 0.45);
-      slot(0.22, 0.1, 0.075, 0.3, -0.45);
-      round(0, -0.32);
-    case 'nemal1430':
-      // The L14-30 twist-lock of a generator: four curved slots around a circle (drawn as short slots turned along the circle).
-      for (var i = 0; i < 4; i++) {
-        final a = math.pi / 4 + i * math.pi / 2;
-        slot(math.cos(a) * 0.36, math.sin(a) * 0.36, 0.075, 0.22, a);
-      }
-      round(0, 0);
-    default:
-      // The 5-20 of the washing machine: a T-shaped neutral slot on the left, a straight hot slot on the right, and the ground hole below.
-      slot(0.2, 0.12, 0.075, 0.3);
-      slot(-0.2, 0.12, 0.075, 0.3);
-      slot(-0.3, 0.12, 0.14, 0.075);
-      round(0, -0.3);
+  // The slots of its type, the same list the room and the framed house draw from.
+  for (final s in nemaSlotsFor(kind)) {
+    if (s.round) {
+      b.cyl(c + V3(s.x, s.y, zf), c + V3(s.x, s.y, zf + 0.012), s.w / 2, dark, sides: 12);
+    } else {
+      slot(s.x, s.y, s.w, s.h, s.angle);
+    }
   }
   b.bias = 0;
 }

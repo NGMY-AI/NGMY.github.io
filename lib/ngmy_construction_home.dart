@@ -177,7 +177,7 @@ const Map<String, Set<String>> kApplianceOutletKinds = {
   'range': {'range4', 'range3'},
 };
 /// Outlets an ordinary plug (a lamp, a TV, a phone charger) fits.
-const Set<String> kNormalOutletKinds = {'outlet', 'gfci', 'split', 'isolated', 'afci', 'tamper', 'usb', 'outlet20', 'weather', 'smartoutlet'};
+const Set<String> kNormalOutletKinds = {'outlet', 'gfci', 'split', 'isolated', 'afci', 'tamper', 'usb', 'outlet20', 'weather', 'smartoutlet', 'old2prong'};
 
 /// Does the plug of [appliance] fit an outlet of kind [outletKind] (an outlet of the electrical lessons)?
 bool applianceFitsOutlet(String appliance, String outletKind) {

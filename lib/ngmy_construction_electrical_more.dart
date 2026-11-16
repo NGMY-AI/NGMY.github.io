@@ -385,6 +385,7 @@ final List<ElectricalLesson> kMoreLessons = [
   ),
   ...kApplianceLessons,
   ...kMoreOutletLessons,
+  ...kChartOutletLessons,
 ];
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -393,7 +394,7 @@ final List<ElectricalLesson> kMoreLessons = [
 // ═════════════════════════════════════════════════════════════════════════════
 
 /// The new outlet lessons, in the order of their tiles.
-const List<String> kMoreOutletKinds = ['afci', 'tamper', 'usb', 'outlet20', 'weather', 'smartoutlet', 'ev1450', 'rv30', 'welder650', 'gen1430'];
+const List<String> kMoreOutletKinds = ['afci', 'tamper', 'usb', 'outlet20', 'weather', 'smartoutlet', 'ev1450', 'rv30', 'welder650', 'gen1430', ...kChartOutletKinds];
 
 const _groundChip = WireChoice('ground', 'Bare copper · ground', _copper, Colors.white, role: 'ground');
 const _neutralChip = WireChoice('neutral', 'White · neutral', _white, Color(0xFF111827), role: 'neutral');
@@ -592,6 +593,291 @@ final List<ElectricalLesson> kMoreOutletLessons = [
 // (white), X and Y are the two hots (black and red, 120 volts each, 240 volts between them) and G is the ground.
 // ═════════════════════════════════════════════════════════════════════════════
 
+// ═════════════════════════════════════════════════════════════════════════════
+// THE OUTLETS OF THE NEMA CHARTS: every receptacle on the reference charts that the lab did not have yet (240 volt, 277 volt,
+// three-phase and twist-lock). Each one is a lesson and can come up as a job in the city. Wire colours follow American practice:
+// black, red and blue for 120/208/240 volts; brown, orange and yellow with a grey neutral for 277/480 volts.
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// The outlets of the charts, in the order of their tiles.
+const List<String> kChartOutletKinds = [
+  'old2prong', 'ac615', 'v630', 'v1460', 'shore50',
+  'l520', 'l530', 'l620', 'l630', 'l1420', 'l220',
+  'v715', 'v720', 'v730', 'v1820', 'l2230',
+  'p1520', 'p1530', 'p1550', 'p1560', 'l1530', 'l2130', 'l1630',
+];
+
+const _blue = Color(0xFF2563EB);
+const _brown = Color(0xFF7C4A21);
+const _orange = Color(0xFFEA7A1A);
+const _yellow = Color(0xFFE5C02A);
+const _grey = Color(0xFFA3A3A3);
+
+/// One wire of a chart outlet and the screw it goes on.
+class _W {
+  const _W(this.chip, this.screw, this.label, this.name, {this.accepts});
+  final WireChoice chip;
+  final int screw;
+  final String label;
+  /// How the step names the wire ("the brown hot").
+  final String name;
+  /// Wires that may go on this screw (the hots of one outlet are interchangeable); only this wire when null.
+  final Set<String>? accepts;
+}
+
+/// A chart outlet: two steps to start (the second says what it is), one for each wire, two to finish.
+ElectricalLesson _chart({required String id, required String title, required String blurb, required String look, required String about, required List<_W> wires}) {
+  String where(String label) => label.split(':').first.toLowerCase();
+  final hooks = [
+    for (final w in wires)
+      Hookup(w.screw, w.label, w.accepts ?? {w.chip.key},
+          w.chip.role == 'ground' ? 'The ground wire goes on the green screw.' : '${w.name[0].toUpperCase()}${w.name.substring(1)} goes on the ${where(w.label)}.',
+          role: w.chip.role),
+  ];
+  return ElectricalLesson(
+    id: id,
+    title: title,
+    blurb: blurb,
+    look: look,
+    strict: true,
+    needsGround: wires.any((w) => w.chip.role == 'ground'),
+    steps: [
+      _intro.first,
+      '${_intro.last} $about',
+      for (final w in wires) 'Fasten ${w.name} to the ${where(w.label)}.',
+      ..._tail,
+    ],
+    chips: [for (final w in wires) w.chip],
+    hookups: hooks,
+    solution: {for (final w in wires) w.screw: w.chip.key},
+    wrongHint: (chip, h) {
+      final role = wires.firstWhere((w) => w.chip.key == chip, orElse: () => wires.first).chip.role;
+      if (role == 'ground') return 'The ground wire only goes on the GREEN screw.';
+      if (h.id == idGreen) return 'Only the ground wire goes on the green screw.';
+      final right = hooks.where((x) => x.accepts.contains(chip)).map((x) => where(x.name)).join(' or the ');
+      return role == 'neutral' ? 'The neutral goes on the $right.' : 'This hot wire goes on the $right.';
+    },
+  );
+}
+
+const _g = _W(_groundChip, idGreen, 'Green screw G: GROUND', 'the bare copper ground');
+const _gGreen = _W(WireChoice('ground', 'Green · ground', _stripe, Colors.white, role: 'ground'), idGreen, 'Green screw G: GROUND', 'the green ground');
+const _w = _W(_neutralChip, idSilverTop, 'Silver screw W: NEUTRAL', 'the white neutral');
+const _wGrey = _W(WireChoice('neutral', 'Grey · neutral (277 V)', _grey, Color(0xFF111827), role: 'neutral'), idSilverTop, 'Silver screw W: NEUTRAL', 'the grey neutral');
+const _h120 = _W(_hotChip, idBrassTop, 'Brass screw X: HOT', 'the black hot');
+const _h277 = _W(WireChoice('hot', 'Brown · hot (277 V)', _brown, Colors.white, role: 'hot'), idBrassTop, 'Brass screw X: HOT', 'the brown hot');
+const _two = {'hot1', 'hot2'};
+const _x2 = _W(_hot1Chip, idBrassTop, 'Brass screw X: HOT', 'the black hot', accepts: _two);
+const _y2 = _W(_hot2Chip, idBrassBottom, 'Brass screw Y: HOT', 'the red hot', accepts: _two);
+const _three = {'hot1', 'hot2', 'hot3'};
+const _x3 = _W(_hot1Chip, idBrassTop, 'Brass screw X: HOT', 'the black hot (phase A)', accepts: _three);
+const _y3 = _W(_hot2Chip, idBrassBottom, 'Brass screw Y: HOT', 'the red hot (phase B)', accepts: _three);
+const _z3 = _W(WireChoice('hot3', 'Blue · hot 3', _blue, Colors.white, role: 'hot'), idSilverBottom, 'Screw Z: HOT', 'the blue hot (phase C)', accepts: _three);
+const _x480 = _W(WireChoice('hot1', 'Brown · hot 1 (480 V)', _brown, Colors.white, role: 'hot'), idBrassTop, 'Brass screw X: HOT', 'the brown hot (phase A)', accepts: _three);
+const _y480 = _W(WireChoice('hot2', 'Orange · hot 2 (480 V)', _orange, Colors.white, role: 'hot'), idBrassBottom, 'Brass screw Y: HOT', 'the orange hot (phase B)', accepts: _three);
+const _z480 = _W(WireChoice('hot3', 'Yellow · hot 3 (480 V)', _yellow, Color(0xFF111827), role: 'hot'), idSilverBottom, 'Screw Z: HOT', 'the yellow hot (phase C)', accepts: _three);
+
+final List<ElectricalLesson> kChartOutletLessons = [
+  _chart(
+    id: 'old2prong',
+    title: 'Old 2-prong outlet (1-15)',
+    blurb: 'The outlet of very old houses: two slots and no ground hole. 120 volts, 15 amps.',
+    look: 'nema115',
+    about: 'Two slots, no ground hole: a NEMA 1-15. There is no ground wire in the box, so only a hot and a neutral. When one is replaced today it must become a GFCI marked NO EQUIPMENT GROUND, or get a real ground wire.',
+    wires: const [_W(_neutralChip, idSilverTop, 'Silver screw: NEUTRAL', 'the white neutral'), _W(_hotChip, idBrassTop, 'Brass screw: HOT', 'the black hot')],
+  ),
+  _chart(
+    id: 'ac615',
+    title: 'Air conditioner outlet (6-15)',
+    blurb: 'A 240 volt, 15 amp outlet for a small window or wall air conditioner: two hots and a ground, no neutral.',
+    look: 'nema615',
+    about: 'Two flat slots lying side by side and a ground hole: a NEMA 6-15. 240 volts, 15 amps, on 14 gauge wire and a 15 amp double breaker. No neutral.',
+    wires: const [_g, _x2, _y2],
+  ),
+  _chart(
+    id: 'v630',
+    title: '240 V 30 amp outlet (6-30)',
+    blurb: 'A 240 volt, 30 amp outlet for a big air conditioner, a kiln or a shop compressor: two hots and a ground, no neutral.',
+    look: 'nema630',
+    about: 'Two flat slots, each with a bent foot, and a round ground hole: a NEMA 6-30. 10 gauge wire and a 30 amp double breaker. No neutral.',
+    wires: const [_g, _x2, _y2],
+  ),
+  _chart(
+    id: 'v1460',
+    title: 'Big 60 amp outlet (14-60)',
+    blurb: 'The 60 amp, 120/240 volt outlet for a big electric car charger or a shop: two hots, a neutral and a ground.',
+    look: 'nema1460',
+    about: 'Four openings: two hots with a bent foot, a flat neutral and a round ground: a NEMA 14-60. It takes 4 gauge wire and a 60 amp double breaker.',
+    wires: const [_g, _w, _x2, _y2],
+  ),
+  _chart(
+    id: 'shore50',
+    title: 'RV shore power twist-lock (50 amp)',
+    blurb: 'The 50 amp twist-lock at a marina or an RV park: 120/240 volts, two hots, a neutral and a ground.',
+    look: 'nemass50',
+    about: 'A big round twist-lock with four openings in a cross: the plug goes in and turns, so the wind or the water can not pull it out. 6 gauge wire and a 50 amp double breaker.',
+    wires: const [_g, _w, _x2, _y2],
+  ),
+  _chart(
+    id: 'l520',
+    title: 'Twist-lock 120 V (L5-20)',
+    blurb: 'A 120 volt, 20 amp twist-lock: the plug turns and locks. Stages, shops and boats.',
+    look: 'nemal520',
+    about: 'Three curved slots in a circle, one with a little hook (the ground): a NEMA L5-20. Push the plug in and turn it to lock. 12 gauge wire and a 20 amp breaker.',
+    wires: const [_g, _w, _h120],
+  ),
+  _chart(
+    id: 'l530',
+    title: 'Twist-lock 120 V 30 amp (L5-30)',
+    blurb: 'A 120 volt, 30 amp twist-lock for a big tool, a small generator or a boat.',
+    look: 'nemal530',
+    about: 'Three long curved slots, one with a hook for the ground: a NEMA L5-30. 10 gauge wire and a 30 amp single breaker.',
+    wires: const [_g, _w, _h120],
+  ),
+  _chart(
+    id: 'l620',
+    title: 'Twist-lock 240 V (L6-20)',
+    blurb: 'A 240 volt, 20 amp twist-lock for workshop tools such as a table saw: two hots and a ground.',
+    look: 'nemal620',
+    about: 'Three curved slots, one with a hook for the ground, and no neutral: a NEMA L6-20. 12 gauge wire and a 20 amp double breaker.',
+    wires: const [_g, _x2, _y2],
+  ),
+  _chart(
+    id: 'l630',
+    title: 'Twist-lock 240 V 30 amp (L6-30)',
+    blurb: 'A 240 volt, 30 amp twist-lock for big shop machines and generators: two hots and a ground.',
+    look: 'nemal630',
+    about: 'Three wide curved slots, one with a hook for the ground: a NEMA L6-30. 10 gauge wire and a 30 amp double breaker. No neutral.',
+    wires: const [_g, _x2, _y2],
+  ),
+  _chart(
+    id: 'l1420',
+    title: 'Generator twist-lock 20 amp (L14-20)',
+    blurb: 'The 20 amp, 120/240 volt twist-lock of a smaller generator: two hots, a neutral and a ground.',
+    look: 'nemal1420',
+    about: 'Four short curved slots, one with a hook for the ground: a NEMA L14-20. 12 gauge wire and a 20 amp double breaker, through a transfer switch or an interlock.',
+    wires: const [_g, _w, _x2, _y2],
+  ),
+  _chart(
+    id: 'l220',
+    title: 'Old twist-lock, no ground (L2-20)',
+    blurb: 'An old 240 volt, 20 amp twist-lock with only two curved slots: two hots, no neutral and no ground.',
+    look: 'nemal220',
+    about: 'Only two curved slots: a NEMA L2-20, an old design with no ground. It is only repaired, never put in new.',
+    wires: const [_x2, _y2],
+  ),
+  _chart(
+    id: 'v715',
+    title: '277 V 15 amp outlet (7-15)',
+    blurb: 'A 277 volt outlet for the lights of offices and stores: one hot, a neutral and a ground. A home plug never fits it.',
+    look: 'nema715',
+    about: 'A flat slot on top, a short upright slot and a slanted one: a NEMA 7-15. In a 277/480 volt building the hot is brown, orange or yellow and the neutral is GREY, not white.',
+    wires: const [_g, _wGrey, _h277],
+  ),
+  _chart(
+    id: 'v720',
+    title: '277 V 20 amp outlet (7-20)',
+    blurb: 'A 277 volt, 20 amp outlet with a T-shaped slot: commercial lighting and machines.',
+    look: 'nema720',
+    about: 'A T-shaped slot, a straight slot and a ground hole, turned so a 120 volt plug never fits: a NEMA 7-20. Brown hot, grey neutral, bare ground.',
+    wires: const [_g, _wGrey, _h277],
+  ),
+  _chart(
+    id: 'v730',
+    title: '277 V 30 amp outlet (7-30)',
+    blurb: 'A single 277 volt, 30 amp receptacle for big commercial equipment.',
+    look: 'nema730',
+    about: 'A wide flat slot on top, an upright slot and a round ground hole: a NEMA 7-30. 10 gauge wire, brown hot and grey neutral.',
+    wires: const [_g, _wGrey, _h277],
+  ),
+  _chart(
+    id: 'v1820',
+    title: 'Three-phase Y outlet (18-20)',
+    blurb: 'A 120/208 volt three-phase outlet with three hots and a neutral, and no ground slot.',
+    look: 'nema1820',
+    about: 'Four slots and no ground hole: a NEMA 18-20, for three-phase machines that also need 120 volts. Black, red and blue are the three phases; the white is the neutral.',
+    wires: const [_w, _x3, _y3, _z3],
+  ),
+  _chart(
+    id: 'l2230',
+    title: 'Twist-lock 277/480 V (L22-30)',
+    blurb: 'A 30 amp, 277/480 volt three-phase twist-lock for factories: three hots, a neutral and a ground.',
+    look: 'nemal2230',
+    about: 'Five curved slots: a NEMA L22-30. The 480 volt phases are brown, orange and yellow, and the neutral is grey. This is factory power, only for trained electricians.',
+    wires: const [_gGreen, _wGrey, _x480, _y480, _z480],
+  ),
+  _chart(
+    id: 'p1520',
+    title: 'Three-phase 20 amp outlet (15-20)',
+    blurb: 'A 250 volt, 20 amp three-phase outlet: three hots and a ground, no neutral.',
+    look: 'nema1520',
+    about: 'Three slots (one with a T foot) and a ground hole: a NEMA 15-20. Black, red and blue are the three phases. No neutral.',
+    wires: const [_g, _x3, _y3, _z3],
+  ),
+  _chart(
+    id: 'p1530',
+    title: 'Three-phase 30 amp outlet (15-30)',
+    blurb: 'A 250 volt, 30 amp three-phase outlet for shop machines: three hots and a ground.',
+    look: 'nema1530',
+    about: 'Three slots with bent feet and a ground hole: a NEMA 15-30. 10 gauge wire and a 30 amp three-pole breaker.',
+    wires: const [_g, _x3, _y3, _z3],
+  ),
+  _chart(
+    id: 'p1550',
+    title: 'Three-phase 50 amp outlet (15-50)',
+    blurb: 'A 250 volt, 50 amp three-phase outlet: three wedge-shaped slots and a round ground.',
+    look: 'nema1550',
+    about: 'Three wedge slots and a round ground hole at the top: a NEMA 15-50. 6 gauge wire and a 50 amp three-pole breaker.',
+    wires: const [_g, _x3, _y3, _z3],
+  ),
+  _chart(
+    id: 'p1560',
+    title: 'Three-phase 60 amp outlet (15-60)',
+    blurb: 'A 250 volt, 60 amp three-phase outlet for the biggest shop machines.',
+    look: 'nema1560',
+    about: 'Two upright slots, a flat one at the bottom and a ground at the top: a NEMA 15-60. 4 gauge wire and a 60 amp three-pole breaker.',
+    wires: const [_g, _x3, _y3, _z3],
+  ),
+  _chart(
+    id: 'l1530',
+    title: 'Three-phase twist-lock (L15-30)',
+    blurb: 'A 250 volt, 30 amp three-phase twist-lock: three hots and a ground.',
+    look: 'nemal1530',
+    about: 'Four curved slots, one with a hook (the ground): a NEMA L15-30. Black, red and blue are the three phases.',
+    wires: const [_g, _x3, _y3, _z3],
+  ),
+  _chart(
+    id: 'l2130',
+    title: 'Twist-lock 5-wire (L21-30)',
+    blurb: 'A 120/208 volt three-phase twist-lock with five wires: three hots, a neutral and a ground.',
+    look: 'nemal2130',
+    about: 'Five curved slots: a NEMA L21-30. Black, red and blue are the three phases, white is the neutral and bare copper the ground.',
+    wires: const [_g, _w, _x3, _y3, _z3],
+  ),
+  _chart(
+    id: 'l1630',
+    title: 'Twist-lock 480 V three-phase (L16-30)',
+    blurb: 'A 480 volt, 30 amp three-phase twist-lock for industry: three hots and a ground.',
+    look: 'nemal1630',
+    about: 'Four curved slots: a NEMA L16-30. The 480 volt phases are brown, orange and yellow. No neutral.',
+    wires: const [_gGreen, _x480, _y480, _z480],
+  ),
+];
+
+/// The slots of a twist-lock: one curved slot (drawn along the circle) at each angle in degrees, the ground one with a little hook inward.
+List<NemaSlot> _twist(List<double> degrees, {double r = 0.36, double len = 0.22, int? hook}) => [
+      for (var i = 0; i < degrees.length; i++) ...[
+        NemaSlot(math.cos(degrees[i] * math.pi / 180) * r, math.sin(degrees[i] * math.pi / 180) * r, 0.075, len, angle: degrees[i] * math.pi / 180),
+        if (hook == i) NemaSlot(math.cos(degrees[i] * math.pi / 180) * (r - 0.09), math.sin(degrees[i] * math.pi / 180) * (r - 0.09), 0.13, 0.06, angle: degrees[i] * math.pi / 180),
+      ],
+    ];
+
+/// The colour of the round face: most are dark, the 1-15, the 6-15 and the 277 volt ones are white and the three-phase Y is grey.
+Color nemaFaceColor(String layout) => switch (layout) {
+      'nema115' || 'nema615' || 'nema715' || 'nema720' || 'nema730' => const Color(0xFFEDEBE4),
+      'nema1820' => const Color(0xFFB9B5AC),
+      _ => const Color(0xFF3B2F2A),
+    };
 
 /// The wrong-hint of the four dryer and range outlets.
 String _bigHint(String chip, Hookup h, {required bool hasGround}) => switch (chip) {
@@ -839,7 +1125,8 @@ String? nemaLayoutOf(String kind) => const {
       'welder650': 'nema620',
       'rv30': 'nematt30',
       'gen1430': 'nemal1430',
-    }[kind];
+    }[kind] ??
+    (kChartOutletKinds.contains(kind) ? kChartOutletLessons.firstWhere((l) => l.id == kind).look : null);
 
 /// The slots of a round face, the same everywhere an outlet is drawn (the bench, the room, the framed house).
 List<NemaSlot> nemaSlotsFor(String layout) {
@@ -853,6 +1140,48 @@ List<NemaSlot> nemaSlotsFor(String layout) {
     'nema620' => [const NemaSlot(0, 0.2, 0.32, 0.075), const NemaSlot(0, 0.0, 0.32, 0.075), const NemaSlot(0.15, -0.07, 0.075, 0.14), const NemaSlot(0, -0.36, 0.13, 0.13, round: true)],
     'nematt30' => [const NemaSlot(-0.22, 0.1, 0.075, 0.3, angle: 0.45), const NemaSlot(0.22, 0.1, 0.075, 0.3, angle: -0.45), const NemaSlot(0, -0.32, 0.13, 0.13, round: true)],
     'nemal1430' => [for (var i = 0; i < 4; i++) NemaSlot(math.cos(math.pi / 4 + i * math.pi / 2) * 0.36, math.sin(math.pi / 4 + i * math.pi / 2) * 0.36, 0.075, 0.22, angle: math.pi / 4 + i * math.pi / 2), const NemaSlot(0, 0, 0.13, 0.13, round: true)],
+    // The outlets of the charts.
+    'nema115' => [const NemaSlot(-0.17, 0.02, 0.075, 0.34), const NemaSlot(0.17, 0.02, 0.075, 0.26)],
+    'nema615' => [const NemaSlot(-0.22, 0.1, 0.26, 0.075), const NemaSlot(0.22, 0.1, 0.26, 0.075), const NemaSlot(0, -0.3, 0.13, 0.13, round: true)],
+    'nema630' => [
+        const NemaSlot(-0.24, 0.06, 0.26, 0.075), const NemaSlot(-0.15, 0.17, 0.075, 0.2),
+        const NemaSlot(0.24, 0.06, 0.26, 0.075), const NemaSlot(0.33, 0.17, 0.075, 0.2),
+        const NemaSlot(0, -0.32, 0.13, 0.13, round: true),
+      ],
+    'nema1460' => [
+        const NemaSlot(0, 0.32, 0.2, 0.075),
+        const NemaSlot(-0.38, -0.02, 0.075, 0.32), const NemaSlot(-0.31, 0.12, 0.14, 0.06),
+        const NemaSlot(0.38, -0.02, 0.075, 0.32), const NemaSlot(0.31, 0.12, 0.14, 0.06),
+        const NemaSlot(0, -0.4, 0.13, 0.13, round: true),
+      ],
+    'nemass50' => [const NemaSlot(0, 0.36, 0.13, 0.2), const NemaSlot(-0.34, 0, 0.24, 0.08), const NemaSlot(0.34, 0, 0.24, 0.08), const NemaSlot(0, -0.34, 0.08, 0.24)],
+    'nemal520' => _twist(const [40, 140, 270], hook: 2),
+    'nemal530' => _twist(const [35, 145, 270], len: 0.28, hook: 2),
+    'nemal620' => _twist(const [10, 170, 270], hook: 2),
+    'nemal630' => _twist(const [50, 130, 270], len: 0.28, r: 0.4, hook: 2),
+    'nemal1420' => _twist(const [45, 135, 225, 315], len: 0.17, hook: 2),
+    'nemal220' => _twist(const [0, 180], len: 0.3),
+    'nema715' => [const NemaSlot(0, 0.32, 0.36, 0.075), const NemaSlot(-0.18, 0.02, 0.075, 0.2), NemaSlot(0.14, -0.08, 0.075, 0.34, angle: -math.pi / 4)],
+    'nema720' => [const NemaSlot(-0.18, 0.1, 0.075, 0.3), const NemaSlot(-0.3, 0.04, 0.2, 0.075), const NemaSlot(0.2, 0.1, 0.075, 0.26), const NemaSlot(0, -0.3, 0.13, 0.13, round: true)],
+    'nema730' => [const NemaSlot(0, 0.3, 0.4, 0.075), const NemaSlot(-0.18, 0, 0.075, 0.26), const NemaSlot(0.18, 0, 0.075, 0.26), const NemaSlot(0, -0.32, 0.13, 0.13, round: true)],
+    'nema1820' => [const NemaSlot(-0.24, 0.12, 0.075, 0.3), const NemaSlot(0.24, 0.12, 0.075, 0.3), const NemaSlot(0, 0.4, 0.22, 0.075), const NemaSlot(0, -0.3, 0.075, 0.24)],
+    'nemal2230' => _twist(const [54, 126, 198, 270, 342], r: 0.4, len: 0.17, hook: 3),
+    'nema1520' => [
+        const NemaSlot(-0.3, 0.1, 0.075, 0.28), const NemaSlot(-0.4, 0.04, 0.16, 0.075),
+        const NemaSlot(0.3, 0.1, 0.075, 0.28), const NemaSlot(0, 0.38, 0.22, 0.075),
+        const NemaSlot(0, -0.32, 0.13, 0.13, round: true),
+      ],
+    'nema1530' => [
+        const NemaSlot(-0.3, 0.1, 0.075, 0.28), const NemaSlot(-0.4, 0.2, 0.16, 0.075),
+        const NemaSlot(0.3, 0.1, 0.075, 0.28), const NemaSlot(0.4, 0.2, 0.16, 0.075),
+        const NemaSlot(0, 0.38, 0.22, 0.075),
+        const NemaSlot(0, -0.32, 0.13, 0.13, round: true),
+      ],
+    'nema1550' => [const NemaSlot(0, 0.38, 0.14, 0.14, round: true), const NemaSlot(-0.3, 0.02, 0.24, 0.11, angle: -0.35), const NemaSlot(0.3, 0.02, 0.24, 0.11, angle: 0.35), const NemaSlot(0, -0.32, 0.11, 0.24)],
+    'nema1560' => [const NemaSlot(0, 0.38, 0.13, 0.17), const NemaSlot(-0.38, 0, 0.075, 0.3), const NemaSlot(0.38, 0, 0.075, 0.3), const NemaSlot(-0.1, 0.06, 0.1, 0.075), const NemaSlot(0, -0.34, 0.28, 0.075)],
+    'nemal1530' => _twist(const [0, 90, 180, 270], hook: 3),
+    'nemal2130' => _twist(const [90, 162, 234, 306, 18], r: 0.4, len: 0.17, hook: 2),
+    'nemal1630' => _twist(const [30, 110, 190, 270], len: 0.2, hook: 3),
     _ => [const NemaSlot(0.2, 0.12, 0.075, 0.3), const NemaSlot(-0.2, 0.12, 0.075, 0.3), const NemaSlot(-0.3, 0.12, 0.14, 0.075), const NemaSlot(0, -0.3, 0.13, 0.13, round: true)],
   };
 }

@@ -156,7 +156,7 @@ void drawDeviceFace(MeshBuilder b, FBox x, WiringHouse w) {
     const r = 1.9;
     const k = r / 0.64;
     final c = at(0, 0, f);
-    b.cyl(c, wallPt(x.wall, uc, x.y, f + 0.1), r, const Color(0xFF3B2F2A), sides: 24, shine: 0.35);
+    b.cyl(c, wallPt(x.wall, uc, x.y, f + 0.1), r, nemaFaceColor(layout), sides: 24, shine: 0.35);
     for (final s in nemaSlotsFor(layout)) {
       if (s.round) {
         b.cyl(at(s.x * k, s.y * k, f + 0.1), at(s.x * k, s.y * k, f + 0.14), s.w * k / 2, const Color(0xFF0B0B0D), sides: 10);

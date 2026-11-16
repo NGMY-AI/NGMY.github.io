@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'ngmy_3d.dart';
 import 'ngmy_avatar_glb.dart';
 import 'ngmy_construction_home.dart';
+import 'ngmy_construction_electrical_more.dart';
 import 'ngmy_construction_tour.dart';
 import 'ngmy_electronics_screens.dart';
 
@@ -204,14 +205,13 @@ void paintNgmyPoster(Canvas c, Size s, double t, int variant) {
 void _outletFace(MeshBuilder b, String kind, double x, bool ok) {
   const slotCol = Color(0xFF0B0B0D), dark = Color(0xFF17181B);
   const plate = Color(0xFFF2EEE2);
-  const layouts = {'dryer3': 'nema1030', 'dryer4': 'nema1430', 'range3': 'nema1050', 'range4': 'nema1450', 'washer': 'nema520', 'v240three': 'nema1030', 'v240four': 'nema1430', 'v240only': 'nema620', 'outlet20': 'nema520', 'ev1450': 'nema1450', 'welder650': 'nema620', 'rv30': 'nematt30', 'gen1430': 'nemal1430'};
-  final layout = layouts[kind];
+  final layout = nemaLayoutOf(kind);
   if (layout != null) {
     final small = kind.startsWith('v240');
     final r = small ? 4.6 : 5.6;
     final k = r / 0.64;
     b.box(V3(x, 14, 0.9), V3(2 * r + 3.2, 2 * r + 4.2, 1.4), plate, shine: 0.25);
-    b.cyl(V3(x, 14, 1.6), V3(x, 14, 2.1), r, const Color(0xFF3B2F2A), sides: 28, shine: 0.35);
+    b.cyl(V3(x, 14, 1.6), V3(x, 14, 2.1), r, nemaFaceColor(layout), sides: 28, shine: 0.35);
     // A slot: a thin rectangle turned [angle] in the plane of the face (sizes as on the bench, in tenths of an inch of the bench).
     void slot(double sx, double sy, double w, double h, [double angle = 0]) {
       final ca = math.cos(angle), sa = math.sin(angle);
@@ -219,51 +219,12 @@ void _outletFace(MeshBuilder b, String kind, double x, bool ok) {
       b.quad(p(-w / 2, -h / 2), p(w / 2, -h / 2), p(w / 2, h / 2), p(-w / 2, h / 2), slotCol, normal: const V3(0, 0, 1));
     }
 
-    void round(double sx, double sy) => b.cyl(V3(x + sx * k, 14 + sy * k, 2.1), V3(x + sx * k, 14 + sy * k, 2.15), 0.065 * k, slotCol, sides: 12);
-    void ell(double sx, double sy) {
-      slot(sx, sy, 0.075, 0.3);
-      slot(sx + 0.09, sy - 0.115, 0.2, 0.075);
-    }
-
-    switch (layout) {
-      case 'nema1030':
-        ell(-0.05, 0.14);
-        slot(-0.3, -0.24, 0.075, 0.3, -0.5);
-        slot(0.3, -0.24, 0.075, 0.3, 0.5);
-      case 'nema1430':
-        ell(-0.05, 0.28);
-        slot(-0.4, -0.04, 0.075, 0.32);
-        slot(0.4, -0.04, 0.075, 0.32);
-        round(0, -0.4);
-      case 'nema1050':
-        slot(-0.3, 0.2, 0.075, 0.3, 0.5);
-        slot(0.3, 0.2, 0.075, 0.3, -0.5);
-        slot(0, -0.26, 0.075, 0.32);
-      case 'nema1450':
-        slot(0, 0.3, 0.075, 0.28);
-        slot(-0.4, -0.04, 0.075, 0.32);
-        slot(0.4, -0.04, 0.075, 0.32);
-        round(0, -0.4);
-      case 'nema620':
-        slot(0, 0.2, 0.32, 0.075);
-        slot(0, 0.0, 0.32, 0.075);
-        slot(0.15, -0.07, 0.075, 0.14);
-        round(0, -0.36);
-      case 'nematt30':
-        slot(-0.22, 0.1, 0.075, 0.3, 0.45);
-        slot(0.22, 0.1, 0.075, 0.3, -0.45);
-        round(0, -0.32);
-      case 'nemal1430':
-        for (var i = 0; i < 4; i++) {
-          final a = math.pi / 4 + i * math.pi / 2;
-          slot(math.cos(a) * 0.36, math.sin(a) * 0.36, 0.075, 0.22, a);
-        }
-        round(0, 0);
-      default:
-        slot(0.2, 0.12, 0.075, 0.3);
-        slot(-0.2, 0.12, 0.075, 0.3);
-        slot(-0.3, 0.12, 0.14, 0.075);
-        round(0, -0.3);
+    for (final s in nemaSlotsFor(layout)) {
+      if (s.round) {
+        b.cyl(V3(x + s.x * k, 14 + s.y * k, 2.1), V3(x + s.x * k, 14 + s.y * k, 2.15), s.w / 2 * k, slotCol, sides: 12);
+      } else {
+        slot(s.x, s.y, s.w, s.h, s.angle);
+      }
     }
     return;
   }
@@ -518,7 +479,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
     b.alpha = 0.55;
     final st = ok ? 2 : (i < 2 ? r.fixtureState(i) : 0);
     final kindOf = i < 2 ? r.outletKind(i) : (r.extras[i - 2].kind == 'gfci' ? 'gfci' : 'outlet');
-    final frameW = const {'range4': 17.5, 'range3': 17.5, 'dryer4': 17.5, 'dryer3': 17.5, 'washer': 17.5, 'v240four': 15.0, 'v240three': 15.0, 'v240only': 15.0, 'outlet20': 17.5, 'ev1450': 17.5, 'welder650': 17.5, 'rv30': 17.5, 'gen1430': 17.5}[kindOf] ?? 15.0;
+    final frameW = nemaLayoutOf(kindOf) != null && !kindOf.startsWith('v240') ? 17.5 : 15.0;
     b.box(V3(x, 14, 0.25), V3(frameW, frameW > 15 ? frameW + 3 : 19.0, 0.5), ok ? okRing : (st == 1 ? const Color(0xFFF59E0B) : badRing));
     b.alpha = 1;
     b.bias = 0;

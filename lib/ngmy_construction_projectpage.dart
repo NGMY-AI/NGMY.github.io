@@ -25,7 +25,7 @@ class _Item {
   final IconData icon;
 }
 
-const List<List<_Item>> _trays = [
+final List<List<_Item>> _trays = [
   [
     _Item('look', 'Look', Icons.search_rounded),
     _Item('wall', 'Wall box', Icons.crop_portrait_rounded),
@@ -69,6 +69,7 @@ const List<List<_Item>> _trays = [
     _Item('rv30', 'RV 30 amp (TT-30)', Icons.rv_hookup_rounded),
     _Item('welder650', 'Welder (6-50)', Icons.construction_rounded),
     _Item('gen1430', 'Generator (L14-30)', Icons.bolt_rounded),
+    for (final l in kChartOutletLessons) _Item(l.id, l.title, Icons.electrical_services_rounded),
     _Item('switch2p', 'Double-pole', Icons.toggle_on_rounded),
     _Item('switch3', '3-way switch', Icons.toggle_on_rounded),
     _Item('switch4', '4-way switch', Icons.toggle_on_rounded),
@@ -448,6 +449,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
       case 'rv30':
       case 'welder650':
       case 'gen1430':
+      case _ when kChartOutletKinds.contains(armed):
       case 'switch2p':
       case 'switch3':
       case 'switch4':

@@ -17,7 +17,7 @@ void main() {
   test('every new switch and outlet is a lesson with the right wiring, and only the right wiring is accepted', () {
     expect(kSwitchVariants.length, 5);
     // The five first variants and the ten more American outlets (AFCI, tamper-resistant, USB, 20 amp, outdoor, smart, EV, RV, welder, generator).
-    expect(kOutletVariants.length, 15);
+    expect(kOutletVariants.length, 15 + kChartOutletKinds.length);
     expect(kOutletVariants, containsAll(kMoreOutletKinds));
     for (final id in newOnes) {
       final l = electricalLesson(id);
@@ -40,7 +40,8 @@ void main() {
         ..power = false
         ..practice = true;
       final entries = l.solution.entries.toList();
-      if (entries.length >= 2) {
+      // (An outlet with only two hots, the L2-20, has nothing of another kind to swap: either hot on either screw is right.)
+      if (entries.length >= 2 && l.chips.map((c) => c.role).toSet().length > 1) {
         // Swap the first wire with a wire of another kind (the ground, or the neutral where there is no ground).
         final a = entries.first;
         final other = entries.firstWhere((e) => l.chips.firstWhere((c) => c.key == e.value).role != l.chips.firstWhere((c) => c.key == a.value).role, orElse: () => entries.last);
@@ -105,7 +106,7 @@ void main() {
 
   test('a job can ask for any of them: devices are picked, installed in the right place and wired by the lesson', () {
     final seen = <String>{};
-    for (var seed = 1; seed <= 300; seed++) {
+    for (var seed = 1; seed <= 900; seed++) {
       final p = RoomProject(seed: seed, kind: 0, variants: true)..fastForward()..completeWiring();
       for (final o in p.orders) {
         seen.add(o.device);
