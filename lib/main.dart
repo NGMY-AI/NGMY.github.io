@@ -17708,12 +17708,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       if (before > total) total = before;
     }
     if (contributed) {
-      // Never the ask again. Instead, once a day, a thank-you with the amount.
+      // Never the ask again. Instead a thank-you with the amount: once before noon and once after noon, while the campaign goes on.
       try {
         await prefs?.setString(doneKey, '$campaignKey\u0001$total');
       } catch (_) {}
       if (!mounted || !ngmyShouldAllowGlobalInterrupt() || _contributionPopupOpen) return;
-      final today = ngmyTodayKey();
+      final today = ngmyHalfDayKey();
       if ((prefs?.getString(thanksKey) ?? '') == '$campaignKey\u0001$today') return;
       _contributionPopupOpen = true;
       try {

@@ -255,4 +255,42 @@ void main() {
     expect(seen, {'cheap', 'good'}, reason: 'either of the other two can turn off');
     expect(ngmyIronTrianglePickDrop({'fast'}), 'fast');
   });
+
+  testWidgets('a button drawn with Ink inside a light frame shows (not hidden behind the white card)', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(300, 200));
+    final key = GlobalKey();
+    await tester.pumpWidget(MaterialApp(
+      theme: ThemeData(brightness: Brightness.light),
+      home: Scaffold(
+        body: Center(
+          child: RepaintBoundary(
+            key: key,
+            child: SizedBox(
+              width: 240,
+              height: 100,
+              child: NgmyToolkitAliveSection(
+                colors: const [Color(0xFF2563EB), Color(0xFF1D4ED8)],
+                pulse: 0,
+                scan: 0,
+                orbit: 0,
+                padding: EdgeInsets.zero,
+                onTap: () {},
+                child: Ink(color: const Color(0xFF2563EB), child: const SizedBox.expand()),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ));
+    await tester.pump();
+    final ro = key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+    late ByteData bytes;
+    await tester.runAsync(() async {
+      final img = await ro.toImage();
+      bytes = (await img.toByteData(format: ui.ImageByteFormat.rawRgba))!;
+    });
+    final i = (50 * 240 + 120) * 4; // the middle
+    final r = bytes.getUint8(i), g = bytes.getUint8(i + 1), b = bytes.getUint8(i + 2);
+    expect(b > 180 && r < 90 && g < 140, isTrue, reason: 'the middle is blue (the button), not white: rgb($r,$g,$b)');
+  });
 }

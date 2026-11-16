@@ -133,4 +133,16 @@ void main() {
     expect(find.byKey(const Key('contribution-popup')), findsNothing);
     expect(opened, 1);
   });
+
+  test('the thank-you can show twice a day: once before noon, once after noon', () {
+    final morning = ngmyHalfDayKey(DateTime(2026, 11, 16, 9, 30));
+    final lateMorning = ngmyHalfDayKey(DateTime(2026, 11, 16, 11, 59));
+    final afternoon = ngmyHalfDayKey(DateTime(2026, 11, 16, 12, 0));
+    final night = ngmyHalfDayKey(DateTime(2026, 11, 16, 23, 0));
+    final nextMorning = ngmyHalfDayKey(DateTime(2026, 11, 17, 8, 0));
+    expect(morning, lateMorning, reason: 'only once before noon');
+    expect(afternoon, night, reason: 'only once after noon');
+    expect(morning, isNot(afternoon));
+    expect(nextMorning, isNot(morning));
+  });
 }

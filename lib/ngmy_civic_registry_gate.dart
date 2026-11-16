@@ -1102,27 +1102,30 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
     final backIconColor = isDark ? Colors.white70 : Colors.black87;
     final progress = (_step + 1) / 4.0;
 
+    // The back button and the flag sit just below the clock (like the other pages), never up in the clock row.
+    final topInset = MediaQuery.paddingOf(context).top;
     return Scaffold(
       backgroundColor: pageBg,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: backIconColor,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: backIconColor),
-          onPressed: _busy ? null : _goBackStep,
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 14),
-            child: Center(
-              child: Container(
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(topInset + 60),
+        child: Padding(
+          key: const Key('civic-gate-top-bar'),
+          padding: EdgeInsets.fromLTRB(6, topInset + 8, 14, 0),
+          child: Row(
+            children: [
+              IconButton(
+                key: const Key('civic-gate-back'),
+                icon: Icon(Icons.arrow_back_ios_new_rounded, color: backIconColor),
+                onPressed: _busy ? null : _goBackStep,
+              ),
+              const Spacer(),
+              Container(
                 decoration: BoxDecoration(color: _redTop, borderRadius: BorderRadius.circular(14)),
                 child: const NgmyLangFlag(),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
       body: Align(
         alignment: const Alignment(0, -0.14),

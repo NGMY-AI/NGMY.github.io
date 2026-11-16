@@ -446,7 +446,11 @@ class NgmyHudTechFrame extends StatelessWidget {
                 : NgmyCalmLight.cardDecoration(radius: borderRadius),
             // Whatever is inside keeps to the round corners (no square corners at the bottom).
             clipBehavior: Clip.antiAlias,
-            child: calmTone != null ? NgmyCalmToneScope(tone: calmTone!, child: child) : child,
+            // Its own drawing surface, so buttons drawn with Ink inside show on top of the white card (not hidden behind it).
+            child: Material(
+              type: MaterialType.transparency,
+              child: calmTone != null ? NgmyCalmToneScope(tone: calmTone!, child: child) : child,
+            ),
           );
         },
       );
@@ -765,7 +769,7 @@ class NgmyToolkitGlassPillFrame extends StatelessWidget {
                 border: Border.all(color: NgmyCalmLight.border, width: NgmyCalmLight.borderWidth),
               )
             : NgmyCalmLight.cardDecoration(radius: borderRadius),
-        child: child,
+        child: Material(type: MaterialType.transparency, child: child),
       );
     }
     final dark = NgmyHudInk.isDark(context);
@@ -999,7 +1003,7 @@ class NgmyToolkitAlivePanel extends StatelessWidget {
         constraints: maxHeight == null ? null : BoxConstraints(maxHeight: maxHeight!),
         decoration: NgmyCalmLight.cardDecoration(radius: borderRadius),
         clipBehavior: Clip.antiAlias,
-        child: child,
+        child: Material(type: MaterialType.transparency, child: child),
       );
     }
     return Container(

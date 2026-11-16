@@ -92,3 +92,10 @@ String ngmyTodayKey([DateTime? now]) {
   final d = (now ?? DateTime.now()).toLocal();
   return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 }
+
+/// Half of today as a key, for the thank-you pop-up: it may show once before noon and once after noon (twice a day),
+/// for as long as the campaign is going.
+String ngmyHalfDayKey([DateTime? now]) {
+  final d = (now ?? DateTime.now()).toLocal();
+  return '${ngmyTodayKey(d)}-${d.hour < 12 ? 'am' : 'pm'}';
+}
