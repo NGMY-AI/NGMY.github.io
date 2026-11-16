@@ -19,10 +19,11 @@ import 'package:ngmy/ngmy_hud_tech_shell.dart';
 // Light mode is calm: plain white cards, icon tiles, nothing glowing or moving.
 // NGMY Advisors keep their own look (NgmyHudKeepLook). Dark mode is unchanged.
 
-/// Real letters (always, so sizes match the phone) and icons (when pictures are asked for).
+/// Real letters and icons only when pictures are asked for (NGMY_SNAP_DIR). The checks run on the plain test
+/// font, which measures the same on every computer (the real font made one check fail on the build server).
 bool _fontsLoaded = false;
 Future<void> _loadFonts() async {
-  if (_fontsLoaded) return;
+  if (_fontsLoaded || Platform.environment['NGMY_SNAP_DIR'] == null) return;
   _fontsLoaded = true;
   Future<void> load(String family, List<String> files) async {
     final l = FontLoader(family);
