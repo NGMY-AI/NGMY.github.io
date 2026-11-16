@@ -102,6 +102,125 @@ class NgmyCalmLight {
       ],
     );
   }
+
+  /// The four colours of a colourful frame for [accent]: bright rim, rim end, inside top, inside bottom.
+  static List<Color> framePalette(Color accent, {required bool strong}) {
+    final hsl = HSLColor.fromColor(accent);
+    Color at(double l, double s) => hsl.withLightness(l).withSaturation(s).toColor();
+    final s = hsl.saturation.clamp(0.65, 0.92);
+    final rimA = at(0.52, s);
+    final rimB = at(0.44, s);
+    if (strong) return [rimA, rimB, at(0.44, s), at(0.30, s)];
+    return [rimA, rimB, Color.lerp(Colors.white, accent, 0.10)!, Color.lerp(Colors.white, accent, 0.24)!];
+  }
+}
+
+/// The colourful frame (the owner's reference look): a thick bright rim, a gradient inside with soft
+/// waves and glowing dots (still, nothing moves), round corners, and a soft coloured shadow under it.
+/// [strong] fills the inside with rich colour (white words go on it); otherwise the inside is a light
+/// wash of the colour so dark words stay easy to read.
+class NgmyCalmColourFrame extends StatelessWidget {
+  const NgmyCalmColourFrame({
+    super.key,
+    required this.accent,
+    required this.child,
+    this.strong = false,
+    this.radius = 26,
+    this.rim = 7,
+    this.padding = EdgeInsets.zero,
+    this.onTap,
+  });
+
+  final Color accent;
+  final Widget child;
+  final bool strong;
+  final double radius;
+  final double rim;
+  final EdgeInsetsGeometry padding;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = NgmyCalmLight.framePalette(accent, strong: strong);
+    final inner = radius - rim < 6 ? 6.0 : radius - rim;
+    Widget frame = LayoutBuilder(
+      builder: (context, constraints) {
+        final fillH = constraints.hasBoundedHeight && constraints.maxHeight.isFinite;
+        return Container(
+          key: const Key('ngmy-calm-colour-frame'),
+          width: double.infinity,
+          height: fillH ? constraints.maxHeight : null,
+          padding: EdgeInsets.all(rim),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(radius),
+            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [p[0], p[1]]),
+            boxShadow: [
+              BoxShadow(color: p[1].withValues(alpha: 0.30), blurRadius: 26, offset: const Offset(0, 10)),
+              const BoxShadow(color: Color(0x0D0F172A), blurRadius: 4, offset: Offset(0, 1)),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(inner),
+            child: CustomPaint(
+              painter: _NgmyCalmWavesPainter(top: p[2], bottom: p[3], strong: strong),
+              child: Padding(padding: padding, child: child),
+            ),
+          ),
+        );
+      },
+    );
+    if (onTap == null) return frame;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(radius), child: frame),
+    );
+  }
+}
+
+class _NgmyCalmWavesPainter extends CustomPainter {
+  _NgmyCalmWavesPainter({required this.top, required this.bottom, required this.strong});
+
+  final Color top;
+  final Color bottom;
+  final bool strong;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = Offset.zero & size;
+    canvas.drawRect(r, Paint()..shader = LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [top, bottom]).createShader(r));
+    final w = size.width, h = size.height;
+    final light = Colors.white.withValues(alpha: strong ? 0.13 : 0.45);
+    // Two soft waves across the lower half.
+    final wave1 = Path()
+      ..moveTo(0, h * 0.55)
+      ..cubicTo(w * 0.30, h * 0.30, w * 0.55, h * 0.85, w, h * 0.50)
+      ..lineTo(w, h)
+      ..lineTo(0, h)
+      ..close();
+    canvas.drawPath(wave1, Paint()..color = light);
+    final wave2 = Path()
+      ..moveTo(0, h * 0.80)
+      ..cubicTo(w * 0.35, h * 0.62, w * 0.65, h * 1.02, w, h * 0.74)
+      ..lineTo(w, h)
+      ..lineTo(0, h)
+      ..close();
+    canvas.drawPath(wave2, Paint()..color = (strong ? Colors.black : bottom).withValues(alpha: strong ? 0.10 : 0.35));
+    // A few soft glowing dots.
+    for (final d in const [(0.18, 0.18, 0.06), (0.80, 0.22, 0.045), (0.62, 0.12, 0.03), (0.30, 0.70, 0.035)]) {
+      final c = Offset(w * d.$1, h * d.$2);
+      final rad = size.shortestSide * d.$3 * 2.2;
+      canvas.drawCircle(
+        c,
+        rad,
+        Paint()
+          ..shader = RadialGradient(colors: [Colors.white.withValues(alpha: strong ? 0.40 : 0.70), Colors.white.withValues(alpha: 0)])
+              .createShader(Rect.fromCircle(center: c, radius: rad)),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _NgmyCalmWavesPainter old) => old.top != top || old.bottom != bottom || old.strong != strong;
 }
 
 /// A rounded tile with the icon in the accent colour, used instead of the glowing orb in calm light.
@@ -261,6 +380,17 @@ class NgmyHudTechFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (NgmyHudInk.calm(context) && onTap != null) {
+      // Tappable tiles get the colourful frame (light inside so dark words stay readable).
+      return NgmyCalmColourFrame(
+        accent: colors.first,
+        radius: borderRadius < 22 ? 24 : borderRadius + 4,
+        rim: 6,
+        padding: padding,
+        onTap: onTap,
+        child: child,
+      );
+    }
     if (NgmyHudInk.calm(context)) {
       final card = LayoutBuilder(
         builder: (context, constraints) {

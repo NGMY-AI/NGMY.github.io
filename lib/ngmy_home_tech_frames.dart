@@ -370,19 +370,16 @@ class _TechFrameCard extends StatelessWidget {
               sub,
             ],
           );
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
+    return SizedBox.expand(
+      child: NgmyCalmColourFrame(
         key: Key('home-tech-calm-${spec.kind.name}'),
+        accent: accent,
+        strong: true,
+        radius: 26,
+        rim: 6,
+        padding: EdgeInsets.fromLTRB(12, wide ? 6 : 10, wide ? 6 : 12, wide ? 6 : 10),
         onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
-        child: Ink(
-          width: double.infinity,
-          height: double.infinity,
-          padding: EdgeInsets.fromLTRB(16, wide ? 12 : 16, wide ? 10 : 16, wide ? 12 : 16),
-          decoration: NgmyCalmLight.colourCardDecoration(accent, radius: 24),
-          child: body,
-        ),
+        child: body,
       ),
     );
   }

@@ -157,6 +157,106 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
     );
   }
 
+  /// Light mode (the owner's reference picture): the name with a round colour icon above, then a thick
+  /// bright colour frame with rich colour, soft waves and glowing dots inside, the light sample card in
+  /// the middle, and a round shiny play button. Still, no dark fade.
+  Widget _lightToolFrame({
+    required String title,
+    required Color accent,
+    required double height,
+    required Widget preview,
+    required VoidCallback onTap,
+    String? badge,
+  }) {
+    final icon = title.contains('Menu')
+        ? Icons.restaurant_rounded
+        : title.contains('Essentials')
+            ? Icons.business_center_rounded
+            : Icons.brush_rounded;
+    final p = NgmyCalmLight.framePalette(accent, strong: true);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 10),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [p[0], p[3]]),
+                  boxShadow: [BoxShadow(color: p[1].withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4))],
+                ),
+                child: Icon(icon, color: Colors.white, size: 21),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: NgmyCalmLight.ink, fontWeight: FontWeight.w900, fontSize: 22, letterSpacing: 0.1),
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: height,
+          child: NgmyCalmColourFrame(
+            key: Key('toolhub-frame-$title'),
+            accent: accent,
+            strong: true,
+            radius: 30,
+            rim: 10,
+            onTap: onTap,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Padding(padding: const EdgeInsets.only(top: 10), child: preview),
+                Positioned(
+                  right: 12,
+                  bottom: 12,
+                  child: Container(
+                    width: 58,
+                    height: 58,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        center: const Alignment(-0.3, -0.4),
+                        colors: [Color.lerp(p[0], Colors.white, 0.45)!, p[0], p[3]],
+                        stops: const [0, 0.45, 1],
+                      ),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.85), width: 2.5),
+                      boxShadow: [BoxShadow(color: p[3].withValues(alpha: 0.45), blurRadius: 12, offset: const Offset(0, 5))],
+                    ),
+                    child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 34),
+                  ),
+                ),
+                if (badge != null)
+                  Positioned(
+                    top: 10,
+                    left: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(999),
+                        color: Colors.white.withValues(alpha: 0.12),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.85), width: 1.4),
+                      ),
+                      child: Text(badge, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _hudFrame({
     required NgmyHubTheme t,
     required String title,
@@ -172,6 +272,9 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
     String? badge,
     String? frameCenterLabel,
   }) {
+    if (!t.isDark) {
+      return _lightToolFrame(title: title, accent: colors.first, height: thumbHeight, preview: preview, onTap: onTap, badge: badge);
+    }
     final hasTitle = title.trim().isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -190,8 +293,6 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
               fit: StackFit.expand,
               children: [
                 preview,
-                // Dark fade at the bottom: dark mode only. Light mode stays all white.
-                if (t.isDark)
                 Positioned(
                   left: 0,
                   right: 0,
@@ -256,15 +357,15 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
                       ),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(999),
-                        color: t.isDark ? Colors.black.withValues(alpha: 0.45) : NgmyCalmLight.accentInk(colors.first),
-                        border: t.isDark
-                            ? Border.all(color: colors.first.withValues(alpha: 0.7))
-                            : null,
+                        color: Colors.black.withValues(alpha: 0.45),
+                        border: Border.all(
+                          color: colors.first.withValues(alpha: 0.7),
+                        ),
                       ),
                       child: Text(
                         badge,
                         style: TextStyle(
-                          color: t.isDark ? colors.first : Colors.white,
+                          color: colors.first,
                           fontWeight: FontWeight.w900,
                           fontSize: 11,
                           letterSpacing: 0.4,
@@ -322,33 +423,29 @@ class _BusinessCardThumbPreview extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
               colors: isDark
                   ? const [Color(0xFF0A0A0A), Color(0xFF171717)]
-                  // Light mode: a strong deep green card.
-                  : const [Color(0xFF16A34A), Color(0xFF065F46)],
+                  : const [Color(0xFFF8FAFC), Color(0xFFE2E8F0)],
             ),
             border: Border.all(
-              color: const Color(0xFFD4AF37).withValues(alpha: isDark ? 0.6 : 0.9),
-              width: isDark ? 1 : 1.4,
+              color: const Color(0xFFD4AF37).withValues(alpha: 0.6),
             ),
             boxShadow: [
               BoxShadow(
-                color: (isDark ? accent : const Color(0xFF065F46)).withValues(alpha: isDark ? 0.25 : 0.35),
-                blurRadius: 22,
-                offset: const Offset(0, 10),
+                color: accent.withValues(alpha: 0.25),
+                blurRadius: 24,
+                offset: const Offset(0, 12),
               ),
             ],
           ),
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'KB PABLO QR',
                 style: TextStyle(
-                  color: isDark ? const Color(0xFFD4AF37) : Colors.white,
+                  color: isDark ? const Color(0xFFD4AF37) : const Color(0xFF92400E),
                   fontWeight: FontWeight.w800,
                   fontSize: 12,
                   letterSpacing: 1.6,
@@ -358,13 +455,13 @@ class _BusinessCardThumbPreview extends StatelessWidget {
               Container(
                 height: 2,
                 width: 40,
-                color: const Color(0xFFD4AF37),
+                color: isDark ? const Color(0xFFD4AF37) : const Color(0xFFB45309),
               ),
               const SizedBox(height: 6),
               Text(
                 'Business Card Studio',
                 style: TextStyle(
-                  color: isDark ? Colors.white.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.92),
+                  color: isDark ? Colors.white.withValues(alpha: 0.5) : const Color(0xFF0F172A),
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                 ),
@@ -395,36 +492,33 @@ class _MenuStudioThumbPreview extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
               colors: isDark
                   ? const [Color(0xFF1A1410), Color(0xFF0A0A0A)]
-                  // Light mode: real gold.
-                  : const [Color(0xFFF3D27A), Color(0xFFD4A62A), Color(0xFFA67C00)],
+                  : const [Color(0xFFFFF8E7), Color(0xFFFEF3C7)],
             ),
-            border: Border.all(color: isDark ? accent.withValues(alpha: 0.65) : const Color(0xFFFFE9A8), width: isDark ? 1 : 1.4),
+            border: Border.all(color: accent.withValues(alpha: 0.65)),
             boxShadow: [
               BoxShadow(
-                color: (isDark ? accent : const Color(0xFFA67C00)).withValues(alpha: isDark ? 0.3 : 0.35),
-                blurRadius: 22,
-                offset: const Offset(0, 10),
+                color: accent.withValues(alpha: 0.3),
+                blurRadius: 24,
+                offset: const Offset(0, 12),
               ),
             ],
           ),
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(
                 Icons.restaurant_menu_rounded,
-                color: isDark ? accent : const Color(0xFF3B2A06),
+                color: isDark ? accent : const Color(0xFF92400E),
                 size: 22,
               ),
               const SizedBox(height: 8),
               Text(
                 'YOUR MENU',
                 style: TextStyle(
-                  color: isDark ? accent : const Color(0xFF3B2A06),
+                  color: isDark ? accent : const Color(0xFF78350F),
                   fontWeight: FontWeight.w900,
                   fontSize: 13,
                   letterSpacing: 1.2,
@@ -434,7 +528,7 @@ class _MenuStudioThumbPreview extends StatelessWidget {
               Text(
                 'Burgers · Drinks · QR',
                 style: TextStyle(
-                  color: isDark ? Colors.white54 : const Color(0xFF3B2A06),
+                  color: isDark ? Colors.white54 : const Color(0xFF0F172A),
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                 ),
@@ -473,26 +567,25 @@ class _EssentialsThumbPreview extends StatelessWidget {
                       Color(0xFF0E7490),
                       Color(0xFF1E3A8A),
                     ]
-                  // Light mode: a strong blue card.
                   : const [
-                      Color(0xFF38BDF8),
-                      Color(0xFF2563EB),
-                      Color(0xFF1E40AF),
+                      Color(0xFFF0F9FF),
+                      Color(0xFFE0F2FE),
+                      Color(0xFFBAE6FD),
                     ],
             ),
             border: Border.all(
-              color: isDark ? accent.withValues(alpha: 0.65) : const Color(0xFFBFDBFE),
+              color: accent.withValues(alpha: 0.65),
               width: 1.3,
             ),
             boxShadow: [
               BoxShadow(
-                color: (isDark ? accent : const Color(0xFF1E40AF)).withValues(alpha: 0.3),
+                color: accent.withValues(alpha: 0.3),
                 blurRadius: 24,
                 offset: const Offset(0, 12),
               ),
             ],
           ),
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -503,15 +596,13 @@ class _EssentialsThumbPreview extends StatelessWidget {
                     height: 28,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(8),
-                      // Light mode: a white tile with a blue icon on the blue card.
-                      color: isDark ? null : Colors.white,
-                      gradient: isDark
-                          ? const LinearGradient(colors: [Color(0xFF38BDF8), Color(0xFF0EA5E9)])
-                          : null,
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF38BDF8), Color(0xFF0EA5E9)],
+                      ),
                     ),
-                    child: Icon(
+                    child: const Icon(
                       Icons.business_center_rounded,
-                      color: isDark ? Colors.white : const Color(0xFF2563EB),
+                      color: Colors.white,
                       size: 16,
                     ),
                   ),
@@ -527,7 +618,7 @@ class _EssentialsThumbPreview extends StatelessWidget {
               Text(
                 'ESSENTIALS',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: isDark ? Colors.white : const Color(0xFF0C4A6E),
                   fontWeight: FontWeight.w900,
                   fontSize: 13,
                   letterSpacing: 1.3,
@@ -537,7 +628,7 @@ class _EssentialsThumbPreview extends StatelessWidget {
               Text(
                 'Notes · Contacts · Tools',
                 style: TextStyle(
-                  color: isDark ? Colors.white54 : Colors.white.withValues(alpha: 0.92),
+                  color: isDark ? Colors.white54 : const Color(0xFF0F172A),
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                 ),

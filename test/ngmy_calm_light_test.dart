@@ -10,6 +10,7 @@ import 'package:ngmy/ngmy_bottom_nav_frame.dart';
 import 'package:ngmy/ngmy_core_protocol_sims.dart';
 import 'package:ngmy/ngmy_studio_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ngmy/ngmy_deferred.dart';
 import 'package:ngmy/ngmy_home_tech_frames.dart';
 import 'package:ngmy/ngmy_market_hub_screen.dart';
 import 'package:ngmy/ngmy_hub_form_ui.dart';
@@ -128,7 +129,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(420, 1400));
     await tester.pumpWidget(_app(Brightness.light, _hubGrid()));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.byKey(const Key('ngmy-calm-card')), findsNWidgets(4));
+    expect(find.byKey(const Key('ngmy-calm-colour-frame')), findsNWidgets(8), reason: 'four hub tiles and four home frames get the colourful frame');
     expect(find.byKey(const Key('ngmy-calm-pill')), findsOneWidget);
     expect(find.byKey(const Key('ngmy-calm-icon')), findsWidgets);
     expect(find.byKey(const Key('home-tech-calm-neural')), findsOneWidget);
@@ -205,8 +206,20 @@ void main() {
         w.decoration is BoxDecoration &&
         ((w.decoration as BoxDecoration).gradient?.colors.any((c) => c.r < 0.05 && c.g < 0.05 && c.b < 0.05 && c.a > 0.5) ?? false));
     expect(fades, findsNothing);
+    expect(find.byKey(const Key('ngmy-calm-colour-frame')), findsNWidgets(3));
     await _snap(tester, 'toolhub_light');
     await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 2));
+  });
+
+  testWidgets('a page that is still loading is light in light mode (not dark)', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: ThemeData(brightness: Brightness.light),
+      home: NgmyDeferred(load: () => Future<void>.delayed(const Duration(seconds: 1)), build: () => const SizedBox()),
+    ));
+    await tester.pump(const Duration(milliseconds: 50));
+    final s = tester.widget<Scaffold>(find.byType(Scaffold).first);
+    expect(s.backgroundColor!.computeLuminance(), greaterThan(0.85));
     await tester.pump(const Duration(seconds: 2));
   });
 }
