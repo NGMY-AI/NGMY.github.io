@@ -17700,6 +17700,15 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     } catch (_) {}
     var total = ngmyMemberCampaignTotal(config, u, all, state);
     var contributed = total > 0 || ngmyMemberContributedToCampaign(config, u, all, state);
+    // The registrar's mark on the member's own registry record ("gave this much to this campaign") counts too, even when the money
+    // records have not reached this phone yet.
+    for (final rec in ngmyRegistryRecordsForAccount(config, u)) {
+      final stamped = ngmyRecordStampedContribution(rec, campaignKey);
+      if (stamped > 0) {
+        contributed = true;
+        if (stamped > total) total = stamped;
+      }
+    }
     final remembered = prefs?.getString(doneKey) ?? '';
     final rememberedParts = remembered.split('\u0001');
     if (rememberedParts.length >= 2 && rememberedParts[0] == campaignKey) {
@@ -29519,6 +29528,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             'scopeValue': widget.config.helpScopeValueFor(receiptState),
           };
           if (campaignId.isNotEmpty) payload['campaignId'] = campaignId;
+          // The member's own app login (when their registry record is linked to another email), so their phone recognises this.
+          if (member != null) {
+            var appEmail = NgmyCivicRegistryMembers.emailKey((member['linkedAppEmail'] ?? '').toString());
+            if (appEmail.isEmpty) {
+              try {
+                appEmail = NgmyCivicRegistryMembers.emailKey(NgmyCivicRegistryMembers.findLinkableAppEmail(widget.allUsers, member) ?? '');
+              } catch (_) {}
+            }
+            if (appEmail.isNotEmpty) payload['appEmail'] = appEmail;
+          }
           widget.onAddTransaction(
             AppTransaction(
               id: 'civic_scan_${registryId}_${now.millisecondsSinceEpoch}',
@@ -29531,6 +29550,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
               timestamp: now,
             ),
           );
+          // Mark the member's own registry record as contributed to this campaign (it reaches the member's phone with the member list),
+          // so they get the thank-you, never the ask again.
+          if (campaignId.isNotEmpty && member != null) {
+            ngmyStampMemberContribution(
+              widget.config,
+              email: memberEmail,
+              registryId: registryId,
+              campaignId: campaignId,
+              total: ngmyRecordStampedContribution(member, campaignId) + amount,
+            );
+            unawaited(ngmyPersistCivicRegistryMembers(widget.config, state: receiptState));
+          }
         }
         widget.onDataChanged();
       },
@@ -44175,6 +44206,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                                         ? u.username.trim()
                                         : ''),
                                 'registryId': memberRid,
+                                // The member's own app login, when their registry record is linked to a different email, so their phone
+                                // recognises this contribution (no ask pop-up, only the thank-you).
+                                'appEmail': _linkedAppEmailForMember(u),
                               });
                               // Re-read: the background refresh may have brought in money another
                               // registrar recorded for this member after the pop-up opened.
@@ -44206,6 +44240,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                                 timestamp: isUpdate ? latest.timestamp : now,
                               );
                               widget.onAddTransaction(tx);
+                              // Mark the member's own registry record as contributed to this campaign (saved with the member list
+                              // below), so their phone shows the thank-you and never the ask again, even before the money records arrive.
+                              ngmyStampMemberContribution(
+                                widget.config,
+                                email: memberEmail.isNotEmpty ? memberEmail : u.email,
+                                registryId: memberRid,
+                                campaignId: campaignId,
+                                total: tx.amount,
+                              );
                               // Keep civic money list in sync instantly so Remove /
                               // deactivate / receipts see this contribution immediately
                               // (do not wait on a cloud round-trip).
@@ -44710,6 +44753,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
       }
     }
     return null;
+  }
+
+  /// The app login linked to this member's registry record (set when the ID card was granted, or the app account with the same
+  /// email or phone). Written into each contribution so the member's own phone recognises it.
+  String _linkedAppEmailForMember(UserData u) {
+    final raw = _civicMemberOrDeceasedRaw(widget.config, u);
+    if (raw == null) return '';
+    final linked = NgmyCivicRegistryMembers.emailKey((raw['linkedAppEmail'] ?? '').toString());
+    if (linked.isNotEmpty) return linked;
+    try {
+      return NgmyCivicRegistryMembers.emailKey(NgmyCivicRegistryMembers.findLinkableAppEmail(widget.allUsers, raw) ?? '');
+    } catch (_) {
+      return '';
+    }
   }
 
   bool _contributionBelongsToMember(AppTransaction t, UserData u) {

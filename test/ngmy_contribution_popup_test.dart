@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/main.dart';
 import 'package:ngmy/ngmy_contribution_popup.dart';
 import 'package:ngmy/ngmy_contribution_popup_logic.dart';
+import 'package:ngmy/ngmy_civic_registry_members.dart';
 
 AppTransaction _gift(String email, String campaignId, {String id = 'c1'}) => AppTransaction(
       id: id,
@@ -144,5 +145,81 @@ void main() {
     expect(afternoon, night, reason: 'only once after noon');
     expect(morning, isNot(afternoon));
     expect(nextMorning, isNot(morning));
+  });
+
+  group('a member marked as contributed never gets the ask, however their app account is linked to the registry', () {
+    Map<String, dynamic> record({required String email, required String rid, String phone = '5550001111'}) =>
+        NgmyCivicRegistryMembers.buildRecord(
+          email: email,
+          fullName: 'Asende Mkombi',
+          dob: '01/02/1990',
+          idType: 'DL',
+          homeAddress: '1 Main',
+          phone: phone,
+          city: 'Atlanta',
+          room: '',
+          state: 'Georgia',
+          registryId: rid,
+        );
+    AppTransaction byRegistrar(String recordEmail, String campaignId, {String rid = 'GA77', String appEmail = ''}) => AppTransaction(
+          id: 'contrib_${recordEmail}_$campaignId',
+          userEmail: recordEmail,
+          amount: 25,
+          type: TransactionType.contribution,
+          method: PaymentMethod.system,
+          status: TransactionStatus.approved,
+          timestamp: DateTime.now(),
+          sourceDetails: jsonEncode({
+            'campaignId': campaignId,
+            'state': 'Georgia',
+            'memberEmail': recordEmail,
+            'registryId': rid,
+            if (appEmail.isNotEmpty) 'appEmail': appEmail,
+          }),
+        );
+
+    test('registry record under another email, linked to the login (linked app email)', () {
+      final config = campaign();
+      final id = config.helpCampaignIdFor('Georgia');
+      NgmyCivicRegistryMembers.upsert(config, {...record(email: 'asende.family@x.com', rid: 'GA77'), 'linkedAppEmail': 'asende@login.com'});
+      final u = UserData(email: 'asende@login.com')..state = 'Georgia';
+      expect(ngmyMemberContributedToCampaign(config, u, [byRegistrar('asende.family@x.com', id)], 'Georgia'), isTrue);
+      expect(ngmyMemberCampaignTotal(config, u, [byRegistrar('asende.family@x.com', id)], 'Georgia'), 25);
+    });
+
+    test('registry record under another email, linked by a granted ID card with the same phone', () {
+      final config = campaign();
+      final id = config.helpCampaignIdFor('Georgia');
+      NgmyCivicRegistryMembers.upsert(config, {...record(email: 'asende.family@x.com', rid: 'GA77', phone: '4785550000'), 'passportGranted': true});
+      final u = UserData(email: 'asende@login.com', phone: '478-555-0000')..state = 'Georgia';
+      expect(ngmyMemberContributedToCampaign(config, u, [byRegistrar('asende.family@x.com', id)], 'Georgia'), isTrue);
+    });
+
+    test('the registrar wrote the member login into the record (no registry list on this phone)', () {
+      final config = campaign();
+      final id = config.helpCampaignIdFor('Georgia');
+      final u = UserData(email: 'asende@login.com')..state = 'Georgia';
+      expect(ngmyMemberContributedToCampaign(config, u, [byRegistrar('asende.family@x.com', id, appEmail: 'asende@login.com')], 'Georgia'), isTrue);
+    });
+
+    test('the mark on the member record counts even before the money records arrive', () {
+      final config = campaign();
+      final id = config.helpCampaignIdFor('Georgia');
+      NgmyCivicRegistryMembers.upsert(config, record(email: 'asende@login.com', rid: 'GA77'));
+      ngmyStampMemberContribution(config, email: 'asende@login.com', registryId: 'GA77', campaignId: id, total: 40);
+      final u = UserData(email: 'asende@login.com')..state = 'Georgia';
+      final recs = ngmyRegistryRecordsForAccount(config, u);
+      expect(recs, isNotEmpty);
+      expect(recs.map((r) => ngmyRecordStampedContribution(r, id)).reduce((a, b) => a > b ? a : b), 40);
+      expect(ngmyRecordStampedContribution(recs.first, 'help_other_campaign'), 0, reason: 'another campaign is not marked');
+    });
+
+    test('someone else is still asked', () {
+      final config = campaign();
+      final id = config.helpCampaignIdFor('Georgia');
+      NgmyCivicRegistryMembers.upsert(config, {...record(email: 'asende.family@x.com', rid: 'GA77'), 'linkedAppEmail': 'asende@login.com'});
+      final other = UserData(email: 'mary@x.com')..state = 'Georgia';
+      expect(ngmyMemberContributedToCampaign(config, other, [byRegistrar('asende.family@x.com', id)], 'Georgia'), isFalse);
+    });
   });
 }
