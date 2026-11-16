@@ -1174,3 +1174,6 @@ class _AiOrbPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _AiOrbPainter old) => old.t != t;
 }
+
+/// Loads the Construction Lab code in the background so it opens at once (see ngmyWarmDeferred).
+Future<void> ngmyElectronicsLabWarm() => construction.loadLibrary();

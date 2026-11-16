@@ -19103,9 +19103,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _homeMountedAt = DateTime.now();
-    // Growth Income is opened often: fetch its code in the background so the first tap is instant.
+    // Every menu that is its own download is loaded in the background a moment after the home screen opens, one
+    // after another, so no menu shows a loading circle the first time it is opened after the app starts.
+    // Growth Income first (opened most), then the rest.
     Future<void>.delayed(const Duration(seconds: 3), () {
-      if (mounted) unawaited(growthui.loadLibrary().catchError((_) {}));
+      if (mounted) unawaited(ngmyWarmDeferred(ngmyAppWarmList()));
     });
     _smokeCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 10));
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -60775,3 +60777,25 @@ class _NicknameAdminPanelState extends State<_NicknameAdminPanel> {
     );
   }
 }
+
+/// Every part of the app that is its own download, in the order they are loaded in the background after the home
+/// screen opens (the most used first). A new deferred menu must be added here too, or it shows a loading circle.
+List<Future<void> Function()> ngmyAppWarmList() => [
+      growthui.loadLibrary,
+      ...ngmyHomeTechFramesWarm(),
+      ...ngmyHomeGlassCardsWarm(),
+      ...ngmyStudioHubWarm(),
+      markethub.loadLibrary,
+      helpcenter.loadLibrary,
+      lightning.loadLibrary,
+      walletui.loadLibrary,
+      ...ngmyCivicStateWalletWarm(),
+      menustudio.loadLibrary,
+      bizess.loadLibrary,
+      worksheets.loadLibrary,
+      slides.loadLibrary,
+      fungames.loadLibrary,
+      pricescan.loadLibrary,
+      appbuilder.loadLibrary,
+      ...ngmyRegisterAiToolsWarm(),
+    ];

@@ -63,3 +63,19 @@ Future<T> ngmyRunDeferred<T>(Future<void> Function() load, FutureOr<T> Function(
   await load();
   return run();
 }
+
+/// Loads every given part of the app one after another in the background, with a short pause between each so the
+/// screen never stutters. Called once after the home screen opens: by the time a menu is tapped its code is already
+/// in memory, so it opens at once instead of showing a loading circle the first time after every start of the app.
+/// Each part comes from the copy stored on the phone (the service worker keeps them), so this costs no data.
+Future<void> ngmyWarmDeferred(List<Future<void> Function()> loads, {Duration gap = const Duration(milliseconds: 200)}) async {
+  for (final load in loads) {
+    try {
+      await load();
+      _ngmyDeferredLoaded.add(load);
+    } catch (_) {
+      // Offline or not stored yet: that menu simply loads when it is opened, as before.
+    }
+    await Future<void>.delayed(gap);
+  }
+}

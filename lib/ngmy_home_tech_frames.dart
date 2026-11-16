@@ -903,3 +903,14 @@ class _ExperienceBackdropPainter extends CustomPainter {
   bool shouldRepaint(covariant _ExperienceBackdropPainter old) =>
       old.spin != spin || old.wave != wave || old.boot != boot;
 }
+
+/// The menus of these home frames that are their own download, for ngmyWarmDeferred: the Vault Arcade, the Core
+/// Protocol, and the Construction Lab inside it.
+List<Future<void> Function()> ngmyHomeTechFramesWarm() => [
+      vault.loadLibrary,
+      sims.loadLibrary,
+      () async {
+        await sims.loadLibrary();
+        await sims.ngmyCoreProtocolSimsWarm();
+      },
+    ];

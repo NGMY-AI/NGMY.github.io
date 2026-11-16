@@ -1417,3 +1417,6 @@ List<Map<String, dynamic>> ngmyCivicMembersForState(dynamic config, String state
       .toList();
 }
 
+
+/// The State Wallet screen code, for ngmyWarmDeferred.
+List<Future<void> Function()> ngmyCivicStateWalletWarm() => [walletui.loadLibrary];

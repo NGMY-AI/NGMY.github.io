@@ -6697,3 +6697,6 @@ class NgmyHomeCardCanvas extends StatelessWidget {
     });
   }
 }
+
+/// The menus of the home cards that are their own download, for ngmyWarmDeferred.
+List<Future<void> Function()> ngmyHomeGlassCardsWarm() => [essentials.loadLibrary];

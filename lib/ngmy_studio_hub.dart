@@ -635,3 +635,13 @@ class _HubGuestUser {
   final String email;
   bool get isAdmin => false;
 }
+
+/// The Studio menus that are their own download (invoices, games, recorder, price scanner, video), for ngmyWarmDeferred.
+List<Future<void> Function()> ngmyStudioHubWarm() => [
+      invoicecreator.loadLibrary,
+      docgate.loadLibrary,
+      fungames.loadLibrary,
+      recorder.loadLibrary,
+      pricescan.loadLibrary,
+      video.loadLibrary,
+    ];

@@ -1338,3 +1338,6 @@ class _TowersPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _TowersPainter old) => true;
 }
+
+/// The menus inside the Core Protocol that are their own download (the Construction Lab), loaded in the background.
+Future<void> ngmyCoreProtocolSimsWarm() => ngmyElectronicsLabWarm();

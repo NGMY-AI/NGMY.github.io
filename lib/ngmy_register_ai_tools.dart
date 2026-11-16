@@ -98,3 +98,6 @@ void ngmyRegisterAiAppTools({
     },
   );
 }
+
+/// The AI tools that are their own download, for ngmyWarmDeferred.
+List<Future<void> Function()> ngmyRegisterAiToolsWarm() => [docgate.loadLibrary, fungames.loadLibrary, recorder.loadLibrary, video.loadLibrary];
