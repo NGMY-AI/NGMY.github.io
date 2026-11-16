@@ -6,6 +6,15 @@ import 'package:ngmy/ngmy_construction_electrical_more.dart';
 // opening - and nothing on the bench goes missing or can be seen through when the view turns.
 
 void main() {
+  test('every outlet: its slots and holes face the front from any side', () {
+    for (final id in kOutletKinds) {
+      final sc = buildBench(electricalLesson(id), WiringState(), withWall: true);
+      final face = sc.polys.where((p) => (p.id == idFace || p.id == idButtons) && p.bias != 0).toList();
+      expect(face, isNotEmpty, reason: id);
+      expect(face.every((p) => p.biasDir != null && p.biasDir!.z == 1), isTrue, reason: '$id: every slot and hole faces the front');
+    }
+  });
+
   for (final id in ['outlet', 'switch']) {
     test('$id: the box and the cable are drawn before the wall, the device after it, every face from both sides', () {
       final l = electricalLesson(id);
@@ -39,6 +48,10 @@ void main() {
       final green = withWall.polys.where((p) => p.id == idGreen && p.bias != 0).toList();
       expect(green, isNotEmpty);
       expect(green.every((p) => p.biasDir != null && p.biasDir!.z == 1), isTrue, reason: 'the ground screw faces the front');
+      // The slots and holes of the face sit on the FRONT: seen from either side they never sink behind the face (they disappeared before).
+      final face = withWall.polys.where((p) => (p.id == idFace || p.id == idButtons) && p.bias != 0).toList();
+      expect(face, isNotEmpty);
+      expect(face.every((p) => p.biasDir != null && p.biasDir!.z == 1), isTrue, reason: 'every slot and hole faces the front');
       // The room goes on behind the wall and is closed at both ends: turning round never shows black.
       expect(room.any((p) => p.pts.every((v) => v.z < -0.5)), isTrue, reason: 'room behind the wall');
       expect(room.any((p) => p.pts.every((v) => v.z > 30)), isTrue, reason: 'far wall in front');

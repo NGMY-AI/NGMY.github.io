@@ -74,6 +74,7 @@ const List<_LessonInfo> _lessons = [
   _LessonInfo('range3', '🥘', 'Range outlet, 3-wire (10-50)', 'Old 50 amp stove: no separate ground', Color(0xFFFBBF24)),
   _LessonInfo('washer', '🧺', 'Washing machine outlet (5-20)', 'Its own 20 amp circuit, near water', Color(0xFF38BDF8)),
   _LessonInfo('afci', '🔥', 'AFCI outlet', 'Stops arcing wires: bedrooms, living rooms', Color(0xFFFB7185)),
+  _LessonInfo('dualfunction', '🛡️', 'Dual-function AFCI/GFCI outlet', 'Todays code: arcs and shocks in one', Color(0xFF34D399)),
   _LessonInfo('tamper', '🧒', 'Tamper-resistant outlet (TR)', 'Shutters keep children safe', Color(0xFFFBBF24)),
   _LessonInfo('usb', '🔋', 'USB outlet', 'Charging ports built in', Color(0xFF60A5FA)),
   _LessonInfo('outlet20', '🛠️', '20 amp outlet (5-20)', 'The T slot: kitchens and garages', Color(0xFF34D399)),

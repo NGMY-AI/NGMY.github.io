@@ -660,6 +660,9 @@ Scene3D buildBench(ElectricalLesson lesson, WiringState s, {bool withWall = true
     // body. Worked out from where they sit they counted as "bottom" and "top", so the green screw was only drawn on top when seen from
     // below, and from the front the strap covered it.
     if (p.id == idGreen || p.id == idYoke) return const V3(0, 0, 1);
+    // The face, its slots and holes, the round plug face and the TEST/RESET buttons are all on the FRONT. Worked out from where they sit, a slot
+    // near the edge of the face counted as being on that edge, so from the other side it sank behind the face and the holes disappeared.
+    if (p.id == idFace || p.id == idButtons) return const V3(0, 0, 1);
     var x0 = double.infinity, x1 = -double.infinity, y0 = double.infinity, y1 = -double.infinity, z0 = double.infinity, z1 = -double.infinity;
     for (final q in body) {
       for (final v in q.pts) {
@@ -953,6 +956,9 @@ void _variantFace(MeshBuilder b, String lesson, double z, bool burnt) {
         b.box(c + V3(x, 0.0, 0.5), const V3(0.34, 0.12, 0.03), const Color(0xFF17181B));
         b.box(c + V3(x, 0.02, 0.52), const V3(0.26, 0.04, 0.02), const Color(0xFFB8BCC4));
       }
+    case 'dualfunction':
+      // The green light that says it is protecting, between the buttons.
+      b.ball(c + const V3(0, -0.3, 0.5), 0.07, burnt ? kChar : const Color(0xFF22C55E), shine: 0.8, lat: 4, lon: 8);
     case 'smartoutlet':
       // The little status light of the radio.
       b.ball(c + const V3(0, 0.0, 0.5), 0.09, burnt ? kChar : const Color(0xFF38BDF8), shine: 0.8, lat: 4, lon: 8);

@@ -394,7 +394,7 @@ final List<ElectricalLesson> kMoreLessons = [
 // ═════════════════════════════════════════════════════════════════════════════
 
 /// The new outlet lessons, in the order of their tiles.
-const List<String> kMoreOutletKinds = ['afci', 'tamper', 'usb', 'outlet20', 'weather', 'smartoutlet', 'ev1450', 'rv30', 'welder650', 'gen1430', ...kChartOutletKinds];
+const List<String> kMoreOutletKinds = ['afci', 'dualfunction', 'tamper', 'usb', 'outlet20', 'weather', 'smartoutlet', 'ev1450', 'rv30', 'welder650', 'gen1430', ...kChartOutletKinds];
 
 const _groundChip = WireChoice('ground', 'Bare copper · ground', _copper, Colors.white, role: 'ground');
 const _neutralChip = WireChoice('neutral', 'White · neutral', _white, Color(0xFF111827), role: 'neutral');
@@ -483,6 +483,22 @@ final List<ElectricalLesson> kMoreOutletLessons = [
     about: const [
       'An AFCI outlet looks like a GFCI, with TEST and RESET buttons. It watches the current for the crackle of an arc (a loose screw, a chewed cord) and cuts the power.',
       'The power from the panel goes on the LINE screws. The LOAD screws are for outlets further down the line; here there are none, so they stay covered.',
+    ],
+    neutralLabel: 'Silver LINE screw: NEUTRAL',
+    hotLabel: 'Brass LINE screw: HOT',
+    neutralWhy: 'The white neutral from the panel goes on the silver LINE screw.',
+    hotWhy: 'The black hot from the panel goes on the brass LINE screw.',
+    hotScrew: 'the brass LINE screw',
+    neutralScrew: 'the silver LINE screw',
+  ),
+  _std120(
+    id: 'dualfunction',
+    title: 'Dual-function AFCI/GFCI outlet',
+    blurb: 'One outlet that guards against both arcing wires (fire) and leaking current (shock). The newer electrical code asks for both in kitchens and laundry rooms, and this does it in one.',
+    look: 'gfci',
+    about: const [
+      'It looks like a GFCI with TEST and RESET buttons and a little light that shows it is protecting. It is wired on the LINE screws, like a GFCI.',
+      'The power from the panel goes on the LINE screws. The LOAD screws protect outlets further down the line; here there are none, so they stay covered.',
     ],
     neutralLabel: 'Silver LINE screw: NEUTRAL',
     hotLabel: 'Brass LINE screw: HOT',

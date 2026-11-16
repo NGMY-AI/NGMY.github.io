@@ -168,7 +168,7 @@ void drawDeviceFace(MeshBuilder b, FBox x, WiringHouse w) {
     }
     return;
   }
-  if (kind == 'gfci' || kind == 'afci' || kind == 'weather') {
+  if (kind == 'gfci' || kind == 'afci' || kind == 'dualfunction' || kind == 'weather') {
     b.box(at(0, 0, f + 0.05), wallSize(x.wall, 1.8, 4.0, 0.14), const Color(0xFFE6E3D8), shine: 0.3);
     b.box(at(0, 0.75, f + 0.16), wallSize(x.wall, 0.8, 0.45, 0.2), const Color(0xFF22262C), shine: 0.3);
     b.box(at(0, -0.75, f + 0.16), wallSize(x.wall, 0.8, 0.45, 0.2), const Color(0xFFD33B2F), shine: 0.3);

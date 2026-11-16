@@ -234,7 +234,7 @@ void _outletFace(MeshBuilder b, String kind, double x, bool ok) {
       b.box(V3(x + dx, 14 + dz * 2.8, 1.7), const V3(0.8, 2.4, 0.3), dark);
     }
   }
-  if (kind == 'gfci' || kind == 'afci' || kind == 'weather') {
+  if (kind == 'gfci' || kind == 'afci' || kind == 'dualfunction' || kind == 'weather') {
     // The TEST and RESET buttons between the two receptacles (a GFCI, an AFCI and the outdoor WR GFCI).
     b.box(V3(x - 1.5, 14, 1.8), const V3(1.6, 1.1, 0.4), const Color(0xFF202226));
     b.box(V3(x + 1.5, 14, 1.8), const V3(1.6, 1.1, 0.4), const Color(0xFFD72A2A));

@@ -17,7 +17,7 @@ void main() {
   test('every new switch and outlet is a lesson with the right wiring, and only the right wiring is accepted', () {
     expect(kSwitchVariants.length, 5);
     // The five first variants and the ten more American outlets (AFCI, tamper-resistant, USB, 20 amp, outdoor, smart, EV, RV, welder, generator).
-    expect(kOutletVariants.length, 15 + kChartOutletKinds.length);
+    expect(kOutletVariants.length, 16 + kChartOutletKinds.length);
     expect(kOutletVariants, containsAll(kMoreOutletKinds));
     for (final id in newOnes) {
       final l = electricalLesson(id);

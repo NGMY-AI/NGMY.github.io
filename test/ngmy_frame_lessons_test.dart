@@ -510,7 +510,7 @@ void main() {
     });
 
     testWidgets('the two lessons sit side by side in the second row from the bottom of the Lessons list, and open', (t) async {
-      t.view.physicalSize = const Size(900, 9000);
+      t.view.physicalSize = const Size(900, 16000);
       t.view.devicePixelRatio = 2.0;
       addTearDown(t.view.reset);
       await t.pumpWidget(const MaterialApp(home: NgmyConstructionLab()));

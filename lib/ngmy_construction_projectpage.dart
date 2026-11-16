@@ -60,6 +60,7 @@ final List<List<_Item>> _trays = [
     _Item('range3', 'Range 3-wire (10-50)', Icons.microwave_rounded),
     _Item('washer', 'Washer (5-20)', Icons.local_laundry_service_rounded),
     _Item('afci', 'AFCI outlet', Icons.local_fire_department_rounded),
+    _Item('dualfunction', 'AFCI/GFCI dual', Icons.verified_user_rounded),
     _Item('tamper', 'Tamper-resistant', Icons.child_care_rounded),
     _Item('usb', 'USB outlet', Icons.usb_rounded),
     _Item('outlet20', '20 amp (5-20)', Icons.power_rounded),
@@ -440,6 +441,7 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
       case 'range3':
       case 'washer':
       case 'afci':
+      case 'dualfunction':
       case 'tamper':
       case 'usb':
       case 'outlet20':
