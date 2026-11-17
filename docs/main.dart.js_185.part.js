@@ -2,7 +2,7 @@
 $__dart_deferred_initializers__.current=function(a,b,c,$){var A,B,C
 A=c[0]
 B=c[2]
-C=c[83]
-var z=a.updateTypes([]);(function constants(){C.EY=new A.F(!0,B.bV,null,null,null,null,13,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-C.abI=new A.F(!0,B.aR,null,null,null,null,12.5,null,null,null,null,null,1.35,null,null,null,null,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["va4EzuB9wpJ/DOyNMtW488QlDDw="]=a.current})($__dart_deferred_initializers__);
+C=c[84]
+var z=a.updateTypes([]);(function constants(){C.EZ=new A.F(!0,B.bV,null,null,null,null,13,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+C.abJ=new A.F(!0,B.aR,null,null,null,null,12.5,null,null,null,null,null,1.35,null,null,null,null,null,null,null,null,null,null,null,null,null)})()};
+(a=>{a["4bbFyN8gAMIyTZOt5LAjgCW4anc="]=a.current})($__dart_deferred_initializers__);
