@@ -1,23 +1,8 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
-$__dart_deferred_initializers__.current=function(a,b,c,$){var A,B,C={
-Hy(d,e){var x=0,w=A.j(y.c),v,u,t
-var $async$Hy=A.e(function(f,g){if(f===1)return A.f(g,w)
-for(;;)switch(x){case 0:x=3
-return A.b(new A.i_().l9(d,e,B.eQ),$async$Hy)
-case 3:t=g
-if(t==null){v=null
-x=1
-break}x=4
-return A.b(t.fq(),$async$Hy)
-case 4:u=g
-v="data:image/jpeg;base64,"+B.cV.gcu().aO(u)
-x=1
-break
-case 1:return A.h(v,w)}})
-return A.i($async$Hy,w)}}
+$__dart_deferred_initializers__.current=function(a,b,c,$){var A,B,C
 A=c[0]
 B=c[2]
-C=a.updateHolder(c[64],C)
-var z=a.updateTypes([])
-var y={c:A.at("n?")}};
-(a=>{a["peYaY0WNoMh8KenN8ieZbKCVNJY="]=a.current})($__dart_deferred_initializers__);
+C=c[111]
+var z=a.updateTypes([]);(function constants(){C.aqf=new A.a_(63031,"MaterialIcons",!1)
+C.aXo=new A.F(!0,B.c,null,null,null,null,17,B.u,null,null,null,null,1.15,null,null,null,null,null,null,null,null,null,null,null,null,null)})()};
+(a=>{a["k0eROlmq6P91nNmzRIE39jvIXt4="]=a.current})($__dart_deferred_initializers__);

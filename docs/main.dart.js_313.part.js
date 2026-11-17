@@ -1,10 +1,11 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
-$__dart_deferred_initializers__.current=function(a,b,c,$){var A,C,B
-A=c[0]
-C=c[2]
-B=c[184]
-var z=a.updateTypes([]);(function constants(){var y=a.makeConstList
-B.aVZ=new A.F(!0,null,null,null,null,null,18,C.I,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-B.aqY=new A.a_(983333,"MaterialIcons",!1)
-B.dmh=y([0,0.25,0.5,0.75,1],A.at("O<G>"))})()};
-(a=>{a["A4enLvTuIfiJNM6JZPd/c36rtaw="]=a.current})($__dart_deferred_initializers__);
+$__dart_deferred_initializers__.current=function(a,b,c,$){var B,A={au3:function au3(d,e){this.a=d
+this.b=e}},C
+B=c[0]
+A=a.updateHolder(c[52],A)
+C=c[281]
+A.au3.prototype={
+a7(){return"NgmyWalletPaymentTheme."+this.b}}
+var z=a.updateTypes([]);(function inheritance(){var y=a.inherit
+y(A.au3,B.lo)})();(function constants(){C.em3=new A.au3(0,"standard")})()};
+(a=>{a["TpPy5qLzONSZbSf7RdNaP+GsIpo="]=a.current})($__dart_deferred_initializers__);
