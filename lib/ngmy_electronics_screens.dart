@@ -2,7 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import 'ngmy_electronics_cartoons.dart';
+import 'ngmy_ads3d.dart';
+
+export 'ngmy_ads3d.dart' show NgmyAdTap, NgmyAdSpec, NgmyAdInfoSheet, kNgmyAds3D, kNgmyAdLength, ngmyAdIndexAt;
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Screens for the Electronics Lab TV and phone: NGMY ads and little apps.
@@ -26,61 +28,20 @@ void _label(Canvas c, String text, Offset center, double size, Color col, {doubl
 }
 
 Paint _fill(Color c) => Paint()..color = c;
-Paint _stroke(Color c, double w) => Paint()..style = PaintingStyle.stroke..strokeWidth = w..color = c..strokeCap = StrokeCap.round;
 
 // ─── NGMY ads ────────────────────────────────────────────────────────────────
-
-class _Ad {
-  const _Ad(this.brand, this.line, this.a, this.b);
-  final String brand, line;
-  final Color a, b;
-}
-
-const List<_Ad> _kAds = [
-  _Ad('NGMY Civic Registry', 'Enroll your family. Stay counted and helped together.', Color(0xFF1E3A8A), Color(0xFF38BDF8)),
-  _Ad('NGMY Jobs', 'Find work. Get hired. Get paid.', Color(0xFFB45309), Color(0xFFFBBF24)),
-  _Ad('NGMY Store', 'African food and traditions. Support our Congolese and African community.', Color(0xFF9A3412), Color(0xFFFACC15)),
-  _Ad('Kiswahili School', 'Learn Swahili and English, step by step.', Color(0xFF0F766E), Color(0xFF5EEAD4)),
-  _Ad('Document Scanner', 'Scan, save and share your papers.', Color(0xFF4338CA), Color(0xFF818CF8)),
-  _Ad('Invoice Creator', 'Make professional invoices in minutes.', Color(0xFF9D174D), Color(0xFFF9A8D4)),
-  _Ad('Family Book and Tree', 'Write your family story. Grow your tree.', Color(0xFF6D28D9), Color(0xFFD8B4FE)),
-  _Ad('NGMY Wallet', 'Save, send and earn coins.', Color(0xFFA16207), Color(0xFFFDE047)),
-  _Ad('Vault Games', 'Play, win and learn.', Color(0xFF1D4ED8), Color(0xFF22D3EE)),
-  _Ad('Electronics Lab', 'Build real circuits and learn.', Color(0xFF0E7490), Color(0xFF67E8F9)),
-  _Ad('NGMY Helper and Advisors', 'Friendly help, any time.', Color(0xFFBE185D), Color(0xFFFB923C)),
-];
+// The ads themselves (a real looking phone in a studio, a 3D hero object and an end card) are drawn in ngmy_ads3d.dart.
 
 /// How many different NGMY ads the loop plays.
-int get kNgmyAdCount => _kAds.length;
+int get kNgmyAdCount => kNgmyAds3D.length;
 
-String ngmyAdName(double t) => _kAds[((t / 6).floor()) % _kAds.length].brand;
+/// The name of the ad that plays at [t] in the loop.
+String ngmyAdName(double t) => kNgmyAds3D[ngmyAdIndexAt(t)].brand;
 
-/// The NGMY ads, one cartoon after another, six seconds each. With [only] the one ad plays again and again.
-void paintNgmyAd(Canvas c, Size s, double t, {int? only}) {
-  const len = 6.0;
-  final i = (only ?? ((t / len).floor())) % _kAds.length;
-  final lt = t % len;
-  final ad = _kAds[i];
-  final w = s.width, h = s.height;
-  c.drawRect(Offset.zero & s, Paint()..shader = LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [ad.a, ad.b]).createShader(Offset.zero & s));
-  final sceneH = h * (w >= h ? 0.7 : 0.6);
-  c.save();
-  c.clipRect(Rect.fromLTWH(0, 0, w, sceneH));
-  cartoonScene(c, Size(w, sceneH), i, lt);
-  c.restore();
-  final band = h - sceneH;
-  c.drawRect(Rect.fromLTWH(0, sceneH, w, band), _fill(Colors.black.withValues(alpha: 0.3)));
-  final slide = Curves.easeOutCubic.transform(((lt - 0.2) / 0.5).clamp(0.0, 1.0));
-  c.save();
-  c.translate((1 - slide) * w * 0.25, 0);
-  _label(c, ad.brand, Offset(w / 2, sceneH + band * 0.3), band * 0.36, Colors.white.withValues(alpha: slide), maxW: w * 0.94);
-  _label(c, ad.line, Offset(w / 2, sceneH + band * 0.64), band * 0.2, Colors.white.withValues(alpha: 0.92 * slide), maxW: w * 0.94, bold: false);
-  c.restore();
-  for (var k = 0; k < _kAds.length; k++) {
-    c.drawCircle(Offset(w / 2 + (k - (_kAds.length - 1) / 2) * h * 0.035, h * 0.965), h * 0.009 + (k == i ? h * 0.004 : 0), _fill(Colors.white.withValues(alpha: k == i ? 0.95 : 0.35)));
-  }
-  _label(c, 'AD', Offset(w - h * 0.07, h * 0.06), h * 0.045, Colors.white.withValues(alpha: 0.85), spacing: 1);
-  c.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: Offset(w - h * 0.07, h * 0.06), width: h * 0.1, height: h * 0.065), Radius.circular(h * 0.02)), _stroke(Colors.white70, 1));
+/// The NGMY ads, one after another, ten seconds each. With [only] that one ad plays again and again.
+void paintNgmyAd(Canvas c, Size s, double t, {int? only, NgmyAdTap? tap, bool loop = false}) {
+  final i = only ?? ngmyAdIndexAt(t);
+  paintNgmyAd3D(c, s, i, t % kNgmyAdLength, tap: tap, ofCount: loop || only == null);
 }
 
 // ─── Apps ────────────────────────────────────────────────────────────────────
@@ -95,7 +56,7 @@ class NgmyApp {
 }
 
 const List<NgmyApp> kNgmyApps = [
-  NgmyApp('NGMY Ads', '📢', Color(0xFFF472B6), 'Every NGMY promotion, as cartoons', -1),
+  NgmyApp('NGMY Ads', '📢', Color(0xFFF472B6), 'Every NGMY ad, as a real 3D commercial', -1),
   NgmyApp('Civic Registry', '🪪', Color(0xFF3B82F6), 'Enroll your family in your community', 0),
   NgmyApp('Jobs', '💼', Color(0xFFF59E0B), 'Find work and get hired', 1),
   NgmyApp('NGMY Store', '🛍️', Color(0xFFEA580C), 'African food and traditions', 2),
@@ -105,16 +66,16 @@ const List<NgmyApp> kNgmyApps = [
   NgmyApp('Calendar', '📅', Color(0xFFEF4444), 'This month, today lit up', -2),
 ];
 
-void paintNgmyApp(Canvas c, Size s, int app, double t) {
+void paintNgmyApp(Canvas c, Size s, int app, double t, {NgmyAdTap? tap, int? pick}) {
   c.save();
   c.clipRect(Offset.zero & s);
   final a = kNgmyApps[app % kNgmyApps.length].ad;
   if (a == -2) {
     _calendarApp(c, s, t);
   } else if (a == -1) {
-    paintNgmyAd(c, s, t);
+    paintNgmyAd(c, s, t, only: pick, tap: tap, loop: true);
   } else {
-    paintNgmyAd(c, s, t, only: a);
+    paintNgmyAd(c, s, t, only: a, tap: tap);
   }
   c.restore();
 }

@@ -11,7 +11,6 @@ import 'package:ngmy/ngmy_construction_homepage.dart';
 import 'package:ngmy/ngmy_construction_homescene.dart';
 import 'package:ngmy/ngmy_construction_plumbing.dart';
 import 'package:ngmy/ngmy_construction_tour.dart';
-import 'package:ngmy/ngmy_electronics_cartoons.dart';
 import 'package:ngmy/ngmy_electronics_screens.dart';
 import 'package:ngmy/ngmy_studio_kit.dart';
 
@@ -54,18 +53,17 @@ void main() {
 
   test('no NGMY ad or TV app is about Growth Income any more, and every ad still draws', () {
     expect(kNgmyApps.any((a) => a.name.contains('Growth')), isFalse);
-    for (var s = 0; s < kNgmyAdCount * 6; s += 6) {
+    for (var s = 0; s < kNgmyAdCount * 10; s += 10) {
       expect(ngmyAdName(s.toDouble()).contains('Growth'), isFalse);
     }
-    expect(kNgmyAdCount, 11);
-    expect(kCartoonScenesCountMatches(), isTrue);
+    expect(kNgmyAdCount, 14);
     for (var i = 0; i < kNgmyApps.length; i++) {
       paintNgmyApp(Canvas(PictureRecorder()), const Size(320, 180), i, 3.0);
     }
     // Each app that shows one ad still points at that ad's own name.
-    final names = [for (var i = 0; i < kNgmyAdCount; i++) ngmyAdName(i * 6.0)];
+    final names = [for (var i = 0; i < kNgmyAdCount; i++) ngmyAdName(i * 10.0)];
     expect(names.toSet().length, kNgmyAdCount);
-    expect(names[1], 'NGMY Jobs');
+    expect(names[1], 'NGMY Jobs and Help');
   });
 
   test('every lesson plays in a big bare room with a big TV showing the NGMY Jobs ad, and only the lesson is waiting', () {
@@ -495,4 +493,3 @@ void main() {
   });
 }
 
-bool kCartoonScenesCountMatches() => kCartoonScenes == kNgmyAdCount;

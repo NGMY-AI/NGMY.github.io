@@ -29,51 +29,48 @@ const List<NgmyTvChannel> kNgmyTvChannels = [
   NgmyTvChannel('Spark Adventure', 'Follow Sparky round a circuit board'),
   NgmyTvChannel('NGMY Game Center', 'Play games and win coins'),
   NgmyTvChannel('NGMY Business Cards', 'Make a card people remember'),
-  NgmyTvChannel('NGMY Vault', 'Keep what matters safe'),
-  NgmyTvChannel('NGMY Studios', 'Make music, art, titles and more'),
+  NgmyTvChannel('NGMY Civic Registry', 'Your family, counted and helped'),
+  NgmyTvChannel('NGMY Creator Hub', 'Record, film and create'),
 ];
+
+/// The TV advert each channel plays (null for Tree Story and Spark Adventure, which are shows, not adverts).
+const Map<int, int> _kChannelTvAd = {1: 7, 2: 0, 3: 1, 4: 2, 6: 3, 7: 6, 8: 4, 9: 5};
+
+/// The NGMY ad (an index into kNgmyAds3D) that channel [ch] plays, or null when it is not an advert.
+int? ngmyTvChannelAd(int ch) {
+  final a = _kChannelTvAd[ch % kNgmyTvChannels.length];
+  return a == null ? null : ngmyTvAdSpecIndex(a);
+}
 
 /// Paints one frame of the TV picture (the boot logo for the first seconds, then the channel).
 /// [age] is how many seconds the TV has been on; [t] is the running clock.
-void paintNgmyTv(Canvas c, Size s, int channel, double t, {double age = 99, int app = -1}) {
+void paintNgmyTv(Canvas c, Size s, int channel, double t, {double age = 99, int app = -1, NgmyAdTap? tap, int? pick}) {
   c.save();
   c.clipRect(Offset.zero & s);
   if (age < 3.0) {
     _boot(c, s, age);
   } else if (app >= 0) {
-    paintNgmyApp(c, s, app, t);
+    paintNgmyApp(c, s, app, t, tap: tap, pick: pick);
   } else {
     final k = ((age - 3.0) / 0.5).clamp(0.0, 1.0);
     final ch = channel % kNgmyTvChannels.length;
-    switch (ch) {
-      case 0:
-        _treeStory(c, s, t);
-      case 1:
-        paintNgmyTvAd(c, s, 7, t);
-      case 2:
-        paintNgmyTvAd(c, s, 0, t);
-      case 3:
-        paintNgmyTvAd(c, s, 1, t);
-      case 4:
-        paintNgmyTvAd(c, s, 2, t);
-      case 5:
-        paintSparkAdventure(c, s, t);
-      case 6:
-        paintNgmyTvAd(c, s, 3, t);
-      case 7:
-        paintNgmyTvAd(c, s, 6, t);
-      case 8:
-        paintNgmyTvAd(c, s, 4, t);
-      default:
-        paintNgmyTvAd(c, s, 5, t);
+    final tvAd = _kChannelTvAd[ch];
+    if (ch == 0) {
+      _treeStory(c, s, t);
+    } else if (tvAd == null) {
+      paintSparkAdventure(c, s, t);
+    } else {
+      paintNgmyTvAd(c, s, tvAd, t, tap: tap);
     }
     _bug(c, s, channel, t);
     if (k < 1) c.drawRect(Offset.zero & s, Paint()..color = Colors.white.withValues(alpha: 0.6 * (1 - k)));
   }
-  // Scan lines and a soft glass reflection.
-  final line = Paint()..color = Colors.black.withValues(alpha: 0.07);
-  for (var y = 0.0; y < s.height; y += 3) {
-    c.drawRect(Rect.fromLTWH(0, y, s.width, 1), line);
+  // Scan lines on the little TVs only (a big modern screen has none), and a soft glass reflection.
+  if (s.shortestSide < 200) {
+    final line = Paint()..color = Colors.black.withValues(alpha: 0.07);
+    for (var y = 0.0; y < s.height; y += 3) {
+      c.drawRect(Rect.fromLTWH(0, y, s.width, 1), line);
+    }
   }
   c.drawPath(Path()..moveTo(0, 0)..lineTo(s.width * 0.45, 0)..lineTo(0, s.height * 0.5)..close(), Paint()..color = Colors.white.withValues(alpha: 0.04));
   c.restore();
@@ -297,6 +294,101 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
   late double _chStart = widget.showBoot ? 3.0 : 0.0;
   double get _nowSec => (_clock.lastElapsedDuration?.inMilliseconds ?? 0) / 1000;
 
+  // Touching the ads: where and when the picture was tapped (the phone or the hero spins), and in the NGMY Ads app
+  // which ad it started from and when (so a chapter can be picked).
+  double _tapAt = -99;
+  Offset _tapPos = const Offset(0.5, 0.5);
+  int _adBase = 0;
+  double _adStart = 0;
+
+  bool get _inAdsApp => _app >= 0 && kNgmyApps[_app].ad == -1;
+
+  /// The NGMY ad on the screen now (an index into kNgmyAds3D), or null when it is not an ad.
+  int? _adNow() {
+    if (_menu) return null;
+    if (_app >= 0) {
+      final a = kNgmyApps[_app].ad;
+      if (a == -2) return null;
+      if (a == -1) return (_adBase + (math.max(0.0, _nowSec - _adStart) / kNgmyAdLength).floor()) % kNgmyAds3D.length;
+      return a;
+    }
+    return ngmyTvChannelAd(_ch);
+  }
+
+  void _tapPicture(Offset at, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
+    setState(() {
+      _tapPos = Offset(at.dx / size.width, at.dy / size.height);
+      _tapAt = _nowSec;
+      _touched();
+    });
+    NgmyTone.play(660, ms: 90, wave: 'tri', volume: 0.25);
+  }
+
+  /// Plays ad [i] in the NGMY Ads app (a chapter).
+  void _pickAd(int i) {
+    final n = kNgmyAds3D.length;
+    setState(() {
+      _app = 0;
+      _menu = false;
+      _adBase = ((i % n) + n) % n;
+      _adStart = _nowSec;
+      _touched();
+    });
+    NgmyTone.play(900, ms: 40, wave: 'noise', volume: 0.25);
+  }
+
+  void _setChannel(int ch) => _go(ch - _ch);
+
+  /// A swipe on the picture: the next or the previous ad (or channel).
+  void _swipe(int d) {
+    if (_inAdsApp) {
+      _pickAd((_adNow() ?? 0) + d);
+    } else {
+      _go(d);
+    }
+  }
+
+  void _replay() {
+    setState(() {
+      if (_inAdsApp) {
+        _adBase = _adNow() ?? _adBase;
+        _adStart = _nowSec;
+      } else {
+        _chStart = _nowSec;
+        _channelSince = math.max(1, _channelSince);
+      }
+      _touched();
+    });
+    _armCycle();
+  }
+
+  Future<void> _learnMore() async {
+    final i = _adNow();
+    if (i == null) return;
+    _cycle?.cancel();
+    setState(_touched);
+    var again = false;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheet) => NgmyAdInfoSheet(
+        ad: kNgmyAds3D[i],
+        onReplay: () {
+          again = true;
+          Navigator.of(sheet).pop();
+        },
+      ),
+    );
+    if (!mounted) return;
+    if (again) {
+      _replay();
+    } else {
+      _armCycle();
+    }
+  }
+
   void _armCycle() {
     _cycle?.cancel();
     _cycle = Timer(Duration(seconds: _chStart > 0 && _nowSec < 3.2 ? 13 : 10), _nextChannel);
@@ -360,6 +452,8 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
     setState(() {
       _app = a;
       _menu = false;
+      _adBase = 0;
+      _adStart = _nowSec;
       _touched();
     });
     NgmyTone.play(700, ms: 60, wave: 'tri', volume: 0.3);
@@ -391,17 +485,43 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: Stack(fit: StackFit.expand, children: [
-                      AnimatedBuilder(
-                      animation: _clock,
-                      builder: (_, __) {
-                        final ms = (_clock.lastElapsedDuration?.inMilliseconds ?? 0).toDouble();
-                        final t = ms / 1000;
-                        // The logo only shows when the TV first starts, not at every channel change.
-                        final age = _channelSince == 0 && widget.showBoot ? t : 99.0;
-                        return CustomPaint(painter: _TvPainter(_ch, age < 3.0 ? t : math.max(0.0, t - _chStart), age, _app), size: Size.infinite);
-                      },
-                    ),
+                      // Tap the picture: the phone (or the coin, the card, the medal) spins. Swipe: the next or the previous ad.
+                      LayoutBuilder(
+                        builder: (context, box) => GestureDetector(
+                          key: const Key('tv-picture'),
+                          behavior: HitTestBehavior.opaque,
+                          onTapUp: (d) => _tapPicture(d.localPosition, box.biggest),
+                          onHorizontalDragEnd: (d) {
+                            final v = d.primaryVelocity ?? 0;
+                            if (v.abs() > 120) _swipe(v < 0 ? 1 : -1);
+                          },
+                          child: AnimatedBuilder(
+                            animation: _clock,
+                            builder: (_, __) {
+                              final ms = (_clock.lastElapsedDuration?.inMilliseconds ?? 0).toDouble();
+                              final t = ms / 1000;
+                              // The logo only shows when the TV first starts, not at every channel change.
+                              final age = _channelSince == 0 && widget.showBoot ? t : 99.0;
+                              final tap = t - _tapAt < 1.4 ? NgmyAdTap(_tapPos, t - _tapAt) : null;
+                              final ads = _inAdsApp;
+                              final local = math.max(0.0, t - _adStart);
+                              final pick = ads ? (_adBase + (local / kNgmyAdLength).floor()) % kNgmyAds3D.length : null;
+                              final tt = ads ? local : (age < 3.0 ? t : math.max(0.0, t - _chStart));
+                              return CustomPaint(painter: _TvPainter(_ch, tt, age, _app, tap: tap, pick: pick), size: Size.infinite);
+                            },
+                          ),
+                        ),
+                      ),
                       if (_menu) _appsMenu(),
+                      if (!_menu && !_hud && _adNow() != null)
+                        // Learn more: above the channel name bar at the bottom of the picture.
+                        Positioned.fill(
+                          child: LayoutBuilder(
+                            builder: (context, box) => Stack(children: [
+                              Positioned(right: box.maxWidth * 0.025, bottom: _app >= 0 ? box.maxHeight * 0.05 : box.maxHeight * 0.17, child: _learnMoreButton()),
+                            ]),
+                          ),
+                        ),
                     ]),
                   ),
                 ),
@@ -429,8 +549,16 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.65), borderRadius: BorderRadius.circular(18)),
                     child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      Text(_app >= 0 ? kNgmyApps[_app].name : kNgmyTvChannels[_ch].title, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
-                      Text(_app >= 0 ? kNgmyApps[_app].blurb : kNgmyTvChannels[_ch].blurb, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white60, fontSize: 11.5)),
+                      Row(children: [
+                        Expanded(
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(_app >= 0 ? kNgmyApps[_app].name : kNgmyTvChannels[_ch].title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+                            Text(_app >= 0 ? kNgmyApps[_app].blurb : kNgmyTvChannels[_ch].blurb, style: const TextStyle(color: Colors.white60, fontSize: 11.5)),
+                          ]),
+                        ),
+                        if (!_menu && _adNow() != null) _learnMoreButton(),
+                      ]),
+                      if (_app < 0 || _inAdsApp) ...[const SizedBox(height: 8), _chapters()],
                     ]),
                   ),
                 ]),
@@ -474,6 +602,75 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
     );
   }
 
+  Widget _learnMoreButton() => Material(
+        color: Colors.white.withValues(alpha: 0.94),
+        shape: const StadiumBorder(),
+        elevation: 6,
+        shadowColor: Colors.black54,
+        child: InkWell(
+          key: const Key('tv-learn-more'),
+          customBorder: const StadiumBorder(),
+          onTap: _learnMore,
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.info_outline_rounded, size: 15, color: Color(0xFF111827)),
+              SizedBox(width: 5),
+              Text('Learn more', style: TextStyle(color: Color(0xFF111827), fontWeight: FontWeight.w900, fontSize: 12)),
+            ]),
+          ),
+        ),
+      );
+
+  /// The chapters: every ad (in the NGMY Ads app) or every channel, to jump straight to one.
+  Widget _chapters() {
+    final ads = _inAdsApp;
+    final n = ads ? kNgmyAds3D.length : kNgmyTvChannels.length;
+    return SizedBox(
+      height: 34,
+      child: AnimatedBuilder(
+        animation: _clock,
+        builder: (context, _) {
+          final now = ads ? (_adNow() ?? 0) : _ch;
+          return ListView.separated(
+            key: const Key('tv-chapters'),
+            scrollDirection: Axis.horizontal,
+            itemCount: n,
+            separatorBuilder: (_, __) => const SizedBox(width: 6),
+            itemBuilder: (context, i) {
+              final adI = ads ? i : ngmyTvChannelAd(i);
+              final ad = adI == null ? null : kNgmyAds3D[adI];
+              final name = ads ? ad!.brand.replaceFirst('NGMY ', '') : kNgmyTvChannels[i].title.replaceFirst('NGMY ', '');
+              final icon = ad?.icon ?? (i == 0 ? Icons.park_rounded : Icons.bolt_rounded);
+              final color = ad?.b ?? (i == 0 ? const Color(0xFFF5C14B) : const Color(0xFF38BDF8));
+              final on = i == now;
+              return GestureDetector(
+                key: Key('tv-chapter-$i'),
+                onTap: () => ads ? _pickAd(i) : _setChannel(i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: on ? color.withValues(alpha: 0.28) : Colors.white.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(17),
+                    border: Border.all(color: on ? color : Colors.white24, width: on ? 1.5 : 1),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text('${i + 1}', style: TextStyle(color: on ? Colors.white : Colors.white54, fontWeight: FontWeight.w900, fontSize: 11)),
+                    const SizedBox(width: 6),
+                    Icon(icon, size: 15, color: color),
+                    const SizedBox(width: 5),
+                    Text(name, style: TextStyle(color: on ? Colors.white : Colors.white70, fontWeight: FontWeight.w800, fontSize: 11.5)),
+                  ]),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
   /// The apps screen is drawn inside the TV, not over it.
   Widget _appsMenu() => NgmyTvHome(kind: widget.kind, onOpen: _openApp, onClose: () => setState(() => _menu = false));
 
@@ -483,12 +680,14 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
 }
 
 class _TvPainter extends CustomPainter {
-  _TvPainter(this.ch, this.t, this.age, this.app);
+  _TvPainter(this.ch, this.t, this.age, this.app, {this.tap, this.pick});
   final int ch, app;
   final double t, age;
+  final NgmyAdTap? tap;
+  final int? pick;
 
   @override
-  void paint(Canvas canvas, Size size) => paintNgmyTv(canvas, size, ch, t, age: age, app: app);
+  void paint(Canvas canvas, Size size) => paintNgmyTv(canvas, size, ch, t, age: age, app: app, tap: tap, pick: pick);
 
   @override
   bool shouldRepaint(covariant _TvPainter old) => true;
