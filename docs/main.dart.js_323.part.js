@@ -8,5 +8,5 @@ A.amJ=new B.Q(14,14,14,12)
 A.an1=new B.Q(16,14,16,18)
 A.a2I=new B.a_(57925,"MaterialIcons",!1)
 A.bfs=new B.fl(2.5,null,null,null,null,C.aV,null,null,null,null)
-A.aUR=new B.a3(22,22,A.bfs,null)})()};
-(a=>{a["2PACKSABRW6rvZCkZtNTIQnmemU="]=a.current})($__dart_deferred_initializers__);
+A.aUR=new B.a4(22,22,A.bfs,null)})()};
+(a=>{a["KJE1O7LVyoQxsTtBnk/IbYRNZk8="]=a.current})($__dart_deferred_initializers__);
