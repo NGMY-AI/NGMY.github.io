@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ngmy/ngmy_hud_tech_shell.dart';
 import 'package:ngmy/ngmy_invoice_creator.dart';
 import 'package:ngmy/ngmy_iron_triangle_panel.dart';
 import 'package:ngmy/ngmy_studio_hub.dart';
@@ -112,7 +113,9 @@ void quoteCalcSnap() {
     testWidgets('quote calc snapshot ${b.name}', (tester) async {
       await _loadFonts();
       SharedPreferences.setMockInitialValues({});
-      await tester.binding.setSurfaceSize(const Size(400, 860));
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(400, 1500);
+      addTearDown(tester.view.reset);
       await tester.pumpWidget(MaterialApp(
         debugShowCheckedModeBanner: false,
         theme: ThemeData(brightness: b, useMaterial3: true, fontFamily: 'Roboto'),
@@ -125,8 +128,14 @@ void quoteCalcSnap() {
         await tester.pump(const Duration(milliseconds: 200));
       }
       expect(find.text('Quote Calc'), findsOneWidget);
+      // The window is only as tall as the two frames inside it: no empty space at the bottom on a tall screen.
+      final panelH = tester.getSize(find.byType(NgmyToolkitAlivePanel)).height;
+      final innerH = tester.getSize(find.descendant(of: find.byType(SingleChildScrollView), matching: find.byType(Column)).first).height;
+      expect(panelH, greaterThanOrEqualTo(innerH), reason: 'nothing is cut off at the bottom');
+      expect(panelH, lessThan(innerH + 60), reason: 'Quote Calc window $panelH tall around content $innerH');
+      expect(panelH, lessThan(1500 * 0.9 - 50));
       await tester.pump(); await _snapOf(tester, find.byKey(const Key('snap-all')), 'quote_${b.name}');
-      await tester.binding.setSurfaceSize(null);
+
     });
   }
 }

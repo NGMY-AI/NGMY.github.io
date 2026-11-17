@@ -522,6 +522,8 @@ class _StandaloneQuoteCalcDialogState extends State<_StandaloneQuoteCalcDialog> 
             width: dialogW,
             maxHeight: MediaQuery.of(context).size.height * 0.9,
             borderRadius: 18,
+            // Only as tall as the two frames inside: no empty space at the bottom.
+            fitContent: true,
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
               child: Column(

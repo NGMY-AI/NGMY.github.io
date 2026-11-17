@@ -415,6 +415,7 @@ class NgmyHudTechFrame extends StatelessWidget {
     this.padding = EdgeInsets.zero,
     this.phase = 0,
     this.calmTone,
+    this.fitContent = false,
   });
 
   final List<Color> colors;
@@ -429,13 +430,15 @@ class NgmyHudTechFrame extends StatelessWidget {
   final double phase;
   /// Light mode: give the tile colour (one of [NgmyCalmLight.toneA] / [NgmyCalmLight.toneB]). Without it the tile is white.
   final Color? calmTone;
+  /// True: the frame is only as tall as what is inside (no empty space at the bottom), up to the room it has.
+  final bool fitContent;
 
   @override
   Widget build(BuildContext context) {
     if (NgmyHudInk.calm(context)) {
       final card = LayoutBuilder(
         builder: (context, constraints) {
-          final fillH = constraints.hasBoundedHeight && constraints.maxHeight.isFinite;
+          final fillH = !fitContent && constraints.hasBoundedHeight && constraints.maxHeight.isFinite;
           return Container(
             key: const Key('ngmy-calm-card'),
             width: double.infinity,
@@ -498,7 +501,7 @@ class NgmyHudTechFrame extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             // Never force infinite height — that blanks Creator Toolkit in scroll views.
-            final fillH = constraints.hasBoundedHeight && constraints.maxHeight.isFinite;
+            final fillH = !fitContent && constraints.hasBoundedHeight && constraints.maxHeight.isFinite;
             final content = Container(
               width: double.infinity,
               height: fillH ? constraints.maxHeight : null,
@@ -983,6 +986,7 @@ class NgmyToolkitAlivePanel extends StatelessWidget {
     this.width,
     this.maxHeight,
     this.borderRadius = 22,
+    this.fitContent = false,
   });
 
   final List<Color> colors;
@@ -993,6 +997,8 @@ class NgmyToolkitAlivePanel extends StatelessWidget {
   final double? width;
   final double? maxHeight;
   final double borderRadius;
+  /// True: the panel is only as tall as what is inside, up to [maxHeight].
+  final bool fitContent;
 
   @override
   Widget build(BuildContext context) {
@@ -1030,6 +1036,7 @@ class NgmyToolkitAlivePanel extends StatelessWidget {
         scan: scan,
         orbit: orbit,
         borderRadius: borderRadius,
+        fitContent: fitContent,
         child: child,
       ),
     );
