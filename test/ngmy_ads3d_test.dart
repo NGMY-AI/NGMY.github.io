@@ -117,6 +117,17 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     // The bottom box is as it was: no chapter strip.
     expect(find.byKey(const Key('tv-chapters')), findsNothing);
+    // On a computer screen the X, the full screen button and the remote are above the picture (not over it), and they
+    // stay in view (they do not fade away after a few seconds).
+    await tester.pump(const Duration(seconds: 12));
+    final picTop = tester.getRect(find.byKey(const Key('tv-picture'))).top;
+    for (final f in [find.byKey(const Key('tv-fullscreen')), find.text('CH +'), find.text('ADS')]) {
+      expect(f, findsOneWidget);
+      expect(tester.getRect(f).bottom, lessThanOrEqualTo(picTop), reason: 'above the picture');
+      final fade = tester.widgetList<AnimatedOpacity>(find.ancestor(of: f, matching: find.byType(AnimatedOpacity)));
+      expect(fade.every((o) => o.opacity == 1), isTrue);
+    }
+    expect(tester.getRect(find.byKey(const Key('tv-info'))).top, greaterThanOrEqualTo(tester.getRect(find.byKey(const Key('tv-picture'))).bottom), reason: 'the name box is under the picture');
     // Learn more is small and sits in the name bar at the bottom of the picture (not in the middle of the ad).
     final pic = tester.getRect(find.byKey(const Key('tv-picture')));
     final lm = tester.getRect(find.byKey(const Key('tv-learn-more')));
@@ -132,7 +143,10 @@ void main() {
     await tester.tap(find.byKey(const Key('tv-learn-more')));
     await settle(tester);
     expect(find.byKey(const Key('ad-info-sheet')), findsOneWidget);
-    expect(find.text('Home tab, then Core Protocol, then Construction Lab'), findsOneWidget);
+    // After the wait the TV has moved on by itself: Learn more tells about the advert on now.
+    final pill = find.byType(Text).evaluate().map((e) => (e.widget as Text).data ?? '').firstWhere((s) => s.contains('· CH '));
+    final chNow = int.parse(pill.split('CH ').last.trim()) - 1;
+    expect(find.text(kNgmyAds3D[ngmyTvChannelAd(chNow)!].find), findsOneWidget, reason: pill);
     await tester.tap(find.byKey(const Key('ad-info-replay')));
     await settle(tester);
     expect(find.byKey(const Key('ad-info-sheet')), findsNothing);
@@ -153,6 +167,8 @@ void main() {
     await settle(tester);
     final full = tester.getRect(find.byKey(const Key('tv-picture')));
     expect(full.width, closeTo(1200, 1), reason: 'the picture is as wide as the screen');
+    expect(find.text('CH +'), findsNothing, reason: 'no remote in full screen');
+    expect(find.byKey(const Key('tv-fullscreen')), findsOneWidget, reason: 'the button to leave full screen is there');
     await _shotAll(tester, 'tv_full_screen');
     await doubleTap(tester);
     expect(find.byKey(const Key('tv-learn-more')), findsNothing, reason: 'buttons hidden');

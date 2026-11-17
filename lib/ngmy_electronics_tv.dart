@@ -296,11 +296,9 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
   bool _menu = false;
   Timer? _auto;
   double _channelSince = 0;
-  bool _hud = true;
   /// Full screen (like NGMY Slides), and in full screen whether a double tap has hidden the buttons.
   bool _full = false;
   bool _locked = false;
-  Timer? _hudTimer;
 
   /// The TV plays its channels one after another: each one for ten seconds (one whole advert), then the next, round and round.
   Timer? _cycle;
@@ -423,17 +421,7 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
     super.initState();
     _auto = Timer(widget.stayFor, _close);
     _armCycle();
-    _hideHudSoon();
     NgmyTone.play(520, ms: 80, wave: 'tri', volume: 0.25);
-  }
-
-  void _hideHudSoon() {
-    _hudTimer?.cancel();
-    // In full screen the buttons stay until a double tap hides them.
-    if (_full) return;
-    _hudTimer = Timer(const Duration(seconds: 6), () {
-      if (mounted && !_menu) setState(() => _hud = false);
-    });
   }
 
   void _close() {
@@ -444,8 +432,6 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
   void _touched() {
     _auto?.cancel();
     _auto = null;
-    _hud = true;
-    _hideHudSoon();
   }
 
   void _go(int d) {
@@ -479,7 +465,6 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
       ngmyExitFullscreen();
     }
     _auto?.cancel();
-    _hudTimer?.cancel();
     _cycle?.cancel();
     _clock.dispose();
     super.dispose();
@@ -488,6 +473,76 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     final show = _controlsShown;
+    final topRow = Padding(
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+      child: Row(children: [
+        _round(Icons.close_rounded, 'Back to the board', _close),
+        const SizedBox(width: 8),
+        _round(_full ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded, _full ? 'Leave full screen' : 'Full screen', _toggleFull, key: const Key('tv-fullscreen')),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
+            child: Text(_app >= 0 ? '${widget.title} · ${kNgmyApps[_app].name}' : '${widget.title} · CH ${_ch + 1}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12.5)),
+            ),
+          ),
+        ),
+      ]),
+    );
+    final tv = Center(
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: Container(
+          key: const Key('tv-frame'),
+          decoration: _full
+              ? const BoxDecoration(color: Colors.black)
+              : BoxDecoration(borderRadius: BorderRadius.circular(10), border: Border.all(color: _frame, width: _kFrame), boxShadow: [BoxShadow(color: tvBrandAccent(widget.kind).withValues(alpha: 0.25), blurRadius: 40)]),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(_full ? 0 : 4),
+            child: LayoutBuilder(builder: (context, box) {
+              final bar = box.maxHeight * 0.14;
+              final bh = (bar * 0.62).clamp(18.0, 30.0);
+              return Stack(fit: StackFit.expand, children: [
+                // Tap the picture: the phone (or the coin, the card, the medal) spins. Swipe: the next or the previous ad.
+                // In full screen, a double tap hides the buttons or brings them back.
+                GestureDetector(
+                  key: const Key('tv-picture'),
+                  behavior: HitTestBehavior.opaque,
+                  onTapUp: (d) => _tapPicture(d.localPosition, box.biggest),
+                  onDoubleTap: _full ? _toggleLock : null,
+                  onHorizontalDragEnd: (d) {
+                    final v = d.primaryVelocity ?? 0;
+                    if (v.abs() > 120) _swipe(v < 0 ? 1 : -1);
+                  },
+                  child: AnimatedBuilder(
+                    animation: _clock,
+                    builder: (_, __) {
+                      final ms = (_clock.lastElapsedDuration?.inMilliseconds ?? 0).toDouble();
+                      final t = ms / 1000;
+                      // The logo only shows when the TV first starts, not at every channel change.
+                      final age = _channelSince == 0 && widget.showBoot ? t : 99.0;
+                      final tap = t - _tapAt < 1.4 ? NgmyAdTap(_tapPos, t - _tapAt) : null;
+                      final ads = _inAdsApp;
+                      final local = math.max(0.0, t - _adStart);
+                      final pick = ads ? (_adBase + (local / kNgmyAdLength).floor()) % kNgmyAds3D.length : null;
+                      final tt = ads ? local : (age < 3.0 ? t : math.max(0.0, t - _chStart));
+                      return CustomPaint(painter: _TvPainter(_ch, tt, age, _app, tap: tap, pick: pick), size: Size.infinite);
+                    },
+                  ),
+                ),
+                if (_menu) _appsMenu(),
+                // Learn more: small, on the right of the name bar at the bottom of the picture. It hides with the other buttons.
+                if (show && !_menu && _adNow() != null)
+                  Positioned(right: bar * 0.3, bottom: bar / 2 - bh / 2, height: bh, child: _learnMoreButton(bh)),
+              ]);
+            }),
+          ),
+        ),
+      ),
+    );
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
@@ -499,74 +554,32 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
           behavior: HitTestBehavior.opaque,
           onTap: () => setState(_touched),
           onDoubleTap: _full ? _toggleLock : null,
-          child: Stack(fit: StackFit.expand, children: [
-            Center(
-              child: AspectRatio(
-                aspectRatio: 16 / 9,
-                child: Container(
-                  key: const Key('tv-frame'),
-                  decoration: _full
-                      ? const BoxDecoration(color: Colors.black)
-                      : BoxDecoration(borderRadius: BorderRadius.circular(10), border: Border.all(color: _frame, width: _kFrame), boxShadow: [BoxShadow(color: tvBrandAccent(widget.kind).withValues(alpha: 0.25), blurRadius: 40)]),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(_full ? 0 : 4),
-                    child: Stack(fit: StackFit.expand, children: [
-                      // Tap the picture: the phone (or the coin, the card, the medal) spins. Swipe: the next or the previous ad.
-                      // In full screen, a double tap hides the buttons or brings them back.
-                      LayoutBuilder(
-                        builder: (context, box) => GestureDetector(
-                          key: const Key('tv-picture'),
-                          behavior: HitTestBehavior.opaque,
-                          onTapUp: (d) => _tapPicture(d.localPosition, box.biggest),
-                          onDoubleTap: _full ? _toggleLock : null,
-                          onHorizontalDragEnd: (d) {
-                            final v = d.primaryVelocity ?? 0;
-                            if (v.abs() > 120) _swipe(v < 0 ? 1 : -1);
-                          },
-                          child: AnimatedBuilder(
-                            animation: _clock,
-                            builder: (_, __) {
-                              final ms = (_clock.lastElapsedDuration?.inMilliseconds ?? 0).toDouble();
-                              final t = ms / 1000;
-                              // The logo only shows when the TV first starts, not at every channel change.
-                              final age = _channelSince == 0 && widget.showBoot ? t : 99.0;
-                              final tap = t - _tapAt < 1.4 ? NgmyAdTap(_tapPos, t - _tapAt) : null;
-                              final ads = _inAdsApp;
-                              final local = math.max(0.0, t - _adStart);
-                              final pick = ads ? (_adBase + (local / kNgmyAdLength).floor()) % kNgmyAds3D.length : null;
-                              final tt = ads ? local : (age < 3.0 ? t : math.max(0.0, t - _chStart));
-                              return CustomPaint(painter: _TvPainter(_ch, tt, age, _app, tap: tap, pick: pick), size: Size.infinite);
-                            },
-                          ),
-                        ),
-                      ),
-                      if (_menu) _appsMenu(),
-                    ]),
+          child: _full
+              // Full screen: only the picture, with the close and leave full screen buttons over it (no remote).
+              ? Stack(fit: StackFit.expand, children: [
+                  tv,
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    child: AnimatedOpacity(
+                      opacity: show ? 1 : 0,
+                      duration: const Duration(milliseconds: 250),
+                      child: IgnorePointer(ignoring: !show, child: topRow),
+                    ),
                   ),
-                ),
-              ),
-            ),
-            AnimatedOpacity(
-              opacity: show ? 1 : 0,
-              duration: const Duration(milliseconds: 250),
-              child: IgnorePointer(
-                ignoring: !show,
-                child: Column(children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
-                    child: Row(children: [
-                      _round(Icons.close_rounded, 'Back to the board', _close),
-                      const SizedBox(width: 8),
-                      _round(_full ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded, _full ? 'Leave full screen' : 'Full screen', _toggleFull, key: const Key('tv-fullscreen')),
-                      const Spacer(),
-                      Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)), child: Text(_app >= 0 ? '${widget.title} · ${kNgmyApps[_app].name}' : '${widget.title} · CH ${_ch + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12.5))),
-                    ]),
-                  ),
+                ])
+              // Not full screen: the buttons and the remote above the picture and the name box under it, always in
+              // view (on a computer too); the picture takes the room in between.
+              : Column(children: [
+                  topRow,
                   const SizedBox(height: 6),
                   _remote(),
-                  const Spacer(),
+                  const SizedBox(height: 8),
+                  Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: tv)),
                   Container(
-                    margin: const EdgeInsets.all(12),
+                    key: const Key('tv-info'),
+                    margin: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.65), borderRadius: BorderRadius.circular(18)),
                     child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -575,27 +588,6 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
                     ]),
                   ),
                 ]),
-              ),
-            ),
-            // Learn more: small, on the right of the name bar at the bottom of the picture (on top of everything so it can
-            // always be tapped). It hides with the other buttons.
-            if (show && !_menu && _adNow() != null)
-              Positioned.fill(
-                child: LayoutBuilder(builder: (context, box) {
-                  final pic = _pictureRect(box.biggest);
-                  final bar = pic.height * 0.14;
-                  final bh = (bar * 0.62).clamp(18.0, 30.0);
-                  return Stack(children: [
-                    Positioned(
-                      right: box.maxWidth - pic.right + bar * 0.3,
-                      top: pic.bottom - bar / 2 - bh / 2,
-                      height: bh,
-                      child: _learnMoreButton(bh),
-                    ),
-                  ]);
-                }),
-              ),
-          ]),
         ),
       ),
     );
@@ -604,14 +596,8 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
   /// The width of the TV frame around the picture (none in full screen).
   static const double _kFrame = 6;
 
-  /// Where the picture is on the screen: as big as fits at 16:9, in the middle, inside the frame.
-  Rect _pictureRect(Size full) {
-    final w = math.min(full.width, full.height * 16 / 9);
-    final outer = Rect.fromCenter(center: full.center(Offset.zero), width: w, height: w * 9 / 16);
-    return _full ? outer : outer.deflate(_kFrame);
-  }
-
-  bool get _controlsShown => _full ? !_locked : _hud;
+  /// The buttons always show, except in full screen after a double tap hid them.
+  bool get _controlsShown => !_full || !_locked;
 
   /// Full screen, like NGMY Slides: the picture fills the screen and the browser bars go away.
   void _toggleFull() {
@@ -622,7 +608,6 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
       _touched();
     });
     if (on) {
-      _hudTimer?.cancel();
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
       ngmyEnterFullscreen(landscape: true);
     } else {
