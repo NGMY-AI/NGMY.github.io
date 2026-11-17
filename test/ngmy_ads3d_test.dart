@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_ads3d.dart';
 import 'package:ngmy/ngmy_electronics_screens.dart';
 import 'package:ngmy/ngmy_electronics_tv.dart';
+import 'package:ngmy/ngmy_electronics_tv_ads.dart';
 import 'package:ngmy/ngmy_studio_kit.dart';
 
 // The NGMY ads on the lab TVs: real looking commercials (a 3D phone in a studio, a 3D hero object, an end card) that
@@ -40,6 +41,16 @@ Future<void> _save(ui.Image img, String name) async {
 
 void main() {
   setUp(() => NgmyTone.enabled = false);
+
+  test('channel 6, Spark Adventure, draws at every size and moment', () {
+    for (final s in [const Size(66, 38), const Size(320, 180), const Size(1280, 720), const Size(360, 640)]) {
+      for (var t = 0.0; t < 20; t += 0.37) {
+        final rec = ui.PictureRecorder();
+        paintSparkAdventure(Canvas(rec), s, t);
+        rec.endRecording().dispose();
+      }
+    }
+  });
 
   test('every ad draws at every size and every moment without failing', () {
     final sizes = [const Size(24, 44), const Size(54, 38), const Size(66, 38), const Size(320, 180), const Size(1280, 720), const Size(360, 640), const Size(200, 200)];
@@ -92,6 +103,11 @@ void main() {
       await shot(5, 4.8, const Size(360, 640), 'ad_portrait_feature');
       await shot(13, 7.8, const Size(360, 640), 'ad_portrait_card');
       await shot(8, 7.6, const Size(960, 540), 'ad_8_coin');
+      for (final t in [1.0, 2.0, 4.0, 6.5, 8.6]) {
+        final rec = ui.PictureRecorder();
+        paintSparkAdventure(Canvas(rec), const Size(960, 540), t);
+        await _save(await rec.endRecording().toImage(960, 540), 'spark_${(t * 10).round()}');
+      }
     });
   });
 

@@ -338,6 +338,35 @@ void main() {
   });
 
 
+  testWidgets('two quick taps on the red "Tap the red one to wire it" box open the wiring work', (t) async {
+    t.view.physicalSize = const Size(900, 1800);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(const MaterialApp(home: NgmyHousePage(lesson: 'outlet')));
+    for (var i = 0; i < 12; i++) {
+      await t.pump(const Duration(milliseconds: 100));
+    }
+    await _chip(t, '🔭 See the whole room');
+    for (var i = 0; i < 30; i++) {
+      await t.pump(const Duration(milliseconds: 100));
+    }
+    final at = _find3d(t, idHLessonHint);
+    expect(at, isNotNull, reason: 'the box can be tapped');
+    // One tap only says what to do.
+    await t.tapAt(at!);
+    await t.pump(const Duration(milliseconds: 900));
+    expect(find.text('Breaker ON (live)'), findsNothing);
+    // Two quick taps open the wiring bench.
+    final again = _find3d(t, idHLessonHint)!;
+    await t.tapAt(again);
+    await t.pump(const Duration(milliseconds: 120));
+    await t.tapAt(again);
+    await t.pump(const Duration(milliseconds: 800));
+    await t.pump(const Duration(milliseconds: 800));
+    expect(find.text('Breaker ON (live)'), findsOneWidget);
+    await t.pump(const Duration(seconds: 12));
+  });
+
   testWidgets('the dryer outlet room is called after what is fixed, shows that outlet, has a search icon and lists only the equipment that fits', (t) async {
     t.view.physicalSize = const Size(900, 1800);
     t.view.devicePixelRatio = 2.0;

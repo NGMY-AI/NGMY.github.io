@@ -474,7 +474,8 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
   Widget build(BuildContext context) {
     final show = _controlsShown;
     final topRow = Padding(
-      padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+      // In full screen the buttons come down below the phone clock and notch (and a little more), so they are easy to reach.
+      padding: EdgeInsets.fromLTRB(10, _full ? MediaQuery.paddingOf(context).top + 26 : 10, 10, 0),
       child: Row(children: [
         _round(Icons.close_rounded, 'Back to the board', _close),
         const SizedBox(width: 8),

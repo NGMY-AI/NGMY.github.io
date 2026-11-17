@@ -374,7 +374,8 @@ class _NgmyDeviceScreenState extends State<NgmyDeviceScreen> with SingleTickerPr
     final dev = _dev;
     final show = _controlsShown;
     final topRow = Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+      // In full screen the buttons come down below the phone clock and notch (and a little more), so they are easy to reach.
+      padding: EdgeInsets.fromLTRB(8, _full ? MediaQuery.paddingOf(context).top + 26 : 8, 8, 0),
       child: Row(children: [
         _round(Icons.close_rounded, 'Back to the board', () => Navigator.of(context).maybePop()),
         const SizedBox(width: 8),
@@ -634,7 +635,7 @@ class _NgmyDeviceScreenState extends State<NgmyDeviceScreen> with SingleTickerPr
                   Positioned.fill(
                     child: Padding(
                       // In full screen the window sits below the X and full screen buttons that float at the top.
-                      padding: EdgeInsets.fromLTRB(26, _full ? 40 : 12, 26, 58),
+                      padding: EdgeInsets.fromLTRB(26, _full ? MediaQuery.paddingOf(context).top + 52 : 12, 26, 58),
                       child: Container(
                         decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white24), boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 16)]),
                         child: ClipRRect(

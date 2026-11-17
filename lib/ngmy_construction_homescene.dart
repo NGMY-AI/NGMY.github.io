@@ -28,6 +28,7 @@ const int idHOutletA = 700, idHOutletB = 701, idHSwitch = 702, idHLight = 703;
 const int idHResident = 900; // + the resident's number: a person who lives in the house
 const int idHApp = 720; // + 0 or 1 (or 2 and up for added outlets): what is plugged in
 const int idHWallTv = 730;
+const int idHLessonHint = 740; // the red "Tap the red one to wire it" box of a lesson: two quick taps open the wiring work
 const int idHCam = 19000; // + 0 to 3: the cameras in the corners of the hall
 const int idHTag = 20000; // + a furniture number: the red tag over a dark house or a street light that is out
 const int idHExtra = 800; // + number: an outlet or switch the visitor added
@@ -528,7 +529,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
     final todo = r.missing;
     labels.add(Label3D(V3(lightX, h - 26, lightZ), todo.isEmpty ? '⚡ No power: needs wiring' : '⚡ Still to wire: ${todo.join(', ')}', const Color(0xFFDC2626)));
   }
-  if (r.lesson.isNotEmpty && !r.lessonDone && !r.lessonIsPlumbing) labels.add(Label3D(V3(0, 4, 24), '👆 Tap the red one to wire it', const Color(0xFFDC2626)));
+  if (r.lesson.isNotEmpty && !r.lessonDone && !r.lessonIsPlumbing) labels.add(Label3D(V3(0, 4, 24), '👆 Tap the red one to wire it', const Color(0xFFDC2626), id: idHLessonHint));
 
   // ── What is plugged in ──
   b.order = 2;

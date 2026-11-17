@@ -260,7 +260,28 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   }
 
   /// Double tap: go to where you tapped. Standing in a room that walks you there; from above or outside it takes you closer.
+  /// When the lesson's "Tap the red one to wire it" box was last tapped: two quick taps on it open the wiring work.
+  DateTime? _hintTapAt;
+  DateTime? _lessonOpenedAt;
+
+  void _tapLessonHint() {
+    final now = DateTime.now();
+    final last = _hintTapAt;
+    if (last != null && now.difference(last) < const Duration(milliseconds: 500)) {
+      _hintTapAt = null;
+      _lessonOpenedAt = now;
+      _openLesson();
+      return;
+    }
+    _hintTapAt = now;
+    _say('Tap this box twice quickly to start wiring, or tap the red one.');
+  }
+
   void _doubleTap(Offset p, Size size) {
+    // A double tap on the lesson box opens the wiring work (see _tapLessonHint), not a walk to that spot.
+    final hint = _hintTapAt;
+    if (hint != null && DateTime.now().difference(hint) < const Duration(milliseconds: 700)) return;
+    if (_lessonOpenedAt != null && DateTime.now().difference(_lessonOpenedAt!) < const Duration(milliseconds: 700)) return;
     final spot = cam.floorPoint(p, size);
     if (spot == null) return;
     final r = room;
@@ -362,6 +383,10 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
 
   void _pick(int id) {
     if (id == 0) return;
+    if (id == idHLessonHint) {
+      _tapLessonHint();
+      return;
+    }
     if (id >= idHCam && id < idHCam + 4) {
       _eyeAt(id - idHCam);
       return;
