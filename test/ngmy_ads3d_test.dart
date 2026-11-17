@@ -95,64 +95,85 @@ void main() {
     });
   });
 
-  testWidgets('on the big TV: tap the picture, pick an ad chapter, and Learn more says where to find it', (tester) async {
+  Future<void> settle(WidgetTester tester) async {
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+  }
+
+  Future<void> doubleTap(WidgetTester tester) async {
+    await tester.tap(find.byKey(const Key('tv-picture')));
+    await tester.pump(const Duration(milliseconds: 60));
+    await tester.tap(find.byKey(const Key('tv-picture')));
+    await settle(tester);
+  }
+
+  testWidgets('on the big TV: tap the picture, small Learn more in the name bar, swipe, full screen and double tap', (tester) async {
     tester.view.physicalSize = const Size(1200, 760);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
     await _loadFonts();
     await tester.pumpWidget(MaterialApp(theme: ThemeData(fontFamily: 'Roboto'), builder: (c, child) => RepaintBoundary(key: const Key('snap-all'), child: child), home: const NgmyTvScreen(channel: 2, showBoot: false, stayFor: Duration(minutes: 30))));
     await tester.pump(const Duration(milliseconds: 500));
-    // Channel 3 is the Construction Lab advert: the chapters list every channel, and Learn more is there.
-    expect(find.byKey(const Key('tv-chapters')), findsOneWidget);
-    expect(find.byKey(const Key('tv-learn-more')), findsOneWidget);
+    // The bottom box is as it was: no chapter strip.
+    expect(find.byKey(const Key('tv-chapters')), findsNothing);
+    // Learn more is small and sits in the name bar at the bottom of the picture (not in the middle of the ad).
+    final pic = tester.getRect(find.byKey(const Key('tv-picture')));
+    final lm = tester.getRect(find.byKey(const Key('tv-learn-more')));
+    expect(lm.height, lessThanOrEqualTo(30));
+    expect(lm.center.dy, greaterThan(pic.bottom - pic.height * 0.14));
+    expect(lm.bottom, lessThanOrEqualTo(pic.bottom));
+    expect(lm.right, lessThanOrEqualTo(pic.right));
+    await _shotAll(tester, 'tv_big_screen');
+
     await tester.tap(find.byKey(const Key('tv-picture')));
     await tester.pump(const Duration(milliseconds: 300));
     expect(tester.takeException(), isNull);
     await tester.tap(find.byKey(const Key('tv-learn-more')));
-    for (var i = 0; i < 8; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
-    }
+    await settle(tester);
     expect(find.byKey(const Key('ad-info-sheet')), findsOneWidget);
     expect(find.text('Home tab, then Core Protocol, then Construction Lab'), findsOneWidget);
     await tester.tap(find.byKey(const Key('ad-info-replay')));
-    for (var i = 0; i < 8; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
-    }
+    await settle(tester);
     expect(find.byKey(const Key('ad-info-sheet')), findsNothing);
 
-    // The ADS key opens the NGMY Ads app; its chapters are the ads, and picking one plays it.
+    // The ADS key opens the NGMY Ads app (ad 1 first); a swipe goes to the next ad.
     await tester.tap(find.text('ADS'));
     await tester.pump(const Duration(milliseconds: 400));
-    await tester.dragUntilVisible(find.byKey(const Key('tv-chapter-7')), find.byKey(const Key('tv-chapters')), const Offset(-150, 0));
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.byKey(const Key('tv-chapter-7')));
-    await tester.pump(const Duration(milliseconds: 400));
-    await _shotAll(tester, 'tv_big_screen');
-    await tester.tap(find.byKey(const Key('tv-learn-more')));
-    for (var i = 0; i < 8; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
-    }
-    expect(find.text('NGMY Wallet'), findsWidgets, reason: 'chapter 8 is the Wallet ad');
-    await tester.tap(find.byKey(const Key('ad-info-ok')));
-    for (var i = 0; i < 8; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
-    }
-    // A swipe goes to the next ad.
     await tester.fling(find.byKey(const Key('tv-picture')), const Offset(-300, 0), 1200);
     await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('tv-learn-more')));
-    for (var i = 0; i < 8; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
-    }
-    expect(find.text('NGMY Game Center'), findsWidgets);
+    await settle(tester);
+    expect(find.text('NGMY Jobs and Help'), findsWidgets);
     await tester.tap(find.byKey(const Key('ad-info-ok')));
-    for (var i = 0; i < 8; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
-    }
+    await settle(tester);
+
+    // Full screen: the picture fills the screen; a double tap hides every button, another brings them back.
+    await tester.tap(find.byKey(const Key('tv-fullscreen')));
+    await settle(tester);
+    final full = tester.getRect(find.byKey(const Key('tv-picture')));
+    expect(full.width, closeTo(1200, 1), reason: 'the picture is as wide as the screen');
+    await _shotAll(tester, 'tv_full_screen');
+    await doubleTap(tester);
+    expect(find.byKey(const Key('tv-learn-more')), findsNothing, reason: 'buttons hidden');
+    final hud = tester.widget<AnimatedOpacity>(find.ancestor(of: find.byKey(const Key('tv-fullscreen')), matching: find.byType(AnimatedOpacity)).first);
+    expect(hud.opacity, 0);
+    // They stay hidden (no timer brings them back) until the next double tap.
+    await tester.pump(const Duration(seconds: 8));
+    expect(find.byKey(const Key('tv-learn-more')), findsNothing);
+    await doubleTap(tester);
+    expect(find.byKey(const Key('tv-learn-more')), findsOneWidget);
+    // And the buttons do not hide by themselves in full screen.
+    await tester.pump(const Duration(seconds: 8));
+    expect(find.byKey(const Key('tv-learn-more')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('tv-fullscreen')));
+    await settle(tester);
+    expect(tester.getRect(find.byKey(const Key('tv-picture'))).width, lessThan(1200));
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 1));
   });
 }
+
 
 Future<void> _shotAll(WidgetTester tester, String name) async {
   if (Platform.environment['NGMY_SNAP_DIR'] == null) return;
