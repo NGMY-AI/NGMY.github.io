@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'ngmy_text_cache.dart';
 import 'package:flutter/services.dart';
 
 import 'ngmy_fullscreen_stub.dart' if (dart.library.html) 'ngmy_fullscreen_web.dart';
@@ -86,12 +87,7 @@ void paintNgmyTv(Canvas c, Size s, int channel, double t, {double age = 99, int 
 }
 
 void _text(Canvas c, String t, Offset o, double size, Color col, {bool bold = true, TextAlign align = TextAlign.left, double? width, double spacing = 0}) {
-  final tp = TextPainter(
-    text: TextSpan(text: t, style: TextStyle(color: col, fontSize: size, fontWeight: bold ? FontWeight.w900 : FontWeight.w600, letterSpacing: spacing)),
-    textDirection: TextDirection.ltr,
-    textAlign: align,
-    maxLines: 1,
-  )..layout(maxWidth: width ?? 9999);
+  final tp = ngmyCachedText(t, TextStyle(color: ngmyTextColorStep(col), fontSize: ngmyTextSizeStep(size), fontWeight: bold ? FontWeight.w900 : FontWeight.w600, letterSpacing: spacing), align: align, maxWidth: width ?? 9999);
   final dx = align == TextAlign.center && width != null ? (width - tp.width) / 2 : 0.0;
   tp.paint(c, o + Offset(dx, 0));
 }
@@ -120,7 +116,7 @@ void _bug(Canvas c, Size s, String label) {
 
 /// Text that shrinks to fit its box and sits in the middle of it.
 void _fit(Canvas c, String text, Rect box, double size, Color col, {bool bold = true, double spacing = 0}) {
-  TextPainter make(double v) => TextPainter(text: TextSpan(text: text, style: TextStyle(color: col, fontSize: v, fontWeight: bold ? FontWeight.w900 : FontWeight.w700, letterSpacing: spacing)), textDirection: TextDirection.ltr, maxLines: 1)..layout();
+  TextPainter make(double v) => ngmyCachedText(text, TextStyle(color: ngmyTextColorStep(col), fontSize: ngmyTextSizeStep(v), fontWeight: bold ? FontWeight.w900 : FontWeight.w700, letterSpacing: spacing));
   var tp = make(size);
   if (tp.width > box.width && tp.width > 0) tp = make(size * box.width / tp.width);
   tp.paint(c, box.center - Offset(tp.width / 2, tp.height / 2));

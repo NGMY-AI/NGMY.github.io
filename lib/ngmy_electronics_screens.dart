@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'ngmy_text_cache.dart';
 import 'package:flutter/services.dart';
 
 import 'ngmy_ads3d.dart';
@@ -16,11 +17,7 @@ export 'ngmy_ads3d.dart' show NgmyAdTap, NgmyAdSpec, NgmyAdInfoSheet, kNgmyAds3D
 /// Draws [text] centred on [center], shrinking it so that it never gets wider than [maxW].
 void _label(Canvas c, String text, Offset center, double size, Color col, {double maxW = 9999, bool bold = true, double spacing = 0}) {
   var sz = size;
-  TextPainter make(double s) => TextPainter(
-        text: TextSpan(text: text, style: TextStyle(color: col, fontSize: s, fontWeight: bold ? FontWeight.w900 : FontWeight.w600, letterSpacing: spacing)),
-        textDirection: TextDirection.ltr,
-        maxLines: 1,
-      )..layout();
+  TextPainter make(double s) => ngmyCachedText(text, TextStyle(color: ngmyTextColorStep(col), fontSize: ngmyTextSizeStep(s), fontWeight: bold ? FontWeight.w900 : FontWeight.w600, letterSpacing: spacing));
   var tp = make(sz);
   if (tp.width > maxW && tp.width > 0) {
     sz = math.max(2.0, sz * maxW / tp.width);

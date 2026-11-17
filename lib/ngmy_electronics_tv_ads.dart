@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'ngmy_text_cache.dart';
 
 // Channel 6 of the lab TV: Spark Adventure, a short 3D film. A real looking circuit board is seen at an angle in a dark
 // studio: gold tracks, a battery standing up, a switch whose lever drops shut, a striped resistor, a blue capacitor,
@@ -16,7 +17,9 @@ double _ease(double x) => Curves.easeOutCubic.transform(x.clamp(0.0, 1.0));
 
 double _text(Canvas c, String s, Offset o, double size, Color col, {double maxW = 1e9, double align = 0, FontWeight w = FontWeight.w900, double ls = 0, List<Color>? grad}) {
   if (size < 1 || s.isEmpty) return 0;
-  TextPainter make(double v) => TextPainter(
+  TextPainter make(double v) => grad == null
+      ? ngmyCachedText(s, TextStyle(fontFamily: _kFont, fontSize: ngmyTextSizeStep(v), fontWeight: w, letterSpacing: ls, height: 1.1, color: ngmyTextColorStep(col)))
+      : TextPainter(
         text: TextSpan(
           text: s,
           style: TextStyle(
@@ -25,8 +28,7 @@ double _text(Canvas c, String s, Offset o, double size, Color col, {double maxW 
             fontWeight: w,
             letterSpacing: ls,
             height: 1.1,
-            color: grad == null ? col : null,
-            foreground: grad == null ? null : (Paint()..shader = LinearGradient(colors: grad).createShader(Rect.fromLTWH(o.dx - align * maxW.clamp(0, 4000), o.dy, maxW.clamp(1, 4000).toDouble(), v))),
+            foreground: Paint()..shader = LinearGradient(colors: grad).createShader(Rect.fromLTWH(o.dx - align * maxW.clamp(0, 4000), o.dy, maxW.clamp(1, 4000).toDouble(), v)),
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -344,7 +346,7 @@ void paintSparkAdventure(Canvas c, Size s, double t) {
     step = 4;
   }
   if (caption != null) {
-    final tp = TextPainter(text: TextSpan(text: caption, style: TextStyle(fontFamily: _kFont, fontSize: u * 0.045, fontWeight: FontWeight.w800, color: Colors.white)), textDirection: TextDirection.ltr, maxLines: 1)..layout();
+    final tp = ngmyCachedText(caption, TextStyle(fontFamily: _kFont, fontSize: ngmyTextSizeStep(u * 0.045), fontWeight: FontWeight.w800, color: Colors.white));
     final pad = u * 0.025;
     final badge = u * 0.06;
     final pill = RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.05, h * 0.66, badge + pad * 3 + tp.width, tp.height + pad * 1.4), Radius.circular(u * 0.04));

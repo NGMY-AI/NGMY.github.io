@@ -895,7 +895,8 @@ class Scene3DPainter extends CustomPainter {
     // Painting a picture (an ad) is the dearest thing in a frame, so only the biggest few are painted in full and the small, far ones are a flat colour.
     final areas = <double>[];
     final fullAt = <double>[0.0];
-    var newPics = 0, stalePics = 0;
+    // How many ad pictures may be made fresh in this frame (the rest show the one made a moment ago).
+    final budget = <int>[4];
     final nStatic = scene.screens.length;
     for (var si = 0; si < allScreens.length; si++) {
       final sq = allScreens[si];
@@ -926,33 +927,15 @@ class Scene3DPainter extends CustomPainter {
         final area = qb.width * qb.height;
         areas.add(area);
         drawn.add(_Face(path, Colors.transparent, mid.z - sq.bias, sq.id, false, false, (c) {
-          if (!isStatic || area >= fullAt[0]) {
-            // The biggest few (and the moving ones) are painted live, so they play smoothly.
-            _drawQuad(c, sq, pts, time);
+          // Every screen shows a picture of its ad that is made again a few times a second (often for the big near
+          // ones, less for the small far ones) and reused in between, so a room full of TVs stays smooth.
+          final big = area >= fullAt[0];
+          final key = isStatic ? sq : 'moving:${si - nStatic}:${sq.width}x${sq.height}';
+          final img = _screenImage(key, sq, time, fps: big ? 20 : (isStatic ? 5 : 12), scale: _screenScale(sq, area), budget: budget);
+          if (img != null) {
+            _drawImageQuad(c, img, sq, pts);
           } else {
-            // The rest show the real ad too, from a picture of it that is made again a few times a second: far away it is the same ad, not a plain colour.
-            final cached = _adCache[sq];
-            final bucket = (time * 5).floor();
-            if (cached == null ? newPics < 10 : (cached.bucket != bucket && stalePics < 3)) {
-              final rec = ui.PictureRecorder();
-              sq.paint(Canvas(rec), Size(sq.width, sq.height), time);
-              cached?.pic.dispose();
-              _adCache[sq] = _AdPic(bucket, rec.endRecording());
-              cached == null ? newPics++ : stalePics++;
-            }
-            final pic = _adCache[sq]?.pic;
-            if (pic != null) {
-              final m = _quadMatrix(pts, sq.width, sq.height);
-              if (m != null) {
-                c.save();
-                c.transform(m.storage);
-                c.clipRect(Rect.fromLTWH(0, 0, sq.width, sq.height));
-                c.drawPicture(pic);
-                c.restore();
-              }
-            } else {
-              c.drawPath(path, Paint()..color = const Color(0xFF1F2937));
-            }
+            c.drawPath(path, Paint()..color = const Color(0xFF1F2937));
           }
         }, sq.order, sq.group));
         continue;
@@ -972,7 +955,12 @@ class Scene3DPainter extends CustomPainter {
         }
       }
       if (cells.isEmpty) continue;
-      drawn.add(_Face(path, Colors.transparent, mid.z - sq.bias, sq.id, false, false, (c) => _drawQuadCells(c, sq, cells, nx, ny, time), sq.order, sq.group));
+      final cellKey = isStatic ? sq : 'moving:${si - nStatic}:${sq.width}x${sq.height}';
+      drawn.add(_Face(path, Colors.transparent, mid.z - sq.bias, sq.id, false, false, (c) {
+        // Up close the screen is cut into patches; they all show parts of one picture of the ad (not the ad drawn again for each patch).
+        final img = _screenImage(cellKey, sq, time, fps: 20, scale: _screenScale(sq, double.infinity), budget: budget);
+        if (img != null) _drawImageCells(c, img, sq, cells, nx, ny);
+      }, sq.order, sq.group));
     }
     areas.sort((a, b) => b.compareTo(a));
     fullAt[0] = areas.length > 6 ? areas[5] : 0.0;
@@ -1088,44 +1076,79 @@ Matrix4? _quadMatrix(List<Offset> p, double w, double h) {
   return Matrix4(a / w, d / w, 0, g / w, b / h, e / h, 0, hh / h, 0, 0, 1, 0, x0, y0, 0, 1);
 }
 
-/// A picture of an ad made a moment ago, kept so a screen that is not one of the biggest does not have to be painted from nothing every frame.
-class _AdPic {
-  _AdPic(this.bucket, this.pic);
+/// A picture of an ad made a moment ago: a screen shows it until it is time for a new one, so the ad is not painted
+/// from nothing every frame (and up close it is not painted again for every patch of the screen).
+class _AdImg {
+  _AdImg(this.bucket, this.image, this.scale);
   final int bucket;
-  final ui.Picture pic;
+  final ui.Image image;
+  final double scale;
 }
 
-final Expando<_AdPic> _adCache = Expando<_AdPic>();
+/// The latest pictures, the most recently used last. Old ones are let go so the phone memory stays small.
+final Map<Object, _AdImg> _adImgs = <Object, _AdImg>{};
+const int _kMaxAdImgs = 32;
 
-void _drawQuad(Canvas canvas, ScreenQuad sq, List<Offset> p, double t) {
-  final w = sq.width, hh = sq.height;
-  final m = _quadMatrix(p, w, hh);
+/// How sharp the picture of a screen is made: twice as sharp when the screen is big on the screen of the phone.
+double _screenScale(ScreenQuad sq, double area) {
+  final base = sq.width * sq.height;
+  final want = area > base * 1.3 ? 2.0 : 1.0;
+  final maxDim = math.max(sq.width, sq.height);
+  return math.min(want, 1600 / maxDim).clamp(0.5, 2.0);
+}
+
+/// The picture of [sq] for this moment: made fresh when it is time ([fps] times a second) and the frame still has
+/// [budget] left, otherwise the one made a moment ago.
+ui.Image? _screenImage(Object key, ScreenQuad sq, double time, {required double fps, required double scale, required List<int> budget}) {
+  final bucket = (time * fps).floor();
+  final have = _adImgs.remove(key);
+  if (have != null) _adImgs[key] = have;
+  final stale = have == null || have.bucket != bucket || have.scale != scale;
+  if (stale && budget[0] > 0) {
+    budget[0]--;
+    final rec = ui.PictureRecorder();
+    final c = Canvas(rec);
+    c.scale(scale);
+    c.clipRect(Rect.fromLTWH(0, 0, sq.width, sq.height));
+    sq.paint(c, Size(sq.width, sq.height), time);
+    final pic = rec.endRecording();
+    final img = pic.toImageSync(math.max(1, (sq.width * scale).round()), math.max(1, (sq.height * scale).round()));
+    pic.dispose();
+    have?.image.dispose();
+    _adImgs[key] = _AdImg(bucket, img, scale);
+    while (_adImgs.length > _kMaxAdImgs) {
+      final k = _adImgs.keys.first;
+      _adImgs.remove(k)!.image.dispose();
+    }
+    return img;
+  }
+  return have?.image;
+}
+
+final Paint _imgPaint = Paint()..filterQuality = FilterQuality.medium;
+
+/// A picture laid on the four corners [p] of a screen.
+void _drawImageQuad(Canvas canvas, ui.Image img, ScreenQuad sq, List<Offset> p) {
+  final m = _quadMatrix(p, sq.width, sq.height);
   if (m == null) return;
   canvas.save();
   canvas.transform(m.storage);
-  canvas.clipRect(Rect.fromLTWH(0, 0, w, hh));
-  sq.paint(canvas, Size(w, hh), t);
+  canvas.drawImageRect(img, Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()), Rect.fromLTWH(0, 0, sq.width, sq.height), _imgPaint);
   canvas.restore();
 }
 
-/// A screen cut into [nx] by [ny] patches: the picture is recorded once and each patch shows its own part of it.
-void _drawQuadCells(Canvas canvas, ScreenQuad sq, List<(int, int, List<Offset>)> cells, int nx, int ny, double t) {
-  final w = sq.width, hh = sq.height;
-  final rec = ui.PictureRecorder();
-  sq.paint(Canvas(rec), Size(w, hh), t);
-  final pic = rec.endRecording();
-  final cw = w / nx, ch = hh / ny;
+/// A screen cut into [nx] by [ny] patches: each patch shows its own part of the one picture.
+void _drawImageCells(Canvas canvas, ui.Image img, ScreenQuad sq, List<(int, int, List<Offset>)> cells, int nx, int ny) {
+  final cw = sq.width / nx, ch = sq.height / ny;
+  final sx = img.width / sq.width, sy = img.height / sq.height;
   for (final (i, j, pts) in cells) {
     final m = _quadMatrix(pts, cw, ch);
     if (m == null) continue;
     canvas.save();
     canvas.transform(m.storage);
-    canvas.clipRect(Rect.fromLTWH(0, 0, cw, ch));
-    canvas.translate(-i * cw, -j * ch);
-    canvas.drawPicture(pic);
+    canvas.drawImageRect(img, Rect.fromLTWH(i * cw * sx, j * ch * sy, cw * sx, ch * sy), Rect.fromLTWH(0, 0, cw, ch), _imgPaint);
     canvas.restore();
   }
-  pic.dispose();
 }
 
 class _Face {

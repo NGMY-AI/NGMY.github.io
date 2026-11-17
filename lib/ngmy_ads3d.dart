@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_text_cache.dart';
+
 // ═════════════════════════════════════════════════════════════════════════════
 // NGMY ads, made like real TV commercials: a studio with soft light and a floor, a real looking phone that turns in
 // 3D and shows the feature working on its screen, a 3D hero object (a gold coin, a card that flips, a medal), and an
@@ -429,14 +431,18 @@ Color _lift(Color c, double k) => Color.lerp(c, Colors.white, k)!;
 Color _sink(Color c, double k) => Color.lerp(c, Colors.black, k)!;
 
 TextPainter _tp(String s, double size, Color col, {FontWeight w = FontWeight.w900, double ls = 0, Shader? shader, int lines = 1, double? width}) {
+  if (shader == null) {
+    // Plain words are laid out once and reused (see ngmy_text_cache.dart).
+    final style = TextStyle(fontFamily: _kFont, fontSize: ngmyTextSizeStep(size), fontWeight: w, letterSpacing: (ls * 4).roundToDouble() / 4, height: 1.12, color: ngmyTextColorStep(col));
+    return ngmyCachedText(s, style, maxLines: lines, ellipsis: lines > 1 ? '…' : null, maxWidth: width ?? double.infinity);
+  }
   final style = TextStyle(
     fontFamily: _kFont,
     fontSize: size,
     fontWeight: w,
     letterSpacing: ls,
     height: 1.12,
-    color: shader == null ? col : null,
-    foreground: shader == null ? null : (Paint()..shader = shader),
+    foreground: Paint()..shader = shader,
   );
   return TextPainter(text: TextSpan(text: s, style: style), textDirection: TextDirection.ltr, maxLines: lines, ellipsis: lines > 1 ? '…' : null)..layout(maxWidth: width ?? double.infinity);
 }
@@ -456,23 +462,14 @@ double _text(Canvas c, String s, Offset o, double size, Color col, {double maxW 
 
 /// Text that wraps on up to [lines] lines inside [width]. Returns its height.
 double _para(Canvas c, String s, Offset o, double size, Color col, double width, {double align = 0, int lines = 2, FontWeight w = FontWeight.w600}) {
-  final tp = TextPainter(
-    text: TextSpan(text: s, style: TextStyle(fontFamily: _kFont, fontSize: size, fontWeight: w, color: col, height: 1.25)),
-    textDirection: TextDirection.ltr,
-    textAlign: align == 0 ? TextAlign.left : TextAlign.center,
-    maxLines: lines,
-    ellipsis: '…',
-  )..layout(maxWidth: width);
+  final tp = ngmyCachedText(s, TextStyle(fontFamily: _kFont, fontSize: ngmyTextSizeStep(size), fontWeight: w, color: ngmyTextColorStep(col), height: 1.25), align: align == 0 ? TextAlign.left : TextAlign.center, maxLines: lines, ellipsis: '…', maxWidth: width);
   tp.paint(c, Offset(align == 0 ? o.dx : o.dx - width / 2, o.dy));
   return tp.height;
 }
 
 void _icon(Canvas c, IconData i, Offset center, double size, Color col) {
   if (size < 1) return;
-  final tp = TextPainter(
-    text: TextSpan(text: String.fromCharCode(i.codePoint), style: TextStyle(fontSize: size, fontFamily: i.fontFamily, package: i.fontPackage, color: col, height: 1)),
-    textDirection: TextDirection.ltr,
-  )..layout();
+  final tp = ngmyCachedText(String.fromCharCode(i.codePoint), TextStyle(fontSize: ngmyTextSizeStep(size), fontFamily: i.fontFamily, package: i.fontPackage, color: ngmyTextColorStep(col), height: 1));
   tp.paint(c, center - Offset(tp.width / 2, tp.height / 2));
 }
 
