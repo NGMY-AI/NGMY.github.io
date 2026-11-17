@@ -1,8 +1,9 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
-$__dart_deferred_initializers__.current=function(a,b,c,$){var A,B,C
+$__dart_deferred_initializers__.current=function(a,b,c,$){var A,C,B
 A=c[0]
-B=c[2]
-C=c[84]
-var z=a.updateTypes([]);(function constants(){C.F_=new A.F(!0,B.bX,null,null,null,null,13,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-C.abL=new A.F(!0,B.aR,null,null,null,null,12.5,null,null,null,null,null,1.35,null,null,null,null,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["4HT7GrngdwbW5AAeCxh68Y5FZCw="]=a.current})($__dart_deferred_initializers__);
+C=c[2]
+B=c[203]
+var z=a.updateTypes([]);(function constants(){B.lI=new A.u(1,0.5450980392156862,0.27058823529411763,0.07450980392156863,C.q)
+B.ajP=new A.u(1,0.07058823529411765,0.0392156862745098,0.13333333333333333,C.q)
+B.a4c=new A.a_(984557,"MaterialIcons",!1)})()};
+(a=>{a["CWsmjoGeC0cgvLbL5u4H4FA4uuI="]=a.current})($__dart_deferred_initializers__);
