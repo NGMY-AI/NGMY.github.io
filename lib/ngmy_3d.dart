@@ -361,6 +361,13 @@ class Cam3 extends ChangeNotifier {
       d = math.min(d, math.max(minDist, room));
       // The camera cannot go back any further (the wall is behind it): zooming out then widens the view instead, like standing back in a small room.
       if (widen && w > d) lens = math.sqrt(d / w).clamp(minLens, 1.0).toDouble();
+      // The camera itself always stays inside the walls. When the point it turns round is on a wall (you zoomed in on an
+      // outlet) or close to one, turning would swing it out through the wall and you would see the room from outside;
+      // instead it stops at the wall and turns where it stands, so you see the other side of the room.
+      final ex = target.x + dx * d, ey = target.y + dy * d, ez = target.z + dz * d;
+      double inside(double v, double lo, double hi) => lo > hi ? (lo + hi) / 2 : v.clamp(lo, hi).toDouble();
+      final cx = inside(ex, k.$1 + m, k.$2 - m), cy = inside(ey, low, k.$5 - m), cz = inside(ez, k.$3 + m, k.$4 - m);
+      if (cx != ex || cy != ey || cz != ez) target = V3(cx - dx * d, cy - dy * d, cz - dz * d);
     }
     dist = d;
     _lastSet = d;
