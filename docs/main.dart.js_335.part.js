@@ -598,8 +598,8 @@ D.hz9=new C.yQ("hotlines","Hotlines",B.wS,B.aQ,G.ayx)
 D.hz6=new C.yQ("medicines","Medicines",B.zF,B.bE,G.aAs)
 D.hzf=new C.yQ("notes","Notes",I.a3A,B.bc,G.aCL)
 D.hzd=new C.yQ("tasks","Quick Tasks",B.De,B.bw,B.a6z)
-D.dC0=x([B.aB,B.bc],y.O)
-D.hze=new C.yQ("where","Where I Put It",B.n6,B.bc,D.dC0)
+D.dC_=x([B.aB,B.bc],y.O)
+D.hze=new C.yQ("where","Where I Put It",B.n6,B.bc,D.dC_)
 D.d9k=x([B.fs,B.aQ],y.O)
 D.hz8=new C.yQ("alarms","Alarms",B.a2X,B.c6,D.d9k)
 D.drD=x([B.on,B.cD],y.O)
@@ -612,4 +612,4 @@ D.fh1=new A.av(0,42)
 D.fjl=new A.hJ(2,10,10,1.28,null)
 D.fEG=new A.F(!0,B.c,null,null,null,null,12,B.u,null,null,null,null,1.15,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.h4O=new A.B("Open / add",null,B.ce,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["U45yXqRGGR636joCo53Zo/gDlOA="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["Rnk7P3T8dGkTlEEDmibFgNQ4Zmw="]=a.current})($__dart_deferred_initializers__);

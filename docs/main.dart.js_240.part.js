@@ -3412,7 +3412,7 @@ w=h?B.j4:B.jo
 v=A.l(14)
 u=A.K(h?B.jD:B.bj,B.r,1)
 r=A.a([],f)
-for(q=A.h8y(D.dBq,0,x.m),p=J.aT(q.a),q=q.b,n=new A.UF(p,q);n.C();){m=n.c
+for(q=A.h8y(D.dBp,0,x.m),p=J.aT(q.a),q=q.b,n=new A.UF(p,q);n.C();){m=n.c
 m=m>=0?new A.y(q+m,p.gR(p)):A.bj(A.fr())
 l=m.b
 k=h?B.c:B.a_
@@ -6062,9 +6062,9 @@ D.eiV=new C.Aj(3,"whitePearlBorder")
 D.ej2=new C.nd("white_pearl","White Pearl",D.dos,B.bN,B.cx,!0,D.eiV)
 D.bxa=new A.u(1,1,0.996078431372549,0.9882352941176471,B.q)
 D.boZ=new A.u(1,0.9411764705882353,0.9215686274509803,0.8901960784313725,B.q)
-D.dB5=w([D.bxa,B.BK,D.boZ],x.O)
+D.dB4=w([D.bxa,B.BK,D.boZ],x.O)
 D.eiW=new C.Aj(4,"whiteLinenStripe")
-D.ej3=new C.nd("white_linen","White Linen",D.dB5,B.i1,B.d3,!0,D.eiW)
+D.ej3=new C.nd("white_linen","White Linen",D.dB4,B.i1,B.d3,!0,D.eiW)
 D.bnA=new A.u(1,0.9372549019607843,0.9490196078431372,0.9647058823529412,B.q)
 D.dsg=w([B.c,B.aS,D.bnA],x.O)
 D.eiX=new C.Aj(5,"whiteEmbossedFrame")
@@ -6121,7 +6121,7 @@ D.eNG=new A.y("The monthly payment","The membership is $125 every month. If a pa
 D.eYc=new A.y("How long you stay","You agree to stay for the number of years you chose. The term starts with your first payment.")
 D.eOJ=new A.y("Where and what","The work is for small home fixes at the home of the member, in the state where the member is registered in Civic Registry.")
 D.eKp=new A.y("Your signature and selfie","Your signature and your selfie are kept by NGMY so we know who signed. The NGMY admin can see them.")
-D.dBq=w([D.eH6,D.f06,D.eNG,D.eYc,D.eOJ,D.eKp],A.at("O<+(n,n)>"))
+D.dBp=w([D.eH6,D.f06,D.eNG,D.eYc,D.eOJ,D.eKp],A.at("O<+(n,n)>"))
 D.emD={tanzania:0,tanz:1,kenya:2,uganda:3,rwanda:4,burundi:5,"south sudan":6,sudan:7,ethiopia:8,somalia:9,djibouti:10,eritrea:11,madagascar:12,mauritius:13,seychelles:14,comoros:15,reunion:16,ghana:17,nigeria:18,senegal:19,"ivory coast":20,"cote d'ivoire":21,"c\xf4te d'ivoire":22,mali:23,"burkina faso":24,burkina:25,niger:26,guinea:27,"sierra leone":28,liberia:29,togo:30,benin:31,gambia:32,"cape verde":33,mauritania:34,"guinea-bissau":35,"guinea bissau":36,drc:37,"democratic republic of congo":38,"dr congo":39,"congo kinshasa":40,kinshasa:41,congo:42,"republic of congo":43,"congo brazzaville":44,brazzaville:45,cameroon:46,chad:47,"central african republic":48,car:49,gabon:50,"equatorial guinea":51,"sao tome":52,"south africa":53,zambia:54,zimbabwe:55,malawi:56,mozambique:57,botswana:58,namibia:59,angola:60,lesotho:61,eswatini:62,swaziland:63,egypt:64,morocco:65,algeria:66,tunisia:67,libya:68,"western sahara":69}
 D.J6=new A.bv(D.emD,["255","255","254","256","250","257","211","249","251","252","253","291","261","230","248","269","262","233","234","221","225","225","225","223","226","226","227","224","232","231","228","229","220","238","222","245","245","243","243","243","243","243","242","242","242","242","237","235","236","236","241","240","239","27","260","263","265","258","267","264","244","266","268","268","20","212","213","216","218","212"],A.at("bv<n,n>"))
 D.em6={faucet:0,toilet:1,outlet:2,door:3,cabinet:4,drywall:5,caulk:6,shelf:7,paint:8}
@@ -6235,4 +6235,4 @@ D.h2A=new A.B("PINNED",null,D.fsc,null,null,null,null,null,null,null,null,null)
 D.aY7=new A.B("Mark done",null,null,null,null,null,null,null,null,null,null,null)
 D.hvd=new A.bo("house-care-download",x.W)
 D.hx4=new C.ZT(null)})()};
-(a=>{a["Ms01iWsuziRZVcsn+s3BQnGBPD4="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["LiYJS6/2u5deEHKoAD1cAiwWnlw="]=a.current})($__dart_deferred_initializers__);

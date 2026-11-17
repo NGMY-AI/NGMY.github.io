@@ -1011,7 +1011,7 @@ D.d.u(k,C.a([D.aC,C.r(q,C.x(C.a([A.fNI,D.am,C.d(x.c,q,q,q,q,q,q,D.nj,q,q,q)],e),
 if(!n.cy)m.push(n.a9t(D.a5f,D.b8,"Reveal Answer",n.gcv8()))
 else m.push(n.a9t(D.a5f,D.b8,"Next Riddle \u2192",n.gc8D()))
 i.push(new C.an(D.a0,q,D.ad,D.f,C.a([j,C.r(q,C.x(m,D.l,q,D.e,D.i,0,D.p),D.f,q,q,new C.o(D.jn,q,g,h,f,q,D.n),q,q,q,q,D.wA,q,q,1/0)],e),q))}else i.push(n.bUI())
-return C.b4m(22,C.x(C.a([o,new C.di(1,D.cl,C.cb(C.x(i,D.l,q,D.e,D.i,0,D.p),D.t,q,D.y,q,D.amz,q,q,D.ah),q)],e),D.l,q,D.e,D.O,0,D.p),E.S_,p.a.b*0.88,a2,a0,a1,this.b)},
+return C.b4m(22,C.x(C.a([o,new C.di(1,D.cl,C.cb(C.x(i,D.l,q,D.e,D.i,0,D.p),D.t,q,D.y,q,D.amz,q,q,D.ah),q)],e),D.l,q,D.e,D.O,0,D.p),E.S_,!1,p.a.b*0.88,a2,a0,a1,this.b)},
 $C:"$4",
 $R:4,
 $S:301}
@@ -2624,4 +2624,4 @@ A.fvE=new C.F(!0,D.c,null,null,null,null,16,D.u,null,0.5,null,null,null,null,nul
 A.h2G=new C.B("Daily Confidence Boost",null,A.fvE,null,null,null,null,null,null,null,null,null)
 A.fB6=new C.F(!0,D.c,null,null,null,null,14,D.I,null,0.8,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 A.h5H=new C.B("Love Match",null,A.fB6,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["wiJGptasKBNGtVz27ATB1iOe0tc="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["QlyHjdoATC1MC7E6loZoO9NZcJc="]=a.current})($__dart_deferred_initializers__);

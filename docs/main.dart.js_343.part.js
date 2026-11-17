@@ -2373,7 +2373,7 @@ d.aF(r,B.hjP,g?B.mR:H.a_b,0.35)
 r=w.a2(0,B.hr0)
 d.aF(r,B.hpf,g?B.mR:B.ahN,0.35)}else{d.e=0.6
 if(D.a.a_(e,"nema"))A.icC(d,w,e,g)
-else{r=u?G.axQ:B.dAZ
+else{r=u?G.axQ:B.dAY
 q=r.length
 p=f+0.47
 o=f+0.46
@@ -18220,7 +18220,7 @@ t=C.U(u)
 t=new C.cM(new C.Y(u,new A.eCB(),t.k("Y<1>")),new A.eCC(),t.k("cM<1,n>")).aN(0,"  \xb7  ")
 u=C.d("Customer: "+(t.length===0?"All fixed!":t),h,2,D.a2,h,h,h,B.aW8,h,h,h)
 t=C.a([],q)
-for(n=0;n<10;++n){m=B.dBu[n]
+for(n=0;n<10;++n){m=B.dBt[n]
 s=i.x===m?D.at.j(0.25):D.c.j(0.07)
 r=new C.aO(14,14)
 p=i.x===m
@@ -28944,8 +28944,8 @@ B.b4E=new A.lR(0,300,0,0,1)
 B.b4r=new A.lR(0,-300,3.141592653589793,0,1)
 B.b4B=new A.lR(-560,0,-1.5707963267948966,0,1)
 B.b4s=new A.lR(560,0,1.5707963267948966,0,1)
-B.dBg=w([B.b4E,B.b4r,B.b4B,B.b4s],x.m)
-B.b51=new A.rp("scatter","\ud83c\udf10","Billboard park","Four separate boards: one at the front, one at the back and one on each side, all facing out",320,160,150,B.dBg,0,0.6)
+B.dBf=w([B.b4E,B.b4r,B.b4B,B.b4s],x.m)
+B.b51=new A.rp("scatter","\ud83c\udf10","Billboard park","Four separate boards: one at the front, one at the back and one on each side, all facing out",320,160,150,B.dBf,0,0.6)
 B.a58=w([B.b4X,B.b4U,B.b5_,B.b4Z,B.b4T,B.b50,B.b4S,B.b52,B.b4V,B.b4Y,B.b4W,B.b51],C.at("O<rp>"))
 B.dI8=new A.ig(-134,-36,16,44)
 B.dHW=new A.ig(34,118,30,66)
@@ -29089,11 +29089,11 @@ B.hwR=new A.Gs("CORE PROTOCOL","Studios for curious minds.",D.b8,D.kq,D.qi)
 B.hwW=new A.Gs("BUILD AND FIX","The Construction Lab: wire it, plumb it.",D.fs,D.fB,D.uu)
 B.hwL=new A.Gs("CREATE WITH NGMY","Videos, slides, bios and books.",D.bE,D.kp,D.qg)
 B.d2k=w([B.hwS,B.hx_,B.hwV,B.hwX,B.hwR,B.hwW,B.hwL],C.at("O<Gs>"))
-B.dB4=w(["Switch 1 common","Switch 2 common","Traveler terminal (both switches)","Green ground screw","Neutral splice (not on a switch)"],x.s)
+B.dB3=w(["Switch 1 common","Switch 2 common","Traveler terminal (both switches)","Green ground screw","Neutral splice (not on a switch)"],x.s)
 B.enj={"Line (from the breaker)":0,"Load (to the light)":1,"Traveler A":2,"Traveler B":3,Ground:4,Neutral:5}
 B.dFc=new C.bv(B.enj,["Switch 1 common","Switch 2 common","Traveler terminal (both switches)","Traveler terminal (both switches)","Green ground screw","Neutral splice (not on a switch)"],x.l)
 B.duL=w(["Never assume the dark screw is the same on every brand: read the diagram on the switch.","A switch loop or an old house may not follow the colors: verify the wires."],x.s)
-B.bAz=new A.alq("threeway","Three-way switch (two switches, one light)","Two three-way switches control one light from two places. Each switch has a COMMON terminal (dark screw) and two TRAVELER terminals. Power (line) goes to the common of the first switch, the light (load) to the common of the second, and two travelers join the switches. The ground goes to the green screw. A standard single-pole switch cannot do this job.",B.dB4,B.dFc,B.duL)
+B.bAz=new A.alq("threeway","Three-way switch (two switches, one light)","Two three-way switches control one light from two places. Each switch has a COMMON terminal (dark screw) and two TRAVELER terminals. Power (line) goes to the common of the first switch, the light (load) to the common of the second, and two travelers join the switches. The ground goes to the green screw. A standard single-pole switch cannot do this job.",B.dB3,B.dFc,B.duL)
 B.d3g=w(["Fan (motor) control wire","Light control wire","Neutral","Ground","Fan-rated support"],x.s)
 B.eo0={"Motor lead (black)":0,"Light lead (blue)":1,"Neutral (white)":2,"Ground (green)":3,Support:4}
 B.dFM=new C.bv(B.eo0,["Fan (motor) control wire","Light control wire","Neutral","Ground","Fan-rated support"],x.l)
@@ -30048,11 +30048,11 @@ B.eIk=new C.y(760,330)
 B.eXq=new C.y(-450,1080)
 B.eH_=new C.y(450,1080)
 B.dAP=w([B.eXG,B.eIk,B.eXq,B.eH_],x.f)
-B.dAZ=w([0.72,-0.72],x.n)
+B.dAY=w([0.72,-0.72],x.n)
 B.hw6=new A.hL("isoground","Green with yellow stripe \xb7 isolated ground",B.Gn,D.c,"ground")
-B.dB7=w([B.xJ,B.WH,B.hw6],x.d)
-B.dBj=w([B.P1,B.aoT,B.aoP],x.r)
-B.dBu=w(["inspect","hand","screwdriver","pliers","wrench","crimper","plunger","flapper","newoutlet","patch"],x.s)
+B.dB6=w([B.xJ,B.WH,B.hw6],x.d)
+B.dBi=w([B.P1,B.aoT,B.aoP],x.r)
+B.dBt=w(["inspect","hand","screwdriver","pliers","wrench","crimper","plunger","flapper","newoutlet","patch"],x.s)
 B.hIl=new A.pU(0,0,70,26)
 B.hIx=new A.pU(1,-100,110,24)
 B.hIz=new A.pU(2,105,100,26)
@@ -32173,7 +32173,7 @@ w($,"ixc","aSW",()=>A.hO1())
 w($,"iF7","hM4",()=>{var v=C.a([A.nZ("Wire a standard 120 volt receptacle: black to brass, white to silver, bare copper to green.",B.SK,B.dxC,"outlet","",!0,B.J9,B.d35,!1,"Wall outlet",new A.fJu()),A.nZ("A single-pole switch breaks the hot wire to the light: two black wires go on the two brass screws.",B.diN,B.dkn,"switch","",!0,B.J9,B.d1r,!1,"Light switch",new A.fJv()),A.nZ("A GFCI protects you near water. Power comes in on LINE. The LOAD screws (covered with tape) feed other outlets.",B.SK,B.dns,"gfci","",!0,B.J9,B.dlS,!1,"GFCI outlet",new A.fJw()),A.nZ("Join the house wires to the fixture wires with wire nuts: black to black, white to white, ground to ground.",B.SK,B.ddE,"light","",!0,B.J9,B.dzo,!1,"Ceiling light",new A.fJx()),A.nZ("A fan hangs from a strong fan-rated box. Join black, white and ground with wire nuts, then fasten the canopy.",B.SK,B.dlg,"fan","",!0,B.J9,B.d9t,!1,"Ceiling fan",new A.fJy())],x.Q)
 D.d.u(v,$.h6Q())
 return v})
-w($,"iF9","h6Q",()=>{var v="switch",u=C.a([A.nZ("Breaks BOTH hot legs of a 240 volt circuit at once: water heaters and baseboard heat.",B.dCo,B.cbN,"switch2p",v,!0,B.dES,B.ddS,!0,"Double-pole switch (240 V)",new A.fJz()),A.nZ("One light, two switches. One COMMON screw and two TRAVELER screws; it pairs with a second three-way.",B.dvs,B.d2P,"switch3",v,!0,B.dF8,B.dlV,!0,"Three-way switch",new A.fJA()),A.nZ("Sits in the middle of two three-way switches: two traveler wires in on one side, two out on the other.",B.dAM,B.doZ,"switch4",v,!0,B.dET,B.duc,!0,"Four-way switch",new A.fJB()),A.nZ("Needs a NEUTRAL wire in the box as well: hot in, hot out to the light, neutral and ground.",B.d8a,B.db6,"switchsmart",v,!0,B.dF9,B.d8s,!0,"Smart, motion or timer switch",new A.fJC()),A.nZ("Two switches in one device: one hot feed is split between them, and two separate lights come out.",B.cQy,B.dsp,"switchcombo",v,!0,B.dGR,B.cDs,!0,"Combination (double) switch",new A.fJD()),A.nZ("The tab between the brass screws is broken off: the top half is switched, the bottom half is always on.",B.dlO,B.cCR,"split","outlet",!0,B.dFa,B.drm,!0,"Split (half-switched) outlet",new A.fJE()),A.nZ("Two hots, a neutral and a ground: the dryer 14-30, and the range and car charger 14-50.",B.SV,B.d6L,"v240four","nema1430",!0,B.Th,B.cV_,!0,"4-wire 240 V outlet (dryer, range, EV)",new A.fJF()),A.nZ("Two hots and a neutral, with no separate ground: the old 10-30 and 10-50, from before 1996.",B.a64,B.dBj,"v240three","nema1030",!1,B.a7D,B.dAt,!0,"3-wire 240 V outlet (old dryer or range)",new A.fJG()),A.nZ("Two hots and a ground, and no neutral at all: the 6-series outlets.",B.aDV,B.aC_,"v240only","nema620",!0,B.aJn,B.dxJ,!0,"240 V only outlet (window AC, welder)",new A.fJH()),A.nZ("Hot and neutral as usual, but the ground goes on its own wire straight back to the panel: shops and offices.",B.dB7,B.djJ,"isolated","outlet",!0,B.dGg,B.df_,!0,"Isolated-ground outlet",new A.fJI())],x.Q)
+w($,"iF9","h6Q",()=>{var v="switch",u=C.a([A.nZ("Breaks BOTH hot legs of a 240 volt circuit at once: water heaters and baseboard heat.",B.dCo,B.cbN,"switch2p",v,!0,B.dES,B.ddS,!0,"Double-pole switch (240 V)",new A.fJz()),A.nZ("One light, two switches. One COMMON screw and two TRAVELER screws; it pairs with a second three-way.",B.dvs,B.d2P,"switch3",v,!0,B.dF8,B.dlV,!0,"Three-way switch",new A.fJA()),A.nZ("Sits in the middle of two three-way switches: two traveler wires in on one side, two out on the other.",B.dAM,B.doZ,"switch4",v,!0,B.dET,B.duc,!0,"Four-way switch",new A.fJB()),A.nZ("Needs a NEUTRAL wire in the box as well: hot in, hot out to the light, neutral and ground.",B.d8a,B.db6,"switchsmart",v,!0,B.dF9,B.d8s,!0,"Smart, motion or timer switch",new A.fJC()),A.nZ("Two switches in one device: one hot feed is split between them, and two separate lights come out.",B.cQy,B.dsp,"switchcombo",v,!0,B.dGR,B.cDs,!0,"Combination (double) switch",new A.fJD()),A.nZ("The tab between the brass screws is broken off: the top half is switched, the bottom half is always on.",B.dlO,B.cCR,"split","outlet",!0,B.dFa,B.drm,!0,"Split (half-switched) outlet",new A.fJE()),A.nZ("Two hots, a neutral and a ground: the dryer 14-30, and the range and car charger 14-50.",B.SV,B.d6L,"v240four","nema1430",!0,B.Th,B.cV_,!0,"4-wire 240 V outlet (dryer, range, EV)",new A.fJF()),A.nZ("Two hots and a neutral, with no separate ground: the old 10-30 and 10-50, from before 1996.",B.a64,B.dBi,"v240three","nema1030",!1,B.a7D,B.dAt,!0,"3-wire 240 V outlet (old dryer or range)",new A.fJG()),A.nZ("Two hots and a ground, and no neutral at all: the 6-series outlets.",B.aDV,B.aC_,"v240only","nema620",!0,B.aJn,B.dxJ,!0,"240 V only outlet (window AC, welder)",new A.fJH()),A.nZ("Hot and neutral as usual, but the ground goes on its own wire straight back to the panel: shops and offices.",B.dB6,B.djJ,"isolated","outlet",!0,B.dGg,B.df_,!0,"Isolated-ground outlet",new A.fJI())],x.Q)
 D.d.u(u,$.hM3())
 D.d.u(u,$.hM5())
 D.d.u(u,$.h6N())
@@ -32225,4 +32225,4 @@ t.push(A.bjj("app:"+p,q.b,o))}t=A.bdi("phones","Phones",D.zx,t)
 n=C.a([],n)
 for(s=0;s<6;++s){q=B.aC3[s]
 n.push(A.bjj("app:"+q.a,q.b,X.PL))}return C.a([B.hxL,m,v,B.hxK,u,t,A.bdi("appliances","Appliances",X.PL,n)],C.at("O<Qz>"))})})()};
-(a=>{a["PhEfiCBH3vABsvzaotzteMpGhXQ="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["aUJG8ARXYYo6a+4sB95MqEVNN98="]=a.current})($__dart_deferred_initializers__);

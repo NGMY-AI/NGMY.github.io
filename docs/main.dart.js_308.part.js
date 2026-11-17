@@ -1447,7 +1447,7 @@ g=g.w
 g=e.blU(B.x(B.a([w,A.T,u,t,s,r,A.W,B.A(B.a([q,A.bo,e.GN("DUE",g.length===0?j:g)],v),A.l,m,A.e,A.i,0,m,m),e.ze()],v),A.E,m,A.e,A.O,0,A.p),!1,!1,f)
 break
 default:f=B.a([f.f,f.r],x.O)
-f=B.r(m,B.A(D.dBQ,A.l,m,A.ba,A.i,0,m,m),A.f,m,m,new B.o(m,m,m,m,m,new B.a8(A.a7,A.aa,A.x,f,m,m),A.n),m,m,m,m,A.hL,m,m,m)
+f=B.r(m,B.A(D.dBP,A.l,m,A.ba,A.i,0,m,m),A.f,m,m,new B.o(m,m,m,m,m,new B.a8(A.a7,A.aa,A.x,f,m,m),A.n),m,m,m,m,A.hL,m,m,m)
 w=e.CS(e.guV(),16)
 v=e.aNv("BY APPOINTMENT TO DISTINGUISHED CLIENTELE")
 u=g.z
@@ -3152,8 +3152,8 @@ D.btv=new B.u(1,0.10196078431372549,0.03137254901960784,0.06274509803921569,A.q)
 D.dpo=w([D.bqf,A.yr,D.btv],x.O)
 D.dWq=new C.h0("essential_rose","Rose Edition","Luxury",D.dW1,D.dpo,A.hI,A.hv,!1,!0)
 D.dW2=new C.kg(35,"essentialMidnight")
-D.dB3=w([D.ZA,A.as,A.a_],x.O)
-D.dWy=new C.h0("essential_midnight","Midnight News","Luxury",D.dW2,D.dB3,A.aE,A.bN,!1,!0)
+D.dB2=w([D.ZA,A.as,A.a_],x.O)
+D.dWy=new C.h0("essential_midnight","Midnight News","Luxury",D.dW2,D.dB2,A.aE,A.bN,!1,!0)
 D.bgx=new B.u(1,0.00784313725490196,0.10196078431372549,0.07058823529411765,A.q)
 D.blQ=new B.u(1,0.00392156862745098,0.0784313725490196,0.054901960784313725,A.q)
 D.dfc=w([D.bgx,A.eZ,D.blQ],x.O)
@@ -3174,7 +3174,7 @@ D.fiv=new B.a5(58,null,D.h21,null)
 D.djX=w([D.bKu,D.fiP,D.fiv],x.p)
 D.c2j=new B.ae(A.CW,14,A.c,null,null,null)
 D.fLU=new B.B("IMPERIAL INVOICE BULLETIN",null,I.aW3,null,null,null,null,null,null,null,null,null)
-D.dBQ=w([D.c2j,A.bo,D.fLU],x.p)
+D.dBP=w([D.c2j,A.bo,D.fLU],x.p)
 D.emg={Modern:0,Classic:1,Minimal:2,Executive:3,Corporate:4,Creative:5,"Gold Foil":6,Marble:7,"Rose Gold":8,Emerald:9,Midnight:10,Diamond:11,Exclusive:12}
 D.aJl=new B.bv(D.emg,["modern","classic","minimal","executive","corporate","creative","gold_foil","marble","rose_gold","emerald","midnight_royale","diamond","exclusive"],B.at("bv<n,n>"))
 D.dVU=new C.kg(20,"diamond")
@@ -3241,4 +3241,4 @@ D.h0z=new B.B("Delete invoice?",null,null,null,null,null,null,null,null,null,nul
 D.h1v=new B.B("Paid invoices auto-delete from local saves after 5 days.",null,null,null,null,null,null,null,null,null,null,null)
 D.h3w=new B.B("Save Invoice",null,null,null,null,null,null,null,null,null,null,null)
 D.hDo=new C.af5(A.a6b,A.c,A.fZ,A.ee)})()};
-(a=>{a["epw3RqtZBL0SG2W5avPEnjvkm2I="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["kbJhXdhHksyjPR2b9aRHxDHT1MY="]=a.current})($__dart_deferred_initializers__);

@@ -7301,7 +7301,7 @@ gbSD(){switch(this.ga2K()){case"cover":var w=D.da6
 break
 case"book":w=D.d5o
 break
-default:w=D.dBL
+default:w=D.dBK
 break}return w},
 B(d){var w,v,u,t,s,r,q=this,p=null,o=A.l(26),n=E.kr.j(0.5),m=x.p,l=A.A(A.a([D.dK9,B.au,D.bKE,A.aI(p,p,p,p,B.lp,p,p,p,new C.diU(d),p,p,p,p,p,p)],m),B.l,p,B.e,B.i,0,p,p),k=A.a([],m),j=q.a
 if(j.c)k.push(A.jy(p,p,p,A.d("This page ("+j.e+")",p,p,p,p,p,p,p,p,p,p),p,new C.diV(q),q.ga2K()==="page",p,p,p,p))
@@ -9538,7 +9538,7 @@ u.r=B.Z3.gp(0)
 d3.N(s,22,u)
 for(c8=c5*4,w=c6+240,v=c7*0.06,r=0;r<5;++r){q=B.j.F(r*190-c4.CW*0.06-c8,w)-120
 p=v+B.o.F(r,3)*22
-for(o=0;o<4;++o){n=D.dBm[o]
+for(o=0;o<4;++o){n=D.dBl[o]
 $.S()
 u=new A.ao(B.P,B.M,B.R,B.S,B.Q)
 u.r=B.c.j(0.75).gp(0)
@@ -17011,8 +17011,8 @@ D.ddh=w([B.db,B.G5,A9.Z5],x.O)
 D.bM0=new C.uW("midnight","Midnight",D.ddh,"starry")
 D.d5_=w([B.es,B.ea,B.lh],x.O)
 D.bM_=new C.uW("forest","Forest",D.d5_,"story")
-D.dBP=w([B.en,B.em,B.kt],x.O)
-D.bLX=new C.uW("burgundy","Burgundy",D.dBP,"royal")
+D.dBO=w([B.en,B.em,B.kt],x.O)
+D.bLX=new C.uW("burgundy","Burgundy",D.dBO,"royal")
 D.cN7=w([B.aB,B.nx,B.np],x.O)
 D.bLY=new C.uW("royal","Royal",D.cN7,"royal")
 D.d7B=w([B.bx,B.cm,F.nB],x.O)
@@ -17153,8 +17153,8 @@ D.dzE=w([B.b4,B.d2,B.ea],x.O)
 D.eq7=new A.p(24,-8)
 D.eqQ=new A.p(48,0)
 D.eq3=new A.p(24,6)
-D.dBm=w([B.J,D.eq7,D.eqQ,D.eq3],x.g)
-D.dBL=w(["Rewrite this page in natural, professional Swahili","Correct the spelling","Rewrite this page in simpler words","Add a paragraph about the family farm","Make this page shorter"],x.s)
+D.dBl=w([B.J,D.eq7,D.eqQ,D.eq3],x.g)
+D.dBK=w(["Rewrite this page in natural, professional Swahili","Correct the spelling","Rewrite this page in simpler words","Add a paragraph about the family farm","Make this page shorter"],x.s)
 D.emE={top:0,middle:1,bottom:2}
 D.dEZ=new A.bv(D.emE,["Top","Middle","Bottom"],x.r)
 D.emd={double:0,single:1,corners:2,none:3}
@@ -17604,4 +17604,4 @@ D.adL=new C.a2g(4,"arrived")
 D.adT=new C.aLP(0,"projects")
 D.b2g=new C.aLP(1,"cashier")
 D.hId=new C.aLP(2,"familyTree")})()};
-(a=>{a["HqObHV22E87DdKepBPF5r6Qdp6o="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["tFrR7L7/iKcbVO8907nkEsW5k34="]=a.current})($__dart_deferred_initializers__);

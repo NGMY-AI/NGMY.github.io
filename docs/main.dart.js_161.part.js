@@ -992,7 +992,7 @@ _.b=h
 _.a=null},
 abI:function abI(d){this.b=d
 this.a=null},
-fP_(d){return B.d.aV(D.dC_,B.a.gke(d.toLowerCase()))?"ABOUT THE COMMUNITY AND THE SYSTEM (facts you can use; do not invent numbers, names or dates):\n- The community is M'MBONDO (also written MBONDO). Its motto is \"EMO 'YA M'MBONDO\". Members live in different US states.\n- The Civic Registry \u2014 people also just call it \"the system\" \u2014 was built inside the NGMY app for the M'MBONDO community.\n- Why it was built: a big problem in the community was not seeing where contribution money went. People gave but were unsure what happened to their money, so trust and giving went down. The system brings light: every contribution gets a receipt, members can see where the money is going and how much has been contributed, and that transparency builds trust and the confidence to keep contributing \u2014 when you know where your money goes, you give.\n- What it does:\n  \u2022 Registers community members with their details and a member ID card (Registry ID), kept safely as the community's records.\n  \u2022 Lets each state know how many members it has (state totals, nationwide totals).\n  \u2022 Records contributions with receipts and contribution reports, so everyone sees the money trail.\n  \u2022 Authorized Registrars enroll members and help them; there is a help mode for assisted sign-up.\n  \u2022 Civic Voting for community decisions, and a Civic State Wallet that shows each state's funds.\n- How NGMY helps members beyond the registry: help finding jobs and applying for them, fixing their houses, helping them get houses, sending money, and NGMY Advisors (AI advisors) who help people apply for jobs, food stamps and other benefits and fill out applications for them.\n- Tone for this community: warm, proud, hopeful and trustworthy; it is about unity, transparency and helping each other.\n":""}},D,H,F,I,K
+fP_(d){return B.d.aV(D.dBZ,B.a.gke(d.toLowerCase()))?"ABOUT THE COMMUNITY AND THE SYSTEM (facts you can use; do not invent numbers, names or dates):\n- The community is M'MBONDO (also written MBONDO). Its motto is \"EMO 'YA M'MBONDO\". Members live in different US states.\n- The Civic Registry \u2014 people also just call it \"the system\" \u2014 was built inside the NGMY app for the M'MBONDO community.\n- Why it was built: a big problem in the community was not seeing where contribution money went. People gave but were unsure what happened to their money, so trust and giving went down. The system brings light: every contribution gets a receipt, members can see where the money is going and how much has been contributed, and that transparency builds trust and the confidence to keep contributing \u2014 when you know where your money goes, you give.\n- What it does:\n  \u2022 Registers community members with their details and a member ID card (Registry ID), kept safely as the community's records.\n  \u2022 Lets each state know how many members it has (state totals, nationwide totals).\n  \u2022 Records contributions with receipts and contribution reports, so everyone sees the money trail.\n  \u2022 Authorized Registrars enroll members and help them; there is a help mode for assisted sign-up.\n  \u2022 Civic Voting for community decisions, and a Civic State Wallet that shows each state's funds.\n- How NGMY helps members beyond the registry: help finding jobs and applying for them, fixing their houses, helping them get houses, sending money, and NGMY Advisors (AI advisors) who help people apply for jobs, food stamps and other benefits and fill out applications for them.\n- Tone for this community: warm, proud, hopeful and trustworthy; it is about unity, transparency and helping each other.\n":""}},D,H,F,I,K
 J=c[1]
 A=c[0]
 B=c[2]
@@ -3145,7 +3145,7 @@ D.dSj=new C.pu("vintage","Vintage",4294306781,4293581764,4287317267,4283053092,"
 D.dSm=new C.pu("starry","Starry Night",4278915110,4281413249,4294829706,4294967295,"middle","classic","small",!1)
 D.A4=x([D.dSg,D.dSl,D.dSk,D.dSf,D.dSn,D.dSo,D.dSh,D.dSi,D.dSj,D.dSm],A.at("O<pu>"))
 D.dzP=x([3,5,8,10,25,50,100],y.t)
-D.dC_=x(["civic","registry","registrar","mbondo","m'mbondo","mmbondo","ngmy","the system","our system","our community","the community","community","contribution","michango","jamii","jumuiya","advisor"],y.s)
+D.dBZ=x(["civic","registry","registrar","mbondo","m'mbondo","mmbondo","ngmy","the system","our system","our community","the community","community","contribution","michango","jamii","jumuiya","advisor"],y.s)
 D.dFp=new A.d_([1611,1611,1612,1612,1613,1613,1614,1614,1615,1615,1616,1616,1617,1617,1618,1618,1648,1648,64606,64606,64607,64607,64608,64608,64609,64609,64610,64610,64611,64611],y.K)
 D.aJN=new A.d_([1575,65165,1576,65167,1578,65173,1579,65177,1580,65181,1581,65185,1582,65189,1583,65193,1584,65195,1585,65197,1586,65199,1587,65201,1588,65205,1589,65209,1590,65213,1591,65217,1592,65221,1593,65225,1594,65229,1601,65233,1602,65237,1603,65241,1604,65245,1605,65249,1606,65253,1607,65257,1608,65261,1610,65263,1569,65152,1570,65153,1571,65155,1572,65157,1573,65159,1574,65161,1577,65171],y.K)
 D.dKb=new C.NY(50,null)
@@ -3173,8 +3173,8 @@ D.eCl=new A.bY(B.XB,0.5,B.x,null,0,D.dCw,B.A0,null)
 D.fbl=new A.a1(-5,-5,5,5)
 D.a4h=new A.ae(B.ed,20,B.c,null,null,null)
 D.fLy=new A.B("Write my book",null,B.fH,null,null,null,null,null,null,null,null,null)
-D.dBn=x([D.a4h,B.af,D.fLy],y.p)
-D.fco=new A.c8(B.aL,B.ba,B.i,B.l,null,B.p,null,0,D.dBn,null)
+D.dBm=x([D.a4h,B.af,D.fLy],y.p)
+D.fco=new A.c8(B.aL,B.ba,B.i,B.l,null,B.p,null,0,D.dBm,null)
 D.c1y=new A.ae(B.oF,null,F.lG,null,null,null)
 D.fCn=new A.F(!0,E.j5,null,null,null,null,18,B.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.h_T=new A.B("Print as a book",null,D.fCn,null,null,null,null,null,null,null,null,null)
@@ -3221,4 +3221,4 @@ D.h3Q=new A.B("Design the cover",null,B.cG,null,null,null,null,null,null,null,nu
 D.h6W=new C.cEd(6,"postScriptName")
 D.hFG=new C.bu9(null)})();(function staticFields(){$.hyG=null
 $.hAK=A.T(y.N,A.at("aB<n?>"))})()};
-(a=>{a["V3aUX1ioUcKjiqhHcs9MGk2AqP0="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["pFKonq9eLQcdAghVI/eCzec0+Jo="]=a.current})($__dart_deferred_initializers__);

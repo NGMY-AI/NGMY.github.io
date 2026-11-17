@@ -8101,7 +8101,7 @@ m=new B.aO(12,12)
 l=new B.aO(12,12)
 l=B.a([new B.bz(1,A.bb,B.aM(a0,A.Z,!1,a0,!0,A.t,a0,B.aP(),r[p],a0,a0,a0,a0,a0,2,new B.e7(a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,"Title",a0,N.EX,a0,a0,a0,!0,!0,!1,a0,a0,a0,a0,a0,a0,!0,a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,"",a0,a0,!0,A.c.j(0.06),a0,a0,a0,a0,a0,a0,a0,new B.b6(4,new B.be(m,m,m,m),A.a1),!0,a0,a0,a0,a0),A.y,!0,a0,!0,a0,!1,a0,A.ak,a0,a0,a0,a0,a0,a0,a0,28,a0,1,a0,a0,!1,"\u2022",a0,a0,a0,a0,a0,!1,a0,a0,!1,a0,!0,a0,A.ac,a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,A.jA,!0,A.a5,a0,A.ao,a0,a0,a0,a0),a0),A.af,new B.bz(2,A.bb,B.aM(a0,A.Z,!1,a0,!0,A.t,a0,B.aP(),q[p],a0,a0,a0,a0,a0,2,new B.e7(a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,"Small line",a0,N.EX,a0,a0,a0,!0,!0,!1,a0,a0,a0,a0,a0,a0,!0,a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,"",a0,a0,!0,A.c.j(0.06),a0,a0,a0,a0,a0,a0,a0,new B.b6(4,new B.be(l,l,l,l),A.a1),!0,a0,a0,a0,a0),A.y,!0,a0,!0,a0,!1,a0,A.ak,a0,a0,a0,a0,a0,a0,a0,28,a0,1,a0,a0,!1,"\u2022",a0,a0,a0,a0,a0,!1,a0,a0,!1,a0,!0,a0,A.ac,a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,a0,A.jA,!0,A.a5,a0,A.ao,a0,a0,a0,a0),a0)],w)
 m=B.a([],w)
-for(k=0;k<30;++k){j=D.dBs[k]
+for(k=0;k<30;++k){j=D.dBr[k]
 i=new B.aO(12,12)
 if(u[p].A(0,j)){h=t.w
 if(h===$){h=B.C(t.a.c.d,s)
@@ -10346,7 +10346,7 @@ D.dxB=w([D.fTY,A.aC,D.fiQ,A.ae,D.fXh,A.aw,D.fU0],x.p)
 D.dya=w(["solar","turbine","crank","pot"],x.s)
 D.dyB=w([0,0.35,0.75,1],x.n)
 D.dzY=w(["volts","level","ohms","on"],x.s)
-D.dBs=w([A.jM,A.zy,A.CW,A.qR,A.Dl,A.ti,A.zw,A.qU,A.il,A.oM,A.hm,A.ed,A.hQ,A.i5,A.n5,A.lQ,A.v7,A.tl,A.lm,A.Hw,A.v6,A.D1,A.D_,A.a3M,A.Pq,A.Da,A.Pz,A.aqD,H.arl,A.k8],x.w)
+D.dBr=w([A.jM,A.zy,A.CW,A.qR,A.Dl,A.ti,A.zw,A.qU,A.il,A.oM,A.hm,A.ed,A.hQ,A.i5,A.n5,A.lQ,A.v7,A.tl,A.lm,A.Hw,A.v6,A.D1,A.D_,A.a3M,A.Pq,A.Da,A.Pz,A.aqD,H.arl,A.k8],x.w)
 D.em8={switch:0,clock:1,and:2,or:3,xor:4,nand:5,nor:6,not:7,led:8,buzzer:9}
 D.hxe=new C.yM("Switch",F.pC,A.bl,0,"Tap it to turn it ON or OFF.")
 D.hxa=new C.yM("Blinker",A.oK,A.bw,0,"Turns itself ON and OFF. Tap to change the speed.")
@@ -10913,4 +10913,4 @@ for(v=0;v<76;++v){u=D.SC[v]
 t.n(0,u.a,u)}return t})
 w($,"iD9","ajg",()=>B.a([C.Gu("Light the bulb","You need a battery and a bulb joined in a loop. Wire the + of the battery to the bulb, and the bulb back to the battery.",new C.fts()),C.Gu("Make a flashlight","Add a switch into the loop, so you can turn the bulb on and off.",new C.ftt()),C.Gu("Spin the motor","A battery and a motor in a loop will make it spin.",new C.ftu()),C.Gu("Light an LED safely","An LED burns out on its own. Put a resistor in the loop with it. Mind the + side of the LED!",new C.ftv()),C.Gu("Light a bulb with no battery","Use a solar panel, a hand crank or a wind turbine instead of a battery.",new C.ftw()),C.Gu("Play the radio","A radio needs about 3 volts or more. Try a 9 volt battery.",new C.ftj()),C.Gu("Watch TV","A TV needs 6 volts or more. Set a battery to 12 volts, and wire the TV's + (left) dot towards the battery +.",new C.ftk()),C.Gu("Charge a battery","A 1.5 V battery starts flat. Join it to a solar panel (+ to +, \u2212 to \u2212) until its charge bar is full.",new C.ftl()),C.Gu("One battery, two gadgets","A TV needs 9 volts but a phone burns out. Use a step-down converter to give the phone 5 V from the same battery.",new C.ftm()),C.Gu("Protect a radio","Put a diode in the loop with a radio. It only lets electricity go one way.",new C.ftn()),C.Gu("Make toast","A heater turns electricity into heat. Make it glow bright orange.",new C.fto())],B.at("O<bdo>")))
 w($,"iDC","hLj",()=>B.a([C.a2d("Spin the Wheel","Let luck decide","\ud83c\udfa1",A.aQ,A.c6,new C.ftX()),C.a2d("Focus Timer","Work, then rest","\u23f1\ufe0f",A.bZ,A.bD,new C.ftY()),C.a2d("Breathe","Calm down in a minute","\ud83e\udee7",A.h0,A.cD,new C.ftZ()),C.a2d("Draw Pad","Sketch and share","\ud83c\udfa8",A.bE,A.b8,new C.fu_()),C.a2d("Memory Match","Find the pairs","\ud83c\udccf",A.aG,A.ci,new C.fu0()),C.a2d("Simon Sounds","Copy the tune","\ud83c\udfb5",A.bl,A.be,new C.fu1()),C.a2d("Tip & Split","Share the bill","\ud83e\uddfe",A.b4,A.b3,new C.fu2()),C.a2d("Lucky Pocket","Dice, coin, number","\ud83c\udfb2",A.bc,A.aB,new C.fu3())],B.at("O<bwY>")))})()};
-(a=>{a["NxJ5SZcauOIacjzxC/LP2UV/alk="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["UWR2zzohN6Aqw8y2uwFJK8nv2S0="]=a.current})($__dart_deferred_initializers__);
