@@ -20,6 +20,9 @@ void main() {
   testWidgets('the people of the city are your own 3D characters (X Bot and Soldier), and a different person is never drawn in their place while they load', (t) async {
     expect(ngmyPlayerAvatar, 'xbot');
     expect(kResidents.map((r) => r.style.avatar).toSet(), {'xbot', 'soldier'});
+    // The ready made characters are read in an instant here, so the slow way is used to see the moment before they are ready.
+    GlbAvatar.useBaked = false;
+    addTearDown(() => GlbAvatar.useBaked = true);
     final home = HomeProject(seed: 4);
     final room = home.rooms.firstWhere((r) => r.kind == 'outside');
     // Not read yet: nobody stands there, rather than somebody else.

@@ -78,4 +78,37 @@ void main() {
     expect(paints, greaterThan(0), reason: 'the screen is in view');
     expect(paints / 60, lessThanOrEqualTo(0.5), reason: 'about twenty pictures a second, not one for every frame and patch');
   });
+
+  test('opening a room: while the camera glides in, the TV pictures are not made again at a new size every frame', () {
+    final h = HomeProject.lesson('outlet');
+    final base = buildHomeRoom(h.room, closed: true);
+    var paints = 0;
+    final screens = [
+      for (final s in base.screens)
+        ScreenQuad(s.corners, s.id, (c, size, t) {
+          paints++;
+          s.paint(c, size, t);
+        }, width: s.width, height: s.height, bias: s.bias, order: s.order, group: s.group, twoSided: s.twoSided),
+    ];
+    final scene = Scene3D(base.polys, info: base.info, labels: base.labels, screens: screens, shell: base.shell, farMin: base.farMin, closedShell: base.closedShell);
+    final tv = screens.reduce((a, b) => (a.corners[0] - a.corners[2]).len > (b.corners[0] - b.corners[2]).len ? a : b);
+    final mid = V3((tv.corners[0].x + tv.corners[2].x) / 2, (tv.corners[0].y + tv.corners[2].y) / 2, (tv.corners[0].z + tv.corners[2].z) / 2);
+    final clock = ValueNotifier<double>(0);
+    final cam = Cam3(yaw: 0.2, pitch: 0.1, dist: 160, target: mid);
+    final painter = Scene3DPainter(scene: scene, cam: cam, hits: HitCache(), clock: clock);
+    const frames = 90;
+    for (var i = 0; i < frames; i++) {
+      // A second and a half of gliding from across the room up to the TV.
+      final u = i / (frames - 1);
+      cam.dist = 160 + (14 - 160) * u;
+      cam.yaw = 0.2 - 0.25 * u;
+      clock.value = 300 + i / 60;
+      final rec = ui.PictureRecorder();
+      painter.paint(Canvas(rec), const Size(430, 760));
+      rec.endRecording().dispose();
+    }
+    debugPrint('SPEED glide in: ${(paints / frames).toStringAsFixed(2)} pictures a frame for ${screens.length} screens');
+    // About twenty a second for the TV (and fewer for the others), not one for every screen in every frame.
+    expect(paints / frames, lessThanOrEqualTo(0.6));
+  });
 }

@@ -101,9 +101,24 @@ class GlbAvatar {
     if (path == null) return Future.value(null);
     return _loading[key] ??= () async {
       try {
-        final data = await rootBundle.load(path);
-        final a = GlbAvatar._(key);
-        await a._read(data);
+        // The character made ready beforehand (a small file of plain numbers) is read in a moment. Working it out from
+        // the .glb file (unpacking the skin pictures, thinning the body) stops the phone for a second or more each
+        // time, which made the first seconds of a lesson or a job jerky, so that is only done when the ready file is missing.
+        GlbAvatar? a;
+        if (useBaked) {
+          try {
+            final baked = await rootBundle.load(kBakedFile(key));
+            final b = GlbAvatar._(key);
+            if (b._readBaked(baked)) a = b;
+          } catch (_) {
+            a = null;
+          }
+        }
+        if (a == null) {
+          final data = await rootBundle.load(path);
+          a = GlbAvatar._(key);
+          await a._read(data);
+        }
         _ready[key] = a;
         _failed.remove(key);
         return a;
@@ -115,6 +130,131 @@ class GlbAvatar {
         _loading.remove(key);
       }
     }();
+  }
+
+  /// Set to false to always work the character out from its .glb file (the tests that check the ready files do).
+  static bool useBaked = true;
+
+  /// Where the ready made character [key] is kept.
+  static String kBakedFile(String key) => kGlbFiles[key]!.replaceAll('.glb', '.ngmyav');
+
+  /// Works the character out from its .glb file only (not the ready file). For making the ready files and checking them.
+  static Future<GlbAvatar> readGlb(String key) async {
+    final a = GlbAvatar._(key);
+    await a._read(await rootBundle.load(kGlbFiles[key]!));
+    return a;
+  }
+
+  // ── The ready made file: everything the game uses, as plain numbers ──
+
+  static const int _bakeMagic = 0x5641474E; // NGAV
+  static const int _bakeVersion = 2;
+
+  /// The character as a ready file (read back with the loader above).
+  Uint8List bake() {
+    final w = _BakeOut();
+    w.u32(_bakeMagic);
+    w.u32(_bakeVersion);
+    w.u32(kAvatarFacesGuide);
+    w.u32(kAvatarFacesResident);
+    w.ints(_parent);
+    w.u32(_names.length);
+    for (final s in _names) {
+      w.str(s);
+    }
+    w.u32(_hips + 1);
+    w.u32(_children.length);
+    for (final c in _children) {
+      w.ints(c);
+    }
+    w.ints(_roots);
+    w.f64s(_restT);
+    w.f64s(_restR);
+    w.f64s(_restS);
+    w.u32(clips.length);
+    for (final c in clips.values) {
+      w.str(c.name);
+      w.f64(c.duration);
+      w.u32(c.chans.length);
+      for (final ch in c.chans) {
+        w.u32(ch.node);
+        w.u32(ch.path);
+        w.u32(ch.step ? 1 : 0);
+        w.nums(ch.times);
+        w.nums(ch.values);
+      }
+    }
+    w.u32(_skinJoints.length);
+    for (var s = 0; s < _skinJoints.length; s++) {
+      w.ints(_skinJoints[s]);
+      w.nums(_skinIbm[s]);
+    }
+    w.u32(_rigid.length);
+    for (final r in _rigid) {
+      w.u32(r.$1);
+      w.u32(r.$2);
+      w.u32(r.$3);
+    }
+    for (final lod in [_guide, _resident]) {
+      w.f64s(lod.rest);
+      w.bytes(lod.jidx.buffer.asUint8List(lod.jidx.offsetInBytes, lod.jidx.lengthInBytes), lod.jidx.length);
+      w.f64s(lod.wgt);
+      w.bytes(lod.vskin, lod.vskin.length);
+      w.bytes(lod.tris.buffer.asUint8List(lod.tris.offsetInBytes, lod.tris.lengthInBytes), lod.tris.length);
+      w.bytes(lod.colors.buffer.asUint8List(lod.colors.offsetInBytes, lod.colors.lengthInBytes), lod.colors.length);
+      w.bytes(lod.region, lod.region.length);
+    }
+    w.f64(_floor);
+    return w.done();
+  }
+
+  /// Reads a ready file. False when it is not one, or was made for a different game (then the .glb file is read instead).
+  bool _readBaked(ByteData data) {
+    final r = _BakeIn(Uint8List.fromList(data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes)));
+    if (r.u32() != _bakeMagic || r.u32() != _bakeVersion || r.u32() != kAvatarFacesGuide || r.u32() != kAvatarFacesResident) return false;
+    _parent = r.ints();
+    _names = [for (var i = r.u32(); i > 0; i--) r.str()];
+    _hips = r.u32() - 1;
+    _children = [for (var i = r.u32(); i > 0; i--) r.ints()];
+    _roots = r.ints();
+    _restT = r.f64s();
+    _restR = r.f64s();
+    _restS = r.f64s();
+    for (var i = r.u32(); i > 0; i--) {
+      final name = r.str();
+      final dur = r.f64();
+      final chans = <_Chan>[];
+      for (var k = r.u32(); k > 0; k--) {
+        final node = r.u32(), path = r.u32(), step = r.u32() == 1;
+        chans.add(_Chan(node, path, r.nums(), r.nums(), step));
+      }
+      clips[name] = _Clip(name, dur, chans);
+    }
+    _skinJoints = [];
+    _skinIbm = [];
+    for (var i = r.u32(); i > 0; i--) {
+      _skinJoints.add(r.ints());
+      _skinIbm.add(r.nums());
+    }
+    for (var i = r.u32(); i > 0; i--) {
+      _rigid.add((r.u32(), r.u32(), r.u32()));
+    }
+    _Lod lod() {
+      final rest = r.f64s();
+      final jidx = r.raw((b, o, n) => b.asUint16List(o, n), 2);
+      final wgt = r.f64s();
+      final vskin = r.raw((b, o, n) => b.asUint8List(o, n), 1);
+      final tris = r.raw((b, o, n) => b.asInt32List(o, n), 4);
+      final colors = r.raw((b, o, n) => b.asInt32List(o, n), 4);
+      final l = _Lod(rest, jidx, wgt, vskin, tris, colors);
+      l.region = r.raw((b, o, n) => b.asUint8List(o, n), 1);
+      return l;
+    }
+
+    _guide = lod();
+    _resident = lod();
+    _floor = r.f64();
+    return r.atEnd;
   }
 
   /// Reads all three, the one that is needed first at the front.
@@ -920,4 +1060,118 @@ class _Glb {
     }
     return (out, comps);
   }
+}
+
+/// Writes the ready made character file: numbers and lists one after the other, each list starting on a multiple of 8
+/// so it can be read back as it is (no copying number by number).
+class _BakeOut {
+  final BytesBuilder _b = BytesBuilder(copy: false);
+  int _len = 0;
+  final ByteData _tmp = ByteData(8);
+
+  void _add(List<int> bytes) {
+    _b.add(Uint8List.fromList(bytes));
+    _len += bytes.length;
+  }
+
+  void _pad() {
+    final n = (8 - _len % 8) % 8;
+    if (n > 0) _add(List<int>.filled(n, 0));
+  }
+
+  void u32(int v) {
+    _tmp.setUint32(0, v, Endian.little);
+    _add(_tmp.buffer.asUint8List(0, 4));
+  }
+
+  void f64(double v) {
+    _pad();
+    _tmp.setFloat64(0, v, Endian.little);
+    _add(_tmp.buffer.asUint8List(0, 8));
+  }
+
+  void str(String s) {
+    final b = utf8.encode(s);
+    u32(b.length);
+    _add(b);
+  }
+
+  void bytes(Uint8List raw, int count) {
+    u32(count);
+    _pad();
+    _add(raw);
+  }
+
+  void ints(List<int> v) {
+    final l = Int32List.fromList(v);
+    bytes(l.buffer.asUint8List(), l.length);
+  }
+
+  void f64s(Float64List v) => bytes(v.buffer.asUint8List(v.offsetInBytes, v.lengthInBytes), v.length);
+
+  Uint8List done() => _b.takeBytes();
+
+  /// A list of numbers, kept at half the size when every number in it fits exactly (the numbers of the .glb file do).
+  void nums(Float64List v) {
+    final small = Float32List.fromList(v);
+    var exact = true;
+    for (var i = 0; i < v.length; i++) {
+      if (small[i] != v[i]) {
+        exact = false;
+        break;
+      }
+    }
+    u32(exact ? 1 : 2);
+    if (exact) {
+      bytes(small.buffer.asUint8List(), small.length);
+    } else {
+      f64s(v);
+    }
+  }
+}
+
+/// Reads the ready made character file written by [_BakeOut].
+class _BakeIn {
+  _BakeIn(this._u) : _d = ByteData.sublistView(_u);
+  final Uint8List _u;
+  final ByteData _d;
+  int _o = 0;
+
+  bool get atEnd => _o == _u.length;
+
+  void _pad() => _o += (8 - _o % 8) % 8;
+
+  int u32() {
+    final v = _d.getUint32(_o, Endian.little);
+    _o += 4;
+    return v;
+  }
+
+  double f64() {
+    _pad();
+    final v = _d.getFloat64(_o, Endian.little);
+    _o += 8;
+    return v;
+  }
+
+  String str() {
+    final n = u32();
+    final s = utf8.decode(_u.sublist(_o, _o + n));
+    _o += n;
+    return s;
+  }
+
+  T raw<T>(T Function(ByteBuffer b, int offset, int count) view, int size) {
+    final n = u32();
+    _pad();
+    final v = view(_u.buffer, _u.offsetInBytes + _o, n);
+    _o += n * size;
+    return v;
+  }
+
+  List<int> ints() => List<int>.of(raw((b, o, n) => b.asInt32List(o, n), 4));
+
+  Float64List f64s() => raw((b, o, n) => b.asFloat64List(o, n), 8);
+
+  Float64List nums() => u32() == 1 ? Float64List.fromList(raw((b, o, n) => b.asFloat32List(o, n), 4)) : f64s();
 }

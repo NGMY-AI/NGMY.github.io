@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'ngmy_3d.dart';
+import 'ngmy_avatar_glb.dart';
 import 'ngmy_construction_electrical.dart';
 import 'ngmy_construction_house.dart';
 import 'ngmy_construction_plumbing.dart';
@@ -135,6 +136,14 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
 
   /// Every lesson plays inside a furnished room, with a big TV on the wall showing the NGMY Jobs ad.
   void _lesson(String id) => _push(id == 'house' ? const _HousePage() : NgmyHousePage(lesson: id));
+
+  @override
+  void initState() {
+    super.initState();
+    // The people of the lessons and jobs are read now, while the list is on screen, so they are ready (and nothing
+    // stops) when a lesson or a job opens.
+    GlbAvatar.preload();
+  }
 
   @override
   Widget build(BuildContext context) {

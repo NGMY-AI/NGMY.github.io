@@ -896,7 +896,7 @@ class Scene3DPainter extends CustomPainter {
     final areas = <double>[];
     final fullAt = <double>[0.0];
     // How many ad pictures may be made fresh in this frame (the rest show the one made a moment ago).
-    final budget = <int>[4];
+    final budget = <int>[4, _kFramePixels];
     final nStatic = scene.screens.length;
     for (var si = 0; si < allScreens.length; si++) {
       final sq = allScreens[si];
@@ -1108,19 +1108,35 @@ double _screenScale(ScreenQuad sq, double area, double viewW) {
   final maxDim = math.max(sq.width, sq.height);
   final cap = math.min(6.0, 2048 / maxDim);
   final onScreen = area.isFinite ? math.sqrt(area / (sq.width * sq.height)) : viewW * 1.3 / sq.width;
-  final want = (onScreen * _devicePixelRatio() * 2).ceilToDouble() / 2;
-  return want.clamp(1.0, math.max(1.0, cap));
+  final want = onScreen * _devicePixelRatio();
+  // Only a few sharpnesses, so a screen that grows a little as the camera glides in keeps the same size of picture
+  // (a new size every frame made the first seconds of a room jerky).
+  var step = 1.0;
+  for (final s in const [1.0, 1.5, 2.0, 3.0, 4.0, 6.0]) {
+    step = s;
+    if (s >= want) break;
+  }
+  return math.min(step, math.max(1.0, cap));
 }
 
+/// The pictures made fresh in one frame may hold at most this many pixels together (the first one always may).
+const int _kFramePixels = 2400000;
+
 /// The picture of [sq] for this moment: made fresh when it is time ([fps] times a second) and the frame still has
-/// [budget] left, otherwise the one made a moment ago.
+/// [budget] left (pictures, then pixels), otherwise the one made a moment ago.
 ui.Image? _screenImage(Object key, ScreenQuad sq, double time, {required double fps, required double scale, required List<int> budget}) {
   final bucket = (time * fps).floor();
   final have = _adImgs.remove(key);
   if (have != null) _adImgs[key] = have;
-  final stale = have == null || have.bucket != bucket || have.scale != scale;
-  if (stale && budget[0] > 0) {
+  // A new sharpness alone does not make a new picture: it is used the next time the picture is made anyway (a moment later).
+  final stale = have == null || have.bucket != bucket || have.scale < scale * 0.5;
+  final px = (sq.width * scale).round() * (sq.height * scale).round();
+  final roomy = budget[1] == _kFramePixels || budget[1] >= px;
+  // A screen with no picture yet gets a quick plain one when the frame is already full; the sharp one comes a moment later.
+  if (stale && budget[0] > 0 && (roomy || have == null)) {
+    if (!roomy) scale = 1.0;
     budget[0]--;
+    budget[1] -= roomy ? px : (sq.width * sq.height).round();
     final rec = ui.PictureRecorder();
     final c = Canvas(rec);
     c.scale(scale);
