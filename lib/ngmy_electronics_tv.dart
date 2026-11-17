@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'ngmy_screen_cache.dart';
 import 'ngmy_text_cache.dart';
 import 'package:flutter/services.dart';
 
@@ -49,6 +50,19 @@ int? ngmyTvChannelAd(int ch) {
 /// Paints one frame of the TV picture (the boot logo for the first seconds, then the channel).
 /// [age] is how many seconds the TV has been on; [t] is the running clock.
 void paintNgmyTv(Canvas c, Size s, int channel, double t, {double age = 99, int app = -1, NgmyAdTap? tap, int? pick}) {
+  if (s.width <= 0 || s.height <= 0) return;
+  // A small TV (the one on the lab board) shows the very same picture as the big screen: it is drawn at a normal
+  // screen size and made smaller to fit.
+  if (s.shortestSide < 180) {
+    final k = 180 / s.shortestSide;
+    // The picture is made fifteen times a second and kept (TVs on the same channel share it), so the board stays smooth.
+    final boot = age < 3.0;
+    ngmyDrawCachedScreen(c, ('tv', channel, app, pick, s.width, s.height, boot), s, boot ? age : t, (pc) {
+      pc.scale(1 / k);
+      paintNgmyTv(pc, Size(s.width * k, s.height * k), channel, t, age: age, app: app, tap: tap, pick: pick);
+    });
+    return;
+  }
   c.save();
   c.clipRect(Offset.zero & s);
   if (age < 3.0) {
@@ -75,13 +89,7 @@ void paintNgmyTv(Canvas c, Size s, int channel, double t, {double age = 99, int 
     _bug(c, s, 'CH ${ch + 1}  ·  ${kNgmyTvChannels[ch].title}');
     if (k < 1) c.drawRect(Offset.zero & s, Paint()..color = Colors.white.withValues(alpha: 0.6 * (1 - k)));
   }
-  // Scan lines on the little TVs only (a big modern screen has none), and a soft glass reflection.
-  if (s.shortestSide < 200) {
-    final line = Paint()..color = Colors.black.withValues(alpha: 0.07);
-    for (var y = 0.0; y < s.height; y += 3) {
-      c.drawRect(Rect.fromLTWH(0, y, s.width, 1), line);
-    }
-  }
+  // A soft glass reflection (no scan lines: every screen is crystal clear).
   c.drawPath(Path()..moveTo(0, 0)..lineTo(s.width * 0.45, 0)..lineTo(0, s.height * 0.5)..close(), Paint()..color = Colors.white.withValues(alpha: 0.04));
   c.restore();
 }

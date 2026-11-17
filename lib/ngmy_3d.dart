@@ -931,7 +931,7 @@ class Scene3DPainter extends CustomPainter {
           // ones, less for the small far ones) and reused in between, so a room full of TVs stays smooth.
           final big = area >= fullAt[0];
           final key = isStatic ? sq : 'moving:${si - nStatic}:${sq.width}x${sq.height}';
-          final img = _screenImage(key, sq, time, fps: big ? 20 : (isStatic ? 5 : 12), scale: _screenScale(sq, area), budget: budget);
+          final img = _screenImage(key, sq, time, fps: big ? 20 : (isStatic ? 5 : 12), scale: _screenScale(sq, area, w), budget: budget);
           if (img != null) {
             _drawImageQuad(c, img, sq, pts);
           } else {
@@ -958,7 +958,7 @@ class Scene3DPainter extends CustomPainter {
       final cellKey = isStatic ? sq : 'moving:${si - nStatic}:${sq.width}x${sq.height}';
       drawn.add(_Face(path, Colors.transparent, mid.z - sq.bias, sq.id, false, false, (c) {
         // Up close the screen is cut into patches; they all show parts of one picture of the ad (not the ad drawn again for each patch).
-        final img = _screenImage(cellKey, sq, time, fps: 20, scale: _screenScale(sq, double.infinity), budget: budget);
+        final img = _screenImage(cellKey, sq, time, fps: 20, scale: _screenScale(sq, double.infinity, w), budget: budget);
         if (img != null) _drawImageCells(c, img, sq, cells, nx, ny);
       }, sq.order, sq.group));
     }
@@ -1089,12 +1089,27 @@ class _AdImg {
 final Map<Object, _AdImg> _adImgs = <Object, _AdImg>{};
 const int _kMaxAdImgs = 32;
 
-/// How sharp the picture of a screen is made: twice as sharp when the screen is big on the screen of the phone.
-double _screenScale(ScreenQuad sq, double area) {
-  final base = sq.width * sq.height;
-  final want = area > base * 1.3 ? 2.0 : 1.0;
+/// All the pictures kept together may hold at most this many pixels (about 48 MB).
+const int _kMaxAdPixels = 12000000;
+
+double _devicePixelRatio() {
+  try {
+    final views = ui.PlatformDispatcher.instance.views;
+    return views.isEmpty ? 2.0 : views.first.devicePixelRatio;
+  } catch (_) {
+    return 2.0;
+  }
+}
+
+/// How sharp the picture of a screen is made: as sharp as the pixels of the phone where the screen shows (a TV that
+/// fills the phone gets a big, crisp picture; a small far one a small picture). [area] is the space it takes on the
+/// phone screen (infinite: up close, as wide as the view [viewW]).
+double _screenScale(ScreenQuad sq, double area, double viewW) {
   final maxDim = math.max(sq.width, sq.height);
-  return math.min(want, 1600 / maxDim).clamp(0.5, 2.0);
+  final cap = math.min(6.0, 2048 / maxDim);
+  final onScreen = area.isFinite ? math.sqrt(area / (sq.width * sq.height)) : viewW * 1.3 / sq.width;
+  final want = (onScreen * _devicePixelRatio() * 2).ceilToDouble() / 2;
+  return want.clamp(1.0, math.max(1.0, cap));
 }
 
 /// The picture of [sq] for this moment: made fresh when it is time ([fps] times a second) and the frame still has
@@ -1116,16 +1131,24 @@ ui.Image? _screenImage(Object key, ScreenQuad sq, double time, {required double 
     pic.dispose();
     have?.image.dispose();
     _adImgs[key] = _AdImg(bucket, img, scale);
-    while (_adImgs.length > _kMaxAdImgs) {
+    var pixels = 0;
+    for (final a in _adImgs.values) {
+      pixels += a.image.width * a.image.height;
+    }
+    while (_adImgs.length > 1 && (_adImgs.length > _kMaxAdImgs || pixels > _kMaxAdPixels)) {
       final k = _adImgs.keys.first;
-      _adImgs.remove(k)!.image.dispose();
+      final old = _adImgs.remove(k)!;
+      pixels -= old.image.width * old.image.height;
+      old.image.dispose();
     }
     return img;
   }
   return have?.image;
 }
 
-final Paint _imgPaint = Paint()..filterQuality = FilterQuality.medium;
+final Paint _imgPaint = Paint()
+  ..filterQuality = FilterQuality.high
+  ..isAntiAlias = true;
 
 /// A picture laid on the four corners [p] of a screen.
 void _drawImageQuad(Canvas canvas, ui.Image img, ScreenQuad sq, List<Offset> p) {

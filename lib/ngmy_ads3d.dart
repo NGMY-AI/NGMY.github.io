@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_screen_cache.dart';
 import 'ngmy_text_cache.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -794,16 +795,16 @@ void paintNgmyAd3D(Canvas c, Size s, int index, double lt, {NgmyAdTap? tap, bool
   c.save();
   c.clipRect(Offset.zero & s);
 
-  // Very small screens (a watch, a tiny board part): the studio, the medal and the name.
-  if (s.shortestSide < 60) {
-    _studio(c, s, ad, lt, index, rich: false);
-    final r = s.shortestSide * 0.3;
-    final ctr = Offset(w / 2, h * (w >= h ? 0.42 : 0.4));
-    final ic = Rect.fromCircle(center: ctr, radius: r);
-    c.drawOval(ic, Paint()..shader = RadialGradient(center: const Alignment(-0.3, -0.4), colors: [_lift(ad.b, 0.4), ad.b, _sink(ad.a, 0.3)]).createShader(ic));
-    _icon(c, ad.icon, ctr, r * 1.1, Colors.white);
-    _text(c, ad.brand.replaceFirst('NGMY ', ''), Offset(w / 2, h * 0.76), s.shortestSide * 0.13, Colors.white, align: 0.5, maxW: w * 0.92);
+  // Small screens (the TV and the phones on the lab board, a watch): the whole real ad is drawn at a normal screen size
+  // and made smaller to fit, so even a little screen shows the ad itself (zoom in and it is all there).
+  if (s.shortestSide < 180) {
+    final k = 180 / s.shortestSide;
     c.restore();
+    // The picture is made fifteen times a second and kept (screens showing the same ad share it), so the board stays smooth.
+    ngmyDrawCachedScreen(c, ('ad', index % kNgmyAds3D.length, ofCount, w, h), s, lt + (index % kNgmyAds3D.length) * 1000, (pc) {
+      pc.scale(1 / k);
+      paintNgmyAd3D(pc, Size(w * k, h * k), index, lt, ofCount: ofCount);
+    });
     return;
   }
 

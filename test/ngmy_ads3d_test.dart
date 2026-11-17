@@ -108,6 +108,19 @@ void main() {
         paintSparkAdventure(Canvas(rec), const Size(960, 540), t);
         await _save(await rec.endRecording().toImage(960, 540), 'spark_${(t * 10).round()}');
       }
+      // The little TV on the lab board (66 by 38) and a phone on the board (24 by 44), seen six times bigger.
+      for (final (name, size, ch) in [('board_tv_game_center', const Size(66, 38), 6), ('board_tv_store', const Size(66, 38), 1)]) {
+        final rec = ui.PictureRecorder();
+        final c = Canvas(rec)..scale(6);
+        paintNgmyTv(c, size, ch, 4.8);
+        await _save(await rec.endRecording().toImage((size.width * 6).round(), (size.height * 6).round()), name);
+      }
+      {
+        final rec = ui.PictureRecorder();
+        final c = Canvas(rec)..scale(8);
+        paintNgmyAd(c, const Size(24, 44), 24.8);
+        await _save(await rec.endRecording().toImage(24 * 8, 44 * 8), 'board_phone');
+      }
     });
   });
 
