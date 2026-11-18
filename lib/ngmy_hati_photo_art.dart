@@ -3,14 +3,18 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 
 // The four picture papers for the Hati documents (curtains, village, sunset, roses) are pictures in assets/hati, made
-// from the owner's own designs by tool/hati_photo/build.dart. A document keeps its paper inside itself as a data link,
+// from the owner's own designs by tool/hati_photo/exact.dart. A document keeps its paper inside itself as a data link,
 // so each picture is read once and kept here as one.
 
 const List<String> kNgmyHatiPhotoArt = [
-  'photo_curtain',
-  'photo_village',
-  'photo_sunset',
-  'photo_roses',
+  'exact_curtain',
+  'exact_curtain_notitle',
+  'exact_village',
+  'exact_village_notitle',
+  'exact_sunset',
+  'exact_sunset_notitle',
+  'exact_roses',
+  'exact_roses_notitle',
   'exact_kijiji',
   'exact_kijiji_notitle',
   'exact_kifalme',

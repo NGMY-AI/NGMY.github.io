@@ -845,53 +845,53 @@ const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaPhotoTemplates = [
     id: 'photo_curtain',
     name: 'Pazia la Kifalme',
     description: 'Mapazia ya bluu · bendera · ngoma.',
-    paperStyle: NgmyMarriagePaperStyle.photoCurtain,
+    paperStyle: NgmyMarriagePaperStyle.exactCurtain,
     background: 0xFF14307E,
     ink: 0xFFF3EEE0,
     accent: 0xFFF2CE6A,
     bannerFill: 0xFFD9B04A,
     bannerText: 0xFF14204A,
     previewColors: [Color(0xFF14307E), Color(0xFFD9B04A), Color(0xFFF4E6C6)],
-    layoutKind: NgmyHatiLayoutKind.royal,
+    layoutKind: NgmyHatiLayoutKind.exact,
   ),
   NgmyHatiKuhowaTemplate(
     id: 'photo_village',
     name: 'Kijiji na Wanandoa',
     description: 'Wanandoa · mnazi na nyumba · kitenge.',
-    paperStyle: NgmyMarriagePaperStyle.photoVillage,
+    paperStyle: NgmyMarriagePaperStyle.exactVillage,
     background: 0xFFF3DDBB,
     ink: 0xFF2B1A12,
     accent: 0xFF5B2A16,
     bannerFill: 0xFF5B2A16,
     bannerText: 0xFFFBEFD3,
     previewColors: [Color(0xFFF3DDBB), Color(0xFF5B2A16), Color(0xFFC0392B)],
-    layoutKind: NgmyHatiLayoutKind.royal,
+    layoutKind: NgmyHatiLayoutKind.exact,
   ),
   NgmyHatiKuhowaTemplate(
     id: 'photo_sunset',
     name: 'Machweo ya Savana',
     description: 'Machweo · njiwa · ramani ya Kongo · ngoma.',
-    paperStyle: NgmyMarriagePaperStyle.photoSunset,
-    background: 0xFF3A1A10,
+    paperStyle: NgmyMarriagePaperStyle.exactSunset,
+    background: 0xFFF6E9C8, // the witness cards are light: signatures in dark ink
     ink: 0xFF2A1A10,
     accent: 0xFFF2C75C,
     bannerFill: 0xFF2A140C,
     bannerText: 0xFFF6ECD4,
     previewColors: [Color(0xFF3A1A10), Color(0xFFE07A2A), Color(0xFFF2C75C)],
-    layoutKind: NgmyHatiLayoutKind.royal,
+    layoutKind: NgmyHatiLayoutKind.exact,
   ),
   NgmyHatiKuhowaTemplate(
     id: 'photo_roses',
     name: 'Waridi na Pete',
     description: 'Waridi nyeupe · pete za dhahabu · mpaka wa bluu.',
-    paperStyle: NgmyMarriagePaperStyle.photoRoses,
+    paperStyle: NgmyMarriagePaperStyle.exactRoses,
     background: 0xFFF7F0E2,
     ink: 0xFF1C2238,
     accent: 0xFF14244F,
     bannerFill: 0xFF14244F,
     bannerText: 0xFFF6F1E1,
     previewColors: [Color(0xFFF7F0E2), Color(0xFF14244F), Color(0xFFC9A23A)],
-    layoutKind: NgmyHatiLayoutKind.royal,
+    layoutKind: NgmyHatiLayoutKind.exact,
   ),
 ];
 
@@ -1907,9 +1907,9 @@ List<NgmySlideElement> _layoutRoyal(
 }
 
 // ── Exact papers ───────────────────────────────────────────────────────────
-// The owner's own full-page designs, used exactly as drawn (assets/hati/exact_*.jpg, made by tool/hati_photo/exact.dart).
-// Only the words that change were wiped off the picture; the fill-in fields are laid exactly where those words were,
-// measured in the picture's own pixels. The labels, lines, coins and frames stay in the picture.
+// The owner's own designs, used exactly as drawn (assets/hati/exact_*.jpg, made by tool/hati_photo/exact.dart). Only the
+// words that change were wiped off the picture; the fill-in fields are laid exactly where those words were, measured in
+// the picture's own pixels, in the design's own colours and letters. The labels, lines, coins and frames stay.
 
 /// A box in the design's own pixels: left, top, right, bottom.
 typedef _Px = (double, double, double, double);
@@ -1917,79 +1917,129 @@ typedef _Px = (double, double, double, double);
 class _ExactSpec {
   const _ExactSpec({
     required this.art,
-    required this.couple,
+    required this.width,
+    required this.height,
     required this.title,
+    required this.titleColor,
+    required this.titleFx,
     required this.tareheLabel,
     required this.tareheDate,
     required this.tareheColor,
     required this.tareheFx,
     required this.tareheFont,
     required this.paragraph,
+    required this.paraFont,
+    required this.paraInk,
+    required this.paraFx,
+    required this.paraAlign,
     required this.section,
     required this.sectionFont,
+    required this.sectionColor,
+    required this.sectionFx,
     required this.subtitle,
+    required this.subtitleFont,
     required this.subtitleColor,
     required this.subtitleFx,
     required this.itemX,
     required this.itemRight,
     required this.itemRight1,
     required this.itemCenters,
+    required this.itemFont,
+    required this.itemInk,
+    required this.itemFx,
     required this.coinX,
     required this.akunaText,
     required this.akunaBox,
     required this.akunaColor,
     required this.akunaFont,
+    required this.ownTick,
     required this.witnessName,
     required this.witnessSign,
+    required this.witnessFont,
+    required this.witnessInk,
+    required this.witnessPlaceholder,
     required this.mwName,
     required this.mwSign,
-    required this.state,
+    required this.mwFont,
+    required this.mwInk,
+    required this.fieldFx,
+    this.state,
+    this.stateText = '',
+    this.stateFont = 28,
+    this.stateColor = 0xFF2A1A10,
+    this.stateFx = 'serif',
+    this.couple,
   });
 
   /// The picture (assets/hati/<art>.jpg; <art>_notitle.jpg has the title wiped; <art>_couple.jpg is the couple).
   final String art;
-  final _Px couple, title, tareheLabel, tareheDate, paragraph, section, subtitle, akunaText, akunaBox, mwName, mwSign, state;
-  final int tareheColor, subtitleColor, akunaColor;
+  final double width, height;
+  final _Px title, tareheLabel, tareheDate, paragraph, section, subtitle, akunaText, akunaBox, mwName, mwSign;
+  final _Px? state, couple;
+  final int titleColor, tareheColor, paraInk, sectionColor, subtitleColor, itemInk, akunaColor, witnessInk, mwInk, stateColor;
+  final String titleFx, tareheFx, paraFx, sectionFx, subtitleFx, itemFx, fieldFx, stateFx;
+  final TextAlign paraAlign;
 
-  /// The dark brown of the written words, and the size of both designs in pixels.
-  int get ink => 0xFF2A1A10;
-  double get width => 1054;
-  double get height => 1492;
-  final String tareheFx, subtitleFx;
-  final double tareheFont, sectionFont, akunaFont;
+  // Font sizes in the design's own pixels.
+  final double tareheFont, paraFont, sectionFont, subtitleFont, itemFont, akunaFont, witnessFont, mwFont, stateFont;
   final double itemX, itemRight, itemRight1, coinX;
   final List<double> itemCenters;
 
-  /// For each side (mke, mume), the name line and the signature line of each witness row.
+  /// True: the design's tick box was wiped with the words, so the app draws its own green tick box.
+  final bool ownTick;
+
+  /// For each side (mke, mume), the name spot and the signature line of each witness row.
   final Map<String, List<_Px>> witnessName, witnessSign;
+
+  /// True: the design wrote "Jina la Shahidi" where the name goes (it was wiped); the field starts with those words.
+  final bool witnessPlaceholder;
+
+  /// The words under the footer with {st} for the state; empty when the footer keeps the design's own words.
+  final String stateText;
 
   double get aspect => width / height;
 }
 
+// The two full-page A4 designs.
 const _ExactSpec _kExactKijiji = _ExactSpec(
   art: 'exact_kijiji',
+  width: 1054,
+  height: 1492,
   couple: (0, 0, 480, 560),
   title: (470, 108, 842, 255),
+  titleColor: 0xFFF2C14E,
+  titleFx: 'goldserif',
   tareheLabel: (514, 349, 640, 383),
   tareheDate: (644, 349, 800, 383),
   tareheColor: 0xFFFBF1DC,
   tareheFx: 'serif',
-  tareheFont: 24,
+  tareheFont: 26,
   paragraph: (128, 517, 918, 690),
+  paraFont: 22,
+  paraInk: 0xFF2A1A10,
+  paraFx: 'serif',
+  paraAlign: TextAlign.center,
   section: (337, 700, 722, 743),
-  sectionFont: 38,
+  sectionFont: 41,
+  sectionColor: 0xFFF2C14E,
+  sectionFx: 'goldserif',
   subtitle: (132, 748, 476, 783),
+  subtitleFont: 23,
   subtitleColor: 0xFFFBEFD3,
   subtitleFx: 'serif',
   itemX: 190,
   itemRight: 695,
   itemRight1: 690,
   itemCenters: [803, 840, 879, 916],
+  itemFont: 21.5,
+  itemInk: 0xFF2A1A10,
+  itemFx: 'serif',
   coinX: 136,
   akunaText: (744, 838, 902, 878),
   akunaBox: (906, 842, 946, 874),
   akunaColor: 0xFFF7D046,
-  akunaFont: 20,
+  akunaFont: 22,
+  ownTick: true,
   witnessName: {
     'mke': [(275, 1052, 374, 1078), (275, 1092, 374, 1118), (275, 1131, 374, 1157)],
     'mume': [(705, 1052, 800, 1078), (705, 1092, 800, 1118), (705, 1131, 800, 1157)],
@@ -1998,35 +2048,58 @@ const _ExactSpec _kExactKijiji = _ExactSpec(
     'mke': [(436, 1046, 499, 1078), (436, 1086, 499, 1118), (436, 1125, 499, 1157)],
     'mume': [(863, 1046, 926, 1078), (863, 1086, 926, 1118), (863, 1125, 926, 1157)],
   },
+  witnessFont: 15.5,
+  witnessInk: 0xFF2A1A10,
+  witnessPlaceholder: false,
   mwName: (252, 1262, 557, 1291),
   mwSign: (661, 1250, 859, 1292),
+  mwFont: 18.5,
+  mwInk: 0xFF2A1A10,
+  fieldFx: 'serif',
   state: (366, 1395, 704, 1432),
+  stateText: '———   {st}   ———',
+  stateFont: 31,
 );
 
 const _ExactSpec _kExactKifalme = _ExactSpec(
   art: 'exact_kifalme',
+  width: 1054,
+  height: 1492,
   couple: (0, 0, 495, 440),
-  title: (470, 305, 950, 382),
+  title: (474, 301, 948, 385),
+  titleColor: 0xFFF2C14E,
+  titleFx: 'goldserif',
   tareheLabel: (560, 386, 684, 419),
   tareheDate: (688, 386, 860, 419),
   tareheColor: 0xFFF2C14E,
   tareheFx: 'goldserif',
-  tareheFont: 23,
+  tareheFont: 25,
   paragraph: (117, 522, 937, 694),
+  paraFont: 22,
+  paraInk: 0xFF2A1A10,
+  paraFx: 'serif',
+  paraAlign: TextAlign.center,
   section: (358, 714, 701, 756),
-  sectionFont: 37,
+  sectionFont: 40,
+  sectionColor: 0xFFF2C14E,
+  sectionFx: 'goldserif',
   subtitle: (129, 761, 440, 793),
+  subtitleFont: 23,
   subtitleColor: 0xFFF8F1DE,
   subtitleFx: '',
   itemX: 182,
   itemRight: 742,
   itemRight1: 745,
   itemCenters: [819.5, 857.5, 892.5, 927],
+  itemFont: 21.5,
+  itemInk: 0xFF2A1A10,
+  itemFx: 'serif',
   coinX: 128,
   akunaText: (800, 803, 922, 834),
   akunaBox: (756, 801, 793, 836),
   akunaColor: 0xFFF6CF4A,
-  akunaFont: 17,
+  akunaFont: 19,
+  ownTick: false,
   witnessName: {
     'mke': [(260, 1058, 362, 1083), (260, 1099, 362, 1124), (260, 1141, 362, 1166)],
     'mume': [(697, 1058, 799, 1083), (697, 1099, 799, 1124), (697, 1141, 799, 1166)],
@@ -2035,14 +2108,257 @@ const _ExactSpec _kExactKifalme = _ExactSpec(
     'mke': [(423, 1050, 499, 1083), (423, 1091, 499, 1124), (423, 1133, 499, 1166)],
     'mume': [(861, 1050, 936, 1083), (861, 1091, 936, 1124), (861, 1133, 936, 1166)],
   },
+  witnessFont: 15.5,
+  witnessInk: 0xFF2A1A10,
+  witnessPlaceholder: false,
   mwName: (228, 1258, 568, 1287),
   mwSign: (680, 1246, 883, 1288),
+  mwFont: 18.5,
+  mwInk: 0xFFF8F1DE,
+  fieldFx: 'serif',
   state: (336, 1395, 722, 1432),
+  stateText: '———   {st}   ———',
+  stateFont: 31,
+);
+
+// The four designs from the owner's 2 x 2 picture, each drawn twice as big (1198 x 1312).
+const _ExactSpec _kExactCurtain = _ExactSpec(
+  art: 'exact_curtain',
+  width: 1198,
+  height: 1312,
+  title: (285, 115, 955, 200),
+  titleColor: 0xFFF2C14E,
+  titleFx: 'goldserif',
+  tareheLabel: (462, 206, 606, 246),
+  tareheDate: (608, 206, 800, 246),
+  tareheColor: 0xFF14204A,
+  tareheFx: '',
+  tareheFont: 31,
+  paragraph: (205, 278, 1028, 538),
+  paraFont: 27,
+  paraInk: 0xFF2A1A10,
+  paraFx: '',
+  paraAlign: TextAlign.left,
+  section: (195, 568, 1040, 620),
+  sectionFont: 38,
+  sectionColor: 0xFF14204A,
+  sectionFx: '',
+  subtitle: (163, 636, 640, 672),
+  subtitleFont: 28,
+  subtitleColor: 0xFFF2CE6A,
+  subtitleFx: '',
+  itemX: 238,
+  itemRight: 830,
+  itemRight1: 828,
+  itemCenters: [708, 761, 815, 867],
+  itemFont: 27,
+  itemInk: 0xFFF3EEE0,
+  itemFx: '',
+  coinX: 175,
+  akunaText: (848, 690, 1012, 727),
+  akunaBox: (1015, 688, 1065, 728),
+  akunaColor: 0xFFF2CE6A,
+  akunaFont: 24,
+  ownTick: false,
+  witnessName: {
+    'mke': [(220, 1017, 382, 1052), (220, 1065, 382, 1100), (220, 1112, 382, 1147)],
+    'mume': [(703, 1017, 855, 1052), (703, 1065, 855, 1100), (703, 1112, 855, 1147)],
+  },
+  witnessSign: {
+    'mke': [(540, 1015, 602, 1052), (540, 1063, 602, 1100), (540, 1110, 602, 1147)],
+    'mume': [(998, 1015, 1058, 1052), (998, 1063, 1058, 1100), (998, 1110, 1058, 1147)],
+  },
+  witnessFont: 25,
+  witnessInk: 0xFFF3EEE0,
+  witnessPlaceholder: true,
+  mwName: (255, 1203, 582, 1233),
+  mwSign: (723, 1198, 1017, 1233),
+  mwFont: 26,
+  mwInk: 0xFFF3EEE0,
+  fieldFx: '',
+  state: (370, 1262, 892, 1302),
+  stateText: "EMO 'YA M'MBONDO – {st}",
+  stateFont: 33,
+  stateColor: 0xFF14204A,
+  stateFx: '',
+);
+
+const _ExactSpec _kExactVillage = _ExactSpec(
+  art: 'exact_village',
+  width: 1198,
+  height: 1312,
+  couple: (850, 25, 1168, 285),
+  title: (310, 108, 836, 200),
+  titleColor: 0xFF5B2A16,
+  titleFx: 'serif',
+  tareheLabel: (380, 198, 562, 238),
+  tareheDate: (564, 198, 765, 238),
+  tareheColor: 0xFFFBEFD3,
+  tareheFx: 'serif',
+  tareheFont: 31,
+  paragraph: (243, 280, 965, 535),
+  paraFont: 26,
+  paraInk: 0xFF2A1A10,
+  paraFx: '',
+  paraAlign: TextAlign.left,
+  section: (325, 617, 885, 665),
+  sectionFont: 36,
+  sectionColor: 0xFFFBEFD3,
+  sectionFx: 'serif',
+  subtitle: (228, 678, 630, 714),
+  subtitleFont: 29,
+  subtitleColor: 0xFF2A1A10,
+  subtitleFx: '',
+  itemX: 305,
+  itemRight: 805,
+  itemRight1: 800,
+  itemCenters: [752, 811, 864, 917],
+  itemFont: 27,
+  itemInk: 0xFF2A1A10,
+  itemFx: '',
+  coinX: 240,
+  akunaText: (846, 736, 1016, 769),
+  akunaBox: (1020, 733, 1070, 771),
+  akunaColor: 0xFFFBEFD3,
+  akunaFont: 25,
+  ownTick: false,
+  witnessName: {
+    'mke': [(178, 1040, 322, 1070), (178, 1080, 322, 1110), (178, 1120, 322, 1150)],
+    'mume': [(668, 1040, 812, 1070), (668, 1080, 812, 1110), (668, 1120, 812, 1150)],
+  },
+  witnessSign: {
+    'mke': [(468, 1040, 527, 1070), (468, 1080, 527, 1110), (468, 1120, 527, 1150)],
+    'mume': [(962, 1040, 1022, 1070), (962, 1080, 1022, 1110), (962, 1120, 1022, 1150)],
+  },
+  witnessFont: 22,
+  witnessInk: 0xFF2A1A10,
+  witnessPlaceholder: true,
+  mwName: (256, 1205, 578, 1235),
+  mwSign: (703, 1200, 948, 1235),
+  mwFont: 24,
+  mwInk: 0xFF2A1A10,
+  fieldFx: '',
+);
+
+const _ExactSpec _kExactSunset = _ExactSpec(
+  art: 'exact_sunset',
+  width: 1198,
+  height: 1312,
+  title: (350, 188, 892, 262),
+  titleColor: 0xFFF2C14E,
+  titleFx: 'goldserif',
+  tareheLabel: (462, 270, 602, 307),
+  tareheDate: (604, 270, 780, 307),
+  tareheColor: 0xFF1A1208,
+  tareheFx: '',
+  tareheFont: 29,
+  paragraph: (182, 328, 1032, 568),
+  paraFont: 27,
+  paraInk: 0xFFF6ECD4,
+  paraFx: '',
+  paraAlign: TextAlign.left,
+  section: (440, 598, 800, 645),
+  sectionFont: 37,
+  sectionColor: 0xFFF6ECD4,
+  sectionFx: 'serif',
+  subtitle: (163, 651, 548, 686),
+  subtitleFont: 27,
+  subtitleColor: 0xFFF6ECD4,
+  subtitleFx: '',
+  itemX: 236,
+  itemRight: 822,
+  itemRight1: 818,
+  itemCenters: [722, 769, 816, 861],
+  itemFont: 27,
+  itemInk: 0xFF2A1A10,
+  itemFx: '',
+  coinX: 172,
+  akunaText: (844, 705, 1000, 741),
+  akunaBox: (1003, 700, 1050, 742),
+  akunaColor: 0xFFF2D04B,
+  akunaFont: 24,
+  ownTick: false,
+  witnessName: {
+    'mke': [(215, 990, 368, 1024), (215, 1032, 368, 1066), (215, 1072, 368, 1107)],
+    'mume': [(678, 990, 828, 1024), (678, 1032, 828, 1066), (678, 1072, 828, 1107)],
+  },
+  witnessSign: {
+    'mke': [(513, 990, 570, 1024), (513, 1032, 570, 1066), (513, 1072, 570, 1107)],
+    'mume': [(973, 990, 1030, 1024), (973, 1032, 1030, 1066), (973, 1072, 1030, 1107)],
+  },
+  witnessFont: 24,
+  witnessInk: 0xFF2A1A10,
+  witnessPlaceholder: true,
+  mwName: (248, 1165, 582, 1195),
+  mwSign: (720, 1160, 992, 1195),
+  mwFont: 25,
+  mwInk: 0xFFF6ECD4,
+  fieldFx: '',
+);
+
+const _ExactSpec _kExactRoses = _ExactSpec(
+  art: 'exact_roses',
+  width: 1198,
+  height: 1312,
+  title: (262, 195, 932, 266),
+  titleColor: 0xFF14244F,
+  titleFx: 'serif',
+  tareheLabel: (418, 276, 577, 314),
+  tareheDate: (579, 276, 785, 314),
+  tareheColor: 0xFFF6F1E1,
+  tareheFx: '',
+  tareheFont: 30,
+  paragraph: (216, 343, 998, 572),
+  paraFont: 26,
+  paraInk: 0xFF14244F,
+  paraFx: '',
+  paraAlign: TextAlign.left,
+  section: (425, 583, 775, 624),
+  sectionFont: 34,
+  sectionColor: 0xFFF6F1E1,
+  sectionFx: 'serif',
+  subtitle: (173, 636, 545, 670),
+  subtitleFont: 27,
+  subtitleColor: 0xFF14244F,
+  subtitleFx: '',
+  itemX: 248,
+  itemRight: 792,
+  itemRight1: 795,
+  itemCenters: [703, 748, 794, 839],
+  itemFont: 26,
+  itemInk: 0xFF14244F,
+  itemFx: '',
+  coinX: 185,
+  akunaText: (816, 687, 978, 719),
+  akunaBox: (980, 684, 1030, 722),
+  akunaColor: 0xFFF2D04B,
+  akunaFont: 23,
+  ownTick: false,
+  witnessName: {
+    'mke': [(213, 965, 362, 997), (213, 1005, 362, 1037), (213, 1045, 362, 1077)],
+    'mume': [(675, 965, 824, 997), (675, 1005, 824, 1037), (675, 1045, 824, 1077)],
+  },
+  witnessSign: {
+    'mke': [(511, 965, 570, 997), (511, 1005, 570, 1037), (511, 1045, 570, 1077)],
+    'mume': [(966, 965, 1024, 997), (966, 1005, 1024, 1037), (966, 1045, 1024, 1077)],
+  },
+  witnessFont: 22,
+  witnessInk: 0xFF14244F,
+  witnessPlaceholder: true,
+  mwName: (260, 1145, 552, 1174),
+  mwSign: (678, 1140, 948, 1174),
+  mwFont: 24,
+  mwInk: 0xFF14244F,
+  fieldFx: '',
 );
 
 _ExactSpec? _exactSpecFor(NgmyMarriagePaperStyle s) => switch (s) {
       NgmyMarriagePaperStyle.exactKijiji => _kExactKijiji,
       NgmyMarriagePaperStyle.exactKifalme => _kExactKifalme,
+      NgmyMarriagePaperStyle.exactCurtain => _kExactCurtain,
+      NgmyMarriagePaperStyle.exactVillage => _kExactVillage,
+      NgmyMarriagePaperStyle.exactSunset => _kExactSunset,
+      NgmyMarriagePaperStyle.exactRoses => _kExactRoses,
       _ => null,
     };
 
@@ -2052,13 +2368,13 @@ double? ngmyHatiPaperAspect(String templateId) {
   return t == null ? null : _exactSpecFor(t.paperStyle)?.aspect;
 }
 
-/// The couple picture of an exact paper (its box in the page, as fractions, and the picture), or null for every other
-/// paper. The AI redraws this picture with the people's own faces.
+/// The couple picture of an exact paper (its box in the page, as fractions, and the picture), or null for a paper
+/// without one. The AI redraws this picture with the people's own faces.
 ({double x, double y, double w, double h, String asset, String art})? ngmyHatiCoupleArea(String templateId) {
   final t = ngmyHatiKuhowaTemplateById(templateId);
   final spec = t == null ? null : _exactSpecFor(t.paperStyle);
-  if (spec == null) return null;
-  final c = spec.couple;
+  final c = spec?.couple;
+  if (spec == null || c == null) return null;
   return (
     x: c.$1 / spec.width,
     y: c.$2 / spec.height,
@@ -2087,93 +2403,105 @@ List<NgmySlideElement> _layoutExact(
     ..y = fy(b.$2)
     ..w = fx(b.$3 - b.$1)
     ..h = fy(b.$4 - b.$2);
-  // Font sizes are in the slides' 960-wide units; the design is 1054 pixels wide.
-  const u = 960 / 1054;
+  // Font sizes are in the slides' 960-wide units; the design's sizes are in its own pixels.
+  final u = 960 / s.width;
+  // A field's box height (the same rule as every Hati field) for a size in the design's pixels, in its pixels.
+  double boxPx(double font) => _hBlankH(font * u) * s.height;
+  // The size (design pixels) at which [text] fits on one line [width] pixels wide.
+  double fit(String text, double width, double font) => math.min(font, width / math.max(1, text.length * 0.48));
   final out = <NgmySlideElement>[];
   final keepTitle = title == 'HATI YA KUHOWA';
   final bgUrl = ngmyHatiPhotoArtUrl(keepTitle ? s.art : '${s.art}_notitle');
-  if (bgUrl != null) {
-    out.add(_hBgImage(bgUrl));
-  }
+  if (bgUrl != null) out.add(_hBgImage(bgUrl));
   out.add(_hWatermark(0xFFFFFFFF));
   if (!keepTitle) {
-    // As big as fits the design's title space: on two lines where the design has two (the village), else on one.
+    // As big as fits the design's title space: on two lines where the design has two, else on one.
     final bw = s.title.$3 - s.title.$1, bh = s.title.$4 - s.title.$2;
     final lines = bh > 110 ? 2 : 1;
     final words = title.split(' ');
     final longest = lines == 1 ? title.length : words.fold<int>(0, (m, w) => math.max(m, w.length)) + (words.length > 3 ? 8 : 3);
     final px = math.min(bh / (lines * 1.3), bw / (longest * 0.66));
-    out.add(at(
-        _hLockedText(title, x: 0, y: 0, w: 0, h: 0, fontSize: px * u, fontWeight: FontWeight.w900, align: TextAlign.center, color: 0xFFF2C14E, tag: 'title')
-          ..textFx = 'goldserif',
-        s.title));
+    out.add(at(_hLockedText(title, x: 0, y: 0, w: 0, h: 0, fontSize: px * u, fontWeight: FontWeight.w900, align: TextAlign.center, color: s.titleColor, tag: 'title')..textFx = s.titleFx, s.title));
   }
 
   // TAREHE and the date.
   out.add(at(_hLockedText('TAREHE:', x: 0, y: 0, w: 0, h: 0, fontSize: s.tareheFont * u, fontWeight: FontWeight.w800, align: TextAlign.right, color: s.tareheColor, tag: 'tarehe_lbl')..textFx = s.tareheFx, s.tareheLabel));
-  out.add(at(_hBlank('tarehe', 0, 0, fx(s.tareheDate.$3 - s.tareheDate.$1), ink: s.tareheColor, fontSize: s.tareheFont * u, startText: ngmyHatiKuhowaTodayDate(), align: TextAlign.left)
-    ..fontStyle = FontStyle.normal
-    ..textFx = s.tareheFx, s.tareheDate));
+  out.add(at(
+      _hBlank('tarehe', 0, 0, fx(s.tareheDate.$3 - s.tareheDate.$1), ink: s.tareheColor, fontSize: s.tareheFont * u, startText: ngmyHatiKuhowaTodayDate(), align: TextAlign.left)
+        ..fontStyle = FontStyle.normal
+        ..fontWeight = FontWeight.w800
+        ..textFx = s.tareheFx,
+      s.tareheDate));
 
-  // The opening paragraph, centred like the design.
-  out.add(at(_hParagraphField('utangulizi', 0, 0, fx(s.paragraph.$3 - s.paragraph.$1), 0, ink: s.ink, fontSize: (introText.length > 500 ? 15.5 : 20) * u, startText: introText)
-    ..fontWeight = FontWeight.w700
-    ..align = TextAlign.center
-    ..textFx = 'serif', s.paragraph));
+  // The opening paragraph, in the design's own letters (the long Malipo paragraph a little smaller).
+  // The paragraph always fits its frame: the size at which all its words fill the frame, if smaller than the design's.
+  final pw = s.paragraph.$3 - s.paragraph.$1, ph = s.paragraph.$4 - s.paragraph.$2;
+  final paraPx = math.min(s.paraFont, math.sqrt(pw * ph / (introText.length * 0.53 * 1.42)));
+  out.add(at(
+      _hParagraphField('utangulizi', 0, 0, fx(s.paragraph.$3 - s.paragraph.$1), 0, ink: s.paraInk, fontSize: paraPx * u, startText: introText)
+        ..fontWeight = FontWeight.w700
+        ..align = s.paraAlign
+        ..textFx = s.paraFx,
+      s.paragraph));
 
   // NIMETOWA (or the document's own word) on the plaque.
   final sec = s.section;
-  final secY = sec.$2 + (sec.$4 - sec.$2) * 0.1;
-  final secBox = (sec.$1, secY, sec.$3, sec.$4);
-  final secFont = (sectionLabel.length > 12 ? s.sectionFont * 0.72 : s.sectionFont) * u;
+  final secFontPx = sectionLabel.length > 12 ? s.sectionFont * 0.72 : s.sectionFont;
+  final secTop = (sec.$2 + sec.$4) / 2 - boxPx(secFontPx) / 2;
+  final secBox = (sec.$1, secTop, sec.$3, secTop + boxPx(secFontPx));
   if (sectionLabelEditable) {
     out.add(at(
         NgmySlideElement(
           id: NgmySlidesTemplates.newId(),
           type: NgmySlideElementType.text,
           text: sectionLabel,
-          fontSize: secFont,
+          fontSize: secFontPx * u,
           fontWeight: FontWeight.w900,
-          color: 0xFFF2C14E,
+          color: s.sectionColor,
           align: TextAlign.center,
-          textFx: 'goldserif',
+          textFx: s.sectionFx,
           fileName: '${kMarriageFieldPrefix}nimetowe_label:${fx(sec.$3 - sec.$1).toStringAsFixed(3)}',
         ),
         secBox));
   } else {
-    out.add(at(_hLockedText(sectionLabel, x: 0, y: 0, w: 0, h: 0, fontSize: secFont, fontWeight: FontWeight.w900, align: TextAlign.center, color: 0xFFF2C14E, tag: 'banner_t_$sectionLabel')..textFx = 'goldserif', secBox));
+    out.add(at(_hLockedText(sectionLabel, x: 0, y: 0, w: 0, h: 0, fontSize: secFontPx * u, fontWeight: FontWeight.w900, align: TextAlign.center, color: s.sectionColor, tag: 'banner_t_$sectionLabel')..textFx = s.sectionFx, secBox));
   }
   final subLen = sectionSubtitle.length;
-  out.add(at(
-      _hLockedText(sectionSubtitle, x: 0, y: 0, w: 0, h: 0, fontSize: (subLen > 30 ? 21 * 28 / subLen : 21) * u, fontWeight: FontWeight.w800, color: s.subtitleColor, tag: 'nimetowe_sub')..textFx = s.subtitleFx,
-      s.subtitle));
+  final subPx = subLen > 30 ? s.subtitleFont * 28 / subLen : s.subtitleFont;
+  final subTop = (s.subtitle.$2 + s.subtitle.$4) / 2 - boxPx(subPx) / 2;
+  out.add(at(_hLockedText(sectionSubtitle, x: 0, y: 0, w: 0, h: 0, fontSize: subPx * u, fontWeight: FontWeight.w800, color: s.subtitleColor, tag: 'nimetowe_sub')..textFx = s.subtitleFx,
+      (s.subtitle.$1, subTop, s.subtitle.$3, subTop + boxPx(subPx))));
 
-  // The four items, on the lines of the design (its coins and lines stay in the picture).
-  const itemFont = 19.5;
-  final itemH = _hBlankH(itemFont * u) * 1492 / s.height;
+  // The four items, on the rows of the design (its coins and lines stay in the picture).
+  final itemH = boxPx(s.itemFont);
   for (var i = 1; i <= 4; i++) {
     final c = s.itemCenters[i - 1];
     final right = i == 1 ? s.itemRight1 : s.itemRight;
-    final top = c - itemH * s.height / 2;
-    out.add(at(_hBlank('mahari_$i', 0, 0, fx(right - s.itemX), ink: s.ink, fontSize: itemFont * u, startText: mahariItems[i - 1], align: TextAlign.left)..textFx = 'serif', (s.itemX, top, right, top + itemH * s.height)));
+    final top = c - itemH / 2;
+    final itemPx = fit(mahariItems[i - 1], right - s.itemX, s.itemFont);
+    out.add(at(_hBlank('mahari_$i', 0, 0, fx(right - s.itemX), ink: s.itemInk, fontSize: itemPx * u, startText: mahariItems[i - 1], align: TextAlign.left)..textFx = s.itemFx, (s.itemX, top, right, top + itemH)));
     // The number is on the coin in the picture; this one stays invisible (the editor finds row 4 by it).
     out.add(at(_hLockedText('$i', x: 0, y: 0, w: 0, h: 0, fontSize: 14, color: 0x00000000, tag: 'nim_n_$i'), (s.coinX, c - 14, s.coinX + 30, c + 14)));
     out.add(at(_hLockedShape(shape: NgmySlideShapeKind.line, x: 0, y: 0, w: 0, h: 0, strokeColor: 0x00000000, strokeWidth: 0, tag: 'nim_ul_$i'), (s.itemX, c + 14, right, c + 16)));
   }
 
-  // AKUNA DENI: the words on the design's own label; the tick box is drawn over the design's tick.
-  out.add(at(_hLockedText('AKUNA DENI', x: 0, y: 0, w: 0, h: 0, fontSize: s.akunaFont * u, fontWeight: FontWeight.w900, align: TextAlign.center, color: s.akunaColor, tag: 'nim_akuna_deni'), s.akunaText));
-  final ownTick = s.akunaBox.$1 > s.akunaText.$1;
-  out.add(at(_hLockedShape(shape: NgmySlideShapeKind.rectangle, x: 0, y: 0, w: 0, h: 0, fillColor: 0x00000000, strokeColor: ownTick ? 0xFF16A34A : 0x00000000, strokeWidth: 2, tag: 'nim_akuna_box'), s.akunaBox));
-  out.add(at(_hLockedText('✓', x: 0, y: 0, w: 0, h: 0, fontSize: 20, fontWeight: FontWeight.w900, align: TextAlign.center, color: ownTick ? 0xFF16A34A : 0x00000000, tag: 'nim_akuna_tick'), s.akunaBox));
+  // AKUNA DENI: the words on the design's own label; the tick box over the design's tick (or the app's own).
+  final akTop = (s.akunaText.$2 + s.akunaText.$4) / 2 - boxPx(s.akunaFont) / 2;
+  out.add(at(_hLockedText('AKUNA DENI', x: 0, y: 0, w: 0, h: 0, fontSize: s.akunaFont * u, fontWeight: FontWeight.w900, align: TextAlign.center, color: s.akunaColor, tag: 'nim_akuna_deni'),
+      (s.akunaText.$1, akTop, s.akunaText.$3, akTop + boxPx(s.akunaFont))));
+  out.add(at(_hLockedShape(shape: NgmySlideShapeKind.rectangle, x: 0, y: 0, w: 0, h: 0, fillColor: 0x00000000, strokeColor: s.ownTick ? 0xFF16A34A : 0x00000000, strokeWidth: 2, tag: 'nim_akuna_box'), s.akunaBox));
+  out.add(at(_hLockedText('✓', x: 0, y: 0, w: 0, h: 0, fontSize: 20, fontWeight: FontWeight.w900, align: TextAlign.center, color: s.ownTick ? 0xFF16A34A : 0x00000000, tag: 'nim_akuna_tick'), s.akunaBox));
   final hit = (math.min(s.akunaText.$1, s.akunaBox.$1), s.akunaText.$2, math.max(s.akunaText.$3, s.akunaBox.$3), s.akunaText.$4);
   out.add(at(_hLockedShape(shape: NgmySlideShapeKind.rectangle, x: 0, y: 0, w: 0, h: 0, fillColor: 0x00000000, strokeColor: 0x00000000, strokeWidth: 0, tag: 'nim_akuna_hit'), hit));
 
-  // The witnesses: a name on each name line, a signature on each Sahihi line.
+  // The witnesses: a name on each name spot, a signature on each Sahihi line.
   for (final side in const ['mke', 'mume']) {
     for (var n = 1; n <= witnessRows; n++) {
       final nb = s.witnessName[side]![n - 1], sb = s.witnessSign[side]![n - 1];
-      out.add(at(_hBlank('witness_${side}_${n}_name', 0, 0, fx(nb.$3 - nb.$1), ink: s.ink, fontSize: 14 * u, align: TextAlign.left, autoShrinkFont: true)..textFx = 'serif', nb));
+      out.add(at(
+          _hBlank('witness_${side}_${n}_name', 0, 0, fx(nb.$3 - nb.$1), ink: s.witnessInk, fontSize: fit('Jina la Shahidi', nb.$3 - nb.$1, s.witnessFont) * u, startText: s.witnessPlaceholder ? 'Jina la Shahidi' : '', align: TextAlign.left, autoShrinkFont: true)
+            ..textFx = s.fieldFx,
+          nb));
       out.add(at(
           NgmySlideElement(id: NgmySlidesTemplates.newId(), type: NgmySlideElementType.shape, shape: NgmySlideShapeKind.rectangle, fillColor: 0x00000000, strokeColor: 0x00000000, fileName: '$kMarriageSignPrefix${side}_witness_$n'),
           sb));
@@ -2181,16 +2509,20 @@ List<NgmySlideElement> _layoutExact(
   }
 
   // MWANDISHI: the name on its line, the signature on the Sahihi line.
-  out.add(at(_hBlank('mwandishi_jina', 0, 0, fx(s.mwName.$3 - s.mwName.$1), ink: s.ink, fontSize: 17 * u, align: TextAlign.left, autoShrinkFont: true)..textFx = 'serif', s.mwName));
+  out.add(at(_hBlank('mwandishi_jina', 0, 0, fx(s.mwName.$3 - s.mwName.$1), ink: s.mwInk, fontSize: s.mwFont * u, align: TextAlign.left, autoShrinkFont: true)..textFx = s.fieldFx, s.mwName));
   out.add(at(
       NgmySlideElement(id: NgmySlidesTemplates.newId(), type: NgmySlideElementType.shape, shape: NgmySlideShapeKind.rectangle, fillColor: 0x00000000, strokeColor: 0x00000000, fileName: '${kMarriageSignPrefix}mwandishi'),
       s.mwSign));
 
-  // The state under EMO 'YA M'MBONDO, with the design's arrows either side.
+  // The state in the footer, where the design has it (the others keep their own words).
   final st = state.trim();
-  if (st.isNotEmpty) {
-    out.add(at(_hLockedShape(shape: NgmySlideShapeKind.rectangle, x: 0, y: 0, w: 0, h: 0, fillColor: 0x00000000, strokeColor: 0x00000000, strokeWidth: 0, tag: 'state_box'), s.state));
-    out.add(at(_hLockedText('———   $st   ———', x: 0, y: 0, w: 0, h: 0, fontSize: 28 * u, fontWeight: FontWeight.w800, align: TextAlign.center, color: s.ink, tag: 'state_text')..textFx = 'serif', s.state));
+  final stBox = s.state;
+  if (stBox != null && s.stateText.isNotEmpty) {
+    final words = st.isEmpty ? s.stateText.replaceAll(RegExp(r'\s*–\s*\{st\}|\{st\}'), '') : s.stateText.replaceAll('{st}', st);
+    final top = (stBox.$2 + stBox.$4) / 2 - boxPx(s.stateFont) / 2;
+    out.add(at(_hLockedShape(shape: NgmySlideShapeKind.rectangle, x: 0, y: 0, w: 0, h: 0, fillColor: 0x00000000, strokeColor: 0x00000000, strokeWidth: 0, tag: 'state_box'), stBox));
+    out.add(at(_hLockedText(words, x: 0, y: 0, w: 0, h: 0, fontSize: s.stateFont * u, fontWeight: FontWeight.w800, align: TextAlign.center, color: s.stateColor, tag: 'state_text')..textFx = s.stateFx,
+        (stBox.$1 - 40, top, stBox.$3 + 40, top + boxPx(s.stateFont))));
   }
   return out;
 }
@@ -2615,7 +2947,8 @@ class _NgmyHatiKuhowaTemplatePickerSheet extends StatelessWidget {
                 itemCount: shown.length,
                 itemBuilder: (_, i) {
                   final tpl = shown[i];
-                  return _HkTemplateCard(template: tpl, onTap: () => Navigator.pop(context, tpl.id));
+                  // Each card is drawn once and kept while the list scrolls.
+                  return RepaintBoundary(child: _HkTemplateCard(template: tpl, onTap: () => Navigator.pop(context, tpl.id)));
                 },
               ),
             ),

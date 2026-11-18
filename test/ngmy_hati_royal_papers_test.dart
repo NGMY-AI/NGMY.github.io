@@ -49,14 +49,16 @@ void main() {
           if (e.fileName == '${kMarriageLocked}_watermark') continue;
           expect(e.x >= -0.001 && e.y >= -0.001 && e.x + e.w <= 1.001, isTrue, reason: '${t.id} $doc ${e.fileName} is off the page');
           // Everything sits inside the gold frame (the seal ribbon may reach a little lower).
-          if (!e.fileName.contains('royal_seal') && e.fileName != '${kMarriageLocked}_bg') {
+          // The owner's own designs keep their footer where they drew it (right at the bottom on some).
+          if (!e.fileName.contains('royal_seal') && e.fileName != '${kMarriageLocked}_bg' && !t.id.startsWith('photo') && !t.id.startsWith('exact')) {
             expect(e.y + e.h, lessThan(0.97), reason: '${t.id} $doc ${e.fileName} runs past the frame');
           }
         }
-        if (!t.id.startsWith('exact')) {
+        if (t.id.startsWith('royal')) {
           expect(page.elements.where((e) => e.fileName.contains('nim_badge_')).length, 4, reason: 'a number coin for each item');
         }
-        expect(page.elements.any((e) => e.fileName == '${kMarriageLocked}_state_text' && e.text.contains('Arizona')), isTrue);
+        // The village, sunset and roses designs carry their motto in the footer instead of the state, as drawn.
+        if (!const {'photo_village', 'photo_sunset', 'photo_roses'}.contains(t.id)) expect(page.elements.any((e) => e.fileName == '${kMarriageLocked}_state_text' && e.text.contains('Arizona')), isTrue);
       });
     }
   });
@@ -64,7 +66,7 @@ void main() {
   test('dark royal papers ask for light signature ink; light papers do not', () {
     for (final t in [...kNgmyHatiKuhowaRoyalTemplates, ...kNgmyHatiKuhowaPhotoTemplates, ...kNgmyHatiKuhowaExactTemplates]) {
       final dark = ngmyHatiPaperIsDark(t.background);
-      expect(dark, const {'royal_emerald', 'royal_navy', 'royal_plum', 'royal_onyx', 'photo_curtain', 'photo_sunset'}.contains(t.id), reason: t.id);
+      expect(dark, const {'royal_emerald', 'royal_navy', 'royal_plum', 'royal_onyx', 'photo_curtain'}.contains(t.id), reason: t.id);
     }
   });
 

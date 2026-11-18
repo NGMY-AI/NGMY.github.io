@@ -3447,7 +3447,19 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
       body: SafeArea(
         top: false,
         bottom: false,
-        child: ListView(
+        // While the list is moving the cards stop glowing, so each frame only moves them (rebuilding every card on every
+        // frame is what made swiping up and down jerky); the glow comes back when the list stops.
+        child: NotificationListener<ScrollNotification>(
+          onNotification: (n) {
+            if (!isDark) return false;
+            if (n is ScrollStartNotification && _framePulse.isAnimating) {
+              _framePulse.stop(canceled: false);
+            } else if (n is ScrollEndNotification && !_framePulse.isAnimating) {
+              _framePulse.repeat(reverse: true);
+            }
+            return false;
+          },
+          child: ListView(
           padding: EdgeInsets.fromLTRB(18, MediaQuery.paddingOf(context).top + 12, 18, widget.bottomScrollPadding),
           children: [
             _header(
@@ -3524,8 +3536,9 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
             if (_decks.isEmpty)
               _aliveEmptyPresentationsFrame(isDark)
             else
-              ..._decks.asMap().entries.map((e) => _deckTile(e.value, isDark, index: e.key)),
+              ..._decks.asMap().entries.map((e) => RepaintBoundary(child: _deckTile(e.value, isDark, index: e.key))),
           ],
+        ),
         ),
       ),
     );
@@ -4006,7 +4019,9 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                             Expanded(
                               child: Align(
                                 alignment: Alignment.topCenter,
-                                child: _canvas(slide, isDark, tight: editing || keyboardOpen),
+                                // The page is drawn on its own layer: the ticking timer and the menus above it no longer make
+                                // the whole paper (its big picture and every field) redraw.
+                                child: RepaintBoundary(child: _canvas(slide, isDark, tight: editing || keyboardOpen)),
                               ),
                             ),
                             if (_shouldShowNotesPanel(compact) && !keyboardOpen && !editing && !_isTransferredReadOnly())

@@ -15,20 +15,22 @@ void main() {
 
   test('exact papers keep the design shape and its picture, and write the other titles in', () async {
     await ngmyHatiPhotoArtLoad();
-    for (final t in kNgmyHatiKuhowaExactTemplates) {
+    for (final t in [...kNgmyHatiKuhowaExactTemplates, ...kNgmyHatiKuhowaPhotoTemplates]) {
       final kuhowa = ngmyBuildHatiKuhowaDeck(templateId: t.id, state: 'Arizona');
-      expect(kuhowa.paperAspect, closeTo(1054 / 1492, 0.001), reason: t.id);
-      expect(kuhowa.aspectValue, closeTo(1054 / 1492, 0.001));
+      final shape = t.id.startsWith('photo') ? 1198 / 1312 : 1054 / 1492;
+      expect(kuhowa.paperAspect, closeTo(shape, 0.001), reason: t.id);
+      expect(kuhowa.aspectValue, closeTo(shape, 0.001));
       final bg = kuhowa.slides.first.elements.first;
       expect(bg.fileName, '${kMarriageLocked}_bg');
-      expect(bg.imageRef, ngmyHatiPhotoArtUrl(t.id), reason: 'Hati ya Kuhowa uses the design with its own title');
+      final art = t.id.startsWith('photo') ? 'exact_${t.id.substring(6)}' : t.id;
+      expect(bg.imageRef, ngmyHatiPhotoArtUrl(art), reason: 'Hati ya Kuhowa uses the design with its own title');
       expect(kuhowa.slides.first.elements.any((e) => e.fileName == '${kMarriageLocked}_title'), isFalse);
 
       final kuhoweya = ngmyBuildHatiKuhoweshaDeck(templateId: t.id, state: 'Arizona');
-      expect(kuhoweya.slides.first.elements.first.imageRef, ngmyHatiPhotoArtUrl('${t.id}_notitle'));
+      expect(kuhoweya.slides.first.elements.first.imageRef, ngmyHatiPhotoArtUrl('${art}_notitle'));
       expect(kuhoweya.slides.first.elements.any((e) => e.fileName == '${kMarriageLocked}_title' && e.text == 'HATI YA KUHOWESHA'), isTrue);
-      expect(ngmyHatiHasCouplePicture(kuhoweya), isTrue);
-      expect(ngmyHatiCoupleArea(t.id), isNotNull);
+      expect(ngmyHatiHasCouplePicture(kuhoweya), t.id != 'photo_curtain' && t.id != 'photo_sunset' && t.id != 'photo_roses', reason: '${t.id} couple');
+
     }
     expect(ngmyHatiCoupleArea('royal_maroon'), isNull, reason: 'only the owner designs have a couple picture');
   });

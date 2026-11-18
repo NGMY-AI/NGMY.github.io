@@ -89,9 +89,24 @@ void save(img.Image im, String name, {int quality = 80}) {
   stdout.writeln('${f.path} ${f.lengthSync() ~/ 1024} KB');
 }
 
-void build(String src, String name, List<List<int>> words, List<int> title, List<int> couple) {
-  final im = img.decodeWebP(File('tool/hati_photo/$src').readAsBytesSync())!;
-  save(img.copyCrop(im, x: couple[0], y: couple[1], width: couple[2] - couple[0], height: couple[3] - couple[1]), '${name}_couple', quality: 90);
+void build(String src, String name, List<List<int>> words, List<int> title, List<int>? couple, {int quarter = -1, int topTrim = 0}) {
+  var im = img.decodeWebP(File('tool/hati_photo/$src').readAsBytesSync())!;
+  if (quarter >= 0) {
+    // One design of the 2 x 2 picture, drawn twice as big so its words and fields stay sharp.
+    final qw = im.width ~/ 2, qh = im.height ~/ 2;
+    im = img.copyResize(img.copyCrop(im, x: (quarter % 2) * qw, y: (quarter ~/ 2) * qh, width: qw, height: qh),
+        width: qw * 2, height: qh * 2, interpolation: img.Interpolation.cubic);
+  }
+  // A sliver of the neighbouring design along the top edge is covered with the design's own bottom border, turned over.
+  for (var y = 0; y < topTrim; y++) {
+    for (var x = 0; x < im.width; x++) {
+      final p = im.getPixel(x, im.height - 1 - y);
+      im.setPixelRgb(x, y, p.r, p.g, p.b);
+    }
+  }
+  if (couple != null) {
+    save(img.copyCrop(im, x: couple[0], y: couple[1], width: couple[2] - couple[0], height: couple[3] - couple[1]), '${name}_couple', quality: 90);
+  }
   var seed = 1;
   for (final w in words) {
     // A fifth number is how much the sides count (out of 100); small plaques and labels blend from the sides only.
@@ -141,4 +156,51 @@ void main() {
     [474, 301, 948, 385], // HATI YA KUHOWA (inside the navy plaque)
     [0, 0, 495, 440], // the couple
   );
+
+  // The four designs of the 2 x 2 picture (owner_designs.webp), each drawn twice as big: 1198 x 1312.
+  List<List<int>> rows(int x0, int x1, int x1first, List<List<int>> ys) =>
+      [for (var i = 0; i < ys.length; i++) [x0, ys[i][0], i == 0 ? x1first : x1, ys[i][1]]];
+  List<List<int>> witness(List<int> xs, List<int> xm, List<List<int>> ys) =>
+      [for (final y in ys) ...[[xs[0], y[0], xs[1], y[1]], [xm[0], y[0], xm[1], y[1]]]];
+  // Royal blue curtains.
+  build('owner_designs.webp', 'exact_curtain', [
+    [462, 204, 800, 247], // TAREHE
+    [200, 276, 1032, 540, 50], // paragraph
+    [490, 568, 755, 618], // NIMETOWA
+    [160, 636, 565, 672], // Vitu vifuatavyo
+    ...rows(236, 825, 830, [[690, 727], [743, 780], [796, 834], [848, 887]]),
+    [848, 690, 1012, 727], // AKUNA DENI
+    ...witness([220, 382], [703, 855], [[1017, 1052], [1065, 1100], [1112, 1147]]),
+    [370, 1262, 892, 1302], // EMO 'YA M'MBONDO - Congo
+  ], [285, 115, 955, 200], null, quarter: 0);
+  // Village with the couple, the palm tree and the hut.
+  build('owner_designs.webp', 'exact_village', [
+    [380, 197, 765, 240],
+    [240, 278, 968, 536, 50],
+    [490, 620, 720, 662],
+    [226, 676, 630, 714],
+    ...rows(303, 805, 803, [[734, 770], [793, 830], [846, 882], [898, 935]]),
+    [846, 736, 1016, 769],
+    ...witness([178, 322], [668, 812], [[1040, 1070], [1080, 1110], [1120, 1150]]),
+  ], [310, 108, 836, 200], [850, 25, 1168, 285], quarter: 1);
+  // Sunset over the savanna.
+  build('owner_designs.webp', 'exact_sunset', [
+    [462, 268, 780, 308],
+    [178, 326, 1036, 570, 50],
+    [500, 598, 740, 645],
+    [160, 651, 550, 686],
+    ...rows(234, 822, 820, [[703, 742], [751, 787], [798, 834], [843, 880]]),
+    [844, 705, 1000, 741],
+    ...witness([215, 368], [678, 828], [[990, 1024], [1032, 1066], [1072, 1107]]),
+  ], [350, 188, 892, 262], null, quarter: 2);
+  // White roses and gold rings.
+  build('owner_designs.webp', 'exact_roses', [
+    [418, 275, 785, 315],
+    [214, 341, 1000, 574, 50],
+    [500, 584, 700, 623],
+    [170, 634, 545, 670],
+    ...rows(246, 792, 795, [[686, 720], [733, 764], [778, 810], [823, 855]]),
+    [816, 687, 978, 719],
+    ...witness([213, 362], [675, 824], [[965, 997], [1005, 1037], [1045, 1077]]),
+  ], [262, 195, 932, 266], null, quarter: 3, topTrim: 22);
 }
