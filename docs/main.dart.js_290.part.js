@@ -46,7 +46,7 @@ this.b=e},euT:function euT(d,e){this.a=d
 this.b=e},euW:function euW(d,e){this.a=d
 this.b=e},euX:function euX(d){this.a=d},euY:function euY(d){this.a=d},euZ:function euZ(d){this.a=d},euS:function euS(d,e){this.a=d
 this.b=e},ev_:function ev_(d){this.a=d},ev0:function ev0(d){this.a=d},ev1:function ev1(d){this.a=d},euR:function euR(d){this.a=d},aOu:function aOu(){},
-i5O(){var x,w,v=C.a([],y.R)
+i5Q(){var x,w,v=C.a([],y.R)
 for(x=y.y,w=0;w<5;++w)v.push(C.c1(16,!1,!1,x))
 return new A.blZ(v,C.c1(5,-1000,!1,y.S),$,B.bC,0,C.a([],y.t),null,null)},
 bi2:function bi2(d,e,f,g){var _=this
@@ -371,8 +371,8 @@ aNW:function aNW(){},
 bAi:function bAi(){},
 aOw:function aOw(){},
 bAv:function bAv(){},
-i_C(d){return D.aE5[B.o.F(B.o.F(d,12)+12,12)]},
-iiD(d){var x
+i_E(d){return D.aE5[B.o.F(B.o.F(d,12)+12,12)]},
+iiF(d){var x
 switch(d){case"title":x=F.aMf
 break
 case"beat":x=D.dNa
@@ -528,7 +528,7 @@ default:u=C.a([],u)
 for(x=0;x<5;++x)u.push(v.$3(w.e+(x-2)*22,w.f,0.95-x*0.03))
 return u}},
 aYm(d,e){var x=D.dgm[B.o.D(B.j.bg(H.a6b(d).b/360*7),0,6)]+12
-if(e===0)E.mv("bell",x,900,0.5)
+if(e===0)E.mw("bell",x,900,0.5)
 else this.z.push(C.cz(C.dw(0,0,0,e,0,0),new A.euO(x)))},
 c27(d){return this.aYm(d,0)},
 aiu(){this.m(new A.euQ(this,this.Jd()))},
@@ -594,7 +594,7 @@ v.cx=v.fa$
 x=v.w.a
 if(x<=0)x=1
 w=B.o.D(B.j.bg(d.a/x*10),0,9)
-E.mv("bell",F.aBW[B.o.F(w,5)]+12*B.o.ar(w,5)+12,500,B.j.D(0.15+e/1400,0.15,0.6))},
+E.mw("bell",F.aBW[B.o.F(w,5)]+12*B.o.ar(w,5)+12,500,B.j.D(0.15+e/1400,0.15,0.6))},
 Y(){this.a3()
 this.mk()},
 gbVk(){var x=this
@@ -932,7 +932,7 @@ h.r=C.ap(B.c,m,o).j(n).gp(0)
 d.O(g,v*(1-0.4*o),h)}},
 aE(d){return!0}}
 A.apR.prototype={
-S(){return A.i5O()}}
+S(){return A.i5Q()}}
 A.blZ.prototype={
 Y(){this.a3()
 this.a1L("house")
@@ -1053,7 +1053,7 @@ A.aGt.prototype={
 cfL(){var x=this.r
 return x==="organ"||x==="synth"||x==="flute"?650:1400},
 b5h(d){var x,w=this,v=w.Q
-E.mv(w.r,d+v*12,w.cfL(),0.7)
+E.mw(w.r,d+v*12,w.cfL(),0.7)
 C.eZ()
 w.e.n(0,d,w.fa$)
 w.f.I(0,d)
@@ -1084,7 +1084,7 @@ x=s.r
 v=w.b
 u=s.Q
 t=x==="organ"||x==="synth"||x==="flute"?650:1400
-E.mv(x,v+u*12,t,0.7)
+E.mw(x,v+u*12,t,0.7)
 r.n(0,v,s.fa$)
 q.I(0,v)
 s.UR(220,new A.evW(s,w))}if(s.ch.length===0&&s.cx.length!==0&&s.fa$-s.CW>600){s.cx=""
@@ -1109,7 +1109,7 @@ if(p.at)u.push(D.fUA)
 u=C.A(u,B.l,o,B.e,B.h,0,o,o)
 if(i)t="You played the whole song. Well done!"
 else{t=p.w
-if(t==="learn")t="Press the glowing key: "+A.i_C(j==null?0:j)+"  ("+(p.y+1)+" of "+l.length+")"
+if(t==="learn")t="Press the glowing key: "+A.i_E(j==null?0:j)+"  ("+(p.y+1)+" of "+l.length+")"
 else t=t==="listen"?"Listen and watch the keys.":"Touch the keys. Choose a song below to learn it or hear it."}t=C.a([u,B.ax,C.d(t,o,o,o,o,o,o,M.tY,o,o,o)],v)
 u=p.w
 s=u==="learn"
@@ -1185,7 +1185,7 @@ A.bmm.prototype={
 b1t(d,e){var x,w,v,u=this,t=D.a7a[d].a
 u.d[d]=u.fa$
 if(B.a.a_(t,"n")){x=C.iZ(B.a.b4(t,1),null,null)
-E.mv("synth",x+(u.f===1?12:0),420,0.6)}else if(t==="bass")G.dA(65*(u.f===2?0.8:1),"",380,0.3,0.9,"sine")
+E.mw("synth",x+(u.f===1?12:0),420,0.6)}else if(t==="bass")G.dA(65*(u.f===2?0.8:1),"",380,0.3,0.9,"sine")
 else E.XF(t,u.f,0.8)
 if(!e){C.jZ()
 if(u.w&&u.r){w=u.y
@@ -1325,7 +1325,7 @@ w=x.ay
 if(w!=null)w.a.push(x.aBx(d.b))
 if(u!=null)x.CW=x.CW+x.aBx(d.b).aJ(0,u).gcJ()
 if(x.ch&&x.CW>46){x.CW=0
-E.mv("bell",F.aAP[B.o.F(x.cx++,8)]+12,800,0.35)}x.m(new A.erb())},
+E.mw("bell",F.aAP[B.o.F(x.cx++,8)]+12,800,0.35)}x.m(new A.erb())},
 $S:19}
 A.erb.prototype={
 $0(){},
@@ -1407,7 +1407,7 @@ $1(d){return this.$3(d,-1,-1)},
 $2(d,e){return this.$3(d,e,-1)},
 $S:2012}
 A.euO.prototype={
-$0(){return E.mv("bell",this.a,900,0.5)},
+$0(){return E.mw("bell",this.a,900,0.5)},
 $S:0}
 A.euQ.prototype={
 $0(){var x,w,v,u,t
@@ -1917,7 +1917,7 @@ v(A.bn7,A.aOu)
 w(C.hq,[A.erA,A.erm,A.ern,A.erl,A.erq,A.err,A.euP,A.euX,A.euY,A.euZ,A.euR,A.e8d,A.e8e,A.e8c,A.e8g,A.e88,A.e8l,A.e8m,A.e8n,A.e4C,A.e4T,A.e4K,A.e4J,A.e4P,A.dNS,A.dNU,A.fyY,A.fyZ,A.evz,A.evA,A.evB,A.evJ,A.evN,A.e1S,A.e1K,A.e1J,A.e1M])
 w(C.iO,[A.erz,A.ero,A.erc,A.erb,A.erk,A.erj,A.ers,A.eri,A.ert,A.erh,A.eru,A.erg,A.erv,A.erf,A.erw,A.ere,A.erx,A.erd,A.ery,A.euO,A.euQ,A.euV,A.euU,A.euT,A.euW,A.euS,A.ev_,A.ev0,A.ev1,A.e8h,A.e8f,A.e8j,A.e8b,A.e8k,A.e8a,A.e89,A.e87,A.e86,A.e8o,A.e85,A.e8p,A.e8q,A.e8r,A.e4L,A.e4N,A.e4I,A.e4O,A.e4H,A.e4G,A.e4Q,A.e4F,A.e4R,A.e4E,A.e4S,A.e4D,A.dNT,A.dNR,A.dNQ,A.dNV,A.dNP,A.dNW,A.dNO,A.dNX,A.dNN,A.dNY,A.dNM,A.dNZ,A.dNL,A.dO_,A.dNK,A.evW,A.evL,A.evI,A.evM,A.evH,A.evO,A.evG,A.evP,A.evF,A.evQ,A.evE,A.evR,A.evD,A.evS,A.evT,A.evC,A.evU,A.evy,A.evV,A.evx,A.evw,A.e1I,A.e1N,A.e1H,A.e1O,A.e1G,A.e1P,A.e1F,A.e1Q,A.e1E,A.e1R])
 w(C.jA,[A.erp,A.e8i,A.e4M,A.evK,A.e1L])
-w(C.mp,[A.bkF,A.bil,A.bhp,A.bjG,A.bkx])
+w(C.mq,[A.bkF,A.bil,A.bhp,A.bjG,A.bkx])
 v(A.bAo,A.aO7)
 v(A.bmA,A.bAo)
 v(A.bAk,A.aNZ)
@@ -1943,7 +1943,7 @@ C.j6(b.typeUniverse,JSON.parse('{"asD":{"af":[],"v":[]},"asO":{"af":[],"v":[]},"
 var y=(function rtii(){var x=C.at
 return{V:x("O<ab>"),O:x("O<u>"),R:x("O<ai<R>>"),g:x("O<r>"),v:x("O<fX>"),C:x("O<+(r,r)>"),L:x("O<+(n,n)>"),D:x("O<+(H,F)>"),P:x("O<+(F,H)>"),n:x("O<+(F,F)>"),c:x("O<+(n,n,a_)>"),s:x("O<n>"),t:x("O<Gg>"),p:x("O<v>"),a:x("O<adJ>"),N:x("O<bi2>"),W:x("O<bkB>"),M:x("O<btf>"),X:x("O<F>"),z:x("cx<ah<af>>"),e:x("N<+(F,H),F>"),Y:x("N<+(n,n,u),u>"),k:x("+(F,F)"),q:x("mc"),y:x("R"),S:x("F"),H:x("~")}})();(function constants(){var x=a.makeConstList
 D.b3U=new C.d7(-0.4,-0.45)
-D.bbH=new C.rM(C.hEa(),C.at("rM<F>"))
+D.bbH=new C.rN(C.hEb(),C.at("rN<F>"))
 D.ai9=new C.u(1,0.0196078431372549,0.0196078431372549,0.0392156862745098,B.q)
 D.bDY=new C.Q(12,4,12,10)
 D.bIN=new C.Q(6,0,6,10)
@@ -1964,11 +1964,11 @@ D.eF4=new C.y(0,"Classic")
 D.eFX=new C.y(1,"Bright")
 D.eGB=new C.y(2,"Deep")
 D.cKx=x([D.eF4,D.eFX,D.eGB],C.at("O<+(F,n)>"))
-D.dkP=x([B.bW,B.bt,B.c],y.O)
+D.dkQ=x([B.bW,B.bt,B.c],y.O)
 D.duz=x([B.b9,B.bf,B.c3],y.O)
 D.d34=x([B.ex,B.at,B.hX],y.O)
 D.d5H=x([B.bc,B.aG,B.bt],y.O)
-D.aAh=x([D.dkP,D.duz,D.d34,D.d5H],C.at("O<ai<u>>"))
+D.aAh=x([D.dkQ,D.duz,D.d34,D.d5H],C.at("O<ai<u>>"))
 D.f4s=new C.b5("peony","Ball",F.aqj)
 D.f5V=new C.b5("ring","Ring",B.pz)
 D.f8d=new C.b5("heart","Heart",B.hB)
@@ -2059,4 +2059,4 @@ D.fFa=new C.G(!0,B.an,null,null,null,null,10,B.H,null,null,null,null,null,null,n
 D.fBv=new C.G(!0,B.bW,null,null,null,null,11,B.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fUA=new C.B("\u25cf RECORDING",null,D.fBv,null,null,null,null,null,null,null,null,null)
 D.fXr=new C.B("Go",null,B.iH,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["7S4pGamt5kdinC+UE/UgGpTU1Q0="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["7fe/kuRGWD245BCXbbttT2pwJPI="]=a.current})($__dart_deferred_initializers__);

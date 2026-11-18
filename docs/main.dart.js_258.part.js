@@ -6,7 +6,7 @@ _.c=f
 _.d=g},a2:function a2(d,e,f){this.a=d
 this.b=e
 this.c=f},
-hjy(d,e){C.cg(null,C.a0(209,D.w.l()>>>16&255,D.w.l()>>>8&255,D.w.l()&255),!0,null,new B.h2b(e),d,null,!0,!0,y.H)},
+hjz(d,e){C.cg(null,C.a0(209,D.w.l()>>>16&255,D.w.l()>>>8&255,D.w.l()&255),!0,null,new B.h2b(e),d,null,!0,!0,y.H)},
 h2b:function h2b(d){this.a=d},
 a0L:function a0L(d,e){this.c=d
 this.a=e},
@@ -304,7 +304,7 @@ q=J.a8(r)
 p=C.eo(q.h(r,f))
 if(p==null)p=0
 u=C.eo(q.h(r,g))
-v=B.hrJ(d,e,u==null?0:u,p,s)
+v=B.hrK(d,e,u==null?0:u,p,s)
 x=1
 break
 case 1:return C.h(v,w)}})
@@ -332,7 +332,7 @@ l=p
 k=q
 x=6
 return C.b(B.arv(),$async$Ot)
-case 6:v=o.hrJ(n,m,l,k,i)
+case 6:v=o.hrK(n,m,l,k,i)
 x=1
 break
 case 1:return C.h(v,w)}})
@@ -484,7 +484,7 @@ x=1
 break
 case 1:return C.h(v,w)}})
 return C.i($async$WB,w)},
-hXN(d,e){var x,w,v,u,t=new C.e_()
+hXP(d,e){var x,w,v,u,t=new C.e_()
 t.cU(e)
 x=J.e5(d,y.S)
 for(w=0;w<d;++w)x[w]=w
@@ -492,16 +492,16 @@ for(w=x.length-1;w>0;--w){v=t.aw(w+1)
 u=x[w]
 x[w]=x[v]
 x[v]=u}return x},
-hXO(d,e,f){var x,w,v,u,t
+hXQ(d,e,f){var x,w,v,u,t
 for(x=new C.d9(d.toLowerCase()),w=y.E,v=w.k("bQ<c0.E>"),x=new C.bQ(x,x.gJ(0),v),w=w.k("c0.E"),u=17;x.C();){t=x.d
 if(t==null)t=w.a(t)
 u=37*u+t}for(x=new C.d9(e),v=new C.bQ(x,x.gJ(0),v);v.C();){x=v.d
 if(x==null)x=w.a(x)
 u=37*u+x}return 37*u+f},
-hrJ(d,e,f,g,h){var x
+hrK(d,e,f,g,h){var x
 if(e<=0)return 0
 x=D.o.F(g,e)
-return B.hXN(e,B.hXO(h,d,f))[x]}},A,G
+return B.hXP(e,B.hXQ(h,d,f))[x]}},A,G
 J=c[1]
 C=c[0]
 D=c[2]
@@ -788,7 +788,7 @@ q=C.K(C.a0(102,D.bT.l()>>>16&255,D.bT.l()>>>8&255,D.bT.l()&255),D.r,1)
 t.push(C.p(o,C.x(C.a([C.d(n.d,o,o,o,o,o,o,C.m(o,o,D.bT,o,o,o,o,o,o,o,o,12,o,o,D.u,o,o,!0,o,1,o,o,o,o,o,o),o,o,o),D.P,C.d(n.a,o,o,o,o,o,o,A.fvI,D.K,o,o),D.T,C.d("Lucky: "+D.d.aM(n.b," \xb7 "),o,o,o,o,o,o,C.m(o,o,C.a0(166,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255),o,o,o,o,o,o,o,o,12,o,o,D.O,o,o,!0,o,o,o,o,o,o,o,o),o,o,o)],s),D.l,o,D.e,D.h,0,D.p),D.f,o,o,new C.o(o,o,q,r,o,new C.a7(D.a5,D.a8,D.x,m,o,o),D.n),o,o,o,o,D.bH,o,o,1/0))}else t.push(C.d("Shake the crystal \u2014 tap below for your fortune.",o,o,o,o,o,o,C.m(o,o,C.a0(140,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255),o,o,o,o,o,o,o,o,12,o,o,o,o,o,!0,o,o,o,o,o,o,o,o),D.K,o,o))
 t.push(D.aB)
 m=p.fr?"View Today's Fortune Again":"Reveal My Fortune"
-t.push(p.a9D(A.djj,D.bT,m,p.gcvO()))
+t.push(p.a9D(A.djk,D.bT,m,p.gcvO()))
 return new C.an(D.a0,o,D.ad,D.f,C.a([x,C.p(o,C.x(t,D.l,o,D.e,D.h,0,D.p),D.f,o,o,new C.o(D.jn,o,v,w,u,o,D.n),o,o,o,o,D.wE,o,o,1/0)],s),o)},
 aet(d,e,f){return C.c6(f,new B.e5H(f,d,e),null)},
 a9D(d,e,f,g){var x=null,w=this.Q?0.96:1
@@ -968,7 +968,7 @@ $0(){var x,w=this.a,v=w.z=w.id.aw(50)
 w.Q=!0
 x=this.b
 if(x===1)w.y=A.cDD[D.o.F(v,50)]
-else if(x===2)w.y=A.dny[D.o.F(v,51)]
+else if(x===2)w.y=A.dnz[D.o.F(v,51)]
 else if(x===3)w.y=A.dez[D.o.F(v,50)]
 else w.y=null},
 $S:0}
@@ -1341,8 +1341,8 @@ A.bDI=new C.Q(12,0,8,0)
 A.bHC=new C.Q(24,30,24,26)
 A.dBt=x([D.aA,D.dR],y.O)
 A.c93=new C.a7(D.ay,D.aC,D.x,A.dBt,null,null)
-A.doc=x([D.hJ,D.bE,D.FY],y.O)
-A.cai=new C.a7(D.ay,D.aC,D.x,A.doc,null,null)
+A.dod=x([D.hJ,D.bE,D.FY],y.O)
+A.cai=new C.a7(D.ay,D.aC,D.x,A.dod,null,null)
 A.aAj=x([D.aA,D.dR,D.FY],y.O)
 A.caj=new C.a7(D.a5,D.a8,D.x,A.aAj,null,null)
 A.aBk=x([D.aQ,D.at,D.d5],y.O)
@@ -1581,8 +1581,8 @@ A.hzg=new B.a_b("Brain","\ud83e\udde0",D.b7)
 A.hze=new B.a_b("Fortune","\ud83d\udd2e",D.bT)
 A.aBw=x([A.hzh,A.hzf,A.hzg,A.hze],C.at("O<a_b>"))
 A.dez=x(["Stargazing picnic with blankets, thermoses, and a constellation app.","Couples pottery or paint-and-sip night \u2014 laugh at the masterpieces.","Sunset kayak or paddleboat if you are both comfortable on water.","Dress up for dinner at a place with live acoustic music.","Home movie marathon: their pick, your pick, popcorn, dim lights.","Botanical garden walk with a camera and zero rush.","Rooftop or hilltop picnic at golden hour with sparkling juice.","Dance class intro: salsa, bachata, or swing \u2014 beginners welcome.","Visit a museum and choose one artwork that represents your mood.","Cook a new recipe together \u2014 assign roles: chef and sous-chef.","Ice skating or roller skating \u2014 hold on if balance needs help.","Book a couples massage or spa half-day for deep calm.","Drive to a small town you have never explored; caf\xe9 hop once there.","Build a blanket fort at home with fairy lights and playlists.","Volunteer together for a few hours \u2014 shared purpose bonds hearts.","Arcade date: playful competition, share tickets for a silly prize.","Wine-free vineyard tour or orchard visit in harvest season.","Photography walk: capture ten things that feel like \u201cus.\u201d","Attend a local theater play or improv show \u2014 shared laughter.","Plan a breakfast-in-bed surprise on a lazy weekend.","Take a scenic train or ferry ride with no destination pressure.","Visit an aquarium or planetarium \u2014 wonder feels romantic.","Host a fondue night: chocolate or cheese, choose your adventure.","Go thrifting and pick one outfit piece for each other.","Write wishes on paper lanterns or jars and read them aloud.","Plan a \u201cyes day\u201d with a small budget and big imagination.","Rent bikes and explore a trail ending at a lakeside bench.","Couples yoga or stretching session \u2014 gentle, grounding.","Attend a food festival and share every bite.","Set up a backyard fire pit with s\u2019mores and old stories.","Take a cooking class: pasta, sushi, or desserts.","Plan a surprise day trip to a waterfall or scenic overlook.","Visit a Christmas market or seasonal fair hand in hand.","Record a short video diary of your date \u2014 memory for later.","Book a cozy cabin or boutique hotel for one night away.","Go to a jazz lounge with mocktails if you prefer no alcohol.","Create a scavenger hunt with inside jokes as clues.","Plant something together \u2014 herbs, flowers, a tree if allowed.","Attend a poetry open mic and dedicate a line to them afterward.","Plan a themed dinner at home: Paris, Tokyo, or their dream city.","Watch the sunrise with hot drinks and silence first, words second.","Visit a cat caf\xe9 or animal shelter visit if you love gentle creatures.","Go bowling or mini-golf \u2014 playful rivalry, sweet truce.","Take a pottery mug home and use it on your next coffee date.","Plan a photo-book page of your favorite moments together.","Attend a lantern festival or night market with matching colors.","Write love letters and exchange them to open on a future date.","Plan a stargazing drive with their favorite snacks in the trunk.","Recreate your first meeting place with a small upgrade: better dessert.","End the night saying what you are grateful for about them \u2014 specific beats generic."],y.s)
-A.djj=x([D.bT,D.jl,D.pk],y.O)
-A.dny=x(["Send a voice note saying one specific thing you appreciated about them today.","Plan a no-phone hour together \u2014 phones face down, eyes on each other.","Remember a small detail they mentioned and bring it up later; it shows you listen.","Compliment their character, not only their appearance \u2014 depth keeps hearts close.","Schedule a weekly check-in: \u201cHow are we feeling about us?\u201d","Share a playlist of songs that remind you of them \u2014 three tracks is enough.","Apologize quickly when you are wrong; pride is the enemy of closeness.","Celebrate their wins loudly, even the small ones \u2014 promotion, recipe, good day.","Ask \u201cWhat would make this week easier for you?\u201d and follow through once.","Leave a handwritten note in their bag, book, or on the mirror.","Plan surprise comfort: their favorite snack after a hard day.","Touch base mid-day with a kind text \u2014 not demanding, just warm.","Learn one thing they care about and ask a thoughtful question about it.","Defend them kindly in public; loyalty builds trust.","Create a shared inside joke \u2014 intimacy loves private language.","Book something to look forward to: concert, class, weekend trip.","Practice patience when they need space; trust is quiet confidence.","Cook or order their favorite meal without being asked.","Take photos together that are candid, not only posed perfection.","Say thank you for ordinary things: listening, driving, patience.","Introduce them proudly to friends \u2014 belonging matters.","Keep promises small and large; reliability is romance in action.","Flirt after you are comfortable \u2014 playfulness keeps sparks alive.","Ask about their family with genuine curiosity, not interrogation.","Share your feelings with calm words instead of guessing games.","Plan a tech-free walk and hold hands if you both want that.","Respect their boundaries without making them explain twice.","Send a meme or reel that made you think of them \u2014 light connection counts.","Celebrate anniversaries of small moments: first coffee, first laugh.","Offer help before they have to ask \u2014 dishes, errands, ride.","Speak their love language: time, words, gifts, acts, touch \u2014 learn which lands.","Do not weaponize the past in arguments; solve today\u2019s issue today.","Plan a double date with friends who bring good energy.","Write three things you love about them and read one aloud.","Protect their reputation online and offline.","Wake up early once to make breakfast \u2014 effort is attractive.","Listen without fixing unless they ask for advice.","Share goals and ask how you can support, not control.","Laugh at yourselves when plans fail \u2014 resilience is sexy.","Keep dating each other: dress up for no reason sometimes.","Remember important dates in your calendar with alerts.","Give them the last bite if they love it \u2014 generosity in small things.","Plan a cozy movie night with their favorite blanket rules.","Tell them when you are proud of how they handled something hard.","Be consistent with good morning and good night kindness.","Create a shared tradition: Sunday brunch, Friday playlist, monthly adventure.","Forgive fast when intent was good \u2014 hold grace like a gift.","Ask for what you need clearly instead of testing them.","Surprise them with flowers, a plant, or something living and hopeful.","Dream aloud about the future together \u2014 direction feels safe.","Choose them again today \u2014 love is a daily decision, not a one-time event."],y.s)
+A.djk=x([D.bT,D.jl,D.pk],y.O)
+A.dnz=x(["Send a voice note saying one specific thing you appreciated about them today.","Plan a no-phone hour together \u2014 phones face down, eyes on each other.","Remember a small detail they mentioned and bring it up later; it shows you listen.","Compliment their character, not only their appearance \u2014 depth keeps hearts close.","Schedule a weekly check-in: \u201cHow are we feeling about us?\u201d","Share a playlist of songs that remind you of them \u2014 three tracks is enough.","Apologize quickly when you are wrong; pride is the enemy of closeness.","Celebrate their wins loudly, even the small ones \u2014 promotion, recipe, good day.","Ask \u201cWhat would make this week easier for you?\u201d and follow through once.","Leave a handwritten note in their bag, book, or on the mirror.","Plan surprise comfort: their favorite snack after a hard day.","Touch base mid-day with a kind text \u2014 not demanding, just warm.","Learn one thing they care about and ask a thoughtful question about it.","Defend them kindly in public; loyalty builds trust.","Create a shared inside joke \u2014 intimacy loves private language.","Book something to look forward to: concert, class, weekend trip.","Practice patience when they need space; trust is quiet confidence.","Cook or order their favorite meal without being asked.","Take photos together that are candid, not only posed perfection.","Say thank you for ordinary things: listening, driving, patience.","Introduce them proudly to friends \u2014 belonging matters.","Keep promises small and large; reliability is romance in action.","Flirt after you are comfortable \u2014 playfulness keeps sparks alive.","Ask about their family with genuine curiosity, not interrogation.","Share your feelings with calm words instead of guessing games.","Plan a tech-free walk and hold hands if you both want that.","Respect their boundaries without making them explain twice.","Send a meme or reel that made you think of them \u2014 light connection counts.","Celebrate anniversaries of small moments: first coffee, first laugh.","Offer help before they have to ask \u2014 dishes, errands, ride.","Speak their love language: time, words, gifts, acts, touch \u2014 learn which lands.","Do not weaponize the past in arguments; solve today\u2019s issue today.","Plan a double date with friends who bring good energy.","Write three things you love about them and read one aloud.","Protect their reputation online and offline.","Wake up early once to make breakfast \u2014 effort is attractive.","Listen without fixing unless they ask for advice.","Share goals and ask how you can support, not control.","Laugh at yourselves when plans fail \u2014 resilience is sexy.","Keep dating each other: dress up for no reason sometimes.","Remember important dates in your calendar with alerts.","Give them the last bite if they love it \u2014 generosity in small things.","Plan a cozy movie night with their favorite blanket rules.","Tell them when you are proud of how they handled something hard.","Be consistent with good morning and good night kindness.","Create a shared tradition: Sunday brunch, Friday playlist, monthly adventure.","Forgive fast when intent was good \u2014 hold grace like a gift.","Ask for what you need clearly instead of testing them.","Surprise them with flowers, a plant, or something living and hopeful.","Dream aloud about the future together \u2014 direction feels safe.","Choose them again today \u2014 love is a daily decision, not a one-time event."],y.s)
 A.e4a=new B.a2("love","I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
 A.e7T=new B.a2("love","Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
 A.ecn=new B.a2("love","Deep riddle #3 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
@@ -2624,4 +2624,4 @@ A.fx7=new C.G(!0,D.c,null,null,null,null,16,D.u,null,0.5,null,null,null,null,nul
 A.h4a=new C.B("Daily Confidence Boost",null,A.fx7,null,null,null,null,null,null,null,null,null)
 A.fCA=new C.G(!0,D.c,null,null,null,null,14,D.H,null,0.8,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 A.h7c=new C.B("Love Match",null,A.fCA,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["y6hDRBYGZqXbdLHlOvqwLdQD5aM="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["fb0K5RoGZYmLINKbJMPujM9ZPsc="]=a.current})($__dart_deferred_initializers__);

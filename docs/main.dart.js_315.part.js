@@ -1,6 +1,6 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var D,A,E,C={
-hty(d){switch(d.a){case 1:return B.emm
+htz(d){switch(d.a){case 1:return B.emm
 case 2:return B.emo
 case 0:return B.emn}},
 auh:function auh(d,e,f,g,h,i){var _=this
@@ -25,13 +25,13 @@ B.dDk=x([A.aD,A.fd],y.c)
 B.ddC=x([A.kN,A.pn,A.aD],y.c)
 B.emm=new C.auh(B.d4U,B.dDk,A.fd,A.iW,"PREMIUM",B.ddC)
 B.dvb=x([A.cU,A.fq,A.bQ],y.c)
-B.dqd=x([A.bQ,A.aV],y.c)
+B.dqe=x([A.bQ,A.aV],y.c)
 B.dch=x([A.wr,A.bQ,A.fq],y.c)
-B.emn=new C.auh(B.dvb,B.dqd,A.bQ,A.js,"NGMY WALLET",B.dch)
+B.emn=new C.auh(B.dvb,B.dqe,A.bQ,A.js,"NGMY WALLET",B.dch)
 B.dsb=x([A.eo,A.dV,A.po],y.c)
 B.dwW=x([A.aE,A.aQ],y.c)
 B.dev=x([A.rI,A.aE,A.c2],y.c)
 B.emo=new C.auh(B.dsb,B.dwW,A.aE,A.mn,"LUXURY",B.dev)
 B.emq=new E.aug(1,"premium")
 B.emr=new E.aug(2,"luxury")})()};
-(a=>{a["g0qSGhuRR5FxvrpDuvRbZmzNncM="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["exk8MmO8emmiP12WyiMdZBl5f1I="]=a.current})($__dart_deferred_initializers__);
