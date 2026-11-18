@@ -392,10 +392,15 @@ class Cam3 extends ChangeNotifier {
 
   // A glide to a new view.
   V3? _toTarget;
+  V3 _aim = V3.zero, _placed = V3.zero;
   double? _toDist;
   double? _toYaw, _toPitch;
 
   void glideTo({V3? target, double? dist, double? yaw, double? pitch}) {
+    // The glide moves where the camera wants to be (the spot and the distance) and the walls are applied after. Gliding
+    // the wall-stopped view itself made it fight the wall every frame, so the picture shook and never came to rest.
+    if (this.dist != _lastSet) _want = this.dist;
+    _aim = this.target;
     _toTarget = target;
     _toDist = dist;
     _toYaw = yaw;
@@ -430,36 +435,40 @@ class Cam3 extends ChangeNotifier {
   void tick(double dt) {
     if (!gliding) return;
     final k = 1 - math.exp(-dt * 7);
-    if (_toDist != null && dist != _lastSet) _want = dist;
+    // Something else moved the view (a drag, a zoom): carry on from where it is now.
+    if (dist != _lastSet) _want = dist;
+    if (target != _placed) _aim = target;
     if (_toTarget != null) {
-      target = V3.lerp(target, _toTarget!, k);
-      if ((target - _toTarget!).len < 0.02) {
-        target = _toTarget!;
+      _aim = V3.lerp(_aim, _toTarget!, k);
+      if ((_aim - _toTarget!).len < 0.02) {
+        _aim = _toTarget!;
         _toTarget = null;
       }
+      target = _aim;
     }
     if (_toDist != null) {
-      dist += (_toDist! - dist) * k;
-      if ((dist - _toDist!).abs() < 0.05) {
-        dist = _toDist!;
+      _want += (_toDist! - _want) * k;
+      if ((_want - _toDist!).abs() < 0.05) {
+        _want = _toDist!;
         _toDist = null;
       }
     }
     if (_toYaw != null) {
       yaw += (_toYaw! - yaw) * k;
-      if ((yaw - _toYaw!).abs() < 0.003) {
+      if ((yaw - _toYaw!).abs() < 0.0005) {
         yaw = _toYaw!;
         _toYaw = null;
       }
     }
     if (_toPitch != null) {
       pitch += (_toPitch! - pitch) * k;
-      if ((pitch - _toPitch!).abs() < 0.003) {
+      if ((pitch - _toPitch!).abs() < 0.0005) {
         pitch = _toPitch!;
         _toPitch = null;
       }
     }
-    _fit();
+    _fit(sync: false);
+    _placed = target;
     notifyListeners();
   }
 
