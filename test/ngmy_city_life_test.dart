@@ -263,10 +263,8 @@ void main() {
     await t.pump(const Duration(milliseconds: 600));
     final phone = find.text('📱 Phone', skipOffstage: false);
     expect(phone, findsOneWidget);
-    // It sits between the Full screen chip and the door chips.
-    final fullX = t.getTopLeft(find.text('⛶ Full screen', skipOffstage: false)).dx;
-    final phoneX = t.getTopLeft(phone).dx;
-    expect(phoneX, greaterThan(fullX));
+    // The full screen button is a small icon by the title; the phone chip is in the menu.
+    expect(find.byKey(const Key('enter-full')), findsOneWidget);
     await t.ensureVisible(phone);
     await t.pump(const Duration(milliseconds: 200));
     await t.tap(phone);

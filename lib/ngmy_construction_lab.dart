@@ -612,6 +612,7 @@ class LessonScaffold extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(child: titleExtra!),
                 const SizedBox(width: 6),
+                if (titleAction != null) titleAction!,
               ],
               GestureDetector(
                 onTap: onSteps,
@@ -627,7 +628,7 @@ class LessonScaffold extends StatelessWidget {
           Container(
             width: double.infinity,
             constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.34),
-            padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
+            padding: const EdgeInsets.fromLTRB(10, 5, 10, 6),
             decoration: const BoxDecoration(color: kConPanel, border: Border(bottom: BorderSide(color: Colors.white12))),
             child: SingleChildScrollView(child: panel),
           ),

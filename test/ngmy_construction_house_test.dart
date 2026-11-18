@@ -211,12 +211,16 @@ void main() {
     await t.tap(find.byIcon(Icons.arrow_forward_rounded));
     await t.pump(const Duration(milliseconds: 300));
     expect(plant.x, greaterThan(x0));
+    await t.ensureVisible(find.byIcon(Icons.delete_outline_rounded));
+    await t.pump(const Duration(milliseconds: 100));
     await t.tap(find.byIcon(Icons.delete_outline_rounded));
     await t.pump(const Duration(milliseconds: 300));
     expect(h.room.furn.length, before);
     // Look mode again and through the door into the hall.
     await t.tap(find.text('👁 Look'));
     await t.pump(const Duration(milliseconds: 300));
+    await t.ensureVisible(find.text('🚪 Hall'));
+    await t.pump(const Duration(milliseconds: 100));
     await t.tap(find.text('🚪 Hall'));
     await t.pump(const Duration(milliseconds: 300));
     expect(h.current, 5);

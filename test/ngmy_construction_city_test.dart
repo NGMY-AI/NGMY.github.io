@@ -214,11 +214,8 @@ void main() {
     HomeProject.session = HomeProject(seed: 31)..current = 11;
     await t.pumpWidget(const MaterialApp(home: NgmyHousePage()));
     await t.pump(const Duration(milliseconds: 600));
-    final row = find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.right).first;
-    await t.scrollUntilVisible(find.text('⛶ Full screen'), 120, scrollable: row);
-    await t.drag(row, const Offset(-120, 0));
     await t.pump(const Duration(milliseconds: 300));
-    await t.tap(find.text('⛶ Full screen'));
+    await t.tap(find.byKey(const Key('enter-full')));
     await t.pump(const Duration(milliseconds: 500));
     expect(find.byIcon(Icons.fullscreen_exit_rounded), findsOneWidget);
     expect(find.text('🎬 Tour'), findsNothing, reason: 'the buttons at the top are gone');
@@ -364,11 +361,8 @@ void main() {
     HomeProject.session = HomeProject(seed: 33)..current = 11;
     await t.pumpWidget(const MaterialApp(home: NgmyHousePage()));
     await t.pump(const Duration(milliseconds: 600));
-    final row = find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.right).first;
-    await t.scrollUntilVisible(find.text('⛶ Full screen'), 120, scrollable: row);
-    await t.drag(row, const Offset(-120, 0));
     await t.pump(const Duration(milliseconds: 300));
-    await t.tap(find.text('⛶ Full screen'));
+    await t.tap(find.byKey(const Key('enter-full')));
     await t.pump(const Duration(milliseconds: 500));
     final exit = find.byIcon(Icons.fullscreen_exit_rounded);
     expect(exit, findsOneWidget);

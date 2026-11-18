@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_3d.dart';
 import 'package:ngmy/ngmy_construction_electrical.dart';
 import 'package:ngmy/ngmy_construction_home.dart';
+import 'package:ngmy/ngmy_construction_lab.dart' show kConPanel;
 import 'package:ngmy/ngmy_construction_homepage.dart';
 import 'package:ngmy/ngmy_construction_homescene.dart';
 import 'package:ngmy/ngmy_construction_plumbing.dart';
@@ -364,6 +365,36 @@ void main() {
     await t.pump(const Duration(milliseconds: 800));
     await t.pump(const Duration(milliseconds: 800));
     expect(find.text('Breaker ON (live)'), findsOneWidget);
+    await t.pump(const Duration(seconds: 12));
+  });
+
+  testWidgets('on a phone the menu over a lesson room is two thin lines, and full screen is a small icon by the search', (t) async {
+    t.view.physicalSize = const Size(1125, 2436);
+    t.view.devicePixelRatio = 3.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(const MaterialApp(home: NgmyHousePage(lesson: 'gfci')));
+    for (var i = 0; i < 12; i++) {
+      await t.pump(const Duration(milliseconds: 100));
+    }
+    // The menu box under the title: two lines of buttons, no more.
+    final panel = find.byWidgetPredicate((w) => w is Container && w.decoration is BoxDecoration && (w.decoration as BoxDecoration).color == kConPanel && w.constraints != null);
+    expect(panel, findsOneWidget);
+    expect(t.getSize(panel).height, lessThan(70), reason: 'the menu takes only two thin lines');
+    final lines = find.descendant(of: panel, matching: find.byWidgetPredicate((w) => w is SingleChildScrollView && w.scrollDirection == Axis.horizontal));
+    expect(lines, findsNWidgets(2));
+    // What fits the outlet is on the second line, the modes are there too.
+    expect(find.byKey(const Key('equip-toaster'), skipOffstage: false), findsOneWidget);
+    expect(find.text('👁 Look', skipOffstage: false), findsOneWidget);
+    // Full screen: no button in the menu, a small icon next to the search icon by the title.
+    expect(find.text('⛶ Full screen', skipOffstage: false), findsNothing);
+    final search = t.getCenter(find.byKey(const Key('equip-search')));
+    final full = t.getCenter(find.byKey(const Key('enter-full')));
+    expect((full.dy - search.dy).abs(), lessThan(2));
+    expect(full.dx, greaterThan(search.dx));
+    expect(t.getSize(find.byKey(const Key('enter-full'))).height, lessThanOrEqualTo(36));
+    await t.tap(find.byKey(const Key('enter-full')));
+    await t.pump(const Duration(milliseconds: 500));
+    expect(find.byIcon(Icons.fullscreen_exit_rounded), findsOneWidget, reason: 'the icon opens full screen');
     await t.pump(const Duration(seconds: 12));
   });
 

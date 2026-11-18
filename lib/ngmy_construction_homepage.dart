@@ -2087,37 +2087,40 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   }
 
   /// All the equipment that fits the outlet being fixed, in a row at the bottom.
-  Widget _equipmentBar() {
+  /// All the equipment that fits the outlet being fixed, at the start of the second line of the menu.
+  List<Widget> _equipmentChips() {
     final kind = room.lesson;
     final list = equipmentFor(kind);
-    return Padding(
-      padding: const EdgeInsets.only(top: 6),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Fits the ${shortDeviceName(kind).toLowerCase()}:', style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 4),
-        if (list.isEmpty)
-          const Text('Nothing in the house plugs into this one: it is for special equipment.', style: TextStyle(color: Colors.white38, fontSize: 11.5))
-        else
-          Wrap(spacing: 6, runSpacing: 6, children: [
-            for (final a in list)
-              GestureDetector(
-                key: Key('equip-${a.key}'),
-                onTap: () => _plugLesson(a),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-                  decoration: BoxDecoration(color: room.plugged[0] == a.key ? kConAmber.withValues(alpha: 0.28) : Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(11), border: Border.all(color: room.plugged[0] == a.key ? kConAmber : Colors.white24)),
-                  child: Text('${a.emoji} ${a.name}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11.5)),
-                ),
-              ),
-          ]),
-      ]),
-    );
+    return [
+      Padding(
+        padding: const EdgeInsets.only(right: 6),
+        child: Text(list.isEmpty ? 'Nothing in the house plugs into the ${shortDeviceName(kind).toLowerCase()}: it is for special equipment.' : 'Fits:', style: const TextStyle(color: Colors.white54, fontSize: 10.5, fontWeight: FontWeight.w800)),
+      ),
+      for (final a in list) KeyedSubtree(key: Key('equip-${a.key}'), child: _chip('${a.emoji} ${a.name}', room.plugged[0] == a.key, () => _plugLesson(a))),
+      if (list.isNotEmpty) Container(width: 1, height: 16, margin: const EdgeInsets.only(right: 6), color: Colors.white24),
+    ];
   }
 
+  /// The full screen button by the title, as a small icon.
+  Widget _fullIcon() => IconButton(
+        key: const Key('enter-full'),
+        tooltip: 'Full screen',
+        onPressed: _enterFull,
+        style: IconButton.styleFrom(tapTargetSize: MaterialTapTargetSize.shrinkWrap, minimumSize: const Size(32, 32), padding: EdgeInsets.zero),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+        icon: const Icon(Icons.fullscreen_rounded, color: Color(0xFF38BDF8), size: 22),
+      );
+
   /// The search icon by the title: type what to plug in (dryer, range, lamp...) and pick it.
-  Widget _searchIcon() => Align(
-        alignment: Alignment.centerRight,
-        child: IconButton(key: const Key('equip-search'), tooltip: 'Search the equipment that fits', onPressed: _findSheet, icon: const Icon(Icons.search_rounded, color: kConAmber)),
+  Widget _searchIcon() => IconButton(
+        key: const Key('equip-search'),
+        tooltip: 'Search the equipment that fits',
+        onPressed: _findSheet,
+        style: IconButton.styleFrom(tapTargetSize: MaterialTapTargetSize.shrinkWrap, minimumSize: const Size(32, 32), padding: EdgeInsets.zero),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+        icon: const Icon(Icons.search_rounded, color: kConAmber, size: 22),
       );
 
   Future<void> _findSheet() {
@@ -3854,9 +3857,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         onTap: f,
         child: Stack(clipBehavior: Clip.none, children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(color: on ? color.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(14), border: Border.all(color: on ? color : Colors.white24, width: on ? 2 : 1)),
-            child: Text(label, style: TextStyle(color: on ? color : Colors.white, fontWeight: FontWeight.w800, fontSize: 11)),
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            decoration: BoxDecoration(color: on ? color.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(12), border: Border.all(color: on ? color : Colors.white24, width: on ? 1.6 : 1)),
+            child: Text(label, style: TextStyle(color: on ? color : Colors.white, fontWeight: FontWeight.w800, fontSize: 10, height: 1.2)),
           ),
           if (dot) Positioned(right: -2, top: -3, child: Container(width: 11, height: 11, decoration: BoxDecoration(color: const Color(0xFFEF4444), shape: BoxShape.circle, border: Border.all(color: kConPanel, width: 2)))),
         ]),
@@ -3864,7 +3867,12 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     );
   }
 
-  Widget _row(List<Widget> kids) => SizedBox(height: 30, child: ListView(scrollDirection: Axis.horizontal, children: kids));
+  /// One thin line of menu buttons that slides sideways. Every button is made (not only the ones on the screen), so the
+  /// line is always whole; a new [key] starts it again from the left.
+  Widget _row(List<Widget> kids, {Key? key}) => SizedBox(
+        height: 24,
+        child: SingleChildScrollView(key: key, scrollDirection: Axis.horizontal, child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: kids)),
+      );
 
   Widget _swatch(Color c, bool on, VoidCallback f, {String? label}) => Padding(
         padding: const EdgeInsets.only(right: 7),
@@ -3884,38 +3892,49 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         padding: const EdgeInsets.only(right: 6),
         child: GestureDetector(
           onTap: f,
-          child: Container(width: 40, height: 36, decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white24)), child: Icon(i, color: Colors.white, size: 20)),
+          child: Container(width: 34, height: 24, decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(9), border: Border.all(color: Colors.white24)), child: Icon(i, color: Colors.white, size: 16)),
         ),
       );
 
+  /// The second line of the menu. In Look mode: what fits the outlet being fixed (outlet lessons), the modes, and the doors.
+  /// In another mode: a way back to Look, the mode itself, then its tools, so the tools are on the screen straight away.
   Widget _context() {
     if (tour != null) {
-      return Row(children: [
-        Expanded(child: Text('🎬 ${tourNote.isEmpty ? 'Walking in' : tourNote}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFFFDE68A), fontWeight: FontWeight.w800, fontSize: 13))),
-        _chip('⏹ Stop the tour', true, _stopTour, color: const Color(0xFFF87171)),
-      ]);
+      return SizedBox(
+        height: 24,
+        child: Row(children: [
+          Expanded(child: Text('🎬 ${tourNote.isEmpty ? 'Walking in' : tourNote}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFFFDE68A), fontWeight: FontWeight.w800, fontSize: 12))),
+          _chip('⏹ Stop the tour', true, _stopTour, color: const Color(0xFFF87171)),
+        ]),
+      );
     }
+    const modes = [('look', '👁 Look'), ('furniture', '🛋 Furniture'), ('walls', '🧱 Walls'), ('floor', '🟫 Floor'), ('ceiling', '⬜ Ceiling'), ('doors', '🚪 Doors')];
+    final learn = _chip('📘 Learn', false, () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const NgmyConstructionLearnPage())), color: const Color(0xFFA78BFA));
+    final lead = mode == 'look'
+        ? <Widget>[for (final (k, l) in modes) _chip(l, k == mode, () => _setMode(k)), learn]
+        : <Widget>[_chip('👁 Look', false, () => _setMode('look')), for (final (k, l) in modes) if (k == mode) _chip(l, true, () => _setMode(k))];
+    final key = ValueKey('menu-$mode-$selFurn');
     switch (mode) {
       case 'furniture':
         final f = room.furnById(selFurn);
-        return Column(mainAxisSize: MainAxisSize.min, children: [
-          if (f != null)
-            _row([
-              _arrow(Icons.arrow_back_rounded, () => _move(-6, 0)),
-              _arrow(Icons.arrow_forward_rounded, () => _move(6, 0)),
-              _arrow(Icons.arrow_upward_rounded, () => _move(0, -6)),
-              _arrow(Icons.arrow_downward_rounded, () => _move(0, 6)),
-              _arrow(Icons.rotate_90_degrees_cw_rounded, _turn),
-              _arrow(Icons.palette_rounded, _recolor),
-              if (!room.indoor) _arrow(Icons.sell_rounded, _sell),
-              _arrow(Icons.delete_outline_rounded, _remove),
-            ])
-          else
-            const Align(alignment: Alignment.centerLeft, child: Padding(padding: EdgeInsets.only(bottom: 4), child: Text('Tap a piece of furniture, or add one:', style: TextStyle(color: Colors.white60, fontSize: 12)))),
-          _row([for (final e in kFurnKinds.entries) if (kOutdoorFurn.contains(e.key) == !room.indoor) _chip('${e.value.emoji} ${e.value.name}', false, () => _addFurn(e.key), color: const Color(0xFF67E8F9))]),
+        return _row(key: key, [
+          ...lead,
+          if (f != null) ...[
+            _arrow(Icons.arrow_back_rounded, () => _move(-6, 0)),
+            _arrow(Icons.arrow_forward_rounded, () => _move(6, 0)),
+            _arrow(Icons.arrow_upward_rounded, () => _move(0, -6)),
+            _arrow(Icons.arrow_downward_rounded, () => _move(0, 6)),
+            _arrow(Icons.rotate_90_degrees_cw_rounded, _turn),
+            _arrow(Icons.palette_rounded, _recolor),
+            if (!room.indoor) _arrow(Icons.sell_rounded, _sell),
+            _arrow(Icons.delete_outline_rounded, _remove),
+          ] else
+            const Padding(padding: EdgeInsets.only(right: 6), child: Text('Tap a piece, or add:', style: TextStyle(color: Colors.white60, fontSize: 10.5, fontWeight: FontWeight.w700))),
+          for (final e in kFurnKinds.entries) if (kOutdoorFurn.contains(e.key) == !room.indoor) _chip('${e.value.emoji} ${e.value.name}', false, () => _addFurn(e.key), color: const Color(0xFF67E8F9)),
         ]);
       case 'walls':
-        return _row([
+        return _row(key: key, [
+          ...lead,
           _chip(selWall < 0 ? 'All walls' : 'Wall ${selWall + 1}: tap Look to reset', selWall < 0, () => setState(() => selWall = -1)),
           for (var i = 0; i < kWallColors.length; i++)
             _swatch(kWallColors[i], false, () {
@@ -3930,7 +3949,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
             }, label: kWallColorNames[i]),
         ]);
       case 'floor':
-        return _row([
+        return _row(key: key, [
+          ...lead,
           for (var i = 0; i < kFloorStyles.length; i++)
             _swatch(kFloorStyles[i].color, room.floor == i, () {
               setState(() {
@@ -3940,7 +3960,8 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
             }, label: kFloorStyles[i].name),
         ]);
       case 'ceiling':
-        return _row([
+        return _row(key: key, [
+          ...lead,
           _chip(room.ceilingFix == 'fan' ? '🌀 Fan (tap for light)' : '💡 Light (tap for fan)', false, () {
             setState(() {
               room.ceilingFix = room.ceilingFix == 'fan' ? 'light' : 'fan';
@@ -3957,8 +3978,9 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
         ]);
       default:
         final seen = <int>{};
-        return _row([
-          _chip('⛶ Full screen', false, _enterFull, color: const Color(0xFF38BDF8)),
+        return _row(key: key, [
+          if (mode == 'look' && room.indoor && isLesson && isOutletKind(room.lesson)) ..._equipmentChips(),
+          ...lead,
           if (!room.indoor) _chip('📱 Phone', false, _enterPhone, color: const Color(0xFFF472B6)),
           for (final d in room.doors)
             if (seen.add(d.to)) _chip('🚪 ${home.rooms[d.to].name}', false, () => _go(d.to), color: const Color(0xFF67E8F9), dot: !home.rooms[d.to].finished),
@@ -4106,7 +4128,10 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       stepText: isLesson ? (r.lessonDone ? 'Done ✓' : 'To do') : '${home.finishedCount}/${home.indoor.length} done',
       onSteps: () => isLesson ? _openLesson() : _problems(context),
       titleExtra: room.indoor ? null : NeedsBars(needs: needs, driving: _driving != null, height: 12),
-      titleAction: room.indoor && isLesson && isOutletKind(room.lesson) ? _searchIcon() : null,
+      titleAction: Row(mainAxisSize: MainAxisSize.min, children: [
+        if (room.indoor && isLesson && isOutletKind(room.lesson)) _searchIcon(),
+        _fullIcon(),
+      ]),
       stage: stage,
       panel: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         _row(!room.indoor ? _cityChips() : [
@@ -4149,18 +4174,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
           ],
         ]),
         const SizedBox(height: 4),
-        _row([
-          _chip('👁 Look', mode == 'look', () => _setMode('look')),
-          _chip('🛋 Furniture', mode == 'furniture', () => _setMode('furniture')),
-          _chip('🧱 Walls', mode == 'walls', () => _setMode('walls')),
-          _chip('🟫 Floor', mode == 'floor', () => _setMode('floor')),
-          _chip('⬜ Ceiling', mode == 'ceiling', () => _setMode('ceiling')),
-          _chip('🚪 Doors', mode == 'doors', () => _setMode('doors')),
-          _chip('📘 Learn', false, () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const NgmyConstructionLearnPage())), color: const Color(0xFFA78BFA)),
-        ]),
-        const SizedBox(height: 4),
         _context(),
-        if (isLesson && isOutletKind(room.lesson)) _equipmentBar(),
       ]),
     );
   }
