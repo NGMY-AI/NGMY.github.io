@@ -152,7 +152,7 @@ pw.Widget _pdfElement(NgmySlideElement e, double pageW, double pageH) {
       // frame lines baked into that now-undersized image. Only a true
       // full-slide background should stretch to fill; a user's actual
       // inserted photo (or a signature) should keep its own proportions.
-      final isFullBleedBg = e.type == NgmySlideElementType.image && e.x == 0 && e.y == 0 && e.w == 1 && e.h == 1;
+      final isFullBleedBg = e.type == NgmySlideElementType.image && ((e.x == 0 && e.y == 0 && e.w == 1 && e.h == 1) || e.fileName.endsWith('_fill'));
       child = img == null
           ? pw.Center(child: pw.Text(e.fileName.isEmpty ? 'Image' : e.fileName, style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700)))
           : pw.Image(img, fit: isFullBleedBg ? pw.BoxFit.fill : pw.BoxFit.contain);

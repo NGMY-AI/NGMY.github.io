@@ -369,6 +369,8 @@ class NgmySlideElementView extends StatelessWidget {
       // used up an iPhone's memory and made the page reload.
       final bytes = ngmySlideImageBytes(ref);
       final coverBg = element.fileName == 'marriage_locked_bg' || element.fileName.endsWith('_bg');
+      // A paper decoration (a gold bar, a coin, the seal) is stretched to fill its box and kept at its own small size.
+      final stretch = element.fileName.endsWith('_fill');
       return LayoutBuilder(builder: (context, c) {
         final dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 2.0;
         final w = c.maxWidth.isFinite ? c.maxWidth : 0.0;
@@ -377,8 +379,8 @@ class NgmySlideElementView extends StatelessWidget {
         return Image.memory(
           bytes,
           key: ValueKey('img_${element.id}_${bytes.length}'),
-          cacheWidth: target,
-          fit: coverBg || cover ? BoxFit.cover : BoxFit.contain,
+          cacheWidth: stretch ? null : target,
+          fit: stretch ? BoxFit.fill : (coverBg || cover ? BoxFit.cover : BoxFit.contain),
           gaplessPlayback: true,
           errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image_outlined, color: Colors.white54)),
         );

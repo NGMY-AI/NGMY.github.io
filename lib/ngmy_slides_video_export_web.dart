@@ -54,10 +54,11 @@ Future<String?> ngmyExportSlidesVideo(BuildContext context, NgmySlideDeck deck) 
   final status = ValueNotifier<String>('Getting ready…');
   final progress = ValueNotifier<double>(0);
 
-  // The slide is drawn under the progress screen, where it is not seen, and captured from there.
+  // The slide is drawn off the screen (left of it), where it is never seen, and captured from there. It used to sit at
+  // the top left, on top of everything at full video size, so the page filled the phone zoomed in while recording.
   final entry = OverlayEntry(
     builder: (_) => Positioned(
-      left: 0,
+      left: -(w + 200).toDouble(),
       top: 0,
       width: w.toDouble(),
       height: h.toDouble(),

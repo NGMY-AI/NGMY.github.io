@@ -2701,7 +2701,13 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
 
   Color? _deckSignatureInkColor() {
     final argb = _activeDeck?.signatureInkColor;
-    return argb == null ? null : Color(argb);
+    if (argb != null) return Color(argb);
+    // On a dark royal paper (emerald, navy, plum, onyx) a dark signature would not show: start with a light gold ink.
+    final page = _currentSlide;
+    if (_activeDeck?.isLockedTemplateDoc == true && page != null && ngmyHatiPaperIsDark(page.background)) {
+      return const Color(0xFFF3DFA2);
+    }
+    return null;
   }
 
   void _rememberFirstDocumentSignatureStyle(NgmySlidesSignatureResult result) {
@@ -2844,6 +2850,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
       slide.elements.removeWhere((e) =>
           e.fileName == '${kMarriageLocked}_nim_n_4' ||
           e.fileName == '${kMarriageLocked}_nim_ul_4' ||
+          e.fileName == '${kMarriageLocked}_nim_badge_4' ||
+          e.fileName == '${kMarriageLocked}_nim_badge_4_fill' ||
           e.fileName.startsWith('${kMarriageFieldPrefix}mahari_4:'));
       for (final e in slide.elements) {
         if (e.y > cutoffY + 0.001) e.y -= rowGap;
@@ -4311,7 +4319,11 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
             _topIconBtn(Icons.redo_rounded, 'Redo', _redo.isEmpty ? null : _redoAction, isDark),
           ],
           _topIconBtn(Icons.picture_as_pdf_outlined, 'PDF', () => unawaited(_downloadPdf()), isDark),
-          _topIconBtn(Icons.download_rounded, 'Download as video', () => unawaited(_downloadVideo()), isDark),
+          // A document (Hati, marriage papers) downloads as its proper PDF page; a presentation downloads as a video.
+          if (deck.isLockedTemplateDoc)
+            _topIconBtn(Icons.download_rounded, 'Download', () => unawaited(_downloadPdf()), isDark)
+          else
+            _topIconBtn(Icons.download_rounded, 'Download as video', () => unawaited(_downloadVideo()), isDark),
           if (!_isTransferredReadOnly())
           PopupMenuButton<String>(
             tooltip: 'More',

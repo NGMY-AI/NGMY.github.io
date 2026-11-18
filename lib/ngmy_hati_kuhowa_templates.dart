@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import 'ngmy_marriage_markers.dart';
+import 'ngmy_hati_royal_art.dart';
 import 'ngmy_marriage_paper_art.dart';
 import 'ngmy_slides_marriage_agreement.dart';
 import 'ngmy_slides_models.dart';
+import 'ngmy_slides_render.dart';
 import 'ngmy_state_picker.dart';
 
 const String kNgmyHatiKuhowaDeckKind = 'hati_kuhowa';
@@ -25,6 +27,7 @@ enum NgmyHatiLayoutKind {
   muhuriCrest,
   fomuWazi,
   upendoOrnate,
+  royal,
 }
 
 class NgmyHatiKuhowaTemplate {
@@ -732,9 +735,106 @@ const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaGoldEdgeAll = [
   ...kNgmyHatiKuhowaGoldTail,
 ];
 
+/// The royal papers, shown first: four from the owner's own designs (maroon band, cream and gold, emerald, navy) and
+/// three more in the same style (plum, onyx, teal band).
+const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaRoyalTemplates = [
+  NgmyHatiKuhowaTemplate(
+    id: 'royal_maroon',
+    name: 'Kifalme Nyekundu',
+    description: 'Ukanda mwekundu juu wenye almasi · baa nyekundu · muhuri wa dhahabu.',
+    paperStyle: NgmyMarriagePaperStyle.royalMaroon,
+    background: 0xFFFCF5E6,
+    ink: 0xFF2B1A12,
+    accent: 0xFF7A1B22,
+    bannerFill: 0xFF7A1B22,
+    bannerText: 0xFFFBEFD3,
+    previewColors: [Color(0xFFFCF5E6), Color(0xFF7A1B22), Color(0xFFC9A23A)],
+    layoutKind: NgmyHatiLayoutKind.royal,
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'royal_cream',
+    name: 'Dhahabu na Krimu',
+    description: 'Baa za dhahabu zinazong’aa · muhuri wenye utepe.',
+    paperStyle: NgmyMarriagePaperStyle.royalCream,
+    background: 0xFFFBF6EA,
+    ink: 0xFF2B1A12,
+    accent: 0xFF7A1B22,
+    bannerFill: 0xFFC9A23A,
+    bannerText: 0xFF6E1620,
+    previewColors: [Color(0xFFFBF6EA), Color(0xFFD9AE3F), Color(0xFF7A1B22)],
+    layoutKind: NgmyHatiLayoutKind.royal,
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'royal_emerald',
+    name: 'Zumaridi na Dhahabu',
+    description: 'Karatasi ya kijani kibichi · baa za dhahabu.',
+    paperStyle: NgmyMarriagePaperStyle.royalEmerald,
+    background: 0xFF0D3528,
+    ink: 0xFFF6ECD4,
+    accent: 0xFFE9C766,
+    bannerFill: 0xFFD4AF37,
+    bannerText: 0xFF0B2A20,
+    previewColors: [Color(0xFF0D3528), Color(0xFFD9AE3F), Color(0xFFF6ECD4)],
+    layoutKind: NgmyHatiLayoutKind.royal,
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'royal_navy',
+    name: 'Bluu ya Usiku',
+    description: 'Karatasi ya bluu ya usiku · baa za dhahabu.',
+    paperStyle: NgmyMarriagePaperStyle.royalNavy,
+    background: 0xFF121F44,
+    ink: 0xFFF3EEE0,
+    accent: 0xFFE9C766,
+    bannerFill: 0xFFD4AF37,
+    bannerText: 0xFF0F1A3A,
+    previewColors: [Color(0xFF121F44), Color(0xFFD9AE3F), Color(0xFFF3EEE0)],
+    layoutKind: NgmyHatiLayoutKind.royal,
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'royal_plum',
+    name: 'Zambarau ya Kifalme',
+    description: 'Karatasi ya zambarau · baa za dhahabu.',
+    paperStyle: NgmyMarriagePaperStyle.royalPlum,
+    background: 0xFF2E1038,
+    ink: 0xFFF7ECF4,
+    accent: 0xFFE9C766,
+    bannerFill: 0xFFD4AF37,
+    bannerText: 0xFF2B0F35,
+    previewColors: [Color(0xFF2E1038), Color(0xFFD9AE3F), Color(0xFFF7ECF4)],
+    layoutKind: NgmyHatiLayoutKind.royal,
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'royal_onyx',
+    name: 'Mkaa na Dhahabu',
+    description: 'Karatasi nyeusi · baa za dhahabu.',
+    paperStyle: NgmyMarriagePaperStyle.royalOnyx,
+    background: 0xFF1A1917,
+    ink: 0xFFF5EFE3,
+    accent: 0xFFE9C766,
+    bannerFill: 0xFFD4AF37,
+    bannerText: 0xFF161514,
+    previewColors: [Color(0xFF1A1917), Color(0xFFD9AE3F), Color(0xFFF5EFE3)],
+    layoutKind: NgmyHatiLayoutKind.royal,
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'royal_teal',
+    name: 'Bahari ya Kifalme',
+    description: 'Ukanda wa bahari juu wenye almasi · baa za bahari.',
+    paperStyle: NgmyMarriagePaperStyle.royalTeal,
+    background: 0xFFF8FBF7,
+    ink: 0xFF14262A,
+    accent: 0xFF0F5257,
+    bannerFill: 0xFF0F5257,
+    bannerText: 0xFFF6F1E1,
+    previewColors: [Color(0xFFF8FBF7), Color(0xFF0F5257), Color(0xFFC9A23A)],
+    layoutKind: NgmyHatiLayoutKind.royal,
+  ),
+];
+
 /// Row 1: navy + gold. Row 2: Utepe + Ukanda. Row 4 (filigree + laurel) stays as-is.
 /// Heritage papers stay resolvable for old saved docs but are off this picker.
 const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaTemplates = [
+  ...kNgmyHatiKuhowaRoyalTemplates,
   ...kNgmyHatiKuhowaNavyOnly,
   ...kNgmyHatiKuhowaSecondSlot,
   ...kNgmyHatiKuhowaRow2,
@@ -1005,6 +1105,7 @@ NgmyHatiKuhowaTemplate? ngmyHatiKuhowaTemplateById(String id, {List<NgmyHatiKuho
   final lists = templates != null
       ? <List<NgmyHatiKuhowaTemplate>>[templates]
       : <List<NgmyHatiKuhowaTemplate>>[
+          kNgmyHatiKuhowaRoyalTemplates,
           kNgmyHatiKuhowaYesterdayTemplates,
           kNgmyHatiKuhowaGoldEdgeAll,
           kNgmyHatiKuhowaNewerTemplates,
@@ -1039,6 +1140,27 @@ List<NgmySlideElement> _buildPageContent(
   double titleY = 0.036,
 }) {
   final bgUrl = ngmyMarriagePaperDataUrl(tpl.paperStyle);
+  final royal = _royalLookFor(tpl.paperStyle);
+  if (royal != null) {
+    return [
+      _hBgImage(bgUrl),
+      ..._layoutRoyal(
+        tpl,
+        royal,
+        title: title,
+        introText: introText,
+        sectionLabel: sectionLabel,
+        sectionLabelEditable: sectionLabelEditable,
+        mahariItems: mahariItems,
+        state: state,
+        titleFontSize: titleFontSize,
+        sectionSubtitle: sectionSubtitle,
+        sectionSubtitleFontSize: sectionSubtitleFontSize,
+        introAdvance: introAdvance,
+        witnessRows: witnessRows,
+      ),
+    ];
+  }
   return [
     _hBgImage(bgUrl),
     ..._layoutSingle(
@@ -1116,6 +1238,7 @@ List<NgmySlideElement> _layoutSingle(
       out.addAll(_hOrnamentRule(0.20, 0.018, 0.60, ink: ink));
       headingY = 0.040;
     case NgmyHatiLayoutKind.classic:
+    case NgmyHatiLayoutKind.royal:
       break;
   }
 
@@ -1256,6 +1379,294 @@ List<NgmySlideElement> _layoutSingle(
   return out;
 }
 
+// ── Royal papers ────────────────────────────────────────────────────────────
+// The maroon band, cream and gold, emerald, navy, plum, onyx and teal papers: full coloured bars for NIMETOWA and
+// MASHAHIDI, round number coins, shaded rows, two witness cards, MWANDISHI with a seal next to it, and a footer bar
+// with the state. Every fill-in field, signature spot and tag is the same one the other papers use, so filling in,
+// signing, moving names between Kuhowa and Kuhoweya, AKUNA DENI and hiding the 4th item all work the same.
+
+class _RoyalLook {
+  const _RoyalLook({
+    required this.band,
+    required this.gold,
+    required this.card,
+    required this.stripe,
+    required this.ink,
+    required this.label,
+    required this.title,
+    required this.barText,
+    required this.badgeText,
+    required this.line,
+    required this.sealCenter,
+    this.barSolid,
+    this.bandFill = 0,
+    this.ribbon,
+    this.sealShiny = true,
+  });
+
+  /// True: a solid header band with diamonds (the title sits on it). False: the title sits on the paper.
+  final bool band;
+  final int gold, card, stripe, ink, label, title, barText, badgeText, line, sealCenter, bandFill;
+
+  /// The colour of the bars and number coins, or null for shiny gold.
+  final int? barSolid;
+  final int? ribbon;
+  final bool sealShiny;
+}
+
+_RoyalLook? _royalLookFor(NgmyMarriagePaperStyle s) {
+  const gold = 0xFFC9A23A, brightGold = 0xFFD4AF37, lightGold = 0xFFE9C766, titleGold = 0xFFE6C25A, ribbon = 0xFF8E1B24;
+  switch (s) {
+    case NgmyMarriagePaperStyle.royalMaroon:
+      return const _RoyalLook(
+          band: true, bandFill: 0xFF7A1B22, gold: gold, card: 0xFFFFFCF4, stripe: 0xFFF3E6CE, ink: 0xFF2B1A12, label: 0xFF7A1B22,
+          title: 0xFFFBEFD3, barSolid: 0xFF7A1B22, barText: 0xFFFBEFD3, badgeText: 0xFFFFFFFF, line: 0xFFD8C8AE,
+          sealCenter: 0xFFD4AF37, sealShiny: false);
+    case NgmyMarriagePaperStyle.royalTeal:
+      return const _RoyalLook(
+          band: true, bandFill: 0xFF0F5257, gold: gold, card: 0xFFFFFFFC, stripe: 0xFFE3EFEA, ink: 0xFF14262A, label: 0xFF0F5257,
+          title: 0xFFF6F1E1, barSolid: 0xFF0F5257, barText: 0xFFF6F1E1, badgeText: 0xFFFFFFFF, line: 0xFFC6D6CF,
+          sealCenter: 0xFF0F5257, sealShiny: false);
+    case NgmyMarriagePaperStyle.royalCream:
+      return const _RoyalLook(
+          band: false, gold: gold, card: 0xFFFFFDF7, stripe: 0xFFF4EBD9, ink: 0xFF2B1A12, label: 0xFF7A1B22, title: 0xFF7A1B22,
+          barText: 0xFF6E1620, badgeText: 0xFF2B1A12, line: 0xFFD8C8AE, sealCenter: 0xFF7A1B22, ribbon: ribbon);
+    case NgmyMarriagePaperStyle.royalEmerald:
+      return const _RoyalLook(
+          band: false, gold: brightGold, card: 0xFF0F4334, stripe: 0xFF145240, ink: 0xFFF6ECD4, label: lightGold, title: titleGold,
+          barText: 0xFF0B2A20, badgeText: 0xFF0B2A20, line: 0xFF3F7A66, sealCenter: 0xFF0B2A20, ribbon: ribbon);
+    case NgmyMarriagePaperStyle.royalNavy:
+      return const _RoyalLook(
+          band: false, gold: brightGold, card: 0xFF172A5C, stripe: 0xFF1D3369, ink: 0xFFF3EEE0, label: lightGold, title: titleGold,
+          barText: 0xFF0F1A3A, badgeText: 0xFF0F1A3A, line: 0xFF3D5590, sealCenter: 0xFF0F1A3A, ribbon: ribbon);
+    case NgmyMarriagePaperStyle.royalPlum:
+      return const _RoyalLook(
+          band: false, gold: brightGold, card: 0xFF3D1A4B, stripe: 0xFF4A215C, ink: 0xFFF7ECF4, label: lightGold, title: titleGold,
+          barText: 0xFF2B0F35, badgeText: 0xFF2B0F35, line: 0xFF6B4380, sealCenter: 0xFF2B0F35, ribbon: ribbon);
+    case NgmyMarriagePaperStyle.royalOnyx:
+      return const _RoyalLook(
+          band: false, gold: brightGold, card: 0xFF23211E, stripe: 0xFF2D2A25, ink: 0xFFF5EFE3, label: lightGold, title: titleGold,
+          barText: 0xFF161514, badgeText: 0xFF161514, line: 0xFF4E473C, sealCenter: 0xFF161514, ribbon: ribbon);
+    default:
+      return null;
+  }
+}
+
+/// True when this paper is one of the dark royal papers (light writing, so a signature is drawn in light ink).
+bool ngmyHatiPaperIsDark(int background) {
+  final r = (background >> 16) & 0xFF, g = (background >> 8) & 0xFF, b = background & 0xFF;
+  return (0.299 * r + 0.587 * g + 0.114 * b) < 90;
+}
+
+NgmySlideElement _hDecor(String url, double x, double y, double w, double h, String tag) {
+  return NgmySlideElement(
+    id: NgmySlidesTemplates.newId(),
+    type: NgmySlideElementType.image,
+    x: x,
+    y: y,
+    w: w,
+    h: h,
+    imageRef: url,
+    // Ends in _fill: the picture is stretched to fill its box, on screen and in the PDF.
+    fileName: '${kMarriageLocked}_${tag}_fill',
+  );
+}
+
+List<NgmySlideElement> _royalBar(_RoyalLook look, double x, double y, double w, double h, String tag) {
+  if (look.barSolid != null) {
+    return [_hLockedShape(shape: NgmySlideShapeKind.rectangle, x: x, y: y, w: w, h: h, fillColor: look.barSolid!, strokeColor: look.barSolid!, strokeWidth: 0, tag: tag)];
+  }
+  return [_hDecor(ngmyRoyalGoldStripUrl(), x, y, w, h, tag)];
+}
+
+List<NgmySlideElement> _layoutRoyal(
+  NgmyHatiKuhowaTemplate tpl,
+  _RoyalLook look, {
+  required String title,
+  required String introText,
+  required String sectionLabel,
+  required bool sectionLabelEditable,
+  required List<String> mahariItems,
+  String state = '',
+  double titleFontSize = 40,
+  String sectionSubtitle = 'Vitu vifuatavyo vimetolewa:',
+  double sectionSubtitleFontSize = 20,
+  double introAdvance = 0.165,
+  int witnessRows = 3,
+}) {
+  const cx = 0.09;
+  const cw = 0.82;
+  const barH = _bannerBoxH;
+  final ink = look.ink;
+  final out = <NgmySlideElement>[];
+
+  // ── Title and TAREHE ──
+  double pillY;
+  double introTop;
+  if (look.band) {
+    out.add(_hDecor(ngmyRoyalBandUrl(look.bandFill, look.gold), 0.03, 0.022, 0.94, 0.096, 'royal_band'));
+    out.add(_hLockedText(title, x: 0.06, y: 0.039, w: 0.88, h: 0.052, fontSize: titleFontSize * 1.15, fontWeight: FontWeight.w900, align: TextAlign.center, color: look.title, tag: 'title'));
+    pillY = 0.1;
+    for (var i = -2; i <= 2; i++) {
+      out.add(_hDecor(ngmyRoyalDiamondUrl(look.gold), 0.5 + i * 0.05 - 0.011, 0.139, 0.022, 0.0124, 'royal_dot_$i'));
+    }
+    introTop = 0.158;
+  } else {
+    out.add(_hLockedText(title, x: 0.06, y: 0.074, w: 0.88, h: 0.054, fontSize: titleFontSize * 1.15, fontWeight: FontWeight.w900, align: TextAlign.center, color: look.title, tag: 'title'));
+    pillY = 0.129;
+    introTop = 0.168;
+  }
+  const pillW = 0.31, pillH = 0.032;
+  const pillX = 0.5 - pillW / 2;
+  out.addAll([
+    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: pillX, y: pillY, w: pillW, h: pillH, fillColor: look.card, strokeColor: look.gold, strokeWidth: 1.4, tag: 'tarehe_box'),
+    _hLockedText('TAREHE:', x: pillX + 0.022, y: pillY + 0.002, w: 0.115, h: _hBlankH(19), fontSize: 19, fontWeight: FontWeight.w800, color: ink, tag: 'tarehe_lbl'),
+    _hBlank('tarehe', pillX + 0.14, pillY + 0.002, pillW - 0.15, ink: ink, fontSize: 20, startText: ngmyHatiKuhowaTodayDate(), align: TextAlign.left),
+  ]);
+
+  // ── The opening paragraph, in its own card ──
+  // Just tall enough for the words: about 6 lines for Kuhowa and Kuhoweya, about 13 for the longer Malipo paragraph.
+  final introH = 0.132 + (introAdvance - 0.165) * 1.45;
+  out.add(_hLockedShape(
+      shape: NgmySlideShapeKind.rectangle, x: cx - 0.006, y: introTop, w: cw + 0.012, h: introH, fillColor: look.card,
+      strokeColor: look.band ? look.bandFill : look.gold, strokeWidth: 1.3, tag: 'intro_frame'));
+  if (look.band) {
+    for (final (dx, dy) in [(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0)]) {
+      out.add(_hDecor(ngmyRoyalDiamondUrl(look.gold), cx - 0.006 + dx * (cw + 0.012) - 0.011, introTop + dy * introH - 0.0062, 0.022, 0.0124, 'intro_dia_${dx}_$dy'));
+    }
+  }
+  out.add(_hParagraphField('utangulizi', cx + 0.01, introTop + 0.01, cw - 0.02, introH - 0.02, ink: ink, fontSize: 19, startText: introText));
+  var y = introTop + introH + 0.014;
+
+  // ── NIMETOWA bar and the list ──
+  void barWithWords(String key, String words, bool editable, double at) {
+    out.addAll(_royalBar(look, cx, at, cw, barH, 'banner_box_$key'));
+    if (editable) {
+      out.add(NgmySlideElement(
+        id: NgmySlidesTemplates.newId(),
+        type: NgmySlideElementType.text,
+        x: cx,
+        y: at + barH * _bannerTextYRatio,
+        w: cw,
+        h: barH * _bannerTextHRatio,
+        text: words,
+        fontSize: 30,
+        fontWeight: FontWeight.w900,
+        color: look.barText,
+        align: TextAlign.center,
+        fileName: '$kMarriageFieldPrefix$key:${cw.toStringAsFixed(3)}',
+      ));
+    } else {
+      out.add(_hLockedText(words, x: cx, y: at + barH * _bannerTextYRatio, w: cw, h: barH * _bannerTextHRatio, fontSize: 30, fontWeight: FontWeight.w900, align: TextAlign.center, color: look.barText, tag: 'banner_t_$words'));
+    }
+  }
+
+  barWithWords('nimetowe_label', sectionLabel, sectionLabelEditable, y);
+  y += barH + 0.008;
+  out.add(_hLockedText(sectionSubtitle, x: cx, y: y, w: cw, h: 0.03, fontSize: sectionSubtitleFontSize, fontWeight: FontWeight.w700, color: ink, tag: 'nimetowe_sub'));
+  y += 0.032;
+  // Rows are 0.043 apart: the same step the editor uses when the 4th item is hidden, so everything below closes up evenly.
+  const rowStep = 0.043;
+  const coinW = 0.044, coinH = coinW * 9 / 16;
+  for (var i = 1; i <= 4; i++) {
+    if (i.isOdd) {
+      out.add(_hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx, y: y - 0.003, w: cw, h: rowStep - 0.002, fillColor: look.stripe, strokeColor: look.stripe, strokeWidth: 0, tag: 'nim_stripe_$i'));
+    }
+    final row = _hNimetoweRow(i, mahariItems[i - 1], cx + 0.016, y, cw - 0.016, ink: ink, accent: look.label);
+    final centerY = y + 0.002 + (i == 1 ? _hBlankH(22) : _hBlankH(16)) / 2;
+    final coinX = cx + 0.006, coinY = centerY - coinH / 2;
+    if (look.barSolid != null) {
+      out.add(_hLockedShape(shape: NgmySlideShapeKind.circle, x: coinX, y: coinY, w: coinW, h: coinH, fillColor: look.barSolid!, strokeColor: look.barSolid!, strokeWidth: 0, tag: 'nim_badge_$i'));
+    } else {
+      out.add(_hDecor(ngmyRoyalGoldCoinUrl(), coinX, coinY, coinW, coinH, 'nim_badge_$i'));
+    }
+    for (final e in row) {
+      if (e.fileName == '${kMarriageLocked}_nim_n_$i') {
+        e
+          ..text = '$i'
+          ..x = coinX
+          ..w = coinW
+          ..y = centerY - 0.0115
+          ..h = 0.023
+          ..fontSize = 15
+          ..fontWeight = FontWeight.w900
+          ..align = TextAlign.center
+          ..color = look.badgeText;
+      } else if (e.fileName == '${kMarriageLocked}_nim_ul_$i') {
+        e.strokeColor = look.line;
+      }
+    }
+    out.addAll(row);
+    y += rowStep;
+  }
+  y += 0.008;
+
+  // ── MASHAHIDI: a bar, then a card for each side ──
+  barWithWords('mashahidi', 'MASHAHIDI', false, y);
+  y += barH + 0.012;
+  const gap = 0.024;
+  const colW = (cw - gap) / 2;
+  const hdrH = 0.036;
+  const rowH = 0.05;
+  final cardH = hdrH + 0.012 + witnessRows * rowH + 0.004;
+  for (final (side, words, x) in [('mke', 'UPANDE WA MKE', cx), ('mume', 'UPANDE WA MUME', cx + colW + gap)]) {
+    out.add(_hLockedShape(shape: NgmySlideShapeKind.rectangle, x: x, y: y, w: colW, h: cardH, fillColor: look.card, strokeColor: look.gold, strokeWidth: 1.2, tag: 'wit_card_$side'));
+    out.addAll(_royalBar(look, x, y, colW, hdrH, 'wit_h_$side'));
+    out.add(_hLockedText(words, x: x, y: y + hdrH * 0.17, w: colW, h: hdrH * 0.7, fontSize: 20, fontWeight: FontWeight.w900, align: TextAlign.center, color: look.barText, tag: 'wit_h_${side}_t'));
+    var ly = y + hdrH + 0.012;
+    for (var n = 1; n <= witnessRows; n++) {
+      out.addAll(_hWitnessLine(side, n, x + 0.014, ly, colW - 0.028, ink: ink, accent: look.label));
+      ly += rowH;
+    }
+  }
+  y += cardH + 0.014;
+
+  // ── MWANDISHI, the seal and the footer ──
+  const mwW = cw * 0.76, mwH = 0.072;
+  const mwRow = 0.036;
+  const mwUl = mwRow + 0.0255;
+  final signX = cx + mwW * 0.55 + 0.088;
+  out.addAll([
+    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx, y: y, w: mwW, h: mwH, fillColor: look.card, strokeColor: look.gold, strokeWidth: 1.2, tag: 'mw_box'),
+    _hLockedText('MWANDISHI', x: cx + 0.022, y: y + 0.008, w: mwW - 0.044, h: 0.024, fontSize: 16, fontWeight: FontWeight.w800, color: look.label, tag: 'mw_hdr'),
+    _hLockedText('Jina:', x: cx + 0.022, y: y + mwRow, w: 0.07, h: 0.026, fontSize: 15, fontWeight: FontWeight.w600, color: ink, tag: 'mw_jl'),
+    _hBlank('mwandishi_jina', cx + 0.095, y + mwRow, mwW * 0.4, ink: ink, fontSize: 15, align: TextAlign.left, autoShrinkFont: true),
+    _hBlankUnderline(cx + 0.095, y + mwUl, mwW * 0.4, color: look.line),
+    _hLockedText('Sahihi:', x: cx + mwW * 0.55, y: y + mwRow, w: 0.085, h: 0.026, fontSize: 15, fontWeight: FontWeight.w600, color: ink, tag: 'mw_sl'),
+    NgmySlideElement(
+      id: NgmySlidesTemplates.newId(),
+      type: NgmySlideElementType.shape,
+      shape: NgmySlideShapeKind.rectangle,
+      x: signX,
+      y: y + mwRow - 0.012,
+      w: cx + mwW - 0.016 - signX,
+      h: 0.04,
+      fillColor: 0x00000000,
+      strokeColor: 0x00000000,
+      fileName: '${kMarriageSignPrefix}mwandishi',
+    ),
+    _hBlankUnderline(signX, y + mwUl, cx + mwW - 0.016 - signX, color: look.line),
+  ]);
+  final footY = y + mwH + 0.012;
+  out.addAll(_royalBar(look, cx, footY, cw, 0.034, 'state_bar'));
+  final trimmedState = state.trim();
+  if (trimmedState.isNotEmpty) {
+    out.addAll([
+      _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx, y: footY, w: cw, h: 0.034, fillColor: 0x00000000, strokeColor: 0x00000000, strokeWidth: 0, tag: 'state_box'),
+      _hLockedText("EMO 'YA M'MBONDO $trimmedState", x: cx, y: footY + 0.005, w: cw, h: 0.026, fontSize: 24, fontWeight: FontWeight.w800, align: TextAlign.center, color: look.barText, tag: 'state_text'),
+    ]);
+  }
+  const sealW = 0.16;
+  const sealH = sealW * 9 / 16 * 280 / 240;
+  out.add(_hDecor(ngmyRoyalSealUrl(center: look.sealCenter, ribbon: look.ribbon, shiny: look.sealShiny), cx + cw - sealW - 0.004, y - 0.006, sealW, sealH, 'royal_seal'));
+
+  // Every soft line on a dark paper takes the paper's own line colour, so it shows but stays quiet.
+  for (final e in out) {
+    if (e.fileName.startsWith('${kMarriageLocked}_ul_')) e.strokeColor = look.line;
+  }
+  return out;
+}
+
 /// Shared hati page (title, TAREHE, intro frame, list, MASHAHIDI, MWANDISHI)
 /// used by Kuhowa / Kuhowesha and also Hati ya Ndoa — Ndoa keeps its papers.
 NgmySlideDeck ngmyBuildHatiLookDeck({
@@ -1313,7 +1724,20 @@ NgmySlideDeck ngmyBuildHatiLookDeck({
 }
 
 /// Soft picker preview — unique chrome per certificate layout.
+final _royalPreviewPages = <String, NgmySlide>{};
+
 Widget ngmyHatiKuhowaTemplateLivePreview(NgmyHatiKuhowaTemplate tpl) {
+  // A royal paper shows a small copy of its real page, so the card looks exactly like what you get.
+  if (_royalLookFor(tpl.paperStyle) != null) {
+    final page = _royalPreviewPages.putIfAbsent(tpl.id, () => ngmyBuildHatiKuhowaDeck(templateId: tpl.id).slides.first);
+    return ClipRect(
+      child: FittedBox(
+        fit: BoxFit.cover,
+        alignment: Alignment.topCenter,
+        child: SizedBox(width: 270, height: 480, child: IgnorePointer(child: NgmySlideAnimatedRender(slide: page, animate: false))),
+      ),
+    );
+  }
   final ink = Color(tpl.ink);
   final accent = Color(tpl.accent);
   final paper = ngmyMarriagePaperPng(tpl.paperStyle);

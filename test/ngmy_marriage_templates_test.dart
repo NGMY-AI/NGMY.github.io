@@ -53,11 +53,18 @@ void main() {
     }
   });
 
-  test('Hati ya Kuhowa and Kuhowesha keep ten papers and resolve heritage for old docs', () {
-    expect(kNgmyHatiKuhowaTemplates, hasLength(10));
+  test('Hati ya Kuhowa and Kuhowesha keep the seven royal papers first, then the ten older papers, and resolve heritage for old docs', () {
+    expect(kNgmyHatiKuhowaTemplates, hasLength(17));
     expect(
       kNgmyHatiKuhowaTemplates.map((t) => t.id).toList(),
       [
+        'royal_maroon',
+        'royal_cream',
+        'royal_emerald',
+        'royal_navy',
+        'royal_plum',
+        'royal_onyx',
+        'royal_teal',
         'kuhowa_elegant_navy',
         'kuhowa_elegant_gold',
         'kuhowa_gold_ribbon',

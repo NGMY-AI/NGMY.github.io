@@ -4,6 +4,8 @@ import 'dart:typed_data';
 
 import 'package:image/image.dart' as img;
 
+import 'ngmy_hati_royal_art.dart';
+
 /// Backgrounds for the "Hati ya Kuhowesha" (Barua ya Uchumba) certificate
 /// templates (portrait 9:16) — a bold tribal-patterned frame for the
 /// "Heritage" family, and a slim double-line frame for the "Elegant" family.
@@ -33,12 +35,21 @@ enum NgmyMarriagePaperStyle {
   goldRibbon,
   goldBaroque,
   goldStar,
+  royalMaroon,
+  royalCream,
+  royalEmerald,
+  royalNavy,
+  royalPlum,
+  royalOnyx,
+  royalTeal,
 }
 
 final _paperCache = <NgmyMarriagePaperStyle, String>{};
 final _pngCache = <NgmyMarriagePaperStyle, Uint8List>{};
 
 Uint8List ngmyMarriagePaperPng(NgmyMarriagePaperStyle style) {
+  final royal = ngmyRoyalPaperFor(style);
+  if (royal != null) return royal;
   return _pngCache.putIfAbsent(style, () => img.encodePng(_renderPaper(style)));
 }
 
@@ -114,6 +125,15 @@ img.Image _renderPaper(NgmyMarriagePaperStyle style) {
     case NgmyMarriagePaperStyle.goldStar:
       // Congo country outline center mark removed — clean paper only.
       return _goldStarPaper();
+    case NgmyMarriagePaperStyle.royalMaroon:
+    case NgmyMarriagePaperStyle.royalCream:
+    case NgmyMarriagePaperStyle.royalEmerald:
+    case NgmyMarriagePaperStyle.royalNavy:
+    case NgmyMarriagePaperStyle.royalPlum:
+    case NgmyMarriagePaperStyle.royalOnyx:
+    case NgmyMarriagePaperStyle.royalTeal:
+      // Drawn by ngmyRoyalPaperFor (bigger, sharper papers); this plain paper is never used.
+      return _elegantPaper(0xFFFFFCF3, 0xFFF6EEDA, 0xFFA6843A);
   }
 }
 
@@ -735,4 +755,19 @@ img.Image _shweshwePaper(int paperTop, int paperBottom) {
   _border(im, inset, inset, _w - inset * 2, _h - inset * 2, 0xFFC45C3E, 2.0);
   _border(im, inset + 8, inset + 8, _w - (inset + 8) * 2, _h - (inset + 8) * 2, 0xFF1B2A4A, 0.8);
   return im;
+}
+
+/// The royal papers (maroon band, cream and gold, emerald, navy, plum, onyx, teal band), or null for every other paper.
+Uint8List? ngmyRoyalPaperFor(NgmyMarriagePaperStyle style) {
+  const gold = 0xFFC9A23A, bright = 0xFFD4AF37;
+  return switch (style) {
+    NgmyMarriagePaperStyle.royalMaroon => ngmyRoyalPaperPng(top: 0xFFFCF5E6, bottom: 0xFFF6EBD4, gold: gold, double: false),
+    NgmyMarriagePaperStyle.royalTeal => ngmyRoyalPaperPng(top: 0xFFF8FBF7, bottom: 0xFFEEF4EE, gold: gold, double: false),
+    NgmyMarriagePaperStyle.royalCream => ngmyRoyalPaperPng(top: 0xFFFBF6EA, bottom: 0xFFF4EBD6, gold: gold),
+    NgmyMarriagePaperStyle.royalEmerald => ngmyRoyalPaperPng(top: 0xFF0D3528, bottom: 0xFF07281D, gold: bright),
+    NgmyMarriagePaperStyle.royalNavy => ngmyRoyalPaperPng(top: 0xFF121F44, bottom: 0xFF0A1530, gold: bright),
+    NgmyMarriagePaperStyle.royalPlum => ngmyRoyalPaperPng(top: 0xFF2E1038, bottom: 0xFF20092A, gold: bright),
+    NgmyMarriagePaperStyle.royalOnyx => ngmyRoyalPaperPng(top: 0xFF1A1917, bottom: 0xFF0D0C0B, gold: bright),
+    _ => null,
+  };
 }
