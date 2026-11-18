@@ -151,7 +151,7 @@ import 'ngmy_studio_hub.dart';
 import 'ngmy_home_glass_cards.dart';
 import 'ngmy_home_tech_frames.dart';
 import 'ngmy_hud_tech_shell.dart';
-import 'ngmy_slides_studio.dart' deferred as slides;
+import 'ngmy_slides_studio.dart' as slides;
 import 'ngmy_hub_tools_bridge.dart';
 import 'ngmy_help_center.dart';
 import 'ngmy_help_center_ui.dart' deferred as helpcenter;
@@ -239,7 +239,7 @@ import 'ngmy_app_notifications.dart';
 import 'ngmy_announcement_reads.dart';
 import 'ngmy_local_deposit_qr.dart';
 import 'ngmy_desktop_frame.dart';
-import 'ngmy_market_hub_screen.dart' deferred as markethub;
+import 'ngmy_market_hub_screen.dart' as markethub;
 import 'ngmy_message_taps.dart';
 import 'ngmy_business_card_studio.dart' show showNgmyBusinessCardStudioDialog;
 import 'ngmy_item_reminder_service.dart';
@@ -18623,12 +18623,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       applications: widget.config.civicRegistrarApplications,
     );
     _tabContentBuilders = {
-      1: () => NgmyDeferred(load: markethub.loadLibrary, build: () => markethub.NgmyMarketHubScreen(
+      1: () => markethub.NgmyMarketHubScreen(
                 userEmail: widget.user.email,
         username: widget.user.username,
         isAdmin: widget.user.isAdmin,
-      )),
-      2: () => NgmyDeferred(load: slides.loadLibrary, build: () => slides.NgmySlidesStudioScreen(
+      ),
+      2: () => slides.NgmySlidesStudioScreen(
         userEmail: widget.user.email,
         isAdmin: widget.user.isAdmin,
         bottomScrollPadding: _ngmyBottomNavScrollPadding(context),
@@ -18638,7 +18638,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         isCivicRegistryAdmin: widget.user.isCivicRegistryAdmin,
         memberState: widget.user.state,
         registrarServingState: registrarServing,
-      )),
+      ),
       3: () => NgmyHubScreen(
         user: widget.user,
         allUsers: widget.allUsers,
@@ -60785,7 +60785,6 @@ List<Future<void> Function()> ngmyAppWarmList() => [
       ...ngmyHomeTechFramesWarm(),
       ...ngmyHomeGlassCardsWarm(),
       ...ngmyStudioHubWarm(),
-      markethub.loadLibrary,
       helpcenter.loadLibrary,
       lightning.loadLibrary,
       walletui.loadLibrary,
@@ -60793,7 +60792,6 @@ List<Future<void> Function()> ngmyAppWarmList() => [
       menustudio.loadLibrary,
       bizess.loadLibrary,
       worksheets.loadLibrary,
-      slides.loadLibrary,
       fungames.loadLibrary,
       pricescan.loadLibrary,
       appbuilder.loadLibrary,

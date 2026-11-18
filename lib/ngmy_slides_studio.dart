@@ -247,17 +247,37 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
   }
 
   Future<void> _loadDecks() async {
+    // First what is kept on this phone (shown at once, no loading circle after the app restarts), then once more with
+    // the state oath paper checked online.
+    final gen = await _loadDecksFromPhone();
+    if (gen == null || !mounted || gen != _loadGen) return;
+    if (!_hasCivicRegistryAccess) return;
+    final state = _kiapoStateForUser;
+    if (state.isEmpty) return;
+    final kiapo = await NgmyHatiKiapoStore.loadForState(state);
+    if (!mounted || gen != _loadGen || kiapo == null) return;
+    // The oath paper is open right now: leave it as it is (it is checked again next time).
+    if (_activeDeck != null && ngmyIsHatiKiapoUongoziDeck(_activeDeck!.deckKind)) return;
+    setState(() {
+      _decks.removeWhere((d) => ngmyIsHatiKiapoUongoziDeck(d.deckKind));
+      if (!_isKiapoHiddenFromPresentations(state)) _decks.insert(0, kiapo);
+    });
+    _ngmySlidesShownCache[widget.userEmail] = List.of(_decks);
+  }
+
+  /// Returns the load number, or null when a newer load took over.
+  Future<int?> _loadDecksFromPhone() async {
     final gen = ++_loadGen;
     final email = widget.userEmail;
     final loaded = await NgmySlidesStorage.loadDecks(email);
     _hiddenKiapoStates = await NgmyHatiKiapoHiddenPresentations.load(email);
-    if (!mounted || gen != _loadGen) return;
+    if (!mounted || gen != _loadGen) return null;
     var decks = NgmySlidesStorage.mergeDecks(loaded, _localLockedDecksToKeep());
     if (_hasCivicRegistryAccess) {
       final state = _kiapoStateForUser;
       if (state.isNotEmpty) {
-        final kiapo = await NgmyHatiKiapoStore.loadForState(state);
-        if (!mounted || gen != _loadGen) return;
+        final kiapo = await NgmyHatiKiapoStore.loadForState(state, cloud: false);
+        if (!mounted || gen != _loadGen) return null;
         if (kiapo != null) {
           decks.removeWhere((d) => ngmyIsHatiKiapoUongoziDeck(d.deckKind));
           if (!_isKiapoHiddenFromPresentations(state)) {
@@ -281,6 +301,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     });
     _ngmySlidesShownCache[email] = List.of(decks);
     if (assignedCodes || decks.length > loaded.length) unawaited(_persistDecks());
+    return gen;
   }
 
   List<NgmySlideDeck> _localLockedDecksToKeep() {

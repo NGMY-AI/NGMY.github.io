@@ -158,8 +158,12 @@ class NgmyHatiKiapoStore {
     _byState = {};
     _deleted = {};
     _loaded = false;
+    _localLoaded = false;
     _cloudAt = null;
   }
+
+  /// The copy kept on this phone has been read (the database may not have been asked yet).
+  static bool _localLoaded = false;
 
   static Future<bool> _online() async => !offlineForTests && await ngmyCanReachCloud();
 
@@ -234,9 +238,11 @@ class NgmyHatiKiapoStore {
     }
   }
 
-  static Future<void> load({bool forceCloud = false}) async {
+  /// [cloud] false: only the copy kept on this phone (instant, for showing the Slides list at once after a restart).
+  static Future<void> load({bool forceCloud = false, bool cloud = true}) async {
     if (_loaded && !forceCloud) return;
-    try {
+    if (_localLoaded && !forceCloud && !cloud) return;
+    if (!_localLoaded || forceCloud) try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_kNgmyHatiKiapoPrefsKey);
       if (raw != null && raw.trim().isNotEmpty) {
@@ -258,6 +264,8 @@ class NgmyHatiKiapoStore {
     } catch (e) {
       debugPrint('[kiapo] local load: $e');
     }
+    _localLoaded = true;
+    if (!cloud) return;
     if (!offlineForTests && (forceCloud || await ngmyCanReachCloud())) {
       try {
         await _pullCloud();
@@ -281,11 +289,11 @@ class NgmyHatiKiapoStore {
     }
   }
 
-  static Future<NgmySlideDeck?> loadForState(String state) async {
-    await load();
+  static Future<NgmySlideDeck?> loadForState(String state, {bool cloud = true}) async {
+    await load(cloud: cloud);
     // Look at the database again at least every minute, so a paper the admin deleted disappears from every phone soon.
     final last = _cloudAt;
-    if (last == null || DateTime.now().difference(last) > const Duration(minutes: 1)) {
+    if (cloud && (last == null || DateTime.now().difference(last) > const Duration(minutes: 1))) {
       try {
         if (await _online()) await _pullCloud();
       } catch (_) {}

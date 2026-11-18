@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'ngmy_marriage_markers.dart';
+import 'ngmy_hati_exact_fit.dart';
 import 'ngmy_hati_photo_art.dart';
 import 'ngmy_hati_pins.dart';
 import 'ngmy_hati_royal_art.dart';
@@ -1997,7 +1998,26 @@ class _ExactSpec {
   /// The words under the footer with {st} for the state; empty when the footer keeps the design's own words.
   final String stateText;
 
-  double get aspect => width / height;
+  /// How the picture sits on an A4 page (the designs of the 2 x 2 picture); null: the picture is the page as measured.
+  NgmyHatiExactFit? get fit => kNgmyHatiExactFit[art];
+
+  /// The page in pixels (the A4 page for a fitted design).
+  double get pageW => fit?.width.toDouble() ?? width;
+  double get pageH => fit?.height.toDouble() ?? height;
+
+  /// A spot measured on the design (its own numbers below) on the page.
+  double mx(double x) => x - (fit?.dx ?? 0);
+  double my(double y) {
+    final f = fit;
+    if (f == null) return y;
+    final r = (y - f.dy) / 4, rows = f.rows;
+    if (r <= 0) return rows.first + r * 4;
+    final i = r.floor();
+    if (i >= rows.length - 1) return rows.last + (r - rows.length + 1) * 4;
+    return rows[i] + (rows[i + 1] - rows[i]) * (r - i);
+  }
+
+  double get aspect => pageW / pageH;
 }
 
 // The two full-page A4 designs.
@@ -2379,10 +2399,10 @@ double? ngmyHatiPaperAspect(String templateId) {
   final c = spec?.couple;
   if (spec == null || c == null) return null;
   return (
-    x: c.$1 / spec.width,
-    y: c.$2 / spec.height,
-    w: (c.$3 - c.$1) / spec.width,
-    h: (c.$4 - c.$2) / spec.height,
+    x: spec.mx(c.$1) / spec.pageW,
+    y: spec.my(c.$2) / spec.pageH,
+    w: (c.$3 - c.$1) / spec.pageW,
+    h: (spec.my(c.$4) - spec.my(c.$2)) / spec.pageH,
     asset: 'assets/hati/${spec.art}_couple.jpg',
     art: spec.art,
   );
@@ -2399,17 +2419,23 @@ List<NgmySlideElement> _layoutExact(
   String state = '',
   int witnessRows = 3,
 }) {
-  double fx(double px) => px / s.width;
-  double fy(double px) => px / s.height;
-  NgmySlideElement at(NgmySlideElement e, _Px b) => e
-    ..x = fx(b.$1)
-    ..y = fy(b.$2)
-    ..w = fx(b.$3 - b.$1)
-    ..h = fy(b.$4 - b.$2);
+  double fx(double px) => px / s.pageW;
+  double fy(double px) => px / s.pageH;
+  // A box measured on the design, on the page. On a design made A4 tall a box keeps its height around its moved
+  // middle (words stay their size); [grow] boxes (the paragraph) take all the room their rows got.
+  NgmySlideElement at(NgmySlideElement e, _Px b, {bool grow = false}) {
+    final top = grow ? s.my(b.$2) : s.my((b.$2 + b.$4) / 2) - (b.$4 - b.$2) / 2;
+    final bottom = grow ? s.my(b.$4) : top + (b.$4 - b.$2);
+    return e
+      ..x = fx(s.mx(b.$1))
+      ..y = fy(top)
+      ..w = fx(b.$3 - b.$1)
+      ..h = fy(bottom - top);
+  }
   // Font sizes are in the slides' 960-wide units; the design's sizes are in its own pixels.
-  final u = 960 / s.width;
+  final u = 960 / s.pageW;
   // A field's box height (the same rule as every Hati field) for a size in the design's pixels, in its pixels.
-  double boxPx(double font) => _hBlankH(font * u) * s.height;
+  double boxPx(double font) => _hBlankH(font * u) * s.pageH;
   // The size (design pixels) at which [text] fits on one line [width] pixels wide.
   double fit(String text, double width, double font) => math.min(font, width / math.max(1, text.length * 0.48));
   final out = <NgmySlideElement>[];
@@ -2438,14 +2464,17 @@ List<NgmySlideElement> _layoutExact(
 
   // The opening paragraph, in the design's own letters (the long Malipo paragraph a little smaller).
   // The paragraph always fits its frame: the size at which all its words fill the frame, if smaller than the design's.
-  final pw = s.paragraph.$3 - s.paragraph.$1, ph = s.paragraph.$4 - s.paragraph.$2;
-  final paraPx = math.min(s.paraFont, math.sqrt(pw * ph / (introText.length * 0.53 * 1.42)));
+  // On a design made A4 tall the frame is taller, so the words may be up to a third bigger to fill it.
+  final pw = s.paragraph.$3 - s.paragraph.$1, ph = s.my(s.paragraph.$4) - s.my(s.paragraph.$2);
+  final grown = math.min(1.33, math.sqrt(ph / (s.paragraph.$4 - s.paragraph.$2)));
+  final paraPx = math.min(s.paraFont * grown, math.sqrt(pw * ph / (introText.length * 0.53 * 1.42)));
   out.add(at(
       _hParagraphField('utangulizi', 0, 0, fx(s.paragraph.$3 - s.paragraph.$1), 0, ink: s.paraInk, fontSize: paraPx * u, startText: introText)
         ..fontWeight = FontWeight.w700
         ..align = s.paraAlign
         ..textFx = s.paraFx,
-      s.paragraph));
+      s.paragraph,
+      grow: true));
 
   // NIMETOWA (or the document's own word) on the plaque.
   final sec = s.section;
@@ -3290,6 +3319,32 @@ bool ngmyHatiRestorePicturePaper(NgmySlideDeck deck) {
   if (tpl == null || spec == null) return false;
   final stand = ngmyMarriagePaperDataUrl(tpl.paperStyle);
   var changed = false;
+  // A document made before the design was made A4 tall (its page still the old, nearly square shape): every word,
+  // field and signature moves to the same spot of the A4 page and the paper is swapped for the A4 one.
+  final oldAspect = spec.width / spec.height;
+  if (spec.fit != null && deck.paperAspect != null && (deck.paperAspect! - oldAspect).abs() < 0.002) {
+    for (final slide in deck.slides) {
+      for (final e in slide.elements) {
+        final f = e.fileName;
+        if (f == '${kMarriageLocked}_bg') {
+          e.imageRef = null; // the A4 paper is put in just below
+          continue;
+        }
+        if (f == '${kMarriageLocked}_watermark') continue;
+        final grow = f.startsWith('${kMarriageFieldPrefix}utangulizi');
+        final y0 = e.y * spec.height, y1 = (e.y + e.h) * spec.height;
+        final top = grow ? spec.my(y0) : spec.my((y0 + y1) / 2) - (y1 - y0) / 2;
+        final bottom = grow ? spec.my(y1) : top + (y1 - y0);
+        e
+          ..x = spec.mx(e.x * spec.width) / spec.pageW
+          ..w = e.w * spec.width / spec.pageW
+          ..y = top / spec.pageH
+          ..h = (bottom - top) / spec.pageH;
+      }
+    }
+    deck.paperAspect = spec.aspect;
+    changed = true;
+  }
   for (final slide in deck.slides) {
     final ownTitle = slide.elements.any((e) => e.fileName == '${kMarriageLocked}_title');
     final url = ngmyHatiPhotoArtUrl(ownTitle ? '${spec.art}_notitle' : spec.art);

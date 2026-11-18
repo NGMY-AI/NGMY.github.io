@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:ngmy/ngmy_hati_couple_ai.dart';
+import 'package:ngmy/ngmy_hati_exact_fit.dart';
 import 'package:ngmy/ngmy_hati_kuhowa_templates.dart';
 import 'package:ngmy/ngmy_hati_photo_art.dart';
 import 'package:ngmy/ngmy_marriage_agreement_templates.dart';
@@ -19,9 +20,15 @@ void main() {
     await ngmyHatiPhotoArtLoad();
     for (final t in [...kNgmyHatiKuhowaExactTemplates, ...kNgmyHatiKuhowaPhotoTemplates]) {
       final kuhowa = ngmyBuildHatiKuhowaDeck(templateId: t.id, state: 'Arizona');
-      final shape = t.id.startsWith('photo') ? 1198 / 1312 : 1054 / 1492;
-      expect(kuhowa.paperAspect, closeTo(shape, 0.001), reason: t.id);
-      expect(kuhowa.aspectValue, closeTo(shape, 0.001));
+      // Every paper is a full A4 page, like the older papers (the owner prints them).
+      final shape = t.id.startsWith('photo') ? 1 / 1.41421 : 1054 / 1492;
+      expect(kuhowa.paperAspect, closeTo(shape, 0.004), reason: t.id);
+      expect(kuhowa.aspectValue, closeTo(shape, 0.004));
+      // Every word and field is on the page.
+      for (final e in kuhowa.slides.first.elements) {
+        if (e.fileName == '${kMarriageLocked}_watermark') continue;
+        expect(e.y >= -0.001 && e.y + e.h <= 1.001, isTrue, reason: '${t.id} ${e.fileName} ${e.y} ${e.h}');
+      }
       final bg = kuhowa.slides.first.elements.first;
       expect(bg.fileName, '${kMarriageLocked}_bg');
       final art = t.id.startsWith('photo') ? 'exact_${t.id.substring(6)}' : t.id;
@@ -68,5 +75,28 @@ void main() {
       expect(bg.imageRef, picture, reason: '$id: the picture is back');
       expect(ngmyHatiRestorePicturePaper(deck), isFalse);
     }
+  });
+
+  test('a document made on the old, nearly square page becomes A4, with every field on the same spot of the design', () async {
+    await ngmyHatiPhotoArtLoad();
+    final deck = ngmyBuildHatiKuhowaDeck(templateId: 'photo_sunset', state: 'Arizona');
+    final now = {for (final e in deck.slides.first.elements) e.fileName: (e.x, e.y, e.w, e.h)};
+    // The same document as an earlier version saved it: the old page shape, the old paper, the fields where the old
+    // page had them. Item 1 sat at its row of the old page, the date at its spot.
+    deck.paperAspect = 1198 / 1312;
+    final bg = deck.slides.first.elements.first..imageRef = 'data:image/jpeg;base64,b2xk';
+    final item = deck.slides.first.elements.firstWhere((e) => (e.fileName).startsWith('${kMarriageFieldPrefix}mahari_1'));
+    final date = deck.slides.first.elements.firstWhere((e) => (e.fileName).startsWith('${kMarriageFieldPrefix}tarehe'));
+    final hPx = item.h * kNgmyHatiExactFit['exact_sunset']!.height;
+    item.y = (722 - hPx / 2) / 1312;
+    item.h = hPx / 1312;
+    date.y = 270 / 1312;
+    expect(ngmyHatiRestorePicturePaper(deck), isTrue);
+    expect(deck.paperAspect, closeTo(1 / 1.41421, 0.004));
+    expect(bg.imageRef, ngmyHatiPhotoArtUrl('exact_sunset'), reason: 'the A4 paper');
+    final want = now[item.fileName]!;
+    expect(item.y + item.h / 2, closeTo(want.$2 + want.$4 / 2, 0.004), reason: 'item 1 is on its row of the A4 page');
+    expect(date.y, lessThan(0.2));
+    expect(ngmyHatiRestorePicturePaper(deck), isFalse, reason: 'done once');
   });
 }
