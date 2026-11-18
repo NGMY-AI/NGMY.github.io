@@ -10,8 +10,9 @@ import 'package:ngmy/ngmy_studio_kit.dart';
 Finder _view() => find.byWidgetPredicate((w) => w is CustomPaint && w.painter is Scene3DPainter);
 
 Future<void> _frames(WidgetTester t, [int n = 25]) async {
-  for (var i = 0; i < n; i++) {
-    await t.pump(const Duration(milliseconds: 100));
+  // Real phone frames (the camera moves a little each frame): n tenths of a second.
+  for (var i = 0; i < n * 6; i++) {
+    await t.pump(const Duration(milliseconds: 16));
   }
 }
 

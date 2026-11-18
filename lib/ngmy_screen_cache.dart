@@ -30,10 +30,21 @@ final Paint _paint = Paint()
   ..filterQuality = FilterQuality.high
   ..isAntiAlias = true;
 
+/// True while a 3D room is making its own kept picture of a screen: the ad is then drawn straight into that picture
+/// (making a second picture of it first, and copying it in, doubled the work and made the phone stop again and again).
+bool ngmyMakingScreenPicture = false;
+
 /// Draws [draw] into the [size] box at the top left of [c], from a picture made [fps] times a second at [time] and
 /// kept under [key]. The picture is made sharp enough to zoom in on ([sharp] times the size, times the phone pixels).
 void ngmyDrawCachedScreen(Canvas c, Object key, Size size, double time, void Function(Canvas c) draw, {double fps = 15, double sharp = 4}) {
   if (size.width <= 0 || size.height <= 0) return;
+  if (ngmyMakingScreenPicture) {
+    c.save();
+    c.clipRect(Offset.zero & size);
+    draw(c);
+    c.restore();
+    return;
+  }
   final bucket = (time * fps).floor();
   var shot = _shots.remove(key);
   if (shot == null || shot.bucket != bucket) {

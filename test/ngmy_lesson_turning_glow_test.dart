@@ -7,8 +7,9 @@ import 'package:ngmy/ngmy_construction_plumbing.dart';
 Scene3DView _view(WidgetTester t) => t.widget<Scene3DView>(find.byType(Scene3DView).first);
 
 Future<void> _settle(WidgetTester t) async {
-  for (var i = 0; i < 8; i++) {
-    await t.pump(const Duration(milliseconds: 300));
+  // Real phone frames (the camera moves a little each frame), 2.4 seconds in all.
+  for (var i = 0; i < 150; i++) {
+    await t.pump(const Duration(milliseconds: 16));
   }
 }
 

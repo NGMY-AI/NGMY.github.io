@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'ngmy_screen_cache.dart' show ngmyMakingScreenPicture;
 
 // ═════════════════════════════════════════════════════════════════════════════
 // A small 3D engine: solid shapes with real lighting that you can turn, zoom and tap.
@@ -938,7 +939,7 @@ class Scene3DPainter extends CustomPainter {
           // ones, less for the small far ones) and reused in between, so a room full of TVs stays smooth.
           final big = area >= fullAt[0];
           final key = isStatic ? sq : 'moving:${si - nStatic}:${sq.width}x${sq.height}';
-          final img = _screenImage(key, sq, time, fps: big ? 20 : (isStatic ? 5 : 12), scale: _screenScale(sq, area, w), budget: budget);
+          final img = _screenImage(key, sq, time, fps: big ? 12 : (isStatic ? 5 : 10), scale: _screenScale(sq, area, w), budget: budget);
           if (img != null) {
             _drawImageQuad(c, img, sq, pts);
           } else {
@@ -965,7 +966,7 @@ class Scene3DPainter extends CustomPainter {
       final cellKey = isStatic ? sq : 'moving:${si - nStatic}:${sq.width}x${sq.height}';
       drawn.add(_Face(path, Colors.transparent, mid.z - sq.bias, sq.id, false, false, (c) {
         // Up close the screen is cut into patches; they all show parts of one picture of the ad (not the ad drawn again for each patch).
-        final img = _screenImage(cellKey, sq, time, fps: 20, scale: _screenScale(sq, double.infinity, w), budget: budget);
+        final img = _screenImage(cellKey, sq, time, fps: 12, scale: _screenScale(sq, double.infinity, w), budget: budget);
         if (img != null) _drawImageCells(c, img, sq, cells, nx, ny);
       }, sq.order, sq.group));
     }
@@ -1123,8 +1124,14 @@ double _screenScale(ScreenQuad sq, double area, double viewW) {
     step = s;
     if (s >= want) break;
   }
-  return math.min(step, math.max(1.0, cap));
+  // A picture holds at most about a million pixels (still sharper than the phone shows it): bigger ones took so long to
+  // make that the phone stopped a moment each time, over and over, like a thump.
+  final pixelCap = math.sqrt(_kPicturePixels / (sq.width * sq.height));
+  return math.min(math.min(step, math.max(1.0, cap)), math.max(1.0, pixelCap));
 }
+
+/// The most pixels one screen picture may hold.
+const double _kPicturePixels = 1100000;
 
 /// The pictures made fresh in one frame may hold at most this many pixels together (the first one always may).
 const int _kFramePixels = 2400000;
@@ -1148,7 +1155,12 @@ ui.Image? _screenImage(Object key, ScreenQuad sq, double time, {required double 
     final c = Canvas(rec);
     c.scale(scale);
     c.clipRect(Rect.fromLTWH(0, 0, sq.width, sq.height));
-    sq.paint(c, Size(sq.width, sq.height), time);
+    ngmyMakingScreenPicture = true;
+    try {
+      sq.paint(c, Size(sq.width, sq.height), time);
+    } finally {
+      ngmyMakingScreenPicture = false;
+    }
     final pic = rec.endRecording();
     final img = pic.toImageSync(math.max(1, (sq.width * scale).round()), math.max(1, (sq.height * scale).round()));
     pic.dispose();
@@ -1258,7 +1270,8 @@ class _Scene3DViewState extends State<Scene3DView> with SingleTickerProviderStat
     _ticker = createTicker((d) {
       final dt = (d - _last).inMicroseconds / 1e6;
       _last = d;
-      widget.cam.tick(dt.clamp(0.0, 0.1));
+      // After a slow frame the camera carries on gently from where it was (a big step would look like a jolt).
+      widget.cam.tick(dt.clamp(0.0, 1 / 30));
       _time.value = d.inMicroseconds / 1e6;
     })..start();
   }
