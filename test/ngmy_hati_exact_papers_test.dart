@@ -5,6 +5,8 @@ import 'package:image/image.dart' as img;
 import 'package:ngmy/ngmy_hati_couple_ai.dart';
 import 'package:ngmy/ngmy_hati_kuhowa_templates.dart';
 import 'package:ngmy/ngmy_hati_photo_art.dart';
+import 'package:ngmy/ngmy_marriage_agreement_templates.dart';
+import 'package:ngmy/ngmy_marriage_paper_art.dart';
 import 'package:ngmy/ngmy_marriage_markers.dart';
 
 // The owner's own full-page designs, used exactly as drawn: the page keeps the design's own shape, the design's
@@ -50,5 +52,21 @@ void main() {
     final outside = page.getPixel(900, 1000);
     final before = img.decodeJpg(base64Decode(paperUrl.substring(paperUrl.indexOf(',') + 1)))!.getPixel(900, 1000);
     expect((outside.r - before.r).abs() < 20 && (outside.g - before.g).abs() < 20, isTrue, reason: 'the rest of the paper is untouched');
+  });
+
+  test('opening a document keeps the design picture, and puts it back on one that lost it', () async {
+    await ngmyHatiPhotoArtLoad();
+    for (final id in ['photo_curtain', 'photo_village', 'exact_kijiji']) {
+      final deck = ngmyBuildHatiKuhowaDeck(templateId: id, state: 'Arizona');
+      final bg = deck.slides.first.elements.first;
+      final picture = bg.imageRef;
+      expect(ngmyRefreshMarriageDeckPaperBackground(deck), isFalse, reason: '$id: opening must not swap the picture');
+      expect(bg.imageRef, picture);
+      // A document an earlier version broke: the plain stand-in paper instead of the picture.
+      bg.imageRef = ngmyMarriagePaperDataUrl(ngmyHatiKuhowaTemplateById(id)!.paperStyle);
+      expect(ngmyHatiRestorePicturePaper(deck), isTrue, reason: id);
+      expect(bg.imageRef, picture, reason: '$id: the picture is back');
+      expect(ngmyHatiRestorePicturePaper(deck), isFalse);
+    }
   });
 }

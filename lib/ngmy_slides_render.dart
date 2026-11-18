@@ -328,10 +328,22 @@ class NgmySlideElementView extends StatelessWidget {
       );
     }
 
-    return Padding(
-      padding: pad,
-      child: Align(alignment: align, child: child),
-    );
+    if (editing) {
+      return Padding(padding: pad, child: Align(alignment: align, child: child));
+    }
+    // A box only tall enough for one line (a name, a date, a list item, a label) always keeps its words on that one
+    // line: they shrink to fit instead of wrapping onto the next line and over the words below (on a small phone the
+    // letters come out a little wider than the box was measured for).
+    final shown = child;
+    return LayoutBuilder(builder: (context, c) {
+      final lineH = element.fontSize * scale * 1.35;
+      final oneLine = c.maxHeight.isFinite && c.maxHeight < lineH * 1.9 && !element.text.contains('\n');
+      if (!oneLine) return Padding(padding: pad, child: Align(alignment: align, child: shown));
+      return Padding(
+        padding: EdgeInsets.symmetric(horizontal: 2 * scale),
+        child: Align(alignment: align, child: FittedBox(fit: BoxFit.scaleDown, alignment: align, child: shown)),
+      );
+    });
   }
 
   Alignment _alignToAlignment(TextAlign align) {

@@ -627,8 +627,12 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     }
     final alreadySaved = _decks.any((d) => d.id == openDeck.id);
     final working = openDeck.copy();
+    // The owner's own designs: their picture is read first, and put back if an earlier version swapped it out.
+    if (working.isLockedTemplateDoc) await ngmyHatiPhotoArtLoad();
+    if (!mounted) return;
+    final pictureBack = working.isLockedTemplateDoc && ngmyHatiRestorePicturePaper(working);
     final paperUpdated =
-        working.isLockedTemplateDoc && ngmyRefreshMarriageDeckPaperBackground(working);
+        (working.isLockedTemplateDoc && ngmyRefreshMarriageDeckPaperBackground(working)) || pictureBack;
     setState(() {
       _activeDeck = working;
       _slideIndex = 0;

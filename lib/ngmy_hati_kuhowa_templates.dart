@@ -2352,6 +2352,9 @@ const _ExactSpec _kExactRoses = _ExactSpec(
   fieldFx: '',
 );
 
+/// True when this paper is one of the owner's own designs (a picture kept in the document).
+bool ngmyHatiPaperIsPicture(NgmyMarriagePaperStyle s) => _exactSpecFor(s) != null;
+
 _ExactSpec? _exactSpecFor(NgmyMarriagePaperStyle s) => switch (s) {
       NgmyMarriagePaperStyle.exactKijiji => _kExactKijiji,
       NgmyMarriagePaperStyle.exactKifalme => _kExactKifalme,
@@ -3274,4 +3277,41 @@ Future<void> launchNgmyHatiMalipoAwamu({
   final state = (reuseState ?? '').trim().isNotEmpty ? reuseState!.trim() : await _pickNgmyHatiState(context);
   if (state == null || !context.mounted) return;
   openDraftEditor(ngmyBuildHatiMalipoAwamuDeck(templateId: templateId, state: state));
+}
+
+/// Puts the design's own picture back on a Hati document made from one of the owner's designs whose paper was swapped
+/// for the plain stand-in (an earlier version did that when a document was opened). A couple picture the AI painted in
+/// is kept. The pictures must be read first ([ngmyHatiPhotoArtLoad]). Returns true when something changed.
+bool ngmyHatiRestorePicturePaper(NgmySlideDeck deck) {
+  final id = ngmyHatiPaperIdOfDeckTheme(deck.themeId);
+  if (id == null) return false;
+  final tpl = ngmyHatiKuhowaTemplateById(id);
+  final spec = tpl == null ? null : _exactSpecFor(tpl.paperStyle);
+  if (tpl == null || spec == null) return false;
+  final stand = ngmyMarriagePaperDataUrl(tpl.paperStyle);
+  var changed = false;
+  for (final slide in deck.slides) {
+    final ownTitle = slide.elements.any((e) => e.fileName == '${kMarriageLocked}_title');
+    final url = ngmyHatiPhotoArtUrl(ownTitle ? '${spec.art}_notitle' : spec.art);
+    if (url == null) continue;
+    for (final e in slide.elements) {
+      if (e.fileName == '${kMarriageLocked}_bg' && (e.imageRef == null || e.imageRef == stand || !e.imageRef!.startsWith('data:image/jpeg'))) {
+        e.imageRef = url;
+        changed = true;
+      }
+    }
+    if (deck.paperAspect == null) {
+      deck.paperAspect = spec.aspect;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+/// The paper id inside a Hati document's theme (hati_kuhowa_<id>, hati_kuhoweya_<id>, hati_malipo_awamu_<id>).
+String? ngmyHatiPaperIdOfDeckTheme(String themeId) {
+  for (final p in const ['hati_kuhowa_', 'hati_kuhoweya_', 'hati_malipo_awamu_']) {
+    if (themeId.startsWith(p) && themeId.length > p.length) return themeId.substring(p.length);
+  }
+  return null;
 }

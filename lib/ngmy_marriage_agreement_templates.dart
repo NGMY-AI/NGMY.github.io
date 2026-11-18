@@ -1014,6 +1014,9 @@ bool ngmyRefreshMarriageDeckPaperBackground(NgmySlideDeck deck) {
     style = ngmyMarriageTemplateById(themeId.substring('marriage_'.length))?.paperStyle;
   }
   if (style == null) return false;
+  // The owner's own designs (and the AI couple picture painted into them) are pictures kept in the document: never
+  // swap them for the plain stand-in paper.
+  if (ngmyHatiPaperIsPicture(style)) return false;
   ngmyClearMarriagePaperCache();
   final url = ngmyMarriagePaperDataUrl(style);
   var changed = false;
