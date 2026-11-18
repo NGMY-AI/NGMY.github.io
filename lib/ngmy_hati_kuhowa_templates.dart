@@ -1,9 +1,12 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'ngmy_marriage_markers.dart';
 import 'ngmy_hati_photo_art.dart';
 import 'ngmy_hati_pins.dart';
 import 'ngmy_hati_royal_art.dart';
+import 'ngmy_news_paper.dart' show ngmyLoadNewsFonts;
 import 'ngmy_marriage_paper_art.dart';
 import 'ngmy_slides_marriage_agreement.dart';
 import 'ngmy_slides_models.dart';
@@ -30,6 +33,7 @@ enum NgmyHatiLayoutKind {
   fomuWazi,
   upendoOrnate,
   royal,
+  exact,
 }
 
 class NgmyHatiKuhowaTemplate {
@@ -891,6 +895,37 @@ const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaPhotoTemplates = [
   ),
 ];
 
+/// The owner's own full-page designs, exactly as drawn (A4 shaped pages). The couple at the top is the default picture;
+/// in the ⋯ menu the AI redraws it with the people's own faces.
+const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaExactTemplates = [
+  NgmyHatiKuhowaTemplate(
+    id: 'exact_kijiji',
+    name: 'Mkataba wa Ndoa — Kijiji',
+    description: 'Wanandoa · wazee na nyumba · mikuki na ngoma.',
+    paperStyle: NgmyMarriagePaperStyle.exactKijiji,
+    background: 0xFFF6E7C4,
+    ink: 0xFF2A1A10,
+    accent: 0xFF7A1B22,
+    bannerFill: 0xFF7A1B22,
+    bannerText: 0xFFF2C14E,
+    previewColors: [Color(0xFFF6E7C4), Color(0xFF7A1B22), Color(0xFFF2C14E)],
+    layoutKind: NgmyHatiLayoutKind.exact,
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'exact_kifalme',
+    name: 'Mkataba wa Ndoa — Kifalme',
+    description: 'Wanandoa · taji na bendera · mapazia ya bluu.',
+    paperStyle: NgmyMarriagePaperStyle.exactKifalme,
+    background: 0xFFF6E7C4,
+    ink: 0xFF2A1A10,
+    accent: 0xFF14244F,
+    bannerFill: 0xFF14244F,
+    bannerText: 0xFFF2C14E,
+    previewColors: [Color(0xFFF6E7C4), Color(0xFF14244F), Color(0xFFF2C14E)],
+    layoutKind: NgmyHatiLayoutKind.exact,
+  ),
+];
+
 /// Row 1: navy + gold. Row 2: Utepe + Ukanda. Row 4 (filigree + laurel) stays as-is. The royal and picture papers come
 /// last (a paper someone pins comes first instead: see ngmy_hati_pins.dart).
 /// Heritage papers stay resolvable for old saved docs but are off this picker.
@@ -903,6 +938,7 @@ const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaTemplates = [
   ...kNgmyHatiKuhowaGoldTail,
   ...kNgmyHatiKuhowaRoyalTemplates,
   ...kNgmyHatiKuhowaPhotoTemplates,
+  ...kNgmyHatiKuhowaExactTemplates,
 ];
 
 /// Newer papers kept so existing saved documents still resolve. They are
@@ -1169,6 +1205,7 @@ NgmyHatiKuhowaTemplate? ngmyHatiKuhowaTemplateById(String id, {List<NgmyHatiKuho
       : <List<NgmyHatiKuhowaTemplate>>[
           kNgmyHatiKuhowaRoyalTemplates,
           kNgmyHatiKuhowaPhotoTemplates,
+          kNgmyHatiKuhowaExactTemplates,
           kNgmyHatiKuhowaYesterdayTemplates,
           kNgmyHatiKuhowaGoldEdgeAll,
           kNgmyHatiKuhowaNewerTemplates,
@@ -1202,6 +1239,24 @@ List<NgmySlideElement> _buildPageContent(
   double titleRuleWidthRatio = 0.55,
   double titleY = 0.036,
 }) {
+  // The owner's own full-page designs, used exactly as drawn.
+  final exact = _exactSpecFor(tpl.paperStyle);
+  if (exact != null) {
+    final page = _layoutExact(
+      exact,
+      title: title,
+      introText: introText,
+      sectionLabel: sectionLabel,
+      sectionLabelEditable: sectionLabelEditable,
+      mahariItems: mahariItems,
+      sectionSubtitle: sectionSubtitle,
+      state: state,
+      witnessRows: witnessRows,
+    );
+    // Not read yet (should not happen: the picture is read before a paper is picked): a plain paper in its colours.
+    if (!page.first.fileName.endsWith('_bg')) page.insert(0, _hBgImage(ngmyMarriagePaperDataUrl(tpl.paperStyle)));
+    return page;
+  }
   final photo = _kHatiPhotoAssets[tpl.paperStyle];
   final bgUrl = (photo == null ? null : ngmyHatiPhotoArtUrl(photo)) ?? ngmyMarriagePaperDataUrl(tpl.paperStyle);
   final royal = _royalLookFor(tpl.paperStyle);
@@ -1303,6 +1358,7 @@ List<NgmySlideElement> _layoutSingle(
       headingY = 0.040;
     case NgmyHatiLayoutKind.classic:
     case NgmyHatiLayoutKind.royal:
+    case NgmyHatiLayoutKind.exact:
       break;
   }
 
@@ -1850,6 +1906,295 @@ List<NgmySlideElement> _layoutRoyal(
   return out;
 }
 
+// ── Exact papers ───────────────────────────────────────────────────────────
+// The owner's own full-page designs, used exactly as drawn (assets/hati/exact_*.jpg, made by tool/hati_photo/exact.dart).
+// Only the words that change were wiped off the picture; the fill-in fields are laid exactly where those words were,
+// measured in the picture's own pixels. The labels, lines, coins and frames stay in the picture.
+
+/// A box in the design's own pixels: left, top, right, bottom.
+typedef _Px = (double, double, double, double);
+
+class _ExactSpec {
+  const _ExactSpec({
+    required this.art,
+    required this.couple,
+    required this.title,
+    required this.tareheLabel,
+    required this.tareheDate,
+    required this.tareheColor,
+    required this.tareheFx,
+    required this.tareheFont,
+    required this.paragraph,
+    required this.section,
+    required this.sectionFont,
+    required this.subtitle,
+    required this.subtitleColor,
+    required this.subtitleFx,
+    required this.itemX,
+    required this.itemRight,
+    required this.itemRight1,
+    required this.itemCenters,
+    required this.coinX,
+    required this.akunaText,
+    required this.akunaBox,
+    required this.akunaColor,
+    required this.akunaFont,
+    required this.witnessName,
+    required this.witnessSign,
+    required this.mwName,
+    required this.mwSign,
+    required this.state,
+  });
+
+  /// The picture (assets/hati/<art>.jpg; <art>_notitle.jpg has the title wiped; <art>_couple.jpg is the couple).
+  final String art;
+  final _Px couple, title, tareheLabel, tareheDate, paragraph, section, subtitle, akunaText, akunaBox, mwName, mwSign, state;
+  final int tareheColor, subtitleColor, akunaColor;
+
+  /// The dark brown of the written words, and the size of both designs in pixels.
+  int get ink => 0xFF2A1A10;
+  double get width => 1054;
+  double get height => 1492;
+  final String tareheFx, subtitleFx;
+  final double tareheFont, sectionFont, akunaFont;
+  final double itemX, itemRight, itemRight1, coinX;
+  final List<double> itemCenters;
+
+  /// For each side (mke, mume), the name line and the signature line of each witness row.
+  final Map<String, List<_Px>> witnessName, witnessSign;
+
+  double get aspect => width / height;
+}
+
+const _ExactSpec _kExactKijiji = _ExactSpec(
+  art: 'exact_kijiji',
+  couple: (0, 0, 480, 560),
+  title: (470, 108, 842, 255),
+  tareheLabel: (514, 349, 640, 383),
+  tareheDate: (644, 349, 800, 383),
+  tareheColor: 0xFFFBF1DC,
+  tareheFx: 'serif',
+  tareheFont: 24,
+  paragraph: (128, 517, 918, 690),
+  section: (337, 700, 722, 743),
+  sectionFont: 38,
+  subtitle: (132, 748, 476, 783),
+  subtitleColor: 0xFFFBEFD3,
+  subtitleFx: 'serif',
+  itemX: 190,
+  itemRight: 695,
+  itemRight1: 690,
+  itemCenters: [803, 840, 879, 916],
+  coinX: 136,
+  akunaText: (744, 838, 902, 878),
+  akunaBox: (906, 842, 946, 874),
+  akunaColor: 0xFFF7D046,
+  akunaFont: 20,
+  witnessName: {
+    'mke': [(275, 1052, 374, 1078), (275, 1092, 374, 1118), (275, 1131, 374, 1157)],
+    'mume': [(705, 1052, 800, 1078), (705, 1092, 800, 1118), (705, 1131, 800, 1157)],
+  },
+  witnessSign: {
+    'mke': [(436, 1046, 499, 1078), (436, 1086, 499, 1118), (436, 1125, 499, 1157)],
+    'mume': [(863, 1046, 926, 1078), (863, 1086, 926, 1118), (863, 1125, 926, 1157)],
+  },
+  mwName: (252, 1262, 557, 1291),
+  mwSign: (661, 1250, 859, 1292),
+  state: (366, 1395, 704, 1432),
+);
+
+const _ExactSpec _kExactKifalme = _ExactSpec(
+  art: 'exact_kifalme',
+  couple: (0, 0, 495, 440),
+  title: (470, 305, 950, 382),
+  tareheLabel: (560, 386, 684, 419),
+  tareheDate: (688, 386, 860, 419),
+  tareheColor: 0xFFF2C14E,
+  tareheFx: 'goldserif',
+  tareheFont: 23,
+  paragraph: (117, 522, 937, 694),
+  section: (358, 714, 701, 756),
+  sectionFont: 37,
+  subtitle: (129, 761, 440, 793),
+  subtitleColor: 0xFFF8F1DE,
+  subtitleFx: '',
+  itemX: 182,
+  itemRight: 742,
+  itemRight1: 745,
+  itemCenters: [819.5, 857.5, 892.5, 927],
+  coinX: 128,
+  akunaText: (800, 803, 922, 834),
+  akunaBox: (756, 801, 793, 836),
+  akunaColor: 0xFFF6CF4A,
+  akunaFont: 17,
+  witnessName: {
+    'mke': [(260, 1058, 362, 1083), (260, 1099, 362, 1124), (260, 1141, 362, 1166)],
+    'mume': [(697, 1058, 799, 1083), (697, 1099, 799, 1124), (697, 1141, 799, 1166)],
+  },
+  witnessSign: {
+    'mke': [(423, 1050, 499, 1083), (423, 1091, 499, 1124), (423, 1133, 499, 1166)],
+    'mume': [(861, 1050, 936, 1083), (861, 1091, 936, 1124), (861, 1133, 936, 1166)],
+  },
+  mwName: (228, 1258, 568, 1287),
+  mwSign: (680, 1246, 883, 1288),
+  state: (336, 1395, 722, 1432),
+);
+
+_ExactSpec? _exactSpecFor(NgmyMarriagePaperStyle s) => switch (s) {
+      NgmyMarriagePaperStyle.exactKijiji => _kExactKijiji,
+      NgmyMarriagePaperStyle.exactKifalme => _kExactKifalme,
+      _ => null,
+    };
+
+/// The page shape of an exact paper (width / height), or null for every other paper.
+double? ngmyHatiPaperAspect(String templateId) {
+  final t = ngmyHatiKuhowaTemplateById(templateId, templates: [...kNgmyHatiKuhowaTemplates, ...kNgmyHatiMalipoAwamuExtraTemplates]);
+  return t == null ? null : _exactSpecFor(t.paperStyle)?.aspect;
+}
+
+/// The couple picture of an exact paper (its box in the page, as fractions, and the picture), or null for every other
+/// paper. The AI redraws this picture with the people's own faces.
+({double x, double y, double w, double h, String asset, String art})? ngmyHatiCoupleArea(String templateId) {
+  final t = ngmyHatiKuhowaTemplateById(templateId);
+  final spec = t == null ? null : _exactSpecFor(t.paperStyle);
+  if (spec == null) return null;
+  final c = spec.couple;
+  return (
+    x: c.$1 / spec.width,
+    y: c.$2 / spec.height,
+    w: (c.$3 - c.$1) / spec.width,
+    h: (c.$4 - c.$2) / spec.height,
+    asset: 'assets/hati/${spec.art}_couple.jpg',
+    art: spec.art,
+  );
+}
+
+List<NgmySlideElement> _layoutExact(
+  _ExactSpec s, {
+  required String title,
+  required String introText,
+  required String sectionLabel,
+  required bool sectionLabelEditable,
+  required List<String> mahariItems,
+  required String sectionSubtitle,
+  String state = '',
+  int witnessRows = 3,
+}) {
+  double fx(double px) => px / s.width;
+  double fy(double px) => px / s.height;
+  NgmySlideElement at(NgmySlideElement e, _Px b) => e
+    ..x = fx(b.$1)
+    ..y = fy(b.$2)
+    ..w = fx(b.$3 - b.$1)
+    ..h = fy(b.$4 - b.$2);
+  // Font sizes are in the slides' 960-wide units; the design is 1054 pixels wide.
+  const u = 960 / 1054;
+  final out = <NgmySlideElement>[];
+  final keepTitle = title == 'HATI YA KUHOWA';
+  final bgUrl = ngmyHatiPhotoArtUrl(keepTitle ? s.art : '${s.art}_notitle');
+  if (bgUrl != null) {
+    out.add(_hBgImage(bgUrl));
+  }
+  out.add(_hWatermark(0xFFFFFFFF));
+  if (!keepTitle) {
+    // As big as fits the design's title space: on two lines where the design has two (the village), else on one.
+    final bw = s.title.$3 - s.title.$1, bh = s.title.$4 - s.title.$2;
+    final lines = bh > 110 ? 2 : 1;
+    final words = title.split(' ');
+    final longest = lines == 1 ? title.length : words.fold<int>(0, (m, w) => math.max(m, w.length)) + (words.length > 3 ? 8 : 3);
+    final px = math.min(bh / (lines * 1.3), bw / (longest * 0.66));
+    out.add(at(
+        _hLockedText(title, x: 0, y: 0, w: 0, h: 0, fontSize: px * u, fontWeight: FontWeight.w900, align: TextAlign.center, color: 0xFFF2C14E, tag: 'title')
+          ..textFx = 'goldserif',
+        s.title));
+  }
+
+  // TAREHE and the date.
+  out.add(at(_hLockedText('TAREHE:', x: 0, y: 0, w: 0, h: 0, fontSize: s.tareheFont * u, fontWeight: FontWeight.w800, align: TextAlign.right, color: s.tareheColor, tag: 'tarehe_lbl')..textFx = s.tareheFx, s.tareheLabel));
+  out.add(at(_hBlank('tarehe', 0, 0, fx(s.tareheDate.$3 - s.tareheDate.$1), ink: s.tareheColor, fontSize: s.tareheFont * u, startText: ngmyHatiKuhowaTodayDate(), align: TextAlign.left)
+    ..fontStyle = FontStyle.normal
+    ..textFx = s.tareheFx, s.tareheDate));
+
+  // The opening paragraph, centred like the design.
+  out.add(at(_hParagraphField('utangulizi', 0, 0, fx(s.paragraph.$3 - s.paragraph.$1), 0, ink: s.ink, fontSize: (introText.length > 500 ? 15.5 : 20) * u, startText: introText)
+    ..fontWeight = FontWeight.w700
+    ..align = TextAlign.center
+    ..textFx = 'serif', s.paragraph));
+
+  // NIMETOWA (or the document's own word) on the plaque.
+  final sec = s.section;
+  final secY = sec.$2 + (sec.$4 - sec.$2) * 0.1;
+  final secBox = (sec.$1, secY, sec.$3, sec.$4);
+  final secFont = (sectionLabel.length > 12 ? s.sectionFont * 0.72 : s.sectionFont) * u;
+  if (sectionLabelEditable) {
+    out.add(at(
+        NgmySlideElement(
+          id: NgmySlidesTemplates.newId(),
+          type: NgmySlideElementType.text,
+          text: sectionLabel,
+          fontSize: secFont,
+          fontWeight: FontWeight.w900,
+          color: 0xFFF2C14E,
+          align: TextAlign.center,
+          textFx: 'goldserif',
+          fileName: '${kMarriageFieldPrefix}nimetowe_label:${fx(sec.$3 - sec.$1).toStringAsFixed(3)}',
+        ),
+        secBox));
+  } else {
+    out.add(at(_hLockedText(sectionLabel, x: 0, y: 0, w: 0, h: 0, fontSize: secFont, fontWeight: FontWeight.w900, align: TextAlign.center, color: 0xFFF2C14E, tag: 'banner_t_$sectionLabel')..textFx = 'goldserif', secBox));
+  }
+  final subLen = sectionSubtitle.length;
+  out.add(at(
+      _hLockedText(sectionSubtitle, x: 0, y: 0, w: 0, h: 0, fontSize: (subLen > 30 ? 21 * 28 / subLen : 21) * u, fontWeight: FontWeight.w800, color: s.subtitleColor, tag: 'nimetowe_sub')..textFx = s.subtitleFx,
+      s.subtitle));
+
+  // The four items, on the lines of the design (its coins and lines stay in the picture).
+  const itemFont = 19.5;
+  final itemH = _hBlankH(itemFont * u) * 1492 / s.height;
+  for (var i = 1; i <= 4; i++) {
+    final c = s.itemCenters[i - 1];
+    final right = i == 1 ? s.itemRight1 : s.itemRight;
+    final top = c - itemH * s.height / 2;
+    out.add(at(_hBlank('mahari_$i', 0, 0, fx(right - s.itemX), ink: s.ink, fontSize: itemFont * u, startText: mahariItems[i - 1], align: TextAlign.left)..textFx = 'serif', (s.itemX, top, right, top + itemH * s.height)));
+    // The number is on the coin in the picture; this one stays invisible (the editor finds row 4 by it).
+    out.add(at(_hLockedText('$i', x: 0, y: 0, w: 0, h: 0, fontSize: 14, color: 0x00000000, tag: 'nim_n_$i'), (s.coinX, c - 14, s.coinX + 30, c + 14)));
+    out.add(at(_hLockedShape(shape: NgmySlideShapeKind.line, x: 0, y: 0, w: 0, h: 0, strokeColor: 0x00000000, strokeWidth: 0, tag: 'nim_ul_$i'), (s.itemX, c + 14, right, c + 16)));
+  }
+
+  // AKUNA DENI: the words on the design's own label; the tick box is drawn over the design's tick.
+  out.add(at(_hLockedText('AKUNA DENI', x: 0, y: 0, w: 0, h: 0, fontSize: s.akunaFont * u, fontWeight: FontWeight.w900, align: TextAlign.center, color: s.akunaColor, tag: 'nim_akuna_deni'), s.akunaText));
+  final ownTick = s.akunaBox.$1 > s.akunaText.$1;
+  out.add(at(_hLockedShape(shape: NgmySlideShapeKind.rectangle, x: 0, y: 0, w: 0, h: 0, fillColor: 0x00000000, strokeColor: ownTick ? 0xFF16A34A : 0x00000000, strokeWidth: 2, tag: 'nim_akuna_box'), s.akunaBox));
+  out.add(at(_hLockedText('✓', x: 0, y: 0, w: 0, h: 0, fontSize: 20, fontWeight: FontWeight.w900, align: TextAlign.center, color: ownTick ? 0xFF16A34A : 0x00000000, tag: 'nim_akuna_tick'), s.akunaBox));
+  final hit = (math.min(s.akunaText.$1, s.akunaBox.$1), s.akunaText.$2, math.max(s.akunaText.$3, s.akunaBox.$3), s.akunaText.$4);
+  out.add(at(_hLockedShape(shape: NgmySlideShapeKind.rectangle, x: 0, y: 0, w: 0, h: 0, fillColor: 0x00000000, strokeColor: 0x00000000, strokeWidth: 0, tag: 'nim_akuna_hit'), hit));
+
+  // The witnesses: a name on each name line, a signature on each Sahihi line.
+  for (final side in const ['mke', 'mume']) {
+    for (var n = 1; n <= witnessRows; n++) {
+      final nb = s.witnessName[side]![n - 1], sb = s.witnessSign[side]![n - 1];
+      out.add(at(_hBlank('witness_${side}_${n}_name', 0, 0, fx(nb.$3 - nb.$1), ink: s.ink, fontSize: 14 * u, align: TextAlign.left, autoShrinkFont: true)..textFx = 'serif', nb));
+      out.add(at(
+          NgmySlideElement(id: NgmySlidesTemplates.newId(), type: NgmySlideElementType.shape, shape: NgmySlideShapeKind.rectangle, fillColor: 0x00000000, strokeColor: 0x00000000, fileName: '$kMarriageSignPrefix${side}_witness_$n'),
+          sb));
+    }
+  }
+
+  // MWANDISHI: the name on its line, the signature on the Sahihi line.
+  out.add(at(_hBlank('mwandishi_jina', 0, 0, fx(s.mwName.$3 - s.mwName.$1), ink: s.ink, fontSize: 17 * u, align: TextAlign.left, autoShrinkFont: true)..textFx = 'serif', s.mwName));
+  out.add(at(
+      NgmySlideElement(id: NgmySlidesTemplates.newId(), type: NgmySlideElementType.shape, shape: NgmySlideShapeKind.rectangle, fillColor: 0x00000000, strokeColor: 0x00000000, fileName: '${kMarriageSignPrefix}mwandishi'),
+      s.mwSign));
+
+  // The state under EMO 'YA M'MBONDO, with the design's arrows either side.
+  final st = state.trim();
+  if (st.isNotEmpty) {
+    out.add(at(_hLockedShape(shape: NgmySlideShapeKind.rectangle, x: 0, y: 0, w: 0, h: 0, fillColor: 0x00000000, strokeColor: 0x00000000, strokeWidth: 0, tag: 'state_box'), s.state));
+    out.add(at(_hLockedText('———   $st   ———', x: 0, y: 0, w: 0, h: 0, fontSize: 28 * u, fontWeight: FontWeight.w800, align: TextAlign.center, color: s.ink, tag: 'state_text')..textFx = 'serif', s.state));
+  }
+  return out;
+}
+
 /// Shared hati page (title, TAREHE, intro frame, list, MASHAHIDI, MWANDISHI)
 /// used by Kuhowa / Kuhowesha and also Hati ya Ndoa — Ndoa keeps its papers.
 NgmySlideDeck ngmyBuildHatiLookDeck({
@@ -1911,13 +2256,14 @@ final _royalPreviewPages = <String, NgmySlide>{};
 
 Widget ngmyHatiKuhowaTemplateLivePreview(NgmyHatiKuhowaTemplate tpl) {
   // A royal paper shows a small copy of its real page, so the card looks exactly like what you get.
-  if (_royalLookFor(tpl.paperStyle) != null) {
+  final exact = _exactSpecFor(tpl.paperStyle);
+  if (_royalLookFor(tpl.paperStyle) != null || exact != null) {
     final page = _royalPreviewPages.putIfAbsent(tpl.id, () => ngmyBuildHatiKuhowaDeck(templateId: tpl.id).slides.first);
     return ClipRect(
       child: FittedBox(
         fit: BoxFit.cover,
         alignment: Alignment.topCenter,
-        child: SizedBox(width: 270, height: 480, child: IgnorePointer(child: NgmySlideAnimatedRender(slide: page, animate: false))),
+        child: SizedBox(width: 270, height: exact == null ? 480 : 270 / exact.aspect, child: IgnorePointer(child: NgmySlideAnimatedRender(slide: page, animate: false))),
       ),
     );
   }
@@ -2052,6 +2398,7 @@ NgmySlideDeck ngmyBuildHatiKuhowaDeck({required String templateId, String state 
     id: NgmySlidesTemplates.newId(),
     name: 'Hati ya Kuhowa',
     themeId: 'hati_kuhowa_${tpl.id}',
+    paperAspect: _exactSpecFor(tpl.paperStyle)?.aspect,
     aspectRatio: NgmySlideAspectRatio.portrait916,
     deckKind: kNgmyHatiKuhowaDeckKind,
     marriageState: state.trim().isEmpty ? null : state.trim(),
@@ -2106,6 +2453,7 @@ NgmySlideDeck ngmyBuildHatiKuhoweshaDeck({required String templateId, String sta
     id: NgmySlidesTemplates.newId(),
     name: 'Hati ya Kuhoweya',
     themeId: 'hati_kuhoweya_${tpl.id}',
+    paperAspect: _exactSpecFor(tpl.paperStyle)?.aspect,
     aspectRatio: NgmySlideAspectRatio.portrait916,
     deckKind: kNgmyHatiKuhoweshaDeckKind,
     marriageState: state.trim().isEmpty ? null : state.trim(),
@@ -2173,6 +2521,7 @@ NgmySlideDeck ngmyBuildHatiMalipoAwamuDeck({required String templateId, String s
     id: NgmySlidesTemplates.newId(),
     name: 'Hati ya Makubaliano ya Malipo ya Awamu',
     themeId: 'hati_malipo_awamu_${tpl.id}',
+    paperAspect: _exactSpecFor(tpl.paperStyle)?.aspect,
     aspectRatio: NgmySlideAspectRatio.portrait916,
     deckKind: kNgmyHatiMalipoAwamuDeckKind,
     marriageState: state.trim().isEmpty ? null : state.trim(),
@@ -2186,7 +2535,7 @@ Future<String?> showNgmyHatiKuhowaTemplatePicker(
   List<NgmyHatiKuhowaTemplate> templates = kNgmyHatiKuhowaTemplates,
 }) async {
   // Pinned papers come first, and the picture papers are read so their cards show them.
-  await Future.wait([ngmyHatiPinsLoad(), ngmyHatiPhotoArtLoad()]);
+  await Future.wait([ngmyHatiPinsLoad(), ngmyHatiPhotoArtLoad(), ngmyLoadNewsFonts()]);
   if (!context.mounted) return null;
   return showModalBottomSheet<String>(
     context: context,

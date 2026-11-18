@@ -384,6 +384,7 @@ class NgmySlideDeck {
     this.finaleTitle,
     this.finaleSubtitle,
     this.finaleLogo,
+    this.paperAspect,
     DateTime? updatedAt,
     List<NgmySlide>? slides,
   })  : updatedAt = updatedAt ?? DateTime.now(),
@@ -430,6 +431,10 @@ class NgmySlideDeck {
   String? finaleSubtitle;
   /// Logo shown in the ending celebration (data URI).
   String? finaleLogo;
+
+  /// A paper with its own shape (width / height), like the Hati pages made from the owner's A4 designs. Null = the
+  /// usual 16:9 or 9:16.
+  double? paperAspect;
   bool get aiMade => (aiOutlineJson ?? '').isNotEmpty;
 
   bool get isMarriageAgreement => deckKind == 'marriage_agreement';
@@ -454,7 +459,7 @@ class NgmySlideDeck {
   /// is locked in place.
   bool get isLockedTemplateDoc => _isLockedDeckKind(deckKind);
 
-  double get aspectValue => aspectRatio == NgmySlideAspectRatio.portrait916 ? 9 / 16 : 16 / 9;
+  double get aspectValue => paperAspect ?? (aspectRatio == NgmySlideAspectRatio.portrait916 ? 9 / 16 : 16 / 9);
 
   NgmySlideDeck copy() => NgmySlideDeck(
         id: id,
@@ -480,6 +485,7 @@ class NgmySlideDeck {
         finaleTitle: finaleTitle,
         finaleSubtitle: finaleSubtitle,
         finaleLogo: finaleLogo,
+        paperAspect: paperAspect,
         slides: slides.map((s) => s.copy()).toList(),
       );
 
@@ -509,6 +515,7 @@ class NgmySlideDeck {
         if (finaleTitle != null) 'finaleTitle': finaleTitle,
         if (finaleSubtitle != null) 'finaleSubtitle': finaleSubtitle,
         if ((finaleLogo ?? '').isNotEmpty) 'finaleLogo': finaleLogo,
+        if (paperAspect != null) 'paperAspect': paperAspect,
         'slides': slides.map((s) => s.toJson()).toList(),
       };
 
@@ -538,6 +545,7 @@ class NgmySlideDeck {
         finaleTitle: json['finaleTitle']?.toString(),
         finaleSubtitle: json['finaleSubtitle']?.toString(),
         finaleLogo: json['finaleLogo']?.toString(),
+        paperAspect: (json['paperAspect'] as num?)?.toDouble(),
         slides: (json['slides'] as List?)
                 ?.whereType<Map>()
                 .map((s) => NgmySlide.fromJson(Map<String, dynamic>.from(s)))

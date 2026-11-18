@@ -46,6 +46,8 @@ enum NgmyMarriagePaperStyle {
   photoVillage,
   photoSunset,
   photoRoses,
+  exactKijiji,
+  exactKifalme,
 }
 
 final _paperCache = <NgmyMarriagePaperStyle, String>{};
@@ -140,6 +142,8 @@ img.Image _renderPaper(NgmyMarriagePaperStyle style) {
     case NgmyMarriagePaperStyle.photoVillage:
     case NgmyMarriagePaperStyle.photoSunset:
     case NgmyMarriagePaperStyle.photoRoses:
+    case NgmyMarriagePaperStyle.exactKijiji:
+    case NgmyMarriagePaperStyle.exactKifalme:
       // Drawn by ngmyRoyalPaperFor (bigger, sharper papers); this plain paper is never used.
       return _elegantPaper(0xFFFFFCF3, 0xFFF6EEDA, 0xFFA6843A);
   }
@@ -781,6 +785,8 @@ Uint8List? ngmyRoyalPaperFor(NgmyMarriagePaperStyle style) {
     NgmyMarriagePaperStyle.photoVillage => ngmyRoyalPaperPng(top: 0xFFF6E2C2, bottom: 0xFFEED6B2, gold: 0xFF8A5A2B),
     NgmyMarriagePaperStyle.photoSunset => ngmyRoyalPaperPng(top: 0xFF5A2A30, bottom: 0xFF2C140A, gold: bright),
     NgmyMarriagePaperStyle.photoRoses => ngmyRoyalPaperPng(top: 0xFFF7F0E2, bottom: 0xFFEFE4D0, gold: gold),
+    NgmyMarriagePaperStyle.exactKijiji => ngmyRoyalPaperPng(top: 0xFFF6E7C4, bottom: 0xFFEFD9AE, gold: 0xFF7A1B22),
+    NgmyMarriagePaperStyle.exactKifalme => ngmyRoyalPaperPng(top: 0xFFF6E7C4, bottom: 0xFFEFD9AE, gold: 0xFF14244F),
     _ => null,
   };
 }

@@ -54,7 +54,7 @@ void main() {
   });
 
   test('Hati ya Kuhowa and Kuhowesha keep the ten older papers first (the royal and picture papers after them), and resolve heritage for old docs', () {
-    expect(kNgmyHatiKuhowaTemplates, hasLength(21));
+    expect(kNgmyHatiKuhowaTemplates, hasLength(23));
     expect(
       kNgmyHatiKuhowaTemplates.take(10).map((t) => t.id).toList(),
       [

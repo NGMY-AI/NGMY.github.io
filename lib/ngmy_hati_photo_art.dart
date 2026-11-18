@@ -6,7 +6,16 @@ import 'package:flutter/services.dart';
 // from the owner's own designs by tool/hati_photo/build.dart. A document keeps its paper inside itself as a data link,
 // so each picture is read once and kept here as one.
 
-const List<String> kNgmyHatiPhotoArt = ['photo_curtain', 'photo_village', 'photo_sunset', 'photo_roses'];
+const List<String> kNgmyHatiPhotoArt = [
+  'photo_curtain',
+  'photo_village',
+  'photo_sunset',
+  'photo_roses',
+  'exact_kijiji',
+  'exact_kijiji_notitle',
+  'exact_kifalme',
+  'exact_kifalme_notitle',
+];
 
 final Map<String, String> _urls = {};
 Future<void>? _loading;

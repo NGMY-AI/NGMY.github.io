@@ -14,6 +14,8 @@ import 'ngmy_hud_tech_shell.dart' show NgmyCalmLight, NgmyCalmIconTile;
 import 'ngmy_hati_kiapo_uongozi.dart';
 import 'ngmy_state_picker.dart';
 import 'ngmy_hati_kuhowa_templates.dart';
+import 'ngmy_hati_couple_ai.dart';
+import 'ngmy_news_paper.dart' show ngmyLoadNewsFonts;
 import 'ngmy_hati_photo_art.dart';
 import 'ngmy_hati_pins.dart';
 import 'ngmy_marriage_agreement_templates.dart';
@@ -121,6 +123,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     // The Hati picture papers and the pinned papers, ready before a document is made or moved to its partner.
     unawaited(ngmyHatiPhotoArtLoad());
     unawaited(ngmyHatiPinsLoad());
+    // The serif letters of the Hati papers made from the owner's own designs.
+    unawaited(ngmyLoadNewsFonts());
     // The AI can put your Bio link on a slide — your published Bio first.
     ngmySlidesLoadBio = () async {
       final bios = await loadNgmyBios(userEmail: widget.userEmail);
@@ -2858,8 +2862,11 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
           e.fileName == '${kMarriageLocked}_nim_badge_4' ||
           e.fileName == '${kMarriageLocked}_nim_badge_4_fill' ||
           e.fileName.startsWith('${kMarriageFieldPrefix}mahari_4:'));
-      for (final e in slide.elements) {
-        if (e.y > cutoffY + 0.001) e.y -= rowGap;
+      // A paper drawn as one picture (the owner's own designs) cannot move up: the row is only emptied there.
+      if (_activeDeck?.paperAspect == null) {
+        for (final e in slide.elements) {
+          if (e.y > cutoffY + 0.001) e.y -= rowGap;
+        }
       }
       _selectedElementId = null;
     });
@@ -4346,6 +4353,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
             ),
             onSelected: (v) async {
               switch (v) {
+                case 'couple':
+                  final page = _currentSlide;
+                  if (page == null) return;
+                  await ngmyHatiOpenCouplePicture(context, deck, page, (change) => _mutate(change));
                 case 'pin':
                   final id = ngmyHatiPaperIdOfDeck(deck);
                   if (id == null) return;
@@ -4428,6 +4439,9 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                   _moreItem('loop', Icons.all_inclusive_rounded, const Color(0xFF10B981), 'Non-stop loop', (_activeDeck?.loop ?? false) ? 'On' : 'Off', isDark),
                   _moreItem('finale', Icons.celebration_outlined, const Color(0xFFF59E0B), 'Ending celebration', ngmyFinaleStyle(_activeDeck?.finaleStyle)?.name ?? 'None', isDark),
                 ],
+                // The owner's own designs: the AI paints the couple at the top with the family's own faces.
+                if (canEdit && ngmyHatiHasCouplePicture(deck))
+                  _moreItem('couple', Icons.face_retouching_natural_rounded, const Color(0xFFF2C14E), 'Couple picture (AI)', 'Put your own faces in the picture', isDark),
                 // Last: pin this paper so it comes first in the paper picker (up to four), or unpin it.
                 if (paperId != null) ...[
                   const PopupMenuDivider(height: 10),

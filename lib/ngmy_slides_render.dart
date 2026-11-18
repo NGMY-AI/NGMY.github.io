@@ -86,7 +86,22 @@ class NgmySlideElementView extends StatelessWidget {
     var color = c;
     Paint? fg;
     List<Shadow>? shadows;
+    String? family;
     switch (fx) {
+      // The serif letters of the Hati papers made from the owner's designs (Old Standard, from the newspaper fonts).
+      case 'serif':
+        family = 'NgmyOldStandard'; // loaded by ngmyLoadNewsFonts
+      case 'goldserif':
+        family = 'NgmyOldStandard'; // loaded by ngmyLoadNewsFonts
+        weight = FontWeight.w700;
+        fg = Paint()
+          ..shader = const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFFF1B8), Color(0xFFF2C14E), Color(0xFFB07A1A)],
+            tileMode: TileMode.mirror,
+          ).createShader(Rect.fromLTWH(0, 0, 900 * scale, element.fontSize * scale * 1.25));
+        shadows = [Shadow(color: const Color(0x99000000), offset: Offset(0, 2.5 * scale), blurRadius: 4 * scale)];
       case 'caps':
         weight = FontWeight.w900;
         spacing = 3 * scale;
@@ -183,6 +198,7 @@ class NgmySlideElementView extends StatelessWidget {
         spacing = 6 * scale;
     }
     return TextStyle(
+      fontFamily: family,
       fontSize: element.fontSize * scale,
       fontWeight: weight,
       fontStyle: fstyle,

@@ -16,13 +16,14 @@ Set<String> _keys(NgmySlide s) => {
     };
 
 void main() {
-  test('the seven royal and four picture papers come last in the picker and can be found by id', () {
+  test('the seven royal, four picture and two exact papers come last in the picker and can be found by id', () {
     expect(kNgmyHatiKuhowaRoyalTemplates.length, 7);
     expect(kNgmyHatiKuhowaPhotoTemplates.length, 4);
-    expect(kNgmyHatiKuhowaTemplates.skip(kNgmyHatiKuhowaTemplates.length - 11).map((t) => t.id),
-        [...kNgmyHatiKuhowaRoyalTemplates, ...kNgmyHatiKuhowaPhotoTemplates].map((t) => t.id));
+    expect(kNgmyHatiKuhowaExactTemplates.length, 2);
+    expect(kNgmyHatiKuhowaTemplates.skip(kNgmyHatiKuhowaTemplates.length - 13).map((t) => t.id),
+        [...kNgmyHatiKuhowaRoyalTemplates, ...kNgmyHatiKuhowaPhotoTemplates, ...kNgmyHatiKuhowaExactTemplates].map((t) => t.id));
     expect(kNgmyHatiKuhowaTemplates.first.id, 'kuhowa_elegant_navy');
-    for (final t in [...kNgmyHatiKuhowaRoyalTemplates, ...kNgmyHatiKuhowaPhotoTemplates]) {
+    for (final t in [...kNgmyHatiKuhowaRoyalTemplates, ...kNgmyHatiKuhowaPhotoTemplates, ...kNgmyHatiKuhowaExactTemplates]) {
       expect(ngmyHatiKuhowaTemplateById(t.id)?.id, t.id);
       expect(kNgmyHatiMalipoAwamuTemplates.any((m) => m.id == t.id), isTrue);
     }
@@ -34,7 +35,7 @@ void main() {
       'kuhoweya': _keys(ngmyBuildHatiKuhoweshaDeck(templateId: 'kuhowa_elegant_navy', state: 'Arizona').slides.first),
       'malipo': _keys(ngmyBuildHatiMalipoAwamuDeck(templateId: 'kuhowa_elegant_navy', state: 'Arizona').slides.first),
     };
-    for (final t in [...kNgmyHatiKuhowaRoyalTemplates, ...kNgmyHatiKuhowaPhotoTemplates]) {
+    for (final t in [...kNgmyHatiKuhowaRoyalTemplates, ...kNgmyHatiKuhowaPhotoTemplates, ...kNgmyHatiKuhowaExactTemplates]) {
       final pages = {
         'kuhowa': ngmyBuildHatiKuhowaDeck(templateId: t.id, state: 'Arizona').slides.first,
         'kuhoweya': ngmyBuildHatiKuhoweshaDeck(templateId: t.id, state: 'Arizona').slides.first,
@@ -52,14 +53,16 @@ void main() {
             expect(e.y + e.h, lessThan(0.97), reason: '${t.id} $doc ${e.fileName} runs past the frame');
           }
         }
-        expect(page.elements.where((e) => e.fileName.contains('nim_badge_')).length, 4, reason: 'a number coin for each item');
+        if (!t.id.startsWith('exact')) {
+          expect(page.elements.where((e) => e.fileName.contains('nim_badge_')).length, 4, reason: 'a number coin for each item');
+        }
         expect(page.elements.any((e) => e.fileName == '${kMarriageLocked}_state_text' && e.text.contains('Arizona')), isTrue);
       });
     }
   });
 
   test('dark royal papers ask for light signature ink; light papers do not', () {
-    for (final t in [...kNgmyHatiKuhowaRoyalTemplates, ...kNgmyHatiKuhowaPhotoTemplates]) {
+    for (final t in [...kNgmyHatiKuhowaRoyalTemplates, ...kNgmyHatiKuhowaPhotoTemplates, ...kNgmyHatiKuhowaExactTemplates]) {
       final dark = ngmyHatiPaperIsDark(t.background);
       expect(dark, const {'royal_emerald', 'royal_navy', 'royal_plum', 'royal_onyx', 'photo_curtain', 'photo_sunset'}.contains(t.id), reason: t.id);
     }
@@ -73,7 +76,7 @@ void main() {
   });
 
   testWidgets('the picker card of a royal paper draws its real page', (tester) async {
-    for (final t in [...kNgmyHatiKuhowaRoyalTemplates, ...kNgmyHatiKuhowaPhotoTemplates]) {
+    for (final t in [...kNgmyHatiKuhowaRoyalTemplates, ...kNgmyHatiKuhowaPhotoTemplates, ...kNgmyHatiKuhowaExactTemplates]) {
       await tester.pumpWidget(MaterialApp(home: Center(child: SizedBox(width: 120, height: 200, child: ngmyHatiKuhowaTemplateLivePreview(t)))));
       await tester.pump();
       expect(tester.takeException(), isNull, reason: t.id);
