@@ -97,6 +97,7 @@ flutter:
     - assets/bio_link_icons/
     - assets/data/
     - assets/news_fonts/
+    - assets/hati/
 
   # Roboto bundled locally so CanvasKit never fetches fonts.gstatic.com (required for iOS offline PWA).
   fonts:

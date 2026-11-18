@@ -16,10 +16,13 @@ Set<String> _keys(NgmySlide s) => {
     };
 
 void main() {
-  test('the seven royal papers come first in the picker and can be found by id', () {
+  test('the seven royal and four picture papers come last in the picker and can be found by id', () {
     expect(kNgmyHatiKuhowaRoyalTemplates.length, 7);
-    expect(kNgmyHatiKuhowaTemplates.take(7).map((t) => t.id), kNgmyHatiKuhowaRoyalTemplates.map((t) => t.id));
-    for (final t in kNgmyHatiKuhowaRoyalTemplates) {
+    expect(kNgmyHatiKuhowaPhotoTemplates.length, 4);
+    expect(kNgmyHatiKuhowaTemplates.skip(kNgmyHatiKuhowaTemplates.length - 11).map((t) => t.id),
+        [...kNgmyHatiKuhowaRoyalTemplates, ...kNgmyHatiKuhowaPhotoTemplates].map((t) => t.id));
+    expect(kNgmyHatiKuhowaTemplates.first.id, 'kuhowa_elegant_navy');
+    for (final t in [...kNgmyHatiKuhowaRoyalTemplates, ...kNgmyHatiKuhowaPhotoTemplates]) {
       expect(ngmyHatiKuhowaTemplateById(t.id)?.id, t.id);
       expect(kNgmyHatiMalipoAwamuTemplates.any((m) => m.id == t.id), isTrue);
     }
@@ -31,7 +34,7 @@ void main() {
       'kuhoweya': _keys(ngmyBuildHatiKuhoweshaDeck(templateId: 'kuhowa_elegant_navy', state: 'Arizona').slides.first),
       'malipo': _keys(ngmyBuildHatiMalipoAwamuDeck(templateId: 'kuhowa_elegant_navy', state: 'Arizona').slides.first),
     };
-    for (final t in kNgmyHatiKuhowaRoyalTemplates) {
+    for (final t in [...kNgmyHatiKuhowaRoyalTemplates, ...kNgmyHatiKuhowaPhotoTemplates]) {
       final pages = {
         'kuhowa': ngmyBuildHatiKuhowaDeck(templateId: t.id, state: 'Arizona').slides.first,
         'kuhoweya': ngmyBuildHatiKuhoweshaDeck(templateId: t.id, state: 'Arizona').slides.first,
@@ -39,7 +42,10 @@ void main() {
       };
       pages.forEach((doc, page) {
         expect(_keys(page), classic[doc], reason: '${t.id} $doc has different fields');
+        expect(page.elements.any((e) => e.fileName == '${kMarriageLocked}_watermark' && e.text == 'NGMY'), isTrue, reason: '${t.id} has the NGMY mark');
         for (final e in page.elements) {
+          // The faint NGMY mark is tilted and tucked past the left edge on purpose, as on every other paper.
+          if (e.fileName == '${kMarriageLocked}_watermark') continue;
           expect(e.x >= -0.001 && e.y >= -0.001 && e.x + e.w <= 1.001, isTrue, reason: '${t.id} $doc ${e.fileName} is off the page');
           // Everything sits inside the gold frame (the seal ribbon may reach a little lower).
           if (!e.fileName.contains('royal_seal') && e.fileName != '${kMarriageLocked}_bg') {
@@ -53,9 +59,9 @@ void main() {
   });
 
   test('dark royal papers ask for light signature ink; light papers do not', () {
-    for (final t in kNgmyHatiKuhowaRoyalTemplates) {
+    for (final t in [...kNgmyHatiKuhowaRoyalTemplates, ...kNgmyHatiKuhowaPhotoTemplates]) {
       final dark = ngmyHatiPaperIsDark(t.background);
-      expect(dark, const {'royal_emerald', 'royal_navy', 'royal_plum', 'royal_onyx'}.contains(t.id), reason: t.id);
+      expect(dark, const {'royal_emerald', 'royal_navy', 'royal_plum', 'royal_onyx', 'photo_curtain', 'photo_sunset'}.contains(t.id), reason: t.id);
     }
   });
 
@@ -67,7 +73,7 @@ void main() {
   });
 
   testWidgets('the picker card of a royal paper draws its real page', (tester) async {
-    for (final t in kNgmyHatiKuhowaRoyalTemplates) {
+    for (final t in [...kNgmyHatiKuhowaRoyalTemplates, ...kNgmyHatiKuhowaPhotoTemplates]) {
       await tester.pumpWidget(MaterialApp(home: Center(child: SizedBox(width: 120, height: 200, child: ngmyHatiKuhowaTemplateLivePreview(t)))));
       await tester.pump();
       expect(tester.takeException(), isNull, reason: t.id);

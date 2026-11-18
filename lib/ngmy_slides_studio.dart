@@ -14,6 +14,8 @@ import 'ngmy_hud_tech_shell.dart' show NgmyCalmLight, NgmyCalmIconTile;
 import 'ngmy_hati_kiapo_uongozi.dart';
 import 'ngmy_state_picker.dart';
 import 'ngmy_hati_kuhowa_templates.dart';
+import 'ngmy_hati_photo_art.dart';
+import 'ngmy_hati_pins.dart';
 import 'ngmy_marriage_agreement_templates.dart';
 import 'ngmy_book_studio.dart';
 import 'ngmy_slides_finale.dart';
@@ -116,6 +118,9 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     WidgetsBinding.instance.addObserver(this);
     // The AI's recent versions (for "undo" / "bring it back") are kept on this device.
     unawaited(ngmySlidesAiLoadHistory());
+    // The Hati picture papers and the pinned papers, ready before a document is made or moved to its partner.
+    unawaited(ngmyHatiPhotoArtLoad());
+    unawaited(ngmyHatiPinsLoad());
     // The AI can put your Bio link on a slide — your published Bio first.
     ngmySlidesLoadBio = () async {
       final bios = await loadNgmyBios(userEmail: widget.userEmail);
@@ -4324,13 +4329,36 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
             _topIconBtn(Icons.download_rounded, 'Download', () => unawaited(_downloadPdf()), isDark)
           else
             _topIconBtn(Icons.download_rounded, 'Download as video', () => unawaited(_downloadVideo()), isDark),
-          if (!_isTransferredReadOnly())
+          if (!_isTransferredReadOnly() || ngmyHatiPaperIdOfDeck(deck) != null)
           PopupMenuButton<String>(
             tooltip: 'More',
             padding: EdgeInsets.zero,
             icon: Icon(Icons.more_horiz_rounded, color: isDark ? Colors.white70 : const Color(0xFF475569)),
+            offset: const Offset(0, 44),
+            elevation: 14,
+            color: isDark ? const Color(0xFF111827) : Colors.white,
+            surfaceTintColor: Colors.transparent,
+            shadowColor: Colors.black.withValues(alpha: 0.35),
+            constraints: const BoxConstraints(minWidth: 264, maxWidth: 300),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(color: isDark ? const Color(0xFF263042) : const Color(0xFFE2E8F0)),
+            ),
             onSelected: (v) async {
               switch (v) {
+                case 'pin':
+                  final id = ngmyHatiPaperIdOfDeck(deck);
+                  if (id == null) return;
+                  final r = await ngmyHatiTogglePin(id);
+                  if (!mounted) return;
+                  final paper = ngmyHatiKuhowaTemplateById(id)?.name ?? 'This paper';
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(switch (r) {
+                      NgmyHatiPinResult.pinned => '$paper is pinned: it comes first when you pick a paper.',
+                      NgmyHatiPinResult.unpinned => '$paper is unpinned.',
+                      NgmyHatiPinResult.full => 'You can pin up to $kNgmyHatiMaxPins papers. Unpin one first (open it, tap ⋯, then Unpin).',
+                    }),
+                  ));
                 case 'share':
                   await _shareOutline();
                 case 'timer':
@@ -4383,13 +4411,37 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                       content: Text(picked.none ? 'No ending celebration.' : '${ngmyFinaleStyle(picked.style)?.name} will play after your last slide.')));
               }
             },
-            itemBuilder: (_) => [
-              const PopupMenuItem(value: 'share', child: Text('Share text outline')),
-              PopupMenuItem(value: 'timer', child: Text('Timer: ${_activeDeck?.autoAdvanceSeconds ?? 5}s')),
-              PopupMenuItem(value: 'motion', child: Text('Video motion: ${(_activeDeck?.cinematic ?? false) ? 'On' : 'Off'}')),
-              PopupMenuItem(value: 'loop', child: Text('Non-stop loop: ${(_activeDeck?.loop ?? false) ? 'On' : 'Off'}')),
-              PopupMenuItem(value: 'finale', child: Text('Ending celebration: ${ngmyFinaleStyle(_activeDeck?.finaleStyle)?.name ?? 'None'}')),
-            ],
+            itemBuilder: (_) {
+              final paperId = ngmyHatiPaperIdOfDeck(deck);
+              final pinned = paperId != null && ngmyHatiIsPinned(paperId);
+              final canEdit = !_isTransferredReadOnly();
+              return [
+                PopupMenuItem<String>(
+                  enabled: false,
+                  height: 34,
+                  child: Text('MORE', style: TextStyle(fontSize: 11, letterSpacing: 1.4, fontWeight: FontWeight.w900, color: isDark ? Colors.white38 : const Color(0xFF94A3B8))),
+                ),
+                if (canEdit) ...[
+                  _moreItem('share', Icons.ios_share_rounded, const Color(0xFF2563EB), 'Share text outline', 'Send the words of every slide', isDark),
+                  _moreItem('timer', Icons.timer_outlined, const Color(0xFF0EA5E9), 'Timer', '${_activeDeck?.autoAdvanceSeconds ?? 5} seconds a slide', isDark),
+                  _moreItem('motion', Icons.movie_filter_outlined, const Color(0xFF8B5CF6), 'Video motion', (_activeDeck?.cinematic ?? false) ? 'On' : 'Off', isDark),
+                  _moreItem('loop', Icons.all_inclusive_rounded, const Color(0xFF10B981), 'Non-stop loop', (_activeDeck?.loop ?? false) ? 'On' : 'Off', isDark),
+                  _moreItem('finale', Icons.celebration_outlined, const Color(0xFFF59E0B), 'Ending celebration', ngmyFinaleStyle(_activeDeck?.finaleStyle)?.name ?? 'None', isDark),
+                ],
+                // Last: pin this paper so it comes first in the paper picker (up to four), or unpin it.
+                if (paperId != null) ...[
+                  const PopupMenuDivider(height: 10),
+                  _moreItem(
+                    'pin',
+                    pinned ? Icons.push_pin : Icons.push_pin_outlined,
+                    const Color(0xFFDB2777),
+                    pinned ? 'Unpin this paper' : 'Pin this paper',
+                    pinned ? 'Stop showing it first' : 'Show it first when you pick a paper',
+                    isDark,
+                  ),
+                ],
+              ];
+            },
           ),
           const SizedBox(width: 4),
           Material(
@@ -4470,6 +4522,37 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
             _ribbonBtn(Icons.slideshow_rounded, 'Present', _startSlideshow, isDark),
           ],
         ),
+      ),
+    );
+  }
+
+  /// One choice in the ⋯ menu: a coloured icon, the name, and what it is set to now underneath.
+  PopupMenuItem<String> _moreItem(String value, IconData icon, Color tint, String title, String sub, bool isDark) {
+    return PopupMenuItem<String>(
+      value: value,
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(color: tint.withValues(alpha: isDark ? 0.18 : 0.12), borderRadius: BorderRadius.circular(11)),
+            child: Icon(icon, size: 19, color: tint),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A))),
+                const SizedBox(height: 1),
+                Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: isDark ? Colors.white54 : const Color(0xFF64748B))),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -42,6 +42,10 @@ enum NgmyMarriagePaperStyle {
   royalPlum,
   royalOnyx,
   royalTeal,
+  photoCurtain,
+  photoVillage,
+  photoSunset,
+  photoRoses,
 }
 
 final _paperCache = <NgmyMarriagePaperStyle, String>{};
@@ -132,6 +136,10 @@ img.Image _renderPaper(NgmyMarriagePaperStyle style) {
     case NgmyMarriagePaperStyle.royalPlum:
     case NgmyMarriagePaperStyle.royalOnyx:
     case NgmyMarriagePaperStyle.royalTeal:
+    case NgmyMarriagePaperStyle.photoCurtain:
+    case NgmyMarriagePaperStyle.photoVillage:
+    case NgmyMarriagePaperStyle.photoSunset:
+    case NgmyMarriagePaperStyle.photoRoses:
       // Drawn by ngmyRoyalPaperFor (bigger, sharper papers); this plain paper is never used.
       return _elegantPaper(0xFFFFFCF3, 0xFFF6EEDA, 0xFFA6843A);
   }
@@ -768,6 +776,11 @@ Uint8List? ngmyRoyalPaperFor(NgmyMarriagePaperStyle style) {
     NgmyMarriagePaperStyle.royalNavy => ngmyRoyalPaperPng(top: 0xFF121F44, bottom: 0xFF0A1530, gold: bright),
     NgmyMarriagePaperStyle.royalPlum => ngmyRoyalPaperPng(top: 0xFF2E1038, bottom: 0xFF20092A, gold: bright),
     NgmyMarriagePaperStyle.royalOnyx => ngmyRoyalPaperPng(top: 0xFF1A1917, bottom: 0xFF0D0C0B, gold: bright),
+    // The picture papers use their own picture (assets/hati); this plain paper in their colours is only a stand-in.
+    NgmyMarriagePaperStyle.photoCurtain => ngmyRoyalPaperPng(top: 0xFF183484, bottom: 0xFF0A1C55, gold: bright),
+    NgmyMarriagePaperStyle.photoVillage => ngmyRoyalPaperPng(top: 0xFFF6E2C2, bottom: 0xFFEED6B2, gold: 0xFF8A5A2B),
+    NgmyMarriagePaperStyle.photoSunset => ngmyRoyalPaperPng(top: 0xFF5A2A30, bottom: 0xFF2C140A, gold: bright),
+    NgmyMarriagePaperStyle.photoRoses => ngmyRoyalPaperPng(top: 0xFFF7F0E2, bottom: 0xFFEFE4D0, gold: gold),
     _ => null,
   };
 }
