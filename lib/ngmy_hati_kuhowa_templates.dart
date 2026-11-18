@@ -1,9 +1,14 @@
+import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as img;
 
 import 'ngmy_marriage_markers.dart';
+import 'ngmy_hati_couple_ai.dart' show ngmyHatiPutCoupleInPaper;
 import 'ngmy_hati_exact_fit.dart';
+import 'ngmy_hati_exact_fit_a4.dart';
 import 'ngmy_hati_photo_art.dart';
 import 'ngmy_hati_pins.dart';
 import 'ngmy_hati_royal_art.dart';
@@ -896,7 +901,7 @@ const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaPhotoTemplates = [
   ),
 ];
 
-/// The owner's own full-page designs, exactly as drawn (A4 shaped pages). The couple at the top is the default picture;
+/// The owner's own full-page designs, exactly as drawn (made as tall as every other Hati paper). The couple at the top is the default picture;
 /// in the ⋯ menu the AI redraws it with the people's own faces.
 const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaExactTemplates = [
   NgmyHatiKuhowaTemplate(
@@ -1998,10 +2003,10 @@ class _ExactSpec {
   /// The words under the footer with {st} for the state; empty when the footer keeps the design's own words.
   final String stateText;
 
-  /// How the picture sits on an A4 page (the designs of the 2 x 2 picture); null: the picture is the page as measured.
+  /// How the picture sits on its tall page (every owner design); null: the picture is the page as measured.
   NgmyHatiExactFit? get fit => kNgmyHatiExactFit[art];
 
-  /// The page in pixels (the A4 page for a fitted design).
+  /// The page in pixels (the tall page for a fitted design).
   double get pageW => fit?.width.toDouble() ?? width;
   double get pageH => fit?.height.toDouble() ?? height;
 
@@ -2009,18 +2014,106 @@ class _ExactSpec {
   double mx(double x) => x - (fit?.dx ?? 0);
   double my(double y) {
     final f = fit;
-    if (f == null) return y;
-    final r = (y - f.dy) / 4, rows = f.rows;
-    if (r <= 0) return rows.first + r * 4;
-    final i = r.floor();
-    if (i >= rows.length - 1) return rows.last + (r - rows.length + 1) * 4;
-    return rows[i] + (rows[i + 1] - rows[i]) * (r - i);
+    return f == null ? y : _fitY(f, y);
   }
 
   double get aspect => pageW / pageH;
+
+  /// The earlier, shorter page a document with this [paperAspect] was made on (the design's own shape, or the A4
+  /// page used for one day), or null when it is on the page of today.
+  _EarlierPage? earlierPage(double paperAspect) {
+    if ((paperAspect - aspect).abs() < 0.002) return null;
+    if ((paperAspect - width / height).abs() < 0.002) {
+      double same(double v) => v;
+      return _EarlierPage(w: width, h: height, y: same, x: same, pageY: same, pageX: same);
+    }
+    final a4 = kNgmyHatiExactFitA4[art];
+    if (a4 != null && (paperAspect - a4.width / a4.height).abs() < 0.002) {
+      return _EarlierPage(
+        w: a4.width.toDouble(),
+        h: a4.height.toDouble(),
+        y: (v) => _unfitY(a4, v),
+        x: (v) => v + a4.dx,
+        pageY: (v) => _fitY(a4, v),
+        pageX: (v) => v - a4.dx,
+      );
+    }
+    return null;
+  }
 }
 
-// The two full-page A4 designs.
+/// A spot measured on a design (its own rows) on a fitted page.
+double _fitY(NgmyHatiExactFit f, double y) {
+  final r = (y - f.dy) / 4, rows = f.rows;
+  if (r <= 0) return rows.first + r * 4;
+  final i = r.floor();
+  if (i >= rows.length - 1) return rows.last + (r - rows.length + 1) * 4;
+  return rows[i] + (rows[i + 1] - rows[i]) * (r - i);
+}
+
+/// The other way: a spot on a fitted page back on the design.
+double _unfitY(NgmyHatiExactFit f, double v) {
+  final rows = f.rows;
+  if (v <= rows.first) return f.dy + (v - rows.first);
+  for (var i = 0; i < rows.length - 1; i++) {
+    if (v < rows[i + 1]) return f.dy + 4 * (i + (v - rows[i]) / math.max(1e-6, rows[i + 1] - rows[i]));
+  }
+  return f.dy + 4 * (rows.length - 1) + (v - rows.last);
+}
+
+/// An earlier page of a design, in its own pixels: [y] and [x] take a spot on it back to the design, [pageY] and
+/// [pageX] put a spot of the design on it.
+class _EarlierPage {
+  const _EarlierPage({required this.w, required this.h, required this.y, required this.x, required this.pageY, required this.pageX});
+  final double w, h;
+  final double Function(double) y, x, pageY, pageX;
+}
+
+/// The couple picture on a document made on an earlier page ([from]), when the family had the AI make their own;
+/// null when it is still the design's own couple (or the paper cannot be read).
+Uint8List? _ngmyHatiEarlierCouple(NgmySlideDeck deck, _ExactSpec spec, _EarlierPage from) {
+  final c = spec.couple;
+  if (c == null || deck.slides.isEmpty) return null;
+  NgmySlideElement? bg;
+  for (final e in deck.slides.first.elements) {
+    if (e.fileName == '${kMarriageLocked}_bg') bg = e;
+  }
+  final ref = bg?.imageRef ?? '';
+  if (!ref.startsWith('data:image')) return null;
+  try {
+    final old = img.decodeImage(base64Decode(ref.substring(ref.indexOf(',') + 1)));
+    if (old == null) return null;
+    final sx = old.width / from.w, sy = old.height / from.h;
+    final x0 = (from.pageX(c.$1) * sx).round(), y0 = (from.pageY(c.$2) * sy).round();
+    final w = ((c.$3 - c.$1) * sx).round(), h = ((from.pageY(c.$4) - from.pageY(c.$2)) * sy).round();
+    if (w < 8 || h < 8 || x0 < 0 || y0 < 0 || x0 + w > old.width || y0 + h > old.height) return null;
+    final couple = img.copyCrop(old, x: x0, y: y0, width: w, height: h);
+    // The design's own couple (the same on every page): nothing to carry over.
+    final now = ngmyHatiPhotoArtUrl(spec.art);
+    if (now != null) {
+      final paper = img.decodeImage(base64Decode(now.substring(now.indexOf(',') + 1)));
+      if (paper != null) {
+        final px = (spec.mx(c.$1) / spec.pageW * paper.width).round(), py = (spec.my(c.$2) / spec.pageH * paper.height).round();
+        var diff = 0.0;
+        var n = 0;
+        for (var j = 4; j < h - 4; j += 6) {
+          for (var i = 4; i < w - 4; i += 6) {
+            if (px + i >= paper.width || py + j >= paper.height) continue;
+            final a = couple.getPixel(i, j), b = paper.getPixel(px + i, py + j);
+            diff += (a.r - b.r).abs() + (a.g - b.g).abs() + (a.b - b.b).abs();
+            n++;
+          }
+        }
+        if (n > 0 && diff / n < 30) return null;
+      }
+    }
+    return img.encodeJpg(couple, quality: 92);
+  } catch (_) {
+    return null;
+  }
+}
+
+// The two full-page designs.
 const _ExactSpec _kExactKijiji = _ExactSpec(
   art: 'exact_kijiji',
   width: 1054,
@@ -2421,16 +2514,18 @@ List<NgmySlideElement> _layoutExact(
 }) {
   double fx(double px) => px / s.pageW;
   double fy(double px) => px / s.pageH;
-  // A box measured on the design, on the page. On a design made A4 tall a box keeps its height around its moved
+  // A box measured on the design, on the page. On a design made tall a box keeps its height around its moved
   // middle (words stay their size); [grow] boxes (the paragraph) take all the room their rows got.
   NgmySlideElement at(NgmySlideElement e, _Px b, {bool grow = false}) {
     final top = grow ? s.my(b.$2) : s.my((b.$2 + b.$4) / 2) - (b.$4 - b.$2) / 2;
     final bottom = grow ? s.my(b.$4) : top + (b.$4 - b.$2);
+    final h = fy(bottom - top);
     return e
       ..x = fx(s.mx(b.$1))
-      ..y = fy(top)
+      // Never past the bottom of the page (the footer words sit close to it).
+      ..y = math.min(fy(top), 1 - h)
       ..w = fx(b.$3 - b.$1)
-      ..h = fy(bottom - top);
+      ..h = h;
   }
   // Font sizes are in the slides' 960-wide units; the design's sizes are in its own pixels.
   final u = 960 / s.pageW;
@@ -2464,7 +2559,7 @@ List<NgmySlideElement> _layoutExact(
 
   // The opening paragraph, in the design's own letters (the long Malipo paragraph a little smaller).
   // The paragraph always fits its frame: the size at which all its words fill the frame, if smaller than the design's.
-  // On a design made A4 tall the frame is taller, so the words may be up to a third bigger to fill it.
+  // On a design made tall the frame is taller, so the words may be up to a third bigger to fill it.
   final pw = s.paragraph.$3 - s.paragraph.$1, ph = s.my(s.paragraph.$4) - s.my(s.paragraph.$2);
   final grown = math.min(1.33, math.sqrt(ph / (s.paragraph.$4 - s.paragraph.$2)));
   final paraPx = math.min(s.paraFont * grown, math.sqrt(pw * ph / (introText.length * 0.53 * 1.42)));
@@ -3024,7 +3119,7 @@ class _HkTemplateCard extends StatelessWidget {
                     boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.14), blurRadius: 6, offset: const Offset(0, 2))],
                   ),
                   clipBehavior: Clip.antiAlias,
-                  child: AspectRatio(aspectRatio: 9 / 16, child: ngmyHatiKuhowaTemplateLivePreview(template)),
+                  child: AspectRatio(aspectRatio: 9 / 16, child: NgmySlidePreviewImages(child: ngmyHatiKuhowaTemplateLivePreview(template))),
                 ),
               ),
               Container(
@@ -3319,31 +3414,48 @@ bool ngmyHatiRestorePicturePaper(NgmySlideDeck deck) {
   if (tpl == null || spec == null) return false;
   final stand = ngmyMarriagePaperDataUrl(tpl.paperStyle);
   var changed = false;
-  // A document made before the design was made A4 tall (its page still the old, nearly square shape): every word,
-  // field and signature moves to the same spot of the A4 page and the paper is swapped for the A4 one.
-  final oldAspect = spec.width / spec.height;
-  if (spec.fit != null && deck.paperAspect != null && (deck.paperAspect! - oldAspect).abs() < 0.002) {
+  // A document made on an earlier, shorter page of the design (the design's own nearly square shape, or the A4 page
+  // used for one day): every word, field and signature moves to the same spot of the tall page, the paper is swapped
+  // for the tall one, and a couple picture the family had made with the AI is carried over onto it.
+  final from = spec.fit == null || deck.paperAspect == null ? null : spec.earlierPage(deck.paperAspect!);
+  if (from != null) {
+    final oldCouple = _ngmyHatiEarlierCouple(deck, spec, from);
     for (final slide in deck.slides) {
       for (final e in slide.elements) {
         final f = e.fileName;
         if (f == '${kMarriageLocked}_bg') {
-          e.imageRef = null; // the A4 paper is put in just below
+          e.imageRef = null; // the tall paper is put in just below
           continue;
         }
         if (f == '${kMarriageLocked}_watermark') continue;
         final grow = f.startsWith('${kMarriageFieldPrefix}utangulizi');
-        final y0 = e.y * spec.height, y1 = (e.y + e.h) * spec.height;
-        final top = grow ? spec.my(y0) : spec.my((y0 + y1) / 2) - (y1 - y0) / 2;
-        final bottom = grow ? spec.my(y1) : top + (y1 - y0);
+        final y0 = from.y(e.y * from.h), y1 = from.y((e.y + e.h) * from.h);
+        final px = e.h * from.h;
+        final top = grow ? spec.my(y0) : spec.my(from.y((e.y + e.h / 2) * from.h)) - px / 2;
+        final bottom = grow ? spec.my(y1) : top + px;
         e
-          ..x = spec.mx(e.x * spec.width) / spec.pageW
-          ..w = e.w * spec.width / spec.pageW
+          ..x = spec.mx(from.x(e.x * from.w)) / spec.pageW
+          ..w = e.w * from.w / spec.pageW
           ..y = top / spec.pageH
           ..h = (bottom - top) / spec.pageH;
       }
     }
     deck.paperAspect = spec.aspect;
     changed = true;
+    if (oldCouple != null) {
+      for (final slide in deck.slides) {
+        final ownTitle = slide.elements.any((e) => e.fileName == '${kMarriageLocked}_title');
+        final url = ngmyHatiPhotoArtUrl(ownTitle ? '${spec.art}_notitle' : spec.art);
+        final area = ngmyHatiCoupleArea(id);
+        if (url == null || area == null) continue;
+        for (final e in slide.elements) {
+          if (e.fileName != '${kMarriageLocked}_bg') continue;
+          try {
+            e.imageRef = ngmyHatiPutCoupleInPaper(url, oldCouple, area);
+          } catch (_) {}
+        }
+      }
+    }
   }
   for (final slide in deck.slides) {
     final ownTitle = slide.elements.any((e) => e.fileName == '${kMarriageLocked}_title');

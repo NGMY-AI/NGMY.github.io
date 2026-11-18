@@ -300,6 +300,12 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
       _loading = false;
     });
     _ngmySlidesShownCache[email] = List.of(decks);
+    // A paper still saved by its short name gets its picture as soon as the pictures are read.
+    unawaited(ngmyHatiPhotoArtLoad().then((_) {
+      if (!mounted) return;
+      final open = _activeDeck;
+      if (NgmySlidesStorage.fillPaperNames([..._decks, if (open != null) open])) setState(() {});
+    }));
     if (assignedCodes || decks.length > loaded.length) unawaited(_persistDecks());
     return gen;
   }

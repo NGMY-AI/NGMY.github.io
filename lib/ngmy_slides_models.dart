@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_hati_photo_art.dart';
 import 'ngmy_slides_storage_idb_stub.dart' if (dart.library.html) 'ngmy_slides_storage_idb_web.dart';
 
 String _ngmySlideDecorationKey(TextDecoration decoration) {
@@ -1085,10 +1087,66 @@ class NgmySlidesTemplates {
 class NgmySlidesStorage {
   static final Map<String, String> _memoryJson = {};
   static final Map<String, List<NgmySlideDeck>> _lastSaved = {};
+  static final Set<String> _compacted = {};
 
   static String _emailKey(String email) => email.toLowerCase().trim();
 
   static String _prefsKey(String email) => 'ngmy_slides_decks_${_emailKey(email)}';
+
+  /// A Hati paper picture saved by its short name (see [_shortPapers]).
+  static const String _kPaperRef = 'ngmyart:';
+
+  /// Every picture of [deck] (as JSON) that is one of the Hati paper pictures is saved as its short name: a paper is
+  /// 300 to 700 KB of text, and reading all of it back is what kept Slides loading after the app was reopened.
+  static Map<String, dynamic> _shortPapers(Map<String, dynamic> deck) {
+    _eachElement(deck, (e) {
+      final r = e['imageRef'];
+      if (r is! String) return;
+      final name = ngmyHatiPhotoArtNameOf(r);
+      if (name != null) e['imageRef'] = '$_kPaperRef$name';
+    });
+    return deck;
+  }
+
+  /// The other way: each short paper name back to its picture (kept as the name while the pictures are not read yet;
+  /// [fillPaperNames] puts them in then).
+  static void _fullPapers(Map deck) {
+    _eachElement(deck, (e) {
+      final r = e['imageRef'];
+      if (r is String && r.startsWith(_kPaperRef)) e['imageRef'] = ngmyHatiPhotoArtUrl(r.substring(_kPaperRef.length)) ?? r;
+    });
+  }
+
+  /// Puts the paper pictures into documents that still have only a paper's short name. True when one changed.
+  static bool fillPaperNames(Iterable<NgmySlideDeck> decks) {
+    var changed = false;
+    for (final d in decks) {
+      for (final s in d.slides) {
+        for (final e in s.elements) {
+          final r = e.imageRef;
+          if (r == null || !r.startsWith(_kPaperRef)) continue;
+          final url = ngmyHatiPhotoArtUrl(r.substring(_kPaperRef.length));
+          if (url == null) continue;
+          e.imageRef = url;
+          changed = true;
+        }
+      }
+    }
+    return changed;
+  }
+
+  static void _eachElement(Map deck, void Function(Map e) visit) {
+    final slides = deck['slides'];
+    if (slides is! List) return;
+    for (final s in slides) {
+      if (s is! Map) continue;
+      final elements = s['elements'];
+      if (elements is! List) continue;
+      for (final e in elements) {
+        if (e is Map) visit(e);
+      }
+    }
+  }
 
   /// Parses a saved library. One bad deck never wipes the rest.
   static List<NgmySlideDeck> parseDecksJson(String raw) {
@@ -1100,6 +1158,7 @@ class NgmySlidesStorage {
       for (final item in decoded) {
         if (item is! Map) continue;
         try {
+          _fullPapers(item);
           decks.add(NgmySlideDeck.fromJson(Map<String, dynamic>.from(item)));
         } catch (_) {}
       }
@@ -1141,9 +1200,16 @@ class NgmySlidesStorage {
 
   static Future<List<NgmySlideDeck>> loadDecks(String email) async {
     final key = _emailKey(email);
+    // The paper pictures are read in the meantime; a paper saved by its short name whose picture is not read yet is
+    // filled in by [fillPaperNames] (waiting here would hold the documents back).
+    unawaited(ngmyHatiPhotoArtLoad());
+    // The same saved text in two places is read once (reading it is the slow part).
+    final parsed = <String, List<NgmySlideDeck>>{};
+    var biggest = 0;
     List<NgmySlideDeck> fromRaw(String? raw) {
       if (raw == null || raw.trim().isEmpty) return [];
-      return parseDecksJson(raw);
+      if (raw.length > biggest) biggest = raw.length;
+      return parsed[raw] ??= parseDecksJson(raw);
     }
 
     var idbDecks = <NgmySlideDeck>[];
@@ -1160,6 +1226,11 @@ class NgmySlidesStorage {
     final memoryDecks = fromRaw(_memoryJson[key]);
     final merged = mergeDecks(mergeDecks(idbDecks, prefsDecks), memoryDecks);
     if (merged.isEmpty) return _preferRicher(_preferRicher(idbDecks, prefsDecks), memoryDecks);
+    // Saved before the papers were kept by name: saved again once, small, so the next start reads it quickly.
+    if (biggest > 1500000 && _compacted.add(key)) {
+      _lastSaved[key] ??= merged;
+      unawaited(saveDecks(email, merged));
+    }
     return merged;
   }
 
@@ -1203,7 +1274,7 @@ class NgmySlidesStorage {
     final merged = byId.values.where((d) => !deleted.contains(d.id)).toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     _lastSaved[key] = merged;
-    final raw = jsonEncode(merged.map((d) => d.toJson()).toList());
+    final raw = jsonEncode(merged.map((d) => _shortPapers(d.toJson())).toList());
     _memoryJson[key] = raw;
     try {
       await ngmySlidesIdbPut(key, raw);

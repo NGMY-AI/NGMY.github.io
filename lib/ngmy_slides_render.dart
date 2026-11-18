@@ -403,7 +403,8 @@ class NgmySlideElementView extends StatelessWidget {
         final dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 2.0;
         final w = c.maxWidth.isFinite ? c.maxWidth : 0.0;
         // Sharp enough for a downloaded picture or video too, which are drawn bigger than the screen.
-        final target = w <= 0 ? null : (w * math.max(dpr, 5.0)).clamp(96.0, 1500.0).round();
+        final preview = NgmySlidePreviewImages.of(context);
+        final target = w <= 0 ? null : (w * (preview ?? math.max(dpr, 5.0))).clamp(preview == null ? 96.0 : 48.0, 1500.0).round();
         return Image.memory(
           bytes,
           key: ValueKey('img_${element.id}_${bytes.length}'),
@@ -973,6 +974,19 @@ Widget ngmyEntranceAt(NgmySlideTransition transition, double p, Widget child) {
         return Transform.translate(offset: Offset((1 - t) * 24, 0), child: Opacity(opacity: t, child: child));
     }
   }
+
+/// Pictures inside a small preview (a template card) are decoded only as big as [pixelsPerPoint] times the space they
+/// are drawn in, not sharp enough for a download. Big pictures decoded for small cards made the list stutter.
+class NgmySlidePreviewImages extends InheritedWidget {
+  const NgmySlidePreviewImages({super.key, this.pixelsPerPoint = 1.6, required super.child});
+
+  final double pixelsPerPoint;
+
+  static double? of(BuildContext context) => context.dependOnInheritedWidgetOfExactType<NgmySlidePreviewImages>()?.pixelsPerPoint;
+
+  @override
+  bool updateShouldNotify(NgmySlidePreviewImages old) => old.pixelsPerPoint != pixelsPerPoint;
+}
 
 /// Slide renderer with animated text/element entrances for Present mode.
 class NgmySlideAnimatedRender extends StatelessWidget {
