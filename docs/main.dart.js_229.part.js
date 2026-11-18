@@ -13,6 +13,6 @@ gX(d){return C.bv("tnum",1,A.i,A.i,A.i,A.i,A.i,A.i,A.i,A.i,A.i,A.i,A.i,A.i,A.i,A
 v(d){return"FontFeature('tnum', 1)"}}
 var z=a.updateTypes([]);(function inheritance(){var y=a.inherit
 y(B.a63,C.aF)})();(function constants(){var y=a.makeConstList
-D.bbV=new B.a63()
-D.a62=y([D.bbV],C.at("O<a63>"))})()};
-(a=>{a["968qQuuZN+i1n4Puj7FRdze//F8="]=a.current})($__dart_deferred_initializers__);
+D.bbW=new B.a63()
+D.a60=y([D.bbW],C.at("O<a63>"))})()};
+(a=>{a["epbAvgu/+JX/r3+CtZHI/u3Gu5g="]=a.current})($__dart_deferred_initializers__);

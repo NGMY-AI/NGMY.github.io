@@ -5,5 +5,5 @@ C=c[2]
 B=c[203]
 var z=a.updateTypes([]);(function constants(){B.lI=new A.u(1,0.5450980392156862,0.27058823529411763,0.07450980392156863,C.q)
 B.ajP=new A.u(1,0.07058823529411765,0.0392156862745098,0.13333333333333333,C.q)
-B.a4c=new A.a_(984557,"MaterialIcons",!1)})()};
-(a=>{a["CWsmjoGeC0cgvLbL5u4H4FA4uuI="]=a.current})($__dart_deferred_initializers__);
+B.a4a=new A.a_(984557,"MaterialIcons",!1)})()};
+(a=>{a["ehbQqdkfh3i1qP1npayNIshOUr4="]=a.current})($__dart_deferred_initializers__);
