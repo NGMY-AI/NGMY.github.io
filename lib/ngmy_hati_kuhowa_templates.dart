@@ -1975,13 +1975,15 @@ class _ExactSpec {
     this.stateColor = 0xFF2A1A10,
     this.stateFx = 'serif',
     this.couple,
+    this.parents,
   });
 
   /// The picture (assets/hati/<art>.jpg; <art>_notitle.jpg has the title wiped; <art>_couple.jpg is the couple).
   final String art;
   final double width, height;
   final _Px title, tareheLabel, tareheDate, paragraph, section, subtitle, akunaText, akunaBox, mwName, mwSign;
-  final _Px? state, couple;
+  /// [parents]: the groom's parents, on the designs that have them (the AI can paint them with the family's own faces).
+  final _Px? state, couple, parents;
   final int titleColor, tareheColor, paraInk, sectionColor, subtitleColor, itemInk, akunaColor, witnessInk, mwInk, stateColor;
   final String titleFx, tareheFx, paraFx, sectionFx, subtitleFx, itemFx, fieldFx, stateFx;
   final TextAlign paraAlign;
@@ -2119,6 +2121,7 @@ const _ExactSpec _kExactKijiji = _ExactSpec(
   width: 1054,
   height: 1492,
   couple: (0, 0, 480, 560),
+  parents: (800, 270, 1050, 522),
   title: (470, 108, 842, 255),
   titleColor: 0xFFF2C14E,
   titleFx: 'goldserif',
@@ -2486,17 +2489,22 @@ double? ngmyHatiPaperAspect(String templateId) {
 
 /// The couple picture of an exact paper (its box in the page, as fractions, and the picture), or null for a paper
 /// without one. The AI redraws this picture with the people's own faces.
-({double x, double y, double w, double h, String asset, String art})? ngmyHatiCoupleArea(String templateId) {
+({double x, double y, double w, double h, String asset, String art})? ngmyHatiCoupleArea(String templateId) => _peopleArea(templateId, parents: false);
+
+/// The groom's parents on an exact paper that has them (Mkataba wa Ndoa Kijiji), like [ngmyHatiCoupleArea].
+({double x, double y, double w, double h, String asset, String art})? ngmyHatiParentsArea(String templateId) => _peopleArea(templateId, parents: true);
+
+({double x, double y, double w, double h, String asset, String art})? _peopleArea(String templateId, {required bool parents}) {
   final t = ngmyHatiKuhowaTemplateById(templateId);
   final spec = t == null ? null : _exactSpecFor(t.paperStyle);
-  final c = spec?.couple;
+  final c = parents ? spec?.parents : spec?.couple;
   if (spec == null || c == null) return null;
   return (
     x: spec.mx(c.$1) / spec.pageW,
     y: spec.my(c.$2) / spec.pageH,
     w: (c.$3 - c.$1) / spec.pageW,
     h: (spec.my(c.$4) - spec.my(c.$2)) / spec.pageH,
-    asset: 'assets/hati/${spec.art}_couple.jpg',
+    asset: 'assets/hati/${spec.art}_${parents ? 'parents' : 'couple'}.jpg',
     art: spec.art,
   );
 }

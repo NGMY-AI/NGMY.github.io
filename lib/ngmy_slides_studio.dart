@@ -678,7 +678,18 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
         unawaited(_persistDecks());
       }
     }
-    if (!_isTransferredReadOnly(openDeck)) unawaited(_maybeShowMarriageHint());
+    // A new document on a paper with people on it: the family is asked for their photos straight away (they can say not
+    // now and do it later from the three dots).
+    final askForFaces = !alreadySaved && !_isTransferredReadOnly(openDeck) && ngmyHatiHasCouplePicture(working);
+    if (askForFaces) {
+      await _maybeShowMarriageHint();
+      final page = _currentSlide;
+      if (mounted && page != null && identical(_activeDeck, working)) {
+        await ngmyHatiOpenCouplePicture(context, working, page, (change) => _mutate(change), firstTime: true);
+      }
+    } else if (!_isTransferredReadOnly(openDeck)) {
+      unawaited(_maybeShowMarriageHint());
+    }
     if (mounted &&
         !_isTransferredReadOnly(openDeck) &&
         ngmyIsHatiKiapoUongoziDeck(openDeck.deckKind) &&
@@ -4487,7 +4498,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                 ],
                 // The owner's own designs: the AI paints the couple at the top with the family's own faces.
                 if (canEdit && ngmyHatiHasCouplePicture(deck))
-                  _moreItem('couple', Icons.face_retouching_natural_rounded, const Color(0xFFF2C14E), 'Couple picture (AI)', 'Put your own faces in the picture', isDark),
+                  _moreItem('couple', Icons.face_retouching_natural_rounded, const Color(0xFFF2C14E), ngmyHatiHasParentsPicture(deck) ? 'Couple and parents (AI)' : 'Couple picture (AI)', 'Put your own faces in the picture', isDark),
                 // Last: pin this paper so it comes first in the paper picker (up to four), or unpin it.
                 if (paperId != null) ...[
                   const PopupMenuDivider(height: 10),

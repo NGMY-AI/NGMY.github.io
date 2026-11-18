@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:ngmy/ngmy_hati_couple_ai.dart';
@@ -43,6 +44,15 @@ void main() {
 
     }
     expect(ngmyHatiCoupleArea('royal_maroon'), isNull, reason: 'only the owner designs have a couple picture');
+    // The groom's parents: only Mkataba wa Ndoa Kijiji has them, with their own picture for the AI.
+    final parents = ngmyHatiParentsArea('exact_kijiji')!;
+    expect(parents.asset, 'assets/hati/exact_kijiji_parents.jpg');
+    expect(await rootBundle.load(parents.asset), isNotNull);
+    expect(parents.x, greaterThan(0.7), reason: 'beside the hut, on the right');
+    expect(parents.x + parents.w, lessThanOrEqualTo(1.0001));
+    for (final id in ['exact_kifalme', 'photo_village', 'photo_sunset', 'royal_maroon']) {
+      expect(ngmyHatiParentsArea(id), isNull, reason: id);
+    }
   });
 
   test('the AI couple is laid into the paper exactly at the couple place', () async {

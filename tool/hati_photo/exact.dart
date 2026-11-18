@@ -84,6 +84,177 @@ void wipe(img.Image im, int x0, int y0, int x1, int y1, {int seed = 1, double si
   }
 }
 
+/// [a] grown ([on] true) or shrunk ([on] false) by [r] pixels.
+List<List<bool>> growMask(List<List<bool>> a, int r, bool on) {
+  final h = a.length, w = a.first.length;
+  return [
+    for (var y = 0; y < h; y++)
+      [
+        for (var x = 0; x < w; x++)
+          () {
+            for (var j = -r; j <= r; j++) {
+              for (var i = -r; i <= r; i++) {
+                if (i * i + j * j > r * r) continue;
+                final yy = y + j, xx = x + i;
+                final v = yy >= 0 && xx >= 0 && yy < h && xx < w && a[yy][xx];
+                if (v == on) return on;
+              }
+            }
+            return !on;
+          }()
+      ]
+  ];
+}
+
+/// [m] with its holes filled (whatever the outside cannot reach is inside).
+List<List<bool>> fillHoles(List<List<bool>> m) {
+  final h = m.length, w = m.first.length;
+  final out = [for (var y = 0; y < h; y++) List<bool>.filled(w, false)];
+  final stack = <(int, int)>[for (var x = 0; x < w; x++) ...[(x, 0), (x, h - 1)], for (var y = 0; y < h; y++) ...[(0, y), (w - 1, y)]];
+  while (stack.isNotEmpty) {
+    final (x, y) = stack.removeLast();
+    if (x < 0 || y < 0 || x >= w || y >= h || out[y][x] || m[y][x]) continue;
+    out[y][x] = true;
+    stack.addAll([(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]);
+  }
+  return [for (var y = 0; y < h; y++) [for (var x = 0; x < w; x++) !out[y][x]]];
+}
+
+/// The map of the Congo in its flag, cut from the owner royal design (its bottom-left corner), where it has the true
+/// shape of the country: the blue of the flag, with the star and the stripe closed in.
+(img.Image, List<List<bool>>) congoMapSprite() {
+  final im = img.decodeWebP(File('tool/hati_photo/owner_royal_couple.webp').readAsBytesSync())!;
+  final c = img.copyCrop(im, x: 30, y: 1260, width: 200, height: 225);
+  final w = c.width, h = c.height;
+  var m = [
+    for (var y = 0; y < h; y++)
+      [
+        for (var x = 0; x < w; x++)
+          () {
+            final p = c.getPixel(x, y);
+            return (p.b > 170 && p.r < 90 && p.g > 70) || (p.b > 150 && p.r < 150 && p.g < 90);
+          }()
+      ]
+  ];
+  // Tiny specks of blue elsewhere are dropped; then the stripe is bridged and the star filled.
+  m = growMask(growMask(m, 3, false), 3, true);
+  m = fillHoles(growMask(growMask(m, 22, true), 22, false));
+  return (c, m);
+}
+
+/// Puts the true Congo map over the old one in [old] (x0, y0, x1, y1): the old map (its flag colours and its light
+/// edge) is painted over with the picture around it, then the new one is laid in, as tall as the old one, with a thin
+/// light edge and a soft shadow like the design own map.
+void congoMap(img.Image im, List<int> old, {bool wipeOld = true}) {
+  if (wipeOld) {
+    final w = old[2] - old[0], h = old[3] - old[1];
+    var m = [
+      for (var y = 0; y < h; y++)
+        [
+          for (var x = 0; x < w; x++)
+            () {
+              final p = im.getPixel(old[0] + x, old[1] + y);
+              final blue = p.b > 150 && p.r < 110 && p.g < 170;
+              final red = p.r > 160 && p.g < 100 && p.b < 100;
+              final yellow = p.r > 200 && p.g > 160 && p.b < 110;
+              return blue || red || yellow;
+            }()
+        ]
+    ];
+    m = growMask(fillHoles(growMask(growMask(m, 10, true), 10, false)), 7, true);
+    // Filled in from the outside inward, each spot the average of its finished neighbours.
+    final done = [for (var y = 0; y < h; y++) [for (var x = 0; x < w; x++) !m[y][x]]];
+    var left = m.expand((r) => r).where((v) => v).length;
+    while (left > 0) {
+      final next = <(int, int, int, int, int)>[];
+      for (var y = 0; y < h; y++) {
+        for (var x = 0; x < w; x++) {
+          if (done[y][x]) continue;
+          var r = 0, g = 0, b = 0, n = 0;
+          for (final (i, j) in const [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1)]) {
+            final xx = x + i, yy = y + j;
+            final inBox = xx >= 0 && yy >= 0 && xx < w && yy < h;
+            if (inBox && !done[yy][xx]) continue;
+            final p = im.getPixel((old[0] + xx).clamp(0, im.width - 1), (old[1] + yy).clamp(0, im.height - 1));
+            r += p.r.toInt();
+            g += p.g.toInt();
+            b += p.b.toInt();
+            n++;
+          }
+          if (n >= 2) next.add((x, y, r ~/ n, g ~/ n, b ~/ n));
+        }
+      }
+      if (next.isEmpty) break;
+      for (final (x, y, r, g, b) in next) {
+        im.setPixelRgb(old[0] + x, old[1] + y, r, g, b);
+        done[y][x] = true;
+      }
+      left -= next.length;
+    }
+  }
+  final (sprite, mask) = congoMapSprite();
+  var bx0 = sprite.width, by0 = sprite.height, bx1 = 0, by1 = 0;
+  for (var y = 0; y < sprite.height; y++) {
+    for (var x = 0; x < sprite.width; x++) {
+      if (!mask[y][x]) continue;
+      bx0 = math.min(bx0, x);
+      by0 = math.min(by0, y);
+      bx1 = math.max(bx1, x);
+      by1 = math.max(by1, y);
+    }
+  }
+  final s = (old[3] - old[1]) / (by1 - by0 + 1);
+  final dw = ((bx1 - bx0 + 1) * s).round(), dh = ((by1 - by0 + 1) * s).round();
+  final ox = ((old[0] + old[2]) / 2 - dw / 2).round(), oy = ((old[1] + old[3]) / 2 - dh / 2).round();
+  // How much of a page spot the map covers (0 to 1), from the mask smoothly scaled: soft, not blocky, edges.
+  double cover(double x, double y) {
+    final sx = bx0 + x / s - 0.5, sy = by0 + y / s - 0.5;
+    final ix = sx.floor(), iy = sy.floor(), fx = sx - ix, fy = sy - iy;
+    double at(int xx, int yy) => xx >= 0 && yy >= 0 && xx < sprite.width && yy < sprite.height && mask[yy][xx] ? 1 : 0;
+    return at(ix, iy) * (1 - fx) * (1 - fy) + at(ix + 1, iy) * fx * (1 - fy) + at(ix, iy + 1) * (1 - fx) * fy + at(ix + 1, iy + 1) * fx * fy;
+  }
+
+  // The most the map covers within [r] pixels: the light edge and the shadow come from it.
+  double near(double x, double y, int r) {
+    var best = 0.0;
+    for (var j = -r; j <= r; j++) {
+      for (var i = -r; i <= r; i++) {
+        if (i * i + j * j > r * r) continue;
+        best = math.max(best, cover(x + i, y + j) * (1 - math.sqrt(i * i + j * j) / (r + 1)));
+      }
+    }
+    return best;
+  }
+
+  for (var y = -12; y < dh + 12; y++) {
+    for (var x = -12; x < dw + 12; x++) {
+      final px = ox + x, py = oy + y;
+      if (px < 0 || py < 0 || px >= im.width || py >= im.height) continue;
+      final o = im.getPixel(px, py);
+      var r = o.r.toDouble(), g = o.g.toDouble(), b = o.b.toDouble();
+      // A soft shadow down and to the right.
+      final sh = near(x + 0.5 - 4, y + 0.5 - 5, 6) * 0.4;
+      r *= 1 - sh;
+      g *= 1 - sh;
+      b *= 1 - sh;
+      // A thin light gold edge.
+      final edge = math.min(1.0, near(x + 0.5, y + 0.5, 3) * 1.6);
+      r = r * (1 - edge) + 255 * edge;
+      g = g * (1 - edge) + 236 * edge;
+      b = b * (1 - edge) + 170 * edge;
+      // The map itself.
+      final a = cover(x + 0.5, y + 0.5);
+      if (a > 0) {
+        final p = sprite.getPixelInterpolate(bx0 + (x + 0.5) / s - 0.5, by0 + (y + 0.5) / s - 0.5, interpolation: img.Interpolation.linear);
+        r = r * (1 - a) + p.r * a;
+        g = g * (1 - a) + p.g * a;
+        b = b * (1 - a) + p.b * a;
+      }
+      im.setPixelRgb(px, py, r.round().clamp(0, 255), g.round().clamp(0, 255), b.round().clamp(0, 255));
+    }
+  }
+}
+
 void save(img.Image im, String name, {int quality = 80}) {
   final f = File('assets/hati/$name.jpg')..writeAsBytesSync(img.encodeJpg(im, quality: quality));
   stdout.writeln('${f.path} ${f.lengthSync() ~/ 1024} KB');
@@ -98,7 +269,7 @@ final String? _only = Platform.environment['ONLY'];
 /// [rect] (x0, y0, x1, y1 in the 2 x 2 picture): exactly one design, cut on its own outer border (the dark lines
 /// between the designs and every bit of the neighbours left out). The numbers of [words], [title] and [couple] are in
 /// the old frame (the quarter of the picture drawn twice as big); [rect] moves them onto the new cut.
-void build(String src, String name, List<List<int>> words, List<int> title, List<int>? couple, {int quarter = -1, List<int>? rect, List<List<int>> keepAlso = const [], bool centre = false, int band = 0, List<List<int>> sprites = const [], List<List<int>> fills = const [], List<int>? paper}) {
+void build(String src, String name, List<List<int>> words, List<int> title, List<int>? couple, {int quarter = -1, List<int>? rect, List<List<int>> keepAlso = const [], bool centre = false, int band = 0, List<List<int>> sprites = const [], List<List<int>> fills = const [], List<int>? paper, List<int>? congo, List<int>? parents}) {
   if (_only != null && _only != name) return;
   var im = img.decodeWebP(File('tool/hati_photo/$src').readAsBytesSync())!;
   var dx = 0, dy = 0;
@@ -117,12 +288,19 @@ void build(String src, String name, List<List<int>> words, List<int> title, List
   if (c != null) {
     save(img.copyCrop(im, x: c[0], y: c[1], width: c[2] - c[0], height: c[3] - c[1]), '${name}_couple', quality: 90);
   }
+  // The groom's parents (on the designs that have them), for the AI too.
+  if (parents != null) {
+    final p = mv(parents);
+    save(img.copyCrop(im, x: p[0], y: p[1], width: p[2] - p[0], height: p[3] - p[1]), '${name}_parents', quality: 90);
+  }
   var seed = 1;
   for (final w0 in words) {
     final w = mv(w0);
     // A fifth number is how much the sides count (out of 100); small plaques and labels blend from the sides only.
     wipe(im, w[0], w[1], w[2], w[3], seed: seed++, sides: w.length > 4 ? w[4] / 100 : 1.0, smooth: w.length > 4);
   }
+  // [congo]: a map of the Congo that does not have the true shape of the country, swapped for the true one.
+  if (congo != null) congoMap(im, mv(congo));
   // Made as tall as every other Hati paper (9 by 16): only plain rows (no words, no lines across) grow taller,
   // so the words, the badges and the pictures keep their own shape.
   final keep = [for (final w0 in words) if (w0.length <= 4) [mv(w0)[1], mv(w0)[3]], [mv(title)[1], mv(title)[3]], if (c != null) [c[1], c[3]], for (final k in keepAlso) [k[0] - dy, k[1] - dy]];
@@ -216,6 +394,8 @@ void build(String src, String name, List<List<int>> words, List<int> title, List
   save(tall, name);
   final t = mv(title);
   wipe(im, t[0], t[1], t[2], t[3], seed: 99, smooth: true);
+  // The title space touches the map: the map is laid in again over the wiped title.
+  if (congo != null) congoMap(im, mv(congo), wipeOld: false);
   save(tallOf(im), '${name}_notitle');
   // The map, every 4 rows, so the app puts its words on the same spots of the taller page.
   final ys = [for (var y = 0; y <= im.height; y += 4) map[math.min(y, im.height)].toStringAsFixed(1)];
@@ -377,6 +557,8 @@ void main() {
     ],
     [460, 102, 850, 268], // HATI YA KUHOWA
     [0, 0, 480, 560], // the couple
+    congo: [803, 15, 983, 198],
+    parents: [800, 270, 1050, 522],
   );
   // Royal couple: navy and gold, the crown, the carved figures, the roses.
   build(
