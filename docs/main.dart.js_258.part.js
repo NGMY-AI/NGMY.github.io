@@ -6,8 +6,8 @@ _.c=f
 _.d=g},a2:function a2(d,e,f){this.a=d
 this.b=e
 this.c=f},
-hjz(d,e){C.cg(null,C.a0(209,D.w.l()>>>16&255,D.w.l()>>>8&255,D.w.l()&255),!0,null,new B.h2b(e),d,null,!0,!0,y.H)},
-h2b:function h2b(d){this.a=d},
+hjA(d,e){C.cg(null,C.a0(209,D.w.l()>>>16&255,D.w.l()>>>8&255,D.w.l()&255),!0,null,new B.h2c(e),d,null,!0,!0,y.H)},
+h2c:function h2c(d){this.a=d},
 a0L:function a0L(d,e){this.c=d
 this.a=e},
 aFF:function aFF(d,e,f,g,h){var _=this
@@ -31,60 +31,60 @@ _.id=f
 _.cO$=g
 _.b8$=h
 _.c=_.a=null},
-e5A:function e5A(d,e,f,g){var _=this
+e5B:function e5B(d,e,f,g){var _=this
 _.a=d
 _.b=e
 _.c=f
 _.d=g},
-e5z:function e5z(d,e){this.a=d
+e5A:function e5A(d,e){this.a=d
 this.b=e},
-e5s:function e5s(d,e,f){this.a=d
+e5t:function e5t(d,e,f){this.a=d
 this.b=e
 this.c=f},
-e5t:function e5t(d){this.a=d},
-e5r:function e5r(d){this.a=d},
-e5P:function e5P(d,e){this.a=d
+e5u:function e5u(d){this.a=d},
+e5s:function e5s(d){this.a=d},
+e5Q:function e5Q(d,e){this.a=d
 this.b=e},
-e5Q:function e5Q(d){this.a=d},
-e5O:function e5O(d){this.a=d},
-e5Z:function e5Z(d,e){this.a=d
+e5R:function e5R(d){this.a=d},
+e5P:function e5P(d){this.a=d},
+e6_:function e6_(d,e){this.a=d
 this.b=e},
-e5Y:function e5Y(d){this.a=d},
-e5w:function e5w(d){this.a=d},
+e5Z:function e5Z(d){this.a=d},
+e5x:function e5x(d){this.a=d},
+e5w:function e5w(d,e){this.a=d
+this.b=e},
 e5v:function e5v(d,e){this.a=d
 this.b=e},
-e5u:function e5u(d,e){this.a=d
+e5H:function e5H(d){this.a=d},
+e5G:function e5G(d,e){this.a=d
 this.b=e},
-e5G:function e5G(d){this.a=d},
 e5F:function e5F(d,e){this.a=d
 this.b=e},
-e5E:function e5E(d,e){this.a=d
-this.b=e},
-e5B:function e5B(d){this.a=d},
 e5C:function e5C(d){this.a=d},
 e5D:function e5D(d){this.a=d},
-e5I:function e5I(d,e){this.a=d
+e5E:function e5E(d){this.a=d},
+e5J:function e5J(d,e){this.a=d
 this.b=e},
-e5K:function e5K(d){this.a=d},
-e5J:function e5J(d){this.a=d},
-e5S:function e5S(d,e,f){this.a=d
-this.b=e
-this.c=f},
-e5T:function e5T(d){this.a=d},
-e5R:function e5R(d){this.a=d},
-e5X:function e5X(d){this.a=d},
-e5M:function e5M(d,e){this.a=d
-this.b=e},
-e5N:function e5N(d){this.a=d},
 e5L:function e5L(d){this.a=d},
-e5V:function e5V(d,e,f){this.a=d
+e5K:function e5K(d){this.a=d},
+e5T:function e5T(d,e,f){this.a=d
 this.b=e
 this.c=f},
-e5W:function e5W(d){this.a=d},
 e5U:function e5U(d){this.a=d},
-e5x:function e5x(d){this.a=d},
+e5S:function e5S(d){this.a=d},
+e5Y:function e5Y(d){this.a=d},
+e5N:function e5N(d,e){this.a=d
+this.b=e},
+e5O:function e5O(d){this.a=d},
+e5M:function e5M(d){this.a=d},
+e5W:function e5W(d,e,f){this.a=d
+this.b=e
+this.c=f},
+e5X:function e5X(d){this.a=d},
+e5V:function e5V(d){this.a=d},
 e5y:function e5y(d){this.a=d},
-e5H:function e5H(d,e,f){this.a=d
+e5z:function e5z(d){this.a=d},
+e5I:function e5I(d,e,f){this.a=d
 this.b=e
 this.c=f},
 a_b:function a_b(d,e,f){this.a=d
@@ -93,98 +93,98 @@ this.c=f},
 a25:function a25(d,e){this.a=d
 this.b=e},
 aO1:function aO1(){},
-h1F(d,e){var x=0,w=C.j(y.H),v,u
-var $async$h1F=C.e(function(f,g){if(f===1)return C.f(g,w)
+h1G(d,e){var x=0,w=C.j(y.H),v,u
+var $async$h1G=C.e(function(f,g){if(f===1)return C.f(g,w)
 for(;;)switch(x){case 0:u=C.qX(d,!0)
 u.toString
 v=C.dl()
-v.b=C.pB(new B.h1H(e,v),!1,!1)
+v.b=C.pB(new B.h1I(e,v),!1,!1)
 u.md(0,v.bm())
 return C.h(null,w)}})
-return C.i($async$h1F,w)},
-h27(d,e){var x=0,w=C.j(y.H),v,u
-var $async$h27=C.e(function(f,g){if(f===1)return C.f(g,w)
+return C.i($async$h1G,w)},
+h28(d,e){var x=0,w=C.j(y.H),v,u
+var $async$h28=C.e(function(f,g){if(f===1)return C.f(g,w)
 for(;;)switch(x){case 0:u=C.qX(d,!0)
 u.toString
 v=C.dl()
-v.b=C.pB(new B.h29(e,v),!1,!1)
+v.b=C.pB(new B.h2a(e,v),!1,!1)
 u.md(0,v.bm())
 return C.h(null,w)}})
-return C.i($async$h27,w)},
-h1H:function h1H(d,e){this.a=d
+return C.i($async$h28,w)},
+h1I:function h1I(d,e){this.a=d
 this.b=e},
-h1G:function h1G(d){this.a=d},
-h29:function h29(d,e){this.a=d
+h1H:function h1H(d){this.a=d},
+h2a:function h2a(d,e){this.a=d
 this.b=e},
-h28:function h28(d){this.a=d},
+h29:function h29(d){this.a=d},
 a_f:function a_f(d,e,f){this.c=d
 this.d=e
 this.a=f},
-be8:function be8(d,e){var _=this
+be9:function be9(d,e){var _=this
 _.d=$
 _.bw$=d
 _.a9$=e
 _.c=_.a=null},
-d8i:function d8i(d){this.a=d},
+d8j:function d8j(d){this.a=d},
 a_R:function a_R(d,e,f){this.c=d
 this.d=e
 this.a=f},
-bhT:function bhT(d,e){var _=this
+bhU:function bhU(d,e){var _=this
 _.e=_.d=$
 _.cO$=d
 _.b8$=e
 _.c=_.a=null},
-dk0:function dk0(d,e){this.a=d
+dk1:function dk1(d,e){this.a=d
 this.b=e},
 aMq:function aMq(){},
 aMT:function aMT(){},
-h3P(d,e,f){var x=0,w=C.j(y.H),v,u
-var $async$h3P=C.e(function(g,h){if(g===1)return C.f(h,w)
+h3Q(d,e,f){var x=0,w=C.j(y.H),v,u
+var $async$h3Q=C.e(function(g,h){if(g===1)return C.f(h,w)
 for(;;)switch(x){case 0:u=C.qX(d,!0)
 u.toString
 v=C.dl()
-v.b=C.pB(new B.h3R(f,e,v),!1,!1)
+v.b=C.pB(new B.h3S(f,e,v),!1,!1)
 u.md(0,v.bm())
 x=2
-return C.b(C.bN(D.qF,null,y.H),$async$h3P)
+return C.b(C.bN(D.qF,null,y.H),$async$h3Q)
 case 2:J.lM(v.bm())
 return C.h(null,w)}})
-return C.i($async$h3P,w)},
-h3M(d,e,f,g){var x=0,w=C.j(y.H),v,u
-var $async$h3M=C.e(function(h,i){if(h===1)return C.f(i,w)
+return C.i($async$h3Q,w)},
+h3N(d,e,f,g){var x=0,w=C.j(y.H),v,u
+var $async$h3N=C.e(function(h,i){if(h===1)return C.f(i,w)
 for(;;)switch(x){case 0:u=C.qX(d,!0)
 u.toString
 v=C.dl()
-v.b=C.pB(new B.h3O(g,e,f,D.bE,v),!1,!1)
+v.b=C.pB(new B.h3P(g,e,f,D.bE,v),!1,!1)
 u.md(0,v.bm())
 x=2
-return C.b(C.bN(A.alX,null,y.H),$async$h3M)
+return C.b(C.bN(A.alX,null,y.H),$async$h3N)
 case 2:J.lM(v.bm())
 return C.h(null,w)}})
-return C.i($async$h3M,w)},
-h3R:function h3R(d,e,f){this.a=d
+return C.i($async$h3N,w)},
+h3S:function h3S(d,e,f){this.a=d
 this.b=e
 this.c=f},
-h3Q:function h3Q(d){this.a=d},
-h3O:function h3O(d,e,f,g,h){var _=this
+h3R:function h3R(d){this.a=d},
+h3P:function h3P(d,e,f,g,h){var _=this
 _.a=d
 _.b=e
 _.c=f
 _.d=g
 _.e=h},
-h3N:function h3N(d){this.a=d},
+h3O:function h3O(d){this.a=d},
 a0f:function a0f(d,e,f,g){var _=this
 _.c=d
 _.d=e
 _.e=f
 _.a=g},
-bkz:function bkz(d,e){var _=this
+bkA:function bkA(d,e){var _=this
 _.d=$
 _.bw$=d
 _.a9$=e
 _.c=_.a=null},
+dtU:function dtU(d){this.a=d},
 dtT:function dtT(d){this.a=d},
-dtS:function dtS(d){this.a=d},
 a0e:function a0e(d,e,f,g,h,i){var _=this
 _.c=d
 _.d=e
@@ -192,30 +192,30 @@ _.e=f
 _.f=g
 _.r=h
 _.a=i},
-bky:function bky(d,e){var _=this
+bkz:function bkz(d,e){var _=this
 _.d=$
 _.bw$=d
 _.a9$=e
 _.c=_.a=null},
-dtR:function dtR(d){this.a=d},
-dtQ:function dtQ(d,e){this.a=d
+dtS:function dtS(d){this.a=d},
+dtR:function dtR(d,e){this.a=d
 this.b=e},
 aNj:function aNj(){},
 aNk:function aNk(){},
-cg5(){var x=0,w=C.j(y.h),v,u,t,s
-var $async$cg5=C.e(function(d,e){if(d===1)return C.f(e,w)
+cg6(){var x=0,w=C.j(y.h),v,u,t,s
+var $async$cg6=C.e(function(d,e){if(d===1)return C.f(e,w)
 for(;;)switch(x){case 0:x=3
-return C.b(C.aA(),$async$cg5)
+return C.b(C.aA(),$async$cg6)
 case 3:u=e.a
 t=J.a8(u)
 s=C.eo(t.h(u,"ngmy_fun_games_category"))
 s=D.o.D(s==null?0:s,0,3)
 u=C.eo(t.h(u,"ngmy_fun_games_love_tab"))
-v=new C.brj(s,D.o.D(u==null?0:u,0,3))
+v=new C.brk(s,D.o.D(u==null?0:u,0,3))
 x=1
 break
 case 1:return C.h(v,w)}})
-return C.i($async$cg5,w)},
+return C.i($async$cg6,w)},
 aru(d){var x=0,w=C.j(y.H),v
 var $async$aru=C.e(function(e,f){if(e===1)return C.f(f,w)
 for(;;)switch(x){case 0:x=2
@@ -227,14 +227,14 @@ case 3:x=4
 return C.b(v.aC("Bool","ngmy_fun_games_seen_v1",!0),$async$aru)
 case 4:return C.h(null,w)}})
 return C.i($async$aru,w)},
-b1O(d){var x=0,w=C.j(y.H)
-var $async$b1O=C.e(function(e,f){if(e===1)return C.f(f,w)
+b1P(d){var x=0,w=C.j(y.H)
+var $async$b1P=C.e(function(e,f){if(e===1)return C.f(f,w)
 for(;;)switch(x){case 0:x=3
-return C.b(C.aA(),$async$b1O)
+return C.b(C.aA(),$async$b1P)
 case 3:x=2
-return C.b(f.aC("Int","ngmy_fun_games_love_tab",D.o.D(d,0,3)),$async$b1O)
+return C.b(f.aC("Int","ngmy_fun_games_love_tab",D.o.D(d,0,3)),$async$b1P)
 case 2:return C.h(null,w)}})
-return C.i($async$b1O,w)},
+return C.i($async$b1P,w)},
 Ov(d){var x=0,w=C.j(y.H),v,u,t,s,r
 var $async$Ov=C.e(function(e,f){if(e===1)return C.f(f,w)
 for(;;)switch(x){case 0:x=3
@@ -304,7 +304,7 @@ q=J.a8(r)
 p=C.eo(q.h(r,f))
 if(p==null)p=0
 u=C.eo(q.h(r,g))
-v=B.hrK(d,e,u==null?0:u,p,s)
+v=B.hrL(d,e,u==null?0:u,p,s)
 x=1
 break
 case 1:return C.h(v,w)}})
@@ -332,7 +332,7 @@ l=p
 k=q
 x=6
 return C.b(B.arv(),$async$Ot)
-case 6:v=o.hrK(n,m,l,k,i)
+case 6:v=o.hrL(n,m,l,k,i)
 x=1
 break
 case 1:return C.h(v,w)}})
@@ -371,7 +371,7 @@ q=D.o.F(s,d)
 p=C.aV(u.h(n,"ngmy_fg_conf_today_quote"))
 n=C.eo(u.h(n,"ngmy_fg_conf_today_content"))
 if(n==null)n=-1
-v=new C.bs8([t<1,r,q,d,n,p])
+v=new C.bs9([t<1,r,q,d,n,p])
 x=1
 break
 case 1:return C.h(v,w)}})
@@ -402,7 +402,7 @@ case 8:s=C.eo(u.h(q,"ngmy_fg_conf_pos"))
 if(s==null)s=0
 x=9
 return C.b(B.Ot("confidence",f,"ngmy_fg_conf_pos","ngmy_fg_conf_gen"),$async$Ju)
-case 9:v=new C.brR(e,s,d)
+case 9:v=new C.brS(e,s,d)
 x=1
 break
 case 1:return C.h(v,w)}})
@@ -420,7 +420,7 @@ if(u==null)u=0
 t=C
 x=5
 return C.b(B.Wz("riddle",d,"ngmy_fg_riddle_pos","ngmy_fg_riddle_gen"),$async$arx)
-case 5:v=new t.brS(f,D.o.D(15-u,0,15),u)
+case 5:v=new t.brT(f,D.o.D(15-u,0,15),u)
 x=1
 break
 case 1:return C.h(v,w)}})
@@ -456,7 +456,7 @@ if(u==null)u=0
 t=C
 x=5
 return C.b(B.Wz("fortune",d,"ngmy_fg_fortune_pos","ngmy_fg_fortune_gen"),$async$a8v)
-case 5:v=new t.brn(f,D.o.D(1-u,0,1))
+case 5:v=new t.bro(f,D.o.D(1-u,0,1))
 x=1
 break
 case 1:return C.h(v,w)}})
@@ -479,12 +479,12 @@ return C.b(B.Wz("fortune",d,"ngmy_fg_fortune_pos","ngmy_fg_fortune_gen"),$async$
 case 6:s=f
 x=7
 return C.b(B.Ot("fortune",d,"ngmy_fg_fortune_pos","ngmy_fg_fortune_gen"),$async$WB)
-case 7:v=new C.br9(s)
+case 7:v=new C.bra(s)
 x=1
 break
 case 1:return C.h(v,w)}})
 return C.i($async$WB,w)},
-hXP(d,e){var x,w,v,u,t=new C.e_()
+hXQ(d,e){var x,w,v,u,t=new C.e_()
 t.cU(e)
 x=J.e5(d,y.S)
 for(w=0;w<d;++w)x[w]=w
@@ -492,16 +492,16 @@ for(w=x.length-1;w>0;--w){v=t.aw(w+1)
 u=x[w]
 x[w]=x[v]
 x[v]=u}return x},
-hXQ(d,e,f){var x,w,v,u,t
+hXR(d,e,f){var x,w,v,u,t
 for(x=new C.d9(d.toLowerCase()),w=y.E,v=w.k("bQ<c0.E>"),x=new C.bQ(x,x.gJ(0),v),w=w.k("c0.E"),u=17;x.C();){t=x.d
 if(t==null)t=w.a(t)
 u=37*u+t}for(x=new C.d9(e),v=new C.bQ(x,x.gJ(0),v);v.C();){x=v.d
 if(x==null)x=w.a(x)
 u=37*u+x}return 37*u+f},
-hrK(d,e,f,g,h){var x
+hrL(d,e,f,g,h){var x
 if(e<=0)return 0
 x=D.o.F(g,e)
-return B.hXP(e,B.hXQ(h,d,f))[x]}},A,G
+return B.hXQ(e,B.hXR(h,d,f))[x]}},A,G
 J=c[1]
 C=c[0]
 D=c[2]
@@ -548,16 +548,16 @@ x=6
 return C.b(B.a8v(120),$async$ys)
 case 6:r=e
 if(u.c==null){x=1
-break}u.m(new B.e5A(u,t,s,r))
+break}u.m(new B.e5B(u,t,s,r))
 case 1:return C.h(v,w)}})
 return C.i($async$ys,w)},
 adK(){var x=0,w=C.j(y.H),v,u=this,t
 var $async$adK=C.e(function(d,e){if(d===1)return C.f(e,w)
 for(;;)switch(x){case 0:x=3
-return C.b(B.cg5(),$async$adK)
+return C.b(B.cg6(),$async$adK)
 case 3:t=e
 if(u.c==null){x=1
-break}u.m(new B.e5z(u,t))
+break}u.m(new B.e5A(u,t))
 case 1:return C.h(v,w)}})
 return C.i($async$adK,w)},
 t(){var x,w=this,v=w.fx
@@ -585,12 +585,12 @@ if(q.length===0||p.length===0){u.c.L(y.q).f.T(A.fnF)
 x=1
 break}t=u.c6o(q,p)
 s=u.c6q(t)
-u.m(new B.e5s(u,t,s))
-C.bN(D.jq,new B.e5t(u),y.H)
+u.m(new B.e5t(u,t,s))
+C.bN(D.jq,new B.e5u(u),y.H)
 r=u.c
 r.toString
 x=3
-return C.b(B.h3P(r,s,t),$async$aal)
+return C.b(B.h3Q(r,s,t),$async$aal)
 case 3:case 1:return C.h(v,w)}})
 return C.i($async$aal,w)},
 c6o(d,e){var x,w,v=C.ag("\\s+",!0,!1,!1,!1),u=C.aL((d+e).toLowerCase(),v,"")
@@ -602,8 +602,8 @@ if(d>=70)return"A sweet match with room to grow even closer."
 if(d>=60)return"Good vibes! Friendship could bloom into something more."
 return"Every great story starts somewhere \u2014 keep exploring together."},
 aAP(d){var x,w,v,u=this
-u.m(new B.e5P(u,d))
-C.bN(D.yJ,new B.e5Q(u),y.H)
+u.m(new B.e5Q(u,d))
+C.bN(D.yJ,new B.e5R(u),y.H)
 switch(d){case 1:x=A.ePi
 break
 case 2:x=A.f2r
@@ -614,11 +614,11 @@ default:x=A.ePv
 break}w=u.y
 if(w!=null&&x.a.length!==0){v=u.c
 v.toString
-B.h3M(v,x.b,w,x.a)}},
+B.h3N(v,x.b,w,x.a)}},
 B(d){var x=null,w=C.aE(d,x,y.w).w.a.a
-return C.eG(x,D.L,new C.m0(new B.e5Z(this,C.hhU(d,w>520?420:w-28)),x),x,x,x,D.a13,x,D.d6,x,x,x)},
-bJW(){return C.A(C.iv(4,new B.e5w(this),!0,y.l),D.l,null,D.e,D.h,0,null,null)},
-c6r(){return C.A(C.iv(4,new B.e5G(this),!0,y.l),D.l,null,D.e,D.h,0,null,null)},
+return C.eG(x,D.L,new C.m0(new B.e6_(this,C.hhV(d,w>520?420:w-28)),x),x,x,x,D.a13,x,D.d6,x,x,x)},
+bJW(){return C.A(C.iv(4,new B.e5x(this),!0,y.l),D.l,null,D.e,D.h,0,null,null)},
+c6r(){return C.A(C.iv(4,new B.e5H(this),!0,y.l),D.l,null,D.e,D.h,0,null,null)},
 c6p(){var x,w,v,u,t,s,r,q,p,o,n,m=this,l=null
 switch(m.e){case 0:x=C.ao(l,m.aeu(42),l,l,l,12,8,l)
 w=C.ao(l,m.aeu(30),l,l,8,l,48,l)
@@ -635,9 +635,9 @@ if(n!=null&&n.length!==0)D.d.u(o,C.a([D.T,C.d(n,l,l,l,l,l,l,C.m(l,l,C.a0(235,D.c
 D.d.u(s,C.a([D.bx,C.p(l,C.x(o,D.l,l,D.e,D.h,0,D.p),D.f,l,l,new C.o(l,l,q,r,p,A.cbe,D.n),l,l,l,l,D.CI,l,l,1/0)],t))}s.push(D.bx)
 s.push(m.b_1("Calculate Love Match",m.gbJj()))
 return new C.an(D.a0,l,D.ad,D.f,C.a([x,w,C.p(l,C.x(s,D.l,l,D.e,D.h,0,D.p),D.f,l,l,new C.o(D.jn,l,u,v,l,l,D.n),l,l,l,l,D.wE,l,l,1/0)],t),l)
-case 1:return m.ayb("Show me what's next","\ud83c\udf39",new B.e5B(m),"You just met \u2014 here is a romantic first-step idea.","What happens next?")
-case 2:return m.ayb("Get relationship tip","\ud83d\udc9e",new B.e5C(m),"Tap for a relationship tip \u2014 what to do after the first spark.","Keep the connection growing")
-case 3:return m.ayb("Generate date idea","\ud83c\udf19",new B.e5D(m),"Romantic date ideas when you are ready to plan something special.","Date inspiration")
+case 1:return m.ayb("Show me what's next","\ud83c\udf39",new B.e5C(m),"You just met \u2014 here is a romantic first-step idea.","What happens next?")
+case 2:return m.ayb("Get relationship tip","\ud83d\udc9e",new B.e5D(m),"Tap for a relationship tip \u2014 what to do after the first spark.","Keep the connection growing")
+case 3:return m.ayb("Generate date idea","\ud83c\udf19",new B.e5E(m),"Romantic date ideas when you are ready to plan something special.","Date inspiration")
 default:return D.bM}},
 ayb(d,e,f,g,h){var x,w,v,u,t=this,s=null,r=C.ao(s,t.aeu(36),s,s,s,16,12,s),q=C.ao(40,t.aeu(28),s,s,10,s,s,s),p=C.l(18),o=C.K(C.a0(89,D.aA.l()>>>16&255,D.aA.l()>>>8&255,D.aA.l()&255),D.r,1),n=C.a([new C.ab(0,D.G,C.a0(31,D.bE.l()>>>16&255,D.bE.l()>>>8&255,D.bE.l()&255),D.J,18)],y.V),m=y.p,l=C.a([C.nH(e,s,40),D.P,C.d(h,s,s,s,s,s,s,D.dk,D.K,s,s),D.am,C.d(g,s,s,s,s,s,s,C.m(s,s,C.a0(140,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255),s,s,s,s,s,s,s,s,12,s,s,s,s,s,!0,s,s,s,s,s,s,s,s),D.K,s,s),D.aO],m)
 if(t.y!=null&&t.e!==0){x=C.a([C.a0(38,D.aA.l()>>>16&255,D.aA.l()>>>8&255,D.aA.l()&255),C.a0(D.j.V(25.5),D.dR.l()>>>16&255,D.dR.l()>>>8&255,D.dR.l()&255)],y.O)
@@ -651,11 +651,11 @@ l.push(C.d("50 romantic ideas \xb7 saved on your device",s,s,s,s,s,s,C.m(s,s,C.a
 return new C.an(D.a0,s,D.ad,D.f,C.a([r,q,C.p(s,C.x(l,D.l,s,D.e,D.h,0,D.p),D.f,s,s,new C.o(D.jn,s,o,p,n,s,D.n),s,s,s,s,D.wE,s,s,1/0)],m),s)},
 aeu(d){var x=this.fx
 x===$&&C.c()
-return C.c6(x,new B.e5I(this,d),null)},
+return C.c6(x,new B.e5J(this,d),null)},
 b_1(d,e){var x=null,w=this.Q?0.96:1
 return C.uK(new C.a5(1/0,x,new C.bM(new C.o(x,x,x,C.l(14),C.a([new C.ab(0,D.G,C.a0(115,D.aA.l()>>>16&255,D.aA.l()>>>8&255,D.aA.l()&255),D.cz,14)],y.V),A.caj,D.n),D.bi,C.aG(!1,D.a3,!0,x,C.aM(!1,C.l(14),!0,new C.D(D.yO,C.A(C.a([A.aLV,D.ae,C.d(d,x,x,x,x,x,x,D.j2,x,x,x)],y.p),D.l,x,D.b8,D.h,0,x,x),x),x,!0,x,x,x,x,x,x,x,x,x,x,x,e,x,x,x,x,x,x,x),D.f,D.L,0,x,x,x,x,x,D.ai),x),x),D.b0,D.jq,w)},
 b_P(d,e,f){var x=null,w=C.m(x,x,C.a0(89,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255),x,x,x,x,x,x,x,x,x,x,x,x,x,x,!0,x,x,x,x,x,x,x,x),v=C.nH(f,x,22)
-return C.aN(x,D.Z,!1,x,!0,D.t,x,C.aO(),d,x,x,x,x,x,2,C.bz(x,x,x,D.bH,x,x,x,x,!0,new C.b6(4,C.l(14),new C.ay(C.a0(115,D.bE.l()>>>16&255,D.bE.l()>>>8&255,D.bE.l()&255),1.2,D.r,-1)),x,x,x,x,x,D.qg,!0,x,x,x,x,new C.b6(4,C.l(14),A.b6y),x,x,x,x,x,x,x,x,w,e,x,x,x,x,x,x,x,x,x,!0,!0,!1,x,new C.D(A.bDI,new C.bK(D.z,1,x,v,x),x),x,D.rt,x,x,x,x,x,x,x,x,x,x),D.y,!0,x,!0,x,!1,x,D.ak,x,x,x,x,x,x,x,x,x,1,x,x,!1,"\u2022",x,new B.e5K(this),x,x,x,!1,x,x,!1,x,!0,x,D.ac,x,x,x,x,x,x,x,x,x,x,x,D.W0,!0,D.a7,x,D.la,x,x,x,x)},
+return C.aN(x,D.Z,!1,x,!0,D.t,x,C.aO(),d,x,x,x,x,x,2,C.bz(x,x,x,D.bH,x,x,x,x,!0,new C.b6(4,C.l(14),new C.ay(C.a0(115,D.bE.l()>>>16&255,D.bE.l()>>>8&255,D.bE.l()&255),1.2,D.r,-1)),x,x,x,x,x,D.qg,!0,x,x,x,x,new C.b6(4,C.l(14),A.b6y),x,x,x,x,x,x,x,x,w,e,x,x,x,x,x,x,x,x,x,!0,!0,!1,x,new C.D(A.bDI,new C.bK(D.z,1,x,v,x),x),x,D.rt,x,x,x,x,x,x,x,x,x,x),D.y,!0,x,!0,x,!1,x,D.ak,x,x,x,x,x,x,x,x,x,1,x,x,!1,"\u2022",x,new B.e5L(this),x,x,x,!1,x,x,!1,x,!0,x,D.ac,x,x,x,x,x,x,x,x,x,x,x,D.W0,!0,D.a7,x,D.la,x,x,x,x)},
 Kz(){var x=0,w=C.j(y.H),v,u=this,t,s,r,q,p,o
 var $async$Kz=C.e(function(d,e){if(d===1)return C.f(e,w)
 for(;;)switch(x){case 0:x=!u.ax?3:4
@@ -666,7 +666,7 @@ x=t!=null?5:7
 break
 case 5:s.toString
 x=8
-return C.b(B.h1F(s,t),$async$Kz)
+return C.b(B.h1G(s,t),$async$Kz)
 case 8:x=6
 break
 case 7:s.L(y.q).f.T(A.fnb)
@@ -681,17 +681,17 @@ break}p=B
 o=q
 x=10
 return C.b(B.a8u(300),$async$Kz)
-case 10:u.m(new p.e5S(u,o,e))
-C.bN(D.yJ,new B.e5T(u),y.H)
+case 10:u.m(new p.e5T(u,o,e))
+C.bN(D.yJ,new B.e5U(u),y.H)
 t=u.c
 t.toString
 x=11
-return C.b(B.h1F(t,q.c),$async$Kz)
+return C.b(B.h1G(t,q.c),$async$Kz)
 case 11:case 1:return C.h(v,w)}})
 return C.i($async$Kz,w)},
 aBX(){var x=0,w=C.j(y.H),v=this
 var $async$aBX=C.e(function(d,e){if(d===1)return C.f(e,w)
-for(;;)switch(x){case 0:v.m(new B.e5X(v))
+for(;;)switch(x){case 0:v.m(new B.e5Y(v))
 return C.h(null,w)}})
 return C.i($async$aBX,w)},
 a_9(){var x=0,w=C.j(y.H),v,u=this,t
@@ -709,8 +709,8 @@ case 6:x=8
 return C.b(u.ys(),$async$a_9)
 case 8:case 7:x=1
 break
-case 5:u.m(new B.e5M(u,t))
-C.bN(D.yJ,new B.e5N(u),y.H)
+case 5:u.m(new B.e5N(u,t))
+C.bN(D.yJ,new B.e5O(u),y.H)
 case 1:return C.h(v,w)}})
 return C.i($async$a_9,w)},
 Fz(){var x=0,w=C.j(y.H),v,u=this,t,s,r,q,p,o
@@ -722,7 +722,7 @@ t.toString
 s=u.dy
 s.toString
 x=5
-return C.b(B.h27(t,s),$async$Fz)
+return C.b(B.h28(t,s),$async$Fz)
 case 5:x=1
 break
 case 4:if(u.dx<=0){u.c.L(y.q).f.T(A.fpl)
@@ -743,12 +743,12 @@ p=B
 o=q
 x=12
 return C.b(B.a8v(120),$async$Fz)
-case 12:u.m(new p.e5V(u,o,e))
-C.bN(D.yJ,new B.e5W(u),y.H)
+case 12:u.m(new p.e5W(u,o,e))
+C.bN(D.yJ,new B.e5X(u),y.H)
 t=u.c
 t.toString
 x=13
-return C.b(B.h27(t,q),$async$Fz)
+return C.b(B.h28(t,q),$async$Fz)
 case 13:case 1:return C.h(v,w)}})
 return C.i($async$Fz,w)},
 bMd(){var x,w,v,u,t,s,r,q,p,o,n=this,m=null,l=n.at/300,k=n.fy
@@ -760,7 +760,7 @@ u=C.K(C.a0(102,D.at.l()>>>16&255,D.at.l()>>>8&255,D.at.l()&255),D.r,1)
 t=C.a([new C.ab(0,D.G,C.a0(38,D.at.l()>>>16&255,D.at.l()>>>8&255,D.at.l()&255),D.J,18)],y.V)
 s=l===0?m:l
 r=y.p
-k=C.a([new C.a5(120,120,C.n7(C.a0(38,D.at.l()>>>16&255,D.at.l()>>>8&255,D.at.l()&255),D.at,m,m,m,m,m,8,s,m),m),C.c6(k,new B.e5x(n),m)],r)
+k=C.a([new C.a5(120,120,C.n7(C.a0(38,D.at.l()>>>16&255,D.at.l()>>>8&255,D.at.l()&255),D.at,m,m,m,m,m,8,s,m),m),C.c6(k,new B.e5y(n),m)],r)
 s=n.ax?"One powerful quote per day \u2014 keep building your confidence circle.":"Today's boost unlocked \u2014 come back tomorrow for the next."
 s=C.a([new C.a5(120,120,new C.an(D.z,m,D.ad,D.t,k,m),m),D.T,A.fQu,D.am,C.d(s,m,m,m,m,m,m,C.m(m,m,C.a0(140,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255),m,m,m,m,m,m,m,m,12,m,m,m,m,m,!0,m,m,m,m,m,m,m,m),D.K,m,m),D.aO],r)
 if(n.ch!=null){k=C.a([C.a0(51,D.at.l()>>>16&255,D.at.l()>>>8&255,D.at.l()&255),C.a0(31,D.d5.l()>>>16&255,D.d5.l()>>>8&255,D.d5.l()&255)],y.O)
@@ -778,7 +778,7 @@ x=C.ao(o,p.aet("\ud83d\udd2e",36,m),o,o,o,10,6,o)
 w=C.l(18)
 v=C.K(C.a0(89,D.bT.l()>>>16&255,D.bT.l()>>>8&255,D.bT.l()&255),D.r,1)
 u=C.a([new C.ab(0,D.G,C.a0(31,D.bT.l()>>>16&255,D.bT.l()>>>8&255,D.bT.l()&255),D.J,18)],y.V)
-m=C.c6(m,new B.e5y(p),o)
+m=C.c6(m,new B.e5z(p),o)
 t=p.dx>0?"Your daily fortune is ready":"Come back tomorrow for a new fortune"
 s=y.p
 t=C.a([m,D.af,A.fTL,D.ax,C.d(t,o,o,o,o,o,o,C.m(o,o,D.bT,o,o,o,o,o,o,o,o,12,o,o,D.O,o,o,!0,o,o,o,o,o,o,o,o),o,o,o),D.aB],s)
@@ -788,9 +788,9 @@ q=C.K(C.a0(102,D.bT.l()>>>16&255,D.bT.l()>>>8&255,D.bT.l()&255),D.r,1)
 t.push(C.p(o,C.x(C.a([C.d(n.d,o,o,o,o,o,o,C.m(o,o,D.bT,o,o,o,o,o,o,o,o,12,o,o,D.u,o,o,!0,o,1,o,o,o,o,o,o),o,o,o),D.P,C.d(n.a,o,o,o,o,o,o,A.fvI,D.K,o,o),D.T,C.d("Lucky: "+D.d.aM(n.b," \xb7 "),o,o,o,o,o,o,C.m(o,o,C.a0(166,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255),o,o,o,o,o,o,o,o,12,o,o,D.O,o,o,!0,o,o,o,o,o,o,o,o),o,o,o)],s),D.l,o,D.e,D.h,0,D.p),D.f,o,o,new C.o(o,o,q,r,o,new C.a7(D.a5,D.a8,D.x,m,o,o),D.n),o,o,o,o,D.bH,o,o,1/0))}else t.push(C.d("Shake the crystal \u2014 tap below for your fortune.",o,o,o,o,o,o,C.m(o,o,C.a0(140,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255),o,o,o,o,o,o,o,o,12,o,o,o,o,o,!0,o,o,o,o,o,o,o,o),D.K,o,o))
 t.push(D.aB)
 m=p.fr?"View Today's Fortune Again":"Reveal My Fortune"
-t.push(p.a9D(A.djk,D.bT,m,p.gcvO()))
+t.push(p.a9D(A.djj,D.bT,m,p.gcvO()))
 return new C.an(D.a0,o,D.ad,D.f,C.a([x,C.p(o,C.x(t,D.l,o,D.e,D.h,0,D.p),D.f,o,o,new C.o(D.jn,o,v,w,u,o,D.n),o,o,o,o,D.wE,o,o,1/0)],s),o)},
-aet(d,e,f){return C.c6(f,new B.e5H(f,d,e),null)},
+aet(d,e,f){return C.c6(f,new B.e5I(f,d,e),null)},
 a9D(d,e,f,g){var x=null,w=this.Q?0.96:1
 return C.uK(new C.a5(1/0,x,new C.bM(new C.o(x,x,x,C.l(14),C.a([new C.ab(0,D.G,C.a0(115,e.l()>>>16&255,e.l()>>>8&255,e.l()&255),D.cz,14)],y.V),new C.a7(D.a5,D.a8,D.x,d,x,x),D.n),D.bi,C.aG(!1,D.a3,!0,x,C.aM(!1,C.l(14),!0,new C.D(D.yO,C.A(C.a([A.aLV,D.ae,C.d(f,x,x,x,x,x,x,D.j2,x,x,x)],y.p),D.l,x,D.b8,D.h,0,x,x),x),x,!0,x,x,x,x,x,x,x,x,x,x,x,g,x,x,x,x,x,x,x),D.f,D.L,0,x,x,x,x,x,D.ai),x),x),D.b0,D.jq,w)}}
 B.a_b.prototype={}
@@ -804,8 +804,8 @@ if(w!=null)w.a6(0,x.gdC())
 x.b8$=null
 x.a2()}}
 B.a_f.prototype={
-S(){return new B.be8(null,null)}}
-B.be8.prototype={
+S(){return new B.be9(null,null)}}
+B.be9.prototype={
 Y(){var x,w=this
 w.a3()
 x=C.bn(null,D.hM,null,1,null,w)
@@ -818,10 +818,10 @@ x.t()
 this.byc()},
 B(d){var x=null,w=D.w.j(0.78),v=this.a.d,u=this.d
 u===$&&C.c()
-return C.aG(!1,D.a3,!0,x,C.az(x,C.c6(u,new B.d8i(this),x),D.y,!1,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,v,x,x,x,x,x,x,!1,D.a4),D.f,w,0,x,x,x,x,x,D.ai)}}
+return C.aG(!1,D.a3,!0,x,C.az(x,C.c6(u,new B.d8j(this),x),D.y,!1,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,v,x,x,x,x,x,x,!1,D.a4),D.f,w,0,x,x,x,x,x,D.ai)}}
 B.a_R.prototype={
-S(){return new B.bhT(null,null)}}
-B.bhT.prototype={
+S(){return new B.bhU(null,null)}}
+B.bhU.prototype={
 Y(){var x,w=this,v=null
 w.a3()
 x=C.bn(v,D.qE,v,1,v,w)
@@ -859,7 +859,7 @@ B(d){var x,w=this,v=null,u=w.bGE(),t=D.w.j(0.82),s=w.a.d,r=w.d
 r===$&&C.c()
 x=w.e
 x===$&&C.c()
-return C.aG(!1,D.a3,!0,v,C.az(v,C.c6(new C.hb(C.a([r,x],y.U)),new B.dk0(w,u),v),D.y,!1,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,s,v,v,v,v,v,v,!1,D.a4),D.f,t,0,v,v,v,v,v,D.ai)}}
+return C.aG(!1,D.a3,!0,v,C.az(v,C.c6(new C.hb(C.a([r,x],y.U)),new B.dk1(w,u),v),D.y,!1,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,s,v,v,v,v,v,v,!1,D.a4),D.f,t,0,v,v,v,v,v,D.ai)}}
 B.aMq.prototype={
 t(){var x=this,w=x.a9$
 if(w!=null)w.a6(0,x.gbC())
@@ -877,41 +877,41 @@ if(w!=null)w.a6(0,x.gdC())
 x.b8$=null
 x.a2()}}
 B.a0f.prototype={
-S(){return new B.bkz(null,null)},
+S(){return new B.bkA(null,null)},
 vr(){return this.e.$0()}}
-B.bkz.prototype={
+B.bkA.prototype={
 Y(){var x,w=this
 w.a3()
 x=C.bn(null,D.hM,null,1,null,w)
 x.cr(0)
 w.d!==$&&C.aQ()
 w.d=x
-C.bN(D.qF,new B.dtT(w),y.H)},
+C.bN(D.qF,new B.dtU(w),y.H)},
 t(){var x=this.d
 x===$&&C.c()
 x.t()
 this.bzb()},
 B(d){var x=null,w=D.w.j(0.72),v=this.d
 v===$&&C.c()
-return C.aG(!1,D.a3,!0,x,C.c6(v,new B.dtS(this),x),D.f,w,0,x,x,x,x,x,D.ai)}}
+return C.aG(!1,D.a3,!0,x,C.c6(v,new B.dtT(this),x),D.f,w,0,x,x,x,x,x,D.ai)}}
 B.a0e.prototype={
-S(){return new B.bky(null,null)},
+S(){return new B.bkz(null,null)},
 vr(){return this.r.$0()}}
-B.bky.prototype={
+B.bkz.prototype={
 Y(){var x,w=this
 w.a3()
 x=C.bn(null,D.a0C,null,1,null,w)
 x.cr(0)
 w.d!==$&&C.aQ()
 w.d=x
-C.bN(A.alX,new B.dtR(w),y.H)},
+C.bN(A.alX,new B.dtS(w),y.H)},
 t(){var x=this.d
 x===$&&C.c()
 x.t()
 this.bza()},
 B(d){var x=null,w=C.aE(d,D.bY,y.w).w,v=this.d
 v===$&&C.c()
-return new C.dt(!0,C.aG(!1,D.a3,!0,x,C.c6(v,new B.dtQ(this,w.a.a*0.88),x),D.f,D.L,0,x,x,x,x,x,D.ai),x)}}
+return new C.dt(!0,C.aG(!1,D.a3,!0,x,C.c6(v,new B.dtR(this,w.a.a*0.88),x),D.f,D.L,0,x,x,x,x,x,D.ai),x)}}
 B.aNj.prototype={
 t(){var x=this,w=x.a9$
 if(w!=null)w.a6(0,x.gbC())
@@ -929,10 +929,10 @@ aX(){this.b7()
 this.b5()
 this.bD()}}
 var z=a.updateTypes(["aB<~>()","a0L(Z)","~()","a_f(Z)","a_R(Z)","a0f(Z)","a0e(Z)"])
-B.h2b.prototype={
+B.h2c.prototype={
 $1(d){return new B.a0L(this.a,null)},
 $S:z+1}
-B.e5A.prototype={
+B.e5B.prototype={
 $0(){var x=this,w=x.a,v=x.b.a,u=v[1]
 w.as=u
 w.at=v[2]
@@ -945,42 +945,42 @@ w.cx=v.b
 w.cy=!1
 w.dx=x.d.b},
 $S:0}
-B.e5z.prototype={
+B.e5A.prototype={
 $0(){var x=this.a,w=this.b
 x.d=w.a
 x.e=w.b},
 $S:0}
-B.e5s.prototype={
+B.e5t.prototype={
 $0(){var x=this.a
 x.w=this.b
 x.x=this.c
 x.Q=!0},
 $S:0}
-B.e5t.prototype={
+B.e5u.prototype={
 $0(){var x=this.a
-if(x.c!=null)x.m(new B.e5r(x))},
+if(x.c!=null)x.m(new B.e5s(x))},
 $S:11}
-B.e5r.prototype={
+B.e5s.prototype={
 $0(){return this.a.Q=!1},
 $S:0}
-B.e5P.prototype={
+B.e5Q.prototype={
 $0(){var x,w=this.a,v=w.z=w.id.aw(50)
 w.Q=!0
 x=this.b
 if(x===1)w.y=A.cDD[D.o.F(v,50)]
-else if(x===2)w.y=A.dnz[D.o.F(v,51)]
+else if(x===2)w.y=A.dny[D.o.F(v,51)]
 else if(x===3)w.y=A.dez[D.o.F(v,50)]
 else w.y=null},
 $S:0}
-B.e5Q.prototype={
+B.e5R.prototype={
 $0(){var x=this.a
-if(x.c!=null)x.m(new B.e5O(x))},
+if(x.c!=null)x.m(new B.e5P(x))},
 $S:11}
-B.e5O.prototype={
+B.e5P.prototype={
 $0(){return this.a.Q=!1},
 $S:0}
-B.e5Z.prototype={
-$4(d,a0,a1,a2){var x,w,v,u,t,s,r,q=null,p=C.aE(d,q,y.w).w,o=C.FA(E.Sb,!1,"\ud83c\udfae",!1,q,new B.e5Y(d),q,a2,a0,"Entertainment Hub \xb7 live","Play Zone",q),n=this.a,m=C.k2(n.bJW(),E.Sb,q,a2,D.cp,0.1,a0,a1),l=A.aBw[n.d],k=l.c,j=C.a0(15,k.l()>>>16&255,k.l()>>>8&255,k.l()&255),i=C.l(12),h=C.K(C.a0(140,k.l()>>>16&255,k.l()>>>8&255,k.l()&255),D.r,1.2),g=C.nH(l.b,q,20),f=n.d===0?"Your Love Journey":l.a+" Zone",e=y.p
+B.e6_.prototype={
+$4(d,a0,a1,a2){var x,w,v,u,t,s,r,q=null,p=C.aE(d,q,y.w).w,o=C.FA(E.Sb,!1,"\ud83c\udfae",!1,q,new B.e5Z(d),q,a2,a0,"Entertainment Hub \xb7 live","Play Zone",q),n=this.a,m=C.k2(n.bJW(),E.Sb,q,a2,D.cp,0.1,a0,a1),l=A.aBw[n.d],k=l.c,j=C.a0(15,k.l()>>>16&255,k.l()>>>8&255,k.l()&255),i=C.l(12),h=C.K(C.a0(140,k.l()>>>16&255,k.l()>>>8&255,k.l()&255),D.r,1.2),g=C.nH(l.b,q,20),f=n.d===0?"Your Love Journey":l.a+" Zone",e=y.p
 i=C.a([m,D.aB,C.k2(C.p(q,C.A(C.a([g,D.ae,C.d(f,q,q,q,q,q,q,C.m(q,q,k,q,q,q,q,q,q,q,q,14,q,q,D.H,q,q,!0,q,q,q,q,q,q,q,q),q,q,q)],e),D.l,q,D.b8,D.h,0,q,q),D.f,q,q,new C.o(j,q,h,i,q,q,D.n),q,q,q,q,D.k6,q,q,1/0),A.dx1,q,a2,D.bj,0.24,a0,a1),D.af],e)
 m=n.d
 if(m===0)D.d.u(i,C.a([n.c6r(),D.aO,n.c6p()],e))
@@ -1011,14 +1011,14 @@ D.d.u(k,C.a([D.aB,C.p(q,C.x(C.a([A.fPd,D.am,C.d(x.c,q,q,q,q,q,q,D.nf,q,q,q)],e),
 if(!n.cy)m.push(n.a9D(D.a5q,D.b7,"Reveal Answer",n.gcvP()))
 else m.push(n.a9D(D.a5q,D.b7,"Next Riddle \u2192",n.gc95()))
 i.push(new C.an(D.a0,q,D.ad,D.f,C.a([j,C.p(q,C.x(m,D.l,q,D.e,D.h,0,D.p),D.f,q,q,new C.o(D.jn,q,g,h,f,q,D.n),q,q,q,q,D.wE,q,q,1/0)],e),q))}else i.push(n.bV7())
-return C.b4v(22,C.x(C.a([o,new C.di(1,D.cm,C.c9(C.x(i,D.l,q,D.e,D.h,0,D.p),D.t,q,D.y,q,q,D.amS,q,q,D.ah),q)],e),D.l,q,D.e,D.N,0,D.p),E.Sb,!1,p.a.b*0.88,a2,a0,a1,this.b)},
+return C.b4w(22,C.x(C.a([o,new C.di(1,D.cm,C.c9(C.x(i,D.l,q,D.e,D.h,0,D.p),D.t,q,D.y,q,q,D.amS,q,q,D.ah),q)],e),D.l,q,D.e,D.N,0,D.p),E.Sb,!1,p.a.b*0.88,a2,a0,a1,this.b)},
 $C:"$4",
 $R:4,
 $S:306}
-B.e5Y.prototype={
+B.e5Z.prototype={
 $0(){return C.a6(this.a,!1).eq()},
 $S:0}
-B.e5w.prototype={
+B.e5x.prototype={
 $1(d){var x,w,v,u,t=null,s=A.aBw[d],r=this.a,q=r.d===d,p=d===0?0:4,o=d===3?0:4,n=q?D.jn:D.L,m=C.l(14),l=C.K(q?C.a0(56,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255):C.a0(15,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255),D.r,1)
 if(q){x=s.c
 x=new C.a7(D.a5,D.a8,D.x,C.a([x,x.j(0.65)],y.O),t,t)}else x=t
@@ -1026,44 +1026,44 @@ w=q?t:s.c.j(0.15)
 v=C.l(10)
 u=C.K(q?D.bV:D.bw,D.r,1)
 x=C.p(t,C.as(C.nH(s.b,t,20),t,t,t),D.f,t,t,new C.o(w,t,u,v,t,x,D.n),t,36,t,t,t,t,t,36)
-return C.E(new C.D(new C.Q(p,0,o,0),C.az(t,C.cT(t,C.x(C.a([x,D.ax,C.d(s.a,t,t,t,t,t,t,C.m(t,t,q?D.c:D.aF,t,t,t,t,t,t,t,t,9,t,t,D.O,t,t,!0,t,t,t,t,t,t,t,t),D.K,t,t)],y.p),D.l,t,D.e,D.h,0,D.p),t,t,D.b0,new C.o(n,t,l,m,t,t,D.n),D.a3,t,t,t,t,D.hN,t,t,t),D.y,!1,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,new B.e5v(r,d),t,t,t,t,t,t,!1,D.a4),t),1)},
+return C.E(new C.D(new C.Q(p,0,o,0),C.az(t,C.cT(t,C.x(C.a([x,D.ax,C.d(s.a,t,t,t,t,t,t,C.m(t,t,q?D.c:D.aF,t,t,t,t,t,t,t,t,9,t,t,D.O,t,t,!0,t,t,t,t,t,t,t,t),D.K,t,t)],y.p),D.l,t,D.e,D.h,0,D.p),t,t,D.b0,new C.o(n,t,l,m,t,t,D.n),D.a3,t,t,t,t,D.hN,t,t,t),D.y,!1,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,new B.e5w(r,d),t,t,t,t,t,t,!1,D.a4),t),1)},
 $S:237}
-B.e5v.prototype={
+B.e5w.prototype={
 $0(){var x=this.a,w=this.b
-x.m(new B.e5u(x,w))
+x.m(new B.e5v(x,w))
 B.aru(w)
 x.ys()},
 $S:0}
-B.e5u.prototype={
+B.e5v.prototype={
 $0(){var x=this.a
 x.d=this.b
 x.y=x.x=x.w=null
 x.fr=x.cy=!1},
 $S:0}
-B.e5G.prototype={
+B.e5H.prototype={
 $1(d){var x=null,w=A.ccn[d],v=this.a,u=v.e===d,t=d===0?0:3,s=d===3?0:3,r=u?1.04:1,q=u?A.c93:x,p=u?x:C.a0(153,D.jn.l()>>>16&255,D.jn.l()>>>8&255,D.jn.l()&255),o=C.l(12),n=C.K(u?C.a0(140,D.c3.l()>>>16&255,D.c3.l()>>>8&255,D.c3.l()&255):C.a0(15,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255),D.r,1),m=u?C.a([new C.ab(0,D.G,C.a0(102,D.aA.l()>>>16&255,D.aA.l()>>>8&255,D.aA.l()&255),D.cJ,10)],y.V):x,l=C.nH(w.b,x,20)
-return C.E(new C.D(new C.Q(t,0,s,0),C.az(x,C.uK(C.cT(x,C.x(C.a([l,C.d(w.a,x,x,x,x,x,x,C.m(x,x,u?D.c:D.aF,x,x,x,x,x,x,x,x,10,x,x,D.H,x,x,!0,x,x,x,x,x,x,x,x),x,x,x)],y.p),D.l,x,D.e,D.h,0,D.p),x,x,D.b0,new C.o(p,x,n,o,m,q,D.n),D.a3,x,x,x,x,D.Cy,x,x,x),D.b0,D.eH,r),D.y,!1,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,new B.e5F(v,d),x,x,x,x,x,x,!1,D.a4),x),1)},
+return C.E(new C.D(new C.Q(t,0,s,0),C.az(x,C.uK(C.cT(x,C.x(C.a([l,C.d(w.a,x,x,x,x,x,x,C.m(x,x,u?D.c:D.aF,x,x,x,x,x,x,x,x,10,x,x,D.H,x,x,!0,x,x,x,x,x,x,x,x),x,x,x)],y.p),D.l,x,D.e,D.h,0,D.p),x,x,D.b0,new C.o(p,x,n,o,m,q,D.n),D.a3,x,x,x,x,D.Cy,x,x,x),D.b0,D.eH,r),D.y,!1,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,new B.e5G(v,d),x,x,x,x,x,x,!1,D.a4),x),1)},
 $S:237}
-B.e5F.prototype={
+B.e5G.prototype={
 $0(){var x=this.a,w=this.b
-x.m(new B.e5E(x,w))
-B.b1O(w)},
+x.m(new B.e5F(x,w))
+B.b1P(w)},
 $S:0}
-B.e5E.prototype={
+B.e5F.prototype={
 $0(){var x=this.a
 x.e=this.b
 x.x=x.w=null},
 $S:0}
-B.e5B.prototype={
+B.e5C.prototype={
 $0(){return this.a.aAP(1)},
 $S:0}
-B.e5C.prototype={
+B.e5D.prototype={
 $0(){return this.a.aAP(2)},
 $S:0}
-B.e5D.prototype={
+B.e5E.prototype={
 $0(){return this.a.aAP(3)},
 $S:0}
-B.e5I.prototype={
+B.e5J.prototype={
 $2(d,e){var x,w,v=this.a.fx
 v===$&&C.c()
 v=v.x
@@ -1076,15 +1076,15 @@ x.fE(Math.sin(v*3.141592653589793*2)*0.35)
 x.k5(0.4)
 return C.fA(D.z,C.nH("\ud83d\udc98",null,this.b*0.85),null,x,!0)},
 $S:45}
-B.e5K.prototype={
+B.e5L.prototype={
 $1(d){var x=this.a
-if(x.w!=null)x.m(new B.e5J(x))},
+if(x.w!=null)x.m(new B.e5K(x))},
 $S:2}
-B.e5J.prototype={
+B.e5K.prototype={
 $0(){var x=this.a
 x.x=x.w=null},
 $S:0}
-B.e5S.prototype={
+B.e5T.prototype={
 $0(){var x,w=this.a
 w.ax=!1
 w.ch=w.ay=this.b.c
@@ -1093,45 +1093,45 @@ w.as=x[1]
 w.at=x[2]
 w.Q=!0},
 $S:0}
-B.e5T.prototype={
+B.e5U.prototype={
 $0(){var x=this.a
-if(x.c!=null)x.m(new B.e5R(x))},
+if(x.c!=null)x.m(new B.e5S(x))},
 $S:11}
-B.e5R.prototype={
+B.e5S.prototype={
 $0(){return this.a.Q=!1},
 $S:0}
-B.e5X.prototype={
+B.e5Y.prototype={
 $0(){return this.a.cy=!0},
 $S:0}
-B.e5M.prototype={
+B.e5N.prototype={
 $0(){var x=this.a
 x.CW=this.b
 x.cx=D.o.D(x.cx-1,0,15)
 x.cy=!1
 x.Q=!0},
 $S:0}
-B.e5N.prototype={
+B.e5O.prototype={
 $0(){var x=this.a
-if(x.c!=null)x.m(new B.e5L(x))},
+if(x.c!=null)x.m(new B.e5M(x))},
 $S:11}
-B.e5L.prototype={
+B.e5M.prototype={
 $0(){return this.a.Q=!1},
 $S:0}
-B.e5V.prototype={
+B.e5W.prototype={
 $0(){var x=this.a
 x.dy=this.b
 x.fr=!0
 x.dx=this.c.b
 x.Q=!0},
 $S:0}
-B.e5W.prototype={
+B.e5X.prototype={
 $0(){var x=this.a
-if(x.c!=null)x.m(new B.e5U(x))},
+if(x.c!=null)x.m(new B.e5V(x))},
 $S:11}
-B.e5U.prototype={
+B.e5V.prototype={
 $0(){return this.a.Q=!1},
 $S:0}
-B.e5x.prototype={
+B.e5y.prototype={
 $2(d,e){var x,w,v=this.a.fy
 v===$&&C.c()
 v=v.x
@@ -1143,7 +1143,7 @@ w[11]=0.003
 x.fE(Math.sin(v*3.141592653589793*2)*0.4)
 return C.fA(D.z,A.e0R,null,x,!0)},
 $S:45}
-B.e5y.prototype={
+B.e5z.prototype={
 $2(d,e){var x,w,v,u=null,t=this.a.fy
 t===$&&C.c()
 t=t.x
@@ -1160,7 +1160,7 @@ v=D.j.V(127.5)
 w=C.a([w,D.bT,C.a0(v,D.jl.l()>>>16&255,D.jl.l()>>>8&255,D.jl.l()&255)],y.O)
 return C.fA(D.z,C.p(u,A.bea,D.f,u,u,new C.o(u,u,u,u,C.a([new C.ab(0,D.G,C.a0(v,D.bT.l()>>>16&255,D.bT.l()>>>8&255,D.bT.l()&255),D.J,20)],y.V),new C.bS(D.z,0.5,D.x,u,0,w,u,u),D.a6),u,96,u,u,u,u,u,96),u,t,!0)},
 $S:45}
-B.e5H.prototype={
+B.e5I.prototype={
 $2(d,e){var x,w,v=this.a.x
 v===$&&C.c()
 x=C.dr()
@@ -1171,19 +1171,19 @@ x.fE(Math.sin(v*3.141592653589793*2)*0.35)
 x.k5(0.35)
 return C.fA(D.z,C.nH(this.b,null,this.c*0.85),null,x,!0)},
 $S:45}
-B.h1H.prototype={
-$1(d){return new B.a_f(this.a,new B.h1G(this.b),null)},
+B.h1I.prototype={
+$1(d){return new B.a_f(this.a,new B.h1H(this.b),null)},
 $S:z+3}
-B.h1G.prototype={
+B.h1H.prototype={
 $0(){return J.lM(this.a.bm())},
 $S:0}
-B.h29.prototype={
-$1(d){return new B.a_R(this.a,new B.h28(this.b),null)},
+B.h2a.prototype={
+$1(d){return new B.a_R(this.a,new B.h29(this.b),null)},
 $S:z+4}
-B.h28.prototype={
+B.h29.prototype={
 $0(){return J.lM(this.a.bm())},
 $S:0}
-B.d8i.prototype={
+B.d8j.prototype={
 $2(d,e){var x,w,v,u,t,s=null,r=this.a,q=r.d
 q===$&&C.c()
 x=q.x
@@ -1203,7 +1203,7 @@ u=C.K(D.c.j(0.55),D.r,2)
 t=C.a([new C.ab(4,D.G,D.at.j(0.6),D.J,36)],y.V)
 return C.as(C.e3(D.z,C.fA(D.z,C.p(s,C.x(C.a([A.e0U,D.P,A.h4a,D.aB,C.d(r.a.c,s,s,s,s,s,s,A.ftE,D.K,s,s),D.aO,C.d("Tap anywhere to close",s,s,s,s,s,s,C.m(s,s,D.c.j(0.7),s,s,s,s,s,s,s,s,11,s,s,s,s,s,!0,s,s,s,s,s,s,s,s),s,s,s)],y.p),D.l,s,D.e,D.N,0,D.p),D.f,s,s,new C.o(s,s,u,v,t,A.cb2,D.n),s,s,s,s,A.bHC,s,s,q),s,x,!0),0.45+w*0.55,s,s),s,s,s)},
 $S:220}
-B.dk0.prototype={
+B.dk1.prototype={
 $2(d,e){var x,w,v,u,t,s,r,q,p,o,n,m,l=null,k=this.a,j=k.d
 j===$&&C.c()
 x=j.x
@@ -1236,24 +1236,24 @@ t=C.d(k.a.c.d,l,l,l,l,l,l,C.m(l,l,t,l,l,l,l,l,l,l,l,14,l,l,D.u,l,l,!0,l,1.2,l,l,
 k=k.a.c
 return C.as(C.d3(C.e3(D.z,C.p(l,C.x(C.a([n,D.af,t,D.T,C.d(k.a,l,l,l,l,l,l,A.fvR,D.K,l,l),D.aB,C.d("Lucky: "+D.d.aM(k.b," \xb7 "),l,l,l,l,l,l,C.m(l,l,D.c.j(0.75),l,l,l,l,l,l,l,l,12,l,l,D.O,l,l,!0,l,l,l,l,l,l,l,l),l,l,l),D.T,C.d("Tap to close",l,l,l,l,l,l,C.m(l,l,D.c.j(0.45),l,l,l,l,l,l,l,l,10,l,l,l,l,l,!0,l,l,l,l,l,l,l,l),l,l,l)],y.p),D.l,l,D.e,D.N,0,D.p),D.f,l,l,new C.o(l,l,q,u,o,new C.a7(D.ay,D.aC,D.x,r,l,l),D.n),l,l,l,l,G.anI,l,l,x),0.7+w*0.3,l,l),j),l,l,l)},
 $S:220}
-B.h3R.prototype={
-$1(d){return new B.a0f(this.a,this.b,new B.h3Q(this.c),null)},
+B.h3S.prototype={
+$1(d){return new B.a0f(this.a,this.b,new B.h3R(this.c),null)},
 $S:z+5}
-B.h3Q.prototype={
+B.h3R.prototype={
 $0(){return J.lM(this.a.bm())},
 $S:0}
-B.h3O.prototype={
+B.h3P.prototype={
 $1(d){var x=this
-return new B.a0e(x.a,x.b,x.c,x.d,new B.h3N(x.e),null)},
+return new B.a0e(x.a,x.b,x.c,x.d,new B.h3O(x.e),null)},
 $S:z+6}
-B.h3N.prototype={
+B.h3O.prototype={
 $0(){return J.lM(this.a.bm())},
 $S:0}
-B.dtT.prototype={
+B.dtU.prototype={
 $0(){var x=this.a
 if(x.c!=null)x.a.vr()},
 $S:11}
-B.dtS.prototype={
+B.dtT.prototype={
 $2(d,e){var x,w,v,u,t,s,r=null,q=this.a,p=q.d
 p===$&&C.c()
 x=p.x
@@ -1275,11 +1275,11 @@ s=C.a([new C.ab(4,D.G,D.bE.j(0.65),D.J,40),new C.ab(0,D.G,D.w.j(0.45),D.kE,24)],
 q=q.a
 return C.as(C.e3(D.z,C.fA(D.z,C.p(r,C.x(C.a([A.aLU,D.P,C.d(""+q.c+"%",r,r,r,r,r,r,A.ftw,r,r,r),D.am,A.fVW,D.af,C.d(q.d,r,r,r,r,r,r,C.m(r,r,D.c.j(0.92),r,r,r,r,r,r,r,r,14,r,r,D.a9,r,1.35,!0,r,r,r,r,r,r,r,r),D.K,r,r)],y.p),D.l,r,D.e,D.N,0,D.p),D.f,r,r,new C.o(r,r,t,u,s,A.cai,D.n),r,r,r,r,D.bHl,r,r,x),r,p,!0),0.4+w*0.6,r,r),r,r,r)},
 $S:220}
-B.dtR.prototype={
+B.dtS.prototype={
 $0(){var x=this.a
 if(x.c!=null)x.a.vr()},
 $S:11}
-B.dtQ.prototype={
+B.dtR.prototype={
 $2(d,e){var x,w,v,u,t,s,r,q=null,p=this.a,o=p.d
 o===$&&C.c()
 x=o.x
@@ -1311,22 +1311,22 @@ x(w,"gcvP","aBX",0)
 x(w,"gc95","a_9",0)
 x(w,"gcvO","Fz",0)})();(function inheritance(){var x=a.mixinHard,w=a.inheritMany,v=a.inherit
 w(C.aF,[B.cQ,B.a2,B.a_b,B.a25])
-w(C.hq,[B.h2b,B.e5Z,B.e5w,B.e5G,B.e5K,B.h1H,B.h29,B.h3R,B.h3O])
+w(C.hq,[B.h2c,B.e6_,B.e5x,B.e5H,B.e5L,B.h1I,B.h2a,B.h3S,B.h3P])
 w(C.af,[B.a0L,B.a_f,B.a_R,B.a0f,B.a0e])
 w(C.ah,[B.aO1,B.aMq,B.aMT,B.aNk,B.aNj])
 v(B.aFF,B.aO1)
-w(C.iO,[B.e5A,B.e5z,B.e5s,B.e5t,B.e5r,B.e5P,B.e5Q,B.e5O,B.e5Y,B.e5v,B.e5u,B.e5F,B.e5E,B.e5B,B.e5C,B.e5D,B.e5J,B.e5S,B.e5T,B.e5R,B.e5X,B.e5M,B.e5N,B.e5L,B.e5V,B.e5W,B.e5U,B.h1G,B.h28,B.h3Q,B.h3N,B.dtT,B.dtR])
-w(C.jA,[B.e5I,B.e5x,B.e5y,B.e5H,B.d8i,B.dk0,B.dtS,B.dtQ])
-v(B.be8,B.aMq)
-v(B.bhT,B.aMT)
-v(B.bkz,B.aNk)
-v(B.bky,B.aNj)
+w(C.iO,[B.e5B,B.e5A,B.e5t,B.e5u,B.e5s,B.e5Q,B.e5R,B.e5P,B.e5Z,B.e5w,B.e5v,B.e5G,B.e5F,B.e5C,B.e5D,B.e5E,B.e5K,B.e5T,B.e5U,B.e5S,B.e5Y,B.e5N,B.e5O,B.e5M,B.e5W,B.e5X,B.e5V,B.h1H,B.h29,B.h3R,B.h3O,B.dtU,B.dtS])
+w(C.jA,[B.e5J,B.e5y,B.e5z,B.e5I,B.d8j,B.dk1,B.dtT,B.dtR])
+v(B.be9,B.aMq)
+v(B.bhU,B.aMT)
+v(B.bkA,B.aNk)
+v(B.bkz,B.aNj)
 x(B.aO1,C.eO)
 x(B.aMq,C.cf)
 x(B.aMT,C.eO)
 x(B.aNj,C.cf)
 x(B.aNk,C.cf)})()
-C.j6(b.typeUniverse,JSON.parse('{"a0L":{"af":[],"v":[]},"aFF":{"ah":["a0L"]},"a_f":{"af":[],"v":[]},"a_R":{"af":[],"v":[]},"be8":{"ah":["a_f"]},"bhT":{"ah":["a_R"]},"a0f":{"af":[],"v":[]},"a0e":{"af":[],"v":[]},"bkz":{"ah":["a0f"]},"bky":{"ah":["a0e"]}}'))
+C.j6(b.typeUniverse,JSON.parse('{"a0L":{"af":[],"v":[]},"aFF":{"ah":["a0L"]},"a_f":{"af":[],"v":[]},"a_R":{"af":[],"v":[]},"be9":{"ah":["a_f"]},"bhU":{"ah":["a_R"]},"a0f":{"af":[],"v":[]},"a0e":{"af":[],"v":[]},"bkA":{"ah":["a0f"]},"bkz":{"ah":["a0e"]}}'))
 var y=(function rtii(){var x=C.at
 return{E:x("d9"),V:x("O<ab>"),O:x("O<u>"),s:x("O<n>"),p:x("O<v>"),t:x("O<F>"),U:x("O<aC?>"),w:x("iw"),h:x("+category,loveTab(F,F)"),a:x("+contentIndex,remaining(F,F)"),N:x("+contentIndex,remaining,viewedToday(F,F,F)"),j:x("+canViewToday,contentIndex,cyclePosition,cycleTotal,todayContentIndex,todayQuote(R,F,F,F,F,n?)"),R:x("n"),l:x("v"),q:x("mc"),S:x("F"),n:x("+contentIndex(F)?"),J:x("+contentIndex,cyclePosition,quote(F,F,n)?"),I:x("F?"),H:x("~")}})();(function constants(){var x=a.makeConstList
 A.b6y=new C.ay(D.c3,1.5,D.r,-1)
@@ -1341,8 +1341,8 @@ A.bDI=new C.Q(12,0,8,0)
 A.bHC=new C.Q(24,30,24,26)
 A.dBt=x([D.aA,D.dR],y.O)
 A.c93=new C.a7(D.ay,D.aC,D.x,A.dBt,null,null)
-A.dod=x([D.hJ,D.bE,D.FY],y.O)
-A.cai=new C.a7(D.ay,D.aC,D.x,A.dod,null,null)
+A.doc=x([D.hJ,D.bE,D.FY],y.O)
+A.cai=new C.a7(D.ay,D.aC,D.x,A.doc,null,null)
 A.aAj=x([D.aA,D.dR,D.FY],y.O)
 A.caj=new C.a7(D.a5,D.a8,D.x,A.aAj,null,null)
 A.aBk=x([D.aQ,D.at,D.d5],y.O)
@@ -1581,8 +1581,8 @@ A.hzg=new B.a_b("Brain","\ud83e\udde0",D.b7)
 A.hze=new B.a_b("Fortune","\ud83d\udd2e",D.bT)
 A.aBw=x([A.hzh,A.hzf,A.hzg,A.hze],C.at("O<a_b>"))
 A.dez=x(["Stargazing picnic with blankets, thermoses, and a constellation app.","Couples pottery or paint-and-sip night \u2014 laugh at the masterpieces.","Sunset kayak or paddleboat if you are both comfortable on water.","Dress up for dinner at a place with live acoustic music.","Home movie marathon: their pick, your pick, popcorn, dim lights.","Botanical garden walk with a camera and zero rush.","Rooftop or hilltop picnic at golden hour with sparkling juice.","Dance class intro: salsa, bachata, or swing \u2014 beginners welcome.","Visit a museum and choose one artwork that represents your mood.","Cook a new recipe together \u2014 assign roles: chef and sous-chef.","Ice skating or roller skating \u2014 hold on if balance needs help.","Book a couples massage or spa half-day for deep calm.","Drive to a small town you have never explored; caf\xe9 hop once there.","Build a blanket fort at home with fairy lights and playlists.","Volunteer together for a few hours \u2014 shared purpose bonds hearts.","Arcade date: playful competition, share tickets for a silly prize.","Wine-free vineyard tour or orchard visit in harvest season.","Photography walk: capture ten things that feel like \u201cus.\u201d","Attend a local theater play or improv show \u2014 shared laughter.","Plan a breakfast-in-bed surprise on a lazy weekend.","Take a scenic train or ferry ride with no destination pressure.","Visit an aquarium or planetarium \u2014 wonder feels romantic.","Host a fondue night: chocolate or cheese, choose your adventure.","Go thrifting and pick one outfit piece for each other.","Write wishes on paper lanterns or jars and read them aloud.","Plan a \u201cyes day\u201d with a small budget and big imagination.","Rent bikes and explore a trail ending at a lakeside bench.","Couples yoga or stretching session \u2014 gentle, grounding.","Attend a food festival and share every bite.","Set up a backyard fire pit with s\u2019mores and old stories.","Take a cooking class: pasta, sushi, or desserts.","Plan a surprise day trip to a waterfall or scenic overlook.","Visit a Christmas market or seasonal fair hand in hand.","Record a short video diary of your date \u2014 memory for later.","Book a cozy cabin or boutique hotel for one night away.","Go to a jazz lounge with mocktails if you prefer no alcohol.","Create a scavenger hunt with inside jokes as clues.","Plant something together \u2014 herbs, flowers, a tree if allowed.","Attend a poetry open mic and dedicate a line to them afterward.","Plan a themed dinner at home: Paris, Tokyo, or their dream city.","Watch the sunrise with hot drinks and silence first, words second.","Visit a cat caf\xe9 or animal shelter visit if you love gentle creatures.","Go bowling or mini-golf \u2014 playful rivalry, sweet truce.","Take a pottery mug home and use it on your next coffee date.","Plan a photo-book page of your favorite moments together.","Attend a lantern festival or night market with matching colors.","Write love letters and exchange them to open on a future date.","Plan a stargazing drive with their favorite snacks in the trunk.","Recreate your first meeting place with a small upgrade: better dessert.","End the night saying what you are grateful for about them \u2014 specific beats generic."],y.s)
-A.djk=x([D.bT,D.jl,D.pk],y.O)
-A.dnz=x(["Send a voice note saying one specific thing you appreciated about them today.","Plan a no-phone hour together \u2014 phones face down, eyes on each other.","Remember a small detail they mentioned and bring it up later; it shows you listen.","Compliment their character, not only their appearance \u2014 depth keeps hearts close.","Schedule a weekly check-in: \u201cHow are we feeling about us?\u201d","Share a playlist of songs that remind you of them \u2014 three tracks is enough.","Apologize quickly when you are wrong; pride is the enemy of closeness.","Celebrate their wins loudly, even the small ones \u2014 promotion, recipe, good day.","Ask \u201cWhat would make this week easier for you?\u201d and follow through once.","Leave a handwritten note in their bag, book, or on the mirror.","Plan surprise comfort: their favorite snack after a hard day.","Touch base mid-day with a kind text \u2014 not demanding, just warm.","Learn one thing they care about and ask a thoughtful question about it.","Defend them kindly in public; loyalty builds trust.","Create a shared inside joke \u2014 intimacy loves private language.","Book something to look forward to: concert, class, weekend trip.","Practice patience when they need space; trust is quiet confidence.","Cook or order their favorite meal without being asked.","Take photos together that are candid, not only posed perfection.","Say thank you for ordinary things: listening, driving, patience.","Introduce them proudly to friends \u2014 belonging matters.","Keep promises small and large; reliability is romance in action.","Flirt after you are comfortable \u2014 playfulness keeps sparks alive.","Ask about their family with genuine curiosity, not interrogation.","Share your feelings with calm words instead of guessing games.","Plan a tech-free walk and hold hands if you both want that.","Respect their boundaries without making them explain twice.","Send a meme or reel that made you think of them \u2014 light connection counts.","Celebrate anniversaries of small moments: first coffee, first laugh.","Offer help before they have to ask \u2014 dishes, errands, ride.","Speak their love language: time, words, gifts, acts, touch \u2014 learn which lands.","Do not weaponize the past in arguments; solve today\u2019s issue today.","Plan a double date with friends who bring good energy.","Write three things you love about them and read one aloud.","Protect their reputation online and offline.","Wake up early once to make breakfast \u2014 effort is attractive.","Listen without fixing unless they ask for advice.","Share goals and ask how you can support, not control.","Laugh at yourselves when plans fail \u2014 resilience is sexy.","Keep dating each other: dress up for no reason sometimes.","Remember important dates in your calendar with alerts.","Give them the last bite if they love it \u2014 generosity in small things.","Plan a cozy movie night with their favorite blanket rules.","Tell them when you are proud of how they handled something hard.","Be consistent with good morning and good night kindness.","Create a shared tradition: Sunday brunch, Friday playlist, monthly adventure.","Forgive fast when intent was good \u2014 hold grace like a gift.","Ask for what you need clearly instead of testing them.","Surprise them with flowers, a plant, or something living and hopeful.","Dream aloud about the future together \u2014 direction feels safe.","Choose them again today \u2014 love is a daily decision, not a one-time event."],y.s)
+A.djj=x([D.bT,D.jl,D.pk],y.O)
+A.dny=x(["Send a voice note saying one specific thing you appreciated about them today.","Plan a no-phone hour together \u2014 phones face down, eyes on each other.","Remember a small detail they mentioned and bring it up later; it shows you listen.","Compliment their character, not only their appearance \u2014 depth keeps hearts close.","Schedule a weekly check-in: \u201cHow are we feeling about us?\u201d","Share a playlist of songs that remind you of them \u2014 three tracks is enough.","Apologize quickly when you are wrong; pride is the enemy of closeness.","Celebrate their wins loudly, even the small ones \u2014 promotion, recipe, good day.","Ask \u201cWhat would make this week easier for you?\u201d and follow through once.","Leave a handwritten note in their bag, book, or on the mirror.","Plan surprise comfort: their favorite snack after a hard day.","Touch base mid-day with a kind text \u2014 not demanding, just warm.","Learn one thing they care about and ask a thoughtful question about it.","Defend them kindly in public; loyalty builds trust.","Create a shared inside joke \u2014 intimacy loves private language.","Book something to look forward to: concert, class, weekend trip.","Practice patience when they need space; trust is quiet confidence.","Cook or order their favorite meal without being asked.","Take photos together that are candid, not only posed perfection.","Say thank you for ordinary things: listening, driving, patience.","Introduce them proudly to friends \u2014 belonging matters.","Keep promises small and large; reliability is romance in action.","Flirt after you are comfortable \u2014 playfulness keeps sparks alive.","Ask about their family with genuine curiosity, not interrogation.","Share your feelings with calm words instead of guessing games.","Plan a tech-free walk and hold hands if you both want that.","Respect their boundaries without making them explain twice.","Send a meme or reel that made you think of them \u2014 light connection counts.","Celebrate anniversaries of small moments: first coffee, first laugh.","Offer help before they have to ask \u2014 dishes, errands, ride.","Speak their love language: time, words, gifts, acts, touch \u2014 learn which lands.","Do not weaponize the past in arguments; solve today\u2019s issue today.","Plan a double date with friends who bring good energy.","Write three things you love about them and read one aloud.","Protect their reputation online and offline.","Wake up early once to make breakfast \u2014 effort is attractive.","Listen without fixing unless they ask for advice.","Share goals and ask how you can support, not control.","Laugh at yourselves when plans fail \u2014 resilience is sexy.","Keep dating each other: dress up for no reason sometimes.","Remember important dates in your calendar with alerts.","Give them the last bite if they love it \u2014 generosity in small things.","Plan a cozy movie night with their favorite blanket rules.","Tell them when you are proud of how they handled something hard.","Be consistent with good morning and good night kindness.","Create a shared tradition: Sunday brunch, Friday playlist, monthly adventure.","Forgive fast when intent was good \u2014 hold grace like a gift.","Ask for what you need clearly instead of testing them.","Surprise them with flowers, a plant, or something living and hopeful.","Dream aloud about the future together \u2014 direction feels safe.","Choose them again today \u2014 love is a daily decision, not a one-time event."],y.s)
 A.e4a=new B.a2("love","I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
 A.e7T=new B.a2("love","Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
 A.ecn=new B.a2("love","Deep riddle #3 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
@@ -2624,4 +2624,4 @@ A.fx7=new C.G(!0,D.c,null,null,null,null,16,D.u,null,0.5,null,null,null,null,nul
 A.h4a=new C.B("Daily Confidence Boost",null,A.fx7,null,null,null,null,null,null,null,null,null)
 A.fCA=new C.G(!0,D.c,null,null,null,null,14,D.H,null,0.8,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 A.h7c=new C.B("Love Match",null,A.fCA,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["fb0K5RoGZYmLINKbJMPujM9ZPsc="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["5fmQSIeEH1Fq9dlX/cjQHyOLs0o="]=a.current})($__dart_deferred_initializers__);
