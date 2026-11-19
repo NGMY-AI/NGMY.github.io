@@ -523,24 +523,7 @@ bool paintExtraPart(Canvas c, Part p, double time, void Function(Canvas, String,
         c.drawRRect(scr, fill(const Color(0xFF05070A)));
         c.drawPath(Path()..moveTo(scr.left, scr.top)..lineTo(scr.left + 24, scr.top)..lineTo(scr.left, scr.top + 22)..close(), fill(Colors.white.withValues(alpha: 0.05)));
       }
-      switch (p.kind) {
-        case 'lgtv':
-          c.drawRRect(rr(-22, 19, 44, 3, 1.5), fill(const Color(0xFF9CA3AF)));
-        case 'sonytv':
-          for (final x in const [-1.0, 1.0]) {
-            c.drawPath(Path()..moveTo(x * 30, 20)..lineTo(x * 22, 20)..lineTo(x * 26, 26)..close(), fill(const Color(0xFF9CA3AF)));
-          }
-          text(c, 'SONY', const Offset(-9, 20.5), const Color(0xFFE5E7EB), 5.5);
-        case 'appletv':
-          c.drawPath(Path()..moveTo(-8, 18)..lineTo(8, 18)..lineTo(12, 25)..lineTo(-12, 25)..close(), fill(const Color(0xFFB6BBC2)));
-          text(c, 'Apple TV', const Offset(-9, 18.5), const Color(0xFF475569), 4.8);
-        default:
-          c.drawRRect(rr(-34, 19, 68, 7, 3), fill(const Color(0xFF6B5B45)));
-          for (var k = 0; k < 14; k++) {
-            c.drawLine(Offset(-32 + k * 4.9, 20), Offset(-32 + k * 4.9, 25), line(Colors.black26, 0.6));
-          }
-          text(c, 'B&O', const Offset(-6, 26), const Color(0xFFD6B77B), 5);
-      }
+      // Only the frame and the screen: no stand, legs, sound bar or name under the TV (the owner asked for the TV alone).
       return true;
     case 'iphonefold':
     case 'galaxy':
