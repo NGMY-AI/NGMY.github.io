@@ -218,11 +218,11 @@ final List<ElectricalLesson> kMoreLessons = [
     ],
     hookups: const [
       Hookup(idGreen, 'Green screw: GROUND', {'ground'}, 'The bare copper ground goes on the green screw.', role: 'ground'),
-      Hookup(idBrassTop, 'FEED screw (joined tab)', {'feed'}, 'The one feed wire goes on the side where the brass screws are joined by a tab: it powers both switches.', role: 'hot'),
-      Hookup(idBrassBottom, 'Switch 1 screw → light 1', {'loadA', 'loadB'}, 'Each switch has its own screw on the other side, and each goes to its own light.', role: 'hot'),
-      Hookup(idSilverBottom, 'Switch 2 screw → light 2', {'loadA', 'loadB'}, 'Each switch has its own screw on the other side, and each goes to its own light.', role: 'hot'),
+      Hookup(idBrassTop, 'FEED screw (joined tab)', {'feed'}, 'The one feed wire goes on the side where the two screws are joined by a tab: it powers both switches.', role: 'hot'),
+      Hookup(idSilverTop, 'Switch 1 screw → light 1', {'loadA', 'loadB'}, 'Each switch has its own screw on the OTHER side (no tab between them), and each goes to its own light.', role: 'hot'),
+      Hookup(idSilverBottom, 'Switch 2 screw → light 2', {'loadA', 'loadB'}, 'Each switch has its own screw on the OTHER side (no tab between them), and each goes to its own light.', role: 'hot'),
     ],
-    solution: const {idGreen: 'ground', idBrassTop: 'feed', idBrassBottom: 'loadA', idSilverBottom: 'loadB'},
+    solution: const {idGreen: 'ground', idBrassTop: 'feed', idSilverTop: 'loadA', idSilverBottom: 'loadB'},
     wrongHint: (chip, h) => chip == 'ground'
         ? 'The bare copper ground wire only goes on the GREEN screw.'
         : h.id == idGreen

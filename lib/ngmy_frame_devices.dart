@@ -145,9 +145,8 @@ void drawDeviceFace(MeshBuilder b, FBox x, WiringHouse w) {
     b.box(at(0, ry + (up ? 0.5 : -0.5), f + 0.3), wallSize(x.wall, 0.55, 1.0, 0.45), white, shine: 0.5);
     if (kind == 'switchsmart') b.ball(at(0, 1.7, f + 0.1), 0.18, const Color(0xFF38BDF8), shine: 0.2, lat: 3, lon: 5);
     if (combo) {
-      b.box(at(-0.38, -1.2, f + 0.05), wallSize(x.wall, 0.12, 0.5, 0.05), dark);
-      b.box(at(0.38, -1.2, f + 0.05), wallSize(x.wall, 0.12, 0.34, 0.05), dark);
-      b.ball(at(0, -1.75, f + 0.05), 0.16, dark, shine: 0.1, lat: 3, lon: 5);
+      // A double switch: a second rocker under the first (two switches for two lights).
+      b.box(at(0, -1.45 + (up ? 0.3 : -0.3), f + 0.3), wallSize(x.wall, 0.55, 0.8, 0.45), white, shine: 0.5);
     }
     return;
   }

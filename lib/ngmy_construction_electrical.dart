@@ -564,7 +564,7 @@ Scene3D buildBench(ElectricalLesson lesson, WiringState s, {bool withWall = true
   if (ceilingKind) {
     _fixture(b, kind, s);
   } else {
-    _device(b, kind, _deviceZ(kind, s), s.burnt, fourScrews: !lesson.legacy, strap: s.strap, screwLook: switchScrewLook(lesson.id));
+    _device(b, kind, _deviceZ(kind, s), s.burnt, fourScrews: !lesson.legacy, strap: s.strap, screwLook: lessonScrewLook(lesson));
     _variantFace(b, lesson.id, _deviceZ(kind, s), s.burnt);
   }
   if (s.hints && s.stage == 0) {
@@ -799,8 +799,36 @@ Map<int, (Color, Color)>? switchScrewLook(String lessonId) => switch (lessonId) 
           idSilverBottom: (kBrass, kBrassPlate),
           idBrassBottom: (kBrass, kBrassPlate),
         },
+      // Double switch: four brass screws; the two on the feed side are joined by a tab, the two on the other side are one per switch.
+      'switchcombo' => const {
+          idSilverTop: (kBrass, kBrassPlate),
+          idBrassTop: (kBrass, kBrassPlate),
+          idSilverBottom: (kBrass, kBrassPlate),
+          idBrassBottom: (kBrass, kBrassPlate),
+        },
       _ => null,
     };
+
+/// The screws of a lesson's device as they are on the real one. The switches above have their own. A plain duplex outlet
+/// (the usual wall outlet, a GFCI, a 20 amp outlet) keeps its four screws, two silver and two brass. Any other device (the
+/// 240 volt, 277 volt, three-phase and twist-lock outlets, the smart switch) shows only the screws it uses, each in the
+/// colour of the wire it takes: brass for a hot, silver for a neutral. So an outlet with no neutral has no silver screw,
+/// and the third hot of a three-phase outlet is on a brass screw, not a silver one. Null for the lab's first five lessons.
+Map<int, (Color, Color)>? lessonScrewLook(ElectricalLesson lesson) {
+  final own = switchScrewLook(lesson.id);
+  if (own != null || lesson.legacy) return own;
+  const silver = (kNickel, kNickelPlate), brass = (kBrass, kBrassPlate);
+  const sides = {idSilverTop, idSilverBottom, idBrassTop, idBrassBottom};
+  final duplex = const {'outlet', 'gfci', 'nema520'}.contains(lesson.look);
+  final look = <int, (Color, Color)>{
+    if (duplex) ...{idSilverTop: silver, idSilverBottom: silver, idBrassTop: brass, idBrassBottom: brass},
+  };
+  for (final h in lesson.hookups) {
+    if (!sides.contains(h.id)) continue;
+    look[h.id] = h.role == 'neutral' ? silver : brass;
+  }
+  return look;
+}
 
 void _device(MeshBuilder b, String kind, double z, bool burnt, {bool faceOnly = false, bool fourScrews = false, bool strap = true, Map<int, (Color, Color)>? screwLook}) {
   if (kind.startsWith('terminal')) {
@@ -985,13 +1013,11 @@ void _variantFace(MeshBuilder b, String lesson, double z, bool burnt) {
       b.ball(c + const V3(0, 1.12, 0.52), 0.1, burnt ? kChar : const Color(0xFF38BDF8), shine: 0.8, lat: 4, lon: 8);
       b.box(c + const V3(0, -0.98, 0.78), const V3(0.5, 0.06, 0.04), const Color(0xFFB8BCC4));
     case 'switchcombo':
-      // The switch above and a small outlet below it, on the same plate.
+      // A double switch: a second small rocker below the first, on the same strap (two switches, two lights).
       b.bias = 1.0;
       b.box(c + const V3(0, -0.98, 0.82), const V3(1.05, 0.95, 0.08), burnt ? kChar : const Color(0xFFF1EEE2), shine: 0.3);
-      const dark = Color(0xFF17181B);
-      b.box(c + const V3(-0.2, -0.9, 0.88), const V3(0.06, 0.3, 0.02), dark);
-      b.box(c + const V3(0.2, -0.9, 0.88), const V3(0.06, 0.22, 0.02), dark);
-      b.cyl(c + const V3(0, -1.2, 0.86), c + const V3(0, -1.2, 0.9), 0.08, dark, sides: 8);
+      b.box(c + const V3(0, -0.98, 0.9), const V3(0.62, 0.62, 0.1), burnt ? kChar : const Color(0xFFFFFFFF), shine: 0.5);
+      b.box(c + const V3(0, -0.98, 0.96), const V3(0.62, 0.04, 0.02), const Color(0xFFCFCAB9));
     case 'isolated':
       b.tri(c + const V3(0, 0.2, 0.5), c + const V3(-0.17, -0.1, 0.5), c + const V3(0.17, -0.1, 0.5), burnt ? kChar : const Color(0xFFF97316));
     case 'usb':

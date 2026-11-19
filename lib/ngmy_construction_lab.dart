@@ -252,10 +252,11 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
                   key: const Key('lessons-search-field'),
                   autofocus: true,
                   onChanged: (v) => setState(() => _query = v),
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  // 16 or bigger: on an iPhone a smaller text in a typing box makes Safari zoom the whole page in.
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
                   decoration: InputDecoration(
-                    hintText: 'Search the lessons: outlet, switch, dryer, sink...',
-                    hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+                    hintText: 'Search: outlet, switch, dryer, sink...',
+                    hintStyle: const TextStyle(color: Colors.white38, fontSize: 16),
                     prefixIcon: const Icon(Icons.search_rounded, color: Colors.white54),
                     filled: true,
                     fillColor: Colors.white.withValues(alpha: 0.07),
@@ -280,8 +281,7 @@ class _NgmyConstructionLabState extends State<NgmyConstructionLab> {
       (emoji: '🧠', title: 'Diagram lessons', blurb: 'Three-way switch, fan with light', color: const Color(0xFFA78BFA), open: () => _push(const NgmyElectricalDiagramPage()), words: 'diagram wiring picture'),
       (emoji: '📘', title: 'Learn the trades', blurb: 'Short cards for beginners', color: const Color(0xFFA78BFA), open: () => _push(const NgmyConstructionLearnPage()), words: 'cards beginner trade'),
     ];
-    final words = _query.toLowerCase().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
-    final shown = [for (final t in all) if (words.every((w) => '${t.title} ${t.blurb} ${t.words}'.toLowerCase().contains(w))) t];
+    final shown = [for (final i in ngmyRankLessons(_query, [for (final t in all) (title: t.title, other: '${t.blurb} ${t.words}')])) all[i]];
     if (shown.isEmpty) {
       return [const Padding(padding: EdgeInsets.symmetric(vertical: 26), child: Center(child: Text('No lesson found. Try another word.', key: Key('lessons-none'), style: TextStyle(color: Colors.white54, fontSize: 13.5))))];
     }
@@ -1893,4 +1893,37 @@ class _ZoomButtonState extends State<_ZoomButton> {
           ),
         ),
       );
+}
+
+/// Which lessons match what is typed, best first (their places in [lessons]). Each typed word must be the START of a
+/// word of the lesson, so the list narrows from the very first letter ("s" shows switch, sink, smart...; it no longer
+/// shows every lesson with an s somewhere inside). Lessons whose title starts with what is typed come first, then those
+/// with a title word that starts with it, then the rest. When nothing starts that way, anything containing it is shown.
+List<int> ngmyRankLessons(String query, List<({String title, String other})> lessons) {
+  final typed = query.toLowerCase().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+  if (typed.isEmpty) return [for (var i = 0; i < lessons.length; i++) i];
+  final split = RegExp(r'[^a-z0-9]+');
+  List<String> wordsOf(String s) => s.toLowerCase().split(split).where((w) => w.isNotEmpty).toList();
+  final scored = <(int, int)>[];
+  for (var i = 0; i < lessons.length; i++) {
+    final title = wordsOf(lessons[i].title);
+    final all = [...title, ...wordsOf(lessons[i].other)];
+    if (!typed.every((t) => all.any((w) => w.startsWith(t)))) continue;
+    final t0 = typed.first;
+    final score = lessons[i].title.toLowerCase().startsWith(t0)
+        ? 0
+        : typed.every((t) => title.any((w) => w.startsWith(t)))
+            ? 1
+            : 2;
+    scored.add((score, i));
+  }
+  if (scored.isEmpty) {
+    // Nothing starts with it: anything that contains it, as before.
+    for (var i = 0; i < lessons.length; i++) {
+      final text = '${lessons[i].title} ${lessons[i].other}'.toLowerCase();
+      if (typed.every(text.contains)) scored.add((3, i));
+    }
+  }
+  scored.sort((a, b) => a.$1 != b.$1 ? a.$1.compareTo(b.$1) : a.$2.compareTo(b.$2));
+  return [for (final s in scored) s.$2];
 }

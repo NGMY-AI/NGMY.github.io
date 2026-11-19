@@ -517,10 +517,8 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
       b.box(V3(x, 43.6, 1.7), const V3(2.6, 0.3, 0.3), const Color(0xFF9CA3AF));
     }
     if (combo) {
-      for (final dx in const [-1.0, 1.0]) {
-        b.box(V3(x + dx, 42.6, 1.7), const V3(0.5, 1.8, 0.3), const Color(0xFF17181B));
-      }
-      b.cyl(V3(x, 40.2, 1.6), V3(x, 40.2, 1.9), 0.5, const Color(0xFF17181B), sides: 8);
+      // A double switch: the second rocker under the first (two switches for two lights).
+      b.box(V3(x, 41.6 + (r.lightOn && ok ? 0.8 : -0.8), 1.9), const V3(1.8, 3.2, 1.0), const Color(0xFFD9D2C2));
     }
     b.endGroup();
     info[id] = ObjInfo(id == idHSwitch && skind != 'switch' ? shortDeviceName(skind) : 'Light switch', !ok ? 'Not wired yet. Tap it to wire it.' : (r.lightOn ? 'On. Tap to turn the ${fan ? 'fan' : 'light'} off.' : 'Off. Tap to turn the ${fan ? 'fan' : 'light'} on.'), V3(x, 48, 2), 60);
