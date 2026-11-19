@@ -3516,9 +3516,11 @@ class _PinnedMedicineCardBodyState extends State<_PinnedMedicineCardBody> {
     final timesPerDay = m?.timesPerDay ?? _timesPerDayFromBody(bodyLines);
     final remindersOn = m?.remindersEnabled ?? bodyLines.any((l) => l.toLowerCase().contains('reminders: on'));
 
-    const topReserve = 68.0;
+    // Just enough room at the top for the Welcome back and date labels (it was 68, which pushed the card's words down
+    // until the last line slid under the pink bar at the bottom).
+    const topReserve = 50.0;
     const bottomBar = 30.0;
-    const bottomClear = 14.0;
+    const bottomClear = 8.0;
 
     return Stack(
       fit: StackFit.expand,
@@ -3589,6 +3591,19 @@ class _PinnedMedicineCardBodyState extends State<_PinnedMedicineCardBody> {
           child: _loading
               ? const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: accent)))
               : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Everything but the last line, made a little smaller when a medicine has many details, so it always
+                    // fits above the "Due now" line and nothing hides under the pink bar.
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, box) => FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.topLeft,
+                          child: SizedBox(
+                            width: box.maxWidth,
+                            child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
@@ -3682,7 +3697,13 @@ class _PinnedMedicineCardBodyState extends State<_PinnedMedicineCardBody> {
                         ),
                       ),
                     ],
-                    const Spacer(flex: 1),
+                  ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
                     Padding(
                       padding: const EdgeInsets.only(bottom: 2),
                       child: Row(

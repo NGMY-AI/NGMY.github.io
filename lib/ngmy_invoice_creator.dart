@@ -983,7 +983,13 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
     final locked = _contentLocked();
     _schedulePrintPdfWarm(subtotal);
 
-    return Dialog(
+    // The page itself already gets shorter when the phone's keyboard opens. A dialog also moves up by the keyboard's
+    // height, so typing in a field (the dates) took the keyboard off twice: the invoice shrank to a strip at the top and
+    // the rest of the screen was the black backdrop. Taken off once only.
+    return MediaQuery.removeViewInsets(
+      context: context,
+      removeBottom: true,
+      child: Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       backgroundColor: isDark ? const Color(0xFF0A1020) : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -1365,6 +1371,7 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

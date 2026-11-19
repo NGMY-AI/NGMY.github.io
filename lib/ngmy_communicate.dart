@@ -2361,6 +2361,11 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
   Uint8List? _syncPortraitBytes() {
     final id = widget.profile.id.trim();
     final name = widget.profile.name.trim();
+    // An advisor with their own photo (Mariam, Suzana, Anna...) only ever shows that photo: an older picture kept under
+    // their id (one an admin set long ago) showed up instead when the phone was offline.
+    if (ngmyAdvisorHasNamedPortrait(name: name, id: id)) {
+      return ngmyAdvisorPhotorealBytesSync(id: id, gender: widget.profile.gender, role: widget.profile.role, name: name);
+    }
     final ram = NgmyCommunicateAvatarCache.bytesInRam(id);
     if (ram != null && ram.isNotEmpty) return ram;
     final url = widget.profile.avatarUrl.trim();
@@ -2394,6 +2399,9 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
       if (!_useBundledAsset && mounted) _applyBytes(assetBytes);
       return;
     }
+    // Their own photo could not be read just now (offline before it was ever kept): wait for it rather than show an
+    // older picture kept under their id.
+    if (ngmyAdvisorHasNamedPortrait(name: name, id: id)) return;
 
     var bytes = NgmyCommunicateAvatarCache.bytesInRam(id);
     bytes ??= await NgmyCommunicateAvatarCache.loadBytes(id);
