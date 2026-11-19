@@ -510,7 +510,8 @@ bool paintExtraPart(Canvas c, Part p, double time, void Function(Canvas, String,
     case 'bangtv':
       final bez = switch (p.kind) { 'lgtv' => const Color(0xFF0A0A0A), 'sonytv' => const Color(0xFF1C1C1E), 'appletv' => const Color(0xFFD1D5DB), _ => const Color(0xFFB8B2A7) };
       final thin = p.kind == 'lgtv' || p.kind == 'appletv';
-      c.drawRRect(rr(-36, -24, 72, thin ? 42 : 44, 6), fill(bez));
+      // The frame's bottom edge is a little taller than the other sides, so the maker's name or logo fits in it.
+      c.drawRRect(rr(-36, -24, 72, 46, 6), fill(bez));
       final scr = rr(thin ? -35 : -33, thin ? -23 : -21, thin ? 70 : 66, thin ? 40 : 38, 3);
       if (on) {
         c.save();
@@ -523,7 +524,30 @@ bool paintExtraPart(Canvas c, Part p, double time, void Function(Canvas, String,
         c.drawRRect(scr, fill(const Color(0xFF05070A)));
         c.drawPath(Path()..moveTo(scr.left, scr.top)..lineTo(scr.left + 24, scr.top)..lineTo(scr.left, scr.top + 22)..close(), fill(Colors.white.withValues(alpha: 0.05)));
       }
-      // Only the frame and the screen: no stand, legs, sound bar or name under the TV (the owner asked for the TV alone).
+      // Only the frame and the screen (no stand, legs or sound bar under the TV); the maker's name or logo sits small
+      // in the middle of the frame's bottom edge.
+      const logoY = 19.6;
+      if (p.kind == 'appletv') {
+        // The apple: a round body with a bite on the right and a small leaf on top.
+        final ink = fill(const Color(0xFF4B5563));
+        final apple = Path()
+          ..addOval(Rect.fromCenter(center: const Offset(-0.7, logoY + 0.35), width: 2.3, height: 2.6))
+          ..addOval(Rect.fromCenter(center: const Offset(0.7, logoY + 0.35), width: 2.3, height: 2.6));
+        final bite = Path()..addOval(Rect.fromCircle(center: const Offset(2.15, logoY + 0.1), radius: 0.85));
+        c.drawPath(Path.combine(PathOperation.difference, apple, bite), ink);
+        c.drawOval(Rect.fromCenter(center: const Offset(0.45, logoY - 1.65), width: 0.8, height: 1.3), ink);
+      } else {
+        final (name, col) = switch (p.kind) {
+          'lgtv' => ('LG', const Color(0xFFD1D5DB)),
+          'sonytv' => ('SONY', const Color(0xFFE5E7EB)),
+          _ => ('B&O', const Color(0xFF3F3A33)),
+        };
+        final tp = TextPainter(
+          text: TextSpan(text: name, style: TextStyle(color: col, fontSize: 3.6, fontWeight: FontWeight.w800, letterSpacing: 0.25, height: 1)),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        tp.paint(c, Offset(-tp.width / 2, logoY - tp.height / 2));
+      }
       return true;
     case 'iphonefold':
     case 'galaxy':
