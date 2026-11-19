@@ -1,6 +1,18 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
-$__dart_deferred_initializers__.current=function(a,b,c,$){var A,B
-A=c[0]
-B=c[109]
-var z=a.updateTypes([]);(function constants(){B.Cz=new A.bf(8e4)})()};
-(a=>{a["EevZaETnimLSTVHAInOe+/m/wRQ="]=a.current})($__dart_deferred_initializers__);
+$__dart_deferred_initializers__.current=function(a,b,c,$){var J,C,A,B={a6d:function a6d(){}},D
+J=c[1]
+C=c[0]
+A=c[2]
+B=a.updateHolder(c[27],B)
+D=c[108]
+B.a6d.prototype={
+A(d,e){if(e==null)return!1
+if(J.bZ(e)!==C.b4(this))return!1
+return e instanceof B.a6d},
+gX(d){return C.bw("tnum",1,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j)},
+v(d){return"FontFeature('tnum', 1)"}}
+var z=a.updateTypes([]);(function inheritance(){var y=a.inherit
+y(B.a6d,C.aK)})();(function constants(){var y=a.makeConstList
+D.bcm=new B.a6d()
+D.a6b=y([D.bcm],C.aF("U<a6d>"))})()};
+(a=>{a["Xjdis0DAneGCmNBc8kbU3rkPNdY="]=a.current})($__dart_deferred_initializers__);

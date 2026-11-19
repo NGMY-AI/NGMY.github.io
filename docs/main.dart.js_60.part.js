@@ -1,2626 +1,3565 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
-$__dart_deferred_initializers__.current=function(a,b,c,$){var J,C,D,E,B={cQ:function cQ(d,e,f,g){var _=this
-_.a=d
-_.b=e
-_.c=f
-_.d=g},a2:function a2(d,e,f){this.a=d
-this.b=e
-this.c=f},
-hll(d,e){C.cg(null,C.a0(209,D.w.l()>>>16&255,D.w.l()>>>8&255,D.w.l()&255),!0,null,new B.h3N(e),d,null,!0,!0,y.H)},
-h3N:function h3N(d){this.a=d},
-a0W:function a0W(d,e){this.c=d
+$__dart_deferred_initializers__.current=function(a,b,c,$){var J,A,B,G,H,I,E,F,C={
+hA9(d){switch(d.a){case 0:return"Instant"
+case 1:return"Slide left/right"
+case 2:return"Slide up/down"
+case 3:return"Fade"}},
+iaq(d){switch(d.a){case 0:return B.v1
+case 1:return B.jN
+case 2:return B.Dt
+case 3:return B.wV}},
+hJW(d,e){return A.a6(d,!1).ce(A.ee(new C.h3o(e),!1,null,x.H))},
+Cf:function Cf(d,e){this.a=d
+this.b=e},
+h3o:function h3o(d){this.a=d},
+Wf:function Wf(d,e){this.c=d
 this.a=e},
-aFS:function aFS(d,e,f,g,h){var _=this
-_.e=_.d=0
-_.f=d
-_.r=e
-_.y=_.x=_.w=null
-_.z=0
-_.Q=!1
-_.at=_.as=0
-_.ax=!0
-_.ch=_.ay=null
-_.CW=0
-_.cx=15
-_.cy=!1
-_.dx=1
-_.dy=null
-_.fr=!1
-_.go=_.fy=_.fx=$
-_.id=f
-_.cO$=g
-_.ba$=h
-_.c=_.a=null},
-e6u:function e6u(d,e,f,g){var _=this
-_.a=d
-_.b=e
-_.c=f
-_.d=g},
-e6t:function e6t(d,e){this.a=d
-this.b=e},
-e6m:function e6m(d,e,f){this.a=d
-this.b=e
-this.c=f},
-e6n:function e6n(d){this.a=d},
-e6l:function e6l(d){this.a=d},
-e6J:function e6J(d,e){this.a=d
-this.b=e},
-e6K:function e6K(d){this.a=d},
-e6I:function e6I(d){this.a=d},
-e6T:function e6T(d,e){this.a=d
-this.b=e},
-e6S:function e6S(d){this.a=d},
-e6q:function e6q(d){this.a=d},
-e6p:function e6p(d,e){this.a=d
-this.b=e},
-e6o:function e6o(d,e){this.a=d
-this.b=e},
-e6A:function e6A(d){this.a=d},
-e6z:function e6z(d,e){this.a=d
-this.b=e},
-e6y:function e6y(d,e){this.a=d
-this.b=e},
-e6v:function e6v(d){this.a=d},
-e6w:function e6w(d){this.a=d},
-e6x:function e6x(d){this.a=d},
-e6C:function e6C(d,e){this.a=d
-this.b=e},
-e6E:function e6E(d){this.a=d},
-e6D:function e6D(d){this.a=d},
-e6M:function e6M(d,e,f){this.a=d
-this.b=e
-this.c=f},
-e6N:function e6N(d){this.a=d},
-e6L:function e6L(d){this.a=d},
-e6R:function e6R(d){this.a=d},
-e6G:function e6G(d,e){this.a=d
-this.b=e},
-e6H:function e6H(d){this.a=d},
-e6F:function e6F(d){this.a=d},
-e6P:function e6P(d,e,f){this.a=d
-this.b=e
-this.c=f},
-e6Q:function e6Q(d){this.a=d},
-e6O:function e6O(d){this.a=d},
-e6r:function e6r(d){this.a=d},
-e6s:function e6s(d){this.a=d},
-e6B:function e6B(d,e,f){this.a=d
-this.b=e
-this.c=f},
-a_l:function a_l(d,e,f){this.a=d
-this.b=e
-this.c=f},
-a2g:function a2g(d,e){this.a=d
-this.b=e},
-aOg:function aOg(){},
-h3g(d,e){var x=0,w=C.j(y.H),v,u
-var $async$h3g=C.e(function(f,g){if(f===1)return C.f(g,w)
-for(;;)switch(x){case 0:u=C.qV(d,!0)
-u.toString
-v=C.dl()
-v.b=C.pE(new B.h3i(e,v),!1,!1)
-u.mf(0,v.bm())
-return C.h(null,w)}})
-return C.i($async$h3g,w)},
-h3J(d,e){var x=0,w=C.j(y.H),v,u
-var $async$h3J=C.e(function(f,g){if(f===1)return C.f(g,w)
-for(;;)switch(x){case 0:u=C.qV(d,!0)
-u.toString
-v=C.dl()
-v.b=C.pE(new B.h3L(e,v),!1,!1)
-u.mf(0,v.bm())
-return C.h(null,w)}})
-return C.i($async$h3J,w)},
-h3i:function h3i(d,e){this.a=d
-this.b=e},
-h3h:function h3h(d){this.a=d},
-h3L:function h3L(d,e){this.a=d
-this.b=e},
-h3K:function h3K(d){this.a=d},
-a_p:function a_p(d,e,f){this.c=d
-this.d=e
-this.a=f},
-bet:function bet(d,e){var _=this
+aFx:function aFx(d,e,f,g){var _=this
 _.d=$
-_.bw$=d
-_.a9$=e
+_.e=d
+_.f=!0
+_.x=_.w=_.r=!1
+_.y=e
+_.z=1
+_.cO$=f
+_.ba$=g
 _.c=_.a=null},
-d8V:function d8V(d){this.a=d},
-a01:function a01(d,e,f){this.c=d
-this.d=e
-this.a=f},
-bie:function bie(d,e){var _=this
-_.e=_.d=$
-_.cO$=d
-_.ba$=e
-_.c=_.a=null},
-dkW:function dkW(d,e){this.a=d
+dZx:function dZx(d){this.a=d},
+dZw:function dZw(){},
+dZ7:function dZ7(d){this.a=d},
+dZ8:function dZ8(){},
+dZ9:function dZ9(d,e){this.a=d
 this.b=e},
-aMF:function aMF(){},
-aN7:function aN7(){},
-h5s(d,e,f){var x=0,w=C.j(y.H),v,u
-var $async$h5s=C.e(function(g,h){if(g===1)return C.f(h,w)
-for(;;)switch(x){case 0:u=C.qV(d,!0)
-u.toString
-v=C.dl()
-v.b=C.pE(new B.h5u(f,e,v),!1,!1)
-u.mf(0,v.bm())
-x=2
-return C.b(C.bO(D.qG,null,y.H),$async$h5s)
-case 2:J.lL(v.bm())
-return C.h(null,w)}})
-return C.i($async$h5s,w)},
-h5p(d,e,f,g){var x=0,w=C.j(y.H),v,u
-var $async$h5p=C.e(function(h,i){if(h===1)return C.f(i,w)
-for(;;)switch(x){case 0:u=C.qV(d,!0)
-u.toString
-v=C.dl()
-v.b=C.pE(new B.h5r(g,e,f,D.bE,v),!1,!1)
-u.mf(0,v.bm())
-x=2
-return C.b(C.bO(A.ami,null,y.H),$async$h5p)
-case 2:J.lL(v.bm())
-return C.h(null,w)}})
-return C.i($async$h5p,w)},
-h5u:function h5u(d,e,f){this.a=d
-this.b=e
-this.c=f},
-h5t:function h5t(d){this.a=d},
-h5r:function h5r(d,e,f,g,h){var _=this
-_.a=d
-_.b=e
-_.c=f
-_.d=g
-_.e=h},
-h5q:function h5q(d){this.a=d},
-a0q:function a0q(d,e,f,g){var _=this
+dYY:function dYY(d,e){this.a=d
+this.b=e},
+dZa:function dZa(){},
+dZd:function dZd(d,e){this.a=d
+this.b=e},
+dZc:function dZc(){},
+dZi:function dZi(d){this.a=d},
+dZj:function dZj(d){this.a=d},
+dZk:function dZk(d){this.a=d},
+dZl:function dZl(d){this.a=d},
+dZb:function dZb(d,e){this.a=d
+this.b=e},
+dZv:function dZv(d,e){this.a=d
+this.b=e},
+dZ2:function dZ2(d){this.a=d},
+dZh:function dZh(){},
+dZp:function dZp(d,e){this.a=d
+this.b=e},
+dZm:function dZm(d){this.a=d},
+dZn:function dZn(d){this.a=d},
+dZo:function dZo(d){this.a=d},
+dZ6:function dZ6(d,e){this.a=d
+this.b=e},
+dZ4:function dZ4(d,e){this.a=d
+this.b=e},
+dZ3:function dZ3(d){this.a=d},
+dZ5:function dZ5(d,e){this.a=d
+this.b=e},
+dYX:function dYX(d){this.a=d},
+dZ1:function dZ1(d){this.a=d},
+dZ0:function dZ0(d){this.a=d},
+dZq:function dZq(d){this.a=d},
+dZt:function dZt(d){this.a=d},
+dZu:function dZu(d){this.a=d},
+dZr:function dZr(d){this.a=d},
+dZs:function dZs(d){this.a=d},
+dZf:function dZf(d,e){this.a=d
+this.b=e},
+dZg:function dZg(d){this.a=d},
+dZe:function dZe(){},
+dYZ:function dYZ(d){this.a=d},
+dZ_:function dZ_(d){this.a=d},
+a2d:function a2d(d,e,f,g){var _=this
 _.c=d
 _.d=e
 _.e=f
 _.a=g},
-bkW:function bkW(d,e){var _=this
+aKJ:function aKJ(){var _=this
 _.d=$
-_.bw$=d
-_.a9$=e
+_.e=!1
+_.f=!0
 _.c=_.a=null},
-duO:function duO(d){this.a=d},
-duN:function duN(d){this.a=d},
-a0p:function a0p(d,e,f,g,h,i){var _=this
+ffC:function ffC(d){this.a=d},
+ffD:function ffD(d){this.a=d},
+ffH:function ffH(d){this.a=d},
+ffE:function ffE(d){this.a=d},
+ffF:function ffF(d){this.a=d},
+ffG:function ffG(d,e){this.a=d
+this.b=e},
+ffI:function ffI(d){this.a=d},
+ffJ:function ffJ(){},
+ffK:function ffK(d){this.a=d},
+ffL:function ffL(d){this.a=d},
+aEn:function aEn(d,e){this.a=d
+this.b=e},
+a0w:function a0w(d){this.a=d},
+aEo:function aEo(d){this.d=d
+this.c=this.a=null},
+dAh:function dAh(d){this.a=d},
+dAg:function dAg(d,e){this.a=d
+this.b=e},
+dAf:function dAf(d,e){this.a=d
+this.b=e},
+aO4:function aO4(){},
+hu6(d){var w=B.a.i(d)
+return"ngmy_live_capture_v1_"+A.w(w.length===0?"guest":Math.abs(B.a.gX(w.toLowerCase())))},
+X6(d){return C.i_F(d)},
+i_F(d){var w=0,v=A.j(x.F),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g
+var $async$X6=A.e(function(e,f){if(e===1){s.push(f)
+w=t}for(;;)switch(w){case 0:t=4
+w=7
+return A.b(A.az(),$async$X6)
+case 7:r=f
+l=C.hu6(d)
+q=A.aW(J.t(r.a,l))
+if(q==null||q.length===0){l=A.a([],x.G)
+u=l
+w=1
+break}p=B.V.aP(0,q,null)
+if(!x.j.b(p)){l=A.a([],x.G)
+u=l
+w=1
+break}l=J.dd(p,x.M)
+l=A.cF(l,new C.ciU(),l.$ti.k("M.E"),x.m)
+k=A.B(l,A.a3(l).k("M.E"))
+B.d.b0(k,new C.ciV())
+o=k
+l=o,j=l.length,i=0
+case 8:if(!(i<l.length)){w=10
+break}n=l[i]
+w=11
+return A.b(C.Ft(n.a,n.f),$async$X6)
+case 11:m=f
+if(m!=null&&m.length!==0)n.e=m
+case 9:l.length===j||(0,A.I)(l),++i
+w=8
+break
+case 10:u=o
+w=1
+break
+t=2
+w=6
+break
+case 4:t=3
+g=s.pop()
+l=A.a([],x.G)
+u=l
+w=1
+break
+w=6
+break
+case 3:w=2
+break
+case 6:case 1:return A.h(u,v)
+case 2:return A.f(s.at(-1),v)}})
+return A.i($async$X6,v)},
+ON(d,e){return C.i_G(d,e)},
+i_G(d,e){var w=0,v=A.j(x.y),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i
+var $async$ON=A.e(function(f,g){if(f===1){s.push(g)
+w=t}for(;;)switch(w){case 0:k=e
+j=!0
+p=J.aT(k)
+case 3:if(!p.C()){w=4
+break}o=p.gP(p)
+n=o.e
+w=n.length===0?5:6
+break
+case 5:w=7
+return A.b(C.Ft(o.a,o.f),$async$ON)
+case 7:m=g
+if(m==null||m.length===0)j=!1
+w=3
+break
+case 6:w=8
+return A.b(C.ciC(o.a,n,o.f),$async$ON)
+case 8:if(g)o.e=""
+else j=!1
+w=3
+break
+case 4:t=10
+w=13
+return A.b(A.az(),$async$ON)
+case 13:r=g
+p=C.hu6(d)
+o=J.b9(k,new C.ciW(),x.P)
+o=A.B(o,o.$ti.k("ak.E"))
+w=14
+return A.b(r.aE("String",p,B.V.av(o,null)),$async$ON)
+case 14:p=j
+u=p
+w=1
+break
+t=2
+w=12
+break
+case 10:t=9
+i=s.pop()
+q=A.aa(i)
+$.am.$1("[live_capture] save: "+A.w(q))
+u=!1
+w=1
+break
+w=12
+break
+case 9:w=2
+break
+case 12:case 1:return A.h(u,v)
+case 2:return A.f(s.at(-1),v)}})
+return A.i($async$ON,v)},
+a96(d,e){var w=0,v=A.j(x.H),u
+var $async$a96=A.e(function(f,g){if(f===1)return A.f(g,v)
+for(;;)switch(w){case 0:w=2
+return A.b(C.X6(d),$async$a96)
+case 2:u=g
+J.mW(u,new C.ciT(e))
+w=3
+return A.b(C.ON(d,u),$async$a96)
+case 3:w=4
+return A.b(C.b31(e),$async$a96)
+case 4:return A.h(null,v)}})
+return A.i($async$a96,v)},
+asB(d){return B.a.b1(B.o.v(B.o.aq(d,60)),2,"0")+":"+B.a.b1(B.o.v(B.o.F(d,60)),2,"0")},
+pu:function pu(d,e,f,g,h,i,j){var _=this
+_.a=d
+_.b=e
+_.c=f
+_.d=g
+_.e=h
+_.f=i
+_.r=j},
+ciU:function ciU(){},
+ciV:function ciV(){},
+ciW:function ciW(){},
+ciT:function ciT(d){this.a=d},
+b34:function b34(d,e,f){var _=this
+_.a=d
+_.f=_.e=_.d=_.c=_.b=null
+_.r=!1
+_.w="user"
+_.x="youtube"
+_.as=_.Q=_.z=_.y=!1
+_.at=0
+_.ax=e
+_.ay=null
+_.R$=0
+_.V$=f
+_.by$=_.bL$=0},
+ciS:function ciS(d){this.a=d},
+b30(){var w,v,u,t=$.hcl
+if(t!=null)return t
+w=window
+w.toString
+v=w.indexedDB||w.webkitIndexedDB||w.mozIndexedDB
+if(v==null){w=A.ur(new A.l1("IndexedDB unavailable"),null)
+u=new A.bn($.bF,x.g)
+u.mQ(w)
+return $.hcl=u}return $.hcl=B.x9.H0(v,"ngmy_live_capture_blobs_v1",new C.ciA(),1)},
+a95(d,e){return C.i_A(d,e)},
+i_A(d,e){var w=0,v=A.j(x.y),u,t=2,s=[],r,q,p,o
+var $async$a95=A.e(function(f,g){if(f===1){s.push(g)
+w=t}for(;;)switch(w){case 0:t=4
+w=7
+return A.b(C.b30(),$async$a95)
+case 7:r=g
+q=J.mc(r,"blobs","readwrite")
+B.iE.mj(J.mb(q,"blobs"),e,d)
+w=8
+return A.b(J.ox(q),$async$a95)
+case 8:u=!0
+w=1
+break
+t=2
+w=6
+break
+case 4:t=3
+o=s.pop()
+u=!1
+w=1
+break
+w=6
+break
+case 3:w=2
+break
+case 6:case 1:return A.h(u,v)
+case 2:return A.f(s.at(-1),v)}})
+return A.i($async$a95,v)},
+a94(d,e,f){return C.i_z(d,e,f)},
+i_z(d,e,f){var w=0,v=A.j(x.y),u,t=2,s=[],r,q,p,o,n
+var $async$a94=A.e(function(g,h){if(g===1){s.push(h)
+w=t}for(;;)switch(w){case 0:o=e
+if(o.type.length===0&&B.a.i(f).length!==0)o=A.hR([o],B.a.i(f))
+t=4
+w=7
+return A.b(C.b30(),$async$a94)
+case 7:r=h
+q=J.mc(r,"blobs","readwrite")
+B.iE.mj(J.mb(q,"blobs"),o,d)
+w=8
+return A.b(J.ox(q),$async$a94)
+case 8:u=!0
+w=1
+break
+t=2
+w=6
+break
+case 4:t=3
+n=s.pop()
+u=!1
+w=1
+break
+w=6
+break
+case 3:w=2
+break
+case 6:case 1:return A.h(u,v)
+case 2:return A.f(s.at(-1),v)}})
+return A.i($async$a94,v)},
+ciC(d,e,f){return C.i_B(d,e,f)},
+i_B(a0,a1,a2){var w=0,v=A.j(x.y),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f,e,d
+var $async$ciC=A.e(function(a4,a5){if(a4===1){s.push(a5)
+w=t}for(;;)switch(w){case 0:if(a1.length===0){u=!1
+w=1
+break}w=B.a.Y(a1,"blob:")?3:4
+break
+case 3:t=6
+w=9
+return A.b(E.anp(a1,"blob"),$async$ciC)
+case 9:r=a5
+q=A.aQe(r.response)
+if(x.d.b(q)){g=q.size
+g.toString
+g=g>0}else g=!1
+if(g){g=C.a94(a0,q,"")
+u=g
+w=1
+break}t=2
+w=8
+break
+case 6:t=5
+d=s.pop()
+w=8
+break
+case 5:w=2
+break
+case 8:case 4:if(B.a.Y(a1,"data:")){try{p=B.a.cm(a1,",")
+if(p<0){g=C.a95(a0,a1)
+u=g
+w=1
+break}o=B.a.aA(a1,0,p).toLowerCase()
+n=B.a.b_(a1,p+1)
+m=A.af("data:([^;,]+)",!0,!1,!1,!1).cF(o)
+g=m
+e=g==null?null:g.b[1]
+l=e==null?a2:e
+k=null
+if(J.eC(o,";base64")){g=A.af("\\s",!0,!1,!1,!1)
+j=A.aL(n,g,"")
+g=j
+g=A.aL(g,"-","+")
+j=A.aL(g,"_","/")
+i=B.o.F(J.ad(j),4)
+if(i>0)j=J.bI7(j,J.ad(j)+(4-i),"=")
+k=B.cH.aL(j)}else{g=n
+k=new Uint8Array(A.cc(new A.d8(A.pR(g,0,g.length,B.cb,!1))))}if(!J.ct(k)){h=A.hR([k],l)
+g=h.size
+g.toString
+if(g>3145728){g=C.a94(a0,h,"")
+u=g
+w=1
+break}}}catch(a3){}u=C.a95(a0,a1)
+w=1
+break}u=C.a95(a0,a1)
+w=1
+break
+case 1:return A.h(u,v)
+case 2:return A.f(s.at(-1),v)}})
+return A.i($async$ciC,v)},
+Ft(d,e){return C.i_y(d,e)},
+i_y(d,e){var w=0,v=A.j(x.T),u,t=2,s=[],r,q,p,o,n,m,l
+var $async$Ft=A.e(function(f,g){if(f===1){s.push(g)
+w=t}for(;;)switch(w){case 0:t=4
+w=7
+return A.b(C.b30(),$async$Ft)
+case 7:r=g
+q=J.mc(r,"blobs","readonly")
+w=8
+return A.b(B.iE.xS(J.mb(q,"blobs"),d),$async$Ft)
+case 8:p=g
+if(x.d.b(p)){o=p
+if(o.type.length===0)n=B.a.i(e).length!==0
+else n=!1
+if(n)o=A.hR([o],B.a.i(e))
+n=(self.URL||self.webkitURL).createObjectURL(o)
+n.toString
+u=n
+w=1
+break}if(typeof p=="string"&&p.length!==0){u=p
+w=1
+break}u=null
+w=1
+break
+t=2
+w=6
+break
+case 4:t=3
+l=s.pop()
+u=null
+w=1
+break
+w=6
+break
+case 3:w=2
+break
+case 6:case 1:return A.h(u,v)
+case 2:return A.f(s.at(-1),v)}})
+return A.i($async$Ft,v)},
+asA(d){return C.i_x(d)},
+i_x(d){var w=0,v=A.j(x.K),u,t=2,s=[],r,q,p,o,n,m
+var $async$asA=A.e(function(e,f){if(e===1){s.push(f)
+w=t}for(;;)switch(w){case 0:t=4
+w=7
+return A.b(C.b30(),$async$asA)
+case 7:r=f
+q=J.mc(r,"blobs","readonly")
+w=8
+return A.b(B.iE.xS(J.mb(q,"blobs"),d),$async$asA)
+case 8:p=f
+w=9
+return A.b(C.hck(p),$async$asA)
+case 9:o=f
+u=o
+w=1
+break
+t=2
+w=6
+break
+case 4:t=3
+m=s.pop()
+u=null
+w=1
+break
+w=6
+break
+case 3:w=2
+break
+case 6:case 1:return A.h(u,v)
+case 2:return A.f(s.at(-1),v)}})
+return A.i($async$asA,v)},
+ciB(d){return C.i_w(d)},
+i_w(d){var w=0,v=A.j(x.K),u,t=2,s=[],r,q,p,o,n,m
+var $async$ciB=A.e(function(e,f){if(e===1){s.push(f)
+w=t}for(;;)switch(w){case 0:if(!B.a.Y(d,"blob:")){u=null
+w=1
+break}t=4
+w=7
+return A.b(E.anp(d,"blob").dg(0,B.qA),$async$ciB)
+case 7:r=f
+q=A.aQe(r.response)
+if(x.d.b(q)){o=C.ciw(q)
+u=o
+w=1
+break}t=2
+w=6
+break
+case 4:t=3
+m=s.pop()
+p=A.aa(m)
+$.am.$1("[live_capture blob] fetchBlobUrlBytes: "+A.w(p))
+w=6
+break
+case 3:w=2
+break
+case 6:u=null
+w=1
+break
+case 1:return A.h(u,v)
+case 2:return A.f(s.at(-1),v)}})
+return A.i($async$ciB,v)},
+hck(d){return C.i_u(d)},
+i_u(d){var w=0,v=A.j(x.K),u,t,s,r,q,p,o,n
+var $async$hck=A.e(function(e,f){if(e===1)return A.f(f,v)
+for(;;)switch(w){case 0:if(x.d.b(d)){u=C.ciw(d)
+w=1
+break}if(typeof d=="string"&&B.a.Y(d,"data:"))try{t=B.a.cm(d,",")
+if(t<0){u=null
+w=1
+break}s=B.a.aA(d,0,t).toLowerCase()
+r=B.a.b_(d,t+1)
+if(J.eC(s,";base64")){o=A.af("\\s",!0,!1,!1,!1)
+q=A.aL(r,o,"")
+o=q
+o=A.aL(o,"-","+")
+q=A.aL(o,"_","/")
+p=B.o.F(J.ad(q),4)
+if(p>0)q=J.bI7(q,J.ad(q)+(4-p),"=")
+o=B.cH.aL(q)
+u=o
+w=1
+break}o=r
+o=new Uint8Array(A.cc(new A.d8(A.pR(o,0,o.length,B.cb,!1))))
+u=o
+w=1
+break}catch(m){u=null
+w=1
+break}if(x.D.b(d)){u=new Uint8Array(A.cc(d))
+w=1
+break}if(x.I.b(d)){u=new Uint8Array(A.cc(d))
+w=1
+break}u=null
+w=1
+break
+case 1:return A.h(u,v)}})
+return A.i($async$hck,v)},
+ciw(d){var w=0,v=A.j(x.K),u,t,s,r,q
+var $async$ciw=A.e(function(e,f){if(e===1)return A.f(f,v)
+for(;;)switch(w){case 0:q=new FileReader()
+q.toString
+t=new A.bn($.bF,x.U)
+s=new A.c7(t,x.h)
+r=x._
+A.fC(q,"loadend",new C.cix(q,s),!1,r)
+A.fC(q,"error",new C.ciy(s),!1,r)
+q.readAsArrayBuffer(d)
+u=t.ix(0,B.Om,new C.ciz(s))
+w=1
+break
+case 1:return A.h(u,v)}})
+return A.i($async$ciw,v)},
+b31(d){return C.i_v(d)},
+i_v(d){var w=0,v=A.j(x.H),u=1,t=[],s,r,q,p
+var $async$b31=A.e(function(e,f){if(e===1){t.push(f)
+w=u}for(;;)switch(w){case 0:u=3
+w=6
+return A.b(C.b30(),$async$b31)
+case 6:s=f
+r=J.mc(s,"blobs","readwrite")
+B.iE.Gw(J.mb(r,"blobs"),d)
+w=7
+return A.b(J.ox(r),$async$b31)
+case 7:u=1
+w=5
+break
+case 3:u=2
+p=t.pop()
+w=5
+break
+case 2:w=1
+break
+case 5:return A.h(null,v)
+case 1:return A.f(t.at(-1),v)}})
+return A.i($async$b31,v)},
+ciA:function ciA(){},
+cix:function cix(d,e){this.a=d
+this.b=e},
+ciy:function ciy(d){this.a=d},
+ciz:function ciz(d){this.a=d},
+X5(){var w=window.navigator.userAgent.toLowerCase(),v=!0
+if(!B.a.q(w,"iphone"))if(!B.a.q(w,"ipad"))if(!B.a.q(w,"ipod"))v=B.a.q(w,"safari")&&!B.a.q(w,"chrome")&&!B.a.q(w,"chromium")&&!B.a.q(w,"android")
+return v},
+b33:function b33(d,e,f){this.a=d
+this.b=e
+this.c=f},
+b32:function b32(d){var _=this
+_.d=_.c=_.b=_.a=null
+_.e=d
+_.f="audio/webm"
+_.x=_.w=_.r=null
+_.z=_.y=!1
+_.as=_.Q=null
+_.at=!1
+_.ch=_.ay=_.ax=null
+_.cx=_.CW=!1
+_.k2=_.k1=_.id=_.go=_.fy=_.fx=_.fr=_.dy=_.dx=_.db=_.cy=null
+_.k3=!1
+_.ok=1280
+_.p1=720
+_.p2="user"
+_.p3="youtube"},
+ciH:function ciH(d,e,f,g){var _=this
+_.a=d
+_.b=e
+_.c=f
+_.d=g},
+ciJ:function ciJ(d){this.a=d},
+ciG:function ciG(d){this.a=d},
+ciD:function ciD(){},
+ciM:function ciM(d){this.a=d},
+ciN:function ciN(d){this.a=d},
+ciO:function ciO(d){this.a=d},
+ciK:function ciK(d){this.a=d},
+ciL:function ciL(d){this.a=d},
+ciP:function ciP(d){this.a=d},
+ciI:function ciI(){},
+ciE:function ciE(){},
+ciF:function ciF(){},
+bFH(d){var w=B.a.i(B.d.gH(d.split(";"))).toLowerCase()
+if(B.a.Y(w,"audio/")||B.a.Y(w,"video/")||B.a.Y(w,"application/"))return w
+return"application/octet-stream"},
+hAA(d){var w,v,u,t,s,r,q,p
+try{w=B.a.cm(d,",")
+if(w<0){q=B.cH.aL(d)
+return q}v=B.a.aA(d,0,w).toLowerCase()
+u=B.a.b_(d,w+1)
+if(J.eC(v,";base64")){q=A.af("\\s",!0,!1,!1,!1)
+t=A.aL(u,q,"")
+q=t
+q=A.aL(q,"-","+")
+t=A.aL(q,"_","/")
+s=B.o.F(J.ad(t),4)
+if(s>0)t=J.bI7(t,J.ad(t)+(4-s),"=")
+q=B.cH.aL(t)
+return q}q=u
+q=new Uint8Array(A.cc(new A.d8(A.pR(q,0,q.length,B.cb,!1))))
+return q}catch(p){r=A.aa(p)
+$.am.$1("[live_capture] decode dataUrl: "+A.w(r))
+return null}},
+i_E(d,e){var w,v,u,t
+if(B.a.Y(d,"blob:")||B.a.Y(d,"http://")||B.a.Y(d,"https://"))return d
+try{w=C.hu5(d,e)
+u=(self.URL||self.webkitURL).createObjectURL(w)
+u.toString
+return u}catch(t){v=A.aa(t)
+$.am.$1("[live_capture] toPlayableUrl: "+A.w(v))
+return d}},
+ciQ(d,e,f){return C.i_D(d,e,f)},
+i_D(d,e,a0){var w=0,v=A.j(x.y),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f
+var $async$ciQ=A.e(function(a1,a2){if(a1===1){s.push(a2)
+w=t}for(;;)switch(w){case 0:t=4
+r=C.bFH(e)
+q=null
+w=B.a.Y(d,"blob:")?7:9
+break
+case 7:w=10
+return A.b(E.anp(d,"blob").dg(0,B.qA),$async$ciQ)
+case 10:p=a2
+o=A.aQe(p.response)
+if(x.d.b(o)){j=o.size
+j.toString
+j=j<=0}else j=!0
+if(j){$.am.$1("[live_capture] download blob fetch failed")
+u=!1
+w=1
+break}q=o.type.length!==0?o:A.hR([o],r)
+w=8
+break
+case 9:q=C.hu5(d,r)
+case 8:j=(self.URL||self.webkitURL).createObjectURL(q)
+j.toString
+n=j
+i=window.navigator.userAgent.toLowerCase()
+if(B.a.q(i,"iphone")||B.a.q(i,"ipad")||B.a.q(i,"ipod")){j=window
+j.toString
+B.m1.rp(j,n,"_blank")
+u=!0
+w=1
+break}j=A.af("[^a-zA-Z0-9_-]+",!0,!1,!1,!1)
+m=A.aL(a0,j,"_")+"."+C.i_C(r)
+h=A.mZ(n)
+h.download=m
+j=h.style
+j.display="none"
+l=h
+j=document.body
+if(j!=null)j.appendChild(l).toString
+J.HM(l)
+A.cy(B.h1,new C.ciR(l,n))
+u=!0
+w=1
+break
+t=2
+w=6
+break
+case 4:t=3
+f=s.pop()
+k=A.aa(f)
+$.am.$1("[live_capture] downloadAsync: "+A.w(k))
+u=!1
+w=1
+break
+w=6
+break
+case 3:w=2
+break
+case 6:case 1:return A.h(u,v)
+case 2:return A.f(s.at(-1),v)}})
+return A.i($async$ciQ,v)},
+hu5(d,e){var w=B.a.cm(d,","),v=w>=0?B.a.aA(d,0,w):"",u=A.af("data:([^;,]+)",!0,!1,!1,!1).cF(v),t=u==null?null:u.b[1],s=C.bFH(t==null?e:t),r=C.hAA(d)
+if(r==null||r.length===0)throw A.W(A.bd("Could not decode capture data URL"))
+return A.hR([r],s)},
+i_C(d){var w=C.bFH(d)
+if(B.a.q(w,"jpeg")||B.a.q(w,"jpg"))return"jpg"
+if(B.a.q(w,"png"))return"png"
+if(B.a.q(w,"audio/mp4")||B.a.q(w,"audio/aac")||B.a.q(w,"audio/m4a"))return"m4a"
+if(B.a.q(w,"mp4"))return"mp4"
+if(B.a.q(w,"ogg"))return"ogg"
+if(B.a.q(w,"wav"))return"wav"
+if(B.a.q(w,"mpeg")||B.a.q(w,"mp3"))return"mp3"
+if(B.a.q(w,"video"))return"webm"
+return"webm"},
+ciR:function ciR(d,e){this.a=d
+this.b=e},
+aKn:function aKn(d,e,f,g,h,i,j){var _=this
 _.c=d
 _.d=e
 _.e=f
 _.f=g
 _.r=h
-_.a=i},
-bkV:function bkV(d,e){var _=this
+_.w=i
+_.a=j},
+bvF:function bvF(){var _=this
 _.d=$
-_.bw$=d
-_.a9$=e
+_.e=null
+_.f=!1
 _.c=_.a=null},
-duM:function duM(d){this.a=d},
-duL:function duL(d,e){this.a=d
-this.b=e},
-aNy:function aNy(){},
-aNz:function aNz(){},
-cgx(){var x=0,w=C.j(y.h),v,u,t,s
-var $async$cgx=C.e(function(d,e){if(d===1)return C.f(e,w)
-for(;;)switch(x){case 0:x=3
-return C.b(C.az(),$async$cgx)
-case 3:u=e.a
-t=J.a8(u)
-s=C.eq(t.h(u,"ngmy_fun_games_category"))
-s=D.o.D(s==null?0:s,0,3)
-u=C.eq(t.h(u,"ngmy_fun_games_love_tab"))
-v=new C.brG(s,D.o.D(u==null?0:u,0,3))
-x=1
+fdq:function fdq(d){this.a=d},
+fdp:function fdp(){},
+fdr:function fdr(){},
+byw:function byw(d,e,f,g){var _=this
+_.c=d
+_.d=e
+_.e=f
+_.a=g},
+iqN(d,e){var w=B.a.i(B.d.gH(d.split(";"))).toLowerCase()
+if(e==="photo"||B.a.q(w,"jpeg")||B.a.q(w,"jpg"))return"jpg"
+if(B.a.q(w,"png"))return"png"
+if(B.a.q(w,"audio/mp4")||B.a.q(w,"audio/aac")||B.a.q(w,"audio/m4a"))return"m4a"
+if(B.a.q(w,"audio/mpeg")||B.a.q(w,"mp3"))return"mp3"
+if(B.a.q(w,"audio/wav"))return"wav"
+if(B.a.q(w,"audio/ogg"))return"ogg"
+if(B.a.q(w,"video/mp4"))return"mp4"
+if(B.a.q(w,"video/webm"))return"webm"
+if(B.a.q(w,"video"))return"mp4"
+if(B.a.q(w,"audio"))return"m4a"
+return"bin"},
+hfR(d){var w,v=B.a.i(B.d.gH(d.split(";"))).toLowerCase()
+if(B.a.Y(v,"video/")||B.a.Y(v,"audio/"))return v
+w=v.length===0
+if(w&&B.a.q(d.toLowerCase(),"video"))return"video/mp4"
+return w?"application/octet-stream":v},
+iio(d){var w=d.c
+if(w==="photo")return"NGMY photo"
+if(w==="video")return"NGMY video"
+return"NGMY voice memo"},
+fTD(d){var w=0,v=A.j(x.N),u,t
+var $async$fTD=A.e(function(e,f){if(e===1)return A.f(f,v)
+for(;;)switch(w){case 0:t=B.a.i(d.e)
+if(t.length!==0){u=t
+w=1
+break}w=3
+return A.b(C.Ft(d.a,C.hfR(d.f)),$async$fTD)
+case 3:t=f
+if(t==null)t=""
+if(t.length!==0)d.e=t
+u=t
+w=1
 break
-case 1:return C.h(v,w)}})
-return C.i($async$cgx,w)},
-arF(d){var x=0,w=C.j(y.H),v
-var $async$arF=C.e(function(e,f){if(e===1)return C.f(f,w)
-for(;;)switch(x){case 0:x=2
-return C.b(C.az(),$async$arF)
-case 2:v=f
-x=3
-return C.b(v.aE("Int","ngmy_fun_games_category",D.o.D(d,0,3)),$async$arF)
-case 3:x=4
-return C.b(v.aE("Bool","ngmy_fun_games_seen_v1",!0),$async$arF)
-case 4:return C.h(null,w)}})
-return C.i($async$arF,w)},
-b28(d){var x=0,w=C.j(y.H)
-var $async$b28=C.e(function(e,f){if(e===1)return C.f(f,w)
-for(;;)switch(x){case 0:x=3
-return C.b(C.az(),$async$b28)
-case 3:x=2
-return C.b(f.aE("Int","ngmy_fun_games_love_tab",D.o.D(d,0,3)),$async$b28)
-case 2:return C.h(null,w)}})
-return C.i($async$b28,w)},
-OB(d){var x=0,w=C.j(y.H),v,u,t,s,r
-var $async$OB=C.e(function(e,f){if(e===1)return C.f(f,w)
-for(;;)switch(x){case 0:x=3
-return C.b(C.az(),$async$OB)
-case 3:s=f
-r=d==null?null:D.a.i(d).toLowerCase()
-if(r==null)r=""
-x=r.length!==0?4:5
+case 1:return A.h(u,v)}})
+return A.i($async$fTD,v)},
+aSs(d){var w=0,v=A.j(x.K),u,t,s,r,q,p,o,n,m
+var $async$aSs=A.e(function(e,f){if(e===1)return A.f(f,v)
+for(;;)switch(w){case 0:o=C.hfR(d.f)
+n=d.a
+w=3
+return A.b(C.asA(n),$async$aSs)
+case 3:m=f
+if(m!=null&&!B.aI.gau(m)){u=m
+w=1
+break}t=B.a.i(d.e)
+w=J.ad(t)===0?4:5
 break
-case 4:x=6
-return C.b(s.aE("String","ngmy_fg_user_key",r),$async$OB)
-case 6:x=1
+case 4:w=6
+return A.b(C.Ft(n,o),$async$aSs)
+case 6:r=f
+t=r==null?"":r
+case 5:n=J.d1(t,"blob:")
+w=n?7:8
 break
-case 5:u=C.aW(J.t(s.a,"ngmy_fg_device_id"))
-x=u==null||u.length===0?7:8
+case 7:w=9
+return A.b(C.ciB(t),$async$aSs)
+case 9:q=f
+if(q!=null&&!B.aI.gau(q)){u=q
+w=1
+break}case 8:if(J.d1(t,"data:"))try{n=C.hAA(t)
+u=n
+w=1
+break}catch(l){s=A.aa(l)
+$.am.$1("[live_capture export] dataUrl decode: "+A.w(s))}u=null
+w=1
 break
-case 7:t=Date.now()
-u="dev_"+1000*t+"_"+D.cT.aw(999999)
-x=9
-return C.b(s.aE("String","ngmy_fg_device_id",u),$async$OB)
-case 9:case 8:x=10
-return C.b(s.aE("String","ngmy_fg_user_key",u),$async$OB)
-case 10:case 1:return C.h(v,w)}})
-return C.i($async$OB,w)},
-arG(){var x=0,w=C.j(y.R),v,u,t,s
-var $async$arG=C.e(function(d,e){if(d===1)return C.f(e,w)
-for(;;)switch(x){case 0:x=3
-return C.b(C.az(),$async$arG)
-case 3:u=e.a
-t=J.a8(u)
-s=C.aW(t.h(u,"ngmy_fg_user_key"))
-if(s!=null&&s.length!==0){v=s
-x=1
-break}x=4
-return C.b(B.OB(null),$async$arG)
-case 4:u=C.aW(t.h(u,"ngmy_fg_user_key"))
-v=u==null?"guest":u
-x=1
+case 1:return A.h(u,v)}})
+return A.i($async$aSs,v)},
+a3S(d){var w=0,v=A.j(x.y),u,t,s,r,q,p,o,n,m,l,k,j
+var $async$a3S=A.e(function(e,f){if(e===1)return A.f(f,v)
+for(;;)switch(w){case 0:n=d.f
+m=C.hfR(n)
+l=d.b
+k=A.af("[^a-zA-Z0-9_-]+",!0,!1,!1,!1)
+l=A.aL(l,k,"_")
+k=A.af("_+",!0,!1,!1,!1)
+t=A.aL(l,k,"_")
+s=t.length>48?B.a.aA(t,0,48):t
+r=s+"."+C.iqN(n,d.c)
+q=C.iio(d)
+w=3
+return A.b(C.fTD(d),$async$a3S)
+case 3:p=f
+n=p.length!==0
+w=n?4:5
 break
-case 1:return C.h(v,w)}})
-return C.i($async$arG,w)},
-OA(d,e){var x=0,w=C.j(y.H),v,u,t
-var $async$OA=C.e(function(f,g){if(f===1)return C.f(g,w)
-for(;;)switch(x){case 0:x=2
-return C.b(C.az(),$async$OA)
-case 2:v=g
-u=new C.V(Date.now(),0,!1)
-t=""+C.bD(u)+"-"+C.bM(u)+"-"+C.bY(u)
-x=C.aW(J.t(v.a,d))!==t?3:4
+case 4:j=B.a
+w=6
+return A.b(C.bHa(p,r,m,d.b,q),$async$a3S)
+case 6:if(!j.q(f.toLowerCase(),"could not")){u=!0
+w=1
+break}case 5:w=7
+return A.b(C.aSs(d),$async$a3S)
+case 7:o=f
+l=o!=null
+w=l&&!B.aI.gau(o)?8:9
 break
-case 3:x=5
-return C.b(v.aE("String",d,t),$async$OA)
-case 5:x=6
-return C.b(v.aE("Int",e,0),$async$OA)
-case 6:case 4:return C.h(null,w)}})
-return C.i($async$OA,w)},
-WI(d,e,f,g){var x=0,w=C.j(y.S),v,u,t,s,r,q,p
-var $async$WI=C.e(function(h,i){if(h===1)return C.f(i,w)
-for(;;)switch(x){case 0:x=3
-return C.b(C.az(),$async$WI)
-case 3:t=i
-x=4
-return C.b(B.arG(),$async$WI)
-case 4:s=i
-r=t.a
-q=J.a8(r)
-p=C.eq(q.h(r,f))
-if(p==null)p=0
-u=C.eq(q.h(r,g))
-v=B.htz(d,e,u==null?0:u,p,s)
-x=1
+case 8:j=B.a
+w=10
+return A.b(A.aj7(o,r,m,d.b,q),$async$a3S)
+case 10:if(!j.q(f.toLowerCase(),"could not")){u=!0
+w=1
+break}case 9:w=n?11:12
 break
-case 1:return C.h(v,w)}})
-return C.i($async$WI,w)},
-Oz(d,e,f,g){var x=0,w=C.j(y.S),v,u,t,s,r,q,p,o,n,m,l,k
-var $async$Oz=C.e(function(h,i){if(h===1)return C.f(i,w)
-for(;;)switch(x){case 0:x=3
-return C.b(C.az(),$async$Oz)
-case 3:u=i
-t=u.a
-s=J.a8(t)
-r=C.eq(s.h(t,f))
-q=(r==null?0:r)+1
-p=C.eq(s.h(t,g))
-if(p==null)p=0
-if(q>=e){++p
-q=0}x=4
-return C.b(u.aE("Int",f,q),$async$Oz)
-case 4:x=5
-return C.b(u.aE("Int",g,p),$async$Oz)
-case 5:o=B
-n=d
-m=e
-l=p
-k=q
-x=6
-return C.b(B.arG(),$async$Oz)
-case 6:v=o.htz(n,m,l,k,i)
-x=1
+case 11:w=13
+return A.b(C.ciQ(p,m,d.b),$async$a3S)
+case 13:if(f){u=!0
+w=1
+break}case 12:if(l&&!B.aI.gau(o)){u=A.ahY(o,r,m)
+w=1
+break}u=!1
+w=1
 break
-case 1:return C.h(v,w)}})
-return C.i($async$Oz,w)},
-WJ(d,e){var x=0,w=C.j(y.H),v
-var $async$WJ=C.e(function(f,g){if(f===1)return C.f(g,w)
-for(;;)switch(x){case 0:if(C.aW(J.t(d.a,"ngmy_fg_conf_day"))===e){x=1
-break}x=3
-return C.b(d.aE("String","ngmy_fg_conf_day",e),$async$WJ)
-case 3:x=4
-return C.b(d.aE("Int","ngmy_fg_conf_day_used",0),$async$WJ)
-case 4:x=5
-return C.b(d.W(0,"ngmy_fg_conf_today_quote"),$async$WJ)
-case 5:x=6
-return C.b(d.W(0,"ngmy_fg_conf_today_content"),$async$WJ)
-case 6:case 1:return C.h(v,w)}})
-return C.i($async$WJ,w)},
-a8G(d){var x=0,w=C.j(y.j),v,u,t,s,r,q,p,o,n
-var $async$a8G=C.e(function(e,f){if(e===1)return C.f(f,w)
-for(;;)switch(x){case 0:x=3
-return C.b(C.az(),$async$a8G)
-case 3:o=f
-n=new C.V(Date.now(),0,!1)
-x=4
-return C.b(B.WJ(o,""+C.bD(n)+"-"+C.bM(n)+"-"+C.bY(n)),$async$a8G)
-case 4:n=o.a
-u=J.a8(n)
-t=C.eq(u.h(n,"ngmy_fg_conf_day_used"))
-if(t==null)t=0
-s=C.eq(u.h(n,"ngmy_fg_conf_pos"))
-if(s==null)s=0
-x=5
-return C.b(B.WI("confidence",d,"ngmy_fg_conf_pos","ngmy_fg_conf_gen"),$async$a8G)
-case 5:r=f
-q=D.o.F(s,d)
-p=C.aW(u.h(n,"ngmy_fg_conf_today_quote"))
-n=C.eq(u.h(n,"ngmy_fg_conf_today_content"))
-if(n==null)n=-1
-v=new C.bsw([t<1,r,q,d,n,p])
-x=1
+case 1:return A.h(u,v)}})
+return A.i($async$a3S,v)},
+bHa(d,e,f,g,h){return C.ivS(d,e,f,g,h)},
+ivS(a7,a8,a9,b0,b1){var w=0,v=A.j(x.N),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6
+var $async$bHa=A.e(function(b2,b3){if(b2===1){s.push(b3)
+w=t}for(;;)switch(w){case 0:a4=A.hAT(a8,a9)
+a5=B.a.i(B.d.gH(a9.split(";")))
+t=4
+r=null
+w=B.a.Y(a7,"blob:")?7:9
 break
-case 1:return C.h(v,w)}})
-return C.i($async$a8G,w)},
-Jy(d,e,f){var x=0,w=C.j(y.J),v,u,t,s,r,q
-var $async$Jy=C.e(function(g,h){if(g===1)return C.f(h,w)
-for(;;)switch(x){case 0:x=3
-return C.b(C.az(),$async$Jy)
-case 3:r=h
-q=new C.V(Date.now(),0,!1)
-x=4
-return C.b(B.WJ(r,""+C.bD(q)+"-"+C.bM(q)+"-"+C.bY(q)),$async$Jy)
-case 4:q=r.a
-u=J.a8(q)
-t=C.eq(u.h(q,"ngmy_fg_conf_day_used"))
-if(t==null)t=0
-if(t>=1){v=null
-x=1
-break}x=5
-return C.b(r.aE("Int","ngmy_fg_conf_day_used",t+1),$async$Jy)
-case 5:x=6
-return C.b(r.aE("String","ngmy_fg_conf_today_quote",d),$async$Jy)
-case 6:x=7
-return C.b(r.aE("Int","ngmy_fg_conf_today_content",e),$async$Jy)
-case 7:x=8
-return C.b(r.aE("Bool","ngmy_fg_conf_ever",!0),$async$Jy)
-case 8:s=C.eq(u.h(q,"ngmy_fg_conf_pos"))
-if(s==null)s=0
-x=9
-return C.b(B.Oz("confidence",f,"ngmy_fg_conf_pos","ngmy_fg_conf_gen"),$async$Jy)
-case 9:v=new C.bsd(e,s,d)
-x=1
+case 7:w=10
+return A.b(E.anp(a7,"blob").dg(0,B.qA),$async$bHa)
+case 10:q=b3
+p=A.aQe(q.response)
+if(x.d.b(p)){j=p.size
+j.toString
+j=j<=0}else j=!0
+if(j){j=A.bd("empty blob")
+throw A.W(j)}r=p.type.length!==0?p:A.hR([p],a5)
+w=8
 break
-case 1:return C.h(v,w)}})
-return C.i($async$Jy,w)},
-arI(d){var x=0,w=C.j(y.N),v,u,t,s
-var $async$arI=C.e(function(e,f){if(e===1)return C.f(f,w)
-for(;;)switch(x){case 0:x=3
-return C.b(B.OA("ngmy_fg_riddle_day","ngmy_fg_riddle_count"),$async$arI)
-case 3:t=C
-s=J
-x=4
-return C.b(C.az(),$async$arI)
-case 4:u=t.eq(s.t(f.a,"ngmy_fg_riddle_count"))
-if(u==null)u=0
-t=C
-x=5
-return C.b(B.WI("riddle",d,"ngmy_fg_riddle_pos","ngmy_fg_riddle_gen"),$async$arI)
-case 5:v=new t.bse(f,D.o.D(15-u,0,15),u)
-x=1
+case 9:if(B.a.Y(a7,"data:")){j=a5
+i=B.a.cm(a7,",")
+if(i<0)A.bi(A.bd("bad data url"))
+h=B.a.aA(a7,0,i).toLowerCase()
+g=B.a.b_(a7,i+1)
+f=A.af("data:([^;,]+)",!0,!1,!1,!1).cF(h)
+e=f==null?null:f.b[1]
+d=B.a.i(B.d.gH((e==null?j:e).split(";")))
+a0=A.dl()
+if(B.a.q(h,";base64")){j=A.af("\\s",!0,!1,!1,!1)
+a1=A.aL(g,j,"")
+j=A.aL(a1,"-","+")
+a1=A.aL(j,"_","/")
+j=a1.length
+a2=B.o.F(j,4)
+a0.b=B.cH.aL(a2>0?B.a.aKj(a1,j+(4-a2),"="):a1)}else a0.b=new A.d8(A.pR(g,0,g.length,B.cb,!1))
+r=A.hR([new Uint8Array(A.cc(a0.bm()))],d)}else{j=A.bd("unsupported url")
+throw A.W(j)}case 8:j=x.z
+o=A.aXk(A.a([r],x.f),a4,A.J(["type",a5],j,j))
+j=window.navigator
+j.toString
+n=j
+m=A.J(["files",A.a([o],x.k)],x.Z,x.X)
+l=B.a.i(b1)
+k=B.a.i(b0)
+if(J.ad(l)!==0)J.aJ(m,"title",l)
+if(J.ad(k)!==0)J.aJ(m,"text",k)
+w=11
+return A.b(J.hnm(n,m),$async$bHa)
+case 11:j=A.w(a4)
+u="Shared "+j
+w=1
 break
-case 1:return C.h(v,w)}})
-return C.i($async$arI,w)},
-arH(d){var x=0,w=C.j(y.I),v,u,t
-var $async$arH=C.e(function(e,f){if(e===1)return C.f(f,w)
-for(;;)switch(x){case 0:x=3
-return C.b(B.OA("ngmy_fg_riddle_day","ngmy_fg_riddle_count"),$async$arH)
-case 3:x=4
-return C.b(C.az(),$async$arH)
-case 4:u=f
-t=C.eq(J.t(u.a,"ngmy_fg_riddle_count"))
-if(t==null)t=0
-if(t>=15){v=null
-x=1
-break}x=5
-return C.b(u.aE("Int","ngmy_fg_riddle_count",t+1),$async$arH)
-case 5:v=B.Oz("riddle",d,"ngmy_fg_riddle_pos","ngmy_fg_riddle_gen")
-x=1
+t=2
+w=6
 break
-case 1:return C.h(v,w)}})
-return C.i($async$arH,w)},
-a8H(d){var x=0,w=C.j(y.a),v,u,t,s
-var $async$a8H=C.e(function(e,f){if(e===1)return C.f(f,w)
-for(;;)switch(x){case 0:x=3
-return C.b(B.OA("ngmy_fg_fortune_day","ngmy_fg_fortune_count"),$async$a8H)
-case 3:t=C
-s=J
-x=4
-return C.b(C.az(),$async$a8H)
-case 4:u=t.eq(s.t(f.a,"ngmy_fg_fortune_count"))
-if(u==null)u=0
-t=C
-x=5
-return C.b(B.WI("fortune",d,"ngmy_fg_fortune_pos","ngmy_fg_fortune_gen"),$async$a8H)
-case 5:v=new t.brK(f,D.o.D(1-u,0,1))
-x=1
+case 4:t=3
+a6=s.pop()
+w=6
 break
-case 1:return C.h(v,w)}})
-return C.i($async$a8H,w)},
-WK(d){var x=0,w=C.j(y.n),v,u,t,s
-var $async$WK=C.e(function(e,f){if(e===1)return C.f(f,w)
-for(;;)switch(x){case 0:x=3
-return C.b(B.OA("ngmy_fg_fortune_day","ngmy_fg_fortune_count"),$async$WK)
-case 3:x=4
-return C.b(C.az(),$async$WK)
-case 4:u=f
-t=C.eq(J.t(u.a,"ngmy_fg_fortune_count"))
-if(t==null)t=0
-if(t>=1){v=null
-x=1
-break}x=5
-return C.b(u.aE("Int","ngmy_fg_fortune_count",t+1),$async$WK)
-case 5:x=6
-return C.b(B.WI("fortune",d,"ngmy_fg_fortune_pos","ngmy_fg_fortune_gen"),$async$WK)
-case 6:s=f
-x=7
-return C.b(B.Oz("fortune",d,"ngmy_fg_fortune_pos","ngmy_fg_fortune_gen"),$async$WK)
-case 7:v=new C.brw(s)
-x=1
+case 3:w=2
 break
-case 1:return C.h(v,w)}})
-return C.i($async$WK,w)},
-hZQ(d,e){var x,w,v,u,t=new C.e_()
-t.cU(e)
-x=J.e4(d,y.S)
-for(w=0;w<d;++w)x[w]=w
-for(w=x.length-1;w>0;--w){v=t.aw(w+1)
-u=x[w]
-x[w]=x[v]
-x[v]=u}return x},
-hZR(d,e,f){var x,w,v,u,t
-for(x=new C.d9(d.toLowerCase()),w=y.E,v=w.k("bR<c2.E>"),x=new C.bR(x,x.gJ(0),v),w=w.k("c2.E"),u=17;x.C();){t=x.d
-if(t==null)t=w.a(t)
-u=37*u+t}for(x=new C.d9(e),v=new C.bR(x,x.gJ(0),v);v.C();){x=v.d
-if(x==null)x=w.a(x)
-u=37*u+x}return 37*u+f},
-htz(d,e,f,g,h){var x
-if(e<=0)return 0
-x=D.o.F(g,e)
-return B.hZQ(e,B.hZR(h,d,f))[x]}},A,F
+case 6:u=A.hAO(null,a4,a7,a5)
+w=1
+break
+case 1:return A.h(u,v)
+case 2:return A.f(s.at(-1),v)}})
+return A.i($async$bHa,v)}},D,K,L
 J=c[1]
-C=c[0]
-D=c[2]
-E=c[131]
-B=a.updateHolder(c[14],B)
-A=c[148]
-F=c[116]
-B.cQ.prototype={}
-B.a2.prototype={}
-B.a0W.prototype={
-S(){var x=$.aw()
-return new B.aFS(new C.at(D.aw,x),new C.at(D.aw,x),D.cT,null,null)},
+A=c[0]
+B=c[2]
+G=c[44]
+H=c[41]
+I=c[67]
+E=c[28]
+F=c[48]
+C=a.updateHolder(c[15],C)
+D=c[109]
+K=c[102]
+L=c[92]
+C.Cf.prototype={
+a7(){return"NgmyCameraFlipStyle."+this.b}}
+C.Wf.prototype={
+S(){return new C.aFx(A.a([],x.G),D.a8o,null,null)},
 ge3(){return this.c}}
-B.aFS.prototype={
-Z(){var x,w=this,v=null
-w.a3()
-x=C.bo(v,D.nD,v,1,v,w)
-x.cK(0)
-w.fx!==$&&C.aQ()
-w.fx=x
-x=C.bo(v,D.t2,v,1,v,w)
-x.cK(0)
-w.fy!==$&&C.aQ()
-w.fy=x
-x=C.bo(v,D.qD,v,1,v,w)
-x.cK(0)
-w.go!==$&&C.aQ()
-w.go=x
-w.adS()
-B.OB(w.a.c)
-w.yw()},
-yw(){var x=0,w=C.j(y.H),v,u=this,t,s,r
-var $async$yw=C.e(function(d,e){if(d===1)return C.f(e,w)
-for(;;)switch(x){case 0:x=3
-return C.b(B.OB(u.a.c),$async$yw)
-case 3:x=4
-return C.b(B.a8G(300),$async$yw)
-case 4:t=e
-x=5
-return C.b(B.arI(1000),$async$yw)
-case 5:s=e
-x=6
-return C.b(B.a8H(120),$async$yw)
-case 6:r=e
-if(u.c==null){x=1
-break}u.m(new B.e6u(u,t,s,r))
-case 1:return C.h(v,w)}})
-return C.i($async$yw,w)},
-adS(){var x=0,w=C.j(y.H),v,u=this,t
-var $async$adS=C.e(function(d,e){if(d===1)return C.f(e,w)
-for(;;)switch(x){case 0:x=3
-return C.b(B.cgx(),$async$adS)
-case 3:t=e
-if(u.c==null){x=1
-break}u.m(new B.e6t(u,t))
-case 1:return C.h(v,w)}})
-return C.i($async$adS,w)},
-t(){var x,w=this,v=w.fx
-v===$&&C.c()
-v.t()
-v=w.fy
-v===$&&C.c()
-v.t()
-v=w.go
-v===$&&C.c()
-v.t()
-v=w.f
-x=$.aw()
-v.V$=x
-v.R$=0
-v=w.r
-v.V$=x
-v.R$=0
-w.bA9()},
-aau(){var x=0,w=C.j(y.H),v,u=this,t,s,r,q,p
-var $async$aau=C.e(function(d,e){if(d===1)return C.f(e,w)
-for(;;)switch(x){case 0:q=D.a.i(u.f.a.a)
-p=D.a.i(u.r.a.a)
-if(q.length===0||p.length===0){u.c.K(y.q).f.U(A.fsD)
-x=1
-break}t=u.c6F(q,p)
-s=u.c6H(t)
-u.m(new B.e6m(u,t,s))
-C.bO(D.jq,new B.e6n(u),y.H)
-r=u.c
-r.toString
-x=3
-return C.b(B.h5s(r,s,t),$async$aau)
-case 3:case 1:return C.h(v,w)}})
-return C.i($async$aau,w)},
-c6F(d,e){var x,w,v=C.af("\\s+",!0,!1,!1,!1),u=C.aL((d+e).toLowerCase(),v,"")
-for(v=u.length,x=0,w=0;w<v;++w)x=x*31+u.charCodeAt(w)&2147483647
-return D.o.D(D.o.F(x+D.o.F(d.length+e.length+C.af("[aeiou]",!0,!1,!1,!1).l_(0,u).gJ(0)*7,23),56)+44,44,99)},
-c6H(d){if(d>=90)return"Soulmate energy! The stars are aligned for you two."
-if(d>=80)return"Strong chemistry \u2014 this connection has serious potential."
-if(d>=70)return"A sweet match with room to grow even closer."
-if(d>=60)return"Good vibes! Friendship could bloom into something more."
-return"Every great story starts somewhere \u2014 keep exploring together."},
-aB_(d){var x,w,v,u=this
-u.m(new B.e6J(u,d))
-C.bO(D.yP,new B.e6K(u),y.H)
-switch(d){case 1:x=A.eRL
+C.aFx.prototype={
+b5A(d){var w,v=A.aD(d,B.bX,x.w).w.a.a-72
+switch($.ov().x){case"tiktok":w=B.h.D(v,200,360)
+return new A.y(w,w*16/9)
+case"square":w=B.h.D(v,220,340)
+return new A.y(w,w)
+case"youtube":default:return new A.y(v,v*9/16)}},
+gbGJ(){switch($.ov().x){case"tiktok":return"TikTok \u2014 hold your phone upright for full-screen vertical video."
+case"square":return"Square \u2014 centered 1:1 video, like Instagram posts."
+case"youtube":default:return"YouTube \u2014 turn your phone sideways for full-screen wide video."}},
+Z(){var w,v,u=this
+u.a3()
+w=A.bo(null,B.t0,null,1,null,u)
+w.f1(0,!0)
+u.d!==$&&A.aQ()
+u.d=w
+w=$.ov()
+w.r=!0
+w.y=!1
+v=w.x
+if(v!=="tiktok"&&v!=="youtube"&&v!=="square")w.x="tiktok"
+w.aV(0,u.gb3F())
+u.adU()
+u.ET().bG(new C.dZx(u),x.H)},
+adU(){var w=0,v=A.j(x.H),u,t=2,s=[],r=this,q,p,o,n,m
+var $async$adU=A.e(function(d,e){if(d===1){s.push(e)
+w=t}for(;;)switch(w){case 0:t=4
+w=7
+return A.b(A.az(),$async$adU)
+case 7:q=e
+p=A.aW(J.t(q.a,"ngmy_recorder_camera_flip_style_v1"))
+if(p==null||r.c==null){w=1
+break}o=B.d.dM(D.a6U,new C.dZ7(p),new C.dZ8())
+r.m(new C.dZ9(r,o))
+t=2
+w=6
 break
-case 2:x=A.f5_
+case 4:t=3
+m=s.pop()
+w=6
 break
-case 3:x=A.f1c
+case 3:w=2
 break
-default:x=A.eRY
-break}w=u.y
-if(w!=null&&x.a.length!==0){v=u.c
-v.toString
-B.h5p(v,x.b,w,x.a)}},
-B(d){var x=null,w=C.aE(d,x,y.w).w.a.a
-return C.eI(x,D.L,new C.lZ(new B.e6T(this,C.hjD(d,w>520?420:w-28)),x),x,x,x,D.a1e,x,D.d7,x,x,x)},
-bKb(){return C.A(C.iB(4,new B.e6q(this),!0,y.l),D.l,null,D.e,D.i,0,null,null)},
-c6I(){return C.A(C.iB(4,new B.e6A(this),!0,y.l),D.l,null,D.e,D.i,0,null,null)},
-c6G(){var x,w,v,u,t,s,r,q,p,o,n,m=this,l=null
-switch(m.e){case 0:x=C.ao(l,m.aeC(42),l,l,l,12,8,l)
-w=C.ao(l,m.aeC(30),l,l,8,l,48,l)
-v=C.l(18)
-u=C.K(C.a0(46,D.bE.l()>>>16&255,D.bE.l()>>>8&255,D.bE.l()&255),D.r,1)
-t=y.p
-s=C.a([A.aMg,D.P,A.fZD,D.am,C.d("Enter both names \u2014 your match shows here and in a love popup",l,l,l,l,l,l,C.m(l,l,C.a0(140,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255),l,l,l,l,l,l,l,l,12,l,l,l,l,l,!0,l,l,l,l,l,l,l,l),D.K,l,l),D.db,m.b01(m.f,"Your name","\ud83d\udc64"),D.af,m.b01(m.r,"Their name","\ud83d\udc98")],t)
-if(m.w!=null){r=C.l(16)
-q=C.K(C.a0(89,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255),D.r,1)
-p=C.a([new C.ac(0,D.G,C.a0(89,D.aA.l()>>>16&255,D.aA.l()>>>8&255,D.aA.l()&255),D.cz,14)],y.V)
-o=C.a([A.e33,D.am,C.d(C.w(m.w)+"%",l,l,l,l,l,l,A.fCk,l,l,l),D.ax,A.hcc],t)
-n=m.x
-if(n!=null&&n.length!==0)D.d.u(o,C.a([D.T,C.d(n,l,l,l,l,l,l,C.m(l,l,C.a0(235,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255),l,l,l,l,l,l,l,l,13,l,l,D.a8,l,1.35,!0,l,l,l,l,l,l,l,l),D.K,l,l)],t))
-D.d.u(s,C.a([D.bx,C.o(l,C.x(o,D.l,l,D.e,D.i,0,D.p),D.f,l,l,new C.n(l,l,q,r,p,A.cc8,D.n),l,l,l,l,D.CL,l,l,1/0)],t))}s.push(D.bx)
-s.push(m.b_e("Calculate Love Match",m.gbJz()))
-return new C.an(D.a0,l,D.ad,D.f,C.a([x,w,C.o(l,C.x(s,D.l,l,D.e,D.i,0,D.p),D.f,l,l,new C.n(D.jn,l,u,v,l,l,D.n),l,l,l,l,D.wI,l,l,1/0)],t),l)
-case 1:return m.aym("Show me what's next","\ud83c\udf39",new B.e6v(m),"You just met \u2014 here is a romantic first-step idea.","What happens next?")
-case 2:return m.aym("Get relationship tip","\ud83d\udc9e",new B.e6w(m),"Tap for a relationship tip \u2014 what to do after the first spark.","Keep the connection growing")
-case 3:return m.aym("Generate date idea","\ud83c\udf19",new B.e6x(m),"Romantic date ideas when you are ready to plan something special.","Date inspiration")
-default:return D.bM}},
-aym(d,e,f,g,h){var x,w,v,u,t=this,s=null,r=C.ao(s,t.aeC(36),s,s,s,16,12,s),q=C.ao(40,t.aeC(28),s,s,10,s,s,s),p=C.l(18),o=C.K(C.a0(89,D.aA.l()>>>16&255,D.aA.l()>>>8&255,D.aA.l()&255),D.r,1),n=C.a([new C.ac(0,D.G,C.a0(31,D.bE.l()>>>16&255,D.bE.l()>>>8&255,D.bE.l()&255),D.J,18)],y.V),m=y.p,l=C.a([C.nC(e,s,40),D.P,C.d(h,s,s,s,s,s,s,D.dl,D.K,s,s),D.am,C.d(g,s,s,s,s,s,s,C.m(s,s,C.a0(140,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255),s,s,s,s,s,s,s,s,12,s,s,s,s,s,!0,s,s,s,s,s,s,s,s),D.K,s,s),D.aO],m)
-if(t.y!=null&&t.e!==0){x=C.a([C.a0(38,D.aA.l()>>>16&255,D.aA.l()>>>8&255,D.aA.l()&255),C.a0(D.h.T(25.5),D.dN.l()>>>16&255,D.dN.l()>>>8&255,D.dN.l()&255)],y.O)
-w=C.l(14)
-v=C.K(C.a0(102,D.bE.l()>>>16&255,D.bE.l()>>>8&255,D.bE.l()&255),D.r,1)
-u=t.y
-u.toString
-D.d.u(l,C.a([C.o(s,C.d(u,s,s,s,s,s,s,A.fKm,s,s,s),D.f,s,s,new C.n(s,s,v,w,s,new C.a7(D.a5,D.a9,D.x,x,s,s),D.n),s,s,s,s,D.bH,s,s,1/0),D.aB],m))}l.push(t.b_e(d,f))
-l.push(D.P)
-l.push(C.d("50 romantic ideas \xb7 saved on your device",s,s,s,s,s,s,C.m(s,s,C.a0(89,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255),s,s,s,s,s,s,s,s,10,s,s,s,s,s,!0,s,s,s,s,s,s,s,s),s,s,s))
-return new C.an(D.a0,s,D.ad,D.f,C.a([r,q,C.o(s,C.x(l,D.l,s,D.e,D.i,0,D.p),D.f,s,s,new C.n(D.jn,s,o,p,n,s,D.n),s,s,s,s,D.wI,s,s,1/0)],m),s)},
-aeC(d){var x=this.fx
-x===$&&C.c()
-return C.c6(x,new B.e6C(this,d),null)},
-b_e(d,e){var x=null,w=this.Q?0.96:1
-return C.uL(new C.a5(1/0,x,new C.bN(new C.n(x,x,x,C.l(14),C.a([new C.ac(0,D.G,C.a0(115,D.aA.l()>>>16&255,D.aA.l()>>>8&255,D.aA.l()&255),D.cz,14)],y.V),A.cbc,D.n),D.bk,C.aF(!1,D.a3,!0,x,C.aM(!1,C.l(14),!0,new C.D(D.yV,C.A(C.a([A.aMh,D.ae,C.d(d,x,x,x,x,x,x,D.j2,x,x,x)],y.p),D.l,x,D.b9,D.i,0,x,x),x),x,!0,x,x,x,x,x,x,x,x,x,x,x,e,x,x,x,x,x,x,x),D.f,D.L,0,x,x,x,x,x,D.ai),x),x),D.b0,D.jq,w)},
-b01(d,e,f){var x=null,w=C.m(x,x,C.a0(89,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255),x,x,x,x,x,x,x,x,x,x,x,x,x,x,!0,x,x,x,x,x,x,x,x),v=C.nC(f,x,22)
-return C.aN(x,D.Z,!1,x,!0,D.t,x,C.aO(),d,x,x,x,x,x,2,C.bA(x,x,x,D.bH,x,x,x,x,!0,new C.b6(4,C.l(14),new C.ax(C.a0(115,D.bE.l()>>>16&255,D.bE.l()>>>8&255,D.bE.l()&255),1.2,D.r,-1)),x,x,x,x,x,D.qh,!0,x,x,x,x,new C.b6(4,C.l(14),A.b6X),x,x,x,x,x,x,x,x,w,e,x,x,x,x,x,x,x,x,x,!0,!0,!1,x,new C.D(A.bEy,new C.bK(D.z,1,x,v,x),x),x,D.rv,x,x,x,x,x,x,x,x,x,x),D.y,!0,x,!0,x,!1,x,D.ak,x,x,x,x,x,x,x,x,x,1,x,x,!1,"\u2022",x,new B.e6E(this),x,x,x,!1,x,x,!1,x,!0,x,D.ac,x,x,x,x,x,x,x,x,x,x,x,D.W9,!0,D.a7,x,D.lc,x,x,x,x)},
-KH(){var x=0,w=C.j(y.H),v,u=this,t,s,r,q,p,o
-var $async$KH=C.e(function(d,e){if(d===1)return C.f(e,w)
-for(;;)switch(x){case 0:x=!u.ax?3:4
+case 6:case 1:return A.h(u,v)
+case 2:return A.f(s.at(-1),v)}})
+return A.i($async$adU,v)},
+a1x(d){return this.coy(d)},
+coy(d){var w=0,v=A.j(x.H),u=1,t=[],s,r,q
+var $async$a1x=A.e(function(e,f){if(e===1){t.push(f)
+w=u}for(;;)switch(w){case 0:u=3
+w=6
+return A.b(A.az(),$async$a1x)
+case 6:s=f
+w=7
+return A.b(s.aE("String","ngmy_recorder_camera_flip_style_v1",d.b),$async$a1x)
+case 7:u=1
+w=5
 break
-case 3:t=u.ay
-s=u.c
-x=t!=null?5:7
+case 3:u=2
+q=t.pop()
+w=5
 break
-case 5:s.toString
-x=8
-return C.b(B.h3g(s,t),$async$KH)
-case 8:x=6
+case 2:w=1
 break
-case 7:s.K(y.q).f.U(A.fs9)
-case 6:x=1
+case 5:return A.h(null,v)
+case 1:return A.f(t.at(-1),v)}})
+return A.i($async$a1x,v)},
+bOa(){var w,v=this,u=null,t=D.a6U[B.o.F(B.d.cm(D.a6U,v.y)+1,4)]
+v.m(new C.dYY(v,t))
+v.a1x(t)
+w=v.c
+if(w==null)return
+w.K(x.q).f.U(A.b2(u,u,u,B.hl,B.iG,B.t,u,A.d("Camera switch: "+C.hA9(t),u,u,u,u,u,u,u,u,u,u),u,B.h1,u,u,u,u,u,u,u,u,u,u))},
+cif(){if(this.c==null)return
+this.m(new C.dZa())},
+t(){var w,v=$.ov()
+v.a6(0,this.gb3F())
+w=this.d
+w===$&&A.c()
+w.t()
+v.amr()
+this.bzY()},
+ET(){var w=0,v=A.j(x.H),u,t=this,s
+var $async$ET=A.e(function(d,e){if(d===1)return A.f(e,v)
+for(;;)switch(w){case 0:w=3
+return A.b(C.X6(t.a.c),$async$ET)
+case 3:s=e
+if(t.c==null){w=1
+break}t.m(new C.dZd(t,s))
+case 1:return A.h(u,v)}})
+return A.i($async$ET,v)},
+a0_(d){return this.bPL(d)},
+bPL(d){var w=0,v=A.j(x.H),u=this
+var $async$a0_=A.e(function(e,f){if(e===1)return A.f(f,v)
+for(;;)switch(w){case 0:w=2
+return A.b(C.a96(u.a.c,d.a),$async$a0_)
+case 2:w=3
+return A.b(u.ET(),$async$a0_)
+case 3:return A.h(null,v)}})
+return A.i($async$a0_,v)},
+akb(){var w=0,v=A.j(x.H),u,t=this,s,r
+var $async$akb=A.e(function(d,e){if(d===1)return A.f(e,v)
+for(;;)switch(w){case 0:if(t.r||$.ov().Q){w=1
+break}s=$.ov()
+s.f=s.e=null
+s.r=!0
+t.m(new C.dZi(t))
+w=3
+return A.b(s.a9n(0,t.a.c,!0),$async$akb)
+case 3:if(t.c!=null){t.m(new C.dZj(t))
+if(s.Q)if(s.z)s.f="Recording with noise cancel \u2014 background sounds are filtered."
+else{r=s.x
+if(r==="youtube")s.f="Recording wide video \u2014 keep your phone sideways."
+else if(r==="tiktok")s.f="Recording vertical video \u2014 keep your phone upright."}}case 1:return A.h(u,v)}})
+return A.i($async$akb,v)},
+ST(){var w=0,v=A.j(x.H),u,t=this,s
+var $async$ST=A.e(function(d,e){if(d===1)return A.f(e,v)
+for(;;)switch(w){case 0:if(t.r||!$.ov().Q){w=1
+break}t.m(new C.dZk(t))
+w=3
+return A.b($.ov().DC(),$async$ST)
+case 3:s=e
+if(t.c==null){w=1
+break}t.m(new C.dZl(t))
+w=s!=null?4:5
 break
-case 4:r=u.as
-x=9
-return C.b(B.Jy(A.ayA[D.o.F(r,300)],r,300),$async$KH)
-case 9:q=e
-if(q==null||u.c==null){x=1
-break}p=B
-o=q
-x=10
-return C.b(B.a8G(300),$async$KH)
-case 10:u.m(new p.e6M(u,o,e))
-C.bO(D.yP,new B.e6N(u),y.H)
-t=u.c
-t.toString
-x=11
-return C.b(B.h3g(t,q.c),$async$KH)
-case 11:case 1:return C.h(v,w)}})
-return C.i($async$KH,w)},
-aC7(){var x=0,w=C.j(y.H),v=this
-var $async$aC7=C.e(function(d,e){if(d===1)return C.f(e,w)
-for(;;)switch(x){case 0:v.m(new B.e6R(v))
-return C.h(null,w)}})
-return C.i($async$aC7,w)},
-a_k(){var x=0,w=C.j(y.H),v,u=this,t
-var $async$a_k=C.e(function(d,e){if(d===1)return C.f(e,w)
-for(;;)switch(x){case 0:if(u.cx<=0){u.c.K(y.q).f.U(A.fuk)
-x=1
-break}x=3
-return C.b(B.arH(1000),$async$a_k)
-case 3:t=e
-x=t==null?4:5
+case 4:w=6
+return A.b(t.ET(),$async$ST)
+case 6:w=t.c!=null?7:8
 break
-case 4:x=u.c!=null?6:7
+case 7:w=9
+return A.b(t.JH(s),$async$ST)
+case 9:case 8:case 5:case 1:return A.h(u,v)}})
+return A.i($async$ST,v)},
+JH(d){return this.ckk(d)},
+ckk(d){var w=0,v=A.j(x.H),u=this,t
+var $async$JH=A.e(function(e,f){if(e===1)return A.f(f,v)
+for(;;)switch(w){case 0:w=d.e.length===0?2:3
 break
-case 6:x=8
-return C.b(u.yw(),$async$a_k)
-case 8:case 7:x=1
-break
-case 5:u.m(new B.e6G(u,t))
-C.bO(D.yP,new B.e6H(u),y.H)
-case 1:return C.h(v,w)}})
-return C.i($async$a_k,w)},
-FE(){var x=0,w=C.j(y.H),v,u=this,t,s,r,q,p,o
-var $async$FE=C.e(function(d,e){if(d===1)return C.f(e,w)
-for(;;)switch(x){case 0:x=u.fr&&u.dy!=null&&u.dx<=0?3:4
-break
+case 2:w=4
+return A.b(C.Ft(d.a,d.f),$async$JH)
+case 4:t=f
+d.e=t==null?"":t
 case 3:t=u.c
 t.toString
-s=u.dy
+w=5
+return A.b(A.bU(B.L,null,new C.dZb(u,d),t,!0,!0,!0,null,!1,!1,x.H),$async$JH)
+case 5:w=u.c!=null?6:7
+break
+case 6:w=8
+return A.b(u.ET(),$async$JH)
+case 8:case 7:return A.h(null,v)}})
+return A.i($async$JH,v)},
+B(d){return new A.lT(new C.dZv(this,$.ov().Q),null)},
+cct(d){var w,v,u,t,s,r,q,p,o=null,n=A.ap(B.bQ,B.bi,0.35)
+n.toString
+n=A.a([B.hl,B.b2,n],x.W)
+w=A.a([new A.ab(0,B.G,B.b2.j(0.35),B.dp,24)],x.V)
+v=A.aH(o,o,o,o,B.asX,o,o,o,new C.dZ2(this),o,o,o,o,o,o)
+u=x.p
+t=A.E(A.x(A.a([D.fTj,A.d(d?"Recording in progress \u2014 come back here to stop & save.":"Video studio \u2014 record with front or back camera.",o,o,o,o,o,o,B.L_,o,o,o)],u),B.E,o,B.e,B.i,0,B.p),1)
+s=B.c.j(0.14)
+r=A.l(14)
+r=A.o(o,D.bY_,B.f,o,o,new A.n(s,o,A.K(B.aT,B.r,1),r,o,o,B.n),o,o,o,o,B.bS,o,o,o)
+s=A.l(10)
+q=B.c.j(0.12)
+p=A.l(10)
+return A.o(o,A.A(A.a([v,t,A.A(A.a([r,B.bn,A.aE(!1,B.a3,!0,o,A.aM(!1,s,!0,A.hd(A.o(o,D.bZe,B.f,o,o,new A.n(q,o,A.K(B.aT,B.r,1),p,o,o,B.n),o,o,o,o,B.OU,o,o,o),o,"How to turn on the microphone",o,o),o,!0,o,o,o,o,o,o,o,o,o,o,o,this.gcBb(),o,o,o,o,o,o,o),B.f,B.L,0,o,o,o,o,o,B.ai)],u),B.l,o,B.e,B.N,0,o,o)],u),B.l,o,B.e,B.i,0,o,o),B.f,o,o,new A.n(o,o,o,o,w,new A.a7(B.ay,B.aC,B.x,n,o,o),B.n),o,o,o,o,D.bKj,o,o,o)},
+cBc(){var w=this.c
+w.toString
+A.bU(B.L,null,new C.dZh(),w,!0,!0,!0,null,!1,!1,x.H)},
+cEd(d,e){var w=this.d
+w===$&&A.c()
+return A.c6(w,new C.dZp(this,d),null)},
+c5p(d){var w=null,v=C.asB(d.r),u=A.o(B.a9,D.fiL,B.f,w,w,new A.n(B.bD,w,w,A.l(16),w,w,B.n),w,w,w,w,B.amv,w,w,w),t=B.c.j(0.05),s=x.p
+return new A.D(B.da,A.bPj(u,B.c_,A.aE(!1,B.a3,!0,A.l(16),A.aM(!1,A.l(16),!0,new A.D(B.bH,A.A(A.a([A.X(B.qW,B.bQ,w,w,w,w),B.bc,A.E(A.x(A.a([A.d(d.b,w,w,w,w,w,w,B.h7,w,w,w),A.d("VIDEO \xb7 "+v+" \xb7 Tap to play",w,w,w,w,w,w,B.F6,w,w,w)],s),B.E,w,B.e,B.i,0,B.p),1),H.Qr],s),B.l,w,B.e,B.i,0,w,w),w),w,!0,w,w,w,w,w,w,w,w,w,w,w,new C.dZ5(this,d),w,w,w,w,w,w,w),B.f,t,0,w,w,w,w,w,B.ai),w,B.Ct,new A.bl("studio-cap-"+d.a,x.O),new C.dZ6(this,d),B.eW,w),w)},
+aQY(d){var w,v,u,t,s,r,q,p,o,n,m,l,k,j=this,i=null,h=j.c
+h.toString
+w=j.b5A(h)
+v=d==null?w.b:d
+h=$.ov()
+u=h.a.b
+t=h.w
+s=new C.aKn(u,v,t==="user",D.b6e,"cover",1,i)
+u=j.y
+if(u===D.a8n)r=new A.lP(s,new A.bl("cam-"+t+"-"+h.x,x.O))
+else{switch(u.a){case 3:u=B.k4
+break
+case 2:u=B.t3
+break
+default:u=I.Oj
+break}r=A.oA(new A.lP(s,new A.bl("cam-"+t+"-"+h.x,x.O)),u,A.pU(),B.ck,B.qy,new C.dYX(j))}u=A.bv(A.l(18),new A.a5(w.a,v,r,i),B.aq)
+t=B.w.j(0.42)
+q=A.l(10)
+p=A.K(B.c.j(0.12),B.r,1)
+o=h.z
+n=o?D.bVz:K.ar9
+m=o?"Noise cancel on":"Turn on noise cancel"
+l=x.p
+m=A.a([j.aib(o,n,j.w?i:j.gcHn(),m)],l)
+if(h.Q){o=h.as
+n=o?B.he:B.v9
+k=o?"Resume recording":"Pause recording"
+m.push(j.aib(o,n,j.w?i:j.gcHt(),k))}o=j.y
+m.push(j.aib(o!==D.a8n,C.iaq(o),j.gbO9(),"Camera switch style: "+C.hA9(o)+" (tap to change)"))
+h=h.w==="user"?"Switch to back camera":"Switch to front camera"
+m.push(j.b5y(D.bSC,j.w?i:j.gbUP(),h))
+h=j.x
+o=h?B.I_:B.wY
+h=h?"Exit full screen":"Full screen preview"
+m.push(j.b5y(o,j.gcHc(),h))
+return new A.an(B.z,i,B.ad,B.f,A.a([u,A.ao(i,new A.bN(new A.n(t,i,p,q,i,i,B.n),B.bk,new A.D(B.hA,A.A(m,B.l,i,B.e,B.N,0,i,i),i),i),i,i,i,6,6,i)],l),i)},
+bI7(){return this.aQY(null)},
+aib(d,e,f,g){var w,v=null,u=A.l(7),t=A.l(7),s=d?B.bi.j(0.28):B.L
+if(f!=null)w=d?1:0.92
+else w=0.4
+return A.hd(A.aE(!1,B.a3,!0,v,A.aM(!1,u,!0,A.o(v,A.X(e,B.c.j(w),v,v,v,13),B.f,v,v,new A.n(s,v,v,t,v,v,B.n),v,24,v,v,v,v,v,24),v,!0,v,v,v,v,v,v,v,v,v,v,v,f,v,v,v,v,v,v,v),B.f,B.L,0,v,v,v,v,v,B.ai),v,g,v,v)},
+b5y(d,e,f){return this.aib(!1,d,e,f)},
+bVA(d){var w,v,u,t,s=null,r=this.c
+r.toString
+r=A.aD(r,B.bX,x.w).w
+w=B.w.j(0.96)
+if(d){v=$.ov()
+u=v.as
+v=v.at
+v=u?"\u23f8 PAUSED "+C.asB(v):"\u25cf RECORDING "+C.asB(v)}else v="PREVIEW"
+if(d)u=$.ov().as?B.Ce:B.bi
+else u=B.ab
+t=x.p
+return A.aE(!1,B.a3,!0,s,A.bm(!0,A.x(A.a([new A.D(B.CF,A.A(A.a([A.d(v,s,s,s,s,s,s,A.m(s,s,u,s,s,s,s,s,s,s,s,12,s,s,B.u,s,s,!0,s,1.1,s,s,s,s,s,s),s,s,s),B.b4,A.aH(s,s,s,s,D.bYP,s,s,s,new C.dZ1(this),s,s,s,s,s,s)],t),B.l,s,B.e,B.i,0,s,s),s),A.E(new A.D(D.bEY,A.as(this.aQY(r.a.b*0.72),s,s,s),s),1)],t),B.l,s,B.e,B.i,0,B.p),!0,!1,B.ag,!0,!0),B.f,w,0,s,s,s,s,s,B.ai)},
+cHd(){this.m(new C.dZq(this))},
+akO(){var w=0,v=A.j(x.H),u,t=this,s,r
+var $async$akO=A.e(function(d,e){if(d===1)return A.f(e,v)
+for(;;)switch(w){case 0:if(t.w||!$.ov().Q){w=1
+break}t.m(new C.dZt(t))
+s=$.ov()
+w=3
+return A.b(s.a8_(),$async$akO)
+case 3:if(t.c!=null){t.m(new C.dZu(t))
+if(s.e!=null){r=t.c.K(x.q).f
+s=s.e
 s.toString
-x=5
-return C.b(B.h3J(t,s),$async$FE)
-case 5:x=1
+r.U(A.b2(null,null,null,B.eq,B.iG,B.t,null,A.d(s,null,null,null,null,null,null,null,null,null,null),null,B.mZ,null,null,null,null,null,null,null,null,null,null))}else if(s.as)t.c.K(x.q).f.U(D.fu4)}case 1:return A.h(u,v)}})
+return A.i($async$akO,v)},
+akN(){var w=0,v=A.j(x.H),u,t=this,s,r
+var $async$akN=A.e(function(d,e){if(d===1)return A.f(e,v)
+for(;;)switch(w){case 0:if(t.w){w=1
+break}t.m(new C.dZr(t))
+s=$.ov()
+r=!s.z
+w=3
+return A.b(s.Ai(r),$async$akN)
+case 3:if(t.c!=null){t.m(new C.dZs(t))
+if(s.Q&&s.e==null){s=t.c.K(x.q).f
+s.U(A.b2(null,null,null,B.hl,B.iG,B.t,null,A.d(r?"Noise cancel on \u2014 still recording.":"Noise cancel off \u2014 still recording.",null,null,null,null,null,null,null,null,null,null),null,B.h1,null,null,null,null,null,null,null,null,null,null))}}case 1:return A.h(u,v)}})
+return A.i($async$akN,v)},
+aCG(d){var w=$.ov()
+if(w.Q)return
+this.m(new C.dZf(this,d))
+w.a7B().bG(new C.dZg(this),x.H)},
+acm(){var w=0,v=A.j(x.H),u,t=this,s
+var $async$acm=A.e(function(d,e){if(d===1)return A.f(e,v)
+for(;;)switch(w){case 0:if(t.w){w=1
+break}s=$.ov()
+t.z=s.w==="user"?1:-1
+t.m(new C.dYZ(t))
+w=3
+return A.b(s.a9F(),$async$acm)
+case 3:if(t.c!=null)t.m(new C.dZ_(t))
+case 1:return A.h(u,v)}})
+return A.i($async$acm,v)},
+aD9(d,e,f){var w=null,v=A.l(999),u=A.l(999),t=e?B.c.j(0.12):B.L,s=A.K(e?B.bQ:B.aT,B.r,1)
+return A.aM(!1,v,!0,A.o(w,A.d(d,w,w,w,w,w,w,A.m(w,w,B.c,w,w,w,w,w,w,w,w,11,w,w,e?B.H:B.a8,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),B.f,w,w,new A.n(t,w,s,u,w,w,B.n),w,w,w,w,B.nH,w,w,w),w,!0,w,w,w,w,w,w,w,w,w,w,w,f,w,w,w,w,w,w,w)}}
+C.a2d.prototype={
+S(){return new C.aKJ()},
+qt(){return this.e.$0()},
+ge3(){return this.d}}
+C.aKJ.prototype={
+Z(){var w,v,u=this
+u.a3()
+w=u.a.c.b
+v=$.aw()
+u.d!==$&&A.aQ()
+u.d=new A.at(new A.bb(w,B.b7,B.aP),v)
+u.YB()},
+YB(){var w=0,v=A.j(x.H),u,t=this,s,r
+var $async$YB=A.e(function(d,e){if(d===1)return A.f(e,v)
+for(;;)switch(w){case 0:r=t.a.c
+if(r.e.length!==0){if(t.c!=null)t.m(new C.ffC(t))
+w=1
+break}w=3
+return A.b(C.Ft(r.a,r.f),$async$YB)
+case 3:s=e
+if(t.c==null){w=1
+break}if(s!=null&&s.length!==0)t.a.c.e=s
+t.m(new C.ffD(t))
+case 1:return A.h(u,v)}})
+return A.i($async$YB,v)},
+t(){var w=this.d
+w===$&&A.c()
+w.V$=$.aw()
+w.R$=0
+this.a2()},
+Kz(){var w=0,v=A.j(x.H),u,t=this,s,r,q,p,o,n,m
+var $async$Kz=A.e(function(d,e){if(d===1)return A.f(e,v)
+for(;;)switch(w){case 0:m=t.d
+m===$&&A.c()
+s=m.a.a
+r=$.aw()
+q=new A.at(new A.bb(s,B.b7,B.aP),r)
+s=t.c
+s.toString
+w=3
+return A.b(A.cg(null,null,!0,null,new C.ffH(q),s,null,!0,!0,x.N),$async$Kz)
+case 3:p=e
+q.V$=r
+q.R$=0
+if(p==null||p.length===0||t.c==null){w=1
+break}m.sb4(0,p)
+m=t.a
+m.c.b=p
+w=4
+return A.b(C.X6(m.d),$async$Kz)
+case 4:o=e
+m=J.cE(o)
+n=m.bk(o,new C.ffI(t))
+w=n>=0?5:6
 break
-case 4:if(u.dx<=0){u.c.K(y.q).f.U(A.fui)
-x=1
-break}x=6
-return C.b(B.WK(120),$async$FE)
-case 6:r=e
-x=r==null?7:8
+case 5:m.h(o,n).b=p
+w=7
+return A.b(C.ON(t.a.d,o),$async$Kz)
+case 7:case 6:w=8
+return A.b(t.a.qt(),$async$Kz)
+case 8:if(t.c!=null)t.m(new C.ffJ())
+case 1:return A.h(u,v)}})
+return A.i($async$Kz,v)},
+a00(){var w=0,v=A.j(x.H),u=this,t,s,r
+var $async$a00=A.e(function(d,e){if(d===1)return A.f(e,v)
+for(;;)switch(w){case 0:u.m(new C.ffK(u))
+w=2
+return A.b(u.YB(),$async$a00)
+case 2:w=3
+return A.b(C.a3S(u.a.c),$async$a00)
+case 3:t=e
+if(u.c!=null){u.m(new C.ffL(u))
+s=x.q
+r=u.c
+if(t)r.K(s).f.U(D.fuJ)
+else r.K(s).f.U(D.fs8)}return A.h(null,v)}})
+return A.i($async$a00,v)},
+a_Z(d){var w=0,v=A.j(x.H),u=this,t
+var $async$a_Z=A.e(function(e,f){if(e===1)return A.f(f,v)
+for(;;)switch(w){case 0:t=u.a
+w=2
+return A.b(C.a96(t.d,t.c.a),$async$a_Z)
+case 2:w=3
+return A.b(u.a.qt(),$async$a_Z)
+case 3:t=u.c
+if(t!=null)A.a6(t,!1).N(null)
+return A.h(null,v)}})
+return A.i($async$a_Z,v)},
+B(d){var w,v,u,t,s,r,q,p,o=this,n=null,m=o.a.c,l=m.c==="video"||B.a.Y(m.f,"video/")
+m=A.aD(d,B.bX,x.w).w
+w=A.l(28)
+v=A.K(B.bQ.j(0.35),B.r,1)
+u=A.as(A.o(n,n,B.f,n,n,new A.n(B.aT,n,n,A.l(99),n,n,B.n),n,4,n,n,n,n,n,40),n,n,n)
+t=o.d
+t===$&&A.c()
+t=A.d(t.a.a,n,n,n,n,n,n,B.fR,n,n,n)
+s=o.a.c.r
+r=x.p
+s=A.a([u,B.aB,t,A.d("Video \xb7 "+C.asB(isNaN(s)||s==1/0||s==-1/0?0:B.o.D(B.o.bh(s),0,99999)),n,n,n,n,n,n,D.fJg,n,n,n),B.aO],r)
+if(o.f)s.push(new A.a5(n,l?280:140,D.be0,n))
+else{u=o.a.c
+t=u.e
+if(t.length===0)s.push(D.fRd)
+else{t=B.a.gX(t)
+q=o.a.c
+p=q.e
+s.push(new C.byw(p,q.f,280,new A.bl("media-"+u.a+"-"+t,x.O)))}}s.push(B.db)
+u=o.e?n:o.gccv()
+s.push(new A.a5(1/0,n,A.de(B.DE,n,D.fZW,u,A.bp(B.b2,n,n,n,B.c,B.hg,n,n,new A.ba(A.l(14),B.a1),n,n,n)),n))
+s.push(B.T)
+u=B.bQ.j(0.6)
+s.push(A.A(A.a([A.E(A.ep(B.Qw,n,D.ha6,o.gcv3(),A.di(n,n,n,n,n,n,n,n,n,B.bi,n,B.hg,n,n,new A.ba(A.l(14),B.a1),new A.ax(u,1,B.r,-1),n,n,n,n)),1)],r),B.l,n,B.e,B.i,0,n,n))
+s.push(B.T)
+s.push(A.hs(B.atd,D.fOp,o.gccs(o),n))
+return A.bm(!0,new A.bK(B.b3,n,n,A.o(n,A.ca(A.x(s,B.al,n,B.e,B.i,0,B.p),B.t,n,B.y,n,n,n,n,n,B.ah),B.f,n,new A.aY(0,520,0,m.a.b*0.88),new A.n(B.ff,n,v,w,n,n,B.n),n,n,n,B.bl,B.anG,n,n,n),n),!0,!1,B.ag,!0,!0)}}
+C.aEn.prototype={
+a7(){return"_MicGuideDevice."+this.b}}
+C.a0w.prototype={
+S(){return new C.aEo(D.b29)}}
+C.aEo.prototype={
+B(d){var w,v,u=this,t=null,s=A.aD(d,B.bX,x.w).w,r=A.l(28),q=A.K(B.bQ.j(0.35),B.r,1),p=x.p
+p=A.a([A.as(A.o(t,t,B.f,t,t,new A.n(B.aT,t,t,A.l(99),t,t,B.n),t,4,t,t,t,t,t,40),t,t,t),B.aB,D.fiU,B.am,D.h0W,B.aO,A.c_(B.bI,A.a([u.av4("iPhone",B.zE,D.b29),u.av4("Android",D.bSg,D.hIi),u.av4("Computer",B.aqM,D.hIj)],p),B.br,t,8,8),B.bx],p)
+w=u.cDE(u.d)
+B.d.u(p,new A.N(w,u.gcDC(),A.T(w).k("N<1,v>")))
+p.push(B.aB)
+w=B.b2.j(0.15)
+v=A.l(14)
+p.push(A.o(t,D.h8l,B.f,t,t,new A.n(w,t,A.K(B.bi.j(0.35),B.r,1),v,t,t,B.n),t,t,t,t,B.bl,t,t,t))
+p.push(B.af)
+p.push(new A.a5(1/0,t,A.bJ(B.acM,t,new C.dAh(d),A.bp(B.b2,t,t,t,B.c,B.hg,t,t,new A.ba(A.l(14),B.a1),t,t,t)),t))
+return A.bm(!0,new A.bK(B.b3,t,t,A.o(t,A.ca(A.x(p,B.al,t,B.e,B.i,0,B.p),B.t,t,B.y,t,t,t,t,t,B.ah),B.f,t,new A.aY(0,520,0,s.a.b*0.88),new A.n(B.ff,t,q,r,t,t,B.n),t,t,t,B.bl,D.bGP,t,t,t),t),!0,!1,B.ag,!0,!0)},
+av4(d,e,f){var w=null,v=this.d===f,u=A.l(12),t=A.l(12),s=v?B.b2.j(0.35):B.c.j(0.06),r=A.K(v?B.bi:B.aT,B.r,1),q=A.X(e,v?B.c:B.aR,w,w,w,16)
+return A.aE(!1,B.a3,!0,w,A.aM(!1,u,!0,A.o(w,A.A(A.a([q,B.bn,A.d(d,w,w,w,w,w,w,A.m(w,w,v?B.c:B.aR,w,w,w,w,w,w,w,w,12,w,w,B.H,w,w,!0,w,w,w,w,w,w,w,w),w,w,w)],x.p),B.l,w,B.e,B.N,0,w,w),B.f,w,w,new A.n(s,w,r,t,w,w,B.n),w,w,w,w,B.ho,w,w,w),w,!0,w,w,w,w,w,w,w,w,w,w,w,new C.dAg(this,f),w,w,w,w,w,w,w),B.f,B.L,0,w,w,w,w,w,B.ai)},
+cDD(d){var w=null,v=B.a.cm(d,"."),u=v>0,t=u?B.a.aA(d,0,v):"\u2022",s=u?B.a.i(B.a.b_(d,v+1)):d
+u=B.bQ.j(0.35)
+return new A.D(B.da,A.A(A.a([A.o(B.z,A.d(t,w,w,w,w,w,w,B.vS,w,w,w),B.f,w,w,new A.n(u,w,w,w,w,w,B.a6),w,24,w,w,w,w,w,24),B.as,A.E(A.d(s,w,w,w,w,w,w,D.fDP,w,w,w),1)],x.p),B.E,w,B.e,B.i,0,w,w),w)},
+cDE(d){switch(d.a){case 0:return D.dAt
+case 1:return D.dv_
+case 2:return D.dkP}}}
+C.aO4.prototype={
+aX(){this.b8()
+this.b6()
+this.dJ()},
+t(){var w=this,v=w.ba$
+if(v!=null)v.a6(0,w.gdC())
+w.ba$=null
+w.a2()}}
+C.pu.prototype={
+aj(){var w=this
+return A.J(["id",w.a,"title",w.b,"kind",w.c,"createdAt",w.d.aa().ag(),"dataUrl","","mimeType",w.f,"durationSec",w.r],x.N,x.z)}}
+C.b34.prototype={
+avr(){var w,v,u,t=this
+if(t.c==null)return t.at
+w=Date.now()
+v=t.c
+v.toString
+u=B.o.aq(new A.V(w,0,!1).bB(v).a,1000)-B.o.aq(t.ax.a,1000)
+if(t.as&&t.ay!=null){w=Date.now()
+v=t.ay
+v.toString
+u-=B.o.aq(new A.V(w,0,!1).bB(v).a,1000)}return B.o.D(B.h.bh(u/1000),0,99999)},
+a8_(){var w=0,v=A.j(x.H),u,t=this
+var $async$a8_=A.e(function(d,e){if(d===1)return A.f(e,v)
+for(;;)switch(w){case 0:if(!t.Q){w=1
+break}w=t.as?3:5
 break
-case 7:x=u.c!=null?9:10
+case 3:w=6
+return A.b(t.Hg(),$async$a8_)
+case 6:w=4
 break
-case 9:x=11
-return C.b(u.yw(),$async$FE)
-case 11:case 10:x=1
+case 5:w=7
+return A.b(t.H3(),$async$a8_)
+case 7:case 4:case 1:return A.h(u,v)}})
+return A.i($async$a8_,v)},
+H3(){var w=0,v=A.j(x.H),u,t=this,s
+var $async$H3=A.e(function(d,e){if(d===1)return A.f(e,v)
+for(;;)switch(w){case 0:if(!t.Q||t.as){w=1
+break}t.e=null
+s=t.a
+w=3
+return A.b(s.H3(),$async$H3)
+case 3:if(!e){s=s.a
+t.e=s==null?"Pause is not supported on this browser.":s
+t.b3()
+w=1
+break}t.as=!0
+t.ay=new A.V(Date.now(),0,!1)
+t.f="Recording paused \u2014 tap Resume when ready to continue."
+t.b3()
+case 1:return A.h(u,v)}})
+return A.i($async$H3,v)},
+Hg(){var w=0,v=A.j(x.H),u,t=this,s,r,q
+var $async$Hg=A.e(function(d,e){if(d===1)return A.f(e,v)
+for(;;)switch(w){case 0:if(!t.Q||!t.as){w=1
+break}t.e=null
+s=t.a
+w=3
+return A.b(s.Hg(),$async$Hg)
+case 3:if(!e){s=s.a
+t.e=s==null?"Could not resume recording.":s
+t.b3()
+w=1
+break}if(t.ay!=null){s=t.ax
+r=Date.now()
+q=t.ay
+q.toString
+t.ax=new A.bf(s.a+new A.V(r,0,!1).bB(q).a)
+t.ay=null}t.as=!1
+t.at=t.avr()
+t.f=y.j
+t.b3()
+case 1:return A.h(u,v)}})
+return A.i($async$Hg,v)},
+a7B(){var w=0,v=A.j(x.H),u,t=this,s
+var $async$a7B=A.e(function(d,e){if(d===1)return A.f(e,v)
+for(;;)switch(w){case 0:if(t.Q||!t.r){w=1
+break}s=t.w
+w=3
+return A.b(t.a.of(t.x,s,t.z,!1),$async$a7B)
+case 3:t.b3()
+case 1:return A.h(u,v)}})
+return A.i($async$a7B,v)},
+amr(){var w=0,v=A.j(x.H),u,t=this
+var $async$amr=A.e(function(d,e){if(d===1)return A.f(e,v)
+for(;;)switch(w){case 0:if(t.Q){w=1
+break}t.y=!1
+w=3
+return A.b(t.a.a4X(),$async$amr)
+case 3:t.b3()
+case 1:return A.h(u,v)}})
+return A.i($async$amr,v)},
+a9F(){var w=0,v=A.j(x.y),u,t=this,s,r,q
+var $async$a9F=A.e(function(d,e){if(d===1)return A.f(e,v)
+for(;;)switch(w){case 0:t.e=null
+s=t.w==="user"?"environment":"user"
+t.w=s
+r=t.a
+w=3
+return A.b(r.DL(t.x,s),$async$a9F)
+case 3:q=e
+if(!q){t.w=t.w==="user"?"environment":"user"
+s=r.a
+t.e=s==null?"Could not switch camera.":s}t.b3()
+u=q
+w=1
 break
-case 8:q=A.cF0[D.o.F(r.a,120)]
-p=B
-o=q
-x=12
-return C.b(B.a8H(120),$async$FE)
-case 12:u.m(new p.e6P(u,o,e))
-C.bO(D.yP,new B.e6Q(u),y.H)
-t=u.c
-t.toString
-x=13
-return C.b(B.h3J(t,q),$async$FE)
-case 13:case 1:return C.h(v,w)}})
-return C.i($async$FE,w)},
-bMt(){var x,w,v,u,t,s,r,q,p,o,n=this,m=null,l=n.at/300,k=n.fy
-k===$&&C.c()
-x=C.ao(m,n.aeB("\ud83d\udcaa",38,k),m,m,m,14,10,m)
-w=C.ao(36,n.aeB("\ud83d\udcaa",28,k),m,m,8,m,m,m)
-v=C.l(18)
-u=C.K(C.a0(102,D.at.l()>>>16&255,D.at.l()>>>8&255,D.at.l()&255),D.r,1)
-t=C.a([new C.ac(0,D.G,C.a0(38,D.at.l()>>>16&255,D.at.l()>>>8&255,D.at.l()&255),D.J,18)],y.V)
-s=l===0?m:l
-r=y.p
-k=C.a([new C.a5(120,120,C.n1(C.a0(38,D.at.l()>>>16&255,D.at.l()>>>8&255,D.at.l()&255),D.at,m,m,m,m,m,8,s,m),m),C.c6(k,new B.e6r(n),m)],r)
-s=n.ax?"One powerful quote per day \u2014 keep building your confidence circle.":"Today's boost unlocked \u2014 come back tomorrow for the next."
-s=C.a([new C.a5(120,120,new C.an(D.z,m,D.ad,D.t,k,m),m),D.T,A.fVs,D.am,C.d(s,m,m,m,m,m,m,C.m(m,m,C.a0(140,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255),m,m,m,m,m,m,m,m,12,m,m,m,m,m,!0,m,m,m,m,m,m,m,m),D.K,m,m),D.aO],r)
-if(n.ch!=null){k=C.a([C.a0(51,D.at.l()>>>16&255,D.at.l()>>>8&255,D.at.l()&255),C.a0(31,D.d6.l()>>>16&255,D.d6.l()>>>8&255,D.d6.l()&255)],y.O)
-q=C.l(14)
-p=C.K(C.a0(115,D.at.l()>>>16&255,D.at.l()>>>8&255,D.at.l()&255),D.r,1)
-o=n.ch
+case 1:return A.h(u,v)}})
+return A.i($async$a9F,v)},
+Ai(d){return this.bs5(d)},
+bs5(d){var w=0,v=A.j(x.H),u=this,t
+var $async$Ai=A.e(function(e,f){if(e===1)return A.f(f,v)
+for(;;)switch(w){case 0:u.z=d
+t=u.a
+w=2
+return A.b(t.Ai(d),$async$Ai)
+case 2:if(!f){u.z=t.cx
+t=t.a
+u.e=t==null?"Could not enable noise cancellation on this device.":t}else if(d)u.f="Noise cancel on \u2014 background sounds are filtered in your recording."
+else u.f="Noise cancel off \u2014 raw microphone audio."
+u.b3()
+return A.h(null,v)}})
+return A.i($async$Ai,v)},
+a9n(d,e,f){return this.btB(0,e,!0)},
+btB(d,e,f){var w=0,v=A.j(x.y),u,t=this,s,r
+var $async$a9n=A.e(function(g,h){if(g===1)return A.f(h,v)
+for(;;)switch(w){case 0:t.f=t.e=null
+s=t.a
+r=t.w
+w=3
+return A.b(s.mM(0,t.x,r,t.z,!1,!0),$async$a9n)
+case 3:if(!h){s=s.a
+t.e=s==null?"Could not start recording on this device.":s
+t.b3()
+u=!1
+w=1
+break}t.d=e
+t.Q=t.r=!0
+t.as=!1
+t.ax=B.bC
+t.ay=null
+t.at=0
+t.c=new A.V(Date.now(),0,!1)
+s=t.b
+if(s!=null)s.a1(0)
+t.b=A.dh(B.fM,new C.ciS(t))
+t.f=y.j
+t.b3()
+u=!0
+w=1
+break
+case 1:return A.h(u,v)}})
+return A.i($async$a9n,v)},
+DC(){var w=0,v=A.j(x.R),u,t=this,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d
+var $async$DC=A.e(function(a0,a1){if(a0===1)return A.f(a1,v)
+for(;;)switch(w){case 0:d=t.b
+if(d!=null)d.a1(0)
+s=t.avr()
+t.as=!1
+t.ay=null
+t.ax=B.bC
+d=t.a
+w=3
+return A.b(d.bQ(0),$async$DC)
+case 3:r=a1
+t.Q=!1
+t.at=s
+if(r==null){d=d.a
+t.e=d==null?"Nothing was captured.":d
+t.b3()
+u=null
+w=1
+break}q=t.d
+if(q==null)q=""
+p=B.o.v(1000*Date.now())
+o=r.c
+d=r.b
+w=4
+return A.b(C.a94(p,o,d),$async$DC)
+case 4:n=a1
+w=n?5:7
+break
+case 5:w=8
+return A.b(C.Ft(p,d),$async$DC)
+case 8:m=a1
+l=m==null?r.a:m
+w=6
+break
+case 7:l=r.a
+case 6:m=t.r?"Video":"Voice Memo"
+k=C.asB(t.at)
+j=t.r?"video":"audio"
+i=Date.now()
+h=n?"":l
+g=new C.pu(p,m+" "+k,j,new A.V(i,0,!1),h,d,t.at)
+w=9
+return A.b(C.X6(q),$async$DC)
+case 9:f=a1
+d=A.a([g],x.G)
+B.d.u(d,f)
+w=10
+return A.b(C.ON(q,d),$async$DC)
+case 10:e=a1
+if(n)g.e=l
+if(n&&e){t.e=null
+t.f=y.d}else if(!n){t.e="Captured, but could not save on this device \u2014 download it from the player before you leave."
+t.f=null}else t.f=y.d
+t.b3()
+u=g
+w=1
+break
+case 1:return A.h(u,v)}})
+return A.i($async$DC,v)}}
+C.b33.prototype={}
+C.b32.prototype={
+of(d,e,f,g){return this.d_k(d,e,f,g)},
+d_j(d,e,f){return this.of(d,e,!1,f)},
+d_k(d,e,f,g){var w=0,v=A.j(x.y),u,t=2,s=[],r=this,q,p,o,n,m,l
+var $async$of=A.e(function(h,i){if(h===1){s.push(i)
+w=t}for(;;)switch(w){case 0:m=r.d
+if(m!=null&&m.state==="recording"){u=!1
+w=1
+break}r.a=null
+r.p2=e
+r.p3=d
+r.CW=g
+r.cx=f
+w=3
+return A.b(r.wQ(),$async$of)
+case 3:w=4
+return A.b(r.yW(),$async$of)
+case 4:w=5
+return A.b(r.FA(),$async$of)
+case 5:r.y=r.at=!0
+t=7
+w=10
+return A.b(r.a1i(d,e,!0),$async$of)
+case 10:m=i
+r.b=m
+m.toString
+r.YD(m)
+m=r.b
+m.toString
+w=11
+return A.b(r.Xb(m),$async$of)
+case 11:w=r.cx?12:13
+break
+case 12:m=r.b
+m.toString
+w=14
+return A.b(r.DV(m,!0),$async$of)
+case 14:case 13:m=r.b
+m.toString
+w=15
+return A.b(r.Lb(m,!0),$async$of)
+case 15:q=i
+w=!q?16:17
+break
+case 16:r.a="Allow microphone access so your videos record with sound."
+w=18
+return A.b(r.yW(),$async$of)
+case 18:r.at=!1
+u=!1
+w=1
+break
+case 17:m=r.b
+m.toString
+w=19
+return A.b(r.Lb(m,!1),$async$of)
+case 19:p=i
+w=!p?20:21
+break
+case 20:r.a="Camera is not ready. Allow camera access for ngmy.org."
+w=22
+return A.b(r.yW(),$async$of)
+case 22:r.at=!1
+u=!1
+w=1
+break
+case 21:w=r.CW?23:24
+break
+case 23:w=25
+return A.b(r.FA(),$async$of)
+case 25:r.CW=!1
+case 24:u=!0
+w=1
+break
+t=2
+w=9
+break
+case 7:t=6
+l=s.pop()
+o=A.aa(l)
+r.a=r.av2(o)
+r.at=!1
+w=26
+return A.b(r.yW(),$async$of)
+case 26:u=!1
+w=1
+break
+w=9
+break
+case 6:w=2
+break
+case 9:case 1:return A.h(u,v)
+case 2:return A.f(s.at(-1),v)}})
+return A.i($async$of,v)},
+a4X(){var w=0,v=A.j(x.H),u,t=this,s
+var $async$a4X=A.e(function(d,e){if(d===1)return A.f(e,v)
+for(;;)switch(w){case 0:s=t.d
+if(s!=null&&s.state==="recording"){w=1
+break}t.CW=t.at=!1
+w=3
+return A.b(t.FA(),$async$a4X)
+case 3:w=4
+return A.b(t.yW(),$async$a4X)
+case 4:case 1:return A.h(u,v)}})
+return A.i($async$a4X,v)},
+DL(d,e){return this.bCg(d,e)},
+bCg(d,e){var w=0,v=A.j(x.y),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i,h,g
+var $async$DL=A.e(function(a0,a1){if(a0===1){s.push(a1)
+w=t}for(;;)switch(w){case 0:r.a=null
+r.p2=e
+r.p3=d
+if(r.b==null){if(r.at){u=r.d_j(d,e,r.CW)
+w=1
+break}u=!1
+w=1
+break}t=4
+if(r.CW){l=r.ay
+l=l!=null&&l.getVideoTracks().length!==0&&r.b.getVideoTracks().length!==0}else l=!1
+w=l?7:8
+break
+case 7:r.cEz()
+n=r.b
+n.toString
+r.YD(n)
+n=r.ay
+n.toString
+r.YD(n)
+w=9
+return A.b(r.a2o(),$async$DL)
+case 9:r.at=!1
+u=!0
+w=1
+break
+case 8:w=10
+return A.b(r.a1m(d,e),$async$DL)
+case 10:q=a1
+p=J.bI6(q).length!==0?B.d.gH(J.bI6(q)):null
+if(p==null){r.a="Could not switch camera."
+u=!1
+w=1
+break}l=r.b.getVideoTracks()
+l.toString
+l=A.bs(l,!0,x.A)
+k=l.length
+j=0
+for(;j<k;++j){o=l[j]
+r.b.removeTrack(o)
+try{J.h9p(o)}catch(f){}}r.b.addTrack(p)
+l=r.b
+l.toString
+r.YD(l)
+for(l=J.bI5(q),k=l.length,j=0;j<l.length;l.length===k||(0,A.I)(l),++j){n=l[j]
+try{J.h9p(n)}catch(f){}}n=r.id
+w=n!=null?11:12
+break
+case 11:n.srcObject=r.b
+t=14
+n=r.id.play()
+n.toString
+w=17
+return A.b(A.eg(n,x.z),$async$DL)
+case 17:t=4
+w=16
+break
+case 14:t=13
+h=s.pop()
+w=16
+break
+case 13:w=4
+break
+case 16:case 12:w=r.CW?18:19
+break
+case 18:w=20
+return A.b(r.a3V(d,e),$async$DL)
+case 20:w=r.k3&&r.ay!=null?21:22
+break
+case 21:n=r.ay
+n.toString
+w=23
+return A.b(r.Xi(n),$async$DL)
+case 23:case 22:case 19:r.at=!1
+u=!0
+w=1
+break
+t=2
+w=6
+break
+case 4:t=3
+g=s.pop()
+m=A.aa(g)
+r.a=r.av2(m)
+$.am.$1("[live_capture] switchVideoFacing: "+A.w(m))
+u=!1
+w=1
+break
+w=6
+break
+case 3:w=2
+break
+case 6:case 1:return A.h(u,v)
+case 2:return A.f(s.at(-1),v)}})
+return A.i($async$DL,v)},
+cEz(){var w,v,u,t=this,s=t.b
+if(s==null||t.ay==null)return
+s=s.getVideoTracks()
+s.toString
+w=t.ay.getVideoTracks()
+w.toString
+if(s.length===0||w.length===0)return
+v=B.d.gH(s)
+u=B.d.gH(w)
+t.b.removeTrack(v)
+t.ay.removeTrack(u)
+t.b.addTrack(u)
+t.ay.addTrack(v)},
+a2o(){var w=0,v=A.j(x.H),u=1,t=[],s=this,r,q,p,o
+var $async$a2o=A.e(function(d,e){if(d===1){t.push(e)
+w=u}for(;;)switch(w){case 0:q=s.id
+w=q!=null&&s.b!=null?2:3
+break
+case 2:q.srcObject=s.b
+u=5
+q=s.id.play()
+q.toString
+w=8
+return A.b(A.eg(q,x.z),$async$a2o)
+case 8:u=1
+w=7
+break
+case 5:u=4
+p=t.pop()
+w=7
+break
+case 4:w=1
+break
+case 7:case 3:q=s.k1
+w=q!=null&&s.ay!=null?9:10
+break
+case 9:q.srcObject=s.ay
+u=12
+q=s.k1.play()
+q.toString
+w=15
+return A.b(A.eg(q,x.z),$async$a2o)
+case 15:u=1
+w=14
+break
+case 12:u=11
+o=t.pop()
+w=14
+break
+case 11:w=1
+break
+case 14:case 10:return A.h(null,v)
+case 1:return A.f(t.at(-1),v)}})
+return A.i($async$a2o,v)},
+Ai(d){return this.bs4(d)},
+bs4(d){var w=0,v=A.j(x.y),u,t=this,s,r,q
+var $async$Ai=A.e(function(e,f){if(e===1)return A.f(f,v)
+for(;;)switch(w){case 0:q=t.cx
+t.cx=d
+s=t.b
+if(s==null){u=!0
+w=1
+break}r=t.d
+if((r==null?null:r.state)==="recording"){u=t.a3d(d,q)
+w=1
+break}w=3
+return A.b(t.DV(s,d),$async$Ai)
+case 3:if(f){if(t.ch!=null)t.cF6()
+u=!0
+w=1
+break}t.cx=q
+s=t.a
+if(s==null)s="Could not "+(d?"enable":"disable")+" noise cancellation on this device."
+t.a=s
+if(t.at){s=t.p2
+u=t.of(t.p3,s,d,t.CW)
+w=1
+break}u=!1
+w=1
+break
+case 1:return A.h(u,v)}})
+return A.i($async$Ai,v)},
+a3d(d,e){return this.czA(d,e)},
+czA(d,e){var w=0,v=A.j(x.y),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i
+var $async$a3d=A.e(function(f,g){if(f===1){s.push(g)
+w=t}for(;;)switch(w){case 0:k=r.b
+if(k==null){u=!0
+w=1
+break}w=r.dy!=null&&r.cy!=null?3:4
+break
+case 3:q=r.dx
+w=q!=null?5:6
+break
+case 5:t=8
+w=11
+return A.b(J.bHY(q,r.Xj(d)),$async$a3d)
+case 11:t=2
+w=10
+break
+case 8:t=7
+j=s.pop()
+p=A.aa(j)
+$.am.$1("[live_capture] recording noise constraints: "+A.w(p))
+w=10
+break
+case 7:w=2
+break
+case 10:case 6:if(d){if(r.fx!=null&&r.fr!=null){l=r.cy
+l.toString
+r.ba3(l)}}else{l=r.fy
+if(l!=null)l.a1(0)
+r.fy=null
+l=r.fr
+if(l!=null)r.wH(l,"gain",1)}u=!0
+w=1
+break
+case 4:q=r.dx
+o=q==null?r.avT(k):q
+if(o==null){r.cx=e
+r.a="Microphone track is not available."
+u=!1
+w=1
+break}t=13
+w=16
+return A.b(J.bHY(o,r.Xj(d)),$async$a3d)
+case 16:u=!0
+w=1
+break
+t=2
+w=15
+break
+case 13:t=12
+i=s.pop()
+n=A.aa(i)
+$.am.$1("[live_capture] recording noise constraints only: "+A.w(n))
+r.cx=e
+r.a="Could not "+(d?"enable":"disable")+" noise cancellation while recording."
+u=!1
+w=1
+break
+w=15
+break
+case 12:w=2
+break
+case 15:case 1:return A.h(u,v)
+case 2:return A.f(s.at(-1),v)}})
+return A.i($async$a3d,v)},
+Xj(d){var w,v,u="echoCancellation",t="noiseSuppression"
+if(d){w=x.N
+v=x.S
+return A.J([u,!0,t,!0,"autoGainControl",!0,"channelCount",A.J(["ideal",1],w,v),"sampleRate",A.J(["ideal",48e3],w,v)],w,x.z)}return A.J([u,!1,t,!1,"autoGainControl",!1],x.N,x.z)},
+aiY(d){return this.cw1(d)},
+cw1(d){var w=0,v=A.j(x.H),u=1,t=[],s,r,q
+var $async$aiY=A.e(function(e,f){if(e===1){t.push(f)
+w=u}for(;;)switch(w){case 0:u=3
+w=J.z(d.state,"suspended")?6:7
+break
+case 6:w=8
+return A.b(A.eg(d.resume(),x.H),$async$aiY)
+case 8:case 7:u=1
+w=5
+break
+case 3:u=2
+q=t.pop()
+s=A.aa(q)
+$.am.$1("[live_capture] AudioContext resume: "+A.w(s))
+w=5
+break
+case 2:w=1
+break
+case 5:return A.h(null,v)
+case 1:return A.f(t.at(-1),v)}})
+return A.i($async$aiY,v)},
+wH(d,e,f){d[e].value=f},
+DV(d,e){return this.bGf(d,e)},
+bGf(d,e){var w=0,v=A.j(x.y),u,t=2,s=[],r=this,q,p,o,n,m,l,k
+var $async$DV=A.e(function(f,g){if(f===1){s.push(g)
+w=t}for(;;)switch(w){case 0:w=!e?3:4
+break
+case 3:w=5
+return A.b(r.bb6(d),$async$DV)
+case 5:o=r.dx
+q=o==null?r.avT(d):o
+w=q!=null?6:7
+break
+case 6:t=9
+w=12
+return A.b(J.bHY(q,r.Xj(!1)),$async$DV)
+case 12:t=2
+w=11
+break
+case 9:t=8
+l=s.pop()
+p=A.aa(l)
+$.am.$1("[live_capture] disable noise constraints: "+A.w(p))
+w=11
+break
+case 8:w=2
+break
+case 11:case 7:u=!0
+w=1
+break
+case 4:q=r.avT(d)
+o=q==null?r.dx:q
+if(o==null){u=!1
+w=1
+break}t=14
+w=17
+return A.b(J.bHY(o,r.Xj(!0)),$async$DV)
+case 17:t=2
+w=16
+break
+case 14:t=13
+k=s.pop()
+n=A.aa(k)
+$.am.$1("[live_capture] enable noise constraints: "+A.w(n))
+w=16
+break
+case 13:w=2
+break
+case 16:u=r.J8(d,o)
+w=1
+break
+case 1:return A.h(u,v)
+case 2:return A.f(s.at(-1),v)}})
+return A.i($async$DV,v)},
+avT(d){var w=d.getAudioTracks(),v=w.length
+if(v===0)return null
+if(this.dy!=null&&v===1&&B.d.gH(w).id==this.dy.id)return this.dx
+return B.d.gH(w)},
+J8(d,e){return this.c4_(d,e)},
+c4_(a5,a6){var w=0,v=A.j(x.y),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4
+var $async$J8=A.e(function(a7,a8){if(a7===1){s.push(a8)
+w=t}for(;;)switch(w){case 0:w=3
+return A.b(r.aDZ(!1),$async$J8)
+case 3:r.dx=a6
+t=5
+e=E.hb_()
+e.addTrack(a6)
+r.db=e
+d=window.AudioContext
+if(d==null)d=window.webkitAudioContext
+if(d==null)A.bi(A.bd("Web Audio is not supported in this browser"))
+a0=new d()
+r.cy=a0
+q=a0
+w=8
+return A.b(r.aiY(q),$async$J8)
+case 8:p=q.createMediaStreamSource(r.db)
+o=q.createBiquadFilter()
+o.type="highpass"
+r.wH(o,"frequency",140)
+r.wH(o,"Q",0.8)
+n=q.createBiquadFilter()
+n.type="lowpass"
+r.wH(n,"frequency",9000)
+r.wH(n,"Q",0.7)
+m=q.createDynamicsCompressor()
+r.wH(m,"threshold",-38)
+r.wH(m,"knee",18)
+r.wH(m,"ratio",10)
+r.wH(m,"attack",0.004)
+r.wH(m,"release",0.12)
+e=q.createGain()
+r.fr=e
+e.toString
+r.wH(e,"gain",1)
+e=q.createAnalyser()
+r.fx=e
+e.toString
+e.fftSize=512
+l=q.createMediaStreamDestination()
+e=r.fr
+e.toString
+k=e
+e=r.fx
+e.toString
+j=e
+A.jR(p,"connect",[o])
+A.jR(o,"connect",[n])
+A.jR(n,"connect",[m])
+A.jR(m,"connect",[k])
+A.jR(k,"connect",[j])
+A.jR(j,"connect",[l])
+r.ba3(q)
+i=x.E.a(l.stream)
+h=J.bI5(i)
+w=J.ad(h)===0?9:10
+break
+case 9:r.a="Noise cancellation could not start on this browser."
+w=11
+return A.b(r.aDZ(!1),$async$J8)
+case 11:u=!1
+w=1
+break
+case 10:r.dy=J.fm(h)
+e=a5.getAudioTracks()
+e.toString
+e=A.bs(e,!0,x.A)
+a1=e.length
+a2=0
+for(;a2<a1;++a2){g=e[a2]
+a5.removeTrack(g)}e=r.dy
+e.toString
+a5.addTrack(e)
+$.am.$1("[live_capture] noise pipeline active raw="+A.w(a6.id)+" processed="+A.w(r.dy.id))
+u=!0
+w=1
+break
+t=2
+w=7
+break
+case 5:t=4
+a4=s.pop()
+f=A.aa(a4)
+r.a="Noise cancellation failed: "+A.w(f)
+$.am.$1("[live_capture] installNoisePipeline: "+A.w(f))
+w=12
+return A.b(r.bb6(a5),$async$J8)
+case 12:u=!1
+w=1
+break
+w=7
+break
+case 4:w=2
+break
+case 7:case 1:return A.h(u,v)
+case 2:return A.f(s.at(-1),v)}})
+return A.i($async$J8,v)},
+ba3(d){var w,v,u,t=this,s=t.fy
+if(s!=null)s.a1(0)
+w=t.fx
+v=t.fr
+if(w==null||v==null)return
+u=A.eq(w.fftSize)
+if(u==null)u=512
+t.fy=A.dh(D.bCH,new C.ciH(w,new Float32Array(u),v,d))},
+a3Y(d,e){return this.cFM(d,e)},
+aDZ(d){return this.a3Y(null,d)},
+bb6(d){return this.a3Y(d,!0)},
+cFM(d,e){var w=0,v=A.j(x.H),u=1,t=[],s=this,r,q,p,o,n,m,l,k
+var $async$a3Y=A.e(function(f,g){if(f===1){t.push(g)
+w=u}for(;;)switch(w){case 0:l=s.fy
+if(l!=null)l.a1(0)
+s.fr=s.fx=s.fy=null
+if(e&&d!=null&&s.dx!=null){l=d.getAudioTracks()
+l.toString
+l=A.bs(l,!0,x.A)
+p=l.length
+o=0
+for(;o<p;++o){r=l[o]
+n=s.dy
+if(n!=null&&r.id==n.id){d.removeTrack(r)
+try{J.h9p(r)}catch(j){}}}l=d.getAudioTracks()
+l.toString
+if(!B.d.aU(l,new C.ciJ(s))){l=s.dx
+l.toString
+d.addTrack(l)}}q=s.cy
+w=q!=null?2:3
+break
+case 2:u=5
+w=8
+return A.b(A.eg(q.close(),x.H),$async$a3Y)
+case 8:u=1
+w=7
+break
+case 5:u=4
+k=t.pop()
+w=7
+break
+case 4:w=1
+break
+case 7:case 3:s.dy=s.db=s.cy=null
+return A.h(null,v)
+case 1:return A.f(t.at(-1),v)}})
+return A.i($async$a3Y,v)},
+cF6(){var w,v,u,t=this.ch,s=this.b
+if(t==null||s==null)return
+w=t.getAudioTracks()
+w.toString
+w=A.bs(w,!0,x.A)
+v=w.length
+u=0
+for(;u<v;++u)t.removeTrack(w[u])
+for(w=s.getAudioTracks(),v=w.length,u=0;u<w.length;w.length===v||(0,A.I)(w),++u)t.addTrack(w[u])},
+a3V(d,e){return this.cF5(d,e)},
+cF5(d,e){var w=0,v=A.j(x.H),u=1,t=[],s=this,r,q,p,o
+var $async$a3V=A.e(function(f,g){if(f===1){t.push(g)
+w=u}for(;;)switch(w){case 0:w=2
+return A.b(s.FA(),$async$a3V)
+case 2:r=e==="user"?"environment":"user"
+u=4
+w=7
+return A.b(s.a1m(d,r),$async$a3V)
+case 7:s.ay=g
+u=1
+w=6
+break
+case 4:u=3
+o=t.pop()
+q=A.aa(o)
+$.am.$1("[live_capture] pip stream failed: "+A.w(q))
+s.ay=null
+w=6
+break
+case 3:w=1
+break
+case 6:return A.h(null,v)
+case 1:return A.f(t.at(-1),v)}})
+return A.i($async$a3V,v)},
+bdj(d,e){var w=this.aD3(e),v=x.N,u=w.a,t=x.S,s=w.b,r=x.i
+return A.J(["facingMode",A.J(["ideal",d],v,v),"width",A.J(["ideal",u],v,t),"height",A.J(["ideal",s],v,t),"aspectRatio",A.J(["ideal",u/s],v,r),"frameRate",A.J(["ideal",30,"max",30],v,t),"zoom",A.J(["ideal",1],v,r)],v,x.z)},
+Xb(d){return this.bGb(d)},
+bGb(d){var w=0,v=A.j(x.H),u=1,t=[],s,r,q,p,o,n,m,l,k,j
+var $async$Xb=A.e(function(e,f){if(e===1){t.push(f)
+w=u}for(;;)switch(w){case 0:r=d.getVideoTracks(),q=r.length,p=x.z,o=x.N,n=0
+case 2:if(!(n<r.length)){w=4
+break}s=r[n]
+u=6
+m=A.DD(A.J(["zoom",1],o,p))
+l=s.applyConstraints(m)
+l.toString
+w=9
+return A.b(A.eg(l,p),$async$Xb)
+case 9:u=1
+w=8
+break
+case 6:u=5
+j=t.pop()
+w=8
+break
+case 5:w=1
+break
+case 8:case 3:r.length===q||(0,A.I)(r),++n
+w=2
+break
+case 4:return A.h(null,v)
+case 1:return A.f(t.at(-1),v)}})
+return A.i($async$Xb,v)},
+bav(d,e,f){var w=this.aD3(d),v=x.N,u=x.i,t=x.S,s=x.z
+t=A.a([A.J(["audio",e,"video",A.J(["facingMode",A.J(["ideal",f],v,v),"aspectRatio",A.J(["ideal",1.3333333333333333],v,u),"width",A.J(["ideal",640,"min",320],v,t),"height",A.J(["ideal",480,"min",240],v,t),"frameRate",A.J(["ideal",30,"max",30],v,t),"zoom",A.J(["ideal",1],v,u)],v,s)],v,s),A.J(["audio",e,"video",A.J(["facingMode",A.J(["ideal",f],v,v),"frameRate",A.J(["ideal",30,"max",30],v,t),"zoom",A.J(["ideal",1],v,u)],v,s)],v,s),A.J(["audio",e,"video",A.J(["facingMode",f],v,v)],v,s),A.J(["audio",e,"video",A.J(["facingMode",A.J(["ideal",f],v,v),"aspectRatio",A.J(["ideal",w.a/w.b],v,u),"zoom",A.J(["ideal",1],v,u),"frameRate",A.J(["ideal",30,"max",30],v,t)],v,x.Y)],v,s),A.J(["audio",e,"video",this.bdj(f,d)],v,s)],x.t)
+if(e!==!1)t.push(A.J(["audio",e,"video",!0],v,s))
+return t},
+a1m(d,e){return this.clg(d,e)},
+clg(d,e){var w=0,v=A.j(x.E),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i,h,g,f
+var $async$a1m=A.e(function(a0,a1){if(a0===1){s.push(a1)
+w=t}for(;;)switch(w){case 0:g=window.navigator.mediaDevices
+if(g==null)throw A.W(A.bd("Secure media devices API unavailable"))
+n=r.bav(d,!1,e==="environment"?"environment":"user")
+q=null
+m=n.length,l=x.E,k=0
+case 3:if(!(k<n.length)){w=5
+break}p=n[k]
+t=7
+j=p
+i=j!=null?A.DD(j):null
+j=g.getUserMedia(i)
+j.toString
+w=10
+return A.b(A.eg(j,l),$async$a1m)
+case 10:j=a1
+u=j
+w=1
+break
+t=2
+w=9
+break
+case 7:t=6
+f=s.pop()
+o=A.aa(f)
+q=o
+w=9
+break
+case 6:w=2
+break
+case 9:case 4:n.length===m||(0,A.I)(n),++k
+w=3
+break
+case 5:m=q
+throw A.W(m==null?A.bd("Could not open camera"):m)
+case 1:return A.h(u,v)
+case 2:return A.f(s.at(-1),v)}})
+return A.i($async$a1m,v)},
+ali(d){return this.cKu(d)},
+cKu(d){var w=0,v=A.j(x.H),u,t,s,r
+var $async$ali=A.e(function(e,f){if(e===1)return A.f(f,v)
+for(;;)switch(w){case 0:t=x.H,s=0
+case 3:if(!(s<80)){w=5
+break}r=d.videoWidth
+r.toString
+if(r>0){r=d.videoHeight
+r.toString
+r=r>0}else r=!1
+if(r){w=1
+break}w=6
+return A.b(A.bO(new A.bf(1000*(C.X5()?80:50)),null,t),$async$ali)
+case 6:case 4:++s
+w=3
+break
+case 5:case 1:return A.h(u,v)}})
+return A.i($async$ali,v)},
+a3A(d,e,f,g){return this.cCX(d,e,f,!1)},
+cCX(a1,a2,a3,a4){var w=0,v=A.j(x.u),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0
+var $async$a3A=A.e(function(a6,a7){if(a6===1){s.push(a7)
+w=t}for(;;)switch(w){case 0:r.akz()
+r.k3=!1
+m=document
+l=m.createElement("video")
+l.autoplay=!0
+l.muted=!0
+l.defaultMuted=!0
+l.setAttribute("playsinline","true")
+l.srcObject=a1
+q=l
+r.id=q
+t=4
+k=q.play()
+k.toString
+w=7
+return A.b(A.eg(k,x.z),$async$a3A)
+case 7:t=2
+w=6
+break
+case 4:t=3
+a0=s.pop()
+w=6
+break
+case 3:w=2
+break
+case 6:w=8
+return A.b(r.ali(q),$async$a3A)
+case 8:i=r.aD3(a3)
+h=i.a
+g=i.b
+r.ok=h
+r.p1=g
+p=A.aVc(g,h)
+k=p
+f=k.style
+f.display="none"
+f=k.style
+f.position="fixed"
+k=k.style
+k.left="-9999px"
+m=m.body
+if(m!=null)m.appendChild(p).toString
+r.go=p
+r.aaZ()
+r.k2=A.dh(F.Cw,new C.ciG(r))
+o=null
+try{o=J.h9d(p,30)}catch(a5){n=A.aa(a5)
+$.am.$1("[live_capture] composite captureStream failed: "+A.w(n))
+r.akz()
+u=null
+w=1
+break}e=E.hb_()
+for(m=o.getVideoTracks(),k=m.length,d=0;d<m.length;m.length===k||(0,A.I)(m),++d)e.addTrack(m[d])
+for(m=a1.getAudioTracks(),k=m.length,d=0;d<m.length;m.length===k||(0,A.I)(m),++d)e.addTrack(m[d])
+u=e
+w=1
+break
+case 1:return A.h(u,v)
+case 2:return A.f(s.at(-1),v)}})
+return A.i($async$a3A,v)},
+Xi(d){return this.bGQ(d)},
+bGQ(d){var w=0,v=A.j(x.H),u,t=2,s=[],r=this,q,p,o,n,m,l
+var $async$Xi=A.e(function(e,f){if(e===1){s.push(f)
+w=t}for(;;)switch(w){case 0:if(r.go==null){w=1
+break}p=r.k1
+w=p!=null?3:4
+break
+case 3:p.srcObject=d
+t=6
+p=r.k1.play()
+p.toString
+w=9
+return A.b(A.eg(p,x.z),$async$Xi)
+case 9:t=2
+w=8
+break
+case 6:t=5
+m=s.pop()
+w=8
+break
+case 5:w=2
+break
+case 8:w=1
+break
+case 4:n=document.createElement("video")
+n.autoplay=!0
+n.muted=!0
+n.defaultMuted=!0
+n.setAttribute("playsinline","true")
+n.srcObject=d
+q=n
+r.k1=q
+t=11
+p=q.play()
+p.toString
+w=14
+return A.b(A.eg(p,x.z),$async$Xi)
+case 14:t=2
+w=13
+break
+case 11:t=10
+l=s.pop()
+w=13
+break
+case 10:w=2
+break
+case 13:case 1:return A.h(u,v)
+case 2:return A.f(s.at(-1),v)}})
+return A.i($async$Xi,v)},
+bRG(d,e,f,g,h,i){var w,v,u,t,s=e.videoWidth
+s.toString
+w=e.videoHeight
+w.toString
+if(s<=0||w<=0){d.drawImage(e,f,g,h,i)
+return}v=s/w
+if(v>h/i){u=i*v
+t=i}else{t=h/v
+u=h}d.drawImage(e,f+(h-u)/2,g+(i-t)/2,u,t)},
+aaZ(){var w,v,u,t,s,r,q,p=this,o=p.go
+if(o==null||p.id==null)return
+o=o.getContext("2d")
 o.toString
-s.push(C.o(m,C.d(o,m,m,m,m,m,m,A.aWM,m,m,m),D.f,m,m,new C.n(m,m,p,q,m,new C.a7(D.a5,D.a9,D.x,k,m,m),D.n),m,m,m,m,D.bH,m,m,1/0))}s.push(D.aB)
-k=n.ax?"Reveal Today's Boost":"View Today's Boost Again"
-s.push(n.a9M(A.aBG,D.at,k,n.gcw9()))
-return new C.an(D.a0,m,D.ad,D.f,C.a([x,w,C.o(m,C.x(s,D.l,m,D.e,D.i,0,D.p),D.f,m,m,new C.n(D.jn,m,u,v,t,m,D.n),m,m,m,m,D.wI,m,m,1/0)],r),m)},
-bVo(){var x,w,v,u,t,s,r,q,p=this,o=null,n=p.dy,m=p.fy
-m===$&&C.c()
-x=C.ao(o,p.aeB("\ud83d\udd2e",36,m),o,o,o,10,6,o)
-w=C.l(18)
-v=C.K(C.a0(89,D.bU.l()>>>16&255,D.bU.l()>>>8&255,D.bU.l()&255),D.r,1)
-u=C.a([new C.ac(0,D.G,C.a0(31,D.bU.l()>>>16&255,D.bU.l()>>>8&255,D.bU.l()&255),D.J,18)],y.V)
-m=C.c6(m,new B.e6s(p),o)
-t=p.dx>0?"Your daily fortune is ready":"Come back tomorrow for a new fortune"
-s=y.p
-t=C.a([m,D.af,A.fYJ,D.ax,C.d(t,o,o,o,o,o,o,C.m(o,o,D.bU,o,o,o,o,o,o,o,o,12,o,o,D.O,o,o,!0,o,o,o,o,o,o,o,o),o,o,o),D.aB],s)
-if(p.fr&&n!=null){m=C.a([C.a0(46,D.bU.l()>>>16&255,D.bU.l()>>>8&255,D.bU.l()&255),C.a0(D.h.T(25.5),D.jl.l()>>>16&255,D.jl.l()>>>8&255,D.jl.l()&255)],y.O)
-r=C.l(14)
-q=C.K(C.a0(102,D.bU.l()>>>16&255,D.bU.l()>>>8&255,D.bU.l()&255),D.r,1)
-t.push(C.o(o,C.x(C.a([C.d(n.d,o,o,o,o,o,o,C.m(o,o,D.bU,o,o,o,o,o,o,o,o,12,o,o,D.u,o,o,!0,o,1,o,o,o,o,o,o),o,o,o),D.P,C.d(n.a,o,o,o,o,o,o,A.fAF,D.K,o,o),D.T,C.d("Lucky: "+D.d.aN(n.b," \xb7 "),o,o,o,o,o,o,C.m(o,o,C.a0(166,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255),o,o,o,o,o,o,o,o,12,o,o,D.O,o,o,!0,o,o,o,o,o,o,o,o),o,o,o)],s),D.l,o,D.e,D.i,0,D.p),D.f,o,o,new C.n(o,o,q,r,o,new C.a7(D.a5,D.a9,D.x,m,o,o),D.n),o,o,o,o,D.bH,o,o,1/0))}else t.push(C.d("Shake the crystal \u2014 tap below for your fortune.",o,o,o,o,o,o,C.m(o,o,C.a0(140,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255),o,o,o,o,o,o,o,o,12,o,o,o,o,o,!0,o,o,o,o,o,o,o,o),D.K,o,o))
-t.push(D.aB)
-m=p.fr?"View Today's Fortune Again":"Reveal My Fortune"
-t.push(p.a9M(A.dkL,D.bU,m,p.gcwa()))
-return new C.an(D.a0,o,D.ad,D.f,C.a([x,C.o(o,C.x(t,D.l,o,D.e,D.i,0,D.p),D.f,o,o,new C.n(D.jn,o,v,w,u,o,D.n),o,o,o,o,D.wI,o,o,1/0)],s),o)},
-aeB(d,e,f){return C.c6(f,new B.e6B(f,d,e),null)},
-a9M(d,e,f,g){var x=null,w=this.Q?0.96:1
-return C.uL(new C.a5(1/0,x,new C.bN(new C.n(x,x,x,C.l(14),C.a([new C.ac(0,D.G,C.a0(115,e.l()>>>16&255,e.l()>>>8&255,e.l()&255),D.cz,14)],y.V),new C.a7(D.a5,D.a9,D.x,d,x,x),D.n),D.bk,C.aF(!1,D.a3,!0,x,C.aM(!1,C.l(14),!0,new C.D(D.yV,C.A(C.a([A.aMh,D.ae,C.d(f,x,x,x,x,x,x,D.j2,x,x,x)],y.p),D.l,x,D.b9,D.i,0,x,x),x),x,!0,x,x,x,x,x,x,x,x,x,x,x,g,x,x,x,x,x,x,x),D.f,D.L,0,x,x,x,x,x,D.ai),x),x),D.b0,D.jq,w)}}
-B.a_l.prototype={}
-B.a2g.prototype={}
-B.aOg.prototype={
-aX(){this.b8()
-this.b6()
-this.dJ()},
-t(){var x=this,w=x.ba$
-if(w!=null)w.a6(0,x.gdC())
-x.ba$=null
-x.a2()}}
-B.a_p.prototype={
-S(){return new B.bet(null,null)}}
-B.bet.prototype={
-Z(){var x,w=this
-w.a3()
-x=C.bo(null,D.hy,null,1,null,w)
-x.cs(0)
-w.d!==$&&C.aQ()
-w.d=x},
-t(){var x=this.d
-x===$&&C.c()
-x.t()
-this.bys()},
-B(d){var x=null,w=D.w.j(0.78),v=this.a.d,u=this.d
-u===$&&C.c()
-return C.aF(!1,D.a3,!0,x,C.ay(x,C.c6(u,new B.d8V(this),x),D.y,!1,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,v,x,x,x,x,x,x,!1,D.a4),D.f,w,0,x,x,x,x,x,D.ai)}}
-B.a01.prototype={
-S(){return new B.bie(null,null)}}
-B.bie.prototype={
-Z(){var x,w=this,v=null
-w.a3()
-x=C.bo(v,D.qF,v,1,v,w)
-x.cs(0)
-w.d!==$&&C.aQ()
-w.d=x
-x=C.bo(v,D.nE,v,1,v,w)
-x.cK(0)
-w.e!==$&&C.aQ()
-w.e=x},
-t(){var x=this.d
-x===$&&C.c()
-x.t()
-x=this.e
-x===$&&C.c()
-x.t()
-this.byW()},
-bGU(){switch(this.a.c.c){case"gold":var x=D.aQ
+w=o
+v=p.ok
+u=p.p1
+try{w.fillStyle="#000000"
+J.hPa(w,0,0,v,u)
+o=w
+t=p.id
+t.toString
+s=v
+r=u
+o.save()
+o.beginPath()
+o.rect(0,0,s,r)
+o.clip()
+p.bRG(o,t,0+(s-s)/2,0+(r-r)/2,s,r)
+o.restore()}catch(q){}},
+akz(){var w,v=this,u=v.k2
+if(u!=null)u.a1(0)
+v.k2=null
+try{u=v.id
+if(u!=null)u.srcObject=null
+u=v.id
+if(u!=null)B.xU.fs(u)}catch(w){}try{u=v.k1
+if(u!=null)u.srcObject=null
+u=v.k1
+if(u!=null)B.xU.fs(u)}catch(w){}v.k1=v.id=null
+try{u=v.go
+if(u!=null)B.Yx.fs(u)}catch(w){}v.go=null
+v.k3=!1
+v.ch=null},
+FA(){var w=0,v=A.j(x.H),u=this,t,s
+var $async$FA=A.e(function(d,e){if(d===1)return A.f(e,v)
+for(;;)switch(w){case 0:try{t=u.ay
+if(t!=null){t=t.getTracks()
+t.toString
+J.iJ(t,new C.ciD())}}catch(r){}u.ay=null
+return A.h(null,v)}})
+return A.i($async$FA,v)},
+mM(d,e,f,g,h,i){return this.btA(0,e,f,g,!1,!0)},
+btA(a2,a3,a4,a5,a6,a7){var w=0,v=A.j(x.y),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1
+var $async$mM=A.e(function(a9,b0){if(a9===1){s.push(b0)
+w=t}for(;;)switch(w){case 0:r.a=null
+r.y=!0
+r.z=!1
+r.p2=a4
+r.p3=a3
+r.CW=!1
+r.cx=a5
+w=3
+return A.b(r.t(),$async$mM)
+case 3:t=5
+w=8
+return A.b(r.a1i(a3,a4,!0),$async$mM)
+case 8:g=b0
+r.b=g
+g.toString
+r.YD(g)
+g=r.b
+g.toString
+w=9
+return A.b(r.Xb(g),$async$mM)
+case 9:w=r.cx?10:11
 break
-case"emerald":x=D.aV
+case 10:g=r.b
+g.toString
+w=12
+return A.b(r.DV(g,!0),$async$mM)
+case 12:case 11:r.c6j("after openStream")
+g=r.b
+g.toString
+w=13
+return A.b(r.Lb(g,!0),$async$mM)
+case 13:q=b0
+w=!q?14:15
 break
-case"sapphire":x=D.d9
+case 14:r.a="Allow microphone access so your video records with sound."
+w=16
+return A.b(r.t(),$async$mM)
+case 16:u=!1
+w=1
 break
-case"amber":x=D.at
+case 15:g=r.b
+g.toString
+w=17
+return A.b(r.Lb(g,!1),$async$mM)
+case 17:f=b0
+p=f
+w=!p?18:19
 break
-case"violet":x=D.b8
+case 18:r.a="Camera track is not active. Allow camera access for ngmy.org and try again."
+w=20
+return A.b(r.t(),$async$mM)
+case 20:u=!1
+w=1
 break
-case"crimson":x=D.aA
+case 19:r.f=r.cpp(!0)
+B.d.a8(r.e)
+g=r.b
+g.toString
+o=g
+w=r.y?21:22
 break
-case"silver":x=D.bP
+case 21:w=23
+return A.b(r.a3A(g,null,a3,!1),$async$mM)
+case 23:n=b0
+w=n==null?24:25
 break
-default:x=D.bU
-break}return x},
-B(d){var x,w=this,v=null,u=w.bGU(),t=D.w.j(0.82),s=w.a.d,r=w.d
-r===$&&C.c()
-x=w.e
-x===$&&C.c()
-return C.aF(!1,D.a3,!0,v,C.ay(v,C.c6(new C.he(C.a([r,x],y.U)),new B.dkW(w,u),v),D.y,!1,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,s,v,v,v,v,v,v,!1,D.a4),D.f,t,0,v,v,v,v,v,D.ai)}}
-B.aMF.prototype={
-t(){var x=this,w=x.a9$
-if(w!=null)w.a6(0,x.gbC())
-x.a9$=null
-x.a2()},
-aX(){this.b8()
-this.b6()
-this.bD()}}
-B.aN7.prototype={
-aX(){this.b8()
-this.b6()
-this.dJ()},
-t(){var x=this,w=x.ba$
-if(w!=null)w.a6(0,x.gdC())
-x.ba$=null
-x.a2()}}
-B.a0q.prototype={
-S(){return new B.bkW(null,null)},
-vu(){return this.e.$0()}}
-B.bkW.prototype={
-Z(){var x,w=this
-w.a3()
-x=C.bo(null,D.hy,null,1,null,w)
-x.cs(0)
-w.d!==$&&C.aQ()
-w.d=x
-C.bO(D.qG,new B.duO(w),y.H)},
-t(){var x=this.d
-x===$&&C.c()
-x.t()
-this.bzr()},
-B(d){var x=null,w=D.w.j(0.72),v=this.d
-v===$&&C.c()
-return C.aF(!1,D.a3,!0,x,C.c6(v,new B.duN(this),x),D.f,w,0,x,x,x,x,x,D.ai)}}
-B.a0p.prototype={
-S(){return new B.bkV(null,null)},
-vu(){return this.r.$0()}}
-B.bkV.prototype={
-Z(){var x,w=this
-w.a3()
-x=C.bo(null,D.a0N,null,1,null,w)
-x.cs(0)
-w.d!==$&&C.aQ()
-w.d=x
-C.bO(A.ami,new B.duM(w),y.H)},
-t(){var x=this.d
-x===$&&C.c()
-x.t()
-this.bzq()},
-B(d){var x=null,w=C.aE(d,D.bX,y.w).w,v=this.d
-v===$&&C.c()
-return new C.dr(!0,C.aF(!1,D.a3,!0,x,C.c6(v,new B.duL(this,w.a.a*0.88),x),D.f,D.L,0,x,x,x,x,x,D.ai),x)}}
-B.aNy.prototype={
-t(){var x=this,w=x.a9$
-if(w!=null)w.a6(0,x.gbC())
-x.a9$=null
-x.a2()},
-aX(){this.b8()
-this.b6()
-this.bD()}}
-B.aNz.prototype={
-t(){var x=this,w=x.a9$
-if(w!=null)w.a6(0,x.gbC())
-x.a9$=null
-x.a2()},
-aX(){this.b8()
-this.b6()
-this.bD()}}
-var z=a.updateTypes(["aA<~>()","a0W(Z)","~()","a_p(Z)","a01(Z)","a0q(Z)","a0p(Z)"])
-B.h3N.prototype={
-$1(d){return new B.a0W(this.a,null)},
-$S:z+1}
-B.e6u.prototype={
-$0(){var x=this,w=x.a,v=x.b.a,u=v[1]
-w.as=u
-w.at=v[2]
-w.ax=v[0]
-v=w.ay=v[5]
-w.ch=v==null?A.ayA[D.o.F(u,300)]:v
-v=x.c
-w.CW=v.a
-w.cx=v.b
-w.cy=!1
-w.dx=x.d.b},
+case 24:r.a="Could not start video recorder on this device."
+w=26
+return A.b(r.wQ(),$async$mM)
+case 26:u=!1
+w=1
+break
+case 25:r.ch=n
+o=n
+case 22:m=r.bNW(o,r.f)
+w=m==null?27:28
+break
+case 27:r.a="This browser cannot record "+(r.y?"video":"audio")+". Try Chrome or Safari 14.5+."
+w=29
+return A.b(r.wQ(),$async$mM)
+case 29:u=!1
+w=1
+break
+case 28:r.d=m
+try{l=m.mimeType
+if(l!=null&&B.a.i(l).length!==0)r.f=B.a.i(l)}catch(a8){}g=x.B
+r.r=A.fC(m,"dataavailable",new C.ciM(r),!1,g)
+r.w=A.fC(m,"error",new C.ciN(r),!1,g)
+t=31
+if(C.X5())m.start(1000)
+else if(r.y)m.start(500)
+else m.start(500)
+t=5
+w=33
+break
+case 31:t=30
+d=s.pop()
+t=35
+m.start()
+t=30
+w=37
+break
+case 35:t=34
+a0=s.pop()
+k=A.aa(a0)
+r.a="Could not start recorder: "+A.w(k)
+w=38
+return A.b(r.wQ(),$async$mM)
+case 38:u=!1
+w=1
+break
+w=37
+break
+case 34:w=30
+break
+case 37:w=33
+break
+case 30:w=5
+break
+case 33:g=r.as
+if(g!=null)g.a1(0)
+r.as=A.dh(B.ei,new C.ciO(r))
+w=39
+return A.b(A.bO(B.h0,null,x.H),$async$mM)
+case 39:w=m.state!=="recording"?40:41
+break
+case 40:r.a="Recorder did not enter recording state (state="+A.w(m.state)+")."
+w=42
+return A.b(r.wQ(),$async$mM)
+case 42:u=!1
+w=1
+break
+case 41:j=r.b.getAudioTracks().length
+i=r.b.getVideoTracks().length
+$.am.$1("[live_capture] recording started mime="+r.f+" video="+r.y+" appleMux="+r.z+" audioTracks="+A.w(j)+" videoTracks="+A.w(i))
+w=(r.y||r.z)&&J.z(j,0)?43:44
+break
+case 43:r.a="Microphone is off \u2014 allow mic access for ngmy.org and record again."
+w=45
+return A.b(r.wQ(),$async$mM)
+case 45:u=!1
+w=1
+break
+case 44:u=!0
+w=1
+break
+t=2
+w=7
+break
+case 5:t=4
+a1=s.pop()
+h=A.aa(a1)
+r.a=r.av2(h)
+$.am.$1("[live_capture] start: "+A.w(h))
+w=46
+return A.b(r.wQ(),$async$mM)
+case 46:u=!1
+w=1
+break
+w=7
+break
+case 4:w=2
+break
+case 7:case 1:return A.h(u,v)
+case 2:return A.f(s.at(-1),v)}})
+return A.i($async$mM,v)},
+H3(){var w=0,v=A.j(x.y),u,t=this,s,r,q,p,o
+var $async$H3=A.e(function(d,e){if(d===1)return A.f(e,v)
+for(;;)switch(w){case 0:t.a=null
+s=t.d
+if(s==null){t.a="Recording is not active."
+u=!1
+w=1
+break}try{r=s.state
+if(J.z(r,"paused")){u=!0
+w=1
+break}if(!J.z(r,"recording")){t.a="Cannot pause right now (recorder state: "+A.w(r)+")."
+u=!1
+w=1
+break}s.pause()
+p=t.k2
+if(p!=null)p.a1(0)
+t.k2=null
+p=t.as
+if(p!=null)p.a1(0)
+t.as=null
+u=!0
+w=1
+break}catch(n){q=A.aa(n)
+t.a="Pause is not supported on this browser."
+$.am.$1("[live_capture] pause: "+A.w(q))
+u=!1
+w=1
+break}case 1:return A.h(u,v)}})
+return A.i($async$H3,v)},
+Hg(){var w=0,v=A.j(x.y),u,t=this,s,r,q,p,o
+var $async$Hg=A.e(function(d,e){if(d===1)return A.f(e,v)
+for(;;)switch(w){case 0:t.a=null
+s=t.d
+if(s==null){t.a="Recording is not active."
+u=!1
+w=1
+break}try{r=s.state
+if(J.z(r,"recording")){u=!0
+w=1
+break}if(!J.z(r,"paused")){t.a="Cannot resume right now (recorder state: "+A.w(r)+")."
+u=!1
+w=1
+break}s.resume()
+if(t.go!=null&&t.k2==null){t.aaZ()
+t.k2=A.dh(F.Cw,new C.ciK(t))}p=t.as
+if(p!=null)p.a1(0)
+t.as=A.dh(B.ei,new C.ciL(t))
+u=!0
+w=1
+break}catch(n){q=A.aa(n)
+t.a="Could not resume recording."
+$.am.$1("[live_capture] resume: "+A.w(q))
+u=!1
+w=1
+break}case 1:return A.h(u,v)}})
+return A.i($async$Hg,v)},
+c3q(d){var w,v,u,t,s,r,q,p
+try{w=x.Q.a(d).data
+if(w!=null){s=w.size
+s.toString
+s=s>0}else s=!1
+if(s){s=this.e
+s.push(w)
+r=$.am
+q=w.size
+q.toString
+r.$1("[live_capture] chunk +"+q+"b (total "+s.length+")")
+return}}catch(p){}try{v=d
+u=J.hPe(v)
+if(u!=null&&J.hP_(J.hPh(u),0)){s=this.e
+s.push(x.d.a(u))
+r=$.am
+q=u.size
+q.toString
+r.$1("[live_capture] chunk(dyn) +"+q+"b (total "+s.length+")")}}catch(p){t=A.aa(p)
+$.am.$1("[live_capture] dataavailable parse: "+A.w(t))}},
+cHR(d){var w,v,u
+try{if(d.enabled!==!0)return!1
+w=d.readyState
+v=J.z(w,"ended")
+return!v}catch(u){return!0}},
+c29(d,e){var w,v
+if(e){w=d.getAudioTracks()
+w.toString
+v=w}else{w=d.getVideoTracks()
+w.toString
+v=w}return v.length!==0&&B.d.aU(v,this.gbbS())},
+Lb(d,e){return this.cKs(d,e)},
+cKs(d,e){var w=0,v=A.j(x.y),u,t=this,s,r,q,p,o,n
+var $async$Lb=A.e(function(f,g){if(f===1)return A.f(g,v)
+for(;;)switch(w){case 0:n=C.X5()?50:15
+s=x.H,r=t.gbbS(),q=0
+case 3:if(!(q<n)){w=5
+break}if(e){p=d.getAudioTracks()
+p.toString
+o=p}else{p=d.getVideoTracks()
+p.toString
+o=p}if(o.length!==0&&B.d.aU(o,r)){u=!0
+w=1
+break}w=6
+return A.b(A.bO(new A.bf(1000*(C.X5()?120:80)),null,s),$async$Lb)
+case 6:case 4:++q
+w=3
+break
+case 5:u=t.c29(d,e)
+w=1
+break
+case 1:return A.h(u,v)}})
+return A.i($async$Lb,v)},
+aBQ(){var w
+this.Q=null
+try{}catch(w){}this.ax=null},
+bGT(d){var w=this.Xj(this.cx)
+return w},
+a1i(d,e,f){return this.cl6(d,e,!0)},
+cl6(d,a0,a1){var w=0,v=A.j(x.E),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i,h,g,f,e
+var $async$a1i=A.e(function(a2,a3){if(a2===1){s.push(a3)
+w=t}for(;;)switch(w){case 0:f=window.navigator.mediaDevices
+if(f==null)throw A.W(A.bd("Secure media devices API unavailable"))
+n=a0==="environment"?"environment":"user"
+m=r.bav(d,r.bGT(!0),n)
+l=x.N
+k=x.z
+B.d.u(m,A.a([A.J(["audio",!0,"video",r.bdj(n,d)],l,k),A.J(["audio",!0,"video",!0],l,k)],x.t))
+q=null
+l=m.length,k=x.E,j=0
+case 3:if(!(j<m.length)){w=5
+break}p=m[j]
+t=7
+i=p
+h=i!=null?A.DD(i):null
+i=f.getUserMedia(h)
+i.toString
+w=10
+return A.b(A.eg(i,k),$async$a1i)
+case 10:i=a3
+u=i
+w=1
+break
+t=2
+w=9
+break
+case 7:t=6
+e=s.pop()
+o=A.aa(e)
+q=o
+$.am.$1("[live_capture] getUserMedia attempt failed: "+A.w(o))
+w=9
+break
+case 6:w=2
+break
+case 9:case 4:m.length===l||(0,A.I)(m),++j
+w=3
+break
+case 5:l=q
+throw A.W(l==null?A.bd("Could not open camera"):l)
+case 1:return A.h(u,v)
+case 2:return A.f(s.at(-1),v)}})
+return A.i($async$a1i,v)},
+aD3(d){switch(d){case"tiktok":return D.eHK
+case"square":return D.eHJ
+case"youtube":default:return D.eI0}},
+c6j(d){var w,v,u,t,s,r=this.b
+if(r==null)return
+for(r=r.getAudioTracks(),w=r.length,v="[live_capture] "+d,u=v+" audio id=",t=0;t<r.length;r.length===w||(0,A.I)(r),++t){s=r[t]
+$.am.$1(u+A.w(s.id)+" state="+A.w(s.readyState)+" enabled="+A.w(s.enabled)+" muted="+A.w(s.muted))}for(r=this.b.getVideoTracks(),w=r.length,v+=" video id=",t=0;t<r.length;r.length===w||(0,A.I)(r),++t){s=r[t]
+$.am.$1(v+A.w(s.id)+" state="+A.w(s.readyState)+" enabled="+A.w(s.enabled)+" muted="+A.w(s.muted))}},
+YD(d){var w,v,u=d.getTracks()
+u.toString
+u=J.aT(u)
+while(u.C()){w=u.gP(u)
+try{w.enabled=!0}catch(v){}}},
+bNW(d,e){var w,v,u,t,s="audioBitsPerSecond",r="videoBitsPerSecond",q=this.y||this.z,p=x.z,o=A.S(x.N,p),n=e.length!==0
+if(n)o.n(0,"mimeType",e)
+o.n(0,s,128e3)
+if(q)o.n(0,r,25e5)
+w=o
+if(n)try{if(A.c2r(e)){o=A.b_d(d,w)
+return o}}catch(t){v=A.aa(t)
+$.am.$1("[live_capture] MediaRecorder mime "+e+" failed: "+A.w(v))}try{p=A.b_d(d,q?A.J([s,128e3,r,25e5],p,p):A.J([s,128e3],p,p))
+return p}catch(t){u=A.aa(t)
+$.am.$1("[live_capture] MediaRecorder default failed: "+A.w(u))
+return null}},
+av2(d){switch(x.v.b(d)?B.bC5.gxz(d):""){case"NotAllowedError":return"Microphone/camera access was blocked. Allow it for ngmy.org in your browser or phone Settings, then try again."
+case"NotFoundError":return"No microphone or camera was found on this device."
+case"NotReadableError":return"Your camera or microphone is already being used by another app. Close it and try again."
+case"OverconstrainedError":return"This device could not meet the recording settings. Try another size (YouTube/TikTok) or switch cameras."
+case"SecurityError":return"Recording is blocked on this connection. Make sure you are on https://ngmy.org."
+case"NotSupportedError":return"Recording is not supported in this browser. Try Chrome or Safari."
+default:return"Could not start recording: "+A.w(d)}},
+cpp(d){var w,v,u,t,s,r,q="video/mp4;codecs=avc1.42E01E,mp4a.40.2",p="video/webm;codecs=vp8,opus",o="audio/webm;codecs=opus"
+if(C.X5()){v=x.s
+u=d?A.a(["video/mp4",q,p,"video/webm"],v):A.a(["video/mp4",q,"audio/mp4","audio/aac",o,"audio/webm"],v)}else{v=x.s
+u=d?A.a(["video/webm;codecs=vp9,opus",p,"video/webm",q,"video/mp4"],v):A.a([o,"audio/webm","audio/ogg;codecs=opus","audio/ogg","audio/mp4"],v)}for(v=u.length,t=0;t<u.length;u.length===v||(0,A.I)(u),++t){w=u[t]
+try{if(A.c2r(w)){s=w
+return s}}catch(r){}}return""},
+bQ(a2){var w=0,v=A.j(x.l),u,t=2,s=[],r=this,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1
+var $async$bQ=A.e(function(a4,a5){if(a4===1){s.push(a5)
+w=t}for(;;)switch(w){case 0:e=r.d
+if(e==null){r.a="Recording was not started."
+u=null
+w=1
+break}m=r.as
+if(m!=null)m.a1(0)
+r.as=null
+q=new A.c7(new A.bn($.bF,x.b),x.a)
+p=A.dl()
+p.seT(A.fC(e,"stop",new C.ciP(q),!1,x.B))
+t=4
+o=e.state
+w=J.z(o,"recording")||J.z(o,"paused")?7:9
+break
+case 7:try{e.requestData()}catch(a3){}w=10
+return A.b(A.bO(A.dx(0,0,0,C.X5()?250:120,0,0),null,x.H),$async$bQ)
+case 10:try{e.requestData()}catch(a3){}e.stop()
+w=8
+break
+case 9:if((q.a.a&30)===0)J.a4o(q)
+case 8:t=2
+w=6
+break
+case 4:t=3
+d=s.pop()
+n=A.aa(d)
+r.a="Stop failed: "+A.w(n)
+$.am.$1("[live_capture] stop call: "+A.w(n))
+if((q.a.a&30)===0)J.a4o(q)
+w=6
+break
+case 3:w=2
+break
+case 6:t=12
+w=15
+return A.b(q.a.dg(0,B.id),$async$bQ)
+case 15:t=2
+w=14
+break
+case 12:t=11
+a0=s.pop()
+$.am.$1("[live_capture] stop event timeout \u2014 using buffered chunks")
+w=14
+break
+case 11:w=2
+break
+case 14:m=x.H
+k=r.e
+j=0
+case 16:if(!(j<20&&k.length===0)){w=17
+break}try{e.requestData()}catch(a3){}w=18
+return A.b(A.bO(new A.bf(1000*(C.X5()?900:400)),null,m),$async$bQ)
+case 18:++j
+w=16
+break
+case 17:w=19
+return A.b(A.bO(A.dx(0,0,0,C.X5()?5000:900,0,0),null,m),$async$bQ)
+case 19:t=21
+w=24
+return A.b(J.aju(p.bm()),$async$bQ)
+case 24:t=2
+w=23
+break
+case 21:t=20
+a1=s.pop()
+w=23
+break
+case 20:w=2
+break
+case 23:m=r.f
+if(!(B.a.i(m).length!==0)){m=e.mimeType
+if(m==null)m=r.y||r.z?"video/mp4":"audio/webm"}i=B.a.i(m)
+h=C.bFH(i)
+w=25
+return A.b(r.OA(),$async$bQ)
+case 25:r.d=null
+r.aBQ()
+r.akz()
+w=r.y?26:28
+break
+case 26:w=29
+return A.b(r.FA(),$async$bQ)
+case 29:w=30
+return A.b(r.yW(),$async$bQ)
+case 30:r.c=null
+w=27
+break
+case 28:r.bao()
+r.b=null
+case 27:if(k.length===0){r.a="No audio was captured. Stay on ngmy.org while recording, then tap Stop & Save. If this keeps happening, refresh once and allow the mic again."
+$.am.$1("[live_capture] empty chunks after stop")
+u=null
+w=1
+break}m=A.bs(k,!0,x.d)
+g=A.hR(m,h.length!==0?h:i)
+m=g.size
+m.toString
+if(m<=0){r.a="No audio/video data was captured."
+u=null
+w=1
+break}$.am.$1("[live_capture] blob ready size="+m+" mime="+i+" chunks="+k.length)
+f=(self.URL||self.webkitURL).createObjectURL(g)
+if(f.length===0){r.a="Captured, but could not read the recording data."
+u=null
+w=1
+break}r.f=h
+r.x=new C.b33(f,h,g)
+B.d.a8(k)
+u=r.x
+w=1
+break
+case 1:return A.h(u,v)
+case 2:return A.f(s.at(-1),v)}})
+return A.i($async$bQ,v)},
+bao(){var w,v
+try{w=this.b
+if(w!=null){w=w.getVideoTracks()
+w.toString
+B.d.bO(w,new C.ciI())}}catch(v){}},
+wQ(){var w=0,v=A.j(x.H),u=this,t,s
+var $async$wQ=A.e(function(d,e){if(d===1)return A.f(e,v)
+for(;;)switch(w){case 0:s=u.as
+if(s!=null)s.a1(0)
+u.as=null
+u.aBQ()
+try{s=u.d
+if(s!=null&&s.state!=="inactive")s.stop()}catch(r){}w=2
+return A.b(u.OA(),$async$wQ)
+case 2:u.d=null
+B.d.a8(u.e)
+u.bao()
+u.b=null
+return A.h(null,v)}})
+return A.i($async$wQ,v)},
+OA(){var w=0,v=A.j(x.H),u=1,t=[],s=this,r,q,p,o
+var $async$OA=A.e(function(d,e){if(d===1){t.push(e)
+w=u}for(;;)switch(w){case 0:u=3
+r=s.r
+r=r==null?null:r.a1(0)
+w=6
+return A.b(x.x.b(r)?r:A.dL(r,x.H),$async$OA)
+case 6:u=1
+w=5
+break
+case 3:u=2
+p=t.pop()
+w=5
+break
+case 2:w=1
+break
+case 5:u=8
+r=s.w
+r=r==null?null:r.a1(0)
+w=11
+return A.b(x.x.b(r)?r:A.dL(r,x.H),$async$OA)
+case 11:u=1
+w=10
+break
+case 8:u=7
+o=t.pop()
+w=10
+break
+case 7:w=1
+break
+case 10:s.w=s.r=null
+return A.h(null,v)
+case 1:return A.f(t.at(-1),v)}})
+return A.i($async$OA,v)},
+yW(){var w=0,v=A.j(x.H),u=this,t,s
+var $async$yW=A.e(function(d,e){if(d===1)return A.f(e,v)
+for(;;)switch(w){case 0:u.aBQ()
+w=2
+return A.b(u.aDZ(!1),$async$yW)
+case 2:try{t=u.dx
+if(t!=null)t.stop()}catch(r){}u.dx=null
+try{t=u.b
+if(t!=null){t=t.getTracks()
+t.toString
+J.iJ(t,new C.ciE())}}catch(r){}u.b=null
+try{t=u.c
+if(t!=null){t=t.getTracks()
+t.toString
+J.iJ(t,new C.ciF())}}catch(r){}u.c=null
+return A.h(null,v)}})
+return A.i($async$yW,v)},
+t(){var w=0,v=A.j(x.H),u=this
+var $async$t=A.e(function(d,e){if(d===1)return A.f(e,v)
+for(;;)switch(w){case 0:u.CW=u.at=!1
+w=2
+return A.b(u.wQ(),$async$t)
+case 2:u.akz()
+w=3
+return A.b(u.FA(),$async$t)
+case 3:w=4
+return A.b(u.yW(),$async$t)
+case 4:return A.h(null,v)}})
+return A.i($async$t,v)}}
+C.aKn.prototype={
+S(){return new C.bvF()}}
+C.bvF.prototype={
+Z(){var w,v,u=this
+u.a3()
+w=A.xs(u.a.c)
+v=Date.now()
+u.d!==$&&A.aQ()
+u.d="ngmy-live-cam-"+w+"-"+1000*v
+u.cum()},
+cum(){var w,v=this
+if(v.f)return
+v.f=!0
+$.xv()
+w=v.d
+w===$&&A.c()
+$.pZ().pm(w,new C.fdq(v),!0)},
+bz(d){var w,v,u,t,s=this
+s.bK(d)
+w=d.c
+v=s.a.c
+if((w==null?v!=null:w!==v)&&s.e!=null&&x.E.b(v)){s.e.srcObject=v
+w=s.e.play()
+w.toString
+A.eg(w,x.z).eF(new C.fdr())}w=s.a.e
+if(d.e!==w&&s.e!=null){u=w?" scaleX(-1)":""
+w=s.e.style
+w.toString
+B.ca.eL(w,B.ca.ef(w,"transform"),"translate(-50%, -50%)"+u,"")}w=s.a.r
+if(d.r!==w&&s.e!=null){v=s.e.style
+v.toString
+B.ca.eL(v,B.ca.ef(v,"object-fit"),w,"")}w=s.a.w
+if(d.w!==w&&s.e!=null){t=B.o.D(w*100,100,135)
+w=s.e.style
+v=A.w(t)+"%"
+w.width=v
+w=s.e.style
+w.height=v}},
+B(d){var w,v,u=null,t=this.a
+if(!x.E.b(t.c)){t=t.d
+return A.o(B.z,D.fOg,B.f,u,u,new A.n(B.hO,u,u,A.l(18),u,u,B.n),u,t,u,u,u,u,u,u)}w=t.f
+t=t.d
+v=this.d
+v===$&&A.c()
+return A.bv(w,new A.a5(1/0,t,A.BX(u,B.pS,v),u),B.aq)}}
+C.byw.prototype={
+B(d){var w,v=this,u=null,t=C.bFH(v.d),s=v.c
+if(B.a.i(s).length===0)return A.o(B.z,D.hbS,B.f,u,u,new A.n(B.a_,u,u,A.l(16),u,u,B.n),u,v.e,u,u,u,u,u,u)
+w=C.i_E(s,t)
+if(w.length===0)return A.o(B.z,D.fOw,B.f,u,u,new A.n(B.a_,u,u,A.l(16),u,u,B.n),u,v.e,u,u,u,u,u,u)
+return A.bv(A.l(16),A.eb(new A.a5(1/0,v.e,new A.a9S(w,t,u),u),B.w,!0),B.aq)}}
+var z=a.updateTypes(["aB<~>()","~()","Q(pu)","Wf(Z)","v(pu)","Q(Cf)","Cf()","a2d(Z)","a0w(Z)","v(q)","pu(ac<@,@>)","H(pu,pu)","ac<q,@>(pu)","Q(wo)"])
+C.h3o.prototype={
+$1(d){return new C.Wf(this.a,null)},
+$S:z+3}
+C.dZx.prototype={
+$1(d){var w=0,v=A.j(x.H),u=this,t
+var $async$$1=A.e(function(e,f){if(e===1)return A.f(f,v)
+for(;;)switch(w){case 0:t=$.ov()
+w=!t.Q?2:3
+break
+case 2:w=4
+return A.b(t.a7B(),$async$$1)
+case 4:t=u.a
+if(t.c!=null)t.m(new C.dZw())
+case 3:return A.h(null,v)}})
+return A.i($async$$1,v)},
+$S:113}
+C.dZw.prototype={
+$0(){},
 $S:0}
-B.e6t.prototype={
-$0(){var x=this.a,w=this.b
-x.d=w.a
-x.e=w.b},
+C.dZ7.prototype={
+$1(d){return d.b===this.a},
+$S:z+5}
+C.dZ8.prototype={
+$0(){return D.a8o},
+$S:z+6}
+C.dZ9.prototype={
+$0(){return this.a.y=this.b},
 $S:0}
-B.e6m.prototype={
-$0(){var x=this.a
-x.w=this.b
-x.x=this.c
-x.Q=!0},
+C.dYY.prototype={
+$0(){return this.a.y=this.b},
 $S:0}
-B.e6n.prototype={
-$0(){var x=this.a
-if(x.c!=null)x.m(new B.e6l(x))},
-$S:11}
-B.e6l.prototype={
-$0(){return this.a.Q=!1},
+C.dZa.prototype={
+$0(){},
 $S:0}
-B.e6J.prototype={
-$0(){var x,w=this.a,v=w.z=w.id.aw(50)
-w.Q=!0
-x=this.b
-if(x===1)w.y=A.cEE[D.o.F(v,50)]
-else if(x===2)w.y=A.dp1[D.o.F(v,51)]
-else if(x===3)w.y=A.dfY[D.o.F(v,50)]
-else w.y=null},
+C.dZd.prototype={
+$0(){var w=this.a,v=J.dH(this.b,new C.dZc())
+v=A.B(v,v.$ti.k("M.E"))
+w.e=v
+w.f=!1},
 $S:0}
-B.e6K.prototype={
-$0(){var x=this.a
-if(x.c!=null)x.m(new B.e6I(x))},
-$S:11}
-B.e6I.prototype={
-$0(){return this.a.Q=!1},
+C.dZc.prototype={
+$1(d){return d.c==="video"||B.a.Y(d.f,"video/")},
+$S:z+2}
+C.dZi.prototype={
+$0(){return this.a.r=!0},
 $S:0}
-B.e6T.prototype={
-$4(d,a0,a1,a2){var x,w,v,u,t,s,r,q=null,p=C.aE(d,q,y.w).w,o=C.FH(D.Sk,!1,"\ud83c\udfae",!1,q,new B.e6S(d),q,a2,a0,"Entertainment Hub \xb7 live","Play Zone",q),n=this.a,m=C.k1(n.bKb(),D.Sk,q,a2,D.cq,0.1,a0,a1),l=A.aBS[n.d],k=l.c,j=C.a0(15,k.l()>>>16&255,k.l()>>>8&255,k.l()&255),i=C.l(12),h=C.K(C.a0(140,k.l()>>>16&255,k.l()>>>8&255,k.l()&255),D.r,1.2),g=C.nC(l.b,q,20),f=n.d===0?"Your Love Journey":l.a+" Zone",e=y.p
-i=C.a([m,D.aB,C.k1(C.o(q,C.A(C.a([g,D.ae,C.d(f,q,q,q,q,q,q,C.m(q,q,k,q,q,q,q,q,q,q,q,14,q,q,D.H,q,q,!0,q,q,q,q,q,q,q,q),q,q,q)],e),D.l,q,D.b9,D.i,0,q,q),D.f,q,q,new C.n(j,q,h,i,q,q,D.n),q,q,q,q,D.k6,q,q,1/0),A.dyB,q,a2,D.bl,0.24,a0,a1),D.af],e)
-m=n.d
-if(m===0)D.d.u(i,C.a([n.c6I(),D.aO,n.c6G()],e))
-else if(m===1)i.push(n.bMt())
-else if(m===2){x=A.dtF[D.o.F(n.CW,1000)]
-m=x.a
-k=m[0]
-m=D.a.b_(m,1)
-j=n.go
-j===$&&C.c()
-j=C.ao(q,n.aeB("\ud83e\udde0",40,j),q,q,q,12,8,q)
-h=C.l(18)
-g=C.K(C.a0(89,D.b8.l()>>>16&255,D.b8.l()>>>8&255,D.b8.l()&255),D.r,1)
-f=C.a([new C.ac(0,D.G,C.a0(31,D.b8.l()>>>16&255,D.b8.l()>>>8&255,D.b8.l()&255),D.J,18)],y.V)
-w=C.a0(51,D.b8.l()>>>16&255,D.b8.l()>>>8&255,D.b8.l()&255)
-v=C.l(20)
-u=D.h.T(127.5)
-t=C.K(C.a0(u,D.b8.l()>>>16&255,D.b8.l()>>>8&255,D.b8.l()&255),D.r,1)
-v=C.A(C.a([C.o(q,C.d(k.toUpperCase()+m,q,q,q,q,q,q,C.m(q,q,D.b8,q,q,q,q,q,q,q,q,11,q,q,D.H,q,q,!0,q,q,q,q,q,q,q,q),q,q,q),D.f,q,q,new C.n(w,q,t,v,q,q,D.n),q,q,q,q,D.lo,q,q,q)],e),D.l,q,D.b9,D.i,0,q,q)
-t=C.d(""+n.cx+" of 15 riddles left today",q,q,q,q,q,q,C.m(q,q,D.b8,q,q,q,q,q,q,q,q,12,q,q,D.O,q,q,!0,q,q,q,q,q,q,q,q),q,q,q)
-w=C.l(14)
-m=C.K(C.a0(89,D.b8.l()>>>16&255,D.b8.l()>>>8&255,D.b8.l()&255),D.r,1)
-k=C.a([A.fYl,D.P,C.d(x.b,q,q,q,q,q,q,A.aWM,q,q,q)],e)
-if(n.cy){s=C.a([C.a0(64,D.b8.l()>>>16&255,D.b8.l()>>>8&255,D.b8.l()&255),C.a0(38,D.j7.l()>>>16&255,D.j7.l()>>>8&255,D.j7.l()&255)],y.O)
-r=C.l(12)
-u=C.K(C.a0(u,D.b8.l()>>>16&255,D.b8.l()>>>8&255,D.b8.l()&255),D.r,1)
-D.d.u(k,C.a([D.aB,C.o(q,C.x(C.a([A.fUb,D.am,C.d(x.c,q,q,q,q,q,q,D.nf,q,q,q)],e),D.E,q,D.e,D.i,0,D.p),D.f,q,q,new C.n(q,q,u,r,q,new C.a7(D.a5,D.a9,D.x,s,q,q),D.n),q,q,q,q,D.bl,q,q,1/0)],e))}m=C.a([v,D.af,A.h6O,D.ax,t,D.aB,C.o(q,C.x(k,D.E,q,D.e,D.i,0,D.p),D.f,q,q,new C.n(D.qh,q,m,w,q,q,D.n),q,q,q,q,D.bT,q,q,1/0),D.aB],e)
-if(!n.cy)m.push(n.a9M(D.a5B,D.b8,"Reveal Answer",n.gcwb()))
-else m.push(n.a9M(D.a5B,D.b8,"Next Riddle \u2192",n.gc9n()))
-i.push(new C.an(D.a0,q,D.ad,D.f,C.a([j,C.o(q,C.x(m,D.l,q,D.e,D.i,0,D.p),D.f,q,q,new C.n(D.jn,q,g,h,f,q,D.n),q,q,q,q,D.wI,q,q,1/0)],e),q))}else i.push(n.bVo())
-return C.b4R(22,C.x(C.a([o,new C.df(1,D.cl,C.ca(C.x(i,D.l,q,D.e,D.i,0,D.p),D.t,q,D.y,q,q,D.and,q,q,D.ah),q)],e),D.l,q,D.e,D.N,0,D.p),D.Sk,!1,p.a.b*0.88,a2,a0,a1,this.b)},
+C.dZj.prototype={
+$0(){return this.a.r=!1},
+$S:0}
+C.dZk.prototype={
+$0(){return this.a.r=!0},
+$S:0}
+C.dZl.prototype={
+$0(){return this.a.r=!1},
+$S:0}
+C.dZb.prototype={
+$1(d){var w=this.a
+return new C.a2d(this.b,w.a.c,w.gccu(),null)},
+$S:z+7}
+C.dZv.prototype={
+$4(d,e,f,g){var w,v=null,u=this.a,t=this.b,s=u.cct(t),r=x.p,q=A.a([u.cEd(t,e)],r),p=$.ov(),o=p.e
+if(o!=null)B.d.u(q,A.a([B.af,A.d(o,v,v,v,v,v,v,D.fHt,v,v,v)],r))
+else{o=p.f
+if(o!=null)B.d.u(q,A.a([B.af,A.d(o,v,v,v,v,v,v,D.fMl,v,v,v)],r))}q.push(B.e4)
+q.push(D.h4g)
+q.push(B.ax)
+q.push(D.fNN)
+q.push(B.af)
+if(u.f)q.push(D.eyP)
+else{o=u.e
+if(o.length===0){o=B.c.j(0.04)
+w=A.l(16)
+q.push(A.o(v,D.h98,B.f,v,v,new A.n(o,v,A.K(B.bQ.j(0.25),B.r,1),w,v,v,B.n),v,v,v,v,B.ac,v,v,1/0))}else B.d.u(q,new A.N(o,u.gc5o(),A.T(o).k("N<1,v>")))}s=A.a([A.bm(!0,A.x(A.a([s,A.E(A.cv(q,v,v,L.anM,v,v,B.ah,!1),1)],r),B.al,v,B.e,B.i,0,B.p),!0,!1,B.ag,!0,!0)],r)
+if(u.x)if(!p.Q){r=p.a
+r=r.at&&r.b!=null}else r=!0
+else r=!1
+if(r)s.push(u.bVA(t))
+return A.c5(v,B.op,new A.an(B.a0,v,B.ad,B.t,s,v),v,!1,!1,v,v)},
 $C:"$4",
 $R:4,
-$S:331}
-B.e6S.prototype={
-$0(){return C.a6(this.a,!1).eb()},
+$S:387}
+C.dZ2.prototype={
+$0(){var w=this.a.c
+w.toString
+A.a6(w,!1).N(null)
+return null},
 $S:0}
-B.e6q.prototype={
-$1(d){var x,w,v,u,t=null,s=A.aBS[d],r=this.a,q=r.d===d,p=d===0?0:4,o=d===3?0:4,n=q?D.jn:D.L,m=C.l(14),l=C.K(q?C.a0(56,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255):C.a0(15,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255),D.r,1)
-if(q){x=s.c
-x=new C.a7(D.a5,D.a9,D.x,C.a([x,x.j(0.65)],y.O),t,t)}else x=t
-w=q?t:s.c.j(0.15)
-v=C.l(10)
-u=C.K(q?D.bV:D.bw,D.r,1)
-x=C.o(t,C.as(C.nC(s.b,t,20),t,t,t),D.f,t,t,new C.n(w,t,u,v,t,x,D.n),t,36,t,t,t,t,t,36)
-return C.E(new C.D(new C.P(p,0,o,0),C.ay(t,C.cU(t,C.x(C.a([x,D.ax,C.d(s.a,t,t,t,t,t,t,C.m(t,t,q?D.c:D.aE,t,t,t,t,t,t,t,t,9,t,t,D.O,t,t,!0,t,t,t,t,t,t,t,t),D.K,t,t)],y.p),D.l,t,D.e,D.i,0,D.p),t,t,D.b0,new C.n(n,t,l,m,t,t,D.n),D.a3,t,t,t,t,D.hz,t,t,t),D.y,!1,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,new B.e6p(r,d),t,t,t,t,t,t,!1,D.a4),t),1)},
-$S:235}
-B.e6p.prototype={
-$0(){var x=this.a,w=this.b
-x.m(new B.e6o(x,w))
-B.arF(w)
-x.yw()},
+C.dZh.prototype={
+$1(d){return D.hIk},
+$S:z+8}
+C.dZp.prototype={
+$2(d,e){var w,v,u,t,s,r,q,p,o,n,m=null,l=this.a,k=l.d
+k===$&&A.c()
+k=k.x
+k===$&&A.c()
+w=B.dJ.az(0,k)
+k=A.l(24)
+v=this.b
+if(v){u=A.ap(B.bi,B.c,w*0.4)
+u.toString}else u=B.bQ.j(0.35)
+u=A.K(u,B.r,v?2:1)
+t=A.ap(B.hl,B.b2,w*0.25)
+t.toString
+t=A.a([B.ff,B.op,t],x.W)
+s=x.p
+r=A.a([],s)
+if(!v){q=$.ov()
+r.push(A.E(A.c_(B.bI,A.a([l.aD9("YouTube 16:9",q.x==="youtube",new C.dZm(l)),l.aD9("TikTok 9:16",q.x==="tiktok",new C.dZn(l)),l.aD9("Square",q.x==="square",new C.dZo(l))],s),B.w0,m,8,8),1))}else r.push(D.bLP)
+q=$.ov()
+p=C.asB(q.at)
+r.push(A.d(p,m,m,m,m,m,m,A.m(m,m,v?B.bi:B.c,m,m,m,m,m,m,m,m,26,m,m,B.u,m,m,!0,m,1.1,m,m,m,m,m,m),m,m,m))
+s=A.a([A.A(r,B.l,m,B.e,B.i,0,m,m),B.aO],s)
+if(!q.Q){r=q.a
+r=r.at&&r.b!=null}else r=!0
+if(r)s.push(l.bI7())
+else{o=l.b5A(d)
+r=B.w.j(0.18)
+p=A.l(18)
+n=A.K(B.bw,B.r,1)
+s.push(A.o(B.z,A.X(B.qW,B.bQ.j(0.85),m,m,m,52),B.f,m,m,new A.n(r,m,n,p,m,m,B.n),m,o.b,m,m,m,m,m,o.a))}s.push(B.aO)
+if(v){r=q.as
+q=r?"\u23f8 PAUSED":"\u25cf LIVE"
+s.push(A.d(q,m,m,m,m,m,m,A.m(m,m,r?B.Ce:B.bi,m,m,m,m,m,m,m,m,m,m,m,B.u,m,m,!0,m,1.4,m,m,m,m,m,m),m,m,m))}else s.push(A.d(l.gbGJ(),m,m,m,m,m,m,D.fLm,B.K,m,m))
+s.push(B.aO)
+if(l.r)l=m
+else l=v?l.gcDI():l.gcDi()
+r=v?B.bD:B.b2
+r=A.bp(r,m,m,m,B.c,m,m,m,new A.ba(A.l(16),B.a1),m,m,m)
+q=A.X(v?B.zL:B.qW,m,m,m,m,m)
+s.push(new A.a5(1/0,52,A.de(q,m,A.d(v?"Stop & Save":"Start Video",m,m,m,m,m,m,B.lZ,m,m,m),l,r),m))
+return A.o(m,A.x(s,B.l,m,B.e,B.i,0,B.p),B.f,m,m,new A.n(m,m,u,k,m,new A.a7(new A.da(-1+w,-0.3),new A.da(1-w,0.7),B.x,t,m,m),B.n),m,m,m,m,B.fu,m,m,m)},
+$S:90}
+C.dZm.prototype={
+$0(){return this.a.aCG("youtube")},
 $S:0}
-B.e6o.prototype={
-$0(){var x=this.a
-x.d=this.b
-x.y=x.x=x.w=null
-x.fr=x.cy=!1},
+C.dZn.prototype={
+$0(){return this.a.aCG("tiktok")},
 $S:0}
-B.e6A.prototype={
-$1(d){var x=null,w=A.cdh[d],v=this.a,u=v.e===d,t=d===0?0:3,s=d===3?0:3,r=u?1.04:1,q=u?A.c9X:x,p=u?x:C.a0(153,D.jn.l()>>>16&255,D.jn.l()>>>8&255,D.jn.l()&255),o=C.l(12),n=C.K(u?C.a0(140,D.c4.l()>>>16&255,D.c4.l()>>>8&255,D.c4.l()&255):C.a0(15,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255),D.r,1),m=u?C.a([new C.ac(0,D.G,C.a0(102,D.aA.l()>>>16&255,D.aA.l()>>>8&255,D.aA.l()&255),D.cM,10)],y.V):x,l=C.nC(w.b,x,20)
-return C.E(new C.D(new C.P(t,0,s,0),C.ay(x,C.uL(C.cU(x,C.x(C.a([l,C.d(w.a,x,x,x,x,x,x,C.m(x,x,u?D.c:D.aE,x,x,x,x,x,x,x,x,10,x,x,D.H,x,x,!0,x,x,x,x,x,x,x,x),x,x,x)],y.p),D.l,x,D.e,D.i,0,D.p),x,x,D.b0,new C.n(p,x,n,o,m,q,D.n),D.a3,x,x,x,x,D.CB,x,x,x),D.b0,D.eH,r),D.y,!1,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,new B.e6z(v,d),x,x,x,x,x,x,!1,D.a4),x),1)},
-$S:235}
-B.e6z.prototype={
-$0(){var x=this.a,w=this.b
-x.m(new B.e6y(x,w))
-B.b28(w)},
+C.dZo.prototype={
+$0(){return this.a.aCG("square")},
 $S:0}
-B.e6y.prototype={
-$0(){var x=this.a
-x.e=this.b
-x.x=x.w=null},
+C.dZ6.prototype={
+$1(d){var w=this.a,v=this.b
+w.m(new C.dZ4(w,v))
+w.a0_(v)},
+$S:454}
+C.dZ4.prototype={
+$0(){return B.d.bq(this.a.e,new C.dZ3(this.b))},
 $S:0}
-B.e6v.prototype={
-$0(){return this.a.aB_(1)},
+C.dZ3.prototype={
+$1(d){return d.a===this.a.a},
+$S:z+2}
+C.dZ5.prototype={
+$0(){return this.a.JH(this.b)},
 $S:0}
-B.e6w.prototype={
-$0(){return this.a.aB_(2)},
+C.dYX.prototype={
+$2(d,e){var w,v=this.a
+switch(v.y.a){case 3:return new A.d2(e,!1,d,null)
+case 2:w=x.L
+return A.jI(d,new A.bh(e,new A.bt(new A.r(0,v.z*0.35),B.J,w),w.k("bh<bQ.T>")),null,!0)
+case 1:w=x.L
+return A.jI(d,new A.bh(e,new A.bt(new A.r(v.z*0.45,0),B.J,w),w.k("bh<bQ.T>")),null,!0)
+case 0:return d}},
+$S:468}
+C.dZ1.prototype={
+$0(){var w=this.a
+return w.m(new C.dZ0(w))},
 $S:0}
-B.e6x.prototype={
-$0(){return this.a.aB_(3)},
+C.dZ0.prototype={
+$0(){return this.a.x=!1},
 $S:0}
-B.e6C.prototype={
-$2(d,e){var x,w,v=this.a.fx
-v===$&&C.c()
-v=v.x
-v===$&&C.c()
-x=C.ds()
-w=x.a
-w.$flags&2&&C.aj(w)
-w[11]=0.002
-x.fE(Math.sin(v*3.141592653589793*2)*0.35)
-x.k5(0.4)
-return C.fA(D.z,C.nC("\ud83d\udc98",null,this.b*0.85),null,x,!0)},
-$S:44}
-B.e6E.prototype={
-$1(d){var x=this.a
-if(x.w!=null)x.m(new B.e6D(x))},
+C.dZq.prototype={
+$0(){var w=this.a
+return w.x=!w.x},
+$S:0}
+C.dZt.prototype={
+$0(){return this.a.w=!0},
+$S:0}
+C.dZu.prototype={
+$0(){return this.a.w=!1},
+$S:0}
+C.dZr.prototype={
+$0(){return this.a.w=!0},
+$S:0}
+C.dZs.prototype={
+$0(){return this.a.w=!1},
+$S:0}
+C.dZf.prototype={
+$0(){return $.ov().x=this.b},
+$S:0}
+C.dZg.prototype={
+$1(d){var w=this.a
+if(w.c!=null)w.m(new C.dZe())},
+$S:29}
+C.dZe.prototype={
+$0(){},
+$S:0}
+C.dYZ.prototype={
+$0(){return this.a.w=!0},
+$S:0}
+C.dZ_.prototype={
+$0(){return this.a.w=!1},
+$S:0}
+C.ffC.prototype={
+$0(){return this.a.f=!1},
+$S:0}
+C.ffD.prototype={
+$0(){return this.a.f=!1},
+$S:0}
+C.ffH.prototype={
+$1(d){var w=null,v=this.a,u=A.aN(w,B.Z,!0,w,!0,B.t,w,A.aO(),v,w,w,w,w,w,2,A.bA(w,w,w,w,w,w,w,w,!0,new A.vH(B.BD,new A.ax(B.bQ.j(0.5),1,B.r,-1)),w,w,w,w,w,w,w,w,w,w,w,D.hf2,w,w,w,w,w,w,w,w,B.kq,"Name",w,w,w,w,w,w,w,w,w,!0,!0,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w),B.y,!0,w,!0,w,!1,w,B.ak,w,w,w,w,w,w,w,w,w,1,w,w,!1,"\u2022",w,w,w,new C.ffE(d),w,!1,w,w,!1,w,!0,w,B.ac,w,w,w,w,w,w,w,w,w,w,w,B.jC,!0,B.a7,w,B.ao,w,w,w,w)
+return A.em(A.a([A.bP(!1,G.Ln,w,w,!0,w,w,w,new C.ffF(d),w,w),A.bP(!1,D.fUS,w,w,!0,w,w,w,new C.ffG(d,v),w,w)],x.p),w,w,B.ff,u,w,w,w,w,D.h7V,w)},
+$S:18}
+C.ffE.prototype={
+$1(d){var w=B.a.i(d)
+A.a6(this.a,!1).N(w)
+return null},
 $S:2}
-B.e6D.prototype={
-$0(){var x=this.a
-x.x=x.w=null},
+C.ffF.prototype={
+$0(){A.a6(this.a,!1).N(null)
+return null},
 $S:0}
-B.e6M.prototype={
-$0(){var x,w=this.a
-w.ax=!1
-w.ch=w.ay=this.b.c
-x=this.c.a
-w.as=x[1]
-w.at=x[2]
-w.Q=!0},
+C.ffG.prototype={
+$0(){var w=B.a.i(this.b.a.a)
+A.a6(this.a,!1).N(w)
+return null},
 $S:0}
-B.e6N.prototype={
-$0(){var x=this.a
-if(x.c!=null)x.m(new B.e6L(x))},
+C.ffI.prototype={
+$1(d){return d.a===this.a.a.c.a},
+$S:z+2}
+C.ffJ.prototype={
+$0(){},
+$S:0}
+C.ffK.prototype={
+$0(){return this.a.e=!0},
+$S:0}
+C.ffL.prototype={
+$0(){return this.a.e=!1},
+$S:0}
+C.dAh.prototype={
+$0(){A.a6(this.a,!1).N(null)
+return null},
+$S:0}
+C.dAg.prototype={
+$0(){var w=this.a
+return w.m(new C.dAf(w,this.b))},
+$S:0}
+C.dAf.prototype={
+$0(){return this.a.d=this.b},
+$S:0}
+C.ciU.prototype={
+$1(d){var w,v,u,t,s,r=A.a1(d,x.N,x.z),q=r.h(0,"id")
+q=J.k(q==null?"":q)
+w=r.h(0,"title")
+w=J.k(w==null?"Capture":w)
+v=r.h(0,"kind")
+v=J.k(v==null?"audio":v)
+u=r.h(0,"createdAt")
+u=A.bj(J.k(u==null?"":u))
+u=u==null?null:u.bU()
+if(u==null)u=new A.V(Date.now(),0,!1)
+t=r.h(0,"dataUrl")
+t=J.k(t==null?"":t)
+s=r.h(0,"mimeType")
+s=J.k(s==null?"audio/webm":s)
+r=A.aI(r.h(0,"durationSec"))
+r=r==null?null:B.h.M(r)
+return new C.pu(q,w,v,u,t,s,r==null?0:r)},
+$S:z+10}
+C.ciV.prototype={
+$2(d,e){return e.d.aQ(0,d.d)},
+$S:z+11}
+C.ciW.prototype={
+$1(d){return d.aj()},
+$S:z+12}
+C.ciT.prototype={
+$1(d){return d.a===this.a},
+$S:z+2}
+C.ciS.prototype={
+$1(d){var w=this.a
+if(!w.Q||w.c==null||w.as)return
+w.at=w.avr()
+w.b3()},
+$S:12}
+C.ciA.prototype={
+$1(d){var w=x.C.a(new A.qu([],[]).o5(d.target.result,!1)),v=w.objectStoreNames
+if(!B.wB.q(v,"blobs"))B.wy.Gr(w,"blobs")},
+$S:173}
+C.cix.prototype={
+$1(d){var w,v=B.Hy.ga7I(this.a)
+if(x.J.b(v))this.b.dd(0,J.er(v,0,null))
+else{w=this.b
+if(x.D.b(v))w.dd(0,new Uint8Array(A.cc(v)))
+else w.dd(0,null)}},
+$S:137}
+C.ciy.prototype={
+$1(d){var w=this.a
+if((w.a.a&30)===0)w.dd(0,null)},
+$S:137}
+C.ciz.prototype={
+$0(){var w=this.a
+if((w.a.a&30)===0)w.dd(0,null)
+return null},
 $S:11}
-B.e6L.prototype={
-$0(){return this.a.Q=!1},
+C.ciH.prototype={
+$1(d){var w,v,u,t,s,r,q,p,o,n,m,l=this
+try{q=l.b
+l.a.getFloatTimeDomainData(q)
+w=0
+for(p=q.length,o=0;o<p;++o){v=q[o]
+w+=v*v}u=Math.sqrt(w/p)
+t=u>0.014?1.05:0.02
+s=l.c.gain
+n=A.aI(l.d.currentTime)
+r=n==null?0:n
+s.setTargetAtTime(t,r,0.02)}catch(m){}},
+$S:12}
+C.ciJ.prototype={
+$1(d){return d.id==this.a.dx.id},
+$S:2312}
+C.ciG.prototype={
+$1(d){return this.a.aaZ()},
+$S:12}
+C.ciD.prototype={
+$1(d){var w
+try{d.stop()}catch(w){}},
+$S:370}
+C.ciM.prototype={
+$1(d){this.a.c3q(d)},
+$S:31}
+C.ciN.prototype={
+$1(d){this.a.a="Recorder error while capturing."
+$.am.$1("[live_capture] recorder error: "+A.w(d))},
+$S:31}
+C.ciO.prototype={
+$1(d){var w,v
+try{w=this.a.d
+if((w==null?null:w.state)==="recording")w.requestData()}catch(v){}},
+$S:12}
+C.ciK.prototype={
+$1(d){return this.a.aaZ()},
+$S:12}
+C.ciL.prototype={
+$1(d){var w,v
+try{w=this.a.d
+if((w==null?null:w.state)==="recording")w.requestData()}catch(v){}},
+$S:12}
+C.ciP.prototype={
+$1(d){var w=this.a
+if((w.a.a&30)===0)w.h1(0)},
+$S:31}
+C.ciI.prototype={
+$1(d){var w
+try{d.stop()}catch(w){}},
+$S:370}
+C.ciE.prototype={
+$1(d){var w
+try{d.stop()}catch(w){}},
+$S:370}
+C.ciF.prototype={
+$1(d){var w
+try{d.stop()}catch(w){}},
+$S:370}
+C.ciR.prototype={
+$0(){var w
+try{B.Bw.fs(this.a)}catch(w){}try{(self.URL||self.webkitURL).revokeObjectURL(this.b)}catch(w){}},
 $S:0}
-B.e6R.prototype={
-$0(){return this.a.cy=!0},
-$S:0}
-B.e6G.prototype={
-$0(){var x=this.a
-x.CW=this.b
-x.cx=D.o.D(x.cx-1,0,15)
-x.cy=!1
-x.Q=!0},
-$S:0}
-B.e6H.prototype={
-$0(){var x=this.a
-if(x.c!=null)x.m(new B.e6F(x))},
-$S:11}
-B.e6F.prototype={
-$0(){return this.a.Q=!1},
-$S:0}
-B.e6P.prototype={
-$0(){var x=this.a
-x.dy=this.b
-x.fr=!0
-x.dx=this.c.b
-x.Q=!0},
-$S:0}
-B.e6Q.prototype={
-$0(){var x=this.a
-if(x.c!=null)x.m(new B.e6O(x))},
-$S:11}
-B.e6O.prototype={
-$0(){return this.a.Q=!1},
-$S:0}
-B.e6r.prototype={
-$2(d,e){var x,w,v=this.a.fy
-v===$&&C.c()
-v=v.x
-v===$&&C.c()
-x=C.ds()
-w=x.a
-w.$flags&2&&C.aj(w)
-w[11]=0.003
-x.fE(Math.sin(v*3.141592653589793*2)*0.4)
-return C.fA(D.z,A.e35,null,x,!0)},
-$S:44}
-B.e6s.prototype={
-$2(d,e){var x,w,v,u=null,t=this.a.fy
-t===$&&C.c()
-t=t.x
-t===$&&C.c()
-x=t*3.141592653589793*2
-t=C.ds()
-w=t.a
-w.$flags&2&&C.aj(w)
-w[11]=0.004
-t.fE(Math.sin(x)*0.55)
-t.k5(0.3+Math.cos(x*0.7)*0.12)
-w=C.a0(217,D.c.l()>>>16&255,D.c.l()>>>8&255,D.c.l()&255)
-v=D.h.T(127.5)
-w=C.a([w,D.bU,C.a0(v,D.jl.l()>>>16&255,D.jl.l()>>>8&255,D.jl.l()&255)],y.O)
-return C.fA(D.z,C.o(u,A.beC,D.f,u,u,new C.n(u,u,u,u,C.a([new C.ac(0,D.G,C.a0(v,D.bU.l()>>>16&255,D.bU.l()>>>8&255,D.bU.l()&255),D.J,20)],y.V),new C.bT(D.z,0.5,D.x,u,0,w,u,u),D.a6),u,96,u,u,u,u,u,96),u,t,!0)},
-$S:44}
-B.e6B.prototype={
-$2(d,e){var x,w,v=this.a.x
-v===$&&C.c()
-x=C.ds()
-w=x.a
-w.$flags&2&&C.aj(w)
-w[11]=0.002
-x.fE(Math.sin(v*3.141592653589793*2)*0.35)
-x.k5(0.35)
-return C.fA(D.z,C.nC(this.b,null,this.c*0.85),null,x,!0)},
-$S:44}
-B.h3i.prototype={
-$1(d){return new B.a_p(this.a,new B.h3h(this.b),null)},
-$S:z+3}
-B.h3h.prototype={
-$0(){return J.lL(this.a.bm())},
-$S:0}
-B.h3L.prototype={
-$1(d){return new B.a01(this.a,new B.h3K(this.b),null)},
-$S:z+4}
-B.h3K.prototype={
-$0(){return J.lL(this.a.bm())},
-$S:0}
-B.d8V.prototype={
-$2(d,e){var x,w,v,u,t,s=null,r=this.a,q=r.d
-q===$&&C.c()
-x=q.x
-x===$&&C.c()
-w=D.nl.az(0,D.h.D(x,0,1))
-q=q.x
-q===$&&C.c()
-x=C.ds()
-v=x.a
-v.$flags&2&&C.aj(v)
-v[11]=0.003
-x.fE(Math.sin(q*3.141592653589793*2)*0.22)
-x.k5(0.18)
-q=Math.min(C.aE(d,D.bX,y.w).w.a.a-40,340)
-v=C.l(28)
-u=C.K(D.c.j(0.55),D.r,2)
-t=C.a([new C.ac(4,D.G,D.at.j(0.6),D.J,36)],y.V)
-return C.as(C.e1(D.z,C.fA(D.z,C.o(s,C.x(C.a([A.e38,D.P,A.h9a,D.aB,C.d(r.a.c,s,s,s,s,s,s,A.fyB,D.K,s,s),D.aO,C.d("Tap anywhere to close",s,s,s,s,s,s,C.m(s,s,D.c.j(0.7),s,s,s,s,s,s,s,s,11,s,s,s,s,s,!0,s,s,s,s,s,s,s,s),s,s,s)],y.p),D.l,s,D.e,D.N,0,D.p),D.f,s,s,new C.n(s,s,u,v,t,A.cbX,D.n),s,s,s,s,A.bIu,s,s,q),s,x,!0),0.45+w*0.55,s,s),s,s,s)},
-$S:240}
-B.dkW.prototype={
-$2(d,e){var x,w,v,u,t,s,r,q,p,o,n,m,l=null,k=this.a,j=k.d
-j===$&&C.c()
-x=j.x
-x===$&&C.c()
-w=D.ed.az(0,x)
-x=k.e
-x===$&&C.c()
-x=x.x
-x===$&&C.c()
-v=x*3.141592653589793*2
-j=j.x
-j===$&&C.c()
-x=Math.min(C.aE(d,D.bX,y.w).w.a.a-36,360)
-u=C.l(26)
-t=this.b
-s=y.O
-r=C.a([D.a_,t.j(0.35)],s)
-q=C.K(t.j(0.75),D.r,1.5)
-p=y.V
-o=C.a([new C.ac(2,D.G,t.j(0.45),D.J,30)],p)
-n=C.ds()
-m=n.a
-m.$flags&2&&C.aj(m)
-m[11]=0.004
-n.fE(Math.sin(v)*0.5)
-n.k5(0.35+Math.cos(v*0.8)*0.15)
-s=C.a([D.c.j(0.9),t,t.j(0.4),D.L],s)
-n=C.fA(D.z,C.o(l,A.beY,D.f,l,l,new C.n(l,l,l,l,C.a([new C.ac(0,D.G,t.j(0.6),D.J,24)],p),new C.bT(D.z,0.5,D.x,l,0,s,D.DO,l),D.a6),l,88,l,l,l,l,l,88),l,n,!0)
-t=C.d(k.a.c.d,l,l,l,l,l,l,C.m(l,l,t,l,l,l,l,l,l,l,l,14,l,l,D.u,l,l,!0,l,1.2,l,l,l,l,l,l),l,l,l)
-k=k.a.c
-return C.as(C.d1(C.e1(D.z,C.o(l,C.x(C.a([n,D.af,t,D.T,C.d(k.a,l,l,l,l,l,l,A.fAO,D.K,l,l),D.aB,C.d("Lucky: "+D.d.aN(k.b," \xb7 "),l,l,l,l,l,l,C.m(l,l,D.c.j(0.75),l,l,l,l,l,l,l,l,12,l,l,D.O,l,l,!0,l,l,l,l,l,l,l,l),l,l,l),D.T,C.d("Tap to close",l,l,l,l,l,l,C.m(l,l,D.c.j(0.45),l,l,l,l,l,l,l,l,10,l,l,l,l,l,!0,l,l,l,l,l,l,l,l),l,l,l)],y.p),D.l,l,D.e,D.N,0,D.p),D.f,l,l,new C.n(l,l,q,u,o,new C.a7(D.ay,D.aC,D.x,r,l,l),D.n),l,l,l,l,F.ao3,l,l,x),0.7+w*0.3,l,l),j),l,l,l)},
-$S:240}
-B.h5u.prototype={
-$1(d){return new B.a0q(this.a,this.b,new B.h5t(this.c),null)},
-$S:z+5}
-B.h5t.prototype={
-$0(){return J.lL(this.a.bm())},
-$S:0}
-B.h5r.prototype={
-$1(d){var x=this
-return new B.a0p(x.a,x.b,x.c,x.d,new B.h5q(x.e),null)},
-$S:z+6}
-B.h5q.prototype={
-$0(){return J.lL(this.a.bm())},
-$S:0}
-B.duO.prototype={
-$0(){var x=this.a
-if(x.c!=null)x.a.vu()},
-$S:11}
-B.duN.prototype={
-$2(d,e){var x,w,v,u,t,s,r=null,q=this.a,p=q.d
-p===$&&C.c()
-x=p.x
-x===$&&C.c()
-w=D.nl.az(0,D.h.D(x,0,1))
-p=p.x
-p===$&&C.c()
-v=p*3.141592653589793*2
-p=C.ds()
-x=p.a
-x.$flags&2&&C.aj(x)
-x[11]=0.003
-p.fE(Math.sin(v)*0.18)
-p.k5(0.22+Math.sin(v*0.7)*0.1)
-x=Math.min(C.aE(d,D.bX,y.w).w.a.a-48,320)
-u=C.l(28)
-t=C.K(D.c.j(0.55),D.r,2)
-s=C.a([new C.ac(4,D.G,D.bE.j(0.65),D.J,40),new C.ac(0,D.G,D.w.j(0.45),D.kF,24)],y.V)
-q=q.a
-return C.as(C.e1(D.z,C.fA(D.z,C.o(r,C.x(C.a([A.aMg,D.P,C.d(""+q.c+"%",r,r,r,r,r,r,A.fyt,r,r,r),D.am,A.h_U,D.af,C.d(q.d,r,r,r,r,r,r,C.m(r,r,D.c.j(0.92),r,r,r,r,r,r,r,r,14,r,r,D.a8,r,1.35,!0,r,r,r,r,r,r,r,r),D.K,r,r)],y.p),D.l,r,D.e,D.N,0,D.p),D.f,r,r,new C.n(r,r,t,u,s,A.cbb,D.n),r,r,r,r,D.bId,r,r,x),r,p,!0),0.4+w*0.6,r,r),r,r,r)},
-$S:240}
-B.duM.prototype={
-$0(){var x=this.a
-if(x.c!=null)x.a.vu()},
-$S:11}
-B.duL.prototype={
-$2(d,e){var x,w,v,u,t,s,r,q=null,p=this.a,o=p.d
-o===$&&C.c()
-x=o.x
-x===$&&C.c()
-w=D.ed.az(0,x)
-o=o.x
-o===$&&C.c()
-x=C.l(16)
-v=C.a([A.bhp.j(0.97),A.bn6.j(0.97)],y.O)
-u=C.K(p.a.f.j(0.75),D.r,1.2)
-t=C.a([new C.ac(0,D.G,p.a.f.j(0.35),D.J,16)],y.V)
-s=p.a
-r=y.p
-return new C.bK(D.z,q,q,C.e1(D.z,C.d1(C.o(q,C.A(C.a([C.nC(s.d,q,22),D.as,C.E(C.x(C.a([C.d(s.c,q,q,q,q,q,q,C.m(q,q,s.f,q,q,q,q,q,q,q,q,12,q,q,D.H,q,q,!0,q,q,q,q,q,q,q,q),q,q,q),D.am,C.d(p.a.e,q,q,q,q,q,q,A.fB6,q,q,q)],r),D.E,q,D.e,D.N,0,D.p),1)],r),D.E,q,D.e,D.i,0,q,q),D.f,q,new C.aY(0,this.b,0,1/0),new C.n(q,q,u,x,t,new C.a7(D.ay,D.aC,D.x,v,q,q),D.n),q,q,q,D.mh,D.jr,q,q,q),o),0.85+w*0.15,q,q),q)},
-$S:2146};(function aliases(){var x=B.aOg.prototype
-x.bA9=x.t
-x=B.aMF.prototype
-x.bys=x.t
-x=B.aN7.prototype
-x.byW=x.t
-x=B.aNy.prototype
-x.bzq=x.t
-x=B.aNz.prototype
-x.bzr=x.t})();(function installTearOffs(){var x=a._instance_0u
-var w
-x(w=B.aFS.prototype,"gbJz","aau",2)
-x(w,"gcw9","KH",0)
-x(w,"gcwb","aC7",0)
-x(w,"gc9n","a_k",0)
-x(w,"gcwa","FE",0)})();(function inheritance(){var x=a.mixinHard,w=a.inheritMany,v=a.inherit
-w(C.aJ,[B.cQ,B.a2,B.a_l,B.a2g])
-w(C.k9,[B.h3N,B.e6T,B.e6q,B.e6A,B.e6E,B.h3i,B.h3L,B.h5u,B.h5r])
-w(C.ag,[B.a0W,B.a_p,B.a01,B.a0q,B.a0p])
-w(C.ah,[B.aOg,B.aMF,B.aN7,B.aNz,B.aNy])
-v(B.aFS,B.aOg)
-w(C.lR,[B.e6u,B.e6t,B.e6m,B.e6n,B.e6l,B.e6J,B.e6K,B.e6I,B.e6S,B.e6p,B.e6o,B.e6z,B.e6y,B.e6v,B.e6w,B.e6x,B.e6D,B.e6M,B.e6N,B.e6L,B.e6R,B.e6G,B.e6H,B.e6F,B.e6P,B.e6Q,B.e6O,B.h3h,B.h3K,B.h5t,B.h5q,B.duO,B.duM])
-w(C.ls,[B.e6C,B.e6r,B.e6s,B.e6B,B.d8V,B.dkW,B.duN,B.duL])
-v(B.bet,B.aMF)
-v(B.bie,B.aN7)
-v(B.bkW,B.aNz)
-v(B.bkV,B.aNy)
-x(B.aOg,C.eO)
-x(B.aMF,C.cf)
-x(B.aN7,C.eO)
-x(B.aNy,C.cf)
-x(B.aNz,C.cf)})()
-C.nh(b.typeUniverse,JSON.parse('{"a0W":{"ag":[],"v":[]},"aFS":{"ah":["a0W"]},"a_p":{"ag":[],"v":[]},"a01":{"ag":[],"v":[]},"bet":{"ah":["a_p"]},"bie":{"ah":["a01"]},"a0q":{"ag":[],"v":[]},"a0p":{"ag":[],"v":[]},"bkW":{"ah":["a0q"]},"bkV":{"ah":["a0p"]}}'))
-var y=(function rtii(){var x=C.aC
-return{E:x("d9"),V:x("R<ac>"),O:x("R<u>"),s:x("R<q>"),p:x("R<v>"),t:x("R<H>"),U:x("R<aB?>"),w:x("jZ"),h:x("+category,loveTab(H,H)"),a:x("+contentIndex,remaining(H,H)"),N:x("+contentIndex,remaining,viewedToday(H,H,H)"),j:x("+canViewToday,contentIndex,cyclePosition,cycleTotal,todayContentIndex,todayQuote(Q,H,H,H,H,q?)"),R:x("q"),l:x("v"),q:x("nJ"),S:x("H"),n:x("+contentIndex(H)?"),J:x("+contentIndex,cyclePosition,quote(H,H,q)?"),I:x("H?"),H:x("~")}})();(function constants(){var x=a.makeConstList
-A.b6X=new C.ax(D.c4,1.5,D.r,-1)
-A.e32=new C.tX("\ud83d\udd2e",42,null,null)
-A.beC=new C.ck(D.z,null,null,A.e32,null)
-A.e36=new C.tX("\ud83d\udd2e",36,null,null)
-A.beY=new C.ck(D.z,null,null,A.e36,null)
-A.bhp=new C.u(1,0.16470588235294117,0.08235294117647059,0.1568627450980392,D.q)
-A.bn6=new C.u(1,0.10196078431372549,0.06274509803921569,0.12549019607843137,D.q)
-A.ami=new C.bf(45e5)
-A.bEy=new C.P(12,0,8,0)
-A.bIu=new C.P(24,30,24,26)
-A.dD5=x([D.aA,D.dN],y.O)
-A.c9X=new C.a7(D.ay,D.aC,D.x,A.dD5,null,null)
-A.dpG=x([D.hM,D.bE,D.G7],y.O)
-A.cbb=new C.a7(D.ay,D.aC,D.x,A.dpG,null,null)
-A.aAF=x([D.aA,D.dN,D.G7],y.O)
-A.cbc=new C.a7(D.a5,D.a9,D.x,A.aAF,null,null)
-A.aBG=x([D.aQ,D.at,D.d6],y.O)
-A.cbX=new C.a7(D.ay,D.aC,D.x,A.aBG,null,null)
-A.cc8=new C.a7(D.ay,D.aC,D.x,A.aAF,null,null)
-A.hMv=new B.a2g("Match","\ud83d\udc98")
-A.hMy=new B.a2g("Next","\ud83c\udf39")
-A.hMw=new B.a2g("Keep","\ud83d\udc9e")
-A.hMx=new B.a2g("Date","\ud83c\udf19")
-A.cdh=x([A.hMv,A.hMy,A.hMw,A.hMx],C.aC("R<a2g>"))
-A.ayA=x(["Your fear is not a stop sign \u2014 it is proof you are standing at the edge of growth.","The version of you that tries again tomorrow is already braver than the one who quit today.","Confidence is not the absence of doubt; it is moving forward while doubt watches. Keep going.","Remember: Every bold step teaches your nervous system that you are safe being visible.","You have survived every hard day so far \u2014 that is an undefeated record worth trusting.","Today \u2014 Speak as if your voice belongs in the room, because it does.","The world does not need a perfect you \u2014 it needs the real you, fully present.","Your potential expands every time you choose action over overthinking.","Stand tall not because life is easy, but because you refuse to shrink for comfort.","Courage is a muscle \u2014 today\u2019s small brave act is tomorrow\u2019s natural reflex.","Remember: You are not behind \u2014 you are on your own timeline, and it is valid.","Your value was never tied to productivity; you matter simply because you exist.","Stop apologizing for taking up space \u2014 the universe made room for you on purpose.","Comparison steals joy; your lane is custom-built for your gifts.","You deserve good things not because you earned them, but because you are human.","Self-respect sounds like: I will not negotiate my peace for temporary approval.","Today \u2014 You are enough right now, not after the next achievement.","Remember: Your story is still being written \u2014 past chapters do not define the ending.","Treat yourself with the kindness you freely give to people you love.","You are allowed to outgrow places that no longer fit who you are becoming. Keep going.","Start messy \u2014 momentum polishes what perfectionism never finishes.","One focused hour beats a week of anxious planning.","Done is a door; perfect is a wall.","Your future self is cheering for the decision you make today.","Remember: Small consistent steps compound into a life that looks impossible from the start.","Action creates clarity \u2014 waiting for clarity creates delay.","You do not need every answer to take the next step.","Today \u2014 Progress is louder than perfection \u2014 let people hear you moving.","The best time was yesterday; the second best time is now.","Show up even at sixty percent \u2014 showing up is the whole game.","Your thoughts are suggestions, not orders \u2014 choose the ones that build you.","Remember: A setback is data, not a verdict.","Train your mind to find proof you can, not evidence you cannot.","Gratitude is not denial of pain \u2014 it is fuel while you heal.","You are the author of your inner dialogue \u2014 edit ruthlessly.",'Replace "What if I fail?" with "What if I fly?"',"Confidence grows where self-talk is kind but honest. Keep going.","Your mindset is the lens \u2014 clean it daily.","Today \u2014 Remember: Obstacles bend for people who refuse to stop bending forward.","Peace and ambition can coexist \u2014 calm minds build lasting success.","The right people celebrate your light instead of dimming it.","Boundaries are bridges to healthier love, not walls against it.","You teach others how to treat you by what you accept.","Vulnerability is strength wearing a softer voice.","You do not need everyone to understand you \u2014 understand yourself.","Remember: Walk away from tables where your worth is questioned.","Real connection starts when masks come off.","Your energy is precious \u2014 invest it where it is returned.","Being alone is not failure; settling is.","Today \u2014 Love yourself first so love from others is a bonus, not a rescue.","Faith is walking when the path is foggy but your purpose is clear.","Prayer plus preparation creates miracles ordinary people call luck.","Remember: You are never alone on the road \u2014 grace walks beside doubt.","Trust the timing that you cannot see yet. Keep going.","Broken places become light if you let healing in.","God does not waste pain \u2014 it becomes purpose in patient hands.","When doors close, windows open \u2014 keep your eyes lifted.","Your testimony is being written in seasons you did not choose.","Hope is defiance with a gentle smile.","Remember: Serve where you are planted \u2014 roots grow before branches.","Today \u2014 Your body carried you here \u2014 honor it with rest, fuel, and movement.","Strength looks different every season \u2014 adapt with compassion.","Rest is productive when your soul is rebuilding.","Hydrate, breathe, stretch \u2014 confidence lives in a cared-for body.","You are not a project to fix; you are a person to nurture.","Energy follows intention \u2014 aim your body toward what matters.","Remember: Sleep is strategy, not laziness.","Stand in your frame \u2014 posture tells your brain you are ready.","Celebrate what your body can do, not only how it appears.","Move today in a way future-you will thank you for.","Your work ethic is a love letter to your future. Keep going.","Today \u2014 Skills are built in public long before results look impressive.","Ask for what you deserve \u2014 silence discounts your value.","Remember: Every expert was once embarrassed to be a beginner.","Discipline is choosing what you want most over what you want now.","Your reputation is built one kept promise at a time.","Network with generosity \u2014 lift others and rise together.","Failure at work is tuition, not expulsion.","Lead with integrity even when no one is grading you.","Build a career that feels like calling, not captivity.","Remember: You are not too young to start and not too old to restart.","Mistakes in your twenties are cheaper than regrets in your forties.","Today \u2014 Learn fast, forgive yourself faster.","Your curiosity is a superpower \u2014 protect it from cynics.","Dream big enough to scare small minds.","Education never ends at graduation \u2014 stay teachable.","Your friends shape your future \u2014 choose wisely.","Remember: Say yes to experiences that expand you, no to ones that shrink you. Keep going.","You will outgrow versions of yourself \u2014 let them go with grace.","The world needs your fresh eyes and fearless questions.","Storms pass \u2014 your roots decide whether you bend or break.","Healing is not linear; neither is confidence \u2014 keep going anyway.","You are harder to destroy than you think.","Today \u2014 Pain taught you empathy \u2014 that is power disguised as softness.","Remember: Rise again \u2014 that is your signature move.","Scars are proof you fought and stayed.","When tired, rest \u2014 do not quit.","Every comeback starts with one honest breath.","You have reframed worse \u2014 this chapter is manageable.","Resilience is hope that learned to work out.","Your fear is not a stop sign \u2014 it is proof you are standing at the edge of growth. (101)","Remember: The version of you that tries again tomorrow is already braver than the one who quit today.","Confidence is not the absence of doubt; it is moving forward while doubt watches.","Every bold step teaches your nervous system that you are safe being visible.","Today \u2014 You have survived every hard day so far \u2014 that is an undefeated record worth trusting. Keep going.","Speak as if your voice belongs in the room, because it does.","The world does not need a perfect you \u2014 it needs the real you, fully present. (107)","Your potential expands every time you choose action over overthinking. (108)","Remember: Stand tall not because life is easy, but because you refuse to shrink for comfort.","Courage is a muscle \u2014 today\u2019s small brave act is tomorrow\u2019s natural reflex. (110)","You are not behind \u2014 you are on your own timeline, and it is valid.","Your value was never tied to productivity; you matter simply because you exist. (112)","Stop apologizing for taking up space \u2014 the universe made room for you on purpose. (113)","Comparison steals joy; your lane is custom-built for your gifts. (114)","You deserve good things not because you earned them, but because you are human. (115)","Today \u2014 Remember: Self-respect sounds like: I will not negotiate my peace for temporary approval.","You are enough right now, not after the next achievement.","Your story is still being written \u2014 past chapters do not define the ending.","Treat yourself with the kindness you freely give to people you love. (119)","You are allowed to outgrow places that no longer fit who you are becoming.","Start messy \u2014 momentum polishes what perfectionism never finishes. (121)","One focused hour beats a week of anxious planning. Keep going.","Remember: Done is a door; perfect is a wall.","Your future self is cheering for the decision you make today. (124)","Small consistent steps compound into a life that looks impossible from the start.","Action creates clarity \u2014 waiting for clarity creates delay. (126)","Today \u2014 You do not need every answer to take the next step.","Progress is louder than perfection \u2014 let people hear you moving.","The best time was yesterday; the second best time is now. (129)","Remember: Show up even at sixty percent \u2014 showing up is the whole game.","Your thoughts are suggestions, not orders \u2014 choose the ones that build you. (131)","A setback is data, not a verdict.","Train your mind to find proof you can, not evidence you cannot. (133)","Gratitude is not denial of pain \u2014 it is fuel while you heal. (134)","You are the author of your inner dialogue \u2014 edit ruthlessly. (135)",'Replace "What if I fail?" with "What if I fly?" (136)',"Remember: Confidence grows where self-talk is kind but honest.","Today \u2014 Your mindset is the lens \u2014 clean it daily.","Obstacles bend for people who refuse to stop bending forward. Keep going.","Peace and ambition can coexist \u2014 calm minds build lasting success. (140)","The right people celebrate your light instead of dimming it. (141)","Boundaries are bridges to healthier love, not walls against it. (142)","You teach others how to treat you by what you accept. (143)","Remember: Vulnerability is strength wearing a softer voice.","You do not need everyone to understand you \u2014 understand yourself. (145)","Walk away from tables where your worth is questioned.","Real connection starts when masks come off. (147)","Your energy is precious \u2014 invest it where it is returned. (148)","Today \u2014 Being alone is not failure; settling is.","Love yourself first so love from others is a bonus, not a rescue.","Remember: Faith is walking when the path is foggy but your purpose is clear.","Prayer plus preparation creates miracles ordinary people call luck. (152)","You are never alone on the road \u2014 grace walks beside doubt.","Trust the timing that you cannot see yet.","Broken places become light if you let healing in. (155)","God does not waste pain \u2014 it becomes purpose in patient hands. Keep going.","When doors close, windows open \u2014 keep your eyes lifted. (157)","Remember: Your testimony is being written in seasons you did not choose.","Hope is defiance with a gentle smile. (159)","Today \u2014 Serve where you are planted \u2014 roots grow before branches.","Your body carried you here \u2014 honor it with rest, fuel, and movement.","Strength looks different every season \u2014 adapt with compassion. (162)","Rest is productive when your soul is rebuilding. (163)","Hydrate, breathe, stretch \u2014 confidence lives in a cared-for body. (164)","Remember: You are not a project to fix; you are a person to nurture.","Energy follows intention \u2014 aim your body toward what matters. (166)","Sleep is strategy, not laziness.","Stand in your frame \u2014 posture tells your brain you are ready. (168)","Celebrate what your body can do, not only how it appears. (169)","Move today in a way future-you will thank you for. (170)","Today \u2014 Your work ethic is a love letter to your future.","Remember: Skills are built in public long before results look impressive.","Ask for what you deserve \u2014 silence discounts your value. Keep going.","Every expert was once embarrassed to be a beginner.","Discipline is choosing what you want most over what you want now. (175)","Your reputation is built one kept promise at a time. (176)","Network with generosity \u2014 lift others and rise together. (177)","Failure at work is tuition, not expulsion. (178)","Remember: Lead with integrity even when no one is grading you.","Build a career that feels like calling, not captivity. (180)","You are not too young to start and not too old to restart.","Today \u2014 Mistakes in your twenties are cheaper than regrets in your forties.","Learn fast, forgive yourself faster.","Your curiosity is a superpower \u2014 protect it from cynics. (184)","Dream big enough to scare small minds. (185)","Remember: Education never ends at graduation \u2014 stay teachable.","Your friends shape your future \u2014 choose wisely. (187)","Say yes to experiences that expand you, no to ones that shrink you.","You will outgrow versions of yourself \u2014 let them go with grace. (189)","The world needs your fresh eyes and fearless questions. Keep going.","Storms pass \u2014 your roots decide whether you bend or break. (191)","Healing is not linear; neither is confidence \u2014 keep going anyway. (192)","Today \u2014 Remember: You are harder to destroy than you think.","Pain taught you empathy \u2014 that is power disguised as softness.","Rise again \u2014 that is your signature move.","Scars are proof you fought and stayed. (196)","When tired, rest \u2014 do not quit. (197)","Every comeback starts with one honest breath. (198)","You have reframed worse \u2014 this chapter is manageable. (199)","Remember: Resilience is hope that learned to work out.","Your fear is not a stop sign \u2014 it is proof you are standing at the edge of growth. (201)","The version of you that tries again tomorrow is already braver than the one who quit today. (202)","Confidence is not the absence of doubt; it is moving forward while doubt watches. (203)","Today \u2014 Every bold step teaches your nervous system that you are safe being visible.","You have survived every hard day so far \u2014 that is an undefeated record worth trusting. (205)","Speak as if your voice belongs in the room, because it does. (206)","Remember: The world does not need a perfect you \u2014 it needs the real you, fully present. Keep going.","Your potential expands every time you choose action over overthinking. (208)","Stand tall not because life is easy, but because you refuse to shrink for comfort. (209)","Courage is a muscle \u2014 today\u2019s small brave act is tomorrow\u2019s natural reflex. (210)","You are not behind \u2014 you are on your own timeline, and it is valid. (211)","Your value was never tied to productivity; you matter simply because you exist. (212)","Stop apologizing for taking up space \u2014 the universe made room for you on purpose. (213)","Remember: Comparison steals joy; your lane is custom-built for your gifts.","Today \u2014 You deserve good things not because you earned them, but because you are human.","Self-respect sounds like: I will not negotiate my peace for temporary approval. (216)","You are enough right now, not after the next achievement. (217)","Your story is still being written \u2014 past chapters do not define the ending. (218)","Treat yourself with the kindness you freely give to people you love. (219)","You are allowed to outgrow places that no longer fit who you are becoming. (220)","Remember: Start messy \u2014 momentum polishes what perfectionism never finishes.","One focused hour beats a week of anxious planning. (222)","Done is a door; perfect is a wall. (223)","Your future self is cheering for the decision you make today. Keep going.","Small consistent steps compound into a life that looks impossible from the start. (225)","Today \u2014 Action creates clarity \u2014 waiting for clarity creates delay.","You do not need every answer to take the next step. (227)","Remember: Progress is louder than perfection \u2014 let people hear you moving.","The best time was yesterday; the second best time is now. (229)","Show up even at sixty percent \u2014 showing up is the whole game. (230)","Your thoughts are suggestions, not orders \u2014 choose the ones that build you. (231)","A setback is data, not a verdict. (232)","Train your mind to find proof you can, not evidence you cannot. (233)","Gratitude is not denial of pain \u2014 it is fuel while you heal. (234)","Remember: You are the author of your inner dialogue \u2014 edit ruthlessly.",'Replace "What if I fail?" with "What if I fly?" (236)',"Today \u2014 Confidence grows where self-talk is kind but honest.","Your mindset is the lens \u2014 clean it daily. (238)","Obstacles bend for people who refuse to stop bending forward.","Peace and ambition can coexist \u2014 calm minds build lasting success. (240)","The right people celebrate your light instead of dimming it. Keep going.","Remember: Boundaries are bridges to healthier love, not walls against it.","You teach others how to treat you by what you accept. (243)","Vulnerability is strength wearing a softer voice. (244)","You do not need everyone to understand you \u2014 understand yourself. (245)","Walk away from tables where your worth is questioned. (246)","Real connection starts when masks come off. (247)","Today \u2014 Your energy is precious \u2014 invest it where it is returned.","Remember: Being alone is not failure; settling is.","Love yourself first so love from others is a bonus, not a rescue. (250)","Faith is walking when the path is foggy but your purpose is clear. (251)","Prayer plus preparation creates miracles ordinary people call luck. (252)","You are never alone on the road \u2014 grace walks beside doubt. (253)","Trust the timing that you cannot see yet. (254)","Broken places become light if you let healing in. (255)","Remember: God does not waste pain \u2014 it becomes purpose in patient hands.","When doors close, windows open \u2014 keep your eyes lifted. (257)","Your testimony is being written in seasons you did not choose. Keep going.","Today \u2014 Hope is defiance with a gentle smile.","Serve where you are planted \u2014 roots grow before branches.","Your body carried you here \u2014 honor it with rest, fuel, and movement. (261)","Strength looks different every season \u2014 adapt with compassion. (262)","Remember: Rest is productive when your soul is rebuilding.","Hydrate, breathe, stretch \u2014 confidence lives in a cared-for body. (264)","You are not a project to fix; you are a person to nurture. (265)","Energy follows intention \u2014 aim your body toward what matters. (266)","Sleep is strategy, not laziness. (267)","Stand in your frame \u2014 posture tells your brain you are ready. (268)","Celebrate what your body can do, not only how it appears. (269)","Today \u2014 Remember: Move today in a way future-you will thank you for.","Your work ethic is a love letter to your future.","Skills are built in public long before results look impressive.","Ask for what you deserve \u2014 silence discounts your value. (273)","Every expert was once embarrassed to be a beginner. (274)","Discipline is choosing what you want most over what you want now. Keep going.","Your reputation is built one kept promise at a time. (276)","Remember: Network with generosity \u2014 lift others and rise together.","Failure at work is tuition, not expulsion. (278)","Lead with integrity even when no one is grading you. (279)","Build a career that feels like calling, not captivity. (280)","Today \u2014 You are not too young to start and not too old to restart.","Mistakes in your twenties are cheaper than regrets in your forties. (282)","Learn fast, forgive yourself faster. (283)","Remember: Your curiosity is a superpower \u2014 protect it from cynics.","Dream big enough to scare small minds. (285)","Education never ends at graduation \u2014 stay teachable. (286)","Your friends shape your future \u2014 choose wisely. (287)","Say yes to experiences that expand you, no to ones that shrink you. (288)","You will outgrow versions of yourself \u2014 let them go with grace. (289)","The world needs your fresh eyes and fearless questions. (290)","Remember: Storms pass \u2014 your roots decide whether you bend or break.","Today \u2014 Healing is not linear; neither is confidence \u2014 keep going anyway. Keep going.","You are harder to destroy than you think. (293)","Pain taught you empathy \u2014 that is power disguised as softness. (294)","Rise again \u2014 that is your signature move. (295)","Scars are proof you fought and stayed. (296)","When tired, rest \u2014 do not quit. (297)","Remember: Every comeback starts with one honest breath.","You have reframed worse \u2014 this chapter is manageable. (299)","Resilience is hope that learned to work out. (300)"],y.s)
-A.cEE=x(["Meet for iced coffee at a cozy corner caf\xe9 \u2014 keep the first chat light and warm.","Grab matcha lattes and take a slow walk through a pretty downtown street.","Share a fruit smoothie at a sunny outdoor patio and people-watch together.","Try a dessert caf\xe9 \u2014 split a slice of cake and talk about favorite memories.","Meet for hot chocolate on a cool evening; bring a light jacket for them if it is chilly.","Visit a bookstore caf\xe9, pick a book each, and swap why you chose it.","Get bubble tea with two straws and play \u201cthis or that\u201d questions.","Meet at a farmers market, sample something small, and stroll the stalls.","Share artisan pizza at a small Italian spot \u2014 split a margherita and a salad.","Try tacos from a popular local truck, then sit in a park nearby.","Breakfast date: pancakes, fresh juice, and no rush to leave the table.","Sushi lunch at a calm spot \u2014 order a few rolls to share and one surprise roll.","Meet for fresh lemonade and sandwiches at a riverside bench.","Visit a tea house for jasmine tea and quiet conversation.","Grab gelato and walk through a garden or campus green.","Try a food hall: each pick one dish and taste from both plates.","Meet for soup and bread at a homestyle diner \u2014 comfort food builds comfort.","Share a charcuterie board and sparkling water at a wine-free bistro patio.","Visit a donut shop early and bring one extra for \u201clater.\u201d","Meet for acai bowls and talk about dreams, not just schedules.","Try a juice bar smoothie bowl after a short morning hike together.","Meet at a rooftop caf\xe9 at golden hour \u2014 photos optional, presence required.","Share pasta at a candle-free lunch spot; save candles for another time.","Visit a bakery, choose two pastries, and rank them honestly.","Meet for chai and samosas at a cozy Indian caf\xe9.","Try Korean street snacks at a small shop and share everything.","Meet for fresh spring rolls and iced tea \u2014 light, fresh, easy to talk.","Share fish and chips by the water if you live near a coast or lake.","Visit a plant-based caf\xe9 even if you are not vegan \u2014 curiosity is attractive.","Meet for espresso and cannoli \u2014 short, sweet, memorable.","Try a build-your-own bowl place; compare creations like a fun contest.","Meet at a dog-friendly patio if one of you has a calm pet \u2014 instant icebreaker.","Share crepes \u2014 one savory, one sweet \u2014 at a French-style caf\xe9.","Visit a chocolate shop for truffles and a five-minute tasting ritual.","Meet for pho or ramen; warm bowls make honest conversation easier.","Try a Mediterranean platter with hummus, pita, and grilled vegetables.","Meet for iced hibiscus tea and a shared salad on a shaded terrace.","Visit a comic shop with a caf\xe9 inside \u2014 laugh together early.","Share wings or sliders at a sports bar during an early, quiet hour.","Meet for cronuts or fresh croissants and talk about childhood favorites.","Try a pop-up food event \u2014 exploring something new together bonds fast.","Meet for coconut water and tropical fruit after a beach walk.","Share a cheese toastie and tomato soup on a rainy afternoon.","Visit a flower market and buy one stem each for the other.","Meet for lavender latte and shortbread at a calm neighborhood spot.","Try handmade pasta at a chef-owned trattoria \u2014 dress cute but casual.","Meet for boba and board games at a caf\xe9 that hosts game nights.","Share a picnic basket you prepared: sandwiches, grapes, and a kind note.","Visit a sunset viewpoint with thermoses of cider or sparkling juice.","End the first meet with a clear \u201cI enjoyed today\u201d \u2014 confidence is romantic."],y.s)
-A.aAg=x([4,6,10],y.t)
-A.dWt=new B.cQ("A bold opportunity knocks twice \u2014 the second time louder.",A.aAg,"gold","Radiant")
-A.auU=x([11,17,23],y.t)
-A.dYj=new B.cQ("Your patience will pay in gold within three moons.",A.auU,"emerald","Calm")
-A.ayp=x([18,28,36],y.t)
-A.dWR=new B.cQ("Someone from your past brings good news soon.",A.ayp,"sapphire","Bold")
-A.ayS=x([25,39,49],y.t)
-A.dX6=new B.cQ("Trust your instinct on Thursday \u2014 it sees what eyes miss.",A.ayS,"amber","Mystic")
-A.azn=x([32,50,62],y.t)
-A.dWx=new B.cQ("Unexpected money finds you when you share freely.",A.azn,"violet","Lucky")
-A.azN=x([39,61,75],y.t)
-A.dWE=new B.cQ("A creative idea you dismiss today becomes treasure tomorrow.",A.azN,"crimson","Serene")
-A.aAd=x([46,72,88],y.t)
-A.dXi=new B.cQ("Love arrives dressed as friendship first.",A.aAd,"silver","Electric")
-A.aAj=x([53,83,2],y.t)
-A.dXc=new B.cQ("Travel plans shift in your favor \u2014 stay flexible.",A.aAj,"jade","Grounded")
-A.aAs=x([60,94,15],y.t)
-A.dWF=new B.cQ("Your kindness returns multiplied before summer ends.",A.aAs,"gold","Radiant")
-A.aAw=x([67,6,28],y.t)
-A.dYi=new B.cQ("Silence now wins an argument later.",A.aAw,"emerald","Calm")
-A.aAC=x([74,17,41],y.t)
-A.dWy=new B.cQ("A stranger's word unlocks a door you thought sealed.",A.aAC,"sapphire","Bold")
-A.aAJ=x([81,28,54],y.t)
-A.dXX=new B.cQ("Health improves when rest becomes sacred.",A.aAJ,"amber","Mystic")
-A.aAO=x([88,39,67],y.t)
-A.dYk=new B.cQ("Your name will be spoken with respect in a room you have not entered.",A.aAO,"violet","Lucky")
-A.aAZ=x([95,50,80],y.t)
-A.dX0=new B.cQ("Let go of one fear and watch three blessings appear.",A.aAZ,"crimson","Serene")
-A.azS=x([3,61,93],y.t)
-A.dXj=new B.cQ("Fortune favors the prepared heart.",A.azS,"silver","Electric")
-A.auS=x([10,72,7],y.t)
-A.dXY=new B.cQ("Reading 16: A bold opportunity knocks twice \u2014 the second time louder.",A.auS,"jade","Grounded")
-A.ayo=x([17,83,20],y.t)
-A.dY1=new B.cQ("Reading 17: Your patience will pay in gold within three moons.",A.ayo,"gold","Radiant")
-A.ayP=x([24,94,33],y.t)
-A.dX1=new B.cQ("Reading 18: Someone from your past brings good news soon.",A.ayP,"emerald","Calm")
-A.azj=x([31,6,46],y.t)
-A.dY6=new B.cQ("Reading 19: Trust your instinct on Thursday \u2014 it sees what eyes miss.",A.azj,"sapphire","Bold")
-A.azM=x([38,17,59],y.t)
-A.dWW=new B.cQ("Reading 20: Unexpected money finds you when you share freely.",A.azM,"amber","Mystic")
-A.aAc=x([45,28,72],y.t)
-A.dXV=new B.cQ("Reading 21: A creative idea you dismiss today becomes treasure tomorrow.",A.aAc,"violet","Lucky")
-A.cNr=x([52,39,85],y.t)
-A.dXS=new B.cQ("Reading 22: Love arrives dressed as friendship first.",A.cNr,"crimson","Serene")
-A.cOt=x([59,50,98],y.t)
-A.dWP=new B.cQ("Reading 23: Travel plans shift in your favor \u2014 stay flexible.",A.cOt,"silver","Electric")
-A.cQr=x([66,61,12],y.t)
-A.dWZ=new B.cQ("Reading 24: Your kindness returns multiplied before summer ends.",A.cQr,"jade","Grounded")
-A.cSQ=x([73,72,25],y.t)
-A.dXe=new B.cQ("Reading 25: Silence now wins an argument later.",A.cSQ,"gold","Radiant")
-A.cXC=x([80,83,38],y.t)
-A.dXW=new B.cQ("Reading 26: A stranger's word unlocks a door you thought sealed.",A.cXC,"emerald","Calm")
-A.cZs=x([87,94,51],y.t)
-A.dY3=new B.cQ("Reading 27: Health improves when rest becomes sacred.",A.cZs,"sapphire","Bold")
-A.d18=x([94,6,64],y.t)
-A.dXb=new B.cQ("Reading 28: Your name will be spoken with respect in a room you have not entered.",A.d18,"amber","Mystic")
-A.cya=x([2,17,77],y.t)
-A.dXO=new B.cQ("Reading 29: Let go of one fear and watch three blessings appear.",A.cya,"violet","Lucky")
-A.d36=x([9,28,90],y.t)
-A.dX4=new B.cQ("Reading 30: Fortune favors the prepared heart.",A.d36,"crimson","Serene")
-A.cpQ=x([16,39,4],y.t)
-A.dXg=new B.cQ("Reading 31: A bold opportunity knocks twice \u2014 the second time louder.",A.cpQ,"silver","Electric")
-A.cu4=x([23,50,17],y.t)
-A.dWQ=new B.cQ("Reading 32: Your patience will pay in gold within three moons.",A.cu4,"jade","Grounded")
-A.czk=x([30,61,30],y.t)
-A.dXk=new B.cQ("Reading 33: Someone from your past brings good news soon.",A.czk,"gold","Radiant")
-A.cD7=x([37,72,43],y.t)
-A.dXs=new B.cQ("Reading 34: Trust your instinct on Thursday \u2014 it sees what eyes miss.",A.cD7,"emerald","Calm")
-A.cJV=x([44,83,56],y.t)
-A.dWu=new B.cQ("Reading 35: Unexpected money finds you when you share freely.",A.cJV,"sapphire","Bold")
-A.cNl=x([51,94,69],y.t)
-A.dYb=new B.cQ("Reading 36: A creative idea you dismiss today becomes treasure tomorrow.",A.cNl,"amber","Mystic")
-A.cOn=x([58,6,82],y.t)
-A.dWM=new B.cQ("Reading 37: Love arrives dressed as friendship first.",A.cOn,"violet","Lucky")
-A.cQ4=x([65,17,95],y.t)
-A.dXv=new B.cQ("Reading 38: Travel plans shift in your favor \u2014 stay flexible.",A.cQ4,"crimson","Serene")
-A.cSG=x([72,28,9],y.t)
-A.dWw=new B.cQ("Reading 39: Your kindness returns multiplied before summer ends.",A.cSG,"silver","Electric")
-A.cVE=x([79,39,22],y.t)
-A.dXq=new B.cQ("Reading 40: Silence now wins an argument later.",A.cVE,"jade","Grounded")
-A.cZ_=x([86,50,35],y.t)
-A.dYf=new B.cQ("Reading 41: A stranger's word unlocks a door you thought sealed.",A.cZ_,"gold","Radiant")
-A.d0K=x([93,61,48],y.t)
-A.dWN=new B.cQ("Reading 42: Health improves when rest becomes sacred.",A.d0K,"emerald","Calm")
-A.cqT=x([1,72,61],y.t)
-A.dWC=new B.cQ("Reading 43: Your name will be spoken with respect in a room you have not entered.",A.cqT,"sapphire","Bold")
-A.d_r=x([8,83,74],y.t)
-A.dYd=new B.cQ("Reading 44: Let go of one fear and watch three blessings appear.",A.d_r,"amber","Mystic")
-A.coF=x([15,94,87],y.t)
-A.dXC=new B.cQ("Reading 45: Fortune favors the prepared heart.",A.coF,"violet","Lucky")
-A.ctq=x([22,6,1],y.t)
-A.dWz=new B.cQ("Reading 46: A bold opportunity knocks twice \u2014 the second time louder.",A.ctq,"crimson","Serene")
-A.cxO=x([29,17,14],y.t)
-A.dXN=new B.cQ("Reading 47: Your patience will pay in gold within three moons.",A.cxO,"silver","Electric")
-A.cCP=x([36,28,27],y.t)
-A.dXT=new B.cQ("Reading 48: Someone from your past brings good news soon.",A.cCP,"jade","Grounded")
-A.cJk=x([43,39,40],y.t)
-A.dY0=new B.cQ("Reading 49: Trust your instinct on Thursday \u2014 it sees what eyes miss.",A.cJk,"gold","Radiant")
-A.cMG=x([50,50,53],y.t)
-A.dWv=new B.cQ("Reading 50: Unexpected money finds you when you share freely.",A.cMG,"emerald","Calm")
-A.cOi=x([57,61,66],y.t)
-A.dY9=new B.cQ("Reading 51: A creative idea you dismiss today becomes treasure tomorrow.",A.cOi,"sapphire","Bold")
-A.cPW=x([64,72,79],y.t)
-A.dYg=new B.cQ("Reading 52: Love arrives dressed as friendship first.",A.cPW,"amber","Mystic")
-A.cSB=x([71,83,92],y.t)
-A.dXU=new B.cQ("Reading 53: Travel plans shift in your favor \u2014 stay flexible.",A.cSB,"violet","Lucky")
-A.cUp=x([78,94,6],y.t)
-A.dWO=new B.cQ("Reading 54: Your kindness returns multiplied before summer ends.",A.cUp,"crimson","Serene")
-A.cYD=x([85,6,19],y.t)
-A.dXG=new B.cQ("Reading 55: Silence now wins an argument later.",A.cYD,"silver","Electric")
-A.d0v=x([92,17,32],y.t)
-A.dXZ=new B.cQ("Reading 56: A stranger's word unlocks a door you thought sealed.",A.d0v,"jade","Grounded")
-A.d2I=x([99,28,45],y.t)
-A.dX_=new B.cQ("Reading 57: Health improves when rest becomes sacred.",A.d2I,"gold","Radiant")
-A.cWe=x([7,39,58],y.t)
-A.dXL=new B.cQ("Reading 58: Your name will be spoken with respect in a room you have not entered.",A.cWe,"emerald","Calm")
-A.cn6=x([14,50,71],y.t)
-A.dY_=new B.cQ("Reading 59: Let go of one fear and watch three blessings appear.",A.cn6,"sapphire","Bold")
-A.csS=x([21,61,84],y.t)
-A.dX7=new B.cQ("Reading 60: Fortune favors the prepared heart.",A.csS,"amber","Mystic")
-A.cx8=x([28,72,97],y.t)
-A.dWI=new B.cQ("Reading 61: A bold opportunity knocks twice \u2014 the second time louder.",A.cx8,"violet","Lucky")
-A.cCm=x([35,83,11],y.t)
-A.dWU=new B.cQ("Reading 62: Your patience will pay in gold within three moons.",A.cCm,"crimson","Serene")
-A.cIt=x([42,94,24],y.t)
-A.dY5=new B.cQ("Reading 63: Someone from your past brings good news soon.",A.cIt,"silver","Electric")
-A.cLm=x([49,6,37],y.t)
-A.dXo=new B.cQ("Reading 64: Trust your instinct on Thursday \u2014 it sees what eyes miss.",A.cLm,"jade","Grounded")
-A.cO7=x([56,17,50],y.t)
-A.dXa=new B.cQ("Reading 65: Unexpected money finds you when you share freely.",A.cO7,"gold","Radiant")
-A.cPN=x([63,28,63],y.t)
-A.dXy=new B.cQ("Reading 66: A creative idea you dismiss today becomes treasure tomorrow.",A.cPN,"emerald","Calm")
-A.cSm=x([70,39,76],y.t)
-A.dXh=new B.cQ("Reading 67: Love arrives dressed as friendship first.",A.cSm,"sapphire","Bold")
-A.cTT=x([77,50,89],y.t)
-A.dYh=new B.cQ("Reading 68: Travel plans shift in your favor \u2014 stay flexible.",A.cTT,"amber","Mystic")
-A.cYl=x([84,61,3],y.t)
-A.dXJ=new B.cQ("Reading 69: Your kindness returns multiplied before summer ends.",A.cYl,"violet","Lucky")
-A.d0g=x([91,72,16],y.t)
-A.dWD=new B.cQ("Reading 70: Silence now wins an argument later.",A.d0g,"crimson","Serene")
-A.d2A=x([98,83,29],y.t)
-A.dX5=new B.cQ("Reading 71: A stranger's word unlocks a door you thought sealed.",A.d2A,"silver","Electric")
-A.cS_=x([6,94,42],y.t)
-A.dXl=new B.cQ("Reading 72: Health improves when rest becomes sacred.",A.cS_,"jade","Grounded")
-A.cmB=x([13,6,55],y.t)
-A.dXz=new B.cQ("Reading 73: Your name will be spoken with respect in a room you have not entered.",A.cmB,"gold","Radiant")
-A.crZ=x([20,17,68],y.t)
-A.dXI=new B.cQ("Reading 74: Let go of one fear and watch three blessings appear.",A.crZ,"emerald","Calm")
-A.cwJ=x([27,28,81],y.t)
-A.dXR=new B.cQ("Reading 75: Fortune favors the prepared heart.",A.cwJ,"sapphire","Bold")
-A.cBP=x([34,39,94],y.t)
-A.dWG=new B.cQ("Reading 76: A bold opportunity knocks twice \u2014 the second time louder.",A.cBP,"amber","Mystic")
-A.cHB=x([41,50,8],y.t)
-A.dY2=new B.cQ("Reading 77: Your patience will pay in gold within three moons.",A.cHB,"violet","Lucky")
-A.cKx=x([48,61,21],y.t)
-A.dWB=new B.cQ("Reading 78: Someone from your past brings good news soon.",A.cKx,"crimson","Serene")
-A.cO4=x([55,72,34],y.t)
-A.dXB=new B.cQ("Reading 79: Trust your instinct on Thursday \u2014 it sees what eyes miss.",A.cO4,"silver","Electric")
-A.cPH=x([62,83,47],y.t)
-A.dYe=new B.cQ("Reading 80: Unexpected money finds you when you share freely.",A.cPH,"jade","Grounded")
-A.cRj=x([69,94,60],y.t)
-A.dX2=new B.cQ("Reading 81: A creative idea you dismiss today becomes treasure tomorrow.",A.cRj,"gold","Radiant")
-A.cTC=x([76,6,73],y.t)
-A.dXn=new B.cQ("Reading 82: Love arrives dressed as friendship first.",A.cTC,"emerald","Calm")
-A.cYb=x([83,17,86],y.t)
-A.dYc=new B.cQ("Reading 83: Travel plans shift in your favor \u2014 stay flexible.",A.cYb,"sapphire","Bold")
-A.d_P=x([90,28,99],y.t)
-A.dXd=new B.cQ("Reading 84: Your kindness returns multiplied before summer ends.",A.d_P,"amber","Mystic")
-A.d2b=x([97,39,13],y.t)
-A.dX3=new B.cQ("Reading 85: Silence now wins an argument later.",A.d2b,"violet","Lucky")
-A.cOU=x([5,50,26],y.t)
-A.dWL=new B.cQ("Reading 86: A stranger's word unlocks a door you thought sealed.",A.cOU,"crimson","Serene")
-A.cmu=x([12,61,39],y.t)
-A.dXE=new B.cQ("Reading 87: Health improves when rest becomes sacred.",A.cmu,"silver","Electric")
-A.cql=x([19,72,52],y.t)
-A.dXP=new B.cQ("Reading 88: Your name will be spoken with respect in a room you have not entered.",A.cql,"jade","Grounded")
-A.cwi=x([26,83,65],y.t)
-A.dWK=new B.cQ("Reading 89: Let go of one fear and watch three blessings appear.",A.cwi,"gold","Radiant")
-A.cBt=x([33,94,78],y.t)
-A.dXr=new B.cQ("Reading 90: Fortune favors the prepared heart.",A.cBt,"emerald","Calm")
-A.cHl=x([40,6,91],y.t)
-A.dWJ=new B.cQ("Reading 91: A bold opportunity knocks twice \u2014 the second time louder.",A.cHl,"sapphire","Bold")
-A.cKu=x([47,17,5],y.t)
-A.dXF=new B.cQ("Reading 92: Your patience will pay in gold within three moons.",A.cKu,"amber","Mystic")
-A.cNR=x([54,28,18],y.t)
-A.dWV=new B.cQ("Reading 93: Someone from your past brings good news soon.",A.cNR,"violet","Lucky")
-A.cPp=x([61,39,31],y.t)
-A.dY8=new B.cQ("Reading 94: Trust your instinct on Thursday \u2014 it sees what eyes miss.",A.cPp,"crimson","Serene")
-A.cQI=x([68,50,44],y.t)
-A.dXm=new B.cQ("Reading 95: Unexpected money finds you when you share freely.",A.cQI,"silver","Electric")
-A.cTn=x([75,61,57],y.t)
-A.dY7=new B.cQ("Reading 96: A creative idea you dismiss today becomes treasure tomorrow.",A.cTn,"jade","Grounded")
-A.cY0=x([82,72,70],y.t)
-A.dWY=new B.cQ("Reading 97: Love arrives dressed as friendship first.",A.cY0,"gold","Radiant")
-A.d_5=x([89,83,83],y.t)
-A.dYl=new B.cQ("Reading 98: Travel plans shift in your favor \u2014 stay flexible.",A.d_5,"emerald","Calm")
-A.d1Y=x([96,94,96],y.t)
-A.dXD=new B.cQ("Reading 99: Your kindness returns multiplied before summer ends.",A.d1Y,"sapphire","Bold")
-A.dWX=new B.cQ("Reading 100: Silence now wins an argument later.",A.aAg,"amber","Mystic")
-A.dYa=new B.cQ("Reading 101: A stranger's word unlocks a door you thought sealed.",A.auU,"violet","Lucky")
-A.dWS=new B.cQ("Reading 102: Health improves when rest becomes sacred.",A.ayp,"crimson","Serene")
-A.dX9=new B.cQ("Reading 103: Your name will be spoken with respect in a room you have not entered.",A.ayS,"silver","Electric")
-A.dXp=new B.cQ("Reading 104: Let go of one fear and watch three blessings appear.",A.azn,"jade","Grounded")
-A.dYm=new B.cQ("Reading 105: Fortune favors the prepared heart.",A.azN,"gold","Radiant")
-A.dWA=new B.cQ("Reading 106: A bold opportunity knocks twice \u2014 the second time louder.",A.aAd,"emerald","Calm")
-A.dXM=new B.cQ("Reading 107: Your patience will pay in gold within three moons.",A.aAj,"sapphire","Bold")
-A.dXw=new B.cQ("Reading 108: Someone from your past brings good news soon.",A.aAs,"amber","Mystic")
-A.dXQ=new B.cQ("Reading 109: Trust your instinct on Thursday \u2014 it sees what eyes miss.",A.aAw,"violet","Lucky")
-A.dX8=new B.cQ("Reading 110: Unexpected money finds you when you share freely.",A.aAC,"crimson","Serene")
-A.dXt=new B.cQ("Reading 111: A creative idea you dismiss today becomes treasure tomorrow.",A.aAJ,"silver","Electric")
-A.dXf=new B.cQ("Reading 112: Love arrives dressed as friendship first.",A.aAO,"jade","Grounded")
-A.dXH=new B.cQ("Reading 113: Travel plans shift in your favor \u2014 stay flexible.",A.aAZ,"gold","Radiant")
-A.dXu=new B.cQ("Reading 114: Your kindness returns multiplied before summer ends.",A.azS,"emerald","Calm")
-A.dY4=new B.cQ("Reading 115: Silence now wins an argument later.",A.auS,"sapphire","Bold")
-A.dWH=new B.cQ("Reading 116: A stranger's word unlocks a door you thought sealed.",A.ayo,"amber","Mystic")
-A.dXK=new B.cQ("Reading 117: Health improves when rest becomes sacred.",A.ayP,"violet","Lucky")
-A.dXA=new B.cQ("Reading 118: Your name will be spoken with respect in a room you have not entered.",A.azj,"crimson","Serene")
-A.dWT=new B.cQ("Reading 119: Let go of one fear and watch three blessings appear.",A.azM,"silver","Electric")
-A.dXx=new B.cQ("Reading 120: Fortune favors the prepared heart.",A.aAc,"jade","Grounded")
-A.cF0=x([A.dWt,A.dYj,A.dWR,A.dX6,A.dWx,A.dWE,A.dXi,A.dXc,A.dWF,A.dYi,A.dWy,A.dXX,A.dYk,A.dX0,A.dXj,A.dXY,A.dY1,A.dX1,A.dY6,A.dWW,A.dXV,A.dXS,A.dWP,A.dWZ,A.dXe,A.dXW,A.dY3,A.dXb,A.dXO,A.dX4,A.dXg,A.dWQ,A.dXk,A.dXs,A.dWu,A.dYb,A.dWM,A.dXv,A.dWw,A.dXq,A.dYf,A.dWN,A.dWC,A.dYd,A.dXC,A.dWz,A.dXN,A.dXT,A.dY0,A.dWv,A.dY9,A.dYg,A.dXU,A.dWO,A.dXG,A.dXZ,A.dX_,A.dXL,A.dY_,A.dX7,A.dWI,A.dWU,A.dY5,A.dXo,A.dXa,A.dXy,A.dXh,A.dYh,A.dXJ,A.dWD,A.dX5,A.dXl,A.dXz,A.dXI,A.dXR,A.dWG,A.dY2,A.dWB,A.dXB,A.dYe,A.dX2,A.dXn,A.dYc,A.dXd,A.dX3,A.dWL,A.dXE,A.dXP,A.dWK,A.dXr,A.dWJ,A.dXF,A.dWV,A.dY8,A.dXm,A.dY7,A.dWY,A.dYl,A.dXD,A.dWX,A.dYa,A.dWS,A.dX9,A.dXp,A.dYm,A.dWA,A.dXM,A.dXw,A.dXQ,A.dX8,A.dXt,A.dXf,A.dXH,A.dXu,A.dY4,A.dWH,A.dXK,A.dXA,A.dWT,A.dXx],C.aC("R<cQ>"))
-A.hEh=new B.a_l("Love","\ud83d\udc95",D.bE)
-A.hEf=new B.a_l("Confidence","\ud83d\udcaa",D.at)
-A.hEg=new B.a_l("Brain","\ud83e\udde0",D.b8)
-A.hEe=new B.a_l("Fortune","\ud83d\udd2e",D.bU)
-A.aBS=x([A.hEh,A.hEf,A.hEg,A.hEe],C.aC("R<a_l>"))
-A.dfY=x(["Stargazing picnic with blankets, thermoses, and a constellation app.","Couples pottery or paint-and-sip night \u2014 laugh at the masterpieces.","Sunset kayak or paddleboat if you are both comfortable on water.","Dress up for dinner at a place with live acoustic music.","Home movie marathon: their pick, your pick, popcorn, dim lights.","Botanical garden walk with a camera and zero rush.","Rooftop or hilltop picnic at golden hour with sparkling juice.","Dance class intro: salsa, bachata, or swing \u2014 beginners welcome.","Visit a museum and choose one artwork that represents your mood.","Cook a new recipe together \u2014 assign roles: chef and sous-chef.","Ice skating or roller skating \u2014 hold on if balance needs help.","Book a couples massage or spa half-day for deep calm.","Drive to a small town you have never explored; caf\xe9 hop once there.","Build a blanket fort at home with fairy lights and playlists.","Volunteer together for a few hours \u2014 shared purpose bonds hearts.","Arcade date: playful competition, share tickets for a silly prize.","Wine-free vineyard tour or orchard visit in harvest season.","Photography walk: capture ten things that feel like \u201cus.\u201d","Attend a local theater play or improv show \u2014 shared laughter.","Plan a breakfast-in-bed surprise on a lazy weekend.","Take a scenic train or ferry ride with no destination pressure.","Visit an aquarium or planetarium \u2014 wonder feels romantic.","Host a fondue night: chocolate or cheese, choose your adventure.","Go thrifting and pick one outfit piece for each other.","Write wishes on paper lanterns or jars and read them aloud.","Plan a \u201cyes day\u201d with a small budget and big imagination.","Rent bikes and explore a trail ending at a lakeside bench.","Couples yoga or stretching session \u2014 gentle, grounding.","Attend a food festival and share every bite.","Set up a backyard fire pit with s\u2019mores and old stories.","Take a cooking class: pasta, sushi, or desserts.","Plan a surprise day trip to a waterfall or scenic overlook.","Visit a Christmas market or seasonal fair hand in hand.","Record a short video diary of your date \u2014 memory for later.","Book a cozy cabin or boutique hotel for one night away.","Go to a jazz lounge with mocktails if you prefer no alcohol.","Create a scavenger hunt with inside jokes as clues.","Plant something together \u2014 herbs, flowers, a tree if allowed.","Attend a poetry open mic and dedicate a line to them afterward.","Plan a themed dinner at home: Paris, Tokyo, or their dream city.","Watch the sunrise with hot drinks and silence first, words second.","Visit a cat caf\xe9 or animal shelter visit if you love gentle creatures.","Go bowling or mini-golf \u2014 playful rivalry, sweet truce.","Take a pottery mug home and use it on your next coffee date.","Plan a photo-book page of your favorite moments together.","Attend a lantern festival or night market with matching colors.","Write love letters and exchange them to open on a future date.","Plan a stargazing drive with their favorite snacks in the trunk.","Recreate your first meeting place with a small upgrade: better dessert.","End the night saying what you are grateful for about them \u2014 specific beats generic."],y.s)
-A.dkL=x([D.bU,D.jl,D.pj],y.O)
-A.dp1=x(["Send a voice note saying one specific thing you appreciated about them today.","Plan a no-phone hour together \u2014 phones face down, eyes on each other.","Remember a small detail they mentioned and bring it up later; it shows you listen.","Compliment their character, not only their appearance \u2014 depth keeps hearts close.","Schedule a weekly check-in: \u201cHow are we feeling about us?\u201d","Share a playlist of songs that remind you of them \u2014 three tracks is enough.","Apologize quickly when you are wrong; pride is the enemy of closeness.","Celebrate their wins loudly, even the small ones \u2014 promotion, recipe, good day.","Ask \u201cWhat would make this week easier for you?\u201d and follow through once.","Leave a handwritten note in their bag, book, or on the mirror.","Plan surprise comfort: their favorite snack after a hard day.","Touch base mid-day with a kind text \u2014 not demanding, just warm.","Learn one thing they care about and ask a thoughtful question about it.","Defend them kindly in public; loyalty builds trust.","Create a shared inside joke \u2014 intimacy loves private language.","Book something to look forward to: concert, class, weekend trip.","Practice patience when they need space; trust is quiet confidence.","Cook or order their favorite meal without being asked.","Take photos together that are candid, not only posed perfection.","Say thank you for ordinary things: listening, driving, patience.","Introduce them proudly to friends \u2014 belonging matters.","Keep promises small and large; reliability is romance in action.","Flirt after you are comfortable \u2014 playfulness keeps sparks alive.","Ask about their family with genuine curiosity, not interrogation.","Share your feelings with calm words instead of guessing games.","Plan a tech-free walk and hold hands if you both want that.","Respect their boundaries without making them explain twice.","Send a meme or reel that made you think of them \u2014 light connection counts.","Celebrate anniversaries of small moments: first coffee, first laugh.","Offer help before they have to ask \u2014 dishes, errands, ride.","Speak their love language: time, words, gifts, acts, touch \u2014 learn which lands.","Do not weaponize the past in arguments; solve today\u2019s issue today.","Plan a double date with friends who bring good energy.","Write three things you love about them and read one aloud.","Protect their reputation online and offline.","Wake up early once to make breakfast \u2014 effort is attractive.","Listen without fixing unless they ask for advice.","Share goals and ask how you can support, not control.","Laugh at yourselves when plans fail \u2014 resilience is sexy.","Keep dating each other: dress up for no reason sometimes.","Remember important dates in your calendar with alerts.","Give them the last bite if they love it \u2014 generosity in small things.","Plan a cozy movie night with their favorite blanket rules.","Tell them when you are proud of how they handled something hard.","Be consistent with good morning and good night kindness.","Create a shared tradition: Sunday brunch, Friday playlist, monthly adventure.","Forgive fast when intent was good \u2014 hold grace like a gift.","Ask for what you need clearly instead of testing them.","Surprise them with flowers, a plant, or something living and hopeful.","Dream aloud about the future together \u2014 direction feels safe.","Choose them again today \u2014 love is a daily decision, not a one-time event."],y.s)
-A.e6p=new B.a2("love","I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.ea7=new B.a2("love","Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.eeC=new B.a2("love","Deep riddle #3 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.ek0=new B.a2("love","I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.ehr=new B.a2("love","Challenge 5: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.ed6=new B.a2("bible","Deep riddle #6 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.egi=new B.a2("bible","Built with pitch and gopher wood, I rode forty days of rain. What am I? (Think carefully.)","Noah's ark")
-A.e6q=new B.a2("bible","I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.ehc=new B.a2("bible","Deep riddle #9 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.e89=new B.a2("bible","Challenge 10: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.eiL=new B.a2("street","I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.e6d=new B.a2("street","Deep riddle #12 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.eet=new B.a2("street","Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.eft=new B.a2("street","I am tagged in spray paint yet tell stories the city tries to erase. What am I? (Think carefully.)","Graffiti")
-A.eaV=new B.a2("street","Challenge 15: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.ef3=new B.a2("church","I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.e78=new B.a2("church","Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.eds=new B.a2("church","Deep riddle #18 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.ee9=new B.a2("church","Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.ekd=new B.a2("church","Challenge 20: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.ef1=new B.a2("logic","Deep riddle #21 \u2014 The more you take from me, the larger I become. What am I? (Think carefully.)","A hole")
-A.egR=new B.a2("logic","I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.efB=new B.a2("logic","I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.e7T=new B.a2("logic","Deep riddle #24 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.efu=new B.a2("logic","Challenge 25: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.eeV=new B.a2("nature","I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.eei=new B.a2("nature","Deep riddle #27 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.ejY=new B.a2("mystery","I am seen in mirrors yet never in the same room twice. What am I? (Think carefully.)","Your reflection leaving")
-A.e9G=new B.a2("mystery","Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.ehJ=new B.a2("wordplay","Challenge 30: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.efr=new B.a2("logic","Logic puzzle #31: a number times itself minus 49 equals 1976. What is the number?","45")
-A.eaw=new B.a2("love","[Set 1] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.e9M=new B.a2("love","[Set 1] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.e7M=new B.a2("love","Deep riddle #33 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.eiY=new B.a2("love","[Set 1] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.e6Q=new B.a2("love","Challenge 35: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I? (Think carefully.)","Recognition")
-A.ed0=new B.a2("bible","Deep riddle #36 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.eeb=new B.a2("bible","Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.efN=new B.a2("bible","[Set 1] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.edy=new B.a2("bible","Deep riddle #39 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.e8a=new B.a2("bible","Challenge 40: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.egV=new B.a2("street","[Set 1] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.eg2=new B.a2("street","Deep riddle #42 \u2014 I change color but never mood; red stops, green releases. What am I? (Think carefully.)","A stoplight")
-A.e7l=new B.a2("street","[Set 1] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.ejS=new B.a2("street","I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.eaW=new B.a2("street","Challenge 45: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.edI=new B.a2("church","[Set 1] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.eiu=new B.a2("church","[Set 1] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.edt=new B.a2("church","Deep riddle #48 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.e9E=new B.a2("church","Whispered on knees, answered in seasons; I move mountains slowly. What am I? (Think carefully.)","Prayer")
-A.eke=new B.a2("church","Challenge 50: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.eh2=new B.a2("logic","Deep riddle #51 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.ejK=new B.a2("logic","[Set 1] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.ecl=new B.a2("logic","[Set 1] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.e7U=new B.a2("logic","Deep riddle #54 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.efv=new B.a2("logic","Challenge 55: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.e9D=new B.a2("nature","I fall but never get hurt; I blanket the world in white silence. What am I? (Think carefully.)","Snow")
-A.eej=new B.a2("nature","Deep riddle #57 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.ejc=new B.a2("mystery","I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.e9r=new B.a2("mystery","[Set 1] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.ehK=new B.a2("wordplay","Challenge 60: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.ejr=new B.a2("logic","Logic puzzle #62: a number times itself minus 7 equals 7562. What is the number?","87")
-A.eax=new B.a2("love","[Set 2] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.e9N=new B.a2("love","[Set 2] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.ebV=new B.a2("love","Deep riddle #63 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I? (Think carefully.)","Affection")
-A.eiZ=new B.a2("love","[Set 2] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.e7B=new B.a2("love","Challenge 65: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.ed1=new B.a2("bible","Deep riddle #66 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.ehT=new B.a2("bible","[Set 2] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.efO=new B.a2("bible","[Set 2] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.edz=new B.a2("bible","Deep riddle #69 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.edk=new B.a2("bible","Challenge 70: I burned yet was not consumed; a bush spoke from within me. What am I? (Think carefully.)","The burning bush")
-A.egW=new B.a2("street","[Set 2] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.e6e=new B.a2("street","Deep riddle #72 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.e7m=new B.a2("street","[Set 2] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.ehM=new B.a2("street","[Set 2] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.eaX=new B.a2("street","Challenge 75: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.edJ=new B.a2("church","[Set 2] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.ef0=new B.a2("church","Passed hand to hand yet never owned; peace lives in my circle. What am I? (Think carefully.)","The sign of peace")
-A.edu=new B.a2("church","Deep riddle #78 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.egs=new B.a2("church","[Set 2] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.ekf=new B.a2("church","Challenge 80: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.eh3=new B.a2("logic","Deep riddle #81 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.ejL=new B.a2("logic","[Set 2] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.ecm=new B.a2("logic","[Set 2] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.ea6=new B.a2("logic","Deep riddle #84 \u2014 Born tall, I die short; every word I carry shrinks me. What am I? (Think carefully.)","A candle")
-A.efw=new B.a2("logic","Challenge 85: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.ei5=new B.a2("nature","[Set 2] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.eek=new B.a2("nature","Deep riddle #87 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.eiP=new B.a2("mystery","[Set 2] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.e9s=new B.a2("mystery","[Set 2] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.ehL=new B.a2("wordplay","Challenge 90: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.eaF=new B.a2("logic","Logic puzzle #93: a number times itself minus 54 equals 970. What is the number?","32")
-A.eeB=new B.a2("love","I have a heart that never beats yet lovers chase me across centuries. What am I? (Think carefully.)","A love letter")
-A.e9O=new B.a2("love","[Set 3] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.e7N=new B.a2("love","Deep riddle #93 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.ej_=new B.a2("love","[Set 3] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.e7C=new B.a2("love","Challenge 95: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.ed2=new B.a2("bible","Deep riddle #96 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.ehU=new B.a2("bible","[Set 3] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.e5f=new B.a2("bible","I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I? (Think carefully.)","The Red Sea")
-A.edA=new B.a2("bible","Deep riddle #99 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.eff=new B.a2("bible","Challenge 100: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.egX=new B.a2("street","[Set 3] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.e6C=new B.a2("street","Deep riddle #102 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.e7n=new B.a2("street","[Set 3] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.ehN=new B.a2("street","[Set 3] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.eb5=new B.a2("street","Challenge 105: Sold from a window with no door; hunger knows my bell. What am I? (Think carefully.)","A food truck")
-A.edK=new B.a2("church","[Set 3] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.eiv=new B.a2("church","[Set 3] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.ebl=new B.a2("church","Deep riddle #108 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.egt=new B.a2("church","[Set 3] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.e8T=new B.a2("church","Challenge 110: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.e7f=new B.a2("logic","Deep riddle #111 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.egN=new B.a2("logic","I have cities but no houses, forests but no trees, water but no fish. What am I? (Think carefully.)","A map")
-A.ecn=new B.a2("logic","[Set 3] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.ecM=new B.a2("logic","Deep riddle #114 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.e6Z=new B.a2("logic","Challenge 115: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.ei6=new B.a2("nature","[Set 3] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.ek5=new B.a2("nature","Deep riddle #117 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.eiQ=new B.a2("mystery","[Set 3] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.eig=new B.a2("mystery","Doors open for me though I carry no key; time is my ally. What am I? (Think carefully.)","A habit")
-A.ec6=new B.a2("wordplay","Challenge 120: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.e9q=new B.a2("logic","Logic puzzle #124: a number times itself minus 12 equals 5464. What is the number?","74")
-A.eay=new B.a2("love","[Set 4] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.e9P=new B.a2("love","[Set 4] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.e83=new B.a2("love","Deep riddle #123 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.ej0=new B.a2("love","[Set 4] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.e6l=new B.a2("love","Challenge 125: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.ejD=new B.a2("bible","Deep riddle #126 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I? (Think carefully.)","The great fish")
-A.ehV=new B.a2("bible","[Set 4] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.efP=new B.a2("bible","[Set 4] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.ehG=new B.a2("bible","Deep riddle #129 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.eac=new B.a2("bible","Challenge 130: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.egY=new B.a2("street","[Set 4] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.ehn=new B.a2("street","Deep riddle #132 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.eiK=new B.a2("street","Rolling on four yet carrying hundreds; I stop every block but never walk. What am I? (Think carefully.)","A city bus")
-A.ehO=new B.a2("street","[Set 4] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.e9o=new B.a2("street","Challenge 135: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.edL=new B.a2("church","[Set 4] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.eiw=new B.a2("church","[Set 4] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.e8Q=new B.a2("church","Deep riddle #138 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.egu=new B.a2("church","[Set 4] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.e7Y=new B.a2("church","Challenge 140: I have no voice but every hymn passes through me. What am I? (Think carefully.)","A choir loft")
-A.e7Z=new B.a2("logic","Deep riddle #141 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.ejM=new B.a2("logic","[Set 4] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.eco=new B.a2("logic","[Set 4] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.e57=new B.a2("logic","Deep riddle #144 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.e52=new B.a2("logic","Challenge 145: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.ei7=new B.a2("nature","[Set 4] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.egz=new B.a2("nature","Deep riddle #147 \u2014 I have no lungs yet I hold every breath of the forest. What am I? (Think carefully.)","A tree")
-A.eiR=new B.a2("mystery","[Set 4] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.e9t=new B.a2("mystery","[Set 4] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.e4B=new B.a2("wordplay","Challenge 150: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.ecQ=new B.a2("logic","Logic puzzle #155: a number times itself minus 59 equals 302. What is the number?","19")
-A.eaz=new B.a2("love","[Set 5] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.e9Q=new B.a2("love","[Set 5] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.ehi=new B.a2("love","Deep riddle #153 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.egr=new B.a2("love","I bind no rope yet hold two souls tighter than chains. What am I? (Think carefully.)","A vow")
-A.efL=new B.a2("love","Challenge 155: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.e8h=new B.a2("bible","Deep riddle #156 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.ehW=new B.a2("bible","[Set 5] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.efQ=new B.a2("bible","[Set 5] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.e95=new B.a2("bible","Deep riddle #159 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.ebJ=new B.a2("bible","Challenge 160: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.ebT=new B.a2("street","I speak without a mouth on every corner; ignore me and pay a fine. What am I? (Think carefully.)","A traffic sign")
-A.efF=new B.a2("street","Deep riddle #162 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.e7o=new B.a2("street","[Set 5] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.ehP=new B.a2("street","[Set 5] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.e4O=new B.a2("street","Challenge 165: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.edM=new B.a2("church","[Set 5] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.eix=new B.a2("church","[Set 5] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.ecK=new B.a2("church","Deep riddle #168 \u2014 I am bread and wine yet become something greater in belief. What am I? (Think carefully.)","Communion")
-A.egv=new B.a2("church","[Set 5] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.e9c=new B.a2("church","Challenge 170: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.ebw=new B.a2("logic","Deep riddle #171 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.ejN=new B.a2("logic","[Set 5] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.ecp=new B.a2("logic","[Set 5] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.e7Q=new B.a2("logic","Deep riddle #174 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.ehh=new B.a2("logic","Challenge 175: I have keys but open no locks; space but no room; enter but not go inside. What am I? (Think carefully.)","A keyboard")
-A.ei8=new B.a2("nature","[Set 5] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.efW=new B.a2("nature","Deep riddle #177 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.eiS=new B.a2("mystery","[Set 5] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.e9u=new B.a2("mystery","[Set 5] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.eka=new B.a2("wordplay","Challenge 180: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.e8v=new B.a2("logic","Logic puzzle #186: a number times itself minus 17 equals 3704. What is the number?","61")
-A.eaA=new B.a2("love","[Set 6] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.e9L=new B.a2("love","Two share me but neither owns me alone; without trust I vanish. What am I? (Think carefully.)","A secret")
-A.ecO=new B.a2("love","Deep riddle #183 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.ej1=new B.a2("love","[Set 6] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.ecV=new B.a2("love","Challenge 185: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.eg5=new B.a2("bible","Deep riddle #186 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.ehX=new B.a2("bible","[Set 6] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.efR=new B.a2("bible","[Set 6] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.eaT=new B.a2("bible","Deep riddle #189 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I? (Think carefully.)","Goliath's challenge")
-A.e5m=new B.a2("bible","Challenge 190: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.egZ=new B.a2("street","[Set 6] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.e98=new B.a2("street","Deep riddle #192 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.e7p=new B.a2("street","[Set 6] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.ehQ=new B.a2("street","[Set 6] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.e8p=new B.a2("street","Challenge 195: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.eaY=new B.a2("church","I rise toward heaven yet stand on earth; bells call the faithful to me. What am I? (Think carefully.)","A steeple")
-A.eiy=new B.a2("church","[Set 6] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.eki=new B.a2("church","Deep riddle #198 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.egw=new B.a2("church","[Set 6] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.e4E=new B.a2("church","Challenge 200: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.e6R=new B.a2("logic","Deep riddle #201 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.ejO=new B.a2("logic","[Set 6] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.eil=new B.a2("logic","I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I? (Think carefully.)","An echo")
-A.ebo=new B.a2("logic","Deep riddle #204 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.egP=new B.a2("logic","Challenge 205: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.ei9=new B.a2("nature","[Set 6] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.ec8=new B.a2("nature","Deep riddle #207 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.eiT=new B.a2("mystery","[Set 6] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.e9v=new B.a2("mystery","[Set 6] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.e4W=new B.a2("wordplay","Challenge 210: What word becomes shorter when you add two letters to it? (Think carefully.)","Short (adding -er)")
-A.eeN=new B.a2("logic","Logic puzzle #217: a number times itself minus 64 equals -28. What is the number?","6")
-A.eaB=new B.a2("love","[Set 7] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.e9R=new B.a2("love","[Set 7] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.e8Z=new B.a2("love","Deep riddle #213 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.ej2=new B.a2("love","[Set 7] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.egf=new B.a2("love","Challenge 215: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.ebZ=new B.a2("bible","Deep riddle #216 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.ei_=new B.a2("bible","[Set 7] Built with pitch and gopher wood, I rode forty days of rain. What am I? (Think carefully.)","Noah's ark")
-A.efS=new B.a2("bible","[Set 7] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.e8A=new B.a2("bible","Deep riddle #219 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.ecw=new B.a2("bible","Challenge 220: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.eh_=new B.a2("street","[Set 7] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.eju=new B.a2("street","Deep riddle #222 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.e7q=new B.a2("street","[Set 7] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.eiB=new B.a2("street","[Set 7] I am tagged in spray paint yet tell stories the city tries to erase. What am I? (Think carefully.)","Graffiti")
-A.egS=new B.a2("street","Challenge 225: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.edN=new B.a2("church","[Set 7] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.eiz=new B.a2("church","[Set 7] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.ehy=new B.a2("church","Deep riddle #228 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.egx=new B.a2("church","[Set 7] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.eaQ=new B.a2("church","Challenge 230: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.ecz=new B.a2("logic","Deep riddle #231 \u2014 The more you take from me, the larger I become. What am I? (Think carefully.)","A hole")
-A.ejP=new B.a2("logic","[Set 7] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.ecq=new B.a2("logic","[Set 7] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.edW=new B.a2("logic","Deep riddle #234 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.e5z=new B.a2("logic","Challenge 235: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.eia=new B.a2("nature","[Set 7] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.eeR=new B.a2("nature","Deep riddle #237 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.e6o=new B.a2("mystery","[Set 7] I am seen in mirrors yet never in the same room twice. What am I? (Think carefully.)","Your reflection leaving")
-A.e9w=new B.a2("mystery","[Set 7] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.ehl=new B.a2("wordplay","Challenge 240: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.ei3=new B.a2("logic","Logic puzzle #248: a number times itself minus 22 equals 2282. What is the number?","48")
-A.eaC=new B.a2("love","[Set 8] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.e9S=new B.a2("love","[Set 8] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.e9X=new B.a2("love","Deep riddle #243 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.ej3=new B.a2("love","[Set 8] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.ecf=new B.a2("love","Challenge 245: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I? (Think carefully.)","Recognition")
-A.edE=new B.a2("bible","Deep riddle #246 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.ehY=new B.a2("bible","[Set 8] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.efT=new B.a2("bible","[Set 8] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.efk=new B.a2("bible","Deep riddle #249 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.ec1=new B.a2("bible","Challenge 250: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.eh0=new B.a2("street","[Set 8] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.ea3=new B.a2("street","Deep riddle #252 \u2014 I change color but never mood; red stops, green releases. What am I? (Think carefully.)","A stoplight")
-A.e7r=new B.a2("street","[Set 8] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.ehR=new B.a2("street","[Set 8] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.eap=new B.a2("street","Challenge 255: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.edO=new B.a2("church","[Set 8] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.eiA=new B.a2("church","[Set 8] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.e8m=new B.a2("church","Deep riddle #258 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.e7X=new B.a2("church","[Set 8] Whispered on knees, answered in seasons; I move mountains slowly. What am I? (Think carefully.)","Prayer")
-A.e93=new B.a2("church","Challenge 260: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.egA=new B.a2("logic","Deep riddle #261 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.ejQ=new B.a2("logic","[Set 8] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.ecr=new B.a2("logic","[Set 8] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.e6G=new B.a2("logic","Deep riddle #264 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.e5s=new B.a2("logic","Challenge 265: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.ef5=new B.a2("nature","[Set 8] I fall but never get hurt; I blanket the world in white silence. What am I? (Think carefully.)","Snow")
-A.e5P=new B.a2("nature","Deep riddle #267 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.eiU=new B.a2("mystery","[Set 8] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.e9x=new B.a2("mystery","[Set 8] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.e8D=new B.a2("wordplay","Challenge 270: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.efD=new B.a2("logic","Logic puzzle #279: a number times itself minus 69 equals 8031. What is the number?","90")
-A.eaD=new B.a2("love","[Set 9] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.e9T=new B.a2("love","[Set 9] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.eg0=new B.a2("love","Deep riddle #273 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I? (Think carefully.)","Affection")
-A.ej4=new B.a2("love","[Set 9] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.e5w=new B.a2("love","Challenge 275: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.ecG=new B.a2("bible","Deep riddle #276 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.ehZ=new B.a2("bible","[Set 9] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.efU=new B.a2("bible","[Set 9] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.ebp=new B.a2("bible","Deep riddle #279 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.e7O=new B.a2("bible","Challenge 280: I burned yet was not consumed; a bush spoke from within me. What am I? (Think carefully.)","The burning bush")
-A.eh1=new B.a2("street","[Set 9] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.e6A=new B.a2("street","Deep riddle #282 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.e7s=new B.a2("street","[Set 9] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.ehS=new B.a2("street","[Set 9] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.eb9=new B.a2("street","Challenge 285: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.edP=new B.a2("church","[Set 9] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.efz=new B.a2("church","[Set 9] Passed hand to hand yet never owned; peace lives in my circle. What am I? (Think carefully.)","The sign of peace")
-A.e7i=new B.a2("church","Deep riddle #288 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.egy=new B.a2("church","[Set 9] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.e4Y=new B.a2("church","Challenge 290: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.ebN=new B.a2("logic","Deep riddle #291 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.ejR=new B.a2("logic","[Set 9] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.ecs=new B.a2("logic","[Set 9] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.ebz=new B.a2("logic","Deep riddle #294 \u2014 Born tall, I die short; every word I carry shrinks me. What am I? (Think carefully.)","A candle")
-A.ed8=new B.a2("logic","Challenge 295: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.eib=new B.a2("nature","[Set 9] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.eew=new B.a2("nature","Deep riddle #297 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.eiV=new B.a2("mystery","[Set 9] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.e9y=new B.a2("mystery","[Set 9] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.efc=new B.a2("wordplay","Challenge 300: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.ecS=new B.a2("logic","Logic puzzle #310: a number times itself minus 27 equals 1198. What is the number?","35")
-A.ebM=new B.a2("love","[Set 10] I have a heart that never beats yet lovers chase me across centuries. What am I? (Think carefully.)","A love letter")
-A.ei1=new B.a2("love","[Set 10] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.eeL=new B.a2("love","Deep riddle #303 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.eeO=new B.a2("love","[Set 10] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.e4K=new B.a2("love","Challenge 305: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.edT=new B.a2("bible","Deep riddle #306 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.e6U=new B.a2("bible","[Set 10] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.ecR=new B.a2("bible","[Set 10] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I? (Think carefully.)","The Red Sea")
-A.ebG=new B.a2("bible","Deep riddle #309 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.eg8=new B.a2("bible","Challenge 310: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.e5g=new B.a2("street","[Set 10] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.e9A=new B.a2("street","Deep riddle #312 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.eiC=new B.a2("street","[Set 10] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.eaK=new B.a2("street","[Set 10] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.ejk=new B.a2("street","Challenge 315: Sold from a window with no door; hunger knows my bell. What am I? (Think carefully.)","A food truck")
-A.ea_=new B.a2("church","[Set 10] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.ekk=new B.a2("church","[Set 10] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.edZ=new B.a2("church","Deep riddle #318 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.een=new B.a2("church","[Set 10] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.e5c=new B.a2("church","Challenge 320: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.e8c=new B.a2("logic","Deep riddle #321 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.e5o=new B.a2("logic","[Set 10] I have cities but no houses, forests but no trees, water but no fish. What am I? (Think carefully.)","A map")
-A.e7D=new B.a2("logic","[Set 10] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.e63=new B.a2("logic","Deep riddle #324 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.efY=new B.a2("logic","Challenge 325: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.ee4=new B.a2("nature","[Set 10] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.eh6=new B.a2("nature","Deep riddle #327 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.ek1=new B.a2("mystery","[Set 10] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.e9n=new B.a2("mystery","[Set 10] Doors open for me though I carry no key; time is my ally. What am I? (Think carefully.)","A habit")
-A.eed=new B.a2("wordplay","Challenge 330: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.ebt=new B.a2("logic","Logic puzzle #341: a number times itself minus 74 equals 5855. What is the number?","77")
-A.ec4=new B.a2("love","[Set 11] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.e5R=new B.a2("love","[Set 11] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.e4y=new B.a2("love","Deep riddle #333 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.ecC=new B.a2("love","[Set 11] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.eb_=new B.a2("love","Challenge 335: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.e4R=new B.a2("bible","Deep riddle #336 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I? (Think carefully.)","The great fish")
-A.e7V=new B.a2("bible","[Set 11] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.e4I=new B.a2("bible","[Set 11] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.ecg=new B.a2("bible","Deep riddle #339 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.ejh=new B.a2("bible","Challenge 340: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.e60=new B.a2("street","[Set 11] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.edp=new B.a2("street","Deep riddle #342 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.ejT=new B.a2("street","[Set 11] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I? (Think carefully.)","A city bus")
-A.eeZ=new B.a2("street","[Set 11] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.e4S=new B.a2("street","Challenge 345: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.e6J=new B.a2("church","[Set 11] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.ejo=new B.a2("church","[Set 11] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.ejA=new B.a2("church","Deep riddle #348 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.e9U=new B.a2("church","[Set 11] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.eaI=new B.a2("church","Challenge 350: I have no voice but every hymn passes through me. What am I? (Think carefully.)","A choir loft")
-A.ejs=new B.a2("logic","Deep riddle #351 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.ejZ=new B.a2("logic","[Set 11] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.e9e=new B.a2("logic","[Set 11] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.e8s=new B.a2("logic","Deep riddle #354 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.eht=new B.a2("logic","Challenge 355: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.e5Y=new B.a2("nature","[Set 11] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.e8f=new B.a2("nature","Deep riddle #357 \u2014 I have no lungs yet I hold every breath of the forest. What am I? (Think carefully.)","A tree")
-A.ebQ=new B.a2("mystery","[Set 11] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.ee1=new B.a2("mystery","[Set 11] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.edv=new B.a2("wordplay","Challenge 360: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.edQ=new B.a2("logic","Logic puzzle #372: a number times itself minus 32 equals 452. What is the number?","22")
-A.ejH=new B.a2("love","[Set 12] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.edm=new B.a2("love","[Set 12] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.ejd=new B.a2("love","Deep riddle #363 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.ehF=new B.a2("love","[Set 12] I bind no rope yet hold two souls tighter than chains. What am I? (Think carefully.)","A vow")
-A.ehd=new B.a2("love","Challenge 365: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.e6y=new B.a2("bible","Deep riddle #366 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.e6v=new B.a2("bible","[Set 12] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.ebi=new B.a2("bible","[Set 12] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.eaN=new B.a2("bible","Deep riddle #369 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.e7K=new B.a2("bible","Challenge 370: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.ejX=new B.a2("street","[Set 12] I speak without a mouth on every corner; ignore me and pay a fine. What am I? (Think carefully.)","A traffic sign")
-A.e7w=new B.a2("street","Deep riddle #372 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.e8K=new B.a2("street","[Set 12] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.e5H=new B.a2("street","[Set 12] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.e8y=new B.a2("street","Challenge 375: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.eih=new B.a2("church","[Set 12] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.ebu=new B.a2("church","[Set 12] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.e8j=new B.a2("church","Deep riddle #378 \u2014 I am bread and wine yet become something greater in belief. What am I? (Think carefully.)","Communion")
-A.e56=new B.a2("church","[Set 12] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.e7I=new B.a2("church","Challenge 380: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.e67=new B.a2("logic","Deep riddle #381 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.eeu=new B.a2("logic","[Set 12] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.eiH=new B.a2("logic","[Set 12] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.eaj=new B.a2("logic","Deep riddle #384 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.e5r=new B.a2("logic","Challenge 385: I have keys but open no locks; space but no room; enter but not go inside. What am I? (Think carefully.)","A keyboard")
-A.ef4=new B.a2("nature","[Set 12] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.e8M=new B.a2("nature","Deep riddle #387 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.ea8=new B.a2("mystery","[Set 12] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.eez=new B.a2("mystery","[Set 12] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.eaG=new B.a2("wordplay","Challenge 390: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.ebB=new B.a2("logic","Logic puzzle #403: a number times itself minus 79 equals 4017. What is the number?","64")
-A.e9J=new B.a2("love","[Set 13] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.eb6=new B.a2("love","[Set 13] Two share me but neither owns me alone; without trust I vanish. What am I? (Think carefully.)","A secret")
-A.eeF=new B.a2("love","Deep riddle #393 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.e79=new B.a2("love","[Set 13] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.ejm=new B.a2("love","Challenge 395: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.eim=new B.a2("bible","Deep riddle #396 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.ehB=new B.a2("bible","[Set 13] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.eb2=new B.a2("bible","[Set 13] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.egO=new B.a2("bible","Deep riddle #399 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I? (Think carefully.)","Goliath's challenge")
-A.efg=new B.a2("bible","Challenge 400: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.e6M=new B.a2("street","[Set 13] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.e6D=new B.a2("street","Deep riddle #402 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.edC=new B.a2("street","[Set 13] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.efi=new B.a2("street","[Set 13] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.egn=new B.a2("street","Challenge 405: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.ehb=new B.a2("church","[Set 13] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I? (Think carefully.)","A steeple")
-A.ejE=new B.a2("church","[Set 13] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.ebm=new B.a2("church","Deep riddle #408 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.e7G=new B.a2("church","[Set 13] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.e8U=new B.a2("church","Challenge 410: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.e7g=new B.a2("logic","Deep riddle #411 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.egd=new B.a2("logic","[Set 13] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.eiJ=new B.a2("logic","[Set 13] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I? (Think carefully.)","An echo")
-A.ecN=new B.a2("logic","Deep riddle #414 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.e7_=new B.a2("logic","Challenge 415: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.ecb=new B.a2("nature","[Set 13] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.ek6=new B.a2("nature","Deep riddle #417 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.edi=new B.a2("mystery","[Set 13] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.ebe=new B.a2("mystery","[Set 13] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.ek9=new B.a2("wordplay","Challenge 420: What word becomes shorter when you add two letters to it? (Think carefully.)","Short (adding -er)")
-A.e5M=new B.a2("logic","Logic puzzle #434: a number times itself minus 37 equals 44. What is the number?","9")
-A.edc=new B.a2("love","[Set 14] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.eda=new B.a2("love","[Set 14] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.e84=new B.a2("love","Deep riddle #423 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.ed4=new B.a2("love","[Set 14] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.e6m=new B.a2("love","Challenge 425: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.e7u=new B.a2("bible","Deep riddle #426 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.efs=new B.a2("bible","[Set 14] Built with pitch and gopher wood, I rode forty days of rain. What am I? (Think carefully.)","Noah's ark")
-A.e9F=new B.a2("bible","[Set 14] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.ehH=new B.a2("bible","Deep riddle #429 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.ead=new B.a2("bible","Challenge 430: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.efx=new B.a2("street","[Set 14] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.eho=new B.a2("street","Deep riddle #432 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.eh4=new B.a2("street","[Set 14] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.efC=new B.a2("street","[Set 14] I am tagged in spray paint yet tell stories the city tries to erase. What am I? (Think carefully.)","Graffiti")
-A.e9p=new B.a2("street","Challenge 435: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.ehf=new B.a2("church","[Set 14] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.ea1=new B.a2("church","[Set 14] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.e8R=new B.a2("church","Deep riddle #438 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.eic=new B.a2("church","[Set 14] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.e5U=new B.a2("church","Challenge 440: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.efh=new B.a2("logic","Deep riddle #441 \u2014 The more you take from me, the larger I become. What am I? (Think carefully.)","A hole")
-A.eeG=new B.a2("logic","[Set 14] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.ef6=new B.a2("logic","[Set 14] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.e58=new B.a2("logic","Deep riddle #444 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.e53=new B.a2("logic","Challenge 445: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.ega=new B.a2("nature","[Set 14] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.ekm=new B.a2("nature","Deep riddle #447 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.egc=new B.a2("mystery","[Set 14] I am seen in mirrors yet never in the same room twice. What am I? (Think carefully.)","Your reflection leaving")
-A.ecT=new B.a2("mystery","[Set 14] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.e4C=new B.a2("wordplay","Challenge 450: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.ecA=new B.a2("logic","Logic puzzle #465: a number times itself minus 84 equals 2517. What is the number?","51")
-A.eeD=new B.a2("love","[Set 15] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.eeI=new B.a2("love","[Set 15] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.ehj=new B.a2("love","Deep riddle #453 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.e64=new B.a2("love","[Set 15] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.e5N=new B.a2("love","Challenge 455: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I? (Think carefully.)","Recognition")
-A.e8i=new B.a2("bible","Deep riddle #456 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.e7b=new B.a2("bible","[Set 15] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.e5k=new B.a2("bible","[Set 15] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.e96=new B.a2("bible","Deep riddle #459 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.ebK=new B.a2("bible","Challenge 460: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.ean=new B.a2("street","[Set 15] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.egH=new B.a2("street","Deep riddle #462 \u2014 I change color but never mood; red stops, green releases. What am I? (Think carefully.)","A stoplight")
-A.e4V=new B.a2("street","[Set 15] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.eb7=new B.a2("street","[Set 15] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.e4P=new B.a2("street","Challenge 465: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.egl=new B.a2("church","[Set 15] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.ebE=new B.a2("church","[Set 15] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.e76=new B.a2("church","Deep riddle #468 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.ehq=new B.a2("church","[Set 15] Whispered on knees, answered in seasons; I move mountains slowly. What am I? (Think carefully.)","Prayer")
-A.e9d=new B.a2("church","Challenge 470: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.ebx=new B.a2("logic","Deep riddle #471 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.eeq=new B.a2("logic","[Set 15] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.e9h=new B.a2("logic","[Set 15] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.e7R=new B.a2("logic","Deep riddle #474 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.eiW=new B.a2("logic","Challenge 475: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.e5L=new B.a2("nature","[Set 15] I fall but never get hurt; I blanket the world in white silence. What am I? (Think carefully.)","Snow")
-A.efX=new B.a2("nature","Deep riddle #477 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.e6r=new B.a2("mystery","[Set 15] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.eel=new B.a2("mystery","[Set 15] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.ekb=new B.a2("wordplay","Challenge 480: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.eeK=new B.a2("logic","Logic puzzle #496: a number times itself minus 42 equals 8607. What is the number?","93")
-A.e6O=new B.a2("love","[Set 16] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.e86=new B.a2("love","[Set 16] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.ek4=new B.a2("love","Deep riddle #483 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I? (Think carefully.)","Affection")
-A.e8g=new B.a2("love","[Set 16] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.ecW=new B.a2("love","Challenge 485: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.eg6=new B.a2("bible","Deep riddle #486 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.e91=new B.a2("bible","[Set 16] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.eie=new B.a2("bible","[Set 16] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.e6X=new B.a2("bible","Deep riddle #489 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.eam=new B.a2("bible","Challenge 490: I burned yet was not consumed; a bush spoke from within me. What am I? (Think carefully.)","The burning bush")
-A.ei0=new B.a2("street","[Set 16] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.e99=new B.a2("street","Deep riddle #492 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.efH=new B.a2("street","[Set 16] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.ebX=new B.a2("street","[Set 16] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.e8q=new B.a2("street","Challenge 495: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.ecu=new B.a2("church","[Set 16] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.eg1=new B.a2("church","[Set 16] Passed hand to hand yet never owned; peace lives in my circle. What am I? (Think carefully.)","The sign of peace")
-A.ekj=new B.a2("church","Deep riddle #498 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.efJ=new B.a2("church","[Set 16] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.e4F=new B.a2("church","Challenge 500: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.e6S=new B.a2("logic","Deep riddle #501 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.edR=new B.a2("logic","[Set 16] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.ebg=new B.a2("logic","[Set 16] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.egU=new B.a2("logic","Deep riddle #504 \u2014 Born tall, I die short; every word I carry shrinks me. What am I? (Think carefully.)","A candle")
-A.egQ=new B.a2("logic","Challenge 505: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.e6t=new B.a2("nature","[Set 16] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.ec9=new B.a2("nature","Deep riddle #507 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.eef=new B.a2("mystery","[Set 16] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.eau=new B.a2("mystery","[Set 16] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.e8I=new B.a2("wordplay","Challenge 510: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.ee7=new B.a2("logic","Logic puzzle #527: a number times itself minus 89 equals 1355. What is the number?","38")
-A.e9z=new B.a2("love","[Set 17] I have a heart that never beats yet lovers chase me across centuries. What am I? (Think carefully.)","A love letter")
-A.ecU=new B.a2("love","[Set 17] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.e9_=new B.a2("love","Deep riddle #513 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.eis=new B.a2("love","[Set 17] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.egg=new B.a2("love","Challenge 515: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.ec_=new B.a2("bible","Deep riddle #516 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.eko=new B.a2("bible","[Set 17] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.eiN=new B.a2("bible","[Set 17] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I? (Think carefully.)","The Red Sea")
-A.e8B=new B.a2("bible","Deep riddle #519 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.ecx=new B.a2("bible","Challenge 520: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.ej8=new B.a2("street","[Set 17] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.ejv=new B.a2("street","Deep riddle #522 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.edG=new B.a2("street","[Set 17] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.e9H=new B.a2("street","[Set 17] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.efV=new B.a2("street","Challenge 525: Sold from a window with no door; hunger knows my bell. What am I? (Think carefully.)","A food truck")
-A.eeW=new B.a2("church","[Set 17] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.egK=new B.a2("church","[Set 17] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.ehz=new B.a2("church","Deep riddle #528 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.eeX=new B.a2("church","[Set 17] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.eaR=new B.a2("church","Challenge 530: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.e50=new B.a2("logic","Deep riddle #531 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.e4U=new B.a2("logic","[Set 17] I have cities but no houses, forests but no trees, water but no fish. What am I? (Think carefully.)","A map")
-A.ees=new B.a2("logic","[Set 17] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.edX=new B.a2("logic","Deep riddle #534 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.e5A=new B.a2("logic","Challenge 535: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.ej6=new B.a2("nature","[Set 17] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.eeS=new B.a2("nature","Deep riddle #537 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.e81=new B.a2("mystery","[Set 17] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.ecd=new B.a2("mystery","[Set 17] Doors open for me though I carry no key; time is my ally. What am I? (Think carefully.)","A habit")
-A.ehm=new B.a2("wordplay","Challenge 540: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.ebU=new B.a2("logic","Logic puzzle #558: a number times itself minus 47 equals 6353. What is the number?","80")
-A.efp=new B.a2("love","[Set 18] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.e5a=new B.a2("love","[Set 18] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.e9Y=new B.a2("love","Deep riddle #543 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.e8X=new B.a2("love","[Set 18] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.e6j=new B.a2("love","Challenge 545: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.e7k=new B.a2("bible","Deep riddle #546 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I? (Think carefully.)","The great fish")
-A.e88=new B.a2("bible","[Set 18] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.e74=new B.a2("bible","[Set 18] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.efl=new B.a2("bible","Deep riddle #549 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.ec2=new B.a2("bible","Challenge 550: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.eja=new B.a2("street","[Set 18] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.e6f=new B.a2("street","Deep riddle #552 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.e9b=new B.a2("street","[Set 18] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I? (Think carefully.)","A city bus")
-A.ef2=new B.a2("street","[Set 18] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.eaq=new B.a2("street","Challenge 555: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.e9k=new B.a2("church","[Set 18] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.e5p=new B.a2("church","[Set 18] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.e8n=new B.a2("church","Deep riddle #558 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.eh9=new B.a2("church","[Set 18] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.eaJ=new B.a2("church","Challenge 560: I have no voice but every hymn passes through me. What am I? (Think carefully.)","A choir loft")
-A.egB=new B.a2("logic","Deep riddle #561 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.ejx=new B.a2("logic","[Set 18] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.eij=new B.a2("logic","[Set 18] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.e6H=new B.a2("logic","Deep riddle #564 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.e5t=new B.a2("logic","Challenge 565: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.e7z=new B.a2("nature","[Set 18] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.ejl=new B.a2("nature","Deep riddle #567 \u2014 I have no lungs yet I hold every breath of the forest. What am I? (Think carefully.)","A tree")
-A.ekg=new B.a2("mystery","[Set 18] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.egI=new B.a2("mystery","[Set 18] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.e8E=new B.a2("wordplay","Challenge 570: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.edB=new B.a2("logic","Logic puzzle #589: a number times itself minus 5 equals 620. What is the number?","25")
-A.ejV=new B.a2("love","[Set 19] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.eip=new B.a2("love","[Set 19] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.e5W=new B.a2("love","Deep riddle #573 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.e5j=new B.a2("love","[Set 19] I bind no rope yet hold two souls tighter than chains. What am I? (Think carefully.)","A vow")
-A.e5x=new B.a2("love","Challenge 575: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.ecH=new B.a2("bible","Deep riddle #576 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.e8O=new B.a2("bible","[Set 19] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.egE=new B.a2("bible","[Set 19] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.ebq=new B.a2("bible","Deep riddle #579 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.e8k=new B.a2("bible","Challenge 580: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.ece=new B.a2("street","[Set 19] I speak without a mouth on every corner; ignore me and pay a fine. What am I? (Think carefully.)","A traffic sign")
-A.e6B=new B.a2("street","Deep riddle #582 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.eaa=new B.a2("street","[Set 19] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.efn=new B.a2("street","[Set 19] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.eba=new B.a2("street","Challenge 585: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.e6a=new B.a2("church","[Set 19] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.efa=new B.a2("church","[Set 19] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.e8b=new B.a2("church","Deep riddle #588 \u2014 I am bread and wine yet become something greater in belief. What am I? (Think carefully.)","Communion")
-A.ecZ=new B.a2("church","[Set 19] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.e4Z=new B.a2("church","Challenge 590: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.ebO=new B.a2("logic","Deep riddle #591 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.egC=new B.a2("logic","[Set 19] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.e5C=new B.a2("logic","[Set 19] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.egp=new B.a2("logic","Deep riddle #594 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.e5J=new B.a2("logic","Challenge 595: I have keys but open no locks; space but no room; enter but not go inside. What am I? (Think carefully.)","A keyboard")
-A.ebA=new B.a2("nature","[Set 19] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.eex=new B.a2("nature","Deep riddle #597 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.e7x=new B.a2("mystery","[Set 19] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.ede=new B.a2("mystery","[Set 19] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.efd=new B.a2("wordplay","Challenge 600: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.eeH=new B.a2("logic","Logic puzzle #620: a number times itself minus 52 equals 4437. What is the number?","67")
-A.e72=new B.a2("love","[Set 20] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.efE=new B.a2("love","[Set 20] Two share me but neither owns me alone; without trust I vanish. What am I? (Think carefully.)","A secret")
-A.eeM=new B.a2("love","Deep riddle #603 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.eeP=new B.a2("love","[Set 20] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.e4L=new B.a2("love","Challenge 605: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.edU=new B.a2("bible","Deep riddle #606 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.e6V=new B.a2("bible","[Set 20] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.ejF=new B.a2("bible","[Set 20] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.e7t=new B.a2("bible","Deep riddle #609 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I? (Think carefully.)","Goliath's challenge")
-A.eg9=new B.a2("bible","Challenge 610: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.e5h=new B.a2("street","[Set 20] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.e9B=new B.a2("street","Deep riddle #612 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.eiD=new B.a2("street","[Set 20] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.eaL=new B.a2("street","[Set 20] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.e6h=new B.a2("street","Challenge 615: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.eaP=new B.a2("church","[Set 20] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I? (Think carefully.)","A steeple")
-A.ekl=new B.a2("church","[Set 20] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.ee_=new B.a2("church","Deep riddle #618 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.eeo=new B.a2("church","[Set 20] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.e5d=new B.a2("church","Challenge 620: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.e8d=new B.a2("logic","Deep riddle #621 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.ebC=new B.a2("logic","[Set 20] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.e6F=new B.a2("logic","[Set 20] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I? (Think carefully.)","An echo")
-A.e65=new B.a2("logic","Deep riddle #624 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.efZ=new B.a2("logic","Challenge 625: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.ee5=new B.a2("nature","[Set 20] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.eh7=new B.a2("nature","Deep riddle #627 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.ek2=new B.a2("mystery","[Set 20] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.edg=new B.a2("mystery","[Set 20] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.eiG=new B.a2("wordplay","Challenge 630: What word becomes shorter when you add two letters to it? (Think carefully.)","Short (adding -er)")
-A.e7d=new B.a2("logic","Logic puzzle #651: a number times itself minus 10 equals 134. What is the number?","12")
-A.ec5=new B.a2("love","[Set 21] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.e5S=new B.a2("love","[Set 21] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.e4z=new B.a2("love","Deep riddle #633 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.ecD=new B.a2("love","[Set 21] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.eb0=new B.a2("love","Challenge 635: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.ehw=new B.a2("bible","Deep riddle #636 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.ejz=new B.a2("bible","[Set 21] Built with pitch and gopher wood, I rode forty days of rain. What am I? (Think carefully.)","Noah's ark")
-A.e4J=new B.a2("bible","[Set 21] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.ech=new B.a2("bible","Deep riddle #639 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.eji=new B.a2("bible","Challenge 640: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.e61=new B.a2("street","[Set 21] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.edq=new B.a2("street","Deep riddle #642 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.ea4=new B.a2("street","[Set 21] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.e4X=new B.a2("street","[Set 21] I am tagged in spray paint yet tell stories the city tries to erase. What am I? (Think carefully.)","Graffiti")
-A.e4T=new B.a2("street","Challenge 645: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.e6K=new B.a2("church","[Set 21] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.ejp=new B.a2("church","[Set 21] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.ejB=new B.a2("church","Deep riddle #648 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.e9V=new B.a2("church","[Set 21] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.ef8=new B.a2("church","Challenge 650: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.eiO=new B.a2("logic","Deep riddle #651 \u2014 The more you take from me, the larger I become. What am I? (Think carefully.)","A hole")
-A.ek_=new B.a2("logic","[Set 21] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.e9f=new B.a2("logic","[Set 21] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.e8t=new B.a2("logic","Deep riddle #654 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.ehu=new B.a2("logic","Challenge 655: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.e5Z=new B.a2("nature","[Set 21] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.e8G=new B.a2("nature","Deep riddle #657 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.eaZ=new B.a2("mystery","[Set 21] I am seen in mirrors yet never in the same room twice. What am I? (Think carefully.)","Your reflection leaving")
-A.ee2=new B.a2("mystery","[Set 21] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.edw=new B.a2("wordplay","Challenge 660: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.eat=new B.a2("logic","Logic puzzle #682: a number times itself minus 57 equals 2859. What is the number?","54")
-A.ejI=new B.a2("love","[Set 22] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.edn=new B.a2("love","[Set 22] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.eje=new B.a2("love","Deep riddle #663 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.egj=new B.a2("love","[Set 22] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.e8x=new B.a2("love","Challenge 665: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I? (Think carefully.)","Recognition")
-A.e6z=new B.a2("bible","Deep riddle #666 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.e6w=new B.a2("bible","[Set 22] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.ebj=new B.a2("bible","[Set 22] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.eaO=new B.a2("bible","Deep riddle #669 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.e7L=new B.a2("bible","Challenge 670: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.ebd=new B.a2("street","[Set 22] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.eb4=new B.a2("street","Deep riddle #672 \u2014 I change color but never mood; red stops, green releases. What am I? (Think carefully.)","A stoplight")
-A.e8L=new B.a2("street","[Set 22] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.e5I=new B.a2("street","[Set 22] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.e8z=new B.a2("street","Challenge 675: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.eii=new B.a2("church","[Set 22] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.ebv=new B.a2("church","[Set 22] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.eiF=new B.a2("church","Deep riddle #678 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.e55=new B.a2("church","[Set 22] Whispered on knees, answered in seasons; I move mountains slowly. What am I? (Think carefully.)","Prayer")
-A.e7J=new B.a2("church","Challenge 680: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.e68=new B.a2("logic","Deep riddle #681 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.eev=new B.a2("logic","[Set 22] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.eiI=new B.a2("logic","[Set 22] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.eak=new B.a2("logic","Deep riddle #684 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.egM=new B.a2("logic","Challenge 685: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.efA=new B.a2("nature","[Set 22] I fall but never get hurt; I blanket the world in white silence. What am I? (Think carefully.)","Snow")
-A.e8N=new B.a2("nature","Deep riddle #687 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.ea9=new B.a2("mystery","[Set 22] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.eeA=new B.a2("mystery","[Set 22] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.eaH=new B.a2("wordplay","Challenge 690: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.edl=new B.a2("logic","Logic puzzle #713: a number times itself minus 15 equals 9201. What is the number?","96")
-A.e9K=new B.a2("love","[Set 23] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.ej5=new B.a2("love","[Set 23] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.e4H=new B.a2("love","Deep riddle #693 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I? (Think carefully.)","Affection")
-A.e7a=new B.a2("love","[Set 23] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.ejn=new B.a2("love","Challenge 695: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.ein=new B.a2("bible","Deep riddle #696 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.ehC=new B.a2("bible","[Set 23] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.eb3=new B.a2("bible","[Set 23] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.e5O=new B.a2("bible","Deep riddle #699 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.ejU=new B.a2("bible","Challenge 700: I burned yet was not consumed; a bush spoke from within me. What am I? (Think carefully.)","The burning bush")
-A.e6N=new B.a2("street","[Set 23] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.e6E=new B.a2("street","Deep riddle #702 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.edD=new B.a2("street","[Set 23] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.efj=new B.a2("street","[Set 23] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.ego=new B.a2("street","Challenge 705: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.eck=new B.a2("church","[Set 23] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.eir=new B.a2("church","[Set 23] Passed hand to hand yet never owned; peace lives in my circle. What am I? (Think carefully.)","The sign of peace")
-A.ebn=new B.a2("church","Deep riddle #708 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.e7H=new B.a2("church","[Set 23] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.e8V=new B.a2("church","Challenge 710: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.e7h=new B.a2("logic","Deep riddle #711 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.ege=new B.a2("logic","[Set 23] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.egG=new B.a2("logic","[Set 23] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.e7e=new B.a2("logic","Deep riddle #714 \u2014 Born tall, I die short; every word I carry shrinks me. What am I? (Think carefully.)","A candle")
-A.e70=new B.a2("logic","Challenge 715: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.ecc=new B.a2("nature","[Set 23] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.ek7=new B.a2("nature","Deep riddle #717 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.edj=new B.a2("mystery","[Set 23] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.ebf=new B.a2("mystery","[Set 23] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.ec7=new B.a2("wordplay","Challenge 720: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.ect=new B.a2("logic","Logic puzzle #744: a number times itself minus 62 equals 1619. What is the number?","41")
-A.eea=new B.a2("love","[Set 24] I have a heart that never beats yet lovers chase me across centuries. What am I? (Think carefully.)","A love letter")
-A.edb=new B.a2("love","[Set 24] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.e85=new B.a2("love","Deep riddle #723 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.ed5=new B.a2("love","[Set 24] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.e6n=new B.a2("love","Challenge 725: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.e7v=new B.a2("bible","Deep riddle #726 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.e6c=new B.a2("bible","[Set 24] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.ee3=new B.a2("bible","[Set 24] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I? (Think carefully.)","The Red Sea")
-A.ehI=new B.a2("bible","Deep riddle #729 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.eae=new B.a2("bible","Challenge 730: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.efy=new B.a2("street","[Set 24] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.ehp=new B.a2("street","Deep riddle #732 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.eh5=new B.a2("street","[Set 24] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.ecF=new B.a2("street","[Set 24] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.eg3=new B.a2("street","Challenge 735: Sold from a window with no door; hunger knows my bell. What am I? (Think carefully.)","A food truck")
-A.ehg=new B.a2("church","[Set 24] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.ea2=new B.a2("church","[Set 24] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.e8S=new B.a2("church","Deep riddle #738 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.eid=new B.a2("church","[Set 24] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.e5V=new B.a2("church","Challenge 740: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.e8_=new B.a2("logic","Deep riddle #741 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.e5K=new B.a2("logic","[Set 24] I have cities but no houses, forests but no trees, water but no fish. What am I? (Think carefully.)","A map")
-A.ef7=new B.a2("logic","[Set 24] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.e59=new B.a2("logic","Deep riddle #744 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.e54=new B.a2("logic","Challenge 745: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.egb=new B.a2("nature","[Set 24] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.ekn=new B.a2("nature","Deep riddle #747 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.ehs=new B.a2("mystery","[Set 24] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.ed7=new B.a2("mystery","[Set 24] Doors open for me though I carry no key; time is my ally. What am I? (Think carefully.)","A habit")
-A.e4D=new B.a2("wordplay","Challenge 750: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.ecj=new B.a2("logic","Logic puzzle #775: a number times itself minus 20 equals 6869. What is the number?","83")
-A.eeE=new B.a2("love","[Set 25] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.eeJ=new B.a2("love","[Set 25] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.ehk=new B.a2("love","Deep riddle #753 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.e66=new B.a2("love","[Set 25] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.efM=new B.a2("love","Challenge 755: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.ehD=new B.a2("bible","Deep riddle #756 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I? (Think carefully.)","The great fish")
-A.e7c=new B.a2("bible","[Set 25] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.e5l=new B.a2("bible","[Set 25] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.e97=new B.a2("bible","Deep riddle #759 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.ebL=new B.a2("bible","Challenge 760: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.eao=new B.a2("street","[Set 25] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.efG=new B.a2("street","Deep riddle #762 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.ebS=new B.a2("street","[Set 25] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I? (Think carefully.)","A city bus")
-A.eb8=new B.a2("street","[Set 25] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.e4Q=new B.a2("street","Challenge 765: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.egm=new B.a2("church","[Set 25] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.ebF=new B.a2("church","[Set 25] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.e77=new B.a2("church","Deep riddle #768 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.e69=new B.a2("church","[Set 25] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.ejg=new B.a2("church","Challenge 770: I have no voice but every hymn passes through me. What am I? (Think carefully.)","A choir loft")
-A.eby=new B.a2("logic","Deep riddle #771 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.eer=new B.a2("logic","[Set 25] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.e9i=new B.a2("logic","[Set 25] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.e7S=new B.a2("logic","Deep riddle #774 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.eiX=new B.a2("logic","Challenge 775: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.ecL=new B.a2("nature","[Set 25] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.e5G=new B.a2("nature","Deep riddle #777 \u2014 I have no lungs yet I hold every breath of the forest. What am I? (Think carefully.)","A tree")
-A.e6s=new B.a2("mystery","[Set 25] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.eem=new B.a2("mystery","[Set 25] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.ekc=new B.a2("wordplay","Challenge 780: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.e8W=new B.a2("logic","Logic puzzle #806: a number times itself minus 67 equals 717. What is the number?","28")
-A.e6P=new B.a2("love","[Set 26] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.e87=new B.a2("love","[Set 26] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.ecP=new B.a2("love","Deep riddle #783 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.e80=new B.a2("love","[Set 26] I bind no rope yet hold two souls tighter than chains. What am I? (Think carefully.)","A vow")
-A.ecX=new B.a2("love","Challenge 785: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.eg7=new B.a2("bible","Deep riddle #786 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.e92=new B.a2("bible","[Set 26] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.eif=new B.a2("bible","[Set 26] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.e6Y=new B.a2("bible","Deep riddle #789 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.e5n=new B.a2("bible","Challenge 790: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.eaU=new B.a2("street","[Set 26] I speak without a mouth on every corner; ignore me and pay a fine. What am I? (Think carefully.)","A traffic sign")
-A.e9a=new B.a2("street","Deep riddle #792 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.efI=new B.a2("street","[Set 26] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.ebY=new B.a2("street","[Set 26] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.e8r=new B.a2("street","Challenge 795: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.ecv=new B.a2("church","[Set 26] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.ebW=new B.a2("church","[Set 26] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.ei4=new B.a2("church","Deep riddle #798 \u2014 I am bread and wine yet become something greater in belief. What am I? (Think carefully.)","Communion")
-A.efK=new B.a2("church","[Set 26] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.e4G=new B.a2("church","Challenge 800: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.e6T=new B.a2("logic","Deep riddle #801 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.edS=new B.a2("logic","[Set 26] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.ebh=new B.a2("logic","[Set 26] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.ebr=new B.a2("logic","Deep riddle #804 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.eag=new B.a2("logic","Challenge 805: I have keys but open no locks; space but no room; enter but not go inside. What am I? (Think carefully.)","A keyboard")
-A.e6u=new B.a2("nature","[Set 26] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.eca=new B.a2("nature","Deep riddle #807 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.eeg=new B.a2("mystery","[Set 26] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.eav=new B.a2("mystery","[Set 26] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.e8J=new B.a2("wordplay","Challenge 810: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.e9j=new B.a2("logic","Logic puzzle #837: a number times itself minus 25 equals 4875. What is the number?","70")
-A.eaf=new B.a2("love","[Set 27] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.ekh=new B.a2("love","[Set 27] Two share me but neither owns me alone; without trust I vanish. What am I? (Think carefully.)","A secret")
-A.e90=new B.a2("love","Deep riddle #813 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.eit=new B.a2("love","[Set 27] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.egh=new B.a2("love","Challenge 815: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.ec0=new B.a2("bible","Deep riddle #816 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.ekp=new B.a2("bible","[Set 27] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.e5v=new B.a2("bible","[Set 27] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.e5y=new B.a2("bible","Deep riddle #819 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I? (Think carefully.)","Goliath's challenge")
-A.ecy=new B.a2("bible","Challenge 820: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.ej9=new B.a2("street","[Set 27] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.ejw=new B.a2("street","Deep riddle #822 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.edH=new B.a2("street","[Set 27] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.e9I=new B.a2("street","[Set 27] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.egT=new B.a2("street","Challenge 825: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.eiM=new B.a2("church","[Set 27] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I? (Think carefully.)","A steeple")
-A.egL=new B.a2("church","[Set 27] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.ehA=new B.a2("church","Deep riddle #828 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.eeY=new B.a2("church","[Set 27] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.eaS=new B.a2("church","Challenge 830: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.e51=new B.a2("logic","Deep riddle #831 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.e7F=new B.a2("logic","[Set 27] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.eai=new B.a2("logic","[Set 27] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I? (Think carefully.)","An echo")
-A.edY=new B.a2("logic","Deep riddle #834 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.e5B=new B.a2("logic","Challenge 835: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.ej7=new B.a2("nature","[Set 27] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.eeT=new B.a2("nature","Deep riddle #837 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.e82=new B.a2("mystery","[Set 27] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.e71=new B.a2("mystery","[Set 27] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.eg4=new B.a2("wordplay","Challenge 840: What word becomes shorter when you add two letters to it? (Think carefully.)","Short (adding -er)")
-A.eec=new B.a2("logic","Logic puzzle #868: a number times itself minus 72 equals 153. What is the number?","15")
-A.efq=new B.a2("love","[Set 28] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.e5b=new B.a2("love","[Set 28] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.e9Z=new B.a2("love","Deep riddle #843 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.e8Y=new B.a2("love","[Set 28] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.e6k=new B.a2("love","Challenge 845: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.edF=new B.a2("bible","Deep riddle #846 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.e5F=new B.a2("bible","[Set 28] Built with pitch and gopher wood, I rode forty days of rain. What am I? (Think carefully.)","Noah's ark")
-A.e75=new B.a2("bible","[Set 28] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.efm=new B.a2("bible","Deep riddle #849 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.ec3=new B.a2("bible","Challenge 850: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.ejb=new B.a2("street","[Set 28] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.e6g=new B.a2("street","Deep riddle #852 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.eas=new B.a2("street","[Set 28] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.e9m=new B.a2("street","[Set 28] I am tagged in spray paint yet tell stories the city tries to erase. What am I? (Think carefully.)","Graffiti")
-A.ear=new B.a2("street","Challenge 855: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.e9l=new B.a2("church","[Set 28] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.e5q=new B.a2("church","[Set 28] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.e8o=new B.a2("church","Deep riddle #858 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.eha=new B.a2("church","[Set 28] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.e94=new B.a2("church","Challenge 860: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.ehE=new B.a2("logic","Deep riddle #861 \u2014 The more you take from me, the larger I become. What am I? (Think carefully.)","A hole")
-A.ejy=new B.a2("logic","[Set 28] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.eik=new B.a2("logic","[Set 28] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.e6I=new B.a2("logic","Deep riddle #864 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.e5u=new B.a2("logic","Challenge 865: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.e7A=new B.a2("nature","[Set 28] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.e5Q=new B.a2("nature","Deep riddle #867 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.eeU=new B.a2("mystery","[Set 28] I am seen in mirrors yet never in the same room twice. What am I? (Think carefully.)","Your reflection leaving")
-A.egJ=new B.a2("mystery","[Set 28] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.e8F=new B.a2("wordplay","Challenge 870: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.ebI=new B.a2("logic","Logic puzzle #899: a number times itself minus 30 equals 3219. What is the number?","57")
-A.ejW=new B.a2("love","[Set 29] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.eiq=new B.a2("love","[Set 29] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.e5X=new B.a2("love","Deep riddle #873 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.eio=new B.a2("love","[Set 29] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.ek8=new B.a2("love","Challenge 875: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I? (Think carefully.)","Recognition")
-A.ecI=new B.a2("bible","Deep riddle #876 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.e8P=new B.a2("bible","[Set 29] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.egF=new B.a2("bible","[Set 29] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.ebs=new B.a2("bible","Deep riddle #879 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.e8l=new B.a2("bible","Challenge 880: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.e8w=new B.a2("street","[Set 29] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.eaE=new B.a2("street","Deep riddle #882 \u2014 I change color but never mood; red stops, green releases. What am I? (Think carefully.)","A stoplight")
-A.eab=new B.a2("street","[Set 29] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.efo=new B.a2("street","[Set 29] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.ebb=new B.a2("street","Challenge 885: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.e6b=new B.a2("church","[Set 29] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.efb=new B.a2("church","[Set 29] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.e7j=new B.a2("church","Deep riddle #888 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.ed_=new B.a2("church","[Set 29] Whispered on knees, answered in seasons; I move mountains slowly. What am I? (Think carefully.)","Prayer")
-A.e5_=new B.a2("church","Challenge 890: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.ebP=new B.a2("logic","Deep riddle #891 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.egD=new B.a2("logic","[Set 29] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.e5D=new B.a2("logic","[Set 29] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.egq=new B.a2("logic","Deep riddle #894 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.ed9=new B.a2("logic","Challenge 895: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.eah=new B.a2("nature","[Set 29] I fall but never get hurt; I blanket the world in white silence. What am I? (Think carefully.)","Snow")
-A.eey=new B.a2("nature","Deep riddle #897 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.e7y=new B.a2("mystery","[Set 29] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.edf=new B.a2("mystery","[Set 29] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.efe=new B.a2("wordplay","Challenge 900: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.e7P=new B.a2("logic","Logic puzzle #930: a number times itself minus 77 equals 9724. What is the number?","99")
-A.e73=new B.a2("love","[Set 30] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.ei2=new B.a2("love","[Set 30] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.ed3=new B.a2("love","Deep riddle #903 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I? (Think carefully.)","Affection")
-A.eeQ=new B.a2("love","[Set 30] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.e4M=new B.a2("love","Challenge 905: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.edV=new B.a2("bible","Deep riddle #906 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.e6W=new B.a2("bible","[Set 30] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.ejG=new B.a2("bible","[Set 30] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.ebH=new B.a2("bible","Deep riddle #909 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.ecB=new B.a2("bible","Challenge 910: I burned yet was not consumed; a bush spoke from within me. What am I? (Think carefully.)","The burning bush")
-A.e5i=new B.a2("street","[Set 30] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.e9C=new B.a2("street","Deep riddle #912 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.eiE=new B.a2("street","[Set 30] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.eaM=new B.a2("street","[Set 30] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.e6i=new B.a2("street","Challenge 915: Sold from a window with no door; hunger knows my bell. What am I?","A food truck")
-A.ea0=new B.a2("church","[Set 30] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.ecJ=new B.a2("church","[Set 30] Passed hand to hand yet never owned; peace lives in my circle. What am I? (Think carefully.)","The sign of peace")
-A.ee0=new B.a2("church","Deep riddle #918 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.eep=new B.a2("church","[Set 30] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.e5e=new B.a2("church","Challenge 920: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.e8e=new B.a2("logic","Deep riddle #921 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.ebD=new B.a2("logic","[Set 30] I have cities but no houses, forests but no trees, water but no fish. What am I?","A map")
-A.e7E=new B.a2("logic","[Set 30] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.ee8=new B.a2("logic","Deep riddle #924 \u2014 Born tall, I die short; every word I carry shrinks me. What am I? (Think carefully.)","A candle")
-A.eg_=new B.a2("logic","Challenge 925: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.ee6=new B.a2("nature","[Set 30] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.eh8=new B.a2("nature","Deep riddle #927 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.ek3=new B.a2("mystery","[Set 30] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.edh=new B.a2("mystery","[Set 30] Doors open for me though I carry no key; time is my ally. What am I?","A habit")
-A.eee=new B.a2("wordplay","Challenge 930: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.e5E=new B.a2("logic","Logic puzzle #961: a number times itself minus 35 equals 1901. What is the number?","44")
-A.eeh=new B.a2("love","[Set 31] I have a heart that never beats yet lovers chase me across centuries. What am I? (Think carefully.)","A love letter")
-A.e5T=new B.a2("love","[Set 31] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.e4A=new B.a2("love","Deep riddle #933 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.ecE=new B.a2("love","[Set 31] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.eb1=new B.a2("love","Challenge 935: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.ehx=new B.a2("bible","Deep riddle #936 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I?","The great fish")
-A.e7W=new B.a2("bible","[Set 31] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.e4N=new B.a2("bible","[Set 31] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I? (Think carefully.)","The Red Sea")
-A.eci=new B.a2("bible","Deep riddle #939 \u2014 Small in hand, giant on the field; one smooth stone ended my echo. What am I?","Goliath's challenge")
-A.ejj=new B.a2("bible","Challenge 940: I burned yet was not consumed; a bush spoke from within me. What am I?","The burning bush")
-A.e62=new B.a2("street","[Set 31] I speak without a mouth on every corner; ignore me and pay a fine. What am I?","A traffic sign")
-A.edr=new B.a2("street","Deep riddle #942 \u2014 I change color but never mood; red stops, green releases. What am I?","A stoplight")
-A.ea5=new B.a2("street","[Set 31] Rolling on four yet carrying hundreds; I stop every block but never walk. What am I?","A city bus")
-A.ef_=new B.a2("street","[Set 31] I am tagged in spray paint yet tell stories the city tries to erase. What am I?","Graffiti")
-A.e8C=new B.a2("street","Challenge 945: Sold from a window with no door; hunger knows my bell. What am I? (Think carefully.)","A food truck")
-A.e6L=new B.a2("church","[Set 31] I rise toward heaven yet stand on earth; bells call the faithful to me. What am I?","A steeple")
-A.ejq=new B.a2("church","[Set 31] Passed hand to hand yet never owned; peace lives in my circle. What am I?","The sign of peace")
-A.ejC=new B.a2("church","Deep riddle #948 \u2014 I am bread and wine yet become something greater in belief. What am I?","Communion")
-A.e9W=new B.a2("church","[Set 31] Whispered on knees, answered in seasons; I move mountains slowly. What am I?","Prayer")
-A.ef9=new B.a2("church","Challenge 950: I have no voice but every hymn passes through me. What am I?","A choir loft")
-A.ejt=new B.a2("logic","Deep riddle #951 \u2014 The more you take from me, the larger I become. What am I?","A hole")
-A.ebc=new B.a2("logic","[Set 31] I have cities but no houses, forests but no trees, water but no fish. What am I? (Think carefully.)","A map")
-A.e9g=new B.a2("logic","[Set 31] I speak without a mouth and hear without ears; I have no body but come alive with wind. What am I?","An echo")
-A.e8u=new B.a2("logic","Deep riddle #954 \u2014 Born tall, I die short; every word I carry shrinks me. What am I?","A candle")
-A.ehv=new B.a2("logic","Challenge 955: I have keys but open no locks; space but no room; enter but not go inside. What am I?","A keyboard")
-A.e6_=new B.a2("nature","[Set 31] I fall but never get hurt; I blanket the world in white silence. What am I?","Snow")
-A.e8H=new B.a2("nature","Deep riddle #957 \u2014 I have no lungs yet I hold every breath of the forest. What am I?","A tree")
-A.ebR=new B.a2("mystery","[Set 31] I am seen in mirrors yet never in the same room twice. What am I?","Your reflection leaving")
-A.ecY=new B.a2("mystery","[Set 31] Doors open for me though I carry no key; time is my ally. What am I? (Think carefully.)","A habit")
-A.edx=new B.a2("wordplay","Challenge 960: What word becomes shorter when you add two letters to it?","Short (adding -er)")
-A.edd=new B.a2("logic","Logic puzzle #992: a number times itself minus 82 equals 7314. What is the number?","86")
-A.ejJ=new B.a2("love","[Set 32] I have a heart that never beats yet lovers chase me across centuries. What am I?","A love letter")
-A.edo=new B.a2("love","[Set 32] Two share me but neither owns me alone; without trust I vanish. What am I?","A secret")
-A.ejf=new B.a2("love","Deep riddle #963 \u2014 I grow when given away in romance yet shrink when hoarded in silence. What am I?","Affection")
-A.egk=new B.a2("love","[Set 32] I bind no rope yet hold two souls tighter than chains. What am I?","A vow")
-A.ehe=new B.a2("love","Challenge 965: Seen in eyes before spoken on lips; I arrive first at every true meeting. What am I?","Recognition")
-A.eal=new B.a2("bible","Deep riddle #966 \u2014 I swallowed a man yet could not digest his prayer; I returned him on the third dawn. What am I? (Think carefully.)","The great fish")
-A.e6x=new B.a2("bible","[Set 32] Built with pitch and gopher wood, I rode forty days of rain. What am I?","Noah's ark")
-A.ebk=new B.a2("bible","[Set 32] I parted for a nation fleeing; walls of me stood like guards then fell flat. What am I?","The Red Sea")
-A.dtF=x([A.e6p,A.ea7,A.eeC,A.ek0,A.ehr,A.ed6,A.egi,A.e6q,A.ehc,A.e89,A.eiL,A.e6d,A.eet,A.eft,A.eaV,A.ef3,A.e78,A.eds,A.ee9,A.ekd,A.ef1,A.egR,A.efB,A.e7T,A.efu,A.eeV,A.eei,A.ejY,A.e9G,A.ehJ,A.efr,A.eaw,A.e9M,A.e7M,A.eiY,A.e6Q,A.ed0,A.eeb,A.efN,A.edy,A.e8a,A.egV,A.eg2,A.e7l,A.ejS,A.eaW,A.edI,A.eiu,A.edt,A.e9E,A.eke,A.eh2,A.ejK,A.ecl,A.e7U,A.efv,A.e9D,A.eej,A.ejc,A.e9r,A.ehK,A.ejr,A.eax,A.e9N,A.ebV,A.eiZ,A.e7B,A.ed1,A.ehT,A.efO,A.edz,A.edk,A.egW,A.e6e,A.e7m,A.ehM,A.eaX,A.edJ,A.ef0,A.edu,A.egs,A.ekf,A.eh3,A.ejL,A.ecm,A.ea6,A.efw,A.ei5,A.eek,A.eiP,A.e9s,A.ehL,A.eaF,A.eeB,A.e9O,A.e7N,A.ej_,A.e7C,A.ed2,A.ehU,A.e5f,A.edA,A.eff,A.egX,A.e6C,A.e7n,A.ehN,A.eb5,A.edK,A.eiv,A.ebl,A.egt,A.e8T,A.e7f,A.egN,A.ecn,A.ecM,A.e6Z,A.ei6,A.ek5,A.eiQ,A.eig,A.ec6,A.e9q,A.eay,A.e9P,A.e83,A.ej0,A.e6l,A.ejD,A.ehV,A.efP,A.ehG,A.eac,A.egY,A.ehn,A.eiK,A.ehO,A.e9o,A.edL,A.eiw,A.e8Q,A.egu,A.e7Y,A.e7Z,A.ejM,A.eco,A.e57,A.e52,A.ei7,A.egz,A.eiR,A.e9t,A.e4B,A.ecQ,A.eaz,A.e9Q,A.ehi,A.egr,A.efL,A.e8h,A.ehW,A.efQ,A.e95,A.ebJ,A.ebT,A.efF,A.e7o,A.ehP,A.e4O,A.edM,A.eix,A.ecK,A.egv,A.e9c,A.ebw,A.ejN,A.ecp,A.e7Q,A.ehh,A.ei8,A.efW,A.eiS,A.e9u,A.eka,A.e8v,A.eaA,A.e9L,A.ecO,A.ej1,A.ecV,A.eg5,A.ehX,A.efR,A.eaT,A.e5m,A.egZ,A.e98,A.e7p,A.ehQ,A.e8p,A.eaY,A.eiy,A.eki,A.egw,A.e4E,A.e6R,A.ejO,A.eil,A.ebo,A.egP,A.ei9,A.ec8,A.eiT,A.e9v,A.e4W,A.eeN,A.eaB,A.e9R,A.e8Z,A.ej2,A.egf,A.ebZ,A.ei_,A.efS,A.e8A,A.ecw,A.eh_,A.eju,A.e7q,A.eiB,A.egS,A.edN,A.eiz,A.ehy,A.egx,A.eaQ,A.ecz,A.ejP,A.ecq,A.edW,A.e5z,A.eia,A.eeR,A.e6o,A.e9w,A.ehl,A.ei3,A.eaC,A.e9S,A.e9X,A.ej3,A.ecf,A.edE,A.ehY,A.efT,A.efk,A.ec1,A.eh0,A.ea3,A.e7r,A.ehR,A.eap,A.edO,A.eiA,A.e8m,A.e7X,A.e93,A.egA,A.ejQ,A.ecr,A.e6G,A.e5s,A.ef5,A.e5P,A.eiU,A.e9x,A.e8D,A.efD,A.eaD,A.e9T,A.eg0,A.ej4,A.e5w,A.ecG,A.ehZ,A.efU,A.ebp,A.e7O,A.eh1,A.e6A,A.e7s,A.ehS,A.eb9,A.edP,A.efz,A.e7i,A.egy,A.e4Y,A.ebN,A.ejR,A.ecs,A.ebz,A.ed8,A.eib,A.eew,A.eiV,A.e9y,A.efc,A.ecS,A.ebM,A.ei1,A.eeL,A.eeO,A.e4K,A.edT,A.e6U,A.ecR,A.ebG,A.eg8,A.e5g,A.e9A,A.eiC,A.eaK,A.ejk,A.ea_,A.ekk,A.edZ,A.een,A.e5c,A.e8c,A.e5o,A.e7D,A.e63,A.efY,A.ee4,A.eh6,A.ek1,A.e9n,A.eed,A.ebt,A.ec4,A.e5R,A.e4y,A.ecC,A.eb_,A.e4R,A.e7V,A.e4I,A.ecg,A.ejh,A.e60,A.edp,A.ejT,A.eeZ,A.e4S,A.e6J,A.ejo,A.ejA,A.e9U,A.eaI,A.ejs,A.ejZ,A.e9e,A.e8s,A.eht,A.e5Y,A.e8f,A.ebQ,A.ee1,A.edv,A.edQ,A.ejH,A.edm,A.ejd,A.ehF,A.ehd,A.e6y,A.e6v,A.ebi,A.eaN,A.e7K,A.ejX,A.e7w,A.e8K,A.e5H,A.e8y,A.eih,A.ebu,A.e8j,A.e56,A.e7I,A.e67,A.eeu,A.eiH,A.eaj,A.e5r,A.ef4,A.e8M,A.ea8,A.eez,A.eaG,A.ebB,A.e9J,A.eb6,A.eeF,A.e79,A.ejm,A.eim,A.ehB,A.eb2,A.egO,A.efg,A.e6M,A.e6D,A.edC,A.efi,A.egn,A.ehb,A.ejE,A.ebm,A.e7G,A.e8U,A.e7g,A.egd,A.eiJ,A.ecN,A.e7_,A.ecb,A.ek6,A.edi,A.ebe,A.ek9,A.e5M,A.edc,A.eda,A.e84,A.ed4,A.e6m,A.e7u,A.efs,A.e9F,A.ehH,A.ead,A.efx,A.eho,A.eh4,A.efC,A.e9p,A.ehf,A.ea1,A.e8R,A.eic,A.e5U,A.efh,A.eeG,A.ef6,A.e58,A.e53,A.ega,A.ekm,A.egc,A.ecT,A.e4C,A.ecA,A.eeD,A.eeI,A.ehj,A.e64,A.e5N,A.e8i,A.e7b,A.e5k,A.e96,A.ebK,A.ean,A.egH,A.e4V,A.eb7,A.e4P,A.egl,A.ebE,A.e76,A.ehq,A.e9d,A.ebx,A.eeq,A.e9h,A.e7R,A.eiW,A.e5L,A.efX,A.e6r,A.eel,A.ekb,A.eeK,A.e6O,A.e86,A.ek4,A.e8g,A.ecW,A.eg6,A.e91,A.eie,A.e6X,A.eam,A.ei0,A.e99,A.efH,A.ebX,A.e8q,A.ecu,A.eg1,A.ekj,A.efJ,A.e4F,A.e6S,A.edR,A.ebg,A.egU,A.egQ,A.e6t,A.ec9,A.eef,A.eau,A.e8I,A.ee7,A.e9z,A.ecU,A.e9_,A.eis,A.egg,A.ec_,A.eko,A.eiN,A.e8B,A.ecx,A.ej8,A.ejv,A.edG,A.e9H,A.efV,A.eeW,A.egK,A.ehz,A.eeX,A.eaR,A.e50,A.e4U,A.ees,A.edX,A.e5A,A.ej6,A.eeS,A.e81,A.ecd,A.ehm,A.ebU,A.efp,A.e5a,A.e9Y,A.e8X,A.e6j,A.e7k,A.e88,A.e74,A.efl,A.ec2,A.eja,A.e6f,A.e9b,A.ef2,A.eaq,A.e9k,A.e5p,A.e8n,A.eh9,A.eaJ,A.egB,A.ejx,A.eij,A.e6H,A.e5t,A.e7z,A.ejl,A.ekg,A.egI,A.e8E,A.edB,A.ejV,A.eip,A.e5W,A.e5j,A.e5x,A.ecH,A.e8O,A.egE,A.ebq,A.e8k,A.ece,A.e6B,A.eaa,A.efn,A.eba,A.e6a,A.efa,A.e8b,A.ecZ,A.e4Z,A.ebO,A.egC,A.e5C,A.egp,A.e5J,A.ebA,A.eex,A.e7x,A.ede,A.efd,A.eeH,A.e72,A.efE,A.eeM,A.eeP,A.e4L,A.edU,A.e6V,A.ejF,A.e7t,A.eg9,A.e5h,A.e9B,A.eiD,A.eaL,A.e6h,A.eaP,A.ekl,A.ee_,A.eeo,A.e5d,A.e8d,A.ebC,A.e6F,A.e65,A.efZ,A.ee5,A.eh7,A.ek2,A.edg,A.eiG,A.e7d,A.ec5,A.e5S,A.e4z,A.ecD,A.eb0,A.ehw,A.ejz,A.e4J,A.ech,A.eji,A.e61,A.edq,A.ea4,A.e4X,A.e4T,A.e6K,A.ejp,A.ejB,A.e9V,A.ef8,A.eiO,A.ek_,A.e9f,A.e8t,A.ehu,A.e5Z,A.e8G,A.eaZ,A.ee2,A.edw,A.eat,A.ejI,A.edn,A.eje,A.egj,A.e8x,A.e6z,A.e6w,A.ebj,A.eaO,A.e7L,A.ebd,A.eb4,A.e8L,A.e5I,A.e8z,A.eii,A.ebv,A.eiF,A.e55,A.e7J,A.e68,A.eev,A.eiI,A.eak,A.egM,A.efA,A.e8N,A.ea9,A.eeA,A.eaH,A.edl,A.e9K,A.ej5,A.e4H,A.e7a,A.ejn,A.ein,A.ehC,A.eb3,A.e5O,A.ejU,A.e6N,A.e6E,A.edD,A.efj,A.ego,A.eck,A.eir,A.ebn,A.e7H,A.e8V,A.e7h,A.ege,A.egG,A.e7e,A.e70,A.ecc,A.ek7,A.edj,A.ebf,A.ec7,A.ect,A.eea,A.edb,A.e85,A.ed5,A.e6n,A.e7v,A.e6c,A.ee3,A.ehI,A.eae,A.efy,A.ehp,A.eh5,A.ecF,A.eg3,A.ehg,A.ea2,A.e8S,A.eid,A.e5V,A.e8_,A.e5K,A.ef7,A.e59,A.e54,A.egb,A.ekn,A.ehs,A.ed7,A.e4D,A.ecj,A.eeE,A.eeJ,A.ehk,A.e66,A.efM,A.ehD,A.e7c,A.e5l,A.e97,A.ebL,A.eao,A.efG,A.ebS,A.eb8,A.e4Q,A.egm,A.ebF,A.e77,A.e69,A.ejg,A.eby,A.eer,A.e9i,A.e7S,A.eiX,A.ecL,A.e5G,A.e6s,A.eem,A.ekc,A.e8W,A.e6P,A.e87,A.ecP,A.e80,A.ecX,A.eg7,A.e92,A.eif,A.e6Y,A.e5n,A.eaU,A.e9a,A.efI,A.ebY,A.e8r,A.ecv,A.ebW,A.ei4,A.efK,A.e4G,A.e6T,A.edS,A.ebh,A.ebr,A.eag,A.e6u,A.eca,A.eeg,A.eav,A.e8J,A.e9j,A.eaf,A.ekh,A.e90,A.eit,A.egh,A.ec0,A.ekp,A.e5v,A.e5y,A.ecy,A.ej9,A.ejw,A.edH,A.e9I,A.egT,A.eiM,A.egL,A.ehA,A.eeY,A.eaS,A.e51,A.e7F,A.eai,A.edY,A.e5B,A.ej7,A.eeT,A.e82,A.e71,A.eg4,A.eec,A.efq,A.e5b,A.e9Z,A.e8Y,A.e6k,A.edF,A.e5F,A.e75,A.efm,A.ec3,A.ejb,A.e6g,A.eas,A.e9m,A.ear,A.e9l,A.e5q,A.e8o,A.eha,A.e94,A.ehE,A.ejy,A.eik,A.e6I,A.e5u,A.e7A,A.e5Q,A.eeU,A.egJ,A.e8F,A.ebI,A.ejW,A.eiq,A.e5X,A.eio,A.ek8,A.ecI,A.e8P,A.egF,A.ebs,A.e8l,A.e8w,A.eaE,A.eab,A.efo,A.ebb,A.e6b,A.efb,A.e7j,A.ed_,A.e5_,A.ebP,A.egD,A.e5D,A.egq,A.ed9,A.eah,A.eey,A.e7y,A.edf,A.efe,A.e7P,A.e73,A.ei2,A.ed3,A.eeQ,A.e4M,A.edV,A.e6W,A.ejG,A.ebH,A.ecB,A.e5i,A.e9C,A.eiE,A.eaM,A.e6i,A.ea0,A.ecJ,A.ee0,A.eep,A.e5e,A.e8e,A.ebD,A.e7E,A.ee8,A.eg_,A.ee6,A.eh8,A.ek3,A.edh,A.eee,A.e5E,A.eeh,A.e5T,A.e4A,A.ecE,A.eb1,A.ehx,A.e7W,A.e4N,A.eci,A.ejj,A.e62,A.edr,A.ea5,A.ef_,A.e8C,A.e6L,A.ejq,A.ejC,A.e9W,A.ef9,A.ejt,A.ebc,A.e9g,A.e8u,A.ehv,A.e6_,A.e8H,A.ebR,A.ecY,A.edx,A.edd,A.ejJ,A.edo,A.ejf,A.egk,A.ehe,A.eal,A.e6x,A.ebk],C.aC("R<a2>"))
-A.dyB=x([D.b8,D.bU],y.O)
-A.e33=new C.tX("\ud83d\udc98",28,null,null)
-A.aMg=new C.tX("\ud83d\udc98",36,null,null)
-A.e35=new C.tX("\ud83d\udcaa",44,null,null)
-A.aMh=new C.tX("\u2728",16,null,null)
-A.e38=new C.tX("\ud83d\udcaa",40,null,null)
-A.eRL=new C.y("Next step for you two","\ud83c\udf39")
-A.eRY=new C.y("","")
-A.f1c=new C.y("Date idea","\ud83c\udf19")
-A.f5_=new C.y("Keep the spark alive","\ud83d\udc9e")
-A.fZg=new C.C("One confidence boost per day \u2014 come back tomorrow! \ud83d\udcaa",null,null,null,null,null,null,null,null,null,null,null)
-A.fs9=new C.b0(A.fZg,null,null,null,null,null,null,null,null,null,null,null,null,D.Y,!1,null,null,null,D.t,null)
-A.h6Q=new C.C("Enter both names to calculate your match.",null,null,null,null,null,null,null,null,null,null,null)
-A.fsD=new C.b0(A.h6Q,null,null,null,null,null,null,null,null,null,null,null,null,D.Y,!1,null,null,null,D.t,null)
-A.h2V=new C.C("One fortune per day \u2014 come back tomorrow! \ud83d\udd2e",null,null,null,null,null,null,null,null,null,null,null)
-A.fui=new C.b0(A.h2V,null,null,null,null,null,null,null,null,null,null,null,null,D.Y,!1,null,null,null,D.t,null)
-A.fUf=new C.C("15 riddles per day \u2014 your brain earned a rest! \ud83e\udde0",null,null,null,null,null,null,null,null,null,null,null)
-A.fuk=new C.b0(A.fUf,null,null,null,null,null,null,null,null,null,null,null,null,D.Y,!1,null,null,null,D.t,null)
-A.fyt=new C.G(!0,D.c,null,null,null,null,56,D.u,null,null,null,null,1,null,null,null,null,null,null,null,null,null,D.IP,null,null,null)
-A.fyB=new C.G(!0,D.c,null,null,null,null,15,D.a8,null,null,null,null,1.45,null,null,null,null,null,null,null,null,null,null,null,null,null)
-A.fAF=new C.G(!0,D.c,null,null,null,null,14,D.a8,null,null,null,null,1.4,null,null,null,null,null,null,null,null,null,null,null,null,null)
-A.aWM=new C.G(!0,D.c,null,null,null,null,14,D.a8,null,null,null,null,1.45,null,null,null,null,null,null,null,null,null,null,null,null,null)
-A.fAO=new C.G(!0,D.c,null,null,null,null,15,D.a8,null,null,null,null,1.4,null,null,null,null,null,null,null,null,null,null,null,null,null)
-A.fB6=new C.G(!0,D.c,null,null,null,null,15,D.a8,null,null,null,null,1.35,null,null,null,null,null,null,null,null,null,null,null,null,null)
-A.fCk=new C.G(!0,D.c,null,null,null,null,44,D.u,null,null,null,null,1,null,null,null,null,null,null,null,null,null,E.a5v,null,null,null)
-A.fKm=new C.G(!0,D.c,null,null,null,null,13,D.cD,null,null,null,null,1.45,null,null,null,null,null,null,null,null,null,null,null,null,null)
-A.fBS=new C.G(!0,D.ey,null,null,null,null,10,D.H,null,1.2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-A.fUb=new C.C("ANSWER",null,A.fBS,null,null,null,null,null,null,null,null,null)
-A.fVs=new C.C("Confidence Circle",null,D.dl,null,D.K,null,null,null,null,null,null,null)
-A.fHR=new C.G(!0,D.bP,null,null,null,null,10,D.H,null,1.2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-A.fYl=new C.C("RIDDLE",null,A.fHR,null,null,null,null,null,null,null,null,null)
-A.fYJ=new C.C("Fortune Crystal",null,D.dl,null,null,null,null,null,null,null,null,null)
-A.fZD=new C.C("Love Match Calculator",null,D.fR,null,D.K,null,null,null,null,null,null,null)
-A.fMS=new C.G(!0,D.c,null,null,null,null,16,D.H,null,1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-A.h_U=new C.C("Love Match",null,A.fMS,null,null,null,null,null,null,null,null,null)
-A.h6O=new C.C("Brain Teasers",null,D.dl,null,null,null,null,null,null,null,null,null)
-A.fC4=new C.G(!0,D.c,null,null,null,null,16,D.u,null,0.5,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-A.h9a=new C.C("Daily Confidence Boost",null,A.fC4,null,null,null,null,null,null,null,null,null)
-A.fHy=new C.G(!0,D.c,null,null,null,null,14,D.H,null,0.8,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-A.hcc=new C.C("Love Match",null,A.fHy,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["ET8l1UrRo96QwC8CTAoqeQPewIQ="]=a.current})($__dart_deferred_initializers__);
+C.fdq.prototype={
+$1(d){var w,v,u,t,s="true",r=document,q=r.createElement("div"),p=q.style
+p.width="100%"
+p=q.style
+p.height="100%"
+p=q.style
+p.overflow="hidden"
+p=q.style
+p.position="relative"
+p=q.style
+p.backgroundColor="#000"
+p=this.a
+w=B.o.D(p.a.w*100,100,135)
+v=p.a.e?" scaleX(-1)":""
+u=r.createElement("video")
+u.autoplay=!0
+u.muted=!0
+u.defaultMuted=!0
+u.controls=!1
+u.setAttribute("playsinline",s)
+u.setAttribute("webkit-playsinline",s)
+u.setAttribute("autoplay",s)
+u.setAttribute("muted",s)
+r=u.style
+r.position="absolute"
+r=u.style
+r.left="50%"
+r=u.style
+r.top="50%"
+r=u.style
+t=A.w(w)+"%"
+r.width=t
+r=u.style
+r.height=t
+r=u.style
+r.toString
+t=p.a.r
+B.ca.eL(r,B.ca.ef(r,"object-fit"),t,"")
+t=u.style
+t.backgroundColor="#000"
+r=u.style
+r.toString
+B.ca.eL(r,B.ca.ef(r,"transform"),"translate(-50%, -50%)"+v,"")
+r=p.a.c
+if(x.E.b(r))u.srcObject=r
+r=u.play()
+r.toString
+A.eg(r,x.z).eF(new C.fdp())
+p.e=u
+q.appendChild(u).toString
+return q},
+$S:635}
+C.fdp.prototype={
+$1(d){$.am.$1("[live_capture] preview play: "+A.w(d))},
+$S:30}
+C.fdr.prototype={
+$1(d){},
+$S:30};(function aliases(){var w=C.aO4.prototype
+w.bzY=w.t})();(function installTearOffs(){var w=a._instance_0u,v=a._instance_1u,u=a._instance_0i
+var t
+w(t=C.aFx.prototype,"gbO9","bOa",1)
+w(t,"gb3F","cif",1)
+w(t,"gccu","ET",0)
+w(t,"gcDi","akb",0)
+w(t,"gcDI","ST",0)
+w(t,"gcBb","cBc",1)
+v(t,"gc5o","c5p",4)
+w(t,"gcHc","cHd",1)
+w(t,"gcHt","akO",0)
+w(t,"gcHn","akN",0)
+w(t,"gbUP","acm",0)
+w(t=C.aKJ.prototype,"gcv3","Kz",0)
+w(t,"gccv","a00",0)
+u(t,"gccs","a_Z",0)
+v(C.aEo.prototype,"gcDC","cDD",9)
+v(C.b32.prototype,"gbbS","cHR",13)})();(function inheritance(){var w=a.mixinHard,v=a.inheritMany,u=a.inherit
+v(A.qv,[C.Cf,C.aEn])
+v(A.kX,[C.h3o,C.dZx,C.dZ7,C.dZc,C.dZb,C.dZv,C.dZh,C.dZ6,C.dZ3,C.dZg,C.ffH,C.ffE,C.ffI,C.ciU,C.ciW,C.ciT,C.ciS,C.ciA,C.cix,C.ciy,C.ciH,C.ciJ,C.ciG,C.ciD,C.ciM,C.ciN,C.ciO,C.ciK,C.ciL,C.ciP,C.ciI,C.ciE,C.ciF,C.fdq,C.fdp,C.fdr])
+v(A.ag,[C.Wf,C.a2d,C.a0w,C.aKn])
+v(A.ah,[C.aO4,C.aKJ,C.aEo,C.bvF])
+u(C.aFx,C.aO4)
+v(A.np,[C.dZw,C.dZ8,C.dZ9,C.dYY,C.dZa,C.dZd,C.dZi,C.dZj,C.dZk,C.dZl,C.dZ2,C.dZm,C.dZn,C.dZo,C.dZ4,C.dZ5,C.dZ1,C.dZ0,C.dZq,C.dZt,C.dZu,C.dZr,C.dZs,C.dZf,C.dZe,C.dYZ,C.dZ_,C.ffC,C.ffD,C.ffF,C.ffG,C.ffJ,C.ffK,C.ffL,C.dAh,C.dAg,C.dAf,C.ciz,C.ciR])
+v(A.n0,[C.dZp,C.dYX,C.ciV])
+v(A.aK,[C.pu,C.b33,C.b32])
+u(C.b34,A.q2)
+u(C.byw,A.av)
+w(C.aO4,A.eO)})()
+A.p2(b.typeUniverse,JSON.parse('{"Wf":{"ag":[],"v":[]},"a2d":{"ag":[],"v":[]},"a0w":{"ag":[],"v":[]},"aFx":{"ah":["Wf"]},"aKJ":{"ah":["a2d"]},"aEo":{"ah":["a0w"]},"b34":{"aA":[]},"aKn":{"ag":[],"v":[]},"bvF":{"ah":["aKn"]},"byw":{"av":[],"v":[]}}'))
+var y={k:"2. Open Recorder Studio and tap Start Video.",j:"Recording \u2014 tap Stop & Save when finished.",d:"Saved. Open it below to play, edit, or download."}
+var x=(function rtii(){var w=A.aF
+return{d:w("nR"),Q:w("MJ"),J:w("nn"),C:w("zw"),v:w("U4"),B:w("ec"),x:w("aB<~>"),V:w("U<ab>"),W:w("U<u>"),k:w("U<mC>"),t:w("U<ac<q,@>>"),G:w("U<pu>"),f:w("U<aK>"),s:w("U<q>"),p:w("U<v>"),F:w("ai<pu>"),j:w("ai<@>"),I:w("ai<H>"),Y:w("ac<q,aK>"),P:w("ac<q,@>"),M:w("ac<@,@>"),w:w("kF"),E:w("NT"),A:w("wo"),m:w("pu"),Z:w("aK"),_:w("yr"),N:w("q"),L:w("bt<r>"),D:w("e8"),O:w("bl<q>"),h:w("c7<e8?>"),a:w("c7<~>"),g:w("bn<zw>"),U:w("bn<e8?>"),b:w("bn<~>"),q:w("pO"),y:w("Q"),i:w("G"),z:w("@"),S:w("H"),u:w("NT?"),R:w("pu?"),l:w("b33?"),X:w("aK?"),T:w("q?"),K:w("e8?"),H:w("~")}})();(function constants(){var w=a.makeConstList
+D.b6e=new A.be(B.iq,B.iq,B.iq,B.iq)
+D.bgt=new A.fi(2.5,null,null,null,null,B.bi,null,null,null,null)
+D.be0=new A.ck(B.z,null,null,D.bgt,null)
+D.bCH=new A.bf(35e3)
+D.bEY=new A.P(12,8,12,16)
+D.bGP=new A.P(18,14,18,22)
+D.bKj=new A.P(8,8,8,18)
+D.fzW=new A.F(!0,B.bi,null,null,null,null,12,B.u,null,1.2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fSj=new A.C("VIDEO",null,D.fzW,null,null,null,null,null,null,null,null,null)
+D.bLP=new A.bz(1,B.bd,D.fSj,null)
+D.bSg=new A.a_(62819,"MaterialIcons",!1)
+D.bSC=new A.a_(62995,"MaterialIcons",!1)
+D.bVz=new A.a_(985101,"MaterialIcons",!1)
+D.bY_=new A.ae(B.oH,22,B.c,null,null,null)
+D.bYP=new A.ae(B.I_,22,B.c,null,null,null)
+D.bZe=new A.ae(B.l_,16,B.c,null,null,null)
+D.dkP=w(["1. Open ngmy.org in Chrome, Edge, or Safari.","2. Click Start Video in Recorder Studio.","3. Click Allow in the browser microphone prompt.","4. If blocked: click the lock icon in the address bar \u2192 Site settings \u2192 Microphone \u2192 Allow.","5. On Mac: System Settings \u2192 Privacy & Security \u2192 Microphone \u2192 enable your browser.","6. On Windows: Settings \u2192 Privacy \u2192 Microphone \u2192 allow desktop apps and your browser.","7. Refresh ngmy.org and click Start Video again."],x.s)
+D.a8n=new C.Cf(0,"instant")
+D.a8o=new C.Cf(1,"slideHorizontal")
+D.dV_=new C.Cf(2,"slideVertical")
+D.dV0=new C.Cf(3,"fade")
+D.a6U=w([D.a8n,D.a8o,D.dV_,D.dV0],A.aF("U<Cf>"))
+D.dv_=w(["1. Open ngmy.org in Chrome (recommended).",y.k,"3. When Android asks, tap Allow while using the app.","4. If blocked: tap the lock icon in the address bar \u2192 Permissions \u2192 Microphone \u2192 Allow.","5. Or go to Settings \u2192 Apps \u2192 Chrome \u2192 Permissions \u2192 Microphone \u2192 Allow.","6. Refresh the page and tap Start Video again."],x.s)
+D.dAt=w(["1. Open ngmy.org in Safari (Add to Home Screen works too).",y.k,"3. Tap Allow when ngmy.org asks \u2014 this works with Safari set to Ask or Allow.","4. Recommended: Settings \u2192 Safari \u2192 Microphone \u2192 Ask, then Allow inside ngmy.org when recording.","5. If no prompt appears: tap the AA icon in the address bar \u2192 Website Settings \u2192 Microphone \u2192 Allow.","6. Also check: Settings \u2192 Privacy & Security \u2192 Microphone \u2192 Safari ON.","7. Close Safari completely, reopen ngmy.org, tap Start Video, then Allow."],x.s)
+D.bgs=new A.fi(null,null,null,null,null,B.bQ,null,null,null,null)
+D.beU=new A.ck(B.z,null,null,D.bgs,null)
+D.eyP=new A.D(B.eA,D.beU,null)
+D.eHJ=new A.y(1080,1080)
+D.eHK=new A.y(1080,1920)
+D.eI0=new A.y(1920,1080)
+D.bWH=new A.ae(B.ej,null,B.c,null,null,null)
+D.fNT=new A.C("Delete",null,B.h7,null,null,null,null,null,null,null,null,null)
+D.d3d=w([D.bWH,B.ae,D.fNT],x.p)
+D.fiL=new A.c8(B.aM,B.mu,B.i,B.l,null,B.p,null,0,D.d3d,null)
+D.c1A=new A.ae(B.l_,22,B.bi,null,null,null)
+D.h7a=new A.C("Turn on the microphone",null,B.fR,null,null,null,null,null,null,null,null,null)
+D.bLm=new A.bz(1,B.bd,D.h7a,null)
+D.d6I=w([D.c1A,B.as,D.bLm],x.p)
+D.fiU=new A.c8(B.aM,B.e,B.i,B.l,null,B.p,null,0,D.d6I,null)
+D.fXi=new A.C("Could not share this recording. Try again after the video finishes loading.",null,null,null,null,null,null,null,null,null,null,null)
+D.fs8=new A.b0(D.fXi,B.bD,null,null,null,null,null,null,B.iG,null,null,null,null,B.Y,!1,null,null,null,B.t,null)
+D.haO=new A.C("Recording paused \u2014 tap Resume when you are ready to continue.",null,null,null,null,null,null,null,null,null,null,null)
+D.fu4=new A.b0(D.haO,B.hl,null,null,null,null,null,null,B.iG,null,null,null,null,B.h1,!1,null,null,null,B.t,null)
+D.fTw=new A.C("Video ready \u2014 use the share sheet or save from your gallery.",null,null,null,null,null,null,null,null,null,null,null)
+D.fuJ=new A.b0(D.fTw,B.b2,null,null,null,null,null,null,B.iG,null,null,null,null,B.Y,!1,null,null,null,B.t,null)
+D.fDP=new A.F(!0,B.c,null,null,null,null,13,B.a8,null,null,null,null,1.45,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fHt=new A.F(!0,B.eV,null,null,null,null,12,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fJg=new A.F(!0,B.aE,null,null,null,null,null,B.a8,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fLm=new A.F(!0,B.aR,null,null,null,null,12,null,null,null,null,null,1.45,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fMl=new A.F(!0,B.bi,null,null,null,null,12,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fNN=new A.C("Videos \u2014 tap to play, swipe left to delete.",null,B.aWt,null,null,null,null,null,null,null,null,null)
+D.fOg=new A.C("Waiting for camera\u2026",null,B.lY,null,null,null,null,null,null,null,null,null)
+D.fOp=new A.C("Delete",null,B.aWv,null,null,null,null,null,null,null,null,null)
+D.fOw=new A.C("Could not load this video.",null,B.hu,null,B.K,null,null,null,null,null,null,null)
+D.fRd=new A.C("Media unavailable \u2014 storage was full when saved.",null,B.hu,null,null,null,null,null,null,null,null,null)
+D.fTj=new A.C("Recorder Studio",null,B.mD,null,null,null,null,null,null,null,null,null)
+D.fIn=new A.F(!0,B.bi,null,null,null,null,null,B.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fUS=new A.C("Save",null,D.fIn,null,null,null,null,null,null,null,null,null)
+D.fZW=new A.C("Share",null,B.ce,null,null,null,null,null,null,null,null,null)
+D.fyo=new A.F(!0,B.aE,null,null,null,null,12,null,null,null,null,null,1.45,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.h0W=new A.C("Pick your device below. Follow the steps so videos record with sound.",null,D.fyo,null,null,null,null,null,null,null,null,null)
+D.h4g=new A.C("Your studio library",null,B.fF,null,null,null,null,null,null,null,null,null)
+D.h7V=new A.C("Rename",null,B.iH,null,null,null,null,null,null,null,null,null)
+D.fEU=new A.F(!0,B.ab,null,null,null,null,12,B.a8,null,null,null,null,1.45,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.h8l=new A.C("Tip: Always tap Start Video first \u2014 then allow the mic when your device asks. Recordings made before the mic is allowed will have no sound.",null,D.fEU,null,null,null,null,null,null,null,null,null)
+D.h98=new A.C("Nothing here yet \u2014 record your first video.",null,B.lY,null,null,null,null,null,null,null,null,null)
+D.ha6=new A.C("Rename",null,B.ce,null,null,null,null,null,null,null,null,null)
+D.hbS=new A.C("Loading video\u2026",null,B.hu,null,null,null,null,null,null,null,null,null)
+D.hf2=new A.vH(B.BD,B.af9)
+D.b29=new C.aEn(0,"iphone")
+D.hIi=new C.aEn(1,"android")
+D.hIj=new C.aEn(2,"computer")
+D.hIk=new C.a0w(null)})();(function staticFields(){$.hcl=null})();(function lazyInitializers(){var w=a.lazyFinal
+w($,"iHt","ov",()=>new C.b34(new C.b32(A.a([],A.aF("U<nR>"))),B.bC,$.aw()))})()};
+(a=>{a["zjlBrFvwUi8tP6Erzwrvncw1b/U="]=a.current})($__dart_deferred_initializers__);
