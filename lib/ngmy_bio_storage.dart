@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:shared_preferences/shared_preferences.dart';
+import 'ngmy_local_keep.dart';
 
 import 'ngmy_bio_models.dart';
 import 'ngmy_bio_publish_registry.dart';
@@ -29,13 +29,11 @@ Future<T> _withBioIoLock<T>(Future<T> Function() action) async {
 }
 
 Future<List<NgmyBioDocument>> loadNgmyBios({required String userEmail}) async {
-  final prefs = await SharedPreferences.getInstance();
-  return NgmyBioDocument.decodeList(prefs.getString(_bioStorageKey(userEmail)) ?? '');
+  return NgmyBioDocument.decodeList(await ngmyKeepRead(_bioStorageKey(userEmail)));
 }
 
 Future<void> _writeNgmyBiosLocal(String userEmail, List<NgmyBioDocument> list) async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString(_bioStorageKey(userEmail), NgmyBioDocument.encodeList(list));
+  await ngmyKeepWrite(_bioStorageKey(userEmail), NgmyBioDocument.encodeList(list));
 }
 
 List<NgmyBioDocument> _mergePreferNewest(

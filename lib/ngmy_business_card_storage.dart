@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_local_keep.dart';
+
 const String kNgmyBusinessCardsKey = 'ngmy_business_cards_v1';
 
 /// Bumped when studio cards change so Home can refresh pinned snapshots.
@@ -23,18 +25,17 @@ String _oldHashKey(String userEmail) => '${kNgmyBusinessCardsKey}_${userEmail.to
 
 Future<List<Map<String, dynamic>>> loadNgmyBusinessCards({String userEmail = ''}) async {
   final prefs = await SharedPreferences.getInstance();
-  var raw = prefs.getString(_cardsKeyForUser(userEmail));
-  if (raw == null || raw.isEmpty) {
+  // From the quick storage, or the phone's database when the quick storage was full.
+  var raw = await ngmyKeepRead(_cardsKeyForUser(userEmail));
+  if (raw.isEmpty) {
     // Cards saved by an older version: find them, and move them under the new key.
     final old = prefs.getString(_oldHashKey(userEmail));
     if (old != null && old.isNotEmpty && userEmail.trim().isNotEmpty) {
       raw = old;
-      try {
-        await prefs.setString(_cardsKeyForUser(userEmail), old);
-      } catch (_) {}
+      await ngmyKeepWrite(_cardsKeyForUser(userEmail), old);
     }
   }
-  if (raw == null || raw.isEmpty) return [];
+  if (raw.isEmpty) return [];
   try {
     final list = jsonDecode(raw);
     if (list is! List) return [];
@@ -56,8 +57,7 @@ Future<List<Map<String, dynamic>>> loadNgmyBusinessCards({String userEmail = ''}
 }
 
 Future<void> persistNgmyBusinessCards(List<Map<String, dynamic>> entries, {String userEmail = ''}) async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString(_cardsKeyForUser(userEmail), jsonEncode(entries));
+  await ngmyKeepWrite(_cardsKeyForUser(userEmail), jsonEncode(entries));
 }
 
 Future<void> saveNgmyBusinessCard(Map<String, dynamic> entry, {String userEmail = ''}) async {

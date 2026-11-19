@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:html' as html;
 import 'dart:indexed_db' as idb;
 
@@ -56,6 +57,18 @@ Future<String?> ngmySlidesIdbGet(String emailKey) async {
     return null;
   } catch (e) {
     debugPrint('[slides idb get] $e');
+    return null;
+  }
+}
+
+/// A value the app saved with SharedPreferences, read at once from the browser (SharedPreferences keeps it in
+/// localStorage under "flutter." plus the key, written as JSON). Null when it is not there or cannot be read.
+Object? ngmySlidesPrefsNow(String prefsKey) {
+  try {
+    final raw = html.window.localStorage['flutter.$prefsKey'];
+    if (raw == null || raw.isEmpty) return null;
+    return jsonDecode(raw);
+  } catch (_) {
     return null;
   }
 }

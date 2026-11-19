@@ -1135,6 +1135,22 @@ class NgmySlidesStorage {
     return changed;
   }
 
+  static String _quickKey(String email) => 'ngmy_slides_quick_${_emailKey(email)}';
+
+  /// The documents without their big photos (a photo over about 100 KB is left out), for showing the list at once.
+  /// Never saved back as the documents themselves.
+  static String _lightCopy(List<Map<String, dynamic>> maps) {
+    bool big(Object? e) => e is Map && e['imageRef'] is String && (e['imageRef'] as String).startsWith('data:') && (e['imageRef'] as String).length > 100000;
+    Object? lightSlide(Object? s) {
+      if (s is! Map || s['elements'] is! List) return s;
+      return {...s, 'elements': [for (final e in s['elements'] as List) big(e) ? {...e as Map, 'imageRef': null} : e]};
+    }
+    return jsonEncode([
+      for (final d in maps)
+        d['slides'] is List ? {...d, 'slides': [for (final s in d['slides'] as List) lightSlide(s)]} : d,
+    ]);
+  }
+
   static void _eachElement(Map deck, void Function(Map e) visit) {
     final slides = deck['slides'];
     if (slides is! List) return;
@@ -1196,6 +1212,28 @@ class NgmySlidesStorage {
         xs.map((d) => d.updatedAt).reduce((x, y) => x.isAfter(y) ? x : y);
     if (a.length != b.length) return a.length >= b.length ? a : b;
     return newest(a).isAfter(newest(b)) ? a : b;
+  }
+
+  /// The documents kept on this phone, read at once with no waiting (from what was read already in this visit, or the
+  /// copy the browser keeps in its quick storage). Null when there is no such copy: then [loadDecks] reads them.
+  static List<NgmySlideDeck>? loadDecksNow(String email) {
+    final key = _emailKey(email);
+    if (key.isEmpty) return null;
+    final last = _lastSaved[key];
+    if (last != null) return List.of(last);
+    try {
+      final raw = _memoryJson[key] ?? ngmySlidesPrefsNow(_quickKey(email)) ?? ngmySlidesPrefsNow(_prefsKey(email));
+      if (raw is! String || raw.trim().isEmpty) return null;
+      final decks = parseDecksJson(raw);
+      final deleted = ngmySlidesPrefsNow(_deletedKey(email));
+      if (deleted is List) {
+        final gone = deleted.map((e) => e.toString()).toSet();
+        decks.removeWhere((d) => gone.contains(d.id));
+      }
+      return decks;
+    } catch (_) {
+      return null;
+    }
   }
 
   static Future<List<NgmySlideDeck>> loadDecks(String email) async {
@@ -1274,14 +1312,43 @@ class NgmySlidesStorage {
     final merged = byId.values.where((d) => !deleted.contains(d.id)).toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     _lastSaved[key] = merged;
-    final raw = jsonEncode(merged.map((d) => _shortPapers(d.toJson())).toList());
+    final maps = merged.map((d) => _shortPapers(d.toJson())).toList();
+    final raw = jsonEncode(maps);
     _memoryJson[key] = raw;
+    var inDb = false;
     try {
-      await ngmySlidesIdbPut(key, raw);
+      inDb = await ngmySlidesIdbPut(key, raw);
     } catch (_) {}
+    // The browser's quick storage is small (about 5 MB for the whole app) and shared with the bio pages, menus and
+    // cards. The full documents (with their photos) live in the phone's database; the quick storage keeps only a
+    // light copy without the big photos, which is enough to show the list the moment Slides opens.
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_quickKey(email), _lightCopy(maps));
+    } catch (_) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(_quickKey(email));
+      } catch (_) {}
+    }
+    if (inDb) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        if (prefs.containsKey(_prefsKey(email))) await prefs.remove(_prefsKey(email));
+      } catch (_) {}
+      return;
+    }
+    // No phone database here: the full copy goes to the quick storage instead.
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_prefsKey(email), raw);
-    } catch (_) {}
+    } catch (_) {
+      // Too big for the browser's quick storage: an older copy left there would show old documents for a moment
+      // when Slides opens, so it is removed (the full copy is in the phone's database).
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(_prefsKey(email));
+      } catch (_) {}
+    }
   }
 }

@@ -144,10 +144,20 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
       return bios.firstWhere((b) => b.isPublished, orElse: () => bios.first);
     };
     _framePulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2800))..repeat(reverse: true);
+    // The documents are on the screen in the very first frame: what was shown last time, or else the copy kept on the
+    // phone, read at once. They are then checked once more (and the state oath paper added).
     final shown = _ngmySlidesShownCache[widget.userEmail];
     if (shown != null) {
       _decks = List.of(shown);
       _loading = false;
+    } else {
+      // The light copy (without big photos) is only shown: until the full documents are read a moment later, the list
+      // cannot be opened or changed, so the light copy is never saved over them.
+      final light = NgmySlidesStorage.loadDecksNow(widget.userEmail);
+      if (light != null) {
+        _decks = light;
+        if (!_hasCivicRegistryAccess) _decks.removeWhere((d) => ngmyIsHatiKiapoUongoziDeck(d.deckKind));
+      }
     }
     unawaited(_loadDecks());
   }
@@ -164,8 +174,11 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
         _isDraft = false;
         _selectedElementId = null;
         _editingTextId = null;
+        // Another account: its own documents (the light copy shown at once, the full ones read in a moment).
+        _decks = NgmySlidesStorage.loadDecksNow(widget.userEmail) ?? [];
+        _loading = true;
       }
-      _loading = true;
+      // When only the state changed, the documents stay on the screen while they are checked again.
       unawaited(_loadDecks());
     }
   }
@@ -3482,7 +3495,9 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
   @override
   Widget build(BuildContext context) {
     // No loading page: Slides opens at once, and the saved documents appear as soon as they are read from the phone.
-    if (_activeDeck == null || _loading) return _buildLibrary();
+    // While the full documents are still being read (a moment after the app opens) the page shows them but does not
+    // take taps yet, so nothing is opened or saved from the light copy.
+    if (_activeDeck == null || _loading) return IgnorePointer(ignoring: _loading, child: _buildLibrary());
     return _buildEditor();
   }
 

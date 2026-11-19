@@ -1,4 +1,4 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'ngmy_local_keep.dart';
 
 import 'ngmy_menu_models.dart';
 import 'ngmy_menu_publish_registry.dart';
@@ -7,14 +7,12 @@ import 'ngmy_studio_library_cloud.dart';
 String _menuStorageKey(String userEmail) => 'ngmy_menus_v1_${userEmail.trim().toLowerCase()}';
 
 Future<List<NgmyMenuDocument>> loadNgmyMenus({required String userEmail}) async {
-  final prefs = await SharedPreferences.getInstance();
-  final raw = prefs.getString(_menuStorageKey(userEmail)) ?? '';
+  final raw = await ngmyKeepRead(_menuStorageKey(userEmail));
   return NgmyMenuDocument.decodeList(raw);
 }
 
 Future<void> _writeNgmyMenusLocal(String userEmail, List<NgmyMenuDocument> list) async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString(_menuStorageKey(userEmail), NgmyMenuDocument.encodeList(list));
+  await ngmyKeepWrite(_menuStorageKey(userEmail), NgmyMenuDocument.encodeList(list));
 }
 
 /// Reconciles this device's menus with the account's cloud copy, so a menu built

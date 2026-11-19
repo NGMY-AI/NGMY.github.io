@@ -31,16 +31,31 @@ bool ngmyHatiHasParentsPicture(NgmySlideDeck deck) {
   return id != null && ngmyHatiParentsArea(id) != null;
 }
 
-String _prompt({required bool parents}) {
-  final who = parents ? 'an older man and an older woman (the parents)' : 'a man and a woman';
-  return 'You are given three pictures. Picture 1 is a traditional Congolese wedding painting of $who. Picture 2 is a '
-      'photo of the real man. Picture 3 is a photo of the real woman. Redraw picture 1 exactly: the same size and '
-      'framing, the same pose, clothes, leopard skin, beads, head wrap, hat, jewellery, staff, spear, colours, lighting, '
-      'background and painted style, and every part of the picture around them. Change only the two faces: the man in '
-      'the painting gets the face of the man in picture 2, and the woman gets the face of the woman in picture 3, so each '
-      'is clearly recognisable, with their own skin tone, age and features, painted in the same style as the rest of the '
-      'picture. Keep their expressions warm as in picture 1. Do not add any words, letters or frames. Return only the '
-      'finished picture.';
+/// The instruction for one person: [who] is the person in the painting whose face is changed (for example "the man").
+/// One person at a time, so the AI gives all its attention to that one face (two faces at once came out looking like
+/// nobody in particular).
+String _prompt(String who, String photoOf) {
+  return 'Picture 1 is a painted traditional Congolese wedding picture. Picture 2 is a real photo of $photoOf. '
+      'Edit picture 1: give $who in picture 1 the face of the person in picture 2. It must be unmistakably the SAME '
+      'person as in picture 2, so that family and friends recognise them at first sight: copy exactly their face shape, '
+      'forehead, eyes and eye shape, eyebrows, nose, lips and mouth, cheeks, jawline and chin, ears, hairline and hair, '
+      'beard or moustache if any, skin tone, and their age. Do not make the face more generic, younger, thinner or more '
+      'beautiful than in the photo; likeness matters more than anything else. Paint the face in the same style, light '
+      'and colours as picture 1 so it blends in naturally, facing the same way as in picture 1, with a warm expression. '
+      'Change nothing else: every other person keeps their own face, and the clothes, leopard skin, beads, head wrap, '
+      'hat, jewellery, staff, spear, pose, background, colours, size and framing stay exactly as in picture 1. Do not '
+      'add any words, letters or borders. Return only the edited picture, the same shape as picture 1.';
+}
+
+/// The people picture made bigger (1024 points on its long side), so the AI has room to paint a detailed face: the
+/// people in the paper are small, and a face a few dozen points wide cannot look like anyone.
+Uint8List _enlarged(Uint8List jpg) {
+  final im = img.decodeImage(jpg);
+  if (im == null) return jpg;
+  final s = 1024 / math.max(im.width, im.height);
+  if (s <= 1) return jpg;
+  final big = img.copyResize(im, width: (im.width * s).round(), height: (im.height * s).round(), interpolation: img.Interpolation.cubic);
+  return Uint8List.fromList(img.encodeJpg(big, quality: 92));
 }
 
 NgmySlideElement? _paper(NgmySlide page) {
@@ -108,16 +123,15 @@ class _CoupleSheetState extends State<_CoupleSheet> {
     });
   }
 
-  Future<Uint8List> _paint(_Area area, Uint8List man, Uint8List woman, {required bool parents}) async {
-    final original = await rootBundle.load(area.asset);
+  /// One face changed in [picture]: [who] in the painting gets the face in [photo].
+  Future<Uint8List> _paintOne(Uint8List picture, Uint8List photo, String who, String photoOf) async {
     final data = await ngmyEdgeInvoke({
       'action': 'geminiVirtualOutfit',
-      'prompt': _prompt(parents: parents),
+      'prompt': _prompt(who, photoOf),
       'personOnly': false,
       'images': [
-        {'mimeType': 'image/jpeg', 'data': base64Encode(original.buffer.asUint8List(original.offsetInBytes, original.lengthInBytes))},
-        {'mimeType': 'image/jpeg', 'data': base64Encode(man)},
-        {'mimeType': 'image/jpeg', 'data': base64Encode(woman)},
+        {'mimeType': 'image/jpeg', 'data': base64Encode(picture)},
+        {'mimeType': 'image/jpeg', 'data': base64Encode(photo)},
       ],
     }, timeout: const Duration(seconds: 170));
     final b64 = data?['imageBase64']?.toString().trim() ?? '';
@@ -127,6 +141,37 @@ class _CoupleSheetState extends State<_CoupleSheet> {
     return base64Decode(b64);
   }
 
+  /// The couple (or the parents): the man's face first, then the woman's face on that result.
+  Future<Uint8List> _paint(_Area area, Uint8List man, Uint8List woman, {required bool parents}) async {
+    final original = await rootBundle.load(area.asset);
+    final start = _enlarged(original.buffer.asUint8List(original.offsetInBytes, original.lengthInBytes));
+    final withHim = await _paintOne(
+      start,
+      man,
+      parents ? 'the older man (the father)' : 'the man (the groom)',
+      parents ? 'the real father, an older man' : 'the real groom, a man',
+    );
+    _stepDone();
+    final withHer = await _paintOne(
+      withHim,
+      woman,
+      parents ? 'the older woman (the mother)' : 'the woman (the bride)',
+      parents ? 'the real mother, an older woman' : 'the real bride, a woman',
+    );
+    _stepDone();
+    return withHer;
+  }
+
+  int _steps = 0, _stepsDone = 0;
+
+  void _stepDone() {
+    if (!mounted) return;
+    setState(() {
+      _stepsDone++;
+      if (_stepsDone < _steps) _status = 'The AI is painting the faces one by one ($_stepsDone of $_steps done). This takes a minute or two.';
+    });
+  }
+
   Future<void> _make() async {
     if (!_ready) return;
     final couple = _useCouple;
@@ -134,9 +179,9 @@ class _CoupleSheetState extends State<_CoupleSheet> {
     setState(() {
       _busy = true;
       _error = null;
-      _status = couple && parents
-          ? 'The AI is painting the couple and the parents. This takes up to two minutes.'
-          : 'The AI is painting your picture. This takes up to a minute.';
+      _steps = (couple ? 2 : 0) + (parents ? 2 : 0);
+      _stepsDone = 0;
+      _status = 'The AI is painting the faces one by one (0 of $_steps done). This takes a minute or two.';
     });
     try {
       // Both at once.
