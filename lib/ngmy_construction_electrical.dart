@@ -564,7 +564,7 @@ Scene3D buildBench(ElectricalLesson lesson, WiringState s, {bool withWall = true
   if (ceilingKind) {
     _fixture(b, kind, s);
   } else {
-    _device(b, kind, _deviceZ(kind, s), s.burnt, fourScrews: !lesson.legacy, strap: s.strap);
+    _device(b, kind, _deviceZ(kind, s), s.burnt, fourScrews: !lesson.legacy, strap: s.strap, screwLook: switchScrewLook(lesson.id));
     _variantFace(b, lesson.id, _deviceZ(kind, s), s.burnt);
   }
   if (s.hints && s.stage == 0) {
@@ -772,7 +772,37 @@ String? _legacyWireKey(String lesson, int id) => switch (id) {
 
 // ─── The device itself ───────────────────────────────────────────────────────
 
-void _device(MeshBuilder b, String kind, double z, bool burnt, {bool faceOnly = false, bool fourScrews = false, bool strap = true}) {
+/// The dark (black or bronze) screw of a real three-way COMMON terminal and of the second traveler pair of a four-way.
+const Color kDarkScrew = Color(0xFF2E2B29);
+const Color kDarkScrewPlate = Color(0xFF55504B);
+
+/// The screws of the switches that have no silver neutral screw, as they are on the real device: only the screws it
+/// has, each with its real colour. Null for every other device (brass on one side, silver on the other).
+Map<int, (Color, Color)>? switchScrewLook(String lessonId) => switch (lessonId) {
+      // Four-way: two PAIRS of traveler screws, told apart by colour: brass pair on top (in), dark pair at the bottom (out).
+      'switch4' => const {
+          idSilverTop: (kBrass, kBrassPlate),
+          idBrassTop: (kBrass, kBrassPlate),
+          idSilverBottom: (kDarkScrew, kDarkScrewPlate),
+          idBrassBottom: (kDarkScrew, kDarkScrewPlate),
+        },
+      // Three-way: one dark COMMON screw and two brass TRAVELER screws (three screws and the green ground).
+      'switch3' => const {
+          idSilverTop: (kDarkScrew, kDarkScrewPlate),
+          idBrassTop: (kBrass, kBrassPlate),
+          idBrassBottom: (kBrass, kBrassPlate),
+        },
+      // Double-pole: four brass screws, LINE on top and LOAD at the bottom.
+      'switch2p' => const {
+          idSilverTop: (kBrass, kBrassPlate),
+          idBrassTop: (kBrass, kBrassPlate),
+          idSilverBottom: (kBrass, kBrassPlate),
+          idBrassBottom: (kBrass, kBrassPlate),
+        },
+      _ => null,
+    };
+
+void _device(MeshBuilder b, String kind, double z, bool burnt, {bool faceOnly = false, bool fourScrews = false, bool strap = true, Map<int, (Color, Color)>? screwLook}) {
   if (kind.startsWith('terminal')) {
     _terminal(b, kind, z, burnt, strap);
     return;
@@ -836,12 +866,26 @@ void _device(MeshBuilder b, String kind, double z, bool burnt, {bool faceOnly = 
       b.box(V3(x + side * 0.05, c.y + y, c.z - 0.45), const V3(0.34, 0.66, 0.9), const Color(0xFFFACC15), shine: 0.2);
     }
   }
-  if (!isSwitch || fourScrews) {
-    screw(idSilverTop, -1, topY, kNickel, kNickelPlate, taped: isGfci);
-    screw(idSilverBottom, -1, botY, kNickel, kNickelPlate);
+  // A switch with its own screw colours (a three-way, four-way or double-pole switch has no silver neutral screw) gets
+  // them from [screwLook], and only the screws it really has are drawn.
+  (Color, Color) look(int id, (Color, Color) normal) => screwLook?[id] ?? normal;
+  bool has(int id) => screwLook == null || screwLook.containsKey(id);
+  if ((!isSwitch || fourScrews) && has(idSilverTop)) {
+    final l = look(idSilverTop, (kNickel, kNickelPlate));
+    screw(idSilverTop, -1, topY, l.$1, l.$2, taped: isGfci);
   }
-  screw(idBrassTop, 1, topY, kBrass, kBrassPlate, taped: isGfci);
-  screw(idBrassBottom, 1, botY, kBrass, kBrassPlate);
+  if ((!isSwitch || fourScrews) && has(idSilverBottom)) {
+    final l = look(idSilverBottom, (kNickel, kNickelPlate));
+    screw(idSilverBottom, -1, botY, l.$1, l.$2);
+  }
+  if (has(idBrassTop)) {
+    final l = look(idBrassTop, (kBrass, kBrassPlate));
+    screw(idBrassTop, 1, topY, l.$1, l.$2, taped: isGfci);
+  }
+  if (has(idBrassBottom)) {
+    final l = look(idBrassBottom, (kBrass, kBrassPlate));
+    screw(idBrassBottom, 1, botY, l.$1, l.$2);
+  }
   b.bias = 0.9;
   b.id = idGreen;
   b.cyl(c + const V3(0, -1.78, 0.3), c + const V3(0, -1.78, 0.52), 0.18, kGreenScrew, shine: 0.7, sides: 12);

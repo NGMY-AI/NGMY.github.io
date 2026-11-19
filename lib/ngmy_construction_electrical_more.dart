@@ -103,7 +103,7 @@ final List<ElectricalLesson> kMoreLessons = [
     steps: const [
       ..._intro,
       'Fasten the bare copper ground to the GREEN screw.',
-      'Fasten the black wire (power in, or to the light) to the COMMON screw: the odd-coloured one.',
+      'Fasten the black wire (power in, or to the light) to the COMMON screw: the odd-coloured DARK one (black or bronze).',
       'Fasten the first traveler (red) to a TRAVELER screw.',
       'Fasten the second traveler (white wire taped black) to the other TRAVELER screw.',
       ..._tail,
@@ -116,7 +116,7 @@ final List<ElectricalLesson> kMoreLessons = [
     ],
     hookups: const [
       Hookup(idGreen, 'Green screw: GROUND', {'ground'}, 'The bare copper ground goes on the green screw.', role: 'ground'),
-      Hookup(idSilverTop, 'COMMON screw (the odd one)', {'common'}, 'The COMMON screw is the one with a different colour. The black wire that brings the power in, or goes to the light, belongs here.', role: 'hot'),
+      Hookup(idSilverTop, 'COMMON screw (dark)', {'common'}, 'The COMMON screw is the DARK one (black or bronze); the two traveler screws are brass. The black wire that brings the power in, or goes to the light, belongs here.', role: 'hot'),
       Hookup(idBrassTop, 'Traveler screw (top)', {'trav1', 'trav2'}, 'The two traveler wires go on the two brass traveler screws, in either order.', role: 'hot'),
       Hookup(idBrassBottom, 'Traveler screw (bottom)', {'trav1', 'trav2'}, 'The two traveler wires go on the two brass traveler screws, in either order.', role: 'hot'),
     ],
@@ -130,38 +130,38 @@ final List<ElectricalLesson> kMoreLessons = [
   ElectricalLesson(
     id: 'switch4',
     title: 'Four-way switch',
-    blurb: 'Sits in the middle of two three-way switches: two traveler wires in on one side, two out on the other.',
+    blurb: 'Sits in the middle of two three-way switches: two traveler wires in on one pair of screws, two out on the other pair. No neutral and no common screw.',
     look: 'switch',
     strict: true,
     steps: const [
       ..._intro,
-      'Fasten the bare copper ground to the GREEN screw.',
-      'The first traveler from the FIRST three-way goes on a top screw (IN).',
-      'The second traveler from the FIRST three-way goes on the other top screw (IN).',
-      'The first traveler to the SECOND three-way goes on a bottom screw (OUT).',
-      'The second traveler to the SECOND three-way goes on the other bottom screw (OUT).',
+      'Fasten the bare copper ground to the GREEN screw. (The white NEUTRAL wires of the two cables are joined together with a wire nut at the back of the box: a four-way switch never takes a neutral, none of its screws is silver.)',
+      'The black traveler from the FIRST three-way goes on a BRASS screw of the top pair (IN).',
+      'The red traveler from the FIRST three-way goes on the other BRASS screw of the top pair (IN).',
+      'The black traveler to the SECOND three-way goes on a DARK screw of the bottom pair (OUT).',
+      'The red traveler to the SECOND three-way goes on the other DARK screw of the bottom pair (OUT).',
       ..._tail,
     ],
     chips: const [
       WireChoice('ground', 'Bare copper · ground', _copper, Colors.white, role: 'ground'),
-      WireChoice('in1', 'Red · traveler in 1 (from the first 3-way)', _red, Colors.white, role: 'hot'),
-      WireChoice('in2', 'White taped red · traveler in 2', _white, Color(0xFF111827), role: 'hot'),
-      WireChoice('out1', 'Red · traveler out 1 (to the second 3-way)', Color(0xFFB03A2B), Colors.white, role: 'hot'),
-      WireChoice('out2', 'White taped red · traveler out 2', Color(0xFFE5E7EB), Color(0xFF111827), role: 'hot'),
+      WireChoice('in1', 'Black · traveler in 1 (from the first 3-way)', _black, Colors.white, role: 'hot'),
+      WireChoice('in2', 'Red · traveler in 2 (from the first 3-way)', _red, Colors.white, role: 'hot'),
+      WireChoice('out1', 'Black · traveler out 1 (to the second 3-way)', Color(0xFF3A2E2E), Colors.white, role: 'hot'),
+      WireChoice('out2', 'Red · traveler out 2 (to the second 3-way)', Color(0xFFB03A2B), Colors.white, role: 'hot'),
     ],
     hookups: const [
       Hookup(idGreen, 'Green screw: GROUND', {'ground'}, 'The bare copper ground goes on the green screw.', role: 'ground'),
-      Hookup(idSilverTop, 'IN screw (top left)', {'in1', 'in2'}, 'The two travelers coming from the first three-way go on the two top screws.', role: 'hot'),
-      Hookup(idBrassTop, 'IN screw (top right)', {'in1', 'in2'}, 'The two travelers coming from the first three-way go on the two top screws.', role: 'hot'),
-      Hookup(idSilverBottom, 'OUT screw (bottom left)', {'out1', 'out2'}, 'The two travelers going to the second three-way go on the two bottom screws.', role: 'hot'),
-      Hookup(idBrassBottom, 'OUT screw (bottom right)', {'out1', 'out2'}, 'The two travelers going to the second three-way go on the two bottom screws.', role: 'hot'),
+      Hookup(idSilverTop, 'Brass IN screw (top pair)', {'in1', 'in2'}, 'The two travelers coming from the first three-way go on the two BRASS screws of the top pair, in either order.', role: 'hot'),
+      Hookup(idBrassTop, 'Brass IN screw (top pair)', {'in1', 'in2'}, 'The two travelers coming from the first three-way go on the two BRASS screws of the top pair, in either order.', role: 'hot'),
+      Hookup(idSilverBottom, 'Dark OUT screw (bottom pair)', {'out1', 'out2'}, 'The two travelers going to the second three-way go on the two DARK screws of the bottom pair, in either order.', role: 'hot'),
+      Hookup(idBrassBottom, 'Dark OUT screw (bottom pair)', {'out1', 'out2'}, 'The two travelers going to the second three-way go on the two DARK screws of the bottom pair, in either order.', role: 'hot'),
     ],
     solution: const {idGreen: 'ground', idSilverTop: 'in1', idBrassTop: 'in2', idSilverBottom: 'out1', idBrassBottom: 'out2'},
     wrongHint: (chip, h) => chip == 'ground'
         ? 'The bare copper ground wire only goes on the GREEN screw.'
         : h.id == idGreen
             ? 'A traveler never goes on the green ground screw.'
-            : 'A four-way has a pair of screws for the travelers coming IN (top) and a pair for the travelers going OUT (bottom). Do not mix the two pairs.',
+            : 'A four-way has a pair of screws for the travelers coming IN (the brass pair on top) and a pair for the travelers going OUT (the dark pair at the bottom). Both travelers of one cable stay on one pair: never mix the two pairs. Always check the markings on your own switch, some makers pair the screws side by side instead.',
   ),
   ElectricalLesson(
     id: 'switchsmart',
