@@ -528,14 +528,12 @@ bool paintExtraPart(Canvas c, Part p, double time, void Function(Canvas, String,
       // in the middle of the frame's bottom edge.
       const logoY = 19.6;
       if (p.kind == 'appletv') {
-        // The apple: a round body with a bite on the right and a small leaf on top.
-        final ink = fill(const Color(0xFF4B5563));
-        final apple = Path()
-          ..addOval(Rect.fromCenter(center: const Offset(-0.7, logoY + 0.35), width: 2.3, height: 2.6))
-          ..addOval(Rect.fromCenter(center: const Offset(0.7, logoY + 0.35), width: 2.3, height: 2.6));
-        final bite = Path()..addOval(Rect.fromCircle(center: const Offset(2.15, logoY + 0.1), radius: 0.85));
-        c.drawPath(Path.combine(PathOperation.difference, apple, bite), ink);
-        c.drawOval(Rect.fromCenter(center: const Offset(0.45, logoY - 1.65), width: 0.8, height: 1.3), ink);
+        c.save();
+        c.translate(0, logoY);
+        c.scale(3.7);
+        c.translate(-0.5, -0.55);
+        c.drawPath(ngmyAppleLogoPath(), fill(const Color(0xFF4B5563)));
+        c.restore();
       } else {
         final (name, col) = switch (p.kind) {
           'lgtv' => ('LG', const Color(0xFFD1D5DB)),
@@ -694,3 +692,31 @@ const List<PartInfo> kPowerPartInfos = [
   PartInfo('diode', 'Diode', '➡️', Color(0xFFFBBF24), 'Lets electricity go one way only (left to right). It uses up about 0.7 volts. Put it in a loop so a battery connected backwards cannot hurt a gadget.', 'A join between two kinds of crystal that electrons can cross in one direction but not the other.'),
   PartInfo('ldr', 'Light sensor', '🌞', Color(0xFFFDE047), 'A resistor that changes with light: in the dark it holds the current back, in bright light it lets more through. Tap it and move the Light slider.', 'A flat disc of a special material (cadmium sulfide) that frees more electrons when light hits it.'),
 ];
+
+/// The apple logo in a box 1 wide and 1.1 tall (top left at 0,0): the body with the dip on top, the two round lobes
+/// at the bottom with the notch between them, the bite on the right, and the leaf leaning to the right above it.
+Path ngmyAppleLogoPath() {
+  final body = Path()
+    ..moveTo(0.50, 0.33)
+    ..cubicTo(0.42, 0.33, 0.33, 0.27, 0.22, 0.27)
+    ..cubicTo(0.08, 0.27, -0.03, 0.40, -0.03, 0.58)
+    ..cubicTo(-0.03, 0.78, 0.09, 0.98, 0.19, 1.06)
+    ..cubicTo(0.26, 1.11, 0.33, 1.11, 0.39, 1.08)
+    ..cubicTo(0.45, 1.05, 0.55, 1.05, 0.61, 1.08)
+    ..cubicTo(0.67, 1.11, 0.74, 1.11, 0.81, 1.05)
+    ..cubicTo(0.88, 0.98, 0.95, 0.88, 0.99, 0.79)
+    // The bite on the right.
+    ..cubicTo(0.86, 0.74, 0.79, 0.62, 0.80, 0.51)
+    ..cubicTo(0.81, 0.42, 0.86, 0.36, 0.92, 0.33)
+    ..cubicTo(0.85, 0.28, 0.77, 0.26, 0.70, 0.26)
+    ..cubicTo(0.61, 0.26, 0.56, 0.33, 0.50, 0.33)
+    ..close();
+  final leaf = Path()
+    ..moveTo(0.49, 0.25)
+    ..cubicTo(0.48, 0.14, 0.56, 0.03, 0.70, 0.0)
+    ..cubicTo(0.71, 0.12, 0.62, 0.23, 0.49, 0.25)
+    ..close();
+  return Path()
+    ..addPath(body, Offset.zero)
+    ..addPath(leaf, Offset.zero);
+}
