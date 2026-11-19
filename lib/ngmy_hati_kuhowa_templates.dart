@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -2996,6 +2997,24 @@ NgmySlideDeck ngmyBuildHatiMalipoAwamuDeck({required String templateId, String s
   );
 }
 
+/// Makes the template cards' pages and decodes their pictures ahead of time, one card after another, so a card does
+/// not pause the list the first time it scrolls into view. Cheap to call again (each card is done once).
+Future<void> ngmyHatiWarmTemplatePreviews(BuildContext context, Iterable<NgmyHatiKuhowaTemplate> templates) async {
+  await ngmyHatiPhotoArtLoad();
+  for (final tpl in templates) {
+    if (!context.mounted) return;
+    if (_royalLookFor(tpl.paperStyle) == null && _exactSpecFor(tpl.paperStyle) == null) continue;
+    if (!_warmedPreviews.add(tpl.id)) continue;
+    final page = _royalPreviewPages.putIfAbsent(tpl.id, () => ngmyBuildHatiKuhowaDeck(templateId: tpl.id).slides.first);
+    // The card draws the page 270 points wide (see ngmyHatiKuhowaTemplateLivePreview).
+    await ngmySlideWarmPage(context, page, 270, preview: 1.6);
+    // One card per frame, so warming never freezes what is on the screen.
+    await WidgetsBinding.instance.endOfFrame;
+  }
+}
+
+final Set<String> _warmedPreviews = <String>{};
+
 Future<String?> showNgmyHatiKuhowaTemplatePicker(
   BuildContext context, {
   String docLabel = 'Hati ya Kuhowa',
@@ -3004,6 +3023,11 @@ Future<String?> showNgmyHatiKuhowaTemplatePicker(
   // Pinned papers come first, and the picture papers are read so their cards show them.
   await Future.wait([ngmyHatiPinsLoad(), ngmyHatiPhotoArtLoad(), ngmyLoadNewsFonts()]);
   if (!context.mounted) return null;
+  // The first cards are ready before the list opens, the rest while it opens, so it scrolls smoothly from the start.
+  final shown = ngmyHatiPinnedFirst(templates, (t) => t.id);
+  await ngmyHatiWarmTemplatePreviews(context, shown.take(4)).timeout(const Duration(milliseconds: 900), onTimeout: () {});
+  if (!context.mounted) return null;
+  unawaited(ngmyHatiWarmTemplatePreviews(context, shown.skip(4)));
   return showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,

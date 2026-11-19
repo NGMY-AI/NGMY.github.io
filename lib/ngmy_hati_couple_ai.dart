@@ -119,7 +119,7 @@ class _CoupleSheetState extends State<_CoupleSheet> {
         {'mimeType': 'image/jpeg', 'data': base64Encode(man)},
         {'mimeType': 'image/jpeg', 'data': base64Encode(woman)},
       ],
-    }, timeout: const Duration(seconds: 150));
+    }, timeout: const Duration(seconds: 170));
     final b64 = data?['imageBase64']?.toString().trim() ?? '';
     if (b64.isEmpty) {
       throw data?['error']?.toString() ?? 'The AI could not make the picture. Please try again.';

@@ -36,11 +36,7 @@ async function geminiVirtualOutfit(
   images: GeminiImagePart[],
   personOnly = false,
 ): Promise<string> {
-  const models = [
-    "gemini-2.5-flash-image",
-    "gemini-2.5-flash-image-preview",
-    "gemini-2.0-flash-preview-image-generation",
-  ];
+  const models = await geminiImageModels(apiKey);
   const parts: unknown[] = [{ text: prompt }];
   const imgs = personOnly ? images.slice(0, 1) : images;
   for (const img of imgs) {
@@ -54,38 +50,111 @@ async function geminiVirtualOutfit(
     });
   }
 
-  let lastErr = "Gemini image generation failed";
-  for (const model of models.slice(0, Math.max(1, AI_RUNTIME.maxModelAttempts))) {
+  // Painting a picture from several photos often takes longer than a chat reply, so it gets its own,
+  // longer wait (the whole request must still finish inside the 150 seconds Supabase allows).
+  const started = Date.now();
+  const budgetMs = 135000;
+  let lastErr = "The AI could not make the picture. Please try again.";
+  for (const model of models.slice(0, Math.max(2, AI_RUNTIME.maxModelAttempts))) {
+    const leftMs = budgetMs - (Date.now() - started);
+    if (leftMs < 15000) break;
     // The key goes in a header, never in the web address (an address can end up in an error message).
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-    const res = await providerFetch(fetch, url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: {
-          responseModalities: ["TEXT", "IMAGE"],
-          temperature: 0.35,
-        },
-      }),
-    }, AI_RUNTIME.timeoutMs);
+    let res: Response;
+    try {
+      res = await providerFetch(fetch, url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: {
+            responseModalities: ["TEXT", "IMAGE"],
+            temperature: 0.35,
+          },
+        }),
+      }, Math.min(110000, leftMs));
+    } catch (e) {
+      if (e instanceof ProviderBusyError || e instanceof ProviderStopError) throw e;
+      const name = (e as Error)?.name ?? "";
+      lastErr = name === "TimeoutError" || name === "AbortError"
+        ? "The AI took too long to paint the picture. Please try again."
+        : "Could not reach the AI. Please try again.";
+      continue;
+    }
     if (!res.ok) {
-      lastErr = scrubSecrets((await res.text()).slice(0, 200));
+      const text = scrubSecrets((await res.text()).slice(0, 300));
+      lastErr = /not found|not supported/i.test(text)
+        ? "The AI picture model is not available right now. Please try again."
+        : `The AI could not make the picture (${res.status}).`;
+      console.log(`geminiVirtualOutfit ${model} HTTP ${res.status}: ${text}`);
       continue;
     }
     const data = await res.json();
+    const blocked = data?.promptFeedback?.blockReason;
     const candidates = data?.candidates;
-    if (!Array.isArray(candidates) || candidates.length === 0) continue;
-    const respParts = candidates[0]?.content?.parts;
-    if (!Array.isArray(respParts)) continue;
-    for (const part of respParts) {
-      const inline = part?.inlineData ?? part?.inline_data;
-      const b64 = inline?.data;
-      if (b64 && String(b64).trim()) return String(b64).trim();
+    if (blocked || !Array.isArray(candidates) || candidates.length === 0) {
+      lastErr = "The AI would not paint these photos. Please try other, clear photos of the faces.";
+      continue;
     }
-    lastErr = "No image in Gemini response";
+    const respParts = candidates[0]?.content?.parts;
+    let said = "";
+    if (Array.isArray(respParts)) {
+      for (const part of respParts) {
+        const inline = part?.inlineData ?? part?.inline_data;
+        const b64 = inline?.data;
+        if (b64 && String(b64).trim()) return String(b64).trim();
+        if (typeof part?.text === "string") said += part.text;
+      }
+    }
+    const why = String(candidates[0]?.finishReason ?? "");
+    console.log(`geminiVirtualOutfit ${model} no image: ${why} ${said.slice(0, 200)}`);
+    lastErr = /SAFETY|PROHIBITED|IMAGE_SAFETY|RECITATION|OTHER/.test(why) || said
+      ? "The AI would not paint these photos. Please try other, clear photos of the faces."
+      : "The AI did not send a picture back. Please try again.";
   }
   throw new Error(lastErr);
+}
+
+// Picture models change often (Google retires and renames them), so ask which ones exist and use the
+// newest flash picture model first, then the one known to work.
+let geminiImageModelCache: { at: number; list: string[] } | null = null;
+async function geminiImageModels(apiKey: string): Promise<string[]> {
+  const known = ["gemini-2.5-flash-image", "gemini-3.1-flash-image-preview", "gemini-3.1-flash-lite-image"];
+  if (geminiImageModelCache && Date.now() - geminiImageModelCache.at < 30 * 60 * 1000) {
+    return geminiImageModelCache.list;
+  }
+  try {
+    const res = await providerFetch(
+      fetch,
+      "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200",
+      { headers: { "x-goog-api-key": apiKey } },
+      8000,
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const found: { name: string; v: number; lite: boolean }[] = [];
+      for (const m of (data?.models ?? []) as any[]) {
+        const methods: string[] = m?.supportedGenerationMethods ?? [];
+        const name = String(m?.name ?? "").replace(/^models\//, "");
+        if (!methods.includes("generateContent")) continue;
+        if (!/^gemini-.*flash.*image/.test(name)) continue;
+        if (/generation|exp/.test(name)) continue;
+        const v = parseFloat((name.match(/gemini-(\d+(?:\.\d+)?)/) ?? [])[1] ?? "0");
+        found.push({ name, v, lite: /lite/.test(name) });
+      }
+      if (found.length) {
+        found.sort((a, b) => (b.v - a.v) || (Number(a.lite) - Number(b.lite)));
+        const newest = found[0].name;
+        const list = [newest, ...known.filter((k) => found.some((f) => f.name === k))]
+          .filter((n, i, a) => a.indexOf(n) === i);
+        geminiImageModelCache = { at: Date.now(), list };
+        return list;
+      }
+    }
+  } catch (e) {
+    if (e instanceof ProviderBusyError || e instanceof ProviderStopError) throw e;
+  }
+  return known;
 }
 
 // The chat models this key can use right now. Google retires and renames models, so ask it

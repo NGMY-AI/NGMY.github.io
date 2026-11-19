@@ -305,6 +305,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
       if (!mounted) return;
       final open = _activeDeck;
       if (NgmySlidesStorage.fillPaperNames([..._decks, if (open != null) open])) setState(() {});
+      // While nothing else is going on, the template cards are made ready, so the paper list scrolls smoothly at once.
+      Future<void>.delayed(const Duration(seconds: 2), () {
+        if (mounted) unawaited(ngmyHatiWarmTemplatePreviews(context, kNgmyHatiKuhowaTemplates));
+      });
     }));
     if (assignedCodes || decks.length > loaded.length) unawaited(_persistDecks());
     return gen;

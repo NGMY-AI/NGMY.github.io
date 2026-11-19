@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart';
 
+import 'ngmy_slides_render.dart' show ngmySlideImageBytesSeed;
+
 // The four picture papers for the Hati documents (curtains, village, sunset, roses) are pictures in assets/hati, made
 // from the owner's own designs by tool/hati_photo/exact.dart. A document keeps its paper inside itself as a data link,
 // so each picture is read once and kept here as one.
@@ -32,7 +34,11 @@ Future<void> ngmyHatiPhotoArtLoad() => _loading ??= () async {
           () async {
             try {
               final data = await rootBundle.load('assets/hati/$name.jpg');
-              _urls[name] = 'data:image/jpeg;base64,${base64Encode(data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes))}';
+              final bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+              final url = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+              _urls[name] = url;
+              // The pages that show this paper reuse these bytes (no turning the text back into a picture).
+              ngmySlideImageBytesSeed(url, bytes);
             } catch (_) {}
           }(),
       ]);
@@ -45,6 +51,9 @@ String? ngmyHatiPhotoArtUrl(String name) => _urls[name];
 /// of the whole picture), or null when it is not one of them.
 String? ngmyHatiPhotoArtNameOf(String url) {
   if (url.length < 1000 || _urls.isEmpty) return null;
+  for (final e in _urls.entries) {
+    if (identical(e.value, url)) return e.key;
+  }
   for (final e in _urls.entries) {
     if (e.value.length == url.length && e.value == url) return e.key;
   }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -403,8 +404,7 @@ class NgmySlideElementView extends StatelessWidget {
         final dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 2.0;
         final w = c.maxWidth.isFinite ? c.maxWidth : 0.0;
         // Sharp enough for a downloaded picture or video too, which are drawn bigger than the screen.
-        final preview = NgmySlidePreviewImages.of(context);
-        final target = w <= 0 ? null : (w * (preview ?? math.max(dpr, 5.0))).clamp(preview == null ? 96.0 : 48.0, 1500.0).round();
+        final target = ngmySlideImageDecodeWidth(w, dpr, NgmySlidePreviewImages.of(context));
         return Image.memory(
           bytes,
           key: ValueKey('img_${element.id}_${bytes.length}'),
@@ -1236,9 +1236,52 @@ class _NgmyLoopFxState extends State<NgmyLoopFx> with SingleTickerProviderStateM
 
 // Pictures in slides are stored as base64 text. Decoding it on every rebuild made a new copy of the
 // whole picture each time, so the decoded bytes are kept (newest last, capped) and reused.
-final Map<String, Uint8List> _slideImageBytes = <String, Uint8List>{};
+// The texts are a megabyte or more, and on the web a text's hash is worked out from every letter each time it is
+// looked up, so the lookup itself froze scrolling. The hash here reads only its length and 64 letters spread through
+// it; two equal texts are still matched letter by letter, and the very same text at once.
+int _cheapRefHash(String s) {
+  var h = s.length;
+  final n = s.length;
+  if (n == 0) return h;
+  for (var i = 0; i < 64; i++) {
+    h = 0x1fffffff & (h * 31 + s.codeUnitAt((i * (n - 1)) ~/ 63));
+  }
+  return h;
+}
+
+final LinkedHashMap<String, Uint8List> _slideImageBytes =
+    LinkedHashMap<String, Uint8List>(equals: (a, b) => identical(a, b) || a == b, hashCode: _cheapRefHash);
 int _slideImageBytesTotal = 0;
 const int _kSlideImageBytesCap = 40 * 1024 * 1024;
+
+/// How wide a picture is decoded when it is drawn [w] points wide (the same size everywhere, so a picture decoded
+/// ahead of time is the one the page uses).
+int? ngmySlideImageDecodeWidth(double w, double dpr, double? preview) {
+  if (w <= 0) return null;
+  return (w * (preview ?? math.max(dpr, 5.0))).clamp(preview == null ? 96.0 : 48.0, 1500.0).round();
+}
+
+/// Keeps the bytes of a picture that was read from the app's own files, so it is never turned back from text.
+void ngmySlideImageBytesSeed(String ref, Uint8List bytes) {
+  if (_slideImageBytes.containsKey(ref)) return;
+  _slideImageBytes[ref] = bytes;
+  _slideImageBytesTotal += bytes.length;
+}
+
+/// Decodes the background pictures of [page] ahead of time, at the size they are drawn when the page is [pageWidth]
+/// points wide, so the page appears without a pause the first time it scrolls into view.
+Future<void> ngmySlideWarmPage(BuildContext context, NgmySlide page, double pageWidth, {double? preview}) async {
+  final dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 2.0;
+  for (final e in page.elements) {
+    final ref = e.imageRef;
+    if (ref == null || !ref.startsWith('data:image') || !e.fileName.endsWith('_bg')) continue;
+    final width = ngmySlideImageDecodeWidth(e.w * pageWidth, dpr, preview);
+    if (!context.mounted) return;
+    try {
+      await precacheImage(ResizeImage.resizeIfNeeded(width, null, MemoryImage(ngmySlideImageBytes(ref))), context);
+    } catch (_) {}
+  }
+}
 
 /// The picture bytes of a `data:image/...;base64,` reference, decoded once and reused.
 Uint8List ngmySlideImageBytes(String ref) {
