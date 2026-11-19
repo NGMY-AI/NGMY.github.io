@@ -2,7 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import 'ngmy_core_protocol_sims.dart' deferred as sims;
+// Core Protocol is part of the app itself (not its own download), so it opens at once after the app is closed and
+// opened again, with no loading page.
+import 'ngmy_core_protocol_sims.dart' as sims;
 import 'ngmy_deferred.dart';
 import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_platform_graphics.dart';
@@ -63,7 +65,7 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
           reverseTransitionDuration: const Duration(milliseconds: 320),
           pageBuilder: (_, anim, secondary) => FadeTransition(
             opacity: CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
-            child: NgmyDeferred(load: sims.loadLibrary, build: () => sims.NgmyCoreProtocolSimsScreen()),
+            child: const sims.NgmyCoreProtocolSimsScreen(),
           ),
         ),
       );
@@ -904,13 +906,9 @@ class _ExperienceBackdropPainter extends CustomPainter {
       old.spin != spin || old.wave != wave || old.boot != boot;
 }
 
-/// The menus of these home frames that are their own download, for ngmyWarmDeferred: the Vault Arcade, the Core
-/// Protocol, and the Construction Lab inside it.
+/// The menus of these home frames made ready in the background, for ngmyWarmDeferred: the Vault Arcade (its own
+/// download) and the Construction Lab inside the Core Protocol (the Core Protocol itself is part of the app).
 List<Future<void> Function()> ngmyHomeTechFramesWarm() => [
       vault.loadLibrary,
-      sims.loadLibrary,
-      () async {
-        await sims.loadLibrary();
-        await sims.ngmyCoreProtocolSimsWarm();
-      },
+      sims.ngmyCoreProtocolSimsWarm,
     ];
