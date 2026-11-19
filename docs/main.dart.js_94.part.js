@@ -76,9 +76,9 @@ i1I(d,e,f,g,h,i){var x=0,w=B.j(y.f),v=1,u=[],t,s,r,q,p,o
 var $async$dB=B.e(function(j,k){if(j===1){u.push(k)
 x=v}for(;;)switch(x){case 0:v=3
 t=""+C.h.T(d)+"|"+f+"|"+i+"|"+B.w(g)+"|"+e
-s=$.i1F.c0(0,t,new D.cnX(d,f,i,g,e))
+s=$.i1F.c_(0,t,new D.cnX(d,f,i,g,e))
 if($.cnU.length<12){q=B.ak7()
-q.NR(C.aTe)
+q.NS(C.aTe)
 $.cnU.push(q)}q=$.hvd
 $.hvd=q+1
 r=$.cnU[C.o.F(q,$.cnU.length)]
@@ -143,8 +143,8 @@ A.dEh=x([1,0.18,0.06],y.h)
 A.eqR={"SPARK PAINTER":0,"MANDALA MAKER":1,"TITLE ANIMATOR":2,"PALETTE LAB":3,"GRAVITY TOY":4,"FIREWORK DESIGNER":5,"CIRCUIT LAB":6,"PERIODIC TABLE":7,"BODY EXPLORER":8,"SPIN THE WHEEL":9,"FOCUS TIMER":10,"MEMORY MATCH":11,"LUCKY POCKET":12,"ELECTRONICS LAB":13,"CONSTRUCTION LAB":14,"AI INVENTOR":15,"MAGNET LAB":16,"RADIO LAB":17,"POWER PLANT":18,"POWER GRID":19,"INTERNET JOURNEY":20,"ROBOT CODER":21,"BUG SMASHER":22,"ROCKET LANDER":23,"DATA SNAKE":24,"BINARY 2048":25,"SIGNAL BREAKER":26,"PASSWORD LAB":27,"WAVE LAB":28,"BUG HUNT":29,"OPTICS LAB":30,"ATOM BUILDER":31,"PIXEL TV":32}
 A.aK8=new B.bq(A.eqR,["sparkle","sparkle","whoosh","click","bounce","pop","tech","lab","organic","click","tech","bubble","click","tech","tech","tech","tech","tech","tech","tech","tech","tech","pop","space","bubble","click","zap","click","tech","click","sparkle","lab","tech"],B.aC("bq<q,q>"))
 A.acy=new B.G(!0,C.aE,null,null,null,null,10.5,C.H,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-A.Ll=new B.G(!0,C.ab,null,null,null,null,12.5,null,null,null,null,null,1.35,null,null,null,null,null,null,null,null,null,null,null,null,null)})();(function staticFields(){$.i1F=B.T(B.aC("q"),B.aC("e2"))
+A.Lk=new B.G(!0,C.ab,null,null,null,null,12.5,null,null,null,null,null,1.35,null,null,null,null,null,null,null,null,null,null,null,null,null)})();(function staticFields(){$.i1F=B.T(B.aC("q"),B.aC("e2"))
 $.cnU=B.a([],B.aC("R<ak6>"))
 $.hvd=0
-$.au2="music"})()};
-(a=>{a["43cyVOjhgfoX2tMbwEHFXrLvrtU="]=a.current})($__dart_deferred_initializers__);
+$.au1="music"})()};
+(a=>{a["C9mpAKmn/2kO0ETchDiHsOQ27K0="]=a.current})($__dart_deferred_initializers__);
