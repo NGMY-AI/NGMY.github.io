@@ -12,7 +12,7 @@ s=new A.V(Date.now(),0,!1)
 r=J.kU(y.i.a(C.V.aP(0,k,null)),y.b)
 p=r
 o=A.hf(p).k("Y<c2.E>")
-n=A.B(new A.Y(p,new B.fIE(s),o),o.k("M.E"))
+n=A.B(new A.Y(p,new B.fIG(s),o),o.k("M.E"))
 q=n
 x=8
 return A.b(l.aF("String","saved_invoices_v1",C.V.av(q,null)),$async$aRD)
@@ -44,10 +44,10 @@ if(!y.i.b(t)){s=A.a([],y.k)
 v=s
 x=1
 break}s=J.dd(t,y.B)
-s=A.cF(s,new B.fMY(),s.$ti.k("M.E"),y.y)
+s=A.cF(s,new B.fN_(),s.$ti.k("M.E"),y.y)
 r=A.a3(s).k("Y<M.E>")
-s=A.B(new A.Y(s,new B.fMZ(),r),r.k("M.E"))
-C.d.b0(s,new B.fN_())
+s=A.B(new A.Y(s,new B.fN0(),r),r.k("M.E"))
+C.d.b0(s,new B.fN1())
 v=s
 x=1
 break}catch(n){s=A.a([],y.k)
@@ -78,23 +78,23 @@ var $async$aRF=A.e(function(e,f){if(e===1)return A.f(f,w)
 for(;;)switch(x){case 0:x=2
 return A.b(B.LT(),$async$aRF)
 case 2:v=f
-J.mW(v,new B.fJo(d))
+J.mW(v,new B.fJq(d))
 x=3
 return A.b(B.aT5(v),$async$aRF)
 case 3:return A.h(null,w)}})
 return A.i($async$aRF,w)},
-fIE:function fIE(d){this.a=d},
-fMY:function fMY(){},
-fMZ:function fMZ(){},
+fIG:function fIG(d){this.a=d},
 fN_:function fN_(){},
-fJo:function fJo(d){this.a=d}},D
+fN0:function fN0(){},
+fN1:function fN1(){},
+fJq:function fJq(d){this.a=d}},D
 J=c[1]
 A=c[0]
 C=c[2]
 B=a.updateHolder(c[20],B)
 D=c[32]
 var z=a.updateTypes([])
-B.fIE.prototype={
+B.fIG.prototype={
 $1(d){var x,w,v
 if(!y.B.b(d))return!1
 v=J.t(d,"paidAt")
@@ -104,25 +104,25 @@ w=A.bj(x)
 if(w==null)return!0
 return this.a.d5(w.bS(432e9))},
 $S:50}
-B.fMY.prototype={
+B.fN_.prototype={
 $1(d){return A.a1(d,y.w,y.b)},
-$S:30}
-B.fMZ.prototype={
+$S:32}
+B.fN0.prototype={
 $1(d){var x=J.t(d,"id")
 return J.k(x==null?"":x).length!==0},
 $S:4}
-B.fN_.prototype={
+B.fN1.prototype={
 $2(d,e){var x,w,v="createdAt",u=J.t(d,v),t=A.bj(J.k(u==null?"":u)),s=t==null?new A.V(A.h2(0,0),0,!1):t
 u=J.t(e,v)
 w=A.bj(J.k(u==null?"":u))
 x=w==null?new A.V(A.h2(0,0),0,!1):w
 return J.xx(x,s)},
-$S:41}
-B.fJo.prototype={
+$S:43}
+B.fJq.prototype={
 $1(d){var x=J.t(d,"id")
 return J.k(x==null?"":x)===this.a},
 $S:4};(function inheritance(){var x=a.inheritMany,w=a.inherit
-x(A.kX,[B.fIE,B.fMY,B.fMZ,B.fJo])
-w(B.fN_,A.n0)})()
+x(A.kX,[B.fIG,B.fN_,B.fN0,B.fJq])
+w(B.fN1,A.n0)})()
 var y={k:A.aF("U<ac<q,@>>"),E:A.aF("ai<ac<q,@>>"),i:A.aF("ai<@>"),y:A.aF("ac<q,@>"),B:A.aF("ac<@,@>"),w:A.aF("q"),b:A.aF("@"),v:A.aF("~")};(function constants(){D.a37=new A.a_(61870,"MaterialIcons",!1)})()};
-(a=>{a["b4jHZEWNEj4inZL/si5CeVqTxo4="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["GBBV2EomkdjRCuiKnus9+Ux5gZw="]=a.current})($__dart_deferred_initializers__);
