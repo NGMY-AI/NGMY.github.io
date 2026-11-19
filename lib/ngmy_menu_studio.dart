@@ -82,7 +82,11 @@ class _NgmyMenuStudio extends StatefulWidget {
   State<_NgmyMenuStudio> createState() => _NgmyMenuStudioState();
 }
 
+// The menus and bio pages shown last time (while the app stays open), so opening the studio again shows them at once.
+final Map<String, (List<NgmyMenuDocument>, List<NgmyBioDocument>)> _ngmyMenuStudioShown = {};
+
 class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
+  String get _shownKey => '${widget._isLocal ? 'local' : 'cloud'}|${widget.userEmail}';
   List<NgmyMenuDocument> _menus = [];
   List<NgmyBioDocument> _bios = [];
   String _homeMode = 'menus';
@@ -115,6 +119,12 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
       NgmyStudioHomeFilter.biosOnly => 'bio',
       NgmyStudioHomeFilter.all => 'menus',
     };
+    final shown = _ngmyMenuStudioShown[_shownKey];
+    if (shown != null) {
+      _menus = List.of(shown.$1);
+      _bios = List.of(shown.$2);
+      _loading = false;
+    }
     _reload(syncCloud: true);
   }
 
@@ -156,6 +166,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
       _bios = bios;
       _loading = false;
     });
+    _ngmyMenuStudioShown[_shownKey] = (List.of(menus), List.of(bios));
 
     if (!syncCloud || widget._isLocal) return;
 
@@ -170,6 +181,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
       _menus = syncedMenus;
       _bios = syncedBios;
     });
+    _ngmyMenuStudioShown[_shownKey] = (List.of(syncedMenus), List.of(syncedBios));
   }
 
   Future<void> _reloadAfterBioSave(NgmyBioDocument saved) async {
@@ -630,7 +642,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
                   const SizedBox(height: 8),
                   Expanded(
                     child: _loading
-                        ? const Center(child: CircularProgressIndicator(color: _kMenuAccent))
+                        ? const SizedBox.shrink()
                         : _menus.isEmpty
                             ? Center(
                                 child: Padding(
@@ -704,7 +716,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
                   const SizedBox(height: 8),
                   Expanded(
                     child: _loading
-                        ? const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)))
+                        ? const SizedBox.shrink()
                         : _bios.isEmpty
                             ? Center(
                                 child: Padding(

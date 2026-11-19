@@ -82,6 +82,18 @@ class NgmySlidesStudioScreen extends StatefulWidget {
 /// the presentations are read and the oath paper is checked online); it then refreshes quietly.
 final Map<String, List<NgmySlideDeck>> _ngmySlidesShownCache = {};
 
+/// Reads the saved documents from the phone as soon as the app opens (before the Slides tab is tapped), so Slides shows
+/// them at once. The Slides screen still checks again when it opens.
+Future<void> ngmySlidesPreload(String email) async {
+  if (email.trim().isEmpty || _ngmySlidesShownCache.containsKey(email)) return;
+  try {
+    final decks = await NgmySlidesStorage.loadDecks(email);
+    // The state oath paper is added by the Slides screen itself (it depends on who is signed in).
+    decks.removeWhere((d) => ngmyIsHatiKiapoUongoziDeck(d.deckKind));
+    _ngmySlidesShownCache.putIfAbsent(email, () => decks);
+  } catch (_) {}
+}
+
 class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   List<NgmySlideDeck> _decks = [];
@@ -3469,13 +3481,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF121212),
-        body: Center(child: CircularProgressIndicator(color: Color(0xFF2563EB))),
-      );
-    }
-    if (_activeDeck == null) return _buildLibrary();
+    // No loading page: Slides opens at once, and the saved documents appear as soon as they are read from the phone.
+    if (_activeDeck == null || _loading) return _buildLibrary();
     return _buildEditor();
   }
 
@@ -3579,7 +3586,11 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
               ),
             ),
             const SizedBox(height: 12),
-            if (_decks.isEmpty)
+            // While the documents are still being read from the phone (a moment after the app restarts) the list is
+            // simply blank: no "no documents yet" and no loading circle.
+            if (_decks.isEmpty && _loading)
+              const SizedBox(height: 120)
+            else if (_decks.isEmpty)
               _aliveEmptyPresentationsFrame(isDark)
             else
               ..._decks.asMap().entries.map((e) => RepaintBoundary(child: _deckTile(e.value, isDark, index: e.key))),

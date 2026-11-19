@@ -136,6 +136,9 @@ const _categoryArt = <String, _CategoryArt>{
   ),
 };
 
+// The counts shown last time (while the app stays open), so the sections open with their numbers.
+final Map<String, List<int>> _ngmyEssentialsShownCounts = {};
+
 class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
   int _contacts = 0;
   int _locations = 0;
@@ -147,12 +150,26 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
   int _colorBuckets = 0;
   int _bibleDictionary = 0;
   int _quickDial = 0;
-  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
+    final shown = _ngmyEssentialsShownCounts[widget.userEmail];
+    if (shown != null) _apply(shown);
     _reload();
+  }
+
+  void _apply(List<int> results) {
+    _contacts = results[0];
+    _locations = results[1];
+    _support = results[2];
+    _medicines = results[3];
+    _notes = results[4];
+    _tasks = results[5];
+    _reminders = results[6];
+    _colorBuckets = results[7];
+    _bibleDictionary = results[8];
+    _quickDial = results[9];
   }
 
   Future<void> _reload() async {
@@ -168,20 +185,9 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
       ngmyBibleDictionaryCount(userEmail: widget.userEmail),
       ngmyQuickDialCount(userEmail: widget.userEmail),
     ]);
+    _ngmyEssentialsShownCounts[widget.userEmail] = List.of(results);
     if (!mounted) return;
-    setState(() {
-      _contacts = results[0];
-      _locations = results[1];
-      _support = results[2];
-      _medicines = results[3];
-      _notes = results[4];
-      _tasks = results[5];
-      _reminders = results[6];
-      _colorBuckets = results[7];
-      _bibleDictionary = results[8];
-      _quickDial = results[9];
-      _loading = false;
-    });
+    setState(() => _apply(results));
   }
 
   Future<void> _openCategory(Future<void> Function(BuildContext) opener) async {
@@ -266,15 +272,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (_loading)
-                  const Expanded(
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF38BDF8),
-                      ),
-                    ),
-                  )
-                else
+                // No loading circle: the sections show at once and their counts fill in a moment later.
                   Expanded(
                     child: Builder(
                       builder: (context) {

@@ -847,7 +847,8 @@ const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaRoyalTemplates = [
 /// The four picture papers, made from the owner's own picture designs: royal curtains with the flag and drums, the
 /// village with the couple, the palm tree and the hut, the savanna sunset with doves and the Congo map, and white roses
 /// with gold rings.
-const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaPhotoTemplates = [
+/// Curtain, village and sunset: taken off the picker by the owner, kept so documents made on them still open.
+const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaPhotoRetired = [
   NgmyHatiKuhowaTemplate(
     id: 'photo_curtain',
     name: 'Pazia la Kifalme',
@@ -887,6 +888,16 @@ const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaPhotoTemplates = [
     previewColors: [Color(0xFF3A1A10), Color(0xFFE07A2A), Color(0xFFF2C75C)],
     layoutKind: NgmyHatiLayoutKind.exact,
   ),
+];
+
+/// All four picture papers (saved documents on any of them still open).
+const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaPhotoTemplates = [
+  ...kNgmyHatiKuhowaPhotoRetired,
+  ...kNgmyHatiKuhowaPhotoRoses,
+];
+
+/// The roses paper: the only picture paper still offered in the picker.
+const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaPhotoRoses = [
   NgmyHatiKuhowaTemplate(
     id: 'photo_roses',
     name: 'Waridi na Pete',
@@ -944,7 +955,9 @@ const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaTemplates = [
   ...kNgmyHatiKuhowaGoldEdgeTemplates,
   ...kNgmyHatiKuhowaGoldTail,
   ...kNgmyHatiKuhowaRoyalTemplates,
-  ...kNgmyHatiKuhowaPhotoTemplates,
+  // The curtain, village and sunset picture papers were taken off the list by the owner (documents already made on
+  // them still open: they stay in kNgmyHatiKuhowaPhotoTemplates). Only the roses paper is still offered.
+  ...kNgmyHatiKuhowaPhotoRoses,
   ...kNgmyHatiKuhowaExactTemplates,
 ];
 

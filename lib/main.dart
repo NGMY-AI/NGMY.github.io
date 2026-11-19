@@ -18242,6 +18242,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) => _promptPushNotificationsIfNeeded());
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeOpenCivicEnrollDeepLink());
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeOpenMediaPostDeepLink());
+    // The saved Slides documents are read from the phone right away, so the Slides tab shows them the moment it opens.
+    WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(slides.ngmySlidesPreload(widget.user.email)));
     ngmyStartItemReminderWatcher(widget.user.email);
     ngmyStartMedicineReminderWatcher(widget.user.email);
     ngmyStartCashierReminderWatcher(widget.user.email);

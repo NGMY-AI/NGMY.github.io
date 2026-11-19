@@ -16,16 +16,16 @@ Set<String> _keys(NgmySlide s) => {
     };
 
 void main() {
-  test('the seven royal, four picture and two exact papers come last in the picker and can be found by id', () {
+  test('the seven royal papers, the roses paper and the two exact papers come last in the picker; the removed picture papers still open by id', () {
     expect(kNgmyHatiKuhowaRoyalTemplates.length, 7);
     expect(kNgmyHatiKuhowaPhotoTemplates.length, 4);
     expect(kNgmyHatiKuhowaExactTemplates.length, 2);
-    expect(kNgmyHatiKuhowaTemplates.skip(kNgmyHatiKuhowaTemplates.length - 13).map((t) => t.id),
-        [...kNgmyHatiKuhowaRoyalTemplates, ...kNgmyHatiKuhowaPhotoTemplates, ...kNgmyHatiKuhowaExactTemplates].map((t) => t.id));
+    expect(kNgmyHatiKuhowaTemplates.skip(kNgmyHatiKuhowaTemplates.length - 10).map((t) => t.id),
+        [...kNgmyHatiKuhowaRoyalTemplates, ...kNgmyHatiKuhowaPhotoRoses, ...kNgmyHatiKuhowaExactTemplates].map((t) => t.id));
     expect(kNgmyHatiKuhowaTemplates.first.id, 'kuhowa_elegant_navy');
     for (final t in [...kNgmyHatiKuhowaRoyalTemplates, ...kNgmyHatiKuhowaPhotoTemplates, ...kNgmyHatiKuhowaExactTemplates]) {
       expect(ngmyHatiKuhowaTemplateById(t.id)?.id, t.id);
-      expect(kNgmyHatiMalipoAwamuTemplates.any((m) => m.id == t.id), isTrue);
+      if (!kNgmyHatiKuhowaPhotoRetired.contains(t)) expect(kNgmyHatiMalipoAwamuTemplates.any((m) => m.id == t.id), isTrue);
     }
   });
 

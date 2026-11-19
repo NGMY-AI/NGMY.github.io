@@ -23,6 +23,16 @@ void main() {
     expect(ngmySlideImageBytes(otherUrl), other);
   });
 
+  test('the curtain, village and sunset papers are off the picker but saved documents on them still open', () {
+    final ids = kNgmyHatiKuhowaTemplates.map((t) => t.id).toList();
+    for (final gone in ['photo_curtain', 'photo_village', 'photo_sunset']) {
+      expect(ids.contains(gone), isFalse, reason: gone);
+      expect(ngmyHatiKuhowaTemplateById(gone), isNotNull, reason: gone);
+    }
+    // From the bottom: Kifalme, Kijiji, roses, then the royal teal paper.
+    expect(ids.reversed.take(4).toList(), ['exact_kifalme', 'exact_kijiji', 'photo_roses', 'royal_teal']);
+  });
+
   test('decode width is the same formula the page uses', () {
     expect(ngmySlideImageDecodeWidth(270, 3, 1.6), 432);
     expect(ngmySlideImageDecodeWidth(0, 3, null), isNull);
