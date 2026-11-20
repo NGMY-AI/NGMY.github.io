@@ -1,6 +1,6 @@
 // deno test supabase/functions/ngmy-ai-chat/alpaca_agent_test.ts
 import { assertEquals, assert } from "https://deno.land/std@0.177.0/testing/asserts.ts";
-import { buildChart, crossover, decide, etParts, PA_MARKETS, pickMarket, readMarket, rsi, sma, type DecideInput, type Scan } from "./alpaca_agent.ts";
+import { buildChart, crossover, decide, etParts, PA_FX, PA_MARKETS, pickMarket, readMarket, rsi, runStats, sma, type DecideInput, type Scan } from "./alpaca_agent.ts";
 
 const base: DecideInput = {
   weekend: false, asset: "SPY", stock: true, price: 100, signal: "none", fast: 100, slow: 100, shadow: null,
@@ -100,6 +100,34 @@ Deno.test("RSI and the live reading", () => {
   assertEquals(down.action, "DOWNTREND · STAY OUT");
   assert(down.score < 40);
   assertEquals(readMarket([1, 2], [], 2, true).bias, "unknown");
+});
+
+Deno.test("trend timing: age, typical length, entry window, how often it worked", () => {
+  // Waves: 20 candles up, 20 down, repeated, then a fresh up move (the averages need a few candles to cross).
+  const closes: number[] = [];
+  let p = 100;
+  for (let w = 0; w < 8; w++) for (let i = 0; i < 20; i++) closes.push((p += w % 2 === 0 ? 0.1 : -0.1));
+  for (let i = 0; i < 10; i++) closes.push((p += 0.1));
+  const t = runStats(closes, 1);
+  assertEquals(t.dir, "up");
+  assert(t.of >= 2);
+  assertEquals(t.worked, t.of); // every past up wave ended higher
+  assert(t.typicalMin! >= 15 && t.typicalMin! <= 25);
+  assert(t.ageMin <= 10);
+  assert(t.enterWithinMin! >= 0);
+  assertEquals(t.remainingMin, Math.max(0, t.typicalMin! - t.ageMin));
+  // 5-minute candles report in minutes.
+  assertEquals(runStats(closes, 5).typicalMin, t.typicalMin! * 5);
+  assertEquals(runStats([1, 2, 3], 1).dir, "none");
+  // Forex wording: an action with an entry window or a "late, wait".
+  const r = readMarket(closes, closes.map((c) => ({ h: c + 0.05, l: c - 0.05 })), p, true, { candleMin: 1, agent: false });
+  assert(/^(BUY · ENTER WITHIN \d+ MIN|BULLISH · LATE, WAIT|SIDEWAYS · NO EDGE|MIXED · NO EDGE)$/.test(r.action), r.action);
+  assert(r.notes.some((n) => n.includes("min ago")));
+});
+
+Deno.test("forex list is live pairs only", () => {
+  assert(PA_FX.length >= 10);
+  assert(PA_FX.every((f) => f.yahoo.endsWith("=X")));
 });
 
 Deno.test("never more than 10 markets", () => {

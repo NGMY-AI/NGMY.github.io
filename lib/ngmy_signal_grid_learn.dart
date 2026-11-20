@@ -27,8 +27,10 @@ Color _actionColor(String a) {
 }
 
 /// One market's live reading: coin, price, action, strength bar, RSI and the plain explanation.
-Widget _readingTile(_Pal p, Map<String, dynamic> m, {bool compact = false, VoidCallback? onAsk}) {
+Widget _readingTile(_Pal p, Map<String, dynamic> m, {bool compact = false, VoidCallback? onAsk, String? changed}) {
   final r = _map(m['reading']);
+  final t = _map(r['timing']);
+  final pts = _points(m);
   final sym = (m['asset'] ?? m['symbol'] ?? '').toString();
   final action = (r['action'] ?? 'WAITING FOR DATA').toString();
   final c = _actionColor(action);
@@ -55,12 +57,35 @@ Widget _readingTile(_Pal p, Map<String, dynamic> m, {bool compact = false, VoidC
             Text((m['name'] ?? '').toString(), style: TextStyle(color: p.muted, fontSize: 11)),
           ]),
         ),
+        if (pts.length > 2) ...[
+          SizedBox(width: 58, height: 26, child: CustomPaint(painter: _SparkPainter(pts, chg >= 0 ? _up : _loss))),
+          const SizedBox(width: 10),
+        ],
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text(_money(_d(m['price']), sign: false), style: TextStyle(color: p.ink, fontWeight: FontWeight.w800, fontSize: 14)),
-          Text('${chg >= 0 ? '+' : ''}${chg.toStringAsFixed(2)}% · 4h',
+          Text(_price(m), style: TextStyle(color: p.ink, fontWeight: FontWeight.w800, fontSize: 14)),
+          Text('${chg >= 0 ? '+' : ''}${chg.toStringAsFixed(2)}% · ${m['kind'] == 'forex' ? '30m' : '4h'}',
               style: TextStyle(color: chg >= 0 ? _up : _loss, fontSize: 11, fontWeight: FontWeight.w700)),
         ]),
       ]),
+      if (changed != null) ...[
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [Color(0xFF6D28D9), _fastC]),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(children: [
+            const Icon(Icons.bolt_rounded, color: Colors.white, size: 16),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text('$changed · check before you act',
+                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 0.3)),
+            ),
+          ]),
+        ),
+      ],
       const SizedBox(height: 10),
       Row(children: [
         Container(
@@ -115,6 +140,31 @@ Widget _readingTile(_Pal p, Map<String, dynamic> m, {bool compact = false, VoidC
         const Spacer(),
         Text('Buyers', style: TextStyle(color: p.muted, fontSize: 10)),
       ]),
+      if (m['open'] == true && t['dir'] != null && t['dir'] != 'none' && t['typicalMin'] != null) ...[
+        const SizedBox(height: 10),
+        Wrap(spacing: 6, runSpacing: 6, children: [
+          _timeChip(p, Icons.play_arrow_rounded, '${t['dir'] == 'up' ? 'Up' : 'Down'} move started ${_d(t['ageMin']).toStringAsFixed(0)} min ago'),
+          _timeChip(p, Icons.timelapse_rounded, 'Usually lasts ~${_d(t['typicalMin']).toStringAsFixed(0)} min'),
+          _timeChip(p, Icons.hourglass_bottom_rounded, '~${_d(t['remainingMin']).toStringAsFixed(0)} min left (estimate)'),
+          if (_d(t['of']) > 0)
+            _timeChip(
+              p,
+              Icons.fact_check_rounded,
+              'Worked ${t['worked']} of ${t['of']} (${(_d(t['worked']) / _d(t['of']) * 100).round()}%)',
+              color: _d(t['worked']) / _d(t['of']) >= 0.55 ? _up : _d(t['worked']) / _d(t['of']) < 0.45 ? _loss : _down,
+            ),
+          // Entry timing only when the direction is clear (bullish with an up move, bearish with a down move).
+          if ((r['bias'] == 'bullish' && t['dir'] == 'up') || (r['bias'] == 'bearish' && t['dir'] == 'down'))
+            _timeChip(
+              p,
+              Icons.login_rounded,
+              _d(t['enterWithinMin']) > 0 ? 'Enter within ${_d(t['enterWithinMin']).toStringAsFixed(0)} min' : 'Too late to enter, wait',
+              color: _d(t['enterWithinMin']) > 0 ? _up : _loss,
+            )
+          else
+            _timeChip(p, Icons.do_not_disturb_on_rounded, 'No clear direction, do not enter', color: _down),
+        ]),
+      ],
       const SizedBox(height: 8),
       for (final n in compact ? notes.take(2) : notes)
         Padding(
@@ -136,6 +186,23 @@ Widget _readingTile(_Pal p, Map<String, dynamic> m, {bool compact = false, VoidC
         ),
     ]),
   );
+}
+
+Widget _timeChip(_Pal p, IconData icon, String text, {Color? color}) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(color: (color ?? p.muted).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(999)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 12, color: color ?? p.muted),
+        const SizedBox(width: 4),
+        Text(text, style: TextStyle(color: color ?? p.ink, fontSize: 10.8, fontWeight: FontWeight.w700)),
+      ]),
+    );
+
+/// Forex prices need more decimals than dollars (EUR/USD 1.09723, USD/JPY 158.792).
+String _price(Map<String, dynamic> m) {
+  final v = _d(m['price']);
+  if (m['kind'] != 'forex') return _money(v, sign: false);
+  return v.toStringAsFixed(v >= 100 ? 3 : 5);
 }
 
 // ───────────────────────────────────────────────────────────── the course
@@ -282,18 +349,29 @@ class _NgmySignalGridLearnScreenState extends State<NgmySignalGridLearnScreen> w
   final _chatScroll = ScrollController();
   bool _thinking = false;
 
+  // Live signals: search, filter, and what changed since the last refresh.
+  List<Map<String, dynamic>> _fx = [];
+  String _query = '';
+  bool _searching = false;
+  String _filter = 'All';
+  final _search = TextEditingController();
+  final Map<String, String> _lastBias = {};
+  final Map<String, ({DateTime at, String from, String to})> _changed = {};
+
   static const _prefsKey = 'ngmy_signal_grid_lessons_done';
 
   @override
   void initState() {
     super.initState();
     _status = widget.initialStatus;
+    _fx = ((widget.initialStatus?['fx'] as List?) ?? const []).whereType<Map>().map((e) => {...Map<String, dynamic>.from(e), 'asset': e['symbol']}).toList();
     _fetchedAt = DateTime.now();
     _tabs.addListener(() => setState(() {}));
     if (!widget.preview) {
       unawaited(_loadDone());
       unawaited(_refresh());
-      _timer = Timer.periodic(const Duration(seconds: 60), (_) => unawaited(_refresh()));
+      // Every 20 seconds, so a signal that flips is shown quickly.
+      _timer = Timer.periodic(const Duration(seconds: 20), (_) => unawaited(_refresh()));
     }
   }
 
@@ -301,6 +379,7 @@ class _NgmySignalGridLearnScreenState extends State<NgmySignalGridLearnScreen> w
   void dispose() {
     _timer?.cancel();
     _tabs.dispose();
+    _search.dispose();
     _input.dispose();
     _chatScroll.dispose();
     super.dispose();
@@ -323,13 +402,44 @@ class _NgmySignalGridLearnScreenState extends State<NgmySignalGridLearnScreen> w
   }
 
   Future<void> _refresh() async {
-    final res = await ngmyEdgeInvoke({'action': 'paStatus', 'live': true}, timeout: const Duration(seconds: 40));
+    final res = await ngmyEdgeInvoke({'action': 'paStatus', 'live': true, 'fx': true}, timeout: const Duration(seconds: 40));
     if (!mounted || res == null || res['ok'] != true) return;
+    final fx = ((res['fx'] as List?) ?? const []).whereType<Map>().map((e) => {...Map<String, dynamic>.from(e), 'asset': e['symbol']}).toList();
     setState(() {
       _status = res;
+      if (fx.isNotEmpty) _fx = fx;
       _fetchedAt = DateTime.now();
     });
+    _noteChanges();
   }
+
+  /// Compares every market with the last refresh. When one flips (for example bearish to bullish) it is marked
+  /// on its card for 3 minutes and announced, so nobody acts on an old signal.
+  void _noteChanges() {
+    final flips = <String>[];
+    for (final m in _allSignals) {
+      final sym = m['asset'].toString();
+      final bias = (_map(m['reading'])['bias'] ?? 'unknown').toString();
+      final before = _lastBias[sym];
+      if (before != null && before != bias && bias != 'unknown' && before != 'unknown') {
+        _changed[sym] = (at: DateTime.now(), from: before, to: bias);
+        flips.add('$sym turned ${bias.toUpperCase()}');
+      }
+      _lastBias[sym] = bias;
+    }
+    _changed.removeWhere((_, v) => DateTime.now().difference(v.at) > const Duration(minutes: 3));
+    if (flips.isNotEmpty && mounted) {
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Signal changed: ${flips.take(3).join(' · ')}${flips.length > 3 ? ' and ${flips.length - 3} more' : ''}'),
+        backgroundColor: const Color(0xFF6D28D9),
+        duration: const Duration(seconds: 5),
+      ));
+    }
+  }
+
+  /// Every market with a live reading: the agent's 10 plus the forex pairs.
+  List<Map<String, dynamic>> get _allSignals => [..._mkts, ..._fx];
 
   Map<String, dynamic> get _snap => _map(_map(_status?['state'])['snapshot']);
   List<Map<String, dynamic>> get _mkts => _markets(_snap);
@@ -362,13 +472,29 @@ class _NgmySignalGridLearnScreenState extends State<NgmySignalGridLearnScreen> w
     } else {
       b.writeln('No open pretend trade.');
     }
-    b.writeln('Markets (5-minute candles; fast line = 9-candle average, slow = 21-candle average; strength 0 bearish to 100 bullish):');
-    for (final m in _mkts) {
+    String line(Map<String, dynamic> m) {
       final r = _map(m['reading']);
-      b.writeln('- ${m['asset']} (${m['name']}): price ${_d(m['price']).toStringAsFixed(2)}, 4h change ${_d(m['changePct']).toStringAsFixed(2)}%, '
+      final t = _map(r['timing']);
+      final timing = t['typicalMin'] == null
+          ? ''
+          : ', current ${t['dir']} move ${t['ageMin']} min old, such moves usually last ${t['typicalMin']} min (about ${t['remainingMin']} min left), '
+              'past ${t['dir']} moves really went that way ${t['worked']} of ${t['of']} times, '
+              '${_d(t['enterWithinMin']) > 0 ? 'still early (enter within ${t['enterWithinMin']} min)' : 'too late to enter'}';
+      return '- ${m['asset']} (${m['name']}): price ${_price(m)}, change ${_d(m['changePct']).toStringAsFixed(2)}%, '
           '${m['open'] == true ? 'open' : 'closed'}, ${r['bias'] ?? 'unknown'}, strength ${_d(r['score']).toStringAsFixed(0)}, '
           'RSI ${r['rsi'] == null ? 'n/a' : _d(r['rsi']).toStringAsFixed(0)}, last hour ${r['mom1h'] == null ? 'n/a' : '${_d(r['mom1h']).toStringAsFixed(2)}%'}, '
-          'agent reading: ${r['action'] ?? 'n/a'}.');
+          'reading: ${r['action'] ?? 'n/a'}$timing.';
+    }
+
+    b.writeln('Agent markets (5-minute candles; fast line = 9-candle average, slow = 21-candle average; strength 0 bearish to 100 bullish):');
+    for (final m in _mkts) {
+      b.writeln(line(m));
+    }
+    if (_fx.isNotEmpty) {
+      b.writeln('Forex pairs (real interbank prices, 1-minute candles, signals only; the agent does not trade them; OTC prices at brokers differ):');
+      for (final m in _fx) {
+        b.writeln(line(m));
+      }
     }
     return b.toString();
   }
@@ -729,15 +855,89 @@ Tutor:''';
 
   // ── Live signals tab
 
+  static String _group(Map<String, dynamic> m) => switch ((m['kind'] ?? '').toString()) {
+        'forex' => 'Forex',
+        'crypto' => 'Crypto',
+        _ => 'Stocks',
+      };
+
   Widget _signalsTab(_Pal p) {
-    final ms = [..._mkts]..sort((a, b) => _NgmySignalGridAgentScreenState._signalRank(a).compareTo(_NgmySignalGridAgentScreenState._signalRank(b)));
+    final q = _query.trim().toLowerCase();
+    final all = _allSignals;
+    final ms = all.where((m) {
+      if (_filter != 'All' && _group(m) != _filter) return false;
+      if (q.isEmpty) return true;
+      final hay = '${m['asset']} ${m['name']} ${(m['asset'] ?? '').toString().replaceAll('/', '')}'.toLowerCase();
+      return hay.contains(q);
+    }).toList()
+      ..sort((a, b) {
+        // Just changed first, then fresh signals, then the strongest.
+        final ca = _changed.containsKey(a['asset']) ? 0 : 1, cb = _changed.containsKey(b['asset']) ? 0 : 1;
+        if (ca != cb) return ca - cb;
+        return _NgmySignalGridAgentScreenState._signalRank(a).compareTo(_NgmySignalGridAgentScreenState._signalRank(b));
+      });
     final bull = ms.where((m) => _map(m['reading'])['bias'] == 'bullish').length;
     final bear = ms.where((m) => _map(m['reading'])['bias'] == 'bearish').length;
     final side = ms.length - bull - bear;
-    final ago = _fetchedAt == null ? '' : DateTime.now().difference(_fetchedAt!).inSeconds < 60 ? 'just now' : '${DateTime.now().difference(_fetchedAt!).inMinutes} min ago';
+    final secs = _fetchedAt == null ? 0 : DateTime.now().difference(_fetchedAt!).inSeconds;
+    final ago = secs < 20 ? 'just now' : secs < 60 ? '$secs s ago' : '${secs ~/ 60} min ago';
     return RefreshIndicator(
       onRefresh: _refresh,
       child: ListView(padding: const EdgeInsets.fromLTRB(16, 6, 16, 40), children: [
+        // Filters, with the search icon at the top right.
+        Row(children: [
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: [
+                for (final f in const ['All', 'Forex', 'Stocks', 'Crypto']) ...[
+                  GestureDetector(
+                    onTap: () => setState(() => _filter = f),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+                      decoration: BoxDecoration(color: _filter == f ? p.dark : p.card, borderRadius: BorderRadius.circular(999), border: Border.all(color: p.line)),
+                      child: Text(
+                        f == 'All' ? 'All ${all.length}' : '$f ${all.where((m) => _group(m) == f).length}',
+                        style: TextStyle(color: _filter == f ? p.onDark : p.ink, fontWeight: FontWeight.w800, fontSize: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+              ]),
+            ),
+          ),
+          const SizedBox(width: 6),
+          _round(p, _searching ? Icons.close_rounded : Icons.search_rounded, () {
+            setState(() {
+              _searching = !_searching;
+              if (!_searching) {
+                _query = '';
+                _search.clear();
+              }
+            });
+          }),
+        ]),
+        if (_searching) ...[
+          const SizedBox(height: 10),
+          TextField(
+            controller: _search,
+            autofocus: true,
+            onChanged: (v) => setState(() => _query = v),
+            style: TextStyle(color: p.ink),
+            decoration: InputDecoration(
+              hintText: 'Search a market, for example EUR/USD, GBP or Bitcoin',
+              hintStyle: TextStyle(color: p.muted, fontSize: 13),
+              prefixIcon: Icon(Icons.search_rounded, color: p.muted),
+              filled: true,
+              fillColor: p.card,
+              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(999), borderSide: BorderSide(color: p.line)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(999), borderSide: BorderSide(color: p.line)),
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
         Row(children: [
           Expanded(child: _countBox(p, 'Bullish', bull, _up, Icons.trending_up_rounded)),
           const SizedBox(width: 8),
@@ -746,12 +946,42 @@ Tutor:''';
           Expanded(child: _countBox(p, 'Sideways', side, _down, Icons.trending_flat_rounded)),
         ]),
         const SizedBox(height: 8),
-        Text('Updated $ago · refreshes every minute · same rules the agent trades by',
-            textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 11)),
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          const Icon(Icons.circle, size: 7, color: _up),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text('Live · updated $ago · checks every 20 seconds, changes are flagged at once',
+                textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 11)),
+          ),
+        ]),
+        if (_filter == 'All' || _filter == 'Forex') ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _down.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _down.withValues(alpha: 0.45)),
+            ),
+            child: Text(
+              'Forex uses real market prices on 1-minute candles. OTC pairs at a broker are priced by that broker (always on weekends) '
+              'and can move differently, and the payout % is the broker\'s. "Worked" shows how often past moves on this pair really '
+              'went that way: under 50% means the signal has been worse than a coin flip, so do not trust it.',
+              style: TextStyle(color: p.ink, fontSize: 11.8, height: 1.35),
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
-        if (ms.isEmpty) Text('Loading the markets...', style: TextStyle(color: p.muted)),
-        for (final m in ms) _readingTile(p, m, onAsk: () => _askAbout('What is happening with ${m['asset']} right now, and what would make the agent buy or sell it?')),
-        Text('Signals show what the agent rules see. They can fail; the stop loss keeps each loss small.',
+        if (all.isEmpty) Text('Loading the markets...', style: TextStyle(color: p.muted)),
+        if (all.isNotEmpty && ms.isEmpty) Center(child: Text('No market matches "$_query".', style: TextStyle(color: p.muted))),
+        for (final m in ms)
+          _readingTile(
+            p,
+            m,
+            changed: _changed[m['asset']] == null ? null : 'JUST TURNED ${_changed[m['asset']]!.to.toUpperCase()}',
+            onAsk: () => _askAbout('What is happening with ${m['asset']} right now? Is it bullish or bearish, how long might the move last, and is it too late to enter?'),
+          ),
+        Text('Signals are estimates from recent price history. They can fail; never risk money you cannot afford to lose.',
             textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 11)),
       ]),
     );

@@ -48,7 +48,9 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
   bool _moreLog = true;
   bool _showAllLog = false;
   int _range = 48; // candles shown: 12 = 1 h, 24 = 2 h, 48 = 4 h
-  String? _selected; // market tapped in the strip
+  String? _selected; // market tapped in the strip (remembered on the phone)
+  final _stripScroll = ScrollController();
+  bool _stripPlaced = false;
   bool _lines = true;
   String? _error;
   Timer? _timer;
@@ -62,6 +64,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
       _loading = false;
       return;
     }
+    unawaited(_loadPicked());
     unawaited(_reload(live: true));
     _timer = Timer.periodic(const Duration(seconds: 60), (_) => unawaited(_reload(live: true)));
   }
@@ -69,7 +72,40 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _stripScroll.dispose();
     super.dispose();
+  }
+
+  static const _pickedKey = 'ngmy_signal_grid_market';
+
+  /// Once, after opening: slide the market cards so the chosen market is in view.
+  ScrollController _placeStrip(int index) {
+    if (!_stripPlaced && index > 0) {
+      _stripPlaced = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_stripScroll.hasClients) {
+          _stripScroll.jumpTo(math.min(index * 160.0 - 16, _stripScroll.position.maxScrollExtent).clamp(0.0, double.infinity));
+        }
+      });
+    }
+    return _stripScroll;
+  }
+
+  /// The market chosen last time, so the screen opens where it was left (even after closing the app).
+  Future<void> _loadPicked() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final v = prefs.getString(_pickedKey);
+      if (v != null && v.isNotEmpty && mounted && _selected == null) setState(() => _selected = v);
+    } catch (_) {}
+  }
+
+  Future<void> _pickMarket(String sym) async {
+    setState(() => _selected = sym);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_pickedKey, sym);
+    } catch (_) {}
   }
 
   Future<void> _reload({bool live = false}) async {
@@ -131,7 +167,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     ));
   }
 
-  /// "Scan now" only LOOKS: a fresh read of all 10 markets. It never buys or sells; only the automatic
+  /// "Check now" only LOOKS: a fresh read of all 10 markets. It never buys or sells; only the automatic
   /// 15-minute check on the server makes pretend trades.
   Future<void> _scanNow() async {
     setState(() => _busy = true);
@@ -142,7 +178,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
       if (res != null && res['ok'] == true) _status = res;
     });
     if (res?['ok'] != true) {
-      _snack((res?['error'] ?? 'The scan did not finish.').toString(), _loss);
+      _snack((res?['error'] ?? 'The check did not finish.').toString(), _loss);
       return;
     }
     final p = _Pal(Theme.of(context).brightness == Brightness.light);
@@ -168,7 +204,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
       const SizedBox(height: 14),
       Text('What the agent sees right now', style: TextStyle(color: p.ink, fontSize: 19, fontWeight: FontWeight.w900)),
       const SizedBox(height: 4),
-      Text('This scan only looks. It never buys or sells. Pretend trades are made only by the automatic check every 15 minutes'
+      Text('Check now only looks. It never buys or sells. Pretend trades are made only by the automatic check every 15 minutes'
           '${st['enabled'] == true ? ' (next one ${_nextAuto()})' : ' (the agent is stopped, so none will be made)'}.',
           style: TextStyle(color: p.muted, fontSize: 12.5, height: 1.35)),
       const SizedBox(height: 12),
@@ -315,6 +351,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
         SizedBox(
           height: 128,
           child: ListView.separated(
+            controller: _placeStrip(markets.indexWhere((m) => m['asset'] == focus['asset'])),
             scrollDirection: Axis.horizontal,
             clipBehavior: Clip.none,
             itemCount: markets.length,
@@ -329,7 +366,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
               final holding = shadow?['symbol'] == sym;
               final signal = _map(m['chart'])['signal'] == 'buy';
               return GestureDetector(
-                onTap: () => setState(() => _selected = sym),
+                onTap: () => _pickMarket(sym),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   width: 150,
@@ -818,7 +855,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
               icon: _busy
                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.radar_rounded, size: 18),
-              label: const Text('Scan now', style: TextStyle(fontWeight: FontWeight.w800)),
+              label: const Text('Check now', style: TextStyle(fontWeight: FontWeight.w800)),
             ),
           ),
         ),
@@ -839,7 +876,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
           child: Text(
             on
                 ? 'Trades are automatic: the agent checks all markets every 15 minutes by itself. '
-                    'Last check ${last == null ? 'not yet' : '${_clock(_toEt(last))} ET'} · next ${_nextAuto()}. Scan now only looks.'
+                    'Last check ${last == null ? 'not yet' : '${_clock(_toEt(last))} ET'} · next ${_nextAuto()}. Check now only looks, it never trades.'
                 : 'The agent is stopped, so it makes no trades. Press Start and it checks all markets every 15 minutes by itself.',
             style: TextStyle(color: p.muted, fontSize: 11.5, height: 1.35),
           ),
@@ -1432,7 +1469,50 @@ _Look _look(String symbol) => switch (symbol) {
       _ => _Look(symbol, symbol.isEmpty ? '?' : symbol[0], _slowC),
     };
 
+/// Currency badge colours and short marks for forex pairs.
+const _ccy = <String, (String, Color)>{
+  'EUR': ('€', Color(0xFF1D4ED8)),
+  'USD': ('\$', Color(0xFF15803D)),
+  'GBP': ('£', Color(0xFF1E3A8A)),
+  'JPY': ('¥', Color(0xFFDC2626)),
+  'CAD': ('C\$', Color(0xFFE11D48)),
+  'AUD': ('A\$', Color(0xFF0F766E)),
+  'NZD': ('NZ', Color(0xFF111827)),
+  'CHF': ('Fr', Color(0xFFB91C1C)),
+  'TRY': ('TL', Color(0xFFEA580C)),
+  'NOK': ('kr', Color(0xFF7C2D12)),
+  'THB': ('TH', Color(0xFF7E22CE)),
+};
+
+bool _isFx(String symbol) {
+  final parts = symbol.split('/');
+  return parts.length == 2 && _ccy.containsKey(parts[0]) && _ccy.containsKey(parts[1]);
+}
+
 Widget _coin(String symbol, double size) {
+  if (_isFx(symbol)) {
+    // Two overlapping currency badges, like a pair of flags.
+    final parts = symbol.split('/');
+    Widget one(String code) {
+      final (mark, color) = _ccy[code]!;
+      return Container(
+        width: size * 0.78,
+        height: size * 0.78,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: color, border: Border.all(color: Colors.white, width: 1.2)),
+        child: Text(mark, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: size * (mark.length > 1 ? 0.26 : 0.36))),
+      );
+    }
+
+    return SizedBox(
+      width: size * 1.25,
+      height: size,
+      child: Stack(children: [
+        Positioned(left: 0, top: 0, child: one(parts[0])),
+        Positioned(right: 0, bottom: 0, child: one(parts[1])),
+      ]),
+    );
+  }
   final l = _look(symbol);
   return Container(
     width: size,

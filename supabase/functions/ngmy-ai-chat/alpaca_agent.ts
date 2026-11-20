@@ -41,6 +41,29 @@ export const PA_MARKETS: MarketDef[] = [
   { symbol: "SOL/USD", name: "Solana", kind: "crypto" },
 ];
 
+/** Forex pairs for Live signals only (the agent does not trade these). Real interbank prices, 1-minute candles,
+ *  from Yahoo Finance's public chart feed. Only pairs that update every minute are listed. */
+export const PA_FX: { symbol: string; yahoo: string; name: string }[] = [
+  { symbol: "EUR/USD", yahoo: "EURUSD=X", name: "Euro / US dollar" },
+  { symbol: "GBP/USD", yahoo: "GBPUSD=X", name: "British pound / US dollar" },
+  { symbol: "AUD/USD", yahoo: "AUDUSD=X", name: "Australian dollar / US dollar" },
+  { symbol: "USD/JPY", yahoo: "USDJPY=X", name: "US dollar / Japanese yen" },
+  { symbol: "USD/CAD", yahoo: "USDCAD=X", name: "US dollar / Canadian dollar" },
+  { symbol: "EUR/GBP", yahoo: "EURGBP=X", name: "Euro / British pound" },
+  { symbol: "EUR/CHF", yahoo: "EURCHF=X", name: "Euro / Swiss franc" },
+  { symbol: "EUR/NZD", yahoo: "EURNZD=X", name: "Euro / New Zealand dollar" },
+  { symbol: "EUR/TRY", yahoo: "EURTRY=X", name: "Euro / Turkish lira" },
+  { symbol: "GBP/CAD", yahoo: "GBPCAD=X", name: "British pound / Canadian dollar" },
+  { symbol: "GBP/JPY", yahoo: "GBPJPY=X", name: "British pound / Japanese yen" },
+  { symbol: "CAD/CHF", yahoo: "CADCHF=X", name: "Canadian dollar / Swiss franc" },
+  { symbol: "CAD/JPY", yahoo: "CADJPY=X", name: "Canadian dollar / Japanese yen" },
+  { symbol: "CHF/JPY", yahoo: "CHFJPY=X", name: "Swiss franc / Japanese yen" },
+  { symbol: "CHF/NOK", yahoo: "CHFNOK=X", name: "Swiss franc / Norwegian krone" },
+  { symbol: "AUD/CAD", yahoo: "AUDCAD=X", name: "Australian dollar / Canadian dollar" },
+  { symbol: "AUD/NZD", yahoo: "AUDNZD=X", name: "Australian dollar / New Zealand dollar" },
+  { symbol: "USD/THB", yahoo: "USDTHB=X", name: "US dollar / Thai baht" },
+];
+
 export const PA_RULES = {
   version: 1,
   readOnly: true,
@@ -214,6 +237,60 @@ export function rsi(closes: number[], n = 14): number | null {
   return 100 - 100 / (1 + gain / loss);
 }
 
+export type Timing = {
+  dir: "up" | "down" | "none";
+  ageMin: number; // how long the current trend (fast line above or below slow) has lasted
+  typicalMin: number | null; // how long trends in this direction usually lasted on this market recently (median)
+  remainingMin: number | null; // typical minus age, never below 0
+  enterWithinMin: number | null; // still early enough to enter for about this many minutes (0 = too late)
+  worked: number; // past trends in this direction that ended in the right direction
+  of: number; // past trends in this direction measured
+};
+
+/** Measures every past up and down trend (fast line above / below slow line) on this market's candles:
+ *  how long they lasted and how often the price really moved that way. An estimate from recent history,
+ *  never a promise. */
+export function runStats(closes: number[], candleMin: number, fast = PA_RULES.fastMa, slow = PA_RULES.slowMa): Timing {
+  const none: Timing = { dir: "none", ageMin: 0, typicalMin: null, remainingMin: null, enterWithinMin: null, worked: 0, of: 0 };
+  if (closes.length < slow + 5) return none;
+  const dirs: number[] = [];
+  let fs = 0, ss = 0;
+  for (let i = 0; i < closes.length; i++) {
+    fs += closes[i];
+    ss += closes[i];
+    if (i >= fast) fs -= closes[i - fast];
+    if (i >= slow) ss -= closes[i - slow];
+    if (i >= slow - 1) dirs.push(Math.sign(fs / fast - ss / slow));
+    else dirs.push(0);
+  }
+  // Runs of the same direction: [start, end] candle indexes.
+  const runs: { d: number; s: number; e: number }[] = [];
+  for (let i = slow - 1; i < dirs.length; i++) {
+    const d = dirs[i];
+    if (d === 0) continue;
+    const last = runs[runs.length - 1];
+    if (last && last.d === d && last.e === i - 1) last.e = i;
+    else runs.push({ d, s: i, e: i });
+  }
+  if (!runs.length) return none;
+  const cur = runs[runs.length - 1];
+  const done = runs.slice(0, -1).filter((r) => r.d === cur.d && r.s > slow - 1); // skip the first, cut-off run
+  const lens = done.map((r) => r.e - r.s + 1).sort((a, b) => a - b);
+  const median = lens.length ? lens[Math.floor(lens.length / 2)] : null;
+  const worked = done.filter((r) => (r.d > 0 ? closes[r.e] > closes[r.s] : closes[r.e] < closes[r.s])).length;
+  const age = cur.e - cur.s + 1;
+  return {
+    dir: cur.d > 0 ? "up" : "down",
+    ageMin: age * candleMin,
+    typicalMin: median == null ? null : median * candleMin,
+    remainingMin: median == null ? null : Math.max(0, median - age) * candleMin,
+    // Early part of a typical trend: the first third.
+    enterWithinMin: median == null ? null : Math.max(0, Math.ceil(median / 3) - age + 1) * candleMin,
+    worked,
+    of: done.length,
+  };
+}
+
 export type Reading = {
   bias: "bullish" | "bearish" | "sideways" | "unknown";
   score: number; // 0 = very bearish, 50 = neutral, 100 = very bullish
@@ -223,10 +300,20 @@ export type Reading = {
   volPct: number | null; // average candle size in % (how jumpy the market is)
   action: string; // one short label for the app
   notes: string[]; // plain sentences explaining the reading
+  timing: Timing;
 };
 
 /** The agent's live reading of one market, in numbers and plain words. Educational, the same rules the agent uses. */
-export function readMarket(closes: number[], ohlc: { h: number; l: number }[], price: number, open: boolean): Reading {
+export function readMarket(
+  closes: number[],
+  ohlc: { h: number; l: number }[],
+  price: number,
+  open: boolean,
+  opts: { candleMin?: number; agent?: boolean } = {},
+): Reading {
+  const candleMin = opts.candleMin ?? PA_RULES.candleMinutes;
+  const agent = opts.agent ?? true;
+  const timing = runStats(closes, candleMin);
   const x = crossover(closes);
   const r = rsi(closes);
   const p = price || closes[closes.length - 1] || 0;
@@ -237,25 +324,43 @@ export function readMarket(closes: number[], ohlc: { h: number; l: number }[], p
   const volPct = last.length && p ? last.reduce((s, b, i) => s + (b.h - b.l) / (closes[closes.length - last.length + i] || p), 0) / last.length * 100 : null;
   const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
   if (gapPct == null || x.slowNow == null) {
-    return { bias: "unknown", score: 50, rsi: r, mom1h, gapPct, volPct, action: "WAITING FOR DATA", notes: ["Not enough 5-minute candles yet to read this market."] };
+    return { bias: "unknown", score: 50, rsi: r, mom1h, gapPct, volPct, action: "WAITING FOR DATA", notes: ["Not enough candles yet to read this market."], timing };
   }
   const score = Math.round(clamp(50 + clamp(gapPct * 60, -25, 25) + clamp((mom1h ?? 0) * 12, -15, 15) + clamp(((r ?? 50) - 50) * 0.4, -10, 10), 0, 100));
   const flat = Math.abs(gapPct) < 0.02;
   const bias = flat ? "sideways" : x.fastNow! > x.slowNow && p >= x.slowNow ? "bullish" : x.fastNow! < x.slowNow && p <= x.slowNow ? "bearish" : "sideways";
+  const early = timing.enterWithinMin != null && timing.enterWithinMin > 0;
   let action: string;
   if (!open) action = "MARKET CLOSED";
-  else if (x.signal === "buy") action = "BUY SIGNAL";
-  else if (x.signal === "sell") action = "SELL SIGNAL";
-  else if (bias === "bullish") action = "UPTREND · WAIT FOR ENTRY";
-  else if (bias === "bearish") action = "DOWNTREND · STAY OUT";
-  else action = "SIDEWAYS · NO EDGE";
+  else if (agent) {
+    if (x.signal === "buy") action = "BUY SIGNAL";
+    else if (x.signal === "sell") action = "SELL SIGNAL";
+    else if (bias === "bullish") action = "UPTREND · WAIT FOR ENTRY";
+    else if (bias === "bearish") action = "DOWNTREND · STAY OUT";
+    else action = "SIDEWAYS · NO EDGE";
+  } else {
+    // Forex: the direction plus whether it is still early enough to act.
+    if (bias === "sideways" || timing.dir === "none") action = "SIDEWAYS · NO EDGE";
+    else if (bias === "bullish" && timing.dir === "up") action = early ? `BUY · ENTER WITHIN ${timing.enterWithinMin} MIN` : "BULLISH · LATE, WAIT";
+    else if (bias === "bearish" && timing.dir === "down") action = early ? `SELL · ENTER WITHIN ${timing.enterWithinMin} MIN` : "BEARISH · LATE, WAIT";
+    else action = "MIXED · NO EDGE";
+  }
 
   const notes: string[] = [];
-  if (x.signal === "buy") notes.push("The fast line just crossed ABOVE the slow line: a fresh buy signal. This is the moment the agent buys.");
-  else if (x.signal === "sell") notes.push("The fast line just crossed BELOW the slow line: a fresh sell signal. A trade here would be closed.");
-  else if (bias === "bullish") notes.push("The fast line is above the slow line and the price is above both: buyers are in control. The cross happened earlier, so buying now would be late.");
-  else if (bias === "bearish") notes.push("The fast line is below the slow line and the price is below both: sellers are in control. The agent does not buy falling markets.");
+  const who = agent ? "the agent" : "a trader";
+  if (x.signal === "buy") notes.push(`The fast line just crossed ABOVE the slow line: a fresh buy signal. ${agent ? "This is the moment the agent buys." : "This is the early moment of an up move."}`);
+  else if (x.signal === "sell") notes.push(`The fast line just crossed BELOW the slow line: a fresh sell signal. ${agent ? "A trade here would be closed." : "This is the early moment of a down move."}`);
+  else if (bias === "bullish") notes.push(`The fast line is above the slow line and the price is above both: buyers are in control.${early ? "" : ` The cross happened earlier, so for ${who} buying now would be late.`}`);
+  else if (bias === "bearish") notes.push(`The fast line is below the slow line and the price is below both: sellers are in control.${agent ? " The agent does not buy falling markets." : ""}`);
   else notes.push("The two lines are close together or mixed: no clear direction. Signals here often fail, so patience is best.");
+  if (open && timing.dir !== "none" && timing.typicalMin != null && bias !== "sideways") {
+    const way = timing.dir === "up" ? "up" : "down";
+    notes.push(`This ${way} trend started about ${timing.ageMin} min ago. On this market, ${way} trends lately lasted about ${timing.typicalMin} min, so roughly ${timing.remainingMin} min may be left (an estimate, not a promise).`);
+    if (timing.of > 0) notes.push(`Of the last ${timing.of} ${way} trends here, ${timing.worked} really ended ${way === "up" ? "higher" : "lower"} (${Math.round(timing.worked / timing.of * 100)}%).`);
+    notes.push(early
+      ? `Still early: about ${timing.enterWithinMin} min left to act in the first part of the move.`
+      : "Too late for a safe entry: most of a typical move is already used. Wait for the next fresh signal.");
+  }
   if (r != null) {
     if (r >= 70) notes.push(`RSI is ${r.toFixed(0)}: stretched (overbought). Prices rose fast and often pause or pull back.`);
     else if (r <= 30) notes.push(`RSI is ${r.toFixed(0)}: oversold. Prices fell fast and often bounce, but a falling trend can keep falling.`);
@@ -265,8 +370,8 @@ export function readMarket(closes: number[], ohlc: { h: number; l: number }[], p
   }
   if (mom1h != null) notes.push(`In the last hour the price ${mom1h >= 0 ? "rose" : "fell"} ${Math.abs(mom1h).toFixed(2)}%.`);
   if (volPct != null) notes.push(volPct > 0.35 ? `It is jumpy right now (candles average ${volPct.toFixed(2)}%), so the +3% target and -1.5% stop can be hit quickly.` : `It is calm right now (candles average ${volPct.toFixed(2)}%).`);
-  if (!open) notes.push("The stock market is closed, so this market cannot be traded until it opens.");
-  return { bias, score, rsi: r, mom1h, gapPct, volPct, action, notes };
+  if (!open) notes.push(agent ? "The stock market is closed, so this market cannot be traded until it opens." : "The forex market is closed (it trades from Sunday 5 PM to Friday 5 PM Eastern). OTC prices at a broker on weekends are made by that broker, not by the real market.");
+  return { bias, score, rsi: r, mom1h, gapPct, volPct, action, notes, timing };
 }
 
 /** The last few hours for the app's chart: candles, fast line and slow line per 5-minute candle, plus the trend. */
@@ -391,6 +496,56 @@ async function readMarkets(k: Keys): Promise<Record<string, Series>> {
   return out;
 }
 
+// ─────────────────────────────────────────────────────────────── forex (Live signals only, read-only)
+
+let fxCache: { at: number; cards: any[] } | null = null;
+
+/** One forex pair from Yahoo Finance's public chart feed: 1-minute candles for today. No key, no personal data. */
+async function readFxPair(def: (typeof PA_FX)[number]) {
+  const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(def.yahoo)}?interval=1m&range=1d`, {
+    headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
+    signal: AbortSignal.timeout(12000),
+  });
+  if (!res.ok) throw new Error(`forex feed answered ${res.status}`);
+  const j = await res.json();
+  const r = j?.chart?.result?.[0];
+  const ts: number[] = r?.timestamp ?? [];
+  const q = r?.indicators?.quote?.[0] ?? {};
+  const now = Date.now();
+  const bars: { t: string; o: number; h: number; l: number; c: number }[] = [];
+  for (let i = 0; i < ts.length; i++) {
+    const c = q.close?.[i], o = q.open?.[i], h = q.high?.[i], l = q.low?.[i];
+    if (c == null || o == null || h == null || l == null) continue;
+    // Only finished 1-minute candles.
+    if (ts[i] * 1000 + 60 * 1000 > now) continue;
+    bars.push({ t: new Date(ts[i] * 1000).toISOString(), o, h, l, c });
+  }
+  const last = bars.slice(-300);
+  const closes = last.map((b) => b.c);
+  const price = Number(r?.meta?.regularMarketPrice ?? closes[closes.length - 1] ?? 0);
+  const lastAt = last.length ? Date.parse(last[last.length - 1].t) : 0;
+  const open = lastAt > 0 && now - lastAt < 10 * 60 * 1000; // the real forex market is trading
+  const chart = buildChart(last.map((b) => b.t), closes, 60, last.map((b) => ({ o: b.o, h: b.h, l: b.l })));
+  const first = chart.points[0]?.c ?? 0;
+  return {
+    symbol: def.symbol, name: def.name, kind: "forex", open, candleMin: 1,
+    price, changePct: first ? round2((price - first) / first * 100) : 0,
+    trend: chart.trend, signal: chart.signal, fast: chart.fast, slow: chart.slow,
+    // Light for phones: the last 30 minutes of closing prices only (for the small line on each card).
+    chart: { points: chart.points.slice(-30).map((q) => ({ c: q.c })), trend: chart.trend, signal: chart.signal },
+    reading: readMarket(closes, last, price, open, { candleMin: 1, agent: false }),
+  };
+}
+
+/** All forex pairs, read at most every 20 seconds (shared by everyone looking). A pair that fails is skipped. */
+export async function readForex(): Promise<any[]> {
+  if (fxCache && Date.now() - fxCache.at < 20 * 1000) return fxCache.cards;
+  const settled = await Promise.allSettled(PA_FX.map((d) => readFxPair(d)));
+  const cards = settled.filter((s) => s.status === "fulfilled").map((s) => (s as PromiseFulfilledResult<any>).value);
+  if (cards.length) fxCache = { at: Date.now(), cards };
+  return cards.length ? cards : fxCache?.cards ?? [];
+}
+
 /** What the app shows for each market: price, change over the chart, trend, signal and the chart itself. */
 function marketCards(series: Record<string, Series>, stockOpen: boolean) {
   return PA_MARKETS.map((m) => {
@@ -403,6 +558,7 @@ function marketCards(series: Record<string, Series>, stockOpen: boolean) {
       symbol: m.symbol, name: m.name, kind: m.kind, open,
       price, changePct: first ? round2((price - first) / first * 100) : 0,
       trend: chart.trend, signal: chart.signal, fast: chart.fast, slow: chart.slow, chart,
+      candleMin: PA_RULES.candleMinutes,
       reading: readMarket(s?.closes ?? [], s?.ohlc ?? [], price, open),
     };
   });
@@ -676,6 +832,11 @@ export async function handleAlpacaAgent(
       }
     }
   }
+  // Live signals also asks for the forex pairs (read-only, the agent does not trade them).
+  let fx: any[] | undefined;
+  if (body?.fx === true) {
+    try { fx = await readForex(); } catch { fx = []; }
+  }
   const etNow = etParts(new Date());
   const market = { stockOpen, weekend: etNow.weekend, nextOpen: clock?.next_open ?? null, nextClose: clock?.next_close ?? null };
   const { data: today } = await db.from("ngmy_alpaca_agent_days").select("*").eq("et_day", etNow.dayKey).maybeSingle();
@@ -693,6 +854,7 @@ export async function handleAlpacaAgent(
       today: today ?? null,
       liveError,
       market,
+      ...(fx ? { fx } : {}),
       trades: (trades ?? []).map((t: any) => ({ ...t, details: { ...(t.details ?? {}), scanned: undefined } })),
       record,
       ticket: {
