@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import 'ngmy_core_reaction_lab.dart';
 import 'ngmy_core_studios_a.dart';
@@ -10,6 +11,7 @@ import 'ngmy_core_circuit_lab.dart';
 import 'ngmy_core_studios_b.dart';
 import 'ngmy_core_studios_e.dart';
 import 'ngmy_studio_kit.dart';
+import 'ngmy_studio_movie.dart';
 import 'ngmy_electronics_lab.dart';
 import 'ngmy_body_explorer.dart';
 import 'ngmy_play_hub.dart';
@@ -655,7 +657,7 @@ class _SequenceCanvasState extends State<_SequenceCanvas> with TickerProviderSta
       _prevT = 0;
       _chimed = false;
     }
-    if (_sound && _playing) {
+    if (_sound && _playing && _saving < 0) {
       final starts = switch (_style) {
         _UnfoldStyle.accordion => const [0.04, 0.2, 0.36],
         _UnfoldStyle.flip => const [0.05, 0.2, 0.35],
@@ -699,6 +701,69 @@ class _SequenceCanvasState extends State<_SequenceCanvas> with TickerProviderSta
   void _pause() {
     _seq.stop();
     setState(() => _playing = false);
+  }
+
+  /// How far the video is made (0 to 1), or -1 when no video is being made.
+  double _saving = -1;
+
+  /// Saves the whole scene, from the first slab to the end, as a sharp HD video: every moment is drawn on the stage and
+  /// photographed, then joined into one MP4.
+  Future<void> _download() async {
+    if (_saving >= 0) return;
+    final b = _shot.currentContext?.findRenderObject();
+    if (b is! RenderRepaintBoundary || !b.hasSize) return;
+    final wasPlaying = _playing;
+    _seq.stop();
+    _pulse.stop();
+    setState(() {
+      _saving = 0;
+      _playing = false;
+    });
+    final size = b.size;
+    var pr = (1080 / math.min(size.width, size.height)).clamp(2.0, 4.0);
+    if (math.max(size.width, size.height) * pr > 1920) pr = 1920 / math.max(size.width, size.height);
+    final w = (size.width * pr).floor() & ~1;
+    final h = (size.height * pr).floor() & ~1;
+    const fps = 30;
+    final secs = 11 / _speed;
+    final frames = (secs * fps).round();
+    String message;
+    try {
+      final movie = await ngmyMakeMovie(
+        width: w,
+        height: h,
+        fps: fps,
+        frames: frames,
+        frameAt: (i) async {
+          final tau = i / fps;
+          _seq.value = i / frames;
+          // The glow breathes in and out every 4 seconds, as on the screen.
+          final phase = (tau % 4) / 4;
+          _pulse.value = phase < 0.5 ? phase * 2 : 2 - phase * 2;
+          await WidgetsBinding.instance.endOfFrame;
+          final shot = _shot.currentContext?.findRenderObject();
+          if (shot is! RenderRepaintBoundary) throw StateError('closed');
+          return ngmyImageExact(await shot.toImage(pixelRatio: pr), w, h);
+        },
+        onProgress: (p) {
+          if (mounted) setState(() => _saving = p);
+        },
+      );
+      if (movie == null || movie.isEmpty) {
+        message = 'This phone cannot make a video here. Try Safari or Chrome up to date.';
+      } else {
+        final name = widget.meta.title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_');
+        message = await ngmySaveMovie(movie, name) ? 'Your scene is saved as a sharp HD video.' : 'Could not save here. Try another browser.';
+      }
+    } catch (_) {
+      message = 'Could not make the video. Try again.';
+    }
+    if (!mounted) return;
+    setState(() => _saving = -1);
+    _pulse.repeat(reverse: true);
+    _seq.value = 0;
+    if (wasPlaying) _play();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _edit() async {
@@ -893,6 +958,26 @@ class _SequenceCanvasState extends State<_SequenceCanvas> with TickerProviderSta
               ),
             ),
         ]),
+        const SizedBox(height: 6),
+        if (_saving >= 0)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Column(children: [
+              ClipRRect(borderRadius: BorderRadius.circular(6), child: LinearProgressIndicator(value: _saving, minHeight: 8, backgroundColor: Colors.white12, color: meta.glow)),
+              const SizedBox(height: 4),
+              Text('Making your video… ${(_saving * 100).round()}%', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+            ]),
+          )
+        else
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _download,
+              style: FilledButton.styleFrom(backgroundColor: meta.glow, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 13)),
+              icon: const Icon(Icons.download_rounded),
+              label: const Text('Download the scene (HD video)', style: TextStyle(fontWeight: FontWeight.w900)),
+            ),
+          ),
       ]),
     );
   }

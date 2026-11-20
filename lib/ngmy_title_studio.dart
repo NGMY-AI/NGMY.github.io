@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 
 import 'ngmy_bytes_save.dart';
 import 'ngmy_studio_kit.dart';
+import 'ngmy_studio_movie.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
 // TITLE ANIMATOR: type a word, pick how every letter moves (24 ways), how the letters are designed (8 looks), and a whole animated
@@ -652,7 +653,7 @@ Future<Uint8List> ngmyTitleGif({
   final w = (aspect >= 1 ? longEdge : longEdge * aspect).round();
   final h = (aspect >= 1 ? longEdge / aspect : longEdge).round();
   final frames = (kTitleLoopSecs * fps).round();
-  final enc = img.GifEncoder(delay: 0, repeat: 0, samplingFactor: 12, dither: img.DitherKernel.none);
+  final enc = img.GifEncoder(delay: 0, repeat: 0, samplingFactor: 4, dither: img.DitherKernel.none);
   final delay = (100 / fps).round();
   for (var f = 0; f < frames; f++) {
     final rec = ui.PictureRecorder();
@@ -747,11 +748,43 @@ class NgmyTitleStudioState extends State<NgmyTitleStudio> with SingleTickerProvi
       note = '';
     });
     try {
-      final bytes = await ngmyTitleGif(text: _text.text, move: move, style: style, bg: bg, color: textColor, fontSize: size, aspect: kTitleShapes[shape].$2, onProgress: (p) {
+      final name = (_text.text.trim().isEmpty ? 'title' : _text.text.trim()).replaceAll(RegExp(r'[^A-Za-z0-9_-]+'), '_');
+      // First a sharp HD video (1920 pixels on the long side, 30 pictures a second, the loop played three times): a
+      // GIF can hold only 256 colours and was small, which is what made the title blurry on the phone.
+      final aspect = kTitleShapes[shape].$2;
+      final w = (aspect >= 1 ? 1920 : 1920 * aspect).round() & ~1;
+      final h = (aspect >= 1 ? 1920 / aspect : 1920).round() & ~1;
+      const fps = 30;
+      final perLoop = (kTitleLoopSecs * fps).round();
+      final movie = await ngmyMakeMovie(
+        width: w,
+        height: h,
+        fps: fps,
+        frames: perLoop * 3,
+        frameAt: (i) async {
+          final rec = ui.PictureRecorder();
+          paintTitleCard(Canvas(rec), Size(w.toDouble(), h.toDouble()), (i % perLoop) / perLoop, text: _text.text, move: move, style: style, bg: bg, color: textColor, fontSize: size);
+          final pic = rec.endRecording();
+          final image = await pic.toImage(w, h);
+          pic.dispose();
+          return image;
+        },
+        onProgress: (p) {
+          if (mounted) setState(() => saving = p);
+        },
+      );
+      if (movie != null && movie.isNotEmpty) {
+        final ok = await ngmySaveMovie(movie, name);
+        if (mounted) setState(() => note = ok ? 'Your animated title is saved as a sharp HD video.' : 'Could not save here. Try another browser.');
+        if (mounted) setState(() => saving = -1);
+        return;
+      }
+      // This phone cannot make video: a sharper GIF than before (bigger, finer colours).
+      if (mounted) setState(() => saving = 0);
+      final bytes = await ngmyTitleGif(text: _text.text, move: move, style: style, bg: bg, color: textColor, fontSize: size, aspect: aspect, longEdge: 800, fps: 20, onProgress: (p) {
         if (mounted) setState(() => saving = p);
       });
       if (bytes.isEmpty) throw StateError('empty');
-      final name = (_text.text.trim().isEmpty ? 'title' : _text.text.trim()).replaceAll(RegExp(r'[^A-Za-z0-9_-]+'), '_');
       var done = false;
       try {
         final res = await Share.shareXFiles([XFile.fromData(bytes, mimeType: 'image/gif', name: '$name.gif')], text: 'Made in NGMY Core Protocol');
@@ -772,7 +805,7 @@ class NgmyTitleStudioState extends State<NgmyTitleStudio> with SingleTickerProvi
     return StudioPage(
       title: 'TITLE ANIMATOR',
       accent: gold,
-      help: 'Type a word or a name. Pick how the letters move (24 ways), how they look (8 designs), and a moving background scene (20 designs). The title plays on a loop. Download saves the WHOLE animation as a moving GIF to post or send.',
+      help: 'Type a word or a name. Pick how the letters move (24 ways), how they look (8 designs), and a moving background scene (20 designs). The title plays on a loop. Download saves the WHOLE animation as a sharp HD video to post or send.',
       stage: Padding(
         padding: const EdgeInsets.all(14),
         child: Center(
@@ -839,7 +872,7 @@ class NgmyTitleStudioState extends State<NgmyTitleStudio> with SingleTickerProvi
               onPressed: downloadAnimation,
               style: FilledButton.styleFrom(backgroundColor: gold, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 13)),
               icon: const Icon(Icons.download_rounded),
-              label: const Text('Download the animation (GIF)', style: TextStyle(fontWeight: FontWeight.w900)),
+              label: const Text('Download the animation (HD video)', style: TextStyle(fontWeight: FontWeight.w900)),
             ),
           ),
         if (note.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text(note, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF4ADE80), fontWeight: FontWeight.w700, fontSize: 12.5))),

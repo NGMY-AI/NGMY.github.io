@@ -242,6 +242,87 @@ export function ngmyStudioFastExportSupported() {
 window.ngmyStudioFastExport = ngmyStudioFastExport;
 window.ngmyStudioFastExportSupported = ngmyStudioFastExportSupported;
 
+// ── Movie from pictures ─────────────────────────────────────────────────────
+// The app draws each moment of an animation as a picture (RGBA bytes) and hands it here; the pictures are made into one
+// sharp MP4 video. Used by the Title Animator and the Core Protocol scenes.
+
+const _movies = {};
+let _movieSeq = 0;
+
+async function ngmyMovieBegin(width, height, fps) {
+  if (typeof VideoEncoder === 'undefined' || typeof VideoFrame === 'undefined') return 0;
+  width = width | 0;
+  height = height | 0;
+  fps = fps | 0;
+  const codec = await pickVideoCodec(width, height, fps);
+  if (!codec) return 0;
+  const muxer = new Muxer({
+    target: new ArrayBufferTarget(),
+    video: { codec: 'avc', width, height, frameRate: fps },
+    fastStart: 'in-memory',
+  });
+  const m = { muxer, width, height, fps, n: 0, error: null };
+  m.enc = new VideoEncoder({
+    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+    error: (e) => {
+      m.error = e;
+    },
+  });
+  m.enc.configure({ codec, width, height, bitrate: 12_000_000, framerate: fps });
+  m.canvas = document.createElement('canvas');
+  m.canvas.width = width;
+  m.canvas.height = height;
+  m.ctx = m.canvas.getContext('2d');
+  const id = ++_movieSeq;
+  _movies[id] = m;
+  return id;
+}
+
+async function ngmyMovieAdd(id, rgba) {
+  const m = _movies[id];
+  if (!m) throw new Error('movie closed');
+  if (m.error) throw m.error;
+  const px = new Uint8ClampedArray(rgba.buffer, rgba.byteOffset, m.width * m.height * 4);
+  m.ctx.putImageData(new ImageData(px, m.width, m.height), 0, 0);
+  const us = 1_000_000 / m.fps;
+  const frame = new VideoFrame(m.canvas, { timestamp: Math.round(m.n * us), duration: Math.round(us) });
+  m.enc.encode(frame, { keyFrame: m.n % (m.fps * 2) === 0 });
+  frame.close();
+  m.n++;
+  // Never let the phone fall far behind (keeps memory low).
+  while (m.enc.encodeQueueSize > 6) {
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  return true;
+}
+
+async function ngmyMovieEnd(id) {
+  const m = _movies[id];
+  if (!m) throw new Error('movie closed');
+  delete _movies[id];
+  await m.enc.flush();
+  m.enc.close();
+  if (m.error) throw m.error;
+  m.muxer.finalize();
+  const buffer = m.muxer.target.buffer;
+  if (!buffer || buffer.byteLength === 0) throw new Error('empty movie');
+  return new Uint8Array(buffer);
+}
+
+function ngmyMovieCancel(id) {
+  const m = _movies[id];
+  if (!m) return;
+  delete _movies[id];
+  try {
+    m.enc.close();
+  } catch (_) {}
+}
+
+window.ngmyMovieBegin = ngmyMovieBegin;
+window.ngmyMovieAdd = ngmyMovieAdd;
+window.ngmyMovieEnd = ngmyMovieEnd;
+window.ngmyMovieCancel = ngmyMovieCancel;
+
 // ── Media-time export ───────────────────────────────────────────────────────
 // Every frame is stamped with the clip's own clock (requestVideoFrameCallback
 // mediaTime), never wall time. A slow phone can drop frames, but the file
