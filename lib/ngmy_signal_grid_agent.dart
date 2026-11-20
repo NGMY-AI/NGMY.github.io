@@ -45,6 +45,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
   bool _moreLog = true;
   bool _showAllLog = false;
   int _range = 48; // candles shown: 12 = 1 h, 24 = 2 h, 48 = 4 h
+  String? _selected; // market tapped in the strip
   bool _lines = true;
   String? _error;
   Timer? _timer;
@@ -206,16 +207,23 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     final cfg = _map(s['config']);
     final snap = _map(st['snapshot']);
     final shadow = st['shadow'] is Map ? _map(st['shadow']) : null;
+    final markets = _markets(snap);
+    // The market on show: the one tapped, else the one held, else the one the agent last looked at.
+    final sel = _selected ?? (shadow?['symbol'] ?? snap['asset'])?.toString();
+    final focus = markets.firstWhere((m) => m['asset'] == sel, orElse: () => markets.isEmpty ? snap : markets.first);
+    final held = shadow == null ? null : markets.firstWhere((m) => m['asset'] == shadow['symbol'], orElse: () => focus);
+    final heldShadow = shadow != null && shadow['symbol'] == focus['asset'] ? shadow : null;
     return [
-      _hero(p, s, snap),
+      _marketStrip(p, s, markets, focus, shadow),
+      _hero(p, s, focus),
       if ((cfg['problem'] ?? '').toString().isNotEmpty) _banner(p, cfg['problem'].toString(), _down),
       if ((s['liveError'] ?? '').toString().isNotEmpty) _banner(p, s['liveError'].toString(), _loss),
       if (st['brakePaused'] == true)
         _banner(p, 'Paused by the \$25 brake. ${st['brakeReason'] ?? ''}. Look over the trades, then press Start to turn it back on.', _loss),
-      _chartCard(p, snap, shadow),
-      _trendPill(p, snap, shadow, s),
+      _chartCard(p, focus, heldShadow),
+      _trendPill(p, focus, shadow, s),
       _balanceCard(p, s, st, snap),
-      shadow != null ? _positionCard(p, shadow, snap) : _ticketCard(p, s, snap),
+      shadow != null ? _positionCard(p, shadow, held!) : _ticketCard(p, s, focus),
       _controls(p, st),
       _tradesCard(p, s),
       _activityCard(p),
@@ -231,42 +239,120 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     ];
   }
 
+  // ── Markets: all watched markets side by side, tap one to see it
+
+  Widget _marketStrip(_Pal p, Map<String, dynamic> s, List<Map<String, dynamic>> markets, Map<String, dynamic> focus,
+      Map<String, dynamic>? shadow) {
+    if (markets.length < 2) return const SizedBox.shrink();
+    final openCount = markets.where((m) => m['open'] == true).length;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+          child: Row(children: [
+            Text('Watching ${markets.length} markets', style: TextStyle(color: p.ink, fontSize: 14, fontWeight: FontWeight.w800)),
+            const SizedBox(width: 8),
+            _pill('$openCount OPEN NOW', _up),
+            const Spacer(),
+            Text('tap one', style: TextStyle(color: p.muted, fontSize: 11)),
+          ]),
+        ),
+        SizedBox(
+          height: 128,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.none,
+            itemCount: markets.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 10),
+            itemBuilder: (_, i) {
+              final m = markets[i];
+              final sym = m['asset'].toString();
+              final on = sym == focus['asset'];
+              final chg = _d(m['changePct']);
+              final up = chg >= 0;
+              final pts = _points(m);
+              final holding = shadow?['symbol'] == sym;
+              final signal = _map(m['chart'])['signal'] == 'buy';
+              return GestureDetector(
+                onTap: () => setState(() => _selected = sym),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 150,
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+                  decoration: BoxDecoration(
+                    color: p.card,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: on ? _look(sym).color : p.cardEdge, width: on ? 2 : 1),
+                    boxShadow: [BoxShadow(color: on ? _look(sym).color.withValues(alpha: 0.25) : p.shadow, blurRadius: on ? 18 : 12, offset: const Offset(0, 6))],
+                  ),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      _coin(sym, 20),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(sym, maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: p.ink, fontSize: 12, fontWeight: FontWeight.w800)),
+                      ),
+                      if (m['open'] != true)
+                        Text('closed', style: TextStyle(color: p.muted, fontSize: 9.5, fontWeight: FontWeight.w700)),
+                    ]),
+                    const SizedBox(height: 6),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(_money(_d(m['price']), sign: false),
+                          style: TextStyle(color: p.ink, fontSize: 17, fontWeight: FontWeight.w700)),
+                    ),
+                    Row(children: [
+                      Text('${up ? '+' : ''}${chg.toStringAsFixed(2)}%',
+                          style: TextStyle(color: up ? _up : _loss, fontSize: 11, fontWeight: FontWeight.w800)),
+                      const Spacer(),
+                      if (holding) _pill('HOLDING', _btc) else if (signal) _pill('BUY SIGNAL', _up),
+                    ]),
+                    const SizedBox(height: 4),
+                    Expanded(child: CustomPaint(size: Size.infinite, painter: _SparkPainter(pts, up ? _up : _loss))),
+                  ]),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 4),
+      ]),
+    );
+  }
+
   // ── Hero: asset, big price, change
 
   Widget _hero(_Pal p, Map<String, dynamic> s, Map<String, dynamic> snap) {
     final market = _map(s['market']);
-    final asset = (snap['asset'] ?? market['asset'] ?? 'SPY').toString();
-    final isBtc = asset.startsWith('BTC');
+    final asset = (snap['asset'] ?? 'SPY').toString();
+    final isCrypto = asset.contains('/');
     final pts = _points(snap);
     final price = _d(snap['price']);
     final first = pts.isNotEmpty ? _d(pts.first['c']) : 0.0;
     final chg = first == 0 ? 0.0 : (price - first) / first * 100;
     final up = chg >= 0;
-    final open = market['open'];
-    final marketText = isBtc
-        ? 'Weekend · Bitcoin trades all day'
+    final open = isCrypto ? true : (snap['open'] ?? market['stockOpen'] ?? market['open']);
+    final marketText = isCrypto
+        ? 'Crypto · trades all day, every day'
         : open == true
-            ? 'Market open · closes 4:00 PM ET'
+            ? 'Stock market open · closes 4:00 PM ET'
             : open == false
-                ? 'Market closed${_whenOpens(market['nextOpen'])}'
+                ? 'Stock market closed${_whenOpens(market['nextOpen'])}'
                 : '';
+    final look = _look(asset);
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 6, 4, 14),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Container(
-            width: 30,
-            height: 30,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: isBtc ? _btc : _spy),
-            child: Text(isBtc ? '₿' : 'S&P',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: isBtc ? 16 : 9.5)),
-          ),
+          _coin(asset, 30),
           const SizedBox(width: 10),
-          Text(isBtc ? 'BTC/USD' : 'SPY/USD', style: TextStyle(color: p.ink, fontSize: 17, fontWeight: FontWeight.w800)),
+          Text(isCrypto ? asset : '$asset/USD', style: TextStyle(color: p.ink, fontSize: 17, fontWeight: FontWeight.w800)),
           const SizedBox(width: 6),
           Flexible(
-            child: Text(isBtc ? 'Bitcoin' : 'S&P 500 fund',
+            child: Text((snap['name'] ?? look.name).toString(),
                 overflow: TextOverflow.ellipsis, style: TextStyle(color: p.muted, fontSize: 13)),
           ),
         ]),
@@ -294,10 +380,15 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
         if (marketText.isNotEmpty) ...[
           const SizedBox(height: 4),
           Row(children: [
-            Icon(Icons.circle, size: 7, color: (isBtc || open == true) ? _up : p.muted),
+            Icon(Icons.circle, size: 7, color: open == true ? _up : p.muted),
             const SizedBox(width: 6),
-            Text(marketText, style: TextStyle(color: p.muted, fontSize: 12)),
-            if (pts.length > 1) Text('  ·  change over ${_rangeLabel(math.min(_range, pts.length))}', style: TextStyle(color: p.muted, fontSize: 12)),
+            Flexible(
+              child: Text(
+                '$marketText${pts.length > 1 ? '  ·  change over 4H' : ''}',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: p.muted, fontSize: 12),
+              ),
+            ),
           ]),
         ],
       ]),
@@ -351,10 +442,16 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
       'flat' => (_down, Icons.trending_flat_rounded, 'Moving sideways'),
       _ => (_slowC, Icons.hourglass_top_rounded, 'Waiting for data'),
     };
+    final asset = (snap['asset'] ?? '').toString();
+    final closedStock = !asset.contains('/') && snap['open'] == false;
     final sub = !running
-        ? 'Agent is stopped. Press Start to let it watch.'
-        : shadow != null
-            ? 'Holding a pretend trade. It sells at the target, the stop, or when the trend turns down.'
+        ? 'Agent is stopped. Press Start to let it watch all markets.'
+        : shadow != null && shadow['symbol'] == asset
+            ? 'Holding a pretend trade here. It sells at the target, the stop, or when the trend turns down.'
+            : shadow != null
+            ? 'Holding ${shadow['symbol']} right now. One trade at a time, so no buy here until that one is sold.'
+            : closedStock
+            ? 'The stock market is closed, so $asset waits. The agent keeps watching the crypto markets.'
             : trend == 'up'
                 ? 'The turn up already happened. It waits for the next fresh turn up so it never buys late.'
                 : trend == 'down'
@@ -605,7 +702,10 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
               style: TextStyle(color: p.onDark, fontWeight: FontWeight.w800, fontSize: 13.5)),
         ),
         const SizedBox(height: 6),
-        Center(child: Text('Prices shown use the price right now', style: TextStyle(color: p.muted, fontSize: 11))),
+        Center(
+          child: Text('Shown for ${snap['asset'] ?? ''} at its price right now. The agent buys whichever market signals first.',
+              textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 11)),
+        ),
       ]),
     );
   }
@@ -1164,7 +1264,94 @@ class _CandlePainter extends CustomPainter {
       old.pts != pts || old.touch != touch || old.lines != lines || old.entry != entry || old.price != price || old.p.light != p.light;
 }
 
+class _SparkPainter extends CustomPainter {
+  _SparkPainter(this.pts, this.color);
+  final List<Map<String, dynamic>> pts;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (pts.length < 2) return;
+    final vals = pts.map((q) => _d(q['c'])).toList();
+    final lo = vals.reduce(math.min), hi = vals.reduce(math.max);
+    final span = hi - lo < 1e-9 ? 1.0 : hi - lo;
+    final path = Path();
+    for (var i = 0; i < vals.length; i++) {
+      final o = Offset(i / (vals.length - 1) * size.width, size.height - (vals[i] - lo) / span * size.height);
+      i == 0 ? path.moveTo(o.dx, o.dy) : path.lineTo(o.dx, o.dy);
+    }
+    final fill = Path.from(path)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(
+        fill,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [color.withValues(alpha: 0.25), color.withValues(alpha: 0)],
+          ).createShader(Offset.zero & size));
+    canvas.drawPath(
+        path,
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.8
+          ..strokeJoin = StrokeJoin.round);
+    final last = Offset(size.width, size.height - (vals.last - lo) / span * size.height);
+    canvas.drawCircle(last, 3, Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SparkPainter old) => old.pts != pts || old.color != color;
+}
+
 // ───────────────────────────────────────────────────────────── palette and helpers
+
+class _Look {
+  const _Look(this.name, this.mark, this.color);
+  final String name;
+  final String mark;
+  final Color color;
+}
+
+_Look _look(String symbol) => switch (symbol) {
+      'SPY' => const _Look('S&P 500 fund', 'S&P', _spy),
+      'QQQ' => const _Look('Nasdaq 100 fund', 'Q', Color(0xFF0EA5E9)),
+      'AAPL' => const _Look('Apple', 'A', Color(0xFF374151)),
+      'MSFT' => const _Look('Microsoft', 'M', Color(0xFF2563EB)),
+      'NVDA' => const _Look('Nvidia', 'N', Color(0xFF65A30D)),
+      'TSLA' => const _Look('Tesla', 'T', Color(0xFFDC2626)),
+      'AMZN' => const _Look('Amazon', 'a', Color(0xFFF59E0B)),
+      'BTC/USD' => const _Look('Bitcoin', '₿', _btc),
+      'ETH/USD' => const _Look('Ethereum', 'Ξ', Color(0xFF627EEA)),
+      'SOL/USD' => const _Look('Solana', 'S', Color(0xFF9945FF)),
+      _ => _Look(symbol, symbol.isEmpty ? '?' : symbol[0], _slowC),
+    };
+
+Widget _coin(String symbol, double size) {
+  final l = _look(symbol);
+  return Container(
+    width: size,
+    height: size,
+    alignment: Alignment.center,
+    decoration: BoxDecoration(shape: BoxShape.circle, color: l.color),
+    child: Text(l.mark,
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: l.mark.length > 1 ? size * 0.32 : size * 0.52)),
+  );
+}
+
+/// Every watched market as a small map with the same keys the big views use (asset, price, chart, name, open).
+List<Map<String, dynamic>> _markets(Map<String, dynamic> snap) {
+  final list = ((snap['markets'] as List?) ?? const []).whereType<Map>().map((e) {
+    final m = Map<String, dynamic>.from(e);
+    return {...m, 'asset': m['symbol']};
+  }).toList();
+  return list;
+}
+
+// ───────────────────────────────────────────────────────────── palette and helpers (shared)
 
 class _Pal {
   _Pal(this.light);

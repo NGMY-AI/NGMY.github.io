@@ -1,9 +1,9 @@
 // deno test supabase/functions/ngmy-ai-chat/alpaca_agent_test.ts
 import { assertEquals, assert } from "https://deno.land/std@0.177.0/testing/asserts.ts";
-import { buildChart, crossover, decide, etParts, sma, type DecideInput } from "./alpaca_agent.ts";
+import { buildChart, crossover, decide, etParts, PA_MARKETS, pickMarket, sma, type DecideInput, type Scan } from "./alpaca_agent.ts";
 
 const base: DecideInput = {
-  weekend: false, asset: "SPY", price: 100, signal: "none", fast: 100, slow: 100, shadow: null,
+  weekend: false, asset: "SPY", stock: true, price: 100, signal: "none", fast: 100, slow: 100, shadow: null,
   dayPnl: 0, totalPnl: 0, tradesToday: 0, finalCheck: false, alpacaHolding: false, signalAlreadyUsed: false,
 };
 
@@ -55,9 +55,38 @@ Deno.test("exits: take profit, stop loss, 3:55 rule, sell signal", () => {
   assertEquals(decide({ ...base, shadow, price: 100.5, finalCheck: true }).decision, "would sell");
   assertEquals(decide({ ...base, shadow, price: 100.5, signal: "sell" }).decision, "would sell");
   assertEquals(decide({ ...base, shadow, price: 100.5 }).decision, "hold");
-  // Crypto held into Monday is closed.
+  // Crypto trades all day: the 3:55 PM stock rule does not sell it.
   const btc = { symbol: "BTC/USD", qty: 0.001, entryPrice: 50000, entryAt: "" };
-  assertEquals(decide({ ...base, shadow: btc, price: 50100 }).decision, "would sell");
+  assertEquals(decide({ ...base, asset: "BTC/USD", stock: false, shadow: btc, price: 50100, finalCheck: true }).decision, "hold");
+  // ...and a crypto buy is still allowed in the last stock minutes.
+  assertEquals(decide({ ...base, asset: "BTC/USD", stock: false, signal: "buy", finalCheck: true }).decision, "would buy");
+});
+
+Deno.test("watchlist: picks the strongest fresh buy among open markets", () => {
+  const mk = (symbol: string, o: Partial<Scan>): Scan => ({
+    symbol, stock: true, open: true, price: 100, fast: 100, slow: 100, signal: "none", key: `${symbol}|t|none`, ...o,
+  });
+  const scans = [
+    mk("SPY", { fast: 101, slow: 100, signal: "buy", key: "SPY|t|buy" }),
+    mk("NVDA", { fast: 103, slow: 100, signal: "buy", key: "NVDA|t|buy" }),
+    mk("TSLA", { fast: 110, slow: 100, signal: "buy", open: false, key: "TSLA|t|buy" }), // stock market closed
+    mk("BTC/USD", { stock: false, fast: 99.9, slow: 100 }),
+  ];
+  assertEquals(pickMarket(scans, null, false).pick?.symbol, "NVDA");
+  // A signal already used is skipped.
+  assertEquals(pickMarket(scans, "NVDA|t|buy", false).pick?.symbol, "SPY");
+  // Last stock check of the day: no new stock buys at all.
+  assertEquals(pickMarket(scans, null, true).pick, null);
+  // Nothing to buy: name the market closest to crossing up.
+  const quiet = [mk("SPY", { fast: 98, slow: 100 }), mk("BTC/USD", { stock: false, fast: 99.9, slow: 100 })];
+  const r = pickMarket(quiet, null, false);
+  assertEquals(r.pick, null);
+  assertEquals(r.closest?.symbol, "BTC/USD");
+});
+
+Deno.test("never more than 10 markets", () => {
+  assert(PA_MARKETS.length <= 10);
+  assertEquals(new Set(PA_MARKETS.map((m) => m.symbol)).size, PA_MARKETS.length);
 });
 
 Deno.test("Eastern Time, not server time", () => {
