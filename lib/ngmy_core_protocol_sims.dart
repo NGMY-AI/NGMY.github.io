@@ -720,8 +720,9 @@ class _SequenceCanvasState extends State<_SequenceCanvas> with TickerProviderSta
       _playing = false;
     });
     final size = b.size;
-    // 960 pixels on the long side: sharp on a phone screen, and a file small enough to send.
-    final pr = 960 / math.max(size.width, size.height);
+    // Sharper than the phone screen itself: 3.5 pixels for every point on the screen (an iPhone shows 3), up to 1600
+    // pixels on the long side. It was 960 on the long side, fewer pixels than the screen, which made it blurry.
+    final pr = math.min(3.5, 1600 / math.max(size.width, size.height));
     final w = (size.width * pr).floor();
     final h = (size.height * pr).floor();
     const fps = 20;
@@ -729,16 +730,17 @@ class _SequenceCanvasState extends State<_SequenceCanvas> with TickerProviderSta
     String message;
     try {
       final gif = await ngmyMakeGif(
+        // Round corners, like the cards in the app.
+        cornerRadius: 24 * pr,
         width: w,
         height: h,
         fps: fps,
         frames: frames,
         frameAt: (i) async {
-          final tau = i / fps;
           _seq.value = i / frames;
-          // The glow breathes in and out every 4 seconds, as on the screen.
-          final phase = (tau % 4) / 4;
-          _pulse.value = phase < 0.5 ? phase * 2 : 2 - phase * 2;
+          // The faint glow behind holds still in the GIF: when the scene stands still the pictures are then the same,
+          // which keeps a sharp GIF small enough to save and send.
+          _pulse.value = 0.5;
           await WidgetsBinding.instance.endOfFrame;
           final shot = _shot.currentContext?.findRenderObject();
           if (shot is! RenderRepaintBoundary) throw StateError('closed');

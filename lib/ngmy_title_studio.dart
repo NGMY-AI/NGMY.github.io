@@ -655,6 +655,8 @@ Future<Uint8List> ngmyTitleGif({
     height: h,
     fps: fps,
     frames: frames,
+    // Round corners, as the title shows in the app (22 points on a card about 360 points wide).
+    cornerRadius: math.max(w, h) * 22 / 360,
     onProgress: onProgress,
     frameAt: (f) async {
       final rec = ui.PictureRecorder();
