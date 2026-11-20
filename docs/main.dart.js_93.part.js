@@ -1,22 +1,37 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
-$__dart_deferred_initializers__.current=function(a,b,c,$){var B,A,D={a9f:function a9f(d,e,f,g,h,i){var _=this
-_.c=d
-_.d=e
-_.e=f
-_.f=g
-_.r=h
-_.a=i}},C
-B=c[0]
+$__dart_deferred_initializers__.current=function(a,b,c,$){var D,A,E,C={
+hyL(d){switch(d.a){case 1:return B.esL
+case 2:return B.esN
+case 0:return B.esM}},
+auL:function auL(d,e,f,g,h,i){var _=this
+_.a=d
+_.b=e
+_.c=f
+_.d=g
+_.e=h
+_.f=i}},B
+D=c[0]
 A=c[2]
-D=a.updateHolder(c[25],D)
-C=c[122]
-D.a9f.prototype={
-B(d){var x=this,w=null,v=B.O(d).ax.a===A.I,u=v?A.alY:C.bvq,t=B.m(10),s=B.K(v?A.aT:C.biV,A.r,1),r=y.a
-return B.o(w,B.x(B.a([B.A(B.a([B.E(B.c(x.c,w,w,w,w,w,w,A.fh,w,w,w),1),B.aH(w,w,w,w,C.c29,w,w,w,x.r,w,w,w,w,"Full screen sign (landscape)",A.cl)],r),A.l,w,A.e,A.h,0,w,w),new B.aKg(x.d,x.e,120,A.cB,A.a_,3.5,w),new B.bK(A.a9,w,w,B.bO(!1,A.FD,w,w,!0,w,w,w,x.f,w,w),w)],r),A.B,w,A.e,A.h,0,A.p),A.f,w,w,new B.n(u,w,s,t,w,w,A.m),w,w,w,w,A.bT,w,w,w)}}
+E=c[30]
+C=a.updateHolder(c[26],C)
+B=c[78]
+C.auL.prototype={}
 var z=a.updateTypes([]);(function inheritance(){var x=a.inherit
-x(D.a9f,B.aw)})()
-B.nN(b.typeUniverse,JSON.parse('{"a9f":{"aw":[],"w":[]}}'))
-var y={a:B.aD("U<w>")};(function constants(){C.biV=new B.u(1,0.792156862745098,0.8392156862745098,0.9529411764705882,A.q)
-C.bvq=new B.u(1,0.9529411764705882,0.9647058823529412,1,A.q)
-C.c29=new B.ae(A.a4F,22,A.aU,null,null,null)})()};
-(a=>{a["Q4KRRWkGRO8XzTNW8qldv4sjx2U="]=a.current})($__dart_deferred_initializers__);
+x(C.auL,D.aK)})()
+var y={c:D.aD("U<u>")};(function constants(){var x=a.makeConstList
+B.aXy=new D.F(!0,A.c,null,null,null,null,9,A.u,null,2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+B.d8n=x([A.dz,A.kC,A.aD],y.c)
+B.dJ3=x([A.aD,A.fk],y.c)
+B.dhU=x([A.kV,A.pz,A.aD],y.c)
+B.esL=new C.auL(B.d8n,B.dJ3,A.fk,A.j2,"PREMIUM",B.dhU)
+B.dAq=x([A.cV,A.fy,A.bQ],y.c)
+B.dv9=x([A.bQ,A.aU],y.c)
+B.dgp=x([A.wK,A.bQ,A.fy],y.c)
+B.esM=new C.auL(B.dAq,B.dv9,A.bQ,A.jA,"NGMY WALLET",B.dgp)
+B.dxg=x([A.ev,A.e_,A.pC],y.c)
+B.dCi=x([A.aE,A.aQ],y.c)
+B.diO=x([A.t2,A.aE,A.c3],y.c)
+B.esN=new C.auL(B.dxg,B.dCi,A.aE,A.mx,"LUXURY",B.diO)
+B.esP=new E.auK(1,"premium")
+B.esQ=new E.auK(2,"luxury")})()};
+(a=>{a["VO8dVhN0HBFz1bTXVlnjlpVCEDw="]=a.current})($__dart_deferred_initializers__);
