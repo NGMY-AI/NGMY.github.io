@@ -1,10 +1,11 @@
 // deno test supabase/functions/ngmy-ai-chat/alpaca_agent_test.ts
 import { assertEquals, assert } from "https://deno.land/std@0.177.0/testing/asserts.ts";
-import { buildChart, crossover, decide, entryNow, etParts, PA_FX, PA_LESSON_IDS, PA_MARKETS, pickMarket, readMarket, rsi, runStats, sma, type DecideInput, type Scan } from "./alpaca_agent.ts";
+import { activeMarket, bigTrend, buildChart, crossover, decide, entryNow, etParts, PA_FX, PA_LESSON_IDS, PA_MARKETS, pickMarket, readMarket, rsi, runStats, sma, type DecideInput, type Scan } from "./alpaca_agent.ts";
 
 const base: DecideInput = {
   weekend: false, asset: "SPY", stock: true, price: 100, signal: "none", fast: 100, slow: 100, shadow: null,
   dayPnl: 0, totalPnl: 0, tradesToday: 0, finalCheck: false, alpacaHolding: false, signalAlreadyUsed: false,
+  bigTrend: { ok: true, why: "the big trend is rising" },
 };
 
 Deno.test("sma", () => {
@@ -169,8 +170,8 @@ Deno.test("forex list is live pairs only", () => {
   assert(PA_FX.every((f) => f.yahoo.endsWith("=X")));
 });
 
-Deno.test("never more than 10 markets", () => {
-  assert(PA_MARKETS.length <= 10);
+Deno.test("only the agreed markets: SPY and BTC/USD", () => {
+  assertEquals(PA_MARKETS.map((m) => m.symbol), ["SPY", "BTC/USD"]);
   assertEquals(new Set(PA_MARKETS.map((m) => m.symbol)).size, PA_MARKETS.length);
 });
 
@@ -203,4 +204,49 @@ Deno.test("no order code path in Version 1", async () => {
   assert(!src.includes("/v2/orders"), "Version 1 must not contain an orders call");
   assert(!/method:\s*"(POST|PATCH|DELETE)"/.test(src), "Version 1 only sends GET to Alpaca");
   assert(!src.includes("//api.alpaca.markets"), "no live endpoint");
+});
+
+Deno.test("fix 1: SPY on weekdays while the stock market is open, BTC/USD on weekends, nothing else", () => {
+  assertEquals(activeMarket(false, true), "SPY");
+  assertEquals(activeMarket(false, false), null); // weekday evening or holiday: no trading
+  assertEquals(activeMarket(true, false), "BTC/USD");
+});
+
+Deno.test("fix 2: never buy into a falling big trend", () => {
+  // A cross up is not enough: the big trend must be rising too.
+  assertEquals(decide({ ...base, signal: "buy", bigTrend: { ok: false, why: "the big trend is falling" } }).decision, "no action");
+  assertEquals(decide({ ...base, signal: "buy", bigTrend: undefined }).decision, "no action");
+  // A long fall with a small bounce at the end: the fast line crosses up, but the slow average is still falling.
+  const fall: number[] = [];
+  let p = 100;
+  for (let i = 0; i < 60; i++) fall.push((p -= 0.15));
+  for (let i = 0; i < 6; i++) fall.push((p += 0.35));
+  const x = crossover(fall);
+  const b = bigTrend(fall, p);
+  assertEquals(b.rising, false);
+  assertEquals(b.ok, false);
+  if (x.signal === "buy") {
+    assertEquals(decide({ ...base, signal: "buy", fast: x.fastNow, slow: x.slowNow, bigTrend: b }).decision, "no action");
+  }
+  // The agent's reading never says ENTER UP into a falling big trend.
+  const r = readMarket(fall, fall.map((c) => ({ h: c + 0.05, l: c - 0.05 })), p, true);
+  assert(!(r.decision === "ENTER" && r.dir === "up"), r.action);
+  // A steady rise with a dip and a cross back up: the big trend is rising and the price is above it.
+  const rise: number[] = [];
+  p = 100;
+  for (let i = 0; i < 60; i++) rise.push((p += 0.15));
+  for (let i = 0; i < 4; i++) rise.push((p -= 0.3));
+  for (let i = 0; i < 4; i++) rise.push((p += 0.4));
+  const br = bigTrend(rise, p);
+  assertEquals(br.rising, true);
+  assertEquals(br.ok, true);
+  // Price under the slow average: no buy even in a rising trend.
+  assertEquals(bigTrend(rise, br.slowNow! * 0.99).ok, false);
+});
+
+Deno.test("3:40 PM: no new stock buys, but an open stock position is only sold from 3:50 PM", () => {
+  const shadow = { symbol: "SPY", qty: 0.5, entryPrice: 100, entryAt: "" };
+  assertEquals(decide({ ...base, signal: "buy", lateForBuys: true }).decision, "no action");
+  assertEquals(decide({ ...base, shadow, price: 100.5, lateForBuys: true, finalCheck: false }).decision, "hold");
+  assertEquals(decide({ ...base, shadow, price: 100.5, lateForBuys: true, finalCheck: true }).decision, "would sell");
 });

@@ -60,7 +60,8 @@ revoke all on public.ngmy_alpaca_agent_state from anon, authenticated;
 revoke all on public.ngmy_alpaca_agent_log from anon, authenticated;
 revoke all on public.ngmy_alpaca_agent_days from anon, authenticated;
 
--- Every 15 minutes, all day every day. The function itself decides (in Eastern Time) whether the
+-- Every 5 minutes, all day every day. New buys only on the quarter hour; an open position's exits every 5 minutes.
+-- The function itself decides (in Eastern Time) whether the
 -- market is open, whether it is a weekend (BTC/USD) or a holiday, and skips when the agent is stopped.
 do $$
 begin
@@ -71,7 +72,7 @@ end $$;
 
 select cron.schedule(
   'ngmy-alpaca-agent',
-  '*/15 * * * *',
+  '*/5 * * * *',
   $job$
   select net.http_post(
     url := 'https://gvufllqqxjnpicmkxzcg.supabase.co/functions/v1/bright-handler',

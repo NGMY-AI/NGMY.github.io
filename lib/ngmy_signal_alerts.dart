@@ -50,10 +50,9 @@ class NgmySignalAlerts {
         return;
       }
       if (!await ngmyPushHasPermission()) return;
-      final all = [
-        ...((res['markets'] as List?) ?? const []),
-        ...((res['fx'] as List?) ?? const []),
-      ].whereType<Map>();
+      // Only the agreed agent market: SPY on weekdays while the stock market is open, BTC/USD on weekends.
+      // The server marks every other market as not traded, so it can never say ENTER. Forex is not alerted.
+      final all = ((res['markets'] as List?) ?? const []).whereType<Map>().where((m) => m['open'] == true);
       var shown = 0;
       for (final m in all) {
         final reading = m['reading'];

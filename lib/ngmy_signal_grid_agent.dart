@@ -62,6 +62,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
   @override
   void initState() {
     super.initState();
+    _TutorChat.enter(); // the tutor conversation lasts until Signal Grid is closed
     if (widget.previewStatus != null) {
       _status = widget.previewStatus;
       _log = widget.previewLog ?? [];
@@ -77,6 +78,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
   void dispose() {
     _timer?.cancel();
     _stripScroll.dispose();
+    _TutorChat.leave();
     super.dispose();
   }
 
@@ -171,7 +173,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     ));
   }
 
-  /// "Check now" only LOOKS: a fresh read of all 10 markets. It never buys or sells; only the automatic
+  /// "Check now" only LOOKS: a fresh read of SPY and Bitcoin. It never buys or sells; only the automatic
   /// 15-minute check on the server makes pretend trades.
   Future<void> _scanNow() async {
     setState(() => _busy = true);
@@ -307,6 +309,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     final held = shadow == null ? null : markets.firstWhere((m) => m['asset'] == shadow['symbol'], orElse: () => focus);
     final heldShadow = shadow != null && shadow['symbol'] == focus['asset'] ? shadow : null;
     return [
+      _todayMarket(p, s, shadow),
       _marketStrip(p, s, markets, focus, shadow),
       _hero(p, s, focus),
       if ((cfg['problem'] ?? '').toString().isNotEmpty) _banner(p, cfg['problem'].toString(), _down),
@@ -333,6 +336,61 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     ];
   }
 
+  // ── Today's market: the ONE market the agent may trade (SPY on weekdays, BTC/USD on weekends)
+
+  Widget _todayMarket(_Pal p, Map<String, dynamic> s, Map<String, dynamic>? shadow) {
+    final market = _map(s['market']);
+    final active = market['activeMarket']?.toString();
+    final weekend = market['weekend'] == true;
+    final heldSym = shadow?['symbol']?.toString();
+    final oldHeld = heldSym != null && heldSym != 'SPY' && heldSym != 'BTC/USD';
+    final String title;
+    final String body;
+    if (active == 'SPY') {
+      title = 'TRADING TODAY: SPY';
+      body = 'Weekday and the stock market is open. Only SPY can be bought. Bitcoin is traded on weekends only.';
+    } else if (active == 'BTC/USD') {
+      title = 'TRADING TODAY: BTC/USD';
+      body = 'Weekend. Only Bitcoin can be bought. SPY is traded on weekdays only.';
+    } else {
+      title = 'NO MARKET TRADED RIGHT NOW';
+      body = weekend
+          ? 'Bitcoin is traded on Saturday and Sunday.'
+          : 'SPY is traded on weekdays while the stock market is open (9:30 AM to 4:00 PM ET). Bitcoin on weekends only.';
+    }
+    final c = active == null ? _down : _up;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: c.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: c.withValues(alpha: 0.45)),
+      ),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (active != null) ...[_coin(active, 30), const SizedBox(width: 10)] else ...[
+          Icon(Icons.nightlight_round, color: c, size: 26),
+          const SizedBox(width: 10),
+        ],
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: TextStyle(color: c, fontSize: 13.5, fontWeight: FontWeight.w900, letterSpacing: 0.3)),
+            const SizedBox(height: 3),
+            Text(body, style: TextStyle(color: p.ink, fontSize: 12, height: 1.3)),
+            const SizedBox(height: 3),
+            Text('Buys only when the fast line crosses up AND the big trend is rising (slow line higher than 1 hour ago, price above it).',
+                style: TextStyle(color: p.muted, fontSize: 11, height: 1.3)),
+            if (oldHeld) ...[
+              const SizedBox(height: 4),
+              Text('Still holding the earlier $heldSym pretend trade: the agent only checks its exits (every 5 minutes) and never buys $heldSym again.',
+                  style: const TextStyle(color: _btc, fontSize: 11, fontWeight: FontWeight.w700, height: 1.3)),
+            ],
+          ]),
+        ),
+      ]),
+    );
+  }
+
   // ── Markets: all watched markets side by side, tap one to see it
 
   Widget _marketStrip(_Pal p, Map<String, dynamic> s, List<Map<String, dynamic>> markets, Map<String, dynamic> focus,
@@ -345,9 +403,9 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
           child: Row(children: [
-            Text('Watching ${markets.length} markets', style: TextStyle(color: p.ink, fontSize: 14, fontWeight: FontWeight.w800)),
+            Text('Agent markets', style: TextStyle(color: p.ink, fontSize: 14, fontWeight: FontWeight.w800)),
             const SizedBox(width: 8),
-            _pill('$openCount OPEN NOW', _up),
+            _pill(openCount == 0 ? 'NONE TRADED NOW' : 'TRADED NOW', openCount == 0 ? _down : _up),
             const Spacer(),
             Text('tap one', style: TextStyle(color: p.muted, fontSize: 11)),
           ]),
@@ -368,7 +426,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
               final up = chg >= 0;
               final pts = _points(m);
               final holding = shadow?['symbol'] == sym;
-              final signal = _map(m['chart'])['signal'] == 'buy';
+              final signal = _map(m['reading'])['decision'] == 'ENTER' && _map(m['reading'])['dir'] == 'up';
               return GestureDetector(
                 onTap: () => _pickMarket(sym),
                 child: AnimatedContainer(
@@ -390,7 +448,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
                             style: TextStyle(color: p.ink, fontSize: 12, fontWeight: FontWeight.w800)),
                       ),
                       if (m['open'] != true)
-                        Text('closed', style: TextStyle(color: p.muted, fontSize: 9.5, fontWeight: FontWeight.w700)),
+                        Text((m['offLabel'] ?? 'closed').toString(), style: TextStyle(color: p.muted, fontSize: 9.5, fontWeight: FontWeight.w700)),
                     ]),
                     const SizedBox(height: 6),
                     FittedBox(
@@ -431,9 +489,9 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     final up = chg >= 0;
     final open = isCrypto ? true : (snap['open'] ?? market['stockOpen'] ?? market['open']);
     final marketText = isCrypto
-        ? 'Crypto · trades all day, every day'
+        ? 'Crypto · the agent trades it on Saturday and Sunday only'
         : open == true
-            ? 'Stock market open · closes 4:00 PM ET'
+            ? 'Stock market open · the agent trades it on weekdays · closes 4:00 PM ET'
             : open == false
                 ? 'Stock market closed${_whenOpens(market['nextOpen'])}'
                 : '';
@@ -898,9 +956,9 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
         Expanded(
           child: Text(
             on
-                ? 'Trades are automatic: the agent checks all markets every 15 minutes by itself. '
-                    'Last check ${last == null ? 'not yet' : '${_clock(_toEt(last))} ET'} · next ${_nextAuto()}. Check now only looks, it never trades.'
-                : 'The agent is stopped, so it makes no trades. Press Start and it checks all markets every 15 minutes by itself.',
+                ? 'Trades are automatic: the agent looks for a new buy every 15 minutes and, while it holds a trade, checks the exits every 5 minutes. '
+                    'Last check ${last == null ? 'not yet' : '${_clock(_toEt(last))} ET'} · next buy check ${_nextAuto()}. Check now only looks, it never trades.'
+                : 'The agent is stopped, so it makes no trades. Press Start and it looks for a buy every 15 minutes by itself.',
             style: TextStyle(color: p.muted, fontSize: 11.5, height: 1.35),
           ),
         ),

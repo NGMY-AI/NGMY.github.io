@@ -499,6 +499,29 @@ class _ChatMsg {
   final String text;
 }
 
+/// The Ask tutor conversation. It lives as long as Signal Grid is open (the agent screen, the Trading
+/// Academy and every tab in it), so switching to Lessons or Live signals and back never loses it.
+/// It is cleared only when the person leaves Signal Grid completely.
+class _TutorChat {
+  static final msgs = <_ChatMsg>[];
+  static bool thinking = false;
+  static String draft = '';
+  static int _open = 0; // Signal Grid screens open right now
+  static int gen = 0; // changes on every clear, so a late answer for a closed conversation is dropped
+
+  static void enter() => _open++;
+
+  static void leave() {
+    _open = math.max(0, _open - 1);
+    if (_open == 0) {
+      msgs.clear();
+      thinking = false;
+      draft = '';
+      gen++;
+    }
+  }
+}
+
 class _NgmySignalGridLearnScreenState extends State<NgmySignalGridLearnScreen> with SingleTickerProviderStateMixin {
   late final TabController _tabs = TabController(length: 3, vsync: this, initialIndex: widget.startTab);
   Map<String, dynamic>? _status; // the agent's full status (admins only)
@@ -513,10 +536,11 @@ class _NgmySignalGridLearnScreenState extends State<NgmySignalGridLearnScreen> w
   bool _pushOk = false;
   Timer? _saveTimer;
   Set<String> get _done => ((_progress['done'] as List?) ?? const []).map((e) => e.toString()).toSet();
-  final _chat = <_ChatMsg>[];
-  final _input = TextEditingController();
+  List<_ChatMsg> get _chat => _TutorChat.msgs;
+  final _input = TextEditingController(text: _TutorChat.draft);
   final _chatScroll = ScrollController();
-  bool _thinking = false;
+  bool get _thinking => _TutorChat.thinking;
+  set _thinking(bool v) => _TutorChat.thinking = v;
 
   // Live signals: search, filter, and what changed since the last refresh.
   List<Map<String, dynamic>> _fx = [];
@@ -540,6 +564,9 @@ class _NgmySignalGridLearnScreenState extends State<NgmySignalGridLearnScreen> w
     if (pm.isNotEmpty) _sigMarkets = pm;
     _fetchedAt = DateTime.now();
     _tabs.addListener(() => setState(() {}));
+    _TutorChat.enter();
+    _input.addListener(() => _TutorChat.draft = _input.text);
+    if (_chat.isNotEmpty || _thinking) _scrollChat();
     if (!widget.preview) {
       unawaited(_loadProgress());
       unawaited(_refresh());
@@ -559,6 +586,7 @@ class _NgmySignalGridLearnScreenState extends State<NgmySignalGridLearnScreen> w
     _search.dispose();
     _input.dispose();
     _chatScroll.dispose();
+    _TutorChat.leave();
     super.dispose();
   }
 
@@ -781,6 +809,7 @@ ${_liveBrief()}
 ${history.isEmpty ? '' : '\nCONVERSATION SO FAR:\n$history\n'}
 Student: $question
 Tutor:''';
+    final gen = _TutorChat.gen;
     String answer;
     if (widget.preview) {
       answer = 'Preview mode: the tutor answers here using the live readings.';
@@ -789,11 +818,13 @@ Tutor:''';
       final text = res?['text']?.toString().trim() ?? '';
       answer = text.isNotEmpty ? text.replaceAll('**', '').replaceAll(RegExp(r'^#+\s*', multiLine: true), '') : (res?['error'] ?? 'The tutor could not answer just now. Please try again.').toString();
     }
+    // Signal Grid was closed while the tutor was answering: that conversation is gone.
+    if (gen != _TutorChat.gen) return;
+    // Keep the answer even if this screen closed meanwhile (the agent screen is still open).
+    _chat.add(_ChatMsg(false, answer));
+    _thinking = false;
     if (!mounted) return;
-    setState(() {
-      _chat.add(_ChatMsg(false, answer));
-      _thinking = false;
-    });
+    setState(() {});
     _scrollChat();
   }
 
@@ -1040,7 +1071,7 @@ Tutor:''';
           chart(),
           const SizedBox(height: 8),
           say('$sym is ${(r['bias'] ?? 'unknown').toString().toUpperCase()} right now. '
-              'Across all 10 markets: ${counts['bullish'] ?? 0} bullish, ${counts['bearish'] ?? 0} bearish, ${counts['sideways'] ?? 0} sideways.'),
+              'Across the markets:${counts['bullish'] ?? 0} bullish, ${counts['bearish'] ?? 0} bearish, ${counts['sideways'] ?? 0} sideways.'),
         ]);
       case 'ma':
         final f = _d(m['fast']), s = _d(m['slow']);
