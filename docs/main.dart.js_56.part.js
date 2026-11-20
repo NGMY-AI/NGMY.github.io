@@ -6,5 +6,5 @@ C=c[74]
 var z=a.updateTypes([]);(function constants(){var y=a.makeConstList
 C.ahY=new B.u(1,0.10196078431372549,0.10196078431372549,0.1803921568627451,A.q)
 C.amR=new B.bf(24e3)
-C.aFl=y([A.a_,A.bs,A.aM],B.aD("U<u>"))})()};
-(a=>{a["Pl2+EWATjgFJQeBn/WKZQ1eqzek="]=a.current})($__dart_deferred_initializers__);
+C.aFo=y([A.a_,A.bs,A.aM],B.aD("U<u>"))})()};
+(a=>{a["x+PFfWLZS1Lod+Sh0H1UJocgWPA="]=a.current})($__dart_deferred_initializers__);
