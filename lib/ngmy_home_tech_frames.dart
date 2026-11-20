@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 // Core Protocol is part of the app itself (not its own download), so it opens at once after the app is closed and
@@ -37,7 +38,8 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
     _scan = AnimationController(vsync: this, duration: const Duration(milliseconds: 3400))..repeat();
     _orbit = AnimationController(vsync: this, duration: const Duration(milliseconds: 9000))..repeat();
     // Signal Grid alerts (admins, and members who finished the Trading Academy). Runs once per app run.
-    NgmySignalAlerts.start();
+    // Web only: that is where its notifications are shown (and tests never get a stray timer).
+    if (kIsWeb) NgmySignalAlerts.start();
   }
 
   @override
