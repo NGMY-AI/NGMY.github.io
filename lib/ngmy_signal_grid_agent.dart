@@ -167,6 +167,8 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
       if ((cfg['problem'] ?? '').toString().isNotEmpty) _notice(pal, cfg['problem'].toString(), color: _amber),
       if ((s['liveError'] ?? '').toString().isNotEmpty) _notice(pal, s['liveError'].toString(), color: _red),
       if (brake) _notice(pal, 'Paused by the \$25 brake. ${st['brakeReason'] ?? ''}. Review the log, then press Start to turn it back on.', color: _red),
+      _plainWords(pal, s, st, snap, today, shadow),
+      _chartCard(pal, snap, shadow),
       _card(pal, title: 'Agent', children: [
         Row(children: [
           Icon(Icons.circle, size: 12, color: brake ? _red : (enabled ? _green : pal.muted)),
@@ -212,6 +214,10 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
           _kv(pal, 'Buying power', _usd(snap['buyingPower'])),
           _kv(pal, 'Cash', _usd(snap['cash'])),
           _kv(pal, 'Read at', (snap['etTime'] ?? '').toString()),
+          Text(
+            'This is pretend money from Alpaca. Buying power shows double because Alpaca offers borrowing (margin); the agent never borrows and only uses \$50 per trade.',
+            style: TextStyle(color: pal.muted, fontSize: 11.5, height: 1.3),
+          ),
         ],
       ]),
       _card(pal, title: 'Market and position', children: [
@@ -244,6 +250,123 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
           Center(child: TextButton(onPressed: () => _loadLog(more: true), child: const Text('Show older'))),
       ]),
     ];
+  }
+
+  /// The whole picture in a few plain sentences: trend, market open or closed, the pretend trade, win or lose.
+  Widget _plainWords(_Pal pal, Map<String, dynamic> s, Map<String, dynamic> st, Map<String, dynamic> snap,
+      Map<String, dynamic> today, Map<String, dynamic>? shadow) {
+    final chart = _map(snap['chart']);
+    final trend = (chart['trend'] ?? 'unknown').toString();
+    final market = _map(s['market']);
+    final asset = (market['asset'] ?? snap['asset'] ?? 'SPY').toString();
+    final name = asset == 'SPY' ? 'SPY (a fund that follows the 500 biggest US companies)' : 'Bitcoin (BTC/USD)';
+    final price = _d(snap['price']);
+    final enabled = st['enabled'] == true && st['brakePaused'] != true;
+
+    final (IconData icon, Color tc, String headline) = switch (trend) {
+      'up' => (Icons.trending_up_rounded, _green, '$asset is trending UP'),
+      'down' => (Icons.trending_down_rounded, _red, '$asset is trending DOWN'),
+      'flat' => (Icons.trending_flat_rounded, _amber, '$asset is moving sideways'),
+      _ => (Icons.hourglass_empty_rounded, pal.muted, 'Waiting for the first reading'),
+    };
+
+    final lines = <String>[];
+    // 1. Is anything happening right now?
+    if (market['open'] == true && asset != 'SPY') {
+      lines.add('It is the weekend, so the agent watches $name, which trades all day.');
+    } else if (market['open'] == true) {
+      lines.add('The stock market is open now. The agent looks at $name every 15 minutes.');
+    } else if (market['open'] == false) {
+      lines.add('The stock market is closed now, so nothing happens until it opens again${_whenOpens(market['nextOpen'])}.');
+    }
+    if (!enabled) lines.add('The agent is stopped. Press Start below to let it watch the market.');
+
+    // 2. The pretend trade and win or lose.
+    if (shadow != null) {
+      final entry = _d(shadow['entryPrice']);
+      final qty = _d(shadow['qty']);
+      final now = shadow['symbol'] == asset ? price : entry;
+      final pl = qty * (now - entry);
+      final pct = entry == 0 ? 0 : (now - entry) / entry * 100;
+      final up = pl >= 0;
+      lines.add('The agent is holding a pretend \$50 of ${shadow['symbol']}, bought at ${_usd(entry)}. '
+          'Right now that would be ${up ? 'UP' : 'DOWN'} ${_usd(pl.abs())} (${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%).');
+      lines.add('It sells to take the win at ${_usd(entry * 1.03)} (about +\$1.50), or to stop the loss at ${_usd(entry * 0.985)} '
+          '(about -\$0.75), or when the trend turns down.');
+    } else {
+      lines.add('No pretend trade is open. The agent only buys \$50 at the moment the trend turns UP '
+          '(the pink fast line crosses above the purple slow line).');
+      if (trend == 'up') {
+        lines.add('The trend is already up, but it turned up earlier, so the agent waits for the next fresh turn instead of buying late.');
+      } else if (trend == 'down') {
+        lines.add('The trend is down, so the agent waits. Buying now would likely lose.');
+      }
+    }
+
+    // 3. Score so far.
+    final total = _d(st['totalPnl']);
+    final day = _d(today['day_pnl']);
+    lines.add(total == 0 && day == 0
+        ? 'Score so far: no pretend wins or losses yet.'
+        : 'Score so far: ${total >= 0 ? 'won' : 'lost'} ${_usd(total.abs())} in total, ${day >= 0 ? 'won' : 'lost'} ${_usd(day.abs())} today (pretend money).');
+    lines.add('How you win or lose: after a buy, if the price goes UP you win, if it goes DOWN you lose. Version 1 only pretends, no money moves.');
+
+    return _card(pal, title: 'In plain words', children: [
+      Row(children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(color: tc.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
+          child: Icon(icon, color: tc, size: 26),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Text(headline, style: TextStyle(color: pal.ink, fontSize: 18, fontWeight: FontWeight.w900))),
+      ]),
+      const SizedBox(height: 10),
+      for (final l in lines)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 7),
+          child: Text(l, style: TextStyle(color: pal.ink, fontSize: 13.5, height: 1.35)),
+        ),
+    ]);
+  }
+
+  Widget _chartCard(_Pal pal, Map<String, dynamic> snap, Map<String, dynamic>? shadow) {
+    final pts = ((_map(snap['chart'])['points'] as List?) ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    if (pts.length < 2) return const SizedBox.shrink();
+    final entry = shadow == null ? null : _d(shadow['entryPrice']);
+    return _card(pal, title: 'Last 4 hours of ${snap['asset'] ?? ''}', children: [
+      SizedBox(
+        height: 180,
+        width: double.infinity,
+        child: CustomPaint(painter: _ChartPainter(pts, pal, entry)),
+      ),
+      const SizedBox(height: 8),
+      Wrap(spacing: 14, runSpacing: 4, children: [
+        _legend(pal, pal.ink, 'Price'),
+        _legend(pal, _pink, 'Fast line (last 45 min)'),
+        _legend(pal, _violet, 'Slow line (last 1 h 45 min)'),
+        if (entry != null) _legend(pal, _amber, 'Pretend buy price'),
+      ]),
+      const SizedBox(height: 6),
+      Text('Pink above purple means prices are rising lately. The agent buys when pink crosses up through purple, and sells when it crosses back down.',
+          style: TextStyle(color: pal.muted, fontSize: 11.5, height: 1.3)),
+    ]);
+  }
+
+  Widget _legend(_Pal pal, Color c, String t) => Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 14, height: 3, color: c),
+        const SizedBox(width: 5),
+        Text(t, style: TextStyle(color: pal.muted, fontSize: 11)),
+      ]);
+
+  String _whenOpens(dynamic iso) {
+    // Alpaca gives the time with the New York offset, e.g. 2026-11-23T09:30:00-05:00: read the clock part as ET.
+    final s = '${iso ?? ''}';
+    final d = DateTime.tryParse(s.length >= 19 ? s.substring(0, 19) : '');
+    if (d == null) return '';
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
+    return ' on ${days[d.weekday - 1]} at $h:${d.minute.toString().padLeft(2, '0')} ${d.hour < 12 ? 'AM' : 'PM'} ET';
   }
 
   Widget _logRow(_Pal pal, Map<String, dynamic> r) {
@@ -350,6 +473,86 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     if (n < 0) return _red;
     return pal.ink;
   }
+}
+
+class _ChartPainter extends CustomPainter {
+  _ChartPainter(this.pts, this.pal, this.entry);
+  final List<Map<String, dynamic>> pts;
+  final _Pal pal;
+  final double? entry;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final vals = <double>[
+      for (final p in pts) ...[
+        _d(p['c']),
+        if (p['f'] != null) _d(p['f']),
+        if (p['s'] != null) _d(p['s']),
+      ],
+      ?entry,
+    ];
+    var lo = vals.reduce((a, b) => a < b ? a : b);
+    var hi = vals.reduce((a, b) => a > b ? a : b);
+    if (hi - lo < 1e-9) {
+      hi += 1;
+      lo -= 1;
+    }
+    final pad = (hi - lo) * 0.08;
+    lo -= pad;
+    hi += pad;
+    double x(int i) => i / (pts.length - 1) * size.width;
+    double y(double v) => size.height - (v - lo) / (hi - lo) * size.height;
+
+    final grid = Paint()
+      ..color = pal.line
+      ..strokeWidth = 1;
+    for (var i = 0; i <= 3; i++) {
+      final gy = size.height * i / 3;
+      canvas.drawLine(Offset(0, gy), Offset(size.width, gy), grid);
+    }
+
+    void line(String key, Color c, double w) {
+      final path = Path();
+      var started = false;
+      for (var i = 0; i < pts.length; i++) {
+        final v = pts[i][key];
+        if (v == null) continue;
+        final o = Offset(x(i), y(_d(v)));
+        started ? path.lineTo(o.dx, o.dy) : path.moveTo(o.dx, o.dy);
+        started = true;
+      }
+      canvas.drawPath(
+          path,
+          Paint()
+            ..color = c
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = w
+            ..strokeJoin = StrokeJoin.round);
+    }
+
+    if (entry != null) {
+      final ey = y(entry!);
+      final p = Paint()
+        ..color = _amber
+        ..strokeWidth = 1.5;
+      for (var dx = 0.0; dx < size.width; dx += 8) {
+        canvas.drawLine(Offset(dx, ey), Offset(dx + 4, ey), p);
+      }
+    }
+    line('s', _violet, 2.2);
+    line('f', _pink, 2.2);
+    line('c', pal.ink.withValues(alpha: 0.85), 1.4);
+
+    final tp = TextPainter(textDirection: TextDirection.ltr);
+    for (final (v, dy) in [(hi - pad, 0.0), (lo + pad, size.height - 14)]) {
+      tp.text = TextSpan(text: _usd(v), style: TextStyle(color: pal.muted, fontSize: 10));
+      tp.layout();
+      tp.paint(canvas, Offset(size.width - tp.width, dy));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ChartPainter old) => old.pts != pts || old.entry != entry;
 }
 
 class _Pal {

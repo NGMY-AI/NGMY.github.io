@@ -1,6 +1,6 @@
 // deno test supabase/functions/ngmy-ai-chat/alpaca_agent_test.ts
 import { assertEquals, assert } from "https://deno.land/std@0.177.0/testing/asserts.ts";
-import { crossover, decide, etParts, sma, type DecideInput } from "./alpaca_agent.ts";
+import { buildChart, crossover, decide, etParts, sma, type DecideInput } from "./alpaca_agent.ts";
 
 const base: DecideInput = {
   weekend: false, asset: "SPY", price: 100, signal: "none", fast: 100, slow: 100, shadow: null,
@@ -72,6 +72,16 @@ Deno.test("Eastern Time, not server time", () => {
   assertEquals(b.weekend, true);
   assertEquals(b.hour, 9);
   assertEquals(b.minute, 30);
+});
+
+Deno.test("chart data and trend for the app", () => {
+  const closes = [...Array(30).fill(100), 101, 102, 103, 104, 105];
+  const times = closes.map((_, i) => `t${i}`);
+  const c = buildChart(times, closes);
+  assertEquals(c.points.length, 35);
+  assertEquals(c.trend, "up");
+  assertEquals(c.points[0].s, null);
+  assert(c.points[34].f! > c.points[34].s!);
 });
 
 Deno.test("no order code path in Version 1", async () => {

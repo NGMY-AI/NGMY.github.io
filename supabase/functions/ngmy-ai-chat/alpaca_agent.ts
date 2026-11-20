@@ -211,7 +211,20 @@ async function readAccount(k: Keys) {
   };
 }
 
-async function readBars(asset: string, k: Keys): Promise<{ closes: number[]; price: number; lastBarAt: string }> {
+/** The last few hours for the app's chart: price, fast line and slow line per 5-minute candle, plus the trend. */
+export function buildChart(times: string[], closes: number[], points = 48) {
+  const out: { t: string; c: number; f: number | null; s: number | null }[] = [];
+  const from = Math.max(0, closes.length - points);
+  for (let i = from; i < closes.length; i++) {
+    const upto = closes.slice(0, i + 1);
+    out.push({ t: times[i], c: closes[i], f: sma(upto, PA_RULES.fastMa), s: sma(upto, PA_RULES.slowMa) });
+  }
+  const x = crossover(closes);
+  const trend = x.fastNow == null || x.slowNow == null ? "unknown" : x.fastNow > x.slowNow ? "up" : x.fastNow < x.slowNow ? "down" : "flat";
+  return { points: out, trend, signal: x.signal, fast: x.fastNow, slow: x.slowNow };
+}
+
+async function readBars(asset: string, k: Keys): Promise<{ closes: number[]; times: string[]; price: number; lastBarAt: string }> {
   const start = new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString();
   let bars: any[] = [];
   let price = 0;
@@ -234,7 +247,7 @@ async function readBars(asset: string, k: Keys): Promise<{ closes: number[]; pri
     .filter((x) => Number.isFinite(x.c) && Date.parse(x.t) + 5 * 60 * 1000 <= now)
     .sort((a, b) => Date.parse(a.t) - Date.parse(b.t));
   if (!price && done.length) price = done[done.length - 1].c;
-  return { closes: done.map((x) => x.c), price, lastBarAt: done.length ? done[done.length - 1].t : "" };
+  return { closes: done.map((x) => x.c), times: done.map((x) => x.t), price, lastBarAt: done.length ? done[done.length - 1].t : "" };
 }
 
 // ─────────────────────────────────────────────────────────────── database
@@ -370,7 +383,7 @@ async function runCheck(db: any, source: "cron" | "manual", who = ""): Promise<R
   }
 
   const statePatch: Record<string, unknown> = {
-    snapshot: { ...acct, asset, price: mkt.price, at: now.toISOString(), etTime: et.label },
+    snapshot: { ...acct, asset, price: mkt.price, at: now.toISOString(), etTime: et.label, chart: buildChart(mkt.times, mkt.closes) },
   };
   let newTotal = totalPnl;
   let newDay = dayPnl;
@@ -484,7 +497,7 @@ export async function handleAlpacaAgent(
         const et = etParts(new Date());
         const asset = et.weekend ? PA_RULES.weekendAsset : PA_RULES.weekdayAsset;
         const [acct, mkt] = await Promise.all([readAccount(cfg.keys), readBars(asset, cfg.keys)]);
-        live = { ...acct, asset, price: mkt.price, at: new Date().toISOString(), etTime: et.label };
+        live = { ...acct, asset, price: mkt.price, at: new Date().toISOString(), etTime: et.label, chart: buildChart(mkt.times, mkt.closes) };
         await saveState(db, { snapshot: live });
         state.snapshot = live;
       } catch (e) {
@@ -492,7 +505,18 @@ export async function handleAlpacaAgent(
       }
     }
   }
-  const { data: today } = await db.from("ngmy_alpaca_agent_days").select("*").eq("et_day", etParts(new Date()).dayKey).maybeSingle();
+  // Is the market open right now? Weekends: BTC/USD trades all day. Weekdays: Alpaca's clock (knows holidays).
+  const etNow = etParts(new Date());
+  let market: Record<string, unknown> = etNow.weekend
+    ? { open: true, asset: PA_RULES.weekendAsset }
+    : { open: null, asset: PA_RULES.weekdayAsset };
+  if (!etNow.weekend && cfg.keys) {
+    try {
+      const clock = await aGet(PAPER_BASE, "/v2/clock", cfg.keys);
+      market = { open: !!clock?.is_open, asset: PA_RULES.weekdayAsset, nextOpen: clock?.next_open ?? null, nextClose: clock?.next_close ?? null };
+    } catch { /* keep unknown */ }
+  }
+  const { data: today } = await db.from("ngmy_alpaca_agent_days").select("*").eq("et_day", etNow.dayKey).maybeSingle();
   return {
     status: 200,
     payload: {
@@ -500,6 +524,7 @@ export async function handleAlpacaAgent(
       state: publicState(state),
       today: today ?? null,
       liveError,
+      market,
       config: {
         keysSet: !!cfg.keys,
         problem: cfg.problem,
