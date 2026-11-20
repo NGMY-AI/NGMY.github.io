@@ -827,7 +827,7 @@ t*=0.45
 b1.$9$sides(t,14,70,t,w,70,3,D.cv,6)}b0.$7(0,w,70,c0*0.9,4,4,D.cv)
 for(w=c4+22,q=0;q<5;++q){p=v+q*c0*0.18
 b0.$7(p,w,70,16,12,14,D.av)
-b0.$8$shine(p,o,70,12,1.4,10,B.d5D[q],0.8)}for(q=-7;q<=7;++q){w=q*c0*0.075
+b0.$8$shine(p,o,70,12,1.4,10,B.d5C[q],0.8)}for(q=-7;q<=7;++q){w=q*c0*0.075
 b1.$9$sides(w,0,220,w,20,220,1.6,D.cv,5)}b0.$7(0,18,220,c0*1.2,2,2,D.cv)
 break
 case"gate":for(v=b4+41,s=b4+46,t+=110,u=0;u<2;++u){p=D.hf[u]
@@ -2402,7 +2402,7 @@ d.aF(B.hsL,B.b0r,B.yG,0.3)
 d.aF(B.hs2,B.b0r,B.yG,0.3)}w=C.a([],x.o)
 v=new A.fr2(d,f,w)
 if(e==="switch"){v.$2(4,B.dc0)
-v.$2(5,B.d9Q)}else v.$2(4,B.dph)
+v.$2(5,B.d9P)}else v.$2(4,B.dph)
 return w},
 hKM(d,e){var w,v=$.h9p(),u=new C.Y(v,new A.h8I(d),C.T(v).k("Y<1>"))
 if(!u.gau(0)){w=e-60
@@ -2839,7 +2839,7 @@ case"nema1560":w=C.a([B.dMi,B.dLP,B.dLQ,B.dLH,B.dLK],x.E)
 break
 case"nemal1530":w=A.LO(B.cdX,3,0.22,0.36)
 break
-case"nemal2130":w=A.LO(B.d9g,2,0.17,0.4)
+case"nemal2130":w=A.LO(B.d9f,2,0.17,0.4)
 break
 case"nemal1630":w=A.LO(B.czz,3,0.2,0.36)
 break
@@ -5406,13 +5406,13 @@ u.$2(B.cyc,B.rQ)
 u.$2(B.dsH,B.nr)
 u.$2(B.dy2,B.nr)
 t=new A.fHR(a1)
-t.$1(B.d8a)
+t.$1(B.d89)
 t.$1(B.deD)
 a1.c=3
 a1.b=93
 s=new A.fHU(a1)
-s.$1(B.d70)
-s.$2$col(B.d5e,B.mO)
+s.$1(B.d7_)
+s.$2$col(B.d5d,B.mO)
 s.$2$col(B.d4f,B.mO)
 s.$1(B.dpn)
 a1.c=4
@@ -5482,7 +5482,7 @@ a1.aC(B.hyW,B.b0U,B.a_r)
 for(f=0;f<2;++f){p=3.9+B.dCJ[f]
 a1.aC(new A.p(5.13,p,-7.78),B.b0h,B.qk)
 a1.aC(new A.p(5.2700000000000005,p,-7.78),B.b_y,B.qk)}a1.b=86
-a1.iM(A.DQ(B.d8E,0.35,3),0.11,B.qm,!1,0.3,8)
+a1.iM(A.DQ(B.d8D,0.35,3),0.11,B.qm,!1,0.3,8)
 a1.b=87
 a1.cz(B.hsy,B.hvJ,0.19,a2.c?B.Zn:B.btm,0.3,8)
 a1.b=88
@@ -8430,7 +8430,7 @@ a4.e=0.4+f*0.1
 for(r=d/2,a2=0;a2<2;++a2){h=D.Th[a2]
 a5.$6(h-r,h+r,-59,59,a1,a0)}a5.$6(-71,71,36-r,36+r,a1,a0)
 for(r=d*0.3,a2=0;a2<2;++a2){i=B.cWB[a2]
-a5.$6(-71,71,i-r,i+r,a1,a0)}for(a2=0;a2<2;++a2){h=B.d8j[a2]
+a5.$6(-71,71,i-r,i+r,a1,a0)}for(a2=0;a2<2;++a2){h=B.d8i[a2]
 a5.$6(h-r,h+r,-59,59,a1,a0)}++f}}for(a6=$.xw(),w=a6.length,e=0;e<a6.length;a6.length===w||(0,C.I)(a6),++e){a0=a6[e]
 u=a0.b
 t=a0.a
@@ -9061,7 +9061,7 @@ v=(r&1)===0
 s=0
 for(;;){if(!(s<D.h.cD((v?144:120)/16)))break
 u.I(0,w+s);++s}}q=new A.fKF()
-for(t=0;t<5;++t){w=B.d7r[t]
+for(t=0;t<5;++t){w=B.d7q[t]
 m.Vj(w.c,q.$2(w.a,w.b))}m.Vj("ceiling",3004)
 for(w=m.b,v=w.length,t=0;t<v;++t){u=w[t].x
 u[0]=!0
@@ -9872,7 +9872,7 @@ g.sam(B.eGX.az(0,C.bW(j,i)))
 b0.O(j,i,g)
 e=C.L()
 e.r=B.bm6.gp(0)
-for(d=0;d<4;++d){u=B.d9p[d].a
+for(d=0;d<4;++d){u=B.d9o[d].a
 a0=u[0]
 a1=u[1]
 a2=u[2]
@@ -9881,7 +9881,7 @@ u=q.a
 b0.c1(C.bX(new C.r(m+(a0*i+Math.sin((u==null?0:u)*0.05)*i*0.08),k+a1*i),a3*i*2,a2*i*2),e)}$.R()
 a4=C.L()
 a4.r=D.c.j(0.55).gp(0)
-for(u=i*0.16,d=0;d<3;++d){q=B.d69[d]
+for(u=i*0.16,d=0;d<3;++d){q=B.d68[d]
 b0.c1(C.bX(new C.r(m+q.a*i,k+q.b*i),u,q.c*i*2),a4)}u=j.a5(0,new C.r(i*0.45,i*0.35))
 $.R()
 q=C.L()
@@ -11713,7 +11713,7 @@ cgj(){switch(this.a){case"hospital":var w=B.cFe
 break
 case"dmv":w=B.dCe
 break
-case"shop":w=B.d54
+case"shop":w=B.d53
 break
 case"school":w=B.df3
 break
@@ -11735,7 +11735,7 @@ case"firestation":w=B.dly
 break
 case"tower":w=B.dEP
 break
-default:w=B.d4w
+default:w=B.d4v
 break}return w},
 fH(d,e){var w,v,u,t,s,r,q,p=this,o=p.ax
 o===$&&C.c()
@@ -12008,7 +12008,7 @@ d.aC(new A.p(e,33,22.4),B.hmr,D.bs)
 for(w=e-21,v=0;v<3;++v){u=v*17
 d.aC(new A.p(e,15+u,21),B.hml,D.bP)
 for(t=16+u,u=27+u,s=v*2,r=0;r<7;++r){q=w+r*7
-d.cz(new A.p(q,t,21.6),new A.p(q,u,21.6),2.2,B.d9q[D.o.F(r+s,6)],0.5,6)}}d.x=0
+d.cz(new A.p(q,t,21.6),new A.p(q,u,21.6),2.2,B.d9p[D.o.F(r+s,6)],0.5,6)}}d.x=0
 p=d.f
 d.f=3
 d.d=0.2
@@ -12101,7 +12101,7 @@ d.eh(B.hqa,2,D.bt,3,5)
 d.eh(B.hm8,2,D.bj,3,5)
 d.b=d.e=0
 n.t_(d,0,70,26,D.aH)
-for(w=0;w<3;++w){v=B.d4C[w]
+for(w=0;w<3;++w){v=B.d4B[w]
 u=v.a
 t=v.b
 d.aF(new A.p(u,15,t),B.hlV,B.od,0.2)
@@ -12403,7 +12403,7 @@ t=d.d
 t===$&&C.c()
 r=q.a
 p=t[r.c]
-if(!p.gkU()&&!n.aYh(r.a,"power")){m.push(new A.IH(n.Q++,r.a,"power",B.d9c[u.aw(3)],15))
+if(!p.gkU()&&!n.aYh(r.a,"power")){m.push(new A.IH(n.Q++,r.a,"power",B.d9b[u.aw(3)],15))
 D.d.ca(j,0,r.b+" is calling for help: no power.")
 if(j.length>12)j.pop()}t=r.d
 o=t>=0?d.d[t]:p
@@ -13089,7 +13089,7 @@ A:{w=-1040+g*520
 if(Math.abs(w)<170&&o)break A
 f=D.o.F(g*7+v,5)===0?a9:a8
 e=B.hU.h(0,f)
-if(k.$4(w,u,e.c,e.d)){b3.dE(0,f,w,u);++i}}++g}++h}for(d=0,t=0;t<11;++t,d=a0){v=B.d6N[t]
+if(k.$4(w,u,e.c,e.d)){b3.dE(0,f,w,u);++i}}++g}++h}for(d=0,t=0;t<11;++t,d=a0){v=B.d6M[t]
 a0=d+1
 b3.dE(0,v.b,v.a,1560).f=D.o.F(d,6)}for(t=0;t<11;++t,d=a0){v=B.dym[t]
 a0=d+1
@@ -15323,7 +15323,7 @@ j=u.c
 i=u.a
 t=-i
 s=C.a([],x.f)
-if(w)for(r=0;r<5;++r)for(q=v+B.dlx[r],p=i*q,q=j*q,o=0;o<5;++o){n=B.da2[o]
+if(w)for(r=0;r<5;++r)for(q=v+B.dlx[r],p=i*q,q=j*q,o=0;o<5;++o){n=B.da1[o]
 s.push(new C.y(d.c+p+j*n,d.d+q+t*n))}else for(m=0;m<12;++m){l=m*3.141592653589793/6
 s.push(new C.y(d.c+Math.cos(l)*v,d.d+Math.sin(l)*v))}for(j=s.length,r=0;r<s.length;s.length===j||(0,C.I)(s),++r){k=s[r]
 if(!e.Lr(k.a,k.b))return k}return D.d.gH(s)},
@@ -19468,7 +19468,7 @@ u.b1C()
 return}u.adM(10,11,9,"Coming in through the front door")
 u.aZS(9,10,5)
 u.adM(5,9,0,"Walking down the hall")
-for(w=0;w<8;++w){v=B.d63[w]
+for(w=0;w<8;++w){v=B.d62[w]
 u.aZS(v,5,w===7?null:5)}u.b1C()},
 b1C(){var w,v,u,t,s,r,q,p,o=this,n=o.c,m=Math.min(1,n/120)
 for(w=o.d,v=w.length,u=0,t=0,s=0;s<v;++s){r=w[s]
@@ -20265,7 +20265,7 @@ w=A.Kx(D.nt,!1,r,m,new A.cg9(s),r,i,k,h,r,r,j,54,s.gcdr(),new A.cga(s),s.gcdx(),
 u=s.f
 v=D.c.j(0.07)
 n=C.l(13)
-return A.IW(!0,D.aH,new A.cgc(d,f),C.x(C.a([A.imF(B.d60,u,s.gbsy(),C.a([C.ay(r,C.o(r,B.fjK,D.f,r,r,new C.n(v,r,C.K(D.aT,D.r,1),n,r,r,D.n),r,r,r,r,D.k7,r,r,r),D.y,!1,B.hBx,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,s.gcdu(),r,r,r,r,r,r,!1,D.a4)],t)),D.P,C.A(C.a([C.E(C.d("Sheets "+q.gaoi()+"/"+l.length+" \xb7 screwed "+q.garz()+"/"+l.length+" \xb7 holes "+q.gaGW()+"/"+g.length+" \xb7 surfaces finished "+o+"/5",r,2,r,r,r,r,B.fA5,r,r,r),1),D.ae,A.ti("Start over",D.kd,s.gcdz(),D.aa)],t),D.l,r,D.e,D.i,0,r,r)],t),D.l,r,D.e,D.N,0,D.p),w,p,"Hanging drywall",r,r)}}
+return A.IW(!0,D.aH,new A.cgc(d,f),C.x(C.a([A.imF(B.d6_,u,s.gbsy(),C.a([C.ay(r,C.o(r,B.fjK,D.f,r,r,new C.n(v,r,C.K(D.aT,D.r,1),n,r,r,D.n),r,r,r,r,D.k7,r,r,r),D.y,!1,B.hBx,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,s.gcdu(),r,r,r,r,r,r,!1,D.a4)],t)),D.P,C.A(C.a([C.E(C.d("Sheets "+q.gaoi()+"/"+l.length+" \xb7 screwed "+q.garz()+"/"+l.length+" \xb7 holes "+q.gaGW()+"/"+g.length+" \xb7 surfaces finished "+o+"/5",r,2,r,r,r,r,B.fA5,r,r,r),1),D.ae,A.ti("Start over",D.kd,s.gcdz(),D.aa)],t),D.l,r,D.e,D.i,0,r,r)],t),D.l,r,D.e,D.N,0,D.p),w,p,"Hanging drywall",r,r)}}
 A.Y2.prototype={}
 A.yx.prototype={
 gcML(){return this.d<=20&&this.e>=20},
@@ -22267,7 +22267,7 @@ return new C.b7([d+100*Math.cos(w),e+100*Math.sin(w),-Math.sin(w),Math.cos(w)])}
 $S:2189}
 A.fpm.prototype={
 $1(a0){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i=this.b,h=A.LV(i,a0).a,g=h[0],f=h[1],e=h[2],d=h[3]
-for(h=this.a,w=h.a,v=h.b,u=h.c,h=h.d,t=0;t<5;++t){s=B.d5g[t]
+for(h=this.a,w=h.a,v=h.b,u=h.c,h=h.d,t=0;t<5;++t){s=B.d5f[t]
 for(r=d*s,q=e*s,p=0;p<3;++p){o=B.dkR[p]
 n=i.a==="bus"
 m=n?120:95.94999999999999
@@ -29019,8 +29019,8 @@ B.bs1=new C.u(1,0.8901960784313725,0.9254901960784314,0.9803921568627451,D.q)
 B.dea=w([D.c,B.bs1],x.O)
 B.ccI=new C.a7(D.aY,D.b2,D.x,B.dea,null,null)
 B.byQ=new C.u(1,0.07058823529411765,0.22745098039215686,0.47843137254901963,D.q)
-B.d6Y=w([D.iN,B.byQ],x.O)
-B.ccU=new C.a7(D.ay,D.aC,D.x,B.d6Y,null,null)
+B.d6X=w([D.iN,B.byQ],x.O)
+B.ccU=new C.a7(D.ay,D.aC,D.x,B.d6X,null,null)
 B.dys=w([D.ct,D.bA],x.O)
 B.A1=new C.a7(D.aY,D.b2,D.x,B.dys,null,null)
 B.cqQ=w([D.iN,D.N1],x.O)
@@ -29356,19 +29356,19 @@ B.erC={"Line (from the breaker)":0,"Load (to the light)":1,"Traveler A":2,"Trave
 B.dI1=new C.bq(B.erC,["Switch 1 common","Switch 2 common","Traveler terminal (both switches)","Traveler terminal (both switches)","Green ground screw","Neutral splice (not on a switch)"],x.l)
 B.dxl=w(["Never assume the dark screw is the same on every brand: read the diagram on the switch.","A switch loop or an old house may not follow the colors: verify the wires."],x.s)
 B.bC7=new A.alE("threeway","Three-way switch (two switches, one light)","Two three-way switches control one light from two places. Each switch has a COMMON terminal (dark screw) and two TRAVELER terminals. Power (line) goes to the common of the first switch, the light (load) to the common of the second, and two travelers join the switches. The ground goes to the green screw. A standard single-pole switch cannot do this job.",B.dDQ,B.dI1,B.dxl)
-B.d5h=w(["Fan (motor) control wire","Light control wire","Neutral","Ground","Fan-rated support"],x.s)
+B.d5g=w(["Fan (motor) control wire","Light control wire","Neutral","Ground","Fan-rated support"],x.s)
 B.esl={"Motor lead (black)":0,"Light lead (blue)":1,"Neutral (white)":2,"Ground (green)":3,Support:4}
 B.dIN=new C.bq(B.esl,["Fan (motor) control wire","Light control wire","Neutral","Ground","Fan-rated support"],x.l)
-B.da3=w(["A blue wire is a light-kit lead on many fans, but not on all: read the diagram.","A fan that spins does not prove the installation is safe."],x.s)
-B.bC8=new A.alE("fanlight","Ceiling fan with a light kit","A fan has a motor and often a light kit, and they are not always switched together. Follow the fan maker's diagram: the motor lead goes to the fan control (or switched hot), the light lead to the light control, the white to neutral and the green to the ground. The box must be fan rated.",B.d5h,B.dIN,B.da3)
+B.da2=w(["A blue wire is a light-kit lead on many fans, but not on all: read the diagram.","A fan that spins does not prove the installation is safe."],x.s)
+B.bC8=new A.alE("fanlight","Ceiling fan with a light kit","A fan has a motor and often a light kit, and they are not always switched together. Follow the fan maker's diagram: the motor lead goes to the fan control (or switched hot), the light lead to the light control, the white to neutral and the green to the ground. The box must be fan rated.",B.d5g,B.dIN,B.da2)
 B.oT=w([B.bC7,B.bC8],C.aF("U<alE>"))
 B.hPk=new A.pS(0,-100,100,24)
 B.hPr=new A.pS(1,90,100,24)
-B.d4w=w([B.hPk,B.hPr],x.X)
+B.d4v=w([B.hPk,B.hPr],x.X)
 B.f1q=new C.y(-95,160)
 B.f0W=new C.y(-35,175)
 B.eNE=new C.y(95,170)
-B.d4C=w([B.f1q,B.f0W,B.eNE],x.f)
+B.d4B=w([B.f1q,B.f0W,B.eNE],x.f)
 B.bnE=new C.u(1,0.9176470588235294,0.9490196078431372,0.9686274509803922,D.q)
 B.btC=new C.u(1,0.9647058823529412,0.9098039215686274,0.9098039215686274,D.q)
 B.bst=new C.u(1,0.9529411764705882,0.9215686274509803,0.7843137254901961,D.q)
@@ -29376,18 +29376,18 @@ B.aBl=w([B.Cb,B.bnE,B.btC,B.bst],x.O)
 B.b1l=new A.hP("neutral","White \xb7 neutral (middle)",B.mO,D.av,"neutral")
 B.b1n=new A.hP("hot1","Black \xb7 hot (left)",B.qu,D.c,"hot")
 B.b1m=new A.hP("hot2","Red \xb7 hot (right)",B.wj,D.c,"hot")
-B.d4J=w([B.b1l,B.b1n,B.b1m],x.d)
+B.d4I=w([B.b1l,B.b1n,B.b1m],x.d)
 B.dLh=new A.ip(-60,60,28,50)
 B.dLd=new A.ip(-150,-100,70,170)
 B.dKR=new A.ip(100,150,70,170)
 B.dLi=new A.ip(-60,-20,156,186)
 B.dKW=new A.ip(20,60,156,186)
-B.d54=w([B.dLh,B.dLd,B.dKR,B.dLi,B.dKW],x.T)
-B.d56=w([y.O,"The cable comes in through the top of the box. Strip about 3/4 inch of insulation from each wire.","Fasten the bare copper ground wire to the GREEN screw.","Fasten the white (neutral) wire to a SILVER screw.","Fasten the black (hot) wire to a BRASS screw. Wrap each wire clockwise under its screw.","Fold the wires back and push the outlet into the box.","Put the cover plate on, then turn the power on and test."],x.s)
+B.d53=w([B.dLh,B.dLd,B.dKR,B.dLi,B.dKW],x.T)
+B.d55=w([y.O,"The cable comes in through the top of the box. Strip about 3/4 inch of insulation from each wire.","Fasten the bare copper ground wire to the GREEN screw.","Fasten the white (neutral) wire to a SILVER screw.","Fasten the black (hot) wire to a BRASS screw. Wrap each wire clockwise under its screw.","Fold the wires back and push the outlet into the box.","Put the cover plate on, then turn the power on and test."],x.s)
 B.hzk=new A.p(-3.6,7.5,-7.85)
 B.hq9=new A.p(-3.6,4.2,-7.85)
-B.d5e=w([B.hzk,B.hq9],x.o)
-B.d5g=w([-0.5,-0.25,0,0.25,0.5],x.n)
+B.d5d=w([B.hzk,B.hq9],x.o)
+B.d5f=w([-0.5,-0.25,0,0.25,0.5],x.n)
 B.xW=new A.hP("neutral","White \xb7 neutral",B.mO,D.av,"neutral")
 B.XY=new A.nJ(B.xW,23,"Silver screw W: NEUTRAL","the white neutral",null)
 B.LL=new A.hP("hot1","Black \xb7 hot 1",B.qu,D.c,"hot")
@@ -29398,8 +29398,8 @@ B.LM=new A.hP("hot2","Red \xb7 hot 2",B.wj,D.c,"hot")
 B.aew=new A.nJ(B.LM,22,"Brass screw Y: HOT","the red hot (phase B)",B.F1)
 B.hDF=new A.hP("hot3","Blue \xb7 hot 3",D.bp,D.c,"hot")
 B.aeu=new A.nJ(B.hDF,24,"Screw Z: HOT","the blue hot (phase C)",B.F1)
-B.d5k=w([B.XY,B.aes,B.aew,B.aeu],x.R)
-B.d5D=w([D.bE,D.ba,D.bt,D.be,D.bi],x.O)
+B.d5j=w([B.XY,B.aes,B.aew,B.aeu],x.R)
+B.d5C=w([D.bE,D.ba,D.bt,D.be,D.bi],x.O)
 B.faC=new C.b4("look","Look",D.eL)
 B.faP=new C.b4("sheet","Drywall sheet",D.zP)
 B.f7A=new C.b4("cut","Cutter",D.Db)
@@ -29411,12 +29411,12 @@ B.f9o=new C.b4("mud","Mud",K.Q6)
 B.f9W=new C.b4("tape","Tape",D.tm)
 B.f88=new C.b4("sand","Sander",D.zx)
 B.faO=new C.b4("paint","Roller",B.asn)
-B.d60=w([B.faC,B.faP,B.f7A,B.f9z,B.faA,B.f9s,B.f9o,B.f9W,B.f88,B.faO],C.aF("U<+(q,q,a_)>"))
-B.d63=w([0,2,1,3,4,6,7,8],x.t)
+B.d6_=w([B.faC,B.faP,B.f7A,B.f9z,B.faA,B.f9s,B.f9o,B.f9W,B.f88,B.faO],C.aF("U<+(q,q,a_)>"))
+B.d62=w([0,2,1,3,4,6,7,8],x.t)
 B.f8h=new C.b4(-0.1,0,0.5)
 B.faB=new C.b4(0.35,-0.4,0.3)
 B.f9h=new C.b4(-0.4,0.55,0.35)
-B.d69=w([B.f8h,B.faB,B.f9h],C.aF("U<+(G,G,G)>"))
+B.d68=w([B.f8h,B.faB,B.f9h],C.aF("U<+(G,G,G)>"))
 B.f0w=new C.y(-1050,"store")
 B.aT_=new C.y(-840,"tower")
 B.f18=new C.y(-630,"tower")
@@ -29428,13 +29428,13 @@ B.eKc=new C.y(420,"store")
 B.eMp=new C.y(630,"tower")
 B.aSM=new C.y(840,"tower")
 B.eId=new C.y(1050,"gasstation")
-B.d6N=w([B.f0w,B.aT_,B.f18,B.f0Y,B.aSZ,B.eHX,B.aSK,B.eKc,B.eMp,B.aSM,B.eId],x.d6)
+B.d6M=w([B.f0w,B.aT_,B.f18,B.f0Y,B.aSZ,B.eHX,B.aSK,B.eKc,B.eMp,B.aSM,B.eId],x.d6)
 B.a6a=w(["Always switch the breaker OFF and test the wires with a tester before you touch them.","Never use water on an electrical fire: switch the power off at the breaker first.","Reversed hot and neutral can look fine and still be a shock hazard.","A GFCI outlet protects you near water: press TEST every month.","A ceiling fan needs a fan-rated box, because it is heavy and it shakes."],x.s)
 B.hvO=new A.p(9.8,6,-7.85)
 B.hp5=new A.p(9.8,7.5,-7.85)
 B.hzL=new A.p(-8,7.5,-7.85)
 B.hsi=new A.p(-8,1.5,-7.85)
-B.d70=w([B.hvO,B.hp5,B.hzL,B.hsi],x.o)
+B.d7_=w([B.hvO,B.hp5,B.hzL,B.hsi],x.o)
 B.f_a=new C.y("look","\ud83d\udc41 Look")
 B.eZt=new C.y("furniture","\ud83d\udecb Furniture")
 B.eLI=new C.y("walls","\ud83e\uddf1 Walls")
@@ -29447,12 +29447,12 @@ B.f6V=new C.b4(1,96,"outlet")
 B.f70=new C.b4(2,112,"outlet")
 B.f78=new C.b4(3,64,"outlet")
 B.f71=new C.b4(2,80,"switch")
-B.d7r=w([B.f6O,B.f6V,B.f70,B.f78,B.f71],C.aF("U<+(H,G,q)>"))
+B.d7q=w([B.f6O,B.f6V,B.f70,B.f78,B.f71],C.aF("U<+(H,G,q)>"))
 B.b0k=new A.p(5,1.8,-7.85)
 B.htl=new A.p(5,-0.1,-7.85)
 B.huE=new A.p(12.5,-0.1,-7.85)
-B.d8a=w([B.b0k,B.htl,B.huE],x.o)
-B.d8j=w([-69.5,69.5],x.n)
+B.d89=w([B.b0k,B.htl,B.huE],x.o)
+B.d8i=w([-69.5,69.5],x.n)
 B.hfQ=new A.p(3,3.1,-7.1)
 B.b09=new A.p(3,1.7,-7.1)
 B.hux=new A.p(3,1,-7.1)
@@ -29460,27 +29460,27 @@ B.hkF=new A.p(3.65,0.5,-7.1)
 B.hmN=new A.p(4.3,1,-7.1)
 B.hti=new A.p(4.3,1.8,-7.1)
 B.hzP=new A.p(5,1.8,-7.1)
-B.d8E=w([B.hfQ,B.b09,B.hux,B.hkF,B.hmN,B.hti,B.hzP,B.b0k],x.o)
+B.d8D=w([B.hfQ,B.b09,B.hux,B.hkF,B.hmN,B.hti,B.hzP,B.b0k],x.o)
 B.A8=w(["tv","lamp","toaster","hairdryer","washerM","dryerM","rangeM"],x.s)
 B.Pr=new A.f5(23,"Silver screw W: NEUTRAL",B.AZ,y.I,!1,"neutral")
 B.esb={hot1:0,hot2:1}
 B.xz=new C.di(B.esb,2,x.M)
 B.apx=new A.f5(21,"Brass screw X: HOT",B.xz,y.l,!1,"hot")
 B.apG=new A.f5(22,"Brass screw Y: HOT",B.xz,y.l,!1,"hot")
-B.d8P=w([B.tf,B.Pr,B.apx,B.apG],x.r)
+B.d8O=w([B.tf,B.Pr,B.apx,B.apG],x.r)
 B.apF=new A.f5(23,"Silver screw: NEUTRAL",B.AZ,y._,!1,"neutral")
 B.esd={hot:0}
 B.Vw=new C.di(B.esd,1,x.M)
 B.apB=new A.f5(21,"Brass screw: HOT",B.Vw,y.u,!1,"hot")
-B.d8R=w([B.tf,B.apF,B.apB],x.r)
-B.d9c=w(["My outlet is dead and it is dark in here. Please come and wire it.","The light in my room does not work, and my phone will not charge. Can you fix the wiring?","I have no power in my room at all. Can an electrician come?"],x.s)
-B.d9g=w([90,162,234,306,18],x.n)
+B.d8Q=w([B.tf,B.apF,B.apB],x.r)
+B.d9b=w(["My outlet is dead and it is dark in here. Please come and wire it.","The light in my room does not work, and my phone will not charge. Can you fix the wiring?","I have no power in my room at all. Can an electrician come?"],x.s)
+B.d9f=w([90,162,234,306,18],x.n)
 B.feU=new C.b7([-0.35,-0.2,0.42,0.3])
 B.ffa=new C.b7([0.3,0.25,0.32,0.38])
 B.fcp=new C.b7([0.05,-0.55,0.22,0.14])
 B.fej=new C.b7([-0.5,0.45,0.2,0.16])
-B.d9p=w([B.feU,B.ffa,B.fcp,B.fej],x.D)
-B.d9q=w([D.aA,D.bj,D.at,D.d9,D.bO,D.fd],x.O)
+B.d9o=w([B.feU,B.ffa,B.fcp,B.fej],x.D)
+B.d9p=w([D.aA,D.bj,D.at,D.d9,D.bO,D.fd],x.O)
 B.FG=new A.nJ(B.q8,25,"Green screw G: GROUND","the bare copper ground",null)
 B.aev=new A.nJ(B.LL,21,"Brass screw X: HOT","the black hot",B.xz)
 B.aet=new A.nJ(B.LM,22,"Brass screw Y: HOT","the red hot",B.xz)
@@ -29489,9 +29489,9 @@ B.hyX=new A.p(0.6,11,-3.4)
 B.hnS=new A.p(0.6,3.2,-3.2)
 B.hym=new A.p(0.6,2.2,-1.9)
 B.hnk=new A.p(0.6,0.7,-1.5)
-B.d9Q=w([B.hyX,B.hnS,B.hym,B.hnk],x.o)
-B.d9R=w([y.O,y.x,y.R,"Fasten the black wire (power in, or to the light) to the COMMON screw: the odd-coloured DARK one (black or bronze).","Fasten the first traveler (red) to a TRAVELER screw.","Fasten the second traveler (white wire taped black) to the other TRAVELER screw.",y.b,y.n],x.s)
-B.da2=w([0,24,-24,48,-48],x.n)
+B.d9P=w([B.hyX,B.hnS,B.hym,B.hnk],x.o)
+B.d9Q=w([y.O,y.x,y.R,"Fasten the black wire (power in, or to the light) to the COMMON screw: the odd-coloured DARK one (black or bronze).","Fasten the first traveler (red) to a TRAVELER screw.","Fasten the second traveler (white wire taped black) to the other TRAVELER screw.",y.b,y.n],x.s)
+B.da1=w([0,24,-24,48,-48],x.n)
 B.erV={common:0}
 B.fmf=new C.di(B.erV,1,x.M)
 B.bQ0=new A.f5(23,"COMMON screw (dark)",B.fmf,"The COMMON screw is the DARK one (black or bronze); the two traveler screws are brass. The black wire that brings the power in, or goes to the light, belongs here.",!1,"hot")
@@ -29602,8 +29602,8 @@ B.dBg=w(["tail"],x.s)
 B.aO0=new A.nC("trap","trap","P-trap",B.dBg,"The P-trap joins the tailpiece. Build the drain from the top down.",!1,1)
 B.dBp=w(["trap"],x.s)
 B.aO1=new A.nC("arm","arm","Trap arm",B.dBp,"The trap arm joins the trap and goes into the wall.",!1,1)
-B.d7B=w([B.eyJ,B.eyH,B.eyE,B.eyI,B.eyF,B.eyG,B.aNW,B.aNZ,B.aNX,B.aO_,B.aNY,B.aNV,B.aO0,B.aO1],x.fI)
-B.eF1=new A.Yo("bathroom","Bathroom",B.d7B,"Fit out a bathroom: a toilet and a sink with its faucet, supply hoses and drain.")
+B.d7A=w([B.eyJ,B.eyH,B.eyE,B.eyI,B.eyF,B.eyG,B.aNW,B.aNZ,B.aNX,B.aO_,B.aNY,B.aNV,B.aO0,B.aO1],x.fI)
+B.eF1=new A.Yo("bathroom","Bathroom",B.d7A,"Fit out a bathroom: a toilet and a sink with its faucet, supply hoses and drain.")
 B.dtr=w([B.aNW,B.aNZ,B.aNX,B.aO_,B.aNY,B.aNV,B.aO0,B.aO1],x.fI)
 B.eF2=new A.Yo("kitchen","Kitchen",B.dtr,"Fit out a kitchen sink: the faucet, the hot and cold supplies and the drain.")
 B.aCd=w([B.eF1,B.eF2],C.aF("U<Yo>"))
@@ -30297,8 +30297,8 @@ B.c8R=new A.jY("Drilling studs","Holes for cable go through the middle of the st
 B.c8I=new A.jY("Drywall","A sheet is 4 feet wide, so its edges land on studs 48 inches apart. Screws go into studs only, just under the paper.")
 B.c8L=new A.jY("Taping and mud","Seams get paper tape and three thin coats of joint compound, sanded smooth between coats, then primer and paint.")
 B.c9_=new A.jY("Order of a build","Frame, run the pipes and wires (rough-in), inspect, hang drywall, finish it, paint, then fit the fixtures and devices.")
-B.d5L=w([B.c8D,B.c8R,B.c8I,B.c8L,B.c9_],x.e)
-B.c94=new A.NK("Framing and walls","\ud83c\udfe0",D.e5,B.d5L)
+B.d5K=w([B.c8D,B.c8R,B.c8I,B.c8L,B.c9_],x.e)
+B.c94=new A.NK("Framing and walls","\ud83c\udfe0",D.e5,B.d5K)
 B.c8M=new A.jY("Voltage tester","A pen that glows or beeps near live wires. Test it on a known live outlet first, so you know it works.")
 B.c8S=new A.jY("Wire strippers","Strip the plastic off without nicking the copper. A nick weakens the wire.")
 B.c8Y=new A.jY("Adjustable wrench","For nuts on valves and hoses. Hold the fitting steady with a second wrench so you do not twist the pipe.")
@@ -30461,8 +30461,8 @@ B.fwL=new A.vz("May the neutral be used as the equipment ground?",B.dao,1,"The g
 B.dmP=w([B.fwR,B.fwP,B.fwL],x.J)
 B.cdJ=w(["The hot to the light","The neutral","The ground"],x.s)
 B.fwS=new A.vz("A single-pole switch opens and closes which conductor?",B.cdJ,0,"The switch breaks the hot conductor to the load.")
-B.d7R=w(["Yes","No, never","If the wire is thick"],x.s)
-B.fwT=new A.vz("May the ground wire be used to carry current to the light?",B.d7R,1,"The equipment ground is only for safety.")
+B.d7Q=w(["Yes","No, never","If the wire is thick"],x.s)
+B.fwT=new A.vz("May the ground wire be used to carry current to the light?",B.d7Q,1,"The equipment ground is only for safety.")
 B.dg8=w(["Yes","No: never assume it does","Only new houses"],x.s)
 B.fwM=new A.vz("Does every switch box have a neutral?",B.dg8,1,"Many switch boxes have no neutral. Smart switches need to be chosen for that.")
 B.dDh=w([B.fwS,B.fwT,B.fwM],x.J)
@@ -30903,8 +30903,8 @@ B.fUg=new C.C("Just the hall and its big TVs, 45 seconds",null,D.Ba,null,null,nu
 B.dD1=w([B.h8e,B.fUg],x.p)
 B.bzH=new C.fo(D.ah,D.e,D.i,D.E,null,D.p,null,0,B.dD1,null)
 B.bMd=new C.bz(1,D.bd,B.bzH,null)
-B.d5S=w([B.c_T,D.bc,B.bMd,P.Qw],x.p)
-B.fjC=new C.c8(D.aM,D.e,D.i,D.l,null,D.p,null,0,B.d5S,null)
+B.d5R=w([B.c_T,D.bc,B.bMd,P.Qw],x.p)
+B.fjC=new C.c8(D.aM,D.e,D.i,D.l,null,D.p,null,0,B.d5R,null)
 B.bYs=new C.ae(D.hd,30,D.c,null,null,null)
 B.hae=new C.C("Play the tour",null,D.jR,null,null,null,null,null,null,null,null,null)
 B.dfv=w([B.bYs,D.bn,B.hae],x.p)
@@ -30914,8 +30914,8 @@ B.aWR=new C.F(!0,D.bt,null,null,null,null,12,D.H,null,null,null,null,null,null,n
 B.h31=new C.C("Hint",null,B.aWR,null,null,null,null,null,null,null,null,null)
 B.fAI=new C.F(!0,D.aF,null,null,null,null,10.5,D.O,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 B.fXt=new C.C("\u22122 \u2b50",null,B.fAI,null,null,null,null,null,null,null,null,null)
-B.d6x=w([B.c2b,D.e7,B.h31,D.e7,B.fXt],x.p)
-B.fjK=new C.c8(D.aM,D.e,D.N,D.l,null,D.p,null,0,B.d6x,null)
+B.d6w=w([B.c2b,D.e7,B.h31,D.e7,B.fXt],x.p)
+B.fjK=new C.c8(D.aM,D.e,D.N,D.l,null,D.p,null,0,B.d6w,null)
 B.rd=new A.Ki(0,"correct")
 B.aTz=new A.Ki(1,"incorrect")
 B.tS=new A.Ki(2,"unsafe")
@@ -32459,18 +32459,18 @@ for(v=0;v<2;++v){u=v*9
 D.d.u(s,C.a([A.ha7(v,175,u),A.ha7(v,612,u+14),A.ha7(v,1013,u+7)],t))}return s})
 w($,"iGU","h9i",()=>C.a([A.hzO(-80,80,400,565),A.hzO(-80,80,715,885)],C.aF("U<bzp>")))
 w($,"izn","aTq",()=>A.hR3())
-w($,"iHk","hP5",()=>{var v=C.a([A.nV("Wire a standard 120 volt receptacle: black to brass, white to silver, bare copper to green.",B.Tb,B.dAg,"outlet","",!0,B.Js,B.d56,!1,"Wall outlet",new A.fLu()),A.nV("A single-pole switch breaks the hot wire to the light: two black wires go on the two brass screws.",B.dle,B.dmN,"switch","",!0,B.Js,B.d3n,!1,"Light switch",new A.fLv()),A.nV("A GFCI protects you near water. Power comes in on LINE. The LOAD screws (covered with tape) feed other outlets.",B.Tb,B.dpS,"gfci","",!0,B.Js,B.doj,!1,"GFCI outlet",new A.fLw()),A.nV("Join the house wires to the fixture wires with wire nuts: black to black, white to white, ground to ground.",B.Tb,B.dg0,"light","",!0,B.Js,B.dC7,!1,"Ceiling light",new A.fLx()),A.nV("A fan hangs from a strong fan-rated box. Join black, white and ground with wire nuts, then fasten the canopy.",B.Tb,B.dnG,"fan","",!0,B.Js,B.dbG,!1,"Ceiling fan",new A.fLy())],x.Q)
+w($,"iHk","hP5",()=>{var v=C.a([A.nV("Wire a standard 120 volt receptacle: black to brass, white to silver, bare copper to green.",B.Tb,B.dAg,"outlet","",!0,B.Js,B.d55,!1,"Wall outlet",new A.fLu()),A.nV("A single-pole switch breaks the hot wire to the light: two black wires go on the two brass screws.",B.dle,B.dmN,"switch","",!0,B.Js,B.d3n,!1,"Light switch",new A.fLv()),A.nV("A GFCI protects you near water. Power comes in on LINE. The LOAD screws (covered with tape) feed other outlets.",B.Tb,B.dpS,"gfci","",!0,B.Js,B.doj,!1,"GFCI outlet",new A.fLw()),A.nV("Join the house wires to the fixture wires with wire nuts: black to black, white to white, ground to ground.",B.Tb,B.dg0,"light","",!0,B.Js,B.dC7,!1,"Ceiling light",new A.fLx()),A.nV("A fan hangs from a strong fan-rated box. Join black, white and ground with wire nuts, then fasten the canopy.",B.Tb,B.dnG,"fan","",!0,B.Js,B.dbG,!1,"Ceiling fan",new A.fLy())],x.Q)
 D.d.u(v,$.h9p())
 return v})
-w($,"iHm","h9p",()=>{var v="switch",u=C.a([A.nV("Breaks BOTH hot legs of a 240 volt circuit at once: water heaters and baseboard heat.",B.dFc,B.cdu,"switch2p",v,!0,B.dHH,B.dgd,!0,"Double-pole switch (240 V)",new A.fLz()),A.nV("One light, two switches. One COMMON screw and two TRAVELER screws; it pairs with a second three-way.",B.dy3,B.dae,"switch3",v,!0,B.dHY,B.d9R,!0,"Three-way switch",new A.fLA()),A.nV("Sits in the middle of two three-way switches: two traveler wires in on one pair of screws, two out on the other pair. No neutral and no common screw.",B.djf,B.dAo,"switch4",v,!0,B.dHI,B.dxR,!0,"Four-way switch",new A.fLB()),A.nV("Needs a NEUTRAL wire in the box as well: hot in, hot out to the light, neutral and ground.",B.dai,B.ddn,"switchsmart",v,!0,B.dHZ,B.daA,!0,"Smart, motion or timer switch",new A.fLC()),A.nV("Two switches in one device: one hot feed is split between them, and two separate lights come out.",B.cSp,B.dsQ,"switchcombo",v,!0,B.dHy,B.cFh,!0,"Combination (double) switch",new A.fLD()),A.nV("The tab between the brass screws is broken off: the top half is switched, the bottom half is always on.",B.doe,B.cEG,"split","outlet",!0,B.dI_,B.dtR,!0,"Split (half-switched) outlet",new A.fLE()),A.nV("Two hots, a neutral and a ground: the dryer 14-30, and the range and car charger 14-50.",B.Tn,B.d8P,"v240four","nema1430",!0,B.TK,B.cWW,!0,"4-wire 240 V outlet (dryer, range, EV)",new A.fLF()),A.nV("Two hots and a neutral, with no separate ground: the old 10-30 and 10-50, from before 1996.",B.a6s,B.dE4,"v240three","nema1030",!1,B.a80,B.dDg,!0,"3-wire 240 V outlet (old dryer or range)",new A.fLG()),A.nV("Two hots and a ground, and no neutral at all: the 6-series outlets.",B.aEF,B.aCM,"v240only","nema620",!0,B.aK7,B.dAn,!0,"240 V only outlet (window AC, welder)",new A.fLH()),A.nV("Hot and neutral as usual, but the ground goes on its own wire straight back to the panel: shops and offices.",B.dDT,B.dm9,"isolated","outlet",!0,B.dJh,B.dhn,!0,"Isolated-ground outlet",new A.fLI())],x.Q)
+w($,"iHm","h9p",()=>{var v="switch",u=C.a([A.nV("Breaks BOTH hot legs of a 240 volt circuit at once: water heaters and baseboard heat.",B.dFc,B.cdu,"switch2p",v,!0,B.dHH,B.dgd,!0,"Double-pole switch (240 V)",new A.fLz()),A.nV("One light, two switches. One COMMON screw and two TRAVELER screws; it pairs with a second three-way.",B.dy3,B.dae,"switch3",v,!0,B.dHY,B.d9Q,!0,"Three-way switch",new A.fLA()),A.nV("Sits in the middle of two three-way switches: two traveler wires in on one pair of screws, two out on the other pair. No neutral and no common screw.",B.djf,B.dAo,"switch4",v,!0,B.dHI,B.dxR,!0,"Four-way switch",new A.fLB()),A.nV("Needs a NEUTRAL wire in the box as well: hot in, hot out to the light, neutral and ground.",B.dai,B.ddn,"switchsmart",v,!0,B.dHZ,B.daA,!0,"Smart, motion or timer switch",new A.fLC()),A.nV("Two switches in one device: one hot feed is split between them, and two separate lights come out.",B.cSp,B.dsQ,"switchcombo",v,!0,B.dHy,B.cFh,!0,"Combination (double) switch",new A.fLD()),A.nV("The tab between the brass screws is broken off: the top half is switched, the bottom half is always on.",B.doe,B.cEG,"split","outlet",!0,B.dI_,B.dtR,!0,"Split (half-switched) outlet",new A.fLE()),A.nV("Two hots, a neutral and a ground: the dryer 14-30, and the range and car charger 14-50.",B.Tn,B.d8O,"v240four","nema1430",!0,B.TK,B.cWW,!0,"4-wire 240 V outlet (dryer, range, EV)",new A.fLF()),A.nV("Two hots and a neutral, with no separate ground: the old 10-30 and 10-50, from before 1996.",B.a6s,B.dE4,"v240three","nema1030",!1,B.a80,B.dDg,!0,"3-wire 240 V outlet (old dryer or range)",new A.fLG()),A.nV("Two hots and a ground, and no neutral at all: the 6-series outlets.",B.aEF,B.aCM,"v240only","nema620",!0,B.aK7,B.dAn,!0,"240 V only outlet (window AC, welder)",new A.fLH()),A.nV("Hot and neutral as usual, but the ground goes on its own wire straight back to the panel: shops and offices.",B.dDT,B.dm9,"isolated","outlet",!0,B.dJh,B.dhn,!0,"Isolated-ground outlet",new A.fLI())],x.Q)
 D.d.u(u,$.hP4())
 D.d.u(u,$.hP6())
 D.d.u(u,$.h9m())
 return u})
 w($,"iHn","hP6",()=>{var v="gfci",u="Silver LINE screw: NEUTRAL",t="Brass LINE screw: HOT",s="The white neutral from the panel goes on the silver LINE screw.",r="The black hot from the panel goes on the brass LINE screw.",q="the brass LINE screw",p="the silver LINE screw",o="outlet",n="Brass screw: HOT",m="a BRASS screw",l=y.u,k="Silver screw: NEUTRAL",j="a SILVER screw",i=y._
 return C.a([A.a3c(B.cP7,"Stops arcing from a loose or damaged wire before it starts a fire. Required in bedrooms and living rooms of new houses.",t,q,r,"afci",v,u,p,s,"AFCI outlet (arc-fault)"),A.a3c(B.dwr,"One outlet that guards against both arcing wires (fire) and leaking current (shock). The newer electrical code asks for both in kitchens and laundry rooms, and this does it in one.",t,q,r,"dualfunction",v,u,p,s,"Dual-function AFCI/GFCI outlet"),A.a3c(B.dkE,"Little shutters behind the slots keep a child from pushing a key or a pin in. Every new house must have them.",n,m,l,"tamper",o,k,j,i,"Tamper-resistant outlet (TR)"),A.a3c(B.dup,"A normal outlet with USB charging ports built in. A small charger inside the outlet turns 120 volts into 5 volts.",n,m,l,"usb",o,k,j,i,"USB outlet"),A.a3c(B.dCX,"The outlet with a sideways T on one slot: for a 20 amp circuit in a kitchen, a garage or for a big tool.",n,m,l,"outlet20","nema520",k,j,i,"20 amp outlet (5-20)"),A.a3c(B.d3W,"Outside: a GFCI marked WR, under a bubble cover that stays closed even with a cord plugged in.",t,q,r,"weather",v,u,p,s,"Outdoor outlet (weather-resistant GFCI)"),A.a3c(B.dBX,"An outlet you can turn on and off from your phone. Its little radio always needs the neutral wire.",n,m,l,"smartoutlet",o,k,j,i,"Smart outlet (Wi-Fi)"),A.hBA(B.dtJ,"The 50 amp, 240 volt outlet in a garage for charging an electric car or for an RV: two hots, a neutral and a ground.","ev1450","nema1450","Electric car charger outlet (14-50)"),A.a3c(B.daH,"The camper outlet at an RV pad: 30 amp but only 120 volts, with slanted slots so only the RV plug fits.","Brass screw X: HOT","the brass X screw","The one black hot goes on the brass X screw.","rv30","nematt30","Silver screw W: NEUTRAL","the silver W screw","The white neutral goes on the silver W screw.","RV outlet, 30 amp (TT-30)"),A.nV("The 50 amp, 240 volt outlet for a welder or a big compressor in a shop: two hots and a ground, no neutral.",B.aEF,B.aCM,"welder650","nema620",!0,B.aK7,B.dBz,!0,"Welder outlet (6-50)",new A.fLJ()),A.hBA(B.dcG,"The round twist-lock for a portable generator: the plug turns and locks, so it cannot fall out. Two hots, a neutral and a ground.","gen1430","nemal1430","Generator twist-lock (L14-30)")],x.Q)})
-w($,"iHf","h9m",()=>C.a([A.om("Two slots, no ground hole: a NEMA 1-15. There is no ground wire in the box, so only a hot and a neutral. When one is replaced today it must become a GFCI marked NO EQUIPMENT GROUND, or get a real ground wire.","The outlet of very old houses: two slots and no ground hole. 120 volts, 15 amps.","old2prong","nema115","Old 2-prong outlet (1-15)",B.dCQ),A.om("Two flat slots lying side by side and a ground hole: a NEMA 6-15. 240 volts, 15 amps, on 14 gauge wire and a 15 amp double breaker. No neutral.","A 240 volt, 15 amp outlet for a small window or wall air conditioner: two hots and a ground, no neutral.","ac615","nema615","Air conditioner outlet (6-15)",B.SA),A.om("Two flat slots, each with a bent foot, and a round ground hole: a NEMA 6-30. 10 gauge wire and a 30 amp double breaker. No neutral.","A 240 volt, 30 amp outlet for a big air conditioner, a kiln or a shop compressor: two hots and a ground, no neutral.","v630","nema630","240 V 30 amp outlet (6-30)",B.SA),A.om("Four openings: two hots with a bent foot, a flat neutral and a round ground: a NEMA 14-60. It takes 4 gauge wire and a 60 amp double breaker.","The 60 amp, 120/240 volt outlet for a big electric car charger or a shop: two hots, a neutral and a ground.","v1460","nema1460","Big 60 amp outlet (14-60)",B.a6m),A.om("A big round twist-lock with four openings in a cross: the plug goes in and turns, so the wind or the water can not pull it out. 6 gauge wire and a 50 amp double breaker.","The 50 amp twist-lock at a marina or an RV park: 120/240 volts, two hots, a neutral and a ground.","shore50","nemass50","RV shore power twist-lock (50 amp)",B.a6m),A.om("Three curved slots in a circle, one with a little hook (the ground): a NEMA L5-20. Push the plug in and turn it to lock. 12 gauge wire and a 20 amp breaker.","A 120 volt, 20 amp twist-lock: the plug turns and locks. Stages, shops and boats.","l520","nemal520","Twist-lock 120 V (L5-20)",B.aC9),A.om("Three long curved slots, one with a hook for the ground: a NEMA L5-30. 10 gauge wire and a 30 amp single breaker.","A 120 volt, 30 amp twist-lock for a big tool, a small generator or a boat.","l530","nemal530","Twist-lock 120 V 30 amp (L5-30)",B.aC9),A.om("Three curved slots, one with a hook for the ground, and no neutral: a NEMA L6-20. 12 gauge wire and a 20 amp double breaker.","A 240 volt, 20 amp twist-lock for workshop tools such as a table saw: two hots and a ground.","l620","nemal620","Twist-lock 240 V (L6-20)",B.SA),A.om("Three wide curved slots, one with a hook for the ground: a NEMA L6-30. 10 gauge wire and a 30 amp double breaker. No neutral.","A 240 volt, 30 amp twist-lock for big shop machines and generators: two hots and a ground.","l630","nemal630","Twist-lock 240 V 30 amp (L6-30)",B.SA),A.om("Four short curved slots, one with a hook for the ground: a NEMA L14-20. 12 gauge wire and a 20 amp double breaker, through a transfer switch or an interlock.","The 20 amp, 120/240 volt twist-lock of a smaller generator: two hots, a neutral and a ground.","l1420","nemal1420","Generator twist-lock 20 amp (L14-20)",B.a6m),A.om("Only two curved slots: a NEMA L2-20, an old design with no ground. It is only repaired, never put in new.","An old 240 volt, 20 amp twist-lock with only two curved slots: two hots, no neutral and no ground.","l220","nemal220","Old twist-lock, no ground (L2-20)",B.ddy),A.om("A flat slot on top, a short upright slot and a slanted one: a NEMA 7-15. In a 277/480 volt building the hot is brown, orange or yellow and the neutral is GREY, not white.","A 277 volt outlet for the lights of offices and stores: one hot, a neutral and a ground. A home plug never fits it.","v715","nema715","277 V 15 amp outlet (7-15)",B.a6j),A.om("A T-shaped slot, a straight slot and a ground hole, turned so a 120 volt plug never fits: a NEMA 7-20. Brown hot, grey neutral, bare ground.","A 277 volt, 20 amp outlet with a T-shaped slot: commercial lighting and machines.","v720","nema720","277 V 20 amp outlet (7-20)",B.a6j),A.om("A wide flat slot on top, an upright slot and a round ground hole: a NEMA 7-30. 10 gauge wire, brown hot and grey neutral.","A single 277 volt, 30 amp receptacle for big commercial equipment.","v730","nema730","277 V 30 amp outlet (7-30)",B.a6j),A.om("Four slots and no ground hole: a NEMA 18-20, for three-phase machines that also need 120 volts. Black, red and blue are the three phases; the white is the neutral.","A 120/208 volt three-phase outlet with three hots and a neutral, and no ground slot.","v1820","nema1820","Three-phase Y outlet (18-20)",B.d5k),A.om("Five curved slots: a NEMA L22-30. The 480 volt phases are brown, orange and yellow, and the neutral is grey. This is factory power, only for trained electricians.","A 30 amp, 277/480 volt three-phase twist-lock for factories: three hots, a neutral and a ground.","l2230","nemal2230","Twist-lock 277/480 V (L22-30)",B.dg7),A.om("Three slots (one with a T foot) and a ground hole: a NEMA 15-20. Black, red and blue are the three phases. No neutral.","A 250 volt, 20 amp three-phase outlet: three hots and a ground, no neutral.","p1520","nema1520","Three-phase 20 amp outlet (15-20)",B.J3),A.om("Three slots with bent feet and a ground hole: a NEMA 15-30. 10 gauge wire and a 30 amp three-pole breaker.","A 250 volt, 30 amp three-phase outlet for shop machines: three hots and a ground.","p1530","nema1530","Three-phase 30 amp outlet (15-30)",B.J3),A.om("Three wedge slots and a round ground hole at the top: a NEMA 15-50. 6 gauge wire and a 50 amp three-pole breaker.","A 250 volt, 50 amp three-phase outlet: three wedge-shaped slots and a round ground.","p1550","nema1550","Three-phase 50 amp outlet (15-50)",B.J3),A.om("Two upright slots, a flat one at the bottom and a ground at the top: a NEMA 15-60. 4 gauge wire and a 60 amp three-pole breaker.","A 250 volt, 60 amp three-phase outlet for the biggest shop machines.","p1560","nema1560","Three-phase 60 amp outlet (15-60)",B.J3),A.om("Four curved slots, one with a hook (the ground): a NEMA L15-30. Black, red and blue are the three phases.","A 250 volt, 30 amp three-phase twist-lock: three hots and a ground.","l1530","nemal1530","Three-phase twist-lock (L15-30)",B.J3),A.om("Five curved slots: a NEMA L21-30. Black, red and blue are the three phases, white is the neutral and bare copper the ground.","A 120/208 volt three-phase twist-lock with five wires: three hots, a neutral and a ground.","l2130","nemal2130","Twist-lock 5-wire (L21-30)",B.djC),A.om("Four curved slots: a NEMA L16-30. The 480 volt phases are brown, orange and yellow. No neutral.","A 480 volt, 30 amp three-phase twist-lock for industry: three hots and a ground.","l1630","nemal1630","Twist-lock 480 V three-phase (L16-30)",B.doZ)],x.Q))
-w($,"iHe","hP4",()=>C.a([A.nV("The dryer outlet of every new house: 30 amp, 240 volts. Two hots (X, Y), a neutral (W) and a separate ground (G).",B.Tn,B.a70,"dryer4","nema1430",!0,B.TK,B.du1,!0,"Dryer outlet, 4-wire (NEMA 14-30)",new A.fLn()),A.nV("The dryer outlet of older houses (before 1996): 30 amp, 240 volts. Two hots and a neutral that also grounds the dryer. No separate ground.",B.a6s,B.aEe,"dryer3","nema1030",!1,B.a80,B.d_N,!0,"Dryer outlet, 3-wire (NEMA 10-30)",new A.fLo()),A.nV("The electric stove outlet of every new house: 50 amp, 240 volts. Two hots (X, Y), a neutral (W) and a separate ground (G). Also used for car chargers.",B.Tn,B.a70,"range4","nema1450",!0,B.TK,B.dr2,!0,"Range outlet, 4-wire (NEMA 14-50)",new A.fLp()),A.nV("The electric stove outlet of older houses (before 1996): 50 amp, 240 volts. Two hots and a neutral that also grounds the range. No separate ground.",B.a6s,B.aEe,"range3","nema1050",!1,B.a80,B.dr0,!0,"Range outlet, 3-wire (NEMA 10-50)",new A.fLq()),A.nV("A dedicated 120 volt, 20 amp outlet for the washer, with a T-shaped neutral slot. Near water, so it needs GFCI protection.",B.aDL,B.d8R,"washer","nema520",!0,B.aKh,B.doQ,!0,"Washing machine outlet (NEMA 5-20)",new A.fLr()),A.nV("At the back of the appliance: black to the left terminal, white (neutral) to the middle one, red to the right one. The ground strap STAYS: it joins the neutral to the frame.",B.d4J,B.det,"cord3","terminal3",!1,B.dIu,B.dzy,!0,"Dryer or range cord, 3-wire hookup",new A.fLs()),A.nV("At the back of the appliance: REMOVE the ground strap first, then black left, white (neutral) middle, red right, and the green ground wire to the frame.",B.dAd,B.daO,"cord4","terminal4",!0,B.dI4,B.dix,!0,"Dryer or range cord, 4-wire hookup",new A.fLt())],x.Q))
+w($,"iHf","h9m",()=>C.a([A.om("Two slots, no ground hole: a NEMA 1-15. There is no ground wire in the box, so only a hot and a neutral. When one is replaced today it must become a GFCI marked NO EQUIPMENT GROUND, or get a real ground wire.","The outlet of very old houses: two slots and no ground hole. 120 volts, 15 amps.","old2prong","nema115","Old 2-prong outlet (1-15)",B.dCQ),A.om("Two flat slots lying side by side and a ground hole: a NEMA 6-15. 240 volts, 15 amps, on 14 gauge wire and a 15 amp double breaker. No neutral.","A 240 volt, 15 amp outlet for a small window or wall air conditioner: two hots and a ground, no neutral.","ac615","nema615","Air conditioner outlet (6-15)",B.SA),A.om("Two flat slots, each with a bent foot, and a round ground hole: a NEMA 6-30. 10 gauge wire and a 30 amp double breaker. No neutral.","A 240 volt, 30 amp outlet for a big air conditioner, a kiln or a shop compressor: two hots and a ground, no neutral.","v630","nema630","240 V 30 amp outlet (6-30)",B.SA),A.om("Four openings: two hots with a bent foot, a flat neutral and a round ground: a NEMA 14-60. It takes 4 gauge wire and a 60 amp double breaker.","The 60 amp, 120/240 volt outlet for a big electric car charger or a shop: two hots, a neutral and a ground.","v1460","nema1460","Big 60 amp outlet (14-60)",B.a6m),A.om("A big round twist-lock with four openings in a cross: the plug goes in and turns, so the wind or the water can not pull it out. 6 gauge wire and a 50 amp double breaker.","The 50 amp twist-lock at a marina or an RV park: 120/240 volts, two hots, a neutral and a ground.","shore50","nemass50","RV shore power twist-lock (50 amp)",B.a6m),A.om("Three curved slots in a circle, one with a little hook (the ground): a NEMA L5-20. Push the plug in and turn it to lock. 12 gauge wire and a 20 amp breaker.","A 120 volt, 20 amp twist-lock: the plug turns and locks. Stages, shops and boats.","l520","nemal520","Twist-lock 120 V (L5-20)",B.aC9),A.om("Three long curved slots, one with a hook for the ground: a NEMA L5-30. 10 gauge wire and a 30 amp single breaker.","A 120 volt, 30 amp twist-lock for a big tool, a small generator or a boat.","l530","nemal530","Twist-lock 120 V 30 amp (L5-30)",B.aC9),A.om("Three curved slots, one with a hook for the ground, and no neutral: a NEMA L6-20. 12 gauge wire and a 20 amp double breaker.","A 240 volt, 20 amp twist-lock for workshop tools such as a table saw: two hots and a ground.","l620","nemal620","Twist-lock 240 V (L6-20)",B.SA),A.om("Three wide curved slots, one with a hook for the ground: a NEMA L6-30. 10 gauge wire and a 30 amp double breaker. No neutral.","A 240 volt, 30 amp twist-lock for big shop machines and generators: two hots and a ground.","l630","nemal630","Twist-lock 240 V 30 amp (L6-30)",B.SA),A.om("Four short curved slots, one with a hook for the ground: a NEMA L14-20. 12 gauge wire and a 20 amp double breaker, through a transfer switch or an interlock.","The 20 amp, 120/240 volt twist-lock of a smaller generator: two hots, a neutral and a ground.","l1420","nemal1420","Generator twist-lock 20 amp (L14-20)",B.a6m),A.om("Only two curved slots: a NEMA L2-20, an old design with no ground. It is only repaired, never put in new.","An old 240 volt, 20 amp twist-lock with only two curved slots: two hots, no neutral and no ground.","l220","nemal220","Old twist-lock, no ground (L2-20)",B.ddy),A.om("A flat slot on top, a short upright slot and a slanted one: a NEMA 7-15. In a 277/480 volt building the hot is brown, orange or yellow and the neutral is GREY, not white.","A 277 volt outlet for the lights of offices and stores: one hot, a neutral and a ground. A home plug never fits it.","v715","nema715","277 V 15 amp outlet (7-15)",B.a6j),A.om("A T-shaped slot, a straight slot and a ground hole, turned so a 120 volt plug never fits: a NEMA 7-20. Brown hot, grey neutral, bare ground.","A 277 volt, 20 amp outlet with a T-shaped slot: commercial lighting and machines.","v720","nema720","277 V 20 amp outlet (7-20)",B.a6j),A.om("A wide flat slot on top, an upright slot and a round ground hole: a NEMA 7-30. 10 gauge wire, brown hot and grey neutral.","A single 277 volt, 30 amp receptacle for big commercial equipment.","v730","nema730","277 V 30 amp outlet (7-30)",B.a6j),A.om("Four slots and no ground hole: a NEMA 18-20, for three-phase machines that also need 120 volts. Black, red and blue are the three phases; the white is the neutral.","A 120/208 volt three-phase outlet with three hots and a neutral, and no ground slot.","v1820","nema1820","Three-phase Y outlet (18-20)",B.d5j),A.om("Five curved slots: a NEMA L22-30. The 480 volt phases are brown, orange and yellow, and the neutral is grey. This is factory power, only for trained electricians.","A 30 amp, 277/480 volt three-phase twist-lock for factories: three hots, a neutral and a ground.","l2230","nemal2230","Twist-lock 277/480 V (L22-30)",B.dg7),A.om("Three slots (one with a T foot) and a ground hole: a NEMA 15-20. Black, red and blue are the three phases. No neutral.","A 250 volt, 20 amp three-phase outlet: three hots and a ground, no neutral.","p1520","nema1520","Three-phase 20 amp outlet (15-20)",B.J3),A.om("Three slots with bent feet and a ground hole: a NEMA 15-30. 10 gauge wire and a 30 amp three-pole breaker.","A 250 volt, 30 amp three-phase outlet for shop machines: three hots and a ground.","p1530","nema1530","Three-phase 30 amp outlet (15-30)",B.J3),A.om("Three wedge slots and a round ground hole at the top: a NEMA 15-50. 6 gauge wire and a 50 amp three-pole breaker.","A 250 volt, 50 amp three-phase outlet: three wedge-shaped slots and a round ground.","p1550","nema1550","Three-phase 50 amp outlet (15-50)",B.J3),A.om("Two upright slots, a flat one at the bottom and a ground at the top: a NEMA 15-60. 4 gauge wire and a 60 amp three-pole breaker.","A 250 volt, 60 amp three-phase outlet for the biggest shop machines.","p1560","nema1560","Three-phase 60 amp outlet (15-60)",B.J3),A.om("Four curved slots, one with a hook (the ground): a NEMA L15-30. Black, red and blue are the three phases.","A 250 volt, 30 amp three-phase twist-lock: three hots and a ground.","l1530","nemal1530","Three-phase twist-lock (L15-30)",B.J3),A.om("Five curved slots: a NEMA L21-30. Black, red and blue are the three phases, white is the neutral and bare copper the ground.","A 120/208 volt three-phase twist-lock with five wires: three hots, a neutral and a ground.","l2130","nemal2130","Twist-lock 5-wire (L21-30)",B.djC),A.om("Four curved slots: a NEMA L16-30. The 480 volt phases are brown, orange and yellow. No neutral.","A 480 volt, 30 amp three-phase twist-lock for industry: three hots and a ground.","l1630","nemal1630","Twist-lock 480 V three-phase (L16-30)",B.doZ)],x.Q))
+w($,"iHe","hP4",()=>C.a([A.nV("The dryer outlet of every new house: 30 amp, 240 volts. Two hots (X, Y), a neutral (W) and a separate ground (G).",B.Tn,B.a70,"dryer4","nema1430",!0,B.TK,B.du1,!0,"Dryer outlet, 4-wire (NEMA 14-30)",new A.fLn()),A.nV("The dryer outlet of older houses (before 1996): 30 amp, 240 volts. Two hots and a neutral that also grounds the dryer. No separate ground.",B.a6s,B.aEe,"dryer3","nema1030",!1,B.a80,B.d_N,!0,"Dryer outlet, 3-wire (NEMA 10-30)",new A.fLo()),A.nV("The electric stove outlet of every new house: 50 amp, 240 volts. Two hots (X, Y), a neutral (W) and a separate ground (G). Also used for car chargers.",B.Tn,B.a70,"range4","nema1450",!0,B.TK,B.dr2,!0,"Range outlet, 4-wire (NEMA 14-50)",new A.fLp()),A.nV("The electric stove outlet of older houses (before 1996): 50 amp, 240 volts. Two hots and a neutral that also grounds the range. No separate ground.",B.a6s,B.aEe,"range3","nema1050",!1,B.a80,B.dr0,!0,"Range outlet, 3-wire (NEMA 10-50)",new A.fLq()),A.nV("A dedicated 120 volt, 20 amp outlet for the washer, with a T-shaped neutral slot. Near water, so it needs GFCI protection.",B.aDL,B.d8Q,"washer","nema520",!0,B.aKh,B.doQ,!0,"Washing machine outlet (NEMA 5-20)",new A.fLr()),A.nV("At the back of the appliance: black to the left terminal, white (neutral) to the middle one, red to the right one. The ground strap STAYS: it joins the neutral to the frame.",B.d4I,B.det,"cord3","terminal3",!1,B.dIu,B.dzy,!0,"Dryer or range cord, 3-wire hookup",new A.fLs()),A.nV("At the back of the appliance: REMOVE the ground strap first, then black left, white (neutral) middle, red right, and the green ground wire to the frame.",B.dAd,B.daO,"cord4","terminal4",!0,B.dI4,B.dix,!0,"Dryer or range cord, 4-wire hookup",new A.fLt())],x.Q))
 w($,"iHy","HM",()=>{var v,u=C.a([],x.n)
 for(v=0;v<10;++v)u.push(-72+16*v)
 return u})
@@ -32514,4 +32514,4 @@ t.push(A.bjQ("app:"+p,q.b,o))}t=A.bdP("phones","Phones",D.zK,t)
 n=C.a([],n)
 for(s=0;s<6;++s){q=B.aCP[s]
 n.push(A.bjQ("app:"+q.a,q.b,K.Qa))}return C.a([B.hEW,m,v,B.hEV,u,t,A.bdP("appliances","Appliances",K.Qa,n)],C.aF("U<QD>"))})})()};
-(a=>{a["5bjNqm2QFwRQE3pKnD0sPnjaGRU="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["C7tzuJkhqUmvKJ8QFfuPCvTGfbY="]=a.current})($__dart_deferred_initializers__);

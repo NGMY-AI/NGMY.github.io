@@ -829,7 +829,7 @@ x=""+B.o.F(B.o.ar(x,6e7),60)
 return v>0?"Removes in "+v+"h "+x+"m":"Removes in "+x+"m"},
 B(d){var x,w=this,v=null,u=A.O(d).ax.a===B.I,t=A.DI(),s=u?D.bwd:D.bky,r=w.d
 r===$&&A.c()
-r=A.eR(v,v,v,!0,!0,D.bp0,A.cDg(r,B.aV,!1,B.c,v,D.d6i,B.aF),1,v,v,v,!1,v,!1,B.c,v,v,v,!0,v,v,v,v,v,D.h61,v,v,v,1,v,!0)
+r=A.eR(v,v,v,!0,!0,D.bp0,A.cDg(r,B.aV,!1,B.c,v,D.d6h,B.aF),1,v,v,v,!1,v,!1,B.c,v,v,v,!0,v,v,v,v,v,D.h61,v,v,v,1,v,!0)
 x=w.d
 return A.c5(r,s,A.cDi(A.a([w.bJ_(u,t),w.bIb(u)],y.p),x,v),v,!1,!1,v,v)},
 bJ_(d,e){var x,w,v,u,t=this,s=null,r=y.p,q=A.a([],r)
@@ -1306,15 +1306,15 @@ D.bUD=new A.a_(983230,"MaterialIcons",!1)
 D.c4A=new A.ae(D.bUD,null,null,null,null,null)
 D.c4C=new A.ae(B.a2Y,null,B.aF,null,null,null)
 D.c6U=new A.e7(null,null,null,null,null,null,null,null,null,null,"UPC / EAN / QR payload",null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,!0,null,null,null,null)
-D.d8B=x([B.uw,B.ku,B.ec],y.O)
-D.caz=new A.a7(B.ay,B.aC,B.x,D.d8B,null,null)
+D.d8A=x([B.uw,B.ku,B.ec],y.O)
+D.caz=new A.a7(B.ay,B.aC,B.x,D.d8A,null,null)
 D.dAw=x([B.uw,B.ku,B.ec,B.ku],y.O)
 D.cb4=new A.a7(B.ay,B.aC,B.x,D.dAw,B.DO,null)
 D.bZA=new A.ae(B.jv,20,null,null,null,null)
 D.fwC=new A.CZ("Scan",D.bZA,null)
 D.bYn=new A.ae(B.oB,20,null,null,null,null)
 D.fwD=new A.CZ("My Catalog",D.bYn,null)
-D.d6i=x([D.fwC,D.fwD],y.p)
+D.d6h=x([D.fwC,D.fwD],y.p)
 D.eFw=new A.jF("edit",!0,48,null,B.acN,null,y._)
 D.eFB=new A.jF("download",!0,48,null,B.aYm,null,y._)
 D.fOP=new A.C("Save QR on device",null,null,null,null,null,null,null,null,null,null,null)
@@ -1347,4 +1347,4 @@ D.h61=new A.C("Product Scanner",null,B.cH,null,null,null,null,null,null,null,nul
 D.h98=new A.C("Enter barcode",null,null,null,null,null,null,null,null,null,null,null)
 D.hbD=new A.C("Store QR code",null,B.nf,null,null,null,null,null,null,null,null,null)
 D.hck=new A.C("Camera scan works on the NGMY phone app.\nOn desktop web, enter the barcode below.",null,B.Ww,null,B.K,null,null,null,null,null,null,null)})()};
-(a=>{a["zIB2mPQ2E72reh5caSTT4h/K06A="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["H2gYJo3u96GUwK1XhqIh/CqoIUc="]=a.current})($__dart_deferred_initializers__);

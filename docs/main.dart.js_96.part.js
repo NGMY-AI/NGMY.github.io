@@ -2446,7 +2446,7 @@ if(p.h4())x=A.a([1,0,2,3],o)
 if(p.h4())x=A.a([x[0],x[1],x[3],x[2]],o)
 if(p.h4())x=A.a([x[2],x[3],x[0],x[1]],o)
 o=A.a([],o)
-for(w=0;w<4;++w)for(v=x[w]*4,u=0;u<4;++u)o.push(n[D.d9t[v+u]-1])
+for(w=0;w<4;++w)for(v=x[w]*4,u=0;u<4;++u)o.push(n[D.d9s[v+u]-1])
 q.d=o
 o=y.S
 v=J.e3(16,o)
@@ -3359,7 +3359,7 @@ if(v.e>=56){v.f=!0
 v.a.c.b.$0()}else if(!v.gbFN()){v.f=!0
 v.a.c.c.$1("No more groups to clear")}},
 B(d){var x=null,w=y.p
-return new A.an(C.a0,x,C.ad,C.t,A.a([B.ix(D.d9l),A.x(A.a([new B.ju(A.d("Tap groups of 2+ matching blocks \xb7 "+this.e+"/56",x,x,x,x,x,x,x,x,x,x),x),A.E(new A.D(C.t9,A.ci(new B.cQy(this)),x),1)],w),C.l,x,C.e,C.i,0,C.p)],w),x)}}
+return new A.an(C.a0,x,C.ad,C.t,A.a([B.ix(D.d9k),A.x(A.a([new B.ju(A.d("Tap groups of 2+ matching blocks \xb7 "+this.e+"/56",x,x,x,x,x,x,x,x,x,x),x),A.E(new A.D(C.t9,A.ci(new B.cQy(this)),x),1)],w),C.l,x,C.e,C.i,0,C.p)],w),x)}}
 B.ake.prototype={
 S(){return new B.bcW()}}
 B.bcW.prototype={
@@ -3881,7 +3881,7 @@ if(t.f<=0)t.zL("Out of spins")}},
 ctX(d){var x,w,v=null,u=this.d[d],t=C.h.bh(u),s=u-t,r=A.l(14),q=A.K(this.e[d]?C.bt:C.bP,C.r,3),p=A.a([],y.p)
 for(x=-1;x<=2;++x){w=D.dEk[C.o.F(t+x,6)]
 p.push(new A.cK(0,30+(x-s)*60,0,v,v,v,new A.cl(C.A,v,v,A.d(w,v,v,v,v,v,v,new A.F(!0,v,v,v,v,v,46,v,v,v,v,v,1,v,v,v,v,v,v,v,v,v,v,v,v,v),C.K,v,v),v),v))}return A.o(v,new A.an(C.a0,v,C.ad,C.t,p,v),C.aq,v,v,new A.n(C.c,v,q,r,v,v,C.n),v,120,v,v,v,v,v,84)},
-B(d){var x,w=this,v=null,u=B.ix(D.d8n),t=A.l(22),s=y.p,r=A.a([],s)
+B(d){var x,w=this,v=null,u=B.ix(D.d8m),t=A.l(22),s=y.p,r=A.a([],s)
 for(x=0;x<3;++x)r.push(new A.D(C.f6,w.ctX(x),v))
 t=A.o(v,A.A(r,C.l,v,C.e,C.N,0,v,v),C.f,v,v,new A.n(v,v,v,t,D.dx2,D.ccD,C.n),v,v,v,v,C.bl,v,v,v)
 r=w.w
@@ -5644,7 +5644,7 @@ else{j=n.y+n.z*0.2*w
 i=0.215+0.55*w*w-0.06*Math.sin(w*3.141592653589793)}h=38}m=h/2
 v=A.ao(q,new A.dn(!0,A.eK(C.A,k*6+C.h.D(n.x,0,1)*4,A.d("\ud83c\udfc0",q,q,q,q,q,q,A.m(q,q,q,q,q,q,q,q,q,q,q,h,q,q,q,q,1,!0,q,q,q,q,q,q,q,q),C.K,q,q),q),q),q,q,j*p-m,q,i*o-m,q)
 u=x&&n.Q
-m=B.ix(D.d4X)
+m=B.ix(D.d4W)
 l=A.ao(0,A.o(q,q,C.f,C.d6.j(0.5),q,q,q,q,q,q,q,q,q,q),o*0.25,q,0,0,q,q)
 t=n.e
 s=C.c.j(0.9)
@@ -5653,7 +5653,7 @@ t=A.a([m,l,A.ao(q,A.o(q,q,C.f,q,q,new A.n(s,q,A.K(C.bC,C.r,4),r,q,q,C.n),q,78,q,
 if(u)t.push(v)
 m=n.e
 l=o*0.2
-t.push(A.ao(q,A.o(q,q,C.f,q,q,new A.n(C.c9,q,q,A.l(6),D.d7h,q,C.n),q,12,q,q,q,q,q,76),q,q,m*p-38,q,l,q))
+t.push(A.ao(q,A.o(q,q,C.f,q,q,new A.n(C.c9,q,q,A.l(6),D.d7g,q,C.n),q,12,q,q,q,q,q,76),q,q,m*p-38,q,l,q))
 m=n.e
 t.push(A.ao(q,A.b3(q,q,q,new B.aEQ(C.aa,5,3,q),D.foW),q,q,m*p-30,q,l+12,q))
 if(!u)t.push(v)
@@ -5710,7 +5710,7 @@ d=u/2
 a2.push(A.ao(l,new A.dn(!0,A.d("\u26bd",l,l,l,l,l,l,A.m(l,l,l,l,l,l,l,l,l,l,l,u,l,l,l,l,1,!0,l,l,l,l,l,l,l,l),C.K,l,l),l),l,l,v.a-d,l,v.b-d,l))
 if(a1.r>0){d=a1.x===!0
 a0=d?"GOOOAL!":"SAVED!"
-a2.push(A.ao(l,A.d(a0,l,l,l,l,l,l,A.m(l,l,d?C.bL:C.eV,l,l,l,l,l,l,l,l,40,l,l,C.u,l,l,!0,l,l,l,l,l,D.d5Y,l,l),C.K,l,l),l,l,0,0,j*0.55,l))}a2.push(B.l5("Tap a corner to shoot \xb7 "+a1.cc$+"/8",!0,a1.e1$))
+a2.push(A.ao(l,A.d(a0,l,l,l,l,l,l,A.m(l,l,d?C.bL:C.eV,l,l,l,l,l,l,l,l,40,l,l,C.u,l,l,!0,l,l,l,l,l,D.d5X,l,l),C.K,l,l),l,l,0,0,j*0.55,l))}a2.push(B.l5("Tap a corner to shoot \xb7 "+a1.cc$+"/8",!0,a1.e1$))
 return new A.an(C.a0,l,C.ad,C.t,a2,l)},
 $S:69}
 B.f0a.prototype={
@@ -8089,14 +8089,14 @@ D.f7N=new A.b4(C.qQ,0,1)
 D.f8k=new A.b4(C.jt,1,0)
 D.d3H=x([D.f9V,D.fav,D.f7N,D.f8k],A.aF("U<+(a_,H,H)>"))
 D.d4e=x([C.h9,C.h9],y.O)
-D.d4X=x([C.fZ,C.dX],y.O)
+D.d4W=x([C.fZ,C.dX],y.O)
 D.fmH=new A.d6(C.w,C.J,12)
-D.d5Y=x([D.fmH],y.r)
+D.d5X=x([D.fmH],y.r)
 D.aBu=x([C.ct,C.i8],y.O)
 D.bsI=new A.u(0.5333333333333333,0.9764705882352941,0.45098039215686275,0.08627450980392157,C.q)
 D.bb8=new A.ab(0,C.G,D.bsI,C.J,10)
-D.d7h=x([D.bb8],y.V)
-D.d8n=x([C.er,C.ky],y.O)
+D.d7g=x([D.bb8],y.V)
+D.d8m=x([C.er,C.ky],y.O)
 D.f3A=new A.y("\ud83c\uddfa\ud83c\uddf8","United States")
 D.eX9=new A.y("\ud83c\udde8\ud83c\udde6","Canada")
 D.f_y=new A.y("\ud83c\uddf2\ud83c\uddfd","Mexico")
@@ -8154,8 +8154,8 @@ D.f9b=new A.b4("\ud83c\udfe0","A house",4e5)
 D.faG=new A.b4("\ud83d\udee5\ufe0f","A yacht",5e6)
 D.f7P=new A.b4("\ud83d\udee9\ufe0f","A private jet",25e6)
 D.aBK=x([D.fb7,D.f9w,D.faJ,D.f8a,D.f6N,D.fb_,D.f91,D.fb2,D.f8M,D.f9I,D.fah,D.fag,D.f9X,D.f8U,D.f9l,D.faT,D.f9b,D.faG,D.f7P],A.aF("U<+(q,q,H)>"))
-D.d9l=x([C.cX,C.on],y.O)
-D.d9t=x([1,2,3,4,3,4,1,2,2,1,4,3,4,3,2,1],y.t)
+D.d9k=x([C.cX,C.on],y.O)
+D.d9s=x([1,2,3,4,3,4,1,2,2,1,4,3,4,3,2,1],y.t)
 D.da5=x([C.ba,C.bt,C.fd,C.d9,C.c9,C.bj,C.aA],y.O)
 D.dal=x(["RED","GREEN","BLUE","YELLOW","PURPLE"],y.s)
 D.dbW=x([C.xu,C.pU,M.Vg,C.l8,E.aSJ],y.n)
@@ -8718,8 +8718,8 @@ D.h0H=new A.C("\u26cf\ufe0f",null,D.fHT,null,null,null,null,null,null,null,null,
 D.h2y=new A.C("\ud83d\udd12",null,C.mD,null,null,null,null,null,null,null,null,null)
 D.h6E=new A.C("Give change",null,C.cH,null,null,null,null,null,null,null,null,null)
 D.fmB=new A.d6(C.at,C.J,16)
-D.d5c=x([D.fmB],y.r)
-D.fDf=new A.F(!0,C.bL,null,null,null,null,34,C.u,null,4,null,null,null,null,null,null,null,null,null,null,null,null,D.d5c,null,null,null)
+D.d5b=x([D.fmB],y.r)
+D.fDf=new A.F(!0,C.bL,null,null,null,null,34,C.u,null,4,null,null,null,null,null,null,null,null,null,null,null,null,D.d5b,null,null,null)
 D.h8Q=new A.C("JACKPOT",null,D.fDf,null,null,null,null,null,null,null,null,null)
 D.hb9=new A.C("Drag the basket \xb7 \ud83d\udc8e = +3  ",null,null,null,null,null,null,null,null,null,null,null)
 D.hcz=new A.C("Pop only ",null,null,null,null,null,null,null,null,null,null,null)
@@ -8736,4 +8736,4 @@ D.hN5=new B.a27(2,"fall")
 D.hN6=new B.a27(3,"walk")
 D.b2K=new B.a27(4,"drop")})();(function staticFields(){$.clG=null
 $.hd9=A.S(y.N,A.aF("+order,pos(ai<H>,H)"))})()};
-(a=>{a["6NGDfEpL18oUAWcaLtN/sYnP6ZE="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["nWpUy/TAyOF+VFagzcsMSXwppNs="]=a.current})($__dart_deferred_initializers__);

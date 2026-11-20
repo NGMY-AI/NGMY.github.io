@@ -3313,7 +3313,7 @@ w===$&&A.c()
 w=w.h(0,"style")
 w=n.IO(g,J.k(w==null?a6:w),D.dp4,new B.fn3(n))
 v=n.d.h(0,"columns")
-return A.a([w,n.IO("Columns",J.k(v==null?2:v),D.d8b,new B.fn4(n)),C.P,A.d("Menu items",l,l,l,l,l,l,A.m(l,l,C.kP,l,l,l,l,l,l,l,l,13,l,l,C.O,l,l,!0,l,l,l,l,l,l,l,l),l,l,l),new B.aEl(n.d.h(0,"items"),n.a.e,new B.fn5(n),l)],x.p)
+return A.a([w,n.IO("Columns",J.k(v==null?2:v),D.d8a,new B.fn4(n)),C.P,A.d("Menu items",l,l,l,l,l,l,A.m(l,l,C.kP,l,l,l,l,l,l,l,l,13,l,l,C.O,l,l,!0,l,l,l,l,l,l,l,l),l,l,l),new B.aEl(n.d.h(0,"items"),n.a.e,new B.fn5(n),l)],x.p)
 case"switch":w=n.d
 w===$&&A.c()
 w=w.h(0,"setting")
@@ -5805,7 +5805,7 @@ D.en0=new B.JP("Portfolio Web App","Showcase work & contact",D.bSo,"video_hub",C
 D.bRW=new A.a_(61573,"MaterialIcons",!1)
 D.emZ=new B.JP("Travel Booking App","Trips, maps & reservations",D.bRW,"qr_studio",C.at)
 D.d2W=w([D.emW,D.en_,D.emY,D.emX,D.en0,D.emZ],A.aF("U<JP>"))
-D.d8b=w(["2","3","4"],x.s)
+D.d8a=w(["2","3","4"],x.s)
 D.eXG=new A.y("button","Button")
 D.eZp=new A.y("form","Form")
 D.eYk=new A.y("dataList","List")
@@ -6064,4 +6064,4 @@ D.h9P=new A.C("My Projects",null,null,null,null,null,null,null,null,null,null,nu
 D.hb7=new A.C("Invoice published",null,C.iI,null,null,null,null,null,null,null,null,null)})();(function lazyInitializers(){var w=a.lazyFinal
 w($,"iHo","hP7",()=>{var v=4279150057,u=4284704497
 return A.a([B.mJ("Featured",new B.fLK(),"Map, saved trips & destinations.","\u2708\ufe0f","qr_studio","Travel Explorer",v),B.mJ("",new B.fLL(),"Product feed, cart & checkout.","\ud83d\udecd\ufe0f","luxe_store","Luxe Store",4293675161),B.mJ("",new B.fLM(),"Posts, profiles & engagement.","\ud83d\udcac","creator_hub","Social Pulse",4287323382),B.mJ("",new B.fLX(),"Workouts, check-ins & nutrition.","\ud83d\udcaa","pulse_fitness","Pulse Fitness",4279286145),B.mJ("",new B.fM2(),"Clients, invoices & pipeline.","\ud83d\udcca","invoice_pro","CRM Dashboard",u),B.mJ("",new B.fM3(),"Showcase work & contact.","\ud83c\udf10","video_hub","Portfolio Hub",v),B.mJ("",new B.fM4(),"Live QR for websites & text.","\ud83d\udcf1","qr_code_studio","QR Code Studio",4278630100),B.mJ("New",new B.fM5(),"Sell, track sales & get paid.","\ud83d\udcb5","side_hustle","Side Hustle Marketplace",4279673674),B.mJ("",new B.fM6(),"Services, bookings & client earnings.","\ud83d\udcc5","booking_pro","Booking & Services",4286331629),B.mJ("",new B.fM7(),"Daily checklist, streaks & progress.","\ud83d\udd25","habit_tracker","Habit Tracker",4279548070),B.mJ("",new B.fM8(),"Income, spending & budget at a glance.","\ud83d\udcb0","finance_dash","Money Tracker",4282090230),B.mJ("",new B.fLN(),"Post roles, track applicants.","\ud83d\udcbc","job_board","Job Board",4281549141),B.mJ("",new B.fLO(),"Discussion feed, posts & replies.","\ud83d\udde3\ufe0f","community_forum","Community Forum",4288814255),B.mJ("",new B.fLP(),"Episodes, categories & playback links.","\ud83c\udf99\ufe0f","podcast_hub","Podcast Hub",4280232247),B.mJ("",new B.fLQ(),"Events, RSVPs & shareable QR codes.","\ud83c\udfab","event_tickets","Event Ticketing",4294286859),B.mJ("New",new B.fLR(),"Raise funds, track donors, share a link.","\u2764\ufe0f","donate_nonprofit","Giving Campaign",4292943176),B.mJ("",new B.fLS(),"Sessions, bookings & client roster.","\ud83e\uddd8","coaching_booking","Coaching Studio",4286456526),B.mJ("",new B.fLT(),"Showcase galleries & booking requests.","\ud83d\udcf7","photo_portfolio","Photo Portfolio",4279310375),B.mJ("",new B.fLU(),"Save recipes, ingredients & steps.","\ud83c\udf73","recipe_box","Recipe Box",4293548044),B.mJ("",new B.fLV(),"Daily care, vet visits & reminders.","\ud83d\udc3e","pet_care","Pet Care Tracker",4284850957),B.mJ("",new B.fLW(),"Create invoices, track clients & income.","\ud83e\uddfe","freelance_invoicing","Freelancer Invoicing",4280171146),B.mJ("",new B.fLY(),"Log rounds, track scores & leaderboard.","\ud83c\udfc6","trivia_game","Trivia Night Scorekeeper",4292552567),B.mJ("New",new B.fLZ(),"Map of properties, inquiries & saves.","\ud83c\udfe0","real_estate","Real Estate Listings",4278995566),B.mJ("",new B.fM_(),"Menu by category, tap to add to order.","\ud83c\udf7d\ufe0f","restaurant_menu","Restaurant Menu & Orders",4290321436),B.mJ("",new B.fM0(),"Members, renewals & revenue.","\ud83e\udeaa","membership_manager","Membership Manager",4278483031),B.mJ("",new B.fM1(),"Start fresh \u2014 describe any app to NGMY AI.","\ud83d\ude80","blank","Blank Canvas",u)],A.aF("U<a7z>"))})})()};
-(a=>{a["eS0U1pu/mw9SoJIdZHgDpKKN/8I="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["yzT8s51h6L70wHKM9iTuNa+4W0A="]=a.current})($__dart_deferred_initializers__);
