@@ -767,10 +767,35 @@ self.addEventListener('fetch', (event) => {
       }
 
       if (event.request.mode === 'navigate') {
-        // Network-first for HTML when online so deploy checks and new builds reach PWAs.
+        // Network-first for HTML when online so deploy checks and new builds reach PWAs — but never waiting long: a
+        // weak or blocked connection (Wi-Fi with no internet) used to hold the Loading NGMY screen until it gave up.
+        // After 2.5 seconds the copy kept on the phone opens, and the new page is still saved for the next start.
         if (self.navigator.onLine) {
           try {
-            const net = await fetch(event.request, { cache: 'no-store' });
+            const netP = fetch(event.request, { cache: 'no-store' });
+            const kept = await offlineDocumentAnyCache();
+            let net;
+            if (kept) {
+              net = await Promise.race([
+                netP.catch(() => null),
+                new Promise((r) => setTimeout(() => r('slow'), 2500)),
+              ]);
+              if (net === 'slow' || !net) {
+                event.waitUntil(
+                  netP
+                    .then((res) => {
+                      if (res && res.status === 200) {
+                        cache.put(event.request, res.clone());
+                        return cacheAbsoluteShell(cache);
+                      }
+                    })
+                    .catch(() => {}),
+                );
+                return kept;
+              }
+            } else {
+              net = await netP;
+            }
             if (net && net.status === 200) {
               cache.put(event.request, net.clone());
               await cacheAbsoluteShell(cache);

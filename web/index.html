@@ -1529,6 +1529,47 @@
         }
       }
 
+      // A new version of the app was published: its helper is put in and takes over, and the app then starts on it.
+      // The files that did not change (the engine, fonts, pictures) are kept on the phone and only the changed ones are
+      // downloaded. Before, everything saved was wiped and the whole app (tens of MB) downloaded again after every
+      // update, which is what kept the Loading NGMY screen up so long.
+      function adoptNewServiceWorker(onReady) {
+        if (!('serviceWorker' in navigator)) return false;
+        var controller = navigator.serviceWorker.controller;
+        if (!controller) return false;
+        var scriptV = '';
+        try { scriptV = new URL(controller.scriptURL).searchParams.get('v') || ''; } catch (e) {}
+        if (scriptV === deployId) return false;
+        var key = 'ngmy_sw_adopt_' + deployId;
+        try {
+          if (sessionStorage.getItem(key) === '1') return false;
+          sessionStorage.setItem(key, '1');
+        } catch (e2) {}
+        var finished = false;
+        var go = function () {
+          if (finished) return;
+          finished = true;
+          onReady();
+        };
+        // Taking too long (a very slow line): the old full clean-up, as before.
+        var slow = setTimeout(function () {
+          if (finished) return;
+          finished = true;
+          bustStaleServiceWorker();
+        }, 45000);
+        navigator.serviceWorker.addEventListener('controllerchange', function () {
+          clearTimeout(slow);
+          go();
+        }, { once: true });
+        navigator.serviceWorker.register('ngmy_service_worker.js?v=' + deployId, { scope: swScope }).catch(function () {
+          clearTimeout(slow);
+          if (finished) return;
+          finished = true;
+          bustStaleServiceWorker();
+        });
+        return true;
+      }
+
       function bustStaleServiceWorker() {
         if (!('serviceWorker' in navigator)) return false;
         var controller = navigator.serviceWorker.controller;
@@ -1564,7 +1605,7 @@
           showPayReturnDone();
           return;
         }
-        if (bustStaleServiceWorker()) return;
+        if (adoptNewServiceWorker(startApp)) return;
 
         var bootTimer = setTimeout(function () {
           showBootstrapError('NGMY is still loading. Tap Reload. If you are offline, connect once and wait for the home screen.');
