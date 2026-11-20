@@ -17,11 +17,12 @@ String _nextAuto() {
   return 'at ${_clock(next)} ET';
 }
 
+/// Colour of the ONE decision label: green to enter up, red to enter down, red for skip or too late,
+/// amber for no clear direction, grey when closed.
 Color _actionColor(String a) {
-  if (a.startsWith('BUY')) return _up;
-  if (a.startsWith('SELL')) return _loss;
-  if (a.startsWith('UP')) return const Color(0xFF10B981);
-  if (a.startsWith('DOWN')) return _loss;
+  if (a.startsWith('ENTER UP')) return _up;
+  if (a.startsWith('ENTER DOWN')) return _loss;
+  if (a.contains('SKIP') || a.contains('TOO LATE')) return _loss;
   if (a.startsWith('MARKET CLOSED')) return const Color(0xFF94A3B8);
   return _down;
 }
@@ -43,8 +44,8 @@ Widget _readingTile(_Pal p, Map<String, dynamic> m, {bool compact = false, VoidC
     decoration: BoxDecoration(
       color: p.card,
       borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: action.startsWith('BUY') || action.startsWith('SELL') ? c.withValues(alpha: 0.6) : p.cardEdge,
-          width: action.startsWith('BUY') || action.startsWith('SELL') ? 1.6 : 1),
+      border: Border.all(color: action.startsWith('ENTER') ? c.withValues(alpha: 0.6) : p.cardEdge,
+          width: action.startsWith('ENTER') ? 1.6 : 1),
       boxShadow: [BoxShadow(color: p.shadow, blurRadius: 14, offset: const Offset(0, 5))],
     ),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -146,7 +147,7 @@ Widget _readingTile(_Pal p, Map<String, dynamic> m, {bool compact = false, VoidC
         Text('Buyers', style: TextStyle(color: p.muted, fontSize: 10)),
       ]),
       const SizedBox(height: 8),
-      for (final n in compact ? notes.take(2) : notes)
+      for (final n in (m['open'] == true ? notes.skip(1) : notes).take(compact ? 2 : 99))
         Padding(
           padding: const EdgeInsets.only(bottom: 4),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -173,113 +174,184 @@ Widget _readingTile(_Pal p, Map<String, dynamic> m, {bool compact = false, VoidC
   );
 }
 
-/// The big "ENTER UP NOW" / "ENTER DOWN NOW" sign.
+/// The big "ENTER UP" / "ENTER DOWN" sign with a live countdown to the moment to enter (the start of the
+/// next candle) and how long to stay in.
 Widget _enterNowSign(Map<String, dynamic> e) {
   final up = e['dir'] == 'up';
   final c = up ? _up : _loss;
-  return Center(
-    child: Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [c, Color.lerp(c, Colors.black, 0.25)!],
-        ),
-        boxShadow: [BoxShadow(color: c.withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 6))],
-      ),
-      child: Column(children: [
-        Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.22), shape: BoxShape.circle),
-          child: Icon(up ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, color: Colors.white, size: 34),
-        ),
-        const SizedBox(height: 6),
-        Text(up ? 'ENTER UP NOW' : 'ENTER DOWN NOW',
-            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 0.8)),
-        Text(up ? 'BUY / CALL' : 'SELL / PUT', style: const TextStyle(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: 1)),
-        const SizedBox(height: 8),
-        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          _signStat('Enter within', '${e['withinMin']} min'),
-          Container(width: 1, height: 30, color: Colors.white30, margin: const EdgeInsets.symmetric(horizontal: 14)),
-          _signStat('Duration', '~${e['durationMin']} min'),
-          Container(width: 1, height: 30, color: Colors.white30, margin: const EdgeInsets.symmetric(horizontal: 14)),
-          _signStat('Worked', '${e['worked']} of ${e['of']}'),
-        ]),
-      ]),
+  final candleMin = math.max(1, _d(e['candleMin']).round());
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(18),
+      gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [c, Color.lerp(c, Colors.black, 0.25)!]),
+      boxShadow: [BoxShadow(color: c.withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 6))],
     ),
+    child: Column(children: [
+      Container(
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.22), shape: BoxShape.circle),
+        child: Icon(up ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, color: Colors.white, size: 34),
+      ),
+      const SizedBox(height: 6),
+      Text(up ? 'ENTER UP' : 'ENTER DOWN', style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 0.8)),
+      Text(up ? 'BUY / CALL' : 'SELL / PUT', style: const TextStyle(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: 1)),
+      const SizedBox(height: 10),
+      _EntryCountdown(candleMin: candleMin),
+      const SizedBox(height: 10),
+      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        _signStat('Trade for', '${_d(e['durationMin']).toStringAsFixed(0)} min'),
+        Container(width: 1, height: 30, color: Colors.white30, margin: const EdgeInsets.symmetric(horizontal: 18)),
+        _signStat('Worked lately', '${e['worked']} of ${e['of']}'),
+      ]),
+    ]),
   );
 }
 
+/// Counts down, second by second, to the start of the next candle: that is the moment to enter.
+/// At zero it shows ENTER NOW for the first 15 seconds of the new candle, then counts to the next one
+/// (the card refreshes every 20 seconds, so the sign disappears as soon as the signal is gone).
+class _EntryCountdown extends StatefulWidget {
+  const _EntryCountdown({required this.candleMin});
+  final int candleMin;
+
+  @override
+  State<_EntryCountdown> createState() => _EntryCountdownState();
+}
+
+class _EntryCountdownState extends State<_EntryCountdown> {
+  Timer? _t;
+
+  @override
+  void initState() {
+    super.initState();
+    _t = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final period = widget.candleMin * 60;
+    final sec = DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
+    final into = sec % period; // seconds since this candle started
+    final now = into < 15;
+    final left = period - into;
+    final text = now ? 'ENTER NOW' : 'Enter in ${left ~/ 60}:${(left % 60).toString().padLeft(2, '0')}';
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+      decoration: BoxDecoration(
+        color: now ? Colors.white : Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(now ? Icons.bolt_rounded : Icons.timer_rounded, size: 20, color: now ? Colors.black : Colors.white),
+        const SizedBox(width: 6),
+        Text(text,
+            style: TextStyle(
+              color: now ? Colors.black : Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            )),
+      ]),
+    );
+  }
+}
+
 Widget _signStat(String k, String v) => Column(children: [
-      Text(v, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)),
+      Text(v, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
       Text(k, style: const TextStyle(color: Colors.white70, fontSize: 10.5, fontWeight: FontWeight.w700)),
     ]);
 
-/// The duration frame at the bottom of every open market's card.
+/// The DURATION frame at the bottom of every open market's card: the SAME decision as the label above,
+/// in one plain sentence, and the three facts it is based on.
 Widget _durationFrame(_Pal p, Map<String, dynamic> r, Map<String, dynamic> t) {
-  final dir = t['dir'];
-  final hasTiming = dir != null && dir != 'none' && t['typicalMin'] != null;
-  final aligned = (r['bias'] == 'bullish' && dir == 'up') || (r['bias'] == 'bearish' && dir == 'down');
-  final early = _d(t['enterWithinMin']) > 0;
-  final ratio = _d(t['of']) > 0 ? _d(t['worked']) / _d(t['of']) : 0.0;
-  final (String verdict, Color vc) = r['entry'] is Map
-      ? ('Enter ${dir == 'up' ? 'UP' : 'DOWN'} now, see the sign above', dir == 'up' ? _up : _loss)
-      : !hasTiming || !aligned
-          ? ('No clear direction: do not enter', _down)
-          : !early
-              ? ('Too late to enter: wait for the next signal', _loss)
-              : ratio < 0.5
-                  ? ('Early, but this signal failed often here: skip it', _loss)
-                  : ('Not enough history yet: wait', _down);
+  final decision = (r['decision'] ?? 'NO_DIRECTION').toString();
+  final up = r['dir'] == 'up';
+  final notes = ((r['notes'] as List?) ?? const []).map((e) => e.toString()).toList();
+  final vc = switch (decision) {
+    'ENTER' => up ? _up : _loss,
+    'SKIP_WEAK' || 'WAIT_LATE' => _loss,
+    _ => _down,
+  };
+  // The facts only make sense when there is a direction (otherwise they would talk about a move it just called unclear).
+  final hasTiming = t['typicalMin'] != null && t['dir'] != null && t['dir'] != 'none' && decision != 'NO_DIRECTION' && decision != 'CLOSED';
+  final of = _d(t['of']), worked = _d(t['worked']);
+  final ratio = of > 0 ? worked / of : 0.0;
+  final way = t['dir'] == 'up' ? 'up' : 'down';
   return Container(
     width: double.infinity,
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
       color: p.inner,
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: p.line, width: 1.5),
+      border: Border.all(color: vc.withValues(alpha: 0.55), width: 1.5),
     ),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
         Icon(Icons.timer_rounded, size: 16, color: p.ink),
         const SizedBox(width: 6),
-        Text('DURATION', style: TextStyle(color: p.ink, fontSize: 11.5, fontWeight: FontWeight.w900, letterSpacing: 1)),
-        const Spacer(),
-        if (hasTiming)
-          Text('~${_d(t['remainingMin']).toStringAsFixed(0)} min left',
-              style: TextStyle(color: p.ink, fontSize: 15, fontWeight: FontWeight.w900)),
+        Text('DECISION AND DURATION', style: TextStyle(color: p.ink, fontSize: 11.5, fontWeight: FontWeight.w900, letterSpacing: 1)),
       ]),
       const SizedBox(height: 8),
-      if (hasTiming) ...[
-        Row(children: [
-          Expanded(child: _durStat(p, 'Move started', '${_d(t['ageMin']).toStringAsFixed(0)} min ago')),
-          Expanded(child: _durStat(p, 'Usually lasts', '~${_d(t['typicalMin']).toStringAsFixed(0)} min')),
-          Expanded(
-            child: _durStat(
-              p,
-              'Worked',
-              _d(t['of']) > 0 ? '${t['worked']} of ${t['of']}' : '—',
-              color: ratio >= 0.55 ? _up : ratio < 0.45 ? _loss : _down,
-            ),
-          ),
-        ]),
-        const SizedBox(height: 8),
-      ],
       Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(color: vc.withValues(alpha: 0.13), borderRadius: BorderRadius.circular(10)),
-        child: Text(verdict, style: TextStyle(color: vc, fontSize: 12, fontWeight: FontWeight.w800)),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(color: vc.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(10)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text((r['action'] ?? '').toString(), style: TextStyle(color: vc, fontSize: 13, fontWeight: FontWeight.w900)),
+          if (notes.isNotEmpty) ...[
+            const SizedBox(height: 3),
+            Text(notes.first, style: TextStyle(color: p.ink, fontSize: 12.3, height: 1.35)),
+          ],
+        ]),
       ),
+      if (decision == 'ENTER' && r['entry'] is Map) ...[
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(child: _durStat(p, 'Trade for', '${_d(_map(r['entry'])['durationMin']).toStringAsFixed(0)} min', color: vc)),
+          Expanded(child: _durStat(p, 'Enter at', 'next ${_d(_map(r['entry'])['candleMin']).toStringAsFixed(0)}-min candle')),
+        ]),
+      ],
+      if (hasTiming) ...[
+        const SizedBox(height: 10),
+        Text('What this is based on', style: TextStyle(color: p.muted, fontSize: 10.5, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 4),
+        _fact(p, Icons.play_arrow_rounded, 'This $way move started ${_d(t['ageMin']).toStringAsFixed(0)} min ago.'),
+        _fact(p, Icons.timelapse_rounded, '${way == 'up' ? 'Up' : 'Down'} moves on this market usually end after about ${_d(t['typicalMin']).toStringAsFixed(0)} min.'),
+        if (of > 0)
+          _fact(
+            p,
+            Icons.fact_check_rounded,
+            'Of the last ${of.toStringAsFixed(0)} $way moves here, ${worked.toStringAsFixed(0)} really went $way (${(ratio * 100).round()}%). '
+            '${ratio >= 0.5 ? 'Reliable enough.' : 'Under half: unreliable.'}',
+            color: ratio >= 0.5 ? _up : _loss,
+          ),
+      ],
       const SizedBox(height: 4),
       Text('Estimates from this market\'s recent moves, not promises.', style: TextStyle(color: p.muted, fontSize: 10.5)),
     ]),
   );
 }
+
+Widget _fact(_Pal p, IconData icon, String text, {Color? color}) => Padding(
+      padding: const EdgeInsets.only(bottom: 3),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(icon, size: 14, color: color ?? p.muted),
+        const SizedBox(width: 6),
+        Expanded(child: Text(text, style: TextStyle(color: color ?? p.ink, fontSize: 12, height: 1.35))),
+      ]),
+    );
 
 Widget _durStat(_Pal p, String k, String v, {Color? color}) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(k, style: TextStyle(color: p.muted, fontSize: 10.5)),
@@ -588,11 +660,18 @@ class _NgmySignalGridLearnScreenState extends State<NgmySignalGridLearnScreen> w
     final flips = <String>[];
     for (final m in _allSignals) {
       final sym = m['asset'].toString();
-      final bias = (_map(m['reading'])['bias'] ?? 'unknown').toString();
+      // The direction from the ONE decision: up, down or no direction (same as the card and the counts).
+      final r = _map(m['reading']);
+      final clear = const ['ENTER', 'SKIP_WEAK', 'WAIT_LATE'].contains(r['decision']);
+      final bias = r['decision'] == null || r['decision'] == 'NO_DATA' || r['decision'] == 'CLOSED'
+          ? 'unknown'
+          : clear
+              ? (r['dir'] == 'up' ? 'up' : 'down')
+              : 'no direction';
       final before = _lastBias[sym];
       if (before != null && before != bias && bias != 'unknown' && before != 'unknown') {
         _changed[sym] = (at: DateTime.now(), from: before, to: bias);
-        flips.add('$sym turned ${bias.toUpperCase()}');
+        flips.add('$sym now ${bias.toUpperCase()}');
       }
       _lastBias[sym] = bias;
     }
@@ -972,8 +1051,8 @@ Tutor:''';
               'The fast line is ${f >= s ? 'ABOVE' : 'BELOW'} the slow line, so the short-term trend is ${f >= s ? 'UP' : 'DOWN'}.'),
         ]);
       case 'cross':
-        final buys = _mkts.where((x) => _map(x['reading'])['action'] == 'BUY SIGNAL').map((x) => x['asset']).toList();
-        final sells = _mkts.where((x) => _map(x['reading'])['action'] == 'SELL SIGNAL').map((x) => x['asset']).toList();
+        final buys = _mkts.where((x) => _map(x['reading'])['decision'] == 'ENTER' && _map(x['reading'])['dir'] == 'up').map((x) => x['asset']).toList();
+        final sells = _mkts.where((x) => _map(x['reading'])['decision'] == 'ENTER' && _map(x['reading'])['dir'] == 'down').map((x) => x['asset']).toList();
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           chart(),
           const SizedBox(height: 8),
@@ -1076,8 +1155,14 @@ Tutor:''';
         if (ca != cb) return ca - cb;
         return _NgmySignalGridAgentScreenState._signalRank(a).compareTo(_NgmySignalGridAgentScreenState._signalRank(b));
       });
-    final bull = ms.where((m) => _map(m['reading'])['bias'] == 'bullish').length;
-    final bear = ms.where((m) => _map(m['reading'])['bias'] == 'bearish').length;
+    // Counted from the ONE decision, so the boxes match the cards (going up or down = a clear direction).
+    bool going(Map<String, dynamic> m, String d) {
+      final r = _map(m['reading']);
+      return r['dir'] == d && const ['ENTER', 'SKIP_WEAK', 'WAIT_LATE'].contains(r['decision']);
+    }
+
+    final bull = ms.where((m) => going(m, 'up')).length;
+    final bear = ms.where((m) => going(m, 'down')).length;
     final side = ms.length - bull - bear;
     final secs = _fetchedAt == null ? 0 : DateTime.now().difference(_fetchedAt!).inSeconds;
     final ago = secs < 20 ? 'just now' : secs < 60 ? '$secs s ago' : '${secs ~/ 60} min ago';
@@ -1140,11 +1225,11 @@ Tutor:''';
         const SizedBox(height: 12),
         _alertsBanner(p),
         Row(children: [
-          Expanded(child: _countBox(p, 'Bullish', bull, _up, Icons.trending_up_rounded)),
+          Expanded(child: _countBox(p, 'Going up', bull, _up, Icons.trending_up_rounded)),
           const SizedBox(width: 8),
-          Expanded(child: _countBox(p, 'Bearish', bear, _loss, Icons.trending_down_rounded)),
+          Expanded(child: _countBox(p, 'Going down', bear, _loss, Icons.trending_down_rounded)),
           const SizedBox(width: 8),
-          Expanded(child: _countBox(p, 'Sideways', side, _down, Icons.trending_flat_rounded)),
+          Expanded(child: _countBox(p, 'No direction', side, _down, Icons.trending_flat_rounded)),
         ]),
         const SizedBox(height: 8),
         Row(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -1179,7 +1264,7 @@ Tutor:''';
           _readingTile(
             p,
             m,
-            changed: _changed[m['asset']] == null ? null : 'JUST TURNED ${_changed[m['asset']]!.to.toUpperCase()}',
+            changed: _changed[m['asset']] == null ? null : (_changed[m['asset']]!.to == 'no direction' ? 'JUST LOST ITS DIRECTION' : 'JUST TURNED ${_changed[m['asset']]!.to.toUpperCase()}'),
             onAsk: () => _askAbout('What is happening with ${m['asset']} right now? Is it bullish or bearish, how long might the move last, and is it too late to enter?'),
           ),
         Text('Signals are estimates from recent price history. They can fail; never risk money you cannot afford to lose.',

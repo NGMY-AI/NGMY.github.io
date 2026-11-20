@@ -67,8 +67,8 @@ class NgmySignalAlerts {
         if (last != null && DateTime.now().difference(last) < const Duration(minutes: 20)) continue;
         _sent[key] = DateTime.now();
         await ngmyPushShow(
-          title: '${up ? '▲ BUY (UP)' : '▼ SELL (DOWN)'} $sym now',
-          body: 'Enter within ${entry['withinMin']} min · duration about ${entry['durationMin']} min · '
+          title: '${up ? '▲ ENTER UP (BUY)' : '▼ ENTER DOWN (SELL)'} $sym',
+          body: 'Enter at the start of the next ${entry['candleMin'] ?? 1}-minute candle · trade for ${entry['durationMin']} min · '
               'worked ${entry['worked']} of ${entry['of']} times lately. Signals can fail.',
           tag: 'signal_${sym.replaceAll('/', '')}',
         );

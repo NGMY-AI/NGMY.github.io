@@ -218,8 +218,8 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
 
   static double _signalRank(Map<String, dynamic> m) {
     final a = (_map(m['reading'])['action'] ?? '').toString();
-    if (a.startsWith('BUY')) return 0;
-    if (a.startsWith('SELL')) return 1;
+    if (a.startsWith('ENTER UP')) return 0;
+    if (a.startsWith('ENTER DOWN')) return 1;
     if (m['open'] != true) return 4;
     return 2 + (100 - _d(_map(m['reading'])['score'])) / 1000;
   }
@@ -585,8 +585,21 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     final today = _map(s['today']);
     final rec = _map(s['record']);
     final ticket = _map(s['ticket']);
-    final total = _d(st['totalPnl']);
+    // Version 1 sends no orders, so the Alpaca paper account itself never changes. The balance shown here is
+    // that account PLUS every finished pretend trade PLUS the open pretend trade's gain or loss right now,
+    // so it goes up when the agent wins and down when it loses.
+    final total = rec['pnlSum'] != null ? _d(rec['pnlSum']) : _d(st['totalPnl']);
     final day = _d(today['day_pnl']);
+    final sh = st['shadow'] is Map ? _map(st['shadow']) : null;
+    var open = 0.0;
+    if (sh != null) {
+      final held = _markets(snap).firstWhere((m) => m['asset'] == sh['symbol'], orElse: () => <String, dynamic>{});
+      final now = _d(held['price']);
+      if (now > 0) open = _d(sh['qty']) * (now - _d(sh['entryPrice']));
+    }
+    final base = _d(snap['equity']);
+    final balance = base + total + open;
+    final move = total + open;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(18),
@@ -613,12 +626,18 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
         FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.centerLeft,
-          child: Text(snap['equity'] == null ? '—' : _money(_d(snap['equity']), sign: false),
+          child: Text(snap['equity'] == null ? '—' : _money(balance, sign: false),
               style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
         ),
+        if (snap['equity'] != null)
+          Row(children: [
+            Icon(move >= 0 ? Icons.arrow_drop_up_rounded : Icons.arrow_drop_down_rounded, color: move > 0 ? _up : move < 0 ? _loss : Colors.white70),
+            Text('${_money(move)} from pretend trades${sh != null ? ' (incl. the open one)' : ''}',
+                style: TextStyle(color: move > 0 ? _up : move < 0 ? _loss : Colors.white70, fontSize: 12.5, fontWeight: FontWeight.w800)),
+          ]),
         const SizedBox(height: 2),
-        Text('Buying power ${_money(_d(snap['buyingPower']), sign: false)} · the agent uses only \$${_d(ticket['amount']).toStringAsFixed(0)} a trade',
-            style: const TextStyle(color: Colors.white60, fontSize: 11.5)),
+        Text('Alpaca paper account ${_money(base, sign: false)} (unchanged, Version 1 sends no orders) · \$${_d(ticket['amount']).toStringAsFixed(0)} a trade',
+            style: const TextStyle(color: Colors.white60, fontSize: 11)),
         const SizedBox(height: 14),
         Row(children: [
           Expanded(child: _darkStat('Today', _money(day), day > 0 ? _up : day < 0 ? _loss : Colors.white)),

@@ -97,9 +97,13 @@ Deno.test("RSI and the live reading", () => {
   assertEquals(readMarket(rising, bars, rising[rising.length - 1], false).action, "MARKET CLOSED");
   const down = readMarket(falling, bars, falling[falling.length - 1], true);
   assertEquals(down.bias, "bearish");
-  assertEquals(down.action, "DOWNTREND · STAY OUT");
+  // One decision: label, decision code and first sentence always agree.
+  assert(["WAIT_LATE", "SKIP_WEAK", "ENTER", "NO_DIRECTION"].includes(down.decision), down.decision);
+  assert(down.action.length > 0);
   assert(down.score < 40);
   assertEquals(readMarket([1, 2], [], 2, true).bias, "unknown");
+  assertEquals(readMarket([1, 2], [], 2, true).decision, "NO_DATA");
+  assertEquals(readMarket(rising, bars, rising[rising.length - 1], false).decision, "CLOSED");
 });
 
 Deno.test("trend timing: age, typical length, entry window, how often it worked", () => {
@@ -119,25 +123,41 @@ Deno.test("trend timing: age, typical length, entry window, how often it worked"
   // 5-minute candles report in minutes.
   assertEquals(runStats(closes, 5).typicalMin, t.typicalMin! * 5);
   assertEquals(runStats([1, 2, 3], 1).dir, "none");
-  // Forex wording: an action with an entry window or a "late, wait".
+  // Clean waves that always worked: a clear, early, reliable up move = ENTER UP, never a mixed message.
   const r = readMarket(closes, closes.map((c) => ({ h: c + 0.05, l: c - 0.05 })), p, true, { candleMin: 1, agent: false });
-  assert(/^(BUY · ENTER WITHIN \d+ MIN|BULLISH · LATE, WAIT|BULLISH · WEAK SIGNAL, SKIP|SIDEWAYS · NO EDGE|MIXED · NO EDGE)$/.test(r.action), r.action);
-  assert(r.notes.some((n) => n.includes("min ago")));
-  // "Enter" in the label only when the reading also has an entry (clear, early and reliable).
-  assertEquals(r.action.includes("ENTER WITHIN"), r.entry != null);
+  assertEquals(r.decision, "ENTER");
+  assertEquals(r.action, "ENTER UP · BUY");
+  assertEquals(r.entry?.dir, "up");
+  assertEquals(r.entry?.candleMin, 1);
+  assert(r.notes[0].startsWith("Enter UP at the start of the next 1-minute candle"));
+});
+
+Deno.test("one decision for every market: the label, the code and the entry never disagree", () => {
+  const rnd = (seed: number) => () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let s = 1; s <= 200; s++) {
+    const next = rnd(s);
+    let p = 100;
+    const closes = Array.from({ length: 300 }, () => (p += (next() - 0.5) * 0.2));
+    const r = readMarket(closes, closes.map((c) => ({ h: c + 0.03, l: c - 0.03 })), p, true, { candleMin: 1, agent: false });
+    assertEquals(r.entry != null, r.decision === "ENTER", `seed ${s}`);
+    assertEquals(r.action.startsWith("ENTER"), r.decision === "ENTER", `seed ${s}`);
+    if (r.decision === "NO_DIRECTION") assertEquals(r.action, "NO CLEAR DIRECTION · WAIT");
+    if (r.decision === "SKIP_WEAK") assert(r.action.endsWith("WEAK · SKIP"));
+    if (r.decision === "WAIT_LATE") assert(r.action.endsWith("TOO LATE · WAIT"));
+  }
 });
 
 Deno.test("enter now: only clear, early and reliable signals", () => {
   const t = { dir: "up" as const, ageMin: 2, typicalMin: 12, remainingMin: 10, enterWithinMin: 3, worked: 5, of: 8 };
-  assertEquals(entryNow("bullish", true, t)?.dir, "up");
-  assertEquals(entryNow("bullish", true, t)?.durationMin, 10);
-  assertEquals(entryNow("bullish", false, t), null); // market closed
-  assertEquals(entryNow("sideways", true, t), null); // no clear direction
-  assertEquals(entryNow("bearish", true, t), null); // direction does not match
-  assertEquals(entryNow("bullish", true, { ...t, enterWithinMin: 0 }), null); // too late
-  assertEquals(entryNow("bullish", true, { ...t, worked: 2, of: 8 }), null); // worse than a coin flip
-  assertEquals(entryNow("bullish", true, { ...t, worked: 2, of: 2 }), null); // too few past moves to judge
-  assertEquals(entryNow("bearish", true, { ...t, dir: "down" })?.dir, "down");
+  assertEquals(entryNow(true, true, t)?.dir, "up");
+  assertEquals(entryNow(true, true, t)?.durationMin, 10);
+  assertEquals(entryNow(true, false, t), null); // market closed
+  assertEquals(entryNow(false, true, t), null); // no clear direction
+  assertEquals(entryNow(true, true, { ...t, enterWithinMin: 0 }), null); // too late
+  assertEquals(entryNow(true, true, { ...t, worked: 2, of: 8 }), null); // worse than a coin flip
+  assertEquals(entryNow(true, true, { ...t, worked: 2, of: 2 }), null); // too few past moves to judge
+  assertEquals(entryNow(true, true, { ...t, dir: "down" })?.dir, "down");
+  assertEquals(entryNow(true, true, { ...t, remainingMin: 1 }, 5)?.durationMin, 5); // never shorter than one candle
 });
 
 Deno.test("lesson ids match the app", () => {

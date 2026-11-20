@@ -302,22 +302,38 @@ export type Reading = {
   gapPct: number | null; // how far the fast line is above (+) or below (-) the slow line, in %
   volPct: number | null; // average candle size in % (how jumpy the market is)
   action: string; // one short label for the app
-  notes: string[]; // plain sentences explaining the reading
+  notes: string[]; // plain sentences explaining the reading (the first one is the decision)
+  decision: Decision2; // the ONE decision shown everywhere
+  dir: "up" | "down" | "none";
   timing: Timing;
   /** Set only when it is time to act RIGHT NOW: clear direction, still early, and past moves on this market
    *  went the right way at least half the time (3 or more measured). Otherwise null. */
   entry: Entry | null;
 };
 
-export type Entry = { dir: "up" | "down"; withinMin: number; durationMin: number; typicalMin: number; worked: number; of: number };
+export type Entry = {
+  dir: "up" | "down";
+  withinMin: number; // minutes left in the early part of the move
+  durationMin: number; // how long to stay in: about the minutes the move may have left
+  typicalMin: number;
+  worked: number;
+  of: number;
+  candleMin: number; // enter at the start of the next candle of this size (1 for forex, 5 for the agent markets)
+};
 
-/** The "enter now" rule shared by the signal cards and the alerts. */
-export function entryNow(bias: string, open: boolean, t: Timing): Entry | null {
-  if (!open || t.dir === "none" || t.typicalMin == null || t.enterWithinMin == null || t.remainingMin == null) return null;
-  const aligned = (bias === "bullish" && t.dir === "up") || (bias === "bearish" && t.dir === "down");
-  if (!aligned || t.enterWithinMin <= 0 || t.remainingMin <= 0) return null;
-  if (t.of < 3 || t.worked / t.of < 0.5) return null; // worse than a coin flip lately: no alert
-  return { dir: t.dir, withinMin: t.enterWithinMin, durationMin: t.remainingMin, typicalMin: t.typicalMin, worked: t.worked, of: t.of };
+/** ONE decision per market, used everywhere (label, frame, sign, alerts), so they can never disagree. */
+export type Decision2 = "ENTER" | "SKIP_WEAK" | "WAIT_LATE" | "NO_DIRECTION" | "CLOSED" | "NO_DATA";
+
+/** The "enter now" rule shared by the signal cards and the alerts: a clear direction, still early, and past
+ *  moves on this market went the right way at least half the time (3 or more measured). */
+export function entryNow(clear: boolean, open: boolean, t: Timing, candleMin = 1): Entry | null {
+  if (!open || !clear || t.dir === "none" || t.typicalMin == null || t.enterWithinMin == null || t.remainingMin == null) return null;
+  if (t.enterWithinMin <= 0 || t.remainingMin <= 0) return null;
+  if (t.of < 3 || t.worked / t.of < 0.5) return null; // worse than a coin flip lately: no entry
+  return {
+    dir: t.dir, withinMin: t.enterWithinMin, durationMin: Math.max(candleMin, t.remainingMin), typicalMin: t.typicalMin,
+    worked: t.worked, of: t.of, candleMin,
+  };
 }
 
 /** The agent's live reading of one market, in numbers and plain words. Educational, the same rules the agent uses. */
@@ -341,47 +357,53 @@ export function readMarket(
   const volPct = last.length && p ? last.reduce((s, b, i) => s + (b.h - b.l) / (closes[closes.length - last.length + i] || p), 0) / last.length * 100 : null;
   const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
   if (gapPct == null || x.slowNow == null) {
-    return { bias: "unknown", score: 50, rsi: r, mom1h, gapPct, volPct, action: "WAITING FOR DATA", notes: ["Not enough candles yet to read this market."], timing, entry: null };
+    return {
+      bias: "unknown", score: 50, rsi: r, mom1h, gapPct, volPct, action: "WAITING FOR DATA", decision: "NO_DATA", dir: "none",
+      notes: ["Not enough candles yet to read this market."], timing, entry: null,
+    };
   }
   const score = Math.round(clamp(50 + clamp(gapPct * 60, -25, 25) + clamp((mom1h ?? 0) * 12, -15, 15) + clamp(((r ?? 50) - 50) * 0.4, -10, 10), 0, 100));
   const flat = Math.abs(gapPct) < 0.02;
   const bias = flat ? "sideways" : x.fastNow! > x.slowNow && p >= x.slowNow ? "bullish" : x.fastNow! < x.slowNow && p <= x.slowNow ? "bearish" : "sideways";
-  const early = timing.enterWithinMin != null && timing.enterWithinMin > 0;
-  const entry = entryNow(bias, open, timing); // enter only when clear, early AND reliable
-  let action: string;
-  if (!open) action = "MARKET CLOSED";
-  else if (agent) {
-    if (x.signal === "buy") action = "BUY SIGNAL";
-    else if (x.signal === "sell") action = "SELL SIGNAL";
-    else if (bias === "bullish") action = "UPTREND · WAIT FOR ENTRY";
-    else if (bias === "bearish") action = "DOWNTREND · STAY OUT";
-    else action = "SIDEWAYS · NO EDGE";
-  } else {
-    // Forex: the direction plus whether it is still early enough to act.
-    if (bias === "sideways" || timing.dir === "none") action = "SIDEWAYS · NO EDGE";
-    else if (entry) action = `${entry.dir === "up" ? "BUY" : "SELL"} · ENTER WITHIN ${entry.withinMin} MIN`;
-    else if (bias === "bullish" && timing.dir === "up") action = early ? "BULLISH · WEAK SIGNAL, SKIP" : "BULLISH · LATE, WAIT";
-    else if (bias === "bearish" && timing.dir === "down") action = early ? "BEARISH · WEAK SIGNAL, SKIP" : "BEARISH · LATE, WAIT";
-    else action = "MIXED · NO EDGE";
-  }
 
+  // Direction is CLEAR when the trend and the current move agree, or a fresh cross just happened.
+  let dir: "up" | "down" | "none" = timing.dir;
+  let clear = (bias === "bullish" && dir === "up") || (bias === "bearish" && dir === "down");
+  if (x.signal === "buy") { clear = true; dir = "up"; }
+  if (x.signal === "sell") { clear = true; dir = "down"; }
+  if (dir !== timing.dir) clear = false; // the move counter disagrees: not clear yet
+  const early = timing.enterWithinMin != null && timing.enterWithinMin > 0;
+  const entry = entryNow(clear, open, timing, candleMin);
+
+  const decision: Decision2 = !open ? "CLOSED" : !clear ? "NO_DIRECTION" : entry ? "ENTER" : early ? "SKIP_WEAK" : "WAIT_LATE";
+  const way = dir === "up" ? "UP" : "DOWN";
+  const action = {
+    CLOSED: "MARKET CLOSED",
+    NO_DATA: "WAITING FOR DATA",
+    NO_DIRECTION: "NO CLEAR DIRECTION · WAIT",
+    ENTER: `ENTER ${way} · ${dir === "up" ? "BUY" : "SELL"}`,
+    SKIP_WEAK: `${way} BUT WEAK · SKIP`,
+    WAIT_LATE: `${way} BUT TOO LATE · WAIT`,
+  }[decision];
+
+  // First sentence = the decision, in plain words. The rest explains it.
   const notes: string[] = [];
-  const who = agent ? "the agent" : "a trader";
-  if (x.signal === "buy") notes.push(`The fast line just crossed ABOVE the slow line: a fresh buy signal. ${agent ? "This is the moment the agent buys." : "This is the early moment of an up move."}`);
-  else if (x.signal === "sell") notes.push(`The fast line just crossed BELOW the slow line: a fresh sell signal. ${agent ? "A trade here would be closed." : "This is the early moment of a down move."}`);
-  else if (bias === "bullish") notes.push(`The fast line is above the slow line and the price is above both: buyers are in control.${early ? "" : ` The cross happened earlier, so for ${who} buying now would be late.`}`);
-  else if (bias === "bearish") notes.push(`The fast line is below the slow line and the price is below both: sellers are in control.${agent ? " The agent does not buy falling markets." : ""}`);
-  else notes.push("The two lines are close together or mixed: no clear direction. Signals here often fail, so patience is best.");
-  if (open && timing.dir !== "none" && timing.typicalMin != null && bias !== "sideways") {
-    const way = timing.dir === "up" ? "up" : "down";
-    notes.push(`This ${way} trend started about ${timing.ageMin} min ago. On this market, ${way} trends lately lasted about ${timing.typicalMin} min, so roughly ${timing.remainingMin} min may be left (an estimate, not a promise).`);
-    if (timing.of > 0) notes.push(`Of the last ${timing.of} ${way} trends here, ${timing.worked} really ended ${way === "up" ? "higher" : "lower"} (${Math.round(timing.worked / timing.of * 100)}%).`);
-    notes.push(entry
-      ? `Still early: about ${timing.enterWithinMin} min left to act in the first part of the move.`
-      : early
-      ? "It is early, but this kind of move has failed too often here lately: a weak signal, so skip it."
-      : "Too late for a safe entry: most of a typical move is already used. Wait for the next fresh signal.");
+  const pct = timing.of > 0 ? Math.round(timing.worked / timing.of * 100) : 0;
+  if (decision === "ENTER") {
+    notes.push(`Enter ${way} at the start of the next ${candleMin}-minute candle and stay in for about ${entry!.durationMin} min.`);
+  } else if (decision === "SKIP_WEAK") {
+    notes.push(`The move is ${way.toLowerCase()} and still early, but on this market only ${timing.worked} of the last ${timing.of} ${way.toLowerCase()} moves really went ${way.toLowerCase()} (${pct}%). Too unreliable: skip it.`);
+  } else if (decision === "WAIT_LATE") {
+    notes.push(`The move is ${way.toLowerCase()}, but it started ${timing.ageMin} min ago and ${way.toLowerCase()} moves here usually end after about ${timing.typicalMin} min. Too late to enter: wait for the next fresh signal.`);
+  } else if (decision === "NO_DIRECTION") {
+    notes.push("Buyers and sellers are balanced, or the trend and the latest move disagree: no clear direction. Do not enter.");
+  } else {
+    notes.push(agent ? "The stock market is closed, so this market cannot be traded until it opens." : "The forex market is closed (it trades from Sunday 5 PM to Friday 5 PM Eastern). OTC prices at a broker on weekends are made by that broker, not by the real market.");
   }
+  if (x.signal === "buy") notes.push(`The fast line just crossed ABOVE the slow line (a fresh up turn).${agent ? " The agent buys on this, if it holds nothing." : ""}`);
+  else if (x.signal === "sell") notes.push("The fast line just crossed BELOW the slow line (a fresh down turn).");
+  else if (bias === "bullish") notes.push("The fast line is above the slow line and the price is above both: buyers are in control.");
+  else if (bias === "bearish") notes.push("The fast line is below the slow line and the price is below both: sellers are in control.");
   if (r != null) {
     if (r >= 70) notes.push(`RSI is ${r.toFixed(0)}: stretched (overbought). Prices rose fast and often pause or pull back.`);
     else if (r <= 30) notes.push(`RSI is ${r.toFixed(0)}: oversold. Prices fell fast and often bounce, but a falling trend can keep falling.`);
@@ -390,9 +412,8 @@ export function readMarket(
     else notes.push(`RSI is ${r.toFixed(0)}: balanced between buyers and sellers.`);
   }
   if (mom1h != null) notes.push(`In the last hour the price ${mom1h >= 0 ? "rose" : "fell"} ${Math.abs(mom1h).toFixed(2)}%.`);
-  if (volPct != null) notes.push(volPct > 0.35 ? `It is jumpy right now (candles average ${volPct.toFixed(2)}%), so the +3% target and -1.5% stop can be hit quickly.` : `It is calm right now (candles average ${volPct.toFixed(2)}%).`);
-  if (!open) notes.push(agent ? "The stock market is closed, so this market cannot be traded until it opens." : "The forex market is closed (it trades from Sunday 5 PM to Friday 5 PM Eastern). OTC prices at a broker on weekends are made by that broker, not by the real market.");
-  return { bias, score, rsi: r, mom1h, gapPct, volPct, action, notes, timing, entry };
+  if (volPct != null) notes.push(volPct > 0.35 ? `It is jumpy right now (candles average ${volPct.toFixed(2)}%).` : `It is calm right now (candles average ${volPct.toFixed(2)}%).`);
+  return { bias, score, rsi: r, mom1h, gapPct, volPct, action, decision, dir, notes, timing, entry };
 }
 
 /** The last few hours for the app's chart: candles, fast line and slow line per 5-minute candle, plus the trend. */
@@ -933,7 +954,11 @@ export async function handleAlpacaAgent(
   const { data: closed } = await db.from("ngmy_alpaca_agent_log").select("details")
     .eq("decision", "would sell").order("id", { ascending: false }).limit(500);
   const pnls: number[] = (closed ?? []).map((r: any) => Number(r?.details?.pnl ?? 0));
-  const record = { wins: pnls.filter((p) => p > 0).length, losses: pnls.filter((p) => p <= 0).length, trades: pnls.length };
+  const record = {
+    wins: pnls.filter((p) => p > 0).length, losses: pnls.filter((p) => p <= 0).length, trades: pnls.length,
+    // Every finished pretend trade added together: the screen adds this to the paper balance.
+    pnlSum: round2(pnls.reduce((s, p) => s + p, 0)),
+  };
   return {
     status: 200,
     payload: {
