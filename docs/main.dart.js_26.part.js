@@ -7,12 +7,12 @@ B=a.updateHolder(c[27],B)
 D=c[108]
 B.a6d.prototype={
 A(d,e){if(e==null)return!1
-if(J.bZ(e)!==C.b4(this))return!1
+if(J.bZ(e)!==C.b5(this))return!1
 return e instanceof B.a6d},
-gY(d){return C.bw("tnum",1,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j)},
+gY(d){return C.by("tnum",1,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j)},
 v(d){return"FontFeature('tnum', 1)"}}
 var z=a.updateTypes([]);(function inheritance(){var y=a.inherit
 y(B.a6d,C.aK)})();(function constants(){var y=a.makeConstList
-D.bco=new B.a6d()
-D.a6e=y([D.bco],C.aF("U<a6d>"))})()};
-(a=>{a["xMiUq7hwlLyusUU00subIHz7qrw="]=a.current})($__dart_deferred_initializers__);
+D.bcv=new B.a6d()
+D.a6d=y([D.bcv],C.aF("U<a6d>"))})()};
+(a=>{a["8nR2eJD2FXI10iiOQwZdq7CkQ+g="]=a.current})($__dart_deferred_initializers__);
