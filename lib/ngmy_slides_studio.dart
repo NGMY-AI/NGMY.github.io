@@ -2110,6 +2110,29 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
       );
       if (overwrite != true || !mounted) return;
       dest = found.copy();
+      // The partner document is rebuilt on the SAME paper as the one being transferred (it keeps its own name, code
+      // and state). Before, the details were poured into the old partner document on whatever paper it had been made
+      // with, so the transferred document looked like a different one.
+      final fresh = ngmyHatiBuildPartnerDeck(source);
+      dest
+        ..themeId = fresh.themeId
+        ..paperAspect = fresh.paperAspect
+        ..aspectRatio = fresh.aspectRatio
+        ..slides = fresh.slides;
+    }
+
+    // The family's own faces painted with the AI go along too (the paper's own people stay where nothing was painted).
+    final paperId = ngmyHatiPaperIdOfDeck(source);
+    NgmySlideElement? bgOf(NgmySlideDeck d) {
+      if (d.slides.isEmpty) return null;
+      for (final e in d.slides.first.elements) {
+        if (e.fileName == '${kMarriageLocked}_bg') return e;
+      }
+      return null;
+    }
+    final srcBg = bgOf(source), destBg = bgOf(dest);
+    if (paperId != null && srcBg?.imageRef != null && destBg?.imageRef != null) {
+      destBg!.imageRef = ngmyHatiCarryPeople(srcBg!.imageRef!, destBg.imageRef!, paperId);
     }
 
     final stats = ngmyHatiTransferDocumentContent(source: source, destination: dest);

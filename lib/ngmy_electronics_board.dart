@@ -1018,48 +1018,98 @@ class BoardPainter extends CustomPainter {
     if (grown) canvas.restore();
   }
 
+  /// One round cell lying on its side, as a real AA cell looks: a metal shell shaded round, a two-colour wrap
+  /// (a silver band at the plus end, blue on the rest), a flat metal minus end and the raised button on the plus end.
+  void _cell(Canvas canvas, Rect r, {bool label = true, String? volts}) {
+    Shader round(Rect b, List<Color> c) => LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: c, stops: const [0, 0.32, 0.62, 1]).createShader(b);
+    final h = r.height;
+    // Minus end: a flat metal disc edge.
+    final minus = Rect.fromLTWH(r.left, r.top + h * 0.06, h * 0.16, h * 0.88);
+    canvas.drawRRect(RRect.fromRectAndRadius(minus, Radius.circular(h * 0.08)), Paint()..shader = round(minus, const [Color(0xFF9CA3AF), Color(0xFFF3F4F6), Color(0xFF9CA3AF), Color(0xFF4B5563)]));
+    // The wrap (plain, no maker): blue, with a silver band towards the plus end.
+    final body = Rect.fromLTRB(minus.right - 0.5, r.top, r.right - h * 0.2, r.bottom);
+    final split = body.left + body.width * 0.66;
+    canvas.drawRect(Rect.fromLTRB(body.left, body.top, split, body.bottom), Paint()..shader = round(body, const [Color(0xFF0B1F4D), Color(0xFF3B6FD8), Color(0xFF1E40AF), Color(0xFF0A1A40)]));
+    canvas.drawRect(Rect.fromLTRB(split, body.top, body.right, body.bottom), Paint()..shader = round(body, const [Color(0xFF6B7280), Color(0xFFF1F5F9), Color(0xFFB8C0CC), Color(0xFF4B5563)]));
+    // Plus end: the shoulder and the raised button.
+    final shoulder = Rect.fromLTWH(body.right - 0.5, r.top + h * 0.08, h * 0.12, h * 0.84);
+    canvas.drawRect(shoulder, Paint()..shader = round(shoulder, const [Color(0xFF9CA3AF), Color(0xFFF9FAFB), Color(0xFFA1A1AA), Color(0xFF52525B)]));
+    final button = Rect.fromLTWH(shoulder.right - 0.5, r.top + h * 0.3, h * 0.1, h * 0.4);
+    canvas.drawRRect(RRect.fromRectAndRadius(button, Radius.circular(h * 0.05)), Paint()..shader = round(button, const [Color(0xFF9CA3AF), Color(0xFFF9FAFB), Color(0xFFA1A1AA), Color(0xFF52525B)]));
+    // A thin shine along the top of the round body.
+    canvas.drawRect(Rect.fromLTWH(body.left + 2, r.top + h * 0.18, body.width - 4, h * 0.08), Paint()..color = Colors.white.withValues(alpha: 0.18));
+    if (label) {
+      _text(canvas, '+', Offset(split + body.width * 0.08, r.top + h * 0.12), const Color(0xFF1E3A8A), h * 0.42);
+      if (volts != null) _text(canvas, volts, Offset(body.left + body.width * 0.12, r.top + h * 0.2), const Color(0xFFE5E7EB), h * 0.42);
+    }
+  }
+
   void _battery(Canvas canvas, Part p) {
     final v = p.volts;
-    if (v <= 4.5) {
-      // A cell, like the ones in a torch: shiny can, coloured label, a bump on the plus end.
-      final can = Rect.fromLTWH(-28, -13, 56, 26);
-      canvas.drawRRect(RRect.fromRectAndRadius(can, const Radius.circular(5)), _metal(can, a: const Color(0xFF9CA3AF), b: const Color(0xFFF9FAFB)));
-      final label = Rect.fromLTWH(-22, -13, 44, 26);
-      canvas.drawRect(label, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1F2937), Color(0xFF030712)]).createShader(label));
-      canvas.drawRect(const Rect.fromLTWH(-22, -3, 44, 6), Paint()..color = const Color(0xFFD97706));
-      final nub = Rect.fromLTWH(28, -5, 6, 10);
-      canvas.drawRRect(RRect.fromRectAndRadius(nub, const Radius.circular(2)), _metal(nub, vertical: true, a: const Color(0xFF9CA3AF), b: const Color(0xFFF3F4F6)));
-      _text(canvas, '+', const Offset(18, -12), const Color(0xFFFBBF24), 11);
-      _text(canvas, '−', const Offset(-22, -11), Colors.white70, 11);
-      _text(canvas, '${v == v.roundToDouble() ? v.round() : v}V', const Offset(-14, -12), const Color(0xFFFBBF24), 13);
-      if (v == 1.5) {
-        canvas.drawRect(const Rect.fromLTWH(-22, 14, 44, 4), Paint()..color = Colors.white12);
-        canvas.drawRect(Rect.fromLTWH(-22, 14, 44 * p.charge, 4), Paint()..color = Color.lerp(const Color(0xFFEF4444), const Color(0xFF4ADE80), p.charge)!);
-        if (p.charge <= 0.02) _text(canvas, 'FLAT', const Offset(-10, 0), const Color(0xFFF87171), 9);
+    final volts = '${v == v.roundToDouble() ? v.round() : v}V';
+    if (v <= 2) {
+      // One cell, like the ones in a torch or a remote.
+      _cell(canvas, const Rect.fromLTWH(-29, -11, 58, 22), volts: volts);
+      _text(canvas, '−', const Offset(-27, -24), Colors.white70, 12);
+      _text(canvas, '+', const Offset(22, -25), const Color(0xFFFBBF24), 12);
+      canvas.drawRect(const Rect.fromLTWH(-22, 15, 44, 4), Paint()..color = Colors.white12);
+      canvas.drawRect(Rect.fromLTWH(-22, 15, 44 * p.charge, 4), Paint()..color = Color.lerp(const Color(0xFFEF4444), const Color(0xFF4ADE80), p.charge)!);
+      if (p.charge <= 0.02) _text(canvas, 'FLAT', const Offset(-12, -5), const Color(0xFFF87171), 9);
+    } else if (v <= 4.5) {
+      // Two or three cells in a black battery holder, one under the other, joined end to end.
+      final n = v > 3 ? 3 : 2;
+      final hh = n * 13.0 + 6;
+      final holder = Rect.fromLTWH(-31, -hh / 2, 62, hh);
+      canvas.drawRRect(RRect.fromRectAndRadius(holder, const Radius.circular(4)), Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF2A2A2E), Color(0xFF0A0A0B)]).createShader(holder));
+      for (var i = 0; i < n; i++) {
+        _cell(canvas, Rect.fromLTWH(-27, holder.top + 3 + i * 13.0, 52, 11.5), label: false);
       }
-      if (v > 2) {
-        canvas.drawLine(const Offset(0, -13), const Offset(0, 13), Paint()..color = Colors.white24..strokeWidth = 1);
-        _text(canvas, v > 3 ? '3 cells' : '2 cells', const Offset(-14, 2), Colors.white54, 8);
+      // The spring and the metal clip at the ends of the holder.
+      for (final sx in const [-29.5, 28.5]) {
+        canvas.drawRect(Rect.fromLTWH(sx, holder.top + 3, 1.6, hh - 6), Paint()..color = const Color(0xFFD1D5DB));
       }
+      _text(canvas, volts, Offset(-9, holder.bottom + 1), const Color(0xFFFBBF24), 10);
+      _text(canvas, '+', Offset(25, holder.top - 13), const Color(0xFFFBBF24), 11);
     } else if (v <= 9) {
-      // The little 9 volt block with its snap studs on top.
-      final box = Rect.fromLTWH(-22, -17, 44, 34);
-      canvas.drawRRect(RRect.fromRectAndRadius(box, const Radius.circular(5)), Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF111827), Color(0xFF000000)]).createShader(box));
-      canvas.drawRect(const Rect.fromLTWH(-22, -4, 44, 16), Paint()..color = const Color(0xFF16A34A));
-      for (final sx in const [-8.0, 8.0]) {
-        canvas.drawCircle(Offset(sx, -18), sx < 0 ? 5 : 3.6, Paint()..shader = const RadialGradient(colors: [Color(0xFFF3F4F6), Color(0xFF6B7280)]).createShader(Rect.fromCircle(center: Offset(sx, -18), radius: 5)));
+      // The 9 volt block: ribbed sides, a two-colour wrap, and the two snap terminals on top
+      // (the round one is plus, the six-sided one is minus).
+      final box = Rect.fromLTWH(-18, -16, 36, 34);
+      canvas.drawRRect(RRect.fromRectAndRadius(box, const Radius.circular(3)), Paint()..shader = const LinearGradient(colors: [Color(0xFF0B0B0C), Color(0xFF3A3A3D), Color(0xFF0B0B0C)]).createShader(box));
+      final wrap = Rect.fromLTWH(-18, -4, 36, 22);
+      canvas.drawRRect(RRect.fromRectAndCorners(wrap, bottomLeft: const Radius.circular(3), bottomRight: const Radius.circular(3)), Paint()..shader = const LinearGradient(colors: [Color(0xFF1E3A8A), Color(0xFF3B82F6), Color(0xFF1E3A8A)]).createShader(wrap));
+      final top = Rect.fromLTWH(-18, -16, 36, 5);
+      canvas.drawRRect(RRect.fromRectAndCorners(top, topLeft: const Radius.circular(3), topRight: const Radius.circular(3)), Paint()..shader = const LinearGradient(colors: [Color(0xFF9CA3AF), Color(0xFFF3F4F6), Color(0xFF9CA3AF)]).createShader(top));
+      final metal = Paint()..shader = const RadialGradient(center: Alignment(-0.3, -0.4), colors: [Color(0xFFF9FAFB), Color(0xFF6B7280)]).createShader(const Rect.fromLTWH(-14, -26, 28, 12));
+      canvas.drawCircle(const Offset(-7, -19), 4, metal);
+      final hex = Path();
+      for (var k = 0; k < 6; k++) {
+        final a = k * math.pi / 3;
+        final pt = Offset(7 + math.cos(a) * 5, -19 + math.sin(a) * 5);
+        k == 0 ? hex.moveTo(pt.dx, pt.dy) : hex.lineTo(pt.dx, pt.dy);
       }
-      _text(canvas, '9V', const Offset(-11, -2), Colors.white, 16);
+      canvas.drawPath(hex..close(), metal);
+      canvas.drawCircle(const Offset(7, -19), 2, Paint()..color = const Color(0xFF4B5563));
+      _text(canvas, '9V', const Offset(-8, -1), Colors.white, 13);
+      _text(canvas, '+', const Offset(-11, -34), const Color(0xFFFBBF24), 11);
     } else {
-      // A big car-style battery with two posts.
-      final box = Rect.fromLTWH(-34, -16, 68, 32);
-      canvas.drawRRect(RRect.fromRectAndRadius(box, const Radius.circular(4)), Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1F2937), Color(0xFF030712)]).createShader(box));
-      canvas.drawRect(const Rect.fromLTWH(-34, -4, 68, 11), Paint()..color = const Color(0xFFFACC15));
-      for (final sx in const [-24.0, 24.0]) {
-        canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: Offset(sx, -20), width: 10, height: 8), const Radius.circular(2)), Paint()..color = const Color(0xFFCBD5E1));
+      // A car battery: a dark case with a raised lid, a row of vent caps, and two lead posts
+      // (red cap on the plus post, black on the minus).
+      final caseR = Rect.fromLTWH(-34, -12, 68, 30);
+      canvas.drawRRect(RRect.fromRectAndRadius(caseR, const Radius.circular(3)), Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF2B2F36), Color(0xFF0B0D10)]).createShader(caseR));
+      final lid = Rect.fromLTWH(-36, -18, 72, 8);
+      canvas.drawRRect(RRect.fromRectAndRadius(lid, const Radius.circular(2.5)), Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF4B5563), Color(0xFF1F2937)]).createShader(lid));
+      for (var k = 0; k < 6; k++) {
+        canvas.drawCircle(Offset(-14 + k * 5.6, -14), 1.6, Paint()..color = const Color(0xFF111827));
       }
-      _text(canvas, '+', const Offset(20, -17), const Color(0xFFEF4444), 10);
-      _text(canvas, '12V', const Offset(-13, -5), const Color(0xFF111827), 15);
+      canvas.drawRect(const Rect.fromLTWH(-34, 0, 68, 10), Paint()..color = const Color(0xFFFACC15).withValues(alpha: 0.92));
+      for (final (sx, cap) in const [(-25.0, Color(0xFF111827)), (25.0, Color(0xFFDC2626))]) {
+        final post = Rect.fromCenter(center: Offset(sx, -21), width: 8, height: 7);
+        canvas.drawRRect(RRect.fromRectAndRadius(post, const Radius.circular(1.5)), Paint()..shader = const LinearGradient(colors: [Color(0xFF9CA3AF), Color(0xFFE5E7EB), Color(0xFF6B7280)]).createShader(post));
+        canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: Offset(sx, -24), width: 9, height: 3.5), const Radius.circular(1.5)), Paint()..color = cap);
+      }
+      _text(canvas, '−', const Offset(-28, -36), Colors.white70, 11);
+      _text(canvas, '+', const Offset(21, -36), const Color(0xFFEF4444), 11);
+      _text(canvas, '12V', const Offset(-11, -1), const Color(0xFF111827), 11);
     }
   }
 

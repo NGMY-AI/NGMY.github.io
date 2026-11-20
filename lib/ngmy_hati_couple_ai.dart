@@ -409,3 +409,46 @@ String ngmyHatiPutCoupleInPaper(String paperUrl, Uint8List picture, ({double x, 
   }
   return 'data:image/jpeg;base64,${base64Encode(img.encodeJpg(paper, quality: 82))}';
 }
+
+/// The people the AI painted on [fromUrl] (the couple, and on Mkataba wa Ndoa Kijiji the groom's parents), laid onto
+/// [toUrl], another page of the same paper [templateId]: a document transferred to its partner keeps the family's own
+/// faces. A group that is still the paper's own picture is left as it is. Returns [toUrl] when nothing changes.
+String ngmyHatiCarryPeople(String fromUrl, String toUrl, String templateId) {
+  if (!fromUrl.startsWith('data:image') || !toUrl.startsWith('data:image') || fromUrl == toUrl) return toUrl;
+  final areas = [ngmyHatiCoupleArea(templateId), ngmyHatiParentsArea(templateId)].whereType<_Area>().toList();
+  if (areas.isEmpty) return toUrl;
+  try {
+    final from = img.decodeImage(base64Decode(fromUrl.substring(fromUrl.indexOf(',') + 1)));
+    if (from == null) return toUrl;
+    var out = toUrl;
+    for (final a in areas) {
+      final x0 = (a.x * from.width).round(), y0 = (a.y * from.height).round();
+      final w = (a.w * from.width).round(), h = (a.h * from.height).round();
+      if (w < 8 || h < 8 || x0 < 0 || y0 < 0 || x0 + w > from.width || y0 + h > from.height) continue;
+      final crop = img.copyCrop(from, x: x0, y: y0, width: w, height: h);
+      // Still the paper's own people: nothing to carry.
+      final own = ngmyHatiPhotoArtUrl(a.art);
+      if (own != null) {
+        final paper = img.decodeImage(base64Decode(own.substring(own.indexOf(',') + 1)));
+        if (paper != null) {
+          final px = (a.x * paper.width).round(), py = (a.y * paper.height).round();
+          var diff = 0.0;
+          var n = 0;
+          for (var j = 4; j < h - 4; j += 6) {
+            for (var i = 4; i < w - 4; i += 6) {
+              if (px + i >= paper.width || py + j >= paper.height) continue;
+              final p = crop.getPixel(i, j), q = paper.getPixel(px + i, py + j);
+              diff += (p.r - q.r).abs() + (p.g - q.g).abs() + (p.b - q.b).abs();
+              n++;
+            }
+          }
+          if (n > 0 && diff / n < 30) continue;
+        }
+      }
+      out = ngmyHatiPutCoupleInPaper(out, Uint8List.fromList(img.encodeJpg(crop, quality: 92)), a);
+    }
+    return out;
+  } catch (_) {
+    return toUrl;
+  }
+}

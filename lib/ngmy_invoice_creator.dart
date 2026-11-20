@@ -147,7 +147,9 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
     super.initState();
     final now = DateTime.now();
     _issuedDateC.text = '${now.month}/${now.day}/${now.year}';
-    _dueDateC.text = '${now.month}/${now.day + 7}/${now.year}';
+    // A week later as a real date (adding 7 to the day gave dates such as 11/35/2026 near the end of a month).
+    final due = now.add(const Duration(days: 7));
+    _dueDateC.text = '${due.month}/${due.day}/${due.year}';
     if (widget.initialService.trim().isNotEmpty) _itemNameC.text = widget.initialService.trim();
     if (widget.initialAmount > 0) _itemPriceC.text = widget.initialAmount.toStringAsFixed(2);
     _providerSignaturePoints.clear();
@@ -975,6 +977,23 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
     );
   }
 
+  /// Opens the calendar on the date already in [c] (month/day/year) and writes the chosen date back the same way.
+  Future<void> _pickDate(TextEditingController c, String title) async {
+    FocusScope.of(context).unfocus();
+    final now = DateTime.now();
+    final parts = c.text.trim().split('/');
+    DateTime initial = now;
+    if (parts.length == 3) {
+      final m = int.tryParse(parts[0]), d = int.tryParse(parts[1]), y = int.tryParse(parts[2]);
+      if (m != null && d != null && y != null && m >= 1 && m <= 12 && d >= 1 && d <= 31) initial = DateTime(y, m, d);
+    }
+    final first = DateTime(now.year - 10), last = DateTime(now.year + 10, 12, 31);
+    if (initial.isBefore(first) || initial.isAfter(last)) initial = now;
+    final picked = await showDatePicker(context: context, initialDate: initial, firstDate: first, lastDate: last, helpText: title);
+    if (picked == null || !mounted) return;
+    setState(() => c.text = '${picked.month}/${picked.day}/${picked.year}');
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -1128,9 +1147,26 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
                       const SizedBox(height: 10),
                       Row(
                         children: [
-                          Expanded(child: TextField(controller: _issuedDateC, decoration: _fieldDec('Issued Date', locked: locked, icon: Icons.event_rounded))),
+                          // A tap opens the calendar at once (no keyboard, no typing the date by hand).
+                          Expanded(
+                            child: TextField(
+                              key: const Key('invoice-issued-date'),
+                              controller: _issuedDateC,
+                              readOnly: true,
+                              onTap: locked ? null : () => _pickDate(_issuedDateC, 'Issued date'),
+                              decoration: _fieldDec('Issued Date', locked: locked, icon: Icons.event_rounded),
+                            ),
+                          ),
                           const SizedBox(width: 8),
-                          Expanded(child: TextField(controller: _dueDateC, decoration: _fieldDec('Due Date', locked: locked, icon: Icons.event_available_rounded))),
+                          Expanded(
+                            child: TextField(
+                              key: const Key('invoice-due-date'),
+                              controller: _dueDateC,
+                              readOnly: true,
+                              onTap: locked ? null : () => _pickDate(_dueDateC, 'Due date'),
+                              decoration: _fieldDec('Due Date', locked: locked, icon: Icons.event_available_rounded),
+                            ),
+                          ),
                         ],
                       ),
                     ],

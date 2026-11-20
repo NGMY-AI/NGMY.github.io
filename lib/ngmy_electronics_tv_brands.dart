@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_electronics_extra_parts.dart' show ngmyAppleLogoPath;
 import 'ngmy_electronics_screens.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -294,4 +295,48 @@ class _NgmyTvHomeState extends State<NgmyTvHome> {
       ),
     );
   }
+}
+
+/// The maker's name, or Apple's logo, small in the middle of the bottom edge of a TV frame (the same marks as on the
+/// little TVs on the lab board): LG, SONY, B&O, SAMSUNG, and the apple.
+class NgmyTvMakerMark extends StatelessWidget {
+  const NgmyTvMakerMark({super.key, required this.kind, required this.height});
+
+  final String kind;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final brand = tvBrandOf(kind);
+    if (brand == 'apple') {
+      return SizedBox(
+        key: const Key('tv-maker-apple'),
+        width: height / 1.1,
+        height: height,
+        child: CustomPaint(painter: _AppleMarkPainter()),
+      );
+    }
+    final (name, col) = switch (brand) {
+      'lg' => ('LG', const Color(0xFFD1D5DB)),
+      'sony' => ('SONY', const Color(0xFFE5E7EB)),
+      'bo' => ('B&O', const Color(0xFF3F3A33)),
+      _ => ('SAMSUNG', const Color(0xFFCBD5E1)),
+    };
+    return Text(
+      name,
+      key: const Key('tv-maker-name'),
+      style: TextStyle(color: col, fontSize: height * 0.82, fontWeight: FontWeight.w800, letterSpacing: height * 0.08, height: 1),
+    );
+  }
+}
+
+class _AppleMarkPainter extends CustomPainter {
+  @override
+  void paint(Canvas c, Size s) {
+    c.scale(s.width, s.height / 1.1);
+    c.drawPath(ngmyAppleLogoPath(), Paint()..color = const Color(0xFF374151));
+  }
+
+  @override
+  bool shouldRepaint(covariant _AppleMarkPainter old) => false;
 }

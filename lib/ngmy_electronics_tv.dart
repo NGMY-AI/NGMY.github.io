@@ -497,14 +497,21 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
         ),
       ]),
     );
+    final frameSide = BorderSide(color: _frame, width: _kFrame);
     final tv = Center(
       child: AspectRatio(
         aspectRatio: 16 / 9,
-        child: Container(
+        child: Stack(fit: StackFit.expand, children: [
+        Container(
           key: const Key('tv-frame'),
           decoration: _full
               ? const BoxDecoration(color: Colors.black)
-              : BoxDecoration(borderRadius: BorderRadius.circular(10), border: Border.all(color: _frame, width: _kFrame), boxShadow: [BoxShadow(color: tvBrandAccent(widget.kind).withValues(alpha: 0.25), blurRadius: 40)]),
+              // The bottom edge of the frame is a little taller, with the maker's name or logo in its middle.
+              : BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border(left: frameSide, top: frameSide, right: frameSide, bottom: BorderSide(color: _frame, width: _kFrameBottom)),
+                  boxShadow: [BoxShadow(color: tvBrandAccent(widget.kind).withValues(alpha: 0.25), blurRadius: 40)],
+                ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(_full ? 0 : 4),
             child: LayoutBuilder(builder: (context, box) {
@@ -546,6 +553,15 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
             }),
           ),
         ),
+        if (!_full)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: _kFrameBottom,
+            child: IgnorePointer(child: Center(child: NgmyTvMakerMark(kind: widget.kind, height: _kFrameBottom * 0.62))),
+          ),
+        ]),
       ),
     );
     return Scaffold(
@@ -600,6 +616,9 @@ class _NgmyTvScreenState extends State<NgmyTvScreen> with SingleTickerProviderSt
 
   /// The width of the TV frame around the picture (none in full screen).
   static const double _kFrame = 6;
+
+  /// The bottom edge of the frame, taller so the maker's name or logo fits in it.
+  static const double _kFrameBottom = 16;
 
   /// The buttons always show, except in full screen after a double tap hid them.
   bool get _controlsShown => !_full || !_locked;
