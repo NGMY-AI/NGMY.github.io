@@ -703,11 +703,11 @@ class _SequenceCanvasState extends State<_SequenceCanvas> with TickerProviderSta
     setState(() => _playing = false);
   }
 
-  /// How far the video is made (0 to 1), or -1 when no video is being made.
+  /// How far the GIF is made (0 to 1), or -1 when none is being made.
   double _saving = -1;
 
-  /// Saves the whole scene, from the first slab to the end, as a sharp HD video: every moment is drawn on the stage and
-  /// photographed, then joined into one MP4.
+  /// Saves the whole scene, from the first slab to the end, as a sharp moving GIF (the same kind of file as the Title
+  /// Animator): every moment is drawn on the stage and photographed, then joined into one animated picture.
   Future<void> _download() async {
     if (_saving >= 0) return;
     final b = _shot.currentContext?.findRenderObject();
@@ -720,16 +720,15 @@ class _SequenceCanvasState extends State<_SequenceCanvas> with TickerProviderSta
       _playing = false;
     });
     final size = b.size;
-    var pr = (1080 / math.min(size.width, size.height)).clamp(2.0, 4.0);
-    if (math.max(size.width, size.height) * pr > 1920) pr = 1920 / math.max(size.width, size.height);
-    final w = (size.width * pr).floor() & ~1;
-    final h = (size.height * pr).floor() & ~1;
-    const fps = 30;
-    final secs = 11 / _speed;
-    final frames = (secs * fps).round();
+    // 960 pixels on the long side: sharp on a phone screen, and a file small enough to send.
+    final pr = 960 / math.max(size.width, size.height);
+    final w = (size.width * pr).floor();
+    final h = (size.height * pr).floor();
+    const fps = 20;
+    final frames = (11 / _speed * fps).round();
     String message;
     try {
-      final movie = await ngmyMakeMovie(
+      final gif = await ngmyMakeGif(
         width: w,
         height: h,
         fps: fps,
@@ -749,14 +748,11 @@ class _SequenceCanvasState extends State<_SequenceCanvas> with TickerProviderSta
           if (mounted) setState(() => _saving = p);
         },
       );
-      if (movie == null || movie.isEmpty) {
-        message = 'This phone cannot make a video here. Try Safari or Chrome up to date.';
-      } else {
-        final name = widget.meta.title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_');
-        message = await ngmySaveMovie(movie, name) ? 'Your scene is saved as a sharp HD video.' : 'Could not save here. Try another browser.';
-      }
+      if (gif.isEmpty) throw StateError('empty');
+      final name = widget.meta.title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_');
+      message = await ngmySaveGif(gif, name) ? 'Your scene is saved (a moving GIF).' : 'Could not save here. Try another browser.';
     } catch (_) {
-      message = 'Could not make the video. Try again.';
+      message = 'Could not make the GIF. Try again.';
     }
     if (!mounted) return;
     setState(() => _saving = -1);
@@ -965,7 +961,7 @@ class _SequenceCanvasState extends State<_SequenceCanvas> with TickerProviderSta
             child: Column(children: [
               ClipRRect(borderRadius: BorderRadius.circular(6), child: LinearProgressIndicator(value: _saving, minHeight: 8, backgroundColor: Colors.white12, color: meta.glow)),
               const SizedBox(height: 4),
-              Text('Making your video… ${(_saving * 100).round()}%', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              Text('Making your GIF… ${(_saving * 100).round()}%', style: const TextStyle(color: Colors.white70, fontSize: 12)),
             ]),
           )
         else
@@ -975,7 +971,7 @@ class _SequenceCanvasState extends State<_SequenceCanvas> with TickerProviderSta
               onPressed: _download,
               style: FilledButton.styleFrom(backgroundColor: meta.glow, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 13)),
               icon: const Icon(Icons.download_rounded),
-              label: const Text('Download the scene (HD video)', style: TextStyle(fontWeight: FontWeight.w900)),
+              label: const Text('Download the scene (GIF)', style: TextStyle(fontWeight: FontWeight.w900)),
             ),
           ),
       ]),
