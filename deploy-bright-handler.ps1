@@ -12,10 +12,13 @@ $FunctionSlug = "bright-handler"
 $fnFile = Join-Path $PSScriptRoot "supabase\functions\ngmy-ai-chat\index.ts"
 # The AI limits live in their own file; it must be uploaded together with index.ts.
 $gateFile = Join-Path $PSScriptRoot "supabase\functions\ngmy-ai-chat\ai_gate.ts"
+# The Alpaca paper-trading agent (Signal Grid) also lives in its own file.
+$alpacaFile = Join-Path $PSScriptRoot "supabase\functions\ngmy-ai-chat\alpaca_agent.ts"
 $secretsPath = Join-Path $PSScriptRoot ".ngmy_secrets.local"
 
 if (-not (Test-Path $fnFile)) { throw "Missing $fnFile" }
 if (-not (Test-Path $gateFile)) { throw "Missing $gateFile" }
+if (-not (Test-Path $alpacaFile)) { throw "Missing $alpacaFile" }
 if (-not (Test-Path $secretsPath)) { throw "Missing .ngmy_secrets.local" }
 
 $secrets = @{}
@@ -39,7 +42,8 @@ $deployRaw = & curl.exe -s -X POST `
     -H "Authorization: Bearer $sbToken" `
     -F "metadata=@$metaPath;type=application/json" `
     -F "file=@$fnFile;type=application/typescript" `
-    -F "file=@$gateFile;filename=ai_gate.ts;type=application/typescript"
+    -F "file=@$gateFile;filename=ai_gate.ts;type=application/typescript" `
+    -F "file=@$alpacaFile;filename=alpaca_agent.ts;type=application/typescript"
 
 Remove-Item $metaPath -ErrorAction SilentlyContinue
 Write-Host $deployRaw

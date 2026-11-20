@@ -138,6 +138,10 @@ const Map<String, String> kNgmyEdgeActionToWire = {
   'tradeHalt': 'x5',
   'tradeRiskSet': 'x6',
   'tradeReset': 'x7',
+  'paStatus': 'y1',
+  'paLog': 'y2',
+  'paSet': 'y3',
+  'paCheck': 'y4',
   'chat': 'z0',
 };
 

@@ -9,6 +9,9 @@ import 'ngmy_deferred.dart';
 import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_platform_graphics.dart';
 import 'ngmy_vault_arcade.dart' deferred as vault;
+import 'ngmy_signal_grid_agent.dart' deferred as sg_agent;
+import 'main.dart' show ngmyEmailIsAdmin;
+import 'ngmy_civic_registry_cloud.dart' show ngmyCurrentAuthEmail;
 
 /// Home “tech deck” under the spending cards — robotic HUD frames with motion.
 /// Tapping a frame opens a full-screen pulse / scan animation.
@@ -43,6 +46,15 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
   }
 
   Future<void> _openExperience(_TechFrameSpec spec) async {
+    // Signal Grid holds the Alpaca paper-trading agent (admins only); everyone else keeps the pulse animation.
+    if (spec.kind == _TechKind.signal && ngmyEmailIsAdmin(ngmyCurrentAuthEmail())) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => NgmyDeferred(load: sg_agent.loadLibrary, build: () => sg_agent.NgmySignalGridAgentScreen()),
+        ),
+      );
+      return;
+    }
     if (spec.kind == _TechKind.vault) {
       await Navigator.of(context).push(
         PageRouteBuilder(

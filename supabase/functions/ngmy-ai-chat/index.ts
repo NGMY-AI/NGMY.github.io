@@ -18,6 +18,7 @@ import {
   scrubSecrets,
 } from "./ai_gate.ts";
 import type { AiClass, ConsumeResult, Entry, GateLimits, GateStore, Who } from "./ai_gate.ts";
+import { handleAlpacaAgent, PA_ACTIONS } from "./alpaca_agent.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10760,11 +10761,27 @@ serve(async (req) => {
       x5: "tradeHalt",
       x6: "tradeRiskSet",
       x7: "tradeReset",
+      y1: "paStatus",
+      y2: "paLog",
+      y3: "paSet",
+      y4: "paCheck",
+      y5: "paTick",
       z0: "chat",
     };
     const action = WIRE_TO_ACTION[wireCode] ?? String(body?.action ?? "chat").trim();
     // Client-supplied apiKey is ignored for AI calls (security). Admin save/login use explicit fields.
     const clientApiKeyIgnored = String(body?.apiKey ?? "").trim();
+
+    // Alpaca paper-trading agent (Signal Grid). Version 1 is read-only: no order code exists.
+    if (PA_ACTIONS.has(action)) {
+      const paEmail = action === "paTick" ? "" : (await requireJwtEmail(req)).trim().toLowerCase();
+      if (action !== "paTick") {
+        const limited = await enforceRateLimit(req, "alpaca_agent", paEmail || clientIp(req), 240, 3600);
+        if (limited) return limited;
+      }
+      const r = await handleAlpacaAgent(action, body, { db: adminClient(), email: paEmail, isAdmin: !!paEmail && NGMY_ADMIN_EMAILS.has(paEmail) });
+      return jsonOk(r.payload, r.status);
+    }
 
     if (action === "passwordResetSendOtp") {
       const email = String(body?.email ?? "").trim().toLowerCase();
