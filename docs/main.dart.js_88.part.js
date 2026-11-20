@@ -1,5 +1,5 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
-$__dart_deferred_initializers__.current=function(a,b,c,$){var B,A,D={a94:function a94(d,e,f,g,h,i){var _=this
+$__dart_deferred_initializers__.current=function(a,b,c,$){var B,A,D={a96:function a96(d,e,f,g,h,i){var _=this
 _.c=d
 _.d=e
 _.e=f
@@ -10,13 +10,13 @@ B=c[0]
 A=c[2]
 D=a.updateHolder(c[25],D)
 C=c[117]
-D.a94.prototype={
-B(d){var x=this,w=null,v=B.O(d).ax.a===A.I,u=v?A.als:C.buV,t=B.m(10),s=B.K(v?A.aT:C.bio,A.r,1),r=y.a
-return B.o(w,B.x(B.a([B.A(B.a([B.E(B.d(x.c,w,w,w,w,w,w,A.fa,w,w,w),1),B.aH(w,w,w,w,C.c1s,w,w,w,x.r,w,w,w,w,"Full screen sign (landscape)",A.ci)],r),A.l,w,A.e,A.i,0,w,w),new B.aK2(x.d,x.e,120,A.cA,A.a_,3.5,w),new B.bK(A.a9,w,w,B.bN(!1,A.Fo,w,w,!0,w,w,w,x.f,w,w),w)],r),A.E,w,A.e,A.i,0,A.p),A.f,w,w,new B.n(u,w,s,t,w,w,A.n),w,w,w,w,A.bS,w,w,w)}}
+D.a96.prototype={
+B(d){var x=this,w=null,v=B.O(d).ax.a===A.I,u=v?A.alu:C.buX,t=B.m(10),s=B.K(v?A.aT:C.bir,A.r,1),r=y.a
+return B.o(w,B.x(B.a([B.A(B.a([B.E(B.d(x.c,w,w,w,w,w,w,A.fa,w,w,w),1),B.aH(w,w,w,w,C.c1u,w,w,w,x.r,w,w,w,w,"Full screen sign (landscape)",A.ci)],r),A.l,w,A.e,A.i,0,w,w),new B.aK4(x.d,x.e,120,A.cA,A.a_,3.5,w),new B.bK(A.a9,w,w,B.bN(!1,A.Fo,w,w,!0,w,w,w,x.f,w,w),w)],r),A.E,w,A.e,A.i,0,A.p),A.f,w,w,new B.n(u,w,s,t,w,w,A.n),w,w,w,w,A.bS,w,w,w)}}
 var z=a.updateTypes([]);(function inheritance(){var x=a.inherit
-x(D.a94,B.av)})()
-B.on(b.typeUniverse,JSON.parse('{"a94":{"av":[],"v":[]}}'))
-var y={a:B.aF("U<v>")};(function constants(){C.bio=new B.u(1,0.792156862745098,0.8392156862745098,0.9529411764705882,A.q)
-C.buV=new B.u(1,0.9529411764705882,0.9647058823529412,1,A.q)
-C.c1s=new B.ae(A.a4e,22,A.aV,null,null,null)})()};
-(a=>{a["XgRic93QpvXZ8zyCK32wzc0RxoE="]=a.current})($__dart_deferred_initializers__);
+x(D.a96,B.av)})()
+B.on(b.typeUniverse,JSON.parse('{"a96":{"av":[],"v":[]}}'))
+var y={a:B.aF("U<v>")};(function constants(){C.bir=new B.u(1,0.792156862745098,0.8392156862745098,0.9529411764705882,A.q)
+C.buX=new B.u(1,0.9529411764705882,0.9647058823529412,1,A.q)
+C.c1u=new B.ae(A.a4e,22,A.aV,null,null,null)})()};
+(a=>{a["qaIOEHMW/TtHGDoRnv/dJvFoVHY="]=a.current})($__dart_deferred_initializers__);
