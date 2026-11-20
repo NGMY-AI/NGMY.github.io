@@ -689,6 +689,16 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     final pictureBack = working.isLockedTemplateDoc && ngmyHatiRestorePicturePaper(working);
     final paperUpdated =
         (working.isLockedTemplateDoc && ngmyRefreshMarriageDeckPaperBackground(working)) || pictureBack;
+    // The paper picture (with the faces the AI painted) is made ready before the document shows. Before, the page
+    // showed for a moment without it (the plain look of an older document) and then the picture popped in.
+    final firstPage = working.slides.isEmpty ? null : working.slides.first;
+    if (firstPage != null) {
+      final pageWidth = MediaQuery.sizeOf(context).width;
+      try {
+        await ngmySlideWarmPage(context, firstPage, pageWidth).timeout(const Duration(milliseconds: 2500));
+      } catch (_) {}
+      if (!mounted) return;
+    }
     setState(() {
       _activeDeck = working;
       _slideIndex = 0;
@@ -4199,7 +4209,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                         fontStyle: el.fontStyle,
                         decoration: el.decoration,
                         color: isDark ? Colors.white : const Color(0xFF0F172A),
-                        height: 1.35,
+                        // No custom line height: the phone's hidden copy of the text uses the font's own line height,
+                        // so the lines match and holding the space bar moves the cursor to the right line and letter.
                       ),
                       cursorColor: const Color(0xFF2563EB),
                       // One cursor only: the round magnifier that followed the finger (with its own grey copy of the
