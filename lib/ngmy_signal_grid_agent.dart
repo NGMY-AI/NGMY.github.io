@@ -309,7 +309,6 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     final held = shadow == null ? null : markets.firstWhere((m) => m['asset'] == shadow['symbol'], orElse: () => focus);
     final heldShadow = shadow != null && shadow['symbol'] == focus['asset'] ? shadow : null;
     return [
-      _todayMarket(p, s, shadow),
       _marketStrip(p, s, markets, focus, shadow),
       _hero(p, s, focus),
       if ((cfg['problem'] ?? '').toString().isNotEmpty) _banner(p, cfg['problem'].toString(), _down),
@@ -360,12 +359,11 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     }
     final c = active == null ? _down : _up;
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       decoration: BoxDecoration(
-        color: c.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: c.withValues(alpha: 0.45)),
+        color: p.card,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: c.withValues(alpha: 0.55)),
       ),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (active != null) ...[_coin(active, 30), const SizedBox(width: 10)] else ...[
@@ -391,6 +389,29 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     );
   }
 
+  /// The "which market today" info as a popup in the middle of the screen (opened from the icon on the markets row).
+  void _showTodayMarket(_Pal p, Map<String, dynamic> s, Map<String, dynamic>? shadow) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Material(
+          color: Colors.transparent,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            _todayMarket(p, s, shadow),
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              style: TextButton.styleFrom(backgroundColor: p.card, shape: const StadiumBorder()),
+              child: Text('Got it', style: TextStyle(color: p.ink, fontWeight: FontWeight.w800)),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
   // ── Markets: all watched markets side by side, tap one to see it
 
   Widget _marketStrip(_Pal p, Map<String, dynamic> s, List<Map<String, dynamic>> markets, Map<String, dynamic> focus,
@@ -406,6 +427,16 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
             Text('Agent markets', style: TextStyle(color: p.ink, fontSize: 14, fontWeight: FontWeight.w800)),
             const SizedBox(width: 8),
             _pill(openCount == 0 ? 'NONE TRADED NOW' : 'TRADED NOW', openCount == 0 ? _down : _up),
+            const SizedBox(width: 4),
+            // Which market the agent trades today: tap for the popup.
+            InkResponse(
+              onTap: () => _showTodayMarket(p, s, shadow),
+              radius: 20,
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(Icons.info_outline_rounded, size: 19, color: openCount == 0 ? _down : _up),
+              ),
+            ),
             const Spacer(),
             Text('tap one', style: TextStyle(color: p.muted, fontSize: 11)),
           ]),
