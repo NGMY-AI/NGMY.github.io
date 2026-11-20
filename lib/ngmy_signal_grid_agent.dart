@@ -2,26 +2,36 @@
 //
 // This screen is only the control panel. The agent itself runs on the server (bright-handler, called every
 // 15 minutes by Supabase pg_cron), so it keeps going when the phone is off. The Alpaca keys live only in
-// Supabase secrets and never reach this app. Version 1 places no orders: it logs what it WOULD do.
+// Supabase secrets and never reach this app. Version 1 places no orders: it logs what it WOULD do with a
+// pretend $50 trade.
 
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
 import 'ngmy_edge_invoke.dart';
 
-const _green = Color(0xFF22C55E);
-const _red = Color(0xFFEF4444);
-const _amber = Color(0xFFF59E0B);
-const _violet = Color(0xFFA78BFA);
-const _pink = Color(0xFFEC4899);
+const _up = Color(0xFF1FBF97); // rising candles, wins
+const _down = Color(0xFFF2C14E); // falling candles
+const _loss = Color(0xFFF0566A); // money lost
+const _fastC = Color(0xFFEC4899);
+const _slowC = Color(0xFF8B5CF6);
+const _btc = Color(0xFFF7931A);
+const _spy = Color(0xFF6366F1);
 
 Future<void> showNgmySignalGridAgent(BuildContext context) => Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const NgmySignalGridAgentScreen()),
     );
 
 class NgmySignalGridAgentScreen extends StatefulWidget {
-  const NgmySignalGridAgentScreen({super.key});
+  const NgmySignalGridAgentScreen({super.key, this.previewStatus, this.previewLog});
+
+  /// Sample data for a design preview test; the real screen always asks the server.
+  @visibleForTesting
+  final Map<String, dynamic>? previewStatus;
+  @visibleForTesting
+  final List<Map<String, dynamic>>? previewLog;
 
   @override
   State<NgmySignalGridAgentScreen> createState() => _NgmySignalGridAgentScreenState();
@@ -33,14 +43,23 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
   bool _loading = true;
   bool _busy = false;
   bool _moreLog = true;
+  bool _showAllLog = false;
+  int _range = 48; // candles shown: 12 = 1 h, 24 = 2 h, 48 = 4 h
+  bool _lines = true;
   String? _error;
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
+    if (widget.previewStatus != null) {
+      _status = widget.previewStatus;
+      _log = widget.previewLog ?? [];
+      _loading = false;
+      return;
+    }
     unawaited(_reload(live: true));
-    _timer = Timer.periodic(const Duration(seconds: 60), (_) => unawaited(_reload()));
+    _timer = Timer.periodic(const Duration(seconds: 60), (_) => unawaited(_reload(live: true)));
   }
 
   @override
@@ -98,7 +117,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     if (!mounted) return;
     setState(() => _busy = false);
     _snack(res?['ok'] == true ? (on ? 'Agent started.' : 'Agent stopped.') : (res?['error'] ?? 'Could not change it.').toString(),
-        res?['ok'] == true ? _green : _red);
+        res?['ok'] == true ? _up : _loss);
     await _reload();
   }
 
@@ -107,7 +126,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     final res = await ngmyEdgeInvoke({'action': 'paCheck'}, timeout: const Duration(seconds: 60));
     if (!mounted) return;
     setState(() => _busy = false);
-    if (res?['ok'] != true) _snack((res?['error'] ?? 'The check did not finish.').toString(), _red);
+    if (res?['ok'] != true) _snack((res?['error'] ?? 'The check did not finish.').toString(), _loss);
     await _reload();
   }
 
@@ -115,475 +134,1112 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: c));
   }
 
+  // ───────────────────────────────────────────────────────────── layout
+
   @override
   Widget build(BuildContext context) {
-    final light = Theme.of(context).brightness == Brightness.light;
-    final pal = _Pal(light);
+    final p = _Pal(Theme.of(context).brightness == Brightness.light);
     return Scaffold(
-      backgroundColor: pal.bg,
-      appBar: AppBar(
-        backgroundColor: pal.bg,
-        foregroundColor: pal.ink,
-        elevation: 0,
-        title: const Text('Signal Grid · Paper Agent', style: TextStyle(fontWeight: FontWeight.w800)),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh from Alpaca',
-            onPressed: _busy ? null : () => _reload(live: true),
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-        ],
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: () => _reload(live: true),
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-                children: _status == null ? [_notice(pal, _error ?? 'Nothing to show yet.')] : _body(pal),
-              ),
+      backgroundColor: p.bgTop,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [p.bgTop, p.bgBottom]),
+        ),
+        child: SafeArea(
+          child: Column(children: [
+            _topBar(p),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : RefreshIndicator(
+                      onRefresh: () => _reload(live: true),
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
+                        children: _status == null ? [_banner(p, _error ?? 'Nothing to show yet.', _slowC)] : _body(p),
+                      ),
+                    ),
             ),
+          ]),
+        ),
+      ),
     );
   }
 
-  List<Widget> _body(_Pal pal) {
+  Widget _topBar(_Pal p) {
+    final st = _map(_status?['state']);
+    final brake = st['brakePaused'] == true;
+    final on = st['enabled'] == true && !brake;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      child: Row(children: [
+        _roundBtn(p, Icons.arrow_back_ios_new_rounded, () => Navigator.maybePop(context)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Signal Grid', style: TextStyle(color: p.ink, fontSize: 17, fontWeight: FontWeight.w800)),
+            Text('Paper trading agent · pretend money', style: TextStyle(color: p.muted, fontSize: 11.5)),
+          ]),
+        ),
+        if (_status != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: (brake ? _loss : on ? _up : p.muted).withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.circle, size: 8, color: brake ? _loss : on ? _up : p.muted),
+              const SizedBox(width: 6),
+              Text(brake ? 'Paused' : on ? 'Running' : 'Stopped',
+                  style: TextStyle(color: brake ? _loss : on ? _up : p.muted, fontSize: 12, fontWeight: FontWeight.w800)),
+            ]),
+          ),
+        const SizedBox(width: 8),
+        _roundBtn(p, Icons.refresh_rounded, _busy ? null : () => _reload(live: true)),
+      ]),
+    );
+  }
+
+  List<Widget> _body(_Pal p) {
     final s = _status!;
     final st = _map(s['state']);
     final cfg = _map(s['config']);
     final snap = _map(st['snapshot']);
-    final today = _map(s['today']);
-    final enabled = st['enabled'] == true;
-    final brake = st['brakePaused'] == true;
-    final positions = ((snap['positions'] as List?) ?? const []).whereType<Map>().toList();
     final shadow = st['shadow'] is Map ? _map(st['shadow']) : null;
-    final asset = (snap['asset'] ?? '').toString();
     return [
-      _chipRow(pal, [
-        _chip('VERSION 1 · READ-ONLY', _violet),
-        _chip('PAPER ONLY', _pink),
-        _chip('NO ORDERS', _amber),
-      ]),
-      const SizedBox(height: 10),
-      if ((cfg['problem'] ?? '').toString().isNotEmpty) _notice(pal, cfg['problem'].toString(), color: _amber),
-      if ((s['liveError'] ?? '').toString().isNotEmpty) _notice(pal, s['liveError'].toString(), color: _red),
-      if (brake) _notice(pal, 'Paused by the \$25 brake. ${st['brakeReason'] ?? ''}. Review the log, then press Start to turn it back on.', color: _red),
-      _plainWords(pal, s, st, snap, today, shadow),
-      _chartCard(pal, snap, shadow),
-      _card(pal, title: 'Agent', children: [
-        Row(children: [
-          Icon(Icons.circle, size: 12, color: brake ? _red : (enabled ? _green : pal.muted)),
-          const SizedBox(width: 8),
-          Text(brake ? 'Paused (brake)' : (enabled ? 'Running' : 'Stopped'),
-              style: TextStyle(color: pal.ink, fontWeight: FontWeight.w800, fontSize: 16)),
-          const Spacer(),
-          Text('Now: ${s['nowEt'] ?? ''}', style: TextStyle(color: pal.muted, fontSize: 11)),
-        ]),
-        const SizedBox(height: 6),
-        Text('Last check: ${_ago(st['lastTickAt'])} · checks every 15 minutes on the server',
-            style: TextStyle(color: pal.muted, fontSize: 12)),
-        const SizedBox(height: 12),
-        Row(children: [
-          Expanded(
-            child: FilledButton.icon(
-              style: FilledButton.styleFrom(backgroundColor: enabled && !brake ? _red : _green),
-              onPressed: _busy ? null : () => _setEnabled(!(enabled && !brake)),
-              icon: Icon(enabled && !brake ? Icons.stop_rounded : Icons.play_arrow_rounded),
-              label: Text(enabled && !brake ? 'Stop' : 'Start'),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: _busy ? null : _checkNow,
-              icon: const Icon(Icons.radar_rounded),
-              label: const Text('Check now'),
-            ),
-          ),
-        ]),
-        const SizedBox(height: 8),
-        Text(
-          'Order switch (ALPACA_ORDERS_ENABLED): ${cfg['ordersSwitchOn'] == true ? 'on' : 'off'}. Version 1 has no order code, so no order can be placed either way.',
-          style: TextStyle(color: pal.muted, fontSize: 11.5),
+      _hero(p, s, snap),
+      if ((cfg['problem'] ?? '').toString().isNotEmpty) _banner(p, cfg['problem'].toString(), _down),
+      if ((s['liveError'] ?? '').toString().isNotEmpty) _banner(p, s['liveError'].toString(), _loss),
+      if (st['brakePaused'] == true)
+        _banner(p, 'Paused by the \$25 brake. ${st['brakeReason'] ?? ''}. Look over the trades, then press Start to turn it back on.', _loss),
+      _chartCard(p, snap, shadow),
+      _trendPill(p, snap, shadow, s),
+      _balanceCard(p, s, st, snap),
+      shadow != null ? _positionCard(p, shadow, snap) : _ticketCard(p, s, snap),
+      _controls(p, st),
+      _tradesCard(p, s),
+      _activityCard(p),
+      _rulesCard(p, s),
+      Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Text(
+          'Version 1 is read-only: no order is ever sent to Alpaca. Order switch (ALPACA_ORDERS_ENABLED): ${cfg['ordersSwitchOn'] == true ? 'on' : 'off'}.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: p.muted, fontSize: 11),
         ),
-      ]),
-      _card(pal, title: 'Paper account', children: [
-        if (snap.isEmpty)
-          Text('No reading yet. Press refresh once the keys are set.', style: TextStyle(color: pal.muted))
-        else ...[
-          _kv(pal, 'Paper balance', _usd(snap['equity']), big: true),
-          _kv(pal, 'Buying power', _usd(snap['buyingPower'])),
-          _kv(pal, 'Cash', _usd(snap['cash'])),
-          _kv(pal, 'Read at', (snap['etTime'] ?? '').toString()),
-          Text(
-            'This is pretend money from Alpaca. Buying power shows double because Alpaca offers borrowing (margin); the agent never borrows and only uses \$50 per trade.',
-            style: TextStyle(color: pal.muted, fontSize: 11.5, height: 1.3),
-          ),
-        ],
-      ]),
-      _card(pal, title: 'Market and position', children: [
-        _kv(pal, asset.isEmpty ? 'Price' : '$asset price', snap['price'] == null ? '—' : _usd(snap['price']), big: true),
-        _kv(pal, 'Open position at Alpaca',
-            positions.isEmpty ? 'None' : positions.map((p) => '${p['symbol']} ${_num(p['qty'], 6)} @ ${_usd(p['avgEntry'])}').join(', ')),
-        _kv(pal, 'Would-be position (log only)',
-            shadow == null ? 'None' : '${shadow['symbol']} \$50 bought at ${_usd(shadow['entryPrice'])}'),
-      ]),
-      _card(pal, title: 'Demo profit and loss', children: [
-        _kv(pal, 'Running total (for the \$25 brake)', _usd(st['totalPnl']), color: _pnlColor(st['totalPnl'], pal)),
-        _kv(pal, 'Today (for the \$10 daily stop)', _usd(today['day_pnl'] ?? 0), color: _pnlColor(today['day_pnl'], pal)),
-        _kv(pal, 'Would-be trades today', '${today['trades'] ?? 0}'),
-        _kv(pal, 'Start-of-day balance', today['start_equity'] == null ? '—' : _usd(today['start_equity'])),
-      ]),
-      _card(pal, title: 'Trading rules (read-only)', children: [
-        for (final line in ((s['rules'] as List?) ?? const []))
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('•  ', style: TextStyle(color: _violet, fontWeight: FontWeight.w900)),
-              Expanded(child: Text(line.toString(), style: TextStyle(color: pal.ink, fontSize: 13, height: 1.3))),
-            ]),
-          ),
-      ]),
-      _card(pal, title: 'Decision log (newest first)', children: [
-        if (_log.isEmpty) Text('No entries yet. The first one comes with the next 15-minute check.', style: TextStyle(color: pal.muted)),
-        for (final r in _log) _logRow(pal, r),
-        if (_log.isNotEmpty && _moreLog)
-          Center(child: TextButton(onPressed: () => _loadLog(more: true), child: const Text('Show older'))),
-      ]),
+      ),
     ];
   }
 
-  /// The whole picture in a few plain sentences: trend, market open or closed, the pretend trade, win or lose.
-  Widget _plainWords(_Pal pal, Map<String, dynamic> s, Map<String, dynamic> st, Map<String, dynamic> snap,
-      Map<String, dynamic> today, Map<String, dynamic>? shadow) {
-    final chart = _map(snap['chart']);
-    final trend = (chart['trend'] ?? 'unknown').toString();
+  // ── Hero: asset, big price, change
+
+  Widget _hero(_Pal p, Map<String, dynamic> s, Map<String, dynamic> snap) {
     final market = _map(s['market']);
-    final asset = (market['asset'] ?? snap['asset'] ?? 'SPY').toString();
-    final name = asset == 'SPY' ? 'SPY (a fund that follows the 500 biggest US companies)' : 'Bitcoin (BTC/USD)';
+    final asset = (snap['asset'] ?? market['asset'] ?? 'SPY').toString();
+    final isBtc = asset.startsWith('BTC');
+    final pts = _points(snap);
     final price = _d(snap['price']);
-    final enabled = st['enabled'] == true && st['brakePaused'] != true;
+    final first = pts.isNotEmpty ? _d(pts.first['c']) : 0.0;
+    final chg = first == 0 ? 0.0 : (price - first) / first * 100;
+    final up = chg >= 0;
+    final open = market['open'];
+    final marketText = isBtc
+        ? 'Weekend · Bitcoin trades all day'
+        : open == true
+            ? 'Market open · closes 4:00 PM ET'
+            : open == false
+                ? 'Market closed${_whenOpens(market['nextOpen'])}'
+                : '';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 6, 4, 14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            width: 30,
+            height: 30,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: isBtc ? _btc : _spy),
+            child: Text(isBtc ? '₿' : 'S&P',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: isBtc ? 16 : 9.5)),
+          ),
+          const SizedBox(width: 10),
+          Text(isBtc ? 'BTC/USD' : 'SPY/USD', style: TextStyle(color: p.ink, fontSize: 17, fontWeight: FontWeight.w800)),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(isBtc ? 'Bitcoin' : 'S&P 500 fund',
+                overflow: TextOverflow.ellipsis, style: TextStyle(color: p.muted, fontSize: 13)),
+          ),
+        ]),
+        const SizedBox(height: 8),
+        Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+          Expanded(
+            child: FittedBox(
+              alignment: Alignment.centerLeft,
+              fit: BoxFit.scaleDown,
+              child: Text(price == 0 ? '—' : _money(price, sign: false, dollar: false),
+                  style: TextStyle(color: p.ink, fontSize: 42, fontWeight: FontWeight.w600, letterSpacing: -1,
+                      fontFeatures: const [FontFeature.tabularFigures()])),
+            ),
+          ),
+          if (pts.length > 1)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(color: (up ? _up : _loss).withValues(alpha: 0.14), borderRadius: BorderRadius.circular(10)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(up ? Icons.arrow_drop_up_rounded : Icons.arrow_drop_down_rounded, color: up ? _up : _loss, size: 20),
+                Text('${chg.abs().toStringAsFixed(2)}%', style: TextStyle(color: up ? _up : _loss, fontWeight: FontWeight.w800, fontSize: 13)),
+              ]),
+            ),
+        ]),
+        if (marketText.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Row(children: [
+            Icon(Icons.circle, size: 7, color: (isBtc || open == true) ? _up : p.muted),
+            const SizedBox(width: 6),
+            Text(marketText, style: TextStyle(color: p.muted, fontSize: 12)),
+            if (pts.length > 1) Text('  ·  change over ${_rangeLabel(math.min(_range, pts.length))}', style: TextStyle(color: p.muted, fontSize: 12)),
+          ]),
+        ],
+      ]),
+    );
+  }
 
-    final (IconData icon, Color tc, String headline) = switch (trend) {
-      'up' => (Icons.trending_up_rounded, _green, '$asset is trending UP'),
-      'down' => (Icons.trending_down_rounded, _red, '$asset is trending DOWN'),
-      'flat' => (Icons.trending_flat_rounded, _amber, '$asset is moving sideways'),
-      _ => (Icons.hourglass_empty_rounded, pal.muted, 'Waiting for the first reading'),
+  // ── Candle chart
+
+  Widget _chartCard(_Pal p, Map<String, dynamic> snap, Map<String, dynamic>? shadow) {
+    final all = _points(snap);
+    if (all.length < 2) {
+      return _card(p, child: SizedBox(height: 120, child: Center(child: Text('The chart appears after the first reading.', style: TextStyle(color: p.muted)))));
+    }
+    final pts = all.sublist(math.max(0, all.length - _range));
+    final entry = shadow == null ? null : _d(shadow['entryPrice']);
+    return _card(
+      p,
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+      child: Column(children: [
+        Row(children: [
+          for (final r in const [12, 24, 48]) ...[
+            _segChip(p, _rangeLabel(r), _range == r, () => setState(() => _range = r)),
+            const SizedBox(width: 6),
+          ],
+          const Spacer(),
+          _segChip(p, 'Trend lines', _lines, () => setState(() => _lines = !_lines), icon: Icons.show_chart_rounded),
+        ]),
+        const SizedBox(height: 10),
+        _CandleChart(points: pts, pal: p, entry: entry, lines: _lines, price: _d(snap['price'])),
+        if (_lines) ...[
+          const SizedBox(height: 8),
+          Wrap(spacing: 14, runSpacing: 4, alignment: WrapAlignment.center, children: [
+            _legend(p, _fastC, 'Fast line (45 min)'),
+            _legend(p, _slowC, 'Slow line (1 h 45 min)'),
+            if (entry != null) _legend(p, _btc, 'Your pretend buy'),
+          ]),
+        ],
+      ]),
+    );
+  }
+
+  // ── What the agent thinks, in one line
+
+  Widget _trendPill(_Pal p, Map<String, dynamic> snap, Map<String, dynamic>? shadow, Map<String, dynamic> s) {
+    final trend = (_map(snap['chart'])['trend'] ?? 'unknown').toString();
+    final st = _map(s['state']);
+    final running = st['enabled'] == true && st['brakePaused'] != true;
+    final (Color c, IconData icon, String title) = switch (trend) {
+      'up' => (_up, Icons.trending_up_rounded, 'Trend is UP'),
+      'down' => (_loss, Icons.trending_down_rounded, 'Trend is DOWN'),
+      'flat' => (_down, Icons.trending_flat_rounded, 'Moving sideways'),
+      _ => (_slowC, Icons.hourglass_top_rounded, 'Waiting for data'),
     };
-
-    final lines = <String>[];
-    // 1. Is anything happening right now?
-    if (market['open'] == true && asset != 'SPY') {
-      lines.add('It is the weekend, so the agent watches $name, which trades all day.');
-    } else if (market['open'] == true) {
-      lines.add('The stock market is open now. The agent looks at $name every 15 minutes.');
-    } else if (market['open'] == false) {
-      lines.add('The stock market is closed now, so nothing happens until it opens again${_whenOpens(market['nextOpen'])}.');
-    }
-    if (!enabled) lines.add('The agent is stopped. Press Start below to let it watch the market.');
-
-    // 2. The pretend trade and win or lose.
-    if (shadow != null) {
-      final entry = _d(shadow['entryPrice']);
-      final qty = _d(shadow['qty']);
-      final now = shadow['symbol'] == asset ? price : entry;
-      final pl = qty * (now - entry);
-      final pct = entry == 0 ? 0 : (now - entry) / entry * 100;
-      final up = pl >= 0;
-      lines.add('The agent is holding a pretend \$50 of ${shadow['symbol']}, bought at ${_usd(entry)}. '
-          'Right now that would be ${up ? 'UP' : 'DOWN'} ${_usd(pl.abs())} (${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%).');
-      lines.add('It sells to take the win at ${_usd(entry * 1.03)} (about +\$1.50), or to stop the loss at ${_usd(entry * 0.985)} '
-          '(about -\$0.75), or when the trend turns down.');
-    } else {
-      lines.add('No pretend trade is open. The agent only buys \$50 at the moment the trend turns UP '
-          '(the pink fast line crosses above the purple slow line).');
-      if (trend == 'up') {
-        lines.add('The trend is already up, but it turned up earlier, so the agent waits for the next fresh turn instead of buying late.');
-      } else if (trend == 'down') {
-        lines.add('The trend is down, so the agent waits. Buying now would likely lose.');
-      }
-    }
-
-    // 3. Score so far.
-    final total = _d(st['totalPnl']);
-    final day = _d(today['day_pnl']);
-    lines.add(total == 0 && day == 0
-        ? 'Score so far: no pretend wins or losses yet.'
-        : 'Score so far: ${total >= 0 ? 'won' : 'lost'} ${_usd(total.abs())} in total, ${day >= 0 ? 'won' : 'lost'} ${_usd(day.abs())} today (pretend money).');
-    lines.add('How you win or lose: after a buy, if the price goes UP you win, if it goes DOWN you lose. Version 1 only pretends, no money moves.');
-
-    return _card(pal, title: 'In plain words', children: [
-      Row(children: [
+    final sub = !running
+        ? 'Agent is stopped. Press Start to let it watch.'
+        : shadow != null
+            ? 'Holding a pretend trade. It sells at the target, the stop, or when the trend turns down.'
+            : trend == 'up'
+                ? 'The turn up already happened. It waits for the next fresh turn up so it never buys late.'
+                : trend == 'down'
+                    ? 'Prices are falling, so it waits. It buys only when the fast line crosses above the slow line.'
+                    : 'It buys only when the fast line crosses above the slow line.';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        gradient: LinearGradient(colors: [c.withValues(alpha: p.light ? 0.16 : 0.22), c.withValues(alpha: 0.04)]),
+        border: Border.all(color: c.withValues(alpha: 0.35)),
+      ),
+      child: Row(children: [
         Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: tc.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
-          child: Icon(icon, color: tc, size: 26),
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(14)),
+          child: Icon(icon, color: Colors.white),
         ),
         const SizedBox(width: 12),
-        Expanded(child: Text(headline, style: TextStyle(color: pal.ink, fontSize: 18, fontWeight: FontWeight.w900))),
-      ]),
-      const SizedBox(height: 10),
-      for (final l in lines)
-        Padding(
-          padding: const EdgeInsets.only(bottom: 7),
-          child: Text(l, style: TextStyle(color: pal.ink, fontSize: 13.5, height: 1.35)),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: TextStyle(color: p.ink, fontSize: 16, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 2),
+            Text(sub, style: TextStyle(color: p.muted, fontSize: 12.5, height: 1.3)),
+          ]),
         ),
-    ]);
-  }
-
-  Widget _chartCard(_Pal pal, Map<String, dynamic> snap, Map<String, dynamic>? shadow) {
-    final pts = ((_map(snap['chart'])['points'] as List?) ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
-    if (pts.length < 2) return const SizedBox.shrink();
-    final entry = shadow == null ? null : _d(shadow['entryPrice']);
-    return _card(pal, title: 'Last 4 hours of ${snap['asset'] ?? ''}', children: [
-      SizedBox(
-        height: 180,
-        width: double.infinity,
-        child: CustomPaint(painter: _ChartPainter(pts, pal, entry)),
-      ),
-      const SizedBox(height: 8),
-      Wrap(spacing: 14, runSpacing: 4, children: [
-        _legend(pal, pal.ink, 'Price'),
-        _legend(pal, _pink, 'Fast line (last 45 min)'),
-        _legend(pal, _violet, 'Slow line (last 1 h 45 min)'),
-        if (entry != null) _legend(pal, _amber, 'Pretend buy price'),
       ]),
-      const SizedBox(height: 6),
-      Text('Pink above purple means prices are rising lately. The agent buys when pink crosses up through purple, and sells when it crosses back down.',
-          style: TextStyle(color: pal.muted, fontSize: 11.5, height: 1.3)),
-    ]);
+    );
   }
 
-  Widget _legend(_Pal pal, Color c, String t) => Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(width: 14, height: 3, color: c),
+  // ── Balance and score
+
+  Widget _balanceCard(_Pal p, Map<String, dynamic> s, Map<String, dynamic> st, Map<String, dynamic> snap) {
+    final today = _map(s['today']);
+    final rec = _map(s['record']);
+    final ticket = _map(s['ticket']);
+    final total = _d(st['totalPnl']);
+    final day = _d(today['day_pnl']);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(26),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1E1B4B), Color(0xFF312E81), Color(0xFF6D28D9)],
+        ),
+        boxShadow: [BoxShadow(color: const Color(0xFF6D28D9).withValues(alpha: 0.30), blurRadius: 24, offset: const Offset(0, 10))],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Text('Paper balance', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(999)),
+            child: const Text('PRETEND MONEY', style: TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w900, letterSpacing: 0.8)),
+          ),
+        ]),
+        const SizedBox(height: 4),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(snap['equity'] == null ? '—' : _money(_d(snap['equity']), sign: false),
+              style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+        ),
+        const SizedBox(height: 2),
+        Text('Buying power ${_money(_d(snap['buyingPower']), sign: false)} · the agent uses only \$${_d(ticket['amount']).toStringAsFixed(0)} a trade',
+            style: const TextStyle(color: Colors.white60, fontSize: 11.5)),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(child: _darkStat('Today', _money(day), day > 0 ? _up : day < 0 ? _loss : Colors.white)),
+          const SizedBox(width: 8),
+          Expanded(child: _darkStat('All time', _money(total), total > 0 ? _up : total < 0 ? _loss : Colors.white)),
+          const SizedBox(width: 8),
+          Expanded(child: _darkStat('Wins / losses', '${rec['wins'] ?? 0} / ${rec['losses'] ?? 0}', Colors.white)),
+        ]),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(child: _darkStat('Trades today', '${today['trades'] ?? 0} of ${ticket['maxTradesToday'] ?? 4}', Colors.white)),
+          const SizedBox(width: 8),
+          Expanded(child: _darkStat('Daily stop', '-\$10', Colors.white)),
+          const SizedBox(width: 8),
+          Expanded(child: _darkStat('Total brake', '-\$25', Colors.white)),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _darkStat(String k, String v, Color c) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(14)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(k, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, fontSize: 10.5)),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(v, style: TextStyle(color: c, fontSize: 15, fontWeight: FontWeight.w800)),
+          ),
+        ]),
+      );
+
+  // ── Open pretend position
+
+  Widget _positionCard(_Pal p, Map<String, dynamic> sh, Map<String, dynamic> snap) {
+    final entry = _d(sh['entryPrice']);
+    final qty = _d(sh['qty']);
+    final sameAsset = sh['symbol'] == snap['asset'];
+    final now = sameAsset ? _d(snap['price']) : entry;
+    final worth = qty * now;
+    final pl = worth - 50;
+    final pct = entry == 0 ? 0.0 : (now - entry) / entry * 100;
+    final win = pl >= 0;
+    final stop = entry * 0.985;
+    final target = entry * 1.03;
+    // Where the price sits between the stop (0) and the target (1); the buy price is at 1/3.
+    final pos = ((now - stop) / (target - stop)).clamp(0.0, 1.0);
+    return _card(
+      p,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          _sectionTitle(p, 'Your pretend position'),
+          const Spacer(),
+          _pill('OPEN', _up),
+        ]),
+        const SizedBox(height: 12),
+        Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text(_money(pl), style: TextStyle(color: win ? _up : _loss, fontSize: 34, fontWeight: FontWeight.w800)),
+          const SizedBox(width: 8),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text('${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%', style: TextStyle(color: win ? _up : _loss, fontWeight: FontWeight.w800)),
+          ),
+        ]),
+        Text(win ? 'You would be winning right now' : 'You would be losing right now', style: TextStyle(color: p.muted, fontSize: 12.5)),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(child: _tile(p, 'You put in', _money(50, sign: false))),
+          const SizedBox(width: 8),
+          Expanded(child: _tile(p, 'Worth now', _money(worth, sign: false), color: win ? _up : _loss)),
+        ]),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(child: _tile(p, 'Bought at', _money(entry, sign: false))),
+          const SizedBox(width: 8),
+          Expanded(child: _tile(p, 'Shares', '${qty.toStringAsFixed(qty < 0.01 ? 6 : 4)} ${sh['symbol']}')),
+        ]),
+        const SizedBox(height: 16),
+        LayoutBuilder(builder: (context, c) {
+          final w = c.maxWidth;
+          return SizedBox(
+            height: 26,
+            child: Stack(clipBehavior: Clip.none, children: [
+              Positioned(
+                left: 0,
+                right: 0,
+                top: 9,
+                child: Container(
+                  height: 8,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(99),
+                    gradient: const LinearGradient(colors: [_loss, Color(0xFFF59E0B), _up], stops: [0, 0.33, 1]),
+                  ),
+                ),
+              ),
+              Positioned(left: w / 3 - 1, top: 4, child: Container(width: 2, height: 18, color: p.ink.withValues(alpha: 0.5))),
+              Positioned(
+                left: (pos * w - 9).clamp(0.0, w - 18),
+                top: 4,
+                child: Container(
+                  width: 18,
+                  height: 18,
+                  decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: p.ink, width: 3)),
+                ),
+              ),
+            ]),
+          );
+        }),
+        const SizedBox(height: 6),
+        Row(children: [
+          Expanded(
+            child: Text('Stop loss\n${_money(stop, sign: false)} · -\$0.75',
+                style: const TextStyle(color: _loss, fontSize: 11.5, fontWeight: FontWeight.w700, height: 1.3)),
+          ),
+          Expanded(
+            child: Text('Take profit\n${_money(target, sign: false)} · +\$1.50',
+                textAlign: TextAlign.right, style: const TextStyle(color: _up, fontSize: 11.5, fontWeight: FontWeight.w700, height: 1.3)),
+          ),
+        ]),
+        const SizedBox(height: 6),
+        Text('Bought ${_etLabel(sh['entryAt'])}', style: TextStyle(color: p.muted, fontSize: 11.5)),
+      ]),
+    );
+  }
+
+  // ── No position: the next trade, as a ticket
+
+  Widget _ticketCard(_Pal p, Map<String, dynamic> s, Map<String, dynamic> snap) {
+    final t = _map(s['ticket']);
+    final price = _d(snap['price']);
+    final amount = _d(t['amount']) == 0 ? 50.0 : _d(t['amount']);
+    final shares = price == 0 ? 0 : amount / price;
+    return _card(
+      p,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          _sectionTitle(p, 'Next trade'),
+          const Spacer(),
+          _pill('AUTOMATIC', _slowC),
+        ]),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(999)),
+          child: Row(children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 9),
+                decoration: BoxDecoration(color: p.dark, borderRadius: BorderRadius.circular(999)),
+                alignment: Alignment.center,
+                child: Text('BUY', style: TextStyle(color: p.onDark, fontWeight: FontWeight.w800, fontSize: 12.5)),
+              ),
+            ),
+            Expanded(
+              child: Center(child: Text('SELL', style: TextStyle(color: p.muted, fontWeight: FontWeight.w800, fontSize: 12.5))),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 10),
+        _ticketRow(p, 'Amount it puts in', _money(amount, sign: false), big: true,
+            trailing: price == 0 ? null : '≈ ${shares.toStringAsFixed(shares < 0.01 ? 6 : 4)} ${snap['asset'] ?? ''}'),
+        _ticketRow(p, 'Take profit  +${_d(t['takeProfitPct']).toStringAsFixed(0)}%', '+${_money(_d(t['takeProfitUsd']), sign: false)}',
+            color: _up, trailing: price == 0 ? null : 'sells at ${_money(price * 1.03, sign: false)}'),
+        _ticketRow(p, 'Stop loss  -${_d(t['stopLossPct']).toStringAsFixed(1)}%', '-${_money(_d(t['stopLossUsd']), sign: false)}',
+            color: _loss, trailing: price == 0 ? null : 'sells at ${_money(price * 0.985, sign: false)}'),
+        _ticketRow(p, 'Leverage', 'None (1x)', trailing: 'no borrowing, no shorting'),
+        const SizedBox(height: 10),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(color: p.dark, borderRadius: BorderRadius.circular(999)),
+          alignment: Alignment.center,
+          child: Text('Buys by itself when the trend turns up',
+              style: TextStyle(color: p.onDark, fontWeight: FontWeight.w800, fontSize: 13.5)),
+        ),
+        const SizedBox(height: 6),
+        Center(child: Text('Prices shown use the price right now', style: TextStyle(color: p.muted, fontSize: 11))),
+      ]),
+    );
+  }
+
+  Widget _ticketRow(_Pal p, String k, String v, {bool big = false, Color? color, String? trailing}) => Container(
+        margin: const EdgeInsets.only(top: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(color: p.inner, borderRadius: BorderRadius.circular(16)),
+        child: Row(children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(k, style: TextStyle(color: p.muted, fontSize: 11.5)),
+              const SizedBox(height: 2),
+              Text(v, style: TextStyle(color: color ?? p.ink, fontSize: big ? 24 : 17, fontWeight: FontWeight.w800)),
+            ]),
+          ),
+          if (trailing != null) Text(trailing, style: TextStyle(color: p.muted, fontSize: 11.5)),
+        ]),
+      );
+
+  // ── Start / Stop / Check now
+
+  Widget _controls(_Pal p, Map<String, dynamic> st) {
+    final on = st['enabled'] == true && st['brakePaused'] != true;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(children: [
+        Expanded(
+          flex: 3,
+          child: SizedBox(
+            height: 52,
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: on ? _loss : _up,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+              ),
+              onPressed: _busy ? null : () => _setEnabled(!on),
+              icon: Icon(on ? Icons.stop_rounded : Icons.play_arrow_rounded),
+              label: Text(on ? 'Stop agent' : 'Start agent', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          flex: 2,
+          child: SizedBox(
+            height: 52,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: p.ink,
+                side: BorderSide(color: p.line, width: 1.5),
+                backgroundColor: p.card,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+              ),
+              onPressed: _busy ? null : _checkNow,
+              icon: _busy
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.radar_rounded, size: 18),
+              label: const Text('Check now', style: TextStyle(fontWeight: FontWeight.w800)),
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  // ── Pretend trade history
+
+  Widget _tradesCard(_Pal p, Map<String, dynamic> s) {
+    final trades = ((s['trades'] as List?) ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    return _card(
+      p,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _sectionTitle(p, 'Pretend trades'),
+        const SizedBox(height: 8),
+        if (trades.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Row(children: [
+              Icon(Icons.receipt_long_rounded, color: p.muted),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text('No trades yet. Each buy shows the \$50 put in, and each sell shows what came back and the win or loss.',
+                    style: TextStyle(color: p.muted, fontSize: 12.5, height: 1.3)),
+              ),
+            ]),
+          ),
+        for (final t in trades) _tradeRow(p, t),
+      ]),
+    );
+  }
+
+  Widget _tradeRow(_Pal p, Map<String, dynamic> t) {
+    final buy = t['decision'] == 'would buy';
+    final det = _map(t['details']);
+    final asset = (t['asset'] ?? '').toString();
+    final amount = det['amount'] == null ? 50.0 : _d(det['amount']);
+    final qty = _d(det['qty']);
+    final pnl = _d(det['pnl']);
+    final win = pnl >= 0;
+    final c = buy ? _spy : (win ? _up : _loss);
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: p.line))),
+      child: Row(children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(color: c.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(13)),
+          child: Icon(buy ? Icons.south_west_rounded : Icons.north_east_rounded, color: c, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('${buy ? 'Bought' : 'Sold'} $asset', style: TextStyle(color: p.ink, fontWeight: FontWeight.w800, fontSize: 14)),
+            const SizedBox(height: 2),
+            Text(
+              buy
+                  ? '${qty == 0 ? '' : '${qty.toStringAsFixed(qty < 0.01 ? 6 : 4)} at '}${_money(_d(t['price']), sign: false)}'
+                  : 'at ${_money(_d(t['price']), sign: false)} · ${_short((t['reason'] ?? '').toString())}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: p.muted, fontSize: 11.5),
+            ),
+            Text((t['et_time'] ?? '').toString(), style: TextStyle(color: p.muted, fontSize: 10.5)),
+          ]),
+        ),
+        const SizedBox(width: 8),
+        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text(buy ? '-${_money(amount, sign: false)}' : '+${_money(det['outValue'] == null ? amount + pnl : _d(det['outValue']), sign: false)}',
+              style: TextStyle(color: p.ink, fontWeight: FontWeight.w800, fontSize: 14)),
+          if (!buy)
+            Text('${_money(pnl)}${det['pct'] == null ? '' : ' (${_d(det['pct']) >= 0 ? '+' : ''}${_d(det['pct']).toStringAsFixed(2)}%)'}',
+                style: TextStyle(color: win ? _up : _loss, fontWeight: FontWeight.w800, fontSize: 12)),
+          if (buy) Text('put in', style: TextStyle(color: p.muted, fontSize: 11)),
+        ]),
+      ]),
+    );
+  }
+
+  // ── Every check the agent made
+
+  Widget _activityCard(_Pal p) {
+    final rows = _showAllLog ? _log : _log.take(8).toList();
+    return _card(
+      p,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          _sectionTitle(p, 'Agent activity'),
+          const Spacer(),
+          Text('newest first', style: TextStyle(color: p.muted, fontSize: 11)),
+        ]),
+        const SizedBox(height: 6),
+        if (_log.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Text('Nothing yet. A new line appears with every 15-minute check.', style: TextStyle(color: p.muted, fontSize: 12.5)),
+          ),
+        for (final r in rows) _logRow(p, r),
+        if (_log.length > 8)
+          Center(
+            child: TextButton(
+              onPressed: () async {
+                if (_showAllLog && _moreLog) {
+                  await _loadLog(more: true);
+                } else {
+                  setState(() => _showAllLog = true);
+                }
+              },
+              child: Text(_showAllLog ? (_moreLog ? 'Show older' : 'That is everything') : 'Show all'),
+            ),
+          ),
+      ]),
+    );
+  }
+
+  Widget _logRow(_Pal p, Map<String, dynamic> r) {
+    final decision = (r['decision'] ?? '').toString();
+    final c = switch (decision) {
+      'would buy' => _up,
+      'would sell' => _fastC,
+      'hold' => _slowC,
+      'day start' || 'day end' => _spy,
+      'start' => _up,
+      'stop' => _loss,
+      _ => r['kind'] == 'error' ? _loss : p.muted,
+    };
+    final hasMa = r['fast_ma'] != null && r['slow_ma'] != null;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(margin: const EdgeInsets.only(top: 5), width: 8, height: 8, decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Text(_cap(decision), style: TextStyle(color: c, fontWeight: FontWeight.w800, fontSize: 12.5)),
+              const Spacer(),
+              Text(_shortTime((r['et_time'] ?? '').toString()), style: TextStyle(color: p.muted, fontSize: 10.5)),
+            ]),
+            Text(_cap((r['reason'] ?? '').toString()), style: TextStyle(color: p.ink, fontSize: 12.5, height: 1.3)),
+            if (r['price'] != null || hasMa)
+              Text(
+                [
+                  if (r['asset'] != null && r['price'] != null) '${r['asset']} ${_money(_d(r['price']), sign: false)}',
+                  if (hasMa) 'fast ${_d(r['fast_ma']).toStringAsFixed(2)} · slow ${_d(r['slow_ma']).toStringAsFixed(2)}',
+                ].join('  ·  '),
+                style: TextStyle(color: p.muted, fontSize: 10.5),
+              ),
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  Widget _rulesCard(_Pal p, Map<String, dynamic> s) => _card(
+        p,
+        padding: EdgeInsets.zero,
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: Material(
+            type: MaterialType.transparency,
+            child: ExpansionTile(
+            tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            iconColor: p.ink,
+            collapsedIconColor: p.muted,
+            leading: Icon(Icons.rule_rounded, color: _slowC),
+            title: Text('The rules it follows', style: TextStyle(color: p.ink, fontWeight: FontWeight.w800, fontSize: 14.5)),
+            subtitle: Text('Read-only, set in the code', style: TextStyle(color: p.muted, fontSize: 11.5)),
+            children: [
+              for (final line in ((s['rules'] as List?) ?? const []))
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 7),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Padding(padding: EdgeInsets.only(top: 6), child: Icon(Icons.circle, size: 5, color: _slowC)),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(line.toString(), style: TextStyle(color: p.ink, fontSize: 12.5, height: 1.35))),
+                  ]),
+                ),
+            ],
+            ),
+          ),
+        ),
+      );
+
+  // ── small pieces
+
+  Widget _card(_Pal p, {required Widget child, EdgeInsets padding = const EdgeInsets.all(16)}) => Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: padding,
+        decoration: BoxDecoration(
+          color: p.card,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: p.cardEdge),
+          boxShadow: [BoxShadow(color: p.shadow, blurRadius: 24, offset: const Offset(0, 8))],
+        ),
+        child: child,
+      );
+
+  Widget _banner(_Pal p, String msg, Color c) => Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: c.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: c.withValues(alpha: 0.45)),
+        ),
+        child: Row(children: [
+          Icon(Icons.info_rounded, color: c, size: 20),
+          const SizedBox(width: 10),
+          Expanded(child: Text(msg, style: TextStyle(color: p.ink, fontSize: 12.5, height: 1.35))),
+        ]),
+      );
+
+  Widget _roundBtn(_Pal p, IconData icon, VoidCallback? onTap) => Material(
+        color: p.card,
+        shape: const CircleBorder(),
+        elevation: 0,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: p.cardEdge)),
+            child: Icon(icon, size: 18, color: p.ink),
+          ),
+        ),
+      );
+
+  Widget _segChip(_Pal p, String t, bool on, VoidCallback onTap, {IconData? icon}) => GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+          decoration: BoxDecoration(color: on ? p.dark : p.chip, borderRadius: BorderRadius.circular(999)),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            if (icon != null) ...[Icon(icon, size: 14, color: on ? p.onDark : p.muted), const SizedBox(width: 4)],
+            Text(t, style: TextStyle(color: on ? p.onDark : p.muted, fontWeight: FontWeight.w700, fontSize: 11.5)),
+          ]),
+        ),
+      );
+
+  Widget _legend(_Pal p, Color c, String t) => Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 14, height: 3, decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(2))),
         const SizedBox(width: 5),
-        Text(t, style: TextStyle(color: pal.muted, fontSize: 11)),
+        Text(t, style: TextStyle(color: p.muted, fontSize: 11)),
       ]);
+
+  Widget _pill(String t, Color c) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(color: c.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(999)),
+        child: Text(t, style: TextStyle(color: c, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.6)),
+      );
+
+  Widget _sectionTitle(_Pal p, String t) => Text(t, style: TextStyle(color: p.ink, fontSize: 16, fontWeight: FontWeight.w800));
+
+  Widget _tile(_Pal p, String k, String v, {Color? color}) => Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: p.inner, borderRadius: BorderRadius.circular(16)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(k, style: TextStyle(color: p.muted, fontSize: 11.5)),
+          const SizedBox(height: 3),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(v, style: TextStyle(color: color ?? p.ink, fontSize: 16, fontWeight: FontWeight.w800)),
+          ),
+        ]),
+      );
 
   String _whenOpens(dynamic iso) {
     // Alpaca gives the time with the New York offset, e.g. 2026-11-23T09:30:00-05:00: read the clock part as ET.
     final s = '${iso ?? ''}';
     final d = DateTime.tryParse(s.length >= 19 ? s.substring(0, 19) : '');
     if (d == null) return '';
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
-    return ' on ${days[d.weekday - 1]} at $h:${d.minute.toString().padLeft(2, '0')} ${d.hour < 12 ? 'AM' : 'PM'} ET';
-  }
-
-  Widget _logRow(_Pal pal, Map<String, dynamic> r) {
-    final decision = (r['decision'] ?? '').toString();
-    final c = switch (decision) {
-      'would buy' => _green,
-      'would sell' => _pink,
-      'hold' => _violet,
-      'day start' || 'day end' => const Color(0xFF60A5FA),
-      'start' => _green,
-      'stop' => _red,
-      _ => r['kind'] == 'error' ? _red : pal.muted,
-    };
-    final hasMa = r['fast_ma'] != null && r['slow_ma'] != null;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: pal.inner,
-        borderRadius: BorderRadius.circular(12),
-        border: Border(left: BorderSide(color: c, width: 3)),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(child: Text((r['et_time'] ?? '').toString(), style: TextStyle(color: pal.muted, fontSize: 11))),
-          _chip(decision.toUpperCase(), c),
-        ]),
-        const SizedBox(height: 4),
-        if (r['asset'] != null || r['price'] != null)
-          Text(
-            [
-              if (r['asset'] != null) r['asset'].toString(),
-              if (r['price'] != null) _usd(r['price']),
-              if (hasMa) 'fast ${_num(r['fast_ma'], 2)} / slow ${_num(r['slow_ma'], 2)}',
-              if (r['signal'] != null) 'signal: ${r['signal']}',
-            ].join(' · '),
-            style: TextStyle(color: pal.ink, fontSize: 12.5, fontWeight: FontWeight.w700),
-          ),
-        Text((r['reason'] ?? '').toString(), style: TextStyle(color: pal.ink, fontSize: 12.5, height: 1.3)),
-        if (r['balance'] != null || r['total_pnl'] != null)
-          Text(
-            [
-              if (r['balance'] != null) 'balance ${_usd(r['balance'])}',
-              if (r['total_pnl'] != null) 'running P/L ${_usd(r['total_pnl'])}',
-            ].join(' · '),
-            style: TextStyle(color: pal.muted, fontSize: 11),
-          ),
-      ]),
-    );
-  }
-
-  Widget _card(_Pal pal, {required String title, required List<Widget> children}) => Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: pal.card,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: pal.line),
-          boxShadow: pal.light ? [BoxShadow(color: _violet.withValues(alpha: 0.12), blurRadius: 18, offset: const Offset(0, 6))] : null,
-        ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title.toUpperCase(),
-              style: TextStyle(color: pal.light ? const Color(0xFF7C3AED) : _violet, fontSize: 11.5, fontWeight: FontWeight.w900, letterSpacing: 1)),
-          const SizedBox(height: 10),
-          ...children,
-        ]),
-      );
-
-  Widget _kv(_Pal pal, String k, String v, {bool big = false, Color? color}) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Expanded(child: Text(k, style: TextStyle(color: pal.muted, fontSize: 13))),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(v,
-                textAlign: TextAlign.right,
-                style: TextStyle(color: color ?? pal.ink, fontSize: big ? 20 : 13.5, fontWeight: big ? FontWeight.w900 : FontWeight.w700)),
-          ),
-        ]),
-      );
-
-  Widget _notice(_Pal pal, String msg, {Color color = _violet}) => Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withValues(alpha: 0.5)),
-        ),
-        child: Text(msg, style: TextStyle(color: pal.ink, fontSize: 13, height: 1.35)),
-      );
-
-  Widget _chipRow(_Pal pal, List<Widget> chips) => Wrap(spacing: 6, runSpacing: 6, children: chips);
-
-  Widget _chip(String t, Color c) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(color: c.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(999)),
-        child: Text(t, style: TextStyle(color: c, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.6)),
-      );
-
-  Color _pnlColor(dynamic v, _Pal pal) {
-    final n = _d(v);
-    if (n > 0) return _green;
-    if (n < 0) return _red;
-    return pal.ink;
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return ' · opens ${days[d.weekday - 1]} ${_clock(d)} ET';
   }
 }
 
-class _ChartPainter extends CustomPainter {
-  _ChartPainter(this.pts, this.pal, this.entry);
-  final List<Map<String, dynamic>> pts;
+// ───────────────────────────────────────────────────────────── candle chart with touch
+
+class _CandleChart extends StatefulWidget {
+  const _CandleChart({required this.points, required this.pal, required this.entry, required this.lines, required this.price});
+  final List<Map<String, dynamic>> points;
   final _Pal pal;
   final double? entry;
+  final bool lines;
+  final double price;
+
+  @override
+  State<_CandleChart> createState() => _CandleChartState();
+}
+
+class _CandleChartState extends State<_CandleChart> {
+  int? _touch;
+
+  void _hit(Offset local, double width) {
+    final n = widget.points.length;
+    final i = (local.dx / width * n).floor().clamp(0, n - 1);
+    if (i != _touch) setState(() => _touch = i);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, c) {
+      final w = c.maxWidth;
+      return GestureDetector(
+        onTapDown: (d) => _hit(d.localPosition, w),
+        onHorizontalDragStart: (d) => _hit(d.localPosition, w),
+        onHorizontalDragUpdate: (d) => _hit(d.localPosition, w),
+        onHorizontalDragEnd: (_) => setState(() => _touch = null),
+        onTapUp: (_) => Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) setState(() => _touch = null);
+        }),
+        child: SizedBox(
+          height: 250,
+          width: w,
+          child: CustomPaint(
+            painter: _CandlePainter(widget.points, widget.pal, widget.entry, widget.lines, widget.price, _touch,
+                DefaultTextStyle.of(context).style.fontFamily),
+          ),
+        ),
+      );
+    });
+  }
+}
+
+class _CandlePainter extends CustomPainter {
+  _CandlePainter(this.pts, this.p, this.entry, this.lines, this.price, this.touch, this.font);
+  final String? font;
+  final List<Map<String, dynamic>> pts;
+  final _Pal p;
+  final double? entry;
+  final bool lines;
+  final double price;
+  final int? touch;
+
+  static const _axisH = 18.0;
 
   @override
   void paint(Canvas canvas, Size size) {
+    final h = size.height - _axisH;
     final vals = <double>[
-      for (final p in pts) ...[
-        _d(p['c']),
-        if (p['f'] != null) _d(p['f']),
-        if (p['s'] != null) _d(p['s']),
-      ],
+      for (final q in pts) ...[_d(q['h']), _d(q['l'])],
+      if (lines)
+        for (final q in pts) ...[if (q['f'] != null) _d(q['f']), if (q['s'] != null) _d(q['s'])],
       ?entry,
+      if (price > 0) price,
     ];
-    var lo = vals.reduce((a, b) => a < b ? a : b);
-    var hi = vals.reduce((a, b) => a > b ? a : b);
+    var lo = vals.reduce(math.min);
+    var hi = vals.reduce(math.max);
     if (hi - lo < 1e-9) {
       hi += 1;
       lo -= 1;
     }
-    final pad = (hi - lo) * 0.08;
+    final pad = (hi - lo) * 0.10;
     lo -= pad;
     hi += pad;
-    double x(int i) => i / (pts.length - 1) * size.width;
-    double y(double v) => size.height - (v - lo) / (hi - lo) * size.height;
+    final n = pts.length;
+    final step = size.width / n;
+    double cx(int i) => step * i + step / 2;
+    double y(double v) => h - (v - lo) / (hi - lo) * h;
 
+    // soft grid
     final grid = Paint()
-      ..color = pal.line
+      ..color = p.line.withValues(alpha: 0.7)
       ..strokeWidth = 1;
-    for (var i = 0; i <= 3; i++) {
-      final gy = size.height * i / 3;
-      canvas.drawLine(Offset(0, gy), Offset(size.width, gy), grid);
-    }
-
-    void line(String key, Color c, double w) {
-      final path = Path();
-      var started = false;
-      for (var i = 0; i < pts.length; i++) {
-        final v = pts[i][key];
-        if (v == null) continue;
-        final o = Offset(x(i), y(_d(v)));
-        started ? path.lineTo(o.dx, o.dy) : path.moveTo(o.dx, o.dy);
-        started = true;
-      }
-      canvas.drawPath(
-          path,
-          Paint()
-            ..color = c
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = w
-            ..strokeJoin = StrokeJoin.round);
-    }
-
-    if (entry != null) {
-      final ey = y(entry!);
-      final p = Paint()
-        ..color = _amber
-        ..strokeWidth = 1.5;
-      for (var dx = 0.0; dx < size.width; dx += 8) {
-        canvas.drawLine(Offset(dx, ey), Offset(dx + 4, ey), p);
+    for (var i = 1; i <= 3; i++) {
+      final gy = h * i / 4;
+      for (var x = 0.0; x < size.width; x += 6) {
+        canvas.drawLine(Offset(x, gy), Offset(x + 2, gy), grid);
       }
     }
-    line('s', _violet, 2.2);
-    line('f', _pink, 2.2);
-    line('c', pal.ink.withValues(alpha: 0.85), 1.4);
 
+    // trend lines under the candles
+    if (lines) {
+      void line(String key, Color c) {
+        final path = Path();
+        var started = false;
+        for (var i = 0; i < n; i++) {
+          final v = pts[i][key];
+          if (v == null) continue;
+          final o = Offset(cx(i), y(_d(v)));
+          started ? path.lineTo(o.dx, o.dy) : path.moveTo(o.dx, o.dy);
+          started = true;
+        }
+        canvas.drawPath(
+            path,
+            Paint()
+              ..color = c.withValues(alpha: 0.85)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 2
+              ..strokeCap = StrokeCap.round
+              ..strokeJoin = StrokeJoin.round);
+      }
+
+      line('s', _slowC);
+      line('f', _fastC);
+    }
+
+    // candles
+    final bodyW = math.max(2.0, step * 0.62);
+    for (var i = 0; i < n; i++) {
+      final q = pts[i];
+      final o = _d(q['o']), c = _d(q['c']), hh = _d(q['h']), ll = _d(q['l']);
+      final rising = c >= o;
+      final col = rising ? _up : _down;
+      final dim = touch != null && touch != i;
+      final paint = Paint()..color = dim ? col.withValues(alpha: 0.45) : col;
+      canvas.drawLine(Offset(cx(i), y(hh)), Offset(cx(i), y(ll)), paint..strokeWidth = 1.4);
+      final top = y(math.max(o, c));
+      final bot = y(math.min(o, c));
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(Rect.fromLTRB(cx(i) - bodyW / 2, top, cx(i) + bodyW / 2, math.max(bot, top + 1.5)), const Radius.circular(2)),
+        paint..style = PaintingStyle.fill,
+      );
+    }
+
+    // pretend buy price
+    if (entry != null) _dashed(canvas, y(entry!), size.width, _btc, 'Buy ${_money(entry!, sign: false)}', left: true);
+
+    // last price line with a tag
+    if (price > 0) _dashed(canvas, y(price), size.width, p.ink.withValues(alpha: 0.55), _money(price, sign: false));
+
+    // time axis (Eastern Time)
     final tp = TextPainter(textDirection: TextDirection.ltr);
-    for (final (v, dy) in [(hi - pad, 0.0), (lo + pad, size.height - 14)]) {
-      tp.text = TextSpan(text: _usd(v), style: TextStyle(color: pal.muted, fontSize: 10));
+    for (final i in [0, n ~/ 3, 2 * n ~/ 3, n - 1]) {
+      final t = DateTime.tryParse('${pts[i]['t'] ?? ''}');
+      if (t == null) continue;
+      tp.text = TextSpan(text: _clock(_toEt(t)), style: TextStyle(color: p.muted, fontSize: 10, fontFamily: font));
       tp.layout();
-      tp.paint(canvas, Offset(size.width - tp.width, dy));
+      final x = (cx(i) - tp.width / 2).clamp(0.0, size.width - tp.width);
+      tp.paint(canvas, Offset(x, size.height - 13));
+    }
+
+    // touch: crosshair and a dark bubble with the time and price
+    if (touch != null && touch! < n) {
+      final q = pts[touch!];
+      final x = cx(touch!);
+      final cy = y(_d(q['c']));
+      final cross = Paint()
+        ..color = p.ink.withValues(alpha: 0.5)
+        ..strokeWidth = 1;
+      for (var yy = 0.0; yy < h; yy += 6) {
+        canvas.drawLine(Offset(x, yy), Offset(x, yy + 3), cross);
+      }
+      canvas.drawCircle(Offset(x, cy), 6, Paint()..color = p.card);
+      canvas.drawCircle(
+          Offset(x, cy),
+          6,
+          Paint()
+            ..color = p.ink
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.5);
+      final t = DateTime.tryParse('${q['t'] ?? ''}');
+      final label = '${t == null ? '' : '${_clock(_toEt(t))} ET\n'}${_money(_d(q['c']), sign: false)}';
+      tp.text = TextSpan(
+        text: label,
+        style: TextStyle(color: p.onDark, fontSize: 11.5, fontWeight: FontWeight.w800, height: 1.3, fontFamily: font),
+      );
+      tp.textAlign = TextAlign.center;
+      tp.layout();
+      final bw = tp.width + 18, bh = tp.height + 10;
+      final bx = (x - bw / 2).clamp(0.0, size.width - bw);
+      final by = math.max(0.0, cy - bh - 14);
+      canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(bx, by, bw, bh), const Radius.circular(10)), Paint()..color = p.dark);
+      tp.paint(canvas, Offset(bx + 9, by + 5));
     }
   }
 
+  void _dashed(Canvas canvas, double yy, double width, Color c, String label, {bool left = false}) {
+    final paint = Paint()
+      ..color = c
+      ..strokeWidth = 1.2;
+    for (var x = 0.0; x < width; x += 7) {
+      canvas.drawLine(Offset(x, yy), Offset(x + 3.5, yy), paint);
+    }
+    final tp = TextPainter(
+      text: TextSpan(text: label, style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800, fontFamily: font)),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final bw = tp.width + 12, bh = tp.height + 6;
+    final bx = left ? 0.0 : width - bw;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromLTWH(bx, yy - bh / 2, bw, bh), const Radius.circular(7)),
+      Paint()..color = left ? _btc : p.dark,
+    );
+    tp.paint(canvas, Offset(bx + 6, yy - bh / 2 + 3));
+  }
+
   @override
-  bool shouldRepaint(covariant _ChartPainter old) => old.pts != pts || old.entry != entry;
+  bool shouldRepaint(covariant _CandlePainter old) =>
+      old.pts != pts || old.touch != touch || old.lines != lines || old.entry != entry || old.price != price || old.p.light != p.light;
 }
+
+// ───────────────────────────────────────────────────────────── palette and helpers
 
 class _Pal {
   _Pal(this.light);
   final bool light;
-  Color get bg => light ? Colors.white : const Color(0xFF0B0F17);
-  Color get card => light ? Colors.white : const Color(0xFF131A26);
-  Color get inner => light ? const Color(0xFFF8FAFC) : const Color(0xFF0F1520);
-  Color get line => light ? const Color(0xFFE9E3FB) : const Color(0xFF1F2A3A);
-  Color get ink => light ? const Color(0xFF0F172A) : Colors.white;
-  Color get muted => light ? const Color(0xFF64748B) : const Color(0xFF8B98AD);
+  Color get bgTop => light ? const Color(0xFFEDEFFA) : const Color(0xFF0A0D18);
+  Color get bgBottom => light ? const Color(0xFFF8F1F2) : const Color(0xFF111529);
+  Color get card => light ? Colors.white.withValues(alpha: 0.92) : const Color(0xFF161B2E);
+  Color get cardEdge => light ? Colors.white : const Color(0xFF232A42);
+  Color get inner => light ? const Color(0xFFF4F5FA) : const Color(0xFF1D2338);
+  Color get chip => light ? const Color(0xFFEFF0F5) : const Color(0xFF20263B);
+  Color get line => light ? const Color(0xFFE7E8F0) : const Color(0xFF262D45);
+  Color get shadow => light ? const Color(0xFF6366F1).withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.35);
+  Color get ink => light ? const Color(0xFF12141C) : Colors.white;
+  Color get muted => light ? const Color(0xFF8A8FA3) : const Color(0xFF8D95AB);
+  Color get dark => light ? const Color(0xFF16171D) : Colors.white;
+  Color get onDark => light ? Colors.white : const Color(0xFF16171D);
 }
 
 Map<String, dynamic> _map(dynamic v) => v is Map ? Map<String, dynamic>.from(v) : <String, dynamic>{};
 
 double _d(dynamic v) => v is num ? v.toDouble() : double.tryParse('${v ?? ''}') ?? 0;
 
-String _num(dynamic v, int digits) => _d(v).toStringAsFixed(digits);
+List<Map<String, dynamic>> _points(Map<String, dynamic> snap) =>
+    ((_map(snap['chart'])['points'] as List?) ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
 
-String _usd(dynamic v) {
-  final n = _d(v);
+String _rangeLabel(int candles) => candles <= 12 ? '1H' : candles <= 24 ? '2H' : '4H';
+
+/// $1,234.56 — with a + or - in front when [sign] is on.
+String _money(double n, {bool sign = true, bool dollar = true}) {
   final s = n.abs().toStringAsFixed(2).replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => ',');
-  return '${n < 0 ? '-' : ''}\$$s';
+  final pre = n < 0 ? '-' : (sign && n > 0 ? '+' : '');
+  return '$pre${dollar ? '\$' : ''}$s';
 }
 
-String _ago(dynamic iso) {
+String _clock(DateTime d) {
+  final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
+  return '$h:${d.minute.toString().padLeft(2, '0')} ${d.hour < 12 ? 'AM' : 'PM'}';
+}
+
+/// UTC to New York time (US daylight saving: second Sunday of March to first Sunday of November).
+DateTime _toEt(DateTime t) {
+  final u = t.toUtc();
+  DateTime nthSunday(int year, int month, int nth) {
+    var d = DateTime.utc(year, month, 1);
+    while (d.weekday != DateTime.sunday) {
+      d = d.add(const Duration(days: 1));
+    }
+    return d.add(Duration(days: 7 * (nth - 1)));
+  }
+
+  final start = nthSunday(u.year, 3, 2).add(const Duration(hours: 7)); // 2 AM EST
+  final end = nthSunday(u.year, 11, 1).add(const Duration(hours: 6)); // 2 AM EDT
+  final dst = !u.isBefore(start) && u.isBefore(end);
+  final et = u.subtract(Duration(hours: dst ? 4 : 5));
+  return DateTime(et.year, et.month, et.day, et.hour, et.minute);
+}
+
+String _etLabel(dynamic iso) {
   final t = DateTime.tryParse('${iso ?? ''}');
-  if (t == null) return 'not yet';
-  final m = DateTime.now().difference(t).inMinutes;
-  if (m < 1) return 'just now';
-  if (m < 60) return '$m min ago';
-  final h = m ~/ 60;
-  return h < 48 ? '$h h ago' : '${h ~/ 24} days ago';
+  if (t == null) return '';
+  final e = _toEt(t);
+  const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return '${m[e.month - 1]} ${e.day} at ${_clock(e)} ET';
+}
+
+/// "Fri, Nov 20, 2026, 12:10 PM ET" becomes "Nov 20, 12:10 PM".
+String _shortTime(String s) {
+  final parts = s.split(', ');
+  if (parts.length >= 4) return '${parts[1]}, ${parts[3].replaceAll(' ET', '')}';
+  return s;
+}
+
+String _cap(String s) => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+
+String _short(String s) {
+  final i = s.indexOf('(');
+  return (i > 0 ? s.substring(0, i) : s).trim();
 }

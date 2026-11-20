@@ -212,19 +212,23 @@ async function readAccount(k: Keys) {
 }
 
 /** The last few hours for the app's chart: price, fast line and slow line per 5-minute candle, plus the trend. */
-export function buildChart(times: string[], closes: number[], points = 48) {
-  const out: { t: string; c: number; f: number | null; s: number | null }[] = [];
+export function buildChart(times: string[], closes: number[], points = 48, ohlc?: { o: number; h: number; l: number }[]) {
+  const out: { t: string; o: number; h: number; l: number; c: number; f: number | null; s: number | null }[] = [];
   const from = Math.max(0, closes.length - points);
   for (let i = from; i < closes.length; i++) {
     const upto = closes.slice(0, i + 1);
-    out.push({ t: times[i], c: closes[i], f: sma(upto, PA_RULES.fastMa), s: sma(upto, PA_RULES.slowMa) });
+    const b = ohlc?.[i];
+    out.push({
+      t: times[i], o: b?.o ?? closes[i], h: b?.h ?? closes[i], l: b?.l ?? closes[i], c: closes[i],
+      f: sma(upto, PA_RULES.fastMa), s: sma(upto, PA_RULES.slowMa),
+    });
   }
   const x = crossover(closes);
   const trend = x.fastNow == null || x.slowNow == null ? "unknown" : x.fastNow > x.slowNow ? "up" : x.fastNow < x.slowNow ? "down" : "flat";
   return { points: out, trend, signal: x.signal, fast: x.fastNow, slow: x.slowNow };
 }
 
-async function readBars(asset: string, k: Keys): Promise<{ closes: number[]; times: string[]; price: number; lastBarAt: string }> {
+async function readBars(asset: string, k: Keys): Promise<{ closes: number[]; times: string[]; ohlc: { o: number; h: number; l: number }[]; price: number; lastBarAt: string }> {
   const start = new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString();
   let bars: any[] = [];
   let price = 0;
@@ -243,11 +247,11 @@ async function readBars(asset: string, k: Keys): Promise<{ closes: number[]; tim
   // Oldest first, and only finished candles (a candle that started less than 5 minutes ago is still moving).
   const now = Date.now();
   const done = bars
-    .map((x: any) => ({ t: String(x.t), c: Number(x.c) }))
+    .map((x: any) => ({ t: String(x.t), o: Number(x.o), h: Number(x.h), l: Number(x.l), c: Number(x.c) }))
     .filter((x) => Number.isFinite(x.c) && Date.parse(x.t) + 5 * 60 * 1000 <= now)
     .sort((a, b) => Date.parse(a.t) - Date.parse(b.t));
   if (!price && done.length) price = done[done.length - 1].c;
-  return { closes: done.map((x) => x.c), times: done.map((x) => x.t), price, lastBarAt: done.length ? done[done.length - 1].t : "" };
+  return { closes: done.map((x) => x.c), times: done.map((x) => x.t), ohlc: done.map((x) => ({ o: x.o, h: x.h, l: x.l })), price, lastBarAt: done.length ? done[done.length - 1].t : "" };
 }
 
 // ─────────────────────────────────────────────────────────────── database
@@ -383,7 +387,7 @@ async function runCheck(db: any, source: "cron" | "manual", who = ""): Promise<R
   }
 
   const statePatch: Record<string, unknown> = {
-    snapshot: { ...acct, asset, price: mkt.price, at: now.toISOString(), etTime: et.label, chart: buildChart(mkt.times, mkt.closes) },
+    snapshot: { ...acct, asset, price: mkt.price, at: now.toISOString(), etTime: et.label, chart: buildChart(mkt.times, mkt.closes, 48, mkt.ohlc) },
   };
   let newTotal = totalPnl;
   let newDay = dayPnl;
@@ -411,7 +415,15 @@ async function runCheck(db: any, source: "cron" | "manual", who = ""): Promise<R
     fast_ma: x.fastNow, slow_ma: x.slowNow, signal: sig, decision: d.decision,
     reason: d.reason + (source === "manual" ? " (check run by an admin from the app)" : ""),
     balance: acct.equity, total_pnl: newTotal, day_pnl: newDay,
-    details: { pnl: d.pnl ?? null, candles: mkt.closes.length, lastCandle: mkt.lastBarAt, by: who ? "admin" : "cron" },
+    details: {
+      pnl: d.pnl ?? null, candles: mkt.closes.length, lastCandle: mkt.lastBarAt, by: who ? "admin" : "cron",
+      // The money side of a pretend trade, so the app can show what went in and what came out.
+      ...(d.decision === "would buy" ? { amount: PA_RULES.tradeUsd, qty: PA_RULES.tradeUsd / price, entryPrice: price } : {}),
+      ...(d.decision === "would sell" && shadow ? {
+        amount: PA_RULES.tradeUsd, qty: shadow.qty, entryPrice: shadow.entryPrice, exitPrice: price, entryAt: shadow.entryAt,
+        outValue: round2(shadow.qty * price), pct: round2((price - shadow.entryPrice) / shadow.entryPrice * 100),
+      } : {}),
+    },
   });
   if (statePatch.brake_paused) {
     await writeLog(db, { kind: "control", asset, decision: "no action", reason: "agent paused by the $25 brake. An admin must review and turn it back on.", total_pnl: newTotal });
@@ -497,7 +509,7 @@ export async function handleAlpacaAgent(
         const et = etParts(new Date());
         const asset = et.weekend ? PA_RULES.weekendAsset : PA_RULES.weekdayAsset;
         const [acct, mkt] = await Promise.all([readAccount(cfg.keys), readBars(asset, cfg.keys)]);
-        live = { ...acct, asset, price: mkt.price, at: new Date().toISOString(), etTime: et.label, chart: buildChart(mkt.times, mkt.closes) };
+        live = { ...acct, asset, price: mkt.price, at: new Date().toISOString(), etTime: et.label, chart: buildChart(mkt.times, mkt.closes, 48, mkt.ohlc) };
         await saveState(db, { snapshot: live });
         state.snapshot = live;
       } catch (e) {
@@ -517,6 +529,12 @@ export async function handleAlpacaAgent(
     } catch { /* keep unknown */ }
   }
   const { data: today } = await db.from("ngmy_alpaca_agent_days").select("*").eq("et_day", etNow.dayKey).maybeSingle();
+  const { data: trades } = await db.from("ngmy_alpaca_agent_log").select("id,created_at,et_time,asset,price,decision,reason,details")
+    .in("decision", ["would buy", "would sell"]).order("id", { ascending: false }).limit(40);
+  const { data: closed } = await db.from("ngmy_alpaca_agent_log").select("details")
+    .eq("decision", "would sell").order("id", { ascending: false }).limit(500);
+  const pnls: number[] = (closed ?? []).map((r: any) => Number(r?.details?.pnl ?? 0));
+  const record = { wins: pnls.filter((p) => p > 0).length, losses: pnls.filter((p) => p <= 0).length, trades: pnls.length };
   return {
     status: 200,
     payload: {
@@ -525,6 +543,13 @@ export async function handleAlpacaAgent(
       today: today ?? null,
       liveError,
       market,
+      trades: trades ?? [],
+      record,
+      ticket: {
+        amount: PA_RULES.tradeUsd, takeProfitPct: PA_RULES.takeProfitPct, stopLossPct: PA_RULES.stopLossPct,
+        takeProfitUsd: round2(PA_RULES.tradeUsd * PA_RULES.takeProfitPct / 100), stopLossUsd: round2(PA_RULES.tradeUsd * PA_RULES.stopLossPct / 100),
+        maxTradesToday: etNow.weekend ? PA_RULES.weekendMaxTrades : PA_RULES.weekdayMaxTrades,
+      },
       config: {
         keysSet: !!cfg.keys,
         problem: cfg.problem,
