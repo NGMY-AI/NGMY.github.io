@@ -12,7 +12,7 @@ s=new A.V(Date.now(),0,!1)
 r=J.kU(y.i.a(C.W.aP(0,k,null)),y.b)
 p=r
 o=A.hf(p).k("Y<c2.E>")
-n=A.B(new A.Y(p,new B.fIR(s),o),o.k("M.E"))
+n=A.B(new A.Y(p,new B.fIS(s),o),o.k("M.E"))
 q=n
 x=8
 return A.b(l.aG("String","saved_invoices_v1",C.W.av(q,null)),$async$aRE)
@@ -44,10 +44,10 @@ if(!y.i.b(t)){s=A.a([],y.k)
 v=s
 x=1
 break}s=J.dd(t,y.B)
-s=A.cF(s,new B.fNa(),s.$ti.k("M.E"),y.y)
+s=A.cF(s,new B.fNb(),s.$ti.k("M.E"),y.y)
 r=A.a4(s).k("Y<M.E>")
-s=A.B(new A.Y(s,new B.fNb(),r),r.k("M.E"))
-C.d.b0(s,new B.fNc())
+s=A.B(new A.Y(s,new B.fNc(),r),r.k("M.E"))
+C.d.b0(s,new B.fNd())
 v=s
 x=1
 break}catch(n){s=A.a([],y.k)
@@ -78,23 +78,23 @@ var $async$aRG=A.e(function(e,f){if(e===1)return A.f(f,w)
 for(;;)switch(x){case 0:x=2
 return A.b(B.LU(),$async$aRG)
 case 2:v=f
-J.mW(v,new B.fJA(d))
+J.mW(v,new B.fJB(d))
 x=3
 return A.b(B.aT5(v),$async$aRG)
 case 3:return A.h(null,w)}})
 return A.i($async$aRG,w)},
-fIR:function fIR(d){this.a=d},
-fNa:function fNa(){},
+fIS:function fIS(d){this.a=d},
 fNb:function fNb(){},
 fNc:function fNc(){},
-fJA:function fJA(d){this.a=d}},D
+fNd:function fNd(){},
+fJB:function fJB(d){this.a=d}},D
 J=c[1]
 A=c[0]
 C=c[2]
 B=a.updateHolder(c[20],B)
 D=c[32]
 var z=a.updateTypes([])
-B.fIR.prototype={
+B.fIS.prototype={
 $1(d){var x,w,v
 if(!y.B.b(d))return!1
 v=J.t(d,"paidAt")
@@ -104,25 +104,25 @@ w=A.bj(x)
 if(w==null)return!0
 return this.a.d2(w.bR(432e9))},
 $S:50}
-B.fNa.prototype={
+B.fNb.prototype={
 $1(d){return A.a1(d,y.w,y.b)},
 $S:31}
-B.fNb.prototype={
+B.fNc.prototype={
 $1(d){var x=J.t(d,"id")
 return J.k(x==null?"":x).length!==0},
 $S:4}
-B.fNc.prototype={
+B.fNd.prototype={
 $2(d,e){var x,w,v="createdAt",u=J.t(d,v),t=A.bj(J.k(u==null?"":u)),s=t==null?new A.V(A.h2(0,0),0,!1):t
 u=J.t(e,v)
 w=A.bj(J.k(u==null?"":u))
 x=w==null?new A.V(A.h2(0,0),0,!1):w
 return J.xx(x,s)},
 $S:41}
-B.fJA.prototype={
+B.fJB.prototype={
 $1(d){var x=J.t(d,"id")
 return J.k(x==null?"":x)===this.a},
 $S:4};(function inheritance(){var x=a.inheritMany,w=a.inherit
-x(A.kX,[B.fIR,B.fNa,B.fNb,B.fJA])
-w(B.fNc,A.n0)})()
+x(A.kX,[B.fIS,B.fNb,B.fNc,B.fJB])
+w(B.fNd,A.n0)})()
 var y={k:A.aF("U<ac<q,@>>"),E:A.aF("ai<ac<q,@>>"),i:A.aF("ai<@>"),y:A.aF("ac<q,@>"),B:A.aF("ac<@,@>"),w:A.aF("q"),b:A.aF("@"),v:A.aF("~")};(function constants(){D.a37=new A.a_(61870,"MaterialIcons",!1)})()};
-(a=>{a["6hg2yNt+dAOQLkQfvdp81M61O2E="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["xxTHH7cLTrVGPIupoeFO0gutLJ0="]=a.current})($__dart_deferred_initializers__);
