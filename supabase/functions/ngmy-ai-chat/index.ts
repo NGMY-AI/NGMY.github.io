@@ -10766,6 +10766,9 @@ serve(async (req) => {
       y3: "paSet",
       y4: "paCheck",
       y5: "paTick",
+      y6: "paSignals",
+      y7: "paLearnGet",
+      y8: "paLearnSave",
       z0: "chat",
     };
     const action = WIRE_TO_ACTION[wireCode] ?? String(body?.action ?? "chat").trim();
@@ -10776,7 +10779,8 @@ serve(async (req) => {
     if (PA_ACTIONS.has(action)) {
       const paEmail = action === "paTick" ? "" : (await requireJwtEmail(req)).trim().toLowerCase();
       if (action !== "paTick") {
-        const limited = await enforceRateLimit(req, "alpaca_agent", paEmail || clientIp(req), 240, 3600);
+        // Live signals refresh every 20 s and the alert watcher every minute, so allow a steady stream.
+        const limited = await enforceRateLimit(req, "alpaca_agent", paEmail || clientIp(req), 600, 3600);
         if (limited) return limited;
       }
       const r = await handleAlpacaAgent(action, body, { db: adminClient(), email: paEmail, isAdmin: !!paEmail && NGMY_ADMIN_EMAILS.has(paEmail) });

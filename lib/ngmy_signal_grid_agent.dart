@@ -6,14 +6,18 @@
 // pretend $50 trade.
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_edge_invoke.dart';
+import 'ngmy_push_notifications.dart';
+import 'ngmy_signal_alerts.dart';
 
 part 'ngmy_signal_grid_learn.dart';
+part 'ngmy_signal_grid_quiz.dart';
 
 const _up = Color(0xFF1FBF97); // rising candles, wins
 const _down = Color(0xFFF2C14E); // falling candles

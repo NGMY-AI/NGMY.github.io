@@ -1,6 +1,6 @@
 // deno test supabase/functions/ngmy-ai-chat/alpaca_agent_test.ts
 import { assertEquals, assert } from "https://deno.land/std@0.177.0/testing/asserts.ts";
-import { buildChart, crossover, decide, etParts, PA_FX, PA_MARKETS, pickMarket, readMarket, rsi, runStats, sma, type DecideInput, type Scan } from "./alpaca_agent.ts";
+import { buildChart, crossover, decide, entryNow, etParts, PA_FX, PA_LESSON_IDS, PA_MARKETS, pickMarket, readMarket, rsi, runStats, sma, type DecideInput, type Scan } from "./alpaca_agent.ts";
 
 const base: DecideInput = {
   weekend: false, asset: "SPY", stock: true, price: 100, signal: "none", fast: 100, slow: 100, shadow: null,
@@ -121,8 +121,27 @@ Deno.test("trend timing: age, typical length, entry window, how often it worked"
   assertEquals(runStats([1, 2, 3], 1).dir, "none");
   // Forex wording: an action with an entry window or a "late, wait".
   const r = readMarket(closes, closes.map((c) => ({ h: c + 0.05, l: c - 0.05 })), p, true, { candleMin: 1, agent: false });
-  assert(/^(BUY · ENTER WITHIN \d+ MIN|BULLISH · LATE, WAIT|SIDEWAYS · NO EDGE|MIXED · NO EDGE)$/.test(r.action), r.action);
+  assert(/^(BUY · ENTER WITHIN \d+ MIN|BULLISH · LATE, WAIT|BULLISH · WEAK SIGNAL, SKIP|SIDEWAYS · NO EDGE|MIXED · NO EDGE)$/.test(r.action), r.action);
   assert(r.notes.some((n) => n.includes("min ago")));
+  // "Enter" in the label only when the reading also has an entry (clear, early and reliable).
+  assertEquals(r.action.includes("ENTER WITHIN"), r.entry != null);
+});
+
+Deno.test("enter now: only clear, early and reliable signals", () => {
+  const t = { dir: "up" as const, ageMin: 2, typicalMin: 12, remainingMin: 10, enterWithinMin: 3, worked: 5, of: 8 };
+  assertEquals(entryNow("bullish", true, t)?.dir, "up");
+  assertEquals(entryNow("bullish", true, t)?.durationMin, 10);
+  assertEquals(entryNow("bullish", false, t), null); // market closed
+  assertEquals(entryNow("sideways", true, t), null); // no clear direction
+  assertEquals(entryNow("bearish", true, t), null); // direction does not match
+  assertEquals(entryNow("bullish", true, { ...t, enterWithinMin: 0 }), null); // too late
+  assertEquals(entryNow("bullish", true, { ...t, worked: 2, of: 8 }), null); // worse than a coin flip
+  assertEquals(entryNow("bullish", true, { ...t, worked: 2, of: 2 }), null); // too few past moves to judge
+  assertEquals(entryNow("bearish", true, { ...t, dir: "down" })?.dir, "down");
+});
+
+Deno.test("lesson ids match the app", () => {
+  assertEquals(PA_LESSON_IDS.length, 10);
 });
 
 Deno.test("forex list is live pairs only", () => {

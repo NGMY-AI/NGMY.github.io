@@ -67,6 +67,11 @@ Widget _readingTile(_Pal p, Map<String, dynamic> m, {bool compact = false, VoidC
               style: TextStyle(color: chg >= 0 ? _up : _loss, fontSize: 11, fontWeight: FontWeight.w700)),
         ]),
       ]),
+      // ── Enter RIGHT NOW: a big sign in the middle at the top, with the direction and the duration.
+      if (r['entry'] is Map) ...[
+        const SizedBox(height: 12),
+        _enterNowSign(_map(r['entry'])),
+      ],
       if (changed != null) ...[
         const SizedBox(height: 8),
         Container(
@@ -140,31 +145,6 @@ Widget _readingTile(_Pal p, Map<String, dynamic> m, {bool compact = false, VoidC
         const Spacer(),
         Text('Buyers', style: TextStyle(color: p.muted, fontSize: 10)),
       ]),
-      if (m['open'] == true && t['dir'] != null && t['dir'] != 'none' && t['typicalMin'] != null) ...[
-        const SizedBox(height: 10),
-        Wrap(spacing: 6, runSpacing: 6, children: [
-          _timeChip(p, Icons.play_arrow_rounded, '${t['dir'] == 'up' ? 'Up' : 'Down'} move started ${_d(t['ageMin']).toStringAsFixed(0)} min ago'),
-          _timeChip(p, Icons.timelapse_rounded, 'Usually lasts ~${_d(t['typicalMin']).toStringAsFixed(0)} min'),
-          _timeChip(p, Icons.hourglass_bottom_rounded, '~${_d(t['remainingMin']).toStringAsFixed(0)} min left (estimate)'),
-          if (_d(t['of']) > 0)
-            _timeChip(
-              p,
-              Icons.fact_check_rounded,
-              'Worked ${t['worked']} of ${t['of']} (${(_d(t['worked']) / _d(t['of']) * 100).round()}%)',
-              color: _d(t['worked']) / _d(t['of']) >= 0.55 ? _up : _d(t['worked']) / _d(t['of']) < 0.45 ? _loss : _down,
-            ),
-          // Entry timing only when the direction is clear (bullish with an up move, bearish with a down move).
-          if ((r['bias'] == 'bullish' && t['dir'] == 'up') || (r['bias'] == 'bearish' && t['dir'] == 'down'))
-            _timeChip(
-              p,
-              Icons.login_rounded,
-              _d(t['enterWithinMin']) > 0 ? 'Enter within ${_d(t['enterWithinMin']).toStringAsFixed(0)} min' : 'Too late to enter, wait',
-              color: _d(t['enterWithinMin']) > 0 ? _up : _loss,
-            )
-          else
-            _timeChip(p, Icons.do_not_disturb_on_rounded, 'No clear direction, do not enter', color: _down),
-        ]),
-      ],
       const SizedBox(height: 8),
       for (final n in compact ? notes.take(2) : notes)
         Padding(
@@ -175,6 +155,11 @@ Widget _readingTile(_Pal p, Map<String, dynamic> m, {bool compact = false, VoidC
             Expanded(child: Text(n, style: TextStyle(color: p.ink, fontSize: 12.3, height: 1.35))),
           ]),
         ),
+      // ── Duration frame: how long the move has run, usually lasts and may have left, and what to do now.
+      if (m['open'] == true) ...[
+        const SizedBox(height: 10),
+        _durationFrame(p, r, t),
+      ],
       if (onAsk != null)
         Align(
           alignment: Alignment.centerRight,
@@ -188,15 +173,119 @@ Widget _readingTile(_Pal p, Map<String, dynamic> m, {bool compact = false, VoidC
   );
 }
 
-Widget _timeChip(_Pal p, IconData icon, String text, {Color? color}) => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: (color ?? p.muted).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(999)),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 12, color: color ?? p.muted),
-        const SizedBox(width: 4),
-        Text(text, style: TextStyle(color: color ?? p.ink, fontSize: 10.8, fontWeight: FontWeight.w700)),
+/// The big "ENTER UP NOW" / "ENTER DOWN NOW" sign.
+Widget _enterNowSign(Map<String, dynamic> e) {
+  final up = e['dir'] == 'up';
+  final c = up ? _up : _loss;
+  return Center(
+    child: Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [c, Color.lerp(c, Colors.black, 0.25)!],
+        ),
+        boxShadow: [BoxShadow(color: c.withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 6))],
+      ),
+      child: Column(children: [
+        Container(
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.22), shape: BoxShape.circle),
+          child: Icon(up ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, color: Colors.white, size: 34),
+        ),
+        const SizedBox(height: 6),
+        Text(up ? 'ENTER UP NOW' : 'ENTER DOWN NOW',
+            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 0.8)),
+        Text(up ? 'BUY / CALL' : 'SELL / PUT', style: const TextStyle(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: 1)),
+        const SizedBox(height: 8),
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          _signStat('Enter within', '${e['withinMin']} min'),
+          Container(width: 1, height: 30, color: Colors.white30, margin: const EdgeInsets.symmetric(horizontal: 14)),
+          _signStat('Duration', '~${e['durationMin']} min'),
+          Container(width: 1, height: 30, color: Colors.white30, margin: const EdgeInsets.symmetric(horizontal: 14)),
+          _signStat('Worked', '${e['worked']} of ${e['of']}'),
+        ]),
       ]),
-    );
+    ),
+  );
+}
+
+Widget _signStat(String k, String v) => Column(children: [
+      Text(v, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)),
+      Text(k, style: const TextStyle(color: Colors.white70, fontSize: 10.5, fontWeight: FontWeight.w700)),
+    ]);
+
+/// The duration frame at the bottom of every open market's card.
+Widget _durationFrame(_Pal p, Map<String, dynamic> r, Map<String, dynamic> t) {
+  final dir = t['dir'];
+  final hasTiming = dir != null && dir != 'none' && t['typicalMin'] != null;
+  final aligned = (r['bias'] == 'bullish' && dir == 'up') || (r['bias'] == 'bearish' && dir == 'down');
+  final early = _d(t['enterWithinMin']) > 0;
+  final ratio = _d(t['of']) > 0 ? _d(t['worked']) / _d(t['of']) : 0.0;
+  final (String verdict, Color vc) = r['entry'] is Map
+      ? ('Enter ${dir == 'up' ? 'UP' : 'DOWN'} now, see the sign above', dir == 'up' ? _up : _loss)
+      : !hasTiming || !aligned
+          ? ('No clear direction: do not enter', _down)
+          : !early
+              ? ('Too late to enter: wait for the next signal', _loss)
+              : ratio < 0.5
+                  ? ('Early, but this signal failed often here: skip it', _loss)
+                  : ('Not enough history yet: wait', _down);
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: p.inner,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: p.line, width: 1.5),
+    ),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Icon(Icons.timer_rounded, size: 16, color: p.ink),
+        const SizedBox(width: 6),
+        Text('DURATION', style: TextStyle(color: p.ink, fontSize: 11.5, fontWeight: FontWeight.w900, letterSpacing: 1)),
+        const Spacer(),
+        if (hasTiming)
+          Text('~${_d(t['remainingMin']).toStringAsFixed(0)} min left',
+              style: TextStyle(color: p.ink, fontSize: 15, fontWeight: FontWeight.w900)),
+      ]),
+      const SizedBox(height: 8),
+      if (hasTiming) ...[
+        Row(children: [
+          Expanded(child: _durStat(p, 'Move started', '${_d(t['ageMin']).toStringAsFixed(0)} min ago')),
+          Expanded(child: _durStat(p, 'Usually lasts', '~${_d(t['typicalMin']).toStringAsFixed(0)} min')),
+          Expanded(
+            child: _durStat(
+              p,
+              'Worked',
+              _d(t['of']) > 0 ? '${t['worked']} of ${t['of']}' : '—',
+              color: ratio >= 0.55 ? _up : ratio < 0.45 ? _loss : _down,
+            ),
+          ),
+        ]),
+        const SizedBox(height: 8),
+      ],
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(color: vc.withValues(alpha: 0.13), borderRadius: BorderRadius.circular(10)),
+        child: Text(verdict, style: TextStyle(color: vc, fontSize: 12, fontWeight: FontWeight.w800)),
+      ),
+      const SizedBox(height: 4),
+      Text('Estimates from this market\'s recent moves, not promises.', style: TextStyle(color: p.muted, fontSize: 10.5)),
+    ]),
+  );
+}
+
+Widget _durStat(_Pal p, String k, String v, {Color? color}) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(k, style: TextStyle(color: p.muted, fontSize: 10.5)),
+      Text(v, style: TextStyle(color: color ?? p.ink, fontSize: 13.5, fontWeight: FontWeight.w800)),
+    ]);
+
 
 /// Forex prices need more decimals than dollars (EUR/USD 1.09723, USD/JPY 158.792).
 String _price(Map<String, dynamic> m) {
@@ -340,10 +429,18 @@ class _ChatMsg {
 
 class _NgmySignalGridLearnScreenState extends State<NgmySignalGridLearnScreen> with SingleTickerProviderStateMixin {
   late final TabController _tabs = TabController(length: 3, vsync: this, initialIndex: widget.startTab);
-  Map<String, dynamic>? _status;
+  Map<String, dynamic>? _status; // the agent's full status (admins only)
+  List<Map<String, dynamic>>? _sigMarkets; // the agent's 10 markets from Live signals (everyone)
   DateTime? _fetchedAt;
   Timer? _timer;
-  Set<String> _done = {};
+  // Lesson progress, saved on the server (and on the phone as a backup):
+  // {done: [lesson ids], lessons: {id: {slots, right, tries, locks, used}}}
+  Map<String, dynamic> _progress = {'done': <String>[], 'lessons': <String, dynamic>{}};
+  bool _isAdmin = false;
+  bool _alertsAllowed = false;
+  bool _pushOk = false;
+  Timer? _saveTimer;
+  Set<String> get _done => ((_progress['done'] as List?) ?? const []).map((e) => e.toString()).toSet();
   final _chat = <_ChatMsg>[];
   final _input = TextEditingController();
   final _chatScroll = ScrollController();
@@ -358,18 +455,25 @@ class _NgmySignalGridLearnScreenState extends State<NgmySignalGridLearnScreen> w
   final Map<String, String> _lastBias = {};
   final Map<String, ({DateTime at, String from, String to})> _changed = {};
 
-  static const _prefsKey = 'ngmy_signal_grid_lessons_done';
+  static const _prefsKey = 'ngmy_signal_grid_academy_v2';
+  static const _oldPrefsKey = 'ngmy_signal_grid_lessons_done';
 
   @override
   void initState() {
     super.initState();
     _status = widget.initialStatus;
-    _fx = ((widget.initialStatus?['fx'] as List?) ?? const []).whereType<Map>().map((e) => {...Map<String, dynamic>.from(e), 'asset': e['symbol']}).toList();
+    _isAdmin = widget.initialStatus != null;
+    _fx = _withAsset(widget.initialStatus?['fx']);
+    final pm = _withAsset(widget.initialStatus?['markets']);
+    if (pm.isNotEmpty) _sigMarkets = pm;
     _fetchedAt = DateTime.now();
     _tabs.addListener(() => setState(() {}));
     if (!widget.preview) {
-      unawaited(_loadDone());
+      unawaited(_loadProgress());
       unawaited(_refresh());
+      unawaited(ngmyPushHasPermission().then((v) {
+        if (mounted) setState(() => _pushOk = v);
+      }));
       // Every 20 seconds, so a signal that flips is shown quickly.
       _timer = Timer.periodic(const Duration(seconds: 20), (_) => unawaited(_refresh()));
     }
@@ -378,6 +482,7 @@ class _NgmySignalGridLearnScreenState extends State<NgmySignalGridLearnScreen> w
   @override
   void dispose() {
     _timer?.cancel();
+    _saveTimer?.cancel();
     _tabs.dispose();
     _search.dispose();
     _input.dispose();
@@ -385,33 +490,97 @@ class _NgmySignalGridLearnScreenState extends State<NgmySignalGridLearnScreen> w
     super.dispose();
   }
 
-  Future<void> _loadDone() async {
+  static List<Map<String, dynamic>> _withAsset(dynamic list) =>
+      ((list as List?) ?? const []).whereType<Map>().map((e) => {...Map<String, dynamic>.from(e), 'asset': e['symbol']}).toList();
+
+  /// Lesson progress: the server copy wins (it unlocks the signal alerts); the phone copy is the backup.
+  Future<void> _loadProgress() async {
+    Map<String, dynamic>? local;
     try {
       final prefs = await SharedPreferences.getInstance();
-      final list = prefs.getStringList(_prefsKey) ?? const [];
-      if (mounted) setState(() => _done = list.toSet());
+      final raw = prefs.getString(_prefsKey);
+      if (raw != null) local = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+      final old = prefs.getStringList(_oldPrefsKey);
+      if (local == null && old != null) local = {'done': old, 'lessons': <String, dynamic>{}};
     } catch (_) {}
+    final res = await ngmyEdgeInvoke({'action': 'paLearnGet'});
+    if (!mounted) return;
+    final server = res?['progress'] is Map ? Map<String, dynamic>.from(res!['progress'] as Map) : null;
+    setState(() {
+      if (res?['isAdmin'] == true) _isAdmin = true;
+      final chosen = server ?? local;
+      if (chosen != null) {
+        _progress = {'done': (chosen['done'] as List?) ?? <String>[], 'lessons': (chosen['lessons'] as Map?) ?? <String, dynamic>{}};
+      }
+    });
+    // Only on the phone so far (for example from before the server copy existed): send it up.
+    if (server == null && local != null) _saveProgress();
   }
 
-  Future<void> _markDone(String id) async {
-    setState(() => _done = {..._done, id});
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList(_prefsKey, _done.toList());
-    } catch (_) {}
+  void _saveProgress() {
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(milliseconds: 800), () async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_prefsKey, jsonEncode(_progress));
+      } catch (_) {}
+      if (widget.preview) return;
+      final res = await ngmyEdgeInvoke({'action': 'paLearnSave', 'progress': _progress});
+      if (res?['allDone'] == true) NgmySignalAlerts.recheck();
+    });
+  }
+
+  Future<void> _lessonFinished(String id) async {
+    final wasAll = _lessons.every((l) => _done.contains(l.id));
+    setState(() {
+      final done = {..._done, id}.toList();
+      _progress = {..._progress, 'done': done};
+    });
+    _saveProgress();
+    final nowAll = _lessons.every((l) => _done.contains(l.id));
+    if (!wasAll && nowAll && mounted) {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('All 10 lessons done!'),
+          content: const Text('Signal alerts are now unlocked. When a market says ENTER UP or ENTER DOWN, '
+              'the app will tell you the market, the direction and the duration. Allow notifications to receive them.'),
+          actions: [
+            FilledButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final ok = await ngmyPushRequestPermission();
+                if (mounted) setState(() => _pushOk = ok);
+              },
+              child: const Text('Allow notifications'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   Future<void> _refresh() async {
-    final res = await ngmyEdgeInvoke({'action': 'paStatus', 'live': true, 'fx': true}, timeout: const Duration(seconds: 40));
+    final res = await ngmyEdgeInvoke({'action': 'paSignals'}, timeout: const Duration(seconds: 40));
     if (!mounted || res == null || res['ok'] != true) return;
-    final fx = ((res['fx'] as List?) ?? const []).whereType<Map>().map((e) => {...Map<String, dynamic>.from(e), 'asset': e['symbol']}).toList();
+    final fx = _withAsset(res['fx']);
+    final ms = _withAsset(res['markets']);
     setState(() {
-      _status = res;
       if (fx.isNotEmpty) _fx = fx;
+      if (ms.isNotEmpty) _sigMarkets = ms;
+      _alertsAllowed = res['alertsAllowed'] == true;
+      if (res['isAdmin'] == true) _isAdmin = true;
+      _sigRules = ((res['rules'] as List?) ?? const []).map((e) => e.toString()).toList();
+      _nowEt = (res['nowEt'] ?? '').toString();
+      _stockOpen = res['stockOpen'] == true;
       _fetchedAt = DateTime.now();
     });
     _noteChanges();
   }
+
+  List<String> _sigRules = const [];
+  String _nowEt = '';
+  bool _stockOpen = false;
 
   /// Compares every market with the last refresh. When one flips (for example bearish to bullish) it is marked
   /// on its card for 3 minutes and announced, so nobody acts on an old signal.
@@ -442,7 +611,7 @@ class _NgmySignalGridLearnScreenState extends State<NgmySignalGridLearnScreen> w
   List<Map<String, dynamic>> get _allSignals => [..._mkts, ..._fx];
 
   Map<String, dynamic> get _snap => _map(_map(_status?['state'])['snapshot']);
-  List<Map<String, dynamic>> get _mkts => _markets(_snap);
+  List<Map<String, dynamic>> get _mkts => _sigMarkets ?? _markets(_snap);
 
   /// The market to use in live examples: a fresh signal first, then the strongest open market.
   Map<String, dynamic>? get _star {
@@ -460,10 +629,15 @@ class _NgmySignalGridLearnScreenState extends State<NgmySignalGridLearnScreen> w
     final today = _map(_status?['today']);
     final rec = _map(_status?['record']);
     final b = StringBuffer();
-    b.writeln('LIVE DATA from the NGMY paper trading agent (Eastern Time now: ${_status?['nowEt'] ?? 'unknown'}):');
-    b.writeln('Agent: ${st['enabled'] == true ? 'running' : 'stopped'}${st['brakePaused'] == true ? ', paused by the 25 dollar brake' : ''}. '
-        'Pretend P/L all time ${_money(_d(st['totalPnl']))}, today ${_money(_d(today['day_pnl']))}, wins ${rec['wins'] ?? 0}, losses ${rec['losses'] ?? 0}.');
-    if (sh != null) {
+    b.writeln('LIVE DATA from the NGMY paper trading agent (Eastern Time now: ${_nowEt.isNotEmpty ? _nowEt : (_status?['nowEt'] ?? 'unknown')}):');
+    // The agent's own account and trades are shared with the tutor only for admins.
+    if (_status != null) {
+      b.writeln('Agent: ${st['enabled'] == true ? 'running' : 'stopped'}${st['brakePaused'] == true ? ', paused by the 25 dollar brake' : ''}. '
+          'Pretend P/L all time ${_money(_d(st['totalPnl']))}, today ${_money(_d(today['day_pnl']))}, wins ${rec['wins'] ?? 0}, losses ${rec['losses'] ?? 0}.');
+    }
+    if (_status == null) {
+      // Members: market data only.
+    } else if (sh != null) {
       final held = _mkts.firstWhere((m) => m['asset'] == sh['symbol'], orElse: () => <String, dynamic>{});
       final now = _d(held['price']);
       final entry = _d(sh['entryPrice']);
@@ -511,7 +685,7 @@ class _NgmySignalGridLearnScreenState extends State<NgmySignalGridLearnScreen> w
     final history = _chat.length > 1
         ? _chat.sublist(math.max(0, _chat.length - 9), _chat.length - 1).map((m) => '${m.fromMe ? 'Student' : 'Tutor'}: ${m.text}').join('\n')
         : '';
-    final rules = ((_status?['rules'] as List?) ?? const []).map((e) => '- $e').join('\n');
+    final rules = (((_status?['rules'] as List?) ?? _sigRules)).map((e) => '- $e').join('\n');
     final prompt = '''
 You are the NGMY Signal Grid trading tutor. You teach a complete beginner how trading works, using the live market data and the rules of the NGMY paper trading agent below.
 How to answer:
@@ -721,7 +895,18 @@ Tutor:''';
         lesson: l,
         number: _lessons.indexOf(l) + 1,
         live: () => _liveExample(_Pal(Theme.of(context).brightness == Brightness.light), l.live),
-        onDone: () => _markDone(l.id),
+        isAdmin: _isAdmin,
+        done: _done.contains(l.id),
+        state: Map<String, dynamic>.from((_map(_progress['lessons'])[l.id] as Map?) ?? const {}),
+        onState: (s) {
+          setState(() {
+            final lessons = Map<String, dynamic>.from(_map(_progress['lessons']));
+            lessons[l.id] = s;
+            _progress = {..._progress, 'lessons': lessons};
+          });
+          _saveProgress();
+        },
+        onDone: () => _lessonFinished(l.id),
         onAsk: (q) {
           Navigator.of(context).pop();
           _askAbout(q);
@@ -837,15 +1022,28 @@ Tutor:''';
           say('Win 1 and lose 2 of 3 trades: +1.50 - 0.75 - 0.75 = \$0.00. That is break even.'),
         ]);
       case 'brakes':
+        if (_status == null) {
+          return say('Try it yourself: before your next practice day, write down "I stop after losing \$10 today". '
+              'If three trades in a row lose, close the app and come back tomorrow. That is exactly what the agent does.');
+        }
         final st = _map(_status?['state']);
         final today = _map(_status?['today']);
         return say('Today the agent is at ${_money(_d(today['day_pnl']))} (the daily stop is -\$10) and ${_money(_d(st['totalPnl']))} all time (the brake is -\$25). '
             '${st['brakePaused'] == true ? 'The brake is ON right now.' : 'Both brakes are off, it can keep trading.'}');
       case 'hours':
-        final stockOpen = _map(_status?['market'])['stockOpen'];
-        return say('Right now the US stock market is ${stockOpen == true ? 'OPEN, so all 10 markets can be traded' : 'CLOSED, so only Bitcoin, Ethereum and Solana can be traded'}. '
-            'Crypto is open now and always.');
+        final stockOpen = _sigMarkets != null ? _stockOpen : _map(_status?['market'])['stockOpen'] == true;
+        final fxOpen = _fx.any((m) => m['open'] == true);
+        return say('Right now the US stock market is ${stockOpen ? 'OPEN' : 'CLOSED'}, '
+            'the forex market is ${fxOpen ? 'OPEN' : 'CLOSED'}, and crypto is open, as always.');
       case 'practice':
+        if (_status == null) {
+          final good = _allSignals.where((m) {
+            final t = _map(_map(m['reading'])['timing']);
+            return _d(t['of']) >= 3 && _d(t['worked']) / _d(t['of']) >= 0.5;
+          }).length;
+          return say('Right now $good of ${_allSignals.length} markets have signals that worked at least half the time lately. '
+              'That is why a journal and many trades matter: some markets suit a method, others do not.');
+        }
         final rec = _map(_status?['record']);
         return say('The agent journal so far: ${rec['trades'] ?? 0} finished pretend trades, ${rec['wins'] ?? 0} wins and ${rec['losses'] ?? 0} losses. '
             'Keep watching until there are at least 20 before judging it.');
@@ -871,7 +1069,9 @@ Tutor:''';
       return hay.contains(q);
     }).toList()
       ..sort((a, b) {
-        // Just changed first, then fresh signals, then the strongest.
+        // Enter-now signals first, then just changed, then fresh signals, then the strongest.
+        final ea = _map(a['reading'])['entry'] is Map ? 0 : 1, eb = _map(b['reading'])['entry'] is Map ? 0 : 1;
+        if (ea != eb) return ea - eb;
         final ca = _changed.containsKey(a['asset']) ? 0 : 1, cb = _changed.containsKey(b['asset']) ? 0 : 1;
         if (ca != cb) return ca - cb;
         return _NgmySignalGridAgentScreenState._signalRank(a).compareTo(_NgmySignalGridAgentScreenState._signalRank(b));
@@ -938,6 +1138,7 @@ Tutor:''';
           ),
         ],
         const SizedBox(height: 12),
+        _alertsBanner(p),
         Row(children: [
           Expanded(child: _countBox(p, 'Bullish', bull, _up, Icons.trending_up_rounded)),
           const SizedBox(width: 8),
@@ -983,6 +1184,49 @@ Tutor:''';
           ),
         Text('Signals are estimates from recent price history. They can fail; never risk money you cannot afford to lose.',
             textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 11)),
+      ]),
+    );
+  }
+
+  /// Signal alerts: on for admins and graduates (with notifications allowed); otherwise how to unlock them.
+  Widget _alertsBanner(_Pal p) {
+    final doneCount = _lessons.where((l) => _done.contains(l.id)).length;
+    final unlocked = _alertsAllowed || _isAdmin;
+    final (IconData icon, Color c, String text, String? button) = !unlocked
+        ? (Icons.lock_rounded, _slowC, 'Signal alerts unlock when you finish all 10 lessons ($doneCount of 10 done). '
+            'You will be told the market, ENTER UP or DOWN, and the duration.', 'Go to lessons')
+        : !_pushOk
+            ? (Icons.notifications_off_rounded, _down, 'Signal alerts are unlocked. Allow notifications so the app can tell you when to enter.', 'Allow')
+            : (Icons.notifications_active_rounded, _up, 'Signal alerts are ON: the market, ENTER UP or DOWN, and the duration, '
+                'while NGMY is open or in the background.', null);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: c.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: c.withValues(alpha: 0.45)),
+      ),
+      child: Row(children: [
+        Icon(icon, color: c),
+        const SizedBox(width: 10),
+        Expanded(child: Text(text, style: TextStyle(color: p.ink, fontSize: 12, height: 1.35))),
+        if (button != null) ...[
+          const SizedBox(width: 8),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: c, padding: const EdgeInsets.symmetric(horizontal: 12)),
+            onPressed: () async {
+              if (!unlocked) {
+                _tabs.animateTo(0);
+              } else {
+                final ok = await ngmyPushRequestPermission();
+                if (mounted) setState(() => _pushOk = ok);
+                NgmySignalAlerts.recheck();
+              }
+            },
+            child: Text(button, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+          ),
+        ],
       ]),
     );
   }
@@ -1131,11 +1375,29 @@ Tutor:''';
 
 // ───────────────────────────────────────────────────────────── one lesson
 
+/// A lesson with a 10-question quiz.
+/// Members: a wrong answer gets ONE more try. Wrong twice and that question locks for 5 minutes, then a
+/// different question (with different answers) takes its place. Admins can always try again.
+/// The quiz state is saved with the lesson progress, so closing the app does not reset a lock.
 class _LessonPage extends StatefulWidget {
-  const _LessonPage({required this.lesson, required this.number, required this.live, required this.onDone, required this.onAsk});
+  const _LessonPage({
+    required this.lesson,
+    required this.number,
+    required this.live,
+    required this.isAdmin,
+    required this.done,
+    required this.state,
+    required this.onState,
+    required this.onDone,
+    required this.onAsk,
+  });
   final _Lesson lesson;
   final int number;
   final Widget Function() live;
+  final bool isAdmin;
+  final bool done;
+  final Map<String, dynamic> state; // {slots, right, tries, locks, used}
+  final void Function(Map<String, dynamic> state) onState;
   final VoidCallback onDone;
   final void Function(String question) onAsk;
 
@@ -1144,13 +1406,110 @@ class _LessonPage extends StatefulWidget {
 }
 
 class _LessonPageState extends State<_LessonPage> {
-  final _picked = <int, int>{};
+  static const _quizSize = 10;
+  static const _lockFor = Duration(minutes: 5);
+
+  late List<_Quiz> _qs;
+  late List<int> _slots; // which bank question sits in each of the 10 places
+  late Set<int> _right; // bank questions answered right
+  late Map<int, int> _tries; // wrong answers per bank question
+  late Map<int, int> _locks; // bank question -> locked until (ms since epoch)
+  late List<int> _used; // every bank question shown so far
+  final _lastWrong = <int, int>{}; // bank question -> the option index picked wrong (shown in red)
+  Timer? _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    _qs = _bank[widget.lesson.id] ?? widget.lesson.quiz;
+    final s = widget.state;
+    List<int> ints(dynamic v) => ((v as List?) ?? const []).map((e) => int.tryParse('$e') ?? 0).toList();
+    Map<int, int> intMap(dynamic v) =>
+        ((v as Map?) ?? const {}).map((k, val) => MapEntry(int.tryParse('$k') ?? 0, int.tryParse('$val') ?? 0));
+    _slots = ints(s['slots']).where((i) => i >= 0 && i < _qs.length).toList();
+    if (_slots.length != math.min(_quizSize, _qs.length)) {
+      final order = List<int>.generate(_qs.length, (i) => i)..shuffle(math.Random());
+      _slots = order.take(math.min(_quizSize, _qs.length)).toList();
+    }
+    _right = ints(s['right']).toSet();
+    _tries = intMap(s['tries']);
+    _locks = intMap(s['locks']);
+    _used = ints(s['used']);
+    for (final b in _slots) {
+      if (!_used.contains(b)) _used.add(b);
+    }
+    _swapExpired(save: false);
+    _tick = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      if (_locks.isNotEmpty) setState(() => _swapExpired());
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  void _save() => widget.onState({
+        'slots': _slots,
+        'right': _right.toList(),
+        'tries': _tries.map((k, v) => MapEntry('$k', v)),
+        'locks': _locks.map((k, v) => MapEntry('$k', v)),
+        'used': _used,
+      });
+
+  /// When a lock runs out, that place gets a question the member has not seen yet
+  /// (or, once all were seen, one that is not on screen now).
+  void _swapExpired({bool save = true}) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    var changed = false;
+    for (var i = 0; i < _slots.length; i++) {
+      final b = _slots[i];
+      final until = _locks[b];
+      if (until == null || until > now) continue;
+      final fresh = List<int>.generate(_qs.length, (x) => x).where((x) => !_used.contains(x) && !_slots.contains(x)).toList();
+      final pool = fresh.isNotEmpty
+          ? fresh
+          : List<int>.generate(_qs.length, (x) => x).where((x) => !_slots.contains(x) && !_right.contains(x)).toList();
+      final next = pool.isEmpty ? b : pool[math.Random().nextInt(pool.length)];
+      _locks.remove(b);
+      _tries.remove(b);
+      _lastWrong.remove(b);
+      _slots[i] = next;
+      if (!_used.contains(next)) _used.add(next);
+      changed = true;
+    }
+    if (changed && save) _save();
+  }
+
+  /// Answer order changes per question, so the right answer is not always in the same place.
+  List<int> _order(int b) => List<int>.generate(_qs[b].options.length, (i) => i)..shuffle(math.Random(b * 7919 + _used.length));
+
+  void _answer(int b, int option) {
+    if (_right.contains(b) || _locks.containsKey(b)) return;
+    setState(() {
+      if (option == _qs[b].answer) {
+        _right.add(b);
+        _lastWrong.remove(b);
+      } else {
+        _lastWrong[b] = option;
+        final t = (_tries[b] ?? 0) + 1;
+        _tries[b] = t;
+        if (!widget.isAdmin && t >= 2) {
+          _locks[b] = DateTime.now().add(_lockFor).millisecondsSinceEpoch;
+        }
+      }
+    });
+    _save();
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = _Pal(Theme.of(context).brightness == Brightness.light);
     final l = widget.lesson;
-    final allRight = l.quiz.asMap().entries.every((e) => _picked[e.key] == e.value.answer);
+    final rightNow = _slots.where(_right.contains).length;
+    final allRight = rightNow == _slots.length;
     return Scaffold(
       backgroundColor: p.bgTop,
       body: Container(
@@ -1209,9 +1568,30 @@ class _LessonPageState extends State<_LessonPage> {
               ]),
             ),
             const SizedBox(height: 18),
-            Text('Quick check', style: TextStyle(color: p.ink, fontSize: 16, fontWeight: FontWeight.w800)),
+            Row(children: [
+              Text('Quiz', style: TextStyle(color: p.ink, fontSize: 16, fontWeight: FontWeight.w800)),
+              const Spacer(),
+              Text('$rightNow of ${_slots.length} right', style: TextStyle(color: allRight ? _up : p.muted, fontWeight: FontWeight.w800, fontSize: 12.5)),
+            ]),
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(9),
+              child: LinearProgressIndicator(
+                value: _slots.isEmpty ? 0 : rightNow / _slots.length,
+                minHeight: 7,
+                backgroundColor: p.chip,
+                valueColor: const AlwaysStoppedAnimation(_up),
+              ),
+            ),
             const SizedBox(height: 8),
-            for (var qi = 0; qi < l.quiz.length; qi++) _quiz(p, qi, l.quiz[qi]),
+            Text(
+              widget.isAdmin
+                  ? 'Admin: you can retry any question.'
+                  : 'Get all 10 right to finish. A wrong answer gets one more try; wrong twice and that question locks for 5 minutes, then a new question takes its place.',
+              style: TextStyle(color: p.muted, fontSize: 11.8, height: 1.35),
+            ),
+            const SizedBox(height: 10),
+            for (var i = 0; i < _slots.length; i++) _quiz(p, i, _slots[i]),
             const SizedBox(height: 8),
             Row(children: [
               Expanded(
@@ -1231,18 +1611,19 @@ class _LessonPageState extends State<_LessonPage> {
               Expanded(
                 child: FilledButton.icon(
                   style: FilledButton.styleFrom(
-                    backgroundColor: allRight ? _up : p.muted,
+                    backgroundColor: allRight || widget.done ? _up : p.muted,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
                   ),
-                  onPressed: allRight
+                  onPressed: allRight || widget.done
                       ? () {
                           widget.onDone();
                           Navigator.maybePop(context);
                         }
                       : null,
                   icon: const Icon(Icons.check_rounded, size: 18),
-                  label: Text(allRight ? 'Finish lesson' : 'Answer the quiz', style: const TextStyle(fontWeight: FontWeight.w800)),
+                  label: Text(allRight || widget.done ? 'Finish lesson' : '$rightNow of ${_slots.length} right',
+                      style: const TextStyle(fontWeight: FontWeight.w800)),
                 ),
               ),
             ]),
@@ -1252,35 +1633,72 @@ class _LessonPageState extends State<_LessonPage> {
     );
   }
 
-  Widget _quiz(_Pal p, int qi, _Quiz q) {
-    final picked = _picked[qi];
+  Widget _quiz(_Pal p, int place, int b) {
+    final q = _qs[b];
+    final right = _right.contains(b);
+    final until = _locks[b];
+    final locked = until != null;
+    final tries = _tries[b] ?? 0;
+    final wrongPick = _lastWrong[b];
+    if (locked) {
+      final left = Duration(milliseconds: math.max(0, until - DateTime.now().millisecondsSinceEpoch));
+      final mm = left.inMinutes, ss = (left.inSeconds % 60).toString().padLeft(2, '0');
+      return Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: p.inner, borderRadius: BorderRadius.circular(20), border: Border.all(color: _loss.withValues(alpha: 0.4))),
+        child: Row(children: [
+          const Icon(Icons.lock_clock_rounded, color: _loss),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Question ${place + 1} is locked', style: TextStyle(color: p.ink, fontWeight: FontWeight.w800, fontSize: 14)),
+              Text('Wrong twice. Re-read the lesson; a new question appears in $mm:$ss.',
+                  style: TextStyle(color: p.muted, fontSize: 12.5, height: 1.35)),
+            ]),
+          ),
+        ]),
+      );
+    }
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(20), border: Border.all(color: p.cardEdge)),
+      decoration: BoxDecoration(
+        color: p.card,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: right ? _up.withValues(alpha: 0.6) : p.cardEdge, width: right ? 1.5 : 1),
+      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(q.q, style: TextStyle(color: p.ink, fontWeight: FontWeight.w800, fontSize: 14)),
+        Text('${place + 1}. ${q.q}', style: TextStyle(color: p.ink, fontWeight: FontWeight.w800, fontSize: 14)),
         const SizedBox(height: 8),
-        for (var oi = 0; oi < q.options.length; oi++)
+        for (final oi in _order(b))
           GestureDetector(
-            onTap: () => setState(() => _picked[qi] = oi),
+            onTap: right ? null : () => _answer(b, oi),
             child: Container(
               margin: const EdgeInsets.only(bottom: 6),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: picked == oi ? (oi == q.answer ? _up : _loss).withValues(alpha: 0.14) : p.inner,
+                color: right && oi == q.answer
+                    ? _up.withValues(alpha: 0.14)
+                    : wrongPick == oi
+                        ? _loss.withValues(alpha: 0.12)
+                        : p.inner,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: picked == oi ? (oi == q.answer ? _up : _loss) : Colors.transparent),
+                border: Border.all(color: right && oi == q.answer ? _up : wrongPick == oi ? _loss : Colors.transparent),
               ),
               child: Row(children: [
                 Expanded(child: Text(q.options[oi], style: TextStyle(color: p.ink, fontSize: 13.5))),
-                if (picked == oi) Icon(oi == q.answer ? Icons.check_circle_rounded : Icons.cancel_rounded, color: oi == q.answer ? _up : _loss, size: 18),
+                if (right && oi == q.answer) const Icon(Icons.check_circle_rounded, color: _up, size: 18),
+                if (!right && wrongPick == oi) const Icon(Icons.cancel_rounded, color: _loss, size: 18),
               ]),
             ),
           ),
-        if (picked != null)
-          Text(picked == q.answer ? 'Right! ${q.why}' : 'Not quite. Try again.',
-              style: TextStyle(color: picked == q.answer ? _up : _loss, fontSize: 12.5, fontWeight: FontWeight.w700)),
+        if (right)
+          Text('Right! ${q.why}', style: const TextStyle(color: _up, fontSize: 12.5, fontWeight: FontWeight.w700))
+        else if (tries == 1 && !widget.isAdmin)
+          const Text('Wrong. You have one more try.', style: TextStyle(color: _loss, fontSize: 12.5, fontWeight: FontWeight.w700))
+        else if (tries >= 1)
+          const Text('Not quite. Try again.', style: TextStyle(color: _loss, fontSize: 12.5, fontWeight: FontWeight.w700)),
       ]),
     );
   }

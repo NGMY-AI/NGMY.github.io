@@ -20,7 +20,10 @@
 
 // deno-lint-ignore-file no-explicit-any
 
-export const PA_ACTIONS = new Set(["paStatus", "paLog", "paSet", "paCheck", "paTick"]);
+export const PA_ACTIONS = new Set(["paStatus", "paLog", "paSet", "paCheck", "paTick", "paSignals", "paLearnGet", "paLearnSave"]);
+
+/** Trading Academy lesson ids (the app has the same list). All done = signal alerts unlocked for members. */
+export const PA_LESSON_IDS = ["basics", "candles", "trend", "ma", "cross", "rsi", "risk", "brakes", "hours", "practice"];
 
 const PAPER_BASE = "https://paper-api.alpaca.markets";
 const DATA_BASE = "https://data.alpaca.markets";
@@ -301,7 +304,21 @@ export type Reading = {
   action: string; // one short label for the app
   notes: string[]; // plain sentences explaining the reading
   timing: Timing;
+  /** Set only when it is time to act RIGHT NOW: clear direction, still early, and past moves on this market
+   *  went the right way at least half the time (3 or more measured). Otherwise null. */
+  entry: Entry | null;
 };
+
+export type Entry = { dir: "up" | "down"; withinMin: number; durationMin: number; typicalMin: number; worked: number; of: number };
+
+/** The "enter now" rule shared by the signal cards and the alerts. */
+export function entryNow(bias: string, open: boolean, t: Timing): Entry | null {
+  if (!open || t.dir === "none" || t.typicalMin == null || t.enterWithinMin == null || t.remainingMin == null) return null;
+  const aligned = (bias === "bullish" && t.dir === "up") || (bias === "bearish" && t.dir === "down");
+  if (!aligned || t.enterWithinMin <= 0 || t.remainingMin <= 0) return null;
+  if (t.of < 3 || t.worked / t.of < 0.5) return null; // worse than a coin flip lately: no alert
+  return { dir: t.dir, withinMin: t.enterWithinMin, durationMin: t.remainingMin, typicalMin: t.typicalMin, worked: t.worked, of: t.of };
+}
 
 /** The agent's live reading of one market, in numbers and plain words. Educational, the same rules the agent uses. */
 export function readMarket(
@@ -324,12 +341,13 @@ export function readMarket(
   const volPct = last.length && p ? last.reduce((s, b, i) => s + (b.h - b.l) / (closes[closes.length - last.length + i] || p), 0) / last.length * 100 : null;
   const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
   if (gapPct == null || x.slowNow == null) {
-    return { bias: "unknown", score: 50, rsi: r, mom1h, gapPct, volPct, action: "WAITING FOR DATA", notes: ["Not enough candles yet to read this market."], timing };
+    return { bias: "unknown", score: 50, rsi: r, mom1h, gapPct, volPct, action: "WAITING FOR DATA", notes: ["Not enough candles yet to read this market."], timing, entry: null };
   }
   const score = Math.round(clamp(50 + clamp(gapPct * 60, -25, 25) + clamp((mom1h ?? 0) * 12, -15, 15) + clamp(((r ?? 50) - 50) * 0.4, -10, 10), 0, 100));
   const flat = Math.abs(gapPct) < 0.02;
   const bias = flat ? "sideways" : x.fastNow! > x.slowNow && p >= x.slowNow ? "bullish" : x.fastNow! < x.slowNow && p <= x.slowNow ? "bearish" : "sideways";
   const early = timing.enterWithinMin != null && timing.enterWithinMin > 0;
+  const entry = entryNow(bias, open, timing); // enter only when clear, early AND reliable
   let action: string;
   if (!open) action = "MARKET CLOSED";
   else if (agent) {
@@ -341,8 +359,9 @@ export function readMarket(
   } else {
     // Forex: the direction plus whether it is still early enough to act.
     if (bias === "sideways" || timing.dir === "none") action = "SIDEWAYS · NO EDGE";
-    else if (bias === "bullish" && timing.dir === "up") action = early ? `BUY · ENTER WITHIN ${timing.enterWithinMin} MIN` : "BULLISH · LATE, WAIT";
-    else if (bias === "bearish" && timing.dir === "down") action = early ? `SELL · ENTER WITHIN ${timing.enterWithinMin} MIN` : "BEARISH · LATE, WAIT";
+    else if (entry) action = `${entry.dir === "up" ? "BUY" : "SELL"} · ENTER WITHIN ${entry.withinMin} MIN`;
+    else if (bias === "bullish" && timing.dir === "up") action = early ? "BULLISH · WEAK SIGNAL, SKIP" : "BULLISH · LATE, WAIT";
+    else if (bias === "bearish" && timing.dir === "down") action = early ? "BEARISH · WEAK SIGNAL, SKIP" : "BEARISH · LATE, WAIT";
     else action = "MIXED · NO EDGE";
   }
 
@@ -357,8 +376,10 @@ export function readMarket(
     const way = timing.dir === "up" ? "up" : "down";
     notes.push(`This ${way} trend started about ${timing.ageMin} min ago. On this market, ${way} trends lately lasted about ${timing.typicalMin} min, so roughly ${timing.remainingMin} min may be left (an estimate, not a promise).`);
     if (timing.of > 0) notes.push(`Of the last ${timing.of} ${way} trends here, ${timing.worked} really ended ${way === "up" ? "higher" : "lower"} (${Math.round(timing.worked / timing.of * 100)}%).`);
-    notes.push(early
+    notes.push(entry
       ? `Still early: about ${timing.enterWithinMin} min left to act in the first part of the move.`
+      : early
+      ? "It is early, but this kind of move has failed too often here lately: a weak signal, so skip it."
       : "Too late for a safe entry: most of a typical move is already used. Wait for the next fresh signal.");
   }
   if (r != null) {
@@ -371,7 +392,7 @@ export function readMarket(
   if (mom1h != null) notes.push(`In the last hour the price ${mom1h >= 0 ? "rose" : "fell"} ${Math.abs(mom1h).toFixed(2)}%.`);
   if (volPct != null) notes.push(volPct > 0.35 ? `It is jumpy right now (candles average ${volPct.toFixed(2)}%), so the +3% target and -1.5% stop can be hit quickly.` : `It is calm right now (candles average ${volPct.toFixed(2)}%).`);
   if (!open) notes.push(agent ? "The stock market is closed, so this market cannot be traded until it opens." : "The forex market is closed (it trades from Sunday 5 PM to Friday 5 PM Eastern). OTC prices at a broker on weekends are made by that broker, not by the real market.");
-  return { bias, score, rsi: r, mom1h, gapPct, volPct, action, notes, timing };
+  return { bias, score, rsi: r, mom1h, gapPct, volPct, action, notes, timing, entry };
 }
 
 /** The last few hours for the app's chart: candles, fast line and slow line per 5-minute candle, plus the trend. */
@@ -499,6 +520,29 @@ async function readMarkets(k: Keys): Promise<Record<string, Series>> {
 // ─────────────────────────────────────────────────────────────── forex (Live signals only, read-only)
 
 let fxCache: { at: number; cards: any[] } | null = null;
+let mktCache: { at: number; cards: any[]; stockOpen: boolean } | null = null;
+
+/** The agent's 10 markets for Live signals, read at most every 30 seconds and shared by everyone looking.
+ *  No account data: only prices and readings. Falls back to the agent's last snapshot. */
+async function agentMarketCards(db: any): Promise<{ cards: any[]; stockOpen: boolean }> {
+  if (mktCache && Date.now() - mktCache.at < 30 * 1000) return mktCache;
+  const cfg = readConfig();
+  if (cfg.keys) {
+    try {
+      const [series, clock] = await Promise.all([readMarkets(cfg.keys), aGet(PAPER_BASE, "/v2/clock", cfg.keys)]);
+      const stockOpen = !!clock?.is_open;
+      mktCache = { at: Date.now(), cards: marketCards(series, stockOpen), stockOpen };
+      return mktCache;
+    } catch { /* fall back below */ }
+  }
+  try {
+    const st = await loadState(db);
+    const cards = Array.isArray(st.snapshot?.markets) ? st.snapshot.markets : [];
+    return { cards, stockOpen: !!st.snapshot?.stockOpen };
+  } catch {
+    return { cards: [], stockOpen: false };
+  }
+}
 
 /** One forex pair from Yahoo Finance's public chart feed: 1-minute candles for today. No key, no personal data. */
 async function readFxPair(def: (typeof PA_FX)[number]) {
@@ -766,6 +810,50 @@ export async function handleAlpacaAgent(
   }
 
   if (!email) return { status: 401, payload: { ok: false, error: "Please sign in." } };
+
+  // ── Trading Academy, open to every signed-in member: lesson progress and live signals.
+  if (action === "paLearnGet") {
+    const { data, error } = await db.from("ngmy_trading_academy").select("progress,all_done").eq("email", email).maybeSingle();
+    if (error) return { status: 200, payload: { ok: true, progress: null, allDone: false, saved: false, isAdmin } };
+    return { status: 200, payload: { ok: true, progress: data?.progress ?? null, allDone: !!data?.all_done, saved: true, isAdmin } };
+  }
+  if (action === "paLearnSave") {
+    const progress = body?.progress && typeof body.progress === "object" ? body.progress : {};
+    if (JSON.stringify(progress).length > 30000) return { status: 400, payload: { ok: false, error: "Progress too large." } };
+    const done: string[] = Array.isArray(progress.done) ? progress.done.map(String) : [];
+    const allDone = PA_LESSON_IDS.every((id) => done.includes(id));
+    const { error } = await db.from("ngmy_trading_academy")
+      .upsert({ email, progress, all_done: allDone, updated_at: new Date().toISOString() });
+    return { status: 200, payload: { ok: !error, saved: !error, allDone, error: error?.message } };
+  }
+  if (action === "paSignals") {
+    // Signal alerts: admins always, members once every lesson is finished.
+    let graduated = false;
+    if (!isAdmin) {
+      const { data } = await db.from("ngmy_trading_academy").select("all_done").eq("email", email).maybeSingle();
+      graduated = !!data?.all_done;
+    }
+    const light = body?.light === true;
+    const markets = await agentMarketCards(db);
+    let fx: any[] = [];
+    try { fx = await readForex(); } catch { fx = []; }
+    const slim = (m: any) => (light ? { ...m, chart: { points: (m.chart?.points ?? []).slice(-30).map((q: any) => ({ c: q.c })), trend: m.chart?.trend } } : m);
+    const etNow = etParts(new Date());
+    return {
+      status: 200,
+      payload: {
+        ok: true,
+        isAdmin,
+        alertsAllowed: isAdmin || graduated,
+        markets: markets.cards.map(slim),
+        stockOpen: markets.stockOpen,
+        fx: fx.map(slim),
+        rules: PA_RULE_LINES,
+        nowEt: etNow.label,
+      },
+    };
+  }
+
   if (!isAdmin) return { status: 403, payload: { ok: false, ownerOnly: true, error: "The trading agent is for NGMY admins only." } };
 
   let state: any;

@@ -142,6 +142,9 @@ const Map<String, String> kNgmyEdgeActionToWire = {
   'paLog': 'y2',
   'paSet': 'y3',
   'paCheck': 'y4',
+  'paSignals': 'y6',
+  'paLearnGet': 'y7',
+  'paLearnSave': 'y8',
   'chat': 'z0',
 };
 

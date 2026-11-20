@@ -12,6 +12,7 @@ import 'ngmy_vault_arcade.dart' deferred as vault;
 import 'ngmy_signal_grid_agent.dart' deferred as sg_agent;
 import 'main.dart' show ngmyEmailIsAdmin;
 import 'ngmy_civic_registry_cloud.dart' show ngmyCurrentAuthEmail;
+import 'ngmy_signal_alerts.dart';
 
 /// Home “tech deck” under the spending cards — robotic HUD frames with motion.
 /// Tapping a frame opens a full-screen pulse / scan animation.
@@ -35,6 +36,8 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
     _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200))..repeat(reverse: true);
     _scan = AnimationController(vsync: this, duration: const Duration(milliseconds: 3400))..repeat();
     _orbit = AnimationController(vsync: this, duration: const Duration(milliseconds: 9000))..repeat();
+    // Signal Grid alerts (admins, and members who finished the Trading Academy). Runs once per app run.
+    NgmySignalAlerts.start();
   }
 
   @override
@@ -46,11 +49,16 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
   }
 
   Future<void> _openExperience(_TechFrameSpec spec) async {
-    // Signal Grid holds the Alpaca paper-trading agent (admins only); everyone else keeps the pulse animation.
-    if (spec.kind == _TechKind.signal && ngmyEmailIsAdmin(ngmyCurrentAuthEmail())) {
+    // Signal Grid: admins get the Alpaca paper-trading agent; members get the Trading Academy
+    // (lessons, live signals and the tutor).
+    if (spec.kind == _TechKind.signal) {
+      final admin = ngmyEmailIsAdmin(ngmyCurrentAuthEmail());
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (_) => NgmyDeferred(load: sg_agent.loadLibrary, build: () => sg_agent.NgmySignalGridAgentScreen()),
+          builder: (_) => NgmyDeferred(
+            load: sg_agent.loadLibrary,
+            build: () => admin ? sg_agent.NgmySignalGridAgentScreen() : sg_agent.NgmySignalGridLearnScreen(),
+          ),
         ),
       );
       return;
