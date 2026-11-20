@@ -154,7 +154,10 @@ export function decide(x: DecideInput): Decision {
     if (chg <= -r.stopLossPct) return { decision: "would sell", reason: `stop loss hit (${chg.toFixed(2)}%)`, pnl };
     if (x.stock && x.finalCheck) return { decision: "would sell", reason: "3:55 PM ET rule, no overnight stock positions", pnl };
     if (x.signal === "sell") return { decision: "would sell", reason: "sell signal: fast average crossed below slow", pnl };
-    return { decision: "hold", reason: `holding ${x.asset}, no exit rule hit (${chg >= 0 ? "+" : ""}${chg.toFixed(2)}%)` };
+    return {
+      decision: "hold",
+      reason: `still holding the same ${x.asset} trade (${chg >= 0 ? "+" : ""}${chg.toFixed(2)}%), waiting for the take profit, the stop loss or a turn down`,
+    };
   }
   if (x.totalPnl <= -r.totalLossBrakeUsd) return { decision: "no action", reason: "agent paused by the $25 brake" };
   if (x.dayPnl <= -r.dailyLossStopUsd) return { decision: "no action", reason: "daily stop reached ($10 lost today)" };
@@ -190,6 +193,80 @@ export function pickMarket(scans: Scan[], usedKey: string | null, finalCheck: bo
   const below = open.filter((s) => s.fast! <= s.slow!).sort((a, b) => gap(b) - gap(a));
   const closest = below[0] ?? [...open].sort((a, b) => gap(a) - gap(b))[0] ?? null;
   return { pick: candidates[0] ?? null, closest };
+}
+
+/** RSI (14): how strong the recent rises were compared with the recent falls, 0 to 100. */
+export function rsi(closes: number[], n = 14): number | null {
+  if (closes.length < n + 1) return null;
+  let gain = 0, loss = 0;
+  for (let i = 1; i <= n; i++) {
+    const d = closes[i] - closes[i - 1];
+    if (d >= 0) gain += d; else loss -= d;
+  }
+  gain /= n;
+  loss /= n;
+  for (let i = n + 1; i < closes.length; i++) {
+    const d = closes[i] - closes[i - 1];
+    gain = (gain * (n - 1) + Math.max(d, 0)) / n;
+    loss = (loss * (n - 1) + Math.max(-d, 0)) / n;
+  }
+  if (loss === 0) return gain === 0 ? 50 : 100;
+  return 100 - 100 / (1 + gain / loss);
+}
+
+export type Reading = {
+  bias: "bullish" | "bearish" | "sideways" | "unknown";
+  score: number; // 0 = very bearish, 50 = neutral, 100 = very bullish
+  rsi: number | null;
+  mom1h: number | null; // % change over the last 12 five-minute candles
+  gapPct: number | null; // how far the fast line is above (+) or below (-) the slow line, in %
+  volPct: number | null; // average candle size in % (how jumpy the market is)
+  action: string; // one short label for the app
+  notes: string[]; // plain sentences explaining the reading
+};
+
+/** The agent's live reading of one market, in numbers and plain words. Educational, the same rules the agent uses. */
+export function readMarket(closes: number[], ohlc: { h: number; l: number }[], price: number, open: boolean): Reading {
+  const x = crossover(closes);
+  const r = rsi(closes);
+  const p = price || closes[closes.length - 1] || 0;
+  const back = closes.length > 12 ? closes[closes.length - 13] : null;
+  const mom1h = back ? (p - back) / back * 100 : null;
+  const gapPct = x.fastNow != null && x.slowNow != null ? (x.fastNow - x.slowNow) / x.slowNow * 100 : null;
+  const last = ohlc.slice(-24);
+  const volPct = last.length && p ? last.reduce((s, b, i) => s + (b.h - b.l) / (closes[closes.length - last.length + i] || p), 0) / last.length * 100 : null;
+  const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+  if (gapPct == null || x.slowNow == null) {
+    return { bias: "unknown", score: 50, rsi: r, mom1h, gapPct, volPct, action: "WAITING FOR DATA", notes: ["Not enough 5-minute candles yet to read this market."] };
+  }
+  const score = Math.round(clamp(50 + clamp(gapPct * 60, -25, 25) + clamp((mom1h ?? 0) * 12, -15, 15) + clamp(((r ?? 50) - 50) * 0.4, -10, 10), 0, 100));
+  const flat = Math.abs(gapPct) < 0.02;
+  const bias = flat ? "sideways" : x.fastNow! > x.slowNow && p >= x.slowNow ? "bullish" : x.fastNow! < x.slowNow && p <= x.slowNow ? "bearish" : "sideways";
+  let action: string;
+  if (!open) action = "MARKET CLOSED";
+  else if (x.signal === "buy") action = "BUY SIGNAL";
+  else if (x.signal === "sell") action = "SELL SIGNAL";
+  else if (bias === "bullish") action = "UPTREND · WAIT FOR ENTRY";
+  else if (bias === "bearish") action = "DOWNTREND · STAY OUT";
+  else action = "SIDEWAYS · NO EDGE";
+
+  const notes: string[] = [];
+  if (x.signal === "buy") notes.push("The fast line just crossed ABOVE the slow line: a fresh buy signal. This is the moment the agent buys.");
+  else if (x.signal === "sell") notes.push("The fast line just crossed BELOW the slow line: a fresh sell signal. A trade here would be closed.");
+  else if (bias === "bullish") notes.push("The fast line is above the slow line and the price is above both: buyers are in control. The cross happened earlier, so buying now would be late.");
+  else if (bias === "bearish") notes.push("The fast line is below the slow line and the price is below both: sellers are in control. The agent does not buy falling markets.");
+  else notes.push("The two lines are close together or mixed: no clear direction. Signals here often fail, so patience is best.");
+  if (r != null) {
+    if (r >= 70) notes.push(`RSI is ${r.toFixed(0)}: stretched (overbought). Prices rose fast and often pause or pull back.`);
+    else if (r <= 30) notes.push(`RSI is ${r.toFixed(0)}: oversold. Prices fell fast and often bounce, but a falling trend can keep falling.`);
+    else if (r >= 55) notes.push(`RSI is ${r.toFixed(0)}: healthy buying strength.`);
+    else if (r <= 45) notes.push(`RSI is ${r.toFixed(0)}: sellers are a little stronger.`);
+    else notes.push(`RSI is ${r.toFixed(0)}: balanced between buyers and sellers.`);
+  }
+  if (mom1h != null) notes.push(`In the last hour the price ${mom1h >= 0 ? "rose" : "fell"} ${Math.abs(mom1h).toFixed(2)}%.`);
+  if (volPct != null) notes.push(volPct > 0.35 ? `It is jumpy right now (candles average ${volPct.toFixed(2)}%), so the +3% target and -1.5% stop can be hit quickly.` : `It is calm right now (candles average ${volPct.toFixed(2)}%).`);
+  if (!open) notes.push("The stock market is closed, so this market cannot be traded until it opens.");
+  return { bias, score, rsi: r, mom1h, gapPct, volPct, action, notes };
 }
 
 /** The last few hours for the app's chart: candles, fast line and slow line per 5-minute candle, plus the trend. */
@@ -321,10 +398,12 @@ function marketCards(series: Record<string, Series>, stockOpen: boolean) {
     const chart = buildChart(s?.times ?? [], s?.closes ?? [], 48, s?.ohlc);
     const first = chart.points[0]?.c ?? 0;
     const price = s?.price ?? 0;
+    const open = m.kind === "crypto" || stockOpen;
     return {
-      symbol: m.symbol, name: m.name, kind: m.kind, open: m.kind === "crypto" || stockOpen,
+      symbol: m.symbol, name: m.name, kind: m.kind, open,
       price, changePct: first ? round2((price - first) / first * 100) : 0,
       trend: chart.trend, signal: chart.signal, fast: chart.fast, slow: chart.slow, chart,
+      reading: readMarket(s?.closes ?? [], s?.ohlc ?? [], price, open),
     };
   });
 }
@@ -374,19 +453,20 @@ async function ensureDay(db: any, et: ReturnType<typeof etParts>, asset: string,
 
 // ─────────────────────────────────────────────────────────────── the 15-minute check
 
-async function runCheck(db: any, source: "cron" | "manual", who = ""): Promise<Record<string, unknown>> {
+/** The automatic 15-minute check. This is the ONLY place that decides would-buy / would-sell: the app can look,
+ *  but it can never make the agent trade. */
+async function runCheck(db: any): Promise<Record<string, unknown>> {
   const state = await loadState(db);
   const now = new Date();
   const et = etParts(now);
   const watch = "watchlist";
 
-  // Never run two checks for the same quarter hour (cron retry or a double tap).
+  // Never run two checks for the same quarter hour (a cron retry).
   const last = state.last_tick_at ? Date.parse(state.last_tick_at) : 0;
-  if (source === "cron" && now.getTime() - last < 10 * 60 * 1000) return { ok: true, skipped: "already checked in the last 10 minutes" };
-  if (source === "manual" && now.getTime() - last < 60 * 1000) return { ok: false, error: "A check ran less than a minute ago. Please wait a moment." };
+  if (now.getTime() - last < 10 * 60 * 1000) return { ok: true, skipped: "already checked in the last 10 minutes" };
   await saveState(db, { last_tick_at: now.toISOString() });
 
-  if (!state.enabled && source === "cron") return { ok: true, skipped: "agent is stopped" };
+  if (!state.enabled) return { ok: true, skipped: "agent is stopped" };
 
   const cfg = readConfig();
   if (!cfg.keys) {
@@ -486,10 +566,10 @@ async function runCheck(db: any, source: "cron" | "manual", who = ""): Promise<R
   await writeLog(db, {
     kind: "check", asset: focus.symbol, price,
     fast_ma: focus.fast, slow_ma: focus.slow, signal: sig, decision: d.decision,
-    reason: d.reason + (source === "manual" ? " (check run by an admin from the app)" : ""),
+    reason: d.reason,
     balance: acct.equity, total_pnl: newTotal, day_pnl: newDay,
     details: {
-      pnl: d.pnl ?? null, by: who ? "admin" : "cron", stockOpen, openMarkets: openCount,
+      pnl: d.pnl ?? null, by: "cron", stockOpen, openMarkets: openCount,
       // Every market the agent looked at in this check.
       scanned: scans.map((s) => ({ s: s.symbol, p: s.price, f: s.fast, sl: s.slow, sig: s.signal, open: s.open })),
       // The money side of a pretend trade, so the app can show what went in and what came out.
@@ -523,7 +603,7 @@ export async function handleAlpacaAgent(
     const token = String(body?.token ?? "");
     if (!token || !state.cron_token || token !== state.cron_token) return { status: 403, payload: { ok: false, error: "forbidden" } };
     try {
-      return { status: 200, payload: await runCheck(db, "cron") };
+      return { status: 200, payload: await runCheck(db) };
     } catch (e) {
       return { status: 500, payload: { ok: false, error: String((e as Error).message) } };
     }
@@ -553,15 +633,9 @@ export async function handleAlpacaAgent(
     state = await loadState(db);
   }
 
-  if (action === "paCheck") {
-    try {
-      const r = await runCheck(db, "manual", email);
-      state = await loadState(db);
-      if (r.ok === false) return { status: 200, payload: { ...r, state: publicState(state) } };
-    } catch (e) {
-      return { status: 200, payload: { ok: false, error: String((e as Error).message) } };
-    }
-  }
+  // paCheck ("Scan now" in the app) only LOOKS: a fresh read of all markets, no decision, no log line,
+  // and it does not touch the automatic check's timer.
+  const forceLive = action === "paCheck";
 
   if (action === "paLog") {
     const limit = Math.min(Math.max(Number(body?.limit ?? 100), 10), 300);
@@ -582,9 +656,9 @@ export async function handleAlpacaAgent(
     try { clock = await aGet(PAPER_BASE, "/v2/clock", cfg.keys); } catch { /* unknown */ }
   }
   const stockOpen = clock ? !!clock.is_open : null;
-  if (body?.live === true && cfg.keys) {
+  if ((body?.live === true || forceLive) && cfg.keys) {
     const snapAt = state.snapshot?.at ? Date.parse(state.snapshot.at) : 0;
-    if (Date.now() - snapAt > 20 * 1000 || !Array.isArray(state.snapshot?.markets)) {
+    if (Date.now() - snapAt > (forceLive ? 5 : 20) * 1000 || !Array.isArray(state.snapshot?.markets)) {
       try {
         const et = etParts(new Date());
         const [acct, series] = await Promise.all([readAccount(cfg.keys), readMarkets(cfg.keys)]);

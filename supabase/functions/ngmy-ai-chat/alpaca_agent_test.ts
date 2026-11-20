@@ -1,6 +1,6 @@
 // deno test supabase/functions/ngmy-ai-chat/alpaca_agent_test.ts
 import { assertEquals, assert } from "https://deno.land/std@0.177.0/testing/asserts.ts";
-import { buildChart, crossover, decide, etParts, PA_MARKETS, pickMarket, sma, type DecideInput, type Scan } from "./alpaca_agent.ts";
+import { buildChart, crossover, decide, etParts, PA_MARKETS, pickMarket, readMarket, rsi, sma, type DecideInput, type Scan } from "./alpaca_agent.ts";
 
 const base: DecideInput = {
   weekend: false, asset: "SPY", stock: true, price: 100, signal: "none", fast: 100, slow: 100, shadow: null,
@@ -82,6 +82,24 @@ Deno.test("watchlist: picks the strongest fresh buy among open markets", () => {
   const r = pickMarket(quiet, null, false);
   assertEquals(r.pick, null);
   assertEquals(r.closest?.symbol, "BTC/USD");
+});
+
+Deno.test("RSI and the live reading", () => {
+  const rising = Array.from({ length: 40 }, (_, i) => 100 + i * 0.5 + (i % 3 === 0 ? -0.2 : 0));
+  assert(rsi(rising)! > 70);
+  const falling = rising.map((v) => 200 - v);
+  assert(rsi(falling)! < 30);
+  assertEquals(rsi([1, 2, 3]), null);
+  const bars = rising.map((c) => ({ h: c + 0.1, l: c - 0.1 }));
+  const up = readMarket(rising, bars, rising[rising.length - 1], true);
+  assertEquals(up.bias, "bullish");
+  assert(up.score > 60);
+  assertEquals(readMarket(rising, bars, rising[rising.length - 1], false).action, "MARKET CLOSED");
+  const down = readMarket(falling, bars, falling[falling.length - 1], true);
+  assertEquals(down.bias, "bearish");
+  assertEquals(down.action, "DOWNTREND · STAY OUT");
+  assert(down.score < 40);
+  assertEquals(readMarket([1, 2], [], 2, true).bias, "unknown");
 });
 
 Deno.test("never more than 10 markets", () => {

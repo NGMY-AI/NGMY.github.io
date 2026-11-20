@@ -9,8 +9,11 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_edge_invoke.dart';
+
+part 'ngmy_signal_grid_learn.dart';
 
 const _up = Color(0xFF1FBF97); // rising candles, wins
 const _down = Color(0xFFF2C14E); // falling candles
@@ -122,13 +125,63 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     await _reload();
   }
 
-  Future<void> _checkNow() async {
+  void _openLearn() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => NgmySignalGridLearnScreen(initialStatus: _status, preview: widget.previewStatus != null),
+    ));
+  }
+
+  /// "Scan now" only LOOKS: a fresh read of all 10 markets. It never buys or sells; only the automatic
+  /// 15-minute check on the server makes pretend trades.
+  Future<void> _scanNow() async {
     setState(() => _busy = true);
     final res = await ngmyEdgeInvoke({'action': 'paCheck'}, timeout: const Duration(seconds: 60));
     if (!mounted) return;
-    setState(() => _busy = false);
-    if (res?['ok'] != true) _snack((res?['error'] ?? 'The check did not finish.').toString(), _loss);
-    await _reload();
+    setState(() {
+      _busy = false;
+      if (res != null && res['ok'] == true) _status = res;
+    });
+    if (res?['ok'] != true) {
+      _snack((res?['error'] ?? 'The scan did not finish.').toString(), _loss);
+      return;
+    }
+    final p = _Pal(Theme.of(context).brightness == Brightness.light);
+    final snap = _map(_map(res!['state'])['snapshot']);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: p.bgTop,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.8,
+        maxChildSize: 0.95,
+        builder: (ctx, scroll) => _scanSheet(p, snap, _map(res['state']), scroll),
+      ),
+    );
+  }
+
+  Widget _scanSheet(_Pal p, Map<String, dynamic> snap, Map<String, dynamic> st, ScrollController scroll) {
+    final markets = _markets(snap)..sort((a, b) => _signalRank(a).compareTo(_signalRank(b)));
+    return ListView(controller: scroll, padding: const EdgeInsets.fromLTRB(16, 10, 16, 30), children: [
+      Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: p.line, borderRadius: BorderRadius.circular(9)))),
+      const SizedBox(height: 14),
+      Text('What the agent sees right now', style: TextStyle(color: p.ink, fontSize: 19, fontWeight: FontWeight.w900)),
+      const SizedBox(height: 4),
+      Text('This scan only looks. It never buys or sells. Pretend trades are made only by the automatic check every 15 minutes'
+          '${st['enabled'] == true ? ' (next one ${_nextAuto()})' : ' (the agent is stopped, so none will be made)'}.',
+          style: TextStyle(color: p.muted, fontSize: 12.5, height: 1.35)),
+      const SizedBox(height: 12),
+      for (final m in markets) _readingTile(p, m, compact: true),
+    ]);
+  }
+
+  static double _signalRank(Map<String, dynamic> m) {
+    final a = (_map(m['reading'])['action'] ?? '').toString();
+    if (a.startsWith('BUY')) return 0;
+    if (a.startsWith('SELL')) return 1;
+    if (m['open'] != true) return 4;
+    return 2 + (100 - _d(_map(m['reading'])['score'])) / 1000;
   }
 
   void _snack(String msg, Color c) {
@@ -225,6 +278,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
       _balanceCard(p, s, st, snap),
       shadow != null ? _positionCard(p, shadow, held!) : _ticketCard(p, s, focus),
       _controls(p, st),
+      _autoLine(p, st),
       _tradesCard(p, s),
       _activityCard(p),
       _rulesCard(p, s),
@@ -760,12 +814,34 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
                 backgroundColor: p.card,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
               ),
-              onPressed: _busy ? null : _checkNow,
+              onPressed: _busy ? null : _scanNow,
               icon: _busy
                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.radar_rounded, size: 18),
-              label: const Text('Check now', style: TextStyle(fontWeight: FontWeight.w800)),
+              label: const Text('Scan now', style: TextStyle(fontWeight: FontWeight.w800)),
             ),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  /// When the agent last checked by itself, and when it checks next.
+  Widget _autoLine(_Pal p, Map<String, dynamic> st) {
+    final on = st['enabled'] == true && st['brakePaused'] != true;
+    final last = DateTime.tryParse('${st['lastTickAt'] ?? ''}');
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(6, 0, 6, 14),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(Icons.autorenew_rounded, size: 16, color: on ? _up : p.muted),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            on
+                ? 'Trades are automatic: the agent checks all markets every 15 minutes by itself. '
+                    'Last check ${last == null ? 'not yet' : '${_clock(_toEt(last))} ET'} · next ${_nextAuto()}. Scan now only looks.'
+                : 'The agent is stopped, so it makes no trades. Press Start and it checks all markets every 15 minutes by itself.',
+            style: TextStyle(color: p.muted, fontSize: 11.5, height: 1.35),
           ),
         ),
       ]),
@@ -902,7 +978,12 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              Text(_cap(decision), style: TextStyle(color: c, fontWeight: FontWeight.w800, fontSize: 12.5)),
+              Text(decision == 'hold' ? 'Still holding' : _cap(decision),
+                  style: TextStyle(color: c, fontWeight: FontWeight.w800, fontSize: 12.5)),
+              if (_map(r['details'])['by'] == 'cron') ...[
+                const SizedBox(width: 6),
+                Text('automatic', style: TextStyle(color: p.muted, fontSize: 10, fontWeight: FontWeight.w700)),
+              ],
               const Spacer(),
               Text(_shortTime((r['et_time'] ?? '').toString()), style: TextStyle(color: p.muted, fontSize: 10.5)),
             ]),
@@ -934,7 +1015,28 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
             iconColor: p.ink,
             collapsedIconColor: p.muted,
             leading: Icon(Icons.rule_rounded, color: _slowC),
-            title: Text('The rules it follows', style: TextStyle(color: p.ink, fontWeight: FontWeight.w800, fontSize: 14.5)),
+            title: Row(children: [
+              Flexible(
+                child: Text('The rules it follows', style: TextStyle(color: p.ink, fontWeight: FontWeight.w800, fontSize: 14.5)),
+              ),
+              const SizedBox(width: 8),
+              // Learn: lessons, live signals and a tutor to ask, using the agent's live readings.
+              GestureDetector(
+                onTap: _openLearn,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [_slowC, _fastC]),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.school_rounded, color: Colors.white, size: 14),
+                    SizedBox(width: 4),
+                    Text('Learn', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+                  ]),
+                ),
+              ),
+            ]),
             subtitle: Text('Read-only, set in the code', style: TextStyle(color: p.muted, fontSize: 11.5)),
             children: [
               for (final line in ((s['rules'] as List?) ?? const []))
@@ -1324,7 +1426,7 @@ _Look _look(String symbol) => switch (symbol) {
       'NVDA' => const _Look('Nvidia', 'N', Color(0xFF65A30D)),
       'TSLA' => const _Look('Tesla', 'T', Color(0xFFDC2626)),
       'AMZN' => const _Look('Amazon', 'a', Color(0xFFF59E0B)),
-      'BTC/USD' => const _Look('Bitcoin', '₿', _btc),
+      'BTC/USD' => const _Look('Bitcoin', 'B', _btc),
       'ETH/USD' => const _Look('Ethereum', 'Ξ', Color(0xFF627EEA)),
       'SOL/USD' => const _Look('Solana', 'S', Color(0xFF9945FF)),
       _ => _Look(symbol, symbol.isEmpty ? '?' : symbol[0], _slowC),
