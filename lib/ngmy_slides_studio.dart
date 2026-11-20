@@ -4202,6 +4202,11 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                         height: 1.35,
                       ),
                       cursorColor: const Color(0xFF2563EB),
+                      // One cursor only: the round magnifier that followed the finger (with its own grey copy of the
+                      // cursor) is off, and the cursor is a little thicker so it is easy to see and to drag.
+                      magnifierConfiguration: TextMagnifierConfiguration.disabled,
+                      cursorWidth: 2.6,
+                      cursorRadius: const Radius.circular(2),
                       decoration: const InputDecoration(
                         border: InputBorder.none,
                         hintText: 'Type here…',

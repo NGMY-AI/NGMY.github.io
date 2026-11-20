@@ -3465,6 +3465,9 @@ class _PasswordCardBodyState extends State<_PasswordCardBody> {
   }
 }
 
+/// The medicines read from the phone in this visit, so a medicine card shows its details at once when it is drawn again.
+final Map<String, List<NgmyMedicineEntry>> _ngmyMedicinesShown = {};
+
 class _PinnedMedicineCardBody extends StatefulWidget {
   const _PinnedMedicineCardBody({required this.entry, required this.userEmail});
 
@@ -3477,21 +3480,23 @@ class _PinnedMedicineCardBody extends StatefulWidget {
 
 class _PinnedMedicineCardBodyState extends State<_PinnedMedicineCardBody> {
   NgmyMedicineEntry? _medicine;
-  bool _loading = true;
+  // Never a loading circle: the card shows at once from what was pinned (name, dose, times are kept in the card itself)
+  // and from the medicines already read in this visit, and fills in from the phone's list a moment later.
+  final bool _loading = false;
 
   @override
   void initState() {
     super.initState();
+    final known = _ngmyMedicinesShown[widget.userEmail];
+    if (known != null) _medicine = _medicineMatchingEntry(known, widget.entry);
     unawaited(_load());
   }
 
   Future<void> _load() async {
     final list = await ngmyExportMedicines(userEmail: widget.userEmail);
+    _ngmyMedicinesShown[widget.userEmail] = list;
     if (!mounted) return;
-    setState(() {
-      _medicine = _medicineMatchingEntry(list, widget.entry);
-      _loading = false;
-    });
+    setState(() => _medicine = _medicineMatchingEntry(list, widget.entry));
   }
 
   @override

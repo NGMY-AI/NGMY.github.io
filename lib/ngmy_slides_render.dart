@@ -272,6 +272,10 @@ class NgmySlideElementView extends StatelessWidget {
         textAlign: element.align,
         textAlignVertical: TextAlignVertical.top,
         cursorColor: const Color(0xFF2563EB),
+        // One cursor only (no magnifier with a second grey cursor), a little thicker so it is easy to drag.
+        magnifierConfiguration: TextMagnifierConfiguration.disabled,
+        cursorWidth: 2.6,
+        cursorRadius: const Radius.circular(2),
         decoration: const InputDecoration(
           border: InputBorder.none,
           isDense: true,
