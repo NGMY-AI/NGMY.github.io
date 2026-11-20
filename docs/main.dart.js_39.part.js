@@ -2,7 +2,7 @@
 $__dart_deferred_initializers__.current=function(a,b,c,$){var B,A,C
 B=c[0]
 A=c[2]
-C=c[63]
-var z=a.updateTypes([]);(function constants(){C.ahI=new B.u(1,0.16470588235294117,0.07058823529411765,0.3137254901960784,A.q)
-C.asO=new B.ae(A.lV,20,A.c,null,null,null)})()};
-(a=>{a["6dY7gVcCGvHwxolJy6phqrnuz70="]=a.current})($__dart_deferred_initializers__);
+C=c[64]
+var z=a.updateTypes([]);(function constants(){C.ahK=new B.u(1,0.16470588235294117,0.07058823529411765,0.3137254901960784,A.q)
+C.asP=new B.ae(A.lX,20,A.c,null,null,null)})()};
+(a=>{a["GzemBTeWHW383Mb8fobgcgln9mY="]=a.current})($__dart_deferred_initializers__);
