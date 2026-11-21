@@ -54,7 +54,14 @@ class _NgmyDeferredState extends State<NgmyDeferred> {
                       FilledButton(onPressed: () => Navigator.of(context).maybePop(), child: const Text('Back')),
                     ]),
                   )
-                : const CircularProgressIndicator(strokeWidth: 3),
+                // The circle only shows when the wait is long: a part that arrives quickly (most of the time it is
+                // already on the phone) opens without any loading circle flashing first.
+                : TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: 1),
+                    duration: const Duration(milliseconds: 900),
+                    builder: (context, t, child) => Opacity(opacity: t < 0.6 ? 0 : (t - 0.6) / 0.4, child: child),
+                    child: const CircularProgressIndicator(strokeWidth: 3),
+                  ),
           ),
         );
       },
@@ -73,14 +80,26 @@ Future<T> ngmyRunDeferred<T>(Future<void> Function() load, FutureOr<T> Function(
 /// screen never stutters. Called once after the home screen opens: by the time a menu is tapped its code is already
 /// in memory, so it opens at once instead of showing a loading circle the first time after every start of the app.
 /// Each part comes from the copy stored on the phone (the service worker keeps them), so this costs no data.
-Future<void> ngmyWarmDeferred(List<Future<void> Function()> loads, {Duration gap = const Duration(milliseconds: 200)}) async {
-  for (final load in loads) {
-    try {
-      await load();
-      _ngmyDeferredLoaded.add(load);
-    } catch (_) {
-      // Offline or not stored yet: that menu simply loads when it is opened, as before.
+Future<void> ngmyWarmDeferred(List<Future<void> Function()> loads, {Duration gap = const Duration(milliseconds: 60), int together = 3}) async {
+  // A few parts come down at the same time (each one used to wait for the one before and a pause, so the last menus
+  // were ready only half a minute after the app opened and showed a loading circle when tapped before that).
+  var next = 0;
+  Future<void> worker() async {
+    while (next < loads.length) {
+      final load = loads[next++];
+      if (_ngmyDeferredLoaded.contains(load)) continue;
+      try {
+        await load();
+        _ngmyDeferredLoaded.add(load);
+      } catch (_) {
+        // Offline or not stored yet: that menu simply loads when it is opened, as before.
+      }
+      await Future<void>.delayed(gap);
     }
-    await Future<void>.delayed(gap);
   }
+
+  await Future.wait([for (var i = 0; i < together; i++) worker()]);
 }
+
+/// True when that part of the app is already downloaded in this visit.
+bool ngmyDeferredIsLoaded(Future<void> Function() load) => _ngmyDeferredLoaded.contains(load);

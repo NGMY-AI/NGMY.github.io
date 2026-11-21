@@ -1416,24 +1416,29 @@ class NgmyBusinessCardGallery extends StatefulWidget {
 
 class _NgmyBusinessCardGalleryState extends State<NgmyBusinessCardGallery> {
   late Future<List<Map<String, dynamic>>> _future;
+  /// Reads the saved cards and keeps them, so opening the gallery again shows them at once (no loading circle).
+  Future<List<Map<String, dynamic>>> _loadShown() => loadNgmyBusinessCards(userEmail: widget.userEmail).then((l) {
+        _ngmyShownCards[widget.userEmail] = l;
+        return l;
+      });
 
   @override
   void initState() {
     super.initState();
-    _future = loadNgmyBusinessCards(userEmail: widget.userEmail);
+    _future = _loadShown();
   }
 
   @override
   void didUpdateWidget(covariant NgmyBusinessCardGallery oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.userEmail != widget.userEmail) {
-      _future = loadNgmyBusinessCards(userEmail: widget.userEmail);
+      _future = _loadShown();
     }
   }
 
   void _reload() {
     setState(
-      () => _future = loadNgmyBusinessCards(userEmail: widget.userEmail),
+      () => _future = _loadShown(),
     );
   }
 
@@ -1454,6 +1459,7 @@ class _NgmyBusinessCardGalleryState extends State<NgmyBusinessCardGallery> {
     final t = NgmyHubTheme.of(context);
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: _future,
+      initialData: _ngmyShownCards[widget.userEmail],
       builder: (context, snap) {
         final raw = snap.data ?? [];
         if (snap.connectionState == ConnectionState.waiting && raw.isEmpty) {
@@ -1554,3 +1560,6 @@ class _NgmyBusinessCardGalleryState extends State<NgmyBusinessCardGallery> {
     );
   }
 }
+
+/// The saved cards last shown for each account (see _loadShown).
+final Map<String, List<Map<String, dynamic>>> _ngmyShownCards = {};

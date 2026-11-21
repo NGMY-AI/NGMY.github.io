@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'ngmy_avatar_glb.dart' show GlbAvatar;
 import 'ngmy_screen_cache.dart' show ngmyMakingScreenPicture;
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -810,7 +811,10 @@ class Scene3DPainter extends CustomPainter {
     final offZ = <int, double>{}, offN = <int, int>{};
     final toLight = _toLight.unit;
     final half = (toLight + const V3(0, 0, -1)).unit;
-    final drawn = <_Face>[];
+    // The list and the faces in it are kept and used again each frame (thousands of new objects 20 times a second
+    // kept the phone busy clearing memory, which showed as the game pausing now and then).
+    final drawn = _drawnFaces..clear();
+    _facesUsed = 0;
     final dyn = dynamicPolys == null ? const <Poly>[] : dynamicPolys!(time);
     // The camera turned into plain numbers once, so the thousands of faces below cost no objects to work out.
     final tgx = cam.target.x, tgy = cam.target.y, tgz = cam.target.z, camDist = cam.dist;
@@ -924,7 +928,7 @@ class Scene3DPainter extends CustomPainter {
         xy[start + i * 2] = sxs[i];
         xy[start + i * 2 + 1] = sys[i];
       }
-      final face = _Face(null, ((p.alpha * 255).round().clamp(0, 255) << 24) | (r << 16) | (g << 8) | b, zMid - bias, p.id, p.alpha < 0.99, p.id == highlight && highlight != 0, null, p.order, p.group);
+      final face = _plainFace(((p.alpha * 255).round().clamp(0, 255) << 24) | (r << 16) | (g << 8) | b, zMid - bias, p.id, p.alpha < 0.99, p.id == highlight && highlight != 0, p.order, p.group);
       face.start = start;
       face.count = cnt;
       // A face only a couple of pixels wide needs no outline to close the seams round it.
@@ -1342,6 +1346,25 @@ ui.Picture? _screenPicture(Object key, ScreenQuad sq, double time, {required dou
   return have?.picture;
 }
 
+/// How many 3D views are open. When the last one closes, what the game kept to draw fast is let go (see [ngmy3dReleaseKept]).
+int _openViews = 0;
+
+/// Lets go of the screen recordings and the kept poses of the people once no 3D view is open, so the memory the game used
+/// goes back to the rest of the app (on a phone a page that keeps too much is closed by the browser and starts again).
+void ngmy3dReleaseKept() {
+  for (final a in _adPics.values) {
+    _retiredPics.add(a.picture);
+  }
+  _adPics.clear();
+  GlbAvatar.releaseAllKept();
+  // The last frame may still show them: they go after the next frame.
+  SchedulerBinding.instance.addPostFrameCallback((_) {
+    if (_openViews > 0) return;
+    _releaseRetiredPics();
+    _releaseRetiredPics();
+  });
+}
+
 /// Recordings no longer used: a frame on its way to the screen may still show them, so they are let go two frames later.
 List<ui.Picture> _retiredPics = [];
 List<ui.Picture> _retiredPrev = [];
@@ -1401,10 +1424,41 @@ class _TriBatch {
 final _TriBatch _batch = _TriBatch();
 final Paint _vertexPaint = Paint();
 
+/// The faces of the frame being drawn, kept from frame to frame (see [_plainFace]).
+final List<_Face> _drawnFaces = [];
+final List<_Face> _facePool = [];
+int _facesUsed = 0;
+
+/// A plain face (no picture) for this frame: one made in an earlier frame is filled in again when there is one.
+/// A frame's faces are used only while it is drawn (what can be tapped is copied out), so they are free again next frame.
+_Face _plainFace(int color, double z, int id, bool see, bool glow, int order, int group) {
+  if (_facesUsed < _facePool.length) {
+    final f = _facePool[_facesUsed++];
+    f
+      ..color = color
+      ..z = z
+      ..id = id
+      ..see = see
+      ..glow = glow
+      ..order = order
+      ..group = group
+      ..seq = 0
+      ..key = 0
+      ..tiny = false
+      ..start = 0
+      ..count = 0;
+    return f;
+  }
+  final f = _Face(null, color, z, id, see, glow, null, order, group);
+  _facePool.add(f);
+  _facesUsed++;
+  return f;
+}
+
 class _Face {
   _Face(this.path, this.color, this.z, this.id, this.see, this.glow, [this.draw, this.order = 2, this.group = 0]);
-  final int order;
-  final int group;
+  int order;
+  int group;
   int seq = 0;
   double key = 0;
   bool tiny = false;
@@ -1415,11 +1469,11 @@ class _Face {
   int start = 0;
   int count = 0;
   /// The colour as one number (alpha, red, green, blue).
-  final int color;
-  final double z;
-  final int id;
-  final bool see;
-  final bool glow;
+  int color;
+  double z;
+  int id;
+  bool see;
+  bool glow;
 }
 
 // ─── The view: turn with a finger, pinch or scroll to zoom, tap to pick ───────
@@ -1463,6 +1517,7 @@ class _Scene3DViewState extends State<Scene3DView> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
+    _openViews++;
     Cam3.loadPrefs();
     _ticker = createTicker((d) {
       final dt = (d - _last).inMicroseconds / 1e6;
@@ -1477,6 +1532,7 @@ class _Scene3DViewState extends State<Scene3DView> with SingleTickerProviderStat
   void dispose() {
     _ticker.dispose();
     _time.dispose();
+    if (--_openViews == 0) ngmy3dReleaseKept();
     super.dispose();
   }
 

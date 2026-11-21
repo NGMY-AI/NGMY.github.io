@@ -19105,7 +19105,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     Future<void>.delayed(const Duration(seconds: 6), () {
       if (mounted) unawaited(ngmyWarmDeferred(ngmyAppWarmList()));
     });
-    _smokeCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 10));
+    // The two bottom-bar tabs that are their own download (Market Hub and Slides) come down first, right after the
+    // home screen has drawn, so tapping them never shows a loading circle. Only on the web (a phone app has them built in).
+    if (kIsWeb) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future<void>.delayed(const Duration(milliseconds: 1500), () {
+          if (mounted) unawaited(ngmyWarmDeferred([markethub.loadLibrary, slides.loadLibrary], together: 2));
+        });
+      });
+    }
+    _smokeCtrl =AnimationController(vsync: this, duration: const Duration(seconds: 10));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (!ngmyPreferLightGraphics) _smokeCtrl.repeat();
@@ -60795,28 +60804,29 @@ class _NicknameAdminPanelState extends State<_NicknameAdminPanel> {
 /// Every part of the app that is its own download, in the order they are loaded in the background after the home
 /// screen opens (the most used first). A new deferred menu must be added here too, or it shows a loading circle.
 List<Future<void> Function()> ngmyAppWarmList() => [
+      // The menus opened most come first; the big arcade games last.
       growthui.loadLibrary,
       markethub.loadLibrary,
       slides.loadLibrary,
-      commui.loadLibrary,
-      ...ngmyArcadeWarm(),
-      docscan.loadLibrary,
-      repairflow.loadLibrary,
-      bizcardstudio.loadLibrary,
-      ...ngmyHomeTechFramesWarm(),
-      ...ngmyHomeGlassCardsWarm(),
-      ...ngmyStudioHubWarm(),
       helpcenter.loadLibrary,
-      lightning.loadLibrary,
-      walletui.loadLibrary,
-      ...ngmyCivicStateWalletWarm(),
+      docscan.loadLibrary,
+      ...ngmyStudioHubWarm(),
+      bizcardstudio.loadLibrary,
       menustudio.loadLibrary,
       bizess.loadLibrary,
+      walletui.loadLibrary,
+      ...ngmyCivicStateWalletWarm(),
+      ...ngmyHomeTechFramesWarm(),
+      ...ngmyHomeGlassCardsWarm(),
+      commui.loadLibrary,
+      repairflow.loadLibrary,
+      lightning.loadLibrary,
       worksheets.loadLibrary,
-      fungames.loadLibrary,
       pricescan.loadLibrary,
       appbuilder.loadLibrary,
+      fungames.loadLibrary,
       ...ngmyRegisterAiToolsWarm(),
+      ...ngmyArcadeWarm(),
     ];
 
 /// Runs the given loads at the same time instead of one after another, and waits for all of them. One that fails
