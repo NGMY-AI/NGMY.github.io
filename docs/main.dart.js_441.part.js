@@ -1,0 +1,6 @@
+((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
+$__dart_deferred_initializers__.current=function(a,b,c,$){var A,B
+A=c[0]
+B=c[289]
+var z=a.updateTypes([]);(function constants(){B.xm=new A.a_(983412,"MaterialIcons",!0)})()};
+(a=>{a["rIZPAML8GadL51ckh4M47axMKJk="]=a.current})($__dart_deferred_initializers__);
