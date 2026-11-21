@@ -497,7 +497,8 @@ class BoardEditorState extends State<BoardEditor> with SingleTickerProviderState
                     _info = null;
                   });
                 },
-                child: CustomPaint(size: _size, painter: BoardPainter(b, selected: _sel, dragFrom: _dragFrom, dragTo: _dragTo, selWire: _selWire, popIn: pop ?? const {})),
+                // Its own layer: the board's drawing every frame does not redraw the notices and buttons on top of it.
+                child: RepaintBoundary(child: CustomPaint(size: _size, painter: BoardPainter(b, selected: _sel, dragFrom: _dragFrom, dragTo: _dragTo, selWire: _selWire, popIn: pop ?? const {}))),
               ),
               if (b.parts.isEmpty)
                 const Center(child: Padding(padding: EdgeInsets.all(30), child: Text('Tap a part below to put it on the board.\nThen drag from a round dot on one part to a dot on another to join them with a wire.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white38, height: 1.5)))),

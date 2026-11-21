@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'ngmy_arcade_games.dart';
+import 'ngmy_arcade_catalog.dart';
 import 'ngmy_dice_admin.dart';
 import 'ngmy_dice_config.dart';
 import 'ngmy_games.dart';

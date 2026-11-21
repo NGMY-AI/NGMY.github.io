@@ -769,7 +769,7 @@ class CityInterior {
       _screens.add(ScreenQuad([V3(cx + 42, 100, 277.7), V3(cx - 42, 100, 277.7), V3(cx - 42, 50, 277.7), V3(cx + 42, 50, 277.7)], 0, (c, size, t) => paintCityAdLoop(c, size, t, cx > 0 ? 2 : 5), width: 720, height: 420));
     }
     b.box(const V3(0, 120, 278.6), const V3(124, 26, 1.6), const Color(0xFF0B1F4B), shine: 0.3);
-    _screens.add(ScreenQuad([const V3(58, 130, 277.7), const V3(-58, 130, 277.7), const V3(-58, 110, 277.7), const V3(58, 110, 277.7)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY', 'Welcome'), width: 900, height: 160));
+    _screens.add(ScreenQuad([const V3(58, 130, 277.7), const V3(-58, 130, 277.7), const V3(-58, 110, 277.7), const V3(58, 110, 277.7)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY', 'Welcome'), width: 900, height: 160, still: true));
     scene = Scene3D(b.polys, screens: List<ScreenQuad>.of(_screens));
   }
 

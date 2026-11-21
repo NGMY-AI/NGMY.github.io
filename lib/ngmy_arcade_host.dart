@@ -4,7 +4,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'main.dart';
-import 'ngmy_arcade_games.dart';
+import 'ngmy_arcade_catalog.dart';
+import 'ngmy_arcade_games.dart' deferred as arcadegames;
+import 'ngmy_deferred.dart';
 import 'ngmy_game_nav.dart';
 import 'ngmy_game_notifications.dart';
 import 'ngmy_game_session.dart';
@@ -291,7 +293,8 @@ class _NgmyArcadePlayScreenState extends State<NgmyArcadePlayScreen> {
                         colors: [widget.colors.first.withValues(alpha: 0.35), const Color(0xFF0B0717)],
                       ),
                     ),
-                    child: IgnorePointer(ignoring: _over, child: ngmyBuildArcadeGame(widget.gameId, args)),
+                    // The games are their own download (usually fetched in the background already).
+                    child: IgnorePointer(ignoring: _over, child: NgmyDeferred(load: arcadegames.loadLibrary, keepFirstBuild: false, background: Colors.transparent, build: () => arcadegames.ngmyBuildArcadeGame(widget.gameId, args))),
                   ),
                 ),
               ),
@@ -302,3 +305,6 @@ class _NgmyArcadePlayScreenState extends State<NgmyArcadePlayScreen> {
     );
   }
 }
+
+/// The arcade games are their own download; this fetches them in the background after the app opens (see ngmyAppWarmList).
+List<Future<void> Function()> ngmyArcadeWarm() => [arcadegames.loadLibrary];

@@ -54,7 +54,7 @@ import 'ngmy_admin_game_timers.dart';
 import 'ngmy_clock_day.dart';
 import 'ngmy_offline_icons.dart' show NgmyOfflineGlyphWarmup, ngmyLoadEmojiFontLater;
 import 'ngmy_modern_chat_icon.dart';
-import 'ngmy_arcade_games.dart';
+import 'ngmy_arcade_catalog.dart';
 import 'ngmy_arcade_host.dart';
 import 'ngmy_wallet_memory.dart';
 import 'ngmy_light_notice_dialog.dart';
@@ -60799,6 +60799,7 @@ List<Future<void> Function()> ngmyAppWarmList() => [
       markethub.loadLibrary,
       slides.loadLibrary,
       commui.loadLibrary,
+      ...ngmyArcadeWarm(),
       docscan.loadLibrary,
       repairflow.loadLibrary,
       bizcardstudio.loadLibrary,

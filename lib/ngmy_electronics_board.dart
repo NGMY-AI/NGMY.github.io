@@ -1,4 +1,6 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
@@ -700,6 +702,29 @@ class ElectronicsBoard {
 // Drawing the board
 // ═════════════════════════════════════════════════════════════════════════════
 
+/// Laid-out words of the board, kept between frames.
+final Map<String, TextPainter> _boardText = {};
+
+/// The dots of the board's background for one size of board, worked out once.
+Float32List _dotGridPts = Float32List(0);
+Size _dotGridSize = Size.zero;
+final Paint _dotPaint = Paint()
+  ..color = Colors.white.withValues(alpha: 0.06)
+  ..strokeWidth = 2.2
+  ..strokeCap = StrokeCap.round;
+
+Float32List _dotGrid(Size size) {
+  if (size == _dotGridSize) return _dotGridPts;
+  final pts = <double>[];
+  for (var x = 12.0; x < size.width; x += 24) {
+    for (var y = 12.0; y < size.height; y += 24) {
+      pts..add(x)..add(y);
+    }
+  }
+  _dotGridSize = size;
+  return _dotGridPts = Float32List.fromList(pts);
+}
+
 class BoardPainter extends CustomPainter {
   BoardPainter(this.board, {this.selected, this.dragFrom, this.dragTo, this.selWire, this.popIn = const {}});
   final ElectronicsBoard board;
@@ -712,12 +737,8 @@ class BoardPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFF0E1218));
-    final dot = Paint()..color = Colors.white.withValues(alpha: 0.06);
-    for (var x = 12.0; x < size.width; x += 24) {
-      for (var y = 12.0; y < size.height; y += 24) {
-        canvas.drawCircle(Offset(x, y), 1.1, dot);
-      }
-    }
+    // The dotted background in one drawing call (it was hundreds of little circles, drawn again every frame).
+    canvas.drawRawPoints(ui.PointMode.points, _dotGrid(size), _dotPaint);
     // Wires.
     for (final w in board.wires) {
       final a = ElectronicsBoard.terminal(w.a, w.ta, size), b = ElectronicsBoard.terminal(w.b, w.tb, size);
@@ -769,13 +790,16 @@ class BoardPainter extends CustomPainter {
     if (shorted) {
       final warn = board.parts.fold<double>(0, (m, p) => math.max(m, p.hot));
       canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFFFF2A1A).withValues(alpha: 0.05 + 0.09 * warn * (0.5 + 0.5 * math.sin(board.time * 22))));
-      final tp = TextPainter(text: const TextSpan(text: '⚡ SHORT CIRCUIT! Too much current. Add a load or a fuse.', style: TextStyle(color: Color(0xFFFFE08A), fontSize: 13, fontWeight: FontWeight.w900)), textDirection: TextDirection.ltr)..layout(maxWidth: size.width - 24);
+      final tp = _boardText['short|${size.width}'] ??= (TextPainter(text: const TextSpan(text: '⚡ SHORT CIRCUIT! Too much current. Add a load or a fuse.', style: TextStyle(color: Color(0xFFFFE08A), fontSize: 13, fontWeight: FontWeight.w900)), textDirection: TextDirection.ltr)..layout(maxWidth: size.width - 24));
       tp.paint(canvas, Offset(12, 10));
     }
   }
 
   void _text(Canvas canvas, String t, Offset o, Color c, double s) {
-    final tp = TextPainter(text: TextSpan(text: t, style: TextStyle(color: c, fontSize: s, fontWeight: FontWeight.w900)), textDirection: TextDirection.ltr)..layout();
+    // Laid-out words are kept: the board is drawn every frame and laying out words is slow on the web.
+    final key = '$t|${c.toARGB32()}|$s';
+    if (_boardText.length > 300) _boardText.clear();
+    final tp = _boardText[key] ??= (TextPainter(text: TextSpan(text: t, style: TextStyle(color: c, fontSize: s, fontWeight: FontWeight.w900)), textDirection: TextDirection.ltr)..layout());
     tp.paint(canvas, o);
   }
 

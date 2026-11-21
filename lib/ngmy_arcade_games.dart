@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
+export 'ngmy_arcade_catalog.dart';
+import 'ngmy_arcade_catalog.dart';
 import 'ngmy_arcade_games_b.dart';
 import 'ngmy_arcade_games_more.dart';
 import 'ngmy_arcade_host.dart';
@@ -11,37 +13,9 @@ import 'ngmy_arcade_host.dart';
 /// The 70 arcade money games (20 here, 50 in ngmy_arcade_games_more.dart). Each reports progress to the host
 /// (NgmyArcadePlayScreen), which handles the stake, timer and payout.
 
-class NgmyArcadeDef {
-  const NgmyArcadeDef(this.id, this.title, this.subtitle, this.emoji, this.icon, this.colors, this.seconds);
-  final String id;
-  final String title;
-  final String subtitle;
-  final String emoji;
-  final IconData icon;
-  final List<Color> colors;
-  final int seconds;
-}
 
-const kNgmyArcadeGames = <NgmyArcadeDef>[
-  NgmyArcadeDef('bubble_pop', 'Bubble Pop', 'Pop only the target colour — 15 to win', '🫧', Icons.bubble_chart_rounded, [Color(0xFF06B6D4), Color(0xFF3B82F6)], 60),
-  NgmyArcadeDef('fruit_slash', 'Fruit Slash', 'Slice flying fruit, dodge the bombs', '🍉', Icons.content_cut_rounded, [Color(0xFF22C55E), Color(0xFFEF4444)], 60),
-  NgmyArcadeDef('sky_stack', 'Sky Stack', 'Drop blocks to build 12 floors high', '🏗️', Icons.layers_rounded, [Color(0xFFF59E0B), Color(0xFFEA580C)], 75),
-  NgmyArcadeDef('sky_hopper', 'Sky Hopper', 'Tap to fly through 10 gates', '🐤', Icons.flight_takeoff_rounded, [Color(0xFF38BDF8), Color(0xFF0EA5E9)], 75),
-  NgmyArcadeDef('brick_breaker', 'Brick Breaker', 'Smash all 24 bricks with the ball', '🧱', Icons.view_module_rounded, [Color(0xFFDB2777), Color(0xFF7C3AED)], 90),
-  NgmyArcadeDef('odd_one', 'Spot the Odd One', 'Find the emoji that\'s different', '👀', Icons.visibility_rounded, [Color(0xFFEC4899), Color(0xFFBE185D)], 60),
-  NgmyArcadeDef('flag_frenzy', 'Flag Frenzy', 'Name 10 countries from their flags', '🏳️', Icons.flag_rounded, [Color(0xFF2563EB), Color(0xFFDC2626)], 75),
-  NgmyArcadeDef('coin_catcher', 'Coin Catcher', 'Catch 25 coins, dodge the rocks', '🪙', Icons.savings_rounded, [Color(0xFFF59E0B), Color(0xFFB45309)], 60),
-  NgmyArcadeDef('number_rush', 'Number Rush', 'Tap 1 to 25 in order, fast', '🔟', Icons.format_list_numbered_rounded, [Color(0xFF8B5CF6), Color(0xFF6D28D9)], 60),
-  ...kNgmyArcadeGamesMore,
-];
 
-const kNgmyArcadeGameIds = <String>{
-  'bubble_pop', 'fruit_slash', 'sky_stack', 'sky_hopper', 'brick_breaker',
-  'odd_one', 'flag_frenzy', 'coin_catcher', 'number_rush', ...kNgmyArcadeGameIdsMore,
-};
 
-int ngmyArcadeDefaultSeconds(String id) =>
-    kNgmyArcadeGames.firstWhere((g) => g.id == id, orElse: () => kNgmyArcadeGames.first).seconds;
 
 Widget ngmyBuildArcadeGame(String id, NgmyArcadeArgs a) {
   switch (id) {

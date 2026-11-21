@@ -886,21 +886,39 @@ class GlbAvatar {
     final lod = close ? _guide : _resident;
     final clip = clipFor(walking: walking, running: running);
     final len = clipLength(clip);
-    final clipTime = walking && walkedUnits != null && clip.toLowerCase().contains('walk') ? walkedUnits / 50 * len : time * (_speed[key] ?? 1.0) * (running ? 1.0 : 1.0);
-    // Where the hips are at the start of the clip: the dancer is kept on her spot and is not carried around by the dance.
-    var start = _hipsStart[clip];
-    if (start == null) {
-      _poseMatrices(clip, 0);
-      start = _hips >= 0 ? (_scratch['world']![_hips * 16 + 12], _scratch['world']![_hips * 16 + 14]) : (0.0, 0.0);
-      _hipsStart[clip] = start;
+    final rawTime = walking && walkedUnits != null && clip.toLowerCase().contains('walk') ? walkedUnits / 50 * len : time * (_speed[key] ?? 1.0) * (running ? 1.0 : 1.0);
+    // The moves are worked out 30 times a second for people near you (10 for far ones) and kept: everybody doing the
+    // same thing at the same moment shares one pose, and the same moment of the next loop of the clip is not worked out
+    // again. Before, every person was posed again for every picture (60 times a second each), which made the city crawl.
+    final rate = close ? 30.0 : 10.0;
+    final dur = len > 0 ? len : 1.0;
+    final inLoop = rawTime - (rawTime / dur).floorToDouble() * dur;
+    final step = (inLoop * rate).floor();
+    final clipTime = step / rate;
+    final poseKey = '${close ? 1 : 0}|$clip|$step';
+    var pose = _poseCache[poseKey];
+    if (pose == null) {
+      // Where the hips are at the start of the clip: the dancer is kept on her spot and is not carried around by the dance.
+      var start = _hipsStart[clip];
+      if (start == null) {
+        _poseMatrices(clip, 0);
+        start = _hips >= 0 ? (_scratch['world']![_hips * 16 + 12], _scratch['world']![_hips * 16 + 14]) : (0.0, 0.0);
+        _hipsStart[clip] = start;
+      }
+      final mats = _poseMatrices(clip, clipTime);
+      var hx = 0.0, hz = 0.0;
+      if (_hips >= 0) {
+        hx = _scratch['world']![_hips * 16 + 12] - start.$1;
+        hz = _scratch['world']![_hips * 16 + 14] - start.$2;
+      }
+      if (_poseCache.length >= 96) _poseCache.clear();
+      pose = _poseCache[poseKey] = _PoseData(_skin(lod, mats), hx, hz);
     }
-    final mats = _poseMatrices(clip, clipTime);
-    var ox = 0.0, oz = 0.0;
-    if (_hips >= 0) {
-      ox = _scratch['world']![_hips * 16 + 12] - start.$1;
-      oz = _scratch['world']![_hips * 16 + 14] - start.$2;
-    }
-    final p = _skin(lod, mats);
+    // The same person in the same pose at the same spot is not built again (a person standing still between two moves).
+    final polyKey = '$poseKey|$x|$z|$yaw|$lift|$id|${tint?.toARGB32()}|${skin?.toARGB32()}|${pants?.toARGB32()}';
+    final built = _polyCache[polyKey];
+    if (built != null) return built;
+    final p = pose.p, ox = pose.ox, oz = pose.oz;
     final s = kAvatarUnitsPerMetre;
     final a = yaw + (_faceFix[key] ?? 0);
     final c = math.cos(a), sn = math.sin(a);
@@ -908,28 +926,71 @@ class GlbAvatar {
       final px = (p[i * 3] - ox) * s, py = (p[i * 3 + 1] - _floor) * s + lift, pz = (p[i * 3 + 2] - oz) * s;
       return V3(px * c + pz * sn + x, py, -px * sn + pz * c + z);
     });
-    final groups = [for (var i = 0; i < 6; i++) MeshBuilder.newGroup()];
-    final out = <Poly>[];
-    for (var t = 0; t < lod.tris.length; t += 3) {
-      final va = pts[lod.tris[t]], vb = pts[lod.tris[t + 1]], vd = pts[lod.tris[t + 2]];
-      final n = (vb - va).cross(vd - va).unit;
-      final region = lod.region[lod.tris[t]];
-      // A person of the city is dressed: shirt on the body, trousers on the legs, and the head and arms in their own skin.
-      final cy = (va.y + vb.y + vd.y) / 3;
-      Color? tone = tint;
-      if (tint != null && skin != null && pants != null) {
-        // Head and hands in skin, short sleeves from the shoulder to the elbow, shirt down to the hips, trousers below.
-        if (region == 0 || ((region == 1 || region == 2) && cy < 40)) {
-          tone = skin;
-        } else if (region == 3 || region == 4 || (region == 5 && cy < 33)) {
-          tone = pants;
+    // What does not depend on where the person stands or faces is worked out once per pose and shared: the way each
+    // triangle faces (before turning) and its height.
+    final tris = lod.tris;
+    final nTri = tris.length ~/ 3;
+    var ns = pose.n, cys = pose.cy;
+    if (ns == null || cys == null) {
+      ns = Float64List(nTri * 3);
+      cys = Float64List(nTri);
+      for (var k = 0; k < nTri; k++) {
+        final i0 = tris[k * 3] * 3, i1 = tris[k * 3 + 1] * 3, i2 = tris[k * 3 + 2] * 3;
+        final ax = (p[i0] - ox) * s, ay = (p[i0 + 1] - _floor) * s, az = (p[i0 + 2] - oz) * s;
+        final bx = (p[i1] - ox) * s - ax, by = (p[i1 + 1] - _floor) * s - ay, bz = (p[i1 + 2] - oz) * s - az;
+        final dx = (p[i2] - ox) * s - ax, dy = (p[i2 + 1] - _floor) * s - ay, dz = (p[i2 + 2] - oz) * s - az;
+        var nx = by * dz - bz * dy, ny = bz * dx - bx * dz, nz = bx * dy - by * dx;
+        final l = math.sqrt(nx * nx + ny * ny + nz * nz);
+        if (l >= 1e-9) {
+          nx /= l;
+          ny /= l;
+          nz /= l;
         }
+        ns[k * 3] = nx;
+        ns[k * 3 + 1] = ny;
+        ns[k * 3 + 2] = nz;
+        cys[k] = (3 * ay + by + dy) / 3;
       }
-      out.add(Poly([va, vb, vd], n, tone == null ? Color(lod.colors[t ~/ 3]) : _tinted(lod.colors[t ~/ 3], tone), id, shine: 0.08, group: groups[region]));
+      pose.n = ns;
+      pose.cy = cys;
     }
+    // The colours of the triangles for these clothes in this pose, also kept.
+    final colorKey = '$poseKey|${tint?.toARGB32()}|${skin?.toARGB32()}|${pants?.toARGB32()}|$lift';
+    var colors = _colorCache[colorKey];
+    if (colors == null) {
+      colors = List<Color>.generate(nTri, (k) {
+        final region = lod.region[tris[k * 3]];
+        // A person of the city is dressed: shirt on the body, trousers on the legs, and the head and arms in their own skin.
+        final cy = cys![k] + lift;
+        Color? tone = tint;
+        if (tint != null && skin != null && pants != null) {
+          // Head and hands in skin, short sleeves from the shoulder to the elbow, shirt down to the hips, trousers below.
+          if (region == 0 || ((region == 1 || region == 2) && cy < 40)) {
+            tone = skin;
+          } else if (region == 3 || region == 4 || (region == 5 && cy < 33)) {
+            tone = pants;
+          }
+        }
+        return tone == null ? Color(lod.colors[k]) : _tinted(lod.colors[k], tone);
+      });
+      if (_colorCache.length >= 96) _colorCache.clear();
+      _colorCache[colorKey] = colors;
+    }
+    final groups = [for (var i = 0; i < 6; i++) MeshBuilder.newGroup()];
+    final out = List<Poly>.generate(nTri, (k) {
+      final nx = ns![k * 3], ny = ns[k * 3 + 1], nz = ns[k * 3 + 2];
+      return Poly([pts[tris[k * 3]], pts[tris[k * 3 + 1]], pts[tris[k * 3 + 2]]], V3(nx * c + nz * sn, ny, -nx * sn + nz * c), colors![k], id, shine: 0.08, group: groups[lod.region[tris[k * 3]]]);
+    }, growable: true);
     if (skin != null && tint != null && key != 'michelle') out.addAll(_facePolys(lod, pts, a, skin, id, groups[0]));
+    if (_polyCache.length >= 64) _polyCache.clear();
+    _polyCache[polyKey] = out;
     return out;
   }
+
+  /// Poses already worked out (see [polys]), and people already built from them.
+  final Map<String, _PoseData> _poseCache = {};
+  final Map<String, List<Color>> _colorCache = {};
+  final Map<String, List<Poly>> _polyCache = {};
 
   /// A face for the characters that have none (the X Bot is a smooth head, the Soldier wears a hood): eyes with a dark middle, brows,
   /// a nose and a mouth, put on the front of the head wherever the head is in this moment of the animation.
@@ -986,11 +1047,29 @@ class GlbAvatar {
 
 /// A character's colours turned towards [tint], keeping the light and dark of the original, so each person in the city looks different.
 Color _tinted(int base, Color tint) {
+  // A character has only a few colours, so each mix is worked out once and kept.
+  final byTint = _tintMemo.putIfAbsent(tint.toARGB32(), () => <int, Color>{});
+  return byTint[base] ??= _tintedNow(base, tint);
+}
+
+final Map<int, Map<int, Color>> _tintMemo = {};
+
+Color _tintedNow(int base, Color tint) {
   final r = (base >> 16) & 255, g = (base >> 8) & 255, b = base & 255;
   final l = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   final k = 0.35 + l * 1.0;
   int mix(int from, double to) => (from + (to.clamp(0.0, 255.0) - from) * 0.8).round();
   return Color.fromARGB(255, mix(r, tint.r * 255 * k), mix(g, tint.g * 255 * k), mix(b, tint.b * 255 * k));
+}
+
+/// One moment of a clip: every point moved by its bones, how far the hips went, and (worked out when first needed)
+/// the way each triangle faces and its height.
+class _PoseData {
+  _PoseData(this.p, this.ox, this.oz);
+  final Float64List p;
+  final double ox, oz;
+  Float64List? n;
+  Float64List? cy;
 }
 
 class _Mesh {

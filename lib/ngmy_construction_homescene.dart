@@ -50,6 +50,15 @@ class NgmyLogo {
       }();
 }
 
+/// Laid-out words of the signs and posters, kept: a sign is drawn again and again and laying out words is slow on the web.
+final Map<String, TextPainter> _signText = {};
+
+TextPainter _signTp(String text, TextStyle style, {double maxWidth = double.infinity}) {
+  final key = "$text|${style.fontSize}|${style.fontWeight?.value}|${style.letterSpacing}|${style.color?.toARGB32()}|$maxWidth";
+  if (_signText.length > 400) _signText.clear();
+  return _signText[key] ??= (TextPainter(text: TextSpan(text: text, style: style), textDirection: TextDirection.ltr)..layout(maxWidth: maxWidth));
+}
+
 /// The hall's carpet: deep blue with a gold border and the NGMY logo in a round gold frame in the middle.
 void paintNgmyCarpet(Canvas c, Size s, double t) {
   final r = Offset.zero & s;
@@ -77,7 +86,7 @@ void paintNgmyCarpet(Canvas c, Size s, double t) {
     final dst = Rect.fromCenter(center: box.center, width: img.width * k, height: img.height * k);
     c.drawImageRect(img, Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()), dst, Paint()..filterQuality = FilterQuality.medium);
   } else {
-    final tp = TextPainter(text: TextSpan(text: 'NGMY', style: TextStyle(color: const Color(0xFF0B1F4B), fontSize: rad * 0.6, fontWeight: FontWeight.w900)), textDirection: TextDirection.ltr)..layout();
+    final tp = _signTp('NGMY', TextStyle(color: const Color(0xFF0B1F4B), fontSize: rad * 0.6, fontWeight: FontWeight.w900));
     tp.paint(c, mid - Offset(tp.width / 2, tp.height / 2));
   }
 }
@@ -99,7 +108,7 @@ void paintNgmyMedallion(Canvas c, Size s, double t) {
     final dst = Rect.fromCenter(center: box.center, width: img.width * k, height: img.height * k);
     c.drawImageRect(img, Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()), dst, Paint()..filterQuality = FilterQuality.medium);
   } else {
-    final tp = TextPainter(text: TextSpan(text: 'NGMY', style: TextStyle(color: const Color(0xFF0B1F4B), fontSize: rad * 0.6, fontWeight: FontWeight.w900)), textDirection: TextDirection.ltr)..layout();
+    final tp = _signTp('NGMY', TextStyle(color: const Color(0xFF0B1F4B), fontSize: rad * 0.6, fontWeight: FontWeight.w900));
     tp.paint(c, mid - Offset(tp.width / 2, tp.height / 2));
   }
 }
@@ -123,14 +132,14 @@ void paintNgmySign(Canvas c, Size s, double t, String line1, String line2) {
     final k = math.min(box.width / img.width, box.height / img.height);
     c.drawImageRect(img, Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()), Rect.fromCenter(center: box.center, width: img.width * k, height: img.height * k), Paint()..filterQuality = FilterQuality.medium);
   } else {
-    final tp = TextPainter(text: TextSpan(text: 'NGMY', style: TextStyle(color: const Color(0xFF0B1F4B), fontSize: rad * 0.55, fontWeight: FontWeight.w900)), textDirection: TextDirection.ltr)..layout();
+    final tp = _signTp('NGMY', TextStyle(color: const Color(0xFF0B1F4B), fontSize: rad * 0.55, fontWeight: FontWeight.w900));
     tp.paint(c, mid - Offset(tp.width / 2, tp.height / 2));
   }
   final left = s.height * 1.08, maxW = s.width - left - s.height * 0.2;
   void line(String text, double size, Color col, double y) {
-    var tp = TextPainter(text: TextSpan(text: text, style: TextStyle(color: col, fontSize: size, fontWeight: FontWeight.w900, letterSpacing: size * 0.05)), textDirection: TextDirection.ltr, maxLines: 1)..layout();
+    var tp = _signTp(text, TextStyle(color: col, fontSize: size, fontWeight: FontWeight.w900, letterSpacing: size * 0.05));
     if (tp.width > maxW) {
-      tp = TextPainter(text: TextSpan(text: text, style: TextStyle(color: col, fontSize: size * maxW / tp.width, fontWeight: FontWeight.w900, letterSpacing: size * 0.05)), textDirection: TextDirection.ltr, maxLines: 1)..layout();
+      tp = _signTp(text, TextStyle(color: col, fontSize: size * maxW / tp.width, fontWeight: FontWeight.w900, letterSpacing: size * 0.05));
     }
     tp.paint(c, Offset(left + maxW / 2 - tp.width / 2, y));
   }
@@ -168,13 +177,13 @@ void paintNgmyPoster(Canvas c, Size s, double t, int variant) {
       final k = math.min(box.width / img.width, box.height / img.height);
       c.drawImageRect(img, Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()), Rect.fromCenter(center: box.center, width: img.width * k, height: img.height * k), Paint()..filterQuality = FilterQuality.medium);
     } else {
-      final tp = TextPainter(text: TextSpan(text: 'NGMY', style: TextStyle(color: textCol, fontSize: box.height * 0.6, fontWeight: FontWeight.w900)), textDirection: TextDirection.ltr)..layout();
+      final tp = _signTp('NGMY', TextStyle(color: textCol, fontSize: box.height * 0.6, fontWeight: FontWeight.w900));
       tp.paint(c, box.center - Offset(tp.width / 2, tp.height / 2));
     }
   }
 
   void line(String text, Offset at, double size, {FontWeight w = FontWeight.w900}) {
-    final tp = TextPainter(text: TextSpan(text: text, style: TextStyle(color: textCol, fontSize: size, fontWeight: w, letterSpacing: size * 0.08)), textDirection: TextDirection.ltr)..layout(maxWidth: s.width * 0.9);
+    final tp = _signTp(text, TextStyle(color: textCol, fontSize: size, fontWeight: w, letterSpacing: size * 0.08), maxWidth: s.width * 0.9);
     tp.paint(c, at - Offset(tp.width / 2, 0));
   }
 
@@ -186,7 +195,7 @@ void paintNgmyPoster(Canvas c, Size s, double t, int variant) {
     logoAt(Rect.fromCenter(center: mid, width: s.height * 0.5, height: s.height * 0.4));
     // The words sit in the space to the right of the logo disc and shrink to fit it, so they can never run over the logo.
     final wl = s.height * 1.04, wr = s.width - s.height * 0.12;
-    double natural(String text) => (TextPainter(text: TextSpan(text: text, style: TextStyle(fontSize: s.height * 0.16, fontWeight: FontWeight.w900, letterSpacing: s.height * 0.16 * 0.08)), textDirection: TextDirection.ltr)..layout()).width;
+    double natural(String text) => (_signTp(text, TextStyle(fontSize: s.height * 0.16, fontWeight: FontWeight.w900, letterSpacing: s.height * 0.16 * 0.08))).width;
     final fit = math.min(1.0, (wr - wl) / math.max(natural('NEW GLOBAL'), math.max(natural('MOVEMENT'), natural('FOR YOUTH'))));
     final cx = (wl + wr) / 2;
     line('NEW GLOBAL', Offset(cx, s.height * 0.2), s.height * 0.16 * fit);
@@ -300,7 +309,7 @@ Scene3D buildHomeRoom(HRoom r, {String mode = 'look', int selected = 0, int prob
   if (r.kind == 'hall') {
     // A big carpet with the NGMY logo, flat on the floor in the middle of the hall.
     final cw = math.min(w * 0.5, d * 1.5), z0 = 14.0, z1 = d - 14;
-    screens.add(ScreenQuad([V3(-cw / 2, 0.5, z0), V3(cw / 2, 0.5, z0), V3(cw / 2, 0.5, z1), V3(-cw / 2, 0.5, z1)], 0, paintNgmyCarpet, width: 900, height: 900 * (z1 - z0) / cw, bias: 60, order: -1, group: gFloor));
+    screens.add(ScreenQuad([V3(-cw / 2, 0.5, z0), V3(cw / 2, 0.5, z0), V3(cw / 2, 0.5, z1), V3(-cw / 2, 0.5, z1)], 0, paintNgmyCarpet, width: 900, height: 900 * (z1 - z0) / cw, bias: 60, order: -1, group: gFloor, still: true));
   }
   // ── Walls ──
   b.order = 0;
@@ -837,7 +846,7 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
   info[idHDoor] = const ObjInfo('Front door', 'Tap the door to go inside the house.', V3(0, 40, 12), 260);
   // The NGMY logo in a round gold frame on every wall, like the one on the hall carpet.
   final logos = <ScreenQuad>[];
-  void logo(V3 tl, V3 tr, V3 br, V3 bl, {int poster = -1}) => logos.add(ScreenQuad([tl, tr, br, bl], 0, poster < 0 ? paintNgmyMedallion : (c, size, t) => paintNgmyPoster(c, size, t, poster), width: poster == 0 ? 1000 : 256, height: poster == 0 ? 424 : 256, bias: 1, order: 2, group: houseGroup));
+  void logo(V3 tl, V3 tr, V3 br, V3 bl, {int poster = -1}) => logos.add(ScreenQuad([tl, tr, br, bl], 0, poster < 0 ? paintNgmyMedallion : (c, size, t) => paintNgmyPoster(c, size, t, poster), width: poster == 0 ? 1000 : 256, height: poster == 0 ? 424 : 256, bias: 1, order: 2, group: houseGroup, still: true));
   logo(const V3(-26, 146, 0.6), const V3(26, 146, 0.6), const V3(26, 94, 0.6), const V3(-26, 94, 0.6));
   logo(const V3(120.6, 140, -8), const V3(120.6, 140, -52), const V3(120.6, 96, -52), const V3(120.6, 96, -8), poster: 1);
   logo(const V3(-120.6, 140, -52), const V3(-120.6, 140, -8), const V3(-120.6, 96, -8), const V3(-120.6, 96, -52), poster: 2);
@@ -927,8 +936,8 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
       final hw = big ? 178.0 : 71.0, hh = big ? 57.0 : 31.0, cy = big ? 252.0 : 122.0, zz = big ? 3.6 : 3.0;
       final l2 = big ? 'Welcome to NGMY City · New Global Movement for Youth' : 'Welcome to NGMY City';
       final px = big ? 1400.0 : 700.0, py = big ? 450.0 : 300.0;
-      adScreens.add(ScreenQuad([w(-hw, cy + hh, zz), w(hw, cy + hh, zz), w(hw, cy - hh, zz), w(-hw, cy - hh, zz)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY TOWN', l2), width: px, height: py, bias: 4, order: 2, group: grp));
-      adScreens.add(ScreenQuad([w(hw, cy + hh, -zz), w(-hw, cy + hh, -zz), w(-hw, cy - hh, -zz), w(hw, cy - hh, -zz)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY TOWN', l2), width: px, height: py, bias: 4, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(-hw, cy + hh, zz), w(hw, cy + hh, zz), w(hw, cy - hh, zz), w(-hw, cy - hh, zz)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY TOWN', l2), width: px, height: py, bias: 4, order: 2, group: grp, still: true));
+      adScreens.add(ScreenQuad([w(hw, cy + hh, -zz), w(-hw, cy + hh, -zz), w(-hw, cy - hh, -zz), w(hw, cy - hh, -zz)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY TOWN', l2), width: px, height: py, bias: 4, order: 2, group: grp, still: true));
     } else if (f.kind == 'adboard') {
       adScreens.add(ScreenQuad([w(-158, 195, 3.6), w(158, 195, 3.6), w(158, 90, 3.6), w(-158, 90, 3.6)], 0, (c, size, t) => paintCityAdLoop(c, size, t, f.id), width: 1280, height: 424, bias: 4, order: 2, group: grp));
       adScreens.add(ScreenQuad([w(158, 195, -3.6), w(-158, 195, -3.6), w(-158, 90, -3.6), w(158, 90, -3.6)], 0, (c, size, t) => paintCityAdLoop(c, size, t, f.id + 4), width: 1280, height: 424, bias: 4, order: 2, group: grp));
@@ -942,8 +951,8 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
       adScreens.add(ScreenQuad([w(-40, hgt + 58, 1.7), w(40, hgt + 58, 1.7), w(40, hgt + 22, 1.7), w(-40, hgt + 22, 1.7)], 0, (c, size, t) => paintCityAdLoop(c, size, t, f.id + 1), width: 960, height: 400, bias: 8, order: 2, group: grp));
       adScreens.add(ScreenQuad([w(40, hgt + 58, -1.7), w(-40, hgt + 58, -1.7), w(-40, hgt + 22, -1.7), w(40, hgt + 22, -1.7)], 0, (c, size, t) => paintCityAdLoop(c, size, t, f.id + 2), width: 960, height: 400, bias: 8, order: 2, group: grp));
     } else if (f.kind == 'hq') {
-      adScreens.add(ScreenQuad([w(-70, 108, 45.9), w(70, 108, 45.9), w(70, 52, 45.9), w(-70, 52, 45.9)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY COMPANY', 'Building the movement'), width: 1000, height: 400, bias: 8, order: 2, group: grp));
-      adScreens.add(ScreenQuad([w(-48, 215, 30.2), w(48, 215, 30.2), w(48, 175, 30.2), w(-48, 175, 30.2)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY', 'New Global Movement for Youth'), width: 900, height: 380, bias: 8, order: 2, group: grp));
+      adScreens.add(ScreenQuad([w(-70, 108, 45.9), w(70, 108, 45.9), w(70, 52, 45.9), w(-70, 52, 45.9)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY COMPANY', 'Building the movement'), width: 1000, height: 400, bias: 8, order: 2, group: grp, still: true));
+      adScreens.add(ScreenQuad([w(-48, 215, 30.2), w(48, 215, 30.2), w(48, 175, 30.2), w(-48, 175, 30.2)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY', 'New Global Movement for Youth'), width: 900, height: 380, bias: 8, order: 2, group: grp, still: true));
       adScreens.add(ScreenQuad([w(70, 108, -45.9), w(-70, 108, -45.9), w(-70, 52, -45.9), w(70, 52, -45.9)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY COMPANY', 'Building the movement'), width: 1000, height: 400, bias: 8, order: 2, group: grp));
       adScreens.add(ScreenQuad([w(48, 215, -30.2), w(-48, 215, -30.2), w(-48, 175, -30.2), w(48, 175, -30.2)], 0, (c, size, t) => paintNgmySign(c, size, t, 'NGMY', 'New Global Movement for Youth'), width: 900, height: 380, bias: 8, order: 2, group: grp));
       adScreens.add(ScreenQuad([w(-54, 276 + 52, 1.7), w(54, 276 + 52, 1.7), w(54, 276 + 18, 1.7), w(-54, 276 + 18, 1.7)], 0, (c, size, t) => paintCityAdLoop(c, size, t, f.id + 4), width: 1000, height: 360, bias: 8, order: 2, group: grp));
@@ -997,8 +1006,21 @@ List<Poly> homeDynamic(HRoom r, double t, {PersonPose? person, PersonStyle? pers
   final b = MeshBuilder();
   b.grouped = true;
   if (r.kind == 'outside') {
-    // People near you (within a few seconds' walk) get the full detail, fingers and face; far ones the light version.
-    bool near(double x, double z) => person == null || (person.x - x) * (person.x - x) + (person.z - z) * (person.z - z) < 100 * 100;
+    // The few people right next to you get the full detail, fingers and face (about 5,000 triangles each); everybody
+    // else the light version (about 1,700), which looks the same at that size on a phone. Before, everyone within 100
+    // steps got the full detail, so a crowd meant 40,000 triangles a frame and the city crawled.
+    final others = [
+      for (final f in residents)
+        if (f.room == r.id) (f.x, f.z),
+      for (final c in couriers) (c.x, c.z),
+    ];
+    double d2(double x, double z) => person == null ? 0 : (person.x - x) * (person.x - x) + (person.z - z) * (person.z - z);
+    var nearCut = 55.0 * 55.0;
+    if (others.length > 3) {
+      final ds = [for (final o in others) d2(o.$1, o.$2)]..sort();
+      nearCut = math.min(nearCut, ds[2]);
+    }
+    bool near(double x, double z) => person == null ? others.length <= 3 : d2(x, z) <= nearCut;
     if (person != null && person.room == r.id) _figure(b, person, t, personStyle ?? playerStyle, close: true);
     if (carrying && person != null && person.room == r.id) {
       // A crate carried in front of the person.

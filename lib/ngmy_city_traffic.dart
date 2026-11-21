@@ -381,14 +381,20 @@ MeshBuilder _police(double t, int seed) {
   return b;
 }
 
+/// The sized shape of each vehicle (see [trafficPolys]).
+final Map<int, List<Poly>> _vehicleShapes = {};
+
 /// The vehicles and helicopters, drawn for time [t].
 List<Poly> trafficPolys(double t) {
   final out = <Poly>[];
   for (var i = 0; i < kTraffic.length; i++) {
     final v = kTraffic[i];
     final (x, z, ux, uz) = vehiclePose(v, t);
-    final m = v.kind == 'bus' ? _bus() : _police(t, i);
-    out.addAll(transformPolys(_scaled(m.polys, v.kind == 'bus' ? kBusSize : kPoliceSize), ry: _heading(ux, uz), t: V3(x, 0, z)));
+    // Each vehicle's shape is built and sized once (twice for a police car: its light bar red or blue) and only moved
+    // each frame. It used to be built from boxes, sized and moved again for every picture.
+    final flip = v.kind == 'bus' ? 0 : ((((t * 5 + i) % 2) < 1) ? 1 : 2);
+    final shape = _vehicleShapes[i * 3 + flip] ??= _scaled((v.kind == 'bus' ? _bus() : _police(flip == 1 ? 0 : 1, 0)).polys, v.kind == 'bus' ? kBusSize : kPoliceSize);
+    out.addAll(transformPolys(shape, ry: _heading(ux, uz), t: V3(x, 0, z)));
   }
   for (final l in kLights) {
     out.addAll(_lightPolys(l, t));

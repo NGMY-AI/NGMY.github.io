@@ -106,7 +106,7 @@ class Scene3D {
 /// A screen in the scene: where its four corners are (top left, top right, bottom right, bottom left, seen from the front)
 /// and how to paint what it shows, at [width] by [height], at a moment [t].
 class ScreenQuad {
-  const ScreenQuad(this.corners, this.id, this.paint, {this.width = 320, this.height = 180, this.bias = 0.6, this.order = 1, this.group = 0, this.twoSided = false});
+  const ScreenQuad(this.corners, this.id, this.paint, {this.width = 320, this.height = 180, this.bias = 0.6, this.order = 1, this.group = 0, this.twoSided = false, this.still = false});
   final List<V3> corners;
   final int id;
   final void Function(Canvas canvas, Size size, double t) paint;
@@ -123,6 +123,9 @@ class ScreenQuad {
 
   /// Also drawn when seen from behind (the picture then shows mirrored), so a TV never goes blank when you walk round it.
   final bool twoSided;
+
+  /// The drawing never changes with time (a sign, a poster): it is recorded every 2 seconds, not a few times a second.
+  final bool still;
 }
 
 // ─── Building shapes ─────────────────────────────────────────────────────────
@@ -588,10 +591,68 @@ class Cam3 extends ChangeNotifier {
 // ─── Drawing ─────────────────────────────────────────────────────────────────
 
 class HitCache {
-  final List<(Path, int)> list = [];
+  // The engine keeps every face's corners of the last picture as plain numbers ([_xy]); the shapes in [list] are made
+  // only when something asks for them (a tap). Before, a shape object was made for every face in every frame.
+  Float32List _xy = Float32List(8192);
+  int _used = 0;
+  final List<int> _ids = [];
+  final List<int> _starts = [];
+  final List<int> _counts = [];
+  final List<Path?> _paths = [];
+  List<(Path, int)>? _list;
+
+  /// What can be tapped in the last picture, nearest last.
+  List<(Path, int)> get list => _list ??= [
+        for (var i = 0; i < _ids.length; i++) (_paths[i] ?? _pathOf(_starts[i], _counts[i]), _ids[i]),
+      ];
+
+  Path _pathOf(int start, int count) {
+    final path = Path()..moveTo(_xy[start], _xy[start + 1]);
+    for (var i = 1; i < count; i++) {
+      path.lineTo(_xy[start + i * 2], _xy[start + i * 2 + 1]);
+    }
+    return path..close();
+  }
+
+  void _beginFrame() {
+    _used = 0;
+    _ids.clear();
+    _starts.clear();
+    _counts.clear();
+    _paths.clear();
+    _list = null;
+  }
+
+  /// Room for [count] corners; returns where they start in [_xy].
+  int _reserve(int count) {
+    final need = _used + count * 2;
+    if (need > _xy.length) {
+      final bigger = Float32List(math.max(need, _xy.length * 2));
+      bigger.setRange(0, _used, _xy);
+      _xy = bigger;
+    }
+    final at = _used;
+    _used = need;
+    return at;
+  }
+
+  void _addFace(int start, int count, int id) {
+    _ids.add(id);
+    _starts.add(start);
+    _counts.add(count);
+    _paths.add(null);
+  }
+
+  void _addPath(Path path, int id) {
+    _ids.add(id);
+    _starts.add(0);
+    _counts.add(0);
+    _paths.add(path);
+  }
 
   /// The object under [p], nearest first.
   int pick(Offset p) {
+    final list = this.list;
     var exact = 0;
     Rect? exactBounds;
     for (var i = list.length - 1; i >= 0; i--) {
@@ -699,6 +760,8 @@ class Scene3DPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    hits._beginFrame();
+    _releaseRetiredPics();
     if (sky) {
       _paintSky(canvas, size);
     } else {
@@ -854,12 +917,16 @@ class Scene3DPainter extends CustomPainter {
       final r = (col.r * 255 * shade + 255 * spec * 0.55).clamp(0.0, 255.0).round();
       final g = (col.g * 255 * shade + 255 * spec * 0.55).clamp(0.0, 255.0).round();
       final b = (col.b * 255 * shade + 255 * spec * 0.55).clamp(0.0, 255.0).round();
-      final path = Path()..moveTo(sxs[0], sys[0]);
-      for (var i = 1; i < cnt; i++) {
-        path.lineTo(sxs[i], sys[i]);
+      // The corners go into one shared list of numbers (no shape object per face).
+      final start = hits._reserve(cnt);
+      final xy = hits._xy;
+      for (var i = 0; i < cnt; i++) {
+        xy[start + i * 2] = sxs[i];
+        xy[start + i * 2 + 1] = sys[i];
       }
-      path.close();
-      final face = _Face(path, Color.fromRGBO(r, g, b, p.alpha), zMid - bias, p.id, p.alpha < 0.99, p.id == highlight && highlight != 0, null, p.order, p.group);
+      final face = _Face(null, ((p.alpha * 255).round().clamp(0, 255) << 24) | (r << 16) | (g << 8) | b, zMid - bias, p.id, p.alpha < 0.99, p.id == highlight && highlight != 0, null, p.order, p.group);
+      face.start = start;
+      face.count = cnt;
       // A face only a couple of pixels wide needs no outline to close the seams round it.
       face.tiny = bw < 2.0 && bh < 2.0;
       drawn.add(face);
@@ -913,7 +980,8 @@ class Scene3DPainter extends CustomPainter {
     final areas = <double>[];
     final fullAt = <double>[0.0];
     // How many ad pictures may be made fresh in this frame (the rest show the one made a moment ago).
-    final budget = <int>[4, _kFramePixels];
+    // At most two screens are recorded again in one frame (more made some frames stutter); the rest show the last one.
+    final budget = <int>[2, _kFramePixels];
     final nStatic = scene.screens.length;
     for (var si = 0; si < allScreens.length; si++) {
       final sq = allScreens[si];
@@ -943,14 +1011,16 @@ class Scene3DPainter extends CustomPainter {
         final qb = path.getBounds();
         final area = qb.width * qb.height;
         areas.add(area);
-        drawn.add(_Face(path, Colors.transparent, mid.z - sq.bias, sq.id, false, false, (c) {
+        drawn.add(_Face(path, 0, mid.z - sq.bias, sq.id, false, false, (c) {
           // Every screen shows a picture of its ad that is made again a few times a second (often for the big near
           // ones, less for the small far ones) and reused in between, so a room full of TVs stays smooth.
           final big = area >= fullAt[0];
           final key = isStatic ? sq : 'moving:${si - nStatic}:${sq.width}x${sq.height}';
-          final img = _screenImage(key, sq, time, fps: big ? 12 : (isStatic ? 5 : 10), scale: _screenScale(sq, area, w), budget: budget);
-          if (img != null) {
-            _drawImageQuad(c, img, sq, pts);
+          // The screen's drawing is recorded a few times a second and played straight onto the screen's four corners.
+          // (It used to be turned into a picture of pixels first, which cost about 50 ms in each frame of the city.)
+          final pic = _screenPicture(key, sq, time, fps: big ? 10 : (isStatic ? 4 : 8), budget: budget);
+          if (pic != null) {
+            _drawPictureQuad(c, pic, sq, pts);
           } else {
             c.drawPath(path, Paint()..color = const Color(0xFF1F2937));
           }
@@ -973,7 +1043,7 @@ class Scene3DPainter extends CustomPainter {
       }
       if (cells.isEmpty) continue;
       final cellKey = isStatic ? sq : 'moving:${si - nStatic}:${sq.width}x${sq.height}';
-      drawn.add(_Face(path, Colors.transparent, mid.z - sq.bias, sq.id, false, false, (c) {
+      drawn.add(_Face(path, 0, mid.z - sq.bias, sq.id, false, false, (c) {
         // Up close the screen is cut into patches; they all show parts of one picture of the ad (not the ad drawn again for each patch).
         final img = _screenImage(cellKey, sq, time, fps: 12, scale: _screenScale(sq, double.infinity, w), budget: budget);
         if (img != null) _drawImageCells(c, img, sq, cells, nx, ny);
@@ -1003,28 +1073,69 @@ class Scene3DPainter extends CustomPainter {
       return k != 0 ? k : a.seq.compareTo(b.seq);
     });
     lastDrawn = drawn.length;
-    hits.list.clear();
     final fill = Paint()..style = PaintingStyle.fill;
     final edge = Paint()..style = PaintingStyle.stroke..strokeWidth = 0.8;
+    final xy = hits._xy;
+    Path facePath(_Face d) => d.path ?? hits._pathOf(d.start, d.count);
+    // The faces are drawn in big batches of triangles (one call for hundreds of faces) instead of two drawing calls
+    // per face. On a sharp phone screen that is many times faster. A computer screen (fewer pixels per point) with a
+    // small scene keeps the old way, a face at a time with soft edges, where the steps along an edge would show.
+    final classic = _devicePixelRatio() < 1.75 && drawn.length <= 900;
+    final batch = _batch;
+    batch.n = 0;
+    void flush() {
+      if (batch.n == 0) return;
+      final v = ui.Vertices.raw(ui.VertexMode.triangles, Float32List.sublistView(batch.pos, 0, batch.n * 2), colors: Int32List.sublistView(batch.col, 0, batch.n));
+      canvas.drawVertices(v, BlendMode.dst, _vertexPaint);
+      v.dispose();
+      batch.n = 0;
+    }
+
     for (final d in drawn) {
       if (d.draw != null) {
+        flush();
         d.draw!(canvas);
-        if (d.id != 0) hits.list.add((d.path, d.id));
+        if (d.id != 0) hits._addPath(d.path!, d.id);
         continue;
       }
-      fill.color = d.color;
-      canvas.drawPath(d.path, fill);
-      if (!d.see && !d.tiny) {
-        edge.color = d.color;
-        canvas.drawPath(d.path, edge);
+      if (classic || d.see) {
+        // See-through faces (glass, water) are drawn one by one so they blend over what is behind them.
+        flush();
+        final path = facePath(d);
+        fill.color = Color(d.color);
+        canvas.drawPath(path, fill);
+        if (classic && !d.see && !d.tiny) {
+          edge.color = Color(d.color);
+          canvas.drawPath(path, edge);
+        }
+      } else {
+        // A face of n corners is n - 2 triangles sharing its first corner.
+        final cnt = d.count, s = d.start;
+        final argb = d.color;
+        batch.ensure((cnt - 2) * 3);
+        final pos = batch.pos, col = batch.col;
+        var k = batch.n;
+        for (var i = 1; i + 1 < cnt; i++) {
+          pos[k * 2] = xy[s];
+          pos[k * 2 + 1] = xy[s + 1];
+          col[k++] = argb;
+          pos[k * 2] = xy[s + i * 2];
+          pos[k * 2 + 1] = xy[s + i * 2 + 1];
+          col[k++] = argb;
+          pos[k * 2] = xy[s + i * 2 + 2];
+          pos[k * 2 + 1] = xy[s + i * 2 + 3];
+          col[k++] = argb;
+        }
+        batch.n = k;
       }
-      if (d.id != 0) hits.list.add((d.path, d.id));
+      if (d.id != 0) hits._addFace(d.start, d.count, d.id);
     }
+    flush();
     // A bright outline around the object that is selected.
     if (highlight != 0) {
       final o = Paint()..style = PaintingStyle.stroke..strokeWidth = 1.4..color = Colors.white.withValues(alpha: 0.35 + 0.25 * math.sin(time * 6));
       for (final d in drawn) {
-        if (d.glow) canvas.drawPath(d.path, o);
+        if (d.glow) canvas.drawPath(facePath(d), o);
       }
     }
     for (final l in scene.labels) {
@@ -1036,7 +1147,7 @@ class Scene3DPainter extends CustomPainter {
       canvas.drawRRect(r, Paint()..color = l.color.withValues(alpha: 0.92));
       canvas.drawRRect(r, Paint()..style = PaintingStyle.stroke..strokeWidth = 1..color = Colors.white70);
       tp.paint(canvas, p - Offset(tp.width / 2, tp.height / 2));
-      if (l.id != 0) hits.list.add((Path()..addRRect(r), l.id));
+      if (l.id != 0) hits._addPath(Path()..addRRect(r), l.id);
     }
   }
 
@@ -1190,19 +1301,73 @@ ui.Image? _screenImage(Object key, ScreenQuad sq, double time, {required double 
   return have?.image;
 }
 
-final Paint _imgPaint = Paint()
-  ..filterQuality = FilterQuality.high
-  ..isAntiAlias = true;
+class _AdPic {
+  _AdPic(this.bucket, this.picture);
+  final int bucket;
+  final ui.Picture picture;
+}
 
-/// A picture laid on the four corners [p] of a screen.
-void _drawImageQuad(Canvas canvas, ui.Image img, ScreenQuad sq, List<Offset> p) {
+/// The latest recorded drawings of the screens, the most recently used last.
+final Map<Object, _AdPic> _adPics = <Object, _AdPic>{};
+const int _kMaxAdPics = 48;
+
+/// The recorded drawing of [sq] for this moment: recorded again when it is time ([fps] times a second) and the frame
+/// still has recordings left in [budget], otherwise the one recorded a moment ago.
+ui.Picture? _screenPicture(Object key, ScreenQuad sq, double time, {required double fps, required List<int> budget}) {
+  // A still one is recorded again only every 2 seconds (so a logo that finishes loading still appears).
+  final bucket = sq.still ? (time / 2).floor() : (time * fps).floor();
+  final have = _adPics.remove(key);
+  if (have != null) _adPics[key] = have;
+  if ((have == null || have.bucket != bucket) && budget[0] > 0) {
+    budget[0]--;
+    final rec = ui.PictureRecorder();
+    final c = Canvas(rec);
+    c.clipRect(Rect.fromLTWH(0, 0, sq.width, sq.height));
+    ngmyMakingScreenPicture = true;
+    try {
+      sq.paint(c, Size(sq.width, sq.height), time);
+    } finally {
+      ngmyMakingScreenPicture = false;
+    }
+    final pic = rec.endRecording();
+    // The old recording may still be in a frame on its way to the screen: let it go a moment later.
+    final old = have?.picture;
+    if (old != null) _retiredPics.add(old);
+    _adPics[key] = _AdPic(bucket, pic);
+    while (_adPics.length > _kMaxAdPics) {
+      _retiredPics.add(_adPics.remove(_adPics.keys.first)!.picture);
+    }
+    return pic;
+  }
+  return have?.picture;
+}
+
+/// Recordings no longer used: a frame on its way to the screen may still show them, so they are let go two frames later.
+List<ui.Picture> _retiredPics = [];
+List<ui.Picture> _retiredPrev = [];
+
+void _releaseRetiredPics() {
+  for (final p in _retiredPrev) {
+    p.dispose();
+  }
+  _retiredPrev = _retiredPics;
+  _retiredPics = [];
+}
+
+/// A recorded drawing laid on the four corners [p] of a screen.
+void _drawPictureQuad(Canvas canvas, ui.Picture pic, ScreenQuad sq, List<Offset> p) {
   final m = _quadMatrix(p, sq.width, sq.height);
   if (m == null) return;
   canvas.save();
   canvas.transform(m.storage);
-  canvas.drawImageRect(img, Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()), Rect.fromLTWH(0, 0, sq.width, sq.height), _imgPaint);
+  canvas.clipRect(Rect.fromLTWH(0, 0, sq.width, sq.height));
+  canvas.drawPicture(pic);
   canvas.restore();
 }
+
+final Paint _imgPaint = Paint()
+  ..filterQuality = FilterQuality.high
+  ..isAntiAlias = true;
 
 /// A screen cut into [nx] by [ny] patches: each patch shows its own part of the one picture.
 void _drawImageCells(Canvas canvas, ui.Image img, ScreenQuad sq, List<(int, int, List<Offset>)> cells, int nx, int ny) {
@@ -1218,6 +1383,24 @@ void _drawImageCells(Canvas canvas, ui.Image img, ScreenQuad sq, List<(int, int,
   }
 }
 
+/// The triangles waiting to be drawn in one call: two numbers (x, y) and one colour per corner. Kept between frames.
+class _TriBatch {
+  Float32List pos = Float32List(6 * 4096);
+  Int32List col = Int32List(3 * 4096);
+  int n = 0;
+
+  void ensure(int more) {
+    final need = n + more;
+    if (need <= col.length) return;
+    final size = math.max(need, col.length * 2);
+    pos = Float32List(size * 2)..setRange(0, n * 2, pos);
+    col = Int32List(size)..setRange(0, n, col);
+  }
+}
+
+final _TriBatch _batch = _TriBatch();
+final Paint _vertexPaint = Paint();
+
 class _Face {
   _Face(this.path, this.color, this.z, this.id, this.see, this.glow, [this.draw, this.order = 2, this.group = 0]);
   final int order;
@@ -1226,8 +1409,13 @@ class _Face {
   double key = 0;
   bool tiny = false;
   final void Function(Canvas canvas)? draw;
-  final Path path;
-  final Color color;
+
+  /// Only screens (pictures) carry a shape; a plain face keeps its corners in the frame's list of numbers.
+  final Path? path;
+  int start = 0;
+  int count = 0;
+  /// The colour as one number (alpha, red, green, blue).
+  final int color;
   final double z;
   final int id;
   final bool see;
