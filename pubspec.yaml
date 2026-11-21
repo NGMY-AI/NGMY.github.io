@@ -98,6 +98,9 @@ flutter:
     - assets/data/
     - assets/news_fonts/
     - assets/hati/
+    # The emoji font is loaded a few seconds after the app opens (ngmyLoadEmojiFontLater in lib/ngmy_offline_icons.dart),
+    # not as a startup font: as a startup font its 10.7 MB had to download before the app could draw anything.
+    - assets/fonts/NotoColorEmoji.ttf
 
   # Roboto bundled locally so CanvasKit never fetches fonts.gstatic.com (required for iOS offline PWA).
   fonts:
@@ -111,6 +114,3 @@ flutter:
           weight: 500
         - asset: assets/fonts/Roboto-Bold.ttf
           weight: 700
-    - family: Noto Color Emoji
-      fonts:
-        - asset: assets/fonts/NotoColorEmoji.ttf

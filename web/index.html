@@ -648,7 +648,6 @@
   <link rel="preload" href="assets/assets/fonts/Roboto-Bold.ttf" as="font" type="font/ttf" crossorigin="anonymous">
   <link rel="preload" href="assets/fonts/MaterialIcons-Regular.otf" as="font" type="font/otf" crossorigin="anonymous">
   <link rel="preload" href="assets/packages/cupertino_icons/assets/CupertinoIcons.ttf" as="font" type="font/ttf" crossorigin="anonymous">
-  <link rel="preload" href="assets/assets/fonts/NotoColorEmoji.ttf" as="font" type="font/ttf" crossorigin="anonymous">
 
   <!-- The phone moves the cursor (hold the space bar) on a hidden copy of the text. Giving that copy the same Roboto
        the app draws with keeps the phone's grey cursor on the app's blue one, so it can reach every letter. -->
@@ -1419,6 +1418,25 @@
         registerServiceWorkerAndWait();
       }
 
+      // Runs fn once, delayMs after the app has drawn its first screen (or after fallbackMs if it never does), so
+      // background downloads never compete with the app's own start.
+      var firstFrameSeen = false;
+      window.addEventListener('flutter-first-frame', function () { firstFrameSeen = true; }, { once: true });
+      function afterFirstFrame(fn, delayMs, fallbackMs) {
+        var ran = false;
+        var run = function () {
+          if (ran) return;
+          ran = true;
+          try { fn(); } catch (e) {}
+        };
+        if (firstFrameSeen) {
+          setTimeout(run, delayMs);
+          return;
+        }
+        window.addEventListener('flutter-first-frame', function () { setTimeout(run, delayMs); }, { once: true });
+        if (fallbackMs) setTimeout(run, fallbackMs);
+      }
+
       function sanitizeBootstrap(code) {
         if (!code) return code;
         // Repair broken deploys that left invalid `});.catch(` JavaScript.
@@ -1452,7 +1470,8 @@
         } catch (e) {
           return Promise.reject(e);
         }
-        warmOfflineCache();
+        // Topping up the offline copy waits until the app is on screen (it used to run during the start).
+        afterFirstFrame(warmOfflineCache, 6000, 60000);
         return verifyBootstrapReady(12000);
       }
 
@@ -1626,7 +1645,15 @@
         }, { once: true });
 
         if (!window.__NGMY_SKIP_SW__) {
-          registerServiceWorkerAndWait();
+          if (('serviceWorker' in navigator) && navigator.serviceWorker.controller) {
+            // Already installed on this phone: just check for an update, as before.
+            registerServiceWorkerAndWait();
+          } else {
+            // First visit: installing the helper downloads the files kept for offline use (tens of MB). Started at
+            // once, that download ran alongside the app's own start and slowed the first open a lot. Now it starts
+            // a few seconds after the first screen shows (or after 30 seconds if the app has not shown by then).
+            afterFirstFrame(registerServiceWorkerAndWait, 4000, 30000);
+          }
         }
 
         if (navigator.onLine) {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -317,86 +318,82 @@ class NgmyHudMotion extends StatefulWidget {
   State<NgmyHudMotion> createState() => _NgmyHudMotionState();
 }
 
-class _NgmyHudMotionState extends State<NgmyHudMotion> with TickerProviderStateMixin {
-  late final AnimationController _pulse;
-  late final AnimationController _scan;
-  late final AnimationController _orbit;
+class _NgmyHudMotionState extends State<NgmyHudMotion> {
+  // One light timer instead of three animation clocks. The clocks asked the screen for a new frame 60 times a second
+  // (so the whole page was redrawn non-stop, even though the cards only changed ~11 times a second). The timer gives
+  // the same pulse / scan / orbit values ~11 times a second, and nothing is redrawn in between.
+  static const _pulseMs = 2200; // there and back (repeat with reverse)
+  static const _scanMs = 3400;
+  static const _orbitMs = 9000;
+  static const _tickMs = 90;
 
-  @override
-  void initState() {
-    super.initState();
-    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200))..repeat(reverse: true);
-    _scan = AnimationController(vsync: this, duration: const Duration(milliseconds: 3400))..repeat();
-    _orbit = AnimationController(vsync: this, duration: const Duration(milliseconds: 9000))..repeat();
-  }
-
-  @override
-  void dispose() {
-    _tick.removeListener(_onTick);
-    _pulse.dispose();
-    _scan.dispose();
-    _orbit.dispose();
-    super.dispose();
-  }
-
-  /// Redraws ~11 times a second (not 60) and holds still while the list scrolls — the whole
-  /// grid of cards was being rebuilt every frame, which made Advisors slow to open and scroll.
-  int _lastTick = 0;
+  final Stopwatch _clock = Stopwatch();
+  Timer? _timer;
   bool _scrolling = false;
-  late final Listenable _tick = Listenable.merge([_pulse, _scan, _orbit]);
+  bool _calm = false;
+  bool _tickerEnabled = true;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _tick.removeListener(_onTick);
-    _tick.addListener(_onTick);
+    _calm = NgmyHudInk.calm(context);
+    // Like the animation clocks before: still while the page is hidden under another screen.
+    _tickerEnabled = TickerMode.valuesOf(context).enabled;
+    _syncClock();
   }
 
-  void _onTick() {
-    if (_scrolling || !mounted) return;
-    if (NgmyHudInk.calm(context)) {
-      // Calm light: nothing moves; the clocks wait until the look changes back.
-      for (final c in [_pulse, _scan, _orbit]) {
-        c.stop(canceled: false);
-      }
-      return;
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _timer = null;
+    super.dispose();
+  }
+
+  bool get _shouldMove => !_scrolling && !_calm && _tickerEnabled;
+
+  void _syncClock() {
+    if (_shouldMove) {
+      if (!_clock.isRunning) _clock.start();
+      _timer ??= Timer.periodic(const Duration(milliseconds: _tickMs), (_) {
+        if (!mounted || !_shouldMove) return;
+        setState(() {});
+      });
+    } else {
+      _clock.stop();
+      _timer?.cancel();
+      _timer = null;
     }
-    final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastTick < 90) return;
-    _lastTick = now;
-    setState(() {});
   }
 
   void _setScrolling(bool v) {
     if (_scrolling == v) return;
     _scrolling = v;
-    for (final c in [_pulse, _scan, _orbit]) {
-      if (v) {
-        c.stop(canceled: false);
-      } else if (!c.isAnimating) {
-        c == _pulse ? c.repeat(reverse: true) : c.repeat();
-      }
-    }
+    _syncClock();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (NgmyHudInk.calm(context)) {
+    final calm = NgmyHudInk.calm(context);
+    if (calm != _calm) {
+      _calm = calm;
+      _syncClock();
+    }
+    if (_calm) {
       return widget.builder(context, 0, 0, 0);
     }
-    if (!_scrolling) {
-      for (final c in [_pulse, _scan, _orbit]) {
-        if (!c.isAnimating) c == _pulse ? c.repeat(reverse: true) : c.repeat();
-      }
-    }
-    final pulse = Curves.easeInOut.transform(_pulse.value);
+    final ms = _clock.elapsedMilliseconds;
+    final pulsePhase = (ms % (_pulseMs * 2)) / _pulseMs; // 0..2
+    final pulseRaw = pulsePhase <= 1 ? pulsePhase : 2 - pulsePhase;
+    final pulse = Curves.easeInOut.transform(pulseRaw.clamp(0.0, 1.0));
+    final scan = (ms % _scanMs) / _scanMs;
+    final orbit = (ms % _orbitMs) / _orbitMs;
     return NotificationListener<ScrollNotification>(
       onNotification: (n) {
         if (n is ScrollStartNotification) _setScrolling(true);
         if (n is ScrollEndNotification) _setScrolling(false);
         return false;
       },
-      child: widget.builder(context, pulse, _scan.value, _orbit.value),
+      child: widget.builder(context, pulse, scan, orbit),
     );
   }
 }

@@ -9,6 +9,10 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+export 'ngmy_advisors_hub_brand.dart';
+export 'ngmy_communicate_avatar_warm.dart';
+import 'ngmy_communicate_avatar_warm.dart';
+import 'ngmy_advisors_hub_brand.dart';
 import 'ngmy_ai_language.dart';
 import 'ngmy_advisor_app_knowledge.dart';
 import 'ngmy_advisor_badge_copy.dart';
@@ -75,11 +79,6 @@ const kNgmyCommunicateRoles = <String, String>{
   'text_coach': 'Text & Rizz Coach',
 };
 
-/// Bottom-nav + hub branding (teachers, lawyers, advisors, therapists, and more).
-const String kNgmyAdvisorsHubTitle = 'NGMY Advisors';
-const IconData kNgmyAdvisorsHubNavIcon = Icons.support_agent_rounded;
-const Color kNgmyAdvisorsHubAccent = Color(0xFF6366F1);
-const Color kNgmyAdvisorsHubAccent2 = Color(0xFF8B5CF6);
 
 const kNgmyCommunicateProfessionalRoles = <String>{
   'teacher',
@@ -219,15 +218,6 @@ bool ngmyCommunicateAdvisorAllowsPartnerPhotos({
   return ngmyCommunicateRoleCanDateUsers(role) || ngmyCommunicateRoleIsRespectableOccupation(role);
 }
 
-/// Pre-cache companion avatars from config (call after settings hydrate).
-Future<void> ngmyWarmCommunicateAvatarsFromConfig(dynamic config) async {
-  await Future.wait([
-    NgmyCommunicateAvatarCache.hydrateRamFromDisk(),
-    ngmyWarmAdvisorPortraitAssets(),
-  ]);
-  final raw = (config as dynamic).communicateProfiles;
-  if (raw is List) await NgmyCommunicateAvatarCache.cacheAllProfiles(raw);
-}
 
 bool ngmyUserRequestedChatImage(String text) {
   final t = text.toLowerCase().trim();

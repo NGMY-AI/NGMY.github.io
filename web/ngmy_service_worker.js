@@ -360,7 +360,9 @@ async function offlineDocumentAnyCache() {
 async function precacheUrl(cache, url) {
   try {
     if (await cache.match(url)) return true;
-    const res = await fetch(new Request(url, { cache: 'reload' }));
+    // 'no-cache' asks the server whether the copy the browser just downloaded for the app is still current, and
+    // reuses it when it is ('reload' downloaded main.dart.js, the engine and fonts a second time on every first visit).
+    const res = await fetch(new Request(url, { cache: 'no-cache' }));
     if (res && res.ok) {
       await putWithRev(cache, url, res);
       return true;

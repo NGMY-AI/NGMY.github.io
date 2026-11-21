@@ -146,7 +146,9 @@ extension _NgmyAiAppPlaces on _MainScreenState {
         'business_cards': NgmyAiPlace(
           description: 'Business Card Creator${u.isAdmin ? ' (admin: also the Vote Ad Studio)' : ''}',
           open: (ctx, _) async {
-            showNgmyBusinessCardStudioDialog(ctx, userEmail: u.email, isAdmin: u.isAdmin);
+            await bizcardstudio.loadLibrary();
+            if (!ctx.mounted) return 'Opened Business Card Creator.';
+            bizcardstudio.showNgmyBusinessCardStudioDialog(ctx, userEmail: u.email, isAdmin: u.isAdmin);
             return 'Opened Business Card Creator.';
           },
         ),

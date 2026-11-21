@@ -2575,14 +2575,17 @@ void ngmyAdminShowCloudSaveSnackBar(
 Future<void> ngmyAdminRefreshManagementConfig(AppConfig config) async {
   if (ngmyShouldDeferRemoteConfigOverwrite()) return;
   await ngmyHydrateManagementListsFromAllBackups(config);
-  await ngmyHydrateFamilyTreePaymentsFromAllBackups(config);
-  await ngmyHydrateInvoicePaymentsFromAllBackups(config);
-  await ngmyHydrateWalletPaymentsFromAllBackups(config);
-  await ngmyHydrateRepairEstimatePaymentsFromAllBackups(config);
-  await ngmyHydrateTranslatePaymentsFromAllBackups(config);
-  await ngmyHydrateDocumentScanPaymentsFromAllBackups(config);
-  await ngmyHydrateDocSharePaymentsFromAllBackups(config);
-  await NgmyAppStudioAccess.hydrate(config);
+  // Each payment row is its own small cloud read; they load together instead of one after another.
+  await ngmyRunTogether([
+    () => ngmyHydrateFamilyTreePaymentsFromAllBackups(config),
+    () => ngmyHydrateInvoicePaymentsFromAllBackups(config),
+    () => ngmyHydrateWalletPaymentsFromAllBackups(config),
+    () => ngmyHydrateRepairEstimatePaymentsFromAllBackups(config),
+    () => ngmyHydrateTranslatePaymentsFromAllBackups(config),
+    () => ngmyHydrateDocumentScanPaymentsFromAllBackups(config),
+    () => ngmyHydrateDocSharePaymentsFromAllBackups(config),
+    () => NgmyAppStudioAccess.hydrate(config),
+  ]);
   final snapshot = AppConfig.fromJson(config.toJson());
 
   if (await ngmyCanReachCloud()) {

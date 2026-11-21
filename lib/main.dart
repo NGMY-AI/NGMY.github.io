@@ -52,7 +52,7 @@ import 'ngmy_admin_ui_kit.dart';
 import 'ngmy_admin_alerts.dart';
 import 'ngmy_admin_game_timers.dart';
 import 'ngmy_clock_day.dart';
-import 'ngmy_offline_icons.dart' show NgmyOfflineGlyphWarmup;
+import 'ngmy_offline_icons.dart' show NgmyOfflineGlyphWarmup, ngmyLoadEmojiFontLater;
 import 'ngmy_modern_chat_icon.dart';
 import 'ngmy_arcade_games.dart';
 import 'ngmy_arcade_host.dart';
@@ -61,7 +61,7 @@ import 'ngmy_light_notice_dialog.dart';
 import 'ngmy_local_menu_guest.dart';
 import 'ngmy_local_bio_guest.dart';
 import 'ngmy_price_calculator_panel.dart';
-import 'ngmy_repair_estimate_flow.dart';
+import 'ngmy_repair_estimate_flow.dart' deferred as repairflow;
 import 'ngmy_repair_estimate_payments.dart';
 import 'ngmy_house_insurance.dart';
 import 'ngmy_house_workers.dart' show showNgmyAdminHouseCareSheet, NgmyHouseWorkersApi;
@@ -128,7 +128,7 @@ import 'ngmy_cloud_policy.dart';
 import 'ngmy_store_gift_celebration.dart';
 import 'ngmy_store_listing_extras.dart';
 import 'ngmy_store_payment_notification.dart';
-import 'ngmy_document_scanner.dart';
+import 'ngmy_document_scanner.dart' deferred as docscan;
 import 'ngmy_document_scan_payments.dart';
 import 'ngmy_doc_share_payments.dart';
 import 'ngmy_doc_share_school.dart';
@@ -151,7 +151,7 @@ import 'ngmy_studio_hub.dart';
 import 'ngmy_home_glass_cards.dart';
 import 'ngmy_home_tech_frames.dart';
 import 'ngmy_hud_tech_shell.dart';
-import 'ngmy_slides_studio.dart' as slides;
+import 'ngmy_slides_studio.dart' deferred as slides;
 import 'ngmy_hub_tools_bridge.dart';
 import 'ngmy_help_center.dart';
 import 'ngmy_help_center_ui.dart' deferred as helpcenter;
@@ -212,8 +212,10 @@ import 'ngmy_state_registrar_payments.dart';
 import 'ngmy_music_payments.dart';
 import 'ngmy_app_studio_payments.dart';
 import 'ngmy_admin_domain_calendar.dart';
-import 'ngmy_communicate.dart';
-import 'ngmy_communicate_admin.dart';
+import 'ngmy_communicate.dart' deferred as commui;
+import 'ngmy_advisors_hub_brand.dart';
+import 'ngmy_communicate_avatar_warm.dart';
+import 'ngmy_communicate_admin.dart' deferred as commadmin;
 import 'ngmy_app_builder.dart' deferred as appbuilder;
 import 'ngmy_app_builder_admin.dart';
 import 'ngmy_app_builder_guest.dart';
@@ -239,9 +241,9 @@ import 'ngmy_app_notifications.dart';
 import 'ngmy_announcement_reads.dart';
 import 'ngmy_local_deposit_qr.dart';
 import 'ngmy_desktop_frame.dart';
-import 'ngmy_market_hub_screen.dart' as markethub;
+import 'ngmy_market_hub_screen.dart' deferred as markethub;
 import 'ngmy_message_taps.dart';
-import 'ngmy_business_card_studio.dart' show showNgmyBusinessCardStudioDialog;
+import 'ngmy_business_card_studio.dart' deferred as bizcardstudio;
 import 'ngmy_item_reminder_service.dart';
 import 'ngmy_cashier_reminder_service.dart';
 import 'ngmy_overlay_guard.dart';
@@ -704,6 +706,10 @@ void main() async {
   if (!isGuestLink) {
     // Never block first frame on cloud — cold start offline must show cached home immediately.
     unawaited(ngmyIgnoreTimeout(initSupabase, timeout: const Duration(seconds: 12)));
+  }
+  // The emoji font is fetched once the app is already showing (it no longer holds up the first screen).
+  if (kIsWeb) {
+    Future<void>.delayed(const Duration(seconds: 3), ngmyLoadEmojiFontLater);
   }
 }
 
@@ -9873,26 +9879,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _applyBundledInvestmentPlansToConfig(_config);
     if (mounted) setState(() => _globalPlans = _bundledInvestmentPlans());
     await ngmyHydrateManagementListsFromAllBackups(_config);
-    final remoteRegistrarApps = await _fetchRemoteCivicRegistrarApplications();
-    _mergeRegistrarApplicationsIntoConfig(_config, remoteRegistrarApps);
-    await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
-    await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
-    await ngmyHydrateMusicPaymentsFromAllBackups(_config);
-    await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
-    await NgmyAppStudioAccess.hydrate(_config);
-    await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
-    await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
-    await ngmyHydrateDocumentScanPaymentsFromAllBackups(_config);
-    await ngmyHydrateDocSharePaymentsFromAllBackups(_config);
-    await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
-    await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
-    await NgmyCivicHelperGifts.hydrateFromCloud(_config);
-    await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
-    await ngmyHydrateHelpCenterHubFromAllBackups(_config);
-    await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
-    await ngmyHydrateWalletPaymentsFromAllBackups(_config);
-    await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
-    await ngmyHydrateAppBrandingFromAllBackups(_config);
+    // The civic rows keep their order (one after another); the feature settings rows load alongside them.
+    await Future.wait([
+      () async {
+        final remoteRegistrarApps = await _fetchRemoteCivicRegistrarApplications();
+        _mergeRegistrarApplicationsIntoConfig(_config, remoteRegistrarApps);
+        await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
+        await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
+        await NgmyCivicHelperGifts.hydrateFromCloud(_config);
+      }(),
+      ngmyHydrateFeatureSettingsTogether(_config),
+    ]);
     await ngmyHydratePrivilegedCivicSettingsFromEdge(_config, user: _currentUser);
     await ngmyApplyStoreSellAccessFromSettings(_config);
     _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
@@ -12002,14 +11999,20 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         if (next.civicRegistryDeceased.isEmpty && keepConfig.civicRegistryDeceased.isNotEmpty) {
           next.civicRegistryDeceased = keepConfig.civicRegistryDeceased;
         }
-        await ngmyHydrateCivicSelfEnrollmentFromAllBackups(next);
-        await ngmyHydrateCivicRegistryMembersFromAllBackups(next, _allUsers);
-        await ngmyHydrateCivicHelpModeFromAllBackups(next);
-        await ngmyHydrateCivicContributionReceiptRemoved(next);
-        await ngmyHydrateCivicDeletedContributions(next);
-        await ngmyHydrateCommunicatePaymentsFromAllBackups(next);
-        await ngmyHydrateDocumentScanPaymentsFromAllBackups(next);
-        await ngmyHydrateDocSharePaymentsFromAllBackups(next);
+        await Future.wait([
+          () async {
+            await ngmyHydrateCivicSelfEnrollmentFromAllBackups(next);
+            await ngmyHydrateCivicRegistryMembersFromAllBackups(next, _allUsers);
+            await ngmyHydrateCivicHelpModeFromAllBackups(next);
+            await ngmyHydrateCivicContributionReceiptRemoved(next);
+            await ngmyHydrateCivicDeletedContributions(next);
+          }(),
+          ngmyRunTogether([
+            () => ngmyHydrateCommunicatePaymentsFromAllBackups(next),
+            () => ngmyHydrateDocumentScanPaymentsFromAllBackups(next),
+            () => ngmyHydrateDocSharePaymentsFromAllBackups(next),
+          ]),
+        ]);
         if (_appConfigSig(_config) == _appConfigSig(next)) return;
         // Never rebuild the app shell mid-session — that can feel like a kick to Home.
         // Apply quietly; screens that need live config already refresh via their own listeners.
@@ -14412,30 +14415,21 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _config.civicRegistryPinsByState,
       );
       await ngmyHydrateManagementListsFromAllBackups(_config);
-      await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
-      await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
-      await ngmyHydrateMusicPaymentsFromAllBackups(_config);
-      await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
-      await NgmyAppStudioAccess.hydrate(_config);
-      await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
-      await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
-      await ngmyHydrateDocumentScanPaymentsFromAllBackups(_config);
-      await ngmyHydrateDocSharePaymentsFromAllBackups(_config);
-      await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
-      await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
-      await NgmyCivicHelperGifts.hydrateFromCloud(_config);
-      NgmyCivicHelperGifts.syncOpenPendingFromMemberStreaks(_config);
-      NgmyAdminLiveRefresh.notify();
-      await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
-      await ngmyHydrateHelpCenterHubFromAllBackups(_config);
-      await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
-      await ngmyHydrateWalletPaymentsFromAllBackups(_config);
-      await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
-      await ngmyHydrateCivicHelpModeFromAllBackups(_config);
-      await ngmyHydrateCivicHelpCampaignSpendings(_config);
-      await ngmyHydrateCivicContributionReceiptRemoved(_config);
-      await ngmyHydrateCivicDeletedContributions(_config);
-      await ngmyHydrateAppBrandingFromAllBackups(_config);
+      // Civic rows in their usual order, the feature settings rows alongside them (not one after another).
+      await Future.wait([
+        () async {
+          await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
+          await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
+          await NgmyCivicHelperGifts.hydrateFromCloud(_config);
+          NgmyCivicHelperGifts.syncOpenPendingFromMemberStreaks(_config);
+          NgmyAdminLiveRefresh.notify();
+          await ngmyHydrateCivicHelpModeFromAllBackups(_config);
+          await ngmyHydrateCivicHelpCampaignSpendings(_config);
+          await ngmyHydrateCivicContributionReceiptRemoved(_config);
+          await ngmyHydrateCivicDeletedContributions(_config);
+        }(),
+        ngmyHydrateFeatureSettingsTogether(_config),
+      ]);
       if (mounted) _scheduleDeferredStartupRebuild();
     } catch (e) {
       debugPrint('[ngmy] deferred config hydrate: $e');
@@ -14510,27 +14504,18 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             _config.civicRegistryPinsByState,
           );
           await ngmyHydrateManagementListsFromAllBackups(_config);
-          await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
-          await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
-          await ngmyHydrateMusicPaymentsFromAllBackups(_config);
-    await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
-    await NgmyAppStudioAccess.hydrate(_config);
-    await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
-    await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
-    await ngmyHydrateDocumentScanPaymentsFromAllBackups(_config);
-    await ngmyHydrateDocSharePaymentsFromAllBackups(_config);
-    await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
-    await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
-    await NgmyCivicHelperGifts.hydrateFromCloud(_config);
-    await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
-    await ngmyHydrateHelpCenterHubFromAllBackups(_config);
-          await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
-          await ngmyHydrateWalletPaymentsFromAllBackups(_config);
-          await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
-          await ngmyHydrateCivicHelpModeFromAllBackups(_config);
-          await ngmyHydrateCivicContributionReceiptRemoved(_config);
-          await ngmyHydrateCivicDeletedContributions(_config);
-          await ngmyHydrateAppBrandingFromAllBackups(_config);
+          // Civic rows in their usual order, the feature settings rows alongside them (not one after another).
+          await Future.wait([
+            () async {
+              await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
+              await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
+              await NgmyCivicHelperGifts.hydrateFromCloud(_config);
+              await ngmyHydrateCivicHelpModeFromAllBackups(_config);
+              await ngmyHydrateCivicContributionReceiptRemoved(_config);
+              await ngmyHydrateCivicDeletedContributions(_config);
+            }(),
+            ngmyHydrateFeatureSettingsTogether(_config),
+          ]);
         } catch (_) {}
       }
       final localMediaJson = safeGet('all_media');
@@ -14799,29 +14784,21 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           _applyRemoteConfigMerge(next, scopedCfg, localConfigSnapshot);
           _mergeOperationalManagementListsIntoConfig(next, localConfigSnapshot);
           _config = next;
-          await ngmyHydrateAppBrandingFromAllBackups(_config);
-          await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
-          if (!bootstrapAdmin) {
-            await ngmyHydratePrivilegedCivicSettingsFromEdge(_config, user: localCurrent);
-            await ngmyHydrateManagementListsFromAllBackups(_config);
-          }
-          await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
-          await NgmyCivicHelperGifts.hydrateFromCloud(_config);
+          // The branding row loads alongside the civic rows (which keep their order).
+          await Future.wait([
+            ngmyHydrateAppBrandingFromAllBackups(_config),
+            () async {
+              await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
+              if (!bootstrapAdmin) {
+                await ngmyHydratePrivilegedCivicSettingsFromEdge(_config, user: localCurrent);
+                await ngmyHydrateManagementListsFromAllBackups(_config);
+              }
+              await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
+              await NgmyCivicHelperGifts.hydrateFromCloud(_config);
+            }(),
+          ]);
           if (bootstrapAdmin) {
-            await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
-            await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
-            await ngmyHydrateMusicPaymentsFromAllBackups(_config);
-            await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
-            await NgmyAppStudioAccess.hydrate(_config);
-            await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
-            await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
-            await ngmyHydrateDocumentScanPaymentsFromAllBackups(_config);
-            await ngmyHydrateDocSharePaymentsFromAllBackups(_config);
-            await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
-            await ngmyHydrateHelpCenterHubFromAllBackups(_config);
-            await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
-            await ngmyHydrateWalletPaymentsFromAllBackups(_config);
-            await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
+            await ngmyHydrateFeatureSettingsTogether(_config, includeBranding: false);
             await ngmyApplyStoreSellAccessFromSettings(_config);
           }
           _mergeOperationalManagementListsIntoConfig(_config, localConfigSnapshot);
@@ -18243,7 +18220,15 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeOpenCivicEnrollDeepLink());
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeOpenMediaPostDeepLink());
     // The saved Slides documents are read from the phone right away, so the Slides tab shows them the moment it opens.
-    WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(slides.ngmySlidesPreload(widget.user.email)));
+    // Slides is its own download now: it is fetched in the background a few seconds after the first screen shows,
+    // then its saved documents are read, so opening the start of the app is not slowed by it.
+    Future<void>.delayed(const Duration(seconds: 7), () async {
+      if (!mounted) return;
+      try {
+        await slides.loadLibrary();
+        if (mounted) await slides.ngmySlidesPreload(widget.user.email);
+      } catch (_) {}
+    });
     ngmyStartItemReminderWatcher(widget.user.email);
     ngmyStartMedicineReminderWatcher(widget.user.email);
     ngmyStartCashierReminderWatcher(widget.user.email);
@@ -18625,12 +18610,19 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       applications: widget.config.civicRegistrarApplications,
     );
     _tabContentBuilders = {
-      1: () => markethub.NgmyMarketHubScreen(
-                userEmail: widget.user.email,
-        username: widget.user.username,
-        isAdmin: widget.user.isAdmin,
+      1: () => NgmyDeferred(
+        load: markethub.loadLibrary,
+        keepFirstBuild: false,
+        build: () => markethub.NgmyMarketHubScreen(
+          userEmail: widget.user.email,
+          username: widget.user.username,
+          isAdmin: widget.user.isAdmin,
+        ),
       ),
-      2: () => slides.NgmySlidesStudioScreen(
+      2: () => NgmyDeferred(
+        load: slides.loadLibrary,
+        keepFirstBuild: false,
+        build: () => slides.NgmySlidesStudioScreen(
         userEmail: widget.user.email,
         isAdmin: widget.user.isAdmin,
         bottomScrollPadding: _ngmyBottomNavScrollPadding(context),
@@ -18640,6 +18632,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         isCivicRegistryAdmin: widget.user.isCivicRegistryAdmin,
         memberState: widget.user.state,
         registrarServingState: registrarServing,
+        ),
       ),
       3: () => NgmyHubScreen(
         user: widget.user,
@@ -25400,7 +25393,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Future<void> _openCommunicateAdmin(bool isDark) async {
-    await showNgmyCommunicateAdminSheet(
+    await commadmin.loadLibrary();
+    if (!mounted) return;
+    await commadmin.showNgmyCommunicateAdminSheet(
       context: context,
       config: widget.config,
       isDark: isDark,
@@ -31583,8 +31578,11 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     return gross - (gross * (disc.clamp(0, 100) / 100));
   }
 
-  void _openRepairEstimateFromCalculator(BuildContext dialogContext) {
-    showNgmyRepairEstimateFlow(
+  void _openRepairEstimateFromCalculator(BuildContext dialogContext) async {
+    // The repair estimate screens are their own download (usually already fetched in the background).
+    await repairflow.loadLibrary();
+    if (!mounted || !dialogContext.mounted) return;
+    repairflow.showNgmyRepairEstimateFlow(
       context: dialogContext,
       geminiApiKey: widget.config.geminiApiKey,
       refreshApiKey: () async {
@@ -32005,9 +32003,17 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
   }
 
   void _openDocumentScanner() async {
-    await ngmyHydrateDocumentScanPaymentsFromAllBackups(widget.config);
+    // Opening no longer waits for the server: the scanner (its own download, usually already fetched in the
+    // background) opens as soon as it is ready; the latest scan prices are read from the cloud at the same time and
+    // are used if they arrive within a moment (they were also read when the app started).
+    await Future.wait([
+      docscan.loadLibrary(),
+      ngmyHydrateDocumentScanPaymentsFromAllBackups(widget.config)
+          .timeout(const Duration(milliseconds: 1200), onTimeout: () {})
+          .catchError((_) {}),
+    ]);
     if (!mounted) return;
-    showNgmyDocumentScanner(
+    docscan.showNgmyDocumentScanner(
       context,
       geminiApiKey: widget.config.geminiApiKey,
       refreshApiKey: () async {
@@ -57442,27 +57448,33 @@ class MediaHubScreen extends StatelessWidget {
       );
     }
 
-    return NgmyCommunicateWorldScreen(
-      embedded: true,
-      user: user,
-      config: config,
-      apiKey: config.geminiApiKey,
-      onDataChanged: onDataChanged,
-      onHydrateSettings: () => ngmyHydrateCommunicateSettingsFromAllBackups(config),
-      onPersistConfig: () => ngmyAdminPersistManagementConfig(config),
-      onChargeWallet: user.isAdmin
-          ? null
-          : (amount, desc) async {
-              final charged = ngmyChargeUserWallet(
-                user: user,
-                allUsers: allUsers,
-                amount: amount,
-                description: desc,
-                onAddTransaction: onAddTransaction,
-              );
-              if (charged) onDataChanged();
-              return charged;
-            },
+    // The Advisors screens are their own download (fetched in the background a few seconds after the app opens).
+    return NgmyDeferred(
+      load: commui.loadLibrary,
+      keepFirstBuild: false,
+      background: const Color(0xFF0A0612),
+      build: () => commui.NgmyCommunicateWorldScreen(
+        embedded: true,
+        user: user,
+        config: config,
+        apiKey: config.geminiApiKey,
+        onDataChanged: onDataChanged,
+        onHydrateSettings: () => ngmyHydrateCommunicateSettingsFromAllBackups(config),
+        onPersistConfig: () => ngmyAdminPersistManagementConfig(config),
+        onChargeWallet: user.isAdmin
+            ? null
+            : (amount, desc) async {
+                final charged = ngmyChargeUserWallet(
+                  user: user,
+                  allUsers: allUsers,
+                  amount: amount,
+                  description: desc,
+                  onAddTransaction: onAddTransaction,
+                );
+                if (charged) onDataChanged();
+                return charged;
+              },
+      ),
     );
   }
 }
@@ -60784,6 +60796,12 @@ class _NicknameAdminPanelState extends State<_NicknameAdminPanel> {
 /// screen opens (the most used first). A new deferred menu must be added here too, or it shows a loading circle.
 List<Future<void> Function()> ngmyAppWarmList() => [
       growthui.loadLibrary,
+      markethub.loadLibrary,
+      slides.loadLibrary,
+      commui.loadLibrary,
+      docscan.loadLibrary,
+      repairflow.loadLibrary,
+      bizcardstudio.loadLibrary,
       ...ngmyHomeTechFramesWarm(),
       ...ngmyHomeGlassCardsWarm(),
       ...ngmyStudioHubWarm(),
@@ -60799,3 +60817,38 @@ List<Future<void> Function()> ngmyAppWarmList() => [
       appbuilder.loadLibrary,
       ...ngmyRegisterAiToolsWarm(),
     ];
+
+/// Runs the given loads at the same time instead of one after another, and waits for all of them. One that fails
+/// does not stop the others. Used for the small settings rows read from the cloud: each used to wait for the one
+/// before it (about 20 trips to the server in a row, several seconds on a phone); now they all go out together.
+Future<void> ngmyRunTogether(List<Future<void> Function()> loads) async {
+  await Future.wait(loads.map((load) async {
+    try {
+      await load();
+    } catch (e) {
+      debugPrint('[ngmy] settings load: $e');
+    }
+  }));
+}
+
+/// The paid-feature and settings rows (prices, payment switches, help center, AI helper settings). Each is its own
+/// row in the cloud and none depends on another, so they are loaded together.
+Future<void> ngmyHydrateFeatureSettingsTogether(AppConfig config, {bool includeBranding = true}) => ngmyRunTogether([
+      () => ngmyHydrateFamilyTreePaymentsFromAllBackups(config),
+      () => ngmyHydrateInvoicePaymentsFromAllBackups(config),
+      () => ngmyHydrateMusicPaymentsFromAllBackups(config),
+      () async {
+        await ngmyHydrateAppStudioPaymentsFromAllBackups(config);
+        await NgmyAppStudioAccess.hydrate(config);
+      },
+      () => ngmyHydrateRepairEstimatePaymentsFromAllBackups(config),
+      () => ngmyHydrateTranslatePaymentsFromAllBackups(config),
+      () => ngmyHydrateDocumentScanPaymentsFromAllBackups(config),
+      () => ngmyHydrateDocSharePaymentsFromAllBackups(config),
+      () => ngmyHydrateCommunicateSettingsFromAllBackups(config),
+      () => ngmyHydrateHelpCenterHubFromAllBackups(config),
+      () => ngmyHydrateCommunicatePaymentsFromAllBackups(config),
+      () => ngmyHydrateWalletPaymentsFromAllBackups(config),
+      () => ngmyHydrateHelperAiSettingsFromAllBackups(config),
+      if (includeBranding) () => ngmyHydrateAppBrandingFromAllBackups(config),
+    ]);

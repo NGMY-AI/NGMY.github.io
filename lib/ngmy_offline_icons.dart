@@ -1,8 +1,26 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// Bundled in pubspec — fallback text emoji on web when no Twemoji PNG exists.
 const kNgmyEmojiFontFamily = 'Noto Color Emoji';
+
+bool _ngmyEmojiFontRequested = false;
+
+/// Loads the bundled emoji font (10.7 MB) after the app is already on screen. It used to be a startup font, and the
+/// web engine downloads every startup font before it draws the first frame, so phones waited for it on every first
+/// open. Until it is in, emoji are drawn by the browser engine's own emoji font; once in, text redraws with it.
+/// The service worker keeps the file, so after the first visit this is instant and works offline.
+Future<void> ngmyLoadEmojiFontLater() async {
+  if (!kIsWeb || _ngmyEmojiFontRequested) return;
+  _ngmyEmojiFontRequested = true;
+  try {
+    final loader = FontLoader(kNgmyEmojiFontFamily)..addFont(rootBundle.load('assets/fonts/NotoColorEmoji.ttf'));
+    await loader.load();
+  } catch (e) {
+    debugPrint('[ngmy] emoji font: $e');
+  }
+}
 
 /// Emoji [TextStyle]: bundled Noto Color Emoji on web; system emoji on mobile/desktop.
 TextStyle ngmyEmojiTextStyle({

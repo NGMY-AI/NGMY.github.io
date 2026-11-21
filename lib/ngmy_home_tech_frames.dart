@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 
 // Core Protocol is part of the app itself (not its own download), so it opens at once after the app is closed and
 // opened again, with no loading page.
-import 'ngmy_core_protocol_sims.dart' as sims;
+import 'ngmy_core_protocol_sims.dart' deferred as sims;
 import 'ngmy_deferred.dart';
 import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_platform_graphics.dart';
@@ -26,28 +26,14 @@ class NgmyHomeTechFramesPanel extends StatefulWidget {
   State<NgmyHomeTechFramesPanel> createState() => _NgmyHomeTechFramesPanelState();
 }
 
-class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with TickerProviderStateMixin {
-  late final AnimationController _pulse;
-  late final AnimationController _scan;
-  late final AnimationController _orbit;
+class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> {
 
   @override
   void initState() {
     super.initState();
-    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200))..repeat(reverse: true);
-    _scan = AnimationController(vsync: this, duration: const Duration(milliseconds: 3400))..repeat();
-    _orbit = AnimationController(vsync: this, duration: const Duration(milliseconds: 9000))..repeat();
     // Signal Grid alerts (admins, and members who finished the Trading Academy). Runs once per app run.
     // Web only: that is where its notifications are shown (and tests never get a stray timer).
     if (kIsWeb) NgmySignalAlerts.start();
-  }
-
-  @override
-  void dispose() {
-    _pulse.dispose();
-    _scan.dispose();
-    _orbit.dispose();
-    super.dispose();
   }
 
   Future<void> _openExperience(_TechFrameSpec spec) async {
@@ -87,7 +73,7 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
           reverseTransitionDuration: const Duration(milliseconds: 320),
           pageBuilder: (_, anim, secondary) => FadeTransition(
             opacity: CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
-            child: const sims.NgmyCoreProtocolSimsScreen(),
+            child: NgmyDeferred(load: sims.loadLibrary, build: () => sims.NgmyCoreProtocolSimsScreen()),
           ),
         ),
       );
@@ -109,21 +95,10 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
 
   @override
   Widget build(BuildContext context) {
-    // Light mode is calm: the clocks stop and the cards stay still.
-    final calm = NgmyHudInk.calm(context);
-    for (final c in [_pulse, _scan, _orbit]) {
-      if (calm) {
-        if (c.isAnimating) c.stop(canceled: false);
-      } else if (!c.isAnimating) {
-        c == _pulse ? c.repeat(reverse: true) : c.repeat();
-      }
-    }
-    return AnimatedBuilder(
-      animation: Listenable.merge([_pulse, _scan, _orbit]),
-      builder: (context, _) {
-        final pulse = calm ? 0.0 : Curves.easeInOut.transform(_pulse.value);
-        final scan = calm ? 0.0 : _scan.value;
-        final orbit = calm ? 0.0 : _orbit.value;
+    // Light mode is calm: the clocks stop and the cards stay still. The shared HUD clock moves the cards ~11 times a
+    // second without asking the phone to redraw the whole home page 60 times a second (it did before, in dark mode).
+    return NgmyHudMotion(
+      builder: (context, pulse, scan, orbit) {
         // Twice the previous shrink (300→270 was −30; now −60 more → 210).
         const gap = 10.0;
         const topH = 210.0;
@@ -932,5 +907,12 @@ class _ExperienceBackdropPainter extends CustomPainter {
 /// download) and the Construction Lab inside the Core Protocol (the Core Protocol itself is part of the app).
 List<Future<void> Function()> ngmyHomeTechFramesWarm() => [
       vault.loadLibrary,
-      sims.ngmyCoreProtocolSimsWarm,
+      sims.loadLibrary,
+      _ngmyWarmCoreProtocolInside,
     ];
+
+/// The Core Protocol is its own download; once it is in, the Construction Lab inside it is made ready too.
+Future<void> _ngmyWarmCoreProtocolInside() async {
+  await sims.loadLibrary();
+  await sims.ngmyCoreProtocolSimsWarm();
+}
