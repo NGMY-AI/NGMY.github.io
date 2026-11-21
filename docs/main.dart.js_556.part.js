@@ -1,20 +1,20 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var J,A,C,B={
-hxK(d){var x=d.lN,w=y.w
-w=x.iW(x,new B.cf9(),w,w)
+hxY(d){var x=d.lN,w=y.w
+w=x.iW(x,new B.cfe(),w,w)
 return w},
-Os(d,e){var x,w,v=C.a.i(e.toLowerCase())
+Ou(d,e){var x,w,v=C.a.i(e.toLowerCase())
 if(v.length===0)return!1
-x=B.hxK(d).h(0,v)
+x=B.hxY(d).h(0,v)
 if(x==null||x.length===0)return!1
 w=A.bi(x)
 return w!=null&&w.cd(new A.V(Date.now(),0,!1))},
-cf9:function cf9(){},
-cow(d,e){var x=0,w=A.j(y.m),v,u,t,s
-var $async$cow=A.e(function(f,g){if(f===1)return A.f(g,w)
+cfe:function cfe(){},
+coB(d,e){var x=0,w=A.j(y.m),v,u,t,s
+var $async$coB=A.e(function(f,g){if(f===1)return A.f(g,w)
 for(;;)switch(x){case 0:s=J
 x=3
-return A.b(A.auh(d),$async$cow)
+return A.b(A.auj(d),$async$coB)
 case 3:u=s.aT(g)
 case 4:if(!u.C()){x=5
 break}t=u.gP(u)
@@ -26,24 +26,24 @@ case 5:v=null
 x=1
 break
 case 1:return A.h(v,w)}})
-return A.i($async$cow,w)},
-b5f(d,e){var x=0,w=A.j(y.e),v
-var $async$b5f=A.e(function(f,g){if(f===1)return A.f(g,w)
+return A.i($async$coB,w)},
+b5h(d,e){var x=0,w=A.j(y.e),v
+var $async$b5h=A.e(function(f,g){if(f===1)return A.f(g,w)
 for(;;)switch(x){case 0:x=3
-return A.b(B.cow(d,e),$async$b5f)
+return A.b(B.coB(d,e),$async$b5h)
 case 3:v=g!=null
 x=1
 break
 case 1:return A.h(v,w)}})
-return A.i($async$b5f,w)},
-aui(d,e,f,g,h,i){var x=0,w=A.j(y.v),v,u,t,s,r,q,p,o,n
-var $async$aui=A.e(function(j,k){if(j===1)return A.f(k,w)
+return A.i($async$b5h,w)},
+auk(d,e,f,g,h,i){var x=0,w=A.j(y.v),v,u,t,s,r,q,p,o,n
+var $async$auk=A.e(function(j,k){if(j===1)return A.f(k,w)
 for(;;)switch(x){case 0:n=C.a.i(e.toLowerCase())
 if(n.length===0)throw A.Y(A.bb("Sign in to save a sync QR code."))
 v=C.a.i(f)
 if(v.length===0||C.a.i(h).length===0)throw A.Y(A.bb("Invalid QR code."))
 x=2
-return A.b(A.aa6(),$async$aui)
+return A.b(A.aa8(),$async$auk)
 case 2:u=k
 t=J.a2(u)
 s=y.u.a(t.h(u,"byEmail"))
@@ -51,19 +51,19 @@ if(s==null){s=y.b
 s=A.S(s,s)}r=y.w
 q=y.b
 p=A.a1(s,r,q)
-s=A.hhG(u,e)
+s=A.hhQ(u,e)
 o=A.a1(s==null?A.S(q,q):s,r,q)
 s=g===C.og
-if(o.am(0,s?"advisor":"family_tree"))throw A.Y(A.bb("You already saved a "+A.i6F(g)+" QR. Open QR Code Generator \u2192 Saved and delete it before saving a new one."))
+if(o.am(0,s?"advisor":"family_tree"))throw A.Y(A.bb("You already saved a "+A.i6U(g)+" QR. Open QR Code Generator \u2192 Saved and delete it before saving a new one."))
 s=s?"advisor":"family_tree"
-o.n(0,s,new A.wM(g,v,C.a.i(h),C.a.i(d),i,new A.V(Date.now(),0,!1).ab().ag()).ak())
+o.n(0,s,new A.wN(g,v,C.a.i(h),C.a.i(d),i,new A.V(Date.now(),0,!1).ab().ag()).ak())
 p.n(0,n,o)
 t.n(u,"byEmail",p)
 x=3
-return A.b(A.aug(u),$async$aui)
+return A.b(A.aui(u),$async$auk)
 case 3:return A.h(null,w)}})
-return A.i($async$aui,w)},
-hzM(d,e){var x,w,v=C.a.i(d)
+return A.i($async$auk,w)},
+hA_(d,e){var x,w,v=C.a.i(d)
 if(!C.a.Y(v,(e===C.og?"NGMYASYNC2":"NGMYFTSYNC2")+"|"))return null
 x=v.split("|")
 if(x.length<2)return null
@@ -75,9 +75,9 @@ C=c[2]
 B=a.updateHolder(c[42],B)
 D=c[141]
 var z=a.updateTypes([])
-B.cf9.prototype={
+B.cfe.prototype={
 $2(d,e){return new A.bu(J.k(d),J.k(e),y.F)},
-$S:94};(function inheritance(){var x=a.inherit
-x(B.cf9,A.id)})()
-var y={F:A.as("bu<m,m>"),w:A.as("m"),e:A.as("P"),b:A.as("@"),u:A.as("a9<@,@>?"),m:A.as("wM?"),v:A.as("~")};(function constants(){D.aqL=new A.a_(61152,"MaterialIcons",!1)})()};
-(a=>{a["HORi8Lxi7v3y3QED+G72UyR1Fkk="]=a.current})($__dart_deferred_initializers__);
+$S:99};(function inheritance(){var x=a.inherit
+x(B.cfe,A.id)})()
+var y={F:A.ar("bu<m,m>"),w:A.ar("m"),e:A.ar("P"),b:A.ar("@"),u:A.ar("a9<@,@>?"),m:A.ar("wN?"),v:A.ar("~")};(function constants(){D.aqM=new A.a_(61152,"MaterialIcons",!1)})()};
+(a=>{a["aZBIdX2Ie3hIXANNs79tZB0LRPk="]=a.current})($__dart_deferred_initializers__);
