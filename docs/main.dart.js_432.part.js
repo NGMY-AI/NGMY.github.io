@@ -829,7 +829,7 @@ k.y=A.De
 e3.O(new C.r(d8*(0.1+0.8*t)+q*10,d9*(0.5+0.38*s)),d9*(0.1+0.08*r),k)}break
 case 19:$.T()
 e0=C.L()
-e0.san(B.uD(e4,D.dkd,D.aDO))
+e0.san(B.uD(e4,D.dke,D.aDO))
 e3.aD(e1,e0)
 for(u=0;u<40;++u){e0=x.$0()
 v=x.$0()
@@ -4185,7 +4185,7 @@ B.e9x.prototype={
 $0(){return this.a.fx=null},
 $S:0}
 B.dqa.prototype={
-$0(){var x=null,w=C.h_(x,A.cH,x,x,x,C.d1(x,x,x,x,x,x,x,x,x,C.l(x,x,this.c,x,x,x,x,x,x,x,x,this.b,x,x,A.F,x,x,!0,x,x,x,x,x,D.djO,x,x),this.a),A.a7,A.cc,x,A.e1,A.cd)
+$0(){var x=null,w=C.h_(x,A.cH,x,x,x,C.d1(x,x,x,x,x,x,x,x,x,C.l(x,x,this.c,x,x,x,x,x,x,x,x,this.b,x,x,A.F,x,x,!0,x,x,x,x,x,D.djP,x,x),this.a),A.a7,A.cc,x,A.e1,A.cd)
 w.eY()
 return w},
 $S:273}
@@ -4998,11 +4998,11 @@ D.aD3=x([0,2,4,7,9],y.t)
 D.diM=x([A.cu,A.a_],y.O)
 D.a6W=x(["Africa","Asia","Europe","North America","South America","Oceania","Antarctica","Seven seas (open ocean)"],y.s)
 D.frl=new C.cX(A.bq,A.J,4)
-D.djO=x([D.frl],y.S)
+D.djP=x([D.frl],y.S)
 D.aDh=x([0,31,59,90,120,151,181,212,243,273,304,334],y.t)
 D.bwP=new C.u(1,0.23137254901960785,0.16470588235294117,0.3686274509803922,A.q)
 D.byu=new C.u(1,0.7058823529411765,0.37254901960784315,0.5411764705882353,A.q)
-D.dkd=x([D.a0r,D.bwP,D.byu],y.O)
+D.dke=x([D.a0r,D.bwP,D.byu],y.O)
 D.bjr=new C.u(1,0.10588235294117647,0.10588235294117647,0.2,A.q)
 D.dlX=x([D.H0,D.bjr],y.O)
 D.dmd=x([1.77,3.55,7.15,16.7],y.n)
@@ -5137,8 +5137,8 @@ D.bfK=new C.cl(A.z,null,null,D.h9L,null)
 D.eJw=new C.cN(0,null,0,14,null,null,D.bfK,null)
 D.bos=new C.u(1,0.1803921568627451,0.49019607843137253,0.7686274509803922,A.q)
 D.bv2=new C.u(1,0.027450980392156862,0.10196078431372549,0.2,A.q)
-D.djW=x([D.bos,D.alF,D.bv2],y.O)
-D.eKr=new C.bT(A.mP,0.5,A.x,null,0,D.djW,D.aDO,null)
+D.djX=x([D.bos,D.alF,D.bv2],y.O)
+D.eKr=new C.bT(A.mP,0.5,A.x,null,0,D.djX,D.aDO,null)
 D.cO_=x([A.CG,A.au,A.L],y.O)
 D.dAK=x([0.3,0.7,1],y.n)
 D.eKs=new C.bT(A.z,0.5,A.x,null,0,D.cO_,D.dAK,null)
@@ -5199,4 +5199,4 @@ $.hjj=null
 $.icP=C.S(C.ar("m"),C.ar("j8"))
 $.idT=C.S(C.ar("m"),C.ar("j8"))})();(function lazyInitializers(){var x=a.lazyFinal
 x($,"iLi","hT5",()=>C.a([B.ah6("EARTH GLOBE","Turn it, tap a country",A.nd,A.aH,new B.fzl()),B.ah6("SOLAR SYSTEM","The Sun and its worlds",D.ark,A.aQ,new B.fzm()),B.ah6("GRAVITY LAB","Drop, weigh, orbit",F.a4K,A.cS,new B.fzn()),B.ah6("BLACK HOLE","Throw in a star",A.r5,A.bk,new B.fzo()),B.ah6("GALAXY","Build, tilt, collide",A.xb,A.hi,new B.fzp()),B.ah6("SIZE COMPARE","Earth next to a star",D.bU4,A.c2,new B.fzq()),B.ah6("SEASONS & MOON","Why it is summer",A.vd,A.bv,new B.fzr())],C.ar("N<bye>")))})()};
-(a=>{a["9u9O4R6TPM3tKaoDEqzjOd6mpzU="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["+TnVnkKtpudY1Qx/rBH4FqGLLHM="]=a.current})($__dart_deferred_initializers__);

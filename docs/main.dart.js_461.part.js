@@ -2354,7 +2354,7 @@ S(){return new C.bo2()},
 d0h(d,e){return this.d.$1(e)}}
 C.bo2.prototype={
 B(d){var w,v,u,t,s=this,r=null,q="Luxury",p=new C.eoP(new C.eoT(new C.eoU(s))),o=new C.eoO(),n=new C.eoN(),m=C.ivd(),l=x.Y,k=B.B(new B.X(D.Eb,new C.eoQ(),l),l.k("M.E")),j=C.hMv(s.a.c),i=B.Q(d).ax.a===A.I?A.aF:A.b7
-l=B.B(new B.O(D.dk_,new C.eoR(D.Eb,o,n,p),x.B),x.l)
+l=B.B(new B.O(D.dk0,new C.eoR(D.Eb,o,n,p),x.B),x.l)
 w=x.p
 l.push(new B.D(A.a1y,B.A(B.a([B.W(o.$1(q),n.$1(q),r,r,r,16),A.bf,B.c(q,r,r,r,r,r,r,B.l(r,r,n.$1(q),r,r,r,r,r,r,r,r,13,r,r,A.F,r,r,!0,r,r,r,r,r,r,r,r),r,r,r)],w),A.l,r,A.e,A.h,0,r,r),r))
 l.push(p.$2$isLuxury(k,!0))
@@ -3208,13 +3208,13 @@ D.dHo=w([D.a_u,A.aw,A.a_],x.O)
 D.e3f=new C.ha("essential_midnight","Midnight News","Luxury",D.e2K,D.dHo,A.aE,A.bP,!1,!0)
 D.bip=new B.u(1,0.00784313725490196,0.10196078431372549,0.07058823529411765,A.q)
 D.bnP=new B.u(1,0.00392156862745098,0.0784313725490196,0.054901960784313725,A.q)
-D.dka=w([D.bip,A.fl,D.bnP],x.O)
-D.e3e=new C.ha("essential_jade","Jade Bulletin","Luxury",D.aMz,D.dka,A.aV,A.bv,!1,!0)
+D.dkb=w([D.bip,A.fl,D.bnP],x.O)
+D.e3e=new C.ha("essential_jade","Jade Bulletin","Luxury",D.aMz,D.dkb,A.aV,A.bv,!1,!0)
 D.bpu=new B.u(1,0.03137254901960784,0.043137254901960784,0.058823529411764705,A.q)
 D.dGC=w([A.Cl,A.bs,D.bpu],x.O)
 D.e3p=new C.ha("essential_steel","Steel Dispatch","Luxury",D.aMA,D.dGC,A.bP,A.cA,!1,!0)
 D.Eb=w([D.e2R,D.e2W,D.e3n,D.e3l,D.e2V,D.e3q,D.e3a,D.e2T,D.e3b,D.e38,D.e3i,D.e3g,D.e3r,D.e34,D.e2Q,D.e3h,D.e33,D.e2Z,D.e3j,D.e3k,D.e3c,D.e3s,D.e2U,D.e3_,D.e2S,D.e36,D.e3d,D.e2X,D.e30,D.e2P,D.e32,D.e35,D.e2Y,D.e31,D.e2O,D.e3m,D.e39,D.e3o,D.e37,D.e3f,D.e3e,D.e3p],B.ar("N<ha>"))
-D.dk_=w(["Standard","Premium"],x.s)
+D.dk0=w(["Standard","Premium"],x.s)
 D.fN_=new B.H(!0,D.jf,null,null,null,null,8,A.u,null,1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fYA=new B.C("DESCRIPTION",null,D.fN_,null,null,null,null,null,null,null,null,null)
 D.bN3=new B.bz(1,A.ba,D.fYA,null)
@@ -3295,4 +3295,4 @@ D.hfG=new B.C("Save Invoice",null,null,null,null,null,null,null,null,null,null,n
 D.hG9=new B.bf("invoice-issued-date",x.W)
 D.hGs=new B.bf("invoice-due-date",x.W)
 D.hQ5=new C.afC(A3.a72,A.c,A.h6,A.ea)})()};
-(a=>{a["LbIg8J6ij4Mg9ny0cZMwpI6wKP8="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["Q7C1PzJY9INh1osuU/BLJx6dyn4="]=a.current})($__dart_deferred_initializers__);

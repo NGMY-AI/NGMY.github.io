@@ -3526,7 +3526,7 @@ w=A.aN(q,B.Z,!1,q,!0,B.t,q,A.aO(),r.ch,q,q,q,q,q,2,A.bC(q,new A.b6(4,A.n(12),B.d
 v=A.c("Corner style",q,q,q,q,q,q,A.l(q,q,A.Q(m).ax.a===B.I?B.c:B.bB,q,q,q,q,q,q,q,q,12,q,q,B.F,q,q,!0,q,q,q,q,q,q,q,q),q,q,q)
 u=A.c("Color presets",q,q,q,q,q,q,A.l(q,q,A.Q(m).ax.a===B.I?B.c:B.bB,q,q,q,q,q,q,q,q,12,q,q,B.F,q,q,!0,q,q,q,q,q,q,q,q),q,q,q)
 t=A.c("QR eye shape",q,q,q,q,q,q,A.l(q,q,A.Q(m).ax.a===B.I?B.c:B.bB,q,q,q,q,q,q,q,q,12,q,q,B.F,q,q,!0,q,q,q,q,q,q,q,q),q,q,q)
-n.push(r.Bk(d,A.x(A.a([w,B.aA,v,B.P,new C.b4B(p.f,B.aE,new C.ewE(r,e),q),B.aA,u,B.P,new C.b4A(p,new C.ewF(r,e),q),B.aA,t,B.P,new C.atF(D.dnw,p.d,B.aE,new C.ewG(r,e),q),B.S,A.c("Dot shape",q,q,q,q,q,q,A.l(q,q,A.Q(m).ax.a===B.I?B.c:B.bB,q,q,q,q,q,q,q,q,12,q,q,B.F,q,q,!0,q,q,q,q,q,q,q,q),q,q,q),B.P,new C.atF(D.dkJ,p.e,B.aE,new C.ewH(r,e),q)],o),B.am,q,B.e,B.h,0,B.p),"Customize QR"))
+n.push(r.Bk(d,A.x(A.a([w,B.aA,v,B.P,new C.b4B(p.f,B.aE,new C.ewE(r,e),q),B.aA,u,B.P,new C.b4A(p,new C.ewF(r,e),q),B.aA,t,B.P,new C.atF(D.dnw,p.d,B.aE,new C.ewG(r,e),q),B.S,A.c("Dot shape",q,q,q,q,q,q,A.l(q,q,A.Q(m).ax.a===B.I?B.c:B.bB,q,q,q,q,q,q,q,q,12,q,q,B.F,q,q,!0,q,q,q,q,q,q,q,q),q,q,q),B.P,new C.atF(D.dkK,p.e,B.aE,new C.ewH(r,e),q)],o),B.am,q,B.e,B.h,0,B.p),"Customize QR"))
 n.push(B.aA)
 m=e.z
 if(m.length!==0)n.push(r.b6m(d,m))
@@ -4827,7 +4827,7 @@ D.dbS=w([D.e4E,D.e4x,D.e4D,D.e4y,D.e4B,D.e4C,D.e4z,D.e4A],A.ar("N<wM>"))
 D.a0o=new A.u(1,0.10196078431372549,0.0784313725490196,0.06274509803921569,B.q)
 D.e5i=new C.JQ("circle",A0.Qw)
 D.e5j=new C.JQ("square",B.Ir)
-D.dkJ=w([D.e5i,D.e5j],x.B)
+D.dkK=w([D.e5i,D.e5j],x.B)
 D.bUY=new A.a_(63565,"MaterialIcons",!1)
 D.e5k=new C.JQ("circle",D.bUY)
 D.bWB=new A.a_(983941,"MaterialIcons",!1)
@@ -4910,4 +4910,4 @@ D.hcl=new A.C("Use banner",null,null,null,null,null,null,null,null,null,null,nul
 D.hd9=new A.C("Create new Bio",null,B.fP,null,null,null,null,null,null,null,null,null)
 D.hNT=new C.aeR(!0,0,"")})();(function staticFields(){$.hES=null
 $.hlL=A.S(x.N,A.ar("+(ai<nR>,ai<iL>)"))})()};
-(a=>{a["BEuVI0hMIbI4KZla4RALQ+wUyNw="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["4D9gcWVLxCt2fULejzEZMVBNbtg="]=a.current})($__dart_deferred_initializers__);

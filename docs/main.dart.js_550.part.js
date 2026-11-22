@@ -5934,7 +5934,7 @@ D.bSj=new A.a_(58244,"MaterialIcons",!0)
 D.fcg=new A.b3("dataList","Data list",D.bSj)
 D.bRJ=new A.a_(57475,"MaterialIcons",!1)
 D.ffx=new A.b3("stat","Stat counter",D.bRJ)
-D.djw=w([D.fck,D.fcg,D.ffx],x.c)
+D.djx=w([D.fck,D.fcg,D.ffx],x.c)
 D.bSe=new A.a_(58090,"MaterialIcons",!1)
 D.fd7=new A.b3("menuGrid","Menu grid",D.bSe)
 D.ffN=new A.b3("list","Link list",M.PS)
@@ -5973,7 +5973,7 @@ D.feh=new A.b3("contact","Contact card",D.bS2)
 D.bSC=new A.a_(59048,"MaterialIcons",!1)
 D.fes=new A.b3("video","Video",D.bSC)
 D.dBd=w([D.ffp,D.fd4,D.ffQ,D.fbM,D.feh,D.fes],x.c)
-D.aKL=new A.bl(D.evC,[D.dr6,D.cGn,D.djw,D.cGC,D.dw6,D.dgi,D.d19,D.dtU,D.dBd],A.ar("bl<m,ai<+(m,m,a_)>>"))
+D.aKL=new A.bl(D.evC,[D.dr6,D.cGn,D.djx,D.cGC,D.dw6,D.dgi,D.d19,D.dtU,D.dBd],A.ar("bl<m,ai<+(m,m,a_)>>"))
 D.dS5=new B.Fm(null,"Invalid backup format. Export again from App Studio \u2192 menu \u2192 Download backup.")
 D.dS6=new B.Fm(null,"Invalid backup \u2014 choose a .ngmy.json file exported from App Studio.")
 D.dS7=new B.Fm(null,"No file selected.")
@@ -6078,4 +6078,4 @@ D.heS=new A.C("My Projects",null,null,null,null,null,null,null,null,null,null,nu
 D.hgb=new A.C("Invoice published",null,C.iQ,null,null,null,null,null,null,null,null,null)})();(function lazyInitializers(){var w=a.lazyFinal
 w($,"iMY","hTY",()=>{var v=4279150057,u=4284704497
 return A.a([B.n0("Featured",new B.fPE(),"Map, saved trips & destinations.","\u2708\ufe0f","qr_studio","Travel Explorer",v),B.n0("",new B.fPF(),"Product feed, cart & checkout.","\ud83d\udecd\ufe0f","luxe_store","Luxe Store",4293675161),B.n0("",new B.fPG(),"Posts, profiles & engagement.","\ud83d\udcac","creator_hub","Social Pulse",4287323382),B.n0("",new B.fPR(),"Workouts, check-ins & nutrition.","\ud83d\udcaa","pulse_fitness","Pulse Fitness",4279286145),B.n0("",new B.fPX(),"Clients, invoices & pipeline.","\ud83d\udcca","invoice_pro","CRM Dashboard",u),B.n0("",new B.fPY(),"Showcase work & contact.","\ud83c\udf10","video_hub","Portfolio Hub",v),B.n0("",new B.fPZ(),"Live QR for websites & text.","\ud83d\udcf1","qr_code_studio","QR Code Studio",4278630100),B.n0("New",new B.fQ_(),"Sell, track sales & get paid.","\ud83d\udcb5","side_hustle","Side Hustle Marketplace",4279673674),B.n0("",new B.fQ0(),"Services, bookings & client earnings.","\ud83d\udcc5","booking_pro","Booking & Services",4286331629),B.n0("",new B.fQ1(),"Daily checklist, streaks & progress.","\ud83d\udd25","habit_tracker","Habit Tracker",4279548070),B.n0("",new B.fQ2(),"Income, spending & budget at a glance.","\ud83d\udcb0","finance_dash","Money Tracker",4282090230),B.n0("",new B.fPH(),"Post roles, track applicants.","\ud83d\udcbc","job_board","Job Board",4281549141),B.n0("",new B.fPI(),"Discussion feed, posts & replies.","\ud83d\udde3\ufe0f","community_forum","Community Forum",4288814255),B.n0("",new B.fPJ(),"Episodes, categories & playback links.","\ud83c\udf99\ufe0f","podcast_hub","Podcast Hub",4280232247),B.n0("",new B.fPK(),"Events, RSVPs & shareable QR codes.","\ud83c\udfab","event_tickets","Event Ticketing",4294286859),B.n0("New",new B.fPL(),"Raise funds, track donors, share a link.","\u2764\ufe0f","donate_nonprofit","Giving Campaign",4292943176),B.n0("",new B.fPM(),"Sessions, bookings & client roster.","\ud83e\uddd8","coaching_booking","Coaching Studio",4286456526),B.n0("",new B.fPN(),"Showcase galleries & booking requests.","\ud83d\udcf7","photo_portfolio","Photo Portfolio",4279310375),B.n0("",new B.fPO(),"Save recipes, ingredients & steps.","\ud83c\udf73","recipe_box","Recipe Box",4293548044),B.n0("",new B.fPP(),"Daily care, vet visits & reminders.","\ud83d\udc3e","pet_care","Pet Care Tracker",4284850957),B.n0("",new B.fPQ(),"Create invoices, track clients & income.","\ud83e\uddfe","freelance_invoicing","Freelancer Invoicing",4280171146),B.n0("",new B.fPS(),"Log rounds, track scores & leaderboard.","\ud83c\udfc6","trivia_game","Trivia Night Scorekeeper",4292552567),B.n0("New",new B.fPT(),"Map of properties, inquiries & saves.","\ud83c\udfe0","real_estate","Real Estate Listings",4278995566),B.n0("",new B.fPU(),"Menu by category, tap to add to order.","\ud83c\udf7d\ufe0f","restaurant_menu","Restaurant Menu & Orders",4290321436),B.n0("",new B.fPV(),"Members, renewals & revenue.","\ud83e\udeaa","membership_manager","Membership Manager",4278483031),B.n0("",new B.fPW(),"Start fresh \u2014 describe any app to NGMY AI.","\ud83d\ude80","blank","Blank Canvas",u)],A.ar("N<a7V>"))})})()};
-(a=>{a["IvPyY09j/pVos8B/ZQcMK8ABfO0="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["c+wDR4Fsr4WwdtTLpdD256ZsEy8="]=a.current})($__dart_deferred_initializers__);
