@@ -124,13 +124,29 @@ Deno.test("trend timing: age, typical length, entry window, how often it worked"
   // 5-minute candles report in minutes.
   assertEquals(runStats(closes, 5).typicalMin, t.typicalMin! * 5);
   assertEquals(runStats([1, 2, 3], 1).dir, "none");
-  // Clean waves that always worked: a clear, early, reliable up move = ENTER UP, never a mixed message.
-  const r = readMarket(closes, closes.map((c) => ({ h: c + 0.05, l: c - 0.05 })), p, true, { candleMin: 1, agent: false });
+  // Flat waves: the new up move comes right after a fall, so the 1-hour big trend is still falling: skip.
+  const flat = readMarket(closes, closes.map((c) => ({ h: c + 0.05, l: c - 0.05 })), p, true, { candleMin: 1, agent: false });
+  assertEquals(flat.decision, "SKIP_WEAK");
+  assertEquals(flat.action, "UP BUT BIG TREND FALLING · SKIP");
+  assertEquals(flat.entry, null);
+  // Waves on a rising market: a clear, early, reliable up move with the big trend rising = ENTER UP.
+  const rising: number[] = [];
+  let q = 100;
+  for (let w = 0; w < 8; w++) for (let i = 0; i < 20; i++) rising.push((q += w % 2 === 0 ? 0.1 : -0.04));
+  for (let i = 0; i < 10; i++) rising.push((q += 0.1));
+  const r = readMarket(rising, rising.map((c) => ({ h: c + 0.05, l: c - 0.05 })), q, true, { candleMin: 1, agent: false });
   assertEquals(r.decision, "ENTER");
   assertEquals(r.action, "ENTER UP · BUY");
   assertEquals(r.entry?.dir, "up");
   assertEquals(r.entry?.candleMin, 1);
   assert(r.notes[0].startsWith("Enter UP at the start of the next 1-minute candle"));
+  // The mirror for a falling market: ENTER DOWN only with the big trend falling.
+  const falling = rising.map((c) => 200 - c);
+  const d = readMarket(falling, falling.map((c) => ({ h: c + 0.05, l: c - 0.05 })), 200 - q, true, { candleMin: 1, agent: false });
+  assertEquals(d.action, "ENTER DOWN · SELL");
+  const flatDown = closes.map((c) => 200 - c);
+  assertEquals(readMarket(flatDown, flatDown.map((c) => ({ h: c + 0.05, l: c - 0.05 })), 200 - p, true, { candleMin: 1, agent: false }).action,
+    "DOWN BUT BIG TREND RISING · SKIP");
 });
 
 Deno.test("one decision for every market: the label, the code and the entry never disagree", () => {
@@ -143,7 +159,8 @@ Deno.test("one decision for every market: the label, the code and the entry neve
     assertEquals(r.entry != null, r.decision === "ENTER", `seed ${s}`);
     assertEquals(r.action.startsWith("ENTER"), r.decision === "ENTER", `seed ${s}`);
     if (r.decision === "NO_DIRECTION") assertEquals(r.action, "NO CLEAR DIRECTION · WAIT");
-    if (r.decision === "SKIP_WEAK") assert(r.action.endsWith("WEAK · SKIP"));
+    if (r.decision === "SKIP_WEAK") assert(r.action.endsWith("WEAK · SKIP") || r.action.includes("BIG TREND"), r.action);
+    if (r.decision === "ENTER") assert(r.notes.length > 0);
     if (r.decision === "WAIT_LATE") assert(r.action.endsWith("TOO LATE · WAIT"));
   }
 });

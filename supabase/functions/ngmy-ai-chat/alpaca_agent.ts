@@ -71,6 +71,23 @@ export function bigTrend(closes: number[], price: number, slow = PA_RULES.slowMa
   return { ok: rising && priceAbove, slowNow, slowHourAgo, rising, priceAbove, why };
 }
 
+/** The same big trend rule for a signal in either direction. Up: slow average higher than 1 hour ago and price
+ *  above it. Down (the mirror): slow average lower than 1 hour ago and price below it. */
+export function bigTrendFor(closes: number[], price: number, dir: "up" | "down", hourCandles = 12) {
+  const b = bigTrend(closes, price, PA_RULES.slowMa, hourCandles);
+  if (dir === "up" || b.slowNow == null || b.slowHourAgo == null) return b;
+  const p = price || closes[closes.length - 1] || 0;
+  const falling = b.slowNow < b.slowHourAgo;
+  const priceBelow = p < b.slowNow;
+  const chg = (b.slowNow - b.slowHourAgo) / b.slowHourAgo * 100;
+  const why = !falling
+    ? `the big trend is ${chg === 0 ? "flat" : "rising"} (slow average ${chg >= 0 ? "+" : ""}${chg.toFixed(3)}% versus 1 hour ago)`
+    : !priceBelow
+      ? "the price is above the slow average"
+      : `the big trend is falling (slow average ${chg.toFixed(3)}% versus 1 hour ago) and the price is below it`;
+  return { ...b, ok: falling && priceBelow, why };
+}
+
 /** Forex pairs for Live signals only (the agent does not trade these). Real interbank prices, 1-minute candles,
  *  from Yahoo Finance's public chart feed. Only pairs that update every minute are listed. */
 export const PA_FX: { symbol: string; yahoo: string; name: string }[] = [
@@ -413,9 +430,11 @@ export function readMarket(
   if (dir !== timing.dir) clear = false; // the move counter disagrees: not clear yet
   const early = timing.enterWithinMin != null && timing.enterWithinMin > 0;
   let entry = entryNow(clear, open, timing, candleMin);
-  // The agent's markets: never an "enter up" into a falling big trend (the same filter the agent buys with).
-  const big = agent ? bigTrend(closes, p) : null;
-  const againstTrend = !!big && dir === "up" && clear && !big.ok;
+  // The big trend rule, the same one the agent buys with, for EVERY signal (agent markets and forex):
+  // ENTER UP only when the slow average is higher than 1 hour ago and the price is above it;
+  // ENTER DOWN only when the slow average is lower than 1 hour ago and the price is below it.
+  const big = dir === "none" ? null : bigTrendFor(closes, p, dir, Math.round(60 / candleMin));
+  const againstTrend = !!big && clear && !big.ok;
   if (againstTrend) entry = null;
 
   const decision: Decision2 = !open ? "CLOSED" : !clear ? "NO_DIRECTION" : entry ? "ENTER" : againstTrend || early ? "SKIP_WEAK" : "WAIT_LATE";
@@ -425,7 +444,7 @@ export function readMarket(
     NO_DATA: "WAITING FOR DATA",
     NO_DIRECTION: "NO CLEAR DIRECTION · WAIT",
     ENTER: `ENTER ${way} · ${dir === "up" ? "BUY" : "SELL"}`,
-    SKIP_WEAK: againstTrend ? "UP BUT BIG TREND FALLING · SKIP" : `${way} BUT WEAK · SKIP`,
+    SKIP_WEAK: againstTrend ? `${way} BUT BIG TREND ${dir === "up" ? "FALLING" : "RISING"} · SKIP` : `${way} BUT WEAK · SKIP`,
     WAIT_LATE: `${way} BUT TOO LATE · WAIT`,
   }[decision];
 
@@ -435,7 +454,9 @@ export function readMarket(
   if (decision === "ENTER") {
     notes.push(`Enter ${way} at the start of the next ${candleMin}-minute candle and stay in for about ${entry!.durationMin} min.`);
   } else if (againstTrend) {
-    notes.push(`The short move is up, but ${big!.why}. The agent never buys into a falling big trend: skip it.`);
+    notes.push(dir === "up"
+      ? `The short move is up, but ${big!.why}. Never enter up into a falling big trend: skip it.`
+      : `The short move is down, but ${big!.why}. Never enter down into a rising big trend: skip it.`);
   } else if (decision === "SKIP_WEAK") {
     notes.push(`The move is ${way.toLowerCase()} and still early, but on this market only ${timing.worked} of the last ${timing.of} ${way.toLowerCase()} moves really went ${way.toLowerCase()} (${pct}%). Too unreliable: skip it.`);
   } else if (decision === "WAIT_LATE") {
