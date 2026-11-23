@@ -1,37 +1,24 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
-$__dart_deferred_initializers__.current=function(a,b,c,$){var D,A,E,C={
-hAd(d){switch(d.a){case 1:return B.esN
-case 2:return B.esP
-case 0:return B.esO}},
-auV:function auV(d,e,f,g,h,i){var _=this
-_.a=d
-_.b=e
-_.c=f
-_.d=g
-_.e=h
-_.f=i}},B
-D=c[0]
+$__dart_deferred_initializers__.current=function(a,b,c,$){var B,A,E,D={a9n:function a9n(d,e,f,g,h,i){var _=this
+_.c=d
+_.d=e
+_.e=f
+_.f=g
+_.r=h
+_.a=i}},C,F
+B=c[0]
 A=c[2]
-E=c[68]
-C=a.updateHolder(c[51],C)
-B=c[267]
-C.auV.prototype={}
+E=c[330]
+D=a.updateHolder(c[44],D)
+C=c[379]
+F=c[146]
+D.a9n.prototype={
+B(d){var x=this,w=null,v=B.Q(d).ax.a===A.I,u=v?E.am2:C.bvP,t=B.n(10),s=B.K(v?A.aT:C.bji,A.r,1),r=y.a
+return B.p(w,B.x(B.a([B.A(B.a([B.E(B.c(x.c,w,w,w,w,w,w,A.fh,w,w,w),1),B.aI(w,w,w,w,C.c2z,w,w,w,x.r,w,w,w,w,"Full screen sign (landscape)",A.cl)],r),A.l,w,A.e,A.h,0,w,w),new B.aKq(x.d,x.e,120,A.cA,A.a_,3.5,w),new B.bK(A.a9,w,w,B.bO(!1,A.FI,w,w,!0,w,w,w,x.f,w,w),w)],r),A.B,w,A.e,A.h,0,A.p),A.f,w,w,new B.o(u,w,s,t,w,w,A.m),w,w,w,w,A.bT,w,w,w)}}
 var z=a.updateTypes([]);(function inheritance(){var x=a.inherit
-x(C.auV,D.aE)})()
-var y={c:D.ar("N<u>")};(function constants(){var x=a.makeConstList
-B.aXC=new D.H(!0,A.c,null,null,null,null,9,A.u,null,2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-B.d8q=x([A.dz,A.kC,A.aD],y.c)
-B.dJ6=x([A.aD,A.fk],y.c)
-B.dhX=x([A.kW,A.pA,A.aD],y.c)
-B.esN=new C.auV(B.d8q,B.dJ6,A.fk,A.j3,"PREMIUM",B.dhX)
-B.dAu=x([A.cU,A.fx,A.bR],y.c)
-B.dvd=x([A.bR,A.aV],y.c)
-B.dgs=x([A.wL,A.bR,A.fx],y.c)
-B.esO=new C.auV(B.dAu,B.dvd,A.bR,A.jA,"NGMY WALLET",B.dgs)
-B.dxk=x([A.ew,A.e_,A.pB],y.c)
-B.dCm=x([A.aE,A.aQ],y.c)
-B.diR=x([A.t3,A.aE,A.c1],y.c)
-B.esP=new C.auV(B.dxk,B.dCm,A.aE,A.mw,"LUXURY",B.diR)
-B.esR=new E.auU(1,"premium")
-B.esS=new E.auU(2,"luxury")})()};
-(a=>{a["1akm/R6ywNs8dMNclAfTID7TWyY="]=a.current})($__dart_deferred_initializers__);
+x(D.a9n,B.aw)})()
+B.i0(b.typeUniverse,JSON.parse('{"a9n":{"aw":[],"w":[]}}'))
+var y={a:B.ar("N<w>")};(function constants(){C.bji=new B.u(1,0.792156862745098,0.8392156862745098,0.9529411764705882,A.q)
+C.bvP=new B.u(1,0.9529411764705882,0.9647058823529412,1,A.q)
+C.c2z=new B.ae(F.a4I,22,A.aV,null,null,null)})()};
+(a=>{a["hMC0hu5gN4YcrLNqltNMiiD2rXA="]=a.current})($__dart_deferred_initializers__);
