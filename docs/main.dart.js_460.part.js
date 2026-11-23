@@ -1,18 +1,18 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var J,B,A,O,P,Q,R,S,T,G,U,V,W,E,X,H,L,Y,C={
-hJ_(d){var w=x._
-w=B.cF(new B.ea(d,w),new C.fH1(),w.k("M.E"),x.U)
+hJ5(d){var w=x._
+w=B.cF(new B.ea(d,w),new C.fH6(),w.k("M.E"),x.U)
 w=B.B(w,B.a5(w).k("M.E"))
 return w},
-hFC(d){var w
+hFI(d){var w
 if(!x.j.b(d))return B.a([],x.i)
 w=x._
-w=B.B(new B.ea(J.b8(d,new C.fwj(),x.g),w),w.k("M.E"))
+w=B.B(new B.ea(J.b8(d,new C.fwo(),x.g),w),w.k("M.E"))
 return w},
-iCs(d,e,f,g,h,i,j,k){B.ce(null,A.bq,!0,null,new C.h9E(k,g,f,j,e,h,i),d,null,!0,!0,x.H)},
-fH1:function fH1(){},
-fwj:function fwj(){},
-h9E:function h9E(d,e,f,g,h,i,j){var _=this
+iCy(d,e,f,g,h,i,j,k){B.ce(null,A.bq,!0,null,new C.h9J(k,g,f,j,e,h,i),d,null,!0,!0,x.H)},
+fH6:function fH6(){},
+fwo:function fwo(){},
+h9J:function h9J(d,e,f,g,h,i,j){var _=this
 _.a=d
 _.b=e
 _.c=f
@@ -184,69 +184,69 @@ _.d=e
 _.e=f
 _.f=g
 _.a=h},
-fXR(d){var w=0,v=B.j(x.D),u,t,s,r
-var $async$fXR=B.e(function(e,f){if(e===1)return B.f(f,v)
+fXW(d){var w=0,v=B.j(x.D),u,t,s,r
+var $async$fXW=B.e(function(e,f){if(e===1)return B.f(f,v)
 for(;;)switch(w){case 0:t=B.a65(null,"NGMY","NGMY Invoice")
 s=B.api(d)
-r=B.hi3(null,null,!1,D.bEo,null,A.xL,null,null)
-t.a4N(new B.CL(r,new C.fXS(s)))
+r=B.hi8(null,null,!1,D.bEp,null,A.xL,null,null)
+t.a4N(new B.CL(r,new C.fXX(s)))
 u=t.jI(0)
 w=1
 break
 case 1:return B.h(u,v)}})
-return B.i($async$fXR,v)},
-fXS:function fXS(d){this.a=d},
-hh6(d){var w=C.fXW(d),v=w.c
-if(v==="Premium")return D.q4
-if(v==="Luxury")return D.UJ
+return B.i($async$fXW,v)},
+fXX:function fXX(d){this.a=d},
+hhb(d){var w=C.fY0(d),v=w.c
+if(v==="Premium")return D.q5
+if(v==="Luxury")return D.UK
 return null},
-b3p(d,e){var w=C.hh6(d)
+b3p(d,e){var w=C.hhb(d)
 if(w==null)return!1
-return C.i4L(e,w)||C.i4K(e,w)},
-i4L(d,e){if(e===D.q4)return d.hc
+return C.i4R(e,w)||C.i4Q(e,w)},
+i4R(d,e){if(e===D.q5)return d.hc
 return d.d8},
-i4K(d,e){if(e===D.q4)return d.j8
+i4Q(d,e){if(e===D.q5)return d.j8
 return d.jo},
-i4M(d,e){var w=e===D.q4?d.p8:d.zE,v=new B.O(w,new C.cjd(),B.U(w).k("O<1,m>")).c0(0,new C.cje())
+i4S(d,e){var w=e===D.q5?d.p8:d.zE,v=new B.O(w,new C.cjd(),B.U(w).k("O<1,m>")).c0(0,new C.cje())
 v=B.B(v,v.$ti.k("M.E"))
 return v},
-hyO(d,e){var w=e===D.q4?d.lL:d.mb,v=x.N
+hyU(d,e){var w=e===D.q5?d.lL:d.mb,v=x.N
 return w.iW(w,new C.cjc(),v,v)},
-hyP(d,e,f,g){var w,v,u,t
+hyV(d,e,f,g){var w,v,u,t
 if(g)return!0
 if(!C.b3p(f,d))return!0
-w=C.hh6(f)
+w=C.hhb(f)
 w.toString
 v=A.a.i(e.toLowerCase())
 if(v.length===0)return!1
-if(A.d.q(C.i4M(d,w),v))return!0
-u=C.hyO(d,w).h(0,v)
+if(A.d.q(C.i4S(d,w),v))return!0
+u=C.hyU(d,w).h(0,v)
 if(u!=null&&u.length!==0){t=B.bi(u)
 if(t!=null&&t.ce(new B.V(Date.now(),0,!1)))return!0}return!1},
-hyQ(d,e,f,g,h,i){return new B.O(B.a([i,f,d,e,g,h],x.s),new C.cjf(),x.e).aL(0,"|")},
+hyW(d,e,f,g,h,i){return new B.O(B.a([i,f,d,e,g,h],x.s),new C.cjf(),x.e).aL(0,"|")},
 asU(d,e,f){var w,v,u,t,s=A.a.i(e.toLowerCase())
 if(s.length===0)return
 w=x.N
-v=B.a1(C.hyO(d,f),w,w)
+v=B.a1(C.hyU(d,f),w,w)
 w=v.h(0,s)
 u=B.bi(w==null?"":w)
 t=u!=null&&u.ce(new B.V(Date.now(),0,!1))?u:new B.V(Date.now(),0,!1)
 v.n(0,s,t.bM(B.dv(30,0,0,0,0,0).a).ab().ag())
-if(f===D.q4)d.lL=v
+if(f===D.q5)d.lL=v
 else d.mb=v},
 asS(d,e,f,g,h,i,j){var w=0,v=B.j(x.y),u
 var $async$asS=B.e(function(k,l){if(k===1)return B.f(l,v)
 for(;;)switch(w){case 0:w=3
-return B.b(B.lt(!1,f,g,!1,h,A.Kd,j),$async$asS)
+return B.b(B.lt(!1,f,g,!1,h,A.Ke,j),$async$asS)
 case 3:if(!l){u=!1
 w=1
-break}C.asU(e,g,D.q4)
-C.asU(e,g,D.UJ)
+break}C.asU(e,g,D.q5)
+C.asU(e,g,D.UK)
 i.$0()
 w=f.e!=null?4:5
 break
 case 4:w=6
-return B.b(C.iCV(f,"Invoice access unlocked","Active for 30 days",d===D.q4?I.esO:I.esP),$async$asS)
+return B.b(C.iD0(f,"Invoice access unlocked","Active for 30 days",d===D.q5?I.esO:I.esP),$async$asS)
 case 6:case 5:u=!0
 w=1
 break
@@ -259,18 +259,18 @@ w=1
 break}t=j.gd6()
 if(!C.b3p(i,d)){u=!0
 w=1
-break}if(C.hyP(d,t,i,!1)){u=!0
+break}if(C.hyV(d,t,i,!1)){u=!0
 w=1
 break}w=3
-return B.b(B.lT(t,A.Kd),$async$b3o)
-case 3:if(l){C.asU(d,t,D.q4)
-C.asU(d,t,D.UJ)
+return B.b(B.lT(t,A.Ke),$async$b3o)
+case 3:if(l){C.asU(d,t,D.q5)
+C.asU(d,t,D.UK)
 h.$0()
 u=!0
 w=1
-break}s=C.hh6(i)
+break}s=C.hhb(i)
 s.toString
-r=s===D.q4?"Premium":"Luxury"
+r=s===D.q5?"Premium":"Luxury"
 u=C.asS(s,d,e,t,"Unlock "+r+" invoice templates to edit, add your photo, save, and download.",h,"NGMY Invoice \u2014 "+r)
 w=1
 break
@@ -282,9 +282,9 @@ for(;;)switch(w){case 0:if(j.gV_()){u=!0
 w=1
 break}t=j.gd6()
 w=3
-return B.b(B.lT(t,A.Kd),$async$asT)
-case 3:if(l){if(C.b3p(i,d)){C.asU(d,t,D.q4)
-C.asU(d,t,D.UJ)}h.$0()
+return B.b(B.lT(t,A.Ke),$async$asT)
+case 3:if(l){if(C.b3p(i,d)){C.asU(d,t,D.q5)
+C.asU(d,t,D.UK)}h.$0()
 u=!0
 w=1
 break}if(C.b3p(i,d)){u=C.b3o(d,e,f,g,h,i,j)
@@ -293,7 +293,7 @@ break}w=4
 return B.b(C.au5(t,f),$async$asT)
 case 4:if(l){u=!0
 w=1
-break}u=C.asS(D.q4,d,e,t,"You have used your 3 free Standard invoices. Subscribe for unlimited invoices, including Premium & Luxury templates (30 days).",h,"NGMY Invoice")
+break}u=C.asS(D.q5,d,e,t,"You have used your 3 free Standard invoices. Subscribe for unlimited invoices, including Premium & Luxury templates (30 days).",h,"NGMY Invoice")
 w=1
 break
 case 1:return B.h(u,v)}})
@@ -308,35 +308,35 @@ b3r:function b3r(d,e,f){this.c=d
 this.d=e
 this.a=f},
 bqO:function bqO(d){this.a=d},
-iAS(d,e){var w
+iAY(d,e){var w
 if(e.a<=0||e.b<=0)return d
-if(B.hPl(d))return d
+if(B.hPr(d))return d
 w=B.U(d).k("O<1,r?>")
-w=B.B(new B.O(d,new C.h2W(e),w),w.k("ak.E"))
+w=B.B(new B.O(d,new C.h30(e),w),w.k("aj.E"))
 return w},
-hpY(d,e,f){var w=null
-if(!A.d.aR(d,new C.h3O()))return new B.a6(w,f,w,w)
-return new B.a6(1/0,f,B.cf(new C.h3P(d,e,f)),w)},
-h2W:function h2W(d){this.a=d},
-h3O:function h3O(){},
-h3P:function h3P(d,e,f){this.a=d
+hq3(d,e,f){var w=null
+if(!A.d.aR(d,new C.h3T()))return new B.a6(w,f,w,w)
+return new B.a6(1/0,f,B.cf(new C.h3U(d,e,f)),w)},
+h30:function h30(d){this.a=d},
+h3T:function h3T(){},
+h3U:function h3U(d,e,f){this.a=d
 this.b=e
 this.c=f},
-hMz(d){var w=C.fXW(d)
+hMF(d){var w=C.fY0(d)
 return w.x},
-ivh(){var w=x.Y
-w=B.B(new B.X(D.Ec,new C.fVH(),w),w.k("M.E"))
+ivn(){var w=x.Y
+w=B.B(new B.X(D.Ec,new C.fVM(),w),w.k("M.E"))
 return w},
-fXW(d){var w,v
-try{w=A.d.ff(D.Ec,new C.fXX(d))
-return w}catch(v){w=A.d.gH(D.Ec)
+fY0(d){var w,v
+try{w=A.d.ff(D.Ec,new C.fY1(d))
+return w}catch(v){w=A.d.gG(D.Ec)
 return w}},
-hN1(d){var w,v
-if(D.aKL.am(0,d)){w=D.aKL.h(0,d)
+hN7(d){var w,v
+if(D.aKM.am(0,d)){w=D.aKM.h(0,d)
 w.toString
-return w}try{A.d.ff(D.Ec,new C.fZH(d))
+return w}try{A.d.ff(D.Ec,new C.fZM(d))
 return d}catch(v){return"modern"}},
-hyR(d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,a0){return new C.cjg(a0,g,f,d,e,l,n,k,i,h,q,r,s,p,o,t,w,v,j,u,m)},
+hyX(d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,a0){return new C.cjg(a0,g,f,d,e,l,n,k,i,h,q,r,s,p,o,t,w,v,j,u,m)},
 dig:function dig(d,e){this.a=d
 this.b=e},
 dih:function dih(){},
@@ -360,12 +360,12 @@ this.a=e},
 boB:function boB(d,e,f){this.c=d
 this.d=e
 this.a=f},
-eQ2:function eQ2(d){this.a=d},
-eQ3:function eQ3(d){this.a=d},
-fhz:function fhz(d,e){this.a=d
+eQ8:function eQ8(d){this.a=d},
+eQ9:function eQ9(d){this.a=d},
+fhF:function fhF(d,e){this.a=d
 this.b=e},
-fhA:function fhA(d){this.a=d},
-fhB:function fhB(d){this.a=d},
+fhG:function fhG(d){this.a=d},
+fhH:function fhH(d){this.a=d},
 bwE:function bwE(d,e,f){this.b=d
 this.c=e
 this.a=f},
@@ -391,9 +391,9 @@ _.f=i
 _.r=j
 _.w=k
 _.x=l},
-fVH:function fVH(){},
-fXX:function fXX(d){this.a=d},
-fZH:function fZH(d){this.a=d},
+fVM:function fVM(){},
+fY1:function fY1(d){this.a=d},
+fZM:function fZM(d){this.a=d},
 cjg:function cjg(d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,a0){var _=this
 _.a=d
 _.b=e
@@ -457,14 +457,14 @@ _.d=g},
 eoM:function eoM(d){this.a=d},
 eoS:function eoS(d){this.a=d},
 eoL:function eoL(d){this.a=d},
-iCV(d,e,f,g){var w=A0.hAg(g)
-return B.i2(A.v.j(0.78),!0,"Unlock celebration",d,new C.hbO(w,e,f,"Tap anywhere to continue"),new C.hbP(),A.iL,!0,x.H)},
-hbO:function hbO(d,e,f,g){var _=this
+iD0(d,e,f,g){var w=A0.hAm(g)
+return B.i2(A.v.j(0.78),!0,"Unlock celebration",d,new C.hbT(w,e,f,"Tap anywhere to continue"),new C.hbU(),A.iL,!0,x.H)},
+hbT:function hbT(d,e,f,g){var _=this
 _.a=d
 _.b=e
 _.c=f
 _.d=g},
-hbP:function hbP(){},
+hbU:function hbU(){},
 Y5:function Y5(d,e,f,g,h){var _=this
 _.c=d
 _.d=e
@@ -533,34 +533,34 @@ return B.i($async$au5,v)}},D,F,Z,A_,M,A0,I,N,K,A1,A2,A3
 J=c[1]
 B=c[0]
 A=c[2]
-O=c[259]
-P=c[260]
-Q=c[258]
-R=c[247]
-S=c[263]
+O=c[260]
+P=c[261]
+Q=c[259]
+R=c[248]
+S=c[264]
 T=c[143]
-G=c[256]
-U=c[266]
+G=c[257]
+U=c[267]
 V=c[57]
-W=c[264]
-E=c[240]
+W=c[265]
+E=c[241]
 X=c[130]
-H=c[257]
-L=c[265]
-Y=c[262]
+H=c[258]
+L=c[266]
+Y=c[263]
 C=a.updateHolder(c[28],C)
-D=c[255]
+D=c[256]
 F=c[31]
 Z=c[89]
 A_=c[151]
 M=c[225]
 A0=c[51]
-I=c[267]
+I=c[268]
 N=c[44]
-K=c[261]
+K=c[262]
 A1=c[183]
 A2=c[200]
-A3=c[233]
+A3=c[234]
 C.Xg.prototype={
 S(){var w,v=x.i,u=B.a([],v)
 v=B.a([],v)
@@ -704,9 +704,9 @@ return u-u*(A.i.D(v,0,100)/100)},
 Y2(){var w,v=this
 if(v.gadV())return!1
 w=v.a
-return C.b3p(v.d,w.r)&&!C.hyP(v.a.r,v.gaAh(),v.d,v.gadV())},
+return C.b3p(v.d,w.r)&&!C.hyV(v.a.r,v.gaAh(),v.d,v.gadV())},
 aZC(){var w=this,v=w.d,u=w.ax.a.a
-return C.hyQ(w.CW.a.a,w.dx.a.a,u,w.fr.a.a,w.fy.a.a,v)},
+return C.hyW(w.CW.a.a,w.dx.a.a,u,w.fr.a.a,w.fy.a.a,v)},
 Pt(d){return this.bTN(d)},
 bTN(d){var w=0,v=B.j(x.y),u,t=this,s,r,q,p,o,n
 var $async$Pt=B.e(function(e,f){if(e===1)return B.f(f,v)
@@ -756,26 +756,26 @@ t.toString
 if(B.Q(t).ax.a===A.I){t=new C.enx()
 w=B.W(e,A.bl,u,u,u,19)
 v=f?D.c42:u
-return B.bC(u,t.$2(A.ZI,1.3),u,A.tr,u,u,u,u,!0,t.$2(A.ZI,1.3),u,u,u,u,u,D.bm7,!0,u,u,D.fOp,u,t.$2(A.bl,1.8),u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,!0,u,D.fDg,d,!0,!0,!1,u,w,u,A.YR,u,u,u,u,v,u,u,u,u,u)}t=new C.enw()
+return B.bC(u,t.$2(A.ZJ,1.3),u,A.tr,u,u,u,u,!0,t.$2(A.ZJ,1.3),u,u,u,u,u,D.bm8,!0,u,u,D.fOs,u,t.$2(A.bl,1.8),u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,!0,u,D.fDj,d,!0,!0,!1,u,w,u,A.YS,u,u,u,u,v,u,u,u,u,u)}t=new C.enw()
 w=B.W(e,A.aD,u,u,u,19)
 v=f?D.c2Q:u
-return B.bC(u,t.$2(A.oC,1.3),u,A.tr,u,u,u,u,!0,t.$2(A.oC,1.3),u,u,u,u,u,A.ahu,!0,u,u,D.fMn,u,t.$2(A.aD,1.8),u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,!0,u,D.fP3,d,!0,!0,!1,u,w,u,A.YR,u,u,u,u,v,u,u,u,u,u)},
+return B.bC(u,t.$2(A.oD,1.3),u,A.tr,u,u,u,u,!0,t.$2(A.oD,1.3),u,u,u,u,u,A.ahu,!0,u,u,D.fMq,u,t.$2(A.aD,1.8),u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,!0,u,D.fP6,d,!0,!0,!1,u,w,u,A.YS,u,u,u,u,v,u,u,u,u,u)},
 Zc(d,e,f){var w,v,u,t=null,s="invoice-section-",r=this.c
 r.toString
 if(B.Q(r).ax.a===A.I){r=B.n(18)
 w=B.K(A.aD.j(0.55),A.r,1.4)
 v=B.n(9)
 u=x.p
-return B.p(t,B.x(B.a([B.A(B.a([B.p(t,B.W(e,A.c,t,t,t,17),A.f,t,t,new B.o(t,t,t,v,t,A.Rg,A.m),t,30,t,t,t,t,t,30),A.ar,B.c(d,t,t,t,t,t,t,G.ad6,t,t,t)],u),A.l,t,A.e,A.h,0,t,t),A.af,f],u),A.B,t,A.e,A.h,0,A.p),A.f,t,t,new B.o(t,t,w,r,D.d6o,D.cb1,A.m),t,t,new B.bf(s+d,x.W),t,D.anw,t,t,1/0)}r=B.n(18)
-w=B.K(A.oC,A.r,1.4)
+return B.p(t,B.x(B.a([B.A(B.a([B.p(t,B.W(e,A.c,t,t,t,17),A.f,t,t,new B.o(t,t,t,v,t,A.Rh,A.m),t,30,t,t,t,t,t,30),A.ar,B.c(d,t,t,t,t,t,t,G.ad6,t,t,t)],u),A.l,t,A.e,A.h,0,t,t),A.af,f],u),A.B,t,A.e,A.h,0,A.p),A.f,t,t,new B.o(t,t,w,r,D.d6q,D.cb1,A.m),t,t,new B.bf(s+d,x.W),t,D.anw,t,t,1/0)}r=B.n(18)
+w=B.K(A.oD,A.r,1.4)
 v=B.n(9)
 u=x.p
-return B.p(t,B.x(B.a([B.A(B.a([B.p(t,B.W(e,A.c,t,t,t,17),A.f,t,t,new B.o(t,t,t,v,t,A.Rg,A.m),t,30,t,t,t,t,t,30),A.ar,B.c(d,t,t,t,t,t,t,D.fQ0,t,t,t)],u),A.l,t,A.e,A.h,0,t,t),A.af,f],u),A.B,t,A.e,A.h,0,A.p),A.f,t,t,new B.o(A.c,t,w,r,D.d1x,t,A.m),t,t,new B.bf(s+d,x.W),t,D.anw,t,t,1/0)},
+return B.p(t,B.x(B.a([B.A(B.a([B.p(t,B.W(e,A.c,t,t,t,17),A.f,t,t,new B.o(t,t,t,v,t,A.Rh,A.m),t,30,t,t,t,t,t,30),A.ar,B.c(d,t,t,t,t,t,t,D.fQ3,t,t,t)],u),A.l,t,A.e,A.h,0,t,t),A.af,f],u),A.B,t,A.e,A.h,0,A.p),A.f,t,t,new B.o(A.c,t,w,r,D.d1y,t,A.m),t,t,new B.bf(s+d,x.W),t,D.anw,t,t,1/0)},
 Jm(d,e){var w=null
 if(!this.Y2())return e
 return B.aA(w,new B.Tc(!0,e,w),A.y,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,new C.eny(this,d),w,w,w,w,w,w,!1,A.a4)},
 aQG(d){var w,v,u=this,t=J.a2(d),s=t.h(d,"template")
-u.d=C.hN1(J.k(s==null?"modern":s))
+u.d=C.hN7(J.k(s==null?"modern":s))
 s=t.h(d,"invoiceNo")
 u.ax.sb1(0,J.k(s==null?"1":s))
 s=t.h(d,"issuedDate")
@@ -815,10 +815,10 @@ u.k1.sb1(0,J.k(s==null?"":s))
 u.e=J.z(t.h(d,"isPaid"),!0)
 s=u.x
 A.d.a5(s)
-A.d.u(s,C.hFC(t.h(d,"providerSignature")))
+A.d.u(s,C.hFI(t.h(d,"providerSignature")))
 s=u.y
 A.d.a5(s)
-A.d.u(s,C.hFC(t.h(d,"clientSignature")))
+A.d.u(s,C.hFI(t.h(d,"clientSignature")))
 t=t.h(d,"photoBase64")
 w=J.k(t==null?"":t)
 if(J.ad(w)!==0)try{u.w=A.cD.aK(w)}catch(v){u.w=null}else u.w=null
@@ -851,7 +851,7 @@ case 7:t=6
 k=s.pop()
 n=B.ac(k)
 m=r.c
-if(m!=null)m.K(x.q).f.T(B.b2(null,null,null,null,null,A.t,null,B.c("Could not load photo: "+B.v(n),null,null,null,null,null,null,null,null,null,null),null,A.Y,null,null,null,null,null,null,null,null,null,null))
+if(m!=null)m.K(x.q).f.T(B.b3(null,null,null,null,null,A.t,null,B.c("Could not load photo: "+B.v(n),null,null,null,null,null,null,null,null,null,null),null,A.Y,null,null,null,null,null,null,null,null,null,null))
 w=9
 break
 case 6:w=2
@@ -885,8 +885,8 @@ p.n(0,"subtotal",e)
 p.n(0,"isPaid",t.e)
 p.n(0,"paidAt",t.e?q:null)
 p.n(0,"createdAt",q)
-p.n(0,"providerSignature",C.hJ_(t.x))
-p.n(0,"clientSignature",C.hJ_(t.y))
+p.n(0,"providerSignature",C.hJ5(t.x))
+p.n(0,"clientSignature",C.hJ5(t.y))
 s=t.w
 if(s!=null&&!A.aI.gar(s)){s=t.w
 s.toString
@@ -896,7 +896,7 @@ case 3:w=4
 return B.b(C.ajB(),$async$a39)
 case 4:r=g
 if(d.e!=null){p=d.K(x.q).f
-p.T(B.b2(null,null,null,A.du,null,A.t,null,B.c(t.e?"Invoice saved. Tap the receipt icon to view it. Paid invoices auto-delete after 5 days.":"Invoice saved. Tap the receipt icon next to Create Invoice to view it.",null,null,null,null,null,null,null,null,null,null),null,A.Y,null,null,null,null,null,null,null,null,null,null))}u=r
+p.T(B.b3(null,null,null,A.du,null,A.t,null,B.c(t.e?"Invoice saved. Tap the receipt icon to view it. Paid invoices auto-delete after 5 days.":"Invoice saved. Tap the receipt icon next to Create Invoice to view it.",null,null,null,null,null,null,null,null,null,null),null,A.Y,null,null,null,null,null,null,null,null,null,null))}u=r
 w=1
 break
 case 1:return B.h(u,v)}})
@@ -919,14 +919,14 @@ return B.b($.aU.glJ(),$async$yk)
 case 8:r=$.aU.bk$.x.h(0,t.z)
 r=r==null?null:r.gbg()
 x.Z.a(r)
-if(r==null)throw B.Y(B.fq("Preview is not ready yet. Scroll to the invoice preview and try again."))
+if(r==null)throw B.Y(B.fr("Preview is not ready yet. Scroll to the invoice preview and try again."))
 w=10
 return B.b(r.lv(d?2:3),$async$yk)
 case 10:w=9
 return B.b(f.ho(A.ho),$async$yk)
 case 9:r=f
 s=r==null?null:J.eS(J.uV(r))
-if(s==null)throw B.Y(B.fq("Could not render invoice image."))
+if(s==null)throw B.Y(B.fr("Could not render invoice image."))
 u=s
 w=1
 break
@@ -938,9 +938,9 @@ if(i==null)i=0
 return v+"|"+u+"|"+t+"|"+s+"|"+r+"|"+q+"|"+p+"|"+o+"|"+n+"|"+m+"|"+l+"|"+B.v(d)+"|"+k+"|"+j+"|"+i},
 cz9(d){var w=this.at
 if(w!=null)w.a1(0)
-this.at=B.cy(A.n5,new C.enD(this,d))},
-a4H(d){return this.cM2(d)},
-cM2(d){var w=0,v=B.j(x.H),u,t=2,s=[],r=this,q,p,o,n,m,l,k
+this.at=B.cy(A.n6,new C.enD(this,d))},
+a4H(d){return this.cM4(d)},
+cM4(d){var w=0,v=B.j(x.H),u,t=2,s=[],r=this,q,p,o,n,m,l,k
 var $async$a4H=B.e(function(e,f){if(e===1){s.push(f)
 w=t}for(;;)switch(w){case 0:t=4
 q=r.b6a(d)
@@ -954,7 +954,7 @@ return B.b(r.yk(!0),$async$a4H)
 case 7:p=f
 if(r.c==null){w=1
 break}w=8
-return B.b(C.fXR(p),$async$a4H)
+return B.b(C.fXW(p),$async$a4H)
 case 8:o=f
 if(r.c==null){w=1
 break}r.Q=o
@@ -982,7 +982,7 @@ break}p=C
 w=4
 return B.b(t.yk(!0),$async$a2d)
 case 4:w=3
-return B.b(p.fXR(f),$async$a2d)
+return B.b(p.fXW(f),$async$a2d)
 case 3:s=f
 t.Q=s
 t.as=r
@@ -1005,14 +1005,14 @@ q=s.aZB()
 w=7
 return B.b(B.rA(r,q),$async$a0q)
 case 7:p=f
-if(d.e!=null)d.K(x.q).f.T(B.b2(null,null,null,A.du,null,A.t,null,B.c(p,null,null,null,null,null,null,null,null,null,null),null,A.Y,null,null,null,null,null,null,null,null,null,null))
+if(d.e!=null)d.K(x.q).f.T(B.b3(null,null,null,A.du,null,A.t,null,B.c(p,null,null,null,null,null,null,null,null,null,null),null,A.Y,null,null,null,null,null,null,null,null,null,null))
 u=1
 w=5
 break
 case 3:u=2
 m=t.pop()
 o=B.ac(m)
-if(d.e!=null)d.K(x.q).f.T(B.b2(null,null,null,A.aB,null,A.t,null,B.c("Download failed: "+B.v(o),null,null,null,null,null,null,null,null,null,null),null,A.Y,null,null,null,null,null,null,null,null,null,null))
+if(d.e!=null)d.K(x.q).f.T(B.b3(null,null,null,A.aB,null,A.t,null,B.c("Download failed: "+B.v(o),null,null,null,null,null,null,null,null,null,null),null,A.Y,null,null,null,null,null,null,null,null,null,null))
 w=5
 break
 case 2:w=1
@@ -1032,7 +1032,7 @@ w=8
 return B.b(V.HI(q,p,!1),$async$a2c)
 case 8:o=g
 if(d.e==null){w=1
-break}if(!o)d.K(x.q).f.T(D.fx5)
+break}if(!o)d.K(x.q).f.T(D.fx8)
 w=1
 break
 t=2
@@ -1041,7 +1041,7 @@ break
 case 4:t=3
 l=s.pop()
 n=B.ac(l)
-if(d.e!=null)d.K(x.q).f.T(B.b2(null,null,null,A.aB,null,A.t,null,B.c("Print failed: "+B.v(n),null,null,null,null,null,null,null,null,null,null),null,A.Y,null,null,null,null,null,null,null,null,null,null))
+if(d.e!=null)d.K(x.q).f.T(B.b3(null,null,null,A.aB,null,A.t,null,B.c("Print failed: "+B.v(n),null,null,null,null,null,null,null,null,null,null),null,A.Y,null,null,null,null,null,null,null,null,null,null))
 w=6
 break
 case 3:w=2
@@ -1077,13 +1077,13 @@ return B.b(F.M1(),$async$a3J)
 case 3:r.a=f
 if(d.e==null){w=1
 break}w=4
-return B.b(B.bU(A.iX,null,new C.enX(s,t,d),d,!0,!0,!0,A.KP,!1,!1,x.H),$async$a3J)
+return B.b(B.bU(A.iX,null,new C.enX(s,t,d),d,!0,!0,!0,A.KQ,!1,!1,x.H),$async$a3J)
 case 4:case 1:return B.h(u,v)}})
 return B.i($async$a3J,v)},
 crU(d,e){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g=this
 if(e){w=g.d
 v=g.ay.a.a
-return C.hyR("City, ST 00000","(555) 555-5555","123 Main Street","Your Business Name","client@email.com","Client Name",A.a7g,g.ch.a.a,"INV-0000",!1,v,"Description","0","Service or item","0.00","1","Payment info",null,A.a7g,0,w)}w=g.d
+return C.hyX("City, ST 00000","(555) 555-5555","123 Main Street","Your Business Name","client@email.com","Client Name",A.a7g,g.ch.a.a,"INV-0000",!1,v,"Description","0","Service or item","0.00","1","Payment info",null,A.a7g,0,w)}w=g.d
 v=g.CW.a.a
 u=g.cx.a.a
 t=g.cy.a.a
@@ -1099,7 +1099,7 @@ k=g.go.a.a
 j=g.id.a.a
 i=g.fx.a.a
 h=g.k1.a.a
-return C.hyR(t,s,u,v,n,o,g.y,p,r,g.e,q,i,j,m,l,k,h,g.w,g.x,d,w)},
+return C.hyX(t,s,u,v,n,o,g.y,p,r,g.e,q,i,j,m,l,k,h,g.w,g.x,d,w)},
 a1g(d,e,f){return this.cld(d,e,f)},
 cld(d,e,f){var w=0,v=B.j(x.H),u=this
 var $async$a1g=B.e(function(g,h){if(g===1)return B.f(h,v)
@@ -1138,8 +1138,8 @@ v=B.n(14)
 u=Math.min(1250,g.a-16)
 t=l.r
 s=x.p
-t=B.a([B.A(B.a([Q.atL,A.aa,D.bNB,B.aI(k,k,k,k,B.bKY(k,D.bZd,t>0,B.c(""+t,k,k,k,k,k,k,k,k,k,k)),k,k,k,new C.eoj(l,d),k,k,k,k,"Saved invoices",k),B.bN(!1,A.qm,k,k,!0,k,k,k,new C.eok(d),k,k)],s),A.l,k,A.e,A.h,0,k,k),D.h6r,A.al,new C.asW(l.d,new C.eol(l),k)],s)
-if(C.hMz(l.d)){r=i?A.lS:A.cj
+t=B.a([B.A(B.a([Q.atM,A.aa,D.bNB,B.aI(k,k,k,k,B.bKY(k,D.bZd,t>0,B.c(""+t,k,k,k,k,k,k,k,k,k,k)),k,k,k,new C.eoj(l,d),k,k,k,k,"Saved invoices",k),B.bN(!1,A.qn,k,k,!0,k,k,k,new C.eok(d),k,k)],s),A.l,k,A.e,A.h,0,k,k),D.h6u,A.ak,new C.asW(l.d,new C.eol(l),k)],s)
+if(C.hMF(l.d)){r=i?A.lS:A.cj
 q=B.n(10)
 p=B.K(A.aE.j(0.35),A.r,1)
 o=B.K(A.aE,A.r,2)
@@ -1148,40 +1148,40 @@ m=n==null
 n=!m?B.alZ(A.bX,new B.p0(n,1),k):k
 m=m?D.bXG:k
 o=B.p(k,m,A.f,k,k,new B.o(A.k9,n,o,k,k,k,A.a6),k,52,k,k,k,k,k,52)
-o=B.a([o,A.bb,B.E(B.x(B.a([D.h0H,B.c("Appears on Essential Luxury templates (broadcast style).",k,k,k,k,k,k,B.l(k,k,i?A.aR:A.b7,k,k,k,k,k,k,k,k,10,k,k,k,k,k,!0,k,k,k,k,k,k,k,k),k,k,k)],s),A.B,k,A.e,A.h,0,A.p),1),B.hu(D.bZP,A.LS,l.gcqI(),k)],s)
+o=B.a([o,A.bb,B.E(B.x(B.a([D.h0K,B.c("Appears on Essential Luxury templates (broadcast style).",k,k,k,k,k,k,B.l(k,k,i?A.aR:A.b7,k,k,k,k,k,k,k,k,10,k,k,k,k,k,!0,k,k,k,k,k,k,k,k),k,k,k)],s),A.B,k,A.e,A.h,0,A.p),1),B.hu(D.bZP,A.LT,l.gcqI(),k)],s)
 if(l.w!=null)o.push(B.aI(k,k,k,k,A.a4Z,k,k,k,new C.eow(l),k,k,k,k,"Remove photo",k))
 A.d.u(t,B.a([A.S,B.p(k,B.A(o,A.l,k,A.e,A.h,0,k,k),A.f,k,k,new B.o(r,k,p,q,k,k,A.m),k,k,k,k,A.bT,k,k,k)],s))}if(f){r=A.aD.j(0.12)
 q=B.n(10)
 p=B.K(A.aD.j(0.45),A.r,1)
-A.d.u(t,B.a([A.S,B.p(k,B.A(B.a([D.c40,A.ar,B.E(B.c("Premium/Luxury locked \u2014 pay to edit, add your photo, save, or download. You can unlock anytime.",k,k,k,k,k,k,B.l(k,k,i?A.ab:A.bq,k,k,k,k,k,k,k,k,11,k,k,k,k,1.35,!0,k,k,k,k,k,k,k,k),k,k,k),1),B.bN(!1,O.aZr,k,k,!0,k,k,k,new C.eoE(l,d),k,k)],s),A.l,k,A.e,A.h,0,k,k),A.f,k,k,new B.o(r,k,p,q,k,k,A.m),k,k,k,k,A.bT,k,k,1/0)],s))}t.push(A.af)
-r=B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.ax,k,k,k,k,k,2,l.pO("Invoice #",A.xn,f),A.y,!0,k,!0,k,!1,k,A.ak,k,k,k,k,k,k,k,k,k,1,k,k,!1,j,k,k,k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k)
+A.d.u(t,B.a([A.S,B.p(k,B.A(B.a([D.c40,A.ar,B.E(B.c("Premium/Luxury locked \u2014 pay to edit, add your photo, save, or download. You can unlock anytime.",k,k,k,k,k,k,B.l(k,k,i?A.ab:A.bq,k,k,k,k,k,k,k,k,11,k,k,k,k,1.35,!0,k,k,k,k,k,k,k,k),k,k,k),1),B.bN(!1,O.aZs,k,k,!0,k,k,k,new C.eoE(l,d),k,k)],s),A.l,k,A.e,A.h,0,k,k),A.f,k,k,new B.o(r,k,p,q,k,k,A.m),k,k,k,k,A.bT,k,k,1/0)],s))}t.push(A.af)
+r=B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.ax,k,k,k,k,k,2,l.pO("Invoice #",A.xn,f),A.y,!0,k,!0,k,!1,k,A.al,k,k,k,k,k,k,k,k,k,1,k,k,!1,j,k,k,k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k)
 q=f?k:new C.eoF(l)
-q=B.E(B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.ay,k,k,k,k,k,2,l.pO("Issued Date",A.zV,f),A.y,!0,k,!0,k,!1,k,A.ak,k,k,k,D.hGb,k,k,k,k,k,1,k,k,!1,j,k,k,k,k,q,!1,k,k,!0,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k),1)
+q=B.E(B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.ay,k,k,k,k,k,2,l.pO("Issued Date",A.zV,f),A.y,!0,k,!0,k,!1,k,A.al,k,k,k,D.hGe,k,k,k,k,k,1,k,k,!1,j,k,k,k,k,q,!1,k,k,!0,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k),1)
 p=f?k:new C.eoG(l)
-t.push(l.Zc("Invoice details",A.h0,l.Jm(d,B.x(B.a([r,A.S,B.A(B.a([q,A.aa,B.E(B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.ch,k,k,k,k,k,2,l.pO("Due Date",A.a48,f),A.y,!0,k,!0,k,!1,k,A.ak,k,k,k,D.hGu,k,k,k,k,k,1,k,k,!1,j,k,k,k,k,p,!1,k,k,!0,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k),1)],s),A.l,k,A.e,A.h,0,k,k)],s),A.l,k,A.e,A.h,0,A.p))))
+t.push(l.Zc("Invoice details",A.h0,l.Jm(d,B.x(B.a([r,A.S,B.A(B.a([q,A.aa,B.E(B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.ch,k,k,k,k,k,2,l.pO("Due Date",A.a49,f),A.y,!0,k,!0,k,!1,k,A.al,k,k,k,D.hGx,k,k,k,k,k,1,k,k,!1,j,k,k,k,k,p,!1,k,k,!0,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k),1)],s),A.l,k,A.e,A.h,0,k,k)],s),A.l,k,A.e,A.h,0,A.p))))
 t.push(A.af)
-t.push(l.Zc("Your business",A.kn,l.Jm(d,B.x(B.a([B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.CW,k,k,k,k,k,2,l.pO("Your Business Name (auto-saved)",P.Qd,f),A.y,!0,k,!0,k,!1,k,A.ak,k,k,k,k,k,k,k,k,k,1,k,k,!1,j,k,new C.eoH(l),k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k),A.S,B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.cx,k,k,k,k,k,2,l.pO("Street Address (auto-saved)",A.zN,f),A.y,!0,k,!0,k,!1,k,A.ak,k,k,k,k,k,k,k,k,k,1,k,k,!1,j,k,new C.eoI(l),k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k),A.S,B.A(B.a([B.E(B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.cy,k,k,k,k,k,2,l.pO("City, State ZIP (auto-saved)",Z.a3E,f),A.y,!0,k,!0,k,!1,k,A.ak,k,k,k,k,k,k,k,k,k,1,k,k,!1,j,k,new C.eoJ(l),k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k),1),A.aa,B.E(B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.db,k,k,k,k,k,2,l.pO("Phone Number (auto-saved)",A.j3,f),A.y,!0,k,!0,k,!1,k,A.ak,k,k,k,k,k,k,k,k,k,1,k,k,!1,j,k,new C.eoK(l),k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k),1)],s),A.l,k,A.e,A.h,0,k,k)],s),A.l,k,A.e,A.h,0,A.p))))
+t.push(l.Zc("Your business",A.kn,l.Jm(d,B.x(B.a([B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.CW,k,k,k,k,k,2,l.pO("Your Business Name (auto-saved)",P.Qe,f),A.y,!0,k,!0,k,!1,k,A.al,k,k,k,k,k,k,k,k,k,1,k,k,!1,j,k,new C.eoH(l),k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k),A.S,B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.cx,k,k,k,k,k,2,l.pO("Street Address (auto-saved)",A.zN,f),A.y,!0,k,!0,k,!1,k,A.al,k,k,k,k,k,k,k,k,k,1,k,k,!1,j,k,new C.eoI(l),k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k),A.S,B.A(B.a([B.E(B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.cy,k,k,k,k,k,2,l.pO("City, State ZIP (auto-saved)",Z.a3F,f),A.y,!0,k,!0,k,!1,k,A.al,k,k,k,k,k,k,k,k,k,1,k,k,!1,j,k,new C.eoJ(l),k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k),1),A.aa,B.E(B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.db,k,k,k,k,k,2,l.pO("Phone Number (auto-saved)",A.j3,f),A.y,!0,k,!0,k,!1,k,A.al,k,k,k,k,k,k,k,k,k,1,k,k,!1,j,k,new C.eoK(l),k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k),1)],s),A.l,k,A.e,A.h,0,k,k)],s),A.l,k,A.e,A.h,0,A.p))))
 t.push(A.af)
-t.push(l.Zc("Bill to",A.f3,l.Jm(d,B.A(B.a([B.E(B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.dx,k,k,k,k,k,2,l.pO("Bill To (Client Name)",A.ms,f),A.y,!0,k,!0,k,!1,k,A.ak,k,k,k,k,k,k,k,k,k,1,k,k,!1,j,k,new C.eom(l),k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k),1),A.aa,B.E(B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.dy,k,k,k,k,k,2,l.pO("Client Email",A.tw,f),A.y,!0,k,!0,k,!1,k,A.ak,k,k,k,k,k,k,k,k,k,1,k,k,!1,j,k,new C.eon(l),k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k),1)],s),A.l,k,A.e,A.h,0,k,k))))
+t.push(l.Zc("Bill to",A.f3,l.Jm(d,B.A(B.a([B.E(B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.dx,k,k,k,k,k,2,l.pO("Bill To (Client Name)",A.ms,f),A.y,!0,k,!0,k,!1,k,A.al,k,k,k,k,k,k,k,k,k,1,k,k,!1,j,k,new C.eom(l),k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k),1),A.aa,B.E(B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.dy,k,k,k,k,k,2,l.pO("Client Email",A.tw,f),A.y,!0,k,!0,k,!1,k,A.al,k,k,k,k,k,k,k,k,k,1,k,k,!1,j,k,new C.eon(l),k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k),1)],s),A.l,k,A.e,A.h,0,k,k))))
 t.push(A.af)
-t.push(l.Zc("Item",A.a3L,l.Jm(d,B.x(B.a([B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.fr,k,k,k,k,k,2,l.pO("Item name",A.oR,f),A.y,!0,k,!0,k,!1,k,A.ak,k,k,k,k,k,k,k,k,k,1,k,k,!1,j,k,new C.eoo(l),k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k),A.S,B.A(B.a([B.E(B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.fy,k,k,k,k,k,2,l.pO("Price",A.hN,f),A.y,!0,k,!0,k,!1,k,A.ak,k,k,k,k,k,A.ec,k,k,k,1,k,k,!1,j,k,new C.eop(l),k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k),1),A.aa,B.E(B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.go,k,k,k,k,k,2,l.pO("Qty",A.asM,f),A.y,!0,k,!0,k,!1,k,A.ak,k,k,k,k,k,A.ec,k,k,k,1,k,k,!1,j,k,new C.eoq(l),k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k),1),A.aa,B.E(B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.id,k,k,k,k,k,2,l.pO("Discount %",M.asN,f),A.y,!0,k,!0,k,!1,k,A.ak,k,k,k,k,k,A.ec,k,k,k,1,k,k,!1,j,k,new C.eor(l),k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k),1)],s),A.l,k,A.e,A.h,0,k,k),A.S,B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.fx,k,k,k,k,k,2,l.pO("Description",A.l9,f),A.y,!0,k,!0,k,!1,k,A.ak,k,k,k,k,k,k,k,k,k,1,k,k,!1,j,k,new C.eos(l),k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k)],s),A.l,k,A.e,A.h,0,A.p))))
+t.push(l.Zc("Item",A.a3M,l.Jm(d,B.x(B.a([B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.fr,k,k,k,k,k,2,l.pO("Item name",A.oS,f),A.y,!0,k,!0,k,!1,k,A.al,k,k,k,k,k,k,k,k,k,1,k,k,!1,j,k,new C.eoo(l),k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k),A.S,B.A(B.a([B.E(B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.fy,k,k,k,k,k,2,l.pO("Price",A.hN,f),A.y,!0,k,!0,k,!1,k,A.al,k,k,k,k,k,A.ec,k,k,k,1,k,k,!1,j,k,new C.eop(l),k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k),1),A.aa,B.E(B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.go,k,k,k,k,k,2,l.pO("Qty",A.asN,f),A.y,!0,k,!0,k,!1,k,A.al,k,k,k,k,k,A.ec,k,k,k,1,k,k,!1,j,k,new C.eoq(l),k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k),1),A.aa,B.E(B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.id,k,k,k,k,k,2,l.pO("Discount %",M.asO,f),A.y,!0,k,!0,k,!1,k,A.al,k,k,k,k,k,A.ec,k,k,k,1,k,k,!1,j,k,new C.eor(l),k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k),1)],s),A.l,k,A.e,A.h,0,k,k),A.S,B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.fx,k,k,k,k,k,2,l.pO("Description",A.l9,f),A.y,!0,k,!0,k,!1,k,A.al,k,k,k,k,k,k,k,k,k,1,k,k,!1,j,k,new C.eos(l),k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k)],s),A.l,k,A.e,A.h,0,A.p))))
 t.push(A.af)
-t.push(l.Zc("Notes & payment",A.ve,l.Jm(d,B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.k1,k,k,k,k,k,2,l.pO("Notes & Payment Instructions (auto-saved)",A.ar6,f),A.y,!0,k,!0,k,!1,k,A.ak,k,k,k,k,k,k,k,k,k,2,k,k,!1,j,k,new C.eot(l),k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k))))
+t.push(l.Zc("Notes & payment",A.vf,l.Jm(d,B.aN(k,A.Z,!1,k,!0,A.t,k,B.aO(),l.k1,k,k,k,k,k,2,l.pO("Notes & Payment Instructions (auto-saved)",A.ar7,f),A.y,!0,k,!0,k,!1,k,A.al,k,k,k,k,k,k,k,k,k,2,k,k,!1,j,k,new C.eot(l),k,k,k,!1,k,k,!1,k,!0,k,A.ae,k,k,k,k,k,k,k,k,k,k,k,k,!0,A.a7,k,A.ao,k,k,k,k))))
 t.push(A.af)
 t.push(l.Jm(d,B.A(B.a([B.E(new N.a9n("Service Provider Signature",l.x,new C.eou(l),new C.eov(l),new C.eox(l,d),k),1),A.aa,B.E(new N.a9n("Client Signature",l.y,new C.eoy(l),new C.eoz(l),new C.eoA(l,d),k),1)],s),A.l,k,A.e,A.h,0,k,k)))
 t.push(A.O)
-t.push(l.Jm(d,B.j7(k,k,k,A.ag,k,new C.eoB(l),k,D.hdB,k,D.h8T,l.e)))
+t.push(l.Jm(d,B.j7(k,k,k,A.ag,k,new C.eoB(l),k,D.hdE,k,D.h8W,l.e)))
 t.push(A.O)
 t.push(new C.b3r(f,new B.e4(new C.b3q(l.crU(h,f),k),l.z),k))
 t.push(A.O)
-t.push(D.h6l)
+t.push(D.h6o)
 t.push(A.O)
-t.push(B.A(B.a([B.E(B.en(D.c_n,k,D.hfG,new C.eoC(l,d,h),k),1),A.aa,B.E(B.dc(A.o8,k,A.LT,new C.eoD(l,d),k),1)],s),A.l,k,A.e,A.h,0,k,k))
+t.push(B.A(B.a([B.E(B.en(D.c_n,k,D.hfJ,new C.eoC(l,d,h),k),1),A.aa,B.E(B.dc(A.o9,k,A.LU,new C.eoD(l,d),k),1)],s),A.l,k,A.e,A.h,0,k,k))
 t.push(D.eD_)
-return B.hfO(B.eF(k,w,new B.a6(u,g.b*0.95,B.cb(B.x(t,A.B,k,A.e,A.h,0,A.p),A.t,k,A.y,k,k,A.bH,k,k,A.ah),k),k,k,k,A.Dc,k,A.d8,k,new B.ba(v,A.a1),k),d,!0,!1,!1,!1)}}
+return B.hfT(B.eF(k,w,new B.a6(u,g.b*0.95,B.cb(B.x(t,A.B,k,A.e,A.h,0,A.p),A.t,k,A.y,k,k,A.bH,k,k,A.ah),k),k,k,k,A.Dc,k,A.d8,k,new B.ba(v,A.a1),k),d,!0,!1,!1,!1)}}
 C.bku.prototype={
-B(d){var w=null,v=B.n(20),u=B.n(20),t=B.a([new B.aa(0,A.H,A.bR.j(0.35),A.eT,24)],x.V),s=this.e,r=x.p,q=B.A(B.a([B.p(w,E.atC,A.f,w,w,new B.o(A.c.j(0.2),w,w,B.n(10),w,w,A.m),w,36,w,w,w,w,w,36),A.ar,D.bN_,B.aM(!1,B.n(8),!0,new B.D(A.eA,B.W(A.cz,A.c.j(0.85),w,w,w,18),w),w,!0,w,w,w,w,w,w,w,w,w,w,w,s,w,w,w,w,w,w,w)],r),A.l,w,A.e,A.h,0,w,w),p=B.A(B.a([B.E(new C.aDY(A.hO,"Download",!1,this.c,w),1),A.aa,B.E(new C.aDY(A.vs,"Print",!0,this.d,w),1)],r),A.l,w,A.e,A.h,0,w,w),o=B.ft(w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,D.fsH,w,A.fC,w,w,w,w,w,A.k_,w,w)
-return B.bw(v,B.p(w,B.aG(!1,A.a3,!0,w,new B.D(A.jA,B.x(B.a([q,A.aA,p,A.al,B.bN(!1,B.c("Cancel",w,w,w,w,w,w,B.l(w,w,A.c.j(0.72),w,w,w,w,w,w,w,w,12,w,w,A.a8,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),w,w,!0,w,w,w,s,w,o)],r),A.l,w,A.e,A.M,0,A.p),w),A.f,A.L,0,w,w,w,w,w,A.ai),A.f,w,w,new B.o(w,w,w,u,t,D.cel,A.m),w,w,w,w,w,w,w,w),A.aq)}}
+B(d){var w=null,v=B.n(20),u=B.n(20),t=B.a([new B.aa(0,A.H,A.bR.j(0.35),A.eT,24)],x.V),s=this.e,r=x.p,q=B.A(B.a([B.p(w,E.atD,A.f,w,w,new B.o(A.c.j(0.2),w,w,B.n(10),w,w,A.m),w,36,w,w,w,w,w,36),A.ar,D.bN_,B.aM(!1,B.n(8),!0,new B.D(A.eA,B.W(A.cz,A.c.j(0.85),w,w,w,18),w),w,!0,w,w,w,w,w,w,w,w,w,w,w,s,w,w,w,w,w,w,w)],r),A.l,w,A.e,A.h,0,w,w),p=B.A(B.a([B.E(new C.aDY(A.hO,"Download",!1,this.c,w),1),A.aa,B.E(new C.aDY(A.vt,"Print",!0,this.d,w),1)],r),A.l,w,A.e,A.h,0,w,w),o=B.fu(w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,D.fsK,w,A.fC,w,w,w,w,w,A.k_,w,w)
+return B.bw(v,B.p(w,B.aG(!1,A.a3,!0,w,new B.D(A.jA,B.x(B.a([q,A.aA,p,A.ak,B.bN(!1,B.c("Cancel",w,w,w,w,w,w,B.l(w,w,A.c.j(0.72),w,w,w,w,w,w,w,w,12,w,w,A.a8,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),w,w,!0,w,w,w,s,w,o)],r),A.l,w,A.e,A.M,0,A.p),w),A.f,A.L,0,w,w,w,w,w,A.ai),A.f,w,w,new B.o(w,w,w,u,t,D.cel,A.m),w,w,w,w,w,w,w,w),A.aq)}}
 C.aDY.prototype={
 B(d){var w=this,v=null,u=B.n(12),t=B.n(12),s=w.e,r=s?A.c:A.c.j(0.14),q=B.K(A.c.j(s?0:0.35),A.r,1),p=s?A.cU:A.c
 p=B.W(w.c,p,v,v,v,20)
@@ -1194,7 +1194,7 @@ if(!this.c)return this.d
 w=B.bS(0,new B.ds(!0,B.b4(t,t,t,new C.bqO(t),A.az),t),0,0,0)
 v=A.v.j(0.72)
 u=B.n(8)
-return new B.an(A.a0,t,A.ad,A.t,B.a([this.d,w,B.ao(8,new B.ds(!0,B.p(t,D.fU_,A.f,t,t,new B.o(v,t,B.K(A.aE.j(0.55),A.r,1),u,t,t,A.m),t,t,t,t,A.fM,t,t,t),t),t,t,8,8,t,t)],x.p),t)}}
+return new B.an(A.a0,t,A.ad,A.t,B.a([this.d,w,B.ao(8,new B.ds(!0,B.p(t,D.fU2,A.f,t,t,new B.o(v,t,B.K(A.aE.j(0.55),A.r,1),u,t,t,A.m),t,t,t,t,A.fM,t,t,t),t),t,t,8,8,t,t)],x.p),t)}}
 C.bqO.prototype={
 a4(d,e){var w,v,u=null,t=e.a,s=B.h0(u,A.cH,u,u,u,B.d1(u,u,u,u,u,u,u,u,u,B.l(u,u,A.c.j(0.08),u,u,u,u,u,u,u,u,t*0.12,u,u,A.u,u,u,!0,u,4,u,u,u,u,u,u),"PREVIEW"),A.a7,A.cd,u,A.e3,A.ce)
 s.eY()
@@ -1217,11 +1217,11 @@ else{w=A.a.i(w.ay)
 w=w.length!==0?w:"With highest regard for your patronage and trust."}return w},
 gVy(){var w=A.a.i(this.a.ay)
 return w.length!==0?w:"It is our honor to serve you with distinction and excellence."},
-VM(d,e,f,g,h){var w,v,u,t,s,r,q,p,o,n,m=null,l=this.b,k=l.e,j=B.ap(A.d.gH(k),D.jf,0.08)
+VM(d,e,f,g,h){var w,v,u,t,s,r,q,p,o,n,m=null,l=this.b,k=l.e,j=B.ap(A.d.gG(k),D.jf,0.08)
 j.toString
 w=B.ap(A.d.gal(k),D.jf,0.22)
 w.toString
-k=B.ap(A.d.gH(k),D.jf,0.35)
+k=B.ap(A.d.gG(k),D.jf,0.35)
 k.toString
 v=x.O
 k=B.a([j,w,k],v)
@@ -1243,7 +1243,7 @@ if(h!=null)q.push(h)
 else if(g){p=B.a([A.jT,A.aE,D.lr,A.aE,A.jT],v)
 o=B.a0(153,D.lr.m()>>>16&255,D.lr.m()>>>8&255,D.lr.m()&255)
 n=B.W(A.j4,B.a0(191,D.jf.m()>>>16&255,D.jf.m()>>>8&255,D.jf.m()&255),m,m,m,16)
-q.push(B.p(m,B.A(B.a([n,A.aa,B.c("BY ROYAL APPOINTMENT \xb7 OFFICIAL INVOICE",m,m,m,m,m,m,B.l(m,m,B.a0(224,D.jf.m()>>>16&255,D.jf.m()>>>8&255,D.jf.m()&255),m,m,m,m,m,m,m,m,8,m,m,A.u,m,m,!0,m,2.2,m,m,m,m,m,m),m,m,m),A.aa,B.W(A.j4,B.a0(191,D.jf.m()>>>16&255,D.jf.m()>>>8&255,D.jf.m()&255),m,m,m,16)],r),A.l,m,A.b9,A.h,0,m,m),A.f,m,m,new B.o(m,m,new B.bE(A.a1,A.a1,new B.ax(o,1,A.r,-1),A.a1),m,m,new B.a7(A.a5,A.a9,A.x,p,K.drE,m),A.m),m,m,m,m,A.eo,m,m,m))}q.push(new B.D(D.bHc,d,m))
+q.push(B.p(m,B.A(B.a([n,A.aa,B.c("BY ROYAL APPOINTMENT \xb7 OFFICIAL INVOICE",m,m,m,m,m,m,B.l(m,m,B.a0(224,D.jf.m()>>>16&255,D.jf.m()>>>8&255,D.jf.m()&255),m,m,m,m,m,m,m,m,8,m,m,A.u,m,m,!0,m,2.2,m,m,m,m,m,m),m,m,m),A.aa,B.W(A.j4,B.a0(191,D.jf.m()>>>16&255,D.jf.m()>>>8&255,D.jf.m()&255),m,m,m,16)],r),A.l,m,A.b9,A.h,0,m,m),A.f,m,m,new B.o(m,m,new B.bE(A.a1,A.a1,new B.ax(o,1,A.r,-1),A.a1),m,m,new B.a7(A.a5,A.a9,A.x,p,K.drF,m),A.m),m,m,m,m,A.eo,m,m,m))}q.push(new B.D(D.bHd,d,m))
 l.push(B.x(q,A.am,m,A.e,A.M,0,A.p))
 if(this.a.dx){q=f?12:m
 p=f?m:12
@@ -1251,27 +1251,27 @@ o=B.n(6)
 n=B.K(A.aE,A.r,2.4)
 v=B.a([B.a0(235,A.jT.m()>>>16&255,A.jT.m()>>>8&255,A.jT.m()&255),B.a0(209,D.jf.m()>>>16&255,D.jf.m()>>>8&255,D.jf.m()&255)],v)
 u=B.a([new B.aa(0,A.H,B.a0(A.i.R(127.5),A.aE.m()>>>16&255,A.aE.m()>>>8&255,A.aE.m()&255),A.dR,12)],u)
-l.push(B.ao(m,B.eO(A.z,-0.32,B.p(m,B.x(B.a([B.W(A.j4,D.lr,m,m,m,18),A.bz,D.fYE],r),A.l,m,A.e,A.M,0,A.p),A.f,m,m,new B.o(m,m,n,o,u,new B.a7(A.ay,A.aC,A.x,v,m,m),A.m),m,m,m,m,Y.anp,m,m,m),m),m,m,q,p,12,m))}return B.p(m,B.bw(s,new B.an(A.a0,m,A.ad,A.t,l,m),A.aq),A.f,m,m,new B.o(m,m,j,w,t,new B.a7(A.ay,A.aC,A.x,k,m,m),A.m),m,m,m,m,m,m,m,1/0)},
+l.push(B.ao(m,B.eO(A.z,-0.32,B.p(m,B.x(B.a([B.W(A.j4,D.lr,m,m,m,18),A.bz,D.fYH],r),A.l,m,A.e,A.M,0,A.p),A.f,m,m,new B.o(m,m,n,o,u,new B.a7(A.ay,A.aC,A.x,v,m,m),A.m),m,m,m,m,Y.anp,m,m,m),m),m,m,q,p,12,m))}return B.p(m,B.bw(s,new B.an(A.a0,m,A.ad,A.t,l,m),A.aq),A.f,m,m,new B.o(m,m,j,w,t,new B.a7(A.ay,A.aC,A.x,k,m,m),A.m),m,m,m,m,m,m,m,1/0)},
 bnb(d,e){return this.VM(d,e,!0,!0,null)},
 bnc(d,e){return this.VM(d,null,e,!0,null)},
 bna(d){return this.VM(d,null,!0,!0,null)},
-d3T(d,e,f){return this.VM(d,e,f,!0,null)},
+d3V(d,e,f){return this.VM(d,e,f,!0,null)},
 bnd(d,e,f,g){return this.VM(d,null,e,f,g)},
-d3U(d,e,f){return this.VM(d,null,!0,e,f)},
+d3W(d,e,f){return this.VM(d,null,!0,e,f)},
 arM(d){var w=null
-return new B.D(new B.R(0,d,0,d),B.A(B.a([B.E(B.p(w,w,A.f,B.a0(140,A.aE.m()>>>16&255,A.aE.m()>>>8&255,A.aE.m()&255),w,w,w,1,w,w,w,w,w,w),1),new B.D(A.fC,B.W(A.mw,A.aE,w,w,w,10),w),B.E(B.p(w,w,A.f,B.a0(140,A.aE.m()>>>16&255,A.aE.m()>>>8&255,A.aE.m()&255),w,w,w,1,w,w,w,w,w,w),1)],x.p),A.l,w,A.e,A.h,0,w,w),w)},
+return new B.D(new B.R(0,d,0,d),B.A(B.a([B.E(B.p(w,w,A.f,B.a0(140,A.aE.m()>>>16&255,A.aE.m()>>>8&255,A.aE.m()&255),w,w,w,1,w,w,w,w,w,w),1),new B.D(A.fC,B.W(A.mx,A.aE,w,w,w,10),w),B.E(B.p(w,w,A.f,B.a0(140,A.aE.m()>>>16&255,A.aE.m()>>>8&255,A.aE.m()&255),w,w,w,1,w,w,w,w,w,w),1)],x.p),A.l,w,A.e,A.h,0,w,w),w)},
 aNo(){return this.arM(8)},
 Db(d,e){var w=null
 return B.os(A.k5,B.c(d,w,w,w,w,w,w,B.l(w,w,A.c,w,w,w,w,w,w,w,w,e,w,w,A.u,w,1.05,!0,w,2.5,w,w,w,w,w,w),A.K,w,w),new C.dih())},
 aOp(d){var w=null
 return B.c(d,w,w,w,w,w,w,B.l(w,w,B.a0(184,D.d_.m()>>>16&255,D.d_.m()>>>8&255,D.d_.m()&255),w,w,w,w,w,w,w,w,9,w,w,A.a8,w,w,!0,w,1.6,w,w,w,w,w,w),A.K,w,w)},
-A2(d){var w=null,v=this.a.cy,u=v!=null&&!A.aI.gar(v)?B.h4(v,A.z,w,w,A.cp,A.bX,!1,d,!1,w,d):B.p(w,B.x(B.a([B.W(A.f3,B.a0(191,A.aE.m()>>>16&255,A.aE.m()>>>8&255,A.aE.m()&255),w,w,w,d*0.38),B.c("PORTRAIT",w,w,w,w,w,w,B.l(w,w,B.a0(140,A.aE.m()>>>16&255,A.aE.m()>>>8&255,A.aE.m()&255),w,w,w,w,w,w,w,w,7,w,w,A.F,w,w,!0,w,1.2,w,w,w,w,w,w),w,w,w)],x.p),A.l,w,A.b9,A.h,0,A.p),A.f,D.bli,w,w,w,w,w,w,w,w,w,w),t=B.K(A.aE,A.r,2.5),s=this.b.f
+A2(d){var w=null,v=this.a.cy,u=v!=null&&!A.aI.gar(v)?B.h4(v,A.z,w,w,A.cp,A.bX,!1,d,!1,w,d):B.p(w,B.x(B.a([B.W(A.f3,B.a0(191,A.aE.m()>>>16&255,A.aE.m()>>>8&255,A.aE.m()&255),w,w,w,d*0.38),B.c("PORTRAIT",w,w,w,w,w,w,B.l(w,w,B.a0(140,A.aE.m()>>>16&255,A.aE.m()>>>8&255,A.aE.m()&255),w,w,w,w,w,w,w,w,7,w,w,A.F,w,w,!0,w,1.2,w,w,w,w,w,w),w,w,w)],x.p),A.l,w,A.b9,A.h,0,A.p),A.f,D.blj,w,w,w,w,w,w,w,w,w,w),t=B.K(A.aE,A.r,2.5),s=this.b.f
 s=B.a([new B.aa(0,A.H,B.a0(115,A.aE.m()>>>16&255,A.aE.m()>>>8&255,A.aE.m()&255),A.J,14),new B.aa(0,A.H,B.a0(64,s.m()>>>16&255,s.m()>>>8&255,s.m()&255),A.J,6)],x.V)
 return B.p(w,B.id(u,A.aq),A.f,w,w,new B.o(w,w,t,w,s,w,A.a6),w,d,w,w,w,w,w,d)},
 H4(d,e){var w=null,v=B.a0(89,A.v.m()>>>16&255,A.v.m()>>>8&255,A.v.m()&255),u=B.K(B.a0(89,A.aE.m()>>>16&255,A.aE.m()>>>8&255,A.aE.m()&255),A.r,1)
-return B.E(B.p(w,B.x(B.a([B.c(d,w,w,w,w,w,w,B.l(w,w,A.aE,w,w,w,w,w,w,w,w,7,w,w,A.u,w,w,!0,w,1.1,w,w,w,w,w,w),w,w,w),A.cN,B.c(e,w,2,A.a2,w,w,w,D.fH1,A.K,w,w)],x.p),A.l,w,A.e,A.h,0,A.p),A.f,w,w,new B.o(v,w,u,w,w,w,A.m),w,w,w,w,X.Pl,w,w,w),1)},
+return B.E(B.p(w,B.x(B.a([B.c(d,w,w,w,w,w,w,B.l(w,w,A.aE,w,w,w,w,w,w,w,w,7,w,w,A.u,w,w,!0,w,1.1,w,w,w,w,w,w),w,w,w),A.cN,B.c(e,w,2,A.a2,w,w,w,D.fH4,A.K,w,w)],x.p),A.l,w,A.e,A.h,0,A.p),A.f,w,w,new B.o(v,w,u,w,w,w,A.m),w,w,w,w,X.Pm,w,w,w),1)},
 b9X(d,e){var w=null,v=B.c(d,w,w,w,w,w,w,B.l(w,w,A.aE,w,w,w,w,w,w,w,w,7,w,w,A.u,w,w,!0,w,0.9,w,w,w,w,w,w),w,w,w),u=B.K(B.a0(166,A.aE.m()>>>16&255,A.aE.m()>>>8&255,A.aE.m()&255),A.r,1),t=B.n(2)
-return B.x(B.a([v,A.at,B.p(w,C.hpY(e,G.H2,38),A.f,w,w,new B.o(D.d_,w,u,t,w,w,A.m),w,38,w,w,w,w,w,w)],x.p),A.B,w,A.e,A.h,0,A.p)},
+return B.x(B.a([v,A.at,B.p(w,C.hq3(e,G.H2,38),A.f,w,w,new B.o(D.d_,w,u,t,w,w,A.m),w,38,w,w,w,w,w,w)],x.p),A.B,w,A.e,A.h,0,A.p)},
 zp(){var w,v,u,t,s,r,q,p,o,n,m,l,k,j=this,i=null,h=B.a0(97,A.v.m()>>>16&255,A.v.m()>>>8&255,A.v.m()&255),g=B.K(B.a0(102,A.aE.m()>>>16&255,A.aE.m()>>>8&255,A.aE.m()&255),A.r,1),f=B.W(A.kj,A.aE,i,i,i,14),e=j.a,d=e.x
 if(d.length===0)d="Distinguished Client"
 d=B.E(B.c("Prepared exclusively for "+d,i,i,i,i,i,i,B.l(i,i,B.a0(209,D.d_.m()>>>16&255,D.d_.m()>>>8&255,D.d_.m()&255),i,i,i,i,i,i,i,i,9,i,i,A.P,i,i,!0,i,0.4,i,i,i,i,i,i),i,i,i),1)
@@ -1288,13 +1288,13 @@ w=B.K(B.a0(A.i.R(127.5),A.aE.m()>>>16&255,A.aE.m()>>>8&255,A.aE.m()&255),A.r,1)
 u=B.a0(71,A.v.m()>>>16&255,A.v.m()>>>8&255,A.v.m()&255)
 r=x.O
 d=B.a([A.jT,A.aE,A.jT],r)
-d=B.p(i,B.A(D.dpa,A.l,i,A.e,A.h,0,i,i),A.f,i,i,new B.o(i,i,i,i,i,new B.a7(A.a5,A.a9,A.x,d,i,i),A.m),i,i,i,i,A.tp,i,i,i)
+d=B.p(i,B.A(D.dpb,A.l,i,A.e,A.h,0,i,i),A.f,i,i,new B.o(i,i,i,i,i,new B.a7(A.a5,A.a9,A.x,d,i,i),A.m),i,i,i,i,A.tp,i,i,i)
 f=e.z
-f=B.E(B.c(f.length===0?"Premium Service":f,i,i,i,i,i,i,D.fGv,i,i,i),1)
+f=B.E(B.c(f.length===0?"Premium Service":f,i,i,i,i,i,i,D.fGy,i,i,i),1)
 p=e.as
 if(p.length===0)p="1"
 o=e.ch
-w=B.p(i,B.x(B.a([d,new B.D(A.jg,B.A(B.a([f,new B.a6(36,i,B.c(p,i,i,i,i,i,i,B.l(i,i,B.a0(A.i.R(229.5),D.d_.m()>>>16&255,D.d_.m()>>>8&255,D.d_.m()&255),i,i,i,i,i,i,i,i,10,i,i,i,i,i,!0,i,i,i,i,i,i,i,i),A.K,i,i),i),new B.a6(58,i,B.c("$"+A.i.a9(o,2),i,i,i,i,i,i,D.fDN,A.e2,i,i),i)],q),A.l,i,A.e,A.h,0,i,i),i)],q),A.l,i,A.e,A.h,0,A.p),A.f,i,i,new B.o(u,i,w,i,i,i,A.m),i,i,i,i,i,i,i,i)
+w=B.p(i,B.x(B.a([d,new B.D(A.jg,B.A(B.a([f,new B.a6(36,i,B.c(p,i,i,i,i,i,i,B.l(i,i,B.a0(A.i.R(229.5),D.d_.m()>>>16&255,D.d_.m()>>>8&255,D.d_.m()&255),i,i,i,i,i,i,i,i,10,i,i,i,i,i,!0,i,i,i,i,i,i,i,i),A.K,i,i),i),new B.a6(58,i,B.c("$"+A.i.a9(o,2),i,i,i,i,i,i,D.fDQ,A.e2,i,i),i)],q),A.l,i,A.e,A.h,0,i,i),i)],q),A.l,i,A.e,A.h,0,A.p),A.f,i,i,new B.o(u,i,w,i,i,i,A.m),i,i,i,i,i,i,i,i)
 f=e.dx
 n=f?"BALANCE DUE":"TOTAL DUE"
 d=B.n(4)
@@ -1303,7 +1303,7 @@ p=B.a([new B.aa(0,A.H,B.a0(89,A.aE.m()>>>16&255,A.aE.m()>>>8&255,A.aE.m()&255),A
 m=A.i.R(178.5)
 l=B.W(A.j4,B.a0(m,D.jf.m()>>>16&255,D.jf.m()>>>8&255,D.jf.m()&255),i,i,i,18)
 k=B.c(n,i,i,i,i,i,i,B.l(i,i,B.a0(217,D.jf.m()>>>16&255,D.jf.m()>>>8&255,D.jf.m()&255),i,i,i,i,i,i,i,i,11,i,i,A.u,i,i,!0,i,1.2,i,i,i,i,i,i),i,i,i)
-h=B.a([g,h,w,A.O,B.p(i,B.A(B.a([l,A.aa,k,A.aZ,B.c("$"+(f?"0.00":A.i.a9(o,2)),i,i,i,i,i,i,D.fCJ,i,i,i)],q),A.l,i,A.e,A.h,0,i,i),A.f,i,i,new B.o(i,i,i,d,p,D.cbb,A.m),i,i,i,i,A1.wW,i,i,1/0),A.O],q)
+h=B.a([g,h,w,A.O,B.p(i,B.A(B.a([l,A.aa,k,A.aZ,B.c("$"+(f?"0.00":A.i.a9(o,2)),i,i,i,i,i,i,D.fCM,i,i,i)],q),A.l,i,A.e,A.h,0,i,i),A.f,i,i,new B.o(i,i,i,d,p,D.cbb,A.m),i,i,i,i,A1.wW,i,i,1/0),A.O],q)
 g=A.a.i(e.ay)
 f=g.length!==0
 if(f){d=B.a([B.a0(20,v.m()>>>16&255,v.m()>>>8&255,v.m()&255),B.a0(89,A.v.m()>>>16&255,A.v.m()>>>8&255,A.v.m()&255)],r)
@@ -1331,7 +1331,7 @@ C.bnv.prototype={
 B(d){var w,v,u,t,s,r,q,p,o,n=this,m=null,l="Distinguished Client",k="1",j="\u2014",i="Executive Services Invoice",h="--/--/----",g=n.c,f=n.d,e=new C.dig(g,f)
 switch(f.d.a){case 27:f=f.f
 f=B.a0(20,f.m()>>>16&255,f.m()>>>8&255,f.m()&255)
-w=B.W(A.asR,A.aE,m,m,m,32)
+w=B.W(A.asS,A.aE,m,m,m,32)
 v=e.A2(86)
 u=e.Db("ROYAL HERALD",18)
 t=B.c(e.guX(),m,m,m,m,m,m,B.l(m,m,D.lr,m,m,m,m,m,m,m,m,11,m,m,A.F,m,m,!0,m,2,m,m,m,m,m,m),m,m,m)
@@ -1344,12 +1344,12 @@ p=g.w
 o=x.p
 p=B.A(B.a([r,A.bf,q,A.bf,e.H4("DUE",p.length===0?j:p)],o),A.l,m,A.e,A.h,0,m,m)
 g=g.z
-g=e.bnb(B.x(B.a([w,A.al,v,A.O,u,t,s,p,A.S,B.c(g.length===0?i:g,m,m,m,m,m,m,D.fFg,A.K,m,m),e.zp()],o),A.l,m,A.e,A.M,0,A.p),new C.bfJ(f,m))
+g=e.bnb(B.x(B.a([w,A.ak,v,A.O,u,t,s,p,A.S,B.c(g.length===0?i:g,m,m,m,m,m,m,D.fFj,A.K,m,m),e.zp()],o),A.l,m,A.e,A.M,0,A.p),new C.bfJ(f,m))
 break
 case 28:w=B.a0(102,A.v.m()>>>16&255,A.v.m()>>>8&255,A.v.m()&255)
 v=e.A2(68)
 u=e.Db("PRESIDENTIAL OFFICE",14)
-t=B.c(e.guX(),m,m,m,m,m,m,D.aYA,m,m,m)
+t=B.c(e.guX(),m,m,m,m,m,m,D.aYB,m,m,m)
 s=g.f
 if(s.length===0)s=k
 f=f.f
@@ -1378,9 +1378,9 @@ g=w
 break
 case 30:w=B.at(e.A2(88),m,m,m)
 v=e.Db("GAZETTE",20)
-u=B.c(e.guX(),m,m,m,m,m,m,D.aYA,A.K,m,m)
+u=B.c(e.guX(),m,m,m,m,m,m,D.aYB,A.K,m,m)
 t=g.x
-t=B.c("Prepared for "+(t.length===0?l:t),m,m,m,m,m,m,D.fJ0,A.K,m,m)
+t=B.c("Prepared for "+(t.length===0?l:t),m,m,m,m,m,m,D.fJ3,A.K,m,m)
 g=g.z
 if(g.length===0)g=i
 f=e.bna(B.x(B.a([w,A.S,v,u,A.O,t,B.c(g,m,m,m,m,m,m,B.l(m,m,f.f,m,m,m,m,m,m,m,m,11,m,m,A.P,m,m,!0,m,m,m,m,m,m,m,m),A.K,m,m),e.zp()],x.p),A.am,m,A.e,A.M,0,A.p))
@@ -1407,7 +1407,7 @@ case 32:w=f.f
 v=B.a0(56,w.m()>>>16&255,w.m()>>>8&255,w.m()&255)
 f=B.a([w,f.r],x.O)
 w=B.K(A.aE,A.r,1)
-f=B.p(m,B.c("URGENT ROYAL NOTICE",m,m,m,m,m,m,D.fFj,m,m,m),A.f,m,m,new B.o(m,m,w,m,m,new B.a7(A.a5,A.a9,A.x,f,m,m),A.m),m,m,m,m,T.D1,m,m,m)
+f=B.p(m,B.c("URGENT ROYAL NOTICE",m,m,m,m,m,m,D.fFm,m,m,m),A.f,m,m,new B.o(m,m,w,m,m,new B.a7(A.a5,A.a9,A.x,f,m,m),A.m),m,m,m,m,T.D1,m,m,m)
 w=e.guX()
 u=x.p
 w=B.a([new B.bK(A.a9,m,m,f,m),A.af,e.Db(w,17)],u)
@@ -1418,21 +1418,21 @@ w.push(B.c(f.toUpperCase(),m,m,m,m,m,m,B.l(m,m,D.lr,m,m,m,m,m,m,m,m,13,m,m,A.F,m
 w.push(A.S)
 f=e.A2(96)
 t=g.x
-t=B.c(t.length===0?l:t,m,m,m,m,m,m,D.aYd,m,m,m)
+t=B.c(t.length===0?l:t,m,m,m,m,m,m,D.aYe,m,m,m)
 s=g.f
 if(s.length===0)s=k
 g=g.w
 if(g.length===0)g=j
-w.push(B.A(B.a([f,A.bb,B.E(B.x(B.a([t,B.c("INVOICE #"+s+" \xb7 Valid until "+g,m,m,m,m,m,m,B.l(m,m,B.a0(153,D.d_.m()>>>16&255,D.d_.m()>>>8&255,D.d_.m()&255),m,m,m,m,m,m,m,m,9,m,m,m,m,m,!0,m,m,m,m,m,m,m,m),m,m,m),A.al,B.c(e.gua(),m,m,m,m,m,m,B.l(m,m,B.a0(184,D.d_.m()>>>16&255,D.d_.m()>>>8&255,D.d_.m()&255),m,m,m,m,m,m,m,m,9,A.cL,m,m,m,1.35,!0,m,m,m,m,m,m,m,m),m,m,m)],u),A.B,m,A.e,A.h,0,A.p),1)],u),A.dH,m,A.e,A.h,0,m,m))
+w.push(B.A(B.a([f,A.bb,B.E(B.x(B.a([t,B.c("INVOICE #"+s+" \xb7 Valid until "+g,m,m,m,m,m,m,B.l(m,m,B.a0(153,D.d_.m()>>>16&255,D.d_.m()>>>8&255,D.d_.m()&255),m,m,m,m,m,m,m,m,9,m,m,m,m,m,!0,m,m,m,m,m,m,m,m),m,m,m),A.ak,B.c(e.gua(),m,m,m,m,m,m,B.l(m,m,B.a0(184,D.d_.m()>>>16&255,D.d_.m()>>>8&255,D.d_.m()&255),m,m,m,m,m,m,m,m,9,A.cL,m,m,m,1.35,!0,m,m,m,m,m,m,m,m),m,m,m)],u),A.B,m,A.e,A.h,0,A.p),1)],u),A.dH,m,A.e,A.h,0,m,m))
 w.push(e.zp())
-v=e.d3T(B.x(w,A.B,m,A.e,A.M,0,A.p),new C.bgQ(v,m),!1)
+v=e.d3V(B.x(w,A.B,m,A.e,A.M,0,A.p),new C.bgQ(v,m),!1)
 g=v
 break
 case 33:w=f.f
-f=B.o8(B.p(A.z,D.h1P,A.f,m,m,new B.o(m,m,m,m,m,new B.a7(A.a5,A.a9,A.x,B.a([w,f.r],x.O),m,m),A.m),m,56,m,m,m,m,m,1/0),A.aq,new C.bzC(m))
+f=B.o8(B.p(A.z,D.h1S,A.f,m,m,new B.o(m,m,m,m,m,new B.a7(A.a5,A.a9,A.x,B.a([w,f.r],x.O),m,m),A.m),m,56,m,m,m,m,m,1/0),A.aq,new C.bzC(m))
 v=B.c(e.guX(),m,m,m,m,m,m,D.acB,m,m,m)
 u=g.f
-u=n.Yp(A2.a3T,"Manifest #"+(u.length===0?k:u))
+u=n.Yp(A2.a3U,"Manifest #"+(u.length===0?k:u))
 t=g.x
 t=n.Yp(A.f3,"Commander: "+(t.length===0?l:t))
 s=g.r
@@ -1455,15 +1455,15 @@ s=g.x
 if(s.length===0)s=l
 s=B.c("Dear "+s+",",m,m,m,m,m,m,B.l(m,m,B.a0(A.i.R(229.5),D.d_.m()>>>16&255,D.d_.m()>>>8&255,D.d_.m()&255),m,m,m,m,m,m,m,m,11,A.cL,m,m,m,m,!0,m,m,m,m,m,m,m,m),m,m,m)
 g=g.z
-g=B.c(g.length===0?i:g,m,m,m,m,m,m,D.fG0,A.K,m,m)
+g=B.c(g.length===0?i:g,m,m,m,m,m,m,D.fG3,A.K,m,m)
 r=e.gVy().length>110?A.a.aw(e.gVy(),0,107)+"...":e.gVy()
-f=e.bnb(B.x(B.a([w,v,u,A.S,t,A.S,s,A.al,g,A.al,B.c(r,m,m,m,m,m,m,B.l(m,m,B.a0(158,D.d_.m()>>>16&255,D.d_.m()>>>8&255,D.d_.m()&255),m,m,m,m,m,m,m,m,9,A.cL,m,m,m,1.4,!0,m,m,m,m,m,m,m,m),A.K,m,m),e.zp()],x.p),A.l,m,A.e,A.M,0,A.p),new C.bpk(f,m))
+f=e.bnb(B.x(B.a([w,v,u,A.S,t,A.S,s,A.ak,g,A.ak,B.c(r,m,m,m,m,m,m,B.l(m,m,B.a0(158,D.d_.m()>>>16&255,D.d_.m()>>>8&255,D.d_.m()&255),m,m,m,m,m,m,m,m,9,A.cL,m,m,m,1.4,!0,m,m,m,m,m,m,m,m),A.K,m,m),e.zp()],x.p),A.l,m,A.e,A.M,0,A.p),new C.bpk(f,m))
 g=f
 break
 case 35:f=B.a0(140,A.aE.m()>>>16&255,A.aE.m()>>>8&255,A.aE.m()&255)
 w=A.i.R(229.5)
 v=x.p
-f=B.p(m,B.A(B.a([B.W(A.vd,B.a0(w,A.aE.m()>>>16&255,A.aE.m()>>>8&255,A.aE.m()&255),m,m,m,14),A.aa,e.Db("MIDNIGHT NEWS",11),A.aa,B.W(A.vd,B.a0(w,A.aE.m()>>>16&255,A.aE.m()>>>8&255,A.aE.m()&255),m,m,m,14)],v),A.l,m,A.b9,A.h,0,m,m),A.f,m,m,new B.o(m,m,new B.bE(A.a1,A.a1,new B.ax(f,1.2,A.r,-1),A.a1),m,m,D.cd1,A.m),m,m,m,m,A.eo,m,m,m)
+f=B.p(m,B.A(B.a([B.W(A.ve,B.a0(w,A.aE.m()>>>16&255,A.aE.m()>>>8&255,A.aE.m()&255),m,m,m,14),A.aa,e.Db("MIDNIGHT NEWS",11),A.aa,B.W(A.ve,B.a0(w,A.aE.m()>>>16&255,A.aE.m()>>>8&255,A.aE.m()&255),m,m,m,14)],v),A.l,m,A.b9,A.h,0,m,m),A.f,m,m,new B.o(m,m,new B.bE(A.a1,A.a1,new B.ax(f,1.2,A.r,-1),A.a1),m,m,D.cd1,A.m),m,m,m,m,A.eo,m,m,m)
 w=B.c("OFFICIAL MIDNIGHT EDITION",m,m,m,m,m,m,B.l(m,m,B.a0(140,D.d_.m()>>>16&255,D.d_.m()>>>8&255,D.d_.m()&255),m,m,m,m,m,m,m,m,8,m,m,A.F,m,m,!0,m,1.8,m,m,m,m,m,m),A.K,m,m)
 u=e.Db(e.guX(),17)
 t=g.f
@@ -1471,15 +1471,15 @@ t=e.aOp("EXECUTIVE NIGHT BULLETIN \xb7 INVOICE #"+(t.length===0?k:t))
 s=e.aNo()
 r=e.A2(96)
 q=g.x
-q=B.a([B.c(q.length===0?l:q,m,m,m,m,m,m,D.aYd,m,m,m)],v)
+q=B.a([B.c(q.length===0?l:q,m,m,m,m,m,m,D.aYe,m,m,m)],v)
 p=g.y
 if(p.length!==0)q.push(B.c(p,m,m,m,m,m,m,B.l(m,m,B.a0(140,D.d_.m()>>>16&255,D.d_.m()>>>8&255,D.d_.m()&255),m,m,m,m,m,m,m,m,8,m,m,m,m,m,!0,m,m,m,m,m,m,m,m),m,m,m))
 q.push(A.O)
 p=g.z
-q.push(B.c(p.length===0?i:p,m,m,m,m,m,m,D.fH3,m,m,m))
-q.push(A.al)
+q.push(B.c(p.length===0?i:p,m,m,m,m,m,m,D.fH6,m,m,m))
+q.push(A.ak)
 q.push(B.c(e.gua(),m,m,m,m,m,m,B.l(m,m,B.a0(184,D.d_.m()>>>16&255,D.d_.m()>>>8&255,D.d_.m()&255),m,m,m,m,m,m,m,m,9,m,m,m,m,1.35,!0,m,m,m,m,m,m,m,m),m,m,m))
-r=B.A(B.a([r,A.ev,B.E(B.x(q,A.B,m,A.e,A.h,0,A.p),1)],v),A.B,m,A.e,A.h,0,m,m)
+r=B.A(B.a([r,A.ew,B.E(B.x(q,A.B,m,A.e,A.h,0,A.p),1)],v),A.B,m,A.e,A.h,0,m,m)
 q=g.r
 q=e.H4("ISSUED",q.length===0?h:q)
 g=g.w
@@ -1491,12 +1491,12 @@ w=e.Db(e.guX(),16)
 v=e.aOp("BY APPOINTMENT TO DISTINGUISHED CLIENTELE")
 u=g.z
 if(u.length===0)u=i
-u=B.c(u.toUpperCase(),m,m,m,m,m,m,D.fGg,m,m,m)
+u=B.c(u.toUpperCase(),m,m,m,m,m,m,D.fGj,m,m,m)
 t=B.c(e.gua(),m,m,m,m,m,m,B.l(m,m,B.a0(199,D.d_.m()>>>16&255,D.d_.m()>>>8&255,D.d_.m()&255),m,m,m,m,m,m,m,m,10,m,m,m,m,1.35,!0,m,m,m,m,m,m,m,m),m,m,m)
 s=g.x
 r=s.length===0
 q=x.p
-t=B.a([w,v,A.S,u,A.al,t,A.O,n.Yp(A.o2,"Honored Client: "+(r?l:s))],q)
+t=B.a([w,v,A.S,u,A.ak,t,A.O,n.Yp(A.o3,"Honored Client: "+(r?l:s))],q)
 g=g.y
 if(g.length!==0)t.push(n.Yp(A.Iu,g))
 g=B.E(B.x(t,A.B,m,A.e,A.h,0,A.p),3)
@@ -1508,13 +1508,13 @@ p=B.c('"',m,m,m,m,m,m,B.l(m,m,A.aE,m,m,m,m,m,m,m,m,26,m,m,A.u,m,0.7,!0,m,m,m,m,m
 o=e.gVy().length>85?A.a.aw(e.gVy(),0,82)+"...":e.gVy()
 o=B.c(o,m,m,m,m,m,m,B.l(m,m,B.a0(224,D.d_.m()>>>16&255,D.d_.m()>>>8&255,D.d_.m()&255),m,m,m,m,m,m,m,m,8,A.cL,m,m,m,1.35,!0,m,m,m,m,m,m,m,m),m,m,m)
 if(r)s=l
-f=e.d3U(B.x(B.a([B.A(B.a([g,A.ar,B.E(B.x(B.a([w,A.O,B.p(m,B.x(B.a([p,o,A.at,B.c("\u2014 "+s,m,m,m,m,m,m,B.l(m,m,A.aE,m,m,m,m,m,m,m,m,7,m,m,A.F,m,m,!0,m,m,m,m,m,m,m,m),m,m,m)],q),A.B,m,A.e,A.h,0,A.p),A.f,m,m,new B.o(v,m,u,t,m,m,A.m),m,m,m,m,A.bT,m,m,1/0)],q),A.l,m,A.e,A.h,0,A.p),2)],q),A.B,m,A.e,A.h,0,m,m),e.zp()],q),A.B,m,A.e,A.M,0,A.p),!1,f)
+f=e.d3W(B.x(B.a([B.A(B.a([g,A.ar,B.E(B.x(B.a([w,A.O,B.p(m,B.x(B.a([p,o,A.at,B.c("\u2014 "+s,m,m,m,m,m,m,B.l(m,m,A.aE,m,m,m,m,m,m,m,m,7,m,m,A.F,m,m,!0,m,m,m,m,m,m,m,m),m,m,m)],q),A.B,m,A.e,A.h,0,A.p),A.f,m,m,new B.o(v,m,u,t,m,m,A.m),m,m,m,m,A.bT,m,m,1/0)],q),A.l,m,A.e,A.h,0,A.p),2)],q),A.B,m,A.e,A.h,0,m,m),e.zp()],q),A.B,m,A.e,A.M,0,A.p),!1,f)
 g=f
 break}return g},
 Yp(d,e){var w=null
-return new B.D(A.n9,B.A(B.a([B.W(d,A.aE,w,w,w,12),A.bf,B.E(B.c(e,w,w,w,w,w,w,B.l(w,w,B.a0(224,D.d_.m()>>>16&255,D.d_.m()>>>8&255,D.d_.m()&255),w,w,w,w,w,w,w,w,9,w,w,w,w,1.2,!0,w,w,w,w,w,w,w,w),w,w,w),1)],x.p),A.l,w,A.e,A.h,0,w,w),w)},
+return new B.D(A.na,B.A(B.a([B.W(d,A.aE,w,w,w,12),A.bf,B.E(B.c(e,w,w,w,w,w,w,B.l(w,w,B.a0(224,D.d_.m()>>>16&255,D.d_.m()>>>8&255,D.d_.m()&255),w,w,w,w,w,w,w,w,9,w,w,w,w,1.2,!0,w,w,w,w,w,w,w,w),w,w,w),1)],x.p),A.l,w,A.e,A.h,0,w,w),w)},
 ae4(d,e){var w=null
-return new B.D(A.Hx,B.A(B.a([new B.a6(72,w,B.c(d.toUpperCase(),w,w,w,w,w,w,B.l(w,w,B.a0(191,A.aE.m()>>>16&255,A.aE.m()>>>8&255,A.aE.m()&255),w,w,w,w,w,w,w,w,7,w,w,w,w,w,!0,w,0.8,w,w,w,w,w,w),w,w,w),w),B.E(B.c(e,w,w,w,w,w,w,D.fLR,w,w,w),1)],x.p),A.l,w,A.e,A.h,0,w,w),w)}}
+return new B.D(A.Hx,B.A(B.a([new B.a6(72,w,B.c(d.toUpperCase(),w,w,w,w,w,w,B.l(w,w,B.a0(191,A.aE.m()>>>16&255,A.aE.m()>>>8&255,A.aE.m()&255),w,w,w,w,w,w,w,w,7,w,w,w,w,w,!0,w,0.8,w,w,w,w,w,w),w,w,w),w),B.E(B.c(e,w,w,w,w,w,w,D.fLU,w,w,w),1)],x.p),A.l,w,A.e,A.h,0,w,w),w)}}
 C.bge.prototype={
 a4(d,e){var w,v,u,t,s,r,q,p
 $.T()
@@ -1616,7 +1616,7 @@ w.c=0.5
 for(v=e.b,u=e.a,t=0;t<v;t+=5)d.ah(new B.r(0,t),new B.r(u,t),w)},
 aC(d){return!1}}
 C.boB.prototype={
-B(d){var w,v,u,t,s,r,q,p,o=this,n=null,m="Your Business",l="Client Name",k=o.c,j=o.d,i=new C.fhz(k,j)
+B(d){var w,v,u,t,s,r,q,p,o=this,n=null,m="Your Business",l="Client Name",k=o.c,j=o.d,i=new C.fhF(k,j)
 switch(j.d.a){case 21:w=j.f
 v=B.a([w,B.a0(A.i.R(178.5),w.m()>>>16&255,w.m()>>>8&255,w.m()&255)],x.O)
 u=B.n(10)
@@ -1630,7 +1630,7 @@ q=r?m:s
 p=x.p
 q=B.a([t,B.c(q,n,n,n,n,n,n,B.l(n,n,u?A.bs:A.c,n,n,n,n,n,n,n,n,16,n,n,A.u,n,n,!0,n,0.3,n,n,n,n,n,n),n,n,n)],p)
 A.d.u(q,i.amt())
-q=B.A(B.a([v,A.bb,B.E(B.x(q,A.B,n,A.e,A.h,0,A.p),1),i.cXU(22)],p),A.B,n,A.e,A.h,0,n,n)
+q=B.A(B.a([v,A.bb,B.E(B.x(q,A.B,n,A.e,A.h,0,A.p),1),i.cXW(22)],p),A.B,n,A.e,A.h,0,n,n)
 v=k.x
 if(v.length===0)v=l
 u=x.s
@@ -1663,7 +1663,7 @@ t=B.a([v,A.af,u,B.c("Refined minimal invoice",n,n,n,n,n,n,B.l(n,n,B.a0(115,t.m()
 A.d.u(t,i.amt())
 t.push(A.S)
 t.push(B.A(B.a([B.E(B.j3(B.a0(89,w.m()>>>16&255,w.m()>>>8&255,w.m()&255),n,n,n,n,0.8),1),new B.D(A.f2,B.c("INVOICE",n,n,n,n,n,n,B.l(n,n,w,n,n,n,n,n,n,n,n,11,n,n,A.F,n,n,!0,n,3,n,n,n,n,n,n),n,n,n),n),B.E(B.j3(B.a0(89,w.m()>>>16&255,w.m()>>>8&255,w.m()&255),n,n,n,n,0.8),1)],s),A.l,n,A.e,A.h,0,n,n))
-t.push(A.al)
+t.push(A.ak)
 v=k.f
 if(v.length===0)v="1"
 u=k.r
@@ -1685,7 +1685,7 @@ return i.WC(t,B.p(n,B.A(B.a([v,B.c("Due "+k,n,n,n,n,n,n,B.l(n,n,B.a0(140,j.m()>>
 case 25:return o.bR5(i)
 default:return o.aSU(i)}},
 bOR(d){var w,v,u,t,s,r,q,p=null,o=d.b,n=o.f,m=o.r,l=x.O,k=B.a([n,m],l)
-k=B.p(p,D.fUg,A.f,p,p,new B.o(p,p,p,B.n(20),p,new B.a7(A.a5,A.a9,A.x,k,p,p),A.m),p,p,p,p,A.lx,p,p,p)
+k=B.p(p,D.fUj,A.f,p,p,new B.o(p,p,p,B.n(20),p,new B.a7(A.a5,A.a9,A.x,k,p,p),A.m),p,p,p,p,A.lx,p,p,p)
 w=d.a
 v=w.f
 if(v.length===0)v="1"
@@ -1695,7 +1695,7 @@ t=x.p
 u=B.A(B.a([k,A.aZ,B.c("#"+v,p,p,p,p,p,p,B.l(p,p,B.a0(153,u.m()>>>16&255,u.m()>>>8&255,u.m()&255),p,p,p,p,p,p,p,p,9,p,p,A.P,p,p,!0,p,p,p,p,p,p,p,p),p,p,p)],t),A.l,p,A.e,A.h,0,p,p)
 k=w.b
 if(k.length===0)k="Your Business"
-k=B.os(A.k5,B.c(k.toUpperCase(),p,p,p,p,p,p,D.fRU,p,p,p),new C.eQ2(d))
+k=B.os(A.k5,B.c(k.toUpperCase(),p,p,p,p,p,p,D.fRX,p,p,p),new C.eQ8(d))
 v=o?A.bs:A.c
 v=B.a([u,A.S,k,B.c("Artisan invoice \xb7 curated for distinction",p,p,p,p,p,p,B.l(p,p,B.a0(140,v.m()>>>16&255,v.m()>>>8&255,v.m()&255),p,p,p,p,p,p,p,p,8,A.cL,p,p,p,p,!0,p,p,p,p,p,p,p,p),p,p,p)],t)
 A.d.u(v,d.amt())
@@ -1734,7 +1734,7 @@ p=w.r
 t.push(B.A(B.a([q,A.aa,d.bl1(p.length===0?"--/--/----":p)],r),A.l,u,A.b9,A.h,0,u,u))
 return d.WC(B.x(t,A.l,u,A.e,A.h,0,A.p),d.bfY(),new C.bwD(s,u))},
 bR5(d){var w,v,u,t,s,r=null,q=d.b,p=q.f,o=q.r,n=B.a([B.a0(A.i.R(76.5),o.m()>>>16&255,o.m()>>>8&255,o.m()&255),B.a0(38,p.m()>>>16&255,p.m()>>>8&255,p.m()&255)],x.O),m=B.K(B.a0(A.i.R(127.5),p.m()>>>16&255,p.m()>>>8&255,p.m()&255),A.r,1.5)
-n=B.p(r,B.W(A.mx,p,r,r,r,26),A.f,r,r,new B.o(r,r,m,r,r,new B.a7(A.a5,A.a9,A.x,n,r,r),A.a6),r,48,r,r,r,r,r,48)
+n=B.p(r,B.W(A.my,p,r,r,r,26),A.f,r,r,new B.o(r,r,m,r,r,new B.a7(A.a5,A.a9,A.x,n,r,r),A.a6),r,48,r,r,r,r,r,48)
 m=d.a
 w=m.b
 if(w.length===0)w="Your Business"
@@ -1743,7 +1743,7 @@ v=x.p
 w=B.a([B.c(w,r,r,r,r,r,r,B.l(r,r,q?A.bs:A.c,r,r,r,r,r,r,r,r,15,r,r,A.u,r,r,!0,r,r,r,r,r,r,r,r),r,r,r),B.c("Crystal-clear billing",r,r,r,r,r,r,B.l(r,r,p,r,r,r,r,r,r,r,r,8,r,r,A.P,r,r,!0,r,0.8,r,r,r,r,r,r),r,r,r)],v)
 A.d.u(w,d.amt())
 w=B.E(B.x(w,A.B,r,A.e,A.h,0,A.p),1)
-u=B.os(A.k5,D.hbJ,new C.eQ3(d))
+u=B.os(A.k5,D.hbM,new C.eQ9(d))
 t=m.f
 if(t.length===0)t="1"
 s=q?A.bs:A.c
@@ -1752,7 +1752,7 @@ m=m.r
 if(m.length===0)m="--/--/----"
 q=q?A.bs:A.c
 return d.WC(B.A(B.a([n,A.bb,w,B.x(B.a([u,s,B.c(m,r,r,r,r,r,r,B.l(r,r,B.a0(140,q.m()>>>16&255,q.m()>>>8&255,q.m()&255),r,r,r,r,r,r,r,r,8,r,r,r,r,r,!0,r,r,r,r,r,r,r,r),r,r,r)],v),A.dH,r,A.e,A.h,0,A.p)],v),A.B,r,A.e,A.h,0,r,r),d.bfY(),new C.bwG(p,o,r))}}
-C.fhz.prototype={
+C.fhF.prototype={
 bfo(d){var w,v=this,u=null,t=B.a([],x.p),s=v.a,r=A.a.i(s.c)
 if(r.length!==0){w=v.b.w?A.bs:A.c
 t.push(B.c(r,u,u,u,u,u,u,B.l(u,u,B.a0(204,w.m()>>>16&255,w.m()>>>8&255,w.m()&255),u,u,u,u,u,u,u,u,9,u,u,u,u,u,!0,u,u,u,u,u,u,u,u),d,u,u))}r=A.a.i(s.d)
@@ -1761,7 +1761,7 @@ t.push(B.c(r,u,u,u,u,u,u,B.l(u,u,B.a0(204,w.m()>>>16&255,w.m()>>>8&255,w.m()&255
 if(s.length!==0){r=v.b.w?A.bs:A.c
 t.push(B.c(s,u,u,u,u,u,u,B.l(u,u,B.a0(204,r.m()>>>16&255,r.m()>>>8&255,r.m()&255),u,u,u,u,u,u,u,u,9,u,u,u,u,u,!0,u,u,u,u,u,u,u,u),d,u,u))}return t},
 amt(){return this.bfo(A.a7)},
-bk5(d,e){var w,v,u,t,s=this,r=null,q=e?B.os(A.k5,B.c("INVOICE",r,r,r,r,r,r,B.l(r,r,A.c,r,r,r,r,r,r,r,r,d,r,r,A.u,r,r,!0,r,2,r,r,r,r,r,r),r,r,r),new C.fhA(s)):B.c("INVOICE",r,r,r,r,r,r,B.l(r,r,s.b.f,r,r,r,r,r,r,r,r,d,r,r,A.u,r,r,!0,r,2,r,r,r,r,r,r),r,r,r),p=s.b,o=p.w,n=o?B.a0(217,A.c.m()>>>16&255,A.c.m()>>>8&255,A.c.m()&255):B.a0(89,A.v.m()>>>16&255,A.v.m()>>>8&255,A.v.m()&255),m=B.n(8)
+bk5(d,e){var w,v,u,t,s=this,r=null,q=e?B.os(A.k5,B.c("INVOICE",r,r,r,r,r,r,B.l(r,r,A.c,r,r,r,r,r,r,r,r,d,r,r,A.u,r,r,!0,r,2,r,r,r,r,r,r),r,r,r),new C.fhG(s)):B.c("INVOICE",r,r,r,r,r,r,B.l(r,r,s.b.f,r,r,r,r,r,r,r,r,d,r,r,A.u,r,r,!0,r,2,r,r,r,r,r,r),r,r,r),p=s.b,o=p.w,n=o?B.a0(217,A.c.m()>>>16&255,A.c.m()>>>8&255,A.c.m()&255):B.a0(89,A.v.m()>>>16&255,A.v.m()>>>8&255,A.v.m()&255),m=B.n(8)
 p=p.f
 w=B.K(B.a0(140,p.m()>>>16&255,p.m()>>>8&255,p.m()&255),A.r,1.2)
 p=B.a([new B.aa(0,A.H,B.a0(51,p.m()>>>16&255,p.m()>>>8&255,p.m()&255),A.J,8)],x.V)
@@ -1774,18 +1774,18 @@ v=v.r
 if(v.length===0)v="--/--/----"
 o=o?A.bs:A.c
 return B.p(r,B.x(B.a([q,A.bz,t,B.c(v,r,r,r,r,r,r,B.l(r,r,B.a0(153,o.m()>>>16&255,o.m()>>>8&255,o.m()&255),r,r,r,r,r,r,r,r,8,r,r,r,r,r,!0,r,r,r,r,r,r,r,r),r,r,r)],x.p),A.dH,r,A.e,A.h,0,A.p),A.f,r,r,new B.o(n,r,w,m,p,r,A.m),r,r,r,r,A.hm,r,r,r)},
-cXU(d){return this.bk5(d,!1)},
+cXW(d){return this.bk5(d,!1)},
 bl1(d){var w,v=null,u=this.b,t=u.r
 t=B.K(B.a0(A.i.R(127.5),t.m()>>>16&255,t.m()>>>8&255,t.m()&255),A.r,1)
 w=B.n(20)
 u=u.w?A.bs:A.c
 return B.p(v,B.c(d,v,v,v,v,v,v,B.l(v,v,B.a0(217,u.m()>>>16&255,u.m()>>>8&255,u.m()&255),v,v,v,v,v,v,v,v,8,v,v,v,v,v,!0,v,0.5,v,v,v,v,v,v),v,v,v),A.f,v,v,new B.o(v,v,t,w,v,v,A.m),v,v,v,v,A.lx,v,v,v)},
 bkV(d,e){var w,v=null,u=this.b,t=u.f,s=B.a([t,B.a0(191,t.m()>>>16&255,t.m()>>>8&255,t.m()&255)],x.O)
-s=B.p(v,B.c(d,v,v,v,v,v,v,D.fGs,v,v,v),A.f,v,v,new B.o(v,v,v,D.afH,v,new B.a7(A.a5,A.a9,A.x,s,v,v),A.m),v,v,v,v,A.fM,v,v,v)
+s=B.p(v,B.c(d,v,v,v,v,v,v,D.fGv,v,v,v),A.f,v,v,new B.o(v,v,v,D.afH,v,new B.a7(A.a5,A.a9,A.x,s,v,v),A.m),v,v,v,v,A.fM,v,v,v)
 u=u.w?A.c:B.a0(15,A.c.m()>>>16&255,A.c.m()>>>8&255,A.c.m()&255)
 t=B.K(B.a0(89,t.m()>>>16&255,t.m()>>>8&255,t.m()&255),A.r,1)
 w=B.U(e).k("O<1,D>")
-w=B.B(new B.O(e,new C.fhB(this),w),w.k("ak.E"))
+w=B.B(new B.O(e,new C.fhH(this),w),w.k("aj.E"))
 return B.x(B.a([s,B.p(v,B.x(w,A.B,v,A.e,A.h,0,A.p),A.f,v,v,new B.o(u,v,t,D.afI,v,v,A.m),v,v,v,v,A.bT,v,v,v)],x.p),A.am,v,A.e,A.h,0,A.p)},
 bfY(){var w,v,u,t,s=null,r=this.b,q=r.w,p=q?B.a0(8,A.v.m()>>>16&255,A.v.m()>>>8&255,A.v.m()&255):B.a0(18,A.c.m()>>>16&255,A.c.m()>>>8&255,A.c.m()&255),o=B.n(12),n=B.K(q?B.a0(20,A.v.m()>>>16&255,A.v.m()>>>8&255,A.v.m()&255):B.a0(46,A.c.m()>>>16&255,A.c.m()>>>8&255,A.c.m()&255),A.r,1)
 r=B.c("CLIENT",s,s,s,s,s,s,B.l(s,s,r.f,s,s,s,s,s,s,s,s,8,s,s,A.F,s,s,!0,s,1.4,s,s,s,s,s,s),s,s,s)
@@ -1827,7 +1827,7 @@ k=x.O
 l=B.a([t,l],k)
 j=B.n(8)
 i=B.a([new B.aa(0,A.H,B.a0(64,t.m()>>>16&255,t.m()>>>8&255,t.m()&255),A.dR,6)],s)
-l=B.p(a9,B.A(B.a([B.E(B.c("ITEM DESCRIPTION",a9,a9,a9,a9,a9,a9,A.oj,a9,a9,a9),1),D.fuk,D.fuC,D.fuf,D.ftV],p),A.l,a9,A.e,A.h,0,a9,a9),A.f,a9,a9,new B.o(a9,a9,a9,j,i,new B.a7(A.a5,A.a9,A.x,l,a9,a9),A.m),a9,a9,a9,a9,A.tp,a9,a9,a9)
+l=B.p(a9,B.A(B.a([B.E(B.c("ITEM DESCRIPTION",a9,a9,a9,a9,a9,a9,A.ok,a9,a9,a9),1),D.fun,D.fuF,D.fui,D.ftY],p),A.l,a9,A.e,A.h,0,a9,a9),A.f,a9,a9,new B.o(a9,a9,a9,j,i,new B.a7(A.a5,A.a9,A.x,l,a9,a9),A.m),a9,a9,a9,a9,A.tp,a9,a9,a9)
 j=a8.a
 h=j.z
 if(h.length===0)h="Item"
@@ -1858,12 +1858,12 @@ A.d.u(a3,B.a([B.p(a9,B.A(B.a([a7,A.bf,B.c("PAID",a9,a9,a9,a9,a9,a9,B.l(a9,a9,A.c
 a3.push(B.c("Subtotal",a9,a9,a9,a9,a9,a9,B.l(a9,a9,B.a0(204,a5.m()>>>16&255,a5.m()>>>8&255,a5.m()&255),a9,a9,a9,a9,a9,a9,a9,a9,11,a9,a9,a9,a9,a9,!0,a9,a9,a9,a9,a9,a9,a9,a9),a9,a9,a9))
 a5=A.i.a9(a2,2)
 a3.push(B.c("$"+a5,a9,a9,a9,a9,a9,a9,B.l(a9,a9,b1?A.bs:A.c,a9,a9,a9,a9,a9,a9,a9,a9,12,a9,a9,A.P,a9,a9,!0,a9,a9,a9,a9,a9,a9,a9,a9),a9,a9,a9))
-a3.push(A.al)
+a3.push(A.ak)
 m=B.ap(t,m,0.4)
 m.toString
 k=B.a([t,m],k)
 m=B.n(6)
-a3.push(B.p(a9,B.A(B.a([B.c(e?"BALANCE DUE":"TOTAL DUE",a9,a9,a9,a9,a9,a9,A.ol,a9,a9,a9),A.aZ,B.c("$"+A.i.a9(a4,2),a9,a9,a9,a9,a9,a9,A.fP,a9,a9,a9)],p),A.l,a9,A.e,A.h,0,a9,a9),A.f,a9,a9,new B.o(a9,a9,a9,m,a9,new B.a7(A.a5,A.a9,A.x,k,a9,a9),A.m),a9,a9,a9,a9,A.m_,a9,a9,a9))
+a3.push(B.p(a9,B.A(B.a([B.c(e?"BALANCE DUE":"TOTAL DUE",a9,a9,a9,a9,a9,a9,A.om,a9,a9,a9),A.aZ,B.c("$"+A.i.a9(a4,2),a9,a9,a9,a9,a9,a9,A.fP,a9,a9,a9)],p),A.l,a9,A.e,A.h,0,a9,a9),A.f,a9,a9,new B.o(a9,a9,a9,m,a9,new B.a7(A.a5,A.a9,A.x,k,a9,a9),A.m),a9,a9,a9,a9,A.m_,a9,a9,a9))
 m=B.a([b2,A.af,b3,A.af,l,A.at,i,A.S,new B.bK(A.a9,a9,a9,B.p(a9,B.x(a3,A.am,a9,A.e,A.h,0,A.p),A.f,a9,a9,new B.o(d,a9,a1,a0,a9,a9,A.m),a9,a9,a9,a9,A.bT,a9,a9,220),a9)],p)
 l=A.a.i(j.ax)
 if(l.length!==0){k=b1?A.bs:A.c
@@ -1897,9 +1897,9 @@ o.push(B.ao(a9,B.eO(A.z,-0.22,B.p(a9,B.x(B.a([B.W(A.j4,t,a9,a9,a9,16),B.c("PAID"
 b9Y(d,e){var w=null,v=this.b,u=v.w,t=u?B.a0(8,A.v.m()>>>16&255,A.v.m()>>>8&255,A.v.m()&255):B.a0(18,A.c.m()>>>16&255,A.c.m()>>>8&255,A.c.m()&255),s=B.n(10),r=B.c(d,w,w,w,w,w,w,B.l(w,w,u?A.bs:A.c,w,w,w,w,w,w,w,w,9,w,w,A.P,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),q=u?A.c:B.a0(245,A.c.m()>>>16&255,A.c.m()>>>8&255,A.c.m()&255),p=B.n(6)
 v=v.f
 v=B.K(B.a0(89,v.m()>>>16&255,v.m()>>>8&255,v.m()&255),A.r,1)
-p=B.p(w,C.hpY(e,A.a_,48),A.f,w,w,new B.o(q,w,v,p,w,w,A.m),w,48,w,w,w,w,w,1/0)
+p=B.p(w,C.hq3(e,A.a_,48),A.f,w,w,new B.o(q,w,v,p,w,w,A.m),w,48,w,w,w,w,w,1/0)
 v=u?A.bs:A.c
-return B.p(w,B.x(B.a([r,A.al,p,A.at,B.c("Sign Here",w,w,w,w,w,w,B.l(w,w,B.a0(140,v.m()>>>16&255,v.m()>>>8&255,v.m()&255),w,w,w,w,w,w,w,w,8,A.cL,w,w,w,w,!0,w,w,w,w,w,w,w,w),w,w,w)],x.p),A.B,w,A.e,A.h,0,A.p),A.f,w,w,new B.o(t,w,w,s,w,w,A.m),w,w,w,w,A.bT,w,w,w)}}
+return B.p(w,B.x(B.a([r,A.ak,p,A.at,B.c("Sign Here",w,w,w,w,w,w,B.l(w,w,B.a0(140,v.m()>>>16&255,v.m()>>>8&255,v.m()&255),w,w,w,w,w,w,w,w,8,A.cL,w,w,w,w,!0,w,w,w,w,w,w,w,w),w,w,w)],x.p),A.B,w,A.e,A.h,0,A.p),A.f,w,w,new B.o(t,w,w,s,w,w,A.m),w,w,w,w,A.bT,w,w,w)}}
 C.bwE.prototype={
 a4(d,e){var w,v,u,t,s,r,q=null,p=$.T(),o=B.L()
 o.b=A.Q
@@ -2018,10 +2018,10 @@ a8(){return"NgmyInvoiceLayout."+this.b}}
 C.ha.prototype={}
 C.cjg.prototype={}
 C.b3q.prototype={
-B(b6){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2=this,b3=null,b4=b2.c,b5=C.fXW(b4.a)
+B(b6){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2=this,b3=null,b4=b2.c,b5=C.fY0(b4.a)
 if(b5.x)return new C.bnv(b4,b5,b3)
 w=b5.d
-if(w===D.aMv||w===D.aMw||w===D.aMx||w===D.aMy||w===D.aMz)return new C.boB(b4,b5,b3)
+if(w===D.aMw||w===D.aMx||w===D.aMy||w===D.aMz||w===D.aMA)return new C.boB(b4,b5,b3)
 v=b5.w
 u=v?A.bs:A.c
 t=v?B.a0(10,A.v.m()>>>16&255,A.v.m()>>>8&255,A.v.m()&255):B.a0(18,A.c.m()>>>16&255,A.c.m()>>>8&255,A.c.m()&255)
@@ -2041,11 +2041,11 @@ g=B.n(6)
 f=h.c
 e=B.K(f,A.r,2.4)
 d=h.a
-d=B.a([A.d.gH(d).bW(0.22),A.d.gal(d).bW(0.38)],x.O)
+d=B.a([A.d.gG(d).bW(0.22),A.d.gal(d).bW(0.38)],x.O)
 j.push(B.ao(b3,B.eO(A.z,-0.28,B.p(b3,B.x(B.a([B.W(h.d,f,b3,b3,b3,18),A.bz,B.c("PAID",b3,b3,b3,b3,b3,b3,B.l(b3,b3,f,b3,b3,b3,b3,b3,b3,b3,b3,18,b3,b3,A.u,b3,b3,!0,b3,3,b3,b3,b3,b3,b3,b3),b3,b3,b3)],k),A.l,b3,A.e,A.M,0,A.p),A.f,b3,b3,new B.o(b3,b3,e,g,b3,new B.a7(A.a5,A.a9,A.x,d,b3,b3),A.m),b3,b3,b3,b3,A.lY,b3,b3,b3),b3),b3,b3,b3,18,88,b3))}g=B.l(b3,b3,u,b3,b3,b3,b3,b3,b3,b3,b3,b3,b3,b3,b3,b3,b3,!0,b3,b3,b3,b3,b3,b3,b3,b3)
 f=b2.cf_(b5,u)
 e=b2.c4c(b5,u,t,s)
-a0=w!==D.aMq&&w!==D.aMt&&w!==D.e2y
+a0=w!==D.aMr&&w!==D.aMu&&w!==D.e2y
 w=a0?new B.a7(A.a5,A.a9,A.x,B.a([p,B.a0(217,l.m()>>>16&255,l.m()>>>8&255,l.m()&255)],x.O),b3,b3):b3
 if(a0)l=b3
 else l=v?B.a0(15,A.v.m()>>>16&255,A.v.m()>>>8&255,A.v.m()&255):B.a0(20,A.c.m()>>>16&255,A.c.m()>>>8&255,A.c.m()&255)
@@ -2075,13 +2075,13 @@ if(i){a2=h.a
 a3=B.n(8)
 a4=h.c
 a4=B.K(B.a0(191,a4.m()>>>16&255,a4.m()>>>8&255,a4.m()&255),A.r,1.4)
-o=B.a([new B.aa(0,A.H,A.d.gH(a2).bW(0.35),A.dR,8)],o)
+o=B.a([new B.aa(0,A.H,A.d.gG(a2).bW(0.35),A.dR,8)],o)
 b0=h.b
 A.d.u(a1,B.a([B.p(b3,B.A(B.a([B.W(h.d,b0,b3,b3,b3,16),A.bf,B.c("PAID",b3,b3,b3,b3,b3,b3,B.l(b3,b3,b0,b3,b3,b3,b3,b3,b3,b3,b3,13,b3,b3,A.u,b3,b3,!0,b3,2.2,b3,b3,b3,b3,b3,b3),b3,b3,b3)],k),A.l,b3,A.b9,A.h,0,b3,b3),A.f,b3,b3,new B.o(b3,b3,a4,a3,o,new B.a7(A.a5,A.a9,A.x,a2,b3,b3),A.m),b3,b3,b3,b3,A.tp,b3,b3,b3),A.O],k))}a1.push(B.c("Subtotal",b3,b3,b3,b3,b3,b3,B.l(b3,b3,B.a0(204,u.m()>>>16&255,u.m()>>>8&255,u.m()&255),b3,b3,b3,b3,b3,b3,b3,b3,11,b3,b3,b3,b3,b3,!0,b3,b3,b3,b3,b3,b3,b3,b3),b3,b3,b3))
 a1.push(B.c("$"+A.i.a9(a8,2),b3,b3,b3,b3,b3,b3,B.l(b3,b3,u,b3,b3,b3,b3,b3,b3,b3,b3,12,b3,b3,A.P,b3,b3,!0,b3,b3,b3,b3,b3,b3,b3,b3),b3,b3,b3))
-a1.push(A.al)
+a1.push(A.ak)
 if(i){o=h.a
-o=new B.a7(A.a5,A.a9,A.x,B.a([A.d.gH(o).bW(0.85),A.d.gal(o).bW(0.85)],x.O),b3,b3)}else o=b3
+o=new B.a7(A.a5,A.a9,A.x,B.a([A.d.gG(o).bW(0.85),A.d.gal(o).bW(0.85)],x.O),b3,b3)}else o=b3
 a2=i?b3:p
 a3=B.n(6)
 if(i){a4=h.c
@@ -2117,7 +2117,7 @@ if(w.length===0)w="1"
 v=m.r
 if(v.length===0)v="--/--/----"
 switch(d.d.a){case 2:case 10:m=x.p
-u=B.a([B.c("BRAND TAGLINE",o,o,o,o,o,o,B.l(o,o,B.a0(166,e.m()>>>16&255,e.m()>>>8&255,e.m()&255),o,o,o,o,o,o,o,o,8,o,o,o,o,o,!0,o,1.2,o,o,o,o,o,o),o,o,o),A.al,B.c(l,o,o,o,o,o,o,B.l(o,o,e,o,o,o,o,o,o,o,o,15,o,o,A.u,o,o,!0,o,o,o,o,o,o,o,o),o,o,o)],m)
+u=B.a([B.c("BRAND TAGLINE",o,o,o,o,o,o,B.l(o,o,B.a0(166,e.m()>>>16&255,e.m()>>>8&255,e.m()&255),o,o,o,o,o,o,o,o,8,o,o,o,o,o,!0,o,1.2,o,o,o,o,o,o),o,o,o),A.ak,B.c(l,o,o,o,o,o,o,B.l(o,o,e,o,o,o,o,o,o,o,o,15,o,o,A.u,o,o,!0,o,o,o,o,o,o,o,o),o,o,o)],m)
 A.d.u(u,p.aaG(e))
 return B.A(B.a([B.E(B.x(u,A.B,o,A.e,A.h,0,A.p),1),B.x(B.a([B.c(n,o,o,o,o,o,o,B.l(o,o,d.f,o,o,o,o,o,o,o,o,28,o,o,A.u,o,o,!0,o,2,o,o,o,o,o,o),o,o,o),A.at,B.c("DATE: "+v,o,o,o,o,o,o,B.l(o,o,B.a0(217,e.m()>>>16&255,e.m()>>>8&255,e.m()&255),o,o,o,o,o,o,o,o,9,o,o,o,o,o,!0,o,o,o,o,o,o,o,o),o,o,o),B.c("INVOICE NO: "+w,o,o,o,o,o,o,B.l(o,o,e,o,o,o,o,o,o,o,o,9,o,o,A.P,o,o,!0,o,o,o,o,o,o,o,o),o,o,o)],m),A.dH,o,A.e,A.h,0,A.p)],m),A.B,o,A.e,A.h,0,o,o)
 case 3:case 12:m=d.r
@@ -2126,7 +2126,7 @@ t=x.p
 m=B.a([B.A(B.a([B.p(o,D.c3Q,A.f,o,o,new B.o(o,o,o,B.n(6),o,new B.a7(A.a5,A.a9,A.x,u,o,o),A.m),o,28,o,o,o,o,o,28),A.aa,B.c(l.toUpperCase(),o,o,o,o,o,o,B.l(o,o,m,o,o,o,o,o,o,o,o,14,o,o,A.u,o,o,!0,o,o,o,o,o,o,o,o),o,o,o)],t),A.l,o,A.e,A.h,0,o,o),B.c("YOUR BRAND SLOGAN",o,o,o,o,o,o,B.l(o,o,B.a0(140,e.m()>>>16&255,e.m()>>>8&255,e.m()&255),o,o,o,o,o,o,o,o,8,o,o,o,o,o,!0,o,o,o,o,o,o,o,o),o,o,o)],t)
 A.d.u(m,p.aaG(e))
 m=B.E(B.x(m,A.B,o,A.e,A.h,0,A.p),1)
-u=B.os(A.k5,D.h7x,new C.cjh(d))
+u=B.os(A.k5,D.h7A,new C.cjh(d))
 s=A.i.R(178.5)
 return B.A(B.a([m,B.x(B.a([u,B.c("Invoice #: "+w,o,o,o,o,o,o,B.l(o,o,B.a0(s,e.m()>>>16&255,e.m()>>>8&255,e.m()&255),o,o,o,o,o,o,o,o,9,o,o,o,o,o,!0,o,o,o,o,o,o,o,o),o,o,o),B.c("Date: "+v,o,o,o,o,o,o,B.l(o,o,B.a0(s,e.m()>>>16&255,e.m()>>>8&255,e.m()&255),o,o,o,o,o,o,o,o,9,o,o,o,o,o,!0,o,o,o,o,o,o,o,o),o,o,o)],t),A.dH,o,A.e,A.h,0,A.p)],t),A.B,o,A.e,A.h,0,o,o)
 case 8:case 15:case 17:m=d.f
@@ -2138,7 +2138,7 @@ A.d.u(u,p.aaG(e))
 u=B.E(B.x(u,A.B,o,A.e,A.h,0,A.p),1)
 t=d.w?d.r:A.yP
 s=B.n(4)
-return B.A(B.a([u,B.p(o,B.x(B.a([D.fUL,B.c("#"+w,o,o,o,o,o,o,A.qg,o,o,o)],m),A.dH,o,A.e,A.h,0,A.p),A.f,o,o,new B.o(t,o,o,s,o,o,A.m),o,o,o,o,A.hy,o,o,o)],m),A.B,o,A.e,A.h,0,o,o)
+return B.A(B.a([u,B.p(o,B.x(B.a([D.fUO,B.c("#"+w,o,o,o,o,o,o,A.qh,o,o,o)],m),A.dH,o,A.e,A.h,0,A.p),A.f,o,o,new B.o(t,o,o,s,o,o,A.m),o,o,o,o,A.hy,o,o,o)],m),A.B,o,A.e,A.h,0,o,o)
 default:m=x.p
 u=B.a([B.c(n,o,o,o,o,o,o,B.l(o,o,B.a0(242,e.m()>>>16&255,e.m()>>>8&255,e.m()&255),o,o,o,o,o,o,o,o,26,o,o,A.kh,o,o,!0,o,1.5,o,o,o,o,o,o),o,o,o),A.cN,B.c(l,o,o,o,o,o,o,B.l(o,o,B.a0(242,e.m()>>>16&255,e.m()>>>8&255,e.m()&255),o,o,o,o,o,o,o,o,14,o,o,A.P,o,o,!0,o,o,o,o,o,o,o,o),o,o,o)],m)
 A.d.u(u,p.aaG(e))
@@ -2162,7 +2162,7 @@ if(w.length===0)w="\u2014"
 v=p.r
 if(v.length===0)v="--/--/----"
 u=d.d
-if(u===D.aMu||u===D.a9y){u=x.s
+if(u===D.aMv||u===D.a9y){u=x.s
 t=B.a([o],u)
 s=p.y
 if(s.length!==0)t.push(s)
@@ -2186,23 +2186,23 @@ if(p.length!==0)r.push(B.c(p,q,q,q,q,q,q,B.l(q,q,B.a0(224,e.m()>>>16&255,e.m()>>
 p=B.E(B.x(r,A.B,q,A.e,A.h,0,A.p),1)
 r=A.i.R(229.5)
 return B.p(q,B.A(B.a([p,B.x(B.a([B.c("Issued: "+v,q,q,q,q,q,q,B.l(q,q,B.a0(r,e.m()>>>16&255,e.m()>>>8&255,e.m()&255),q,q,q,q,q,q,q,q,10,q,q,q,q,q,!0,q,q,q,q,q,q,q,q),q,q,q),B.c("Due: "+w,q,q,q,q,q,q,B.l(q,q,B.a0(r,e.m()>>>16&255,e.m()>>>8&255,e.m()&255),q,q,q,q,q,q,q,q,10,q,q,q,q,q,!0,q,q,q,q,q,q,q,q),q,q,q)],s),A.dH,q,A.e,A.h,0,A.p)],s),A.B,q,A.e,A.h,0,q,q),A.f,q,q,new B.o(f,q,t,u,q,q,A.m),q,q,q,q,A.bT,q,q,1/0)},
-b_4(d,e,f,g){var w,v=null,u=f.f,t=B.p(v,B.c(d,v,v,v,v,v,v,A.aYk,v,v,v),A.f,v,v,new B.o(u,v,v,D.afH,v,v,A.m),v,v,v,v,A.De,v,v,v),s=f.w?A.c:B.a0(15,A.c.m()>>>16&255,A.c.m()>>>8&255,A.c.m()&255)
+b_4(d,e,f,g){var w,v=null,u=f.f,t=B.p(v,B.c(d,v,v,v,v,v,v,A.aYl,v,v,v),A.f,v,v,new B.o(u,v,v,D.afH,v,v,A.m),v,v,v,v,A.De,v,v,v),s=f.w?A.c:B.a0(15,A.c.m()>>>16&255,A.c.m()>>>8&255,A.c.m()&255)
 u=B.K(B.a0(89,u.m()>>>16&255,u.m()>>>8&255,u.m()&255),A.r,1)
 w=B.U(e).k("O<1,D>")
-w=B.B(new B.O(e,new C.cji(f,g),w),w.k("ak.E"))
+w=B.B(new B.O(e,new C.cji(f,g),w),w.k("aj.E"))
 return B.x(B.a([t,B.p(v,B.x(w,A.B,v,A.e,A.h,0,A.p),A.f,v,v,new B.o(s,v,u,D.afI,v,v,A.m),v,v,v,v,A.cr,v,v,v)],x.p),A.am,v,A.e,A.h,0,A.p)},
 b4P(d){var w,v=d.c
 if(v==="Luxury"){v=d.r
 w=B.a([d.f,v],x.O)
-return new C.afC(w,d.w?A.a_:A.c,v,A.mw)}if(v==="Premium"){v=d.f
+return new C.afC(w,d.w?A.a_:A.c,v,A.mx)}if(v==="Premium"){v=d.f
 w=B.ap(v,d.r,0.55)
 w.toString
-return new C.afC(B.a([v,w],x.O),A.c,v,A.j4)}if(d.w)return D.hQ7
+return new C.afC(B.a([v,w],x.O),A.c,v,A.j4)}if(d.w)return D.hQa
 v=d.f
 return new C.afC(B.a([v,d.r],x.O),A.c,v,A.la)},
 b9Z(d,e,f,g,h){var w=null,v=B.n(10),u=B.c(d,w,w,w,w,w,w,B.l(w,w,g,w,w,w,w,w,w,w,w,9,w,w,A.P,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),t=f.w?A.c:B.a0(245,A.c.m()>>>16&255,A.c.m()>>>8&255,A.c.m()&255),s=B.n(6),r=f.f
 r=B.K(B.a0(89,r.m()>>>16&255,r.m()>>>8&255,r.m()&255),A.r,1)
-return B.p(w,B.x(B.a([u,A.al,B.p(w,C.hpY(e,A.a_,48),A.f,w,w,new B.o(t,w,r,s,w,w,A.m),w,48,w,w,w,w,w,1/0),A.at,B.c("Sign Here",w,w,w,w,w,w,B.l(w,w,B.a0(140,g.m()>>>16&255,g.m()>>>8&255,g.m()&255),w,w,w,w,w,w,w,w,8,A.cL,w,w,w,w,!0,w,w,w,w,w,w,w,w),w,w,w)],x.p),A.B,w,A.e,A.h,0,A.p),A.f,w,w,new B.o(h,w,w,v,w,w,A.m),w,w,w,w,A.bT,w,w,w)}}
+return B.p(w,B.x(B.a([u,A.ak,B.p(w,C.hq3(e,A.a_,48),A.f,w,w,new B.o(t,w,r,s,w,w,A.m),w,48,w,w,w,w,w,1/0),A.at,B.c("Sign Here",w,w,w,w,w,w,B.l(w,w,B.a0(140,g.m()>>>16&255,g.m()>>>8&255,g.m()&255),w,w,w,w,w,w,w,w,8,A.cL,w,w,w,w,!0,w,w,w,w,w,w,w,w),w,w,w)],x.p),A.B,w,A.e,A.h,0,A.p),A.f,w,w,new B.o(h,w,w,v,w,w,A.m),w,w,w,w,A.bT,w,w,w)}}
 C.afC.prototype={}
 C.aDZ.prototype={
 B(d){return new B.ds(!0,B.cf(new C.dsR(this.c?B.a0(15,A.v.m()>>>16&255,A.v.m()>>>8&255,A.v.m()&255):B.a0(20,A.c.m()>>>16&255,A.c.m()>>>8&255,A.c.m()&255))),null)}}
@@ -2351,12 +2351,12 @@ for(v=e.a,t=e.b,s=0;s<40;++s)d.O(new B.r(u.ai()*v,u.ai()*t),u.ai()*3+1,w)},
 aC(d){return d.b!==this.b}}
 C.asW.prototype={
 S(){return new C.bo1()},
-d0f(d,e){return this.d.$1(e)}}
+d0h(d,e){return this.d.$1(e)}}
 C.bo1.prototype={
-B(d){var w,v,u,t,s=this,r=null,q="Luxury",p=new C.eoP(new C.eoT(new C.eoU(s))),o=new C.eoO(),n=new C.eoN(),m=C.ivh(),l=x.Y,k=B.B(new B.X(D.Ec,new C.eoQ(),l),l.k("M.E")),j=C.hMz(s.a.c),i=B.Q(d).ax.a===A.I?A.aF:A.b7
-l=B.B(new B.O(D.dk1,new C.eoR(D.Ec,o,n,p),x.B),x.l)
+B(d){var w,v,u,t,s=this,r=null,q="Luxury",p=new C.eoP(new C.eoT(new C.eoU(s))),o=new C.eoO(),n=new C.eoN(),m=C.ivn(),l=x.Y,k=B.B(new B.X(D.Ec,new C.eoQ(),l),l.k("M.E")),j=C.hMF(s.a.c),i=B.Q(d).ax.a===A.I?A.aF:A.b7
+l=B.B(new B.O(D.dk2,new C.eoR(D.Ec,o,n,p),x.B),x.l)
 w=x.p
-l.push(new B.D(A.a1y,B.A(B.a([B.W(o.$1(q),n.$1(q),r,r,r,16),A.bf,B.c(q,r,r,r,r,r,r,B.l(r,r,n.$1(q),r,r,r,r,r,r,r,r,13,r,r,A.F,r,r,!0,r,r,r,r,r,r,r,r),r,r,r)],w),A.l,r,A.e,A.h,0,r,r),r))
+l.push(new B.D(A.a1z,B.A(B.a([B.W(o.$1(q),n.$1(q),r,r,r,16),A.bf,B.c(q,r,r,r,r,r,r,B.l(r,r,n.$1(q),r,r,r,r,r,r,r,r,13,r,r,A.F,r,r,!0,r,r,r,r,r,r,r,r),r,r,r)],w),A.l,r,A.e,A.h,0,r,r),r))
 l.push(p.$2$isLuxury(k,!0))
 l.push(A.O)
 n=B.n(8)
@@ -2367,7 +2367,7 @@ t=s.d
 o=B.p(r,B.W(t?A.Ir:A.zX,A.aE,r,r,r,18),A.f,r,r,new B.o(o,r,u,v,r,r,A.m),r,26,r,r,r,r,r,26)
 v=t?"Hide Essential Luxury templates":"Essential Luxury templates (with your photo)"
 v=B.a([o,A.aa,B.c(v,r,r,r,r,r,r,B.l(r,r,i,r,r,r,r,r,r,r,r,11,r,r,A.P,r,r,!0,r,r,r,r,r,r,r,r),r,r,r)],w)
-if(j&&!s.d){o=C.fXW(s.a.c).b
+if(j&&!s.d){o=C.fY0(s.a.c).b
 A.d.u(v,B.a([A.bf,B.E(B.c("\xb7 "+o,r,r,A.a2,r,r,r,B.l(r,r,i,r,r,r,r,r,r,r,r,10,r,r,r,r,r,!0,r,r,r,r,r,r,r,r),r,r,r),1)],w))}l.push(B.aM(!1,n,!0,new B.D(A.kg,B.A(v,A.l,r,A.e,A.h,0,r,r),r),r,!0,r,r,r,r,r,r,r,r,r,r,r,new C.eoS(s),r,r,r,r,r,r,r))
 if(s.d)A.d.u(l,B.a([A.at,p.$2$isLuxury(m,!0),A.S],w))
 return B.x(l,A.B,r,A.e,A.h,0,A.p)}}
@@ -2400,12 +2400,12 @@ n=i.a.c
 p=B.a([new B.aa(0,A.H,n.c.j(0.6),A.J,24)],p)
 m=i.a
 n=B.p(h,B.W(m.c.d,A.c,h,h,h,44),A.f,h,h,new B.o(h,h,h,h,p,new B.a7(A.a5,A.a9,A.x,n.b,h,h),A.a6),h,88,h,h,h,h,h,88)
-p=B.c(m.d,h,h,h,h,h,h,A.Lv,A.K,h,h)
+p=B.c(m.d,h,h,h,h,h,h,A.Lw,A.K,h,h)
 m=B.c(m.e,h,h,h,h,h,h,B.l(h,h,A.c.j(0.82),h,h,h,h,h,h,h,h,14,h,h,A.a8,h,h,!0,h,h,h,h,h,h,h,h),A.K,h,h)
 l=B.c("Your invoice templates are ready.",h,h,h,h,h,h,B.l(h,h,A.c.j(0.65),h,h,h,h,h,h,h,h,12,h,h,h,h,h,!0,h,h,h,h,h,h,h,h),A.K,h,h)
 k=i.a
 j=x.p
-return B.aG(!1,A.a3,!0,h,new B.an(A.z,h,A.ad,A.t,B.a([w,B.iC(A.z,new B.d9(new B.bj(t,new B.bq(0,1,v),u),!1,B.p(h,B.x(B.a([n,A.bx,p,A.O,m,A.aA,l,A.aO,B.c(k.f,h,h,h,h,h,h,B.l(h,h,k.c.c.j(0.85),h,h,h,h,h,h,h,h,11,h,h,A.P,h,h,!0,h,h,h,h,h,h,h,h),h,h,h)],j),A.l,h,A.e,A.M,0,A.p),A.f,h,h,new B.o(h,h,q,s,o,new B.a7(A.ay,A.aC,A.x,r.a,h,h),A.m),h,h,h,A.a2b,D.bJG,h,h,h),h),h,new B.bj(g,new B.bq(0.6,1,v),u)),B.bS(0,B.aA(A.j2,h,A.y,!1,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,new C.cph(d),h,h,h,h,h,h,!1,A.a4),0,0,0)],j),h),A.f,A.L,0,h,h,h,h,h,A.ai)}}
+return B.aG(!1,A.a3,!0,h,new B.an(A.z,h,A.ad,A.t,B.a([w,B.iC(A.z,new B.d9(new B.bj(t,new B.bq(0,1,v),u),!1,B.p(h,B.x(B.a([n,A.bx,p,A.O,m,A.aA,l,A.aO,B.c(k.f,h,h,h,h,h,h,B.l(h,h,k.c.c.j(0.85),h,h,h,h,h,h,h,h,11,h,h,A.P,h,h,!0,h,h,h,h,h,h,h,h),h,h,h)],j),A.l,h,A.e,A.M,0,A.p),A.f,h,h,new B.o(h,h,q,s,o,new B.a7(A.ay,A.aC,A.x,r.a,h,h),A.m),h,h,h,A.a2c,D.bJH,h,h,h),h),h,new B.bj(g,new B.bq(0.6,1,v),u)),B.bS(0,B.aA(A.j2,h,A.y,!1,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,new C.cph(d),h,h,h,h,h,h,!1,A.a4),0,0,0)],j),h),A.f,A.L,0,h,h,h,h,h,A.ai)}}
 C.bex.prototype={
 a4(d,e){var w,v,u,t,s,r,q,p,o,n,m=e.a/2,l=e.b/2,k=new B.e0()
 k.cT(7)
@@ -2427,10 +2427,10 @@ aZ(){this.b7()
 this.b5()
 this.bC()}}
 var z=a.updateTypes(["P(ha)","w(ai<ha>{isLuxury:P})","Xg(Z)","~()","ay<~>()","w(ha{isLuxury:P})","Y5(Z,by<G>,by<G>)"])
-C.fH1.prototype={
+C.fH6.prototype={
 $1(d){return B.J(["x",d.a,"y",d.b],x.N,x.X)},
 $S:2014}
-C.fwj.prototype={
+C.fwo.prototype={
 $1(d){var w,v,u
 if(!x.f.b(d))return null
 w=J.a2(d)
@@ -2439,7 +2439,7 @@ u=w.h(d,"y")
 if(typeof v=="number"&&typeof u=="number")return new B.r(v,u)
 return null},
 $S:2015}
-C.h9E.prototype={
+C.h9J.prototype={
 $1(d){var w=this
 return new C.Xg(w.a,w.b,w.c,w.d,w.e,w.f,w.r,null)},
 $S:z+2}
@@ -2474,7 +2474,7 @@ w.a4H(this.b)},
 $S:0}
 C.enH.prototype={
 $1(d){var w=null
-return B.eF(w,A.L,new B.cQ(A.YN,new C.bku(new C.enE(d),new C.enF(d),new C.enG(d),w),w),w,w,w,D.bK8,w,A.d8,w,w,w)},
+return B.eF(w,A.L,new B.cQ(A.YO,new C.bku(new C.enE(d),new C.enF(d),new C.enG(d),w),w),w,w,w,D.bK9,w,A.d8,w,w,w)},
 $S:47}
 C.enE.prototype={
 $0(){B.a8(this.a,!1).N("download")
@@ -2545,27 +2545,27 @@ q=x.p
 p=B.a([B.c("Invoice #"+w,g,g,g,g,g,g,A.nt,g,g,g),B.c(v,g,g,g,g,g,g,B.l(g,g,A.c.j(0.75),g,g,g,g,g,g,g,g,13,g,g,g,g,g,!0,g,g,g,g,g,g,g,g),g,g,g)],q)
 if(u.length!==0)p.push(B.c(u,g,g,g,g,g,g,B.l(g,g,A.c.j(0.45),g,g,g,g,g,g,g,g,11,g,g,g,g,g,!0,g,g,g,g,g,g,g,g),g,g,g))
 p=B.E(B.x(p,A.B,g,A.e,A.h,0,A.p),1)
-o=B.c("$"+A.i.a9(s,2),g,g,g,g,g,g,D.fNz,g,g,g)
-n=r?A.dt:A.c7.j(0.15)
+o=B.c("$"+A.i.a9(s,2),g,g,g,g,g,g,D.fNC,g,g,g)
+n=r?A.dt:A.c8.j(0.15)
 m=B.n(10)
 l=r?"Paid":"Unpaid"
 k=h.b
 j=h.c
 i=h.d
-return B.p(g,B.x(B.a([B.A(B.a([p,B.x(B.a([o,A.at,B.p(g,B.c(l,g,g,g,g,g,g,B.l(g,g,r?A.aF:A.c7,g,g,g,g,g,g,g,g,10,g,g,A.F,g,g,!0,g,g,g,g,g,g,g,g),g,g,g),A.f,g,g,new B.o(n,g,g,m,g,g,A.m),g,g,g,g,A.fD,g,g,g)],q),A.dH,g,A.e,A.h,0,A.p)],q),A.l,g,A.e,A.h,0,g,g),A.S,B.A(B.a([B.E(B.dW(A.adi,new C.enN(k,f,j,i),g),1),A.aa,B.E(B.en(D.c6t,g,A.LT,new C.enO(k,f,i),g),1),B.aI(g,g,g,g,A.IJ,g,g,g,new C.enP(j,w,a0,h.e),g,g,g,g,g,g)],q),A.l,g,A.e,A.h,0,g,g)],q),A.B,g,A.e,A.h,0,A.p),A.f,g,g,new B.o(A.jv,g,d,e,g,g,A.m),g,g,g,g,A.bh,g,g,g)},
+return B.p(g,B.x(B.a([B.A(B.a([p,B.x(B.a([o,A.at,B.p(g,B.c(l,g,g,g,g,g,g,B.l(g,g,r?A.aF:A.c8,g,g,g,g,g,g,g,g,10,g,g,A.F,g,g,!0,g,g,g,g,g,g,g,g),g,g,g),A.f,g,g,new B.o(n,g,g,m,g,g,A.m),g,g,g,g,A.fD,g,g,g)],q),A.dH,g,A.e,A.h,0,A.p)],q),A.l,g,A.e,A.h,0,g,g),A.S,B.A(B.a([B.E(B.dW(A.adi,new C.enN(k,f,j,i),g),1),A.aa,B.E(B.en(D.c6t,g,A.LU,new C.enO(k,f,i),g),1),B.aI(g,g,g,g,A.IK,g,g,g,new C.enP(j,w,a0,h.e),g,g,g,g,g,g)],q),A.l,g,A.e,A.h,0,g,g)],q),A.B,g,A.e,A.h,0,A.p),A.f,g,g,new B.o(A.jv,g,d,e,g,g,A.m),g,g,g,g,A.bh,g,g,g)},
 $S:249}
 C.enN.prototype={
 $0(){var w=this
 w.a.aQG(w.b)
 B.a8(w.c,!1).N(null)
-w.d.K(x.q).f.T(D.fvX)},
+w.d.K(x.q).f.T(D.fw_)},
 $S:0}
 C.enO.prototype={
 $0(){var w=0,v=B.j(x.H),u,t=this,s,r,q,p,o,n,m,l,k,j,i,h,g
 var $async$$0=B.e(function(d,e){if(d===1)return B.f(e,v)
 for(;;)switch(w){case 0:i=t.b
 h=J.t(i,"template")
-g=C.hN1(J.k(h==null?"modern":h))
+g=C.hN7(J.k(h==null?"modern":h))
 h=t.a
 s=h.a
 s.toString
@@ -2589,7 +2589,7 @@ if(j==null)j=o.h(0,"itemName")
 j=J.k(j==null?"":j)
 o=o.h(0,"itemPrice")
 w=3
-return B.b(C.asT(s.r,r,C.hyQ(l,k,m,j,J.k(o==null?"":o),n),p,s.x,g,q),$async$$0)
+return B.b(C.asT(s.r,r,C.hyW(l,k,m,j,J.k(o==null?"":o),n),p,s.x,g,q),$async$$0)
 case 3:if(!e){w=1
 break}if(h.c!=null)h.l(new C.enM())
 h.aQG(i)
@@ -2632,7 +2632,7 @@ return B.i($async$$0,v)},
 $S:1}
 C.enK.prototype={
 $1(d){var w=null,v=B.c("Remove invoice #"+this.a+" from this device?",w,w,w,w,w,w,w,w,w,w)
-return B.eh(B.a([B.bN(!1,A.dr,w,w,!0,w,w,w,new C.enI(d),w,w),B.bN(!1,A.y5,w,w,!0,w,w,w,new C.enJ(d),w,w)],x.p),w,w,w,v,w,w,w,w,D.hcF,w)},
+return B.eh(B.a([B.bN(!1,A.dr,w,w,!0,w,w,w,new C.enI(d),w,w),B.bN(!1,A.y5,w,w,!0,w,w,w,new C.enJ(d),w,w)],x.p),w,w,w,v,w,w,w,w,D.hcI,w)},
 $S:18}
 C.enI.prototype={
 $0(){B.a8(this.a,!1).N(!1)
@@ -2645,7 +2645,7 @@ $S:0}
 C.enA.prototype={
 $4(d,e,f,g){var w=this.b
 A.d.a5(w)
-A.d.u(w,C.iAS(d,e))
+A.d.u(w,C.iAY(d,e))
 this.a.l(new C.enz())},
 $S:445}
 C.enz.prototype={
@@ -2852,7 +2852,7 @@ return B.b(s.L8(r),$async$$0)
 case 4:case 1:return B.h(u,v)}})
 return B.i($async$$0,v)},
 $S:1}
-C.fXS.prototype={
+C.fXX.prototype={
 $1(d){return new B.h7(612,792,new B.IY(this.a,A.agv,null,null))},
 $S:416}
 C.cjd.prototype={
@@ -2867,47 +2867,47 @@ $S:99}
 C.cjf.prototype={
 $1(d){return A.a.i(d).toLowerCase()},
 $S:13}
-C.h2W.prototype={
+C.h30.prototype={
 $1(d){var w
 if(d==null)w=null
 else{w=this.a
 w=new B.r(d.a/w.a,d.b/w.b)}return w},
 $S:253}
-C.h3O.prototype={
+C.h3T.prototype={
 $1(d){return d!=null},
 $S:212}
-C.h3P.prototype={
+C.h3U.prototype={
 $2(d,e){var w=null
 return B.b4(w,w,w,new B.XG(this.a,this.b,new B.av(e.b,this.c),!1,2.8,w),A.az)},
 $S:397}
 C.dih.prototype={
 $1(d){return new B.a7(A.a5,A.a9,A.x,B.a([D.lr,A.aE,A.jT],x.O),null,null).az(0,d)},
 $S:70}
-C.eQ2.prototype={
+C.eQ8.prototype={
 $1(d){var w=this.a.b
 return new B.a7(A.a5,A.a9,A.x,B.a([w.f,w.r,A.c],x.O),null,null).az(0,d)},
 $S:70}
-C.eQ3.prototype={
+C.eQ9.prototype={
 $1(d){var w=this.a.b
 return new B.a7(A.a5,A.a9,A.x,B.a([w.f,w.r],x.O),null,null).az(0,d)},
 $S:70}
-C.fhA.prototype={
+C.fhG.prototype={
 $1(d){var w=this.a.b
 return new B.a7(A.a5,A.a9,A.x,B.a([w.f,w.r],x.O),null,null).az(0,d)},
 $S:70}
-C.fhB.prototype={
+C.fhH.prototype={
 $1(d){var w,v=null
 if(this.a.b.w)w=A.bq
 else w=A.c
 return new B.D(A.zd,B.c(d,v,v,v,v,v,v,B.l(v,v,w,v,v,v,v,v,v,v,v,9,v,v,v,v,v,!0,v,v,v,v,v,v,v,v),v,v,v),v)},
 $S:139}
-C.fVH.prototype={
+C.fVM.prototype={
 $1(d){return d.x},
 $S:z+0}
-C.fXX.prototype={
+C.fY1.prototype={
 $1(d){return d.a===this.a},
 $S:z+0}
-C.fZH.prototype={
+C.fZM.prototype={
 $1(d){return d.a===this.a},
 $S:z+0}
 C.cjh.prototype={
@@ -2920,7 +2920,7 @@ return new B.D(A.zd,B.c(d,w,w,w,w,w,w,B.l(w,w,this.a.w?A.bq:this.b,w,w,w,w,w,w,w
 $S:139}
 C.dsR.prototype={
 $2(d,e){var w=e.d,v=x.c
-v=B.B(new B.O(B.a([w*0.22,w*0.5,w*0.78],x.n),new C.dsQ(e.b,this.a),v),v.k("ak.E"))
+v=B.B(new B.O(B.a([w*0.22,w*0.5,w*0.78],x.n),new C.dsQ(e.b,this.a),v),v.k("aj.E"))
 return new B.an(A.a0,null,A.ad,A.t,v,null)},
 $S:63}
 C.dsQ.prototype={
@@ -2933,17 +2933,17 @@ if(s)w=d.w?A.v:A.c
 else w=A.aT
 w=B.K(w,A.r,s?2:1)
 v=e||d.x?B.a([new B.aa(0,A.H,d.f.j(0.35),A.J,8)],x.V):u
-return B.aA(u,B.p(A.z,B.c(d.b,u,2,A.a2,u,u,u,B.l(u,u,d.w?A.bq:A.c,u,u,u,u,u,u,u,u,10,u,u,A.P,u,1.1,!0,u,u,u,u,u,u,u,u),A.K,u,u),A.f,u,u,new B.o(u,u,w,r,v,new B.a7(A.a5,A.a9,A.x,d.e,u,u),A.m),u,52,u,u,A.a2j,u,u,u),A.y,!1,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,new C.eoV(t,d),u,u,u,u,u,u,!1,A.a4)},
+return B.aA(u,B.p(A.z,B.c(d.b,u,2,A.a2,u,u,u,B.l(u,u,d.w?A.bq:A.c,u,u,u,u,u,u,u,u,10,u,u,A.P,u,1.1,!0,u,u,u,u,u,u,u,u),A.K,u,u),A.f,u,u,new B.o(u,u,w,r,v,new B.a7(A.a5,A.a9,A.x,d.e,u,u),A.m),u,52,u,u,A.a2k,u,u,u),A.y,!1,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,new C.eoV(t,d),u,u,u,u,u,u,!1,A.a4)},
 $1(d){return this.$2$isLuxury(d,!1)},
 $S:z+5}
 C.eoV.prototype={
-$0(){return this.a.a.d0f(0,this.b.a)},
+$0(){return this.a.a.d0h(0,this.b.a)},
 $S:0}
 C.eoT.prototype={
 $2$isLuxury(d,e){var w,v,u,t=null,s=x.p,r=B.a([],s)
 for(w=this.a,v=0;v<3;++v){u=B.a([],s)
 if(v>0)u.push(new B.a6(6,t,t,t))
-u.push(new B.bz(1,A.ba,v<d.length?w.$2$isLuxury(d[v],e):D.fuP,t))
+u.push(new B.bz(1,A.ba,v<d.length?w.$2$isLuxury(d[v],e):D.fuS,t))
 A.d.u(r,u)}return B.A(r,A.B,t,A.e,A.h,0,t,t)},
 $1(d){return this.$2$isLuxury(d,!1)},
 $S:z+1}
@@ -2956,7 +2956,7 @@ $1(d){return this.$2$isLuxury(d,!1)},
 $S:z+1}
 C.eoO.prototype={
 $1(d){var w
-switch(d){case"Luxury":w=A.mw
+switch(d){case"Luxury":w=A.mx
 break
 case"Premium":w=A.j4
 break
@@ -2979,7 +2979,7 @@ C.eoR.prototype={
 $1(d){var w=this,v=null,u=w.a,t=B.U(u).k("X<1>"),s=B.B(new B.X(u,new C.eoM(d),t),t.k("M.E"))
 u=w.c
 t=x.p
-return B.x(B.a([new B.D(A.a1y,B.A(B.a([B.W(w.b.$1(d),u.$1(d),v,v,v,16),A.bf,B.c(d,v,v,v,v,v,v,B.l(v,v,u.$1(d),v,v,v,v,v,v,v,v,13,v,v,A.F,v,v,!0,v,v,v,v,v,v,v,v),v,v,v)],t),A.l,v,A.e,A.h,0,v,v),v),w.d.$1(s),A.S],t),A.B,v,A.e,A.h,0,A.p)},
+return B.x(B.a([new B.D(A.a1z,B.A(B.a([B.W(w.b.$1(d),u.$1(d),v,v,v,16),A.bf,B.c(d,v,v,v,v,v,v,B.l(v,v,u.$1(d),v,v,v,v,v,v,v,v,13,v,v,A.F,v,v,!0,v,v,v,v,v,v,v,v),v,v,v)],t),A.l,v,A.e,A.h,0,v,v),v),w.d.$1(s),A.S],t),A.B,v,A.e,A.h,0,A.p)},
 $S:2018}
 C.eoM.prototype={
 $1(d){return d.c===this.a},
@@ -2992,13 +2992,13 @@ C.eoL.prototype={
 $0(){var w=this.a
 return w.d=!w.d},
 $S:0}
-C.hbO.prototype={
+C.hbT.prototype={
 $3(d,e,f){var w=this
 return new C.Y5(w.a,w.b,w.c,w.d,null)},
 $C:"$3",
 $R:3,
 $S:z+6}
-C.hbP.prototype={
+C.hbU.prototype={
 $4(d,e,f,g){var w=x.t
 return new B.d9(e,!1,B.iC(A.z,g,null,new B.bj(B.cI(A.ei,e,null),new B.bq(0.88,1,w),w.k("bj<bR.T>"))),null)},
 $S:34}
@@ -3020,15 +3020,15 @@ w.bxX=w.t})();(function installTearOffs(){var w=a._instance_0u
 var v
 w(v=C.aGK.prototype,"gb5z","aBq",3)
 w(v,"gcqI","RQ",4)})();(function inheritance(){var w=a.mixinHard,v=a.inheritMany,u=a.inherit
-v(B.fO,[C.fH1,C.fwj,C.h9E,C.enH,C.enX,C.enK,C.enA,C.eoa,C.eol,C.eoH,C.eoI,C.eoJ,C.eoK,C.eom,C.eon,C.eoo,C.eop,C.eoq,C.eor,C.eos,C.eot,C.eoB,C.fXS,C.cjd,C.cje,C.cjf,C.h2W,C.h3O,C.dih,C.eQ2,C.eQ3,C.fhA,C.fhB,C.fVH,C.fXX,C.fZH,C.cjh,C.cji,C.dsQ,C.eoU,C.eoT,C.eoP,C.eoO,C.eoN,C.eoQ,C.eoR,C.eoM,C.hbO,C.hbP])
+v(B.fO,[C.fH6,C.fwo,C.h9J,C.enH,C.enX,C.enK,C.enA,C.eoa,C.eol,C.eoH,C.eoI,C.eoJ,C.eoK,C.eom,C.eon,C.eoo,C.eop,C.eoq,C.eor,C.eos,C.eot,C.eoB,C.fXX,C.cjd,C.cje,C.cjf,C.h30,C.h3T,C.dih,C.eQ8,C.eQ9,C.fhG,C.fhH,C.fVM,C.fY1,C.fZM,C.cjh,C.cji,C.dsQ,C.eoU,C.eoT,C.eoP,C.eoO,C.eoN,C.eoQ,C.eoR,C.eoM,C.hbT,C.hbU])
 v(B.af,[C.Xg,C.asW,C.Y5])
 v(B.ah,[C.aGK,C.bo1,C.aHA])
 v(B.hR,[C.ent,C.env,C.enu,C.eny,C.ens,C.enC,C.enD,C.enE,C.enF,C.enG,C.enW,C.enT,C.enU,C.enQ,C.enN,C.enO,C.enM,C.enP,C.enI,C.enJ,C.enz,C.enB,C.eoj,C.enY,C.eok,C.eo9,C.eow,C.eo8,C.eoE,C.eoF,C.eoG,C.eo7,C.eo6,C.eo5,C.eo4,C.eo3,C.eo2,C.eo1,C.eoi,C.eoh,C.eog,C.eof,C.eoe,C.eou,C.eod,C.eov,C.eoc,C.eox,C.eoy,C.eob,C.eoz,C.eo0,C.eoA,C.eo_,C.eoC,C.enZ,C.eoD,C.eoV,C.eoS,C.eoL,C.cpi,C.cph])
-v(B.ie,[C.enx,C.enw,C.enV,C.enS,C.enR,C.enL,C.cjc,C.h3P,C.dsR,C.cpg])
+v(B.ie,[C.enx,C.enw,C.enV,C.enS,C.enR,C.enL,C.cjc,C.h3U,C.dsR,C.cpg])
 v(B.aw,[C.bku,C.aDY,C.b3r,C.bnv,C.boB,C.b3q,C.aDZ])
 v(B.kP,[C.b3n,C.kr])
 v(B.lK,[C.bqO,C.bge,C.bfJ,C.bgQ,C.bpk,C.bfw,C.ble,C.bwE,C.bwF,C.bwD,C.bwH,C.bwG,C.bkY,C.bex])
-v(B.aE,[C.dig,C.fhz,C.ha,C.cjg,C.afC])
+v(B.aE,[C.dig,C.fhF,C.ha,C.cjg,C.afC])
 u(C.bzC,B.Il)
 u(C.b5B,C.aHA)
 w(C.aHA,B.cg)})()
@@ -3040,259 +3040,259 @@ D.afH=new B.bc(A.h2,A.h2,A.bJ,A.bJ)
 D.afI=new B.bc(A.bJ,A.bJ,A.h2,A.h2)
 D.agf=new B.aY(0,1/0,560,1/0)
 D.d_=new B.u(1,0.9725490196078431,0.9568627450980393,0.9176470588235294,A.q)
-D.bli=new B.u(1,0.0784313725490196,0.06274509803921569,0.06274509803921569,A.q)
+D.blj=new B.u(1,0.0784313725490196,0.06274509803921569,0.06274509803921569,A.q)
 D.lr=new B.u(1,0.9607843137254902,0.9019607843137255,0.7215686274509804,A.q)
-D.bm7=new B.u(1,0.058823529411764705,0.050980392156862744,0.10196078431372549,A.q)
+D.bm8=new B.u(1,0.058823529411764705,0.050980392156862744,0.10196078431372549,A.q)
 D.jf=new B.u(1,0.03137254901960784,0.03137254901960784,0.03137254901960784,A.q)
-D.bEo=new B.iI(0,0,0,0)
+D.bEp=new B.iI(0,0,0,0)
 D.anw=new B.R(12,12,12,14)
-D.bHc=new B.R(16,12,16,14)
-D.bJG=new B.R(24,28,24,24)
-D.bK8=new B.R(32,24,32,24)
-D.fXj=new B.C("Export Invoice",null,A.un,null,null,null,null,null,null,null,null,null)
-D.bN_=new B.bz(1,A.ba,D.fXj,null)
-D.hfr=new B.C("Saved Invoices",null,A.dq,null,null,null,null,null,null,null,null,null)
-D.bNA=new B.bz(1,A.ba,D.hfr,null)
-D.h4Q=new B.C("Create Invoice",null,K.aXx,null,null,null,null,null,null,null,null,null)
-D.bNB=new B.bz(1,A.ba,D.h4Q,null)
+D.bHd=new B.R(16,12,16,14)
+D.bJH=new B.R(24,28,24,24)
+D.bK9=new B.R(32,24,32,24)
+D.fXm=new B.C("Export Invoice",null,A.uo,null,null,null,null,null,null,null,null,null)
+D.bN_=new B.bz(1,A.ba,D.fXm,null)
+D.hfu=new B.C("Saved Invoices",null,A.dq,null,null,null,null,null,null,null,null,null)
+D.bNA=new B.bz(1,A.ba,D.hfu,null)
+D.h4T=new B.C("Create Invoice",null,K.aXy,null,null,null,null,null,null,null,null,null)
+D.bNB=new B.bz(1,A.ba,D.h4T,null)
 D.bTe=new B.a_(62192,"MaterialIcons",!1)
 D.bXG=new B.ae(A.f3,null,A.aF,null,null,null)
-D.bZd=new B.ae(A.arG,null,A.aV,null,null,null)
+D.bZd=new B.ae(A.arH,null,A.aV,null,null,null)
 D.bZP=new B.ae(A.x9,18,null,null,null,null)
-D.c_n=new B.ae(K.asf,null,null,null,null,null)
+D.c_n=new B.ae(K.asg,null,null,null,null,null)
 D.c1g=new B.ae(A.I9,24,A.c,null,null,null)
 D.c1h=new B.ae(A.h0,null,A.aV,null,null,null)
 D.c2Q=new B.ae(A.tD,18,A.cX,null,null,null)
-D.c3Q=new B.ae(A.mx,16,A.c,null,null,null)
+D.c3Q=new B.ae(A.my,16,A.c,null,null,null)
 D.c40=new B.ae(A.jD,20,A.bl,null,null,null)
 D.c42=new B.ae(A.tD,18,A.bV,null,null,null)
-D.c5I=new B.ae(A.oQ,null,A.aF,null,null,null)
+D.c5I=new B.ae(A.oR,null,A.aF,null,null,null)
 D.c6t=new B.ae(A.hO,16,null,null,null,null)
 D.c8U=new B.i7(0,0.55,A.ny)
 D.c8Y=new B.i7(0,0.35,A.e9)
-D.byx=new B.u(1,0.09019607843137255,0.0784313725490196,0.15294117647058825,A.q)
-D.dEL=w([A_.aiO,D.byx],x.O)
+D.byy=new B.u(1,0.09019607843137255,0.0784313725490196,0.15294117647058825,A.q)
+D.dEL=w([A_.aiO,D.byy],x.O)
 D.cb1=new B.a7(A.ay,A.aC,A.x,D.dEL,null,null)
-D.dq7=w([A.jT,A.aE,D.lr,A.aE],x.O)
-D.cbb=new B.a7(A.a5,A.a9,A.x,D.dq7,null,null)
-D.a_u=new B.u(1,0.0196078431372549,0.0196078431372549,0.03137254901960784,A.q)
-D.dsO=w([D.a_u,A.bs,D.a_u],x.O)
-D.cd1=new B.a7(A.a5,A.a9,A.x,D.dsO,null,null)
-D.dhD=w([A.bR,A.fx,A.cU],x.O)
-D.cel=new B.a7(A.ay,A.aC,A.x,D.dhD,null,null)
-D.bmR=new B.u(0.10196078431372549,0.48627450980392156,0.22745098039215686,0.9294117647058824,A.q)
-D.bck=new B.aa(0,A.H,D.bmR,A.cy,18)
-D.d1x=w([D.bck],x.V)
-D.bs9=new B.u(0.2,0.48627450980392156,0.22745098039215686,0.9294117647058824,A.q)
-D.bbW=new B.aa(0,A.H,D.bs9,A.cy,18)
-D.d6o=w([D.bbW],x.V)
-D.aMw=new C.kr(22,"standardCreativeLux")
+D.dq8=w([A.jT,A.aE,D.lr,A.aE],x.O)
+D.cbb=new B.a7(A.a5,A.a9,A.x,D.dq8,null,null)
+D.a_v=new B.u(1,0.0196078431372549,0.0196078431372549,0.03137254901960784,A.q)
+D.dsP=w([D.a_v,A.bs,D.a_v],x.O)
+D.cd1=new B.a7(A.a5,A.a9,A.x,D.dsP,null,null)
+D.dhE=w([A.bR,A.fx,A.cU],x.O)
+D.cel=new B.a7(A.ay,A.aC,A.x,D.dhE,null,null)
+D.bmS=new B.u(0.10196078431372549,0.48627450980392156,0.22745098039215686,0.9294117647058824,A.q)
+D.bcl=new B.aa(0,A.H,D.bmS,A.cy,18)
+D.d1y=w([D.bcl],x.V)
+D.bsa=new B.u(0.2,0.48627450980392156,0.22745098039215686,0.9294117647058824,A.q)
+D.bbX=new B.aa(0,A.H,D.bsa,A.cy,18)
+D.d6q=w([D.bbX],x.V)
+D.aMx=new C.kr(22,"standardCreativeLux")
 D.dAk=w([A.dz,A.kD,A.k7],x.O)
-D.e2O=new C.ha("creative","Creative","Standard",D.aMw,D.dAk,A.pA,A.bB,!1,!1)
-D.aMr=new C.kr(1,"modernWave")
-D.e2T=new C.ha("modern","Modern","Standard",D.aMr,E.aDq,E.akD,A.v,!1,!1)
+D.e2O=new C.ha("creative","Creative","Standard",D.aMx,D.dAk,A.pB,A.bB,!1,!1)
+D.aMs=new C.kr(1,"modernWave")
+D.e2T=new C.ha("modern","Modern","Standard",D.aMs,E.aDr,E.akD,A.v,!1,!1)
 D.e2C=new C.kr(3,"roseLuxury")
-D.e3k=new C.ha("rose_gold","Rose Gold","Standard",D.e2C,E.aDp,A.pC,E.aiq,!0,!1)
-D.aMy=new C.kr(24,"standardMinimalLux")
-D.e3i=new C.ha("minimal","Minimal","Standard",D.aMy,E.aFj,A.c1,A.iF,!0,!1)
-D.aMz=new C.kr(25,"standardDiamondLux")
-D.e2S=new C.ha("diamond","Diamond","Standard",D.aMz,S.aBS,A.oD,A.aH,!0,!1)
-D.e3n=new C.ha("ocean","Ocean","Standard",D.aMr,E.aB8,A.bR,A.n4,!1,!1)
-D.aMv=new C.kr(21,"standardCorporateLux")
-D.bm9=new B.u(1,0.0392156862745098,0.08627450980392157,0.1568627450980392,A.q)
-D.dyE=w([D.bm9,A.dg,A.a_],x.O)
-D.e37=new C.ha("corporate","Corporate","Premium",D.aMv,D.dyE,A.aE,A.bp,!1,!1)
+D.e3k=new C.ha("rose_gold","Rose Gold","Standard",D.e2C,E.aDq,A.pD,E.aiq,!0,!1)
+D.aMz=new C.kr(24,"standardMinimalLux")
+D.e3i=new C.ha("minimal","Minimal","Standard",D.aMz,E.aFk,A.c1,A.iF,!0,!1)
+D.aMA=new C.kr(25,"standardDiamondLux")
+D.e2S=new C.ha("diamond","Diamond","Standard",D.aMA,S.aBT,A.oE,A.aH,!0,!1)
+D.e3n=new C.ha("ocean","Ocean","Standard",D.aMs,E.aB9,A.bR,A.n5,!1,!1)
+D.aMw=new C.kr(21,"standardCorporateLux")
+D.bma=new B.u(1,0.0392156862745098,0.08627450980392157,0.1568627450980392,A.q)
+D.dyF=w([D.bma,A.dg,A.a_],x.O)
+D.e37=new C.ha("corporate","Corporate","Premium",D.aMw,D.dyF,A.aE,A.bp,!1,!1)
 D.e2I=new C.kr(4,"emeraldPrestige")
-D.e2Q=new C.ha("emerald","Emerald","Premium",D.e2I,E.aD3,A.aV,A.aE,!1,!1)
+D.e2Q=new C.ha("emerald","Emerald","Premium",D.e2I,E.aD4,A.aV,A.aE,!1,!1)
 D.e2J=new C.kr(6,"exclusiveGold")
-D.dwJ=w([W.alS,H.ai_],x.O)
-D.e38=new C.ha("exclusive","Exclusive","Premium",D.e2J,D.dwJ,A.aE,A.ZZ,!1,!1)
-D.aMx=new C.kr(23,"standardClassicLux")
-D.e35=new C.ha("classic","Classic","Premium",D.aMx,H.aFq,A.cA,A.aE,!1,!1)
-D.aMq=new C.kr(0,"classic")
-D.e3f=new C.ha("executive","Executive","Premium",D.aMq,L.T2,A.bP,A.v,!1,!1)
+D.dwK=w([W.alS,H.ai_],x.O)
+D.e38=new C.ha("exclusive","Exclusive","Premium",D.e2J,D.dwK,A.aE,A.a__,!1,!1)
+D.aMy=new C.kr(23,"standardClassicLux")
+D.e35=new C.ha("classic","Classic","Premium",D.aMy,H.aFr,A.cA,A.aE,!1,!1)
+D.aMr=new C.kr(0,"classic")
+D.e3f=new C.ha("executive","Executive","Premium",D.aMr,L.T3,A.bP,A.v,!1,!1)
 D.e2x=new C.kr(18,"goldFoil")
-D.e3d=new C.ha("gold_foil","Gold Foil","Premium",D.e2x,E.aDD,A.aQ,A.v,!1,!1)
-D.aMt=new C.kr(19,"marble")
-D.ddW=w([A.qI,A.t5],x.O)
-D.e3o=new C.ha("marble","Marble","Premium",D.aMt,D.ddW,A.iF,A.v,!0,!1)
+D.e3d=new C.ha("gold_foil","Gold Foil","Premium",D.e2x,E.aDE,A.aQ,A.v,!1,!1)
+D.aMu=new C.kr(19,"marble")
+D.ddX=w([A.qJ,A.t5],x.O)
+D.e3o=new C.ha("marble","Marble","Premium",D.aMu,D.ddX,A.iF,A.v,!0,!1)
 D.e2K=new C.kr(7,"midnightRoyale")
-D.e31=new C.ha("midnight_royale","Midnight Royale","Premium",D.e2K,E.aDa,A.aE,A.bs,!1,!1)
-D.aMC=new C.kr(8,"obsidianChevron")
-D.dpA=w([A.ew,A.k9],x.O)
-D.e2N=new C.ha("obsidian_chevron","Obsidian Chevron","Premium",D.aMC,D.dpA,A.bE,A.ir,!1,!1)
+D.e31=new C.ha("midnight_royale","Midnight Royale","Premium",D.e2K,E.aDb,A.aE,A.bs,!1,!1)
+D.aMD=new C.kr(8,"obsidianChevron")
+D.dpB=w([A.ex,A.k9],x.O)
+D.e2N=new C.ha("obsidian_chevron","Obsidian Chevron","Premium",D.aMD,D.dpB,A.bE,A.ir,!1,!1)
 D.AV=new C.kr(17,"luxuryCombo")
-D.e3e=new C.ha("sapphire_luxe","Sapphire Luxe","Premium",D.AV,E.aEQ,A.aH,A.hi,!1,!1)
+D.e3e=new C.ha("sapphire_luxe","Sapphire Luxe","Premium",D.AV,E.aER,A.aH,A.hi,!1,!1)
 D.a9y=new C.kr(10,"rubyExecutive")
-D.bvj=new B.u(1,0.12156862745098039,0.0392156862745098,0.0392156862745098,A.q)
-D.dba=w([D.bvj,A.kG],x.O)
-D.e30=new C.ha("ruby_executive","Ruby Executive","Premium",D.a9y,D.dba,A.aB,A.aQ,!1,!1)
+D.bvk=new B.u(1,0.12156862745098039,0.0392156862745098,0.0392156862745098,A.q)
+D.dbc=w([D.bvk,A.kG],x.O)
+D.e30=new C.ha("ruby_executive","Ruby Executive","Premium",D.a9y,D.dbc,A.aB,A.aQ,!1,!1)
 D.e2v=new C.kr(11,"onyxPrism")
-D.cYs=w([A.Co,A.l2],x.O)
-D.e2W=new C.ha("onyx_prism","Onyx Prism","Premium",D.e2v,D.cYs,A.bc,A.bl,!1,!1)
+D.cYt=w([A.Co,A.l2],x.O)
+D.e2W=new C.ha("onyx_prism","Onyx Prism","Premium",D.e2v,D.cYt,A.bc,A.bl,!1,!1)
 D.e2w=new C.kr(12,"champagneNoir")
-D.bwA=new B.u(1,0.050980392156862744,0.050980392156862744,0.050980392156862744,A.q)
-D.dhs=w([D.bwA,A.e_],x.O)
-D.e3g=new C.ha("champagne_noir","Champagne Noir","Luxury",D.e2w,D.dhs,A.ahI,A.aE,!1,!1)
-D.dkV=w([A.dz,A.fw],x.O)
-D.e3h=new C.ha("violet_crown","Violet Crown","Luxury",D.AV,D.dkV,A.pA,A.c2,!1,!1)
-D.e39=new C.ha("arctic_platinum","Arctic Platinum","Luxury",D.AV,L.T2,A.bn,A.bP,!1,!1)
-D.aMs=new C.kr(15,"crimsonEdge")
-D.bno=new B.u(1,0.058823529411764705,0.058823529411764705,0.058823529411764705,A.q)
+D.bwB=new B.u(1,0.050980392156862744,0.050980392156862744,0.050980392156862744,A.q)
+D.dht=w([D.bwB,A.e_],x.O)
+D.e3g=new C.ha("champagne_noir","Champagne Noir","Luxury",D.e2w,D.dht,A.ahI,A.aE,!1,!1)
+D.dkW=w([A.dz,A.fw],x.O)
+D.e3h=new C.ha("violet_crown","Violet Crown","Luxury",D.AV,D.dkW,A.pB,A.c2,!1,!1)
+D.e39=new C.ha("arctic_platinum","Arctic Platinum","Luxury",D.AV,L.T3,A.bn,A.bP,!1,!1)
+D.aMt=new C.kr(15,"crimsonEdge")
+D.bnp=new B.u(1,0.058823529411764705,0.058823529411764705,0.058823529411764705,A.q)
 D.ajx=new B.u(1,0.10196078431372549,0.0196078431372549,0.0196078431372549,A.q)
-D.dqB=w([D.bno,D.ajx],x.O)
-D.e3p=new C.ha("crimson_edge","Crimson Edge","Luxury",D.aMs,D.dqB,A.es,A.f1,!1,!1)
-D.dGm=w([U.Nr,A.dz],x.O)
+D.dqC=w([D.bnp,D.ajx],x.O)
+D.e3p=new C.ha("crimson_edge","Crimson Edge","Luxury",D.aMt,D.dqC,A.es,A.f1,!1,!1)
+D.dGm=w([U.Ns,A.dz],x.O)
 D.e2R=new C.ha("celestial_gradient","Celestial Gradient","Luxury",D.AV,D.dGm,A.cf,A.bB,!1,!1)
-D.bl_=new B.u(1,0.17647058823529413,0.10588235294117647,0.054901960784313725,A.q)
-D.dH0=w([G.H2,D.bl_],x.O)
+D.bl0=new B.u(1,0.17647058823529413,0.10588235294117647,0.054901960784313725,A.q)
+D.dH0=w([G.H2,D.bl0],x.O)
 D.e2X=new C.ha("golden_phoenix","Golden Phoenix","Luxury",D.AV,D.dH0,A.aQ,A.bE,!1,!1)
-D.d1G=w([A.il,A.a_],x.O)
-D.e2P=new C.ha("midnight_blade","Midnight Blade","Luxury",D.aMC,D.d1G,A.aH,A.bs,!1,!1)
-D.d6v=w([A.qH,A.fl],x.O)
-D.e33=new C.ha("emerald_fang","Emerald Fang","Luxury",D.a9y,D.d6v,A.aV,A.aE,!1,!1)
-D.aMu=new C.kr(2,"corporateStripe")
-D.e3a=new C.ha("royal_carbon","Royal Carbon","Luxury",D.aMu,A.a7b,A.aE,A.air,!1,!1)
-D.e2U=new C.ha("platinum_strike","Platinum Strike","Luxury",D.aMs,A.aEW,A.bO,A.cX,!1,!1)
-D.buH=new B.u(1,0.12156862745098039,0.07450980392156863,0.023529411764705882,A.q)
-D.cRt=w([D.buH,A.pB],x.O)
-D.e2Y=new C.ha("topaz_reign","Topaz Reign","Luxury",D.AV,D.cRt,A.au,A.aQ,!1,!1)
-D.dpj=w([A.bC,A.bs],x.O)
-D.e2M=new C.ha("frost_sovereign","Frost Sovereign","Luxury",D.AV,D.dpj,A.ct,A.pD,!1,!1)
+D.d1H=w([A.il,A.a_],x.O)
+D.e2P=new C.ha("midnight_blade","Midnight Blade","Luxury",D.aMD,D.d1H,A.aH,A.bs,!1,!1)
+D.d6x=w([A.qI,A.fl],x.O)
+D.e33=new C.ha("emerald_fang","Emerald Fang","Luxury",D.a9y,D.d6x,A.aV,A.aE,!1,!1)
+D.aMv=new C.kr(2,"corporateStripe")
+D.e3a=new C.ha("royal_carbon","Royal Carbon","Luxury",D.aMv,A.a7b,A.aE,A.air,!1,!1)
+D.e2U=new C.ha("platinum_strike","Platinum Strike","Luxury",D.aMt,A.aEX,A.bO,A.cX,!1,!1)
+D.buI=new B.u(1,0.12156862745098039,0.07450980392156863,0.023529411764705882,A.q)
+D.cRu=w([D.buI,A.pC],x.O)
+D.e2Y=new C.ha("topaz_reign","Topaz Reign","Luxury",D.AV,D.cRu,A.au,A.aQ,!1,!1)
+D.dpk=w([A.bC,A.bs],x.O)
+D.e2M=new C.ha("frost_sovereign","Frost Sovereign","Luxury",D.AV,D.dpk,A.ct,A.pE,!1,!1)
 D.e2z=new C.kr(26,"essentialBroadcast")
-D.bki=new B.u(1,0.23921568627450981,0.0392156862745098,0.0392156862745098,A.q)
-D.byX=new B.u(1,0.07058823529411765,0.011764705882352941,0.011764705882352941,A.q)
-D.dyY=w([D.ajx,D.bki,D.byX],x.O)
-D.e3_=new C.ha("essential_crimson","Crimson Broadcast","Luxury",D.e2z,D.dyY,A.es,A.ex,!1,!0)
+D.bkj=new B.u(1,0.23921568627450981,0.0392156862745098,0.0392156862745098,A.q)
+D.byY=new B.u(1,0.07058823529411765,0.011764705882352941,0.011764705882352941,A.q)
+D.dyZ=w([D.ajx,D.bkj,D.byY],x.O)
+D.e3_=new C.ha("essential_crimson","Crimson Broadcast","Luxury",D.e2z,D.dyZ,A.es,A.ey,!1,!0)
 D.e2A=new C.kr(27,"essentialHerald")
-D.bu5=new B.u(1,0.07058823529411765,0.054901960784313725,0.03137254901960784,A.q)
-D.btv=new B.u(1,0.0392156862745098,0.03137254901960784,0.0196078431372549,A.q)
-D.dbw=w([D.bu5,A.ZM,D.btv],x.O)
-D.e32=new C.ha("essential_gold","Gold Herald","Luxury",D.e2A,D.dbw,A.aE,A.Cu,!1,!0)
-D.aMA=new C.kr(28,"essentialBulletin")
-D.boH=new B.u(1,0.047058823529411764,0.10196078431372549,0.23921568627450981,A.q)
-D.dIP=w([A.dV,D.boH,A.il],x.O)
-D.e2V=new C.ha("essential_sapphire","Sapphire Bulletin","Luxury",D.aMA,D.dIP,A.dU,A.bp,!1,!0)
+D.bu6=new B.u(1,0.07058823529411765,0.054901960784313725,0.03137254901960784,A.q)
+D.btw=new B.u(1,0.0392156862745098,0.03137254901960784,0.0196078431372549,A.q)
+D.dby=w([D.bu6,A.ZN,D.btw],x.O)
+D.e32=new C.ha("essential_gold","Gold Herald","Luxury",D.e2A,D.dby,A.aE,A.Cu,!1,!0)
+D.aMB=new C.kr(28,"essentialBulletin")
+D.boI=new B.u(1,0.047058823529411764,0.10196078431372549,0.23921568627450981,A.q)
+D.dIP=w([A.dV,D.boI,A.il],x.O)
+D.e2V=new C.ha("essential_sapphire","Sapphire Bulletin","Luxury",D.aMB,D.dIP,A.dU,A.bp,!1,!0)
 D.e2B=new C.kr(29,"essentialChronicle")
-D.biK=new B.u(1,0.00784313725490196,0.0784313725490196,0.058823529411764705,A.q)
-D.bzO=new B.u(1,0.00392156862745098,0.10196078431372549,0.07058823529411765,A.q)
-D.dg7=w([D.biK,A.fl,D.bzO],x.O)
-D.e2Z=new C.ha("essential_emerald","Emerald Chronicle","Luxury",D.e2B,D.dg7,A.b5,A.aV,!1,!0)
+D.biL=new B.u(1,0.00784313725490196,0.0784313725490196,0.058823529411764705,A.q)
+D.bzP=new B.u(1,0.00392156862745098,0.10196078431372549,0.07058823529411765,A.q)
+D.dg9=w([D.biL,A.fl,D.bzP],x.O)
+D.e2Z=new C.ha("essential_emerald","Emerald Chronicle","Luxury",D.e2B,D.dg9,A.b5,A.aV,!1,!0)
 D.e2D=new C.kr(30,"essentialGazette")
-D.bt0=new B.u(1,0.047058823529411764,0.023529411764705882,0.09411764705882353,A.q)
-D.bvG=new B.u(1,0.07058823529411765,0.023529411764705882,0.11764705882352941,A.q)
-D.dpO=w([D.bt0,A.nB,D.bvG],x.O)
-D.e2L=new C.ha("essential_violet","Violet Gazette","Luxury",D.e2D,D.dpO,A.aD,A.fk,!1,!0)
+D.bt1=new B.u(1,0.047058823529411764,0.023529411764705882,0.09411764705882353,A.q)
+D.bvH=new B.u(1,0.07058823529411765,0.023529411764705882,0.11764705882352941,A.q)
+D.dpP=w([D.bt1,A.nB,D.bvH],x.O)
+D.e2L=new C.ha("essential_violet","Violet Gazette","Luxury",D.e2D,D.dpP,A.aD,A.fk,!1,!0)
 D.e2E=new C.kr(31,"essentialWire")
-D.ble=new B.u(1,0.03137254901960784,0.0392156862745098,0.050980392156862744,A.q)
-D.czI=w([M.amk,A.bs,D.ble],x.O)
-D.e3j=new C.ha("essential_platinum","Platinum Wire","Luxury",D.e2E,D.czI,A.bn,A.bP,!1,!0)
+D.blf=new B.u(1,0.03137254901960784,0.0392156862745098,0.050980392156862744,A.q)
+D.czJ=w([M.amk,A.bs,D.blf],x.O)
+D.e3j=new C.ha("essential_platinum","Platinum Wire","Luxury",D.e2E,D.czJ,A.bn,A.bP,!1,!0)
 D.e2F=new C.kr(32,"essentialFlash")
-D.bqv=new B.u(1,0.07058823529411765,0.0392156862745098,0.00784313725490196,A.q)
-D.bwM=new B.u(1,0.10196078431372549,0.058823529411764705,0.011764705882352941,A.q)
-D.cTf=w([D.bqv,A.pB,D.bwM],x.O)
-D.e36=new C.ha("essential_amber","Amber Flash","Luxury",D.e2F,D.cTf,A.au,A.aQ,!1,!0)
-D.aMB=new C.kr(33,"essentialDispatch")
-D.bph=new B.u(1,0.00784313725490196,0.06274509803921569,0.09411764705882353,A.q)
-D.bwJ=new B.u(1,0.054901960784313725,0.30196078431372547,0.39215686274509803,A.q)
-D.bj8=new B.u(1,0.011764705882352941,0.09411764705882353,0.12549019607843137,A.q)
-D.d6d=w([D.bph,D.bwJ,D.bj8],x.O)
-D.e3l=new C.ha("essential_ocean","Ocean Dispatch","Luxury",D.aMB,D.d6d,A.jt,A.bc,!1,!0)
+D.bqw=new B.u(1,0.07058823529411765,0.0392156862745098,0.00784313725490196,A.q)
+D.bwN=new B.u(1,0.10196078431372549,0.058823529411764705,0.011764705882352941,A.q)
+D.cTg=w([D.bqw,A.pC,D.bwN],x.O)
+D.e36=new C.ha("essential_amber","Amber Flash","Luxury",D.e2F,D.cTg,A.au,A.aQ,!1,!0)
+D.aMC=new C.kr(33,"essentialDispatch")
+D.bpi=new B.u(1,0.00784313725490196,0.06274509803921569,0.09411764705882353,A.q)
+D.bwK=new B.u(1,0.054901960784313725,0.30196078431372547,0.39215686274509803,A.q)
+D.bj9=new B.u(1,0.011764705882352941,0.09411764705882353,0.12549019607843137,A.q)
+D.d6f=w([D.bpi,D.bwK,D.bj9],x.O)
+D.e3l=new C.ha("essential_ocean","Ocean Dispatch","Luxury",D.aMC,D.d6f,A.jt,A.bc,!1,!0)
 D.e2G=new C.kr(34,"essentialRose")
-D.bsw=new B.u(1,0.07058823529411765,0.023529411764705882,0.0392156862745098,A.q)
-D.bvR=new B.u(1,0.10196078431372549,0.03137254901960784,0.06274509803921569,A.q)
-D.duV=w([D.bsw,A.yY,D.bvR],x.O)
-D.e34=new C.ha("essential_rose","Rose Edition","Luxury",D.e2G,D.duV,A.hG,A.hF,!1,!0)
+D.bsx=new B.u(1,0.07058823529411765,0.023529411764705882,0.0392156862745098,A.q)
+D.bvS=new B.u(1,0.10196078431372549,0.03137254901960784,0.06274509803921569,A.q)
+D.duW=w([D.bsx,A.yY,D.bvS],x.O)
+D.e34=new C.ha("essential_rose","Rose Edition","Luxury",D.e2G,D.duW,A.hG,A.hF,!1,!0)
 D.e2H=new C.kr(35,"essentialMidnight")
-D.dHk=w([D.a_u,A.aw,A.a_],x.O)
+D.dHk=w([D.a_v,A.aw,A.a_],x.O)
 D.e3c=new C.ha("essential_midnight","Midnight News","Luxury",D.e2H,D.dHk,A.aE,A.bP,!1,!0)
-D.biq=new B.u(1,0.00784313725490196,0.10196078431372549,0.07058823529411765,A.q)
-D.bnQ=new B.u(1,0.00392156862745098,0.0784313725490196,0.054901960784313725,A.q)
-D.dkc=w([D.biq,A.fl,D.bnQ],x.O)
-D.e3b=new C.ha("essential_jade","Jade Bulletin","Luxury",D.aMA,D.dkc,A.aV,A.bv,!1,!0)
-D.bpv=new B.u(1,0.03137254901960784,0.043137254901960784,0.058823529411764705,A.q)
-D.dGy=w([A.Cl,A.bs,D.bpv],x.O)
-D.e3m=new C.ha("essential_steel","Steel Dispatch","Luxury",D.aMB,D.dGy,A.bP,A.cA,!1,!0)
+D.bir=new B.u(1,0.00784313725490196,0.10196078431372549,0.07058823529411765,A.q)
+D.bnR=new B.u(1,0.00392156862745098,0.0784313725490196,0.054901960784313725,A.q)
+D.dkd=w([D.bir,A.fl,D.bnR],x.O)
+D.e3b=new C.ha("essential_jade","Jade Bulletin","Luxury",D.aMB,D.dkd,A.aV,A.bv,!1,!0)
+D.bpw=new B.u(1,0.03137254901960784,0.043137254901960784,0.058823529411764705,A.q)
+D.dGy=w([A.Cl,A.bs,D.bpw],x.O)
+D.e3m=new C.ha("essential_steel","Steel Dispatch","Luxury",D.aMC,D.dGy,A.bP,A.cA,!1,!0)
 D.Ec=w([D.e2O,D.e2T,D.e3k,D.e3i,D.e2S,D.e3n,D.e37,D.e2Q,D.e38,D.e35,D.e3f,D.e3d,D.e3o,D.e31,D.e2N,D.e3e,D.e30,D.e2W,D.e3g,D.e3h,D.e39,D.e3p,D.e2R,D.e2X,D.e2P,D.e33,D.e3a,D.e2U,D.e2Y,D.e2M,D.e3_,D.e32,D.e2V,D.e2Z,D.e2L,D.e3j,D.e36,D.e3l,D.e34,D.e3c,D.e3b,D.e3m],B.ar("N<ha>"))
-D.dk1=w(["Standard","Premium"],x.s)
-D.fMY=new B.H(!0,D.jf,null,null,null,null,8,A.u,null,1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fYz=new B.C("DESCRIPTION",null,D.fMY,null,null,null,null,null,null,null,null,null)
-D.bN1=new B.bz(1,A.ba,D.fYz,null)
-D.aYp=new B.H(!0,D.jf,null,null,null,null,8,A.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.haA=new B.C("QTY",null,D.aYp,null,A.K,null,null,null,null,null,null,null)
-D.fux=new B.a6(36,null,D.haA,null)
-D.he8=new B.C("AMOUNT",null,D.aYp,null,A.e2,null,null,null,null,null,null,null)
-D.fud=new B.a6(58,null,D.he8,null)
-D.dpa=w([D.bN1,D.fux,D.fud],x.p)
+D.dk2=w(["Standard","Premium"],x.s)
+D.fN0=new B.H(!0,D.jf,null,null,null,null,8,A.u,null,1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fYC=new B.C("DESCRIPTION",null,D.fN0,null,null,null,null,null,null,null,null,null)
+D.bN1=new B.bz(1,A.ba,D.fYC,null)
+D.aYq=new B.H(!0,D.jf,null,null,null,null,8,A.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.haD=new B.C("QTY",null,D.aYq,null,A.K,null,null,null,null,null,null,null)
+D.fuA=new B.a6(36,null,D.haD,null)
+D.heb=new B.C("AMOUNT",null,D.aYq,null,A.e2,null,null,null,null,null,null,null)
+D.fug=new B.a6(58,null,D.heb,null)
+D.dpb=w([D.bN1,D.fuA,D.fug],x.p)
 D.c55=new B.ae(A.zS,14,A.c,null,null,null)
-D.fXS=new B.C("IMPERIAL INVOICE BULLETIN",null,I.aXD,null,null,null,null,null,null,null,null,null)
-D.dIc=w([D.c55,A.bf,D.fXS],x.p)
+D.fXV=new B.C("IMPERIAL INVOICE BULLETIN",null,I.aXE,null,null,null,null,null,null,null,null,null)
+D.dIc=w([D.c55,A.bf,D.fXV],x.p)
 D.eua={Modern:0,Classic:1,Minimal:2,Executive:3,Corporate:4,Creative:5,"Gold Foil":6,Marble:7,"Rose Gold":8,Emerald:9,Midnight:10,Diamond:11,Exclusive:12}
-D.aKL=new B.bl(D.eua,["modern","classic","minimal","executive","corporate","creative","gold_foil","marble","rose_gold","emerald","midnight_royale","diamond","exclusive"],B.ar("bl<m,m>"))
+D.aKM=new B.bl(D.eua,["modern","classic","minimal","executive","corporate","creative","gold_foil","marble","rose_gold","emerald","midnight_royale","diamond","exclusive"],B.ar("bl<m,m>"))
 D.e2y=new C.kr(20,"diamond")
-D.q4=new C.b3n(0,"premium")
-D.UJ=new C.b3n(1,"luxury")
+D.q5=new C.b3n(0,"premium")
+D.UK=new C.b3n(1,"luxury")
 D.eAP=new B.r(-18,12)
-D.hej=new B.C("Tip: signatures are optional for download, but recommended.",null,A.qj,null,null,null,null,null,null,null,null,null)
-D.eD_=new B.D(A.hJ,D.hej,null)
-D.fsH=new B.av(0,32)
-D.hdm=new B.C("TOTAL",null,A.oj,null,A.e2,null,null,null,null,null,null,null)
-D.ftV=new B.a6(60,null,D.hdm,null)
-D.fWy=new B.C("DISC.",null,A.oj,null,A.K,null,null,null,null,null,null,null)
-D.fuf=new B.a6(44,null,D.fWy,null)
-D.hfR=new B.C("PRICE",null,A.oj,null,A.K,null,null,null,null,null,null,null)
-D.fuk=new B.a6(52,null,D.hfR,null)
-D.hho=new B.C("QTY",null,A.oj,null,A.K,null,null,null,null,null,null,null)
-D.fuC=new B.a6(36,null,D.hho,null)
-D.fuP=new B.a6(null,52,null,null)
-D.h2m=new B.C("Invoice loaded into editor.",null,null,null,null,null,null,null,null,null,null,null)
-D.fvX=new B.b1(D.h2m,null,null,null,null,null,null,null,null,null,null,null,null,A.Y,!1,null,null,null,A.t,null)
-D.h7H=new B.C("Could not open print \u2014 try again.",null,null,null,null,null,null,null,null,null,null,null)
-D.fx5=new B.b1(D.h7H,A.aB,null,null,null,null,null,null,null,null,null,null,null,A.Y,!1,null,null,null,A.t,null)
-D.fCJ=new B.H(!0,D.jf,null,null,null,null,22,A.u,null,null,null,null,1,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fDg=new B.H(!0,A.aR,null,null,null,null,13,A.a8,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fDN=new B.H(!0,D.lr,null,null,null,null,11,A.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fFg=new B.H(!0,D.d_,null,null,null,null,13,A.P,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fFj=new B.H(!0,A.c,null,null,null,null,8,A.u,null,1.3,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fG0=new B.H(!0,D.d_,null,null,null,null,12,A.a8,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fGg=new B.H(!0,D.d_,null,null,null,null,15,A.u,null,null,null,null,1.12,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fGs=new B.H(!0,A.c,null,null,null,null,8,A.u,null,1.2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.hem=new B.C("Tip: signatures are optional for download, but recommended.",null,A.qk,null,null,null,null,null,null,null,null,null)
+D.eD_=new B.D(A.hJ,D.hem,null)
+D.fsK=new B.av(0,32)
+D.hdp=new B.C("TOTAL",null,A.ok,null,A.e2,null,null,null,null,null,null,null)
+D.ftY=new B.a6(60,null,D.hdp,null)
+D.fWB=new B.C("DISC.",null,A.ok,null,A.K,null,null,null,null,null,null,null)
+D.fui=new B.a6(44,null,D.fWB,null)
+D.hfU=new B.C("PRICE",null,A.ok,null,A.K,null,null,null,null,null,null,null)
+D.fun=new B.a6(52,null,D.hfU,null)
+D.hhr=new B.C("QTY",null,A.ok,null,A.K,null,null,null,null,null,null,null)
+D.fuF=new B.a6(36,null,D.hhr,null)
+D.fuS=new B.a6(null,52,null,null)
+D.h2p=new B.C("Invoice loaded into editor.",null,null,null,null,null,null,null,null,null,null,null)
+D.fw_=new B.b2(D.h2p,null,null,null,null,null,null,null,null,null,null,null,null,A.Y,!1,null,null,null,A.t,null)
+D.h7K=new B.C("Could not open print \u2014 try again.",null,null,null,null,null,null,null,null,null,null,null)
+D.fx8=new B.b2(D.h7K,A.aB,null,null,null,null,null,null,null,null,null,null,null,A.Y,!1,null,null,null,A.t,null)
+D.fCM=new B.H(!0,D.jf,null,null,null,null,22,A.u,null,null,null,null,1,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fDj=new B.H(!0,A.aR,null,null,null,null,13,A.a8,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fDQ=new B.H(!0,D.lr,null,null,null,null,11,A.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fFj=new B.H(!0,D.d_,null,null,null,null,13,A.P,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fFm=new B.H(!0,A.c,null,null,null,null,8,A.u,null,1.3,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fG3=new B.H(!0,D.d_,null,null,null,null,12,A.a8,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fGj=new B.H(!0,D.d_,null,null,null,null,15,A.u,null,null,null,null,1.12,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fGv=new B.H(!0,A.c,null,null,null,null,8,A.u,null,1.2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.acB=new B.H(!0,D.d_,null,null,null,null,12,A.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fGv=new B.H(!0,D.d_,null,null,null,null,11,A.P,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fH1=new B.H(!0,D.d_,null,null,null,null,10,A.F,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fH3=new B.H(!0,D.d_,null,null,null,null,12,A.P,null,null,null,null,1.2,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fJ0=new B.H(!0,D.d_,null,null,null,null,12,A.F,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.aYd=new B.H(!0,D.d_,null,null,null,null,13,A.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fLR=new B.H(!0,D.d_,null,null,null,null,9,A.P,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fMn=new B.H(!0,A.aD,null,null,null,null,null,A.P,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fNz=new B.H(!0,A.bv,null,null,null,null,16,A.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fOp=new B.H(!0,A.bl,null,null,null,null,null,A.P,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.aYA=new B.H(!0,D.d_,null,null,null,null,11,A.F,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fP3=new B.H(!0,A.bk,null,null,null,null,13,A.a8,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fQ0=new B.H(!0,A.aw,null,null,null,null,14.5,A.F,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fRU=new B.H(!0,A.c,null,null,null,null,18,A.u,null,1.2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fIk=new B.H(!0,A.bM,null,null,null,null,10,A.F,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fU_=new B.C("PREVIEW ONLY \u2014 Pay to edit, save, or download",null,D.fIk,null,A.K,null,null,null,null,null,null,null)
-D.fLL=new B.H(!0,A.c,null,null,null,null,7,A.u,null,1.4,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fUg=new B.C("CREATIVE STUDIO",null,D.fLL,null,null,null,null,null,null,null,null,null)
-D.fHb=new B.H(!0,A.c,null,null,null,null,18,A.u,null,1.5,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fUL=new B.C("INVOICE",null,D.fHb,null,null,null,null,null,null,null,null,null)
-D.fG3=new B.H(!0,D.lr,null,null,null,null,14,A.u,null,2.6,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.fYE=new B.C("PAID",null,D.fG3,null,null,null,null,null,null,null,null,null)
-D.h0H=new B.C("Your photo",null,A.w6,null,null,null,null,null,null,null,null,null)
-D.fCO=new B.H(!0,A.c,null,null,null,null,13,A.u,null,3,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.h1P=new B.C("ROYAL DISPATCH",null,D.fCO,null,null,null,null,null,null,null,null,null)
-D.h6l=new B.C("Offline ready: all invoice calculations/templates are local and work without internet.",null,A.qj,null,null,null,null,null,null,null,null,null)
-D.h6r=new B.C("Choose Template",null,A.fh,null,null,null,null,null,null,null,null,null)
-D.fI8=new B.H(!0,A.c,null,null,null,null,26,A.u,null,2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.h7x=new B.C("INVOICE",null,D.fI8,null,null,null,null,null,null,null,null,null)
-D.h8T=new B.C("Mark invoice as paid",null,null,null,null,null,null,null,null,null,null,null)
-D.fKP=new B.H(!0,A.c,null,null,null,null,20,A.u,null,2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.hbJ=new B.C("INVOICE",null,D.fKP,null,null,null,null,null,null,null,null,null)
-D.hcF=new B.C("Delete invoice?",null,null,null,null,null,null,null,null,null,null,null)
-D.hdB=new B.C("Paid invoices auto-delete from local saves after 5 days.",null,null,null,null,null,null,null,null,null,null,null)
-D.hfG=new B.C("Save Invoice",null,null,null,null,null,null,null,null,null,null,null)
-D.hGb=new B.bf("invoice-issued-date",x.W)
-D.hGu=new B.bf("invoice-due-date",x.W)
-D.hQ7=new C.afC(A3.a72,A.c,A.h6,A.ea)})()};
-(a=>{a["1A3I3DI7NS+6Fxw1Eca5nQYe2CU="]=a.current})($__dart_deferred_initializers__);
+D.fGy=new B.H(!0,D.d_,null,null,null,null,11,A.P,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fH4=new B.H(!0,D.d_,null,null,null,null,10,A.F,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fH6=new B.H(!0,D.d_,null,null,null,null,12,A.P,null,null,null,null,1.2,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fJ3=new B.H(!0,D.d_,null,null,null,null,12,A.F,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.aYe=new B.H(!0,D.d_,null,null,null,null,13,A.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fLU=new B.H(!0,D.d_,null,null,null,null,9,A.P,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fMq=new B.H(!0,A.aD,null,null,null,null,null,A.P,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fNC=new B.H(!0,A.bv,null,null,null,null,16,A.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fOs=new B.H(!0,A.bl,null,null,null,null,null,A.P,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.aYB=new B.H(!0,D.d_,null,null,null,null,11,A.F,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fP6=new B.H(!0,A.bk,null,null,null,null,13,A.a8,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fQ3=new B.H(!0,A.aw,null,null,null,null,14.5,A.F,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fRX=new B.H(!0,A.c,null,null,null,null,18,A.u,null,1.2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fIn=new B.H(!0,A.bM,null,null,null,null,10,A.F,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fU2=new B.C("PREVIEW ONLY \u2014 Pay to edit, save, or download",null,D.fIn,null,A.K,null,null,null,null,null,null,null)
+D.fLO=new B.H(!0,A.c,null,null,null,null,7,A.u,null,1.4,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fUj=new B.C("CREATIVE STUDIO",null,D.fLO,null,null,null,null,null,null,null,null,null)
+D.fHe=new B.H(!0,A.c,null,null,null,null,18,A.u,null,1.5,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fUO=new B.C("INVOICE",null,D.fHe,null,null,null,null,null,null,null,null,null)
+D.fG6=new B.H(!0,D.lr,null,null,null,null,14,A.u,null,2.6,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.fYH=new B.C("PAID",null,D.fG6,null,null,null,null,null,null,null,null,null)
+D.h0K=new B.C("Your photo",null,A.w6,null,null,null,null,null,null,null,null,null)
+D.fCR=new B.H(!0,A.c,null,null,null,null,13,A.u,null,3,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.h1S=new B.C("ROYAL DISPATCH",null,D.fCR,null,null,null,null,null,null,null,null,null)
+D.h6o=new B.C("Offline ready: all invoice calculations/templates are local and work without internet.",null,A.qk,null,null,null,null,null,null,null,null,null)
+D.h6u=new B.C("Choose Template",null,A.fh,null,null,null,null,null,null,null,null,null)
+D.fIb=new B.H(!0,A.c,null,null,null,null,26,A.u,null,2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.h7A=new B.C("INVOICE",null,D.fIb,null,null,null,null,null,null,null,null,null)
+D.h8W=new B.C("Mark invoice as paid",null,null,null,null,null,null,null,null,null,null,null)
+D.fKS=new B.H(!0,A.c,null,null,null,null,20,A.u,null,2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
+D.hbM=new B.C("INVOICE",null,D.fKS,null,null,null,null,null,null,null,null,null)
+D.hcI=new B.C("Delete invoice?",null,null,null,null,null,null,null,null,null,null,null)
+D.hdE=new B.C("Paid invoices auto-delete from local saves after 5 days.",null,null,null,null,null,null,null,null,null,null,null)
+D.hfJ=new B.C("Save Invoice",null,null,null,null,null,null,null,null,null,null,null)
+D.hGe=new B.bf("invoice-issued-date",x.W)
+D.hGx=new B.bf("invoice-due-date",x.W)
+D.hQa=new C.afC(A3.a72,A.c,A.h6,A.ea)})()};
+(a=>{a["ZlTXXYFJhhdmA8LkCWUHq5Zr/mI="]=a.current})($__dart_deferred_initializers__);
