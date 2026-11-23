@@ -1,6 +1,6 @@
 // deno test supabase/functions/ngmy-ai-chat/alpaca_agent_test.ts
 import { assertEquals, assert } from "https://deno.land/std@0.177.0/testing/asserts.ts";
-import { activeMarket, bigTrend, buildChart, crossover, decide, entryNow, etParts, PA_FX, PA_LESSON_IDS, PA_MARKETS, pickMarket, readMarket, rsi, runStats, sma, type DecideInput, type Scan } from "./alpaca_agent.ts";
+import { activeMarket, addDays, bigTrend, heldMark, optionFits, pickOption, buildChart, crossover, decide, entryNow, etParts, PA_FX, PA_LESSON_IDS, PA_MARKETS, pickMarket, readMarket, rsi, runStats, sma, type DecideInput, type Scan } from "./alpaca_agent.ts";
 
 const base: DecideInput = {
   weekend: false, asset: "SPY", stock: true, price: 100, signal: "none", fast: 100, slow: 100, shadow: null,
@@ -35,8 +35,9 @@ Deno.test("buy only on a real signal", () => {
 });
 
 Deno.test("brakes beat signals", () => {
-  assertEquals(decide({ ...base, signal: "buy", dayPnl: -10 }).reason, "daily stop reached ($10 lost today)");
-  assertEquals(decide({ ...base, signal: "buy", totalPnl: -25 }).reason, "agent paused by the $25 brake");
+  assertEquals(decide({ ...base, signal: "buy", dayPnl: -50 }).reason, "daily stop reached ($50 lost today)");
+  assertEquals(decide({ ...base, signal: "buy", dayPnl: -49.99 }).decision, "would buy");
+  assertEquals(decide({ ...base, signal: "buy", totalPnl: -100 }).reason, "agent paused by the $100 brake");
   assertEquals(decide({ ...base, signal: "buy", tradesToday: 4 }).decision, "no action");
   assertEquals(decide({ ...base, weekend: true, asset: "BTC/USD", signal: "buy", tradesToday: 4 }).decision, "would buy");
   assertEquals(decide({ ...base, weekend: true, asset: "BTC/USD", signal: "buy", tradesToday: 5 }).decision, "no action");
@@ -45,19 +46,24 @@ Deno.test("brakes beat signals", () => {
   assertEquals(decide({ ...base, signal: "buy", finalCheck: true }).decision, "no action");
 });
 
-Deno.test("exits: take profit, stop loss, 3:55 rule, sell signal", () => {
-  const shadow = { symbol: "SPY", qty: 0.5, entryPrice: 100, entryAt: "" };
-  const tp = decide({ ...base, shadow, price: 103 });
+Deno.test("exits in dollars: +$50 take profit, -$50 stop loss, 3:55 rule, sell signal", () => {
+  // One SPY call: 1 contract x 100 shares, bought at $1.00 a share ($100).
+  const shadow = { symbol: "SPY", qty: 1, mult: 100, entryPrice: 1, entryAt: "" };
+  const tp = decide({ ...base, shadow, price: 1.5 });
   assertEquals(tp.decision, "would sell");
-  assertEquals(tp.pnl, 1.5);
-  const sl = decide({ ...base, shadow, price: 98.5 });
+  assertEquals(tp.pnl, 50);
+  assertEquals(decide({ ...base, shadow, price: 1.49 }).decision, "hold");
+  const sl = decide({ ...base, shadow, price: 0.5 });
   assertEquals(sl.decision, "would sell");
-  assertEquals(sl.pnl, -0.75);
-  assertEquals(decide({ ...base, shadow, price: 100.5, finalCheck: true }).decision, "would sell");
-  assertEquals(decide({ ...base, shadow, price: 100.5, signal: "sell" }).decision, "would sell");
-  assertEquals(decide({ ...base, shadow, price: 100.5 }).decision, "hold");
+  assertEquals(sl.pnl, -50);
+  assertEquals(decide({ ...base, shadow, price: 0.51 }).decision, "hold");
+  assertEquals(decide({ ...base, shadow, price: 1.1, finalCheck: true }).decision, "would sell");
+  assertEquals(decide({ ...base, shadow, price: 1.1, signal: "sell" }).decision, "would sell");
+  assertEquals(decide({ ...base, shadow, price: 1.1 }).decision, "hold");
   // Crypto trades all day: the 3:55 PM stock rule does not sell it.
-  const btc = { symbol: "BTC/USD", qty: 0.001, entryPrice: 50000, entryAt: "" };
+  const btc = { symbol: "BTC/USD", qty: 0.002, mult: 1, entryPrice: 50000, entryAt: "" };
+  // $100 of Bitcoin: +$50 needs +50%, so a normal move only holds.
+  assertEquals(decide({ ...base, asset: "BTC/USD", stock: false, shadow: btc, price: 75000 }).pnl, 50);
   assertEquals(decide({ ...base, asset: "BTC/USD", stock: false, shadow: btc, price: 50100, finalCheck: true }).decision, "hold");
   // ...and a crypto buy is still allowed in the last stock minutes.
   assertEquals(decide({ ...base, asset: "BTC/USD", stock: false, signal: "buy", finalCheck: true }).decision, "would buy");
@@ -266,4 +272,24 @@ Deno.test("3:40 PM: no new stock buys, but an open stock position is only sold f
   assertEquals(decide({ ...base, signal: "buy", lateForBuys: true }).decision, "no action");
   assertEquals(decide({ ...base, shadow, price: 100.5, lateForBuys: true, finalCheck: false }).decision, "hold");
   assertEquals(decide({ ...base, shadow, price: 100.5, lateForBuys: true, finalCheck: true }).decision, "would sell");
+});
+
+Deno.test("SPY option: nearest expiry at least 7 days away, strike closest to the price, $120 limit", () => {
+  assertEquals(addDays("2026-11-27", 7), "2026-12-04");
+  const c = [
+    { symbol: "A", strike: 700, expiry: "2026-11-27" }, // too soon
+    { symbol: "B", strike: 705, expiry: "2026-12-04" },
+    { symbol: "C", strike: 702, expiry: "2026-12-04" },
+    { symbol: "D", strike: 698, expiry: "2026-12-04" },
+    { symbol: "E", strike: 701, expiry: "2026-12-11" }, // closer strike, but a later expiry
+  ];
+  assertEquals(pickOption(c, 701, "2026-11-27")?.symbol, "C"); // 702 and 698 are both 1 away... 702 is 1, 698 is 3
+  assertEquals(pickOption(c, 700, "2026-11-27")?.symbol, "D"); // tie (698 and 702 both 2 away): the lower strike
+  assertEquals(pickOption([c[0]], 700, "2026-11-27"), null);
+  assertEquals(optionFits(1.2), { ok: true, cost: 120 });
+  assertEquals(optionFits(1.21).ok, false);
+  assertEquals(optionFits(8.5), { ok: false, cost: 850 }); // a real at-the-money price: no trade
+  assertEquals(optionFits(0).ok, false);
+  const m = heldMark({ symbol: "SPY", qty: 1, mult: 100, entryPrice: 1.1, entryAt: "" }, 1.35);
+  assertEquals(m, { price: 1.35, cost: 110, value: 135, pnl: 25, priced: true });
 });

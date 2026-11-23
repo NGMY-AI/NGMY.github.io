@@ -111,19 +111,24 @@ export const PA_FX: { symbol: string; yahoo: string; name: string }[] = [
   { symbol: "USD/THB", yahoo: "USDTHB=X", name: "US dollar / Thai baht" },
 ];
 
+/** Marks log lines made under the $100 / +$50 / -$50 rules (Nov 22, 2026), for their own win rate. */
+export const PA_RULES_TAG = "usd100";
+
 export const PA_RULES = {
   version: 1,
   readOnly: true,
-  tradeUsd: 50,
+  tradeUsd: 100, // per trade: one SPY call option (premium up to $120) on weekdays, $100 of BTC on weekends
   fastMa: 9,
   slowMa: 21,
   candleMinutes: 5,
   checkEveryMinutes: 15, // new buys are looked for every 15 minutes
   exitCheckMinutes: 5, // an open position is checked every 5 minutes (take profit, stop loss, turn down)
-  takeProfitPct: 3,
-  stopLossPct: 1.5,
-  dailyLossStopUsd: 10,
-  totalLossBrakeUsd: 25,
+  takeProfitUsd: 50, // sell when the position is up $50
+  stopLossUsd: 50, // sell when the position is down $50 (same size as the win: 5 wins out of 10 breaks even)
+  dailyLossStopUsd: 50,
+  totalLossBrakeUsd: 100,
+  optionMaxPremiumUsd: 120, // one SPY call contract (100 shares x the premium) may cost at most this
+  optionMinDays: 7, // the nearest expiry at least 7 days away
   weekdayMaxTrades: 4,
   weekendMaxTrades: 5,
   closeOutEt: "3:55 PM",
@@ -133,18 +138,20 @@ export const PA_RULES = {
 export const PA_RULE_LINES: string[] = [
   "Version 1 is read-only: it logs what it WOULD do and places no orders.",
   "Alpaca paper account only. No live keys, no live endpoint, no real money.",
-  "$50 per trade, one position at a time across all markets. No options, no margin, no short selling.",
+  "$100 per trade, one position at a time. No margin, no short selling.",
+  "Weekdays (SPY): instead of shares it would buy ONE SPY call option contract: the strike closest to the SPY price (at the money), the nearest expiry at least 7 days away, and only if the contract costs $120 or less. If it costs more, no trade, and the log says why.",
+  "Weekends (BTC/USD): $100 of Bitcoin itself (spot).",
   "All times are Eastern Time (New York).",
   "It trades ONE market: SPY on weekdays while the US stock market is open (9:30 AM to 4:00 PM ET, never on market holidays), and Bitcoin (BTC/USD) on Saturday and Sunday. No other market, and nothing on weekday evenings.",
   "Every 15 minutes it looks for a new buy. While it holds a position it checks the exit rules every 5 minutes.",
   "Buy signal, ALL of these: the fast average (9 candles) crosses above the slow average (21 candles) on 5-minute candles, the slow average is higher than 1 hour ago (the big trend is rising), the price is above the slow average, and no position is held.",
   "Never buys into a falling big trend: if the slow average is flat or falling, no trade, even when the fast line crosses up.",
   "Sell signal: the fast average crosses back below the slow average.",
-  "Take profit: sell the whole position at +3%. Stop loss: sell the whole position at -1.5%.",
-  "Stocks: sell everything by 3:55 PM ET. No overnight stock positions, and no new stock buys after 3:40 PM ET.",
+  "Take profit: sell when the position is up $50. Stop loss: sell when it is down $50. Win and loss are the same size, so winning 5 out of 10 trades breaks even.",
+  "Weekdays: sell everything by 3:55 PM ET. No overnight SPY positions, and no new SPY buys after 3:40 PM ET.",
   "Up to 4 trades per weekday and 5 per weekend day, only on a real signal. Never forced.",
-  "Daily stop: if the day loses $10, no more buys that day.",
-  "Total brake: if total demo losses reach $25, the agent pauses until an admin turns it back on.",
+  "Daily stop: if the day loses $50, no more buys that day.",
+  "Total brake: if total demo losses reach $100, the agent pauses until an admin turns it back on.",
 ];
 
 // ─────────────────────────────────────────────────────────────── pure helpers (tested)
@@ -191,7 +198,12 @@ export function etParts(d: Date) {
   return { dayKey, weekday, hour, minute, weekend: weekday === "Sat" || weekday === "Sun", label };
 }
 
-export type Shadow = { symbol: string; qty: number; entryPrice: number; entryAt: string } | null;
+/** A SPY call option contract (pretend). Prices are per share; one contract = 100 shares. */
+export type OptionInfo = { contract: string; strike: number; expiry: string; premium: number; cost: number };
+
+/** The pretend position. For an option: symbol "SPY" (the market it follows), qty 1 contract, mult 100,
+ *  entryPrice = the premium per share paid, and `option` has the contract. */
+export type Shadow = { symbol: string; qty: number; entryPrice: number; entryAt: string; mult?: number; option?: OptionInfo } | null;
 
 export type DecideInput = {
   weekend: boolean;
@@ -223,19 +235,22 @@ export type Decision = {
 export function decide(x: DecideInput): Decision {
   const r = PA_RULES;
   if (x.shadow) {
-    const chg = (x.price - x.shadow.entryPrice) / x.shadow.entryPrice * 100;
-    const pnl = round2(x.shadow.qty * (x.price - x.shadow.entryPrice));
-    if (chg >= r.takeProfitPct) return { decision: "would sell", reason: `take profit hit (+${chg.toFixed(2)}%)`, pnl };
-    if (chg <= -r.stopLossPct) return { decision: "would sell", reason: `stop loss hit (${chg.toFixed(2)}%)`, pnl };
-    if (x.stock && x.finalCheck) return { decision: "would sell", reason: "3:55 PM ET rule, no overnight stock positions", pnl };
-    if (x.signal === "sell") return { decision: "would sell", reason: "sell signal: fast average crossed below slow", pnl };
+    // x.price = the current price of what is held (for an option: its premium per share now).
+    const mult = x.shadow.mult ?? 1;
+    const pnl = round2(x.shadow.qty * mult * (x.price - x.shadow.entryPrice));
+    const money = `${pnl >= 0 ? "+" : "-"}$${Math.abs(pnl).toFixed(2)}`;
+    if (pnl >= r.takeProfitUsd) return { decision: "would sell", reason: `take profit hit (${money})`, pnl };
+    if (pnl <= -r.stopLossUsd) return { decision: "would sell", reason: `stop loss hit (${money})`, pnl };
+    if (x.stock && x.finalCheck) return { decision: "would sell", reason: `3:55 PM ET rule, no overnight SPY positions (${money})`, pnl };
+    if (x.signal === "sell") return { decision: "would sell", reason: `sell signal: fast average crossed below slow (${money})`, pnl };
+    const what = x.shadow.option ? `SPY $${x.shadow.option.strike} call` : `${x.asset} trade`;
     return {
       decision: "hold",
-      reason: `still holding the same ${x.asset} trade (${chg >= 0 ? "+" : ""}${chg.toFixed(2)}%), waiting for the take profit, the stop loss or a turn down`,
+      reason: `still holding the same ${what} (${money}), waiting for +$${r.takeProfitUsd}, -$${r.stopLossUsd} or a turn down`,
     };
   }
-  if (x.totalPnl <= -r.totalLossBrakeUsd) return { decision: "no action", reason: "agent paused by the $25 brake" };
-  if (x.dayPnl <= -r.dailyLossStopUsd) return { decision: "no action", reason: "daily stop reached ($10 lost today)" };
+  if (x.totalPnl <= -r.totalLossBrakeUsd) return { decision: "no action", reason: `agent paused by the $${r.totalLossBrakeUsd} brake` };
+  if (x.dayPnl <= -r.dailyLossStopUsd) return { decision: "no action", reason: `daily stop reached ($${r.dailyLossStopUsd} lost today)` };
   const maxTrades = x.weekend ? r.weekendMaxTrades : r.weekdayMaxTrades;
   if (x.tradesToday >= maxTrades) return { decision: "no action", reason: `daily trade limit reached (${maxTrades})` };
   if (x.stock && (x.lateForBuys ?? x.finalCheck)) return { decision: "no action", reason: "too close to the 3:55 PM ET close-out, no new stock buys" };
@@ -250,6 +265,44 @@ export function decide(x: DecideInput): Decision {
   if (x.alpacaHolding) return { decision: "no action", reason: "buy signal, but a position is already open at Alpaca" };
   if (x.signalAlreadyUsed) return { decision: "no action", reason: "buy signal already used, never twice for one signal" };
   return { decision: "would buy", reason: `buy signal on ${x.asset}: fast average crossed above slow and ${x.bigTrend.why}, would buy $${r.tradeUsd}` };
+}
+
+/** An open pretend position at a price: what it is worth and its win or loss in dollars. */
+export function heldMark(s: NonNullable<Shadow>, price: number) {
+  const m = s.mult ?? 1;
+  const p = price || s.entryPrice;
+  return {
+    price: p, cost: round2(s.qty * m * s.entryPrice), value: round2(s.qty * m * p), pnl: round2(s.qty * m * (p - s.entryPrice)),
+    priced: price > 0,
+  };
+}
+
+/** "YYYY-MM-DD" plus n days. */
+export function addDays(dayKey: string, n: number): string {
+  const [y, m, d] = dayKey.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}
+
+/** The SPY call to buy: the nearest expiry at least 7 days after today (Eastern), and in it the strike closest to the
+ *  SPY price (at the money; on a tie the lower strike). Pure, so it is tested. */
+export function pickOption(
+  contracts: { symbol: string; strike: number; expiry: string }[],
+  spot: number,
+  todayKey: string,
+  minDays = PA_RULES.optionMinDays,
+): { symbol: string; strike: number; expiry: string } | null {
+  const minExpiry = addDays(todayKey, minDays);
+  const ok = contracts.filter((c) => c.expiry >= minExpiry && c.strike > 0);
+  if (!ok.length || !(spot > 0)) return null;
+  const expiry = ok.map((c) => c.expiry).sort()[0];
+  return ok.filter((c) => c.expiry === expiry)
+    .sort((a, b) => Math.abs(a.strike - spot) - Math.abs(b.strike - spot) || a.strike - b.strike)[0];
+}
+
+/** Whether the picked contract fits the budget: one contract = 100 x the premium, at most $120. */
+export function optionFits(premiumPerShare: number): { ok: boolean; cost: number } {
+  const cost = round2(premiumPerShare * 100);
+  return { ok: premiumPerShare > 0 && cost <= PA_RULES.optionMaxPremiumUsd, cost };
 }
 
 export type Scan = {
@@ -558,6 +611,58 @@ async function readAccount(k: Keys) {
 type Series = { closes: number[]; times: string[]; ohlc: { o: number; h: number; l: number }[]; price: number; lastBarAt: string };
 
 /** All watchlist markets in a handful of calls: one bars call and one latest-price call for stocks, the same for crypto. */
+/** Bid and ask of one option contract now (Alpaca's free indicative options feed). GET only. */
+async function readOptionQuote(k: Keys, contract: string): Promise<{ bid: number; ask: number; last: number }> {
+  const j = await aGet(DATA_BASE, `/v1beta1/options/snapshots?symbols=${encodeURIComponent(contract)}&feed=indicative`, k);
+  const s = j?.snapshots?.[contract] ?? {};
+  return { bid: Number(s.latestQuote?.bp ?? 0), ask: Number(s.latestQuote?.ap ?? 0), last: Number(s.latestTrade?.p ?? 0) };
+}
+
+/** What a held option would sell for now: the bid (what a buyer pays), else the last trade. 0 = unknown. */
+async function optionSellPrice(k: Keys, contract: string): Promise<number> {
+  try {
+    const q = await readOptionQuote(k, contract);
+    return q.bid > 0 ? q.bid : q.last;
+  } catch {
+    return 0;
+  }
+}
+
+/** Finds the SPY call to buy (at the money, nearest expiry at least 7 days away) and its price (the ask).
+ *  Read-only: the contract list from the paper endpoint and a quote from the data feed. */
+async function chooseSpyCall(k: Keys, spot: number, todayKey: string): Promise<
+  { ok: true; option: OptionInfo } | { ok: false; why: string; option?: OptionInfo }
+> {
+  const from = addDays(todayKey, PA_RULES.optionMinDays);
+  const to = addDays(todayKey, PA_RULES.optionMinDays + 21);
+  const q = `/v2/options/contracts?underlying_symbols=SPY&type=call&status=active&expiration_date_gte=${from}` +
+    `&expiration_date_lte=${to}&strike_price_gte=${Math.floor(spot * 0.97)}&strike_price_lte=${Math.ceil(spot * 1.03)}&limit=1000`;
+  let list: any[] = [];
+  try {
+    const j = await aGet(PAPER_BASE, q, k);
+    list = Array.isArray(j?.option_contracts) ? j.option_contracts : [];
+  } catch (e) {
+    return { ok: false, why: `could not read the SPY option list (${String((e as Error).message)})` };
+  }
+  const pick = pickOption(list.map((c) => ({ symbol: String(c.symbol), strike: Number(c.strike_price), expiry: String(c.expiration_date) })), spot, todayKey);
+  if (!pick) return { ok: false, why: "no SPY call option found with an expiry at least 7 days away" };
+  let quote: { bid: number; ask: number; last: number };
+  try { quote = await readOptionQuote(k, pick.symbol); } catch (e) {
+    return { ok: false, why: `could not read the price of the SPY $${pick.strike} call (${String((e as Error).message)})` };
+  }
+  const premium = quote.ask > 0 ? quote.ask : quote.last;
+  const fit = optionFits(premium);
+  const option: OptionInfo = { contract: pick.symbol, strike: pick.strike, expiry: pick.expiry, premium, cost: fit.cost };
+  if (!premium) return { ok: false, why: `no price for the SPY $${pick.strike} call expiring ${pick.expiry}`, option };
+  if (!fit.ok) {
+    return {
+      ok: false, option,
+      why: `the at-the-money SPY $${pick.strike} call expiring ${pick.expiry} costs $${fit.cost.toFixed(2)} ($${premium.toFixed(2)} x 100), over the $${PA_RULES.optionMaxPremiumUsd} limit, so no trade`,
+    };
+  }
+  return { ok: true, option };
+}
+
 async function readMarkets(k: Keys, extra: MarketDef[] = []): Promise<Record<string, Series>> {
   // `extra`: a position still open in a market that is no longer on the list keeps being read, so its exit
   // rules (take profit, stop loss, turn down) still work. It is never bought again.
@@ -827,20 +932,31 @@ async function runCheck(db: any): Promise<Record<string, unknown>> {
 
   let d: Decision;
   let focus: Scan;
+  let heldPrice = 0;
+  let optionPriceMissing = false;
+  let newShadow: Shadow = null;
   if (shadow) {
     // Holding: only the held market matters (one position at a time).
     focus = scans.find((s) => s.symbol === shadow.symbol) ?? {
       symbol: shadow.symbol, stock: !shadow.symbol.includes("/"), open: false, price: shadow.entryPrice,
       fast: null, slow: null, signal: "none", key: "",
     };
-    d = decide({ ...base, asset: focus.symbol, stock: focus.stock, price: focus.price || shadow.entryPrice, signal: focus.signal,
+    // What is held is worth: for a SPY option, its own price now (the bid); for Bitcoin, the Bitcoin price.
+    if (shadow.option) {
+      heldPrice = await optionSellPrice(cfg.keys, shadow.option.contract);
+      if (!heldPrice) optionPriceMissing = true;
+    } else {
+      heldPrice = focus.price;
+    }
+    d = decide({ ...base, asset: focus.symbol, stock: focus.stock, price: heldPrice || shadow.entryPrice, signal: focus.signal,
       fast: focus.fast, slow: focus.slow, shadow, signalAlreadyUsed: false });
+    if (optionPriceMissing && d.decision === "hold") d = { ...d, reason: `${d.reason} (no option price right now, checked again in 5 minutes)` };
   } else {
     const { pick } = pickMarket(scans, state.last_signal_key ?? null, lateForBuys);
     // Only the active market can be bought: SPY on weekdays while the stock market is open, BTC/USD on weekends.
     focus = pick ?? scans.find((s) => s.symbol === active) ?? scans[0];
     if (state.brake_paused) {
-      d = { decision: "no action", reason: "agent paused by the $25 brake, waiting for an admin to turn it back on" };
+      d = { decision: "no action", reason: `agent paused by the $${PA_RULES.totalLossBrakeUsd} brake, waiting for an admin to turn it back on` };
     } else if (!active) {
       d = { decision: "no action", reason: "no market is traded right now: SPY trades on weekdays 9:30 AM to 4:00 PM ET, BTC/USD on Saturday and Sunday" };
     } else {
@@ -853,6 +969,21 @@ async function runCheck(db: any): Promise<Record<string, unknown>> {
           reason: `no buy signal on ${active} (the only market traded today)${below ? ", the fast average is below the slow" : ""}; ${focus.big?.why ?? ""}`.replace(/; $/, ""),
         };
       }
+      if (d.decision === "would buy") {
+        if (focus.stock) {
+          // Weekdays: one SPY call option instead of shares, only if it costs $120 or less.
+          const c = await chooseSpyCall(cfg.keys, focus.price, et.dayKey);
+          if (!c.ok) {
+            d = { decision: "no action", reason: `buy signal on SPY, but ${c.why}` };
+          } else {
+            const o = c.option;
+            newShadow = { symbol: "SPY", qty: 1, mult: 100, entryPrice: o.premium, entryAt: now.toISOString(), option: o };
+            d = { ...d, reason: `${d.reason.replace(/, would buy \$\d+$/, "")}: would buy 1 SPY $${o.strike} call expiring ${o.expiry} for $${o.cost.toFixed(2)} ($${o.premium.toFixed(2)} x 100)` };
+          }
+        } else {
+          newShadow = { symbol: focus.symbol, qty: PA_RULES.tradeUsd / focus.price, mult: 1, entryPrice: focus.price, entryAt: now.toISOString() };
+        }
+      }
     }
   }
 
@@ -862,12 +993,14 @@ async function runCheck(db: any): Promise<Record<string, unknown>> {
     snapshot: {
       ...acct, at: now.toISOString(), etTime: et.label, stockOpen, markets: cards,
       asset: focus.symbol, price, chart: focusCard?.chart ?? null,
+      // The open pretend position marked to market (for an option: its own price, not the SPY price).
+      held: shadow && d.decision !== "would sell" ? heldMark(shadow, heldPrice) : null,
     },
   };
   let newTotal = totalPnl;
   let newDay = dayPnl;
-  if (d.decision === "would buy") {
-    statePatch.shadow = { symbol: focus.symbol, qty: PA_RULES.tradeUsd / price, entryPrice: price, entryAt: now.toISOString() };
+  if (d.decision === "would buy" && newShadow) {
+    statePatch.shadow = newShadow;
     statePatch.last_signal_key = focus.key;
     await db.from("ngmy_alpaca_agent_days").update({ trades: Number(day.trades ?? 0) + 1 }).eq("et_day", et.dayKey);
   } else if (d.decision === "would sell") {
@@ -891,20 +1024,29 @@ async function runCheck(db: any): Promise<Record<string, unknown>> {
     reason: d.reason,
     balance: acct.equity, total_pnl: newTotal, day_pnl: newDay,
     details: {
-      pnl: d.pnl ?? null, by: "cron", stockOpen, openMarkets: openCount, activeMarket: active,
+      pnl: d.pnl ?? null, by: "cron", rules: shadow && shadow.mult == null ? "usd50" : PA_RULES_TAG, stockOpen, openMarkets: openCount, activeMarket: active,
       bigTrendOk: focus.big?.ok ?? null, exitOnly: holding,
       // Every market the agent looked at in this check.
       scanned: scans.map((s) => ({ s: s.symbol, p: s.price, f: s.fast, sl: s.slow, sig: s.signal, open: s.open })),
       // The money side of a pretend trade, so the app can show what went in and what came out.
-      ...(d.decision === "would buy" ? { amount: PA_RULES.tradeUsd, qty: PA_RULES.tradeUsd / price, entryPrice: price } : {}),
-      ...(d.decision === "would sell" && shadow ? {
-        amount: PA_RULES.tradeUsd, qty: shadow.qty, entryPrice: shadow.entryPrice, exitPrice: price, entryAt: shadow.entryAt,
-        outValue: round2(shadow.qty * price), pct: round2((price - shadow.entryPrice) / shadow.entryPrice * 100),
+      // For a SPY option, prices are the option premium per share, and option has the contract (strike, expiry).
+      ...(d.decision === "would buy" && newShadow ? {
+        amount: round2(newShadow.qty * (newShadow.mult ?? 1) * newShadow.entryPrice), qty: newShadow.qty, mult: newShadow.mult ?? 1,
+        entryPrice: newShadow.entryPrice, option: newShadow.option ?? null,
       } : {}),
+      ...(d.decision === "would sell" && shadow ? (() => {
+        const m = shadow.mult ?? 1;
+        const exit = heldPrice || shadow.entryPrice;
+        return {
+          amount: round2(shadow.qty * m * shadow.entryPrice), qty: shadow.qty, mult: m, entryPrice: shadow.entryPrice, exitPrice: exit,
+          entryAt: shadow.entryAt, option: shadow.option ?? null,
+          outValue: round2(shadow.qty * m * exit), pct: round2((exit - shadow.entryPrice) / shadow.entryPrice * 100),
+        };
+      })() : {}),
     },
   });
   if (statePatch.brake_paused) {
-    await writeLog(db, { kind: "control", asset: watch, decision: "no action", reason: "agent paused by the $25 brake. An admin must review and turn it back on.", total_pnl: newTotal });
+    await writeLog(db, { kind: "control", asset: watch, decision: "no action", reason: `agent paused by the $${PA_RULES.totalLossBrakeUsd} brake. An admin must review and turn it back on.`, total_pnl: newTotal });
   }
   return { ok: true, decision: d.decision, reason: d.reason };
 }
@@ -1036,9 +1178,12 @@ export async function handleAlpacaAgent(
         const [acct, series] = await Promise.all([readAccount(cfg.keys), readMarkets(cfg.keys, extra)]);
         const cards = marketCards(series, !!stockOpen, et.weekend, extra);
         const focus = cards.find((c) => c.symbol === held) ?? cards.find((c) => c.open) ?? cards[0];
+        const sh: Shadow = state.shadow ?? null;
+        const markPrice = !sh ? 0 : sh.option ? await optionSellPrice(cfg.keys, sh.option.contract) : (cards.find((c) => c.symbol === sh.symbol)?.price ?? 0);
         const live = {
           ...acct, at: new Date().toISOString(), etTime: et.label, stockOpen: !!stockOpen, markets: cards,
           asset: focus.symbol, price: focus.price, chart: focus.chart,
+          held: sh ? heldMark(sh, markPrice) : null,
         };
         await saveState(db, { snapshot: live });
         state.snapshot = live;
@@ -1060,10 +1205,19 @@ export async function handleAlpacaAgent(
   const { data: closed } = await db.from("ngmy_alpaca_agent_log").select("details")
     .eq("decision", "would sell").order("id", { ascending: false }).limit(500);
   const pnls: number[] = (closed ?? []).map((r: any) => Number(r?.details?.pnl ?? 0));
+  // The $100 rules (Nov 22): their own win rate, to see if the agent wins at least 5 out of 10.
+  const newPnls: number[] = (closed ?? []).filter((r: any) => r?.details?.rules === PA_RULES_TAG).map((r: any) => Number(r?.details?.pnl ?? 0));
+  const newWins = newPnls.filter((p) => p > 0).length;
   const record = {
     wins: pnls.filter((p) => p > 0).length, losses: pnls.filter((p) => p <= 0).length, trades: pnls.length,
     // Every finished pretend trade added together: the screen adds this to the paper balance.
     pnlSum: round2(pnls.reduce((s, p) => s + p, 0)),
+    winRatePct: pnls.length ? Math.round(pnls.filter((p) => p > 0).length / pnls.length * 100) : null,
+    newRules: {
+      trades: newPnls.length, wins: newWins, losses: newPnls.length - newWins,
+      winRatePct: newPnls.length ? Math.round(newWins / newPnls.length * 100) : null,
+      pnlSum: round2(newPnls.reduce((s, p) => s + p, 0)),
+    },
   };
   return {
     status: 200,
@@ -1077,9 +1231,12 @@ export async function handleAlpacaAgent(
       trades: (trades ?? []).map((t: any) => ({ ...t, details: { ...(t.details ?? {}), scanned: undefined } })),
       record,
       ticket: {
-        amount: PA_RULES.tradeUsd, takeProfitPct: PA_RULES.takeProfitPct, stopLossPct: PA_RULES.stopLossPct,
-        takeProfitUsd: round2(PA_RULES.tradeUsd * PA_RULES.takeProfitPct / 100), stopLossUsd: round2(PA_RULES.tradeUsd * PA_RULES.stopLossPct / 100),
+        amount: PA_RULES.tradeUsd, takeProfitUsd: PA_RULES.takeProfitUsd, stopLossUsd: PA_RULES.stopLossUsd,
         maxTradesToday: etNow.weekend ? PA_RULES.weekendMaxTrades : PA_RULES.weekdayMaxTrades,
+        dailyStopUsd: PA_RULES.dailyLossStopUsd, totalBrakeUsd: PA_RULES.totalLossBrakeUsd,
+        optionMaxUsd: PA_RULES.optionMaxPremiumUsd, optionMinDays: PA_RULES.optionMinDays,
+        // What the next trade would be: a SPY call on weekdays, Bitcoin itself on weekends.
+        kind: etNow.weekend ? "spot" : "option",
       },
       config: {
         keysSet: !!cfg.keys,

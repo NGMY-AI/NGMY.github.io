@@ -427,7 +427,7 @@ const _lessons = <_Lesson>[
     _Quiz('Fast line above slow line means...', ['Trend is up', 'Trend is down', 'Market closed'], 0, 'Recent prices are higher than older prices.'),
   ]),
   _Lesson('cross', 'The crossover signal', 'Exactly when the agent buys and sells', 6, Icons.call_split_rounded, Color(0xFF8B5CF6), 'cross', [
-    ('Buy signal', "When the fast line crosses UP through the slow line, the short-term trend has just turned up. That moment is the buy signal. The agent buys \$50 at that point."),
+    ('Buy signal', "When the fast line crosses UP through the slow line, the short-term trend has just turned up. That moment is the buy signal. The agent buys at that point (\$100: one SPY call option on weekdays, Bitcoin on weekends), but only if the big trend is rising too."),
     ('Sell signal', "When the fast line crosses back DOWN through the slow line, the up move is over. That is the sell signal, and the agent closes the trade."),
     ('Why it must be fresh', "If the cross happened an hour ago, the easy part of the move may be gone. Buying late means buying high. So the agent only acts on a cross that happened since its last check, never on an old one."),
     ('The weakness', "In sideways markets the lines cross back and forth and give false signals. That is why every trade also has a stop loss: when a signal is wrong, the loss stays small."),
@@ -445,21 +445,21 @@ const _lessons = <_Lesson>[
     _Quiz('RSI below 30 always means buy.', ['True', 'False'], 1, 'Falling markets can stay oversold. It is a hint, not a signal.'),
   ]),
   _Lesson('risk', 'Risk: stop loss and take profit', 'Why small losses beat big wins', 7, Icons.shield_rounded, Color(0xFFF0566A), 'risk', [
-    ('Decide the exit before you enter', "Every agent trade has two exits set before it starts. Take profit at +3% (about +\$1.50 on \$50) and stop loss at -1.5% (about -\$0.75)."),
-    ('Win twice what you risk', "The win (+\$1.50) is twice the loss (-\$0.75). Because of that, you only need to be right about 1 trade in 3 to break even. Being right half the time would be clearly profitable."),
-    ('Size matters most', "The agent uses \$50 per trade even though the paper account has \$100,000. Small trades mean no single mistake can hurt much. Pros rarely risk more than 1 to 2 percent of their money on one trade."),
+    ('Decide the exit before you enter', "Every agent trade has two exits set before it starts, in dollars: take profit when the trade is up \$50, stop loss when it is down \$50."),
+    ('Win the same as you risk', "The win (+\$50) is the same size as the loss (-\$50). So every win cancels one loss: winning 5 out of 10 trades breaks even. More than 5 out of 10 is profit, fewer is a loss. The win rate on the agent screen shows which side it is on."),
+    ('Size matters most', "The agent uses \$100 per trade even though the paper account has \$100,000. Small trades mean no single mistake can hurt much. Pros rarely risk more than 1 to 2 percent of their money on one trade."),
     ('Never move the stop', "The biggest beginner mistake is hoping a losing trade comes back and moving the stop lower. Small losses are the cost of doing business. Big losses end accounts."),
   ], [
-    _Quiz('With +\$1.50 wins and -\$0.75 losses, to break even you must win about...', ['1 in 3 trades', '9 in 10 trades', 'Every trade'], 0, 'One win (+1.50) pays for two losses (-1.50).'),
+    _Quiz('With +\$50 wins and -\$50 losses, to break even you must win about...', ['5 in 10 trades', '9 in 10 trades', 'Every trade'], 0, 'Each win (+50) cancels one loss (-50).'),
     _Quiz('A trade is losing. The best move is...', ['Move the stop lower', 'Let the stop loss work', 'Buy more'], 1, 'The stop exists to keep losses small.'),
   ]),
   _Lesson('brakes', 'Daily stop and total brake', 'Protecting your account from bad days', 4, Icons.front_hand_rounded, Color(0xFFF2C14E), 'brakes', [
     ('Bad days happen', "Some days every signal fails. The danger is trying to win it back by trading more and bigger. That is called revenge trading and it is how small losses become big ones."),
-    ('Daily stop: \$10', "If the day loses \$10, the agent makes no more buys until tomorrow. It walks away and lets the market calm down."),
-    ('Total brake: \$25', "If total losses reach \$25, the agent pauses completely until you review what happened and turn it back on. Reviewing is the most important part of learning."),
+    ('Daily stop: \$50', "If the day loses \$50, the agent makes no more buys until tomorrow. It walks away and lets the market calm down."),
+    ('Total brake: \$100', "If total losses reach \$100, the agent pauses completely until you review what happened and turn it back on. Reviewing is the most important part of learning."),
     ('Your own rules', "When you trade yourself, set the same kind of limits before the day starts, and keep them even when it hurts."),
   ], [
-    _Quiz('After losing \$10 in a day, the agent...', ['Doubles the next trade', 'Stops buying for the day', 'Sells everything forever'], 1, 'The daily stop prevents revenge trading.'),
+    _Quiz('After losing \$50 in a day, the agent...', ['Doubles the next trade', 'Stops buying for the day', 'Sells everything forever'], 1, 'The daily stop prevents revenge trading.'),
   ]),
   _Lesson('hours', 'Stocks vs crypto', 'Market hours, weekends and jumpiness', 5, Icons.schedule_rounded, Color(0xFF627EEA), 'hours', [
     ('Stocks and funds', "SPY, QQQ, Apple, Microsoft, Nvidia, Tesla and Amazon trade on US market days from 9:30 AM to 4:00 PM Eastern Time. Closed at night, on weekends and on holidays."),
@@ -748,8 +748,16 @@ class _NgmySignalGridLearnScreenState extends State<NgmySignalGridLearnScreen> w
       final held = _mkts.firstWhere((m) => m['asset'] == sh['symbol'], orElse: () => <String, dynamic>{});
       final now = _d(held['price']);
       final entry = _d(sh['entryPrice']);
-      b.writeln('Open pretend trade: ${sh['symbol']}, \$50 bought at ${entry.toStringAsFixed(2)}, now ${now.toStringAsFixed(2)} '
-          '(${entry == 0 ? 0 : ((now - entry) / entry * 100).toStringAsFixed(2)}%). Take profit at ${(entry * 1.03).toStringAsFixed(2)}, stop loss at ${(entry * 0.985).toStringAsFixed(2)}.');
+      final opt = sh['option'] is Map ? _map(sh['option']) : null;
+      final mark = _map(_map(_map(_status?['state'])['snapshot'])['held']);
+      final pnl = mark['pnl'] == null ? null : _d(mark['pnl']);
+      final pnlText = pnl == null ? 'unknown' : pnl.toStringAsFixed(2);
+      b.writeln(opt != null
+          ? 'Open pretend trade: 1 SPY call option, strike ${_d(opt['strike']).toStringAsFixed(0)}, expires ${opt['expiry']}, '
+              'premium paid ${entry.toStringAsFixed(2)} a share (${_d(opt['cost']).toStringAsFixed(2)} dollars). '
+              'Win or loss now: $pnlText dollars. It sells at +50 or -50 dollars.'
+          : 'Open pretend trade: ${sh['symbol']}, bought at ${entry.toStringAsFixed(2)}, now ${now.toStringAsFixed(2)}. '
+              'Win or loss now: $pnlText dollars. It sells at +50 or -50 dollars.');
     } else {
       b.writeln('No open pretend trade.');
     }
@@ -1044,12 +1052,12 @@ Tutor:''';
     switch (kind) {
       case 'basics':
         final first = pts.isNotEmpty ? _d(pts.first['c']) : price;
-        final worth = first == 0 ? 50 : 50 * price / first;
+        final worth = first == 0 ? 100 : 100 * price / first;
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           say('Right now $sym is ${_money(price, sign: false)}. About 4 hours ago it was ${_money(first, sign: false)}.'),
           const SizedBox(height: 8),
-          say('If you had put \$50 into $sym then, it would be worth ${_money(worth.toDouble(), sign: false)} now: '
-              '${worth >= 50 ? 'a win of' : 'a loss of'} ${_money((worth - 50).abs().toDouble(), sign: false)}. That difference is your profit or loss.'),
+          say('If you had put \$100 into $sym then, it would be worth ${_money(worth.toDouble(), sign: false)} now: '
+              '${worth >= 100 ? 'a win of' : 'a loss of'} ${_money((worth - 100).abs().toDouble(), sign: false)}. That difference is your profit or loss.'),
         ]);
       case 'candles':
         final q = pts.isNotEmpty ? pts.last : <String, dynamic>{};
@@ -1088,7 +1096,7 @@ Tutor:''';
           chart(),
           const SizedBox(height: 8),
           say(buys.isNotEmpty
-              ? 'Fresh BUY crosses right now: ${buys.join(', ')}. On its next automatic check the agent would buy the strongest of these if it holds nothing.'
+              ? 'Fresh BUY crosses right now: ${buys.join(', ')}. On its next automatic check the agent would buy if it holds nothing and it is the market traded today.'
               : 'No fresh buy cross in any open market right now. ${sells.isNotEmpty ? 'Fresh sell crosses: ${sells.join(', ')}. ' : ''}The agent simply waits; no signal means no trade.'),
         ]);
       case 'rsi':
@@ -1121,24 +1129,22 @@ Tutor:''';
           say('Red bars are above 70 (stretched), blue below 30 (oversold), green in between (healthy).'),
         ]);
       case 'risk':
-        final shares = price == 0 ? 0 : 50 / price;
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          say('If the agent bought $sym right now at ${_money(price, sign: false)}:'),
+          say('Every agent trade is about \$100 (one SPY call option on weekdays, Bitcoin on weekends). $sym is ${_money(price, sign: false)} right now.'),
           const SizedBox(height: 6),
-          say('- \$50 buys ${shares.toStringAsFixed(shares < 0.01 ? 6 : 4)} $sym'),
-          say('- Take profit at ${_money(price * 1.03, sign: false)}: you get back about \$51.50 (+\$1.50)'),
-          say('- Stop loss at ${_money(price * 0.985, sign: false)}: you get back about \$49.25 (-\$0.75)'),
+          say('- Take profit: it sells when the trade is up \$50'),
+          say('- Stop loss: it sells when the trade is down \$50'),
           const SizedBox(height: 6),
-          say('Win 1 and lose 2 of 3 trades: +1.50 - 0.75 - 0.75 = \$0.00. That is break even.'),
+          say('Win 5 and lose 5 of 10 trades: 5 x 50 - 5 x 50 = \$0.00. That is break even. Win 6 of 10 and you are up \$100.'),
         ]);
       case 'brakes':
         if (_status == null) {
-          return say('Try it yourself: before your next practice day, write down "I stop after losing \$10 today". '
+          return say('Try it yourself: before your next practice day, write down "I stop after losing \$50 today". '
               'If three trades in a row lose, close the app and come back tomorrow. That is exactly what the agent does.');
         }
         final st = _map(_status?['state']);
         final today = _map(_status?['today']);
-        return say('Today the agent is at ${_money(_d(today['day_pnl']))} (the daily stop is -\$10) and ${_money(_d(st['totalPnl']))} all time (the brake is -\$25). '
+        return say('Today the agent is at ${_money(_d(today['day_pnl']))} (the daily stop is -\$50) and ${_money(_d(st['totalPnl']))} all time (the brake is -\$100).'
             '${st['brakePaused'] == true ? 'The brake is ON right now.' : 'Both brakes are off, it can keep trading.'}');
       case 'hours':
         final stockOpen = _sigMarkets != null ? _stockOpen : _map(_status?['market'])['stockOpen'] == true;

@@ -3,7 +3,7 @@
 // This screen is only the control panel. The agent itself runs on the server (bright-handler, called every
 // 15 minutes by Supabase pg_cron), so it keeps going when the phone is off. The Alpaca keys live only in
 // Supabase secrets and never reach this app. Version 1 places no orders: it logs what it WOULD do with a
-// pretend $50 trade.
+// pretend $100 trade (one SPY call option on weekdays, Bitcoin on weekends).
 
 import 'dart:async';
 import 'dart:convert';
@@ -149,7 +149,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
         builder: (ctx) => AlertDialog(
           title: const Text('Turn the agent back on?'),
           content: const Text(
-              'The \$25 brake paused the agent. Turning it back on means you have reviewed it. The running demo profit and loss starts again from \$0.'),
+              'The \$100 brake paused the agent. Turning it back on means you have reviewed it. The running demo profit and loss starts again from \$0.'),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
             FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Turn back on')),
@@ -314,11 +314,11 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
       if ((cfg['problem'] ?? '').toString().isNotEmpty) _banner(p, cfg['problem'].toString(), _down),
       if ((s['liveError'] ?? '').toString().isNotEmpty) _banner(p, s['liveError'].toString(), _loss),
       if (st['brakePaused'] == true)
-        _banner(p, 'Paused by the \$25 brake. ${st['brakeReason'] ?? ''}. Look over the trades, then press Start to turn it back on.', _loss),
+        _banner(p, 'Paused by the \$100 brake. ${st['brakeReason'] ?? ''}. Look over the trades, then press Start to turn it back on.', _loss),
       _chartCard(p, focus, heldShadow),
       _trendPill(p, focus, shadow, s),
       _balanceCard(p, s, st, snap),
-      shadow != null ? _positionCard(p, shadow, held!) : _ticketCard(p, s, focus),
+      shadow != null ? _positionCard(p, shadow, held!, _map(s['ticket']), _map(snap['held'])) : _ticketCard(p, s, focus),
       _controls(p, st),
       _autoLine(p, st),
       _tradesCard(p, s),
@@ -587,7 +587,8 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
       return _card(p, child: SizedBox(height: 120, child: Center(child: Text('The chart appears after the first reading.', style: TextStyle(color: p.muted)))));
     }
     final pts = all.sublist(math.max(0, all.length - _range));
-    final entry = shadow == null ? null : _d(shadow['entryPrice']);
+    // A SPY option's buy price is the option premium, not a SPY price, so it is not drawn on the SPY chart.
+    final entry = shadow == null || shadow['option'] is Map ? null : _d(shadow['entryPrice']);
     return _card(
       p,
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
@@ -682,10 +683,17 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     final sh = st['shadow'] is Map ? _map(st['shadow']) : null;
     var open = 0.0;
     if (sh != null) {
-      final held = _markets(snap).firstWhere((m) => m['asset'] == sh['symbol'], orElse: () => <String, dynamic>{});
-      final now = _d(held['price']);
-      if (now > 0) open = _d(sh['qty']) * (now - _d(sh['entryPrice']));
+      final mark = _map(snap['held']);
+      if (mark['pnl'] != null) {
+        open = _d(mark['pnl']); // the server prices the open trade (for an option: the option itself)
+      } else if (sh['option'] is! Map) {
+        final held = _markets(snap).firstWhere((m) => m['asset'] == sh['symbol'], orElse: () => <String, dynamic>{});
+        final now = _d(held['price']);
+        if (now > 0) open = _d(sh['qty']) * (sh['mult'] == null ? 1 : _d(sh['mult'])) * (now - _d(sh['entryPrice']));
+      }
     }
+    final nr = _map(rec['newRules']);
+    final rate = nr['winRatePct'];
     final base = _d(snap['equity']);
     final balance = base + total + open;
     final move = total + open;
@@ -739,10 +747,31 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
         Row(children: [
           Expanded(child: _darkStat('Trades today', '${today['trades'] ?? 0} of ${ticket['maxTradesToday'] ?? 4}', Colors.white)),
           const SizedBox(width: 8),
-          Expanded(child: _darkStat('Daily stop', '-\$10', Colors.white)),
+          Expanded(child: _darkStat('Daily stop', '-\$${_d(ticket['dailyStopUsd'] ?? 50).toStringAsFixed(0)}', Colors.white)),
           const SizedBox(width: 8),
-          Expanded(child: _darkStat('Total brake', '-\$25', Colors.white)),
+          Expanded(child: _darkStat('Total brake', '-\$${_d(ticket['totalBrakeUsd'] ?? 100).toStringAsFixed(0)}', Colors.white)),
         ]),
+        const SizedBox(height: 8),
+        // Win rate under the $100 rules: win and loss are both $50, so 50% (5 out of 10) breaks even.
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(14)),
+          child: Row(children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Win rate (\$100 trades)', style: TextStyle(color: Colors.white60, fontSize: 10.5)),
+                const SizedBox(height: 2),
+                Text(
+                  rate == null ? 'No \$100 trades yet' : '${_d(rate).toStringAsFixed(0)}%  ·  ${nr['wins'] ?? 0} won of ${nr['trades'] ?? 0}',
+                  style: TextStyle(
+                      color: rate == null ? Colors.white : _d(rate) >= 50 ? _up : _loss, fontSize: 16, fontWeight: FontWeight.w800),
+                ),
+              ]),
+            ),
+            const Text('5 of 10\n= break even', textAlign: TextAlign.right, style: TextStyle(color: Colors.white60, fontSize: 10.5, height: 1.25)),
+          ]),
+        ),
       ]),
     );
   }
@@ -763,19 +792,27 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
 
   // ── Open pretend position
 
-  Widget _positionCard(_Pal p, Map<String, dynamic> sh, Map<String, dynamic> snap) {
+  Widget _positionCard(_Pal p, Map<String, dynamic> sh, Map<String, dynamic> snap, Map<String, dynamic> ticket, Map<String, dynamic> mark) {
     final entry = _d(sh['entryPrice']);
     final qty = _d(sh['qty']);
+    final mult = sh['mult'] == null ? 1.0 : _d(sh['mult']);
+    final opt = sh['option'] is Map ? _map(sh['option']) : null;
+    // mark: the server's price of the open trade right now (for an option: the option itself).
     final sameAsset = sh['symbol'] == snap['asset'];
-    final now = sameAsset ? _d(snap['price']) : entry;
-    final worth = qty * now;
-    final pl = worth - 50;
+    // The price of what is held right now (for an option: the option premium per share, priced by the server).
+    final now = mark['price'] != null ? _d(mark['price']) : (opt == null && sameAsset ? _d(snap['price']) : entry);
+    final cost = qty * mult * entry;
+    final worth = qty * mult * now;
+    final pl = worth - cost;
     final pct = entry == 0 ? 0.0 : (now - entry) / entry * 100;
     final win = pl >= 0;
-    final stop = entry * 0.985;
-    final target = entry * 1.03;
-    // Where the price sits between the stop (0) and the target (1); the buy price is at 1/3.
-    final pos = ((now - stop) / (target - stop)).clamp(0.0, 1.0);
+    final tpUsd = _d(ticket['takeProfitUsd'] ?? 50);
+    final slUsd = _d(ticket['stopLossUsd'] ?? 50);
+    // Where the win or loss sits between the stop loss (0) and the take profit (1); the buy is in the middle.
+    final pos = ((pl + slUsd) / (tpUsd + slUsd)).clamp(0.0, 1.0);
+    final perUnit = qty * mult == 0 ? 0.0 : 1 / (qty * mult);
+    final stopPrice = entry - slUsd * perUnit;
+    final targetPrice = entry + tpUsd * perUnit;
     return _card(
       p,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -795,16 +832,37 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
         ]),
         Text(win ? 'You would be winning right now' : 'You would be losing right now', style: TextStyle(color: p.muted, fontSize: 12.5)),
         const SizedBox(height: 14),
+        if (opt != null) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: p.inner, borderRadius: BorderRadius.circular(16)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('1 SPY call option', style: TextStyle(color: p.muted, fontSize: 11.5)),
+              const SizedBox(height: 2),
+              Text('Strike ${_money(_d(opt['strike']), sign: false)} · expires ${_dateLabel(opt['expiry'])}',
+                  style: TextStyle(color: p.ink, fontSize: 15, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 2),
+              Text('Premium paid ${_money(entry, sign: false)} a share x 100 = ${_money(cost, sign: false)}',
+                  style: TextStyle(color: p.muted, fontSize: 11.5)),
+            ]),
+          ),
+          const SizedBox(height: 8),
+        ],
         Row(children: [
-          Expanded(child: _tile(p, 'You put in', _money(50, sign: false))),
+          Expanded(child: _tile(p, 'You put in', _money(cost, sign: false))),
           const SizedBox(width: 8),
           Expanded(child: _tile(p, 'Worth now', _money(worth, sign: false), color: win ? _up : _loss)),
         ]),
         const SizedBox(height: 8),
         Row(children: [
-          Expanded(child: _tile(p, 'Bought at', _money(entry, sign: false))),
+          Expanded(child: _tile(p, opt != null ? 'Premium paid' : 'Bought at', _money(entry, sign: false))),
           const SizedBox(width: 8),
-          Expanded(child: _tile(p, 'Shares', '${qty.toStringAsFixed(qty < 0.01 ? 6 : 4)} ${sh['symbol']}')),
+          Expanded(
+            child: opt != null
+                ? _tile(p, 'Premium now', mark['priced'] == false ? 'no price yet' : _money(now, sign: false), color: win ? _up : _loss)
+                : _tile(p, 'Amount', '${qty.toStringAsFixed(qty < 0.01 ? 6 : 4)} ${sh['symbol']}'),
+          ),
         ]),
         const SizedBox(height: 16),
         LayoutBuilder(builder: (context, c) {
@@ -820,11 +878,11 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
                   height: 8,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(99),
-                    gradient: const LinearGradient(colors: [_loss, Color(0xFFF59E0B), _up], stops: [0, 0.33, 1]),
+                    gradient: const LinearGradient(colors: [_loss, Color(0xFFF59E0B), _up], stops: [0, 0.5, 1]),
                   ),
                 ),
               ),
-              Positioned(left: w / 3 - 1, top: 4, child: Container(width: 2, height: 18, color: p.ink.withValues(alpha: 0.5))),
+              Positioned(left: w / 2 - 1, top: 4, child: Container(width: 2, height: 18, color: p.ink.withValues(alpha: 0.5))),
               Positioned(
                 left: (pos * w - 9).clamp(0.0, w - 18),
                 top: 4,
@@ -840,11 +898,11 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
         const SizedBox(height: 6),
         Row(children: [
           Expanded(
-            child: Text('Stop loss\n${_money(stop, sign: false)} · -\$0.75',
+            child: Text('Stop loss\n-${_money(slUsd, sign: false)} · at ${_money(stopPrice < 0 ? 0 : stopPrice, sign: false)}',
                 style: const TextStyle(color: _loss, fontSize: 11.5, fontWeight: FontWeight.w700, height: 1.3)),
           ),
           Expanded(
-            child: Text('Take profit\n${_money(target, sign: false)} · +\$1.50',
+            child: Text('Take profit\n+${_money(tpUsd, sign: false)} · at ${_money(targetPrice, sign: false)}',
                 textAlign: TextAlign.right, style: const TextStyle(color: _up, fontSize: 11.5, fontWeight: FontWeight.w700, height: 1.3)),
           ),
         ]),
@@ -859,8 +917,11 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
   Widget _ticketCard(_Pal p, Map<String, dynamic> s, Map<String, dynamic> snap) {
     final t = _map(s['ticket']);
     final price = _d(snap['price']);
-    final amount = _d(t['amount']) == 0 ? 50.0 : _d(t['amount']);
+    final amount = _d(t['amount']) == 0 ? 100.0 : _d(t['amount']);
+    final option = t['kind'] != 'spot'; // weekdays: one SPY call option; weekends: Bitcoin itself
     final shares = price == 0 ? 0 : amount / price;
+    final tpUsd = _d(t['takeProfitUsd'] ?? 50);
+    final slUsd = _d(t['stopLossUsd'] ?? 50);
     return _card(
       p,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -888,13 +949,20 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
           ]),
         ),
         const SizedBox(height: 10),
-        _ticketRow(p, 'Amount it puts in', _money(amount, sign: false), big: true,
-            trailing: price == 0 ? null : '≈ ${shares.toStringAsFixed(shares < 0.01 ? 6 : 4)} ${snap['asset'] ?? ''}'),
-        _ticketRow(p, 'Take profit  +${_d(t['takeProfitPct']).toStringAsFixed(0)}%', '+${_money(_d(t['takeProfitUsd']), sign: false)}',
-            color: _up, trailing: price == 0 ? null : 'sells at ${_money(price * 1.03, sign: false)}'),
-        _ticketRow(p, 'Stop loss  -${_d(t['stopLossPct']).toStringAsFixed(1)}%', '-${_money(_d(t['stopLossUsd']), sign: false)}',
-            color: _loss, trailing: price == 0 ? null : 'sells at ${_money(price * 0.985, sign: false)}'),
-        _ticketRow(p, 'Leverage', 'None (1x)', trailing: 'no borrowing, no shorting'),
+        if (option) ...[
+          _ticketRow(p, 'What it buys (weekdays)', '1 SPY call option', big: true,
+              trailing: 'at the money, expiry 7+ days'),
+          _ticketRow(p, 'Most it pays', _money(_d(t['optionMaxUsd'] ?? 120), sign: false),
+              trailing: 'costs more: no trade, log says why'),
+        ] else
+          _ticketRow(p, 'Amount it puts in (weekends)', _money(amount, sign: false), big: true,
+              trailing: price == 0 ? null : '≈ ${shares.toStringAsFixed(shares < 0.01 ? 6 : 4)} ${snap['asset'] ?? ''}'),
+        _ticketRow(p, 'Take profit', '+${_money(tpUsd, sign: false)}',
+            color: _up, trailing: option || price == 0 ? 'sells when up \$${tpUsd.toStringAsFixed(0)}' : 'sells at ${_money(price * (1 + tpUsd / amount), sign: false)}'),
+        _ticketRow(p, 'Stop loss', '-${_money(slUsd, sign: false)}',
+            color: _loss, trailing: option || price == 0 ? 'sells when down \$${slUsd.toStringAsFixed(0)}' : 'sells at ${_money(price * (1 - slUsd / amount), sign: false)}'),
+        _ticketRow(p, 'Brakes', '-\$${_d(t['dailyStopUsd'] ?? 50).toStringAsFixed(0)} a day · -\$${_d(t['totalBrakeUsd'] ?? 100).toStringAsFixed(0)} total',
+            trailing: 'win = loss: 5 of 10 breaks even'),
         const SizedBox(height: 10),
         Container(
           width: double.infinity,
@@ -906,7 +974,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
         ),
         const SizedBox(height: 6),
         Center(
-          child: Text('Shown for ${snap['asset'] ?? ''} at its price right now. The agent buys whichever market signals first.',
+          child: Text('Pretend money only: Version 1 never sends an order to Alpaca.',
               textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 11)),
         ),
       ]),
@@ -1013,7 +1081,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
               Icon(Icons.receipt_long_rounded, color: p.muted),
               const SizedBox(width: 10),
               Expanded(
-                child: Text('No trades yet. Each buy shows the \$50 put in, and each sell shows what came back and the win or loss.',
+                child: Text('No trades yet. Each buy shows what was bought (for a SPY option: strike, expiry and premium) and what was put in; each sell shows the entry and exit price and the win or loss in dollars.',
                     style: TextStyle(color: p.muted, fontSize: 12.5, height: 1.3)),
               ),
             ]),
@@ -1026,10 +1094,24 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
   Widget _tradeRow(_Pal p, Map<String, dynamic> t) {
     final buy = t['decision'] == 'would buy';
     final det = _map(t['details']);
-    final asset = (t['asset'] ?? '').toString();
+    final opt = det['option'] is Map ? _map(det['option']) : null;
+    final asset = opt != null ? 'SPY ${_money(_d(opt['strike']), sign: false)} call' : (t['asset'] ?? '').toString();
     final amount = det['amount'] == null ? 50.0 : _d(det['amount']);
     final qty = _d(det['qty']);
     final pnl = _d(det['pnl']);
+    final hasEntry = det['entryPrice'] != null;
+    final entryP = _d(det['entryPrice']);
+    final exitP = det['exitPrice'] == null ? _d(t['price']) : _d(det['exitPrice']);
+    final String line;
+    if (opt != null) {
+      line = buy
+          ? 'expires ${_dateLabel(opt['expiry'])} · premium ${_money(entryP, sign: false)} x 100'
+          : 'premium ${_money(entryP, sign: false)} → ${_money(exitP, sign: false)} · ${_short((t['reason'] ?? '').toString())}';
+    } else {
+      line = buy
+          ? '${qty == 0 ? '' : '${qty.toStringAsFixed(qty < 0.01 ? 6 : 4)} at '}${_money(hasEntry ? entryP : _d(t['price']), sign: false)}'
+          : '${hasEntry ? '${_money(entryP, sign: false)} → ' : 'at '}${_money(exitP, sign: false)} · ${_short((t['reason'] ?? '').toString())}';
+    }
     final win = pnl >= 0;
     final c = buy ? _spy : (win ? _up : _loss);
     return Container(
@@ -1048,10 +1130,8 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
             Text('${buy ? 'Bought' : 'Sold'} $asset', style: TextStyle(color: p.ink, fontWeight: FontWeight.w800, fontSize: 14)),
             const SizedBox(height: 2),
             Text(
-              buy
-                  ? '${qty == 0 ? '' : '${qty.toStringAsFixed(qty < 0.01 ? 6 : 4)} at '}${_money(_d(t['price']), sign: false)}'
-                  : 'at ${_money(_d(t['price']), sign: false)} · ${_short((t['reason'] ?? '').toString())}',
-              maxLines: 1,
+              line,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(color: p.muted, fontSize: 11.5),
             ),
@@ -1701,6 +1781,15 @@ DateTime _toEt(DateTime t) {
   final dst = !u.isBefore(start) && u.isBefore(end);
   final et = u.subtract(Duration(hours: dst ? 4 : 5));
   return DateTime(et.year, et.month, et.day, et.hour, et.minute);
+}
+
+/// "2026-12-04" becomes "Dec 4, 2026".
+String _dateLabel(dynamic ymd) {
+  final p = '${ymd ?? ''}'.split('-');
+  if (p.length != 3) return '${ymd ?? ''}';
+  const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  final mi = int.tryParse(p[1]) ?? 1;
+  return '${m[(mi - 1).clamp(0, 11)]} ${int.tryParse(p[2]) ?? p[2]}, ${p[0]}';
 }
 
 String _etLabel(dynamic iso) {
