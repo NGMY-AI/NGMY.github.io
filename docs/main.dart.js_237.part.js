@@ -1,6 +1,6 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var J,A,C,B={
-hA2(d){var x=C.a.i(d.toLowerCase())
+hA4(d){var x=C.a.i(d.toLowerCase())
 return x.length===0?"device":x},
 b5w(d,e){var x=0,w=A.j(y.e),v,u
 var $async$b5w=A.e(function(f,g){if(f===1)return A.f(g,w)
@@ -19,8 +19,8 @@ var $async$b5v=A.e(function(e,f){if(e===1)return A.f(f,w)
 for(;;)switch(x){case 0:x=3
 return A.b(A.aB(),$async$b5v)
 case 3:u=f
-t=B.hA2(d)
-t=A.es(J.t(u.a,"ngmy_device_transfer_used_"+t))
+t=B.hA4(d)
+t=A.er(J.t(u.a,"ngmy_device_transfer_used_"+t))
 v=t==null?0:t
 x=1
 break
@@ -31,8 +31,8 @@ var $async$b5x=A.e(function(e,f){if(e===1)return A.f(f,w)
 for(;;)switch(x){case 0:x=2
 return A.b(A.aB(),$async$b5x)
 case 2:v=f
-u="ngmy_device_transfer_used_"+B.hA2(d)
-t=A.es(J.t(v.a,u))
+u="ngmy_device_transfer_used_"+B.hA4(d)
+t=A.er(J.t(v.a,u))
 x=3
 return A.b(v.aE("Int",u,(t==null?0:t)+1),$async$b5x)
 case 3:return A.h(null,w)}})
@@ -52,7 +52,7 @@ var $async$pP=A.e(function(g,h){if(g===1)return A.f(h,w)
 for(;;)switch(x){case 0:if(f){v=!0
 x=1
 break}u=C.a.i(e)
-if(u.length===0){if(d.e!=null)d.L(y.a).f.T(D.fwG)
+if(u.length===0){if(d.e!=null)d.K(y.a).f.T(D.fwG)
 v=!1
 x=1
 break}x=3
@@ -78,4 +78,4 @@ D=c[385]
 var z=a.updateTypes([])
 var y={a:A.ar("kx"),e:A.ar("P"),l:A.ar("F"),f:A.ar("~")};(function constants(){D.h7l=new A.C("Sign in to transfer files between devices.",null,null,null,null,null,null,null,null,null,null,null)
 D.fwG=new A.b1(D.h7l,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)})()};
-(a=>{a["98EDtnSSvBpntrgz/vOz6rK4hlw="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["9Cl4k31/LOVqfl0O2+CujId/vqA="]=a.current})($__dart_deferred_initializers__);
