@@ -1,9 +1,9 @@
 // Signal Grid — Alpaca PAPER trading agent, Version 1 (read-only).
 //
 // This screen is only the control panel. The agent itself runs on the server (bright-handler, called every
-// 15 minutes by Supabase pg_cron), so it keeps going when the phone is off. The Alpaca keys live only in
+// 5 minutes by Supabase pg_cron), so it keeps going when the phone is off. The Alpaca keys live only in
 // Supabase secrets and never reach this app. Version 1 places no orders: it logs what it WOULD do with a
-// pretend $100 trade (one SPY call option on weekdays, Bitcoin on weekends).
+// pretend $100 trade ($100 of a stock on weekdays, of a coin on weekends).
 
 import 'dart:async';
 import 'dart:convert';
@@ -174,8 +174,8 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     ));
   }
 
-  /// "Check now" only LOOKS: a fresh read of SPY and Bitcoin. It never buys or sells; only the automatic
-  /// 15-minute check on the server makes pretend trades.
+  /// "Check now" only LOOKS: a fresh read of every market. It never buys or sells; only the automatic
+  /// 5-minute check on the server makes pretend trades.
   Future<void> _scanNow() async {
     setState(() => _busy = true);
     final res = await ngmyEdgeInvoke({'action': 'paCheck'}, timeout: const Duration(seconds: 60));
@@ -211,7 +211,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
       const SizedBox(height: 14),
       Text('What the agent sees right now', style: TextStyle(color: p.ink, fontSize: 19, fontWeight: FontWeight.w900)),
       const SizedBox(height: 4),
-      Text('Check now only looks. It never buys or sells. Pretend trades are made only by the automatic check every 15 minutes'
+      Text('Check now only looks. It never buys or sells. Pretend trades are made only by the automatic check every 5 minutes'
           '${st['enabled'] == true ? ' (next one ${_nextAuto()})' : ' (the agent is stopped, so none will be made)'}.',
           style: TextStyle(color: p.muted, fontSize: 12.5, height: 1.35)),
       const SizedBox(height: 12),
@@ -304,13 +304,18 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     final snap = _map(st['snapshot']);
     final shadow = st['shadow'] is Map ? _map(st['shadow']) : null;
     final markets = _markets(snap);
-    // The market on show: the one tapped, else the one held, else the one the agent last looked at.
-    final sel = _selected ?? (shadow?['symbol'] ?? snap['asset'])?.toString();
-    final focus = markets.firstWhere((m) => m['asset'] == sel, orElse: () => markets.isEmpty ? snap : markets.first);
+    // Today's watchlist (10 stocks on weekdays, 4 coins on weekends), plus a market still held from before.
+    final todays = markets.where((m) => m['today'] == true || m['asset'] == shadow?['symbol']).toList();
+    final watch = todays.isEmpty ? markets : todays;
+    // The market on show: the one tapped (if on today's list), else the one held, else the one the agent last looked at.
+    final tapped = _selected != null && watch.any((m) => m['asset'] == _selected) ? _selected : null;
+    final sel = tapped ?? (shadow?['symbol'] ?? snap['asset'])?.toString();
+    final focus = watch.firstWhere((m) => m['asset'] == sel,
+        orElse: () => markets.firstWhere((m) => m['asset'] == sel, orElse: () => watch.isEmpty ? snap : watch.first));
     final held = shadow == null ? null : markets.firstWhere((m) => m['asset'] == shadow['symbol'], orElse: () => focus);
     final heldShadow = shadow != null && shadow['symbol'] == focus['asset'] ? shadow : null;
     return [
-      _marketStrip(p, s, markets, focus, shadow),
+      _marketStrip(p, s, watch, focus, shadow),
       _hero(p, s, focus),
       if ((cfg['problem'] ?? '').toString().isNotEmpty) _banner(p, cfg['problem'].toString(), _down),
       if ((s['liveError'] ?? '').toString().isNotEmpty) _banner(p, s['liveError'].toString(), _loss),
@@ -320,7 +325,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
       _balanceCard(p, s, st, snap),
       if (shadow != null) _positionCard(p, shadow, held!, _map(s['ticket']), _map(snap['held'])),
       _controls(p, st),
-      _autoLine(p, st),
+      _autoLine(p, st, s),
       _tradesCard(p, s),
       _activityCard(p),
       _rulesCard(p, s),
@@ -347,28 +352,28 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     ];
   }
 
-  // ── Today's market: the ONE market the agent may trade (SPY on weekdays, BTC/USD on weekends)
+  // ── Today's watchlist: 10 stocks on weekdays, 4 coins on weekends, all watched at once
 
   Widget _todayMarket(_Pal p, Map<String, dynamic> s, Map<String, dynamic>? shadow) {
     final market = _map(s['market']);
-    final active = market['activeMarket']?.toString();
+    final activeList = ((market['activeMarkets'] as List?) ?? const []).map((e) => '$e').toList();
+    final todayList = ((market['todaysList'] as List?) ?? const []).map((e) => '$e').toList();
     final weekend = market['weekend'] == true;
     final heldSym = shadow?['symbol']?.toString();
-    final oldHeld = heldSym != null && heldSym != 'SPY' && heldSym != 'BTC/USD';
+    final oldHeld = heldSym != null && todayList.isNotEmpty && !todayList.contains(heldSym);
     final String title;
     final String body;
-    if (active == 'SPY') {
-      title = 'TRADING TODAY: SPY';
-      body = 'Weekday and the stock market is open. Only SPY can be bought. Bitcoin is traded on weekends only.';
-    } else if (active == 'BTC/USD') {
-      title = 'TRADING TODAY: BTC/USD';
-      body = 'Weekend. Only Bitcoin can be bought. SPY is traded on weekdays only.';
+    if (activeList.isNotEmpty) {
+      title = weekend ? 'TRADING TODAY: 4 COINS' : 'TRADING TODAY: 10 STOCKS';
+      body = '${activeList.join(', ')}. All of them are checked at the same time, every 5 minutes, and the agent buys the first one '
+          'that gives a valid entry. One trade at a time, up to ${weekend ? 5 : 4} trades today in total.';
     } else {
       title = 'NO MARKET TRADED RIGHT NOW';
       body = weekend
-          ? 'Bitcoin is traded on Saturday and Sunday.'
-          : 'SPY is traded on weekdays while the stock market is open (9:30 AM to 4:00 PM ET). Bitcoin on weekends only.';
+          ? 'The 4 coins (BTC, ETH, SOL, DOGE) are traded on Saturday and Sunday.'
+          : 'The 10 stocks (${todayList.isEmpty ? 'SPY, QQQ, AAPL and more' : todayList.join(', ')}) are traded while the stock market is open, 9:30 AM to 4:00 PM ET. Coins on weekends.';
     }
+    final active = activeList.isEmpty ? null : activeList.first;
     final c = active == null ? _down : _up;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
@@ -378,10 +383,8 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
         border: Border.all(color: c.withValues(alpha: 0.55)),
       ),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        if (active != null) ...[_coin(active, 30), const SizedBox(width: 10)] else ...[
-          Icon(Icons.nightlight_round, color: c, size: 26),
-          const SizedBox(width: 10),
-        ],
+        Icon(active != null ? Icons.radar_rounded : Icons.nightlight_round, color: c, size: 26),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(title, style: TextStyle(color: c, fontSize: 13.5, fontWeight: FontWeight.w900, letterSpacing: 0.3)),
@@ -392,7 +395,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
                 style: TextStyle(color: p.muted, fontSize: 11, height: 1.3)),
             if (oldHeld) ...[
               const SizedBox(height: 4),
-              Text('Still holding the earlier $heldSym pretend trade: the agent only checks its exits (every 5 minutes) and never buys $heldSym again.',
+              Text('Still holding the $heldSym pretend trade from before: the agent keeps checking its exits every 5 minutes.',
                   style: const TextStyle(color: _btc, fontSize: 11, fontWeight: FontWeight.w700, height: 1.3)),
             ],
           ]),
@@ -424,6 +427,29 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     );
   }
 
+  /// Each watchlist card's trend: green arrow up, red arrow down, grey hourglass while waiting
+  /// (market closed, no data yet, or moving sideways).
+  Widget _trendBadge(Map<String, dynamic> m) {
+    final t = m['open'] == true ? (_map(m['chart'])['trend'] ?? m['trend'] ?? 'unknown').toString() : 'waiting';
+    final (Color c, IconData icon, String label) = switch (t) {
+      'up' => (_up, Icons.trending_up_rounded, 'up'),
+      'down' => (_loss, Icons.trending_down_rounded, 'down'),
+      _ => (const Color(0xFF94A3B8), Icons.hourglass_top_rounded, 'waiting'),
+    };
+    return Semantics(
+      label: 'trend $label',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        decoration: BoxDecoration(color: c.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 12, color: c),
+          const SizedBox(width: 2),
+          Text(label, style: TextStyle(color: c, fontSize: 9, fontWeight: FontWeight.w800)),
+        ]),
+      ),
+    );
+  }
+
   // ── Markets: all watched markets side by side, tap one to see it
 
   Widget _marketStrip(_Pal p, Map<String, dynamic> s, List<Map<String, dynamic>> markets, Map<String, dynamic> focus,
@@ -436,9 +462,9 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
           child: Row(children: [
-            Text('Agent markets', style: TextStyle(color: p.ink, fontSize: 14, fontWeight: FontWeight.w800)),
+            Text("Today's watchlist", style: TextStyle(color: p.ink, fontSize: 14, fontWeight: FontWeight.w800)),
             const SizedBox(width: 8),
-            _pill(openCount == 0 ? 'NONE TRADED NOW' : 'TRADED NOW', openCount == 0 ? _down : _up),
+            _pill(openCount == 0 ? 'NONE TRADED NOW' : '$openCount WATCHED NOW', openCount == 0 ? _down : _up),
             const SizedBox(width: 4),
             // Which market the agent trades today: tap for the popup.
             InkResponse(
@@ -490,12 +516,14 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
                         child: Text(sym, maxLines: 1, overflow: TextOverflow.ellipsis,
                             style: TextStyle(color: p.ink, fontSize: 11.5, fontWeight: FontWeight.w800)),
                       ),
-                      if (holding)
-                        Icon(Icons.work_rounded, size: 13, color: _btc)
-                      else if (signal)
-                        Icon(Icons.bolt_rounded, size: 14, color: _up)
-                      else if (m['open'] != true)
-                        Text((m['offLabel'] ?? 'closed').toString(), style: TextStyle(color: p.muted, fontSize: 9, fontWeight: FontWeight.w700)),
+                      if (holding) ...[
+                        Icon(Icons.work_rounded, size: 13, color: _btc),
+                        const SizedBox(width: 3),
+                      ] else if (signal) ...[
+                        Icon(Icons.bolt_rounded, size: 14, color: _up),
+                        const SizedBox(width: 3),
+                      ],
+                      _trendBadge(m),
                     ]),
                     Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
                       Expanded(
@@ -755,7 +783,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
           Row(children: [
             Expanded(
               child: _darkStat('Buys',
-                  ticket['kind'] == 'spot' ? '\$${_d(ticket['amount'] ?? 100).toStringAsFixed(0)} BTC' : 'SPY call ≤\$${_d(ticket['optionMaxUsd'] ?? 120).toStringAsFixed(0)}',
+                  '\$${_d(ticket['amount'] ?? 100).toStringAsFixed(0)} of ${ticket['kind'] == 'crypto' ? 'a coin' : 'a stock'}',
                   Colors.white),
             ),
             const SizedBox(width: 8),
@@ -990,10 +1018,20 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
   }
 
   /// When the agent last checked by itself, and when it checks next.
-  Widget _autoLine(_Pal p, Map<String, dynamic> st) {
+  Widget _autoLine(_Pal p, Map<String, dynamic> st, Map<String, dynamic> s) {
     final on = st['enabled'] == true && st['brakePaused'] != true;
     final last = DateTime.tryParse('${st['lastTickAt'] ?? ''}');
     final c = on ? _up : p.muted;
+    // Which market the current (or the last) pretend trade came from.
+    final sh = st['shadow'] is Map ? _map(st['shadow']) : null;
+    final trades = ((s['trades'] as List?) ?? const []).whereType<Map>().toList();
+    final lastTrade = trades.isEmpty ? null : _map(trades.first);
+    final tradeKey = sh != null ? 'Current trade from' : 'Last trade from';
+    final tradeVal = sh != null
+        ? '${sh['symbol']}'
+        : lastTrade == null
+            ? 'no trade yet'
+            : '${lastTrade['asset']} (${lastTrade['decision'] == 'would buy' ? 'bought' : 'sold ${_money(_d(_map(lastTrade['details'])['pnl']))}'})';
     Widget chip(String k, String v) => Expanded(
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -1041,13 +1079,17 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
           ]),
           const SizedBox(height: 6),
           Row(children: [
-            chip('Looks for a buy', 'every 15 min'),
+            chip('Checks every market', 'every 5 min'),
             const SizedBox(width: 6),
             chip('Open trade exits', 'every 5 min'),
           ]),
-        ] else
-          Text('It makes no trades. Press Start and it looks for a buy every 15 minutes by itself.',
+          const SizedBox(height: 6),
+        ] else ...[
+          Text('It makes no trades. Press Start and it checks every market on the day\'s list every 5 minutes by itself.',
               style: TextStyle(color: p.muted, fontSize: 12, height: 1.35)),
+          const SizedBox(height: 8),
+        ],
+        Row(children: [chip(tradeKey, tradeVal)]),
       ]),
     );
   }
@@ -1162,7 +1204,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
         if (_log.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Text('Nothing yet. A new line appears with every 15-minute check.', style: TextStyle(color: p.muted, fontSize: 12.5)),
+            child: Text('Nothing yet. A new line appears with every automatic check (every 5 minutes).', style: TextStyle(color: p.muted, fontSize: 12.5)),
           ),
         for (final r in rows) _logRow(p, r),
         if (_log.length > 4)

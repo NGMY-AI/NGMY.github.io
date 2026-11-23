@@ -1,6 +1,6 @@
 // deno test supabase/functions/ngmy-ai-chat/alpaca_agent_test.ts
 import { assertEquals, assert } from "https://deno.land/std@0.177.0/testing/asserts.ts";
-import { activeMarket, addDays, bigTrend, heldMark, optionFits, pickOption, buildChart, crossover, decide, entryNow, etParts, PA_FX, PA_LESSON_IDS, PA_MARKETS, pickMarket, readMarket, rsi, runStats, sma, type DecideInput, type Scan } from "./alpaca_agent.ts";
+import { activeMarkets, crossAt, todaysList, addDays, bigTrend, heldMark, optionFits, pickOption, buildChart, crossover, decide, entryNow, etParts, PA_FX, PA_LESSON_IDS, PA_MARKETS, pickMarket, readMarket, rsi, runStats, sma, type DecideInput, type Scan } from "./alpaca_agent.ts";
 
 const base: DecideInput = {
   weekend: false, asset: "SPY", stock: true, price: 100, signal: "none", fast: 100, slow: 100, shadow: null,
@@ -193,8 +193,9 @@ Deno.test("forex list is live pairs only", () => {
   assert(PA_FX.every((f) => f.yahoo.endsWith("=X")));
 });
 
-Deno.test("only the agreed markets: SPY and BTC/USD", () => {
-  assertEquals(PA_MARKETS.map((m) => m.symbol), ["SPY", "BTC/USD"]);
+Deno.test("watchlists: 10 stocks on weekdays, 4 coins on weekends", () => {
+  assertEquals(todaysList(false), ["SPY", "QQQ", "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "AMD"]);
+  assertEquals(todaysList(true), ["BTC/USD", "ETH/USD", "SOL/USD", "DOGE/USD"]);
   assertEquals(new Set(PA_MARKETS.map((m) => m.symbol)).size, PA_MARKETS.length);
 });
 
@@ -229,11 +230,6 @@ Deno.test("no order code path in Version 1", async () => {
   assert(!src.includes("//api.alpaca.markets"), "no live endpoint");
 });
 
-Deno.test("fix 1: SPY on weekdays while the stock market is open, BTC/USD on weekends, nothing else", () => {
-  assertEquals(activeMarket(false, true), "SPY");
-  assertEquals(activeMarket(false, false), null); // weekday evening or holiday: no trading
-  assertEquals(activeMarket(true, false), "BTC/USD");
-});
 
 Deno.test("fix 2: never buy into a falling big trend", () => {
   // A cross up is not enough: the big trend must be rising too.
@@ -292,4 +288,35 @@ Deno.test("SPY option: nearest expiry at least 7 days away, strike closest to th
   assertEquals(optionFits(0).ok, false);
   const m = heldMark({ symbol: "SPY", qty: 1, mult: 100, entryPrice: 1.1, entryAt: "" }, 1.35);
   assertEquals(m, { price: 1.35, cost: 110, value: 135, pnl: 25, priced: true });
+});
+
+Deno.test("all of the day's markets are buyable at once: stocks while open on weekdays, coins on weekends", () => {
+  assertEquals(activeMarkets(false, true).length, 10);
+  assertEquals(activeMarkets(false, false), []); // weekday evening or holiday: no trading
+  assertEquals(activeMarkets(true, false), ["BTC/USD", "ETH/USD", "SOL/USD", "DOGE/USD"]);
+});
+
+Deno.test("first valid entry wins; a cross up into a falling big trend is skipped for another market", () => {
+  const mk = (symbol: string, o: Partial<Scan>): Scan => ({
+    symbol, stock: true, open: true, price: 100, fast: 100, slow: 100, signal: "none", key: `${symbol}|t|none`, ...o,
+  });
+  const scans = [
+    mk("NVDA", { fast: 103, slow: 100, signal: "buy", key: "NVDA|t|buy", big: { ok: false, why: "falling" } }), // strongest, but falling
+    mk("AAPL", { fast: 101, slow: 100, signal: "buy", key: "AAPL|t|buy", big: { ok: true, why: "rising" } }),
+    mk("TSLA", { fast: 100.5, slow: 100, signal: "none", big: { ok: true, why: "rising" } }),
+  ];
+  const r = pickMarket(scans, null, false);
+  assertEquals(r.pick?.symbol, "AAPL");
+  assertEquals(r.blocked.map((b) => b.symbol), ["NVDA"]);
+  assertEquals(pickMarket(scans.slice(0, 1), null, false).pick, null);
+});
+
+Deno.test("a cross is named by its candle, so 5-minute checks never buy it twice", () => {
+  const closes = [...Array(30).fill(100), 99, 98, 97, 96, 95, 95, 95, 110, 112, 114];
+  const times = closes.map((_, i) => `t${i}`);
+  const a = crossAt(closes, times);
+  assert(a.length > 0);
+  // One candle later the same cross keeps the same name.
+  assertEquals(crossAt([...closes, 115], [...times, "t99"]), a);
+  assertEquals(crossAt(Array(40).fill(100), times), "");
 });

@@ -30,25 +30,42 @@ const DATA_BASE = "https://data.alpaca.markets";
 
 export type MarketDef = { symbol: string; name: string; kind: "stock" | "crypto" };
 
-/** The agreed markets, and ONLY these: SPY on weekdays while the US stock market is open, Bitcoin on weekends
- *  (Saturday and Sunday, Eastern Time). Nothing else is traded or watched for buy signals. */
+/** The watchlists (Nov 22, 2026): 10 stocks on weekdays while the US stock market is open, 4 coins on Saturday
+ *  and Sunday (Eastern Time). All of the day's list is watched at once; the first valid entry is taken. */
 export const PA_MARKETS: MarketDef[] = [
   { symbol: "SPY", name: "S&P 500 fund", kind: "stock" },
+  { symbol: "QQQ", name: "Nasdaq 100 fund", kind: "stock" },
+  { symbol: "AAPL", name: "Apple", kind: "stock" },
+  { symbol: "MSFT", name: "Microsoft", kind: "stock" },
+  { symbol: "NVDA", name: "Nvidia", kind: "stock" },
+  { symbol: "AMZN", name: "Amazon", kind: "stock" },
+  { symbol: "GOOGL", name: "Alphabet (Google)", kind: "stock" },
+  { symbol: "META", name: "Meta", kind: "stock" },
+  { symbol: "TSLA", name: "Tesla", kind: "stock" },
+  { symbol: "AMD", name: "AMD", kind: "stock" },
   { symbol: "BTC/USD", name: "Bitcoin", kind: "crypto" },
+  { symbol: "ETH/USD", name: "Ethereum", kind: "crypto" },
+  { symbol: "SOL/USD", name: "Solana", kind: "crypto" },
+  { symbol: "DOGE/USD", name: "Dogecoin", kind: "crypto" },
 ];
 
-/** The one market the agent may trade right now: SPY on a weekday while the stock market is open (the Alpaca
- *  clock knows holidays), BTC/USD on Saturday and Sunday (Eastern Time), otherwise none. */
-export function activeMarket(weekend: boolean, stockOpen: boolean): string | null {
-  if (weekend) return "BTC/USD";
-  return stockOpen ? "SPY" : null;
+/** Today's list: the 10 stocks on weekdays, the 4 coins on Saturday and Sunday (whether open or not). */
+export function todaysList(weekend: boolean): string[] {
+  return PA_MARKETS.filter((m) => (weekend ? m.kind === "crypto" : m.kind === "stock")).map((m) => m.symbol);
 }
 
-/** When a market is NOT the one traded right now, a short reason for the app. */
+/** The markets the agent may buy right now: the 4 coins on Saturday and Sunday; the 10 stocks on a weekday while
+ *  the stock market is open (the Alpaca clock knows holidays); otherwise none (weekday evenings, holidays). */
+export function activeMarkets(weekend: boolean, stockOpen: boolean): string[] {
+  if (weekend) return todaysList(true);
+  return stockOpen ? todaysList(false) : [];
+}
+
+/** When a market is NOT traded right now, a short reason for the app. */
 export function offNote(symbol: string, weekend: boolean): string {
-  if (symbol === "BTC/USD") return "weekends only";
-  if (symbol === "SPY") return weekend ? "weekdays only" : "closed";
-  return "not traded";
+  const crypto = symbol.includes("/");
+  if (crypto) return weekend ? "" : "weekends only";
+  return weekend ? "weekdays only" : "closed";
 }
 
 /** The big trend filter (fix 2): the slow average must be HIGHER than it was 1 hour ago (12 five-minute candles)
@@ -117,39 +134,38 @@ export const PA_RULES_TAG = "usd100";
 export const PA_RULES = {
   version: 1,
   readOnly: true,
-  tradeUsd: 100, // per trade: one SPY call option (premium up to $120) on weekdays, $100 of BTC on weekends
+  tradeUsd: 100, // per trade: $100 of the stock (weekdays) or coin (weekends) itself
   fastMa: 9,
   slowMa: 21,
   candleMinutes: 5,
-  checkEveryMinutes: 15, // new buys are looked for every 15 minutes
+  checkEveryMinutes: 5, // every market on the day's list is checked for a new buy every 5 minutes (Nov 22)
   exitCheckMinutes: 5, // an open position is checked every 5 minutes (take profit, stop loss, turn down)
   takeProfitUsd: 50, // sell when the position is up $50
   stopLossUsd: 50, // sell when the position is down $50 (same size as the win: 5 wins out of 10 breaks even)
   dailyLossStopUsd: 50,
   totalLossBrakeUsd: 100,
-  optionMaxPremiumUsd: 120, // one SPY call contract (100 shares x the premium) may cost at most this
+  optionMaxPremiumUsd: 120, // (option buying is off since Nov 22; kept so an option bought earlier still prices and exits)
   optionMinDays: 7, // the nearest expiry at least 7 days away
   weekdayMaxTrades: 4,
   weekendMaxTrades: 5,
   closeOutEt: "3:55 PM",
-  maxMarkets: 2,
+  maxMarkets: 14,
 };
 
 export const PA_RULE_LINES: string[] = [
   "Version 1 is read-only: it logs what it WOULD do and places no orders.",
   "Alpaca paper account only. No live keys, no live endpoint, no real money.",
-  "$100 per trade, one position at a time. No margin, no short selling.",
-  "Weekdays (SPY): instead of shares it would buy ONE SPY call option contract: the strike closest to the SPY price (at the money), the nearest expiry at least 7 days away, and only if the contract costs $120 or less. If it costs more, no trade, and the log says why.",
-  "Weekends (BTC/USD): $100 of Bitcoin itself (spot).",
+  "$100 per trade: $100 of the stock or coin itself. One position at a time across all markets. No options, no margin, no short selling.",
   "All times are Eastern Time (New York).",
-  "It trades ONE market: SPY on weekdays while the US stock market is open (9:30 AM to 4:00 PM ET, never on market holidays), and Bitcoin (BTC/USD) on Saturday and Sunday. No other market, and nothing on weekday evenings.",
-  "Every 15 minutes it looks for a new buy. While it holds a position it checks the exit rules every 5 minutes.",
+  "Weekdays: it watches 10 stocks at the same time (SPY, QQQ, AAPL, MSFT, NVDA, AMZN, GOOGL, META, TSLA, AMD) while the US stock market is open (9:30 AM to 4:00 PM ET, never on market holidays). Nothing on weekday evenings.",
+  "Weekends (Saturday and Sunday): it watches 4 coins at the same time (BTC/USD, ETH/USD, SOL/USD, DOGE/USD).",
+  "Every 5 minutes it looks at every market on the day's list and buys the one that gives a valid entry first (if several do at the same check, the strongest one). While it holds a position it checks the exit rules every 5 minutes.",
   "Buy signal, ALL of these: the fast average (9 candles) crosses above the slow average (21 candles) on 5-minute candles, the slow average is higher than 1 hour ago (the big trend is rising), the price is above the slow average, and no position is held.",
   "Never buys into a falling big trend: if the slow average is flat or falling, no trade, even when the fast line crosses up.",
   "Sell signal: the fast average crosses back below the slow average.",
   "Take profit: sell when the position is up $50. Stop loss: sell when it is down $50. Win and loss are the same size, so winning 5 out of 10 trades breaks even.",
-  "Weekdays: sell everything by 3:55 PM ET. No overnight SPY positions, and no new SPY buys after 3:40 PM ET.",
-  "Up to 4 trades per weekday and 5 per weekend day, only on a real signal. Never forced.",
+  "Weekdays: sell everything by 3:55 PM ET. No overnight stock positions, and no new stock buys after 3:40 PM ET.",
+  "Up to 4 trades per weekday and 5 per weekend day in total across all markets (not per market), only on a real signal. Never forced.",
   "Daily stop: if the day loses $50, no more buys that day.",
   "Total brake: if total demo losses reach $100, the agent pauses until an admin turns it back on.",
 ];
@@ -277,6 +293,15 @@ export function heldMark(s: NonNullable<Shadow>, price: number) {
   };
 }
 
+/** When the fast line crossed above (or below) the slow line in the last 3 candles: that candle's time.
+ *  It names the signal, so checking every 5 minutes never buys the same cross twice. */
+export function crossAt(closes: number[], times: string[]): string {
+  for (let k = Math.max(1, closes.length - 2); k <= closes.length; k++) {
+    if (crossover(closes.slice(0, k), PA_RULES.fastMa, PA_RULES.slowMa, 1).signal !== "none") return times[k - 1] ?? String(k);
+  }
+  return "";
+}
+
 /** "YYYY-MM-DD" plus n days. */
 export function addDays(dayKey: string, n: number): string {
   const [y, m, d] = dayKey.split("-").map(Number);
@@ -317,17 +342,19 @@ export type Scan = {
   big?: { ok: boolean; why: string }; // the big trend filter (fix 2)
 };
 
-/** Of all open markets with a fresh buy signal, the strongest one (fast line furthest above the slow line). */
-export function pickMarket(scans: Scan[], usedKey: string | null, finalCheck: boolean): { pick: Scan | null; closest: Scan | null } {
+/** Of all open markets with a VALID entry (a fresh cross up AND the big trend rising, when known), the first one;
+ *  if several are valid at the same check, the strongest (fast line furthest above the slow line).
+ *  `blocked` = markets that crossed up but failed the big trend rule, for the log. */
+export function pickMarket(scans: Scan[], usedKey: string | null, finalCheck: boolean): { pick: Scan | null; closest: Scan | null; blocked: Scan[] } {
   const open = scans.filter((s) => s.open && s.fast != null && s.slow != null && s.price > 0);
   const gap = (s: Scan) => (s.fast! - s.slow!) / s.slow!;
-  const candidates = open
-    .filter((s) => s.signal === "buy" && s.key !== usedKey && !(s.stock && finalCheck))
-    .sort((a, b) => gap(b) - gap(a));
+  const crossed = open.filter((s) => s.signal === "buy" && s.key !== usedKey && !(s.stock && finalCheck));
+  const candidates = crossed.filter((s) => s.big?.ok !== false).sort((a, b) => gap(b) - gap(a));
+  const blocked = crossed.filter((s) => s.big?.ok === false);
   // For the log when nothing qualifies: the market whose fast line is closest to crossing up.
   const below = open.filter((s) => s.fast! <= s.slow!).sort((a, b) => gap(b) - gap(a));
   const closest = below[0] ?? [...open].sort((a, b) => gap(a) - gap(b))[0] ?? null;
-  return { pick: candidates[0] ?? null, closest };
+  return { pick: candidates[0] ?? null, closest, blocked };
 }
 
 /** RSI (14): how strong the recent rises were compared with the recent falls, 0 to 100. */
@@ -786,27 +813,28 @@ export async function readForex(): Promise<any[]> {
 }
 
 /** What the app shows for each market: price, change over the chart, trend, signal and the chart itself. */
-/** `open` here means "the agent may trade it right now": only the active market (SPY on weekdays while the stock
- *  market is open, BTC/USD on weekends). The other one shows why it is not traded now. */
+/** `open` here means "the agent may buy it right now": the 10 stocks on a weekday while the stock market is open,
+ *  the 4 coins on Saturday and Sunday. `today` = on today's watchlist (even when the market is closed). */
 function marketCards(series: Record<string, Series>, stockOpen: boolean, weekend = etParts(new Date()).weekend, extra: MarketDef[] = []) {
-  const active = activeMarket(weekend, stockOpen);
+  const active = activeMarkets(weekend, stockOpen);
+  const list = todaysList(weekend);
   return [...PA_MARKETS, ...extra].map((m) => {
     const exitOnly = !PA_MARKETS.some((x) => x.symbol === m.symbol);
     const s = series[m.symbol];
     const chart = buildChart(s?.times ?? [], s?.closes ?? [], 48, s?.ohlc);
     const first = chart.points[0]?.c ?? 0;
     const price = s?.price ?? 0;
-    const open = m.symbol === active;
+    const open = active.includes(m.symbol);
     const off = open ? "" : exitOnly ? "exit only" : offNote(m.symbol, weekend);
     const closedNote = open ? undefined : exitOnly
       ? "Not on the list any more. The agent only watches the exit rules for the position it still holds here and never buys it again."
-      : m.symbol === "BTC/USD"
-      ? `The agent trades Bitcoin only on Saturday and Sunday.${active ? ` Today it trades ${active}.` : " Right now nothing is traded (SPY trades on weekdays 9:30 AM to 4:00 PM ET)."}`
+      : m.kind === "crypto"
+      ? "The agent trades coins only on Saturday and Sunday. On weekdays it watches the 10 stocks."
       : weekend
-        ? "The agent trades SPY only on weekdays while the stock market is open. Today it trades BTC/USD."
-        : "The stock market is closed, so SPY cannot be traded until it opens. Bitcoin is traded only on weekends.";
+        ? "The agent trades stocks only on weekdays while the stock market is open. Today it watches the 4 coins."
+        : "The stock market is closed, so stocks cannot be traded until it opens (9:30 AM ET). Coins are traded only on weekends.";
     return {
-      symbol: m.symbol, name: m.name, kind: m.kind, open, active: open, offLabel: off,
+      symbol: m.symbol, name: m.name, kind: m.kind, open, active: open, today: list.includes(m.symbol) || exitOnly, offLabel: off,
       price, changePct: first ? round2((price - first) / first * 100) : 0,
       trend: chart.trend, signal: chart.signal, fast: chart.fast, slow: chart.slow, chart,
       candleMin: PA_RULES.candleMinutes,
@@ -872,11 +900,9 @@ async function runCheck(db: any): Promise<Record<string, unknown>> {
   const last = state.last_tick_at ? Date.parse(state.last_tick_at) : 0;
   if (now.getTime() - last < 4 * 60 * 1000) return { ok: true, skipped: "already checked in the last 4 minutes" };
 
-  // Fix 3: while a position is open, every 5-minute check runs the exit rules. With nothing held, new buys are
-  // looked for only on the quarter hour (:00, :15, :30, :45 ET), as before.
+  // Every 5-minute check: the exit rules while a position is open, otherwise a new buy across the whole day's list
+  // (buy checks every 5 minutes since Nov 22, 2026).
   const holding = !!state.shadow;
-  const entryWindow = et.minute % 15 < 3;
-  if (!holding && !entryWindow) return { ok: true, skipped: "nothing held; new buys are looked for every 15 minutes" };
   await saveState(db, { last_tick_at: now.toISOString() });
 
   if (!state.enabled) return { ok: true, skipped: "agent is stopped" };
@@ -908,16 +934,17 @@ async function runCheck(db: any): Promise<Record<string, unknown>> {
   const toClose = stockOpen && clock?.next_close ? (Date.parse(clock.next_close) - now.getTime()) / 60000 : Infinity;
   const finalCheck = toClose < 10;
   const lateForBuys = toClose < 20;
-  const active = activeMarket(et.weekend, stockOpen);
+  const active = activeMarkets(et.weekend, stockOpen);
 
-  const day = await ensureDay(db, et, active ?? watch, acct.equity);
+  const day = await ensureDay(db, et, active.length ? (et.weekend ? "4 coins" : "10 stocks") : watch, acct.equity);
   const cards = marketCards(series, stockOpen, et.weekend, extra);
+  // EVERY market on the day's list is checked in this same check (never one market per check).
   const scans: Scan[] = [...PA_MARKETS, ...extra].map((m) => {
     const s = series[m.symbol] ?? { closes: [], times: [], ohlc: [], price: 0, lastBarAt: "" };
     const x = crossover(s.closes);
     return {
-      symbol: m.symbol, stock: m.kind === "stock", open: m.symbol === active, price: s.price,
-      fast: x.fastNow, slow: x.slowNow, signal: x.signal, key: `${m.symbol}|${s.lastBarAt}|${x.signal}`,
+      symbol: m.symbol, stock: m.kind === "stock", open: active.includes(m.symbol), price: s.price,
+      fast: x.fastNow, slow: x.slowNow, signal: x.signal, key: `${m.symbol}|${crossAt(s.closes, s.times)}|${x.signal}`,
       big: bigTrend(s.closes, s.price),
     };
   });
@@ -952,37 +979,27 @@ async function runCheck(db: any): Promise<Record<string, unknown>> {
       fast: focus.fast, slow: focus.slow, shadow, signalAlreadyUsed: false });
     if (optionPriceMissing && d.decision === "hold") d = { ...d, reason: `${d.reason} (no option price right now, checked again in 5 minutes)` };
   } else {
-    const { pick } = pickMarket(scans, state.last_signal_key ?? null, lateForBuys);
-    // Only the active market can be bought: SPY on weekdays while the stock market is open, BTC/USD on weekends.
-    focus = pick ?? scans.find((s) => s.symbol === active) ?? scans[0];
+    // All of the day's markets at once: the first VALID entry (cross up + big trend rising) is bought.
+    const { pick, closest, blocked } = pickMarket(scans, state.last_signal_key ?? null, lateForBuys);
+    focus = pick ?? closest ?? scans.find((s) => s.open) ?? scans[0];
+    const listName = et.weekend ? "4 coins" : "10 stocks";
     if (state.brake_paused) {
       d = { decision: "no action", reason: `agent paused by the $${PA_RULES.totalLossBrakeUsd} brake, waiting for an admin to turn it back on` };
-    } else if (!active) {
-      d = { decision: "no action", reason: "no market is traded right now: SPY trades on weekdays 9:30 AM to 4:00 PM ET, BTC/USD on Saturday and Sunday" };
+    } else if (!active.length) {
+      d = { decision: "no action", reason: "no market is traded right now: the 10 stocks trade on weekdays 9:30 AM to 4:00 PM ET, the 4 coins on Saturday and Sunday" };
     } else {
       d = decide({ ...base, asset: focus.symbol, stock: focus.stock, price: focus.price, signal: pick ? "buy" : "none",
         fast: focus.fast, slow: focus.slow, shadow: null, signalAlreadyUsed: false, bigTrend: focus.big });
       if (!pick && d.reason === "no signal") {
-        const below = focus.fast != null && focus.slow != null && focus.fast <= focus.slow;
-        d = {
-          decision: "no action",
-          reason: `no buy signal on ${active} (the only market traded today)${below ? ", the fast average is below the slow" : ""}; ${focus.big?.why ?? ""}`.replace(/; $/, ""),
-        };
+        const why = blocked.length
+          ? `${blocked.map((b) => b.symbol).join(", ")} crossed up but the big trend is not rising, so no trade`
+          : `no fresh cross up${closest ? `, closest to one: ${closest.symbol}` : ""}`;
+        d = { decision: "no action", reason: `checked all ${active.length} ${listName}: ${why}` };
       }
       if (d.decision === "would buy") {
-        if (focus.stock) {
-          // Weekdays: one SPY call option instead of shares, only if it costs $120 or less.
-          const c = await chooseSpyCall(cfg.keys, focus.price, et.dayKey);
-          if (!c.ok) {
-            d = { decision: "no action", reason: `buy signal on SPY, but ${c.why}` };
-          } else {
-            const o = c.option;
-            newShadow = { symbol: "SPY", qty: 1, mult: 100, entryPrice: o.premium, entryAt: now.toISOString(), option: o };
-            d = { ...d, reason: `${d.reason.replace(/, would buy \$\d+$/, "")}: would buy 1 SPY $${o.strike} call expiring ${o.expiry} for $${o.cost.toFixed(2)} ($${o.premium.toFixed(2)} x 100)` };
-          }
-        } else {
-          newShadow = { symbol: focus.symbol, qty: PA_RULES.tradeUsd / focus.price, mult: 1, entryPrice: focus.price, entryAt: now.toISOString() };
-        }
+        // $100 of the stock or coin itself.
+        newShadow = { symbol: focus.symbol, qty: PA_RULES.tradeUsd / focus.price, mult: 1, entryPrice: focus.price, entryAt: now.toISOString() };
+        d = { ...d, reason: `${d.reason} (first valid entry of the ${listName})` };
       }
     }
   }
@@ -1024,7 +1041,7 @@ async function runCheck(db: any): Promise<Record<string, unknown>> {
     reason: d.reason,
     balance: acct.equity, total_pnl: newTotal, day_pnl: newDay,
     details: {
-      pnl: d.pnl ?? null, by: "cron", rules: shadow && shadow.mult == null ? "usd50" : PA_RULES_TAG, stockOpen, openMarkets: openCount, activeMarket: active,
+      pnl: d.pnl ?? null, by: "cron", rules: shadow && shadow.mult == null ? "usd50" : PA_RULES_TAG, stockOpen, openMarkets: openCount, activeMarkets: active,
       bigTrendOk: focus.big?.ok ?? null, exitOnly: holding,
       // Every market the agent looked at in this check.
       scanned: scans.map((s) => ({ s: s.symbol, p: s.price, f: s.fast, sl: s.slow, sig: s.signal, open: s.open })),
@@ -1112,7 +1129,7 @@ export async function handleAlpacaAgent(
         alertsAllowed: isAdmin || graduated,
         markets: markets.cards.map(slim),
         stockOpen: markets.stockOpen,
-        activeMarket: activeMarket(etParts(new Date()).weekend, markets.stockOpen),
+        activeMarkets: activeMarkets(etParts(new Date()).weekend, markets.stockOpen), todaysList: todaysList(etParts(new Date()).weekend),
         fx: fx.map(slim),
         rules: PA_RULE_LINES,
         nowEt: etNow.label,
@@ -1198,7 +1215,7 @@ export async function handleAlpacaAgent(
     try { fx = await readForex(); } catch { fx = []; }
   }
   const etNow = etParts(new Date());
-  const market = { stockOpen, weekend: etNow.weekend, activeMarket: activeMarket(etNow.weekend, !!stockOpen), nextOpen: clock?.next_open ?? null, nextClose: clock?.next_close ?? null };
+  const market = { stockOpen, weekend: etNow.weekend, activeMarkets: activeMarkets(etNow.weekend, !!stockOpen), todaysList: todaysList(etNow.weekend), nextOpen: clock?.next_open ?? null, nextClose: clock?.next_close ?? null };
   const { data: today } = await db.from("ngmy_alpaca_agent_days").select("*").eq("et_day", etNow.dayKey).maybeSingle();
   const { data: trades } = await db.from("ngmy_alpaca_agent_log").select("id,created_at,et_time,asset,price,decision,reason,details")
     .in("decision", ["would buy", "would sell"]).order("id", { ascending: false }).limit(40);
@@ -1236,7 +1253,7 @@ export async function handleAlpacaAgent(
         dailyStopUsd: PA_RULES.dailyLossStopUsd, totalBrakeUsd: PA_RULES.totalLossBrakeUsd,
         optionMaxUsd: PA_RULES.optionMaxPremiumUsd, optionMinDays: PA_RULES.optionMinDays,
         // What the next trade would be: a SPY call on weekdays, Bitcoin itself on weekends.
-        kind: etNow.weekend ? "spot" : "option",
+        kind: etNow.weekend ? "crypto" : "stock",
       },
       config: {
         keysSet: !!cfg.keys,
