@@ -1,9 +1,9 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var J,A,C,B={
-hA4(d){var x=C.a.i(d.toLowerCase())
+hA5(d){var x=C.a.i(d.toLowerCase())
 return x.length===0?"device":x},
-b5w(d,e){var x=0,w=A.j(y.e),v,u
-var $async$b5w=A.e(function(f,g){if(f===1)return A.f(g,w)
+b5u(d,e){var x=0,w=A.j(y.e),v,u
+var $async$b5u=A.e(function(f,g){if(f===1)return A.f(g,w)
 for(;;)switch(x){case 0:if(e){v=!0
 x=1
 break}u=C.a.i(d)
@@ -13,38 +13,38 @@ break}v=A.lT(u,C.V4)
 x=1
 break
 case 1:return A.h(v,w)}})
-return A.i($async$b5w,w)},
-b5v(d){var x=0,w=A.j(y.l),v,u,t
-var $async$b5v=A.e(function(e,f){if(e===1)return A.f(f,w)
+return A.i($async$b5u,w)},
+b5t(d){var x=0,w=A.j(y.l),v,u,t
+var $async$b5t=A.e(function(e,f){if(e===1)return A.f(f,w)
 for(;;)switch(x){case 0:x=3
-return A.b(A.aB(),$async$b5v)
+return A.b(A.aB(),$async$b5t)
 case 3:u=f
-t=B.hA4(d)
+t=B.hA5(d)
 t=A.er(J.t(u.a,"ngmy_device_transfer_used_"+t))
 v=t==null?0:t
 x=1
 break
 case 1:return A.h(v,w)}})
-return A.i($async$b5v,w)},
-b5x(d){var x=0,w=A.j(y.f),v,u,t
-var $async$b5x=A.e(function(e,f){if(e===1)return A.f(f,w)
+return A.i($async$b5t,w)},
+b5v(d){var x=0,w=A.j(y.f),v,u,t
+var $async$b5v=A.e(function(e,f){if(e===1)return A.f(f,w)
 for(;;)switch(x){case 0:x=2
-return A.b(A.aB(),$async$b5x)
+return A.b(A.aB(),$async$b5v)
 case 2:v=f
-u="ngmy_device_transfer_used_"+B.hA4(d)
+u="ngmy_device_transfer_used_"+B.hA5(d)
 t=A.er(J.t(v.a,u))
 x=3
-return A.b(v.aE("Int",u,(t==null?0:t)+1),$async$b5x)
+return A.b(v.aE("Int",u,(t==null?0:t)+1),$async$b5v)
 case 3:return A.h(null,w)}})
-return A.i($async$b5x,w)},
+return A.i($async$b5v,w)},
 pO(d,e){var x=0,w=A.j(y.f),v
 var $async$pO=A.e(function(f,g){if(f===1)return A.f(g,w)
 for(;;)switch(x){case 0:if(e){x=1
 break}x=3
-return A.b(B.b5w(d,!1),$async$pO)
+return A.b(B.b5u(d,!1),$async$pO)
 case 3:if(g){x=1
 break}x=4
-return A.b(B.b5x(d),$async$pO)
+return A.b(B.b5v(d),$async$pO)
 case 4:case 1:return A.h(v,w)}})
 return A.i($async$pO,w)},
 pP(d,e,f){var x=0,w=A.j(y.e),v,u
@@ -52,15 +52,15 @@ var $async$pP=A.e(function(g,h){if(g===1)return A.f(h,w)
 for(;;)switch(x){case 0:if(f){v=!0
 x=1
 break}u=C.a.i(e)
-if(u.length===0){if(d.e!=null)d.K(y.a).f.T(D.fwG)
+if(u.length===0){if(d.e!=null)d.K(y.a).f.T(D.fwE)
 v=!1
 x=1
 break}x=3
-return A.b(B.b5w(u,!1),$async$pP)
+return A.b(B.b5u(u,!1),$async$pP)
 case 3:if(h){v=!0
 x=1
 break}x=4
-return A.b(B.b5v(u),$async$pP)
+return A.b(B.b5t(u),$async$pP)
 case 4:if(h<2){v=!0
 x=1
 break}if(d.e==null){v=!1
@@ -76,6 +76,6 @@ C=c[2]
 B=a.updateHolder(c[83],B)
 D=c[385]
 var z=a.updateTypes([])
-var y={a:A.ar("kx"),e:A.ar("P"),l:A.ar("F"),f:A.ar("~")};(function constants(){D.h7l=new A.C("Sign in to transfer files between devices.",null,null,null,null,null,null,null,null,null,null,null)
-D.fwG=new A.b1(D.h7l,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)})()};
-(a=>{a["9Cl4k31/LOVqfl0O2+CujId/vqA="]=a.current})($__dart_deferred_initializers__);
+var y={a:A.ar("kx"),e:A.ar("P"),l:A.ar("F"),f:A.ar("~")};(function constants(){D.h7k=new A.C("Sign in to transfer files between devices.",null,null,null,null,null,null,null,null,null,null,null)
+D.fwE=new A.b1(D.h7k,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)})()};
+(a=>{a["BExsOfFMVXPx3flvWPud0lkemk0="]=a.current})($__dart_deferred_initializers__);

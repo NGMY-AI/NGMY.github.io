@@ -1,11 +1,11 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var J,A,C,B={
-hy_(d){var x=d.lN,w=y.w
+hy0(d){var x=d.lN,w=y.w
 w=x.iW(x,new B.cff(),w,w)
 return w},
 Ou(d,e){var x,w,v=C.a.i(e.toLowerCase())
 if(v.length===0)return!1
-x=B.hy_(d).h(0,v)
+x=B.hy0(d).h(0,v)
 if(x==null||x.length===0)return!1
 w=A.bi(x)
 return w!=null&&w.ce(new A.V(Date.now(),0,!1))},
@@ -27,15 +27,15 @@ x=1
 break
 case 1:return A.h(v,w)}})
 return A.i($async$coC,w)},
-b5h(d,e){var x=0,w=A.j(y.e),v
-var $async$b5h=A.e(function(f,g){if(f===1)return A.f(g,w)
+b5f(d,e){var x=0,w=A.j(y.e),v
+var $async$b5f=A.e(function(f,g){if(f===1)return A.f(g,w)
 for(;;)switch(x){case 0:x=3
-return A.b(B.coC(d,e),$async$b5h)
+return A.b(B.coC(d,e),$async$b5f)
 case 3:v=g!=null
 x=1
 break
 case 1:return A.h(v,w)}})
-return A.i($async$b5h,w)},
+return A.i($async$b5f,w)},
 auk(d,e,f,g,h,i){var x=0,w=A.j(y.v),v,u,t,s,r,q,p,o,n
 var $async$auk=A.e(function(j,k){if(j===1)return A.f(k,w)
 for(;;)switch(x){case 0:n=C.a.i(e.toLowerCase())
@@ -51,10 +51,10 @@ if(s==null){s=y.b
 s=A.S(s,s)}r=y.w
 q=y.b
 p=A.a1(s,r,q)
-s=A.hhS(u,e)
+s=A.hhT(u,e)
 o=A.a1(s==null?A.S(q,q):s,r,q)
 s=g===C.og
-if(o.am(0,s?"advisor":"family_tree"))throw A.Y(A.bb("You already saved a "+A.i6X(g)+" QR. Open QR Code Generator \u2192 Saved and delete it before saving a new one."))
+if(o.am(0,s?"advisor":"family_tree"))throw A.Y(A.bb("You already saved a "+A.i6Y(g)+" QR. Open QR Code Generator \u2192 Saved and delete it before saving a new one."))
 s=s?"advisor":"family_tree"
 o.n(0,s,new A.wN(g,v,C.a.i(h),C.a.i(d),i,new A.V(Date.now(),0,!1).ab().ag()).ak())
 p.n(0,n,o)
@@ -63,7 +63,7 @@ x=3
 return A.b(A.aui(u),$async$auk)
 case 3:return A.h(null,w)}})
 return A.i($async$auk,w)},
-hA1(d,e){var x,w,v=C.a.i(d)
+hA2(d,e){var x,w,v=C.a.i(d)
 if(!C.a.Y(v,(e===C.og?"NGMYASYNC2":"NGMYFTSYNC2")+"|"))return null
 x=v.split("|")
 if(x.length<2)return null
@@ -73,11 +73,11 @@ J=c[1]
 A=c[0]
 C=c[2]
 B=a.updateHolder(c[42],B)
-D=c[141]
+D=c[140]
 var z=a.updateTypes([])
 B.cff.prototype={
 $2(d,e){return new A.bu(J.k(d),J.k(e),y.F)},
 $S:99};(function inheritance(){var x=a.inherit
 x(B.cff,A.ie)})()
-var y={F:A.ar("bu<m,m>"),w:A.ar("m"),e:A.ar("P"),b:A.ar("@"),u:A.ar("a9<@,@>?"),m:A.ar("wN?"),v:A.ar("~")};(function constants(){D.aqM=new A.a_(61152,"MaterialIcons",!1)})()};
-(a=>{a["+FaVP+U/yelUj6orXuiPU437UHc="]=a.current})($__dart_deferred_initializers__);
+var y={F:A.ar("bu<m,m>"),w:A.ar("m"),e:A.ar("P"),b:A.ar("@"),u:A.ar("a9<@,@>?"),m:A.ar("wN?"),v:A.ar("~")};(function constants(){D.aqN=new A.a_(61152,"MaterialIcons",!1)})()};
+(a=>{a["spL3EMDNOQKGZS0ditIIlUqBGW4="]=a.current})($__dart_deferred_initializers__);
