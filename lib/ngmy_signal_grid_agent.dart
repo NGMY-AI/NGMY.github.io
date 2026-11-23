@@ -324,13 +324,25 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
       _tradesCard(p, s),
       _activityCard(p),
       _rulesCard(p, s),
-      Padding(
-        padding: const EdgeInsets.only(top: 6),
-        child: Text(
-          'Version 1 is read-only: no order is ever sent to Alpaca. Order switch (ALPACA_ORDERS_ENABLED): ${cfg['ordersSwitchOn'] == true ? 'on' : 'off'}.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: p.muted, fontSize: 11),
+      // Paper-only note, framed and compact.
+      Container(
+        margin: const EdgeInsets.only(top: 2, bottom: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: p.card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: p.cardEdge),
         ),
+        child: Row(children: [
+          Icon(Icons.verified_user_rounded, size: 18, color: _up),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Paper money only: no order is ever sent to Alpaca. Order switch: ${cfg['ordersSwitchOn'] == true ? 'on' : 'off'}.',
+              style: TextStyle(color: p.muted, fontSize: 11.5, height: 1.3),
+            ),
+          ),
+        ]),
       ),
     ];
   }
@@ -442,7 +454,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
           ]),
         ),
         SizedBox(
-          height: 128,
+          height: 66,
           child: ListView.separated(
             controller: _placeStrip(markets.indexWhere((m) => m['asset'] == focus['asset'])),
             scrollDirection: Axis.horizontal,
@@ -455,47 +467,49 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
               final on = sym == focus['asset'];
               final chg = _d(m['changePct']);
               final up = chg >= 0;
-              final pts = _points(m);
               final holding = shadow?['symbol'] == sym;
               final signal = _map(m['reading'])['decision'] == 'ENTER' && _map(m['reading'])['dir'] == 'up';
+              // Small card: name and tag on top, price and change below.
               return GestureDetector(
                 onTap: () => _pickMarket(sym),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  width: 150,
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+                  width: 152,
+                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
                   decoration: BoxDecoration(
                     color: p.card,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: on ? _look(sym).color : p.cardEdge, width: on ? 2 : 1),
-                    boxShadow: [BoxShadow(color: on ? _look(sym).color.withValues(alpha: 0.25) : p.shadow, blurRadius: on ? 18 : 12, offset: const Offset(0, 6))],
+                    boxShadow: [BoxShadow(color: on ? _look(sym).color.withValues(alpha: 0.20) : p.shadow, blurRadius: on ? 12 : 8, offset: const Offset(0, 4))],
                   ),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                     Row(children: [
-                      _coin(sym, 20),
-                      const SizedBox(width: 6),
+                      _coin(sym, 16),
+                      const SizedBox(width: 5),
                       Expanded(
                         child: Text(sym, maxLines: 1, overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: p.ink, fontSize: 12, fontWeight: FontWeight.w800)),
+                            style: TextStyle(color: p.ink, fontSize: 11.5, fontWeight: FontWeight.w800)),
                       ),
-                      if (m['open'] != true)
-                        Text((m['offLabel'] ?? 'closed').toString(), style: TextStyle(color: p.muted, fontSize: 9.5, fontWeight: FontWeight.w700)),
+                      if (holding)
+                        Icon(Icons.work_rounded, size: 13, color: _btc)
+                      else if (signal)
+                        Icon(Icons.bolt_rounded, size: 14, color: _up)
+                      else if (m['open'] != true)
+                        Text((m['offLabel'] ?? 'closed').toString(), style: TextStyle(color: p.muted, fontSize: 9, fontWeight: FontWeight.w700)),
                     ]),
-                    const SizedBox(height: 6),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(_money(_d(m['price']), sign: false),
-                          style: TextStyle(color: p.ink, fontSize: 17, fontWeight: FontWeight.w700)),
-                    ),
-                    Row(children: [
+                    Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                      Expanded(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(_money(_d(m['price']), sign: false),
+                              style: TextStyle(color: p.ink, fontSize: 14.5, fontWeight: FontWeight.w800)),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
                       Text('${up ? '+' : ''}${chg.toStringAsFixed(2)}%',
-                          style: TextStyle(color: up ? _up : _loss, fontSize: 11, fontWeight: FontWeight.w800)),
-                      const Spacer(),
-                      if (holding) _pill('HOLDING', _btc) else if (signal) _pill('BUY SIGNAL', _up),
+                          style: TextStyle(color: up ? _up : _loss, fontSize: 10.5, fontWeight: FontWeight.w800)),
                     ]),
-                    const SizedBox(height: 4),
-                    Expanded(child: CustomPaint(size: Size.infinite, painter: _SparkPainter(pts, up ? _up : _loss))),
                   ]),
                 ),
               );
@@ -527,8 +541,16 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
                 ? 'Stock market closed${_whenOpens(market['nextOpen'])}'
                 : '';
     final look = _look(asset);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 6, 4, 14),
+    // The market on show (name, price, change, open or closed), in its own frame.
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: p.card,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: p.cardEdge),
+        boxShadow: [BoxShadow(color: p.shadow, blurRadius: 12, offset: const Offset(0, 6))],
+      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           _coin(asset, 30),
@@ -547,7 +569,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
               alignment: Alignment.centerLeft,
               fit: BoxFit.scaleDown,
               child: Text(price == 0 ? '—' : _money(price, sign: false, dollar: false),
-                  style: TextStyle(color: p.ink, fontSize: 42, fontWeight: FontWeight.w600, letterSpacing: -1,
+                  style: TextStyle(color: p.ink, fontSize: 34, fontWeight: FontWeight.w700, letterSpacing: -1,
                       fontFeatures: const [FontFeature.tabularFigures()])),
             ),
           ),
@@ -709,58 +731,81 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
         Text('Alpaca paper account ${_money(base, sign: false)} (unchanged, Version 1 sends no orders) · \$${_d(ticket['amount']).toStringAsFixed(0)} a trade',
             style: const TextStyle(color: Colors.white60, fontSize: 11)),
         const SizedBox(height: 14),
-        Row(children: [
-          Expanded(child: _darkStat('Today', _money(day), day > 0 ? _up : day < 0 ? _loss : Colors.white)),
-          const SizedBox(width: 8),
-          Expanded(child: _darkStat('All time', _money(total), total > 0 ? _up : total < 0 ? _loss : Colors.white)),
-          const SizedBox(width: 8),
-          Expanded(child: _darkStat('Wins / losses', '${rec['wins'] ?? 0} / ${rec['losses'] ?? 0}', Colors.white)),
-        ]),
-        const SizedBox(height: 8),
-        Row(children: [
-          Expanded(child: _darkStat('Trades today', '${today['trades'] ?? 0} of ${ticket['maxTradesToday'] ?? 4}', Colors.white)),
-          const SizedBox(width: 8),
-          Expanded(child: _darkStat('Daily stop', '-\$${_d(ticket['dailyStopUsd'] ?? 50).toStringAsFixed(0)}', Colors.white)),
-          const SizedBox(width: 8),
-          Expanded(child: _darkStat('Total brake', '-\$${_d(ticket['totalBrakeUsd'] ?? 100).toStringAsFixed(0)}', Colors.white)),
-        ]),
-        const SizedBox(height: 8),
-        // What each trade is and where it ends (this used to be the Next trade card).
-        Row(children: [
-          Expanded(
-            child: _darkStat('Each trade',
-                ticket['kind'] == 'spot' ? '\$${_d(ticket['amount'] ?? 100).toStringAsFixed(0)} BTC' : 'SPY call ≤\$${_d(ticket['optionMaxUsd'] ?? 120).toStringAsFixed(0)}',
-                Colors.white),
-          ),
-          const SizedBox(width: 8),
-          Expanded(child: _darkStat('Take profit', '+\$${_d(ticket['takeProfitUsd'] ?? 50).toStringAsFixed(0)}', _up)),
-          const SizedBox(width: 8),
-          Expanded(child: _darkStat('Stop loss', '-\$${_d(ticket['stopLossUsd'] ?? 50).toStringAsFixed(0)}', _loss)),
-        ]),
-        const SizedBox(height: 8),
-        // Win rate under the $100 rules: win and loss are both $50, so 50% (5 out of 10) breaks even.
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(14)),
-          child: Row(children: [
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Win rate (\$100 trades)', style: TextStyle(color: Colors.white60, fontSize: 10.5)),
-                const SizedBox(height: 2),
-                Text(
-                  rate == null ? 'No \$100 trades yet' : '${_d(rate).toStringAsFixed(0)}%  ·  ${nr['wins'] ?? 0} won of ${nr['trades'] ?? 0}',
-                  style: TextStyle(
-                      color: rate == null ? Colors.white : _d(rate) >= 50 ? _up : _loss, fontSize: 16, fontWeight: FontWeight.w800),
-                ),
-              ]),
-            ),
-            const Text('5 of 10\n= break even', textAlign: TextAlign.right, style: TextStyle(color: Colors.white60, fontSize: 10.5, height: 1.25)),
+        // Frame 1: results and limits (what was always on this card).
+        _balanceGroup('RESULTS AND LIMITS', [
+          Row(children: [
+            Expanded(child: _darkStat('Today', _money(day), day > 0 ? _up : day < 0 ? _loss : Colors.white)),
+            const SizedBox(width: 8),
+            Expanded(child: _darkStat('All time', _money(total), total > 0 ? _up : total < 0 ? _loss : Colors.white)),
+            const SizedBox(width: 8),
+            Expanded(child: _darkStat('Wins / losses', '${rec['wins'] ?? 0} / ${rec['losses'] ?? 0}', Colors.white)),
           ]),
-        ),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(child: _darkStat('Trades today', '${today['trades'] ?? 0} of ${ticket['maxTradesToday'] ?? 4}', Colors.white)),
+            const SizedBox(width: 8),
+            Expanded(child: _darkStat('Daily stop', '-\$${_d(ticket['dailyStopUsd'] ?? 50).toStringAsFixed(0)}', Colors.white)),
+            const SizedBox(width: 8),
+            Expanded(child: _darkStat('Total brake', '-\$${_d(ticket['totalBrakeUsd'] ?? 100).toStringAsFixed(0)}', Colors.white)),
+          ]),
+        ]),
+        const SizedBox(height: 10),
+        // Frame 2: each $100 trade (what it buys, where it sells) and how often those trades win.
+        _balanceGroup('EACH TRADE', [
+          Row(children: [
+            Expanded(
+              child: _darkStat('Buys',
+                  ticket['kind'] == 'spot' ? '\$${_d(ticket['amount'] ?? 100).toStringAsFixed(0)} BTC' : 'SPY call ≤\$${_d(ticket['optionMaxUsd'] ?? 120).toStringAsFixed(0)}',
+                  Colors.white),
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: _darkStat('Take profit', '+\$${_d(ticket['takeProfitUsd'] ?? 50).toStringAsFixed(0)}', _up)),
+            const SizedBox(width: 8),
+            Expanded(child: _darkStat('Stop loss', '-\$${_d(ticket['stopLossUsd'] ?? 50).toStringAsFixed(0)}', _loss)),
+          ]),
+          const SizedBox(height: 8),
+          // Win rate under the $100 rules: win and loss are both $50, so 50% (5 out of 10) breaks even.
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(14)),
+            child: Row(children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Win rate (\$100 trades)', style: TextStyle(color: Colors.white60, fontSize: 10.5)),
+                  const SizedBox(height: 2),
+                  Text(
+                    rate == null ? 'No \$100 trades yet' : '${_d(rate).toStringAsFixed(0)}%  ·  ${nr['wins'] ?? 0} won of ${nr['trades'] ?? 0}',
+                    style: TextStyle(
+                        color: rate == null ? Colors.white : _d(rate) >= 50 ? _up : _loss, fontSize: 16, fontWeight: FontWeight.w800),
+                  ),
+                ]),
+              ),
+              const Text('5 of 10\n= break even', textAlign: TextAlign.right, style: TextStyle(color: Colors.white60, fontSize: 10.5, height: 1.25)),
+            ]),
+          ),
+        ]),
       ]),
     );
   }
+
+  /// One framed group inside the purple balance card.
+  Widget _balanceGroup(String title, List<Widget> children) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 2, bottom: 8),
+            child: Text(title, style: const TextStyle(color: Colors.white70, fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: 0.9)),
+          ),
+          ...children,
+        ]),
+      );
 
   Widget _darkStat(String k, String v, Color c) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
@@ -948,20 +993,61 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
   Widget _autoLine(_Pal p, Map<String, dynamic> st) {
     final on = st['enabled'] == true && st['brakePaused'] != true;
     final last = DateTime.tryParse('${st['lastTickAt'] ?? ''}');
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(6, 0, 6, 14),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Icon(Icons.autorenew_rounded, size: 16, color: on ? _up : p.muted),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            on
-                ? 'Trades are automatic: the agent looks for a new buy every 15 minutes and, while it holds a trade, checks the exits every 5 minutes. '
-                    'Last check ${last == null ? 'not yet' : '${_clock(_toEt(last))} ET'} · next buy check ${_nextAuto()}. Check now only looks, it never trades.'
-                : 'The agent is stopped, so it makes no trades. Press Start and it looks for a buy every 15 minutes by itself.',
-            style: TextStyle(color: p.muted, fontSize: 11.5, height: 1.35),
+    final c = on ? _up : p.muted;
+    Widget chip(String k, String v) => Expanded(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(color: p.inner, borderRadius: BorderRadius.circular(12)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(k, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.muted, fontSize: 10.5)),
+              const SizedBox(height: 2),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(v, style: TextStyle(color: p.ink, fontSize: 13, fontWeight: FontWeight.w800)),
+              ),
+            ]),
           ),
-        ),
+        );
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: p.card,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: c.withValues(alpha: 0.35)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(color: c.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(9)),
+            child: Icon(Icons.autorenew_rounded, size: 17, color: c),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(on ? 'Trades are automatic' : 'Agent is stopped',
+                style: TextStyle(color: p.ink, fontSize: 13.5, fontWeight: FontWeight.w800)),
+          ),
+          Text('Check now only looks', style: TextStyle(color: p.muted, fontSize: 10.5)),
+        ]),
+        const SizedBox(height: 10),
+        if (on) ...[
+          Row(children: [
+            chip('Last check', last == null ? 'not yet' : '${_clock(_toEt(last))} ET'),
+            const SizedBox(width: 6),
+            chip('Next buy check', _nextAuto()),
+          ]),
+          const SizedBox(height: 6),
+          Row(children: [
+            chip('Looks for a buy', 'every 15 min'),
+            const SizedBox(width: 6),
+            chip('Open trade exits', 'every 5 min'),
+          ]),
+        ] else
+          Text('It makes no trades. Press Start and it looks for a buy every 15 minutes by itself.',
+              style: TextStyle(color: p.muted, fontSize: 12, height: 1.35)),
       ]),
     );
   }
@@ -1015,11 +1101,11 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     if (opt != null) {
       line = buy
           ? 'expires ${_dateLabel(opt['expiry'])} · premium ${_money(entryP, sign: false)} x 100'
-          : 'premium ${_money(entryP, sign: false)} → ${_money(exitP, sign: false)} · ${_short((t['reason'] ?? '').toString())}';
+          : 'premium ${_money(entryP, sign: false)} to ${_money(exitP, sign: false)} · ${_short((t['reason'] ?? '').toString())}';
     } else {
       line = buy
           ? '${qty == 0 ? '' : '${qty.toStringAsFixed(qty < 0.01 ? 6 : 4)} at '}${_money(hasEntry ? entryP : _d(t['price']), sign: false)}'
-          : '${hasEntry ? '${_money(entryP, sign: false)} → ' : 'at '}${_money(exitP, sign: false)} · ${_short((t['reason'] ?? '').toString())}';
+          : '${hasEntry ? '${_money(entryP, sign: false)} to ' : 'at '}${_money(exitP, sign: false)} · ${_short((t['reason'] ?? '').toString())}';
     }
     final win = pnl >= 0;
     final c = buy ? _spy : (win ? _up : _loss);
