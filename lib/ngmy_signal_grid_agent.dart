@@ -51,6 +51,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
   bool _busy = false;
   bool _moreLog = true;
   bool _showAllLog = false;
+  bool _showAllTrades = false;
   int _range = 48; // candles shown: 12 = 1 h, 24 = 2 h, 48 = 4 h
   String? _selected; // market tapped in the strip (remembered on the phone)
   final _stripScroll = ScrollController();
@@ -316,9 +317,8 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
       if (st['brakePaused'] == true)
         _banner(p, 'Paused by the \$100 brake. ${st['brakeReason'] ?? ''}. Look over the trades, then press Start to turn it back on.', _loss),
       _chartCard(p, focus, heldShadow),
-      _trendPill(p, focus, shadow, s),
       _balanceCard(p, s, st, snap),
-      shadow != null ? _positionCard(p, shadow, held!, _map(s['ticket']), _map(snap['held'])) : _ticketCard(p, s, focus),
+      if (shadow != null) _positionCard(p, shadow, held!, _map(s['ticket']), _map(snap['held'])),
       _controls(p, st),
       _autoLine(p, st),
       _tradesCard(p, s),
@@ -599,6 +599,8 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
             const SizedBox(width: 6),
           ],
           const Spacer(),
+          _trendIcon(snap),
+          const SizedBox(width: 6),
           _segChip(p, 'Trend lines', _lines, () => setState(() => _lines = !_lines), icon: Icons.show_chart_rounded),
         ]),
         const SizedBox(height: 10),
@@ -615,57 +617,28 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     );
   }
 
-  // ── What the agent thinks, in one line
+  // ── The trend, as one small icon next to Trend lines: green arrow up, red arrow down
 
-  Widget _trendPill(_Pal p, Map<String, dynamic> snap, Map<String, dynamic>? shadow, Map<String, dynamic> s) {
+  Widget _trendIcon(Map<String, dynamic> snap) {
     final trend = (_map(snap['chart'])['trend'] ?? 'unknown').toString();
-    final st = _map(s['state']);
-    final running = st['enabled'] == true && st['brakePaused'] != true;
     final (Color c, IconData icon, String title) = switch (trend) {
-      'up' => (_up, Icons.trending_up_rounded, 'Trend is UP'),
-      'down' => (_loss, Icons.trending_down_rounded, 'Trend is DOWN'),
+      'up' => (_up, Icons.trending_up_rounded, 'Trending up'),
+      'down' => (_loss, Icons.trending_down_rounded, 'Trending down'),
       'flat' => (_down, Icons.trending_flat_rounded, 'Moving sideways'),
       _ => (_slowC, Icons.hourglass_top_rounded, 'Waiting for data'),
     };
-    final asset = (snap['asset'] ?? '').toString();
-    final closedStock = !asset.contains('/') && snap['open'] == false;
-    final sub = !running
-        ? 'Agent is stopped. Press Start to let it watch all markets.'
-        : shadow != null && shadow['symbol'] == asset
-            ? 'Holding a pretend trade here. It sells at the target, the stop, or when the trend turns down.'
-            : shadow != null
-            ? 'Holding ${shadow['symbol']} right now. One trade at a time, so no buy here until that one is sold.'
-            : closedStock
-            ? 'The stock market is closed, so $asset waits. The agent keeps watching the crypto markets.'
-            : trend == 'up'
-                ? 'The turn up already happened. It waits for the next fresh turn up so it never buys late.'
-                : trend == 'down'
-                    ? 'Prices are falling, so it waits. It buys only when the fast line crosses above the slow line.'
-                    : 'It buys only when the fast line crosses above the slow line.';
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        gradient: LinearGradient(colors: [c.withValues(alpha: p.light ? 0.16 : 0.22), c.withValues(alpha: 0.04)]),
-        border: Border.all(color: c.withValues(alpha: 0.35)),
+    return Tooltip(
+      message: title,
+      triggerMode: TooltipTriggerMode.tap,
+      child: Semantics(
+        label: title,
+        child: Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(10)),
+          child: Icon(icon, color: Colors.white, size: 20),
+        ),
       ),
-      child: Row(children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(14)),
-          child: Icon(icon, color: Colors.white),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title, style: TextStyle(color: p.ink, fontSize: 16, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 2),
-            Text(sub, style: TextStyle(color: p.muted, fontSize: 12.5, height: 1.3)),
-          ]),
-        ),
-      ]),
     );
   }
 
@@ -750,6 +723,19 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
           Expanded(child: _darkStat('Daily stop', '-\$${_d(ticket['dailyStopUsd'] ?? 50).toStringAsFixed(0)}', Colors.white)),
           const SizedBox(width: 8),
           Expanded(child: _darkStat('Total brake', '-\$${_d(ticket['totalBrakeUsd'] ?? 100).toStringAsFixed(0)}', Colors.white)),
+        ]),
+        const SizedBox(height: 8),
+        // What each trade is and where it ends (this used to be the Next trade card).
+        Row(children: [
+          Expanded(
+            child: _darkStat('Each trade',
+                ticket['kind'] == 'spot' ? '\$${_d(ticket['amount'] ?? 100).toStringAsFixed(0)} BTC' : 'SPY call ≤\$${_d(ticket['optionMaxUsd'] ?? 120).toStringAsFixed(0)}',
+                Colors.white),
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: _darkStat('Take profit', '+\$${_d(ticket['takeProfitUsd'] ?? 50).toStringAsFixed(0)}', _up)),
+          const SizedBox(width: 8),
+          Expanded(child: _darkStat('Stop loss', '-\$${_d(ticket['stopLossUsd'] ?? 50).toStringAsFixed(0)}', _loss)),
         ]),
         const SizedBox(height: 8),
         // Win rate under the $100 rules: win and loss are both $50, so 50% (5 out of 10) breaks even.
@@ -912,91 +898,6 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     );
   }
 
-  // ── No position: the next trade, as a ticket
-
-  Widget _ticketCard(_Pal p, Map<String, dynamic> s, Map<String, dynamic> snap) {
-    final t = _map(s['ticket']);
-    final price = _d(snap['price']);
-    final amount = _d(t['amount']) == 0 ? 100.0 : _d(t['amount']);
-    final option = t['kind'] != 'spot'; // weekdays: one SPY call option; weekends: Bitcoin itself
-    final shares = price == 0 ? 0 : amount / price;
-    final tpUsd = _d(t['takeProfitUsd'] ?? 50);
-    final slUsd = _d(t['stopLossUsd'] ?? 50);
-    return _card(
-      p,
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          _sectionTitle(p, 'Next trade'),
-          const Spacer(),
-          _pill('AUTOMATIC', _slowC),
-        ]),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(999)),
-          child: Row(children: [
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 9),
-                decoration: BoxDecoration(color: p.dark, borderRadius: BorderRadius.circular(999)),
-                alignment: Alignment.center,
-                child: Text('BUY', style: TextStyle(color: p.onDark, fontWeight: FontWeight.w800, fontSize: 12.5)),
-              ),
-            ),
-            Expanded(
-              child: Center(child: Text('SELL', style: TextStyle(color: p.muted, fontWeight: FontWeight.w800, fontSize: 12.5))),
-            ),
-          ]),
-        ),
-        const SizedBox(height: 10),
-        if (option) ...[
-          _ticketRow(p, 'What it buys (weekdays)', '1 SPY call option', big: true,
-              trailing: 'at the money, expiry 7+ days'),
-          _ticketRow(p, 'Most it pays', _money(_d(t['optionMaxUsd'] ?? 120), sign: false),
-              trailing: 'costs more: no trade, log says why'),
-        ] else
-          _ticketRow(p, 'Amount it puts in (weekends)', _money(amount, sign: false), big: true,
-              trailing: price == 0 ? null : '≈ ${shares.toStringAsFixed(shares < 0.01 ? 6 : 4)} ${snap['asset'] ?? ''}'),
-        _ticketRow(p, 'Take profit', '+${_money(tpUsd, sign: false)}',
-            color: _up, trailing: option || price == 0 ? 'sells when up \$${tpUsd.toStringAsFixed(0)}' : 'sells at ${_money(price * (1 + tpUsd / amount), sign: false)}'),
-        _ticketRow(p, 'Stop loss', '-${_money(slUsd, sign: false)}',
-            color: _loss, trailing: option || price == 0 ? 'sells when down \$${slUsd.toStringAsFixed(0)}' : 'sells at ${_money(price * (1 - slUsd / amount), sign: false)}'),
-        _ticketRow(p, 'Brakes', '-\$${_d(t['dailyStopUsd'] ?? 50).toStringAsFixed(0)} a day · -\$${_d(t['totalBrakeUsd'] ?? 100).toStringAsFixed(0)} total',
-            trailing: 'win = loss: 5 of 10 breaks even'),
-        const SizedBox(height: 10),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(color: p.dark, borderRadius: BorderRadius.circular(999)),
-          alignment: Alignment.center,
-          child: Text('Buys by itself when the trend turns up',
-              style: TextStyle(color: p.onDark, fontWeight: FontWeight.w800, fontSize: 13.5)),
-        ),
-        const SizedBox(height: 6),
-        Center(
-          child: Text('Pretend money only: Version 1 never sends an order to Alpaca.',
-              textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 11)),
-        ),
-      ]),
-    );
-  }
-
-  Widget _ticketRow(_Pal p, String k, String v, {bool big = false, Color? color, String? trailing}) => Container(
-        margin: const EdgeInsets.only(top: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(color: p.inner, borderRadius: BorderRadius.circular(16)),
-        child: Row(children: [
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(k, style: TextStyle(color: p.muted, fontSize: 11.5)),
-              const SizedBox(height: 2),
-              Text(v, style: TextStyle(color: color ?? p.ink, fontSize: big ? 24 : 17, fontWeight: FontWeight.w800)),
-            ]),
-          ),
-          if (trailing != null) Text(trailing, style: TextStyle(color: p.muted, fontSize: 11.5)),
-        ]),
-      );
-
   // ── Start / Stop / Check now
 
   Widget _controls(_Pal p, Map<String, dynamic> st) {
@@ -1086,7 +987,15 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
               ),
             ]),
           ),
-        for (final t in trades) _tradeRow(p, t),
+        // The 4 newest; the rest behind Show all.
+        for (final t in _showAllTrades ? trades : trades.take(4)) _tradeRow(p, t),
+        if (trades.length > 4)
+          Center(
+            child: TextButton(
+              onPressed: () => setState(() => _showAllTrades = !_showAllTrades),
+              child: Text(_showAllTrades ? 'Show less' : 'Show all (${trades.length})'),
+            ),
+          ),
       ]),
     );
   }
@@ -1154,7 +1063,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
   // ── Every check the agent made
 
   Widget _activityCard(_Pal p) {
-    final rows = _showAllLog ? _log : _log.take(8).toList();
+    final rows = _showAllLog ? _log : _log.take(4).toList();
     return _card(
       p,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1170,17 +1079,17 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
             child: Text('Nothing yet. A new line appears with every 15-minute check.', style: TextStyle(color: p.muted, fontSize: 12.5)),
           ),
         for (final r in rows) _logRow(p, r),
-        if (_log.length > 8)
+        if (_log.length > 4)
           Center(
             child: TextButton(
               onPressed: () async {
                 if (_showAllLog && _moreLog) {
                   await _loadLog(more: true);
                 } else {
-                  setState(() => _showAllLog = true);
+                  setState(() => _showAllLog = !_showAllLog);
                 }
               },
-              child: Text(_showAllLog ? (_moreLog ? 'Show older' : 'That is everything') : 'Show all'),
+              child: Text(_showAllLog ? (_moreLog ? 'Show older' : 'Show less') : 'Show all'),
             ),
           ),
       ]),
