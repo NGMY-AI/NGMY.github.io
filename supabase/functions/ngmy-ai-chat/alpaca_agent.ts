@@ -745,19 +745,24 @@ export function readClock(k: Keys): Promise<any> {
 const marketsCache = new Map<string, { at: number; p: Promise<Record<string, Series>> }>();
 
 export function readMarkets(k: Keys, extra: MarketDef[] = [], maxAgeMs = 10_000): Promise<Record<string, Series>> {
-  const key = extra.map((e) => e.symbol).sort().join(",");
+  // `extra`: a position still open in a market that is no longer on the list keeps being read, so its exit
+  // rules (take profit, stop loss, turn down) still work. It is never bought again.
+  return readMarketsFor(k, [...PA_MARKETS, ...extra.filter((e) => !PA_MARKETS.some((m) => m.symbol === e.symbol))], maxAgeMs);
+}
+
+/** Any list of stocks and coins (the fast systems have their own lists). A market Alpaca does not offer simply
+ *  comes back with no candles. */
+export function readMarketsFor(k: Keys, list: MarketDef[], maxAgeMs = 10_000): Promise<Record<string, Series>> {
+  const key = list.map((e) => e.symbol).sort().join(",");
   const hit = marketsCache.get(key);
   if (hit && Date.now() - hit.at < maxAgeMs) return hit.p;
-  const p = readMarketsFresh(k, extra);
+  const p = readMarketsFresh(k, list);
   marketsCache.set(key, { at: Date.now(), p });
   p.catch(() => marketsCache.delete(key)); // never keep a failed read
   return p;
 }
 
-async function readMarketsFresh(k: Keys, extra: MarketDef[] = []): Promise<Record<string, Series>> {
-  // `extra`: a position still open in a market that is no longer on the list keeps being read, so its exit
-  // rules (take profit, stop loss, turn down) still work. It is never bought again.
-  const list = [...PA_MARKETS, ...extra.filter((e) => !PA_MARKETS.some((m) => m.symbol === e.symbol))];
+async function readMarketsFresh(k: Keys, list: MarketDef[]): Promise<Record<string, Series>> {
   const stocks = list.filter((m) => m.kind === "stock").map((m) => m.symbol);
   const coins = list.filter((m) => m.kind === "crypto").map((m) => m.symbol);
   const stockStart = new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString();
@@ -776,20 +781,33 @@ async function readMarketsFresh(k: Keys, extra: MarketDef[] = []): Promise<Recor
   }
 
   const enc = (xs: string[]) => xs.map(encodeURIComponent).join(",");
-  const [sBars, sLast, cBars, cLast] = await Promise.all([
-    pagedBars(`/v2/stocks/bars?symbols=${enc(stocks)}&timeframe=5Min&start=${stockStart}&limit=10000&feed=iex`),
-    aGet(DATA_BASE, `/v2/stocks/trades/latest?symbols=${enc(stocks)}&feed=iex`, k),
-    pagedBars(`/v1beta3/crypto/us/bars?symbols=${enc(coins)}&timeframe=5Min&start=${coinStart}&limit=10000`),
-    aGet(DATA_BASE, `/v1beta3/crypto/us/latest/trades?symbols=${enc(coins)}`, k),
+  // One market Alpaca does not offer must not break the others: if a batch fails, each market is asked alone
+  // and the ones that fail are simply left out.
+  async function each<T extends Record<string, any>>(syms: string[], one: (s: string[]) => Promise<T>, pick: (r: T) => Record<string, any>): Promise<Record<string, any>> {
+    if (!syms.length) return {};
+    try { return pick(await one(syms)); } catch { /* ask one by one */ }
+    const out: Record<string, any> = {};
+    await Promise.all(syms.map(async (s) => {
+      try { Object.assign(out, pick(await one([s]))); } catch { /* not offered: dropped */ }
+    }));
+    return out;
+  }
+  const [sBars, sLastT, cBars, cLastT] = await Promise.all([
+    each(stocks, (s) => pagedBars(`/v2/stocks/bars?symbols=${enc(s)}&timeframe=5Min&start=${stockStart}&limit=10000&feed=iex`), (r) => r),
+    each(stocks, (s) => aGet(DATA_BASE, `/v2/stocks/trades/latest?symbols=${enc(s)}&feed=iex`, k), (r) => r?.trades ?? {}),
+    each(coins, (s) => pagedBars(`/v1beta3/crypto/us/bars?symbols=${enc(s)}&timeframe=5Min&start=${coinStart}&limit=10000`), (r) => r),
+    each(coins, (s) => aGet(DATA_BASE, `/v1beta3/crypto/us/latest/trades?symbols=${enc(s)}`, k), (r) => r?.trades ?? {}),
   ]);
+  const sLast = { trades: sLastT };
+  const cLast = { trades: cLastT };
 
   const now = Date.now();
   const out: Record<string, Series> = {};
   for (const m of list) {
-    const raw = (m.kind === "stock" ? sBars : cBars)[m.symbol] ?? [];
+    const raw: any[] = (m.kind === "stock" ? sBars : cBars)[m.symbol] ?? [];
     // Oldest first, and only finished candles (a candle that started less than 5 minutes ago is still moving).
     const done = raw
-      .map((x: any) => ({ t: String(x.t), o: Number(x.o), h: Number(x.h), l: Number(x.l), c: Number(x.c) }))
+      .map((x: any): { t: string; o: number; h: number; l: number; c: number } => ({ t: String(x.t), o: Number(x.o), h: Number(x.h), l: Number(x.l), c: Number(x.c) }))
       .filter((x) => Number.isFinite(x.c) && Date.parse(x.t) + 5 * 60 * 1000 <= now)
       .sort((a, b) => Date.parse(a.t) - Date.parse(b.t))
       .slice(-80);

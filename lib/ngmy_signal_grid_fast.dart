@@ -105,7 +105,12 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
     final before = _s;
     setState(() {
       _busy = true;
-      if (_s != null) _s = {..._s!, 'state': {..._map(_s!['state']), 'enabled': on, if (on) 'brakePaused': false}};
+      if (_s != null) {
+        _s = {
+          ..._s!,
+          'state': {..._map(_s!['state']), 'enabled': on, if (on) 'brakePaused': false},
+        };
+      }
     });
     final res = await ngmyEdgeInvoke({'action': 'fsSet', 'system': widget.system, 'enabled': on}, timeout: const Duration(seconds: 40));
     if (!mounted) return;
@@ -343,26 +348,39 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
     );
   }
 
-  // ── the daily target: real trades so far against the pace (10 spread over the session)
+  // ── the daily target: 20 real trades, the pace ladder, what it learned this morning
 
   Widget _paceCard(_Pal p, Map<String, dynamic> s) {
     final pc = _map(s['pace']);
-    final target = _d(pc['target'] ?? 10).toInt();
+    final target = _d(pc['target'] ?? 20).toInt();
     final trades = _d(pc['trades']).toInt();
     final expected = _d(pc['expected']).toInt();
-    final phase2 = pc['phase2Active'] == true;
-    final behind = pc['behind'] == true;
+    final behind = _d(pc['deficit']) > 0;
+    final thr = _d(pc['thresholdPct']);
+    final start = _d(pc['startPct']);
+    final steps = _d(pc['steps']).toInt();
+    final finalHour = pc['finalHour'] == true;
+    final minsLeft = _d(pc['minutesLeft']).toInt();
     final c = trades >= target
         ? _up
         : behind
-        ? (phase2 ? _accent : _down)
+        ? _down
         : _up;
     final status = trades >= target
         ? 'target reached'
         : behind
-        ? (phase2 ? 'behind — Phase 2 active' : 'behind pace')
+        ? 'behind pace by ${_d(pc['deficit']).toInt()}'
         : 'on pace';
+    final ladderText = trades >= target
+        ? 'Target reached: back to the day\'s start, +${start.toStringAsFixed(2)}%.'
+        : finalHour
+        ? 'Last hour of the window: at the floor, +${thr.toStringAsFixed(2)}% (still never a falling market).'
+        : steps > 0
+        ? 'Behind by ${_d(pc['hoursBehind']).toStringAsFixed(1)} h, so $steps step(s) down from +${start.toStringAsFixed(2)}%.'
+        : 'On pace: the day\'s start, +${start.toStringAsFixed(2)}%.';
     final note = (_map(s['state'])['lastNote'] ?? '').toString();
+    final learned = (pc['learned'] ?? '').toString();
+    final dayNote = (pc['dayNote'] ?? '').toString();
     return _frame(
       p,
       child: Column(
@@ -371,11 +389,11 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
           Row(
             children: [
               Text(
-                'TODAY',
+                'TRADES TODAY',
                 style: TextStyle(color: p.muted, fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: 0.9),
               ),
               const Spacer(),
-              _tag(_d(pc['phase']).toInt() == 2 ? 'PHASE 2 · FROM 2 PM ET' : 'PHASE 1 · STRONG SETUPS ONLY', _d(pc['phase']).toInt() == 2 ? _accent : _up),
+              _tag(pc['inWindow'] == true ? '${minsLeft ~/ 60}h ${minsLeft % 60}m left' : 'window closed', p.muted),
             ],
           ),
           const SizedBox(height: 6),
@@ -383,20 +401,15 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '$trades of $target',
-                style: TextStyle(color: p.ink, fontSize: 26, fontWeight: FontWeight.w900),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text(
-                    'trades · $status',
-                    style: TextStyle(color: c, fontSize: 13, fontWeight: FontWeight.w800),
-                  ),
-                ),
+                'Trades today: $trades of $target',
+                style: TextStyle(color: p.ink, fontSize: 22, fontWeight: FontWeight.w900),
               ),
             ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '$status · ${_d(pc['remaining']).toInt()} to go · expected by now: $expected',
+            style: TextStyle(color: c, fontSize: 12.5, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 8),
           LayoutBuilder(
@@ -434,12 +447,50 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
               );
             },
           ),
-          const SizedBox(height: 6),
-          Text(
-            'Expected by now: $expected · real trades only, never faked. Phase 1 until 2:00 PM ET takes strong setups only; '
-            'after that, if behind, the best-ranked setup that is not falling hard.',
-            style: TextStyle(color: p.muted, fontSize: 11.5, height: 1.35),
+          const SizedBox(height: 10),
+          // The pace ladder, live.
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: p.inner, borderRadius: BorderRadius.circular(12)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Entry strength needed now: +${thr.toStringAsFixed(2)}% in 15 min',
+                  style: TextStyle(color: p.ink, fontSize: 13, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 2),
+                Text(ladderText, style: TextStyle(color: p.muted, fontSize: 11.5, height: 1.3)),
+                Text(
+                  'It steps down 0.05% per hour behind the pace to 20, never below +0.05%, and never buys a falling market.',
+                  style: TextStyle(color: p.muted, fontSize: 11, height: 1.3),
+                ),
+              ],
+            ),
           ),
+          if (learned.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: 'What it learned: ',
+                    style: TextStyle(color: _accent, fontWeight: FontWeight.w900),
+                  ),
+                  TextSpan(text: learned),
+                ],
+              ),
+              style: TextStyle(color: p.ink, fontSize: 12, height: 1.35),
+            ),
+          ],
+          if (dayNote.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              dayNote,
+              style: TextStyle(color: _down, fontSize: 12, height: 1.3, fontWeight: FontWeight.w700),
+            ),
+          ],
           if (note.isNotEmpty && _map(s['state'])['shadow'] == null) ...[
             const SizedBox(height: 6),
             Text('Now: $note', style: TextStyle(color: p.ink, fontSize: 12, height: 1.3)),
@@ -468,7 +519,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
           Row(
             children: [
               Text(
-                'Agent markets',
+                'Its markets (${markets.length})',
                 style: TextStyle(color: p.ink, fontSize: 15, fontWeight: FontWeight.w800),
               ),
               const Spacer(),
@@ -476,87 +527,105 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          SizedBox(
-            height: 84,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: markets.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (_, i) {
-                final m = markets[i];
-                final on = m['symbol'] == sel['symbol'];
-                final chg = _d(m['changePct']);
-                final rec = _map(m['record']);
-                final tag = '${m['tag'] ?? ''}';
-                final tagC = tag == 'TRADED NOW'
-                    ? _btc
-                    : tag == 'watching'
-                    ? _up
-                    : p.muted;
-                return GestureDetector(
-                  onTap: () => setState(() => _market = '${m['symbol']}'),
-                  child: Container(
-                    width: 156,
-                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                    decoration: BoxDecoration(
-                      color: p.inner,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: on ? _accent : Colors.transparent, width: 2),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            _coin('${m['symbol']}', 15),
-                            const SizedBox(width: 5),
-                            Expanded(
-                              child: Text(
-                                '${m['symbol']}',
+          // The full list at once, best-ranked first, two to a row.
+          LayoutBuilder(
+            builder: (context, box) => Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final m in markets)
+                  Builder(
+                    builder: (_) {
+                      final on = m['symbol'] == sel['symbol'];
+                      final chg = _d(m['changePct']);
+                      final rec = _map(m['record']);
+                      final tag = '${m['tag'] ?? ''}';
+                      final tagC = tag == 'TRADED NOW'
+                          ? _btc
+                          : tag == 'watching'
+                          ? _up
+                          : p.muted;
+                      final a = _map(m['analysis']);
+                      return GestureDetector(
+                        onTap: () => setState(() => _market = '${m['symbol']}'),
+                        child: Container(
+                          width: (box.maxWidth - 8) / 2,
+                          height: 80,
+                          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                          decoration: BoxDecoration(
+                            color: p.inner,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: on ? _accent : Colors.transparent, width: 2),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  _coin('${m['symbol']}', 15),
+                                  const SizedBox(width: 5),
+                                  Expanded(
+                                    child: Text(
+                                      '${m['symbol']}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(color: p.ink, fontSize: 11.5, fontWeight: FontWeight.w800),
+                                    ),
+                                  ),
+                                  Text(
+                                    tag,
+                                    style: TextStyle(color: tagC, fontSize: 8.5, fontWeight: FontWeight.w900),
+                                  ),
+                                ],
+                              ),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        _money(_d(m['price']), sign: false),
+                                        style: TextStyle(color: p.ink, fontSize: 14, fontWeight: FontWeight.w800),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${chg >= 0 ? '+' : ''}${chg.toStringAsFixed(2)}%',
+                                    style: TextStyle(color: chg >= 0 ? _up : _loss, fontSize: 10.5, fontWeight: FontWeight.w800),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                '${a.isEmpty
+                                    ? ''
+                                    : a['passes'] == true
+                                    ? 'passes now · '
+                                    : a['falling'] == true
+                                    ? 'falling · '
+                                    : ''}'
+                                '${_d(rec['n']) == 0 ? 'no trades yet' : 'last ${_d(rec['n']).toInt()}: ${_d(rec['wins']).toInt()}W/${_d(rec['losses']).toInt()}L ${_money(_d(rec['pnl']))}'}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(color: p.ink, fontSize: 11.5, fontWeight: FontWeight.w800),
-                              ),
-                            ),
-                            Text(
-                              tag,
-                              style: TextStyle(color: tagC, fontSize: 8.5, fontWeight: FontWeight.w900),
-                            ),
-                          ],
-                        ),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  _money(_d(m['price']), sign: false),
-                                  style: TextStyle(color: p.ink, fontSize: 14, fontWeight: FontWeight.w800),
+                                style: TextStyle(
+                                  color: a['passes'] == true
+                                      ? _up
+                                      : a['falling'] == true
+                                      ? _loss
+                                      : p.muted,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${chg >= 0 ? '+' : ''}${chg.toStringAsFixed(2)}%',
-                              style: TextStyle(color: chg >= 0 ? _up : _loss, fontSize: 10.5, fontWeight: FontWeight.w800),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                        Text(
-                          _d(rec['n']) == 0
-                              ? 'no trades here yet'
-                              : 'last ${_d(rec['n']).toInt()}: ${_d(rec['wins']).toInt()}W / ${_d(rec['losses']).toInt()}L · ${_money(_d(rec['pnl']))}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: rec['lastThreeLosses'] == true ? _loss : p.muted, fontSize: 10, fontWeight: FontWeight.w700),
-                        ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
-                );
-              },
+              ],
             ),
           ),
           const SizedBox(height: 10),
@@ -576,7 +645,18 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
               ),
               const Spacer(),
               if (a.isNotEmpty)
-                _tag(a['strong'] == true ? 'STRONG SETUP' : 'TREND ${'${a['trend'] ?? '?'}'.toUpperCase()}', a['strong'] == true ? _up : p.muted),
+                _tag(
+                  a['passes'] == true
+                      ? 'PASSES NOW'
+                      : a['falling'] == true
+                      ? 'FALLING'
+                      : 'TREND ${'${a['trend'] ?? '?'}'.toUpperCase()}',
+                  a['passes'] == true
+                      ? _up
+                      : a['falling'] == true
+                      ? _loss
+                      : p.muted,
+                ),
             ],
           ),
           const SizedBox(height: 6),
@@ -584,13 +664,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
             _CandleChart(points: pts.sublist(math.max(0, pts.length - 36)), pal: p, entry: null, lines: true, price: _d(sel['price']))
           else
             Text('The chart appears after the first reading.', style: TextStyle(color: p.muted, fontSize: 12)),
-          if (a['why'] != null) ...[
-            const SizedBox(height: 6),
-            Text(
-              'Analysis: ${a['why']}${a['penalized'] == true ? ' · 3 straight losses here: ranked last' : ''}',
-              style: TextStyle(color: p.muted, fontSize: 11.5, height: 1.3),
-            ),
-          ],
+          if (a['why'] != null) ...[const SizedBox(height: 6), Text('Analysis: ${a['why']}', style: TextStyle(color: p.muted, fontSize: 11.5, height: 1.3))],
         ],
       ),
     );
@@ -717,7 +791,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
               const SizedBox(width: 6),
               chip('Exit checks', 'every ${_d(g['exitCheckEveryMin']).toStringAsFixed(0)} min'),
               const SizedBox(width: 6),
-              chip('Each trade', _options ? '1 contract ≤\$${_d(g['maxPremiumUsd']).toStringAsFixed(0)}' : '\$${_d(g['tradeUsd']).toStringAsFixed(0)}'),
+              chip('Each trade', _options ? '1 call ≤\$${_d(g['maxPremiumUsd']).toStringAsFixed(0)}' : '\$${_d(g['tradeUsd']).toStringAsFixed(0)}'),
             ],
           ),
           const SizedBox(height: 6),
@@ -750,12 +824,14 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
   Widget _optionsCard(_Pal p, Map<String, dynamic> s) {
     final o = _map(s['options']);
     if (o.isEmpty) return const SizedBox.shrink();
+    if (o['weekend'] == true) return _note(p, (o['message'] ?? '').toString(), _slowC);
     if (o['enabled'] != true) {
       return _note(p, (o['message'] ?? 'Options are not enabled on the paper account yet').toString(), o['enabled'] == false ? _down : _slowC);
     }
     final c = _map(o['preview']);
     final fits = o['fits'] == true;
     final right = '${o['right'] ?? 'call'}';
+    final und = '${o['underlying'] ?? 'SPY'}';
     final tried = ((o['tried'] as List?) ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
     return _frame(
       p,
@@ -766,7 +842,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
             children: [
               Expanded(
                 child: Text(
-                  'SPY ${right.toUpperCase()} IT WOULD CHOOSE NOW',
+                  '$und CALL IT WOULD CHOOSE NOW',
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: p.muted, fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: 0.8),
                 ),
@@ -776,18 +852,18 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Direction follows the trend: SPY trend is ${right == 'put' ? 'DOWN, so a put' : 'UP, so a call'}.',
+            'For the best-ranked market right now. Calls only (trend up), slightly out of the money, expiring this week.',
             style: TextStyle(color: p.muted, fontSize: 11.5),
           ),
           const SizedBox(height: 8),
           if (fits && c.isNotEmpty) ...[
             Text(
-              'SPY ${_money(_d(c['strike']), sign: false)} $right · expires ${_dateLabel(c['expiry'])}',
+              '$und ${_money(_d(c['strike']), sign: false)} $right · expires ${_dateLabel(c['expiry'])}',
               style: TextStyle(color: p.ink, fontSize: 16, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 2),
             Text(
-              'Premium ${_money(_d(c['premium']), sign: false)} a share x 100 = ${_money(_d(c['cost']), sign: false)}  ·  SPY ${_money(_d(o['spot']), sign: false)}',
+              'Premium ${_money(_d(c['premium']), sign: false)} a share x 100 = ${_money(_d(c['cost']), sign: false)}  ·  $und ${_money(_d(o['spot']), sign: false)}',
               style: TextStyle(color: p.muted, fontSize: 12),
             ),
             const SizedBox(height: 4),
@@ -853,7 +929,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            opt != null ? 'SPY ${_money(_d(opt['strike']), sign: false)} ${opt['right'] ?? 'call'} · expires ${_dateLabel(opt['expiry'])}' : '${sh['symbol']}',
+            opt != null ? '${sh['symbol']} ${_money(_d(opt['strike']), sign: false)} ${opt['right'] ?? 'call'} · expires ${_dateLabel(opt['expiry'])}' : '${sh['symbol']}',
             style: TextStyle(color: p.ink, fontSize: 17, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 2),
@@ -944,7 +1020,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
     final opt = det['option'] is Map ? _map(det['option']) : null;
     final pnl = _d(det['pnl']);
     final c = buy ? _spy : (pnl >= 0 ? _up : _loss);
-    final what = opt != null ? 'SPY ${_money(_d(opt['strike']), sign: false)} ${opt['right'] ?? 'call'}' : '${t['asset']}';
+    final what = opt != null ? '${t['asset']} ${_money(_d(opt['strike']), sign: false)} ${opt['right'] ?? 'call'}' : '${t['asset']}';
     final line = buy
         ? (opt != null
               ? 'expires ${_dateLabel(opt['expiry'])} · premium ${_money(_d(det['entryPrice']), sign: false)} x 100'
@@ -952,9 +1028,11 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
         : '${_money(_d(det['entryPrice']), sign: false)} to ${_money(_d(det['exitPrice']), sign: false)} · ${det['heldMin'] == null ? '' : '${_d(det['heldMin']).toStringAsFixed(0)} min · '}${_short((t['reason'] ?? '').toString())}';
     // "Why this trade": the analysis logged with every buy (market, price, trend, strength, why it was chosen).
     final an = _map(det['analysis']);
-    final why = (an['why'] ?? '').toString();
+    // A sold trade shows WIN or LOSS next to the reason it was bought.
+    final why = buy ? (an['why'] ?? '').toString() : (det['entryWhy'] ?? '').toString();
+    final result = buy ? '' : (det['result'] ?? (pnl > 0 ? 'WIN' : 'LOSS')).toString();
     return InkWell(
-      onTap: why.isEmpty ? null : () => _showWhy(p, what, an),
+      onTap: why.isEmpty ? null : () => _showWhy(p, what, buy ? an : {'why': '$result. Bought because: $why'}),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 9),
         decoration: BoxDecoration(
@@ -985,10 +1063,10 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
                   ),
                   if (why.isNotEmpty)
                     Text(
-                      'Why this trade: $why',
+                      buy ? 'Why this trade: $why' : '$result · it was bought because: $why',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: _accent, fontSize: 11, fontWeight: FontWeight.w700, height: 1.3),
+                      style: TextStyle(color: buy ? _accent : result == 'WIN' ? _up : _loss, fontSize: 11, fontWeight: FontWeight.w700, height: 1.3),
                     ),
                   Text((t['et_time'] ?? '').toString(), style: TextStyle(color: p.muted, fontSize: 10.5)),
                 ],
@@ -1255,7 +1333,10 @@ class _CloseCountdownState extends State<_CloseCountdown> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(color: c.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(999)),
-      child: Text('closes in $mm at most', style: TextStyle(color: c, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+      child: Text(
+        'closes in $mm at most',
+        style: TextStyle(color: c, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+      ),
     );
   }
 }

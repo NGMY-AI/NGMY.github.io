@@ -67,3 +67,9 @@ select cron.schedule(
   );
   $job$
 );
+
+-- Nov 24, 2026 (20 trades a day): each day's starting strength and what it learned that morning, and what kept
+-- the checks from trading (for the plain-words reason when a day ends below 20).
+alter table public.ngmy_fast_days add column if not exists start_pct numeric;
+alter table public.ngmy_fast_days add column if not exists learned text;
+alter table public.ngmy_fast_days add column if not exists blocks jsonb not null default '{}'::jsonb;
