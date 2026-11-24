@@ -233,6 +233,15 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
       if (st['brakePaused'] == true)
         _note(p, 'Paused by this system\'s brake. ${st['brakeReason'] ?? ''}. Look over the trades, then press Start to turn it back on.', _loss),
       _controls(p, st),
+      if (s['weekendNote'] != null)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+          child: Row(children: [
+            Icon(Icons.event_busy_rounded, size: 16, color: p.muted),
+            const SizedBox(width: 6),
+            Expanded(child: Text('${s['weekendNote']}', style: TextStyle(color: p.muted, fontSize: 11.5, fontWeight: FontWeight.w700))),
+          ]),
+        ),
       _paceCard(p, s),
       _learningPanel(p, s),
       _winRate(p, s),

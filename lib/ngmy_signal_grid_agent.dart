@@ -377,7 +377,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     final snap = _map(st['snapshot']);
     final shadow = st['shadow'] is Map ? _map(st['shadow']) : null;
     final markets = _markets(snap);
-    // Today's watchlist (10 stocks on weekdays, 4 coins on weekends), plus a market still held from before.
+    // Today's watchlist (10 stocks on weekdays, all crypto every day), plus a market still held from before.
     final todays = markets.where((m) => m['today'] == true || m['asset'] == shadow?['symbol']).toList();
     final watch = todays.isEmpty ? markets : todays;
     // The market on show: the one tapped (if on today's list), else the one held, else the one the agent last looked at.
@@ -393,9 +393,10 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
       if ((cfg['problem'] ?? '').toString().isNotEmpty) _banner(p, cfg['problem'].toString(), _down),
       if ((s['liveError'] ?? '').toString().isNotEmpty) _banner(p, s['liveError'].toString(), _loss),
       if (st['brakePaused'] == true)
-        _banner(p, 'Paused by the \$100 brake. ${st['brakeReason'] ?? ''}. Look over the trades, then press Start to turn it back on.', _loss),
+        _banner(p, 'Paused by the \$${_d(_map(s['ticket'])['totalBrakeUsd'] ?? 200).toStringAsFixed(0)} brake. ${st['brakeReason'] ?? ''}. Look over the trades, then press Start to turn it back on.', _loss),
       _chartCard(p, focus, heldShadow),
       _balanceCard(p, s, st, snap),
+      if (s['pace'] is Map) _paceCard(p, s),
       if (shadow != null) _positionCard(p, shadow, held!, _map(s['ticket']), _map(snap['held'])),
       _controls(p, st),
       _autoLine(p, st, s),
@@ -425,7 +426,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     ];
   }
 
-  // ── Today's watchlist: 10 stocks on weekdays, 4 coins on weekends, all watched at once
+  // ── Today's watchlist: 10 stocks on weekdays, all crypto every day, all watched at once
 
   Widget _todayMarket(_Pal p, Map<String, dynamic> s, Map<String, dynamic>? shadow) {
     final market = _map(s['market']);
@@ -436,15 +437,16 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     final oldHeld = heldSym != null && todayList.isNotEmpty && !todayList.contains(heldSym);
     final String title;
     final String body;
+    final coins = activeList.where((e) => e.contains('/')).length;
+    final stocks = activeList.length - coins;
     if (activeList.isNotEmpty) {
-      title = weekend ? 'TRADING TODAY: 4 COINS' : 'TRADING TODAY: 10 STOCKS';
-      body = '${activeList.join(', ')}. All of them are checked at the same time, every 5 minutes, and the agent buys the first one '
-          'that gives a valid entry. One trade at a time, up to ${weekend ? 5 : 4} trades today in total.';
+      title = stocks > 0 ? 'TRADING NOW: 10 STOCKS + $coins CRYPTO' : 'TRADING NOW: ALL $coins CRYPTO';
+      body = 'Every tradable crypto pair on Alpaca, around the clock${stocks > 0 ? ', plus the 10 stocks while the stock market is open' : weekend ? ' (stocks trade on weekdays)' : ' (the stocks trade 9:30 AM to 4:00 PM ET)'}. '
+          'All of them are checked at the same time, every 5 minutes, and the agent buys the strongest valid entry. '
+          'One trade at a time, up to 20 trades today in total.';
     } else {
       title = 'NO MARKET TRADED RIGHT NOW';
-      body = weekend
-          ? 'The 4 coins (BTC, ETH, SOL, DOGE) are traded on Saturday and Sunday.'
-          : 'The 10 stocks (${todayList.isEmpty ? 'SPY, QQQ, AAPL and more' : todayList.join(', ')}) are traded while the stock market is open, 9:30 AM to 4:00 PM ET. Coins on weekends.';
+      body = 'Crypto trades around the clock and the 10 stocks (${todayList.where((e) => !e.contains('/')).take(10).join(', ')}) while the stock market is open. The market list is loading.';
     }
     final active = activeList.isEmpty ? null : activeList.first;
     final c = active == null ? _down : _up;
@@ -889,7 +891,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
           ]),
           const SizedBox(height: 8),
           Row(children: [
-            Expanded(child: _darkStat('Trades today', '${today['trades'] ?? 0} of ${ticket['maxTradesToday'] ?? 4}', Colors.white)),
+            Expanded(child: _darkStat('Trades today', '${today['trades'] ?? 0} of ${ticket['maxTradesToday'] ?? 20}', Colors.white)),
             const SizedBox(width: 8),
             Expanded(child: _darkStat('Daily stop', '-\$${_d(ticket['dailyStopUsd'] ?? 50).toStringAsFixed(0)}', Colors.white)),
             const SizedBox(width: 8),
@@ -932,6 +934,82 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
             ]),
           ),
         ]),
+      ]),
+    );
+  }
+
+  /// 20 trades a day, every day: the counter, the pace checkpoints, the max hold now, any pace steps, today's
+  /// record, the wider brakes and why, and the crypto list (with any pair Alpaca dropped today).
+  Widget _paceCard(_Pal p, Map<String, dynamic> s) {
+    final pc = _map(s['pace']);
+    final t = _map(s['todayStats']);
+    final market = _map(s['market']);
+    final target = _d(pc['target'] ?? 20).toInt();
+    final trades = _d(pc['trades']).toInt();
+    final expected = _d(pc['expected']).toInt();
+    final behind = _d(pc['deficit']) > 0;
+    final c = trades >= target || !behind ? _up : _down;
+    final lines = ((pc['lines'] as List?) ?? const []).map((e) => '$e').toList();
+    final dropped = ((market['cryptoDropped'] as List?) ?? const []).map((e) => '$e').toList();
+    final tpnl = _d(t['pnl']);
+    final dayNote = (pc['dayNote'] ?? '').toString();
+    return _card(
+      p,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: Text('Trades today: $trades of $target', style: TextStyle(color: p.ink, fontSize: 20, fontWeight: FontWeight.w900))),
+          _pill(trades >= target ? 'TARGET REACHED' : behind ? '${_d(pc['deficit']).toInt()} BEHIND' : 'ON PACE', c),
+        ]),
+        const SizedBox(height: 2),
+        Text('Expected by now: $expected · max hold now ${_d(pc['maxHold'] ?? 120).toInt()} min · top ${_d(pc['topN'] ?? 3).toInt()} valid entries considered',
+            style: TextStyle(color: c, fontSize: 12, fontWeight: FontWeight.w800, height: 1.3)),
+        const SizedBox(height: 8),
+        LayoutBuilder(builder: (context, box) {
+          final w = box.maxWidth;
+          return SizedBox(
+            height: 14,
+            child: Stack(children: [
+              Positioned.fill(top: 3, bottom: 3, child: Container(decoration: BoxDecoration(color: p.inner, borderRadius: BorderRadius.circular(99)))),
+              Positioned(
+                left: 0, top: 3, bottom: 3, width: w * (trades / target).clamp(0.0, 1.0),
+                child: Container(decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(99))),
+              ),
+              Positioned(left: (w * (expected / target).clamp(0.0, 1.0) - 1).clamp(0.0, w - 2), top: 0, bottom: 0, child: Container(width: 2, color: p.ink)),
+            ]),
+          );
+        }),
+        const SizedBox(height: 8),
+        Text('${pc['checkpoints'] ?? ''}', style: TextStyle(color: p.ink, fontSize: 11, fontWeight: FontWeight.w700, height: 1.3)),
+        for (final l in lines) Padding(
+          padding: const EdgeInsets.only(top: 3),
+          child: Text(l, style: const TextStyle(color: _down, fontSize: 11.5, fontWeight: FontWeight.w700, height: 1.3)),
+        ),
+        if (dayNote.isNotEmpty) Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(dayNote, style: const TextStyle(color: _down, fontSize: 12, fontWeight: FontWeight.w700, height: 1.3)),
+        ),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(child: Text(
+            t['closed'] == null || _d(t['closed']) == 0
+                ? 'No closed trades today yet'
+                : 'Today: ${t['wins'] ?? 0} won, ${t['losses'] ?? 0} lost (${_d(t['winRatePct']).toStringAsFixed(0)}%)',
+            style: TextStyle(color: p.ink, fontSize: 12.5, fontWeight: FontWeight.w800),
+          )),
+          Text(_money(tpnl), style: TextStyle(color: tpnl > 0 ? _up : tpnl < 0 ? _loss : p.ink, fontSize: 14, fontWeight: FontWeight.w900)),
+        ]),
+        const SizedBox(height: 6),
+        Text(
+          'Watching ${market['cryptoCount'] ?? '?'} crypto pairs around the clock${market['cryptoFromAlpaca'] == false ? ' (Alpaca\'s list could not be read, using the main ones for now)' : ' (every tradable USD pair on Alpaca)'}'
+          '${market['weekend'] == true ? '' : ' plus the 10 stocks in market hours'}.',
+          style: TextStyle(color: p.muted, fontSize: 11.5, height: 1.3),
+        ),
+        if (dropped.isNotEmpty)
+          Text('Dropped today (no longer tradable on Alpaca): ${dropped.join(', ')}', style: const TextStyle(color: _loss, fontSize: 11.5, height: 1.3)),
+        if (s['brakeNote'] != null) ...[
+          const SizedBox(height: 6),
+          Text('${s['brakeNote']}', style: TextStyle(color: p.muted, fontSize: 11, height: 1.3)),
+        ],
       ]),
     );
   }

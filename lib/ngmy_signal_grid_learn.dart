@@ -616,7 +616,7 @@ const _lessons = <_Lesson>[
     _Quiz('Fast line above slow line means...', ['Trend is up', 'Trend is down', 'Market closed'], 0, 'Recent prices are higher than older prices.'),
   ]),
   _Lesson('cross', 'The crossover signal', 'Exactly when the agent buys and sells', 6, Icons.call_split_rounded, Color(0xFF8B5CF6), 'cross', [
-    ('Buy signal', "When the fast line crosses UP through the slow line, the short-term trend has just turned up. That moment is the buy signal. The agent buys at that point (\$100 of the stock or coin), but only if the big trend is rising too. It watches 10 stocks on weekdays and 4 coins on weekends at the same time and buys whichever gives a valid entry first."),
+    ('Buy signal', "When the fast line crosses UP through the slow line, the short-term trend has just turned up. That moment is the buy signal. The agent buys at that point (\$100 of the stock or coin), but only if the big trend is rising too. It watches the 10 stocks on weekdays and every crypto pair on Alpaca around the clock, all at the same time, and buys whichever gives a valid entry first."),
     ('Sell signal', "When the fast line crosses back DOWN through the slow line, the up move is over. That is the sell signal, and the agent closes the trade."),
     ('Why it must be fresh', "If the cross happened an hour ago, the easy part of the move may be gone. Buying late means buying high. So the agent only acts on a cross that happened since its last check, never on an old one."),
     ('The weakness', "In sideways markets the lines cross back and forth and give false signals. That is why every trade also has a stop loss: when a signal is wrong, the loss stays small."),

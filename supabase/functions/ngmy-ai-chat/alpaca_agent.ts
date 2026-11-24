@@ -87,23 +87,107 @@ export const PA_MARKETS: MarketDef[] = [
   { symbol: "DOGE/USD", name: "Dogecoin", kind: "crypto" },
 ];
 
-/** Today's list: the 10 stocks on weekdays, the 4 coins on Saturday and Sunday (whether open or not). */
-export function todaysList(weekend: boolean): string[] {
-  return PA_MARKETS.filter((m) => (weekend ? m.kind === "crypto" : m.kind === "stock")).map((m) => m.symbol);
+/** The 10 weekday stocks (unchanged). */
+export const PA_STOCKS: MarketDef[] = PA_MARKETS.filter((m) => m.kind === "stock");
+
+/** Nov 24, 2026 (all crypto + 20 a day): the main agent watches EVERY active, tradable USD crypto pair Alpaca
+ *  offers, every day, around the clock. The list is read from Alpaca's asset list (once per Eastern day, and at
+ *  every start of the server); these are only the fallback when that list cannot be read. */
+export const PA_BASE_COINS: MarketDef[] = [
+  ["BTC", "Bitcoin"], ["ETH", "Ethereum"], ["SOL", "Solana"], ["DOGE", "Dogecoin"], ["AVAX", "Avalanche"], ["LINK", "Chainlink"],
+  ["LTC", "Litecoin"], ["BCH", "Bitcoin Cash"], ["DOT", "Polkadot"], ["UNI", "Uniswap"], ["ADA", "Cardano"], ["NEAR", "NEAR"],
+  ["ATOM", "Cosmos"], ["XLM", "Stellar"], ["AAVE", "Aave"], ["GRT", "The Graph"], ["MKR", "Maker"], ["CRV", "Curve"],
+  ["BAT", "Basic Attention Token"], ["SUSHI", "SushiSwap"], ["XTZ", "Tezos"], ["MANA", "Decentraland"], ["SAND", "The Sandbox"], ["ALGO", "Algorand"],
+].map(([s, n]) => ({ symbol: `${s}/USD`, name: n, kind: "crypto" as const }));
+
+/** The USD crypto pairs from Alpaca's asset list: active and tradable only. Bitcoin, Ethereum, Solana and
+ *  Dogecoin first, then A to Z. */
+export function cryptoFromAssets(assets: any[]): MarketDef[] {
+  const first = ["BTC/USD", "ETH/USD", "SOL/USD", "DOGE/USD"];
+  const out = (Array.isArray(assets) ? assets : [])
+    .filter((a) => a && String(a.class ?? "crypto") === "crypto" && a.status === "active" && a.tradable === true && /^[A-Z0-9]+\/USD$/.test(String(a.symbol)))
+    .map((a) => ({ symbol: String(a.symbol), name: String(a.name ?? a.symbol).replace(/\s*\/\s*US Dollar.*$/i, "").trim() || String(a.symbol), kind: "crypto" as const }));
+  const seen = new Set<string>();
+  return out.filter((m) => !seen.has(m.symbol) && seen.add(m.symbol))
+    .sort((a, b) => {
+      const ia = first.indexOf(a.symbol), ib = first.indexOf(b.symbol);
+      if (ia >= 0 || ib >= 0) return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+      return a.symbol.localeCompare(b.symbol);
+    });
 }
 
-/** The markets the agent may buy right now: the 4 coins on Saturday and Sunday; the 10 stocks on a weekday while
- *  the stock market is open (the Alpaca clock knows holidays); otherwise none (weekday evenings, holidays). */
-export function activeMarkets(weekend: boolean, stockOpen: boolean): string[] {
-  if (weekend) return todaysList(true);
-  return stockOpen ? todaysList(false) : [];
+let cryptoCache: { day: string; list: MarketDef[]; ok: boolean; at: number } | null = null;
+
+/** Every tradable USD crypto pair on Alpaca, read once per Eastern day (GET only). If the list cannot be read,
+ *  the fallback list is used and it tries again in 10 minutes. */
+export async function readCryptoList(k: Keys): Promise<{ list: MarketDef[]; fromAlpaca: boolean }> {
+  const day = etParts(new Date()).dayKey;
+  if (cryptoCache && cryptoCache.day === day && (cryptoCache.ok || Date.now() - cryptoCache.at < 10 * 60 * 1000)) {
+    return { list: cryptoCache.list, fromAlpaca: cryptoCache.ok };
+  }
+  try {
+    const assets = await aGet(PAPER_BASE, "/v2/assets?asset_class=crypto&status=active", k);
+    const list = cryptoFromAssets(assets);
+    if (!list.length) throw new Error("empty");
+    cryptoCache = { day, list, ok: true, at: Date.now() };
+  } catch {
+    cryptoCache = { day, list: cryptoCache?.ok ? cryptoCache.list : PA_BASE_COINS, ok: false, at: Date.now() };
+  }
+  return { list: cryptoCache.list, fromAlpaca: cryptoCache.ok };
 }
 
-/** When a market is NOT traded right now, a short reason for the app. */
+/** The main agent's markets: the 10 stocks and every crypto pair. */
+export function mainMarkets(crypto: MarketDef[] = PA_BASE_COINS): MarketDef[] {
+  return [...PA_STOCKS, ...crypto];
+}
+
+/** Today's list: the 10 stocks on weekdays plus all crypto every day (whether open or not). */
+export function todaysList(weekend: boolean, crypto: MarketDef[] = PA_MARKETS.filter((m) => m.kind === "crypto")): string[] {
+  return [...(weekend ? [] : PA_STOCKS), ...crypto].map((m) => m.symbol);
+}
+
+/** The markets the agent may buy right now: all crypto, any hour, any day; plus the 10 stocks on a weekday while
+ *  the stock market is open (the Alpaca clock knows holidays). */
+export function activeMarkets(weekend: boolean, stockOpen: boolean, crypto: MarketDef[] = PA_MARKETS.filter((m) => m.kind === "crypto")): string[] {
+  return [...(!weekend && stockOpen ? PA_STOCKS : []), ...crypto].map((m) => m.symbol);
+}
+
+/** When a market is NOT traded right now, a short reason for the app. Crypto is never off. */
 export function offNote(symbol: string, weekend: boolean): string {
-  const crypto = symbol.includes("/");
-  if (crypto) return weekend ? "" : "weekends only";
+  if (symbol.includes("/")) return "";
   return weekend ? "weekdays only" : "closed";
+}
+
+/** Pace checkpoints for 20 a day, every day (ET minutes from midnight -> trades done by then). */
+export const PA_PACE: [number, number][] = [[0, 0], [360, 4], [600, 8], [840, 12], [1080, 16], [1320, 19], [1435, 20]];
+export const PA_PACE_LINE = "Pace: 6:00 AM 4 · 10:00 AM 8 · 2:00 PM 12 · 6:00 PM 16 · 10:00 PM 19 · 11:55 PM 20";
+
+/** The main agent's pace for 20 a day. Behind the pace, in order: (1) a shorter max hold for new trades
+ *  (2 hours -> 60 min from 1 behind -> 30 min from 2 behind); (2) from 3 behind, the top 5 valid entries are
+ *  considered instead of the top 3. The not-falling rule never relaxes. `impossible`: 20 can no longer be
+ *  reached (each trade needs at least two 5-minute checks, one position at a time). */
+export function mainPace(et: { hour: number; minute: number }, trades: number) {
+  const mins = et.hour * 60 + et.minute;
+  let expected = 20;
+  for (let i = 1; i < PA_PACE.length; i++) {
+    if (mins <= PA_PACE[i][0]) {
+      const [m0, t0] = PA_PACE[i - 1], [m1, t1] = PA_PACE[i];
+      expected = Math.floor(t0 + (t1 - t0) * (mins - m0) / (m1 - m0));
+      break;
+    }
+  }
+  const target = PA_RULES.maxTradesPerDay;
+  const done = trades >= target;
+  const deficit = done ? 0 : Math.max(0, expected - trades);
+  const maxHold = deficit >= 2 ? PA_RULES.holdSteps[2] : deficit >= 1 ? PA_RULES.holdSteps[1] : PA_RULES.holdSteps[0];
+  const topN = deficit >= 3 ? 5 : 3;
+  const level = deficit >= 3 ? 3 : deficit >= 2 ? 2 : deficit >= 1 ? 1 : 0;
+  const lines: string[] = [];
+  if (deficit >= 1) lines.push(`Step 1: ${deficit} behind the pace, so new trades are held ${maxHold} minutes at most (not 2 hours), to free the one position slot sooner.`);
+  if (deficit >= 3) lines.push("Step 2: it now considers the top 5 valid entries instead of the top 3.");
+  const minutesLeft = Math.max(0, 24 * 60 - mins);
+  const impossible = !done && trades + Math.floor(minutesLeft / (2 * PA_RULES.checkEveryMinutes)) < target;
+  return { target, trades, expected, deficit, remaining: Math.max(0, target - trades), done, maxHold, topN, level, lines, impossible, minutesLeft, checkpoints: PA_PACE_LINE };
 }
 
 /** The big trend filter (fix 2): the slow average must be HIGHER than it was 1 hour ago (12 five-minute candles)
@@ -180,32 +264,39 @@ export const PA_RULES = {
   exitCheckMinutes: 5, // an open position is checked every 5 minutes (take profit, stop loss, turn down)
   takeProfitUsd: 50, // sell when the position is up $50
   stopLossUsd: 50, // sell when the position is down $50 (same size as the win: 5 wins out of 10 breaks even)
-  dailyLossStopUsd: 50,
-  totalLossBrakeUsd: 100,
+  dailyLossStopUsd: 100, // Nov 24: widened from $50 so 20 trades a day is possible
+  totalLossBrakeUsd: 200, // Nov 24: widened from $100
   optionMaxPremiumUsd: 120, // (option buying is off since Nov 22; kept so an option bought earlier still prices and exits)
   optionMinDays: 7, // the nearest expiry at least 7 days away
-  weekdayMaxTrades: 4,
-  weekendMaxTrades: 5,
+  maxTradesPerDay: 20, // Nov 24: 20 a day, every day (cap and target), all markets together
+  weekdayMaxTrades: 20,
+  weekendMaxTrades: 20,
+  maxHoldMin: 120, // a trade that hits no exit closes at its max hold (2 hours; shorter when behind the pace)
+  holdSteps: [120, 60, 30],
   closeOutEt: "3:55 PM",
-  maxMarkets: 14,
+  maxMarkets: 200,
 };
+
+export const PA_BRAKE_NOTE = "Brakes widened on Nov 24 so 20 trades a day is possible: daily stop -$100 and total brake -$200 (were -$50 and -$100). " +
+  "With 20 trades a day, the old -$50 daily stop could end the day after a single bad trade. The real protection stays the entry rule: it never buys a falling market.";
 
 export const PA_RULE_LINES: string[] = [
   "Version 1 is read-only: it logs what it WOULD do and places no orders.",
   "Alpaca paper account only. No live keys, no live endpoint, no real money.",
   "$100 per trade: $100 of the stock or coin itself. One position at a time across all markets. No options, no margin, no short selling.",
   "All times are Eastern Time (New York).",
-  "Weekdays: it watches 10 stocks at the same time (SPY, QQQ, AAPL, MSFT, NVDA, AMZN, GOOGL, META, TSLA, AMD) while the US stock market is open (9:30 AM to 4:00 PM ET, never on market holidays). Nothing on weekday evenings.",
-  "Weekends (Saturday and Sunday): it watches 4 coins at the same time (BTC/USD, ETH/USD, SOL/USD, DOGE/USD).",
-  "Every 5 minutes it looks at every market on the day's list and buys the one that gives a valid entry first (if several do at the same check, the strongest one). While it holds a position it checks the exit rules every 5 minutes.",
+  "Weekdays: it watches 10 stocks (SPY, QQQ, AAPL, MSFT, NVDA, AMZN, GOOGL, META, TSLA, AMD) while the US stock market is open (9:30 AM to 4:00 PM ET, never on market holidays).",
+  "Crypto: EVERY tradable USD crypto pair on Alpaca (Bitcoin, Ethereum, Solana, Dogecoin and all the others), every day, 24 hours a day, nights and weekends too. The list is read from Alpaca each day; a pair that is delisted or not tradable is dropped automatically and shown on screen.",
+  "Every 5 minutes it looks at ALL markets open at that moment in the same check (stocks and crypto in stock market hours, crypto only otherwise) and buys the one that gives a valid entry first (if several do at the same check, the strongest one). While it holds a position it checks the exit rules every 5 minutes.",
   "Buy signal, ALL of these: the fast average (9 candles) crosses above the slow average (21 candles) on 5-minute candles, the slow average is higher than 1 hour ago (the big trend is rising), the price is above the slow average, and no position is held.",
   "Never buys into a falling big trend: if the slow average is flat or falling, no trade, even when the fast line crosses up.",
   "Sell signal: the fast average crosses back below the slow average.",
   "Take profit: sell when the position is up $50. Stop loss: sell when it is down $50. Win and loss are the same size, so winning 5 out of 10 trades breaks even.",
   "Weekdays: sell everything by 3:55 PM ET. No overnight stock positions, and no new stock buys after 3:40 PM ET.",
-  "Up to 4 trades per weekday and 5 per weekend day in total across all markets (not per market), only on a real signal. Never forced.",
-  "Daily stop: if the day loses $50, no more buys that day.",
-  "Total brake: if total demo losses reach $100, the agent pauses until an admin turns it back on.",
+  "20 trades a day, every day (target and cap), all markets together, only on a real signal. Never forced. Pace: 6:00 AM 4, 10:00 AM 8, 2:00 PM 12, 6:00 PM 16, 10:00 PM 19, 11:55 PM 20.",
+  "Max hold: a trade that hits no exit is closed after 2 hours. Behind the pace, new trades get 60, then 30 minutes, and from 3 behind it considers the top 5 valid entries instead of the top 3. The not-falling rule never relaxes.",
+  "Daily stop: if the day loses $100, no more buys that day (was $50; with 20 trades a day one bad trade could have ended the day).",
+  "Total brake: if total demo losses reach $200, the agent pauses until an admin turns it back on (was $100).",
 ];
 
 // ─────────────────────────────────────────────────────────────── pure helpers (tested)
@@ -277,6 +368,9 @@ export type DecideInput = {
   signalAlreadyUsed: boolean;
   /** Fix 2: the big trend filter. A buy needs the slow average rising over the last hour and the price above it. */
   bigTrend?: { ok: boolean; why: string };
+  /** Nov 24: minutes the position has been held, and its max hold (2 hours, or 60 / 30 minutes behind the pace). */
+  heldMin?: number;
+  maxHoldMin?: number;
 };
 
 export type Decision = {
@@ -295,7 +389,12 @@ export function decide(x: DecideInput): Decision {
     const money = `${pnl >= 0 ? "+" : "-"}$${Math.abs(pnl).toFixed(2)}`;
     if (pnl >= r.takeProfitUsd) return { decision: "would sell", reason: `take profit hit (${money})`, pnl };
     if (pnl <= -r.stopLossUsd) return { decision: "would sell", reason: `stop loss hit (${money})`, pnl };
-    if (x.stock && x.finalCheck) return { decision: "would sell", reason: `3:55 PM ET rule, no overnight SPY positions (${money})`, pnl };
+    // The max hold: closed at the last 5-minute check before it is reached, so one position never blocks the day.
+    const hold = x.maxHoldMin ?? (x.shadow as any).maxHold ?? r.maxHoldMin;
+    if (x.heldMin != null && x.heldMin >= hold - r.exitCheckMinutes) {
+      return { decision: "would sell", reason: `max hold reached: closed after ${Math.floor(x.heldMin)} min (max ${hold} min) (${money})`, pnl };
+    }
+    if (x.stock && x.finalCheck) return { decision: "would sell", reason: `3:55 PM ET rule, no overnight stock positions (${money})`, pnl };
     if (x.signal === "sell") return { decision: "would sell", reason: `sell signal: fast average crossed below slow (${money})`, pnl };
     const what = x.shadow.option ? `SPY $${x.shadow.option.strike} call` : `${x.asset} trade`;
     return {
@@ -305,8 +404,7 @@ export function decide(x: DecideInput): Decision {
   }
   if (x.totalPnl <= -r.totalLossBrakeUsd) return { decision: "no action", reason: `agent paused by the $${r.totalLossBrakeUsd} brake` };
   if (x.dayPnl <= -r.dailyLossStopUsd) return { decision: "no action", reason: `daily stop reached ($${r.dailyLossStopUsd} lost today)` };
-  const maxTrades = x.weekend ? r.weekendMaxTrades : r.weekdayMaxTrades;
-  if (x.tradesToday >= maxTrades) return { decision: "no action", reason: `daily trade limit reached (${maxTrades})` };
+  if (x.tradesToday >= r.maxTradesPerDay) return { decision: "no action", reason: `daily target reached (${r.maxTradesPerDay} of ${r.maxTradesPerDay})` };
   if (x.stock && (x.lateForBuys ?? x.finalCheck)) return { decision: "no action", reason: "too close to the 3:55 PM ET close-out, no new stock buys" };
   if (x.fast == null || x.slow == null) return { decision: "no action", reason: "not enough 5-minute candles yet" };
   if (x.signal !== "buy") return { decision: "no action", reason: "no signal" };
@@ -383,7 +481,7 @@ export type Scan = {
 /** Of all open markets with a VALID entry (a fresh cross up AND the big trend rising, when known), the first one;
  *  if several are valid at the same check, the strongest (fast line furthest above the slow line).
  *  `blocked` = markets that crossed up but failed the big trend rule, for the log. */
-export function pickMarket(scans: Scan[], usedKey: string | null, finalCheck: boolean): { pick: Scan | null; closest: Scan | null; blocked: Scan[] } {
+export function pickMarket(scans: Scan[], usedKey: string | null, finalCheck: boolean, topN = 3): { pick: Scan | null; closest: Scan | null; blocked: Scan[]; top: Scan[] } {
   const open = scans.filter((s) => s.open && s.fast != null && s.slow != null && s.price > 0);
   const gap = (s: Scan) => (s.fast! - s.slow!) / s.slow!;
   const crossed = open.filter((s) => s.signal === "buy" && s.key !== usedKey && !(s.stock && finalCheck));
@@ -392,7 +490,9 @@ export function pickMarket(scans: Scan[], usedKey: string | null, finalCheck: bo
   // For the log when nothing qualifies: the market whose fast line is closest to crossing up.
   const below = open.filter((s) => s.fast! <= s.slow!).sort((a, b) => gap(b) - gap(a));
   const closest = below[0] ?? [...open].sort((a, b) => gap(a) - gap(b))[0] ?? null;
-  return { pick: candidates[0] ?? null, closest, blocked };
+  // The valid entries ranked by strength; the top 3 (top 5 when behind the pace) are considered, the strongest wins.
+  const top = candidates.slice(0, topN);
+  return { pick: top[0] ?? null, closest, blocked, top };
 }
 
 /** RSI (14): how strong the recent rises were compared with the recent falls, 0 to 100. */
@@ -1158,11 +1258,12 @@ export async function signalsBoard(db: any) {
 /** What the app shows for each market: price, change over the chart, trend, signal and the chart itself. */
 /** `open` here means "the agent may buy it right now": the 10 stocks on a weekday while the stock market is open,
  *  the 4 coins on Saturday and Sunday. `today` = on today's watchlist (even when the market is closed). */
-function marketCards(series: Record<string, Series>, stockOpen: boolean, weekend = etParts(new Date()).weekend, extra: MarketDef[] = []) {
-  const active = activeMarkets(weekend, stockOpen);
-  const list = todaysList(weekend);
-  return [...PA_MARKETS, ...extra].map((m) => {
-    const exitOnly = !PA_MARKETS.some((x) => x.symbol === m.symbol);
+function marketCards(series: Record<string, Series>, stockOpen: boolean, weekend = etParts(new Date()).weekend, extra: MarketDef[] = [], all: MarketDef[] = PA_MARKETS) {
+  const coins = all.filter((m) => m.kind === "crypto");
+  const active = activeMarkets(weekend, stockOpen, coins);
+  const list = todaysList(weekend, coins);
+  return [...all, ...extra].map((m) => {
+    const exitOnly = !all.some((x) => x.symbol === m.symbol);
     const s = series[m.symbol];
     const chart = buildChart(s?.times ?? [], s?.closes ?? [], 48, s?.ohlc);
     const first = chart.points[0]?.c ?? 0;
@@ -1172,10 +1273,10 @@ function marketCards(series: Record<string, Series>, stockOpen: boolean, weekend
     const closedNote = open ? undefined : exitOnly
       ? "Not on the list any more. The agent only watches the exit rules for the position it still holds here and never buys it again."
       : m.kind === "crypto"
-      ? "The agent trades coins only on Saturday and Sunday. On weekdays it watches the 10 stocks."
+      ? "Crypto trades every day, around the clock."
       : weekend
-        ? "The agent trades stocks only on weekdays while the stock market is open. Today it watches the 4 coins."
-        : "The stock market is closed, so stocks cannot be traded until it opens (9:30 AM ET). Coins are traded only on weekends.";
+        ? "The agent trades stocks only on weekdays while the stock market is open. Today it watches the crypto markets."
+        : "The stock market is closed, so stocks cannot be traded until it opens (9:30 AM ET). Crypto keeps trading around the clock.";
     return {
       symbol: m.symbol, name: m.name, kind: m.kind, open, active: open, today: list.includes(m.symbol) || exitOnly, offLabel: off,
       price, changePct: first ? round2((price - first) / first * 100) : 0,
@@ -1184,6 +1285,17 @@ function marketCards(series: Record<string, Series>, stockOpen: boolean, weekend
       reading: readMarket(s?.closes ?? [], s?.ohlc ?? [], price, open, { closedNote }),
       v2: signalV2(s?.times ?? [], s?.closes ?? [], (s?.ohlc ?? []).map((o) => o.o), price),
     };
+  });
+}
+
+/** The market cards as saved for the agent screen, smaller now that every crypto pair is watched: no Live
+ *  signals block (that screen reads its own), and chart numbers rounded to 6 significant digits. */
+export function slimCards(cards: any[], _focus?: string): any[] {
+  const r6 = (v: unknown) => typeof v === "number" && Number.isFinite(v) ? Number(v.toPrecision(6)) : v;
+  return cards.map((c) => {
+    const { v2: _v2, ...rest } = c;
+    const pts = (c.chart?.points ?? []).map((q: any) => ({ t: q.t, o: r6(q.o), h: r6(q.h), l: r6(q.l), c: r6(q.c), f: r6(q.f), s: r6(q.s) }));
+    return { ...rest, chart: { ...(c.chart ?? {}), points: pts } };
   });
 }
 
@@ -1260,14 +1372,20 @@ async function runCheck(db: any): Promise<Record<string, unknown>> {
   // Account, the stock market clock (knows holidays and early closes), SPY and Bitcoin, plus the market of a
   // position still open from before the market list was cut down (exits only).
   const held: Shadow = state.shadow ?? null;
-  const extra: MarketDef[] = held && !PA_MARKETS.some((m) => m.symbol === held.symbol)
-    ? [{ symbol: held.symbol, name: held.symbol, kind: held.symbol.includes("/") ? "crypto" : "stock" }]
-    : [];
+  let extra: MarketDef[] = [];
+  let all: MarketDef[] = mainMarkets();
+  let crypto: { list: MarketDef[]; fromAlpaca: boolean } = { list: PA_BASE_COINS, fromAlpaca: false };
   let acct: Awaited<ReturnType<typeof readAccount>>;
   let series: Record<string, Series>;
   let clock: any;
   try {
-    [acct, series, clock] = await Promise.all([readAccount(cfg.keys), readMarkets(cfg.keys, extra), aGet(PAPER_BASE, "/v2/clock", cfg.keys)]);
+    // Every tradable USD crypto pair on Alpaca (read once a day) plus the 10 stocks, all in this one check.
+    crypto = await readCryptoList(cfg.keys);
+    all = mainMarkets(crypto.list);
+    extra = held && !all.some((m) => m.symbol === held.symbol)
+      ? [{ symbol: held.symbol, name: held.symbol, kind: held.symbol.includes("/") ? "crypto" : "stock" }]
+      : [];
+    [acct, series, clock] = await Promise.all([readAccount(cfg.keys), readMarketsFor(cfg.keys, [...all, ...extra]), aGet(PAPER_BASE, "/v2/clock", cfg.keys)]);
   } catch (e) {
     await writeLog(db, { kind: "error", asset: watch, decision: "no action", reason: `Alpaca connection failed (${String((e as Error).message)}), no action taken` });
     return { ok: false, error: "Alpaca connection failed" };
@@ -1278,12 +1396,26 @@ async function runCheck(db: any): Promise<Record<string, unknown>> {
   const toClose = stockOpen && clock?.next_close ? (Date.parse(clock.next_close) - now.getTime()) / 60000 : Infinity;
   const finalCheck = toClose < 10;
   const lateForBuys = toClose < 20;
-  const active = activeMarkets(et.weekend, stockOpen);
+  const active = activeMarkets(et.weekend, stockOpen, crypto.list);
 
-  const day = await ensureDay(db, et, active.length ? (et.weekend ? "4 coins" : "10 stocks") : watch, acct.equity);
-  const cards = marketCards(series, stockOpen, et.weekend, extra);
-  // EVERY market on the day's list is checked in this same check (never one market per check).
-  const scans: Scan[] = [...PA_MARKETS, ...extra].map((m) => {
+  const day = await ensureDay(db, et, active.length ? `${active.length} markets` : watch, acct.equity);
+  const pace = mainPace(et, Number(day.trades ?? 0));
+  const cards = marketCards(series, stockOpen, et.weekend, extra, all);
+  // A crypto pair that left Alpaca's tradable list since the last check: dropped automatically, said on screen.
+  const prevCrypto: string[] = Array.isArray(state.snapshot?.cryptoList) ? state.snapshot.cryptoList : [];
+  const nowCrypto = crypto.list.map((m) => m.symbol);
+  const droppedNow = crypto.fromAlpaca && prevCrypto.length ? prevCrypto.filter((s) => !nowCrypto.includes(s)) : [];
+  const prevDropped = state.snapshot?.cryptoDropped?.day === et.dayKey ? state.snapshot.cryptoDropped.symbols ?? [] : [];
+  const cryptoDropped = { day: et.dayKey, symbols: [...new Set([...prevDropped, ...droppedNow])] };
+  if (droppedNow.length) {
+    await writeLog(db, { kind: "control", asset: watch, decision: "no action", reason: `Dropped ${droppedNow.join(", ")}: no longer active and tradable on Alpaca, so it is not watched any more.` });
+  }
+  if (pace.level > Number(day.pace_level ?? 0)) {
+    await db.from("ngmy_alpaca_agent_days").update({ pace_level: pace.level }).eq("et_day", et.dayKey);
+    await writeLog(db, { kind: "control", asset: watch, decision: "no action", reason: `Behind the pace (${day.trades ?? 0} of ${pace.expected} expected by now). ${pace.lines.join(" ")}` });
+  }
+  // EVERY market open right now is checked in this same check (never one market per check).
+  const scans: Scan[] = [...all, ...extra].map((m) => {
     const s = series[m.symbol] ?? { closes: [], times: [], ohlc: [], price: 0, lastBarAt: "" };
     const x = crossover(s.closes);
     return {
@@ -1306,6 +1438,8 @@ async function runCheck(db: any): Promise<Record<string, unknown>> {
   let heldPrice = 0;
   let optionPriceMissing = false;
   let newShadow: Shadow = null;
+  let topRanked: string[] = [];
+  let blockKey = ""; // what kept this check from buying (for the plain reason when the day ends below 20)
   if (shadow) {
     // Holding: only the held market matters (one position at a time).
     focus = scans.find((s) => s.symbol === shadow.symbol) ?? {
@@ -1319,18 +1453,22 @@ async function runCheck(db: any): Promise<Record<string, unknown>> {
     } else {
       heldPrice = focus.price;
     }
+    const heldMin = (now.getTime() - Date.parse(shadow.entryAt)) / 60000;
     d = decide({ ...base, asset: focus.symbol, stock: focus.stock, price: heldPrice || shadow.entryPrice, signal: focus.signal,
-      fast: focus.fast, slow: focus.slow, shadow, signalAlreadyUsed: false });
+      fast: focus.fast, slow: focus.slow, shadow, signalAlreadyUsed: false,
+      heldMin: Number.isFinite(heldMin) ? heldMin : undefined, maxHoldMin: (shadow as any).maxHold ?? PA_RULES.maxHoldMin });
     if (optionPriceMissing && d.decision === "hold") d = { ...d, reason: `${d.reason} (no option price right now, checked again in 5 minutes)` };
   } else {
     // All of the day's markets at once: the first VALID entry (cross up + big trend rising) is bought.
-    const { pick, closest, blocked } = pickMarket(scans, state.last_signal_key ?? null, lateForBuys);
+    const { pick, closest, blocked, top } = pickMarket(scans, state.last_signal_key ?? null, lateForBuys, pace.topN);
+    topRanked = top.map((s) => s.symbol);
     focus = pick ?? closest ?? scans.find((s) => s.open) ?? scans[0];
-    const listName = et.weekend ? "4 coins" : "10 stocks";
+    const listName = `${active.length} open markets`;
     if (state.brake_paused) {
       d = { decision: "no action", reason: `agent paused by the $${PA_RULES.totalLossBrakeUsd} brake, waiting for an admin to turn it back on` };
+      blockKey = "brake";
     } else if (!active.length) {
-      d = { decision: "no action", reason: "no market is traded right now: the 10 stocks trade on weekdays 9:30 AM to 4:00 PM ET, the 4 coins on Saturday and Sunday" };
+      d = { decision: "no action", reason: "no market is traded right now: the 10 stocks trade on weekdays 9:30 AM to 4:00 PM ET, crypto around the clock" };
     } else {
       d = decide({ ...base, asset: focus.symbol, stock: focus.stock, price: focus.price, signal: pick ? "buy" : "none",
         fast: focus.fast, slow: focus.slow, shadow: null, signalAlreadyUsed: false, bigTrend: focus.big });
@@ -1338,12 +1476,15 @@ async function runCheck(db: any): Promise<Record<string, unknown>> {
         const why = blocked.length
           ? `${blocked.map((b) => b.symbol).join(", ")} crossed up but the big trend is not rising, so no trade`
           : `no fresh cross up${closest ? `, closest to one: ${closest.symbol}` : ""}`;
-        d = { decision: "no action", reason: `checked all ${active.length} ${listName}: ${why}` };
+        d = { decision: "no action", reason: `checked all ${listName}: ${why}` };
+        blockKey = blocked.length ? "falling" : "nocross";
+      } else if (d.decision === "no action") {
+        blockKey = /daily stop|brake/.test(d.reason) ? "brake" : /falling big trend/.test(d.reason) ? "falling" : /target reached/.test(d.reason) ? "" : "other";
       }
       if (d.decision === "would buy") {
-        // $100 of the stock or coin itself.
-        newShadow = { symbol: focus.symbol, qty: PA_RULES.tradeUsd / focus.price, mult: 1, entryPrice: focus.price, entryAt: now.toISOString() };
-        d = { ...d, reason: `${d.reason} (first valid entry of the ${listName})` };
+        // $100 of the stock or coin itself, held at most the current max hold.
+        newShadow = { symbol: focus.symbol, qty: PA_RULES.tradeUsd / focus.price, mult: 1, entryPrice: focus.price, entryAt: now.toISOString(), maxHold: pace.maxHold } as any;
+        d = { ...d, reason: `${d.reason} (strongest valid entry of the top ${pace.topN} among ${listName}; max hold ${pace.maxHold} min)` };
       }
     }
   }
@@ -1352,12 +1493,18 @@ async function runCheck(db: any): Promise<Record<string, unknown>> {
   const focusCard = cards.find((c) => c.symbol === focus.symbol);
   const statePatch: Record<string, unknown> = {
     snapshot: {
-      ...acct, at: now.toISOString(), etTime: et.label, stockOpen, markets: cards,
+      ...acct, at: now.toISOString(), etTime: et.label, stockOpen, markets: slimCards(cards, focus.symbol),
       asset: focus.symbol, price, chart: focusCard?.chart ?? null,
       // The open pretend position marked to market (for an option: its own price, not the SPY price).
       held: shadow && d.decision !== "would sell" ? heldMark(shadow, heldPrice) : null,
+      cryptoList: nowCrypto, cryptoFromAlpaca: crypto.fromAlpaca, cryptoDropped,
     },
   };
+  if (blockKey && !shadow) {
+    const blocks = { ...(day.blocks ?? {}) };
+    blocks[blockKey] = Number(blocks[blockKey] ?? 0) + 1;
+    await db.from("ngmy_alpaca_agent_days").update({ blocks }).eq("et_day", et.dayKey);
+  }
   let newTotal = totalPnl;
   let newDay = dayPnl;
   if (d.decision === "would buy" && newShadow) {
@@ -1386,7 +1533,7 @@ async function runCheck(db: any): Promise<Record<string, unknown>> {
     balance: acct.equity, total_pnl: newTotal, day_pnl: newDay,
     details: {
       pnl: d.pnl ?? null, by: "cron", rules: shadow && shadow.mult == null ? "usd50" : PA_RULES_TAG, stockOpen, openMarkets: openCount, activeMarkets: active,
-      bigTrendOk: focus.big?.ok ?? null, exitOnly: holding,
+      bigTrendOk: focus.big?.ok ?? null, exitOnly: holding, topRanked, topN: pace.topN, maxHold: pace.maxHold,
       // Every market the agent looked at in this check.
       scanned: scans.map((s) => ({ s: s.symbol, p: s.price, f: s.fast, sl: s.slow, sig: s.signal, open: s.open })),
       // The money side of a pretend trade, so the app can show what went in and what came out.
@@ -1565,11 +1712,13 @@ export async function handleAlpacaAgent(
       try {
         const et = etParts(new Date());
         const held = state.shadow?.symbol as string | undefined;
-        const extra: MarketDef[] = held && !PA_MARKETS.some((m) => m.symbol === held)
+        const crypto = await readCryptoList(cfg.keys);
+        const all = mainMarkets(crypto.list);
+        const extra: MarketDef[] = held && !all.some((m) => m.symbol === held)
           ? [{ symbol: held, name: held, kind: held.includes("/") ? "crypto" : "stock" }]
           : [];
-        const [acct, series] = await Promise.all([readAccount(cfg.keys), readMarkets(cfg.keys, extra)]);
-        const cards = marketCards(series, !!stockOpen, et.weekend, extra);
+        const [acct, series] = await Promise.all([readAccount(cfg.keys), readMarketsFor(cfg.keys, [...all, ...extra])]);
+        const cards = slimCards(marketCards(series, !!stockOpen, et.weekend, extra, all));
         const focus = cards.find((c) => c.symbol === held) ?? cards.find((c) => c.open) ?? cards[0];
         const sh: Shadow = state.shadow ?? null;
         const markPrice = !sh ? 0 : sh.option ? await optionSellPrice(cfg.keys, sh.option.contract) : (cards.find((c) => c.symbol === sh.symbol)?.price ?? 0);
@@ -1577,6 +1726,7 @@ export async function handleAlpacaAgent(
           ...acct, at: new Date().toISOString(), etTime: et.label, stockOpen: !!stockOpen, markets: cards,
           asset: focus.symbol, price: focus.price, chart: focus.chart,
           held: sh ? heldMark(sh, markPrice) : null,
+          cryptoList: crypto.list.map((m) => m.symbol), cryptoFromAlpaca: crypto.fromAlpaca, cryptoDropped: state.snapshot?.cryptoDropped ?? null,
         };
         await saveState(db, { snapshot: live });
         state.snapshot = live;
@@ -1591,16 +1741,43 @@ export async function handleAlpacaAgent(
     try { fx = await readForex(); } catch { fx = []; }
   }
   const etNow = etParts(new Date());
-  const market = { stockOpen, weekend: etNow.weekend, activeMarkets: activeMarkets(etNow.weekend, !!stockOpen), todaysList: todaysList(etNow.weekend), nextOpen: clock?.next_open ?? null, nextClose: clock?.next_close ?? null };
+  // Every crypto pair the agent watches (as saved by the last check), plus the 10 stocks on weekdays.
+  const snapCrypto: MarketDef[] = (Array.isArray(state.snapshot?.cryptoList) ? state.snapshot.cryptoList : PA_BASE_COINS.map((m) => m.symbol))
+    .map((sym: string) => ({ symbol: sym, name: sym, kind: "crypto" as const }));
+  const market = {
+    stockOpen, weekend: etNow.weekend, activeMarkets: activeMarkets(etNow.weekend, !!stockOpen, snapCrypto), todaysList: todaysList(etNow.weekend, snapCrypto),
+    nextOpen: clock?.next_open ?? null, nextClose: clock?.next_close ?? null,
+    cryptoCount: snapCrypto.length, cryptoFromAlpaca: state.snapshot?.cryptoFromAlpaca ?? null,
+    cryptoDropped: state.snapshot?.cryptoDropped?.day === etNow.dayKey ? state.snapshot.cryptoDropped.symbols ?? [] : [],
+  };
+  const nowD = new Date();
+  const etMidnight = new Date(nowD.getTime() - ((etNow.hour * 60 + etNow.minute) * 60 + nowD.getUTCSeconds()) * 1000).toISOString();
   // All at once (they used to run one after another). The closed-trade list reads only the two numbers it needs.
-  const [{ data: today }, { data: trades }, { data: closed }, fast] = await Promise.all([
+  const [{ data: today }, { data: trades }, { data: closed }, fast, { data: todaySells }] = await Promise.all([
     db.from("ngmy_alpaca_agent_days").select("*").eq("et_day", etNow.dayKey).maybeSingle(),
     db.from("ngmy_alpaca_agent_log").select("id,created_at,et_time,asset,price,decision,reason,details")
       .in("decision", ["would buy", "would sell"]).order("id", { ascending: false }).limit(40),
     db.from("ngmy_alpaca_agent_log").select("pnl:details->pnl,rules:details->>rules")
       .eq("decision", "would sell").order("id", { ascending: false }).limit(500),
     fastSharedPnl(db),
+    db.from("ngmy_alpaca_agent_log").select("asset,pnl:details->pnl").eq("decision", "would sell").gte("created_at", etMidnight).limit(200),
   ]);
+  const tp: number[] = (todaySells ?? []).map((r: any) => Number(r?.pnl ?? 0));
+  const tw = tp.filter((x) => x > 0).length;
+  const todayStats = { closed: tp.length, wins: tw, losses: tp.length - tw, winRatePct: tp.length ? Math.round(tw / tp.length * 100) : null, pnl: round2(tp.reduce((a, b) => a + b, 0)) };
+  const pace = mainPace(etNow, Number(today?.trades ?? 0));
+  const blocks: Record<string, number> = today?.blocks ?? {};
+  const below = pace.trades < pace.target;
+  const blockWords: Record<string, string> = {
+    falling: "markets crossed up but their big trend was falling or flat — it never buys a falling market",
+    nocross: "no market gave a fresh cross up with a rising big trend",
+    brake: "a brake stopped it (the daily stop or the total brake)",
+    other: "the open position slot or the stock close rules",
+  };
+  const topBlock = Object.entries(blocks).filter(([k]) => k in blockWords).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const dayNote = pace.impossible && below
+    ? `Pace stopped at ${pace.trades} of ${pace.target} — reaching ${pace.target} would require buying a falling market${topBlock ? ` (most often: ${blockWords[topBlock]})` : ""}.`
+    : below && topBlock ? `Most often blocked so far today: ${blockWords[topBlock]}.` : null;
   const pnls: number[] = (closed ?? []).map((r: any) => Number(r?.pnl ?? 0));
   // The $100 rules (Nov 22): their own win rate, to see if the agent wins at least 5 out of 10.
   const newPnls: number[] = (closed ?? []).filter((r: any) => r?.rules === PA_RULES_TAG).map((r: any) => Number(r?.pnl ?? 0));
@@ -1627,15 +1804,18 @@ export async function handleAlpacaAgent(
       ...(fx ? { fx } : {}),
       trades: (trades ?? []).map((t: any) => ({ ...t, details: { ...(t.details ?? {}), scanned: undefined } })),
       record,
+      todayStats,
+      pace: { ...pace, dayNote, blocks },
+      brakeNote: PA_BRAKE_NOTE,
       // The other systems (Options, Scalper) share this paper balance: their closed and open pretend P/L.
       fast,
       ticket: {
         amount: PA_RULES.tradeUsd, takeProfitUsd: PA_RULES.takeProfitUsd, stopLossUsd: PA_RULES.stopLossUsd,
-        maxTradesToday: etNow.weekend ? PA_RULES.weekendMaxTrades : PA_RULES.weekdayMaxTrades,
+        maxTradesToday: PA_RULES.maxTradesPerDay, maxHoldMin: pace.maxHold,
         dailyStopUsd: PA_RULES.dailyLossStopUsd, totalBrakeUsd: PA_RULES.totalLossBrakeUsd,
         optionMaxUsd: PA_RULES.optionMaxPremiumUsd, optionMinDays: PA_RULES.optionMinDays,
         // What the next trade would be: a SPY call on weekdays, Bitcoin itself on weekends.
-        kind: etNow.weekend ? "crypto" : "stock",
+        kind: etNow.weekend || !stockOpen ? "crypto" : "stock",
       },
       config: {
         keysSet: !!cfg.keys,

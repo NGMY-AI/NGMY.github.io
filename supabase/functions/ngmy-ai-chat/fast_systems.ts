@@ -3,9 +3,10 @@
 // Two extra systems next to the main Signal Grid agent, each with its own Start/Stop, its own trade history,
 // trades-today count, daily stop and total brake, and ONE open position at a time. They watch their OWN markets,
 // never one of the main agent's:
-//   A. OPTIONS: weekdays one call (trend up) or one put (trend down), premium $150 or less, on 21 underlyings;
-//      weekends 10 coins as spot ($100, +2% / -1%).
-//   B. SCALPER: $100 of a stock (30 weekday stocks) or coin (10 weekend coins), +2% / -1%.
+//   A. OPTIONS: weekdays one call (trend up) or one put (trend down), premium $150 or less, on 21 underlyings.
+//   B. SCALPER: $100 of a stock (30 weekday stocks), +2% / -1%.
+// Nov 24, 2026 (all crypto to Signal Grid): the main agent now watches EVERY crypto pair, so the fast systems'
+// weekend coin lists are retired (no overlap). Both fast systems trade weekdays only; on weekends only Signal Grid trades.
 //
 // 40 trades a day each, honestly. Every minute each system scores ALL its markets and takes the best-ranked one
 // that passes every rule. The NEVER rules: the 5-minute and 15-minute trends agree with the direction, and for a
@@ -52,7 +53,6 @@ export const FS_SYSTEMS: SystemId[] = ["options", "scalper"];
 export type Dir = "up" | "down";
 
 const stock = (symbol: string, name: string): MarketDef => ({ symbol, name, kind: "stock" });
-const coin = (symbol: string, name: string): MarketDef => ({ symbol, name, kind: "crypto" });
 
 /** Each fast system's own markets (Nov 24, 40-trades update): none of them is on the main agent's lists.
  *  A market Alpaca does not offer is left out silently (no prices come back for it). */
@@ -68,11 +68,7 @@ export const FS_LISTS: Record<SystemId, { weekday: MarketDef[]; weekend: MarketD
       stock("WMT", "Walmart"), stock("COST", "Costco"), stock("DIS", "Disney"), stock("BA", "Boeing"),
       stock("UBER", "Uber"), stock("SHOP", "Shopify"),
     ],
-    weekend: [
-      coin("AVAX/USD", "Avalanche"), coin("LINK/USD", "Chainlink"), coin("LTC/USD", "Litecoin"),
-      coin("BCH/USD", "Bitcoin Cash"), coin("DOT/USD", "Polkadot"), coin("UNI/USD", "Uniswap"),
-      coin("ADA/USD", "Cardano"), coin("NEAR/USD", "NEAR"), coin("ATOM/USD", "Cosmos"), coin("XLM/USD", "Stellar"),
-    ],
+    weekend: [], // retired Nov 24: weekend crypto moved to Signal Grid
   },
   options: {
     weekday: [
@@ -82,13 +78,11 @@ export const FS_LISTS: Record<SystemId, { weekday: MarketDef[]; weekend: MarketD
       stock("VZ", "Verizon"), stock("PYPL", "PayPal"), stock("NIO", "NIO"), stock("RIVN", "Rivian"), stock("SNAP", "Snap"),
       stock("MARA", "MARA Holdings"), stock("RIOT", "Riot Platforms"), stock("UBER", "Uber"),
     ],
-    weekend: [
-      coin("AAVE/USD", "Aave"), coin("GRT/USD", "The Graph"), coin("MKR/USD", "Maker"),
-      coin("CRV/USD", "Curve"), coin("BAT/USD", "Basic Attention Token"), coin("SUSHI/USD", "SushiSwap"),
-      coin("XTZ/USD", "Tezos"), coin("MANA/USD", "Decentraland"), coin("SAND/USD", "The Sandbox"), coin("ALGO/USD", "Algorand"),
-    ],
+    weekend: [], // retired Nov 24: weekend crypto moved to Signal Grid
   },
 };
+
+export const FS_WEEKEND_NOTE = "Weekend crypto moved to Signal Grid — this system trades weekdays only.";
 
 export const FS_RULES = {
   maxHoldMin: 30, // the 30-minute law
@@ -130,17 +124,17 @@ export const PACE_LINE = "Pace: 10:30 AM 7 · 12:00 PM 15 · 1:30 PM 23 · 3:00 
 export const FS_RULE_LINES: Record<SystemId, string[]> = {
   options: [
     "Paper only: no order is ever sent to Alpaca.",
-    "Its own markets, none of the main agent's. Weekdays: options on IWM, DIA, XLF, BAC, INTC, F, PFE, SOFI, HOOD, PLTR, COIN, XLE, T, VZ, PYPL, NIO, RIVN, SNAP, MARA, RIOT, UBER. Weekends: AAVE, GRT, MKR, CRV, BAT, SUSHI, XTZ, MANA, SAND, ALGO as the coins themselves (Alpaca has no crypto options).",
+    "Its own markets, none of the main agent's: options on IWM, DIA, XLF, BAC, INTC, F, PFE, SOFI, HOOD, PLTR, COIN, XLE, T, VZ, PYPL, NIO, RIVN, SNAP, MARA, RIOT, UBER. Weekdays only: weekend crypto moved to Signal Grid.",
     "Weekdays it buys ONE call when the trend is up or ONE put when the trend is down: slightly out of the money, at least 3 days to expiry (7 after the no-follow-through lesson), premium $150 or less, and never a contract whose bid/ask spread is over 10% of the premium (7% after the wide-spread lesson).",
     "Target: 40 trades a day, never forced. Every minute it ranks all its markets: strength, trend agreement, the market's own last 20 trades and its winning setup size.",
     "NEVER relaxed: the 5-minute and 15-minute trends agree with the trade, and for a call the slow average is rising with the price above it (for a put: falling, price below). It skips a market that already moved more than 0.8% in 15 minutes, and a choppy one (4+ crosses in 30 minutes).",
     "Behind the pace it shortens the hold for new trades (30, then 20, then 12 minutes), then lowers the strength needed (from +0.3% to a floor of +0.12%), then tries the top 5 setups instead of the top 3.",
-    "Exits, checked every 1 minute: options +$50 / -$50; weekend coins +2% / -1% on $100; the trend turning against the trade; the max hold reached; weekdays always out by 3:55 PM ET.",
-    "Daily stop -$500, total brake -$1,000 (weekend coin days: daily stop -$50). These brakes are wide on purpose: one options loss is $50, so a tight brake would make 40 trades impossible. The real protection is the learning: benching losing markets, the pause after 2 losses in a row, and raising the strength needed.",
+    "Exits, checked every 1 minute: +$50 / -$50; the trend turning against the trade; the max hold reached; always out by 3:55 PM ET.",
+    "Daily stop -$500, total brake -$1,000. These brakes are wide on purpose: one options loss is $50, so a tight brake would make 40 trades impossible. The real protection is the learning: benching losing markets, the pause after 2 losses in a row, and raising the strength needed.",
   ],
   scalper: [
     "Paper only: no order is ever sent to Alpaca.",
-    "Its own markets, none of the main agent's. Weekdays: DIA, IWM, AVGO, NFLX, PLTR, COIN, MSTR, HOOD, SOFI, BAC, JPM, XOM, UNH, LLY, CRM, MU, INTC, F, SMCI, MARA, RIOT, CVX, PFE, T, WMT, COST, DIS, BA, UBER, SHOP. Weekends: AVAX, LINK, LTC, BCH, DOT, UNI, ADA, NEAR, ATOM, XLM.",
+    "Its own markets, none of the main agent's: DIA, IWM, AVGO, NFLX, PLTR, COIN, MSTR, HOOD, SOFI, BAC, JPM, XOM, UNH, LLY, CRM, MU, INTC, F, SMCI, MARA, RIOT, CVX, PFE, T, WMT, COST, DIS, BA, UBER, SHOP. Weekdays only: weekend crypto moved to Signal Grid.",
     "Target: 40 trades a day, never forced. Every minute it ranks all its markets: strength, trend agreement, the market's own last 20 trades and its winning setup size.",
     "NEVER relaxed: the 5-minute and 15-minute trends are up, the slow average is rising and the price is above it. It skips a market that already moved more than 0.8% in 15 minutes, and a choppy one (4+ crosses in 30 minutes).",
     "Behind the pace it shortens the hold for new trades (30, then 20, then 12 minutes), then lowers the strength needed (from +0.3% to a floor of +0.12%), then tries the top 5 setups instead of the top 3.",
@@ -181,17 +175,17 @@ export function mustHardClose(entryAt: string, now: Date, maxHold = FS_RULES.max
   return heldMinutes(entryAt, now) >= maxHold - FS_RULES.exitCheckEveryMin;
 }
 
-/** The trading window: weekdays 9:30 AM to 4:00 PM ET, weekends the whole day ET. */
+/** The trading window: weekdays 9:30 AM to 4:00 PM ET. No window on weekends (weekend crypto moved to Signal Grid). */
 export function tradingWindow(et: { weekend: boolean; hour: number; minute: number }) {
   const mins = et.hour * 60 + et.minute;
-  const [start, end] = et.weekend ? [0, 24 * 60] : [9 * 60 + 30, 16 * 60];
+  const [start, end] = et.weekend ? [0, 0] : [9 * 60 + 30, 16 * 60];
   return { start, end, mins, inWindow: mins >= start && mins < end, minutesLeft: Math.max(0, end - mins), length: end - start };
 }
 
 /** Trades expected by now: the weekday checkpoints (straight lines between them), or 40 spread over a weekend day. */
 export function expectedBy(et: { weekend: boolean; hour: number; minute: number }): number {
   const mins = et.hour * 60 + et.minute;
-  if (et.weekend) return Math.floor(FS_RULES.dailyTarget * Math.max(0, Math.min(1, mins / (24 * 60))));
+  if (et.weekend) return 0;
   const cp = PACE_CHECKPOINTS;
   if (mins <= cp[0][0]) return 0;
   for (let i = 1; i < cp.length; i++) {
@@ -1074,7 +1068,8 @@ async function runFast(db: any): Promise<Record<string, unknown>> {
     }
     if (st.brake_paused || Number(st.total_pnl ?? 0) <= -brakes.total) { await countBlock(db, id, day, "brake"); await note(`paused by the $${brakes.total} brake`); continue; }
     if (Number(day.day_pnl ?? 0) <= -brakes.daily) { await countBlock(db, id, day, "brake"); await note(`daily stop reached ($${brakes.daily} lost today)`); continue; }
-    if (!pace.inWindow) { await note("outside the trading window (weekdays 9:30 AM to 4:00 PM ET, weekends all day)"); continue; }
+    if (et.weekend) { await note(FS_WEEKEND_NOTE); continue; }
+    if (!pace.inWindow) { await note("outside the trading window (weekdays 9:30 AM to 4:00 PM ET)"); continue; }
     if (!et.weekend && !stockOpen) { await countBlock(db, id, day, "closed"); await note("the stock market is closed today"); continue; }
     if (openingWindow(et)) { await note("first 15 minutes after the open, no entries"); continue; }
     if (!et.weekend && closeOut) { await note("3:55 PM ET or later, no new trades"); continue; }
@@ -1242,7 +1237,7 @@ export async function handleFast(
   const below = ladder.trades < ladder.target;
   const ended = !et.weekend ? w.mins >= 955 : false;
   const impossible = w.inWindow && paceImpossible(et, tradesToday);
-  const dayNote = (ended || (!w.inWindow && w.mins >= w.end)) && below
+  const dayNote = et.weekend ? FS_WEEKEND_NOTE : (ended || (!w.inWindow && w.mins >= w.end)) && below
     ? `The day ended at ${ladder.trades} of ${ladder.target}: ${blockReason(blocks)}.`
     : impossible
       ? `Pace stopped at ${ladder.trades} of ${ladder.target} — reaching ${ladder.target} would require breaking a safety rule (too few minutes left for one trade at a time). Most often blocked: ${blockReason(blocks)}.`
@@ -1338,7 +1333,7 @@ export async function handleFast(
 
       if (id === "options") {
         if (et.weekend) {
-          options = { enabled: true, weekend: true, message: "Weekend: Alpaca has no crypto options, so it trades AAVE, GRT, MKR, CRV, BAT, SUSHI, XTZ, MANA, SAND and ALGO as coins ($100, +2% / -1%)." };
+          options = { enabled: true, weekend: true, message: FS_WEEKEND_NOTE };
         } else {
           if (!optionsLevelCache || Date.now() - optionsLevelCache.at > 10 * 60 * 1000) {
             const acc = await readAccount(cfg.keys);
@@ -1406,6 +1401,7 @@ export async function handleFast(
         takeProfitPct: FS_RULES.spot.takeProfitPct, stopLossPct: FS_RULES.spot.stopLossPct,
         maxTrades: FS_RULES.dailyTarget, strengthPct: rules.thresholdPct,
       },
+      weekendNote: FS_WEEKEND_NOTE,
       paperOnly: true,
       nowEt: et.label,
     },

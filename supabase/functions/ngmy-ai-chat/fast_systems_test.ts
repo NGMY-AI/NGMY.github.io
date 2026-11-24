@@ -39,9 +39,11 @@ Deno.test("own markets: no ticker from the main agent's lists, and the new count
     for (const sys of Object.values(FS_LISTS)) assert(![...sys.weekday, ...sys.weekend].some((m) => m.symbol === banned), banned);
   }
   assertEquals(FS_LISTS.scalper.weekday.length, 30);
-  assertEquals(FS_LISTS.scalper.weekend.length, 10);
   assertEquals(FS_LISTS.options.weekday.length, 21);
-  assertEquals(FS_LISTS.options.weekend.length, 10);
+  // Nov 24: Signal Grid carries ALL crypto, so the fast systems' weekend coins are retired: no coin at all.
+  assertEquals(FS_LISTS.scalper.weekend.length, 0);
+  assertEquals(FS_LISTS.options.weekend.length, 0);
+  for (const sys of Object.values(FS_LISTS)) assert(![...sys.weekday, ...sys.weekend].some((m) => m.symbol.includes("/")));
 });
 
 Deno.test("brakes for 40 trades", () => {
@@ -113,9 +115,9 @@ Deno.test("40 a day: checkpoints, then shorter holds, then lower strength, then 
   assertEquals(paceLadder(wk(15, 10), 40).thresholdPct, 0.3);
   assertEquals(paceLadder(wk(10, 0), 1, 0.35).thresholdPct, 0.35);
   assert(paceLadder(wk(12, 0), 7).lines.length === 3);
-  // Weekends: 40 over the whole day.
-  assertEquals(tradingWindow({ weekend: true, hour: 12, minute: 0 }).length, 24 * 60);
-  assertEquals(expectedBy({ weekend: true, hour: 12, minute: 0 }), 20);
+  // Weekends: no trading window (weekend crypto moved to Signal Grid).
+  assertEquals(tradingWindow({ weekend: true, hour: 12, minute: 0 }).inWindow, false);
+  assertEquals(expectedBy({ weekend: true, hour: 12, minute: 0 }), 0);
   // Honest: 40 can no longer be reached.
   assertEquals(paceImpossible(wk(15, 30), 10), true);
   assertEquals(paceImpossible(wk(10, 0), 3), false);
