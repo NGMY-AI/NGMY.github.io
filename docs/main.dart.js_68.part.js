@@ -1,6 +1,6 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var B,A,C={
-a6L(d){var y=d.ga7Y()/255,x=d.gWt()/255,w=d.ga5b()/255,v=Math.max(y,Math.max(x,w)),u=v-Math.min(y,Math.min(x,w)),t=d.gjB(d),s=B.hHd(y,x,w,v,u),r=v===0?0:u/v
+a6L(d){var y=d.ga7Z()/255,x=d.gWt()/255,w=d.ga5c()/255,v=Math.max(y,Math.max(x,w)),u=v-Math.min(y,Math.min(x,w)),t=d.gjB(d),s=B.hHd(y,x,w,v,u),r=v===0?0:u/v
 return new C.pA(t/255,s,r,v)},
 pA:function pA(d,e,f,g){var _=this
 _.a=d
@@ -24,4 +24,4 @@ v(d){var y=this
 return"HSVColor("+B.v(y.a)+", "+B.v(y.b)+", "+B.v(y.c)+", "+B.v(y.d)+")"}}
 var z=a.updateTypes([]);(function inheritance(){var y=a.inherit
 y(C.pA,B.aE)})();(function constants(){D.asS=new B.a_(983930,"MaterialIcons",!1)})()};
-(a=>{a["v4T8G/ypNEb6C2uf5yF+sPDeEhE="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["s4Nk7Ydt5EvqgYcNZkBCt/tJ0VU="]=a.current})($__dart_deferred_initializers__);
