@@ -141,9 +141,9 @@ A.dBj=x([1,0.5,0.33,0.25,0.2,0.16,0.14,0.12],y.h)
 A.dDe=x([1,2,3,4,5,6,7,8],y.h)
 A.dIk=x([1,0.18,0.06],y.h)
 A.ev0={"SPARK PAINTER":0,"MANDALA MAKER":1,"TITLE ANIMATOR":2,"PALETTE LAB":3,"GRAVITY TOY":4,"FIREWORK DESIGNER":5,"CIRCUIT LAB":6,"PERIODIC TABLE":7,"BODY EXPLORER":8,"SPIN THE WHEEL":9,"FOCUS TIMER":10,"MEMORY MATCH":11,"LUCKY POCKET":12,"ELECTRONICS LAB":13,"CONSTRUCTION LAB":14,"AI INVENTOR":15,"MAGNET LAB":16,"RADIO LAB":17,"POWER PLANT":18,"POWER GRID":19,"INTERNET JOURNEY":20,"ROBOT CODER":21,"BUG SMASHER":22,"ROCKET LANDER":23,"DATA SNAKE":24,"BINARY 2048":25,"SIGNAL BREAKER":26,"PASSWORD LAB":27,"WAVE LAB":28,"BUG HUNT":29,"OPTICS LAB":30,"ATOM BUILDER":31,"PIXEL TV":32}
-A.aKW=new B.bl(A.ev0,["sparkle","sparkle","whoosh","click","bounce","pop","tech","lab","organic","click","tech","bubble","click","tech","tech","tech","tech","tech","tech","tech","tech","tech","pop","space","bubble","click","zap","click","tech","click","sparkle","lab","tech"],B.ar("bl<n,n>"))
-A.ada=new B.G(!0,C.aF,null,null,null,null,10.5,C.E,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)})();(function staticFields(){$.i7Y=B.S(B.ar("n"),B.ar("dC"))
+A.aKW=new B.bl(A.ev0,["sparkle","sparkle","whoosh","click","bounce","pop","tech","lab","organic","click","tech","bubble","click","tech","tech","tech","tech","tech","tech","tech","tech","tech","pop","space","bubble","click","zap","click","tech","click","sparkle","lab","tech"],B.ar("bl<m,m>"))
+A.ada=new B.G(!0,C.aF,null,null,null,null,10.5,C.E,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)})();(function staticFields(){$.i7Y=B.S(B.ar("m"),B.ar("dC"))
 $.cpa=B.a([],B.ar("N<akD>"))
 $.hAY=0
 $.aux="music"})()};
-(a=>{a["F2Jx+3PbxNH0waeg1JRAQr+cuDY="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["pNgjitYuOZ46XtjiaKQfvERlAAA="]=a.current})($__dart_deferred_initializers__);
