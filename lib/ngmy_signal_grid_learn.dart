@@ -1350,7 +1350,6 @@ Tutor:''';
         return _d(_map(b['v2'])['passed']).compareTo(_d(_map(a['v2'])['passed']));
       });
     final board = _board;
-    final rec = _map(board['record']);
     final secs = _fetchedAt == null ? 0 : DateTime.now().difference(_fetchedAt!).inSeconds;
     final ago = secs < 20 ? 'just now' : secs < 60 ? '$secs s ago' : '${secs ~/ 60} min ago';
     return RefreshIndicator(
@@ -1411,49 +1410,17 @@ Tutor:''';
         ],
         const SizedBox(height: 12),
         _alertsBanner(p),
-        // Signals v2: the public record, today's count, the self-brake and the warning, always on screen.
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(18), border: Border.all(color: p.cardEdge)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Expanded(
-                child: Text('Last 20 signals: ${_d(rec['wins']).toInt()} wins / ${_d(rec['losses']).toInt()} losses',
-                    style: TextStyle(color: p.ink, fontSize: 14.5, fontWeight: FontWeight.w900)),
-              ),
-              _pill('${_d(board['today']).toInt()} of ${_d(board['maxPerDay'] ?? 5).toInt()} today', _slowC),
-            ]),
-            const SizedBox(height: 4),
-            Text(
-              'The default answer is WAIT. A STRONG signal needs all 5 confirmations at once, is checked every 30 minutes, '
-              'at most 5 a day, and is graded WIN or LOSS 30 minutes later. A day with zero signals is a correct day.',
-              style: TextStyle(color: p.muted, fontSize: 11.5, height: 1.35),
+        // Only while signals are paused by the self-brake: one slim line (no frame otherwise).
+        if (board['paused'] == true)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(
+              '${board['pauseReason'] ?? 'Record too weak — signals paused until the pattern improves.'} '
+              '(${_d(board['paperStreak']).toInt()} of ${_d(board['liftStreak'] ?? 10).toInt()} paper wins in a row to lift it)',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: _loss, fontSize: 12, fontWeight: FontWeight.w800, height: 1.35),
             ),
-            if (board['paused'] == true) ...[
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: _loss.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
-                child: Text(
-                  '${board['pauseReason'] ?? 'Record too weak — signals paused until the pattern improves.'} '
-                  'WAIT-only: it keeps grading would-be signals on paper and lifts after ${_d(board['liftStreak'] ?? 10).toInt()} straight paper wins '
-                  '(now ${_d(board['paperStreak']).toInt()}).',
-                  style: const TextStyle(color: _loss, fontSize: 12, fontWeight: FontWeight.w800, height: 1.35),
-                ),
-              ),
-            ],
-            if (board['setupNeeded'] == true) ...[
-              const SizedBox(height: 6),
-              Text('The signal history is not set up yet (run the signals SQL in Supabase).', style: TextStyle(color: _down, fontSize: 11.5)),
-            ],
-            const SizedBox(height: 8),
-            Text(
-              '${board['disclaimer'] ?? 'Signals are opinions from price patterns, not guarantees. Even strong signals lose.'}',
-              style: TextStyle(color: p.ink, fontSize: 12, fontWeight: FontWeight.w800, height: 1.35),
-            ),
-          ]),
-        ),
+          ),
         const SizedBox(height: 8),
         Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           const Icon(Icons.circle, size: 7, color: _up),
@@ -1463,23 +1430,6 @@ Tutor:''';
                 textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 11)),
           ),
         ]),
-        if (_filter == 'All' || _filter == 'Forex') ...[
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: _down.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: _down.withValues(alpha: 0.45)),
-            ),
-            child: Text(
-              'Forex uses real market prices. OTC pairs at a broker are priced by that broker (always on weekends) and can move '
-              'differently. These signals read 15-minute and 1-hour trends: they are built for a 15–30 minute expiry and cannot '
-              'judge 1-minute noise. Do NOT use them for 1–5 minute trades.',
-              style: TextStyle(color: p.ink, fontSize: 11.8, height: 1.35),
-            ),
-          ),
-        ],
         const SizedBox(height: 12),
         if (all.isEmpty) Text('Loading the markets...', style: TextStyle(color: p.muted)),
         if (all.isNotEmpty && ms.isEmpty) Center(child: Text('No market matches "$_query".', style: TextStyle(color: p.muted))),
