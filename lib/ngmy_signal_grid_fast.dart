@@ -223,18 +223,20 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
     final s = _s!;
     final st = _map(s['state']);
     final sh = st['shadow'] is Map ? _map(st['shadow']) : null;
+    // The most important first: the open trade, then the markets and the candle chart, then the balance.
     return [
+      if (sh != null) _openTrade(p, sh, _map(st['mark'])),
+      _marketStrip(p, s),
+      _chartCard(p, s),
       _sharedBalance(p, s),
       if (_error != null) _note(p, _error!, _loss),
       if (st['brakePaused'] == true)
         _note(p, 'Paused by this system\'s brake. ${st['brakeReason'] ?? ''}. Look over the trades, then press Start to turn it back on.', _loss),
       _controls(p, st),
       _paceCard(p, s),
-      _marketsPanel(p, s),
       _winRate(p, s),
       if (_options) _optionsCard(p, s),
       _settings(p, s),
-      if (sh != null) _openTrade(p, sh, _map(st['mark'])),
       _lastCheck(p, st),
       _trades(p, s),
       _activity(p),
@@ -500,173 +502,141 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
     );
   }
 
-  // ── Agent markets: every market of this system, live, with this system's record in it
+  // ── Its markets: side by side like the main Signal Grid screen (best-ranked first); tap one for its chart
 
-  Widget _marketsPanel(_Pal p, Map<String, dynamic> s) {
-    final markets = ((s['markets'] as List?) ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+  List<Map<String, dynamic>> _marketsOf(Map<String, dynamic> s) =>
+      ((s['markets'] as List?) ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+
+  Map<String, dynamic>? _selectedMarket(List<Map<String, dynamic>> markets) {
+    if (markets.isEmpty) return null;
+    return markets.firstWhere((m) => m['symbol'] == _market,
+        orElse: () => markets.firstWhere((m) => m['tag'] == 'TRADED NOW', orElse: () => markets.first));
+  }
+
+  Widget _marketStrip(_Pal p, Map<String, dynamic> s) {
+    final markets = _marketsOf(s);
     if (markets.isEmpty) return const SizedBox.shrink();
-    final sel = markets.firstWhere(
-      (m) => m['symbol'] == _market,
-      orElse: () => markets.firstWhere((m) => m['tag'] == 'TRADED NOW', orElse: () => markets.first),
+    final sel = _selectedMarket(markets)!;
+    final passing = markets.where((m) => _map(m['analysis'])['passes'] == true).length;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+          child: Row(children: [
+            Text('Its markets (${markets.length})', style: TextStyle(color: p.ink, fontSize: 14, fontWeight: FontWeight.w800)),
+            const SizedBox(width: 8),
+            _tag(passing == 0 ? 'NONE PASSING NOW' : '$passing PASSING NOW', passing == 0 ? p.muted : _up),
+            const Spacer(),
+            Text('tap one', style: TextStyle(color: p.muted, fontSize: 11)),
+          ]),
+        ),
+        SizedBox(
+          height: 82,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.none,
+            itemCount: markets.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 10),
+            itemBuilder: (_, i) {
+              final m = markets[i];
+              final sym = '${m['symbol']}';
+              final on = sym == sel['symbol'];
+              final chg = _d(m['changePct']);
+              final rec = _map(m['record']);
+              final a = _map(m['analysis']);
+              final tag = '${m['tag'] ?? ''}';
+              final (Color tc, String tl) = tag == 'TRADED NOW'
+                  ? (_btc, 'HOLDING')
+                  : a['passes'] == true
+                      ? (_up, 'PASSES')
+                      : a['falling'] == true
+                          ? (_loss, 'FALLING')
+                          : (p.muted, tag == 'closed' ? 'CLOSED' : 'WATCHING');
+              return GestureDetector(
+                onTap: () => setState(() => _market = sym),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: 152,
+                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                  decoration: BoxDecoration(
+                    color: p.card,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: on ? _accent : p.cardEdge, width: on ? 2 : 1),
+                    boxShadow: [BoxShadow(color: on ? _accent.withValues(alpha: 0.18) : p.shadow, blurRadius: on ? 12 : 8, offset: const Offset(0, 4))],
+                  ),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                    Row(children: [
+                      _coin(sym, 16),
+                      const SizedBox(width: 5),
+                      Expanded(
+                        child: Text(sym, maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: p.ink, fontSize: 11.5, fontWeight: FontWeight.w800)),
+                      ),
+                      Text(tl, style: TextStyle(color: tc, fontSize: 8.5, fontWeight: FontWeight.w900)),
+                    ]),
+                    Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                      Expanded(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(_money(_d(m['price']), sign: false), style: TextStyle(color: p.ink, fontSize: 14.5, fontWeight: FontWeight.w800)),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text('${chg >= 0 ? '+' : ''}${chg.toStringAsFixed(2)}%',
+                          style: TextStyle(color: chg >= 0 ? _up : _loss, fontSize: 10.5, fontWeight: FontWeight.w800)),
+                    ]),
+                    Text(
+                      _d(rec['n']) == 0 ? 'no trades here yet' : 'last ${_d(rec['n']).toInt()}: ${_d(rec['wins']).toInt()}W/${_d(rec['losses']).toInt()}L ${_money(_d(rec['pnl']))}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: p.muted, fontSize: 9.5, fontWeight: FontWeight.w700),
+                    ),
+                  ]),
+                ),
+              );
+            },
+          ),
+        ),
+      ]),
     );
+  }
+
+  /// The candlestick chart of the market picked in the strip (the held one first), with the trend lines.
+  Widget _chartCard(_Pal p, Map<String, dynamic> s) {
+    final sel = _selectedMarket(_marketsOf(s));
+    if (sel == null) return const SizedBox.shrink();
     final pts = ((_map(sel['chart'])['points'] as List?) ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
     final a = _map(sel['analysis']);
+    final chg = _d(sel['changePct']);
     return _frame(
       p,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                'Its markets (${markets.length})',
-                style: TextStyle(color: p.ink, fontSize: 15, fontWeight: FontWeight.w800),
-              ),
-              const Spacer(),
-              Text('tap one', style: TextStyle(color: p.muted, fontSize: 11)),
-            ],
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          _coin('${sel['symbol']}', 24),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('${sel['symbol']}', style: TextStyle(color: p.ink, fontSize: 15, fontWeight: FontWeight.w800)),
+              Text('${sel['name'] ?? ''}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.muted, fontSize: 11.5)),
+            ]),
           ),
-          const SizedBox(height: 8),
-          // The full list at once, best-ranked first, two to a row.
-          LayoutBuilder(
-            builder: (context, box) => Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final m in markets)
-                  Builder(
-                    builder: (_) {
-                      final on = m['symbol'] == sel['symbol'];
-                      final chg = _d(m['changePct']);
-                      final rec = _map(m['record']);
-                      final tag = '${m['tag'] ?? ''}';
-                      final tagC = tag == 'TRADED NOW'
-                          ? _btc
-                          : tag == 'watching'
-                          ? _up
-                          : p.muted;
-                      final a = _map(m['analysis']);
-                      return GestureDetector(
-                        onTap: () => setState(() => _market = '${m['symbol']}'),
-                        child: Container(
-                          width: (box.maxWidth - 8) / 2,
-                          height: 80,
-                          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                          decoration: BoxDecoration(
-                            color: p.inner,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: on ? _accent : Colors.transparent, width: 2),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  _coin('${m['symbol']}', 15),
-                                  const SizedBox(width: 5),
-                                  Expanded(
-                                    child: Text(
-                                      '${m['symbol']}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(color: p.ink, fontSize: 11.5, fontWeight: FontWeight.w800),
-                                    ),
-                                  ),
-                                  Text(
-                                    tag,
-                                    style: TextStyle(color: tagC, fontSize: 8.5, fontWeight: FontWeight.w900),
-                                  ),
-                                ],
-                              ),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      alignment: Alignment.centerLeft,
-                                      child: Text(
-                                        _money(_d(m['price']), sign: false),
-                                        style: TextStyle(color: p.ink, fontSize: 14, fontWeight: FontWeight.w800),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '${chg >= 0 ? '+' : ''}${chg.toStringAsFixed(2)}%',
-                                    style: TextStyle(color: chg >= 0 ? _up : _loss, fontSize: 10.5, fontWeight: FontWeight.w800),
-                                  ),
-                                ],
-                              ),
-                              Text(
-                                '${a.isEmpty
-                                    ? ''
-                                    : a['passes'] == true
-                                    ? 'passes now · '
-                                    : a['falling'] == true
-                                    ? 'falling · '
-                                    : ''}'
-                                '${_d(rec['n']) == 0 ? 'no trades yet' : 'last ${_d(rec['n']).toInt()}: ${_d(rec['wins']).toInt()}W/${_d(rec['losses']).toInt()}L ${_money(_d(rec['pnl']))}'}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: a['passes'] == true
-                                      ? _up
-                                      : a['falling'] == true
-                                      ? _loss
-                                      : p.muted,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Text(
-                '${sel['symbol']}',
-                style: TextStyle(color: p.ink, fontSize: 14, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  '${sel['name'] ?? ''}',
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: p.muted, fontSize: 12),
-                ),
-              ),
-              const Spacer(),
-              if (a.isNotEmpty)
-                _tag(
-                  a['passes'] == true
-                      ? 'PASSES NOW'
-                      : a['falling'] == true
-                      ? 'FALLING'
-                      : 'TREND ${'${a['trend'] ?? '?'}'.toUpperCase()}',
-                  a['passes'] == true
-                      ? _up
-                      : a['falling'] == true
-                      ? _loss
-                      : p.muted,
-                ),
-            ],
-          ),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Text(_money(_d(sel['price']), sign: false), style: TextStyle(color: p.ink, fontSize: 17, fontWeight: FontWeight.w800)),
+            Text('${chg >= 0 ? '+' : ''}${chg.toStringAsFixed(2)}% today', style: TextStyle(color: chg >= 0 ? _up : _loss, fontSize: 11, fontWeight: FontWeight.w800)),
+          ]),
+        ]),
+        const SizedBox(height: 10),
+        if (pts.length > 1)
+          _CandleChart(points: pts.sublist(math.max(0, pts.length - 36)), pal: p, entry: null, lines: true, price: _d(sel['price']))
+        else
+          Text('The chart appears after the first reading.', style: TextStyle(color: p.muted, fontSize: 12)),
+        if (a['why'] != null) ...[
           const SizedBox(height: 6),
-          if (pts.length > 1)
-            _CandleChart(points: pts.sublist(math.max(0, pts.length - 36)), pal: p, entry: null, lines: true, price: _d(sel['price']))
-          else
-            Text('The chart appears after the first reading.', style: TextStyle(color: p.muted, fontSize: 12)),
-          if (a['why'] != null) ...[const SizedBox(height: 6), Text('Analysis: ${a['why']}', style: TextStyle(color: p.muted, fontSize: 11.5, height: 1.3))],
+          Text('Analysis: ${a['why']}', style: TextStyle(color: p.muted, fontSize: 11.5, height: 1.3)),
         ],
-      ),
+      ]),
     );
   }
 
