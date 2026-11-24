@@ -4,6 +4,6 @@ B=c[0]
 C=c[2]
 A=c[356]
 var z=a.updateTypes([]);(function constants(){var y=a.makeConstList
-A.frs=new B.cY(C.v,C.J,8)
-A.Jq=y([A.frs],B.ar("N<cY>"))})()};
-(a=>{a["o3uKRhYzgq1m+Lxr6kotXK7Sy6I="]=a.current})($__dart_deferred_initializers__);
+A.frs=new B.cZ(C.v,C.J,8)
+A.Jq=y([A.frs],B.ar("N<cZ>"))})()};
+(a=>{a["VbRfCmMsTZYAzRFOzxHHqpWDs7Y="]=a.current})($__dart_deferred_initializers__);
