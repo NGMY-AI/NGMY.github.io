@@ -1,6 +1,6 @@
 // deno test supabase/functions/ngmy-ai-chat/alpaca_agent_test.ts
 import { assertEquals, assert } from "https://deno.land/std@0.177.0/testing/asserts.ts";
-import { activeMarkets, crossAt, todaysList, addDays, bigTrend, heldMark, optionFits, pickOption, buildChart, crossover, decide, entryNow, etParts, PA_FX, PA_LESSON_IDS, PA_MARKETS, pickMarket, readMarket, rsi, runStats, sma, type DecideInput, type Scan } from "./alpaca_agent.ts";
+import { activeMarkets, crossAt, SIG_RULES, signalV2, todaysList, addDays, bigTrend, heldMark, optionFits, pickOption, buildChart, crossover, decide, entryNow, etParts, PA_FX, PA_LESSON_IDS, PA_MARKETS, pickMarket, readMarket, rsi, runStats, sma, type DecideInput, type Scan } from "./alpaca_agent.ts";
 
 const base: DecideInput = {
   weekend: false, asset: "SPY", stock: true, price: 100, signal: "none", fast: 100, slow: 100, shadow: null,
@@ -319,4 +319,53 @@ Deno.test("a cross is named by its candle, so 5-minute checks never buy it twice
   // One candle later the same cross keeps the same name.
   assertEquals(crossAt([...closes, 115], [...times, "t99"]), a);
   assertEquals(crossAt(Array(40).fill(100), times), "");
+});
+
+// Signals v2: 7 hours of 5-minute candles built from a list of per-candle % steps.
+function series(step: (i: number) => number, n = 84) {
+  const t0 = Date.parse("2026-11-24T10:00:00Z");
+  const times: string[] = [], closes: number[] = [], opens: number[] = [];
+  let p = 100;
+  for (let i = 0; i < n; i++) {
+    const o = p;
+    p = p * (1 + step(i) / 100);
+    times.push(new Date(t0 + i * 5 * 60000).toISOString());
+    opens.push(o);
+    closes.push(p);
+  }
+  return { times, closes, opens, price: p };
+}
+
+Deno.test("signals v2: a steady, fresh, calm rise on both timeframes = BUY (all 5 yes)", () => {
+  const s = series(() => 0.02);
+  const v = signalV2(s.times, s.closes, s.opens, s.price);
+  assertEquals(v.passed, 5, v.checks.filter((c) => !c.ok).map((c) => c.text).join(" | "));
+  assertEquals(v.direction, "BUY");
+  assert(v.strong);
+  const d = series(() => -0.02);
+  assertEquals(signalV2(d.times, d.closes, d.opens, d.price).direction, "SELL");
+});
+
+Deno.test("signals v2: the default answer is WAIT when any confirmation is missing", () => {
+  // A finished move: up more than 1% in the last hour.
+  const run = series((i) => (i > 70 ? 0.2 : 0.02));
+  const r = signalV2(run.times, run.closes, run.opens, run.price);
+  assertEquals(r.checks.find((c) => c.key === "fresh")?.ok, false);
+  assertEquals(r.direction, "WAIT");
+  // A sudden 0.6% jump in the last 15 minutes.
+  const spike = series((i) => (i === 82 ? 0.6 : 0.02));
+  assertEquals(signalV2(spike.times, spike.closes, spike.opens, spike.price).checks.find((c) => c.key === "calm")?.ok, false);
+  // Sideways noise: up and down.
+  const chop = series((i) => (Math.floor(i / 3) % 2 === 0 ? 0.08 : -0.08));
+  assertEquals(signalV2(chop.times, chop.closes, chop.opens, chop.price).direction, "WAIT");
+  // Too little data.
+  const short = series(() => 0.02, 10);
+  assertEquals(signalV2(short.times, short.closes, short.opens, short.price).direction, "WAIT");
+});
+
+Deno.test("signals v2: limits and the self-brake", () => {
+  assertEquals(SIG_RULES.maxStrongPerDay, 5);
+  assertEquals(SIG_RULES.checkEveryMin, 30);
+  assertEquals(SIG_RULES.brakeMinPct, 55);
+  assertEquals(SIG_RULES.liftStreak, 10);
 });

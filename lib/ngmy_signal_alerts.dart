@@ -1,10 +1,10 @@
-// Signal Grid alerts: a notification when a market says ENTER UP or ENTER DOWN right now.
+// Signal Grid alerts: a notification for each STRONG signal given (Signals v2: all five confirmations agreed).
 //
 // Who gets them: NGMY admins always; members once they have finished every Trading Academy lesson
 // (the server decides, from the saved lesson progress).
 // How: like the app's other notifications, this watcher runs inside the app (open or in the background)
-// and checks the live signals once a minute. Only "enter now" signals with a clear direction, still early,
-// and that worked at least half the time lately on that market (see entryNow on the server).
+// and checks once a minute for newly given STRONG signals (at most 5 a day, given at the 30-minute checks).
+// Each one says it is built for a 15 to 30 minute expiry, never for 1 to 5 minute trades.
 //
 // Admins also get a notification for every pretend trade any system makes (Signal Grid, Options, Scalper):
 // each new buy and each new sell, once.
@@ -57,30 +57,23 @@ class NgmySignalAlerts {
       }
       if (!await ngmyPushHasPermission()) return;
       await _tradeAlerts(res['tradeFeed']);
-      // Only markets the agent may buy right now: the 10 stocks on weekdays while the stock market is open, the 4 coins on weekends.
-      // The server marks every other market as not traded, so it can never say ENTER. Forex is not alerted.
-      final all = ((res['markets'] as List?) ?? const []).whereType<Map>().where((m) => m['open'] == true);
+      // Signals v2: an alert only for a STRONG signal actually given at a 30-minute check (all five confirmations
+      // agreed), once per signal. Never for weaker readings.
       var shown = 0;
-      for (final m in all) {
-        final reading = m['reading'];
-        final entry = reading is Map ? reading['entry'] : null;
-        if (entry is! Map) continue;
-        final sym = '${m['symbol'] ?? ''}';
-        final up = entry['dir'] == 'up';
-        final key = '$sym|${entry['dir']}';
-        final last = _sent[key];
-        // One alert per market and direction every 20 minutes.
-        if (last != null && DateTime.now().difference(last) < const Duration(minutes: 20)) continue;
+      for (final s in ((res['signalFeed'] as List?) ?? const []).whereType<Map>()) {
+        final key = '${s['key'] ?? ''}';
+        if (key.isEmpty || _sent.containsKey(key)) continue;
         _sent[key] = DateTime.now();
+        final buy = s['direction'] == 'BUY';
         await ngmyPushShow(
-          title: '${up ? '▲ ENTER UP (BUY)' : '▼ ENTER DOWN (SELL)'} $sym',
-          body: 'Enter at the start of the next ${entry['candleMin'] ?? 1}-minute candle · trade for ${entry['durationMin']} min · '
-              'worked ${entry['worked']} of ${entry['of']} times lately. Signals can fail.',
-          tag: 'signal_${sym.replaceAll('/', '')}',
+          title: '${buy ? '▲ STRONG BUY' : '▼ STRONG SELL'} ${s['market'] ?? ''}',
+          body: 'All 5 confirmations agree · ${res['expiryText'] ?? 'Built for a 15–30 minute expiry. Do NOT use this for 1–5 minute trades.'} '
+              'Signals are opinions from price patterns, not guarantees. Even strong signals lose.',
+          tag: 'signal_$key',
         );
         if (++shown >= 3) break;
       }
-      _sent.removeWhere((_, t) => DateTime.now().difference(t) > const Duration(hours: 2));
+      _sent.removeWhere((_, t) => DateTime.now().difference(t) > const Duration(hours: 3));
     } catch (_) {
       // Never break the app over an alert.
     } finally {

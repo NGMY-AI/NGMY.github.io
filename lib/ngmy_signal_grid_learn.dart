@@ -68,7 +68,12 @@ Widget _readingTile(_Pal p, Map<String, dynamic> m, {bool compact = false, VoidC
               style: TextStyle(color: chg >= 0 ? _up : _loss, fontSize: 11, fontWeight: FontWeight.w700)),
         ]),
       ]),
-      // ── Enter RIGHT NOW: a big sign in the middle at the top, with the direction and the duration.
+      // ── Signals v2: one card, BUY / SELL only for a STRONG signal given at a 30-minute check, otherwise WAIT.
+      if (m['v2'] is Map) ...[
+        const SizedBox(height: 12),
+        _v2Block(p, m),
+      ] else ...[
+      // ── (older readings) Enter RIGHT NOW: a big sign in the middle at the top, with the direction and the duration.
       if (r['entry'] is Map) ...[
         const SizedBox(height: 12),
         _enterNowSign(_map(r['entry'])),
@@ -161,6 +166,7 @@ Widget _readingTile(_Pal p, Map<String, dynamic> m, {bool compact = false, VoidC
         const SizedBox(height: 10),
         _durationFrame(p, r, t),
       ],
+      ],
       if (onAsk != null)
         Align(
           alignment: Alignment.centerRight,
@@ -169,6 +175,64 @@ Widget _readingTile(_Pal p, Map<String, dynamic> m, {bool compact = false, VoidC
             icon: const Icon(Icons.forum_rounded, size: 16),
             label: Text('Ask the tutor about $sym'),
           ),
+        ),
+    ]),
+  );
+}
+
+/// Signals v2 card body: the answer (BUY / SELL only for a STRONG signal given at a 30-minute check and still
+/// within its expiry, otherwise WAIT), the confidence, the time, the expiry warning and the 5 confirmations.
+Widget _v2Block(_Pal p, Map<String, dynamic> m) {
+  final v = _map(m['v2']);
+  final sig = m['activeSignal'] is Map ? _map(m['activeSignal']) : null;
+  final open = m['open'] == true;
+  final answer = sig != null ? '${sig['direction']}' : 'WAIT';
+  final c = answer == 'BUY' ? _up : answer == 'SELL' ? _loss : const Color(0xFF94A3B8);
+  final checks = ((sig?['checks'] ?? v['checks']) as List? ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+  final passed = sig != null ? 5 : _d(v['passed']).toInt();
+  final gradeAt = DateTime.tryParse('${sig?['grade_at'] ?? ''}');
+  final explain = !open
+      ? 'This market is closed right now, so the answer is WAIT. No signals while it is closed.'
+      : sig != null
+          ? '${sig['explain'] ?? ''}'
+          : v['strong'] == true
+              ? 'All 5 confirmations agree right now, but a signal is only given at the 30-minute checks (at most 5 a day). Until then: WAIT.'
+              : '${v['explain'] ?? 'WAIT.'}';
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(color: c.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(16), border: Border.all(color: c.withValues(alpha: 0.45))),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Text(answer, style: TextStyle(color: c, fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: 1)),
+        const SizedBox(width: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(color: c.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(999)),
+          child: Text(sig != null ? 'STRONG' : '$passed of 5 confirmations', style: TextStyle(color: c, fontSize: 10.5, fontWeight: FontWeight.w900)),
+        ),
+        const Spacer(),
+        if (sig != null) Text('${sig['et_time'] ?? ''}'.split(', ').last, style: TextStyle(color: p.muted, fontSize: 10.5, fontWeight: FontWeight.w700)),
+      ]),
+      const SizedBox(height: 4),
+      const Text('Built for a 15–30 minute expiry. Do NOT use this for 1–5 minute trades.',
+          style: TextStyle(color: _loss, fontSize: 11.5, fontWeight: FontWeight.w800, height: 1.3)),
+      if (sig != null && gradeAt != null)
+        Text('Graded at ${_clock(_toEt(gradeAt.toUtc()))} ET, 30 minutes after it was given: WIN if the price finished ${answer == 'BUY' ? 'higher' : 'lower'}.',
+            style: TextStyle(color: p.muted, fontSize: 11, height: 1.3)),
+      const SizedBox(height: 8),
+      Text(explain, style: TextStyle(color: p.ink, fontSize: 12.3, height: 1.35)),
+      const SizedBox(height: 8),
+      for (final ch in checks)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Icon(ch['ok'] == true ? Icons.check_circle_rounded : Icons.cancel_rounded, size: 15, color: ch['ok'] == true ? _up : _loss),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text('${ch['ok'] == true ? 'Yes' : 'No'} — ${ch['text'] ?? ''}', style: TextStyle(color: p.ink, fontSize: 11.8, height: 1.3)),
+            ),
+          ]),
         ),
     ]),
   );
@@ -548,8 +612,6 @@ class _NgmySignalGridLearnScreenState extends State<NgmySignalGridLearnScreen> w
   bool _searching = false;
   String _filter = 'All';
   final _search = TextEditingController();
-  final Map<String, String> _lastBias = {};
-  final Map<String, ({DateTime at, String from, String to})> _changed = {};
 
   static const _prefsKey = 'ngmy_signal_grid_academy_v2';
   static const _oldPrefsKey = 'ngmy_signal_grid_lessons_done';
@@ -674,45 +736,17 @@ class _NgmySignalGridLearnScreenState extends State<NgmySignalGridLearnScreen> w
       _nowEt = (res['nowEt'] ?? '').toString();
       _stockOpen = res['stockOpen'] == true;
       _fetchedAt = DateTime.now();
+      if (res['signals'] is Map) _board = _map(res['signals']);
     });
-    _noteChanges();
+    // Signals v2: the old "just turned up / down" flags are gone; only STRONG signals (all five confirmations) count.
   }
+
+  /// Signals v2: the active STRONG signals, the history with WIN or LOSS, the last-20 record and the self-brake.
+  Map<String, dynamic> _board = const {};
 
   List<String> _sigRules = const [];
   String _nowEt = '';
   bool _stockOpen = false;
-
-  /// Compares every market with the last refresh. When one flips (for example bearish to bullish) it is marked
-  /// on its card for 3 minutes and announced, so nobody acts on an old signal.
-  void _noteChanges() {
-    final flips = <String>[];
-    for (final m in _allSignals) {
-      final sym = m['asset'].toString();
-      // The direction from the ONE decision: up, down or no direction (same as the card and the counts).
-      final r = _map(m['reading']);
-      final clear = const ['ENTER', 'SKIP_WEAK', 'WAIT_LATE'].contains(r['decision']);
-      final bias = r['decision'] == null || r['decision'] == 'NO_DATA' || r['decision'] == 'CLOSED'
-          ? 'unknown'
-          : clear
-              ? (r['dir'] == 'up' ? 'up' : 'down')
-              : 'no direction';
-      final before = _lastBias[sym];
-      if (before != null && before != bias && bias != 'unknown' && before != 'unknown') {
-        _changed[sym] = (at: DateTime.now(), from: before, to: bias);
-        flips.add('$sym now ${bias.toUpperCase()}');
-      }
-      _lastBias[sym] = bias;
-    }
-    _changed.removeWhere((_, v) => DateTime.now().difference(v.at) > const Duration(minutes: 3));
-    if (flips.isNotEmpty && mounted) {
-      setState(() {});
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Signal changed: ${flips.take(3).join(' · ')}${flips.length > 3 ? ' and ${flips.length - 3} more' : ''}'),
-        backgroundColor: const Color(0xFF6D28D9),
-        duration: const Duration(seconds: 5),
-      ));
-    }
-  }
 
   /// Every market with a live reading: the agent's 10 plus the forex pairs.
   List<Map<String, dynamic>> get _allSignals => [..._mkts, ..._fx];
@@ -1185,22 +1219,13 @@ Tutor:''';
       return hay.contains(q);
     }).toList()
       ..sort((a, b) {
-        // Enter-now signals first, then just changed, then fresh signals, then the strongest.
-        final ea = _map(a['reading'])['entry'] is Map ? 0 : 1, eb = _map(b['reading'])['entry'] is Map ? 0 : 1;
-        if (ea != eb) return ea - eb;
-        final ca = _changed.containsKey(a['asset']) ? 0 : 1, cb = _changed.containsKey(b['asset']) ? 0 : 1;
-        if (ca != cb) return ca - cb;
-        return _NgmySignalGridAgentScreenState._signalRank(a).compareTo(_NgmySignalGridAgentScreenState._signalRank(b));
+        // Signals v2: a STRONG signal given now first, then the markets with the most confirmations.
+        final sa = a['activeSignal'] is Map ? 0 : 1, sb = b['activeSignal'] is Map ? 0 : 1;
+        if (sa != sb) return sa - sb;
+        return _d(_map(b['v2'])['passed']).compareTo(_d(_map(a['v2'])['passed']));
       });
-    // Counted from the ONE decision, so the boxes match the cards (going up or down = a clear direction).
-    bool going(Map<String, dynamic> m, String d) {
-      final r = _map(m['reading']);
-      return r['dir'] == d && const ['ENTER', 'SKIP_WEAK', 'WAIT_LATE'].contains(r['decision']);
-    }
-
-    final bull = ms.where((m) => going(m, 'up')).length;
-    final bear = ms.where((m) => going(m, 'down')).length;
-    final side = ms.length - bull - bear;
+    final board = _board;
+    final rec = _map(board['record']);
     final secs = _fetchedAt == null ? 0 : DateTime.now().difference(_fetchedAt!).inSeconds;
     final ago = secs < 20 ? 'just now' : secs < 60 ? '$secs s ago' : '${secs ~/ 60} min ago';
     return RefreshIndicator(
@@ -1261,19 +1286,55 @@ Tutor:''';
         ],
         const SizedBox(height: 12),
         _alertsBanner(p),
-        Row(children: [
-          Expanded(child: _countBox(p, 'Going up', bull, _up, Icons.trending_up_rounded)),
-          const SizedBox(width: 8),
-          Expanded(child: _countBox(p, 'Going down', bear, _loss, Icons.trending_down_rounded)),
-          const SizedBox(width: 8),
-          Expanded(child: _countBox(p, 'No direction', side, _down, Icons.trending_flat_rounded)),
-        ]),
+        // Signals v2: the public record, today's count, the self-brake and the warning, always on screen.
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(18), border: Border.all(color: p.cardEdge)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(
+                child: Text('Last 20 signals: ${_d(rec['wins']).toInt()} wins / ${_d(rec['losses']).toInt()} losses',
+                    style: TextStyle(color: p.ink, fontSize: 14.5, fontWeight: FontWeight.w900)),
+              ),
+              _pill('${_d(board['today']).toInt()} of ${_d(board['maxPerDay'] ?? 5).toInt()} today', _slowC),
+            ]),
+            const SizedBox(height: 4),
+            Text(
+              'The default answer is WAIT. A STRONG signal needs all 5 confirmations at once, is checked every 30 minutes, '
+              'at most 5 a day, and is graded WIN or LOSS 30 minutes later. A day with zero signals is a correct day.',
+              style: TextStyle(color: p.muted, fontSize: 11.5, height: 1.35),
+            ),
+            if (board['paused'] == true) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: _loss.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
+                child: Text(
+                  '${board['pauseReason'] ?? 'Record too weak — signals paused until the pattern improves.'} '
+                  'WAIT-only: it keeps grading would-be signals on paper and lifts after ${_d(board['liftStreak'] ?? 10).toInt()} straight paper wins '
+                  '(now ${_d(board['paperStreak']).toInt()}).',
+                  style: const TextStyle(color: _loss, fontSize: 12, fontWeight: FontWeight.w800, height: 1.35),
+                ),
+              ),
+            ],
+            if (board['setupNeeded'] == true) ...[
+              const SizedBox(height: 6),
+              Text('The signal history is not set up yet (run the signals SQL in Supabase).', style: TextStyle(color: _down, fontSize: 11.5)),
+            ],
+            const SizedBox(height: 8),
+            Text(
+              '${board['disclaimer'] ?? 'Signals are opinions from price patterns, not guarantees. Even strong signals lose.'}',
+              style: TextStyle(color: p.ink, fontSize: 12, fontWeight: FontWeight.w800, height: 1.35),
+            ),
+          ]),
+        ),
         const SizedBox(height: 8),
         Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           const Icon(Icons.circle, size: 7, color: _up),
           const SizedBox(width: 5),
           Flexible(
-            child: Text('Live · updated $ago · checks every 20 seconds, changes are flagged at once',
+            child: Text('Live confirmations · updated $ago · signals are only given at the 30-minute checks',
                 textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 11)),
           ),
         ]),
@@ -1287,9 +1348,9 @@ Tutor:''';
               border: Border.all(color: _down.withValues(alpha: 0.45)),
             ),
             child: Text(
-              'Forex uses real market prices on 1-minute candles. OTC pairs at a broker are priced by that broker (always on weekends) '
-              'and can move differently, and the payout % is the broker\'s. "Worked" shows how often past moves on this pair really '
-              'went that way: under 50% means the signal has been worse than a coin flip, so do not trust it.',
+              'Forex uses real market prices. OTC pairs at a broker are priced by that broker (always on weekends) and can move '
+              'differently. These signals read 15-minute and 1-hour trends: they are built for a 15–30 minute expiry and cannot '
+              'judge 1-minute noise. Do NOT use them for 1–5 minute trades.',
               style: TextStyle(color: p.ink, fontSize: 11.8, height: 1.35),
             ),
           ),
@@ -1301,11 +1362,61 @@ Tutor:''';
           _readingTile(
             p,
             m,
-            changed: _changed[m['asset']] == null ? null : (_changed[m['asset']]!.to == 'no direction' ? 'JUST LOST ITS DIRECTION' : 'JUST TURNED ${_changed[m['asset']]!.to.toUpperCase()}'),
-            onAsk: () => _askAbout('What is happening with ${m['asset']} right now? Is it bullish or bearish, how long might the move last, and is it too late to enter?'),
+            onAsk: () => _askAbout('What is happening with ${m['asset']} right now? Which of the 5 confirmations are missing, and why is the answer BUY, SELL or WAIT?'),
           ),
-        Text('Signals are estimates from recent price history. They can fail; never risk money you cannot afford to lose.',
+        _signalHistory(p),
+        Text('Signals are opinions from price patterns, not guarantees. Even strong signals lose. Signals only: nothing is ever traded here.',
             textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 11)),
+      ]),
+    );
+  }
+
+  Widget _pill(String t, Color c) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(color: c.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(999)),
+        child: Text(t, style: TextStyle(color: c, fontSize: 10.5, fontWeight: FontWeight.w900)),
+      );
+
+  /// Signals v2: every STRONG signal given, with WIN or LOSS once graded. Never hidden, deleted or re-graded.
+  Widget _signalHistory(_Pal p) {
+    final hist = ((_board['history'] as List?) ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    return Container(
+      margin: const EdgeInsets.only(top: 4, bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(20), border: Border.all(color: p.cardEdge)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Signal history', style: TextStyle(color: p.ink, fontSize: 15, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 4),
+        Text('Every STRONG signal, graded at its 30-minute expiry: did the price finish its way? The record is the record.',
+            style: TextStyle(color: p.muted, fontSize: 11.5, height: 1.3)),
+        const SizedBox(height: 8),
+        if (hist.isEmpty)
+          Text('No STRONG signals yet. Zero signals is a correct outcome when the confirmations do not all agree.',
+              style: TextStyle(color: p.muted, fontSize: 12.5)),
+        for (final s in hist)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: p.line))),
+            child: Row(children: [
+              Container(
+                width: 46,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                decoration: BoxDecoration(color: (s['direction'] == 'BUY' ? _up : _loss).withValues(alpha: 0.14), borderRadius: BorderRadius.circular(8)),
+                alignment: Alignment.center,
+                child: Text('${s['direction']}', style: TextStyle(color: s['direction'] == 'BUY' ? _up : _loss, fontSize: 11, fontWeight: FontWeight.w900)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('${s['market']} at ${_d(s['price']).toStringAsFixed(_d(s['price']) < 10 ? 4 : 2)}',
+                      style: TextStyle(color: p.ink, fontSize: 13, fontWeight: FontWeight.w800)),
+                  Text('${s['et_time'] ?? ''}${s['graded'] == true ? ' · then ${_d(s['exit_price']).toStringAsFixed(_d(s['exit_price']) < 10 ? 4 : 2)} (${_d(s['move_pct']) >= 0 ? '+' : ''}${_d(s['move_pct']).toStringAsFixed(2)}%)' : ''}',
+                      style: TextStyle(color: p.muted, fontSize: 11)),
+                ]),
+              ),
+              _pill(s['graded'] == true ? '${s['result']}' : 'PENDING', s['graded'] != true ? _slowC : s['result'] == 'WIN' ? _up : _loss),
+            ]),
+          ),
       ]),
     );
   }
@@ -1316,10 +1427,10 @@ Tutor:''';
     final unlocked = _alertsAllowed || _isAdmin;
     final (IconData icon, Color c, String text, String? button) = !unlocked
         ? (Icons.lock_rounded, _slowC, 'Signal alerts unlock when you finish all 10 lessons ($doneCount of 10 done). '
-            'You will be told the market, ENTER UP or DOWN, and the duration.', 'Go to lessons')
+            'You will be told the market and STRONG BUY or SELL (only when all 5 confirmations agree), built for a 15–30 minute expiry.', 'Go to lessons')
         : !_pushOk
-            ? (Icons.notifications_off_rounded, _down, 'Signal alerts are unlocked. Allow notifications so the app can tell you when to enter.', 'Allow')
-            : (Icons.notifications_active_rounded, _up, 'Signal alerts are ON: the market, ENTER UP or DOWN, and the duration, '
+            ? (Icons.notifications_off_rounded, _down, 'Signal alerts are unlocked. Allow notifications so the app can tell you when a STRONG signal is given.', 'Allow')
+            : (Icons.notifications_active_rounded, _up, 'Signal alerts are ON: only STRONG BUY or SELL signals (all 5 confirmations), built for a 15–30 minute expiry, '
                 'while NGMY is open or in the background.', null);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1353,20 +1464,6 @@ Tutor:''';
     );
   }
 
-  Widget _countBox(_Pal p, String label, int n, Color c, IconData icon) => Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          gradient: LinearGradient(colors: [c.withValues(alpha: 0.20), c.withValues(alpha: 0.05)]),
-          border: Border.all(color: c.withValues(alpha: 0.35)),
-        ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Icon(icon, color: c, size: 20),
-          const SizedBox(height: 4),
-          Text('$n', style: TextStyle(color: p.ink, fontSize: 22, fontWeight: FontWeight.w900)),
-          Text(label, style: TextStyle(color: p.muted, fontSize: 11.5, fontWeight: FontWeight.w700)),
-        ]),
-      );
 
   // ── Ask tab
 

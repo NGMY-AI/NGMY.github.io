@@ -599,6 +599,144 @@ export function readMarket(
   return { bias, score, rsi: r, mom1h, gapPct, volPct, action, decision, dir, notes, timing, entry };
 }
 
+// ─────────────────────────────────────────────────────────────── Signals v2 (STRICT, Nov 24, 2026)
+//
+// The default answer is WAIT. BUY or SELL only when ALL FIVE confirmations agree at the same time:
+//   1. the 15-minute trend and the 1-hour trend point the same way;
+//   2. the price is above (BUY) or below (SELL) both the fast and the slow average on the 15-minute chart;
+//   3. a fresh move: not already more than 1% the signal's way in the last hour;
+//   4. not choppy: the price crossed the 15-minute slow average fewer than 3 times in the last 2 hours;
+//   5. calm: no 5-minute jump or drop of 0.5% or more in the last 15 minutes.
+// Built for a 15 to 30 minute expiry, never for 1 to 5 minute trades. Signals only: nothing is ever traded.
+
+export const SIG_RULES = {
+  maxStrongPerDay: 5,
+  checkEveryMin: 30,
+  expiryMin: 30, // graded 30 minutes after it is given
+  freshMaxPct: 1, // not already more than 1% the signal's way in the last hour
+  choppyCrosses: 3, // 3 or more crosses of the slow average in 2 hours = choppy
+  spikePct: 0.5, // a 5-minute move of 0.5% or more ...
+  spikeLookbackMin: 15, // ... in the last 15 minutes = not calm
+  brakeMinPct: 55, // the last 20 graded signals below 55% wins: WAIT-only
+  brakeMinGraded: 10, // judged once at least 10 signals are graded
+  liftStreak: 10, // WAIT-only lifts after 10 straight paper-graded wins
+};
+
+export const SIG_EXPIRY_TEXT = "Built for a 15–30 minute expiry. Do NOT use this for 1–5 minute trades.";
+export const SIG_DISCLAIMER = "Signals are opinions from price patterns, not guarantees. Even strong signals lose.";
+
+type Bar = { t: number; o: number; c: number };
+
+/** Groups candles into bigger ones (15-minute or 1-hour), by clock time. */
+export function groupBars(times: string[], closes: number[], opens: number[], minutes: number): Bar[] {
+  const out: Bar[] = [];
+  const size = minutes * 60000;
+  for (let i = 0; i < closes.length; i++) {
+    const t = Math.floor(Date.parse(times[i]) / size) * size;
+    if (!Number.isFinite(t)) continue;
+    const last = out[out.length - 1];
+    if (last && last.t === t) last.c = closes[i];
+    else out.push({ t, o: opens[i] ?? closes[i], c: closes[i] });
+  }
+  return out;
+}
+
+export type SigCheck = { key: string; ok: boolean; text: string };
+export type SignalV2 = {
+  direction: "BUY" | "SELL" | "WAIT";
+  lean: "up" | "down" | "none";
+  strong: boolean;
+  passed: number;
+  checks: SigCheck[];
+  trend15: "up" | "down" | "flat" | "unknown";
+  trend60: "up" | "down" | "flat" | "unknown";
+  move60: number | null;
+  crosses2h: number;
+  explain: string;
+};
+
+/** The five confirmations for one market, from its candles (1-minute or 5-minute) and the price now. */
+export function signalV2(times: string[], closes: number[], opens: number[], price: number): SignalV2 {
+  const p = price || closes[closes.length - 1] || 0;
+  const b15 = groupBars(times, closes, opens, 15);
+  const b60 = groupBars(times, closes, opens, 60);
+  const c15 = b15.map((b) => b.c);
+  const c60 = b60.map((b) => b.c);
+  const fast15 = sma(c15, 4); // the last hour of 15-minute candles
+  const slow15 = sma(c15, 12); // the last 3 hours
+  const trend15: SignalV2["trend15"] = fast15 == null || slow15 == null ? "unknown" : fast15 > slow15 ? "up" : fast15 < slow15 ? "down" : "flat";
+  const avg60 = sma(c60, 4);
+  const avg60Prev = c60.length > 4 ? sma(c60.slice(0, -1), 4) : null;
+  const trend60: SignalV2["trend60"] = avg60 == null || avg60Prev == null ? "unknown"
+    : p > avg60 && avg60 > avg60Prev ? "up" : p < avg60 && avg60 < avg60Prev ? "down" : "flat";
+  const lean: SignalV2["lean"] = (trend15 === "up" || trend15 === "down") && trend15 === trend60 ? trend15 : "none";
+  const dir = lean !== "none" ? lean : trend15 === "down" ? "down" : "up";
+  const sign = dir === "up" ? 1 : -1;
+  const way = dir === "up" ? "up" : "down";
+  const word = (t: string) => (t === "unknown" ? "not clear yet (too little data)" : t === "flat" ? "flat" : t);
+
+  // 3. The move over the last hour.
+  const t0 = Date.parse(times[times.length - 1] ?? "");
+  let ref60: number | null = null;
+  for (let i = times.length - 1; i >= 0; i--) {
+    if (t0 - Date.parse(times[i]) >= 60 * 60000) { ref60 = closes[i]; break; }
+  }
+  const move60 = ref60 ? (p - ref60) / ref60 * 100 : null;
+  // 4. Crosses of the 15-minute slow average over the last 2 hours (8 candles).
+  let crosses = 0;
+  if (c15.length >= 12 + 8) {
+    let prevSide = 0;
+    for (let i = c15.length - 9; i < c15.length; i++) {
+      const s = sma(c15.slice(0, i + 1), 12)!;
+      const side = Math.sign(c15[i] - s);
+      if (prevSide !== 0 && side !== 0 && side !== prevSide) crosses++;
+      if (side !== 0) prevSide = side;
+    }
+  }
+  // 5. Any 5-minute candle in the last 15 minutes that moved 0.5% or more.
+  const b5 = groupBars(times, closes, opens, 5).filter((b) => t0 - b.t < SIG_RULES.spikeLookbackMin * 60000);
+  const spike = b5.reduce((m, b) => Math.max(m, b.o ? Math.abs(b.c - b.o) / b.o * 100 : 0), 0);
+
+  const enough15 = fast15 != null && slow15 != null;
+  const checks: SigCheck[] = [
+    {
+      key: "timeframes",
+      ok: lean !== "none",
+      text: `Two timeframes: the 15-minute trend is ${word(trend15)} and the 1-hour trend is ${word(trend60)}, ${lean !== "none" ? "so they agree" : "so they do not agree"}.`,
+    },
+    {
+      key: "position",
+      ok: enough15 && sign * (p - fast15!) > 0 && sign * (p - slow15!) > 0,
+      text: !enough15 ? "Price position: not enough 15-minute candles yet."
+        : `Price position: the price is ${p > fast15! && p > slow15! ? "above both" : p < fast15! && p < slow15! ? "below both" : "between"} the fast and slow averages (needs to be ${dir === "up" ? "above" : "below"} both).`,
+    },
+    {
+      key: "fresh",
+      ok: move60 != null && sign * move60 <= SIG_RULES.freshMaxPct,
+      text: move60 == null ? "Fresh move: not enough history for the last hour."
+        : `Fresh move: it moved ${move60 >= 0 ? "+" : ""}${move60.toFixed(2)}% in the last hour (more than 1% ${way} = the move is mostly over).`,
+    },
+    {
+      key: "choppy",
+      ok: c15.length >= 20 && crosses < SIG_RULES.choppyCrosses,
+      text: c15.length < 20 ? "Not choppy: not enough history for the last 2 hours."
+        : `Not choppy: it crossed the slow average ${crosses} time(s) in 2 hours (3 or more = sideways noise).`,
+    },
+    {
+      key: "calm",
+      ok: b5.length > 0 && spike < SIG_RULES.spikePct,
+      text: `Calm: the biggest 5-minute move in the last 15 minutes was ${spike.toFixed(2)}% (0.5% or more = a sudden spike, let it settle).`,
+    },
+  ];
+  const passed = checks.filter((c) => c.ok).length;
+  const strong = passed === 5;
+  const direction = strong ? (dir === "up" ? "BUY" : "SELL") : "WAIT";
+  const explain = strong
+    ? `Both the short and the longer trend point ${way}, the price is clearly on that side, the move is still fresh, steady and calm. All 5 confirmations agree.`
+    : `${5 - passed} of the 5 confirmations ${5 - passed === 1 ? "is" : "are"} missing, so the answer is WAIT. A signal needs all five at the same time.`;
+  return { direction, lean, strong, passed, checks, trend15, trend60, move60: move60 == null ? null : round2(move60), crosses2h: crosses, explain };
+}
+
 /** The last few hours for the app's chart: candles, fast line and slow line per 5-minute candle, plus the trend. */
 export function buildChart(times: string[], closes: number[], points = 48, ohlc?: { o: number; h: number; l: number }[]) {
   const out: { t: string; o: number; h: number; l: number; c: number; f: number | null; s: number | null }[] = [];
@@ -868,7 +1006,7 @@ async function readFxPair(def: (typeof PA_FX)[number]) {
     if (ts[i] * 1000 + 60 * 1000 > now) continue;
     bars.push({ t: new Date(ts[i] * 1000).toISOString(), o, h, l, c });
   }
-  const last = bars.slice(-300);
+  const last = bars.slice(-420); // 7 hours: enough for the 1-hour trend and the 2-hour choppiness check
   const closes = last.map((b) => b.c);
   const price = Number(r?.meta?.regularMarketPrice ?? closes[closes.length - 1] ?? 0);
   const lastAt = last.length ? Date.parse(last[last.length - 1].t) : 0;
@@ -882,6 +1020,7 @@ async function readFxPair(def: (typeof PA_FX)[number]) {
     // Light for phones: the last 30 minutes of closing prices only (for the small line on each card).
     chart: { points: chart.points.slice(-30).map((q) => ({ c: q.c })), trend: chart.trend, signal: chart.signal },
     reading: readMarket(closes, last, price, open, { candleMin: 1, agent: false }),
+    v2: signalV2(last.map((b) => b.t), closes, last.map((b) => b.o), price),
   };
 }
 
@@ -892,6 +1031,127 @@ export async function readForex(): Promise<any[]> {
   const cards = settled.filter((s) => s.status === "fulfilled").map((s) => (s as PromiseFulfilledResult<any>).value);
   if (cards.length) fxCache = { at: Date.now(), cards };
   return cards.length ? cards : fxCache?.cards ?? [];
+}
+
+// ─────────────────────────────────────────────────────────────── Signals v2: giving, grading, the self-brake
+
+/** The signals state (one row): WAIT-only mode, when it started and when it was last lifted, the last check. */
+async function sigState(db: any) {
+  const { data } = await db.from("ngmy_signals_state").select("*").eq("id", 1).maybeSingle();
+  return data ?? { id: 1, paused: false, paused_at: null, lifted_at: null, last_check_at: null };
+}
+
+/** Runs with the 5-minute timer: grades signals whose 30 minutes are up, updates the self-brake, and every 30
+ *  minutes (:00 and :30 ET) gives at most 5 STRONG signals a day. While WAIT-only, would-be signals are kept as
+ *  paper signals (never shown as tradeable) and graded the same way. Nothing is ever traded. */
+export async function runSignals(db: any): Promise<Record<string, unknown>> {
+  const now = new Date();
+  const et = etParts(now);
+  const cfg = readConfig();
+  const st = await sigState(db);
+  // Every market's price and five confirmations right now: the agent's markets and the forex pairs.
+  const [agent, fx] = await Promise.all([agentMarketCards(db).catch(() => ({ cards: [] as any[], stockOpen: false })), readForex().catch(() => [] as any[])]);
+  const cards = [...agent.cards, ...fx];
+  const priceOf = (sym: string) => Number(cards.find((c) => c.symbol === sym)?.price ?? 0);
+
+  // 1. Grade every signal whose expiry has come: did the price finish the signal's way?
+  const { data: due } = await db.from("ngmy_signals").select("*").eq("graded", false).lte("grade_at", now.toISOString()).limit(50);
+  let graded = 0;
+  for (const s of due ?? []) {
+    const p = priceOf(s.market);
+    if (!p) continue; // no price right now: graded at the next check
+    const move = (p - Number(s.price)) / Number(s.price) * 100;
+    const win = s.direction === "BUY" ? move > 0 : move < 0;
+    await db.from("ngmy_signals").update({ graded: true, result: win ? "WIN" : "LOSS", exit_price: p, move_pct: round2(move) }).eq("id", s.id);
+    graded++;
+  }
+
+  // 2. The self-brake.
+  const patch: Record<string, unknown> = {};
+  if (!st.paused) {
+    let q = db.from("ngmy_signals").select("result").eq("graded", true).eq("paper", false).order("id", { ascending: false }).limit(20);
+    if (st.lifted_at) q = q.gt("created_at", st.lifted_at);
+    const { data: last } = await q;
+    const n = (last ?? []).length;
+    const wins = (last ?? []).filter((r: any) => r.result === "WIN").length;
+    if (n >= SIG_RULES.brakeMinGraded && wins / n * 100 < SIG_RULES.brakeMinPct) {
+      patch.paused = true;
+      patch.paused_at = now.toISOString();
+      st.paused = true;
+      st.paused_at = patch.paused_at;
+    }
+  } else {
+    const { data: paper } = await db.from("ngmy_signals").select("result").eq("graded", true).eq("paper", true)
+      .gt("created_at", st.paused_at ?? "1970-01-01").order("id", { ascending: false }).limit(SIG_RULES.liftStreak);
+    if ((paper ?? []).length >= SIG_RULES.liftStreak && (paper ?? []).every((r: any) => r.result === "WIN")) {
+      patch.paused = false;
+      patch.lifted_at = now.toISOString();
+      st.paused = false;
+    }
+  }
+
+  // 3. Every 30 minutes: give the STRONG signals (all five confirmations), at most 5 a day.
+  let given = 0;
+  const lastCheck = st.last_check_at ? Date.parse(st.last_check_at) : 0;
+  if (et.minute % SIG_RULES.checkEveryMin < 5 && now.getTime() - lastCheck > 20 * 60000) {
+    patch.last_check_at = now.toISOString();
+    const { data: open } = await db.from("ngmy_signals").select("market").eq("graded", false);
+    const busy = new Set((open ?? []).map((r: any) => r.market));
+    const strong = cards.filter((c) => c.open && c.v2?.strong && !busy.has(c.symbol) && Number(c.price) > 0)
+      // The freshest first: the least already-moved in the last hour.
+      .sort((a, b) => Math.abs(a.v2.move60 ?? 0) - Math.abs(b.v2.move60 ?? 0));
+    let room = SIG_RULES.maxStrongPerDay;
+    if (!st.paused) {
+      const { count } = await db.from("ngmy_signals").select("id", { count: "exact", head: true }).eq("et_day", et.dayKey).eq("paper", false);
+      room = Math.max(0, SIG_RULES.maxStrongPerDay - Number(count ?? 0));
+    }
+    for (const c of st.paused ? strong : strong.slice(0, room)) {
+      await db.from("ngmy_signals").insert({
+        et_time: et.label, et_day: et.dayKey, market: c.symbol, kind: c.kind, direction: c.v2.direction, price: c.price,
+        checks: c.v2.checks, explain: c.v2.explain, paper: !!st.paused,
+        grade_at: new Date(now.getTime() + SIG_RULES.expiryMin * 60000).toISOString(),
+      });
+      given++;
+    }
+  }
+  if (Object.keys(patch).length) await db.from("ngmy_signals_state").upsert({ id: 1, ...patch });
+  return { ok: true, graded, given, paused: !!st.paused, keys: !!cfg.keys };
+}
+
+/** What the signals screen shows: the active STRONG signals, the history with WIN or LOSS, the rolling record of
+ *  the last 20, today's count, and the self-brake. */
+export async function signalsBoard(db: any) {
+  try {
+    const et = etParts(new Date());
+    const st = await sigState(db);
+    const [{ data: hist }, { data: last20 }, { count }] = await Promise.all([
+      db.from("ngmy_signals").select("id,created_at,et_time,market,kind,direction,price,checks,explain,paper,grade_at,graded,result,exit_price,move_pct")
+        .eq("paper", false).order("id", { ascending: false }).limit(30),
+      db.from("ngmy_signals").select("result").eq("graded", true).eq("paper", false).order("id", { ascending: false }).limit(20),
+      db.from("ngmy_signals").select("id", { count: "exact", head: true }).eq("et_day", et.dayKey).eq("paper", false),
+    ]);
+    const wins = (last20 ?? []).filter((r: any) => r.result === "WIN").length;
+    const active = (hist ?? []).filter((s: any) => !s.graded && Date.parse(s.grade_at) > Date.now());
+    let paperStreak = 0;
+    if (st.paused) {
+      const { data: paper } = await db.from("ngmy_signals").select("result").eq("graded", true).eq("paper", true)
+        .gt("created_at", st.paused_at ?? "1970-01-01").order("id", { ascending: false }).limit(SIG_RULES.liftStreak);
+      for (const r of paper ?? []) { if (r.result === "WIN") paperStreak++; else break; }
+    }
+    return {
+      ok: true,
+      active, history: hist ?? [],
+      record: { wins, losses: (last20 ?? []).length - wins, graded: (last20 ?? []).length },
+      today: Number(count ?? 0), maxPerDay: SIG_RULES.maxStrongPerDay,
+      paused: !!st.paused,
+      pauseReason: st.paused ? "Record too weak — signals paused until the pattern improves." : null,
+      paperStreak, liftStreak: SIG_RULES.liftStreak,
+      expiryText: SIG_EXPIRY_TEXT, disclaimer: SIG_DISCLAIMER,
+      checkEveryMin: SIG_RULES.checkEveryMin,
+    };
+  } catch {
+    return { ok: false, setupNeeded: true, expiryText: SIG_EXPIRY_TEXT, disclaimer: SIG_DISCLAIMER };
+  }
 }
 
 /** What the app shows for each market: price, change over the chart, trend, signal and the chart itself. */
@@ -921,6 +1181,7 @@ function marketCards(series: Record<string, Series>, stockOpen: boolean, weekend
       trend: chart.trend, signal: chart.signal, fast: chart.fast, slow: chart.slow, chart,
       candleMin: PA_RULES.candleMinutes,
       reading: readMarket(s?.closes ?? [], s?.ohlc ?? [], price, open, { closedNote }),
+      v2: signalV2(s?.times ?? [], s?.closes ?? [], (s?.ohlc ?? []).map((o) => o.o), price),
     };
   });
 }
@@ -1168,10 +1429,14 @@ export async function handleAlpacaAgent(
     try { state = await loadState(db); } catch (e) { return { status: 500, payload: { ok: false, error: String((e as Error).message) } }; }
     const token = String(body?.token ?? "");
     if (!token || !state.cron_token || token !== state.cron_token) return { status: 403, payload: { ok: false, error: "forbidden" } };
+    // Signals v2 run with the same timer, apart from the agent (signals only: nothing is traded). A problem
+    // there never stops the agent's check.
+    let signals: unknown = null;
+    try { signals = await runSignals(db); } catch (e) { signals = { ok: false, error: String((e as Error).message) }; }
     try {
-      return { status: 200, payload: await runCheck(db) };
+      return { status: 200, payload: { ...(await runCheck(db)), signals } };
     } catch (e) {
-      return { status: 500, payload: { ok: false, error: String((e as Error).message) } };
+      return { status: 500, payload: { ok: false, error: String((e as Error).message), signals } };
     }
   }
 
@@ -1203,20 +1468,29 @@ export async function handleAlpacaAgent(
     // The background alert watcher (every minute on the home screen) needs only each market's "enter now" and
     // the newest trades: a tiny answer, no forex, no charts, no notes.
     if (body?.alerts === true) {
-      const [markets, feed] = await Promise.all([agentMarketCards(db), isAdmin ? tradeFeed(db) : Promise.resolve(undefined)]);
+      // Signals v2: alerts only for the STRONG signals actually given (all five confirmations), never for weaker ones.
+      const [board, feed] = await Promise.all([signalsBoard(db), isAdmin ? tradeFeed(db) : Promise.resolve(undefined)]);
       return {
         status: 200,
         payload: {
           ok: true, isAdmin, alertsAllowed: isAdmin || graduated,
-          markets: markets.cards.map((m: any) => ({ symbol: m.symbol, open: m.open, reading: { entry: m.reading?.entry ?? null } })),
+          signalFeed: ((board as any).active ?? []).map((s: any) => ({
+            key: `sig:${s.id}`, market: s.market, direction: s.direction, et_time: s.et_time, price: s.price, grade_at: s.grade_at,
+          })),
+          expiryText: SIG_EXPIRY_TEXT,
           ...(feed ? { tradeFeed: feed } : {}),
         },
       };
     }
-    const markets = await agentMarketCards(db);
+    const [markets, board] = await Promise.all([agentMarketCards(db), signalsBoard(db)]);
     let fx: any[] = [];
     try { fx = await readForex(); } catch { fx = []; }
-    const slim = (m: any) => (light ? { ...m, chart: { points: (m.chart?.points ?? []).slice(-30).map((q: any) => ({ c: q.c })), trend: m.chart?.trend } } : m);
+    // Signals v2: a card shows BUY or SELL only while a STRONG signal given for it is still within its expiry.
+    const activeBy = new Map<string, any>(((board as any).active ?? []).map((s: any) => [s.market, s]));
+    const slim = (m: any) => {
+      const withSig = { ...m, activeSignal: activeBy.get(m.symbol) ?? null };
+      return light ? { ...withSig, chart: { points: (m.chart?.points ?? []).slice(-30).map((q: any) => ({ c: q.c })), trend: m.chart?.trend } } : withSig;
+    };
     const etNow = etParts(new Date());
     return {
       status: 200,
@@ -1230,6 +1504,7 @@ export async function handleAlpacaAgent(
         fx: fx.map(slim),
         rules: PA_RULE_LINES,
         nowEt: etNow.label,
+        signals: board,
         // Admins: the newest pretend trades of every system, so the app can notify on each new buy or sell.
         ...(isAdmin ? { tradeFeed: await tradeFeed(db) } : {}),
       },
