@@ -1225,7 +1225,7 @@ x=1
 break}if(B.b2m(d,u)){v=!0
 x=1
 break}x=5
-return A.b(A.lT(u,C.V8),$async$a8K)
+return A.b(A.lT(u,C.V7),$async$a8K)
 case 5:x=k?3:4
 break
 case 3:B.hz_(d,u,30)
@@ -1236,7 +1236,7 @@ case 6:v=!0
 x=1
 break
 case 4:x=7
-return A.b(A.lt(!1,e,u,!1,"Subscribe for your organization license \u2014 create team access codes (30 days).",C.V8,"Doc Share for Organizations"),$async$a8K)
+return A.b(A.lt(!1,e,u,!1,"Subscribe for your organization license \u2014 create team access codes (30 days).",C.V7,"Doc Share for Organizations"),$async$a8K)
 case 7:if(!k){v=!1
 x=1
 break}B.hz_(d,u,30)
@@ -1410,7 +1410,7 @@ s=y.aK
 A.fH(r,"loadend",new B.fH_(r,t),!1,s)
 A.fH(r,"error",new B.fH0(t),!1,s)
 r.readAsArrayBuffer(d)
-v=u.ic(0,C.OY,new B.fH1())
+v=u.ic(0,C.OX,new B.fH1())
 x=1
 break
 case 1:return A.h(v,w)}})
@@ -2225,7 +2225,7 @@ x=9
 break
 case 8:x=10
 return A.b(B.b2s(s),$async$a8S)
-case 10:case 9:if(g){v=new A.Ru(1,D.UM,"NGMYDOCSYNC1|"+s)
+case 10:case 9:if(g){v=new A.Ru(1,D.UL,"NGMYDOCSYNC1|"+s)
 x=1
 break}case 7:x=11
 return A.b(B.WJ(d,e),$async$a8S)
@@ -2269,8 +2269,8 @@ case 5:x=7
 return A.b(B.cgA(e,C.d.gG(d).a,r.b),$async$WJ)
 case 7:case 6:q=r.a
 x=8
-return A.b(B.OE(d,D.UM,e,q),$async$WJ)
-case 8:v=new A.Ru(d.length,D.UM,q)
+return A.b(B.OE(d,D.UL,e,q),$async$WJ)
+case 8:v=new A.Ru(d.length,D.UL,q)
 x=1
 break
 case 1:return A.h(v,w)}})
@@ -2337,7 +2337,7 @@ var $async$OE=A.e(function(h,i){if(h===1)return A.f(i,w)
 for(;;)switch(x){case 0:n=d.length
 if(n===0||C.a.i(g).length===0){x=1
 break}u=C.a.i(g)
-t=e===D.UM&&C.a.Y(u,"NGMYDOCSYNC1|")?C.a.i(C.a.aY(u,13)):null
+t=e===D.UL&&C.a.Y(u,"NGMYDOCSYNC1|")?C.a.i(C.a.aY(u,13)):null
 s=e.a,r=t!=null,q=0
 case 3:if(!(q<d.length)){x=5
 break}p=d[q]
@@ -4652,12 +4652,12 @@ o=A.aF(d,C.dK,y.m).w
 w=A.n(28)
 v=A.a([new A.aa(0,C.H,C.aC.j(0.35),C.h1,24)],y.V)
 u=y.p
-v=A.p(s,A.x(A.a([A.p(s,D.fTy,C.f,s,s,new A.o(C.c.j(0.2),s,s,A.n(20),s,s,C.m),s,s,s,s,C.hm,s,s,s),C.aA,D.hcQ,C.R,A.c("Photos, documents, long videos \u2014 share with My Code or QR.",s,s,s,s,s,s,A.l(s,s,C.c.j(0.92),s,s,s,s,s,s,s,s,14,s,s,s,s,1.45,!0,s,s,s,s,s,s,s,s),s,s,s)],u),C.B,s,C.e,C.h,0,C.p),C.f,s,s,new A.o(s,s,s,w,v,D.cdY,C.m),s,s,s,s,C.eJ,s,s,s)
+v=A.p(s,A.x(A.a([A.p(s,D.fTz,C.f,s,s,new A.o(C.c.j(0.2),s,s,A.n(20),s,s,C.m),s,s,s,s,C.hm,s,s,s),C.aA,D.hcO,C.R,A.c("Photos, documents, long videos \u2014 share with My Code or QR.",s,s,s,s,s,s,A.l(s,s,C.c.j(0.92),s,s,s,s,s,s,s,s,14,s,s,s,s,1.45,!0,s,s,s,s,s,s,s,s),s,s,s)],u),C.B,s,C.e,C.h,0,C.p),C.f,s,s,new A.o(s,s,s,w,v,D.cdY,C.m),s,s,s,s,C.eJ,s,s,s)
 w=t.a.x?"Choose how to continue":"Who are you?"
 w=A.a([new A.lP(new B.dfC(),s),C.N,v,C.ec,A.c(w,s,s,s,s,s,s,A.l(s,s,r?C.c:C.a_,s,s,s,s,s,s,s,s,16,s,s,C.u,s,s,!0,s,s,s,s,s,s,s,s),s,s,s)],u)
 if(t.a.x)C.d.u(w,A.a([C.ak,A.c("Your free personal uploads are used up. Join a team or subscribe for your organization.",s,s,s,s,s,s,A.l(s,s,r?C.aR:C.an,s,s,s,s,s,s,s,s,13,s,s,s,s,1.4,!0,s,s,s,s,s,s,s,s),s,s,s)],u))
 w.push(C.af)
-if(!t.a.x)C.d.u(w,A.a([new B.aeB(C.f4,C.aFC,"Individual","Personal use \xb7 "+x+" uploads/shares",t.gclD(),s),C.af],u))
+if(!t.a.x)C.d.u(w,A.a([new B.aeB(C.f3,C.aFC,"Individual","Personal use \xb7 "+x+" uploads/shares",t.gclD(),s),C.af],u))
 w.push(new B.aeB(C.pZ,C.a6j,"Team Member","Sign in with your organization access code + password",t.gcmx(),s))
 w.push(C.af)
 w.push(new B.aeB(C.arx,C.a7X,"Organization Owner","Subscribe for your team \xb7 create member logins",t.gcm1(),s))
@@ -4780,7 +4780,7 @@ v=A.n(20)
 u=A.a([new A.aa(0,C.H,C.aC.j(0.2),C.dt,24)],y.V)
 s=q.e
 s.toString
-r=A.ca(A.x(A.a([x,C.nr,w,C.lj,new A.e6(A.p(p,A.qs(p,p,!1,B.i4g(s),p,!0,!0,220,!1,C.c),C.f,p,p,new A.o(C.c,p,p,v,u,p,C.m),p,p,p,p,C.bQ,p,p,p),q.d),C.af,A.c("Others scan this in Doc Share \u2192 Scan QR to send you a file.",p,p,p,p,p,p,A.l(p,p,m.j(0.55),p,p,p,p,p,p,p,p,12,p,p,p,p,1.4,!0,p,p,p,p,p,p,p,p),C.K,p,p),C.lj,A.A(A.a([A.E(A.ep(K.DX,p,C.Xb,q.gcdP(),p),1),C.ar,A.E(A.db(C.Aj,p,C.adh,q.gcdQ(),A.bp(C.aC,p,p,p,p,p,p,p,p,p,p,p)),1)],r),C.l,p,C.e,C.h,0,p,p),C.R,new A.a5(1/0,p,A.ep(O.a56,p,D.h8k,q.gcBK(),p),p)],r),C.l,p,C.e,C.h,0,C.p),C.t,p,C.y,p,p,A_.aoF,p,p,C.ah)
+r=A.ca(A.x(A.a([x,C.nr,w,C.lj,new A.e6(A.p(p,A.qs(p,p,!1,B.i4g(s),p,!0,!0,220,!1,C.c),C.f,p,p,new A.o(C.c,p,p,v,u,p,C.m),p,p,p,p,C.bQ,p,p,p),q.d),C.af,A.c("Others scan this in Doc Share \u2192 Scan QR to send you a file.",p,p,p,p,p,p,A.l(p,p,m.j(0.55),p,p,p,p,p,p,p,p,12,p,p,p,p,1.4,!0,p,p,p,p,p,p,p,p),C.K,p,p),C.lj,A.A(A.a([A.E(A.ep(K.DX,p,C.Xb,q.gcdP(),p),1),C.ar,A.E(A.db(C.Aj,p,C.adh,q.gcdQ(),A.bp(C.aC,p,p,p,p,p,p,p,p,p,p,p)),1)],r),C.l,p,C.e,C.h,0,p,p),C.R,new A.a5(1/0,p,A.ep(O.a56,p,D.h8i,q.gcBK(),p),p)],r),C.l,p,C.e,C.h,0,C.p),C.t,p,C.y,p,p,A_.aoF,p,p,C.ah)
 x=r}return A.c5(l,n,x,p,!1,!1,p,p)}}
 B.WF.prototype={
 R(){return new B.aGd(new A.au(C.ax,$.az()),A.ko(!0,null,!0,!0,null,null,!1))}}
@@ -4866,14 +4866,14 @@ u=i[2]
 t=A.n(22)
 s=A.K(i[1],C.r,1)
 r=y.p
-t=A.p(k,A.A(A.a([A.p(k,D.c0Q,C.f,k,k,new A.o(k,k,k,A.n(16),k,new A.a8(C.ay,C.aD,C.x,A.a([i[5].j(0.85),C.aC],e),k,k),C.m),k,52,k,k,k,k,k,52),C.ew,A.E(A.x(A.a([A.c("Send to someone else",k,k,k,k,k,k,A.l(k,k,i[3],k,k,k,k,k,k,k,k,16,k,k,C.u,k,k,!0,k,k,k,k,k,k,k,k),k,k,k),C.at,A.c("Enter their personal Doc Share code \u2014 not your own My Code.",k,k,k,k,k,k,A.l(k,k,i[4],k,k,k,k,k,k,k,k,13,k,k,k,k,1.35,!0,k,k,k,k,k,k,k,k),k,k,k)],r),C.B,k,C.e,C.h,0,C.p),1)],r),C.l,k,C.e,C.h,0,k,k),C.f,k,k,new A.o(u,k,s,t,k,k,C.m),k,k,k,k,C.fa,k,k,k)
+t=A.p(k,A.A(A.a([A.p(k,D.c0Q,C.f,k,k,new A.o(k,k,k,A.n(16),k,new A.a8(C.ay,C.aD,C.x,A.a([i[5].j(0.85),C.aC],e),k,k),C.m),k,52,k,k,k,k,k,52),C.ew,A.E(A.x(A.a([A.c("Send to someone else",k,k,k,k,k,k,A.l(k,k,i[3],k,k,k,k,k,k,k,k,16,k,k,C.u,k,k,!0,k,k,k,k,k,k,k,k),k,k,k),C.at,A.c("Enter their personal Doc Share code \u2014 not your own My Code.",k,k,k,k,k,k,A.l(k,k,i[4],k,k,k,k,k,k,k,k,13,k,k,k,k,1.35,!0,k,k,k,k,k,k,k,k),k,k,k)],r),C.B,k,C.e,C.h,0,C.p),1)],r),C.l,k,C.e,C.h,0,k,k),C.f,k,k,new A.o(u,k,s,t,k,k,C.m),k,k,k,k,C.f9,k,k,k)
 s=A.c("THEIR CODE",k,k,k,k,k,k,A.l(k,k,i[4],k,k,k,k,k,k,k,k,11,k,k,C.E,k,k,!0,k,1.1,k,k,k,k,k,k),k,k,k)
 u=l.a.e
 e=A.l(k,k,i[3],k,k,k,k,k,k,k,M.Av,28,k,k,C.u,k,k,!0,k,6,k,k,k,k,k,k)
 q=A.a([new A.v9(A.ag("[0-9A-Za-z]",!0,!1,!1,!1),!0,""),new B.bmM()],y.E)
 p=A.l(k,k,i[4].j(0.45),k,k,k,k,k,k,k,k,28,k,k,C.u,k,k,!0,k,6,k,k,k,k,k,k)
 o=i[2]
-e=A.aN(k,C.Z,u==null,k,!0,C.t,k,A.aO(),l.d,k,k,k,k,k,2,A.bC(k,k,k,C.Ph,k,k,"",k,!0,new A.b6(4,A.n(18),new A.ax(i[1],1,C.r,-1)),k,k,k,k,k,o,!0,k,k,k,k,new A.b6(4,A.n(18),new A.ax(C.aC,1.7,C.r,-1)),k,k,k,k,k,k,k,k,p,"12345A",k,k,k,k,k,k,k,k,k,!0,!0,!1,k,k,k,k,k,k,k,k,k,k,k,k,k,k),C.y,!0,k,!0,k,!1,l.e,C.al,k,k,q,k,k,k,k,6,k,1,k,k,!1,"\u2022",k,k,k,new B.e3b(l),k,!1,k,k,!1,k,!0,k,C.ae,k,k,k,k,k,k,k,k,k,k,k,e,!0,C.K,k,C.mJ,k,k,k,k)
+e=A.aN(k,C.Z,u==null,k,!0,C.t,k,A.aO(),l.d,k,k,k,k,k,2,A.bC(k,k,k,C.Pg,k,k,"",k,!0,new A.b6(4,A.n(18),new A.ax(i[1],1,C.r,-1)),k,k,k,k,k,o,!0,k,k,k,k,new A.b6(4,A.n(18),new A.ax(C.aC,1.7,C.r,-1)),k,k,k,k,k,k,k,k,p,"12345A",k,k,k,k,k,k,k,k,k,!0,!0,!1,k,k,k,k,k,k,k,k,k,k,k,k,k,k),C.y,!0,k,!0,k,!1,l.e,C.al,k,k,q,k,k,k,k,6,k,1,k,k,!1,"\u2022",k,k,k,new B.e3b(l),k,!1,k,k,!1,k,!0,k,C.ae,k,k,k,k,k,k,k,k,k,k,k,e,!0,C.K,k,C.mJ,k,k,k,k)
 q=A.c("5 numbers + 1 letter",k,k,k,k,k,k,A.l(k,k,i[4],k,k,k,k,k,k,k,k,12,k,k,k,k,k,!0,k,k,k,k,k,k,k,k),C.K,k,k)
 p=A.c("FILES ("+w+")",k,k,k,k,k,k,A.l(k,k,i[4],k,k,k,k,k,k,k,k,11,k,k,C.E,k,k,!0,k,1.1,k,k,k,k,k,k),k,k,k)
 o=i[2]
@@ -4898,11 +4898,11 @@ u=l.f?k:l.gcBL()
 t=i[3]
 s=i[1]
 q=A.n(16)
-s=A.ep(O.a56,k,D.h9r,u,A.dk(k,k,i[2].j(0.75),k,k,k,k,k,k,t,k,k,C.cp,k,new A.b9(q,C.a1),new A.ax(s,1,C.r,-1),k,k,k,k))
+s=A.ep(O.a56,k,D.h9p,u,A.dk(k,k,i[2].j(0.75),k,k,k,k,k,k,t,k,k,C.cp,k,new A.b9(q,C.a1),new A.ax(s,1,C.r,-1),k,k,k,k))
 i=A.c("Device share sheet when available. Or send in-app with their code below.",k,k,k,k,k,k,A.l(k,k,i[4],k,k,k,k,k,k,k,k,11,k,k,k,k,1.35,!0,k,k,k,k,k,k,k,k),C.K,k,k)
 u=l.f?k:l.gcdR()
 t=A.bp(C.aC,k,k,0,C.c,k,C.nX,k,new A.b9(A.n(16),C.a1),k,k,k)
-return A.c5(g,h,new A.an(C.a0,k,C.ad,C.t,A.a([f,v,A.bo(!0,A.lz(new B.e3d(),A.x(A.a([e,new A.D(D.bID,A.x(A.a([s,C.N,i,C.af,A.bI(l.f?C.ul:D.h7G,k,u,t)],r),C.am,k,C.e,C.h,0,C.p),k)],r),C.l,k,C.e,C.h,0,C.p),C.co,C.a1l,k,k,new A.bq(0,1,y.X),y.i),!0,!1,C.ag,!0,!0)],r),k),k,!1,!1,k,k)}}
+return A.c5(g,h,new A.an(C.a0,k,C.ad,C.t,A.a([f,v,A.bo(!0,A.lz(new B.e3d(),A.x(A.a([e,new A.D(D.bID,A.x(A.a([s,C.N,i,C.af,A.bI(l.f?C.ul:D.h7E,k,u,t)],r),C.am,k,C.e,C.h,0,C.p),k)],r),C.l,k,C.e,C.h,0,C.p),C.co,C.a1l,k,k,new A.bq(0,1,y.X),y.i),!0,!1,C.ag,!0,!0)],r),k),k,!1,!1,k,k)}}
 B.bmM.prototype={
 pe(d,e){var x,w,v,u=e.a.toUpperCase(),t=new A.fl(""),s=u.length,r=0
 for(;;){if(!(r<s&&r<6))break
@@ -5032,7 +5032,7 @@ B(d){var x=this,w=null,v=B.a31(d),u=x.a.c,t=u?C.iV:v.a[2],s=u?C.c:v.a[3],r=u?C.a
 i=A.aN(!1,C.Z,!1,w,!0,C.t,w,A.aO(),x.d,w,w,w,w,w,2,A.bC(w,w,w,C.D8,w,w,"",w,!0,new A.b6(4,A.n(16),new A.ax(f[1],1,C.r,-1)),w,w,w,w,w,q,!0,w,w,w,w,new A.b6(4,A.n(16),D.b8d),w,w,w,w,w,w,w,w,g,"A3K9P2",w,w,w,w,w,w,w,w,w,!0,!0,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w),C.y,!0,w,!1,w,!1,x.e,C.al,w,w,h,w,w,w,w,6,w,1,w,w,!1,"\u2022",w,w,w,new B.dfu(x),w,!1,w,w,!1,w,!0,w,C.ae,w,w,w,w,w,w,w,w,w,w,w,i,!0,C.K,w,C.mJ,w,w,w,w)
 f=f[1]
 h=y.p
-return A.eH(w,C.L,new A.cS(U.MV,new A.bQ(new A.o(t,w,o,p,m,w,C.m),C.bm,new A.D(C.x7,A.x(A.a([l,C.aO,k,C.N,j,C.ec,i,C.ec,A.A(A.a([A.E(A.dY(C.op,new B.dfv(d),A.dk(w,w,w,w,w,w,w,w,w,s,w,w,C.cp,w,new A.b9(A.n(14),C.a1),new A.ax(f,1,C.r,-1),w,w,w,w)),1),C.ar,A.E(new A.bQ(new A.o(w,w,w,A.n(14),A.a([new A.aa(0,C.H,C.aC.j(0.35),C.cO,12)],n),N.Rk,C.m),C.bm,A.aG(!1,C.a3,!0,w,A.aM(!1,A.n(14),!0,D.eDm,w,!0,w,w,w,w,w,w,w,w,w,w,w,x.gcdX(),w,w,w,w,w,w,w),C.f,C.L,0,w,w,w,w,w,C.ai),w),2)],h),C.l,w,C.e,C.h,0,w,w)],h),C.l,w,C.e,C.M,0,C.p),w),w),w),w,w,w,C.Pp,w,C.dc,w,w,w)}}
+return A.eH(w,C.L,new A.cS(U.MU,new A.bQ(new A.o(t,w,o,p,m,w,C.m),C.bm,new A.D(C.x7,A.x(A.a([l,C.aO,k,C.N,j,C.ec,i,C.ec,A.A(A.a([A.E(A.dY(C.op,new B.dfv(d),A.dk(w,w,w,w,w,w,w,w,w,s,w,w,C.cp,w,new A.b9(A.n(14),C.a1),new A.ax(f,1,C.r,-1),w,w,w,w)),1),C.ar,A.E(new A.bQ(new A.o(w,w,w,A.n(14),A.a([new A.aa(0,C.H,C.aC.j(0.35),C.cO,12)],n),N.Rj,C.m),C.bm,A.aG(!1,C.a3,!0,w,A.aM(!1,A.n(14),!0,D.eDm,w,!0,w,w,w,w,w,w,w,w,w,w,w,x.gcdX(),w,w,w,w,w,w,w),C.f,C.L,0,w,w,w,w,w,C.ai),w),2)],h),C.l,w,C.e,C.h,0,w,w)],h),C.l,w,C.e,C.M,0,C.p),w),w),w),w,w,w,C.Po,w,C.dc,w,w,w)}}
 B.bzo.prototype={
 pe(d,e){return e.anb(e.a.toUpperCase())}}
 B.WD.prototype={
@@ -5263,7 +5263,7 @@ x=5
 return A.b(A.a7(t,!1).cc(A.eb(new B.e2M(u,d),!1,null,y.H)),$async$TC)
 case 5:x=1
 break
-case 4:x=C.a.Y(t,"image/")||d.mQ(D.To)?6:7
+case 4:x=C.a.Y(t,"image/")||d.mQ(D.Tn)?6:7
 break
 case 6:t=u.c
 t.toString
@@ -5557,7 +5557,7 @@ break}case 1:return A.h(v,w)}})
 return A.i($async$akt,w)},
 cdV(d){var x=d.c
 if(C.a.Y(x,"video/")||d.mQ(D.nl))return C.rm
-if(C.a.Y(x,"image/")||d.mQ(D.To))return C.vv
+if(C.a.Y(x,"image/")||d.mQ(D.Tn))return C.vv
 if(C.a.q(x,"pdf"))return T.ID
 return D.arV},
 B(d){var x,w,v=this,u=null,t=B.a31(d),s=t.a,r=s[0],q=s[3],p=A.aI(u,u,u,u,C.IQ,u,u,u,new B.e2W(d),u,u,u,u,u,u),o=y.p,n=A.a([],o)
@@ -5593,7 +5593,7 @@ v=A.dk(t,t,x[2].j(0.7),t,t,t,t,t,t,w,t,t,C.tx,t,new A.b9(s,C.a1),new A.ax(v,1,C.
 return A.ep(A.V(u.c,t,t,t,t,18),t,A.c(u.d,t,t,t,t,t,t,C.fi,t,t,t),u.r,v)}}
 B.bhf.prototype={
 B(d){var x=null,w=y.X,v=this.c.a,u=A.a([v[5].j(0.22),C.aC.j(0.16)],y.O),t=A.K(v[5].j(0.35),C.r,1),s=y.i
-return A.at(A.lz(new B.dfs(),new A.D(E.a2g,A.x(A.a([A.lz(new B.dft(),A.p(x,A.V(C.zX,v[5],x,x,x,36),C.f,x,x,new A.o(x,x,t,x,x,new A.a8(C.ay,C.aD,C.x,u,x,x),C.a6),x,88,x,x,x,x,x,88),C.ej,C.hx,x,x,new A.bq(0.86,1,w),s),C.ec,A.c("Your Doc Share is empty",x,x,x,x,x,x,A.l(x,x,v[3],x,x,x,x,x,x,x,x,20,x,x,C.u,x,x,!0,x,-0.2,x,x,x,x,x,x),C.K,x,x),C.R,A.c("Add photos, videos, or documents \u2014 then share with a QR or Send to their Code.",x,x,x,x,x,x,A.l(x,x,v[4],x,x,x,x,x,x,x,x,14,x,x,x,x,1.5,!0,x,x,x,x,x,x,x,x),C.K,x,x),C.ec,A.db(C.p3,x,D.hd9,this.d,A.bp(C.aC,x,x,x,C.c,x,C.Pn,x,new A.b9(A.n(16),C.a1),x,x,x))],y.p),C.l,x,C.e,C.M,0,C.p),x),C.co,C.CX,x,x,new A.bq(0,1,w),s),x,x,x)}}
+return A.at(A.lz(new B.dfs(),new A.D(E.a2g,A.x(A.a([A.lz(new B.dft(),A.p(x,A.V(C.zX,v[5],x,x,x,36),C.f,x,x,new A.o(x,x,t,x,x,new A.a8(C.ay,C.aD,C.x,u,x,x),C.a6),x,88,x,x,x,x,x,88),C.ej,C.hx,x,x,new A.bq(0.86,1,w),s),C.ec,A.c("Your Doc Share is empty",x,x,x,x,x,x,A.l(x,x,v[3],x,x,x,x,x,x,x,x,20,x,x,C.u,x,x,!0,x,-0.2,x,x,x,x,x,x),C.K,x,x),C.R,A.c("Add photos, videos, or documents \u2014 then share with a QR or Send to their Code.",x,x,x,x,x,x,A.l(x,x,v[4],x,x,x,x,x,x,x,x,14,x,x,x,x,1.5,!0,x,x,x,x,x,x,x,x),C.K,x,x),C.ec,A.db(C.p3,x,D.hd7,this.d,A.bp(C.aC,x,x,x,C.c,x,C.Pm,x,new A.b9(A.n(16),C.a1),x,x,x))],y.p),C.l,x,C.e,C.M,0,C.p),x),C.co,C.CX,x,x,new A.bq(0,1,w),s),x,x,x)}}
 B.ae8.prototype={
 B(d){var x,w,v,u,t,s,r,q,p,o,n,m,l,k=this,j=null,i=k.d,h=i.w,g=C.a.i(h==null?"":h).toUpperCase()
 h=A.dx(0,0,0,380+C.o.D(k.c*45,0,360),0,0)
@@ -5608,7 +5608,7 @@ q=A.n(14)
 p=i.c
 o=!C.a.Y(p,"video/")
 if(!o||i.mQ(D.nl))p=D.dAm
-else{p=C.a.Y(p,"image/")||i.mQ(D.To)
+else{p=C.a.Y(p,"image/")||i.mQ(D.Tn)
 n=y.O
 p=p?A.a([C.cY,C.aC],n):A.a([C.aN.j(0.85),C.aC.j(0.7)],n)}p=A.p(j,A.V(k.w,C.c,j,j,j,22),C.f,j,j,new A.o(j,j,j,q,j,new A.a8(C.ay,C.aD,C.x,p,j,j),C.m),j,48,j,j,j,j,j,48)
 q=A.c(i.b,j,2,C.a2,j,j,j,A.l(j,j,x[3],j,j,j,j,j,j,j,j,14,j,j,C.E,j,j,!0,j,j,j,j,j,j,j,j),j,j,j)
@@ -5708,7 +5708,7 @@ else if(v.w){q=v.a.d
 x=q.c.toLowerCase()
 w=q.b.toLowerCase()
 q=C.a.q(x,"heic")||C.a.q(x,"heif")||C.a.c7(w,".heic")||C.a.c7(w,".heif")?"This HEIC/HEIF photo cannot be previewed here. Use Share to open it in Photos or AirDrop it.":"Could not display this image in-app. Use Share to open or save it on your device."
-p=new A.D(C.eJ,A.x(A.a([A.c(q,u,u,u,u,u,u,A.l(u,u,t[4],u,u,u,u,u,u,u,u,u,u,u,u,u,1.4,!0,u,u,u,u,u,u,u,u),C.K,u,u),C.aO,A.db(C.DZ,u,D.fW2,v.gb9E(),A.bp(C.aC,u,u,u,u,u,u,u,u,u,u,u))],p),C.l,u,C.e,C.M,0,C.p),u)
+p=new A.D(C.eJ,A.x(A.a([A.c(q,u,u,u,u,u,u,A.l(u,u,t[4],u,u,u,u,u,u,u,u,u,u,u,u,u,1.4,!0,u,u,u,u,u,u,u,u),C.K,u,u),C.aO,A.db(C.DZ,u,D.fW3,v.gb9E(),A.bp(C.aC,u,u,u,u,u,u,u,u,u,u,u))],p),C.l,u,C.e,C.M,0,C.p),u)
 t=p}else t=v.c4a()}return A.c5(r,s,A.at(t,u,u,u),u,!1,!1,u,u)}}
 B.a_V.prototype={
 R(){return new B.aC6(A.akE(),C.bH,C.bH)},
@@ -5781,7 +5781,7 @@ v=A.eV(o,o,o,!0,!0,w,o,1,o,o,0,!1,o,!1,v,o,o,o,!0,o,o,o,o,o,A.c(p.a.d.b,o,o,o,o,
 if(p.e)x=C.Gn
 else{u=p.r
 if(u!=null)x=A.c(u,o,o,o,o,o,o,A.l(o,o,x[4],o,o,o,o,o,o,o,o,o,o,o,o,o,o,!0,o,o,o,o,o,o,o,o),C.K,o,o)
-else{u=A.p(o,D.bXt,C.f,o,o,new A.o(o,o,o,A.n(24),o,N.Rk,C.m),o,88,o,o,o,o,o,88)
+else{u=A.p(o,D.bXt,C.f,o,o,new A.o(o,o,o,A.n(24),o,N.Rj,C.m),o,88,o,o,o,o,o,88)
 t=A.ld(C.aC,o,o,m,0,new B.dfl(p),C.o.D(C.o.ao(p.w.a,1000),0,m))
 x=A.c(p.aWQ(p.w)+" / "+p.aWQ(p.x),o,o,o,o,o,o,A.l(o,o,x[4],o,o,o,o,o,o,o,o,o,o,o,C.a8,o,o,!0,o,o,o,o,o,o,o,o),o,o,o)
 s=A.bp(C.aC,o,o,o,o,D.ft2,o,o,o,o,o,o)
@@ -5866,7 +5866,7 @@ B.a0_.prototype={
 R(){return new B.aCa(new A.cz(null,y.A))}}
 B.aCa.prototype={
 gcMA(){var x,w,v=this.a
-if(v.e!==D.UN)return null
+if(v.e!==D.UM)return null
 x=C.a.i(v.c)
 if(!C.a.Y(x,"NGMYDOCSYNC3|"))return null
 w=C.a.i(C.a.aY(x,13))
@@ -6019,13 +6019,13 @@ return A.i($async$ag5,w)},
 B(d){var x,w,v,u,t,s,r,q,p,o,n,m=this,l=null,k="Keep screen open",j=B.a31(d),i=m.a,h=i.c
 if(h.length>48)h=C.a.aw(h,0,44)+"\u2026"
 i=i.e
-i=i!==D.K2&&i!==D.UN&&i!==D.AX
+i=i!==D.K2&&i!==D.UM&&i!==D.AX
 x=j.a
 w=x[0]
 v=x[3]
 u=A.c("Share via QR",l,l,l,l,l,l,A.l(l,l,v,l,l,l,l,l,l,l,l,l,l,l,C.u,l,l,!0,l,l,l,l,l,l,l,l),l,l,l)
 t=m.a.e
-v=A.eV(l,l,l,!0,!0,w,l,1,!0,l,0,!1,l,!1,v,l,t===D.K2||t===D.UN||t===D.AX?l:A.aI(l,l,l,l,C.lA,l,l,l,m.gb2n(),l,l,l,l,l,l),l,!0,l,l,l,l,l,u,l,l,l,1,l,!0)
+v=A.eV(l,l,l,!0,!0,w,l,1,!0,l,0,!1,l,!1,v,l,t===D.K2||t===D.UM||t===D.AX?l:A.aI(l,l,l,l,C.lA,l,l,l,m.gb2n(),l,l,l,l,l,l),l,!0,l,l,l,l,l,u,l,l,l,1,l,!0)
 u=x[2]
 s=A.n(24)
 r=A.K(C.aC.j(0.35),C.r,1)
@@ -6039,19 +6039,19 @@ q.push(A.c(m.gcdU(),l,l,l,l,l,l,A.l(l,l,x[4],l,l,l,l,l,l,l,l,12,l,l,l,l,1.45,!0,
 t=m.a.f
 o=t.length
 if(o!==0){t=o===1?"Type-in code: "+C.d.gG(t):"Type-in codes: "+C.d.aL(t,", ")
-C.d.u(q,A.a([C.R,A.c(t,l,l,l,l,l,l,A.l(l,l,x[4],l,l,l,l,l,l,l,l,11,l,l,C.P,l,l,!0,l,l,l,l,l,l,l,l),C.K,l,l),A.hv(D.c7k,D.h4Q,new B.dfU(m,d),l)],p))}if(m.a.e===D.K2&&m.gb_f()!=null)C.d.u(q,A.a([C.R,A.c("Code: "+h,l,l,l,l,l,l,A.l(l,l,x[4],l,l,l,l,l,l,l,l,11,l,l,C.a8,l,l,!0,l,l,l,l,l,l,l,l),C.K,l,l),A.hv(D.c3B,D.h1n,new B.dfV(m,d),l)],p))
+C.d.u(q,A.a([C.R,A.c(t,l,l,l,l,l,l,A.l(l,l,x[4],l,l,l,l,l,l,l,l,11,l,l,C.P,l,l,!0,l,l,l,l,l,l,l,l),C.K,l,l),A.hv(D.c7k,D.h4O,new B.dfU(m,d),l)],p))}if(m.a.e===D.K2&&m.gb_f()!=null)C.d.u(q,A.a([C.R,A.c("Code: "+h,l,l,l,l,l,l,A.l(l,l,x[4],l,l,l,l,l,l,l,l,11,l,l,C.a8,l,l,!0,l,l,l,l,l,l,l,l),C.K,l,l),A.hv(D.c3B,D.h1n,new B.dfV(m,d),l)],p))
 if(m.a.e===D.AX){x=(m.w?C.dR:C.aC).j(0.12)
 t=A.n(20)
 o=m.w?"Ready to receive":"Uploading "+C.i.a5(C.i.D(m.x*100,0,99),0)+"%"
-C.d.u(q,A.a([C.N,A.p(l,A.c(o,l,l,l,l,l,l,A.l(l,l,m.w?C.Gr:C.aC,l,l,l,l,l,l,l,l,12,l,l,C.E,l,l,!0,l,l,l,l,l,l,l,l),l,l,l),C.f,l,l,new A.o(x,l,l,t,l,l,C.m),l,l,l,l,C.lY,l,l,l)],p))}if(m.a.e===D.UN){x=(m.r?C.dR:C.aC).j(0.12)
+C.d.u(q,A.a([C.N,A.p(l,A.c(o,l,l,l,l,l,l,A.l(l,l,m.w?C.Gr:C.aC,l,l,l,l,l,l,l,l,12,l,l,C.E,l,l,!0,l,l,l,l,l,l,l,l),l,l,l),C.f,l,l,new A.o(x,l,l,t,l,l,C.m),l,l,l,l,C.lY,l,l,l)],p))}if(m.a.e===D.UM){x=(m.r?C.dR:C.aC).j(0.12)
 t=A.n(20)
 o=m.r
 n=o?"Connected \u2014 sending\u2026":k
-C.d.u(q,A.a([C.N,A.p(l,A.c(n,l,l,l,l,l,l,A.l(l,l,o?C.Gr:C.aC,l,l,l,l,l,l,l,l,12,l,l,C.E,l,l,!0,l,l,l,l,l,l,l,l),l,l,l),C.f,l,l,new A.o(x,l,l,t,l,l,C.m),l,l,l,l,C.lY,l,l,l),C.af,A.db(D.bZY,l,D.h8_,m.gcza(),A.bp(C.aC,l,l,l,l,l,l,l,l,l,l,l))],p))}return A.p9(i,A.c5(v,w,new A.D(C.ae,A.x(A.a([A.E(A.p(l,A.x(q,C.l,l,C.ba,C.h,0,C.p),C.f,l,l,new A.o(u,l,r,s,l,l,C.m),l,l,l,l,C.ae,l,l,1/0),1),C.af,A.A(A.a([A.E(A.ep(K.DX,l,C.Xb,new B.dfW(m,d),l),1),C.ar,A.E(A.db(C.Aj,l,C.adh,new B.dfX(m,d),A.bp(C.aC,l,l,l,l,l,l,l,l,l,l,l)),1)],p),C.l,l,C.e,C.h,0,l,l),C.N,new A.a5(1/0,l,A.bI(W.BB,l,m.gb2n(),A.bp(C.aN,l,l,l,l,C.hr,l,l,l,l,l,l)),l)],p),C.l,l,C.e,C.h,0,C.p),l),l,!1,!1,l,l),new B.dfY(),y.C)}}
+C.d.u(q,A.a([C.N,A.p(l,A.c(n,l,l,l,l,l,l,A.l(l,l,o?C.Gr:C.aC,l,l,l,l,l,l,l,l,12,l,l,C.E,l,l,!0,l,l,l,l,l,l,l,l),l,l,l),C.f,l,l,new A.o(x,l,l,t,l,l,C.m),l,l,l,l,C.lY,l,l,l),C.af,A.db(D.bZY,l,D.h7Y,m.gcza(),A.bp(C.aC,l,l,l,l,l,l,l,l,l,l,l))],p))}return A.p9(i,A.c5(v,w,new A.D(C.ae,A.x(A.a([A.E(A.p(l,A.x(q,C.l,l,C.ba,C.h,0,C.p),C.f,l,l,new A.o(u,l,r,s,l,l,C.m),l,l,l,l,C.ae,l,l,1/0),1),C.af,A.A(A.a([A.E(A.ep(K.DX,l,C.Xb,new B.dfW(m,d),l),1),C.ar,A.E(A.db(C.Aj,l,C.adh,new B.dfX(m,d),A.bp(C.aC,l,l,l,l,l,l,l,l,l,l,l)),1)],p),C.l,l,C.e,C.h,0,l,l),C.N,new A.a5(1/0,l,A.bI(W.BB,l,m.gb2n(),A.bp(C.aN,l,l,l,l,C.hr,l,l,l,l,l,l)),l)],p),C.l,l,C.e,C.h,0,C.p),l),l,!1,!1,l,l),new B.dfY(),y.C)}}
 B.ae6.prototype={
 B(d){var x=null,w=A.c('Sender taps "Scan receiver answer QR" and points at this code.',x,x,x,x,x,x,A.l(x,x,C.c.j(0.7),x,x,x,x,x,x,x,x,12,x,x,x,x,1.4,!0,x,x,x,x,x,x,x,x),C.K,x,x),v=A.n(16),u=y.p
 v=A.ca(A.x(A.a([w,C.aO,A.p(x,A.qs(x,x,!1,this.c,x,!0,!0,x,!1,C.c),C.f,x,x,new A.o(C.c,x,x,v,x,x,C.m),x,x,x,x,C.bF,x,x,x)],u),C.l,x,C.e,C.M,0,C.p),C.t,x,C.y,x,x,x,x,x,C.ah)
-return A.eh(A.a([A.bI(C.BC,x,new B.dfh(d),x)],u),x,x,C.nF,v,x,x,x,x,D.fV_,x)}}
+return A.eh(A.a([A.bI(C.BC,x,new B.dfh(d),x)],u),x,x,C.nF,v,x,x,x,x,D.fV0,x)}}
 B.a_U.prototype={
 R(){return new B.aC5(A.A8(C.zc,C.ow,C.vK))}}
 B.aC5.prototype={
@@ -6123,7 +6123,7 @@ x.toString
 A.a7(x,!1).N(t)
 return}},
 B(d){var x,w=this,v=null,u=A.aI(v,v,v,v,F.atl,v,v,v,w.gbU9(),v,v,v,v,"Enter QR share code",v),t=A.aI(v,v,v,v,F.a5a,v,v,v,w.gcoT(),v,v,v,v,"Paste Wi\u2011Fi link",v),s=y.p
-t=A.eV(A.a([u,t,A.aI(v,v,v,v,A.V(w.f?C.rg:S.Qx,v,v,v,v,v),v,v,v,new B.dg1(w),v,v,v,v,v,v)],s),v,v,!0,!0,C.v,v,1,v,v,v,!1,v,!1,C.c,v,v,v,!0,v,v,v,v,v,D.h8W,v,v,v,1,v,!0)
+t=A.eV(A.a([u,t,A.aI(v,v,v,v,A.V(w.f?C.rg:S.Qw,v,v,v,v,v),v,v,v,new B.dg1(w),v,v,v,v,v,v)],s),v,v,!0,!0,C.v,v,1,v,v,v,!1,v,!1,C.c,v,v,v,!0,v,v,v,v,v,D.h8U,v,v,v,1,v,!0)
 u=A.A7(w.d,C.bY,w.gaA5())
 x=A.n(20)
 return A.c5(t,C.v,new A.an(C.a0,v,C.ad,C.t,A.a([u,A.at(A.p(v,v,C.f,v,v,new A.o(v,v,A.K(C.aN,C.r,4),x,v,v,C.m),v,300,v,v,v,v,v,300),v,v,v),D.eJE],s),v),v,!1,!1,v,v)}}
@@ -6279,7 +6279,7 @@ return B.cgi(x.e,w,!1,x.f,x.r,x.w,!0,!1,v)},
 $S:z+3}
 B.dfC.prototype={
 $4(d,e,f,g){var x=null
-return A.kd(A.A(A.a([A.aI(x,x,x,x,D.bYz,x,x,x,new B.dfB(d),x,x,x,x,x,x),A.E(A.FU(D.T6,!0,x,!1,C.a4d,x,x,g,e,"Upload \xb7 share \xb7 sync","Doc Share",x),1)],y.p),C.l,x,C.e,C.h,0,x,x),D.T6,x,g,C.aoZ,0,e,f)},
+return A.kd(A.A(A.a([A.aI(x,x,x,x,D.bYz,x,x,x,new B.dfB(d),x,x,x,x,x,x),A.E(A.FU(D.T5,!0,x,!1,C.a4d,x,x,g,e,"Upload \xb7 share \xb7 sync","Doc Share",x),1)],y.p),C.l,x,C.e,C.h,0,x,x),D.T5,x,g,C.aoZ,0,e,f)},
 $C:"$4",
 $R:4,
 $S:411}
@@ -6307,7 +6307,7 @@ A.a7(w.c,!1).N(new B.aEO(v,x))},
 $S:0}
 B.fJg.prototype={
 $1(d){var x=this,w=null,v=A.aF(d,C.f0,y.m).w,u=x.a,t=u?C.iV:C.c,s=A.n(28),r=x.b,q=x.c,p=x.d,o=y.p
-return new A.D(new A.R(0,0,0,v.f.d),A.p(w,A.x(A.a([A.p(w,D.bAM,C.f,w,w,D.bbm,w,w,w,w,D.aoL,w,w,1/0),new A.D(C.Da,A.x(A.a([A.aN(w,C.Z,!1,w,!0,C.t,w,A.aO(),r,w,w,w,w,w,2,B.hn7(u,"Organization name",C.Ic,w),C.y,!0,w,!0,w,!1,w,C.al,w,w,w,w,w,w,w,w,w,1,w,w,!1,"\u2022",w,w,w,w,w,!1,w,w,!1,w,!0,w,C.ae,w,w,w,w,w,w,w,w,w,w,w,w,!0,C.a7,w,C.ao,w,w,w,w),C.R,A.aN(w,C.Z,!1,w,!0,C.t,w,A.aO(),q,w,w,w,w,w,2,B.hn7(u,"Access code",C.mu,"e.g. acme-team"),C.y,!0,w,!0,w,!1,w,C.al,w,w,w,w,w,w,w,w,w,1,w,w,!1,"\u2022",w,w,w,w,w,!1,w,w,!1,w,!0,w,C.ae,w,w,w,w,w,w,w,w,w,w,w,w,!0,C.a7,w,C.ao,w,w,w,w),C.R,A.aN(w,C.Z,!1,w,!0,C.t,w,A.aO(),p,w,w,w,w,w,2,B.hn7(u,"Member password",C.DW,w),C.y,!0,w,!0,w,!1,w,C.al,w,w,w,w,w,w,w,w,w,1,w,w,!0,"\u2022",w,w,w,w,w,!1,w,w,!1,w,!0,w,C.ae,w,w,w,w,w,w,w,w,w,w,w,w,!0,C.a7,w,C.ao,w,w,w,w),C.by,A.bI(D.h92,w,new B.fJf(r,q,p,d),A.bp(C.aC,w,w,w,w,C.hr,w,w,w,w,w,w))],o),C.l,w,C.e,C.h,0,C.p),w)],o),C.l,w,C.e,C.M,0,C.p),C.f,w,w,new A.o(t,w,w,s,w,w,C.m),w,w,w,C.HC,w,w,w,w),w)},
+return new A.D(new A.R(0,0,0,v.f.d),A.p(w,A.x(A.a([A.p(w,D.bAM,C.f,w,w,D.bbm,w,w,w,w,D.aoL,w,w,1/0),new A.D(C.Da,A.x(A.a([A.aN(w,C.Z,!1,w,!0,C.t,w,A.aO(),r,w,w,w,w,w,2,B.hn7(u,"Organization name",C.Ic,w),C.y,!0,w,!0,w,!1,w,C.al,w,w,w,w,w,w,w,w,w,1,w,w,!1,"\u2022",w,w,w,w,w,!1,w,w,!1,w,!0,w,C.ae,w,w,w,w,w,w,w,w,w,w,w,w,!0,C.a7,w,C.ao,w,w,w,w),C.R,A.aN(w,C.Z,!1,w,!0,C.t,w,A.aO(),q,w,w,w,w,w,2,B.hn7(u,"Access code",C.mu,"e.g. acme-team"),C.y,!0,w,!0,w,!1,w,C.al,w,w,w,w,w,w,w,w,w,1,w,w,!1,"\u2022",w,w,w,w,w,!1,w,w,!1,w,!0,w,C.ae,w,w,w,w,w,w,w,w,w,w,w,w,!0,C.a7,w,C.ao,w,w,w,w),C.R,A.aN(w,C.Z,!1,w,!0,C.t,w,A.aO(),p,w,w,w,w,w,2,B.hn7(u,"Member password",C.DW,w),C.y,!0,w,!0,w,!1,w,C.al,w,w,w,w,w,w,w,w,w,1,w,w,!0,"\u2022",w,w,w,w,w,!1,w,w,!1,w,!0,w,C.ae,w,w,w,w,w,w,w,w,w,w,w,w,!0,C.a7,w,C.ao,w,w,w,w),C.by,A.bI(D.h90,w,new B.fJf(r,q,p,d),A.bp(C.aC,w,w,w,w,C.hr,w,w,w,w,w,w))],o),C.l,w,C.e,C.h,0,C.p),w)],o),C.l,w,C.e,C.M,0,C.p),C.f,w,w,new A.o(t,w,w,s,w,w,C.m),w,w,w,C.HC,w,w,w,w),w)},
 $S:63}
 B.fJf.prototype={
 $0(){var x,w,v=this,u=C.a.i(v.a.a.a)
@@ -6445,7 +6445,7 @@ return x.f?null:x.a0h()},
 $S:2}
 B.e3c.prototype={
 $1(d){var x,w,v=null,u=A.n(11),t=C.aC.j(this.a?0.22:0.12),s=d.c
-if(C.a.Y(s,"image/")||d.mQ(D.To))s=C.vv
+if(C.a.Y(s,"image/")||d.mQ(D.Tn))s=C.vv
 else s=C.a.Y(s,"video/")||d.mQ(D.nl)?C.rm:D.arV
 x=this.b.a
 w=y.p
@@ -6948,7 +6948,7 @@ return null},
 $S:0}
 B.e2Y.prototype={
 $4(d,e,f,g){var x=null
-return A.A(A.a([A.JH(D.T6,x,C.a4d,g,e,32),C.ar,A.c("Doc Share",x,x,x,x,x,x,A.l(x,x,this.a.a[3],x,x,x,x,x,x,x,x,x,x,x,C.u,x,x,!0,x,x,x,x,x,A.a([new A.cZ(C.d.gG(D.T6).j(0.4+e*0.2),C.J,10)],y.u),x,x),x,x,x)],y.p),C.l,x,C.e,C.h,0,x,x)},
+return A.A(A.a([A.JH(D.T5,x,C.a4d,g,e,32),C.ar,A.c("Doc Share",x,x,x,x,x,x,A.l(x,x,this.a.a[3],x,x,x,x,x,x,x,x,x,x,x,C.u,x,x,!0,x,x,x,x,x,A.a([new A.cZ(C.d.gG(D.T5).j(0.4+e*0.2),C.J,10)],y.u),x,x),x,x,x)],y.p),C.l,x,C.e,C.h,0,x,x)},
 $C:"$4",
 $R:4,
 $S:653}
@@ -7144,7 +7144,7 @@ B.dfS.prototype={
 $0(){return this.a.r=!0},
 $S:0}
 B.dfT.prototype={
-$1(d){return D.hKV},
+$1(d){return D.hKT},
 $S:z+25}
 B.dfY.prototype={
 $2(d,e){if(d)B.WM()},
@@ -7356,17 +7356,17 @@ D.ahw=new A.u(1,0.9529411764705882,0.9686274509803922,0.984313725490196,C.q)
 D.aj0=new A.u(1,0.1411764705882353,0.18823529411764706,0.2549019607843137,C.q)
 D.ak2=new A.u(1,0.03137254901960784,0.06274509803921569,0.09411764705882353,C.q)
 D.alQ=new A.u(1,0.07058823529411765,0.10196078431372549,0.14901960784313725,C.q)
-D.fVV=new A.C("Your team portal",null,C.du,null,null,null,null,null,null,null,null,null)
-D.ha0=new A.C("Share the access code and member password with your team. They only sign in once.",null,H.FB,null,null,null,null,null,null,null,null,null)
-D.dqS=x([D.fVV,C.ak,D.ha0],y.p)
+D.fVW=new A.C("Your team portal",null,C.du,null,null,null,null,null,null,null,null,null)
+D.h9Z=new A.C("Share the access code and member password with your team. They only sign in once.",null,H.FB,null,null,null,null,null,null,null,null,null)
+D.dqS=x([D.fVW,C.ak,D.h9Z],y.p)
 D.bAC=new A.ft(C.ah,C.e,C.h,C.B,null,C.p,null,0,D.dqS,null)
-D.hez=new A.C("Create your organization",null,C.fP,null,null,null,null,null,null,null,null,null)
+D.hex=new A.C("Create your organization",null,C.fP,null,null,null,null,null,null,null,null,null)
 D.h_x=new A.C("Set an access code and member password. Share them with your team \u2014 they sign in once.",null,H.FB,null,null,null,null,null,null,null,null,null)
-D.dJ3=x([D.hez,C.ak,D.h_x],y.p)
+D.dJ3=x([D.hex,C.ak,D.h_x],y.p)
 D.bAM=new A.ft(C.ah,C.e,C.h,C.B,null,C.p,null,0,D.dJ3,null)
-D.haF=new A.C("Team Member sign-in",null,C.fP,null,null,null,null,null,null,null,null,null)
+D.haD=new A.C("Team Member sign-in",null,C.fP,null,null,null,null,null,null,null,null,null)
 D.h3x=new A.C("Enter the access code and password from your organization.",null,H.FB,null,null,null,null,null,null,null,null,null)
-D.dGC=x([D.haF,C.ak,D.h3x],y.p)
+D.dGC=x([D.haD,C.ak,D.h3x],y.p)
 D.bAW=new A.ft(C.ah,C.e,C.h,C.B,null,C.p,null,0,D.dGC,null)
 D.bHd=new A.R(16,10,16,28)
 D.bHm=new A.R(16,14,16,4)
@@ -7395,8 +7395,8 @@ D.c8s=new A.ee(null,null,null,"New member password (optional)",null,null,null,"L
 D.cYw=x([C.fz,C.b5,C.aC],y.O)
 D.cdY=new A.a8(C.ay,C.aD,C.x,D.cYw,null,null)
 D.cXT=x(["mp3","wav","m4a","aac","ogg","flac","opus","wma","weba"],y.s)
-D.T6=x([C.fz,C.aC],y.O)
-D.To=x(["jpg","jpeg","jfif","png","gif","webp","heic","heif","bmp","tif","tiff"],y.s)
+D.T5=x([C.fz,C.aC],y.O)
+D.Tn=x(["jpg","jpeg","jfif","png","gif","webp","heic","heif","bmp","tif","tiff"],y.s)
 D.nl=x(["mp4","mov","m4v","webm","avi","mkv","3gp"],y.s)
 D.dAm=x([C.n1,C.aC],y.O)
 D.evU={iceServers:0}
@@ -7406,17 +7406,17 @@ D.dMY=new A.bl(D.aND,["stun:stun1.l.google.com:19302"],y.o)
 D.dfv=x([D.dMZ,D.dMY],A.ar("N<a9<m,m>>"))
 D.dM4=new A.bl(D.evU,[D.dfv],A.ar("bl<m,@>"))
 D.K2=new B.OD(0,"lanDirect")
-D.UM=new B.OD(1,"cloudStash")
+D.UL=new B.OD(1,"cloudStash")
 D.dZX=new B.OD(2,"inlineInstant")
-D.UN=new B.OD(3,"webrtcLink")
+D.UM=new B.OD(3,"webrtcLink")
 D.AX=new B.OD(4,"videoCloud")
-D.ha_=new A.C("Receive file",null,C.nw,null,null,null,null,null,null,null,null,null)
-D.cNr=x([E.atK,C.aa,D.ha_],y.p)
+D.h9Y=new A.C("Receive file",null,C.nw,null,null,null,null,null,null,null,null,null)
+D.cNr=x([E.atK,C.aa,D.h9Y],y.p)
 D.fnT=new A.c1(C.aK,C.ba,C.h,C.l,null,C.p,null,0,D.cNr,null)
 D.eDm=new A.D(C.cp,D.fnT,null)
 D.fM8=new A.G(!0,C.c,null,null,null,null,null,C.P,null,null,null,null,null,null,null,null,null,null,null,null,null,null,A0.Js,null,null,null)
-D.fWx=new A.C("Fill the frame \xb7 bright screen \xb7 Paste link or tap # to type code",null,D.fM8,null,C.K,null,null,null,null,null,null,null)
-D.eCw=new A.D(C.zw,D.fWx,null)
+D.fWy=new A.C("Fill the frame \xb7 bright screen \xb7 Paste link or tap # to type code",null,D.fM8,null,C.K,null,null,null,null,null,null,null)
+D.eCw=new A.D(C.zw,D.fWy,null)
 D.bfX=new A.cm(C.z,null,null,D.eCw,null)
 D.eJE=new A.cO(0,null,0,28,null,null,D.bfX,null)
 D.eJY=new B.abh(0,"RTCDataChannelConnecting")
@@ -7450,51 +7450,51 @@ D.bhc=new A.fr(2,null,null,null,null,C.aC,null,null,null,null)
 D.fuA=new A.a5(16,16,D.bhc,null)
 D.fZS=new A.C("Could not create portal. Access code may already be in use.",null,null,null,null,null,null,null,null,null,null,null)
 D.fw3=new A.b2(D.fZS,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)
-D.h6D=new A.C("Access code or password incorrect, or organization subscription expired.",null,null,null,null,null,null,null,null,null,null,null)
-D.fw7=new A.b2(D.h6D,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)
-D.hfD=new A.C("Enter a valid 5\u20136 character code.",null,null,null,null,null,null,null,null,null,null,null)
-D.fwe=new A.b2(D.hfD,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)
+D.h6B=new A.C("Access code or password incorrect, or organization subscription expired.",null,null,null,null,null,null,null,null,null,null,null)
+D.fw7=new A.b2(D.h6B,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)
+D.hfB=new A.C("Enter a valid 5\u20136 character code.",null,null,null,null,null,null,null,null,null,null,null)
+D.fwe=new A.b2(D.hfB,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)
 D.fZr=new A.C("Could not read this image to share.",null,null,null,null,null,null,null,null,null,null,null)
 D.fwE=new A.b2(D.fZr,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)
-D.haR=new A.C("Connected \u2014 sending files now\u2026",null,null,null,null,null,null,null,null,null,null,null)
-D.aWr=new A.b2(D.haR,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)
-D.hck=new A.C("Share code copied",null,null,null,null,null,null,null,null,null,null,null)
-D.fx7=new A.b2(D.hck,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)
-D.hh7=new A.C("Enter a valid access code and password.",null,null,null,null,null,null,null,null,null,null,null)
-D.fxo=new A.b2(D.hh7,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)
-D.hf2=new A.C("Fill in organization name, access code, and password.",null,null,null,null,null,null,null,null,null,null,null)
-D.fxt=new A.b2(D.hf2,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)
-D.hgi=new A.C("Organization settings saved.",null,null,null,null,null,null,null,null,null,null,null)
-D.fyg=new A.b2(D.hgi,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)
+D.haP=new A.C("Connected \u2014 sending files now\u2026",null,null,null,null,null,null,null,null,null,null,null)
+D.aWr=new A.b2(D.haP,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)
+D.hci=new A.C("Share code copied",null,null,null,null,null,null,null,null,null,null,null)
+D.fx7=new A.b2(D.hci,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)
+D.hh5=new A.C("Enter a valid access code and password.",null,null,null,null,null,null,null,null,null,null,null)
+D.fxo=new A.b2(D.hh5,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)
+D.hf0=new A.C("Fill in organization name, access code, and password.",null,null,null,null,null,null,null,null,null,null,null)
+D.fxt=new A.b2(D.hf0,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)
+D.hgg=new A.C("Organization settings saved.",null,null,null,null,null,null,null,null,null,null,null)
+D.fyg=new A.b2(D.hgg,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)
 D.fY1=new A.C("Link copied",null,null,null,null,null,null,null,null,null,null,null)
 D.fyO=new A.b2(D.fY1,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)
-D.h8y=new A.C("Free uploads used up. Join an organization or subscribe as an owner.",null,null,null,null,null,null,null,null,null,null,null)
-D.fz8=new A.b2(D.h8y,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)
+D.h8w=new A.C("Free uploads used up. Join an organization or subscribe as an owner.",null,null,null,null,null,null,null,null,null,null,null)
+D.fz8=new A.b2(D.h8w,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)
 D.h1c=new A.C("Could not save. Access code may already be in use.",null,null,null,null,null,null,null,null,null,null,null)
 D.fzF=new A.b2(D.h1c,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)
-D.hhc=new A.C("Copy the share code or Wi\u2011Fi link from sender first.",null,null,null,null,null,null,null,null,null,null,null)
-D.fzJ=new A.b2(D.hhc,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)
+D.hha=new A.C("Copy the share code or Wi\u2011Fi link from sender first.",null,null,null,null,null,null,null,null,null,null,null)
+D.fzJ=new A.b2(D.hha,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)
 D.fYh=new A.C("Use the phone app camera to scan the answer QR.",null,null,null,null,null,null,null,null,null,null,null)
 D.fzP=new A.b2(D.fYh,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)
 D.fWV=new A.C("My Code copied",null,null,null,null,null,null,null,null,null,null,null)
 D.fA3=new A.b2(D.fWV,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)
-D.fTy=new A.C("NGMY DOC SHARE",null,C.aXR,null,null,null,null,null,null,null,null,null)
-D.fV_=new A.C("Show this to sender",null,C.iT,null,null,null,null,null,null,null,null,null)
-D.fW2=new A.C("Share / save",null,null,null,null,null,null,null,null,null,null,null)
+D.fTz=new A.C("NGMY DOC SHARE",null,C.aXR,null,null,null,null,null,null,null,null,null)
+D.fV0=new A.C("Show this to sender",null,C.iT,null,null,null,null,null,null,null,null,null)
+D.fW3=new A.C("Share / save",null,null,null,null,null,null,null,null,null,null,null)
 D.h_Y=new A.C("Organization settings",null,C.cJ,null,null,null,null,null,null,null,null,null)
 D.h0l=new A.C("Sign in",null,C.cd,null,null,null,null,null,null,null,null,null)
 D.h1n=new A.C("Copy link for Paste",null,null,null,null,null,null,null,null,null,null,null)
 D.h1V=new A.C("Scan answer QR",null,null,null,null,null,null,null,null,null,null,null)
-D.h4Q=new A.C("Copy 6-digit code",null,null,null,null,null,null,null,null,null,null,null)
-D.h7G=new A.C("Send to their Doc Share",null,C.mL,null,null,null,null,null,null,null,null,null)
-D.h8_=new A.C("Scan receiver answer QR",null,null,null,null,null,null,null,null,null,null,null)
-D.h8k=new A.C("Share code & instructions",null,null,null,null,null,null,null,null,null,null,null)
-D.h8W=new A.C("Scan Doc Share QR",null,null,null,null,null,null,null,null,null,null,null)
-D.h92=new A.C("Create portal",null,C.cd,null,null,null,null,null,null,null,null,null)
-D.h9r=new A.C("Share via AirDrop / Bluetooth / Nearby",null,C.fi,null,null,null,null,null,null,null,null,null)
-D.hcQ=new A.C("Share files & videos\nwith a scan.",null,C.aXU,null,null,null,null,null,null,null,null,null)
-D.hd9=new A.C("Add files",null,C.cd,null,null,null,null,null,null,null,null,null)
-D.hKV=new B.a_U(null)
+D.h4O=new A.C("Copy 6-digit code",null,null,null,null,null,null,null,null,null,null,null)
+D.h7E=new A.C("Send to their Doc Share",null,C.mL,null,null,null,null,null,null,null,null,null)
+D.h7Y=new A.C("Scan receiver answer QR",null,null,null,null,null,null,null,null,null,null,null)
+D.h8i=new A.C("Share code & instructions",null,null,null,null,null,null,null,null,null,null,null)
+D.h8U=new A.C("Scan Doc Share QR",null,null,null,null,null,null,null,null,null,null,null)
+D.h90=new A.C("Create portal",null,C.cd,null,null,null,null,null,null,null,null,null)
+D.h9p=new A.C("Share via AirDrop / Bluetooth / Nearby",null,C.fi,null,null,null,null,null,null,null,null,null)
+D.hcO=new A.C("Share files & videos\nwith a scan.",null,C.aXU,null,null,null,null,null,null,null,null,null)
+D.hd7=new A.C("Add files",null,C.cd,null,null,null,null,null,null,null,null,null)
+D.hKT=new B.a_U(null)
 D.aej=new B.ae7(0,"docShare")
 D.aek=new B.ae7(1,"gate")
 D.XP=new B.ae7(2,"gateNoIndividual")})();(function staticFields(){$.aQS=null
@@ -7512,4 +7512,4 @@ $.ig_=null
 $.hnj=null})();(function lazyInitializers(){var x=a.lazyFinal
 x($,"iIx","hS_",()=>new B.cuG())
 x($,"iGr","hrw",()=>C.a.q(A.bw(A.bw(A.bw(A.HS(),"window"),"navigator"),"userAgent"),"Firefox"))})()};
-(a=>{a["/oqzf5TYHIxcC/Sv27qbqRvhk1E="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["JHZ6n7QvH0BzdtS7ceFAj/pnUdo="]=a.current})($__dart_deferred_initializers__);

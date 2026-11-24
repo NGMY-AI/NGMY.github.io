@@ -25,7 +25,7 @@ t=document.body
 if(t!=null)t.appendChild(u).toString
 J.HX(u)
 J.m2(u)
-A.bL(B.OZ,new C.fE3(v),x.H)
+A.bL(B.OY,new C.fE3(v),x.H)
 return!0}catch(r){return!1}},
 fWs(d,e,f){return C.iw5(d,e,f)},
 iw5(d,e,f){var w=0,v=A.j(x.N),u,t,s,r,q,p,o,n,m,l
@@ -1664,7 +1664,7 @@ A.i0(b.typeUniverse,JSON.parse('{"aYX":{"fV":["m","m"],"fV.S":"m","fV.T":"m"},"b
 var y={k:"Allow the ngmy.org calendar invite on the next prompt.",p:"Could not find a phone number for that name.",d:"Could not find a phone number or email for that contact.",c:"Only NGMY admins can send direct emails from the AI."}
 var x=(function rtii(){var w=A.ar
 return{V:w("N<aa>"),O:w("N<u>"),X:w("N<a9<m,@>>"),t:w("N<kb>"),I:w("N<lr>"),P:w("N<+c,s(lr,F)>"),s:w("N<m>"),A:w("N<GA>"),p:w("N<w>"),x:w("ai<kb>"),S:w("ai<lr>"),j:w("ai<@>"),f:w("a9<@,@>"),E:w("O<+c,s(lr,F),lr>"),w:w("hW"),B:w("lr"),F:w("+error,messageId,ok(m?,m?,P)"),U:w("Q9"),N:w("m"),e:w("x2"),q:w("ky"),y:w("P"),z:w("@"),h:w("lr?"),T:w("m?"),H:w("~")}})();(function constants(){var w=a.makeConstList
-D.hXf=new C.bZ5()
+D.hXd=new C.bZ5()
 D.bdy=new C.aYX()
 D.btq=new A.u(1,0.9098039215686274,0.9725490196078431,0.9372549019607843,B.q)
 D.a0i=new A.u(1,0.10980392156862745,0.1411764705882353,0.2,B.q)
@@ -1675,5 +1675,5 @@ D.bVa=new A.a_(63655,"MaterialIcons",!1)
 D.bVw=new A.a_(983176,"MaterialIcons",!1)
 D.j8=w([],x.t)
 D.aFj=w([B.bs,B.aM],x.O)
-D.aZi=new A.C("Restore QR",null,B.cJ,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["pT4ONTiGB2IsL533yqsAuGuf4eM="]=a.current})($__dart_deferred_initializers__);
+D.aZh=new A.C("Restore QR",null,B.cJ,null,null,null,null,null,null,null,null,null)})()};
+(a=>{a["cHAqnOhOE3pNucG4HBuuD1JZ6Rs="]=a.current})($__dart_deferred_initializers__);

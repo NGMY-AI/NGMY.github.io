@@ -1132,12 +1132,12 @@ u=A.K(B.b0.j(0.45),B.r,1)
 return A.p(o,A.A(A.a([A.V(D.bSE,B.b0.j(0.95),o,o,o,18),B.aa,A.E(A.c("Unlimited scans (admin)",o,o,o,o,o,o,A.l(o,o,B.c.j(0.88),o,o,o,o,o,o,o,o,12,o,o,B.P,o,o,!0,o,o,o,o,o,o,o,o),o,o,o),1)],x.p),B.l,o,B.e,B.h,0,o,o),B.f,o,o,new A.o(w,o,u,v,o,o,B.m),o,o,o,o,B.ep,o,o,o)}if(p.dx){w=B.bw.j(0.15)
 v=A.n(12)
 u=A.K(B.bw.j(0.45),B.r,1)
-return A.p(o,A.A(A.a([A.V(F.Qh,B.bw.j(0.95),o,o,o,18),B.aa,A.E(A.c("Unlimited scans active (30-day pass)",o,o,o,o,o,o,A.l(o,o,B.c.j(0.88),o,o,o,o,o,o,o,o,12,o,o,B.P,o,o,!0,o,o,o,o,o,o,o,o),o,o,o),1)],x.p),B.l,o,B.e,B.h,0,o,o),B.f,o,o,new A.o(w,o,u,v,o,o,B.m),o,o,o,o,B.ep,o,o,o)}t=C.i4H(p.a.f)
+return A.p(o,A.A(A.a([A.V(F.Qg,B.bw.j(0.95),o,o,o,18),B.aa,A.E(A.c("Unlimited scans active (30-day pass)",o,o,o,o,o,o,A.l(o,o,B.c.j(0.88),o,o,o,o,o,o,o,o,12,o,o,B.P,o,o,!0,o,o,o,o,o,o,o,o),o,o,o),1)],x.p),B.l,o,B.e,B.h,0,o,o),B.f,o,o,new A.o(w,o,u,v,o,o,B.m),o,o,o,o,B.ep,o,o,o)}t=C.i4H(p.a.f)
 s=p.db
 if(t<=0){w=B.bw.j(0.12)
 v=A.n(12)
 u=A.K(B.bw.j(0.35),B.r,1)
-return A.p(o,A.A(A.a([A.V(F.Qh,B.bw.j(0.9),o,o,o,18),B.aa,A.E(A.c("Unlimited free scans",o,o,o,o,o,o,A.l(o,o,B.c.j(0.88),o,o,o,o,o,o,o,o,12,o,o,B.P,o,o,!0,o,o,o,o,o,o,o,o),o,o,o),1)],x.p),B.l,o,B.e,B.h,0,o,o),B.f,o,o,new A.o(w,o,u,v,o,o,B.m),o,o,o,o,B.ep,o,o,o)}if(s==null||s===-1||s>=999999)return B.bK
+return A.p(o,A.A(A.a([A.V(F.Qg,B.bw.j(0.9),o,o,o,18),B.aa,A.E(A.c("Unlimited free scans",o,o,o,o,o,o,A.l(o,o,B.c.j(0.88),o,o,o,o,o,o,o,o,12,o,o,B.P,o,o,!0,o,o,o,o,o,o,o,o),o,o,o),1)],x.p),B.l,o,B.e,B.h,0,o,o),B.f,o,o,new A.o(w,o,u,v,o,o,B.m),o,o,o,o,B.ep,o,o,o)}if(s==null||s===-1||s>=999999)return B.bK
 w=B.c.j(0.08)
 v=A.n(12)
 u=A.K(B.c.j(0.18),B.r,1)
@@ -1382,7 +1382,7 @@ else t=!1
 if(t){t=B.b0.j(0.25)
 s=A.n(20)
 r=A.K(B.b0.j(0.5),B.r,1)
-w.push(A.p(j,A.c(A.v(k.ax)+" free left",j,j,j,j,j,j,B.LH,j,j,j),B.f,j,j,new A.o(t,j,r,s,j,j,B.m),j,j,j,B.pP,B.hm,j,j,j))}w=A.A(w,B.l,j,B.e,B.h,0,j,j)
+w.push(A.p(j,A.c(A.v(k.ax)+" free left",j,j,j,j,j,j,B.LG,j,j,j),B.f,j,j,new A.o(t,j,r,s,j,j,B.m),j,j,j,B.pP,B.hm,j,j,j))}w=A.A(w,B.l,j,B.e,B.h,0,j,j)
 t=A.A(A.a([A.E(k.b0q(D.bV9,"They wrote",new C.e44(k),!k.f,"Paste what you don't understand"),1),B.ar,A.E(k.b0q(E.a4E,"You reply",new C.e45(k),k.f,"Write in your language"),1)],f),B.l,j,B.e,B.h,0,j,j)
 s=A.c("Languages",j,j,j,j,j,j,A.l(j,j,B.c.j(0.65),j,j,j,j,j,j,j,j,12,j,j,B.E,j,j,!0,j,j,j,j,j,j,j,j),B.K,j,j)
 r=k.e
@@ -1399,7 +1399,7 @@ o=B.c.j(0.07)
 r=A.aN(j,B.Z,!1,j,!0,B.t,j,A.aO(),k.r,j,j,j,j,j,2,A.bC(j,new A.b6(4,A.n(16),B.a1),j,j,j,j,j,j,!0,j,j,j,j,j,j,o,!0,j,j,j,j,j,j,j,j,j,j,j,j,j,q,r,j,j,j,j,j,j,j,j,j,!0,!0,!1,j,j,j,j,j,j,j,j,j,j,j,j,j,j),B.y,!0,j,!0,j,!1,j,B.al,j,j,j,j,j,j,j,j,j,6,5,j,!1,"\u2022",j,new C.e48(k),j,j,j,!1,j,j,!1,j,!0,j,B.ae,j,j,j,j,j,j,j,j,j,j,j,B.ad3,!0,B.a7,j,B.ao,j,j,j,j)
 q=k.z
 o=q?j:k.gcJP()
-n=q?B.Wl:D.c_I
+n=q?B.Wk:D.c_I
 t=A.a([t,B.lj,s,B.af,p,B.lj,r,B.aA,A.db(n,j,A.c(q?"Translating\u2026":"Translate ("+v+" \u2192 "+u+")",j,j,j,j,j,j,j,j,j,j),o,A.bp(B.b0,j,j,j,j,B.Lg,j,j,new A.b9(A.n(16),B.a1),j,j,j))],f)
 s=k.y
 if(s!=null)B.d.u(t,A.a([B.af,A.c(s,j,j,j,j,j,j,B.aXG,B.K,j,j)],f))
@@ -1409,7 +1409,7 @@ q=A.K(B.bx,B.r,1)
 p=A.c("Original ("+v+") \u2014 tap a word",j,j,j,j,j,j,A.l(j,j,B.c.j(0.45),j,j,j,j,j,j,j,j,10,j,j,B.P,j,j,!0,j,j,j,j,j,j,j,j),j,j,j)
 o=k.x
 o.toString
-p=A.A(A.a([p,B.aW,k.bay(B.bd,"source",k.f?k.d:k.e,o,"Listen to original")],f),B.l,j,B.e,B.h,0,j,j)
+p=A.A(A.a([p,B.aY,k.bay(B.bd,"source",k.f?k.d:k.e,o,"Listen to original")],f),B.l,j,B.e,B.h,0,j,j)
 o=k.x
 o.toString
 n=k.f
@@ -1421,7 +1421,7 @@ p=A.K(B.bw.j(0.45),B.r,1)
 o=A.c("In "+u,j,j,j,j,j,j,D.fPF,j,j,j)
 n=k.w
 n.toString
-o=A.A(A.a([o,B.aW,k.bay(B.bw,"translation",k.f?k.e:k.d,n,"Listen to translation"),A.aI(j,B.ot,j,j,D.c_t,j,j,j,new C.e49(k),B.ag,j,j,j,"Copy",B.cn)],f),B.l,j,B.e,B.h,0,j,j)
+o=A.A(A.a([o,B.aY,k.bay(B.bw,"translation",k.f?k.e:k.d,n,"Listen to translation"),A.aI(j,B.ot,j,j,D.c_t,j,j,j,new C.e49(k),B.ag,j,j,j,"Copy",B.cn)],f),B.l,j,B.e,B.h,0,j,j)
 n=k.w
 n.toString
 m=k.f
@@ -1431,7 +1431,7 @@ r=B.b0.j(0.14)
 q=A.K(B.b0.j(0.45),B.r,1)
 p=k.at
 p=A.a([A.E(A.c(p!=null?"Word: "+p:"Word lesson",j,j,j,j,j,j,D.fQb,j,j,j),1)],f)
-if(k.as!=null)p.push(A.aI(j,j,j,j,L.R5,j,j,j,new C.e4b(k),j,j,j,j,j,B.cn))
+if(k.as!=null)p.push(A.aI(j,j,j,j,L.R4,j,j,j,new C.e4b(k),j,j,j,j,j,B.cn))
 p=A.a([A.A(p,B.l,j,B.e,B.h,0,j,j),B.N],f)
 if(k.Q)p.push(D.bg2)
 else{o=k.as
@@ -1440,7 +1440,7 @@ b0q(d,e,f,g,h){var w=null,v=A.n(16),u=A.n(16),t=g?B.bd.j(0.18):B.c.j(0.05),s=A.K
 return A.aG(!1,B.a3,!0,w,A.aM(!1,v,!0,A.cV(w,A.x(A.a([A.A(A.a([r,B.aa,A.c(e,w,w,w,w,w,w,A.l(w,w,g?B.c:B.ab,w,w,w,w,w,w,w,w,13,w,w,B.u,w,w,!0,w,w,w,w,w,w,w,w),w,w,w)],q),B.l,w,B.e,B.h,0,w,w),B.at,A.c(h,w,w,w,w,w,w,A.l(w,w,B.c.j(0.4),w,w,w,w,w,w,w,w,10,w,w,w,w,1.25,!0,w,w,w,w,w,w,w,w),w,w,w)],q),B.B,w,B.e,B.h,0,B.p),w,w,B.aZ,new A.o(t,w,s,u,w,w,B.m),B.a3,w,w,w,w,B.tx,w,w,w),w,!0,w,w,w,w,w,w,w,w,w,w,w,f,w,w,w,w,w,w,w),B.f,B.L,0,w,w,w,w,w,B.ai)}}
 C.atq.prototype={
 B(d){var w=this.c
-return A.b4(null,null,null,D.hOD,new A.av(w,w))},
+return A.b4(null,null,null,D.hOB,new A.av(w,w))},
 ga0(d){return this.c}}
 C.bmz.prototype={
 a4(d,e){var w,v,u,t,s,r=null,q=e.a,p=e.b,o=q*0.52,n=p*0.44,m=p*0.14,l=A.by(A.bY(new A.r(o,n),p*0.48,q*0.72),new A.aP(m,m))
@@ -1662,9 +1662,9 @@ v=2-w.length===2?"2 pages":"1 more"
 u=x.p
 t=A.a([A.p(j,j,B.f,j,j,D.baf,j,j,j,j,j,j,j,j)],u)
 B.d.u(t,A.ip(8,new C.e3B(h,d),!0,x.l))
-s=A.A(A.a([A.aI(j,j,j,j,N.R9,j,j,j,new C.e3C(d),j,j,j,j,j,j),D.bNo,i.c80()],u),B.l,j,B.e,B.h,0,j,j)
+s=A.A(A.a([A.aI(j,j,j,j,N.R8,j,j,j,new C.e3C(d),j,j,j,j,j,j),D.bNo,i.c80()],u),B.l,j,B.e,B.h,0,j,j)
 h=i.c3y(h)
-r=A.os(B.k6,D.h3S,new C.e3D())
+r=A.os(B.k6,D.h3R,new C.e3D())
 q=A.c("Family-friendly AI reads your papers and highlights what matters.",j,j,j,j,j,j,A.l(j,j,B.c.j(0.72),j,j,j,j,j,j,j,j,13,j,j,j,j,1.35,!0,j,j,j,j,j,j,j,j),B.K,j,j)
 p=w.length===0
 h=A.a([h,B.at,r,B.ak,q,B.by,i.czb(!p?i.bV5():new A.a5(1/0,116,i.bWw(),j),p)],u)
@@ -1689,7 +1689,7 @@ p=r?j:i.gcG7()
 o=A.n(18)
 n=A.n(18)
 if(r)r=A.a([B.kZ,B.n_],x.O)
-else r=i.gum()&&i.ch===i.gwu()&&B.a.i(q.a.a).length!==0?D.dvY:D.djD
+else r=i.gum()&&i.ch===i.gwu()&&B.a.i(q.a.a).length!==0?D.dvY:D.djC
 m=A.a([new A.aa(0,B.H,B.c3.j(0.45),B.dt,20)],x.V)
 l=A.a([],u)
 if(i.as)l.push(D.ftT)
@@ -1703,7 +1703,7 @@ r=i.CW
 if(r.length!==0){q=B.d.gG(r)
 p=B.bd.j(0.15)
 o=A.n(20)
-q=A.a([B.aO,new A.mb(i.adg(D.dk5,A.x(A.a([A.p(j,D.h22,B.f,j,j,new A.o(p,j,A.K(B.bd.j(0.45),B.r,1),o,j,j,B.m),j,j,j,j,B.lx,j,j,j),B.R,A.A(A.a([A.V(B.o6,B.bd.j(0.9),j,j,j,18),B.aa,A.E(A.c(q.b,j,j,j,j,j,j,A.l(j,j,B.c.j(0.92),j,j,j,j,j,j,j,j,13,j,j,B.P,j,j,!0,j,j,j,j,j,j,j,j),j,j,j),1)],u),B.B,j,B.e,B.h,0,j,j),B.R,A.A(A.a([A.V(B.eg,B.bw.j(0.9),j,j,j,18),B.aa,A.E(A.AI(q.a,D.X_,j),1)],u),B.B,j,B.e,B.h,0,j,j)],u),B.B,j,B.e,B.h,0,B.p)),i.r)],u)
+q=A.a([B.aO,new A.mb(i.adg(D.dk4,A.x(A.a([A.p(j,D.h22,B.f,j,j,new A.o(p,j,A.K(B.bd.j(0.45),B.r,1),o,j,j,B.m),j,j,j,j,B.lx,j,j,j),B.R,A.A(A.a([A.V(B.o6,B.bd.j(0.9),j,j,j,18),B.aa,A.E(A.c(q.b,j,j,j,j,j,j,A.l(j,j,B.c.j(0.92),j,j,j,j,j,j,j,j,13,j,j,B.P,j,j,!0,j,j,j,j,j,j,j,j),j,j,j),1)],u),B.B,j,B.e,B.h,0,j,j),B.R,A.A(A.a([A.V(B.eg,B.bw.j(0.9),j,j,j,18),B.aa,A.E(A.AI(q.a,D.X_,j),1)],u),B.B,j,B.e,B.h,0,j,j)],u),B.B,j,B.e,B.h,0,B.p)),i.r)],u)
 for(k=1;k<r.length;++k){p=r[k]
 o=A.V(B.o6,B.bd.j(0.9),j,j,j,18)
 n=B.c.j(0.92)
@@ -1952,14 +1952,14 @@ D.bIB=new A.R(1,1,1,1)
 D.bKF=new A.R(4,4,8,0)
 D.bKM=new A.R(4,8,8,8)
 D.bKV=new A.R(6,0,2,0)
-D.hic=new A.C("Message translator",null,B.du,null,null,null,null,null,null,null,null,null)
-D.hfL=new A.C("Paste chats \xb7 copy replies",null,O.Fz,null,null,null,null,null,null,null,null,null)
-D.dwf=w([D.hic,D.hfL],x.p)
+D.hia=new A.C("Message translator",null,B.du,null,null,null,null,null,null,null,null,null)
+D.hfJ=new A.C("Paste chats \xb7 copy replies",null,O.Fz,null,null,null,null,null,null,null,null,null)
+D.dwf=w([D.hia,D.hfJ],x.p)
 D.bAU=new A.ft(B.ah,B.e,B.h,B.B,null,B.p,null,0,D.dwf,null)
 D.bMB=new A.bu(1,B.b9,D.bAU,null)
 D.fE7=new A.G(!0,B.c,null,null,null,null,18,B.u,null,0.3,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.hfq=new A.C("Document Scanner",null,D.fE7,null,B.K,null,null,null,null,null,null,null)
-D.bNo=new A.bu(1,B.b9,D.hfq,null)
+D.hfo=new A.C("Document Scanner",null,D.fE7,null,B.K,null,null,null,null,null,null,null)
+D.bNo=new A.bu(1,B.b9,D.hfo,null)
 D.bSE=new A.a_(61011,"MaterialIcons",!1)
 D.bV9=new A.a_(63653,"MaterialIcons",!1)
 D.bXy=new A.ae(B.k_,26,B.bd,null,null,null)
@@ -1974,11 +1974,11 @@ D.doN=w([B.b3,B.bl,B.c3],x.O)
 D.cbl=new A.a8(B.ay,B.aD,B.x,D.doN,null,null)
 D.de6=w([B.bd,B.bw,B.b0],x.O)
 D.cco=new A.a8(B.a5,B.a9,B.x,D.de6,null,null)
-D.djD=w([B.as,B.bB,B.b0],x.O)
-D.dk5=w([B.bd],x.O)
+D.djC=w([B.as,B.bB,B.b0],x.O)
+D.dk4=w([B.bd],x.O)
 D.dnw=w(["eleven_turbo_v2_5","eleven_flash_v2_5","eleven_multilingual_v2"],A.ar("N<m>"))
 D.dq2=w([B.fq],x.O)
-D.hYe=w([],x.W)
+D.hYc=w([],x.W)
 D.duO=w([B.bw],x.O)
 D.dvY=w([B.b5,B.aV,B.bd],x.O)
 D.e5V=new C.atq(26,null)
@@ -1996,10 +1996,10 @@ D.h3_=new A.C("Add one or two document photos first.",null,null,null,null,null,n
 D.aWw=new A.b2(D.h3_,null,null,null,null,null,null,null,null,null,null,null,null,B.Y,!1,null,null,null,B.t,null)
 D.h3M=new A.C("Only 2 documents at a time \u2014 extra files were skipped.",null,null,null,null,null,null,null,null,null,null,null)
 D.fyB=new A.b2(D.h3M,null,null,null,null,null,null,null,null,null,null,null,null,B.Y,!1,null,null,null,B.t,null)
-D.he_=new A.C("You already have 2 documents. Remove one to add another.",null,null,null,null,null,null,null,null,null,null,null)
-D.aWx=new A.b2(D.he_,null,null,null,null,null,null,null,null,null,null,null,null,B.Y,!1,null,null,null,B.t,null)
-D.h9B=new A.C("Type a question about your document, or remove pages to scan again.",null,null,null,null,null,null,null,null,null,null,null)
-D.fzT=new A.b2(D.h9B,null,null,null,null,null,null,null,null,null,null,null,null,B.Y,!1,null,null,null,B.t,null)
+D.hdY=new A.C("You already have 2 documents. Remove one to add another.",null,null,null,null,null,null,null,null,null,null,null)
+D.aWx=new A.b2(D.hdY,null,null,null,null,null,null,null,null,null,null,null,null,B.Y,!1,null,null,null,B.t,null)
+D.h9z=new A.C("Type a question about your document, or remove pages to scan again.",null,null,null,null,null,null,null,null,null,null,null)
+D.fzT=new A.b2(D.h9z,null,null,null,null,null,null,null,null,null,null,null,null,B.Y,!1,null,null,null,B.t,null)
 D.fLZ=new A.G(!0,B.fq,null,null,null,null,13,null,null,null,null,null,1.4,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fNc=new A.G(!0,B.c,null,null,null,null,15,B.cI,null,null,null,null,1.55,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.X_=new A.G(!0,B.c,null,null,null,null,14,null,null,null,null,null,1.5,null,null,null,null,null,null,null,null,null,null,null,null,null)
@@ -2009,8 +2009,8 @@ D.fQb=new A.G(!0,B.b0,null,null,null,null,13,B.u,null,null,null,null,null,null,n
 D.fNg=new A.G(!0,B.bd,null,null,null,null,11,B.E,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.h22=new A.C("Latest answer",null,D.fNg,null,null,null,null,null,null,null,null,null)
 D.fGs=new A.G(!0,B.c,null,null,null,null,15,B.E,null,0.5,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-D.h3S=new A.C("Snap \xb7 Scan \xb7 Understand",null,D.fGs,null,B.K,null,null,null,null,null,null,null)
-D.hOD=new C.bmz(null)})();(function staticFields(){$.OH=null
+D.h3R=new A.C("Snap \xb7 Scan \xb7 Understand",null,D.fGs,null,B.K,null,null,null,null,null,null,null)
+D.hOB=new C.bmz(null)})();(function staticFields(){$.OH=null
 $.hz4=!1})();(function lazyInitializers(){var w=a.lazyFinal
 w($,"iI8","ajU",()=>A.akE())})()};
-(a=>{a["aSywL3CtUgPrzaJ2fpl8i6UhR98="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["ZQ0MgD71oiVfpAhSw9G1lL7f3bw="]=a.current})($__dart_deferred_initializers__);
