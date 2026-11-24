@@ -1,6 +1,6 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var J,A,C,B={
-hAT(d){var x=C.a.i(d.toLowerCase())
+hAU(d){var x=C.a.i(d.toLowerCase())
 return x.length===0?"device":x},
 b5z(d,e){var x=0,w=A.j(y.e),v,u
 var $async$b5z=A.e(function(f,g){if(f===1)return A.f(g,w)
@@ -19,7 +19,7 @@ var $async$b5y=A.e(function(e,f){if(e===1)return A.f(f,w)
 for(;;)switch(x){case 0:x=3
 return A.b(A.aB(),$async$b5y)
 case 3:u=f
-t=B.hAT(d)
+t=B.hAU(d)
 t=A.et(J.t(u.a,"ngmy_device_transfer_used_"+t))
 v=t==null?0:t
 x=1
@@ -31,7 +31,7 @@ var $async$b5A=A.e(function(e,f){if(e===1)return A.f(f,w)
 for(;;)switch(x){case 0:x=2
 return A.b(A.aB(),$async$b5A)
 case 2:v=f
-u="ngmy_device_transfer_used_"+B.hAT(d)
+u="ngmy_device_transfer_used_"+B.hAU(d)
 t=A.et(J.t(v.a,u))
 x=3
 return A.b(v.aB("Int",u,(t==null?0:t)+1),$async$b5A)
@@ -52,7 +52,7 @@ var $async$pP=A.e(function(g,h){if(g===1)return A.f(h,w)
 for(;;)switch(x){case 0:if(f){v=!0
 x=1
 break}u=C.a.i(e)
-if(u.length===0){if(d.e!=null)d.K(y.a).f.T(D.fwG)
+if(u.length===0){if(d.e!=null)d.K(y.a).f.T(D.fwJ)
 v=!1
 x=1
 break}x=3
@@ -76,6 +76,6 @@ C=c[2]
 B=a.updateHolder(c[83],B)
 D=c[386]
 var z=a.updateTypes([])
-var y={a:A.ar("ky"),e:A.ar("P"),l:A.ar("F"),f:A.ar("~")};(function constants(){D.h7s=new A.C("Sign in to transfer files between devices.",null,null,null,null,null,null,null,null,null,null,null)
-D.fwG=new A.b2(D.h7s,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)})()};
-(a=>{a["uob3t0Vfcpc6UQb3OdPbsVUprO0="]=a.current})($__dart_deferred_initializers__);
+var y={a:A.ar("ky"),e:A.ar("P"),l:A.ar("F"),f:A.ar("~")};(function constants(){D.h7v=new A.C("Sign in to transfer files between devices.",null,null,null,null,null,null,null,null,null,null,null)
+D.fwJ=new A.b2(D.h7v,null,null,null,null,null,null,null,null,null,null,null,null,C.Y,!1,null,null,null,C.t,null)})()};
+(a=>{a["elJI9FgpLtsf0g9PCrezATwzs4w="]=a.current})($__dart_deferred_initializers__);
