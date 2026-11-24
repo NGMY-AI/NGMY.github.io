@@ -234,7 +234,9 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
         _note(p, 'Paused by this system\'s brake. ${st['brakeReason'] ?? ''}. Look over the trades, then press Start to turn it back on.', _loss),
       _controls(p, st),
       _paceCard(p, s),
+      _learningPanel(p, s),
       _winRate(p, s),
+      if (_options && s['brakeNote'] != null) _note(p, '${s['brakeNote']}', _slowC),
       if (_options) _optionsCard(p, s),
       _settings(p, s),
       _lastCheck(p, st),
@@ -354,15 +356,15 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
 
   Widget _paceCard(_Pal p, Map<String, dynamic> s) {
     final pc = _map(s['pace']);
-    final target = _d(pc['target'] ?? 20).toInt();
+    final target = _d(pc['target'] ?? 40).toInt();
     final trades = _d(pc['trades']).toInt();
     final expected = _d(pc['expected']).toInt();
     final behind = _d(pc['deficit']) > 0;
     final thr = _d(pc['thresholdPct']);
     final start = _d(pc['startPct']);
-    final steps = _d(pc['steps']).toInt();
-    final finalHour = pc['finalHour'] == true;
     final minsLeft = _d(pc['minutesLeft']).toInt();
+    final steps = ((pc['lines'] as List?) ?? const []).map((e) => '$e').toList();
+    final ranking = ((s['ranking'] as List?) ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
     final c = trades >= target
         ? _up
         : behind
@@ -375,11 +377,9 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
         : 'on pace';
     final ladderText = trades >= target
         ? 'Target reached: back to the day\'s start, +${start.toStringAsFixed(2)}%.'
-        : finalHour
-        ? 'Last hour of the window: at the floor, +${thr.toStringAsFixed(2)}% (still never a falling market).'
-        : steps > 0
-        ? 'Behind by ${_d(pc['hoursBehind']).toStringAsFixed(1)} h, so $steps step(s) down from +${start.toStringAsFixed(2)}%.'
-        : 'On pace: the day\'s start, +${start.toStringAsFixed(2)}%.';
+        : steps.isEmpty
+        ? 'On pace: the day\'s start, +${start.toStringAsFixed(2)}%, held up to ${_d(pc['maxHold'] ?? 30).toInt()} minutes, top ${_d(pc['topN'] ?? 3).toInt()} setups tried.'
+        : steps.join('\n');
     final note = (_map(s['state'])['lastNote'] ?? '').toString();
     final learned = (pc['learned'] ?? '').toString();
     final dayNote = (pc['dayNote'] ?? '').toString();
@@ -463,14 +463,35 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
                   style: TextStyle(color: p.ink, fontSize: 13, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 2),
-                Text(ladderText, style: TextStyle(color: p.muted, fontSize: 11.5, height: 1.3)),
+                Text(ladderText, style: TextStyle(color: steps.isEmpty ? p.muted : _down, fontSize: 11.5, height: 1.3, fontWeight: steps.isEmpty ? FontWeight.w500 : FontWeight.w700)),
+                const SizedBox(height: 2),
                 Text(
-                  'It steps down 0.05% per hour behind the pace to 20, never below +0.05%, and never buys a falling market.',
+                  '${pc['checkpoints'] ?? ''}',
+                  style: TextStyle(color: p.ink, fontSize: 11, height: 1.3, fontWeight: FontWeight.w700),
+                ),
+                Text(
+                  'Behind the pace: first a shorter hold (20, then 12 min), then less strength needed (never below +0.12%), then the top 5 setups. '
+                  'The trend rules are never relaxed.',
                   style: TextStyle(color: p.muted, fontSize: 11, height: 1.3),
                 ),
               ],
             ),
           ),
+          if (ranking.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text('Top 3 ranked right now', style: TextStyle(color: p.ink, fontSize: 12.5, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 2),
+            for (final (i, r) in ranking.indexed)
+              Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: Text(
+                  '${i + 1}. ${r['symbol']} · score ${r['score']} '
+                  '(strength and trend ${_map(r['parts'])['base'] ?? '?'}, record ${_map(r['parts'])['record'] ?? 0}, setup size ${_map(r['parts'])['bucket'] ?? 0}) · '
+                  '${r['passes'] == true ? 'PASSES' : r['why'] ?? ''}',
+                  style: TextStyle(color: r['passes'] == true ? _up : p.muted, fontSize: 11.5, height: 1.3, fontWeight: r['passes'] == true ? FontWeight.w800 : FontWeight.w500),
+                ),
+              ),
+          ],
           if (learned.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text.rich(
@@ -496,6 +517,86 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
           if (note.isNotEmpty && _map(s['state'])['shadow'] == null) ...[
             const SizedBox(height: 6),
             Text('Now: $note', style: TextStyle(color: p.ink, fontSize: 12, height: 1.3)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ── Learning: the lessons in force today, benched markets, what the next entry needs, the last 5 loss reasons
+
+  static String _reasonShort(String r) => switch (r) {
+    'AGAINST_TREND' => 'against trend',
+    'CHASED' => 'chased',
+    'CHOP' => 'chop',
+    'NOISE_STOP' => 'noise stop',
+    'NO_FOLLOW_THROUGH' => 'no follow-through',
+    'WIDE_SPREAD' => 'wide spread',
+    _ => r.toLowerCase(),
+  };
+
+  Widget _learningPanel(_Pal p, Map<String, dynamic> s) {
+    final l = _map(s['learning']);
+    if (l.isEmpty) return const SizedBox.shrink();
+    List<Map<String, dynamic>> listOf(String k) => ((l[k] as List?) ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    final lessons = listOf('lessons');
+    final benched = listOf('benched');
+    final losses = listOf('lastLosses');
+    final review = ((l['review'] as List?) ?? const []).map((e) => '$e').toList();
+    final pause = DateTime.tryParse('${l['pauseUntil'] ?? ''}');
+    Widget head(String t) => Padding(
+      padding: const EdgeInsets.only(top: 10, bottom: 4),
+      child: Text(t, style: TextStyle(color: p.ink, fontSize: 12.5, fontWeight: FontWeight.w800)),
+    );
+    Widget line(String t, {Color? c, IconData icon = Icons.circle}) => Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Padding(padding: const EdgeInsets.only(top: 4), child: Icon(icon, size: icon == Icons.circle ? 6 : 13, color: c ?? _accent)),
+        const SizedBox(width: 7),
+        Expanded(child: Text(t, style: TextStyle(color: c ?? p.ink, fontSize: 12, height: 1.3))),
+      ]),
+    );
+    return _frame(
+      p,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(Icons.psychology_rounded, size: 18, color: _accent),
+            const SizedBox(width: 6),
+            Text('LEARNING', style: TextStyle(color: p.ink, fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 0.8)),
+            const Spacer(),
+            _tag(lessons.isEmpty ? 'NO LESSONS YET' : '${lessons.length} ACTIVE', lessons.isEmpty ? p.muted : _accent),
+          ]),
+          if (l['setupNeeded'] == true)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text('The learning store is not set up yet: run the learning SQL in Supabase.', style: TextStyle(color: _loss, fontSize: 12, fontWeight: FontWeight.w700)),
+            ),
+          head('Lessons active today'),
+          if (lessons.isEmpty) Text('${l['empty'] ?? 'No lessons yet — still learning this market.'}', style: TextStyle(color: p.muted, fontSize: 12)),
+          for (final x in lessons) line('${x['text'] ?? ''}${x['at'] == null ? '' : ' · ${_shortTime(_etLabel(x['at']))}'}'),
+          if (pause != null && pause.isAfter(DateTime.now()))
+            line('Paused after 2 losses in a row until ${_clock(_toEt(pause.toUtc()))} ET', c: _down, icon: Icons.pause_circle_rounded),
+          if (l['stepUpNext'] == true) line('The next entry needs +0.05% more strength (after 2 losses in a row)', c: _down, icon: Icons.trending_up_rounded),
+          head('Benched markets'),
+          if (benched.isEmpty) Text('None benched today.', style: TextStyle(color: p.muted, fontSize: 12)),
+          for (final b in benched) line('${b['text'] ?? b['symbol']}', c: _loss, icon: Icons.block_rounded),
+          head('What the next entry needs'),
+          Wrap(spacing: 6, runSpacing: 6, children: [
+            _tag('STRENGTH +${_d(l['thresholdPct']).toStringAsFixed(2)}%', _accent),
+            _tag('MAX HOLD ${_d(l['maxHold']).toInt()} MIN', _accent),
+            _tag('NO-CHASE ${_d(l['chaseCapPct']).toStringAsFixed(1)}%', _accent),
+            _tag('CHOP SKIP ${_d(l['chopSkipAt']).toInt()}+', _accent),
+            if (l['need60'] == true) _tag('1-HOUR TREND MUST AGREE', _down),
+          ]),
+          head('Last 5 loss reasons'),
+          if (losses.isEmpty) Text('No graded losses yet.', style: TextStyle(color: p.muted, fontSize: 12)),
+          for (final x in losses)
+            line('${x['market']} ${_money(_d(x['pnl']))} · ${_reasonShort('${x['reason']}')}: ${x['text'] ?? ''}', c: p.ink, icon: Icons.close_rounded),
+          if (review.isNotEmpty) ...[
+            head('What I learned yesterday'),
+            for (final r in review) line(r, c: p.muted),
           ],
         ],
       ),
@@ -532,7 +633,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
           ]),
         ),
         SizedBox(
-          height: 82,
+          height: 96,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             clipBehavior: Clip.none,
@@ -546,8 +647,12 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
               final rec = _map(m['record']);
               final a = _map(m['analysis']);
               final tag = '${m['tag'] ?? ''}';
+              final today = _map(m['today']);
+              final tw = _d(today['wins']).toInt(), tlo = _d(today['losses']).toInt();
               final (Color tc, String tl) = tag == 'TRADED NOW'
                   ? (_btc, 'HOLDING')
+                  : m['benched'] != null
+                  ? (_loss, 'BENCHED')
                   : a['passes'] == true
                       ? (_up, 'PASSES')
                       : a['falling'] == true
@@ -588,10 +693,20 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
                           style: TextStyle(color: chg >= 0 ? _up : _loss, fontSize: 10.5, fontWeight: FontWeight.w800)),
                     ]),
                     Text(
-                      _d(rec['n']) == 0 ? 'no trades here yet' : 'last ${_d(rec['n']).toInt()}: ${_d(rec['wins']).toInt()}W/${_d(rec['losses']).toInt()}L ${_money(_d(rec['pnl']))}',
+                      'today ${tw}W/${tlo}L${_d(rec['n']) == 0 ? '' : ' · last ${_d(rec['n']).toInt()}: ${_d(rec['wins']).toInt()}W/${_d(rec['losses']).toInt()}L'}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: p.muted, fontSize: 9.5, fontWeight: FontWeight.w700),
+                      style: TextStyle(color: tw + tlo > 0 ? p.ink : p.muted, fontSize: 9.5, fontWeight: FontWeight.w700),
+                    ),
+                    Text(
+                      m['benched'] != null
+                          ? 'benched for today'
+                          : _d(rec['n']) == 0
+                          ? 'no trades here yet'
+                          : '${_money(_d(rec['pnl']))}${rec['topLoss'] != null ? ' · most losses: ${_reasonShort('${rec['topLoss']}')}' : ''}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: m['benched'] != null ? _loss : p.muted, fontSize: 9.5, fontWeight: FontWeight.w700),
                     ),
                   ]),
                 ),
@@ -644,7 +759,9 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
 
   Widget _winRate(_Pal p, Map<String, dynamic> s) {
     final r = _map(s['record']);
-    final rate = r['winRatePct'];
+    final t = _map(s['todayStats']);
+    final rate = t['winRatePct'];
+    final tp = _d(t['pnl']);
     final c = rate == null
         ? p.ink
         : _d(rate) >= 50
@@ -659,15 +776,23 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'LIVE WIN RATE',
+                  'TODAY: WIN RATE AND P/L',
                   style: TextStyle(color: p.muted, fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: 0.9),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  rate == null ? 'No closed trades yet' : '${_d(rate).toStringAsFixed(0)}%',
-                  style: TextStyle(color: c, fontSize: rate == null ? 16 : 30, fontWeight: FontWeight.w900),
-                ),
-                Text('${r['wins'] ?? 0} won out of ${r['trades'] ?? 0} closed trades', style: TextStyle(color: p.muted, fontSize: 12)),
+                Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  Text(
+                    rate == null ? 'No closed trades today' : '${_d(rate).toStringAsFixed(0)}%',
+                    style: TextStyle(color: c, fontSize: rate == null ? 16 : 30, fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(width: 10),
+                  if (rate != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 5),
+                      child: Text(_money(tp), style: TextStyle(color: tp > 0 ? _up : tp < 0 ? _loss : p.ink, fontSize: 16, fontWeight: FontWeight.w800)),
+                    ),
+                ]),
+                Text('${t['wins'] ?? 0} won out of ${t['closed'] ?? 0} closed today', style: TextStyle(color: p.muted, fontSize: 12)),
               ],
             ),
           ),
@@ -749,19 +874,19 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Every trade closes within ${_d(g['maxHoldMin']).toStringAsFixed(0)} minutes, win, lose or flat. Exits are checked every '
-            '${_d(g['exitCheckEveryMin']).toStringAsFixed(0)} minute, and the hard close sells at the last check before 30 minutes '
-            '(${_d(g['hardCloseAtMin']).toStringAsFixed(0)} minutes held).',
+            'Every trade closes within 30 minutes at most, win, lose or flat. Behind the pace (or after a lesson) new trades get a '
+            'shorter max hold: now ${_d(g['maxHoldMin']).toStringAsFixed(0)} minutes. Exits are checked every '
+            '${_d(g['exitCheckEveryMin']).toStringAsFixed(0)} minute, and the hard close sells at the last check before the max hold.',
             style: TextStyle(color: p.muted, fontSize: 11.5, height: 1.35),
           ),
           const SizedBox(height: 10),
           Row(
             children: [
-              chip('Hard close', '${_d(g['maxHoldMin']).toStringAsFixed(0)} min max'),
+              chip('Max hold now', '${_d(g['maxHoldMin']).toStringAsFixed(0)} min'),
               const SizedBox(width: 6),
               chip('Exit checks', 'every ${_d(g['exitCheckEveryMin']).toStringAsFixed(0)} min'),
               const SizedBox(width: 6),
-              chip('Each trade', _options ? '1 call ≤\$${_d(g['maxPremiumUsd']).toStringAsFixed(0)}' : '\$${_d(g['tradeUsd']).toStringAsFixed(0)}'),
+              chip('Each trade', _options ? '1 call/put ≤\$${_d(g['maxPremiumUsd']).toStringAsFixed(0)}' : '\$${_d(g['tradeUsd']).toStringAsFixed(0)}'),
             ],
           ),
           const SizedBox(height: 6),
@@ -781,7 +906,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
               const SizedBox(width: 6),
               chip('Total brake', '-\$${_d(g['totalBrakeUsd']).toStringAsFixed(0)}'),
               const SizedBox(width: 6),
-              chip('Strength', '+${_d(g['strengthPct']).toStringAsFixed(1)}% in 15 min'),
+              chip('Strength', '+${_d(g['strengthPct']).toStringAsFixed(2)}% in 15 min'),
             ],
           ),
         ],
@@ -812,17 +937,18 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
             children: [
               Expanded(
                 child: Text(
-                  '$und CALL IT WOULD CHOOSE NOW',
+                  '$und ${right.toUpperCase()} IT WOULD CHOOSE NOW',
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: p.muted, fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: 0.8),
                 ),
               ),
-              _tag(fits ? 'UNDER \$150' : 'NONE UNDER \$150', fits ? _up : _loss),
+              _tag(fits ? 'FITS' : 'NONE FITS', fits ? _up : _loss),
             ],
           ),
           const SizedBox(height: 4),
           Text(
-            'For the best-ranked market right now. Calls only (trend up), slightly out of the money, expiring this week.',
+            'For the best-ranked market right now: a call when its trend is up, a put when it is down. Slightly out of the money, '
+            'at least 3 days to expiry, \$150 or less, spread at most 10% of the premium.',
             style: TextStyle(color: p.muted, fontSize: 11.5),
           ),
           const SizedBox(height: 8),
@@ -840,7 +966,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
             Text('It fits: ${o['why'] ?? ''}. On a passing setup it would buy this one.', style: const TextStyle(color: _up, fontSize: 12, height: 1.3)),
           ] else
             Text(
-              '${'${o['why'] ?? ''}'.startsWith('no contract') ? '' : 'No contract under \$150 right now. '}${o['why'] ?? ''}. It keeps checking every minute; the budget is never raised.',
+              '${o['why'] ?? ''}. It keeps checking every minute; the budget is never raised.',
               style: const TextStyle(color: _loss, fontSize: 12, height: 1.3),
             ),
           if (tried.isNotEmpty) ...[
@@ -862,7 +988,8 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '\$${_d(t['strike']).toStringAsFixed(0)} · ${_dateLabel(t['expiry']).replaceAll(RegExp(r', \d{4}$'), '')} · ${t['cost'] == null ? 'no price' : _money(_d(t['cost']), sign: false)}',
+                      '\$${_d(t['strike']).toStringAsFixed(0)} · ${_dateLabel(t['expiry']).replaceAll(RegExp(r', \d{4}$'), '')} · ${t['cost'] == null ? 'no price' : _money(_d(t['cost']), sign: false)}'
+                      '${t['spreadPct'] == null || _d(t['spreadPct']) >= 100 ? '' : ' · spread ${_d(t['spreadPct']).toStringAsFixed(0)}%'}',
                       style: TextStyle(color: p.ink, fontSize: 10.5, fontWeight: FontWeight.w700),
                     ),
                   ),
@@ -879,7 +1006,8 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
   Widget _openTrade(_Pal p, Map<String, dynamic> sh, Map<String, dynamic> mark) {
     final opt = sh['option'] is Map ? _map(sh['option']) : null;
     final opened = DateTime.tryParse('${sh['entryAt'] ?? ''}');
-    final closeBy = opened?.add(const Duration(minutes: 30));
+    final hold = _d(sh['maxHold'] ?? 30).toInt();
+    final closeBy = opened?.add(Duration(minutes: hold));
     final pnl = _d(mark['pnl']);
     return _frame(
       p,
@@ -921,7 +1049,8 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
             ],
           ),
           Text(
-            'Bought ${_etLabel(sh['entryAt'])}${closeBy == null ? '' : ' · hard close by ${_clock(_toEt(closeBy.toUtc()))} ET'}',
+            'Bought ${_etLabel(sh['entryAt'])}${closeBy == null ? '' : ' · max hold $hold min, closes by ${_clock(_toEt(closeBy.toUtc()))} ET'}'
+            '${sh['tpUsd'] == null ? '' : ' · take profit +${_money(_d(sh['tpUsd']), sign: false)} / stop -${_money(_d(sh['slUsd']), sign: false)}'}',
             style: TextStyle(color: p.muted, fontSize: 11.5),
           ),
         ],
@@ -1001,8 +1130,10 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
     // A sold trade shows WIN or LOSS next to the reason it was bought.
     final why = buy ? (an['why'] ?? '').toString() : (det['entryWhy'] ?? '').toString();
     final result = buy ? '' : (det['result'] ?? (pnl > 0 ? 'WIN' : 'LOSS')).toString();
+    // Every loss carries its one plain reason (graded from the conditions saved at entry).
+    final lossText = buy ? '' : (det['lossText'] ?? '').toString();
     return InkWell(
-      onTap: why.isEmpty ? null : () => _showWhy(p, what, buy ? an : {'why': '$result. Bought because: $why'}),
+      onTap: why.isEmpty ? null : () => _showWhy(p, what, buy ? an : {'why': '${lossText.isNotEmpty ? '$lossText.\n\n' : '$result. '}Bought because: $why'}),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 9),
         decoration: BoxDecoration(
@@ -1031,6 +1162,13 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(color: p.muted, fontSize: 11.5),
                   ),
+                  if (lossText.isNotEmpty)
+                    Text(
+                      lossText,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: _loss, fontSize: 11.5, fontWeight: FontWeight.w800, height: 1.3),
+                    ),
                   if (why.isNotEmpty)
                     Text(
                       buy ? 'Why this trade: $why' : '$result · it was bought because: $why',
@@ -1086,7 +1224,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
               const SizedBox(height: 10),
               Text(
                 'Market ${an['market'] ?? '?'} at ${_money(_d(an['price']), sign: false)} · trend ${an['trend'] ?? '?'} · 15 min ${pct(an['strength'])} · score ${an['score'] ?? '?'}'
-                '${an['direction'] != null ? ' · ${an['direction']}' : ''} · Phase ${an['phase'] ?? '?'}${an['mode'] == 'pace' ? ' (behind pace)' : ''}',
+                '${an['thresholdPct'] != null ? ' · needed +${_d(an['thresholdPct']).toStringAsFixed(2)}%' : ''}',
                 style: TextStyle(color: p.muted, fontSize: 12, height: 1.35),
               ),
               if (rec.isNotEmpty && _d(rec['n']) > 0)
@@ -1102,7 +1240,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
                 ),
                 for (final (i, r) in ranked.indexed)
                   Text(
-                    '${i + 1}. ${r['s']} · score ${r['score']} · ${pct(r['strength'])} · trend ${r['trend']}',
+                    '${i + 1}. ${r['s']} · score ${r['score']} · ${pct(r['strength'])} · ${r['passes'] == true ? 'passes' : (r['why'] ?? 'trend ${r['trend'] ?? r['dir'] ?? '?'}')}',
                     style: TextStyle(color: p.muted, fontSize: 12, height: 1.4),
                   ),
               ],
@@ -1150,8 +1288,10 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${r['decision'] ?? ''}${r['asset'] == null ? '' : ' · ${r['asset']}'}',
-                          style: TextStyle(color: p.ink, fontSize: 12.5, fontWeight: FontWeight.w800),
+                          r['kind'] == 'lesson'
+                              ? 'Lesson${r['asset'] == null ? '' : ' · ${r['asset']}'}'
+                              : '${r['decision'] ?? ''}${r['asset'] == null ? '' : ' · ${r['asset']}'}',
+                          style: TextStyle(color: r['kind'] == 'lesson' ? _accent : p.ink, fontSize: 12.5, fontWeight: FontWeight.w800),
                         ),
                         Text((r['reason'] ?? '').toString(), style: TextStyle(color: p.muted, fontSize: 11.5, height: 1.3)),
                       ],

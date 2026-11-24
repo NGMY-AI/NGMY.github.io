@@ -102,12 +102,13 @@ class NgmySignalAlerts {
           if (at != null && DateTime.now().toUtc().difference(at.toUtc()) > const Duration(hours: 1)) continue;
           final buy = t['decision'] == 'would buy';
           final opt = t['option'];
-          final what = opt is Map ? 'SPY ${opt['strike']} call' : '${t['asset'] ?? ''}';
+          final what = opt is Map ? '${opt['underlying'] ?? t['asset'] ?? 'SPY'} ${opt['strike']} ${opt['right'] ?? 'call'}' : '${t['asset'] ?? ''}';
           final pnl = t['pnl'] is num ? (t['pnl'] as num).toDouble() : null;
           final money = pnl == null ? '' : ' ${pnl >= 0 ? '+' : '-'}\$${pnl.abs().toStringAsFixed(2)}';
+          final lossText = (t['lossText'] ?? '').toString();
           await ngmyPushShow(
             title: '${t['system']}: ${buy ? 'bought' : 'sold'} $what${buy ? '' : money}',
-            body: '${(t['reason'] ?? '').toString()} · pretend money',
+            body: lossText.isNotEmpty ? lossText : (t['reason'] ?? '').toString(),
             tag: 'sg_trade_$key',
           );
           if (++shown >= 4) break;

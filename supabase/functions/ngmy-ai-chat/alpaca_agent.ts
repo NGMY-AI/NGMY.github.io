@@ -48,7 +48,8 @@ async function tradeFeed(db: any): Promise<any[]> {
     return {
       at: r.created_at, asset: r.asset, decision: r.decision, reason: r.reason,
       pnl: d.pnl ?? null, amount: d.amount ?? null,
-      option: d.option ? { strike: d.option.strike, expiry: d.option.expiry, cost: d.option.cost } : null,
+      option: d.option ? { strike: d.option.strike, expiry: d.option.expiry, cost: d.option.cost, right: d.option.right ?? "call", underlying: r.asset } : null,
+      lossText: d.lossText ?? null,
     };
   }
 }
@@ -909,7 +910,7 @@ async function readMarketsFresh(k: Keys, list: MarketDef[]): Promise<Record<stri
   async function pagedBars(path: string): Promise<Record<string, any[]>> {
     const all: Record<string, any[]> = {};
     let token = "";
-    for (let page = 0; page < 4; page++) {
+    for (let page = 0; page < 10; page++) {
       const b = await aGet(DATA_BASE, path + (token ? `&page_token=${encodeURIComponent(token)}` : ""), k);
       for (const [sym, rows] of Object.entries(b?.bars ?? {})) all[sym] = [...(all[sym] ?? []), ...(rows as any[])];
       token = b?.next_page_token ?? "";
