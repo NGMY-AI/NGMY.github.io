@@ -5,8 +5,13 @@
 // How: like the app's other notifications, this watcher runs inside the app (open or in the background)
 // and checks the live signals once a minute. Only "enter now" signals with a clear direction, still early,
 // and that worked at least half the time lately on that market (see entryNow on the server).
+//
+// Admins also get a notification for every pretend trade any system makes (Signal Grid, Options, Scalper):
+// each new buy and each new sell, once.
 
 import 'dart:async';
+
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_edge_invoke.dart';
 import 'ngmy_push_notifications.dart';
@@ -50,6 +55,7 @@ class NgmySignalAlerts {
         return;
       }
       if (!await ngmyPushHasPermission()) return;
+      await _tradeAlerts(res['tradeFeed']);
       // Only markets the agent may buy right now: the 10 stocks on weekdays while the stock market is open, the 4 coins on weekends.
       // The server marks every other market as not traded, so it can never say ENTER. Forex is not alerted.
       final all = ((res['markets'] as List?) ?? const []).whereType<Map>().where((m) => m['open'] == true);
@@ -78,6 +84,46 @@ class NgmySignalAlerts {
       // Never break the app over an alert.
     } finally {
       _busy = false;
+    }
+  }
+
+  static const _seenKey = 'ngmy_signal_grid_trades_seen';
+
+  /// One notification per new pretend trade (buy or sell) of any system. The first time, the trades already
+  /// there are only remembered, never announced; trades older than an hour are never announced.
+  static Future<void> _tradeAlerts(dynamic feed) async {
+    if (feed is! List) return; // not an admin
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final stored = prefs.getStringList(_seenKey);
+      final seen = (stored ?? const <String>[]).toSet();
+      final trades = feed.whereType<Map>().toList();
+      if (stored != null) {
+        var shown = 0;
+        for (final t in trades.reversed) {
+          final key = '${t['key'] ?? ''}';
+          if (key.isEmpty || seen.contains(key)) continue;
+          final at = DateTime.tryParse('${t['at'] ?? ''}');
+          if (at != null && DateTime.now().toUtc().difference(at.toUtc()) > const Duration(hours: 1)) continue;
+          final buy = t['decision'] == 'would buy';
+          final opt = t['option'];
+          final what = opt is Map ? 'SPY ${opt['strike']} call' : '${t['asset'] ?? ''}';
+          final pnl = t['pnl'] is num ? (t['pnl'] as num).toDouble() : null;
+          final money = pnl == null ? '' : ' ${pnl >= 0 ? '+' : '-'}\$${pnl.abs().toStringAsFixed(2)}';
+          await ngmyPushShow(
+            title: '${t['system']}: ${buy ? 'bought' : 'sold'} $what${buy ? '' : money}',
+            body: '${(t['reason'] ?? '').toString()} · pretend money',
+            tag: 'sg_trade_$key',
+          );
+          if (++shown >= 4) break;
+        }
+      }
+      // Remember exactly the trades in the feed (the newest of each system): an older one only leaves the feed
+      // when newer ones arrive, so nothing is ever announced twice.
+      final keys = <String>{for (final t in trades) '${t['key'] ?? ''}'}..remove('');
+      await prefs.setStringList(_seenKey, keys.toList());
+    } catch (_) {
+      // Never break the app over an alert.
     }
   }
 }

@@ -273,25 +273,34 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
         _roundBtn(p, Icons.arrow_back_ios_new_rounded, () => Navigator.maybePop(context)),
         const SizedBox(width: 10),
         Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Signal Grid', style: TextStyle(color: p.ink, fontSize: 17, fontWeight: FontWeight.w800)),
-            Text('Paper trading agent · pretend money', style: TextStyle(color: p.muted, fontSize: 11.5)),
+          child: Row(children: [
+            Flexible(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Signal Grid', maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: p.ink, fontSize: 17, fontWeight: FontWeight.w800)),
+                // Running, stopped or paused, on the small line under the title (saves room for the icons).
+                if (_status == null)
+                  Text('Paper trading agent', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.muted, fontSize: 11.5))
+                else
+                  Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.circle, size: 7, color: brake ? _loss : on ? _up : p.muted),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(brake ? 'Paused' : on ? 'Running' : 'Stopped', maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: brake ? _loss : on ? _up : p.muted, fontSize: 11.5, fontWeight: FontWeight.w800)),
+                    ),
+                  ]),
+              ]),
+            ),
+            // The other systems, as two small icons next to the title.
+            if (_status != null) ...[
+              const SizedBox(width: 10),
+              _systemIcon(p, 'options', 'Options', Icons.bolt_rounded, const Color(0xFF7C3AED)),
+              const SizedBox(width: 8),
+              _systemIcon(p, 'scalper', 'Scalper', Icons.flash_on_rounded, const Color(0xFFF59E0B)),
+            ],
           ]),
         ),
-        if (_status != null)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: (brake ? _loss : on ? _up : p.muted).withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.circle, size: 8, color: brake ? _loss : on ? _up : p.muted),
-              const SizedBox(width: 6),
-              Text(brake ? 'Paused' : on ? 'Running' : 'Stopped',
-                  style: TextStyle(color: brake ? _loss : on ? _up : p.muted, fontSize: 12, fontWeight: FontWeight.w800)),
-            ]),
-          ),
         const SizedBox(width: 8),
         _roundBtn(p, Icons.refresh_rounded, _busy ? null : () => _reload(live: true)),
       ]),
@@ -316,7 +325,6 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     final held = shadow == null ? null : markets.firstWhere((m) => m['asset'] == shadow['symbol'], orElse: () => focus);
     final heldShadow = shadow != null && shadow['symbol'] == focus['asset'] ? shadow : null;
     return [
-      _systemIcons(p, s),
       _marketStrip(p, s, watch, focus, shadow),
       _hero(p, s, focus),
       if ((cfg['problem'] ?? '').toString().isNotEmpty) _banner(p, cfg['problem'].toString(), _down),
@@ -429,58 +437,52 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     );
   }
 
-  /// The other trading systems, as icons at the top. This screen stays the landing page; a tap opens a system,
-  /// and back returns here.
-  Widget _systemIcons(_Pal p, Map<String, dynamic> s) {
-    final systems = {for (final x in ((_map(s['fast'])['systems'] as List?) ?? const []).whereType<Map>()) '${x['id']}': _map(x)};
-    Widget icon(String id, String name, IconData ic, Color c) {
-      final info = systems[id] ?? const <String, dynamic>{};
-      final on = info['enabled'] == true;
-      final holding = info['holding'] != null;
-      return Expanded(
-        child: Material(
-          color: p.card,
-          borderRadius: BorderRadius.circular(16),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: () async {
-              await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => NgmyFastSystemScreen(system: id)));
-              if (mounted) unawaited(_reload(live: false));
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: c.withValues(alpha: 0.45))),
-              child: Row(children: [
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(9)),
-                  child: Icon(ic, color: Colors.white, size: 18),
+  /// One of the other trading systems, as a small icon in the header next to "Signal Grid". This screen stays the
+  /// landing page; a tap opens the system and back returns here. A dot shows running (green) or holding a trade (orange).
+  Widget _systemIcon(_Pal p, String id, String name, IconData ic, Color c) {
+    final systems = {for (final x in ((_map(_status?['fast'])['systems'] as List?) ?? const []).whereType<Map>()) '${x['id']}': _map(x)};
+    final info = systems[id] ?? const <String, dynamic>{};
+    final on = info['enabled'] == true;
+    final holding = info['holding'] != null;
+    return Tooltip(
+      message: '$name${holding ? ' · holding ${info['holding']}' : on ? ' · running' : ' · stopped'}',
+      child: Semantics(
+        button: true,
+        label: name,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(11),
+          onTap: () async {
+            await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => NgmyFastSystemScreen(system: id)));
+            if (mounted) unawaited(_reload(live: false));
+          },
+          child: SizedBox(
+            width: 34,
+            height: 34,
+            child: Stack(clipBehavior: Clip.none, children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(11)),
+                child: Icon(ic, color: Colors.white, size: 20),
+              ),
+              if (on || holding)
+                Positioned(
+                  right: -2,
+                  top: -2,
+                  child: Container(
+                    width: 11,
+                    height: 11,
+                    decoration: BoxDecoration(
+                      color: holding ? _btc : _up,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: p.bgTop, width: 2),
+                    ),
+                  ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(name, style: TextStyle(color: p.ink, fontSize: 12.5, fontWeight: FontWeight.w800)),
-                    Text(holding ? 'holding ${info['holding']}' : on ? 'running' : 'stopped',
-                        maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: holding ? _btc : on ? _up : p.muted, fontSize: 10.5, fontWeight: FontWeight.w700)),
-                  ]),
-                ),
-                Icon(Icons.chevron_right_rounded, color: p.muted, size: 18),
-              ]),
-            ),
+            ]),
           ),
         ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(children: [
-        icon('options', 'Options', Icons.bolt_rounded, const Color(0xFF7C3AED)),
-        const SizedBox(width: 10),
-        icon('scalper', 'Scalper', Icons.flash_on_rounded, const Color(0xFFF59E0B)),
-      ]),
+      ),
     );
   }
 

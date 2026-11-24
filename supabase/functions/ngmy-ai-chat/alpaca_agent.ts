@@ -28,6 +28,31 @@ export const PA_ACTIONS = new Set([
   "fsTick", "fsStatus", "fsSet", "fsLog",
 ]);
 
+/** The newest pretend buys and sells of all three systems (main agent, Options, Scalper), newest first. Each has a
+ *  unique key, so the app notifies once per trade. */
+async function tradeFeed(db: any): Promise<any[]> {
+  const pick = "id,created_at,asset,decision,reason,details";
+  const out: any[] = [];
+  try {
+    const { data } = await db.from("ngmy_alpaca_agent_log").select(pick).in("decision", ["would buy", "would sell"]).order("id", { ascending: false }).limit(8);
+    for (const r of data ?? []) out.push({ key: `main:${r.id}`, system: "Signal Grid", ...trim(r) });
+  } catch { /* main log unavailable */ }
+  try {
+    const { data } = await db.from("ngmy_fast_log").select(`${pick},system`).in("decision", ["would buy", "would sell"]).order("id", { ascending: false }).limit(8);
+    for (const r of data ?? []) out.push({ key: `fast:${r.id}`, system: r.system === "options" ? "Options" : "Scalper", ...trim(r) });
+  } catch { /* fast tables not set up yet */ }
+  return out.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+
+  function trim(r: any) {
+    const d = r.details ?? {};
+    return {
+      at: r.created_at, asset: r.asset, decision: r.decision, reason: r.reason,
+      pnl: d.pnl ?? null, amount: d.amount ?? null,
+      option: d.option ? { strike: d.option.strike, expiry: d.option.expiry, cost: d.option.cost } : null,
+    };
+  }
+}
+
 /** Every closed pretend trade of the main agent added together (for the shared balance). */
 async function landingClosedPnl(db: any): Promise<number> {
   const { data } = await db.from("ngmy_alpaca_agent_log").select("details").eq("decision", "would sell").order("id", { ascending: false }).limit(1000);
@@ -1149,6 +1174,8 @@ export async function handleAlpacaAgent(
         fx: fx.map(slim),
         rules: PA_RULE_LINES,
         nowEt: etNow.label,
+        // Admins: the newest pretend trades of every system, so the app can notify on each new buy or sell.
+        ...(isAdmin ? { tradeFeed: await tradeFeed(db) } : {}),
       },
     };
   }
