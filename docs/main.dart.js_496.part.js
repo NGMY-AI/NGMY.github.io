@@ -6,6 +6,6 @@ A=c[275]
 var z=a.updateTypes([]);(function constants(){A.any=new B.R(12,4,12,4)
 A.ao1=new B.R(16,14,16,18)
 A.a3t=new B.a_(57925,"MaterialIcons",!1)
-A.bh4=new B.fr(2.5,null,null,null,null,C.aV,null,null,null,null)
-A.aW6=new B.a5(22,22,A.bh4,null)})()};
-(a=>{a["bQjvD82N+62S5enC7RlyqVHVAyc="]=a.current})($__dart_deferred_initializers__);
+A.bh5=new B.fr(2.5,null,null,null,null,C.aV,null,null,null,null)
+A.aW7=new B.a4(22,22,A.bh5,null)})()};
+(a=>{a["5rrCPk2Yf74C25lOHKssYGYvDpg="]=a.current})($__dart_deferred_initializers__);

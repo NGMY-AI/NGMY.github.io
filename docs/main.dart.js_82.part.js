@@ -5,6 +5,6 @@ A=c[2]
 C=c[242]
 var z=a.updateTypes([]);(function constants(){var y=a.makeConstList
 C.Qf=new B.a_(62777,"MaterialIcons",!1)
-C.atY=new B.ae(A.xp,null,null,null,null,null)
-C.azl=y([A.c,A.aS,A.bn],B.ar("N<u>"))})()};
-(a=>{a["avGwQcxYg/6V0Q4ChTWwDu7H1C8="]=a.current})($__dart_deferred_initializers__);
+C.atZ=new B.ae(A.xp,null,null,null,null,null)
+C.azm=y([A.c,A.aS,A.bn],B.ar("N<u>"))})()};
+(a=>{a["fKqg5U2QROFxD0Sl6cyC3Tc0ybE="]=a.current})($__dart_deferred_initializers__);

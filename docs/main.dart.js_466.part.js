@@ -11,8 +11,8 @@ break}u=5
 s=new A.W(Date.now(),0,!1)
 r=J.l7(y.i.a(C.U.aP(0,k,null)),y.b)
 p=r
-o=A.hm(p).k("X<c3.E>")
-n=A.B(new A.X(p,new B.fNQ(s),o),o.k("M.E"))
+o=A.hm(p).k("X<c4.E>")
+n=A.B(new A.X(p,new B.fNV(s),o),o.k("M.E"))
 q=n
 x=8
 return A.b(l.aB("String","saved_invoices_v1",C.U.au(q,null)),$async$aSd)
@@ -44,10 +44,10 @@ if(!y.i.b(t)){s=A.a([],y.k)
 v=s
 x=1
 break}s=J.cQ(t,y.B)
-s=A.cy(s,new B.fSa(),s.$ti.k("M.E"),y.y)
+s=A.cy(s,new B.fSf(),s.$ti.k("M.E"),y.y)
 r=A.a3(s).k("X<M.E>")
-s=A.B(new A.X(s,new B.fSb(),r),r.k("M.E"))
-C.d.b0(s,new B.fSc())
+s=A.B(new A.X(s,new B.fSg(),r),r.k("M.E"))
+C.d.b0(s,new B.fSh())
 v=s
 x=1
 break}catch(n){s=A.a([],y.k)
@@ -78,23 +78,23 @@ var $async$aSf=A.e(function(e,f){if(e===1)return A.f(f,w)
 for(;;)switch(x){case 0:x=2
 return A.b(B.M5(),$async$aSf)
 case 2:v=f
-J.ne(v,new B.fOz(d))
+J.ne(v,new B.fOE(d))
 x=3
 return A.b(B.aTI(v),$async$aSf)
 case 3:return A.h(null,w)}})
 return A.i($async$aSf,w)},
-fNQ:function fNQ(d){this.a=d},
-fSa:function fSa(){},
-fSb:function fSb(){},
-fSc:function fSc(){},
-fOz:function fOz(d){this.a=d}},D
+fNV:function fNV(d){this.a=d},
+fSf:function fSf(){},
+fSg:function fSg(){},
+fSh:function fSh(){},
+fOE:function fOE(d){this.a=d}},D
 J=c[1]
 A=c[0]
 C=c[2]
 B=a.updateHolder(c[31],B)
 D=c[89]
 var z=a.updateTypes([])
-B.fNQ.prototype={
+B.fNV.prototype={
 $1(d){var x,w,v
 if(!y.B.b(d))return!1
 v=J.t(d,"paidAt")
@@ -104,25 +104,25 @@ w=A.bg(x)
 if(w==null)return!0
 return this.a.cW(w.bL(432e9))},
 $S:51}
-B.fSa.prototype={
+B.fSf.prototype={
 $1(d){return A.a0(d,y.w,y.b)},
 $S:22}
-B.fSb.prototype={
+B.fSg.prototype={
 $1(d){var x=J.t(d,"id")
 return J.k(x==null?"":x).length!==0},
 $S:4}
-B.fSc.prototype={
+B.fSh.prototype={
 $2(d,e){var x,w,v="createdAt",u=J.t(d,v),t=A.bg(J.k(u==null?"":u)),s=t==null?new A.W(A.h0(0,0),0,!1):t
 u=J.t(e,v)
 w=A.bg(J.k(u==null?"":u))
 x=w==null?new A.W(A.h0(0,0),0,!1):w
 return J.xJ(x,s)},
 $S:40}
-B.fOz.prototype={
+B.fOE.prototype={
 $1(d){var x=J.t(d,"id")
 return J.k(x==null?"":x)===this.a},
 $S:4};(function inheritance(){var x=a.inheritMany,w=a.inherit
-x(A.fR,[B.fNQ,B.fSa,B.fSb,B.fOz])
-w(B.fSc,A.ie)})()
+x(A.fR,[B.fNV,B.fSf,B.fSg,B.fOE])
+w(B.fSh,A.ie)})()
 var y={k:A.ar("N<a9<m,@>>"),E:A.ar("ai<a9<m,@>>"),i:A.ar("ai<@>"),y:A.ar("a9<m,@>"),B:A.ar("a9<@,@>"),w:A.ar("m"),b:A.ar("@"),v:A.ar("~")};(function constants(){D.a3H=new A.a_(61870,"MaterialIcons",!1)})()};
-(a=>{a["C9JrpQqIv5WIY5n1atMi3QNtF2s="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["eqvT7bvgAjJcjslkXZQ8QsOu/xs="]=a.current})($__dart_deferred_initializers__);
