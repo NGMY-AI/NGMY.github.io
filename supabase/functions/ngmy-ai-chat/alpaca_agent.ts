@@ -20,13 +20,25 @@
 
 // deno-lint-ignore-file no-explicit-any
 
-export const PA_ACTIONS = new Set(["paStatus", "paLog", "paSet", "paCheck", "paTick", "paSignals", "paLearnGet", "paLearnSave"]);
+import { FS_ACTIONS, fastSharedPnl, handleFast } from "./fast_systems.ts";
+
+export const PA_ACTIONS = new Set([
+  "paStatus", "paLog", "paSet", "paCheck", "paTick", "paSignals", "paLearnGet", "paLearnSave",
+  // Fast systems (Options, Scalper), routed to fast_systems.ts.
+  "fsTick", "fsStatus", "fsSet", "fsLog",
+]);
+
+/** Every closed pretend trade of the main agent added together (for the shared balance). */
+async function landingClosedPnl(db: any): Promise<number> {
+  const { data } = await db.from("ngmy_alpaca_agent_log").select("details").eq("decision", "would sell").order("id", { ascending: false }).limit(1000);
+  return round2((data ?? []).reduce((s: number, r: any) => s + Number(r?.details?.pnl ?? 0), 0));
+}
 
 /** Trading Academy lesson ids (the app has the same list). All done = signal alerts unlocked for members. */
 export const PA_LESSON_IDS = ["basics", "candles", "trend", "ma", "cross", "rsi", "risk", "brakes", "hours", "practice"];
 
-const PAPER_BASE = "https://paper-api.alpaca.markets";
-const DATA_BASE = "https://data.alpaca.markets";
+export const PAPER_BASE = "https://paper-api.alpaca.markets";
+export const DATA_BASE = "https://data.alpaca.markets";
 
 export type MarketDef = { symbol: string; name: string; kind: "stock" | "crypto" };
 
@@ -579,15 +591,15 @@ export function buildChart(times: string[], closes: number[], points = 48, ohlc?
   return { points: out, trend, signal: x.signal, fast: x.fastNow, slow: x.slowNow };
 }
 
-function round2(n: number) {
+export function round2(n: number) {
   return Math.round(n * 100) / 100;
 }
 
 // ─────────────────────────────────────────────────────────────── Alpaca (read-only GETs)
 
-type Keys = { id: string; secret: string };
+export type Keys = { id: string; secret: string };
 
-function readConfig(): { keys: Keys | null; baseOk: boolean; ordersSwitch: boolean; problem: string } {
+export function readConfig(): { keys: Keys | null; baseOk: boolean; ordersSwitch: boolean; problem: string } {
   const id = (Deno.env.get("ALPACA_API_KEY") ?? "").trim();
   const secret = (Deno.env.get("ALPACA_SECRET_KEY") ?? "").trim();
   const base = (Deno.env.get("ALPACA_BASE_URL") ?? "").trim().replace(/\/+$/, "").replace(/\/v2$/, "");
@@ -600,7 +612,7 @@ function readConfig(): { keys: Keys | null; baseOk: boolean; ordersSwitch: boole
   return { keys: problem ? null : { id, secret }, baseOk, ordersSwitch, problem };
 }
 
-async function aGet(base: string, path: string, k: Keys): Promise<any> {
+export async function aGet(base: string, path: string, k: Keys): Promise<any> {
   // GET only. This agent never sends POST, PATCH or DELETE to Alpaca.
   const res = await fetch(`${base}${path}`, {
     method: "GET",
@@ -612,7 +624,7 @@ async function aGet(base: string, path: string, k: Keys): Promise<any> {
   return text ? JSON.parse(text) : null;
 }
 
-async function readAccount(k: Keys) {
+export async function readAccount(k: Keys) {
   const [acct, positions] = await Promise.all([
     aGet(PAPER_BASE, "/v2/account", k),
     aGet(PAPER_BASE, "/v2/positions", k),
@@ -623,6 +635,8 @@ async function readAccount(k: Keys) {
     buyingPower: Number(acct?.buying_power ?? 0),
     lastEquity: Number(acct?.last_equity ?? 0),
     status: String(acct?.status ?? ""),
+    // Options level on the paper account (0 = options not enabled; 2 or more = may buy calls).
+    optionsLevel: Number(acct?.options_trading_level ?? acct?.options_approved_level ?? 0),
     positions: (Array.isArray(positions) ? positions : []).map((p: any) => ({
       symbol: String(p.symbol ?? ""),
       qty: Number(p.qty ?? 0),
@@ -635,18 +649,18 @@ async function readAccount(k: Keys) {
   };
 }
 
-type Series = { closes: number[]; times: string[]; ohlc: { o: number; h: number; l: number }[]; price: number; lastBarAt: string };
+export type Series = { closes: number[]; times: string[]; ohlc: { o: number; h: number; l: number }[]; price: number; lastBarAt: string };
 
 /** All watchlist markets in a handful of calls: one bars call and one latest-price call for stocks, the same for crypto. */
 /** Bid and ask of one option contract now (Alpaca's free indicative options feed). GET only. */
-async function readOptionQuote(k: Keys, contract: string): Promise<{ bid: number; ask: number; last: number }> {
+export async function readOptionQuote(k: Keys, contract: string): Promise<{ bid: number; ask: number; last: number }> {
   const j = await aGet(DATA_BASE, `/v1beta1/options/snapshots?symbols=${encodeURIComponent(contract)}&feed=indicative`, k);
   const s = j?.snapshots?.[contract] ?? {};
   return { bid: Number(s.latestQuote?.bp ?? 0), ask: Number(s.latestQuote?.ap ?? 0), last: Number(s.latestTrade?.p ?? 0) };
 }
 
 /** What a held option would sell for now: the bid (what a buyer pays), else the last trade. 0 = unknown. */
-async function optionSellPrice(k: Keys, contract: string): Promise<number> {
+export async function optionSellPrice(k: Keys, contract: string): Promise<number> {
   try {
     const q = await readOptionQuote(k, contract);
     return q.bid > 0 ? q.bid : q.last;
@@ -690,7 +704,7 @@ async function chooseSpyCall(k: Keys, spot: number, todayKey: string): Promise<
   return { ok: true, option };
 }
 
-async function readMarkets(k: Keys, extra: MarketDef[] = []): Promise<Record<string, Series>> {
+export async function readMarkets(k: Keys, extra: MarketDef[] = []): Promise<Record<string, Series>> {
   // `extra`: a position still open in a market that is no longer on the list keeps being read, so its exit
   // rules (take profit, stop loss, turn down) still work. It is never bought again.
   const list = [...PA_MARKETS, ...extra.filter((e) => !PA_MARKETS.some((m) => m.symbol === e.symbol))];
@@ -845,7 +859,7 @@ function marketCards(series: Record<string, Series>, stockOpen: boolean, weekend
 
 // ─────────────────────────────────────────────────────────────── database
 
-async function loadState(db: any) {
+export async function loadState(db: any) {
   const { data, error } = await db.from("ngmy_alpaca_agent_state").select("*").eq("id", 1).maybeSingle();
   if (error) throw new Error(`state table: ${error.message}`);
   if (!data) throw new Error("state table is empty, run the setup SQL");
@@ -1078,6 +1092,8 @@ export async function handleAlpacaAgent(
   const { db, email, isAdmin } = ctx;
   if (!db) return { status: 500, payload: { ok: false, error: "Server database unavailable." } };
 
+  if (FS_ACTIONS.has(action)) return handleFast(action, body, { ...ctx, landingClosed: () => landingClosedPnl(db) });
+
   if (action === "paTick") {
     // Called by pg_cron. The token lives only in the state table (service role), never in the app.
     let state: any;
@@ -1247,6 +1263,8 @@ export async function handleAlpacaAgent(
       ...(fx ? { fx } : {}),
       trades: (trades ?? []).map((t: any) => ({ ...t, details: { ...(t.details ?? {}), scanned: undefined } })),
       record,
+      // The other systems (Options, Scalper) share this paper balance: their closed and open pretend P/L.
+      fast: await fastSharedPnl(db),
       ticket: {
         amount: PA_RULES.tradeUsd, takeProfitUsd: PA_RULES.takeProfitUsd, stopLossUsd: PA_RULES.stopLossUsd,
         maxTradesToday: etNow.weekend ? PA_RULES.weekendMaxTrades : PA_RULES.weekdayMaxTrades,
@@ -1268,7 +1286,7 @@ export async function handleAlpacaAgent(
   };
 }
 
-function publicState(s: any) {
+export function publicState(s: any) {
   // Never return the cron token.
   return {
     enabled: !!s.enabled,

@@ -145,6 +145,9 @@ const Map<String, String> kNgmyEdgeActionToWire = {
   'paSignals': 'y6',
   'paLearnGet': 'y7',
   'paLearnSave': 'y8',
+  'fsStatus': 'ya',
+  'fsSet': 'yb',
+  'fsLog': 'yc',
   'chat': 'z0',
 };
 

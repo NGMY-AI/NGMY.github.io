@@ -10769,6 +10769,10 @@ serve(async (req) => {
       y6: "paSignals",
       y7: "paLearnGet",
       y8: "paLearnSave",
+      y9: "fsTick",
+      ya: "fsStatus",
+      yb: "fsSet",
+      yc: "fsLog",
       z0: "chat",
     };
     const action = WIRE_TO_ACTION[wireCode] ?? String(body?.action ?? "chat").trim();
@@ -10777,8 +10781,10 @@ serve(async (req) => {
 
     // Alpaca paper-trading agent (Signal Grid). Version 1 is read-only: no order code exists.
     if (PA_ACTIONS.has(action)) {
-      const paEmail = action === "paTick" ? "" : (await requireJwtEmail(req)).trim().toLowerCase();
-      if (action !== "paTick") {
+      // The two cron ticks (main agent every 5 minutes, fast systems every minute) carry the secret token instead of a login.
+      const cronTick = action === "paTick" || action === "fsTick";
+      const paEmail = cronTick ? "" : (await requireJwtEmail(req)).trim().toLowerCase();
+      if (!cronTick) {
         // Live signals refresh every 20 s and the alert watcher every minute, so allow a steady stream.
         const limited = await enforceRateLimit(req, "alpaca_agent", paEmail || clientIp(req), 600, 3600);
         if (limited) return limited;

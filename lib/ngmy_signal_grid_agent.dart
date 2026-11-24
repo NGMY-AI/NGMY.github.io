@@ -18,6 +18,7 @@ import 'ngmy_signal_alerts.dart';
 
 part 'ngmy_signal_grid_learn.dart';
 part 'ngmy_signal_grid_quiz.dart';
+part 'ngmy_signal_grid_fast.dart';
 
 const _up = Color(0xFF1FBF97); // rising candles, wins
 const _down = Color(0xFFF2C14E); // falling candles
@@ -315,6 +316,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     final held = shadow == null ? null : markets.firstWhere((m) => m['asset'] == shadow['symbol'], orElse: () => focus);
     final heldShadow = shadow != null && shadow['symbol'] == focus['asset'] ? shadow : null;
     return [
+      _systemIcons(p, s),
       _marketStrip(p, s, watch, focus, shadow),
       _hero(p, s, focus),
       if ((cfg['problem'] ?? '').toString().isNotEmpty) _banner(p, cfg['problem'].toString(), _down),
@@ -424,6 +426,61 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
           ]),
         ),
       ),
+    );
+  }
+
+  /// The other trading systems, as icons at the top. This screen stays the landing page; a tap opens a system,
+  /// and back returns here.
+  Widget _systemIcons(_Pal p, Map<String, dynamic> s) {
+    final systems = {for (final x in ((_map(s['fast'])['systems'] as List?) ?? const []).whereType<Map>()) '${x['id']}': _map(x)};
+    Widget icon(String id, String name, IconData ic, Color c) {
+      final info = systems[id] ?? const <String, dynamic>{};
+      final on = info['enabled'] == true;
+      final holding = info['holding'] != null;
+      return Expanded(
+        child: Material(
+          color: p.card,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () async {
+              await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => NgmyFastSystemScreen(system: id)));
+              if (mounted) unawaited(_reload(live: false));
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: c.withValues(alpha: 0.45))),
+              child: Row(children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(9)),
+                  child: Icon(ic, color: Colors.white, size: 18),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(name, style: TextStyle(color: p.ink, fontSize: 12.5, fontWeight: FontWeight.w800)),
+                    Text(holding ? 'holding ${info['holding']}' : on ? 'running' : 'stopped',
+                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: holding ? _btc : on ? _up : p.muted, fontSize: 10.5, fontWeight: FontWeight.w700)),
+                  ]),
+                ),
+                Icon(Icons.chevron_right_rounded, color: p.muted, size: 18),
+              ]),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(children: [
+        icon('options', 'Options', Icons.bolt_rounded, const Color(0xFF7C3AED)),
+        const SizedBox(width: 10),
+        icon('scalper', 'Scalper', Icons.flash_on_rounded, const Color(0xFFF59E0B)),
+      ]),
     );
   }
 
@@ -718,8 +775,11 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     final nr = _map(rec['newRules']);
     final rate = nr['winRatePct'];
     final base = _d(snap['equity']);
-    final balance = base + total + open;
-    final move = total + open;
+    // ONE shared paper balance: the Options and Scalper systems' closed and open pretend trades count here too.
+    final fast = _map(s['fast']);
+    final others = _d(fast['closed']) + _d(fast['open']);
+    final balance = base + total + open + others;
+    final move = total + open + others;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(18),
@@ -752,7 +812,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
         if (snap['equity'] != null)
           Row(children: [
             Icon(move >= 0 ? Icons.arrow_drop_up_rounded : Icons.arrow_drop_down_rounded, color: move > 0 ? _up : move < 0 ? _loss : Colors.white70),
-            Text('${_money(move)} from pretend trades${sh != null ? ' (incl. the open one)' : ''}',
+            Text('${_money(move)} from pretend trades${others != 0 ? ' (all systems)' : sh != null ? ' (incl. the open one)' : ''}',
                 style: TextStyle(color: move > 0 ? _up : move < 0 ? _loss : Colors.white70, fontSize: 12.5, fontWeight: FontWeight.w800)),
           ]),
         const SizedBox(height: 2),
