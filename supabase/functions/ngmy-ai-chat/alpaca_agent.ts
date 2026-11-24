@@ -252,7 +252,7 @@ export function etParts(d: Date) {
 }
 
 /** A SPY call option contract (pretend). Prices are per share; one contract = 100 shares. */
-export type OptionInfo = { contract: string; strike: number; expiry: string; premium: number; cost: number };
+export type OptionInfo = { contract: string; strike: number; expiry: string; premium: number; cost: number; right?: "call" | "put" };
 
 /** The pretend position. For an option: symbol "SPY" (the market it follows), qty 1 contract, mult 100,
  *  entryPrice = the premium per share paid, and `option` has the contract. */

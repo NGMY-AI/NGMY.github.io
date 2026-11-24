@@ -292,15 +292,15 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
                   ]),
               ]),
             ),
-            // The other systems, as two small icons next to the title.
-            if (_status != null) ...[
-              const SizedBox(width: 10),
-              _systemIcon(p, 'options', 'Options', Icons.bolt_rounded, const Color(0xFF7C3AED)),
-              const SizedBox(width: 8),
-              _systemIcon(p, 'scalper', 'Scalper', Icons.flash_on_rounded, const Color(0xFFF59E0B)),
-            ],
           ]),
         ),
+        // The other systems, as two small icons on the right, next to the refresh button.
+        if (_status != null) ...[
+          const SizedBox(width: 8),
+          _systemIcon(p, 'options', 'Options', Icons.bolt_rounded, const Color(0xFF7C3AED)),
+          const SizedBox(width: 8),
+          _systemIcon(p, 'scalper', 'Scalper', Icons.flash_on_rounded, const Color(0xFFF59E0B)),
+        ],
         const SizedBox(width: 8),
         _roundBtn(p, Icons.refresh_rounded, _busy ? null : () => _reload(live: true)),
       ]),
