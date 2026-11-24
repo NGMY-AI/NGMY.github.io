@@ -67,8 +67,9 @@ class NgmySignalAlerts {
         final buy = s['direction'] == 'BUY';
         await ngmyPushShow(
           title: '${buy ? '▲ STRONG BUY' : '▼ STRONG SELL'} ${s['market'] ?? ''}',
-          body: 'All 5 confirmations agree · ${res['expiryText'] ?? 'Built for a 15–30 minute expiry. Do NOT use this for 1–5 minute trades.'} '
-              'Signals are opinions from price patterns, not guarantees. Even strong signals lose.',
+          body: 'All 5 confirmations agree · enter within 5 minutes, at the start of a minute · trade for 30 min. '
+              '${res['expiryText'] ?? 'Built for a 15–30 minute expiry. Do NOT use this for 1–5 minute trades.'} '
+              'Open Signal Grid for the live countdown. Signals are opinions from price patterns, not guarantees. Even strong signals lose.',
           tag: 'signal_$key',
         );
         if (++shown >= 3) break;

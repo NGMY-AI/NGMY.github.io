@@ -186,39 +186,59 @@ Widget _v2Block(_Pal p, Map<String, dynamic> m) {
   final v = _map(m['v2']);
   final sig = m['activeSignal'] is Map ? _map(m['activeSignal']) : null;
   final open = m['open'] == true;
-  final answer = sig != null ? '${sig['direction']}' : 'WAIT';
-  final c = answer == 'BUY' ? _up : answer == 'SELL' ? _loss : const Color(0xFF94A3B8);
+  // STRONG BUY / SELL: a signal given at a 30-minute check (all 5 confirmations). WEAK BUY / SELL: both trends
+  // point one way but not all 5 agree: shown so you know, never to be entered. WAIT: no direction.
+  final lean = '${v['lean'] ?? 'none'}';
+  final weak = sig == null && open && (lean == 'up' || lean == 'down');
+  final side = sig != null ? '${sig['direction']}' : weak ? (lean == 'up' ? 'BUY' : 'SELL') : 'WAIT';
+  final answer = sig != null ? 'STRONG $side' : weak ? 'WEAK $side' : 'WAIT';
+  final c = side == 'BUY' ? _up : side == 'SELL' ? _loss : const Color(0xFF94A3B8);
   final checks = ((sig?['checks'] ?? v['checks']) as List? ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
   final passed = sig != null ? 5 : _d(v['passed']).toInt();
   final gradeAt = DateTime.tryParse('${sig?['grade_at'] ?? ''}');
+  final givenAt = DateTime.tryParse('${sig?['created_at'] ?? ''}');
   final explain = !open
       ? 'This market is closed right now, so the answer is WAIT. No signals while it is closed.'
       : sig != null
           ? '${sig['explain'] ?? ''}'
           : v['strong'] == true
-              ? 'All 5 confirmations agree right now, but a signal is only given at the 30-minute checks (at most 5 a day). Until then: WAIT.'
-              : '${v['explain'] ?? 'WAIT.'}';
+              ? 'All 5 confirmations agree right now, but a signal is only given at the 30-minute checks (at most 5 a day). Until then it is not a signal: do not enter.'
+              : weak
+                  ? 'WEAK ${side == 'BUY' ? 'BUY: the trends point up' : 'SELL: the trends point down'}, but only $passed of the 5 confirmations agree. Do NOT enter a weak signal. ${v['explain'] ?? ''}'
+                  : '${v['explain'] ?? 'WAIT.'}';
   return Container(
     width: double.infinity,
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(color: c.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(16), border: Border.all(color: c.withValues(alpha: 0.45))),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
-        Text(answer, style: TextStyle(color: c, fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: 1)),
-        const SizedBox(width: 10),
+        Text(answer, style: TextStyle(color: c, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 0.4)),
+        const SizedBox(width: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(color: c.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(999)),
-          child: Text(sig != null ? 'STRONG' : '$passed of 5 confirmations', style: TextStyle(color: c, fontSize: 10.5, fontWeight: FontWeight.w900)),
+          child: Text(sig != null ? '5 of 5' : '$passed of 5', style: TextStyle(color: c, fontSize: 10.5, fontWeight: FontWeight.w900)),
         ),
-        const Spacer(),
-        if (sig != null) Text('${sig['et_time'] ?? ''}'.split(', ').last, style: TextStyle(color: p.muted, fontSize: 10.5, fontWeight: FontWeight.w700)),
+        Expanded(
+          child: Text(sig != null ? '${sig['et_time'] ?? ''}'.split(', ').last : '', textAlign: TextAlign.right, maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: p.muted, fontSize: 10.5, fontWeight: FontWeight.w700)),
+        ),
       ]),
+      if (weak) ...[
+        const SizedBox(height: 4),
+        Text('WEAK SIGNAL · DO NOT ENTER', style: TextStyle(color: c, fontSize: 11.5, fontWeight: FontWeight.w900, letterSpacing: 0.4)),
+      ],
+      // The live clock of a STRONG signal: when to enter (seconds), how long the entry window stays open, how
+      // long to trade for, and when the signal closes.
+      if (sig != null && givenAt != null && gradeAt != null) ...[
+        const SizedBox(height: 10),
+        _SignalClock(givenAt: givenAt, closesAt: gradeAt, buy: side == 'BUY'),
+      ],
       const SizedBox(height: 4),
       const Text('Built for a 15–30 minute expiry. Do NOT use this for 1–5 minute trades.',
           style: TextStyle(color: _loss, fontSize: 11.5, fontWeight: FontWeight.w800, height: 1.3)),
       if (sig != null && gradeAt != null)
-        Text('Graded at ${_clock(_toEt(gradeAt.toUtc()))} ET, 30 minutes after it was given: WIN if the price finished ${answer == 'BUY' ? 'higher' : 'lower'}.',
+        Text('Graded at ${_clock(_toEt(gradeAt.toUtc()))} ET, 30 minutes after it was given: WIN if the price finished ${side == 'BUY' ? 'higher' : 'lower'}.',
             style: TextStyle(color: p.muted, fontSize: 11, height: 1.3)),
       const SizedBox(height: 8),
       Text(explain, style: TextStyle(color: p.ink, fontSize: 12.3, height: 1.35)),
@@ -236,6 +256,111 @@ Widget _v2Block(_Pal p, Map<String, dynamic> m) {
         ),
     ]),
   );
+}
+
+/// The live clock on a STRONG signal, ticking every second:
+/// - when to enter: the start of the next minute ("Enter in 0:36", then "ENTER NOW" for its first 15 seconds);
+/// - the entry window: 5 minutes after the signal was given; after that "TOO LATE TO ENTER", so nobody jumps into
+///   an old signal;
+/// - how long to trade for: 30 minutes from the signal (the expiry it is graded at), and how long is left of it;
+/// - when the signal closes (is graded).
+class _SignalClock extends StatefulWidget {
+  const _SignalClock({required this.givenAt, required this.closesAt, required this.buy});
+  final DateTime givenAt;
+  final DateTime closesAt;
+  final bool buy;
+
+  @override
+  State<_SignalClock> createState() => _SignalClockState();
+}
+
+class _SignalClockState extends State<_SignalClock> {
+  Timer? _t;
+  static const _windowMin = 5;
+
+  @override
+  void initState() {
+    super.initState();
+    _t = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  static String _mmss(Duration d) {
+    final s = d.isNegative ? 0 : d.inSeconds;
+    return '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now().toUtc();
+    final windowEnd = widget.givenAt.toUtc().add(const Duration(minutes: _windowMin));
+    final closes = widget.closesAt.toUtc();
+    final total = closes.difference(widget.givenAt.toUtc()).inMinutes;
+    final c = widget.buy ? _up : _loss;
+    final late = now.isAfter(windowEnd);
+    final closed = now.isAfter(closes);
+    // The next whole minute: the moment to enter (the start of the next 1-minute candle).
+    final nextMin = DateTime.utc(now.year, now.month, now.day, now.hour, now.minute).add(const Duration(minutes: 1));
+    final toEntry = nextMin.difference(now);
+    final enterNow = toEntry.inSeconds >= 45; // the first 15 seconds of a minute
+    final String big;
+    final String small;
+    if (closed) {
+      big = 'SIGNAL CLOSED';
+      small = 'Being graded now: WIN if the price finished ${widget.buy ? 'higher' : 'lower'}.';
+    } else if (late) {
+      big = 'TOO LATE TO ENTER';
+      small = 'The 5-minute entry window has passed. Wait for the next signal: entering an old signal is how money is lost.';
+    } else {
+      big = enterNow ? '${widget.buy ? 'BUY' : 'SELL'} NOW' : 'Enter in ${_mmss(toEntry)}';
+      small = 'Entry window closes in ${_mmss(windowEnd.difference(now))} · enter at the start of a minute.';
+    }
+    Widget box(String k, String v) => Expanded(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(10)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(k, style: const TextStyle(color: Colors.white70, fontSize: 9.5, fontWeight: FontWeight.w700)),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(v, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, fontFeatures: [FontFeature.tabularFigures()])),
+              ),
+            ]),
+          ),
+        );
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: late || closed ? const Color(0xFF64748B) : c,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [BoxShadow(color: (late || closed ? Colors.black : c).withValues(alpha: 0.25), blurRadius: 12, offset: const Offset(0, 4))],
+      ),
+      child: Column(children: [
+        Text(big, textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white, fontSize: enterNow && !late && !closed ? 26 : 22, fontWeight: FontWeight.w900, letterSpacing: 0.6,
+                fontFeatures: const [FontFeature.tabularFigures()])),
+        const SizedBox(height: 2),
+        Text(small, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 11.5, height: 1.3)),
+        const SizedBox(height: 8),
+        Row(children: [
+          box('Trade for', '$total min'),
+          const SizedBox(width: 6),
+          box('Entry window', late ? 'closed' : _mmss(windowEnd.difference(now))),
+          const SizedBox(width: 6),
+          box('Signal closes in', _mmss(closes.difference(now))),
+        ]),
+      ]),
+    );
+  }
 }
 
 /// The big "ENTER UP" / "ENTER DOWN" sign with a live countdown to the moment to enter (the start of the
