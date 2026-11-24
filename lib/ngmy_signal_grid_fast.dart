@@ -162,7 +162,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
                             name,
                             style: TextStyle(color: p.ink, fontSize: 17, fontWeight: FontWeight.w800),
                           ),
-                          Text('Fast system · paper money only', style: TextStyle(color: p.muted, fontSize: 11.5)),
+                          Text('Fast system', style: TextStyle(color: p.muted, fontSize: 11.5)),
                         ],
                       ),
                     ),
@@ -249,7 +249,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Paper money only: no order is ever sent to Alpaca. Orders are disabled.',
+                'No order is ever sent to Alpaca. Orders are disabled.',
                 style: TextStyle(color: p.muted, fontSize: 11.5, height: 1.3),
               ),
             ),
@@ -278,7 +278,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
           Row(
             children: [
               const Text(
-                'Shared paper balance',
+                'Balance',
                 style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
               ),
               const Spacer(),
@@ -302,7 +302,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
             ),
           ),
           Text(
-            '${_money(move)} from pretend trades of every system',
+            '${_money(move)} from trades of every system',
             style: TextStyle(
               color: move > 0
                   ? _up
@@ -315,7 +315,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
           ),
           const SizedBox(height: 2),
           Text(
-            'Alpaca paper account ${sh['equity'] == null ? '—' : _money(_d(sh['equity']), sign: false)} (unchanged, no orders are sent)',
+            'Alpaca account ${sh['equity'] == null ? '—' : _money(_d(sh['equity']), sign: false)} (unchanged, no orders are sent)',
             style: const TextStyle(color: Colors.white60, fontSize: 11),
           ),
         ],

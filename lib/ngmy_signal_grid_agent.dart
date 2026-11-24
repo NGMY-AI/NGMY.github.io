@@ -343,7 +343,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
                     style: TextStyle(color: p.ink, fontSize: 17, fontWeight: FontWeight.w800)),
                 // Running, stopped or paused, on the small line under the title (saves room for the icons).
                 if (_status == null)
-                  Text('Paper trading agent', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.muted, fontSize: 11.5))
+                  Text('Trading agent', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.muted, fontSize: 11.5))
                 else
                   Row(mainAxisSize: MainAxisSize.min, children: [
                     Icon(Icons.circle, size: 7, color: brake ? _loss : on ? _up : p.muted),
@@ -416,7 +416,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Paper money only: no order is ever sent to Alpaca. Order switch: ${cfg['ordersSwitchOn'] == true ? 'on' : 'off'}.',
+              'No order is ever sent to Alpaca. Order switch: ${cfg['ordersSwitchOn'] == true ? 'on' : 'off'}.',
               style: TextStyle(color: p.muted, fontSize: 11.5, height: 1.3),
             ),
           ),
@@ -859,13 +859,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          const Text('Paper balance', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(999)),
-            child: const Text('PRETEND MONEY', style: TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w900, letterSpacing: 0.8)),
-          ),
+          const Text('Balance', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
         ]),
         const SizedBox(height: 4),
         FittedBox(
@@ -877,11 +871,11 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
         if (snap['equity'] != null)
           Row(children: [
             Icon(move >= 0 ? Icons.arrow_drop_up_rounded : Icons.arrow_drop_down_rounded, color: move > 0 ? _up : move < 0 ? _loss : Colors.white70),
-            Text('${_money(move)} from pretend trades${others != 0 ? ' (all systems)' : sh != null ? ' (incl. the open one)' : ''}',
+            Text('${_money(move)} from trades${others != 0 ? ' (all systems)' : sh != null ? ' (incl. the open one)' : ''}',
                 style: TextStyle(color: move > 0 ? _up : move < 0 ? _loss : Colors.white70, fontSize: 12.5, fontWeight: FontWeight.w800)),
           ]),
         const SizedBox(height: 2),
-        Text('Alpaca paper account ${_money(base, sign: false)} (unchanged, Version 1 sends no orders) · \$${_d(ticket['amount']).toStringAsFixed(0)} a trade',
+        Text('Alpaca account ${_money(base, sign: false)} (unchanged, no orders are sent) · \$${_d(ticket['amount']).toStringAsFixed(0)} a trade',
             style: const TextStyle(color: Colors.white60, fontSize: 11)),
         const SizedBox(height: 14),
         // Frame 1: results and limits (what was always on this card).
