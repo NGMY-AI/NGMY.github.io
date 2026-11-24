@@ -72,8 +72,35 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
       return;
     }
     unawaited(_loadPicked());
-    unawaited(_reload(live: true));
+    // Fast open: the last screen saved on this phone shows at once, then the server's saved snapshot (quick),
+    // then the live prices in the background.
+    unawaited(_loadCached());
+    unawaited(_reload(live: false).then((_) {
+      if (mounted) unawaited(_reload(live: true));
+    }));
     _timer = Timer.periodic(const Duration(seconds: 60), (_) => unawaited(_reload(live: true)));
+  }
+
+  static const _cacheKey = 'ngmy_signal_grid_status_cache';
+
+  Future<void> _loadCached() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_cacheKey);
+      if (raw == null || !mounted || _status != null) return;
+      final cached = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+      setState(() {
+        _status = cached;
+        _loading = false;
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _saveCached(Map<String, dynamic> res) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_cacheKey, jsonEncode(res));
+    } catch (_) {}
   }
 
   @override
@@ -117,6 +144,8 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
   }
 
   Future<void> _reload({bool live = false}) async {
+    // The status and the activity log are asked for at the same time (they used to wait for each other).
+    final logF = _showAllLog ? null : _fetchLog();
     final res = await ngmyEdgeInvoke({'action': 'paStatus', 'live': live}, timeout: const Duration(seconds: 40));
     if (!mounted) return;
     setState(() {
@@ -129,17 +158,34 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
         if (res?['ownerOnly'] == true || res?['setupNeeded'] == true) _status = null;
       }
     });
-    if (_status != null) await _loadLog();
+    if (res != null && res['ok'] == true) unawaited(_saveCached(res));
+    if (logF != null) {
+      final rows = await logF;
+      if (mounted && rows != null && _status != null) {
+        setState(() {
+          _log = rows;
+          _moreLog = rows.length >= _logPage;
+        });
+      }
+    }
+  }
+
+  /// Activity lines come in pages of 30 (the screen shows 4, Show all reveals the rest).
+  static const _logPage = 30;
+
+  Future<List<Map<String, dynamic>>?> _fetchLog({Object before = 0}) async {
+    final res = await ngmyEdgeInvoke({'action': 'paLog', 'limit': _logPage, 'beforeId': before});
+    if (res == null || res['ok'] != true) return null;
+    return ((res['rows'] as List?) ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
   }
 
   Future<void> _loadLog({bool more = false}) async {
     final before = more && _log.isNotEmpty ? _log.last['id'] : 0;
-    final res = await ngmyEdgeInvoke({'action': 'paLog', 'limit': 100, 'beforeId': before});
-    if (!mounted || res == null || res['ok'] != true) return;
-    final rows = ((res['rows'] as List?) ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    final rows = await _fetchLog(before: before ?? 0);
+    if (!mounted || rows == null) return;
     setState(() {
       _log = more ? [..._log, ...rows] : rows;
-      _moreLog = rows.length >= 100;
+      _moreLog = rows.length >= _logPage;
     });
   }
 
@@ -160,13 +206,30 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
       );
       if (ok != true) return;
     }
-    setState(() => _busy = true);
+    // The button changes at once; the server's answer (the full status) then confirms it.
+    final before = _status;
+    setState(() {
+      _busy = true;
+      if (_status != null) {
+        _status = {
+          ..._status!,
+          'state': {..._map(_status!['state']), 'enabled': on, if (on) 'brakePaused': false},
+        };
+      }
+    });
     final res = await ngmyEdgeInvoke({'action': 'paSet', 'enabled': on});
     if (!mounted) return;
-    setState(() => _busy = false);
-    _snack(res?['ok'] == true ? (on ? 'Agent started.' : 'Agent stopped.') : (res?['error'] ?? 'Could not change it.').toString(),
-        res?['ok'] == true ? _up : _loss);
-    await _reload();
+    final ok = res?['ok'] == true;
+    setState(() {
+      _busy = false;
+      if (ok && res!['state'] != null) {
+        _status = res;
+      } else if (!ok) {
+        _status = before; // undo
+      }
+    });
+    _snack(ok ? (on ? 'Agent started.' : 'Agent stopped.') : (res?['error'] ?? 'Could not change it.').toString(), ok ? _up : _loss);
+    if (ok) unawaited(_loadLog());
   }
 
   void _openLearn() {

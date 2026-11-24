@@ -55,8 +55,8 @@ async function tradeFeed(db: any): Promise<any[]> {
 
 /** Every closed pretend trade of the main agent added together (for the shared balance). */
 async function landingClosedPnl(db: any): Promise<number> {
-  const { data } = await db.from("ngmy_alpaca_agent_log").select("details").eq("decision", "would sell").order("id", { ascending: false }).limit(1000);
-  return round2((data ?? []).reduce((s: number, r: any) => s + Number(r?.details?.pnl ?? 0), 0));
+  const { data } = await db.from("ngmy_alpaca_agent_log").select("pnl:details->pnl").eq("decision", "would sell").order("id", { ascending: false }).limit(1000);
+  return round2((data ?? []).reduce((s: number, r: any) => s + Number(r?.pnl ?? 0), 0));
 }
 
 /** Trading Academy lesson ids (the app has the same list). All done = signal alerts unlocked for members. */
@@ -729,7 +729,32 @@ async function chooseSpyCall(k: Keys, spot: number, todayKey: string): Promise<
   return { ok: true, option };
 }
 
-export async function readMarkets(k: Keys, extra: MarketDef[] = []): Promise<Record<string, Series>> {
+/** The stock market clock, shared for 30 seconds (it only says open or closed and the next open and close). */
+let clockCache: { at: number; p: Promise<any> } | null = null;
+export function readClock(k: Keys): Promise<any> {
+  if (clockCache && Date.now() - clockCache.at < 30_000) return clockCache.p;
+  const p = aGet(PAPER_BASE, "/v2/clock", k);
+  clockCache = { at: Date.now(), p };
+  p.catch(() => { clockCache = null; });
+  return p;
+}
+
+/** Market reads shared for a few seconds: the screens, the 1-minute fast systems check and the 5-minute check
+ *  often ask at the same moment, and 5-minute candles barely change in 10 seconds. A read already on its way is
+ *  shared too, so two callers never download the same thing twice. */
+const marketsCache = new Map<string, { at: number; p: Promise<Record<string, Series>> }>();
+
+export function readMarkets(k: Keys, extra: MarketDef[] = [], maxAgeMs = 10_000): Promise<Record<string, Series>> {
+  const key = extra.map((e) => e.symbol).sort().join(",");
+  const hit = marketsCache.get(key);
+  if (hit && Date.now() - hit.at < maxAgeMs) return hit.p;
+  const p = readMarketsFresh(k, extra);
+  marketsCache.set(key, { at: Date.now(), p });
+  p.catch(() => marketsCache.delete(key)); // never keep a failed read
+  return p;
+}
+
+async function readMarketsFresh(k: Keys, extra: MarketDef[] = []): Promise<Record<string, Series>> {
   // `extra`: a position still open in a market that is no longer on the list keeps being read, so its exit
   // rules (take profit, stop loss, turn down) still work. It is never bought again.
   const list = [...PA_MARKETS, ...extra.filter((e) => !PA_MARKETS.some((m) => m.symbol === e.symbol))];
@@ -790,7 +815,7 @@ async function agentMarketCards(db: any): Promise<{ cards: any[]; stockOpen: boo
   const cfg = readConfig();
   if (cfg.keys) {
     try {
-      const [series, clock] = await Promise.all([readMarkets(cfg.keys), aGet(PAPER_BASE, "/v2/clock", cfg.keys)]);
+      const [series, clock] = await Promise.all([readMarkets(cfg.keys), readClock(cfg.keys)]);
       const stockOpen = !!clock?.is_open;
       mktCache = { at: Date.now(), cards: marketCards(series, stockOpen), stockOpen };
       return mktCache;
@@ -1157,6 +1182,19 @@ export async function handleAlpacaAgent(
       graduated = !!data?.all_done;
     }
     const light = body?.light === true;
+    // The background alert watcher (every minute on the home screen) needs only each market's "enter now" and
+    // the newest trades: a tiny answer, no forex, no charts, no notes.
+    if (body?.alerts === true) {
+      const [markets, feed] = await Promise.all([agentMarketCards(db), isAdmin ? tradeFeed(db) : Promise.resolve(undefined)]);
+      return {
+        status: 200,
+        payload: {
+          ok: true, isAdmin, alertsAllowed: isAdmin || graduated,
+          markets: markets.cards.map((m: any) => ({ symbol: m.symbol, open: m.open, reading: { entry: m.reading?.entry ?? null } })),
+          ...(feed ? { tradeFeed: feed } : {}),
+        },
+      };
+    }
     const markets = await agentMarketCards(db);
     let fx: any[] = [];
     try { fx = await readForex(); } catch { fx = []; }
@@ -1214,7 +1252,8 @@ export async function handleAlpacaAgent(
     if (before > 0) q = q.lt("id", before);
     const { data, error } = await q;
     if (error) return { status: 200, payload: { ok: false, error: error.message } };
-    return { status: 200, payload: { ok: true, rows: data ?? [] } };
+    // The app never shows the per-market scan of each check: leaving it out makes the answer about 10 times smaller.
+    return { status: 200, payload: { ok: true, rows: (data ?? []).map((r: any) => ({ ...r, details: r.details ? { ...r.details, scanned: undefined } : r.details })) } };
   }
 
   // paStatus (and the answer to paSet / paCheck): live read of the account and all markets when asked
@@ -1223,7 +1262,7 @@ export async function handleAlpacaAgent(
   let liveError = "";
   let clock: any = null;
   if (cfg.keys) {
-    try { clock = await aGet(PAPER_BASE, "/v2/clock", cfg.keys); } catch { /* unknown */ }
+    try { clock = await readClock(cfg.keys); } catch { /* unknown */ }
   }
   const stockOpen = clock ? !!clock.is_open : null;
   if ((body?.live === true || forceLive) && cfg.keys) {
@@ -1259,14 +1298,18 @@ export async function handleAlpacaAgent(
   }
   const etNow = etParts(new Date());
   const market = { stockOpen, weekend: etNow.weekend, activeMarkets: activeMarkets(etNow.weekend, !!stockOpen), todaysList: todaysList(etNow.weekend), nextOpen: clock?.next_open ?? null, nextClose: clock?.next_close ?? null };
-  const { data: today } = await db.from("ngmy_alpaca_agent_days").select("*").eq("et_day", etNow.dayKey).maybeSingle();
-  const { data: trades } = await db.from("ngmy_alpaca_agent_log").select("id,created_at,et_time,asset,price,decision,reason,details")
-    .in("decision", ["would buy", "would sell"]).order("id", { ascending: false }).limit(40);
-  const { data: closed } = await db.from("ngmy_alpaca_agent_log").select("details")
-    .eq("decision", "would sell").order("id", { ascending: false }).limit(500);
-  const pnls: number[] = (closed ?? []).map((r: any) => Number(r?.details?.pnl ?? 0));
+  // All at once (they used to run one after another). The closed-trade list reads only the two numbers it needs.
+  const [{ data: today }, { data: trades }, { data: closed }, fast] = await Promise.all([
+    db.from("ngmy_alpaca_agent_days").select("*").eq("et_day", etNow.dayKey).maybeSingle(),
+    db.from("ngmy_alpaca_agent_log").select("id,created_at,et_time,asset,price,decision,reason,details")
+      .in("decision", ["would buy", "would sell"]).order("id", { ascending: false }).limit(40),
+    db.from("ngmy_alpaca_agent_log").select("pnl:details->pnl,rules:details->>rules")
+      .eq("decision", "would sell").order("id", { ascending: false }).limit(500),
+    fastSharedPnl(db),
+  ]);
+  const pnls: number[] = (closed ?? []).map((r: any) => Number(r?.pnl ?? 0));
   // The $100 rules (Nov 22): their own win rate, to see if the agent wins at least 5 out of 10.
-  const newPnls: number[] = (closed ?? []).filter((r: any) => r?.details?.rules === PA_RULES_TAG).map((r: any) => Number(r?.details?.pnl ?? 0));
+  const newPnls: number[] = (closed ?? []).filter((r: any) => r?.rules === PA_RULES_TAG).map((r: any) => Number(r?.pnl ?? 0));
   const newWins = newPnls.filter((p) => p > 0).length;
   const record = {
     wins: pnls.filter((p) => p > 0).length, losses: pnls.filter((p) => p <= 0).length, trades: pnls.length,
@@ -1291,7 +1334,7 @@ export async function handleAlpacaAgent(
       trades: (trades ?? []).map((t: any) => ({ ...t, details: { ...(t.details ?? {}), scanned: undefined } })),
       record,
       // The other systems (Options, Scalper) share this paper balance: their closed and open pretend P/L.
-      fast: await fastSharedPnl(db),
+      fast,
       ticket: {
         amount: PA_RULES.tradeUsd, takeProfitUsd: PA_RULES.takeProfitUsd, stopLossUsd: PA_RULES.stopLossUsd,
         maxTradesToday: etNow.weekend ? PA_RULES.weekendMaxTrades : PA_RULES.weekdayMaxTrades,

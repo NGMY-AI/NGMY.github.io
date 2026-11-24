@@ -36,6 +36,7 @@ import {
   PA_MARKETS,
   PAPER_BASE,
   readAccount,
+  readClock,
   readConfig,
   readMarkets,
   round2,
@@ -308,10 +309,10 @@ async function dayFs(db: any, id: SystemId, dayKey: string) {
 
 /** Every closed pretend trade of one or all fast systems: wins, losses, win rate, total. */
 async function recordFs(db: any, id?: SystemId) {
-  let q = db.from("ngmy_fast_log").select("details").eq("decision", "would sell").order("id", { ascending: false }).limit(1000);
+  let q = db.from("ngmy_fast_log").select("pnl:details->pnl").eq("decision", "would sell").order("id", { ascending: false }).limit(1000);
   if (id) q = q.eq("system", id);
   const { data } = await q;
-  const pnls: number[] = (data ?? []).map((r: any) => Number(r?.details?.pnl ?? 0));
+  const pnls: number[] = (data ?? []).map((r: any) => Number(r?.pnl ?? 0));
   const wins = pnls.filter((p) => p > 0).length;
   return {
     trades: pnls.length, wins, losses: pnls.length - wins,
@@ -322,13 +323,13 @@ async function recordFs(db: any, id?: SystemId) {
 
 /** One system's own record per market (its last 20 closed trades there), and when each market was last sold. */
 async function marketRecordsFs(db: any, id: SystemId): Promise<{ records: Record<string, MarketRecord>; lastSold: Record<string, number> }> {
-  const { data } = await db.from("ngmy_fast_log").select("asset,created_at,details").eq("system", id).eq("decision", "would sell")
+  const { data } = await db.from("ngmy_fast_log").select("asset,created_at,pnl:details->pnl").eq("system", id).eq("decision", "would sell")
     .order("id", { ascending: false }).limit(600);
   const by: Record<string, number[]> = {};
   const lastSold: Record<string, number> = {};
   for (const r of data ?? []) {
     const a = String(r.asset ?? "");
-    (by[a] ??= []).push(Number(r?.details?.pnl ?? 0));
+    (by[a] ??= []).push(Number(r?.pnl ?? 0));
     if (!(a in lastSold)) lastSold[a] = Date.parse(r.created_at);
   }
   const records: Record<string, MarketRecord> = {};
@@ -635,26 +636,32 @@ export async function handleFast(
   const st = states[id];
   const et = etParts(new Date());
   const cfg = readConfig();
-  const { data: today } = await db.from("ngmy_fast_days").select("*").eq("system", id).eq("et_day", et.dayKey).maybeSingle();
-  const { data: trades } = await db.from("ngmy_fast_log").select("id,created_at,et_time,asset,price,decision,reason,details")
-    .eq("system", id).in("decision", ["would buy", "would sell"]).order("id", { ascending: false }).limit(40);
-  const record = await recordFs(db, id);
-  const allFast = await recordFs(db);
-  const { records } = await marketRecordsFs(db, id);
+  // All database reads at once (they used to run one after another).
+  const [{ data: today }, { data: trades }, record, allFast, { records }] = await Promise.all([
+    db.from("ngmy_fast_days").select("*").eq("system", id).eq("et_day", et.dayKey).maybeSingle(),
+    db.from("ngmy_fast_log").select("id,created_at,et_time,asset,price,decision,reason,details")
+      .eq("system", id).in("decision", ["would buy", "would sell"]).order("id", { ascending: false }).limit(40),
+    recordFs(db, id),
+    recordFs(db),
+    marketRecordsFs(db, id),
+  ]);
   const fastOpen = FS_SYSTEMS.reduce((s, x) => s + (states[x].shadow ? Number(states[x].last_mark?.pnl ?? 0) : 0), 0);
   const pc = pace(et, Number(today?.trades ?? 0));
 
   // The shared paper balance: the Alpaca paper account plus every closed and open pretend trade of every system.
-  let shared: Record<string, unknown> | null = null;
-  try {
-    const main = await loadState(db);
-    const equity = Number(main.snapshot?.equity ?? 0) || null;
-    const landingClosed = ctx.landingClosed ? await ctx.landingClosed() : 0;
-    const landingOpen = main.shadow ? Number(main.snapshot?.held?.pnl ?? 0) : 0;
-    const closed = round2(landingClosed + allFast.pnlSum);
-    const open = round2(landingOpen + fastOpen);
-    shared = { equity, closed, open, balance: equity == null ? null : round2(equity + closed + open) };
-  } catch { /* shown without the balance */ }
+  // Started now and awaited at the end, so it runs while the market prices are read.
+  const sharedP: Promise<Record<string, unknown> | null> = (async () => {
+    try {
+      const [main, landingClosed] = await Promise.all([loadState(db), ctx.landingClosed ? ctx.landingClosed() : Promise.resolve(0)]);
+      const equity = Number(main.snapshot?.equity ?? 0) || null;
+      const landingOpen = main.shadow ? Number(main.snapshot?.held?.pnl ?? 0) : 0;
+      const closed = round2(landingClosed + allFast.pnlSum);
+      const open = round2(landingOpen + fastOpen);
+      return { equity, closed, open, balance: equity == null ? null : round2(equity + closed + open) };
+    } catch {
+      return null; // shown without the balance
+    }
+  })();
 
   // The Agent markets panel: every market of this system, live, with its own record there.
   let markets: any[] = [];
@@ -662,7 +669,7 @@ export async function handleFast(
   let stockOpen = false;
   if (cfg.keys) {
     try {
-      const [series, clock] = await Promise.all([readMarkets(cfg.keys), aGet(PAPER_BASE, "/v2/clock", cfg.keys)]);
+      const [series, clock] = await Promise.all([readMarkets(cfg.keys), readClock(cfg.keys)]);
       stockOpen = !!clock?.is_open;
       const list = id === "options" ? ["SPY"] : todaysList(et.weekend);
       const active = id === "options" ? (stockOpen && !et.weekend ? ["SPY"] : []) : activeMarkets(et.weekend, stockOpen);
@@ -718,7 +725,7 @@ export async function handleFast(
         totalPnl: Number(st.total_pnl ?? 0), shadow: st.shadow ?? null, mark: st.last_mark ?? null,
         lastTickAt: st.last_tick_at ?? null, lastNote: st.last_note ?? null, lastNoteAt: st.last_note_at ?? null,
       },
-      shared,
+      shared: await sharedP,
       today: today ?? null,
       pace: pc,
       record,

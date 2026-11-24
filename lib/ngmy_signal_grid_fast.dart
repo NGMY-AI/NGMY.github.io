@@ -26,7 +26,6 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
   bool _busy = false;
   String? _error;
   Timer? _timer;
-  Timer? _clockTimer;
   bool _allTrades = false;
   bool _allLog = false;
   String? _market; // the market tapped in the Agent markets panel
@@ -44,24 +43,42 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
       _loading = false;
       return;
     }
+    // Fast open: the last screen saved on this phone shows at once, the fresh one replaces it when it arrives.
+    unawaited(_loadCached());
     unawaited(_reload());
     _timer = Timer.periodic(const Duration(seconds: 30), (_) => unawaited(_reload()));
-    // The 30-minute countdown on an open trade moves every second.
-    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted && _map(_map(_s?['state'])['shadow']).isNotEmpty) setState(() {});
-    });
   }
 
   @override
   void dispose() {
     _timer?.cancel();
-    _clockTimer?.cancel();
     super.dispose();
   }
 
+  String get _cacheKey => 'ngmy_signal_grid_fast_${widget.system}';
+
+  Future<void> _loadCached() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_cacheKey);
+      if (raw == null || !mounted || _s != null) return;
+      final cached = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+      setState(() {
+        _s = Map<String, dynamic>.from(_map(cached['s']));
+        _log = ((cached['log'] as List?) ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        _loading = false;
+      });
+    } catch (_) {}
+  }
+
   Future<void> _reload() async {
-    final res = await ngmyEdgeInvoke({'action': 'fsStatus', 'system': widget.system}, timeout: const Duration(seconds: 40));
-    final log = await ngmyEdgeInvoke({'action': 'fsLog', 'system': widget.system, 'limit': 60}, timeout: const Duration(seconds: 30));
+    // Status and activity are asked for at the same time (they used to wait for each other).
+    final results = await Future.wait([
+      ngmyEdgeInvoke({'action': 'fsStatus', 'system': widget.system}, timeout: const Duration(seconds: 40)),
+      ngmyEdgeInvoke({'action': 'fsLog', 'system': widget.system, 'limit': 30}, timeout: const Duration(seconds: 30)),
+    ]);
+    final res = results[0];
+    final log = results[1];
     if (!mounted) return;
     setState(() {
       _loading = false;
@@ -75,17 +92,32 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
         _log = ((log['rows'] as List?) ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
       }
     });
+    if (res != null && res['ok'] == true) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_cacheKey, jsonEncode({'s': res, 'log': _log}));
+      } catch (_) {}
+    }
   }
 
   Future<void> _setEnabled(bool on) async {
-    setState(() => _busy = true);
+    // The button changes at once; the server's answer then confirms it.
+    final before = _s;
+    setState(() {
+      _busy = true;
+      if (_s != null) _s = {..._s!, 'state': {..._map(_s!['state']), 'enabled': on, if (on) 'brakePaused': false}};
+    });
     final res = await ngmyEdgeInvoke({'action': 'fsSet', 'system': widget.system, 'enabled': on}, timeout: const Duration(seconds: 40));
     if (!mounted) return;
     setState(() {
       _busy = false;
-      if (res != null && res['ok'] == true) _s = Map<String, dynamic>.from(res);
+      if (res != null && res['ok'] == true) {
+        _s = Map<String, dynamic>.from(res);
+      } else {
+        _s = before; // undo
+        _error = (res?['error'] ?? 'Could not change it right now.').toString();
+      }
     });
-    unawaited(_reload());
   }
 
   @override
@@ -802,9 +834,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
     final opt = sh['option'] is Map ? _map(sh['option']) : null;
     final opened = DateTime.tryParse('${sh['entryAt'] ?? ''}');
     final closeBy = opened?.add(const Duration(minutes: 30));
-    final left = closeBy?.difference(DateTime.now());
     final pnl = _d(mark['pnl']);
-    final mm = left == null || left.isNegative ? '0:00' : '${left.inMinutes}:${(left.inSeconds % 60).toString().padLeft(2, '0')}';
     return _frame(
       p,
       border: _accent,
@@ -818,7 +848,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
                 style: TextStyle(color: p.muted, fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: 0.8),
               ),
               const Spacer(),
-              _tag('closes in $mm at most', _accent),
+              _CloseCountdown(closeBy: closeBy, color: _accent),
             ],
           ),
           const SizedBox(height: 8),
@@ -1188,4 +1218,44 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
       ),
     ),
   );
+}
+
+/// The "closes in 12:34 at most" tag on an open trade. Only this small tag redraws every second, not the screen.
+class _CloseCountdown extends StatefulWidget {
+  const _CloseCountdown({required this.closeBy, required this.color});
+  final DateTime? closeBy;
+  final Color color;
+
+  @override
+  State<_CloseCountdown> createState() => _CloseCountdownState();
+}
+
+class _CloseCountdownState extends State<_CloseCountdown> {
+  Timer? _t;
+
+  @override
+  void initState() {
+    super.initState();
+    _t = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final left = widget.closeBy?.difference(DateTime.now());
+    final mm = left == null || left.isNegative ? '0:00' : '${left.inMinutes}:${(left.inSeconds % 60).toString().padLeft(2, '0')}';
+    final c = widget.color;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(color: c.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(999)),
+      child: Text('closes in $mm at most', style: TextStyle(color: c, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+    );
+  }
 }

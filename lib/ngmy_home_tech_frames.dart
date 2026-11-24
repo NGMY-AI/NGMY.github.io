@@ -33,7 +33,12 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> {
     super.initState();
     // Signal Grid alerts (admins, and members who finished the Trading Academy). Runs once per app run.
     // Web only: that is where its notifications are shown (and tests never get a stray timer).
-    if (kIsWeb) NgmySignalAlerts.start();
+    if (kIsWeb) {
+      NgmySignalAlerts.start();
+      // Fetch the Signal Grid screens' code quietly a little after the home screen is up, so the first tap
+      // opens it at once instead of waiting for the download.
+      Future<void>.delayed(const Duration(seconds: 8), () => sg_agent.loadLibrary().catchError((_) {}));
+    }
   }
 
   Future<void> _openExperience(_TechFrameSpec spec) async {

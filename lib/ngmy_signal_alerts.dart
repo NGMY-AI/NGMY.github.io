@@ -44,7 +44,8 @@ class NgmySignalAlerts {
     if (!_allowed && DateTime.now().isBefore(_nextEligibilityCheck)) return;
     _busy = true;
     try {
-      final res = await ngmyEdgeInvoke({'action': 'paSignals', 'light': true}, timeout: const Duration(seconds: 40));
+      // 'alerts': the small answer (each market's enter-now and the newest trades only: no forex, no charts).
+      final res = await ngmyEdgeInvoke({'action': 'paSignals', 'light': true, 'alerts': true}, timeout: const Duration(seconds: 40));
       if (res == null || res['ok'] != true) {
         _nextEligibilityCheck = DateTime.now().add(const Duration(minutes: 10));
         return;
