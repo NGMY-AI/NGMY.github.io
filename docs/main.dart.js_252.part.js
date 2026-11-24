@@ -1,6 +1,20 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
-$__dart_deferred_initializers__.current=function(a,b,c,$){var A
+$__dart_deferred_initializers__.current=function(a,b,c,$){var A,B,C
 A=c[0]
-var z=a.updateTypes([]);(function lazyInitializers(){var y=a.lazyFinal
-y($,"iNc","hrO",()=>A.ey(["habari","mambo","poa","asante","karibu","pole","sawa","rafiki","mama","baba","kwa","nini","sana","tafadhali","nataka","naomba","ninaomba","nipe","nifanye","mimi","wewe","yako","yangu","yetu","wetu","zetu","hapana","ndiyo","ndio","pia","lakini","kwamba","hii","hiyo","huyu","mtoto","watoto","familia","nyumba","kazi","pesa","leo","kesho","jana","sasa","bado","tena","vizuri","nzuri","mzuri","siku","usiku","asubuhi","jioni","mungu","upendo","mpenzi","nakupenda","kiswahili","kitabu","hadithi","shule","kanisa","jamii","biashara","ndugu","dada","kaka","bibi","babu","mjomba","shangazi","sema","sikia","angalia","nisaidie","nisaidieni","tusaidie","saidia","andika","tengeneza","eleza","nieleze","unaweza","naweza","tunaweza","nina","una","ana","tuna","hakuna","kuna","vipi","namna","gani","wapi","lini","nani","kwanini","mbona","basi","kidogo","kubwa","ndogo","mpya","zamani","mwanangu","mwanamke","mwanaume","mume","mke","harusi","salamu","shikamoo","marahaba","hongera","pongezi","safari","chakula","maji","jina","kwaheri","tutaonana","samahani","ahsante","wiki","mwezi","mwaka","saa"],A.ar("m")))})()};
-(a=>{a["+5xr5wjqCpAO0/OmJ66E72FeLMg="]=a.current})($__dart_deferred_initializers__);
+B=c[2]
+C=c[153]
+var z=a.updateTypes([]);(function constants(){var y=a.makeConstList
+C.auq=new A.ae(B.eb,18,B.c,null,null,null)
+C.VL=new A.aP(30,30)
+C.afY=new A.bE(B.C3,B.a1,B.a1,B.a1)
+C.a0a=new A.u(1,1,0.9921568627450981,0.9647058823529412,B.q)
+C.anc=new A.R(0,18,0,8)
+C.anq=new A.R(12,0,12,10)
+C.arG=new A.a_(63351,"MaterialIcons",!1)
+C.arH=new A.a_(63352,"MaterialIcons",!1)
+C.asR=new A.a_(983924,"MaterialIcons",!1)
+C.atr=new A.ae(B.QM,28,B.c,null,null,null)
+C.Rb=new A.ae(B.cB,18,B.aF,null,null,null)
+C.avA=y([0,0,0],A.ar("N<cp>"))
+C.aYv=new A.H(!0,B.bM,null,null,null,null,12,B.F,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)})()};
+(a=>{a["h0K9wan/gtOwjDIqulGSMA75xmc="]=a.current})($__dart_deferred_initializers__);
