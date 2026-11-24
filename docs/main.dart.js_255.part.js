@@ -1,7 +1,6 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
-$__dart_deferred_initializers__.current=function(a,b,c,$){var A,B
+$__dart_deferred_initializers__.current=function(a,b,c,$){var A
 A=c[0]
-B=c[324]
-var z=a.updateTypes([]);(function constants(){var y=a.makeConstList
-B.T2=y([0,0.35,1],A.ar("N<H>"))})()};
-(a=>{a["ns2RUuWVFt5rYaZdDIWp/z82Zss="]=a.current})($__dart_deferred_initializers__);
+var z=a.updateTypes([]);(function lazyInitializers(){var y=a.lazyFinal
+y($,"iOa","hsM",()=>A.eA(["habari","mambo","poa","asante","karibu","pole","sawa","rafiki","mama","baba","kwa","nini","sana","tafadhali","nataka","naomba","ninaomba","nipe","nifanye","mimi","wewe","yako","yangu","yetu","wetu","zetu","hapana","ndiyo","ndio","pia","lakini","kwamba","hii","hiyo","huyu","mtoto","watoto","familia","nyumba","kazi","pesa","leo","kesho","jana","sasa","bado","tena","vizuri","nzuri","mzuri","siku","usiku","asubuhi","jioni","mungu","upendo","mpenzi","nakupenda","kiswahili","kitabu","hadithi","shule","kanisa","jamii","biashara","ndugu","dada","kaka","bibi","babu","mjomba","shangazi","sema","sikia","angalia","nisaidie","nisaidieni","tusaidie","saidia","andika","tengeneza","eleza","nieleze","unaweza","naweza","tunaweza","nina","una","ana","tuna","hakuna","kuna","vipi","namna","gani","wapi","lini","nani","kwanini","mbona","basi","kidogo","kubwa","ndogo","mpya","zamani","mwanangu","mwanamke","mwanaume","mume","mke","harusi","salamu","shikamoo","marahaba","hongera","pongezi","safari","chakula","maji","jina","kwaheri","tutaonana","samahani","ahsante","wiki","mwezi","mwaka","saa"],A.ar("m")))})()};
+(a=>{a["b3C4gz8pwmwC0PFdDX8R5F4W/kY="]=a.current})($__dart_deferred_initializers__);
