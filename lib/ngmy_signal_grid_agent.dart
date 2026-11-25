@@ -441,9 +441,9 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     final stocks = activeList.length - coins;
     if (activeList.isNotEmpty) {
       title = stocks > 0 ? 'TRADING NOW: 10 STOCKS + $coins CRYPTO' : 'TRADING NOW: ALL $coins CRYPTO';
-      body = 'Every tradable crypto pair on Alpaca, around the clock${stocks > 0 ? ', plus the 10 stocks while the stock market is open' : weekend ? ' (stocks trade on weekdays)' : ' (the stocks trade 9:30 AM to 4:00 PM ET)'}. '
-          'All of them are checked at the same time, every 5 minutes, and the agent buys the strongest valid entry. '
-          'One trade at a time, up to 20 trades today in total.';
+      body = 'The 15 liquid crypto majors, around the clock${stocks > 0 ? ', plus the 10 stocks while the stock market is open' : weekend ? ' (stocks trade on weekdays)' : ' (the stocks trade 9:30 AM to 4:00 PM ET)'}. '
+          'All of them are checked at the same time, every 5 minutes, and the agent buys the valid entry with the strongest 1-hour move. '
+          'One trade at a time, at most 20 trades today (a maximum, never a target).';
     } else {
       title = 'NO MARKET TRADED RIGHT NOW';
       body = 'Crypto trades around the clock and the 10 stocks (${todayList.where((e) => !e.contains('/')).take(10).join(', ')}) while the stock market is open. The market list is loading.';
@@ -466,7 +466,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
             const SizedBox(height: 3),
             Text(body, style: TextStyle(color: p.ink, fontSize: 12, height: 1.3)),
             const SizedBox(height: 3),
-            Text('Buys only when the fast line crosses up AND the big trend is rising (slow line higher than 1 hour ago, price above it).',
+            Text('Buys only when the fast line crosses up AND the big trend is rising (slow line higher than 1 hour ago, price above it) AND the market moved +0.4% or more in the last hour.',
                 style: TextStyle(color: p.muted, fontSize: 11, height: 1.3)),
             if (oldHeld) ...[
               const SizedBox(height: 4),
@@ -946,23 +946,29 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     final market = _map(s['market']);
     final target = _d(pc['target'] ?? 20).toInt();
     final trades = _d(pc['trades']).toInt();
-    final expected = _d(pc['expected']).toInt();
-    final behind = _d(pc['deficit']) > 0;
-    final c = trades >= target || !behind ? _up : _down;
     final lines = ((pc['lines'] as List?) ?? const []).map((e) => '$e').toList();
     final dropped = ((market['cryptoDropped'] as List?) ?? const []).map((e) => '$e').toList();
     final tpnl = _d(t['pnl']);
     final dayNote = (pc['dayNote'] ?? '').toString();
+    final cooldowns = ((s['cooldowns'] as List?) ?? const []).whereType<Map>().toList();
+    final why = ((s['whyFix'] as List?) ?? const []).map((e) => '$e').toList();
+    String clockOf(dynamic iso) {
+      final d = DateTime.tryParse('${iso ?? ''}');
+      if (d == null) return '?';
+      final l = d.toLocal();
+      final h = l.hour % 12 == 0 ? 12 : l.hour % 12;
+      return '$h:${l.minute.toString().padLeft(2, '0')} ${l.hour < 12 ? 'AM' : 'PM'}';
+    }
     return _card(
       p,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Expanded(child: Text('Trades today: $trades of $target', style: TextStyle(color: p.ink, fontSize: 20, fontWeight: FontWeight.w900))),
-          _pill(trades >= target ? 'TARGET REACHED' : behind ? '${_d(pc['deficit']).toInt()} BEHIND' : 'ON PACE', c),
+          _pill(trades >= target ? 'MAX REACHED' : 'MAX $target', trades >= target ? _down : _up),
         ]),
         const SizedBox(height: 2),
-        Text('Expected by now: $expected · max hold now ${_d(pc['maxHold'] ?? 120).toInt()} min · top ${_d(pc['topN'] ?? 3).toInt()} valid entries considered',
-            style: TextStyle(color: c, fontSize: 12, fontWeight: FontWeight.w800, height: 1.3)),
+        Text('Max hold ${_d(pc['maxHold'] ?? 120).toInt()} min · exits checked every 5 min',
+            style: TextStyle(color: p.muted, fontSize: 12, fontWeight: FontWeight.w800, height: 1.3)),
         const SizedBox(height: 8),
         LayoutBuilder(builder: (context, box) {
           final w = box.maxWidth;
@@ -972,9 +978,8 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
               Positioned.fill(top: 3, bottom: 3, child: Container(decoration: BoxDecoration(color: p.inner, borderRadius: BorderRadius.circular(99)))),
               Positioned(
                 left: 0, top: 3, bottom: 3, width: w * (trades / target).clamp(0.0, 1.0),
-                child: Container(decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(99))),
+                child: Container(decoration: BoxDecoration(color: _up, borderRadius: BorderRadius.circular(99))),
               ),
-              Positioned(left: (w * (expected / target).clamp(0.0, 1.0) - 1).clamp(0.0, w - 2), top: 0, bottom: 0, child: Container(width: 2, color: p.ink)),
             ]),
           );
         }),
@@ -1000,12 +1005,35 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
         ]),
         const SizedBox(height: 6),
         Text(
-          'Watching ${market['cryptoCount'] ?? '?'} crypto pairs around the clock${market['cryptoFromAlpaca'] == false ? ' (Alpaca\'s list could not be read, using the main ones for now)' : ' (every tradable USD pair on Alpaca)'}'
+          'Watching ${market['cryptoCount'] ?? '?'} crypto pairs around the clock${market['cryptoFromAlpaca'] == false ? ' (Alpaca\'s list could not be read, using the main ones for now)' : ' (the liquid majors only, thin coins are never traded)'}'
           '${market['weekend'] == true ? '' : ' plus the 10 stocks in market hours'}.',
           style: TextStyle(color: p.muted, fontSize: 11.5, height: 1.3),
         ),
         if (dropped.isNotEmpty)
           Text('Dropped today (no longer tradable on Alpaca): ${dropped.join(', ')}', style: const TextStyle(color: _loss, fontSize: 11.5, height: 1.3)),
+        // Markets resting 2 hours after a flat trade.
+        const SizedBox(height: 6),
+        Text(
+          cooldowns.isEmpty
+              ? 'Cooldown: no market is resting right now.'
+              : 'Cooldown (closed flat, not traded again for 2 hours): ${cooldowns.map((x) => '${'${x['symbol']}'.replaceAll('/USD', '')} until ${clockOf(x['until'])}').join(', ')}',
+          style: TextStyle(color: cooldowns.isEmpty ? p.muted : _down, fontSize: 11.5, fontWeight: FontWeight.w700, height: 1.3),
+        ),
+        if (why.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: p.inner, borderRadius: BorderRadius.circular(12)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              for (final (i, l) in why.indexed)
+                Padding(
+                  padding: EdgeInsets.only(top: i == 0 ? 0 : 3),
+                  child: Text(l, style: TextStyle(color: i == 0 ? p.ink : p.muted, fontSize: 11.5, height: 1.3, fontWeight: i == 0 ? FontWeight.w800 : FontWeight.w500)),
+                ),
+            ]),
+          ),
+        ],
         if (s['brakeNote'] != null) ...[
           const SizedBox(height: 6),
           Text('${s['brakeNote']}', style: TextStyle(color: p.muted, fontSize: 11, height: 1.3)),
@@ -1321,6 +1349,15 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
               child: Text(_showAllTrades ? 'Show less' : 'Show all (${trades.length})'),
             ),
           ),
+        // Learning line (display only): how many of today's closed trades went nowhere.
+        if (s['todayStats'] is Map) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Flat trades today: ${_map(s['todayStats'])['flat'] ?? 0} of ${_map(s['todayStats'])['closed'] ?? 0} closed',
+            style: TextStyle(color: p.ink, fontSize: 12.5, fontWeight: FontWeight.w800),
+          ),
+          Text('A flat trade closed between -\$1 and +\$1.', style: TextStyle(color: p.muted, fontSize: 11)),
+        ],
       ]),
     );
   }
@@ -1369,6 +1406,9 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(color: p.muted, fontSize: 11.5),
             ),
+            if (!buy && det['exitKind'] != null)
+              Text('Exit: ${det['exitKind']}${det['flat'] == true ? ' · flat' : ''}',
+                  style: TextStyle(color: win ? _up : _loss, fontSize: 11, fontWeight: FontWeight.w800)),
             Text((t['et_time'] ?? '').toString(), style: TextStyle(color: p.muted, fontSize: 10.5)),
           ]),
         ),

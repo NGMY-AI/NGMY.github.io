@@ -1,6 +1,6 @@
 // deno test supabase/functions/ngmy-ai-chat/alpaca_agent_test.ts
 import { assertEquals, assert } from "https://deno.land/std@0.177.0/testing/asserts.ts";
-import { activeMarkets, cryptoFromAssets, mainPace, PA_BASE_COINS, PA_RULES, crossAt, SIG_RULES, signalV2, todaysList, addDays, bigTrend, heldMark, optionFits, pickOption, buildChart, crossover, decide, entryNow, etParts, PA_FX, PA_LESSON_IDS, PA_MARKETS, pickMarket, readMarket, rsi, runStats, sma, type DecideInput, type Scan } from "./alpaca_agent.ts";
+import { activeMarkets, cryptoFromAssets, lockFloor, mainPace, majorsOnly, move60Pct, PA_BASE_COINS, PA_RULES, crossAt, SIG_RULES, signalV2, todaysList, addDays, bigTrend, heldMark, optionFits, pickOption, buildChart, crossover, decide, entryNow, etParts, PA_FX, PA_LESSON_IDS, PA_MARKETS, pickMarket, readMarket, rsi, runStats, sma, type DecideInput, type Scan } from "./alpaca_agent.ts";
 
 const base: DecideInput = {
   weekend: false, asset: "SPY", stock: true, price: 100, signal: "none", fast: 100, slow: 100, shadow: null,
@@ -197,11 +197,15 @@ Deno.test("forex list is live pairs only", () => {
   assert(PA_FX.every((f) => f.yahoo.endsWith("=X")));
 });
 
-Deno.test("watchlists: 10 stocks on weekdays, all crypto every day", () => {
+Deno.test("watchlists: 10 stocks on weekdays, the 15 crypto majors every day", () => {
   const coins = PA_BASE_COINS;
   assertEquals(todaysList(false, []), ["SPY", "QQQ", "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "AMD"]);
-  assertEquals(todaysList(true, coins).length, 24);
-  assertEquals(todaysList(false, coins).length, 34);
+  assertEquals(coins.map((m) => m.symbol.replace("/USD", "")), ["BTC", "ETH", "SOL", "DOGE", "XRP", "ADA", "AVAX", "LINK", "LTC", "BCH", "DOT", "UNI", "NEAR", "ATOM", "ARB"]);
+  assertEquals(todaysList(true, coins).length, 15);
+  assertEquals(todaysList(false, coins).length, 25);
+  // Of Alpaca's list, only the majors (a thin coin like GRT or HYPE is never traded; a missing major is dropped).
+  const fromAlpaca = ["BTC/USD", "GRT/USD", "HYPE/USD", "ETH/USD", "ARB/USD"].map((symbol) => ({ symbol, name: symbol, kind: "crypto" as const }));
+  assertEquals(majorsOnly(fromAlpaca).map((m) => m.symbol), ["BTC/USD", "ETH/USD", "ARB/USD"]);
   assertEquals(PA_RULES.maxTradesPerDay, 20);
   assertEquals([PA_RULES.dailyLossStopUsd, PA_RULES.totalLossBrakeUsd], [100, 200]);
   assertEquals(new Set(PA_MARKETS.map((m) => m.symbol)).size, PA_MARKETS.length);
@@ -300,9 +304,9 @@ Deno.test("SPY option: nearest expiry at least 7 days away, strike closest to th
 
 Deno.test("all of the day's markets are buyable at once: stocks while open on weekdays, coins on weekends", () => {
   const coins = PA_BASE_COINS;
-  assertEquals(activeMarkets(false, true, coins).length, 34); // weekday, stock market open: stocks + crypto
-  assertEquals(activeMarkets(false, false, coins).length, 24); // weekday evening: crypto keeps trading
-  assertEquals(activeMarkets(true, false, coins).length, 24); // weekend: crypto
+  assertEquals(activeMarkets(false, true, coins).length, 25); // weekday, stock market open: stocks + crypto
+  assertEquals(activeMarkets(false, false, coins).length, 15); // weekday evening: crypto keeps trading
+  assertEquals(activeMarkets(true, false, coins).length, 15); // weekend: crypto
   assert(!activeMarkets(true, true, coins).includes("SPY"));
 });
 
@@ -396,27 +400,61 @@ Deno.test("all crypto: every active, tradable USD pair from Alpaca's asset list"
   assertEquals(cryptoFromAssets(null as any), []);
 });
 
-Deno.test("20 a day: 24-hour pace checkpoints, shorter hold, then top 5", () => {
+Deno.test("20 is a maximum, not a target: being behind changes nothing", () => {
   const at = (h: number, m = 0) => ({ hour: h, minute: m });
-  assertEquals(mainPace(at(6), 4).expected, 4);
-  assertEquals(mainPace(at(10), 8).expected, 8);
-  assertEquals(mainPace(at(14), 12).expected, 12);
-  assertEquals(mainPace(at(18), 16).expected, 16);
-  assertEquals(mainPace(at(22), 19).expected, 19);
-  assertEquals(mainPace(at(23, 55), 20).expected, 20);
-  const on = mainPace(at(10), 8);
-  assertEquals([on.maxHold, on.topN, on.level], [120, 3, 0]);
-  assertEquals(mainPace(at(10), 7).maxHold, 60);
-  assertEquals(mainPace(at(10), 6).maxHold, 30);
-  assertEquals(mainPace(at(10), 5).topN, 5);
-  assertEquals(mainPace(at(10), 5).lines.length, 2);
-  assertEquals(mainPace(at(23, 0), 5).impossible, true); // 15 to go in 60 minutes: not possible
-  assertEquals(mainPace(at(12), 8).impossible, false);
+  for (const trades of [0, 3, 8]) {
+    const p = mainPace(at(20), trades);
+    assertEquals([p.maxHold, p.topN, p.level, p.lines.length, p.impossible], [120, 3, 0, 0, false]);
+  }
+  assert(mainPace(at(10), 0).checkpoints.includes("maximum"));
+});
+
+Deno.test("momentum gate: a cross in a flat market is skipped (needs +0.4% in the last hour)", () => {
+  const closes = [...Array(20).fill(100), ...Array(13).fill(100)];
+  assertEquals(move60Pct(closes, 100.5), 0.5);
+  assertEquals(move60Pct(closes, 100.3), 0.3);
+  assertEquals(move60Pct([100, 101], 102), null);
+  assertEquals(decide({ ...base, signal: "buy", move60: 0.3 }).decision, "no action");
+  assert(decide({ ...base, signal: "buy", move60: 0.3 }).reason.includes("too flat"));
+  assertEquals(decide({ ...base, signal: "buy", move60: 0.4 }).decision, "would buy");
+  assertEquals(decide({ ...base, signal: "buy", move60: null }).decision, "no action");
+  // Of several valid crosses, the strongest 1-hour move; flat ones and resting ones are never picked.
+  const mk = (symbol: string, o: Partial<Scan>): Scan => ({
+    symbol, stock: false, open: true, price: 100, fast: 101, slow: 100, signal: "buy", key: `${symbol}|t|buy`, big: { ok: true, why: "rising" }, ...o,
+  });
+  const r = pickMarket([mk("A/USD", { move60: 0.6 }), mk("B/USD", { move60: 1.2 }), mk("C/USD", { move60: 0.2 }), mk("D/USD", { move60: 2, cooling: true })], null, false);
+  assertEquals(r.pick?.symbol, "B/USD");
+  assertEquals(r.flat.map((x) => x.symbol), ["C/USD"]);
+});
+
+Deno.test("profit lock and dead-trade exit", () => {
+  assertEquals([lockFloor(2.99), lockFloor(3), lockFloor(7.99), lockFloor(8)], [null, 1, 1, 4]);
+  // $100 of a $100 coin: 1 coin, so $1 of price = $1 of P/L.
+  const sh = (peak?: number) => ({ symbol: "BTC/USD", qty: 1, mult: 1, entryPrice: 100, entryAt: "", ...(peak != null ? { peak } : {}) });
+  const x = { ...base, asset: "BTC/USD", stock: false };
+  // Up $3.50 once, now back to +$1: sold by the profit lock, keeping the win.
+  const lock = decide({ ...x, shadow: sh(3.5), price: 101, heldMin: 20 });
+  assertEquals([lock.decision, lock.kind], ["would sell", "profit lock"]);
+  assertEquals(decide({ ...x, shadow: sh(3.5), price: 102, heldMin: 20 }).decision, "hold");
+  // Up $9 once: the floor is +$4.
+  assertEquals(decide({ ...x, shadow: sh(9), price: 104.5, heldMin: 20 }).decision, "hold");
+  assertEquals(decide({ ...x, shadow: sh(9), price: 104, heldMin: 20 }).kind, "profit lock");
+  // The peak is remembered while holding.
+  assertEquals(decide({ ...x, shadow: sh(), price: 105, heldMin: 10 }).peak, 5);
+  // Dead trade: within $1 of flat after 45 minutes.
+  assertEquals(decide({ ...x, shadow: sh(), price: 100.5, heldMin: 30 }).decision, "hold");
+  assertEquals(decide({ ...x, shadow: sh(), price: 100.5, heldMin: 45 }).kind, "dead-trade exit");
+  assertEquals(decide({ ...x, shadow: sh(), price: 99, heldMin: 45 }).kind, "dead-trade exit");
+  assertEquals(decide({ ...x, shadow: sh(), price: 98.5, heldMin: 45 }).decision, "hold");
+  // The old exits keep their names.
+  assertEquals(decide({ ...x, shadow: sh(), price: 150 }).kind, "take profit");
+  assertEquals(decide({ ...x, shadow: sh(), price: 50 }).kind, "stop loss");
+  assertEquals(decide({ ...x, shadow: sh(), price: 102, signal: "sell" }).kind, "trend turn");
 });
 
 Deno.test("max hold: a trade that hits no exit closes at the last check before its max hold", () => {
   const shadow = { symbol: "BTC/USD", qty: 0.001, mult: 1, entryPrice: 100000, entryAt: "" };
-  const x = { ...base, asset: "BTC/USD", stock: false, shadow, price: 100010 };
+  const x = { ...base, asset: "BTC/USD", stock: false, shadow, price: 101500 }; // +$1.50: not a dead trade
   assertEquals(decide({ ...x, heldMin: 100, maxHoldMin: 120 }).decision, "hold");
   const s = decide({ ...x, heldMin: 115, maxHoldMin: 120 });
   assertEquals(s.decision, "would sell");

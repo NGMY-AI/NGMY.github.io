@@ -90,15 +90,20 @@ export const PA_MARKETS: MarketDef[] = [
 /** The 10 weekday stocks (unchanged). */
 export const PA_STOCKS: MarketDef[] = PA_MARKETS.filter((m) => m.kind === "stock");
 
-/** Nov 24, 2026 (all crypto + 20 a day): the main agent watches EVERY active, tradable USD crypto pair Alpaca
- *  offers, every day, around the clock. The list is read from Alpaca's asset list (once per Eastern day, and at
- *  every start of the server); these are only the fallback when that list cannot be read. */
+/** Nov 25, 2026 (profit fix): the main agent trades ONLY these 15 liquid crypto majors (USD pairs), every day,
+ *  around the clock. Thin coins barely move, so a $100 trade went nowhere. Alpaca's asset list is still read once
+ *  a day: a major that is not active and tradable there is dropped automatically and shown on screen. */
 export const PA_BASE_COINS: MarketDef[] = [
-  ["BTC", "Bitcoin"], ["ETH", "Ethereum"], ["SOL", "Solana"], ["DOGE", "Dogecoin"], ["AVAX", "Avalanche"], ["LINK", "Chainlink"],
-  ["LTC", "Litecoin"], ["BCH", "Bitcoin Cash"], ["DOT", "Polkadot"], ["UNI", "Uniswap"], ["ADA", "Cardano"], ["NEAR", "NEAR"],
-  ["ATOM", "Cosmos"], ["XLM", "Stellar"], ["AAVE", "Aave"], ["GRT", "The Graph"], ["MKR", "Maker"], ["CRV", "Curve"],
-  ["BAT", "Basic Attention Token"], ["SUSHI", "SushiSwap"], ["XTZ", "Tezos"], ["MANA", "Decentraland"], ["SAND", "The Sandbox"], ["ALGO", "Algorand"],
+  ["BTC", "Bitcoin"], ["ETH", "Ethereum"], ["SOL", "Solana"], ["DOGE", "Dogecoin"], ["XRP", "XRP"], ["ADA", "Cardano"],
+  ["AVAX", "Avalanche"], ["LINK", "Chainlink"], ["LTC", "Litecoin"], ["BCH", "Bitcoin Cash"], ["DOT", "Polkadot"], ["UNI", "Uniswap"],
+  ["NEAR", "NEAR"], ["ATOM", "Cosmos"], ["ARB", "Arbitrum"],
 ].map(([s, n]) => ({ symbol: `${s}/USD`, name: n, kind: "crypto" as const }));
+
+/** Of Alpaca's tradable crypto pairs, only the 15 majors, in the order above. */
+export function majorsOnly(fromAlpaca: MarketDef[]): MarketDef[] {
+  const have = new Set(fromAlpaca.map((m) => m.symbol));
+  return PA_BASE_COINS.filter((m) => have.has(m.symbol));
+}
 
 /** The USD crypto pairs from Alpaca's asset list: active and tradable only. Bitcoin, Ethereum, Solana and
  *  Dogecoin first, then A to Z. */
@@ -127,7 +132,7 @@ export async function readCryptoList(k: Keys): Promise<{ list: MarketDef[]; from
   }
   try {
     const assets = await aGet(PAPER_BASE, "/v2/assets?asset_class=crypto&status=active", k);
-    const list = cryptoFromAssets(assets);
+    const list = majorsOnly(cryptoFromAssets(assets));
     if (!list.length) throw new Error("empty");
     cryptoCache = { day, list, ok: true, at: Date.now() };
   } catch {
@@ -161,6 +166,32 @@ export function offNote(symbol: string, weekend: boolean): string {
 /** Pace checkpoints for 20 a day, every day (ET minutes from midnight -> trades done by then). */
 export const PA_PACE: [number, number][] = [[0, 0], [360, 4], [600, 8], [840, 12], [1080, 16], [1320, 19], [1435, 20]];
 export const PA_PACE_LINE = "Pace: 6:00 AM 4 · 10:00 AM 8 · 2:00 PM 12 · 6:00 PM 16 · 10:00 PM 19 · 11:55 PM 20";
+export const PA_MAX_LINE = "20 is a maximum, not a target: the agent never loosens a rule to reach it.";
+
+/** Nov 25, 2026: the profit fix rules. */
+export const PA_FIX = {
+  momentumPct: 0.4, // the market must have moved at least +0.4% in the last 60 minutes
+  lockStartUsd: 3, lockFloorUsd: 1, // up $3 or more: a floor at +$1
+  lockHighUsd: 8, lockHighFloorUsd: 4, // up $8 or more: the floor rises to +$4
+  deadAfterMin: 45, deadBandUsd: 1, // still between -$1 and +$1 after 45 minutes: sold
+  flatBandUsd: 1, cooldownMin: 120, // a trade that closed between -$1 and +$1: that market rests 2 hours
+};
+
+export const PA_FIX_WHY = [
+  "Why the profit fix (Nov 25): the night trades (HYPE, PAXG, GRT, YFI, SKY) almost all closed at $0.00 or a small loss.",
+  "1. Thin coins barely move, so a $100 trade went nowhere. Now only 15 liquid crypto majors are traded.",
+  "2. The entry fired in sideways markets. Now the market must also have moved at least +0.4% in the last hour.",
+  "3. Winners drifted back to $0.00. Now a trade up $3 locks a +$1 floor (up $8: a +$4 floor), and a trade still within $1 of flat after 45 minutes is sold.",
+];
+
+/** How far the price moved in the last 60 minutes, in %: the price now against the close 12 five-minute candles
+ *  before the last finished one. null with too few candles. */
+export function move60Pct(closes: number[], price: number): number | null {
+  if (closes.length < 13) return null;
+  const ref = closes[closes.length - 13];
+  const p = price || closes[closes.length - 1];
+  return ref > 0 ? round2((p - ref) / ref * 100 * 100) / 100 : null;
+}
 
 /** The main agent's pace for 20 a day. Behind the pace, in order: (1) a shorter max hold for new trades
  *  (2 hours -> 60 min from 1 behind -> 30 min from 2 behind); (2) from 3 behind, the top 5 valid entries are
@@ -176,18 +207,18 @@ export function mainPace(et: { hour: number; minute: number }, trades: number) {
       break;
     }
   }
+  // Nov 25 (profit fix): 20 is a MAXIMUM, not a target. Being behind changes nothing: the max hold stays 2 hours
+  // and no rule is ever loosened to reach 20.
   const target = PA_RULES.maxTradesPerDay;
   const done = trades >= target;
   const deficit = done ? 0 : Math.max(0, expected - trades);
-  const maxHold = deficit >= 2 ? PA_RULES.holdSteps[2] : deficit >= 1 ? PA_RULES.holdSteps[1] : PA_RULES.holdSteps[0];
-  const topN = deficit >= 3 ? 5 : 3;
-  const level = deficit >= 3 ? 3 : deficit >= 2 ? 2 : deficit >= 1 ? 1 : 0;
+  const maxHold = PA_RULES.maxHoldMin;
+  const topN = 3;
+  const level = 0;
   const lines: string[] = [];
-  if (deficit >= 1) lines.push(`Step 1: ${deficit} behind the pace, so new trades are held ${maxHold} minutes at most (not 2 hours), to free the one position slot sooner.`);
-  if (deficit >= 3) lines.push("Step 2: it now considers the top 5 valid entries instead of the top 3.");
   const minutesLeft = Math.max(0, 24 * 60 - mins);
-  const impossible = !done && trades + Math.floor(minutesLeft / (2 * PA_RULES.checkEveryMinutes)) < target;
-  return { target, trades, expected, deficit, remaining: Math.max(0, target - trades), done, maxHold, topN, level, lines, impossible, minutesLeft, checkpoints: PA_PACE_LINE };
+  const impossible = false;
+  return { target, trades, expected, deficit, remaining: Math.max(0, target - trades), done, maxHold, topN, level, lines, impossible, minutesLeft, checkpoints: PA_MAX_LINE };
 }
 
 /** The big trend filter (fix 2): the slow average must be HIGHER than it was 1 hour ago (12 five-minute candles)
@@ -286,15 +317,18 @@ export const PA_RULE_LINES: string[] = [
   "$100 per trade: $100 of the stock or coin itself. One position at a time across all markets. No options, no margin, no short selling.",
   "All times are Eastern Time (New York).",
   "Weekdays: it watches 10 stocks (SPY, QQQ, AAPL, MSFT, NVDA, AMZN, GOOGL, META, TSLA, AMD) while the US stock market is open (9:30 AM to 4:00 PM ET, never on market holidays).",
-  "Crypto: EVERY tradable USD crypto pair on Alpaca (Bitcoin, Ethereum, Solana, Dogecoin and all the others), every day, 24 hours a day, nights and weekends too. The list is read from Alpaca each day; a pair that is delisted or not tradable is dropped automatically and shown on screen.",
-  "Every 5 minutes it looks at ALL markets open at that moment in the same check (stocks and crypto in stock market hours, crypto only otherwise) and buys the one that gives a valid entry first (if several do at the same check, the strongest one). While it holds a position it checks the exit rules every 5 minutes.",
-  "Buy signal, ALL of these: the fast average (9 candles) crosses above the slow average (21 candles) on 5-minute candles, the slow average is higher than 1 hour ago (the big trend is rising), the price is above the slow average, and no position is held.",
+  "Crypto: ONLY 15 liquid majors (BTC, ETH, SOL, DOGE, XRP, ADA, AVAX, LINK, LTC, BCH, DOT, UNI, NEAR, ATOM, ARB, all against USD), every day, 24 hours a day, nights and weekends too. Thin coins are not traded: they barely move. A major Alpaca does not offer as tradable is dropped automatically and shown on screen.",
+  "Every 5 minutes it looks at ALL markets open at that moment in the same check (stocks and crypto in stock market hours, crypto only otherwise). Of the markets that pass all four entry rules it buys the one with the strongest 1-hour move. While it holds a position it checks the exit rules every 5 minutes.",
+  "Buy signal, ALL FOUR: (1) the fast average (9 candles) crossed above the slow average (21 candles) on 5-minute candles in the last 15 minutes, (2) the slow average is higher than 1 hour ago, (3) the price is above the slow average, (4) the momentum gate: the market moved at least +0.4% in the last 60 minutes. Under +0.4% it is too flat and is skipped, even when 1 to 3 are true.",
   "Never buys into a falling big trend: if the slow average is flat or falling, no trade, even when the fast line crosses up.",
   "Sell signal: the fast average crosses back below the slow average.",
-  "Take profit: sell when the position is up $50. Stop loss: sell when it is down $50. Win and loss are the same size, so winning 5 out of 10 trades breaks even.",
+  "Take profit: sell when the position is up $50. Stop loss: sell when it is down $50.",
+  "Profit lock: once a trade is up $3 or more, a floor is set at +$1; falling back to +$1 sells it and keeps the win. Once up $8, the floor rises to +$4. Checked every 5 minutes, so a fast drop between two checks can still close a little below the floor.",
+  "Dead-trade exit: a trade still between -$1 and +$1 after 45 minutes is sold to free the slot.",
+  "Cooldown: after a trade closes flat (between -$1 and +$1), that market is not traded again for 2 hours.",
   "Weekdays: sell everything by 3:55 PM ET. No overnight stock positions, and no new stock buys after 3:40 PM ET.",
-  "20 trades a day, every day (target and cap), all markets together, only on a real signal. Never forced. Pace: 6:00 AM 4, 10:00 AM 8, 2:00 PM 12, 6:00 PM 16, 10:00 PM 19, 11:55 PM 20.",
-  "Max hold: a trade that hits no exit is closed after 2 hours. Behind the pace, new trades get 60, then 30 minutes, and from 3 behind it considers the top 5 valid entries instead of the top 3. The not-falling rule never relaxes.",
+  "At most 20 trades a day, every day, all markets together. 20 is a maximum, not a target: no rule is ever loosened to reach it.",
+  "Max hold: a trade that hits no other exit is closed after 2 hours.",
   "Daily stop: if the day loses $100, no more buys that day (was $50; with 20 trades a day one bad trade could have ended the day).",
   "Total brake: if total demo losses reach $200, the agent pauses until an admin turns it back on (was $100).",
 ];
@@ -371,13 +405,26 @@ export type DecideInput = {
   /** Nov 24: minutes the position has been held, and its max hold (2 hours, or 60 / 30 minutes behind the pace). */
   heldMin?: number;
   maxHoldMin?: number;
+  /** Nov 25: the momentum gate, the 60-minute move in % (a buy needs +0.4% or more). */
+  move60?: number | null;
 };
 
 export type Decision = {
   decision: "would buy" | "would sell" | "hold" | "no action";
   reason: string;
   pnl?: number; // realized would-be P/L when it would sell
+  kind?: ExitKind; // why it sold (for the trade history)
+  peak?: number; // the best P/L this trade has reached so far (for the profit lock)
 };
+
+export type ExitKind = "take profit" | "stop loss" | "profit lock" | "dead-trade exit" | "max hold" | "3:55 close" | "trend turn";
+
+/** The profit lock floor for a trade that has reached `peak`: +$1 from +$3, +$4 from +$8, else none. */
+export function lockFloor(peak: number): number | null {
+  if (peak >= PA_FIX.lockHighUsd) return PA_FIX.lockHighFloorUsd;
+  if (peak >= PA_FIX.lockStartUsd) return PA_FIX.lockFloorUsd;
+  return null;
+}
 
 /** The trading rules, as one pure function. No network, no orders. */
 export function decide(x: DecideInput): Decision {
@@ -387,19 +434,29 @@ export function decide(x: DecideInput): Decision {
     const mult = x.shadow.mult ?? 1;
     const pnl = round2(x.shadow.qty * mult * (x.price - x.shadow.entryPrice));
     const money = `${pnl >= 0 ? "+" : "-"}$${Math.abs(pnl).toFixed(2)}`;
-    if (pnl >= r.takeProfitUsd) return { decision: "would sell", reason: `take profit hit (${money})`, pnl };
-    if (pnl <= -r.stopLossUsd) return { decision: "would sell", reason: `stop loss hit (${money})`, pnl };
+    // The best this trade has been (the profit lock remembers it between checks).
+    const peak = round2(Math.max(Number((x.shadow as any).peak ?? -Infinity), pnl));
+    const sell = (kind: ExitKind, why: string): Decision => ({ decision: "would sell", reason: `${why} (${money})`, pnl, kind, peak });
+    if (pnl >= r.takeProfitUsd) return sell("take profit", "take profit hit");
+    if (pnl <= -r.stopLossUsd) return sell("stop loss", "stop loss hit");
+    // Profit lock: up $3 or more sets a +$1 floor (up $8: +$4). Falling back to the floor sells and keeps the win.
+    const floor = lockFloor(peak);
+    if (floor != null && pnl <= floor) return sell("profit lock", `profit lock: it was up ${peak.toFixed(2)}, the +${floor.toFixed(2)} floor was reached`);
+    // Dead trade: still within $1 of flat after 45 minutes: sold to free the slot.
+    if (x.heldMin != null && x.heldMin >= PA_FIX.deadAfterMin - 1 && Math.abs(pnl) <= PA_FIX.deadBandUsd) {
+      return sell("dead-trade exit", `dead-trade exit: still between -$1 and +$1 after ${Math.floor(x.heldMin)} min`);
+    }
     // The max hold: closed at the last 5-minute check before it is reached, so one position never blocks the day.
     const hold = x.maxHoldMin ?? (x.shadow as any).maxHold ?? r.maxHoldMin;
     if (x.heldMin != null && x.heldMin >= hold - r.exitCheckMinutes) {
-      return { decision: "would sell", reason: `max hold reached: closed after ${Math.floor(x.heldMin)} min (max ${hold} min) (${money})`, pnl };
+      return sell("max hold", `max hold reached: closed after ${Math.floor(x.heldMin)} min (max ${hold} min)`);
     }
-    if (x.stock && x.finalCheck) return { decision: "would sell", reason: `3:55 PM ET rule, no overnight stock positions (${money})`, pnl };
-    if (x.signal === "sell") return { decision: "would sell", reason: `sell signal: fast average crossed below slow (${money})`, pnl };
-    const what = x.shadow.option ? `SPY $${x.shadow.option.strike} call` : `${x.asset} trade`;
+    if (x.stock && x.finalCheck) return sell("3:55 close", "3:55 PM ET rule, no overnight stock positions");
+    if (x.signal === "sell") return sell("trend turn", "sell signal: fast average crossed below slow");
+    const what = x.shadow.option ? `SPY ${x.shadow.option.strike} call` : `${x.asset} trade`;
     return {
-      decision: "hold",
-      reason: `still holding the same ${what} (${money}), waiting for +$${r.takeProfitUsd}, -$${r.stopLossUsd} or a turn down`,
+      decision: "hold", peak,
+      reason: `still holding the same ${what} (${money}), waiting for +${r.takeProfitUsd}, -${r.stopLossUsd}, a turn down${floor != null ? `, or the +${floor.toFixed(2)} profit lock floor` : ""}`,
     };
   }
   if (x.totalPnl <= -r.totalLossBrakeUsd) return { decision: "no action", reason: `agent paused by the $${r.totalLossBrakeUsd} brake` };
@@ -414,9 +471,14 @@ export function decide(x: DecideInput): Decision {
       reason: `fast average crossed above slow on ${x.asset}, but ${x.bigTrend?.why ?? "the big trend is unknown"}: never buys into a falling big trend, no trade`,
     };
   }
+  // Nov 25: the momentum gate. A cross in a flat market is skipped: it must have moved +0.4% in the last hour.
+  if (x.move60 !== undefined && (x.move60 == null || x.move60 < PA_FIX.momentumPct)) {
+    return { decision: "no action", reason: `fast average crossed above slow on ${x.asset} with a rising trend, but it moved only ${x.move60 == null ? "?" : `${x.move60 >= 0 ? "+" : ""}${x.move60.toFixed(2)}%`} in the last hour (needs +${PA_FIX.momentumPct}%): too flat, no trade` };
+  }
   if (x.alpacaHolding) return { decision: "no action", reason: "buy signal, but a position is already open at Alpaca" };
   if (x.signalAlreadyUsed) return { decision: "no action", reason: "buy signal already used, never twice for one signal" };
-  return { decision: "would buy", reason: `buy signal on ${x.asset}: fast average crossed above slow and ${x.bigTrend.why}, would buy $${r.tradeUsd}` };
+  const mom = x.move60 != null ? `, up ${x.move60.toFixed(2)}% in the last hour` : "";
+  return { decision: "would buy", reason: `buy signal on ${x.asset}: fast average crossed above slow and ${x.bigTrend.why}${mom}, would buy ${r.tradeUsd}` };
 }
 
 /** An open pretend position at a price: what it is worth and its win or loss in dollars. */
@@ -476,23 +538,30 @@ export type Scan = {
   signal: "buy" | "sell" | "none";
   key: string; // identifies this signal so it is never used twice
   big?: { ok: boolean; why: string }; // the big trend filter (fix 2)
+  move60?: number | null; // Nov 25: the 60-minute move in % (the momentum gate needs +0.4%)
+  cooling?: boolean; // Nov 25: closed flat in the last 2 hours, not traded again yet
 };
 
 /** Of all open markets with a VALID entry (a fresh cross up AND the big trend rising, when known), the first one;
  *  if several are valid at the same check, the strongest (fast line furthest above the slow line).
  *  `blocked` = markets that crossed up but failed the big trend rule, for the log. */
-export function pickMarket(scans: Scan[], usedKey: string | null, finalCheck: boolean, topN = 3): { pick: Scan | null; closest: Scan | null; blocked: Scan[]; top: Scan[] } {
+export function pickMarket(scans: Scan[], usedKey: string | null, finalCheck: boolean, topN = 3): { pick: Scan | null; closest: Scan | null; blocked: Scan[]; top: Scan[]; flat: Scan[] } {
   const open = scans.filter((s) => s.open && s.fast != null && s.slow != null && s.price > 0);
   const gap = (s: Scan) => (s.fast! - s.slow!) / s.slow!;
-  const crossed = open.filter((s) => s.signal === "buy" && s.key !== usedKey && !(s.stock && finalCheck));
-  const candidates = crossed.filter((s) => s.big?.ok !== false).sort((a, b) => gap(b) - gap(a));
+  const crossed = open.filter((s) => s.signal === "buy" && s.key !== usedKey && !(s.stock && finalCheck) && !s.cooling);
+  // All four: a fresh cross up (last 15 minutes), slow average higher than 1 hour ago, price above it, and the
+  // momentum gate (+0.4% or more in the last 60 minutes). Ranked by the 1-hour move, strongest first.
+  const momentumOk = (s: Scan) => s.move60 === undefined || (s.move60 != null && s.move60 >= PA_FIX.momentumPct);
+  const candidates = crossed.filter((s) => s.big?.ok !== false && momentumOk(s))
+    .sort((a, b) => (b.move60 ?? gap(b) * 100) - (a.move60 ?? gap(a) * 100));
   const blocked = crossed.filter((s) => s.big?.ok === false);
+  const flat = crossed.filter((s) => s.big?.ok !== false && !momentumOk(s));
   // For the log when nothing qualifies: the market whose fast line is closest to crossing up.
   const below = open.filter((s) => s.fast! <= s.slow!).sort((a, b) => gap(b) - gap(a));
   const closest = below[0] ?? [...open].sort((a, b) => gap(a) - gap(b))[0] ?? null;
   // The valid entries ranked by strength; the top 3 (top 5 when behind the pace) are considered, the strongest wins.
   const top = candidates.slice(0, topN);
-  return { pick: top[0] ?? null, closest, blocked, top };
+  return { pick: top[0] ?? null, closest, blocked, top, flat };
 }
 
 /** RSI (14): how strong the recent rises were compared with the recent falls, 0 to 100. */
@@ -1342,6 +1411,24 @@ async function ensureDay(db: any, et: ReturnType<typeof etParts>, asset: string,
   return row;
 }
 
+/** Markets resting after a flat trade: a sell between -$1 and +$1 in the last 2 hours. Until when, for the screen. */
+async function flatCooldowns(db: any, now: Date): Promise<{ symbol: string; until: string; pnl: number }[]> {
+  try {
+    const since = new Date(now.getTime() - PA_FIX.cooldownMin * 60000).toISOString();
+    const { data } = await db.from("ngmy_alpaca_agent_log").select("asset,created_at,pnl:details->pnl").eq("decision", "would sell")
+      .gte("created_at", since).order("id", { ascending: false }).limit(50);
+    const out: { symbol: string; until: string; pnl: number }[] = [];
+    for (const r of data ?? []) {
+      const pnl = Number(r?.pnl ?? 0);
+      if (Math.abs(pnl) > PA_FIX.flatBandUsd || out.some((o) => o.symbol === r.asset)) continue;
+      out.push({ symbol: String(r.asset), until: new Date(Date.parse(r.created_at) + PA_FIX.cooldownMin * 60000).toISOString(), pnl });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 // ─────────────────────────────────────────────────────────────── the 15-minute check
 
 /** The automatic 15-minute check. This is the ONLY place that decides would-buy / would-sell: the app can look,
@@ -1410,10 +1497,8 @@ async function runCheck(db: any): Promise<Record<string, unknown>> {
   if (droppedNow.length) {
     await writeLog(db, { kind: "control", asset: watch, decision: "no action", reason: `Dropped ${droppedNow.join(", ")}: no longer active and tradable on Alpaca, so it is not watched any more.` });
   }
-  if (pace.level > Number(day.pace_level ?? 0)) {
-    await db.from("ngmy_alpaca_agent_days").update({ pace_level: pace.level }).eq("et_day", et.dayKey);
-    await writeLog(db, { kind: "control", asset: watch, decision: "no action", reason: `Behind the pace (${day.trades ?? 0} of ${pace.expected} expected by now). ${pace.lines.join(" ")}` });
-  }
+  // Cooldown: a market whose trade closed flat (between -$1 and +$1) in the last 2 hours is not traded again yet.
+  const cooldowns = await flatCooldowns(db, now);
   // EVERY market open right now is checked in this same check (never one market per check).
   const scans: Scan[] = [...all, ...extra].map((m) => {
     const s = series[m.symbol] ?? { closes: [], times: [], ohlc: [], price: 0, lastBarAt: "" };
@@ -1422,6 +1507,8 @@ async function runCheck(db: any): Promise<Record<string, unknown>> {
       symbol: m.symbol, stock: m.kind === "stock", open: active.includes(m.symbol), price: s.price,
       fast: x.fastNow, slow: x.slowNow, signal: x.signal, key: `${m.symbol}|${crossAt(s.closes, s.times)}|${x.signal}`,
       big: bigTrend(s.closes, s.price),
+      move60: move60Pct(s.closes, s.price),
+      cooling: cooldowns.some((c) => c.symbol === m.symbol),
     };
   });
   const shadow: Shadow = state.shadow ?? null;
@@ -1460,7 +1547,7 @@ async function runCheck(db: any): Promise<Record<string, unknown>> {
     if (optionPriceMissing && d.decision === "hold") d = { ...d, reason: `${d.reason} (no option price right now, checked again in 5 minutes)` };
   } else {
     // All of the day's markets at once: the first VALID entry (cross up + big trend rising) is bought.
-    const { pick, closest, blocked, top } = pickMarket(scans, state.last_signal_key ?? null, lateForBuys, pace.topN);
+    const { pick, closest, blocked, top, flat } = pickMarket(scans, state.last_signal_key ?? null, lateForBuys, pace.topN);
     topRanked = top.map((s) => s.symbol);
     focus = pick ?? closest ?? scans.find((s) => s.open) ?? scans[0];
     const listName = `${active.length} open markets`;
@@ -1471,20 +1558,23 @@ async function runCheck(db: any): Promise<Record<string, unknown>> {
       d = { decision: "no action", reason: "no market is traded right now: the 10 stocks trade on weekdays 9:30 AM to 4:00 PM ET, crypto around the clock" };
     } else {
       d = decide({ ...base, asset: focus.symbol, stock: focus.stock, price: focus.price, signal: pick ? "buy" : "none",
-        fast: focus.fast, slow: focus.slow, shadow: null, signalAlreadyUsed: false, bigTrend: focus.big });
+        fast: focus.fast, slow: focus.slow, shadow: null, signalAlreadyUsed: false, bigTrend: focus.big, move60: pick ? focus.move60 : undefined });
       if (!pick && d.reason === "no signal") {
-        const why = blocked.length
-          ? `${blocked.map((b) => b.symbol).join(", ")} crossed up but the big trend is not rising, so no trade`
-          : `no fresh cross up${closest ? `, closest to one: ${closest.symbol}` : ""}`;
-        d = { decision: "no action", reason: `checked all ${listName}: ${why}` };
-        blockKey = blocked.length ? "falling" : "nocross";
+        const pct = (v: number | null | undefined) => v == null ? "?" : `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
+        const parts: string[] = [];
+        if (flat.length) parts.push(`${flat.map((b) => `${b.symbol} (${pct(b.move60)} in 1 h)`).join(", ")} crossed up with a rising trend but moved under +0.4% in the last hour: too flat`);
+        if (blocked.length) parts.push(`${blocked.map((b) => b.symbol).join(", ")} crossed up but the big trend is not rising`);
+        const cool = scans.filter((x) => x.open && x.cooling).length;
+        const why = parts.length ? `${parts.join("; ")}, so no trade` : `no fresh cross up${closest ? `, closest to one: ${closest.symbol}` : ""}`;
+        d = { decision: "no action", reason: `checked all ${listName}${cool ? ` (${cool} resting after a flat trade)` : ""}: ${why}` };
+        blockKey = flat.length ? "flat" : blocked.length ? "falling" : "nocross";
       } else if (d.decision === "no action") {
         blockKey = /daily stop|brake/.test(d.reason) ? "brake" : /falling big trend/.test(d.reason) ? "falling" : /target reached/.test(d.reason) ? "" : "other";
       }
       if (d.decision === "would buy") {
         // $100 of the stock or coin itself, held at most the current max hold.
         newShadow = { symbol: focus.symbol, qty: PA_RULES.tradeUsd / focus.price, mult: 1, entryPrice: focus.price, entryAt: now.toISOString(), maxHold: pace.maxHold } as any;
-        d = { ...d, reason: `${d.reason} (strongest valid entry of the top ${pace.topN} among ${listName}; max hold ${pace.maxHold} min)` };
+        d = { ...d, reason: `${d.reason} (strongest 1-hour move of the valid entries among ${listName}; max hold ${pace.maxHold} min)` };
       }
     }
   }
@@ -1497,9 +1587,11 @@ async function runCheck(db: any): Promise<Record<string, unknown>> {
       asset: focus.symbol, price, chart: focusCard?.chart ?? null,
       // The open pretend position marked to market (for an option: its own price, not the SPY price).
       held: shadow && d.decision !== "would sell" ? heldMark(shadow, heldPrice) : null,
-      cryptoList: nowCrypto, cryptoFromAlpaca: crypto.fromAlpaca, cryptoDropped,
+      cryptoList: nowCrypto, cryptoFromAlpaca: crypto.fromAlpaca, cryptoDropped, cooldowns,
     },
   };
+  // Holding: remember the best P/L so far (the profit lock floor never forgets it).
+  if (shadow && d.decision === "hold" && d.peak != null && d.peak !== (shadow as any).peak) statePatch.shadow = { ...shadow, peak: d.peak };
   if (blockKey && !shadow) {
     const blocks = { ...(day.blocks ?? {}) };
     blocks[blockKey] = Number(blocks[blockKey] ?? 0) + 1;
@@ -1549,6 +1641,7 @@ async function runCheck(db: any): Promise<Record<string, unknown>> {
           amount: round2(shadow.qty * m * shadow.entryPrice), qty: shadow.qty, mult: m, entryPrice: shadow.entryPrice, exitPrice: exit,
           entryAt: shadow.entryAt, option: shadow.option ?? null,
           outValue: round2(shadow.qty * m * exit), pct: round2((exit - shadow.entryPrice) / shadow.entryPrice * 100),
+          exitKind: d.kind ?? null, peak: d.peak ?? null, flat: Math.abs(d.pnl ?? 0) <= PA_FIX.flatBandUsd,
         };
       })() : {}),
     },
@@ -1762,22 +1855,25 @@ export async function handleAlpacaAgent(
     fastSharedPnl(db),
     db.from("ngmy_alpaca_agent_log").select("asset,pnl:details->pnl").eq("decision", "would sell").gte("created_at", etMidnight).limit(200),
   ]);
+  const cooldowns = await flatCooldowns(db, new Date());
   const tp: number[] = (todaySells ?? []).map((r: any) => Number(r?.pnl ?? 0));
   const tw = tp.filter((x) => x > 0).length;
-  const todayStats = { closed: tp.length, wins: tw, losses: tp.length - tw, winRatePct: tp.length ? Math.round(tw / tp.length * 100) : null, pnl: round2(tp.reduce((a, b) => a + b, 0)) };
+  const todayStats = {
+    closed: tp.length, wins: tw, losses: tp.length - tw, winRatePct: tp.length ? Math.round(tw / tp.length * 100) : null, pnl: round2(tp.reduce((a, b) => a + b, 0)),
+    flat: tp.filter((x) => Math.abs(x) <= PA_FIX.flatBandUsd).length,
+  };
   const pace = mainPace(etNow, Number(today?.trades ?? 0));
   const blocks: Record<string, number> = today?.blocks ?? {};
   const below = pace.trades < pace.target;
   const blockWords: Record<string, string> = {
+    flat: "markets crossed up with a rising trend but moved under +0.4% in the last hour (the momentum gate)",
     falling: "markets crossed up but their big trend was falling or flat — it never buys a falling market",
     nocross: "no market gave a fresh cross up with a rising big trend",
     brake: "a brake stopped it (the daily stop or the total brake)",
     other: "the open position slot or the stock close rules",
   };
   const topBlock = Object.entries(blocks).filter(([k]) => k in blockWords).sort((a, b) => b[1] - a[1])[0]?.[0];
-  const dayNote = pace.impossible && below
-    ? `Pace stopped at ${pace.trades} of ${pace.target} — reaching ${pace.target} would require buying a falling market${topBlock ? ` (most often: ${blockWords[topBlock]})` : ""}.`
-    : below && topBlock ? `Most often blocked so far today: ${blockWords[topBlock]}.` : null;
+  const dayNote = below && topBlock ? `Most often blocked so far today: ${blockWords[topBlock]}.` : null;
   const pnls: number[] = (closed ?? []).map((r: any) => Number(r?.pnl ?? 0));
   // The $100 rules (Nov 22): their own win rate, to see if the agent wins at least 5 out of 10.
   const newPnls: number[] = (closed ?? []).filter((r: any) => r?.rules === PA_RULES_TAG).map((r: any) => Number(r?.pnl ?? 0));
@@ -1807,6 +1903,8 @@ export async function handleAlpacaAgent(
       todayStats,
       pace: { ...pace, dayNote, blocks },
       brakeNote: PA_BRAKE_NOTE,
+      cooldowns,
+      whyFix: PA_FIX_WHY,
       // The other systems (Options, Scalper) share this paper balance: their closed and open pretend P/L.
       fast,
       ticket: {
