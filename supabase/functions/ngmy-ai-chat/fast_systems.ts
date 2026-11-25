@@ -115,10 +115,10 @@ export const FS_RULES = {
   spot: { tradeUsd: 100, takeProfitPct: 2, stopLossPct: 1, takeProfitUsd: 2, stopLossUsd: 1 },
   options: {
     // Nov 25 (options fix): near the money only (the strike within 5% of the price, the 2 nearest always tried),
-    // so the option moves with the stock like the Scalper; spread at most 5% of the premium (4% after the lesson).
+    // so the option moves with the stock like the Scalper; spread at most 10% of the premium (7% after the lesson).
     // The money is unchanged: premium $5 to $150, take profit +$50, stop loss -$50, early cut -$15.
     name: "Options", maxPremiumUsd: 150, minPremiumUsd: 5, strikeSteps: 4, nearPct: 5, maxExpiries: 3, minDays: 3, lessonMinDays: 7, preferMinDays: 5, preferMaxDays: 9,
-    spreadMaxPct: 5, spreadTightPct: 4, maxHoldMin: 45,
+    spreadMaxPct: 10, spreadTightPct: 7, lessonHoldMin: 20,
     takeProfitUsd: 50, stopLossUsd: 50, dailyStopUsd: 500, totalBrakeUsd: 1000, weekendDailyStopUsd: 50, tradeUsd: 100,
   },
   scalper: { name: "Scalper", tradeUsd: 100, dailyStopUsd: 50, totalBrakeUsd: 100 },
@@ -132,13 +132,13 @@ export const FS_RULE_LINES: Record<SystemId, string[]> = {
   options: [
     "Paper only: no order is ever sent to Alpaca.",
     "Its own markets, none of the main agent's: options on IWM, DIA, XLF, BAC, INTC, F, PFE, SOFI, HOOD, PLTR, COIN, XLE, T, VZ, PYPL, NIO, RIVN, SNAP, MARA, RIOT, UBER. Weekdays only: weekend crypto moved to Signal Grid.",
-    "It buys ONE call when the trend is up or ONE put when the trend is down: NEAR THE MONEY (the strike closest to the price, within 5%), 5 to 9 days to expiry preferred (never the same day, at least 3 days; 7 after the no-follow-through lesson), premium $150 or less, and never a contract whose bid/ask spread is over 5% of the premium (4% after the wide-spread lesson). Cheap far-out contracts are never bought: they barely move with the stock.",
+    "It buys ONE call when the trend is up or ONE put when the trend is down: NEAR THE MONEY (the strike closest to the price, within 5%), 5 to 9 days to expiry preferred (never the same day, at least 3 days; 7 after the no-follow-through lesson), premium $150 or less, and never a contract whose bid/ask spread is over 10% of the premium (7% after the wide-spread lesson). Cheap far-out contracts are never bought: they barely move with the stock.",
     "Up to 40 trades a day: a MAXIMUM, never a target. If the strict entries mean fewer trades, that is correct: the screen says waiting for a real setup. No rule is ever loosened to fill the count.",
     "NEVER relaxed: the 5-minute and 15-minute trends must agree with the trade (when they do not, the market is untradeable), the slow average rising with the price above BOTH averages (for a put: falling, price below both).",
     "Strength floor: it enters only when the market moved at least +0.5% in the trade's direction in the last 30 minutes. Each morning the floor learns: entries just above it that won under 45% of their last 20 raise it 0.1%, over 60% lower it 0.1% (never below +0.5%). The screen shows Entry floor today.",
     "No chasing: a market that already moved more than 1.5% in the last hour is skipped, the move is mostly over. Choppy markets (4+ crosses in 30 minutes) are skipped too.",
     "Two losses in a row in one market: that market is benched for the rest of the day. Two losses in a row in the system: a 20-minute pause, then the next entry needs +0.8% or more in 30 minutes.",
-    "Exits, checked every 1 minute: +$50 / -$50; early cut: down $15 within the first 5 minutes with the trend already against it is closed at once; the trend turning against the trade; 45 minutes reached; always out by 3:55 PM ET.",
+    "Exits, checked every 1 minute: +$50 / -$50; early cut: down $15 within the first 5 minutes with the trend already against it is closed at once; the trend turning against the trade; 30 minutes reached; always out by 3:55 PM ET.",
     "Daily stop -$500, total brake -$1,000. These brakes are wide on purpose: one options loss is $50. The real protection is the strict entries and the learning: benching losing markets, the pause after 2 losses in a row, and the entry floor.",
   ],
   scalper: [
@@ -593,7 +593,7 @@ export function evaluateLessons(system: SystemId, trades: TradeRow[], todayKey: 
     }
   }
   if (system === "options") {
-    if (count("NO_FOLLOW_THROUGH") >= 3) add("nft", `Options: only contracts with 7+ days to expiry —${count("NO_FOLLOW_THROUGH")} of the last ${losses.length} losses had no follow-through`);
+    if (count("NO_FOLLOW_THROUGH") >= 3) add("nft", `Options: max hold 20 min and only contracts with 7+ days to expiry — ${count("NO_FOLLOW_THROUGH")} of the last ${losses.length} losses had no follow-through`);
     if (count("WIDE_SPREAD") >= 3) add("spread", `Options: spread limit tightened to ${FS_RULES.options.spreadTightPct}% of the premium — ${count("WIDE_SPREAD")} losses had wide spreads`);
   }
 
@@ -643,10 +643,7 @@ export function activeRules(system: SystemId, weekend: boolean, lessons: Lesson[
     benched,
     strict: new Set(keyed("strict:").map((l) => l.key.slice(7))),
     noisy: new Set(keyed("noise:").map((l) => l.key.slice(6))),
-    // Nov 25 (options fix): options hold up to 45 minutes so a move has time to show in the premium. The old
-    // no-follow-through lesson cut it to 20 minutes, which only left the spread and time decay; it now only asks
-    // for 7+ days to expiry.
-    maxHold: isOpt ? FS_RULES.options.maxHoldMin : pace.maxHold,
+    maxHold: isOpt && has("nft") ? Math.min(pace.maxHold, FS_RULES.options.lessonHoldMin) : pace.maxHold,
     optMinDays: has("nft") ? FS_RULES.options.lessonMinDays : FS_RULES.options.minDays,
     spreadMaxPct: has("spread") ? FS_RULES.options.spreadTightPct : FS_RULES.options.spreadMaxPct,
     preferred: (keyed("pref:")[0]?.key.slice(5) as Bucket) ?? null,
@@ -737,7 +734,7 @@ export function blockReason(blocks: Record<string, number>): string {
     against60: "the 1-hour trend did not agree (a lesson made that a must)",
     benched: "its best markets were benched by the lessons",
     paused: "the pause after 2 losses in a row",
-    noContract: "no near-the-money option under $150 with a spread of 5% or less",
+    noContract: "no near-the-money option under $150 with a tight enough spread",
     notEnabled: "options are not enabled on the paper account",
     brake: "a brake stopped it (the daily stop or the total brake)",
     noData: "there were no prices for its markets",

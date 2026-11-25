@@ -242,8 +242,8 @@ Deno.test("lessons that change behavior", () => {
   assertEquals(activeRules("scalper", false, [], { thresholdPct: 0.5, maxHold: 30 }, true).thresholdPct, 0.8);
   assertEquals(activeRules("scalper", false, [{ key: "streak3", text: "" }], { thresholdPct: 0.5, maxHold: 30 }, false).thresholdPct, 0.6);
   const o = activeRules("options", false, [{ key: "nft", text: "" }, { key: "spread", text: "" }], { thresholdPct: 0.5, maxHold: 30 }, false);
-  assertEquals([o.maxHold, o.optMinDays, o.spreadMaxPct, o.allowDown], [45, 7, 4, true]);
-  assertEquals(activeRules("options", false, [], { thresholdPct: 0.5, maxHold: 30 }, false).spreadMaxPct, 5);
+  assertEquals([o.maxHold, o.optMinDays, o.spreadMaxPct, o.allowDown], [20, 7, 7, true]);
+  assertEquals(activeRules("options", false, [], { thresholdPct: 0.5, maxHold: 30 }, false).spreadMaxPct, 10);
   assertEquals(activeRules("scalper", false, [], { thresholdPct: 0.01, maxHold: 30 }, false).thresholdPct, 0.5);
   assertEquals([FS_RULES.streakPauseMin, FS_RULES.afterStreakPct], [20, 0.8]);
 });
@@ -286,10 +286,11 @@ Deno.test("options: calls above the price, puts below, at least 3 days out", () 
   assertEquals(new Set(calls.map((x) => x.expiry)).size, 3);
 });
 
-Deno.test("options: the money is unchanged, only the contract choice and the hold changed", () => {
+Deno.test("options: the money is unchanged, only the contract choice changed", () => {
   assertEquals(exitLevels(true, false), { tpUsd: 50, slUsd: 50 });
   assertEquals([FS_RULES.options.minPremiumUsd, FS_RULES.options.maxPremiumUsd, FS_RULES.earlyCutOptionUsd], [5, 150, 15]);
-  assertEquals([FS_RULES.options.spreadMaxPct, FS_RULES.options.maxHoldMin], [5, 45]);
+  assertEquals(FS_RULES.options.spreadMaxPct, 10);
+  assertEquals(activeRules("options", false, [], { thresholdPct: 0.5, maxHold: 30 }, false).maxHold, 30);
 });
 
 Deno.test("why the day ended below 40, in plain words", () => {
