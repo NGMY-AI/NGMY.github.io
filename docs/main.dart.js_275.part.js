@@ -1,13 +1,6 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
-$__dart_deferred_initializers__.current=function(a,b,c,$){var A,C,B
+$__dart_deferred_initializers__.current=function(a,b,c,$){var A,B
 A=c[0]
-C=c[2]
-B=c[228]
-var z=a.updateTypes([]);(function constants(){B.aTL=new A.y("rainbow","Rainbow")
-B.aTy=new A.y("Square",1)
-B.aTK=new A.y("outline","Outline")
-B.aTM=new A.y("retro","Retro")
-B.aTE=new A.y("glitch","Glitch")
-B.acy=new A.G(!0,null,null,null,null,null,16,C.u,null,1.4,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-B.aZ4=new A.G(!0,C.aR,null,null,null,null,11.5,null,null,null,null,null,1.35,null,null,null,null,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["wL2da7dKFnFs2Gu07N5LIboFO/I="]=a.current})($__dart_deferred_initializers__);
+B=c[239]
+var z=a.updateTypes([]);(function constants(){B.P5=new A.R(0,5,0,0)})()};
+(a=>{a["SO2D+XYOYRaSxTX5IUNSJuw5ruk="]=a.current})($__dart_deferred_initializers__);
