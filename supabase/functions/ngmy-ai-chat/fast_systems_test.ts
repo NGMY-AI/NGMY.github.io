@@ -205,10 +205,10 @@ Deno.test("every loss gets exactly one plain reason", () => {
 Deno.test("cut losers faster: first 5 minutes, trend already against it", () => {
   const o = (price: number, min: number, against: boolean) =>
     fastExit({ system: "options", shadow: call, price, now: at(min), trendAgainst: false, closeOut: false, trendNowAgainst: against });
-  assertEquals(o(0.90, 3, true).kind, "early cut"); // -10% of the $100 premium at 3 minutes, trend against
-  assertEquals(o(0.91, 3, true).sell, false); // -9%
-  assertEquals(o(0.90, 3, false).sell, false); // trend not against yet
-  assertEquals(o(0.90, 8, true).sell, false); // after the first 5 minutes the normal exits apply
+  assertEquals(o(0.85, 3, true).kind, "early cut"); // -$15 at 3 minutes, trend against
+  assertEquals(o(0.86, 3, true).sell, false); // -$14
+  assertEquals(o(0.85, 3, false).sell, false); // trend not against yet
+  assertEquals(o(0.85, 8, true).sell, false); // after the first 5 minutes the normal exits apply
   // Spot: -0.8% of $100.
   assertEquals(ex({ price: 198.4, now: at(4), trendNowAgainst: true }).kind, "early cut");
   assertEquals(ex({ price: 198.5, now: at(4), trendNowAgainst: true }).sell, false);
@@ -286,22 +286,10 @@ Deno.test("options: calls above the price, puts below, at least 3 days out", () 
   assertEquals(new Set(calls.map((x) => x.expiry)).size, 3);
 });
 
-Deno.test("options exits are a share of the premium, with a profit lock", () => {
-  // A $40 contract: take profit +$12 (30%), stop loss -$8 (20%).
-  assertEquals(exitLevels(true, false, 40), { tpUsd: 12, slUsd: 8 });
-  const sh = { symbol: "MARA", qty: 1, mult: 100, entryPrice: 0.4, entryAt: at(0).toISOString(), option: { contract: "M", strike: 5.5, expiry: "2026-12-04", premium: 0.4, cost: 40 }, ...exitLevels(true, false, 40) };
-  const o = (price: number, min: number, peakUsd = 0) =>
-    fastExit({ system: "options", shadow: { ...sh, tpUsd: sh.tpUsd, slUsd: sh.slUsd, peakUsd } as any, price, now: at(min), trendAgainst: false, closeOut: false });
-  assertEquals(o(0.52, 10).kind, "take profit");
-  assertEquals(o(0.32, 10).kind, "stop loss");
-  assertEquals(o(0.44, 10).sell, false);
-  // Up $6 (15%) at its best, back to +$2 (5%): the profit lock sells. Never got to 15%: it holds.
-  assertEquals(o(0.42, 12, 6).kind, "profit lock");
-  assertEquals(o(0.43, 12, 6).sell, false);
-  assertEquals(o(0.42, 12, 5).sell, false);
-  // 45 minutes for options.
-  assertEquals(FS_RULES.options.maxHoldMin, 45);
-  assertEquals([FS_RULES.options.minPremiumUsd, FS_RULES.options.spreadMaxPct], [20, 5]);
+Deno.test("options: the money is unchanged, only the contract choice and the hold changed", () => {
+  assertEquals(exitLevels(true, false), { tpUsd: 50, slUsd: 50 });
+  assertEquals([FS_RULES.options.minPremiumUsd, FS_RULES.options.maxPremiumUsd, FS_RULES.earlyCutOptionUsd], [5, 150, 15]);
+  assertEquals([FS_RULES.options.spreadMaxPct, FS_RULES.options.maxHoldMin], [5, 45]);
 });
 
 Deno.test("why the day ended below 40, in plain words", () => {

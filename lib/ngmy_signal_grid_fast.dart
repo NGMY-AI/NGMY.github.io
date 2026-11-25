@@ -28,6 +28,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
   Timer? _timer;
   bool _allTrades = false;
   bool _allLog = false;
+  bool _allTried = false; // the contract list in the "would choose now" card: 4 shown until See more
   String? _market; // the market tapped in the Agent markets panel
 
   bool get _options => widget.system == 'options';
@@ -845,10 +846,10 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
       ),
     );
     final tp = _options
-        ? '+${_d(g['takeProfitPct']).toStringAsFixed(0)}% of cost'
+        ? '+${_money(_d(g['takeProfitUsd']), sign: false)}'
         : '+${_d(g['takeProfitPct']).toStringAsFixed(0)}% (+\$${_d(g['takeProfitUsd']).toStringAsFixed(0)})';
     final sl = _options
-        ? '-${_d(g['stopLossPct']).toStringAsFixed(0)}% of cost'
+        ? '-${_money(_d(g['stopLossUsd']), sign: false)}'
         : '-${_d(g['stopLossPct']).toStringAsFixed(0)}% (-\$${_d(g['stopLossUsd']).toStringAsFixed(0)})';
     return _frame(
       p,
@@ -867,8 +868,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            '${_options ? 'Every option trade closes within 45 minutes at most, win, lose or flat, so a move has time to show in the premium. '
-                'Take profit and stop loss are a share of what the contract cost. Once up 15% it locks in at least +5%. ' : 'Every trade closes within 30 minutes at most, win, lose or flat. '}'
+            '${_options ? 'Every option trade closes within 45 minutes at most, win, lose or flat, so a move has time to show in the premium. ' :'Every trade closes within 30 minutes at most, win, lose or flat. '}'
             'Exits are checked every '
             '${_d(g['exitCheckEveryMin']).toStringAsFixed(0)} minute, and the hard close sells at the last check before the max hold.',
             style: TextStyle(color: p.muted, fontSize: 11.5, height: 1.35),
@@ -942,7 +942,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
           const SizedBox(height: 4),
           Text(
             'For the best-ranked market right now: a call when its trend is up, a put when it is down. Near the money (the strike '
-            'closest to the price), at least 3 days to expiry, \$20 to \$150, spread at most 5% of the premium.',
+            'closest to the price), at least 3 days to expiry, \$150 or less, spread at most 5% of the premium.',
             style: TextStyle(color: p.muted, fontSize: 11.5),
           ),
           const SizedBox(height: 8),
@@ -970,25 +970,57 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
               style: TextStyle(color: p.ink, fontSize: 12, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 4),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final t in tried.take(18))
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            // 2 in a row, 4 shown; the rest behind See more.
+            Builder(builder: (context) {
+              final shown = _allTried ? tried.take(18).toList() : tried.take(4).toList();
+              Widget cell(Map t) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     decoration: BoxDecoration(
                       color: (t['cost'] != null && _d(t['cost']) <= 150 ? _up : p.muted).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(
-                      '\$${_d(t['strike']).toStringAsFixed(0)} · ${_dateLabel(t['expiry']).replaceAll(RegExp(r', \d{4}$'), '')} · ${t['cost'] == null ? 'no price' : _money(_d(t['cost']), sign: false)}'
-                      '${t['spreadPct'] == null || _d(t['spreadPct']) >= 100 ? '' : ' · spread ${_d(t['spreadPct']).toStringAsFixed(0)}%'}',
-                      style: TextStyle(color: p.ink, fontSize: 10.5, fontWeight: FontWeight.w700),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '\$${_d(t['strike']).toStringAsFixed(t['strike'] is num && _d(t['strike']) % 1 != 0 ? 2 : 0)} · ${_dateLabel(t['expiry']).replaceAll(RegExp(r', \d{4}$'), '')}',
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: p.ink, fontSize: 11, fontWeight: FontWeight.w800),
+                        ),
+                        Text(
+                          '${t['cost'] == null ? 'no price' : _money(_d(t['cost']), sign: false)}'
+                          '${t['spreadPct'] == null || _d(t['spreadPct']) >= 100 ? '' : ' · spread ${_d(t['spreadPct']).toStringAsFixed(0)}%'}',
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: p.muted, fontSize: 10.5, fontWeight: FontWeight.w700),
+                        ),
+                      ],
                     ),
-                  ),
-              ],
-            ),
+                  );
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var i = 0; i < shown.length; i += 2)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        children: [
+                          Expanded(child: cell(_map(shown[i]))),
+                          const SizedBox(width: 6),
+                          Expanded(child: i + 1 < shown.length ? cell(_map(shown[i + 1])) : const SizedBox()),
+                        ],
+                      ),
+                    ),
+                  if (tried.length > 4)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        onPressed: () => setState(() => _allTried = !_allTried),
+                        child: Text(_allTried ? 'Show less' : 'See more (${math.min(tried.length, 18) - 4})'),
+                      ),
+                    ),
+                ],
+              );
+            }),
           ],
         ],
       ),
