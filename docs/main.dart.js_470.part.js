@@ -25,13 +25,13 @@ B.dJ8=x([A.az,A.fl],y.c)
 B.dhY=x([A.kZ,A.pH,A.az],y.c)
 B.esP=new C.av0(B.d8s,B.dJ8,A.fl,A.j7,"PREMIUM",B.dhY)
 B.dAr=x([A.cZ,A.fz,A.bT],y.c)
-B.dvf=x([A.bT,A.aV],y.c)
+B.dve=x([A.bT,A.aV],y.c)
 B.dgt=x([A.wS,A.bT,A.fz],y.c)
-B.esQ=new C.av0(B.dAr,B.dvf,A.bT,A.jD,"NGMY WALLET",B.dgt)
-B.dxk=x([A.ex,A.e4,A.pI],y.c)
+B.esQ=new C.av0(B.dAr,B.dve,A.bT,A.jD,"NGMY WALLET",B.dgt)
+B.dxj=x([A.ex,A.e4,A.pI],y.c)
 B.dCm=x([A.aE,A.aQ],y.c)
 B.diU=x([A.td,A.aE,A.c4],y.c)
-B.esR=new C.av0(B.dxk,B.dCm,A.aE,A.mz,"LUXURY",B.diU)
+B.esR=new C.av0(B.dxj,B.dCm,A.aE,A.mz,"LUXURY",B.diU)
 B.esT=new E.av_(1,"premium")
 B.esU=new E.av_(2,"luxury")})()};
-(a=>{a["m0gut7hWS8YPSbM6a/9MVnIVF8g="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["xvagC7L7dcFIamIJOa4PdkAuWIE="]=a.current})($__dart_deferred_initializers__);

@@ -6051,7 +6051,7 @@ C.d.u(q,A.a([C.M,A.p(l,A.c(n,l,l,l,l,l,l,A.l(l,l,o?C.Gr:C.az,l,l,l,l,l,l,l,l,12,
 B.ae8.prototype={
 B(d){var x=null,w=A.c('Sender taps "Scan receiver answer QR" and points at this code.',x,x,x,x,x,x,A.l(x,x,C.c.j(0.7),x,x,x,x,x,x,x,x,12,x,x,x,x,1.4,!0,x,x,x,x,x,x,x,x),C.K,x,x),v=A.n(16),u=y.p
 v=A.cb(A.x(A.a([w,C.aO,A.p(x,A.qs(x,x,!1,this.c,x,!0,!0,x,!1,C.c),C.f,x,x,new A.o(C.c,x,x,v,x,x,C.m),x,x,x,x,C.bF,x,x,x)],u),C.l,x,C.e,C.O,0,C.p),C.t,x,C.y,x,x,x,x,x,C.ah)
-return A.ei(A.a([A.bI(C.BC,x,new B.dfi(d),x)],u),x,x,C.nG,v,x,x,x,x,D.fV8,x)}}
+return A.eh(A.a([A.bI(C.BC,x,new B.dfi(d),x)],u),x,x,C.nG,v,x,x,x,x,D.fV8,x)}}
 B.a_W.prototype={
 R(){return new B.aC7(A.A8(C.zc,C.ox,C.vK))}}
 B.aC7.prototype={
@@ -7358,8 +7358,8 @@ D.ak2=new A.u(1,0.03137254901960784,0.06274509803921569,0.09411764705882353,C.q)
 D.alQ=new A.u(1,0.07058823529411765,0.10196078431372549,0.14901960784313725,C.q)
 D.fW3=new A.C("Your team portal",null,C.dv,null,null,null,null,null,null,null,null,null)
 D.ha6=new A.C("Share the access code and member password with your team. They only sign in once.",null,H.FB,null,null,null,null,null,null,null,null,null)
-D.dqU=x([D.fW3,C.aj,D.ha6],y.p)
-D.bAF=new A.ft(C.ah,C.e,C.h,C.B,null,C.p,null,0,D.dqU,null)
+D.dqT=x([D.fW3,C.aj,D.ha6],y.p)
+D.bAF=new A.ft(C.ah,C.e,C.h,C.B,null,C.p,null,0,D.dqT,null)
 D.heF=new A.C("Create your organization",null,C.fP,null,null,null,null,null,null,null,null,null)
 D.h_F=new A.C("Set an access code and member password. Share them with your team \u2014 they sign in once.",null,H.FB,null,null,null,null,null,null,null,null,null)
 D.dJ9=x([D.heF,C.aj,D.h_F],y.p)
@@ -7512,4 +7512,4 @@ $.igj=null
 $.hnC=null})();(function lazyInitializers(){var x=a.lazyFinal
 x($,"iIR","hSj",()=>new B.cuH())
 x($,"iGL","hrQ",()=>C.a.q(A.bx(A.bx(A.bx(A.HT(),"window"),"navigator"),"userAgent"),"Firefox"))})()};
-(a=>{a["soBK/pJ5pCy5G6QNGab4nH+/ZEM="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["FjbGWuoMtAHENtNtjIzdl+QL6Iw="]=a.current})($__dart_deferred_initializers__);

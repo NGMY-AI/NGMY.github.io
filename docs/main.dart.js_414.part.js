@@ -1346,7 +1346,7 @@ u=B.bT.j(0.35)
 return new A.D(B.d7,A.A(A.a([A.p(B.z,A.c(t,w,w,w,w,w,w,B.we,w,w,w),B.f,w,w,new A.o(u,w,w,w,w,w,B.a6),w,24,w,w,w,w,w,24),B.ar,A.E(A.c(s,w,w,w,w,w,w,D.fJj,w,w,w),1)],x.p),B.B,w,B.e,B.h,0,w,w),w)},
 cFq(d){switch(d.a){case 0:return D.dEl
 case 1:return D.dyF
-case 2:return D.do4}}}
+case 2:return D.do3}}}
 C.aOG.prototype={
 b_(){this.b8()
 this.b6()
@@ -3040,7 +3040,7 @@ B(d){var w,v=this,u=null,t=C.bGO(v.d),s=v.c
 if(B.a.i(s).length===0)return A.p(B.z,D.hhR,B.f,u,u,new A.o(B.a_,u,u,A.n(16),u,u,B.m),u,v.e,u,u,u,u,u,u)
 w=C.i6f(s,t)
 if(w.length===0)return A.p(B.z,D.fUd,B.f,u,u,new A.o(B.a_,u,u,A.n(16),u,u,B.m),u,v.e,u,u,u,u,u,u)
-return A.by(A.n(16),A.ej(new A.a5(1/0,v.e,new P.aak(w,t,u),u),B.v,!0),B.aq)}}
+return A.by(A.n(16),A.ei(new A.a5(1/0,v.e,new P.aak(w,t,u),u),B.v,!0),B.aq)}}
 var z=a.updateTypes(["ay<~>()","~()","P(pL)","WA(Z)","w(pL)","P(Cw)","Cw()","a2C(Z)","a0V(Z)","w(m)","pL(a9<@,@>)","F(pL,pL)","a9<m,@>(pL)","P(wC)"])
 C.h9o.prototype={
 $1(d){return new C.WA(this.a,null)},
@@ -3253,7 +3253,7 @@ $0(){return this.a.f=!1},
 $S:0}
 C.fkM.prototype={
 $1(d){var w=null,v=this.a,u=A.aN(w,B.Z,!0,w,!0,B.t,w,A.aO(),v,w,w,w,w,w,2,A.bC(w,w,w,w,w,w,w,w,!0,new A.vX(B.C1,new A.ax(B.bT.j(0.5),1,B.r,-1)),w,w,w,w,w,w,w,w,w,w,w,D.hl3,w,w,w,w,w,w,w,w,B.kz,"Name",w,w,w,w,w,w,w,w,w,!0,!0,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w),B.y,!0,w,!0,w,!1,w,B.al,w,w,w,w,w,w,w,w,w,1,w,w,!1,"\u2022",w,w,w,new C.fkJ(d),w,!1,w,w,!1,w,!0,w,B.ae,w,w,w,w,w,w,w,w,w,w,w,B.jN,!0,B.a7,w,B.ao,w,w,w,w)
-return A.ei(A.a([A.bM(!1,T.LR,w,w,!0,w,w,w,new C.fkK(d),w,w),A.bM(!1,D.h_G,w,w,!0,w,w,w,new C.fkL(d,v),w,w)],x.p),w,w,B.fm,u,w,w,w,w,D.hdP,w)},
+return A.eh(A.a([A.bM(!1,T.LR,w,w,!0,w,w,w,new C.fkK(d),w,w),A.bM(!1,D.h_G,w,w,!0,w,w,w,new C.fkL(d,v),w,w)],x.p),w,w,B.fm,u,w,w,w,w,D.hdP,w)},
 $S:18}
 C.fkJ.prototype={
 $1(d){var w=B.a.i(d)
@@ -3516,7 +3516,7 @@ D.bWW=new A.a_(985101,"MaterialIcons",!1)
 D.bZo=new A.ae(B.oZ,22,B.c,null,null,null)
 D.c_f=new A.ae(L.Ir,22,B.c,null,null,null)
 D.c_F=new A.ae(B.kN,16,B.c,null,null,null)
-D.do4=w(["1. Open ngmy.org in Chrome, Edge, or Safari.","2. Click Start Video in Recorder Studio.","3. Click Allow in the browser microphone prompt.","4. If blocked: click the lock icon in the address bar \u2192 Site settings \u2192 Microphone \u2192 Allow.","5. On Mac: System Settings \u2192 Privacy & Security \u2192 Microphone \u2192 enable your browser.","6. On Windows: Settings \u2192 Privacy \u2192 Microphone \u2192 allow desktop apps and your browser.","7. Refresh ngmy.org and click Start Video again."],x.s)
+D.do3=w(["1. Open ngmy.org in Chrome, Edge, or Safari.","2. Click Start Video in Recorder Studio.","3. Click Allow in the browser microphone prompt.","4. If blocked: click the lock icon in the address bar \u2192 Site settings \u2192 Microphone \u2192 Allow.","5. On Mac: System Settings \u2192 Privacy & Security \u2192 Microphone \u2192 enable your browser.","6. On Windows: Settings \u2192 Privacy \u2192 Microphone \u2192 allow desktop apps and your browser.","7. Refresh ngmy.org and click Start Video again."],x.s)
 D.a8V=new C.Cw(0,"instant")
 D.a8W=new C.Cw(1,"slideHorizontal")
 D.dZd=new C.Cw(2,"slideVertical")
@@ -3574,4 +3574,4 @@ D.hOG=new C.aEX(1,"android")
 D.hOH=new C.aEX(2,"computer")
 D.hOI=new C.a0V(null)})();(function staticFields(){$.him=null})();(function lazyInitializers(){var w=a.lazyFinal
 w($,"iOJ","oJ",()=>new C.b3N(new C.b3L(A.a([],A.as("N<nD>"))),B.bH,$.az()))})()};
-(a=>{a["u7xhoFtqxJBwDpDUJtLrLbCAHds="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["kCY4qurOFXlP6tkntW5iTMVvdsU="]=a.current})($__dart_deferred_initializers__);

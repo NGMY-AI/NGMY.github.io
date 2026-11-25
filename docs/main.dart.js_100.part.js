@@ -672,7 +672,7 @@ l=a3.d
 l===$&&A.d()
 l=a3.akV("Accent",D.dGV,l.z,new C.c9K(a3),"Default")
 k=a3.akV("Background",D.cYv,a3.d.Q,new C.c9L(a3),"Template")
-j=a3.akV("Text color",D.dx0,a3.d.at,new C.c9M(a3),"Auto")
+j=a3.akV("Text color",D.dx_,a3.d.at,new C.c9M(a3),"Auto")
 i=a3.akV("Card border",D.d7l,a3.d.ax,new C.c9N(a3),"None")
 h=A.E(A.x(A.a([A.c("Text size",a4,a4,a4,a4,a4,a4,A.l(a4,a4,A.Q(a5).ax.a===B.I?B.c.j(0.55):B.aM,a4,a4,a4,a4,a4,a4,a4,a4,11,a4,a4,B.N,a4,a4,!0,a4,a4,a4,a4,a4,a4,a4,a4),a4,a4,a4),A.ld(B.bj,9,a4,1.3,0.85,new C.c9O(a3),B.i.D(a3.d.ay,0.85,1.3))],s),B.B,a4,B.e,B.h,0,B.p),1)
 g=a3.d.ch
@@ -1342,7 +1342,7 @@ $S:36}
 C.c9o.prototype={
 $2(d,e){var w,v,u,t,s=null,r={}
 r.a=null
-w=D.dqg[e]
+w=D.dqf[e]
 r.a=w.b
 v=A.V(w.a,B.bj,s,s,s,16)
 u=this.b.a
@@ -1702,8 +1702,8 @@ D.f42=new A.y(B.i1,"\ud83c\udf10 ")
 D.fa8=new A.y(B.vx,"\ud83d\udccd ")
 D.eRI=new A.y(O.Qk,"\ud83c\udfe2 ")
 D.eLv=new A.y(B.ie,"\u2b50 ")
-D.dqg=w([D.eYO,D.f84,D.f42,D.fa8,D.eRI,D.eLv],A.as("N<+(a_,m)>"))
-D.dx0=w([B.a_,B.c,B.l3,B.bt,B.yS,B.aE,B.dY],x.O)
+D.dqf=w([D.eYO,D.f84,D.f42,D.fa8,D.eRI,D.eLv],A.as("N<+(a_,m)>"))
+D.dx_=w([B.a_,B.c,B.l3,B.bt,B.yS,B.aE,B.dY],x.O)
 D.dGV=w([B.bp,B.b5,B.dY,B.aE,B.a_,B.bd,B.az,B.aC,B.ca,B.bT],x.O)
 D.aMe=new C.a87(0,"neverPurchased")
 D.aMf=new C.a87(1,"active")
@@ -1736,4 +1736,4 @@ D.hbm=new A.C("Show circle photo",null,null,null,null,null,null,null,null,null,n
 D.hcM=new A.C("Running ticker",null,null,null,null,null,null,null,null,null,null,null)
 D.hgq=new A.C("Community voice",null,null,null,null,null,null,null,null,null,null,null)
 D.hgu=new A.C("Save Card",null,null,null,null,null,null,null,null,null,null,null)})();(function staticFields(){$.hJ8=A.S(x.N,x.D)})()};
-(a=>{a["5baqPybeOVQO+LhyfHUatq8zl74="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["IjHn5WafRHjJKtcc1P2eshPMQ4c="]=a.current})($__dart_deferred_initializers__);

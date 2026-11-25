@@ -2842,7 +2842,7 @@ C.JR.prototype={}
 C.ok.prototype={}
 C.b4I.prototype={
 B(d){var w=x.M
-w=A.B(new A.O(D.dsn,new C.cmE(this),w),w.k("aj.E"))
+w=A.B(new A.O(D.dsm,new C.cmE(this),w),w.k("aj.E"))
 return A.bZ(B.bI,w,B.br,null,8,8)}}
 C.b4H.prototype={
 B(d){var w=x.x
@@ -3526,7 +3526,7 @@ w=A.aN(q,B.Z,!1,q,!0,B.t,q,A.aO(),r.ch,q,q,q,q,q,2,A.bC(q,new A.b6(4,A.n(12),B.d
 v=A.c("Corner style",q,q,q,q,q,q,A.l(q,q,A.Q(m).ax.a===B.I?B.c:B.bC,q,q,q,q,q,q,q,q,12,q,q,B.D,q,q,!0,q,q,q,q,q,q,q,q),q,q,q)
 u=A.c("Color presets",q,q,q,q,q,q,A.l(q,q,A.Q(m).ax.a===B.I?B.c:B.bC,q,q,q,q,q,q,q,q,12,q,q,B.D,q,q,!0,q,q,q,q,q,q,q,q),q,q,q)
 t=A.c("QR eye shape",q,q,q,q,q,q,A.l(q,q,A.Q(m).ax.a===B.I?B.c:B.bC,q,q,q,q,q,q,q,q,12,q,q,B.D,q,q,!0,q,q,q,q,q,q,q,q),q,q,q)
-n.push(r.Bp(d,A.x(A.a([w,B.aB,v,B.M,new C.b4I(p.f,B.aE,new C.exv(r,e),q),B.aB,u,B.M,new C.b4H(p,new C.exw(r,e),q),B.aB,t,B.M,new C.atK(D.dnA,p.d,B.aE,new C.exx(r,e),q),B.R,A.c("Dot shape",q,q,q,q,q,q,A.l(q,q,A.Q(m).ax.a===B.I?B.c:B.bC,q,q,q,q,q,q,q,q,12,q,q,B.D,q,q,!0,q,q,q,q,q,q,q,q),q,q,q),B.M,new C.atK(D.dkO,p.e,B.aE,new C.exy(r,e),q)],o),B.am,q,B.e,B.h,0,B.p),"Customize QR"))
+n.push(r.Bp(d,A.x(A.a([w,B.aB,v,B.M,new C.b4I(p.f,B.aE,new C.exv(r,e),q),B.aB,u,B.M,new C.b4H(p,new C.exw(r,e),q),B.aB,t,B.M,new C.atK(D.dnz,p.d,B.aE,new C.exx(r,e),q),B.R,A.c("Dot shape",q,q,q,q,q,q,A.l(q,q,A.Q(m).ax.a===B.I?B.c:B.bC,q,q,q,q,q,q,q,q,12,q,q,B.D,q,q,!0,q,q,q,q,q,q,q,q),q,q,q),B.M,new C.atK(D.dkN,p.e,B.aE,new C.exy(r,e),q)],o),B.am,q,B.e,B.h,0,B.p),"Customize QR"))
 n.push(B.aB)
 m=e.z
 if(m.length!==0)n.push(r.b6w(d,m))
@@ -3741,7 +3741,7 @@ $S:0}
 C.dS2.prototype={
 $1(d){var w=null,v=A.n(20),u=A.n(12),t=A.K(B.eE,B.r,1),s=this.a,r=x.p
 u=A.x(A.a([D.fYl,B.aB,A.p(w,A.c(s,w,w,w,w,w,w,D.fQO,w,w,w),B.f,w,w,new A.o(B.nM,w,t,u,w,w,B.m),w,w,w,w,B.ep,w,w,1/0)],r),B.B,w,B.e,B.O,0,B.p)
-return A.ei(A.a([A.bM(!1,B.BC,w,w,!0,w,w,w,new C.dS0(d),w,w),A.db(N.DX,w,G.Xh,new C.dS1(s,d),A.bp(B.dy,w,w,w,w,w,w,w,w,w,w,w))],r),w,B.r8,w,u,D.bJJ,w,w,new A.b9(v,B.a1),D.foL,D.bJK)},
+return A.eh(A.a([A.bM(!1,B.BC,w,w,!0,w,w,w,new C.dS0(d),w,w),A.db(N.DX,w,G.Xh,new C.dS1(s,d),A.bp(B.dy,w,w,w,w,w,w,w,w,w,w,w))],r),w,B.r8,w,u,D.bJJ,w,w,new A.b9(v,B.a1),D.foL,D.bJK)},
 $S:18}
 C.dS0.prototype={
 $0(){A.a7(this.a,!1).N(null)
@@ -4296,7 +4296,7 @@ o=A.K(B.aE.j(0.35),B.r,1)
 w=this.b
 v=x.p
 p=A.x(A.a([q,B.af,A.p(u,A.AI(w.z,B.y4,u),B.f,u,u,new A.o(s,u,o,p,u,u,B.m),u,u,u,u,B.bg,u,u,u)],v),B.am,u,B.e,B.O,0,B.p)
-return A.ei(A.a([A.bM(!1,B.ps,u,u,!0,u,u,u,new C.exc(d),u,u),A.db(N.DX,u,G.Xh,new C.exd(t,w,d),u)],v),u,u,u,p,u,u,u,u,r,u)},
+return A.eh(A.a([A.bM(!1,B.ps,u,u,!0,u,u,u,new C.exc(d),u,u),A.db(N.DX,u,G.Xh,new C.exd(t,w,d),u)],v),u,u,u,p,u,u,u,u,r,u)},
 $S:18}
 C.exc.prototype={
 $0(){A.a7(this.a,!1).N(null)
@@ -4529,7 +4529,7 @@ r=d.d
 q=x.p
 s=A.a([A.E(A.x(A.a([s,A.c(d.c+" \xb7 "+r,o,o,o,o,o,o,A.l(o,o,A.Q(t).ax.a===B.I?B.c.j(0.55):B.aM,o,o,o,o,o,o,o,o,11,o,o,o,o,o,!0,o,o,o,o,o,o,o,o),o,o,o)],q),B.B,o,B.e,B.h,0,B.p),1)],q)
 if(l)s.push(D.c5Y)
-return new A.D(B.dU,A.aG(!1,B.a3,!0,o,A.aM(!1,k,!0,A.eJ(A.x(A.a([new A.D(D.bGH,A.A(s,B.l,o,B.e,B.h,0,o,o),o),new A.D(O.tz,A.by(A.n(16),new A.a5(o,160,A.clx(!0,A.hiD("preview",B.dtA,"auto","white","",B.UV,u,A.a([new A.n4("Signature",A.a([new A.lQ("Chef's Special","House favorite","Seasonal ingredients","24.00")],x.t))],x.n),"",B.UW,"draft",r,m,o),0),o),B.aq),o)],q),B.am,o,B.e,B.h,0,B.p),o,new A.o(o,o,w,j,v,o,B.m),o,o,o),o,!0,o,o,o,o,o,o,o,o,o,o,o,new C.ewq(p.a,n,d),o,o,o,o,o,o,o),B.f,B.L,0,o,o,o,o,o,B.ai),o)},
+return new A.D(B.dU,A.aG(!1,B.a3,!0,o,A.aM(!1,k,!0,A.eJ(A.x(A.a([new A.D(D.bGH,A.A(s,B.l,o,B.e,B.h,0,o,o),o),new A.D(O.tz,A.by(A.n(16),new A.a5(o,160,A.clx(!0,A.hiD("preview",B.dtz,"auto","white","",B.UV,u,A.a([new A.n4("Signature",A.a([new A.lQ("Chef's Special","House favorite","Seasonal ingredients","24.00")],x.t))],x.n),"",B.UW,"draft",r,m,o),0),o),B.aq),o)],q),B.am,o,B.e,B.h,0,B.p),o,new A.o(o,o,w,j,v,o,B.m),o,o,o),o,!0,o,o,o,o,o,o,o,o,o,o,o,new C.ewq(p.a,n,d),o,o,o,o,o,o,o),B.f,B.L,0,o,o,o,o,o,B.ai),o)},
 $S:1938}
 C.ewq.prototype={
 $0(){return this.a.l(new C.ewp(this.b,this.c))},
@@ -4684,7 +4684,7 @@ $S:1942}
 C.cos.prototype={
 $1(d){var w=A.ag("(\\d{10,})$",!0,!1,!1,!1).cI(B.a.i(d))
 w=w==null?null:w.b[1]
-w=A.c9(w==null?"":w,null)
+w=A.c8(w==null?"":w,null)
 return w==null?9007199254740991:w},
 $S:261}
 C.cor.prototype={
@@ -4827,12 +4827,12 @@ D.dbW=w([D.e4G,D.e4z,D.e4F,D.e4A,D.e4D,D.e4E,D.e4B,D.e4C],A.as("N<wM>"))
 D.a0t=new A.u(1,0.10196078431372549,0.0784313725490196,0.06274509803921569,B.q)
 D.e5k=new C.JR("circle",A0.QD)
 D.e5l=new C.JR("square",B.It)
-D.dkO=w([D.e5k,D.e5l],x.B)
+D.dkN=w([D.e5k,D.e5l],x.B)
 D.bV0=new A.a_(63565,"MaterialIcons",!1)
 D.e5m=new C.JR("circle",D.bV0)
 D.bWG=new A.a_(983941,"MaterialIcons",!1)
 D.e5j=new C.JR("square",D.bWG)
-D.dnA=w([D.e5m,D.e5j],x.B)
+D.dnz=w([D.e5m,D.e5j],x.B)
 D.e5h=new C.u4("ring",B.A6)
 D.e5d=new C.u4("circle",B.pV)
 D.e5a=new C.u4("square",Z.tI)
@@ -4845,7 +4845,7 @@ D.e5b=new C.u4("arc",D.bVS)
 D.e5f=new C.u4("star",A2.QU)
 D.e5g=new C.u4("cross",B.id)
 D.e5i=new C.u4("none",B.tG)
-D.dsn=w([D.e5h,D.e5d,D.e5a,D.e5e,D.e5c,D.e59,D.e5b,D.e5f,D.e5g,D.e5i],A.as("N<u4>"))
+D.dsm=w([D.e5h,D.e5d,D.e5a,D.e5e,D.e5c,D.e59,D.e5b,D.e5f,D.e5g,D.e5i],A.as("N<u4>"))
 D.dNm=new A.bl(B.ii,[],A.as("bl<m,W>"))
 D.Kn=new C.auf(0,"all")
 D.eqC=new C.auf(1,"menusOnly")
@@ -4862,8 +4862,8 @@ D.eK_=new A.CY(B.VG,D.a0t)
 D.c2L=new A.ae(B.ea,28,B.dy,null,null,null)
 D.hgO=new A.C("Published",null,B.WI,null,null,null,null,null,null,null,null,null)
 D.bNy=new A.bu(1,B.b9,D.hgO,null)
-D.dp8=w([D.c2L,B.ar,D.bNy],x.p)
-D.foL=new A.c1(B.aK,B.e,B.h,B.l,null,B.p,null,0,D.dp8,null)
+D.dp7=w([D.c2L,B.ar,D.bNy],x.p)
+D.foL=new A.c1(B.aK,B.e,B.h,B.l,null,B.p,null,0,D.dp7,null)
 D.fub=new A.a5(18,18,M.ahf,null)
 D.fvb=new A.hY(4,10,8,0.78,null)
 D.fvt=new A.hY(7,6,6,1.05,null)
@@ -4910,4 +4910,4 @@ D.hcF=new A.C("Use banner",null,null,null,null,null,null,null,null,null,null,nul
 D.hdt=new A.C("Create new Bio",null,B.fQ,null,null,null,null,null,null,null,null,null)
 D.hOe=new C.aeX(!0,0,"")})();(function staticFields(){$.hG9=null
 $.hn1=A.S(x.N,A.as("+(ai<nR>,ai<iL>)"))})()};
-(a=>{a["Jzb9XQ456h89hTwChTmqnLVIA18="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["jXNJNvzQ5lwcJgouvaTSjgbGTAk="]=a.current})($__dart_deferred_initializers__);

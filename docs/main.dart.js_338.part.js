@@ -2090,7 +2090,7 @@ r=B.E(new C.aDf("State Trust","Registrar reserve",r,q.r>0?"In "+d.hr(o)+" \xc2\x
 o=d.hr(w)
 q=d.d
 n=q.b
-r=B.A(B.a([r,A.bc,B.E(new C.aDf("Contribution Case","Community funds",o,q.f>0?"In "+d.hr(n)+" \xc2\xb7 Credits "+d.hr(d.d.f)+" \xc2\xb7 Out "+d.hr(x):"In "+d.hr(n)+" \xc2\xb7 Out "+d.hr(x),D.dnf,A.my,a0),1)],p),A.l,a0,A.e,A.h,0,a0,a0)
+r=B.A(B.a([r,A.bc,B.E(new C.aDf("Contribution Case","Community funds",o,q.f>0?"In "+d.hr(n)+" \xc2\xb7 Credits "+d.hr(d.d.f)+" \xc2\xb7 Out "+d.hr(x):"In "+d.hr(n)+" \xc2\xb7 Out "+d.hr(x),D.dne,A.my,a0),1)],p),A.l,a0,A.e,A.h,0,a0,a0)
 q=B.c("Contribution money never enters State Trust. Only an authorized registrar can deposit into Trust or record spending from either ledger.",a0,a0,a0,a0,a0,a0,B.l(a0,a0,a1?A.bv:A.an,a0,a0,a0,a0,a0,a0,a0,a0,11,a0,a0,a0,a0,1.35,!0,a0,a0,a0,a0,a0,a0,a0,a0),A.K,a0,a0)
 o=B.a([],p)
 if(d.d.w.length!==0){n=B.a([],p)
@@ -2914,7 +2914,7 @@ t=B.K(w?A.eo:A.bO,A.r,1)
 s=B.a([new B.aa(0,A.H,A.v.j(w?0.45:0.12),A.h1,28)],y.V)
 r=i.a
 q=y.p
-r=B.A(B.a([B.E(C.dJ7(A.dG,!1,A.bH,D.dsc,A.q_,"Members",j,A.o.v(r.a)),1),A.ar,B.E(C.dJ7(A.eG,!0,S.CY,D.dpl,A.xk,"Family total",j,A.o.v(r.b)),1)],q),A.B,j,A.e,A.h,0,j,j)
+r=B.A(B.a([B.E(C.dJ7(A.dG,!1,A.bH,D.dsb,A.q_,"Members",j,A.o.v(r.a)),1),A.ar,B.E(C.dJ7(A.eG,!0,S.CY,D.dpk,A.xk,"Family total",j,A.o.v(r.b)),1)],q),A.B,j,A.e,A.h,0,j,j)
 p=i.a
 o=k.b
 n=B.E(C.dJ7(A.b3,!1,A.hl,D.djb,A.h0,"Contributions",new C.dWK(i,o,d),A.o.v(p.d)),1)
@@ -3821,9 +3821,9 @@ D.d6g=x([A.an,A.bA,A.aM],y.O)
 D.d8o=x(["Day","Week","Month","Year"],y.s)
 D.d9l=x([A.cZ,A.oE],y.O)
 D.djb=x([A.jv,A.fv,A.yY],y.O)
-D.dnf=x([A.h6,A.hw],y.O)
-D.dpl=x([A.az,A.ir,A.n2],y.O)
-D.dsc=x([A.bp,A.dW,A.dl],y.O)
+D.dne=x([A.h6,A.hw],y.O)
+D.dpk=x([A.az,A.ir,A.n2],y.O)
+D.dsb=x([A.bp,A.dW,A.dl],y.O)
 D.aDY=x([],B.as("N<u2>"))
 D.ex3=new B.r(0,36)
 D.eJ8=new O.ab_(8,null)
@@ -3860,4 +3860,4 @@ D.hLM=new C.aeL(0,"none")
 D.b2I=new C.aeL(1,"highlightLeading")
 D.aep=new C.aeL(2,"highlightTrailing")
 D.b2J=new C.aeL(3,"highlightAll")})()};
-(a=>{a["lMXNv5MSUz1Sg3WnjQL3N3HferY="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["0jqLG/RrKURuC+1YCnM9wkndH9I="]=a.current})($__dart_deferred_initializers__);

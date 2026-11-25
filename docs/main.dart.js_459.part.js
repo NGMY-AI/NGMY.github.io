@@ -257,7 +257,7 @@ r=J.rC(r==null?0:r)
 q=J.t(x,"description")
 q=J.k(q==null?"":q)
 if(A.ja(J.t(x,l)))p=A.dV(J.t(x,l))
-else{p=A.c9(A.v(J.t(x,l)),m)
+else{p=A.c8(A.v(J.t(x,l)),m)
 if(p==null)p=1}o=new A.W(Date.now(),0,!1).aa().ag()
 return new C.p7(w,v,u,t,s,r,q,m,o,p,m)}catch(n){return m}},
 hqC(d){var x,w,v,u,t=B.a.i(d),s=t.length
@@ -641,7 +641,7 @@ u=A.cr(B.a.i(q.db.a.a))
 if(u==null)u=0
 t=B.a.i(q.dy.a.a)
 s=new A.W(Date.now(),0,!1).aa().ag()
-r=A.c9(B.a.i(q.dx.a.a),p)
+r=A.c8(B.a.i(q.dx.a.a),p)
 return new C.p7(x,n,o,w,v,u,t,p,s,r==null?1:r,p)},
 bHk(){var x,w=this,v=w.gagC(),u=w.gPk(),t=w.gPl()
 if(u<=0&&v.length===0){w.c.L(y.q).f.T(D.fwR)
@@ -689,7 +689,7 @@ i=B.a.i(u.CW.a.a)
 h=B.a.i(u.cx.a.a)
 g=A.cr(B.a.i(u.db.a.a))
 if(g==null)g=0
-t=A.c9(B.a.i(u.dx.a.a),null)
+t=A.c8(B.a.i(u.dx.a.a),null)
 s=B.o.D(t==null?1:t,1,9999)
 if(j.length===0){u.c.L(y.q).f.T(D.fwX)
 x=1
@@ -1045,7 +1045,7 @@ $0(){},
 $S:0}
 C.eB3.prototype={
 $1(d){var x=null,w=this.a,v=A.aN(x,B.Z,!0,x,!0,B.t,x,A.aO(),w,x,x,x,x,x,2,D.c8d,B.y,!0,x,!0,x,!1,x,B.al,x,x,x,x,x,x,x,x,x,1,x,x,!1,"\u2022",x,x,x,x,x,!1,x,x,!1,x,!0,x,B.ae,x,x,x,x,x,x,x,x,x,x,x,x,!0,B.a7,x,B.ao,x,x,x,x)
-return A.ei(A.a([A.bM(!1,B.dw,x,x,!0,x,x,x,new C.eB1(d),x,x),A.bI(B.aZx,x,new C.eB2(d,w),x)],y.p),x,x,x,v,x,x,x,x,D.h3i,x)},
+return A.eh(A.a([A.bM(!1,B.dw,x,x,!0,x,x,x,new C.eB1(d),x,x),A.bI(B.aZx,x,new C.eB2(d,w),x)],y.p),x,x,x,v,x,x,x,x,D.h3i,x)},
 $S:18}
 C.eB1.prototype={
 $0(){A.a7(this.a,!1).N(null)
@@ -1243,7 +1243,7 @@ else{r=k.h(0,n)
 r=J.k(r==null?"":r)}q=k.h(0,"savedAt")
 q=J.k(q==null?"":q)
 if(A.ja(k.h(0,m)))p=A.dV(k.h(0,m))
-else{p=A.c9(A.v(k.h(0,m)),null)
+else{p=A.c8(A.v(k.h(0,m)),null)
 if(p==null)p=1}o=k.h(0,l)
 if(B.a.i(J.k(o==null?"":o)).length===0)k=null
 else{k=k.h(0,l)
@@ -1349,4 +1349,4 @@ D.hbk=new A.C("Product Scanner",null,B.cL,null,null,null,null,null,null,null,nul
 D.heu=new A.C("Enter barcode",null,null,null,null,null,null,null,null,null,null,null)
 D.hh0=new A.C("Store QR code",null,B.nx,null,null,null,null,null,null,null,null,null)
 D.hhJ=new A.C("Camera scan works on the NGMY phone app.\nOn desktop web, enter the barcode below.",null,B.X5,null,B.K,null,null,null,null,null,null,null)})()};
-(a=>{a["lyXqIe9fH2tbXei48rR4Lt1Zpz0="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["mytJw4szs1+Ywihc7a14QkHO1EM="]=a.current})($__dart_deferred_initializers__);
