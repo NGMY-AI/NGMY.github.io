@@ -845,10 +845,10 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
       ),
     );
     final tp = _options
-        ? '+${_money(_d(g['takeProfitUsd']), sign: false)}'
+        ? '+${_d(g['takeProfitPct']).toStringAsFixed(0)}% of cost'
         : '+${_d(g['takeProfitPct']).toStringAsFixed(0)}% (+\$${_d(g['takeProfitUsd']).toStringAsFixed(0)})';
     final sl = _options
-        ? '-${_money(_d(g['stopLossUsd']), sign: false)}'
+        ? '-${_d(g['stopLossPct']).toStringAsFixed(0)}% of cost'
         : '-${_d(g['stopLossPct']).toStringAsFixed(0)}% (-\$${_d(g['stopLossUsd']).toStringAsFixed(0)})';
     return _frame(
       p,
@@ -860,15 +860,16 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
               Icon(Icons.timer_rounded, size: 18, color: _accent),
               const SizedBox(width: 6),
               Text(
-                'THE 30-MINUTE LAW',
+                _options ? 'THE 45-MINUTE LAW' : 'THE 30-MINUTE LAW',
                 style: TextStyle(color: p.ink, fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 0.8),
               ),
             ],
           ),
           const SizedBox(height: 4),
           Text(
-            'Every trade closes within 30 minutes at most, win, lose or flat. After the options no-follow-through lesson new trades get a '
-            'shorter max hold: now ${_d(g['maxHoldMin']).toStringAsFixed(0)} minutes. Exits are checked every '
+            '${_options ? 'Every option trade closes within 45 minutes at most, win, lose or flat, so a move has time to show in the premium. '
+                'Take profit and stop loss are a share of what the contract cost. Once up 15% it locks in at least +5%. ' : 'Every trade closes within 30 minutes at most, win, lose or flat. '}'
+            'Exits are checked every '
             '${_d(g['exitCheckEveryMin']).toStringAsFixed(0)} minute, and the hard close sells at the last check before the max hold.',
             style: TextStyle(color: p.muted, fontSize: 11.5, height: 1.35),
           ),
@@ -940,8 +941,8 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'For the best-ranked market right now: a call when its trend is up, a put when it is down. Slightly out of the money, '
-            'at least 3 days to expiry, \$150 or less, spread at most 10% of the premium.',
+            'For the best-ranked market right now: a call when its trend is up, a put when it is down. Near the money (the strike '
+            'closest to the price), at least 3 days to expiry, \$20 to \$150, spread at most 5% of the premium.',
             style: TextStyle(color: p.muted, fontSize: 11.5),
           ),
           const SizedBox(height: 8),

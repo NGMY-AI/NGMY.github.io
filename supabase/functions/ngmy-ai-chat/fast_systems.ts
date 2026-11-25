@@ -114,8 +114,14 @@ export const FS_RULES = {
   noiseWatchMin: 10, // a stop is a noise stop if the price comes back past the entry within 10 minutes
   spot: { tradeUsd: 100, takeProfitPct: 2, stopLossPct: 1, takeProfitUsd: 2, stopLossUsd: 1 },
   options: {
-    name: "Options", maxPremiumUsd: 150, minPremiumUsd: 5, strikeSteps: 6, maxExpiries: 3, minDays: 3, lessonMinDays: 7, preferMinDays: 5, preferMaxDays: 9,
-    spreadMaxPct: 10, spreadTightPct: 7, lessonHoldMin: 20,
+    // Nov 25 (options fix): near the money only (the strike within 5% of the price, the 2 nearest always tried),
+    // premium $20 to $150, spread at most 5% of the premium (4% after the wide-spread lesson).
+    name: "Options", maxPremiumUsd: 150, minPremiumUsd: 20, strikeSteps: 4, nearPct: 5, maxExpiries: 3, minDays: 3, lessonMinDays: 7, preferMinDays: 5, preferMaxDays: 9,
+    spreadMaxPct: 5, spreadTightPct: 4, maxHoldMin: 45,
+    // Nov 25 (options fix): exits are a share of the premium paid, not fixed dollars (a $40 contract could never
+    // reach +$50 or -$50, so every trade just ran out the clock). Take profit +30%, stop loss -20%, profit lock: once
+    // up 15% it sells if it falls back to +5%; early cut -10% in the first 5 minutes with the trend against it.
+    takeProfitPct: 30, stopLossPct: 20, lockAtPct: 15, lockFloorPct: 5, earlyCutPct: 10,
     takeProfitUsd: 50, stopLossUsd: 50, dailyStopUsd: 500, totalBrakeUsd: 1000, weekendDailyStopUsd: 50, tradeUsd: 100,
   },
   scalper: { name: "Scalper", tradeUsd: 100, dailyStopUsd: 50, totalBrakeUsd: 100 },
@@ -129,13 +135,13 @@ export const FS_RULE_LINES: Record<SystemId, string[]> = {
   options: [
     "Paper only: no order is ever sent to Alpaca.",
     "Its own markets, none of the main agent's: options on IWM, DIA, XLF, BAC, INTC, F, PFE, SOFI, HOOD, PLTR, COIN, XLE, T, VZ, PYPL, NIO, RIVN, SNAP, MARA, RIOT, UBER. Weekdays only: weekend crypto moved to Signal Grid.",
-    "It buys ONE call when the trend is up or ONE put when the trend is down: slightly out of the money, 5 to 9 days to expiry preferred (never the same day, at least 3 days; 7 after the no-follow-through lesson), premium $150 or less, and never a contract whose bid/ask spread is over 10% of the premium (7% after the wide-spread lesson).",
+    "It buys ONE call when the trend is up or ONE put when the trend is down: NEAR THE MONEY (the strike closest to the price, within 5%), 5 to 9 days to expiry preferred (never the same day, at least 3 days; 7 after the no-follow-through lesson), premium $20 to $150, and never a contract whose bid/ask spread is over 5% of the premium (4% after the wide-spread lesson). Cheap far-out contracts are never bought: they barely move with the stock.",
     "Up to 40 trades a day: a MAXIMUM, never a target. If the strict entries mean fewer trades, that is correct: the screen says waiting for a real setup. No rule is ever loosened to fill the count.",
     "NEVER relaxed: the 5-minute and 15-minute trends must agree with the trade (when they do not, the market is untradeable), the slow average rising with the price above BOTH averages (for a put: falling, price below both).",
     "Strength floor: it enters only when the market moved at least +0.5% in the trade's direction in the last 30 minutes. Each morning the floor learns: entries just above it that won under 45% of their last 20 raise it 0.1%, over 60% lower it 0.1% (never below +0.5%). The screen shows Entry floor today.",
     "No chasing: a market that already moved more than 1.5% in the last hour is skipped, the move is mostly over. Choppy markets (4+ crosses in 30 minutes) are skipped too.",
     "Two losses in a row in one market: that market is benched for the rest of the day. Two losses in a row in the system: a 20-minute pause, then the next entry needs +0.8% or more in 30 minutes.",
-    "Exits, checked every 1 minute: +$50 / -$50; early cut: down $15 within the first 5 minutes with the trend already against it is closed at once; the trend turning against the trade; 30 minutes reached; always out by 3:55 PM ET.",
+    "Exits, checked every 1 minute, as a share of the premium paid: take profit +30%, stop loss -20%; profit lock: once up 15% it sells if it falls back to +5%; early cut: down 10% within the first 5 minutes with the trend already against it is closed at once; the trend turning against the trade; 45 minutes reached; always out by 3:55 PM ET. Prices are honest: it buys at the ask and sells at the bid.",
     "Daily stop -$500, total brake -$1,000. These brakes are wide on purpose: one options loss is $50. The real protection is the strict entries and the learning: benching losing markets, the pause after 2 losses in a row, and the entry floor.",
   ],
   scalper: [
@@ -453,6 +459,7 @@ export function pickRanked<T extends { a: Analysis; score?: number; check?: Entr
 export type FastShadow = {
   symbol: string; qty: number; entryPrice: number; entryAt: string; mult?: number; option?: OptionInfo;
   dir?: Dir; tpUsd?: number; slUsd?: number; maxHold?: number; spot?: number; why?: string; entry?: Record<string, unknown>;
+  peakUsd?: number; // the best win so far while holding (for the options profit lock)
 };
 
 export type ExitInput = {
@@ -465,13 +472,14 @@ export type ExitInput = {
   trendNowAgainst?: boolean; // Nov 25: the 5-minute trend is already against the trade (for the early cut)
 };
 
-export type ExitKind = "take profit" | "stop loss" | "early cut" | "max hold" | "3:55 close" | "trend turned" | "hold";
+export type ExitKind = "take profit" | "stop loss" | "profit lock" | "early cut" | "max hold" | "3:55 close" | "trend turned" | "hold";
 
 /** Take profit and stop loss in dollars for a new trade: options $50 / $50, spot 2% / 1% of $100; a market with the
  *  noise-stop lesson gets the stop 25% wider and the take profit 25% smaller. */
-export function exitLevels(option: boolean, noisy: boolean): { tpUsd: number; slUsd: number } {
-  const tp = option ? FS_RULES.options.takeProfitUsd : FS_RULES.spot.takeProfitUsd;
-  const sl = option ? FS_RULES.options.stopLossUsd : FS_RULES.spot.stopLossUsd;
+export function exitLevels(option: boolean, noisy: boolean, costUsd = 0): { tpUsd: number; slUsd: number } {
+  const o = FS_RULES.options;
+  const tp = option ? (costUsd > 0 ? round2(costUsd * o.takeProfitPct / 100) : o.takeProfitUsd) : FS_RULES.spot.takeProfitUsd;
+  const sl = option ? (costUsd > 0 ? round2(costUsd * o.stopLossPct / 100) : o.stopLossUsd) : FS_RULES.spot.stopLossUsd;
   return noisy ? { tpUsd: round2(tp * 0.75), slUsd: round2(sl * 1.25) } : { tpUsd: tp, slUsd: sl };
 }
 
@@ -488,10 +496,19 @@ export function fastExit(x: ExitInput): { sell: boolean; reason: string; pnl: nu
   const mins = heldMinutes(x.shadow.entryAt, x.now);
   if (pnl >= tp) return { sell: true, kind: "take profit", reason: `take profit hit (${money})`, pnl };
   if (pnl <= -sl) return { sell: true, kind: "stop loss", reason: `stop loss hit (${money})`, pnl };
-  // Nov 25: cut losers faster. In the first 5 minutes, down $15 (option) or 0.8% (spot) with the trend already
-  // against it: closed at once, without waiting for the full stop or the max hold.
   const cost = x.shadow.qty * m * x.shadow.entryPrice;
-  const cut = x.shadow.option ? FS_RULES.earlyCutOptionUsd : cost * FS_RULES.earlyCutSpotPct / 100;
+  // Nov 25 (options fix): profit lock. Once an option was up 15% of its premium, it sells if it falls back to +5%,
+  // so a winner never turns into a loser.
+  if (x.shadow.option && cost > 0) {
+    const o = FS_RULES.options;
+    const peak = Math.max(Number(x.shadow.peakUsd ?? 0), pnl);
+    if (peak >= cost * o.lockAtPct / 100 && pnl <= cost * o.lockFloorPct / 100) {
+      return { sell: true, kind: "profit lock", reason: `profit lock: it was up $${peak.toFixed(2)}, fell back to ${money}`, pnl };
+    }
+  }
+  // Nov 25: cut losers faster. In the first 5 minutes, down 10% of the premium (option) or 0.8% (spot) with the
+  // trend already against it: closed at once, without waiting for the full stop or the max hold.
+  const cut = x.shadow.option ? (cost > 0 ? cost * FS_RULES.options.earlyCutPct / 100 : FS_RULES.earlyCutOptionUsd) : cost * FS_RULES.earlyCutSpotPct / 100;
   if (x.trendNowAgainst && mins <= FS_RULES.earlyCutMin + 0.5 && pnl <= -cut) {
     return { sell: true, kind: "early cut", reason: `early cut: ${money} within ${Math.max(1, Math.round(mins))} min and the trend already turned against it`, pnl };
   }
@@ -590,8 +607,8 @@ export function evaluateLessons(system: SystemId, trades: TradeRow[], todayKey: 
     }
   }
   if (system === "options") {
-    if (count("NO_FOLLOW_THROUGH") >= 3) add("nft", `Options: max hold 20 min and only contracts with 7+ days to expiry — ${count("NO_FOLLOW_THROUGH")} of the last ${losses.length} losses had no follow-through`);
-    if (count("WIDE_SPREAD") >= 3) add("spread", `Options: spread limit tightened to 7% of the premium — ${count("WIDE_SPREAD")} losses had wide spreads`);
+    if (count("NO_FOLLOW_THROUGH") >= 3) add("nft", `Options: only contracts with 7+ days to expiry —${count("NO_FOLLOW_THROUGH")} of the last ${losses.length} losses had no follow-through`);
+    if (count("WIDE_SPREAD") >= 3) add("spread", `Options: spread limit tightened to ${FS_RULES.options.spreadTightPct}% of the premium — ${count("WIDE_SPREAD")} losses had wide spreads`);
   }
 
   // Nov 25: the old setup-size lessons are replaced by the entry floor, learned each morning (learnFloor).
@@ -640,7 +657,10 @@ export function activeRules(system: SystemId, weekend: boolean, lessons: Lesson[
     benched,
     strict: new Set(keyed("strict:").map((l) => l.key.slice(7))),
     noisy: new Set(keyed("noise:").map((l) => l.key.slice(6))),
-    maxHold: isOpt && has("nft") ? Math.min(pace.maxHold, FS_RULES.options.lessonHoldMin) : pace.maxHold,
+    // Nov 25 (options fix): options hold up to 45 minutes so a move has time to show in the premium. The old
+    // no-follow-through lesson cut it to 20 minutes, which only left the spread and time decay; it now only asks
+    // for 7+ days to expiry.
+    maxHold: isOpt ? FS_RULES.options.maxHoldMin : pace.maxHold,
     optMinDays: has("nft") ? FS_RULES.options.lessonMinDays : FS_RULES.options.minDays,
     spreadMaxPct: has("spread") ? FS_RULES.options.spreadTightPct : FS_RULES.options.spreadMaxPct,
     preferred: (keyed("pref:")[0]?.key.slice(5) as Bucket) ?? null,
@@ -700,13 +720,18 @@ export function contractLadder(
   maxExpiries = FS_RULES.options.maxExpiries,
   prefer?: [string, string],
 ): Contract[] {
-  const ok = contracts.filter((c) => c.expiry >= minExpiry && (right === "call" ? c.strike > spot : c.strike < spot));
+  // Nov 25 (options fix): near the money only, on either side of the price, nearest strike first. Far out of the
+  // money contracts barely move with the stock, so the spread and time decay ate every trade.
+  const ok = contracts.filter((c) => c.expiry >= minExpiry);
   // Nov 25: expiries 5 to 9 days out first (`prefer`), then the others, nearest first.
   const inPref = (e: string) => !!prefer && e >= prefer[0] && e <= prefer[1];
   const expiries = [...new Set(ok.map((c) => c.expiry))].sort((a, b) => (inPref(a) ? 0 : 1) - (inPref(b) ? 0 : 1) || a.localeCompare(b)).slice(0, maxExpiries);
   const out: Contract[] = [];
+  const near = FS_RULES.options.nearPct;
   for (const e of expiries) {
-    out.push(...ok.filter((c) => c.expiry === e).sort((a, b) => right === "call" ? a.strike - b.strike : b.strike - a.strike).slice(0, steps));
+    const byDist = ok.filter((c) => c.expiry === e)
+      .sort((a, b) => Math.abs(a.strike - spot) - Math.abs(b.strike - spot) || (right === "call" ? a.strike - b.strike : b.strike - a.strike));
+    out.push(...byDist.filter((c, i) => i < 2 || Math.abs(c.strike - spot) / spot * 100 <= near).slice(0, steps));
   }
   return out;
 }
@@ -726,7 +751,7 @@ export function blockReason(blocks: Record<string, number>): string {
     against60: "the 1-hour trend did not agree (a lesson made that a must)",
     benched: "its best markets were benched by the lessons",
     paused: "the pause after 2 losses in a row",
-    noContract: "no option contract under $150 with a tight enough spread",
+    noContract: "no near-the-money option from $20 to $150 with a spread of 5% or less",
     notEnabled: "options are not enabled on the paper account",
     brake: "a brake stopped it (the daily stop or the total brake)",
     noData: "there were no prices for its markets",
@@ -899,8 +924,9 @@ async function chooseContract(k: any, underlying: string, spot: number, right: "
   const r = FS_RULES.options;
   const from = addDays(et.dayKey, minDays);
   const to = addDays(from, 21);
-  const lo = right === "call" ? spot * 0.999 : spot * 0.85;
-  const hi = right === "call" ? spot * 1.15 : spot * 1.001;
+  // near the money on both sides (the ladder keeps the nearest strikes)
+  const lo = spot * 0.85;
+  const hi = spot * 1.15;
   let list: any[] = [];
   try {
     const j = await aGet(PAPER_BASE, `/v2/options/contracts?underlying_symbols=${encodeURIComponent(underlying)}&type=${right}&status=active` +
@@ -930,7 +956,7 @@ async function chooseContract(k: any, underlying: string, spot: number, right: "
       if (cost == null || cost > r.maxPremiumUsd || cost < r.minPremiumUsd) continue;
       if (sp > spreadMax) { wide++; continue; }
       return {
-        ok: true, why: `slightly out of the money, $${cost.toFixed(2)}, spread ${sp.toFixed(1)}%`, tried,
+        ok: true, why: `near the money, $${cost.toFixed(2)}, spread ${sp.toFixed(1)}%`, tried,
         option: { contract: c.symbol, strike: c.strike, expiry: c.expiry, premium: ask, cost, right, spreadPct: sp, bid, ask },
       };
     }
@@ -1111,7 +1137,8 @@ async function runFast(db: any): Promise<Record<string, unknown>> {
         }
         out[id] = { sold: sh.symbol, reason: ex.reason, pnl: ex.pnl, loss: loss?.reason ?? null };
       } else {
-        await saveFs(db, id, { last_mark: mark, last_note: ex.reason, last_note_at: now.toISOString() });
+        const peakUsd = Math.max(Number(sh.peakUsd ?? 0), mark.priced ? mark.pnl : 0);
+        await saveFs(db, id, { last_mark: mark, last_note: ex.reason, last_note_at: now.toISOString(), ...(peakUsd > Number(sh.peakUsd ?? 0) ? { shadow: { ...sh, peakUsd } } : {}) });
         out[id] = { holding: sh.symbol, note: ex.reason };
       }
       continue;
@@ -1192,7 +1219,7 @@ async function runFast(db: any): Promise<Record<string, unknown>> {
         const c = await chooseContract(k, cand.sym, spot, right, et, rules.optMinDays, rules.spreadMaxPct);
         if (!c.ok || !c.option) { misses.push(c.why); continue; }
         const o = c.option;
-        const lv = exitLevels(true, rules.noisy.has(cand.sym));
+        const lv = exitLevels(true, rules.noisy.has(cand.sym), o.cost);
         const entry = { ...conditionsOf(cand.a, spot), spreadPct: o.spreadPct ?? null };
         const newSh: FastShadow = {
           symbol: cand.sym, qty: 1, mult: 100, entryPrice: o.premium, entryAt: now.toISOString(), option: o, dir: cand.a.dir ?? "up",
@@ -1459,7 +1486,8 @@ export async function handleFast(
         exitCheckEveryMin: FS_RULES.exitCheckEveryMin, dailyTarget: FS_RULES.dailyTarget, floorPct: FS_RULES.floorPct,
         takeProfitUsd: id === "options" && !et.weekend ? FS_RULES.options.takeProfitUsd : FS_RULES.spot.takeProfitUsd,
         stopLossUsd: id === "options" && !et.weekend ? FS_RULES.options.stopLossUsd : FS_RULES.spot.stopLossUsd,
-        takeProfitPct: FS_RULES.spot.takeProfitPct, stopLossPct: FS_RULES.spot.stopLossPct,
+        takeProfitPct: id === "options" ? FS_RULES.options.takeProfitPct : FS_RULES.spot.takeProfitPct,
+        stopLossPct: id === "options" ? FS_RULES.options.stopLossPct : FS_RULES.spot.stopLossPct,
         maxTrades: FS_RULES.dailyTarget, strengthPct: rules.thresholdPct,
       },
       weekendNote: FS_WEEKEND_NOTE,

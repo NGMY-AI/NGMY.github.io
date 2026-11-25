@@ -205,10 +205,10 @@ Deno.test("every loss gets exactly one plain reason", () => {
 Deno.test("cut losers faster: first 5 minutes, trend already against it", () => {
   const o = (price: number, min: number, against: boolean) =>
     fastExit({ system: "options", shadow: call, price, now: at(min), trendAgainst: false, closeOut: false, trendNowAgainst: against });
-  assertEquals(o(0.85, 3, true).kind, "early cut"); // -$15 at 3 minutes, trend against
-  assertEquals(o(0.86, 3, true).sell, false); // -$14
-  assertEquals(o(0.85, 3, false).sell, false); // trend not against yet
-  assertEquals(o(0.85, 8, true).sell, false); // after the first 5 minutes the normal exits apply
+  assertEquals(o(0.90, 3, true).kind, "early cut"); // -10% of the $100 premium at 3 minutes, trend against
+  assertEquals(o(0.91, 3, true).sell, false); // -9%
+  assertEquals(o(0.90, 3, false).sell, false); // trend not against yet
+  assertEquals(o(0.90, 8, true).sell, false); // after the first 5 minutes the normal exits apply
   // Spot: -0.8% of $100.
   assertEquals(ex({ price: 198.4, now: at(4), trendNowAgainst: true }).kind, "early cut");
   assertEquals(ex({ price: 198.5, now: at(4), trendNowAgainst: true }).sell, false);
@@ -242,7 +242,8 @@ Deno.test("lessons that change behavior", () => {
   assertEquals(activeRules("scalper", false, [], { thresholdPct: 0.5, maxHold: 30 }, true).thresholdPct, 0.8);
   assertEquals(activeRules("scalper", false, [{ key: "streak3", text: "" }], { thresholdPct: 0.5, maxHold: 30 }, false).thresholdPct, 0.6);
   const o = activeRules("options", false, [{ key: "nft", text: "" }, { key: "spread", text: "" }], { thresholdPct: 0.5, maxHold: 30 }, false);
-  assertEquals([o.maxHold, o.optMinDays, o.spreadMaxPct, o.allowDown], [20, 7, 7, true]);
+  assertEquals([o.maxHold, o.optMinDays, o.spreadMaxPct, o.allowDown], [45, 7, 4, true]);
+  assertEquals(activeRules("options", false, [], { thresholdPct: 0.5, maxHold: 30 }, false).spreadMaxPct, 5);
   assertEquals(activeRules("scalper", false, [], { thresholdPct: 0.01, maxHold: 30 }, false).thresholdPct, 0.5);
   assertEquals([FS_RULES.streakPauseMin, FS_RULES.afterStreakPct], [20, 0.8]);
 });
@@ -269,9 +270,15 @@ Deno.test("options: calls above the price, puts below, at least 3 days out", () 
   }
   const calls = contractLadder(c, 240.4, "call", "2026-11-27");
   assertEquals(calls[0].expiry, "2026-11-27");
-  assertEquals(calls.slice(0, 6).map((x) => x.strike), [241, 242, 243, 244, 245, 246]);
+  // Near the money only: the nearest strikes on either side, nearest first, 4 per expiry.
+  assertEquals(calls.slice(0, 4).map((x) => x.strike), [240, 241, 239, 242]);
+  assertEquals(calls.filter((x) => x.expiry === "2026-11-27").length, 4);
   const puts = contractLadder(c, 240.4, "put", "2026-11-27");
-  assertEquals(puts.slice(0, 3).map((x) => x.strike), [240, 239, 238]);
+  assertEquals(puts.slice(0, 2).map((x) => x.strike), [240, 241]);
+  // Nothing far out of the money: never more than 5% away (the 2 nearest are always tried).
+  assert(calls.every((x) => Math.abs(x.strike - 240.4) / 240.4 * 100 <= 5));
+  const wide = [{ symbol: "a", strike: 5, expiry: "2026-12-04" }, { symbol: "b", strike: 5.5, expiry: "2026-12-04" }, { symbol: "c", strike: 7, expiry: "2026-12-04" }];
+  assertEquals(contractLadder(wide, 5.2, "call", "2026-11-27").map((x) => x.strike), [5, 5.5]);
   assertEquals(contractLadder(c, 240.4, "call", "2026-12-01")[0].expiry, "2026-12-04"); // the 7-day lesson
   // 5 to 9 days out first (Nov 24 + 5..9 = Nov 29 .. Dec 3: none; Dec 4 is 10 days): with Dec 4 preferred it comes first.
   assertEquals(contractLadder(c, 240.4, "call", "2026-11-27", 6, 3, ["2026-12-01", "2026-12-05"])[0].expiry, "2026-12-04");
@@ -279,9 +286,27 @@ Deno.test("options: calls above the price, puts below, at least 3 days out", () 
   assertEquals(new Set(calls.map((x) => x.expiry)).size, 3);
 });
 
+Deno.test("options exits are a share of the premium, with a profit lock", () => {
+  // A $40 contract: take profit +$12 (30%), stop loss -$8 (20%).
+  assertEquals(exitLevels(true, false, 40), { tpUsd: 12, slUsd: 8 });
+  const sh = { symbol: "MARA", qty: 1, mult: 100, entryPrice: 0.4, entryAt: at(0).toISOString(), option: { contract: "M", strike: 5.5, expiry: "2026-12-04", premium: 0.4, cost: 40 }, ...exitLevels(true, false, 40) };
+  const o = (price: number, min: number, peakUsd = 0) =>
+    fastExit({ system: "options", shadow: { ...sh, tpUsd: sh.tpUsd, slUsd: sh.slUsd, peakUsd } as any, price, now: at(min), trendAgainst: false, closeOut: false });
+  assertEquals(o(0.52, 10).kind, "take profit");
+  assertEquals(o(0.32, 10).kind, "stop loss");
+  assertEquals(o(0.44, 10).sell, false);
+  // Up $6 (15%) at its best, back to +$2 (5%): the profit lock sells. Never got to 15%: it holds.
+  assertEquals(o(0.42, 12, 6).kind, "profit lock");
+  assertEquals(o(0.43, 12, 6).sell, false);
+  assertEquals(o(0.42, 12, 5).sell, false);
+  // 45 minutes for options.
+  assertEquals(FS_RULES.options.maxHoldMin, 45);
+  assertEquals([FS_RULES.options.minPremiumUsd, FS_RULES.options.spreadMaxPct], [20, 5]);
+});
+
 Deno.test("why the day ended below 40, in plain words", () => {
   assert(blockReason({ falling: 120, weak: 30 }).startsWith("markets were falling"));
-  assert(blockReason({ noContract: 50, weak: 3 }).includes("under $150"));
+  assert(blockReason({ noContract: 50, weak: 3 }).includes("near-the-money"));
   assert(blockReason({ chased: 9, weak: 3 }).includes("no-chase"));
   assert(blockReason({}).length > 10);
 });
