@@ -11,6 +11,9 @@ Future<void> ngmyPushShow({
   required String body,
   String? tag,
   bool silent = false,
+  String? route,
 }) async {}
+
+void ngmyPushListenForOpen() {}
 
 Future<void> ngmyPushMaybePrompt(BuildContext context, String userEmail) async {}

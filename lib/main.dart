@@ -235,6 +235,7 @@ import 'ngmy_web_lifecycle_stub.dart' if (dart.library.html) 'ngmy_web_lifecycle
 import 'ngmy_media_delivery.dart';
 import 'ngmy_push_notification_prompt.dart';
 import 'ngmy_push_notifications.dart';
+import 'ngmy_notification_routes.dart';
 import 'ngmy_civic_birthdays.dart';
 import 'ngmy_civic_lightning_enroll.dart';
 import 'ngmy_app_notifications.dart';
@@ -514,6 +515,8 @@ void main() async {
     debugPrint = (String? message, {int? wrapWidth}) {};
   }
   ngmyInitCrispRendering();
+  // A tapped notification opens the place it came from (read before anything can change the link).
+  ngmyPushListenForOpen();
   // The language chosen with the flag is read before the first screen, so it is the same after the app reopens.
   unawaited(NgmyUiLang.civic.load());
   unawaited(NgmyUiLang.post.load());
@@ -12640,7 +12643,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         macOS: darwin,
         linux: linux,
       );
-      await _localNotifications.initialize(settings: initSettings);
+      await _localNotifications.initialize(
+        settings: initSettings,
+        // Tapping a notification opens the place it came from.
+        onDidReceiveNotificationResponse: (r) => NgmyNotificationOpen.deliver(r.payload),
+      );
       await _localNotifications
           .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
           ?.requestNotificationsPermission();
@@ -12723,15 +12730,16 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _notificationCooldown[dedupeKey] = DateTime.now();
     // Money in/out, approvals and sales also drop down from the top while the app is open
     // (never in the middle of a game).
+    final route = ngmyNotificationRoute(tag, title: title, body: body);
     if (banner && !NgmyGameSession.suppressExternalNotifications) {
-      _showModernInAppNotice(title: title, body: body, force: true);
+      _showModernInAppNotice(title: title, body: body, force: true, route: route);
     }
 
     final useCashSound = sound == NgmyPushSoundKind.incomeCash;
     final silentPush = useCashSound;
 
     if (kIsWeb) {
-      await ngmyPushShow(title: title, body: body, tag: tag ?? title, silent: silentPush);
+      await ngmyPushShow(title: title, body: body, tag: tag ?? title, silent: silentPush, route: route);
     } else if (_notificationsReady) {
       try {
         final androidDetails = AndroidNotificationDetails(
@@ -12759,6 +12767,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           title: title,
           body: body,
           notificationDetails: details,
+          payload: route,
         );
       } catch (e) {
         debugPrint('Push alert failed: $e');
@@ -12815,9 +12824,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     final last = _notificationCooldown[dedupeKey];
     if (last != null && DateTime.now().difference(last) < cooldown) return;
     _notificationCooldown[dedupeKey] = DateTime.now();
+    final route = ngmyNotificationRoute(tag, title: title, body: body);
 
     if (kIsWeb) {
-      await ngmyPushShow(title: title, body: body, tag: tag ?? title);
+      await ngmyPushShow(title: title, body: body, tag: tag ?? title, route: route);
     } else if (_notificationsReady) {
       try {
         const androidDetails = AndroidNotificationDetails(
@@ -12844,6 +12854,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           title: title,
           body: body,
           notificationDetails: details,
+          payload: route,
         );
       } catch (e) {
         debugPrint('Notification show failed: $e');
@@ -12855,7 +12866,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           important ||
           (adminDashboardAlert && _ngmyReceivesAdminDashboardAlerts(_currentUser));
       if (showBanner) {
-        _showModernInAppNotice(title: title, body: body, force: true);
+        _showModernInAppNotice(title: title, body: body, force: true, route: route);
       }
     }
   }
@@ -12865,6 +12876,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     required String body,
     bool isError = false,
     bool force = false,
+    /// Tapping the card opens this place (where the notification came from). None: the card ignores taps.
+    String? route,
   }) {
     if (kNgmySuppressInAppBannerPopups && !force) return;
     if (!mounted) return;
@@ -12892,10 +12905,18 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       builder: (_) => Material(
         type: MaterialType.transparency,
         child: IgnorePointer(
+          ignoring: route == null,
           child: SafeArea(
             child: Align(
               alignment: Alignment.topCenter,
-              child: TweenAnimationBuilder<double>(
+              child: GestureDetector(
+               behavior: HitTestBehavior.opaque,
+               onTap: () {
+                 _inAppNoticeEntry?.remove();
+                 _inAppNoticeEntry = null;
+                 NgmyNotificationOpen.deliver(route);
+               },
+               child: TweenAnimationBuilder<double>(
                 tween: Tween(begin: 0, end: 1),
                 duration: const Duration(milliseconds: 320),
                 curve: Curves.easeOutCubic,
@@ -12942,6 +12963,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     ),
                   ),
                 ),
+               ),
               ),
             ),
           ),
@@ -18243,6 +18265,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       onDataChanged: widget.onDataChanged,
     );
     _registerAiAppPlaces();
+    // Tapped notifications open where they came from (Signal Grid, Options, Scalper, Civic Registry…).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) NgmyNotificationOpen.attach(_openNotificationPlace);
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_claimAdminSentMoney()));
     _onlineCheck = Timer.periodic(const Duration(seconds: 30), (_) => _refreshOnlineStatus());
     _t = Timer.periodic(const Duration(seconds: 1), (t) {
@@ -18410,8 +18436,16 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       }
     }));
   }
+  /// A tapped notification: open the place it came from, over whatever screen is showing.
+  Future<void> _openNotificationPlace(String route) async {
+    if (!mounted) return;
+    final msg = await NgmyAiAppBridge.open(route);
+    if (msg != null && msg.startsWith('Unknown place')) await NgmyAiAppBridge.open('home');
+  }
+
   @override
   void dispose() {
+    NgmyNotificationOpen.detach(_openNotificationPlace);
     WidgetsBinding.instance.removeObserver(this);
     ngmyUnregisterPageVisibleHandler(_onShellVisibleAgain);
     NgmyAdminLiveRefresh.removeListener(_onAdminLiveRefresh);

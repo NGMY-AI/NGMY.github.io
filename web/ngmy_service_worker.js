@@ -863,17 +863,25 @@ self.addEventListener('fetch', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  // The place the notification came from (Signal Grid, Options, Scalper, Civic Registry…): the open app
+  // is told to go there; a closed app is opened with ?ngmy_open=<place>.
+  const data = event.notification.data || {};
+  const route = typeof data.route === 'string' ? data.route : '';
   event.waitUntil(
     (async () => {
       const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       for (const client of all) {
         if ('focus' in client) {
-          client.focus();
+          try {
+            await client.focus();
+          } catch (_) {}
+          if (route) client.postMessage({ ngmyOpen: route });
           return;
         }
       }
       if (self.clients.openWindow) {
-        await self.clients.openWindow(scopeUrl(SCOPE_PATH));
+        const url = scopeUrl(SCOPE_PATH) + (route ? '?ngmy_open=' + encodeURIComponent(route) : '');
+        await self.clients.openWindow(url);
       }
     })(),
   );

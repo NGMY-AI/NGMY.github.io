@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -14,6 +15,30 @@ import 'ngmy_signal_grid_agent.dart' deferred as sg_agent;
 import 'main.dart' show ngmyEmailIsAdmin;
 import 'ngmy_civic_registry_cloud.dart' show ngmyCurrentAuthEmail;
 import 'ngmy_signal_alerts.dart';
+
+/// Opens Signal Grid (admins: the trading agent; members: the Trading Academy). With `system` 'options' or
+/// 'scalper' (admins), that fast system opens on top of the agent, so back returns to Signal Grid. Used by
+/// tapped notifications.
+Future<String?> ngmyOpenSignalGridPlace(BuildContext context, {String? system}) async {
+  final admin = ngmyEmailIsAdmin(ngmyCurrentAuthEmail());
+  final nav = Navigator.of(context);
+  unawaited(nav.push(
+    MaterialPageRoute<void>(
+      builder: (_) => NgmyDeferred(
+        load: sg_agent.loadLibrary,
+        build: () => admin ? sg_agent.NgmySignalGridAgentScreen() : sg_agent.NgmySignalGridLearnScreen(),
+      ),
+    ),
+  ));
+  if (!admin || (system != 'options' && system != 'scalper')) return 'Opened Signal Grid.';
+  try {
+    await sg_agent.loadLibrary();
+  } catch (_) {
+    return 'Opened Signal Grid.';
+  }
+  unawaited(nav.push(MaterialPageRoute<void>(builder: (_) => sg_agent.NgmyFastSystemScreen(system: system!))));
+  return system == 'options' ? 'Opened Options.' : 'Opened Scalper.';
+}
 
 /// Home “tech deck” under the spending cards — robotic HUD frames with motion.
 /// Tapping a frame opens a full-screen pulse / scan animation.

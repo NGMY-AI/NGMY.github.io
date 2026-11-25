@@ -59,6 +59,65 @@ extension _NgmyAiAppPlaces on _MainScreenState {
             );
           },
         ),
+        'signal_grid': NgmyAiPlace(
+          description: 'Signal Grid — the trading agent (admins) or the Trading Academy (members)',
+          open: (ctx, _) => ngmyOpenSignalGridPlace(ctx),
+        ),
+        'options': NgmyAiPlace(
+          description: 'Signal Grid Options — the fast options trading system (admins)',
+          open: (ctx, _) => ngmyOpenSignalGridPlace(ctx, system: 'options'),
+        ),
+        'scalper': NgmyAiPlace(
+          description: 'Signal Grid Scalper — the fast stock trading system (admins)',
+          open: (ctx, _) => ngmyOpenSignalGridPlace(ctx, system: 'scalper'),
+        ),
+        'news': NgmyAiPlace(
+          description: 'News — announcements and posts',
+          open: (ctx, _) => push(
+            ctx,
+            AnnouncementScreen(
+              user: u,
+              allUsers: widget.allUsers,
+              announcements: const [],
+              config: widget.config,
+              onPostToNews: (_) {},
+              onAddTransaction: widget.onAddTransaction,
+              onDataChanged: widget.onDataChanged,
+            ),
+            'AnnouncementScreen',
+            'Opened News.',
+          ),
+        ),
+        'game_center': NgmyAiPlace(
+          description: 'Game Center — games and game invites',
+          open: (ctx, _) async {
+            if (!NgmyGameAccess.hasActiveInvestment(u) && !await NgmyGameAccess.canStartGame(u)) {
+              return goTab(ctx, 0, 'Home');
+            }
+            if (!ctx.mounted) return null;
+            unawaited(NgmyNavigator.push(
+              ctx,
+              GameCenterScreen(
+                user: u,
+                config: widget.config,
+                allTransactions: widget.allTransactions,
+                onAddTransaction: widget.onAddTransaction,
+                onDataChanged: widget.onDataChanged,
+                onGoToInvest: () => _goToMainTab(1, refreshLegal: true),
+              ),
+              routeName: kRouteGameCenter,
+            ));
+            return 'Opened Game Center.';
+          },
+        ),
+        if (u.isAdmin)
+          'admin': NgmyAiPlace(
+            description: 'Admin dashboard — requests, payments, members (admins)',
+            open: (ctx, _) async {
+              unawaited(_openAdminDashboardFromHome());
+              return 'Opened the admin dashboard.';
+            },
+          ),
         'civic_member': NgmyAiPlace(
           description: "Open one Civic Registry member's ID card",
           args: 'query = name, registry ID, phone or email',
