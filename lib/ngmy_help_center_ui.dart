@@ -8,7 +8,10 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'ngmy_countries.dart';
+import 'ngmy_country_combo_field.dart';
 import 'ngmy_help_center.dart';
+import 'ngmy_help_center_fx.dart';
 import 'ngmy_help_center_phone.dart';
 import 'ngmy_help_center_saved_recipients_dialog.dart';
 import 'ngmy_help_center_send_money_delivery_status.dart';
@@ -92,6 +95,11 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
   List<NgmyHelpCenterSavedRecipient> _savedRecipients = const [];
   String _receiptTemplateId = 'modern';
   Timer? _senderPhoneSaveTimer;
+  NgmyFxRates? _fxRates;
+  bool _fxLoading = true;
+  /// True once the user picks or types a destination country: auto-detect never overrides it.
+  bool _countryManual = false;
+  final FocusNode _receiverPhoneFocus = FocusNode();
 
   @override
   void initState() {
@@ -121,7 +129,20 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
     _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))..repeat(reverse: true);
     _enter = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..forward();
     _loadSendMoneyLocalData();
+    unawaited(_loadFxRates());
   }
+
+  Future<void> _loadFxRates() async {
+    final rates = await ngmyLoadUsdRates();
+    if (!mounted) return;
+    setState(() {
+      _fxRates = rates;
+      _fxLoading = false;
+    });
+  }
+
+  NgmyFxQuote? get _fxQuote =>
+      NgmyFxQuote.forCountry(ngmyHelpCenterCountryFor(_receiverCountryC.text), _fxRates);
 
   Future<void> _loadSendMoneyLocalData() async {
     final sender = await ngmyLoadHelpCenterSenderInfo();
@@ -162,9 +183,46 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
     _receiverPhoneC.text = local;
   }
 
+  void _onReceiverCountryTyped(String value) {
+    _countryManual = value.trim().isNotEmpty;
+    _onReceiverCountryChanged(value);
+  }
+
+  void _onReceiverCountryPicked(NgmyCountry country) {
+    _countryManual = true;
+    _onReceiverCountryChanged(country.name);
+  }
+
+  /// Reads the calling code typed at the start of the receiver phone (+255 ...) and selects
+  /// that country, unless the user already chose one by hand or the code is shared (+1).
+  void _onReceiverPhoneChanged(String text) {
+    _resetCashApp();
+    final code = ngmyCallingCodeInPhone(text);
+    if (code == null) return;
+    final before = _receiverPhonePattern.dialCode;
+    if (!_countryManual) {
+      final detected = ngmyCountryForPhone(text);
+      if (detected != null) _receiverCountryC.text = detected.name;
+    }
+    if (_receiverPhonePattern.dialCode == code) {
+      final local = ngmyHelpCenterReceiverLocalFromStored(text, _receiverCountryC.text);
+      _receiverPhoneC.value = TextEditingValue(
+        text: local,
+        selection: TextSelection.collapsed(offset: local.length),
+      );
+    }
+    setState(() {});
+    if (before != _receiverPhonePattern.dialCode) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _receiverPhoneFocus.requestFocus();
+      });
+    }
+  }
+
   @override
   void dispose() {
     _senderPhoneSaveTimer?.cancel();
+    _receiverPhoneFocus.dispose();
     _notesC.dispose();
     _qtyC.dispose();
     _priceC.dispose();
@@ -219,6 +277,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
       _receiverC.clear();
       _receiverPhoneC.clear();
       _receiverCountryC.clear();
+      _countryManual = false;
       _senderCashAppC.clear();
       _helpTopicC.clear();
       _helpDetailsC.clear();
@@ -494,6 +553,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
       receiverCountry: _receiverCountryC.text,
       transferAmountText: _priceC.text,
       serviceName: _selected?.name ?? 'Send Money',
+      fx: _fxQuote,
     );
   }
 
@@ -516,6 +576,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
         entry.receiverCountry,
       );
       _receiverCountryC.text = entry.receiverCountry;
+      _countryManual = entry.receiverCountry.trim().isNotEmpty;
       _cashAppOpened = false;
     });
   }
@@ -1153,13 +1214,19 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
             const SizedBox(height: 10),
             _textField('Receiver full name *', _receiverC, isDark, onChanged: (_) => _resetCashApp(), textCapitalization: TextCapitalization.words),
             const SizedBox(height: 10),
-            _textField(
-              'Destination country *',
-              _receiverCountryC,
-              isDark,
-              onChanged: _onReceiverCountryChanged,
+            NgmyCountryComboField(
+              controller: _receiverCountryC,
+              isDark: isDark,
+              onTyped: _onReceiverCountryTyped,
+              onPicked: _onReceiverCountryPicked,
               textCapitalization: TextCapitalization.words,
-              hint: 'e.g. Tanzania, Ghana, DRC Congo, Kenya, Nigeria',
+              decoration: InputDecoration(
+                labelText: 'Destination country *',
+                hintText: 'e.g. Tanzania, Ghana, DRC Congo, Kenya, Nigeria',
+                filled: true,
+                fillColor: isDark ? Colors.white.withOpacity(0.04) : const Color(0xFFF8FAFC),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
             ),
             const SizedBox(height: 10),
             _receiverPhoneField(isDark),
@@ -1188,6 +1255,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
                   _summaryLine('Transfer', '\$${amount.toStringAsFixed(2)}', isDark),
                   _summaryLine(feeLabel, '\$${fee.toStringAsFixed(2)}', isDark),
                   _summaryLine('Recipient gets', '\$${recipientGets.toStringAsFixed(2)}', isDark),
+                  if (_fxQuote != null) _localCurrencyRow(_fxQuote!, recipientGets, isDark),
                 ],
               ),
             ),
@@ -1333,6 +1401,40 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
     );
   }
 
+  /// "Recipient gets in Tanzanian Shilling: 251,400 TZS" plus the rate used underneath.
+  Widget _localCurrencyRow(NgmyFxQuote quote, double recipientGets, bool isDark) {
+    final value = (_fxLoading && !quote.hasRate) ? 'loading rate...' : quote.valueFor(recipientGets);
+    final rateLine = quote.rateLine;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text.rich(
+            TextSpan(children: [
+              TextSpan(
+                text: '${quote.rowLabel}: ',
+                style: TextStyle(fontSize: 10, color: isDark ? Colors.white.withOpacity(0.45) : Colors.black45),
+              ),
+              TextSpan(
+                text: value,
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+              ),
+            ]),
+          ),
+          if (rateLine != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                rateLine,
+                style: TextStyle(fontSize: 9, color: isDark ? Colors.white38 : Colors.black45),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _deliveryFeeBox(bool isDark) {
     final miles = double.tryParse(_mileageC.text.trim()) ?? 0;
     final est = ngmyHelpCenterDeliveryEstimate(_mileageC.text);
@@ -1372,7 +1474,8 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
     return TextField(
       key: ValueKey('recv-${pattern.dialCode}'),
       controller: _receiverPhoneC,
-      onChanged: (_) => _resetCashApp(),
+      focusNode: _receiverPhoneFocus,
+      onChanged: _onReceiverPhoneChanged,
       keyboardType: TextInputType.phone,
       inputFormatters: const [NgmyHelpCenterReceiverLocalFormatter()],
       decoration: InputDecoration(

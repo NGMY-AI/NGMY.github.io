@@ -1,4 +1,5 @@
 import 'ngmy_help_center.dart';
+import 'ngmy_help_center_fx.dart';
 
 /// Professional NGMY money-transfer quote receipt (no Cash App tag).
 class NgmyHelpCenterSendMoneyReceipt {
@@ -16,6 +17,7 @@ class NgmyHelpCenterSendMoneyReceipt {
     required this.recipientGets,
     required this.feeDescription,
     this.serviceName = 'Send Money',
+    this.fx,
   });
 
   final String reference;
@@ -32,6 +34,13 @@ class NgmyHelpCenterSendMoneyReceipt {
   final String feeDescription;
   final String serviceName;
 
+  /// Local currency and the rate at the moment of the transfer (null when no country matched).
+  final NgmyFxQuote? fx;
+
+  /// "Recipient gets in Tanzanian Shilling" / "251,400 TZS", or null when there is no country.
+  String? get localCurrencyLabel => fx?.rowLabel;
+  String? get localCurrencyValue => fx?.valueFor(recipientGets);
+
   factory NgmyHelpCenterSendMoneyReceipt.fromForm({
     required String reference,
     required String senderName,
@@ -42,6 +51,7 @@ class NgmyHelpCenterSendMoneyReceipt {
     required String receiverCountry,
     required String transferAmountText,
     String serviceName = 'Send Money',
+    NgmyFxQuote? fx,
   }) {
     final amount = double.tryParse(transferAmountText.trim()) ?? 0;
     final fee = ngmyHelpCenterMoneyTransferFee(amount);
@@ -59,6 +69,7 @@ class NgmyHelpCenterSendMoneyReceipt {
       recipientGets: amount - fee,
       feeDescription: ngmyHelpCenterMoneyTransferFeeDescription(amount),
       serviceName: serviceName,
+      fx: fx,
     );
   }
 
@@ -97,7 +108,9 @@ class NgmyHelpCenterSendMoneyReceipt {
       ..writeln('TRANSFER SUMMARY')
       ..writeln('Transfer amount: \$${transferAmount.toStringAsFixed(2)}')
       ..writeln('$feeDescription: \$${serviceFee.toStringAsFixed(2)}')
-      ..writeln('Recipient receives: \$${recipientGets.toStringAsFixed(2)}')
+      ..writeln('Recipient receives: \$${recipientGets.toStringAsFixed(2)}');
+    if (fx != null) buf.writeln('$localCurrencyLabel: $localCurrencyValue');
+    buf
       ..writeln()
       ..writeln('This is a fee quote from NGMY Help Center.')
       ..writeln('NGMY.ORG');

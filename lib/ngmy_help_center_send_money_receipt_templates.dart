@@ -323,6 +323,7 @@ class NgmyTransferReceiptPreview extends StatelessWidget {
                       _Row('Transfer amount', '\$${r.transferAmount.toStringAsFixed(2)}'),
                       _Row(r.feeDescription, '\$${r.serviceFee.toStringAsFixed(2)}'),
                       _Row('Recipient receives', '\$${r.recipientGets.toStringAsFixed(2)}', bold: true, highlight: true),
+                      if (r.fx != null) _Row(r.localCurrencyLabel!, r.localCurrencyValue!, bold: true),
                     ],
                   ),
                   const SizedBox(height: 12),

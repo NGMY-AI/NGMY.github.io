@@ -1,5 +1,7 @@
 import 'package:flutter/services.dart';
 
+import 'ngmy_countries.dart';
+
 /// Dial-code + grouping for US senders and African receivers.
 class NgmyHelpCenterPhonePattern {
   const NgmyHelpCenterPhonePattern({
@@ -129,6 +131,8 @@ const Map<String, String> kNgmyAfricanCountryDialCodes = {
 String? ngmyHelpCenterDialCodeForCountry(String country) {
   final raw = country.trim().toLowerCase();
   if (raw.isEmpty) return null;
+  final picked = ngmyCountryByName(country);
+  if (picked != null) return picked.dialCode;
   if (kNgmyAfricanCountryDialCodes.containsKey(raw)) return kNgmyAfricanCountryDialCodes[raw];
 
   final keys = kNgmyAfricanCountryDialCodes.keys.toList()..sort((a, b) => b.length.compareTo(a.length));
@@ -249,7 +253,10 @@ class NgmyHelpCenterReceiverLocalFormatter extends TextInputFormatter {
   const NgmyHelpCenterReceiverLocalFormatter();
   @override
   TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
-    final formatted = ngmyHelpCenterFormatReceiverLocal(newValue.text);
+    // A number typed with its calling code (+243 ...) stays as typed so the country can be read from it.
+    final formatted = newValue.text.trimLeft().startsWith('+')
+        ? '+${ngmyHelpCenterDigitsOnly(newValue.text)}'
+        : ngmyHelpCenterFormatReceiverLocal(newValue.text);
     return TextEditingValue(
       text: formatted,
       selection: TextSelection.collapsed(offset: formatted.length),
