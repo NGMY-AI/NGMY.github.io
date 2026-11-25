@@ -1,9 +1,9 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var D,A,E,C={
-hBr(d){switch(d.a){case 1:return B.esN
-case 2:return B.esP
-case 0:return B.esO}},
-av_:function av_(d,e,f,g,h,i){var _=this
+hBu(d){switch(d.a){case 1:return B.esP
+case 2:return B.esR
+case 0:return B.esQ}},
+av0:function av0(d,e,f,g,h,i){var _=this
 _.a=d
 _.b=e
 _.c=f
@@ -15,23 +15,23 @@ A=c[2]
 E=c[68]
 C=a.updateHolder(c[51],C)
 B=c[269]
-C.av_.prototype={}
+C.av0.prototype={}
 var z=a.updateTypes([]);(function inheritance(){var x=a.inherit
-x(C.av_,D.aE)})()
-var y={c:D.ar("N<u>")};(function constants(){var x=a.makeConstList
+x(C.av0,D.aE)})()
+var y={c:D.as("N<u>")};(function constants(){var x=a.makeConstList
 B.aXG=new D.G(!0,A.c,null,null,null,null,9,A.u,null,2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-B.d8s=x([A.dD,A.kE,A.az],y.c)
-B.dJ6=x([A.az,A.fl],y.c)
-B.di0=x([A.kZ,A.pG,A.az],y.c)
-B.esN=new C.av_(B.d8s,B.dJ6,A.fl,A.j7,"PREMIUM",B.di0)
-B.dAs=x([A.cY,A.fz,A.bU],y.c)
-B.dve=x([A.bU,A.aV],y.c)
-B.dgw=x([A.wS,A.bU,A.fz],y.c)
-B.esO=new C.av_(B.dAs,B.dve,A.bU,A.jD,"NGMY WALLET",B.dgw)
-B.dxj=x([A.ex,A.e3,A.pH],y.c)
-B.dCm=x([A.aE,A.aQ],y.c)
-B.diW=x([A.td,A.aE,A.c4],y.c)
-B.esP=new C.av_(B.dxj,B.dCm,A.aE,A.mz,"LUXURY",B.diW)
-B.esR=new E.auZ(1,"premium")
-B.esS=new E.auZ(2,"luxury")})()};
-(a=>{a["7SWDO81F3oHr8vcHqnYuYAFjdNY="]=a.current})($__dart_deferred_initializers__);
+B.d8t=x([A.dD,A.kE,A.az],y.c)
+B.dJ8=x([A.az,A.fl],y.c)
+B.di1=x([A.kZ,A.pH,A.az],y.c)
+B.esP=new C.av0(B.d8t,B.dJ8,A.fl,A.j7,"PREMIUM",B.di1)
+B.dAu=x([A.cZ,A.fz,A.bT],y.c)
+B.dvh=x([A.bT,A.aV],y.c)
+B.dgx=x([A.wS,A.bT,A.fz],y.c)
+B.esQ=new C.av0(B.dAu,B.dvh,A.bT,A.jD,"NGMY WALLET",B.dgx)
+B.dxm=x([A.ex,A.e4,A.pI],y.c)
+B.dCo=x([A.aE,A.aQ],y.c)
+B.diX=x([A.td,A.aE,A.c4],y.c)
+B.esR=new C.av0(B.dxm,B.dCo,A.aE,A.mz,"LUXURY",B.diX)
+B.esT=new E.av_(1,"premium")
+B.esU=new E.av_(2,"luxury")})()};
+(a=>{a["b3ZvfF22yHWkribMTaoeRMOmdnc="]=a.current})($__dart_deferred_initializers__);
