@@ -319,7 +319,7 @@ t=A.B(t,t.$ti.k("aj.E"))
 v=t
 x=1
 break
-case 15:v=D.dtE
+case 15:v=D.dtC
 x=1
 break
 case 4:case 1:return A.h(v,w)}})
@@ -550,7 +550,7 @@ $0(){A.a7(this.a,!1).N(null)
 return null},
 $S:0}
 C.eh6.prototype={
-$2(d,e){var x,w,v,u,t,s,r,q,p,o,n,m,l=null,k=D.dpU[e],j=this.a,i=k.a,h=j.e.h(0,i)
+$2(d,e){var x,w,v,u,t,s,r,q,p,o,n,m,l=null,k=D.dpS[e],j=this.a,i=k.a,h=j.e.h(0,i)
 if(h==null)h=0
 x=j.r===i
 w=B.i.F(this.b+e*0.08,1)
@@ -602,16 +602,16 @@ D.hLZ=new C.z1("notes","Notes",L.a4x,B.bl,G.aEe)
 D.hLX=new C.z1("tasks","Quick Tasks",K.DP,B.bw,B.a7r)
 D.dIt=x([B.az,B.bl],y.O)
 D.hLY=new C.z1("where","Where I Put It",B.mv,B.bl,D.dIt)
-D.ddT=x([B.fK,B.aQ],y.O)
-D.hLS=new C.z1("alarms","Alarms",I.a3V,B.ca,D.ddT)
-D.dxn=x([B.oI,B.cG],y.O)
-D.hLR=new C.z1("menu","Local Menu",B.xs,B.cG,D.dxn)
-D.dA4=x([B.jR,B.ch],y.O)
-D.hLU=new C.z1("bio","Local Bio",B.i2,B.ch,D.dA4)
-D.dpU=x([D.hLV,D.hLW,D.hLT,D.hLQ,D.hLZ,D.hLX,D.hLY,D.hLS,D.hLR,D.hLU],A.as("N<z1>"))
-D.dtE=x([],A.as("N<k_>"))
+D.ddR=x([B.fK,B.aQ],y.O)
+D.hLS=new C.z1("alarms","Alarms",I.a3V,B.ca,D.ddR)
+D.dxl=x([B.oI,B.cG],y.O)
+D.hLR=new C.z1("menu","Local Menu",B.xs,B.cG,D.dxl)
+D.dA1=x([B.jR,B.ch],y.O)
+D.hLU=new C.z1("bio","Local Bio",B.i2,B.ch,D.dA1)
+D.dpS=x([D.hLV,D.hLW,D.hLT,D.hLQ,D.hLZ,D.hLX,D.hLY,D.hLS,D.hLR,D.hLU],A.as("N<z1>"))
+D.dtC=x([],A.as("N<k_>"))
 D.fsW=new A.av(0,42)
 D.fve=new A.hY(2,10,10,1.28,null)
 D.fQL=new A.G(!0,B.c,null,null,null,null,12,B.u,null,null,null,null,1.15,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.hhh=new A.C("Open / add",null,B.cf,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["HEj/SMvMge6XSWbKhk/zm82WQ10="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["hIs5f3xSEh+ecgB4tuiEOsWg5ws="]=a.current})($__dart_deferred_initializers__);

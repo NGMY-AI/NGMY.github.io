@@ -96,7 +96,7 @@ return new B.a7V(w,r,v,u,t==null?s:J.k(t))},
 iuU(d){var w,v,u,t=A.ow(C.a.i(d))
 if(t==null||t.gkI(t).length===0)return!1
 w=t.gkI(t).toLowerCase()
-if(C.d.aR(D.d6Q,new B.fTs(w)))return!0
+if(C.d.aR(D.d6P,new B.fTs(w)))return!0
 if((w==="facebook.com"||C.a.c7(w,".facebook.com"))&&C.a.q(t.gfh(t),"login"))return!0
 v=A.ag("/(log-?in|sign-?in|sign-?up|register|auth|oauth2?|sso|account/create)(/|$|\\?)",!1,!1,!1,!1)
 u=t.gfh(t)
@@ -833,10 +833,10 @@ if(w!=null&&!C.aI.gar(w))return w
 return null},
 ilN(d,e){var w,v,u,t=C.a.i(d).toLowerCase()
 if(e){w=C.d.cd(D.cQT,t)
-return w>=0?D.dqI[w]:null}v=C.d.cd(D.dEs,t)
-if(v>=0)return D.d6r[v]
+return w>=0?D.dqG[w]:null}v=C.d.cd(D.dEq,t)
+if(v>=0)return D.d6q[v]
 u=C.d.cd(D.dHY,t)
-return u>=0?D.dqj[u]:null},
+return u>=0?D.dqh[u]:null},
 a4_(d,e,f,g){var w=0,v=A.j(x.K),u,t=2,s=[],r,q,p,o,n,m
 var $async$a4_=A.e(function(h,i){if(h===1){s.push(i)
 w=t}for(;;)switch(w){case 0:w=3
@@ -881,7 +881,7 @@ s=$.fGE.h(0,t)
 if(s!=null)return s
 r=new Uint8Array(A.cc(H.fP4(B.hJV(u))))
 $.fGE.n(0,t,r)
-return r}q=w?D.ddC:D.dAK
+return r}q=w?D.ddB:D.dAH
 if(C.a.i(e).length===0)p=0
 else{o=new A.di(e)
 p=o.cE(o,0,new B.fTy())}o=new A.di(g)
@@ -1053,13 +1053,13 @@ fTy:function fTy(){},
 fTz:function fTz(){},
 fTA:function fTA(){},
 a3Z(d,e){var w
-if(C.d.q(D.dp4,C.a.i(e).toUpperCase()))return!0
+if(C.d.q(D.dp2,C.a.i(e).toUpperCase()))return!0
 w=C.a.i(d).toLowerCase()
 if(C.a.q(w,"mariam")||C.a.q(w,"dusabe"))return!0
 if(C.a.q(w,"suzana-vanessa")||w==="cmp-suzana-vanessa")return!0
 return!1},
 aSu(d,e){var w
-if(C.d.q(D.daH,C.a.i(e).toUpperCase()))return!0
+if(C.d.q(D.daG,C.a.i(e).toUpperCase()))return!0
 w=C.a.i(d).toLowerCase()
 if(C.a.q(w,"suzana-vanessa")||w==="cmp-suzana-vanessa")return!0
 return!1},
@@ -1310,7 +1310,7 @@ w.n(0,c2,a9?a6.h(0,c2):c6.h(a4,c2))
 w.n(0,c3,b0?a6.h(0,c3):c6.h(a4,c3))
 o[a3]=w
 n=h}}}b1=new A.O(o,new B.h_S(),x.bi).fD(0)
-for(s=0;s<20;++s){b2=D.dwB[s]
+for(s=0;s<20;++s){b2=D.dwz[s]
 c6=b2.h(0,b4)
 a7=C.a.i(J.k(c6==null?"":c6)).toUpperCase()
 if(a7.length===0||b1.q(0,a7))continue
@@ -1635,7 +1635,7 @@ if(u!=null){w=u.b[0]
 w=!C.a.q(w==null?"":w,"@")}else w=!1
 if(w)return new A.afZ("https://"+A.v(u.b[0]))
 return D.eLj},
-hGb(d,e){return new A.aJj([e,!1,null,D.dtQ,"","",d==null?"":d])},
+hGb(d,e){return new A.aJj([e,!1,null,D.dtO,"","",d==null?"":d])},
 fTq(d,e){return B.iuQ(d,e)},
 iuQ(a1,a2){var w=0,v=A.j(x.g4),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0
 var $async$fTq=A.e(function(a3,a4){if(a3===1){s.push(a4)
@@ -1905,7 +1905,7 @@ b3=!1
 b4=!0
 b5=C.a.i(b9)
 b6=b5.length
-if(b6===0){u=D.f_Z
+if(b6===0){u=D.f0_
 w=1
 break}r=c0
 q=b6>280?C.a.aw(b5,0,277)+"...":b5
@@ -2456,7 +2456,7 @@ if(!w.b.test(v)){w=A.ag("\u2764|\ud83d\udc95|\ud83e\udd70|\ud83d\ude18",!0,!1,!1
 w=w.b.test(d)}else w=!0
 return w},
 hph(d,e){if(d==="female")return D.cY1[C.o.F(A.G5(new A.W(Date.now(),0,!1)),4)]
-return D.dhR[C.o.F(A.G5(new A.W(Date.now(),0,!1)),4)]},
+return D.dhN[C.o.F(A.G5(new A.W(Date.now(),0,!1)),4)]},
 hNd(d,e){return 88+A.aF(d,C.dK,x.w).w.r.d},
 hMB(d,e,f){var w,v,u,t=C.a.i(f).toUpperCase()
 if(C.a.q(t,"MARIAM"))return"beautiful young African Black woman late teens/early 20s, soft curly afro puff, glowing skin, warm smile \u2014 same face every time"
@@ -2640,7 +2640,7 @@ if(C.a.q(v,"MSHAURI")||C.a.q(v,"AMANI")||C.a.q(u,"mshauri"))return!0
 return!1},
 iuR(d,e,f){var w,v=C.a.i(f)
 if(v.length!==0)return new A.ag0(v,"Georgia")
-if(B.iuT(d,e))return D.f19
+if(B.iuT(d,e))return D.f1a
 w=new A.di(C.a.i(d).toLowerCase()+"|"+C.a.i(e).toLowerCase())
 return new A.ag0(D.dIK[C.o.F(w.cE(w,0,new B.fTr()),10)],"Georgia")},
 iw9(d,e){var w,v,u,t=C.a.i(e).toLowerCase()
@@ -2651,7 +2651,7 @@ if(C.d.aR(A.a([d.b.toLowerCase(),v.toLowerCase(),A.aL(w,"_"," "),d.e.toLowerCase
 u=D.dLX.h(0,w)
 if(u==null)u=C.Z
 return C.d.aR(u,new B.fWe(t))},
-a3e(d,e,f,g,h,i){var w=null,v=i?D.dxy:D.cQy,u=A.K(i?D.bkm:C.Cf,C.r,1.35),t=C.v.j(i?0.38:0.08)
+a3e(d,e,f,g,h,i){var w=null,v=i?D.dxw:D.cQy,u=A.K(i?D.bkm:C.Cf,C.r,1.35),t=C.v.j(i?0.38:0.08)
 t=A.a([new A.aa(0,C.H,t,C.du,20),new A.aa(0,C.H,D.bkQ.j(i?0.16:0.12),C.cP,24)],x.V)
 return A.by(e,A.p(w,f,C.f,w,w,new A.o(w,w,u,e,t,new A.a8(C.ay,C.aD,C.x,v,w,w),C.m),new A.o(w,w,w,e,w,new A.a8(C.aX,C.z,C.x,A.a([C.c.j(i?0.2:0.55),C.c.j(0)],x.O),w,w),C.m),w,w,w,w,w,w,w),C.aq)},
 hmS(d){var w
@@ -5674,7 +5674,7 @@ for(w=0,v=0;v<17;++v){u=d[v]
 t=A.c9(u,null)
 if(t==null)t=D.dM1.h(0,u)
 if(t==null)return null
-w+=t*D.drX[v]}s=C.o.F(w,11)
+w+=t*D.drU[v]}s=C.o.F(w,11)
 r=s===10?"X":""+s
 return d[8]===r},
 aR8(d){return B.ijy(d)},
@@ -7684,7 +7684,7 @@ a9=p}else{p=a8<=1?"about an hour ago":""+a8+" hours ago"
 a9=p}a6="SAME THREAD: You two were already talking "+a9+'. Continue naturally from the last topic. Do NOT ask fresh-day openers like "what are you up to today?", "how\'s your day?", "what are you doing today?", or "what\'s new?" \u2014 you already know them and just talked. Skip repetitive check-ins you already asked recently.\n'}else if(B.a48(w)&&v>=4)if(j&&a8>=24){p=C.o.ao(p,864e8)
 a6="They ghosted "+(p>=1?""+p+"d":""+a8+"h")+". You can be mad, hurt, or call it out \u2014 real partners need attention. Break up if it feels disrespectful.\n"}else a6=j?"They took a while to reply. Ask where they were \u2014 curious, playful, or bothered like a real partner. Do not treat this like meeting for the first time today.\n":""}b0=B.iuR(r,t,"")
 b1=new A.W(Date.now(),0,!1).bU()
-b2=C.Ef[A.lU(b1)-1]
+b2=C.Ee[A.lU(b1)-1]
 b3=C.p8[A.bN(b1)-1]
 b4=A.d_(b1)
 if(b4===0)b5=12
@@ -8320,7 +8320,7 @@ s=t.fy
 if(s.c)s.jE()
 u=t.rO(f,"Perfect \u2014 filling it out now in my browser. Watch me live below \ud83d\udc40")
 w=1
-break}u=t.ac0(D.dgy,f,n===D.a8O?y.O+s.y+"). Want me to try again?":"My live browser isn't available right now. Want me to try again in a moment?")
+break}u=t.ac0(D.dgu,f,n===D.a8O?y.O+s.y+"). Want me to try again?":"My live browser isn't available right now. Want me to try again in a moment?")
 w=1
 break
 case 1:return A.h(u,v)}})
@@ -9605,7 +9605,7 @@ k=""
 j=""
 a0=""
 i=""
-h=D.dtP
+h=D.dtN
 f=G.j9
 e=G.j9}if(n.length!==0)a1=n
 else if(J.cJ(b2))a1=b2
@@ -11970,7 +11970,7 @@ u=A.c(u,q,q,q,q,q,q,A.l(q,q,r.e,q,q,q,q,q,q,q,q,11,q,q,q,q,q,!0,q,q,q,q,q,q,q,q)
 w=B.hnL(w,new B.dah(p,d),!0)
 t=A.n(20)
 s=A.a([new A.aa(0,C.H,C.hI.j(0.35+o*0.2),C.J,10)],x.V)
-m.push(new A.a5(1/0,q,A.x(A.a([l,C.M,v,C.cQ,u,C.aj,w,C.M,A.p(q,A.A(D.do7,C.l,q,C.e,C.O,0,q,q),C.f,q,q,new A.o(q,q,q,t,s,D.ccB,C.m),q,q,q,q,Z.D2,q,q,q)],n),C.l,q,C.ba,C.h,0,C.p),q))
+m.push(new A.a5(1/0,q,A.x(A.a([l,C.M,v,C.cQ,u,C.aj,w,C.M,A.p(q,A.A(D.do5,C.l,q,C.e,C.O,0,q,q),C.f,q,q,new A.o(q,q,q,t,s,D.ccB,C.m),q,q,q,q,Z.D2,q,q,q)],n),C.l,q,C.ba,C.h,0,C.p),q))
 return A.OZ(22,q,new A.am(C.a0,q,C.ad,C.f,m,q),r.b,!1,p.z,p.y,Ae.a1C,p.d*0.13,o,p.x)},
 $S:1611}
 B.dah.prototype={
@@ -11984,7 +11984,7 @@ v=w?0.18:0.34
 u=p*3.141592653589793*2
 t=Math.sin(u)
 u=Math.cos(u)
-s=w?D.daI:A.a([C.qF,C.GK,C.c],x.O)
+s=w?D.daH:A.a([C.qF,C.GK,C.c],x.O)
 s=A.a([A.p(r,r,C.f,r,r,new A.o(r,r,r,r,r,new A.bT(new A.dg(0.2+t*0.3,-0.3+u*0.2),1.2,C.x,r,0,s,r,r),C.m),r,r,r,r,r,r,r,r)],x.p)
 C.d.u(s,A.ip(12,new B.dwB(q,p,d,v),!0,x.gy))
 q=x.O
@@ -12006,7 +12006,7 @@ $S:213}
 B.drw.prototype={
 $1(d){var w,v,u,t,s,r=this,q=null,p=x.p,o=A.a([],p)
 if(r.b){p=A.a([],p)
-for(w=r.a,v=0;v<6;++v){u=D.dhc[v]
+for(w=r.a,v=0;v<6;++v){u=D.dh8[v]
 t=new A.aP(30,30)
 s=w.a.f===u?C.c.j(0.15):C.L
 p.push(A.aM(!1,new A.bb(t,t,t,t),!0,A.p(q,A.c(u,q,q,q,q,q,q,C.y9,q,q,q),C.f,q,q,new A.o(s,q,q,q,q,q,C.a6),q,q,q,q,C.cu,q,q,q),q,!0,q,q,q,q,q,q,q,q,q,q,q,new B.dru(w,d,u),q,q,q,q,q,q,q))}o.push(A.A(p,C.l,q,C.ru,C.h,0,q,q))}p=r.c
@@ -13517,8 +13517,8 @@ D.bAd=new A.i4(P.akl,!0,D.bf8,null)
 D.ahh=new A.fr(2.4,null,null,null,null,C.cw,null,null,null,null)
 D.fuN=new A.a5(26,26,D.ahh,null)
 D.fU8=new A.C("Opening a live browser\u2026",null,R.hG,null,null,null,null,null,null,null,null,null)
-D.dG8=w([D.fuN,C.R,D.fU8],x.p)
-D.bAT=new A.ft(C.ah,C.e,C.O,C.l,null,C.p,null,0,D.dG8,null)
+D.dG7=w([D.fuN,C.R,D.fU8],x.p)
+D.bAT=new A.ft(C.ah,C.e,C.O,C.l,null,C.p,null,0,D.dG7,null)
 D.Hd=new A.u(1,0.7019607843137254,0.7019607843137254,0.7019607843137254,C.q)
 D.bBF=new A.iw(D.Hd,"offSwitchLabel",null,D.Hd,D.Hd,C.c,C.c,D.Hd,D.Hd,C.c,C.c)
 D.bDR=new A.bh(16e6)
@@ -13563,12 +13563,12 @@ D.c8A=new A.ee(null,null,null,"I want to learn",null,null,null,null,null,null,"e
 D.c8Q=new A.ee(null,null,null,"I speak",null,null,null,null,null,null,"e.g. English",null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,!0,null,null,null,null)
 D.av0=new A.a8(C.ay,C.aD,C.x,L.a6F,null,null)
 D.cbL=new A.a8(C.a5,C.a9,C.x,L.a6F,null,null)
-D.dwk=w([C.bB,C.nK,C.hI],x.O)
-D.ccn=new A.a8(C.ay,C.aD,C.x,D.dwk,null,null)
+D.dwi=w([C.bB,C.nK,C.hI],x.O)
+D.ccn=new A.a8(C.ay,C.aD,C.x,D.dwi,null,null)
 D.cNX=w([C.hI,C.dY],x.O)
 D.ccB=new A.a8(C.a5,C.a9,C.x,D.cNX,null,null)
-D.d55=w([C.bB,C.nK],x.O)
-D.avo=new A.a8(C.a5,C.a9,C.x,D.d55,null,null)
+D.d54=w([C.bB,C.nK],x.O)
+D.avo=new A.a8(C.a5,C.a9,C.x,D.d54,null,null)
 D.coA=w([148,260,380],x.n)
 D.azh=w([C.cw,C.bw,C.aQ,C.c5,C.bl],x.O)
 D.bpL=new A.u(1,1,0.996078431372549,1,C.q)
@@ -13593,11 +13593,11 @@ D.aAL=w([4279203438,4279455306],x.t)
 D.hRP=new B.k0(4293972140,4285219366,D.hLI,D.aAL,!1,!0,null)
 D.a65=w([4286331629,4284162486],x.t)
 D.hRC=new B.k0(4293444768,4279964176,D.b2H,D.a65,!1,!0,null)
-D.d6r=w([D.hRr,D.hRJ,D.hRo,D.hRP,D.hRC],x.F)
-D.d6Q=w(["accounts.google.com","accounts.youtube.com","appleid.apple.com","idmsa.apple.com","login.microsoftonline.com","login.live.com","auth0.com","okta.com"],x.s)
+D.d6q=w([D.hRr,D.hRJ,D.hRo,D.hRP,D.hRC],x.F)
+D.d6P=w(["accounts.google.com","accounts.youtube.com","appleid.apple.com","idmsa.apple.com","login.microsoftonline.com","login.live.com","auth0.com","okta.com"],x.s)
 D.aCl=w(["SUZANA VANESSA","ANNA AMURI","SUZANA MBUTO","SUZY BENET"],x.s)
-D.daH=w(["SUZANA VANESSA"],x.s)
-D.daI=w([C.c7,C.c7,C.c7],x.O)
+D.daG=w(["SUZANA VANESSA"],x.s)
+D.daH=w([C.c7,C.c7,C.c7],x.O)
 D.XY=new B.xc(5,"fadeShort")
 D.cJF=w([4280171146,4280172719],x.t)
 D.hRw=new B.k0(4288441159,4279570188,D.XY,D.cJF,!1,!1,null)
@@ -13615,14 +13615,14 @@ D.cJP=w([4290321436,4286520605],x.t)
 D.hRA=new B.k0(4291399786,4280555539,D.XZ,D.cJP,!1,!1,null)
 D.cJJ=w([4282595530,4281807011],x.t)
 D.hRE=new B.k0(4283051548,4278978566,D.XY,D.cJJ,!0,!1,null)
-D.ddC=w([D.hRw,D.hRQ,D.hRx,D.hRy,D.hRA,D.hRE],x.F)
-D.dgy=w(["Try again"],x.s)
-D.dhc=w(["\u2764\ufe0f","\ud83d\ude02","\ud83d\ude2e","\ud83d\ude22","\ud83d\ude21","\ud83d\udc4d"],x.s)
-D.dhR=w(["I appreciate that, honestly. I'm seeing someone right now though, so I'll keep it friendly.","That's nice of you. I'm in a relationship though, so let's keep it cool and friendly.","Haha I'm flattered, but I'm taken right now. Happy to keep chatting as friends.","Respect, and thank you. I'm with someone though, so I'll keep things friendly."],x.s)
+D.ddB=w([D.hRw,D.hRQ,D.hRx,D.hRy,D.hRA,D.hRE],x.F)
+D.dgu=w(["Try again"],x.s)
+D.dh8=w(["\u2764\ufe0f","\ud83d\ude02","\ud83d\ude2e","\ud83d\ude22","\ud83d\ude21","\ud83d\udc4d"],x.s)
+D.dhN=w(["I appreciate that, honestly. I'm seeing someone right now though, so I'll keep it friendly.","That's nice of you. I'm in a relationship though, so let's keep it cool and friendly.","Haha I'm flattered, but I'm taken right now. Happy to keep chatting as friends.","Respect, and thank you. I'm with someone though, so I'll keep things friendly."],x.s)
 D.h6U=new A.C("Say hi",null,C.LG,null,null,null,null,null,null,null,null,null)
 D.c0f=new A.ae(C.Dx,11,C.c,null,null,null)
-D.do7=w([D.h6U,C.da,D.c0f],x.p)
-D.dp4=w(["MARIAM DUSABE","SUZANA VANESSA"],x.s)
+D.do5=w([D.h6U,C.da,D.c0f],x.p)
+D.dp2=w(["MARIAM DUSABE","SUZANA VANESSA"],x.s)
 D.cK_=w([4293675161,4292552567],x.t)
 D.hRB=new B.k0(4289755734,4279964176,D.XZ,D.cK_,!1,!0,null)
 D.XX=new B.xc(1,"braids")
@@ -13635,7 +13635,7 @@ D.cJM=w([4287323382,4286331629],x.t)
 D.hRl=new B.k0(4291399786,4280555539,D.Mm,D.cJM,!1,!0,null)
 D.cJC=w([4279286145,4278556265],x.t)
 D.hRs=new B.k0(4288441159,4279701773,D.Mn,D.cJC,!1,!0,null)
-D.dqj=w([D.hRB,D.hRz,D.hRL,D.hRl,D.hRs],x.F)
+D.dqh=w([D.hRB,D.hRz,D.hRL,D.hRl,D.hRs],x.F)
 D.hRN=new B.k0(4287257147,4279570188,D.XY,D.a64,!1,!1,null)
 D.cJw=w([4278556265,4278483031],x.t)
 D.hRK=new B.k0(4289755734,4279964176,D.Mm,D.cJw,!1,!1,null)
@@ -13654,10 +13654,10 @@ D.cJy=w([4279080072,4279203438],x.t)
 D.hRM=new B.k0(4291399786,4280555539,D.Mm,D.cJy,!1,!1,null)
 D.cJS=w([4291463684,4288766471],x.t)
 D.hRG=new B.k0(4285219366,4279701773,D.XX,D.cJS,!0,!1,null)
-D.dqI=w([D.hRN,D.hRK,D.hRp,D.hRD,D.hRH,D.hRO,D.hRm,D.hRu,D.hRM,D.hRG],x.F)
-D.drX=w([8,7,6,5,4,3,2,10,0,9,8,7,6,5,4,3,2],x.t)
-D.dtP=w([],x.o)
-D.dtQ=w([],x.d)
+D.dqG=w([D.hRN,D.hRK,D.hRp,D.hRD,D.hRH,D.hRO,D.hRm,D.hRu,D.hRM,D.hRG],x.F)
+D.drU=w([8,7,6,5,4,3,2,10,0,9,8,7,6,5,4,3,2],x.t)
+D.dtN=w([],x.o)
+D.dtO=w([],x.d)
 D.kP={id:0,name:1,gender:2,role:3,emoji:4,avatarUrl:5,active:6,bio:7,personality:8}
 D.dMN=new A.bl(D.kP,["cmp-david-okonkwo","DAVID OKONKWO","male","lawyer","\ud83d\udc68\u200d\u2696\ufe0f","",!0,y.B,"You are DAVID OKONKWO, a sharp 24-year-old legal advisor. Explain legal ideas in plain, everyday language \u2014 no dense jargon. Confident, direct, a little brisk, but genuinely wants people to understand their rights. Always make clear you give general information, not formal legal representation, and tell people to consult a licensed attorney for anything serious or urgent. Sound like a real young professional, not a textbook."],x.R)
 D.dMx=new A.bl(D.kP,["cmp-samuel-kiran","SAMUEL KIRAN","male","teacher","\ud83d\udc68\u200d\ud83c\udfeb","",!0,y.Q,"You are SAMUEL KIRAN, a warm 23-year-old teacher. Break subjects down into small, clear steps, check understanding with questions instead of just lecturing, and celebrate progress. Patient, encouraging, a little playful. Never make someone feel dumb for not knowing something \u2014 that is the whole point of a teacher. Sound like a real young tutor who genuinely likes teaching."],x.R)
@@ -13679,11 +13679,11 @@ D.dMF=new A.bl(D.kP,["cmp-grace-anderson","GRACE ANDERSON","female","financial_a
 D.dMw=new A.bl(D.kP,["cmp-sophie-morgan","SOPHIE MORGAN","female","career_coach","\ud83d\udcbc","",!0,y.m,"You are SOPHIE MORGAN, a driven 23-year-old career coach. Help with resumes, interview prep, and career decisions with sharp, practical advice \u2014 never generic platitudes. Direct, encouraging, genuinely invested in people landing the job or path they want. Sound like a real young professional who has actually been through the job hunt."],x.R)
 D.dMA=new A.bl(D.kP,["cmp-chloe-mitchell","CHLOE MITCHELL","female","bible_study_teacher","\ud83d\udcd6","",!0,y.U,"You are CHLOE MITCHELL, a thoughtful 22-year-old Bible study teacher. Explain Scripture clearly, invite real questions rather than preaching at people, and use logic alongside faith. Warm but sharp-minded. Sound like a real young teacher who loves digging into the text with people."],x.R)
 D.dMI=new A.bl(D.kP,["cmp-olivia-bennett","OLIVIA BENNETT","female","fitness_coach","\ud83d\udcaa","",!0,y.s,"You are OLIVIA BENNETT, an energetic 21-year-old fitness coach. Give practical workout and nutrition guidance, hype people up without being obnoxious about it, and meet people where they are. Upbeat, motivating, genuinely invested in people's progress. Sound like a real young coach, not a fitness influencer script."],x.R)
-D.dwB=w([D.dMN,D.dMx,D.dMC,D.dME,D.dMH,D.dMG,D.dMz,D.dMK,D.dMO,D.dMM,D.dMy,D.dMv,D.dMD,D.dMJ,D.dML,D.dMB,D.dMF,D.dMw,D.dMA,D.dMI],x.X)
+D.dwz=w([D.dMN,D.dMx,D.dMC,D.dME,D.dMH,D.dMG,D.dMz,D.dMK,D.dMO,D.dMM,D.dMy,D.dMv,D.dMD,D.dMJ,D.dML,D.dMB,D.dMF,D.dMw,D.dMA,D.dMI],x.X)
 D.bk9=new A.u(1,0.23921568627450981,0.19607843137254902,0.25882352941176473,C.q)
 D.bmu=new A.u(1,0.16470588235294117,0.13333333333333333,0.18823529411764706,C.q)
 D.bjc=new A.u(1,0.10196078431372549,0.08235294117647059,0.10980392156862745,C.q)
-D.dxy=w([D.bk9,D.bmu,D.bjc],x.O)
+D.dxw=w([D.bk9,D.bmu,D.bjc],x.O)
 D.a7z=w(["MARIAM DUSABE","SUZANA VANESSA","ANNA AMURI","SUZANA MBUTO","SUZY BENET","MINA SAMUEL"],x.s)
 D.aEH=w(["Yes, use these","Change something"],x.s)
 D.hRF=new B.k0(4289755734,4279964176,D.Mm,D.aAL,!1,!0,null)
@@ -13697,47 +13697,47 @@ D.hRt=new B.k0(4291399786,4280555539,D.aeo,D.a65,!1,!0,null)
 D.cJY=w([4293548044,4290920716],x.t)
 D.hRI=new B.k0(4288441159,4279701773,D.aeo,D.cJY,!1,!0,null)
 D.hRn=new B.k0(4283051548,4278978566,D.Mn,D.a64,!1,!0,null)
-D.dAK=w([D.hRF,D.hRq,D.hRv,D.hRt,D.hRI,D.hRn],x.F)
-D.dEs=w(["emma carson","grace anderson","sophie morgan","chloe mitchell","olivia bennett"],x.s)
+D.dAH=w([D.hRF,D.hRq,D.hRv,D.hRt,D.hRI,D.hRn],x.F)
+D.dEq=w(["emma carson","grace anderson","sophie morgan","chloe mitchell","olivia bennett"],x.s)
 D.dHY=w(["anika weston","nia robertson","destiny okafor","jasmine cole","aaliyah grant"],x.s)
 D.e5X=new B.mg("name","Name",C.mu,M.aA_,C.eG)
-D.dvQ=w([C.ju,C.kb],x.O)
-D.e5O=new B.mg("email","Email",C.tF,D.dvQ,C.hk)
-D.dlf=w([C.fm,C.h6],x.O)
-D.e5R=new B.mg("phone","Phone",C.A3,D.dlf,C.k9)
-D.dD8=w([C.iY,C.de],x.O)
-D.e5I=new B.mg("address","Home address",C.kM,D.dD8,C.oA)
-D.dxG=w([C.oE,C.cZ],x.O)
-D.e5W=new B.mg("place","Location",C.vx,D.dxG,C.n9)
-D.dnp=w([C.k8,C.lP],x.O)
-D.e5V=new B.mg("age","Age",C.Ih,D.dnp,C.pB)
-D.dcH=w([C.fy,C.tk],x.O)
-D.e5U=new B.mg("time","Availability",C.jZ,D.dcH,C.a05)
-D.dGR=w([C.pE,C.fv],x.O)
-D.e5H=new B.mg("date","Date",C.zY,D.dGR,C.b3)
-D.dqL=w([C.ei,C.es],x.O)
-D.e5G=new B.mg("money","Money",C.iv,D.dqL,C.bM)
-D.dDK=w([C.fW,C.wQ],x.O)
-D.e5P=new B.mg("job","Job",C.q2,D.dDK,C.n5)
-D.djW=w([C.dl,C.dW],x.O)
-D.e5K=new B.mg("link","Website",C.i2,D.djW,C.dG)
-D.dxw=w([C.yN,Ai.a_b],x.O)
-D.e5T=new B.mg("confirm","Quick check",Ah.DP,D.dxw,C.a_W)
+D.dvO=w([C.ju,C.kb],x.O)
+D.e5O=new B.mg("email","Email",C.tF,D.dvO,C.hk)
+D.dld=w([C.fm,C.h6],x.O)
+D.e5R=new B.mg("phone","Phone",C.A3,D.dld,C.k9)
+D.dD6=w([C.iY,C.de],x.O)
+D.e5I=new B.mg("address","Home address",C.kM,D.dD6,C.oA)
+D.dxF=w([C.oE,C.cZ],x.O)
+D.e5W=new B.mg("place","Location",C.vx,D.dxF,C.n9)
+D.dnn=w([C.k8,C.lP],x.O)
+D.e5V=new B.mg("age","Age",C.Ih,D.dnn,C.pB)
+D.dcG=w([C.fy,C.tk],x.O)
+D.e5U=new B.mg("time","Availability",C.jZ,D.dcG,C.a05)
+D.dGQ=w([C.pE,C.fv],x.O)
+D.e5H=new B.mg("date","Date",C.zY,D.dGQ,C.b3)
+D.dqJ=w([C.ei,C.es],x.O)
+D.e5G=new B.mg("money","Money",C.iv,D.dqJ,C.bM)
+D.dDI=w([C.fW,C.wQ],x.O)
+D.e5P=new B.mg("job","Job",C.q2,D.dDI,C.n5)
+D.djU=w([C.dl,C.dW],x.O)
+D.e5K=new B.mg("link","Website",C.i2,D.djU,C.dG)
+D.dxu=w([C.yN,Ai.a_b],x.O)
+D.e5T=new B.mg("confirm","Quick check",Ah.DP,D.dxu,C.a_W)
 D.bud=new A.u(1,0.4392156862745098,0.10196078431372549,0.4588235294117647,C.q)
-D.dC4=w([D.bud,C.alJ],x.O)
-D.e5N=new B.mg("choice","Your pick",C.DR,D.dC4,C.tj)
-D.dxQ=w([A_.CM,C.dD],x.O)
-D.aN0=new B.mg("question","Question",C.zZ,D.dxQ,C.Ne)
+D.dC2=w([D.bud,C.alJ],x.O)
+D.e5N=new B.mg("choice","Your pick",C.DR,D.dC2,C.tj)
+D.dxP=w([A_.CM,C.dD],x.O)
+D.aN0=new B.mg("question","Question",C.zZ,D.dxP,C.Ne)
 D.e5Y=new B.mg("warning","Important",C.q1,M.aFF,C.f1)
-D.dhW=w([C.a0e,C.CB],x.O)
-D.e5M=new B.mg("win","Great news",C.kl,D.dhW,C.eF)
-D.dju=w([C.pI,C.wG],x.O)
-D.e5J=new B.mg("tip","Tip",X.l9,D.dju,C.oM)
+D.dhS=w([C.a0e,C.CB],x.O)
+D.e5M=new B.mg("win","Great news",C.kl,D.dhS,C.eF)
+D.djs=w([C.pI,C.wG],x.O)
+D.e5J=new B.mg("tip","Tip",X.l9,D.djs,C.oM)
 D.dIr=w([C.z2,C.hI],x.O)
 D.e5Q=new B.mg("heart","From the heart",C.hP,D.dIr,C.GB)
 D.bUT=new A.a_(63454,"MaterialIcons",!1)
-D.d7u=w([C.t8,C.fz],x.O)
-D.e5L=new B.mg("health","Health",D.bUT,D.d7u,C.wC)
+D.d7t=w([C.t8,C.fz],x.O)
+D.e5L=new B.mg("health","Health",D.bUT,D.d7t,C.wC)
 D.e5S=new B.mg("travel","Travel",C.Qy,G.aFk,C.hk)
 D.dIp=w([D.e5X,D.e5O,D.e5R,D.e5I,D.e5W,D.e5V,D.e5U,D.e5H,D.e5G,D.e5P,D.e5K,D.e5T,D.e5N,D.aN0,D.e5Y,D.e5M,D.e5J,D.e5Q,D.e5L,D.e5S],A.as("N<mg>"))
 D.dIK=w(["Atlanta","Atlanta","Atlanta","Lawrenceville","Clarkston","Stone Mountain","Decatur","Marietta","Duluth","Lithonia"],x.s)
@@ -13761,28 +13761,28 @@ D.dRB=new B.jh("Wisdom Advisor","Elder experience for life\u2019s harder questio
 D.dRy=new B.jh("Bible Study Advisor","Scripture opened with care \u2014 teaching, clarity, and pastoral warmth on NGMY Advisors.","Humble instruction. Faith-led. Respectful and clear.")
 D.dLM=new A.bl(D.euW,[D.dRx,D.dRg,D.dRq,D.aLT,D.aLT,D.dRd,D.dRj,D.dRF,D.dRA,D.dRG,D.dRB,D.dRy],x.G)
 D.ev1={teacher:0,lawyer:1,financial_advisor:2,pastor:3,bible_study_teacher:4,debater:5,marriage_advisor:6,doctor:7,therapist:8,counselor:9,mentor:10,career_coach:11,fitness_coach:12,life_coach:13,romantic:14,friend:15,translator:16,mshauri:17,pickup_line:18,smart_mouth:19,text_coach:20}
-D.dij=w(["teach","tutor","school","homework","education","class"],x.s)
-D.dE5=w(["legal","attorney","law","court","rights"],x.s)
-D.dyV=w(["finance","financial","money","budget","invest","saving","debt"],x.s)
-D.dkb=w(["church","faith","spiritual","prayer","god","bible","ministry"],x.s)
+D.dif=w(["teach","tutor","school","homework","education","class"],x.s)
+D.dE3=w(["legal","attorney","law","court","rights"],x.s)
+D.dyS=w(["finance","financial","money","budget","invest","saving","debt"],x.s)
+D.dk9=w(["church","faith","spiritual","prayer","god","bible","ministry"],x.s)
 D.cYD=w(["bible","scripture","gospel","john","corinthians","trinity","christian","study","jesus"],x.s)
-D.di4=w(["debate","debating","apologetics","muslim","islam","atheist","argue","defend","christian"],x.s)
-D.dvj=w(["marriage","wedding","husband","wife","couple","african","traditional","muslim","quran","islam"],x.s)
-D.dy5=w(["medical","health","medicine","physician","nurse","symptom"],x.s)
-D.dqD=w(["therapy","mental","anxiety","depression","counsel"],x.s)
-D.dsa=w(["counsel","guidance","support"],x.s)
-D.dzX=w(["mentoring","coach","guide"],x.s)
-D.dnx=w(["career","job","resume","interview","work"],x.s)
-D.dmy=w(["fitness","workout","gym","exercise","nutrition"],x.s)
-D.dyO=w(["life","goals","habits","motivation"],x.s)
-D.dyU=w(["love","dating","partner","relationship"],x.s)
-D.drl=w(["buddy","pal","chat"],x.s)
-D.db2=w(["language","translate","spanish","french","english"],x.s)
-D.dFf=w(["mshauri","advisor","advise","babembe","congo","congolese","fizi","swahili","kibembe","community","comfort","civic","registry","president","leader"],x.s)
-D.dlp=w(["pickup","pick up","flirt","rizz","opener","dating","crush","girl","guy","line"],x.s)
-D.dE2=w(["smart mouth","comeback","witty","roast","clap back","savage","funny","joke"],x.s)
-D.ddW=w(["text","reply","what to say","screenshot","conversation","dm","message","rizz","dating"],x.s)
-D.dLX=new A.bl(D.ev1,[D.dij,D.dE5,D.dyV,D.dkb,D.cYD,D.di4,D.dvj,D.dy5,D.dqD,D.dsa,D.dzX,D.dnx,D.dmy,D.dyO,D.dyU,D.drl,D.db2,D.dFf,D.dlp,D.dE2,D.ddW],A.as("bl<m,ai<m>>"))
+D.di0=w(["debate","debating","apologetics","muslim","islam","atheist","argue","defend","christian"],x.s)
+D.dvh=w(["marriage","wedding","husband","wife","couple","african","traditional","muslim","quran","islam"],x.s)
+D.dy2=w(["medical","health","medicine","physician","nurse","symptom"],x.s)
+D.dqB=w(["therapy","mental","anxiety","depression","counsel"],x.s)
+D.ds7=w(["counsel","guidance","support"],x.s)
+D.dzU=w(["mentoring","coach","guide"],x.s)
+D.dnv=w(["career","job","resume","interview","work"],x.s)
+D.dmw=w(["fitness","workout","gym","exercise","nutrition"],x.s)
+D.dyL=w(["life","goals","habits","motivation"],x.s)
+D.dyR=w(["love","dating","partner","relationship"],x.s)
+D.dri=w(["buddy","pal","chat"],x.s)
+D.db1=w(["language","translate","spanish","french","english"],x.s)
+D.dFe=w(["mshauri","advisor","advise","babembe","congo","congolese","fizi","swahili","kibembe","community","comfort","civic","registry","president","leader"],x.s)
+D.dln=w(["pickup","pick up","flirt","rizz","opener","dating","crush","girl","guy","line"],x.s)
+D.dE0=w(["smart mouth","comeback","witty","roast","clap back","savage","funny","joke"],x.s)
+D.ddU=w(["text","reply","what to say","screenshot","conversation","dm","message","rizz","dating"],x.s)
+D.dLX=new A.bl(D.ev1,[D.dif,D.dE3,D.dyS,D.dk9,D.cYD,D.di0,D.dvh,D.dy2,D.dqB,D.ds7,D.dzU,D.dnv,D.dmw,D.dyL,D.dyR,D.dri,D.db1,D.dFe,D.dln,D.dE0,D.ddU],A.as("bl<m,ai<m>>"))
 D.eut={A:0,B:1,C:2,D:3,E:4,F:5,G:6,H:7,J:8,K:9,L:10,M:11,N:12,P:13,R:14,S:15,T:16,U:17,V:18,W:19,X:20,Y:21,Z:22}
 D.dM1=new A.bl(D.eut,[1,2,3,4,5,6,7,8,1,2,3,4,5,7,9,2,3,4,5,6,7,8,9],A.as("bl<m,F>"))
 D.ewL={companion:0,romantic:1,friend:2,therapist:3,teacher:4,lawyer:5,financial_advisor:6,pastor:7,bible_study_teacher:8,debater:9,marriage_advisor:10,doctor:11,counselor:12,mentor:13,career_coach:14,fitness_coach:15,life_coach:16,translator:17,mshauri:18,pickup_line:19,smart_mouth:20,text_coach:21}
@@ -13834,8 +13834,8 @@ D.aTw=new A.kx(null,"Photo timed out.")
 D.aTz=new A.kx(null,"AI image proxy unavailable.")
 D.eZq=new A.kx(null,"AI proxy unavailable.")
 D.aTB=new A.kx(null,"Enter an image description.")
-D.f_Z=new A.kx(null,"Empty image prompt.")
-D.f19=new A.ag0("Macon","Georgia")
+D.f0_=new A.kx(null,"Empty image prompt.")
+D.f1a=new A.ag0("Macon","Georgia")
 D.evn={"\u2764\ufe0f":0,"\ud83d\udc95":1,"\ud83d\udc96":2}
 D.fqi=new A.de(D.evn,3,x.M)
 D.fqu=new A.iX(["true","1","yes"],A.as("iX<m>"))
@@ -13924,4 +13924,4 @@ w($,"iLv","hTK",()=>A.ag('\\b((?:[a-z0-9-]+\\.)+(?:com|org|net|io|co|ai|app|dev|
 w($,"iLy","hTM",()=>A.ag("\\b(open|go to|goto|visit|pull up|load|check out|look at|browse)\\b.{0,40}\\b(site|website|web ?page|page|link|url|browser|online)\\b|\\b(open|use) (the|your|a) browser\\b|\\bbrowse\\b|\\bsearch (the )?(web|internet|online|google)\\b|\\bgoogle (it|that|this|for)\\b|\\b(search online for|search for|look up|look it up|look that up|find online)\\b|\\b(latest|today'?s|current|live|right now)\\b.{0,25}\\b(news|price|prices|score|scores|weather|rate|rates|results|headlines)\\b",!1,!1,!1,!1))
 v($,"hzd","hs1",()=>A.f8(null,x.H))
 w($,"iNM","hV8",()=>A.ag("\\b[A-HJ-NPR-Z0-9]{17}\\b",!1,!1,!1,!1))})()};
-(a=>{a["fg/z2/FbrIoFsYC+UgN7B0in8Zk="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["YiNDRWdIBHaeAs21S/Uwr72LFbU="]=a.current})($__dart_deferred_initializers__);

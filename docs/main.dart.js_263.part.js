@@ -52,7 +52,7 @@ s=B.a.fn(t,A.ag("[^a-z]+",!0,!1,!1,!1))
 x=A.U(s).k("X<1>")
 w=A.B(new A.X(s,new C.h1x(),x),x.k("M.E"))
 if(w.length===0)return null
-v=new A.X(w,B.d.gjC(D.dgI),A.U(w).k("X<1>")).gJ(0)
+v=new A.X(w,B.d.gjC(D.dgE),A.U(w).k("X<1>")).gJ(0)
 if(v>=2&&v*5>=w.length)return u
 return null},
 a4a(d){var x,w,v=B.a.fn(d.toLowerCase(),A.ag("[^a-z']+",!0,!1,!1,!1)),u=A.U(v).k("X<1>"),t=A.pd(new A.X(v,new C.fWD(),u),2000,u.k("M.E"))
@@ -624,7 +624,7 @@ try{J.aK(t,x,A.apn(w))}catch(u){}}return t},
 hId(d,e,f,g,h){var x,w,v=new C.fB7(d,C.hMS(e),f,g,h),u=new C.fB4(),t=v.$1(11.5)
 if(h||J.z(u.$1(t),0))return t
 if(B.d.cE(d.d,0,new C.fB6())>4e4)return t
-for(x=0;x<3;++x){w=v.$1(D.dD_[x])
+for(x=0;x<3;++x){w=v.$1(D.dCY[x])
 if(u.$1(w)<u.$1(t))t=w
 if(J.z(u.$1(t),0))break}return t},
 fUm(d,e,f){var x=0,w=A.j(y.U),v,u,t,s,r,q,p,o,n
@@ -1301,7 +1301,7 @@ if(k===$)k=j.d=j.a.c.e
 s.push(j.OW(o.b,k.r===l,new C.dbG(r,j)))}s=j.a3u("Title place",A.bZ(B.bI,s,B.br,i,0,0))
 r=A.a([],x)
 for(q=0;q<4;++q){o={}
-n=D.dpx[q]
+n=D.dpv[q]
 o.a=null
 l=n.a
 o.a=l
@@ -1613,7 +1613,7 @@ a3=A.a([B.aj,A.A(a4,B.l,g,B.e,B.h,0,g,g),B.by],a5)
 if(h.r)B.d.u(a3,A.a([B.R,A.at(new A.a5(92,92,new A.am(B.z,g,B.ad,B.t,A.a([A.qC(A.nh(B.bx,B.bl,g,g,g,g,g,6,B.i.D(h.y,0.02,1),g)),A.c(""+B.i.S(B.i.D(h.y*100,1,100))+"%",g,g,g,g,g,g,B.dv,g,g,g)],a5),g),g),g,g,g),B.aO,A.c(h.x,g,g,g,g,g,g,B.jN,B.K,g,g),B.aj,A.c(h.gaWb(),g,g,g,g,g,g,B.Fw,B.K,g,g),B.di],a5))
 else{a4=A.aN(g,B.Z,!1,g,!0,B.t,g,A.aO(),h.d,g,g,g,g,g,2,h.aUA(B.a.i(h.a.c).length!==0?"Anything to add? (optional) \u2014 e.g. focus on grandma, make it for the kids, write it in Swahili\u2026":"What is the book about? Who is it for? Any names, places or style\u2026"),B.y,!0,g,!0,g,!1,g,B.al,g,g,g,g,g,g,g,g,g,6,3,g,!1,"\u2022",g,g,g,g,g,!1,g,g,!1,g,!0,g,B.ae,g,g,g,g,g,g,g,g,g,g,g,D.fEu,!0,B.a7,g,B.ao,g,g,g,g)
 x=A.a([],a5)
-w=B.a.i(h.a.c).length!==0?D.d8W:D.dgL
+w=B.a.i(h.a.c).length!==0?D.d8W:D.dgH
 v=w.length
 u=0
 for(;u<v;++u){t=w[u]
@@ -1622,7 +1622,7 @@ r=new A.aP(999,999)
 q=new A.ax(B.bx,1,B.r,-1)
 x.push(A.aA(g,A.p(g,A.c(t,g,g,g,g,g,g,D.fN6,g,g,g),B.f,g,g,new A.o(s,g,new A.bE(q,q,q,q),new A.bb(r,r,r,r),g,g,B.m),g,g,g,g,B.nZ,g,g,g),B.y,!1,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,new C.cRU(h,t),g,g,g,g,g,g,!1,B.a4))}x=A.bZ(B.bI,x,B.br,g,8,8)
 w=A.a([],a5)
-for(u=0;u<3;++u){p=D.d5c[u]
+for(u=0;u<3;++u){p=D.d5b[u]
 v=h.z===p.a
 s=v?B.c:B.Cf
 s=A.c(p.b,g,g,g,g,g,g,new A.G(!0,s,g,g,g,g,g,B.D,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g),g,g,g)
@@ -1633,7 +1633,7 @@ r=A.A(A.a([D.hb8,B.aW,new A.a5(96,g,A.aN(g,B.Z,!1,g,!0,B.t,g,A.aO(),s,g,g,g,g,g,
 o=B.c.j(0.06)
 n=A.n(14)
 m=A.a([],a5)
-for(u=0;u<7;++u){l=D.dG3[u]
+for(u=0;u<7;++u){l=D.dG2[u]
 k=A.c9(B.a.i(s.a.a),g)
 k=B.o.D(k==null?10:k,1,100)===l?B.b_:B.L
 j=new A.aP(10,10)
@@ -3084,8 +3084,8 @@ D.a_u=new A.u(1,0.16862745098039217,0.11372549019607843,0.0784313725490196,B.q)
 D.CD=new A.u(1,0.1411764705882353,0.0784313725490196,0.03529411764705882,B.q)
 D.al4=new A.u(1,0.9529411764705882,0.9137254901960784,0.8549019607843137,B.q)
 D.bvz=new A.u(0.13333333333333333,0,0,0,B.q)
-D.dt1=x([B.L,D.bvz,B.a_v],y.O)
-D.cec=new A.a8(B.aX,B.b1,B.x,D.dt1,B.xG,null)
+D.dsZ=x([B.L,D.bvz,B.a_v],y.O)
+D.cec=new A.a8(B.aX,B.b1,B.x,D.dsZ,B.xG,null)
 D.baK=new A.o(null,null,null,null,null,D.cec,B.m)
 D.bC7=new A.bQ(D.baK,B.bm,null,null)
 D.Hu=new A.bh(15e7)
@@ -3113,29 +3113,29 @@ D.buS=new A.u(1,0.1411764705882353,0.07058823529411765,0.2784313725490196,B.q)
 D.cQE=x([D.buS,F.akN],y.O)
 D.cbg=new A.a8(B.aX,B.b1,B.x,D.cQE,null,null)
 D.cNN=x([4,4],A.as("N<cq>"))
-D.f4w=new A.y("auto","Same as I type")
-D.f24=new A.y("en","English")
+D.f4x=new A.y("auto","Same as I type")
+D.f25=new A.y("en","English")
 D.f8O=new A.y("sw","Swahili")
-D.d5c=x([D.f4w,D.f24,D.f8O],y.L)
+D.d5b=x([D.f4x,D.f25,D.f8O],y.L)
 D.aTF=new A.y("","Template")
 D.f9a=new A.y("top","Top")
-D.f63=new A.y("middle","Middle")
-D.f0P=new A.y("bottom","Bottom")
-D.d8Q=x([D.aTF,D.f9a,D.f63,D.f0P],y.L)
+D.f64=new A.y("middle","Middle")
+D.f0Q=new A.y("bottom","Bottom")
+D.d8Q=x([D.aTF,D.f9a,D.f64,D.f0Q],y.L)
 D.d8W=x(["The story of our family, from the oldest to the youngest","A tribute to our grandparents","Hadithi ya familia yetu","A children's book about our family"],y.s)
 D.d8Z=x([4279180093,4280171146,4280640491,4279137424,4279203438,4279599165,4280468830,4286893078,4294829706,4294286859,4292128567,4294933061,4292617766,4292887931,4292552567,4286331629,4287317267,4283053092,4294306781,4294833900,4294967295,4288455599,4281811281,4279310375],y.t)
 D.UL=new C.aqL(0,"letter")
 D.dXa=new C.aqL(1,"a4")
 D.aD_=x([D.UL,D.dXa],A.as("N<aqL>"))
-D.dgI=x(["na","ya","wa","kwa","ni","za","la","katika","kuhusu","tengeneza","nitengenezee","naomba","tafadhali","habari","watoto","mtoto","familia","kitabu","hadithi","shule","kanisa","mungu","jamii","biashara","somo","masomo","yetu","wetu","zetu","yangu","wangu","kuhusiana","pamoja","sana","hii","hiyo","kila","andika","unda","kuwa","ambayo","ambao","lakini","pia","au","kama","baba","mama","bibi","babu","upendo"],y.s)
-D.dgL=x(["A children's story about a brave little lion","Hadithi ya familia yetu kutoka Kigoma","Our family history for the grandchildren","A devotional: 30 days of hope"],y.s)
-D.f1a=new A.y("classic","Classic")
-D.f69=new A.y("modern","Modern")
-D.f1A=new A.y("display","Bold")
-D.dpx=x([D.aTF,D.f1a,D.f69,D.f1A],y.L)
+D.dgE=x(["na","ya","wa","kwa","ni","za","la","katika","kuhusu","tengeneza","nitengenezee","naomba","tafadhali","habari","watoto","mtoto","familia","kitabu","hadithi","shule","kanisa","mungu","jamii","biashara","somo","masomo","yetu","wetu","zetu","yangu","wangu","kuhusiana","pamoja","sana","hii","hiyo","kila","andika","unda","kuwa","ambayo","ambao","lakini","pia","au","kama","baba","mama","bibi","babu","upendo"],y.s)
+D.dgH=x(["A children's story about a brave little lion","Hadithi ya familia yetu kutoka Kigoma","Our family history for the grandchildren","A devotional: 30 days of hope"],y.s)
+D.f1b=new A.y("classic","Classic")
+D.f6a=new A.y("modern","Modern")
+D.f1B=new A.y("display","Bold")
+D.dpv=x([D.aTF,D.f1b,D.f6a,D.f1B],y.L)
 D.Ty=x([],y.P)
 D.Tz=x([],y.x)
-D.dD_=x([12,11,12.5],A.as("N<H>"))
+D.dCY=x([12,11,12.5],A.as("N<H>"))
 D.dZU=new C.pK("royal","Royal",4279180093,4280171146,4292128567,4294965479,"middle","classic","small",!0)
 D.dZZ=new C.pK("sunset","Sunset",4294933061,4292887931,4294955366,4294967295,"bottom","display","small",!1)
 D.dZY=new C.pK("photo","Big Photo",4279310375,4281811281,4294286859,4294967295,"bottom","display","full",!1)
@@ -3147,7 +3147,7 @@ D.dZW=new C.pK("geo","Geometric",4279310375,4280232247,4279286145,4294967295,"mi
 D.dZX=new C.pK("vintage","Vintage",4294306781,4293581764,4287317267,4283053092,"middle","classic","small",!1)
 D.e__=new C.pK("starry","Starry Night",4278915110,4281413249,4294829706,4294967295,"middle","classic","small",!1)
 D.AE=x([D.dZU,D.dZZ,D.dZY,D.dZT,D.e_0,D.e_1,D.dZV,D.dZW,D.dZX,D.e__],A.as("N<pK>"))
-D.dG3=x([3,5,8,10,25,50,100],y.t)
+D.dG2=x([3,5,8,10,25,50,100],y.t)
 D.dIs=x(["civic","registry","registrar","mbondo","m'mbondo","mmbondo","ngmy","the system","our system","our community","the community","community","contribution","michango","jamii","jumuiya","advisor"],y.s)
 D.dLW=new A.cY([1611,1611,1612,1612,1613,1613,1614,1614,1615,1615,1616,1616,1617,1617,1618,1618,1648,1648,64606,64606,64607,64607,64608,64608,64609,64609,64610,64610,64611,64611],y.K)
 D.aLh=new A.cY([1575,65165,1576,65167,1578,65173,1579,65177,1580,65181,1581,65185,1582,65189,1583,65193,1584,65195,1585,65197,1586,65199,1587,65201,1588,65205,1589,65209,1590,65213,1591,65217,1592,65221,1593,65225,1594,65229,1601,65233,1602,65237,1603,65241,1604,65245,1605,65249,1606,65253,1607,65257,1608,65261,1610,65263,1569,65152,1570,65153,1571,65155,1572,65157,1573,65159,1574,65161,1577,65171],y.K)
@@ -3182,8 +3182,8 @@ D.c4q=new A.ae(B.o6,null,F.lT,null,null,null)
 D.fOq=new A.G(!0,E.jh,null,null,null,null,18,B.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.hci=new A.C("Print as a book",null,D.fOq,null,null,null,null,null,null,null,null,null)
 D.bMY=new A.bu(1,B.b9,D.hci,null)
-D.dn6=x([D.c4q,B.aa,D.bMY],y.p)
-D.foz=new A.c1(B.aK,B.e,B.h,B.l,null,B.p,null,0,D.dn6,null)
+D.dn4=x([D.c4q,B.aa,D.bMY],y.p)
+D.foz=new A.c1(B.aK,B.e,B.h,B.l,null,B.p,null,0,D.dn4,null)
 D.evr={the:0,and:1,of:2,to:3,was:4,is:5,in:6,that:7,he:8,she:9,his:10,her:11,with:12,for:13,as:14,they:15,their:16,from:17,by:18,were:19,are:20,it:21,this:22,be:23,on:24,at:25,who:26,had:27,have:28,our:29,we:30}
 D.fqq=new A.de(D.evr,31,y.M)
 D.ewy={na:0,ya:1,wa:2,za:3,ni:4,la:5,katika:6,ambao:7,ambayo:8,hawa:9,yake:10,wake:11,zao:12,yao:13,kuwa:14,alikuwa:15,walikuwa:16,mtu:17,watu:18,wakati:19,baada:20,kila:21}
@@ -3224,4 +3224,4 @@ D.hgj=new A.C("Design the cover",null,B.cL,null,null,null,null,null,null,null,nu
 D.hjt=new C.cGn(6,"postScriptName")
 D.hUj=new C.bvC(null)})();(function staticFields(){$.hHm=null
 $.hJB=A.S(y.N,A.as("ay<m?>"))})()};
-(a=>{a["/M9Jfhfc3H2GveW35vYt0C/g1sg="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["NIXFYstEo/LcI/vHVHWqlIfo3DU="]=a.current})($__dart_deferred_initializers__);

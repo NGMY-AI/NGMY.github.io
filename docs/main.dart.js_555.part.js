@@ -798,7 +798,7 @@ ahT(){var w=0,v=A.j(x.T),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g
 var $async$ahT=A.e(function(d,e){if(d===1){s.push(e)
 w=t}for(;;)switch(w){case 0:t=4
 w=7
-return A.b($.y1.cq().Nf(!1,D.dxp,C.vk,!0),$async$ahT)
+return A.b($.y1.cq().Nf(!1,D.dxn,C.vk,!0),$async$ahT)
 case 7:r=e
 w=r!=null&&J.cJ(r.a)?8:9
 break
@@ -2679,7 +2679,7 @@ o=g.y
 n=g.afq(o,"Text shown under the QR (optional \u2014 link itself stays hidden)")
 m=g.Q
 l=x.e
-l=A.B(new A.O(D.dmW,new B.dLl(),l),l.k("aj.E"))
+l=A.B(new A.O(D.dmU,new B.dLl(),l),l.k("aj.E"))
 m=A.E(A.nG(D.c8e,C.cx,m,!1,l,f,new B.dLm(g),C.ds,f,x.W),1)
 l=g.as?f:g.gcaY()
 g.a.toString
@@ -3179,7 +3179,7 @@ return K.aXq(new B.ft_(v,w),u,new B.ft0(v),u,u,u,x.N)}}
 B.bs4.prototype={
 B(d){var w,v,u,t,s=null,r=A.a([],x.p)
 for(w=this.c,v=0;v<11;++v){u={}
-t=D.dd_[v]
+t=D.dcZ[v]
 u.a=null
 u.a=t.a
 t=A.c(t.b,s,s,s,s,s,s,C.mc,s,s,s)
@@ -3277,7 +3277,7 @@ if(v==null)v=n.d.h(0,"targetScreenId")
 u=x.p
 v=A.a([w,n.czF("Opens screen",J.k(v==null?"":v),new B.frK(n))],u)
 if(b2==="button"){w=n.d.h(0,j)
-w=A.a([n.J1("Action",J.k(w==null?i:w),D.dAz,new B.frL(n))],u)
+w=A.a([n.J1("Action",J.k(w==null?i:w),D.dAw,new B.frL(n))],u)
 u=n.d.h(0,j)
 if(J.z(u==null?i:u,"snack")){u=n.d.h(0,"message")
 w.push(n.eQ("Snack message",J.k(u==null?"":u),new B.frW(n)))}u=n.d.h(0,j)
@@ -3289,7 +3289,7 @@ w===$&&A.d()
 w=w.h(0,"text")
 w=n.al7("Text",J.k(w==null?"":w),new B.fss(n),3)
 v=n.d.h(0,"style")
-return A.a([w,n.J1(g,J.k(v==null?f:v),D.dEN,new B.fsD(n))],x.p)
+return A.a([w,n.J1(g,J.k(v==null?f:v),D.dEL,new B.fsD(n))],x.p)
 case"hero":w=n.d
 w===$&&A.d()
 w=w.h(0,"emoji")
@@ -3325,9 +3325,9 @@ return A.a([w,v,u,t,s,n.aD0("Add button opens",J.k(r==null?"":r),new B.frX(n),!0
 case"menuGrid":w=n.d
 w===$&&A.d()
 w=w.h(0,"style")
-w=n.J1(g,J.k(w==null?a6:w),D.ds7,new B.frZ(n))
+w=n.J1(g,J.k(w==null?a6:w),D.ds4,new B.frZ(n))
 v=n.d.h(0,"columns")
-return A.a([w,n.J1("Columns",J.k(v==null?2:v),D.dam,new B.fs_(n)),C.M,A.c("Menu items",l,l,l,l,l,l,A.l(l,l,C.l_,l,l,l,l,l,l,l,l,13,l,l,C.N,l,l,!0,l,l,l,l,l,l,l,l),l,l,l),new B.aEU(n.d.h(0,"items"),n.a.e,new B.fs0(n),l)],x.p)
+return A.a([w,n.J1("Columns",J.k(v==null?2:v),D.dal,new B.fs_(n)),C.M,A.c("Menu items",l,l,l,l,l,l,A.l(l,l,C.l_,l,l,l,l,l,l,l,l,13,l,l,C.N,l,l,!0,l,l,l,l,l,l,l,l),l,l,l),new B.aEU(n.d.h(0,"items"),n.a.e,new B.fs0(n),l)],x.p)
 case"switch":w=n.d
 w===$&&A.d()
 w=w.h(0,"setting")
@@ -3390,7 +3390,7 @@ w===$&&A.d()
 w=w.h(0,h)
 w=n.eQ("Save to collection",J.k(w==null?a8:w),new B.fso(n))
 v=n.d.h(0,"mode")
-v=n.J1("Mode",J.k(v==null?"reel":v),D.dDu,new B.fsp(n))
+v=n.J1("Mode",J.k(v==null?"reel":v),D.dDs,new B.fsp(n))
 u=n.d.h(0,a1)
 return A.a([w,v,n.eQ("After post go to screen ID",J.k(u==null?"":u),new B.fsq(n))],x.p)
 case"profile":w=n.d
@@ -3444,7 +3444,7 @@ w===$&&A.d()
 w=w.h(0,"text")
 w=n.al7("Banner text",J.k(w==null?"":w),new B.fsG(n),3)
 v=n.d.h(0,"variant")
-return A.a([w,n.J1(g,J.k(v==null?"info":v),D.dww,new B.fsH(n))],x.p)
+return A.a([w,n.J1(g,J.k(v==null?"info":v),D.dwu,new B.fsH(n))],x.p)
 case"progress":w=n.d
 w===$&&A.d()
 w=w.h(0,k)
@@ -3524,7 +3524,7 @@ w=J.t(w[p],"label")
 w=J.k(w==null?"":w)
 w=A.aN(t,C.Z,!1,t,!0,C.t,t,A.aO(),new A.au(new A.bd(w,C.b6,C.aP),$.az()),t,t,t,t,t,2,D.auH,C.y,!0,t,!0,t,!1,t,C.al,t,t,t,t,t,t,t,t,t,1,t,t,!1,"\u2022",t,new B.dmi(u,p),t,t,t,!1,t,t,!1,t,!0,t,C.ae,t,t,t,t,t,t,t,t,t,t,t,t,!0,C.a7,t,C.ao,t,t,t,t)
 v=J.t(u.d[p],"type")
-r.push(new A.D(C.cB,new A.c1(C.aK,C.e,C.h,C.l,t,C.p,t,0,A.a([new A.bu(1,C.b9,w,t),C.aa,A.a6e(t,t,t,t,!1,!1,D.dvi,new B.dmj(u,p),t,t,J.k(v==null?"text":v),q),A.aI(t,t,t,t,D.c4V,t,t,t,new B.dmk(u,p),t,t,t,t,t,t)],s),t),t));++p}r.push(A.hv(D.R2,D.fUx,new B.dml(u),t))
+r.push(new A.D(C.cB,new A.c1(C.aK,C.e,C.h,C.l,t,C.p,t,0,A.a([new A.bu(1,C.b9,w,t),C.aa,A.a6e(t,t,t,t,!1,!1,D.dvg,new B.dmj(u,p),t,t,J.k(v==null?"text":v),q),A.aI(t,t,t,t,D.c4V,t,t,t,new B.dmk(u,p),t,t,t,t,t,t)],s),t),t));++p}r.push(A.hv(D.R2,D.fUx,new B.dml(u),t))
 return A.x(r,C.l,t,C.e,C.h,0,C.p)}}
 B.aEU.prototype={
 R(){return new B.bml()},
@@ -3820,7 +3820,7 @@ o=r.a.as?12:16
 p.push(A.E(A.kH(!0,q,r.e,new B.dOI(r),r.f.length,q,new A.R(o,o,o,o),q,q,!1,!1),1))
 if(r.w)p.push(D.ceH)
 o=x.G
-o=A.B(new A.O(D.dwm,new B.dOJ(r),o),o.k("aj.E"))
+o=A.B(new A.O(D.dwk,new B.dOJ(r),o),o.k("aj.E"))
 p.push(new A.a5(q,40,A.co(o,q,q,C.f2,q,q,C.aK,!1),q))
 o=r.a.as?10:14
 w=A.n(16)
@@ -4565,7 +4565,7 @@ $S:0}
 B.ft2.prototype={
 $2(d,e){var w,v,u,t,s,r,q,p=null
 if(e>=35)return C.bK
-w=D.dla[e]
+w=D.dl8[e]
 v=w.a
 u=w.b
 t=w.c
@@ -5036,15 +5036,15 @@ $1(d){return d.a===this.a.a},
 $S:162}
 B.fQU.prototype={
 $1(d){var w=x.N,v=x.z,u=x.K,t=x.J
-return B.nw(d,"Travel Explorer","Maps, trips & reservations",4279150057,A.a([B.dm("home","Map",A.J(["type","mapView","collection","places","titleField","name","subtitleField","address","latField","lat","lngField","lng","height",440,"placeholder","Search cities, hotels, airports\u2026","centerLat",48.8566,"centerLng",2.3522],w,v),!0,!0),B.dm("add_place","Add destination",A.J(["type","column","children",A.a([A.J(["type","text","text","Save a place","style","title"],w,w),A.J(["type","form","collection","places","submitLabel","Save on map","successMessage","Place saved!","navigateAfter","home","fields",A.a([A.J(["id","name","label","Place name","type","text"],w,w),A.J(["id","address","label","Address","type","text"],w,w),A.J(["id","lat","label","Latitude","type","text"],w,w),A.J(["id","lng","label","Longitude","type","text"],w,w)],x.m)],w,u)],t)],w,v),!1,!1),B.dm("trips","My trips",A.J(["type","column","children",A.a([A.J(["type","text","text","Saved trips","style","title"],w,w),A.J(["type","dataList","collection","places","titleField","name","subtitleField","address","emptyText","No trips yet \u2014 add a destination on the map.","addTarget","add_place","addLabel","Add trip","allowDelete",!0],w,u)],t)],w,v),!1,!1),B.dm("settings","Settings",B.ny("home"),!1,!1)],x.X),"\u2708\ufe0f",A.J(["bottomNav",D.dmE],w,v))},
+return B.nw(d,"Travel Explorer","Maps, trips & reservations",4279150057,A.a([B.dm("home","Map",A.J(["type","mapView","collection","places","titleField","name","subtitleField","address","latField","lat","lngField","lng","height",440,"placeholder","Search cities, hotels, airports\u2026","centerLat",48.8566,"centerLng",2.3522],w,v),!0,!0),B.dm("add_place","Add destination",A.J(["type","column","children",A.a([A.J(["type","text","text","Save a place","style","title"],w,w),A.J(["type","form","collection","places","submitLabel","Save on map","successMessage","Place saved!","navigateAfter","home","fields",A.a([A.J(["id","name","label","Place name","type","text"],w,w),A.J(["id","address","label","Address","type","text"],w,w),A.J(["id","lat","label","Latitude","type","text"],w,w),A.J(["id","lng","label","Longitude","type","text"],w,w)],x.m)],w,u)],t)],w,v),!1,!1),B.dm("trips","My trips",A.J(["type","column","children",A.a([A.J(["type","text","text","Saved trips","style","title"],w,w),A.J(["type","dataList","collection","places","titleField","name","subtitleField","address","emptyText","No trips yet \u2014 add a destination on the map.","addTarget","add_place","addLabel","Add trip","allowDelete",!0],w,u)],t)],w,v),!1,!1),B.dm("settings","Settings",B.ny("home"),!1,!1)],x.X),"\u2708\ufe0f",A.J(["bottomNav",D.dmC],w,v))},
 $S:60}
 B.fQV.prototype={
 $1(d){var w=x.N,v=x.m,u=x.K,t=x.J,s=x.z
-return B.nw(d,"Luxe Store","Curated shop with cart & checkout",4293675161,A.a([B.dm("home","Shop",A.J(["type","column","children",A.a([A.J(["type","text","text","Discover","style","title"],w,w),A.J(["type","wrap","children",A.a([A.J(["type","chip","label","New arrivals"],w,w),A.J(["type","chip","label","Best sellers"],w,w),A.J(["type","chip","label","Sale"],w,w)],v)],w,u),A.J(["type","stat","collection","products","label","Products live"],w,w),A.J(["type","dataList","collection","products","titleField","name","subtitleField","price","emptyText","Your catalog is empty.","addTarget","add_product","addLabel","Add product","allowDelete",!0],w,u)],t)],w,s),!1,!1),B.dm("add_product","Add Product",A.J(["type","column","children",A.a([A.J(["type","form","collection","products","submitLabel","List product","successMessage","Listed!","navigateAfter","home","fields",A.a([A.J(["id","name","label","Product name","type","text"],w,w),A.J(["id","price","label","Price","type","text"],w,w),A.J(["id","desc","label","Description","type","text"],w,w)],v)],w,u)],t)],w,s),!1,!1),B.dm("cart","Cart",A.J(["type","column","children",A.a([A.J(["type","text","text","Your cart","style","title"],w,w),A.J(["type","dataList","collection","cart","titleField","name","subtitleField","price","emptyText","Cart is empty."],w,w),A.J(["type","button","label","Checkout","target","checkout","large",!0],w,u)],t)],w,s),!1,!1),B.dm("checkout","Checkout",A.J(["type","column","children",A.a([A.J(["type","form","collection","orders","submitLabel","Place order","successMessage","Order placed!","navigateAfter","home","fields",A.a([A.J(["id","name","label","Name","type","text"],w,w),A.J(["id","address","label","Shipping address","type","text"],w,w)],v)],w,u)],t)],w,s),!1,!1),B.dm("profile","Profile",A.J(["type","column","children",A.a([A.J(["type","profile","collection","orders","handle","Shopper"],w,w),A.J(["type","button","label","Settings","target","settings"],w,w)],v)],w,s),!1,!1),B.dm("settings","Settings",B.ny("home"),!1,!1)],x.X),"\ud83d\udecd\ufe0f",A.J(["bottomNav",D.dD5],w,s))},
+return B.nw(d,"Luxe Store","Curated shop with cart & checkout",4293675161,A.a([B.dm("home","Shop",A.J(["type","column","children",A.a([A.J(["type","text","text","Discover","style","title"],w,w),A.J(["type","wrap","children",A.a([A.J(["type","chip","label","New arrivals"],w,w),A.J(["type","chip","label","Best sellers"],w,w),A.J(["type","chip","label","Sale"],w,w)],v)],w,u),A.J(["type","stat","collection","products","label","Products live"],w,w),A.J(["type","dataList","collection","products","titleField","name","subtitleField","price","emptyText","Your catalog is empty.","addTarget","add_product","addLabel","Add product","allowDelete",!0],w,u)],t)],w,s),!1,!1),B.dm("add_product","Add Product",A.J(["type","column","children",A.a([A.J(["type","form","collection","products","submitLabel","List product","successMessage","Listed!","navigateAfter","home","fields",A.a([A.J(["id","name","label","Product name","type","text"],w,w),A.J(["id","price","label","Price","type","text"],w,w),A.J(["id","desc","label","Description","type","text"],w,w)],v)],w,u)],t)],w,s),!1,!1),B.dm("cart","Cart",A.J(["type","column","children",A.a([A.J(["type","text","text","Your cart","style","title"],w,w),A.J(["type","dataList","collection","cart","titleField","name","subtitleField","price","emptyText","Cart is empty."],w,w),A.J(["type","button","label","Checkout","target","checkout","large",!0],w,u)],t)],w,s),!1,!1),B.dm("checkout","Checkout",A.J(["type","column","children",A.a([A.J(["type","form","collection","orders","submitLabel","Place order","successMessage","Order placed!","navigateAfter","home","fields",A.a([A.J(["id","name","label","Name","type","text"],w,w),A.J(["id","address","label","Shipping address","type","text"],w,w)],v)],w,u)],t)],w,s),!1,!1),B.dm("profile","Profile",A.J(["type","column","children",A.a([A.J(["type","profile","collection","orders","handle","Shopper"],w,w),A.J(["type","button","label","Settings","target","settings"],w,w)],v)],w,s),!1,!1),B.dm("settings","Settings",B.ny("home"),!1,!1)],x.X),"\ud83d\udecd\ufe0f",A.J(["bottomNav",D.dD3],w,s))},
 $S:60}
 B.fQW.prototype={
 $1(d){var w=x.N,v=x.z
-return B.nw(d,"Social Pulse","Share posts and connect",4287323382,A.a([B.dm("feed","Feed",A.J(["type","socialFeed","collection","posts"],w,v),!0,!0),B.dm("create","Create",A.J(["type","postComposer","mode","post","collection","posts","captionField","body","videoField","imageUrl","navigateAfter","feed","submitLabel","Share post"],w,v),!1,!1),B.dm("profile","Profile",A.J(["type","profile","collection","posts","handle","@you"],w,v),!1,!1),B.dm("settings","Settings",B.ny("feed"),!1,!1)],x.X),"\ud83d\udcac",A.J(["bottomNav",D.duh],w,v))},
+return B.nw(d,"Social Pulse","Share posts and connect",4287323382,A.a([B.dm("feed","Feed",A.J(["type","socialFeed","collection","posts"],w,v),!0,!0),B.dm("create","Create",A.J(["type","postComposer","mode","post","collection","posts","captionField","body","videoField","imageUrl","navigateAfter","feed","submitLabel","Share post"],w,v),!1,!1),B.dm("profile","Profile",A.J(["type","profile","collection","posts","handle","@you"],w,v),!1,!1),B.dm("settings","Settings",B.ny("feed"),!1,!1)],x.X),"\ud83d\udcac",A.J(["bottomNav",D.duf],w,v))},
 $S:60}
 B.fR6.prototype={
 $1(d){var w=x.N,v=x.m,u=x.K,t=x.J,s=x.z
@@ -5702,7 +5702,7 @@ w===$&&A.d()
 if(w===D.Ko)v.d=D.lI},
 $S:0}
 B.dPY.prototype={
-$2(d,e){return this.a.cHB(D.d4H[e],this.b)},
+$2(d,e){return this.a.cHB(D.d4G[e],this.b)},
 $S:45}
 B.dPV.prototype={
 $0(){var w=this.a,v=w.cHA(this.b.d)
@@ -5818,20 +5818,20 @@ D.bTu=new A.a_(62657,"MaterialIcons",!1)
 D.eqI=new B.JZ("Portfolio Web App","Showcase work & contact",D.bTu,"video_hub",C.cG)
 D.bT1=new A.a_(61573,"MaterialIcons",!1)
 D.eqG=new B.JZ("Travel Booking App","Trips, maps & reservations",D.bT1,"qr_studio",C.as)
-D.d4H=w([D.eqD,D.eqH,D.eqF,D.eqE,D.eqI,D.eqG],A.as("N<JZ>"))
-D.dam=w(["2","3","4"],x.s)
-D.f0R=new A.y("button","Button")
-D.f2C=new A.y("form","Form")
-D.f1w=new A.y("dataList","List")
-D.f5X=new A.y("mapView","Map")
-D.f60=new A.y("menuGrid","Menu")
-D.f3g=new A.y("hero","Hero")
+D.d4G=w([D.eqD,D.eqH,D.eqF,D.eqE,D.eqI,D.eqG],A.as("N<JZ>"))
+D.dal=w(["2","3","4"],x.s)
+D.f0S=new A.y("button","Button")
+D.f2D=new A.y("form","Form")
+D.f1x=new A.y("dataList","List")
+D.f5Y=new A.y("mapView","Map")
+D.f61=new A.y("menuGrid","Menu")
+D.f3h=new A.y("hero","Hero")
 D.f8Q=new A.y("switch","Switch")
 D.f81=new A.y("reelFeed","Reels")
 D.f8C=new A.y("socialFeed","Feed")
-D.f7L=new A.y("qrGenerator","QR")
+D.f7M=new A.y("qrGenerator","QR")
 D.f8L=new A.y("stat","Stat")
-D.dd_=w([D.f0R,D.f2C,D.f1w,D.f5X,D.f60,D.f3g,D.f8Q,D.f81,D.f8C,D.f7L,D.f8L],A.as("N<+(m,m)>"))
+D.dcZ=w([D.f0S,D.f2D,D.f1x,D.f5Y,D.f61,D.f3h,D.f8Q,D.f81,D.f8C,D.f7M,D.f8L],A.as("N<+(m,m)>"))
 D.fcB=new A.b0("button",D.ar7,"Button")
 D.bSS=new A.a_(61341,"MaterialIcons",!1)
 D.fcH=new A.b0("outlined_button",D.bSS,"Outline")
@@ -5880,20 +5880,20 @@ D.bSA=new A.a_(58877,"MaterialIcons",!1)
 D.fg9=new A.b0("rating",D.bSA,"Rating")
 D.fcN=new A.b0("contact",C.a3F,"Contact")
 D.fdH=new A.b0("video",I.a3Q,"Video")
-D.dla=w([D.fcB,D.fcH,D.fds,D.fez,D.fe2,D.feV,D.fcD,D.fbs,D.fdi,D.fev,D.ffe,D.ffc,D.fdR,D.ffD,D.fde,D.fg3,D.feB,D.fbV,D.fdI,D.fdq,D.feh,D.fd9,D.feS,D.ffa,D.ff8,D.fd4,D.feK,D.fdX,D.fbA,D.fbz,D.fdP,D.fek,D.fg9,D.fcN,D.fdH],A.as("N<+(m,a_,m)>"))
+D.dl8=w([D.fcB,D.fcH,D.fds,D.fez,D.fe2,D.feV,D.fcD,D.fbs,D.fdi,D.fev,D.ffe,D.ffc,D.fdR,D.ffD,D.fde,D.fg3,D.feB,D.fbV,D.fdI,D.fdq,D.feh,D.fd9,D.feS,D.ffa,D.ff8,D.fd4,D.feK,D.fdX,D.fbA,D.fbz,D.fdP,D.fek,D.fg9,D.fcN,D.fdH],A.as("N<+(m,a_,m)>"))
 D.ua={icon:0,label:1,target:2}
 D.dNd=new A.bl(D.ua,["map","Map","home"],x.w)
 D.dNe=new A.bl(D.ua,["list","Trips","trips"],x.w)
 D.dNc=new A.bl(D.ua,["add","Add","add_place"],x.w)
 D.dN9=new A.bl(D.ua,["settings","Settings","settings"],x.w)
-D.dmE=w([D.dNd,D.dNe,D.dNc,D.dN9],x.m)
-D.dmW=w([C.Hx,C.zf,C.oR,C.a1i,C.a1p,null],A.as("N<bh?>"))
-D.ds7=w(["classic","neon","hologram","pulse"],x.s)
+D.dmC=w([D.dNd,D.dNe,D.dNc,D.dN9],x.m)
+D.dmU=w([C.Hx,C.zf,C.oR,C.a1i,C.a1p,null],A.as("N<bh?>"))
+D.ds4=w(["classic","neon","hologram","pulse"],x.s)
 D.hYl=w([],x.X)
 D.dNf=new A.bl(D.ua,["feed","Feed","feed"],x.w)
 D.dNb=new A.bl(D.ua,["create","Post","create"],x.w)
 D.aL3=new A.bl(D.ua,["profile","Profile","profile"],x.w)
-D.duh=w([D.dNf,D.dNb,D.aL3],x.m)
+D.duf=w([D.dNf,D.dNb,D.aL3],x.m)
 D.hac=new A.C("Text",null,null,null,null,null,null,null,null,null,null,null)
 D.bDx=new A.eN("text",D.hac,C.fk,null,x.r)
 D.fUX=new A.C("Number",null,null,null,null,null,null,null,null,null,null,null)
@@ -5902,24 +5902,24 @@ D.fXz=new A.C("Email",null,null,null,null,null,null,null,null,null,null,null)
 D.bDt=new A.eN("email",D.fXz,C.fk,null,x.r)
 D.h7F=new A.C("Long text",null,null,null,null,null,null,null,null,null,null,null)
 D.bDB=new A.eN("multiline",D.h7F,C.fk,null,x.r)
-D.dvi=w([D.bDx,D.bDC,D.bDt,D.bDB],x.I)
-D.dwm=w(["Build a map app with saved places and directions","Create a store with product feed and cart","Make a TikTok-style video feed with posting","Design a fitness app with workouts and check-ins","Build a booking app with calendar and payments","Create a game score tracker with leaderboards"],x.s)
-D.dww=w(["info","warning","success"],x.s)
-D.dxp=w(["json"],x.s)
-D.dAz=w(["navigate","snack","clear"],x.s)
+D.dvg=w([D.bDx,D.bDC,D.bDt,D.bDB],x.I)
+D.dwk=w(["Build a map app with saved places and directions","Create a store with product feed and cart","Make a TikTok-style video feed with posting","Design a fitness app with workouts and check-ins","Build a booking app with calendar and payments","Create a game score tracker with leaderboards"],x.s)
+D.dwu=w(["info","warning","success"],x.s)
+D.dxn=w(["json"],x.s)
+D.dAw=w(["navigate","snack","clear"],x.s)
 D.dNa=new A.bl(D.ua,["shop","Shop","home"],x.w)
 D.dN8=new A.bl(D.ua,["cart","Cart","cart"],x.w)
 D.dN7=new A.bl(D.ua,["add","Sell","add_product"],x.w)
-D.dD5=w([D.dNa,D.dN8,D.dN7,D.aL3],x.m)
-D.dDu=w(["reel","post"],x.s)
-D.dEN=w(["title","subtitle","body"],x.s)
+D.dD3=w([D.dNa,D.dN8,D.dN7,D.aL3],x.m)
+D.dDs=w(["reel","post"],x.s)
+D.dEL=w(["title","subtitle","body"],x.s)
 D.aFG=w(["add","calendar","cart","chat","earnings","fitness","food","history","home","info","list","mail","menu","music","person","phone","referral","sales","settings","share","shop","star","venue","video","wallet","withdraw"],x.s)
 D.evF={Actions:0,Content:1,"Data & forms":2,Navigation:3,Interactive:4,"QR & Invoices":5,"Social & Video":6,Layout:7,"More widgets":8}
 D.bSz=new A.a_(58818,"MaterialIcons",!1)
 D.ffR=new A.b0("button","Button",D.bSz)
 D.bS8=new A.a_(57774,"MaterialIcons",!1)
 D.fcz=new A.b0("outlined_button","Outlined button",D.bS8)
-D.drc=w([D.ffR,D.fcz],x.c)
+D.dr9=w([D.ffR,D.fcz],x.c)
 D.fbH=new A.b0("title","Title text",Q.a3C)
 D.ff_=new A.b0("text","Body text",D.a3B)
 D.bSH=new A.a_(59054,"MaterialIcons",!1)
@@ -5934,7 +5934,7 @@ D.bSn=new A.a_(58244,"MaterialIcons",!0)
 D.fcn=new A.b0("dataList","Data list",D.bSn)
 D.bRN=new A.a_(57475,"MaterialIcons",!1)
 D.ffG=new A.b0("stat","Stat counter",D.bRN)
-D.djC=w([D.fcr,D.fcn,D.ffG],x.c)
+D.djA=w([D.fcr,D.fcn,D.ffG],x.c)
 D.bSi=new A.a_(58090,"MaterialIcons",!1)
 D.fdf=new A.b0("menuGrid","Menu grid",D.bSi)
 D.ffW=new A.b0("list","Link list",M.PZ)
@@ -5948,21 +5948,21 @@ D.fg1=new A.b0("checklist","Checklist",D.aqs)
 D.fcZ=new A.b0("workout","Workout plan",D.aqw)
 D.bSk=new A.a_(58208,"MaterialIcons",!0)
 D.fcm=new A.b0("chip","Chip tag",D.bSk)
-D.dw9=w([D.feU,D.feM,D.fg1,D.fcZ,D.fcm],x.c)
+D.dw7=w([D.feU,D.feM,D.fg1,D.fcZ,D.fcm],x.c)
 D.fd7=new A.b0("qrGenerator","QR generator",D.a3y)
 D.fdk=new A.b0("qrCode","Static QR",D.aqJ)
 D.fe0=new A.b0("invoiceBuilder","Invoice",F.Q1)
-D.dgn=w([D.fd7,D.fdk,D.fe0],x.c)
+D.dgj=w([D.fd7,D.fdk,D.fe0],x.c)
 D.ffO=new A.b0("reelFeed","TikTok feed",N.asp)
 D.fd_=new A.b0("socialFeed","Social feed",F.arB)
 D.fco=new A.b0("postComposer","Post / reel",C.asD)
 D.fcw=new A.b0("searchHub","Search hub",C.eN)
 D.fcR=new A.b0("mapView","Map view",C.lz)
 D.fbO=new A.b0("profile","Profile",C.f3)
-D.d1a=w([D.ffO,D.fd_,D.fco,D.fcw,D.fcR,D.fbO],x.c)
+D.d19=w([D.ffO,D.fd_,D.fco,D.fcw,D.fcR,D.fbO],x.c)
 D.fdZ=new A.b0("spacer","Spacer",D.aqM)
 D.ffS=new A.b0("divider","Divider",I.Q_)
-D.dtZ=w([D.fdZ,D.ffS],x.c)
+D.dtX=w([D.fdZ,D.ffS],x.c)
 D.ffz=new A.b0("link","Link button",C.I5)
 D.bRZ=new A.a_(57656,"MaterialIcons",!1)
 D.fdc=new A.b0("banner","Banner alert",D.bRZ)
@@ -5972,8 +5972,8 @@ D.bS6=new A.a_(57740,"MaterialIcons",!1)
 D.fer=new A.b0("contact","Contact card",D.bS6)
 D.bSG=new A.a_(59048,"MaterialIcons",!1)
 D.feC=new A.b0("video","Video",D.bSG)
-D.dBe=w([D.ffz,D.fdc,D.ffZ,D.fbS,D.fer,D.feC],x.c)
-D.aKP=new A.bl(D.evF,[D.drc,D.cGq,D.djC,D.cGF,D.dw9,D.dgn,D.d1a,D.dtZ,D.dBe],A.as("bl<m,ai<+(m,m,a_)>>"))
+D.dBb=w([D.ffz,D.fdc,D.ffZ,D.fbS,D.fer,D.feC],x.c)
+D.aKP=new A.bl(D.evF,[D.dr9,D.cGq,D.djA,D.cGF,D.dw7,D.dgj,D.d19,D.dtX,D.dBb],A.as("bl<m,ai<+(m,m,a_)>>"))
 D.dS7=new B.Fo(null,"Invalid backup format. Export again from App Studio \u2192 menu \u2192 Download backup.")
 D.dS8=new B.Fo(null,"Invalid backup \u2014 choose a .ngmy.json file exported from App Studio.")
 D.dS9=new B.Fo(null,"No file selected.")
@@ -6078,4 +6078,4 @@ D.hfb=new A.C("My Projects",null,null,null,null,null,null,null,null,null,null,nu
 D.hgv=new A.C("Invoice published",null,C.iU,null,null,null,null,null,null,null,null,null)})();(function lazyInitializers(){var w=a.lazyFinal
 w($,"iOh","hVg",()=>{var v=4279150057,u=4284704497
 return A.a([B.n1("Featured",new B.fQU(),"Map, saved trips & destinations.","\u2708\ufe0f","qr_studio","Travel Explorer",v),B.n1("",new B.fQV(),"Product feed, cart & checkout.","\ud83d\udecd\ufe0f","luxe_store","Luxe Store",4293675161),B.n1("",new B.fQW(),"Posts, profiles & engagement.","\ud83d\udcac","creator_hub","Social Pulse",4287323382),B.n1("",new B.fR6(),"Workouts, check-ins & nutrition.","\ud83d\udcaa","pulse_fitness","Pulse Fitness",4279286145),B.n1("",new B.fRc(),"Clients, invoices & pipeline.","\ud83d\udcca","invoice_pro","CRM Dashboard",u),B.n1("",new B.fRd(),"Showcase work & contact.","\ud83c\udf10","video_hub","Portfolio Hub",v),B.n1("",new B.fRe(),"Live QR for websites & text.","\ud83d\udcf1","qr_code_studio","QR Code Studio",4278630100),B.n1("New",new B.fRf(),"Sell, track sales & get paid.","\ud83d\udcb5","side_hustle","Side Hustle Marketplace",4279673674),B.n1("",new B.fRg(),"Services, bookings & client earnings.","\ud83d\udcc5","booking_pro","Booking & Services",4286331629),B.n1("",new B.fRh(),"Daily checklist, streaks & progress.","\ud83d\udd25","habit_tracker","Habit Tracker",4279548070),B.n1("",new B.fRi(),"Income, spending & budget at a glance.","\ud83d\udcb0","finance_dash","Money Tracker",4282090230),B.n1("",new B.fQX(),"Post roles, track applicants.","\ud83d\udcbc","job_board","Job Board",4281549141),B.n1("",new B.fQY(),"Discussion feed, posts & replies.","\ud83d\udde3\ufe0f","community_forum","Community Forum",4288814255),B.n1("",new B.fQZ(),"Episodes, categories & playback links.","\ud83c\udf99\ufe0f","podcast_hub","Podcast Hub",4280232247),B.n1("",new B.fR_(),"Events, RSVPs & shareable QR codes.","\ud83c\udfab","event_tickets","Event Ticketing",4294286859),B.n1("New",new B.fR0(),"Raise funds, track donors, share a link.","\u2764\ufe0f","donate_nonprofit","Giving Campaign",4292943176),B.n1("",new B.fR1(),"Sessions, bookings & client roster.","\ud83e\uddd8","coaching_booking","Coaching Studio",4286456526),B.n1("",new B.fR2(),"Showcase galleries & booking requests.","\ud83d\udcf7","photo_portfolio","Photo Portfolio",4279310375),B.n1("",new B.fR3(),"Save recipes, ingredients & steps.","\ud83c\udf73","recipe_box","Recipe Box",4293548044),B.n1("",new B.fR4(),"Daily care, vet visits & reminders.","\ud83d\udc3e","pet_care","Pet Care Tracker",4284850957),B.n1("",new B.fR5(),"Create invoices, track clients & income.","\ud83e\uddfe","freelance_invoicing","Freelancer Invoicing",4280171146),B.n1("",new B.fR7(),"Log rounds, track scores & leaderboard.","\ud83c\udfc6","trivia_game","Trivia Night Scorekeeper",4292552567),B.n1("New",new B.fR8(),"Map of properties, inquiries & saves.","\ud83c\udfe0","real_estate","Real Estate Listings",4278995566),B.n1("",new B.fR9(),"Menu by category, tap to add to order.","\ud83c\udf7d\ufe0f","restaurant_menu","Restaurant Menu & Orders",4290321436),B.n1("",new B.fRa(),"Members, renewals & revenue.","\ud83e\udeaa","membership_manager","Membership Manager",4278483031),B.n1("",new B.fRb(),"Start fresh \u2014 describe any app to NGMY AI.","\ud83d\ude80","blank","Blank Canvas",u)],A.as("N<a81>"))})})()};
-(a=>{a["u0RBjbMM2zW/LhzN9c2FTEZHHQk="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["1XePPiF+47F+nY3y+ifWZdbf0Ec="]=a.current})($__dart_deferred_initializers__);

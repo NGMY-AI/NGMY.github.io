@@ -2086,11 +2086,11 @@ s=B.A(q,A.l,a0,A.e,A.h,0,a0,a0)
 r=d.hr(d.d.gNG())
 q=d.d
 o=q.d
-r=B.E(new C.aDf("State Trust","Registrar reserve",r,q.r>0?"In "+d.hr(o)+" \xc2\xb7 Out "+d.hr(d.d.e)+" \xc2\xb7 Reserved "+d.hr(d.d.r):"In "+d.hr(o)+" \xc2\xb7 Out "+d.hr(d.d.e),D.d9m,A.kj,a0),1)
+r=B.E(new C.aDf("State Trust","Registrar reserve",r,q.r>0?"In "+d.hr(o)+" \xc2\xb7 Out "+d.hr(d.d.e)+" \xc2\xb7 Reserved "+d.hr(d.d.r):"In "+d.hr(o)+" \xc2\xb7 Out "+d.hr(d.d.e),D.d9l,A.kj,a0),1)
 o=d.hr(w)
 q=d.d
 n=q.b
-r=B.A(B.a([r,A.bc,B.E(new C.aDf("Contribution Case","Community funds",o,q.f>0?"In "+d.hr(n)+" \xc2\xb7 Credits "+d.hr(d.d.f)+" \xc2\xb7 Out "+d.hr(x):"In "+d.hr(n)+" \xc2\xb7 Out "+d.hr(x),D.dnh,A.my,a0),1)],p),A.l,a0,A.e,A.h,0,a0,a0)
+r=B.A(B.a([r,A.bc,B.E(new C.aDf("Contribution Case","Community funds",o,q.f>0?"In "+d.hr(n)+" \xc2\xb7 Credits "+d.hr(d.d.f)+" \xc2\xb7 Out "+d.hr(x):"In "+d.hr(n)+" \xc2\xb7 Out "+d.hr(x),D.dnf,A.my,a0),1)],p),A.l,a0,A.e,A.h,0,a0,a0)
 q=B.c("Contribution money never enters State Trust. Only an authorized registrar can deposit into Trust or record spending from either ledger.",a0,a0,a0,a0,a0,a0,B.l(a0,a0,a1?A.bv:A.an,a0,a0,a0,a0,a0,a0,a0,a0,11,a0,a0,a0,a0,1.35,!0,a0,a0,a0,a0,a0,a0,a0,a0),A.K,a0,a0)
 o=B.a([],p)
 if(d.d.w.length!==0){n=B.a([],p)
@@ -2107,7 +2107,7 @@ o.push(new C.adP(a2,B.x(B.a([n,A.aB,m,A.aB,B.by(l,B.jE(a1?A.Nj:A.bn,a0,a0,10,a0,
 o.push(A.aB)
 n=B.c("Expenses",a0,a0,a0,a0,a0,a0,B.l(a0,a0,a1?A.c:A.a_,a0,a0,a0,a0,a0,a0,a0,a0,18,a0,a0,A.u,a0,a0,!0,a0,a0,a0,a0,a0,a0,a0,a0),a0,a0,a0)
 m=B.a([],p)
-for(f=0;f<4;++f){l=B.c(D.d8p[f],a0,a0,a0,a0,a0,a0,a0,a0,a0,a0)
+for(f=0;f<4;++f){l=B.c(D.d8o[f],a0,a0,a0,a0,a0,a0,a0,a0,a0,a0)
 k=d.e===f
 h=k&&d.y==null
 g=a1?A.c:A.v
@@ -2914,13 +2914,13 @@ t=B.K(w?A.eo:A.bO,A.r,1)
 s=B.a([new B.aa(0,A.H,A.v.j(w?0.45:0.12),A.h1,28)],y.V)
 r=i.a
 q=y.p
-r=B.A(B.a([B.E(C.dJ7(A.dG,!1,A.bH,D.dsf,A.q_,"Members",j,A.o.v(r.a)),1),A.ar,B.E(C.dJ7(A.eG,!0,S.CY,D.dpn,A.xk,"Family total",j,A.o.v(r.b)),1)],q),A.B,j,A.e,A.h,0,j,j)
+r=B.A(B.a([B.E(C.dJ7(A.dG,!1,A.bH,D.dsc,A.q_,"Members",j,A.o.v(r.a)),1),A.ar,B.E(C.dJ7(A.eG,!0,S.CY,D.dpl,A.xk,"Family total",j,A.o.v(r.b)),1)],q),A.B,j,A.e,A.h,0,j,j)
 p=i.a
 o=k.b
-n=B.E(C.dJ7(A.b3,!1,A.hl,D.dje,A.h0,"Contributions",new C.dWK(i,o,d),A.o.v(p.d)),1)
+n=B.E(C.dJ7(A.b3,!1,A.hl,D.djb,A.h0,"Contributions",new C.dWK(i,o,d),A.o.v(p.d)),1)
 p=A.o.v(p.e)
 o.a.toString
-p=B.A(B.a([n,A.ar,B.E(C.dJ7(A.cD,!0,A.Hw,D.d6h,A.a4y,"Deceased",new C.dWL(o,d),p),1)],q),A.B,j,A.e,A.h,0,j,j)
+p=B.A(B.a([n,A.ar,B.E(C.dJ7(A.cD,!0,A.Hw,D.d6g,A.a4y,"Deceased",new C.dWL(o,d),p),1)],q),A.B,j,A.e,A.h,0,j,j)
 n=A.b5.j(0.14)
 m=B.K(A.b5.j(0.45),A.r,1)
 m=B.p(j,B.V(A.nj,A.b5,j,j,j,24),A.f,j,j,new B.o(n,j,m,j,j,j,A.a6),j,44,j,j,j,j,j,44)
@@ -3815,15 +3815,15 @@ D.c0R=new B.ae(A.A7,18,A.c,null,null,null)
 D.c1j=new B.ae(A.eq,null,A.bE,null,null,null)
 D.c1V=new B.ae(A.o5,18,A.c,null,null,null)
 D.c2B=new B.ae(A.k_,null,A.bp,null,null,null)
-D.dym=x([A.dl,A.lU],y.O)
-D.cbc=new B.a8(A.a5,A.a9,A.x,D.dym,null,null)
-D.d6h=x([A.an,A.bA,A.aM],y.O)
-D.d8p=x(["Day","Week","Month","Year"],y.s)
-D.d9m=x([A.cZ,A.oE],y.O)
-D.dje=x([A.jv,A.fv,A.yY],y.O)
-D.dnh=x([A.h6,A.hw],y.O)
-D.dpn=x([A.az,A.ir,A.n2],y.O)
-D.dsf=x([A.bp,A.dW,A.dl],y.O)
+D.dyj=x([A.dl,A.lU],y.O)
+D.cbc=new B.a8(A.a5,A.a9,A.x,D.dyj,null,null)
+D.d6g=x([A.an,A.bA,A.aM],y.O)
+D.d8o=x(["Day","Week","Month","Year"],y.s)
+D.d9l=x([A.cZ,A.oE],y.O)
+D.djb=x([A.jv,A.fv,A.yY],y.O)
+D.dnf=x([A.h6,A.hw],y.O)
+D.dpl=x([A.az,A.ir,A.n2],y.O)
+D.dsc=x([A.bp,A.dW,A.dl],y.O)
 D.aDY=x([],B.as("N<u2>"))
 D.ex3=new B.r(0,36)
 D.eJ8=new O.ab_(8,null)
@@ -3860,4 +3860,4 @@ D.hLM=new C.aeL(0,"none")
 D.b2I=new C.aeL(1,"highlightLeading")
 D.aep=new C.aeL(2,"highlightTrailing")
 D.b2J=new C.aeL(3,"highlightAll")})()};
-(a=>{a["noOUVRuRg84QtV1B8Jay31QLCVI="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["lMXNv5MSUz1Sg3WnjQL3N3HferY="]=a.current})($__dart_deferred_initializers__);
