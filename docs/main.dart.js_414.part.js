@@ -1344,9 +1344,9 @@ return A.aG(!1,B.a3,!0,w,A.aM(!1,u,!0,A.p(w,A.A(A.a([q,B.ba,A.c(d,w,w,w,w,w,w,A.
 cFp(d){var w=null,v=B.a.cd(d,"."),u=v>0,t=u?B.a.aw(d,0,v):"\u2022",s=u?B.a.i(B.a.aY(d,v+1)):d
 u=B.bU.j(0.35)
 return new A.D(B.d7,A.A(A.a([A.p(B.z,A.c(t,w,w,w,w,w,w,B.wf,w,w,w),B.f,w,w,new A.o(u,w,w,w,w,w,B.a6),w,24,w,w,w,w,w,24),B.ar,A.E(A.c(s,w,w,w,w,w,w,D.fJj,w,w,w),1)],x.p),B.B,w,B.e,B.h,0,w,w),w)},
-cFq(d){switch(d.a){case 0:return D.dEl
-case 1:return D.dyF
-case 2:return D.do4}}}
+cFq(d){switch(d.a){case 0:return D.dEk
+case 1:return D.dyE
+case 2:return D.do3}}}
 C.aOG.prototype={
 b_(){this.b8()
 this.b6()
@@ -3516,14 +3516,14 @@ D.bWW=new A.a_(985101,"MaterialIcons",!1)
 D.bZo=new A.ae(B.oZ,22,B.c,null,null,null)
 D.c_f=new A.ae(L.Ir,22,B.c,null,null,null)
 D.c_F=new A.ae(B.kN,16,B.c,null,null,null)
-D.do4=w(["1. Open ngmy.org in Chrome, Edge, or Safari.","2. Click Start Video in Recorder Studio.","3. Click Allow in the browser microphone prompt.","4. If blocked: click the lock icon in the address bar \u2192 Site settings \u2192 Microphone \u2192 Allow.","5. On Mac: System Settings \u2192 Privacy & Security \u2192 Microphone \u2192 enable your browser.","6. On Windows: Settings \u2192 Privacy \u2192 Microphone \u2192 allow desktop apps and your browser.","7. Refresh ngmy.org and click Start Video again."],x.s)
+D.do3=w(["1. Open ngmy.org in Chrome, Edge, or Safari.","2. Click Start Video in Recorder Studio.","3. Click Allow in the browser microphone prompt.","4. If blocked: click the lock icon in the address bar \u2192 Site settings \u2192 Microphone \u2192 Allow.","5. On Mac: System Settings \u2192 Privacy & Security \u2192 Microphone \u2192 enable your browser.","6. On Windows: Settings \u2192 Privacy \u2192 Microphone \u2192 allow desktop apps and your browser.","7. Refresh ngmy.org and click Start Video again."],x.s)
 D.a8V=new C.Cw(0,"instant")
 D.a8W=new C.Cw(1,"slideHorizontal")
 D.dZd=new C.Cw(2,"slideVertical")
 D.dZe=new C.Cw(3,"fade")
 D.a7q=w([D.a8V,D.a8W,D.dZd,D.dZe],A.as("N<Cw>"))
-D.dyF=w(["1. Open ngmy.org in Chrome (recommended).",y.k,"3. When Android asks, tap Allow while using the app.","4. If blocked: tap the lock icon in the address bar \u2192 Permissions \u2192 Microphone \u2192 Allow.","5. Or go to Settings \u2192 Apps \u2192 Chrome \u2192 Permissions \u2192 Microphone \u2192 Allow.","6. Refresh the page and tap Start Video again."],x.s)
-D.dEl=w(["1. Open ngmy.org in Safari (Add to Home Screen works too).",y.k,"3. Tap Allow when ngmy.org asks \u2014 this works with Safari set to Ask or Allow.","4. Recommended: Settings \u2192 Safari \u2192 Microphone \u2192 Ask, then Allow inside ngmy.org when recording.","5. If no prompt appears: tap the AA icon in the address bar \u2192 Website Settings \u2192 Microphone \u2192 Allow.","6. Also check: Settings \u2192 Privacy & Security \u2192 Microphone \u2192 Safari ON.","7. Close Safari completely, reopen ngmy.org, tap Start Video, then Allow."],x.s)
+D.dyE=w(["1. Open ngmy.org in Chrome (recommended).",y.k,"3. When Android asks, tap Allow while using the app.","4. If blocked: tap the lock icon in the address bar \u2192 Permissions \u2192 Microphone \u2192 Allow.","5. Or go to Settings \u2192 Apps \u2192 Chrome \u2192 Permissions \u2192 Microphone \u2192 Allow.","6. Refresh the page and tap Start Video again."],x.s)
+D.dEk=w(["1. Open ngmy.org in Safari (Add to Home Screen works too).",y.k,"3. Tap Allow when ngmy.org asks \u2014 this works with Safari set to Ask or Allow.","4. Recommended: Settings \u2192 Safari \u2192 Microphone \u2192 Ask, then Allow inside ngmy.org when recording.","5. If no prompt appears: tap the AA icon in the address bar \u2192 Website Settings \u2192 Microphone \u2192 Allow.","6. Also check: Settings \u2192 Privacy & Security \u2192 Microphone \u2192 Safari ON.","7. Close Safari completely, reopen ngmy.org, tap Start Video, then Allow."],x.s)
 D.bhB=new A.fr(null,null,null,null,null,B.bU,null,null,null,null)
 D.bg4=new A.cm(B.z,null,null,D.bhB,null)
 D.eD3=new A.D(B.eJ,D.bg4,null)
@@ -3574,4 +3574,4 @@ D.hOG=new C.aEX(1,"android")
 D.hOH=new C.aEX(2,"computer")
 D.hOI=new C.a0V(null)})();(function staticFields(){$.hiq=null})();(function lazyInitializers(){var w=a.lazyFinal
 w($,"iON","oJ",()=>new C.b3N(new C.b3L(A.a([],A.as("N<nD>"))),B.bH,$.az()))})()};
-(a=>{a["kezjzpWqZ6sQZ8mfIRhzprbt3k4="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["awjrGU37x/z6Mc8DJcdqtYKvRI0="]=a.current})($__dart_deferred_initializers__);

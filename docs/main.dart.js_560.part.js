@@ -833,10 +833,10 @@ if(w!=null&&!C.aI.gar(w))return w
 return null},
 ilR(d,e){var w,v,u,t=C.a.i(d).toLowerCase()
 if(e){w=C.d.cd(D.cQT,t)
-return w>=0?D.dqG[w]:null}v=C.d.cd(D.dEq,t)
+return w>=0?D.dqF[w]:null}v=C.d.cd(D.dEp,t)
 if(v>=0)return D.d6q[v]
 u=C.d.cd(D.dHY,t)
-return u>=0?D.dqh[u]:null},
+return u>=0?D.dqg[u]:null},
 a4_(d,e,f,g){var w=0,v=A.j(x.K),u,t=2,s=[],r,q,p,o,n,m
 var $async$a4_=A.e(function(h,i){if(h===1){s.push(i)
 w=t}for(;;)switch(w){case 0:w=3
@@ -881,7 +881,7 @@ s=$.fGI.h(0,t)
 if(s!=null)return s
 r=new Uint8Array(A.cc(H.fP8(B.hJZ(u))))
 $.fGI.n(0,t,r)
-return r}q=w?D.ddB:D.dAH
+return r}q=w?D.ddB:D.dAG
 if(C.a.i(e).length===0)p=0
 else{o=new A.di(e)
 p=o.cE(o,0,new B.fTC())}o=new A.di(g)
@@ -1053,7 +1053,7 @@ fTC:function fTC(){},
 fTD:function fTD(){},
 fTE:function fTE(){},
 a3Z(d,e){var w
-if(C.d.q(D.dp2,C.a.i(e).toUpperCase()))return!0
+if(C.d.q(D.dp1,C.a.i(e).toUpperCase()))return!0
 w=C.a.i(d).toLowerCase()
 if(C.a.q(w,"mariam")||C.a.q(w,"dusabe"))return!0
 if(C.a.q(w,"suzana-vanessa")||w==="cmp-suzana-vanessa")return!0
@@ -1310,7 +1310,7 @@ w.n(0,c2,a9?a6.h(0,c2):c6.h(a4,c2))
 w.n(0,c3,b0?a6.h(0,c3):c6.h(a4,c3))
 o[a3]=w
 n=h}}}b1=new A.O(o,new B.h_W(),x.bi).fD(0)
-for(s=0;s<20;++s){b2=D.dwz[s]
+for(s=0;s<20;++s){b2=D.dwy[s]
 c6=b2.h(0,b4)
 a7=C.a.i(J.k(c6==null?"":c6)).toUpperCase()
 if(a7.length===0||b1.q(0,a7))continue
@@ -1635,7 +1635,7 @@ if(u!=null){w=u.b[0]
 w=!C.a.q(w==null?"":w,"@")}else w=!1
 if(w)return new A.afZ("https://"+A.v(u.b[0]))
 return D.eLj},
-hGf(d,e){return new A.aJj([e,!1,null,D.dtO,"","",d==null?"":d])},
+hGf(d,e){return new A.aJj([e,!1,null,D.dtN,"","",d==null?"":d])},
 fTu(d,e){return B.iuU(d,e)},
 iuU(a1,a2){var w=0,v=A.j(x.g4),u,t=2,s=[],r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0
 var $async$fTu=A.e(function(a3,a4){if(a3===1){s.push(a4)
@@ -2456,7 +2456,7 @@ if(!w.b.test(v)){w=A.ag("\u2764|\ud83d\udc95|\ud83e\udd70|\ud83d\ude18",!0,!1,!1
 w=w.b.test(d)}else w=!0
 return w},
 hpl(d,e){if(d==="female")return D.cY1[C.o.F(A.G5(new A.W(Date.now(),0,!1)),4)]
-return D.dhO[C.o.F(A.G5(new A.W(Date.now(),0,!1)),4)]},
+return D.dhN[C.o.F(A.G5(new A.W(Date.now(),0,!1)),4)]},
 hNh(d,e){return 88+A.aF(d,C.dK,x.w).w.r.d},
 hMF(d,e,f){var w,v,u,t=C.a.i(f).toUpperCase()
 if(C.a.q(t,"MARIAM"))return"beautiful young African Black woman late teens/early 20s, soft curly afro puff, glowing skin, warm smile \u2014 same face every time"
@@ -2651,7 +2651,7 @@ if(C.d.aR(A.a([d.b.toLowerCase(),v.toLowerCase(),A.aL(w,"_"," "),d.e.toLowerCase
 u=D.dLX.h(0,w)
 if(u==null)u=C.Z
 return C.d.aR(u,new B.fWi(t))},
-a3e(d,e,f,g,h,i){var w=null,v=i?D.dxw:D.cQy,u=A.K(i?D.bkm:C.Cf,C.r,1.35),t=C.v.j(i?0.38:0.08)
+a3e(d,e,f,g,h,i){var w=null,v=i?D.dxv:D.cQy,u=A.K(i?D.bkm:C.Cf,C.r,1.35),t=C.v.j(i?0.38:0.08)
 t=A.a([new A.aa(0,C.H,t,C.du,20),new A.aa(0,C.H,D.bkQ.j(i?0.16:0.12),C.cP,24)],x.V)
 return A.by(e,A.p(w,f,C.f,w,w,new A.o(w,w,u,e,t,new A.a8(C.ay,C.aD,C.x,v,w,w),C.m),new A.o(w,w,w,e,w,new A.a8(C.aX,C.z,C.x,A.a([C.c.j(i?0.2:0.55),C.c.j(0)],x.O),w,w),C.m),w,w,w,w,w,w,w),C.aq)},
 hmW(d){var w
@@ -5674,7 +5674,7 @@ for(w=0,v=0;v<17;++v){u=d[v]
 t=A.c9(u,null)
 if(t==null)t=D.dM1.h(0,u)
 if(t==null)return null
-w+=t*D.drU[v]}s=C.o.F(w,11)
+w+=t*D.drT[v]}s=C.o.F(w,11)
 r=s===10?"X":""+s
 return d[8]===r},
 aR8(d){return B.ijC(d)},
@@ -8320,7 +8320,7 @@ s=t.fy
 if(s.c)s.jE()
 u=t.rO(f,"Perfect \u2014 filling it out now in my browser. Watch me live below \ud83d\udc40")
 w=1
-break}u=t.ac0(D.dgv,f,n===D.a8O?y.O+s.y+"). Want me to try again?":"My live browser isn't available right now. Want me to try again in a moment?")
+break}u=t.ac0(D.dgu,f,n===D.a8O?y.O+s.y+"). Want me to try again?":"My live browser isn't available right now. Want me to try again in a moment?")
 w=1
 break
 case 1:return A.h(u,v)}})
@@ -9605,7 +9605,7 @@ k=""
 j=""
 a0=""
 i=""
-h=D.dtN
+h=D.dtM
 f=G.j9
 e=G.j9}if(n.length!==0)a1=n
 else if(J.cJ(b2))a1=b2
@@ -11970,7 +11970,7 @@ u=A.c(u,q,q,q,q,q,q,A.l(q,q,r.e,q,q,q,q,q,q,q,q,11,q,q,q,q,q,!0,q,q,q,q,q,q,q,q)
 w=B.hnP(w,new B.dah(p,d),!0)
 t=A.n(20)
 s=A.a([new A.aa(0,C.H,C.hI.j(0.35+o*0.2),C.J,10)],x.V)
-m.push(new A.a5(1/0,q,A.x(A.a([l,C.M,v,C.cQ,u,C.aj,w,C.M,A.p(q,A.A(D.do5,C.l,q,C.e,C.O,0,q,q),C.f,q,q,new A.o(q,q,q,t,s,D.ccB,C.m),q,q,q,q,Z.D2,q,q,q)],n),C.l,q,C.bb,C.h,0,C.p),q))
+m.push(new A.a5(1/0,q,A.x(A.a([l,C.M,v,C.cQ,u,C.aj,w,C.M,A.p(q,A.A(D.do4,C.l,q,C.e,C.O,0,q,q),C.f,q,q,new A.o(q,q,q,t,s,D.ccB,C.m),q,q,q,q,Z.D2,q,q,q)],n),C.l,q,C.bb,C.h,0,C.p),q))
 return A.OZ(22,q,new A.am(C.a0,q,C.ad,C.f,m,q),r.b,!1,p.z,p.y,Ae.a1C,p.d*0.13,o,p.x)},
 $S:1611}
 B.dah.prototype={
@@ -12006,7 +12006,7 @@ $S:213}
 B.drw.prototype={
 $1(d){var w,v,u,t,s,r=this,q=null,p=x.p,o=A.a([],p)
 if(r.b){p=A.a([],p)
-for(w=r.a,v=0;v<6;++v){u=D.dh9[v]
+for(w=r.a,v=0;v<6;++v){u=D.dh8[v]
 t=new A.aP(30,30)
 s=w.a.f===u?C.c.j(0.15):C.L
 p.push(A.aM(!1,new A.bb(t,t,t,t),!0,A.p(q,A.c(u,q,q,q,q,q,q,C.y9,q,q,q),C.f,q,q,new A.o(s,q,q,q,q,q,C.a6),q,q,q,q,C.cu,q,q,q),q,!0,q,q,q,q,q,q,q,q,q,q,q,new B.dru(w,d,u),q,q,q,q,q,q,q))}o.push(A.A(p,C.l,q,C.ru,C.h,0,q,q))}p=r.c
@@ -13517,8 +13517,8 @@ D.bAd=new A.i4(P.akl,!0,D.bf8,null)
 D.ahh=new A.fr(2.4,null,null,null,null,C.cw,null,null,null,null)
 D.fuN=new A.a5(26,26,D.ahh,null)
 D.fU8=new A.C("Opening a live browser\u2026",null,R.hG,null,null,null,null,null,null,null,null,null)
-D.dG7=w([D.fuN,C.R,D.fU8],x.p)
-D.bAT=new A.ft(C.ah,C.e,C.O,C.l,null,C.p,null,0,D.dG7,null)
+D.dG6=w([D.fuN,C.R,D.fU8],x.p)
+D.bAT=new A.ft(C.ah,C.e,C.O,C.l,null,C.p,null,0,D.dG6,null)
 D.Hd=new A.u(1,0.7019607843137254,0.7019607843137254,0.7019607843137254,C.q)
 D.bBF=new A.iw(D.Hd,"offSwitchLabel",null,D.Hd,D.Hd,C.c,C.c,D.Hd,D.Hd,C.c,C.c)
 D.bDR=new A.bh(16e6)
@@ -13563,8 +13563,8 @@ D.c8A=new A.ee(null,null,null,"I want to learn",null,null,null,null,null,null,"e
 D.c8Q=new A.ee(null,null,null,"I speak",null,null,null,null,null,null,"e.g. English",null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,!0,null,null,null,null)
 D.av0=new A.a8(C.ay,C.aD,C.x,L.a6F,null,null)
 D.cbL=new A.a8(C.a5,C.a9,C.x,L.a6F,null,null)
-D.dwi=w([C.bB,C.nK,C.hI],x.O)
-D.ccn=new A.a8(C.ay,C.aD,C.x,D.dwi,null,null)
+D.dwh=w([C.bB,C.nK,C.hI],x.O)
+D.ccn=new A.a8(C.ay,C.aD,C.x,D.dwh,null,null)
 D.cNX=w([C.hI,C.dY],x.O)
 D.ccB=new A.a8(C.a5,C.a9,C.x,D.cNX,null,null)
 D.d54=w([C.bB,C.nK],x.O)
@@ -13616,13 +13616,13 @@ D.hRA=new B.k0(4291399786,4280555539,D.XZ,D.cJP,!1,!1,null)
 D.cJJ=w([4282595530,4281807011],x.t)
 D.hRE=new B.k0(4283051548,4278978566,D.XY,D.cJJ,!0,!1,null)
 D.ddB=w([D.hRw,D.hRQ,D.hRx,D.hRy,D.hRA,D.hRE],x.F)
-D.dgv=w(["Try again"],x.s)
-D.dh9=w(["\u2764\ufe0f","\ud83d\ude02","\ud83d\ude2e","\ud83d\ude22","\ud83d\ude21","\ud83d\udc4d"],x.s)
-D.dhO=w(["I appreciate that, honestly. I'm seeing someone right now though, so I'll keep it friendly.","That's nice of you. I'm in a relationship though, so let's keep it cool and friendly.","Haha I'm flattered, but I'm taken right now. Happy to keep chatting as friends.","Respect, and thank you. I'm with someone though, so I'll keep things friendly."],x.s)
+D.dgu=w(["Try again"],x.s)
+D.dh8=w(["\u2764\ufe0f","\ud83d\ude02","\ud83d\ude2e","\ud83d\ude22","\ud83d\ude21","\ud83d\udc4d"],x.s)
+D.dhN=w(["I appreciate that, honestly. I'm seeing someone right now though, so I'll keep it friendly.","That's nice of you. I'm in a relationship though, so let's keep it cool and friendly.","Haha I'm flattered, but I'm taken right now. Happy to keep chatting as friends.","Respect, and thank you. I'm with someone though, so I'll keep things friendly."],x.s)
 D.h6U=new A.C("Say hi",null,C.LG,null,null,null,null,null,null,null,null,null)
 D.c0f=new A.ae(C.Dx,11,C.c,null,null,null)
-D.do5=w([D.h6U,C.da,D.c0f],x.p)
-D.dp2=w(["MARIAM DUSABE","SUZANA VANESSA"],x.s)
+D.do4=w([D.h6U,C.da,D.c0f],x.p)
+D.dp1=w(["MARIAM DUSABE","SUZANA VANESSA"],x.s)
 D.cK_=w([4293675161,4292552567],x.t)
 D.hRB=new B.k0(4289755734,4279964176,D.XZ,D.cK_,!1,!0,null)
 D.XX=new B.xc(1,"braids")
@@ -13635,7 +13635,7 @@ D.cJM=w([4287323382,4286331629],x.t)
 D.hRl=new B.k0(4291399786,4280555539,D.Mm,D.cJM,!1,!0,null)
 D.cJC=w([4279286145,4278556265],x.t)
 D.hRs=new B.k0(4288441159,4279701773,D.Mn,D.cJC,!1,!0,null)
-D.dqh=w([D.hRB,D.hRz,D.hRL,D.hRl,D.hRs],x.F)
+D.dqg=w([D.hRB,D.hRz,D.hRL,D.hRl,D.hRs],x.F)
 D.hRN=new B.k0(4287257147,4279570188,D.XY,D.a64,!1,!1,null)
 D.cJw=w([4278556265,4278483031],x.t)
 D.hRK=new B.k0(4289755734,4279964176,D.Mm,D.cJw,!1,!1,null)
@@ -13654,10 +13654,10 @@ D.cJy=w([4279080072,4279203438],x.t)
 D.hRM=new B.k0(4291399786,4280555539,D.Mm,D.cJy,!1,!1,null)
 D.cJS=w([4291463684,4288766471],x.t)
 D.hRG=new B.k0(4285219366,4279701773,D.XX,D.cJS,!0,!1,null)
-D.dqG=w([D.hRN,D.hRK,D.hRp,D.hRD,D.hRH,D.hRO,D.hRm,D.hRu,D.hRM,D.hRG],x.F)
-D.drU=w([8,7,6,5,4,3,2,10,0,9,8,7,6,5,4,3,2],x.t)
-D.dtN=w([],x.o)
-D.dtO=w([],x.d)
+D.dqF=w([D.hRN,D.hRK,D.hRp,D.hRD,D.hRH,D.hRO,D.hRm,D.hRu,D.hRM,D.hRG],x.F)
+D.drT=w([8,7,6,5,4,3,2,10,0,9,8,7,6,5,4,3,2],x.t)
+D.dtM=w([],x.o)
+D.dtN=w([],x.d)
 D.kP={id:0,name:1,gender:2,role:3,emoji:4,avatarUrl:5,active:6,bio:7,personality:8}
 D.dMN=new A.bl(D.kP,["cmp-david-okonkwo","DAVID OKONKWO","male","lawyer","\ud83d\udc68\u200d\u2696\ufe0f","",!0,y.B,"You are DAVID OKONKWO, a sharp 24-year-old legal advisor. Explain legal ideas in plain, everyday language \u2014 no dense jargon. Confident, direct, a little brisk, but genuinely wants people to understand their rights. Always make clear you give general information, not formal legal representation, and tell people to consult a licensed attorney for anything serious or urgent. Sound like a real young professional, not a textbook."],x.R)
 D.dMx=new A.bl(D.kP,["cmp-samuel-kiran","SAMUEL KIRAN","male","teacher","\ud83d\udc68\u200d\ud83c\udfeb","",!0,y.Q,"You are SAMUEL KIRAN, a warm 23-year-old teacher. Break subjects down into small, clear steps, check understanding with questions instead of just lecturing, and celebrate progress. Patient, encouraging, a little playful. Never make someone feel dumb for not knowing something \u2014 that is the whole point of a teacher. Sound like a real young tutor who genuinely likes teaching."],x.R)
@@ -13679,11 +13679,11 @@ D.dMF=new A.bl(D.kP,["cmp-grace-anderson","GRACE ANDERSON","female","financial_a
 D.dMw=new A.bl(D.kP,["cmp-sophie-morgan","SOPHIE MORGAN","female","career_coach","\ud83d\udcbc","",!0,y.m,"You are SOPHIE MORGAN, a driven 23-year-old career coach. Help with resumes, interview prep, and career decisions with sharp, practical advice \u2014 never generic platitudes. Direct, encouraging, genuinely invested in people landing the job or path they want. Sound like a real young professional who has actually been through the job hunt."],x.R)
 D.dMA=new A.bl(D.kP,["cmp-chloe-mitchell","CHLOE MITCHELL","female","bible_study_teacher","\ud83d\udcd6","",!0,y.U,"You are CHLOE MITCHELL, a thoughtful 22-year-old Bible study teacher. Explain Scripture clearly, invite real questions rather than preaching at people, and use logic alongside faith. Warm but sharp-minded. Sound like a real young teacher who loves digging into the text with people."],x.R)
 D.dMI=new A.bl(D.kP,["cmp-olivia-bennett","OLIVIA BENNETT","female","fitness_coach","\ud83d\udcaa","",!0,y.s,"You are OLIVIA BENNETT, an energetic 21-year-old fitness coach. Give practical workout and nutrition guidance, hype people up without being obnoxious about it, and meet people where they are. Upbeat, motivating, genuinely invested in people's progress. Sound like a real young coach, not a fitness influencer script."],x.R)
-D.dwz=w([D.dMN,D.dMx,D.dMC,D.dME,D.dMH,D.dMG,D.dMz,D.dMK,D.dMO,D.dMM,D.dMy,D.dMv,D.dMD,D.dMJ,D.dML,D.dMB,D.dMF,D.dMw,D.dMA,D.dMI],x.X)
+D.dwy=w([D.dMN,D.dMx,D.dMC,D.dME,D.dMH,D.dMG,D.dMz,D.dMK,D.dMO,D.dMM,D.dMy,D.dMv,D.dMD,D.dMJ,D.dML,D.dMB,D.dMF,D.dMw,D.dMA,D.dMI],x.X)
 D.bk9=new A.u(1,0.23921568627450981,0.19607843137254902,0.25882352941176473,C.q)
 D.bmu=new A.u(1,0.16470588235294117,0.13333333333333333,0.18823529411764706,C.q)
 D.bjc=new A.u(1,0.10196078431372549,0.08235294117647059,0.10980392156862745,C.q)
-D.dxw=w([D.bk9,D.bmu,D.bjc],x.O)
+D.dxv=w([D.bk9,D.bmu,D.bjc],x.O)
 D.a7z=w(["MARIAM DUSABE","SUZANA VANESSA","ANNA AMURI","SUZANA MBUTO","SUZY BENET","MINA SAMUEL"],x.s)
 D.aEH=w(["Yes, use these","Change something"],x.s)
 D.hRF=new B.k0(4289755734,4279964176,D.Mm,D.aAL,!1,!0,null)
@@ -13697,42 +13697,42 @@ D.hRt=new B.k0(4291399786,4280555539,D.aeo,D.a65,!1,!0,null)
 D.cJY=w([4293548044,4290920716],x.t)
 D.hRI=new B.k0(4288441159,4279701773,D.aeo,D.cJY,!1,!0,null)
 D.hRn=new B.k0(4283051548,4278978566,D.Mn,D.a64,!1,!0,null)
-D.dAH=w([D.hRF,D.hRq,D.hRv,D.hRt,D.hRI,D.hRn],x.F)
-D.dEq=w(["emma carson","grace anderson","sophie morgan","chloe mitchell","olivia bennett"],x.s)
+D.dAG=w([D.hRF,D.hRq,D.hRv,D.hRt,D.hRI,D.hRn],x.F)
+D.dEp=w(["emma carson","grace anderson","sophie morgan","chloe mitchell","olivia bennett"],x.s)
 D.dHY=w(["anika weston","nia robertson","destiny okafor","jasmine cole","aaliyah grant"],x.s)
 D.e5X=new B.mg("name","Name",C.mu,M.aA_,C.eH)
-D.dvO=w([C.ju,C.kb],x.O)
-D.e5O=new B.mg("email","Email",C.tF,D.dvO,C.hk)
-D.dld=w([C.fm,C.h6],x.O)
-D.e5R=new B.mg("phone","Phone",C.A3,D.dld,C.k9)
-D.dD6=w([C.iY,C.de],x.O)
-D.e5I=new B.mg("address","Home address",C.kM,D.dD6,C.oA)
-D.dxF=w([C.oE,C.cZ],x.O)
-D.e5W=new B.mg("place","Location",C.vx,D.dxF,C.n9)
-D.dnn=w([C.k8,C.lQ],x.O)
-D.e5V=new B.mg("age","Age",C.Ih,D.dnn,C.pB)
+D.dvN=w([C.ju,C.kb],x.O)
+D.e5O=new B.mg("email","Email",C.tF,D.dvN,C.hk)
+D.dlc=w([C.fm,C.h6],x.O)
+D.e5R=new B.mg("phone","Phone",C.A3,D.dlc,C.k9)
+D.dD5=w([C.iY,C.de],x.O)
+D.e5I=new B.mg("address","Home address",C.kM,D.dD5,C.oA)
+D.dxE=w([C.oE,C.cZ],x.O)
+D.e5W=new B.mg("place","Location",C.vx,D.dxE,C.n9)
+D.dnm=w([C.k8,C.lQ],x.O)
+D.e5V=new B.mg("age","Age",C.Ih,D.dnm,C.pB)
 D.dcG=w([C.fy,C.tk],x.O)
 D.e5U=new B.mg("time","Availability",C.jZ,D.dcG,C.a05)
 D.dGQ=w([C.pE,C.fv],x.O)
 D.e5H=new B.mg("date","Date",C.zY,D.dGQ,C.b3)
-D.dqJ=w([C.ei,C.es],x.O)
-D.e5G=new B.mg("money","Money",C.iv,D.dqJ,C.bM)
-D.dDI=w([C.fW,C.wR],x.O)
-D.e5P=new B.mg("job","Job",C.q2,D.dDI,C.n5)
-D.djU=w([C.dl,C.dW],x.O)
-D.e5K=new B.mg("link","Website",C.i2,D.djU,C.dG)
-D.dxu=w([C.yN,Ai.a_b],x.O)
-D.e5T=new B.mg("confirm","Quick check",Ah.DP,D.dxu,C.a_W)
+D.dqI=w([C.ei,C.es],x.O)
+D.e5G=new B.mg("money","Money",C.iv,D.dqI,C.bM)
+D.dDH=w([C.fW,C.wR],x.O)
+D.e5P=new B.mg("job","Job",C.q2,D.dDH,C.n5)
+D.djT=w([C.dl,C.dW],x.O)
+D.e5K=new B.mg("link","Website",C.i2,D.djT,C.dG)
+D.dxt=w([C.yN,Ai.a_b],x.O)
+D.e5T=new B.mg("confirm","Quick check",Ah.DP,D.dxt,C.a_W)
 D.bud=new A.u(1,0.4392156862745098,0.10196078431372549,0.4588235294117647,C.q)
-D.dC2=w([D.bud,C.alJ],x.O)
-D.e5N=new B.mg("choice","Your pick",C.DR,D.dC2,C.tj)
-D.dxP=w([A_.CM,C.dD],x.O)
-D.aN0=new B.mg("question","Question",C.zZ,D.dxP,C.Ne)
+D.dC1=w([D.bud,C.alJ],x.O)
+D.e5N=new B.mg("choice","Your pick",C.DR,D.dC1,C.tj)
+D.dxO=w([A_.CM,C.dD],x.O)
+D.aN0=new B.mg("question","Question",C.zZ,D.dxO,C.Ne)
 D.e5Y=new B.mg("warning","Important",C.q1,M.aFF,C.f1)
-D.dhT=w([C.a0e,C.CB],x.O)
-D.e5M=new B.mg("win","Great news",C.kl,D.dhT,C.eG)
-D.djs=w([C.pI,C.wH],x.O)
-D.e5J=new B.mg("tip","Tip",X.l9,D.djs,C.oM)
+D.dhS=w([C.a0e,C.CB],x.O)
+D.e5M=new B.mg("win","Great news",C.kl,D.dhS,C.eG)
+D.djr=w([C.pI,C.wH],x.O)
+D.e5J=new B.mg("tip","Tip",X.l9,D.djr,C.oM)
 D.dIr=w([C.z2,C.hI],x.O)
 D.e5Q=new B.mg("heart","From the heart",C.hP,D.dIr,C.GB)
 D.bUT=new A.a_(63454,"MaterialIcons",!1)
@@ -13761,28 +13761,28 @@ D.dRB=new B.jh("Wisdom Advisor","Elder experience for life\u2019s harder questio
 D.dRy=new B.jh("Bible Study Advisor","Scripture opened with care \u2014 teaching, clarity, and pastoral warmth on NGMY Advisors.","Humble instruction. Faith-led. Respectful and clear.")
 D.dLM=new A.bl(D.euW,[D.dRx,D.dRg,D.dRq,D.aLT,D.aLT,D.dRd,D.dRj,D.dRF,D.dRA,D.dRG,D.dRB,D.dRy],x.G)
 D.ev1={teacher:0,lawyer:1,financial_advisor:2,pastor:3,bible_study_teacher:4,debater:5,marriage_advisor:6,doctor:7,therapist:8,counselor:9,mentor:10,career_coach:11,fitness_coach:12,life_coach:13,romantic:14,friend:15,translator:16,mshauri:17,pickup_line:18,smart_mouth:19,text_coach:20}
-D.dig=w(["teach","tutor","school","homework","education","class"],x.s)
-D.dE3=w(["legal","attorney","law","court","rights"],x.s)
-D.dyS=w(["finance","financial","money","budget","invest","saving","debt"],x.s)
-D.dk9=w(["church","faith","spiritual","prayer","god","bible","ministry"],x.s)
+D.dif=w(["teach","tutor","school","homework","education","class"],x.s)
+D.dE2=w(["legal","attorney","law","court","rights"],x.s)
+D.dyR=w(["finance","financial","money","budget","invest","saving","debt"],x.s)
+D.dk8=w(["church","faith","spiritual","prayer","god","bible","ministry"],x.s)
 D.cYD=w(["bible","scripture","gospel","john","corinthians","trinity","christian","study","jesus"],x.s)
-D.di1=w(["debate","debating","apologetics","muslim","islam","atheist","argue","defend","christian"],x.s)
-D.dvh=w(["marriage","wedding","husband","wife","couple","african","traditional","muslim","quran","islam"],x.s)
-D.dy2=w(["medical","health","medicine","physician","nurse","symptom"],x.s)
-D.dqB=w(["therapy","mental","anxiety","depression","counsel"],x.s)
-D.ds7=w(["counsel","guidance","support"],x.s)
-D.dzU=w(["mentoring","coach","guide"],x.s)
-D.dnv=w(["career","job","resume","interview","work"],x.s)
-D.dmw=w(["fitness","workout","gym","exercise","nutrition"],x.s)
-D.dyL=w(["life","goals","habits","motivation"],x.s)
-D.dyR=w(["love","dating","partner","relationship"],x.s)
-D.dri=w(["buddy","pal","chat"],x.s)
+D.di0=w(["debate","debating","apologetics","muslim","islam","atheist","argue","defend","christian"],x.s)
+D.dvg=w(["marriage","wedding","husband","wife","couple","african","traditional","muslim","quran","islam"],x.s)
+D.dy1=w(["medical","health","medicine","physician","nurse","symptom"],x.s)
+D.dqA=w(["therapy","mental","anxiety","depression","counsel"],x.s)
+D.ds6=w(["counsel","guidance","support"],x.s)
+D.dzT=w(["mentoring","coach","guide"],x.s)
+D.dnu=w(["career","job","resume","interview","work"],x.s)
+D.dmv=w(["fitness","workout","gym","exercise","nutrition"],x.s)
+D.dyK=w(["life","goals","habits","motivation"],x.s)
+D.dyQ=w(["love","dating","partner","relationship"],x.s)
+D.drh=w(["buddy","pal","chat"],x.s)
 D.db1=w(["language","translate","spanish","french","english"],x.s)
-D.dFe=w(["mshauri","advisor","advise","babembe","congo","congolese","fizi","swahili","kibembe","community","comfort","civic","registry","president","leader"],x.s)
-D.dln=w(["pickup","pick up","flirt","rizz","opener","dating","crush","girl","guy","line"],x.s)
-D.dE0=w(["smart mouth","comeback","witty","roast","clap back","savage","funny","joke"],x.s)
+D.dFd=w(["mshauri","advisor","advise","babembe","congo","congolese","fizi","swahili","kibembe","community","comfort","civic","registry","president","leader"],x.s)
+D.dlm=w(["pickup","pick up","flirt","rizz","opener","dating","crush","girl","guy","line"],x.s)
+D.dE_=w(["smart mouth","comeback","witty","roast","clap back","savage","funny","joke"],x.s)
 D.ddU=w(["text","reply","what to say","screenshot","conversation","dm","message","rizz","dating"],x.s)
-D.dLX=new A.bl(D.ev1,[D.dig,D.dE3,D.dyS,D.dk9,D.cYD,D.di1,D.dvh,D.dy2,D.dqB,D.ds7,D.dzU,D.dnv,D.dmw,D.dyL,D.dyR,D.dri,D.db1,D.dFe,D.dln,D.dE0,D.ddU],A.as("bl<m,ai<m>>"))
+D.dLX=new A.bl(D.ev1,[D.dif,D.dE2,D.dyR,D.dk8,D.cYD,D.di0,D.dvg,D.dy1,D.dqA,D.ds6,D.dzT,D.dnu,D.dmv,D.dyK,D.dyQ,D.drh,D.db1,D.dFd,D.dlm,D.dE_,D.ddU],A.as("bl<m,ai<m>>"))
 D.eut={A:0,B:1,C:2,D:3,E:4,F:5,G:6,H:7,J:8,K:9,L:10,M:11,N:12,P:13,R:14,S:15,T:16,U:17,V:18,W:19,X:20,Y:21,Z:22}
 D.dM1=new A.bl(D.eut,[1,2,3,4,5,6,7,8,1,2,3,4,5,7,9,2,3,4,5,6,7,8,9],A.as("bl<m,F>"))
 D.ewL={companion:0,romantic:1,friend:2,therapist:3,teacher:4,lawyer:5,financial_advisor:6,pastor:7,bible_study_teacher:8,debater:9,marriage_advisor:10,doctor:11,counselor:12,mentor:13,career_coach:14,fitness_coach:15,life_coach:16,translator:17,mshauri:18,pickup_line:19,smart_mouth:20,text_coach:21}
@@ -13924,4 +13924,4 @@ w($,"iLz","hTO",()=>A.ag('\\b((?:[a-z0-9-]+\\.)+(?:com|org|net|io|co|ai|app|dev|
 w($,"iLC","hTQ",()=>A.ag("\\b(open|go to|goto|visit|pull up|load|check out|look at|browse)\\b.{0,40}\\b(site|website|web ?page|page|link|url|browser|online)\\b|\\b(open|use) (the|your|a) browser\\b|\\bbrowse\\b|\\bsearch (the )?(web|internet|online|google)\\b|\\bgoogle (it|that|this|for)\\b|\\b(search online for|search for|look up|look it up|look that up|find online)\\b|\\b(latest|today'?s|current|live|right now)\\b.{0,25}\\b(news|price|prices|score|scores|weather|rate|rates|results|headlines)\\b",!1,!1,!1,!1))
 v($,"hzh","hs5",()=>A.f8(null,x.H))
 w($,"iNQ","hVc",()=>A.ag("\\b[A-HJ-NPR-Z0-9]{17}\\b",!1,!1,!1,!1))})()};
-(a=>{a["7BYItM+Fr39Qv9VzAqYogZlB/hE="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["FOZrS/Y/Bdo1+nk+IWrpWnx9QYE="]=a.current})($__dart_deferred_initializers__);
