@@ -1,4 +1,4 @@
-// Signal Grid — Fast Systems screen (Options, Scalper). Paper only, pretend money.
+// Signal Grid — Fast Systems screen (Options, Scalper). Paper only.
 //
 // Opened from the icons at the top of the Signal Grid agent screen; back returns there. Each system has its own
 // Start/Stop, history, win rate and brakes, and shares ONE paper balance with the main agent. Every trade closes
@@ -1091,7 +1091,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Pretend trades',
+            'Trades',
             style: TextStyle(color: p.ink, fontSize: 16, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 6),

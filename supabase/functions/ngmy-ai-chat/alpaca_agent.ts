@@ -28,7 +28,7 @@ export const PA_ACTIONS = new Set([
   "fsTick", "fsStatus", "fsSet", "fsLog",
 ]);
 
-/** The newest pretend buys and sells of all three systems (main agent, Options, Scalper), newest first. Each has a
+/** The newest buys and sells of all three systems (main agent, Options, Scalper), newest first. Each has a
  *  unique key, so the app notifies once per trade. */
 async function tradeFeed(db: any): Promise<any[]> {
   const pick = "id,created_at,asset,decision,reason,details";
@@ -54,7 +54,7 @@ async function tradeFeed(db: any): Promise<any[]> {
   }
 }
 
-/** Every closed pretend trade of the main agent added together (for the shared balance). */
+/** Every closed trade of the main agent added together (for the shared balance). */
 async function landingClosedPnl(db: any): Promise<number> {
   const { data } = await db.from("ngmy_alpaca_agent_log").select("pnl:details->pnl").eq("decision", "would sell").order("id", { ascending: false }).limit(1000);
   return round2((data ?? []).reduce((s: number, r: any) => s + Number(r?.pnl ?? 0), 0));
@@ -377,10 +377,10 @@ export function etParts(d: Date) {
   return { dayKey, weekday, hour, minute, weekend: weekday === "Sat" || weekday === "Sun", label };
 }
 
-/** A SPY call option contract (pretend). Prices are per share; one contract = 100 shares. */
+/** A SPY call option contract. Prices are per share; one contract = 100 shares. */
 export type OptionInfo = { contract: string; strike: number; expiry: string; premium: number; cost: number; right?: "call" | "put" };
 
-/** The pretend position. For an option: symbol "SPY" (the market it follows), qty 1 contract, mult 100,
+/** The position. For an option: symbol "SPY" (the market it follows), qty 1 contract, mult 100,
  *  entryPrice = the premium per share paid, and `option` has the contract. */
 export type Shadow = { symbol: string; qty: number; entryPrice: number; entryAt: string; mult?: number; option?: OptionInfo } | null;
 
@@ -481,7 +481,7 @@ export function decide(x: DecideInput): Decision {
   return { decision: "would buy", reason: `buy signal on ${x.asset}: fast average crossed above slow and ${x.bigTrend.why}${mom}, would buy ${r.tradeUsd}` };
 }
 
-/** An open pretend position at a price: what it is worth and its win or loss in dollars. */
+/** An open position at a price: what it is worth and its win or loss in dollars. */
 export function heldMark(s: NonNullable<Shadow>, price: number) {
   const m = s.mult ?? 1;
   const p = price || s.entryPrice;
@@ -1585,7 +1585,7 @@ async function runCheck(db: any): Promise<Record<string, unknown>> {
     snapshot: {
       ...acct, at: now.toISOString(), etTime: et.label, stockOpen, markets: slimCards(cards, focus.symbol),
       asset: focus.symbol, price, chart: focusCard?.chart ?? null,
-      // The open pretend position marked to market (for an option: its own price, not the SPY price).
+      // The open position marked to market (for an option: its own price, not the SPY price).
       held: shadow && d.decision !== "would sell" ? heldMark(shadow, heldPrice) : null,
       cryptoList: nowCrypto, cryptoFromAlpaca: crypto.fromAlpaca, cryptoDropped, cooldowns,
     },
@@ -1628,7 +1628,7 @@ async function runCheck(db: any): Promise<Record<string, unknown>> {
       bigTrendOk: focus.big?.ok ?? null, exitOnly: holding, topRanked, topN: pace.topN, maxHold: pace.maxHold,
       // Every market the agent looked at in this check.
       scanned: scans.map((s) => ({ s: s.symbol, p: s.price, f: s.fast, sl: s.slow, sig: s.signal, open: s.open })),
-      // The money side of a pretend trade, so the app can show what went in and what came out.
+      // The money side of a trade, so the app can show what went in and what came out.
       // For a SPY option, prices are the option premium per share, and option has the contract (strike, expiry).
       ...(d.decision === "would buy" && newShadow ? {
         amount: round2(newShadow.qty * (newShadow.mult ?? 1) * newShadow.entryPrice), qty: newShadow.qty, mult: newShadow.mult ?? 1,
@@ -1746,7 +1746,7 @@ export async function handleAlpacaAgent(
         rules: PA_RULE_LINES,
         nowEt: etNow.label,
         signals: board,
-        // Admins: the newest pretend trades of every system, so the app can notify on each new buy or sell.
+        // Admins: the newest trades of every system, so the app can notify on each new buy or sell.
         ...(isAdmin ? { tradeFeed: await tradeFeed(db) } : {}),
       },
     };
@@ -1880,7 +1880,7 @@ export async function handleAlpacaAgent(
   const newWins = newPnls.filter((p) => p > 0).length;
   const record = {
     wins: pnls.filter((p) => p > 0).length, losses: pnls.filter((p) => p <= 0).length, trades: pnls.length,
-    // Every finished pretend trade added together: the screen adds this to the paper balance.
+    // Every finished trade added together: the screen adds this to the paper balance.
     pnlSum: round2(pnls.reduce((s, p) => s + p, 0)),
     winRatePct: pnls.length ? Math.round(pnls.filter((p) => p > 0).length / pnls.length * 100) : null,
     newRules: {
@@ -1905,7 +1905,7 @@ export async function handleAlpacaAgent(
       brakeNote: PA_BRAKE_NOTE,
       cooldowns,
       whyFix: PA_FIX_WHY,
-      // The other systems (Options, Scalper) share this paper balance: their closed and open pretend P/L.
+      // The other systems (Options, Scalper) share this paper balance: their closed and open P/L.
       fast,
       ticket: {
         amount: PA_RULES.tradeUsd, takeProfitUsd: PA_RULES.takeProfitUsd, stopLossUsd: PA_RULES.stopLossUsd,

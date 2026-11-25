@@ -20,7 +20,7 @@
 // Every lesson is written to the day's row and the activity log the moment it is applied.
 //
 // PAPER ONLY. No order code here at all: only GET requests to Alpaca's paper endpoint and data feed, through the
-// main agent's read-only GET helper. Pretend trades, written to the fast-systems tables.
+// main agent's read-only GET helper. Trades, written to the fast-systems tables.
 
 // deno-lint-ignore-file no-explicit-any
 
@@ -822,7 +822,7 @@ async function countBlock(db: any, id: SystemId, day: any, key: string) {
   await saveDay(db, id, day, { blocks });
 }
 
-/** Every closed pretend trade of one or all fast systems: wins, losses, win rate, total. */
+/** Every closed trade of one or all fast systems: wins, losses, win rate, total. */
 async function recordFs(db: any, id?: SystemId) {
   let q = db.from("ngmy_fast_log").select("pnl:details->pnl").eq("decision", "would sell").order("id", { ascending: false }).limit(2000);
   if (id) q = q.eq("system", id);
@@ -862,7 +862,7 @@ async function marketRecordsFs(db: any, id: SystemId, store?: { rows: TradeRow[]
   return { records, lastSold, today, rows };
 }
 
-/** For the shared balance on the main agent screen: closed and open pretend P/L of the fast systems. */
+/** For the shared balance on the main agent screen: closed and open P/L of the fast systems. */
 export async function fastSharedPnl(db: any): Promise<{ closed: number; open: number; systems: any[] }> {
   try {
     const states = await loadFs(db);

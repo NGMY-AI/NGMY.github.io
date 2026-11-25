@@ -4,7 +4,7 @@
 // Live signals: every market read with the same rules the agent trades by (trend, strength, RSI, last hour).
 // Ask: the app's AI (through bright-handler, with its normal limits) answers questions, given the live readings
 // and the agent's state, so answers talk about what the market is doing right now.
-// Educational practice with pretend money. Signals can fail; nothing here is a promise of profit.
+// Educational practice. Signals can fail; nothing here is a promise of profit.
 
 part of 'ngmy_signal_grid_agent.dart';
 
@@ -583,7 +583,7 @@ const _lessons = <_Lesson>[
     ('The idea', "Trading means buying something and selling it later. You make money when you sell for more than you paid, and you lose money when you sell for less. That is all a trade is."),
     ('Why prices move', "Every price is set by buyers and sellers. When more people want to buy than sell, the price goes up. When more want to sell, it goes down. A chart is simply a picture of that tug of war over time."),
     ('Nobody knows the future', "No person, app or AI can know for sure where a price goes next. Good traders do not guess. They follow clear rules, keep losses small, and let the winners pay for the losers."),
-    ('Why pretend money first', "This agent uses Alpaca paper money: real prices, fake dollars. You can learn every step, make mistakes and see real results without risking a cent. Professionals practise this way too."),
+    ('Why practise first', "This agent uses Alpaca paper money: real prices, fake dollars. You can learn every step, make mistakes and see real results without risking a cent. Professionals practise this way too."),
   ], [
     _Quiz('When do you make money on a trade?', ['When you buy', 'When you sell for more than you paid', 'When the market opens'], 1, 'Profit only exists after you sell higher than you bought.'),
     _Quiz('What makes a price go up?', ['More buyers than sellers', 'The app', 'The time of day'], 0, 'More people wanting to buy pushes the price up.'),
@@ -661,7 +661,7 @@ const _lessons = <_Lesson>[
   ]),
   _Lesson('practice', 'Practising like a pro', 'Journals, patience and judging results', 5, Icons.emoji_events_rounded, Color(0xFF22C55E), 'practice', [
     ('Judge many trades, not one', "One trade tells you nothing. Luck decides single trades. After 20 to 50 trades you start to see if a method really works. That is why the plan is 2 to 4 weeks of paper trading."),
-    ('Keep a journal', "For each trade write: why you bought, where your stop and target were, what happened, and what you learned. The Pretend trades list on the main screen is the agent's journal."),
+    ('Keep a journal', "For each trade write: why you bought, where your stop and target were, what happened, and what you learned. The Trades list on the main screen is the agent's journal."),
     ('Follow the rules exactly', "The point of the agent is to follow rules perfectly, with no fear and no greed. Check that it did. If it ever breaks a rule, that is a bug to fix before real money."),
     ('Before real money', "Real money comes only after a long paper test with a positive result, a full review, and money you can truly afford to lose. Never borrow to trade."),
   ], [
@@ -899,7 +899,7 @@ class _NgmySignalGridLearnScreenState extends State<NgmySignalGridLearnScreen> w
     // The agent's own account and trades are shared with the tutor only for admins.
     if (_status != null) {
       b.writeln('Agent: ${st['enabled'] == true ? 'running' : 'stopped'}${st['brakePaused'] == true ? ', paused by the 25 dollar brake' : ''}. '
-          'Pretend P/L all time ${_money(_d(st['totalPnl']))}, today ${_money(_d(today['day_pnl']))}, wins ${rec['wins'] ?? 0}, losses ${rec['losses'] ?? 0}.');
+          'P/L all time ${_money(_d(st['totalPnl']))}, today ${_money(_d(today['day_pnl']))}, wins ${rec['wins'] ?? 0}, losses ${rec['losses'] ?? 0}.');
     }
     if (_status == null) {
       // Members: market data only.
@@ -912,13 +912,13 @@ class _NgmySignalGridLearnScreenState extends State<NgmySignalGridLearnScreen> w
       final pnl = mark['pnl'] == null ? null : _d(mark['pnl']);
       final pnlText = pnl == null ? 'unknown' : pnl.toStringAsFixed(2);
       b.writeln(opt != null
-          ? 'Open pretend trade: 1 SPY call option, strike ${_d(opt['strike']).toStringAsFixed(0)}, expires ${opt['expiry']}, '
+          ? 'Open trade: 1 SPY call option, strike ${_d(opt['strike']).toStringAsFixed(0)}, expires ${opt['expiry']}, '
               'premium paid ${entry.toStringAsFixed(2)} a share (${_d(opt['cost']).toStringAsFixed(2)} dollars). '
               'Win or loss now: $pnlText dollars. It sells at +50 or -50 dollars.'
-          : 'Open pretend trade: ${sh['symbol']}, bought at ${entry.toStringAsFixed(2)}, now ${now.toStringAsFixed(2)}. '
+          : 'Open trade: ${sh['symbol']}, bought at ${entry.toStringAsFixed(2)}, now ${now.toStringAsFixed(2)}. '
               'Win or loss now: $pnlText dollars. It sells at +50 or -50 dollars.');
     } else {
-      b.writeln('No open pretend trade.');
+      b.writeln('No open trade.');
     }
     String line(Map<String, dynamic> m) {
       final r = _map(m['reading']);
@@ -966,7 +966,7 @@ How to answer:
 - Plain, friendly, simple English. Short sentences. No jargon without explaining it. Usually under 170 words.
 - When the question is about a market or "right now", use the LIVE DATA and quote the real numbers (price, trend, strength, RSI, last hour), then explain what they mean and what the agent's rules say.
 - Say clearly whether a market looks bullish, bearish or sideways and why, and what would need to happen for a buy or sell signal under the agent's rules.
-- This is practice with pretend (paper) money. You may explain what the rules signal, but never promise profit, never say a price will surely go up or down, and never tell the student to trade real or borrowed money. Remind them briefly when it fits that signals can fail and the stop loss keeps losses small.
+- This is practice. You may explain what the rules signal, but never promise profit, never say a price will surely go up or down, and never tell the student to trade real or borrowed money. Remind them briefly when it fits that signals can fail and the stop loss keeps losses small.
 - No markdown headings or tables. You may use short lines starting with "- ".
 
 AGENT RULES:
@@ -1126,7 +1126,7 @@ Tutor:''';
       const SizedBox(height: 14),
       for (var i = 0; i < _lessons.length; i++) _lessonRow(p, i),
       const SizedBox(height: 6),
-      Text('Practice with pretend money. Signals and lessons are for learning; markets can always surprise.',
+      Text('Practice only, no real money. Signals and lessons are for learning; markets can always surprise.',
           textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 11)),
     ]);
   }
@@ -1320,7 +1320,7 @@ Tutor:''';
               'That is why a journal and many trades matter: some markets suit a method, others do not.');
         }
         final rec = _map(_status?['record']);
-        return say('The agent journal so far: ${rec['trades'] ?? 0} finished pretend trades, ${rec['wins'] ?? 0} wins and ${rec['losses'] ?? 0} losses. '
+        return say('The agent journal so far: ${rec['trades'] ?? 0} finished trades, ${rec['wins'] ?? 0} wins and ${rec['losses'] ?? 0} losses. '
             'Keep watching until there are at least 20 before judging it.');
     }
     return const SizedBox.shrink();

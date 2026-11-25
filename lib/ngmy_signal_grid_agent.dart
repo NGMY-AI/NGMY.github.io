@@ -3,7 +3,7 @@
 // This screen is only the control panel. The agent itself runs on the server (bright-handler, called every
 // 5 minutes by Supabase pg_cron), so it keeps going when the phone is off. The Alpaca keys live only in
 // Supabase secrets and never reach this app. Version 1 places no orders: it logs what it WOULD do with a
-// pretend $100 trade ($100 of a stock on weekdays, of a coin on weekends).
+// $100 trade ($100 of a stock on weekdays, of a coin on weekends).
 
 import 'dart:async';
 import 'dart:convert';
@@ -239,7 +239,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
   }
 
   /// "Check now" only LOOKS: a fresh read of every market. It never buys or sells; only the automatic
-  /// 5-minute check on the server makes pretend trades.
+  /// 5-minute check on the server makes trades.
   Future<void> _scanNow() async {
     setState(() => _busy = true);
     final res = await ngmyEdgeInvoke({'action': 'paCheck'}, timeout: const Duration(seconds: 60));
@@ -275,7 +275,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
       const SizedBox(height: 14),
       Text('What the agent sees right now', style: TextStyle(color: p.ink, fontSize: 19, fontWeight: FontWeight.w900)),
       const SizedBox(height: 4),
-      Text('Check now only looks. It never buys or sells. Pretend trades are made only by the automatic check every 5 minutes'
+      Text('Check now only looks. It never buys or sells. Trades are made only by the automatic check every 5 minutes'
           '${st['enabled'] == true ? ' (next one ${_nextAuto()})' : ' (the agent is stopped, so none will be made)'}.',
           style: TextStyle(color: p.muted, fontSize: 12.5, height: 1.35)),
       const SizedBox(height: 12),
@@ -470,7 +470,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
                 style: TextStyle(color: p.muted, fontSize: 11, height: 1.3)),
             if (oldHeld) ...[
               const SizedBox(height: 4),
-              Text('Still holding the $heldSym pretend trade from before: the agent keeps checking its exits every 5 minutes.',
+              Text('Still holding the $heldSym trade from before: the agent keeps checking its exits every 5 minutes.',
                   style: const TextStyle(color: _btc, fontSize: 11, fontWeight: FontWeight.w700, height: 1.3)),
             ],
           ]),
@@ -827,7 +827,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     final rec = _map(s['record']);
     final ticket = _map(s['ticket']);
     // Version 1 sends no orders, so the Alpaca paper account itself never changes. The balance shown here is
-    // that account PLUS every finished pretend trade PLUS the open pretend trade's gain or loss right now,
+    // that account PLUS every finished trade PLUS the open trade's gain or loss right now,
     // so it goes up when the agent wins and down when it loses.
     final total = rec['pnlSum'] != null ? _d(rec['pnlSum']) : _d(st['totalPnl']);
     final day = _d(today['day_pnl']);
@@ -846,7 +846,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     final nr = _map(rec['newRules']);
     final rate = nr['winRatePct'];
     final base = _d(snap['equity']);
-    // ONE shared paper balance: the Options and Scalper systems' closed and open pretend trades count here too.
+    // ONE shared paper balance: the Options and Scalper systems' closed and open trades count here too.
     final fast = _map(s['fast']);
     final others = _d(fast['closed']) + _d(fast['open']);
     final balance = base + total + open + others;
@@ -1078,7 +1078,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
         ]),
       );
 
-  // ── Open pretend position
+  // ── Open position
 
   Widget _positionCard(_Pal p, Map<String, dynamic> sh, Map<String, dynamic> snap, Map<String, dynamic> ticket, Map<String, dynamic> mark) {
     final entry = _d(sh['entryPrice']);
@@ -1105,7 +1105,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
       p,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          _sectionTitle(p, 'Your pretend position'),
+          _sectionTitle(p, 'Your position'),
           const Spacer(),
           _pill('OPEN', _up),
         ]),
@@ -1251,7 +1251,7 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     final on = st['enabled'] == true && st['brakePaused'] != true;
     final last = DateTime.tryParse('${st['lastTickAt'] ?? ''}');
     final c = on ? _up : p.muted;
-    // Which market the current (or the last) pretend trade came from.
+    // Which market the current (or the last) trade came from.
     final sh = st['shadow'] is Map ? _map(st['shadow']) : null;
     final trades = ((s['trades'] as List?) ?? const []).whereType<Map>().toList();
     final lastTrade = trades.isEmpty ? null : _map(trades.first);
@@ -1323,14 +1323,14 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
     );
   }
 
-  // ── Pretend trade history
+  // ── Trade history
 
   Widget _tradesCard(_Pal p, Map<String, dynamic> s) {
     final trades = ((s['trades'] as List?) ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
     return _card(
       p,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _sectionTitle(p, 'Pretend trades'),
+        _sectionTitle(p, 'Trades'),
         const SizedBox(height: 8),
         if (trades.isEmpty)
           Padding(
@@ -1865,7 +1865,7 @@ class _CandlePainter extends CustomPainter {
       );
     }
 
-    // pretend buy price: a thin line only (no box over the candles)
+    // buy price: a thin line only (no box over the candles)
     if (entry != null) _dashed(canvas, y(entry!), cw, _btc, '', left: true);
 
     // last price: a thin line across the candles and a small tag in the right margin

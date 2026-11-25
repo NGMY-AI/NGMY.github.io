@@ -6,7 +6,7 @@
 // and checks once a minute for newly given STRONG signals (at most 5 a day, given at the 30-minute checks).
 // Each one says it is built for a 15 to 30 minute expiry, never for 1 to 5 minute trades.
 //
-// Admins also get a notification for every pretend trade any system makes (Signal Grid, Options, Scalper):
+// Admins also get a notification for every trade any system makes (Signal Grid, Options, Scalper):
 // each new buy and each new sell, once.
 
 import 'dart:async';
@@ -84,7 +84,7 @@ class NgmySignalAlerts {
 
   static const _seenKey = 'ngmy_signal_grid_trades_seen';
 
-  /// One notification per new pretend trade (buy or sell) of any system. The first time, the trades already
+  /// One notification per new trade (buy or sell) of any system. The first time, the trades already
   /// there are only remembered, never announced; trades older than an hour are never announced.
   static Future<void> _tradeAlerts(dynamic feed) async {
     if (feed is! List) return; // not an admin
