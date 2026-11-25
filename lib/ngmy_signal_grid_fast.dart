@@ -367,28 +367,11 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
     final pc = _map(s['pace']);
     final target = _d(pc['target'] ?? 40).toInt();
     final trades = _d(pc['trades']).toInt();
-    final expected = _d(pc['expected']).toInt();
-    final behind = _d(pc['deficit']) > 0;
     final thr = _d(pc['thresholdPct']);
-    final start = _d(pc['startPct']);
+    final floor = _d(pc['entryFloor'] ?? 0.5);
     final minsLeft = _d(pc['minutesLeft']).toInt();
-    final steps = ((pc['lines'] as List?) ?? const []).map((e) => '$e').toList();
     final ranking = ((s['ranking'] as List?) ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
-    final c = trades >= target
-        ? _up
-        : behind
-        ? _down
-        : _up;
-    final status = trades >= target
-        ? 'target reached'
-        : behind
-        ? 'behind pace by ${_d(pc['deficit']).toInt()}'
-        : 'on pace';
-    final ladderText = trades >= target
-        ? 'Target reached: back to the day\'s start, +${start.toStringAsFixed(2)}%.'
-        : steps.isEmpty
-        ? 'On pace: the day\'s start, +${start.toStringAsFixed(2)}%, held up to ${_d(pc['maxHold'] ?? 30).toInt()} minutes, top ${_d(pc['topN'] ?? 3).toInt()} setups tried.'
-        : steps.join('\n');
+    final c = trades >= target ? _down : _up;
     final note = (_map(s['state'])['lastNote'] ?? '').toString();
     final learned = (pc['learned'] ?? '').toString();
     final dayNote = (pc['dayNote'] ?? '').toString();
@@ -411,16 +394,18 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                'Trades today: $trades of $target',
-                style: TextStyle(color: p.ink, fontSize: 22, fontWeight: FontWeight.w900),
+              Expanded(
+                child: Text(
+                  'Trades today: $trades of $target',
+                  style: TextStyle(color: p.ink, fontSize: 22, fontWeight: FontWeight.w900),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 2),
           Text(
-            '$status · ${_d(pc['remaining']).toInt()} to go · expected by now: $expected',
-            style: TextStyle(color: c, fontSize: 12.5, fontWeight: FontWeight.w800),
+            '$trades of $target — ${pc['waiting'] ?? 'waiting for a real setup'} ($target is a maximum, never a target)',
+            style: TextStyle(color: c, fontSize: 12.5, fontWeight: FontWeight.w800, height: 1.3),
           ),
           const SizedBox(height: 8),
           LayoutBuilder(
@@ -446,13 +431,6 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
                         decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(99)),
                       ),
                     ),
-                    // Where the pace says it should be by now.
-                    Positioned(
-                      left: (w * (expected / target).clamp(0.0, 1.0) - 1).clamp(0.0, w - 2),
-                      top: 0,
-                      bottom: 0,
-                      child: Container(width: 2, color: p.ink),
-                    ),
                   ],
                 ),
               );
@@ -468,19 +446,18 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Entry strength needed now: +${thr.toStringAsFixed(2)}% in 15 min',
+                  'Entry floor today: +${floor.toStringAsFixed(2)}%',
                   style: TextStyle(color: p.ink, fontSize: 13, fontWeight: FontWeight.w800),
                 ),
-                const SizedBox(height: 2),
-                Text(ladderText, style: TextStyle(color: steps.isEmpty ? p.muted : _down, fontSize: 11.5, height: 1.3, fontWeight: steps.isEmpty ? FontWeight.w500 : FontWeight.w700)),
+                if (thr > floor + 0.001)
+                  Text(
+                    'Needed for the next entry: +${thr.toStringAsFixed(2)}% (raised by a loss streak or a lesson)',
+                    style: const TextStyle(color: _down, fontSize: 11.5, height: 1.3, fontWeight: FontWeight.w700),
+                  ),
                 const SizedBox(height: 2),
                 Text(
-                  '${pc['checkpoints'] ?? ''}',
-                  style: TextStyle(color: p.ink, fontSize: 11, height: 1.3, fontWeight: FontWeight.w700),
-                ),
-                Text(
-                  'Behind the pace: first a shorter hold (20, then 12 min), then less strength needed (never below +0.12%), then the top 5 setups. '
-                  'The trend rules are never relaxed.',
+                  'An entry needs the 5-minute and 15-minute trends to agree, at least that move in the trade\'s direction in the last 30 minutes, '
+                  'the price past both averages, and no more than 1.5% in the last hour (no chasing). Falling behind never loosens a rule.',
                   style: TextStyle(color: p.muted, fontSize: 11, height: 1.3),
                 ),
               ],
@@ -523,9 +500,9 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
               style: TextStyle(color: _down, fontSize: 12, height: 1.3, fontWeight: FontWeight.w700),
             ),
           ],
-          if (note.isNotEmpty && _map(s['state'])['shadow'] == null) ...[
+          if (note.isNotEmpty) ...[
             const SizedBox(height: 6),
-            Text('Now: $note', style: TextStyle(color: p.ink, fontSize: 12, height: 1.3)),
+            Text.rich(TextSpan(children: [TextSpan(text: 'Last decision: ', style: TextStyle(color: _accent, fontWeight: FontWeight.w900)), TextSpan(text: note)]), style: TextStyle(color: p.ink, fontSize: 12, height: 1.3)),
           ],
         ],
       ),
@@ -587,7 +564,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
           for (final x in lessons) line('${x['text'] ?? ''}${x['at'] == null ? '' : ' · ${_shortTime(_etLabel(x['at']))}'}'),
           if (pause != null && pause.isAfter(DateTime.now()))
             line('Paused after 2 losses in a row until ${_clock(_toEt(pause.toUtc()))} ET', c: _down, icon: Icons.pause_circle_rounded),
-          if (l['stepUpNext'] == true) line('The next entry needs +0.05% more strength (after 2 losses in a row)', c: _down, icon: Icons.trending_up_rounded),
+          if (l['stepUpNext'] == true) line('The next entry needs +0.8% or more in 30 minutes (after 2 losses in a row)', c: _down, icon: Icons.trending_up_rounded),
           head('Benched markets'),
           if (benched.isEmpty) Text('None benched today.', style: TextStyle(color: p.muted, fontSize: 12)),
           for (final b in benched) line('${b['text'] ?? b['symbol']}', c: _loss, icon: Icons.block_rounded),
@@ -595,7 +572,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
           Wrap(spacing: 6, runSpacing: 6, children: [
             _tag('STRENGTH +${_d(l['thresholdPct']).toStringAsFixed(2)}%', _accent),
             _tag('MAX HOLD ${_d(l['maxHold']).toInt()} MIN', _accent),
-            _tag('NO-CHASE ${_d(l['chaseCapPct']).toStringAsFixed(1)}%', _accent),
+            _tag('NO-CHASE ${_d(l['chaseCapPct']).toStringAsFixed(1)}% IN 1 H', _accent),
             _tag('CHOP SKIP ${_d(l['chopSkipAt']).toInt()}+', _accent),
             if (l['need60'] == true) _tag('1-HOUR TREND MUST AGREE', _down),
           ]),
@@ -753,7 +730,14 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
         ]),
         const SizedBox(height: 10),
         if (pts.length > 1)
-          _CandleChart(points: pts.sublist(math.max(0, pts.length - 36)), pal: p, entry: null, lines: true, price: _d(sel['price']))
+          _CandleChart(
+            points: pts.sublist(math.max(0, pts.length - 36)), pal: p, entry: null, lines: true, price: _d(sel['price']),
+            // Thin dashed lines with small flags where this system went in (accent) and out (green win, red loss).
+            marks: _tradeMarks(
+              ((s['trades'] as List?) ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList(),
+              '${sel['symbol']}', _accent,
+              open: _map(s['state'])['shadow'] is Map ? _map(_map(s['state'])['shadow']) : null),
+          )
         else
           Text('The chart appears after the first reading.', style: TextStyle(color: p.muted, fontSize: 12)),
         if (a['why'] != null) ...[
@@ -883,7 +867,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Every trade closes within 30 minutes at most, win, lose or flat. Behind the pace (or after a lesson) new trades get a '
+            'Every trade closes within 30 minutes at most, win, lose or flat. After the options no-follow-through lesson new trades get a '
             'shorter max hold: now ${_d(g['maxHoldMin']).toStringAsFixed(0)} minutes. Exits are checked every '
             '${_d(g['exitCheckEveryMin']).toStringAsFixed(0)} minute, and the hard close sells at the last check before the max hold.',
             style: TextStyle(color: p.muted, fontSize: 11.5, height: 1.35),
@@ -915,7 +899,7 @@ class _NgmyFastSystemScreenState extends State<NgmyFastSystemScreen> {
               const SizedBox(width: 6),
               chip('Total brake', '-\$${_d(g['totalBrakeUsd']).toStringAsFixed(0)}'),
               const SizedBox(width: 6),
-              chip('Strength', '+${_d(g['strengthPct']).toStringAsFixed(2)}% in 15 min'),
+              chip('Strength', '+${_d(g['strengthPct']).toStringAsFixed(2)}% in 30 min'),
             ],
           ),
         ],

@@ -4,7 +4,7 @@ import { PA_MARKETS } from "./alpaca_agent.ts";
 import {
   activeRules, analyzeMarket, blockReason, bucketOf, contractLadder, DEFAULT_ENTRY, entryCheck, evaluateLessons, expectedBy, exitLevels,
   fastExit, fridayOf, FS_LISTS, FS_RULES, gradeLoss, learnStart, lossStreak, marketRecord, morningReview, mustHardClose, openingWindow,
-  paceImpossible, paceLadder, passes, pickRanked, rankScore, recovered, spreadPct, strengthPct, tradingWindow, type TradeRow,
+  hourMovePct, learnFloor, paceImpossible, paceLadder, passes, pickRanked, rankScore, recovered, spreadPct, strengthPct, tradingWindow, type TradeRow,
 } from "./fast_systems.ts";
 
 const at = (min: number) => new Date(Date.parse("2026-11-24T15:00:00Z") + min * 60000);
@@ -86,41 +86,19 @@ Deno.test("exits: stocks and coins +2% / -1%, options +$50 / -$50, noisy markets
   assertEquals(ex({ shadow: noisy, price: 203 }).kind, "take profit");
 });
 
-Deno.test("40 a day: checkpoints, then shorter holds, then lower strength, then top 5", () => {
+Deno.test("40 a day is a maximum: being behind changes nothing", () => {
   assertEquals(FS_RULES.dailyTarget, 40);
   const wk = (h: number, m: number) => ({ weekend: false, hour: h, minute: m });
-  assertEquals(expectedBy(wk(9, 45)), 0);
   assertEquals(expectedBy(wk(10, 30)), 7);
-  assertEquals(expectedBy(wk(12, 0)), 15);
-  assertEquals(expectedBy(wk(13, 30)), 23);
-  assertEquals(expectedBy(wk(15, 0)), 32);
-  assertEquals(expectedBy(wk(15, 45)), 38);
-  assertEquals(expectedBy(wk(15, 55)), 40);
-  // On pace: the day's start, 30 minutes, top 3.
-  const on = paceLadder(wk(12, 0), 15);
-  assertEquals([on.thresholdPct, on.maxHold, on.topN, on.level], [0.3, 30, 3, 0]);
-  // 1 behind: hold 20 first.
-  assertEquals(paceLadder(wk(12, 0), 14).maxHold, 20);
-  // 3 behind: hold 12, strength unchanged.
-  const l2 = paceLadder(wk(12, 0), 12);
-  assertEquals([l2.maxHold, l2.thresholdPct], [12, 0.3]);
-  // 5 behind: one step down.
-  assertEquals(paceLadder(wk(12, 0), 10).thresholdPct, 0.25);
-  // 8 behind: top 5.
-  assertEquals(paceLadder(wk(12, 0), 7).topN, 5);
-  // Far behind: never below the floor.
-  assertEquals(paceLadder(wk(15, 0), 0).thresholdPct, FS_RULES.floorPct);
-  assertEquals(FS_RULES.floorPct, 0.12);
-  // 40 reached: back to the day's start.
-  assertEquals(paceLadder(wk(15, 10), 40).thresholdPct, 0.3);
-  assertEquals(paceLadder(wk(10, 0), 1, 0.35).thresholdPct, 0.35);
-  assert(paceLadder(wk(12, 0), 7).lines.length === 3);
-  // Weekends: no trading window (weekend crypto moved to Signal Grid).
+  for (const trades of [0, 7, 15]) {
+    const l = paceLadder(wk(12, 0), trades);
+    assertEquals([l.thresholdPct, l.maxHold, l.topN, l.level, l.lines.length], [0.5, 30, 3, 0, 0]);
+  }
+  assertEquals(FS_RULES.floorPct, 0.5);
+  assertEquals(paceLadder(wk(10, 0), 1, 0.7).thresholdPct, 0.7); // the learned floor carries in
+  assertEquals(paceLadder(wk(10, 0), 1, 0.3).thresholdPct, 0.5); // never below +0.5%
   assertEquals(tradingWindow({ weekend: true, hour: 12, minute: 0 }).inWindow, false);
   assertEquals(expectedBy({ weekend: true, hour: 12, minute: 0 }), 0);
-  // Honest: 40 can no longer be reached.
-  assertEquals(paceImpossible(wk(15, 30), 10), true);
-  assertEquals(paceImpossible(wk(10, 0), 3), false);
 });
 
 Deno.test("never buy a falling market, at any strength", () => {
@@ -140,19 +118,28 @@ Deno.test("never buy a falling market, at any strength", () => {
   assert(entryCheck(down, { ...DEFAULT_ENTRY, thresholdPct: 0.12, chaseCapPct: 99, chopSkipAt: 99, allowDown: true }).ok);
 });
 
-Deno.test("entry rules: no-chase cap, chop filter, strength, 1-hour trend lesson", () => {
-  const { closes, price } = steadyRise(0.1);
+Deno.test("entry rules: trends agree, +0.5% in 30 min, price past both averages, no chasing past 1.5% in an hour", () => {
+  const { closes, price } = steadyRise(0.1); // about +0.6% in 30 minutes, +1.3% in the hour
   const a = analyzeMarket(closes, price);
   assertEquals(a.dir, "up");
   assertEquals(a.chop, 0);
-  assert(entryCheck(a, { ...DEFAULT_ENTRY, thresholdPct: 0.2 }).ok);
-  assertEquals(entryCheck(a, { ...DEFAULT_ENTRY, thresholdPct: 0.5 }).fail, "weak");
-  assertEquals(entryCheck({ ...a, dirStrength: 0.9 }, DEFAULT_ENTRY).fail, "chased");
-  assertEquals(entryCheck({ ...a, dirStrength: 0.6 }, { ...DEFAULT_ENTRY, chaseCapPct: 0.5 }).fail, "chased");
+  assert(a.dirStrength! > 0.5 && a.dirStrength! < 0.8);
+  assert(entryCheck(a, { ...DEFAULT_ENTRY, thresholdPct: 0.5 }).ok);
+  assertEquals(entryCheck(a, { ...DEFAULT_ENTRY, thresholdPct: 0.8 }).fail, "weak"); // after 2 losses in a row
+  assertEquals(entryCheck({ ...a, dirHourMove: 1.6 }, DEFAULT_ENTRY).fail, "chased");
+  assertEquals(entryCheck({ ...a, dirHourMove: 1.2 }, { ...DEFAULT_ENTRY, chaseCapPct: 1.0 }).fail, "chased");
   assertEquals(entryCheck({ ...a, chop: 4 }, DEFAULT_ENTRY).fail, "chop");
-  assert(entryCheck({ ...a, chop: 3 }, { ...DEFAULT_ENTRY, thresholdPct: 0.2 }).ok);
   assertEquals(entryCheck({ ...a, chop: 3 }, { ...DEFAULT_ENTRY, chopSkipAt: 3 }).fail, "chop");
-  assertEquals(entryCheck({ ...a, trend60: "down" }, { ...DEFAULT_ENTRY, thresholdPct: 0.2, need60: true }).fail, "against60");
+  assertEquals(entryCheck({ ...a, trend60: "down" }, { ...DEFAULT_ENTRY, need60: true }).fail, "against60");
+  // Trends that disagree: never traded, and the screen says why.
+  const mixed = { ...a, dir: null, trend5: "up" as const, trend15: "down" as const };
+  const c = entryCheck(mixed, { ...DEFAULT_ENTRY, allowDown: true });
+  assertEquals(c.fail, "falling");
+  assert(c.text.includes("do not agree"));
+  // A flat drift: under +0.5% in 30 minutes is not a setup.
+  const flat = analyzeMarket(steadyRise(0.03).closes, steadyRise(0.03).price);
+  assertEquals(entryCheck(flat, DEFAULT_ENTRY).fail, "weak");
+  assertEquals(hourMovePct([...Array(13).fill(100)], 101), 1);
 });
 
 Deno.test("ranking: all markets scored, the top-ranked passing one is taken", () => {
@@ -173,74 +160,91 @@ Deno.test("ranking: all markets scored, the top-ranked passing one is taken", ()
   assertEquals(rankScore(strong, undefined, bucketOf(strong.dirStrength), null).bucket, 0.5);
 });
 
-Deno.test("learning each morning from its own last 20 trades", () => {
-  assertEquals(learnStart(0.3, [1, -1, -1, -1, -1, 1]).startPct, 0.35);
-  assertEquals(learnStart(0.3, [1, 1, 1, -1, 1]).startPct, 0.25);
-  assertEquals(learnStart(0.3, [1, 1, -1, -1, 1, -1, 1, -1, 1, -1, 1]).startPct, 0.3);
-  assertEquals(learnStart(0.5, Array(10).fill(-1)).startPct, 0.5);
-  assertEquals(learnStart(0.2, Array(10).fill(1)).startPct, 0.2);
-  assertEquals(learnStart(0.3, [1, 1]).startPct, 0.3);
+Deno.test("the entry floor learns each morning (bucket just above the floor, last 20)", () => {
+  const t = (pnl: number, strength: number) => ({ pnl, strength });
+  // Entries from +0.5% to +0.8% won 2 of 6 (33%): the floor rises to +0.6%.
+  assertEquals(learnFloor(0.5, [t(1, 0.6), t(-1, 0.55), t(-1, 0.7), t(-1, 0.6), t(1, 0.75), t(-1, 0.52), t(5, 1.2)]).floor, 0.6);
+  // Won 5 of 6 (83%) at +0.6%: lowered to +0.5%, never below.
+  assertEquals(learnFloor(0.6, [t(1, 0.7), t(1, 0.65), t(1, 0.8), t(-1, 0.6), t(1, 0.62), t(1, 0.85)]).floor, 0.5);
+  assertEquals(learnFloor(0.5, Array(6).fill(0).map(() => t(1, 0.6))).floor, 0.5);
+  // 50%: kept. Too few: kept.
+  assertEquals(learnFloor(0.7, [t(1, 0.8), t(-1, 0.75), t(1, 0.9), t(-1, 0.7), t(1, 0.95), t(-1, 0.8)]).floor, 0.7);
+  assertEquals(learnFloor(0.5, [t(-1, 0.6), t(-1, 0.6)]).floor, 0.5);
+  assert(learnFloor(0.5, []).line.startsWith("Entry floor today: +0.50%"));
+  // Old floors from before (0.3) start at +0.5%.
+  assertEquals(learnFloor(0.3, []).floor, 0.5);
   assertEquals(marketRecord(Array(25).fill(1)).n, 20);
   assertEquals(marketRecord([-1, -1, 1], ["CHASED", "CHASED", null]).topLoss, "CHASED");
 });
 
 const cond = (o: Record<string, unknown> = {}) => ({
   dir: "up" as const, trend5: "up" as const, trend15: "up" as const, trend60: "up" as const, fast: 1, slow: 1, priceVsSlow: "above" as const,
-  slowRising: true, strength: 0.3, dirStrength: 0.3, ranOver08: false, chop: 0, bucket: "medium" as const, spot: 100, ...o,
-});
-
-Deno.test("every loss gets exactly one plain reason", () => {
-  assertEquals(gradeLoss(cond({ trend60: "down" }), "stop loss", false, null).reason, "AGAINST_TREND");
-  assertEquals(gradeLoss(cond({ dirStrength: 0.7 }), "stop loss", false, null).reason, "CHASED");
-  assertEquals(gradeLoss(cond({ chop: 3 }), "stop loss", false, null).reason, "CHOP");
-  assertEquals(gradeLoss(cond({ spreadPct: 9 }), "stop loss", true, null).reason, "WIDE_SPREAD");
-  const nft = gradeLoss(cond(), "stop loss", false, null);
-  assertEquals(nft.reason, "NO_FOLLOW_THROUGH");
-  assert(nft.watch); // watched 10 minutes for a noise stop
-  assertEquals(gradeLoss(cond(), "max hold", false, null).watch, false);
-  assert(gradeLoss(cond(), "max hold", true, 0.1).text.includes("time decay"));
-  assert(gradeLoss(cond({ dirStrength: 0.7 }), "stop loss", false, null).text.includes("chased"));
-  assertEquals(recovered("up", 100, 100.01), true);
-  assertEquals(recovered("up", 100, 99.9), false);
-  assertEquals(recovered("down", 100, 99.9), true);
-  assertEquals(spreadPct(0.9, 1), 10);
-  assertEquals(spreadPct(0, 1), 100);
+  slowRising: true, strength: 0.6, dirStrength: 0.6, ranOver08: false, chop: 0, bucket: "medium" as const, spot: 100, ...o,
 });
 
 const tr = (market: string, pnl: number, loss: string | null = null, day = "2026-11-24", bucket = "medium"): TradeRow =>
   ({ market, pnl, loss_reason: loss, et_day: day, conditions: { bucket: bucket as any } });
 
+Deno.test("every loss gets exactly one plain reason", () => {
+  assertEquals(gradeLoss(cond({ trend60: "down" }), "stop loss", false, null).reason, "AGAINST_TREND");
+  assertEquals(gradeLoss(cond({ dirHourMove: 1.2 }), "stop loss", false, null).reason, "CHASED");
+  assertEquals(gradeLoss(cond({ chop: 3 }), "stop loss", false, null).reason, "CHOP");
+  assertEquals(gradeLoss(cond({ spreadPct: 9 }), "stop loss", true, null).reason, "WIDE_SPREAD");
+  const nft = gradeLoss(cond(), "stop loss", false, null);
+  assertEquals(nft.reason, "NO_FOLLOW_THROUGH");
+  assert(nft.watch);
+  assert(gradeLoss(cond(), "early cut", false, null).watch);
+  assertEquals(gradeLoss(cond(), "max hold", false, null).watch, false);
+  assert(gradeLoss(cond(), "max hold", true, 0.1).text.includes("time decay"));
+  assertEquals(recovered("up", 100, 100.01), true);
+  assertEquals(recovered("down", 100, 99.9), true);
+  assertEquals(spreadPct(0.9, 1), 10);
+  assertEquals(spreadPct(0, 1), 100);
+});
+
+Deno.test("cut losers faster: first 5 minutes, trend already against it", () => {
+  const o = (price: number, min: number, against: boolean) =>
+    fastExit({ system: "options", shadow: call, price, now: at(min), trendAgainst: false, closeOut: false, trendNowAgainst: against });
+  assertEquals(o(0.85, 3, true).kind, "early cut"); // -$15 at 3 minutes, trend against
+  assertEquals(o(0.86, 3, true).sell, false); // -$14
+  assertEquals(o(0.85, 3, false).sell, false); // trend not against yet
+  assertEquals(o(0.85, 8, true).sell, false); // after the first 5 minutes the normal exits apply
+  // Spot: -0.8% of $100.
+  assertEquals(ex({ price: 198.4, now: at(4), trendNowAgainst: true }).kind, "early cut");
+  assertEquals(ex({ price: 198.5, now: at(4), trendNowAgainst: true }).sell, false);
+});
+
 Deno.test("lessons that change behavior", () => {
   const today = "2026-11-24";
-  // A market under 40% wins over its last 10+ trades is benched.
-  const pltr = [...Array(7).fill(0).map(() => tr("PLTR", -1, "NO_FOLLOW_THROUGH")), ...Array(3).fill(0).map(() => tr("PLTR", 2))];
-  const l1 = evaluateLessons("scalper", pltr, today, new Set());
-  assert(l1.some((l) => l.key === "bench:PLTR" && l.text.includes("lost 7 of its last 10")));
-  // ... but not in the morning (benches reset each morning).
+  // 2 losses in a row in one market today: benched for the rest of the day.
+  const two = [tr("XLE", -50, "NO_FOLLOW_THROUGH"), tr("XLE", -50, "CHOP"), tr("F", 50)];
+  assert(evaluateLessons("options", two, today, new Set()).some((l) => l.key === "bench:XLE" && l.text.includes("2 in a row")));
+  assert(!evaluateLessons("options", [tr("XLE", -50), tr("XLE", 50)], today, new Set()).some((l) => l.key === "bench:XLE"));
+  assert(!evaluateLessons("options", [tr("XLE", -50), tr("XLE", -50, null, "2026-11-23")], today, new Set()).some((l) => l.key === "bench:XLE"));
+  // A market under 40% wins over its last 10+ trades is benched too; never in the morning.
+  const pltr = [tr("PLTR", 2), ...Array(7).fill(0).map(() => tr("PLTR", -1, "NO_FOLLOW_THROUGH", "2026-11-23")), ...Array(2).fill(0).map(() => tr("PLTR", 2, null, "2026-11-23"))];
+  assert(evaluateLessons("scalper", pltr, today, new Set()).some((l) => l.key === "bench:PLTR" && l.text.includes("lost 7 of its last 10")));
   assert(!evaluateLessons("scalper", pltr, today, new Set(), true).some((l) => l.key.startsWith("bench:")));
   // 3 of the last 10 losses with the same reason apply its fix.
   const mix = [tr("A", -1, "CHASED"), tr("B", -1, "CHASED"), tr("C", 1), tr("D", -1, "CHASED"), tr("E", -1, "CHOP")];
   assert(evaluateLessons("scalper", mix, today, new Set()).some((l) => l.key === "chase"));
-  assert(!evaluateLessons("scalper", mix, today, new Set(["chase"])).some((l) => l.key === "chase")); // already active
-  const noise = [tr("COIN", -1, "NOISE_STOP"), tr("COIN", -1, "NOISE_STOP"), tr("MU", -1, "NOISE_STOP")];
-  const nl = evaluateLessons("scalper", noise, today, new Set()).map((l) => l.key);
-  assert(nl.includes("noise:COIN") && nl.includes("noise:MU"));
-  const opt = [tr("F", -50, "NO_FOLLOW_THROUGH"), tr("F", -50, "NO_FOLLOW_THROUGH"), tr("T", -50, "NO_FOLLOW_THROUGH")];
+  assert(!evaluateLessons("scalper", mix, today, new Set(["chase"])).some((l) => l.key === "chase"));
+  const opt = [tr("F", -50, "NO_FOLLOW_THROUGH"), tr("G", -50, "NO_FOLLOW_THROUGH"), tr("T", -50, "NO_FOLLOW_THROUGH")];
   assert(evaluateLessons("options", opt, today, new Set()).some((l) => l.key === "nft"));
-  assert(!evaluateLessons("scalper", opt, today, new Set()).some((l) => l.key === "nft")); // options only
-  // Setup sizes: weak setups losing raise the minimum; a winning size becomes preferred.
-  const weak = Array(10).fill(0).map((_, i) => tr(`W${i}`, i < 3 ? 1 : -1, "NO_FOLLOW_THROUGH", "2026-11-20", "weak"));
-  const strong = Array(10).fill(0).map((_, i) => tr(`S${i}`, i < 7 ? 1 : -1, null, "2026-11-20", "strong"));
-  const bl = evaluateLessons("scalper", [...weak, ...strong], today, new Set(), true).map((l) => l.key);
-  assert(bl.includes("bucket:weak"));
-  assert(bl.includes("pref:strong"));
+  assert(!evaluateLessons("scalper", opt, today, new Set()).some((l) => l.key === "nft"));
+  // The old setup-size lessons are gone (the entry floor replaces them).
+  const weak = Array(12).fill(0).map((_, i) => tr(`W${i}`, -1, null, "2026-11-20", "weak"));
+  assert(!evaluateLessons("scalper", weak, today, new Set(), true).some((l) => l.key.startsWith("bucket:") || l.key.startsWith("pref:")));
   // What the lessons do to the next entry.
-  const r = activeRules("scalper", false, [{ key: "chase", text: "" }, { key: "chop", text: "" }, { key: "bucket:weak", text: "" }, { key: "bench:PLTR", text: "x" }], { thresholdPct: 0.15, maxHold: 30 }, false);
-  assertEquals([r.chaseCapPct, r.chopSkipAt, r.thresholdPct, r.benched.PLTR], [0.5, 3, 0.3, "x"]);
-  const o = activeRules("options", false, [{ key: "nft", text: "" }, { key: "spread", text: "" }, { key: "streak3", text: "" }], { thresholdPct: 0.3, maxHold: 30 }, true);
-  assertEquals([o.maxHold, o.optMinDays, o.spreadMaxPct, o.thresholdPct, o.allowDown], [20, 7, 7, 0.4, true]);
-  assertEquals(activeRules("options", true, [], { thresholdPct: 0.12, maxHold: 12 }, false).allowDown, false); // weekend coins: buys only
-  assertEquals(activeRules("scalper", false, [], { thresholdPct: 0.01, maxHold: 30 }, false).thresholdPct, 0.12); // never below the floor
+  const r = activeRules("scalper", false, [{ key: "chase", text: "" }, { key: "chop", text: "" }, { key: "bench:PLTR", text: "x" }], { thresholdPct: 0.5, maxHold: 30 }, false);
+  assertEquals([r.chaseCapPct, r.chopSkipAt, r.thresholdPct, r.benched.PLTR], [1.0, 3, 0.5, "x"]);
+  // After 2 losses in a row the next entry needs +0.8%; 3 in a row: +0.1% for the day.
+  assertEquals(activeRules("scalper", false, [], { thresholdPct: 0.5, maxHold: 30 }, true).thresholdPct, 0.8);
+  assertEquals(activeRules("scalper", false, [{ key: "streak3", text: "" }], { thresholdPct: 0.5, maxHold: 30 }, false).thresholdPct, 0.6);
+  const o = activeRules("options", false, [{ key: "nft", text: "" }, { key: "spread", text: "" }], { thresholdPct: 0.5, maxHold: 30 }, false);
+  assertEquals([o.maxHold, o.optMinDays, o.spreadMaxPct, o.allowDown], [20, 7, 7, true]);
+  assertEquals(activeRules("scalper", false, [], { thresholdPct: 0.01, maxHold: 30 }, false).thresholdPct, 0.5);
+  assertEquals([FS_RULES.streakPauseMin, FS_RULES.afterStreakPct], [20, 0.8]);
 });
 
 Deno.test("loss streak and the morning review", () => {
@@ -269,6 +273,9 @@ Deno.test("options: calls above the price, puts below, at least 3 days out", () 
   const puts = contractLadder(c, 240.4, "put", "2026-11-27");
   assertEquals(puts.slice(0, 3).map((x) => x.strike), [240, 239, 238]);
   assertEquals(contractLadder(c, 240.4, "call", "2026-12-01")[0].expiry, "2026-12-04"); // the 7-day lesson
+  // 5 to 9 days out first (Nov 24 + 5..9 = Nov 29 .. Dec 3: none; Dec 4 is 10 days): with Dec 4 preferred it comes first.
+  assertEquals(contractLadder(c, 240.4, "call", "2026-11-27", 6, 3, ["2026-12-01", "2026-12-05"])[0].expiry, "2026-12-04");
+  assertEquals(contractLadder(c, 240.4, "call", "2026-11-27", 6, 3, ["2026-12-01", "2026-12-05"]).slice(6, 7)[0].expiry, "2026-11-27");
   assertEquals(new Set(calls.map((x) => x.expiry)).size, 3);
 });
 
@@ -279,9 +286,9 @@ Deno.test("why the day ended below 40, in plain words", () => {
   assert(blockReason({}).length > 10);
 });
 
-Deno.test("strength check and the opening window", () => {
-  assertEquals(strengthPct([100, 100, 100, 100, 100], 100.3)?.toFixed(2), "0.30");
-  assertEquals(strengthPct([100, 100], 101), null);
+Deno.test("strength over 30 minutes and the opening window", () => {
+  assertEquals(strengthPct([100, 100, 100, 100, 100, 100, 100, 100], 100.5)?.toFixed(2), "0.50");
+  assertEquals(strengthPct([100, 100, 100], 101), null);
   assertEquals(openingWindow({ weekend: false, hour: 9, minute: 35 }), true);
   assertEquals(openingWindow({ weekend: false, hour: 9, minute: 45 }), false);
 });

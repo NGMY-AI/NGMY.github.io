@@ -761,8 +761,6 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
       return _card(p, child: SizedBox(height: 120, child: Center(child: Text('The chart appears after the first reading.', style: TextStyle(color: p.muted)))));
     }
     final pts = all.sublist(math.max(0, all.length - _range));
-    // A SPY option's buy price is the option premium, not a SPY price, so it is not drawn on the SPY chart.
-    final entry = shadow == null || shadow['option'] is Map ? null : _d(shadow['entryPrice']);
     return _card(
       p,
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
@@ -778,13 +776,19 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
           _segChip(p, 'Trend lines', _lines, () => setState(() => _lines = !_lines), icon: Icons.show_chart_rounded),
         ]),
         const SizedBox(height: 10),
-        _CandleChart(points: pts, pal: p, entry: entry, lines: _lines, price: _d(snap['price'])),
+        _CandleChart(
+          points: pts, pal: p, entry: null, lines: _lines, price: _d(snap['price']),
+          // Where trades went in and out on this market: thin dashed lines with small flags, never over the candles.
+          marks: _tradeMarks(
+            ((_status?['trades'] as List?) ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList(),
+            '${snap['asset'] ?? snap['symbol']}', _btc, open: shadow),
+        ),
         if (_lines) ...[
           const SizedBox(height: 8),
           Wrap(spacing: 14, runSpacing: 4, alignment: WrapAlignment.center, children: [
             _legend(p, _fastC, 'Fast line (45 min)'),
             _legend(p, _slowC, 'Slow line (1 h 45 min)'),
-            if (entry != null) _legend(p, _btc, 'Your pretend buy'),
+            _legend(p, _btc, 'Trade in'),
           ]),
         ],
       ]),
@@ -1655,13 +1659,49 @@ class _NgmySignalGridAgentScreenState extends State<NgmySignalGridAgentScreen> {
 
 // ───────────────────────────────────────────────────────────── candle chart with touch
 
+/// Where a trade went in or out, drawn on the chart as a thin dashed line at that candle with a small flag on top.
+class _ChartMark {
+  const _ChartMark({required this.at, required this.price, required this.label, required this.color});
+  final DateTime at;
+  final double price;
+  final String label;
+  final Color color;
+}
+
+/// The entry and exit marks for one market from the trade list (and the open trade), for the chart.
+List<_ChartMark> _tradeMarks(List<Map<String, dynamic>> trades, String symbol, Color entryColor, {Map<String, dynamic>? open}) {
+  final out = <_ChartMark>[];
+  for (final t in trades) {
+    if ('${t['asset']}' != symbol) continue;
+    final at = DateTime.tryParse('${t['created_at'] ?? ''}');
+    final price = _d(t['price']);
+    if (at == null || price <= 0) continue;
+    final buy = t['decision'] == 'would buy';
+    final pnl = _d(_map(t['details'])['pnl']);
+    out.add(_ChartMark(
+      at: at, price: price,
+      label: buy ? 'In ${_money(price, sign: false)}' : 'Out ${_money(pnl)}',
+      color: buy ? entryColor : (pnl > 0 ? _up : _loss),
+    ));
+  }
+  if (open != null && '${open['symbol']}' == symbol) {
+    final at = DateTime.tryParse('${open['entryAt'] ?? ''}');
+    final price = open['spot'] != null ? _d(open['spot']) : open['option'] is Map ? 0.0 : _d(open['entryPrice']);
+    if (at != null && price > 0 && !out.any((m) => m.at.difference(at).inSeconds.abs() < 90 && m.color == entryColor)) {
+      out.add(_ChartMark(at: at, price: price, label: 'In ${_money(price, sign: false)}', color: entryColor));
+    }
+  }
+  return out;
+}
+
 class _CandleChart extends StatefulWidget {
-  const _CandleChart({required this.points, required this.pal, required this.entry, required this.lines, required this.price});
+  const _CandleChart({required this.points, required this.pal, required this.entry, required this.lines, required this.price, this.marks = const []});
   final List<Map<String, dynamic>> points;
   final _Pal pal;
   final double? entry;
   final bool lines;
   final double price;
+  final List<_ChartMark> marks;
 
   @override
   State<_CandleChart> createState() => _CandleChartState();
@@ -1693,7 +1733,7 @@ class _CandleChartState extends State<_CandleChart> {
           width: w,
           child: CustomPaint(
             painter: _CandlePainter(widget.points, widget.pal, widget.entry, widget.lines, widget.price, _touch,
-                DefaultTextStyle.of(context).style.fontFamily),
+                DefaultTextStyle.of(context).style.fontFamily, widget.marks),
           ),
         ),
       );
@@ -1702,8 +1742,9 @@ class _CandleChartState extends State<_CandleChart> {
 }
 
 class _CandlePainter extends CustomPainter {
-  _CandlePainter(this.pts, this.p, this.entry, this.lines, this.price, this.touch, this.font);
+  _CandlePainter(this.pts, this.p, this.entry, this.lines, this.price, this.touch, this.font, [this.marks = const []]);
   final String? font;
+  final List<_ChartMark> marks;
   final List<Map<String, dynamic>> pts;
   final _Pal p;
   final double? entry;
@@ -1733,7 +1774,14 @@ class _CandlePainter extends CustomPainter {
     lo -= pad;
     hi += pad;
     final n = pts.length;
-    final step = size.width / n;
+    // The last price tag sits in its own small margin on the right, so it never covers a candle.
+    final priceTp = TextPainter(
+      text: TextSpan(text: price > 0 ? _money(price, sign: false) : '', style: TextStyle(color: p.card, fontSize: 9.5, fontWeight: FontWeight.w800, fontFamily: font)),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final gutter = price > 0 ? priceTp.width + 12 : 0.0;
+    final cw = size.width - gutter;
+    final step = cw / n;
     double cx(int i) => step * i + step / 2;
     double y(double v) => h - (v - lo) / (hi - lo) * h;
 
@@ -1743,8 +1791,33 @@ class _CandlePainter extends CustomPainter {
       ..strokeWidth = 1;
     for (var i = 1; i <= 3; i++) {
       final gy = h * i / 4;
-      for (var x = 0.0; x < size.width; x += 6) {
+      for (var x = 0.0; x < cw; x += 6) {
         canvas.drawLine(Offset(x, gy), Offset(x + 2, gy), grid);
+      }
+    }
+
+    // Trade marks: which candle each one belongs to (the candle whose 5 minutes hold that time).
+    final times = [for (final q in pts) DateTime.tryParse('${q['t'] ?? ''}')];
+    final placed = <(int, _ChartMark)>[];
+    for (final m in marks) {
+      if (times.isEmpty || times.first == null || m.at.isBefore(times.first!)) continue;
+      var idx = -1;
+      for (var i = 0; i < n; i++) {
+        final t = times[i];
+        if (t != null && !t.isAfter(m.at)) idx = i;
+      }
+      final last = times.last;
+      if (idx < 0 || (idx == n - 1 && last != null && m.at.difference(last).inMinutes > 30)) continue;
+      placed.add((idx, m));
+    }
+    // A thin dashed line (2 px) at each entry or exit candle, drawn BEHIND the candles so they stay visible.
+    for (final (i, m) in placed) {
+      final x = cx(i);
+      final dash = Paint()
+        ..color = m.color.withValues(alpha: 0.75)
+        ..strokeWidth = math.min(2.0, math.max(1.0, step * 0.3));
+      for (var yy = 12.0; yy < h; yy += 7) {
+        canvas.drawLine(Offset(x, yy), Offset(x, math.min(h, yy + 3.5)), dash);
       }
     }
 
@@ -1792,11 +1865,39 @@ class _CandlePainter extends CustomPainter {
       );
     }
 
-    // pretend buy price
-    if (entry != null) _dashed(canvas, y(entry!), size.width, _btc, 'Buy ${_money(entry!, sign: false)}', left: true);
+    // pretend buy price: a thin line only (no box over the candles)
+    if (entry != null) _dashed(canvas, y(entry!), cw, _btc, '', left: true);
 
-    // last price line with a tag
-    if (price > 0) _dashed(canvas, y(price), size.width, p.ink.withValues(alpha: 0.55), _money(price, sign: false));
+    // last price: a thin line across the candles and a small tag in the right margin
+    if (price > 0) {
+      _dashed(canvas, y(price), cw, p.ink.withValues(alpha: 0.45), '');
+      final ty = y(price).clamp(priceTp.height / 2 + 2, h - priceTp.height / 2 - 2);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(Rect.fromLTWH(cw + 3, ty - priceTp.height / 2 - 2, priceTp.width + 8, priceTp.height + 4), const Radius.circular(5)),
+        Paint()..color = p.ink.withValues(alpha: 0.85),
+      );
+      priceTp.paint(canvas, Offset(cw + 7, ty - priceTp.height / 2));
+    }
+
+    // The small flags on top of the trade lines: a 10 px triangle pointing at the candle and the price in 10 px text.
+    var row = 0;
+    for (final (i, m) in placed) {
+      final x = cx(i);
+      final top = 1.0 + (row % 2) * 12;
+      row++;
+      final tri = Path()
+        ..moveTo(x - 5, top)
+        ..lineTo(x + 5, top)
+        ..lineTo(x, top + 9)
+        ..close();
+      canvas.drawPath(tri, Paint()..color = m.color);
+      final tp = TextPainter(
+        text: TextSpan(text: m.label, style: TextStyle(color: m.color, fontSize: 10, fontWeight: FontWeight.w800, fontFamily: font)),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      final right = x + 7 + tp.width <= cw;
+      tp.paint(canvas, Offset(right ? x + 7 : x - 7 - tp.width, top - 1));
+    }
 
     // time axis (Eastern Time)
     final tp = TextPainter(textDirection: TextDirection.ltr);
@@ -1851,6 +1952,7 @@ class _CandlePainter extends CustomPainter {
     for (var x = 0.0; x < width; x += 7) {
       canvas.drawLine(Offset(x, yy), Offset(x + 3.5, yy), paint);
     }
+    if (label.isEmpty) return;
     final tp = TextPainter(
       text: TextSpan(text: label, style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800, fontFamily: font)),
       textDirection: TextDirection.ltr,
@@ -1866,7 +1968,7 @@ class _CandlePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _CandlePainter old) =>
-      old.pts != pts || old.touch != touch || old.lines != lines || old.entry != entry || old.price != price || old.p.light != p.light;
+      old.pts != pts || old.touch != touch || old.lines != lines || old.entry != entry || old.price != price || old.p.light != p.light || old.marks != marks;
 }
 
 class _SparkPainter extends CustomPainter {

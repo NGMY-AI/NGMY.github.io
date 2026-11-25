@@ -89,14 +89,14 @@ export const FS_RULES = {
   exitCheckEveryMin: 1, // exit checks every 1 minute while a trade is open
   dailyTarget: 40, // trades a day, each system: a target to reach, never forced
   holdSteps: [30, 20, 12], // behind the pace, new trades get a shorter max hold first
-  startPct: 0.3, // the entry strength (15-minute move) to start the day with, before learning
-  startMinPct: 0.2, // learning never starts the day below this ...
-  startMaxPct: 0.5, // ... or above this
-  learnStepPct: 0.05, // learning moves the start by this much a day
+  startPct: 0.5, // Nov 25: the entry floor, the 30-minute move in the trade's direction (learning moves it each morning)
+  startMinPct: 0.5, // learning never sets the floor below +0.5% ...
+  startMaxPct: 1.4, // ... or above +1.4% (the no-chase cap is 1.5% in an hour)
+  learnStepPct: 0.1, // the morning review moves the floor by 0.1%
   ladderStepPct: 0.05, // the pace ladder lowers the strength by this much a step
-  floorPct: 0.12, // never below this
-  chaseCapPct: 0.8, // skip a market that already moved more than this in 15 minutes (never looser)
-  chaseTightPct: 0.5, // ... after 3 chased losses
+  floorPct: 0.5, // never below this (+0.5% in 30 minutes)
+  chaseCapPct: 1.5, // Nov 25: skip a market that already moved more than 1.5% in the last hour (never looser)
+  chaseTightPct: 1.0, // ... 1.0% after 3 chased losses
   chopSkipAt: 4, // skip a market with 4+ fast-average crosses in the last 30 minutes ...
   chopTightSkipAt: 3, // ... 3+ after 3 chop losses
   noEntryFirstMin: 15, // no stock or option entries 9:30 to 9:45 AM ET
@@ -104,13 +104,17 @@ export const FS_RULES = {
   minLearnTrades: 5, // learning needs at least 5 closed trades to judge
   benchMinTrades: 10, // a market is judged for the bench once it has 10 or more trades ...
   benchWinPct: 40, // ... and benched under 40% wins
-  streakPauseMin: 15, // 2 losses in a row: no entries for 15 minutes
-  stepUpPct: 0.05, // "one step up"
+  streakPauseMin: 20, // Nov 25: 2 losses in a row: no entries for 20 minutes ...
+  afterStreakPct: 0.8, // ... then the next entry needs +0.8% in 30 minutes
+  stepUpPct: 0.1, // "one step up" (3 losses in a row: for the rest of the day)
+  earlyCutMin: 5, // Nov 25: a loser in the first 5 minutes with the trend already against it is closed at once ...
+  earlyCutOptionUsd: 15, // ... options down $15 or more
+  earlyCutSpotPct: 0.8, // ... spot down 0.8% or more
   strictPct: 0.1, // benched 2 days in a row: this much more strength the next day
   noiseWatchMin: 10, // a stop is a noise stop if the price comes back past the entry within 10 minutes
   spot: { tradeUsd: 100, takeProfitPct: 2, stopLossPct: 1, takeProfitUsd: 2, stopLossUsd: 1 },
   options: {
-    name: "Options", maxPremiumUsd: 150, minPremiumUsd: 5, strikeSteps: 6, maxExpiries: 3, minDays: 3, lessonMinDays: 7,
+    name: "Options", maxPremiumUsd: 150, minPremiumUsd: 5, strikeSteps: 6, maxExpiries: 3, minDays: 3, lessonMinDays: 7, preferMinDays: 5, preferMaxDays: 9,
     spreadMaxPct: 10, spreadTightPct: 7, lessonHoldMin: 20,
     takeProfitUsd: 50, stopLossUsd: 50, dailyStopUsd: 500, totalBrakeUsd: 1000, weekendDailyStopUsd: 50, tradeUsd: 100,
   },
@@ -125,21 +129,25 @@ export const FS_RULE_LINES: Record<SystemId, string[]> = {
   options: [
     "Paper only: no order is ever sent to Alpaca.",
     "Its own markets, none of the main agent's: options on IWM, DIA, XLF, BAC, INTC, F, PFE, SOFI, HOOD, PLTR, COIN, XLE, T, VZ, PYPL, NIO, RIVN, SNAP, MARA, RIOT, UBER. Weekdays only: weekend crypto moved to Signal Grid.",
-    "Weekdays it buys ONE call when the trend is up or ONE put when the trend is down: slightly out of the money, at least 3 days to expiry (7 after the no-follow-through lesson), premium $150 or less, and never a contract whose bid/ask spread is over 10% of the premium (7% after the wide-spread lesson).",
-    "Target: 40 trades a day, never forced. Every minute it ranks all its markets: strength, trend agreement, the market's own last 20 trades and its winning setup size.",
-    "NEVER relaxed: the 5-minute and 15-minute trends agree with the trade, and for a call the slow average is rising with the price above it (for a put: falling, price below). It skips a market that already moved more than 0.8% in 15 minutes, and a choppy one (4+ crosses in 30 minutes).",
-    "Behind the pace it shortens the hold for new trades (30, then 20, then 12 minutes), then lowers the strength needed (from +0.3% to a floor of +0.12%), then tries the top 5 setups instead of the top 3.",
-    "Exits, checked every 1 minute: +$50 / -$50; the trend turning against the trade; the max hold reached; always out by 3:55 PM ET.",
-    "Daily stop -$500, total brake -$1,000. These brakes are wide on purpose: one options loss is $50, so a tight brake would make 40 trades impossible. The real protection is the learning: benching losing markets, the pause after 2 losses in a row, and raising the strength needed.",
+    "It buys ONE call when the trend is up or ONE put when the trend is down: slightly out of the money, 5 to 9 days to expiry preferred (never the same day, at least 3 days; 7 after the no-follow-through lesson), premium $150 or less, and never a contract whose bid/ask spread is over 10% of the premium (7% after the wide-spread lesson).",
+    "Up to 40 trades a day: a MAXIMUM, never a target. If the strict entries mean fewer trades, that is correct: the screen says waiting for a real setup. No rule is ever loosened to fill the count.",
+    "NEVER relaxed: the 5-minute and 15-minute trends must agree with the trade (when they do not, the market is untradeable), the slow average rising with the price above BOTH averages (for a put: falling, price below both).",
+    "Strength floor: it enters only when the market moved at least +0.5% in the trade's direction in the last 30 minutes. Each morning the floor learns: entries just above it that won under 45% of their last 20 raise it 0.1%, over 60% lower it 0.1% (never below +0.5%). The screen shows Entry floor today.",
+    "No chasing: a market that already moved more than 1.5% in the last hour is skipped, the move is mostly over. Choppy markets (4+ crosses in 30 minutes) are skipped too.",
+    "Two losses in a row in one market: that market is benched for the rest of the day. Two losses in a row in the system: a 20-minute pause, then the next entry needs +0.8% or more in 30 minutes.",
+    "Exits, checked every 1 minute: +$50 / -$50; early cut: down $15 within the first 5 minutes with the trend already against it is closed at once; the trend turning against the trade; 30 minutes reached; always out by 3:55 PM ET.",
+    "Daily stop -$500, total brake -$1,000. These brakes are wide on purpose: one options loss is $50. The real protection is the strict entries and the learning: benching losing markets, the pause after 2 losses in a row, and the entry floor.",
   ],
   scalper: [
     "Paper only: no order is ever sent to Alpaca.",
     "Its own markets, none of the main agent's: DIA, IWM, AVGO, NFLX, PLTR, COIN, MSTR, HOOD, SOFI, BAC, JPM, XOM, UNH, LLY, CRM, MU, INTC, F, SMCI, MARA, RIOT, CVX, PFE, T, WMT, COST, DIS, BA, UBER, SHOP. Weekdays only: weekend crypto moved to Signal Grid.",
-    "Target: 40 trades a day, never forced. Every minute it ranks all its markets: strength, trend agreement, the market's own last 20 trades and its winning setup size.",
-    "NEVER relaxed: the 5-minute and 15-minute trends are up, the slow average is rising and the price is above it. It skips a market that already moved more than 0.8% in 15 minutes, and a choppy one (4+ crosses in 30 minutes).",
-    "Behind the pace it shortens the hold for new trades (30, then 20, then 12 minutes), then lowers the strength needed (from +0.3% to a floor of +0.12%), then tries the top 5 setups instead of the top 3.",
-    "$100 a trade, one position at a time. Exits, checked every 1 minute: +2% / -1% (a noisy market may get -1.25% / +1.5% after the noise-stop lesson), the trend turning down, or the max hold reached. Stock positions always close by 3:55 PM ET.",
-    "Daily stop -$50, total brake -$100 (this system's own; a full day of 40 stops at -$1 is -$40).",
+    "Up to 40 trades a day: a MAXIMUM, never a target. If the strict entries mean fewer trades, that is correct: the screen says waiting for a real setup. No rule is ever loosened to fill the count.",
+    "NEVER relaxed: the 5-minute and 15-minute trends must agree with the trade (when they do not, the market is untradeable), the slow average rising with the price above BOTH averages (for a put: falling, price below both).",
+    "Strength floor: it enters only when the market moved at least +0.5% in the trade's direction in the last 30 minutes. Each morning the floor learns: entries just above it that won under 45% of their last 20 raise it 0.1%, over 60% lower it 0.1% (never below +0.5%). The screen shows Entry floor today.",
+    "No chasing: a market that already moved more than 1.5% in the last hour is skipped, the move is mostly over. Choppy markets (4+ crosses in 30 minutes) are skipped too.",
+    "Two losses in a row in one market: that market is benched for the rest of the day. Two losses in a row in the system: a 20-minute pause, then the next entry needs +0.8% or more in 30 minutes.",
+    "$100 a trade, one position at a time. Exits, checked every 1 minute: +2% / -1% (a noisy market may get -1.25% / +1.5% after the noise-stop lesson); early cut: down 0.8% within the first 5 minutes with the trend already against it is closed at once; the trend turning down; 30 minutes reached. Stock positions always close by 3:55 PM ET.",
+    "Daily stop -$50, total brake -$100 (this system's own).",
   ],
 };
 
@@ -152,8 +160,16 @@ export function listFor(id: SystemId, weekend: boolean): MarketDef[] {
 /** How far the price moved over the last 15 minutes, in %: the price now against the close 3 five-minute
  *  candles before the last finished one. null when there are too few candles. */
 export function strengthPct(closes: number[], price: number): number | null {
-  if (closes.length < 4) return null;
-  const ref = closes[closes.length - 4];
+  if (closes.length < 7) return null;
+  const ref = closes[closes.length - 7]; // Nov 25: 30 minutes (6 five-minute candles before the last finished one)
+  const p = price || closes[closes.length - 1];
+  return ref > 0 ? (p - ref) / ref * 100 : null;
+}
+
+/** How far the price moved in the last 60 minutes, in %. null with too few candles. */
+export function hourMovePct(closes: number[], price: number): number | null {
+  if (closes.length < 13) return null;
+  const ref = closes[closes.length - 13];
   const p = price || closes[closes.length - 1];
   return ref > 0 ? (p - ref) / ref * 100 : null;
 }
@@ -207,15 +223,14 @@ export function paceLadder(et: { weekend: boolean; hour: number; minute: number 
   const expected = expectedBy(et);
   const done = trades >= target;
   const deficit = done ? 0 : Math.max(0, expected - trades);
-  const maxHold = deficit >= 3 ? FS_RULES.holdSteps[2] : deficit >= 1 ? FS_RULES.holdSteps[1] : FS_RULES.holdSteps[0];
-  const steps = deficit >= 5 ? Math.floor((deficit - 3) / 2) : 0;
-  const thresholdPct = round2(Math.max(FS_RULES.floorPct, startPct - steps * FS_RULES.ladderStepPct));
-  const topN = deficit >= 8 ? 5 : 3;
-  const level = deficit >= 8 ? 4 : deficit >= 5 ? 3 : deficit >= 3 ? 2 : deficit >= 1 ? 1 : 0;
+  // Nov 25: 40 is a MAXIMUM, never a target to force. Being behind changes nothing: the hold stays 30 minutes and
+  // the entry floor is never lowered. Fewer trades on a quiet day is correct.
+  const maxHold = FS_RULES.holdSteps[0];
+  const steps = 0;
+  const thresholdPct = round2(Math.max(FS_RULES.floorPct, startPct));
+  const topN = 3;
+  const level = 0;
   const lines: string[] = [];
-  if (deficit >= 1) lines.push(`Step 1: ${deficit} behind the pace, so new trades are held ${maxHold} minutes at most (not 30), to free the slot sooner.`);
-  if (deficit >= 5) lines.push(`Step 2: the strength needed is lowered to +${thresholdPct.toFixed(2)}% (from +${startPct.toFixed(2)}%, never below +${FS_RULES.floorPct.toFixed(2)}%).`);
-  if (deficit >= 8) lines.push("Step 3: it now tries the top 5 passing setups instead of the top 3.");
   return {
     target, trades, remaining: Math.max(0, target - trades), expected, deficit, steps, done, level, lines,
     startPct, thresholdPct, maxHold, topN, minutesLeft: w.minutesLeft, inWindow: w.inWindow,
@@ -253,6 +268,29 @@ export function learnStart(prevStartPct: number, pnlsNewestFirst: number[]): { s
   return { startPct: prev, line: `Its last ${last.length} trades won ${rate}% (between 50% and 60%), so it keeps the same start: +${prev.toFixed(2)}%.` };
 }
 
+/** Nov 25: each morning the entry floor learns from the entries it allows. The bucket = closed trades whose entry
+ *  strength was within 0.3% above the floor; its last 20: under 45% wins raises the floor 0.1%, over 60% lowers it
+ *  0.1% (never below +0.5%). Fewer than 5 trades in the bucket: no change. */
+export function learnFloor(prevFloor: number, trades: { pnl: number; strength: number | null }[]): { floor: number; line: string } {
+  const prev = round2(Math.max(FS_RULES.startMinPct, prevFloor));
+  const bucket = trades.filter((t) => t.strength != null && t.strength >= prev && t.strength < prev + 0.3).slice(0, 20);
+  const name = `entries from +${prev.toFixed(1)}% to +${(prev + 0.3).toFixed(1)}%`;
+  if (bucket.length < FS_RULES.minLearnTrades) {
+    return { floor: prev, line: `Entry floor today: +${prev.toFixed(2)}% (only ${bucket.length} trade(s) in ${name}, too few to judge).` };
+  }
+  const rate = Math.round(bucket.filter((t) => t.pnl > 0).length / bucket.length * 100);
+  const clamp = (v: number) => round2(Math.max(FS_RULES.startMinPct, Math.min(FS_RULES.startMaxPct, v)));
+  if (rate < 45) {
+    const f = clamp(prev + FS_RULES.learnStepPct);
+    return { floor: f, line: `Entry floor today: +${f.toFixed(2)}% (raised: ${name} won only ${rate}% of their last ${bucket.length}).` };
+  }
+  if (rate > 60) {
+    const f = clamp(prev - FS_RULES.learnStepPct);
+    return { floor: f, line: `Entry floor today: +${f.toFixed(2)}% (${f < prev ? "lowered" : "kept at the lowest"}: ${name} won ${rate}% of their last ${bucket.length}).` };
+  }
+  return { floor: prev, line: `Entry floor today: +${prev.toFixed(2)}% (kept: ${name} won ${rate}% of their last ${bucket.length}).` };
+}
+
 /** A system's own record in one market: its last 20 closed trades. */
 export type MarketRecord = { n: number; wins: number; losses: number; pnl: number; topLoss?: string | null };
 export const EMPTY_RECORD: MarketRecord = { n: 0, wins: 0, losses: 0, pnl: 0, topLoss: null };
@@ -288,7 +326,9 @@ export type Analysis = {
   trend60: Trend; // 1-hour closes: price and the 4-hour average, and that average rising or falling
   chop: number; // crosses of the fast average in the last 30 minutes
   dir: Dir | null; // up: trends up, slow rising, price above. down: the mirror. null: neither (never traded)
-  dirStrength: number | null; // the 15-minute move in the trade's direction
+  dirStrength: number | null; // the 30-minute move in the trade's direction
+  hourMove: number | null; // the 60-minute move in %, signed
+  dirHourMove: number | null; // the 60-minute move in the trade's direction
   falling: boolean; // for a buy: never bought (slow not rising, price not above, or trends not both up)
   trend: Trend; // = trend5 (for the charts)
   score: number; // base ranking score: strength in the direction, trend agreement, the 1-hour trend agreeing
@@ -324,15 +364,19 @@ export function analyzeMarket(closes: number[], price: number): Analysis {
     if (side0 !== 0 && side !== 0 && side !== side0) chop++;
     if (side !== 0) side0 = side;
   }
-  const up = trend5 === "up" && trend15 === "up" && slowRising && priceAbove;
-  const down = trend5 === "down" && trend15 === "down" && slowFalling && priceBelow;
+  // Nov 25: also the price above BOTH averages for a buy or call (below both for a put).
+  const aboveFast = fast != null && p > fast, belowFast = fast != null && p < fast;
+  const up = trend5 === "up" && trend15 === "up" && slowRising && priceAbove && aboveFast;
+  const down = trend5 === "down" && trend15 === "down" && slowFalling && priceBelow && belowFast;
+  const hourMove = hourMovePct(closes, p);
   const dir: Dir | null = up ? "up" : down ? "down" : null;
   const dirStrength = strength == null ? null : dir === "down" ? -strength : strength;
+  const dirHourMove = hourMove == null ? null : dir === "down" ? -hourMove : hourMove;
   const s = Math.max(-2, Math.min(2, dirStrength ?? -2));
   const score = round2(s * 2 + (dir ? 2 : 0) + (dir && trend60 === dir ? 1 : 0));
   return {
     fast, slow, slowRising, slowFalling, priceAbove, priceBelow, strength, trend5, trend15, trend60, chop, dir, dirStrength,
-    falling: !up, trend: trend5, score,
+    hourMove, dirHourMove, falling: !up, trend: trend5, score,
   };
 }
 
@@ -354,14 +398,18 @@ export type EntryCheck = { ok: boolean; fail?: "falling" | "weak" | "chased" | "
 export function entryCheck(a: Analysis, r: EntryRules): EntryCheck {
   const pct = (v: number | null) => v == null ? "?" : `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
   if (!a.dir || (a.dir === "down" && !r.allowDown)) {
-    return { ok: false, fail: "falling", text: r.allowDown ? "trends do not agree, never traded" : "falling or trends not both up, never bought" };
+    const agree = a.trend5 === a.trend15 && (a.trend5 === "up" || a.trend5 === "down");
+    const why = !agree ? "the 5-minute and 15-minute trends do not agree" : a.trend5 === "down" && !r.allowDown ? "falling" : "the price is not on the right side of both averages";
+    return { ok: false, fail: "falling", text: `${why}, never traded` };
   }
   if (a.dirStrength == null) return { ok: false, fail: "weak", text: "too few candles" };
   if (a.chop >= r.chopSkipAt) return { ok: false, fail: "chop", text: `choppy: ${a.chop} crosses in 30 min (skips at ${r.chopSkipAt}+)` };
-  if (a.dirStrength > r.chaseCapPct) return { ok: false, fail: "chased", text: `already moved ${pct(a.dirStrength)} in 15 min (no-chase cap ${r.chaseCapPct.toFixed(1)}%)` };
-  if (a.dirStrength < r.thresholdPct) return { ok: false, fail: "weak", text: `${pct(a.dirStrength)} in 15 min, needs +${r.thresholdPct.toFixed(2)}%` };
+  if (a.dirHourMove != null && a.dirHourMove > r.chaseCapPct) {
+    return { ok: false, fail: "chased", text: `already moved ${pct(a.dirHourMove)} in the last hour (over ${r.chaseCapPct.toFixed(1)}%: the move is mostly over)` };
+  }
+  if (a.dirStrength < r.thresholdPct) return { ok: false, fail: "weak", text: `${pct(a.dirStrength)} in 30 min, needs +${r.thresholdPct.toFixed(2)}%` };
   if (r.need60 && a.trend60 !== a.dir) return { ok: false, fail: "against60", text: `the 1-hour trend is ${a.trend60}, it must agree now` };
-  return { ok: true, text: `passes: ${pct(a.dirStrength)} in 15 min ${a.dir === "down" ? "down" : "up"}, trends agree` };
+  return { ok: true, text: `passes: ${pct(a.dirStrength)} in 30 min ${a.dir === "down" ? "down" : "up"}, trends agree, price ${a.dir === "down" ? "below" : "above"} both averages` };
 }
 
 /** Kept for the old callers and tests: passes at this strength as a buy. */
@@ -414,9 +462,10 @@ export type ExitInput = {
   now: Date;
   trendAgainst: boolean; // the fast line crossed against the trade
   closeOut: boolean; // weekday stock or option: 3:55 PM ET
+  trendNowAgainst?: boolean; // Nov 25: the 5-minute trend is already against the trade (for the early cut)
 };
 
-export type ExitKind = "take profit" | "stop loss" | "max hold" | "3:55 close" | "trend turned" | "hold";
+export type ExitKind = "take profit" | "stop loss" | "early cut" | "max hold" | "3:55 close" | "trend turned" | "hold";
 
 /** Take profit and stop loss in dollars for a new trade: options $50 / $50, spot 2% / 1% of $100; a market with the
  *  noise-stop lesson gets the stop 25% wider and the take profit 25% smaller. */
@@ -439,6 +488,13 @@ export function fastExit(x: ExitInput): { sell: boolean; reason: string; pnl: nu
   const mins = heldMinutes(x.shadow.entryAt, x.now);
   if (pnl >= tp) return { sell: true, kind: "take profit", reason: `take profit hit (${money})`, pnl };
   if (pnl <= -sl) return { sell: true, kind: "stop loss", reason: `stop loss hit (${money})`, pnl };
+  // Nov 25: cut losers faster. In the first 5 minutes, down $15 (option) or 0.8% (spot) with the trend already
+  // against it: closed at once, without waiting for the full stop or the max hold.
+  const cost = x.shadow.qty * m * x.shadow.entryPrice;
+  const cut = x.shadow.option ? FS_RULES.earlyCutOptionUsd : cost * FS_RULES.earlyCutSpotPct / 100;
+  if (x.trendNowAgainst && mins <= FS_RULES.earlyCutMin + 0.5 && pnl <= -cut) {
+    return { sell: true, kind: "early cut", reason: `early cut: ${money} within ${Math.max(1, Math.round(mins))} min and the trend already turned against it`, pnl };
+  }
   if (mustHardClose(x.shadow.entryAt, x.now, hold)) {
     return { sell: true, kind: "max hold", reason: `${hold}-minute law: closed after ${Math.floor(mins)} min (${money})`, pnl };
   }
@@ -454,7 +510,7 @@ export const LOSS_REASONS: LossReason[] = ["AGAINST_TREND", "CHASED", "CHOP", "N
 
 /** The grading lines. The entry filters already skip moves over 0.8%, 4+ crosses and spreads over 10%, so a loss is
  *  graded at the level the matching lesson tightens to: chased past +0.5%, choppy at 3+ crosses, spread over 7%. */
-export const GRADE = { chasedPct: 0.5, chopCrosses: 3, spreadPct: 7, decayMovePct: 0.3 };
+export const GRADE = { chasedPct: 1.0, chopCrosses: 3, spreadPct: 7, decayMovePct: 0.3 };
 
 export const LOSS_WORDS: Record<LossReason, string> = {
   AGAINST_TREND: "the 1-hour trend was against the trade (against trend)",
@@ -468,7 +524,7 @@ export const LOSS_WORDS: Record<LossReason, string> = {
 export type EntryConditions = {
   dir: Dir; trend5: Trend; trend15: Trend; trend60: Trend; fast: number | null; slow: number | null;
   priceVsSlow: "above" | "below"; slowRising: boolean; strength: number | null; dirStrength: number | null;
-  ranOver08: boolean; chop: number; bucket: Bucket; spot: number; spreadPct?: number | null;
+  ranOver08: boolean; chop: number; bucket: Bucket; spot: number; spreadPct?: number | null; dirHourMove?: number | null;
 };
 
 /** Exactly one main reason for a loss, from the saved entry conditions. A stop-loss exit with none of the entry
@@ -479,10 +535,11 @@ export function gradeLoss(c: EntryConditions, kind: ExitKind, option: boolean, u
   if (option && c.spreadPct != null && c.spreadPct > GRADE.spreadPct) return t("WIDE_SPREAD", ` (${c.spreadPct.toFixed(1)}% of the premium)`);
   const against = c.dir === "up" ? "down" : "up";
   if (c.trend60 === against) return t("AGAINST_TREND");
-  if ((c.dirStrength ?? 0) > GRADE.chasedPct) return t("CHASED", ` (+${(c.dirStrength ?? 0).toFixed(2)}% in the 15 minutes before)`);
+  const ran = (c as any).dirHourMove ?? null;
+  if (ran != null && ran > GRADE.chasedPct) return t("CHASED", ` (+${Number(ran).toFixed(2)}% in the hour before)`);
   if (c.chop >= GRADE.chopCrosses) return t("CHOP", ` (${c.chop} crosses in 30 minutes)`);
   const decay = option && underlyingMovePct != null && Math.abs(underlyingMovePct) < GRADE.decayMovePct ? " — the stock barely moved, time decay did the damage" : "";
-  return { ...t("NO_FOLLOW_THROUGH", decay), watch: kind === "stop loss" };
+  return { ...t("NO_FOLLOW_THROUGH", decay), watch: kind === "stop loss" || kind === "early cut" };
 }
 
 /** A noise stop: after a stop, the price came back past the entry (for a put: back below it). */
@@ -509,6 +566,12 @@ export function evaluateLessons(system: SystemId, trades: TradeRow[], todayKey: 
   if (!morning) {
     const tradedToday = new Set(trades.filter((t) => t.et_day === todayKey).map((t) => t.market));
     for (const m of tradedToday) {
+      // Nov 25: 2 losses in a row in this market today: benched for the rest of the day.
+      const mine = trades.filter((t) => t.market === m && t.et_day === todayKey);
+      if (mine.length >= 2 && mine[0].pnl <= 0 && mine[1].pnl <= 0) {
+        add(`bench:${m}`, `${short(m)} benched for today — lost 2 in a row`);
+        continue;
+      }
       const last = trades.filter((t) => t.market === m).slice(0, 20);
       if (last.length < FS_RULES.benchMinTrades) continue;
       const wins = last.filter((t) => t.pnl > 0).length;
@@ -531,21 +594,7 @@ export function evaluateLessons(system: SystemId, trades: TradeRow[], todayKey: 
     if (count("WIDE_SPREAD") >= 3) add("spread", `Options: spread limit tightened to 7% of the premium — ${count("WIDE_SPREAD")} losses had wide spreads`);
   }
 
-  const words: Record<Bucket, string> = { weak: "Weak setups (under +0.30%)", medium: "Medium setups (+0.30% to +0.50%)", strong: "Strong setups (+0.50% or more)" };
-  let best: { b: Bucket; rate: number; n: number } | null = null;
-  for (const b of ["weak", "medium", "strong"] as Bucket[]) {
-    const last = trades.filter((t) => (t.conditions?.bucket ?? bucketOf(t.conditions?.dirStrength ?? null)) === b).slice(0, 15);
-    if (last.length < 10) continue;
-    const rate = Math.round(last.filter((t) => t.pnl > 0).length / last.length * 100);
-    if (rate < 40) {
-      add(`bucket:${b}`, b === "strong"
-        ? `${words[b]} won only ${rate}% of their last ${last.length} — ranked lower now`
-        : `${words[b]} won only ${rate}% of their last ${last.length} — the minimum strength is raised to +${b === "weak" ? "0.30" : "0.50"}%`);
-    } else if (rate >= 60 && (!best || rate > best.rate)) best = { b, rate, n: last.length };
-  }
-  if (best && ![...active].some((k) => k.startsWith("pref:")) && !out.some((l) => l.key.startsWith("pref:"))) {
-    add(`pref:${best.b}`, `${words[best.b]} won ${best.rate}% of their last ${best.n} — preferred when ranking`);
-  }
+  // Nov 25: the old setup-size lessons are replaced by the entry floor, learned each morning (learnFloor).
   return out;
 }
 
@@ -579,8 +628,8 @@ export function activeRules(system: SystemId, weekend: boolean, lessons: Lesson[
   const benched: Record<string, string> = {};
   for (const l of keyed("bench:")) benched[l.key.slice(6)] = l.text;
   const bucketMinPct = has("bucket:medium") ? 0.5 : has("bucket:weak") ? 0.3 : 0;
-  const extraPct = (has("streak3") ? FS_RULES.stepUpPct : 0) + (stepUpNext ? FS_RULES.stepUpPct : 0);
-  const thresholdPct = round2(Math.max(FS_RULES.floorPct, pace.thresholdPct + extraPct, bucketMinPct));
+  const extraPct = has("streak3") ? FS_RULES.stepUpPct : 0;
+  const thresholdPct = round2(Math.max(FS_RULES.floorPct, pace.thresholdPct + extraPct, bucketMinPct, stepUpNext ? FS_RULES.afterStreakPct : 0));
   const isOpt = system === "options" && !weekend;
   return {
     thresholdPct,
@@ -649,9 +698,12 @@ export function contractLadder(
   minExpiry: string,
   steps = FS_RULES.options.strikeSteps,
   maxExpiries = FS_RULES.options.maxExpiries,
+  prefer?: [string, string],
 ): Contract[] {
   const ok = contracts.filter((c) => c.expiry >= minExpiry && (right === "call" ? c.strike > spot : c.strike < spot));
-  const expiries = [...new Set(ok.map((c) => c.expiry))].sort().slice(0, maxExpiries);
+  // Nov 25: expiries 5 to 9 days out first (`prefer`), then the others, nearest first.
+  const inPref = (e: string) => !!prefer && e >= prefer[0] && e <= prefer[1];
+  const expiries = [...new Set(ok.map((c) => c.expiry))].sort((a, b) => (inPref(a) ? 0 : 1) - (inPref(b) ? 0 : 1) || a.localeCompare(b)).slice(0, maxExpiries);
   const out: Contract[] = [];
   for (const e of expiries) {
     out.push(...ok.filter((c) => c.expiry === e).sort((a, b) => right === "call" ? a.strike - b.strike : b.strike - a.strike).slice(0, steps));
@@ -722,7 +774,9 @@ async function dayFs(db: any, id: SystemId, et: ReturnType<typeof etParts>, now:
   ]);
   const prev = (prevRows ?? [])[0];
   const before = store.rows.filter((t) => t.et_day < et.dayKey);
-  const learned = learnStart(Number(prev?.start_pct ?? FS_RULES.startPct) || FS_RULES.startPct, before.map((t) => t.pnl));
+  const fl = learnFloor(Number(prev?.start_pct ?? FS_RULES.startPct) || FS_RULES.startPct,
+    before.map((t) => ({ pnl: t.pnl, strength: (t.conditions as any)?.dirStrength ?? null })));
+  const learned = { startPct: fl.floor, line: fl.line };
   // Benched two days in a row: a stronger setup needed today in that market.
   const benchedOn = (r: any) => new Set<string>((Array.isArray(r?.lessons) ? r.lessons : []).filter((l: any) => String(l.key).startsWith("bench:")).map((l: any) => String(l.key).slice(6)));
   const b1 = benchedOn(prevRows?.[0]), b2 = benchedOn(prevRows?.[1]);
@@ -855,7 +909,10 @@ async function chooseContract(k: any, underlying: string, spot: number, right: "
   } catch (e) {
     return { ok: false, why: `could not read the ${underlying} option list (${String((e as Error).message)})`, tried: [] };
   }
-  const ladder = contractLadder(list.map((c) => ({ symbol: String(c.symbol), strike: Number(c.strike_price), expiry: String(c.expiration_date) })), spot, right, from);
+  const o = FS_RULES.options;
+  const prefer: [string, string] = [addDays(et.dayKey, Math.max(minDays, o.preferMinDays)), addDays(et.dayKey, Math.max(minDays, o.preferMaxDays))];
+  const ladder = contractLadder(list.map((c) => ({ symbol: String(c.symbol), strike: Number(c.strike_price), expiry: String(c.expiration_date) })), spot, right, from,
+    FS_RULES.options.strikeSteps, FS_RULES.options.maxExpiries, prefer);
   if (!ladder.length) return { ok: false, why: `no ${underlying} ${right} with ${minDays}+ days to expiry`, tried: [] };
   const tried: Choice["tried"] = [];
   let wide = 0;
@@ -895,7 +952,7 @@ function conditionsOf(a: Analysis, spot: number): EntryConditions {
   return {
     dir: a.dir ?? "up", trend5: a.trend5, trend15: a.trend15, trend60: a.trend60, fast: a.fast, slow: a.slow,
     priceVsSlow: a.priceAbove ? "above" : "below", slowRising: a.slowRising, strength: a.strength, dirStrength: a.dirStrength,
-    ranOver08: (a.dirStrength ?? 0) > 0.8, chop: a.chop, bucket: bucketOf(a.dirStrength), spot,
+    ranOver08: (a.dirHourMove ?? 0) > 0.8, chop: a.chop, bucket: bucketOf(a.dirStrength), spot, dirHourMove: a.dirHourMove,
   };
 }
 
@@ -988,7 +1045,9 @@ async function runFast(db: any): Promise<Record<string, unknown>> {
       const x = crossover(s?.closes ?? []);
       const trendAgainst = sh.dir === "down" ? x.signal === "buy" : x.signal === "sell";
       const isStock = !sh.symbol.includes("/");
-      const ex = fastExit({ system: id, shadow: sh, price, now, trendAgainst, closeOut: isStock && closeOut });
+      const trendNow = s?.closes?.length ? analyzeMarket(s.closes, s.price).trend5 : "unknown";
+      const trendNowAgainst = sh.dir === "down" ? trendNow === "up" : trendNow === "down";
+      const ex = fastExit({ system: id, shadow: sh, price, now, trendAgainst, closeOut: isStock && closeOut, trendNowAgainst });
       const mark = heldMark(sh as any, price);
       if (ex.sell) {
         const total = round2(Number(st.total_pnl ?? 0) + ex.pnl);
@@ -1035,7 +1094,7 @@ async function runFast(db: any): Promise<Record<string, unknown>> {
         const fresh: Lesson[] = [];
         if (ex.pnl <= 0 && streak === 2) {
           await saveDay(db, id, day, { pause_until: new Date(now.getTime() + FS_RULES.streakPauseMin * 60000).toISOString(), step_up_next: true });
-          await logFs(db, id, { kind: "lesson", decision: "no action", reason: `2 losses in a row: no new entries for ${FS_RULES.streakPauseMin} minutes, then the next entry needs +${FS_RULES.stepUpPct.toFixed(2)}% more strength.` });
+          await logFs(db, id, { kind: "lesson", decision: "no action", reason: `2 losses in a row: no new entries for ${FS_RULES.streakPauseMin} minutes, then the next entry needs +${FS_RULES.afterStreakPct.toFixed(1)}% or more in 30 minutes.` });
         }
         if (ex.pnl <= 0 && streak >= 3) fresh.push({ key: "streak3", text: `3 losses in a row — entries need +${FS_RULES.stepUpPct.toFixed(2)}% more strength for the rest of the day` });
         const active = new Set<string>((day.lessons ?? []).map((l: Lesson) => l.key));
@@ -1236,7 +1295,7 @@ export async function handleFast(
   const blocks = (day as any)?.blocks ?? {};
   const below = ladder.trades < ladder.target;
   const ended = !et.weekend ? w.mins >= 955 : false;
-  const impossible = w.inWindow && paceImpossible(et, tradesToday);
+  const impossible = false; // Nov 25: 40 is a maximum, so there is no pace to miss
   const dayNote = et.weekend ? FS_WEEKEND_NOTE : (ended || (!w.inWindow && w.mins >= w.end)) && below
     ? `The day ended at ${ladder.trades} of ${ladder.target}: ${blockReason(blocks)}.`
     : impossible
@@ -1378,7 +1437,9 @@ export async function handleFast(
       today: day ?? null,
       todayStats,
       pace: {
-        ...ladder, thresholdPct: rules.thresholdPct, maxHold: rules.maxHold, behind: ladder.deficit > 0, dayNote, impossible,
+        ...ladder, thresholdPct: rules.thresholdPct, maxHold: rules.maxHold, behind: false, dayNote, impossible,
+        entryFloor: Number(day?.start_pct ?? FS_RULES.startPct) < FS_RULES.floorPct ? FS_RULES.floorPct : Number(day?.start_pct ?? FS_RULES.startPct),
+        waiting: tradesToday < FS_RULES.dailyTarget ? "waiting for a real setup" : "the daily maximum is reached",
         checkpoints: PACE_LINE, learned: (day as any)?.learned ?? null, blocks,
       },
       learning,
@@ -1391,7 +1452,7 @@ export async function handleFast(
       options,
       rules: FS_RULE_LINES[id],
       brakeNote: id === "options"
-        ? "Daily stop -$500 and total brake -$1,000 are wide on purpose: one options loss is $50, so a tight brake would make 40 trades impossible. The real protection is the learning: benching losing markets, the pause after 2 losses in a row, and raising the strength needed."
+        ? "Daily stop -$500 and total brake -$1,000 are wide on purpose: one options loss is $50. The real protection is the strict entries and the learning: benching losing markets, the pause after 2 losses in a row, and the entry floor."
         : null,
       settings: {
         ...FS_RULES[id], dailyStopUsd: brakeDaily, spot: FS_RULES.spot, maxHoldMin: rules.maxHold,
