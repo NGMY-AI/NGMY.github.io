@@ -1,6 +1,6 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var D,A,E,C={
-hBu(d){switch(d.a){case 1:return B.esP
+hBy(d){switch(d.a){case 1:return B.esP
 case 2:return B.esR
 case 0:return B.esQ}},
 av0:function av0(d,e,f,g,h,i){var _=this
@@ -22,16 +22,16 @@ var y={c:D.as("N<u>")};(function constants(){var x=a.makeConstList
 B.aXG=new D.G(!0,A.c,null,null,null,null,9,A.u,null,2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 B.d8s=x([A.dD,A.kE,A.az],y.c)
 B.dJ8=x([A.az,A.fl],y.c)
-B.dhY=x([A.kZ,A.pH,A.az],y.c)
-B.esP=new C.av0(B.d8s,B.dJ8,A.fl,A.j7,"PREMIUM",B.dhY)
-B.dAr=x([A.cZ,A.fz,A.bT],y.c)
-B.dve=x([A.bT,A.aV],y.c)
-B.dgt=x([A.wS,A.bT,A.fz],y.c)
-B.esQ=new C.av0(B.dAr,B.dve,A.bT,A.jD,"NGMY WALLET",B.dgt)
-B.dxj=x([A.ex,A.e4,A.pI],y.c)
+B.dhZ=x([A.kZ,A.pH,A.az],y.c)
+B.esP=new C.av0(B.d8s,B.dJ8,A.fl,A.j7,"PREMIUM",B.dhZ)
+B.dAr=x([A.cZ,A.fz,A.bU],y.c)
+B.dvf=x([A.bU,A.aV],y.c)
+B.dgu=x([A.wT,A.bU,A.fz],y.c)
+B.esQ=new C.av0(B.dAr,B.dvf,A.bU,A.jD,"NGMY WALLET",B.dgu)
+B.dxk=x([A.ex,A.e4,A.pI],y.c)
 B.dCm=x([A.aE,A.aQ],y.c)
-B.diU=x([A.td,A.aE,A.c4],y.c)
-B.esR=new C.av0(B.dxj,B.dCm,A.aE,A.mz,"LUXURY",B.diU)
+B.diV=x([A.td,A.aE,A.c4],y.c)
+B.esR=new C.av0(B.dxk,B.dCm,A.aE,A.mz,"LUXURY",B.diV)
 B.esT=new E.av_(1,"premium")
 B.esU=new E.av_(2,"luxury")})()};
-(a=>{a["xvagC7L7dcFIamIJOa4PdkAuWIE="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["ifNgT2+ociC5IRaOcFztAg6QTuU="]=a.current})($__dart_deferred_initializers__);

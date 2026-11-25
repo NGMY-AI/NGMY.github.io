@@ -1,6 +1,6 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var J,B,A,E,F,C={
-hzI(a3){var x,w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f="Call Now",e="Pay on Cash App",d="NGMY Support",a0="NGMY Help Center",a1="Send on WhatsApp",a2=a3.a
+hzM(a3){var x,w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f="Call Now",e="Pay on Cash App",d="NGMY Support",a0="NGMY Help Center",a1="Send on WhatsApp",a2=a3.a
 if(a2===0)return B.asx(f,!0,e,!0,"NGMYpay",!0,"706-623-7963","Choose the service you need below. We will prepare a ready-to-send request summary for you \u2014 then open WhatsApp or call us directly. Nothing is submitted inside the app.","Need help? We are one tap away.",A.AA,A.Er,"Direct support \u2014 no forms, no waiting",d,a0,a1,!0,"")
 x=a3.h(0,"steps")
 w=a3.h(0,"services")
@@ -38,15 +38,15 @@ return B.asx(k,!m,h,!i,j,!v,p,q,r,u,a2,s,J.k(g==null?d:g),t,l,!n,o)},
 ci9:function ci9(){},
 cia:function cia(){},
 cib:function cib(){},
-hro(d,e,f,g,h,i,j){return B.i2(B.a1(158,A.v.m()>>>16&255,A.v.m()>>>8&255,A.v.m()&255),!0,"Close",d,new C.h6D(e,i,g,f,h,j),new C.h6E(),A.tw,!0,y.P)},
-h6D:function h6D(d,e,f,g,h,i){var _=this
+hrs(d,e,f,g,h,i,j){return B.i2(B.a1(158,A.v.m()>>>16&255,A.v.m()>>>8&255,A.v.m()&255),!0,"Close",d,new C.h6H(e,i,g,f,h,j),new C.h6I(),A.tw,!0,y.P)},
+h6H:function h6H(d,e,f,g,h,i){var _=this
 _.a=d
 _.b=e
 _.c=f
 _.d=g
 _.e=h
 _.f=i},
-h6E:function h6E(){},
+h6I:function h6I(){},
 a_E:function a_E(d,e,f,g,h,i,j){var _=this
 _.c=d
 _.d=e
@@ -190,9 +190,9 @@ aE7(d,e,f,g,h){var x,w,v=null,u=B.n(22),t=B.a1(A.i.S(255*(f?0.07:0.045)),A.c.m()
 if(f)x=D.bXw
 else{x=""+g
 x=B.c(x,new B.bg("n"+x,y.W),v,v,v,v,v,D.fD2,v,v,v)}w=y.p
-r=B.a([B.A(B.a([B.cV(A.z,B.oQ(x,A.ib,B.q8(),A.aZ,A.aZ,B.M0()),v,v,A.aZ,new B.o(q,v,p,v,o,r,A.a6),A.eX,v,30,v,v,v,v,v,30),A.ar,new B.d2(1,A.ci,B.c(h,v,v,v,v,v,v,A.hs,v,v,v),v)],w),A.l,v,A.ba,A.h,0,v,v),A.aj,B.c(d,v,v,v,v,v,v,B.l(v,v,B.a1(158,A.c.m()>>>16&255,A.c.m()>>>8&255,A.c.m()&255),v,v,v,v,v,v,v,v,12.5,v,v,v,v,1.35,!0,v,v,v,v,v,v,v,v),A.K,v,v)],w)
+r=B.a([B.A(B.a([B.cV(A.z,B.oQ(x,A.ib,B.q8(),A.aZ,A.aZ,B.M0()),v,v,A.aZ,new B.o(q,v,p,v,o,r,A.a6),A.eW,v,30,v,v,v,v,v,30),A.ar,new B.d2(1,A.ci,B.c(h,v,v,v,v,v,v,A.hs,v,v,v),v)],w),A.l,v,A.bb,A.h,0,v,v),A.aj,B.c(d,v,v,v,v,v,v,B.l(v,v,B.a1(158,A.c.m()>>>16&255,A.c.m()>>>8&255,A.c.m()&255),v,v,v,v,v,v,v,v,12.5,v,v,v,v,1.35,!0,v,v,v,v,v,v,v,v),A.K,v,v)],w)
 A.d.u(r,B.a([A.af,e],w))
-return B.cV(v,B.x(r,A.l,v,A.e,A.h,0,A.p),v,v,A.aZ,new B.o(t,v,s,u,v,v,A.m),A.eX,v,v,v,v,A.bF,v,v,1/0)},
+return B.cV(v,B.x(r,A.l,v,A.e,A.h,0,A.p),v,v,A.aZ,new B.o(t,v,s,u,v,v,A.m),A.eW,v,v,v,v,A.bF,v,v,1/0)},
 axb(d,e,f,g,h){var x,w,v=null,u=f==null,t=!u&&!g,s=u?0.42:1,r=B.n(18)
 if(u)u=v
 else{u=A.d.gal(h)
@@ -212,14 +212,14 @@ v=r.f
 v=r.m4(2,r.aE7("Open Cash App and send $"+w+" with the code in the note.",r.bYw("Open Cash App",A.tO,r.gcfe()),v,2,"Send the money"))
 w=r.x
 u=w==null
-w=B.akj(u?D.fuo:new B.D(A.d7,B.by(B.n(16),new B.cS(D.b9m,B.h5(w,A.z,q,q,A.cs,A.dI,!1,q,!1,q,q),q),A.aq),q),A.cp,A.eX)
+w=B.akj(u?D.fuo:new B.D(A.d7,B.by(B.n(16),new B.cS(D.b9m,B.h5(w,A.z,q,q,A.cs,A.dI,!1,q,!1,q,q),q),A.aq),q),A.cp,A.eW)
 t=u?"Add screenshot":"Change screenshot"
 s=u?A.vo:A.k_
 u=r.m4(3,r.aE7("Take a screenshot that shows the amount and the code, then add it here.",B.x(B.a([w,r.bYy(t,s,r.gcr1(),A.a5S)],i),A.l,q,A.e,A.h,0,A.p),!u,3,"Screenshot your payment"))
 w=r.x==null?q:r.gaAn()
 w=r.m4(4,r.bYx("Submit payment",A.jE,w,r.r))
 t=r.r?q:new C.cXI(d)
-return B.bo(!0,B.at(B.aG(!1,A.a3,!0,q,B.p(q,B.by(k,new B.am(A.a0,q,A.ad,A.t,B.a([j,B.cb(B.x(B.a([h,A.aO,x,A.R,v,A.R,u,A.aO,w,A.at,B.bM(!1,B.c("Cancel",q,q,q,q,q,q,B.l(q,q,B.a1(140,A.c.m()>>>16&255,A.c.m()>>>8&255,A.c.m()&255),q,q,q,q,q,q,q,q,q,q,q,A.D,q,q,!0,q,q,q,q,q,q,q,q),q,q,q),q,q,!0,q,q,q,t,q,q)],i),A.am,q,A.e,A.h,0,A.p),A.t,q,A.y,q,q,A.x6,q,q,A.ah)],i),q),A.aq),A.f,q,new B.aY(0,400,0,o.a.b*0.92),new B.o(q,q,m,n,l,D.caP,A.m),q,q,q,A.jC,q,q,q,q),A.f,A.L,0,q,q,q,q,q,A.ai),q,q,q),!0,!1,A.ag,!0,!0)}}
+return B.bo(!0,B.at(B.aG(!1,A.a3,!0,q,B.p(q,B.by(k,new B.am(A.a0,q,A.ad,A.t,B.a([j,B.cb(B.x(B.a([h,A.aO,x,A.R,v,A.R,u,A.aO,w,A.at,B.bL(!1,B.c("Cancel",q,q,q,q,q,q,B.l(q,q,B.a1(140,A.c.m()>>>16&255,A.c.m()>>>8&255,A.c.m()&255),q,q,q,q,q,q,q,q,q,q,q,A.D,q,q,!0,q,q,q,q,q,q,q,q),q,q,q),q,q,!0,q,q,q,t,q,q)],i),A.am,q,A.e,A.h,0,A.p),A.t,q,A.y,q,q,A.x7,q,q,A.ah)],i),q),A.aq),A.f,q,new B.aY(0,400,0,o.a.b*0.92),new B.o(q,q,m,n,l,D.caP,A.m),q,q,q,A.jC,q,q,q,q),A.f,A.L,0,q,q,q,q,q,A.ai),q,q,q),!0,!1,A.ag,!0,!0)}}
 C.aN7.prototype={
 t(){var x=this,w=x.ab$
 if(w!=null)w.a8(0,x.gbB())
@@ -250,13 +250,13 @@ $S:15}
 C.cib.prototype={
 $1(d){return A.a.i(d).length!==0},
 $S:3}
-C.h6D.prototype={
+C.h6H.prototype={
 $3(d,e,f){var x=this
 return new C.a_E(x.f,x.a,x.b,x.c,x.d,x.e,null)},
 $C:"$3",
 $R:3,
 $S:z+1}
-C.h6E.prototype={
+C.h6I.prototype={
 $4(d,e,f,g){var x=B.cK(A.ej,e,A.r_),w=y.t
 return new B.da(B.cK(A.eb,e,null),!1,B.iC(A.z,g,null,new B.bk(x,new B.bq(0.86,1,w),w.k("bk<bR.T>"))),null)},
 $S:34}
@@ -309,7 +309,7 @@ x(w=C.aB2.prototype,"gbOj","abF",0)
 x(w,"gcfe","a0v",0)
 x(w,"gcr1","a2b",0)
 x(w,"gaAn","yL",0)})();(function inheritance(){var x=a.mixinHard,w=a.inheritMany,v=a.inherit
-w(B.fR,[C.ci9,C.cia,C.cib,C.h6D,C.h6E,C.cXD,C.cXG])
+w(B.fR,[C.ci9,C.cia,C.cib,C.h6H,C.h6I,C.cXD,C.cXG])
 v(C.a_E,B.af)
 v(C.aN7,B.ah)
 v(C.aB2,C.aN7)
@@ -342,4 +342,4 @@ D.fEU=new B.G(!0,A.c,null,null,null,null,46,A.u,null,null,null,null,1.15,null,nu
 D.aXw=new B.G(!0,A.c,null,null,null,null,9.5,A.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fMN=new B.G(!0,D.ip,null,null,null,null,14,A.D,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fPx=new B.G(!0,D.ip,null,null,null,null,32,A.u,null,7,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["GD+BrNbk1TDwvMVkVSPLvrQTRdc="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["OPw4Ydxi0NFyy6cXXkyjMOLFxvI="]=a.current})($__dart_deferred_initializers__);

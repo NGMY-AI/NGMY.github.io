@@ -1,6 +1,6 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var J,B,C,D={
-i8i(a9,b0,b1,b2,b3){var x,w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5=C.o.ao(22050*b0,1000),a6=a5*2,a7=new DataView(new ArrayBuffer(44+a6)),a8=new D.cpc(a7)
+i8m(a9,b0,b1,b2,b3){var x,w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5=C.o.ao(22050*b0,1000),a6=a5*2,a7=new DataView(new ArrayBuffer(44+a6)),a8=new D.cpc(a7)
 a8.$2(0,"RIFF")
 a7.setUint32(4,36+a6,!0)
 a8.$2(8,"WAVE")
@@ -21,10 +21,10 @@ v=0.006
 u=!1
 t=0
 switch(b3){case"piano":s=A.dds
-r=A.djE
+r=A.djF
 w=3.4
 break
-case"organ":s=A.dil
+case"organ":s=A.dim
 r=A.dAh
 v=0.02
 u=!0
@@ -71,19 +71,19 @@ case"saw":d=C.i.F(i/6.283185307179586,1)*1.2-0.6
 break
 default:d=Math.sin(i)
 break}a0=d*(Math.min(1,h/120)*Math.pow(f,1.6))}a7.setInt16(44+h*2,C.o.D(C.i.S(a0*0.8*32e3),-32768,32767),!0)}return J.eU(C.dM.gaS(a7))},
-dG(d,e,f,g,h,i){return D.i8k(d,e,f,g,h,i)},
-i8k(d,e,f,g,h,i){var x=0,w=B.j(y.f),v=1,u=[],t,s,r,q,p,o
+dG(d,e,f,g,h,i){return D.i8o(d,e,f,g,h,i)},
+i8o(d,e,f,g,h,i){var x=0,w=B.j(y.f),v=1,u=[],t,s,r,q,p,o
 var $async$dG=B.e(function(j,k){if(j===1){u.push(k)
 x=v}for(;;)switch(x){case 0:v=3
 t=""+C.i.S(d)+"|"+f+"|"+i+"|"+B.v(g)+"|"+e
-s=$.i8h.c_(0,t,new D.cpe(d,f,i,g,e))
+s=$.i8l.c_(0,t,new D.cpe(d,f,i,g,e))
 if($.cpb.length<12){q=B.akF()
 q.O7(C.aU6)
-$.cpb.push(q)}q=$.hBh
-$.hBh=q+1
+$.cpb.push(q)}q=$.hBl
+$.hBl=q+1
 r=$.cpb[C.o.F(q,$.cpb.length)]
 x=6
-return B.b(J.hVU(r,new B.a5h(s,null),h),$async$dG)
+return B.b(J.hVY(r,new B.a5h(s,null),h),$async$dG)
 case 6:v=1
 x=5
 break
@@ -116,8 +116,8 @@ w.setUint8(d+u,e.charCodeAt(u))}},
 $S:766}
 D.cpe.prototype={
 $0(){var x=this
-return D.i8i(x.a,x.b,x.c,x.d,x.e)},
-$S:247};(function inheritance(){var x=a.inherit
+return D.i8m(x.a,x.b,x.c,x.d,x.e)},
+$S:264};(function inheritance(){var x=a.inherit
 x(D.cpc,B.ie)
 x(D.cpe,B.hS)})()
 var y={h:B.as("N<H>"),b:B.as("H"),f:B.as("~")};(function constants(){var x=a.makeConstList
@@ -134,16 +134,16 @@ A.d6T=x([1,2.76,5.4,8.93,13.3],y.h)
 A.d8g=x([1,0.6,0.38,0.22,0.12],y.h)
 A.ddr=x([1,0.7,0.45,0.28,0.16,0.1,0.06],y.h)
 A.dds=x([1,0.55,0.32,0.2,0.12,0.07],y.h)
-A.dil=x([1,0.6,0.45,0.3,0.22,0.15],y.h)
-A.djE=x([1,2,3,4,5,6],y.h)
+A.dim=x([1,0.6,0.45,0.3,0.22,0.15],y.h)
+A.djF=x([1,2,3,4,5,6],y.h)
 A.dAh=x([1,2,3,4,6,8],y.h)
 A.dBn=x([1,0.5,0.33,0.25,0.2,0.16,0.14,0.12],y.h)
 A.dDi=x([1,2,3,4,5,6,7,8],y.h)
 A.dIq=x([1,0.18,0.06],y.h)
 A.ev6={"SPARK PAINTER":0,"MANDALA MAKER":1,"TITLE ANIMATOR":2,"PALETTE LAB":3,"GRAVITY TOY":4,"FIREWORK DESIGNER":5,"CIRCUIT LAB":6,"PERIODIC TABLE":7,"BODY EXPLORER":8,"SPIN THE WHEEL":9,"FOCUS TIMER":10,"MEMORY MATCH":11,"LUCKY POCKET":12,"ELECTRONICS LAB":13,"CONSTRUCTION LAB":14,"AI INVENTOR":15,"MAGNET LAB":16,"RADIO LAB":17,"POWER PLANT":18,"POWER GRID":19,"INTERNET JOURNEY":20,"ROBOT CODER":21,"BUG SMASHER":22,"ROCKET LANDER":23,"DATA SNAKE":24,"BINARY 2048":25,"SIGNAL BREAKER":26,"PASSWORD LAB":27,"WAVE LAB":28,"BUG HUNT":29,"OPTICS LAB":30,"ATOM BUILDER":31,"PIXEL TV":32}
 A.aKX=new B.bl(A.ev6,["sparkle","sparkle","whoosh","click","bounce","pop","tech","lab","organic","click","tech","bubble","click","tech","tech","tech","tech","tech","tech","tech","tech","tech","pop","space","bubble","click","zap","click","tech","click","sparkle","lab","tech"],B.as("bl<m,m>"))
-A.ada=new B.G(!0,C.aF,null,null,null,null,10.5,C.D,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)})();(function staticFields(){$.i8h=B.S(B.as("m"),B.as("dC"))
+A.ada=new B.G(!0,C.aF,null,null,null,null,10.5,C.D,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)})();(function staticFields(){$.i8l=B.S(B.as("m"),B.as("dC"))
 $.cpb=B.a([],B.as("N<akE>"))
-$.hBh=0
+$.hBl=0
 $.auz="music"})()};
-(a=>{a["FC8P437WYJuJ5dlUKc39TecyikQ="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["c0XyEoSsqhMBtnR+ZzyCPdxH9wg="]=a.current})($__dart_deferred_initializers__);
