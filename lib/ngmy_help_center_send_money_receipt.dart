@@ -37,7 +37,7 @@ class NgmyHelpCenterSendMoneyReceipt {
   /// Local currency and the rate at the moment of the transfer (null when no country matched).
   final NgmyFxQuote? fx;
 
-  /// "Recipient gets in Tanzanian Shilling" / "251,400 TZS", or null when there is no country.
+  /// "They receive" / "983,969 TZS", or null when there is no country.
   String? get localCurrencyLabel => fx?.rowLabel;
   String? get localCurrencyValue => fx?.valueFor(recipientGets);
 

@@ -12,6 +12,13 @@ const String kNgmyFxRatesUrl = 'https://open.er-api.com/v6/latest/USD';
 /// A saved copy is used for at most this long when a fresh fetch fails.
 const Duration kNgmyFxMaxCacheAge = Duration(hours: 24);
 
+/// NGMY pays a little under the live mid rate, like other transfer apps (about 1%).
+/// The reduced rate is the one shown and used everywhere.
+const double kNgmyFxMargin = 0.01;
+
+/// The rate NGMY uses: live mid rate minus [kNgmyFxMargin].
+double ngmyFxRateAfterMargin(double liveRate) => liveRate * (1 - kNgmyFxMargin);
+
 const String _kFxCacheKey = 'ngmy_fx_usd_rates_v1';
 
 /// Currencies normally used without cents: whole numbers with thousands separators.
@@ -167,23 +174,24 @@ class NgmyFxQuote {
   final String currencyName;
   final String currencyCode;
 
-  /// Null when the rate could not be loaded.
+  /// The rate used (live rate minus the NGMY margin). Null when it could not be loaded.
   final double? rate;
   final DateTime? updatedAt;
 
   static NgmyFxQuote? forCountry(NgmyCountry? country, NgmyFxRates? rates) {
     if (country == null) return null;
+    final live = rates?.rateFor(country.currencyCode);
     return NgmyFxQuote(
       currencyName: country.currencyName,
       currencyCode: country.currencyCode,
-      rate: rates?.rateFor(country.currencyCode),
+      rate: live == null ? null : ngmyFxRateAfterMargin(live),
       updatedAt: rates?.updatedAt,
     );
   }
 
   bool get hasRate => rate != null && rate! > 0;
 
-  String get rowLabel => hasRate ? 'Recipient gets in $currencyName' : 'Recipient gets in local currency';
+  String get rowLabel => 'They receive';
 
   /// "251,400 TZS" or "rate unavailable right now".
   String valueFor(double usdAfterFees) {

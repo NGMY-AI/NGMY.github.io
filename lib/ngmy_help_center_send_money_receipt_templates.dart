@@ -320,10 +320,10 @@ class NgmyTransferReceiptPreview extends StatelessWidget {
                     t,
                     title: 'TRANSFER SUMMARY',
                     rows: [
-                      _Row('Transfer amount', '\$${r.transferAmount.toStringAsFixed(2)}'),
-                      _Row(r.feeDescription, '\$${r.serviceFee.toStringAsFixed(2)}'),
-                      _Row('Recipient receives', '\$${r.recipientGets.toStringAsFixed(2)}', bold: true, highlight: true),
-                      if (r.fx != null) _Row(r.localCurrencyLabel!, r.localCurrencyValue!, bold: true),
+                      _Row('Transfer amount', '\$${r.transferAmount.toStringAsFixed(2)}', boldLabel: true),
+                      _Row(r.feeDescription, '\$${r.serviceFee.toStringAsFixed(2)}', boldLabel: true),
+                      _Row('Recipient receives', '\$${r.recipientGets.toStringAsFixed(2)}', bold: true, highlight: true, boldLabel: true),
+                      if (r.fx != null) _Row(r.localCurrencyLabel!, r.localCurrencyValue!, bold: true, boldLabel: true),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -470,7 +470,17 @@ class NgmyTransferReceiptPreview extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 108, child: Text(row.label, style: TextStyle(color: t.mutedText, fontSize: 10))),
+          SizedBox(
+            width: 108,
+            child: Text(
+              row.label,
+              style: TextStyle(
+                color: t.mutedText,
+                fontSize: 10,
+                fontWeight: row.boldLabel ? FontWeight.w700 : null,
+              ),
+            ),
+          ),
           Expanded(
             child: Text(
               row.value,
@@ -488,11 +498,14 @@ class NgmyTransferReceiptPreview extends StatelessWidget {
 }
 
 class _Row {
-  const _Row(this.label, this.value, {this.bold = false, this.highlight = false});
+  const _Row(this.label, this.value, {this.bold = false, this.highlight = false, this.boldLabel = false});
   final String label;
   final String value;
   final bool bold;
   final bool highlight;
+
+  /// Thicker, easier-to-read label (Transfer Summary rows).
+  final bool boldLabel;
 }
 
 class _MarbleVeinPainter extends CustomPainter {

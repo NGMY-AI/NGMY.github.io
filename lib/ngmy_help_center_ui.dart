@@ -1401,7 +1401,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
     );
   }
 
-  /// "Recipient gets in Tanzanian Shilling: 251,400 TZS" plus the rate used underneath.
+  /// "They receive: 983,969 TZS" plus the rate used underneath.
   Widget _localCurrencyRow(NgmyFxQuote quote, double recipientGets, bool isDark) {
     final value = (_fxLoading && !quote.hasRate) ? 'loading rate...' : quote.valueFor(recipientGets);
     final rateLine = quote.rateLine;

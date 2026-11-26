@@ -101,19 +101,20 @@ void main() {
       fetchedAt: DateTime(2026, 11, 25, 8),
     );
 
-    test('uses the after-fee USD amount times the live rate', () {
+    test('uses the after-fee USD amount times the live rate minus the NGMY margin', () {
       final tz = NgmyFxQuote.forCountry(ngmyCountryByName('Tanzania'), rates)!;
-      expect(tz.rowLabel, 'Recipient gets in Tanzanian Shilling');
-      expect(tz.valueFor(100), '251,400 TZS');
-      expect(tz.rateLine, 'Rate used: 1 USD = 2,514.00 TZS · updated Nov 25, 2026');
+      expect(kNgmyFxMargin, 0.01);
+      expect(tz.rowLabel, 'They receive');
+      expect(tz.valueFor(100), '248,886 TZS');
+      expect(tz.rateLine, 'Rate used: 1 USD = 2,488.86 TZS · updated Nov 25, 2026');
       final eu = NgmyFxQuote.forCountry(ngmyCountryByName('France'), rates)!;
-      expect(eu.valueFor(93), '84.86 EUR');
-      expect(eu.rateLine, startsWith('Rate used: 1 USD = 0.9125 EUR ·'));
+      expect(eu.valueFor(93), '84.01 EUR');
+      expect(eu.rateLine, startsWith('Rate used: 1 USD = 0.9033 EUR ·'));
     });
 
     test('no rate shows rate unavailable, never a number', () {
       final q = NgmyFxQuote.forCountry(ngmyCountryByName('DR Congo'), null)!;
-      expect(q.rowLabel, 'Recipient gets in local currency');
+      expect(q.rowLabel, 'They receive');
       expect(q.valueFor(100), 'rate unavailable right now');
       expect(q.rateLine, isNull);
     });
@@ -130,11 +131,11 @@ void main() {
         transferAmountText: '100',
         fx: NgmyFxQuote.forCountry(ngmyCountryByName('DR Congo'), rates),
       );
-      final expected = ngmyFormatLocalAmount(r.recipientGets * 2299.591066, 'CDF');
+      final expected = ngmyFormatLocalAmount(r.recipientGets * 2299.591066 * 0.99, 'CDF');
       expect(r.recipientGets, lessThan(100));
-      expect(r.localCurrencyLabel, 'Recipient gets in Congolese Franc');
+      expect(r.localCurrencyLabel, 'They receive');
       expect(r.localCurrencyValue, '$expected CDF');
-      expect(r.toShareText(), contains('Recipient gets in Congolese Franc: $expected CDF'));
+      expect(r.toShareText(), contains('They receive: $expected CDF'));
     });
 
     test('cache is used for at most 24 hours', () {
