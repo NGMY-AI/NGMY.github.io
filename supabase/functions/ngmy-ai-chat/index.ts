@@ -1885,24 +1885,27 @@ async function handleHelpServices(req: Request, action: string, body: any): Prom
       const s = await res.json();
       if (!res.ok || !s?.url || !s?.id) {
         await db.from("service_purchases").delete().eq("id", row.id).eq("status", "pending");
-        const why = String(s?.error?.message ?? res.status);
-        console.error("[svcStripeStart] stripe error", why);
-        // A restricted Stripe key without the Checkout Sessions permission cannot open a checkout.
-        if (/permission/i.test(why)) {
-          return jsonOk({
-            ok: false,
-            error: isAdmin
-              ? "Stripe refused: the Stripe key needs the Checkout Sessions Write permission (Stripe Dashboard, Developers, API keys, edit the key). Use Cash App until then."
-              : "Card payments are not ready yet. Please use Cash App for now.",
-          }, 502);
-        }
-        return jsonOk({ ok: false, error: "Card checkout could not start. Try again or use Cash App." }, 502);
+        // Stripe's own reason, with any key text hidden, so the real cause never hides behind a generic message.
+        const why = String(s?.error?.message ?? `HTTP ${res.status}`).replace(/\b(sk|rk|pk)_(live|test)_[A-Za-z0-9*.]+/g, "$1_$2_…");
+        const keyKind = key.startsWith("rk_live_") ? "restricted live key" : key.startsWith("sk_live_") ? "live secret key"
+          : key.startsWith("sk_test_") || key.startsWith("rk_test_") ? "TEST key" : "unknown key type";
+        console.error("[svcStripeStart] stripe error", res.status, keyKind, why);
+        let reason = "Stripe did not accept the request";
+        if (/permission/i.test(why)) reason = "the Stripe key in Supabase (STRIPE_SECRET_KEY) does not have the Checkout Sessions Write permission";
+        else if (/invalid api key|expired|revoked/i.test(why) || res.status === 401) reason = "the Stripe key in Supabase (STRIPE_SECRET_KEY) is wrong, expired or deleted";
+        return jsonOk({
+          ok: false,
+          error: isAdmin
+            ? `Card checkout could not start: ${reason}. Stripe said: ${why} (${keyKind}, code ${res.status}).`
+            : `Card payments are not ready yet (code S${res.status}). Please use Cash App for now.`,
+        }, 502);
       }
       await db.from("service_purchases").update({ transaction_id: s.id }).eq("id", row.id);
       return jsonOk({ ok: true, url: s.url, purchaseId: row.id });
-    } catch (_) {
+    } catch (e) {
       await db.from("service_purchases").delete().eq("id", row.id).eq("status", "pending");
-      return jsonOk({ ok: false, error: "Card checkout could not start. Try again or use Cash App." }, 502);
+      console.error("[svcStripeStart] network error", String((e as Error)?.message ?? e));
+      return jsonOk({ ok: false, error: "Card checkout could not reach Stripe (network). Try again in a minute or use Cash App." }, 502);
     }
   }
 

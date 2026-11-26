@@ -102,6 +102,34 @@ String _date(dynamic raw) {
   }
 }
 
+/// A very light tint for the top of each plan card.
+Color _soft(String icon) {
+  switch (icon) {
+    case 'flipper':
+      return const Color(0xFFFFF3E2);
+    case 'house':
+      return const Color(0xFFE8FAF5);
+    case 'advice':
+      return const Color(0xFFF4F0FF);
+    default:
+      return const Color(0xFFEAF2FF);
+  }
+}
+
+/// A dark shade of each plan colour, for the price and the checkmarks, readable on white.
+Color _deepInk(String icon) {
+  switch (icon) {
+    case 'flipper':
+      return const Color(0xFFC2410C);
+    case 'house':
+      return const Color(0xFF0F766E);
+    case 'advice':
+      return const Color(0xFF6D28D9);
+    default:
+      return const Color(0xFF1D4ED8);
+  }
+}
+
 class _Palette {
   _Palette(BuildContext context) : dark = Theme.of(context).brightness == Brightness.dark;
   final bool dark;
@@ -602,30 +630,29 @@ class _CategoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = _Palette(context);
+    // Plan cards are always light (white with a pale tint) and use dark text so every word is easy to read.
+    final soft = _soft(category.icon);
+    const ink = Color(0xFF0F172A);
+    const muted = Color(0xFF334155);
     final look = _look(category.icon);
-    final accent = look.colors.last;
+    final accent = _deepInk(category.icon);
     final status = (latest?['status'] ?? '').toString();
     final paid = status == 'paid';
     final waiting = status == 'pending' && latest?['method'] == 'cashapp';
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: c.card,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: c.line),
-        boxShadow: [BoxShadow(color: accent.withValues(alpha: c.dark ? 0.16 : 0.10), blurRadius: 28, offset: const Offset(0, 12))],
+        border: Border.all(color: accent.withValues(alpha: 0.22), width: 1.2),
+        boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.10), blurRadius: 28, offset: const Offset(0, 12))],
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Container(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [look.colors.first.withValues(alpha: 0.20), look.colors.last.withValues(alpha: 0.06)],
-            ),
+            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [soft, Color.lerp(soft, Colors.white, 0.55)!]),
           ),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Container(
@@ -641,14 +668,14 @@ class _CategoryCard extends StatelessWidget {
             const SizedBox(width: 14),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(category.title(), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, height: 1.15, color: c.ink)),
+                Text(category.title(), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, height: 1.15, color: ink)),
                 const SizedBox(height: 6),
                 Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
                   Text(_money(category.price), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 26, height: 1, color: accent)),
                   const SizedBox(width: 6),
                   Padding(
                     padding: const EdgeInsets.only(bottom: 2),
-                    child: Text(_t('one-time', 'mara moja'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: c.muted)),
+                    child: Text(_t('one-time', 'mara moja'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: muted)),
                   ),
                 ]),
               ]),
@@ -658,13 +685,13 @@ class _CategoryCard extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
-          child: Text(category.description(), style: TextStyle(fontSize: 14, height: 1.45, fontWeight: FontWeight.w600, color: c.ink.withValues(alpha: 0.86))),
+          child: Text(category.description(), style: TextStyle(fontSize: 14, height: 1.45, fontWeight: FontWeight.w600, color: ink)),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
           child: Text(
             _t('WHAT THIS PACKAGE INCLUDES', 'KIFURUSHI HIKI KINAJUMUISHA'),
-            style: TextStyle(fontSize: 10.5, letterSpacing: 1.5, fontWeight: FontWeight.w900, color: c.muted),
+            style: TextStyle(fontSize: 10.5, letterSpacing: 1.5, fontWeight: FontWeight.w900, color: muted),
           ),
         ),
         for (final line in category.includes())
@@ -679,7 +706,7 @@ class _CategoryCard extends StatelessWidget {
                 child: Icon(Icons.check_rounded, size: 14, color: accent),
               ),
               const SizedBox(width: 10),
-              Expanded(child: Text(line, style: TextStyle(fontSize: 13.5, height: 1.4, color: c.ink, fontWeight: FontWeight.w600))),
+              Expanded(child: Text(line, style: TextStyle(fontSize: 13.5, height: 1.4, color: ink, fontWeight: FontWeight.w600))),
             ]),
           ),
         Padding(
