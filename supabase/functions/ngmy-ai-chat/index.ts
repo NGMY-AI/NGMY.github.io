@@ -1708,7 +1708,7 @@ async function handleAdvisorRelationship(req: Request, action: string, body: any
 // the Cash App screenshot, or after Stripe itself says the checkout session was paid.
 const SVC_ACTIONS = new Set([
   "svcList", "svcCashApp", "svcStripeStart", "svcStripeVerify",
-  "svcAdminList", "svcAdminDecide", "svcAdminSetWhatsapp",
+  "svcAdminList", "svcAdminDecide", "svcAdminSetWhatsapp", "svcStripeHealth",
 ]);
 
 function svcStripeKey(): string {
@@ -1786,12 +1786,72 @@ function svcReturnOrigin(raw: unknown): string {
   return "https://ngmy.org";
 }
 
+/// Health check for card payments with the key saved in Supabase: opens a test checkout and closes it at once
+/// (nothing can be paid), and reads one Payment Link. It answers only status codes and Stripe's messages.
+async function svcStripeHealth(req: Request): Promise<Response> {
+  const limited = await enforceRateLimit(req, "svc_health", clientIp(req), 6, 3600);
+  if (limited) return limited;
+  const key = svcStripeKey();
+  const mask = (m: unknown) => String(m ?? "").replace(/\b(sk|rk|pk)_(live|test)_[A-Za-z0-9*.]+/g, "$1_$2_…");
+  if (!key) return jsonOk({ ok: false, keySaved: false });
+  const auth = { Authorization: `Bearer ${key}` };
+  const out: Record<string, unknown> = {
+    ok: true,
+    keyKind: key.startsWith("rk_live_") ? "restricted live" : key.startsWith("sk_live_") ? "live secret" : key.startsWith("pk_") ? "publishable (wrong kind)" : /_test_/.test(key) ? "test" : "unknown",
+  };
+  try {
+    const form = new URLSearchParams();
+    form.set("mode", "payment");
+    form.set("success_url", "https://ngmy.org/?svc_health=1");
+    form.set("cancel_url", "https://ngmy.org/?svc_health=0");
+    form.set("line_items[0][quantity]", "1");
+    form.set("line_items[0][price_data][currency]", "usd");
+    form.set("line_items[0][price_data][unit_amount]", "4000");
+    form.set("line_items[0][price_data][product_data][name]", "NGMY health check (not for sale)");
+    form.set("metadata[ngmy_kind]", "health_check");
+    const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+      method: "POST", headers: { ...auth, "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString(),
+    });
+    const s = await res.json();
+    out.checkoutStatus = res.status;
+    out.checkoutOpens = res.ok && typeof s?.url === "string" && s.url.startsWith("https://checkout.stripe.com/");
+    out.livemode = s?.livemode === true;
+    if (!res.ok) out.checkoutError = mask(s?.error?.message);
+    if (s?.id) {
+      const ex = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(s.id)}/expire`, { method: "POST", headers: auth });
+      const e = await ex.json();
+      out.expireStatus = ex.status;
+      out.expired = e?.status === "expired";
+      if (!ex.ok) out.expireError = mask(e?.error?.message);
+    }
+  } catch (e) {
+    out.checkoutError = `network: ${mask((e as Error)?.message)}`;
+  }
+  try {
+    const pl = await fetch("https://api.stripe.com/v1/payment_links?limit=1", { headers: auth });
+    const p = await pl.json();
+    out.paymentLinksStatus = pl.status;
+    if (!pl.ok) out.paymentLinksError = mask(p?.error?.message);
+  } catch (e) {
+    out.paymentLinksError = `network: ${mask((e as Error)?.message)}`;
+  }
+  return jsonOk(out);
+}
+
 async function handleHelpServices(req: Request, action: string, body: any): Promise<Response> {
+  if (action === "svcStripeHealth") return await svcStripeHealth(req);
   const email = (await requireJwtEmail(req)).trim().toLowerCase();
   if (!email) return jsonOk({ ok: false, error: "Please sign in first." }, 401);
   const db = adminClient();
   if (!db) return jsonOk({ ok: false, error: "Server database unavailable." }, 500);
-  const isAdmin = isNgmyAdminEmail(email);
+  // An admin is on the built-in admin list or marked admin on their account (users.isAdmin), like the app.
+  let isAdmin = isNgmyAdminEmail(email);
+  if (!isAdmin) {
+    try {
+      const { data: me } = await db.from("users").select("isAdmin").eq("email", email).maybeSingle();
+      isAdmin = me?.isAdmin === true;
+    } catch (_) { /* not an admin */ }
+  }
   const notReady = (msg: string) => /service_|relation|does not exist/i.test(msg);
   const setupError = "Help & Services is not switched on yet. Please tell the admin to finish the setup.";
 
@@ -1887,8 +1947,14 @@ async function handleHelpServices(req: Request, action: string, body: any): Prom
         await db.from("service_purchases").delete().eq("id", row.id).eq("status", "pending");
         // Stripe's own reason, with any key text hidden, so the real cause never hides behind a generic message.
         const why = String(s?.error?.message ?? `HTTP ${res.status}`).replace(/\b(sk|rk|pk)_(live|test)_[A-Za-z0-9*.]+/g, "$1_$2_…");
-        const keyKind = key.startsWith("rk_live_") ? "restricted live key" : key.startsWith("sk_live_") ? "live secret key"
-          : key.startsWith("sk_test_") || key.startsWith("rk_test_") ? "TEST key" : "unknown key type";
+        // What the saved key looks like (never the key itself), so a bad paste is easy to spot.
+        const keyKind = /^["'`]|["'`]$/.test(key) ? "the saved key has quote marks around it"
+          : /\s/.test(key) ? "the saved key has a space or line break inside it"
+          : key.startsWith("pk_") ? "this is a PUBLISHABLE key (pk_), it must be a secret key (sk_live_ or rk_live_)"
+          : key.startsWith("rk_live_") ? `restricted live key, ${key.length} characters`
+          : key.startsWith("sk_live_") ? `live secret key, ${key.length} characters`
+          : key.startsWith("sk_test_") || key.startsWith("rk_test_") ? "TEST key"
+          : `does not start with sk_live_ or rk_live_ (${key.length} characters)`;
         console.error("[svcStripeStart] stripe error", res.status, keyKind, why);
         let reason = "Stripe did not accept the request";
         if (/permission/i.test(why)) reason = "the Stripe key in Supabase (STRIPE_SECRET_KEY) does not have the Checkout Sessions Write permission";
@@ -11023,6 +11089,7 @@ serve(async (req) => {
       q5: "svcAdminList",
       q6: "svcAdminDecide",
       q7: "svcAdminSetWhatsapp",
+      q8: "svcStripeHealth",
       s1: "storeGrant",
       s2: "storeRevoke",
       s3: "storeList",

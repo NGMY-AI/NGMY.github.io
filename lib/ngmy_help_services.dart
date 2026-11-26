@@ -102,17 +102,17 @@ String _date(dynamic raw) {
   }
 }
 
-/// A very light tint for the top of each plan card.
+/// A bright, light colour for each plan card (lavender, mint, peach). Dark text stays easy to read on it.
 Color _soft(String icon) {
   switch (icon) {
     case 'flipper':
-      return const Color(0xFFFFF3E2);
+      return const Color(0xFFFFD2A6);
     case 'house':
-      return const Color(0xFFE8FAF5);
+      return const Color(0xFFADF0DA);
     case 'advice':
-      return const Color(0xFFF4F0FF);
+      return const Color(0xFFD8C8FF);
     default:
-      return const Color(0xFFEAF2FF);
+      return const Color(0xFFC4DCFF);
   }
 }
 
@@ -642,7 +642,7 @@ class _CategoryCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color.lerp(soft, Colors.white, 0.18)!, Color.lerp(soft, Colors.white, 0.45)!]),
         borderRadius: BorderRadius.circular(26),
         border: Border.all(color: accent.withValues(alpha: 0.22), width: 1.2),
         boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.10), blurRadius: 28, offset: const Offset(0, 12))],
@@ -652,7 +652,7 @@ class _CategoryCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
           decoration: BoxDecoration(
-            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [soft, Color.lerp(soft, Colors.white, 0.55)!]),
+            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [soft, Color.lerp(soft, Colors.white, 0.2)!]),
           ),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Container(
