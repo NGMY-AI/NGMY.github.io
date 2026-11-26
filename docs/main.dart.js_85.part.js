@@ -671,16 +671,16 @@ m=a3.acK(a3.F0("Address",a3.CW,"address"),a3.F0("Tagline",a3.cx,"tagline"))
 l=a3.d
 l===$&&A.d()
 l=a3.akZ("Accent",D.dHg,l.z,new C.c9U(a3),"Default")
-k=a3.akZ("Background",D.cYz,a3.d.Q,new C.c9V(a3),"Template")
+k=a3.akZ("Background",D.cYA,a3.d.Q,new C.c9V(a3),"Template")
 j=a3.akZ("Text color",D.dxl,a3.d.at,new C.c9W(a3),"Auto")
-i=a3.akZ("Card border",D.d7r,a3.d.ax,new C.c9X(a3),"None")
+i=a3.akZ("Card border",D.d7s,a3.d.ax,new C.c9X(a3),"None")
 h=A.E(A.x(A.a([A.c("Text size",a4,a4,a4,a4,a4,a4,A.l(a4,a4,A.Q(a5).ax.a===B.I?B.c.j(0.55):B.aM,a4,a4,a4,a4,a4,a4,a4,a4,11,a4,a4,B.O,a4,a4,!0,a4,a4,a4,a4,a4,a4,a4,a4),a4,a4,a4),A.ld(B.bj,9,a4,1.3,0.85,new C.c9Y(a3),B.i.D(a3.d.ay,0.85,1.3))],s),B.B,a4,B.e,B.h,0,B.p),1)
 g=a3.d.ch
 f=A.Q(a5).ax.a===B.I?B.dJ:B.bn
 g=A.A(A.a([h,B.aa,A.v9(a4,f,B.v,D.h30,a4,new C.c9Z(a3),a4,g,B.bj,a4,a4,a4)],s),B.l,a4,B.e,B.h,0,a4,a4)
 h=A.c("Logo rings",a4,a4,a4,a4,a4,a4,A.l(a4,a4,A.Q(a5).ax.a===B.I?B.c.j(0.55):B.aM,a4,a4,a4,a4,a4,a4,a4,a4,11,a4,a4,B.O,a4,a4,!0,a4,a4,a4,a4,a4,a4,a4,a4),a4,a4,a4)
 f=A.a([],s)
-for(e=0;e<6;++e){d=D.di3[e]
+for(e=0;e<6;++e){d=D.di4[e]
 a0=A.c(d.b,a4,a4,a4,a4,a4,a4,E.WW,a4,a4,a4)
 a1=a3.d.cx
 a2=A.Q(a5).ax.a===B.I?B.dJ:B.bn
@@ -1318,7 +1318,7 @@ else s=A.Q(o.b.a).ax.a===B.I?B.c.j(0.12):B.dr
 s=A.K(s,B.r,1)
 if(u)r=B.bj
 else r=A.Q(o.b.a).ax.a===B.I?B.c.j(0.48):B.bB
-return A.aA(n,A.p(B.z,A.c("None",n,n,n,n,n,n,A.l(n,n,r,n,n,n,n,n,n,n,n,8,n,n,B.D,n,n,!0,n,n,n,n,n,n,n,n),n,n,n),B.f,n,n,new A.o(t,n,s,v,n,n,B.m),n,36,n,n,n,n,n,36),B.y,!1,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,w.gbMz(),n,n,n,n,n,n,!1,B.a4)}q=D.dhe[e-1]
+return A.aA(n,A.p(B.z,A.c("None",n,n,n,n,n,n,A.l(n,n,r,n,n,n,n,n,n,n,n,8,n,n,B.D,n,n,!0,n,n,n,n,n,n,n,n),n,n,n),B.f,n,n,new A.o(t,n,s,v,n,n,B.m),n,36,n,n,n,n,n,36),B.y,!1,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,w.gbMz(),n,n,n,n,n,n,!1,B.a4)}q=D.dhf[e-1]
 w=o.a
 v=w.d
 v===$&&A.d()
@@ -1480,7 +1480,7 @@ return w.e=w.e.cRI(this.b)},
 $S:0}
 C.ei4.prototype={
 $1(d){var w=null,v=A.Q(d).ax.a===B.I?B.oO:B.c,u=A.m(18),t=A.a([D.eGX],x.p)
-B.d.u(t,new A.O(D.deo,new C.ei3(d),x.E))
+B.d.u(t,new A.O(D.dep,new C.ei3(d),x.E))
 t.push(B.N)
 return A.bo(!0,A.p(w,A.x(t,B.l,w,B.e,B.P,0,B.p),B.f,w,w,new A.o(v,w,w,u,w,w,B.m),w,w,w,B.bg,w,w,w,w),!0,!1,B.ag,!0,!0)},
 $S:30}
@@ -1562,7 +1562,7 @@ C.eiz.prototype={
 $2(d,e){return B.aa},
 $S:36}
 C.eiy.prototype={
-$2(d,e){var w=null,v=D.dch[e],u=this.a,t=u.e.ax===v.m(),s=t?B.c:B.aT
+$2(d,e){var w=null,v=D.dci[e],u=this.a,t=u.e.ax===v.m(),s=t?B.c:B.aT
 return A.aA(w,A.p(w,w,B.f,w,w,new A.o(v,w,A.K(s,B.r,t?3:1),w,w,w,B.a6),w,28,w,w,w,w,w,28),B.y,!1,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,new C.eim(u,v),w,w,w,w,w,w,!1,B.a4)},
 $S:78}
 C.eim.prototype={
@@ -1676,9 +1676,9 @@ D.eZl=new A.y("real_estate","Real Estate")
 D.f6e=new A.y("freelance","Freelance")
 D.f3N=new A.y("admin","Admin")
 D.aBn=w([D.f4Q,D.f4R,D.f9F,D.f8l,D.fcD,D.f9A,D.eZl,D.f6e,D.f3N],x.L)
-D.cYz=w([B.c,B.aS,B.a_,B.aw,B.dD,B.ex,B.ami,B.qG],x.O)
-D.d7r=w([B.aE,B.bp,B.bj,B.az,B.aC,B.a_],x.O)
-D.dch=w([B.bu,B.aC,B.bd,B.ca,B.aE,B.bl,B.oK,B.bw,B.bn,B.cw],x.O)
+D.cYA=w([B.c,B.aS,B.a_,B.aw,B.dD,B.ex,B.ami,B.qG],x.O)
+D.d7s=w([B.aE,B.bp,B.bj,B.az,B.aC,B.a_],x.O)
+D.dci=w([B.bu,B.aC,B.bd,B.ca,B.aE,B.bl,B.oK,B.bw,B.bn,B.cw],x.O)
 D.xG=w([B.bj,B.hx,B.oE],x.O)
 D.f5o=new A.y(1,"1 day")
 D.feV=new A.y(3,"3 days")
@@ -1689,13 +1689,13 @@ D.fbz=new A.y(60,"2 months")
 D.eWk=new A.y(90,"3 months")
 D.ePP=new A.y(120,"4 months")
 D.f_r=new A.y(149,"Just under 5 months")
-D.deo=w([D.f5o,D.feV,D.f0K,D.f7c,D.fa7,D.fbz,D.eWk,D.ePP,D.f_r],A.as("N<+(F,n)>"))
-D.dhe=w(["\ud83d\udcbc","\ud83d\udcc7","\u2728","\ud83c\udfe2","\ud83d\udca1","\ud83c\udfaf","\u2b50","\ud83d\udd25","\ud83d\udc8e","\ud83d\ude80","\ud83d\udcde","\u2709\ufe0f","\ud83c\udf10","\ud83d\udccd","\ud83d\udcb0","\ud83e\udd1d","\ud83c\udfa8","\ud83d\udcca","\ud83c\udfc6","\ud83d\udc54","\ud83d\udcbb","\ud83d\udcdd","\ud83d\udd14","\u2705","\ud83c\udf1f","\ud83c\udfe0","\ud83d\udcf1","\ud83d\udcb3","\ud83c\udf93","\u26a1"],A.as("N<n>"))
+D.dep=w([D.f5o,D.feV,D.f0K,D.f7c,D.fa7,D.fbz,D.eWk,D.ePP,D.f_r],A.as("N<+(F,n)>"))
+D.dhf=w(["\ud83d\udcbc","\ud83d\udcc7","\u2728","\ud83c\udfe2","\ud83d\udca1","\ud83c\udfaf","\u2b50","\ud83d\udd25","\ud83d\udc8e","\ud83d\ude80","\ud83d\udcde","\u2709\ufe0f","\ud83c\udf10","\ud83d\udccd","\ud83d\udcb0","\ud83e\udd1d","\ud83c\udfa8","\ud83d\udcca","\ud83c\udfc6","\ud83d\udc54","\ud83d\udcbb","\ud83d\udcdd","\ud83d\udd14","\u2705","\ud83c\udf1f","\ud83c\udfe0","\ud83d\udcf1","\ud83d\udcb3","\ud83c\udf93","\u26a1"],A.as("N<n>"))
 D.fa3=new A.y("none","None")
 D.fcF=new A.y("thin","Thin")
 D.f5g=new A.y("double","Double")
 D.fcc=new A.y("soft","Soft")
-D.di3=w([D.fa3,D.fcF,D.f5g,F.VS,O.aTL,D.fcc],x.L)
+D.di4=w([D.fa3,D.fcF,D.f5g,F.VS,O.aTL,D.fcc],x.L)
 D.f1n=new A.y(B.j7,"\ud83d\udcde ")
 D.fbE=new A.y(B.DA,"\u2709\ufe0f ")
 D.f7C=new A.y(B.i2,"\ud83c\udf10 ")
@@ -1736,4 +1736,4 @@ D.heX=new A.C("Show circle photo",null,null,null,null,null,null,null,null,null,n
 D.hgm=new A.C("Running ticker",null,null,null,null,null,null,null,null,null,null,null)
 D.hk0=new A.C("Community voice",null,null,null,null,null,null,null,null,null,null,null)
 D.hk4=new A.C("Save Card",null,null,null,null,null,null,null,null,null,null,null)})();(function staticFields(){$.hK2=A.S(x.N,x.D)})()};
-(a=>{a["wz4LKVAezaf3z2ZaV+xI8BOf5Ao="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["WqKMQ/MISxJiVU0ydzzu5Ju/kjI="]=a.current})($__dart_deferred_initializers__);

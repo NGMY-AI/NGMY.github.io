@@ -639,7 +639,7 @@ f=B.d.q(D.a7d,o.h(0,"texture"))?A.cU(o.h(0,"texture")):"leather"
 e=o.h(0,"author")
 e=J.k(e==null?"":e)
 d=J.z(o.h(0,"ribbon"),!1)
-o=B.d.q(D.dcD,o.h(0,"header"))?A.cU(o.h(0,"header")):"classic"
+o=B.d.q(D.dcE,o.h(0,"header"))?A.cU(o.h(0,"header")):"classic"
 o=new C.IH(n,m,l,k,j,i,h,g,f,e,!d,o)}else o=D.PM
 u=o
 w=1
@@ -1660,7 +1660,7 @@ w=A.L()
 w.r=c1.gp(0)
 c2.O(D.eDI,1.7,w)}},
 ip1(a3){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h=null,g=$.T(),f=new A.oW(new A.or()),e=A.v2(f,h),d=a3.a,a0=a3.b,a1=Math.min(d/450,a0/900),a2=A.L()
-a2.san(A.jP(B.J,new A.r(0,a0*0.46),D.dgz,D.d78,B.x,h))
+a2.san(A.jP(B.J,new A.r(0,a0*0.46),D.dgA,D.d79,B.x,h))
 e.aE(new A.a5(0,0,0+d,0+a0),a2)
 a2=e.c
 J.bs(a2.save())
@@ -1746,7 +1746,7 @@ d=B.o.F(v,4)
 u=new A.ar(B.U,B.R,B.X,B.Y,B.W)
 u.r=D.bkt.j(0.8).gp(0)
 e.O(new A.r(20+v*52+g*7,400+d*5),1.2,u)}g=A.L()
-g.san(A.jP(D.eAF,D.eAI,D.d9m,B.xH,B.x,h))
+g.san(A.jP(D.eAF,D.eAI,D.d9n,B.xH,B.x,h))
 e.aE(new A.a5(-200,412,650,1300),g)
 j=new A.e3()
 j.cT(21)
@@ -2244,7 +2244,7 @@ B.d.u(j,D.cU9)
 h=l+" was born in "+k
 c2.$2("place",C.Hm(c6,"Where was "+l+" born?",k,j,h+".",h+". Every one of us comes from a place.",20))}k=B.a.i(m.z)
 if(k.length!==0){j=A.B(q,c0)
-B.d.u(j,D.dat)
+B.d.u(j,D.dau)
 h=l+" works as "+k
 f=h+"."
 c2.$2("job",C.Hm(c6,"What work does "+l+" do?",k,j,f,h+". Work is how we serve the family and the village.",20))
@@ -7387,9 +7387,9 @@ t(){var w=this.d
 w.V$=$.az()
 w.W$=0
 this.a2()},
-gbUv(){switch(this.ga3u()){case"cover":var w=D.deR
+gbUv(){switch(this.ga3u()){case"cover":var w=D.deS
 break
-case"book":w=D.d9J
+case"book":w=D.d9K
 break
 default:w=D.dIx
 break}return w},
@@ -7747,7 +7747,7 @@ for(w=x.O,t=a4.c,s=0;s<v;){++s
 r=s*112
 for(q=r-14,p=q+2,o=-r,n=6;n<a0;){m=14+u.ai()*20
 l=56+u.ai()*40
-k=D.deQ[u.av(9)]
+k=D.deR[u.av(9)]
 j=u.av(14)
 J.bs(t.save())
 if(j===0){j=n+m
@@ -8603,7 +8603,7 @@ if(r===0)r=s
 return A.co(A.a([D.bgb,u,t,B.aO,new C.IJ(s,r,w.cx,v),B.aO,A.at(C.uH("Back to the games",new C.bN3(w),B.d_,B.kk,D.fJ),v,v,v)],x.p),v,v,B.ae,v,v,B.ah,!1)}}
 C.beN.prototype={
 a4(a4,a5){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e=null,d=a5.a,a0=a5.b,a1=0+d,a2=$.T(),a3=A.L()
-a3.san(A.jP(B.J,new A.r(0,a0),D.d87,G.aCF,B.x,e))
+a3.san(A.jP(B.J,new A.r(0,a0),D.d88,G.aCF,B.x,e))
 a4.aE(new A.a5(0,0,a1,0+a0),a3)
 a3=A.L()
 a3.r=G.Ov.gp(0)
@@ -8676,7 +8676,7 @@ m.c=4
 m.d=B.bG
 a4.ah(D.eAS,D.eBZ,m)
 m=new A.ar(B.U,B.R,B.X,B.Y,B.W)
-m.san(new A.amO(D.eE6,46,D.dhA,B.vJ,B.x,e,e,0))
+m.san(new A.amO(D.eE6,46,D.dhB,B.vJ,B.x,e,e,0))
 a4.O(B.J,34,m)
 m=A.bZ(D.eEc,8,12)
 l=new A.ar(B.U,B.R,B.X,B.Y,B.W)
@@ -9157,7 +9157,7 @@ v.translate(w.a,w.b)
 a0.bV(0,w.c)
 if(e.Q){u=e.gqz()
 t=u.d<u.c.length}else t=!1
-for(s=0;s<2;++s){u=D.d1W[s]-6
+for(s=0;s<2;++s){u=D.d1X[s]-6
 $.T()
 r=new A.ar(B.U,B.R,B.X,B.Y,B.W)
 r.r=D.GS.gp(0)
@@ -9769,7 +9769,7 @@ w.E(new A.bA())
 t=A.L()
 t.r=D.a0f.gp(0)
 d.af(w,t)
-for(w=v+0,t=u+-54,s=u+-72,u+=-76,r=0;r<4;++r){q=D.d68[r]
+for(w=v+0,t=u+-54,s=u+-72,u+=-76,r=0;r<4;++r){q=D.d69[r]
 p=new A.ar(B.U,B.R,B.X,B.Y,B.W)
 p.r=D.a0f.gp(0)
 p.c=4
@@ -9817,7 +9817,7 @@ t.san(A.jP(D.eAU,B.aa4,D.doR,G.a5U,B.x,f))
 a2.aq(p,t)
 for(o=0;o<20;++o){t=-100+o*10
 s=new A.ar(B.U,B.R,B.X,B.Y,B.W)
-s.r=D.dim[B.o.F(o,4)].gp(0)
+s.r=D.din[B.o.F(o,4)].gp(0)
 a2.aE(new A.a5(t,-26,t+10,-19),s)}n=d.r===D.BQ&&d.ax
 m=[2,3,4,5]
 for(t=a4*10,o=0;o<4;++o){s=-88+o*38
@@ -10937,8 +10937,8 @@ aD(d){return d.b!==this.b}}
 C.bml.prototype={
 gceK(){var w=this.c
 if(B.a.i(w.y).length!==0)return B.aFE
-switch(w.c.a){case 0:return D.d4D
-case 1:return D.dig
+switch(w.c.a){case 0:return D.d4E
+case 1:return D.dih
 case 2:return D.dBP}},
 gceN(){var w=this.c,v=C.hLY(w.w),u=C.hLY(w.y)
 w=v!=null
@@ -11806,7 +11806,7 @@ m.r=B.c.j(0.25+q*0.55).gp(0)
 d.O(new A.r(u*(0.1+p)+o*12,t*(0.15+n)),2+q*3,m)}l.mv(d,e,B.bM.j(0.4),-w*3.141592653589793*2.2,11)
 l.yX(d,e,B.qD,4,14)},
 coc(d,e){var w,v,u,t,s,r,q,p,o,n=this
-n.mp(d,e,D.d9h)
+n.mp(d,e,D.d9i)
 for(w=e.a,v=Math.abs(w),u=e.b,t=Math.abs(u),s=n.c*0.08,w/=2,u*=0.55,r=0;r<3;++r){q=Math.min(v,t)
 p=B.i.F(s,0.12)
 $.T()
@@ -11828,7 +11828,7 @@ d.aq(r,q)}p.mv(d,e,B.c.j(0.3),w,16)
 p.BS(d,e,8)
 p.yX(d,e,B.wL,5,13)},
 co7(d,e){var w,v,u,t,s,r,q
-this.mp(d,e,D.dgh)
+this.mp(d,e,D.dgi)
 for(w=this.c,v=e.a,u=e.b,t=0;t<4;++t){s=B.i.F(w+t*0.2,1)
 r=v*(0.18+t*0.18)
 q=u*(0.15+s*0.55)
@@ -11838,7 +11838,7 @@ r=new A.ar(B.U,B.R,B.X,B.Y,B.W)
 r.r=[B.iJ,B.dG,B.bM,B.eF][t].j(0.85).gp(0)
 d.aq(q,r)}this.mv(d,e,B.c.j(0.45),w*3.141592653589793*2.5,13)},
 coe(d,e){var w,v,u,t,s,r,q
-this.mp(d,e,D.ddl)
+this.mp(d,e,D.ddm)
 for(w=e.b,v=this.c*0.35,u=e.a,t=0;t<8;++t){s=w*(0.12+B.i.F(v+t*0.12,0.75))
 r=B.o.F(t,4)*0.22
 $.T()
@@ -12158,7 +12158,7 @@ t===$&&A.d()
 s=A.l(o,o,n?B.aS:B.aw,o,o,o,o,o,o,o,o,16,o,o,B.O,o,o,!0,o,o,o,o,o,o,o,o)
 s=A.A(A.a([u,B.ar,A.E(A.aN(o,B.M,!1,o,!0,B.t,o,A.aO(),t,o,o,o,o,o,2,p.aAX(m,"Amount","0.00",B.hO),B.y,!0,o,!0,o,!1,o,B.al,o,o,o,o,o,B.eh,o,o,o,1,o,o,!1,"\u2022",o,new C.cJY(p),o,o,o,!1,o,o,!1,o,!0,o,B.ae,o,o,o,o,o,o,o,o,o,o,o,s,!0,B.a7,o,B.ao,o,o,o,o),1)],w),B.B,o,B.e,B.h,0,o,o)
 t=x.gv
-u=A.B(new A.O(D.dgQ,new C.cJZ(p,m),t),t.k("aj.E"))
+u=A.B(new A.O(D.dgR,new C.cJZ(p,m),t),t.k("aj.E"))
 i=A.a([i,B.by,v,B.aB,h,B.N,s,B.af,A.c_(B.bI,u,B.br,o,6,6)],w)
 if(p.w==="other"){h=p.r
 h===$&&A.d()
@@ -14113,7 +14113,7 @@ w=new A.e3()
 w.cT(u.as*13+u.a.e)
 v=u.r
 v.Q=3+w.av(3)
-v.z=D.d9T[w.av(6)]
+v.z=D.d9U[w.av(6)]
 v.as=u.f.a+2.6},
 $S:0}
 C.bU0.prototype={
@@ -14133,7 +14133,7 @@ t=t.f
 w.y=t.a+2.2
 v=u.d
 w.Q=3+v.av(3)
-w.z=s?D.dh3[v.av(4)]:D.dDU[v.av(3)]
+w.z=s?D.dh4[v.av(4)]:D.dDU[v.av(3)]
 w.as=t.a+2.8},
 $S:0}
 C.bU2.prototype={
@@ -15309,7 +15309,7 @@ if(k.gcn(k)){k=A.aT(1/0,e.a,e.b)
 s=A.aT(1/0,e.c,e.d)
 l.czC(new A.av(u,t),v.gbnk(),new A.av(k,s))}k=A.m(22)
 s=this.b.a
-r=s?D.d7u:D.d5m
+r=s?D.d7v:D.d5n
 q=A.K(s?B.dx:D.bmX,B.r,1)
 p=A.m(22)
 o=A.bT(0,A.b4(m,m,m,new C.bhy(s,m),B.aA),0,0,0)
@@ -15934,7 +15934,7 @@ v=v.e
 v===$&&A.d()
 v=v.x
 v===$&&A.d()
-return A.b4(A.at(A.V(this.b.d,B.c.j(0.95),w,w,D.df2,44),w,w,w),w,w,new C.bnt(u,t,v,w),B.aA)},
+return A.b4(A.at(A.V(this.b.d,B.c.j(0.95),w,w,D.df3,44),w,w,w),w,w,new C.bnt(u,t,v,w),B.aA)},
 $S:56}
 C.h7b.prototype={
 $1(d){return A.oX(new C.h7a(this.a,d),!1,0.72,0.92,0.45,!1,null)},
@@ -16905,8 +16905,8 @@ D.fSA=new A.G(!0,B.c,null,null,null,null,22,B.u,null,null,null,null,1.1,null,nul
 D.hjD=new A.C("Worksheets",null,D.fSA,null,null,null,null,null,null,null,null,null)
 D.fSM=new A.G(!0,E.ahX,null,null,null,null,13,B.cH,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.his=new A.C("Track your project spending",null,D.fSM,null,null,null,null,null,null,null,null,null)
-D.dcQ=w([D.hjD,B.at,D.his],x.p)
-D.bAC=new A.fu(B.ah,B.e,B.h,B.B,null,B.p,null,0,D.dcQ,null)
+D.dcR=w([D.hjD,B.at,D.his],x.p)
+D.bAC=new A.fu(B.ah,B.e,B.h,B.B,null,B.p,null,0,D.dcR,null)
 D.bNn=new A.bu(1,B.b8,D.bAC,null)
 D.fNp=new A.G(!0,E.kF,null,null,null,null,18,B.u,null,1.2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fYM=new A.C("FAMILY LIBRARY",null,D.fNp,null,null,null,null,null,null,null,null,null)
@@ -16974,14 +16974,14 @@ D.dv_=w([B.bw,B.aV,B.fz,B.b5],x.O)
 D.caz=new A.a8(B.ay,B.aD,B.x,D.dv_,null,null)
 D.bt6=new A.u(1,0.5411764705882353,0.35294117647058826,0.16862745098039217,B.q)
 D.bzB=new A.u(1,0.23137254901960785,0.13725490196078433,0.07058823529411765,B.q)
-D.d8Y=w([D.bt6,D.bzB],x.O)
-D.caM=new A.a8(B.aX,B.b1,B.x,D.d8Y,null,null)
+D.d8Z=w([D.bt6,D.bzB],x.O)
+D.caM=new A.a8(B.aX,B.b1,B.x,D.d8Z,null,null)
 D.dou=w([B.fm,B.h6,B.fz],x.O)
 D.caS=new A.a8(B.ay,B.aD,B.x,D.dou,null,null)
 D.akO=new A.u(1,0.16470588235294117,0.09019607843137255,0.047058823529411764,B.q)
 D.bjl=new A.u(1,0.08627450980392157,0.043137254901960784,0.0196078431372549,B.q)
-D.dbn=w([D.akO,D.bjl],x.O)
-D.cbu=new A.a8(B.aX,B.b1,B.x,D.dbn,null,null)
+D.dbo=w([D.akO,D.bjl],x.O)
+D.cbu=new A.a8(B.aX,B.b1,B.x,D.dbo,null,null)
 D.bnc=new A.u(1,0.2901960784313726,0.16470588235294117,0.08235294117647059,B.q)
 D.aEc=w([D.bnc,D.akO],x.O)
 D.cbO=new A.a8(B.ay,B.aD,B.x,D.aEc,null,null)
@@ -16996,8 +16996,8 @@ D.dDD=w([D.bt1,D.l0,D.l0,I.Og],x.O)
 D.dGn=w([0,0.07,0.9,1],x.n)
 D.cd0=new A.a8(B.a5,B.a9,B.x,D.dDD,D.dGn,null)
 D.cd9=new A.a8(B.ay,B.aD,B.x,B.U3,null,null)
-D.d6q=w([B.az,D.lR],x.O)
-D.cdc=new A.a8(B.a5,B.a9,B.x,D.d6q,null,null)
+D.d6r=w([B.az,D.lR],x.O)
+D.cdc=new A.a8(B.a5,B.a9,B.x,D.d6r,null,null)
 D.dCb=w([B.b5,B.aV,B.bU],x.O)
 D.cef=new A.a8(B.ay,B.aD,B.x,D.dCb,null,null)
 D.ciG=w([10,20,30],x.t)
@@ -17016,13 +17016,13 @@ D.cR6=w([B.bQ,B.bB,B.bs],x.O)
 D.bOw=new C.v6("classic","Classic leather","Gold-edged brown leather",D.aEc,E.kF,E.kF,"\u2766",B.K,!0,!1,!1,!1)
 D.biq=new A.u(1,0.23137254901960785,0.12156862745098039,0.054901960784313725,B.q)
 D.byg=new A.u(1,0.10980392156862745,0.058823529411764705,0.027450980392156862,B.q)
-D.deK=w([D.biq,D.byg],x.O)
+D.deL=w([D.biq,D.byg],x.O)
 D.akq=new A.u(1,0.9490196078431372,0.8235294117647058,0.47843137254901963,B.q)
-D.bOr=new C.v6("ornate","Ornate gold","Double gold border and flourishes",D.deK,D.akq,D.akq,"\u2726",B.K,!0,!0,!0,!1)
+D.bOr=new C.v6("ornate","Ornate gold","Double gold border and flourishes",D.deL,D.akq,D.akq,"\u2726",B.K,!0,!0,!0,!1)
 D.bmJ=new A.u(1,0.9647058823529412,0.9137254901960784,0.7843137254901961,B.q)
 D.btR=new A.u(1,0.9019607843137255,0.8274509803921568,0.6392156862745098,B.q)
-D.d56=w([D.bmJ,D.btR],x.O)
-D.bOq=new C.v6("parchment","Parchment","Old paper with dark ink",D.d56,D.H0,L.jh,"\u2767",B.K,!0,!1,!1,!0)
+D.d57=w([D.bmJ,D.btR],x.O)
+D.bOq=new C.v6("parchment","Parchment","Old paper with dark ink",D.d57,D.H0,L.jh,"\u2767",B.K,!0,!1,!1,!0)
 D.ahA=new A.u(1,0.984313725490196,0.9686274509803922,0.9333333333333333,B.q)
 D.bwp=new A.u(1,0.9450980392156862,0.9176470588235294,0.8588235294117647,B.q)
 D.dAb=w([D.ahA,D.bwp],x.O)
@@ -17042,93 +17042,93 @@ D.a6g=w([D.bOw,D.bOr,D.bOq,D.bOt,D.bOv,D.bOp,D.bOu,D.bOs],A.as("N<v6>"))
 D.cU9=w(["Nairobi","Lagos","Accra","Kampala","Dar es Salaam","Kigali","Addis Ababa","Dakar"],x.s)
 D.dD0=w(["I am because we are","Good morning","Big river","Come and eat"],x.s)
 D.bOH=new C.lL('What does "Ubuntu" mean?',D.dD0,0,"Ubuntu means a person is a person through other people.","Listen, children. Ubuntu is an old word: I am because we are. Nobody grows alone.","culture",20)
-D.d7b=w(["Bibi","Babu","Dada","Kaka"],x.s)
-D.bOK=new C.lL("In Swahili, what do we call a grandmother?",D.d7b,0,"Bibi is grandmother. Babu is grandfather.","Your grandmother is Bibi, and your grandfather is Babu. Say it with respect.","culture",20)
-D.d72=w(["Babu","Mama","Baba","Dada"],x.s)
-D.bOF=new C.lL("In Swahili, what do we call a grandfather?",D.d72,0,"Babu is grandfather.","Babu is the grandfather, the one who keeps the old stories.","culture",20)
-D.d8u=w(["Dada","Kaka","Bibi","Mtoto"],x.s)
-D.bOJ=new C.lL("What is a sister called in Swahili?",D.d8u,0,"Dada is sister. Kaka is brother.","A sister is Dada and a brother is Kaka. Brothers and sisters carry each other.","culture",20)
-D.de6=w(["Kaka","Dada","Babu","Mzee"],x.s)
-D.bOG=new C.lL("What is a brother called in Swahili?",D.de6,0,"Kaka is brother.","A brother is Kaka. Look after your Kaka and your Dada.","culture",20)
-D.d71=w(["Baba","Mama","Bibi","Kaka"],x.s)
-D.bOR=new C.lL("Which word means father in Swahili?",D.d71,0,"Baba is father and Mama is mother.","Baba is father and Mama is mother. They are the roots of the home.","culture",20)
+D.d7c=w(["Bibi","Babu","Dada","Kaka"],x.s)
+D.bOK=new C.lL("In Swahili, what do we call a grandmother?",D.d7c,0,"Bibi is grandmother. Babu is grandfather.","Your grandmother is Bibi, and your grandfather is Babu. Say it with respect.","culture",20)
+D.d73=w(["Babu","Mama","Baba","Dada"],x.s)
+D.bOF=new C.lL("In Swahili, what do we call a grandfather?",D.d73,0,"Babu is grandfather.","Babu is the grandfather, the one who keeps the old stories.","culture",20)
+D.d8v=w(["Dada","Kaka","Bibi","Mtoto"],x.s)
+D.bOJ=new C.lL("What is a sister called in Swahili?",D.d8v,0,"Dada is sister. Kaka is brother.","A sister is Dada and a brother is Kaka. Brothers and sisters carry each other.","culture",20)
+D.de7=w(["Kaka","Dada","Babu","Mzee"],x.s)
+D.bOG=new C.lL("What is a brother called in Swahili?",D.de7,0,"Kaka is brother.","A brother is Kaka. Look after your Kaka and your Dada.","culture",20)
+D.d72=w(["Baba","Mama","Bibi","Kaka"],x.s)
+D.bOR=new C.lL("Which word means father in Swahili?",D.d72,0,"Baba is father and Mama is mother.","Baba is father and Mama is mother. They are the roots of the home.","culture",20)
 D.dEe=w(["Unity is strength","Rain is coming","The market is open","The night is long"],x.s)
 D.bOQ=new C.lL('"Umoja ni nguvu" means...',D.dEe,0,"Together we are strong.","Umoja ni nguvu: unity is strength. One stick breaks, but a bundle of sticks does not.","culture",20)
 D.dAV=w(["Little by little fills the measure","Big rivers need bridges","Cows love green grass","Fire needs wood"],x.s)
 D.bOS=new C.lL('"Haba na haba hujaza kibaba" teaches us...',D.dAV,0,"Small steps add up to great things.","Haba na haba hujaza kibaba: little by little fills the measure. Patience builds a family.","culture",20)
-D.dbw=w(["Everyone helps to raise the children","Villages must be big","Children build houses","Only parents teach"],x.s)
-D.bOP=new C.lL('The African saying "It takes a village to raise a child" means...',D.dbw,0,"Aunts, uncles, elders and neighbours all help.","It takes a whole village to raise a child. Aunties, uncles, elders and neighbours all teach.","culture",20)
+D.dbx=w(["Everyone helps to raise the children","Villages must be big","Children build houses","Only parents teach"],x.s)
+D.bOP=new C.lL('The African saying "It takes a village to raise a child" means...',D.dbx,0,"Aunts, uncles, elders and neighbours all help.","It takes a whole village to raise a child. Aunties, uncles, elders and neighbours all teach.","culture",20)
 D.dEx=w(["The elders","The market","The river","The drum"],x.s)
 D.bOL=new C.lL("Who is the traditional keeper of the family stories?",D.dEx,0,"Elders hold the memory of the family.","The elders are a library that walks. When an elder is gone, a library burns, so we listen while we can.","culture",20)
-D.cYt=w(["To share stories and wisdom","To race each other","To hide from the sun","To count cows"],x.s)
-D.bOI=new C.lL("Why do families sit round the fire at night?",D.cYt,0,"The fire is where the old teach the young.","At night we sit round the fire. The flames are warm, and the stories are warmer.","culture",20)
+D.cYu=w(["To share stories and wisdom","To race each other","To hide from the sun","To count cows"],x.s)
+D.bOI=new C.lL("Why do families sit round the fire at night?",D.cYu,0,"The fire is where the old teach the young.","At night we sit round the fire. The flames are warm, and the stories are warmer.","culture",20)
 D.dDg=w(["Let us all pull together","A kind of fish","A long road","A rain dance"],x.s)
 D.bON=new C.lL('What does "Harambee" mean?',D.dDg,0,"Harambee: everyone pulls together.","Harambee! It means let us all pull together, like many hands on one rope.","culture",20)
-D.dhg=w(["An elder","A baby","A market","A cow"],x.s)
-D.bOM=new C.lL('"Mzee" is a respectful word for...',D.dhg,0,"We honour our Mzee.","Mzee is how we greet an elder with honour. We bow our heads and listen.","culture",20)
+D.dhh=w(["An elder","A baby","A market","A cow"],x.s)
+D.bOM=new C.lL('"Mzee" is a respectful word for...',D.dhh,0,"We honour our Mzee.","Mzee is how we greet an elder with honour. We bow our heads and listen.","culture",20)
 D.dxV=w(["Respect for an elder","Hunger","Sleepiness","A race"],x.s)
 D.bOO=new C.lL('What does "Shikamoo" show?',D.dxV,0,"Children greet elders with Shikamoo, and the elder answers Marahaba.","Shikamoo is how a child greets an elder, and the elder says Marahaba. Respect travels both ways.","culture",20)
 D.aBp=w([D.bOH,D.bOK,D.bOF,D.bOJ,D.bOG,D.bOR,D.bOQ,D.bOS,D.bOP,D.bOL,D.bOI,D.bON,D.bOM,D.bOO],x.J)
-D.d1W=w([90,360],x.n)
-D.d4D=w([B.bU,B.bp],x.O)
+D.d1X=w([90,360],x.n)
+D.d4E=w([B.bU,B.bp],x.O)
 D.bsP=new A.u(1,0.9372549019607843,0.9647058823529412,0.9372549019607843,B.q)
-D.d5m=w([D.ahA,D.bsP],x.O)
-D.d68=w([-1,-0.3,0.4,1],x.n)
-D.d78=w([0,0.45,0.72,0.92,1],x.n)
+D.d5n=w([D.ahA,D.bsP],x.O)
+D.d69=w([-1,-0.3,0.4,1],x.n)
+D.d79=w([0,0.45,0.72,0.92,1],x.n)
 D.bmF=new A.u(1,0.054901960784313725,0.10196078431372549,0.09019607843137255,B.q)
-D.d7u=w([D.bmF,B.bD],x.O)
+D.d7v=w([D.bmF,B.bD],x.O)
 D.bkl=new A.u(1,0.4196078431372549,0.1803921568627451,0.37254901960784315,B.q)
 D.amc=new A.u(1,0.8784313725490196,0.5411764705882353,0.27058823529411763,B.q)
-D.d87=w([B.dD,D.bkl,D.amc],x.O)
-D.d9h=w([B.bd,B.jv,B.pE],x.O)
+D.d88=w([B.dD,D.bkl,D.amc],x.O)
+D.d9i=w([B.bd,B.jv,B.pE],x.O)
 D.bne=new A.u(1,0.23137254901960785,0.16862745098039217,0.20392156862745098,B.q)
 D.bvt=new A.u(1,0.22745098039215686,0.1568627450980392,0.1411764705882353,B.q)
 D.bk1=new A.u(1,0.1411764705882353,0.09019607843137255,0.0784313725490196,B.q)
-D.d9m=w([D.bne,D.bvt,D.bk1],x.O)
-D.d9J=w(["Rewrite the whole book in natural, professional Swahili","Correct the spelling in the whole book",'Change the word "tree" to the right Swahili word',"Use simple words everyone understands","Make every page a little shorter"],x.s)
-D.d9T=w(["Really, Babu?","Eh! I did not know that.","Tell us more!","Wow...","Mmm, I see.","Ooh, that is a good one."],x.s)
+D.d9n=w([D.bne,D.bvt,D.bk1],x.O)
+D.d9K=w(["Rewrite the whole book in natural, professional Swahili","Correct the spelling in the whole book",'Change the word "tree" to the right Swahili word',"Use simple words everyone understands","Make every page a little shorter"],x.s)
+D.d9U=w(["Really, Babu?","Eh! I did not know that.","Tell us more!","Wow...","Mmm, I see.","Ooh, that is a good one."],x.s)
 D.hPC=new C.aeS(78,424,48,44,56)
 D.hPA=new C.aeS(214,396,34,34,42)
 D.hPB=new C.aeS(442,452,56,50,64)
 D.aCo=w([D.hPC,D.hPA,D.hPB],A.as("N<aeS>"))
-D.dat=w(["Farmer","Teacher","Nurse","Driver","Builder","Trader","Doctor","Tailor"],x.s)
+D.dau=w(["Farmer","Teacher","Nurse","Driver","Builder","Trader","Doctor","Tailor"],x.s)
 D.bje=new A.u(1,0.4196078431372549,0.19607843137254902,0.08627450980392157,B.q)
 D.bp7=new A.u(1,0.2901960784313726,0.13333333333333333,0.06274509803921569,B.q)
 D.dGj=w([D.ajw,D.bje,D.bp7],x.O)
 D.bOx=new C.v7("leather","Leather",D.dGj,"vintage")
-D.dil=w([B.dl,B.GQ,Ac.a_8],x.O)
-D.bOE=new C.v7("midnight","Midnight",D.dil,"starry")
-D.d9i=w([B.es,B.ei,B.lx],x.O)
-D.bOD=new C.v7("forest","Forest",D.d9i,"story")
+D.dim=w([B.dl,B.GQ,Ac.a_8],x.O)
+D.bOE=new C.v7("midnight","Midnight",D.dim,"starry")
+D.d9j=w([B.es,B.ei,B.lx],x.O)
+D.bOD=new C.v7("forest","Forest",D.d9j,"story")
 D.dIC=w([B.et,B.ey,B.kH],x.O)
 D.bOA=new C.v7("burgundy","Burgundy",D.dIC,"royal")
 D.cQE=w([B.az,B.n2,B.nF],x.O)
 D.bOB=new C.v7("royal","Royal",D.cQE,"royal")
-D.dc4=w([B.bB,B.cx,F.n8],x.O)
-D.bOy=new C.v7("charcoal","Charcoal",D.dc4,"geo")
+D.dc5=w([B.bB,B.cx,F.n8],x.O)
+D.bOy=new C.v7("charcoal","Charcoal",D.dc5,"geo")
 D.dGs=w([B.ca,B.dZ,B.wM],x.O)
 D.bOC=new C.v7("sunset","Sunset",D.dGs,"sunset")
 D.dHh=w([B.jv,B.yY,B.a_c],x.O)
 D.bOz=new C.v7("ocean","Ocean",D.dHh,"band")
 D.Aw=w([D.bOx,D.bOE,D.bOD,D.bOA,D.bOB,D.bOy,D.bOC,D.bOz],A.as("N<v7>"))
-D.dcD=w(["classic","ornate","parchment","minimal","midnight","emerald","rose","modern"],x.s)
-D.ddl=w([B.an,B.aM,B.a_],x.O)
-D.deQ=w([B.ey,B.ei,B.dl,B.iZ,B.z_,B.cZ,B.kc,B.cU,B.de],x.O)
-D.deR=w(["Make the cover dark blue with silver letters","Put the title at the top and make it bigger","Use a star sky and a heart picture","Add our family name under the title"],x.s)
+D.dcE=w(["classic","ornate","parchment","minimal","midnight","emerald","rose","modern"],x.s)
+D.ddm=w([B.an,B.aM,B.a_],x.O)
+D.deR=w([B.ey,B.ei,B.dl,B.iZ,B.z_,B.cZ,B.kc,B.cU,B.de],x.O)
+D.deS=w(["Make the cover dark blue with silver letters","Put the title at the top and make it bigger","Use a star sky and a heart picture","Add our family name under the title"],x.s)
 D.fvf=new A.d2(B.dJ,B.dS,8)
-D.df2=w([D.fvf],x.F)
-D.dgh=w([B.c5,B.dZ,B.k8],x.O)
+D.df3=w([D.fvf],x.F)
+D.dgi=w([B.c5,B.dZ,B.k8],x.O)
 D.blc=new A.u(1,0.0196078431372549,0.03137254901960784,0.12156862745098039,B.q)
 D.bpq=new A.u(1,0.22745098039215686,0.16470588235294117,0.3843137254901961,B.q)
 D.btM=new A.u(1,0.5411764705882353,0.2901960784313726,0.3686274509803922,B.q)
-D.dgz=w([D.blc,G.akX,D.bpq,D.btM,D.amc],x.O)
-D.dgQ=w(["each","pcs","boxes","bags","hours","days","sq ft","gallons","lbs","ft","other"],x.s)
-D.dh3=w(["Yes! \ud83c\udf89","Hongera!","We did it!","Eeh, well done!"],x.s)
+D.dgA=w([D.blc,G.akX,D.bpq,D.btM,D.amc],x.O)
+D.dgR=w(["each","pcs","boxes","bags","hours","days","sq ft","gallons","lbs","ft","other"],x.s)
+D.dh4=w(["Yes! \ud83c\udf89","Hongera!","We did it!","Eeh, well done!"],x.s)
 D.biC=new A.u(1,0.8509803921568627,0.6431372549019608,0.2549019607843137,B.q)
 D.boL=new A.u(1,0.5411764705882353,0.35294117647058826,0.11764705882352941,B.q)
-D.dhA=w([D.biC,D.aiZ,D.boL],x.O)
-D.dig=w([B.c5,B.hJ],x.O)
-D.dim=w([G.nH,B.iu,G.ahM,B.d_],x.O)
+D.dhB=w([D.biC,D.aiZ,D.boL],x.O)
+D.dih=w([B.c5,B.hJ],x.O)
+D.din=w([G.nH,B.iu,G.ahM,B.d_],x.O)
 D.dk5=w([B.d_,G.nH,B.iu,D.lS,B.d_],x.O)
 D.dkM=w([B.aQ,B.yW,B.yN],x.O)
 D.eZ_=new A.y(-0.65,0.6)
@@ -17431,8 +17431,8 @@ D.fqR=new A.a5(-98,-80,92,-75)
 D.fqS=new A.a5(-9,-15,9,-9)
 D.hhI=new A.C("Let the AI write it from your tree",null,B.iV,null,B.K,null,null,null,null,null,null,null)
 D.bPr=new A.d3(1,B.ci,D.hhI,null)
-D.dif=w([E.a5g,B.aa,D.bPr],x.p)
-D.frW=new A.c2(B.aK,B.e,B.P,B.l,null,B.p,null,0,D.dif,null)
+D.dig=w([E.a5g,B.aa,D.bPr],x.p)
+D.frW=new A.c2(B.aK,B.e,B.P,B.l,null,B.p,null,0,D.dig,null)
 D.fYN=new A.C("Save member",null,B.cf,null,null,null,null,null,null,null,null,null)
 D.dzt=w([D.aua,B.aa,D.fYN],x.p)
 D.fs6=new A.c2(B.aK,B.bb,B.h,B.l,null,B.p,null,0,D.dzt,null)
@@ -17443,8 +17443,8 @@ D.drl=w([D.c0e,B.ba,D.h1Q],x.p)
 D.fsa=new A.c2(B.aK,B.e,B.P,B.l,null,B.p,null,0,D.drl,null)
 D.fYO=new A.C("Transfer & settings",null,B.dv,null,null,null,null,null,null,null,null,null)
 D.bN7=new A.bu(1,B.b8,D.fYO,null)
-D.d8D=w([D.atK,B.ar,D.bN7],x.p)
-D.fsb=new A.c2(B.aK,B.e,B.h,B.l,null,B.p,null,0,D.d8D,null)
+D.d8E=w([D.atK,B.ar,D.bN7],x.p)
+D.fsb=new A.c2(B.aK,B.e,B.h,B.l,null,B.p,null,0,D.d8E,null)
 D.fwN=new A.av(16,40)
 D.fwS=new A.av(22,64)
 D.fwZ=new A.av(280,88)
@@ -17689,4 +17689,4 @@ D.aeZ=new C.a2S(4,"arrived")
 D.af6=new C.aMU(0,"projects")
 D.b4b=new C.aMU(1,"cashier")
 D.i_r=new C.aMU(2,"familyTree")})()};
-(a=>{a["E/z7O27s4Ueo0mn5f8e+W2xUz9c="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["EhWSFEbXyHGOIkq9s5+BDYNL/yg="]=a.current})($__dart_deferred_initializers__);

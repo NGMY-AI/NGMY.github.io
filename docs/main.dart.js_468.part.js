@@ -3174,7 +3174,7 @@ return I.aXw(new B.ftB(v,w),u,new B.ftC(v),u,u,u,x.N)}}
 B.bsd.prototype={
 B(d){var w,v,u,t,s=null,r=A.a([],x.p)
 for(w=this.c,v=0;v<11;++v){u={}
-t=D.dd6[v]
+t=D.dd7[v]
 u.a=null
 u.a=t.a
 t=A.c(t.b,s,s,s,s,s,s,C.mc,s,s,s)
@@ -3322,7 +3322,7 @@ w===$&&A.d()
 w=w.h(0,"style")
 w=n.J1(g,J.k(w==null?a6:w),D.dsk,new B.fsA(n))
 v=n.d.h(0,"columns")
-return A.a([w,n.J1("Columns",J.k(v==null?2:v),D.das,new B.fsB(n)),C.N,A.c("Menu items",l,l,l,l,l,l,A.l(l,l,C.l_,l,l,l,l,l,l,l,l,13,l,l,C.O,l,l,!0,l,l,l,l,l,l,l,l),l,l,l),new B.aEX(n.d.h(0,"items"),n.a.e,new B.fsC(n),l)],x.p)
+return A.a([w,n.J1("Columns",J.k(v==null?2:v),D.dat,new B.fsB(n)),C.N,A.c("Menu items",l,l,l,l,l,l,A.l(l,l,C.l_,l,l,l,l,l,l,l,l,13,l,l,C.O,l,l,!0,l,l,l,l,l,l,l,l),l,l,l),new B.aEX(n.d.h(0,"items"),n.a.e,new B.fsC(n),l)],x.p)
 case"switch":w=n.d
 w===$&&A.d()
 w=w.h(0,"setting")
@@ -5697,7 +5697,7 @@ w===$&&A.d()
 if(w===D.Kr)v.d=D.lK},
 $S:0}
 B.dQl.prototype={
-$2(d,e){return this.a.cHR(D.d4K[e],this.b)},
+$2(d,e){return this.a.cHR(D.d4L[e],this.b)},
 $S:43}
 B.dQi.prototype={
 $0(){var w=this.a,v=w.cHQ(this.b.d)
@@ -5813,8 +5813,8 @@ D.bTv=new A.a_(62657,"MaterialIcons",!1)
 D.eug=new B.JZ("Portfolio Web App","Showcase work & contact",D.bTv,"video_hub",C.cG)
 D.bT2=new A.a_(61573,"MaterialIcons",!1)
 D.eue=new B.JZ("Travel Booking App","Trips, maps & reservations",D.bT2,"qr_studio",C.as)
-D.d4K=w([D.eub,D.euf,D.eud,D.euc,D.eug,D.eue],A.as("N<JZ>"))
-D.das=w(["2","3","4"],x.s)
+D.d4L=w([D.eub,D.euf,D.eud,D.euc,D.eug,D.eue],A.as("N<JZ>"))
+D.dat=w(["2","3","4"],x.s)
 D.f4r=new A.y("button","Button")
 D.f6c=new A.y("form","Form")
 D.f56=new A.y("dataList","List")
@@ -5826,7 +5826,7 @@ D.fbB=new A.y("reelFeed","Reels")
 D.fcb=new A.y("socialFeed","Feed")
 D.fbl=new A.y("qrGenerator","QR")
 D.fck=new A.y("stat","Stat")
-D.dd6=w([D.f4r,D.f6c,D.f56,D.f9x,D.f9B,D.f6R,D.fcp,D.fbB,D.fcb,D.fbl,D.fck],A.as("N<+(n,n)>"))
+D.dd7=w([D.f4r,D.f6c,D.f56,D.f9x,D.f9B,D.f6R,D.fcp,D.fbB,D.fcb,D.fbl,D.fck],A.as("N<+(n,n)>"))
 D.fga=new A.b0("button",D.ara,"Button")
 D.bST=new A.a_(61341,"MaterialIcons",!1)
 D.fgg=new A.b0("outlined_button",D.bST,"Outline")
@@ -5929,7 +5929,7 @@ D.bSo=new A.a_(58244,"MaterialIcons",!0)
 D.ffX=new A.b0("dataList","Data list",D.bSo)
 D.bRO=new A.a_(57475,"MaterialIcons",!1)
 D.fjf=new A.b0("stat","Stat counter",D.bRO)
-D.djJ=w([D.fg0,D.ffX,D.fjf],x.c)
+D.djK=w([D.fg0,D.ffX,D.fjf],x.c)
 D.bSj=new A.a_(58090,"MaterialIcons",!1)
 D.fgP=new A.b0("menuGrid","Menu grid",D.bSj)
 D.fjv=new A.b0("list","Link list",C.Q1)
@@ -5947,14 +5947,14 @@ D.dws=w([D.fit,D.fil,D.fjB,D.fgy,D.ffW],x.c)
 D.fgH=new A.b0("qrGenerator","QR generator",D.a3A)
 D.fgU=new A.b0("qrCode","Static QR",D.aqM)
 D.fhA=new A.b0("invoiceBuilder","Invoice",F.Q4)
-D.dgt=w([D.fgH,D.fgU,D.fhA],x.c)
+D.dgu=w([D.fgH,D.fgU,D.fhA],x.c)
 D.fjn=new A.b0("reelFeed","TikTok feed",K.asr)
 D.fgz=new A.b0("socialFeed","Social feed",F.arD)
 D.ffY=new A.b0("postComposer","Post / reel",C.asF)
 D.fg5=new A.b0("searchHub","Search hub",C.eN)
 D.fgq=new A.b0("mapView","Map view",C.lB)
 D.ffn=new A.b0("profile","Profile",C.f3)
-D.d1d=w([D.fjn,D.fgz,D.ffY,D.fg5,D.fgq,D.ffn],x.c)
+D.d1e=w([D.fjn,D.fgz,D.ffY,D.fg5,D.fgq,D.ffn],x.c)
 D.fhy=new A.b0("spacer","Spacer",D.aqP)
 D.fjr=new A.b0("divider","Divider",C.Q2)
 D.dud=w([D.fhy,D.fjr],x.c)
@@ -5968,7 +5968,7 @@ D.fi0=new A.b0("contact","Contact card",D.bS7)
 D.bSH=new A.a_(59048,"MaterialIcons",!1)
 D.fib=new A.b0("video","Video",D.bSH)
 D.dBw=w([D.fj8,D.fgM,D.fjy,D.ffr,D.fi0,D.fib],x.c)
-D.aKR=new A.bn(D.eze,[D.dro,D.cGs,D.djJ,D.cGH,D.dws,D.dgt,D.d1d,D.dud,D.dBw],A.as("bn<n,ai<+(n,n,a_)>>"))
+D.aKR=new A.bn(D.eze,[D.dro,D.cGs,D.djK,D.cGH,D.dws,D.dgu,D.d1e,D.dud,D.dBw],A.as("bn<n,ai<+(n,n,a_)>>"))
 D.dSu=new B.Fo(null,"Invalid backup format. Export again from App Studio \u2192 menu \u2192 Download backup.")
 D.dSv=new B.Fo(null,"Invalid backup \u2014 choose a .ngmy.json file exported from App Studio.")
 D.dSw=new B.Fo(null,"No file selected.")
@@ -6073,4 +6073,4 @@ D.hiM=new A.C("My Projects",null,null,null,null,null,null,null,null,null,null,nu
 D.hk5=new A.C("Invoice published",null,C.iV,null,null,null,null,null,null,null,null,null)})();(function lazyInitializers(){var w=a.lazyFinal
 w($,"iPm","hWg",()=>{var v=4279150057,u=4284704497
 return A.a([B.n3("Featured",new B.fRv(),"Map, saved trips & destinations.","\u2708\ufe0f","qr_studio","Travel Explorer",v),B.n3("",new B.fRw(),"Product feed, cart & checkout.","\ud83d\udecd\ufe0f","luxe_store","Luxe Store",4293675161),B.n3("",new B.fRx(),"Posts, profiles & engagement.","\ud83d\udcac","creator_hub","Social Pulse",4287323382),B.n3("",new B.fRI(),"Workouts, check-ins & nutrition.","\ud83d\udcaa","pulse_fitness","Pulse Fitness",4279286145),B.n3("",new B.fRO(),"Clients, invoices & pipeline.","\ud83d\udcca","invoice_pro","CRM Dashboard",u),B.n3("",new B.fRP(),"Showcase work & contact.","\ud83c\udf10","video_hub","Portfolio Hub",v),B.n3("",new B.fRQ(),"Live QR for websites & text.","\ud83d\udcf1","qr_code_studio","QR Code Studio",4278630100),B.n3("New",new B.fRR(),"Sell, track sales & get paid.","\ud83d\udcb5","side_hustle","Side Hustle Marketplace",4279673674),B.n3("",new B.fRS(),"Services, bookings & client earnings.","\ud83d\udcc5","booking_pro","Booking & Services",4286331629),B.n3("",new B.fRT(),"Daily checklist, streaks & progress.","\ud83d\udd25","habit_tracker","Habit Tracker",4279548070),B.n3("",new B.fRU(),"Income, spending & budget at a glance.","\ud83d\udcb0","finance_dash","Money Tracker",4282090230),B.n3("",new B.fRy(),"Post roles, track applicants.","\ud83d\udcbc","job_board","Job Board",4281549141),B.n3("",new B.fRz(),"Discussion feed, posts & replies.","\ud83d\udde3\ufe0f","community_forum","Community Forum",4288814255),B.n3("",new B.fRA(),"Episodes, categories & playback links.","\ud83c\udf99\ufe0f","podcast_hub","Podcast Hub",4280232247),B.n3("",new B.fRB(),"Events, RSVPs & shareable QR codes.","\ud83c\udfab","event_tickets","Event Ticketing",4294286859),B.n3("New",new B.fRC(),"Raise funds, track donors, share a link.","\u2764\ufe0f","donate_nonprofit","Giving Campaign",4292943176),B.n3("",new B.fRD(),"Sessions, bookings & client roster.","\ud83e\uddd8","coaching_booking","Coaching Studio",4286456526),B.n3("",new B.fRE(),"Showcase galleries & booking requests.","\ud83d\udcf7","photo_portfolio","Photo Portfolio",4279310375),B.n3("",new B.fRF(),"Save recipes, ingredients & steps.","\ud83c\udf73","recipe_box","Recipe Box",4293548044),B.n3("",new B.fRG(),"Daily care, vet visits & reminders.","\ud83d\udc3e","pet_care","Pet Care Tracker",4284850957),B.n3("",new B.fRH(),"Create invoices, track clients & income.","\ud83e\uddfe","freelance_invoicing","Freelancer Invoicing",4280171146),B.n3("",new B.fRJ(),"Log rounds, track scores & leaderboard.","\ud83c\udfc6","trivia_game","Trivia Night Scorekeeper",4292552567),B.n3("New",new B.fRK(),"Map of properties, inquiries & saves.","\ud83c\udfe0","real_estate","Real Estate Listings",4278995566),B.n3("",new B.fRL(),"Menu by category, tap to add to order.","\ud83c\udf7d\ufe0f","restaurant_menu","Restaurant Menu & Orders",4290321436),B.n3("",new B.fRM(),"Members, renewals & revenue.","\ud83e\udeaa","membership_manager","Membership Manager",4278483031),B.n3("",new B.fRN(),"Start fresh \u2014 describe any app to NGMY AI.","\ud83d\ude80","blank","Blank Canvas",u)],A.as("N<a84>"))})})()};
-(a=>{a["Nyi2YhwyfrevlyNlmhAPF/EDWQ4="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["5yjnlyPK8MGEJzlO/xy/C92rL0Q="]=a.current})($__dart_deferred_initializers__);

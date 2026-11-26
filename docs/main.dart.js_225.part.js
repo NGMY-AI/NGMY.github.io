@@ -52,7 +52,7 @@ s=B.a.fo(t,A.ag("[^a-z]+",!0,!1,!1,!1))
 x=A.U(s).k("X<1>")
 w=A.B(new A.X(s,new C.h2j(),x),x.k("M.E"))
 if(w.length===0)return null
-v=new A.X(w,B.d.gjD(D.dgO),A.U(w).k("X<1>")).gJ(0)
+v=new A.X(w,B.d.gjD(D.dgP),A.U(w).k("X<1>")).gJ(0)
 if(v>=2&&v*5>=w.length)return u
 return null},
 a4f(d){var x,w,v=B.a.fo(d.toLowerCase(),A.ag("[^a-z']+",!0,!1,!1,!1)),u=A.U(v).k("X<1>"),t=A.pe(new A.X(v,new C.fXi(),u),2000,u.k("M.E"))
@@ -1283,14 +1283,14 @@ if(j.gnd().f.length!==0)B.d.u(t,A.a([B.aa,A.bM(!1,D.h6o,i,i,!0,i,i,i,new C.dbK(j
 t=j.a3w("Your picture",A.A(t,B.l,i,B.e,B.h,0,i,i))
 s=A.c_(B.bI,A.a([j.OX("Background",j.e==="bg1",new C.dbO(j)),j.OX("Second colour",j.e==="bg2",new C.dbP(j)),j.OX("Accent",j.e==="accent",new C.dbQ(j)),j.OX("Title",j.e==="ink",new C.dbR(j))],x),B.br,i,0,0)
 r=A.a([],x)
-for(q=0;q<24;++q){p=D.d95[q]
+for(q=0;q<24;++q){p=D.d96[q]
 o=A.b1(p)
 n=h.m()===p?B.bM:B.aT
 m=new A.ax(n,h.m()===p?3:1,B.r,-1)
 r.push(A.aA(i,A.p(i,i,B.f,i,i,new A.o(o,i,new A.bE(m,m,m,m),i,i,i,B.a6),i,34,i,i,i,i,i,34),B.y,!1,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,new C.dbS(j,p),i,i,i,i,i,i,!1,B.a4))}h=j.a3w("Colours",A.x(A.a([s,A.c_(B.bI,r,B.br,i,8,8),A.hx(D.c7w,D.fXd,new C.dbT(j),i)],x),B.B,i,B.e,B.h,0,B.p))
 s=A.a([],x)
 for(q=0;q<4;++q){r={}
-o=D.d8X[q]
+o=D.d8Y[q]
 r.a=null
 l=o.a
 r.a=l
@@ -1611,7 +1611,7 @@ a3=A.a([B.aj,A.A(a4,B.l,g,B.e,B.h,0,g,g),B.by],a5)
 if(h.r)B.d.u(a3,A.a([B.S,A.at(new A.a4(92,92,new A.an(B.z,g,B.ad,B.t,A.a([A.qD(A.nj(B.bx,B.bl,g,g,g,g,g,6,B.i.D(h.y,0.02,1),g)),A.c(""+B.i.S(B.i.D(h.y*100,1,100))+"%",g,g,g,g,g,g,B.dv,g,g,g)],a5),g),g),g,g,g),B.aO,A.c(h.x,g,g,g,g,g,g,B.jN,B.K,g,g),B.aj,A.c(h.gaWf(),g,g,g,g,g,g,B.Fw,B.K,g,g),B.di],a5))
 else{a4=A.aN(g,B.M,!1,g,!0,B.t,g,A.aO(),h.d,g,g,g,g,g,2,h.aUE(B.a.i(h.a.c).length!==0?"Anything to add? (optional) \u2014 e.g. focus on grandma, make it for the kids, write it in Swahili\u2026":"What is the book about? Who is it for? Any names, places or style\u2026"),B.y,!0,g,!0,g,!1,g,B.al,g,g,g,g,g,g,g,g,g,6,3,g,!1,"\u2022",g,g,g,g,g,!1,g,g,!1,g,!0,g,B.ae,g,g,g,g,g,g,g,g,g,g,g,D.fI4,!0,B.a7,g,B.ao,g,g,g,g)
 x=A.a([],a5)
-w=B.a.i(h.a.c).length!==0?D.d92:D.dgR
+w=B.a.i(h.a.c).length!==0?D.d93:D.dgS
 v=w.length
 u=0
 for(;u<v;++u){t=w[u]
@@ -1620,7 +1620,7 @@ r=new A.aP(999,999)
 q=new A.ax(B.bx,1,B.r,-1)
 x.push(A.aA(g,A.p(g,A.c(t,g,g,g,g,g,g,D.fQH,g,g,g),B.f,g,g,new A.o(s,g,new A.bE(q,q,q,q),new A.bb(r,r,r,r),g,g,B.m),g,g,g,g,B.nZ,g,g,g),B.y,!1,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,new C.cS7(h,t),g,g,g,g,g,g,!1,B.a4))}x=A.c_(B.bI,x,B.br,g,8,8)
 w=A.a([],a5)
-for(u=0;u<3;++u){p=D.d5f[u]
+for(u=0;u<3;++u){p=D.d5g[u]
 v=h.z===p.a
 s=v?B.c:B.Cf
 s=A.c(p.b,g,g,g,g,g,g,new A.G(!0,s,g,g,g,g,g,B.D,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g,g),g,g,g)
@@ -3114,19 +3114,19 @@ D.cNP=x([4,4],A.as("N<cr>"))
 D.f86=new A.y("auto","Same as I type")
 D.f5F=new A.y("en","English")
 D.fcn=new A.y("sw","Swahili")
-D.d5f=x([D.f86,D.f5F,D.fcn],y.L)
+D.d5g=x([D.f86,D.f5F,D.fcn],y.L)
 D.aTH=new A.y("","Template")
 D.fcK=new A.y("top","Top")
 D.f9E=new A.y("middle","Middle")
 D.f4p=new A.y("bottom","Bottom")
-D.d8X=x([D.aTH,D.fcK,D.f9E,D.f4p],y.L)
-D.d92=x(["The story of our family, from the oldest to the youngest","A tribute to our grandparents","Hadithi ya familia yetu","A children's book about our family"],y.s)
-D.d95=x([4279180093,4280171146,4280640491,4279137424,4279203438,4279599165,4280468830,4286893078,4294829706,4294286859,4292128567,4294933061,4292617766,4292887931,4292552567,4286331629,4287317267,4283053092,4294306781,4294833900,4294967295,4288455599,4281811281,4279310375],y.t)
+D.d8Y=x([D.aTH,D.fcK,D.f9E,D.f4p],y.L)
+D.d93=x(["The story of our family, from the oldest to the youngest","A tribute to our grandparents","Hadithi ya familia yetu","A children's book about our family"],y.s)
+D.d96=x([4279180093,4280171146,4280640491,4279137424,4279203438,4279599165,4280468830,4286893078,4294829706,4294286859,4292128567,4294933061,4292617766,4292887931,4292552567,4286331629,4287317267,4283053092,4294306781,4294833900,4294967295,4288455599,4281811281,4279310375],y.t)
 D.UM=new C.aqR(0,"letter")
 D.dXx=new C.aqR(1,"a4")
 D.aD1=x([D.UM,D.dXx],A.as("N<aqR>"))
-D.dgO=x(["na","ya","wa","kwa","ni","za","la","katika","kuhusu","tengeneza","nitengenezee","naomba","tafadhali","habari","watoto","mtoto","familia","kitabu","hadithi","shule","kanisa","mungu","jamii","biashara","somo","masomo","yetu","wetu","zetu","yangu","wangu","kuhusiana","pamoja","sana","hii","hiyo","kila","andika","unda","kuwa","ambayo","ambao","lakini","pia","au","kama","baba","mama","bibi","babu","upendo"],y.s)
-D.dgR=x(["A children's story about a brave little lion","Hadithi ya familia yetu kutoka Kigoma","Our family history for the grandchildren","A devotional: 30 days of hope"],y.s)
+D.dgP=x(["na","ya","wa","kwa","ni","za","la","katika","kuhusu","tengeneza","nitengenezee","naomba","tafadhali","habari","watoto","mtoto","familia","kitabu","hadithi","shule","kanisa","mungu","jamii","biashara","somo","masomo","yetu","wetu","zetu","yangu","wangu","kuhusiana","pamoja","sana","hii","hiyo","kila","andika","unda","kuwa","ambayo","ambao","lakini","pia","au","kama","baba","mama","bibi","babu","upendo"],y.s)
+D.dgS=x(["A children's story about a brave little lion","Hadithi ya familia yetu kutoka Kigoma","Our family history for the grandchildren","A devotional: 30 days of hope"],y.s)
 D.f4L=new A.y("classic","Classic")
 D.f9K=new A.y("modern","Modern")
 D.f5a=new A.y("display","Bold")
@@ -3222,4 +3222,4 @@ D.hjU=new A.C("Design the cover",null,B.cL,null,null,null,null,null,null,null,nu
 D.hn3=new C.cGB(6,"postScriptName")
 D.hXU=new C.bvL(null)})();(function staticFields(){$.hIe=null
 $.hKw=A.S(y.N,A.as("ay<n?>"))})()};
-(a=>{a["2VMTx3TIQYM9etnRs+laN10HNo8="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["Ky/26zLjhldBaOrP8vObL5JIDQY="]=a.current})($__dart_deferred_initializers__);

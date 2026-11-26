@@ -601,8 +601,8 @@ D.hPz=new C.z0("notes","Notes",K.a4A,B.bl,G.aEg)
 D.hPx=new C.z0("tasks","Quick Tasks",I.DP,B.bw,B.a7u)
 D.dIP=x([B.az,B.bl],y.O)
 D.hPy=new C.z0("where","Where I Put It",B.mv,B.bl,D.dIP)
-D.ddZ=x([B.fK,B.aQ],y.O)
-D.hPs=new C.z0("alarms","Alarms",B.a3X,B.ca,D.ddZ)
+D.de_=x([B.fK,B.aQ],y.O)
+D.hPs=new C.z0("alarms","Alarms",B.a3X,B.ca,D.de_)
 D.dxG=x([B.oI,B.cG],y.O)
 D.hPr=new C.z0("menu","Local Menu",B.xt,B.cG,D.dxG)
 D.dAm=x([B.jR,B.ch],y.O)
@@ -613,4 +613,4 @@ D.fww=new A.av(0,42)
 D.fyP=new A.hX(2,10,10,1.28,null)
 D.fUl=new A.G(!0,B.c,null,null,null,null,12,B.u,null,null,null,null,1.15,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.hkS=new A.C("Open / add",null,B.cf,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["XeZ/6jJuCL04fnkcdFnOJbbjtnI="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["Aq4zD0zEYy/ajrEg6Iw2+moF7os="]=a.current})($__dart_deferred_initializers__);
