@@ -9,6 +9,7 @@ import 'ngmy_house_workers.dart' show showNgmyCareCashAppSheet;
 import 'ngmy_nav.dart';
 import 'ngmy_stripe_payments.dart' show showNgmyPlanPaymentDialog;
 import 'ngmy_stripe_checkout_launch_stub.dart' if (dart.library.html) 'ngmy_stripe_checkout_launch_web.dart';
+import 'ngmy_help_services_nav_stub.dart' if (dart.library.html) 'ngmy_help_services_nav_web.dart';
 import 'ngmy_ui_lang.dart';
 
 /// Help & Services: paid help plans from the NGMY team (Real Estate Flipper course, help buying a house,
@@ -37,6 +38,7 @@ class NgmyHelpServicesApi {
   static Future<Map<String, dynamic>> stripeStart(String categoryId) =>
       _call('svcStripeStart', {'categoryId': categoryId, 'origin': Uri.base.origin});
   static Future<Map<String, dynamic>> stripeVerify(String purchaseId) => _call('svcStripeVerify', {'purchaseId': purchaseId});
+  static Future<Map<String, dynamic>> stripeCancel(String purchaseId) => _call('svcStripeCancel', {'purchaseId': purchaseId});
   static Future<Map<String, dynamic>> adminList() => _call('svcAdminList');
   static Future<Map<String, dynamic>> adminDecide(String id, bool approve) =>
       _call('svcAdminDecide', {'purchaseId': id, 'decision': approve ? 'approve' : 'reject'});
@@ -150,12 +152,23 @@ Future<void> showNgmyHelpServicesPage(
   BuildContext context, {
   required String userName,
   required dynamic config,
+  String? returnSession,
 }) {
   return NgmyNavigator.push(
     context,
-    NgmyHelpServicesPage(userName: userName, config: config),
+    NgmyHelpServicesPage(userName: userName, config: config, returnSession: returnSession),
     routeName: 'NgmyHelpServicesPage',
   );
+}
+
+/// When the app opens after Stripe (?svc_paid=<session> or ?svc_cancel=1): the session id, 'cancel', or null.
+/// It is read once and removed from the address.
+String? ngmyHelpServicesTakeReturn() {
+  try {
+    return ngmyHelpServicesReadReturnParam();
+  } catch (_) {
+    return null;
+  }
 }
 
 NgmyHelpCenterConfig _helpConfig(dynamic config) {
@@ -175,9 +188,12 @@ String _fallbackWhatsapp(dynamic config) {
 }
 
 class NgmyHelpServicesPage extends StatefulWidget {
-  const NgmyHelpServicesPage({super.key, required this.userName, required this.config});
+  const NgmyHelpServicesPage({super.key, required this.userName, required this.config, this.returnSession});
   final String userName;
   final dynamic config;
+
+  /// Set when the app was opened by Stripe after a card payment (the checkout session id), or 'cancel'.
+  final String? returnSession;
 
   @override
   State<NgmyHelpServicesPage> createState() => _NgmyHelpServicesPageState();
@@ -191,6 +207,14 @@ class _NgmyHelpServicesPageState extends State<NgmyHelpServicesPage> with Widget
   String _whatsapp = '';
   Timer? _poll;
 
+  /// The card purchase whose Stripe page was just opened. When it becomes paid, its receipt opens by itself.
+  String? _awaitingId;
+
+  /// The Stripe session the app came back from (after paying in the same window or a new one).
+  String? _returnSession;
+  int _returnTries = 0;
+  bool _receiptOpen = false;
+
   NgmyLangStore get _lang => NgmyHelpServicesLang.store;
 
   @override
@@ -199,6 +223,8 @@ class _NgmyHelpServicesPageState extends State<NgmyHelpServicesPage> with Widget
     WidgetsBinding.instance.addObserver(this);
     _lang.code.addListener(_langChanged);
     unawaited(_lang.load());
+    final back = widget.returnSession;
+    if (back != null && back != 'cancel' && back.isNotEmpty) _returnSession = back;
     _load();
   }
 
@@ -240,14 +266,35 @@ class _NgmyHelpServicesPageState extends State<NgmyHelpServicesPage> with Widget
         _error = (res['error'] ?? 'Could not load. Try again.').toString();
       }
     });
+    await _openReceiptIfPaid();
     _schedulePoll();
   }
 
-  /// While a card payment is waiting, ask the server every few seconds (it asks Stripe).
+  /// After a card payment (Stripe confirmed it on the server), open the receipt by itself.
+  Future<void> _openReceiptIfPaid() async {
+    if (!mounted || _receiptOpen) return;
+    Map<String, dynamic>? match;
+    for (final p in _purchases) {
+      final mine = (_awaitingId != null && p['id'] == _awaitingId) || (_returnSession != null && p['transactionId'] == _returnSession);
+      if (mine) match = p;
+    }
+    if (_returnSession != null) {
+      _returnTries++;
+      // Stripe can take a moment to confirm; stop waiting after about a minute.
+      if (_returnTries > 12 && (match == null || match['status'] != 'paid')) _returnSession = null;
+    }
+    if (match == null || match['status'] != 'paid') return;
+    _awaitingId = null;
+    _returnSession = null;
+    _receiptOpen = true;
+    await _openPurchase(match);
+    _receiptOpen = false;
+  }
+
+  /// While a card payment just opened on Stripe is not confirmed yet, ask the server every few seconds (it asks Stripe).
   void _schedulePoll() {
     _poll?.cancel();
-    final waitingCard = _purchases.any((p) => p['method'] == 'stripe' && p['status'] == 'pending');
-    if (waitingCard) _poll = Timer(const Duration(seconds: 6), () => _load(quiet: true));
+    if (_awaitingId != null || _returnSession != null) _poll = Timer(const Duration(seconds: 5), () => _load(quiet: true));
   }
 
   NgmyServiceCategory? _cat(String id) {
@@ -259,7 +306,9 @@ class _NgmyHelpServicesPageState extends State<NgmyHelpServicesPage> with Widget
 
   Map<String, dynamic>? _latestFor(String categoryId) {
     for (final p in _purchases) {
-      if (p['categoryId'] == categoryId && (p['status'] == 'paid' || p['status'] == 'pending')) return p;
+      // A card checkout that was opened but not paid is not shown (it closes by itself at Stripe).
+      final openCard = p['method'] == 'stripe' && p['status'] == 'pending';
+      if (p['categoryId'] == categoryId && !openCard && (p['status'] == 'paid' || p['status'] == 'pending')) return p;
     }
     return null;
   }
@@ -282,7 +331,21 @@ class _NgmyHelpServicesPageState extends State<NgmyHelpServicesPage> with Widget
   Future<void> _pay(NgmyServiceCategory cat) async {
     // The same payment pop-up as Help Center, House + Insurance.
     final look = _look(cat.icon);
+    // The card checkout is made on the server while the pop-up is showing, so that Pay with card opens the
+    // Stripe page inside the tap itself (like Phone Unlock). A phone blocks a window opened later than the tap.
+    Map<String, dynamic>? ready;
+    final preparing = NgmyHelpServicesApi.stripeStart(cat.id).then((r) => ready = r);
+    var opened = false;
     final method = await showNgmyPlanPaymentDialog(
+      onCard: () {
+        final r = ready;
+        final url = (r?['url'] ?? '').toString();
+        if (r?['ok'] == true && url.isNotEmpty) {
+          ngmyLaunchPaymentCheckout(url);
+          opened = true;
+          _awaitingId = (r?['purchaseId'] ?? '').toString();
+        }
+      },
       context: context,
       title: cat.title(),
       message: cat.description(),
@@ -296,9 +359,29 @@ class _NgmyHelpServicesPageState extends State<NgmyHelpServicesPage> with Widget
       cashAppLabel: _t('Pay with Cash App', 'Lipa kwa Cash App'),
       laterLabel: _t('Maybe later', 'Baadaye'),
     );
+    if (method != 'stripe') {
+      // The prepared card checkout is not used: close it at Stripe so it never lingers.
+      unawaited(preparing.then((r) {
+        final id = (r['purchaseId'] ?? '').toString();
+        if (id.isNotEmpty) unawaited(NgmyHelpServicesApi.stripeCancel(id));
+      }));
+    }
     if (!mounted || method == null) return;
     if (method == 'stripe') {
-      await _payStripe(cat);
+      if (opened) {
+        _schedulePoll();
+        return;
+      }
+      // The link was not ready at the moment of the tap: go to Stripe in this same window as soon as it is.
+      final r = await preparing;
+      if (!mounted) return;
+      final url = (r['url'] ?? '').toString();
+      if (r['ok'] != true || url.isEmpty) {
+        _snack((r['error'] ?? _t('Card checkout could not start.', 'Malipo ya kadi hayakuweza kuanza.')).toString(), error: true);
+        return;
+      }
+      _awaitingId = (r['purchaseId'] ?? '').toString();
+      ngmyHelpServicesGoTo(url);
     } else {
       await _payCashApp(cat);
     }
@@ -328,30 +411,11 @@ class _NgmyHelpServicesPageState extends State<NgmyHelpServicesPage> with Widget
     await _load(quiet: true);
   }
 
-  Future<void> _payStripe(NgmyServiceCategory cat) async {
-    final res = await NgmyHelpServicesApi.stripeStart(cat.id);
-    if (!mounted) return;
-    if (res['ok'] != true || (res['url'] ?? '').toString().isEmpty) {
-      _snack((res['error'] ?? _t('Card checkout could not start.', 'Malipo ya kadi hayakuweza kuanza.')).toString(), error: true);
-      return;
-    }
-    final purchaseId = (res['purchaseId'] ?? '').toString();
-    ngmyLaunchPaymentCheckout(res['url'].toString());
-    if (!mounted) return;
-    final paid = await showDialog<Map<String, dynamic>>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => _StripeWaitDialog(purchaseId: purchaseId, amount: cat.price),
-    );
-    if (!mounted) return;
-    await _load(quiet: true);
-    if (paid != null && mounted) await _openPurchase(paid);
-  }
-
   @override
   Widget build(BuildContext context) {
     final c = _Palette(context);
-    final paidOrPending = _purchases.where((p) => p['status'] != 'cancelled').toList();
+    // Card checkouts that were opened but not paid are not listed.
+    final paidOrPending = _purchases.where((p) => p['status'] != 'cancelled' && !(p['method'] == 'stripe' && p['status'] == 'pending')).toList();
     return Scaffold(
       backgroundColor: c.page,
       body: RefreshIndicator(
@@ -777,98 +841,6 @@ class _GradientButton extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Waits while the buyer pays on the Stripe tab. The server asks Stripe; only a paid session counts.
-class _StripeWaitDialog extends StatefulWidget {
-  const _StripeWaitDialog({required this.purchaseId, required this.amount});
-  final String purchaseId;
-  final double amount;
-
-  @override
-  State<_StripeWaitDialog> createState() => _StripeWaitDialogState();
-}
-
-class _StripeWaitDialogState extends State<_StripeWaitDialog> {
-  Timer? _timer;
-  bool _checking = false;
-  String _note = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 4), (_) => _check(quiet: true));
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _check({bool quiet = false}) async {
-    if (_checking || widget.purchaseId.isEmpty) return;
-    _checking = true;
-    if (!quiet && mounted) setState(() {});
-    final res = await NgmyHelpServicesApi.stripeVerify(widget.purchaseId);
-    _checking = false;
-    if (!mounted) return;
-    final p = res['purchase'];
-    if (p is Map && p['status'] == 'paid') {
-      _timer?.cancel();
-      Navigator.pop(context, Map<String, dynamic>.from(p));
-      return;
-    }
-    if (p is Map && p['status'] == 'cancelled') {
-      _timer?.cancel();
-      setState(() => _note = _t('This card payment was not finished.', 'Malipo haya ya kadi hayakukamilika.'));
-      return;
-    }
-    setState(() => _note = quiet ? _note : _t('Not paid yet. Finish paying in the Stripe page.', 'Bado haijalipwa. Maliza kulipa kwenye ukurasa wa Stripe.'));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final c = _Palette(context);
-    return Dialog(
-      backgroundColor: c.card,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 22, 20, 12),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const SizedBox(width: 44, height: 44, child: CircularProgressIndicator(strokeWidth: 3, color: Color(0xFF635BFF))),
-          const SizedBox(height: 16),
-          Text(_t('Finish your card payment', 'Maliza malipo yako ya kadi'),
-              textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: c.ink)),
-          const SizedBox(height: 6),
-          Text(
-            _t(
-              'Pay ${_money(widget.amount)} on the Stripe page. This screen updates by itself once Stripe confirms it.',
-              'Lipa ${_money(widget.amount)} kwenye ukurasa wa Stripe. Skrini hii itajibadilisha yenyewe Stripe ikithibitisha.',
-            ),
-            textAlign: TextAlign.center,
-            style: TextStyle(color: c.muted, fontSize: 13, height: 1.35, fontWeight: FontWeight.w600),
-          ),
-          if (_note.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(_note, textAlign: TextAlign.center, style: const TextStyle(color: _kAmber, fontWeight: FontWeight.w800, fontSize: 12.5)),
-          ],
-          const SizedBox(height: 16),
-          _GradientButton(
-            text: _t('I paid · check now', 'Nimelipa · angalia sasa'),
-            icon: Icons.refresh_rounded,
-            colors: const [Color(0xFF818CF8), Color(0xFF635BFF)],
-            busy: _checking,
-            onTap: () => _check(),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(_t('Close', 'Funga'), style: TextStyle(color: c.muted, fontWeight: FontWeight.w800)),
-          ),
-        ]),
       ),
     );
   }

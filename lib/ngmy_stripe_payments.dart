@@ -2232,6 +2232,8 @@ Future<String?> showNgmyPlanPaymentDialog({
   required String cardLabel,
   required String cashAppLabel,
   required String laterLabel,
+  /// Runs inside the Pay with card tap (opens Stripe there, so the phone does not block the window).
+  VoidCallback? onCard,
 }) {
   return showDialog<String>(
     context: context,
@@ -2249,6 +2251,7 @@ Future<String?> showNgmyPlanPaymentDialog({
       cardLabel: cardLabel,
       cashAppLabel: cashAppLabel,
       laterLabel: laterLabel,
+      onCard: onCard,
     ),
   );
 }
@@ -2266,6 +2269,7 @@ class _NgmyPlanPaymentDialog extends StatefulWidget {
     required this.cardLabel,
     required this.cashAppLabel,
     required this.laterLabel,
+    this.onCard,
   });
 
   final String title;
@@ -2279,6 +2283,8 @@ class _NgmyPlanPaymentDialog extends StatefulWidget {
   final String cardLabel;
   final String cashAppLabel;
   final String laterLabel;
+  /// Called inside the Pay with card tap, before the pop-up closes.
+  final VoidCallback? onCard;
 
   @override
   State<_NgmyPlanPaymentDialog> createState() => _NgmyPlanPaymentDialogState();
@@ -2497,6 +2503,8 @@ class _NgmyPlanPaymentDialogState extends State<_NgmyPlanPaymentDialog> with Tic
                             colors: [mid, deep],
                             shine: shine,
                             onPressed: () async {
+                              // Runs inside the tap itself, so a new Stripe window is allowed on iPhone.
+                              widget.onCard?.call();
                               if (context.mounted) Navigator.pop(context, 'stripe');
                             },
                           ),

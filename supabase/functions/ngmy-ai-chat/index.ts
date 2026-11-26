@@ -1708,7 +1708,7 @@ async function handleAdvisorRelationship(req: Request, action: string, body: any
 // the Cash App screenshot, or after Stripe itself says the checkout session was paid.
 const SVC_ACTIONS = new Set([
   "svcList", "svcCashApp", "svcStripeStart", "svcStripeVerify",
-  "svcAdminList", "svcAdminDecide", "svcAdminSetWhatsapp", "svcStripeHealth",
+  "svcAdminList", "svcAdminDecide", "svcAdminSetWhatsapp", "svcStripeHealth", "svcStripeCancel",
 ]);
 
 function svcStripeKey(): string {
@@ -1973,6 +1973,28 @@ async function handleHelpServices(req: Request, action: string, body: any): Prom
       console.error("[svcStripeStart] network error", String((e as Error)?.message ?? e));
       return jsonOk({ ok: false, error: "Card checkout could not reach Stripe (network). Try again in a minute or use Cash App." }, 502);
     }
+  }
+
+  if (action === "svcStripeCancel") {
+    // A card checkout was prepared when the pay pop-up opened, but the member chose Cash App or closed it.
+    const id = hwText(body?.purchaseId, 60);
+    if (!id) return jsonOk({ ok: false, error: "Pick a purchase." }, 400);
+    const { data: p } = await db.from("service_purchases").select("*").eq("id", id).eq("email", email).maybeSingle();
+    if (!p || p.method !== "stripe" || p.status !== "pending") return jsonOk({ ok: true });
+    const key = svcStripeKey();
+    if (key && p.transaction_id) {
+      try {
+        await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(p.transaction_id)}/expire`, {
+          method: "POST", headers: { Authorization: `Bearer ${key}` },
+        });
+      } catch (_) { /* it closes by itself after a day */ }
+    }
+    // Paid in the meantime? Then keep it (the check below marks it paid); otherwise it is cancelled.
+    const checked = await svcCheckStripe(db, p);
+    if (checked.status === "pending") {
+      await db.from("service_purchases").update({ status: "cancelled" }).eq("id", id).eq("status", "pending");
+    }
+    return jsonOk({ ok: true });
   }
 
   if (action === "svcStripeVerify") {
@@ -11090,6 +11112,7 @@ serve(async (req) => {
       q6: "svcAdminDecide",
       q7: "svcAdminSetWhatsapp",
       q8: "svcStripeHealth",
+      q9: "svcStripeCancel",
       s1: "storeGrant",
       s2: "storeRevoke",
       s3: "storeList",

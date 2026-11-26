@@ -66,7 +66,7 @@ import 'ngmy_repair_estimate_payments.dart';
 import 'ngmy_house_insurance.dart';
 import 'ngmy_house_workers.dart' show showNgmyAdminHouseCareSheet, NgmyHouseWorkersApi;
 import 'ngmy_ui_lang.dart';
-import 'ngmy_help_services.dart' show showNgmyHelpServicesPage, showNgmyAdminHelpServicesSheet, NgmyHelpServicesLang;
+import 'ngmy_help_services.dart' show showNgmyHelpServicesPage, showNgmyAdminHelpServicesSheet, NgmyHelpServicesLang, ngmyHelpServicesTakeReturn;
 import 'ngmy_civic_helper_gifts.dart';
 import 'ngmy_civic_helper_gift_admin_popup.dart';
 import 'ngmy_civic_helper_gift_ui.dart';
@@ -19134,6 +19134,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _homeMountedAt = DateTime.now();
+    // Back from a Help & Services card payment (Stripe sends ?svc_paid= or ?svc_cancel=): open the page,
+    // and after a payment its receipt. Only once, and the address is cleaned so a reload does not repeat it.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final back = ngmyHelpServicesTakeReturn();
+      if (back == null || !mounted) return;
+      final full = (widget.user.fullName ?? '').trim();
+      unawaited(showNgmyHelpServicesPage(
+        context,
+        userName: full.isNotEmpty ? full : widget.user.username,
+        config: widget.config,
+        returnSession: back,
+      ));
+    });
     // Every menu that is its own download is loaded in the background a moment after the home screen opens, one
     // after another, so no menu shows a loading circle the first time it is opened after the app starts.
     // Growth Income first (opened most), then the rest. Started 6 seconds in, after the screen has settled (the iPhone bar check).

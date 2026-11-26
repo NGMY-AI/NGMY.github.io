@@ -128,6 +128,8 @@ const Map<String, String> kNgmyEdgeActionToWire = {
   'svcAdminList': 'q5',
   'svcAdminDecide': 'q6',
   'svcAdminSetWhatsapp': 'q7',
+  'svcStripeHealth': 'q8',
+  'svcStripeCancel': 'q9',
   'storeGrant': 's1',
   'storeRevoke': 's2',
   'storeList': 's3',
