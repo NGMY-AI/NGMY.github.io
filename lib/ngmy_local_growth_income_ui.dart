@@ -20,6 +20,7 @@ import 'ngmy_wallet_server.dart';
 import 'ngmy_local_growth_income.dart';
 import 'ngmy_back_scope.dart';
 import 'ngmy_nav.dart';
+import 'ngmy_help_services.dart' show showNgmyHelpServicesPage;
 import 'ngmy_network_resilience.dart';
 import 'ngmy_worksheet_helpers.dart';
 
@@ -866,7 +867,8 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
           plans: widget.plans,
           purchaseInFlight: _investPurchaseInFlight,
           onInvest: _onInvest,
-          titleLeading: _giHomeButton(),
+          // On Growth the $ button opens Help & Services, the same page members see.
+          titleLeading: _giHomeButton(onTap: _openHelpServices, tooltip: 'Help & Services'),
         ),
       ),
       ColoredBox(
@@ -923,15 +925,29 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     );
   }
 
+  /// Help & Services (paid help plans), opened from the $ button on the Growth tab.
+  void _openHelpServices() {
+    final full = (widget.liveUser.fullName ?? '').trim();
+    unawaited(showNgmyHelpServicesPage(
+      context,
+      userName: full.isNotEmpty ? full : widget.liveUser.username,
+      config: widget.config,
+    ));
+  }
+
   /// The $ button on Wallet and Investment: back to Growth Income's own home
   /// (on the Home tab the same button leaves Growth Income for the main app).
-  Widget _giHomeButton() {
+  Widget _giHomeButton({VoidCallback? onTap, String? tooltip}) {
     const green = Color(0xFF2EF6A3);
     return Tooltip(
-      message: 'Growth Income home',
+      message: tooltip ?? 'Growth Income home',
       child: InkWell(
         onTap: () {
           HapticFeedback.selectionClick();
+          if (onTap != null) {
+            onTap();
+            return;
+          }
           setState(() => _idx = 0);
         },
         customBorder: const CircleBorder(),

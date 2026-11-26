@@ -396,6 +396,27 @@ serve(async (req) => {
     return json({ received: true, skipped: "not_paid" });
   }
 
+  // Help & Services plans: the purchase row was made by the app server before checkout. It is
+  // marked paid only when this signed event matches it (same purchase, full amount, dollars).
+  if (session?.metadata?.ngmy_kind === "service_purchase") {
+    const purchaseId = String(session?.metadata?.purchase_id ?? "");
+    const { data: p } = await admin.from("service_purchases").select("*").eq("id", purchaseId).maybeSingle();
+    if (!p) return json({ received: true, skipped: "service_purchase_missing" });
+    const fullAmount = Number(session?.amount_total ?? 0) === Math.round(Number(p.amount) * 100) &&
+      String(session?.currency ?? "") === "usd";
+    if (p.status !== "pending" || !fullAmount) {
+      return json({ received: true, skipped: "service_purchase_not_pending_or_amount" });
+    }
+    const { data: cat } = await admin.from("service_categories").select("grants_course").eq("id", p.category_id).maybeSingle();
+    await admin.from("service_purchases").update({
+      status: "paid",
+      paid_at: new Date().toISOString(),
+      transaction_id: String(session?.id ?? p.transaction_id ?? ""),
+      course_access: cat?.grants_course === true,
+    }).eq("id", purchaseId).eq("status", "pending");
+    return json({ received: true, service_purchase: purchaseId });
+  }
+
   const email = emailFromSession(session);
   let product = productFromSession(session);
   if (!product && session?.payment_link) {

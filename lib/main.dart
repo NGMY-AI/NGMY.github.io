@@ -66,6 +66,7 @@ import 'ngmy_repair_estimate_payments.dart';
 import 'ngmy_house_insurance.dart';
 import 'ngmy_house_workers.dart' show showNgmyAdminHouseCareSheet, NgmyHouseWorkersApi;
 import 'ngmy_ui_lang.dart';
+import 'ngmy_help_services.dart' show showNgmyHelpServicesPage, showNgmyAdminHelpServicesSheet, NgmyHelpServicesLang;
 import 'ngmy_civic_helper_gifts.dart';
 import 'ngmy_civic_helper_gift_admin_popup.dart';
 import 'ngmy_civic_helper_gift_ui.dart';
@@ -19407,6 +19408,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     await _runHomePhoneActions([action]);
   }
 
+  /// Help & Services: the paid help plans page members see in place of Growth Income.
+  Future<void> _openHelpServicesFromHome() async {
+    final full = (widget.user.fullName ?? '').trim();
+    await showNgmyHelpServicesPage(
+      context,
+      userName: full.isNotEmpty ? full : widget.user.username,
+      config: widget.config,
+    );
+  }
+
   Future<void> _openLocalGrowthFromHome() async {
     // Growth Income is closed for members; only the admin opens it.
     if (widget.user.isAdmin != true) return;
@@ -19487,10 +19498,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                   ),
                                 ),
                             Expanded(child: Center(child: NgmyHomeBrandBadge(onTap: widget.onOpenAdminDashboard))),
+                            // Members: Help & Services (paid help plans). The admin still opens Growth Income here.
                             _roundGlassButton(
-                              icon: Icons.wifi_rounded,
-                              tooltip: 'Growth Income',
-                              onTap: widget.user.isAdmin != true ? null : _openLocalGrowthFromHome,
+                              icon: widget.user.isAdmin == true ? Icons.wifi_rounded : Icons.volunteer_activism_rounded,
+                              tooltip: widget.user.isAdmin == true ? 'Growth Income' : NgmyHelpServicesLang.store.t('Help & Services', 'Msaada na Huduma'),
+                              onTap: widget.user.isAdmin == true ? _openLocalGrowthFromHome : _openHelpServicesFromHome,
                             ),
                           ],
                         ),
@@ -19672,9 +19684,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         ),
         const SizedBox(width: 10),
         _roundGlassButton(
-          icon: Icons.wifi_rounded,
-          tooltip: 'Growth Income',
-          onTap: widget.user.isAdmin != true ? null : _openLocalGrowthFromHome,
+          icon: widget.user.isAdmin == true ? Icons.wifi_rounded : Icons.volunteer_activism_rounded,
+          tooltip: widget.user.isAdmin == true ? 'Growth Income' : NgmyHelpServicesLang.store.t('Help & Services', 'Msaada na Huduma'),
+          onTap: widget.user.isAdmin == true ? _openLocalGrowthFromHome : _openHelpServicesFromHome,
         ),
       ],
     );
@@ -24328,6 +24340,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 Icons.home_work_rounded,
                 const Color(0xFF0F766E),
                 () => unawaited(showNgmyAdminHouseCareSheet(context)),
+                isDark,
+                animDelayMs: 200,
+              ),
+              _menuFrame(
+                'Help & Services',
+                Icons.volunteer_activism_rounded,
+                const Color(0xFF0E7490),
+                () => unawaited(showNgmyAdminHelpServicesSheet(context, config: widget.config)),
                 isDark,
                 animDelayMs: 200,
               ),

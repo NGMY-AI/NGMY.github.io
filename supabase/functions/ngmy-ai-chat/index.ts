@@ -1703,6 +1703,265 @@ async function handleAdvisorRelationship(req: Request, action: string, body: any
   return jsonOk({ ok: true, ...(await relStatusFor(db, advisorId, email)) });
 }
 
+// ── Help & Services: paid help plans (Real Estate Flipper course, help buying a house, advice) ──
+// Prices always come from service_categories. A purchase becomes "paid" only after an admin approves
+// the Cash App screenshot, or after Stripe itself says the checkout session was paid.
+const SVC_ACTIONS = new Set([
+  "svcList", "svcCashApp", "svcStripeStart", "svcStripeVerify",
+  "svcAdminList", "svcAdminDecide", "svcAdminSetWhatsapp",
+]);
+
+function svcStripeKey(): string {
+  return (Deno.env.get("STRIPE_SECRET_KEY") ?? "").trim() || (Deno.env.get("STRIPE_SECRET_KEY_TEST") ?? "").trim();
+}
+
+function svcReceiptNo(id: string): string {
+  return `NGMY-${String(id).replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+}
+
+function svcCategory(r: any) {
+  return {
+    id: r.id,
+    titleEn: r.title_en ?? "", titleSw: r.title_sw ?? "",
+    descriptionEn: r.description_en ?? "", descriptionSw: r.description_sw ?? "",
+    includesEn: Array.isArray(r.includes_en) ? r.includes_en : [],
+    includesSw: Array.isArray(r.includes_sw) ? r.includes_sw : [],
+    whatsappMessageEn: r.whatsapp_message_en ?? "", whatsappMessageSw: r.whatsapp_message_sw ?? "",
+    price: Number(r.price ?? 0),
+    icon: r.icon ?? "",
+    grantsCourse: r.grants_course === true,
+  };
+}
+
+function svcPurchase(r: any) {
+  return {
+    id: r.id, email: r.email, categoryId: r.category_id, amount: Number(r.amount ?? 0),
+    method: r.method, status: r.status, transactionId: r.transaction_id ?? "",
+    code: r.code ?? "", proofUrl: r.proof_url ?? "", courseAccess: r.course_access === true,
+    receiptNo: svcReceiptNo(String(r.id)), createdAt: r.created_at, paidAt: r.paid_at, decidedAt: r.decided_at,
+  };
+}
+
+/// Asks Stripe about the purchase's checkout session and marks it paid only when Stripe says it was paid
+/// for this purchase, in full, in dollars. An expired session cancels the purchase.
+async function svcCheckStripe(db: any, p: any): Promise<any> {
+  if (p.method !== "stripe" || p.status !== "pending" || !p.transaction_id) return p;
+  const key = svcStripeKey();
+  if (!key) return p;
+  try {
+    const res = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(p.transaction_id)}`, {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    if (!res.ok) return p;
+    const s = await res.json();
+    const sameBuy = String(s?.metadata?.purchase_id ?? "") === String(p.id);
+    const fullAmount = Number(s?.amount_total ?? 0) === Math.round(Number(p.amount) * 100) && String(s?.currency ?? "") === "usd";
+    if (s?.payment_status === "paid" && sameBuy && fullAmount) {
+      const { data: cat } = await db.from("service_categories").select("grants_course").eq("id", p.category_id).maybeSingle();
+      const now = new Date().toISOString();
+      const { data } = await db.from("service_purchases")
+        .update({ status: "paid", paid_at: now, course_access: cat?.grants_course === true })
+        .eq("id", p.id).eq("status", "pending").select("*").maybeSingle();
+      return data ?? { ...p, status: "paid", paid_at: now };
+    }
+    if (s?.status === "expired") {
+      const { data } = await db.from("service_purchases").update({ status: "cancelled" })
+        .eq("id", p.id).eq("status", "pending").select("*").maybeSingle();
+      return data ?? p;
+    }
+  } catch (_) { /* Stripe unreachable: ask again next time */ }
+  return p;
+}
+
+async function svcWhatsappNumber(db: any): Promise<string> {
+  const { data } = await db.from("service_settings").select("value").eq("key", "whatsapp_number").maybeSingle();
+  return String(data?.value ?? "").trim();
+}
+
+/// Only our own site (or a local test copy) may be the page Stripe sends the buyer back to.
+function svcReturnOrigin(raw: unknown): string {
+  const s = String(raw ?? "").trim().replace(/\/+$/, "");
+  if (/^https:\/\/(www\.)?ngmy\.org$/.test(s)) return s;
+  if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(s)) return s;
+  return "https://ngmy.org";
+}
+
+async function handleHelpServices(req: Request, action: string, body: any): Promise<Response> {
+  const email = (await requireJwtEmail(req)).trim().toLowerCase();
+  if (!email) return jsonOk({ ok: false, error: "Please sign in first." }, 401);
+  const db = adminClient();
+  if (!db) return jsonOk({ ok: false, error: "Server database unavailable." }, 500);
+  const isAdmin = isNgmyAdminEmail(email);
+  const notReady = (msg: string) => /service_|relation|does not exist/i.test(msg);
+  const setupError = "Help & Services is not switched on yet. Please tell the admin to finish the setup.";
+
+  async function activeCategory(id: unknown) {
+    const catId = hwText(id, 60);
+    if (!catId) return null;
+    const { data } = await db.from("service_categories").select("*").eq("id", catId).eq("active", true).maybeSingle();
+    return data ?? null;
+  }
+
+  if (action === "svcList") {
+    const { data: cats, error } = await db.from("service_categories").select("*").eq("active", true).order("sort_order", { ascending: true });
+    if (error) return jsonOk({ ok: false, error: notReady(error.message) ? setupError : error.message }, 500);
+    const { data: mine } = await db.from("service_purchases").select("*").eq("email", email)
+      .order("created_at", { ascending: false }).limit(50);
+    const purchases: any[] = [];
+    for (const p of mine ?? []) purchases.push(await svcCheckStripe(db, p));
+    return jsonOk({
+      ok: true,
+      categories: (cats ?? []).map(svcCategory),
+      purchases: purchases.map(svcPurchase),
+      courseAccess: purchases.some((p) => p.status === "paid" && p.course_access === true),
+      whatsappNumber: await svcWhatsappNumber(db),
+      isAdmin,
+    });
+  }
+
+  if (action === "svcCashApp") {
+    const limited = await enforceRateLimit(req, "svc_pay", email, 8, 86400);
+    if (limited) return limited;
+    const cat = await activeCategory(body?.categoryId);
+    if (!cat) return jsonOk({ ok: false, error: "That plan is not available." }, 404);
+    const { data: waiting } = await db.from("service_purchases").select("id")
+      .eq("email", email).eq("category_id", cat.id).eq("method", "cashapp").eq("status", "pending").limit(1);
+    if (waiting && waiting.length > 0) return jsonOk({ ok: false, error: "Your last payment for this plan is still being confirmed." }, 409);
+    const code = String(body?.code ?? "").replace(/\D/g, "").slice(0, 8);
+    const proofB64 = String(body?.proofBase64 ?? "");
+    if (code.length < 4) return jsonOk({ ok: false, error: "Your payment code is missing. Open the payment again." }, 400);
+    if (!proofB64) return jsonOk({ ok: false, error: "Attach the screenshot of your Cash App payment." }, 400);
+    let proofUrl = "";
+    try {
+      proofUrl = await hwUploadCareImage(db, email, "pay", proofB64, String(body?.proofMime ?? ""));
+    } catch (e) {
+      return jsonOk({ ok: false, error: String((e as Error).message ?? e) }, 400);
+    }
+    const { data, error } = await db.from("service_purchases").insert({
+      email, category_id: cat.id, amount: Number(cat.price), method: "cashapp", status: "pending",
+      code, proof_url: proofUrl, transaction_id: code,
+    }).select("*").maybeSingle();
+    if (error) {
+      await hwRemoveCareImage(db, proofUrl);
+      return jsonOk({ ok: false, error: notReady(error.message) ? setupError : error.message }, 500);
+    }
+    return jsonOk({ ok: true, pending: true, purchase: svcPurchase(data) });
+  }
+
+  if (action === "svcStripeStart") {
+    const limited = await enforceRateLimit(req, "svc_stripe", email, 20, 3600);
+    if (limited) return limited;
+    const key = svcStripeKey();
+    if (!key) return jsonOk({ ok: false, error: "Card payments are not set up yet. Use Cash App." }, 503);
+    const cat = await activeCategory(body?.categoryId);
+    if (!cat) return jsonOk({ ok: false, error: "That plan is not available." }, 404);
+    const amount = Number(cat.price);
+    if (!(amount > 0)) return jsonOk({ ok: false, error: "That plan has no price yet." }, 400);
+    const { data: row, error } = await db.from("service_purchases").insert({
+      email, category_id: cat.id, amount, method: "stripe", status: "pending",
+    }).select("*").maybeSingle();
+    if (error || !row) return jsonOk({ ok: false, error: error && notReady(error.message) ? setupError : (error?.message ?? "Could not start the payment.") }, 500);
+    const origin = svcReturnOrigin(body?.origin);
+    const form = new URLSearchParams();
+    form.set("mode", "payment");
+    form.set("success_url", `${origin}/?svc_paid={CHECKOUT_SESSION_ID}`);
+    form.set("cancel_url", `${origin}/?svc_cancel=1`);
+    form.set("client_reference_id", `svc_${row.id}`);
+    form.set("customer_email", email);
+    form.set("line_items[0][quantity]", "1");
+    form.set("line_items[0][price_data][currency]", "usd");
+    form.set("line_items[0][price_data][unit_amount]", String(Math.round(amount * 100)));
+    form.set("line_items[0][price_data][product_data][name]", `NGMY · ${cat.title_en}`);
+    form.set("metadata[ngmy_kind]", "service_purchase");
+    form.set("metadata[purchase_id]", String(row.id));
+    form.set("metadata[category_id]", String(cat.id));
+    form.set("payment_intent_data[metadata][purchase_id]", String(row.id));
+    try {
+      const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/x-www-form-urlencoded" },
+        body: form.toString(),
+      });
+      const s = await res.json();
+      if (!res.ok || !s?.url || !s?.id) {
+        await db.from("service_purchases").delete().eq("id", row.id).eq("status", "pending");
+        console.error("[svcStripeStart] stripe error", s?.error?.message ?? res.status);
+        return jsonOk({ ok: false, error: "Card checkout could not start. Try again or use Cash App." }, 502);
+      }
+      await db.from("service_purchases").update({ transaction_id: s.id }).eq("id", row.id);
+      return jsonOk({ ok: true, url: s.url, purchaseId: row.id });
+    } catch (_) {
+      await db.from("service_purchases").delete().eq("id", row.id).eq("status", "pending");
+      return jsonOk({ ok: false, error: "Card checkout could not start. Try again or use Cash App." }, 502);
+    }
+  }
+
+  if (action === "svcStripeVerify") {
+    const id = hwText(body?.purchaseId, 60);
+    if (!id) return jsonOk({ ok: false, error: "Pick a purchase." }, 400);
+    const { data: p } = await db.from("service_purchases").select("*").eq("id", id).eq("email", email).maybeSingle();
+    if (!p) return jsonOk({ ok: false, error: "That purchase was not found." }, 404);
+    const checked = await svcCheckStripe(db, p);
+    return jsonOk({ ok: true, purchase: svcPurchase(checked) });
+  }
+
+  if (!isAdmin) return jsonOk({ ok: false, error: "Admin only." }, 403);
+
+  if (action === "svcAdminList") {
+    const { data, error } = await db.from("service_purchases").select("*").order("created_at", { ascending: false }).limit(300);
+    if (error) return jsonOk({ ok: false, error: notReady(error.message) ? setupError : error.message }, 500);
+    const rows: any[] = [];
+    for (const p of data ?? []) rows.push(await svcCheckStripe(db, p));
+    const { data: cats } = await db.from("service_categories").select("*").order("sort_order", { ascending: true });
+    const emails = [...new Set(rows.map((r) => String(r.email)))];
+    const names: Record<string, string> = {};
+    if (emails.length > 0) {
+      const { data: users } = await db.from("users").select("*").in("email", emails);
+      for (const u of users ?? []) {
+        const n = String(u.fullName ?? u.full_name ?? u.username ?? "").trim();
+        if (n) names[String(u.email)] = n;
+      }
+    }
+    const purchases = rows.map((r) => ({ ...svcPurchase(r), name: names[String(r.email)] ?? "" }));
+    return jsonOk({
+      ok: true,
+      purchases,
+      categories: (cats ?? []).map(svcCategory),
+      pending: purchases.filter((p) => p.status === "pending" && p.method === "cashapp").length,
+      whatsappNumber: await svcWhatsappNumber(db),
+    });
+  }
+
+  if (action === "svcAdminDecide") {
+    const id = hwText(body?.purchaseId, 60);
+    const decision = body?.decision === "approve" ? "paid" : body?.decision === "reject" ? "rejected" : "";
+    if (!id || !decision) return jsonOk({ ok: false, error: "Pick a purchase." }, 400);
+    const { data: p } = await db.from("service_purchases").select("*").eq("id", id).maybeSingle();
+    if (!p) return jsonOk({ ok: false, error: "That purchase was not found." }, 404);
+    if (p.method !== "cashapp") return jsonOk({ ok: false, error: "Card payments are confirmed by Stripe, not by hand." }, 409);
+    if (p.status !== "pending") return jsonOk({ ok: false, error: `That purchase was already ${p.status}.` }, 409);
+    const now = new Date().toISOString();
+    const patch: Record<string, unknown> = { status: decision, decided_at: now, decided_by: email };
+    if (decision === "paid") {
+      const { data: cat } = await db.from("service_categories").select("grants_course").eq("id", p.category_id).maybeSingle();
+      patch.paid_at = now;
+      patch.course_access = cat?.grants_course === true;
+    }
+    const { error } = await db.from("service_purchases").update(patch).eq("id", id).eq("status", "pending");
+    if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    return jsonOk({ ok: true });
+  }
+
+  if (action === "svcAdminSetWhatsapp") {
+    const number = hwPhone(body?.number);
+    const { error } = await db.from("service_settings").upsert({ key: "whatsapp_number", value: number, updated_at: new Date().toISOString() });
+    if (error) return jsonOk({ ok: false, error: notReady(error.message) ? setupError : error.message }, 500);
+    return jsonOk({ ok: true, whatsappNumber: number });
+  }
+
+  return jsonOk({ ok: false, error: "Unknown action." }, 400);
+}
+
 // ── House & Insurance workers (apply, list by state, work requests, ratings) ──
 // Phones never read these tables directly. A worker's phone number is only
 // returned to a client after that worker accepted the client's job, and a
@@ -10744,6 +11003,13 @@ serve(async (req) => {
       hr: "bwPassGet",
       hs: "bwAdminPayments",
       ht: "bwAdminPaymentDecide",
+      q1: "svcList",
+      q2: "svcCashApp",
+      q3: "svcStripeStart",
+      q4: "svcStripeVerify",
+      q5: "svcAdminList",
+      q6: "svcAdminDecide",
+      q7: "svcAdminSetWhatsapp",
       s1: "storeGrant",
       s2: "storeRevoke",
       s3: "storeList",
@@ -11035,6 +11301,7 @@ serve(async (req) => {
 
     if (action === "freeTimeGet" || action === "freeTimeAdd") return await handleFreeTime(req, action, body);
     if (HW_ACTIONS.has(action)) return await handleHouseWorkers(req, action, body);
+    if (SVC_ACTIONS.has(action)) return await handleHelpServices(req, action, body);
     if (CIVIC_GIVE_ACTIONS.has(action)) {
       const limited = await enforceRateLimit(req, action === "civicGiveInbox" ? "civic_give_inbox" : "civic_give", clientIp(req), action === "civicGiveInbox" ? 120 : 40, 3600);
       if (limited) return limited;
