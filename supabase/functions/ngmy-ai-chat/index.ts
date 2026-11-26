@@ -1885,7 +1885,17 @@ async function handleHelpServices(req: Request, action: string, body: any): Prom
       const s = await res.json();
       if (!res.ok || !s?.url || !s?.id) {
         await db.from("service_purchases").delete().eq("id", row.id).eq("status", "pending");
-        console.error("[svcStripeStart] stripe error", s?.error?.message ?? res.status);
+        const why = String(s?.error?.message ?? res.status);
+        console.error("[svcStripeStart] stripe error", why);
+        // A restricted Stripe key without the Checkout Sessions permission cannot open a checkout.
+        if (/permission/i.test(why)) {
+          return jsonOk({
+            ok: false,
+            error: isAdmin
+              ? "Stripe refused: the Stripe key needs the Checkout Sessions Write permission (Stripe Dashboard, Developers, API keys, edit the key). Use Cash App until then."
+              : "Card payments are not ready yet. Please use Cash App for now.",
+          }, 502);
+        }
         return jsonOk({ ok: false, error: "Card checkout could not start. Try again or use Cash App." }, 502);
       }
       await db.from("service_purchases").update({ transaction_id: s.id }).eq("id", row.id);

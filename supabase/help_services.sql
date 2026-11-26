@@ -77,7 +77,7 @@ values
   ],
   'Hello, I just paid for the Real Estate Flipper Course ($500) in the NGMY app. My name is {name}. Please help me get started.',
   'Habari, nimelipa Kozi ya Kuwa Mwekezaji wa Nyumba ($500) kwenye app ya NGMY. Jina langu ni {name}. Tafadhali nisaidie kuanza.',
-  500, true, 'flipper', 1
+  500, true, 'flipper', 3
 ),
 (
   'buy_house',
@@ -125,6 +125,6 @@ values
   ],
   'Hello, I just paid for Advice ($40) in the NGMY app. My name is {name}. I would like some advice.',
   'Habari, nimelipa huduma ya Ushauri ($40) kwenye app ya NGMY. Jina langu ni {name}. Ningependa kupata ushauri.',
-  40, false, 'advice', 3
+  40, false, 'advice', 1
 )
 on conflict (id) do nothing;

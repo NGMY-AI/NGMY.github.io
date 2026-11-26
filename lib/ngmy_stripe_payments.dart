@@ -2215,3 +2215,336 @@ class _NgmyMarriageSessionTimerBarState
     );
   }
 }
+
+/// The same card payment pop-up as House + Insurance (dark card, metal frame, halo icon, big price,
+/// perks, gradient pay button, Cash App button), for a plan that is not a Payment Link product.
+/// Returns 'stripe', 'cashapp', or null when closed.
+Future<String?> showNgmyPlanPaymentDialog({
+  required BuildContext context,
+  required String title,
+  required String message,
+  required String priceLabel,
+  required IconData icon,
+  required List<Color> colors,
+  required List<String> perks,
+  required String badge,
+  required String chip,
+  required String cardLabel,
+  required String cashAppLabel,
+  required String laterLabel,
+}) {
+  return showDialog<String>(
+    context: context,
+    barrierDismissible: true,
+    barrierColor: Colors.black.withValues(alpha: 0.78),
+    builder: (_) => _NgmyPlanPaymentDialog(
+      title: title,
+      message: message,
+      priceLabel: priceLabel,
+      icon: icon,
+      colors: colors,
+      perks: perks,
+      badge: badge,
+      chip: chip,
+      cardLabel: cardLabel,
+      cashAppLabel: cashAppLabel,
+      laterLabel: laterLabel,
+    ),
+  );
+}
+
+class _NgmyPlanPaymentDialog extends StatefulWidget {
+  const _NgmyPlanPaymentDialog({
+    required this.title,
+    required this.message,
+    required this.priceLabel,
+    required this.icon,
+    required this.colors,
+    required this.perks,
+    required this.badge,
+    required this.chip,
+    required this.cardLabel,
+    required this.cashAppLabel,
+    required this.laterLabel,
+  });
+
+  final String title;
+  final String message;
+  final String priceLabel;
+  final IconData icon;
+  final List<Color> colors;
+  final List<String> perks;
+  final String badge;
+  final String chip;
+  final String cardLabel;
+  final String cashAppLabel;
+  final String laterLabel;
+
+  @override
+  State<_NgmyPlanPaymentDialog> createState() => _NgmyPlanPaymentDialogState();
+}
+
+class _NgmyPlanPaymentDialogState extends State<_NgmyPlanPaymentDialog> with TickerProviderStateMixin {
+  static const _card = Color(0xFF0B0E14);
+  static const _muted = Color(0xFF7C8499);
+
+  late final AnimationController _entry = AnimationController(vsync: this, duration: const Duration(milliseconds: 720))..forward();
+  late final AnimationController _ambient = AnimationController(vsync: this, duration: const Duration(seconds: 9))..repeat();
+
+  @override
+  void dispose() {
+    _entry.dispose();
+    _ambient.dispose();
+    super.dispose();
+  }
+
+  Widget _stagger(int index, Widget child) {
+    final start = (0.14 + index * 0.07).clamp(0.0, 0.66);
+    final anim = CurvedAnimation(parent: _entry, curve: Interval(start, (start + 0.44).clamp(0.0, 1.0), curve: Curves.easeOutCubic));
+    return AnimatedBuilder(
+      animation: anim,
+      builder: (context, inner) => Opacity(
+        opacity: anim.value.clamp(0.0, 1.0),
+        child: Transform.translate(offset: Offset(0, 16 * (1 - anim.value)), child: inner),
+      ),
+      child: child,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mid = widget.colors.first;
+    final deep = widget.colors.last;
+    final shine = Color.lerp(mid, Colors.white, 0.45)!;
+    final metalText = Color.lerp(mid, Colors.white, 0.55)!;
+    Widget line(List<Color> c) => Expanded(child: Container(height: 1, decoration: BoxDecoration(gradient: LinearGradient(colors: c))));
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 26),
+      child: AnimatedBuilder(
+        animation: _entry,
+        builder: (context, child) {
+          final pop = Curves.easeOutBack.transform(_entry.value.clamp(0.0, 1.0));
+          return Opacity(opacity: (_entry.value / 0.45).clamp(0.0, 1.0), child: Transform.scale(scale: 0.9 + 0.1 * pop, child: child));
+        },
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 392),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(color: mid.withValues(alpha: 0.3), blurRadius: 60, spreadRadius: -10, offset: const Offset(0, 22)),
+                BoxShadow(color: Colors.black.withValues(alpha: 0.66), blurRadius: 34, offset: const Offset(0, 14)),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(30),
+              child: Container(
+                color: _card,
+                child: Stack(children: [
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 240,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [mid.withValues(alpha: 0.20), deep.withValues(alpha: 0.09), Colors.transparent],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: AnimatedBuilder(
+                        animation: _ambient,
+                        builder: (context, _) => CustomPaint(painter: _SparklePainter(t: _ambient.value, color: shine)),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 30, 24, 20),
+                    child: SingleChildScrollView(
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        _stagger(
+                          0,
+                          SizedBox(
+                            width: 112,
+                            height: 112,
+                            child: Stack(alignment: Alignment.center, children: [
+                              AnimatedBuilder(
+                                animation: _ambient,
+                                builder: (context, _) => CustomPaint(size: const Size(112, 112), painter: _HaloPainter(t: _ambient.value, mid: mid, shine: shine)),
+                              ),
+                              Container(
+                                width: 66,
+                                height: 66,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [shine, mid, deep]),
+                                  borderRadius: BorderRadius.circular(22),
+                                  boxShadow: [BoxShadow(color: mid.withValues(alpha: 0.5), blurRadius: 22, offset: const Offset(0, 9))],
+                                ),
+                                child: Icon(widget.icon, color: Colors.white, size: 31),
+                              ),
+                            ]),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        _stagger(
+                          1,
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: mid.withValues(alpha: 0.10),
+                              borderRadius: BorderRadius.circular(30),
+                              border: Border.all(color: mid.withValues(alpha: 0.30)),
+                            ),
+                            child: Text(widget.badge, style: TextStyle(color: metalText, fontSize: 9.5, fontWeight: FontWeight.w800, letterSpacing: 1.7)),
+                          ),
+                        ),
+                        const SizedBox(height: 15),
+                        _stagger(
+                          2,
+                          Text(widget.title,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 23, height: 1.18, letterSpacing: -0.4)),
+                        ),
+                        const SizedBox(height: 9),
+                        _stagger(
+                          3,
+                          Text(widget.message, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF98A0B2), fontSize: 12.8, height: 1.45)),
+                        ),
+                        const SizedBox(height: 20),
+                        _stagger(
+                          4,
+                          Text(
+                            widget.priceLabel,
+                            style: TextStyle(
+                              color: shine,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 46,
+                              height: 1,
+                              letterSpacing: -1.8,
+                              shadows: [Shadow(color: metalText.withValues(alpha: 0.32), blurRadius: 8)],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 11),
+                        _stagger(
+                          5,
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: mid.withValues(alpha: 0.13),
+                              borderRadius: BorderRadius.circular(30),
+                              border: Border.all(color: mid.withValues(alpha: 0.30)),
+                            ),
+                            child: Text(widget.chip, style: TextStyle(color: metalText, fontSize: 11.5, fontWeight: FontWeight.w700)),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        _stagger(
+                          6,
+                          Row(children: [
+                            line([Colors.transparent, mid.withValues(alpha: 0.38)]),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 11),
+                              child: Transform.rotate(
+                                angle: math.pi / 4,
+                                child: Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(color: mid.withValues(alpha: 0.85), borderRadius: BorderRadius.circular(1.5)),
+                                ),
+                              ),
+                            ),
+                            line([mid.withValues(alpha: 0.38), Colors.transparent]),
+                          ]),
+                        ),
+                        const SizedBox(height: 16),
+                        _stagger(
+                          7,
+                          Column(children: [
+                            for (final perk in widget.perks)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 5),
+                                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                  Container(
+                                    width: 19,
+                                    height: 19,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [shine, mid]),
+                                    ),
+                                    child: const Icon(Icons.check_rounded, size: 12, color: _card),
+                                  ),
+                                  const SizedBox(width: 9),
+                                  Expanded(
+                                    child: Text(perk, style: const TextStyle(color: Color(0xFFB9C0CF), fontSize: 12.5, height: 1.35, fontWeight: FontWeight.w500)),
+                                  ),
+                                ]),
+                              ),
+                          ]),
+                        ),
+                        const SizedBox(height: 22),
+                        _stagger(
+                          8,
+                          _GradientPayButton(
+                            label: widget.cardLabel,
+                            colors: [mid, deep],
+                            shine: shine,
+                            onPressed: () async {
+                              if (context.mounted) Navigator.pop(context, 'stripe');
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        _stagger(
+                          9,
+                          SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: OutlinedButton.icon(
+                              onPressed: () => Navigator.pop(context, 'cashapp'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.white,
+                                side: BorderSide(color: mid.withValues(alpha: 0.6), width: 1.4),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                              ),
+                              icon: const Icon(Icons.attach_money_rounded, size: 20),
+                              label: Text(widget.cashAppLabel, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        _stagger(
+                          10,
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: TextButton.styleFrom(foregroundColor: _muted, padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8)),
+                            child: Text(widget.laterLabel, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          ),
+                        ),
+                      ]),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: AnimatedBuilder(
+                        animation: _ambient,
+                        builder: (context, _) => CustomPaint(painter: _MetalFramePainter(t: _ambient.value, mid: mid, deep: deep, shine: shine)),
+                      ),
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

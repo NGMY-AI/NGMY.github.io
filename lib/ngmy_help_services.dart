@@ -1,13 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_edge_invoke.dart';
 import 'ngmy_help_center.dart';
 import 'ngmy_house_workers.dart' show showNgmyCareCashAppSheet;
 import 'ngmy_nav.dart';
+import 'ngmy_stripe_payments.dart' show showNgmyPlanPaymentDialog;
 import 'ngmy_stripe_checkout_launch_stub.dart' if (dart.library.html) 'ngmy_stripe_checkout_launch_web.dart';
 import 'ngmy_ui_lang.dart';
 
@@ -67,6 +67,14 @@ class NgmyServiceCategory {
     final v = (raw[s ? sw : en] ?? '').toString();
     return v.isNotEmpty ? v : (raw[en] ?? '').toString();
   }
+}
+
+/// Plan order on the page: Advice, then Buy a House, then the Flipper course. Plans the admin adds later
+/// follow, in the order the server sends them (sort_order).
+const _kPlanOrder = ['advice', 'buy_house', 'flipper_course'];
+int _planRank(NgmyServiceCategory c) {
+  final i = _kPlanOrder.indexOf(c.id);
+  return i >= 0 ? i : _kPlanOrder.length;
 }
 
 String _money(num v) => v == v.roundToDouble() ? '\$${v.toStringAsFixed(0)}' : '\$${v.toStringAsFixed(2)}';
@@ -192,7 +200,11 @@ class _NgmyHelpServicesPageState extends State<NgmyHelpServicesPage> with Widget
       _loading = false;
       if (res['ok'] == true) {
         _error = null;
-        _cats = ((res['categories'] as List?) ?? const []).whereType<Map>().map((e) => NgmyServiceCategory(Map<String, dynamic>.from(e))).toList();
+        final fromServer = ((res['categories'] as List?) ?? const []).whereType<Map>().map((e) => NgmyServiceCategory(Map<String, dynamic>.from(e))).toList();
+        _cats = [...fromServer]..sort((a, b) {
+            final r = _planRank(a).compareTo(_planRank(b));
+            return r != 0 ? r : fromServer.indexOf(a).compareTo(fromServer.indexOf(b));
+          });
         _purchases = ((res['purchases'] as List?) ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
         final n = (res['whatsappNumber'] ?? '').toString().trim();
         _whatsapp = n.isNotEmpty ? n : _fallbackWhatsapp(widget.config);
@@ -240,11 +252,21 @@ class _NgmyHelpServicesPageState extends State<NgmyHelpServicesPage> with Widget
   }
 
   Future<void> _pay(NgmyServiceCategory cat) async {
-    final method = await showModalBottomSheet<String>(
+    // The same payment pop-up as Help Center, House + Insurance.
+    final look = _look(cat.icon);
+    final method = await showNgmyPlanPaymentDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _PayMethodSheet(category: cat),
+      title: cat.title(),
+      message: cat.description(),
+      priceLabel: _money(cat.price),
+      icon: look.icon,
+      colors: look.colors,
+      perks: cat.includes(),
+      badge: _t('ONE-TIME PAYMENT', 'MALIPO YA MARA MOJA'),
+      chip: _t('Pay once · no monthly fee', 'Lipa mara moja · hakuna ada ya mwezi'),
+      cardLabel: '${_t('Pay with card', 'Lipa kwa kadi')} ${_money(cat.price)}',
+      cashAppLabel: _t('Pay with Cash App', 'Lipa kwa Cash App'),
+      laterLabel: _t('Maybe later', 'Baadaye'),
     );
     if (!mounted || method == null) return;
     if (method == 'stripe') {
@@ -378,96 +400,115 @@ class _NgmyHelpServicesPageState extends State<NgmyHelpServicesPage> with Widget
         ]),
       );
 
+  /// The header: a contained, rounded frame (curved at the top and the bottom), not a band up to the screen edge.
   Widget _hero(BuildContext context) {
     final top = MediaQuery.of(context).padding.top;
-    return Container(
-      padding: EdgeInsets.fromLTRB(16, top + 10, 16, 26),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF0B1B3A), Color(0xFF13306B), Color(0xFF0E7490)],
-        ),
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
-      ),
-      child: Stack(children: [
-        Positioned(
-          right: -40,
-          top: -30,
-          child: IgnorePointer(
-            child: Container(
-              width: 180,
-              height: 180,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(colors: [const Color(0xFF5EEAD4).withValues(alpha: 0.28), Colors.transparent]),
+    return Padding(
+      padding: EdgeInsets.fromLTRB(14, top + 10, 14, 0),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(28),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF0B1B3A), Color(0xFF13306B), Color(0xFF0E7490)],
               ),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+              boxShadow: [
+                BoxShadow(color: const Color(0xFF0E7490).withValues(alpha: 0.28), blurRadius: 26, offset: const Offset(0, 12)),
+              ],
             ),
-          ),
-        ),
-        Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Material(
-                  color: Colors.white.withValues(alpha: 0.12),
-                  shape: const CircleBorder(),
-                  child: IconButton(
-                    onPressed: () => NgmyNavigator.pop(context),
-                    icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-                    tooltip: _t('Back', 'Rudi'),
+            clipBehavior: Clip.antiAlias,
+            child: Stack(children: [
+              Positioned(
+                right: -40,
+                top: -40,
+                child: IgnorePointer(
+                  child: Container(
+                    width: 160,
+                    height: 160,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(colors: [const Color(0xFF5EEAD4).withValues(alpha: 0.26), Colors.transparent]),
+                    ),
                   ),
                 ),
-                const Spacer(),
-                NgmyLangFlag(store: _lang),
-              ]),
-              const SizedBox(height: 18),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(999)),
-                child: Text(
-                  _t('NGMY TEAM · REAL HELP', 'TIMU YA NGMY · MSAADA HALISI'),
-                  style: const TextStyle(color: Color(0xFF99F6E4), fontSize: 10.5, letterSpacing: 1.6, fontWeight: FontWeight.w900),
-                ),
               ),
-              const SizedBox(height: 10),
-              Text(
-                _t('Help & Services', 'Msaada na Huduma'),
-                style: const TextStyle(color: Colors.white, fontSize: 30, height: 1.1, fontWeight: FontWeight.w900),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 14, 16),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Material(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      shape: const CircleBorder(),
+                      child: IconButton(
+                        onPressed: () => NgmyNavigator.pop(context),
+                        icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                        tooltip: _t('Back', 'Rudi'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _t('Help & Services', 'Msaada na Huduma'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontSize: 22, height: 1.1, fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Bigger EN / SW flag.
+                    Transform.scale(scale: 1.35, alignment: Alignment.centerRight, child: NgmyLangFlag(store: _lang)),
+                  ]),
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      _t(
+                        'Pick the help you need, pay once, and our team walks with you step by step.',
+                        'Chagua msaada unaohitaji, lipa mara moja, na timu yetu inatembea na wewe hatua kwa hatua.',
+                      ),
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.80), fontSize: 13, height: 1.35, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // The three features in one aligned row.
+                  Row(children: [
+                    Expanded(child: _heroChip(Icons.lock_rounded, _t('Secure card payment', 'Malipo salama ya kadi'))),
+                    const SizedBox(width: 6),
+                    Expanded(child: _heroChip(Icons.attach_money_rounded, 'Cash App')),
+                    const SizedBox(width: 6),
+                    Expanded(child: _heroChip(Icons.chat_rounded, _t('WhatsApp support', 'Msaada kwa WhatsApp'))),
+                  ]),
+                ]),
               ),
-              const SizedBox(height: 8),
-              Text(
-                _t(
-                  'Pick the help you need, pay once, and our team walks with you step by step.',
-                  'Chagua msaada unaohitaji, lipa mara moja, na timu yetu inatembea na wewe hatua kwa hatua.',
-                ),
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.78), fontSize: 14, height: 1.4, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 16),
-              Wrap(spacing: 8, runSpacing: 8, children: [
-                _heroChip(Icons.lock_rounded, _t('Secure card payment', 'Malipo salama ya kadi')),
-                _heroChip(Icons.attach_money_rounded, 'Cash App'),
-                _heroChip(Icons.chat_rounded, _t('WhatsApp support', 'Msaada kwa WhatsApp')),
-              ]),
             ]),
           ),
         ),
-      ]),
+      ),
     );
   }
 
   Widget _heroChip(IconData icon, String text) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        height: 34,
+        padding: const EdgeInsets.symmetric(horizontal: 6),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
         ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 14, color: const Color(0xFF99F6E4)),
-          const SizedBox(width: 6),
-          Text(text, style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w800)),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(icon, size: 13, color: const Color(0xFF99F6E4)),
+          const SizedBox(width: 4),
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(text, maxLines: 1, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)),
+            ),
+          ),
         ]),
       );
 
@@ -708,117 +749,6 @@ class _GradientButton extends StatelessWidget {
                     ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Choose how to pay ─────────────────────────────────────────────────────────
-
-class _PayMethodSheet extends StatelessWidget {
-  const _PayMethodSheet({required this.category});
-  final NgmyServiceCategory category;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = _Palette(context);
-    final look = _look(category.icon);
-    return SafeArea(
-      top: false,
-      child: Center(
-        heightFactor: 1,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
-          child: Container(
-            margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-            padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
-            decoration: BoxDecoration(color: c.card, borderRadius: BorderRadius.circular(28)),
-            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Center(
-                child: Container(width: 40, height: 4, decoration: BoxDecoration(color: c.line, borderRadius: BorderRadius.circular(4))),
-              ),
-              const SizedBox(height: 16),
-              Row(children: [
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(15), gradient: LinearGradient(colors: look.colors)),
-                  child: Icon(look.icon, color: Colors.white),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(category.title(), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: c.ink)),
-                    Text(_t('One-time payment', 'Malipo ya mara moja'), style: TextStyle(fontSize: 12, color: c.muted, fontWeight: FontWeight.w600)),
-                  ]),
-                ),
-                Text(_money(category.price), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 24, color: c.ink)),
-              ]),
-              const SizedBox(height: 18),
-              Text(_t('HOW DO YOU WANT TO PAY?', 'UNATAKA KULIPA VIPI?'),
-                  style: TextStyle(fontSize: 10.5, letterSpacing: 1.5, fontWeight: FontWeight.w900, color: c.muted)),
-              const SizedBox(height: 10),
-              _option(
-                context,
-                c,
-                icon: Icons.credit_card_rounded,
-                colors: const [Color(0xFF818CF8), Color(0xFF635BFF)],
-                title: _t('Card · Stripe', 'Kadi · Stripe'),
-                body: _t('Pay safely by card. Confirmed right away.', 'Lipa kwa usalama kwa kadi. Inathibitishwa papo hapo.'),
-                value: 'stripe',
-              ),
-              const SizedBox(height: 10),
-              _option(
-                context,
-                c,
-                icon: Icons.attach_money_rounded,
-                colors: const [Color(0xFF22E07A), Color(0xFF0FA958)],
-                title: 'Cash App',
-                body: _t(
-                  'Send on Cash App, add your screenshot, and an admin approves it.',
-                  'Tuma kwa Cash App, weka picha ya malipo, na msimamizi ataidhinisha.',
-                ),
-                value: 'cashapp',
-              ),
-            ]),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _option(BuildContext context, _Palette c,
-      {required IconData icon, required List<Color> colors, required String title, required String body, required String value}) {
-    return Material(
-      color: c.tile,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: () {
-          HapticFeedback.selectionClick();
-          Navigator.pop(context, value);
-        },
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: c.line)),
-          child: Row(children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: colors)),
-              child: Icon(icon, color: Colors.white),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(title, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: c.ink)),
-                const SizedBox(height: 2),
-                Text(body, style: TextStyle(fontSize: 12.5, height: 1.3, color: c.muted, fontWeight: FontWeight.w600)),
-              ]),
-            ),
-            Icon(Icons.arrow_forward_ios_rounded, size: 16, color: c.muted),
-          ]),
         ),
       ),
     );
