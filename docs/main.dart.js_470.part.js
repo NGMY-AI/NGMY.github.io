@@ -56,7 +56,7 @@ o=A.a0(s==null?A.S(q,q):s,r,q)
 s=g===C.op
 if(o.am(0,s?"advisor":"family_tree"))throw A.Y(A.bd("You already saved a "+A.iaI(g)+" QR. Open QR Code Generator \u2192 Saved and delete it before saving a new one."))
 s=s?"advisor":"family_tree"
-o.n(0,s,new A.wQ(g,v,C.a.i(h),C.a.i(d),i,new A.W(Date.now(),0,!1).aa().ag()).al())
+o.n(0,s,new A.wQ(g,v,C.a.i(h),C.a.i(d),i,new A.W(Date.now(),0,!1).aa().ag()).ak())
 p.n(0,n,o)
 t.n(u,"byEmail",p)
 x=3
@@ -80,4 +80,4 @@ $2(d,e){return new A.bw(J.k(d),J.k(e),y.F)},
 $S:102};(function inheritance(){var x=a.inherit
 x(B.cfU,A.iW)})()
 var y={F:A.as("bw<n,n>"),w:A.as("n"),e:A.as("P"),b:A.as("@"),u:A.as("a9<@,@>?"),m:A.as("wQ?"),v:A.as("~")};(function constants(){D.arf=new A.a_(61152,"MaterialIcons",!1)})()};
-(a=>{a["TiMxfENr1Gs+MKGJ8dQdWN50R3Q="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["MvvCoU6z60QXSVmQP5r4KqKSqPI="]=a.current})($__dart_deferred_initializers__);
