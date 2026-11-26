@@ -174,7 +174,7 @@ m=A.a([new A.aa(0,B.H,d.j(0.35),B.cy,16)],m)
 f=B.c.j(0.22)
 f=A.p(a2,A.V(e?B.q2:B.q1,B.c,a2,a2,a2,34),B.f,a2,a2,new A.o(f,a2,a2,a2,a2,a2,B.a6),a2,52,a2,a2,a2,a2,a2,52)
 a1=A.c(e?"ENTER UP":"ENTER DOWN",a2,a2,a2,a2,a2,a2,C.fUx,a2,a2,a2)
-B.d.u(j,A.a([B.af,A.p(a2,A.w(A.a([f,B.aj,a1,A.c(e?"BUY / CALL":"SELL / PUT",a2,a2,a2,a2,a2,a2,C.fM2,a2,a2,a2),B.S,new D.aCU(a0,a2),B.S,A.A(A.a([A.w(A.a([A.c(B.i.a5(D.c4(k.h(0,"durationMin")),0)+" min",a2,a2,a2,a2,a2,a2,B.jr,a2,a2,a2),A.c("Trade for",a2,a2,a2,a2,a2,a2,H.ad_,a2,a2,a2)],i),B.l,a2,B.e,B.h,0,B.p),A.p(a2,a2,B.f,B.jW,a2,a2,a2,30,a2,B.re,a2,a2,a2,1),A.w(A.a([A.c(A.v(k.h(0,"worked"))+" of "+A.v(k.h(0,"of")),a2,a2,a2,a2,a2,a2,B.jr,a2,a2,a2),A.c("Worked lately",a2,a2,a2,a2,a2,a2,H.ad_,a2,a2,a2)],i),B.l,a2,B.e,B.h,0,B.p)],i),B.l,a2,B.bb,B.h,0,a2,a2)],i),B.l,a2,B.e,B.h,0,B.p),B.f,a2,a2,new A.o(a2,a2,a2,h,m,new A.a6(B.aV,B.b1,B.w,g,a2,a2),B.m),a2,a2,a2,a2,B.a29,a2,a2,1/0)],i))}j.push(B.S)
+B.d.u(j,A.a([B.af,A.p(a2,A.w(A.a([f,B.aj,a1,A.c(e?"BUY / CALL":"SELL / PUT",a2,a2,a2,a2,a2,a2,C.fM2,a2,a2,a2),B.S,new D.aCU(a0,a2),B.S,A.A(A.a([A.w(A.a([A.c(B.i.a5(D.c4(k.h(0,"durationMin")),0)+" min",a2,a2,a2,a2,a2,a2,B.jr,a2,a2,a2),A.c("Trade for",a2,a2,a2,a2,a2,a2,H.ad_,a2,a2,a2)],i),B.l,a2,B.e,B.h,0,B.p),A.p(a2,a2,B.f,B.jW,a2,a2,a2,30,a2,B.re,a2,a2,a2,1),A.w(A.a([A.c(A.v(k.h(0,"worked"))+" of "+A.v(k.h(0,"of")),a2,a2,a2,a2,a2,a2,B.jr,a2,a2,a2),A.c("Worked lately",a2,a2,a2,a2,a2,a2,H.ad_,a2,a2,a2)],i),B.l,a2,B.e,B.h,0,B.p)],i),B.l,a2,B.bb,B.h,0,a2,a2)],i),B.l,a2,B.e,B.h,0,B.p),B.f,a2,a2,new A.o(a2,a2,a2,h,m,new A.a6(B.aU,B.b1,B.w,g,a2,a2),B.m),a2,a2,a2,a2,B.a29,a2,a2,1/0)],i))}j.push(B.S)
 m=u.j(0.15)
 k=A.m(999)
 k=A.a([A.p(a2,A.c(v,a2,a2,a2,a2,a2,a2,A.l(a2,a2,u,a2,a2,a2,a2,a2,a2,a2,a2,10.5,a2,a2,B.u,a2,a2,!0,a2,0.4,a2,a2,a2,a2,a2,a2),a2,a2,a2),B.f,a2,a2,new A.o(m,a2,a2,k,a2,a2,B.m),a2,a2,a2,a2,B.o9,a2,a2,a2),B.aX],i)
@@ -1068,7 +1068,7 @@ w=v.chm(s)
 if(v.f)t=B.l2
 else{if(v.d==null){t=v.ay
 t=A.a([v.ab2(s,t==null?"Nothing to show yet.":t,B.b_)],x.p)}else t=v.bJ4(0,s)
-t=A.Gg(A.co(t,u,u,C.aow,u,u,B.ah,!1),u,new D.eJH(v))}return A.c6(u,r,A.p(u,A.bo(!0,A.w(A.a([w,A.E(t,1)],x.p),B.l,u,B.e,B.h,0,B.p),!0,!1,B.ag,!0,!0),B.f,u,u,new A.o(u,u,u,u,u,new A.a6(B.aV,B.b1,B.w,q,u,u),B.m),u,u,u,u,u,u,u,u),u,!1,!1,u,u)},
+t=A.Gg(A.co(t,u,u,C.aow,u,u,B.ah,!1),u,new D.eJH(v))}return A.c6(u,r,A.p(u,A.bo(!0,A.w(A.a([w,A.E(t,1)],x.p),B.l,u,B.e,B.h,0,B.p),!0,!1,B.ag,!0,!0),B.f,u,u,new A.o(u,u,u,u,u,new A.a6(B.aU,B.b1,B.w,q,u,u),B.m),u,u,u,u,u,u,u,u),u,!1,!1,u,u)},
 chm(d){var w,v,u,t,s,r=this,q=null,p=r.d,o=D.dD(p==null?q:J.t(p,"state")),n=J.z(o.h(0,"brakePaused"),!0),m=J.z(o.h(0,"enabled"),!0)&&!n
 p=r.b3N(d,B.eD,new D.eJC(r))
 w=d.a
@@ -2022,7 +2022,7 @@ n.E(new A.bA())
 $.T()
 w=A.L()
 p=this.c
-w.san(new A.a6(B.aV,B.b1,B.w,A.a([p.j(0.25),p.j(0)],x.O),m,m).az(0,new A.a5(0,0,0+l,0+r)))
+w.san(new A.a6(B.aU,B.b1,B.w,A.a([p.j(0.25),p.j(0)],x.O),m,m).az(0,new A.a5(0,0,0+l,0+r)))
 d.af(n,w)
 w=A.L()
 w.r=p.gp(0)
@@ -2250,7 +2250,7 @@ r.push(a8.cKS(b7,u))
 r.push(a8.bFF(b7))
 r.push(a8.czi(b7,u))
 r.push(a8.wt(b7,A.A(A.a([C.c60,B.aa,A.E(A.c("No order is ever sent to Alpaca. Orders are disabled.",a9,a9,a9,a9,a9,a9,A.l(a9,a9,b6?C.bT:C.bV,a9,a9,a9,a9,a9,a9,a9,a9,11.5,a9,a9,a9,a9,1.3,!0,a9,a9,a9,a9,a9,a9,a9,a9),a9,a9,a9),1)],s),B.l,a9,B.e,B.h,0,a9,a9)))
-b6=r}b6=A.Gg(A.co(b6,a9,a9,C.aow,a9,a9,B.ah,!1),a9,a8.gchl())}return A.c6(a9,b9,A.p(a9,A.bo(!0,A.w(A.a([new A.C(B.he,v,a9),A.E(b6,1)],s),B.l,a9,B.e,B.h,0,B.p),!0,!1,B.ag,!0,!0),B.f,a9,a9,new A.o(a9,a9,a9,a9,a9,new A.a6(B.aV,B.b1,B.w,w,a9,a9),B.m),a9,a9,a9,a9,a9,a9,a9,a9),a9,!1,!1,a9,a9)},
+b6=r}b6=A.Gg(A.co(b6,a9,a9,C.aow,a9,a9,B.ah,!1),a9,a8.gchl())}return A.c6(a9,b9,A.p(a9,A.bo(!0,A.w(A.a([new A.C(B.he,v,a9),A.E(b6,1)],s),B.l,a9,B.e,B.h,0,B.p),!0,!1,B.ag,!0,!0),B.f,a9,a9,new A.o(a9,a9,a9,a9,a9,new A.a6(B.aU,B.b1,B.w,w,a9,a9),B.m),a9,a9,a9,a9,a9,a9,a9,a9),a9,!1,!1,a9,a9)},
 aB5(d,e){var w,v,u,t=this,s=null,r=J.z(e.h(0,"enabled"),!0)&&!J.z(e.h(0,"brakePaused"),!0),q=r?C.d5:C.cH
 q=A.bp(q,s,s,s,s,s,s,s,new A.b9(A.m(999),B.a1),s,s,s)
 w=t.r
@@ -2907,7 +2907,7 @@ if(m)m=g?B.c:C.n7
 else m=g?C.bT:C.bV
 s.push(new A.bu(1,B.b6,A.aA(h,A.cY(h,new A.c0(B.aK,B.bb,B.h,B.l,h,B.p,h,0,A.a([j,B.e0,new A.d0(1,B.c9,A.c(n.b,h,h,B.a2,h,h,h,new A.F(!0,m,h,h,h,h,12.5,B.C,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h),h,h,h),h)],u),h),h,h,B.aZ,new A.o(l,h,h,new A.bc(k,k,k,k),h,h,B.m),B.a3,h,h,h,h,B.x5,h,h,h),B.y,!1,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,new D.eKE(o,i),h,h,h,h,h,h,!1,B.a4),h))}g=A.p(h,A.A(s,B.l,h,B.e,B.h,0,h,h),B.f,h,h,new A.o(w,h,h,t,h,h,B.m),h,h,h,h,B.eC,h,h,h)
 w=i.gLt()
-return A.c6(h,e,A.p(h,A.bo(!0,A.w(A.a([new A.C(C.bGU,v,h),new A.C(B.aox,g,h),A.E(A.bb9(A.a([i.c7d(f),i.cEQ(f),i.bIh(f)],u),w,h),1)],u),B.l,h,B.e,B.h,0,B.p),!0,!1,B.ag,!0,!0),B.f,h,h,new A.o(h,h,h,h,h,new A.a6(B.aV,B.b1,B.w,d,h,h),B.m),h,h,h,h,h,h,h,h),h,!1,!1,h,h)},
+return A.c6(h,e,A.p(h,A.bo(!0,A.w(A.a([new A.C(C.bGU,v,h),new A.C(B.aox,g,h),A.E(A.bb9(A.a([i.c7d(f),i.cEQ(f),i.bIh(f)],u),w,h),1)],u),B.l,h,B.e,B.h,0,B.p),!0,!1,B.ag,!0,!0),B.f,h,h,new A.o(h,h,h,h,h,new A.a6(B.aU,B.b1,B.w,d,h,h),B.m),h,h,h,h,h,h,h,h),h,!1,!1,h,h)},
 a18(d,e,f){var w=null,v=d.a,u=v?B.c.j(0.92):C.ib,t=A.K(v?B.c:C.nf,B.r,1)
 return A.aE(!1,B.a3,!0,w,A.aM(!1,w,!0,A.p(w,A.V(e,v?C.cl:B.c,w,w,w,18),B.f,w,w,new A.o(w,w,t,w,w,w,B.a6),w,40,w,w,w,w,w,40),B.cM,!0,w,w,w,w,w,w,w,w,w,w,w,f,w,w,w,w,w,w,w),B.f,u,0,w,w,B.cM,w,w,B.ai)},
 c7d(d){var w,v=null,u=new A.X(C.Ep,new D.eK0(this),x.E).gJ(0),t=A.m(24),s=x.p
@@ -3370,7 +3370,7 @@ else j=j?C.bT:C.bV
 j=A.bp(j,k,k,k,k,k,B.cq,k,new A.b9(A.m(999),B.a1),k,k,k)
 o=!w||l.a.r?new D.dvN(l,d):k
 s.push(A.A(A.a([p,B.ar,A.E(A.de(B.Rl,k,A.c(!w||l.a.r?"Finish lesson":r+l.e.length+" right",k,k,k,k,k,k,B.ch,k,k,k),o,j),1)],q),B.l,k,B.e,B.h,0,k,k))
-return A.c6(k,g,A.p(k,A.bo(!0,A.co(s,k,k,C.bIm,k,k,B.ah,!1),!0,!1,B.ag,!0,!0),B.f,k,k,new A.o(k,k,k,k,k,new A.a6(B.aV,B.b1,B.w,t,k,k),B.m),k,k,k,k,k,k,k,k),k,!1,!1,k,k)},
+return A.c6(k,g,A.p(k,A.bo(!0,A.co(s,k,k,C.bIm,k,k,B.ah,!1),!0,!1,B.ag,!0,!0),B.f,k,k,new A.o(k,k,k,k,k,new A.a6(B.aU,B.b1,B.w,t,k,k),B.m),k,k,k,k,k,k,k,k),k,!1,!1,k,k)},
 cve(a8,a9,b0){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5=this,a6=null,a7=a5.d
 a7===$&&A.d()
 w=a7[b0]
@@ -4741,8 +4741,8 @@ C.f72=new A.y("How to read them","Fast line ABOVE slow line: recent prices are h
 C.dtC=w([C.ffx,C.eUN,C.eWp,C.f72],x.L)
 C.dJi=w(["45 minutes","1 day","1 week"],x.s)
 C.b42=new D.cH("The pink fast line averages about...",C.dJi,0,"9 candles x 5 minutes = 45 minutes.")
-C.dEO=w(["Trend is up","Trend is down","Market closed"],x.s)
-C.b3W=new D.cH("Fast line above slow line means...",C.dEO,0,"Recent prices are higher than older prices.")
+C.dEP=w(["Trend is up","Trend is down","Market closed"],x.s)
+C.b3W=new D.cH("Fast line above slow line means...",C.dEP,0,"Recent prices are higher than older prices.")
 C.dpk=w([C.b42,C.b3W],x.r)
 C.hSn=new D.uy("ma","Moving averages","The pink fast line and the purple slow line",6,B.xy,B.bE,"ma",C.dtC,C.dpk)
 C.fbL=new A.y("Buy signal","When the fast line crosses UP through the slow line, the short-term trend has just turned up. That moment is the buy signal. The agent buys at that point ($100 of the stock or coin), but only if the big trend is rising too. It watches the 10 stocks on weekdays and the 15 liquid crypto majors around the clock, all at the same time, and buys whichever gives a valid entry first.")
@@ -4805,8 +4805,8 @@ C.eYn=new A.y("Keep a journal","For each trade write: why you bought, where your
 C.eUG=new A.y("Follow the rules exactly","The point of the agent is to follow rules perfectly, with no fear and no greed. Check that it did. If it ever breaks a rule, that is a bug to fix before real money.")
 C.f18=new A.y("Before real money","Real money comes only after a long paper test with a positive result, a full review, and money you can truly afford to lose. Never borrow to trade.")
 C.dyH=w([C.f8Y,C.eYn,C.eUG,C.f18],x.L)
-C.dFJ=w(["1","3","20 or more"],x.s)
-C.b3L=new D.cH("How many trades before judging a method?",C.dFJ,2,"Small samples are mostly luck.")
+C.dFK=w(["1","3","20 or more"],x.s)
+C.b3L=new D.cH("How many trades before judging a method?",C.dFK,2,"Small samples are mostly luck.")
 C.dII=w(["Borrowed","Money you can afford to lose","Rent money"],x.s)
 C.b3T=new D.cH("Money for trading should be...",C.dII,1,"Never trade money you need.")
 C.dJ5=w([C.b3L,C.b3T],x.r)
@@ -4818,10 +4818,10 @@ C.dcr=w(["A $4 profit","A $4 loss","Nothing"],x.s)
 C.hWq=new D.cH("You buy at $100 and sell at $96. What happened?",C.dcr,1,"Selling lower than you bought is a loss.")
 C.dvP=w(["The future price","How the price moved over time","Who is buying"],x.s)
 C.hWo=new D.cH("What does a price chart show?",C.dvP,1,"A chart is a record of past prices.")
-C.dHo=w(["Yes, experts can","Yes, an AI can","No, nobody can"],x.s)
-C.hWw=new D.cH("Can anyone know for sure where a price goes next?",C.dHo,2,"Markets are uncertain; rules and stops manage that.")
-C.dG7=w(["Trading with real prices and practice money","Trading newspapers","Trading on paper forms"],x.s)
-C.hYd=new D.cH("What is paper trading?",C.dG7,0,"Real prices, fake dollars: practice without risk.")
+C.dHp=w(["Yes, experts can","Yes, an AI can","No, nobody can"],x.s)
+C.hWw=new D.cH("Can anyone know for sure where a price goes next?",C.dHp,2,"Markets are uncertain; rules and stops manage that.")
+C.dG8=w(["Trading with real prices and practice money","Trading newspapers","Trading on paper forms"],x.s)
+C.hYd=new D.cH("What is paper trading?",C.dG8,0,"Real prices, fake dollars: practice without risk.")
 C.du8=w(["It is faster","To learn without risking real money","Practice money earns more"],x.s)
 C.hY8=new D.cH("Why practise first?",C.du8,1,"Mistakes cost nothing while you learn.")
 C.cte=w(["Rise","Fall","Stay frozen"],x.s)
@@ -4832,8 +4832,8 @@ C.cfn=w(["$45","$55","$60"],x.s)
 C.hXs=new D.cH("You buy $50 of something and it rises 10%. It is now worth...",C.cfn,1,"10% of $50 is $5, so $55.")
 C.cYL=w(["Buy","Sell","Look at the chart"],x.s)
 C.hWO=new D.cH("A trade is only finished when you...",C.cYL,1,"Until you sell, a gain or loss is not locked in.")
-C.dGC=w(["Good traders never lose","Every trader has losing trades","Losses only happen to beginners"],x.s)
-C.hWJ=new D.cH("Which is true about losses?",C.dGC,1,"Losing trades are normal; keeping them small is the skill.")
+C.dGD=w(["Good traders never lose","Every trader has losing trades","Losses only happen to beginners"],x.s)
+C.hWJ=new D.cH("Which is true about losses?",C.dGD,1,"Losing trades are normal; keeping them small is the skill.")
 C.cRD=w(["Real dollars are spent","No real money is at risk","It trades in secret"],x.s)
 C.hXA=new D.cH("The agent uses Alpaca paper money. That means...",C.cRD,1,"Paper accounts use fake dollars.")
 C.drp=w(["The government","Buyers and sellers agreeing","The app makers"],x.s)
@@ -4916,8 +4916,8 @@ C.hY6=new D.cH("When the two lines are tangled together, the market is often..."
 C.dC1=w([C.b42,C.b3W,C.hXV,C.hXX,C.hXh,C.hXj,C.hX5,C.hWs,C.hXD,C.hWI,C.hXK,C.hXY,C.hX6,C.hY6],x.r)
 C.dhE=w(["Crosses below the slow line","Crosses above the slow line","Touches the price"],x.s)
 C.hWm=new D.cH("The sell signal is when the fast line...",C.dhE,0,"Crossing down = the up move is over.")
-C.dHl=w(["About $100","$5,000","All the money"],x.s)
-C.hYe=new D.cH("How much does the agent put into one trade?",C.dHl,0,"Every trade is $100 of the stock (weekdays) or coin (weekends) itself.")
+C.dHm=w(["About $100","$5,000","All the money"],x.s)
+C.hYe=new D.cH("How much does the agent put into one trade?",C.dHm,0,"Every trade is $100 of the stock (weekdays) or coin (weekends) itself.")
 C.dBV=w(["A fresh signal","An old signal","Not a signal at all ever"],x.s)
 C.hXP=new D.cH("A cross that happened an hour ago is...",C.dBV,1,"Fresh means since the last check.")
 C.cto=w(["Sideways markets","Strong trends","Closed markets"],x.s)
@@ -5013,14 +5013,14 @@ C.dAM=w(["The next day","Never","Every minute"],x.s)
 C.hXx=new D.cH("The daily stop resets...",C.dAM,0,"A new Eastern Time day starts fresh.")
 C.dnA=w(["Can lose everything on a bad day","Always wins","Pays no fees"],x.s)
 C.hWC=new D.cH("A trader with no loss limits...",C.dnA,0,"Limits are the safety net.")
-C.dHc=w(["Pause","Trade faster","Bet bigger"],x.s)
-C.hWr=new D.cH("Feeling angry after a loss is a sign to...",C.dHc,0,"Emotions lead to bad trades.")
+C.dHd=w(["Pause","Trade faster","Bet bigger"],x.s)
+C.hWr=new D.cH("Feeling angry after a loss is a sign to...",C.dHd,0,"Emotions lead to bad trades.")
 C.d9O=w([C.b3R,C.hXi,C.hWR,C.hXe,C.hWz,C.hXS,C.hWu,C.hX3,C.hXw,C.hXq,C.hX_,C.hXx,C.hWC,C.hWr],x.r)
 C.dbH=w(["9:30 AM to 4:00 PM Eastern","24 hours","8 PM to midnight"],x.s)
 C.hWK=new D.cH("US stock market hours are...",C.dbH,0,"On market days only.")
 C.hWD=new D.cH("Is the US stock market open on Saturday?",S.a7t,1,"Weekends are closed.")
-C.dGM=w(["A jump between the close and the next open","A break in the chart software","A holiday"],x.s)
-C.hXo=new D.cH("An overnight gap is...",C.dGM,0,"News while closed moves the next open.")
+C.dGN=w(["A jump between the close and the next open","A break in the chart software","A holiday"],x.s)
+C.hXo=new D.cH("An overnight gap is...",C.dGN,0,"News while closed moves the next open.")
 C.d2h=w(["Faster and harder","Slower","Exactly the same"],x.s)
 C.hX0=new D.cH("Crypto compared with SPY usually moves...",C.d2h,0,"Crypto is more jumpy.")
 C.dvM=w(["The 500 biggest US companies","One company","Bitcoin"],x.s)
@@ -5061,8 +5061,8 @@ C.cUH=w(["+$100","-$100","$0"],x.s)
 C.hYc=new D.cH("After 10 trades you have 6 wins at +$50 and 4 losses at -$50. Total?",C.cUH,0,"6 x 50 = 300; 4 x 50 = 200; 300 - 200 = +100.")
 C.cZ6=w(["Review the trades calmly","Quit forever without looking","Double the size"],x.s)
 C.hWM=new D.cH("A losing week means you should...",C.cZ6,0,"Reviews find what to fix.")
-C.dFs=w(["Patient and disciplined","Lucky","Fast clickers"],x.s)
-C.hWT=new D.cH("The best traders are mostly...",C.dFs,0,"Patience and rules win over time.")
+C.dFt=w(["Patient and disciplined","Lucky","Fast clickers"],x.s)
+C.hWT=new D.cH("The best traders are mostly...",C.dFt,0,"Patience and rules win over time.")
 C.djk=w([C.b3L,C.b3T,C.hWN,C.hXa,C.hWv,C.hWF,C.hYa,C.hXH,C.hXB,C.hXI,C.hWZ,C.hYc,C.hWM,C.hWT],x.r)
 C.dMs=new A.bn(C.eyE,[C.dCi,C.dzf,C.d9r,C.dC1,C.dI8,C.dlX,C.ddF,C.d9O,C.ds0,C.djk],A.as("bn<n,ai<cH>>"))
 C.eAG={EUR:0,USD:1,GBP:2,JPY:3,CAD:4,AUD:5,NZD:6,CHF:7,TRY:8,NOK:9,THB:10}
@@ -5160,4 +5160,4 @@ $.ahz=!1
 $.hnH=""
 $.aMs=0
 $.fqH=0})()};
-(a=>{a["1E7XGAiKN6CNCtbLFGRmUx0f2F8="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["7dY2gDQPsJpgUbtApBWE8PIzDfg="]=a.current})($__dart_deferred_initializers__);

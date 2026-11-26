@@ -6623,7 +6623,7 @@ q=r.a.as
 l.push(new B.d6(C.c_,C.z,C.f,new B.a4(q.a,q.b,new B.AX(r,p),p),p))}else l.push(B.p(p,D.bgO,C.f,C.ax,p,p,p,p,p,p,p,p,p,p))
 l.push(B.ao(28,B.w(B.a([B.c(v,p,p,p,p,p,p,C.fT,p,p,p),C.aj,B.c(w,p,3,C.a2,p,p,p,C.Xq,p,p,p)],m),C.B,p,C.e,C.h,0,C.p),p,p,14,72,p,p))
 r=s?C.hQ:C.Iw
-q=s?D.blg:C.c
+q=s?D.blf:C.c
 l.push(B.ao(80,B.w(B.a([new A.ah1(r,""+u,q,new A.eHy(n,o),p),C.bx,new A.ah1(C.DE,"24",C.c,new A.eHz(n),p),C.bx,new A.ah1(C.IO,"Share",C.c,new A.eHA(n),p)],m),C.l,p,C.e,C.h,0,C.p),p,p,p,10,p,p))
 return new B.am(C.a0,p,C.b4,C.t,l,p)},
 $S:490}
@@ -6933,7 +6933,7 @@ D.bem=new A.b_a()
 D.bf3=new A.cHa()
 D.c2V=new B.ae(C.tW,72,C.bX,null,null,null)
 D.bgO=new B.cn(C.z,null,null,D.c2V,null)
-D.blg=new B.u(1,0.996078431372549,0.17254901960784313,0.3333333333333333,C.q)
+D.blf=new B.u(1,0.996078431372549,0.17254901960784313,0.3333333333333333,C.q)
 D.bB2=new B.i3(C.ax,!0,C.l2,null)
 D.c64=new B.ae(C.a4b,48,null,null,null,null)
 D.hd6=new B.D("Add video URL in widget settings",null,null,null,null,null,null,null,null,null,null,null)
@@ -7021,8 +7021,8 @@ D.c4h=new B.ae(C.kn,null,C.aW,null,null,null)
 D.fL2=new B.F(!0,C.b5,null,null,null,null,null,C.C,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.hcg=new B.D("Workout complete! Great job!",null,D.fL2,null,null,null,null,null,null,null,null,null)
 D.bNC=new B.bu(1,C.b6,D.hcg,null)
-D.dFz=w([D.c4h,C.aa,D.bNC],x.p)
-D.fsZ=new B.c0(C.aK,C.e,C.h,C.l,null,C.p,null,0,D.dFz,null)
+D.dFA=w([D.c4h,C.aa,D.bNC],x.p)
+D.fsZ=new B.c0(C.aK,C.e,C.h,C.l,null,C.p,null,0,D.dFA,null)
 D.aWo=new B.av(-1/0,-1/0)
 D.fIf=new B.F(!0,null,null,null,null,null,15,null,null,null,null,null,1.45,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.fJX=new B.F(!0,null,null,null,null,null,28,C.u,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
@@ -7056,4 +7056,4 @@ w($,"iLb","hUE",()=>C.i.cG(B.aiY($.hgH())/B.aiY(10)))
 w($,"iPj","huW",()=>B.aiY(10))
 w($,"iPk","hWV",()=>B.aiY(10))
 w($,"iOS","hWC",()=>B.ag("---HTML:([A-Za-z0-9_\\-]+)---\\s*([\\s\\S]*?)\\s*---END_HTML---",!0,!1,!1,!1))})()};
-(a=>{a["FLRX+BEULWhyETFj2tI/blyxls8="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["3uFrb/91Wtn1F8YWoPyfNuNTMdo="]=a.current})($__dart_deferred_initializers__);

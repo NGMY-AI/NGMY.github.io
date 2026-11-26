@@ -62,7 +62,7 @@ o=B.v(J.t(q,"id"))
 if(!$.qU().am(0,p)||J.eF(s,o)||J.ad(t)>=8)continue
 J.c8(s,o)
 n=B.S(a5,a8)
-for(a9=0;a9<4;++a9){m=D.dHg[a9]
+for(a9=0;a9<4;++a9){m=D.dHh[a9]
 l=J.t(q,m)
 if(typeof l=="number")J.aL(n,m,l)}k=A.i.D(typeof J.t(q,"x")=="number"?B.dJ(J.t(q,"x")):0.2+A.i.F(r,3)*0.3,0.16,0.84)
 j=A.i.D(typeof J.t(q,"y")=="number"?B.dJ(J.t(q,"y")):0.25+A.i.ao(r,3)*0.3,0.1,0.9)
@@ -106,7 +106,7 @@ q=B.a([],w)
 p=t.b
 if(p==="battery")q.push(B.v(t.e)+" V")
 if(p==="resistor")q.push(""+A.i.S(t.r)+" ohms")
-if(A.d.q(D.dFj,p))q.push("level "+A.i.S(t.f*100)+"%")
+if(A.d.q(D.dFk,p))q.push("level "+A.i.S(t.f*100)+"%")
 if(p==="switch")q.push(t.w?"closed":"open")
 if(t.x)o="BURNT OUT"
 else{p=t.fx
@@ -227,7 +227,7 @@ this.b=e},
 bEK(d,e,f){var w=null
 return B.w(B.a([B.c(d,w,w,w,w,w,w,D.fKW,w,w,w),B.c(e,w,w,w,w,w,w,B.l(w,w,f,w,w,w,w,w,w,w,w,18,w,w,A.u,w,w,!0,w,w,w,w,w,w,w,w),w,w,w)],x.p),A.l,w,A.e,A.P,0,A.p)},
 hLI(d,e,f,g){var w=null,v=B.m(24),u=B.K(f.j(0.6),A.r,1)
-return B.at(B.p(w,B.w(B.a([B.c(d,w,w,w,w,w,w,B.l(w,w,f,w,w,w,w,w,w,w,w,22,w,w,A.u,w,w,!0,w,w,w,w,w,w,w,w),A.K,w,w),A.aj,B.c(e,w,w,w,w,w,w,A.BF,A.K,w,w),A.aB,B.c_(A.fX,g,A.br,w,0,8)],x.p),A.l,w,A.e,A.P,0,A.p),A.f,w,w,new B.o(D.bkT,w,u,v,w,w,A.m),w,w,w,w,A.ae,w,w,w),w,w,w)},
+return B.at(B.p(w,B.w(B.a([B.c(d,w,w,w,w,w,w,B.l(w,w,f,w,w,w,w,w,w,w,w,22,w,w,A.u,w,w,!0,w,w,w,w,w,w,w,w),A.K,w,w),A.aj,B.c(e,w,w,w,w,w,w,A.BF,A.K,w,w),A.aB,B.c_(A.fX,g,A.br,w,0,8)],x.p),A.l,w,A.e,A.P,0,A.p),A.f,w,w,new B.o(D.bkS,w,u,v,w,w,A.m),w,w,w,w,A.ae,w,w,w),w,w,w)},
 Hi:function Hi(d,e,f,g){var _=this
 _.a=d
 _.b=e
@@ -2056,7 +2056,7 @@ a4.E(new B.ck(0,-30,16,-2))
 a4.E(new B.aq(16,12))
 a4.E(new B.bA())
 b8=B.L()
-b8.r=B.ap(A.ez,D.bmC,a3).gp(0)
+b8.r=B.ap(A.ez,D.bmB,a3).gp(0)
 b9.af(a4,b8)
 b8=B.L()
 b8.b=A.ad
@@ -3101,7 +3101,7 @@ A.d.u(v,B.a([A.bc,B.aA(r,B.p(r,D.c_F,A.f,r,r,new B.o(u,r,B.K(A.aT,A.r,1),t,r,r,A
 C.blv.prototype={
 a4(a0,a1){var w,v,u,t,s,r,q,p,o,n=null,m=this.b,l=D.u3[m.d],k=a1.a,j=a1.b,i=0+k,h=0+j,g=$.T(),f=B.L(),e=l.c,d=B.ap(I.a0N,e,0.25)
 d.toString
-f.san(new B.a6(A.aV,A.b1,A.w,B.a([F.ajr,d],x.O),n,n).az(0,new B.a5(0,0,i,h)))
+f.san(new B.a6(A.aU,A.b1,A.w,B.a([F.ajr,d],x.O),n,n).az(0,new B.a5(0,0,i,h)))
 a0.aE(new B.a5(0,0,i,h),f)
 w=new B.e4()
 w.cV(5)
@@ -3374,7 +3374,7 @@ p=i.as
 if((p==null?h:p.b!=null)===!0){p=p.b
 q.push(p==null?A.bK:B.C9(h,A.ql,p))}p=i.ax
 o=p?0:1
-q.push(new B.dp(p,B.xM(B.p(A.z,B.w(D.dEK,A.l,h,A.e,A.P,0,A.p),A.f,h,h,D.ba8,h,h,D.hLD,h,h,h,h,h),A.aZ,A.nk,o),h))
+q.push(new B.dp(p,B.xM(B.p(A.z,B.w(D.dEL,A.l,h,A.e,A.P,0,A.p),A.f,h,h,D.ba8,h,h,D.hLD,h,h,h,h,h),A.aZ,A.nk,o),h))
 q=B.w(B.a([B.E(new B.am(A.a0,h,A.b4,A.t,q,h),1),new B.C(F.anI,i.c59(g,f),h)],v),A.l,h,A.e,A.h,0,A.p)
 p=B.a([],v)
 for(s=0;s<5;++s){n=D.dlg[s]
@@ -3786,7 +3786,7 @@ p=B.ap(o,A.c,0.1+n)
 p.toString
 m=B.ap(o,A.v,u?0.2:0.45)
 m.toString
-q.san(new B.a6(A.aV,A.b1,A.w,B.a([p,m],x.O),g,g).az(0,t))
+q.san(new B.a6(A.aU,A.b1,A.w,B.a([p,m],x.O),g,g).az(0,t))
 d.aq(s,q)
 q=B.L()
 q.b=A.ad
@@ -3933,7 +3933,7 @@ i=B.ap(A.d.gal(i),A.v,0.45)
 i.toString
 m=x.O
 l=x.p
-m=B.a([B.bT(0,new B.bP(new B.o(j,j,j,j,j,new B.a6(A.aw,A.aD,A.w,B.a([p,o,n,i],m),D.dFO,j),A.m),A.bm,j,j),0,0,0),B.ao(j,new B.bP(new B.o(j,j,j,j,j,new B.a6(A.aV,A.b1,A.w,B.a([A.c.j(0.28),A.c.j(0)],m),j,j),A.m),A.bm,j,j),v*0.52,j,0,0,0,j)],l)
+m=B.a([B.bT(0,new B.bP(new B.o(j,j,j,j,j,new B.a6(A.aw,A.aD,A.w,B.a([p,o,n,i],m),D.dFP,j),A.m),A.bm,j,j),0,0,0),B.ao(j,new B.bP(new B.o(j,j,j,j,j,new B.a6(A.aU,A.b1,A.w,B.a([A.c.j(0.28),A.c.j(0)],m),j,j),A.m),A.bm,j,j),v*0.52,j,0,0,0,j)],l)
 i=k.z
 if(i>=0)m.push(B.bT(0,B.b4(j,j,j,new C.bx_(i,j),A.aA),0,0,0))
 i=A.c.j(0.16)
@@ -3968,7 +3968,7 @@ d.aE(t,s)
 u.restore()},
 aD(d){return d.b!==this.b}}
 C.bwv.prototype={
-B(d){var w=null,v=B.m(22),u=B.a([D.btC,D.ak3],x.O),t=this.e,s=B.K(A.d.gG(t).j(0.4),A.r,1.2),r=B.a([new B.aa(0,A.H,A.v.j(0.5),A.kx,24)],x.V),q=B.m(22),p=A.d.gG(t)
+B(d){var w=null,v=B.m(22),u=B.a([D.btB,D.ak3],x.O),t=this.e,s=B.K(A.d.gG(t).j(0.4),A.r,1.2),r=B.a([new B.aa(0,A.H,A.v.j(0.5),A.kx,24)],x.V),q=B.m(22),p=A.d.gG(t)
 return new B.a4(this.c,this.d,new B.bP(new B.o(w,w,s,v,r,new B.a6(A.aw,A.aD,A.w,u,w,w),A.m),A.bm,B.bv(q,B.b4(B.at(B.V(A.j8,A.d.gG(t).j(0.7),w,w,w,34),w,w,w),w,w,new C.be5(p,w),A.aA),A.ap),w),w)}}
 C.be5.prototype={
 a4(d,e){var w,v,u,t,s,r
@@ -4197,7 +4197,7 @@ if(i){i=D.ol[r]
 h=i+0.1
 h=A.i.D((a0-h)/(i+0.3-h),0,1)
 i=h}else i=-1
-e.push(new B.cR(0,r*118,0,f,f,f,new B.kZ(q,new B.jc(n,f,A.aV,!0,f,new C.RK(a2,112,w,l,k,j,o,m*s,i,f),f),f),f))}for(r=1;r<3;++r){v=D.ol[r]
+e.push(new B.cR(0,r*118,0,f,f,f,new B.kZ(q,new B.jc(n,f,A.aU,!0,f,new C.RK(a2,112,w,l,k,j,o,m*s,i,f),f),f),f))}for(r=1;r<3;++r){v=D.ol[r]
 u=v-0.02
 g=A.i.D((a0-u)/(v+0.1-u),0,1)
 u=A.d.gG(w)
@@ -4406,7 +4406,7 @@ $.T()
 c9=B.L()
 w=c0.b
 v=x.O
-c9.san(new B.a6(A.aV,A.b1,A.w,B.a([A.d.gG(w).j(0.18),A.L],v),c1,c1).az(0,d0))
+c9.san(new B.a6(A.aU,A.b1,A.w,B.a([A.d.gG(w).j(0.18),A.L],v),c1,c1).az(0,d0))
 d1.aE(d0,c9)
 c9=B.L()
 c9.r=A.c.j(0.18).gp(0)
@@ -4428,7 +4428,7 @@ a4=new B.a5(d,a3,a1,a3+a0)
 a5=new B.ar(A.U,A.R,A.X,A.Y,A.W)
 a6=B.ap(A.d.gG(w),A.c,0.1)
 a6.toString
-a5.san(new B.a6(A.aV,A.b1,A.w,B.a([a6,A.d.gal(w)],v),c1,c1).az(0,a4))
+a5.san(new B.a6(A.aU,A.b1,A.w,B.a([a6,A.d.gal(w)],v),c1,c1).az(0,a4))
 d1.aE(a4,a5)
 a2=a2.r
 a5=B.a([],o)
@@ -4508,7 +4508,7 @@ J.bs(g.save())
 g.clipRect(B.hS(a4),$.lF()[1],!0)
 $.T()
 a2=new B.ar(A.U,A.R,A.X,A.Y,A.W)
-a2.san(new B.a6(A.aV,A.b1,A.w,B.a([A.L,A.c.j(0.4),A.L],v),c1,c1).az(0,b9))
+a2.san(new B.a6(A.aU,A.b1,A.w,B.a([A.L,A.c.j(0.4),A.L],v),c1,c1).az(0,b9))
 d1.aE(b9,a2)
 g.restore()}}},
 aD(d){return!0}}
@@ -5030,7 +5030,7 @@ w=B.m(14)
 v=r.d
 u=B.a([v.j(0.32),v.j(0.1)],x.O)
 t=B.K(v.j(0.5),A.r,1)
-return new B.C(A.fa,B.aA(s,B.p(s,B.w(B.a([B.V(r.b,v,s,s,s,22),A.cQ,B.c(r.a,s,1,A.a2,s,s,s,D.aYX,s,s,s)],x.p),A.l,s,A.e,A.P,0,A.p),A.f,s,s,new B.o(s,s,t,w,s,new B.a6(A.aV,A.b1,A.w,u,s,s),A.m),s,s,s,s,A.hA,s,s,62),A.y,!1,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,new C.eEk(this,d),s,s,s,s,s,s,!1,A.a4),s)}}
+return new B.C(A.fa,B.aA(s,B.p(s,B.w(B.a([B.V(r.b,v,s,s,s,22),A.cQ,B.c(r.a,s,1,A.a2,s,s,s,D.aYX,s,s,s)],x.p),A.l,s,A.e,A.P,0,A.p),A.f,s,s,new B.o(s,s,t,w,s,new B.a6(A.aU,A.b1,A.w,u,s,s),A.m),s,s,s,s,A.hA,s,s,62),A.y,!1,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,s,new C.eEk(this,d),s,s,s,s,s,s,!1,A.a4),s)}}
 C.blt.prototype={
 a4(b7,b8){var w,v,u,t,s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2=this,b3=null,b4=b2.b,b5=b4.ax,b6=b7.c
 J.bs(b6.save())
@@ -5195,7 +5195,7 @@ s=B.ap(q,A.c,0.18+0.4*v)
 s.toString
 p=B.ap(q,A.v,0.35)
 p.toString
-r.san(new B.a6(A.aV,A.b1,A.w,B.a([s,p],x.O),j,j).az(0,u))
+r.san(new B.a6(A.aU,A.b1,A.w,B.a([s,p],x.O),j,j).az(0,u))
 d.aq(t,r)
 r=B.L()
 r.b=A.ad
@@ -5864,7 +5864,7 @@ d.O(f.a,2.6,j);++k}}},
 a_H(d,e,f,g){var w,v,u,t
 $.T()
 w=B.L()
-v=g?A.aV:A.a5
+v=g?A.aU:A.a5
 u=g?A.b1:A.a9
 t=B.ap(e,A.v,0.3)
 t.toString
@@ -5908,7 +5908,7 @@ c0.aq(r,b2.a_H(new B.a5(r.a,r.b,r.c,r.d),A.d0,A.bP,!1))
 b8=B.L()
 w=B.ap(D.boE,A.dh,0.25+0.55*c1.f)
 w.toString
-v=B.ap(D.bys,A.m_,0.3+0.4*c1.f)
+v=B.ap(D.byt,A.m_,0.3+0.4*c1.f)
 v.toString
 b8.san(new B.a6(A.aw,A.aD,A.w,B.a([w,v],x.O),b3,b3).az(0,D.abt))
 c0.aE(D.abt,b8)
@@ -6248,7 +6248,7 @@ if(b8>0.1){$.T()
 w=B.L()
 w.b=A.ad
 w.c=10
-w.r=D.bqy.j(0.5*b8).gp(0)
+w.r=D.bqz.j(0.5*b8).gp(0)
 w.y=A.ld
 c0.af(a9,w)}$.T()
 b8=B.L()
@@ -6360,7 +6360,7 @@ v=new B.a5(i,m,k,n)
 u=k-i
 t=i+u*0.66
 s=B.L()
-s.san(o.$2(v,D.dHk))
+s.san(o.$2(v,D.dHl))
 d.aE(new B.a5(i,m,t,n),s)
 s=B.L()
 s.san(o.$2(v,D.dgM))
@@ -6759,7 +6759,7 @@ if(e.a.c.rB(a2))v=a2.dx
 else{e.a.toString
 v=a0==="regulator"?5:a2.e}v=B.a([A.aj,B.c("Volts in: "+w+" V   \u2192   Volts out: "+A.i.a5(v,1)+" V",d,d,d,d,d,d,D.fQR,d,d,d)],k)
 if(a1){a1=B.a([],k)
-for(g=0;g<5;++g){f=D.dEd[g]
+for(g=0;g<5;++g){f=D.dEe[g]
 w=f===A.i.fJ(f)?A.i.S(f):f
 a1.push(new E.e3(B.v(w)+" V out",a2.e===f,new C.bMh(e,a2,f),d,r,d))}v.push(new B.C(A.kO,B.c_(A.bI,a1,A.br,d,0,6),d))}if(a0==="regulator")v.push(D.hfn)
 A.d.u(m,v)}if(e.a.c.MZ(a2)&&!a2.x){a1=A.i.a5(a2.cx,2)
@@ -7199,7 +7199,7 @@ a4(d,e){var w,v,u,t,s,r,q,p,o,n,m,l=null,k=e.a,j=k/2,i=e.b,h=i/2+10,g=new B.r(j,
 i=f+8
 k=$.T()
 w=B.L()
-w.r=D.bmf.gp(0)
+w.r=D.bme.gp(0)
 d.O(g,i,w)
 w=B.L()
 w.b=A.ad
@@ -8883,7 +8883,7 @@ C.bMZ.prototype={
 $2(d,e){return Math.max(d,e.Q)},
 $S:z+6}
 C.bMX.prototype={
-$2(d,e){return new B.a6(A.aV,A.b1,A.w,e,D.div,null).az(0,d)},
+$2(d,e){return new B.a6(A.aU,A.b1,A.w,e,D.div,null).az(0,d)},
 $S:1967}
 C.cwZ.prototype={
 $2(d,e){var w=this
@@ -8923,7 +8923,7 @@ C.h6r.prototype={
 $3(d,e,f){var w
 $.T()
 w=B.L()
-w.san(new B.a6(A.aV,A.b1,A.w,B.a([e,f],x.O),null,null).az(0,d))
+w.san(new B.a6(A.aU,A.b1,A.w,B.a([e,f],x.O),null,null).az(0,d))
 return w},
 $S:1971}
 C.bMA.prototype={
@@ -9047,7 +9047,7 @@ if(o.a.c.a.length===0)n.push(D.bg0)
 w=o.ay
 if(w!=null){v=B.m(14)
 u=B.K(A.cW,A.r,1)
-n.push(B.ao(p,B.aA(p,B.p(p,B.A(B.a([D.fXO,B.E(B.c(w,p,p,p,p,p,p,D.fPg,p,p,p),1)],q),A.B,p,A.e,A.h,0,p,p),A.f,p,p,new B.o(D.bm8,p,u,v,p,p,A.m),p,p,p,p,A.o5,p,p,p),A.y,!1,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,new C.bMR(o),p,p,p,p,p,p,!1,A.a4),p,p,10,10,8,p))}if(o.x!=null){o=B.A(B.a([D.bOa,new E.fJ(A.DG,"Cut wire",new C.bMS(o),A.c1,p)],q),A.l,p,A.e,A.h,0,p,p)
+n.push(B.ao(p,B.aA(p,B.p(p,B.A(B.a([D.fXO,B.E(B.c(w,p,p,p,p,p,p,D.fPg,p,p,p),1)],q),A.B,p,A.e,A.h,0,p,p),A.f,p,p,new B.o(D.bm7,p,u,v,p,p,A.m),p,p,p,p,A.o5,p,p,p),A.y,!1,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,new C.bMR(o),p,p,p,p,p,p,!1,A.a4),p,p,10,10,8,p))}if(o.x!=null){o=B.A(B.a([D.bOa,new E.fJ(A.DG,"Cut wire",new C.bMS(o),A.c1,p)],q),A.l,p,A.e,A.h,0,p,p)
 w=B.m(18)
 n.push(B.ao(8,B.p(p,o,A.f,p,p,new B.o(F.ZM,p,B.K(A.by,A.r,1),w,p,p,A.m),p,p,p,p,F.anY,p,p,p),p,p,12,12,p,p))}else{w=o.e
 if(w!=null&&A.d.q(o.a.c.a,w)){w=o.e
@@ -9613,7 +9613,7 @@ if(s)p.push(l.b_T(19))
 s=B.p(n,B.A(p,A.l,n,A.e,A.h,0,n,n),A.f,A.cx,n,n,n,26,n,n,A.fD,n,n,n)
 r=l.e
 r.toString
-j.push(B.bT(0,new B.C(new B.R(26,m,26,58),B.p(n,B.bv(t,B.w(B.a([s,B.E(l.aRd(r),1)],w),A.l,n,A.e,A.h,0,A.p),A.ap),A.f,n,n,new B.o(A.v,n,u,v,D.dEH,n,A.m),n,n,n,n,n,n,n,n),n),0,0,0))}m=A.c.j(0.16)
+j.push(B.bT(0,new B.C(new B.R(26,m,26,58),B.p(n,B.bv(t,B.w(B.a([s,B.E(l.aRd(r),1)],w),A.l,n,A.e,A.h,0,A.p),A.ap),A.f,n,n,new B.o(A.v,n,u,v,D.dEI,n,A.m),n,n,n,n,n,n,n,n),n),0,0,0))}m=A.c.j(0.16)
 v=B.m(18)
 u=B.K(A.aT,A.r,1)
 t=B.a([],w)
@@ -10162,9 +10162,9 @@ D.MX=new C.aW0(0,0.5,0)
 D.b8k=new B.ax(A.bf,1,A.r,-1)
 D.b9Q=new B.aX(16,1/0,16,1/0)
 D.ba0=new B.aX(0,1/0,0,210)
-D.bs8=new B.u(1,0.10588235294117647,0.12549019607843137,0.18823529411764706,A.q)
-D.dEV=w([D.bs8,Av.akW],x.O)
-D.eOJ=new B.bU(A.C_,1.1,A.w,null,0,D.dEV,null,null)
+D.bs7=new B.u(1,0.10588235294117647,0.12549019607843137,0.18823529411764706,A.q)
+D.dEW=w([D.bs7,Av.akW],x.O)
+D.eOJ=new B.bU(A.C_,1.1,A.w,null,0,D.dEW,null,null)
 D.ba8=new B.o(null,null,null,null,null,D.eOJ,A.m)
 D.bb5=new B.o(A.bk,null,null,null,null,null,A.a6)
 D.fIH=new B.F(!0,null,null,null,null,null,19,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
@@ -10179,24 +10179,24 @@ D.eHK=new B.C(A.HW,D.h12,null)
 D.bgJ=new B.cn(A.z,null,null,D.eHK,null)
 D.ahG=new B.u(1,0.054901960784313725,0.058823529411764705,0.0784313725490196,A.q)
 D.bkB=new B.u(1,1,0.16470588235294117,0.10196078431372549,A.q)
-D.bkT=new B.u(0.9333333333333333,0.09019607843137255,0.09019607843137255,0.10196078431372549,A.q)
-D.bm8=new B.u(0.9490196078431372,0.2627450980392157,0.0784313725490196,0.027450980392156862,A.q)
-D.bmf=new B.u(1,0.16470588235294117,0.16470588235294117,0.2,A.q)
-D.bmC=new B.u(1,1,0.4196078431372549,0.4196078431372549,A.q)
+D.bkS=new B.u(0.9333333333333333,0.09019607843137255,0.09019607843137255,0.10196078431372549,A.q)
+D.bm7=new B.u(0.9490196078431372,0.2627450980392157,0.0784313725490196,0.027450980392156862,A.q)
+D.bme=new B.u(1,0.16470588235294117,0.16470588235294117,0.2,A.q)
+D.bmB=new B.u(1,1,0.4196078431372549,0.4196078431372549,A.q)
 D.boE=new B.u(1,0.043137254901960784,0.10588235294117647,0.30196078431372547,A.q)
 D.bpO=new B.u(1,1,0.9686274509803922,0.8,A.q)
-D.bqy=new B.u(1,1,0.47843137254901963,0.09411764705882353,A.q)
+D.bqz=new B.u(1,1,0.47843137254901963,0.09411764705882353,A.q)
 D.ak3=new B.u(1,0.06666666666666667,0.06666666666666667,0.0784313725490196,A.q)
 D.brB=new B.u(1,1,0.5411764705882353,0.5411764705882353,A.q)
 D.akr=new B.u(1,0.043137254901960784,0.047058823529411764,0.06274509803921569,A.q)
 D.akz=new B.u(1,0.7137254901960784,0.7333333333333333,0.7607843137254902,A.q)
-D.btC=new B.u(1,0.14901960784313725,0.14901960784313725,0.16862745098039217,A.q)
+D.btB=new B.u(1,0.14901960784313725,0.14901960784313725,0.16862745098039217,A.q)
 D.al0=new B.u(1,0.08235294117647059,0.08235294117647059,0.09411764705882353,A.q)
 D.bvE=new B.u(1,0.3568627450980392,0.16470588235294117,0.26666666666666666,A.q)
 D.bvM=new B.u(0.9490196078431372,0.09019607843137255,0.09019607843137255,0.10196078431372549,A.q)
 D.bwh=new B.u(1,0.24705882352941178,0.2901960784313726,0.22745098039215686,A.q)
 D.wV=new B.u(1,0.0196078431372549,0.027450980392156862,0.0392156862745098,A.q)
-D.bys=new B.u(1,0.0196078431372549,0.043137254901960784,0.1411764705882353,A.q)
+D.byt=new B.u(1,0.0196078431372549,0.043137254901960784,0.1411764705882353,A.q)
 D.amy=new B.u(1,0.5411764705882353,0.5215686274509804,0.5019607843137255,A.q)
 D.bEl=new B.bh(11e6)
 D.bGe=new B.R(10,6,10,2)
@@ -10239,44 +10239,44 @@ D.c7I=new B.ae(A.eh,null,A.aQ,null,null,null)
 D.dCr=w([A.dl,A.dh,A.dl],x.O)
 D.avo=new B.a6(A.a5,A.a9,A.w,D.dCr,null,null)
 D.dbB=w([A.bP,A.bl],x.O)
-D.cbd=new B.a6(A.aV,A.b1,A.w,D.dbB,null,null)
-D.cbs=new B.a6(A.aV,A.b1,A.w,A.a7P,null,null)
+D.cbd=new B.a6(A.aU,A.b1,A.w,D.dbB,null,null)
+D.cbs=new B.a6(A.aU,A.b1,A.w,A.a7P,null,null)
 D.dxG=w([F.Np,A8.amI],x.O)
-D.ccc=new B.a6(A.aV,A.b1,A.w,D.dxG,null,null)
+D.ccc=new B.a6(A.aU,A.b1,A.w,D.dxG,null,null)
 D.d8U=w([A.pD,A.iI],x.O)
-D.cci=new B.a6(A.aV,A.b1,A.w,D.d8U,null,null)
+D.cci=new B.a6(A.aU,A.b1,A.w,D.d8U,null,null)
 D.dbj=w([A.cU,A.ax],x.O)
-D.avB=new B.a6(A.aV,A.b1,A.w,D.dbj,null,null)
+D.avB=new B.a6(A.aU,A.b1,A.w,D.dbj,null,null)
 D.dvz=w([A.d0,A.iL,A.bl],x.O)
 D.ccB=new B.a6(A.a5,A.a9,A.w,D.dvz,null,null)
 D.dHN=w([A.d0,A.bP,A.bl],x.O)
 D.ccM=new B.a6(A.a5,A.a9,A.w,D.dHN,null,null)
 D.dvF=w([A.cz,A.cx],x.O)
-D.avE=new B.a6(A.aV,A.b1,A.w,D.dvF,null,null)
+D.avE=new B.a6(A.aU,A.b1,A.w,D.dvF,null,null)
 D.aFC=w([A.cU,M.ni],x.O)
-D.cdc=new B.a6(A.aV,A.b1,A.w,D.aFC,null,null)
-D.cdu=new B.a6(A.aV,A.b1,A.w,X.avY,null,null)
+D.cdc=new B.a6(A.aU,A.b1,A.w,D.aFC,null,null)
+D.cdu=new B.a6(A.aU,A.b1,A.w,X.avY,null,null)
 D.cel=new B.a6(A.aw,A.aD,A.w,A.Te,null,null)
 D.bxc=new B.u(1,0.16470588235294117,0.16470588235294117,0.1803921568627451,A.q)
-D.bso=new B.u(1,0.0392156862745098,0.0392156862745098,0.043137254901960784,A.q)
-D.dl8=w([D.bxc,D.bso],x.O)
-D.cep=new B.a6(A.aV,A.b1,A.w,D.dl8,null,null)
-D.cez=new B.a6(A.aV,A.b1,A.w,H.aEU,null,null)
+D.bsn=new B.u(1,0.0392156862745098,0.0392156862745098,0.043137254901960784,A.q)
+D.dl8=w([D.bxc,D.bsn],x.O)
+D.cep=new B.a6(A.aU,A.b1,A.w,D.dl8,null,null)
+D.cez=new B.a6(A.aU,A.b1,A.w,H.aEU,null,null)
 D.amh=new B.u(1,0.043137254901960784,0.043137254901960784,0.047058823529411764,A.q)
 D.bwO=new B.u(1,0.22745098039215686,0.22745098039215686,0.23921568627450981,A.q)
-D.dEk=w([D.amh,D.bwO,D.amh],x.O)
-D.ceH=new B.a6(A.a5,A.a9,A.w,D.dEk,null,null)
+D.dEl=w([D.amh,D.bwO,D.amh],x.O)
+D.ceH=new B.a6(A.a5,A.a9,A.w,D.dEl,null,null)
 D.bwb=new B.u(1,0.788235294117647,0.6509803921568628,0.4196078431372549,A.q)
 D.bx5=new B.u(1,0.5450980392156862,0.4196078431372549,0.22745098039215686,A.q)
 D.cU8=w([A.Ox,D.bwb,D.bx5],x.O)
-D.ceL=new B.a6(A.aV,A.b1,A.w,D.cU8,null,null)
+D.ceL=new B.a6(A.aU,A.b1,A.w,D.cU8,null,null)
 D.cHi=w([A.de,A.j_],x.O)
-D.cf_=new B.a6(A.aV,A.b1,A.w,D.cHi,null,null)
+D.cf_=new B.a6(A.aU,A.b1,A.w,D.cHi,null,null)
 D.cUP=w([A.d0,A.hX,A.d0],x.O)
 D.cf7=new B.a6(A.a5,A.a9,A.w,D.cUP,null,null)
 D.bzV=new B.u(1,0.07058823529411765,0.0784313725490196,0.10196078431372549,A.q)
 D.cI4=w([F.ahO,D.bzV],x.O)
-D.cfd=new B.a6(A.aV,A.b1,A.w,D.cI4,null,null)
+D.cfd=new B.a6(A.aU,A.b1,A.w,D.cI4,null,null)
 D.cfS=w([0,4,7],x.t)
 D.cfT=w([0,4,7,12],x.t)
 D.cfU=w([0,4,7,4],x.t)
@@ -10294,10 +10294,10 @@ D.coW=w([1400,800,450,2400],x.t)
 D.cxu=w([250,450,900,1500],x.t)
 D.bjU=new B.u(1,0.9647058823529412,0.8274509803921568,0.7215686274509804,A.q)
 D.bwB=new B.u(1,0.8862745098039215,0.6823529411764706,0.5254901960784314,A.q)
-D.buh=new B.u(1,0.7450980392156863,0.5411764705882353,0.4,A.q)
+D.bug=new B.u(1,0.7450980392156863,0.5411764705882353,0.4,A.q)
 D.bAw=new B.u(1,0.5529411764705883,0.3568627450980392,0.24313725490196078,A.q)
-D.btp=new B.u(1,0.3686274509803922,0.23529411764705882,0.1568627450980392,A.q)
-D.aB5=w([D.bjU,D.bwB,D.buh,D.bAw,D.btp],x.O)
+D.bto=new B.u(1,0.3686274509803922,0.23529411764705882,0.1568627450980392,A.q)
+D.aB5=w([D.bjU,D.bwB,D.bug,D.bAw,D.bto],x.O)
 D.f8u=new B.y(-25,A.ax)
 D.eXC=new B.y(25,A.bC)
 D.cHo=w([D.f8u,D.eXC],B.as("N<+(H,u)>"))
@@ -10361,9 +10361,9 @@ D.dc7=w([D.L0,D.fp5,D.fp7],x.d)
 D.fnG=new B.b7(["b",0,"p",0])
 D.foi=new B.b7(["p",1,"m",0])
 D.fod=new B.b7(["m",1,"b",1])
-D.dED=w([D.fnG,D.foi,D.fod],x.o)
+D.dEE=w([D.fnG,D.foi,D.fod],x.o)
 D.dvs=w(["fan","motor","spin","dimmer"],x.s)
-D.ePq=new C.nb("Electric fan","Current through a motor turns its coil into a magnet that spins. A dimmer knob changes how fast.",D.dc7,D.dED,D.dvs)
+D.ePq=new C.nb("Electric fan","Current through a motor turns its coil into a magnet that spins. A dimmer knob changes how fast.",D.dc7,D.dEE,D.dvs)
 D.a8M=new B.bn(D.aak,[0.9],x.J)
 D.aUq=new B.e1(["s","solar",0.25,0.3,D.a8M])
 D.aUp=new B.e1(["l","bulb",0.75,0.3,A.jK])
@@ -10371,8 +10371,8 @@ D.dfg=w([D.aUq,D.aUp],x.d)
 D.foq=new B.b7(["s",0,"l",0])
 D.foa=new B.b7(["l",1,"s",1])
 D.dd1=w([D.foq,D.foa],x.o)
-D.dFo=w(["solar","sun","without battery","no battery","free"],x.s)
-D.ePt=new C.nb("Sun-powered lamp","A solar panel turns light into electricity with no battery at all. More light, brighter bulb.",D.dfg,D.dd1,D.dFo)
+D.dFp=w(["solar","sun","without battery","no battery","free"],x.s)
+D.ePt=new C.nb("Sun-powered lamp","A solar panel turns light into electricity with no battery at all. More light, brighter bulb.",D.dfg,D.dd1,D.dFp)
 D.fpW=new B.e1(["c","crank",0.25,0.3,D.a8M])
 D.dtv=w([D.fpW,D.aUp],x.d)
 D.fnK=new B.b7(["c",0,"l",0])
@@ -10392,12 +10392,12 @@ D.ePm=new C.nb("Wind-powered motor","The wind turns the blades, the blades turn 
 D.aLA=new B.bn(D.Ky,[9],x.J)
 D.abr=new B.e1(["b","battery",0.2,0.3,D.aLA])
 D.aUn=new B.e1(["r","radio",0.8,0.3,A.jK])
-D.dG1=w([D.abr,D.Fr,D.aUn],x.d)
+D.dG2=w([D.abr,D.Fr,D.aUn],x.d)
 D.fow=new B.b7(["s",1,"r",0])
 D.aUj=new B.b7(["r",1,"b",1])
 D.cfv=w([D.Fp,D.fow,D.aUj],x.o)
-D.dEo=w(["radio","music","listen"],x.s)
-D.ePy=new C.nb("Pocket radio","A 9 volt battery powers a radio. Radio waves in the air are caught by the aerial and turned into sound.",D.dG1,D.cfv,D.dEo)
+D.dEp=w(["radio","music","listen"],x.s)
+D.ePy=new C.nb("Pocket radio","A 9 volt battery powers a radio. Radio waves in the air are caught by the aerial and turned into sound.",D.dG2,D.cfv,D.dEp)
 D.dOB=new B.bn(D.Ky,[12],x.J)
 D.aUm=new B.e1(["b","battery",0.2,0.3,D.dOB])
 D.fpB=new B.e1(["t","tv",0.8,0.3,A.jK])
@@ -10405,8 +10405,8 @@ D.dbO=w([D.aUm,D.Fr,D.fpB],x.d)
 D.fox=new B.b7(["s",1,"t",0])
 D.aUk=new B.b7(["t",1,"b",1])
 D.dx9=w([D.Fp,D.fox,D.aUk],x.o)
-D.dG_=w(["tv","television","screen","watch"],x.s)
-D.ePj=new C.nb("Television","A TV needs more power than a torch. Twelve volts light up its screen of tiny coloured dots.",D.dbO,D.dx9,D.dG_)
+D.dG0=w(["tv","television","screen","watch"],x.s)
+D.ePj=new C.nb("Television","A TV needs more power than a torch. Twelve volts light up its screen of tiny coloured dots.",D.dbO,D.dx9,D.dG0)
 D.fpq=new B.e1(["z","buzzer",0.8,0.3,A.jK])
 D.cRk=w([D.L0,D.Fr,D.fpq],x.d)
 D.foy=new B.b7(["s",1,"z",0])
@@ -10445,8 +10445,8 @@ D.fnF=new B.b7(["b",0,"l1",0])
 D.fo6=new B.b7(["l1",1,"l2",0])
 D.fo7=new B.b7(["l2",1,"b",1])
 D.dnW=w([D.fnF,D.fo6,D.fo7],x.o)
-D.dFK=w(["series","two bulbs","dim"],x.s)
-D.ePn=new C.nb("Two bulbs in a row","Bulbs wired one after another share the push, so each one is dimmer. Add the second bulb and watch.",D.d9C,D.dnW,D.dFK)
+D.dFL=w(["series","two bulbs","dim"],x.s)
+D.ePn=new C.nb("Two bulbs in a row","Bulbs wired one after another share the push, so each one is dimmer. Add the second bulb and watch.",D.d9C,D.dnW,D.dFL)
 D.eB3={volts:0,charge:1}
 D.dOK=new B.bn(D.eB3,[1.5,0],x.J)
 D.fpM=new B.e1(["b","battery",0.75,0.3,D.dOK])
@@ -10576,11 +10576,11 @@ D.foG=new B.b7(["delay",0.4,0.45,0])
 D.fnw=new B.b7(["ripple",0.7,0.45,0])
 D.fn5=new B.b7(["delay",0.4,0.7,1])
 D.foj=new B.b7(["shake",0.75,0.75,0])
-D.dH0=w([D.fnU,D.flr,D.foG,D.fnw,D.fn5,D.foj],x.e)
+D.dH1=w([D.fnU,D.flr,D.foG,D.fnw,D.fn5,D.foj],x.e)
 D.eRt=new B.y(2,4)
 D.aTU=new B.y(4,5)
 D.djj=w([Q.lm,R.KZ,F.W1,D.eRt,D.aTU],x.u)
-D.hWg=new C.H3("Heartbeat","Two thumps, then a shake",D.dH0,D.djj)
+D.hWg=new C.H3("Heartbeat","Two thumps, then a shake",D.dH1,D.djj)
 D.fng=new B.b7(["dice",0.15,0.7,1])
 D.foM=new B.b7(["echo",0.4,0.7,0])
 D.fns=new B.b7(["comet",0.7,0.5,4])
@@ -10747,22 +10747,22 @@ D.ffU=new B.b1(D.b4x,"Pop",A.kn)
 D.dCH=w([D.fjB,D.fiv,D.fjZ,D.ffN,D.fg_,D.ffU],B.as("N<+(LA,n,a_)>"))
 D.aFl=w([A.c5,A.eH,A.bw,A.aH,A.bj,A.c1],x.O)
 D.dD7=w(["How does it work?","Why is it not working?","What is the most important part?"],x.s)
-D.dEd=w([3,4.5,5,6,9],x.n)
+D.dEe=w([3,4.5,5,6,9],x.n)
 D.bd3=new B.aa(0,A.H,A.b9,A.J,16)
-D.dEH=w([D.bd3],x.V)
+D.dEI=w([D.bd3],x.V)
 D.h9A=new B.D("\ud83e\uddcd",null,S.LR,null,null,null,null,null,null,null,null,null)
 D.cfh=new B.Ja(5,null,null,A.by,A.c5,null,null,null,null)
 D.fz2=new B.a4(150,null,D.cfh,null)
 D.fRx=new B.F(!0,A.ac,null,null,null,null,14,A.C,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.hcU=new B.D("Getting the body ready...",null,D.fRx,null,null,null,null,null,null,null,null,null)
 D.h9D=new B.D("Real 3D anatomy, kept on your phone",null,Af.BB,null,null,null,null,null,null,null,null,null)
-D.dEK=w([D.h9A,A.aB,D.fz2,A.af,D.hcU,A.at,D.h9D],x.p)
-D.dFj=w(["solar","turbine","crank","pot"],x.s)
-D.dFO=w([0,0.35,0.75,1],x.n)
-D.dHg=w(["volts","level","ohms","on"],x.s)
+D.dEL=w([D.h9A,A.aB,D.fz2,A.af,D.hcU,A.at,D.h9D],x.p)
+D.dFk=w(["solar","turbine","crank","pot"],x.s)
+D.dFP=w([0,0.35,0.75,1],x.n)
+D.dHh=w(["volts","level","ohms","on"],x.s)
 D.boP=new B.u(1,0.23137254901960785,0.43529411764705883,0.8470588235294118,A.q)
 D.bzZ=new B.u(1,0.0392156862745098,0.10196078431372549,0.25098039215686274,A.q)
-D.dHk=w([A.al_,D.boP,A.m_,D.bzZ],x.O)
+D.dHl=w([A.al_,D.boP,A.m_,D.bzZ],x.O)
 D.dIT=w([A.k0,A.Ag,A.A1,A.rp,A.E3,A.rs,A.Ae,A.mG,A.iw,A.og,A.fP,A.eh,A.hQ,A.ih,A.m5,A.kP,A.rr,A.q7,A.lG,A.Ip,A.vH,A.DJ,A.DH,A.R5,A.Io,A.DT,A.QH,A.aso,H.at8,A.kn],x.x)
 D.eyo={switch:0,clock:1,and:2,or:3,xor:4,nand:5,nor:6,not:7,led:8,buzzer:9}
 D.hO9=new C.yY("Switch",F.p4,A.bu,0,"Tap it to turn it ON or OFF.")
@@ -10792,8 +10792,8 @@ D.bAc=new B.u(1,0.6039215686274509,0.5843137254901961,0.5607843137254902,A.q)
 D.fts=new C.mm("iPhone Fold",D.Bo,D.bAc,A.b_)
 D.Bn=new C.Ky(2,"android")
 D.ftt=new C.mm("Samsung Galaxy S26 Ultra",D.Bn,F.Np,A.dh)
-D.bst=new B.u(1,0.23137254901960785,0.25098039215686274,0.2823529411764706,A.q)
-D.ftl=new C.mm("Samsung Galaxy Z Fold7",D.Bo,D.bst,A.cI)
+D.bss=new B.u(1,0.23137254901960785,0.25098039215686274,0.2823529411764706,A.q)
+D.ftl=new C.mm("Samsung Galaxy Z Fold7",D.Bo,D.bss,A.cI)
 D.fth=new C.mm("Google Pixel 10 Pro XL",D.Bn,A.d0,A.bk)
 D.ftp=new C.mm("Xiaomi 16 Ultra",D.Bn,A.iu,A.c8)
 D.ftk=new C.mm("Huawei Mate 80 Pro Max",D.Bn,A.eu,A.aC)
@@ -10829,8 +10829,8 @@ D.yB=new C.a2r(0,"source")
 D.djn=w(["every 1.4s","every 0.8s","every 0.45s","every 2.4s"],x.s)
 D.hUS=new C.qL("Clock",A.mF,D.yB,A.bw,D.djn)
 D.hUO=new C.qL("Button",A.DZ,D.yB,A.aQ,A.M)
-D.dEq=w(["random","quick","slow"],x.s)
-D.hUZ=new C.qL("Dice",A.oa,D.yB,A.c5,D.dEq)
+D.dEr=w(["random","quick","slow"],x.s)
+D.hUZ=new C.qL("Dice",A.oa,D.yB,A.c5,D.dEr)
 D.bVt=new B.a_(63484,"MaterialIcons",!1)
 D.Ga=new C.a2r(1,"logic")
 D.dJP=w(["0.25s","0.45s","0.9s","1.5s"],x.s)
@@ -11140,8 +11140,8 @@ D.eOA=new B.bU(A.z,0.5,A.w,null,0,D.dw8,null,null)
 D.eOB=new B.bU(A.z,0.5,A.w,null,0,D.aFC,null,null)
 D.dm1=w([A.c,A.bQ],x.O)
 D.eOD=new B.bU(A.z,0.5,A.w,null,0,D.dm1,null,null)
-D.dFA=w([A.bP,A.cz],x.O)
-D.aTJ=new B.bU(A.z,0.5,A.w,null,0,D.dFA,null,null)
+D.dFB=w([A.bP,A.cz],x.O)
+D.aTJ=new B.bU(A.z,0.5,A.w,null,0,D.dFB,null,null)
 D.cYD=w([A.c,A.bP],x.O)
 D.eOI=new B.bU(A.n_,0.5,A.w,null,0,D.cYD,null,null)
 D.bAg=new B.u(1,0.058823529411764705,0.043137254901960784,0.12156862745098039,A.q)
@@ -11154,8 +11154,8 @@ D.eOR=new B.bU(A.n_,0.5,A.w,null,0,D.d5I,null,null)
 D.dwT=w([A.cz,M.ni],x.O)
 D.eOS=new B.bU(A.n_,0.5,A.w,null,0,D.dwT,null,null)
 D.eOX=new B.bU(A.z,0.5,A.w,null,0,D.aBQ,null,null)
-D.dGv=w([A.cz,A.ip],x.O)
-D.eP4=new B.bU(A.z,0.5,A.w,null,0,D.dGv,null,null)
+D.dGw=w([A.cz,A.ip],x.O)
+D.eP4=new B.bU(A.z,0.5,A.w,null,0,D.dGw,null,null)
 D.dfA=w([A.iL,A.bl],x.O)
 D.eP7=new B.bU(A.n_,0.5,A.w,null,0,D.dfA,null,null)
 D.aTO=new B.aP(9,9)
@@ -11343,4 +11343,4 @@ u.d=A.bG
 return u})
 w($,"iOM","aki",()=>B.a([C.GP("Light the bulb","You need a battery and a bulb joined in a loop. Wire the + of the battery to the bulb, and the bulb back to the battery.",new C.fC6()),C.GP("Make a flashlight","Add a switch into the loop, so you can turn the bulb on and off.",new C.fC7()),C.GP("Spin the motor","A battery and a motor in a loop will make it spin.",new C.fC8()),C.GP("Light an LED safely","An LED burns out on its own. Put a resistor in the loop with it. Mind the + side of the LED!",new C.fC9()),C.GP("Light a bulb with no battery","Use a solar panel, a hand crank or a wind turbine instead of a battery.",new C.fCa()),C.GP("Play the radio","A radio needs about 3 volts or more. Try a 9 volt battery.",new C.fBY()),C.GP("Watch TV","A TV needs 6 volts or more. Set a battery to 12 volts, and wire the TV's + (left) dot towards the battery +.",new C.fBZ()),C.GP("Charge a battery","A 1.5 V battery starts flat. Join it to a solar panel (+ to +, \u2212 to \u2212) until its charge bar is full.",new C.fC_()),C.GP("One battery, two gadgets","A TV needs 9 volts but a phone burns out. Use a step-down converter to give the phone 5 V from the same battery.",new C.fC0()),C.GP("Protect a radio","Put a diode in the loop with a radio. It only lets electricity go one way.",new C.fC1()),C.GP("Make toast","A heater turns electricity into heat. Make it glow bright orange.",new C.fC2())],B.as("N<bfc>")))
 w($,"iPe","hWR",()=>B.a([C.a2Z("Spin the Wheel","Let luck decide","\ud83c\udfa1",A.aQ,A.c8,new C.fCB()),C.a2Z("Focus Timer","Work, then rest","\u23f1\ufe0f",A.c1,A.bC,new C.fCC()),C.a2Z("Breathe","Calm down in a minute","\ud83e\udee7",A.fK,A.cI,new C.fCD()),C.a2Z("Draw Pad","Sketch and share","\ud83c\udfa8",A.bE,A.b_,new C.fCE()),C.a2Z("Memory Match","Find the pairs","\ud83c\udccf",A.aH,A.ci,new C.fCF()),C.a2Z("Simon Sounds","Copy the tune","\ud83c\udfb5",A.bu,A.bk,new C.fCG()),C.a2Z("Tip & Split","Share the bill","\ud83e\uddfe",A.bf,A.b5,new C.fCH()),C.a2Z("Lucky Pocket","Dice, coin, number","\ud83c\udfb2",A.bj,A.az,new C.fCI())],B.as("N<byX>")))})()};
-(a=>{a["ymNY7urP/JXJBduAIo+MY9lTq3M="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["I+ZhOjzRl+FSiYRSXPzh6XcN9i8="]=a.current})($__dart_deferred_initializers__);
