@@ -1,7 +1,6 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
-$__dart_deferred_initializers__.current=function(a,b,c,$){var A,B,C
+$__dart_deferred_initializers__.current=function(a,b,c,$){var A,B
 A=c[0]
-B=c[2]
-C=c[116]
-var z=a.updateTypes([]);(function constants(){C.b_4=new A.D("Restore QR",null,B.cK,null,null,null,null,null,null,null,null,null)})()};
-(a=>{a["p2BWJKHQcamIrXP3+ZTXD2I1Hl8="]=a.current})($__dart_deferred_initializers__);
+B=c[114]
+var z=a.updateTypes([]);(function constants(){B.a2E=new A.R(20,8,20,120)})()};
+(a=>{a["9ZlJWqZYn0v3aD5sWbBwlmYQphw="]=a.current})($__dart_deferred_initializers__);
