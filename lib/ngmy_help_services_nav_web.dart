@@ -43,3 +43,32 @@ String? ngmyHelpServicesReadReturnParam() {
   if (paid.isNotEmpty) return paid;
   return cancel ? 'cancel' : 'open';
 }
+
+/// A visitor link to Help & Services that needs no login: ?svc_open=1 (from the admin Bio page),
+/// ?svc_guest=<token> (a guest receipt link), or the return from Stripe for a guest
+/// (?svc_paid=<session>&svc_guest=<token>). Returns null when the address is none of these.
+/// The address is cleaned so a reload does not repeat it.
+({String token, String paid})? ngmyHelpServicesGuestLaunch() {
+  final uri = Uri.parse(html.window.location.href);
+  final open = uri.queryParameters.containsKey('svc_open');
+  final token = (uri.queryParameters['svc_guest'] ?? '').trim().toLowerCase();
+  final paid = (uri.queryParameters['svc_paid'] ?? '').trim();
+  var fromBio = false;
+  try {
+    final at = int.tryParse(html.window.localStorage[_kOpenFromBioKey] ?? '');
+    fromBio = at != null && DateTime.now().millisecondsSinceEpoch - at < 30 * 60 * 1000;
+  } catch (_) {}
+  if (!open && token.isEmpty && !fromBio) return null;
+  try {
+    html.window.localStorage.remove(_kOpenFromBioKey);
+  } catch (_) {}
+  final rest = Map<String, String>.from(uri.queryParameters)
+    ..remove('svc_open')
+    ..remove('svc_guest')
+    ..remove('svc_paid')
+    ..remove('svc_cancel');
+  var href = uri.replace(queryParameters: rest.isEmpty ? null : rest).toString();
+  if (rest.isEmpty && href.endsWith('?')) href = href.substring(0, href.length - 1);
+  html.window.history.replaceState(null, '', href);
+  return (token: RegExp(r'^[a-f0-9]{48}$').hasMatch(token) ? token : '', paid: token.isEmpty ? '' : paid);
+}

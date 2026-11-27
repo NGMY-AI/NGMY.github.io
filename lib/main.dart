@@ -66,7 +66,8 @@ import 'ngmy_repair_estimate_payments.dart';
 import 'ngmy_house_insurance.dart';
 import 'ngmy_house_workers.dart' show showNgmyAdminHouseCareSheet, NgmyHouseWorkersApi;
 import 'ngmy_ui_lang.dart';
-import 'ngmy_help_services.dart' show showNgmyHelpServicesPage, showNgmyAdminHelpServicesSheet, NgmyHelpServicesLang, ngmyHelpServicesTakeReturn;
+import 'ngmy_help_services.dart'
+    show showNgmyHelpServicesPage, showNgmyAdminHelpServicesSheet, NgmyHelpServicesLang, ngmyHelpServicesTakeReturn, ngmyHelpServicesGuestLaunchInfo, NgmyGuestHelpServicesApp;
 import 'ngmy_civic_helper_gifts.dart';
 import 'ngmy_civic_helper_gift_admin_popup.dart';
 import 'ngmy_civic_helper_gift_ui.dart';
@@ -581,6 +582,8 @@ void main() async {
 
   var launchBootstrap = NgmyLaunchBootstrap.empty;
   const deferBootstrapLoad = false;
+  // A visitor from the admin Bio link (or a guest receipt link) who is not logged in: Help & Services, no login.
+  ({String token, String paid})? guestHelpServices;
   if (!isGuestLink) {
     if (oauthReturn) {
       await ngmyIgnoreTimeout(ngmyEnsureSupabaseAuthInitialized, timeout: const Duration(seconds: 15));
@@ -595,6 +598,9 @@ void main() async {
         await ngmyEnsureSupabaseAuthInitialized();
         await Supabase.instance.client.auth.signOut();
       } catch (_) {}
+    }
+    if (kIsWeb && !oauthReturn && (launchBootstrap.currentUser == null || launchLoggedOut)) {
+      guestHelpServices = ngmyHelpServicesGuestLaunchInfo();
     }
     if (oauthReturn && !launchLoggedOut) {
       try {
@@ -699,6 +705,11 @@ void main() async {
     }
     if (isGuestLocalPublishedBio) {
       runApp(NgmyGuestLocalPublishedBio(slug: guestLocalBioSlug.trim().toLowerCase()));
+      return;
+    }
+    final guestServices = guestHelpServices;
+    if (guestServices != null) {
+      runApp(NgmyGuestHelpServicesApp(token: guestServices.token, paidSession: guestServices.paid));
       return;
     }
     final app = NGMYApp(launchBootstrap: launchBootstrap, deferBootstrapLoad: deferBootstrapLoad);

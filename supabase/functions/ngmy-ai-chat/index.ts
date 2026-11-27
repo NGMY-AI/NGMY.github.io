@@ -1709,6 +1709,7 @@ async function handleAdvisorRelationship(req: Request, action: string, body: any
 const SVC_ACTIONS = new Set([
   "svcList", "svcCashApp", "svcStripeStart", "svcStripeVerify",
   "svcAdminList", "svcAdminDecide", "svcAdminSetWhatsapp", "svcStripeHealth", "svcStripeCancel",
+  "svcGuestList", "svcGuestPurchases", "svcGuestCashApp", "svcGuestStripeStart", "svcGuestStripeCancel",
 ]);
 
 function svcStripeKey(): string {
@@ -1739,7 +1740,168 @@ function svcPurchase(r: any) {
     method: r.method, status: r.status, transactionId: r.transaction_id ?? "",
     code: r.code ?? "", proofUrl: r.proof_url ?? "", courseAccess: r.course_access === true,
     receiptNo: svcReceiptNo(String(r.id)), createdAt: r.created_at, paidAt: r.paid_at, decidedAt: r.decided_at,
+    guest: r.guest === true, buyerName: r.buyer_name ?? "", buyerPhone: r.buyer_phone ?? "",
   };
+}
+
+/// A private token a guest keeps (on their phone and in their receipt link) to open their purchase again.
+function svcNewGuestToken(): string {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/// The guest details from the pay pop-up, checked. Returns an error text when something is missing.
+function svcGuestDetails(body: any): { name: string; email: string; phone: string } | { error: string } {
+  const name = hwText(body?.name, 80);
+  const email = String(body?.email ?? "").trim().toLowerCase().slice(0, 120);
+  const phone = hwPhone(body?.phone);
+  if (name.length < 3) return { error: "Enter your full name." };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return { error: "Enter a correct email address." };
+  if (phone.replace(/\D/g, "").length < 7) return { error: "Enter your phone (WhatsApp) number." };
+  return { name, email, phone };
+}
+
+/// The Cash App tag and WhatsApp number from the Help Center settings, for guests (they have no app settings).
+async function svcPublicContacts(db: any): Promise<{ cashAppTag: string; phone: string }> {
+  try {
+    const { data } = await db.from("ngmy_settings").select("value").eq("key", "help_center_hub_settings").maybeSingle();
+    const v = data?.value && typeof data.value === "object" ? data.value as Record<string, unknown> : {};
+    const link = String(v.whatsappLink ?? "");
+    const fromLink = /wa\.me\/(\d+)/.exec(link)?.[1] ?? "";
+    return { cashAppTag: String(v.cashAppTag ?? "").trim(), phone: fromLink || String(v.phone ?? "").replace(/[^\d+]/g, "") };
+  } catch (_) {
+    return { cashAppTag: "", phone: "" };
+  }
+}
+
+/// Help & Services for visitors without an NGMY account (they arrive from the admin Bio link).
+/// Only the plans, paying, and their own purchases by private token. Nothing else is open to guests.
+async function handleHelpServicesGuest(req: Request, action: string, body: any): Promise<Response> {
+  const db = adminClient();
+  if (!db) return jsonOk({ ok: false, error: "Server database unavailable." }, 500);
+  const ip = clientIp(req);
+  const notReady = (msg: string) => /service_|relation|does not exist|column/i.test(msg);
+  const setupError = "Help & Services is not switched on for visitors yet. Please tell the admin to finish the setup.";
+
+  if (action === "svcGuestList") {
+    const limited = await enforceRateLimit(req, "svc_guest_list", ip, 120, 3600);
+    if (limited) return limited;
+    const { data: cats, error } = await db.from("service_categories").select("*").eq("active", true).order("sort_order", { ascending: true });
+    if (error) return jsonOk({ ok: false, error: notReady(error.message) ? setupError : error.message }, 500);
+    const contacts = await svcPublicContacts(db);
+    const saved = await svcWhatsappNumber(db);
+    return jsonOk({ ok: true, categories: (cats ?? []).map(svcCategory), whatsappNumber: saved || contacts.phone, cashAppTag: contacts.cashAppTag });
+  }
+
+  if (action === "svcGuestPurchases") {
+    const limited = await enforceRateLimit(req, "svc_guest_mine", ip, 240, 3600);
+    if (limited) return limited;
+    const tokens = (Array.isArray(body?.tokens) ? body.tokens : []).map((t: unknown) => String(t ?? "").trim().toLowerCase())
+      .filter((t: string) => /^[a-f0-9]{48}$/.test(t)).slice(0, 20);
+    if (tokens.length === 0) return jsonOk({ ok: true, purchases: [] });
+    const { data, error } = await db.from("service_purchases").select("*").in("guest_token", tokens).order("created_at", { ascending: false });
+    if (error) return jsonOk({ ok: false, error: notReady(error.message) ? setupError : error.message }, 500);
+    const rows: any[] = [];
+    for (const p of data ?? []) rows.push(await svcCheckStripe(db, p));
+    return jsonOk({ ok: true, purchases: rows.map((r) => ({ ...svcPurchase(r), guestToken: r.guest_token })) });
+  }
+
+  if (action === "svcGuestStripeCancel") {
+    const token = String(body?.token ?? "").trim().toLowerCase();
+    if (!/^[a-f0-9]{48}$/.test(token)) return jsonOk({ ok: true });
+    const { data: p } = await db.from("service_purchases").select("*").eq("guest_token", token).maybeSingle();
+    if (!p || p.method !== "stripe" || p.status !== "pending") return jsonOk({ ok: true });
+    const key = svcStripeKey();
+    if (key && p.transaction_id) {
+      try {
+        await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(p.transaction_id)}/expire`, {
+          method: "POST", headers: { Authorization: `Bearer ${key}` },
+        });
+      } catch (_) { /* it closes by itself after a day */ }
+    }
+    const checked = await svcCheckStripe(db, p);
+    if (checked.status === "pending") await db.from("service_purchases").update({ status: "cancelled" }).eq("id", p.id).eq("status", "pending");
+    return jsonOk({ ok: true });
+  }
+
+  // Paying: the plan and its price always come from the database.
+  const who = svcGuestDetails(body);
+  if ("error" in who) return jsonOk({ ok: false, error: who.error }, 400);
+  const catId = hwText(body?.categoryId, 60);
+  const { data: cat } = catId
+    ? await db.from("service_categories").select("*").eq("id", catId).eq("active", true).maybeSingle()
+    : { data: null };
+  if (!cat) return jsonOk({ ok: false, error: "That plan is not available." }, 404);
+  const amount = Number(cat.price);
+  if (!(amount > 0)) return jsonOk({ ok: false, error: "That plan has no price yet." }, 400);
+  const token = svcNewGuestToken();
+  const base = { email: who.email, buyer_name: who.name, buyer_phone: who.phone, guest: true, guest_token: token, category_id: cat.id, amount };
+
+  if (action === "svcGuestCashApp") {
+    const limited = await enforceRateLimit(req, "svc_guest_pay", ip, 6, 86400);
+    if (limited) return limited;
+    const code = String(body?.code ?? "").replace(/\D/g, "").slice(0, 8);
+    const proofB64 = String(body?.proofBase64 ?? "");
+    if (code.length < 4) return jsonOk({ ok: false, error: "Your payment code is missing. Open the payment again." }, 400);
+    if (!proofB64) return jsonOk({ ok: false, error: "Attach the screenshot of your Cash App payment." }, 400);
+    let proofUrl = "";
+    try {
+      proofUrl = await hwUploadCareImage(db, `guest:${who.email}`, "pay", proofB64, String(body?.proofMime ?? ""));
+    } catch (e) {
+      return jsonOk({ ok: false, error: String((e as Error).message ?? e) }, 400);
+    }
+    const { data, error } = await db.from("service_purchases").insert({
+      ...base, method: "cashapp", status: "pending", code, proof_url: proofUrl, transaction_id: code,
+    }).select("*").maybeSingle();
+    if (error) {
+      await hwRemoveCareImage(db, proofUrl);
+      return jsonOk({ ok: false, error: notReady(error.message) ? setupError : error.message }, 500);
+    }
+    return jsonOk({ ok: true, pending: true, token, purchase: { ...svcPurchase(data), guestToken: token } });
+  }
+
+  // svcGuestStripeStart
+  const limited = await enforceRateLimit(req, "svc_guest_stripe", ip, 20, 3600);
+  if (limited) return limited;
+  const key = svcStripeKey();
+  if (!key) return jsonOk({ ok: false, error: "Card payments are not set up yet. Use Cash App." }, 503);
+  const { data: row, error } = await db.from("service_purchases").insert({ ...base, method: "stripe", status: "pending" }).select("*").maybeSingle();
+  if (error || !row) return jsonOk({ ok: false, error: error && notReady(error.message) ? setupError : (error?.message ?? "Could not start the payment.") }, 500);
+  const origin = svcReturnOrigin(body?.origin);
+  const form = new URLSearchParams();
+  form.set("mode", "payment");
+  form.set("success_url", `${origin}/?svc_paid={CHECKOUT_SESSION_ID}&svc_guest=${token}`);
+  form.set("cancel_url", `${origin}/?svc_open=1`);
+  form.set("client_reference_id", `svc_${row.id}`);
+  form.set("customer_email", who.email);
+  form.set("line_items[0][quantity]", "1");
+  form.set("line_items[0][price_data][currency]", "usd");
+  form.set("line_items[0][price_data][unit_amount]", String(Math.round(amount * 100)));
+  form.set("line_items[0][price_data][product_data][name]", `NGMY · ${cat.title_en}`);
+  form.set("metadata[ngmy_kind]", "service_purchase");
+  form.set("metadata[purchase_id]", String(row.id));
+  form.set("metadata[category_id]", String(cat.id));
+  form.set("metadata[guest]", "1");
+  form.set("payment_intent_data[metadata][purchase_id]", String(row.id));
+  try {
+    const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/x-www-form-urlencoded" },
+      body: form.toString(),
+    });
+    const s = await res.json();
+    if (!res.ok || !s?.url || !s?.id) {
+      await db.from("service_purchases").delete().eq("id", row.id).eq("status", "pending");
+      console.error("[svcGuestStripeStart] stripe error", res.status);
+      return jsonOk({ ok: false, error: `Card payments are not ready yet (code S${res.status}). Please use Cash App for now.` }, 502);
+    }
+    await db.from("service_purchases").update({ transaction_id: s.id }).eq("id", row.id);
+    return jsonOk({ ok: true, url: s.url, purchaseId: row.id, token });
+  } catch (_) {
+    await db.from("service_purchases").delete().eq("id", row.id).eq("status", "pending");
+    return jsonOk({ ok: false, error: "Card checkout could not reach Stripe (network). Try again in a minute or use Cash App." }, 502);
+  }
 }
 
 /// Asks Stripe about the purchase's checkout session and marks it paid only when Stripe says it was paid
@@ -1840,6 +2002,7 @@ async function svcStripeHealth(req: Request): Promise<Response> {
 
 async function handleHelpServices(req: Request, action: string, body: any): Promise<Response> {
   if (action === "svcStripeHealth") return await svcStripeHealth(req);
+  if (action.startsWith("svcGuest")) return await handleHelpServicesGuest(req, action, body);
   const email = (await requireJwtEmail(req)).trim().toLowerCase();
   if (!email) return jsonOk({ ok: false, error: "Please sign in first." }, 401);
   const db = adminClient();
@@ -2023,7 +2186,7 @@ async function handleHelpServices(req: Request, action: string, body: any): Prom
         if (n) names[String(u.email)] = n;
       }
     }
-    const purchases = rows.map((r) => ({ ...svcPurchase(r), name: names[String(r.email)] ?? "" }));
+    const purchases = rows.map((r) => ({ ...svcPurchase(r), name: String(r.buyer_name ?? "").trim() || (names[String(r.email)] ?? "") }));
     return jsonOk({
       ok: true,
       purchases,
@@ -11113,6 +11276,11 @@ serve(async (req) => {
       q7: "svcAdminSetWhatsapp",
       q8: "svcStripeHealth",
       q9: "svcStripeCancel",
+      qa: "svcGuestList",
+      qb: "svcGuestPurchases",
+      qc: "svcGuestCashApp",
+      qd: "svcGuestStripeStart",
+      qe: "svcGuestStripeCancel",
       s1: "storeGrant",
       s2: "storeRevoke",
       s3: "storeList",

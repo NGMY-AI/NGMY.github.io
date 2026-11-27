@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_edge_invoke.dart';
@@ -43,6 +45,100 @@ class NgmyHelpServicesApi {
   static Future<Map<String, dynamic>> adminDecide(String id, bool approve) =>
       _call('svcAdminDecide', {'purchaseId': id, 'decision': approve ? 'approve' : 'reject'});
   static Future<Map<String, dynamic>> adminSetWhatsapp(String number) => _call('svcAdminSetWhatsapp', {'number': number});
+
+  // ── Visitors without an account (from the admin Bio link): no login, only the public guest path ──
+  static Future<Map<String, dynamic>> _guestCall(String action, [Map<String, dynamic> extra = const {}]) async {
+    try {
+      final res = await ngmyEdgeInvoke({'action': action, ...extra}, anonymous: true, timeout: const Duration(seconds: 30));
+      if (res == null) return {'ok': false, 'error': 'No connection. Try again.'};
+      return res;
+    } catch (_) {
+      return {'ok': false, 'error': 'No connection. Try again.'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> guestList() => _guestCall('svcGuestList');
+  static Future<Map<String, dynamic>> guestPurchases(List<String> tokens) => _guestCall('svcGuestPurchases', {'tokens': tokens});
+  static Future<Map<String, dynamic>> guestCashApp(NgmyGuestBuyer who, String categoryId, String code, String proofBase64, String proofMime) =>
+      _guestCall('svcGuestCashApp', {...who.toMap(), 'categoryId': categoryId, 'code': code, 'proofBase64': proofBase64, 'proofMime': proofMime});
+  static Future<Map<String, dynamic>> guestStripeStart(NgmyGuestBuyer who, String categoryId) =>
+      _guestCall('svcGuestStripeStart', {...who.toMap(), 'categoryId': categoryId, 'origin': Uri.base.origin});
+  static Future<Map<String, dynamic>> guestStripeCancel(String token) => _guestCall('svcGuestStripeCancel', {'token': token});
+}
+
+/// A visitor who pays without an NGMY account: their name, email and WhatsApp number.
+class NgmyGuestBuyer {
+  const NgmyGuestBuyer({required this.name, required this.email, required this.phone});
+  final String name;
+  final String email;
+  final String phone;
+  Map<String, dynamic> toMap() => {'name': name, 'email': email, 'phone': phone};
+}
+
+/// What a guest keeps on their own phone: the private tokens of their purchases and their details.
+class NgmyGuestServicesStore {
+  static const _tokensKey = 'ngmy_svc_guest_tokens_v1';
+  static const _whoKey = 'ngmy_svc_guest_buyer_v1';
+
+  static Future<List<String>> tokens() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      return p.getStringList(_tokensKey) ?? const [];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<void> addToken(String token) async {
+    if (!RegExp(r'^[a-f0-9]{48}$').hasMatch(token)) return;
+    try {
+      final p = await SharedPreferences.getInstance();
+      final list = [token, ...(p.getStringList(_tokensKey) ?? const <String>[]).where((t) => t != token)].take(20).toList();
+      await p.setStringList(_tokensKey, list);
+    } catch (_) {}
+  }
+
+  static Future<NgmyGuestBuyer?> buyer() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      final l = p.getStringList(_whoKey);
+      if (l == null || l.length != 3) return null;
+      return NgmyGuestBuyer(name: l[0], email: l[1], phone: l[2]);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> saveBuyer(NgmyGuestBuyer who) async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.setStringList(_whoKey, [who.name, who.email, who.phone]);
+    } catch (_) {}
+  }
+}
+
+/// The Help & Services page on its own, for a visitor with no NGMY account (no login).
+class NgmyGuestHelpServicesApp extends StatelessWidget {
+  const NgmyGuestHelpServicesApp({super.key, this.token = '', this.paidSession = ''});
+  final String token;
+  final String paidSession;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'NGMY Help & Services',
+      navigatorKey: ngmyRootNavigatorKey,
+      theme: ThemeData(useMaterial3: true, brightness: Brightness.light, colorSchemeSeed: const Color(0xFF0E7490)),
+      home: NgmyHelpServicesPage(
+        userName: '',
+        config: null,
+        guest: true,
+        guestToken: token,
+        returnSession: paidSession.isEmpty ? null : paidSession,
+      ),
+    );
+  }
 }
 
 class NgmyServiceCategory {
@@ -172,6 +268,16 @@ String? ngmyHelpServicesTakeReturn() {
   }
 }
 
+/// A visitor link that opens Help & Services with no login (from the admin Bio page, a guest receipt link,
+/// or back from Stripe for a guest). Call only when nobody is logged in. Null when the address is not one.
+({String token, String paid})? ngmyHelpServicesGuestLaunchInfo() {
+  try {
+    return ngmyHelpServicesGuestLaunch();
+  } catch (_) {
+    return null;
+  }
+}
+
 NgmyHelpCenterConfig _helpConfig(dynamic config) {
   try {
     return NgmyHelpCenterConfig.fromMap((config as dynamic).helpCenterHub as Map<String, dynamic>);
@@ -189,9 +295,22 @@ String _fallbackWhatsapp(dynamic config) {
 }
 
 class NgmyHelpServicesPage extends StatefulWidget {
-  const NgmyHelpServicesPage({super.key, required this.userName, required this.config, this.returnSession});
+  const NgmyHelpServicesPage({
+    super.key,
+    required this.userName,
+    required this.config,
+    this.returnSession,
+    this.guest = false,
+    this.guestToken = '',
+  });
   final String userName;
   final dynamic config;
+
+  /// A visitor without an NGMY account (from the admin Bio link): no login, they give their details to pay.
+  final bool guest;
+
+  /// A guest receipt link (?svc_guest=<token>): that purchase opens when the page loads.
+  final String guestToken;
 
   /// Set when the app was opened by Stripe after a card payment (the checkout session id), or 'cancel'.
   final String? returnSession;
@@ -216,6 +335,10 @@ class _NgmyHelpServicesPageState extends State<NgmyHelpServicesPage> with Widget
   int _returnTries = 0;
   bool _receiptOpen = false;
 
+  /// Guests: the Cash App tag from the server (they have no app settings), and a receipt link to open.
+  String _guestCashTag = '';
+  String _openToken = '';
+
   NgmyLangStore get _lang => NgmyHelpServicesLang.store;
 
   @override
@@ -226,7 +349,23 @@ class _NgmyHelpServicesPageState extends State<NgmyHelpServicesPage> with Widget
     unawaited(_lang.load());
     final back = widget.returnSession;
     if (back != null && back != 'cancel' && back != 'open' && back.isNotEmpty) _returnSession = back;
-    _load();
+    _openToken = widget.guestToken;
+    unawaited(_start());
+  }
+
+  Future<void> _start() async {
+    if (widget.guest && _openToken.isNotEmpty) await NgmyGuestServicesStore.addToken(_openToken);
+    await _load();
+  }
+
+  /// The guest version of the list: the plans and their own purchases (by the tokens kept on this phone).
+  Future<Map<String, dynamic>> _guestLoad() async {
+    final res = await NgmyHelpServicesApi.guestList();
+    if (res['ok'] != true) return res;
+    _guestCashTag = (res['cashAppTag'] ?? '').toString();
+    final tokens = await NgmyGuestServicesStore.tokens();
+    final mine = tokens.isEmpty ? const <String, dynamic>{'purchases': []} : await NgmyHelpServicesApi.guestPurchases(tokens);
+    return {...res, 'purchases': mine['purchases'] ?? const []};
   }
 
   @override
@@ -249,7 +388,7 @@ class _NgmyHelpServicesPageState extends State<NgmyHelpServicesPage> with Widget
 
   Future<void> _load({bool quiet = false}) async {
     if (!quiet && mounted) setState(() => _loading = true);
-    final res = await NgmyHelpServicesApi.list();
+    final res = widget.guest ? await _guestLoad() : await NgmyHelpServicesApi.list();
     if (!mounted) return;
     setState(() {
       _loading = false;
@@ -279,6 +418,18 @@ class _NgmyHelpServicesPageState extends State<NgmyHelpServicesPage> with Widget
       final mine = (_awaitingId != null && p['id'] == _awaitingId) || (_returnSession != null && p['transactionId'] == _returnSession);
       if (mine) match = p;
     }
+    // A guest receipt link: open that purchase once, whatever its status.
+    if (match == null && _openToken.isNotEmpty && _returnSession == null) {
+      for (final p in _purchases) {
+        if (p['guestToken'] == _openToken) {
+          _openToken = '';
+          _receiptOpen = true;
+          await _openPurchase(p);
+          _receiptOpen = false;
+          return;
+        }
+      }
+    }
     if (_returnSession != null) {
       _returnTries++;
       // Stripe can take a moment to confirm; stop waiting after about a minute.
@@ -287,6 +438,7 @@ class _NgmyHelpServicesPageState extends State<NgmyHelpServicesPage> with Widget
     if (match == null || match['status'] != 'paid') return;
     _awaitingId = null;
     _returnSession = null;
+    _openToken = '';
     _receiptOpen = true;
     await _openPurchase(match);
     _receiptOpen = false;
@@ -321,21 +473,135 @@ class _NgmyHelpServicesPageState extends State<NgmyHelpServicesPage> with Widget
   Future<void> _openPurchase(Map<String, dynamic> p) async {
     final cat = _cat((p['categoryId'] ?? '').toString());
     if (cat == null) return;
+    final buyer = (p['buyerName'] ?? '').toString().trim();
     await NgmyNavigator.push(
       context,
-      NgmyServicePurchasePage(purchase: p, category: cat, userName: widget.userName, whatsapp: _whatsapp),
+      NgmyServicePurchasePage(purchase: p, category: cat, userName: buyer.isNotEmpty ? buyer : widget.userName, whatsapp: _whatsapp),
       routeName: 'NgmyServicePurchasePage',
     );
     if (mounted) _load(quiet: true);
   }
 
+  /// Guests: full name, email and WhatsApp number before paying (remembered on this phone for next time).
+  Future<NgmyGuestBuyer?> _askGuestDetails(NgmyServiceCategory cat) async {
+    final saved = await NgmyGuestServicesStore.buyer();
+    if (!mounted) return null;
+    final name = TextEditingController(text: saved?.name ?? '');
+    final email = TextEditingController(text: saved?.email ?? '');
+    final phone = TextEditingController(text: saved?.phone ?? '');
+    final look = _look(cat.icon);
+    String? problem;
+    final who = await showDialog<NgmyGuestBuyer>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          InputDecoration deco(String label, IconData icon) => InputDecoration(
+                labelText: label,
+                prefixIcon: Icon(icon),
+                filled: true,
+                fillColor: const Color(0xFFF6F8FC),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              );
+          void submit() {
+            final n = name.text.trim();
+            final e = email.text.trim().toLowerCase();
+            final ph = phone.text.replaceAll(RegExp(r'[^\d+]'), '');
+            if (n.length < 3) {
+              setLocal(() => problem = _t('Enter your full name.', 'Andika jina lako kamili.'));
+            } else if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$').hasMatch(e)) {
+              setLocal(() => problem = _t('Enter a correct email address.', 'Andika barua pepe sahihi.'));
+            } else if (ph.replaceAll('+', '').length < 7) {
+              setLocal(() => problem = _t('Enter your phone (WhatsApp) number.', 'Andika namba yako ya simu (WhatsApp).'));
+            } else {
+              Navigator.pop(ctx, NgmyGuestBuyer(name: n, email: e, phone: ph));
+            }
+          }
+
+          return Dialog(
+            backgroundColor: Colors.white,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 22, 20, 14),
+                child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  Row(children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(15), gradient: LinearGradient(colors: look.colors)),
+                      child: Icon(look.icon, color: Colors.white),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(_t('Your details', 'Taarifa zako'),
+                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Color(0xFF0F172A))),
+                        Text('${cat.title()} · ${_money(cat.price)}',
+                            maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, color: Color(0xFF334155), fontWeight: FontWeight.w700)),
+                      ]),
+                    ),
+                  ]),
+                  const SizedBox(height: 10),
+                  Text(
+                    _t('No account needed. We use these to send your receipt and to contact you on WhatsApp.',
+                        'Huhitaji akaunti. Tunazitumia kukutumia risiti na kuwasiliana nawe kwa WhatsApp.'),
+                    style: const TextStyle(fontSize: 13, height: 1.35, color: Color(0xFF334155), fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(controller: name, textCapitalization: TextCapitalization.words, decoration: deco(_t('Full name', 'Jina kamili'), Icons.person_rounded)),
+                  const SizedBox(height: 10),
+                  TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: deco(_t('Email', 'Barua pepe'), Icons.mail_rounded)),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: phone,
+                    keyboardType: TextInputType.phone,
+                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d+\-\s()]'))],
+                    decoration: deco(_t('Phone (WhatsApp)', 'Simu (WhatsApp)'), Icons.chat_rounded),
+                    onSubmitted: (_) => submit(),
+                  ),
+                  if (problem != null) ...[
+                    const SizedBox(height: 10),
+                    Text(problem!, style: const TextStyle(color: _kRed, fontWeight: FontWeight.w800, fontSize: 13)),
+                  ],
+                  const SizedBox(height: 16),
+                  _GradientButton(text: _t('Continue to pay', 'Endelea kulipa'), icon: Icons.lock_rounded, colors: look.colors, onTap: submit),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: Text(_t('Cancel', 'Ghairi'), style: const TextStyle(color: Color(0xFF334155), fontWeight: FontWeight.w800)),
+                  ),
+                ]),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    if (who != null) await NgmyGuestServicesStore.saveBuyer(who);
+    return who;
+  }
+
   Future<void> _pay(NgmyServiceCategory cat) async {
     // The same payment pop-up as Help Center, House + Insurance.
     final look = _look(cat.icon);
+    // A visitor without an account first gives their name, email and WhatsApp number.
+    NgmyGuestBuyer? who;
+    if (widget.guest) {
+      who = await _askGuestDetails(cat);
+      if (who == null || !mounted) return;
+    }
+    final guestBuyer = who;
     // The card checkout is made on the server while the pop-up is showing, so that Pay with card opens the
     // Stripe page inside the tap itself (like Phone Unlock). A phone blocks a window opened later than the tap.
     Map<String, dynamic>? ready;
-    final preparing = NgmyHelpServicesApi.stripeStart(cat.id).then((r) => ready = r);
+    final preparing = (guestBuyer != null ? NgmyHelpServicesApi.guestStripeStart(guestBuyer, cat.id) : NgmyHelpServicesApi.stripeStart(cat.id))
+        .then((r) {
+      ready = r;
+      final token = (r['token'] ?? '').toString();
+      if (token.isNotEmpty) unawaited(NgmyGuestServicesStore.addToken(token));
+      return r;
+    });
     var opened = false;
     final method = await showNgmyPlanPaymentDialog(
       onCard: () {
@@ -364,7 +630,12 @@ class _NgmyHelpServicesPageState extends State<NgmyHelpServicesPage> with Widget
       // The prepared card checkout is not used: close it at Stripe so it never lingers.
       unawaited(preparing.then((r) {
         final id = (r['purchaseId'] ?? '').toString();
-        if (id.isNotEmpty) unawaited(NgmyHelpServicesApi.stripeCancel(id));
+        final token = (r['token'] ?? '').toString();
+        if (token.isNotEmpty) {
+          unawaited(NgmyHelpServicesApi.guestStripeCancel(token));
+        } else if (id.isNotEmpty) {
+          unawaited(NgmyHelpServicesApi.stripeCancel(id));
+        }
       }));
     }
     if (!mounted || method == null) return;
@@ -384,12 +655,14 @@ class _NgmyHelpServicesPageState extends State<NgmyHelpServicesPage> with Widget
       _awaitingId = (r['purchaseId'] ?? '').toString();
       ngmyHelpServicesGoTo(url);
     } else {
-      await _payCashApp(cat);
+      await _payCashApp(cat, guestBuyer);
     }
   }
 
-  Future<void> _payCashApp(NgmyServiceCategory cat) async {
-    final cfg = _helpConfig(widget.config);
+  Future<void> _payCashApp(NgmyServiceCategory cat, [NgmyGuestBuyer? who]) async {
+    var cfg = _helpConfig(widget.config);
+    // Guests have no app settings: the Cash App tag comes from the server.
+    if (widget.guest && _guestCashTag.trim().isNotEmpty) cfg = cfg.copyWith(cashAppTag: _guestCashTag.trim());
     final url = cfg.resolvedCashAppUrl();
     if (url.isEmpty) {
       _snack(_t('Cash App is not set up yet.', 'Cash App bado haijawekwa.'), error: true);
@@ -402,9 +675,21 @@ class _NgmyHelpServicesPageState extends State<NgmyHelpServicesPage> with Widget
       cashAppUrl: url,
       cashAppTag: cfg.cashAppDisplayTag(),
       fullTerm: false,
-      onSubmit: (code, proof, mime) => NgmyHelpServicesApi.cashApp(cat.id, code, proof, mime),
+      onSubmit: (code, proof, mime) async {
+        if (who == null) return NgmyHelpServicesApi.cashApp(cat.id, code, proof, mime);
+        final r = await NgmyHelpServicesApi.guestCashApp(who, cat.id, code, proof, mime);
+        final token = (r['token'] ?? '').toString();
+        if (token.isNotEmpty) await NgmyGuestServicesStore.addToken(token);
+        return r;
+      },
     );
     if (res == null || !mounted) return;
+    // A guest sees the pending purchase with its receipt link, so they can come back after approval.
+    if (who != null && res['purchase'] is Map) {
+      await _load(quiet: true);
+      if (mounted) await _openPurchase(Map<String, dynamic>.from(res['purchase'] as Map));
+      return;
+    }
     _snack(_t(
       'Payment sent. An admin will check your screenshot and approve it.',
       'Malipo yametumwa. Msimamizi ataangalia picha yako na kuidhinisha.',
@@ -534,16 +819,20 @@ class _NgmyHelpServicesPageState extends State<NgmyHelpServicesPage> with Widget
                 padding: const EdgeInsets.fromLTRB(12, 12, 14, 16),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Row(children: [
-                    Material(
-                      color: Colors.white.withValues(alpha: 0.12),
-                      shape: const CircleBorder(),
-                      child: IconButton(
-                        onPressed: () => NgmyNavigator.pop(context),
-                        icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-                        tooltip: _t('Back', 'Rudi'),
+                    // A visitor without an account opened this page on its own: there is nothing to go back to.
+                    if (!widget.guest) ...[
+                      Material(
+                        color: Colors.white.withValues(alpha: 0.12),
+                        shape: const CircleBorder(),
+                        child: IconButton(
+                          onPressed: () => NgmyNavigator.pop(context),
+                          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                          tooltip: _t('Back', 'Rudi'),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
+                      const SizedBox(width: 10),
+                    ] else
+                      const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         _t('Help & Services', 'Msaada na Huduma'),
@@ -979,6 +1268,10 @@ class _NgmyServicePurchasePageState extends State<NgmyServicePurchasePage> {
                 const SizedBox(height: 16),
                 _contactCard(c),
               ],
+              if ((_p['guestToken'] ?? '').toString().isNotEmpty && (status == 'paid' || status == 'pending')) ...[
+                const SizedBox(height: 16),
+                _guestLinkCard(c, (_p['guestToken'] ?? '').toString()),
+              ],
             ]),
           ),
         ),
@@ -1113,6 +1406,42 @@ class _NgmyServicePurchasePageState extends State<NgmyServicePurchasePage> {
             row(_t('Confirmation number', 'Namba ya uthibitisho'), (_p['receiptNo'] ?? '').toString()),
             if (paid && _p['courseAccess'] == true) row(_t('Course access', 'Ufikiaji wa kozi'), _t('Active', 'Hai')),
           ]),
+        ),
+      ]),
+    );
+  }
+
+  /// Guests have no account: this private link opens this receipt again on any phone.
+  Widget _guestLinkCard(_Palette c, String token) {
+    final link = 'https://ngmy.org/?svc_guest=$token';
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: c.card, borderRadius: BorderRadius.circular(20), border: Border.all(color: c.line)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text(_t('YOUR RECEIPT LINK', 'KIUNGO CHA RISITI YAKO'),
+            style: TextStyle(fontSize: 10.5, letterSpacing: 1.6, fontWeight: FontWeight.w900, color: c.muted)),
+        const SizedBox(height: 6),
+        Text(
+          _t('Keep this link. Open it any time to see this payment, and after approval the WhatsApp contact. No login needed.',
+              'Hifadhi kiungo hiki. Kifungue wakati wowote kuona malipo haya, na baada ya kuidhinishwa mawasiliano ya WhatsApp. Huhitaji kuingia.'),
+          style: TextStyle(fontSize: 13, height: 1.35, color: c.ink, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(12), border: Border.all(color: c.line)),
+          child: SelectableText(link, style: TextStyle(fontSize: 12, color: c.ink, fontWeight: FontWeight.w700)),
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          onPressed: () async {
+            await Clipboard.setData(ClipboardData(text: link));
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_t('Link copied.', 'Kiungo kimenakiliwa.'))));
+            }
+          },
+          icon: const Icon(Icons.copy_rounded, size: 18),
+          label: Text(_t('Copy link', 'Nakili kiungo')),
         ),
       ]),
     );
@@ -1398,6 +1727,9 @@ class _AdminServicesSheetState extends State<_AdminServicesSheet> {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(name.isNotEmpty ? name : (p['email'] ?? '').toString(), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: c.ink)),
               if (name.isNotEmpty) Text((p['email'] ?? '').toString(), style: TextStyle(fontSize: 11.5, color: c.muted)),
+              if ((p['buyerPhone'] ?? '').toString().isNotEmpty)
+                Text('${p['guest'] == true ? 'GUEST (no account) · ' : ''}Phone ${p['buyerPhone']}',
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: p['guest'] == true ? const Color(0xFF0E7490) : c.muted)),
               Text(_titles[p['categoryId']] ?? (p['categoryId'] ?? '').toString(), style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: c.ink)),
               Text('${method == 'stripe' ? 'Card (Stripe)' : 'Cash App'} · ${_date(p['createdAt'])} · ${p['receiptNo'] ?? ''}', style: TextStyle(fontSize: 11.5, color: c.muted)),
             ]),

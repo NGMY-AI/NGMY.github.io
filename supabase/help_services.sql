@@ -128,3 +128,11 @@ values
   40, false, 'advice', 1
 )
 on conflict (id) do nothing;
+
+-- Guests (visitors from the admin Bio link, no NGMY account): their name and WhatsApp number, and a
+-- private token so they can open their receipt again without logging in.
+alter table public.service_purchases add column if not exists buyer_name text;
+alter table public.service_purchases add column if not exists buyer_phone text;
+alter table public.service_purchases add column if not exists guest boolean not null default false;
+alter table public.service_purchases add column if not exists guest_token text;
+create unique index if not exists service_purchases_guest_token_idx on public.service_purchases (guest_token) where guest_token is not null;

@@ -9,3 +9,5 @@ void ngmyHelpServicesOpenFromBio() {
 }
 
 String? ngmyHelpServicesReadReturnParam() => null;
+
+({String token, String paid})? ngmyHelpServicesGuestLaunch() => null;
