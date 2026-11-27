@@ -6,6 +6,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import 'ngmy_paper_craft_ai.dart' show showNgmyPaperCraftAiSheet;
+import 'ngmy_paper_craft_stamps.dart' show kNgmyCraftDefaultStamp, ngmyCraftStampDraw;
 import 'ngmy_paper_craft_watermark.dart' show kNgmyCraftDefaultWatermark, ngmyApplyCraftWatermark, ngmyPreloadCraftLogo;
 import 'ngmy_slides_models.dart';
 import 'ngmy_slides_render.dart' show NgmySlideElementView;
@@ -120,11 +121,25 @@ _CraftSpec _readSpec(String text) {
       glue.add([lx + 1.3, ly, lx + 1.46, ly, lx + 1.46, ly + 0.09, lx + 1.3, ly + 0.09]);
       notes.add(_Note(lx + 1.51, ly, 'glue'));
     }
+    // The stamp boxes: drawn from the deck stamp design, on top of the coloured panels.
+    final stampFills = <List<num>>[];
+    final st = m['st'];
+    if (st is Map) {
+      final colors = [for (final v in (st['c'] as List? ?? const [])) (v as num).toInt()];
+      for (final b in (st['b'] as List? ?? const [])) {
+        final v = [for (final n in b as List) (n as num).toDouble()];
+        if (v.length < 4) continue;
+        final d = ngmyCraftStampDraw(st['id']?.toString(), v[0], v[1], v[2], v[3], colors);
+        stampFills.addAll(d.fills);
+        notes.addAll([for (final n in d.notes) _Note(n.$1, n.$2, n.$3, color: n.$4, pt: n.$5, bold: n.$6)]);
+      }
+    }
     spec = _CraftSpec(
       w: (m['W'] as num?)?.toDouble() ?? kNgmyCraftPageW,
       h: (m['H'] as num?)?.toDouble() ?? kNgmyCraftPageH,
       fills: [
         for (final f in (m['f'] as List? ?? const [])) [for (final v in f as List) v as num],
+        ...stampFills,
       ],
       glue: glue,
       marks: lines('m'),
@@ -609,6 +624,15 @@ class _Page {
   void glueRect(double x, double y, double w, double h) => glue(_rectPts(x, y, w, h));
   void note(double x, double y, String text) => _notes.add([_r3(x), _r3(y), text]);
 
+  /// Each envelope's front and its four flaps as printed (so the fold can be checked).
+  final List<Map<String, Object>> _envelopes = [];
+  void envelopeNet(double x0, double y0, double w, double h, List<Offset> top, List<Offset> right, List<Offset> bottom, List<Offset> left) =>
+      _envelopes.add({'b': [_r3(x0), _r3(y0), _r3(w), _r3(h)], 't': _flat(top), 'r': _flat(right), 'u': _flat(bottom), 'l': _flat(left)});
+
+  /// Stamp boxes (x, y, w, h): drawn from the deck stamp design (plain PLACE STAMP HERE unless one is chosen).
+  final List<List<double>> _stamps = [];
+  void stampBox(double x, double y, double w, double h) => _stamps.add([_r3(x), _r3(y), _r3(w), _r3(h)]);
+
   /// A label centred on [cx], [cy] in its own colour and size.
   void noteAt(double cx, double cy, String text, {int color = _labelInk, double pt = _labelPt, bool bold = false}) {
     final lines = text.split('\n');
@@ -741,6 +765,8 @@ class _Page {
       'n': _notes,
       'l': ?_legend,
       if (_anchors.isNotEmpty) 'a': _anchors,
+      if (_envelopes.isNotEmpty) 'e': _envelopes,
+      if (_stamps.isNotEmpty) 'st': {'id': kNgmyCraftDefaultStamp, 'b': _stamps, 'c': [p.ink, p.main, p.soft, p.pale, p.accent]},
     };
     final lines = NgmySlideElement(
       id: 'craft_lines_${NgmySlidesTemplates.newId()}',
@@ -773,47 +799,56 @@ String _printNote(String name) => '$name  -  Letter 8.5 x 11 in  -  print at Act
 // Shared pieces.
 // ---------------------------------------------------------------------------------------------------------------
 
-enum _EnvStyle { curved, pointed, coin }
+enum _EnvStyle { curved, pointed, flat }
+
+/// One envelope flap on the base edge [a] to [b], reaching out in direction [out]: it rises almost straight to
+/// [shoulder] at both ends (so it covers the side flaps well), then runs to [tip] in the middle.
+List<Offset> _flap(Offset a, Offset b, Offset out, {required double shoulder, required double tip, required _EnvStyle shape, double ins = 0.1}) {
+  final len = (b - a).distance;
+  final u = (b - a) / len;
+  final sa = a + u * ins + out * (shape == _EnvStyle.flat ? tip : shoulder);
+  final sb = b - u * ins + out * (shape == _EnvStyle.flat ? tip : shoulder);
+  final mid = (a + b) / 2 + out * tip;
+  switch (shape) {
+    case _EnvStyle.flat:
+      return [a, sa, sb, b];
+    case _EnvStyle.pointed:
+      return [a, sa, mid, sb, b];
+    case _EnvStyle.curved:
+      final reach = (len / 2 - ins) * 0.45;
+      final ca = (a + u * (ins + reach)) + out * tip;
+      final cb = (b - u * (ins + reach)) + out * tip;
+      return [a, ..._quad(sa, ca, mid), ..._quad(mid, cb, sb).skip(1), b];
+  }
+}
 
 /// An envelope net around a body (the front) at [x0],[y0] of [w] x [h]. The flaps fold BACK (away from you), so the
 /// printed body is the front with the address, and the printed flaps show on the back.
+///
+/// Worked out so the folded envelope is closed all round: the side flaps fold in first, the bottom flap folds up
+/// over them and is glued (it covers each side flap by 15 mm or more), and the top flap closes over the rest with
+/// at least 15 mm to spare. Nothing of the inside shows. The test folds every envelope and checks this.
 void _envelope(_Page k, double x0, double y0, double w, double h,
     {required double top,
+    required double topShoulder,
     required double bottom,
+    required double bottomShoulder,
     required double side,
-    _EnvStyle style = _EnvStyle.curved,
-    double sidePoint = 0.5,
+    _EnvStyle topStyle = _EnvStyle.curved,
+    _EnvStyle bottomStyle = _EnvStyle.curved,
+    double sideTapTop = 0,
+    double sideTapBottom = 0.35,
     int? topFill,
     int? bottomFill,
     int? sideFill}) {
   final p = k.p;
   final x1 = x0 + w;
   final y1 = y0 + h;
-  final cx = x0 + w / 2;
-  final yp = y0 + h * sidePoint;
-  final sideInset = math.min(0.45, h * 0.14);
-  late List<Offset> topFlap, rightFlap, bottomFlap, leftFlap;
-  switch (style) {
-    case _EnvStyle.pointed:
-      topFlap = [Offset(x0, y0), Offset(cx, y0 - top), Offset(x1, y0)];
-      rightFlap = [Offset(x1, y0), Offset(x1 + side, yp), Offset(x1, y1)];
-      bottomFlap = [Offset(x1, y1), Offset(cx, y1 + bottom), Offset(x0, y1)];
-      leftFlap = [Offset(x0, y1), Offset(x0 - side, yp), Offset(x0, y0)];
-    case _EnvStyle.curved:
-    case _EnvStyle.coin:
-      topFlap = [
-        ..._quad(Offset(x0, y0), Offset(cx - w * 0.2, y0 - top), Offset(cx, y0 - top)),
-        ..._quad(Offset(cx, y0 - top), Offset(cx + w * 0.2, y0 - top), Offset(x1, y0)).skip(1),
-      ];
-      rightFlap = [Offset(x1, y0), Offset(x1 + side, y0 + sideInset), Offset(x1 + side, y1 - sideInset), Offset(x1, y1)];
-      leftFlap = [Offset(x0, y1), Offset(x0 - side, y1 - sideInset), Offset(x0 - side, y0 + sideInset), Offset(x0, y0)];
-      bottomFlap = style == _EnvStyle.coin
-          ? [Offset(x1, y1), Offset(x1 - 0.25, y1 + bottom), Offset(x0 + 0.25, y1 + bottom), Offset(x0, y1)]
-          : [
-              ..._quad(Offset(x1, y1), Offset(cx + w * 0.4, y1 + bottom), Offset(cx, y1 + bottom)),
-              ..._quad(Offset(cx, y1 + bottom), Offset(cx - w * 0.4, y1 + bottom), Offset(x0, y1)).skip(1),
-            ];
-  }
+  final topFlap = _flap(Offset(x0, y0), Offset(x1, y0), const Offset(0, -1), shoulder: topShoulder, tip: top, shape: topStyle);
+  final bottomFlap = _flap(Offset(x1, y1), Offset(x0, y1), const Offset(0, 1), shoulder: bottomShoulder, tip: bottom, shape: bottomStyle);
+  final rightFlap = [Offset(x1, y0), Offset(x1 + side, y0 + sideTapTop), Offset(x1 + side, y1 - sideTapBottom), Offset(x1, y1)];
+  final leftFlap = [Offset(x0, y1), Offset(x0 - side, y1 - sideTapBottom), Offset(x0 - side, y0 + sideTapTop), Offset(x0, y0)];
+  k.envelopeNet(x0, y0, w, h, topFlap, rightFlap, bottomFlap, leftFlap);
   if (sideFill != null) {
     k.poly(sideFill, rightFlap);
     k.poly(sideFill, leftFlap);
@@ -836,34 +871,9 @@ void _envelope(_Page k, double x0, double y0, double w, double h,
   k.foldLine(x0, y1, x0, y0);
 }
 
-/// A stamp box in the top-right of an envelope front.
-/// Drawn to print clearly on a home printer: a dark frame, a white inside, a dashed inner edge like a real stamp,
-/// and a bold PLACE STAMP HERE in the design's darkest colour.
-void _stamp(_Page k, double x1, double y0) {
-  const w = 0.75;
-  const h = 0.88;
-  const b = 0.028;
-  final x = x1 - 0.95;
-  final y = y0 + 0.22;
-  final ink = k.p.ink;
-  k.rect(ink, x, y, w, h);
-  k.rect(0xFFFFFFFF, x + b, y + b, w - 2 * b, h - 2 * b);
-  for (final (dx, dy, ww, hh) in [(0.07, 0.07, w - 0.14, 0.012), (0.07, h - 0.082, w - 0.14, 0.012)]) {
-    for (var xx = x + dx; xx + 0.03 <= x + dx + ww; xx += 0.06) {
-      k.rect(ink, xx, y + dy, 0.03, hh);
-    }
-  }
-  for (final (dx, dy, ww, hh) in [(0.07, 0.07, 0.012, h - 0.14), (w - 0.082, 0.07, 0.012, h - 0.14)]) {
-    for (var yy = y + dy; yy + 0.03 <= y + dy + hh; yy += 0.06) {
-      k.rect(ink, x + dx, yy, ww, 0.03);
-    }
-  }
-  final cx = x + w / 2;
-  final cy = y + h / 2;
-  k.noteAt(cx, cy - 0.14, 'PLACE', color: ink, pt: 7.5, bold: true);
-  k.noteAt(cx, cy, 'STAMP', color: ink, pt: 7.5, bold: true);
-  k.noteAt(cx, cy + 0.14, 'HERE', color: ink, pt: 7.5, bold: true);
-}
+/// A stamp box in the top-right of an envelope front (or postcard). What is drawn in it is the deck stamp design:
+/// the plain PLACE STAMP HERE box unless an NGMY stamp is chosen (see ngmy_paper_craft_stamps.dart).
+void _stamp(_Page k, double x1, double y0) => k.stampBox(x1 - 0.95, y0 + 0.22, 0.75, 0.88);
 
 /// An open tray (box base or lid): a square floor with four walls and four glue tabs in the corners.
 void _tray(_Page k, double ox, double oy, double s, double h, {required int floor, required int walls, int? wallDots, double? tab}) {
@@ -1010,12 +1020,12 @@ NgmySlide _windowLetter(NgmyCraftPalette p) {
   return k.build('Window Envelope Letter', noteText: _printNote('Window letter for #10 envelopes'));
 }
 
-NgmySlide _cardEnvelope(NgmyCraftPalette p, {required String title, required double w, required double h, required double top, required double bottom, required double side}) {
+NgmySlide _cardEnvelope(NgmyCraftPalette p, {required String title, required double w, required double h, required double top, required double topShoulder, required double bottom, required double bottomShoulder, required double side}) {
   final k = _Page(p);
   final x0 = (_pw - w) / 2;
   final total = top + h + bottom;
   final y0 = 0.35 + (10.1 - total) / 2 + top;
-  _envelope(k, x0, y0, w, h, top: top, bottom: bottom, side: side);
+  _envelope(k, x0, y0, w, h, top: top, topShoulder: topShoulder, bottom: bottom, bottomShoulder: bottomShoulder, side: side);
   _stamp(k, x0 + w, y0);
   k.anchor(x0, y0, w, h);
   k.text('Your Name\nStreet Address\nCity, State ZIP', x0 + 0.2, y0 + 0.18, 2.4, 0.75, pt: 7.5, align: TextAlign.left);
@@ -1030,8 +1040,9 @@ NgmySlide _diamondEnvelope(NgmyCraftPalette p) {
   const w = 4.75;
   const h = 3.5;
   const x0 = (_pw - w) / 2;
-  const y0 = 3.4;
-  _envelope(k, x0, y0, w, h, top: 2.3, bottom: 3.2, side: 1.62, sidePoint: 0.74, style: _EnvStyle.pointed, sideFill: p.pale, bottomFill: p.soft);
+  const y0 = 3.55;
+  _envelope(k, x0, y0, w, h,
+      top: 2.4, topShoulder: 1.8, bottom: 2.6, bottomShoulder: 2.2, side: 1.3, topStyle: _EnvStyle.pointed, bottomStyle: _EnvStyle.pointed, sideFill: p.pale, bottomFill: p.soft);
   _stamp(k, x0 + w, y0);
   k.anchor(x0, y0, w, h);
   k.text('Your Name\nStreet Address\nCity, State ZIP', x0 + 0.18, y0 + 0.16, 2.2, 0.72, pt: 7, align: TextAlign.left);
@@ -1044,9 +1055,9 @@ NgmySlide _seedEnvelopes(NgmyCraftPalette p) {
   final k = _Page(p);
   const w = 2.5;
   const h = 3.6;
-  const y0 = 3.35;
+  const y0 = 3.15;
   for (final x0 in [0.95, 5.05]) {
-    _envelope(k, x0, y0, w, h, top: 1.0, bottom: 1.5, side: 0.7, style: _EnvStyle.coin, bottomFill: p.pale);
+    _envelope(k, x0, y0, w, h, top: 1.8, topShoulder: 1.4, bottom: 2.7, bottomShoulder: 2.7, side: 0.7, bottomStyle: _EnvStyle.flat, bottomFill: p.pale);
     k.anchor(x0, y0, w, h);
     final cx = x0 + w / 2;
     k.circle(p.pale, cx, y0 + 0.95, 0.6);
@@ -1064,8 +1075,9 @@ NgmySlide _giftCardEnvelopes(NgmyCraftPalette p) {
   const w = 3.6;
   const h = 2.4;
   const x0 = (_pw - w) / 2;
-  for (final y0 in [1.6, 6.75]) {
-    _envelope(k, x0, y0, w, h, top: 1.2, bottom: 1.3, side: 0.9, topFill: y0 < 3 ? p.main : p.accent);
+  for (final y0 in [1.45, 6.3]) {
+    // The side flaps meet and overlap in the middle; the bottom flap is glued over them.
+    _envelope(k, x0, y0, w, h, top: 1.1, topShoulder: 0.7, bottom: 1.2, bottomShoulder: 0.9, side: 2.1, sideTapBottom: 0.3, topFill: y0 < 3 ? p.main : p.accent);
     k.anchor(x0, y0, w, h);
     k.text('A gift for you', x0 + 0.2, y0 + 0.5, w - 0.4, 0.5, pt: 13, bold: true, color: p.main);
     k.rect(p.soft, x0 + w / 2 - 0.4, y0 + 1.05, 0.8, 0.025);
@@ -1751,14 +1763,14 @@ final List<NgmyPaperCraft> kNgmyPaperCrafts = [
       group: _lettersGroup,
       blurb: '5.75 x 4.375 in, fits a quarter-fold card',
       icon: Icons.mail_outline_rounded,
-      build: (p) => [_cardEnvelope(p, title: 'Card Envelope (A2)', w: 5.75, h: 4.375, top: 2.2, bottom: 2.55, side: 1.0)]),
+      build: (p) => [_cardEnvelope(p, title: 'Card Envelope (A2)', w: 5.75, h: 4.375, top: 2.45, topShoulder: 2.0, bottom: 2.9, bottomShoulder: 2.5, side: 1.1)]),
   NgmyPaperCraft(number: 3, 
       id: 'square_envelope',
       name: 'Square Envelope',
       group: _lettersGroup,
-      blurb: '5.5 in square for greeting cards',
+      blurb: '4.5 in square for greeting cards',
       icon: Icons.crop_square_rounded,
-      build: (p) => [_cardEnvelope(p, title: 'Square Envelope', w: 5.5, h: 5.5, top: 2.1, bottom: 2.35, side: 1.0)]),
+      build: (p) => [_cardEnvelope(p, title: 'Square Envelope', w: 4.5, h: 4.5, top: 2.3, topShoulder: 2.15, bottom: 2.9, bottomShoulder: 2.6, side: 1.2)]),
   NgmyPaperCraft(number: 4, id: 'diamond_envelope', name: 'Diamond Envelope', group: _lettersGroup, blurb: 'Classic pointed flaps', icon: Icons.diamond_outlined, build: (p) => [_diamondEnvelope(p)]),
   NgmyPaperCraft(number: 5, id: 'seed_envelopes', name: 'Seed Envelopes', group: _lettersGroup, blurb: 'Two small seed or coin packets', icon: Icons.eco_outlined, build: (p) => [_seedEnvelopes(p)]),
   NgmyPaperCraft(number: 6, id: 'gift_card_envelopes', name: 'Gift Card Envelopes', group: _lettersGroup, blurb: 'Two little envelopes for gift cards', icon: Icons.card_giftcard_rounded, build: (p) => [_giftCardEnvelopes(p)]),

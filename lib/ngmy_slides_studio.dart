@@ -27,6 +27,7 @@ import 'ngmy_quote_maker.dart';
 import 'ngmy_quote_templates.dart' show kNgmyQuoteLogoFile;
 import 'ngmy_paper_crafts.dart' show ngmyIsCraftLines, ngmyIsPaperCraftDeck, showNgmyPaperCraftPicker;
 import 'ngmy_paper_craft_ai.dart' show NgmyPaperCraftAiBubble, ngmyApplyPaperCraftEdit, showNgmyPaperCraftAiChat;
+import 'ngmy_paper_craft_stamps.dart' show NgmyCraftStampButton, ngmyApplyCraftStamp, ngmyDeckHasStampBox, showNgmyCraftStampPanel;
 import 'ngmy_paper_craft_watermark.dart'
     show NgmyCraftWatermarkButton, ngmyApplyCraftWatermarkSettings, ngmyIsCraftWatermark, showNgmyCraftWatermarkPanel;
 import 'ngmy_slides_video_export.dart';
@@ -5441,6 +5442,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
         NgmyPaperCraftAiBubble(onTap: () => unawaited(_openPaperCraftAiChat())),
         const SizedBox(width: 6),
         NgmyCraftWatermarkButton(onTap: () => unawaited(_openPaperCraftWatermark())),
+        if (ngmyDeckHasStampBox(deck)) ...[
+          const SizedBox(width: 6),
+          NgmyCraftStampButton(onTap: () => unawaited(_openPaperCraftStamp())),
+        ],
       ],
     );
     final list = ListView.separated(
@@ -5536,6 +5541,24 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
   }
 
   Widget _canvas(NgmySlide slide, bool isDark, {bool tight = false}) => _canvasPage(slide, isDark, tight: tight);
+
+  /// Fold & Cut: the NGMY stamp designs for the stamp boxes (envelopes and postcards), for the whole deck.
+  Future<void> _openPaperCraftStamp() async {
+    if (_activeDeck == null) return;
+    _stopTextEditing(unfocus: true);
+    await showNgmyCraftStampPanel(
+      context,
+      deck: () => _activeDeck!,
+      onApply: (id) {
+        final d = _activeDeck;
+        if (d == null || !mounted) return;
+        _mutate(() {
+          ngmyApplyCraftStamp(d, id);
+          _selectedElementId = null;
+        });
+      },
+    );
+  }
 
   /// Fold & Cut: the watermark panel (style, design, one or many, where, size, visibility) for the whole deck.
   Future<void> _openPaperCraftWatermark() async {

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_paper_crafts.dart';
+import 'package:ngmy/ngmy_paper_craft_stamps.dart';
 import 'package:ngmy/ngmy_slides_export.dart';
 import 'package:ngmy/ngmy_slides_models.dart';
 
@@ -48,6 +49,80 @@ double _glueWidthMm(List<double> g) {
   return 2 * r * 25.4;
 }
 
+typedef _Pt = (double, double);
+
+bool _in(List<_Pt> poly, _Pt p) {
+  var c = false;
+  for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    final a = poly[i], b = poly[j];
+    if ((a.$2 > p.$2) != (b.$2 > p.$2) && p.$1 < (b.$1 - a.$1) * (p.$2 - a.$2) / (b.$2 - a.$2) + a.$1) c = !c;
+  }
+  return c;
+}
+
+/// Distance from [p] to the edges of [poly], leaving out edges that lie on a fold ([skip] says which).
+double _edgeDist(List<_Pt> poly, _Pt p, {bool Function(_Pt a, _Pt b)? skip}) {
+  var best = double.infinity;
+  for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    final a = poly[j], b = poly[i];
+    if (skip != null && skip(a, b)) continue;
+    final dx = b.$1 - a.$1, dy = b.$2 - a.$2;
+    final l2 = dx * dx + dy * dy;
+    final t = l2 == 0 ? 0.0 : (((p.$1 - a.$1) * dx + (p.$2 - a.$2) * dy) / l2).clamp(0.0, 1.0);
+    best = math.min(best, math.sqrt(math.pow(p.$1 - a.$1 - t * dx, 2) + math.pow(p.$2 - a.$2 - t * dy, 2)));
+  }
+  return best;
+}
+
+/// Folds one envelope net on paper (each flap turned over its fold line onto the back of the front) and measures it.
+({int gapPoints, double bottomOnSideMm, double topOverOpeningMm, String worstAt, bool onPage}) _foldEnvelope(Map<String, dynamic> e) {
+  final b = [for (final v in e['b'] as List) (v as num).toDouble()];
+  final x0 = b[0], y0 = b[1], x1 = b[0] + b[2], y1 = b[1] + b[3];
+  List<_Pt> pts(String k) {
+    final v = [for (final n in e[k] as List) (n as num).toDouble()];
+    return [for (var i = 0; i + 1 < v.length; i += 2) (v[i], v[i + 1])];
+  }
+
+  final flat = [pts('t'), pts('r'), pts('u'), pts('l')];
+  final onPage = flat.every((f) => f.every((q) => q.$1 >= 0.2 && q.$1 <= 8.3 && q.$2 >= 0.2 && q.$2 <= 10.8));
+  final top = [for (final q in flat[0]) (q.$1, 2 * y0 - q.$2)];
+  final right = [for (final q in flat[1]) (2 * x1 - q.$1, q.$2)];
+  final bottom = [for (final q in flat[2]) (q.$1, 2 * y1 - q.$2)];
+  final left = [for (final q in flat[3]) (2 * x0 - q.$1, q.$2)];
+  bool onLine(_Pt a, _Pt c, {double? y, double? x}) =>
+      (y != null && (a.$2 - y).abs() < 1e-3 && (c.$2 - y).abs() < 1e-3) || (x != null && (a.$1 - x).abs() < 1e-3 && (c.$1 - x).abs() < 1e-3);
+  var gaps = 0;
+  var bottomRight = 0.0, bottomLeft = 0.0;
+  var topMargin = double.infinity;
+  var worstAt = '';
+  const step = 0.02;
+  for (var x = x0 + step / 2; x < x1; x += step) {
+    for (var y = y0 + step / 2; y < y1; y += step) {
+      final p = (x, y);
+      final inT = _in(top, p), inR = _in(right, p), inB = _in(bottom, p), inL = _in(left, p);
+      if (!inT && !inR && !inB && !inL) gaps++;
+      // How wide the glued strip is: the biggest circle inside both the bottom flap and a side flap.
+      if (inB && inR) bottomRight = math.max(bottomRight, math.min(_edgeDist(bottom, p), _edgeDist(right, p)));
+      if (inB && inL) bottomLeft = math.max(bottomLeft, math.min(_edgeDist(bottom, p), _edgeDist(left, p)));
+      // The opening (not closed by the side and bottom flaps): the top flap must reach 15 mm past every part of it.
+      if (!inR && !inB && !inL) {
+        final m = inT ? _edgeDist(top, p, skip: (a, c) => onLine(a, c, y: y0)) : 0.0;
+        if (m < topMargin) {
+          topMargin = m;
+          worstAt = '${(x - x0).toStringAsFixed(2)},${(y - y0).toStringAsFixed(2)} in from the top left';
+        }
+      }
+    }
+  }
+  return (
+    gapPoints: gaps,
+    bottomOnSideMm: 2 * math.min(bottomRight, bottomLeft) * 25.4,
+    topOverOpeningMm: (topMargin.isFinite ? topMargin : 1) * 25.4,
+    worstAt: worstAt,
+    onPage: onPage,
+  );
+}
+
 void main() {
   test('Every glue tab and envelope glue area is wide enough to glue (at least 12 mm, envelopes at least 14 mm)', () {
     // Envelope glue areas are worked out from the folds: the part of each side flap that the bottom flap covers.
@@ -80,14 +155,39 @@ void main() {
         final slides = craft.build(palette);
         final s = id == 'postcards' ? slides.last : slides.first;
         final spec = jsonDecode(s.elements.firstWhere(ngmyIsCraftLines).text) as Map<String, dynamic>;
-        final stamp = [for (final n in spec['n'] as List) n as List].where((n) => n[2] == 'STAMP').toList();
-        expect(stamp, isNotEmpty, reason: id);
-        for (final n in stamp) {
-          expect(n[3], palette.ink, reason: '$id stamp label uses the darkest colour');
-          expect(n.length > 5 && n[5] == 1, isTrue, reason: '$id stamp label is bold');
-        }
-        expect((spec['f'] as List).any((f) => (f as List)[0] == palette.ink), isTrue, reason: '$id dark stamp frame');
+        final st = spec['st'] as Map<String, dynamic>;
+        expect(st['id'], 'plain', reason: id);
+        expect(st['b'] as List, isNotEmpty, reason: id);
+        expect(st['c'], [palette.ink, palette.main, palette.soft, palette.pale, palette.accent], reason: id);
+        final box = [for (final v in (st['b'] as List).first as List) (v as num).toDouble()];
+        final d = ngmyCraftStampDraw('plain', box[0], box[1], box[2], box[3], [for (final v in st['c'] as List) v as int]);
+        final label = d.notes.where((n) => n.$3 == 'STAMP').single;
+        expect(label.$4, palette.ink, reason: '$id stamp label uses the darkest colour');
+        expect(label.$6, isTrue, reason: '$id stamp label is bold');
+        expect(d.fills.any((f) => f[0] == palette.ink), isTrue, reason: '$id dark stamp frame');
       }
+    }
+  });
+
+  test('Every envelope folds shut: no gap shows, flaps overlap by 15 mm or more, all on the printable page', () {
+    for (final craft in kNgmyPaperCrafts) {
+      for (final s in craft.build(kNgmyCraftPalettes.first)) {
+        final spec = jsonDecode(s.elements.firstWhere(ngmyIsCraftLines).text) as Map<String, dynamic>;
+        for (final e in (spec['e'] as List? ?? const [])) {
+          final r = _foldEnvelope(e as Map<String, dynamic>);
+          final why = '${craft.id}: $r';
+          expect(r.gapPoints, 0, reason: '$why - some of the inside shows');
+          expect(r.bottomOnSideMm, greaterThanOrEqualTo(15), reason: '$why - bottom flap over side flaps');
+          expect(r.topOverOpeningMm, greaterThanOrEqualTo(15), reason: '$why - top flap over the opening');
+          expect(r.onPage, isTrue, reason: '$why - outside the printable page');
+        }
+      }
+    }
+    // Every envelope design is checked.
+    for (final id in ['card_envelope', 'square_envelope', 'diamond_envelope', 'seed_envelopes', 'gift_card_envelopes']) {
+      final s = kNgmyPaperCrafts.firstWhere((c) => c.id == id).build(kNgmyCraftPalettes.first).first;
+      final spec = jsonDecode(s.elements.firstWhere(ngmyIsCraftLines).text) as Map<String, dynamic>;
+      expect(spec['e'] as List?, isNotEmpty, reason: id);
     }
   });
 
