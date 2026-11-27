@@ -414,6 +414,18 @@ serve(async (req) => {
       transaction_id: String(session?.id ?? p.transaction_id ?? ""),
       course_access: cat?.grants_course === true,
     }).eq("id", purchaseId).eq("status", "pending");
+    // Visitors give their email, name and phone to Stripe, not to the app: keep them on the purchase.
+    // A separate write, so a missing column can never stop the payment being marked paid.
+    const cd = session?.customer_details ?? {};
+    const buyer: Record<string, string> = {};
+    if (cd.email && !String(p.email ?? "").trim()) buyer.email = String(cd.email).trim().toLowerCase();
+    if (cd.name && !String(p.buyer_name ?? "").trim()) buyer.buyer_name = String(cd.name).slice(0, 80);
+    if (cd.phone && !String(p.buyer_phone ?? "").trim()) buyer.buyer_phone = String(cd.phone).slice(0, 20);
+    if (Object.keys(buyer).length > 0) {
+      try {
+        await admin.from("service_purchases").update(buyer).eq("id", purchaseId);
+      } catch (_) { /* details are a nice-to-have */ }
+    }
     return json({ received: true, service_purchase: purchaseId });
   }
 

@@ -59,26 +59,16 @@ class NgmyHelpServicesApi {
 
   static Future<Map<String, dynamic>> guestList() => _guestCall('svcGuestList');
   static Future<Map<String, dynamic>> guestPurchases(List<String> tokens) => _guestCall('svcGuestPurchases', {'tokens': tokens});
-  static Future<Map<String, dynamic>> guestCashApp(NgmyGuestBuyer who, String categoryId, String code, String proofBase64, String proofMime) =>
-      _guestCall('svcGuestCashApp', {...who.toMap(), 'categoryId': categoryId, 'code': code, 'proofBase64': proofBase64, 'proofMime': proofMime});
-  static Future<Map<String, dynamic>> guestStripeStart(NgmyGuestBuyer who, String categoryId) =>
-      _guestCall('svcGuestStripeStart', {...who.toMap(), 'categoryId': categoryId, 'origin': Uri.base.origin});
+  static Future<Map<String, dynamic>> guestCashApp(String categoryId, String code, String proofBase64, String proofMime) =>
+      _guestCall('svcGuestCashApp', {'categoryId': categoryId, 'code': code, 'proofBase64': proofBase64, 'proofMime': proofMime});
+  static Future<Map<String, dynamic>> guestStripeStart(String categoryId) =>
+      _guestCall('svcGuestStripeStart', {'categoryId': categoryId, 'origin': Uri.base.origin});
   static Future<Map<String, dynamic>> guestStripeCancel(String token) => _guestCall('svcGuestStripeCancel', {'token': token});
 }
 
-/// A visitor who pays without an NGMY account: their name, email and WhatsApp number.
-class NgmyGuestBuyer {
-  const NgmyGuestBuyer({required this.name, required this.email, required this.phone});
-  final String name;
-  final String email;
-  final String phone;
-  Map<String, dynamic> toMap() => {'name': name, 'email': email, 'phone': phone};
-}
-
-/// What a guest keeps on their own phone: the private tokens of their purchases and their details.
+/// What a visitor keeps on their own phone: the private tokens of their purchases (no account needed).
 class NgmyGuestServicesStore {
   static const _tokensKey = 'ngmy_svc_guest_tokens_v1';
-  static const _whoKey = 'ngmy_svc_guest_buyer_v1';
 
   static Future<List<String>> tokens() async {
     try {
@@ -95,24 +85,6 @@ class NgmyGuestServicesStore {
       final p = await SharedPreferences.getInstance();
       final list = [token, ...(p.getStringList(_tokensKey) ?? const <String>[]).where((t) => t != token)].take(20).toList();
       await p.setStringList(_tokensKey, list);
-    } catch (_) {}
-  }
-
-  static Future<NgmyGuestBuyer?> buyer() async {
-    try {
-      final p = await SharedPreferences.getInstance();
-      final l = p.getStringList(_whoKey);
-      if (l == null || l.length != 3) return null;
-      return NgmyGuestBuyer(name: l[0], email: l[1], phone: l[2]);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  static Future<void> saveBuyer(NgmyGuestBuyer who) async {
-    try {
-      final p = await SharedPreferences.getInstance();
-      await p.setStringList(_whoKey, [who.name, who.email, who.phone]);
     } catch (_) {}
   }
 }
@@ -482,120 +454,16 @@ class _NgmyHelpServicesPageState extends State<NgmyHelpServicesPage> with Widget
     if (mounted) _load(quiet: true);
   }
 
-  /// Guests: full name, email and WhatsApp number before paying (remembered on this phone for next time).
-  Future<NgmyGuestBuyer?> _askGuestDetails(NgmyServiceCategory cat) async {
-    final saved = await NgmyGuestServicesStore.buyer();
-    if (!mounted) return null;
-    final name = TextEditingController(text: saved?.name ?? '');
-    final email = TextEditingController(text: saved?.email ?? '');
-    final phone = TextEditingController(text: saved?.phone ?? '');
-    final look = _look(cat.icon);
-    String? problem;
-    final who = await showDialog<NgmyGuestBuyer>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) {
-          InputDecoration deco(String label, IconData icon) => InputDecoration(
-                labelText: label,
-                prefixIcon: Icon(icon),
-                filled: true,
-                fillColor: const Color(0xFFF6F8FC),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-              );
-          void submit() {
-            final n = name.text.trim();
-            final e = email.text.trim().toLowerCase();
-            final ph = phone.text.replaceAll(RegExp(r'[^\d+]'), '');
-            if (n.length < 3) {
-              setLocal(() => problem = _t('Enter your full name.', 'Andika jina lako kamili.'));
-            } else if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$').hasMatch(e)) {
-              setLocal(() => problem = _t('Enter a correct email address.', 'Andika barua pepe sahihi.'));
-            } else if (ph.replaceAll('+', '').length < 7) {
-              setLocal(() => problem = _t('Enter your phone (WhatsApp) number.', 'Andika namba yako ya simu (WhatsApp).'));
-            } else {
-              Navigator.pop(ctx, NgmyGuestBuyer(name: n, email: e, phone: ph));
-            }
-          }
-
-          return Dialog(
-            backgroundColor: Colors.white,
-            insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 22, 20, 14),
-                child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  Row(children: [
-                    Container(
-                      width: 46,
-                      height: 46,
-                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(15), gradient: LinearGradient(colors: look.colors)),
-                      child: Icon(look.icon, color: Colors.white),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(_t('Your details', 'Taarifa zako'),
-                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Color(0xFF0F172A))),
-                        Text('${cat.title()} · ${_money(cat.price)}',
-                            maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, color: Color(0xFF334155), fontWeight: FontWeight.w700)),
-                      ]),
-                    ),
-                  ]),
-                  const SizedBox(height: 10),
-                  Text(
-                    _t('No account needed. We use these to send your receipt and to contact you on WhatsApp.',
-                        'Huhitaji akaunti. Tunazitumia kukutumia risiti na kuwasiliana nawe kwa WhatsApp.'),
-                    style: const TextStyle(fontSize: 13, height: 1.35, color: Color(0xFF334155), fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 14),
-                  TextField(controller: name, textCapitalization: TextCapitalization.words, decoration: deco(_t('Full name', 'Jina kamili'), Icons.person_rounded)),
-                  const SizedBox(height: 10),
-                  TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: deco(_t('Email', 'Barua pepe'), Icons.mail_rounded)),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: phone,
-                    keyboardType: TextInputType.phone,
-                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d+\-\s()]'))],
-                    decoration: deco(_t('Phone (WhatsApp)', 'Simu (WhatsApp)'), Icons.chat_rounded),
-                    onSubmitted: (_) => submit(),
-                  ),
-                  if (problem != null) ...[
-                    const SizedBox(height: 10),
-                    Text(problem!, style: const TextStyle(color: _kRed, fontWeight: FontWeight.w800, fontSize: 13)),
-                  ],
-                  const SizedBox(height: 16),
-                  _GradientButton(text: _t('Continue to pay', 'Endelea kulipa'), icon: Icons.lock_rounded, colors: look.colors, onTap: submit),
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: Text(_t('Cancel', 'Ghairi'), style: const TextStyle(color: Color(0xFF334155), fontWeight: FontWeight.w800)),
-                  ),
-                ]),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-    if (who != null) await NgmyGuestServicesStore.saveBuyer(who);
-    return who;
-  }
-
   Future<void> _pay(NgmyServiceCategory cat) async {
     // The same payment pop-up as Help Center, House + Insurance.
     final look = _look(cat.icon);
-    // A visitor without an account first gives their name, email and WhatsApp number.
-    NgmyGuestBuyer? who;
-    if (widget.guest) {
-      who = await _askGuestDetails(cat);
-      if (who == null || !mounted) return;
-    }
-    final guestBuyer = who;
+    // Visitors without an account pay exactly like members: nothing is asked here (Stripe asks for the
+    // email, name and phone on its own page).
+    final guest = widget.guest;
     // The card checkout is made on the server while the pop-up is showing, so that Pay with card opens the
     // Stripe page inside the tap itself (like Phone Unlock). A phone blocks a window opened later than the tap.
     Map<String, dynamic>? ready;
-    final preparing = (guestBuyer != null ? NgmyHelpServicesApi.guestStripeStart(guestBuyer, cat.id) : NgmyHelpServicesApi.stripeStart(cat.id))
+    final preparing = (guest ? NgmyHelpServicesApi.guestStripeStart(cat.id) : NgmyHelpServicesApi.stripeStart(cat.id))
         .then((r) {
       ready = r;
       final token = (r['token'] ?? '').toString();
@@ -655,11 +523,11 @@ class _NgmyHelpServicesPageState extends State<NgmyHelpServicesPage> with Widget
       _awaitingId = (r['purchaseId'] ?? '').toString();
       ngmyHelpServicesGoTo(url);
     } else {
-      await _payCashApp(cat, guestBuyer);
+      await _payCashApp(cat, guest: guest);
     }
   }
 
-  Future<void> _payCashApp(NgmyServiceCategory cat, [NgmyGuestBuyer? who]) async {
+  Future<void> _payCashApp(NgmyServiceCategory cat, {bool guest = false}) async {
     var cfg = _helpConfig(widget.config);
     // Guests have no app settings: the Cash App tag comes from the server.
     if (widget.guest && _guestCashTag.trim().isNotEmpty) cfg = cfg.copyWith(cashAppTag: _guestCashTag.trim());
@@ -676,8 +544,8 @@ class _NgmyHelpServicesPageState extends State<NgmyHelpServicesPage> with Widget
       cashAppTag: cfg.cashAppDisplayTag(),
       fullTerm: false,
       onSubmit: (code, proof, mime) async {
-        if (who == null) return NgmyHelpServicesApi.cashApp(cat.id, code, proof, mime);
-        final r = await NgmyHelpServicesApi.guestCashApp(who, cat.id, code, proof, mime);
+        if (!guest) return NgmyHelpServicesApi.cashApp(cat.id, code, proof, mime);
+        final r = await NgmyHelpServicesApi.guestCashApp(cat.id, code, proof, mime);
         final token = (r['token'] ?? '').toString();
         if (token.isNotEmpty) await NgmyGuestServicesStore.addToken(token);
         return r;
@@ -685,7 +553,7 @@ class _NgmyHelpServicesPageState extends State<NgmyHelpServicesPage> with Widget
     );
     if (res == null || !mounted) return;
     // A guest sees the pending purchase with its receipt link, so they can come back after approval.
-    if (who != null && res['purchase'] is Map) {
+    if (guest && res['purchase'] is Map) {
       await _load(quiet: true);
       if (mounted) await _openPurchase(Map<String, dynamic>.from(res['purchase'] as Map));
       return;
@@ -1727,8 +1595,12 @@ class _AdminServicesSheetState extends State<_AdminServicesSheet> {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(name.isNotEmpty ? name : (p['email'] ?? '').toString(), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: c.ink)),
               if (name.isNotEmpty) Text((p['email'] ?? '').toString(), style: TextStyle(fontSize: 11.5, color: c.muted)),
-              if ((p['buyerPhone'] ?? '').toString().isNotEmpty)
-                Text('${p['guest'] == true ? 'GUEST (no account) · ' : ''}Phone ${p['buyerPhone']}',
+              if ((p['buyerPhone'] ?? '').toString().isNotEmpty || p['guest'] == true)
+                Text(
+                    [
+                      if (p['guest'] == true) 'GUEST (no account, from the Bio link)',
+                      if ((p['buyerPhone'] ?? '').toString().isNotEmpty) 'Phone ${p['buyerPhone']}',
+                    ].join(' · '),
                     style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: p['guest'] == true ? const Color(0xFF0E7490) : c.muted)),
               Text(_titles[p['categoryId']] ?? (p['categoryId'] ?? '').toString(), style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: c.ink)),
               Text('${method == 'stripe' ? 'Card (Stripe)' : 'Cash App'} · ${_date(p['createdAt'])} · ${p['receiptNo'] ?? ''}', style: TextStyle(fontSize: 11.5, color: c.muted)),
