@@ -11,6 +11,7 @@ import 'ngmy_bio_templates.dart';
 import 'ngmy_guest_link_missing.dart';
 import 'ngmy_bio_launch_stub.dart' if (dart.library.html) 'ngmy_bio_launch_web.dart';
 import 'ngmy_guest_html_splash_stub.dart' if (dart.library.html) 'ngmy_guest_html_splash_web.dart';
+import 'ngmy_help_services_nav_stub.dart' if (dart.library.html) 'ngmy_help_services_nav_web.dart';
 import 'ngmy_platform_graphics.dart';
 
 String? ngmyPublishedBioSlugFromLaunch() => ngmyReadBioSlugFromLaunchUrl();
@@ -153,7 +154,12 @@ class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> {
       value: ngmyBioSystemUiOverlay(chrome),
       child: Scaffold(
         backgroundColor: chrome,
-        body: NgmyBioPreview(document: _doc!, fullBleed: true),
+        body: NgmyBioPreview(
+          document: _doc!,
+          fullBleed: true,
+          // Admin Bio pages with the switch on: hidden spots open Help & Services on ngmy.org.
+          onHelpTap: ngmyHelpServicesOpenFromBio,
+        ),
       ),
     );
   }

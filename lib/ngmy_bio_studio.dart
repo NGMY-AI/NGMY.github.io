@@ -320,6 +320,8 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
 
   Future<void> _publish() async {
     _sync();
+    // The hidden Help & Services spots are for admin Bio pages only.
+    if (!widget.isAdmin) _doc.helpTap = false;
     if (_doc.displayName.trim().isEmpty) {
       ScaffoldMessenger.of(
         context,
@@ -401,6 +403,37 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     await _copyLink(_doc.publicUrl, silent: true);
     if (!mounted) return;
     await _showPublishedDialog(_doc.publicUrl);
+  }
+
+  /// Admin only: turns the hidden Help & Services spots on or off for this Bio. Saved on the Bio and,
+  /// when the Bio is already live, on the public link too. Nothing on the page looks different.
+  Future<void> _toggleHelpTap() async {
+    if (!widget.isAdmin || widget._isLocal) return;
+    _sync();
+    final on = !_doc.helpTap;
+    setState(() => _doc.helpTap = on);
+    String? err;
+    try {
+      await saveNgmyBio(userEmail: widget.userEmail, doc: _doc);
+      widget.onSaved(_doc.copy());
+      final live = _originalPublishedSlug.trim().isNotEmpty ? _originalPublishedSlug : _doc.slug;
+      if (_doc.isPublished && live.trim().isNotEmpty) {
+        err = await NgmyBioPublishRegistry.setHelpTap(slug: live, on: on, ownerEmail: widget.userEmail);
+      }
+    } catch (e) {
+      err = 'Could not save. Try again.';
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          err ??
+              (on
+                  ? 'Help & Services tap is ON. The frame around the picture opens Help & Services.'
+                  : 'Help & Services tap is OFF.'),
+        ),
+      ),
+    );
   }
 
   Future<void> _copyLink(String url, {bool silent = false}) async {
@@ -1242,6 +1275,16 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          // Admin only: switch for the hidden Help & Services spots on this Bio page.
+          if (widget.isAdmin && !widget._isLocal)
+            IconButton(
+              onPressed: _toggleHelpTap,
+              tooltip: _doc.helpTap ? 'Help & Services tap: ON' : 'Help & Services tap: OFF',
+              icon: Icon(
+                _doc.helpTap ? Icons.support_agent_rounded : Icons.support_agent_outlined,
+                color: _doc.helpTap ? _kBioAccent : t.iconButtonIcon.withValues(alpha: 0.45),
+              ),
+            ),
           if (_doc.publicUrl.isNotEmpty)
             IconButton(
               onPressed: () => _copyLink(_doc.publicUrl),

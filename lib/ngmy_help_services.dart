@@ -162,6 +162,7 @@ Future<void> showNgmyHelpServicesPage(
 }
 
 /// When the app opens after Stripe (?svc_paid=<session> or ?svc_cancel=1): the session id, 'cancel', or null.
+/// 'open' when a visitor came from the hidden Help & Services spot on an admin Bio page.
 /// It is read once and removed from the address.
 String? ngmyHelpServicesTakeReturn() {
   try {
@@ -224,7 +225,7 @@ class _NgmyHelpServicesPageState extends State<NgmyHelpServicesPage> with Widget
     _lang.code.addListener(_langChanged);
     unawaited(_lang.load());
     final back = widget.returnSession;
-    if (back != null && back != 'cancel' && back.isNotEmpty) _returnSession = back;
+    if (back != null && back != 'cancel' && back != 'open' && back.isNotEmpty) _returnSession = back;
     _load();
   }
 

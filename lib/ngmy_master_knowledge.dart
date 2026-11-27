@@ -125,6 +125,7 @@ const List<String> kNgmyFeatureFacts = [
   // Creating
   'NGMY QUOTES: make a picture quote with many designs, word sizes, text styles, your own photo and the NGMY logo. It also makes NEWS: a newspaper page with a headline, article and your picture, written by an AI that knows NGMY.',
   'BIO STUDIO: link-in-bio pages with designs such as Neural Core, Quantum Grid and Mech Terminal, and visitors can react to a page.',
+  'BIO LINK HELP AND SERVICES TAP (ADMIN ONLY): on a Bio link page made by the admin, hidden tap spots can open Help and Services. On the Holo Member design they are the card chip and the small white tap (contactless) icon at the top of the card. On every other design they are the frame or ring around the profile picture and the big shapes beside it (for example the two glass panels on Blush Glass). Tapping the picture itself does nothing new. Nothing on the page looks different: no new icons, borders or effects. A visitor who taps a spot goes to ngmy.org; if they are not logged in they log in first and then land on Help and Services. The admin turns it on or off with the small helper (headset) button next to the copy link icon at the top of the Bio editor; it is bright when on and faded when off, and the change also reaches the live link. Bio pages of members never have these spots.',
   'MENU STUDIO: restaurant menus published as a link.',
   'BUSINESS CARD CREATOR: design and download business cards.',
   'INVOICES AND QUOTE CALC: invoices, receipts and estimates with NGMY watermarks.',

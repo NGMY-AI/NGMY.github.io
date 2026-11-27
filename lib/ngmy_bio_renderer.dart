@@ -4,6 +4,7 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderProxyBox;
 
 import 'ngmy_image_memo.dart';
 import 'ngmy_platform_graphics.dart';
@@ -27,6 +28,7 @@ class NgmyBioPreview extends StatelessWidget {
     this.interactive = true,
     this.lightweight = false,
     this.fullBleed = false,
+    this.onHelpTap,
   });
 
   final NgmyBioDocument document;
@@ -35,6 +37,22 @@ class NgmyBioPreview extends StatelessWidget {
   final bool interactive;
   final bool lightweight;
   final bool fullBleed;
+
+  /// Admin Bio pages only: what a tap on the hidden Help & Services spots does (the frame around the
+  /// picture, the shapes beside it, and on Holo Member the card chip and the tap icon). The spots only
+  /// exist when the document has [NgmyBioDocument.helpTap] on. They draw nothing at all.
+  final VoidCallback? onHelpTap;
+
+  bool get _helpOn => interactive && document.helpTap && onHelpTap != null;
+
+  /// Hidden Help & Services spot: taps on anything drawn inside [child] open the page, except taps on the
+  /// picture itself (marked with [_helpPicture]), which keep doing what they did before.
+  /// [opaque] also counts the empty space inside the spot (for designs whose frame is only a soft glow).
+  Widget _helpZone(Widget child, {bool opaque = false}) =>
+      _helpOn ? _NgmyBioHelpZone(onTap: onHelpTap!, opaque: opaque, child: child) : child;
+
+  /// Marks the profile picture so a hidden spot around it never reacts to a tap on the picture itself.
+  Widget _helpPicture(Widget child) => _helpOn ? _NgmyBioHelpPicture(child: child) : child;
 
   @override
   Widget build(BuildContext context) {
@@ -1215,7 +1233,7 @@ class NgmyBioPreview extends StatelessWidget {
               ),
             ),
             SizedBox(height: compact ? 18 : 26),
-            SizedBox(
+            _helpZone(SizedBox(
               width: ringSize,
               height: ringSize,
               child: Stack(
@@ -1235,7 +1253,7 @@ class NgmyBioPreview extends StatelessWidget {
                   _avatar(document.avatarImageBase64, avatarSize, ring),
                 ],
               ),
-            ),
+            )),
             SizedBox(height: compact ? 12 : 16),
             Text(
               name.toUpperCase(),
@@ -1287,7 +1305,7 @@ class NgmyBioPreview extends StatelessWidget {
         child: Column(
           children: [
             SizedBox(height: compact ? 10 : 18),
-            SizedBox(
+            _helpZone(SizedBox(
               width: size,
               height: size,
               child: Stack(
@@ -1315,7 +1333,7 @@ class NgmyBioPreview extends StatelessWidget {
                   _avatar(document.avatarImageBase64, avatarSize, ring),
                 ],
               ),
-            ),
+            )),
             SizedBox(height: compact ? 8 : 12),
             _belowName(tpl, name, tagline),
             SizedBox(height: compact ? 14 : 18),
@@ -1343,7 +1361,7 @@ class NgmyBioPreview extends StatelessWidget {
               height: photo,
               child: front
                   ? (document.avatarImageBase64.isNotEmpty
-                      ? _bioImage(document.avatarImageBase64, fit: BoxFit.cover, width: photo, height: photo)
+                      ? _helpPicture(_bioImage(document.avatarImageBase64, fit: BoxFit.cover, width: photo, height: photo))
                       : Container(color: tpl.accent.withValues(alpha: 0.3), child: Icon(Icons.person_rounded, size: photo * 0.5, color: Colors.white)))
                   : Container(color: tpl.accent.withValues(alpha: front ? 0.3 : 0.18)),
             ),
@@ -1355,7 +1373,7 @@ class NgmyBioPreview extends StatelessWidget {
         child: Column(
           children: [
             SizedBox(height: compact ? 14 : 22),
-            SizedBox(
+            _helpZone(SizedBox(
               height: photo + 70,
               child: Stack(
                 alignment: Alignment.center,
@@ -1374,7 +1392,7 @@ class NgmyBioPreview extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
+            )),
             Text(
               name,
               textAlign: TextAlign.center,
@@ -1452,11 +1470,11 @@ class NgmyBioPreview extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
+                      _helpZone(Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         color: tpl.accent,
                         child: const Text('EXCLUSIVE', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1.6)),
-                      ),
+                      )),
                       const SizedBox(height: 6),
                       Text(name, style: TextStyle(color: Colors.white, fontSize: compact ? 22 : 28, fontWeight: FontWeight.w900, height: 1)),
                       if (tagline.isNotEmpty)
@@ -1467,7 +1485,7 @@ class NgmyBioPreview extends StatelessWidget {
                 Positioned(
                   right: pad,
                   bottom: pad,
-                  child: Container(
+                  child: _helpZone(Container(
                     padding: const EdgeInsets.all(4),
                     color: Colors.white,
                     child: Row(
@@ -1476,7 +1494,7 @@ class NgmyBioPreview extends StatelessWidget {
                           Container(width: i % 3 == 0 ? 2.2 : 1.1, height: 22, margin: const EdgeInsets.only(right: 1.2), color: Colors.black),
                       ],
                     ),
-                  ),
+                  )),
                 ),
               ],
             ),
@@ -1507,7 +1525,7 @@ class NgmyBioPreview extends StatelessWidget {
         child: Column(
           children: [
             SizedBox(height: compact ? 8 : 14),
-            SizedBox(
+            _helpZone(SizedBox(
               width: blob,
               height: blob,
               child: Stack(
@@ -1517,7 +1535,7 @@ class NgmyBioPreview extends StatelessWidget {
                   _avatar(document.avatarImageBase64, avatarSize, ring),
                 ],
               ),
-            ),
+            )),
             SizedBox(height: compact ? 8 : 12),
             _belowName(tpl, name, tagline),
             SizedBox(height: compact ? 14 : 18),
@@ -1551,7 +1569,7 @@ class NgmyBioPreview extends StatelessWidget {
           const SizedBox(height: 6),
           NgmyTechTelemetry(color: a, t: t, labels: const ['CPU', 'SIGNAL', 'POWER']),
           SizedBox(height: compact ? 12 : 18),
-          SizedBox(
+          _helpZone(SizedBox(
             width: d,
             height: d,
             child: Stack(
@@ -1566,7 +1584,7 @@ class NgmyBioPreview extends StatelessWidget {
                 ),
               ],
             ),
-          ),
+          )),
           const SizedBox(height: 10),
           Text(name.toUpperCase(), textAlign: TextAlign.center, style: _mono(tpl.titleColor, compact ? 19 : 24, weight: FontWeight.w900).copyWith(letterSpacing: 3)),
           if (tagline.isNotEmpty)
@@ -1735,7 +1753,7 @@ class NgmyBioPreview extends StatelessWidget {
                     Positioned(
                       left: 16,
                       top: 16,
-                      child: Container(
+                      child: _helpZone(Container(
                         width: 38,
                         height: 28,
                         decoration: BoxDecoration(
@@ -1743,9 +1761,9 @@ class NgmyBioPreview extends StatelessWidget {
                           gradient: const LinearGradient(colors: [Color(0xFFFDE68A), Color(0xFFD4AF37), Color(0xFFB8860B)]),
                         ),
                         child: CustomPaint(painter: _ProChipPainter()),
-                      ),
+                      )),
                     ),
-                    Positioned(right: 16, top: 14, child: Icon(Icons.contactless_rounded, color: Colors.white.withValues(alpha: 0.85), size: 26)),
+                    Positioned(right: 16, top: 14, child: _helpZone(Icon(Icons.contactless_rounded, color: Colors.white.withValues(alpha: 0.85), size: 26))),
                     Positioned(right: 16, bottom: 16, child: _avatar(document.avatarImageBase64, avatarSize * 0.78, ring)),
                     Positioned(
                       left: 16,
@@ -1798,7 +1816,7 @@ class NgmyBioPreview extends StatelessWidget {
         child: Column(
           children: [
             SizedBox(height: compact ? topGap * 0.6 : topGap),
-            hero,
+            _helpZone(hero),
             SizedBox(height: compact ? 8 : 12),
             nameOverride ?? _belowName(tpl, name, tagline),
             if (nameOverride != null)
@@ -1909,7 +1927,7 @@ class NgmyBioPreview extends StatelessWidget {
                           width: avatarSize * 0.9,
                           height: avatarSize * 0.9,
                           child: document.avatarImageBase64.isNotEmpty
-                              ? _bioImage(document.avatarImageBase64, fit: BoxFit.cover, width: avatarSize * 0.9, height: avatarSize * 0.9)
+                              ? _helpPicture(_bioImage(document.avatarImageBase64, fit: BoxFit.cover, width: avatarSize * 0.9, height: avatarSize * 0.9))
                               : ColoredBox(color: tpl.accent, child: Icon(Icons.music_note_rounded, color: Colors.white, size: avatarSize * 0.4)),
                         ),
                       ),
@@ -1960,7 +1978,7 @@ class NgmyBioPreview extends StatelessWidget {
                     width: frame * 1.3,
                     height: frame,
                     child: document.headerImageBase64.isNotEmpty || document.avatarImageBase64.isNotEmpty
-                        ? _bioImage(document.headerImageBase64.isNotEmpty ? document.headerImageBase64 : document.avatarImageBase64, fit: BoxFit.cover, width: frame * 1.3, height: frame)
+                        ? _helpPicture(_bioImage(document.headerImageBase64.isNotEmpty ? document.headerImageBase64 : document.avatarImageBase64, fit: BoxFit.cover, width: frame * 1.3, height: frame))
                         : DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(colors: tpl.headerGradient ?? [tpl.accent, tpl.pageBg]))),
                   ),
                 ),
@@ -2296,7 +2314,7 @@ class NgmyBioPreview extends StatelessWidget {
                 width: w,
                 height: w * 1.2,
                 child: document.avatarImageBase64.isNotEmpty
-                    ? _bioImage(document.avatarImageBase64, fit: BoxFit.cover, width: w, height: w * 1.2)
+                    ? _helpPicture(_bioImage(document.avatarImageBase64, fit: BoxFit.cover, width: w, height: w * 1.2))
                     : ColoredBox(color: tpl.pageBg, child: Icon(Icons.person_rounded, size: w * 0.5, color: a)),
               ),
             ),
@@ -2396,7 +2414,7 @@ class NgmyBioPreview extends StatelessWidget {
                       width: avatarSize * 0.72,
                       height: avatarSize * 0.86,
                       child: document.avatarImageBase64.isNotEmpty
-                          ? _bioImage(document.avatarImageBase64, fit: BoxFit.cover, width: avatarSize * 0.72, height: avatarSize * 0.86)
+                          ? _helpPicture(_bioImage(document.avatarImageBase64, fit: BoxFit.cover, width: avatarSize * 0.72, height: avatarSize * 0.86))
                           : ColoredBox(color: a.withValues(alpha: 0.25), child: Icon(Icons.person_rounded, color: a)),
                     ),
                   ),
@@ -2430,7 +2448,7 @@ class NgmyBioPreview extends StatelessWidget {
     return _proScroll(
       Column(
         children: [
-          SizedBox(
+          _helpZone(SizedBox(
             height: heroH,
             child: Stack(
               fit: StackFit.expand,
@@ -2453,7 +2471,7 @@ class NgmyBioPreview extends StatelessWidget {
                 Positioned(right: pad + 4, top: heroH * 0.18, child: _avatar(document.avatarImageBase64, avatarSize * 1.05, ring)),
               ],
             ),
-          ),
+          )),
           Padding(
             padding: EdgeInsets.fromLTRB(pad, 4, pad, pad),
             child: Column(
@@ -2513,13 +2531,13 @@ class NgmyBioPreview extends StatelessWidget {
   Widget _rawAvatar(double w, [double? h]) {
     final ref = document.avatarImageBase64;
     final hh = h ?? w;
-    return SizedBox(
+    return _helpPicture(SizedBox(
       width: w,
       height: hh,
       child: ref.isNotEmpty
           ? _bioImage(ref, fit: BoxFit.cover, width: w, height: hh)
           : ColoredBox(color: const Color(0xFFE5E7EB), child: Icon(Icons.person_rounded, size: math.min(w, hh) * 0.5, color: const Color(0xFF9CA3AF))),
-    );
+    ));
   }
 
   Widget _proPage(
@@ -2567,7 +2585,7 @@ class NgmyBioPreview extends StatelessWidget {
       tpl,
       pad,
       [
-        SizedBox(
+        _helpZone(SizedBox(
           height: avatarSize * 2.3,
           child: _ProTicker(
             animate: !lightweight,
@@ -2585,7 +2603,7 @@ class NgmyBioPreview extends StatelessWidget {
               ],
             ),
           ),
-        ),
+        )),
         const SizedBox(height: 12),
         const Text('NOW SHOWING', style: TextStyle(color: gold, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 4)),
         const SizedBox(height: 4),
@@ -2636,7 +2654,7 @@ class NgmyBioPreview extends StatelessWidget {
       tpl,
       pad,
       [
-        SizedBox(
+        _helpZone(SizedBox(
           height: avatarSize * 2.2,
           child: _ProTicker(
             animate: !lightweight,
@@ -2652,7 +2670,7 @@ class NgmyBioPreview extends StatelessWidget {
               ],
             ),
           ),
-        ),
+        )),
         const SizedBox(height: 10),
         _belowName(tpl, name, tagline),
         SizedBox(height: compact ? 12 : 16),
@@ -2725,7 +2743,7 @@ class NgmyBioPreview extends StatelessWidget {
         _ProTicker(
           animate: !lightweight,
           seconds: 3,
-          builder: (t) => Container(
+          builder: (t) => _helpZone(Container(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(22),
@@ -2765,7 +2783,7 @@ class NgmyBioPreview extends StatelessWidget {
                 ),
               ],
             ),
-          ),
+          )),
         ),
         const SizedBox(height: 14),
         _belowName(tpl, name, tagline),
@@ -2825,7 +2843,7 @@ class NgmyBioPreview extends StatelessWidget {
       tpl,
       pad,
       [
-        SizedBox(
+        _helpZone(SizedBox(
           width: d + 16,
           height: d,
           child: _ProTicker(
@@ -2839,7 +2857,7 @@ class NgmyBioPreview extends StatelessWidget {
               ],
             ),
           ),
-        ),
+        )),
         const SizedBox(height: 14),
         Text(name.toUpperCase(), textAlign: TextAlign.center, style: _serif(tpl.titleColor, compact ? 19 : 23, spacing: 3.5)),
         const SizedBox(height: 6),
@@ -2900,7 +2918,7 @@ class NgmyBioPreview extends StatelessWidget {
       tpl,
       pad,
       [
-        SizedBox(
+        _helpZone(SizedBox(
           height: avatarSize * 2.1,
           child: _ProTicker(
             animate: !lightweight,
@@ -2922,7 +2940,7 @@ class NgmyBioPreview extends StatelessWidget {
               ],
             ),
           ),
-        ),
+        )),
         const SizedBox(height: 8),
         _belowName(tpl, name, tagline),
         SizedBox(height: compact ? 12 : 16),
@@ -2985,7 +3003,7 @@ class NgmyBioPreview extends StatelessWidget {
         ],
       ],
       minPageHeight,
-      header: SizedBox(
+      header: _helpZone(SizedBox(
         height: h,
         child: _ProTicker(
           animate: !lightweight,
@@ -3003,7 +3021,7 @@ class NgmyBioPreview extends StatelessWidget {
             ],
           ),
         ),
-      ),
+      )),
     );
   }
 
@@ -3015,7 +3033,7 @@ class NgmyBioPreview extends StatelessWidget {
       tpl,
       pad,
       [
-        SizedBox(
+        _helpZone(SizedBox(
           width: w,
           height: avatarSize * 2.25,
           child: _ProTicker(
@@ -3035,7 +3053,7 @@ class NgmyBioPreview extends StatelessWidget {
               ],
             ),
           ),
-        ),
+        )),
         Text(name, textAlign: TextAlign.center, style: _serif(tpl.titleColor, compact ? 24 : 29)),
         if (tagline.isNotEmpty) Text('— ${tagline.toUpperCase()} —', textAlign: TextAlign.center, style: TextStyle(color: tpl.subtitleColor, fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 2.2)),
         _social(tpl),
@@ -3076,7 +3094,7 @@ class NgmyBioPreview extends StatelessWidget {
       tpl,
       pad,
       [
-        Container(
+        _helpZone(Container(
           padding: const EdgeInsets.all(5),
           decoration: BoxDecoration(color: tpl.cardBg, border: Border.all(color: gold, width: 1.4), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.10), blurRadius: 20, offset: const Offset(0, 8))]),
           child: Container(
@@ -3120,7 +3138,7 @@ class NgmyBioPreview extends StatelessWidget {
               ],
             ),
           ),
-        ),
+        )),
         _social(tpl),
         SizedBox(height: compact ? 10 : 14),
         for (final l in links)
@@ -3159,7 +3177,7 @@ class NgmyBioPreview extends StatelessWidget {
       tpl,
       pad,
       [
-        Container(
+        _helpZone(Container(
           width: w,
           height: h,
           decoration: BoxDecoration(color: frame, borderRadius: arch, border: Border.all(color: tpl.accent.withValues(alpha: 0.45), width: 1.5), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 24, offset: const Offset(0, 10))]),
@@ -3182,7 +3200,7 @@ class NgmyBioPreview extends StatelessWidget {
               ),
             ),
           ),
-        ),
+        )),
         Container(width: w + 20, height: 8, decoration: BoxDecoration(color: frame, borderRadius: BorderRadius.circular(3))),
         const SizedBox(height: 14),
         _belowName(tpl, name, tagline),
@@ -3224,7 +3242,7 @@ class NgmyBioPreview extends StatelessWidget {
       tpl,
       pad,
       [
-        SizedBox(
+        _helpZone(SizedBox(
           height: avatarSize * 1.95,
           child: _ProTicker(
             animate: !lightweight,
@@ -3246,7 +3264,7 @@ class NgmyBioPreview extends StatelessWidget {
               ],
             ),
           ),
-        ),
+        )),
         const SizedBox(height: 6),
         _belowName(tpl, name, tagline),
         SizedBox(height: compact ? 12 : 16),
@@ -3314,11 +3332,11 @@ class NgmyBioPreview extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
+                      _helpZone(Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(color: tpl.accent, borderRadius: BorderRadius.circular(4)),
                         child: Text('FEATURED', style: TextStyle(color: tpl.pageBg, fontSize: 9.5, fontWeight: FontWeight.w900, letterSpacing: 1.6)),
-                      ),
+                      )),
                       const SizedBox(height: 8),
                       Text(name, style: TextStyle(color: Colors.white, fontSize: compact ? 28 : 36, fontWeight: FontWeight.w900, height: 1, letterSpacing: -0.6)),
                       if (tagline.isNotEmpty) ...[
@@ -3421,7 +3439,7 @@ class NgmyBioPreview extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              Row(
+              _helpZone(opaque: true, Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
@@ -3450,7 +3468,7 @@ class NgmyBioPreview extends StatelessWidget {
                     ),
                   ),
                 ],
-              ),
+              )),
               _social(tpl, light: true),
               rule(),
               for (var i = 0; i < links.length; i++) ...[
@@ -3500,7 +3518,7 @@ class NgmyBioPreview extends StatelessWidget {
         tpl,
         pad,
         [
-          SizedBox(
+          _helpZone(opaque: true, SizedBox(
             height: avatarSize * 1.9,
             child: Center(
               child: Container(
@@ -3522,8 +3540,8 @@ class NgmyBioPreview extends StatelessWidget {
                 ),
               ),
             ),
-          ),
-          Row(
+          )),
+          _helpZone(Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               for (var i = 0; i < 7; i++)
@@ -3532,7 +3550,7 @@ class NgmyBioPreview extends StatelessWidget {
                   child: CustomPaint(size: const Size.square(13), painter: _ProMoonIconPainter(i / 6, a, (t * 7).floor() % 7 == i)),
                 ),
             ],
-          ),
+          )),
           const SizedBox(height: 12),
           _belowName(tpl, name, tagline),
           SizedBox(height: compact ? 8 : 12),
@@ -3576,7 +3594,7 @@ class NgmyBioPreview extends StatelessWidget {
       tpl,
       pad,
       [
-        SizedBox(
+        _helpZone(SizedBox(
           width: w,
           height: h,
           child: _ProTicker(
@@ -3596,7 +3614,7 @@ class NgmyBioPreview extends StatelessWidget {
               ],
             ),
           ),
-        ),
+        )),
         Text(name.toUpperCase(), textAlign: TextAlign.center, style: TextStyle(color: tpl.titleColor, fontSize: compact ? 22 : 27, fontWeight: FontWeight.w900, fontStyle: FontStyle.italic, letterSpacing: 1)),
         if (tagline.isNotEmpty) Text(tagline.toUpperCase(), textAlign: TextAlign.center, style: TextStyle(color: tpl.subtitleColor, fontSize: 11, fontWeight: FontWeight.w800, fontStyle: FontStyle.italic, letterSpacing: 2)),
         _social(tpl),
@@ -3654,7 +3672,7 @@ class NgmyBioPreview extends StatelessWidget {
       tpl,
       pad,
       [
-        SizedBox(
+        _helpZone(SizedBox(
           height: avatarSize * 2.1,
           child: _ProTicker(
             animate: !lightweight,
@@ -3671,7 +3689,7 @@ class NgmyBioPreview extends StatelessWidget {
               ],
             ),
           ),
-        ),
+        )),
         Text(name.toUpperCase(), textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: compact ? 26 : 32, fontWeight: FontWeight.w900, fontStyle: FontStyle.italic, shadows: stroke)),
         if (tagline.isNotEmpty) ...[
           const SizedBox(height: 10),
@@ -3759,7 +3777,7 @@ class NgmyBioPreview extends StatelessWidget {
           ),
       ],
       minPageHeight,
-      header: SizedBox(
+      header: _helpZone(SizedBox(
         height: h,
         child: _ProTicker(
           animate: !lightweight,
@@ -3771,7 +3789,7 @@ class NgmyBioPreview extends StatelessWidget {
             ],
           ),
         ),
-      ),
+      )),
     );
   }
 
@@ -3788,7 +3806,7 @@ class NgmyBioPreview extends StatelessWidget {
           tpl,
           pad,
           [
-            SizedBox(
+            _helpZone(SizedBox(
               width: d,
               height: d,
               child: Stack(
@@ -3798,7 +3816,7 @@ class NgmyBioPreview extends StatelessWidget {
                   ClipOval(child: _rawAvatar(avatarSize * 1.08)),
                 ],
               ),
-            ),
+            )),
             const SizedBox(height: 14),
             Row(
               mainAxisSize: MainAxisSize.min,
@@ -3893,7 +3911,7 @@ class NgmyBioPreview extends StatelessWidget {
           ),
       ],
       minPageHeight,
-      header: SizedBox(
+      header: _helpZone(SizedBox(
         height: h,
         child: _ProTicker(
           animate: !lightweight,
@@ -3920,7 +3938,7 @@ class NgmyBioPreview extends StatelessWidget {
             );
           },
         ),
-      ),
+      )),
     );
   }
 
@@ -3932,7 +3950,7 @@ class NgmyBioPreview extends StatelessWidget {
       tpl,
       pad,
       [
-        SizedBox(
+        _helpZone(SizedBox(
           width: d,
           height: d,
           child: _ProTicker(
@@ -3946,7 +3964,7 @@ class NgmyBioPreview extends StatelessWidget {
               ],
             ),
           ),
-        ),
+        )),
         const SizedBox(height: 14),
         _belowName(tpl, name, tagline),
         SizedBox(height: compact ? 12 : 16),
@@ -3987,7 +4005,7 @@ class NgmyBioPreview extends StatelessWidget {
         tpl,
         pad,
         [
-          SizedBox(
+          _helpZone(SizedBox(
             height: avatarSize * 2.1,
             child: Stack(
               alignment: Alignment.center,
@@ -4009,7 +4027,7 @@ class NgmyBioPreview extends StatelessWidget {
                 ),
               ],
             ),
-          ),
+          )),
           const SizedBox(height: 8),
           Text(name, textAlign: TextAlign.center, style: _serif(tpl.titleColor, compact ? 23 : 28)),
           if (tagline.isNotEmpty) Text(tagline, textAlign: TextAlign.center, style: _serif(tpl.subtitleColor, 13, italic: true, weight: FontWeight.w400)),
@@ -4062,7 +4080,7 @@ class NgmyBioPreview extends StatelessWidget {
       tpl,
       pad,
       [
-        SizedBox(
+        _helpZone(SizedBox(
           width: d,
           height: d,
           child: _ProTicker(
@@ -4076,7 +4094,7 @@ class NgmyBioPreview extends StatelessWidget {
               ],
             ),
           ),
-        ),
+        )),
         const SizedBox(height: 10),
         Text(name, textAlign: TextAlign.center, style: _serif(tpl.titleColor, compact ? 24 : 30, italic: true, weight: FontWeight.w600)),
         if (tagline.isNotEmpty) Text(tagline, textAlign: TextAlign.center, style: TextStyle(color: tpl.subtitleColor, fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1)),
@@ -4181,7 +4199,7 @@ class NgmyBioPreview extends StatelessWidget {
             Text('${(11 + (t * 40).floor() % 9)}ms', style: _mono(b.withValues(alpha: 0.8), 10)),
           ]),
           SizedBox(height: compact ? 8 : 14),
-          SizedBox(
+          _helpZone(SizedBox(
             width: d,
             height: d,
             child: Stack(
@@ -4195,7 +4213,7 @@ class NgmyBioPreview extends StatelessWidget {
                 ),
               ],
             ),
-          ),
+          )),
           const SizedBox(height: 8),
           Text(name.toUpperCase(), textAlign: TextAlign.center, style: _mono(tpl.titleColor, compact ? 20 : 25, weight: FontWeight.w900).copyWith(letterSpacing: 3, shadows: [Shadow(color: a.withValues(alpha: 0.7), blurRadius: 14)])),
           if (tagline.isNotEmpty) ...[
@@ -4230,7 +4248,7 @@ class NgmyBioPreview extends StatelessWidget {
         [
           Text('QUANTUM // GRID', style: _mono(a.withValues(alpha: 0.85), 10, weight: FontWeight.w900).copyWith(letterSpacing: 4)),
           SizedBox(height: compact ? 10 : 16),
-          SizedBox(
+          _helpZone(SizedBox(
             width: d,
             height: d,
             child: Stack(
@@ -4245,7 +4263,7 @@ class NgmyBioPreview extends StatelessWidget {
                 ),
               ],
             ),
-          ),
+          )),
           const SizedBox(height: 12),
           Text(name.toUpperCase(), textAlign: TextAlign.center, style: _mono(tpl.titleColor, compact ? 20 : 25, weight: FontWeight.w900).copyWith(letterSpacing: 4, shadows: [Shadow(color: a, blurRadius: 12), Shadow(color: b.withValues(alpha: 0.8), blurRadius: 26)])),
           if (tagline.isNotEmpty) ...[
@@ -4480,12 +4498,12 @@ class NgmyBioPreview extends StatelessWidget {
         ),
       ),
     );
-    return NgmyBioRingFrame(
+    return _helpZone(NgmyBioRingFrame(
       ringId: ring.id,
       size: size,
       accent: ring.auraColor ?? const Color(0xFFD4AF37),
-      child: SizedBox(width: size, height: size, child: inner),
-    );
+      child: SizedBox(width: size, height: size, child: _helpPicture(inner)),
+    ));
   }
 
   Widget _linkCard(NgmyBioLink link, NgmyBioTemplate tpl) {
@@ -4676,6 +4694,57 @@ class NgmyBioPreview extends StatelessWidget {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 }
+
+/// Hidden Help & Services spot (admin Bio pages). It draws nothing: no ripple, no cursor, no border.
+/// A tap on anything drawn inside it opens Help & Services, unless the tap lands on the profile picture.
+class _NgmyBioHelpZone extends StatelessWidget {
+  const _NgmyBioHelpZone({required this.onTap, required this.opaque, required this.child});
+
+  final VoidCallback onTap;
+  final bool opaque;
+  final Widget child;
+
+  static bool _onPicture(RenderObject root, Offset global) {
+    var hit = false;
+    void visit(RenderObject node) {
+      if (hit) return;
+      if (node is _RenderNgmyBioHelpPicture && node.attached && node.hasSize) {
+        final local = node.globalToLocal(global);
+        if ((Offset.zero & node.size).contains(local)) {
+          hit = true;
+          return;
+        }
+      }
+      node.visitChildren(visit);
+    }
+
+    root.visitChildren(visit);
+    return hit;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: opaque ? HitTestBehavior.opaque : null,
+      onTapUp: (details) {
+        final root = context.findRenderObject();
+        if (root != null && _onPicture(root, details.globalPosition)) return;
+        onTap();
+      },
+      child: child,
+    );
+  }
+}
+
+/// Marks the profile picture inside a hidden Help & Services spot. Draws nothing.
+class _NgmyBioHelpPicture extends SingleChildRenderObjectWidget {
+  const _NgmyBioHelpPicture({required Widget super.child});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderNgmyBioHelpPicture();
+}
+
+class _RenderNgmyBioHelpPicture extends RenderProxyBox {}
 
 class _BioLinkTap extends StatefulWidget {
   const _BioLinkTap({required this.onTap, required this.borderRadius, required this.child});

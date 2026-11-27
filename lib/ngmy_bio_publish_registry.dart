@@ -227,6 +227,39 @@ class NgmyBioPublishRegistry {
     }
   }
 
+  /// Admin switch: turns the hidden Help & Services spots on or off on an already published Bio,
+  /// without republishing anything else. Returns null when it worked, or a short reason.
+  static Future<String?> setHelpTap({
+    required String slug,
+    required bool on,
+    required String ownerEmail,
+  }) async {
+    final clean = _normSlug(slug);
+    if (clean.isEmpty) return null;
+    if (!await ngmyCanReachCloud()) return 'No internet. Try again when online.';
+    await ngmyWaitForSupabaseReady();
+    try {
+      final slugKey = _slugSettingsKey(clean);
+      final entry = await ngmyFetchSettingsValueReliable(slugKey, timeout: _guestFetchTimeout);
+      if (entry == null || entry['data'] is! Map) return 'Publish this Bio first.';
+      final owner = (entry['createdByEmail'] ?? '').toString().toLowerCase().trim();
+      final email = ownerEmail.toLowerCase().trim();
+      if (owner.isNotEmpty && email.isNotEmpty && owner != email) return 'This Bio link belongs to another account.';
+      final data = Map<String, dynamic>.from(entry['data'] as Map);
+      if (on) {
+        data['helpTap'] = true;
+      } else {
+        data.remove('helpTap');
+      }
+      final next = Map<String, dynamic>.from(entry)..['data'] = data;
+      final ok = await ngmyUpsertSettingsRowReliable(slugKey, next);
+      return ok ? null : 'Could not update the live Bio. Try again.';
+    } catch (e) {
+      debugPrint('[bio registry] help tap $clean: $e');
+      return 'Could not update the live Bio. Try again.';
+    }
+  }
+
   /// Removes the public Bio link from Supabase so guests can no longer open it.
   /// Deletes the per-slug payload row (frees space) and drops the slug from the index.
   static Future<void> unpublishSlug(String slug, {String? ownerEmail}) async {

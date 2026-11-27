@@ -102,6 +102,7 @@ class NgmyBioDocument {
     this.publicUrl = '',
     this.status = 'draft',
     this.qrStyle = const NgmyMenuQrStyle(),
+    this.helpTap = false,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) : createdAt = createdAt ?? ngmyBioCreatedAtFromId(id) ?? DateTime.now(),
@@ -122,6 +123,10 @@ class NgmyBioDocument {
   String publicUrl;
   String status;
   NgmyMenuQrStyle qrStyle;
+
+  /// Admin only: hidden tap spots on the picture frame (and the Holo card icons) open Help & Services.
+  /// Nothing on the page looks different. Turned on or off with the switch next to the copy icon.
+  bool helpTap;
 
   /// Fixed at creation. Ordering by this is what decides which Bio is the one
   /// backed up to the account, so editing must never move it.
@@ -153,6 +158,7 @@ class NgmyBioDocument {
     'publicUrl': publicUrl,
     'status': status,
     'qrStyle': qrStyle.toJson(),
+    if (helpTap) 'helpTap': true,
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
   };
@@ -194,6 +200,7 @@ class NgmyBioDocument {
             ? Map<String, dynamic>.from(json['qrStyle'] as Map)
             : null,
       ),
+      helpTap: json['helpTap'] == true,
       // Bios written before this field existed fall back to the timestamp in
       // their id, so their age order is preserved rather than reset to now.
       createdAt:
