@@ -18,9 +18,9 @@ x=1
 break}s=o.a
 r=s==null?"":s
 q=r.toLowerCase()
-if(A.hSw(s)){x=5
+if(A.hSx(s)){x=5
 break}p=!0
-if(!A.HW(q))if(!A.hSC(q)){if(!A.cX(q,"socket",0))if(!A.cX(q,"network",0))s=A.cX(q,"connection",0)
+if(!A.HW(q))if(!A.hSD(q)){if(!A.cX(q,"socket",0))if(!A.cX(q,"network",0))s=A.cX(q,"connection",0)
 else s=p
 else s=p
 p=s}if(!p){x=5
@@ -37,4 +37,4 @@ B=c[2]
 C=a.updateHolder(c[42],C)
 var z=a.updateTypes([])
 var y={c:A.as("+error,text(o?,o?)"),f:A.as("~")}};
-(a=>{a["329FpzN2sagwomcQEH+mhcUlHoU="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["vAcvydrH/VoZH+5nKiHFkQnuyXI="]=a.current})($__dart_deferred_initializers__);
