@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import 'ngmy_paper_crafts.dart' show ngmyCraftLinesPdf, ngmyIsCraftLines, ngmyIsPaperCraftDeck;
 import 'ngmy_slides_models.dart';
 import 'ngmy_slides_bio_phone.dart';
 
@@ -171,7 +172,7 @@ pw.Widget _pdfElement(NgmySlideElement e, double pageW, double pageH) {
         ),
       );
     case NgmySlideElementType.shape:
-      child = _pdfShape(e, pageW);
+      child = ngmyIsCraftLines(e) ? ngmyCraftLinesPdf(e.text, width, height) : _pdfShape(e, pageW);
     case NgmySlideElementType.bio:
       child = _pdfBio(e);
   }
@@ -303,6 +304,22 @@ pw.Widget _pdfSlidePage(NgmySlide slide, NgmySlideDeck deck, double pageW, doubl
 /// blank margin down both sides.
 Future<Uint8List> ngmySlidesExportPdfBytes(NgmySlideDeck deck) async {
   final doc = pw.Document(title: deck.name, creator: 'NGMY Slides');
+  // Fold & Cut designs are drawn on a true Letter page, so they print at their real size: no margin, no zoom
+  // (the zoom below would move every fold line).
+  if (ngmyIsPaperCraftDeck(deck)) {
+    final w = PdfPageFormat.letter.width;
+    final h = PdfPageFormat.letter.height;
+    for (final slide in deck.slides) {
+      doc.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.letter,
+          margin: pw.EdgeInsets.zero,
+          build: (_) => pw.SizedBox(width: w, height: h, child: pw.ClipRect(child: _pdfSlidePage(slide, deck, w, h))),
+        ),
+      );
+    }
+    return doc.save();
+  }
   const pageFormat = PdfPageFormat.letter;
   const margin = 2.5;
   // Requested after the print margin was already trimmed to near zero:

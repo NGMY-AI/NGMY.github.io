@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'ngmy_invoice_signature.dart';
+import 'ngmy_paper_crafts.dart' show ngmyIsPaperCraftDeck, ngmyPaperCraftPrintHtml;
 import 'ngmy_slides_download.dart';
 import 'ngmy_slides_export.dart';
 import 'ngmy_slides_models.dart';
@@ -193,6 +194,8 @@ Future<NgmySlidesSignatureResult?> ngmySlidesCaptureSignature(
 }
 
 String ngmySlidesPrintHtml(NgmySlideDeck deck) {
+  // Fold & Cut designs print on true Letter pages (no margin, no zoom) so the folds land in the right place.
+  if (ngmyIsPaperCraftDeck(deck)) return ngmyPaperCraftPrintHtml(deck);
   // The old fixed pixel size (up to 960px) had no relation to the actual
   // printed page — on real paper that's a small rectangle stranded in the
   // middle with huge blank margins. A later fix shaped `@page` itself to

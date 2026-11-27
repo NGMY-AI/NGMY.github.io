@@ -25,6 +25,7 @@ import 'ngmy_slides_ai_history.dart';
 import 'ngmy_slides_icon_picker.dart';
 import 'ngmy_quote_maker.dart';
 import 'ngmy_quote_templates.dart' show kNgmyQuoteLogoFile;
+import 'ngmy_paper_crafts.dart' show ngmyIsCraftLines, showNgmyPaperCraftPicker;
 import 'ngmy_slides_video_export.dart';
 import 'ngmy_slides_ai_maker.dart';
 import 'ngmy_slides_class_templates.dart';
@@ -2037,6 +2038,16 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
   /// NGMY Quotes: pick a design and type a quote. Editing it opens it as a new presentation.
   Future<void> _openQuoteMaker() async {
     final deck = await showNgmyQuoteMaker(context);
+    if (deck == null || !mounted) return;
+    _syncDeckIntoList();
+    setState(() => _decks.insert(0, deck));
+    await _persistDecks();
+    if (mounted) _openDeck(deck);
+  }
+
+  /// Design > Fold & Cut: printable envelopes, boxes, cards and more. The pick opens as a new presentation.
+  Future<void> _openPaperCrafts() async {
+    final deck = await showNgmyPaperCraftPicker(context);
     if (deck == null || !mounted) return;
     _syncDeckIntoList();
     setState(() => _decks.insert(0, deck));
@@ -4924,6 +4935,15 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                       onPressed: () => unawaited(_openQuoteMaker()),
                     ),
                   ),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ActionChip(
+                      key: const ValueKey('design_fold_cut'),
+                      avatar: const Icon(Icons.content_cut_rounded, size: 14),
+                      label: const Text('Fold & Cut', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
+                      onPressed: () => unawaited(_openPaperCrafts()),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -5567,6 +5587,17 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
   }
 
   Widget _canvasElement(NgmySlideElement e, double cw, double ch, bool isDark) {
+    // Fold & Cut: the fold, cut and glue lines stay where they are (taps go through to the words on top).
+    if (ngmyIsCraftLines(e)) {
+      return Positioned(
+        key: ValueKey('el_${e.id}'),
+        left: e.x * cw,
+        top: e.y * ch,
+        width: e.w * cw,
+        height: e.h * ch,
+        child: IgnorePointer(child: NgmySlideElementView(element: e, scale: cw / 960)),
+      );
+    }
     final marriage = _activeDeck?.isLockedTemplateDoc == true;
     final signZone = marriage && ngmyMarriageElementIsSignZone(e);
     final placedSign = marriage && ngmyMarriageElementIsPlacedSign(e);

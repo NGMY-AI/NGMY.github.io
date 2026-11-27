@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import 'ngmy_hati_kiapo_uongozi.dart';
+import 'ngmy_paper_crafts.dart' show kNgmyCraftLinesFile, ngmyPaintCraftLines;
 import 'ngmy_slides_luxe_fx.dart';
 import 'ngmy_slides_bio_phone.dart';
 import 'ngmy_slides_models.dart';
@@ -442,6 +443,11 @@ class NgmyShapePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Fold & Cut: the page's fold, cut and glue lines (see ngmy_paper_crafts.dart).
+    if (element.fileName == kNgmyCraftLinesFile) {
+      ngmyPaintCraftLines(canvas, size, element.text);
+      return;
+    }
     final fill = Paint()..color = Color(element.fillColor);
     final stroke = Paint()
       ..color = Color(element.strokeColor)
