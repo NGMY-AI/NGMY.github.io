@@ -36,7 +36,7 @@ String? ngmyHelpServicesReadReturnParam() {
     ..remove('svc_paid')
     ..remove('svc_cancel')
     ..remove('svc_open');
-  final cleaned = uri.replace(queryParameters: rest.isEmpty ? null : rest);
+  final cleaned = (rest.isEmpty ? uri.replace(query: "") : uri.replace(queryParameters: rest));
   var href = cleaned.toString();
   if (rest.isEmpty && href.endsWith('?')) href = href.substring(0, href.length - 1);
   html.window.history.replaceState(null, '', href);
@@ -67,7 +67,7 @@ String? ngmyHelpServicesReadReturnParam() {
     ..remove('svc_guest')
     ..remove('svc_paid')
     ..remove('svc_cancel');
-  var href = uri.replace(queryParameters: rest.isEmpty ? null : rest).toString();
+  var href = (rest.isEmpty ? uri.replace(query: "") : uri.replace(queryParameters: rest)).toString();
   if (rest.isEmpty && href.endsWith('?')) href = href.substring(0, href.length - 1);
   html.window.history.replaceState(null, '', href);
   return (token: RegExp(r'^[a-f0-9]{48}$').hasMatch(token) ? token : '', paid: token.isEmpty ? '' : paid);
