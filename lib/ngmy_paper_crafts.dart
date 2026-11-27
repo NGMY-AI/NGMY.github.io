@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import 'ngmy_paper_craft_ai.dart' show showNgmyPaperCraftAiSheet;
 import 'ngmy_slides_models.dart';
 import 'ngmy_slides_render.dart' show ngmyMiniSlidePreview;
 
@@ -821,7 +822,10 @@ const String _moreGroup = 'Tags & More';
 
 /// One Fold & Cut design.
 class NgmyPaperCraft {
-  const NgmyPaperCraft({required this.id, required this.name, required this.group, required this.blurb, required this.icon, required this.build});
+  const NgmyPaperCraft({required this.number, required this.id, required this.name, required this.group, required this.blurb, required this.icon, required this.build});
+
+  /// The small number shown on the design in the picker ("make number 5"). Never changes; new designs get the next one.
+  final int number;
   final String id;
   final String name;
   final String group;
@@ -1580,44 +1584,44 @@ NgmySlide _doorHangers(NgmyCraftPalette p) {
 // ---------------------------------------------------------------------------------------------------------------
 
 final List<NgmyPaperCraft> kNgmyPaperCrafts = [
-  NgmyPaperCraft(id: 'window_letter', name: 'Window Envelope Letter', group: _lettersGroup, blurb: 'Folds in three; the address shows in a #10 window', icon: Icons.mark_email_read_outlined, build: (p) => [_windowLetter(p)]),
-  NgmyPaperCraft(
+  NgmyPaperCraft(number: 1, id: 'window_letter', name: 'Window Envelope Letter', group: _lettersGroup, blurb: 'Folds in three; the address shows in a #10 window', icon: Icons.mark_email_read_outlined, build: (p) => [_windowLetter(p)]),
+  NgmyPaperCraft(number: 2, 
       id: 'card_envelope',
       name: 'Card Envelope (A2)',
       group: _lettersGroup,
       blurb: '5.75 x 4.375 in, fits a quarter-fold card',
       icon: Icons.mail_outline_rounded,
       build: (p) => [_cardEnvelope(p, title: 'Card Envelope (A2)', w: 5.75, h: 4.375, top: 2.2, bottom: 2.55, side: 0.85)]),
-  NgmyPaperCraft(
+  NgmyPaperCraft(number: 3, 
       id: 'square_envelope',
       name: 'Square Envelope',
       group: _lettersGroup,
       blurb: '5.5 in square for greeting cards',
       icon: Icons.crop_square_rounded,
       build: (p) => [_cardEnvelope(p, title: 'Square Envelope', w: 5.5, h: 5.5, top: 2.1, bottom: 2.35, side: 0.85)]),
-  NgmyPaperCraft(id: 'diamond_envelope', name: 'Diamond Envelope', group: _lettersGroup, blurb: 'Classic pointed flaps', icon: Icons.diamond_outlined, build: (p) => [_diamondEnvelope(p)]),
-  NgmyPaperCraft(id: 'seed_envelopes', name: 'Seed Envelopes', group: _lettersGroup, blurb: 'Two small seed or coin packets', icon: Icons.eco_outlined, build: (p) => [_seedEnvelopes(p)]),
-  NgmyPaperCraft(id: 'gift_card_envelopes', name: 'Gift Card Envelopes', group: _lettersGroup, blurb: 'Two little envelopes for gift cards', icon: Icons.card_giftcard_rounded, build: (p) => [_giftCardEnvelopes(p)]),
-  NgmyPaperCraft(id: 'gift_box', name: 'Gift Box with Lid', group: _boxesGroup, blurb: 'Square box and a matching lid', icon: Icons.redeem_rounded, build: (p) => [_giftBox(p)]),
-  NgmyPaperCraft(id: 'pillow_box', name: 'Pillow Box', group: _boxesGroup, blurb: 'Curved ends that fold closed', icon: Icons.bedtime_outlined, build: (p) => [_pillowBox(p)]),
-  NgmyPaperCraft(id: 'pyramid_box', name: 'Pyramid Box', group: _boxesGroup, blurb: 'Four triangles close to a point', icon: Icons.change_history_rounded, build: (p) => [_pyramidBox(p)]),
-  NgmyPaperCraft(id: 'prism_box', name: 'Triangle Prism Box', group: _boxesGroup, blurb: 'Long triangle box for treats', icon: Icons.signal_cellular_0_bar_rounded, build: (p) => [_prismBox(p)]),
-  NgmyPaperCraft(id: 'favor_box', name: 'Favor Box', group: _boxesGroup, blurb: 'Small cube with tuck lids', icon: Icons.inventory_2_outlined, build: (p) => [_favorBox(p)]),
-  NgmyPaperCraft(id: 'paper_bag', name: 'Paper Gift Bag', group: _boxesGroup, blurb: 'Bag with side folds and ribbon holes', icon: Icons.shopping_bag_outlined, build: (p) => [_paperBag(p)]),
-  NgmyPaperCraft(id: 'half_fold_card', name: 'Half-Fold Card', group: _cardsGroup, blurb: '8.5 x 5.5 in card with an inside page', icon: Icons.menu_book_outlined, build: _halfFoldCard),
-  NgmyPaperCraft(id: 'quarter_fold_card', name: 'Quarter-Fold Card', group: _cardsGroup, blurb: '4.25 x 5.5 in card from one side', icon: Icons.auto_stories_outlined, build: (p) => [_quarterFoldCard(p)]),
-  NgmyPaperCraft(id: 'tri_fold_card', name: 'Tri-Fold Card', group: _cardsGroup, blurb: 'Folds in three, like an invitation', icon: Icons.view_agenda_outlined, build: _triFoldCard),
-  NgmyPaperCraft(id: 'pop_up_card', name: 'Pop-Up Card', group: _cardsGroup, blurb: 'Three pop-ups jump out when opened', icon: Icons.celebration_outlined, build: _popUpCard),
-  NgmyPaperCraft(id: 'postcards', name: 'Postcards', group: _cardsGroup, blurb: 'Two 6 x 4 in postcards, both sides', icon: Icons.local_post_office_outlined, build: _postcards),
-  NgmyPaperCraft(id: 'gift_tags', name: 'Gift Tags', group: _moreGroup, blurb: 'Eight tags with string holes', icon: Icons.sell_outlined, build: (p) => [_giftTags(p)]),
-  NgmyPaperCraft(id: 'folded_tags', name: 'Folded Gift Tags', group: _moreGroup, blurb: 'Nine little folded tags', icon: Icons.style_outlined, build: (p) => [_foldedTags(p)]),
-  NgmyPaperCraft(id: 'bookmarks', name: 'Bookmarks', group: _moreGroup, blurb: 'Four bookmarks with tassel holes', icon: Icons.bookmark_outline_rounded, build: (p) => [_bookmarks(p)]),
-  NgmyPaperCraft(id: 'mini_zine', name: 'Mini Zine', group: _moreGroup, blurb: 'One sheet folds into an 8 page book', icon: Icons.import_contacts_outlined, build: (p) => [_miniZine(p)]),
-  NgmyPaperCraft(id: 'place_cards', name: 'Place Cards', group: _moreGroup, blurb: 'Four tent cards, names on both sides', icon: Icons.table_restaurant_outlined, build: (p) => [_placeCards(p)]),
-  NgmyPaperCraft(id: 'pocket_folder', name: 'Pocket Folder', group: _moreGroup, blurb: 'Folded folder with two pockets', icon: Icons.folder_open_outlined, build: (p) => [_pocketFolder(p)]),
-  NgmyPaperCraft(id: 'cd_sleeve', name: 'CD Sleeve', group: _moreGroup, blurb: 'Pocket for a CD or DVD', icon: Icons.album_outlined, build: (p) => [_cdSleeve(p)]),
-  NgmyPaperCraft(id: 'photo_sleeve', name: 'Photo Sleeve', group: _moreGroup, blurb: 'Pocket for a 6 x 4 in photo', icon: Icons.photo_outlined, build: (p) => [_photoSleeve(p)]),
-  NgmyPaperCraft(id: 'door_hangers', name: 'Door Hangers', group: _moreGroup, blurb: 'Two hangers for a door knob', icon: Icons.door_front_door_outlined, build: (p) => [_doorHangers(p)]),
+  NgmyPaperCraft(number: 4, id: 'diamond_envelope', name: 'Diamond Envelope', group: _lettersGroup, blurb: 'Classic pointed flaps', icon: Icons.diamond_outlined, build: (p) => [_diamondEnvelope(p)]),
+  NgmyPaperCraft(number: 5, id: 'seed_envelopes', name: 'Seed Envelopes', group: _lettersGroup, blurb: 'Two small seed or coin packets', icon: Icons.eco_outlined, build: (p) => [_seedEnvelopes(p)]),
+  NgmyPaperCraft(number: 6, id: 'gift_card_envelopes', name: 'Gift Card Envelopes', group: _lettersGroup, blurb: 'Two little envelopes for gift cards', icon: Icons.card_giftcard_rounded, build: (p) => [_giftCardEnvelopes(p)]),
+  NgmyPaperCraft(number: 7, id: 'gift_box', name: 'Gift Box with Lid', group: _boxesGroup, blurb: 'Square box and a matching lid', icon: Icons.redeem_rounded, build: (p) => [_giftBox(p)]),
+  NgmyPaperCraft(number: 8, id: 'pillow_box', name: 'Pillow Box', group: _boxesGroup, blurb: 'Curved ends that fold closed', icon: Icons.bedtime_outlined, build: (p) => [_pillowBox(p)]),
+  NgmyPaperCraft(number: 9, id: 'pyramid_box', name: 'Pyramid Box', group: _boxesGroup, blurb: 'Four triangles close to a point', icon: Icons.change_history_rounded, build: (p) => [_pyramidBox(p)]),
+  NgmyPaperCraft(number: 10, id: 'prism_box', name: 'Triangle Prism Box', group: _boxesGroup, blurb: 'Long triangle box for treats', icon: Icons.signal_cellular_0_bar_rounded, build: (p) => [_prismBox(p)]),
+  NgmyPaperCraft(number: 11, id: 'favor_box', name: 'Favor Box', group: _boxesGroup, blurb: 'Small cube with tuck lids', icon: Icons.inventory_2_outlined, build: (p) => [_favorBox(p)]),
+  NgmyPaperCraft(number: 12, id: 'paper_bag', name: 'Paper Gift Bag', group: _boxesGroup, blurb: 'Bag with side folds and ribbon holes', icon: Icons.shopping_bag_outlined, build: (p) => [_paperBag(p)]),
+  NgmyPaperCraft(number: 13, id: 'half_fold_card', name: 'Half-Fold Card', group: _cardsGroup, blurb: '8.5 x 5.5 in card with an inside page', icon: Icons.menu_book_outlined, build: _halfFoldCard),
+  NgmyPaperCraft(number: 14, id: 'quarter_fold_card', name: 'Quarter-Fold Card', group: _cardsGroup, blurb: '4.25 x 5.5 in card from one side', icon: Icons.auto_stories_outlined, build: (p) => [_quarterFoldCard(p)]),
+  NgmyPaperCraft(number: 15, id: 'tri_fold_card', name: 'Tri-Fold Card', group: _cardsGroup, blurb: 'Folds in three, like an invitation', icon: Icons.view_agenda_outlined, build: _triFoldCard),
+  NgmyPaperCraft(number: 16, id: 'pop_up_card', name: 'Pop-Up Card', group: _cardsGroup, blurb: 'Three pop-ups jump out when opened', icon: Icons.celebration_outlined, build: _popUpCard),
+  NgmyPaperCraft(number: 17, id: 'postcards', name: 'Postcards', group: _cardsGroup, blurb: 'Two 6 x 4 in postcards, both sides', icon: Icons.local_post_office_outlined, build: _postcards),
+  NgmyPaperCraft(number: 18, id: 'gift_tags', name: 'Gift Tags', group: _moreGroup, blurb: 'Eight tags with string holes', icon: Icons.sell_outlined, build: (p) => [_giftTags(p)]),
+  NgmyPaperCraft(number: 19, id: 'folded_tags', name: 'Folded Gift Tags', group: _moreGroup, blurb: 'Nine little folded tags', icon: Icons.style_outlined, build: (p) => [_foldedTags(p)]),
+  NgmyPaperCraft(number: 20, id: 'bookmarks', name: 'Bookmarks', group: _moreGroup, blurb: 'Four bookmarks with tassel holes', icon: Icons.bookmark_outline_rounded, build: (p) => [_bookmarks(p)]),
+  NgmyPaperCraft(number: 21, id: 'mini_zine', name: 'Mini Zine', group: _moreGroup, blurb: 'One sheet folds into an 8 page book', icon: Icons.import_contacts_outlined, build: (p) => [_miniZine(p)]),
+  NgmyPaperCraft(number: 22, id: 'place_cards', name: 'Place Cards', group: _moreGroup, blurb: 'Four tent cards, names on both sides', icon: Icons.table_restaurant_outlined, build: (p) => [_placeCards(p)]),
+  NgmyPaperCraft(number: 23, id: 'pocket_folder', name: 'Pocket Folder', group: _moreGroup, blurb: 'Folded folder with two pockets', icon: Icons.folder_open_outlined, build: (p) => [_pocketFolder(p)]),
+  NgmyPaperCraft(number: 24, id: 'cd_sleeve', name: 'CD Sleeve', group: _moreGroup, blurb: 'Pocket for a CD or DVD', icon: Icons.album_outlined, build: (p) => [_cdSleeve(p)]),
+  NgmyPaperCraft(number: 25, id: 'photo_sleeve', name: 'Photo Sleeve', group: _moreGroup, blurb: 'Pocket for a 6 x 4 in photo', icon: Icons.photo_outlined, build: (p) => [_photoSleeve(p)]),
+  NgmyPaperCraft(number: 26, id: 'door_hangers', name: 'Door Hangers', group: _moreGroup, blurb: 'Two hangers for a door knob', icon: Icons.door_front_door_outlined, build: (p) => [_doorHangers(p)]),
 ];
 
 /// A new presentation on true Letter paper made from [craft] in [palette].
@@ -1685,6 +1689,30 @@ class _CraftPickerScreenState extends State<_CraftPickerScreen> {
                 'Print, cut on the thin solid lines, fold on the light dashed lines and glue the grey tabs. '
                 'Every design is a Letter page; print it at Actual size (100%).',
                 style: TextStyle(color: sub, fontSize: 12.5, height: 1.35),
+              ),
+            ),
+            // Same as Slides "Create with AI": say a number, a name or what you need, and the AI writes it.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              child: SizedBox(
+                height: 46,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]),
+                    boxShadow: [BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.35), blurRadius: 12)],
+                  ),
+                  child: TextButton.icon(
+                    key: const ValueKey('craft_ai_open'),
+                    onPressed: () async {
+                      final nav = Navigator.of(context);
+                      final deck = await showNgmyPaperCraftAiSheet(context, palette: kNgmyCraftPalettes[_palette]);
+                      if (deck != null && mounted) nav.pop(deck);
+                    },
+                    icon: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20),
+                    label: const Text('Create with AI  -  say a number or a name', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13.5)),
+                  ),
+                ),
               ),
             ),
             SizedBox(
@@ -1767,7 +1795,28 @@ class _CraftPickerScreenState extends State<_CraftPickerScreen> {
                                       borderRadius: BorderRadius.circular(6),
                                       boxShadow: const [BoxShadow(color: Color(0x22000000), blurRadius: 6, offset: Offset(0, 2))],
                                     ),
-                                    child: ngmyMiniSlidePreview(_preview(c)),
+                                    child: Stack(
+                                      children: [
+                                        Positioned.fill(child: ngmyMiniSlidePreview(_preview(c))),
+                                        // The design number: "make number 5".
+                                        Positioned(
+                                          left: 4,
+                                          top: 4,
+                                          child: Container(
+                                            key: ValueKey('craft_number_${c.number}'),
+                                            constraints: const BoxConstraints(minWidth: 20),
+                                            height: 20,
+                                            padding: const EdgeInsets.symmetric(horizontal: 5),
+                                            alignment: Alignment.center,
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xE60F172A),
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: Text('${c.number}', style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800)),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
