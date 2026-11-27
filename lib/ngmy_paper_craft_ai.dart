@@ -11,6 +11,7 @@ import 'ngmy_slides_models.dart';
 /// Fold & Cut with AI: "make number 5 for my tomato seeds", "window envelope letter to my landlord",
 /// "kadi ya kuzaliwa kwa mama Asha". The AI picks the design (by its number, its name or what is described) and a
 /// colour set, then writes into that design's own text boxes only. The paper, folds and cuts never change.
+/// In the editor, the round AI button beside the page changes the words and colours the same way.
 
 // ---------------------------------------------------------------------------------------------------------------
 // Finding a design by number or name.
@@ -72,8 +73,9 @@ NgmyPaperCraft? ngmyFindPaperCraft(String request) {
     final names = {c.name, c.id.replaceAll('_', ' '), ...?_kCraftAliases[c.id]};
     for (final name in names) {
       final a = _norm(name);
+      final stem = a.trimRight();
       // Also match the plural / singular ("gift tag" in "gift tags").
-      final hit = n.contains(a) || n.contains('${a.trimRight()}s ') || (a.trimRight().endsWith('s') && n.contains('${a.trimRight().substring(0, a.trimRight().length - 1)} '));
+      final hit = n.contains(a) || n.contains('${stem}s ') || (stem.endsWith('s') && n.contains('${stem.substring(0, stem.length - 1)} '));
       if (hit && a.length > bestLen) {
         best = c;
         bestLen = a.length;
@@ -82,6 +84,75 @@ NgmyPaperCraft? ngmyFindPaperCraft(String request) {
   }
   return best;
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// The details each design carries (the small boxes the sheet shows). One list, here.
+// ---------------------------------------------------------------------------------------------------------------
+
+class NgmyCraftDetail {
+  const NgmyCraftDetail(this.key, this.label, {this.needed = false, this.multiline = false});
+  final String key;
+  final String label;
+
+  /// The AI asks for this when it is in neither the boxes nor the request.
+  final bool needed;
+  final bool multiline;
+}
+
+const _toName = NgmyCraftDetail('to_name', 'Recipient name', needed: true);
+const _toAddress = NgmyCraftDetail('to_address', 'Recipient address', needed: true, multiline: true);
+const _fromName = NgmyCraftDetail('from_name', 'Your name');
+const _fromAddress = NgmyCraftDetail('from_address', 'Your address', multiline: true);
+const _cardTo = NgmyCraftDetail('to_name', 'To (name)', needed: true);
+const _cardFrom = NgmyCraftDetail('from_name', 'From (name)', needed: true);
+const _occasion = NgmyCraftDetail('occasion', 'Occasion', needed: true);
+const _message = NgmyCraftDetail('message', 'Message', multiline: true);
+const _giftTo = NgmyCraftDetail('to_name', 'To (name)');
+const _giftFrom = NgmyCraftDetail('from_name', 'From (name)');
+const _boxWords = NgmyCraftDetail('words', 'Words on it');
+
+const Map<String, List<NgmyCraftDetail>> _kCraftDetails = {
+  'window_letter': [
+    _toName,
+    _toAddress,
+    NgmyCraftDetail('from_name', 'Your name', needed: true),
+    _fromAddress,
+    NgmyCraftDetail('topic', 'What the letter is about', needed: true, multiline: true),
+  ],
+  'card_envelope': [_toName, _toAddress, _fromName, _fromAddress],
+  'square_envelope': [_toName, _toAddress, _fromName, _fromAddress],
+  'diamond_envelope': [_toName, _toAddress, _fromName, _fromAddress],
+  'seed_envelopes': [NgmyCraftDetail('seeds', 'Seed names (one per envelope)', needed: true), NgmyCraftDetail('dates', 'Planted and harvest dates')],
+  'gift_card_envelopes': [_giftTo, _giftFrom, _boxWords],
+  'gift_box': [_giftTo, _giftFrom, _boxWords],
+  'pillow_box': [_giftTo, _giftFrom, _boxWords],
+  'pyramid_box': [_giftTo, _boxWords],
+  'prism_box': [_boxWords],
+  'favor_box': [_boxWords, NgmyCraftDetail('occasion', 'Occasion')],
+  'paper_bag': [_boxWords, NgmyCraftDetail('shop', 'Shop or your name')],
+  'half_fold_card': [_cardTo, _cardFrom, _occasion, _message],
+  'quarter_fold_card': [_cardTo, _cardFrom, _occasion, _message],
+  'tri_fold_card': [
+    NgmyCraftDetail('occasion', 'Event', needed: true),
+    NgmyCraftDetail('host', 'Who it is for or from', needed: true),
+    NgmyCraftDetail('date_time', 'Date and time', needed: true),
+    NgmyCraftDetail('place', 'Place', needed: true, multiline: true),
+    NgmyCraftDetail('rsvp', 'Reply to (name and phone)'),
+  ],
+  'pop_up_card': [_cardTo, _cardFrom, _occasion, _message],
+  'postcards': [NgmyCraftDetail('place', 'Town or place on the picture'), _toName, _toAddress, _message],
+  'gift_tags': [NgmyCraftDetail('names', 'Names (one per tag)', needed: true, multiline: true), _giftFrom],
+  'folded_tags': [NgmyCraftDetail('names', 'Names (one per tag)', needed: true, multiline: true), _giftFrom],
+  'bookmarks': [_boxWords, NgmyCraftDetail('name', 'Your name')],
+  'mini_zine': [NgmyCraftDetail('title', 'Title', needed: true), NgmyCraftDetail('author', 'By (name)'), NgmyCraftDetail('topic', 'What it is about', multiline: true)],
+  'place_cards': [NgmyCraftDetail('names', 'Guest names', needed: true, multiline: true), NgmyCraftDetail('tables', 'Table numbers')],
+  'pocket_folder': [NgmyCraftDetail('title', 'Title'), NgmyCraftDetail('name', 'Name and subject')],
+  'cd_sleeve': [NgmyCraftDetail('title', 'Title', needed: true), NgmyCraftDetail('name', 'Artist or your name'), NgmyCraftDetail('tracks', 'Tracks', multiline: true)],
+  'photo_sleeve': [NgmyCraftDetail('title', 'Title'), NgmyCraftDetail('date_place', 'Date and place'), _message],
+  'door_hangers': [_boxWords, NgmyCraftDetail('name', 'Your name')],
+};
+
+List<NgmyCraftDetail> ngmyPaperCraftDetails(NgmyPaperCraft craft) => _kCraftDetails[craft.id] ?? const [_message];
 
 // ---------------------------------------------------------------------------------------------------------------
 // The text boxes of every design, read from the designs themselves (so new designs are picked up on their own).
@@ -111,11 +182,12 @@ int _capacity(NgmySlideElement e, double sizePt) {
 
 bool _upsideDown(NgmySlideElement e) => (e.rotation.abs() - math.pi).abs() < 0.01;
 
-List<NgmyCraftField> ngmyPaperCraftFields(NgmyPaperCraft craft) {
+List<NgmySlideElement> _textsOf(NgmySlide s) => s.elements.where((e) => e.type == NgmySlideElementType.text).toList();
+
+List<NgmyCraftField> _fieldsOfSlides(List<NgmySlide> slides) {
   final out = <NgmyCraftField>[];
-  final slides = craft.build(kNgmyCraftPalettes.first);
   for (var s = 0; s < slides.length; s++) {
-    final texts = slides[s].elements.where((e) => e.type == NgmySlideElementType.text).toList();
+    final texts = _textsOf(slides[s]);
     for (var i = 0; i < texts.length; i++) {
       final e = texts[i];
       out.add(NgmyCraftField(
@@ -130,12 +202,15 @@ List<NgmyCraftField> ngmyPaperCraftFields(NgmyPaperCraft craft) {
   return out;
 }
 
-/// Every design with its number, name and boxes, for the AI.
+List<NgmyCraftField> ngmyPaperCraftFields(NgmyPaperCraft craft) => _fieldsOfSlides(craft.build(kNgmyCraftPalettes.first));
+
+/// Every design with its number, name, the details it needs and its boxes, for the AI.
 String ngmyPaperCraftCatalog({NgmyPaperCraft? only}) {
   final b = StringBuffer();
   for (final c in kNgmyPaperCrafts) {
     if (only != null && c.id != only.id) continue;
-    b.writeln('#${c.number} ${c.name} (${c.group}): ${c.blurb}');
+    final needs = ngmyPaperCraftDetails(c).where((d) => d.needed).map((d) => d.label).join(', ');
+    b.writeln('#${c.number} ${c.name} (${c.group}): ${c.blurb}${needs.isEmpty ? '' : '. NEEDS: $needs'}');
     for (final f in ngmyPaperCraftFields(c)) {
       final sample = f.sample.replaceAll('\n', ' / ');
       b.writeln('   ${f.key} [${f.page}${f.upsideDown ? ', upside down' : ''}] max ${f.maxChars} chars, sample: "$sample"');
@@ -145,7 +220,7 @@ String ngmyPaperCraftCatalog({NgmyPaperCraft? only}) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// The prompt and the answer.
+// The prompts and the answer.
 // ---------------------------------------------------------------------------------------------------------------
 
 String _languageRule(String request, String language) {
@@ -160,26 +235,56 @@ String _languageRule(String request, String language) {
   }
 }
 
-String ngmyPaperCraftAiPrompt({required String request, String language = 'auto', NgmyPaperCraft? picked, NgmyCraftPalette? palette}) {
+const String _kBoxRules = '''
+- Every box keeps its role (look at its sample): a title stays a title, an address stays an address with its lines (name / street / city, state ZIP), "To:" and "From:" stay.
+- Write professionally: warm, clear, correct spelling and grammar, the right tone for the occasion (formal for business letters, warm for cards). Short and sweet on small items.
+- Keep each text within its max length. Short words in small boxes. Never pad.
+- Boxes marked "upside down" are turned by the app so they read the right way after folding: just write their text normally.
+- Never invent addresses, phone numbers, emails or prices.''';
+
+String _detailsBlock(Map<String, String> details, NgmyPaperCraft? craft) {
+  if (details.isEmpty) return '';
+  final labels = {for (final c in kNgmyPaperCrafts) for (final d in ngmyPaperCraftDetails(c)) d.key: d.label};
+  if (craft != null) {
+    for (final d in ngmyPaperCraftDetails(craft)) {
+      labels[d.key] = d.label;
+    }
+  }
+  final b = StringBuffer('DETAILS THE USER TYPED IN THE BOXES (use them exactly):\n');
+  details.forEach((k, v) => b.writeln('- ${labels[k] ?? k}: ${v.replaceAll('\n', ' / ')}'));
+  return b.toString();
+}
+
+String ngmyPaperCraftAiPrompt({
+  required String request,
+  String language = 'auto',
+  NgmyPaperCraft? picked,
+  NgmyCraftPalette? palette,
+  Map<String, String> details = const {},
+  bool allowAsk = false,
+}) {
   final palettes = kNgmyCraftPalettes.map((p) => p.name).join(', ');
+  final askRule = allowAsk
+      ? '- MISSING DETAILS: if something listed under NEEDS for the chosen design is in neither the request nor the typed details (and the user did not ask you to make it up), do not fill the design. Reply only {"design": N, "ask": "one short, friendly question that asks for exactly what is missing"} in the language of the request. Never ask about anything that is not listed under NEEDS.'
+      : '- Do not ask questions. If something needed is missing, keep a clear placeholder in the same language (for example "Recipient Name", "Street Address", "City, State ZIP", or in Swahili "Jina la Mpokeaji", "Anwani ya Mtaa", "Mji, Mkoa, Sanduku la Posta").';
   return '''
 You write the words on a printable paper design from NGMY Slides "Fold & Cut" (envelopes, letters, boxes, cards, tags and more). The paper, its folds and cuts are already made; you only fill its text boxes.
 
 USER REQUEST (typed or spoken, may be informal):
 """$request"""
 
+${_detailsBlock(details, picked)}
 ${picked != null ? 'The user chose design #${picked.number} ${picked.name}. Use it.' : 'Choose the ONE design that fits best: by its number ("number 5", "namba 5"), by its name, or by what they describe (a letter for a window envelope, a birthday card, seed packets, gift tags...).'}
 
-DESIGNS (number, name, then each text box: key [page] max length, sample):
+DESIGNS (number, name, what it needs, then each text box: key [page] max length, sample):
 ${ngmyPaperCraftCatalog(only: picked)}
 COLOUR SETS: $palettes. Use ${palette?.name ?? 'Blush'} unless the request asks for other colours or a mood that clearly fits another set.
 
 Rules:
-- Fill the text boxes of the chosen design only, using their keys. Every box keeps its role (look at its sample): a title stays a title, an address stays an address with its lines (name / street / city, state ZIP), "To:" and "From:" stay.
-- Write professionally: warm, clear, correct spelling and grammar, the right tone for the occasion (formal for business letters, warm for cards). Short and sweet on small items.
-- Keep each text within its max length. Short words in small boxes. Never pad.
-- Use the names, places, dates and messages the user gave. If something needed is missing (an address, a phone number, a date), keep a clear placeholder in the same language (for example "Recipient Name", "Street Address", "City, State ZIP", or in Swahili "Jina la Mpokeaji", "Anwani ya Mtaa", "Mji, Mkoa, Sanduku la Posta"). Never invent addresses, phone numbers, emails or prices.
-- Boxes marked "upside down" are turned by the app so they read the right way after folding: just write their text normally.
+- Fill the text boxes of the chosen design only, using their keys.
+$_kBoxRules
+- Use the names, places, dates and messages the user gave, in the request or in the typed details.
+$askRule
 - Designs with several copies (gift tags, place cards, seed envelopes, postcards): fill every copy; use different names or titles when the user gives several, otherwise vary them nicely.
 - A box you have nothing better for keeps its sample text (translated if the language is not English).
 ${_languageRule(request, language)}
@@ -188,7 +293,7 @@ ${_languageRule(request, language)}
 ''';
 }
 
-typedef NgmyPaperCraftAiAnswer = ({int design, String? palette, Map<String, String> fields});
+typedef NgmyPaperCraftAiAnswer = ({int design, String? palette, Map<String, String> fields, String? ask, String? reply});
 
 NgmyPaperCraftAiAnswer? ngmyParsePaperCraftAi(String raw) {
   final start = raw.indexOf('{');
@@ -208,7 +313,14 @@ NgmyPaperCraftAiAnswer? ngmyParsePaperCraftAi(String raw) {
         if (s.isNotEmpty) fields['$k'.trim()] = s;
       });
     }
-    return (design: design, palette: m['palette']?.toString(), fields: fields);
+    String? text(String k) {
+      final v = m[k];
+      if (v == null) return null;
+      final s = '$v'.trim();
+      return s.isEmpty ? null : s;
+    }
+
+    return (design: design, palette: text('palette'), fields: fields, ask: text('ask'), reply: text('reply'));
   } catch (_) {
     return null;
   }
@@ -255,7 +367,7 @@ void ngmyFitCraftText(NgmySlideElement e) {
 NgmySlideDeck ngmyBuildFilledPaperCraft(NgmyPaperCraft craft, NgmyCraftPalette palette, Map<String, String> fields) {
   final deck = ngmyBuildPaperCraftDeck(craft, palette);
   for (var s = 0; s < deck.slides.length; s++) {
-    final texts = deck.slides[s].elements.where((e) => e.type == NgmySlideElementType.text).toList();
+    final texts = _textsOf(deck.slides[s]);
     for (var i = 0; i < texts.length; i++) {
       final v = fields['${s + 1}.${i + 1}'];
       if (v == null || v.trim().isEmpty) continue;
@@ -266,49 +378,148 @@ NgmySlideDeck ngmyBuildFilledPaperCraft(NgmyPaperCraft craft, NgmyCraftPalette p
   return deck;
 }
 
-NgmyCraftPalette _paletteNamed(String? name, NgmyCraftPalette fallback) {
+NgmyCraftPalette? _paletteNamed(String? name) {
   final n = (name ?? '').trim().toLowerCase();
   for (final p in kNgmyCraftPalettes) {
     if (p.name.toLowerCase() == n) return p;
   }
-  return fallback;
+  return null;
 }
 
-/// Asks the AI to fill a Fold & Cut design from [request]. [language] is 'auto', 'en' or 'sw'.
-Future<NgmySlideDeck> ngmyFillPaperCraftWithAi({
-  required String request,
-  String language = 'auto',
-  NgmyCraftPalette? palette,
-  void Function(String status)? onStatus,
-}) async {
-  final picked = ngmyFindPaperCraft(request);
-  final fallbackPalette = palette ?? kNgmyCraftPalettes.first;
-  final prompt = ngmyPaperCraftAiPrompt(request: request, language: language, picked: picked, palette: fallbackPalette);
+/// What the AI made: a finished deck, or one short question when something it needs is missing.
+typedef NgmyPaperCraftAiResult = ({NgmySlideDeck? deck, String? ask, NgmyPaperCraft? craft});
+
+Future<String> _askAi(String prompt) async {
   final key = await ngmyResolveGeminiApiKey();
   if (key.trim().isEmpty) throw 'AI is not available right now. Please try again later.';
   final creds = ngmyParseAiCredentials(key);
-  onStatus?.call(picked != null ? 'Writing #${picked.number} ${picked.name}...' : 'Choosing the design and writing it...');
   String? lastError;
   for (var attempt = 0; attempt < 2; attempt++) {
     final r = await ngmyAiGenerateWithCredentials(creds, prompt, kind: 'slides');
-    if (r.text == null) {
-      lastError = r.error;
-      continue;
-    }
-    final answer = ngmyParsePaperCraftAi(r.text!);
-    if (answer == null) continue;
-    final craft = picked ?? ngmyPaperCraftByNumber(answer.design);
-    if (craft == null) continue;
-    onStatus?.call('Putting the words on #${craft.number} ${craft.name}...');
-    return ngmyBuildFilledPaperCraft(craft, _paletteNamed(answer.palette, fallbackPalette), answer.fields);
+    if (r.text != null && ngmyParsePaperCraftAi(r.text!) != null) return r.text!;
+    lastError = r.error ?? lastError;
   }
   throw lastError != null && ngmyIsOfflineOrNetworkError(lastError)
       ? 'No internet connection. Try again when you are online.'
-      : 'The AI could not write that. Try saying it another way, or name the design number.';
+      : 'The AI could not do that. Try saying it another way, or name the design number.';
+}
+
+/// Asks the AI to fill a Fold & Cut design from [request] and the typed [details]. [language] is 'auto', 'en' or
+/// 'sw'. With [allowAsk] the AI may answer with one question instead, when a needed detail is missing.
+Future<NgmyPaperCraftAiResult> ngmyFillPaperCraftWithAi({
+  required String request,
+  String language = 'auto',
+  NgmyCraftPalette? palette,
+  Map<String, String> details = const {},
+  bool allowAsk = false,
+  NgmyPaperCraft? design,
+  void Function(String status)? onStatus,
+}) async {
+  final picked = design ?? ngmyFindPaperCraft(request);
+  final fallbackPalette = palette ?? kNgmyCraftPalettes.first;
+  final prompt = ngmyPaperCraftAiPrompt(request: request, language: language, picked: picked, palette: fallbackPalette, details: details, allowAsk: allowAsk);
+  onStatus?.call(picked != null ? 'Writing #${picked.number} ${picked.name}...' : 'Choosing the design and writing it...');
+  final answer = ngmyParsePaperCraftAi(await _askAi(prompt))!;
+  final craft = picked ?? ngmyPaperCraftByNumber(answer.design);
+  if (craft == null) throw 'The AI could not choose a design. Try naming the design number.';
+  if (answer.ask != null && allowAsk) return (deck: null, ask: answer.ask, craft: craft);
+  onStatus?.call('Putting the words on #${craft.number} ${craft.name}...');
+  return (deck: ngmyBuildFilledPaperCraft(craft, _paletteNamed(answer.palette) ?? fallbackPalette, answer.fields), ask: null, craft: craft);
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// The sheet (same look as Slides "Create with AI").
+// Changing a design that is already open (the round AI button beside the page).
+// ---------------------------------------------------------------------------------------------------------------
+
+String ngmyPaperCraftEditPrompt({required NgmySlideDeck deck, required String request, List<(bool, String)> history = const []}) {
+  final info = ngmyPaperCraftOfDeck(deck);
+  final palettes = kNgmyCraftPalettes.map((p) => p.name).join(', ');
+  final boxes = StringBuffer();
+  final template = info == null ? null : info.craft.build(info.palette);
+  for (var s = 0; s < deck.slides.length; s++) {
+    final texts = _textsOf(deck.slides[s]);
+    final tpl = template != null && s < template.length ? _textsOf(template[s]) : const <NgmySlideElement>[];
+    for (var i = 0; i < texts.length; i++) {
+      final e = texts[i];
+      final base = i < tpl.length ? tpl[i] : e;
+      boxes.writeln('   ${s + 1}.${i + 1} [${deck.slides[s].title}${_upsideDown(e) ? ', upside down' : ''}] max ${_capacity(base, base.fontSize * _unitPt)} chars, now: "${e.text.replaceAll('\n', ' / ')}"');
+    }
+  }
+  final talk = history.isEmpty ? '' : 'EARLIER IN THIS CHAT:\n${history.map((h) => '${h.$1 ? 'User' : 'AI'}: ${h.$2}').join('\n')}\n';
+  return '''
+You change the words and colours of a printable paper design from NGMY Slides "Fold & Cut"${info == null ? '' : ' (#${info.craft.number} ${info.craft.name})'}. The paper, its folds and cuts never change; you only change the text in its boxes and, if asked, its colour set.
+
+${talk}WHAT THEY WANT NOW (may be informal):
+"""$request"""
+
+TEXT BOXES (key [page] max length, what it says now):
+$boxes
+COLOUR SET NOW: ${info?.palette.name ?? 'unknown'}. Colour sets: $palettes.
+
+Rules:
+- Change only what they ask. Return only the boxes you change, using their keys. "The name" means every box that holds that name.
+- If they ask for other colours, set "palette" to the best colour set from the list (Ocean for blue, Sage for green, Blush for pink, Kraft for brown, Midnight for dark, Sunny for orange or yellow); otherwise leave it "".
+$_kBoxRules
+- LANGUAGE: keep the language the boxes are in now, unless they ask for another one; then translate every box. Write Swahili the way people in Tanzania and Kenya really write it.
+- If you truly cannot tell what they mean, reply only {"ask": "one short question"}.
+- "reply": one short, friendly sentence telling them what you changed, in the language they wrote in.
+- Reply with JSON only, no markdown, in this shape:
+{"palette": "", "fields": {"1.1": "..."}, "reply": "..."}
+''';
+}
+
+/// Asks the AI how to change [deck]. Nothing is changed yet: give the answer to [ngmyApplyPaperCraftEdit].
+Future<NgmyPaperCraftAiAnswer> ngmyAskPaperCraftEdit({required NgmySlideDeck deck, required String request, List<(bool, String)> history = const []}) async {
+  return ngmyParsePaperCraftAi(await _askAi(ngmyPaperCraftEditPrompt(deck: deck, request: request, history: history)))!;
+}
+
+/// Puts a new colour set on an open design: the panels and lines are redrawn, and words in the old colours take
+/// the new ones. Returns false when the design is not known.
+bool ngmyRecolorPaperCraft(NgmySlideDeck deck, NgmyCraftPalette to) {
+  final info = ngmyPaperCraftOfDeck(deck);
+  if (info == null) return false;
+  final from = info.palette;
+  final fresh = ngmyBuildPaperCraftDeck(info.craft, to);
+  final map = {from.main: to.main, from.soft: to.soft, from.pale: to.pale, from.accent: to.accent, from.ink: to.ink};
+  for (var s = 0; s < deck.slides.length && s < fresh.slides.length; s++) {
+    final lines = fresh.slides[s].elements.firstWhere(ngmyIsCraftLines);
+    for (final e in deck.slides[s].elements) {
+      if (ngmyIsCraftLines(e)) {
+        e.text = lines.text;
+      } else if (e.type == NgmySlideElementType.text) {
+        e.color = map[e.color] ?? e.color;
+      }
+    }
+  }
+  return true;
+}
+
+/// Applies the AI's change to [deck] in place: new words in the named boxes (sized to fit, starting from the
+/// design's own letter size) and the new colour set. Returns true if anything changed.
+bool ngmyApplyPaperCraftEdit(NgmySlideDeck deck, NgmyPaperCraftAiAnswer answer) {
+  var changed = false;
+  final info = ngmyPaperCraftOfDeck(deck);
+  final template = info == null ? null : info.craft.build(info.palette);
+  for (var s = 0; s < deck.slides.length; s++) {
+    final texts = _textsOf(deck.slides[s]);
+    final tpl = template != null && s < template.length ? _textsOf(template[s]) : const <NgmySlideElement>[];
+    for (var i = 0; i < texts.length; i++) {
+      final v = answer.fields['${s + 1}.${i + 1}'];
+      if (v == null || v.trim().isEmpty) continue;
+      final e = texts[i];
+      e.text = v.replaceAll('\r', '').trim();
+      if (i < tpl.length) e.fontSize = tpl[i].fontSize;
+      ngmyFitCraftText(e);
+      changed = true;
+    }
+  }
+  final to = _paletteNamed(answer.palette);
+  if (to != null && info != null && to.name != info.palette.name && ngmyRecolorPaperCraft(deck, to)) changed = true;
+  return changed;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// The create sheet (same look as Slides "Create with AI").
 // ---------------------------------------------------------------------------------------------------------------
 
 Future<NgmySlideDeck?> showNgmyPaperCraftAiSheet(BuildContext context, {NgmyCraftPalette? palette}) {
@@ -330,10 +541,18 @@ class _CraftAiSheet extends StatefulWidget {
 class _CraftAiSheetState extends State<_CraftAiSheet> {
   final _desc = TextEditingController();
   final _focus = FocusNode();
+  final Map<String, TextEditingController> _details = {};
   String _language = 'auto';
   bool _busy = false;
   String _status = '';
   String? _error;
+
+  /// The AI question about a missing detail (it asks once; the next Create fills placeholders instead).
+  String? _question;
+  bool _asked = false;
+
+  /// The design the AI chose from a description (when the request did not name one).
+  NgmyPaperCraft? _aiPicked;
 
   static const _examples = [
     'Number 1: a letter to my landlord about the repairs',
@@ -346,12 +565,29 @@ class _CraftAiSheetState extends State<_CraftAiSheet> {
   void dispose() {
     _desc.dispose();
     _focus.dispose();
+    for (final c in _details.values) {
+      c.dispose();
+    }
     super.dispose();
+  }
+
+  NgmyPaperCraft? get _design => ngmyFindPaperCraft(_desc.text) ?? _aiPicked;
+
+  TextEditingController _detail(String key) => _details.putIfAbsent(key, () => TextEditingController());
+
+  Map<String, String> _typedDetails(NgmyPaperCraft? craft) {
+    if (craft == null) return const {};
+    return {
+      for (final d in ngmyPaperCraftDetails(craft))
+        if ((_details[d.key]?.text.trim() ?? '').isNotEmpty) d.key: _details[d.key]!.text.trim(),
+    };
   }
 
   Future<void> _create() async {
     final d = _desc.text.trim();
-    if (d.isEmpty) {
+    final design = _design;
+    final typed = _typedDetails(design);
+    if (d.isEmpty && typed.isEmpty) {
       setState(() => _error = 'Type a number, a design name or what you need first.');
       return;
     }
@@ -361,15 +597,28 @@ class _CraftAiSheetState extends State<_CraftAiSheet> {
       _status = 'Writing...';
     });
     try {
-      final deck = await ngmyFillPaperCraftWithAi(
-        request: d,
+      final r = await ngmyFillPaperCraftWithAi(
+        request: d.isEmpty ? 'Fill design #${design!.number} ${design.name}' : d,
         language: _language,
         palette: widget.palette,
+        details: typed,
+        allowAsk: !_asked,
+        design: design,
         onStatus: (s) {
           if (mounted) setState(() => _status = s);
         },
       );
-      if (mounted) Navigator.of(context).pop(deck);
+      if (!mounted) return;
+      if (r.deck != null) {
+        Navigator.of(context).pop(r.deck);
+        return;
+      }
+      setState(() {
+        _busy = false;
+        _asked = true;
+        _question = r.ask;
+        _aiPicked = r.craft;
+      });
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -380,10 +629,50 @@ class _CraftAiSheetState extends State<_CraftAiSheet> {
     }
   }
 
+  Widget _detailFields(NgmyPaperCraft craft) {
+    final details = ngmyPaperCraftDetails(craft);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('DETAILS FOR #${craft.number} ${craft.name.toUpperCase()}  (optional)',
+            style: const TextStyle(color: Colors.white54, fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 0.8)),
+        const SizedBox(height: 4),
+        const Text('Type them here, or just tell the AI above.', style: TextStyle(color: Colors.white38, fontSize: 11.5)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final d in details)
+              SizedBox(
+                width: d.multiline ? 640 : 300,
+                child: TextField(
+                  key: ValueKey('craft_detail_${d.key}'),
+                  controller: _detail(d.key),
+                  enabled: !_busy,
+                  minLines: 1,
+                  maxLines: d.multiline ? 3 : 1,
+                  style: const TextStyle(color: Colors.white, fontSize: 13.5),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    labelText: d.label,
+                    labelStyle: const TextStyle(color: Colors.white54, fontSize: 12.5),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.05),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     const panel = Color(0xFF111827);
-    final picked = ngmyFindPaperCraft(_desc.text);
+    final design = _design;
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: Container(
@@ -414,8 +703,8 @@ class _CraftAiSheetState extends State<_CraftAiSheet> {
                   child: GestureDetector(
                     onTap: () => _focus.requestFocus(),
                     child: Container(
-                      width: 84,
-                      height: 84,
+                      width: 72,
+                      height: 72,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: const LinearGradient(
@@ -426,7 +715,7 @@ class _CraftAiSheetState extends State<_CraftAiSheet> {
                         border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 2),
                         boxShadow: [BoxShadow(color: const Color(0xFF22C55E).withValues(alpha: 0.5), blurRadius: 24, spreadRadius: 2)],
                       ),
-                      child: const Icon(Icons.mic_rounded, color: Colors.white, size: 40),
+                      child: const Icon(Icons.mic_rounded, color: Colors.white, size: 34),
                     ),
                   ),
                 ),
@@ -454,38 +743,68 @@ class _CraftAiSheetState extends State<_CraftAiSheet> {
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                   ),
                 ),
-                if (picked != null) ...[
+                if (design != null) ...[
                   const SizedBox(height: 8),
                   Row(
                     children: [
                       const Icon(Icons.check_circle_rounded, color: Color(0xFF4ADE80), size: 16),
                       const SizedBox(width: 6),
                       Expanded(
-                        child: Text('Design #${picked.number} ${picked.name}',
+                        child: Text('Design #${design.number} ${design.name}',
                             style: const TextStyle(color: Color(0xFF86EFAC), fontWeight: FontWeight.w700, fontSize: 12.5)),
                       ),
                     ],
                   ),
                 ],
+                if (_question != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    key: const ValueKey('craft_ai_question'),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF8B5CF6).withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.45)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.auto_awesome_rounded, color: Color(0xFFC4B5FD), size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '$_question\nAnswer in the boxes below or above, then tap Create. Tap Create again to leave it blank.',
+                            style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                if (design != null) ...[
+                  const SizedBox(height: 14),
+                  _detailFields(design),
+                ],
                 const SizedBox(height: 12),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (final ex in _examples)
-                      ActionChip(
-                        label: Text(ex, style: const TextStyle(fontSize: 11, color: Colors.white70)),
-                        backgroundColor: Colors.white.withValues(alpha: 0.06),
-                        side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-                        onPressed: _busy
-                            ? null
-                            : () => setState(() {
-                                  _desc.text = ex;
-                                  _error = null;
-                                }),
-                      ),
-                  ],
-                ),
+                if (design == null)
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final ex in _examples)
+                        ActionChip(
+                          label: Text(ex, style: const TextStyle(fontSize: 11, color: Colors.white70)),
+                          backgroundColor: Colors.white.withValues(alpha: 0.06),
+                          side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                          onPressed: _busy
+                              ? null
+                              : () => setState(() {
+                                    _desc.text = ex;
+                                    _error = null;
+                                  }),
+                        ),
+                    ],
+                  ),
                 const SizedBox(height: 14),
                 const Text('LANGUAGE', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 1)),
                 const SizedBox(height: 6),
@@ -506,10 +825,10 @@ class _CraftAiSheetState extends State<_CraftAiSheet> {
                 ],
                 const SizedBox(height: 18),
                 SizedBox(
-                  height: 54,
+                  height: 50,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: BorderRadius.circular(16),
                       gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]),
                       boxShadow: [BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.4), blurRadius: 16)],
                     ),
@@ -538,6 +857,270 @@ class _CraftAiSheetState extends State<_CraftAiSheet> {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// The chat that opens from the round AI button beside the page.
+// ---------------------------------------------------------------------------------------------------------------
+
+/// The chat of each open design (kept while the app is open), as (from the user, text).
+final Map<String, List<(bool, String)>> _chats = {};
+
+/// Opens the small AI chat for an open Fold & Cut design. [deck] gives the design as it is now; [onApply] makes the
+/// change (inside the editor, so Undo works) and returns true when something changed.
+Future<void> showNgmyPaperCraftAiChat(
+  BuildContext context, {
+  required NgmySlideDeck Function() deck,
+  required bool Function(NgmyPaperCraftAiAnswer answer) onApply,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black26,
+    builder: (_) => _CraftAiChat(deck: deck, onApply: onApply),
+  );
+}
+
+class _CraftAiChat extends StatefulWidget {
+  const _CraftAiChat({required this.deck, required this.onApply});
+  final NgmySlideDeck Function() deck;
+  final bool Function(NgmyPaperCraftAiAnswer answer) onApply;
+  @override
+  State<_CraftAiChat> createState() => _CraftAiChatState();
+}
+
+class _CraftAiChatState extends State<_CraftAiChat> {
+  final _input = TextEditingController();
+  final _scroll = ScrollController();
+  bool _busy = false;
+
+  List<(bool, String)> get _log => _chats.putIfAbsent(widget.deck().id, () => []);
+
+  static const _ideas = ['Change the name to Neema', 'Make it Swahili', 'Shorter message', 'Use the Ocean colours'];
+
+  @override
+  void dispose() {
+    _input.dispose();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _toBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scroll.hasClients) _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
+    });
+  }
+
+  Future<void> _send([String? text]) async {
+    final t = (text ?? _input.text).trim();
+    if (t.isEmpty || _busy) return;
+    final history = List<(bool, String)>.of(_log);
+    setState(() {
+      _busy = true;
+      _log.add((true, t));
+      _input.clear();
+    });
+    _toBottom();
+    try {
+      final answer = await ngmyAskPaperCraftEdit(deck: widget.deck(), request: t, history: history.length > 8 ? history.sublist(history.length - 8) : history);
+      String reply;
+      if (answer.ask != null) {
+        reply = answer.ask!;
+      } else {
+        final changed = widget.onApply(answer);
+        reply = changed ? (answer.reply ?? 'Done.') : 'I could not find anything to change. Try saying it another way.';
+      }
+      if (mounted) setState(() => _log.add((false, reply)));
+    } catch (e) {
+      if (mounted) setState(() => _log.add((false, '$e')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+      _toBottom();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const panel = Color(0xFF111827);
+    final log = _log;
+    final info = ngmyPaperCraftOfDeck(widget.deck());
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: Container(
+          constraints: BoxConstraints(maxHeight: math.min(460, MediaQuery.sizeOf(context).height * 0.6), maxWidth: 520),
+          decoration: const BoxDecoration(color: panel, borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 30,
+                        height: 30,
+                        decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)])),
+                        child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 16),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          info == null ? 'AI helper' : 'AI helper  -  #${info.craft.number} ${info.craft.name}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14),
+                        ),
+                      ),
+                      IconButton(onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 20)),
+                    ],
+                  ),
+                ),
+                Flexible(
+                  child: ListView(
+                    controller: _scroll,
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.fromLTRB(14, 4, 14, 8),
+                    children: [
+                      if (log.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 8),
+                          child: Text(
+                            'Tell me what to change: a name, the address, the message, the language or the colours. The folds and cuts stay as they are.',
+                            style: TextStyle(color: Colors.white60, fontSize: 12.5, height: 1.4),
+                          ),
+                        ),
+                      for (final (mine, text) in log)
+                        Align(
+                          alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            constraints: const BoxConstraints(maxWidth: 380),
+                            decoration: BoxDecoration(
+                              color: mine ? const Color(0xFF7C3AED) : Colors.white.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.35)),
+                          ),
+                        ),
+                      if (_busy)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 2, bottom: 6),
+                          child: Row(children: [
+                            SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFC4B5FD))),
+                            SizedBox(width: 8),
+                            Text('Changing it...', style: TextStyle(color: Colors.white60, fontSize: 12)),
+                          ]),
+                        ),
+                    ],
+                  ),
+                ),
+                if (log.isEmpty)
+                  SizedBox(
+                    height: 36,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      children: [
+                        for (final idea in _ideas)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: ActionChip(
+                              label: Text(idea, style: const TextStyle(fontSize: 11, color: Colors.white70)),
+                              backgroundColor: Colors.white.withValues(alpha: 0.06),
+                              side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                              onPressed: _busy ? null : () => _input.text = idea,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          key: const ValueKey('craft_ai_chat_input'),
+                          controller: _input,
+                          autofocus: true,
+                          enabled: !_busy,
+                          minLines: 1,
+                          maxLines: 3,
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => _send(),
+                          style: const TextStyle(color: Colors.white, fontSize: 14),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            hintText: 'Type a change...',
+                            hintStyle: const TextStyle(color: Colors.white38),
+                            filled: true,
+                            fillColor: Colors.white.withValues(alpha: 0.07),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(99), borderSide: BorderSide.none),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      InkWell(
+                        key: const ValueKey('craft_ai_chat_send'),
+                        customBorder: const CircleBorder(),
+                        onTap: _busy ? null : _send,
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)])),
+                          child: const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 20),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The round AI button that sits beside an open Fold & Cut page.
+class NgmyPaperCraftAiBubble extends StatelessWidget {
+  const NgmyPaperCraftAiBubble({super.key, required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Ask the AI to change this',
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        child: InkWell(
+          key: const ValueKey('craft_ai_bubble'),
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 1.5),
+              boxShadow: [BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.45), blurRadius: 12)],
+            ),
+            child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20),
           ),
         ),
       ),

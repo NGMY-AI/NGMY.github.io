@@ -72,4 +72,46 @@ void main() {
     expect(long.text.endsWith('...'), isTrue);
     expect(long.text.length, lessThan(150 * 20));
   });
+
+  test('Each design lists the details it needs, and the prompt carries typed details and the ask rule', () {
+    for (final c in kNgmyPaperCrafts) {
+      expect(ngmyPaperCraftDetails(c), isNotEmpty, reason: c.id);
+    }
+    final letter = ngmyPaperCraftByNumber(1)!;
+    final keys = ngmyPaperCraftDetails(letter).map((d) => d.key).toList();
+    expect(keys, containsAll(['to_name', 'to_address', 'from_name', 'from_address']));
+    final places = kNgmyPaperCrafts.firstWhere((c) => c.id == 'place_cards');
+    expect(ngmyPaperCraftDetails(places).first.label, 'Guest names');
+    final prompt = ngmyPaperCraftAiPrompt(request: 'number 1', picked: letter, details: {'to_name': 'Mr Juma'}, allowAsk: true);
+    expect(prompt, contains('Recipient name: Mr Juma'));
+    expect(prompt, contains('NEEDS: Recipient name, Recipient address'));
+    expect(prompt, contains('"ask"'));
+    final noAsk = ngmyPaperCraftAiPrompt(request: 'number 1', picked: letter);
+    expect(noAsk, contains('Do not ask questions'));
+    final asked = ngmyParsePaperCraftAi('{"design": 1, "ask": "What is the address of Mr Juma?"}')!;
+    expect(asked.ask, 'What is the address of Mr Juma?');
+    expect(asked.fields, isEmpty);
+  });
+
+  test('The editor chat changes words and colours in place, never the folds', () {
+    final craft = ngmyPaperCraftByNumber(14)!;
+    final deck = ngmyBuildPaperCraftDeck(craft, kNgmyCraftPalettes[0]);
+    final info = ngmyPaperCraftOfDeck(deck)!;
+    expect(info.craft.id, 'quarter_fold_card');
+    expect(info.palette.name, 'Blush');
+    final before = deck.slides.first.elements.where((e) => e.type == NgmySlideElementType.text).map((e) => (e.x, e.y, e.w, e.h, e.rotation)).toList();
+    final prompt = ngmyPaperCraftEditPrompt(deck: deck, request: 'change the name to Neema');
+    expect(prompt, contains('#14 Quarter-Fold Card'));
+    expect(prompt, contains('COLOUR SET NOW: Blush'));
+    final answer = ngmyParsePaperCraftAi('{"palette": "Ocean", "fields": {"1.1": "Asante Neema"}, "reply": "Done"}')!;
+    expect(ngmyApplyPaperCraftEdit(deck, answer), isTrue);
+    final texts = deck.slides.first.elements.where((e) => e.type == NgmySlideElementType.text).toList();
+    expect(texts.first.text, 'Asante Neema');
+    expect(texts.map((e) => (e.x, e.y, e.w, e.h, e.rotation)).toList(), before);
+    final after = ngmyPaperCraftOfDeck(deck)!;
+    expect(after.palette.name, 'Ocean');
+    expect(texts.first.color, kNgmyCraftPalettes[2].main);
+    final fresh = ngmyBuildPaperCraftDeck(craft, kNgmyCraftPalettes[2]);
+    expect(deck.slides.first.elements.first.text, fresh.slides.first.elements.first.text);
+  });
 }

@@ -1625,15 +1625,60 @@ final List<NgmyPaperCraft> kNgmyPaperCrafts = [
 ];
 
 /// A new presentation on true Letter paper made from [craft] in [palette].
-NgmySlideDeck ngmyBuildPaperCraftDeck(NgmyPaperCraft craft, NgmyCraftPalette palette) => NgmySlideDeck(
-      id: NgmySlidesTemplates.newId(),
-      name: craft.name,
-      aspectRatio: NgmySlideAspectRatio.portrait916,
-      paperAspect: kNgmyCraftPageW / kNgmyCraftPageH,
-      deckKind: kNgmyPaperCraftDeckKind,
-      autoAdvanceSeconds: 6,
-      slides: craft.build(palette),
-    );
+NgmySlideDeck ngmyBuildPaperCraftDeck(NgmyPaperCraft craft, NgmyCraftPalette palette) {
+  final slides = craft.build(palette);
+  // The lines layer remembers which design and colour set it is, so the AI can change it later.
+  for (final s in slides) {
+    for (final e in s.elements) {
+      if (!ngmyIsCraftLines(e)) continue;
+      final m = jsonDecode(e.text) as Map<String, dynamic>;
+      m['craft'] = craft.id;
+      m['pal'] = palette.name;
+      e.text = jsonEncode(m);
+    }
+  }
+  return NgmySlideDeck(
+    id: NgmySlidesTemplates.newId(),
+    name: craft.name,
+    aspectRatio: NgmySlideAspectRatio.portrait916,
+    paperAspect: kNgmyCraftPageW / kNgmyCraftPageH,
+    deckKind: kNgmyPaperCraftDeckKind,
+    autoAdvanceSeconds: 6,
+    slides: slides,
+  );
+}
+
+/// Which design and colour set a Fold & Cut deck was made from (null when it cannot tell).
+({NgmyPaperCraft craft, NgmyCraftPalette palette})? ngmyPaperCraftOfDeck(NgmySlideDeck deck) {
+  for (final s in deck.slides) {
+    for (final e in s.elements) {
+      if (!ngmyIsCraftLines(e)) continue;
+      try {
+        final m = jsonDecode(e.text) as Map<String, dynamic>;
+        final id = m['craft']?.toString();
+        final pal = m['pal']?.toString();
+        NgmyPaperCraft? craft;
+        for (final c in kNgmyPaperCrafts) {
+          if (c.id == id || (id == null && c.name == deck.name)) craft = c;
+        }
+        if (craft == null) return null;
+        for (final p in kNgmyCraftPalettes) {
+          if (p.name == pal) return (craft: craft, palette: p);
+        }
+        // Made before the design was remembered: find the colour set whose lines match.
+        for (final p in kNgmyCraftPalettes) {
+          final fresh = craft.build(p).first.elements.firstWhere(ngmyIsCraftLines);
+          final a = (jsonDecode(fresh.text) as Map)['f'];
+          if (jsonEncode(a) == jsonEncode(m['f'])) return (craft: craft, palette: p);
+        }
+        return (craft: craft, palette: kNgmyCraftPalettes.first);
+      } catch (_) {
+        return null;
+      }
+    }
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------------------------------------------------------
 // The picker.
@@ -1677,6 +1722,42 @@ class _CraftPickerScreenState extends State<_CraftPickerScreen> {
         foregroundColor: ink,
         elevation: 0,
         title: const Text('Fold & Cut', style: TextStyle(fontWeight: FontWeight.w800)),
+        actions: [
+          // Same as Slides "Create with AI", as a small pill: say a number, a name or what you need.
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Center(
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  key: const ValueKey('craft_ai_open'),
+                  borderRadius: BorderRadius.circular(99),
+                  onTap: () async {
+                    final nav = Navigator.of(context);
+                    final deck = await showNgmyPaperCraftAiSheet(context, palette: kNgmyCraftPalettes[_palette]);
+                    if (deck != null && mounted) nav.pop(deck);
+                  },
+                  child: Ink(
+                    height: 32,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(99),
+                      gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 15),
+                        SizedBox(width: 5),
+                        Text('AI', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12.5)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
       body: SafeArea(
         top: false,
@@ -1689,30 +1770,6 @@ class _CraftPickerScreenState extends State<_CraftPickerScreen> {
                 'Print, cut on the thin solid lines, fold on the light dashed lines and glue the grey tabs. '
                 'Every design is a Letter page; print it at Actual size (100%).',
                 style: TextStyle(color: sub, fontSize: 12.5, height: 1.35),
-              ),
-            ),
-            // Same as Slides "Create with AI": say a number, a name or what you need, and the AI writes it.
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-              child: SizedBox(
-                height: 46,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]),
-                    boxShadow: [BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.35), blurRadius: 12)],
-                  ),
-                  child: TextButton.icon(
-                    key: const ValueKey('craft_ai_open'),
-                    onPressed: () async {
-                      final nav = Navigator.of(context);
-                      final deck = await showNgmyPaperCraftAiSheet(context, palette: kNgmyCraftPalettes[_palette]);
-                      if (deck != null && mounted) nav.pop(deck);
-                    },
-                    icon: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20),
-                    label: const Text('Create with AI  -  say a number or a name', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13.5)),
-                  ),
-                ),
               ),
             ),
             SizedBox(

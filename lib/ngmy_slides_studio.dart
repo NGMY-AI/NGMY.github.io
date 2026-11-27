@@ -25,7 +25,8 @@ import 'ngmy_slides_ai_history.dart';
 import 'ngmy_slides_icon_picker.dart';
 import 'ngmy_quote_maker.dart';
 import 'ngmy_quote_templates.dart' show kNgmyQuoteLogoFile;
-import 'ngmy_paper_crafts.dart' show ngmyIsCraftLines, showNgmyPaperCraftPicker;
+import 'ngmy_paper_crafts.dart' show ngmyIsCraftLines, ngmyIsPaperCraftDeck, showNgmyPaperCraftPicker;
+import 'ngmy_paper_craft_ai.dart' show NgmyPaperCraftAiBubble, ngmyApplyPaperCraftEdit, showNgmyPaperCraftAiChat;
 import 'ngmy_slides_video_export.dart';
 import 'ngmy_slides_ai_maker.dart';
 import 'ngmy_slides_class_templates.dart';
@@ -5518,6 +5519,45 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
   }
 
   Widget _canvas(NgmySlide slide, bool isDark, {bool tight = false}) {
+    // Fold & Cut: a round AI button sits beside the page (never on it), to change the words or colours by chat.
+    final deck = _activeDeck;
+    if (ngmyIsPaperCraftDeck(deck) && !_isTransferredReadOnly()) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: _canvasPage(slide, isDark, tight: tight)),
+          Padding(
+            padding: EdgeInsets.only(top: tight ? 8 : 16, right: tight ? 4 : 8),
+            child: NgmyPaperCraftAiBubble(onTap: () => unawaited(_openPaperCraftAiChat())),
+          ),
+        ],
+      );
+    }
+    return _canvasPage(slide, isDark, tight: tight);
+  }
+
+  Future<void> _openPaperCraftAiChat() async {
+    final deck = _activeDeck;
+    if (deck == null) return;
+    _stopTextEditing(unfocus: true);
+    await showNgmyPaperCraftAiChat(
+      context,
+      deck: () => _activeDeck ?? deck,
+      onApply: (answer) {
+        final d = _activeDeck;
+        if (d == null || !mounted) return false;
+        var changed = false;
+        _mutate(() {
+          changed = ngmyApplyPaperCraftEdit(d, answer);
+          _selectedElementId = null;
+          _clearTextControllers();
+        });
+        return changed;
+      },
+    );
+  }
+
+  Widget _canvasPage(NgmySlide slide, bool isDark, {bool tight = false}) {
     final aspect = _activeDeck?.aspectValue ?? 16 / 9;
     return Padding(
       padding: EdgeInsets.all(tight ? 8 : 16),
