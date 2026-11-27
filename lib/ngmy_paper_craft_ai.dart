@@ -237,6 +237,8 @@ String _languageRule(String request, String language) {
   }
 }
 
+String get _wmDesigns => kNgmyCraftWatermarks.map((w) => '${w.id}: ${w.variants.map((v) => v.$1).join('/')}${w.canBeOne ? ' (can be one only)' : ''}').join('; ');
+
 String get _wmList => kNgmyCraftWatermarks.map((w) => '${w.id} (${w.name})').join(', ');
 
 const String _kBoxRules = '''
@@ -298,7 +300,7 @@ ${_languageRule(request, language)}
 ''';
 }
 
-typedef NgmyPaperCraftAiAnswer = ({int design, String? palette, Map<String, String> fields, String? ask, String? reply, String? watermark});
+typedef NgmyPaperCraftAiAnswer = ({int design, String? palette, Map<String, String> fields, String? ask, String? reply, String? watermark, Object? wm});
 
 NgmyPaperCraftAiAnswer? ngmyParsePaperCraftAi(String raw) {
   final start = raw.indexOf('{');
@@ -333,6 +335,7 @@ NgmyPaperCraftAiAnswer? ngmyParsePaperCraftAi(String raw) {
       ask: text('ask'),
       reply: text('reply'),
       watermark: wm != null && ngmyCraftWatermarkById(wm) != null ? wm : null,
+      wm: m['wm'],
     );
   } catch (_) {
     return null;
@@ -473,18 +476,19 @@ ${talk}WHAT THEY WANT NOW (may be informal):
 TEXT BOXES (key [page] max length, what it says now):
 $boxes
 COLOUR SET NOW: ${info?.palette.name ?? 'unknown'}. Colour sets: $palettes.
-WATERMARK NOW: ${ngmyCraftWatermarkOf(deck)}. Watermark styles: $_wmList.
+WATERMARK NOW: ${ngmyCraftWmDescribe(ngmyCraftWatermarkSettingsOf(deck))}.
+WATERMARK STYLES AND THEIR DESIGNS: $_wmDesigns. PLACES: ${kNgmyCraftWmPlaces.join(', ')}.
 
 Rules:
 - Change only what they ask. Return only the boxes you change, using their keys. "The name" means every box that holds that name.
 - If they ask for other colours, set "palette" to the best colour set from the list (Ocean for blue, Sage for green, Blush for pink, Kraft for brown, Midnight for dark, Sunny for orange or yellow); otherwise leave it "".
-- If they ask for another NGMY watermark ("use the seal watermark", "put the logo", "diagonal NGMY"), set "watermark" to that style id; otherwise leave it "". The watermark is always there: if they ask to remove it, pick the most discreet one (footer) and say so.
+- WATERMARK: if they ask about the NGMY watermark, set "wm" to only the parts that change: "style" (a style id), "variant" (a design id of that style), "one" (true for a single one, false for many), "place" (one of the places), "size" (0.5 to 1.8, 1 is normal; "bigger" is about 1.3 times what it is now, "smaller" about 0.75 times), "visibility" (0.3 to 2.5, 1 is the default; "more faint" is about 0.7 times now, "more visible" about 1.4 times), or "reset": true to go back to the default size and visibility. Otherwise leave "wm" as {}. The watermark is always there: if they ask to remove it, make it as faint as allowed (visibility 0.3) and say so.
 $_kBoxRules
 - LANGUAGE: keep the language the boxes are in now, unless they ask for another one; then translate every box. Write Swahili the way people in Tanzania and Kenya really write it.
 - If you truly cannot tell what they mean, reply only {"ask": "one short question"}.
 - "reply": one short, friendly sentence telling them what you changed, in the language they wrote in.
 - Reply with JSON only, no markdown, in this shape:
-{"palette": "", "watermark": "", "fields": {"1.1": "..."}, "reply": "..."}
+{"palette": "", "wm": {}, "fields": {"1.1": "..."}, "reply": "..."}
 ''';
 }
 
@@ -499,7 +503,7 @@ bool ngmyRecolorPaperCraft(NgmySlideDeck deck, NgmyCraftPalette to) {
   final info = ngmyPaperCraftOfDeck(deck);
   if (info == null) return false;
   final from = info.palette;
-  final style = ngmyCraftWatermarkOf(deck);
+  final wmNow = ngmyCraftWatermarkSettingsOf(deck);
   final fresh = ngmyBuildPaperCraftDeck(info.craft, to);
   final map = {from.main: to.main, from.soft: to.soft, from.pale: to.pale, from.accent: to.accent, from.ink: to.ink};
   for (var s = 0; s < deck.slides.length && s < fresh.slides.length; s++) {
@@ -513,7 +517,7 @@ bool ngmyRecolorPaperCraft(NgmySlideDeck deck, NgmyCraftPalette to) {
     }
   }
   // The same watermark style, in the new colours.
-  ngmyApplyCraftWatermark(deck, style, palette: to);
+  ngmyApplyCraftWatermarkSettings(deck, wmNow, palette: to);
   return true;
 }
 
@@ -538,9 +542,10 @@ bool ngmyApplyPaperCraftEdit(NgmySlideDeck deck, NgmyPaperCraftAiAnswer answer) 
   }
   final to = _paletteNamed(answer.palette);
   if (to != null && info != null && to.name != info.palette.name && ngmyRecolorPaperCraft(deck, to)) changed = true;
-  final wm = answer.watermark;
-  if (wm != null && wm != ngmyCraftWatermarkOf(deck)) {
-    ngmyApplyCraftWatermark(deck, wm);
+  final now = ngmyCraftWatermarkSettingsOf(deck);
+  final next = ngmyCraftWmSettingsFromAi(answer.wm, now) ?? ngmyCraftWmSettingsFromAi(answer.watermark, now);
+  if (next != null) {
+    ngmyApplyCraftWatermarkSettings(deck, next);
     changed = true;
   }
   return changed;
@@ -1031,7 +1036,7 @@ class _CraftAiChatState extends State<_CraftAiChat> {
 
   /// Puts another NGMY watermark style on the open design (one tap, no AI needed).
   void _setWatermark(NgmyCraftWatermark w) {
-    final changed = widget.onApply((design: 0, palette: null, fields: const {}, ask: null, reply: null, watermark: w.id));
+    final changed = widget.onApply((design: 0, palette: null, fields: const {}, ask: null, reply: null, watermark: w.id, wm: null));
     setState(() => _log.add((false, changed ? 'Done: the watermark is now ${w.name}.' : 'That watermark is already on.')));
     _toBottom();
   }

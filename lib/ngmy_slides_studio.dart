@@ -27,7 +27,8 @@ import 'ngmy_quote_maker.dart';
 import 'ngmy_quote_templates.dart' show kNgmyQuoteLogoFile;
 import 'ngmy_paper_crafts.dart' show ngmyIsCraftLines, ngmyIsPaperCraftDeck, showNgmyPaperCraftPicker;
 import 'ngmy_paper_craft_ai.dart' show NgmyPaperCraftAiBubble, ngmyApplyPaperCraftEdit, showNgmyPaperCraftAiChat;
-import 'ngmy_paper_craft_watermark.dart' show ngmyIsCraftWatermark;
+import 'ngmy_paper_craft_watermark.dart'
+    show NgmyCraftWatermarkButton, ngmyApplyCraftWatermarkSettings, ngmyIsCraftWatermark, showNgmyCraftWatermarkPanel;
 import 'ngmy_slides_video_export.dart';
 import 'ngmy_slides_ai_maker.dart';
 import 'ngmy_slides_class_templates.dart';
@@ -5434,7 +5435,14 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
   Widget _slideStrip(bool isDark, {required bool vertical}) {
     final deck = _activeDeck!;
     final craftAi = ngmyIsPaperCraftDeck(deck) && !_isTransferredReadOnly();
-    final craftBubble = NgmyPaperCraftAiBubble(onTap: () => unawaited(_openPaperCraftAiChat()));
+    final craftBubble = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        NgmyPaperCraftAiBubble(onTap: () => unawaited(_openPaperCraftAiChat())),
+        const SizedBox(width: 6),
+        NgmyCraftWatermarkButton(onTap: () => unawaited(_openPaperCraftWatermark())),
+      ],
+    );
     final list = ListView.separated(
       scrollDirection: vertical ? Axis.vertical : Axis.horizontal,
       padding: const EdgeInsets.all(8),
@@ -5528,6 +5536,24 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
   }
 
   Widget _canvas(NgmySlide slide, bool isDark, {bool tight = false}) => _canvasPage(slide, isDark, tight: tight);
+
+  /// Fold & Cut: the watermark panel (style, design, one or many, where, size, visibility) for the whole deck.
+  Future<void> _openPaperCraftWatermark() async {
+    if (_activeDeck == null) return;
+    _stopTextEditing(unfocus: true);
+    await showNgmyCraftWatermarkPanel(
+      context,
+      deck: () => _activeDeck!,
+      onApply: (settings) {
+        final d = _activeDeck;
+        if (d == null || !mounted) return;
+        _mutate(() {
+          ngmyApplyCraftWatermarkSettings(d, settings);
+          _selectedElementId = null;
+        });
+      },
+    );
+  }
 
   Future<void> _openPaperCraftAiChat() async {
     final deck = _activeDeck;

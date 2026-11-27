@@ -74,7 +74,7 @@ void main() {
     final crestText = deck.slides.first.elements.firstWhere((e) => ngmyIsCraftWatermark(e) && e.type == NgmySlideElementType.text);
     expect(crestText.color & 0xFFFFFF, kNgmyCraftPalettes[2].main & 0xFFFFFF);
     final prompt = ngmyPaperCraftEditPrompt(deck: deck, request: 'use the seal watermark');
-    expect(prompt, contains('WATERMARK NOW: crest'));
+    expect(prompt, contains('WATERMARK NOW: style crest'));
     final answer = ngmyParsePaperCraftAi('{"watermark": "seal", "fields": {}, "reply": "Done"}')!;
     expect(answer.watermark, 'seal');
     expect(ngmyApplyPaperCraftEdit(deck, answer), isTrue);
@@ -85,5 +85,76 @@ void main() {
     final pdf = latin1.decode(await ngmySlidesExportPdfBytes(deck));
     expect(pdf, contains('/MediaBox'));
     expect(jsonDecode(deck.slides.first.elements.first.text)['wm'], 'seal');
+  });
+
+  test('Watermark controls: designs, one or many, place, size and visibility, saved with the deck', () {
+    final craft = ngmyPaperCraftByNumber(13)!;
+    final deck = ngmyBuildPaperCraftDeck(craft, kNgmyCraftPalettes[2]);
+    // The default is exactly the look from before: nothing extra saved, visibility 1.
+    expect(jsonDecode(deck.slides.first.elements.first.text).containsKey('wmo'), isFalse);
+    final before = deck.slides.first.elements.where(ngmyIsCraftWatermark).map((e) => (e.x, e.y, e.w, e.h, e.color, e.strokeColor)).toList();
+    ngmyApplyCraftWatermarkSettings(deck, const NgmyCraftWmSettings());
+    expect(deck.slides.first.elements.where(ngmyIsCraftWatermark).map((e) => (e.x, e.y, e.w, e.h, e.color, e.strokeColor)).toList(), before);
+
+    for (final w in kNgmyCraftWatermarks) {
+      expect(w.variants.length, greaterThanOrEqualTo(3), reason: w.id);
+      for (final v in w.variants) {
+        for (final s in [
+          NgmyCraftWmSettings(style: w.id, variant: v.$1),
+          NgmyCraftWmSettings(style: w.id, variant: v.$1, one: true, place: 0, size: kNgmyCraftWmMaxSize, visibility: kNgmyCraftWmMaxVis),
+          NgmyCraftWmSettings(style: w.id, variant: v.$1, place: 8, size: kNgmyCraftWmMinSize, visibility: kNgmyCraftWmMinVis),
+        ]) {
+          final d = ngmyBuildPaperCraftDeck(ngmyPaperCraftByNumber(18)!, kNgmyCraftPalettes[0]);
+          ngmyApplyCraftWatermarkSettings(d, s);
+          expect(ngmyCraftWatermarkSettingsOf(d), s, reason: '${w.id} ${v.$1}');
+          final els = d.slides.first.elements.where(ngmyIsCraftWatermark).toList();
+          expect(els, isNotEmpty, reason: '${w.id} ${v.$1}');
+          for (final e in els) {
+            // Every piece stays on the paper, even at the biggest size.
+            expect((e.x + e.w / 2) * 8.5, inInclusiveRange(0, 8.5), reason: '${w.id} ${v.$1}');
+            expect((e.y + e.h / 2) * 11, inInclusiveRange(0, 11), reason: '${w.id} ${v.$1}');
+          }
+        }
+      }
+    }
+
+    // Visibility changes how faint it is; the seal moves to the spot chosen; one only makes the pattern a single word.
+    NgmySlideElement firstText(NgmySlideDeck d) => d.slides.first.elements.firstWhere((e) => ngmyIsCraftWatermark(e) && e.type == NgmySlideElementType.text);
+    final faint = ngmyBuildPaperCraftDeck(craft, kNgmyCraftPalettes[2]);
+    final normalAlpha = (firstText(faint).color >> 24) & 0xFF;
+    ngmyApplyCraftWatermarkSettings(faint, const NgmyCraftWmSettings(visibility: 0.5));
+    expect((firstText(faint).color >> 24) & 0xFF, (normalAlpha * 0.5).round());
+    ngmyApplyCraftWatermarkSettings(faint, const NgmyCraftWmSettings(place: 0));
+    expect(firstText(faint).x, lessThan(0.3));
+    final many = ngmyBuildPaperCraftDeck(craft, kNgmyCraftPalettes[2]);
+    ngmyApplyCraftWatermarkSettings(many, const NgmyCraftWmSettings(style: 'pattern'));
+    final one = ngmyBuildPaperCraftDeck(craft, kNgmyCraftPalettes[2]);
+    ngmyApplyCraftWatermarkSettings(one, const NgmyCraftWmSettings(style: 'pattern', one: true));
+    expect(many.slides.first.elements.where(ngmyIsCraftWatermark).length, greaterThan(5));
+    expect(one.slides.first.elements.where(ngmyIsCraftWatermark).length, 1);
+    // Size is clamped.
+    expect(const NgmyCraftWmSettings().copyWith(size: 9).size, kNgmyCraftWmMaxSize);
+    expect(const NgmyCraftWmSettings().copyWith(visibility: 0).visibility, kNgmyCraftWmMinVis);
+  });
+
+  test('The AI chat sets watermark size, visibility, place and design; colours keep them', () {
+    final deck = ngmyBuildPaperCraftDeck(ngmyPaperCraftByNumber(14)!, kNgmyCraftPalettes.first);
+    final prompt = ngmyPaperCraftEditPrompt(deck: deck, request: 'make the watermark bigger');
+    expect(prompt, contains('style seal'));
+    expect(prompt, contains('visibility 1.00'));
+    final a = ngmyParsePaperCraftAi('{"wm": {"variant": "double", "size": 1.3, "visibility": 0.7, "place": "bottom left"}, "fields": {}, "reply": "ok"}')!;
+    expect(ngmyApplyPaperCraftEdit(deck, a), isTrue);
+    final s = ngmyCraftWatermarkSettingsOf(deck);
+    expect(s.variantId, 'double');
+    expect(s.size, 1.3);
+    expect(s.visibility, 0.7);
+    expect(s.placeOrDefault, 6);
+    expect(ngmyRecolorPaperCraft(deck, kNgmyCraftPalettes[3]), isTrue);
+    expect(ngmyCraftWatermarkSettingsOf(deck), s);
+    final reset = ngmyParsePaperCraftAi('{"wm": {"reset": true}}')!;
+    expect(ngmyApplyPaperCraftEdit(deck, reset), isTrue);
+    expect(ngmyCraftWatermarkSettingsOf(deck).visibility, 1);
+    expect(ngmyCraftWatermarkSettingsOf(deck).size, 1);
+    expect(ngmyApplyPaperCraftEdit(deck, ngmyParsePaperCraftAi('{"wm": {}}')!), isFalse);
   });
 }
