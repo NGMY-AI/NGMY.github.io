@@ -1,6 +1,6 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var A,B
 A=c[0]
-B=c[141]
-var z=a.updateTypes([]);(function constants(){B.DX=new A.a0(983548,"MaterialIcons",!1)})()};
-(a=>{a["Z202Fi2YVxsZy37JFCqginPMG1w="]=a.current})($__dart_deferred_initializers__);
+B=c[247]
+var z=a.updateTypes([]);(function constants(){B.aZA=new A.D("Download QR",null,null,null,null,null,null,null,null,null,null,null)})()};
+(a=>{a["xOQyq2E3SO5kcwmOW1hgO9/pxcY="]=a.current})($__dart_deferred_initializers__);
