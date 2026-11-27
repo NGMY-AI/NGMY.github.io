@@ -522,18 +522,21 @@ bool ngmyApplyPaperCraftEdit(NgmySlideDeck deck, NgmyPaperCraftAiAnswer answer) 
 // The create sheet (same look as Slides "Create with AI").
 // ---------------------------------------------------------------------------------------------------------------
 
-Future<NgmySlideDeck?> showNgmyPaperCraftAiSheet(BuildContext context, {NgmyCraftPalette? palette}) {
+/// The AI sheet. With [design] (a template the user just chose) it shows that template's detail boxes and a box to
+/// describe the paper; closing it or tapping Skip returns null, and the blank template opens instead.
+Future<NgmySlideDeck?> showNgmyPaperCraftAiSheet(BuildContext context, {NgmyCraftPalette? palette, NgmyPaperCraft? design}) {
   return showModalBottomSheet<NgmySlideDeck>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => _CraftAiSheet(palette: palette),
+    builder: (_) => _CraftAiSheet(palette: palette, design: design),
   );
 }
 
 class _CraftAiSheet extends StatefulWidget {
-  const _CraftAiSheet({this.palette});
+  const _CraftAiSheet({this.palette, this.design});
   final NgmyCraftPalette? palette;
+  final NgmyPaperCraft? design;
   @override
   State<_CraftAiSheet> createState() => _CraftAiSheetState();
 }
@@ -571,7 +574,30 @@ class _CraftAiSheetState extends State<_CraftAiSheet> {
     super.dispose();
   }
 
-  NgmyPaperCraft? get _design => ngmyFindPaperCraft(_desc.text) ?? _aiPicked;
+  NgmyPaperCraft? get _design => widget.design ?? ngmyFindPaperCraft(_desc.text) ?? _aiPicked;
+
+  /// Opened right after choosing a template: details first, then "describe the paper".
+  bool get _template => widget.design != null;
+
+  Widget _descField() => TextField(
+        key: const ValueKey('craft_ai_text'),
+        controller: _desc,
+        focusNode: _focus,
+        minLines: 3,
+        maxLines: 6,
+        enabled: !_busy,
+        onChanged: (_) => setState(() {}),
+        style: const TextStyle(color: Colors.white, height: 1.35),
+        decoration: InputDecoration(
+          hintText: _template
+              ? 'Example: a warm thank-you letter to my landlord for fixing the roof, signed by the whole family'
+              : 'Example: number 1, a letter to Mr Juma at 12 Uhuru Street, Dar es Salaam...',
+          hintStyle: const TextStyle(color: Colors.white38),
+          filled: true,
+          fillColor: Colors.white.withValues(alpha: 0.06),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+        ),
+      );
 
   TextEditingController _detail(String key) => _details.putIfAbsent(key, () => TextEditingController());
 
@@ -587,7 +613,7 @@ class _CraftAiSheetState extends State<_CraftAiSheet> {
     final d = _desc.text.trim();
     final design = _design;
     final typed = _typedDetails(design);
-    if (d.isEmpty && typed.isEmpty) {
+    if (d.isEmpty && typed.isEmpty && !_template) {
       setState(() => _error = 'Type a number, a design name or what you need first.');
       return;
     }
@@ -598,7 +624,7 @@ class _CraftAiSheetState extends State<_CraftAiSheet> {
     });
     try {
       final r = await ngmyFillPaperCraftWithAi(
-        request: d.isEmpty ? 'Fill design #${design!.number} ${design.name}' : d,
+        request: d.isEmpty ? 'Write design #${design!.number} ${design.name} nicely and professionally.' : d,
         language: _language,
         palette: widget.palette,
         details: typed,
@@ -637,7 +663,7 @@ class _CraftAiSheetState extends State<_CraftAiSheet> {
         Text('DETAILS FOR #${craft.number} ${craft.name.toUpperCase()}  (optional)',
             style: const TextStyle(color: Colors.white54, fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 0.8)),
         const SizedBox(height: 4),
-        const Text('Type them here, or just tell the AI above.', style: TextStyle(color: Colors.white38, fontSize: 11.5)),
+        const Text('Type them here, or just put them in the description.', style: TextStyle(color: Colors.white38, fontSize: 11.5)),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
@@ -687,17 +713,29 @@ class _CraftAiSheetState extends State<_CraftAiSheet> {
               children: [
                 Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(99)))),
                 const SizedBox(height: 14),
-                const Text(
-                  'Create with AI',
+                Text(
+                  _template ? '#${widget.design!.number} ${widget.design!.name}' : 'Create with AI',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 24, letterSpacing: 0.3),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22, letterSpacing: 0.3),
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  'Say a design number, its name or what you need. The AI writes it for you in English or Swahili.',
+                Text(
+                  _template
+                      ? 'Fill in what you know and describe the paper you want. The AI writes and designs it in English or Swahili. Everything is optional: skip to write it yourself.'
+                      : 'Say a design number, its name or what you need. The AI writes it for you in English or Swahili.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white60, fontSize: 13, height: 1.35),
+                  style: const TextStyle(color: Colors.white60, fontSize: 13, height: 1.35),
                 ),
+                if (_template && design != null) ...[
+                  const SizedBox(height: 16),
+                  _detailFields(design),
+                  const SizedBox(height: 16),
+                  const Text('DESCRIBE THE PAPER YOU WANT',
+                      style: TextStyle(color: Color(0xFF86EFAC), fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.8)),
+                  const SizedBox(height: 6),
+                  _descField(),
+                ],
+                if (!_template) ...[
                 const SizedBox(height: 18),
                 Center(
                   child: GestureDetector(
@@ -726,24 +764,9 @@ class _CraftAiSheetState extends State<_CraftAiSheet> {
                   style: TextStyle(color: Color(0xFF86EFAC), fontWeight: FontWeight.w800, fontSize: 12),
                 ),
                 const SizedBox(height: 14),
-                TextField(
-                  key: const ValueKey('craft_ai_text'),
-                  controller: _desc,
-                  focusNode: _focus,
-                  minLines: 3,
-                  maxLines: 6,
-                  enabled: !_busy,
-                  onChanged: (_) => setState(() {}),
-                  style: const TextStyle(color: Colors.white, height: 1.35),
-                  decoration: InputDecoration(
-                    hintText: 'Example: number 1, a letter to Mr Juma at 12 Uhuru Street, Dar es Salaam...',
-                    hintStyle: const TextStyle(color: Colors.white38),
-                    filled: true,
-                    fillColor: Colors.white.withValues(alpha: 0.06),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                  ),
-                ),
-                if (design != null) ...[
+                _descField(),
+                ],
+                if (design != null && !_template) ...[
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -762,14 +785,14 @@ class _CraftAiSheetState extends State<_CraftAiSheet> {
                     key: const ValueKey('craft_ai_question'),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF8B5CF6).withValues(alpha: 0.16),
+                      color: const Color(0xFF14B87A).withValues(alpha: 0.16),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.45)),
+                      border: Border.all(color: const Color(0xFF14B87A).withValues(alpha: 0.45)),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.auto_awesome_rounded, color: Color(0xFFC4B5FD), size: 18),
+                        const Icon(Icons.auto_awesome_rounded, color: Color(0xFF86EFAC), size: 18),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -781,7 +804,7 @@ class _CraftAiSheetState extends State<_CraftAiSheet> {
                     ),
                   ),
                 ],
-                if (design != null) ...[
+                if (design != null && !_template) ...[
                   const SizedBox(height: 14),
                   _detailFields(design),
                 ],
@@ -829,8 +852,8 @@ class _CraftAiSheetState extends State<_CraftAiSheet> {
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
-                      gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]),
-                      boxShadow: [BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.4), blurRadius: 16)],
+                      gradient: const LinearGradient(colors: [Color(0xFF14B87A), Color(0xFF0E9F6A)]),
+                      boxShadow: [BoxShadow(color: const Color(0xFF14B87A).withValues(alpha: 0.4), blurRadius: 16)],
                     ),
                     child: TextButton(
                       key: const ValueKey('craft_ai_create'),
@@ -855,6 +878,14 @@ class _CraftAiSheetState extends State<_CraftAiSheet> {
                     ),
                   ),
                 ),
+                if (_template) ...[
+                  const SizedBox(height: 6),
+                  TextButton(
+                    key: const ValueKey('craft_ai_skip'),
+                    onPressed: _busy ? null : () => Navigator.of(context).pop(),
+                    child: const Text('Skip  -  open it blank and write it myself', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
+                  ),
+                ],
               ],
             ),
           ),
@@ -970,7 +1001,7 @@ class _CraftAiChatState extends State<_CraftAiChat> {
                       Container(
                         width: 30,
                         height: 30,
-                        decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)])),
+                        decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [Color(0xFF14B87A), Color(0xFF0E9F6A)])),
                         child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 16),
                       ),
                       const SizedBox(width: 10),
@@ -1008,7 +1039,7 @@ class _CraftAiChatState extends State<_CraftAiChat> {
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             constraints: const BoxConstraints(maxWidth: 380),
                             decoration: BoxDecoration(
-                              color: mine ? const Color(0xFF7C3AED) : Colors.white.withValues(alpha: 0.08),
+                              color: mine ? const Color(0xFF0E9F6A) : Colors.white.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(14),
                             ),
                             child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.35)),
@@ -1018,7 +1049,7 @@ class _CraftAiChatState extends State<_CraftAiChat> {
                         const Padding(
                           padding: EdgeInsets.only(top: 2, bottom: 6),
                           child: Row(children: [
-                            SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFC4B5FD))),
+                            SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF86EFAC))),
                             SizedBox(width: 8),
                             Text('Changing it...', style: TextStyle(color: Colors.white60, fontSize: 12)),
                           ]),
@@ -1079,7 +1110,7 @@ class _CraftAiChatState extends State<_CraftAiChat> {
                         child: Container(
                           width: 40,
                           height: 40,
-                          decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)])),
+                          decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [Color(0xFF14B87A), Color(0xFF0E9F6A)])),
                           child: const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 20),
                         ),
                       ),
@@ -1116,9 +1147,9 @@ class NgmyPaperCraftAiBubble extends StatelessWidget {
             height: 44,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]),
+              gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF14B87A), Color(0xFF0E9F6A)]),
               border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 1.5),
-              boxShadow: [BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.45), blurRadius: 12)],
+              boxShadow: [BoxShadow(color: const Color(0xFF14B87A).withValues(alpha: 0.45), blurRadius: 12)],
             ),
             child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20),
           ),

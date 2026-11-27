@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_paper_craft_ai.dart';
 import 'package:ngmy/ngmy_paper_crafts.dart';
@@ -113,5 +114,37 @@ void main() {
     expect(texts.first.color, kNgmyCraftPalettes[2].main);
     final fresh = ngmyBuildPaperCraftDeck(craft, kNgmyCraftPalettes[2]);
     expect(deck.slides.first.elements.first.text, fresh.slides.first.elements.first.text);
+  });
+
+  testWidgets('Choosing a template opens its details and a describe box; skipping opens the blank template', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    NgmySlideDeck? got;
+    await tester.pumpWidget(MaterialApp(
+      home: Builder(
+        builder: (ctx) => Scaffold(
+          body: TextButton(onPressed: () async => got = await showNgmyPaperCraftPicker(ctx), child: const Text('open')),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('craft_number_1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('craft_ai_open')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('craft_window_letter')));
+    await tester.pumpAndSettle();
+    expect(find.text('#1 Window Envelope Letter'), findsOneWidget);
+    expect(find.byKey(const ValueKey('craft_detail_to_name')), findsOneWidget);
+    expect(find.byKey(const ValueKey('craft_detail_to_address')), findsOneWidget);
+    expect(find.text('DESCRIBE THE PAPER YOU WANT'), findsOneWidget);
+    expect(find.byKey(const ValueKey('craft_ai_text')), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const ValueKey('craft_ai_skip')));
+    await tester.tap(find.byKey(const ValueKey('craft_ai_skip')));
+    await tester.pumpAndSettle();
+    expect(got, isNotNull);
+    expect(ngmyPaperCraftOfDeck(got!)!.craft.id, 'window_letter');
+    expect(got!.slides.first.elements.any((e) => e.text.startsWith('Recipient Name')), isTrue);
+    expect(tester.takeException(), isNull);
   });
 }

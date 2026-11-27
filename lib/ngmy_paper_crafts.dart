@@ -1742,7 +1742,7 @@ class _CraftPickerScreenState extends State<_CraftPickerScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(99),
-                      gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]),
+                      gradient: const LinearGradient(colors: [Color(0xFF14B87A), Color(0xFF0E9F6A)]),
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
@@ -1836,7 +1836,15 @@ class _CraftPickerScreenState extends State<_CraftPickerScreen> {
                     clipBehavior: Clip.antiAlias,
                     child: InkWell(
                       key: ValueKey('craft_${c.id}'),
-                      onTap: () => Navigator.of(context).pop(ngmyBuildPaperCraftDeck(c, kNgmyCraftPalettes[_palette])),
+                      // Template first: then a sheet with its details and "describe the paper". Closing or skipping
+                      // the sheet opens the blank template to write by hand.
+                      onTap: () async {
+                        final nav = Navigator.of(context);
+                        final palette = kNgmyCraftPalettes[_palette];
+                        final made = await showNgmyPaperCraftAiSheet(context, palette: palette, design: c);
+                        if (!mounted) return;
+                        nav.pop(made ?? ngmyBuildPaperCraftDeck(c, palette));
+                      },
                       child: Padding(
                         padding: const EdgeInsets.all(8),
                         child: Column(

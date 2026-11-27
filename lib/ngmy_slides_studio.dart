@@ -5432,6 +5432,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
 
   Widget _slideStrip(bool isDark, {required bool vertical}) {
     final deck = _activeDeck!;
+    final craftAi = ngmyIsPaperCraftDeck(deck) && !_isTransferredReadOnly();
+    final craftBubble = NgmyPaperCraftAiBubble(onTap: () => unawaited(_openPaperCraftAiChat()));
     final list = ListView.separated(
       scrollDirection: vertical ? Axis.vertical : Axis.horizontal,
       padding: const EdgeInsets.all(8),
@@ -5512,29 +5514,19 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                 style: IconButton.styleFrom(backgroundColor: const Color(0xFF2563EB), minimumSize: const Size(36, 36)),
               ),
             ),
-          Expanded(child: list),
+          // Fold & Cut only: the green AI button sits here with the slide frames, to change the words or colours by chat.
+          if (vertical && craftAi) Padding(padding: const EdgeInsets.only(bottom: 4), child: craftBubble),
+          Expanded(
+            child: vertical || !craftAi
+                ? list
+                : Row(children: [Padding(padding: const EdgeInsets.only(left: 8), child: Center(child: craftBubble)), Expanded(child: list)]),
+          ),
         ],
       ),
     );
   }
 
-  Widget _canvas(NgmySlide slide, bool isDark, {bool tight = false}) {
-    // Fold & Cut: a round AI button sits beside the page (never on it), to change the words or colours by chat.
-    final deck = _activeDeck;
-    if (ngmyIsPaperCraftDeck(deck) && !_isTransferredReadOnly()) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(child: _canvasPage(slide, isDark, tight: tight)),
-          Padding(
-            padding: EdgeInsets.only(top: tight ? 8 : 16, right: tight ? 4 : 8),
-            child: NgmyPaperCraftAiBubble(onTap: () => unawaited(_openPaperCraftAiChat())),
-          ),
-        ],
-      );
-    }
-    return _canvasPage(slide, isDark, tight: tight);
-  }
+  Widget _canvas(NgmySlide slide, bool isDark, {bool tight = false}) => _canvasPage(slide, isDark, tight: tight);
 
   Future<void> _openPaperCraftAiChat() async {
     final deck = _activeDeck;
