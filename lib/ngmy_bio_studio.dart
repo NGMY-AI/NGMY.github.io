@@ -83,6 +83,17 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     _originalPublishedSlug = _doc.slug.trim();
     _anchorDisplayName = _doc.displayName.trim();
     _bind();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _matchLiveHelpTap());
+  }
+
+  /// Admin only: the live Bio page must do exactly what the Help & Services switch shows. If an older
+  /// save left the live page in the other state, the state on the switch is sent to it again.
+  Future<void> _matchLiveHelpTap() async {
+    if (!widget.isAdmin || widget._isLocal || !_doc.isPublished) return;
+    final slug = _originalPublishedSlug.trim().isNotEmpty ? _originalPublishedSlug : _doc.slug;
+    final live = await NgmyBioPublishRegistry.fetchLiveHelpTap(slug);
+    if (!mounted || live == null || live == _doc.helpTap) return;
+    await NgmyBioPublishRegistry.setHelpTap(slug: slug, on: _doc.helpTap, ownerEmail: widget.userEmail);
   }
 
   @override

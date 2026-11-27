@@ -227,6 +227,25 @@ class NgmyBioPublishRegistry {
     }
   }
 
+  /// What a visitor of the published Bio gets right now: true or false for the hidden Help & Services
+  /// spots, or null when the live page could not be read.
+  static Future<bool?> fetchLiveHelpTap(String slug) async {
+    final clean = _normSlug(slug);
+    if (clean.isEmpty) return null;
+    try {
+      final entry = await ngmyDbRelaySettingsFetch(
+        _slugSettingsKey(clean),
+        timeout: _guestFetchTimeout,
+        anonymous: true,
+        fresh: true,
+      );
+      if (entry == null || entry['data'] is! Map) return null;
+      return (entry['data'] as Map)['helpTap'] == true;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Admin switch: turns the hidden Help & Services spots on or off on an already published Bio,
   /// without republishing anything else. Returns null when it worked, or a short reason.
   static Future<String?> setHelpTap({
@@ -240,7 +259,9 @@ class NgmyBioPublishRegistry {
     await ngmyWaitForSupabaseReady();
     try {
       final slugKey = _slugSettingsKey(clean);
-      final entry = await ngmyFetchSettingsValueReliable(slugKey, timeout: _guestFetchTimeout);
+      // Always read the live row fresh: a saved answer from earlier (for example after the app sat idle)
+      // would write an old copy of the Bio back over the newer one.
+      final entry = await ngmyDbRelaySettingsFetch(slugKey, timeout: _guestFetchTimeout, fresh: true);
       if (entry == null || entry['data'] is! Map) return 'Publish this Bio first.';
       final owner = (entry['createdByEmail'] ?? '').toString().toLowerCase().trim();
       final email = ownerEmail.toLowerCase().trim();
@@ -251,9 +272,21 @@ class NgmyBioPublishRegistry {
       } else {
         data.remove('helpTap');
       }
+      // The time stamp makes every switch a new save. Without it, switching back to a state used a few
+      // minutes earlier looked like the same save again and was skipped, so the live page kept the old state.
       final next = Map<String, dynamic>.from(entry)..['data'] = data;
-      final ok = await ngmyUpsertSettingsRowReliable(slugKey, next);
-      return ok ? null : 'Could not update the live Bio. Try again.';
+      for (var attempt = 0; attempt < 3; attempt++) {
+        next['helpTapAt'] = DateTime.now().toUtc().toIso8601String();
+        final ok = await ngmyUpsertSettingsRowReliable(slugKey, next);
+        if (ok) {
+          // Check what a visitor really gets now.
+          final check = await ngmyFetchSettingsValueViaRest(slugKey, timeout: _guestFetchTimeout, anonymous: true);
+          final live = check?['data'] is Map ? (check!['data'] as Map)['helpTap'] == true : null;
+          if (live == on) return null;
+        }
+        await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+      }
+      return 'Could not update the live Bio. Try again.';
     } catch (e) {
       debugPrint('[bio registry] help tap $clean: $e');
       return 'Could not update the live Bio. Try again.';
