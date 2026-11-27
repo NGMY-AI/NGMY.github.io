@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_paper_crafts.dart';
@@ -14,7 +15,82 @@ List<List<double>> _lines(NgmySlide s, String key) {
   ];
 }
 
+/// How wide a glue area is, in mm: the biggest circle that fits inside it (so a thin sliver scores low even if long).
+double _glueWidthMm(List<double> g) {
+  final xs = [for (var i = 0; i + 1 < g.length; i += 2) g[i]];
+  final ys = [for (var i = 1; i < g.length; i += 2) g[i]];
+  final n = xs.length;
+  bool inside(double x, double y) {
+    var c = false;
+    for (var i = 0, j = n - 1; i < n; j = i++) {
+      if ((ys[i] > y) != (ys[j] > y) && x < (xs[j] - xs[i]) * (y - ys[i]) / (ys[j] - ys[i]) + xs[i]) c = !c;
+    }
+    return c;
+  }
+
+  double edge(double x, double y) {
+    var best = double.infinity;
+    for (var i = 0, j = n - 1; i < n; j = i++) {
+      final dx = xs[i] - xs[j], dy = ys[i] - ys[j];
+      final l2 = dx * dx + dy * dy;
+      final t = l2 == 0 ? 0.0 : (((x - xs[j]) * dx + (y - ys[j]) * dy) / l2).clamp(0.0, 1.0);
+      best = math.min(best, math.sqrt(math.pow(x - xs[j] - t * dx, 2) + math.pow(y - ys[j] - t * dy, 2)));
+    }
+    return best;
+  }
+
+  var r = 0.0;
+  for (var x = xs.reduce(math.min); x <= xs.reduce(math.max); x += 0.01) {
+    for (var y = ys.reduce(math.min); y <= ys.reduce(math.max); y += 0.01) {
+      if (inside(x, y)) r = math.max(r, edge(x, y));
+    }
+  }
+  return 2 * r * 25.4;
+}
+
 void main() {
+  test('Every glue tab and envelope glue area is wide enough to glue (at least 12 mm, envelopes at least 14 mm)', () {
+    // Envelope glue areas are worked out from the folds: the part of each side flap that the bottom flap covers.
+    const envelopes = {'card_envelope', 'square_envelope', 'diamond_envelope', 'seed_envelopes', 'gift_card_envelopes'};
+    const glued = {
+      ...envelopes,
+      'gift_box', 'pillow_box', 'pyramid_box', 'prism_box', 'favor_box', 'paper_bag', 'pocket_folder', 'cd_sleeve', 'photo_sleeve',
+    };
+    for (final craft in kNgmyPaperCrafts) {
+      final patches = [for (final s in craft.build(kNgmyCraftPalettes.first)) ..._lines(s, 'g')];
+      if (glued.contains(craft.id)) expect(patches, isNotEmpty, reason: craft.id);
+      final least = envelopes.contains(craft.id) ? 14.0 : 12.0;
+      for (final g in patches) {
+        expect(_glueWidthMm(g), greaterThanOrEqualTo(least), reason: '${craft.id} glue area too thin');
+      }
+    }
+  });
+
+  test('Every glue area says glue, and every stamp box is dark and labelled', () {
+    for (final craft in kNgmyPaperCrafts) {
+      for (final s in craft.build(kNgmyCraftPalettes.first)) {
+        final spec = jsonDecode(s.elements.firstWhere(ngmyIsCraftLines).text) as Map<String, dynamic>;
+        final notes = [for (final n in spec['n'] as List) n as List];
+        expect(notes.where((n) => n[2] == 'glue').length, (spec['g'] as List).length, reason: craft.id);
+      }
+    }
+    for (final id in ['card_envelope', 'square_envelope', 'diamond_envelope', 'postcards']) {
+      final craft = kNgmyPaperCrafts.firstWhere((c) => c.id == id);
+      for (final palette in kNgmyCraftPalettes) {
+        final slides = craft.build(palette);
+        final s = id == 'postcards' ? slides.last : slides.first;
+        final spec = jsonDecode(s.elements.firstWhere(ngmyIsCraftLines).text) as Map<String, dynamic>;
+        final stamp = [for (final n in spec['n'] as List) n as List].where((n) => n[2] == 'STAMP').toList();
+        expect(stamp, isNotEmpty, reason: id);
+        for (final n in stamp) {
+          expect(n[3], palette.ink, reason: '$id stamp label uses the darkest colour');
+          expect(n.length > 5 && n[5] == 1, isTrue, reason: '$id stamp label is bold');
+        }
+        expect((spec['f'] as List).any((f) => (f as List)[0] == palette.ink), isTrue, reason: '$id dark stamp frame');
+      }
+    }
+  });
+
   test('Fold & Cut has at least 20 designs in every palette, each a true Letter page', () {
     expect(kNgmyPaperCrafts.length, greaterThanOrEqualTo(20));
     expect(kNgmyPaperCrafts.map((c) => c.id).toSet().length, kNgmyPaperCrafts.length);

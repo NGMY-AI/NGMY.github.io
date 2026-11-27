@@ -35,7 +35,7 @@ bool ngmyIsCraftLines(NgmySlideElement e) => e.type == NgmySlideElementType.shap
 const int _cutInk = 0xFF9AA3AF;
 const int _foldInk = 0xFFB3BBC7;
 const int _markInk = 0xFFC3CAD4;
-const int _glueInk = 0xFFECEFF3;
+const int _glueInk = 0xFFE2E6EC;
 const int _labelInk = 0xFF9AA3AF;
 const double _cutPt = 0.5;
 const double _foldPt = 0.45;
@@ -43,6 +43,17 @@ const double _markPt = 0.45;
 const List<double> _foldDashPt = [3, 2.2];
 const List<double> _markDashPt = [0.8, 1.6];
 const double _labelPt = 6;
+
+/// A small locked word on the paper (a hint, a label like "glue" or "PLACE STAMP HERE"). [x], [y] is its top left.
+class _Note {
+  const _Note(this.x, this.y, this.text, {this.color = _labelInk, this.pt = _labelPt, this.bold = false});
+  final double x;
+  final double y;
+  final String text;
+  final int color;
+  final double pt;
+  final bool bold;
+}
 
 /// One drawing, read from the JSON in the lines layer.
 class _CraftSpec {
@@ -66,7 +77,7 @@ class _CraftSpec {
   final List<List<double>> marks;
   final List<List<double>> folds;
   final List<List<double>> cuts;
-  final List<(double, double, String)> notes;
+  final List<_Note> notes;
 
   static final empty = _CraftSpec(w: kNgmyCraftPageW, h: kNgmyCraftPageH, fills: const [], glue: const [], marks: const [], folds: const [], cuts: const [], notes: const []);
 }
@@ -86,9 +97,16 @@ _CraftSpec _readSpec(String text) {
     final cuts = lines('c');
     final folds = lines('d');
     final glue = lines('g');
-    final notes = <(double, double, String)>[
+    final notes = <_Note>[
       for (final n in (m['n'] as List? ?? const []))
-        (((n as List)[0] as num).toDouble(), (n[1] as num).toDouble(), n[2].toString()),
+        _Note(
+          ((n as List)[0] as num).toDouble(),
+          (n[1] as num).toDouble(),
+          n[2].toString(),
+          color: n.length > 3 ? (n[3] as num).toInt() : _labelInk,
+          pt: n.length > 4 ? (n[4] as num).toDouble() : _labelPt,
+          bold: n.length > 5 && n[5] == 1,
+        ),
     ];
     // The little key in the corner: a cut line, a fold line and a glue patch with their names.
     final l = m['l'] as List?;
@@ -96,11 +114,11 @@ _CraftSpec _readSpec(String text) {
       final lx = (l[0] as num).toDouble();
       final ly = (l[1] as num).toDouble();
       cuts.add([lx, ly + 0.045, lx + 0.3, ly + 0.045]);
-      notes.add((lx + 0.35, ly, 'cut'));
+      notes.add(_Note(lx + 0.35, ly, 'cut'));
       folds.add([lx + 0.62, ly + 0.045, lx + 0.92, ly + 0.045]);
-      notes.add((lx + 0.97, ly, 'fold'));
+      notes.add(_Note(lx + 0.97, ly, 'fold'));
       glue.add([lx + 1.3, ly, lx + 1.46, ly, lx + 1.46, ly + 0.09, lx + 1.3, ly + 0.09]);
-      notes.add((lx + 1.51, ly, 'glue'));
+      notes.add(_Note(lx + 1.51, ly, 'glue'));
     }
     spec = _CraftSpec(
       w: (m['W'] as num?)?.toDouble() ?? kNgmyCraftPageW,
@@ -185,15 +203,17 @@ void ngmyPaintCraftLines(Canvas canvas, Size size, String text) {
   stroke(s.folds, _foldInk, _foldPt, _foldDashPt);
   stroke(s.cuts, _cutInk, _cutPt, null);
 
-  final fs = _labelPt * ptPx;
-  if (fs >= 2.5) {
-    for (final n in s.notes) {
-      final tp = TextPainter(
-        text: TextSpan(text: n.$3, style: TextStyle(fontSize: fs, color: const Color(_labelInk), height: 1.0)),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      tp.paint(canvas, o(n.$1, n.$2));
-    }
+  for (final n in s.notes) {
+    final fs = n.pt * ptPx;
+    if (fs < 2.5) continue;
+    final tp = TextPainter(
+      text: TextSpan(
+        text: n.text,
+        style: TextStyle(fontSize: fs, color: Color(n.color), height: 1.0, fontWeight: n.bold ? FontWeight.w700 : FontWeight.w400),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(canvas, o(n.x, n.y));
   }
 }
 
@@ -289,9 +309,12 @@ pw.Widget ngmyCraftLinesPdf(String text, double w, double h) {
       ),
       for (final n in s.notes)
         pw.Positioned(
-          left: n.$1 * kx,
-          top: n.$2 * ky - 1,
-          child: pw.Text(n.$3, style: pw.TextStyle(fontSize: _labelPt * ptk, color: const PdfColor.fromInt(_labelInk))),
+          left: n.x * kx,
+          top: n.y * ky - 1,
+          child: pw.Text(
+            n.text,
+            style: pw.TextStyle(fontSize: n.pt * ptk, color: PdfColor.fromInt(n.color), fontWeight: n.bold ? pw.FontWeight.bold : pw.FontWeight.normal),
+          ),
         ),
     ],
   );
@@ -346,7 +369,8 @@ String ngmyCraftLinesSvg(String text) {
   stroke(s.folds, _foldInk, _foldPt, _foldDashPt);
   stroke(s.cuts, _cutInk, _cutPt, null);
   for (final n in s.notes) {
-    b.write('<text x="${_n(n.$1)}" y="${_n(n.$2)}" font-size="${_n(_labelPt / 72)}" fill="${_css(_labelInk)}" dominant-baseline="hanging" font-family="Helvetica, Arial, sans-serif">${_esc(n.$3)}</text>');
+    b.write('<text x="${_n(n.x)}" y="${_n(n.y)}" font-size="${_n(n.pt / 72)}" fill="${_css(n.color)}"${n.bold ? ' font-weight="bold"' : ''} '
+        'dominant-baseline="hanging" font-family="Helvetica, Arial, sans-serif">${_esc(n.text)}</text>');
   }
   b.write('</svg>');
   return b.toString();
@@ -498,6 +522,59 @@ double _edgeDist(List<Offset> poly, Offset p) {
   return best;
 }
 
+/// The middle of the biggest circle that fits in [poly], and its radius (a quick grid search).
+(Offset, double) _widestSpot(List<Offset> poly) {
+  var minX = double.infinity, minY = double.infinity, maxX = -double.infinity, maxY = -double.infinity;
+  for (final q in poly) {
+    minX = math.min(minX, q.dx);
+    minY = math.min(minY, q.dy);
+    maxX = math.max(maxX, q.dx);
+    maxY = math.max(maxY, q.dy);
+  }
+  final step = math.max(0.01, math.max(maxX - minX, maxY - minY) / 60);
+  var best = (Offset((minX + maxX) / 2, (minY + maxY) / 2), 0.0);
+  for (var x = minX + step / 2; x < maxX; x += step) {
+    for (var y = minY + step / 2; y < maxY; y += step) {
+      final q = Offset(x, y);
+      if (!_inside(poly, q)) continue;
+      final d = _edgeDist(poly, q);
+      if (d > best.$2) best = (q, d);
+    }
+  }
+  return best;
+}
+
+double _signedArea(List<Offset> poly) {
+  var a = 0.0;
+  for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    a += poly[j].dx * poly[i].dy - poly[i].dx * poly[j].dy;
+  }
+  return a / 2;
+}
+
+/// The part of [subject] that lies inside the convex shape [clip] (where two folded flaps cover each other).
+List<Offset> _clipConvex(List<Offset> subject, List<Offset> clip) {
+  final sign = _signedArea(clip) >= 0 ? 1.0 : -1.0;
+  double side(Offset a, Offset b, Offset q) => sign * ((b.dx - a.dx) * (q.dy - a.dy) - (b.dy - a.dy) * (q.dx - a.dx));
+  var out = List<Offset>.of(subject);
+  for (var i = 0; i < clip.length && out.isNotEmpty; i++) {
+    final a = clip[i];
+    final b = clip[(i + 1) % clip.length];
+    if ((b - a).distance < 1e-9) continue;
+    final input = out;
+    out = [];
+    for (var j = 0; j < input.length; j++) {
+      final p = input[j];
+      final q = input[(j + 1) % input.length];
+      final sp = side(a, b, p);
+      final sq = side(a, b, q);
+      if (sp >= 0) out.add(p);
+      if ((sp >= 0) != (sq >= 0)) out.add(p + (q - p) * (sp / (sp - sq)));
+    }
+  }
+  return out;
+}
+
 class _Page {
   _Page(this.p);
   final NgmyCraftPalette p;
@@ -521,9 +598,25 @@ class _Page {
   void foldLine(double x1, double y1, double x2, double y2) => _folds.add([_r3(x1), _r3(y1), _r3(x2), _r3(y2)]);
   void mark(List<Offset> pts, {bool close = false}) => _marks.add(_flat(close ? [...pts, pts.first] : pts));
   void markRect(double x, double y, double w, double h) => mark(_rectPts(x, y, w, h), close: true);
-  void glue(List<Offset> pts) => _glue.add(_flat(pts));
+  /// A glue area, lightly shaded, with a small "glue" word in its widest spot.
+  void glue(List<Offset> pts) {
+    if (pts.length < 3) return;
+    _glue.add(_flat(pts));
+    final (c, r) = _widestSpot(pts);
+    if (r >= 0.12) noteAt(c.dx, c.dy, 'glue');
+  }
+
   void glueRect(double x, double y, double w, double h) => glue(_rectPts(x, y, w, h));
   void note(double x, double y, String text) => _notes.add([_r3(x), _r3(y), text]);
+
+  /// A label centred on [cx], [cy] in its own colour and size.
+  void noteAt(double cx, double cy, String text, {int color = _labelInk, double pt = _labelPt, bool bold = false}) {
+    final lines = text.split('\n');
+    final widest = lines.map((l) => l.length).reduce(math.max);
+    final w = widest * pt * (bold ? 0.6 : 0.55) / 72;
+    final h = lines.length * pt / 72;
+    _notes.add([_r3(cx - w / 2), _r3(cy - h / 2), text, color, pt, if (bold) 1]);
+  }
   void legendAt(double x, double y) => _legend = [x, y];
 
   /// The front panel(s) where the NGMY watermark goes: x, y, width, height, how the words are turned, dark or light.
@@ -685,22 +778,27 @@ enum _EnvStyle { curved, pointed, coin }
 /// An envelope net around a body (the front) at [x0],[y0] of [w] x [h]. The flaps fold BACK (away from you), so the
 /// printed body is the front with the address, and the printed flaps show on the back.
 void _envelope(_Page k, double x0, double y0, double w, double h,
-    {required double top, required double bottom, required double side, _EnvStyle style = _EnvStyle.curved, int? topFill, int? bottomFill, int? sideFill}) {
+    {required double top,
+    required double bottom,
+    required double side,
+    _EnvStyle style = _EnvStyle.curved,
+    double sidePoint = 0.5,
+    int? topFill,
+    int? bottomFill,
+    int? sideFill}) {
   final p = k.p;
   final x1 = x0 + w;
   final y1 = y0 + h;
   final cx = x0 + w / 2;
-  final ym = y0 + h / 2;
+  final yp = y0 + h * sidePoint;
   final sideInset = math.min(0.45, h * 0.14);
-  late List<Offset> topFlap, rightFlap, bottomFlap, leftFlap, rightGlue, leftGlue;
+  late List<Offset> topFlap, rightFlap, bottomFlap, leftFlap;
   switch (style) {
     case _EnvStyle.pointed:
       topFlap = [Offset(x0, y0), Offset(cx, y0 - top), Offset(x1, y0)];
-      rightFlap = [Offset(x1, y0), Offset(x1 + side, ym), Offset(x1, y1)];
+      rightFlap = [Offset(x1, y0), Offset(x1 + side, yp), Offset(x1, y1)];
       bottomFlap = [Offset(x1, y1), Offset(cx, y1 + bottom), Offset(x0, y1)];
-      leftFlap = [Offset(x0, y1), Offset(x0 - side, ym), Offset(x0, y0)];
-      rightGlue = [Offset(x1, ym), Offset(x1 + side, ym), Offset(x1, y1)];
-      leftGlue = [Offset(x0, y1), Offset(x0 - side, ym), Offset(x0, ym)];
+      leftFlap = [Offset(x0, y1), Offset(x0 - side, yp), Offset(x0, y0)];
     case _EnvStyle.curved:
     case _EnvStyle.coin:
       topFlap = [
@@ -709,13 +807,11 @@ void _envelope(_Page k, double x0, double y0, double w, double h,
       ];
       rightFlap = [Offset(x1, y0), Offset(x1 + side, y0 + sideInset), Offset(x1 + side, y1 - sideInset), Offset(x1, y1)];
       leftFlap = [Offset(x0, y1), Offset(x0 - side, y1 - sideInset), Offset(x0 - side, y0 + sideInset), Offset(x0, y0)];
-      rightGlue = [Offset(x1, ym), Offset(x1 + side, ym), Offset(x1 + side, y1 - sideInset), Offset(x1, y1)];
-      leftGlue = [Offset(x0, y1), Offset(x0 - side, y1 - sideInset), Offset(x0 - side, ym), Offset(x0, ym)];
       bottomFlap = style == _EnvStyle.coin
           ? [Offset(x1, y1), Offset(x1 - 0.25, y1 + bottom), Offset(x0 + 0.25, y1 + bottom), Offset(x0, y1)]
           : [
-              ..._quad(Offset(x1, y1), Offset(cx + w * 0.24, y1 + bottom), Offset(cx, y1 + bottom)),
-              ..._quad(Offset(cx, y1 + bottom), Offset(cx - w * 0.24, y1 + bottom), Offset(x0, y1)).skip(1),
+              ..._quad(Offset(x1, y1), Offset(cx + w * 0.4, y1 + bottom), Offset(cx, y1 + bottom)),
+              ..._quad(Offset(cx, y1 + bottom), Offset(cx - w * 0.4, y1 + bottom), Offset(x0, y1)).skip(1),
             ];
   }
   if (sideFill != null) {
@@ -725,8 +821,14 @@ void _envelope(_Page k, double x0, double y0, double w, double h,
   k.poly(bottomFill ?? p.soft, bottomFlap);
   k.poly(topFill ?? p.main, topFlap);
   k.dotsIn(p.pale, topFlap, step: 0.3, r: 0.04);
-  k.glue(rightGlue);
-  k.glue(leftGlue);
+  // The glue goes exactly where the bottom flap lands on each side flap: fold both in, take the part they share,
+  // and unfold it back onto the side flap.
+  Offset upB(Offset q) => Offset(q.dx, 2 * y1 - q.dy);
+  Offset inR(Offset q) => Offset(2 * x1 - q.dx, q.dy);
+  Offset inL(Offset q) => Offset(2 * x0 - q.dx, q.dy);
+  final bottomIn = bottomFlap.map(upB).toList();
+  k.glue(_clipConvex(rightFlap.map(inR).toList(), bottomIn).map(inR).toList());
+  k.glue(_clipConvex(leftFlap.map(inL).toList(), bottomIn).map(inL).toList());
   k.cut([...topFlap, ...rightFlap.skip(1), ...bottomFlap.skip(1), ...leftFlap.skip(1)]);
   k.foldLine(x0, y0, x1, y0);
   k.foldLine(x1, y0, x1, y1);
@@ -735,9 +837,32 @@ void _envelope(_Page k, double x0, double y0, double w, double h,
 }
 
 /// A stamp box in the top-right of an envelope front.
+/// Drawn to print clearly on a home printer: a dark frame, a white inside, a dashed inner edge like a real stamp,
+/// and a bold PLACE STAMP HERE in the design's darkest colour.
 void _stamp(_Page k, double x1, double y0) {
-  k.markRect(x1 - 0.95, y0 + 0.22, 0.75, 0.88);
-  k.note(x1 - 0.8, y0 + 0.6, 'STAMP');
+  const w = 0.75;
+  const h = 0.88;
+  const b = 0.028;
+  final x = x1 - 0.95;
+  final y = y0 + 0.22;
+  final ink = k.p.ink;
+  k.rect(ink, x, y, w, h);
+  k.rect(0xFFFFFFFF, x + b, y + b, w - 2 * b, h - 2 * b);
+  for (final (dx, dy, ww, hh) in [(0.07, 0.07, w - 0.14, 0.012), (0.07, h - 0.082, w - 0.14, 0.012)]) {
+    for (var xx = x + dx; xx + 0.03 <= x + dx + ww; xx += 0.06) {
+      k.rect(ink, xx, y + dy, 0.03, hh);
+    }
+  }
+  for (final (dx, dy, ww, hh) in [(0.07, 0.07, 0.012, h - 0.14), (w - 0.082, 0.07, 0.012, h - 0.14)]) {
+    for (var yy = y + dy; yy + 0.03 <= y + dy + hh; yy += 0.06) {
+      k.rect(ink, x + dx, yy, ww, 0.03);
+    }
+  }
+  final cx = x + w / 2;
+  final cy = y + h / 2;
+  k.noteAt(cx, cy - 0.14, 'PLACE', color: ink, pt: 7.5, bold: true);
+  k.noteAt(cx, cy, 'STAMP', color: ink, pt: 7.5, bold: true);
+  k.noteAt(cx, cy + 0.14, 'HERE', color: ink, pt: 7.5, bold: true);
 }
 
 /// An open tray (box base or lid): a square floor with four walls and four glue tabs in the corners.
@@ -905,8 +1030,8 @@ NgmySlide _diamondEnvelope(NgmyCraftPalette p) {
   const w = 4.75;
   const h = 3.5;
   const x0 = (_pw - w) / 2;
-  const y0 = 3.5;
-  _envelope(k, x0, y0, w, h, top: 2.3, bottom: 2.6, side: 1.5, style: _EnvStyle.pointed, sideFill: p.pale, bottomFill: p.soft);
+  const y0 = 3.4;
+  _envelope(k, x0, y0, w, h, top: 2.3, bottom: 3.2, side: 1.62, sidePoint: 0.74, style: _EnvStyle.pointed, sideFill: p.pale, bottomFill: p.soft);
   _stamp(k, x0 + w, y0);
   k.anchor(x0, y0, w, h);
   k.text('Your Name\nStreet Address\nCity, State ZIP', x0 + 0.18, y0 + 0.16, 2.2, 0.72, pt: 7, align: TextAlign.left);
@@ -920,8 +1045,8 @@ NgmySlide _seedEnvelopes(NgmyCraftPalette p) {
   const w = 2.5;
   const h = 3.6;
   const y0 = 3.35;
-  for (final x0 in [1.05, 4.95]) {
-    _envelope(k, x0, y0, w, h, top: 1.0, bottom: 1.5, side: 0.45, style: _EnvStyle.coin, bottomFill: p.pale);
+  for (final x0 in [0.95, 5.05]) {
+    _envelope(k, x0, y0, w, h, top: 1.0, bottom: 1.5, side: 0.7, style: _EnvStyle.coin, bottomFill: p.pale);
     k.anchor(x0, y0, w, h);
     final cx = x0 + w / 2;
     k.circle(p.pale, cx, y0 + 0.95, 0.6);
@@ -940,7 +1065,7 @@ NgmySlide _giftCardEnvelopes(NgmyCraftPalette p) {
   const h = 2.4;
   const x0 = (_pw - w) / 2;
   for (final y0 in [1.6, 6.75]) {
-    _envelope(k, x0, y0, w, h, top: 1.2, bottom: 1.3, side: 0.55, topFill: y0 < 3 ? p.main : p.accent);
+    _envelope(k, x0, y0, w, h, top: 1.2, bottom: 1.3, side: 0.9, topFill: y0 < 3 ? p.main : p.accent);
     k.anchor(x0, y0, w, h);
     k.text('A gift for you', x0 + 0.2, y0 + 0.5, w - 0.4, 0.5, pt: 13, bold: true, color: p.main);
     k.rect(p.soft, x0 + w / 2 - 0.4, y0 + 1.05, 0.8, 0.025);
@@ -962,10 +1087,10 @@ NgmySlide _giftBox(NgmyCraftPalette p) {
   _tray(k, ox, oy, s, h, floor: p.pale, walls: p.soft, wallDots: p.pale);
   k.note(ox, oy - 0.16, 'Box');
   const ls = 2.68;
-  const lh = 0.65;
+  const lh = 0.8;
   const lox = (_pw - (ls + 2 * lh)) / 2;
   const loy = 5.95;
-  _tray(k, lox, loy, ls, lh, floor: p.main, walls: p.soft, tab: 0.45);
+  _tray(k, lox, loy, ls, lh, floor: p.main, walls: p.soft, tab: 0.6);
   k.stripesV(p.pale, lox + lh, loy, ls, lh, step: 0.28, thick: 0.07);
   k.stripesV(p.pale, lox + lh, loy + lh + ls, ls, lh, step: 0.28, thick: 0.07);
   k.dotsRect(p.soft, lox + lh, loy + lh, ls, ls, step: 0.32, r: 0.035);
@@ -981,7 +1106,7 @@ NgmySlide _pillowBox(NgmyCraftPalette p) {
   const w = 2.6;
   const len = 6.0;
   const d = 0.6;
-  const tab = 0.45;
+  const tab = 0.6;
   const xa = (_pw - (2 * w + tab)) / 2;
   const y0 = 2.4;
   const y1 = y0 + len;
@@ -1051,7 +1176,7 @@ NgmySlide _pyramidBox(NgmyCraftPalette p) {
   final path = <Offset>[tl];
   for (final f in faces) {
     path.add(f[1]);
-    path.addAll(_edgeTab(k, f[1], f[2], centre(f), depth: 0.32, insetA: 0.5, insetC: 0.08, taperA: 0.1, taperC: 0.22).skip(1));
+    path.addAll(_edgeTab(k, f[1], f[2], centre(f), depth: 0.6, insetA: 0.5, insetC: 0.08, taperA: 0.1, taperC: 0.22).skip(1));
   }
   k.cut(path);
   k.foldLine(tl.dx, tl.dy, tr.dx, tr.dy);
@@ -1069,8 +1194,8 @@ NgmySlide _prismBox(NgmyCraftPalette p) {
   const w = 2.0;
   const len = 5.5;
   final th = w * math.sqrt(3) / 2;
-  const x0 = (_pw - (3 * w + 0.4)) / 2;
-  final y0 = 0.45 + 0.3 + th;
+  const x0 = (_pw - (3 * w + 0.65)) / 2;
+  final y0 = 0.25 + 0.55 + th;
   final y1 = y0 + len;
   const xs = [x0, x0 + w, x0 + 2 * w, x0 + 3 * w];
   k.rect(p.soft, xs[0], y0, w, len);
@@ -1087,17 +1212,17 @@ NgmySlide _prismBox(NgmyCraftPalette p) {
   k.poly(p.pale, botTri);
   final topMid = (topTri[0] + topTri[1] + topTri[2]) / 3;
   final botMid = (botTri[0] + botTri[1] + botTri[2]) / 3;
-  final tabSide = [Offset(xs[3], y0), Offset(xs[3] + 0.4, y0 + 0.3), Offset(xs[3] + 0.4, y1 - 0.3), Offset(xs[3], y1)];
+  final tabSide = [Offset(xs[3], y0), Offset(xs[3] + 0.65, y0 + 0.3), Offset(xs[3] + 0.65, y1 - 0.3), Offset(xs[3], y1)];
   k.glue(tabSide);
   k.cut([
     Offset(xs[0], y0),
     Offset(xs[1], y0),
-    ..._edgeTab(k, topTri[0], apexTop, topMid, depth: 0.28, insetA: 0.12, insetC: 0.45).skip(1),
-    ..._edgeTab(k, apexTop, topTri[2], topMid, depth: 0.28, insetA: 0.45, insetC: 0.12).skip(1),
+    ..._edgeTab(k, topTri[0], apexTop, topMid, depth: 0.55, insetA: 0.12, insetC: 0.45).skip(1),
+    ..._edgeTab(k, apexTop, topTri[2], topMid, depth: 0.55, insetA: 0.45, insetC: 0.12).skip(1),
     ...tabSide,
     Offset(xs[2], y1),
-    ..._edgeTab(k, botTri[0], apexBottom, botMid, depth: 0.28, insetA: 0.12, insetC: 0.45).skip(1),
-    ..._edgeTab(k, apexBottom, botTri[2], botMid, depth: 0.28, insetA: 0.45, insetC: 0.12).skip(1),
+    ..._edgeTab(k, botTri[0], apexBottom, botMid, depth: 0.55, insetA: 0.12, insetC: 0.45).skip(1),
+    ..._edgeTab(k, apexBottom, botTri[2], botMid, depth: 0.55, insetA: 0.45, insetC: 0.12).skip(1),
     Offset(xs[0], y1),
     Offset(xs[0], y0),
   ]);
@@ -1114,7 +1239,7 @@ NgmySlide _prismBox(NgmyCraftPalette p) {
 NgmySlide _favorBox(NgmyCraftPalette p) {
   final k = _Page(p);
   const a = 1.75;
-  const x0 = (_pw - (4 * a + 0.35)) / 2;
+  const x0 = (_pw - (4 * a + 0.6)) / 2;
   const y0 = 4.525;
   const y1 = y0 + a;
   const dust = 0.62;
@@ -1138,7 +1263,7 @@ NgmySlide _favorBox(NgmyCraftPalette p) {
   final botLid = [Offset(x0 + 4 * a, y1), Offset(x0 + 4 * a, y1 + a), ...tuckFlap(x0 + 3 * a, y1 + a, 1).reversed.skip(1), Offset(x0 + 3 * a, y1)];
   k.poly(p.pale, topLid);
   k.poly(p.pale, botLid);
-  final glueTab = [Offset(x0 + 4 * a, y0), Offset(x0 + 4 * a + 0.35, y0 + 0.18), Offset(x0 + 4 * a + 0.35, y1 - 0.18), Offset(x0 + 4 * a, y1)];
+  final glueTab = [Offset(x0 + 4 * a, y0), Offset(x0 + 4 * a + 0.6, y0 + 0.18), Offset(x0 + 4 * a + 0.6, y1 - 0.18), Offset(x0 + 4 * a, y1)];
   k.glue(glueTab);
   k.cut([
     Offset(x0, y0),
@@ -1174,7 +1299,7 @@ NgmySlide _favorBox(NgmyCraftPalette p) {
 
 NgmySlide _paperBag(NgmyCraftPalette p) {
   final k = _Page(p);
-  const tab = 0.35;
+  const tab = 0.6;
   const fw = 2.6;
   const g = 1.1;
   const xt = (_pw - (tab + 2 * fw + 2 * g)) / 2;
@@ -1535,14 +1660,14 @@ NgmySlide _pocketFolder(NgmyCraftPalette p) {
   k.text('Name  -  Subject', 4.95, 3.45, 2.85, 0.45, pt: 10);
   k.rect(p.soft, 0.3, 0.6, 3.65, 7.35);
   k.stripesH(p.pale, 0.3, 0.6, 3.65, 7.35, step: 0.34, thick: 0.08);
-  k.rect(p.pale, 0.7, 8.45, 7.1, 2.3);
-  k.glueRect(0.3, 8.4, 0.35, 2.45);
-  k.glueRect(7.85, 8.4, 0.35, 2.45);
+  k.rect(p.pale, 0.95, 8.45, 6.6, 2.3);
+  k.glueRect(0.3, 8.4, 0.6, 2.45);
+  k.glueRect(7.6, 8.4, 0.6, 2.45);
   for (final cx in [2.125, 6.375]) {
     k.cut(_arc(cx, 11.0, 0.45, 0.45, _pi, 2 * _pi, 16));
   }
-  k.text('Notes & papers', 0.8, 9.2, 3.2, 0.5, pt: 12, italic: true, color: p.main, rot: _pi);
-  k.text('Keep it safe', 4.5, 9.2, 3.2, 0.5, pt: 12, italic: true, color: p.main, rot: _pi);
+  k.text('Notes & papers', 1.0, 9.2, 3.0, 0.5, pt: 12, italic: true, color: p.main, rot: _pi);
+  k.text('Keep it safe', 4.5, 9.2, 3.0, 0.5, pt: 12, italic: true, color: p.main, rot: _pi);
   k.note(0.35, 0.3, 'Fold the bottom strip back, glue its ends, then fold in half with the print outside');
   k.anchor(4.55, 0.6, 3.65, 7.35, dark: true);
   return k.build('Pocket Folder');
@@ -1562,7 +1687,7 @@ NgmySlide _cdSleeve(NgmyCraftPalette p) {
   k.text('Your Name  -  2026', x0 + 0.3, 4.95, sq - 0.6, 0.38, pt: 9, color: p.pale);
   k.rect(p.pale, x0, yTop + sq, sq, sq);
   k.text('Track list\n1. Song title\n2. Song title\n3. Song title\n4. Song title\n5. Song title', x0 + 0.4, yTop + sq + 0.6, sq - 0.8, 3.6, pt: 11, rot: _pi);
-  _sleeve(k, x0, yTop, sq, sq, notch: 0.55, tab: 0.5);
+  _sleeve(k, x0, yTop, sq, sq, notch: 0.55, tab: 0.6);
   k.anchor(x0, yTop, sq, sq, dark: true);
   return k.build('CD Sleeve', noteText: _printNote('CD sleeve 4.875 in square'));
 }
@@ -1581,7 +1706,7 @@ NgmySlide _photoSleeve(NgmyCraftPalette p) {
   k.text('Date  -  Place', x0 + 0.5, yTop + 2.15, w - 1.0, 0.42, pt: 10, italic: true);
   k.rect(p.pale, x0, yTop + h, w, h);
   k.text('Notes\n\n________________________\n________________________', x0 + 0.5, yTop + h + 0.6, w - 1.0, 2.6, pt: 11, rot: _pi);
-  _sleeve(k, x0, yTop, w, h, notch: 0.55, tab: 0.45);
+  _sleeve(k, x0, yTop, w, h, notch: 0.55, tab: 0.6);
   k.anchor(x0, yTop, w, h);
   return k.build('Photo Sleeve', noteText: _printNote('Sleeve for a 6 x 4 in photo'));
 }
@@ -1626,14 +1751,14 @@ final List<NgmyPaperCraft> kNgmyPaperCrafts = [
       group: _lettersGroup,
       blurb: '5.75 x 4.375 in, fits a quarter-fold card',
       icon: Icons.mail_outline_rounded,
-      build: (p) => [_cardEnvelope(p, title: 'Card Envelope (A2)', w: 5.75, h: 4.375, top: 2.2, bottom: 2.55, side: 0.85)]),
+      build: (p) => [_cardEnvelope(p, title: 'Card Envelope (A2)', w: 5.75, h: 4.375, top: 2.2, bottom: 2.55, side: 1.0)]),
   NgmyPaperCraft(number: 3, 
       id: 'square_envelope',
       name: 'Square Envelope',
       group: _lettersGroup,
       blurb: '5.5 in square for greeting cards',
       icon: Icons.crop_square_rounded,
-      build: (p) => [_cardEnvelope(p, title: 'Square Envelope', w: 5.5, h: 5.5, top: 2.1, bottom: 2.35, side: 0.85)]),
+      build: (p) => [_cardEnvelope(p, title: 'Square Envelope', w: 5.5, h: 5.5, top: 2.1, bottom: 2.35, side: 1.0)]),
   NgmyPaperCraft(number: 4, id: 'diamond_envelope', name: 'Diamond Envelope', group: _lettersGroup, blurb: 'Classic pointed flaps', icon: Icons.diamond_outlined, build: (p) => [_diamondEnvelope(p)]),
   NgmyPaperCraft(number: 5, id: 'seed_envelopes', name: 'Seed Envelopes', group: _lettersGroup, blurb: 'Two small seed or coin packets', icon: Icons.eco_outlined, build: (p) => [_seedEnvelopes(p)]),
   NgmyPaperCraft(number: 6, id: 'gift_card_envelopes', name: 'Gift Card Envelopes', group: _lettersGroup, blurb: 'Two little envelopes for gift cards', icon: Icons.card_giftcard_rounded, build: (p) => [_giftCardEnvelopes(p)]),
