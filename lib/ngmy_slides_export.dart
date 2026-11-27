@@ -6,6 +6,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import 'ngmy_paper_crafts.dart' show ngmyCraftLinesPdf, ngmyIsCraftLines, ngmyIsPaperCraftDeck;
+import 'ngmy_paper_craft_watermark.dart' show ngmyIsCraftWatermark;
 import 'ngmy_slides_models.dart';
 import 'ngmy_slides_bio_phone.dart';
 
@@ -121,6 +122,18 @@ pw.Widget _pdfShape(NgmySlideElement e, double pageW) {
   }
 }
 
+/// A see-through shape (an NGMY watermark ring or band): the pdf package drops a colour's alpha, so the shape is
+/// drawn in full colour and faded with pw.Opacity.
+pw.Widget _pdfFadedShape(NgmySlideElement e, double pageW) {
+  final fa = (e.fillColor >> 24) & 0xFF;
+  final sa = (e.strokeColor >> 24) & 0xFF;
+  final solid = e.copy()
+    ..fillColor = fa == 0 ? 0 : (e.fillColor | 0xFF000000)
+    ..strokeColor = sa == 0 ? 0 : (e.strokeColor | 0xFF000000);
+  final o = (fa > sa ? fa : sa) / 255;
+  return pw.Opacity(opacity: o, child: _pdfShape(solid, pageW));
+}
+
 pw.Widget _pdfElement(NgmySlideElement e, double pageW, double pageH) {
   final left = e.x * pageW;
   final top = e.y * pageH;
@@ -172,7 +185,9 @@ pw.Widget _pdfElement(NgmySlideElement e, double pageW, double pageH) {
         ),
       );
     case NgmySlideElementType.shape:
-      child = ngmyIsCraftLines(e) ? ngmyCraftLinesPdf(e.text, width, height) : _pdfShape(e, pageW);
+      child = ngmyIsCraftLines(e)
+          ? ngmyCraftLinesPdf(e.text, width, height)
+          : (ngmyIsCraftWatermark(e) ? _pdfFadedShape(e, pageW) : _pdfShape(e, pageW));
     case NgmySlideElementType.bio:
       child = _pdfBio(e);
   }

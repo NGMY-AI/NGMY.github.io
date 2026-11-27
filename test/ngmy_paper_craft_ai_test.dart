@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_paper_craft_ai.dart';
+import 'package:ngmy/ngmy_paper_craft_watermark.dart';
 import 'package:ngmy/ngmy_paper_crafts.dart';
 import 'package:ngmy/ngmy_slides_models.dart';
 
@@ -57,8 +58,8 @@ void main() {
     final craft = ngmyPaperCraftByNumber(answer.design)!;
     final plain = ngmyBuildPaperCraftDeck(craft, kNgmyCraftPalettes[2]);
     final deck = ngmyBuildFilledPaperCraft(craft, kNgmyCraftPalettes[2], answer.fields);
-    final texts = deck.slides.first.elements.where((e) => e.type == NgmySlideElementType.text).toList();
-    final plainTexts = plain.slides.first.elements.where((e) => e.type == NgmySlideElementType.text).toList();
+    final texts = deck.slides.first.elements.where((e) => e.type == NgmySlideElementType.text && !ngmyIsCraftWatermark(e)).toList();
+    final plainTexts = plain.slides.first.elements.where((e) => e.type == NgmySlideElementType.text && !ngmyIsCraftWatermark(e)).toList();
     expect(texts[0].text, 'Asante sana');
     // Same boxes, same places, same turns.
     for (var i = 0; i < texts.length; i++) {
@@ -100,13 +101,13 @@ void main() {
     final info = ngmyPaperCraftOfDeck(deck)!;
     expect(info.craft.id, 'quarter_fold_card');
     expect(info.palette.name, 'Blush');
-    final before = deck.slides.first.elements.where((e) => e.type == NgmySlideElementType.text).map((e) => (e.x, e.y, e.w, e.h, e.rotation)).toList();
+    final before = deck.slides.first.elements.where((e) => e.type == NgmySlideElementType.text && !ngmyIsCraftWatermark(e)).map((e) => (e.x, e.y, e.w, e.h, e.rotation)).toList();
     final prompt = ngmyPaperCraftEditPrompt(deck: deck, request: 'change the name to Neema');
     expect(prompt, contains('#14 Quarter-Fold Card'));
     expect(prompt, contains('COLOUR SET NOW: Blush'));
     final answer = ngmyParsePaperCraftAi('{"palette": "Ocean", "fields": {"1.1": "Asante Neema"}, "reply": "Done"}')!;
     expect(ngmyApplyPaperCraftEdit(deck, answer), isTrue);
-    final texts = deck.slides.first.elements.where((e) => e.type == NgmySlideElementType.text).toList();
+    final texts = deck.slides.first.elements.where((e) => e.type == NgmySlideElementType.text && !ngmyIsCraftWatermark(e)).toList();
     expect(texts.first.text, 'Asante Neema');
     expect(texts.map((e) => (e.x, e.y, e.w, e.h, e.rotation)).toList(), before);
     final after = ngmyPaperCraftOfDeck(deck)!;

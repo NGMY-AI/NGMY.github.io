@@ -27,6 +27,7 @@ import 'ngmy_quote_maker.dart';
 import 'ngmy_quote_templates.dart' show kNgmyQuoteLogoFile;
 import 'ngmy_paper_crafts.dart' show ngmyIsCraftLines, ngmyIsPaperCraftDeck, showNgmyPaperCraftPicker;
 import 'ngmy_paper_craft_ai.dart' show NgmyPaperCraftAiBubble, ngmyApplyPaperCraftEdit, showNgmyPaperCraftAiChat;
+import 'ngmy_paper_craft_watermark.dart' show ngmyIsCraftWatermark;
 import 'ngmy_slides_video_export.dart';
 import 'ngmy_slides_ai_maker.dart';
 import 'ngmy_slides_class_templates.dart';
@@ -5620,7 +5621,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
 
   Widget _canvasElement(NgmySlideElement e, double cw, double ch, bool isDark) {
     // Fold & Cut: the fold, cut and glue lines stay where they are (taps go through to the words on top).
-    if (ngmyIsCraftLines(e)) {
+    if (ngmyIsCraftLines(e) || ngmyIsCraftWatermark(e)) {
       return Positioned(
         key: ValueKey('el_${e.id}'),
         left: e.x * cw,

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'ngmy_ai_client.dart';
 import 'ngmy_ai_language.dart';
 import 'ngmy_paper_crafts.dart';
+import 'ngmy_paper_craft_watermark.dart';
 import 'ngmy_slides_models.dart';
 
 /// Fold & Cut with AI: "make number 5 for my tomato seeds", "window envelope letter to my landlord",
@@ -182,7 +183,8 @@ int _capacity(NgmySlideElement e, double sizePt) {
 
 bool _upsideDown(NgmySlideElement e) => (e.rotation.abs() - math.pi).abs() < 0.01;
 
-List<NgmySlideElement> _textsOf(NgmySlide s) => s.elements.where((e) => e.type == NgmySlideElementType.text).toList();
+/// The text boxes people write in (not the watermark words).
+List<NgmySlideElement> _textsOf(NgmySlide s) => s.elements.where((e) => e.type == NgmySlideElementType.text && !ngmyIsCraftWatermark(e)).toList();
 
 List<NgmyCraftField> _fieldsOfSlides(List<NgmySlide> slides) {
   final out = <NgmyCraftField>[];
@@ -235,6 +237,8 @@ String _languageRule(String request, String language) {
   }
 }
 
+String get _wmList => kNgmyCraftWatermarks.map((w) => '${w.id} (${w.name})').join(', ');
+
 const String _kBoxRules = '''
 - Every box keeps its role (look at its sample): a title stays a title, an address stays an address with its lines (name / street / city, state ZIP), "To:" and "From:" stay.
 - Write professionally: warm, clear, correct spelling and grammar, the right tone for the occasion (formal for business letters, warm for cards). Short and sweet on small items.
@@ -286,14 +290,15 @@ $_kBoxRules
 - Use the names, places, dates and messages the user gave, in the request or in the typed details.
 $askRule
 - Designs with several copies (gift tags, place cards, seed envelopes, postcards): fill every copy; use different names or titles when the user gives several, otherwise vary them nicely.
+- WATERMARK: every design carries a faint NGMY watermark. Only if the request names a watermark style, set "watermark" to one of: $_wmList. Otherwise leave it "".
 - A box you have nothing better for keeps its sample text (translated if the language is not English).
 ${_languageRule(request, language)}
 - Reply with JSON only, no markdown, in this shape:
-{"design": 1, "palette": "Blush", "language": "English", "fields": {"1.1": "...", "1.2": "..."}}
+{"design": 1, "palette": "Blush", "watermark": "", "language": "English", "fields": {"1.1": "...", "1.2": "..."}}
 ''';
 }
 
-typedef NgmyPaperCraftAiAnswer = ({int design, String? palette, Map<String, String> fields, String? ask, String? reply});
+typedef NgmyPaperCraftAiAnswer = ({int design, String? palette, Map<String, String> fields, String? ask, String? reply, String? watermark});
 
 NgmyPaperCraftAiAnswer? ngmyParsePaperCraftAi(String raw) {
   final start = raw.indexOf('{');
@@ -320,7 +325,15 @@ NgmyPaperCraftAiAnswer? ngmyParsePaperCraftAi(String raw) {
       return s.isEmpty ? null : s;
     }
 
-    return (design: design, palette: text('palette'), fields: fields, ask: text('ask'), reply: text('reply'));
+    final wm = text('watermark')?.toLowerCase();
+    return (
+      design: design,
+      palette: text('palette'),
+      fields: fields,
+      ask: text('ask'),
+      reply: text('reply'),
+      watermark: wm != null && ngmyCraftWatermarkById(wm) != null ? wm : null,
+    );
   } catch (_) {
     return null;
   }
@@ -413,6 +426,7 @@ Future<NgmyPaperCraftAiResult> ngmyFillPaperCraftWithAi({
   Map<String, String> details = const {},
   bool allowAsk = false,
   NgmyPaperCraft? design,
+  String? watermark,
   void Function(String status)? onStatus,
 }) async {
   final picked = design ?? ngmyFindPaperCraft(request);
@@ -424,7 +438,11 @@ Future<NgmyPaperCraftAiResult> ngmyFillPaperCraftWithAi({
   if (craft == null) throw 'The AI could not choose a design. Try naming the design number.';
   if (answer.ask != null && allowAsk) return (deck: null, ask: answer.ask, craft: craft);
   onStatus?.call('Putting the words on #${craft.number} ${craft.name}...');
-  return (deck: ngmyBuildFilledPaperCraft(craft, _paletteNamed(answer.palette) ?? fallbackPalette, answer.fields), ask: null, craft: craft);
+  final deck = ngmyBuildFilledPaperCraft(craft, _paletteNamed(answer.palette) ?? fallbackPalette, answer.fields);
+  // The watermark the user picked wins; otherwise the one their words asked for; otherwise the Seal.
+  final wm = watermark ?? answer.watermark;
+  if (wm != null) ngmyApplyCraftWatermark(deck, wm);
+  return (deck: deck, ask: null, craft: craft);
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -455,16 +473,18 @@ ${talk}WHAT THEY WANT NOW (may be informal):
 TEXT BOXES (key [page] max length, what it says now):
 $boxes
 COLOUR SET NOW: ${info?.palette.name ?? 'unknown'}. Colour sets: $palettes.
+WATERMARK NOW: ${ngmyCraftWatermarkOf(deck)}. Watermark styles: $_wmList.
 
 Rules:
 - Change only what they ask. Return only the boxes you change, using their keys. "The name" means every box that holds that name.
 - If they ask for other colours, set "palette" to the best colour set from the list (Ocean for blue, Sage for green, Blush for pink, Kraft for brown, Midnight for dark, Sunny for orange or yellow); otherwise leave it "".
+- If they ask for another NGMY watermark ("use the seal watermark", "put the logo", "diagonal NGMY"), set "watermark" to that style id; otherwise leave it "". The watermark is always there: if they ask to remove it, pick the most discreet one (footer) and say so.
 $_kBoxRules
 - LANGUAGE: keep the language the boxes are in now, unless they ask for another one; then translate every box. Write Swahili the way people in Tanzania and Kenya really write it.
 - If you truly cannot tell what they mean, reply only {"ask": "one short question"}.
 - "reply": one short, friendly sentence telling them what you changed, in the language they wrote in.
 - Reply with JSON only, no markdown, in this shape:
-{"palette": "", "fields": {"1.1": "..."}, "reply": "..."}
+{"palette": "", "watermark": "", "fields": {"1.1": "..."}, "reply": "..."}
 ''';
 }
 
@@ -479,6 +499,7 @@ bool ngmyRecolorPaperCraft(NgmySlideDeck deck, NgmyCraftPalette to) {
   final info = ngmyPaperCraftOfDeck(deck);
   if (info == null) return false;
   final from = info.palette;
+  final style = ngmyCraftWatermarkOf(deck);
   final fresh = ngmyBuildPaperCraftDeck(info.craft, to);
   final map = {from.main: to.main, from.soft: to.soft, from.pale: to.pale, from.accent: to.accent, from.ink: to.ink};
   for (var s = 0; s < deck.slides.length && s < fresh.slides.length; s++) {
@@ -486,11 +507,13 @@ bool ngmyRecolorPaperCraft(NgmySlideDeck deck, NgmyCraftPalette to) {
     for (final e in deck.slides[s].elements) {
       if (ngmyIsCraftLines(e)) {
         e.text = lines.text;
-      } else if (e.type == NgmySlideElementType.text) {
+      } else if (e.type == NgmySlideElementType.text && !ngmyIsCraftWatermark(e)) {
         e.color = map[e.color] ?? e.color;
       }
     }
   }
+  // The same watermark style, in the new colours.
+  ngmyApplyCraftWatermark(deck, style, palette: to);
   return true;
 }
 
@@ -515,6 +538,11 @@ bool ngmyApplyPaperCraftEdit(NgmySlideDeck deck, NgmyPaperCraftAiAnswer answer) 
   }
   final to = _paletteNamed(answer.palette);
   if (to != null && info != null && to.name != info.palette.name && ngmyRecolorPaperCraft(deck, to)) changed = true;
+  final wm = answer.watermark;
+  if (wm != null && wm != ngmyCraftWatermarkOf(deck)) {
+    ngmyApplyCraftWatermark(deck, wm);
+    changed = true;
+  }
   return changed;
 }
 
@@ -546,6 +574,10 @@ class _CraftAiSheetState extends State<_CraftAiSheet> {
   final _focus = FocusNode();
   final Map<String, TextEditingController> _details = {};
   String _language = 'auto';
+
+  /// The NGMY watermark style (null = not chosen yet: the AI may follow the words, otherwise the Seal).
+  String? _wm;
+  NgmySlideDeck? _wmPreview;
   bool _busy = false;
   String _status = '';
   String? _error;
@@ -578,6 +610,39 @@ class _CraftAiSheetState extends State<_CraftAiSheet> {
 
   /// Opened right after choosing a template: details first, then "describe the paper".
   bool get _template => widget.design != null;
+
+  /// The chosen template, blank, in the chosen colours (shown under each watermark style).
+  NgmySlideDeck get _blank => _wmPreview ??= ngmyBuildPaperCraftDeck(widget.design!, widget.palette ?? kNgmyCraftPalettes.first);
+
+  Widget _watermarkChoice() => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('NGMY WATERMARK', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 1)),
+          const SizedBox(height: 6),
+          if (_template)
+            NgmyCraftWatermarkPicker(
+              preview: _blank,
+              selected: _wm ?? kNgmyCraftDefaultWatermark,
+              enabled: !_busy,
+              onChanged: (id) => setState(() => _wm = id),
+            )
+          else
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final w in kNgmyCraftWatermarks)
+                  ChoiceChip(
+                    key: ValueKey('craft_wm_${w.id}'),
+                    avatar: Icon(w.icon, size: 14),
+                    label: Text(w.name, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                    selected: (_wm ?? kNgmyCraftDefaultWatermark) == w.id,
+                    onSelected: _busy ? null : (_) => setState(() => _wm = w.id),
+                  ),
+              ],
+            ),
+        ],
+      );
 
   Widget _descField() => TextField(
         key: const ValueKey('craft_ai_text'),
@@ -630,6 +695,7 @@ class _CraftAiSheetState extends State<_CraftAiSheet> {
         details: typed,
         allowAsk: !_asked,
         design: design,
+        watermark: _wm,
         onStatus: (s) {
           if (mounted) setState(() => _status = s);
         },
@@ -829,6 +895,8 @@ class _CraftAiSheetState extends State<_CraftAiSheet> {
                     ],
                   ),
                 const SizedBox(height: 14),
+                _watermarkChoice(),
+                const SizedBox(height: 14),
                 const Text('LANGUAGE', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 1)),
                 const SizedBox(height: 6),
                 Wrap(
@@ -882,7 +950,14 @@ class _CraftAiSheetState extends State<_CraftAiSheet> {
                   const SizedBox(height: 6),
                   TextButton(
                     key: const ValueKey('craft_ai_skip'),
-                    onPressed: _busy ? null : () => Navigator.of(context).pop(),
+                    onPressed: _busy
+                        ? null
+                        : () {
+                            // Blank, ready to write by hand, with the chosen watermark.
+                            final deck = ngmyBuildPaperCraftDeck(widget.design!, widget.palette ?? kNgmyCraftPalettes.first);
+                            if (_wm != null) ngmyApplyCraftWatermark(deck, _wm!);
+                            Navigator.of(context).pop(deck);
+                          },
                     child: const Text('Skip  -  open it blank and write it myself', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
                   ),
                 ],
@@ -931,6 +1006,12 @@ class _CraftAiChatState extends State<_CraftAiChat> {
   final _scroll = ScrollController();
   bool _busy = false;
 
+  @override
+  void initState() {
+    super.initState();
+    ngmyPreloadCraftLogo();
+  }
+
   List<(bool, String)> get _log => _chats.putIfAbsent(widget.deck().id, () => []);
 
   static const _ideas = ['Change the name to Neema', 'Make it Swahili', 'Shorter message', 'Use the Ocean colours'];
@@ -946,6 +1027,13 @@ class _CraftAiChatState extends State<_CraftAiChat> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
     });
+  }
+
+  /// Puts another NGMY watermark style on the open design (one tap, no AI needed).
+  void _setWatermark(NgmyCraftWatermark w) {
+    final changed = widget.onApply((design: 0, palette: null, fields: const {}, ask: null, reply: null, watermark: w.id));
+    setState(() => _log.add((false, changed ? 'Done: the watermark is now ${w.name}.' : 'That watermark is already on.')));
+    _toBottom();
   }
 
   Future<void> _send([String? text]) async {
@@ -1057,6 +1145,29 @@ class _CraftAiChatState extends State<_CraftAiChat> {
                     ],
                   ),
                 ),
+                // NGMY watermark styles: one tap changes it.
+                SizedBox(
+                  height: 36,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    children: [
+                      const Center(child: Padding(padding: EdgeInsets.only(right: 8), child: Text('Watermark', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w800)))),
+                      for (final w in kNgmyCraftWatermarks)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: ChoiceChip(
+                            key: ValueKey('craft_chat_wm_${w.id}'),
+                            avatar: Icon(w.icon, size: 14),
+                            label: Text(w.name, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                            selected: ngmyCraftWatermarkOf(widget.deck()) == w.id,
+                            onSelected: _busy ? null : (_) => _setWatermark(w),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 4),
                 if (log.isEmpty)
                   SizedBox(
                     height: 36,

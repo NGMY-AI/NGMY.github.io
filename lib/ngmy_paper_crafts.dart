@@ -6,8 +6,9 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import 'ngmy_paper_craft_ai.dart' show showNgmyPaperCraftAiSheet;
+import 'ngmy_paper_craft_watermark.dart' show kNgmyCraftDefaultWatermark, ngmyApplyCraftWatermark, ngmyPreloadCraftLogo;
 import 'ngmy_slides_models.dart';
-import 'ngmy_slides_render.dart' show ngmyMiniSlidePreview;
+import 'ngmy_slides_render.dart' show NgmySlideElementView;
 
 /// NGMY Slides "Fold & Cut": printable paper designs (envelopes, a window letter, gift boxes, cards, tags and more).
 ///
@@ -525,6 +526,10 @@ class _Page {
   void note(double x, double y, String text) => _notes.add([_r3(x), _r3(y), text]);
   void legendAt(double x, double y) => _legend = [x, y];
 
+  /// The front panel(s) where the NGMY watermark goes: x, y, width, height, how the words are turned, dark or light.
+  final List<List<double>> _anchors = [];
+  void anchor(double x, double y, double w, double h, {double rot = 0, bool dark = false}) => _anchors.add([_r3(x), _r3(y), _r3(w), _r3(h), _r3(rot), dark ? 1 : 0]);
+
   /// Corner brackets around an area (like a camera frame): shows where something goes without a full box.
   void corners(double x, double y, double w, double h, double arm) {
     mark([Offset(x, y + arm), Offset(x, y), Offset(x + arm, y)]);
@@ -642,6 +647,7 @@ class _Page {
       'm': _marks,
       'n': _notes,
       'l': ?_legend,
+      if (_anchors.isNotEmpty) 'a': _anchors,
     };
     final lines = NgmySlideElement(
       id: 'craft_lines_${NgmySlidesTemplates.newId()}',
@@ -875,6 +881,7 @@ NgmySlide _windowLetter(NgmyCraftPalette p) {
   );
   k.text('Sincerely,\n\nYour Name', 0.875, 8.9, 3.5, 0.95, pt: 11, align: TextAlign.left);
   k.rect(p.soft, 0.875, 10.25, 6.75, 0.02);
+  k.anchor(0.875, 4.0, 6.75, 6.1);
   return k.build('Window Envelope Letter', noteText: _printNote('Window letter for #10 envelopes'));
 }
 
@@ -885,6 +892,7 @@ NgmySlide _cardEnvelope(NgmyCraftPalette p, {required String title, required dou
   final y0 = 0.35 + (10.1 - total) / 2 + top;
   _envelope(k, x0, y0, w, h, top: top, bottom: bottom, side: side);
   _stamp(k, x0 + w, y0);
+  k.anchor(x0, y0, w, h);
   k.text('Your Name\nStreet Address\nCity, State ZIP', x0 + 0.2, y0 + 0.18, 2.4, 0.75, pt: 7.5, align: TextAlign.left);
   k.rect(p.accent, x0 + 0.28, y0 + 0.98, 0.6, 0.02);
   k.text('Recipient Name\nStreet Address\nCity, State ZIP', x0 + w * 0.3, y0 + h * 0.4, w * 0.6, 1.15, pt: 11.5, align: TextAlign.left);
@@ -900,6 +908,7 @@ NgmySlide _diamondEnvelope(NgmyCraftPalette p) {
   const y0 = 3.5;
   _envelope(k, x0, y0, w, h, top: 2.3, bottom: 2.6, side: 1.5, style: _EnvStyle.pointed, sideFill: p.pale, bottomFill: p.soft);
   _stamp(k, x0 + w, y0);
+  k.anchor(x0, y0, w, h);
   k.text('Your Name\nStreet Address\nCity, State ZIP', x0 + 0.18, y0 + 0.16, 2.2, 0.72, pt: 7, align: TextAlign.left);
   k.text('Recipient Name\nStreet Address\nCity, State ZIP', x0 + 1.2, y0 + 1.45, 3.1, 1.1, pt: 11, align: TextAlign.left);
   k.text('hello', x0 + w / 2 - 1.0, y0 - 1.25, 2.0, 0.5, pt: 15, italic: true, color: p.pale, rot: _pi);
@@ -913,6 +922,7 @@ NgmySlide _seedEnvelopes(NgmyCraftPalette p) {
   const y0 = 3.35;
   for (final x0 in [1.05, 4.95]) {
     _envelope(k, x0, y0, w, h, top: 1.0, bottom: 1.5, side: 0.45, style: _EnvStyle.coin, bottomFill: p.pale);
+    k.anchor(x0, y0, w, h);
     final cx = x0 + w / 2;
     k.circle(p.pale, cx, y0 + 0.95, 0.6);
     k.circle(p.soft, cx - 0.32, y0 + 0.7, 0.12);
@@ -931,6 +941,7 @@ NgmySlide _giftCardEnvelopes(NgmyCraftPalette p) {
   const x0 = (_pw - w) / 2;
   for (final y0 in [1.6, 6.75]) {
     _envelope(k, x0, y0, w, h, top: 1.2, bottom: 1.3, side: 0.55, topFill: y0 < 3 ? p.main : p.accent);
+    k.anchor(x0, y0, w, h);
     k.text('A gift for you', x0 + 0.2, y0 + 0.5, w - 0.4, 0.5, pt: 13, bold: true, color: p.main);
     k.rect(p.soft, x0 + w / 2 - 0.4, y0 + 1.05, 0.8, 0.025);
     k.text('To: ______________\nFrom: ____________', x0 + 0.5, y0 + 1.2, w - 1.0, 0.75, pt: 9);
@@ -958,10 +969,10 @@ NgmySlide _giftBox(NgmyCraftPalette p) {
   k.stripesV(p.pale, lox + lh, loy, ls, lh, step: 0.28, thick: 0.07);
   k.stripesV(p.pale, lox + lh, loy + lh + ls, ls, lh, step: 0.28, thick: 0.07);
   k.dotsRect(p.soft, lox + lh, loy + lh, ls, ls, step: 0.32, r: 0.035);
-  k.circle(p.pale, lox + lh + ls / 2, loy + lh + ls / 2, 0.95);
   k.note(lox, loy - 0.16, 'Lid');
-  k.text('For You', lox + lh + 0.3, loy + lh + ls / 2 - 0.5, ls - 0.6, 0.58, pt: 20, bold: true, color: p.main);
-  k.text('To: _________\nFrom: _______', lox + lh + 0.45, loy + lh + ls / 2 + 0.05, ls - 0.9, 0.55, pt: 8);
+  k.text('For You', lox + lh + 0.3, loy + lh + ls / 2 - 0.5, ls - 0.6, 0.58, pt: 20, bold: true, color: p.pale);
+  k.text('To: _________\nFrom: _______', lox + lh + 0.45, loy + lh + ls / 2 + 0.05, ls - 0.9, 0.55, pt: 8, color: p.pale);
+  k.anchor(lox + lh, loy + lh, ls, ls, dark: true);
   return k.build('Gift Box with Lid', noteText: _printNote('Gift box 2.6 x 2.6 x 1.2 in with lid'));
 }
 
@@ -1007,6 +1018,7 @@ NgmySlide _pillowBox(NgmyCraftPalette p) {
     k.fold(_arc(xc, y1, w / 2, d, _pi, 2 * _pi, 20));
   }
   k.note(xa, 1.2, 'Fold the curved lines gently inward to close each end');
+  k.anchor(xa, y0, w, len);
   return k.build('Pillow Box', noteText: _printNote('Pillow box 2.6 x 6 in'));
 }
 
@@ -1048,6 +1060,7 @@ NgmySlide _pyramidBox(NgmyCraftPalette p) {
   k.foldLine(bl.dx, bl.dy, tl.dx, tl.dy);
   k.text('For You', cx - 0.8, cy - b / 2 - 1.05, 1.6, 0.5, pt: 14, bold: true, color: p.pale);
   k.text('Open me', cx - 0.75, cy + b / 2 + 0.55, 1.5, 0.45, pt: 11, bold: true, color: p.pale, rot: _pi);
+  k.anchor(tl.dx, tl.dy, b, b);
   return k.build('Pyramid Box', noteText: _printNote('Pyramid box, 2.4 in base'));
 }
 
@@ -1094,6 +1107,7 @@ NgmySlide _prismBox(NgmyCraftPalette p) {
   k.foldLine(xs[1], y0, xs[2], y0);
   k.foldLine(xs[1], y1, xs[2], y1);
   k.textAt('Sweet Treats', xs[1] + w / 2, (y0 + y1) / 2, 4.6, 1.0, pt: 22, bold: true, color: p.pale, rot: -_pi / 2);
+  k.anchor(xs[0], y0, w, len);
   return k.build('Triangle Prism Box', noteText: _printNote('Triangle box 2 in sides, 5.5 in long'));
 }
 
@@ -1154,6 +1168,7 @@ NgmySlide _favorBox(NgmyCraftPalette p) {
   k.foldLine(x0 + 3 * a, y1 + a, x0 + 4 * a, y1 + a);
   k.text('Thank You', x0 + a + 0.1, y0 + 0.55, a - 0.2, 0.6, pt: 13, bold: true, color: p.pale);
   k.text('with love', x0 + 3 * a + 0.1, y0 + 0.6, a - 0.2, 0.5, pt: 10, italic: true, color: p.pale);
+  k.anchor(x0, y0, a, a);
   return k.build('Favor Box', noteText: _printNote('Favor cube box 1.75 in'));
 }
 
@@ -1218,6 +1233,7 @@ NgmySlide _paperBag(NgmyCraftPalette p) {
     k.fold([Offset(gx, yB - g / 2), Offset(gx + g / 2, yB), Offset(gx + g, yB - g / 2)]);
   }
   k.note(xf, yT - 0.18, 'Fold the top band inside. Thread a ribbon through the holes for handles.');
+  k.anchor(xb, yC, fw, yB - yC);
   return k.build('Paper Gift Bag', noteText: _printNote('Gift bag 2.6 x 1.1 x 6 in'));
 }
 
@@ -1240,6 +1256,8 @@ List<NgmySlide> _halfFoldCard(NgmyCraftPalette p) {
   inside.foldLine(0.25, 5.5, 8.25, 5.5);
   inside.rect(p.accent, 3.9, 5.95, 0.7, 0.025);
   inside.text('Dear Name,\n\nWrite your message here.\n\nWith love,\nYour Name', 1.0, 6.3, 6.5, 3.3, pt: 13);
+  out.anchor(0.45, 5.85, 7.6, 4.55);
+  inside.anchor(0.45, 5.85, 7.6, 4.55);
   return [
     out.build('Half-Fold Card - outside', noteText: 'Outside  -  fold the top half back. Front is the bottom half.  -  Actual size (100%)'),
     inside.build('Half-Fold Card - inside', noteText: 'Inside  -  $_shortEdge'),
@@ -1259,6 +1277,7 @@ NgmySlide _quarterFoldCard(NgmyCraftPalette p) {
   k.circle(p.pale, 6.375, 2.75, 1.05);
   k.text('You make the world brighter', 4.85, 2.25, 3.05, 1.0, pt: 13, italic: true, color: p.main, rot: _pi);
   k.text('Dear Name,\n\nWrite your message here.\n\nWith love,\nYour Name', 0.55, 1.0, 3.15, 3.5, pt: 11, rot: _pi);
+  k.anchor(4.55, 5.8, 3.65, 4.6);
   return k.build('Quarter-Fold Card', noteText: 'Fold in half across, then in half again. Words on top print upside down for the inside.');
 }
 
@@ -1284,6 +1303,8 @@ List<NgmySlide> _triFoldCard(NgmyCraftPalette p) {
   out.rect(p.pale, 1.3, f2 + 0.95, 5.9, 1.6);
   out.text('Party Time', 1.3, f2 + 1.05, 5.9, 0.8, pt: 30, bold: true, color: p.main);
   out.text('Open me', 1.3, f2 + 1.8, 5.9, 0.45, pt: 11, italic: true);
+  inside.anchor(0.8, 4.15, 6.9, 2.7);
+  out.anchor(0.45, f2 + 0.3, 7.6, 2.95, dark: true);
   return [
     inside.build('Tri-Fold Card - inside', noteText: 'Inside  -  fold the bottom third up, then the top third down  -  Actual size (100%)'),
     out.build('Tri-Fold Card - outside', noteText: 'Outside  -  $_shortEdge'),
@@ -1316,6 +1337,8 @@ List<NgmySlide> _popUpCard(NgmyCraftPalette p) {
   cover.text('Surprise!', 1.4, 7.2, 5.7, 0.9, pt: 32, bold: true, color: p.main);
   cover.text('Open me', 1.4, 8.05, 5.7, 0.45, pt: 11, italic: true);
   cover.text('Made with love', 2.25, 4.0, 4.0, 0.36, pt: 8, rot: _pi);
+  k.anchor(0.5, 0.5, 7.5, 3.6);
+  cover.anchor(0.45, 5.85, 7.6, 4.55, dark: true);
   return [
     k.build('Pop-Up Card - inside', noteText: 'Inside with pop-ups  -  Actual size (100%)'),
     cover.build('Pop-Up Card - cover', noteText: 'Cover  -  $_shortEdge'),
@@ -1333,6 +1356,8 @@ List<NgmySlide> _postcards(NgmyCraftPalette p) {
     front.confetti([p.soft, p.pale, p.accent], x0 + 0.1, y + 0.1, w - 0.2, h - 0.2, count: 45, keepOut: Rect.fromLTWH(x0 + 0.6, y + 1.0, w - 1.2, 2.0));
     front.text('Greetings from\nYour Town', x0 + 0.6, y + 1.05, w - 1.2, 1.9, pt: 26, bold: true, color: p.pale);
     front.cutRect(x0, y, w, h);
+    front.anchor(x0, y, w, h, dark: true);
+    back.anchor(x0, y, w, h);
     back.cutRect(x0, y, w, h);
     back.rect(p.soft, x0 + 3.25, y + 0.35, 0.02, h - 0.7);
     _stamp(back, x0 + w, y);
@@ -1366,6 +1391,7 @@ NgmySlide _giftTags(NgmyCraftPalette p) {
       k.circle(p.pale, x + 0.4, y + h / 2, 0.18);
       k.cut(shape, close: true);
       k.cutCircle(x + 0.4, y + h / 2, 0.1);
+      k.anchor(x + 1.0, y, w - 1.0, h);
       k.text(titles[i], x + 1.1, y + 0.25, w - 1.25, 0.48, pt: 13, bold: true, color: p.main, align: TextAlign.left);
       k.rect(p.accent, x + 1.17, y + 0.76, 0.6, 0.02);
       k.text('To: ______________\nFrom: ____________', x + 1.1, y + 0.85, w - 1.25, 0.95, pt: 9.5, align: TextAlign.left);
@@ -1388,6 +1414,7 @@ NgmySlide _foldedTags(NgmyCraftPalette p) {
       k.rect(i.isEven ? p.soft : p.main, x, y, w, h / 2);
       k.dotsRect(p.pale, x, y, w, h / 2, step: 0.26, r: 0.03);
       k.rect(p.pale, x + 0.12, y + h / 2 + 0.12, w - 0.24, h / 2 - 0.24);
+      k.anchor(x + 0.12, y + h / 2 + 0.12, w - 0.24, h / 2 - 0.24);
       k.cutRect(x, y, w, h);
       k.foldLine(x, y + h / 2, x + w, y + h / 2);
       k.cutCircle(x + 0.3, y + h / 2 + 0.3, 0.075);
@@ -1425,6 +1452,7 @@ NgmySlide _bookmarks(NgmyCraftPalette p) {
         k.rect(p.main, x, y + h - 1.1, w, 0.08);
     }
     k.rect(0xFFFFFFFF, x + 0.3, y + 1.4, w - 0.6, 5.6);
+    k.anchor(x + 0.3, y + 1.4, w - 0.6, 5.6, rot: -_pi / 2);
     k.circle(p.pale, x + w / 2, y + 0.4, 0.17);
     k.cut(shape, close: true);
     k.cutCircle(x + w / 2, y + 0.4, 0.1);
@@ -1468,6 +1496,8 @@ NgmySlide _miniZine(NgmyCraftPalette p) {
     }
   }
   k.note(0.35, 10.72, 'Fold, cut the middle line, then fold into an 8 page book');
+  k.anchor(0.3, 8.55, 3.7, 2.15, rot: _pi / 2, dark: true);
+  k.anchor(0.3, 5.8, 3.7, 2.15, rot: _pi / 2);
   return k.build('Mini Zine');
 }
 
@@ -1483,6 +1513,7 @@ NgmySlide _placeCards(NgmyCraftPalette p) {
       k.rect(p.main, x + 0.2, y + 0.22, w - 0.4, 0.08);
       k.circle(p.soft, x + w / 2, y + 2.42, 0.07);
       k.circle(p.soft, x + w / 2, y + 1.78, 0.07);
+      k.anchor(x + 0.2, y + 2.2, w - 0.4, 1.85);
       k.text('Guest Name', x + 0.2, y + 2.55, w - 0.4, 0.75, pt: 20, bold: true);
       k.text('Table 1', x + 0.2, y + 3.3, w - 0.4, 0.35, pt: 9, color: p.main);
       k.text('Guest Name', x + 0.2, y + 0.9, w - 0.4, 0.75, pt: 20, bold: true, rot: _pi);
@@ -1513,6 +1544,7 @@ NgmySlide _pocketFolder(NgmyCraftPalette p) {
   k.text('Notes & papers', 0.8, 9.2, 3.2, 0.5, pt: 12, italic: true, color: p.main, rot: _pi);
   k.text('Keep it safe', 4.5, 9.2, 3.2, 0.5, pt: 12, italic: true, color: p.main, rot: _pi);
   k.note(0.35, 0.3, 'Fold the bottom strip back, glue its ends, then fold in half with the print outside');
+  k.anchor(4.55, 0.6, 3.65, 7.35, dark: true);
   return k.build('Pocket Folder');
 }
 
@@ -1531,6 +1563,7 @@ NgmySlide _cdSleeve(NgmyCraftPalette p) {
   k.rect(p.pale, x0, yTop + sq, sq, sq);
   k.text('Track list\n1. Song title\n2. Song title\n3. Song title\n4. Song title\n5. Song title', x0 + 0.4, yTop + sq + 0.6, sq - 0.8, 3.6, pt: 11, rot: _pi);
   _sleeve(k, x0, yTop, sq, sq, notch: 0.55, tab: 0.5);
+  k.anchor(x0, yTop, sq, sq, dark: true);
   return k.build('CD Sleeve', noteText: _printNote('CD sleeve 4.875 in square'));
 }
 
@@ -1549,6 +1582,7 @@ NgmySlide _photoSleeve(NgmyCraftPalette p) {
   k.rect(p.pale, x0, yTop + h, w, h);
   k.text('Notes\n\n________________________\n________________________', x0 + 0.5, yTop + h + 0.6, w - 1.0, 2.6, pt: 11, rot: _pi);
   _sleeve(k, x0, yTop, w, h, notch: 0.55, tab: 0.45);
+  k.anchor(x0, yTop, w, h);
   return k.build('Photo Sleeve', noteText: _printNote('Sleeve for a 6 x 4 in photo'));
 }
 
@@ -1568,6 +1602,7 @@ NgmySlide _doorHangers(NgmyCraftPalette p) {
     k.dotsIn(p.pale, [Offset(x, y + 2.3), Offset(x + w, y + 2.3), Offset(x + w, y + h), Offset(x, y + h)], step: 0.34, r: 0.04);
     k.circle(p.pale, cx, cy, r + 0.12);
     k.rect(p.pale, x + 0.25, y + 2.6, w - 0.5, h - 2.9);
+    k.anchor(x + 0.25, y + 2.6, w - 0.5, h - 2.9);
     k.text(words[i].$1, x + 0.3, y + 3.4, w - 0.6, 1.7, pt: 28, bold: true, color: p.main);
     k.rect(p.accent, cx - 0.4, y + 5.2, 0.8, 0.025);
     k.text(words[i].$2, x + 0.3, y + 5.35, w - 0.6, 0.5, pt: 11, italic: true);
@@ -1637,7 +1672,7 @@ NgmySlideDeck ngmyBuildPaperCraftDeck(NgmyPaperCraft craft, NgmyCraftPalette pal
       e.text = jsonEncode(m);
     }
   }
-  return NgmySlideDeck(
+  final deck = NgmySlideDeck(
     id: NgmySlidesTemplates.newId(),
     name: craft.name,
     aspectRatio: NgmySlideAspectRatio.portrait916,
@@ -1646,6 +1681,9 @@ NgmySlideDeck ngmyBuildPaperCraftDeck(NgmyPaperCraft craft, NgmyCraftPalette pal
     autoAdvanceSeconds: 6,
     slides: slides,
   );
+  // Every design carries an NGMY watermark (the Seal unless another is chosen).
+  ngmyApplyCraftWatermark(deck, kNgmyCraftDefaultWatermark, palette: palette);
+  return deck;
 }
 
 /// Which design and colour set a Fold & Cut deck was made from (null when it cannot tell).
@@ -1684,6 +1722,34 @@ NgmySlideDeck ngmyBuildPaperCraftDeck(NgmyPaperCraft craft, NgmyCraftPalette pal
 // The picker.
 // ---------------------------------------------------------------------------------------------------------------
 
+/// A whole Fold & Cut page, every piece drawn (also the many small pieces of a watermark pattern).
+class NgmyCraftPagePreview extends StatelessWidget {
+  const NgmyCraftPagePreview({super.key, required this.slide});
+  final NgmySlide slide;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, c) {
+      final w = c.maxWidth;
+      final h = c.maxHeight;
+      return ClipRect(
+        child: Stack(
+          children: [
+            for (final e in slide.elements)
+              Positioned(
+                left: e.x * w,
+                top: e.y * h,
+                width: e.w * w,
+                height: e.h * h,
+                child: Transform.rotate(angle: e.rotation, child: NgmySlideElementView(element: e, scale: w / 960, showEmptyHint: false)),
+              ),
+          ],
+        ),
+      );
+    });
+  }
+}
+
 /// Opens Design > Fold & Cut. Returns the new presentation the user picked, or null.
 Future<NgmySlideDeck?> showNgmyPaperCraftPicker(BuildContext context) {
   return Navigator.of(context).push<NgmySlideDeck>(
@@ -1702,9 +1768,16 @@ class _CraftPickerScreenState extends State<_CraftPickerScreen> {
   String _group = 'All';
   final Map<int, Map<String, NgmySlide>> _previews = {};
 
+  @override
+  void initState() {
+    super.initState();
+    // The "NGMY logo" watermark needs the logo picture.
+    ngmyPreloadCraftLogo();
+  }
+
   NgmySlide _preview(NgmyPaperCraft c) {
     final byId = _previews[_palette] ??= {};
-    return byId[c.id] ??= c.build(kNgmyCraftPalettes[_palette]).first;
+    return byId[c.id] ??= ngmyBuildPaperCraftDeck(c, kNgmyCraftPalettes[_palette]).slides.first;
   }
 
   @override
@@ -1862,7 +1935,7 @@ class _CraftPickerScreenState extends State<_CraftPickerScreen> {
                                     ),
                                     child: Stack(
                                       children: [
-                                        Positioned.fill(child: ngmyMiniSlidePreview(_preview(c))),
+                                        Positioned.fill(child: NgmyCraftPagePreview(slide: _preview(c))),
                                         // The design number: "make number 5".
                                         Positioned(
                                           left: 4,
