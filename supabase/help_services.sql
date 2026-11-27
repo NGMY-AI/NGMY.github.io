@@ -136,3 +136,37 @@ alter table public.service_purchases add column if not exists buyer_phone text;
 alter table public.service_purchases add column if not exists guest boolean not null default false;
 alter table public.service_purchases add column if not exists guest_token text;
 create unique index if not exists service_purchases_guest_token_idx on public.service_purchases (guest_token) where guest_token is not null;
+
+-- One waiting (pending) purchase per phone until it is paid. Each phone has its own id (device_id);
+-- members are also matched by their account email.
+alter table public.service_purchases add column if not exists device_id text;
+
+-- Tidy up: where one phone (or one member) has more than one waiting purchase, keep one and mark the
+-- others cancelled. A Cash App payment with a screenshot is kept before an unfinished card checkout,
+-- then the newest one.
+with ranked as (
+  select id, row_number() over (
+    partition by device_id
+    order by (method = 'cashapp') desc, created_at desc
+  ) as n
+  from public.service_purchases
+  where status = 'pending' and device_id is not null
+)
+update public.service_purchases p set status = 'cancelled'
+from ranked r where p.id = r.id and r.n > 1;
+
+with ranked as (
+  select id, row_number() over (
+    partition by lower(email)
+    order by (method = 'cashapp') desc, created_at desc
+  ) as n
+  from public.service_purchases
+  where status = 'pending' and coalesce(guest, false) = false and email <> ''
+)
+update public.service_purchases p set status = 'cancelled'
+from ranked r where p.id = r.id and r.n > 1;
+
+create unique index if not exists service_purchases_one_pending_device
+  on public.service_purchases (device_id) where status = 'pending' and device_id is not null;
+create unique index if not exists service_purchases_one_pending_member
+  on public.service_purchases (lower(email)) where status = 'pending' and coalesce(guest, false) = false and email <> '';

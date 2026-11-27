@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -24,9 +25,31 @@ class NgmyHelpServicesLang {
 String _t(String en, String sw) => NgmyHelpServicesLang.store.t(en, sw);
 
 class NgmyHelpServicesApi {
+  static String? _device;
+
+  /// This phone's own random id (kept on the phone). The server lets one phone have only one waiting
+  /// purchase at a time: a new Pay reuses it until it is paid.
+  static Future<String> deviceId() async {
+    final known = _device;
+    if (known != null) return known;
+    const key = 'ngmy_svc_device_v1';
+    try {
+      final p = await SharedPreferences.getInstance();
+      var id = p.getString(key) ?? '';
+      if (!RegExp(r'^[a-f0-9]{32}$').hasMatch(id)) {
+        final r = math.Random.secure();
+        id = List.generate(16, (_) => r.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+        await p.setString(key, id);
+      }
+      return _device = id;
+    } catch (_) {
+      return '';
+    }
+  }
+
   static Future<Map<String, dynamic>> _call(String action, [Map<String, dynamic> extra = const {}]) async {
     try {
-      final res = await ngmyEdgeInvoke({'action': action, ...extra}, timeout: const Duration(seconds: 30));
+      final res = await ngmyEdgeInvoke({'action': action, 'deviceId': await deviceId(), ...extra}, timeout: const Duration(seconds: 30));
       if (res == null) return {'ok': false, 'error': 'No connection. Try again.'};
       return res;
     } catch (_) {
@@ -49,7 +72,7 @@ class NgmyHelpServicesApi {
   // ── Visitors without an account (from the admin Bio link): no login, only the public guest path ──
   static Future<Map<String, dynamic>> _guestCall(String action, [Map<String, dynamic> extra = const {}]) async {
     try {
-      final res = await ngmyEdgeInvoke({'action': action, ...extra}, anonymous: true, timeout: const Duration(seconds: 30));
+      final res = await ngmyEdgeInvoke({'action': action, 'deviceId': await deviceId(), ...extra}, anonymous: true, timeout: const Duration(seconds: 30));
       if (res == null) return {'ok': false, 'error': 'No connection. Try again.'};
       return res;
     } catch (_) {
@@ -1136,10 +1159,6 @@ class _NgmyServicePurchasePageState extends State<NgmyServicePurchasePage> {
                 const SizedBox(height: 16),
                 _contactCard(c),
               ],
-              if ((_p['guestToken'] ?? '').toString().isNotEmpty && (status == 'paid' || status == 'pending')) ...[
-                const SizedBox(height: 16),
-                _guestLinkCard(c, (_p['guestToken'] ?? '').toString()),
-              ],
             ]),
           ),
         ),
@@ -1274,42 +1293,6 @@ class _NgmyServicePurchasePageState extends State<NgmyServicePurchasePage> {
             row(_t('Confirmation number', 'Namba ya uthibitisho'), (_p['receiptNo'] ?? '').toString()),
             if (paid && _p['courseAccess'] == true) row(_t('Course access', 'Ufikiaji wa kozi'), _t('Active', 'Hai')),
           ]),
-        ),
-      ]),
-    );
-  }
-
-  /// Guests have no account: this private link opens this receipt again on any phone.
-  Widget _guestLinkCard(_Palette c, String token) {
-    final link = 'https://ngmy.org/?svc_guest=$token';
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: c.card, borderRadius: BorderRadius.circular(20), border: Border.all(color: c.line)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text(_t('YOUR RECEIPT LINK', 'KIUNGO CHA RISITI YAKO'),
-            style: TextStyle(fontSize: 10.5, letterSpacing: 1.6, fontWeight: FontWeight.w900, color: c.muted)),
-        const SizedBox(height: 6),
-        Text(
-          _t('Keep this link. Open it any time to see this payment, and after approval the WhatsApp contact. No login needed.',
-              'Hifadhi kiungo hiki. Kifungue wakati wowote kuona malipo haya, na baada ya kuidhinishwa mawasiliano ya WhatsApp. Huhitaji kuingia.'),
-          style: TextStyle(fontSize: 13, height: 1.35, color: c.ink, fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(12), border: Border.all(color: c.line)),
-          child: SelectableText(link, style: TextStyle(fontSize: 12, color: c.ink, fontWeight: FontWeight.w700)),
-        ),
-        const SizedBox(height: 10),
-        OutlinedButton.icon(
-          onPressed: () async {
-            await Clipboard.setData(ClipboardData(text: link));
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_t('Link copied.', 'Kiungo kimenakiliwa.'))));
-            }
-          },
-          icon: const Icon(Icons.copy_rounded, size: 18),
-          label: Text(_t('Copy link', 'Nakili kiungo')),
         ),
       ]),
     );

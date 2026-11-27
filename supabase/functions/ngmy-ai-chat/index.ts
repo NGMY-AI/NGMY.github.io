@@ -1764,6 +1764,155 @@ async function svcPublicContacts(db: any): Promise<{ cashAppTag: string; phone: 
   }
 }
 
+// ── One waiting purchase per phone ──
+// Each phone sends its own random id (deviceId). A member is also matched by their account email.
+// While a phone has a waiting (pending) purchase, every new Pay reuses that same row; it never adds another.
+type SvcWho = { email: string; deviceId: string; guest: boolean; token?: string };
+
+function svcDeviceId(v: unknown): string {
+  const s = String(v ?? "").trim().toLowerCase();
+  return /^[a-f0-9]{32}$/.test(s) ? s : "";
+}
+
+/// The waiting purchase of this phone (or member), after asking Stripe whether a card one was paid meanwhile.
+async function svcFindPending(db: any, who: SvcWho): Promise<any | null> {
+  const found: any[] = [];
+  if (!who.guest && who.email) {
+    const { data } = await db.from("service_purchases").select("*").eq("status", "pending").eq("email", who.email)
+      .order("created_at", { ascending: false }).limit(5);
+    for (const r of data ?? []) if (r.guest !== true) found.push(r);
+  }
+  if (who.deviceId) {
+    try {
+      const { data, error } = await db.from("service_purchases").select("*").eq("status", "pending").eq("device_id", who.deviceId)
+        .order("created_at", { ascending: false }).limit(5);
+      if (!error) found.push(...(data ?? []));
+    } catch (_) { /* the device_id column is not there yet */ }
+  }
+  // A Cash App payment waiting for the admin comes first, then the newest.
+  found.sort((a, b) => (Number(b.method === "cashapp") - Number(a.method === "cashapp")) || String(b.created_at).localeCompare(String(a.created_at)));
+  for (const r of found) {
+    const checked = await svcCheckStripe(db, r);
+    if (checked.status === "pending") return checked;
+  }
+  return null;
+}
+
+/// Adds a purchase row, with the phone id when the column exists.
+async function svcInsertPurchase(db: any, who: SvcWho, fields: Record<string, unknown>): Promise<{ data: any; error: any }> {
+  const row = { ...fields, ...(who.deviceId ? { device_id: who.deviceId } : {}) };
+  let res = await db.from("service_purchases").insert(row).select("*").maybeSingle();
+  if (res.error && who.deviceId && /device_id/i.test(String(res.error.message))) {
+    res = await db.from("service_purchases").insert(fields).select("*").maybeSingle();
+  }
+  return res;
+}
+
+async function svcExpireSession(key: string, sessionId: unknown): Promise<void> {
+  const id = String(sessionId ?? "");
+  if (!key || !id.startsWith("cs_")) return;
+  try {
+    await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(id)}/expire`, { method: "POST", headers: { Authorization: `Bearer ${key}` } });
+  } catch (_) { /* it closes by itself after a day */ }
+}
+
+const SVC_STILL_CHECKING_EN = "Your last payment is still being checked by the admin. You can pay again after it is approved.";
+
+/// Card: reuse this phone's waiting purchase (and its open Stripe page when it is the same plan), or add one.
+async function svcStartCard(
+  db: any, key: string, who: SvcWho, cat: any,
+  opts: { successUrl: string; cancelUrl: string; customerEmail?: string; collectPhone?: boolean; retried?: boolean },
+): Promise<{ ok: true; url: string; purchaseId: string; token: string } | { ok: false; status: number; why: string; busy?: boolean }> {
+  const amount = Number(cat.price);
+  let row = await svcFindPending(db, who);
+  if (row && row.method === "cashapp") return { ok: false, status: 409, why: SVC_STILL_CHECKING_EN, busy: true };
+  if (row && row.transaction_id && row.category_id === cat.id && Number(row.amount) === amount) {
+    try {
+      const r = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(row.transaction_id)}`, { headers: { Authorization: `Bearer ${key}` } });
+      const s = await r.json();
+      if (r.ok && s?.status === "open" && typeof s?.url === "string") {
+        return { ok: true, url: s.url, purchaseId: String(row.id), token: String(row.guest_token ?? "") };
+      }
+    } catch (_) { /* make a new Stripe page below */ }
+  }
+  let added = false;
+  if (row) {
+    await svcExpireSession(key, row.transaction_id);
+    const { data } = await db.from("service_purchases")
+      .update({ category_id: cat.id, amount, method: "stripe", transaction_id: null })
+      .eq("id", row.id).eq("status", "pending").select("*").maybeSingle();
+    row = data ?? null;
+  }
+  if (!row) {
+    const base: Record<string, unknown> = { email: who.email, category_id: cat.id, amount, method: "stripe", status: "pending" };
+    if (who.guest) Object.assign(base, { guest: true, guest_token: svcNewGuestToken() });
+    const { data, error } = await svcInsertPurchase(db, who, base);
+    if (error || !data) {
+      // Another tap from this phone made the row a moment ago: use that one.
+      if (error && !opts.retried && /duplicate|unique/i.test(String(error.message))) return svcStartCard(db, key, who, cat, { ...opts, retried: true });
+      return { ok: false, status: 500, why: String(error?.message ?? "insert failed") };
+    }
+    row = data;
+    added = true;
+  }
+  const form = new URLSearchParams();
+  form.set("mode", "payment");
+  form.set("success_url", opts.successUrl);
+  form.set("cancel_url", opts.cancelUrl);
+  form.set("client_reference_id", `svc_${row.id}`);
+  if (opts.customerEmail) form.set("customer_email", opts.customerEmail);
+  if (opts.collectPhone) form.set("phone_number_collection[enabled]", "true");
+  form.set("line_items[0][quantity]", "1");
+  form.set("line_items[0][price_data][currency]", "usd");
+  form.set("line_items[0][price_data][unit_amount]", String(Math.round(amount * 100)));
+  form.set("line_items[0][price_data][product_data][name]", `NGMY · ${cat.title_en}`);
+  form.set("metadata[ngmy_kind]", "service_purchase");
+  form.set("metadata[purchase_id]", String(row.id));
+  form.set("metadata[category_id]", String(cat.id));
+  if (who.guest) form.set("metadata[guest]", "1");
+  form.set("payment_intent_data[metadata][purchase_id]", String(row.id));
+  try {
+    const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/x-www-form-urlencoded" },
+      body: form.toString(),
+    });
+    const s = await res.json();
+    if (!res.ok || !s?.url || !s?.id) {
+      if (added) await db.from("service_purchases").delete().eq("id", row.id).eq("status", "pending");
+      const why = String(s?.error?.message ?? `HTTP ${res.status}`).replace(/\b(sk|rk|pk)_(live|test)_[A-Za-z0-9*.]+/g, "$1_$2_…");
+      return { ok: false, status: res.status, why };
+    }
+    await db.from("service_purchases").update({ transaction_id: s.id }).eq("id", row.id);
+    return { ok: true, url: s.url, purchaseId: String(row.id), token: String(row.guest_token ?? "") };
+  } catch (e) {
+    if (added) await db.from("service_purchases").delete().eq("id", row.id).eq("status", "pending");
+    return { ok: false, status: 0, why: `network: ${String((e as Error)?.message ?? e)}` };
+  }
+}
+
+/// Cash App: one waiting payment per phone. An unfinished card checkout of this phone becomes this Cash App payment.
+async function svcSubmitCashApp(
+  db: any, who: SvcWho, cat: any, code: string, proofUrl: string,
+): Promise<{ ok: true; row: any } | { ok: false; busy?: boolean; why: string }> {
+  const row = await svcFindPending(db, who);
+  if (row && row.method === "cashapp") return { ok: false, busy: true, why: SVC_STILL_CHECKING_EN };
+  const fields = { category_id: cat.id, amount: Number(cat.price), method: "cashapp", code, proof_url: proofUrl, transaction_id: code };
+  if (row) {
+    await svcExpireSession(svcStripeKey(), row.transaction_id);
+    const { data, error } = await db.from("service_purchases").update(fields).eq("id", row.id).eq("status", "pending").select("*").maybeSingle();
+    if (!error && data) return { ok: true, row: data };
+  }
+  const base: Record<string, unknown> = { email: who.email, status: "pending", ...fields };
+  if (who.guest) Object.assign(base, { guest: true, guest_token: svcNewGuestToken() });
+  const { data, error } = await svcInsertPurchase(db, who, base);
+  if (error || !data) {
+    if (error && /duplicate|unique/i.test(String(error.message))) return { ok: false, busy: true, why: SVC_STILL_CHECKING_EN };
+    return { ok: false, why: String(error?.message ?? "insert failed") };
+  }
+  return { ok: true, row: data };
+}
+
 /// Help & Services for visitors without an NGMY account (they arrive from the admin Bio link).
 /// Only the plans, paying, and their own purchases by private token. Nothing else is open to guests.
 async function handleHelpServicesGuest(req: Request, action: string, body: any): Promise<Response> {
@@ -1779,8 +1928,15 @@ async function handleHelpServicesGuest(req: Request, action: string, body: any):
     return jsonOk({ ok: false, error: text }, status);
   };
 
+  // Limits count per phone (its id) and, much higher, per internet address: on mobile networks many
+  // visitors share one address, so the address alone must never block normal visitors.
+  const phone = `${ip}:${svcDeviceId(body?.deviceId) || "none"}`;
+  const limit = async (bucket: string, perPhone: number, perAddress: number, windowSeconds: number) =>
+    (await enforceRateLimit(req, `${bucket}_dev`, phone, perPhone, windowSeconds)) ??
+      (await enforceRateLimit(req, `${bucket}_ip`, ip, perAddress, windowSeconds));
+
   if (action === "svcGuestList") {
-    const limited = await enforceRateLimit(req, "svc_guest_list", ip, 120, 3600);
+    const limited = await limit("svc_guest_list", 240, 6000, 3600);
     if (limited) return limited;
     const { data: cats, error } = await db.from("service_categories").select("*").eq("active", true).order("sort_order", { ascending: true });
     if (error) return fail("svcGuestList", error);
@@ -1790,7 +1946,7 @@ async function handleHelpServicesGuest(req: Request, action: string, body: any):
   }
 
   if (action === "svcGuestPurchases") {
-    const limited = await enforceRateLimit(req, "svc_guest_mine", ip, 240, 3600);
+    const limited = await limit("svc_guest_mine", 480, 12000, 3600);
     if (limited) return limited;
     const tokens = (Array.isArray(body?.tokens) ? body.tokens : []).map((t: unknown) => String(t ?? "").trim().toLowerCase())
       .filter((t: string) => /^[a-f0-9]{48}$/.test(t)).slice(0, 20);
@@ -1832,12 +1988,12 @@ async function handleHelpServicesGuest(req: Request, action: string, body: any):
   if (!cat) return jsonOk({ ok: false, error: "That plan is not available." }, 404);
   const amount = Number(cat.price);
   if (!(amount > 0)) return fail("svcGuestPay", "plan has no price", busy, 400);
-  const token = svcNewGuestToken();
   // The email is filled in from Stripe after a card payment (Cash App visitors reach us on WhatsApp).
-  const base = { email: "", guest: true, guest_token: token, category_id: cat.id, amount };
+  // One waiting purchase per phone: the phone id decides which row is reused.
+  const who: SvcWho = { email: "", deviceId: svcDeviceId(body?.deviceId), guest: true };
 
   if (action === "svcGuestCashApp") {
-    const limited = await enforceRateLimit(req, "svc_guest_pay", ip, 6, 86400);
+    const limited = await limit("svc_guest_pay", 6, 300, 86400);
     if (limited) return limited;
     const code = String(body?.code ?? "").replace(/\D/g, "").slice(0, 8);
     const proofB64 = String(body?.proofBase64 ?? "");
@@ -1845,61 +2001,36 @@ async function handleHelpServicesGuest(req: Request, action: string, body: any):
     if (!proofB64) return jsonOk({ ok: false, error: "Attach the screenshot of your Cash App payment." }, 400);
     let proofUrl = "";
     try {
-      proofUrl = await hwUploadCareImage(db, `guest:${token}`, "pay", proofB64, String(body?.proofMime ?? ""));
+      proofUrl = await hwUploadCareImage(db, `guest:${who.deviceId || svcNewGuestToken()}`, "pay", proofB64, String(body?.proofMime ?? ""));
     } catch (e) {
       return jsonOk({ ok: false, error: String((e as Error).message ?? e) }, 400);
     }
-    const { data, error } = await db.from("service_purchases").insert({
-      ...base, method: "cashapp", status: "pending", code, proof_url: proofUrl, transaction_id: code,
-    }).select("*").maybeSingle();
-    if (error) {
+    const done = await svcSubmitCashApp(db, who, cat, code, proofUrl);
+    if (!done.ok) {
       await hwRemoveCareImage(db, proofUrl);
-      return fail("svcGuestCashApp", error);
+      if (done.busy) return jsonOk({ ok: false, error: done.why }, 409);
+      return fail("svcGuestCashApp", done.why);
     }
-    return jsonOk({ ok: true, pending: true, token, purchase: { ...svcPurchase(data), guestToken: token } });
+    const token = String(done.row.guest_token ?? "");
+    return jsonOk({ ok: true, pending: true, token, purchase: { ...svcPurchase(done.row), guestToken: token } });
   }
 
   // svcGuestStripeStart
-  const limited = await enforceRateLimit(req, "svc_guest_stripe", ip, 20, 3600);
+  const limited = await limit("svc_guest_stripe", 20, 600, 3600);
   if (limited) return limited;
   const key = svcStripeKey();
   if (!key) return fail("svcGuestStripeStart", "no Stripe key", cardBusy, 503);
-  const { data: row, error } = await db.from("service_purchases").insert({ ...base, method: "stripe", status: "pending" }).select("*").maybeSingle();
-  if (error || !row) return fail("svcGuestStripeStart", error ?? "insert", cardBusy);
   const origin = svcReturnOrigin(body?.origin);
-  const form = new URLSearchParams();
-  form.set("mode", "payment");
-  form.set("success_url", `${origin}/?svc_paid={CHECKOUT_SESSION_ID}&svc_guest=${token}`);
-  form.set("cancel_url", `${origin}/?svc_open=1`);
-  form.set("client_reference_id", `svc_${row.id}`);
-  // Stripe asks for the email (always) and the name with the card; the phone is asked here too.
-  form.set("phone_number_collection[enabled]", "true");
-  form.set("line_items[0][quantity]", "1");
-  form.set("line_items[0][price_data][currency]", "usd");
-  form.set("line_items[0][price_data][unit_amount]", String(Math.round(amount * 100)));
-  form.set("line_items[0][price_data][product_data][name]", `NGMY · ${cat.title_en}`);
-  form.set("metadata[ngmy_kind]", "service_purchase");
-  form.set("metadata[purchase_id]", String(row.id));
-  form.set("metadata[category_id]", String(cat.id));
-  form.set("metadata[guest]", "1");
-  form.set("payment_intent_data[metadata][purchase_id]", String(row.id));
-  try {
-    const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/x-www-form-urlencoded" },
-      body: form.toString(),
-    });
-    const s = await res.json();
-    if (!res.ok || !s?.url || !s?.id) {
-      await db.from("service_purchases").delete().eq("id", row.id).eq("status", "pending");
-      return fail("svcGuestStripeStart", `stripe ${res.status} ${String(s?.error?.message ?? "").replace(/\b(sk|rk|pk)_(live|test)_[A-Za-z0-9*.]+/g, "$1_$2_…")}`, cardBusy, 502);
-    }
-    await db.from("service_purchases").update({ transaction_id: s.id }).eq("id", row.id);
-    return jsonOk({ ok: true, url: s.url, purchaseId: row.id, token });
-  } catch (e) {
-    await db.from("service_purchases").delete().eq("id", row.id).eq("status", "pending");
-    return fail("svcGuestStripeStart", e, cardBusy, 502);
-  }
+  // Stripe asks for the email (always) and the name with the card; the phone is asked there too.
+  // The return address only says "a visitor came back": the purchase is found on this phone, no link is made.
+  const card = await svcStartCard(db, key, who, cat, {
+    successUrl: `${origin}/?svc_paid={CHECKOUT_SESSION_ID}&svc_guest=1`,
+    cancelUrl: `${origin}/?svc_open=1`,
+    collectPhone: true,
+  });
+  if (card.ok) return jsonOk({ ok: true, url: card.url, purchaseId: card.purchaseId, token: card.token });
+  if (card.busy) return jsonOk({ ok: false, error: card.why }, 409);
+  return fail("svcGuestStripeStart", `stripe ${card.status} ${card.why}`, cardBusy, 502);
 }
 
 /// Visitors are not asked anything in the app: Stripe collects their email, name and phone, and they are
@@ -2065,9 +2196,9 @@ async function handleHelpServices(req: Request, action: string, body: any): Prom
     if (limited) return limited;
     const cat = await activeCategory(body?.categoryId);
     if (!cat) return jsonOk({ ok: false, error: "That plan is not available." }, 404);
-    const { data: waiting } = await db.from("service_purchases").select("id")
-      .eq("email", email).eq("category_id", cat.id).eq("method", "cashapp").eq("status", "pending").limit(1);
-    if (waiting && waiting.length > 0) return jsonOk({ ok: false, error: "Your last payment for this plan is still being confirmed." }, 409);
+    const who: SvcWho = { email, deviceId: svcDeviceId(body?.deviceId), guest: false };
+    const waiting = await svcFindPending(db, who);
+    if (waiting && waiting.method === "cashapp") return jsonOk({ ok: false, error: SVC_STILL_CHECKING_EN }, 409);
     const code = String(body?.code ?? "").replace(/\D/g, "").slice(0, 8);
     const proofB64 = String(body?.proofBase64 ?? "");
     if (code.length < 4) return jsonOk({ ok: false, error: "Your payment code is missing. Open the payment again." }, 400);
@@ -2078,15 +2209,13 @@ async function handleHelpServices(req: Request, action: string, body: any): Prom
     } catch (e) {
       return jsonOk({ ok: false, error: String((e as Error).message ?? e) }, 400);
     }
-    const { data, error } = await db.from("service_purchases").insert({
-      email, category_id: cat.id, amount: Number(cat.price), method: "cashapp", status: "pending",
-      code, proof_url: proofUrl, transaction_id: code,
-    }).select("*").maybeSingle();
-    if (error) {
+    const done = await svcSubmitCashApp(db, who, cat, code, proofUrl);
+    if (!done.ok) {
       await hwRemoveCareImage(db, proofUrl);
-      return jsonOk({ ok: false, error: notReady(error.message) ? setupError : error.message }, 500);
+      if (done.busy) return jsonOk({ ok: false, error: done.why }, 409);
+      return jsonOk({ ok: false, error: notReady(done.why) ? setupError : done.why }, 500);
     }
-    return jsonOk({ ok: true, pending: true, purchase: svcPurchase(data) });
+    return jsonOk({ ok: true, pending: true, purchase: svcPurchase(done.row) });
   }
 
   if (action === "svcStripeStart") {
@@ -2098,62 +2227,40 @@ async function handleHelpServices(req: Request, action: string, body: any): Prom
     if (!cat) return jsonOk({ ok: false, error: "That plan is not available." }, 404);
     const amount = Number(cat.price);
     if (!(amount > 0)) return jsonOk({ ok: false, error: "That plan has no price yet." }, 400);
-    const { data: row, error } = await db.from("service_purchases").insert({
-      email, category_id: cat.id, amount, method: "stripe", status: "pending",
-    }).select("*").maybeSingle();
-    if (error || !row) return jsonOk({ ok: false, error: error && notReady(error.message) ? setupError : (error?.message ?? "Could not start the payment.") }, 500);
     const origin = svcReturnOrigin(body?.origin);
-    const form = new URLSearchParams();
-    form.set("mode", "payment");
-    form.set("success_url", `${origin}/?svc_paid={CHECKOUT_SESSION_ID}`);
-    form.set("cancel_url", `${origin}/?svc_cancel=1`);
-    form.set("client_reference_id", `svc_${row.id}`);
-    form.set("customer_email", email);
-    form.set("line_items[0][quantity]", "1");
-    form.set("line_items[0][price_data][currency]", "usd");
-    form.set("line_items[0][price_data][unit_amount]", String(Math.round(amount * 100)));
-    form.set("line_items[0][price_data][product_data][name]", `NGMY · ${cat.title_en}`);
-    form.set("metadata[ngmy_kind]", "service_purchase");
-    form.set("metadata[purchase_id]", String(row.id));
-    form.set("metadata[category_id]", String(cat.id));
-    form.set("payment_intent_data[metadata][purchase_id]", String(row.id));
-    try {
-      const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/x-www-form-urlencoded" },
-        body: form.toString(),
-      });
-      const s = await res.json();
-      if (!res.ok || !s?.url || !s?.id) {
-        await db.from("service_purchases").delete().eq("id", row.id).eq("status", "pending");
-        // Stripe's own reason, with any key text hidden, so the real cause never hides behind a generic message.
-        const why = String(s?.error?.message ?? `HTTP ${res.status}`).replace(/\b(sk|rk|pk)_(live|test)_[A-Za-z0-9*.]+/g, "$1_$2_…");
-        // What the saved key looks like (never the key itself), so a bad paste is easy to spot.
-        const keyKind = /^["'`]|["'`]$/.test(key) ? "the saved key has quote marks around it"
-          : /\s/.test(key) ? "the saved key has a space or line break inside it"
-          : key.startsWith("pk_") ? "this is a PUBLISHABLE key (pk_), it must be a secret key (sk_live_ or rk_live_)"
-          : key.startsWith("rk_live_") ? `restricted live key, ${key.length} characters`
-          : key.startsWith("sk_live_") ? `live secret key, ${key.length} characters`
-          : key.startsWith("sk_test_") || key.startsWith("rk_test_") ? "TEST key"
-          : `does not start with sk_live_ or rk_live_ (${key.length} characters)`;
-        console.error("[svcStripeStart] stripe error", res.status, keyKind, why);
-        let reason = "Stripe did not accept the request";
-        if (/permission/i.test(why)) reason = "the Stripe key in Supabase (STRIPE_SECRET_KEY) does not have the Checkout Sessions Write permission";
-        else if (/invalid api key|expired|revoked/i.test(why) || res.status === 401) reason = "the Stripe key in Supabase (STRIPE_SECRET_KEY) is wrong, expired or deleted";
-        return jsonOk({
-          ok: false,
-          error: isAdmin
-            ? `Card checkout could not start: ${reason}. Stripe said: ${why} (${keyKind}, code ${res.status}).`
-            : `Card payments are not ready yet (code S${res.status}). Please use Cash App for now.`,
-        }, 502);
-      }
-      await db.from("service_purchases").update({ transaction_id: s.id }).eq("id", row.id);
-      return jsonOk({ ok: true, url: s.url, purchaseId: row.id });
-    } catch (e) {
-      await db.from("service_purchases").delete().eq("id", row.id).eq("status", "pending");
-      console.error("[svcStripeStart] network error", String((e as Error)?.message ?? e));
+    const who: SvcWho = { email, deviceId: svcDeviceId(body?.deviceId), guest: false };
+    const card = await svcStartCard(db, key, who, cat, {
+      successUrl: `${origin}/?svc_paid={CHECKOUT_SESSION_ID}`,
+      cancelUrl: `${origin}/?svc_cancel=1`,
+      customerEmail: email,
+    });
+    if (card.ok) return jsonOk({ ok: true, url: card.url, purchaseId: card.purchaseId });
+    if (card.busy) return jsonOk({ ok: false, error: card.why }, 409);
+    if (card.status === 500) return jsonOk({ ok: false, error: notReady(card.why) ? setupError : card.why }, 500);
+    if (card.status === 0) {
+      console.error("[svcStripeStart] network error", card.why);
       return jsonOk({ ok: false, error: "Card checkout could not reach Stripe (network). Try again in a minute or use Cash App." }, 502);
     }
+    // Stripe's own reason (key text hidden), so the real cause never hides behind a generic message.
+    const why = card.why;
+    // What the saved key looks like (never the key itself), so a bad paste is easy to spot.
+    const keyKind = /^["'`]|["'`]$/.test(key) ? "the saved key has quote marks around it"
+      : /\s/.test(key) ? "the saved key has a space or line break inside it"
+      : key.startsWith("pk_") ? "this is a PUBLISHABLE key (pk_), it must be a secret key (sk_live_ or rk_live_)"
+      : key.startsWith("rk_live_") ? `restricted live key, ${key.length} characters`
+      : key.startsWith("sk_live_") ? `live secret key, ${key.length} characters`
+      : key.startsWith("sk_test_") || key.startsWith("rk_test_") ? "TEST key"
+      : `does not start with sk_live_ or rk_live_ (${key.length} characters)`;
+    console.error("[svcStripeStart] stripe error", card.status, keyKind, why);
+    let reason = "Stripe did not accept the request";
+    if (/permission/i.test(why)) reason = "the Stripe key in Supabase (STRIPE_SECRET_KEY) does not have the Checkout Sessions Write permission";
+    else if (/invalid api key|expired|revoked/i.test(why) || card.status === 401) reason = "the Stripe key in Supabase (STRIPE_SECRET_KEY) is wrong, expired or deleted";
+    return jsonOk({
+      ok: false,
+      error: isAdmin
+        ? `Card checkout could not start: ${reason}. Stripe said: ${why} (${keyKind}, code ${card.status}).`
+        : `Card payments are not ready yet (code S${card.status}). Please use Cash App for now.`,
+    }, 502);
   }
 
   if (action === "svcStripeCancel") {
