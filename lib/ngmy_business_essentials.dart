@@ -9,7 +9,7 @@ import 'ngmy_hub_form_ui.dart';
 import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_item_reminder.dart';
 import 'ngmy_item_reminder_storage.dart';
-import 'ngmy_color_buckets.dart';
+import 'ngmy_learn_english.dart';
 import 'ngmy_medicine_organizer.dart';
 import 'ngmy_private_vault.dart';
 import 'ngmy_quick_support.dart';
@@ -28,7 +28,7 @@ Future<int> ngmyBusinessEssentialsTotalCount({
     ngmyBusinessNotesCount(userEmail: userEmail),
     ngmyBusinessTasksCount(userEmail: userEmail),
     ngmyItemReminderCount(userEmail: userEmail),
-    ngmyColorBucketsCount(userEmail: userEmail),
+    ngmyLearnEnglishCount(userEmail: userEmail),
     ngmyBibleDictionaryCount(userEmail: userEmail),
     ngmyQuickDialCount(userEmail: userEmail),
   ]);
@@ -119,10 +119,10 @@ const _categoryArt = <String, _CategoryArt>{
     accent: Color(0xFF818CF8),
     gradient: [Color(0xFF4338CA), Color(0xFF6366F1)],
   ),
-  'Paint Mix': _CategoryArt(
-    icon: Icons.palette_outlined,
-    accent: Color(0xFFD6A800),
-    gradient: [Color(0xFF2A2A2A), Color(0xFFC59A1B)],
+  'Learn English': _CategoryArt(
+    icon: Icons.record_voice_over_rounded,
+    accent: Color(0xFF22D3EE),
+    gradient: [Color(0xFF0891B2), Color(0xFF22D3EE)],
   ),
   'Bible Dictionary': _CategoryArt(
     icon: Icons.auto_stories_rounded,
@@ -147,7 +147,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
   int _notes = 0;
   int _tasks = 0;
   int _reminders = 0;
-  int _colorBuckets = 0;
+  int _learnEnglish = 0;
   int _bibleDictionary = 0;
   int _quickDial = 0;
 
@@ -167,7 +167,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
     _notes = results[4];
     _tasks = results[5];
     _reminders = results[6];
-    _colorBuckets = results[7];
+    _learnEnglish = results[7];
     _bibleDictionary = results[8];
     _quickDial = results[9];
   }
@@ -181,7 +181,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
       ngmyBusinessNotesCount(userEmail: widget.userEmail),
       ngmyBusinessTasksCount(userEmail: widget.userEmail),
       ngmyItemReminderCount(userEmail: widget.userEmail),
-      ngmyColorBucketsCount(userEmail: widget.userEmail),
+      ngmyLearnEnglishCount(userEmail: widget.userEmail),
       ngmyBibleDictionaryCount(userEmail: widget.userEmail),
       ngmyQuickDialCount(userEmail: widget.userEmail),
     ]);
@@ -383,14 +383,14 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                               ),
                             ),
                             _CompactCategoryCard(
-                              title: 'Paint Mix',
-                              count: _colorBuckets,
+                              title: 'Learn English',
+                              count: _learnEnglish,
                               pulse: pulse,
                               scan: scan,
                               orbit: orbit,
                               phase: 0.48,
                               onTap: () => _openCategory(
-                                (ctx) => showNgmyColorBucketsDialog(
+                                (ctx) => showNgmyLearnEnglishDialog(
                                   ctx,
                                   userEmail: widget.userEmail,
                                 ),
@@ -447,7 +447,7 @@ const _categoryBlurb = <String, String>{
   'Site Map': 'Saved places',
   'Quick Tasks': 'Get things done',
   'Hotlines': 'Help numbers',
-  'Paint Mix': 'Your color recipes',
+  'Learn English': 'Meanings & how to say them',
   'Bible Dictionary': 'Words & meanings',
   'Quick Dial': 'Call in one tap',
 };

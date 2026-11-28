@@ -178,7 +178,7 @@ ROLES:
 - Store sell grant: canSellOnStore. Workers/helpers: approval flags.
 
 HUBS RECAP FOR DEEP ANSWERS:
-- Business Essentials + Home Essentials: notes, contacts, meds, site map, tasks, hotlines, paint mix, bible dictionary, alarms, local menu/bio.
+- Business Essentials + Home Essentials: notes, contacts, meds, site map, tasks, hotlines, learn english (dictionary and pronunciation), bible dictionary, alarms, local menu/bio.
 - Helper AI / Help Topics: separate from Advisors; Helper can use live DB dumps. You (Advisors) use THIS knowledge block.
 - Communicate pass: Stripe advisors preferred; wallet legacy passes may still exist.
 
