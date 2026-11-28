@@ -278,9 +278,9 @@ void main() {
     expect(glue.length, 3);
     final xs = [for (final g in glue) for (var i = 0; i < g.length; i += 2) g[i]];
     expect(xs.reduce((a, b) => a > b ? a : b) - xs.reduce((a, b) => a < b ? a : b) - 2 * 0.6, greaterThan(3.375 + 0.1));
-    // Closed 3.8 x 5.2 in fits inside the 5.75 x 4.375 in A2 envelope.
-    expect(5.2, lessThan(5.75));
-    expect(3.8, lessThan(4.375));
+    // Closed 4.25 x 5.5 in (half the paper) fits inside the 5.75 x 4.375 in A2 envelope.
+    expect(5.5, lessThan(5.75));
+    expect(4.25, lessThan(4.375));
     // A deck made from the old Round Labels design still opens, prints and talks to the AI, without breaking.
     final deck = _deck('gift_card_holder');
     final lines = deck.slides.first.elements.firstWhere(ngmyIsCraftLines);

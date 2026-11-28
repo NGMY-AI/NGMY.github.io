@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:ui' show Rect;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_paper_crafts.dart';
@@ -84,7 +85,8 @@ double _edgeDist(List<_Pt> poly, _Pt p, {bool Function(_Pt a, _Pt b)? skip}) {
   }
 
   final flat = [pts('t'), pts('r'), pts('u'), pts('l')];
-  final onPage = flat.every((f) => f.every((q) => q.$1 >= 0.2 && q.$1 <= 8.3 && q.$2 >= 0.2 && q.$2 <= 10.8));
+  // On the paper: straight sides may reach the paper edge (the edge is then the cut).
+  final onPage = flat.every((f) => f.every((q) => q.$1 >= -1e-6 && q.$1 <= 8.5 + 1e-6 && q.$2 >= -1e-6 && q.$2 <= 11 + 1e-6));
   final top = [for (final q in flat[0]) (q.$1, 2 * y0 - q.$2)];
   final right = [for (final q in flat[1]) (2 * x1 - q.$1, q.$2)];
   final bottom = [for (final q in flat[2]) (q.$1, 2 * y1 - q.$2)];
@@ -179,7 +181,7 @@ void main() {
           expect(r.gapPoints, 0, reason: '$why - some of the inside shows');
           expect(r.bottomOnSideMm, greaterThanOrEqualTo(15), reason: '$why - bottom flap over side flaps');
           expect(r.topOverOpeningMm, greaterThanOrEqualTo(15), reason: '$why - top flap over the opening');
-          expect(r.onPage, isTrue, reason: '$why - outside the printable page');
+          expect(r.onPage, isTrue, reason: '$why - off the paper');
         }
       }
     }
@@ -188,6 +190,37 @@ void main() {
       final s = kNgmyPaperCrafts.firstWhere((c) => c.id == id).build(kNgmyCraftPalettes.first).first;
       final spec = jsonDecode(s.elements.firstWhere(ngmyIsCraftLines).text) as Map<String, dynamic>;
       expect(spec['e'] as List?, isNotEmpty, reason: id);
+    }
+  });
+
+  test('Straight outer sides near the paper edge sit on the paper edge (no thin strips to cut off)', () {
+    for (final craft in kNgmyPaperCrafts) {
+      final slides = craft.build(kNgmyCraftPalettes.first);
+      for (var s = 0; s < slides.length; s++) {
+        final why = '${craft.number} ${craft.id} page ${s + 1}';
+        for (final l in _lines(slides[s], 'c')) {
+          for (var i = 0; i + 3 < l.length; i += 2) {
+            final x1 = l[i], y1 = l[i + 1], x2 = l[i + 2], y2 = l[i + 3];
+            if ((x2 - x1).abs() < 1e-6 && (y2 - y1).abs() > 0.05) {
+              // An up and down cut: never on the paper edge, and never within 1 in of it.
+              final d = math.min(x1, 8.5 - x1);
+              expect(d, greaterThan(1.0), reason: '$why: cut at x = $x1 runs beside the paper edge');
+            } else if ((y2 - y1).abs() < 1e-6 && (x2 - x1).abs() > 0.05) {
+              final d = math.min(y1, 11 - y1);
+              expect(d, greaterThan(1.0), reason: '$why: cut at y = $y1 runs beside the paper edge');
+            }
+          }
+        }
+        // The words stay clear of the strip a home printer cannot print (turned words are checked by their middle).
+        for (final e in slides[s].elements.where((e) => e.type == NgmySlideElementType.text)) {
+          final r = Rect.fromLTWH(e.x * 8.5, e.y * 11, e.w * 8.5, e.h * 11);
+          if (e.rotation == 0 || (e.rotation.abs() - math.pi).abs() < 1e-6) {
+            expect(r.left >= 0.2 && r.top >= 0.2 && r.right <= 8.3 && r.bottom <= 10.8, isTrue, reason: '$why: "${e.text}" at $r');
+          } else {
+            expect(r.center.dx >= 0.2 && r.center.dy >= 0.2 && r.center.dx <= 8.3 && r.center.dy <= 10.8, isTrue, reason: '$why: "${e.text}"');
+          }
+        }
+      }
     }
   });
 

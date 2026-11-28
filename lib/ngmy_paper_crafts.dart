@@ -670,6 +670,9 @@ class _Page {
   }
   void legendAt(double x, double y) => _legend = [x, y];
 
+  /// No cut, fold and glue key (for designs whose pieces fill the whole sheet).
+  void noLegend() => _legend = null;
+
   /// The front panel(s) where the NGMY watermark goes: x, y, width, height, how the words are turned, dark or light.
   final List<List<double>> _anchors = [];
   void anchor(double x, double y, double w, double h, {double rot = 0, bool dark = false}) => _anchors.add([_r3(x), _r3(y), _r3(w), _r3(h), _r3(rot), dark ? 1 : 0]);
@@ -780,15 +783,17 @@ class _Page {
           {double pt = 11, int? color, bool bold = false, bool italic = false, TextAlign align = TextAlign.center, double rot = 0}) =>
       text(t, cx - w / 2, cy - h / 2, w, h, pt: pt, color: color, bold: bold, italic: italic, align: align, rot: rot);
 
-  NgmySlide build(String title, {String? noteText}) {
-    if (noteText != null) note(0.4, 10.62, noteText);
+  /// Builds the page. [noteText] is the small printing note, at the bottom unless [noteY] puts it elsewhere (for
+  /// designs whose pieces reach the bottom of the paper).
+  NgmySlide build(String title, {String? noteText, double noteY = 10.62}) {
+    if (noteText != null) note(0.4, noteY, noteText);
     final spec = <String, Object>{
       'W': _pw,
       'H': _ph,
       'f': _fills,
       'g': _glue,
       'd': _folds,
-      'c': _cuts,
+      'c': _offPaperEdge(_cuts),
       'm': _marks,
       'n': _notes,
       'l': ?_legend,
@@ -820,6 +825,33 @@ class _Page {
       elements: [lines, ..._texts],
     );
   }
+}
+
+/// Cut lines without the parts that lie on the edge of the paper: there the paper edge is already the cut, so
+/// nothing needs cutting (pieces whose straight sides run near the paper edge are made to reach it).
+List<List<double>> _offPaperEdge(List<List<double>> cuts) {
+  bool onEdge(double a, double b, double c, double d) =>
+      ((a - b).abs() < 1e-6 || (c - d).abs() < 1e-6) &&
+      (((a).abs() < 1e-6 && (b).abs() < 1e-6) ||
+          ((a - _pw).abs() < 1e-6 && (b - _pw).abs() < 1e-6) ||
+          ((c).abs() < 1e-6 && (d).abs() < 1e-6) ||
+          ((c - _ph).abs() < 1e-6 && (d - _ph).abs() < 1e-6));
+  final out = <List<double>>[];
+  for (final l in cuts) {
+    var run = <double>[];
+    for (var i = 0; i + 1 < l.length; i += 2) {
+      final edge = i + 3 < l.length && onEdge(l[i], l[i + 2], l[i + 1], l[i + 3]);
+      if (run.isEmpty) run = [l[i], l[i + 1]];
+      if (edge) {
+        if (run.length >= 4) out.add(run);
+        run = [];
+      } else if (i + 3 < l.length) {
+        run.addAll([l[i + 2], l[i + 3]]);
+      }
+    }
+    if (run.length >= 4) out.add(run);
+  }
+  return out;
 }
 
 String _printNote(String name) => '$name  -  Letter 8.5 x 11 in  -  print at Actual size (100%)';
@@ -863,6 +895,8 @@ void _envelope(_Page k, double x0, double y0, double w, double h,
     required double bottom,
     required double bottomShoulder,
     required double side,
+    double? sideLeft,
+    double? sideRight,
     _EnvStyle topStyle = _EnvStyle.curved,
     _EnvStyle bottomStyle = _EnvStyle.curved,
     double sideTapTop = 0,
@@ -875,8 +909,10 @@ void _envelope(_Page k, double x0, double y0, double w, double h,
   final y1 = y0 + h;
   final topFlap = _flap(Offset(x0, y0), Offset(x1, y0), const Offset(0, -1), shoulder: topShoulder, tip: top, shape: topStyle);
   final bottomFlap = _flap(Offset(x1, y1), Offset(x0, y1), const Offset(0, 1), shoulder: bottomShoulder, tip: bottom, shape: bottomStyle);
-  final rightFlap = [Offset(x1, y0), Offset(x1 + side, y0 + sideTapTop), Offset(x1 + side, y1 - sideTapBottom), Offset(x1, y1)];
-  final leftFlap = [Offset(x0, y1), Offset(x0 - side, y1 - sideTapBottom), Offset(x0 - side, y0 + sideTapTop), Offset(x0, y0)];
+  final sr = sideRight ?? side;
+  final sl = sideLeft ?? side;
+  final rightFlap = [Offset(x1, y0), Offset(x1 + sr, y0 + sideTapTop), Offset(x1 + sr, y1 - sideTapBottom), Offset(x1, y1)];
+  final leftFlap = [Offset(x0, y1), Offset(x0 - sl, y1 - sideTapBottom), Offset(x0 - sl, y0 + sideTapTop), Offset(x0, y0)];
   k.envelopeNet(x0, y0, w, h, topFlap, rightFlap, bottomFlap, leftFlap);
   if (sideFill != null) {
     k.poly(sideFill, rightFlap);
@@ -1078,7 +1114,7 @@ NgmySlide _cardEnvelope(NgmyCraftPalette p, {required String title, required dou
   final x0 = (_pw - w) / 2;
   final total = top + h + bottom;
   final y0 = 0.35 + (10.1 - total) / 2 + top;
-  _envelope(k, x0, y0, w, h, top: top, topShoulder: topShoulder, bottom: bottom, bottomShoulder: bottomShoulder, side: side);
+  _envelope(k, x0, y0, w, h, top: top, topShoulder: topShoulder, bottom: bottom, bottomShoulder: bottomShoulder, side: x0);
   _stamp(k, x0 + w, y0);
   k.anchor(x0, y0, w, h);
   _addresses(k, x0, y0, w, h);
@@ -1093,7 +1129,7 @@ NgmySlide _diamondEnvelope(NgmyCraftPalette p) {
   const x0 = (_pw - w) / 2;
   const y0 = 3.55;
   _envelope(k, x0, y0, w, h,
-      top: 2.4, topShoulder: 1.8, bottom: 2.6, bottomShoulder: 2.2, side: 1.3, topStyle: _EnvStyle.pointed, bottomStyle: _EnvStyle.pointed, sideFill: p.pale, bottomFill: p.soft);
+      top: 2.4, topShoulder: 1.8, bottom: 2.6, bottomShoulder: 2.2, side: x0, topStyle: _EnvStyle.pointed, bottomStyle: _EnvStyle.pointed, sideFill: p.pale, bottomFill: p.soft);
   _stamp(k, x0 + w, y0);
   k.anchor(x0, y0, w, h);
   _addresses(k, x0, y0, w, h);
@@ -1107,7 +1143,7 @@ NgmySlide _seedEnvelopes(NgmyCraftPalette p) {
   const h = 3.6;
   const y0 = 3.15;
   for (final x0 in [0.95, 5.05]) {
-    _envelope(k, x0, y0, w, h, top: 1.8, topShoulder: 1.4, bottom: 2.7, bottomShoulder: 2.7, side: 0.7, bottomStyle: _EnvStyle.flat, bottomFill: p.pale);
+    _envelope(k, x0, y0, w, h, top: 1.8, topShoulder: 1.4, bottom: 2.7, bottomShoulder: 2.7, side: 0.7, sideLeft: x0 < 3 ? x0 : null, sideRight: x0 < 3 ? null : _pw - x0 - w, bottomStyle: _EnvStyle.flat, bottomFill: p.pale);
     k.anchor(x0, y0, w, h);
     final cx = x0 + w / 2;
     k.circle(p.pale, cx, y0 + 0.95, 0.6);
@@ -1127,7 +1163,7 @@ NgmySlide _giftCardEnvelopes(NgmyCraftPalette p) {
   const x0 = (_pw - w) / 2;
   for (final y0 in [1.45, 6.3]) {
     // The side flaps meet and overlap in the middle; the bottom flap is glued over them.
-    _envelope(k, x0, y0, w, h, top: 1.1, topShoulder: 0.7, bottom: 1.2, bottomShoulder: 0.9, side: 2.1, sideTapBottom: 0.3, topFill: y0 < 3 ? p.main : p.accent);
+    _envelope(k, x0, y0, w, h, top: 1.1, topShoulder: 0.7, bottom: 1.2, bottomShoulder: 0.9, side: x0, sideTapBottom: 0.3, topFill: y0 < 3 ? p.main : p.accent);
     k.anchor(x0, y0, w, h);
     k.text('A gift for you', x0 + 0.2, y0 + 0.5, w - 0.4, 0.5, pt: 13, bold: true, color: p.main);
     k.rect(p.soft, x0 + w / 2 - 0.4, y0 + 1.05, 0.8, 0.025);
@@ -1149,7 +1185,7 @@ NgmySlide _letterEnvelope(NgmyCraftPalette p) {
   const top = 2.5;
   const bottom = 3.0;
   const y0 = 0.35 + (10.1 - (top + h + bottom)) / 2 + top;
-  _envelope(k, x0, y0, w, h, top: top, topShoulder: 2.05, bottom: bottom, bottomShoulder: 2.6, side: 1.0);
+  _envelope(k, x0, y0, w, h, top: top, topShoulder: 2.05, bottom: bottom, bottomShoulder: 2.6, side: x0);
   _stamp(k, x0 + w, y0);
   k.anchor(x0, y0, w, h);
   _addresses(k, x0, y0, w, h);
@@ -1218,22 +1254,24 @@ NgmySlide _giftBox(NgmyCraftPalette p) {
   const s = 2.6;
   const h = 1.2;
   const ox = (_pw - (s + 2 * h)) / 2;
-  const oy = 0.5;
-  _tray(k, ox, oy, s, h, floor: p.pale, walls: p.soft, wallDots: p.pale);
-  k.note(ox, oy - 0.16, 'Box');
+  // The box at the top of the paper and the lid at the bottom: their outer walls and corner tabs reach the paper edge.
+  const oy = 0.0;
+  _tray(k, ox, oy, s, h, floor: p.pale, walls: p.soft, wallDots: p.pale, tab: h);
+  k.note(ox - 0.55, oy + h + 0.1, 'Box');
   const ls = 2.68;
   const lh = 0.8;
   const lox = (_pw - (ls + 2 * lh)) / 2;
-  const loy = 5.95;
-  _tray(k, lox, loy, ls, lh, floor: p.main, walls: p.soft, tab: 0.6);
+  const loy = _ph - (ls + 2 * lh);
+  _tray(k, lox, loy, ls, lh, floor: p.main, walls: p.soft, tab: lh);
   k.stripesV(p.pale, lox + lh, loy, ls, lh, step: 0.28, thick: 0.07);
   k.stripesV(p.pale, lox + lh, loy + lh + ls, ls, lh, step: 0.28, thick: 0.07);
   k.dotsRect(p.soft, lox + lh, loy + lh, ls, ls, step: 0.32, r: 0.035);
-  k.note(lox, loy - 0.16, 'Lid');
+  k.note(lox - 0.55, loy + lh + 0.1, 'Lid');
+  k.legendAt(6.55, 5.85);
   k.text('For You', lox + lh + 0.3, loy + lh + ls / 2 - 0.5, ls - 0.6, 0.58, pt: 20, bold: true, color: p.pale);
   k.text('To: _________\nFrom: _______', lox + lh + 0.45, loy + lh + ls / 2 + 0.05, ls - 0.9, 0.55, pt: 8, color: p.pale);
   k.anchor(lox + lh, loy + lh, ls, ls, dark: true);
-  return k.build('Gift Box with Lid', noteText: _printNote('Gift box 2.6 x 2.6 x 1.2 in with lid'));
+  return k.build('Gift Box with Lid', noteText: _printNote('Gift box 2.6 x 2.6 x 1.2 in with lid'), noteY: 5.85);
 }
 
 NgmySlide _pillowBox(NgmyCraftPalette p) {
@@ -1326,11 +1364,13 @@ NgmySlide _pyramidBox(NgmyCraftPalette p) {
 
 NgmySlide _prismBox(NgmyCraftPalette p) {
   final k = _Page(p);
-  const w = 2.0;
-  const len = 5.5;
+  // Three sides and the glue tab fill the paper from edge to edge.
+  const w = 2.4;
+  const len = 5.0;
+  const side = _pw - 3 * w;
   final th = w * math.sqrt(3) / 2;
-  const x0 = (_pw - (3 * w + 0.65)) / 2;
-  final y0 = 0.25 + 0.55 + th;
+  const x0 = 0.0;
+  final y0 = (_ph - (len + 2 * th + 1.1)) / 2 + 0.55 + th;
   final y1 = y0 + len;
   const xs = [x0, x0 + w, x0 + 2 * w, x0 + 3 * w];
   k.rect(p.soft, xs[0], y0, w, len);
@@ -1347,7 +1387,7 @@ NgmySlide _prismBox(NgmyCraftPalette p) {
   k.poly(p.pale, botTri);
   final topMid = (topTri[0] + topTri[1] + topTri[2]) / 3;
   final botMid = (botTri[0] + botTri[1] + botTri[2]) / 3;
-  final tabSide = [Offset(xs[3], y0), Offset(xs[3] + 0.65, y0 + 0.3), Offset(xs[3] + 0.65, y1 - 0.3), Offset(xs[3], y1)];
+  final tabSide = [Offset(xs[3], y0), Offset(xs[3] + side, y0 + 0.3), Offset(xs[3] + side, y1 - 0.3), Offset(xs[3], y1)];
   k.glue(tabSide);
   k.cut([
     Offset(xs[0], y0),
@@ -1368,14 +1408,15 @@ NgmySlide _prismBox(NgmyCraftPalette p) {
   k.foldLine(xs[1], y1, xs[2], y1);
   k.textAt('Sweet Treats', xs[1] + w / 2, (y0 + y1) / 2, 4.6, 1.0, pt: 22, bold: true, color: p.pale, rot: -_pi / 2);
   k.anchor(xs[0], y0, w, len);
-  return k.build('Triangle Prism Box', noteText: _printNote('Triangle box 2 in sides, 5.5 in long'));
+  return k.build('Triangle Prism Box', noteText: _printNote('Triangle box 2.4 in sides, 5 in long'));
 }
 
 NgmySlide _favorBox(NgmyCraftPalette p) {
   final k = _Page(p);
-  const a = 1.75;
-  const x0 = (_pw - (4 * a + 0.6)) / 2;
-  const y0 = 4.525;
+  // The four sides and the glue tab fill the paper from edge to edge.
+  const a = (_pw - 0.6) / 4;
+  const x0 = 0.0;
+  const y0 = (_ph - a) / 2;
   const y1 = y0 + a;
   const dust = 0.62;
   const tuck = 0.42;
@@ -1395,7 +1436,8 @@ NgmySlide _favorBox(NgmyCraftPalette p) {
         Offset(xl + a, yb),
       ];
   final topLid = [Offset(x0 + a, y0), Offset(x0 + a, y0 - a), ...tuckFlap(x0 + a, y0 - a, -1).skip(1), Offset(x0 + 2 * a, y0)];
-  final botLid = [Offset(x0 + 4 * a, y1), Offset(x0 + 4 * a, y1 + a), ...tuckFlap(x0 + 3 * a, y1 + a, 1).reversed.skip(1), Offset(x0 + 3 * a, y1)];
+  // The bottom lid hangs from the first side, so its outer side is the paper edge.
+  final botLid = [Offset(x0 + a, y1), Offset(x0 + a, y1 + a), ...tuckFlap(x0, y1 + a, 1).reversed.skip(1), Offset(x0, y1)];
   k.poly(p.pale, topLid);
   k.poly(p.pale, botLid);
   final glueTab = [Offset(x0 + 4 * a, y0), Offset(x0 + 4 * a + 0.6, y0 + 0.18), Offset(x0 + 4 * a + 0.6, y1 - 0.18), Offset(x0 + 4 * a, y1)];
@@ -1409,14 +1451,13 @@ NgmySlide _favorBox(NgmyCraftPalette p) {
     Offset(x0 + 3 * a - 0.12, y0 - dust),
     Offset(x0 + 3 * a, y0),
     ...glueTab,
-    ...botLid.skip(1),
-    Offset(x0 + 3 * a - 0.12, y1 + dust),
-    Offset(x0 + 2 * a + 0.4, y1 + dust),
+    Offset(x0 + 4 * a - 0.12, y1 + dust),
+    Offset(x0 + 3 * a + 0.4, y1 + dust),
+    Offset(x0 + 3 * a, y1),
     Offset(x0 + 2 * a, y1),
-    Offset(x0 + a, y1),
-    Offset(x0 + a - 0.4, y1 + dust),
-    Offset(x0 + 0.12, y1 + dust),
-    Offset(x0, y1),
+    Offset(x0 + 2 * a - 0.12, y1 + dust),
+    Offset(x0 + a + 0.4, y1 + dust),
+    ...botLid,
     Offset(x0, y0),
   ]);
   for (var i = 1; i <= 4; i++) {
@@ -1425,19 +1466,20 @@ NgmySlide _favorBox(NgmyCraftPalette p) {
   k.foldLine(x0, y0, x0 + 4 * a, y0);
   k.foldLine(x0, y1, x0 + 4 * a, y1);
   k.foldLine(x0 + a, y0 - a, x0 + 2 * a, y0 - a);
-  k.foldLine(x0 + 3 * a, y1 + a, x0 + 4 * a, y1 + a);
+  k.foldLine(x0, y1 + a, x0 + a, y1 + a);
   k.text('Thank You', x0 + a + 0.1, y0 + 0.55, a - 0.2, 0.6, pt: 13, bold: true, color: p.pale);
   k.text('with love', x0 + 3 * a + 0.1, y0 + 0.6, a - 0.2, 0.5, pt: 10, italic: true, color: p.pale);
   k.anchor(x0, y0, a, a);
-  return k.build('Favor Box', noteText: _printNote('Favor cube box 1.75 in'));
+  return k.build('Favor Box', noteText: _printNote('Favor cube box 2 in'));
 }
 
 NgmySlide _paperBag(NgmyCraftPalette p) {
   final k = _Page(p);
   const tab = 0.6;
-  const fw = 2.6;
+  // The glue tab and the last side reach the paper edges.
   const g = 1.1;
-  const xt = (_pw - (tab + 2 * fw + 2 * g)) / 2;
+  const fw = (_pw - tab - 2 * g) / 2;
+  const xt = 0.0;
   const xf = xt + tab;
   const xg1 = xf + fw;
   const xb = xg1 + g;
@@ -1461,7 +1503,8 @@ NgmySlide _paperBag(NgmyCraftPalette p) {
   k.text('Your shop or name', xf + 0.25, 4.25, fw - 0.5, 0.4, pt: 9.5, italic: true);
   final tabPts = [Offset(xf, yB), Offset(xt, yB - 0.2), Offset(xt, yT + 0.2), Offset(xf, yT)];
   k.glue(tabPts);
-  k.glueRect(xf, yB, fw, fd);
+  // The front bottom flap is cut at a slant on its left so it never sticks out past the bag.
+  k.glue([Offset(xf, yB), Offset(xg1, yB), Offset(xg1, yB + fd), Offset(xf + 0.2, yB + fd)]);
   k.cut([
     Offset(xf, yT),
     Offset(xe, yT),
@@ -1476,7 +1519,7 @@ NgmySlide _paperBag(NgmyCraftPalette p) {
     Offset(xg1, yB + gd),
     Offset(xg1, yB),
     Offset(xg1, yB + fd),
-    Offset(xf, yB + fd),
+    Offset(xf + 0.2, yB + fd),
     ...tabPts,
   ]);
   for (final cx in [xf + 0.75, xf + fw - 0.75, xb + 0.75, xb + fw - 0.75]) {
@@ -1494,7 +1537,7 @@ NgmySlide _paperBag(NgmyCraftPalette p) {
   }
   k.note(xf, yT - 0.18, 'Fold the top band inside. Thread a ribbon through the holes for handles.');
   k.anchor(xb, yC, fw, yB - yC);
-  return k.build('Paper Gift Bag', noteText: _printNote('Gift bag 2.6 x 1.1 x 6 in'));
+  return k.build('Paper Gift Bag', noteText: _printNote('Gift bag 2.85 x 1.1 x 6 in'));
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1635,15 +1678,17 @@ List<NgmySlide> _postcards(NgmyCraftPalette p) {
 // Tags and more.
 // ---------------------------------------------------------------------------------------------------------------
 
-/// Four flat note cards (3.9 x 5.1 in, they fit the A2 card envelope) with a coloured top and room to write.
+/// Four flat note cards that fill the paper (two by two, each 4.25 x 5.5 in, the size the A2 card envelope is made
+/// for), with a coloured top and room to write. Only the two lines between them need cutting.
 NgmySlide _flatCards(NgmyCraftPalette p) {
   final k = _Page(p);
-  const w = 3.9;
-  const h = 5.1;
+  const w = _pw / 2;
+  const h = _ph / 2;
+  k.noLegend();
   const titles = ['Thank You', 'Hello', 'Congrats', 'With Love'];
   var i = 0;
-  for (final y in [0.3, 5.55]) {
-    for (final x in [0.25, 4.35]) {
+  for (final y in [0.0, h]) {
+    for (final x in [0.0, w]) {
       k.rect(i.isEven ? p.main : p.soft, x, y, w, 1.6);
       k.dotsRect(i.isEven ? p.soft : p.pale, x, y, w, 1.6, step: 0.3, r: 0.035);
       k.circle(p.pale, x + w / 2, y + 1.6, 0.42);
@@ -1653,22 +1698,23 @@ NgmySlide _flatCards(NgmyCraftPalette p) {
       k.text(titles[i], x + 0.2, y + 2.15, w - 0.4, 0.6, pt: 20, bold: true, color: p.main);
       k.rect(p.accent, x + w / 2 - 0.4, y + 2.85, 0.8, 0.025);
       k.text('Write a short note here.', x + 0.3, y + 3.0, w - 0.6, 1.3, pt: 11);
-      k.text('From: ____________', x + 0.3, y + 4.4, w - 0.6, 0.4, pt: 9.5);
+      k.text('From: ____________', x + 0.3, y + 4.55, w - 0.6, 0.4, pt: 9.5);
       i++;
     }
   }
-  return k.build('Flat Note Cards', noteText: _printNote('Four flat cards 3.9 x 5.1 in'));
+  return k.build('Flat Note Cards');
 }
 
-/// A gift card holder that folds in half (print outside) to 3.8 x 5.2 in, so it fits the Card Envelope (A2). A
+/// A gift card holder that folds in half (print outside) to 4.25 x 5.5 in, so it fits the Card Envelope (A2). It is
+/// the top half of the paper, so only its bottom line needs cutting. A
 /// separate printed pocket, wide enough for a standard 3.375 x 2.125 in gift card, has glue tabs that fold under it;
 /// it is glued inside the holder and the card slides in from the top (the notch helps pull it out).
 NgmySlide _giftCardHolder(NgmyCraftPalette p) {
   final k = _Page(p);
-  const w = 3.8;
-  const h = 5.2;
-  const x0 = (_pw - 2 * w) / 2;
-  const y0 = 0.5;
+  const w = _pw / 2;
+  const h = 5.5;
+  const x0 = 0.0;
+  const y0 = 0.0;
   const xf = x0 + w;
   // Back cover (left) and front cover (right).
   k.rect(p.soft, x0, y0, w, h);
@@ -1713,18 +1759,21 @@ NgmySlide _giftCardHolder(NgmyCraftPalette p) {
   k.note(0.45, 9.25, '1. Fold the holder in half with the print outside.');
   k.note(0.45, 9.45, '2. Fold the three pocket tabs under the pocket and glue them inside the holder, near the bottom.');
   k.note(0.45, 9.65, '3. Slide a gift card into the pocket from the top.');
-  return k.build('Gift Card Holder', noteText: _printNote('Gift card holder 3.8 x 5.2 in, fits the A2 envelope'));
+  return k.build('Gift Card Holder', noteText: _printNote('Gift card holder 4.25 x 5.5 in, fits the A2 envelope'));
 }
 
+/// Eight tags that fill the paper (two across, four down): the paper edges are their outer sides, so only the
+/// lines between them and the pointed ends need cutting.
 NgmySlide _giftTags(NgmyCraftPalette p) {
   final k = _Page(p);
-  const w = 3.4;
-  const h = 2.2;
+  const w = _pw / 2;
+  const h = _ph / 4;
+  k.noLegend();
   const titles = ['For You', 'Thank You', 'Happy Birthday', 'With Love', 'Congrats', 'Just Because', 'Cheers', 'Merry & Bright'];
   var i = 0;
   for (var row = 0; row < 4; row++) {
-    for (final x in [0.65, 4.45]) {
-      final y = 0.45 + row * 2.5;
+    for (final x in [0.0, w]) {
+      final y = row * h;
       final shape = [Offset(x + 0.5, y), Offset(x + w, y), Offset(x + w, y + h), Offset(x + 0.5, y + h), Offset(x, y + h - 0.6), Offset(x, y + 0.6)];
       final tip = [Offset(x + 0.5, y), Offset(x + 1.0, y), Offset(x + 1.0, y + h), Offset(x + 0.5, y + h), Offset(x, y + h - 0.6), Offset(x, y + 0.6)];
       k.poly(p.pale, shape);
@@ -1734,25 +1783,27 @@ NgmySlide _giftTags(NgmyCraftPalette p) {
       k.cut(shape, close: true);
       k.cutCircle(x + 0.4, y + h / 2, 0.1);
       k.anchor(x + 1.0, y, w - 1.0, h);
-      k.text(titles[i], x + 1.1, y + 0.25, w - 1.25, 0.48, pt: 13, bold: true, color: p.main, align: TextAlign.left);
-      k.rect(p.accent, x + 1.17, y + 0.76, 0.6, 0.02);
-      k.text('To: ______________\nFrom: ____________', x + 1.1, y + 0.85, w - 1.25, 0.95, pt: 9.5, align: TextAlign.left);
+      k.text(titles[i], x + 1.1, y + 0.4, w - 1.4, 0.48, pt: 13, bold: true, color: p.main, align: TextAlign.left);
+      k.rect(p.accent, x + 1.17, y + 0.91, 0.6, 0.02);
+      k.text('To: ______________\nFrom: ____________', x + 1.1, y + 1.0, w - 1.4, 0.95, pt: 9.5, align: TextAlign.left);
       i++;
     }
   }
-  return k.build('Gift Tags', noteText: _printNote('Eight gift tags'));
+  return k.build('Gift Tags');
 }
 
+/// Nine folded tags that fill the paper (three by three), so only the lines between them need cutting.
 NgmySlide _foldedTags(NgmyCraftPalette p) {
   final k = _Page(p);
-  const w = 2.3;
-  const h = 3.0;
+  const w = _pw / 3;
+  const h = _ph / 3;
+  k.noLegend();
   const titles = ['For You', 'Thank You', 'Enjoy', 'Happy Day', 'With Love', 'Hello', 'Cheers', 'Sweet', 'Smile'];
   var i = 0;
   for (var row = 0; row < 3; row++) {
     for (var col = 0; col < 3; col++) {
-      final x = 0.55 + col * (w + 0.25);
-      final y = 0.5 + row * (h + 0.3);
+      final x = col * w;
+      final y = row * h;
       k.rect(i.isEven ? p.soft : p.main, x, y, w, h / 2);
       k.dotsRect(p.pale, x, y, w, h / 2, step: 0.26, r: 0.03);
       k.rect(p.pale, x + 0.12, y + h / 2 + 0.12, w - 0.24, h / 2 - 0.24);
@@ -1761,22 +1812,24 @@ NgmySlide _foldedTags(NgmyCraftPalette p) {
       k.foldLine(x, y + h / 2, x + w, y + h / 2);
       k.cutCircle(x + 0.3, y + h / 2 + 0.3, 0.075);
       k.cutCircle(x + 0.3, y + h / 2 - 0.3, 0.075);
-      k.text(titles[i], x + 0.45, y + h / 2 + 0.3, w - 0.6, 0.5, pt: 13, bold: true, color: p.main);
+      k.text(titles[i], x + 0.45, y + h / 2 + 0.3, w - 0.9, 0.5, pt: 13, bold: true, color: p.main);
       k.text('To:\nFrom:', x + 0.25, y + h / 2 + 0.78, w - 0.5, 0.55, pt: 8, align: TextAlign.left);
       i++;
     }
   }
-  return k.build('Folded Gift Tags', noteText: _printNote('Nine folded tags 2.3 x 1.5 in'));
+  return k.build('Folded Gift Tags');
 }
 
+/// Four bookmarks side by side from the top of the paper and edge to edge, so only the lines between them and
+/// the pointed ends need cutting.
 NgmySlide _bookmarks(NgmyCraftPalette p) {
   final k = _Page(p);
-  const w = 1.6;
+  const w = _pw / 4;
   const h = 8.0;
-  const y = 0.9;
+  const y = 0.0;
   const words = ['Keep Reading', 'Dream Big', 'One More Chapter', 'Your Name'];
   for (var i = 0; i < 4; i++) {
-    final x = 0.6 + i * 1.9;
+    final x = i * w;
     final shape = [Offset(x, y), Offset(x + w, y), Offset(x + w, y + h), Offset(x + w / 2, y + h - 0.45), Offset(x, y + h)];
     switch (i) {
       case 0:
@@ -1800,7 +1853,7 @@ NgmySlide _bookmarks(NgmyCraftPalette p) {
     k.cutCircle(x + w / 2, y + 0.4, 0.1);
     k.textAt(words[i], x + w / 2, y + 4.2, 5.4, 0.9, pt: 18, bold: true, color: p.main, rot: -_pi / 2);
   }
-  return k.build('Bookmarks', noteText: _printNote('Four bookmarks 1.6 x 8 in'));
+  return k.build('Bookmarks', noteText: _printNote('Four bookmarks 2.1 x 8 in'));
 }
 
 NgmySlide _miniZine(NgmyCraftPalette p) {
@@ -1843,26 +1896,30 @@ NgmySlide _miniZine(NgmyCraftPalette p) {
   return k.build('Mini Zine');
 }
 
+/// Four tent place cards that fill the paper (two by two, each 4.25 x 5.5 in, folded to 4.25 x 2.75 in), so only
+/// the lines between them need cutting.
 NgmySlide _placeCards(NgmyCraftPalette p) {
   final k = _Page(p);
-  const w = 3.6;
-  const h = 4.2;
-  for (final y in [0.8, 5.4]) {
-    for (final x in [0.5, 4.4]) {
+  const w = _pw / 2;
+  const h = _ph / 2;
+  const m = h / 2;
+  k.noLegend();
+  for (final y in [0.0, h]) {
+    for (final x in [0.0, w]) {
       k.cutRect(x, y, w, h);
-      k.foldLine(x, y + h / 2, x + w, y + h / 2);
-      k.rect(p.main, x + 0.2, y + 3.9, w - 0.4, 0.08);
-      k.rect(p.main, x + 0.2, y + 0.22, w - 0.4, 0.08);
-      k.circle(p.soft, x + w / 2, y + 2.42, 0.07);
-      k.circle(p.soft, x + w / 2, y + 1.78, 0.07);
-      k.anchor(x + 0.2, y + 2.2, w - 0.4, 1.85);
-      k.text('Guest Name', x + 0.2, y + 2.55, w - 0.4, 0.75, pt: 20, bold: true);
-      k.text('Table 1', x + 0.2, y + 3.3, w - 0.4, 0.35, pt: 9, color: p.main);
-      k.text('Guest Name', x + 0.2, y + 0.9, w - 0.4, 0.75, pt: 20, bold: true, rot: _pi);
-      k.text('Table 1', x + 0.2, y + 0.55, w - 0.4, 0.35, pt: 9, color: p.main, rot: _pi);
+      k.foldLine(x, y + m, x + w, y + m);
+      k.rect(p.main, x + 0.4, y + h - 0.48, w - 0.8, 0.08);
+      k.rect(p.main, x + 0.4, y + 0.4, w - 0.8, 0.08);
+      k.circle(p.soft, x + w / 2, y + m + 0.3, 0.07);
+      k.circle(p.soft, x + w / 2, y + m - 0.3, 0.07);
+      k.anchor(x + 0.3, y + m + 0.1, w - 0.6, m - 0.7);
+      k.text('Guest Name', x + 0.3, y + m + 0.55, w - 0.6, 0.85, pt: 22, bold: true);
+      k.text('Table 1', x + 0.3, y + m + 1.45, w - 0.6, 0.4, pt: 10, color: p.main);
+      k.text('Guest Name', x + 0.3, y + m - 1.4, w - 0.6, 0.85, pt: 22, bold: true, rot: _pi);
+      k.text('Table 1', x + 0.3, y + m - 1.85, w - 0.6, 0.4, pt: 10, color: p.main, rot: _pi);
     }
   }
-  return k.build('Place Cards', noteText: _printNote('Four tent place cards 3.6 x 2.1 in'));
+  return k.build('Place Cards');
 }
 
 NgmySlide _pocketFolder(NgmyCraftPalette p) {
@@ -1894,14 +1951,15 @@ NgmySlide _cdSleeve(NgmyCraftPalette p) {
   final k = _Page(p);
   const sq = 4.875;
   const x0 = (_pw - sq) / 2;
-  const yTop = 0.6;
+  // The front starts at the top edge of the paper, so its top needs no cutting (only the thumb notch).
+  const yTop = 0.0;
   const cx = x0 + sq / 2;
   k.rect(p.main, x0, yTop, sq, sq);
-  k.circle(p.soft, cx, 3.5, 1.35);
-  k.circle(p.pale, cx, 3.5, 0.5);
-  k.circle(p.main, cx, 3.5, 0.16);
-  k.text('My Mixtape', x0 + 0.3, 1.25, sq - 0.6, 0.6, pt: 20, bold: true, color: p.pale);
-  k.text('Your Name  -  2026', x0 + 0.3, 4.95, sq - 0.6, 0.38, pt: 9, color: p.pale);
+  k.circle(p.soft, cx, yTop + 2.9, 1.35);
+  k.circle(p.pale, cx, yTop + 2.9, 0.5);
+  k.circle(p.main, cx, yTop + 2.9, 0.16);
+  k.text('My Mixtape', x0 + 0.3, yTop + 0.75, sq - 0.6, 0.6, pt: 20, bold: true, color: p.pale);
+  k.text('Your Name  -  2026', x0 + 0.3, yTop + 4.35, sq - 0.6, 0.38, pt: 9, color: p.pale);
   k.rect(p.pale, x0, yTop + sq, sq, sq);
   k.text('Track list\n1. Song title\n2. Song title\n3. Song title\n4. Song title\n5. Song title', x0 + 0.4, yTop + sq + 0.6, sq - 0.8, 3.6, pt: 11, rot: _pi);
   _sleeve(k, x0, yTop, sq, sq, notch: 0.55, tab: 0.6);
@@ -1914,7 +1972,8 @@ NgmySlide _photoSleeve(NgmyCraftPalette p) {
   const w = 6.3;
   const h = 4.3;
   const x0 = (_pw - w) / 2;
-  const yTop = 0.9;
+  // From the top edge of the paper, with glue tabs out to the side edges: only the bottom and the notch need cutting.
+  const yTop = 0.0;
   k.rect(p.soft, x0, yTop, w, h);
   k.dotsRect(p.pale, x0, yTop, w, h, step: 0.34, r: 0.045);
   k.rect(p.pale, x0 + 0.5, yTop + 0.85, w - 1.0, 2.75);
@@ -1923,19 +1982,22 @@ NgmySlide _photoSleeve(NgmyCraftPalette p) {
   k.text('Date  -  Place', x0 + 0.5, yTop + 2.15, w - 1.0, 0.42, pt: 10, italic: true);
   k.rect(p.pale, x0, yTop + h, w, h);
   k.text('Notes\n\n________________________\n________________________', x0 + 0.5, yTop + h + 0.6, w - 1.0, 2.6, pt: 11, rot: _pi);
-  _sleeve(k, x0, yTop, w, h, notch: 0.55, tab: 0.6);
+  _sleeve(k, x0, yTop, w, h, notch: 0.55, tab: x0);
   k.anchor(x0, yTop, w, h);
   return k.build('Photo Sleeve', noteText: _printNote('Sleeve for a 6 x 4 in photo'));
 }
 
+/// Two door hangers, each half the paper (4.25 x 11 in, the usual door hanger size): the paper edges are their
+/// sides, top and bottom, so only the middle line, the round top corners and the knob hole need cutting.
 NgmySlide _doorHangers(NgmyCraftPalette p) {
   final k = _Page(p);
-  const w = 3.6;
-  const h = 9.6;
-  const y = 0.5;
+  const w = _pw / 2;
+  const h = _ph;
+  const y = 0.0;
+  k.noLegend();
   const words = [('Do Not\nDisturb', 'Please come back later'), ('Come\nOn In', 'The door is open')];
   for (var i = 0; i < 2; i++) {
-    final x = i == 0 ? 0.55 : 4.35;
+    final x = i * w;
     final cx = x + w / 2;
     const cy = y + 1.3;
     const r = 0.72;
@@ -1943,8 +2005,8 @@ NgmySlide _doorHangers(NgmyCraftPalette p) {
     k.poly(i == 0 ? p.soft : p.main, shape);
     k.dotsIn(p.pale, [Offset(x, y + 2.3), Offset(x + w, y + 2.3), Offset(x + w, y + h), Offset(x, y + h)], step: 0.34, r: 0.04);
     k.circle(p.pale, cx, cy, r + 0.12);
-    k.rect(p.pale, x + 0.25, y + 2.6, w - 0.5, h - 2.9);
-    k.anchor(x + 0.25, y + 2.6, w - 0.5, h - 2.9);
+    k.rect(p.pale, x + 0.35, y + 2.6, w - 0.7, h - 3.1);
+    k.anchor(x + 0.35, y + 2.6, w - 0.7, h - 3.1);
     k.text(words[i].$1, x + 0.3, y + 3.4, w - 0.6, 1.7, pt: 28, bold: true, color: p.main);
     k.rect(p.accent, cx - 0.4, y + 5.2, 0.8, 0.025);
     k.text(words[i].$2, x + 0.3, y + 5.35, w - 0.6, 0.5, pt: 11, italic: true);
@@ -1953,7 +2015,7 @@ NgmySlide _doorHangers(NgmyCraftPalette p) {
     k.cutCircle(cx, cy, r);
     k.cut([Offset(cx + r * math.cos(-0.6), cy + r * math.sin(-0.6)), Offset(x + w, y + 0.62)]);
   }
-  return k.build('Door Hangers', noteText: _printNote('Two door hangers 3.6 x 9.6 in'));
+  return k.build('Door Hangers');
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -2008,7 +2070,7 @@ final List<NgmyPaperCraft> kNgmyPaperCrafts = [
       icon: Icons.drafts_outlined,
       build: (p) => [_letterEnvelope(p)]),
   NgmyPaperCraft(number: 28, id: 'letter_paper', name: 'Letter Writing Paper', group: _lettersGroup, blurb: 'Lined paper for the Full Page Letter Envelope', icon: Icons.edit_note_rounded, build: (p) => [_letterPaper(p)]),
-  NgmyPaperCraft(number: 29, id: 'flat_cards', name: 'Flat Note Cards', group: _cardsGroup, blurb: 'Four 3.9 x 5.1 in cards, fit the A2 envelope', icon: Icons.note_alt_outlined, build: (p) => [_flatCards(p)]),
+  NgmyPaperCraft(number: 29, id: 'flat_cards', name: 'Flat Note Cards', group: _cardsGroup, blurb: 'Four 4.25 x 5.5 in cards, fit the A2 envelope', icon: Icons.note_alt_outlined, build: (p) => [_flatCards(p)]),
   NgmyPaperCraft(number: 30, id: 'gift_card_holder', name: 'Gift Card Holder', group: _moreGroup, blurb: 'Folding holder with a pocket for a gift card, fits the A2 envelope', icon: Icons.card_giftcard_outlined, build: (p) => [_giftCardHolder(p)]),
 ];
 
