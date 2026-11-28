@@ -3,6 +3,10 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
+// ignore: implementation_imports
+import 'package:pdf/src/pdf/format/bool.dart' show PdfBool;
+// ignore: implementation_imports
+import 'package:pdf/src/pdf/format/dict.dart' show PdfDict;
 import 'package:pdf/widgets.dart' as pw;
 
 import 'ngmy_paper_crafts.dart' show ngmyCraftLinesPdf, ngmyIsCraftLines, ngmyIsPaperCraftDeck;
@@ -333,6 +337,12 @@ Future<Uint8List> ngmySlidesExportPdfBytes(NgmySlideDeck deck) async {
         ),
       );
     }
+    // Ask PDF viewers to print at actual size (not "fit to page", which shrinks the page and adds a white border)
+    // and to pick paper of the page size.
+    doc.document.catalog.params['/ViewerPreferences'] = PdfDict.values({
+      '/PrintScaling': const PdfName('/None'),
+      '/PickTrayByPDFSize': const PdfBool(true),
+    });
     return doc.save();
   }
   const pageFormat = PdfPageFormat.letter;

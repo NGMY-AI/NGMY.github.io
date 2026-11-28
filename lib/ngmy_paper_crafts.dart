@@ -32,15 +32,15 @@ bool ngmyIsPaperCraftDeck(NgmySlideDeck? deck) => deck?.deckKind == kNgmyPaperCr
 bool ngmyIsCraftLines(NgmySlideElement e) => e.type == NgmySlideElementType.shape && e.fileName == kNgmyCraftLinesFile;
 
 // ---------------------------------------------------------------------------------------------------------------
-// Line styles. Sizes are printer points (1/72 in). Thin and light on purpose: easy to follow, hardly seen.
+// Line styles. Sizes are printer points (1/72 in). Cut lines are dark so they print clearly; folds stay light.
 // ---------------------------------------------------------------------------------------------------------------
 
-const int _cutInk = 0xFF9AA3AF;
+const int _cutInk = 0xFF374151;
 const int _foldInk = 0xFFB3BBC7;
 const int _markInk = 0xFFC3CAD4;
 const int _glueInk = 0xFFE2E6EC;
 const int _labelInk = 0xFF9AA3AF;
-const double _cutPt = 0.5;
+const double _cutPt = 0.7;
 const double _foldPt = 0.45;
 const double _markPt = 0.45;
 const List<double> _foldDashPt = [3, 2.2];
@@ -425,7 +425,7 @@ String ngmyPaperCraftPrintHtml(NgmySlideDeck deck) {
   @media screen { body { background: #e5e7eb; } .pg { margin: 0 auto 18px; box-shadow: 0 2px 14px rgba(0,0,0,.18); } }
   @media print { .tip { display: none; } }
 </style></head><body>
-<div class="tip">Print on Letter paper (8.5 x 11 in). In the print window choose <b>Actual size</b> or <b>Scale 100%</b> and <b>Margins: None</b>, so every fold lands in the right place.</div>
+<div class="tip">Print on Letter paper (8.5 x 11 in). In the print window choose <b>Actual size</b> or <b>Scale 100%</b> and <b>Margins: None</b> (or <b>Borderless</b> if your printer has it), so every fold lands in the right place. Do not choose <b>Fit to page</b> or <b>Fit to printable area</b>: that shrinks the whole page and leaves a white border round it.</div>
 ''');
   for (final slide in deck.slides) {
     b.writeln('<div class="pg" style="background:${_css(slide.background)}">');
@@ -793,7 +793,7 @@ class _Page {
       'f': _fills,
       'g': _glue,
       'd': _folds,
-      'c': _offPaperEdge(_cuts),
+      'c': _edgeGuides(_cuts),
       'm': _marks,
       'n': _notes,
       'l': ?_legend,
@@ -827,31 +827,18 @@ class _Page {
   }
 }
 
-/// Cut lines without the parts that lie on the edge of the paper: there the paper edge is already the cut, so
-/// nothing needs cutting (pieces whose straight sides run near the paper edge are made to reach it).
-List<List<double>> _offPaperEdge(List<List<double>> cuts) {
-  bool onEdge(double a, double b, double c, double d) =>
-      ((a - b).abs() < 1e-6 || (c - d).abs() < 1e-6) &&
-      (((a).abs() < 1e-6 && (b).abs() < 1e-6) ||
-          ((a - _pw).abs() < 1e-6 && (b - _pw).abs() < 1e-6) ||
-          ((c).abs() < 1e-6 && (d).abs() < 1e-6) ||
-          ((c - _ph).abs() < 1e-6 && (d - _ph).abs() < 1e-6));
-  final out = <List<double>>[];
-  for (final l in cuts) {
-    var run = <double>[];
-    for (var i = 0; i + 1 < l.length; i += 2) {
-      final edge = i + 3 < l.length && onEdge(l[i], l[i + 2], l[i + 1], l[i + 3]);
-      if (run.isEmpty) run = [l[i], l[i + 1]];
-      if (edge) {
-        if (run.length >= 4) out.add(run);
-        run = [];
-      } else if (i + 3 < l.length) {
-        run.addAll([l[i + 2], l[i + 3]]);
-      }
-    }
-    if (run.length >= 4) out.add(run);
-  }
-  return out;
+/// How far in from the paper edge the cut line of a side that reaches the paper edge is drawn (most home printers
+/// cannot print the very edge). The piece and its colours still go right to the paper edge.
+const double kNgmyCraftEdgeGuide = 0.15;
+
+/// Cut lines with every point on the paper edge moved just inside it ([kNgmyCraftEdgeGuide]), so the sides that
+/// reach the paper edge still show a clear cut line that prints.
+List<List<double>> _edgeGuides(List<List<double>> cuts) {
+  double inX(double x) => x.abs() < 1e-6 ? kNgmyCraftEdgeGuide : ((x - _pw).abs() < 1e-6 ? _pw - kNgmyCraftEdgeGuide : x);
+  double inY(double y) => y.abs() < 1e-6 ? kNgmyCraftEdgeGuide : ((y - _ph).abs() < 1e-6 ? _ph - kNgmyCraftEdgeGuide : y);
+  return [
+    for (final l in cuts) [for (var i = 0; i + 1 < l.length; i += 2) ...[inX(l[i]), inY(l[i + 1])]],
+  ];
 }
 
 String _printNote(String name) => '$name  -  Letter 8.5 x 11 in  -  print at Actual size (100%)';

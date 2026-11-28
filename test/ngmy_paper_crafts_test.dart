@@ -193,7 +193,7 @@ void main() {
     }
   });
 
-  test('Straight outer sides near the paper edge sit on the paper edge (no thin strips to cut off)', () {
+  test('Straight outer sides near the paper edge reach the paper edge, with their cut line just inside it', () {
     for (final craft in kNgmyPaperCrafts) {
       final slides = craft.build(kNgmyCraftPalettes.first);
       for (var s = 0; s < slides.length; s++) {
@@ -202,12 +202,12 @@ void main() {
           for (var i = 0; i + 3 < l.length; i += 2) {
             final x1 = l[i], y1 = l[i + 1], x2 = l[i + 2], y2 = l[i + 3];
             if ((x2 - x1).abs() < 1e-6 && (y2 - y1).abs() > 0.05) {
-              // An up and down cut: never on the paper edge, and never within 1 in of it.
+              // An up and down cut near the paper edge is only the guide line of a side that reaches the paper edge.
               final d = math.min(x1, 8.5 - x1);
-              expect(d, greaterThan(1.0), reason: '$why: cut at x = $x1 runs beside the paper edge');
+              if (d <= 1.0) expect(d, closeTo(kNgmyCraftEdgeGuide, 1e-6), reason: '$why: cut at x = $x1 runs beside the paper edge');
             } else if ((y2 - y1).abs() < 1e-6 && (x2 - x1).abs() > 0.05) {
               final d = math.min(y1, 11 - y1);
-              expect(d, greaterThan(1.0), reason: '$why: cut at y = $y1 runs beside the paper edge');
+              if (d <= 1.0) expect(d, closeTo(kNgmyCraftEdgeGuide, 1e-6), reason: '$why: cut at y = $y1 runs beside the paper edge');
             }
           }
         }
@@ -281,8 +281,14 @@ void main() {
       final bytes = await ngmySlidesExportPdfBytes(deck);
       final pdf = latin1.decode(bytes);
       expect(RegExp(r'/MediaBox\s*\[0 0 612(\.0)? 792(\.0)?\]').hasMatch(pdf), isTrue, reason: craft.id);
+      // Every page is Letter, nothing else, and viewers are asked to print it at actual size (no fit to page).
+      expect(RegExp(r'/MediaBox').allMatches(pdf).length, deck.slides.length, reason: craft.id);
+      expect(RegExp(r'/PrintScaling\s*/None').hasMatch(pdf), isTrue, reason: craft.id);
+      // The drawing covers the whole page, edge to edge, with no margin.
+      final lines = deck.slides.first.elements.firstWhere(ngmyIsCraftLines);
+      expect([lines.x, lines.y, lines.w, lines.h], [0, 0, 1, 1], reason: craft.id);
       final html = ngmyPaperCraftPrintHtml(deck);
-      expect(html, contains('size: 8.5in 11in'));
+      expect(html, contains('size: 8.5in 11in; margin: 0;'));
       expect(html, isNot(contains('scaleX')));
       expect(html, contains('<svg'));
     }

@@ -314,7 +314,8 @@ Future<void> ngmySlidesOpenPrintPreview(BuildContext context, NgmySlideDeck deck
       content: SizedBox(
         width: 320,
         child: Text(
-          'Download a PDF that looks like your slides (${deck.slides.length} page${deck.slides.length == 1 ? '' : 's'}), or open the print view in your browser.',
+          'Download a PDF that looks like your slides (${deck.slides.length} page${deck.slides.length == 1 ? '' : 's'}), or open the print view in your browser.'
+          '${ngmyIsPaperCraftDeck(deck) ? '\n\nFold & Cut pages go right to the edge of the paper. When you print, choose Actual size or Scale 100% and Margins: None (or Borderless). Fit to page shrinks the page and leaves a white border.' : ''}',
           style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 13),
         ),
       ),
