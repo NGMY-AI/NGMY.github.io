@@ -1,23 +1,6 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
-$__dart_deferred_initializers__.current=function(a,b,c,$){var A,B={
-aje(d,e,f){return B.iAH(d,e,f)},
-iAH(d,e,f){var x=0,w=A.j(y.a),v,u,t,s,r
-var $async$aje=A.e(function(g,h){if(g===1)return A.f(h,w)
-for(;;)switch(x){case 0:try{u=A.i5([d],f)
-s=(self.URL||self.webkitURL).createObjectURL(u)
-s.toString
-t=s
-s=A.np(t)
-s.download=e
-s.click();(self.URL||self.webkitURL).revokeObjectURL(t)
-v=!0
-x=1
-break}catch(q){v=!1
-x=1
-break}case 1:return A.h(v,w)}})
-return A.i($async$aje,w)}}
+$__dart_deferred_initializers__.current=function(a,b,c,$){var A,B
 A=c[0]
-B=a.updateHolder(c[63],B)
-var z=a.updateTypes([])
-var y={a:A.as("P")}};
-(a=>{a["q8bgDcIn5fRiIYG53v0+ph4EsSM="]=a.current})($__dart_deferred_initializers__);
+B=c[118]
+var z=a.updateTypes([]);(function constants(){B.a4o=new A.a_(61152,"MaterialIcons",!1)})()};
+(a=>{a["gBBfxhLtSgxNnr8c6ZnZiKDgQY4="]=a.current})($__dart_deferred_initializers__);
