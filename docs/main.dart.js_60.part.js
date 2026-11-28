@@ -1,6 +1,6 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var B,A,C={
-a7r(d){var y=d.ga95()/255,x=d.gXl()/255,w=d.ga6i()/255,v=Math.max(y,Math.max(x,w)),u=v-Math.min(y,Math.min(x,w)),t=d.gjM(d),s=B.hO2(y,x,w,v,u),r=v===0?0:u/v
+a7r(d){var y=d.ga96()/255,x=d.gXm()/255,w=d.ga6j()/255,v=Math.max(y,Math.max(x,w)),u=v-Math.min(y,Math.min(x,w)),t=d.gjM(d),s=B.hO2(y,x,w,v,u),r=v===0?0:u/v
 return new C.pI(t/255,s,r,v)},
 pI:function pI(d,e,f,g){var _=this
 _.a=d
@@ -23,5 +23,5 @@ return B.bC(y.a,y.b,y.c,y.d,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,A.j,
 v(d){var y=this
 return"HSVColor("+B.v(y.a)+", "+B.v(y.b)+", "+B.v(y.c)+", "+B.v(y.d)+")"}}
 var z=a.updateTypes([]);(function inheritance(){var y=a.inherit
-y(C.pI,B.aG)})();(function constants(){D.atX=new B.a_(983930,"MaterialIcons",!1)})()};
-(a=>{a["koLeqgQi65oeoizEMmEAfLIH23U="]=a.current})($__dart_deferred_initializers__);
+y(C.pI,B.aG)})();(function constants(){D.atZ=new B.a_(983930,"MaterialIcons",!1)})()};
+(a=>{a["9zXx9Wv2B3rhE4EYxVcrDB2g5QI="]=a.current})($__dart_deferred_initializers__);
