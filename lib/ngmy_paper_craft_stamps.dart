@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_paper_craft_dialog.dart';
 import 'ngmy_paper_crafts.dart';
 import 'ngmy_slides_models.dart';
 
@@ -479,15 +480,10 @@ class NgmyCraftStampButton extends StatelessWidget {
   }
 }
 
-/// The stamp chooser: every design as a small picture; tapping one puts it on the deck at once.
+/// The stamp chooser, a centred card: every design as a small picture, three to a row; tapping one puts it on the
+/// deck at once.
 Future<void> showNgmyCraftStampPanel(BuildContext context, {required NgmySlideDeck Function() deck, required void Function(String id) onApply}) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Theme.of(context).colorScheme.surface,
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
-    builder: (context) => _StampPanel(deck: deck, onApply: onApply),
-  );
+  return showNgmyCraftDialog<void>(context, builder: (_) => _StampPanel(deck: deck, onApply: onApply));
 }
 
 class _StampPanel extends StatefulWidget {
@@ -505,59 +501,27 @@ class _StampPanelState extends State<_StampPanel> {
   @override
   Widget build(BuildContext context) {
     final colors = ngmyCraftStampColors(widget.deck());
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(width: 36, height: 4, decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(2))),
-            ),
-            const SizedBox(height: 10),
-            const Text('Stamp', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 2),
-            Text('NGMY stamp designs for the stamp box. They print dark and clear.', style: TextStyle(fontSize: 12.5, color: dark ? Colors.white70 : Colors.black54)),
-            const SizedBox(height: 12),
-            ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.55),
-              child: GridView.builder(
-                shrinkWrap: true,
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 104, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 0.72),
-                itemCount: kNgmyCraftStamps.length,
-                itemBuilder: (context, i) {
-                  final s = kNgmyCraftStamps[i];
-                  final on = s.id == _id;
-                  return InkWell(
-                    key: ValueKey('craft_stamp_${s.id}'),
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: () {
-                      setState(() => _id = s.id);
-                      widget.onApply(s.id);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: on ? const Color(0xFF14B87A) : Colors.grey.withValues(alpha: 0.3), width: on ? 2.5 : 1),
-                      ),
-                      child: Column(
-                        children: [
-                          Expanded(child: NgmyCraftStampPreview(id: s.id, colors: colors)),
-                          const SizedBox(height: 4),
-                          Text(s.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: Colors.black87, fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+    return NgmyCraftDialogCard(
+      title: 'Stamp',
+      subtitle: 'NGMY stamp designs for the stamp box. They print dark and clear.',
+      icon: Icons.local_post_office_outlined,
+      maxWidth: 440,
+      child: NgmyCraftChoiceGrid(
+        count: kNgmyCraftStamps.length,
+        aspect: 0.74,
+        builder: (i) {
+          final s = kNgmyCraftStamps[i];
+          return NgmyCraftChoiceTile(
+            key: ValueKey('craft_stamp_${s.id}'),
+            selected: s.id == _id,
+            label: s.name,
+            onTap: () {
+              setState(() => _id = s.id);
+              widget.onApply(s.id);
+            },
+            child: NgmyCraftStampPreview(id: s.id, colors: colors),
+          );
+        },
       ),
     );
   }

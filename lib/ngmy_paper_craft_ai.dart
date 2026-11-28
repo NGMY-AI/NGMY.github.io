@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_ai_client.dart';
 import 'ngmy_ai_language.dart';
+import 'ngmy_paper_craft_dialog.dart';
 import 'ngmy_paper_crafts.dart';
 import 'ngmy_paper_craft_frames.dart';
 import 'ngmy_paper_craft_stamps.dart';
@@ -56,6 +57,9 @@ const Map<String, List<String>> _kCraftAliases = {
   'photo_sleeve': ['photo sleeve', 'picture sleeve', 'mfuko wa picha'],
   'door_hangers': ['door hanger', 'do not disturb', 'kibao cha mlango'],
   'letter_envelope': ['letter envelope', 'full page envelope', 'envelope for a letter', 'envelope for a full page', 'a4 envelope', 'bahasha ya barua', 'bahasha ya ukurasa mzima'],
+  'letter_paper': ['letter paper', 'writing paper', 'lined paper', 'stationery', 'karatasi ya barua', 'karatasi ya kuandikia'],
+  'flat_cards': ['flat card', 'note card', 'thank you card', 'kadi bapa', 'kadi za shukrani'],
+  'round_labels': ['round label', 'jar label', 'sticker', 'labels', 'lebo za duara', 'lebo za chupa'],
 };
 
 String _norm(String s) => ' ${s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim()} ';
@@ -127,6 +131,9 @@ const Map<String, List<NgmyCraftDetail>> _kCraftDetails = {
   'square_envelope': [_toName, _toAddress, _fromName, _fromAddress],
   'diamond_envelope': [_toName, _toAddress, _fromName, _fromAddress],
   'letter_envelope': [_toName, _toAddress, _fromName, _fromAddress],
+  'letter_paper': [NgmyCraftDetail('to_name', 'Who the letter is to', needed: true), NgmyCraftDetail('from_name', 'Your name', needed: true), _fromAddress, NgmyCraftDetail('topic', 'What the letter is about', needed: true, multiline: true)],
+  'flat_cards': [_cardFrom, _message],
+  'round_labels': [_boxWords, _fromName],
   'seed_envelopes': [NgmyCraftDetail('seeds', 'Seed names (one per envelope)', needed: true), NgmyCraftDetail('dates', 'Planted and harvest dates')],
   'gift_card_envelopes': [_giftTo, _giftFrom, _boxWords],
   'gift_box': [_giftTo, _giftFrom, _boxWords],
@@ -1006,13 +1013,7 @@ Future<void> showNgmyPaperCraftAiChat(
   required NgmySlideDeck Function() deck,
   required bool Function(NgmyPaperCraftAiAnswer answer) onApply,
 }) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    barrierColor: Colors.black26,
-    builder: (_) => _CraftAiChat(deck: deck, onApply: onApply),
-  );
+  return showNgmyCraftDialog<void>(context, builder: (_) => _CraftAiChat(deck: deck, onApply: onApply));
 }
 
 class _CraftAiChat extends StatefulWidget {
@@ -1088,172 +1089,143 @@ class _CraftAiChatState extends State<_CraftAiChat> {
 
   @override
   Widget build(BuildContext context) {
-    const panel = Color(0xFF111827);
     final log = _log;
     final info = ngmyPaperCraftOfDeck(widget.deck());
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: Container(
-          constraints: BoxConstraints(maxHeight: math.min(460, MediaQuery.sizeOf(context).height * 0.6), maxWidth: 520),
-          decoration: const BoxDecoration(color: panel, borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
-          child: SafeArea(
-            top: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+    return NgmyCraftDialogCard(
+      title: 'AI helper',
+      subtitle: info == null ? null : '#${info.craft.number} ${info.craft.name}',
+      icon: Icons.auto_awesome_rounded,
+      scroll: false,
+      maxHeight: 560,
+      padding: const EdgeInsets.only(top: 6),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Flexible(
+            child: ListView(
+              controller: _scroll,
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(14, 4, 14, 8),
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 30,
-                        height: 30,
-                        decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [Color(0xFF14B87A), Color(0xFF0E9F6A)])),
-                        child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 16),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          info == null ? 'AI helper' : 'AI helper  -  #${info.craft.number} ${info.craft.name}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14),
-                        ),
-                      ),
-                      IconButton(onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 20)),
-                    ],
-                  ),
-                ),
-                Flexible(
-                  child: ListView(
-                    controller: _scroll,
-                    shrinkWrap: true,
-                    padding: const EdgeInsets.fromLTRB(14, 4, 14, 8),
-                    children: [
-                      if (log.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.only(bottom: 8),
-                          child: Text(
-                            'Tell me what to change: a name, the address, the message, the language or the colours. The folds and cuts stay as they are.',
-                            style: TextStyle(color: Colors.white60, fontSize: 12.5, height: 1.4),
-                          ),
-                        ),
-                      for (final (mine, text) in log)
-                        Align(
-                          alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 6),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            constraints: const BoxConstraints(maxWidth: 380),
-                            decoration: BoxDecoration(
-                              color: mine ? const Color(0xFF0E9F6A) : Colors.white.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.35)),
-                          ),
-                        ),
-                      if (_busy)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 2, bottom: 6),
-                          child: Row(children: [
-                            SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF86EFAC))),
-                            SizedBox(width: 8),
-                            Text('Changing it...', style: TextStyle(color: Colors.white60, fontSize: 12)),
-                          ]),
-                        ),
-                    ],
-                  ),
-                ),
-                // NGMY watermark styles: one tap changes it.
-                SizedBox(
-                  height: 36,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    children: [
-                      const Center(child: Padding(padding: EdgeInsets.only(right: 8), child: Text('Watermark', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w800)))),
-                      for (final w in kNgmyCraftWatermarks)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: ChoiceChip(
-                            key: ValueKey('craft_chat_wm_${w.id}'),
-                            avatar: Icon(w.icon, size: 14),
-                            label: Text(w.name, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-                            selected: ngmyCraftWatermarkOf(widget.deck()) == w.id,
-                            onSelected: _busy ? null : (_) => _setWatermark(w),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 4),
                 if (log.isEmpty)
-                  SizedBox(
-                    height: 36,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      children: [
-                        for (final idea in _ideas)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: ActionChip(
-                              label: Text(idea, style: const TextStyle(fontSize: 11, color: Colors.white70)),
-                              backgroundColor: Colors.white.withValues(alpha: 0.06),
-                              side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-                              onPressed: _busy ? null : () => _input.text = idea,
-                            ),
-                          ),
-                      ],
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'Tell me what to change: a name, the address, the message, the language or the colours. The folds and cuts stay as they are.',
+                      style: TextStyle(color: Colors.white60, fontSize: 12.5, height: 1.4),
                     ),
                   ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          key: const ValueKey('craft_ai_chat_input'),
-                          controller: _input,
-                          autofocus: true,
-                          enabled: !_busy,
-                          minLines: 1,
-                          maxLines: 3,
-                          textInputAction: TextInputAction.send,
-                          onSubmitted: (_) => _send(),
-                          style: const TextStyle(color: Colors.white, fontSize: 14),
-                          decoration: InputDecoration(
-                            isDense: true,
-                            hintText: 'Type a change...',
-                            hintStyle: const TextStyle(color: Colors.white38),
-                            filled: true,
-                            fillColor: Colors.white.withValues(alpha: 0.07),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(99), borderSide: BorderSide.none),
-                          ),
-                        ),
+                for (final (mine, text) in log)
+                  Align(
+                    alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      constraints: const BoxConstraints(maxWidth: 380),
+                      decoration: BoxDecoration(
+                        color: mine ? const Color(0xFF0E9F6A) : Colors.white.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      const SizedBox(width: 8),
-                      InkWell(
-                        key: const ValueKey('craft_ai_chat_send'),
-                        customBorder: const CircleBorder(),
-                        onTap: _busy ? null : _send,
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [Color(0xFF14B87A), Color(0xFF0E9F6A)])),
-                          child: const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 20),
-                        ),
+                      child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.35)),
+                    ),
+                  ),
+                if (_busy)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 2, bottom: 6),
+                    child: Row(children: [
+                      SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF86EFAC))),
+                      SizedBox(width: 8),
+                      Text('Changing it...', style: TextStyle(color: Colors.white60, fontSize: 12)),
+                    ]),
+                  ),
+              ],
+            ),
+          ),
+          // NGMY watermark styles: one tap changes it.
+          SizedBox(
+            height: 36,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              children: [
+                const Center(child: Padding(padding: EdgeInsets.only(right: 8), child: Text('Watermark', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w800)))),
+                for (final w in kNgmyCraftWatermarks)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ChoiceChip(
+                      key: ValueKey('craft_chat_wm_${w.id}'),
+                      avatar: Icon(w.icon, size: 14),
+                      label: Text(w.name, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                      selected: ngmyCraftWatermarkOf(widget.deck()) == w.id,
+                      onSelected: _busy ? null : (_) => _setWatermark(w),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          if (log.isEmpty)
+            SizedBox(
+              height: 36,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                children: [
+                  for (final idea in _ideas)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ActionChip(
+                        label: Text(idea, style: const TextStyle(fontSize: 11, color: Colors.white70)),
+                        backgroundColor: Colors.white.withValues(alpha: 0.06),
+                        side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                        onPressed: _busy ? null : () => _input.text = idea,
                       ),
-                    ],
+                    ),
+                ],
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    key: const ValueKey('craft_ai_chat_input'),
+                    controller: _input,
+                    autofocus: true,
+                    enabled: !_busy,
+                    minLines: 1,
+                    maxLines: 3,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _send(),
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      hintText: 'Type a change...',
+                      hintStyle: const TextStyle(color: Colors.white38),
+                      filled: true,
+                      fillColor: Colors.white.withValues(alpha: 0.07),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(99), borderSide: BorderSide.none),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                InkWell(
+                  key: const ValueKey('craft_ai_chat_send'),
+                  customBorder: const CircleBorder(),
+                  onTap: _busy ? null : _send,
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [Color(0xFF14B87A), Color(0xFF0E9F6A)])),
+                    child: const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 20),
                   ),
                 ),
               ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }

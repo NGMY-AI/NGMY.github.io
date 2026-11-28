@@ -1183,6 +1183,32 @@ NgmySlide _letterEnvelope(NgmyCraftPalette p) {
   return k.build('Full Page Letter Envelope', noteText: _printNote('Letter envelope 6.1 x 4.5 in, holds a page folded in four'));
 }
 
+/// Writing paper with ruled lines, made to go in the Full Page Letter Envelope: small marks on the edges show where
+/// to fold it in half and in half again.
+NgmySlide _letterPaper(NgmyCraftPalette p) {
+  final k = _Page(p);
+  k.rect(p.main, 0.75, 0.6, 7.0, 0.07);
+  k.circle(p.soft, 7.25, 1.2, 0.36);
+  k.circle(p.main, 7.25, 1.2, 0.3);
+  k.text('YN', 6.95, 0.97, 0.6, 0.46, pt: 13, bold: true, color: p.pale);
+  k.text('Your Name', 0.75, 0.8, 5.6, 0.45, pt: 17, bold: true, color: p.main, align: TextAlign.left);
+  k.text('Street Address  -  City  -  phone or email', 0.75, 1.25, 5.6, 0.3, pt: 8.5, align: TextAlign.left);
+  k.text('Month Day, Year', 4.75, 1.85, 3.0, 0.3, pt: 9.5, align: TextAlign.right);
+  k.text('Dear Name,', 0.75, 2.25, 4.0, 0.36, pt: 12, align: TextAlign.left);
+  for (var y = 2.95; y < 9.6; y += 0.34) {
+    k.rect(p.soft, 0.75, y, 7.0, 0.012);
+  }
+  k.text('With love,\nYour Name', 4.75, 9.5, 3.0, 0.6, pt: 11, italic: true, align: TextAlign.right);
+  k.rect(p.main, 0.75, 10.2, 7.0, 0.035);
+  // Fold in half (top to bottom), then in half again (side to side).
+  k.foldLine(0.2, 5.5, 0.55, 5.5);
+  k.foldLine(7.95, 5.5, 8.3, 5.5);
+  k.foldLine(4.25, 0.2, 4.25, 0.45);
+  k.foldLine(4.25, 10.3, 4.25, 10.55);
+  k.anchor(0.75, 2.8, 7.0, 6.6);
+  return k.build('Letter Writing Paper', noteText: 'Fold in half, then in half again, for the Full Page Letter Envelope (#27)  -  Actual size (100%)');
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // Boxes and bags.
 // ---------------------------------------------------------------------------------------------------------------
@@ -1609,6 +1635,53 @@ List<NgmySlide> _postcards(NgmyCraftPalette p) {
 // Tags and more.
 // ---------------------------------------------------------------------------------------------------------------
 
+/// Four flat note cards (3.9 x 5.1 in, they fit the A2 card envelope) with a coloured top and room to write.
+NgmySlide _flatCards(NgmyCraftPalette p) {
+  final k = _Page(p);
+  const w = 3.9;
+  const h = 5.1;
+  const titles = ['Thank You', 'Hello', 'Congrats', 'With Love'];
+  var i = 0;
+  for (final y in [0.3, 5.55]) {
+    for (final x in [0.25, 4.35]) {
+      k.rect(i.isEven ? p.main : p.soft, x, y, w, 1.6);
+      k.dotsRect(i.isEven ? p.soft : p.pale, x, y, w, 1.6, step: 0.3, r: 0.035);
+      k.circle(p.pale, x + w / 2, y + 1.6, 0.42);
+      k.circle(i.isEven ? p.main : p.accent, x + w / 2, y + 1.6, 0.34);
+      k.cutRect(x, y, w, h);
+      k.anchor(x + 0.2, y + 2.1, w - 0.4, h - 2.3);
+      k.text(titles[i], x + 0.2, y + 2.15, w - 0.4, 0.6, pt: 20, bold: true, color: p.main);
+      k.rect(p.accent, x + w / 2 - 0.4, y + 2.85, 0.8, 0.025);
+      k.text('Write a short note here.', x + 0.3, y + 3.0, w - 0.6, 1.3, pt: 11);
+      k.text('From: ____________', x + 0.3, y + 4.4, w - 0.6, 0.4, pt: 9.5);
+      i++;
+    }
+  }
+  return k.build('Flat Note Cards', noteText: _printNote('Four flat cards 3.9 x 5.1 in'));
+}
+
+/// Twelve round labels (2.25 in across) for jars, gifts and treats.
+NgmySlide _roundLabels(NgmyCraftPalette p) {
+  final k = _Page(p);
+  const r = 1.125;
+  const titles = ['Homemade', 'For You', 'Thank You', 'Jam', 'Cookies', 'Spices', 'Honey', 'Tea', 'Sweets', 'Party', 'Love', 'Enjoy'];
+  var i = 0;
+  for (final cy in [1.45, 3.95, 6.45, 8.95]) {
+    for (final cx in [1.45, 4.25, 7.05]) {
+      k.circle(i.isEven ? p.main : p.soft, cx, cy, r);
+      k.circle(p.pale, cx, cy, r - 0.16);
+      k.circle(i.isEven ? p.soft : p.main, cx, cy - 0.62, 0.06);
+      k.cutCircle(cx, cy, r);
+      k.anchor(cx - 0.72, cy - 0.72, 1.44, 1.44);
+      k.text(titles[i], cx - 0.8, cy - 0.38, 1.6, 0.5, pt: 15, bold: true, color: p.main);
+      k.rect(p.accent, cx - 0.3, cy + 0.17, 0.6, 0.02);
+      k.text('by Your Name', cx - 0.8, cy + 0.24, 1.6, 0.32, pt: 8);
+      i++;
+    }
+  }
+  return k.build('Round Labels', noteText: _printNote('Twelve round labels 2.25 in'));
+}
+
 NgmySlide _giftTags(NgmyCraftPalette p) {
   final k = _Page(p);
   const w = 3.4;
@@ -1900,6 +1973,9 @@ final List<NgmyPaperCraft> kNgmyPaperCrafts = [
       blurb: 'Holds a Letter or A4 page: fold the page in half, then in half again',
       icon: Icons.drafts_outlined,
       build: (p) => [_letterEnvelope(p)]),
+  NgmyPaperCraft(number: 28, id: 'letter_paper', name: 'Letter Writing Paper', group: _lettersGroup, blurb: 'Lined paper for the Full Page Letter Envelope', icon: Icons.edit_note_rounded, build: (p) => [_letterPaper(p)]),
+  NgmyPaperCraft(number: 29, id: 'flat_cards', name: 'Flat Note Cards', group: _cardsGroup, blurb: 'Four 3.9 x 5.1 in cards, fit the A2 envelope', icon: Icons.note_alt_outlined, build: (p) => [_flatCards(p)]),
+  NgmyPaperCraft(number: 30, id: 'round_labels', name: 'Round Labels', group: _moreGroup, blurb: 'Twelve round labels for jars and gifts', icon: Icons.circle_outlined, build: (p) => [_roundLabels(p)]),
 ];
 
 /// A new presentation on true Letter paper made from [craft] in [palette].
@@ -2134,92 +2210,98 @@ class _CraftPickerScreenState extends State<_CraftPickerScreen> {
               ),
             ),
             const SizedBox(height: 8),
+            // Two designs to a row (every row full), kept a comfortable size on wide screens.
             Expanded(
-              child: GridView.builder(
-                padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 190,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: 0.56,
-                ),
-                itemCount: list.length,
-                itemBuilder: (context, i) {
-                  final c = list[i];
-                  return Material(
-                    color: card,
-                    borderRadius: BorderRadius.circular(14),
-                    clipBehavior: Clip.antiAlias,
-                    child: InkWell(
-                      key: ValueKey('craft_${c.id}'),
-                      // Template first: then a sheet with its details and "describe the paper". Closing or skipping
-                      // the sheet opens the blank template to write by hand.
-                      onTap: () async {
-                        final nav = Navigator.of(context);
-                        final palette = kNgmyCraftPalettes[_palette];
-                        final made = await showNgmyPaperCraftAiSheet(context, palette: palette, design: c);
-                        if (!mounted) return;
-                        nav.pop(made ?? ngmyBuildPaperCraftDeck(c, palette));
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Center(
-                                child: AspectRatio(
-                                  aspectRatio: kNgmyCraftPageW / kNgmyCraftPageH,
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(6),
-                                      boxShadow: const [BoxShadow(color: Color(0x22000000), blurRadius: 6, offset: Offset(0, 2))],
-                                    ),
-                                    child: Stack(
-                                      children: [
-                                        Positioned.fill(child: NgmyCraftPagePreview(slide: _preview(c))),
-                                        // The design number: "make number 5".
-                                        Positioned(
-                                          left: 4,
-                                          top: 4,
-                                          child: Container(
-                                            key: ValueKey('craft_number_${c.number}'),
-                                            constraints: const BoxConstraints(minWidth: 20),
-                                            height: 20,
-                                            padding: const EdgeInsets.symmetric(horizontal: 5),
-                                            alignment: Alignment.center,
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xE60F172A),
-                                              borderRadius: BorderRadius.circular(10),
-                                            ),
-                                            child: Text('${c.number}', style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800)),
-                                          ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 560),
+                  child: GridView.builder(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 12,
+                      childAspectRatio: 0.56,
+                    ),
+                    itemCount: list.length,
+                    itemBuilder: (context, i) {
+                      final c = list[i];
+                      return Material(
+                        color: card,
+                        borderRadius: BorderRadius.circular(14),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          key: ValueKey('craft_${c.id}'),
+                          // Template first: then a sheet with its details and "describe the paper". Closing or skipping
+                          // the sheet opens the blank template to write by hand.
+                          onTap: () async {
+                            final nav = Navigator.of(context);
+                            final palette = kNgmyCraftPalettes[_palette];
+                            final made = await showNgmyPaperCraftAiSheet(context, palette: palette, design: c);
+                            if (!mounted) return;
+                            nav.pop(made ?? ngmyBuildPaperCraftDeck(c, palette));
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Center(
+                                    child: AspectRatio(
+                                      aspectRatio: kNgmyCraftPageW / kNgmyCraftPageH,
+                                      child: DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(6),
+                                          boxShadow: const [BoxShadow(color: Color(0x22000000), blurRadius: 6, offset: Offset(0, 2))],
                                         ),
-                                      ],
+                                        child: Stack(
+                                          children: [
+                                            Positioned.fill(child: NgmyCraftPagePreview(slide: _preview(c))),
+                                            // The design number: "make number 5".
+                                            Positioned(
+                                              left: 4,
+                                              top: 4,
+                                              child: Container(
+                                                key: ValueKey('craft_number_${c.number}'),
+                                                constraints: const BoxConstraints(minWidth: 20),
+                                                height: 20,
+                                                padding: const EdgeInsets.symmetric(horizontal: 5),
+                                                alignment: Alignment.center,
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xE60F172A),
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: Text('${c.number}', style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800)),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Icon(c.icon, size: 15, color: Color(kNgmyCraftPalettes[_palette].main)),
-                                const SizedBox(width: 5),
-                                Expanded(
-                                  child: Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 12.5)),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Icon(c.icon, size: 15, color: Color(kNgmyCraftPalettes[_palette].main)),
+                                    const SizedBox(width: 5),
+                                    Expanded(
+                                      child: Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 12.5)),
+                                    ),
+                                  ],
                                 ),
+                                const SizedBox(height: 2),
+                                Text(c.blurb, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: sub, fontSize: 10.5, height: 1.25)),
                               ],
                             ),
-                            const SizedBox(height: 2),
-                            Text(c.blurb, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: sub, fontSize: 10.5, height: 1.25)),
-                          ],
+                          ),
                         ),
-                      ),
-                    ),
-                  );
-                },
+                      );
+                    },
+                  ),
+                ),
               ),
             ),
           ],

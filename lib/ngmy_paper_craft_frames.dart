@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_paper_craft_dialog.dart';
 import 'ngmy_paper_crafts.dart';
 import 'ngmy_slides_models.dart';
 
@@ -48,6 +49,8 @@ const List<NgmyCraftAddressFrame> kNgmyCraftAddressFrames = [
   NgmyCraftAddressFrame('postal', 'Dotted postal label', Icons.local_shipping_outlined, aliases: ['dotted', 'dots', 'postal', 'shipping', 'delivery', 'vitone']),
   NgmyCraftAddressFrame('elegant', 'Elegant ornament', Icons.auto_awesome_outlined, center: true, aliases: ['elegant', 'ornament', 'fancy', 'wedding', 'classy', 'maridadi']),
   NgmyCraftAddressFrame('bold', 'Bold block', Icons.format_bold_rounded, aliases: ['bold', 'block', 'strong', 'thick', 'nzito']),
+  NgmyCraftAddressFrame('shadow', 'Shadow box', Icons.filter_none_rounded, aliases: ['shadow', 'drop shadow', 'kivuli']),
+  NgmyCraftAddressFrame('scallop', 'Scalloped edge', Icons.wb_sunny_outlined, center: true, aliases: ['scallop', 'scalloped', 'wavy edge', 'lace', 'mawimbi']),
   NgmyCraftAddressFrame('ngmy', 'NGMY branded', Icons.verified_outlined, aliases: ['ngmy', 'brand', 'branded', 'logo']),
 ];
 
@@ -164,6 +167,8 @@ double _head(String id, bool from) => switch (id) {
     'postal' => (0.14, hd + 0.06, 0.12, 0.06),
     'elegant' => (0.14, 0.17, 0.14, 0.17),
     'bold' => (from ? 0.42 : 0.5, 0.06, 0.12, 0.06),
+    'shadow' => (0.16, 0.08, 0.2, 0.12),
+    'scallop' => (0.22, 0.14, 0.22, 0.14),
     'ngmy' => (0.14, hd + 0.05, 0.12, 0.06),
     _ => (0.1, 0.06, 0.1, 0.06),
   };
@@ -262,6 +267,28 @@ double _head(String id, bool from) => switch (id) {
       for (var i = 0; i < label.length; i++) {
         k.word(label[i], x + bw / 2, top + i * step, white, lpt);
       }
+    case 'shadow':
+      const o = 0.07;
+      k.rect(ink, x + o, y + o, w - o, h - o);
+      k.rect(white, x, y, w - o, h - o);
+      k.outline(ink, x, y, w - o, h - o, 0.022 * s);
+    case 'scallop':
+      // Little half circles all round, like the edge of a doily, with a thin line inside.
+      final r = 0.05 * s;
+      final d = <(double, double, double)>[];
+      final nx = ((w - 2 * r) / (r * 1.9)).round();
+      final ny = ((h - 2 * r) / (r * 1.9)).round();
+      for (var i = 0; i <= nx; i++) {
+        d.add((x + r + (w - 2 * r) * i / nx, y + r, r));
+        d.add((x + r + (w - 2 * r) * i / nx, y1 - r, r));
+      }
+      for (var i = 1; i < ny; i++) {
+        d.add((x + r, y + r + (h - 2 * r) * i / ny, r));
+        d.add((x1 - r, y + r + (h - 2 * r) * i / ny, r));
+      }
+      k.dots(ink, d);
+      k.rect(white, x + r, y + r, w - 2 * r, h - 2 * r);
+      k.outline(ink, x + 2 * r + 0.02, y + 2 * r + 0.02, w - 4 * r - 0.04, h - 4 * r - 0.04, 0.01);
     case 'ngmy':
       k.outline(ink, x, y, w, h, 0.02 * s);
       k.rect(ink, x, y, w, hd);
@@ -397,7 +424,7 @@ class NgmyCraftAddressFramePreview extends StatelessWidget {
     final spec = jsonEncode({
       'W': bw + 2 * bx,
       'H': bh + 2 * by,
-      'f': bars,
+      'f': [],
       'af': {
         'id': id,
         'b': [
@@ -406,7 +433,12 @@ class NgmyCraftAddressFramePreview extends StatelessWidget {
         'c': colors,
       },
     });
-    return AspectRatio(aspectRatio: (bw + 2 * bx) / (bh + 2 * by), child: CustomPaint(painter: _FramePainter(spec)));
+    // The grey lines go on top, as the words do on the page.
+    final words = jsonEncode({'W': bw + 2 * bx, 'H': bh + 2 * by, 'f': bars});
+    return AspectRatio(
+      aspectRatio: (bw + 2 * bx) / (bh + 2 * by),
+      child: Stack(fit: StackFit.expand, children: [CustomPaint(painter: _FramePainter(spec)), CustomPaint(painter: _FramePainter(words))]),
+    );
   }
 }
 
@@ -464,15 +496,10 @@ class NgmyCraftAddressFrameButton extends StatelessWidget {
   }
 }
 
-/// The frame chooser: every design as a small picture; tapping one puts it on the deck at once.
+/// The frame chooser, a centred card: every design as a small picture, three to a row; tapping one puts it on the
+/// deck at once.
 Future<void> showNgmyCraftAddressFramePanel(BuildContext context, {required NgmySlideDeck Function() deck, required void Function(String id) onApply}) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Theme.of(context).colorScheme.surface,
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
-    builder: (context) => _FramePanel(deck: deck, onApply: onApply),
-  );
+  return showNgmyCraftDialog<void>(context, builder: (_) => _FramePanel(deck: deck, onApply: onApply));
 }
 
 class _FramePanel extends StatefulWidget {
@@ -490,60 +517,26 @@ class _FramePanelState extends State<_FramePanel> {
   @override
   Widget build(BuildContext context) {
     final colors = ngmyCraftAddressFrameColors(widget.deck());
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(width: 36, height: 4, decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(2))),
-            ),
-            const SizedBox(height: 10),
-            const Text('Address frame', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 2),
-            Text('A neat frame for the name and address and for the sender. The words line up inside it.',
-                style: TextStyle(fontSize: 12.5, color: dark ? Colors.white70 : Colors.black54)),
-            const SizedBox(height: 12),
-            ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.55),
-              child: GridView.builder(
-                shrinkWrap: true,
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 150, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 1.25),
-                itemCount: kNgmyCraftAddressFrames.length,
-                itemBuilder: (context, i) {
-                  final f = kNgmyCraftAddressFrames[i];
-                  final on = f.id == _id;
-                  return InkWell(
-                    key: ValueKey('craft_frame_${f.id}'),
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: () {
-                      setState(() => _id = f.id);
-                      widget.onApply(f.id);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: on ? const Color(0xFF14B87A) : Colors.grey.withValues(alpha: 0.3), width: on ? 2.5 : 1),
-                      ),
-                      child: Column(
-                        children: [
-                          Expanded(child: Center(child: NgmyCraftAddressFramePreview(id: f.id, colors: colors))),
-                          const SizedBox(height: 4),
-                          Text(f.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: Colors.black87, fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+    return NgmyCraftDialogCard(
+      title: 'Address frame',
+      subtitle: 'A neat frame for the name and address and for the sender. The words line up inside it.',
+      icon: Icons.contact_mail_outlined,
+      child: NgmyCraftChoiceGrid(
+        count: kNgmyCraftAddressFrames.length,
+        aspect: 1.12,
+        builder: (i) {
+          final f = kNgmyCraftAddressFrames[i];
+          return NgmyCraftChoiceTile(
+            key: ValueKey('craft_frame_${f.id}'),
+            selected: f.id == _id,
+            label: f.name,
+            onTap: () {
+              setState(() => _id = f.id);
+              widget.onApply(f.id);
+            },
+            child: Center(child: NgmyCraftAddressFramePreview(id: f.id, colors: colors)),
+          );
+        },
       ),
     );
   }

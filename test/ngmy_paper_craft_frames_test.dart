@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_paper_craft_ai.dart';
+import 'package:ngmy/ngmy_paper_craft_dialog.dart';
 import 'package:ngmy/ngmy_paper_craft_frames.dart';
+import 'package:ngmy/ngmy_paper_craft_stamps.dart';
 import 'package:ngmy/ngmy_paper_craft_watermark.dart';
 import 'package:ngmy/ngmy_paper_crafts.dart';
 import 'package:ngmy/ngmy_slides_export.dart';
@@ -31,9 +34,10 @@ const _withFrames = ['card_envelope', 'square_envelope', 'diamond_envelope', 'le
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('There are 8 to 10 address frame designs plus no frame, each drawn dark, inside its box', () {
+  test('There are 11 address frame designs plus no frame (full rows of three), each drawn dark, inside its box', () {
     expect(kNgmyCraftAddressFrames.first.id, 'none');
-    expect(kNgmyCraftAddressFrames.where((f) => f.id != 'none').length, inInclusiveRange(8, 10));
+    expect(kNgmyCraftAddressFrames.where((f) => f.id != 'none').length, 11);
+    expect(kNgmyCraftAddressFrames.length % 3, 0);
     expect(kNgmyCraftAddressFrames.map((f) => f.id).toSet().length, kNgmyCraftAddressFrames.length);
     expect(ngmyCraftAddressFrameById(kNgmyCraftDefaultAddressFrame), isNotNull);
     for (final palette in kNgmyCraftPalettes) {
@@ -208,4 +212,59 @@ void main() {
     expect(applied, 'double');
     expect(ngmyCraftAddressFrameOf(deck), 'double');
   });
+
+  test('Every row is full: designs two to a row in every group, choosers three to a row', () {
+    expect(kNgmyPaperCrafts.length.isEven, isTrue);
+    for (final g in kNgmyCraftGroups) {
+      expect(kNgmyPaperCrafts.where((c) => c.group == g).length.isEven, isTrue, reason: g);
+    }
+    expect(kNgmyCraftStamps.length % 3, 0);
+    expect(kNgmyCraftAddressFrames.length % 3, 0);
+  });
+
+  for (final size in [const Size(360, 640), const Size(1280, 800)]) {
+    testWidgets('The four strip pop-ups open in the middle of a ${size.width.toInt()} wide screen and fit it', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final deck = _deck('card_envelope');
+      late BuildContext ctx;
+      await tester.pumpWidget(MaterialApp(home: Builder(builder: (c) {
+        ctx = c;
+        return const Scaffold(body: SizedBox.expand());
+      })));
+      final openers = <String, Future<void> Function()>{
+        'AI helper': () => showNgmyPaperCraftAiChat(ctx, deck: () => deck, onApply: (_) => false),
+        'NGMY watermark': () => showNgmyCraftWatermarkPanel(ctx, deck: () => deck, onApply: (_) {}),
+        'Stamp': () => showNgmyCraftStampPanel(ctx, deck: () => deck, onApply: (_) {}),
+        'Address frame': () => showNgmyCraftAddressFramePanel(ctx, deck: () => deck, onApply: (_) {}),
+      };
+      for (final entry in openers.entries) {
+        unawaited(entry.value());
+        await tester.pumpAndSettle();
+        final card = find.byType(NgmyCraftDialogCard);
+        expect(card, findsOneWidget, reason: entry.key);
+        expect(find.text(entry.key), findsOneWidget, reason: entry.key);
+        final box = tester.getRect(find.descendant(of: card, matching: find.byType(Container)).first);
+        expect(box.left, greaterThanOrEqualTo(0), reason: entry.key);
+        expect(box.top, greaterThanOrEqualTo(0), reason: entry.key);
+        expect(box.right, lessThanOrEqualTo(size.width), reason: entry.key);
+        expect(box.bottom, lessThanOrEqualTo(size.height), reason: entry.key);
+        // In the middle, not stuck to the bottom.
+        expect((box.center.dx - size.width / 2).abs(), lessThan(2), reason: entry.key);
+        expect((box.center.dy - size.height / 2).abs(), lessThan(40), reason: entry.key);
+        expect(tester.takeException(), isNull, reason: entry.key);
+        // The close X closes it.
+        await tester.tap(find.byKey(const ValueKey('craft_dialog_close')));
+        await tester.pumpAndSettle();
+        expect(card, findsNothing, reason: entry.key);
+      }
+      // Tapping outside closes it too.
+      unawaited(openers['Stamp']!());
+      await tester.pumpAndSettle();
+      await tester.tapAt(const Offset(4, 4));
+      await tester.pumpAndSettle();
+      expect(find.byType(NgmyCraftDialogCard), findsNothing);
+    });
+  }
 }

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:image/image.dart' as img;
 
+import 'ngmy_paper_craft_dialog.dart';
 import 'ngmy_paper_crafts.dart';
 import 'ngmy_slides_models.dart';
 
@@ -732,13 +733,7 @@ Future<void> showNgmyCraftWatermarkPanel(
   required NgmySlideDeck Function() deck,
   required void Function(NgmyCraftWmSettings settings) onApply,
 }) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    barrierColor: Colors.black26,
-    builder: (_) => _WatermarkPanel(deck: deck, onApply: onApply),
-  );
+  return showNgmyCraftDialog<void>(context, builder: (_) => _WatermarkPanel(deck: deck, onApply: onApply));
 }
 
 class _WatermarkPanel extends StatefulWidget {
@@ -801,29 +796,33 @@ class _WatermarkPanelState extends State<_WatermarkPanel> {
 
   Widget _placeGrid() {
     final current = _s.placeOrDefault;
-    return Wrap(
-      spacing: 4,
-      runSpacing: 4,
-      children: [
-        for (var i = 0; i < 9; i++)
-          Tooltip(
-            message: kNgmyCraftWmPlaces[i],
-            child: InkWell(
-              key: ValueKey('craft_wm_place_$i'),
-              onTap: () => _set(_s.copyWith(place: i)),
-              borderRadius: BorderRadius.circular(6),
-              child: Container(
-                width: 30,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: i == current ? _green : Colors.white.withValues(alpha: 0.07),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: Colors.white24),
+    // A 3 x 3 square of spots (three cells of 30 and two gaps of 4 across).
+    return SizedBox(
+      width: 98,
+      child: Wrap(
+        spacing: 4,
+        runSpacing: 4,
+        children: [
+          for (var i = 0; i < 9; i++)
+            Tooltip(
+              message: kNgmyCraftWmPlaces[i],
+              child: InkWell(
+                key: ValueKey('craft_wm_place_$i'),
+                onTap: () => _set(_s.copyWith(place: i)),
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  width: 30,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    color: i == current ? _green : Colors.white.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.white24),
+                  ),
                 ),
               ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -832,85 +831,69 @@ class _WatermarkPanelState extends State<_WatermarkPanel> {
     final kind = _s.kind;
     final canPlace = kind.places && (!kind.canBeOne || _s.one);
     final isDefault = _s.visibility == 1;
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: Container(
-          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.8, maxWidth: 520),
-          decoration: const BoxDecoration(color: Color(0xFF111827), borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
-          child: SafeArea(
-            top: false,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(children: [
-                    const Icon(Icons.branding_watermark_outlined, color: Color(0xFF86EFAC), size: 20),
-                    const SizedBox(width: 8),
-                    const Expanded(child: Text('NGMY watermark', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15))),
-                    IconButton(onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 20)),
-                  ]),
-                  _label('STYLE'),
-                  _chips([for (final w in kNgmyCraftWatermarks) (w.id, w.name, w.icon)], _s.style, (id) => _set(_s.withStyle(id)), 'craft_wmp_style_'),
-                  _label('DESIGN'),
-                  _chips([for (final v in kind.variants) (v.$1, v.$2, null)], _s.variantId, (id) => _set(_s.copyWith(variant: id)), 'craft_wmp_variant_'),
-                  if (kind.canBeOne) ...[
-                    _label('HOW MANY'),
-                    _chips<bool>([(false, kind.id == 'border' ? 'All round' : 'Many', Icons.grid_view_rounded), (true, 'One only', Icons.crop_square_rounded)], _s.one,
-                        (one) => _set(_s.copyWith(one: one)), 'craft_wmp_one_'),
-                  ],
-                  if (canPlace) ...[
-                    _label('WHERE'),
-                    Row(children: [
-                      _placeGrid(),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(kNgmyCraftWmPlaces[_s.placeOrDefault],
-                            style: const TextStyle(color: Colors.white70, fontSize: 12.5, fontWeight: FontWeight.w700)),
-                      ),
-                    ]),
-                  ],
-                  _label('SIZE', trailing: Text('${(_s.size * 100).round()}%', style: const TextStyle(color: Colors.white54, fontSize: 11))),
-                  Slider(
-                    key: const ValueKey('craft_wmp_size'),
-                    value: _s.size,
-                    min: kNgmyCraftWmMinSize,
-                    max: kNgmyCraftWmMaxSize,
-                    activeColor: _green,
-                    onChanged: (v) => _set(_s.copyWith(size: v), apply: false),
-                    onChangeEnd: (v) => _set(_s.copyWith(size: v)),
-                  ),
-                  _label(
-                    'VISIBILITY',
-                    trailing: TextButton(
-                      key: const ValueKey('craft_wmp_reset'),
-                      onPressed: isDefault && _s.size == 1 ? null : () => _set(_s.copyWith(visibility: 1, size: 1)),
-                      child: Text(isDefault ? 'Default' : 'Reset to default', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
-                    ),
-                  ),
-                  Row(children: [
-                    const Text('Fainter', style: TextStyle(color: Colors.white38, fontSize: 11)),
-                    Expanded(
-                      child: Slider(
-                        key: const ValueKey('craft_wmp_visibility'),
-                        value: _s.visibility,
-                        min: kNgmyCraftWmMinVis,
-                        max: kNgmyCraftWmMaxVis,
-                        activeColor: _green,
-                        onChanged: (v) => _set(_s.copyWith(visibility: (v - 1).abs() < 0.06 ? 1 : v), apply: false),
-                        onChangeEnd: (v) => _set(_s.copyWith(visibility: (v - 1).abs() < 0.06 ? 1 : v)),
-                      ),
-                    ),
-                    const Text('Stronger', style: TextStyle(color: Colors.white38, fontSize: 11)),
-                  ]),
-                ],
+    return NgmyCraftDialogCard(
+      title: 'NGMY watermark',
+      subtitle: 'Style, design, where it goes, size and how strong it prints.',
+      icon: Icons.branding_watermark_outlined,
+      padding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _label('STYLE'),
+          _chips([for (final w in kNgmyCraftWatermarks) (w.id, w.name, w.icon)], _s.style, (id) => _set(_s.withStyle(id)), 'craft_wmp_style_'),
+          _label('DESIGN'),
+          _chips([for (final v in kind.variants) (v.$1, v.$2, null)], _s.variantId, (id) => _set(_s.copyWith(variant: id)), 'craft_wmp_variant_'),
+          if (kind.canBeOne) ...[
+            _label('HOW MANY'),
+            _chips<bool>([(false, kind.id == 'border' ? 'All round' : 'Many', Icons.grid_view_rounded), (true, 'One only', Icons.crop_square_rounded)], _s.one,
+                (one) => _set(_s.copyWith(one: one)), 'craft_wmp_one_'),
+          ],
+          if (canPlace) ...[
+            _label('WHERE'),
+            Row(children: [
+              _placeGrid(),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(kNgmyCraftWmPlaces[_s.placeOrDefault],
+                    style: const TextStyle(color: Colors.white70, fontSize: 12.5, fontWeight: FontWeight.w700)),
               ),
+            ]),
+          ],
+          _label('SIZE', trailing: Text('${(_s.size * 100).round()}%', style: const TextStyle(color: Colors.white54, fontSize: 11))),
+          Slider(
+            key: const ValueKey('craft_wmp_size'),
+            value: _s.size,
+            min: kNgmyCraftWmMinSize,
+            max: kNgmyCraftWmMaxSize,
+            activeColor: _green,
+            onChanged: (v) => _set(_s.copyWith(size: v), apply: false),
+            onChangeEnd: (v) => _set(_s.copyWith(size: v)),
+          ),
+          _label(
+            'VISIBILITY',
+            trailing: TextButton(
+              key: const ValueKey('craft_wmp_reset'),
+              onPressed: isDefault && _s.size == 1 ? null : () => _set(_s.copyWith(visibility: 1, size: 1)),
+              child: Text(isDefault ? 'Default' : 'Reset to default', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
             ),
           ),
-        ),
+          Row(children: [
+            const Text('Fainter', style: TextStyle(color: Colors.white38, fontSize: 11)),
+            Expanded(
+              child: Slider(
+                key: const ValueKey('craft_wmp_visibility'),
+                value: _s.visibility,
+                min: kNgmyCraftWmMinVis,
+                max: kNgmyCraftWmMaxVis,
+                activeColor: _green,
+                onChanged: (v) => _set(_s.copyWith(visibility: (v - 1).abs() < 0.06 ? 1 : v), apply: false),
+                onChangeEnd: (v) => _set(_s.copyWith(visibility: (v - 1).abs() < 0.06 ? 1 : v)),
+              ),
+            ),
+            const Text('Stronger', style: TextStyle(color: Colors.white38, fontSize: 11)),
+          ]),
+        ],
       ),
     );
   }
