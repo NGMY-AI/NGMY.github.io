@@ -1660,26 +1660,60 @@ NgmySlide _flatCards(NgmyCraftPalette p) {
   return k.build('Flat Note Cards', noteText: _printNote('Four flat cards 3.9 x 5.1 in'));
 }
 
-/// Twelve round labels (2.25 in across) for jars, gifts and treats.
-NgmySlide _roundLabels(NgmyCraftPalette p) {
+/// A gift card holder that folds in half (print outside) to 3.8 x 5.2 in, so it fits the Card Envelope (A2). A
+/// separate printed pocket, wide enough for a standard 3.375 x 2.125 in gift card, has glue tabs that fold under it;
+/// it is glued inside the holder and the card slides in from the top (the notch helps pull it out).
+NgmySlide _giftCardHolder(NgmyCraftPalette p) {
   final k = _Page(p);
-  const r = 1.125;
-  const titles = ['Homemade', 'For You', 'Thank You', 'Jam', 'Cookies', 'Spices', 'Honey', 'Tea', 'Sweets', 'Party', 'Love', 'Enjoy'];
-  var i = 0;
-  for (final cy in [1.45, 3.95, 6.45, 8.95]) {
-    for (final cx in [1.45, 4.25, 7.05]) {
-      k.circle(i.isEven ? p.main : p.soft, cx, cy, r);
-      k.circle(p.pale, cx, cy, r - 0.16);
-      k.circle(i.isEven ? p.soft : p.main, cx, cy - 0.62, 0.06);
-      k.cutCircle(cx, cy, r);
-      k.anchor(cx - 0.72, cy - 0.72, 1.44, 1.44);
-      k.text(titles[i], cx - 0.8, cy - 0.38, 1.6, 0.5, pt: 15, bold: true, color: p.main);
-      k.rect(p.accent, cx - 0.3, cy + 0.17, 0.6, 0.02);
-      k.text('by Your Name', cx - 0.8, cy + 0.24, 1.6, 0.32, pt: 8);
-      i++;
-    }
-  }
-  return k.build('Round Labels', noteText: _printNote('Twelve round labels 2.25 in'));
+  const w = 3.8;
+  const h = 5.2;
+  const x0 = (_pw - 2 * w) / 2;
+  const y0 = 0.5;
+  const xf = x0 + w;
+  // Back cover (left) and front cover (right).
+  k.rect(p.soft, x0, y0, w, h);
+  k.stripesH(p.pale, x0, y0, w, h, step: 0.34, thick: 0.08);
+  k.rect(p.pale, x0 + 0.5, y0 + h - 1.3, w - 1.0, 0.8);
+  k.text('Made with love by Your Name', x0 + 0.55, y0 + h - 1.2, w - 1.1, 0.6, pt: 9, italic: true);
+  k.rect(p.main, xf, y0, w, h);
+  k.dotsRect(p.soft, xf, y0, w, h, step: 0.32, r: 0.04);
+  k.rect(p.pale, xf + 0.4, y0 + 1.5, w - 0.8, 2.2);
+  k.rect(p.accent, xf + 0.4, y0 + 1.5, w - 0.8, 0.06);
+  k.rect(p.accent, xf + 0.4, y0 + 3.64, w - 0.8, 0.06);
+  k.text('A Gift for You', xf + 0.5, y0 + 1.75, w - 1.0, 0.9, pt: 22, bold: true, color: p.main);
+  k.text('Happy Birthday', xf + 0.5, y0 + 2.75, w - 1.0, 0.6, pt: 12, italic: true);
+  k.cutRect(x0, y0, 2 * w, h);
+  k.foldLine(xf, y0, xf, y0 + h);
+  k.anchor(xf, y0, w, h, dark: true);
+  // The pocket: its tabs fold under it and are glued to the inside of the holder.
+  const pw = 3.6;
+  const ph = 2.1;
+  const px = (_pw - pw) / 2;
+  const py = 6.3;
+  const tab = 0.6;
+  k.rect(p.pale, px, py, pw, ph);
+  k.rect(p.main, px, py + ph - 0.3, pw, 0.3);
+  k.text('To: ______________\nFrom: ____________', px + 0.3, py + 0.55, pw - 0.6, 0.95, pt: 10, align: TextAlign.left);
+  final left = [Offset(px, py + ph), Offset(px - tab, py + ph - 0.25), Offset(px - tab, py + 0.25), Offset(px, py)];
+  final right = [Offset(px + pw, py), Offset(px + pw + tab, py + 0.25), Offset(px + pw + tab, py + ph - 0.25), Offset(px + pw, py + ph)];
+  final bottom = [Offset(px + pw, py + ph), Offset(px + pw - 0.3, py + ph + tab), Offset(px + 0.3, py + ph + tab), Offset(px, py + ph)];
+  k.glue(left);
+  k.glue(right);
+  k.glue(bottom);
+  k.cut([
+    Offset(px, py),
+    ..._arc(px + pw / 2, py, 0.45, 0.45, _pi, 0, 16),
+    ...right,
+    ...bottom.skip(1),
+    ...left.skip(1),
+  ]);
+  k.foldLine(px, py, px, py + ph);
+  k.foldLine(px + pw, py, px + pw, py + ph);
+  k.foldLine(px, py + ph, px + pw, py + ph);
+  k.note(0.45, 9.25, '1. Fold the holder in half with the print outside.');
+  k.note(0.45, 9.45, '2. Fold the three pocket tabs under the pocket and glue them inside the holder, near the bottom.');
+  k.note(0.45, 9.65, '3. Slide a gift card into the pocket from the top.');
+  return k.build('Gift Card Holder', noteText: _printNote('Gift card holder 3.8 x 5.2 in, fits the A2 envelope'));
 }
 
 NgmySlide _giftTags(NgmyCraftPalette p) {
@@ -1975,7 +2009,7 @@ final List<NgmyPaperCraft> kNgmyPaperCrafts = [
       build: (p) => [_letterEnvelope(p)]),
   NgmyPaperCraft(number: 28, id: 'letter_paper', name: 'Letter Writing Paper', group: _lettersGroup, blurb: 'Lined paper for the Full Page Letter Envelope', icon: Icons.edit_note_rounded, build: (p) => [_letterPaper(p)]),
   NgmyPaperCraft(number: 29, id: 'flat_cards', name: 'Flat Note Cards', group: _cardsGroup, blurb: 'Four 3.9 x 5.1 in cards, fit the A2 envelope', icon: Icons.note_alt_outlined, build: (p) => [_flatCards(p)]),
-  NgmyPaperCraft(number: 30, id: 'round_labels', name: 'Round Labels', group: _moreGroup, blurb: 'Twelve round labels for jars and gifts', icon: Icons.circle_outlined, build: (p) => [_roundLabels(p)]),
+  NgmyPaperCraft(number: 30, id: 'gift_card_holder', name: 'Gift Card Holder', group: _moreGroup, blurb: 'Folding holder with a pocket for a gift card, fits the A2 envelope', icon: Icons.card_giftcard_outlined, build: (p) => [_giftCardHolder(p)]),
 ];
 
 /// A new presentation on true Letter paper made from [craft] in [palette].

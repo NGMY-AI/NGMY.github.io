@@ -267,4 +267,30 @@ void main() {
       expect(find.byType(NgmyCraftDialogCard), findsNothing);
     });
   }
+
+  test('Gift Card Holder takes a standard gift card and fits the A2 envelope; an old Round Labels deck still works', () async {
+    final craft = kNgmyPaperCrafts.firstWhere((c) => c.id == 'gift_card_holder');
+    expect(craft.number, 30);
+    expect(kNgmyPaperCrafts.where((c) => c.id == 'round_labels'), isEmpty);
+    final spec = _spec(craft.build(kNgmyCraftPalettes.first).single);
+    // The pocket (the glued area between the tabs) is wider than a 3.375 in gift card.
+    final glue = _list(spec['g']);
+    expect(glue.length, 3);
+    final xs = [for (final g in glue) for (var i = 0; i < g.length; i += 2) g[i]];
+    expect(xs.reduce((a, b) => a > b ? a : b) - xs.reduce((a, b) => a < b ? a : b) - 2 * 0.6, greaterThan(3.375 + 0.1));
+    // Closed 3.8 x 5.2 in fits inside the 5.75 x 4.375 in A2 envelope.
+    expect(5.2, lessThan(5.75));
+    expect(3.8, lessThan(4.375));
+    // A deck made from the old Round Labels design still opens, prints and talks to the AI, without breaking.
+    final deck = _deck('gift_card_holder');
+    final lines = deck.slides.first.elements.firstWhere(ngmyIsCraftLines);
+    final m = jsonDecode(lines.text) as Map<String, dynamic>;
+    m['craft'] = 'round_labels';
+    lines.text = jsonEncode(m);
+    final old = NgmySlideDeck(id: 'old', name: 'Round Labels', deckKind: deck.deckKind, aspectRatio: deck.aspectRatio, paperAspect: deck.paperAspect, slides: deck.slides);
+    expect(ngmyPaperCraftOfDeck(old), isNull);
+    expect(ngmyRecolorPaperCraft(old, kNgmyCraftPalettes[1]), isFalse);
+    expect(ngmyPaperCraftEditPrompt(deck: old, request: 'hi'), contains('TEXT BOXES'));
+    expect(await ngmySlidesExportPdfBytes(old), isNotEmpty);
+  });
 }

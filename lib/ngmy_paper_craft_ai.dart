@@ -59,7 +59,7 @@ const Map<String, List<String>> _kCraftAliases = {
   'letter_envelope': ['letter envelope', 'full page envelope', 'envelope for a letter', 'envelope for a full page', 'a4 envelope', 'bahasha ya barua', 'bahasha ya ukurasa mzima'],
   'letter_paper': ['letter paper', 'writing paper', 'lined paper', 'stationery', 'karatasi ya barua', 'karatasi ya kuandikia'],
   'flat_cards': ['flat card', 'note card', 'thank you card', 'kadi bapa', 'kadi za shukrani'],
-  'round_labels': ['round label', 'jar label', 'sticker', 'labels', 'lebo za duara', 'lebo za chupa'],
+  'gift_card_holder': ['gift card holder', 'gift card wallet', 'card holder', 'kishikio cha kadi ya zawadi', 'mfuko wa kadi ya zawadi'],
 };
 
 String _norm(String s) => ' ${s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim()} ';
@@ -133,7 +133,7 @@ const Map<String, List<NgmyCraftDetail>> _kCraftDetails = {
   'letter_envelope': [_toName, _toAddress, _fromName, _fromAddress],
   'letter_paper': [NgmyCraftDetail('to_name', 'Who the letter is to', needed: true), NgmyCraftDetail('from_name', 'Your name', needed: true), _fromAddress, NgmyCraftDetail('topic', 'What the letter is about', needed: true, multiline: true)],
   'flat_cards': [_cardFrom, _message],
-  'round_labels': [_boxWords, _fromName],
+  'gift_card_holder': [_giftTo, _giftFrom, NgmyCraftDetail('occasion', 'Occasion')],
   'seed_envelopes': [NgmyCraftDetail('seeds', 'Seed names (one per envelope)', needed: true), NgmyCraftDetail('dates', 'Planted and harvest dates')],
   'gift_card_envelopes': [_giftTo, _giftFrom, _boxWords],
   'gift_box': [_giftTo, _giftFrom, _boxWords],
