@@ -1,11 +1,11 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
 $__dart_deferred_initializers__.current=function(a,b,c,$){var J,A,C,B={
-hFH(d){var x=d.kP,w=y.w
+hFI(d){var x=d.kP,w=y.w
 w=x.j6(x,new B.ch1(),w,w)
 return w},
 OX(d,e){var x,w,v=C.a.i(e.toLowerCase())
 if(v.length===0)return!1
-x=B.hFH(d).h(0,v)
+x=B.hFI(d).h(0,v)
 if(x==null||x.length===0)return!1
 w=A.bf(x)
 return w!=null&&w.cb(new A.W(Date.now(),0,!1))},
@@ -51,10 +51,10 @@ if(s==null){s=y.b
 s=A.S(s,s)}r=y.w
 q=y.b
 p=A.a1(s,r,q)
-s=A.hpi(u,e)
+s=A.hpj(u,e)
 o=A.a1(s==null?A.S(q,q):s,r,q)
 s=g===C.ov
-if(o.am(0,s?"advisor":"family_tree"))throw A.Y(A.be("You already saved a "+A.ifk(g)+" QR. Open QR Code Generator \u2192 Saved and delete it before saving a new one."))
+if(o.am(0,s?"advisor":"family_tree"))throw A.Y(A.be("You already saved a "+A.ifl(g)+" QR. Open QR Code Generator \u2192 Saved and delete it before saving a new one."))
 s=s?"advisor":"family_tree"
 o.n(0,s,new A.x1(g,v,C.a.i(h),C.a.i(d),i,new A.W(Date.now(),0,!1).aa().ag()).ak())
 p.n(0,n,o)
@@ -63,7 +63,7 @@ x=3
 return A.b(A.avl(u),$async$avn)
 case 3:return A.h(null,w)}})
 return A.i($async$avn,w)},
-hHJ(d,e){var x,w,v=C.a.i(d)
+hHK(d,e){var x,w,v=C.a.i(d)
 if(!C.a.Y(v,(e===C.ov?"NGMYASYNC2":"NGMYFTSYNC2")+"|"))return null
 x=v.split("|")
 if(x.length<2)return null
@@ -77,7 +77,7 @@ D=c[117]
 var z=a.updateTypes([])
 B.ch1.prototype={
 $2(d,e){return new A.bw(J.k(d),J.k(e),y.F)},
-$S:100};(function inheritance(){var x=a.inherit
+$S:99};(function inheritance(){var x=a.inherit
 x(B.ch1,A.j1)})()
 var y={F:A.as("bw<o,o>"),w:A.as("o"),e:A.as("P"),b:A.as("@"),u:A.as("a9<@,@>?"),m:A.as("x1?"),v:A.as("~")};(function constants(){D.arS=new A.a_(61152,"MaterialIcons",!1)})()};
-(a=>{a["5LBMQxawM+gkeZfXRJpVQ02ieuU="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["9OITyvjt0jcn48D39nbgkFEpZXU="]=a.current})($__dart_deferred_initializers__);
