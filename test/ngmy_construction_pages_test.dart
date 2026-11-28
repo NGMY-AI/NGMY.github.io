@@ -68,7 +68,8 @@ void main() {
     expect(find.textContaining('Real work: no hints'), findsOneWidget);
     expect(find.textContaining('Mount a box at'), findsNothing);
     expect(find.text('Behind the wall'), findsOneWidget);
-    await t.ensureVisible(find.text('Wall box'));
+    // The tray starts with Back, so Wall box may be further along: slide the tray to it.
+    await t.scrollUntilVisible(find.text('Wall box'), 120, scrollable: find.descendant(of: find.byKey(const Key('room-tray')), matching: find.byType(Scrollable)));
     await t.pump(const Duration(milliseconds: 300));
     await t.tap(find.text('Wall box'));
     await t.pump(const Duration(milliseconds: 500));

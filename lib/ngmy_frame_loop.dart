@@ -16,6 +16,10 @@ class FrameLoop {
 
   bool get running => _on;
 
+  /// The time of the frame being drawn, during [tick] (null under the test framework). Movement measured with it goes at the
+  /// same speed whatever else the frame had to do before it.
+  Duration? stamp;
+
   static bool get _inTest => WidgetsBinding.instance.runtimeType.toString().contains('Test');
 
   void start() {
@@ -29,8 +33,9 @@ class FrameLoop {
   }
 
   void _next() {
-    SchedulerBinding.instance.scheduleFrameCallback((_) {
+    SchedulerBinding.instance.scheduleFrameCallback((t) {
       if (!_on) return;
+      stamp = t;
       tick();
       if (_on) _next();
     });

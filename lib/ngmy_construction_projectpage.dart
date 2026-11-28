@@ -298,6 +298,28 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
     cam.glideTo(target: at, dist: s.ceiling ? 20 : 15, yaw: s.ceiling ? 1.2 : 0.3, pitch: s.ceiling ? -0.12 : 0.26);
   }
 
+  /// The Back button of the tray: lets go of the box you picked or the tool in your hand, one step at a time, and from the top
+  /// goes back to the view of the whole room (in front of the wall), so you can look round and check what is already done. Nothing
+  /// of the work is undone.
+  void _stepBack() {
+    if (active >= 0) {
+      _leave();
+      return;
+    }
+    if (picked >= 0 || armed.isNotEmpty) {
+      setState(() {
+        picked = -1;
+        armed = '';
+        hl = 0;
+        _rebuild();
+      });
+      _roomView();
+      return;
+    }
+    setState(() => hl = 0);
+    _front();
+  }
+
   void _leave() {
     setState(() {
       active = -1;
@@ -920,6 +942,19 @@ class _NgmyRoomProjectPageState extends State<NgmyRoomProjectPage> {
             SizedBox(
               height: 52,
               child: ListView(key: const Key('room-tray'), scrollDirection: Axis.horizontal, children: [
+                // Back: one step at a time (the box you picked, the tool in your hand), then out to the whole room, so you can look round and see what is already fixed.
+                Padding(
+                  padding: const EdgeInsets.only(right: 7),
+                  child: GestureDetector(
+                    key: const Key('tray-back'),
+                    onTap: _stepBack,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white24)),
+                      child: const Row(children: [Icon(Icons.arrow_back_rounded, size: 19, color: Colors.white70), SizedBox(width: 6), Text('Back', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12.5))]),
+                    ),
+                  ),
+                ),
                 if (sideways)
                   Padding(
                     padding: const EdgeInsets.only(right: 7),

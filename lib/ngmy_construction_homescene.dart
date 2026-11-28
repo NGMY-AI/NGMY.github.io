@@ -980,13 +980,9 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
       }
     }
   }
-  for (final f in residents.where((f) => f.room == r.id && !f.calling && f.activityLabel.isNotEmpty)) {
-    labels.add(Label3D(V3(f.x, 82, f.z), f.activityLabel, const Color(0xFF0F766E)));
-  }
-  // Somebody who is calling for help is marked with a phone, so they can be found in the street.
-  for (final f in residents.where((f) => f.room == r.id && f.calling)) {
-    labels.add(Label3D(V3(f.x, 80, f.z), '📞 Help!', const Color(0xFFDC2626)));
-  }
+  final residentAt = labels.length;
+  labels.addAll(_residentLabels(r, residents));
+  final residentCount = labels.length - residentAt;
   labels.add(Label3D(const V3(0, 216, -30), problems == 0 ? '✅ The house is finished' : '🏠 $problems rooms still need work', problems == 0 ? const Color(0xFF16A34A) : const Color(0xFFD97706)));
   // The big billboard behind the house: the NGMY logo with New Global Movement for Youth.
   final gBoard = b.startGroup();
@@ -998,7 +994,32 @@ Scene3D _outside(HRoom r, int problems, String mode, int selected, List<Resident
   logos.add(ScreenQuad(const [V3(-125, 292, -114.5), V3(125, 292, -114.5), V3(125, 208, -114.5), V3(-125, 208, -114.5)], 0, (c, size, t) => paintNgmyPoster(c, size, t, 0), width: 1000, height: 336, bias: 4, order: 2, group: gBoard));
   // The same board seen from the back: its own face, turned round, so nothing is upside down or backwards from either side.
   logos.add(ScreenQuad(const [V3(125, 292, -121.5), V3(-125, 292, -121.5), V3(-125, 208, -121.5), V3(125, 208, -121.5)], 0, (c, size, t) => paintNgmyPoster(c, size, t, 0), width: 1000, height: 336, bias: 4, order: 2, group: gBoard));
-  return Scene3D(b.polys, info: info, labels: labels, screens: [...logos, ...adScreens], farMin: 4000);
+  final scene = Scene3D(b.polys, info: info, labels: labels, screens: [...logos, ...adScreens], farMin: 4000);
+  _residentSpan[scene] = (residentAt, residentCount);
+  return scene;
+}
+
+/// The labels over the people in the city: what they are doing, and a phone over somebody calling for help.
+List<Label3D> _residentLabels(HRoom r, List<ResidentFigure> residents) => [
+      for (final f in residents.where((f) => f.room == r.id && !f.calling && f.activityLabel.isNotEmpty)) Label3D(V3(f.x, 82, f.z), f.activityLabel, const Color(0xFF0F766E)),
+      // Somebody who is calling for help is marked with a phone, so they can be found in the street.
+      for (final f in residents.where((f) => f.room == r.id && f.calling)) Label3D(V3(f.x, 80, f.z), '📞 Help!', const Color(0xFFDC2626)),
+    ];
+
+/// Where the people's labels sit in the labels of a city scene (first, how many).
+final Expando<(int, int)> _residentSpan = Expando<(int, int)>();
+
+/// The city scene with the people's labels moved to where the people are now, and everything else (the thousands of faces, the
+/// signs and the screens) kept as it is. Building the whole city again every time somebody took a step held the game up for a
+/// moment every two seconds, so the person you walk stopped and then jumped on. Null when [s] is not a city scene.
+Scene3D? relabelResidents(Scene3D s, HRoom r, List<ResidentFigure> residents) {
+  final span = _residentSpan[s];
+  if (span == null) return null;
+  final fresh = _residentLabels(r, residents);
+  final labels = [...s.labels.sublist(0, span.$1), ...fresh, ...s.labels.sublist(span.$1 + span.$2)];
+  final out = Scene3D(s.polys, info: s.info, labels: labels, screens: s.screens, shell: s.shell, farMin: s.farMin, closedShell: s.closedShell);
+  _residentSpan[out] = (span.$1, fresh.length);
+  return out;
 }
 
 /// Things that move: the fan blades and the pictures on the TVs.

@@ -1634,12 +1634,13 @@ class _Blocks {
   final List<_Block> blocks;
 }
 
+// Kept by the list of faces, not the scene: a scene that only gets new labels (the people walking about the city) keeps its faces and its blocks.
 final Expando<_Blocks> _blockCache = Expando<_Blocks>();
 
 /// Cuts the still faces of a scene into blocks about 60 units wide. Faces of one part (a group) always stay in one block, and a face bigger than a block
 /// (the lawn, a wall) goes in a block that is never skipped.
 _Blocks _blocksOf(Scene3D scene) {
-  final cached = _blockCache[scene];
+  final cached = _blockCache[scene.polys];
   if (cached != null) return cached;
   const cell = 60.0;
   final always = _Block(true);
@@ -1672,7 +1673,7 @@ _Blocks _blocksOf(Scene3D scene) {
     if (p.group != 0) groupCell[p.group] = blk;
   }
   final out = _Blocks([always, ...cells.values]);
-  _blockCache[scene] = out;
+  _blockCache[scene.polys] = out;
   return out;
 }
 

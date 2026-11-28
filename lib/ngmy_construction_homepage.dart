@@ -148,7 +148,14 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
       final sig = [for (final f in figs) '${f.id}:${f.x.round()}:${f.z.round()}:${f.calling}:${f.activityLabel}'].join('|');
       if (inner == null && sig != _figSig) {
         _figSig = sig;
-        setState(_rebuild);
+        // In the city only the labels over the people move (they are drawn walking every frame anyway): the city itself is not built again.
+        final moved = room.indoor ? null : relabelResidents(scene, room, figs);
+        if (moved != null) {
+          _figs = figs;
+          setState(() => scene = moved);
+        } else {
+          setState(_rebuild);
+        }
       }
       if (cm.log.isNotEmpty && cm.log.first != _lastNews) {
         _lastNews = cm.log.first;
@@ -2614,6 +2621,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
   FrameLoop? _walkTimer;
   double _inX = 0, _inZ = 0;
   int _lastWalkMs = 0;
+  Duration? _lastWalkStamp;
 
   /// The building you are walking about in (the hospital or the shop), running, the vehicle you drive, and what you can do where you stand.
   CityInterior? inner;
@@ -2681,6 +2689,7 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     walker!.refresh();
     steer = true;
     _lastWalkMs = DateTime.now().millisecondsSinceEpoch;
+    _lastWalkStamp = null;
     _walkTimer?.cancel();
     _walkTimer = FrameLoop(_walkTick, testEvery: const Duration(milliseconds: 40))..start();
     setState(() {});
@@ -2706,7 +2715,17 @@ class _NgmyHousePageState extends State<NgmyHousePage> {
     if (_ride != null) return;
     if (w == null || !mounted || (inn == null && room.indoor)) return;
     final nowMs = DateTime.now().millisecondsSinceEpoch;
-    final dt = ((nowMs - _lastWalkMs) / 1000).clamp(0.0, 0.1);
+    // The step is measured from frame to frame (the time of each frame, not of the moment this code happens to run in it), so
+    // the person walks at one even speed. A long pause (the page was hidden) still counts as only a short step.
+    final stamp = _walkTimer?.stamp;
+    double dt;
+    if (stamp != null) {
+      final last = _lastWalkStamp;
+      dt = last == null ? 0.0 : ((stamp - last).inMicroseconds / 1e6).clamp(0.0, 0.1);
+      _lastWalkStamp = stamp;
+    } else {
+      dt = ((nowMs - _lastWalkMs) / 1000).clamp(0.0, 0.1);
+    }
     _lastWalkMs = nowMs;
     w.refresh();
     w.running = _run && _driving == null;
