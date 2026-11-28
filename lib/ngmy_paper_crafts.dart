@@ -6,6 +6,8 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import 'ngmy_paper_craft_ai.dart' show showNgmyPaperCraftAiSheet;
+import 'ngmy_paper_craft_frames.dart'
+    show kNgmyCraftDefaultAddressFrame, kNgmyCraftFromPrefix, kNgmyCraftFromPt, kNgmyCraftToPrefix, kNgmyCraftToPt, ngmyCraftAddressFrameDraw, ngmyCraftAddressTextRect;
 import 'ngmy_paper_craft_stamps.dart' show kNgmyCraftDefaultStamp, ngmyCraftStampDraw;
 import 'ngmy_paper_craft_watermark.dart' show kNgmyCraftDefaultWatermark, ngmyApplyCraftWatermark, ngmyPreloadCraftLogo;
 import 'ngmy_slides_models.dart';
@@ -130,6 +132,18 @@ _CraftSpec _readSpec(String text) {
         final v = [for (final n in b as List) (n as num).toDouble()];
         if (v.length < 4) continue;
         final d = ngmyCraftStampDraw(st['id']?.toString(), v[0], v[1], v[2], v[3], colors);
+        stampFills.addAll(d.fills);
+        notes.addAll([for (final n in d.notes) _Note(n.$1, n.$2, n.$3, color: n.$4, pt: n.$5, bold: n.$6)]);
+      }
+    }
+    // The address frames around the recipient and sender words, in the deck frame design.
+    final af = m['af'];
+    if (af is Map) {
+      final colors = [for (final v in (af['c'] as List? ?? const [])) (v as num).toInt()];
+      for (final b in (af['b'] as List? ?? const [])) {
+        final v = [for (final n in b as List) (n as num).toDouble()];
+        if (v.length < 4) continue;
+        final d = ngmyCraftAddressFrameDraw(af['id']?.toString(), v[0], v[1], v[2], v[3], colors, from: v.length > 4 && v[4] == 1);
         stampFills.addAll(d.fills);
         notes.addAll([for (final n in d.notes) _Note(n.$1, n.$2, n.$3, color: n.$4, pt: n.$5, bold: n.$6)]);
       }
@@ -633,6 +647,19 @@ class _Page {
   final List<List<double>> _stamps = [];
   void stampBox(double x, double y, double w, double h) => _stamps.add([_r3(x), _r3(y), _r3(w), _r3(h)]);
 
+  /// Address frames (x, y, w, h, 0 recipient / 1 sender), drawn from the deck frame design, with the words in a
+  /// text box that sits neatly inside the frame.
+  final List<List<double>> _frames = [];
+  void addressBox(String words, double x, double y, double w, double h, {bool from = false}) {
+    _frames.add([_r3(x), _r3(y), _r3(w), _r3(h), from ? 1 : 0]);
+    final r = ngmyCraftAddressTextRect(kNgmyCraftDefaultAddressFrame, x, y, w, h, from: from);
+    text(words, r.box.left, r.box.top, r.box.width, r.box.height,
+        pt: from ? kNgmyCraftFromPt : kNgmyCraftToPt, align: r.align, idPrefix: from ? kNgmyCraftFromPrefix : kNgmyCraftToPrefix);
+  }
+
+  /// A locked line of words with its top left at x, y (for printed steps beside the pieces).
+  void noteLine(double x, double y, String words, {int? color, double pt = 7, bool bold = false}) => _notes.add([_r3(x), _r3(y), words, color ?? p.ink, pt, if (bold) 1]);
+
   /// A label centred on [cx], [cy] in its own colour and size.
   void noteAt(double cx, double cy, String text, {int color = _labelInk, double pt = _labelPt, bool bold = false}) {
     final lines = text.split('\n');
@@ -729,9 +756,10 @@ class _Page {
     bool italic = false,
     TextAlign align = TextAlign.center,
     double rot = 0,
+    String idPrefix = 'craft_t_',
   }) {
     _texts.add(NgmySlideElement(
-      id: 'craft_t_${NgmySlidesTemplates.newId()}',
+      id: '$idPrefix${NgmySlidesTemplates.newId()}',
       type: NgmySlideElementType.text,
       x: x / _pw,
       y: y / _ph,
@@ -767,6 +795,7 @@ class _Page {
       if (_anchors.isNotEmpty) 'a': _anchors,
       if (_envelopes.isNotEmpty) 'e': _envelopes,
       if (_stamps.isNotEmpty) 'st': {'id': kNgmyCraftDefaultStamp, 'b': _stamps, 'c': [p.ink, p.main, p.soft, p.pale, p.accent]},
+      if (_frames.isNotEmpty) 'af': {'id': kNgmyCraftDefaultAddressFrame, 'b': _frames, 'c': [p.ink, p.main, p.soft, p.pale, p.accent]},
     };
     final lines = NgmySlideElement(
       id: 'craft_lines_${NgmySlidesTemplates.newId()}',
@@ -874,6 +903,30 @@ void _envelope(_Page k, double x0, double y0, double w, double h,
 /// A stamp box in the top-right of an envelope front (or postcard). What is drawn in it is the deck stamp design:
 /// the plain PLACE STAMP HERE box unless an NGMY stamp is chosen (see ngmy_paper_craft_stamps.dart).
 void _stamp(_Page k, double x1, double y0) => k.stampBox(x1 - 0.95, y0 + 0.22, 0.75, 0.88);
+
+/// The sender frame in the top left and the recipient frame in the middle of an envelope front, both clear of the
+/// stamp box (top right) and of the NGMY seal watermark where it sits by default (bottom right).
+void _addresses(_Page k, double x0, double y0, double w, double h) {
+  final x1 = x0 + w;
+  final y1 = y0 + h;
+  final seal = (math.min(w, h) * 0.3).clamp(0.7, 1.25) + 0.15;
+  const stampBottom = 0.22 + 0.88;
+  k.addressBox('Your Name\nStreet Address\nCity, State ZIP', x0 + 0.2, y0 + 0.2, math.min(2.4, w - 1.3), stampBottom - 0.2, from: true);
+  final top = y0 + stampBottom + 0.12;
+  // Across the middle, above the seal, when there is room; otherwise beside it.
+  final above = y1 - seal - 0.08 - top;
+  if (above >= 1.3) {
+    final bh = math.min(1.5, above);
+    final bw = math.min(3.6, w - 0.8);
+    k.addressBox('Recipient Name\nStreet Address\nCity, State ZIP', x0 + (w - bw) / 2, top + (above - bh) / 2, bw, bh);
+  } else {
+    final room = (x1 - seal - 0.12) - (x0 + 0.3);
+    final bw = math.min(3.6, room);
+    final tall = y1 - 0.25 - top;
+    final bh = math.min(1.5, tall);
+    k.addressBox('Recipient Name\nStreet Address\nCity, State ZIP', x0 + 0.3 + (room - bw) / 2, top + (tall - bh) / 2, bw, bh);
+  }
+}
 
 /// An open tray (box base or lid): a square floor with four walls and four glue tabs in the corners.
 void _tray(_Page k, double ox, double oy, double s, double h, {required int floor, required int walls, int? wallDots, double? tab}) {
@@ -1028,9 +1081,7 @@ NgmySlide _cardEnvelope(NgmyCraftPalette p, {required String title, required dou
   _envelope(k, x0, y0, w, h, top: top, topShoulder: topShoulder, bottom: bottom, bottomShoulder: bottomShoulder, side: side);
   _stamp(k, x0 + w, y0);
   k.anchor(x0, y0, w, h);
-  k.text('Your Name\nStreet Address\nCity, State ZIP', x0 + 0.2, y0 + 0.18, 2.4, 0.75, pt: 7.5, align: TextAlign.left);
-  k.rect(p.accent, x0 + 0.28, y0 + 0.98, 0.6, 0.02);
-  k.text('Recipient Name\nStreet Address\nCity, State ZIP', x0 + w * 0.3, y0 + h * 0.4, w * 0.6, 1.15, pt: 11.5, align: TextAlign.left);
+  _addresses(k, x0, y0, w, h);
   k.text('with love', x0 + w / 2 - 1.3, y0 - top * 0.55, 2.6, 0.5, pt: 14, italic: true, color: p.pale, rot: _pi);
   return k.build(title, noteText: _printNote(title));
 }
@@ -1045,8 +1096,7 @@ NgmySlide _diamondEnvelope(NgmyCraftPalette p) {
       top: 2.4, topShoulder: 1.8, bottom: 2.6, bottomShoulder: 2.2, side: 1.3, topStyle: _EnvStyle.pointed, bottomStyle: _EnvStyle.pointed, sideFill: p.pale, bottomFill: p.soft);
   _stamp(k, x0 + w, y0);
   k.anchor(x0, y0, w, h);
-  k.text('Your Name\nStreet Address\nCity, State ZIP', x0 + 0.18, y0 + 0.16, 2.2, 0.72, pt: 7, align: TextAlign.left);
-  k.text('Recipient Name\nStreet Address\nCity, State ZIP', x0 + 1.2, y0 + 1.45, 3.1, 1.1, pt: 11, align: TextAlign.left);
+  _addresses(k, x0, y0, w, h);
   k.text('hello', x0 + w / 2 - 1.0, y0 - 1.25, 2.0, 0.5, pt: 15, italic: true, color: p.pale, rot: _pi);
   return k.build('Diamond Envelope', noteText: _printNote('Diamond envelope 4.75 x 3.5 in'));
 }
@@ -1084,6 +1134,53 @@ NgmySlide _giftCardEnvelopes(NgmyCraftPalette p) {
     k.text('To: ______________\nFrom: ____________', x0 + 0.5, y0 + 1.2, w - 1.0, 0.75, pt: 9);
   }
   return k.build('Gift Card Envelopes', noteText: _printNote('Two gift card envelopes 3.6 x 2.4 in'));
+}
+
+/// An envelope for a whole letter: a Letter page (8.5 x 11 in) or an A4 page folded in half and in half again is
+/// 5.5 x 4.25 in (A4: 5.85 x 4.13 in), and slides into this 6.1 x 4.5 in envelope with room to spare. The whole
+/// net fills the Letter sheet (0.2 in from the left and right edges). A page folded in thirds would need an envelope
+/// 9.5 in wide, wider than the sheet, so this one takes a page folded in four. The folding steps are printed in
+/// the two top corners, which are cut away.
+NgmySlide _letterEnvelope(NgmyCraftPalette p) {
+  final k = _Page(p);
+  const w = 6.1;
+  const h = 4.5;
+  const x0 = (_pw - w) / 2;
+  const top = 2.5;
+  const bottom = 3.0;
+  const y0 = 0.35 + (10.1 - (top + h + bottom)) / 2 + top;
+  _envelope(k, x0, y0, w, h, top: top, topShoulder: 2.05, bottom: bottom, bottomShoulder: 2.6, side: 1.0);
+  _stamp(k, x0 + w, y0);
+  k.anchor(x0, y0, w, h);
+  _addresses(k, x0, y0, w, h);
+  const left = [
+    ('HOW TO FOLD', true),
+    ('YOUR LETTER', true),
+    ('1. Fold the page', false),
+    ('in half, top to', false),
+    ('bottom.', false),
+    ('2. Fold it in', false),
+    ('half again, side', false),
+    ('to side.', false),
+  ];
+  const right = [
+    ('3. Slide it in.', false),
+    ('4. Fold in the', false),
+    ('sides. Glue the', false),
+    ('bottom flap on', false),
+    ('them. Close the', false),
+    ('top flap.', false),
+    ('Letter or A4', true),
+    ('page fits.', true),
+  ];
+  for (var i = 0; i < left.length; i++) {
+    k.noteLine(0.28, 0.4 + i * 0.13, left[i].$1, pt: 6.5, bold: left[i].$2);
+  }
+  for (var i = 0; i < right.length; i++) {
+    k.noteLine(x0 + w + 0.06, 0.4 + i * 0.13, right[i].$1, pt: 6.5, bold: right[i].$2);
+  }
+  k.text('a letter for you', x0 + w / 2 - 1.4, y0 - top * 0.55, 2.8, 0.5, pt: 14, italic: true, color: p.pale, rot: _pi);
+  return k.build('Full Page Letter Envelope', noteText: _printNote('Letter envelope 6.1 x 4.5 in, holds a page folded in four'));
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1499,7 +1596,8 @@ List<NgmySlide> _postcards(NgmyCraftPalette p) {
     back.rect(p.soft, x0 + 3.25, y + 0.35, 0.02, h - 0.7);
     _stamp(back, x0 + w, y);
     back.text('Write your message here...', x0 + 0.25, y + 0.3, 2.85, 3.4, pt: 11, align: TextAlign.left);
-    back.text('Recipient Name\nStreet Address\nCity, State ZIP', x0 + 3.45, y + 1.7, 2.4, 1.3, pt: 10.5, align: TextAlign.left);
+    // Clear of the stamp box above and of the NGMY seal in the bottom right corner.
+    back.addressBox('Recipient Name\nStreet Address\nCity, State ZIP', x0 + 3.42, y + 1.22, 2.43, 1.35);
   }
   return [
     front.build('Postcards - picture side', noteText: _printNote('Two 6 x 4 in postcards')),
@@ -1794,6 +1892,14 @@ final List<NgmyPaperCraft> kNgmyPaperCrafts = [
   NgmyPaperCraft(number: 24, id: 'cd_sleeve', name: 'CD Sleeve', group: _moreGroup, blurb: 'Pocket for a CD or DVD', icon: Icons.album_outlined, build: (p) => [_cdSleeve(p)]),
   NgmyPaperCraft(number: 25, id: 'photo_sleeve', name: 'Photo Sleeve', group: _moreGroup, blurb: 'Pocket for a 6 x 4 in photo', icon: Icons.photo_outlined, build: (p) => [_photoSleeve(p)]),
   NgmyPaperCraft(number: 26, id: 'door_hangers', name: 'Door Hangers', group: _moreGroup, blurb: 'Two hangers for a door knob', icon: Icons.door_front_door_outlined, build: (p) => [_doorHangers(p)]),
+  NgmyPaperCraft(
+      number: 27,
+      id: 'letter_envelope',
+      name: 'Full Page Letter Envelope',
+      group: _lettersGroup,
+      blurb: 'Holds a Letter or A4 page: fold the page in half, then in half again',
+      icon: Icons.drafts_outlined,
+      build: (p) => [_letterEnvelope(p)]),
 ];
 
 /// A new presentation on true Letter paper made from [craft] in [palette].

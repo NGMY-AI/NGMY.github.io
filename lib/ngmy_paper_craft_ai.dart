@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'ngmy_ai_client.dart';
 import 'ngmy_ai_language.dart';
 import 'ngmy_paper_crafts.dart';
+import 'ngmy_paper_craft_frames.dart';
 import 'ngmy_paper_craft_stamps.dart';
 import 'ngmy_paper_craft_watermark.dart';
 import 'ngmy_slides_models.dart';
@@ -54,6 +55,7 @@ const Map<String, List<String>> _kCraftAliases = {
   'cd_sleeve': ['cd sleeve', 'cd cover', 'dvd sleeve', 'mfuko wa cd'],
   'photo_sleeve': ['photo sleeve', 'picture sleeve', 'mfuko wa picha'],
   'door_hangers': ['door hanger', 'do not disturb', 'kibao cha mlango'],
+  'letter_envelope': ['letter envelope', 'full page envelope', 'envelope for a letter', 'envelope for a full page', 'a4 envelope', 'bahasha ya barua', 'bahasha ya ukurasa mzima'],
 };
 
 String _norm(String s) => ' ${s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim()} ';
@@ -124,6 +126,7 @@ const Map<String, List<NgmyCraftDetail>> _kCraftDetails = {
   'card_envelope': [_toName, _toAddress, _fromName, _fromAddress],
   'square_envelope': [_toName, _toAddress, _fromName, _fromAddress],
   'diamond_envelope': [_toName, _toAddress, _fromName, _fromAddress],
+  'letter_envelope': [_toName, _toAddress, _fromName, _fromAddress],
   'seed_envelopes': [NgmyCraftDetail('seeds', 'Seed names (one per envelope)', needed: true), NgmyCraftDetail('dates', 'Planted and harvest dates')],
   'gift_card_envelopes': [_giftTo, _giftFrom, _boxWords],
   'gift_box': [_giftTo, _giftFrom, _boxWords],
@@ -301,7 +304,7 @@ ${_languageRule(request, language)}
 ''';
 }
 
-typedef NgmyPaperCraftAiAnswer = ({int design, String? palette, Map<String, String> fields, String? ask, String? reply, String? watermark, Object? wm, String? stamp});
+typedef NgmyPaperCraftAiAnswer = ({int design, String? palette, Map<String, String> fields, String? ask, String? reply, String? watermark, Object? wm, String? stamp, String? frame});
 
 NgmyPaperCraftAiAnswer? ngmyParsePaperCraftAi(String raw) {
   final start = raw.indexOf('{');
@@ -338,6 +341,7 @@ NgmyPaperCraftAiAnswer? ngmyParsePaperCraftAi(String raw) {
       watermark: wm != null && ngmyCraftWatermarkById(wm) != null ? wm : null,
       wm: m['wm'],
       stamp: ngmyFindCraftStamp(text('stamp'))?.id,
+      frame: ngmyFindCraftAddressFrame(text('frame'))?.id,
     );
   } catch (_) {
     return null;
@@ -481,17 +485,19 @@ COLOUR SET NOW: ${info?.palette.name ?? 'unknown'}. Colour sets: $palettes.
 WATERMARK NOW: ${ngmyCraftWmDescribe(ngmyCraftWatermarkSettingsOf(deck))}.
 WATERMARK STYLES AND THEIR DESIGNS: $_wmDesigns. PLACES: ${kNgmyCraftWmPlaces.join(', ')}.
 ${ngmyDeckHasStampBox(deck) ? 'STAMP NOW: ${ngmyCraftStampOf(deck)}. STAMP DESIGNS (id and name): ${ngmyCraftStampCatalog()}.\n' : ''}
+${ngmyDeckHasAddressFrames(deck) ? 'ADDRESS FRAME NOW: ${ngmyCraftAddressFrameOf(deck)}. ADDRESS FRAME DESIGNS (id and name): ${ngmyCraftAddressFrameCatalog()}.\n' : ''}
 Rules:
 - Change only what they ask. Return only the boxes you change, using their keys. "The name" means every box that holds that name.
 - If they ask for other colours, set "palette" to the best colour set from the list (Ocean for blue, Sage for green, Blush for pink, Kraft for brown, Midnight for dark, Sunny for orange or yellow); otherwise leave it "".
 - WATERMARK: if they ask about the NGMY watermark, set "wm" to only the parts that change: "style" (a style id), "variant" (a design id of that style), "one" (true for a single one, false for many), "place" (one of the places), "size" (0.5 to 1.8, 1 is normal; "bigger" is about 1.3 times what it is now, "smaller" about 0.75 times), "visibility" (0.3 to 2.5, 1 is the default; "more faint" is about 0.7 times now, "more visible" about 1.4 times), or "reset": true to go back to the default size and visibility. Otherwise leave "wm" as {}. The watermark is always there: if they ask to remove it, make it as faint as allowed (visibility 0.3) and say so.
 - STAMP: if they ask to change the stamp (the stamp box on an envelope or postcard), set "stamp" to the id of the stamp design they mean ("the crown one" is crown, "no design" or "plain" is plain). Otherwise leave "stamp" as "".
+- ADDRESS FRAME: if they ask to change the frame around the name and address or the sender (for example put the address in the ribbon frame), set "frame" to the id of the frame design they mean ("no frame" is none). Otherwise leave "frame" as "".
 $_kBoxRules
 - LANGUAGE: keep the language the boxes are in now, unless they ask for another one; then translate every box. Write Swahili the way people in Tanzania and Kenya really write it.
 - If you truly cannot tell what they mean, reply only {"ask": "one short question"}.
 - "reply": one short, friendly sentence telling them what you changed, in the language they wrote in.
 - Reply with JSON only, no markdown, in this shape:
-{"palette": "", "wm": {}, "stamp": "", "fields": {"1.1": "..."}, "reply": "..."}
+{"palette": "", "wm": {}, "stamp": "", "frame": "", "fields": {"1.1": "..."}, "reply": "..."}
 ''';
 }
 
@@ -508,6 +514,7 @@ bool ngmyRecolorPaperCraft(NgmySlideDeck deck, NgmyCraftPalette to) {
   final from = info.palette;
   final wmNow = ngmyCraftWatermarkSettingsOf(deck);
   final stampNow = ngmyCraftStampOf(deck);
+  final frameNow = ngmyCraftAddressFrameOf(deck);
   final fresh = ngmyBuildPaperCraftDeck(info.craft, to);
   final map = {from.main: to.main, from.soft: to.soft, from.pale: to.pale, from.accent: to.accent, from.ink: to.ink};
   for (var s = 0; s < deck.slides.length && s < fresh.slides.length; s++) {
@@ -523,6 +530,7 @@ bool ngmyRecolorPaperCraft(NgmySlideDeck deck, NgmyCraftPalette to) {
   // The same watermark style, in the new colours.
   ngmyApplyCraftWatermarkSettings(deck, wmNow, palette: to);
   ngmyApplyCraftStamp(deck, stampNow);
+  ngmyApplyCraftAddressFrame(deck, frameNow);
   return true;
 }
 
@@ -555,6 +563,8 @@ bool ngmyApplyPaperCraftEdit(NgmySlideDeck deck, NgmyPaperCraftAiAnswer answer) 
   }
   final stamp = answer.stamp;
   if (stamp != null && ngmyApplyCraftStamp(deck, stamp)) changed = true;
+  final frame = answer.frame;
+  if (frame != null && ngmyApplyCraftAddressFrame(deck, frame)) changed = true;
   return changed;
 }
 
@@ -1043,7 +1053,7 @@ class _CraftAiChatState extends State<_CraftAiChat> {
 
   /// Puts another NGMY watermark style on the open design (one tap, no AI needed).
   void _setWatermark(NgmyCraftWatermark w) {
-    final changed = widget.onApply((design: 0, palette: null, fields: const {}, ask: null, reply: null, watermark: w.id, wm: null, stamp: null));
+    final changed = widget.onApply((design: 0, palette: null, fields: const {}, ask: null, reply: null, watermark: w.id, wm: null, stamp: null, frame: null));
     setState(() => _log.add((false, changed ? 'Done: the watermark is now ${w.name}.' : 'That watermark is already on.')));
     _toBottom();
   }

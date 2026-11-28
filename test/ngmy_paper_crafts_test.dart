@@ -184,7 +184,7 @@ void main() {
       }
     }
     // Every envelope design is checked.
-    for (final id in ['card_envelope', 'square_envelope', 'diamond_envelope', 'seed_envelopes', 'gift_card_envelopes']) {
+    for (final id in ['card_envelope', 'square_envelope', 'diamond_envelope', 'seed_envelopes', 'gift_card_envelopes', 'letter_envelope']) {
       final s = kNgmyPaperCrafts.firstWhere((c) => c.id == id).build(kNgmyCraftPalettes.first).first;
       final spec = jsonDecode(s.elements.firstWhere(ngmyIsCraftLines).text) as Map<String, dynamic>;
       expect(spec['e'] as List?, isNotEmpty, reason: id);

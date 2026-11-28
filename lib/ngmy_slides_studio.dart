@@ -27,6 +27,7 @@ import 'ngmy_quote_maker.dart';
 import 'ngmy_quote_templates.dart' show kNgmyQuoteLogoFile;
 import 'ngmy_paper_crafts.dart' show ngmyIsCraftLines, ngmyIsPaperCraftDeck, showNgmyPaperCraftPicker;
 import 'ngmy_paper_craft_ai.dart' show NgmyPaperCraftAiBubble, ngmyApplyPaperCraftEdit, showNgmyPaperCraftAiChat;
+import 'ngmy_paper_craft_frames.dart' show NgmyCraftAddressFrameButton, ngmyApplyCraftAddressFrame, ngmyDeckHasAddressFrames, showNgmyCraftAddressFramePanel;
 import 'ngmy_paper_craft_stamps.dart' show NgmyCraftStampButton, ngmyApplyCraftStamp, ngmyDeckHasStampBox, showNgmyCraftStampPanel;
 import 'ngmy_paper_craft_watermark.dart'
     show NgmyCraftWatermarkButton, ngmyApplyCraftWatermarkSettings, ngmyIsCraftWatermark, showNgmyCraftWatermarkPanel;
@@ -2049,12 +2050,16 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     if (mounted) _openDeck(deck);
   }
 
-  /// Design > Fold & Cut: printable envelopes, boxes, cards and more. The pick opens as a new presentation.
+  /// Design > Fold & Cut: printable envelopes, boxes, cards and more. The pick opens as a new presentation, on the
+  /// Home tab (the slide strip with the AI, watermark, stamp and frame buttons), not back on Design.
   Future<void> _openPaperCrafts() async {
     final deck = await showNgmyPaperCraftPicker(context);
     if (deck == null || !mounted) return;
     _syncDeckIntoList();
-    setState(() => _decks.insert(0, deck));
+    setState(() {
+      _decks.insert(0, deck);
+      _ribbonTab = 'Home';
+    });
     await _persistDecks();
     if (mounted) _openDeck(deck);
   }
@@ -5436,18 +5441,24 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
   Widget _slideStrip(bool isDark, {required bool vertical}) {
     final deck = _activeDeck!;
     final craftAi = ngmyIsPaperCraftDeck(deck) && !_isTransferredReadOnly();
-    final craftBubble = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        NgmyPaperCraftAiBubble(onTap: () => unawaited(_openPaperCraftAiChat())),
-        const SizedBox(width: 6),
-        NgmyCraftWatermarkButton(onTap: () => unawaited(_openPaperCraftWatermark())),
-        if (ngmyDeckHasStampBox(deck)) ...[
-          const SizedBox(width: 6),
-          NgmyCraftStampButton(onTap: () => unawaited(_openPaperCraftStamp())),
-        ],
-      ],
-    );
+    final craftButtons = [
+      NgmyPaperCraftAiBubble(onTap: () => unawaited(_openPaperCraftAiChat())),
+      NgmyCraftWatermarkButton(onTap: () => unawaited(_openPaperCraftWatermark())),
+      if (ngmyDeckHasStampBox(deck)) NgmyCraftStampButton(onTap: () => unawaited(_openPaperCraftStamp())),
+      if (ngmyDeckHasAddressFrames(deck)) NgmyCraftAddressFrameButton(onTap: () => unawaited(_openPaperCraftFrame())),
+    ];
+    // In the narrow side strip the buttons wrap two to a row.
+    final Widget craftBubble = vertical
+        ? Wrap(alignment: WrapAlignment.center, spacing: 6, runSpacing: 6, children: craftButtons)
+        : Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < craftButtons.length; i++) ...[
+                if (i > 0) const SizedBox(width: 6),
+                craftButtons[i],
+              ],
+            ],
+          );
     final list = ListView.separated(
       scrollDirection: vertical ? Axis.vertical : Axis.horizontal,
       padding: const EdgeInsets.all(8),
@@ -5554,6 +5565,24 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
         if (d == null || !mounted) return;
         _mutate(() {
           ngmyApplyCraftStamp(d, id);
+          _selectedElementId = null;
+        });
+      },
+    );
+  }
+
+  /// Fold & Cut: the frames around the name and address and the sender (envelopes and postcards), for the whole deck.
+  Future<void> _openPaperCraftFrame() async {
+    if (_activeDeck == null) return;
+    _stopTextEditing(unfocus: true);
+    await showNgmyCraftAddressFramePanel(
+      context,
+      deck: () => _activeDeck!,
+      onApply: (id) {
+        final d = _activeDeck;
+        if (d == null || !mounted) return;
+        _mutate(() {
+          ngmyApplyCraftAddressFrame(d, id);
           _selectedElementId = null;
         });
       },
